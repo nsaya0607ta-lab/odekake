@@ -1,4 +1,5 @@
 import { cookies } from "next/headers";
+import { cache } from "react";
 import type { TripRow } from "@/lib/supabase/types";
 import type { DB } from "./client";
 
@@ -106,10 +107,10 @@ export async function listWorkspaces(supabase: DB, userId: string): Promise<Work
   return summaries;
 }
 
-async function readWorkspaceId(): Promise<string> {
+const readWorkspaceId = cache(async function readWorkspaceId(): Promise<string> {
   const store = await cookies();
   return store.get(WORKSPACE_COOKIE)?.value ?? PERSONAL_WORKSPACE_ID;
-}
+});
 
 /**
  * いま開いているワークスペースを求める。
@@ -119,14 +120,15 @@ export async function resolveWorkspace(supabase: DB, userId: string): Promise<Wo
   const id = await readWorkspaceId();
 
   if (id !== PERSONAL_WORKSPACE_ID && /^[0-9a-f-]{36}$/i.test(id)) {
-    const { data } = await supabase.from("trips").select("*").eq("id", id).maybeSingle();
+    // 旅行本体と参加人数は互いに依存しないため同時に取得する。
+    const [{ data }, { count }] = await Promise.all([
+      supabase.from("trips").select("*").eq("id", id).maybeSingle(),
+      supabase.from("trip_members").select("id", { count: "exact", head: true }).eq("trip_id", id),
+    ]);
     const trip = data as TripRow | null;
+
     // RLS で取得できた時点で参加している。一人旅はワークスペースにしない
     if (trip && trip.trip_type === "shared") {
-      const { count } = await supabase
-        .from("trip_members")
-        .select("id", { count: "exact", head: true })
-        .eq("trip_id", trip.id);
       return tripWorkspace(trip, count ?? 1);
     }
   }
