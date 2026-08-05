@@ -51,38 +51,29 @@ export async function getTimeline(supabase: DB, filter: TimelineFilter = {}): Pr
   let visits = (data ?? []) as VisitRecordRow[];
   if (visits.length === 0) return [];
 
-  const tripLabels = await loadTripLabels(
-    supabase,
-    visits.map((v) => v.trip_id),
-  );
+  const visitTripIds = visits.map((v) => v.trip_id);
+  const visitSpotIds = visits.map((v) => v.spot_id);
+  const visitIds = visits.map((v) => v.id);
+  const authorIds = visits.map((v) => v.user_id);
+
+  // 以前は旅行名を取得してから残りの問い合わせを始めていたため、
+  // タイムライン表示に余分な1往復が発生していた。独立した取得は同時に行う。
+  const [tripLabels, { data: spots }, { data: photos }, authorNames, categoryNames] = await Promise.all([
+    loadTripLabels(supabase, visitTripIds),
+    supabase.from("spots").select("*").in("id", visitSpotIds),
+    supabase
+      .from("visit_photos")
+      .select("*")
+      .in("visit_record_id", visitIds)
+      .order("display_order", { ascending: true }),
+    loadDisplayNames(supabase, authorIds),
+    loadCategoryNames(supabase),
+  ]);
 
   if (filter.tripType && filter.tripType !== "all") {
     visits = visits.filter((v) => tripLabels.get(v.trip_id)?.type === filter.tripType);
     if (visits.length === 0) return [];
   }
-
-  const [{ data: spots }, { data: photos }, authorNames, categoryNames] = await Promise.all([
-    supabase
-      .from("spots")
-      .select("*")
-      .in(
-        "id",
-        visits.map((v) => v.spot_id),
-      ),
-    supabase
-      .from("visit_photos")
-      .select("*")
-      .in(
-        "visit_record_id",
-        visits.map((v) => v.id),
-      )
-      .order("display_order", { ascending: true }),
-    loadDisplayNames(
-      supabase,
-      visits.map((v) => v.user_id),
-    ),
-    loadCategoryNames(supabase),
-  ]);
 
   const spotById = new Map(((spots ?? []) as SpotRow[]).map((s) => [s.id, s]));
 
