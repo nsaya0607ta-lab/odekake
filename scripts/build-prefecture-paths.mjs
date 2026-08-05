@@ -76,6 +76,67 @@ function project([lng, lat], offset) {
   return [(lng + offset.dx) * LAT_K, -(lat + offset.dy)];
 }
 
+function pointInRing(x, y, ring) {
+  let inside = false;
+  for (let i = 0, j = ring.length - 1; i < ring.length; j = i++) {
+    const [xi, yi] = ring[i];
+    const [xj, yj] = ring[j];
+    if (yi > y !== yj > y && x < ((xj - xi) * (y - yi)) / (yj - yi) + xi) inside = !inside;
+  }
+  return inside;
+}
+
+function distanceToRing(x, y, ring) {
+  let min = Infinity;
+  for (let i = 0, j = ring.length - 1; i < ring.length; j = i++) {
+    const [ax, ay] = ring[j];
+    const [bx, by] = ring[i];
+    const dx = bx - ax;
+    const dy = by - ay;
+    const len = dx * dx + dy * dy;
+    let t = len ? ((x - ax) * dx + (y - ay) * dy) / len : 0;
+    t = Math.max(0, Math.min(1, t));
+    min = Math.min(min, Math.hypot(x - (ax + t * dx), y - (ay + t * dy)));
+  }
+  return min;
+}
+
+/**
+ * ラベルを置くのに適した点を求める（pole of inaccessibility の簡易版）。
+ * 三日月型の県では外接矩形の中心や重心が海上に出てしまうため、
+ * 内部の点のうち海岸線から最も遠い点を選ぶ。
+ */
+function labelPointOf(ring) {
+  let minX = Infinity;
+  let minY = Infinity;
+  let maxX = -Infinity;
+  let maxY = -Infinity;
+  for (const [x, y] of ring) {
+    if (x < minX) minX = x;
+    if (y < minY) minY = y;
+    if (x > maxX) maxX = x;
+    if (y > maxY) maxY = y;
+  }
+
+  const steps = 24;
+  let best = null;
+  let bestDistance = -1;
+  for (let i = 1; i < steps; i++) {
+    for (let j = 1; j < steps; j++) {
+      const x = minX + ((maxX - minX) * i) / steps;
+      const y = minY + ((maxY - minY) * j) / steps;
+      if (!pointInRing(x, y, ring)) continue;
+      const distance = distanceToRing(x, y, ring);
+      if (distance > bestDistance) {
+        bestDistance = distance;
+        best = [x, y];
+      }
+    }
+  }
+
+  return best ?? [(minX + maxX) / 2, (minY + maxY) / 2];
+}
+
 const prefectures = [];
 
 for (const feature of geo.features) {
@@ -112,7 +173,7 @@ for (const feature of geo.features) {
     );
     if (pts.length < 3) continue;
     d += `M${pts.map(([x, y]) => `${x.toFixed(3)} ${y.toFixed(3)}`).join("L")}Z`;
-    if (!labelPoint) labelPoint = centroid(pts);
+    if (!labelPoint) labelPoint = labelPointOf(pts);
     for (const [x, y] of pts) {
       if (x < minX) minX = x;
       if (y < minY) minY = y;
@@ -126,7 +187,7 @@ for (const feature of geo.features) {
     name: feature.properties.nam_ja,
     d,
     bbox: [minX, minY, maxX, maxY].map((v) => Number(v.toFixed(3))),
-    // ラベル位置は最大の島の重心（外接矩形の中心だと海上に出ることがある）
+    // ラベルは陸地の内側に置く
     center: (labelPoint ?? [(minX + maxX) / 2, (minY + maxY) / 2]).map((v) => Number(v.toFixed(3))),
   });
 }

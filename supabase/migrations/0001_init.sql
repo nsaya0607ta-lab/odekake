@@ -428,13 +428,7 @@ create policy categories_select on public.categories for select to authenticated
 -- ---------------- trips ----------------
 drop policy if exists trips_select on public.trips;
 create policy trips_select on public.trips for select to authenticated
-  using (
-    owner_id = auth.uid()
-    or (
-      trip_type = 'shared'
-      and exists (select 1 from public.trip_members m where m.trip_id = trips.id and m.user_id = auth.uid())
-    )
-  );
+  using (owner_id = auth.uid() or public.can_access_trip(id));
 
 drop policy if exists trips_insert on public.trips;
 create policy trips_insert on public.trips for insert to authenticated
@@ -472,14 +466,7 @@ create policy trip_members_delete on public.trip_members for delete to authentic
 -- ---------------- spots ----------------
 drop policy if exists spots_select on public.spots;
 create policy spots_select on public.spots for select to authenticated
-  using (
-    created_by = auth.uid()
-    or exists (
-      select 1 from public.visit_records vr
-      where vr.spot_id = spots.id
-        and (vr.user_id = auth.uid() or public.can_access_trip(vr.trip_id))
-    )
-  );
+  using (created_by = auth.uid() or public.can_read_spot(id));
 
 drop policy if exists spots_insert on public.spots;
 create policy spots_insert on public.spots for insert to authenticated
@@ -633,6 +620,8 @@ as $$
   group by s.prefecture_code, s.municipality_code;
 $$;
 
+grant execute on function public.area_stats() to authenticated;
+
 -- 招待コードで共有旅に参加する
 create or replace function public.join_trip_by_code(p_code text)
 returns table (trip_id uuid, title text)
@@ -753,13 +742,13 @@ create policy photos_select on storage.objects for select to authenticated
 
 drop policy if exists photos_insert on storage.objects;
 create policy photos_insert on storage.objects for insert to authenticated
-  with check (bucket_id = 'photos' and owner = auth.uid() and public.can_access_storage_path(name));
+  with check (bucket_id = 'photos' and public.can_access_storage_path(name));
 
 drop policy if exists photos_update on storage.objects;
 create policy photos_update on storage.objects for update to authenticated
-  using (bucket_id = 'photos' and owner = auth.uid())
-  with check (bucket_id = 'photos' and owner = auth.uid() and public.can_access_storage_path(name));
+  using (bucket_id = 'photos' and public.can_access_storage_path(name))
+  with check (bucket_id = 'photos' and public.can_access_storage_path(name));
 
 drop policy if exists photos_delete on storage.objects;
 create policy photos_delete on storage.objects for delete to authenticated
-  using (bucket_id = 'photos' and (owner = auth.uid() or public.can_access_storage_path(name)));
+  using (bucket_id = 'photos' and public.can_access_storage_path(name));
