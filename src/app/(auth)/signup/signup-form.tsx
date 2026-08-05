@@ -4,11 +4,12 @@ import { useActionState } from "react";
 import { emptyActionState, Field, FormMessage, SubmitButton } from "@/components/form";
 import { signUpAction } from "../actions";
 
-export function SignUpForm() {
+export function SignUpForm({ next }: { next: string }) {
   const [state, formAction] = useActionState(signUpAction, emptyActionState);
 
   return (
     <form action={formAction} className="space-y-4" noValidate>
+      <input type="hidden" name="next" value={state.values?.next ?? next} />
       <FormMessage state={state} />
 
       <Field label="ニックネーム" htmlFor="displayName" error={state.fieldErrors?.displayName}>
