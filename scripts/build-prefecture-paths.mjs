@@ -34,12 +34,25 @@ const MAX_ISLAND_DIST_OVERRIDE = {
 
 /**
  * 離島グループ。bounds に重心が入る島をまとめて1つの枠として扱う。
- *   core     … その都道府県の本体（見出しの位置決めに使う）
- *   national … 日本地図での寄せ先。place は枠の左上（地図座標）
- *   regional … 地方地図での寄せ先。省略すると実際の位置のまま
+ *   core       … その都道府県の本体（見出しの位置決めに使う）
+ *   national   … 日本地図での寄せ先。place は枠の左上（地図座標）
+ *   regional   … 地方地図での寄せ先。省略すると実際の位置のまま
+ *   prefecture … 都道府県だけを表示する地図での寄せ先。
+ *                こちらは本体の大きさに合わせて自動配置するので指定は不要
+ *
+ * 都道府県だけを表示すると、東京都のように本土が小さく離島が広がる県では
+ * 本土が読めなくなる。そのため都道府県スケールでは、本体の右側へ
+ * 縮めた枠を積んで配置する（inset）。
  */
 const ISLAND_GROUPS = {
   13: [
+    {
+      id: "izu",
+      label: "伊豆諸島",
+      // 都道府県の地図でだけ寄せる（日本地図・地方地図では実際の位置に描く）
+      bounds: [138.6, 31.8, 140.5, 35.0],
+      insetOnly: ["prefecture"],
+    },
     {
       id: "ogasawara",
       label: "小笠原諸島",
@@ -47,6 +60,14 @@ const ISLAND_GROUPS = {
       bounds: [140.0, 23.0, 145.0, 28.5],
       national: { place: [113.6, -32.6] },
       regional: { place: [114.4, -36.4] },
+    },
+  ],
+  46: [
+    {
+      id: "amami",
+      label: "奄美群島",
+      bounds: [128.0, 26.6, 130.2, 29.0],
+      insetOnly: ["prefecture"],
     },
   ],
   47: [
@@ -210,14 +231,21 @@ function labelPointOf(ring) {
 
 const inBounds = ([lng, lat], [w, s, e, n]) => lng >= w && lng <= e && lat >= s && lat <= n;
 
-/** 寄せ先の指定から平行移動量を求める */
-function offsetFor(placement, groupBounds) {
-  if (!placement) return [0, 0];
-  if (placement.place) return [placement.place[0] - groupBounds[0], placement.place[1] - groupBounds[1]];
-  return [placement.dx ?? 0, placement.dy ?? 0];
+/**
+ * 図形の変換。[倍率, x の移動量, y の移動量] で表し、
+ * x' = x * 倍率 + 移動量 として適用する。市区町村の境界も同じ変換を使う。
+ */
+function transformFor(placement, groupBounds) {
+  if (!placement) return [1, 0, 0];
+  const scale = placement.scale ?? 1;
+  if (placement.place) {
+    return [scale, placement.place[0] - groupBounds[0] * scale, placement.place[1] - groupBounds[1] * scale];
+  }
+  return [scale, placement.dx ?? 0, placement.dy ?? 0];
 }
 
-const shift = (points, [dx, dy]) => points.map(([x, y]) => [x + dx, y + dy]);
+const applyTransform = (points, [scale, tx, ty]) =>
+  points.map(([x, y]) => [x * scale + tx, y * scale + ty]);
 const toPath = (rings) =>
   rings.map((pts) => `M${pts.map(([x, y]) => `${x.toFixed(3)} ${y.toFixed(3)}`).join("L")}Z`).join("");
 
@@ -269,44 +297,100 @@ for (const feature of geo.features) {
     );
   }
 
-  const simplifyRings = (items) =>
+  // 日本地図では小さすぎる島を見える大きさまで広げるが、
+  // 都道府県だけを表示する地図では等倍のままにする（本体との大きさが合わなくなるため）
+  const simplifyRings = (items, enlarge) =>
     items
-      .map((item) => enlargeIfTiny(simplify(item.ring.map(project), TOLERANCE)))
+      .map((item) => {
+        const points = simplify(item.ring.map(project), TOLERANCE);
+        return enlarge ? enlargeIfTiny(points) : points;
+      })
       .filter((pts) => pts.length >= 3);
 
-  const mainlandRings = simplifyRings(mainlandKept);
-  const groupRings = new Map([...groupKept].map(([gid, items]) => [gid, simplifyRings(items)]));
+  const wideMainland = simplifyRings(mainlandKept, true);
+  const wideGroups = new Map([...groupKept].map(([gid, items]) => [gid, simplifyRings(items, true)]));
+  const plainMainland = simplifyRings(mainlandKept, false);
+  const plainGroups = new Map([...groupKept].map(([gid, items]) => [gid, simplifyRings(items, false)]));
 
-  // 見出し（都道府県名）を置く場所は、本体のいちばん大きな島から求める
   const coreGroup = groups.find((g) => g.core);
-  const coreRings = mainlandRings.length > 0 ? mainlandRings : (groupRings.get(coreGroup?.id) ?? []);
 
-  const build = (kind) => {
-    const allRings = [...mainlandRings];
-    let labelSource = coreRings[0] ?? null;
+  /** その縮尺で枠として寄せるグループかどうか */
+  const isInsetIn = (group, kind) => {
+    if (group.insetOnly) return group.insetOnly.includes(kind);
+    if (kind === "prefecture") return !group.core;
+    return Boolean(group[kind]);
+  };
+
+  /**
+   * 都道府県だけを表示する地図での枠の位置を、本体の大きさから自動で決める。
+   * 本体の右側に、縮めた枠を上から順に積む。
+   */
+  function autoPlacements(coreBounds) {
+    const coreWidth = coreBounds[2] - coreBounds[0];
+    const coreHeight = coreBounds[3] - coreBounds[1];
+    const gap = Math.max(coreWidth, coreHeight) * 0.06;
+    const placements = new Map();
+    let cursorY = coreBounds[1];
 
     for (const group of groups) {
+      if (!isInsetIn(group, "prefecture")) continue;
+      const rings = plainGroups.get(group.id);
+      if (!rings || rings.length === 0) continue;
+      const [x0, y0, x1, y1] = boundsOf(rings.flat());
+      const width = x1 - x0;
+      const height = y1 - y0;
+      const scale = Math.min(1, (coreHeight * 1.1) / (height || 1), (coreWidth * 0.5) / (width || 1));
+      placements.set(group.id, { place: [coreBounds[2] + gap, cursorY], scale });
+      cursorY += height * scale + gap * 2.2;
+    }
+    return placements;
+  }
+
+  const build = (kind) => {
+    const wide = kind !== "prefecture";
+    const mainlandRings = wide ? wideMainland : plainMainland;
+    const groupRings = wide ? wideGroups : plainGroups;
+
+    // 枠にしないグループの図形は、本体と同じ扱いで実際の位置に描く
+    const inPlace = groups.filter((g) => !isInsetIn(g, kind)).flatMap((g) => groupRings.get(g.id) ?? []);
+    const baseRings = [...mainlandRings, ...inPlace];
+
+    const coreSource =
+      mainlandRings.length > 0
+        ? mainlandRings
+        : (groupRings.get(coreGroup?.id) ?? baseRings);
+    const coreBounds = boundsOf((baseRings.length > 0 ? baseRings : coreSource).flat());
+    const auto = kind === "prefecture" ? autoPlacements(coreBounds) : null;
+
+    const allRings = [...baseRings];
+    let labelSource = coreSource[0] ?? null;
+
+    for (const group of groups) {
+      if (!isInsetIn(group, kind)) continue;
       const ringsOfGroup = groupRings.get(group.id);
       if (!ringsOfGroup || ringsOfGroup.length === 0) continue;
+
       const groupBounds = boundsOf(ringsOfGroup.flat());
-      const delta = offsetFor(group[kind], groupBounds);
-      const moved = ringsOfGroup.map((pts) => shift(pts, delta));
+      const placement = auto?.get(group.id) ?? group[kind];
+      const transform = transformFor(placement, groupBounds);
+      const moved = ringsOfGroup.map((pts) => applyTransform(pts, transform));
       allRings.push(...moved);
       if (group.core && mainlandRings.length === 0) labelSource = moved[0];
 
       const [minX, minY, maxX, maxY] = boundsOf(moved.flat());
-      const pad = 0.18;
+      const pad = Math.max(maxX - minX, maxY - minY) * 0.12 + 0.02;
       const frame = [minX - pad, minY - pad, maxX - minX + pad * 2, maxY - minY + pad * 2].map((v) =>
         Number(v.toFixed(3)),
       );
+
       let entry = insets.find((i) => i.id === group.id);
       if (!entry) {
-        // bounds と offset は、市区町村の代表座標を同じ場所へ寄せるために使う
+        // bounds と transform は、市区町村の境界を同じ場所へ寄せるために使う
         entry = { id: group.id, label: group.label, prefectureCode: code, bounds: group.bounds };
         insets.push(entry);
       }
       entry[kind] = frame;
-      entry[`${kind}Offset`] = delta.map((v) => Number(v.toFixed(3)));
+      entry[`${kind}Transform`] = transform.map((v) => Number(v.toFixed(4)));
     }
 
     const [minX, minY, maxX, maxY] = boundsOf(allRings.flat());
@@ -321,6 +405,7 @@ for (const feature of geo.features) {
 
   const national = build("national");
   const regional = build("regional");
+  const prefectureScope = build("prefecture");
 
   prefectures.push({
     code,
@@ -328,10 +413,13 @@ for (const feature of geo.features) {
     d: national.d,
     bbox: national.bbox,
     center: national.center,
-    // 地方地図では離島の寄せ先が変わるため、別に持つ
+    // 地方地図・都道府県地図では離島の寄せ先が変わるため、別に持つ
     rd: regional.d,
     rbbox: regional.bbox,
     rcenter: regional.center,
+    pd: prefectureScope.d,
+    pbbox: prefectureScope.bbox,
+    pcenter: prefectureScope.center,
   });
 }
 
@@ -358,5 +446,7 @@ console.log("prefectures:", prefectures.length, "bytes:", fs.statSync(pathsFile)
 console.log("insets:", insets.map((i) => i.id).join(", "));
 console.log("全国の地図範囲:", overall.map((v) => v.toFixed(2)).join(", "));
 for (const inset of insets) {
-  console.log(`  ${inset.id}: national=${inset.national?.join(", ")} regional=${inset.regional?.join(", ")}`);
+  console.log(
+    `  ${inset.id}: national=${inset.national ? "有" : "-"} regional=${inset.regional ? "有" : "-"} prefecture=${inset.prefectureTransform?.join(",")}`,
+  );
 }

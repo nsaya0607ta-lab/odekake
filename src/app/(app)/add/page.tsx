@@ -4,14 +4,19 @@ import { PageBody } from "@/components/page-body";
 import { TopHeader } from "@/components/page-header";
 import { getTripOptions } from "@/lib/data/trips";
 import { getAllSpots } from "@/lib/data/spots";
+import { resolveWorkspace } from "@/lib/data/workspace";
 import { requireUser } from "@/lib/supabase/server";
 
 export const metadata = { title: "追加 | おでかけ記録" };
 export const dynamic = "force-dynamic";
 
 export default async function AddPage() {
-  const { supabase } = await requireUser();
-  const [trips, spots] = await Promise.all([getTripOptions(supabase), getAllSpots(supabase)]);
+  const { supabase, user } = await requireUser();
+  const workspace = await resolveWorkspace(supabase, user.id);
+  const [trips, spots] = await Promise.all([
+    getTripOptions(supabase, workspace.tripIds),
+    getAllSpots(supabase, workspace.tripIds),
+  ]);
 
   const recentSpots = spots.slice(0, 5);
 

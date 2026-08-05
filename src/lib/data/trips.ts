@@ -53,11 +53,16 @@ export async function getTripSummaries(supabase: DB, userId: string): Promise<Tr
   }));
 }
 
-/** 訪問履歴の登録フォームで使う、旅行の選択肢 */
-export async function getTripOptions(supabase: DB): Promise<Array<Pick<TripRow, "id" | "title" | "trip_type">>> {
+/** 訪問履歴の登録フォームで使う、旅行の選択肢（いまの旅ワークスペースの分だけ） */
+export async function getTripOptions(
+  supabase: DB,
+  tripIds: string[],
+): Promise<Array<Pick<TripRow, "id" | "title" | "trip_type">>> {
+  if (tripIds.length === 0) return [];
   const { data } = await supabase
     .from("trips")
     .select("id, title, trip_type")
+    .in("id", tripIds)
     .order("created_at", { ascending: false });
   return data ?? [];
 }

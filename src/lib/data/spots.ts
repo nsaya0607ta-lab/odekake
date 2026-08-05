@@ -64,14 +64,16 @@ async function attachSummaries(
   supabase: DB,
   spots: SpotRow[],
   categoryNames: Map<number, string>,
+  tripIds: string[],
 ): Promise<SpotSummary[]> {
-  if (spots.length === 0) return [];
+  if (spots.length === 0 || tripIds.length === 0) return [];
 
   const spotIds = spots.map((s) => s.id);
   const { data: visits } = await supabase
     .from("visit_records")
     .select("*")
     .in("spot_id", spotIds)
+    .in("trip_id", tripIds)
     .order("visited_at", { ascending: false });
 
   const visitList = (visits ?? []) as VisitRecordRow[];
@@ -111,9 +113,12 @@ async function attachSummaries(
   );
   const coverBySpot = new Map(coverPaths.map(([id, path]) => [id, signed.get(path) ?? null]));
 
-  return spots.map((spot) => {
-    const stats = summarize(visitsBySpot.get(spot.id) ?? []);
-    return {
+  // いまの旅ワークスペースで訪問していないスポットは、この空間には出さない
+  return spots.flatMap((spot) => {
+    const spotVisits = visitsBySpot.get(spot.id) ?? [];
+    if (spotVisits.length === 0) return [];
+    const stats = summarize(spotVisits);
+    return [{
       id: spot.id,
       name: spot.name,
       categoryId: spot.category_id,
@@ -125,7 +130,7 @@ async function attachSummaries(
       longitude: spot.longitude,
       photoUrl: coverBySpot.get(spot.id) ?? null,
       ...stats,
-    };
+    }];
   });
 }
 
@@ -134,20 +139,26 @@ export async function loadCategoryNames(supabase: DB): Promise<Map<number, strin
   return new Map((data ?? []).map((c) => [c.id, c.name]));
 }
 
-export async function getSpotsInMunicipality(supabase: DB, municipalityCode: string): Promise<SpotSummary[]> {
+export async function getSpotsInMunicipality(
+  supabase: DB,
+  municipalityCode: string,
+  tripIds: string[],
+): Promise<SpotSummary[]> {
+  if (tripIds.length === 0) return [];
   const [{ data: spots }, categoryNames] = await Promise.all([
     supabase.from("spots").select("*").eq("municipality_code", municipalityCode).order("name"),
     loadCategoryNames(supabase),
   ]);
-  return attachSummaries(supabase, (spots ?? []) as SpotRow[], categoryNames);
+  return attachSummaries(supabase, (spots ?? []) as SpotRow[], categoryNames, tripIds);
 }
 
-export async function getAllSpots(supabase: DB): Promise<SpotSummary[]> {
+export async function getAllSpots(supabase: DB, tripIds: string[]): Promise<SpotSummary[]> {
+  if (tripIds.length === 0) return [];
   const [{ data: spots }, categoryNames] = await Promise.all([
     supabase.from("spots").select("*").order("created_at", { ascending: false }),
     loadCategoryNames(supabase),
   ]);
-  return attachSummaries(supabase, (spots ?? []) as SpotRow[], categoryNames);
+  return attachSummaries(supabase, (spots ?? []) as SpotRow[], categoryNames, tripIds);
 }
 
 export type SpotDetail = {
@@ -158,12 +169,24 @@ export type SpotDetail = {
   galleryUrls: string[];
 };
 
-export async function getSpotDetail(supabase: DB, spotId: string): Promise<SpotDetail | null> {
+/** スポットの詳細。訪問履歴はいまの旅ワークスペースの分だけを見せる */
+export async function getSpotDetail(
+  supabase: DB,
+  spotId: string,
+  tripIds: string[],
+): Promise<SpotDetail | null> {
   const { data: spot } = await supabase.from("spots").select("*").eq("id", spotId).maybeSingle();
   if (!spot) return null;
 
   const [{ data: visits }, categoryNames] = await Promise.all([
-    supabase.from("visit_records").select("*").eq("spot_id", spotId).order("visited_at", { ascending: false }),
+    tripIds.length === 0
+      ? Promise.resolve({ data: [] as VisitRecordRow[] })
+      : supabase
+          .from("visit_records")
+          .select("*")
+          .eq("spot_id", spotId)
+          .in("trip_id", tripIds)
+          .order("visited_at", { ascending: false }),
     loadCategoryNames(supabase),
   ]);
 

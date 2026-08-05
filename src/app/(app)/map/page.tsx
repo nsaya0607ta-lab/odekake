@@ -5,6 +5,8 @@ import { PageBody } from "@/components/page-body";
 import { TopHeader } from "@/components/page-header";
 import { VisitedBadge } from "@/components/ui";
 import { loadAreaIndex } from "@/lib/data/areas";
+import { resolveWorkspace } from "@/lib/data/workspace";
+import { WorkspaceBar } from "@/components/workspace-bar";
 import { REGIONS } from "@/lib/geo/regions";
 import { requireUser } from "@/lib/supabase/server";
 
@@ -12,8 +14,9 @@ export const metadata = { title: "日本地図 | おでかけ記録" };
 export const dynamic = "force-dynamic";
 
 export default async function MapPage() {
-  const { supabase } = await requireUser();
-  const areas = await loadAreaIndex(supabase);
+  const { supabase, user } = await requireUser();
+  const workspace = await resolveWorkspace(supabase, user.id);
+  const areas = await loadAreaIndex(supabase, workspace.tripIds);
 
   const visitedRegions = Object.fromEntries(
     REGIONS.map((r) => [r.slug, (areas.region.get(r.slug)?.visitCount ?? 0) > 0]),
@@ -23,6 +26,8 @@ export default async function MapPage() {
     <>
       <TopHeader title="日本地図" />
       <PageBody>
+        <WorkspaceBar workspace={workspace} />
+
         <section className="rough-card px-3 py-4">
           <p className="mb-2 text-center text-xs text-ink-soft">
             <span className="rough-pill bg-leaf-soft px-3 py-1 text-leaf-deep">

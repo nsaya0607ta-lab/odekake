@@ -62,7 +62,7 @@ node scripts/verify-supabase.mjs  # 実 Supabase プロジェクトでの動作�
 ```
 
 `verify-rls.sh` は、素の PostgreSQL に Supabase 相当の土台を作って
-`supabase/migrations/*.sql` を適用し、公開範囲を87項目確認します。
+`supabase/migrations/*.sql` を適用し、公開範囲を91項目確認します。
 `verify-supabase.mjs` は、新規登録・確認メール・ログイン・公開範囲・写真・アカウント削除を
 実際のプロジェクトに対して順に確認します。
 
@@ -70,10 +70,11 @@ node scripts/verify-supabase.mjs  # 実 Supabase プロジェクトでの動作�
 
 | 画面 | パス |
 | --- | --- |
-| ホーム（あなたの旅） | `/home` |
+| ホーム（いまの旅） | `/home` |
+| 旅を選ぶ（自分の旅 / 共有旅一覧） | `/workspaces` |
 | 日本地図（地方選択） | `/map` |
 | 地方地図（都道府県選択） | `/map/[region]` |
-| 都道府県詳細（市区町村の地図 / 一覧） | `/map/[region]/[pref]` |
+| 都道府県地図（市区町村の境界 ＋ 検索・一覧） | `/map/[region]/[pref]` |
 | 市区町村詳細（スポット一覧） | `/map/[region]/[pref]/[muni]` |
 | スポット詳細 | `/spots/[spotId]` |
 | スポット登録・編集 | `/spots/new` `/spots/[spotId]/edit` |
@@ -93,6 +94,7 @@ node scripts/verify-supabase.mjs  # 実 Supabase プロジェクトでの動作�
 - `src/lib/geo/prefecture-paths.json` — 47都道府県の輪郭（`scripts/build-prefecture-paths.mjs` で生成）
 - `src/lib/geo/map-insets.json` — 離島を寄せて描く枠（同スクリプトで生成）
 - `src/lib/geo/municipalities.json` — 全国 1,894 件の市区町村マスタ（`scripts/build-municipalities.mjs` で生成）
+- `src/lib/geo/municipality-paths/{都道府県コード}.json` — 市区町村の境界（`scripts/build-municipality-paths.mjs` で生成）
 - `src/lib/geo/regions.ts` — 8地方の区分
 
 政令指定都市の区と東京23区も、それぞれ独立した地域選択の単位として扱っています。
@@ -107,12 +109,34 @@ node scripts/verify-supabase.mjs  # 実 Supabase プロジェクトでの動作�
 ```bash
 node scripts/build-prefecture-paths.mjs path/to/japan.geojson src/lib/geo
 node scripts/build-municipalities.mjs path/to/latest.csv src/lib/geo/municipalities.json
+node scripts/build-municipality-paths.mjs path/to/N03-21_210101.json src/lib/geo/municipality-paths
 ```
 
 出典データ
 
 - 都道府県境界: [dataofjapan/land](https://github.com/dataofjapan/land) の `japan.geojson`
 - 市区町村マスタ: [geolonia/japanese-addresses](https://github.com/geolonia/japanese-addresses)
+- 市区町村境界: [smartnews-smri/japan-topography](https://github.com/smartnews-smri/japan-topography)（簡素化1%）
+
+市区町村の境界は都道府県ごとにファイルを分け、開いている県の分だけを
+サーバー側で読み込みます（全国で約2MB。端末へは表示中の県の分だけが届きます）。
+
+## 旅ワークスペース
+
+アプリは「自分の旅」と、共有旅ごとの独立した空間に分かれています。
+
+```
+自分の旅        … 自分がつくった一人旅すべて
+共有旅①②③…    … 参加している共有旅ひとつずつ
+```
+
+ホーム・地図・記録・スポットは、選んでいる旅の記録だけを表示します。
+共有旅を新しくつくった直後の日本地図は、すべて未訪問から始まります
+（自分の旅や他の共有旅の記録は合算しません）。
+
+切り替えはホーム上部か `/workspaces` から行い、選択は Cookie
+（`odekake-workspace`）に保存します。マイページだけは、旅をまたいだ
+アカウント全体の合計を表示します。
 
 ## データ構造と公開範囲
 
@@ -170,5 +194,6 @@ trips/{trip_id}/visits/{visit_record_id}/
 - SNS 公開、いいね、フォロー、一般公開プロフィール、バッジ
 - 訪問回数による地図の濃淡（現在は「未訪問 / 訪問済み」の2段階。回数による塗り分けを後から追加できる構造にしています）
 
-直近の追加修正の内容は [`docs/changes-2.md`](docs/changes-2.md) に、
+直近の変更内容は [`docs/changes-3.md`](docs/changes-3.md) と
+[`docs/changes-2.md`](docs/changes-2.md) に、
 そのほかの制限事項は [`docs/notes.md`](docs/notes.md) にまとめています。

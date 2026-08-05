@@ -14,10 +14,13 @@ export function RecordTabs({
   tabs,
   current,
   tripType,
+  showTypeFilter = true,
 }: {
   tabs: Array<{ key: Tab; label: string }>;
   current: Tab;
   tripType: "all" | "solo" | "shared";
+  /** 旅ワークスペースで絞り込み済みのときは、一人旅／共有旅の切替を出さない */
+  showTypeFilter?: boolean;
 }) {
   const hrefFor = (tab: Tab, type: string) => {
     const params = new URLSearchParams({ tab });
@@ -45,7 +48,7 @@ export function RecordTabs({
         ))}
       </div>
 
-      {current !== "spots" ? (
+      {showTypeFilter && current !== "spots" ? (
         <div className="flex gap-2">
           {TYPE_FILTERS.map((filter) => (
             <Link
