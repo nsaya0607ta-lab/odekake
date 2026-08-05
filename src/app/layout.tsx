@@ -5,6 +5,12 @@ export const metadata: Metadata = {
   title: "おでかけ記録",
   description: "訪れた場所を日本地図から振り返る、おでかけの記録帳です。",
   applicationName: "おでかけ記録",
+  manifest: "/manifest.webmanifest",
+  appleWebApp: {
+    capable: true,
+    title: "おでかけ記録",
+    statusBarStyle: "default",
+  },
 };
 
 export const viewport: Viewport = {
