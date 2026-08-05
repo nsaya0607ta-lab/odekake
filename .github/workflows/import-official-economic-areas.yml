@@ -1,0 +1,86 @@
+name: Import official prefecture economic areas
+
+on:
+  push:
+    branches:
+      - feat/official-prefecture-regions-20260805
+    paths:
+      - .github/workflows/import-official-economic-areas.yml
+
+permissions:
+  contents: write
+
+jobs:
+  import:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: feat/official-prefecture-regions-20260805
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install parser
+        run: python -m pip install --disable-pip-version-check openpyxl
+
+      - name: Download and convert the official workbook
+        env:
+          SOURCE_URL: https://www.stat.go.jp/data/zenkokukakei/2024/zuhyou/keizaiken2024.xlsx
+        run: |
+          python - <<'PY'
+          from __future__ import annotations
+
+          import hashlib
+          import json
+          import os
+          import urllib.request
+          from pathlib import Path
+
+          from openpyxl import load_workbook
+
+          source_url = os.environ["SOURCE_URL"]
+          work = Path("/tmp/keizaiken2024.xlsx")
+          request = urllib.request.Request(
+              source_url,
+              headers={"User-Agent": "odekake-data-import/1.0 (+https://github.com/nsaya0607ta-lab/odekake)"},
+          )
+          with urllib.request.urlopen(request, timeout=60) as response:
+              work.write_bytes(response.read())
+
+          workbook = load_workbook(work, data_only=True, read_only=True)
+          result = {
+              "source": source_url,
+              "retrievedBy": "GitHub Actions",
+              "sha256": hashlib.sha256(work.read_bytes()).hexdigest(),
+              "sheets": {},
+          }
+
+          for sheet in workbook.worksheets:
+              rows = []
+              for row in sheet.iter_rows(values_only=True):
+                  values = [value for value in row]
+                  while values and values[-1] is None:
+                      values.pop()
+                  if any(value not in (None, "") for value in values):
+                      rows.append(values)
+              result["sheets"][sheet.title] = rows
+
+          output = Path("tools/keizaiken2024-dump.json")
+          output.parent.mkdir(parents=True, exist_ok=True)
+          output.write_text(json.dumps(result, ensure_ascii=False, indent=2), encoding="utf-8")
+          print(f"wrote {output} ({output.stat().st_size} bytes)")
+          PY
+
+      - name: Commit converted official data
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add tools/keizaiken2024-dump.json
+          if git diff --cached --quiet; then
+            echo "No data changes"
+          else
+            git commit -m "Import official prefecture economic area workbook"
+            git push origin HEAD:feat/official-prefecture-regions-20260805
+          fi
