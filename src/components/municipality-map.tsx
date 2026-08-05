@@ -1,7 +1,7 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useState, type PointerEvent } from "react";
 
 export type MunicipalityArea = {
   code: string;
@@ -46,6 +46,7 @@ export function MunicipalityMap({
 }) {
   const router = useRouter();
   const [active, setActive] = useState<string | null>(null);
+  const [pressed, setPressed] = useState<string | null>(null);
 
   const [, , boxWidth = 1, boxHeight = 1] = viewBox.split(" ").map(Number);
   const scale = Math.max(boxWidth, boxHeight);
@@ -54,8 +55,35 @@ export function MunicipalityMap({
   const markerRadius = scale / 90;
   const smallThreshold = markerRadius * 2.4;
 
-  const activeArea = areas.find((m) => m.code === active) ?? null;
-  const open = (code: string) => router.push(`${hrefBase}/${code}`);
+  const activeCode = pressed ?? active;
+  const activeArea = areas.find((municipality) => municipality.code === activeCode) ?? null;
+
+  const beginPress = (code: string) => {
+    const href = `${hrefBase}/${code}`;
+    setActive(code);
+    setPressed(code);
+    router.prefetch(href);
+  };
+
+  const open = (code: string) => {
+    const href = `${hrefBase}/${code}`;
+    setActive(code);
+    setPressed(code);
+    router.push(href);
+
+    // 遷移に失敗した場合でも選択状態が残り続けないようにする。
+    // 画面遷移を遅らせる処理ではない。
+    window.setTimeout(() => {
+      setPressed((current) => (current === code ? null : current));
+    }, 900);
+  };
+
+  const onPointerLeave = (event: PointerEvent<SVGGElement>, code: string) => {
+    if (event.pointerType === "mouse") {
+      setActive((current) => (current === code ? null : current));
+      setPressed((current) => (current === code ? null : current));
+    }
+  };
 
   return (
     <div className={className}>
@@ -64,6 +92,7 @@ export function MunicipalityMap({
         role="group"
         aria-label={`${prefectureName}の市区町村地図`}
         className="h-auto w-full"
+        style={{ touchAction: "manipulation" }}
       >
         {/* 位置を動かして描いている離島の枠 */}
         {insets.map((inset) => (
@@ -93,13 +122,18 @@ export function MunicipalityMap({
 
         {areas.map((area) => {
           if (!area.d) return null;
-          const isActive = active === area.code;
+          const isActive = activeCode === area.code;
+
           return (
             <g
               key={area.code}
               role="link"
               tabIndex={0}
               aria-label={`${area.name}${area.level > 0 ? "（訪問済み）" : "（未訪問）"}`}
+              onPointerDown={() => beginPress(area.code)}
+              onPointerCancel={() => setPressed((current) => (current === area.code ? null : current))}
+              onPointerEnter={() => setActive(area.code)}
+              onPointerLeave={(event) => onPointerLeave(event, area.code)}
               onClick={() => open(area.code)}
               onKeyDown={(event) => {
                 if (event.key === "Enter" || event.key === " ") {
@@ -107,11 +141,19 @@ export function MunicipalityMap({
                   open(area.code);
                 }
               }}
-              onPointerEnter={() => setActive(area.code)}
               onFocus={() => setActive(area.code)}
-              onPointerLeave={() => setActive((current) => (current === area.code ? null : current))}
-              onBlur={() => setActive((current) => (current === area.code ? null : current))}
+              onBlur={() => {
+                setActive((current) => (current === area.code ? null : current));
+                setPressed((current) => (current === area.code ? null : current));
+              }}
               className="cursor-pointer outline-none"
+              style={{
+                transformBox: "fill-box",
+                transformOrigin: "center",
+                transform: pressed === area.code ? "scale(0.975)" : "scale(1)",
+                filter: pressed === area.code ? "brightness(0.93)" : "none",
+                transition: "transform 70ms ease-out, filter 70ms ease-out",
+              }}
             >
               <title>{area.name}</title>
               <path
@@ -120,6 +162,7 @@ export function MunicipalityMap({
                 stroke={isActive ? "#5d8049" : (STROKE[area.level] ?? STROKE[0])}
                 strokeWidth={isActive ? strokeWidth * 3 : strokeWidth}
                 strokeLinejoin="round"
+                style={{ transition: "stroke 70ms ease, stroke-width 70ms ease" }}
               />
               {/* 小さな市区町村は形だけでは押しづらいので、目印と当たり判定を重ねる */}
               {area.center && area.span < smallThreshold ? (
@@ -129,8 +172,8 @@ export function MunicipalityMap({
                     cy={area.center[1]}
                     r={markerRadius}
                     fill={FILL[area.level] ?? FILL[0]}
-                    stroke={STROKE[area.level] ?? STROKE[0]}
-                    strokeWidth={strokeWidth * 1.4}
+                    stroke={isActive ? "#5d8049" : (STROKE[area.level] ?? STROKE[0])}
+                    strokeWidth={isActive ? strokeWidth * 2.6 : strokeWidth * 1.4}
                   />
                   <circle cx={area.center[0]} cy={area.center[1]} r={markerRadius * 2.2} fill="transparent" />
                 </>
