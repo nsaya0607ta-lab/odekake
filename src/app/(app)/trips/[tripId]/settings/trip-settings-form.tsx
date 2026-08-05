@@ -6,7 +6,15 @@ import { emptyActionState, Field, FormMessage, SubmitButton } from "@/components
 import { PhotoUploader } from "@/components/photo-uploader";
 import type { TripRow } from "@/lib/supabase/types";
 
-export function TripSettingsForm({ trip, coverUrl }: { trip: TripRow; coverUrl: string | null }) {
+export function TripSettingsForm({
+  userId,
+  trip,
+  coverUrl,
+}: {
+  userId: string;
+  trip: TripRow;
+  coverUrl: string | null;
+}) {
   const [state, formAction] = useActionState(updateTripAction, emptyActionState);
 
   return (
@@ -62,7 +70,8 @@ export function TripSettingsForm({ trip, coverUrl }: { trip: TripRow; coverUrl: 
 
       <PhotoUploader
         name="coverPaths"
-        prefix={`trips/${trip.id}/cover`}
+        userId={userId}
+        draftKey={`trip-cover-${trip.id}`}
         max={1}
         label="表紙画像"
         initial={trip.cover_image_url && coverUrl ? [{ path: trip.cover_image_url, url: coverUrl }] : []}

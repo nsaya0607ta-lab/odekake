@@ -31,16 +31,25 @@ export type MapShape = {
   labelAt?: [number, number] | null;
 };
 
+/** 位置を動かして描いている離島の枠 */
+export type MapInsetFrame = {
+  id: string;
+  label: string;
+  /** [x, y, width, height] */
+  frame: [number, number, number, number];
+};
+
 type Props = {
   shapes: MapShape[];
   viewBox: string;
   /** ラベルの文字サイズ（viewBox 単位） */
   labelSize?: number;
+  insets?: MapInsetFrame[];
   className?: string;
   ariaLabel: string;
 };
 
-export function AreaMap({ shapes, viewBox, labelSize = 0.62, className, ariaLabel }: Props) {
+export function AreaMap({ shapes, viewBox, labelSize = 0.62, insets = [], className, ariaLabel }: Props) {
   const router = useRouter();
 
   // 表示倍率が変わっても境界線の太さがほぼ一定に見えるようにする
@@ -64,6 +73,32 @@ export function AreaMap({ shapes, viewBox, labelSize = 0.62, className, ariaLabe
       className={className}
       style={{ touchAction: "manipulation" }}
     >
+      {/* 離島の枠は図形の背面に描く */}
+      {insets.map((inset) => (
+        <g key={`inset-${inset.id}`} pointerEvents="none">
+          <rect
+            x={inset.frame[0]}
+            y={inset.frame[1]}
+            width={inset.frame[2]}
+            height={inset.frame[3]}
+            rx={labelSize * 0.5}
+            fill="#fbf8f0"
+            stroke="#c8c1b0"
+            strokeWidth={strokeWidth * 1.3}
+            strokeDasharray={`${strokeWidth * 5} ${strokeWidth * 4}`}
+          />
+          <text
+            x={inset.frame[0] + inset.frame[2] / 2}
+            y={inset.frame[1] - labelSize * 0.32}
+            textAnchor="middle"
+            fontSize={labelSize * 0.66}
+            fill="#7b7466"
+          >
+            {inset.label}
+          </text>
+        </g>
+      ))}
+
       {shapes.map((shape) => {
         const tone = shape.visited ? TONES[shape.tone] : UNVISITED;
         return (

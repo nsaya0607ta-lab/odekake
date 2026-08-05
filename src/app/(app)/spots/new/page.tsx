@@ -1,9 +1,9 @@
 import { PageBody } from "@/components/page-body";
 import { PageHeader } from "@/components/page-header";
+import { SpotForm } from "@/components/spot-form";
 import { loadCategoryNames } from "@/lib/data/spots";
 import { getMunicipality } from "@/lib/geo";
 import { requireUser } from "@/lib/supabase/server";
-import { SpotForm } from "./spot-form";
 
 export const metadata = { title: "スポットを登録 | おでかけ記録" };
 export const dynamic = "force-dynamic";
@@ -17,7 +17,6 @@ export default async function NewSpotPage({
   const categoryNames = await loadCategoryNames(supabase);
 
   const municipality = muni ? getMunicipality(muni) : undefined;
-  const defaultPrefectureCode = municipality?.prefectureCode ?? pref ?? "";
 
   return (
     <>
@@ -25,8 +24,16 @@ export default async function NewSpotPage({
       <PageBody>
         <SpotForm
           categories={[...categoryNames.entries()].map(([id, name]) => ({ id, name }))}
-          defaultPrefectureCode={defaultPrefectureCode}
-          defaultMunicipalityCode={municipality?.code ?? ""}
+          location={{
+            prefectureCode: municipality?.prefectureCode ?? pref ?? "",
+            municipalityCode: municipality?.code ?? "",
+            latitude: municipality?.lat ?? null,
+            longitude: municipality?.lng ?? null,
+            locationSource: "municipality",
+            locationAccuracyMeters: null,
+            placeProvider: null,
+            placeId: null,
+          }}
         />
       </PageBody>
     </>

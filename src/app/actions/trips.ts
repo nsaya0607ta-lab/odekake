@@ -4,8 +4,12 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { z } from "zod";
 import type { ActionState } from "@/components/form";
+import { getMailer, renderTripInvitationMail } from "@/lib/email";
 import { toJapaneseError } from "@/lib/errors";
+import { finalizePhotoPaths } from "@/lib/photos";
+import { getSiteUrl } from "@/lib/supabase/env";
 import { requireUser } from "@/lib/supabase/server";
+import type { DB } from "@/lib/data/client";
 
 const CODE_CHARS = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
 
@@ -71,6 +75,13 @@ function firstPhotoPath(formData: FormData): string | null {
   return null;
 }
 
+/** 一時領域にある表紙画像を旅行の保存先へ移す */
+async function moveCover(supabase: DB, tripId: string, path: string | null): Promise<string | null> {
+  if (!path) return null;
+  const [moved] = await finalizePhotoPaths(supabase, [path], `trips/${tripId}/cover`);
+  return moved ?? null;
+}
+
 export async function createTripAction(_prev: ActionState, formData: FormData): Promise<ActionState> {
   const values = collect(formData);
   const parsed = tripSchema.safeParse(values);
@@ -100,13 +111,16 @@ export async function createTripAction(_prev: ActionState, formData: FormData): 
     start_date: parsed.data.startDate,
     end_date: parsed.data.endDate,
     description: parsed.data.description,
-    cover_image_url: firstPhotoPath(formData),
     invite_code: isShared ? await generateInviteCode() : null,
   });
 
   if (error) {
     return { error: toJapaneseError(error, "旅行の作成に失敗しました。"), values };
   }
+
+  // 表紙画像は旅行を作ってから移す（保存先の権限は旅行の存在を前提にしているため）
+  const cover = await moveCover(supabase, tripId, firstPhotoPath(formData));
+  if (cover) await supabase.from("trips").update({ cover_image_url: cover }).eq("id", tripId);
 
   // 共有旅では、入力されたメールアドレス宛の招待をまとめて作成する
   if (isShared) {
@@ -119,11 +133,8 @@ export async function createTripAction(_prev: ActionState, formData: FormData): 
       ),
     ].slice(0, 20);
 
-    if (emails.length > 0) {
-      const rows = await Promise.all(
-        emails.map(async (email) => ({ trip_id: tripId, email, invite_code: await generateInviteCode() })),
-      );
-      await supabase.from("trip_invitations").insert(rows);
+    for (const email of emails) {
+      await createInvitation(supabase, { tripId, email, invitedBy: user.id });
     }
   }
 
@@ -142,7 +153,7 @@ export async function updateTripAction(_prev: ActionState, formData: FormData): 
   }
 
   const { supabase } = await requireUser();
-  const coverPath = firstPhotoPath(formData);
+  const coverPath = await moveCover(supabase, tripId, firstPhotoPath(formData));
 
   const { error } = await supabase
     .from("trips")
@@ -170,6 +181,87 @@ export async function deleteTripAction(formData: FormData) {
   redirect("/records?tab=trips");
 }
 
+/**
+ * 招待を1件作り、送信できる設定なら招待メールも送る。
+ * 送信結果は trip_invitations に残すので、あとから送信機能を足しても
+ * 「どの招待をまだ知らせていないか」が分かる。
+ */
+async function createInvitation(
+  supabase: DB,
+  input: { tripId: string; email: string; invitedBy: string; message?: string | null },
+): Promise<{ ok: true; code: string; sent: boolean } | { ok: false; error: string }> {
+  const code = await generateInviteCode();
+
+  const { data, error } = await supabase
+    .from("trip_invitations")
+    .insert({
+      trip_id: input.tripId,
+      email: input.email,
+      invite_code: code,
+      invited_by: input.invitedBy,
+      message: input.message ?? null,
+    })
+    .select("id")
+    .single();
+
+  if (error || !data) {
+    if (error?.code === "23505") {
+      return { ok: false, error: "このメールアドレスにはすでに招待を送っています。" };
+    }
+    return { ok: false, error: toJapaneseError(error, "招待の作成に失敗しました。") };
+  }
+
+  const sent = await deliverInvitation(supabase, {
+    invitationId: data.id,
+    email: input.email,
+    tripId: input.tripId,
+    code,
+    message: input.message ?? null,
+  });
+
+  return { ok: true, code, sent };
+}
+
+async function deliverInvitation(
+  supabase: DB,
+  input: { invitationId: string; email: string; tripId: string; code: string; message: string | null },
+): Promise<boolean> {
+  const mailer = getMailer();
+  if (!mailer.enabled) return false;
+
+  const [{ data: trip }, { data: profile }] = await Promise.all([
+    supabase.from("trips").select("title").eq("id", input.tripId).maybeSingle(),
+    supabase.from("profiles").select("display_name").maybeSingle(),
+  ]);
+
+  const result = await mailer
+    .send(
+      renderTripInvitationMail({
+        to: input.email,
+        tripTitle: trip?.title ?? "共有旅",
+        inviterName: profile?.display_name ?? "メンバー",
+        inviteCode: input.code,
+        joinUrl: `${getSiteUrl()}/join/${input.code}`,
+        message: input.message,
+      }),
+    )
+    .catch((error: unknown) => ({
+      status: "failed" as const,
+      error: error instanceof Error ? error.message : String(error),
+    }));
+
+  await supabase
+    .from("trip_invitations")
+    .update({
+      email_status: result.status,
+      email_sent_at: result.status === "sent" ? new Date().toISOString() : null,
+      email_error: result.error ?? null,
+    })
+    .eq("id", input.invitationId);
+
+  return result.status === "sent" || result.status === "queued";
+}
+
 export async function inviteMemberAction(_prev: ActionState, formData: FormData): Promise<ActionState> {
   const tripId = String(formData.get("tripId") ?? "");
   const email = String(formData.get("email") ?? "")
@@ -180,15 +272,57 @@ export async function inviteMemberAction(_prev: ActionState, formData: FormData)
     return { error: "メールアドレスの形式が正しくありません。", values: { email } };
   }
 
-  const { supabase } = await requireUser();
-  const { error } = await supabase
-    .from("trip_invitations")
-    .insert({ trip_id: tripId, email, invite_code: await generateInviteCode() });
+  const message = String(formData.get("message") ?? "").trim();
+  if (message.length > 300) {
+    return { error: "メッセージは300文字以内で入力してください。", values: { email, message } };
+  }
 
-  if (error) return { error: toJapaneseError(error, "招待の作成に失敗しました。"), values: { email } };
+  const { supabase, user } = await requireUser();
+  const result = await createInvitation(supabase, {
+    tripId,
+    email,
+    invitedBy: user.id,
+    message: message || null,
+  });
+
+  if (!result.ok) return { error: result.error, values: { email, message } };
 
   revalidatePath(`/trips/${tripId}/settings`);
-  return { ok: true, message: `${email} を招待しました。招待コードを相手に伝えてください。` };
+  return {
+    ok: true,
+    message: result.sent
+      ? `${email} に招待メールを送りました。`
+      : `${email} を招待しました。招待コード ${result.code} かリンクを相手に伝えてください。`,
+  };
+}
+
+/** 招待をもう一度知らせる（メール送信が有効なら再送する） */
+export async function resendInvitationAction(formData: FormData) {
+  const invitationId = String(formData.get("invitationId") ?? "");
+  const tripId = String(formData.get("tripId") ?? "");
+
+  const { supabase } = await requireUser();
+  const { data } = await supabase
+    .from("trip_invitations")
+    .select("id, email, invite_code, message, email_attempts")
+    .eq("id", invitationId)
+    .maybeSingle();
+
+  if (data?.email) {
+    await supabase
+      .from("trip_invitations")
+      .update({ email_attempts: (data.email_attempts ?? 0) + 1 })
+      .eq("id", invitationId);
+    await deliverInvitation(supabase, {
+      invitationId: data.id,
+      email: data.email,
+      tripId,
+      code: data.invite_code,
+      message: data.message,
+    });
+  }
+
+  revalidatePath(`/trips/${tripId}/settings`);
 }
 
 export async function cancelInvitationAction(formData: FormData) {

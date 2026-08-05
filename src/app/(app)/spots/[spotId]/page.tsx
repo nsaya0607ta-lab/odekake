@@ -2,6 +2,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import {
   IconCalendar,
+  IconSliders,
   IconClock,
   IconGlobe,
   IconHeart,
@@ -17,10 +18,19 @@ import { StarRating, TripTypeBadge, formatDate } from "@/components/ui";
 import { getSpotDetail } from "@/lib/data/spots";
 import { getMunicipality, getPrefecture } from "@/lib/geo";
 import { requireUser } from "@/lib/supabase/server";
+import type { LocationSource } from "@/lib/supabase/types";
 
 export const dynamic = "force-dynamic";
 
 const CONGESTION_LABELS: Record<number, string> = { 1: "空いていた", 2: "ふつう", 3: "混んでいた" };
+
+const LOCATION_SOURCE_LABELS: Record<LocationSource, string> = {
+  municipality: "市区町村の代表地点",
+  address: "住所から推定",
+  map: "地図で選んだ地点",
+  device: "現在地",
+  place_search: "店舗検索の結果",
+};
 
 export async function generateMetadata({ params }: { params: Promise<{ spotId: string }> }) {
   const { spotId } = await params;
@@ -59,12 +69,23 @@ export default async function SpotDetailPage({
         title={spot.name}
         subtitle={municipality ? `${prefecture?.name ?? ""}${municipality.name}` : undefined}
         backHref={backHref}
+        action={
+          spot.created_by === user.id ? (
+            <Link
+              href={`/spots/${spot.id}/edit`}
+              aria-label="スポットを編集"
+              className="flex h-10 w-10 items-center justify-center rounded-full text-ink-soft active:bg-paper-deep"
+            >
+              <IconSliders />
+            </Link>
+          ) : undefined
+        }
       />
 
       <PageBody>
         {saved === "1" ? (
           <p className="rounded-2xl border border-leaf bg-leaf-soft px-4 py-3 text-sm text-leaf-deep">
-            訪問履歴を保存しました。
+            保存しました。
           </p>
         ) : null}
 
@@ -118,6 +139,23 @@ export default async function SpotDetailPage({
             {spot.memo ? (
               <InfoRow icon={<IconLayers size={17} />} label="メモ">
                 <span className="whitespace-pre-wrap">{spot.memo}</span>
+              </InfoRow>
+            ) : null}
+            {spot.latitude !== null && spot.longitude !== null ? (
+              <InfoRow icon={<IconMapPin size={17} />} label="場所">
+                <span className="tabular-nums">
+                  {spot.latitude.toFixed(5)}, {spot.longitude.toFixed(5)}
+                </span>
+                <span className="mt-0.5 block text-xs text-ink-faint">
+                  {LOCATION_SOURCE_LABELS[spot.location_source]}
+                  {spot.location_accuracy_m !== null
+                    ? `・およそ ±${
+                        spot.location_accuracy_m < 1000
+                          ? `${Math.round(spot.location_accuracy_m)}m`
+                          : `${(spot.location_accuracy_m / 1000).toFixed(1)}km`
+                      }`
+                    : ""}
+                </span>
               </InfoRow>
             ) : null}
           </dl>

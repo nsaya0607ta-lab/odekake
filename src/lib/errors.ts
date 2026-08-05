@@ -39,7 +39,10 @@ const RPC_MESSAGES: Array<[RegExp, string]> = [
   [/AUTH_REQUIRED/, "ログインが必要です。"],
 ];
 
-export function toJapaneseError(error: UnknownError, fallback = "処理に失敗しました。時間をおいて再度お試しください。") {
+export function toJapaneseError(
+  error: UnknownError,
+  fallback = "処理に失敗しました。時間をおいて再度お試しください。",
+): string {
   if (!error) return fallback;
 
   const message = error.message ?? "";
@@ -48,7 +51,8 @@ export function toJapaneseError(error: UnknownError, fallback = "処理に失敗
     if (pattern.test(message)) return text;
   }
 
-  if (error.code && DB_MESSAGES[error.code]) return DB_MESSAGES[error.code];
+  const byCode = error.code ? DB_MESSAGES[error.code] : undefined;
+  if (byCode) return byCode;
 
   for (const [pattern, text] of AUTH_MESSAGES) {
     if (pattern.test(message)) return text;
@@ -62,7 +66,7 @@ export function toJapaneseError(error: UnknownError, fallback = "処理に失敗
 }
 
 /** ストレージ操作向けのメッセージ */
-export function toJapaneseStorageError(error: UnknownError) {
+export function toJapaneseStorageError(error: UnknownError): string {
   const message = error?.message ?? "";
   if (/exceeded the maximum allowed size|Payload too large/i.test(message)) {
     return "画像のサイズが大きすぎます。別の画像をお試しください。";

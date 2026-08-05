@@ -12,7 +12,7 @@ export const metadata = { title: "訪問履歴を編集 | おでかけ記録" };
 export const dynamic = "force-dynamic";
 
 export default async function EditVisitPage({ params }: { params: Promise<{ visitId: string }> }) {
-  const [{ visitId }, { supabase }] = await Promise.all([params, requireUser()]);
+  const [{ visitId }, { supabase, user }] = await Promise.all([params, requireUser()]);
 
   const detail = await getVisitForEdit(supabase, visitId);
   if (!detail || !detail.spot) notFound();
@@ -41,6 +41,7 @@ export default async function EditVisitPage({ params }: { params: Promise<{ visi
       <PageHeader title="訪問履歴を編集" backHref={`/spots/${spot.id}`} />
       <PageBody>
         <VisitForm
+          userId={user.id}
           mode="edit"
           visitId={record.id}
           spotId={spot.id}

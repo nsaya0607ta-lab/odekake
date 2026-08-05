@@ -27,6 +27,7 @@ export type VisitFormDefaults = {
 };
 
 export function VisitForm({
+  userId,
   mode,
   visitId: fixedVisitId,
   spotId,
@@ -35,6 +36,7 @@ export function VisitForm({
   defaults,
   initialPhotos = [],
 }: {
+  userId: string;
   mode: "create" | "edit";
   /** 編集時の訪問記録 ID。新規作成時はクライアント側で発行する */
   visitId?: string;
@@ -84,7 +86,6 @@ export function VisitForm({
   }
 
   // 写真は旅行ごとに分けて保存する（trips/{tripId}/visits/{visitId}/）
-  const photoPrefix = `trips/${tripId}/visits/${visitId}`;
 
   return (
     <form
@@ -167,7 +168,8 @@ export function VisitForm({
       {tripId && visitId ? (
         <PhotoUploader
           name="photoPaths"
-          prefix={photoPrefix}
+          userId={userId}
+          draftKey={`visit-${visitId}`}
           max={MAX_PHOTOS_PER_VISIT}
           initial={initialPhotos}
         />

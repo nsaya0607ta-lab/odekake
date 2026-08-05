@@ -1,9 +1,10 @@
 "use client";
 
-import { useCallback, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { IconCamera, IconClose, IconPlus, IconSpinner } from "./icons";
 import { toJapaneseStorageError } from "@/lib/errors";
 import { ACCEPTED_IMAGE_TYPES, compressImage, extensionFor } from "@/lib/image";
+import { isTemporaryPath, tmpPrefixFor } from "@/lib/photos";
 import { createClient } from "@/lib/supabase/client";
 
 export type UploadedPhoto = { path: string; url: string };
@@ -19,24 +20,43 @@ type PendingItem = {
 /**
  * Supabase Storage へ直接アップロードし、保存済みのパスを hidden input で送信する。
  * 送信前にアップロードを終えるので、サーバーアクション側は失敗しにくい。
+ *
+ * アップロード先は一時領域 tmp/{user_id}/{draft_token}/ で、保存時に
+ * サーバー側で本来の場所へ移動する（src/lib/photos.ts）。保存されなかった
+ * 写真は一時領域に残るだけなので、あとからまとめて削除できる。
  */
 export function PhotoUploader({
   name,
-  prefix,
+  userId,
+  draftKey,
   max = 10,
   initial = [],
   label = "写真",
 }: {
   name: string;
-  /** 例: trips/{tripId}/visits/{visitId} */
-  prefix: string;
+  userId: string;
+  /** 下書きごとの識別子。同じ画面を開き直しても同じ一時フォルダを使う */
+  draftKey: string;
   max?: number;
   initial?: UploadedPhoto[];
   label?: string;
 }) {
   const [uploaded, setUploaded] = useState<UploadedPhoto[]>(initial);
   const [pending, setPending] = useState<PendingItem[]>([]);
+  const [draftToken, setDraftToken] = useState("");
   const inputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    const storageKey = `odekake:photo-draft:${draftKey}`;
+    const saved = window.sessionStorage.getItem(storageKey);
+    if (saved) {
+      setDraftToken(saved);
+      return;
+    }
+    const generated = crypto.randomUUID();
+    window.sessionStorage.setItem(storageKey, generated);
+    setDraftToken(generated);
+  }, [draftKey]);
 
   const total = uploaded.length + pending.length;
   const remaining = Math.max(0, max - total);
@@ -47,6 +67,7 @@ export function PhotoUploader({
         const supabase = createClient();
         const blob = await compressImage(item.file);
         const extension = extensionFor(blob.type || item.file.type);
+        const prefix = tmpPrefixFor(userId, draftToken || item.localId);
         const path = `${prefix}/${crypto.randomUUID()}.${extension}`;
 
         const { error } = await supabase.storage.from("photos").upload(path, blob, {
@@ -70,7 +91,7 @@ export function PhotoUploader({
         );
       }
     },
-    [prefix],
+    [userId, draftToken],
   );
 
   const handleFiles = (files: FileList | null) => {
@@ -94,6 +115,9 @@ export function PhotoUploader({
 
   const removeUploaded = async (path: string) => {
     setUploaded((list) => list.filter((p) => p.path !== path));
+    // 保存済みの写真は、フォームを保存するまで実ファイルを消さない
+    // （保存せずに画面を離れたときに、写真だけが消えてしまうのを防ぐ）
+    if (!isTemporaryPath(path)) return;
     try {
       const supabase = createClient();
       await supabase.storage.from("photos").remove([path]);

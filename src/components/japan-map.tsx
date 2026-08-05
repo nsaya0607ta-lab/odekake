@@ -1,6 +1,6 @@
-import { PREFECTURES, getPrefecturesByRegion, viewBoxFor } from "@/lib/geo";
+import { PREFECTURES, getPrefecturesByRegion, insetsFor, shapeOf, viewBoxFor } from "@/lib/geo";
 import { REGIONS } from "@/lib/geo/regions";
-import { AreaMap, type MapShape } from "./area-map";
+import { AreaMap, type MapInsetFrame, type MapShape } from "./area-map";
 
 /** 地方名ラベルの位置（viewBox 座標。読みやすい場所を選んで調整している） */
 const REGION_LABEL: Record<string, [number, number]> = {
@@ -11,8 +11,11 @@ const REGION_LABEL: Record<string, [number, number]> = {
   kinki: [109.7, -34.4],
   chugoku: [107.2, -34.9],
   shikoku: [107.9, -33.5],
-  "kyushu-okinawa": [105.5, -32.3],
+  "kyushu-okinawa": [105.4, -31.4],
 };
+
+const framesOf = (scope: "national" | "regional", regionSlug?: string): MapInsetFrame[] =>
+  insetsFor(scope, regionSlug);
 
 /**
  * 日本地図（地方選択）。地方ごとに色分けし、タップでその地方の画面へ遷移する。
@@ -38,12 +41,13 @@ export function JapanMap({
     <div className={className}>
       <AreaMap
         shapes={shapes}
-        viewBox={viewBoxFor(PREFECTURES, 0.3)}
+        viewBox={viewBoxFor(PREFECTURES, "national", 0.3)}
+        insets={framesOf("national")}
         ariaLabel="日本地図。地方を選ぶと都道府県一覧へ移動します"
         className="h-auto w-full"
       />
-      <p className="mt-1 text-center text-[11px] text-ink-faint">
-        沖縄県は見やすさのため、地図の左上へ移動して表示しています。
+      <p className="mt-1 text-center text-[11px] leading-relaxed text-ink-faint">
+        破線の枠の中は、見やすさのため実際の位置から動かして描いています。
       </p>
     </div>
   );
@@ -62,34 +66,59 @@ export function RegionMap({
   className?: string;
 }) {
   const prefectures = getPrefecturesByRegion(regionSlug);
-  // 県が多い地方はラベルが重なるため、面積の小さい県のラベルは省く
-  const areaOf = (p: (typeof prefectures)[number]) =>
-    (p.bbox[2] - p.bbox[0]) * (p.bbox[3] - p.bbox[1]);
-  const showLabel = new Set(
-    prefectures.filter((p) => areaOf(p) > 0.12 || prefectures.length <= 5).map((p) => p.code),
-  );
-
-  const shapes: MapShape[] = prefectures.map((p) => ({
-    key: p.code,
-    name: p.name,
-    paths: [p.d],
-    tone: p.region.tone,
-    visited: Boolean(visitedPrefectures[p.code]),
-    href: `/map/${regionSlug}/${p.code}`,
-    labelAt: showLabel.has(p.code) ? p.center : null,
-  }));
-
-  const box = viewBoxFor(prefectures, 0.2);
+  const box = viewBoxFor(prefectures, "regional", 0.2);
   const width = Number(box.split(" ")[2] ?? 1);
+  const labelSize = Math.max(0.12, width / 26);
+
+  // 面積の小さい県と、すでに置いたラベルに近すぎる県のラベルは省いて重なりを避ける
+  const areaOf = (p: (typeof prefectures)[number]) => {
+    const [x0, y0, x1, y1] = shapeOf(p, "regional").bbox;
+    return (x1 - x0) * (y1 - y0);
+  };
+  const placed: Array<[number, number]> = [];
+  const showLabel = new Set<string>();
+  for (const p of [...prefectures].sort((a, b) => areaOf(b) - areaOf(a))) {
+    if (areaOf(p) <= 0.12 && prefectures.length > 5) continue;
+    const [cx, cy] = shapeOf(p, "regional").center;
+    const overlaps = placed.some(
+      ([px, py]) => Math.abs(px - cx) < labelSize * 2.4 && Math.abs(py - cy) < labelSize * 1.1,
+    );
+    if (overlaps) continue;
+    placed.push([cx, cy]);
+    showLabel.add(p.code);
+  }
+
+  const shapes: MapShape[] = prefectures.map((p) => {
+    const shape = shapeOf(p, "regional");
+    return {
+      key: p.code,
+      name: p.name,
+      paths: [shape.d],
+      tone: p.region.tone,
+      visited: Boolean(visitedPrefectures[p.code]),
+      href: `/map/${regionSlug}/${p.code}`,
+      labelAt: showLabel.has(p.code) ? shape.center : null,
+    };
+  });
+
+  const insets = framesOf("regional", regionSlug);
 
   return (
-    <AreaMap
-      shapes={shapes}
-      viewBox={box}
-      // 表示範囲が狭いほど文字も小さくする
-      labelSize={Math.max(0.12, width / 26)}
-      ariaLabel="地方の地図。都道府県を選ぶと市区町村一覧へ移動します"
-      className={className}
-    />
+    <div className={className}>
+      <AreaMap
+        shapes={shapes}
+        viewBox={box}
+        // 表示範囲が狭いほど文字も小さくする
+        labelSize={labelSize}
+        insets={insets}
+        ariaLabel="地方の地図。都道府県を選ぶと市区町村一覧へ移動します"
+        className="mx-auto h-auto w-full"
+      />
+      {insets.length > 0 ? (
+        <p className="mt-1 text-center text-[11px] leading-relaxed text-ink-faint">
+          破線の枠の中は、見やすさのため実際の位置から動かして描いています。
+        </p>
+      ) : null}
+    </div>
   );
 }

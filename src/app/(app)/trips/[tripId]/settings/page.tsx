@@ -4,6 +4,7 @@ import {
   deleteTripAction,
   regenerateInviteCodeAction,
   removeMemberAction,
+  resendInvitationAction,
 } from "@/app/actions/trips";
 import { ConfirmSubmitButton } from "@/components/confirm-submit-button";
 import { IconUsers } from "@/components/icons";
@@ -11,9 +12,11 @@ import { PageBody } from "@/components/page-body";
 import { PageHeader } from "@/components/page-header";
 import { formatDate } from "@/components/ui";
 import { getTripCoverUrl, getTripMembers } from "@/lib/data/trips";
+import { getMailer } from "@/lib/email";
 import { getSiteUrl } from "@/lib/supabase/env";
 import { requireUser } from "@/lib/supabase/server";
 import type { TripInvitationRow, TripRow } from "@/lib/supabase/types";
+import { InvitationActions } from "./invitation-row";
 import { InviteCodeBox } from "./invite-code-box";
 import { InviteMemberForm } from "./invite-member-form";
 import { TripSettingsForm } from "./trip-settings-form";
@@ -26,6 +29,13 @@ const STATUS_LABELS: Record<string, string> = {
   accepted: "参加済み",
   expired: "期限切れ",
   cancelled: "取り消し",
+};
+
+const EMAIL_STATUS_LABELS: Record<string, string> = {
+  not_sent: "メール未送信",
+  queued: "メール送信中",
+  sent: "メール送信済み",
+  failed: "メール送信に失敗",
 };
 
 export default async function TripSettingsPage({ params }: { params: Promise<{ tripId: string }> }) {
@@ -50,6 +60,8 @@ export default async function TripSettingsPage({ params }: { params: Promise<{ t
 
   const invitations = (invitationRows ?? []) as TripInvitationRow[];
   const isShared = trip.trip_type === "shared";
+  const emailSendingEnabled = getMailer().enabled;
+  const siteUrl = getSiteUrl();
 
   return (
     <>
@@ -57,17 +69,14 @@ export default async function TripSettingsPage({ params }: { params: Promise<{ t
       <PageBody>
         <section>
           <h2 className="mb-2 px-1 text-base font-bold">旅行の情報</h2>
-          <TripSettingsForm trip={trip} coverUrl={coverUrl} />
+          <TripSettingsForm userId={user.id} trip={trip} coverUrl={coverUrl} />
         </section>
 
         {isShared ? (
           <>
             <section>
               <h2 className="mb-2 px-1 text-base font-bold">招待</h2>
-              <InviteCodeBox
-                code={trip.invite_code ?? ""}
-                link={`${getSiteUrl()}/join/${trip.invite_code ?? ""}`}
-              />
+              <InviteCodeBox code={trip.invite_code ?? ""} link={`${siteUrl}/join/${trip.invite_code ?? ""}`} />
               <form action={regenerateInviteCodeAction} className="mt-2">
                 <input type="hidden" name="tripId" value={trip.id} />
                 <ConfirmSubmitButton
@@ -80,34 +89,63 @@ export default async function TripSettingsPage({ params }: { params: Promise<{ t
               </form>
 
               <div className="mt-4">
-                <InviteMemberForm tripId={trip.id} />
+                <InviteMemberForm tripId={trip.id} emailSendingEnabled={emailSendingEnabled} />
               </div>
 
               {invitations.length > 0 ? (
-                <ul className="mt-3 rough-card divide-y divide-line">
-                  {invitations.map((invitation) => (
-                    <li key={invitation.id} className="flex items-center gap-3 px-4 py-3">
-                      <span className="min-w-0 flex-1">
-                        <span className="block truncate text-sm font-semibold">
-                          {invitation.email ?? "コード招待"}
-                        </span>
-                        <span className="text-[11px] text-ink-faint">
-                          {STATUS_LABELS[invitation.status] ?? invitation.status}・コード {invitation.invite_code}・
-                          {formatDate(invitation.expires_at)}まで
-                        </span>
-                      </span>
-                      {invitation.status === "pending" ? (
-                        <form action={cancelInvitationAction}>
-                          <input type="hidden" name="invitationId" value={invitation.id} />
-                          <input type="hidden" name="tripId" value={trip.id} />
-                          <button type="submit" className="text-xs text-[#95505e] underline underline-offset-4">
-                            取り消す
-                          </button>
-                        </form>
-                      ) : null}
-                    </li>
-                  ))}
-                </ul>
+                <>
+                  <h3 className="mt-4 mb-2 px-1 text-sm font-bold text-ink-soft">招待の状況</h3>
+                  <ul className="rough-card divide-y divide-line">
+                    {invitations.map((invitation) => (
+                      <li key={invitation.id} className="space-y-2 px-4 py-3">
+                        <div className="flex items-start gap-3">
+                          <span className="min-w-0 flex-1">
+                            <span className="block truncate text-sm font-semibold">
+                              {invitation.email ?? "コード招待"}
+                            </span>
+                            <span className="mt-0.5 block text-[11px] text-ink-faint">
+                              {STATUS_LABELS[invitation.status] ?? invitation.status}
+                              {invitation.email ? `・${EMAIL_STATUS_LABELS[invitation.email_status] ?? ""}` : ""}
+                              ・{formatDate(invitation.expires_at)}まで
+                            </span>
+                            {invitation.email_error ? (
+                              <span className="mt-0.5 block text-[11px] text-[#a85c6a]">
+                                {invitation.email_error}
+                              </span>
+                            ) : null}
+                          </span>
+                          {invitation.status === "pending" ? (
+                            <InvitationActions
+                              code={invitation.invite_code}
+                              link={`${siteUrl}/join/${invitation.invite_code}`}
+                            />
+                          ) : null}
+                        </div>
+
+                        {invitation.status === "pending" ? (
+                          <div className="flex items-center gap-4">
+                            {invitation.email && emailSendingEnabled ? (
+                              <form action={resendInvitationAction}>
+                                <input type="hidden" name="invitationId" value={invitation.id} />
+                                <input type="hidden" name="tripId" value={trip.id} />
+                                <button type="submit" className="text-xs text-leaf-deep underline underline-offset-4">
+                                  もう一度送る
+                                </button>
+                              </form>
+                            ) : null}
+                            <form action={cancelInvitationAction}>
+                              <input type="hidden" name="invitationId" value={invitation.id} />
+                              <input type="hidden" name="tripId" value={trip.id} />
+                              <button type="submit" className="text-xs text-[#95505e] underline underline-offset-4">
+                                取り消す
+                              </button>
+                            </form>
+                          </div>
+                        ) : null}
+                      </li>
+                    ))}
+                  </ul>
+                </>
               ) : null}
             </section>
 

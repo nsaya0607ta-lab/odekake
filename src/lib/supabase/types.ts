@@ -1,6 +1,21 @@
 export type TripType = "solo" | "shared";
 export type TripRole = "owner" | "member" | "viewer";
 export type InvitationStatus = "pending" | "accepted" | "expired" | "cancelled";
+/** スポットの座標をどうやって決めたか */
+export type LocationSource = "municipality" | "address" | "map" | "device" | "place_search";
+export type InvitationEmailStatus = "not_sent" | "queued" | "sent" | "failed";
+export type TripActivityAction =
+  | "trip_created"
+  | "trip_updated"
+  | "member_joined"
+  | "member_left"
+  | "member_removed"
+  | "visit_added"
+  | "visit_updated"
+  | "visit_deleted"
+  | "photo_added"
+  | "photo_removed"
+  | "comment_added";
 
 export type ProfileRow = {
   id: string;
@@ -56,6 +71,13 @@ export type SpotRow = {
   opening_hours: string | null;
   closed_days: string | null;
   memo: string | null;
+  location_source: LocationSource;
+  location_accuracy_m: number | null;
+  location_updated_at: string | null;
+  place_provider: string | null;
+  place_id: string | null;
+  postal_code: string | null;
+  phone: string | null;
   created_at: string;
   updated_at: string;
 };
@@ -112,6 +134,26 @@ export type TripInvitationRow = {
   invite_code: string;
   status: InvitationStatus;
   expires_at: string;
+  created_at: string;
+  invited_by: string | null;
+  message: string | null;
+  email_status: InvitationEmailStatus;
+  email_sent_at: string | null;
+  email_error: string | null;
+  email_attempts: number;
+  accepted_by: string | null;
+  accepted_at: string | null;
+};
+
+export type TripActivityRow = {
+  id: string;
+  trip_id: string;
+  actor_id: string | null;
+  action: TripActivityAction;
+  target_type: string | null;
+  target_id: string | null;
+  target_label: string | null;
+  detail: Record<string, unknown>;
   created_at: string;
 };
 
@@ -187,6 +229,12 @@ export type Database = {
         Update: Partial<TripInvitationRow>;
         Relationships: [];
       };
+      trip_activities: {
+        Row: TripActivityRow;
+        Insert: never;
+        Update: never;
+        Relationships: [];
+      };
     };
     Views: Record<string, never>;
     Functions: {
@@ -198,6 +246,8 @@ export type Database = {
       trip_type: TripType;
       trip_role: TripRole;
       invitation_status: InvitationStatus;
+      location_source: LocationSource;
+      trip_activity_action: TripActivityAction;
     };
     CompositeTypes: Record<string, never>;
   };

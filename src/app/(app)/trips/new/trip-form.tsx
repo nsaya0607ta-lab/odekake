@@ -6,7 +6,7 @@ import { FormDraft } from "@/components/form-draft";
 import { emptyActionState, Field, FormMessage, SubmitButton } from "@/components/form";
 import { PhotoUploader } from "@/components/photo-uploader";
 
-export function TripForm({ defaultType }: { defaultType: "solo" | "shared" }) {
+export function TripForm({ userId, defaultType }: { userId: string; defaultType: "solo" | "shared" }) {
   const [state, formAction] = useActionState(createTripAction, emptyActionState);
   const [tripType, setTripType] = useState<"solo" | "shared">(
     (state.values?.tripType as "solo" | "shared") ?? defaultType,
@@ -113,7 +113,7 @@ export function TripForm({ defaultType }: { defaultType: "solo" | "shared" }) {
         />
       </Field>
 
-      {tripId ? <PhotoUploader name="coverPaths" prefix={`trips/${tripId}/cover`} max={1} label="表紙画像" /> : null}
+      <PhotoUploader name="coverPaths" userId={userId} draftKey="trip-new-cover" max={1} label="表紙画像" />
 
       {tripType === "shared" ? (
         <div className="rough-card space-y-3 p-4">
