@@ -44,7 +44,9 @@ export function PhotoUploader({
   const [uploaded, setUploaded] = useState<UploadedPhoto[]>(initial);
   const [pending, setPending] = useState<PendingItem[]>([]);
   const [draftToken, setDraftToken] = useState("");
+  const [submitWarning, setSubmitWarning] = useState<string | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+  const rootRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     const storageKey = `odekake:photo-draft:${draftKey}`;
@@ -57,6 +59,65 @@ export function PhotoUploader({
     window.sessionStorage.setItem(storageKey, generated);
     setDraftToken(generated);
   }, [draftKey]);
+
+  /**
+   * 写真の送信中・失敗中は、同じフォームの保存ボタンを無効化する。
+   * ボタン以外（Enterキーなど）から送信された場合も capture フェーズで止める。
+   */
+  useEffect(() => {
+    const form = rootRef.current?.closest("form");
+    if (!form) return;
+
+    const blocked = pending.length > 0;
+    const uploading = pending.some((item) => item.status === "uploading");
+    const submitControls = Array.from(
+      form.querySelectorAll<HTMLButtonElement | HTMLInputElement>('button[type="submit"], input[type="submit"]'),
+    );
+
+    for (const control of submitControls) {
+      if (blocked) {
+        if (control.dataset.photoUploadPreviousDisabled === undefined) {
+          control.dataset.photoUploadPreviousDisabled = control.disabled ? "true" : "false";
+        }
+        control.disabled = true;
+        control.setAttribute("aria-disabled", "true");
+      } else {
+        const wasDisabled = control.dataset.photoUploadPreviousDisabled === "true";
+        if (!wasDisabled) control.disabled = false;
+        delete control.dataset.photoUploadPreviousDisabled;
+        if (!wasDisabled) control.removeAttribute("aria-disabled");
+      }
+    }
+
+    if (blocked) form.dataset.photoUploadBlocked = "true";
+    else delete form.dataset.photoUploadBlocked;
+
+    const guardSubmit = (event: Event) => {
+      if (!blocked) return;
+      event.preventDefault();
+      event.stopImmediatePropagation();
+      setSubmitWarning(
+        uploading
+          ? "写真の送信が完了するまでお待ちください。"
+          : "送信に失敗した写真があります。再試行するか、写真を取り消してください。",
+      );
+    };
+
+    form.addEventListener("submit", guardSubmit, true);
+
+    if (!blocked) setSubmitWarning(null);
+
+    return () => {
+      form.removeEventListener("submit", guardSubmit, true);
+      for (const control of submitControls) {
+        const wasDisabled = control.dataset.photoUploadPreviousDisabled === "true";
+        if (!wasDisabled) control.disabled = false;
+        delete control.dataset.photoUploadPreviousDisabled;
+        if (!wasDisabled) control.removeAttribute("aria-disabled");
+      }
+      delete form.dataset.photoUploadBlocked;
+    };
+  }, [pending]);
 
   const total = uploaded.length + pending.length;
   const remaining = Math.max(0, max - total);
@@ -107,6 +168,7 @@ export function PhotoUploader({
       status: "uploading",
     }));
 
+    setSubmitWarning(null);
     setPending((list) => [...list, ...items]);
     for (const item of items) void upload(item);
 
@@ -127,7 +189,7 @@ export function PhotoUploader({
   };
 
   return (
-    <div>
+    <div ref={rootRef}>
       <p className="field-label">
         {label}
         <span className="ml-1.5 text-[11px] font-normal text-ink-faint">（最大{max}枚）</span>
@@ -165,6 +227,7 @@ export function PhotoUploader({
                 <button
                   type="button"
                   onClick={() => {
+                    setSubmitWarning(null);
                     setPending((list) =>
                       list.map((p) => (p.localId === item.localId ? { ...p, status: "uploading" } : p)),
                     );
@@ -179,7 +242,10 @@ export function PhotoUploader({
             {item.status === "error" ? (
               <button
                 type="button"
-                onClick={() => setPending((list) => list.filter((p) => p.localId !== item.localId))}
+                onClick={() => {
+                  setSubmitWarning(null);
+                  setPending((list) => list.filter((p) => p.localId !== item.localId));
+                }}
                 aria-label="この写真を取り消す"
                 className="absolute top-1 right-1 flex h-7 w-7 items-center justify-center rounded-full bg-paper/90 text-ink-soft"
               >
@@ -204,6 +270,12 @@ export function PhotoUploader({
       {pending.some((p) => p.status === "error") ? (
         <p className="mt-2 text-xs text-[#a85c6a]">
           {pending.find((p) => p.status === "error")?.error ?? "アップロードに失敗しました。"}
+        </p>
+      ) : null}
+
+      {submitWarning ? (
+        <p role="alert" className="mt-2 rounded-xl bg-blossom-soft px-3 py-2 text-xs text-[#8f4c59]">
+          {submitWarning}
         </p>
       ) : null}
 
