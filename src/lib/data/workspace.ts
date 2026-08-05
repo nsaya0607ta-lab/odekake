@@ -2,6 +2,7 @@ import { cookies } from "next/headers";
 import { cache } from "react";
 import type { TripRow } from "@/lib/supabase/types";
 import type { DB } from "./client";
+import { getTripSummaries } from "./trips";
 
 /**
  * 旅ワークスペース
@@ -60,51 +61,31 @@ function tripWorkspace(trip: TripRow, memberCount: number): Workspace {
 
 /** 参加しているすべてのワークスペースを、切替画面のために取り出す */
 export async function listWorkspaces(supabase: DB, userId: string): Promise<WorkspaceSummary[]> {
-  const currentId = await readWorkspaceId();
-
-  const { data: tripRows } = await supabase
-    .from("trips")
-    .select("*")
-    .order("start_date", { ascending: false, nullsFirst: false })
-    .order("created_at", { ascending: false });
-
-  const trips = (tripRows ?? []) as TripRow[];
-  const soloTrips = trips.filter((t) => t.trip_type === "solo" && t.owner_id === userId);
-  const sharedTrips = trips.filter((t) => t.trip_type === "shared");
-
-  const tripIds = trips.map((t) => t.id);
-  const [{ data: members }, { data: visits }] = await Promise.all([
-    tripIds.length > 0
-      ? supabase.from("trip_members").select("trip_id, user_id").in("trip_id", tripIds)
-      : Promise.resolve({ data: [] as Array<{ trip_id: string; user_id: string }> }),
-    tripIds.length > 0
-      ? supabase.from("visit_records").select("id, trip_id").in("trip_id", tripIds)
-      : Promise.resolve({ data: [] as Array<{ id: string; trip_id: string }> }),
+  const [currentId, tripSummaries] = await Promise.all([
+    readWorkspaceId(),
+    getTripSummaries(supabase, userId),
   ]);
 
-  const memberCount = new Map<string, number>();
-  for (const m of members ?? []) memberCount.set(m.trip_id, (memberCount.get(m.trip_id) ?? 0) + 1);
-
-  const visitCount = new Map<string, number>();
-  for (const v of visits ?? []) visitCount.set(v.trip_id, (visitCount.get(v.trip_id) ?? 0) + 1);
-
-  const soloIds = soloTrips.map((t) => t.id);
+  const soloTrips = tripSummaries.filter(
+    ({ trip }) => trip.trip_type === "solo" && trip.owner_id === userId,
+  );
+  const sharedTrips = tripSummaries.filter(({ trip }) => trip.trip_type === "shared");
+  const soloIds = soloTrips.map(({ trip }) => trip.id);
   const personal = personalWorkspace(soloIds);
 
-  const summaries: WorkspaceSummary[] = [
+  return [
     {
       ...personal,
-      visitCount: soloIds.reduce((sum, id) => sum + (visitCount.get(id) ?? 0), 0),
-      isCurrent: currentId === PERSONAL_WORKSPACE_ID || !sharedTrips.some((t) => t.id === currentId),
+      visitCount: soloTrips.reduce((sum, item) => sum + item.visitCount, 0),
+      isCurrent:
+        currentId === PERSONAL_WORKSPACE_ID || !sharedTrips.some(({ trip }) => trip.id === currentId),
     },
-    ...sharedTrips.map((trip) => ({
-      ...tripWorkspace(trip, memberCount.get(trip.id) ?? 1),
-      visitCount: visitCount.get(trip.id) ?? 0,
+    ...sharedTrips.map(({ trip, memberCount, visitCount }) => ({
+      ...tripWorkspace(trip, memberCount),
+      visitCount,
       isCurrent: currentId === trip.id,
     })),
   ];
-
-  return summaries;
 }
 
 const readWorkspaceId = cache(async function readWorkspaceId(): Promise<string> {
@@ -133,11 +114,12 @@ export async function resolveWorkspace(supabase: DB, userId: string): Promise<Wo
     }
   }
 
-  const { data: soloTrips } = await supabase
-    .from("trips")
-    .select("id")
-    .eq("trip_type", "solo")
-    .eq("owner_id", userId);
+  // 自分の旅では、ホームでも使う旅行一覧を共通キャッシュから取り出す。
+  // resolveWorkspace と listWorkspaces が同じ旅行を二重取得しない。
+  const summaries = await getTripSummaries(supabase, userId);
+  const soloTripIds = summaries
+    .filter(({ trip }) => trip.trip_type === "solo" && trip.owner_id === userId)
+    .map(({ trip }) => trip.id);
 
-  return personalWorkspace((soloTrips ?? []).map((t) => t.id));
+  return personalWorkspace(soloTripIds);
 }
