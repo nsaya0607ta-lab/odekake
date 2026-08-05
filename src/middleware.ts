@@ -11,6 +11,8 @@ const PUBLIC_PATHS = [
   "/reset-password",
   "/setup",
   "/auth",
+  "/privacy",
+  "/terms",
   "/manifest.webmanifest",
 ];
 
@@ -23,7 +25,14 @@ export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
   if (!env) {
-    if (pathname === "/setup" || pathname === "/manifest.webmanifest") return NextResponse.next();
+    if (
+      pathname === "/setup" ||
+      pathname === "/manifest.webmanifest" ||
+      pathname === "/privacy" ||
+      pathname === "/terms"
+    ) {
+      return NextResponse.next();
+    }
     const url = request.nextUrl.clone();
     url.pathname = "/setup";
     return NextResponse.redirect(url);
