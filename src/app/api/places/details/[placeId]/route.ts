@@ -55,7 +55,7 @@ export async function GET(
 
   const url = new URL(`https://places.googleapis.com/v1/places/${encodeURIComponent(placeId)}`);
   url.searchParams.set("languageCode", "ja");
-  url.searchParams.set("regionCode", "JP");
+  url.searchParams.set("regionCode", "jp");
   url.searchParams.set("sessionToken", sessionToken);
 
   const response = await fetch(url, {
