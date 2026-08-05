@@ -55,6 +55,16 @@ export async function updateProfileAction(_prev: ActionState, formData: FormData
 
   if (error) return { error: toJapaneseError(error, "プロフィールの更新に失敗しました。"), values };
 
+  // 通常画面は JWT の user_metadata からニックネームを即座に読めるようにする。
+  // profiles と同じ値を保持することで、画面遷移ごとのプロフィール取得を不要にする。
+  await supabase.auth.updateUser({
+    data: {
+      display_name: parsed.data.displayName,
+      profile_image_url: profileImagePath,
+    },
+  });
+
+  revalidatePath("/home");
   revalidatePath("/mypage");
   return { ok: true, message: "プロフィールを更新しました。", values };
 }
