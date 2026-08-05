@@ -61,8 +61,9 @@ export function PhotoUploader({
   }, [draftKey]);
 
   /**
-   * 写真の送信中・失敗中は、同じフォームの保存ボタンを無効化する。
-   * ボタン以外（Enterキーなど）から送信された場合も capture フェーズで止める。
+   * 写真の送信中・失敗中は同じフォームの保存操作を止める。
+   * React が管理している disabled 状態は直接上書きせず、フォーム属性と
+   * capture フェーズのガードで、タップ・Enter の両方を確実に防ぐ。
    */
   useEffect(() => {
     const form = rootRef.current?.closest("form");
@@ -70,24 +71,6 @@ export function PhotoUploader({
 
     const blocked = pending.length > 0;
     const uploading = pending.some((item) => item.status === "uploading");
-    const submitControls = Array.from(
-      form.querySelectorAll<HTMLButtonElement | HTMLInputElement>('button[type="submit"], input[type="submit"]'),
-    );
-
-    for (const control of submitControls) {
-      if (blocked) {
-        if (control.dataset.photoUploadPreviousDisabled === undefined) {
-          control.dataset.photoUploadPreviousDisabled = control.disabled ? "true" : "false";
-        }
-        control.disabled = true;
-        control.setAttribute("aria-disabled", "true");
-      } else {
-        const wasDisabled = control.dataset.photoUploadPreviousDisabled === "true";
-        if (!wasDisabled) control.disabled = false;
-        delete control.dataset.photoUploadPreviousDisabled;
-        if (!wasDisabled) control.removeAttribute("aria-disabled");
-      }
-    }
 
     if (blocked) form.dataset.photoUploadBlocked = "true";
     else delete form.dataset.photoUploadBlocked;
@@ -104,17 +87,10 @@ export function PhotoUploader({
     };
 
     form.addEventListener("submit", guardSubmit, true);
-
     if (!blocked) setSubmitWarning(null);
 
     return () => {
       form.removeEventListener("submit", guardSubmit, true);
-      for (const control of submitControls) {
-        const wasDisabled = control.dataset.photoUploadPreviousDisabled === "true";
-        if (!wasDisabled) control.disabled = false;
-        delete control.dataset.photoUploadPreviousDisabled;
-        if (!wasDisabled) control.removeAttribute("aria-disabled");
-      }
       delete form.dataset.photoUploadBlocked;
     };
   }, [pending]);
