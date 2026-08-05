@@ -49,11 +49,11 @@ export function PrefectureAreaBrowser({
     <div className="space-y-4">
       {hasMap ? (
         <section>
-          <h2 className="mb-2 px-1 text-base font-bold">エリアから選ぶ</h2>
+          <h2 className="mb-2 px-1 text-base font-bold">公式地域から選ぶ</h2>
           <div className="rough-card px-3 py-4">
             <p className="mb-2 text-center text-xs text-ink-soft">
               <span className="rough-pill bg-leaf-soft px-3 py-1 text-leaf-deep">
-                エリアをタップすると市区町村を拡大表示
+                地域をタップすると市区町村を拡大表示
               </span>
             </p>
             <AreaMap
@@ -61,19 +61,19 @@ export function PrefectureAreaBrowser({
               viewBox={viewBox}
               labelSize={labelSize}
               insets={insets}
-              ariaLabel={`${prefectureName}のエリア地図。エリアを選ぶと市区町村地図へ移動します`}
+              ariaLabel={`${prefectureName}の公式地域区分地図。地域を選ぶと市区町村地図へ移動します`}
               className="h-auto w-full"
               colorUnvisited
             />
             <p className="mt-2 text-center text-[11px] leading-relaxed text-ink-faint">
-              市区町村の位置をもとに、見やすい大きさへ自動でエリア分けしています。
+              総務省統計局の都道府県内経済圏を基本に、県が公表する行政区分を優先しています。
             </p>
           </div>
         </section>
       ) : null}
 
       <section>
-        <h2 className="mb-2 px-1 text-base font-bold">エリア一覧</h2>
+        <h2 className="mb-2 px-1 text-base font-bold">公式地域一覧</h2>
         <ul className="grid grid-cols-1 gap-2 min-[390px]:grid-cols-2">
           {areas.map((area) => (
             <li key={area.slug}>
