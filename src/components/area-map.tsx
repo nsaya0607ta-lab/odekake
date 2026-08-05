@@ -1,7 +1,7 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import type { KeyboardEvent } from "react";
+import { useState, type KeyboardEvent, type PointerEvent } from "react";
 
 export type MapTone = "pink" | "green" | "blue" | "yellow" | "purple" | "orange" | "teal" | "rose";
 
@@ -51,17 +51,39 @@ type Props = {
 
 export function AreaMap({ shapes, viewBox, labelSize = 0.62, insets = [], className, ariaLabel }: Props) {
   const router = useRouter();
+  const [pressedKey, setPressedKey] = useState<string | null>(null);
 
   // 表示倍率が変わっても境界線の太さがほぼ一定に見えるようにする
   const viewBoxWidth = Number(viewBox.split(" ")[2] ?? 1);
   const strokeWidth = viewBoxWidth / 300;
 
-  const activate = (href: string) => router.push(href);
+  const beginPress = (key: string, href: string) => {
+    setPressedKey(key);
+    router.prefetch(href);
+  };
 
-  const onKeyDown = (event: KeyboardEvent<SVGGElement>, href: string) => {
+  const activate = (key: string, href: string) => {
+    setPressedKey(key);
+    router.push(href);
+
+    // 遷移に失敗した場合でも選択状態が残り続けないようにする。
+    // 画面遷移を待たせるための遅延ではない。
+    window.setTimeout(() => {
+      setPressedKey((current) => (current === key ? null : current));
+    }, 900);
+  };
+
+  const onKeyDown = (event: KeyboardEvent<SVGGElement>, key: string, href: string) => {
     if (event.key === "Enter" || event.key === " ") {
       event.preventDefault();
-      activate(href);
+      activate(key, href);
+    }
+  };
+
+  const onPointerLeave = (event: PointerEvent<SVGGElement>, key: string) => {
+    // マウス操作ではホバー解除時に戻す。タッチ操作では指のわずかな移動で解除しない。
+    if (event.pointerType === "mouse") {
+      setPressedKey((current) => (current === key ? null : current));
     }
   };
 
@@ -101,26 +123,39 @@ export function AreaMap({ shapes, viewBox, labelSize = 0.62, insets = [], classN
 
       {shapes.map((shape) => {
         const tone = shape.visited ? TONES[shape.tone] : UNVISITED;
+        const isPressed = pressedKey === shape.key;
+
         return (
           <g
             key={shape.key}
             role="link"
             tabIndex={0}
             aria-label={`${shape.name}${shape.visited ? "（訪問済み）" : "（未訪問）"}`}
-            onClick={() => activate(shape.href)}
-            onKeyDown={(e) => onKeyDown(e, shape.href)}
+            onPointerDown={() => beginPress(shape.key, shape.href)}
+            onPointerCancel={() => setPressedKey((current) => (current === shape.key ? null : current))}
+            onPointerLeave={(event) => onPointerLeave(event, shape.key)}
+            onClick={() => activate(shape.key, shape.href)}
+            onKeyDown={(event) => onKeyDown(event, shape.key, shape.href)}
+            onBlur={() => setPressedKey((current) => (current === shape.key ? null : current))}
             className="cursor-pointer outline-none [&:focus-visible>path]:stroke-[#5d8049] [&:hover>path]:brightness-[0.97]"
+            style={{
+              transformBox: "fill-box",
+              transformOrigin: "center",
+              transform: isPressed ? "scale(0.975)" : "scale(1)",
+              filter: isPressed ? "brightness(0.93)" : "none",
+              transition: "transform 70ms ease-out, filter 70ms ease-out",
+            }}
           >
             <title>{shape.name}</title>
-            {shape.paths.map((d, i) => (
+            {shape.paths.map((d, index) => (
               <path
-                key={i}
+                key={index}
                 d={d}
                 fill={tone.fill}
-                stroke={tone.stroke}
-                strokeWidth={strokeWidth}
+                stroke={isPressed ? "#5d8049" : tone.stroke}
+                strokeWidth={isPressed ? strokeWidth * 3 : strokeWidth}
                 strokeLinejoin="round"
-                style={{ transition: "fill 160ms ease" }}
+                style={{ transition: "fill 120ms ease, stroke 70ms ease, stroke-width 70ms ease" }}
               />
             ))}
           </g>
