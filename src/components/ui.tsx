@@ -15,7 +15,10 @@ export function SectionHeading({
     <div className="mb-2 flex items-baseline justify-between gap-3 px-1">
       <h2 className="text-base font-bold">{title}</h2>
       {moreHref ? (
-        <Link href={moreHref} className="flex items-center gap-0.5 text-sm text-leaf-deep">
+        <Link
+          href={moreHref}
+          className="pressable tap-target -mr-2 flex items-center gap-0.5 rounded-full px-2 py-1 text-sm text-leaf-deep active:bg-paper-deep"
+        >
           {moreLabel}
           <IconChevronRight size={15} />
         </Link>
@@ -148,7 +151,7 @@ export function LinkRow({
   return (
     <Link
       href={href}
-      className="rough-card flex items-center gap-3 px-4 py-3 transition-transform active:scale-[0.99]"
+      className="rough-card pressable flex min-h-14 items-center gap-3 px-4 py-3 active:border-line-strong active:bg-paper-deep"
     >
       {leading}
       <span className="min-w-0 flex-1">
