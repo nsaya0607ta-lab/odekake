@@ -3,7 +3,18 @@ import { AreaMap, type MapShape } from "@/components/area-map";
 import { IconChevronRight } from "@/components/icons";
 import { VisitedBadge } from "@/components/ui";
 import type { MapFrame } from "@/components/municipality-map";
-import type { PrefectureArea } from "@/lib/geo/prefecture-areas";
+import type { AreaTone, PrefectureArea } from "@/lib/geo/prefecture-areas";
+
+const AREA_ACCENT: Record<AreaTone, string> = {
+  pink: "#f3d7dd",
+  blue: "#d7e5f0",
+  green: "#dceacc",
+  yellow: "#f2dda0",
+  purple: "#e4dcf1",
+  teal: "#d3eae4",
+  orange: "#f7e0cd",
+  rose: "#f5d9d2",
+};
 
 export function PrefectureAreaBrowser({
   prefectureName,
@@ -72,7 +83,8 @@ export function PrefectureAreaBrowser({
               >
                 <span
                   aria-hidden
-                  className={`h-9 w-2 shrink-0 rounded-full bg-${area.tone}-soft`}
+                  className="h-9 w-2 shrink-0 rounded-full"
+                  style={{ backgroundColor: AREA_ACCENT[area.tone] }}
                 />
                 <span className="min-w-0 flex-1">
                   <span className="block text-sm font-semibold leading-snug">{area.name}</span>
