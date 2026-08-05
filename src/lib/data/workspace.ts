@@ -114,12 +114,13 @@ export async function resolveWorkspace(supabase: DB, userId: string): Promise<Wo
     }
   }
 
-  // 自分の旅では、ホームでも使う旅行一覧を共通キャッシュから取り出す。
-  // resolveWorkspace と listWorkspaces が同じ旅行を二重取得しない。
-  const summaries = await getTripSummaries(supabase, userId);
-  const soloTripIds = summaries
-    .filter(({ trip }) => trip.trip_type === "solo" && trip.owner_id === userId)
-    .map(({ trip }) => trip.id);
+  // 地図など多くの画面では旅行IDだけあればよい。
+  // 件数集計まで行う getTripSummaries は使わず、最小限の1問い合わせにする。
+  const { data: soloTrips } = await supabase
+    .from("trips")
+    .select("id")
+    .eq("trip_type", "solo")
+    .eq("owner_id", userId);
 
-  return personalWorkspace(soloTripIds);
+  return personalWorkspace((soloTrips ?? []).map((trip) => trip.id));
 }
