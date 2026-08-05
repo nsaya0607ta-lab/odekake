@@ -32,10 +32,10 @@ export function BottomNav() {
                 <Link
                   href={href}
                   aria-current={active ? "page" : undefined}
-                  className="flex w-full flex-col items-center gap-1 pt-1.5 pb-2"
+                  className="pressable tap-target flex w-full flex-col items-center gap-1 rounded-2xl pt-1.5 pb-2 active:bg-paper-deep"
                 >
                   <span
-                    className={`flex h-12 w-12 items-center justify-center rounded-full border transition-transform active:scale-95 ${
+                    className={`flex h-12 w-12 items-center justify-center rounded-full border transition-colors duration-75 ${
                       active
                         ? "border-leaf-deep bg-leaf text-white"
                         : "border-leaf bg-leaf-soft text-leaf-deep"
@@ -54,7 +54,7 @@ export function BottomNav() {
               <Link
                 href={href}
                 aria-current={active ? "page" : undefined}
-                className={`flex w-full flex-col items-center justify-center gap-1 rounded-2xl py-2.5 transition-colors ${
+                className={`pressable tap-target flex w-full flex-col items-center justify-center gap-1 rounded-2xl py-2.5 active:bg-paper-deep ${
                   active ? "text-leaf-deep" : "text-ink-faint"
                 }`}
               >
