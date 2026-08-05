@@ -45,8 +45,12 @@ export function JapanMap({
         insets={framesOf("national")}
         ariaLabel="日本地図。地方を選ぶと都道府県一覧へ移動します"
         className="h-auto w-full"
+        colorUnvisited
       />
       <p className="mt-1 text-center text-[11px] leading-relaxed text-ink-faint">
+        地方ごとの色で表示しています。訪問した地方は少し濃くなります。
+      </p>
+      <p className="mt-0.5 text-center text-[11px] leading-relaxed text-ink-faint">
         破線の枠の中は、見やすさのため実際の位置から動かして描いています。
       </p>
     </div>
@@ -108,11 +112,11 @@ export function RegionMap({
       <AreaMap
         shapes={shapes}
         viewBox={box}
-        // 表示範囲が狭いほど文字も小さくする
         labelSize={labelSize}
         insets={insets}
-        ariaLabel="地方の地図。都道府県を選ぶと市区町村一覧へ移動します"
+        ariaLabel="地方の地図。都道府県を選ぶとエリア一覧へ移動します"
         className="mx-auto h-auto w-full"
+        colorUnvisited
       />
       {insets.length > 0 ? (
         <p className="mt-1 text-center text-[11px] leading-relaxed text-ink-faint">
