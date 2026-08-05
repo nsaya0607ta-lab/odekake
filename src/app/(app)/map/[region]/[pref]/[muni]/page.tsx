@@ -21,10 +21,12 @@ export async function generateMetadata({ params }: { params: Promise<{ muni: str
 
 export default async function MunicipalityPage({
   params,
+  searchParams,
 }: {
   params: Promise<{ region: string; pref: string; muni: string }>;
+  searchParams: Promise<{ area?: string }>;
 }) {
-  const { region: regionSlug, pref, muni } = await params;
+  const [{ region: regionSlug, pref, muni }, { area }] = await Promise.all([params, searchParams]);
   const region = getRegion(regionSlug);
   const prefecture = getPrefecture(pref);
   const municipality = getMunicipality(muni);
@@ -48,18 +50,22 @@ export default async function MunicipalityPage({
 
   const categories = [...categoryNames.entries()].map(([id, name]) => ({ id, name }));
   const newSpotHref = `/spots/new?pref=${prefecture.code}&muni=${municipality.code}`;
+  const backHref =
+    area && /^m\d{5}$/.test(area)
+      ? `/map/${region.slug}/${prefecture.code}/area/${area}`
+      : `/map/${region.slug}/${prefecture.code}`;
 
   return (
     <>
       <PageHeader
         title={municipality.name}
         subtitle={prefecture.name}
-        backHref={`/map/${region.slug}/${prefecture.code}`}
+        backHref={backHref}
         action={
           <Link
             href={newSpotHref}
             aria-label="スポットを追加"
-            className="flex h-10 w-10 items-center justify-center rounded-full border border-leaf bg-leaf-soft text-leaf-deep"
+            className="pressable flex h-10 w-10 items-center justify-center rounded-full border border-leaf bg-leaf-soft text-leaf-deep"
           >
             <IconPlus size={20} />
           </Link>
