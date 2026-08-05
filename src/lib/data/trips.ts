@@ -1,3 +1,4 @@
+import { cache } from "react";
 import type { TripActivityRow, TripMemberRow, TripRole, TripRow } from "@/lib/supabase/types";
 import type { DB } from "./client";
 import { signPhotoPath } from "./photos";
@@ -16,7 +17,14 @@ export type TripMemberInfo = {
   joinedAt: string;
 };
 
-export async function getTripSummaries(supabase: DB, userId: string): Promise<TripSummary[]> {
+/**
+ * 同じ画面内ではホーム・ワークスペース一覧など複数箇所から呼ばれる。
+ * React cache で1リクエスト中の重複したDB取得をまとめる。
+ */
+export const getTripSummaries = cache(async function getTripSummaries(
+  supabase: DB,
+  userId: string,
+): Promise<TripSummary[]> {
   const { data: trips } = await supabase
     .from("trips")
     .select("*")
@@ -51,7 +59,7 @@ export async function getTripSummaries(supabase: DB, userId: string): Promise<Tr
     visitCount: visitCount.get(trip.id) ?? 0,
     role: myRole.get(trip.id) ?? (trip.owner_id === userId ? "owner" : null),
   }));
-}
+});
 
 /** 訪問履歴の登録フォームで使う、旅行の選択肢（いまの旅ワークスペースの分だけ） */
 export async function getTripOptions(
