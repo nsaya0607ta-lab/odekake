@@ -7,9 +7,10 @@ export const metadata = { title: "確認メールを送信しました | おで�
 export default async function SignUpCompletePage({
   searchParams,
 }: {
-  searchParams: Promise<{ email?: string }>;
+  searchParams: Promise<{ email?: string; next?: string }>;
 }) {
-  const { email } = await searchParams;
+  const { email, next } = await searchParams;
+  const nextPath = next?.startsWith("/") && !next.startsWith("//") ? next : "/home";
 
   return (
     <div className="rough-card p-6 text-center">
@@ -28,10 +29,13 @@ export default async function SignUpCompletePage({
       </p>
 
       <div className="mt-6">
-        <ResendForm email={email ?? ""} />
+        <ResendForm email={email ?? ""} next={nextPath} />
       </div>
 
-      <Link href="/login" className="mt-5 inline-block text-sm text-leaf-deep underline underline-offset-4">
+      <Link
+        href={`/login?next=${encodeURIComponent(nextPath)}`}
+        className="mt-5 inline-block text-sm text-leaf-deep underline underline-offset-4"
+      >
         ログイン画面へ
       </Link>
     </div>
