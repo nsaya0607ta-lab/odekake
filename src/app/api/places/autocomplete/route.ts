@@ -67,7 +67,7 @@ export async function POST(request: Request) {
     input,
     sessionToken,
     languageCode: "ja",
-    regionCode: "JP",
+    regionCode: "jp",
     includedRegionCodes: ["jp"],
     includeQueryPredictions: false,
   };
