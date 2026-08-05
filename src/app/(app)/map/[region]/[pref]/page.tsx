@@ -57,7 +57,7 @@ export default async function PrefecturePage({
     };
   });
 
-  const prefectureAreas = buildPrefectureAreas(municipalities);
+  const prefectureAreas = buildPrefectureAreas(prefecture.code, municipalities);
   const prefectureEntry = areasIndex.prefecture.get(prefecture.code);
   const visitedCount = municipalities.filter((municipality) => municipality.level > 0).length;
 
@@ -82,7 +82,7 @@ export default async function PrefecturePage({
           <div className="h-8 w-px bg-line" />
           <div>
             <p className="text-2xl leading-none font-bold tabular-nums">{prefectureAreas.length}</p>
-            <p className="mt-1 text-xs text-ink-soft">エリア</p>
+            <p className="mt-1 text-xs text-ink-soft">公式エリア</p>
           </div>
         </section>
 

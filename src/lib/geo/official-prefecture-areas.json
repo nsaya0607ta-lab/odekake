@@ -1,0 +1,4438 @@
+{
+  "schemaVersion": 1,
+  "checkedAt": "2026-08-06",
+  "description": "総務省統計局の都道府県内経済圏を全国共通の公的区分として採用し、都道府県が明示する行政区分を優先した市区町村対応表。",
+  "sources": [
+    {
+      "title": "令和6年全国家計構造調査 都道府県内経済圏別市町村一覧",
+      "url": "https://www.stat.go.jp/data/zenkokukakei/2024/zuhyou/keizaiken2024.xlsx",
+      "sha256": "fffe0458c7f9a9dc94859d9ef06872484aa562a07839199e41f09fc94b6e6a44"
+    },
+    {
+      "title": "令和元年全国家計構造調査 都道府県内経済圏別市町村一覧（欠落補完用）",
+      "url": "https://www.stat.go.jp/data/zenkokukakei/2019/zuhyou/keizaiken.xlsx",
+      "sha256": "7539788f088f09c1243895e57abb0d68ef119a922e7e3003c098d543a63478eb"
+    },
+    {
+      "title": "山口県 行政上の8圏域",
+      "url": "https://faq.pref.yamaguchi.lg.jp/faq/detail.aspx?id=1216"
+    }
+  ],
+  "prefectures": {
+    "01": [
+      {
+        "slug": "official-b",
+        "name": "道央圏",
+        "label": "道央",
+        "tone": "pink",
+        "municipalityCodes": [
+          "01101",
+          "01102",
+          "01103",
+          "01104",
+          "01105",
+          "01106",
+          "01107",
+          "01108",
+          "01109",
+          "01110",
+          "01203",
+          "01205",
+          "01209",
+          "01210",
+          "01213",
+          "01215",
+          "01216",
+          "01217",
+          "01218",
+          "01222",
+          "01224",
+          "01225",
+          "01226",
+          "01227",
+          "01228",
+          "01230",
+          "01231",
+          "01233",
+          "01234",
+          "01235",
+          "01303",
+          "01304",
+          "01391",
+          "01392",
+          "01393",
+          "01394",
+          "01395",
+          "01396",
+          "01397",
+          "01398",
+          "01399",
+          "01400",
+          "01401",
+          "01402",
+          "01403",
+          "01404",
+          "01405",
+          "01406",
+          "01407",
+          "01408",
+          "01409",
+          "01423",
+          "01424",
+          "01425",
+          "01427",
+          "01428",
+          "01429",
+          "01430",
+          "01431",
+          "01432",
+          "01433",
+          "01434",
+          "01436",
+          "01437",
+          "01438",
+          "01452",
+          "01453",
+          "01454",
+          "01455",
+          "01456",
+          "01457",
+          "01458",
+          "01459",
+          "01460",
+          "01461",
+          "01462",
+          "01463",
+          "01464",
+          "01465",
+          "01468",
+          "01469",
+          "01470",
+          "01471",
+          "01472",
+          "01481",
+          "01482",
+          "01483",
+          "01484",
+          "01485",
+          "01486",
+          "01487",
+          "01571",
+          "01575",
+          "01578",
+          "01581",
+          "01584",
+          "01585",
+          "01586",
+          "01601",
+          "01602",
+          "01604",
+          "01607",
+          "01608",
+          "01609",
+          "01610"
+        ],
+        "sourceKind": "statistics-bureau-economic-area",
+        "sourceTitle": "令和6年全国家計構造調査 都道府県内経済圏別市町村一覧",
+        "sourceUrl": "https://www.stat.go.jp/data/zenkokukakei/2024/zuhyou/keizaiken2024.xlsx"
+      },
+      {
+        "slug": "official-a",
+        "name": "道南圏",
+        "label": "道南",
+        "tone": "blue",
+        "municipalityCodes": [
+          "01202",
+          "01236",
+          "01331",
+          "01332",
+          "01333",
+          "01334",
+          "01337",
+          "01343",
+          "01345",
+          "01346",
+          "01347",
+          "01361",
+          "01362",
+          "01363",
+          "01364",
+          "01367",
+          "01370",
+          "01371"
+        ],
+        "sourceKind": "statistics-bureau-economic-area",
+        "sourceTitle": "令和6年全国家計構造調査 都道府県内経済圏別市町村一覧",
+        "sourceUrl": "https://www.stat.go.jp/data/zenkokukakei/2024/zuhyou/keizaiken2024.xlsx"
+      },
+      {
+        "slug": "official-c",
+        "name": "道北圏",
+        "label": "道北",
+        "tone": "green",
+        "municipalityCodes": [
+          "01204",
+          "01212",
+          "01214",
+          "01220",
+          "01221",
+          "01229",
+          "01511",
+          "01512",
+          "01513",
+          "01514",
+          "01516",
+          "01517",
+          "01518",
+          "01519",
+          "01520"
+        ],
+        "sourceKind": "statistics-bureau-economic-area",
+        "sourceTitle": "令和6年全国家計構造調査 都道府県内経済圏別市町村一覧",
+        "sourceUrl": "https://www.stat.go.jp/data/zenkokukakei/2024/zuhyou/keizaiken2024.xlsx"
+      },
+      {
+        "slug": "official-f",
+        "name": "釧路・根室圏",
+        "label": "釧路・根室",
+        "tone": "yellow",
+        "municipalityCodes": [
+          "01206",
+          "01223",
+          "01661",
+          "01662",
+          "01663",
+          "01664",
+          "01665",
+          "01667",
+          "01668",
+          "01691",
+          "01692",
+          "01693",
+          "01694"
+        ],
+        "sourceKind": "statistics-bureau-economic-area",
+        "sourceTitle": "令和6年全国家計構造調査 都道府県内経済圏別市町村一覧",
+        "sourceUrl": "https://www.stat.go.jp/data/zenkokukakei/2024/zuhyou/keizaiken2024.xlsx"
+      },
+      {
+        "slug": "official-e",
+        "name": "十勝圏",
+        "label": "十勝",
+        "tone": "purple",
+        "municipalityCodes": [
+          "01207",
+          "01631",
+          "01632",
+          "01633",
+          "01634",
+          "01635",
+          "01636",
+          "01637",
+          "01638",
+          "01639",
+          "01641",
+          "01642",
+          "01643",
+          "01644",
+          "01645",
+          "01646",
+          "01647",
+          "01648",
+          "01649"
+        ],
+        "sourceKind": "statistics-bureau-economic-area",
+        "sourceTitle": "令和6年全国家計構造調査 都道府県内経済圏別市町村一覧",
+        "sourceUrl": "https://www.stat.go.jp/data/zenkokukakei/2024/zuhyou/keizaiken2024.xlsx"
+      },
+      {
+        "slug": "official-d",
+        "name": "オホーツク圏",
+        "label": "オホーツク",
+        "tone": "teal",
+        "municipalityCodes": [
+          "01208",
+          "01211",
+          "01219",
+          "01543",
+          "01544",
+          "01545",
+          "01546",
+          "01547",
+          "01549",
+          "01550",
+          "01552",
+          "01555",
+          "01559",
+          "01560",
+          "01561",
+          "01562",
+          "01563",
+          "01564"
+        ],
+        "sourceKind": "statistics-bureau-economic-area",
+        "sourceTitle": "令和6年全国家計構造調査 都道府県内経済圏別市町村一覧",
+        "sourceUrl": "https://www.stat.go.jp/data/zenkokukakei/2024/zuhyou/keizaiken2024.xlsx"
+      }
+    ],
+    "02": [
+      {
+        "slug": "official-a",
+        "name": "青森圏域",
+        "label": "青森",
+        "tone": "pink",
+        "municipalityCodes": [
+          "02201",
+          "02301",
+          "02303",
+          "02304",
+          "02307"
+        ],
+        "sourceKind": "statistics-bureau-economic-area",
+        "sourceTitle": "令和6年全国家計構造調査 都道府県内経済圏別市町村一覧",
+        "sourceUrl": "https://www.stat.go.jp/data/zenkokukakei/2024/zuhyou/keizaiken2024.xlsx"
+      },
+      {
+        "slug": "official-b",
+        "name": "弘前・五所川原圏域",
+        "label": "弘前・五所川原",
+        "tone": "blue",
+        "municipalityCodes": [
+          "02202",
+          "02204",
+          "02205",
+          "02209",
+          "02210",
+          "02321",
+          "02323",
+          "02343",
+          "02361",
+          "02362",
+          "02367",
+          "02381",
+          "02384",
+          "02387"
+        ],
+        "sourceKind": "statistics-bureau-economic-area",
+        "sourceTitle": "令和6年全国家計構造調査 都道府県内経済圏別市町村一覧",
+        "sourceUrl": "https://www.stat.go.jp/data/zenkokukakei/2024/zuhyou/keizaiken2024.xlsx"
+      },
+      {
+        "slug": "official-d",
+        "name": "八戸圏域",
+        "label": "八戸",
+        "tone": "green",
+        "municipalityCodes": [
+          "02203",
+          "02412",
+          "02441",
+          "02442",
+          "02443",
+          "02445",
+          "02446",
+          "02450"
+        ],
+        "sourceKind": "statistics-bureau-economic-area",
+        "sourceTitle": "令和6年全国家計構造調査 都道府県内経済圏別市町村一覧",
+        "sourceUrl": "https://www.stat.go.jp/data/zenkokukakei/2024/zuhyou/keizaiken2024.xlsx"
+      },
+      {
+        "slug": "official-c",
+        "name": "むつ・十和田・三沢圏域",
+        "label": "むつ・十和田・三沢",
+        "tone": "yellow",
+        "municipalityCodes": [
+          "02206",
+          "02207",
+          "02208",
+          "02401",
+          "02402",
+          "02405",
+          "02406",
+          "02408",
+          "02411",
+          "02423",
+          "02424",
+          "02425",
+          "02426"
+        ],
+        "sourceKind": "statistics-bureau-economic-area",
+        "sourceTitle": "令和6年全国家計構造調査 都道府県内経済圏別市町村一覧",
+        "sourceUrl": "https://www.stat.go.jp/data/zenkokukakei/2024/zuhyou/keizaiken2024.xlsx"
+      }
+    ],
+    "03": [
+      {
+        "slug": "official-a",
+        "name": "県央広域振興圏",
+        "label": "県央広域振興",
+        "tone": "pink",
+        "municipalityCodes": [
+          "03201",
+          "03214",
+          "03216",
+          "03301",
+          "03302",
+          "03303",
+          "03321",
+          "03322"
+        ],
+        "sourceKind": "statistics-bureau-economic-area",
+        "sourceTitle": "令和6年全国家計構造調査 都道府県内経済圏別市町村一覧",
+        "sourceUrl": "https://www.stat.go.jp/data/zenkokukakei/2024/zuhyou/keizaiken2024.xlsx"
+      },
+      {
+        "slug": "official-c",
+        "name": "沿岸広域振興圏",
+        "label": "沿岸広域振興",
+        "tone": "blue",
+        "municipalityCodes": [
+          "03202",
+          "03203",
+          "03210",
+          "03211",
+          "03441",
+          "03461",
+          "03482",
+          "03483",
+          "03484"
+        ],
+        "sourceKind": "statistics-bureau-economic-area",
+        "sourceTitle": "令和6年全国家計構造調査 都道府県内経済圏別市町村一覧",
+        "sourceUrl": "https://www.stat.go.jp/data/zenkokukakei/2024/zuhyou/keizaiken2024.xlsx"
+      },
+      {
+        "slug": "official-b",
+        "name": "県南広域振興圏",
+        "label": "県南広域振興",
+        "tone": "green",
+        "municipalityCodes": [
+          "03205",
+          "03206",
+          "03208",
+          "03209",
+          "03215",
+          "03366",
+          "03381",
+          "03402"
+        ],
+        "sourceKind": "statistics-bureau-economic-area",
+        "sourceTitle": "令和6年全国家計構造調査 都道府県内経済圏別市町村一覧",
+        "sourceUrl": "https://www.stat.go.jp/data/zenkokukakei/2024/zuhyou/keizaiken2024.xlsx"
+      },
+      {
+        "slug": "official-d",
+        "name": "県北広域振興圏",
+        "label": "県北広域振興",
+        "tone": "yellow",
+        "municipalityCodes": [
+          "03207",
+          "03213",
+          "03485",
+          "03501",
+          "03503",
+          "03506",
+          "03507",
+          "03524"
+        ],
+        "sourceKind": "statistics-bureau-economic-area",
+        "sourceTitle": "令和6年全国家計構造調査 都道府県内経済圏別市町村一覧",
+        "sourceUrl": "https://www.stat.go.jp/data/zenkokukakei/2024/zuhyou/keizaiken2024.xlsx"
+      }
+    ],
+    "04": [
+      {
+        "slug": "official-b",
+        "name": "仙台",
+        "label": "仙台",
+        "tone": "pink",
+        "municipalityCodes": [
+          "04101",
+          "04102",
+          "04103",
+          "04104",
+          "04105",
+          "04203",
+          "04207",
+          "04209",
+          "04211",
+          "04216",
+          "04361",
+          "04362",
+          "04401",
+          "04404",
+          "04406",
+          "04421",
+          "04422",
+          "04424"
+        ],
+        "sourceKind": "statistics-bureau-economic-area",
+        "sourceTitle": "令和6年全国家計構造調査 都道府県内経済圏別市町村一覧",
+        "sourceUrl": "https://www.stat.go.jp/data/zenkokukakei/2024/zuhyou/keizaiken2024.xlsx"
+      },
+      {
+        "slug": "official-c",
+        "name": "石巻・気仙沼",
+        "label": "石巻・気仙沼",
+        "tone": "blue",
+        "municipalityCodes": [
+          "04202",
+          "04205",
+          "04214",
+          "04581",
+          "04606"
+        ],
+        "sourceKind": "statistics-bureau-economic-area",
+        "sourceTitle": "令和6年全国家計構造調査 都道府県内経済圏別市町村一覧",
+        "sourceUrl": "https://www.stat.go.jp/data/zenkokukakei/2024/zuhyou/keizaiken2024.xlsx"
+      },
+      {
+        "slug": "official-a",
+        "name": "仙南",
+        "label": "仙南",
+        "tone": "green",
+        "municipalityCodes": [
+          "04206",
+          "04208",
+          "04301",
+          "04302",
+          "04321",
+          "04322",
+          "04323",
+          "04324",
+          "04341"
+        ],
+        "sourceKind": "statistics-bureau-economic-area",
+        "sourceTitle": "令和6年全国家計構造調査 都道府県内経済圏別市町村一覧",
+        "sourceUrl": "https://www.stat.go.jp/data/zenkokukakei/2024/zuhyou/keizaiken2024.xlsx"
+      },
+      {
+        "slug": "official-d",
+        "name": "大崎・栗原・登米",
+        "label": "大崎・栗原・登米",
+        "tone": "yellow",
+        "municipalityCodes": [
+          "04212",
+          "04213",
+          "04215",
+          "04444",
+          "04445",
+          "04501",
+          "04505"
+        ],
+        "sourceKind": "statistics-bureau-economic-area",
+        "sourceTitle": "令和6年全国家計構造調査 都道府県内経済圏別市町村一覧",
+        "sourceUrl": "https://www.stat.go.jp/data/zenkokukakei/2024/zuhyou/keizaiken2024.xlsx"
+      }
+    ],
+    "05": [
+      {
+        "slug": "official-b",
+        "name": "県央",
+        "label": "県央",
+        "tone": "pink",
+        "municipalityCodes": [
+          "05201",
+          "05206",
+          "05210",
+          "05211",
+          "05214",
+          "05361",
+          "05363",
+          "05366",
+          "05368"
+        ],
+        "sourceKind": "statistics-bureau-economic-area",
+        "sourceTitle": "令和6年全国家計構造調査 都道府県内経済圏別市町村一覧",
+        "sourceUrl": "https://www.stat.go.jp/data/zenkokukakei/2024/zuhyou/keizaiken2024.xlsx"
+      },
+      {
+        "slug": "official-a",
+        "name": "県北",
+        "label": "県北",
+        "tone": "blue",
+        "municipalityCodes": [
+          "05202",
+          "05204",
+          "05209",
+          "05213",
+          "05303",
+          "05327",
+          "05346",
+          "05348",
+          "05349"
+        ],
+        "sourceKind": "statistics-bureau-economic-area",
+        "sourceTitle": "令和6年全国家計構造調査 都道府県内経済圏別市町村一覧",
+        "sourceUrl": "https://www.stat.go.jp/data/zenkokukakei/2024/zuhyou/keizaiken2024.xlsx"
+      },
+      {
+        "slug": "official-c",
+        "name": "県南",
+        "label": "県南",
+        "tone": "green",
+        "municipalityCodes": [
+          "05203",
+          "05207",
+          "05212",
+          "05215",
+          "05434",
+          "05463",
+          "05464"
+        ],
+        "sourceKind": "statistics-bureau-economic-area",
+        "sourceTitle": "令和6年全国家計構造調査 都道府県内経済圏別市町村一覧",
+        "sourceUrl": "https://www.stat.go.jp/data/zenkokukakei/2024/zuhyou/keizaiken2024.xlsx"
+      }
+    ],
+    "06": [
+      {
+        "slug": "official-a",
+        "name": "村山地域",
+        "label": "村山",
+        "tone": "pink",
+        "municipalityCodes": [
+          "06201",
+          "06206",
+          "06207",
+          "06208",
+          "06210",
+          "06211",
+          "06212",
+          "06301",
+          "06302",
+          "06321",
+          "06322",
+          "06323",
+          "06324",
+          "06341"
+        ],
+        "sourceKind": "statistics-bureau-economic-area",
+        "sourceTitle": "令和6年全国家計構造調査 都道府県内経済圏別市町村一覧",
+        "sourceUrl": "https://www.stat.go.jp/data/zenkokukakei/2024/zuhyou/keizaiken2024.xlsx"
+      },
+      {
+        "slug": "official-c",
+        "name": "置賜地域",
+        "label": "置賜",
+        "tone": "blue",
+        "municipalityCodes": [
+          "06202",
+          "06209",
+          "06213",
+          "06381",
+          "06382",
+          "06401",
+          "06402",
+          "06403"
+        ],
+        "sourceKind": "statistics-bureau-economic-area",
+        "sourceTitle": "令和6年全国家計構造調査 都道府県内経済圏別市町村一覧",
+        "sourceUrl": "https://www.stat.go.jp/data/zenkokukakei/2024/zuhyou/keizaiken2024.xlsx"
+      },
+      {
+        "slug": "official-d",
+        "name": "庄内地域",
+        "label": "庄内",
+        "tone": "green",
+        "municipalityCodes": [
+          "06203",
+          "06204",
+          "06426",
+          "06428",
+          "06461"
+        ],
+        "sourceKind": "statistics-bureau-economic-area",
+        "sourceTitle": "令和6年全国家計構造調査 都道府県内経済圏別市町村一覧",
+        "sourceUrl": "https://www.stat.go.jp/data/zenkokukakei/2024/zuhyou/keizaiken2024.xlsx"
+      },
+      {
+        "slug": "official-b",
+        "name": "最上地域",
+        "label": "最上",
+        "tone": "yellow",
+        "municipalityCodes": [
+          "06205",
+          "06361",
+          "06362",
+          "06363",
+          "06364",
+          "06365",
+          "06366",
+          "06367"
+        ],
+        "sourceKind": "statistics-bureau-economic-area",
+        "sourceTitle": "令和6年全国家計構造調査 都道府県内経済圏別市町村一覧",
+        "sourceUrl": "https://www.stat.go.jp/data/zenkokukakei/2024/zuhyou/keizaiken2024.xlsx"
+      }
+    ],
+    "07": [
+      {
+        "slug": "official-a",
+        "name": "中通り",
+        "label": "中通り",
+        "tone": "pink",
+        "municipalityCodes": [
+          "07201",
+          "07203",
+          "07205",
+          "07207",
+          "07210",
+          "07211",
+          "07213",
+          "07214",
+          "07301",
+          "07303",
+          "07308",
+          "07322",
+          "07342",
+          "07344",
+          "07461",
+          "07464",
+          "07465",
+          "07466",
+          "07481",
+          "07482",
+          "07483",
+          "07484",
+          "07501",
+          "07502",
+          "07503",
+          "07504",
+          "07505",
+          "07521",
+          "07522"
+        ],
+        "sourceKind": "statistics-bureau-economic-area",
+        "sourceTitle": "令和6年全国家計構造調査 都道府県内経済圏別市町村一覧",
+        "sourceUrl": "https://www.stat.go.jp/data/zenkokukakei/2024/zuhyou/keizaiken2024.xlsx"
+      },
+      {
+        "slug": "official-b",
+        "name": "会津",
+        "label": "会津",
+        "tone": "blue",
+        "municipalityCodes": [
+          "07202",
+          "07208",
+          "07362",
+          "07364",
+          "07367",
+          "07368",
+          "07402",
+          "07405",
+          "07407",
+          "07408",
+          "07421",
+          "07422",
+          "07423",
+          "07444",
+          "07445",
+          "07446",
+          "07447"
+        ],
+        "sourceKind": "statistics-bureau-economic-area",
+        "sourceTitle": "令和6年全国家計構造調査 都道府県内経済圏別市町村一覧",
+        "sourceUrl": "https://www.stat.go.jp/data/zenkokukakei/2024/zuhyou/keizaiken2024.xlsx"
+      },
+      {
+        "slug": "official-c",
+        "name": "浜通り",
+        "label": "浜通り",
+        "tone": "green",
+        "municipalityCodes": [
+          "07204",
+          "07209",
+          "07212",
+          "07541",
+          "07542",
+          "07543",
+          "07544",
+          "07545",
+          "07546",
+          "07547",
+          "07548",
+          "07561",
+          "07564"
+        ],
+        "sourceKind": "statistics-bureau-economic-area",
+        "sourceTitle": "令和6年全国家計構造調査 都道府県内経済圏別市町村一覧",
+        "sourceUrl": "https://www.stat.go.jp/data/zenkokukakei/2024/zuhyou/keizaiken2024.xlsx"
+      }
+    ],
+    "08": [
+      {
+        "slug": "official-b",
+        "name": "県央",
+        "label": "県央",
+        "tone": "pink",
+        "municipalityCodes": [
+          "08201",
+          "08216",
+          "08221",
+          "08226",
+          "08236",
+          "08302",
+          "08309",
+          "08310",
+          "08341"
+        ],
+        "sourceKind": "statistics-bureau-economic-area",
+        "sourceTitle": "令和6年全国家計構造調査 都道府県内経済圏別市町村一覧",
+        "sourceUrl": "https://www.stat.go.jp/data/zenkokukakei/2024/zuhyou/keizaiken2024.xlsx"
+      },
+      {
+        "slug": "official-a",
+        "name": "県北",
+        "label": "県北",
+        "tone": "blue",
+        "municipalityCodes": [
+          "08202",
+          "08212",
+          "08214",
+          "08215",
+          "08225",
+          "08364"
+        ],
+        "sourceKind": "statistics-bureau-economic-area",
+        "sourceTitle": "令和6年全国家計構造調査 都道府県内経済圏別市町村一覧",
+        "sourceUrl": "https://www.stat.go.jp/data/zenkokukakei/2024/zuhyou/keizaiken2024.xlsx"
+      },
+      {
+        "slug": "official-d",
+        "name": "県南",
+        "label": "県南",
+        "tone": "green",
+        "municipalityCodes": [
+          "08203",
+          "08205",
+          "08208",
+          "08217",
+          "08219",
+          "08220",
+          "08224",
+          "08229",
+          "08230",
+          "08235",
+          "08442",
+          "08443",
+          "08447",
+          "08564"
+        ],
+        "sourceKind": "statistics-bureau-economic-area",
+        "sourceTitle": "令和6年全国家計構造調査 都道府県内経済圏別市町村一覧",
+        "sourceUrl": "https://www.stat.go.jp/data/zenkokukakei/2024/zuhyou/keizaiken2024.xlsx"
+      },
+      {
+        "slug": "official-e",
+        "name": "県西",
+        "label": "県西",
+        "tone": "yellow",
+        "municipalityCodes": [
+          "08204",
+          "08207",
+          "08210",
+          "08211",
+          "08227",
+          "08228",
+          "08231",
+          "08521",
+          "08542",
+          "08546"
+        ],
+        "sourceKind": "statistics-bureau-economic-area",
+        "sourceTitle": "令和6年全国家計構造調査 都道府県内経済圏別市町村一覧",
+        "sourceUrl": "https://www.stat.go.jp/data/zenkokukakei/2024/zuhyou/keizaiken2024.xlsx"
+      },
+      {
+        "slug": "official-c",
+        "name": "鹿行",
+        "label": "鹿行",
+        "tone": "purple",
+        "municipalityCodes": [
+          "08222",
+          "08223",
+          "08232",
+          "08233",
+          "08234"
+        ],
+        "sourceKind": "statistics-bureau-economic-area",
+        "sourceTitle": "令和6年全国家計構造調査 都道府県内経済圏別市町村一覧",
+        "sourceUrl": "https://www.stat.go.jp/data/zenkokukakei/2024/zuhyou/keizaiken2024.xlsx"
+      }
+    ],
+    "09": [
+      {
+        "slug": "official-b",
+        "name": "県央",
+        "label": "県央",
+        "tone": "pink",
+        "municipalityCodes": [
+          "09201",
+          "09205",
+          "09209",
+          "09301",
+          "09342",
+          "09343",
+          "09344",
+          "09345",
+          "09361"
+        ],
+        "sourceKind": "statistics-bureau-economic-area",
+        "sourceTitle": "令和6年全国家計構造調査 都道府県内経済圏別市町村一覧",
+        "sourceUrl": "https://www.stat.go.jp/data/zenkokukakei/2024/zuhyou/keizaiken2024.xlsx"
+      },
+      {
+        "slug": "official-c",
+        "name": "県南",
+        "label": "県南",
+        "tone": "blue",
+        "municipalityCodes": [
+          "09202",
+          "09203",
+          "09204",
+          "09208",
+          "09216",
+          "09364"
+        ],
+        "sourceKind": "statistics-bureau-economic-area",
+        "sourceTitle": "令和6年全国家計構造調査 都道府県内経済圏別市町村一覧",
+        "sourceUrl": "https://www.stat.go.jp/data/zenkokukakei/2024/zuhyou/keizaiken2024.xlsx"
+      },
+      {
+        "slug": "official-a",
+        "name": "県北",
+        "label": "県北",
+        "tone": "green",
+        "municipalityCodes": [
+          "09206",
+          "09210",
+          "09211",
+          "09213",
+          "09214",
+          "09215",
+          "09384",
+          "09386",
+          "09407",
+          "09411"
+        ],
+        "sourceKind": "statistics-bureau-economic-area",
+        "sourceTitle": "令和6年全国家計構造調査 都道府県内経済圏別市町村一覧",
+        "sourceUrl": "https://www.stat.go.jp/data/zenkokukakei/2024/zuhyou/keizaiken2024.xlsx"
+      }
+    ],
+    "10": [
+      {
+        "slug": "official-a",
+        "name": "中部",
+        "label": "中部",
+        "tone": "pink",
+        "municipalityCodes": [
+          "10201",
+          "10204",
+          "10208",
+          "10344",
+          "10345",
+          "10464"
+        ],
+        "sourceKind": "statistics-bureau-economic-area",
+        "sourceTitle": "令和6年全国家計構造調査 都道府県内経済圏別市町村一覧",
+        "sourceUrl": "https://www.stat.go.jp/data/zenkokukakei/2024/zuhyou/keizaiken2024.xlsx"
+      },
+      {
+        "slug": "official-c",
+        "name": "西部",
+        "label": "西部",
+        "tone": "blue",
+        "municipalityCodes": [
+          "10202",
+          "10209",
+          "10210",
+          "10211",
+          "10366",
+          "10367",
+          "10382",
+          "10383",
+          "10384"
+        ],
+        "sourceKind": "statistics-bureau-economic-area",
+        "sourceTitle": "令和6年全国家計構造調査 都道府県内経済圏別市町村一覧",
+        "sourceUrl": "https://www.stat.go.jp/data/zenkokukakei/2024/zuhyou/keizaiken2024.xlsx"
+      },
+      {
+        "slug": "official-b",
+        "name": "東部",
+        "label": "東部",
+        "tone": "green",
+        "municipalityCodes": [
+          "10203",
+          "10205",
+          "10207",
+          "10212",
+          "10521",
+          "10522",
+          "10523",
+          "10524",
+          "10525"
+        ],
+        "sourceKind": "statistics-bureau-economic-area",
+        "sourceTitle": "令和6年全国家計構造調査 都道府県内経済圏別市町村一覧",
+        "sourceUrl": "https://www.stat.go.jp/data/zenkokukakei/2024/zuhyou/keizaiken2024.xlsx"
+      },
+      {
+        "slug": "official-d",
+        "name": "吾妻・利根沼田",
+        "label": "吾妻・利根沼田",
+        "tone": "yellow",
+        "municipalityCodes": [
+          "10206",
+          "10421",
+          "10424",
+          "10425",
+          "10426",
+          "10428",
+          "10429",
+          "10443",
+          "10444",
+          "10448",
+          "10449"
+        ],
+        "sourceKind": "statistics-bureau-economic-area",
+        "sourceTitle": "令和6年全国家計構造調査 都道府県内経済圏別市町村一覧",
+        "sourceUrl": "https://www.stat.go.jp/data/zenkokukakei/2024/zuhyou/keizaiken2024.xlsx"
+      }
+    ],
+    "11": [
+      {
+        "slug": "official-a",
+        "name": "さいたま",
+        "label": "さいたま",
+        "tone": "pink",
+        "municipalityCodes": [
+          "11101",
+          "11102",
+          "11103",
+          "11104",
+          "11105",
+          "11106",
+          "11107",
+          "11108",
+          "11109",
+          "11110"
+        ],
+        "sourceKind": "statistics-bureau-economic-area",
+        "sourceTitle": "令和6年全国家計構造調査 都道府県内経済圏別市町村一覧",
+        "sourceUrl": "https://www.stat.go.jp/data/zenkokukakei/2024/zuhyou/keizaiken2024.xlsx"
+      },
+      {
+        "slug": "official-d",
+        "name": "川越比企",
+        "label": "川越比企",
+        "tone": "blue",
+        "municipalityCodes": [
+          "11201",
+          "11212",
+          "11239",
+          "11241",
+          "11326",
+          "11327",
+          "11341",
+          "11342",
+          "11343",
+          "11346",
+          "11347",
+          "11348",
+          "11349",
+          "11369"
+        ],
+        "sourceKind": "statistics-bureau-economic-area",
+        "sourceTitle": "令和6年全国家計構造調査 都道府県内経済圏別市町村一覧",
+        "sourceUrl": "https://www.stat.go.jp/data/zenkokukakei/2024/zuhyou/keizaiken2024.xlsx"
+      },
+      {
+        "slug": "official-i",
+        "name": "秩父・北部",
+        "label": "秩父・北部",
+        "tone": "green",
+        "municipalityCodes": [
+          "11202",
+          "11207",
+          "11211",
+          "11218",
+          "11361",
+          "11362",
+          "11363",
+          "11365",
+          "11381",
+          "11383",
+          "11385",
+          "11408"
+        ],
+        "sourceKind": "statistics-bureau-economic-area",
+        "sourceTitle": "令和6年全国家計構造調査 都道府県内経済圏別市町村一覧",
+        "sourceUrl": "https://www.stat.go.jp/data/zenkokukakei/2024/zuhyou/keizaiken2024.xlsx"
+      },
+      {
+        "slug": "official-b",
+        "name": "南部",
+        "label": "南部",
+        "tone": "yellow",
+        "municipalityCodes": [
+          "11203",
+          "11223",
+          "11224"
+        ],
+        "sourceKind": "statistics-bureau-economic-area",
+        "sourceTitle": "令和6年全国家計構造調査 都道府県内経済圏別市町村一覧",
+        "sourceUrl": "https://www.stat.go.jp/data/zenkokukakei/2024/zuhyou/keizaiken2024.xlsx"
+      },
+      {
+        "slug": "official-g",
+        "name": "利根",
+        "label": "利根",
+        "tone": "purple",
+        "municipalityCodes": [
+          "11206",
+          "11210",
+          "11216",
+          "11232",
+          "11238",
+          "11240",
+          "11246",
+          "11442",
+          "11464"
+        ],
+        "sourceKind": "statistics-bureau-economic-area",
+        "sourceTitle": "令和6年全国家計構造調査 都道府県内経済圏別市町村一覧",
+        "sourceUrl": "https://www.stat.go.jp/data/zenkokukakei/2024/zuhyou/keizaiken2024.xlsx"
+      },
+      {
+        "slug": "official-e",
+        "name": "西部",
+        "label": "西部",
+        "tone": "teal",
+        "municipalityCodes": [
+          "11208",
+          "11209",
+          "11215",
+          "11225",
+          "11242"
+        ],
+        "sourceKind": "statistics-bureau-economic-area",
+        "sourceTitle": "令和6年全国家計構造調査 都道府県内経済圏別市町村一覧",
+        "sourceUrl": "https://www.stat.go.jp/data/zenkokukakei/2024/zuhyou/keizaiken2024.xlsx"
+      },
+      {
+        "slug": "official-h",
+        "name": "東部",
+        "label": "東部",
+        "tone": "orange",
+        "municipalityCodes": [
+          "11214",
+          "11221",
+          "11222",
+          "11234",
+          "11237",
+          "11243",
+          "11465"
+        ],
+        "sourceKind": "statistics-bureau-economic-area",
+        "sourceTitle": "令和6年全国家計構造調査 都道府県内経済圏別市町村一覧",
+        "sourceUrl": "https://www.stat.go.jp/data/zenkokukakei/2024/zuhyou/keizaiken2024.xlsx"
+      },
+      {
+        "slug": "official-c",
+        "name": "県央",
+        "label": "県央",
+        "tone": "rose",
+        "municipalityCodes": [
+          "11217",
+          "11219",
+          "11231",
+          "11233",
+          "11301"
+        ],
+        "sourceKind": "statistics-bureau-economic-area",
+        "sourceTitle": "令和6年全国家計構造調査 都道府県内経済圏別市町村一覧",
+        "sourceUrl": "https://www.stat.go.jp/data/zenkokukakei/2024/zuhyou/keizaiken2024.xlsx"
+      },
+      {
+        "slug": "official-f",
+        "name": "南西部",
+        "label": "南西部",
+        "tone": "pink",
+        "municipalityCodes": [
+          "11227",
+          "11228",
+          "11229",
+          "11230",
+          "11235",
+          "11245",
+          "11324"
+        ],
+        "sourceKind": "statistics-bureau-economic-area",
+        "sourceTitle": "令和6年全国家計構造調査 都道府県内経済圏別市町村一覧",
+        "sourceUrl": "https://www.stat.go.jp/data/zenkokukakei/2024/zuhyou/keizaiken2024.xlsx"
+      }
+    ],
+    "12": [
+      {
+        "slug": "official-a",
+        "name": "湾岸",
+        "label": "湾岸",
+        "tone": "pink",
+        "municipalityCodes": [
+          "12101",
+          "12102",
+          "12103",
+          "12104",
+          "12105",
+          "12106",
+          "12203",
+          "12204",
+          "12216",
+          "12221",
+          "12227"
+        ],
+        "sourceKind": "statistics-bureau-economic-area",
+        "sourceTitle": "令和6年全国家計構造調査 都道府県内経済圏別市町村一覧",
+        "sourceUrl": "https://www.stat.go.jp/data/zenkokukakei/2024/zuhyou/keizaiken2024.xlsx"
+      },
+      {
+        "slug": "official-e",
+        "name": "香取・東総",
+        "label": "香取・東総",
+        "tone": "blue",
+        "municipalityCodes": [
+          "12202",
+          "12215",
+          "12235",
+          "12236",
+          "12342",
+          "12347",
+          "12349"
+        ],
+        "sourceKind": "statistics-bureau-economic-area",
+        "sourceTitle": "令和6年全国家計構造調査 都道府県内経済圏別市町村一覧",
+        "sourceUrl": "https://www.stat.go.jp/data/zenkokukakei/2024/zuhyou/keizaiken2024.xlsx"
+      },
+      {
+        "slug": "official-g",
+        "name": "南房総",
+        "label": "南房総",
+        "tone": "green",
+        "municipalityCodes": [
+          "12205",
+          "12218",
+          "12223",
+          "12234",
+          "12238",
+          "12441",
+          "12443",
+          "12463"
+        ],
+        "sourceKind": "statistics-bureau-economic-area",
+        "sourceTitle": "令和6年全国家計構造調査 都道府県内経済圏別市町村一覧",
+        "sourceUrl": "https://www.stat.go.jp/data/zenkokukakei/2024/zuhyou/keizaiken2024.xlsx"
+      },
+      {
+        "slug": "official-b",
+        "name": "圏央道西",
+        "label": "圏央道西",
+        "tone": "yellow",
+        "municipalityCodes": [
+          "12206",
+          "12219",
+          "12225",
+          "12226",
+          "12229"
+        ],
+        "sourceKind": "statistics-bureau-economic-area",
+        "sourceTitle": "令和6年全国家計構造調査 都道府県内経済圏別市町村一覧",
+        "sourceUrl": "https://www.stat.go.jp/data/zenkokukakei/2024/zuhyou/keizaiken2024.xlsx"
+      },
+      {
+        "slug": "official-c",
+        "name": "東葛飾",
+        "label": "東葛飾",
+        "tone": "purple",
+        "municipalityCodes": [
+          "12207",
+          "12208",
+          "12217",
+          "12220",
+          "12222",
+          "12224"
+        ],
+        "sourceKind": "statistics-bureau-economic-area",
+        "sourceTitle": "令和6年全国家計構造調査 都道府県内経済圏別市町村一覧",
+        "sourceUrl": "https://www.stat.go.jp/data/zenkokukakei/2024/zuhyou/keizaiken2024.xlsx"
+      },
+      {
+        "slug": "official-f",
+        "name": "圏央道東",
+        "label": "圏央道東",
+        "tone": "teal",
+        "municipalityCodes": [
+          "12210",
+          "12213",
+          "12237",
+          "12239",
+          "12403",
+          "12410",
+          "12421",
+          "12422",
+          "12423",
+          "12424",
+          "12426",
+          "12427"
+        ],
+        "sourceKind": "statistics-bureau-economic-area",
+        "sourceTitle": "令和6年全国家計構造調査 都道府県内経済圏別市町村一覧",
+        "sourceUrl": "https://www.stat.go.jp/data/zenkokukakei/2024/zuhyou/keizaiken2024.xlsx"
+      },
+      {
+        "slug": "official-d",
+        "name": "空港",
+        "label": "空港",
+        "tone": "orange",
+        "municipalityCodes": [
+          "12211",
+          "12212",
+          "12228",
+          "12230",
+          "12231",
+          "12232",
+          "12233",
+          "12322",
+          "12329",
+          "12409"
+        ],
+        "sourceKind": "statistics-bureau-economic-area",
+        "sourceTitle": "令和6年全国家計構造調査 都道府県内経済圏別市町村一覧",
+        "sourceUrl": "https://www.stat.go.jp/data/zenkokukakei/2024/zuhyou/keizaiken2024.xlsx"
+      }
+    ],
+    "13": [
+      {
+        "slug": "official-a",
+        "name": "区部センターコアエリア",
+        "label": "区部センターコアエリア",
+        "tone": "pink",
+        "municipalityCodes": [
+          "13101",
+          "13102",
+          "13103",
+          "13104",
+          "13105",
+          "13106",
+          "13107",
+          "13108",
+          "13113",
+          "13116",
+          "13118"
+        ],
+        "sourceKind": "statistics-bureau-economic-area",
+        "sourceTitle": "令和6年全国家計構造調査 都道府県内経済圏別市町村一覧",
+        "sourceUrl": "https://www.stat.go.jp/data/zenkokukakei/2024/zuhyou/keizaiken2024.xlsx"
+      },
+      {
+        "slug": "official-c",
+        "name": "区部西部・南部エリア",
+        "label": "区部西部・南部エリア",
+        "tone": "blue",
+        "municipalityCodes": [
+          "13109",
+          "13110",
+          "13111",
+          "13112",
+          "13114",
+          "13115",
+          "13120"
+        ],
+        "sourceKind": "statistics-bureau-economic-area",
+        "sourceTitle": "令和6年全国家計構造調査 都道府県内経済圏別市町村一覧",
+        "sourceUrl": "https://www.stat.go.jp/data/zenkokukakei/2024/zuhyou/keizaiken2024.xlsx"
+      },
+      {
+        "slug": "official-b",
+        "name": "区部東部・北部エリア",
+        "label": "区部東部・北部エリア",
+        "tone": "green",
+        "municipalityCodes": [
+          "13117",
+          "13119",
+          "13121",
+          "13122",
+          "13123"
+        ],
+        "sourceKind": "statistics-bureau-economic-area",
+        "sourceTitle": "令和6年全国家計構造調査 都道府県内経済圏別市町村一覧",
+        "sourceUrl": "https://www.stat.go.jp/data/zenkokukakei/2024/zuhyou/keizaiken2024.xlsx"
+      },
+      {
+        "slug": "official-d",
+        "name": "多摩・島嶼エリア",
+        "label": "多摩・島嶼エリア",
+        "tone": "yellow",
+        "municipalityCodes": [
+          "13201",
+          "13202",
+          "13203",
+          "13204",
+          "13205",
+          "13206",
+          "13207",
+          "13208",
+          "13209",
+          "13210",
+          "13211",
+          "13212",
+          "13213",
+          "13214",
+          "13215",
+          "13218",
+          "13219",
+          "13220",
+          "13221",
+          "13222",
+          "13223",
+          "13224",
+          "13225",
+          "13227",
+          "13228",
+          "13229",
+          "13303",
+          "13305",
+          "13307",
+          "13308",
+          "13361",
+          "13363",
+          "13364",
+          "13381",
+          "13382",
+          "13401",
+          "13402",
+          "13421"
+        ],
+        "sourceKind": "statistics-bureau-economic-area",
+        "sourceTitle": "令和6年全国家計構造調査 都道府県内経済圏別市町村一覧",
+        "sourceUrl": "https://www.stat.go.jp/data/zenkokukakei/2024/zuhyou/keizaiken2024.xlsx"
+      }
+    ],
+    "14": [
+      {
+        "slug": "official-a",
+        "name": "川崎・横浜",
+        "label": "川崎・横浜",
+        "tone": "pink",
+        "municipalityCodes": [
+          "14101",
+          "14102",
+          "14103",
+          "14104",
+          "14105",
+          "14106",
+          "14107",
+          "14108",
+          "14109",
+          "14110",
+          "14111",
+          "14112",
+          "14113",
+          "14114",
+          "14115",
+          "14116",
+          "14117",
+          "14118",
+          "14131",
+          "14132",
+          "14133",
+          "14134",
+          "14135",
+          "14136",
+          "14137",
+          "14151",
+          "14152",
+          "14153"
+        ],
+        "sourceKind": "statistics-bureau-economic-area",
+        "sourceTitle": "令和6年全国家計構造調査 都道府県内経済圏別市町村一覧",
+        "sourceUrl": "https://www.stat.go.jp/data/zenkokukakei/2024/zuhyou/keizaiken2024.xlsx"
+      },
+      {
+        "slug": "official-b",
+        "name": "三浦半島",
+        "label": "三浦半島",
+        "tone": "blue",
+        "municipalityCodes": [
+          "14201",
+          "14204",
+          "14208",
+          "14210",
+          "14301"
+        ],
+        "sourceKind": "statistics-bureau-economic-area",
+        "sourceTitle": "令和6年全国家計構造調査 都道府県内経済圏別市町村一覧",
+        "sourceUrl": "https://www.stat.go.jp/data/zenkokukakei/2024/zuhyou/keizaiken2024.xlsx"
+      },
+      {
+        "slug": "official-d",
+        "name": "湘南",
+        "label": "湘南",
+        "tone": "green",
+        "municipalityCodes": [
+          "14203",
+          "14205",
+          "14207",
+          "14211",
+          "14214",
+          "14321",
+          "14341",
+          "14342"
+        ],
+        "sourceKind": "statistics-bureau-economic-area",
+        "sourceTitle": "令和6年全国家計構造調査 都道府県内経済圏別市町村一覧",
+        "sourceUrl": "https://www.stat.go.jp/data/zenkokukakei/2024/zuhyou/keizaiken2024.xlsx"
+      },
+      {
+        "slug": "official-e",
+        "name": "県西",
+        "label": "県西",
+        "tone": "yellow",
+        "municipalityCodes": [
+          "14206",
+          "14217",
+          "14361",
+          "14362",
+          "14363",
+          "14364",
+          "14366",
+          "14382",
+          "14383",
+          "14384"
+        ],
+        "sourceKind": "statistics-bureau-economic-area",
+        "sourceTitle": "令和6年全国家計構造調査 都道府県内経済圏別市町村一覧",
+        "sourceUrl": "https://www.stat.go.jp/data/zenkokukakei/2024/zuhyou/keizaiken2024.xlsx"
+      },
+      {
+        "slug": "official-c",
+        "name": "県央",
+        "label": "県央",
+        "tone": "purple",
+        "municipalityCodes": [
+          "14212",
+          "14213",
+          "14215",
+          "14216",
+          "14218",
+          "14401",
+          "14402"
+        ],
+        "sourceKind": "statistics-bureau-economic-area",
+        "sourceTitle": "令和6年全国家計構造調査 都道府県内経済圏別市町村一覧",
+        "sourceUrl": "https://www.stat.go.jp/data/zenkokukakei/2024/zuhyou/keizaiken2024.xlsx"
+      }
+    ],
+    "15": [
+      {
+        "slug": "official-a",
+        "name": "下越・佐渡地域",
+        "label": "下越・佐渡",
+        "tone": "pink",
+        "municipalityCodes": [
+          "15101",
+          "15102",
+          "15103",
+          "15104",
+          "15105",
+          "15106",
+          "15107",
+          "15108",
+          "15204",
+          "15206",
+          "15209",
+          "15212",
+          "15213",
+          "15218",
+          "15223",
+          "15224",
+          "15227",
+          "15307",
+          "15342",
+          "15361",
+          "15385",
+          "15581",
+          "15586"
+        ],
+        "sourceKind": "statistics-bureau-economic-area",
+        "sourceTitle": "令和6年全国家計構造調査 都道府県内経済圏別市町村一覧",
+        "sourceUrl": "https://www.stat.go.jp/data/zenkokukakei/2024/zuhyou/keizaiken2024.xlsx"
+      },
+      {
+        "slug": "official-b",
+        "name": "長岡地域",
+        "label": "長岡",
+        "tone": "blue",
+        "municipalityCodes": [
+          "15202",
+          "15205",
+          "15208",
+          "15210",
+          "15211",
+          "15225",
+          "15226",
+          "15405",
+          "15461",
+          "15482",
+          "15504"
+        ],
+        "sourceKind": "statistics-bureau-economic-area",
+        "sourceTitle": "令和6年全国家計構造調査 都道府県内経済圏別市町村一覧",
+        "sourceUrl": "https://www.stat.go.jp/data/zenkokukakei/2024/zuhyou/keizaiken2024.xlsx"
+      },
+      {
+        "slug": "official-c",
+        "name": "上越地域",
+        "label": "上越",
+        "tone": "green",
+        "municipalityCodes": [
+          "15216",
+          "15217",
+          "15222"
+        ],
+        "sourceKind": "statistics-bureau-economic-area",
+        "sourceTitle": "令和6年全国家計構造調査 都道府県内経済圏別市町村一覧",
+        "sourceUrl": "https://www.stat.go.jp/data/zenkokukakei/2024/zuhyou/keizaiken2024.xlsx"
+      }
+    ],
+    "16": [
+      {
+        "slug": "official-a",
+        "name": "富山",
+        "label": "富山",
+        "tone": "pink",
+        "municipalityCodes": [
+          "16201",
+          "16204",
+          "16206",
+          "16207",
+          "16321",
+          "16322",
+          "16323",
+          "16342",
+          "16343"
+        ],
+        "sourceKind": "statistics-bureau-economic-area",
+        "sourceTitle": "令和6年全国家計構造調査 都道府県内経済圏別市町村一覧",
+        "sourceUrl": "https://www.stat.go.jp/data/zenkokukakei/2024/zuhyou/keizaiken2024.xlsx"
+      },
+      {
+        "slug": "official-b",
+        "name": "高岡",
+        "label": "高岡",
+        "tone": "blue",
+        "municipalityCodes": [
+          "16202",
+          "16205",
+          "16208",
+          "16209",
+          "16210",
+          "16211"
+        ],
+        "sourceKind": "statistics-bureau-economic-area",
+        "sourceTitle": "令和6年全国家計構造調査 都道府県内経済圏別市町村一覧",
+        "sourceUrl": "https://www.stat.go.jp/data/zenkokukakei/2024/zuhyou/keizaiken2024.xlsx"
+      }
+    ],
+    "17": [
+      {
+        "slug": "official-a",
+        "name": "石川中央",
+        "label": "石川中央",
+        "tone": "pink",
+        "municipalityCodes": [
+          "17201",
+          "17209",
+          "17210",
+          "17212",
+          "17361",
+          "17365"
+        ],
+        "sourceKind": "statistics-bureau-economic-area",
+        "sourceTitle": "令和6年全国家計構造調査 都道府県内経済圏別市町村一覧",
+        "sourceUrl": "https://www.stat.go.jp/data/zenkokukakei/2024/zuhyou/keizaiken2024.xlsx"
+      },
+      {
+        "slug": "official-c",
+        "name": "中能登",
+        "label": "中能登",
+        "tone": "blue",
+        "municipalityCodes": [
+          "17202",
+          "17207",
+          "17384",
+          "17386",
+          "17407"
+        ],
+        "sourceKind": "statistics-bureau-economic-area",
+        "sourceTitle": "令和6年全国家計構造調査 都道府県内経済圏別市町村一覧",
+        "sourceUrl": "https://www.stat.go.jp/data/zenkokukakei/2024/zuhyou/keizaiken2024.xlsx"
+      },
+      {
+        "slug": "official-b",
+        "name": "南加賀",
+        "label": "南加賀",
+        "tone": "green",
+        "municipalityCodes": [
+          "17203",
+          "17206",
+          "17211",
+          "17324"
+        ],
+        "sourceKind": "statistics-bureau-economic-area",
+        "sourceTitle": "令和6年全国家計構造調査 都道府県内経済圏別市町村一覧",
+        "sourceUrl": "https://www.stat.go.jp/data/zenkokukakei/2024/zuhyou/keizaiken2024.xlsx"
+      },
+      {
+        "slug": "official-d",
+        "name": "奥能登",
+        "label": "奥能登",
+        "tone": "yellow",
+        "municipalityCodes": [
+          "17204",
+          "17205",
+          "17461",
+          "17463"
+        ],
+        "sourceKind": "statistics-bureau-economic-area",
+        "sourceTitle": "令和6年全国家計構造調査 都道府県内経済圏別市町村一覧",
+        "sourceUrl": "https://www.stat.go.jp/data/zenkokukakei/2024/zuhyou/keizaiken2024.xlsx"
+      }
+    ],
+    "18": [
+      {
+        "slug": "official-a",
+        "name": "福井・坂井",
+        "label": "福井・坂井",
+        "tone": "pink",
+        "municipalityCodes": [
+          "18201",
+          "18208",
+          "18210",
+          "18322"
+        ],
+        "sourceKind": "statistics-bureau-economic-area",
+        "sourceTitle": "令和6年全国家計構造調査 都道府県内経済圏別市町村一覧",
+        "sourceUrl": "https://www.stat.go.jp/data/zenkokukakei/2024/zuhyou/keizaiken2024.xlsx"
+      },
+      {
+        "slug": "official-d",
+        "name": "嶺南",
+        "label": "嶺南",
+        "tone": "blue",
+        "municipalityCodes": [
+          "18202",
+          "18204",
+          "18442",
+          "18481",
+          "18483",
+          "18501"
+        ],
+        "sourceKind": "statistics-bureau-economic-area",
+        "sourceTitle": "令和6年全国家計構造調査 都道府県内経済圏別市町村一覧",
+        "sourceUrl": "https://www.stat.go.jp/data/zenkokukakei/2024/zuhyou/keizaiken2024.xlsx"
+      },
+      {
+        "slug": "official-c",
+        "name": "奥越",
+        "label": "奥越",
+        "tone": "green",
+        "municipalityCodes": [
+          "18205",
+          "18206"
+        ],
+        "sourceKind": "statistics-bureau-economic-area",
+        "sourceTitle": "令和6年全国家計構造調査 都道府県内経済圏別市町村一覧",
+        "sourceUrl": "https://www.stat.go.jp/data/zenkokukakei/2024/zuhyou/keizaiken2024.xlsx"
+      },
+      {
+        "slug": "official-b",
+        "name": "丹南",
+        "label": "丹南",
+        "tone": "yellow",
+        "municipalityCodes": [
+          "18207",
+          "18209",
+          "18382",
+          "18404",
+          "18423"
+        ],
+        "sourceKind": "statistics-bureau-economic-area",
+        "sourceTitle": "令和6年全国家計構造調査 都道府県内経済圏別市町村一覧",
+        "sourceUrl": "https://www.stat.go.jp/data/zenkokukakei/2024/zuhyou/keizaiken2024.xlsx"
+      }
+    ],
+    "19": [
+      {
+        "slug": "official-a",
+        "name": "中北",
+        "label": "中北",
+        "tone": "pink",
+        "municipalityCodes": [
+          "19201",
+          "19207",
+          "19208",
+          "19209",
+          "19210",
+          "19214",
+          "19384"
+        ],
+        "sourceKind": "statistics-bureau-economic-area",
+        "sourceTitle": "令和6年全国家計構造調査 都道府県内経済圏別市町村一覧",
+        "sourceUrl": "https://www.stat.go.jp/data/zenkokukakei/2024/zuhyou/keizaiken2024.xlsx"
+      },
+      {
+        "slug": "official-d",
+        "name": "富士・東部",
+        "label": "富士・東部",
+        "tone": "blue",
+        "municipalityCodes": [
+          "19202",
+          "19204",
+          "19206",
+          "19212",
+          "19422",
+          "19423",
+          "19424",
+          "19425",
+          "19429",
+          "19430",
+          "19442",
+          "19443"
+        ],
+        "sourceKind": "statistics-bureau-economic-area",
+        "sourceTitle": "令和6年全国家計構造調査 都道府県内経済圏別市町村一覧",
+        "sourceUrl": "https://www.stat.go.jp/data/zenkokukakei/2024/zuhyou/keizaiken2024.xlsx"
+      },
+      {
+        "slug": "official-b",
+        "name": "峡東",
+        "label": "峡東",
+        "tone": "green",
+        "municipalityCodes": [
+          "19205",
+          "19211",
+          "19213"
+        ],
+        "sourceKind": "statistics-bureau-economic-area",
+        "sourceTitle": "令和6年全国家計構造調査 都道府県内経済圏別市町村一覧",
+        "sourceUrl": "https://www.stat.go.jp/data/zenkokukakei/2024/zuhyou/keizaiken2024.xlsx"
+      },
+      {
+        "slug": "official-c",
+        "name": "峡南",
+        "label": "峡南",
+        "tone": "yellow",
+        "municipalityCodes": [
+          "19346",
+          "19364",
+          "19365",
+          "19366",
+          "19368"
+        ],
+        "sourceKind": "statistics-bureau-economic-area",
+        "sourceTitle": "令和6年全国家計構造調査 都道府県内経済圏別市町村一覧",
+        "sourceUrl": "https://www.stat.go.jp/data/zenkokukakei/2024/zuhyou/keizaiken2024.xlsx"
+      }
+    ],
+    "20": [
+      {
+        "slug": "official-a",
+        "name": "長野・北信",
+        "label": "長野・北信",
+        "tone": "pink",
+        "municipalityCodes": [
+          "20201",
+          "20207",
+          "20211",
+          "20213",
+          "20218",
+          "20521",
+          "20541",
+          "20543",
+          "20561",
+          "20562",
+          "20563",
+          "20583",
+          "20588",
+          "20590",
+          "20602"
+        ],
+        "sourceKind": "statistics-bureau-economic-area",
+        "sourceTitle": "令和6年全国家計構造調査 都道府県内経済圏別市町村一覧",
+        "sourceUrl": "https://www.stat.go.jp/data/zenkokukakei/2024/zuhyou/keizaiken2024.xlsx"
+      },
+      {
+        "slug": "official-c",
+        "name": "木曽・松本・大北",
+        "label": "木曽・松本・大北",
+        "tone": "blue",
+        "municipalityCodes": [
+          "20202",
+          "20212",
+          "20215",
+          "20220",
+          "20422",
+          "20423",
+          "20425",
+          "20429",
+          "20430",
+          "20432",
+          "20446",
+          "20448",
+          "20450",
+          "20451",
+          "20452",
+          "20481",
+          "20482",
+          "20485",
+          "20486"
+        ],
+        "sourceKind": "statistics-bureau-economic-area",
+        "sourceTitle": "令和6年全国家計構造調査 都道府県内経済圏別市町村一覧",
+        "sourceUrl": "https://www.stat.go.jp/data/zenkokukakei/2024/zuhyou/keizaiken2024.xlsx"
+      },
+      {
+        "slug": "official-b",
+        "name": "佐久・上小",
+        "label": "佐久・上小",
+        "tone": "green",
+        "municipalityCodes": [
+          "20203",
+          "20208",
+          "20217",
+          "20219",
+          "20303",
+          "20304",
+          "20305",
+          "20306",
+          "20307",
+          "20309",
+          "20321",
+          "20323",
+          "20324",
+          "20349",
+          "20350"
+        ],
+        "sourceKind": "statistics-bureau-economic-area",
+        "sourceTitle": "令和6年全国家計構造調査 都道府県内経済圏別市町村一覧",
+        "sourceUrl": "https://www.stat.go.jp/data/zenkokukakei/2024/zuhyou/keizaiken2024.xlsx"
+      },
+      {
+        "slug": "official-d",
+        "name": "諏訪・上伊那・飯伊",
+        "label": "諏訪・上伊那・飯伊",
+        "tone": "yellow",
+        "municipalityCodes": [
+          "20204",
+          "20205",
+          "20206",
+          "20209",
+          "20210",
+          "20214",
+          "20361",
+          "20362",
+          "20363",
+          "20382",
+          "20383",
+          "20384",
+          "20385",
+          "20386",
+          "20388",
+          "20402",
+          "20403",
+          "20404",
+          "20407",
+          "20409",
+          "20410",
+          "20411",
+          "20412",
+          "20413",
+          "20414",
+          "20415",
+          "20416",
+          "20417"
+        ],
+        "sourceKind": "statistics-bureau-economic-area",
+        "sourceTitle": "令和6年全国家計構造調査 都道府県内経済圏別市町村一覧",
+        "sourceUrl": "https://www.stat.go.jp/data/zenkokukakei/2024/zuhyou/keizaiken2024.xlsx"
+      }
+    ],
+    "21": [
+      {
+        "slug": "official-a",
+        "name": "岐阜圏域",
+        "label": "岐阜",
+        "tone": "pink",
+        "municipalityCodes": [
+          "21201",
+          "21209",
+          "21213",
+          "21215",
+          "21216",
+          "21218",
+          "21302",
+          "21303",
+          "21421"
+        ],
+        "sourceKind": "statistics-bureau-economic-area",
+        "sourceTitle": "令和6年全国家計構造調査 都道府県内経済圏別市町村一覧",
+        "sourceUrl": "https://www.stat.go.jp/data/zenkokukakei/2024/zuhyou/keizaiken2024.xlsx"
+      },
+      {
+        "slug": "official-b",
+        "name": "西濃圏域",
+        "label": "西濃",
+        "tone": "blue",
+        "municipalityCodes": [
+          "21202",
+          "21221",
+          "21341",
+          "21361",
+          "21362",
+          "21381",
+          "21382",
+          "21383",
+          "21401",
+          "21403",
+          "21404"
+        ],
+        "sourceKind": "statistics-bureau-economic-area",
+        "sourceTitle": "令和6年全国家計構造調査 都道府県内経済圏別市町村一覧",
+        "sourceUrl": "https://www.stat.go.jp/data/zenkokukakei/2024/zuhyou/keizaiken2024.xlsx"
+      },
+      {
+        "slug": "official-c",
+        "name": "中濃・飛騨圏域",
+        "label": "中濃・飛騨",
+        "tone": "green",
+        "municipalityCodes": [
+          "21203",
+          "21205",
+          "21207",
+          "21211",
+          "21214",
+          "21217",
+          "21219",
+          "21220",
+          "21501",
+          "21502",
+          "21503",
+          "21504",
+          "21505",
+          "21506",
+          "21507",
+          "21521",
+          "21604"
+        ],
+        "sourceKind": "statistics-bureau-economic-area",
+        "sourceTitle": "令和6年全国家計構造調査 都道府県内経済圏別市町村一覧",
+        "sourceUrl": "https://www.stat.go.jp/data/zenkokukakei/2024/zuhyou/keizaiken2024.xlsx"
+      },
+      {
+        "slug": "official-d",
+        "name": "東濃圏域",
+        "label": "東濃",
+        "tone": "yellow",
+        "municipalityCodes": [
+          "21204",
+          "21206",
+          "21208",
+          "21210",
+          "21212"
+        ],
+        "sourceKind": "statistics-bureau-economic-area",
+        "sourceTitle": "令和6年全国家計構造調査 都道府県内経済圏別市町村一覧",
+        "sourceUrl": "https://www.stat.go.jp/data/zenkokukakei/2024/zuhyou/keizaiken2024.xlsx"
+      }
+    ],
+    "22": [
+      {
+        "slug": "official-c",
+        "name": "中部",
+        "label": "中部",
+        "tone": "pink",
+        "municipalityCodes": [
+          "22101",
+          "22102",
+          "22103",
+          "22131",
+          "22132",
+          "22133",
+          "22134",
+          "22135",
+          "22136",
+          "22137"
+        ],
+        "sourceKind": "statistics-bureau-economic-area",
+        "sourceTitle": "令和6年全国家計構造調査 都道府県内経済圏別市町村一覧",
+        "sourceUrl": "https://www.stat.go.jp/data/zenkokukakei/2024/zuhyou/keizaiken2024.xlsx"
+      },
+      {
+        "slug": "official-b",
+        "name": "東部",
+        "label": "東部",
+        "tone": "blue",
+        "municipalityCodes": [
+          "22203",
+          "22206",
+          "22207",
+          "22210",
+          "22215",
+          "22220",
+          "22325",
+          "22341",
+          "22342",
+          "22344"
+        ],
+        "sourceKind": "statistics-bureau-economic-area",
+        "sourceTitle": "令和6年全国家計構造調査 都道府県内経済圏別市町村一覧",
+        "sourceUrl": "https://www.stat.go.jp/data/zenkokukakei/2024/zuhyou/keizaiken2024.xlsx"
+      },
+      {
+        "slug": "official-a",
+        "name": "伊豆",
+        "label": "伊豆",
+        "tone": "green",
+        "municipalityCodes": [
+          "22205",
+          "22208",
+          "22219",
+          "22222",
+          "22225",
+          "22301",
+          "22302",
+          "22304",
+          "22305",
+          "22306"
+        ],
+        "sourceKind": "statistics-bureau-economic-area",
+        "sourceTitle": "令和6年全国家計構造調査 都道府県内経済圏別市町村一覧",
+        "sourceUrl": "https://www.stat.go.jp/data/zenkokukakei/2024/zuhyou/keizaiken2024.xlsx"
+      },
+      {
+        "slug": "official-d",
+        "name": "志太・榛原",
+        "label": "志太・榛原",
+        "tone": "yellow",
+        "municipalityCodes": [
+          "22209",
+          "22212",
+          "22214",
+          "22223",
+          "22226",
+          "22424",
+          "22429"
+        ],
+        "sourceKind": "statistics-bureau-economic-area",
+        "sourceTitle": "令和6年全国家計構造調査 都道府県内経済圏別市町村一覧",
+        "sourceUrl": "https://www.stat.go.jp/data/zenkokukakei/2024/zuhyou/keizaiken2024.xlsx"
+      },
+      {
+        "slug": "official-e",
+        "name": "中東遠",
+        "label": "中東遠",
+        "tone": "purple",
+        "municipalityCodes": [
+          "22211",
+          "22213",
+          "22216",
+          "22224",
+          "22461"
+        ],
+        "sourceKind": "statistics-bureau-economic-area",
+        "sourceTitle": "令和6年全国家計構造調査 都道府県内経済圏別市町村一覧",
+        "sourceUrl": "https://www.stat.go.jp/data/zenkokukakei/2024/zuhyou/keizaiken2024.xlsx"
+      },
+      {
+        "slug": "official-f",
+        "name": "西部",
+        "label": "西部",
+        "tone": "teal",
+        "municipalityCodes": [
+          "22221"
+        ],
+        "sourceKind": "statistics-bureau-economic-area",
+        "sourceTitle": "令和6年全国家計構造調査 都道府県内経済圏別市町村一覧",
+        "sourceUrl": "https://www.stat.go.jp/data/zenkokukakei/2024/zuhyou/keizaiken2024.xlsx"
+      }
+    ],
+    "23": [
+      {
+        "slug": "official-a",
+        "name": "尾張地域",
+        "label": "尾張",
+        "tone": "pink",
+        "municipalityCodes": [
+          "23101",
+          "23102",
+          "23103",
+          "23104",
+          "23105",
+          "23106",
+          "23107",
+          "23108",
+          "23109",
+          "23110",
+          "23111",
+          "23112",
+          "23113",
+          "23114",
+          "23115",
+          "23116",
+          "23203",
+          "23204",
+          "23205",
+          "23206",
+          "23208",
+          "23215",
+          "23216",
+          "23217",
+          "23219",
+          "23220",
+          "23222",
+          "23223",
+          "23224",
+          "23226",
+          "23228",
+          "23229",
+          "23230",
+          "23232",
+          "23233",
+          "23234",
+          "23235",
+          "23237",
+          "23238",
+          "23302",
+          "23342",
+          "23361",
+          "23362",
+          "23424",
+          "23425",
+          "23427",
+          "23441",
+          "23442",
+          "23445",
+          "23446",
+          "23447"
+        ],
+        "sourceKind": "statistics-bureau-economic-area",
+        "sourceTitle": "令和6年全国家計構造調査 都道府県内経済圏別市町村一覧",
+        "sourceUrl": "https://www.stat.go.jp/data/zenkokukakei/2024/zuhyou/keizaiken2024.xlsx"
+      },
+      {
+        "slug": "official-c",
+        "name": "東三河地域",
+        "label": "東三河",
+        "tone": "blue",
+        "municipalityCodes": [
+          "23201",
+          "23207",
+          "23214",
+          "23221",
+          "23231",
+          "23561",
+          "23562",
+          "23563"
+        ],
+        "sourceKind": "statistics-bureau-economic-area",
+        "sourceTitle": "令和6年全国家計構造調査 都道府県内経済圏別市町村一覧",
+        "sourceUrl": "https://www.stat.go.jp/data/zenkokukakei/2024/zuhyou/keizaiken2024.xlsx"
+      },
+      {
+        "slug": "official-b",
+        "name": "西三河地域",
+        "label": "西三河",
+        "tone": "green",
+        "municipalityCodes": [
+          "23202",
+          "23209",
+          "23210",
+          "23211",
+          "23212",
+          "23213",
+          "23225",
+          "23227",
+          "23236",
+          "23501"
+        ],
+        "sourceKind": "statistics-bureau-economic-area",
+        "sourceTitle": "令和6年全国家計構造調査 都道府県内経済圏別市町村一覧",
+        "sourceUrl": "https://www.stat.go.jp/data/zenkokukakei/2024/zuhyou/keizaiken2024.xlsx"
+      }
+    ],
+    "24": [
+      {
+        "slug": "official-b",
+        "name": "中南勢・伊賀",
+        "label": "中南勢・伊賀",
+        "tone": "pink",
+        "municipalityCodes": [
+          "24201",
+          "24204",
+          "24208",
+          "24216",
+          "24441",
+          "24442",
+          "24443"
+        ],
+        "sourceKind": "statistics-bureau-economic-area",
+        "sourceTitle": "令和6年全国家計構造調査 都道府県内経済圏別市町村一覧",
+        "sourceUrl": "https://www.stat.go.jp/data/zenkokukakei/2024/zuhyou/keizaiken2024.xlsx"
+      },
+      {
+        "slug": "official-a",
+        "name": "北勢",
+        "label": "北勢",
+        "tone": "blue",
+        "municipalityCodes": [
+          "24202",
+          "24205",
+          "24207",
+          "24210",
+          "24214",
+          "24303",
+          "24324",
+          "24341",
+          "24343",
+          "24344"
+        ],
+        "sourceKind": "statistics-bureau-economic-area",
+        "sourceTitle": "令和6年全国家計構造調査 都道府県内経済圏別市町村一覧",
+        "sourceUrl": "https://www.stat.go.jp/data/zenkokukakei/2024/zuhyou/keizaiken2024.xlsx"
+      },
+      {
+        "slug": "official-c",
+        "name": "伊勢志摩・東紀州",
+        "label": "伊勢志摩・東紀州",
+        "tone": "green",
+        "municipalityCodes": [
+          "24203",
+          "24209",
+          "24211",
+          "24212",
+          "24215",
+          "24461",
+          "24470",
+          "24471",
+          "24472",
+          "24543",
+          "24561",
+          "24562"
+        ],
+        "sourceKind": "statistics-bureau-economic-area",
+        "sourceTitle": "令和6年全国家計構造調査 都道府県内経済圏別市町村一覧",
+        "sourceUrl": "https://www.stat.go.jp/data/zenkokukakei/2024/zuhyou/keizaiken2024.xlsx"
+      }
+    ],
+    "25": [
+      {
+        "slug": "official-a",
+        "name": "大津・高島",
+        "label": "大津・高島",
+        "tone": "pink",
+        "municipalityCodes": [
+          "25201",
+          "25212"
+        ],
+        "sourceKind": "statistics-bureau-economic-area",
+        "sourceTitle": "令和6年全国家計構造調査 都道府県内経済圏別市町村一覧",
+        "sourceUrl": "https://www.stat.go.jp/data/zenkokukakei/2024/zuhyou/keizaiken2024.xlsx"
+      },
+      {
+        "slug": "official-d",
+        "name": "湖東・湖北",
+        "label": "湖東・湖北",
+        "tone": "blue",
+        "municipalityCodes": [
+          "25202",
+          "25203",
+          "25214",
+          "25425",
+          "25441",
+          "25442",
+          "25443"
+        ],
+        "sourceKind": "statistics-bureau-economic-area",
+        "sourceTitle": "令和6年全国家計構造調査 都道府県内経済圏別市町村一覧",
+        "sourceUrl": "https://www.stat.go.jp/data/zenkokukakei/2024/zuhyou/keizaiken2024.xlsx"
+      },
+      {
+        "slug": "official-c",
+        "name": "甲賀・東近江",
+        "label": "甲賀・東近江",
+        "tone": "green",
+        "municipalityCodes": [
+          "25204",
+          "25209",
+          "25211",
+          "25213",
+          "25383",
+          "25384"
+        ],
+        "sourceKind": "statistics-bureau-economic-area",
+        "sourceTitle": "令和6年全国家計構造調査 都道府県内経済圏別市町村一覧",
+        "sourceUrl": "https://www.stat.go.jp/data/zenkokukakei/2024/zuhyou/keizaiken2024.xlsx"
+      },
+      {
+        "slug": "official-b",
+        "name": "南部",
+        "label": "南部",
+        "tone": "yellow",
+        "municipalityCodes": [
+          "25206",
+          "25207",
+          "25208",
+          "25210"
+        ],
+        "sourceKind": "statistics-bureau-economic-area",
+        "sourceTitle": "令和6年全国家計構造調査 都道府県内経済圏別市町村一覧",
+        "sourceUrl": "https://www.stat.go.jp/data/zenkokukakei/2024/zuhyou/keizaiken2024.xlsx"
+      }
+    ],
+    "26": [
+      {
+        "slug": "official-d",
+        "name": "京都市",
+        "label": "京都市",
+        "tone": "pink",
+        "municipalityCodes": [
+          "26101",
+          "26102",
+          "26103",
+          "26104",
+          "26105",
+          "26106",
+          "26107",
+          "26108",
+          "26109",
+          "26110",
+          "26111"
+        ],
+        "sourceKind": "statistics-bureau-economic-area",
+        "sourceTitle": "令和6年全国家計構造調査 都道府県内経済圏別市町村一覧",
+        "sourceUrl": "https://www.stat.go.jp/data/zenkokukakei/2024/zuhyou/keizaiken2024.xlsx"
+      },
+      {
+        "slug": "official-b",
+        "name": "中丹",
+        "label": "中丹",
+        "tone": "blue",
+        "municipalityCodes": [
+          "26201",
+          "26202",
+          "26203"
+        ],
+        "sourceKind": "statistics-bureau-economic-area",
+        "sourceTitle": "令和6年全国家計構造調査 都道府県内経済圏別市町村一覧",
+        "sourceUrl": "https://www.stat.go.jp/data/zenkokukakei/2024/zuhyou/keizaiken2024.xlsx"
+      },
+      {
+        "slug": "official-e",
+        "name": "山城",
+        "label": "山城",
+        "tone": "green",
+        "municipalityCodes": [
+          "26204",
+          "26207",
+          "26208",
+          "26209",
+          "26210",
+          "26211",
+          "26214",
+          "26303",
+          "26322",
+          "26343",
+          "26344",
+          "26364",
+          "26365",
+          "26366",
+          "26367"
+        ],
+        "sourceKind": "statistics-bureau-economic-area",
+        "sourceTitle": "令和6年全国家計構造調査 都道府県内経済圏別市町村一覧",
+        "sourceUrl": "https://www.stat.go.jp/data/zenkokukakei/2024/zuhyou/keizaiken2024.xlsx"
+      },
+      {
+        "slug": "official-a",
+        "name": "丹後",
+        "label": "丹後",
+        "tone": "yellow",
+        "municipalityCodes": [
+          "26205",
+          "26212",
+          "26463",
+          "26465"
+        ],
+        "sourceKind": "statistics-bureau-economic-area",
+        "sourceTitle": "令和6年全国家計構造調査 都道府県内経済圏別市町村一覧",
+        "sourceUrl": "https://www.stat.go.jp/data/zenkokukakei/2024/zuhyou/keizaiken2024.xlsx"
+      },
+      {
+        "slug": "official-c",
+        "name": "南丹",
+        "label": "南丹",
+        "tone": "purple",
+        "municipalityCodes": [
+          "26206",
+          "26213",
+          "26407"
+        ],
+        "sourceKind": "statistics-bureau-economic-area",
+        "sourceTitle": "令和6年全国家計構造調査 都道府県内経済圏別市町村一覧",
+        "sourceUrl": "https://www.stat.go.jp/data/zenkokukakei/2024/zuhyou/keizaiken2024.xlsx"
+      }
+    ],
+    "27": [
+      {
+        "slug": "official-a",
+        "name": "大阪市地域",
+        "label": "大阪市",
+        "tone": "pink",
+        "municipalityCodes": [
+          "27102",
+          "27103",
+          "27104",
+          "27106",
+          "27107",
+          "27108",
+          "27109",
+          "27111",
+          "27113",
+          "27114",
+          "27115",
+          "27116",
+          "27117",
+          "27118",
+          "27119",
+          "27120",
+          "27121",
+          "27122",
+          "27123",
+          "27124",
+          "27125",
+          "27126",
+          "27127",
+          "27128",
+          "27141",
+          "27142",
+          "27143",
+          "27144",
+          "27145",
+          "27146",
+          "27147"
+        ],
+        "sourceKind": "statistics-bureau-economic-area",
+        "sourceTitle": "令和6年全国家計構造調査 都道府県内経済圏別市町村一覧",
+        "sourceUrl": "https://www.stat.go.jp/data/zenkokukakei/2024/zuhyou/keizaiken2024.xlsx"
+      },
+      {
+        "slug": "official-h",
+        "name": "泉南地域",
+        "label": "泉南",
+        "tone": "blue",
+        "municipalityCodes": [
+          "27202",
+          "27208",
+          "27213",
+          "27228",
+          "27232",
+          "27361",
+          "27362",
+          "27366"
+        ],
+        "sourceKind": "statistics-bureau-economic-area",
+        "sourceTitle": "令和6年全国家計構造調査 都道府県内経済圏別市町村一覧",
+        "sourceUrl": "https://www.stat.go.jp/data/zenkokukakei/2024/zuhyou/keizaiken2024.xlsx"
+      },
+      {
+        "slug": "official-b",
+        "name": "北摂地域",
+        "label": "北摂",
+        "tone": "green",
+        "municipalityCodes": [
+          "27203",
+          "27204",
+          "27220",
+          "27321",
+          "27322"
+        ],
+        "sourceKind": "statistics-bureau-economic-area",
+        "sourceTitle": "令和6年全国家計構造調査 都道府県内経済圏別市町村一覧",
+        "sourceUrl": "https://www.stat.go.jp/data/zenkokukakei/2024/zuhyou/keizaiken2024.xlsx"
+      },
+      {
+        "slug": "official-c",
+        "name": "三島地域",
+        "label": "三島",
+        "tone": "yellow",
+        "municipalityCodes": [
+          "27205",
+          "27207",
+          "27211",
+          "27224",
+          "27301"
+        ],
+        "sourceKind": "statistics-bureau-economic-area",
+        "sourceTitle": "令和6年全国家計構造調査 都道府県内経済圏別市町村一覧",
+        "sourceUrl": "https://www.stat.go.jp/data/zenkokukakei/2024/zuhyou/keizaiken2024.xlsx"
+      },
+      {
+        "slug": "official-g",
+        "name": "泉北地域",
+        "label": "泉北",
+        "tone": "purple",
+        "municipalityCodes": [
+          "27206",
+          "27219",
+          "27225",
+          "27341"
+        ],
+        "sourceKind": "statistics-bureau-economic-area",
+        "sourceTitle": "令和6年全国家計構造調査 都道府県内経済圏別市町村一覧",
+        "sourceUrl": "https://www.stat.go.jp/data/zenkokukakei/2024/zuhyou/keizaiken2024.xlsx"
+      },
+      {
+        "slug": "official-d",
+        "name": "北河内地域",
+        "label": "北河内",
+        "tone": "teal",
+        "municipalityCodes": [
+          "27209",
+          "27210",
+          "27215",
+          "27218",
+          "27223",
+          "27229",
+          "27230"
+        ],
+        "sourceKind": "statistics-bureau-economic-area",
+        "sourceTitle": "令和6年全国家計構造調査 都道府県内経済圏別市町村一覧",
+        "sourceUrl": "https://www.stat.go.jp/data/zenkokukakei/2024/zuhyou/keizaiken2024.xlsx"
+      },
+      {
+        "slug": "official-e",
+        "name": "中河内地域",
+        "label": "中河内",
+        "tone": "orange",
+        "municipalityCodes": [
+          "27212",
+          "27221",
+          "27227"
+        ],
+        "sourceKind": "statistics-bureau-economic-area",
+        "sourceTitle": "令和6年全国家計構造調査 都道府県内経済圏別市町村一覧",
+        "sourceUrl": "https://www.stat.go.jp/data/zenkokukakei/2024/zuhyou/keizaiken2024.xlsx"
+      },
+      {
+        "slug": "official-f",
+        "name": "南河内地域",
+        "label": "南河内",
+        "tone": "rose",
+        "municipalityCodes": [
+          "27214",
+          "27216",
+          "27217",
+          "27222",
+          "27226",
+          "27231",
+          "27381",
+          "27382",
+          "27383"
+        ],
+        "sourceKind": "statistics-bureau-economic-area",
+        "sourceTitle": "令和6年全国家計構造調査 都道府県内経済圏別市町村一覧",
+        "sourceUrl": "https://www.stat.go.jp/data/zenkokukakei/2024/zuhyou/keizaiken2024.xlsx"
+      }
+    ],
+    "28": [
+      {
+        "slug": "official-a",
+        "name": "神戸市・淡路地域",
+        "label": "神戸市・淡路",
+        "tone": "pink",
+        "municipalityCodes": [
+          "28101",
+          "28102",
+          "28105",
+          "28106",
+          "28107",
+          "28108",
+          "28109",
+          "28110",
+          "28111",
+          "28205",
+          "28224",
+          "28226"
+        ],
+        "sourceKind": "statistics-bureau-economic-area",
+        "sourceTitle": "令和6年全国家計構造調査 都道府県内経済圏別市町村一覧",
+        "sourceUrl": "https://www.stat.go.jp/data/zenkokukakei/2024/zuhyou/keizaiken2024.xlsx"
+      },
+      {
+        "slug": "official-f",
+        "name": "中播磨地域",
+        "label": "中播磨",
+        "tone": "blue",
+        "municipalityCodes": [
+          "28201",
+          "28442",
+          "28443",
+          "28446"
+        ],
+        "sourceKind": "statistics-bureau-economic-area",
+        "sourceTitle": "令和6年全国家計構造調査 都道府県内経済圏別市町村一覧",
+        "sourceUrl": "https://www.stat.go.jp/data/zenkokukakei/2024/zuhyou/keizaiken2024.xlsx"
+      },
+      {
+        "slug": "official-b",
+        "name": "阪神南地域",
+        "label": "阪神南",
+        "tone": "green",
+        "municipalityCodes": [
+          "28202",
+          "28204",
+          "28206"
+        ],
+        "sourceKind": "statistics-bureau-economic-area",
+        "sourceTitle": "令和6年全国家計構造調査 都道府県内経済圏別市町村一覧",
+        "sourceUrl": "https://www.stat.go.jp/data/zenkokukakei/2024/zuhyou/keizaiken2024.xlsx"
+      },
+      {
+        "slug": "official-d",
+        "name": "東播磨地域",
+        "label": "東播磨",
+        "tone": "yellow",
+        "municipalityCodes": [
+          "28203",
+          "28210",
+          "28216",
+          "28381",
+          "28382"
+        ],
+        "sourceKind": "statistics-bureau-economic-area",
+        "sourceTitle": "令和6年全国家計構造調査 都道府県内経済圏別市町村一覧",
+        "sourceUrl": "https://www.stat.go.jp/data/zenkokukakei/2024/zuhyou/keizaiken2024.xlsx"
+      },
+      {
+        "slug": "official-c",
+        "name": "阪神北地域",
+        "label": "阪神北",
+        "tone": "purple",
+        "municipalityCodes": [
+          "28207",
+          "28214",
+          "28217",
+          "28219",
+          "28301"
+        ],
+        "sourceKind": "statistics-bureau-economic-area",
+        "sourceTitle": "令和6年全国家計構造調査 都道府県内経済圏別市町村一覧",
+        "sourceUrl": "https://www.stat.go.jp/data/zenkokukakei/2024/zuhyou/keizaiken2024.xlsx"
+      },
+      {
+        "slug": "official-g",
+        "name": "西播磨地域",
+        "label": "西播磨",
+        "tone": "teal",
+        "municipalityCodes": [
+          "28208",
+          "28212",
+          "28227",
+          "28229",
+          "28464",
+          "28481",
+          "28501"
+        ],
+        "sourceKind": "statistics-bureau-economic-area",
+        "sourceTitle": "令和6年全国家計構造調査 都道府県内経済圏別市町村一覧",
+        "sourceUrl": "https://www.stat.go.jp/data/zenkokukakei/2024/zuhyou/keizaiken2024.xlsx"
+      },
+      {
+        "slug": "official-h",
+        "name": "但馬・丹波地域",
+        "label": "但馬・丹波",
+        "tone": "orange",
+        "municipalityCodes": [
+          "28209",
+          "28221",
+          "28222",
+          "28223",
+          "28225",
+          "28585",
+          "28586"
+        ],
+        "sourceKind": "statistics-bureau-economic-area",
+        "sourceTitle": "令和6年全国家計構造調査 都道府県内経済圏別市町村一覧",
+        "sourceUrl": "https://www.stat.go.jp/data/zenkokukakei/2024/zuhyou/keizaiken2024.xlsx"
+      },
+      {
+        "slug": "official-e",
+        "name": "北播磨地域",
+        "label": "北播磨",
+        "tone": "rose",
+        "municipalityCodes": [
+          "28213",
+          "28215",
+          "28218",
+          "28220",
+          "28228",
+          "28365"
+        ],
+        "sourceKind": "statistics-bureau-economic-area",
+        "sourceTitle": "令和6年全国家計構造調査 都道府県内経済圏別市町村一覧",
+        "sourceUrl": "https://www.stat.go.jp/data/zenkokukakei/2024/zuhyou/keizaiken2024.xlsx"
+      }
+    ],
+    "29": [
+      {
+        "slug": "official-a",
+        "name": "北和圏",
+        "label": "北和",
+        "tone": "pink",
+        "municipalityCodes": [
+          "29201",
+          "29203",
+          "29204",
+          "29209",
+          "29342",
+          "29343",
+          "29344",
+          "29345"
+        ],
+        "sourceKind": "statistics-bureau-economic-area",
+        "sourceTitle": "令和6年全国家計構造調査 都道府県内経済圏別市町村一覧",
+        "sourceUrl": "https://www.stat.go.jp/data/zenkokukakei/2024/zuhyou/keizaiken2024.xlsx"
+      },
+      {
+        "slug": "official-b",
+        "name": "中和圏",
+        "label": "中和",
+        "tone": "blue",
+        "municipalityCodes": [
+          "29202",
+          "29205",
+          "29206",
+          "29210",
+          "29211",
+          "29361",
+          "29362",
+          "29363",
+          "29424",
+          "29425",
+          "29426",
+          "29427"
+        ],
+        "sourceKind": "statistics-bureau-economic-area",
+        "sourceTitle": "令和6年全国家計構造調査 都道府県内経済圏別市町村一覧",
+        "sourceUrl": "https://www.stat.go.jp/data/zenkokukakei/2024/zuhyou/keizaiken2024.xlsx"
+      },
+      {
+        "slug": "official-c",
+        "name": "東南和圏",
+        "label": "東南和",
+        "tone": "green",
+        "municipalityCodes": [
+          "29207",
+          "29208",
+          "29212",
+          "29322",
+          "29385",
+          "29386",
+          "29401",
+          "29402",
+          "29441",
+          "29442",
+          "29443",
+          "29444",
+          "29446",
+          "29447",
+          "29449",
+          "29450",
+          "29451",
+          "29452",
+          "29453"
+        ],
+        "sourceKind": "statistics-bureau-economic-area",
+        "sourceTitle": "令和6年全国家計構造調査 都道府県内経済圏別市町村一覧",
+        "sourceUrl": "https://www.stat.go.jp/data/zenkokukakei/2024/zuhyou/keizaiken2024.xlsx"
+      }
+    ],
+    "30": [
+      {
+        "slug": "official-a",
+        "name": "和歌山",
+        "label": "和歌山",
+        "tone": "pink",
+        "municipalityCodes": [
+          "30201",
+          "30202",
+          "30208",
+          "30209",
+          "30304"
+        ],
+        "sourceKind": "statistics-bureau-economic-area",
+        "sourceTitle": "令和6年全国家計構造調査 都道府県内経済圏別市町村一覧",
+        "sourceUrl": "https://www.stat.go.jp/data/zenkokukakei/2024/zuhyou/keizaiken2024.xlsx"
+      },
+      {
+        "slug": "official-b",
+        "name": "橋本",
+        "label": "橋本",
+        "tone": "blue",
+        "municipalityCodes": [
+          "30203",
+          "30341",
+          "30343",
+          "30344"
+        ],
+        "sourceKind": "statistics-bureau-economic-area",
+        "sourceTitle": "令和6年全国家計構造調査 都道府県内経済圏別市町村一覧",
+        "sourceUrl": "https://www.stat.go.jp/data/zenkokukakei/2024/zuhyou/keizaiken2024.xlsx"
+      },
+      {
+        "slug": "official-c",
+        "name": "御坊・有田",
+        "label": "御坊・有田",
+        "tone": "green",
+        "municipalityCodes": [
+          "30204",
+          "30205",
+          "30361",
+          "30362",
+          "30366",
+          "30381",
+          "30382",
+          "30383",
+          "30390",
+          "30392"
+        ],
+        "sourceKind": "statistics-bureau-economic-area",
+        "sourceTitle": "令和6年全国家計構造調査 都道府県内経済圏別市町村一覧",
+        "sourceUrl": "https://www.stat.go.jp/data/zenkokukakei/2024/zuhyou/keizaiken2024.xlsx"
+      },
+      {
+        "slug": "official-d",
+        "name": "田辺",
+        "label": "田辺",
+        "tone": "yellow",
+        "municipalityCodes": [
+          "30206",
+          "30391",
+          "30401",
+          "30404",
+          "30406"
+        ],
+        "sourceKind": "statistics-bureau-economic-area",
+        "sourceTitle": "令和6年全国家計構造調査 都道府県内経済圏別市町村一覧",
+        "sourceUrl": "https://www.stat.go.jp/data/zenkokukakei/2024/zuhyou/keizaiken2024.xlsx"
+      },
+      {
+        "slug": "official-e",
+        "name": "新宮",
+        "label": "新宮",
+        "tone": "purple",
+        "municipalityCodes": [
+          "30207",
+          "30421",
+          "30422",
+          "30424",
+          "30427",
+          "30428"
+        ],
+        "sourceKind": "statistics-bureau-economic-area",
+        "sourceTitle": "令和6年全国家計構造調査 都道府県内経済圏別市町村一覧",
+        "sourceUrl": "https://www.stat.go.jp/data/zenkokukakei/2024/zuhyou/keizaiken2024.xlsx"
+      }
+    ],
+    "31": [
+      {
+        "slug": "official-a",
+        "name": "東部",
+        "label": "東部",
+        "tone": "pink",
+        "municipalityCodes": [
+          "31201",
+          "31302",
+          "31325",
+          "31328",
+          "31329"
+        ],
+        "sourceKind": "statistics-bureau-economic-area",
+        "sourceTitle": "令和6年全国家計構造調査 都道府県内経済圏別市町村一覧",
+        "sourceUrl": "https://www.stat.go.jp/data/zenkokukakei/2024/zuhyou/keizaiken2024.xlsx"
+      },
+      {
+        "slug": "official-c",
+        "name": "西部",
+        "label": "西部",
+        "tone": "blue",
+        "municipalityCodes": [
+          "31202",
+          "31204",
+          "31384",
+          "31386",
+          "31389",
+          "31390",
+          "31401",
+          "31402",
+          "31403"
+        ],
+        "sourceKind": "statistics-bureau-economic-area",
+        "sourceTitle": "令和6年全国家計構造調査 都道府県内経済圏別市町村一覧",
+        "sourceUrl": "https://www.stat.go.jp/data/zenkokukakei/2024/zuhyou/keizaiken2024.xlsx"
+      },
+      {
+        "slug": "official-b",
+        "name": "中部",
+        "label": "中部",
+        "tone": "green",
+        "municipalityCodes": [
+          "31203",
+          "31364",
+          "31370",
+          "31371",
+          "31372"
+        ],
+        "sourceKind": "statistics-bureau-economic-area",
+        "sourceTitle": "令和6年全国家計構造調査 都道府県内経済圏別市町村一覧",
+        "sourceUrl": "https://www.stat.go.jp/data/zenkokukakei/2024/zuhyou/keizaiken2024.xlsx"
+      }
+    ],
+    "32": [
+      {
+        "slug": "official-a",
+        "name": "出雲地域",
+        "label": "出雲",
+        "tone": "pink",
+        "municipalityCodes": [
+          "32201",
+          "32203",
+          "32206",
+          "32209",
+          "32343",
+          "32386"
+        ],
+        "sourceKind": "statistics-bureau-economic-area",
+        "sourceTitle": "令和6年全国家計構造調査 都道府県内経済圏別市町村一覧",
+        "sourceUrl": "https://www.stat.go.jp/data/zenkokukakei/2024/zuhyou/keizaiken2024.xlsx"
+      },
+      {
+        "slug": "official-b",
+        "name": "石見地域",
+        "label": "石見",
+        "tone": "blue",
+        "municipalityCodes": [
+          "32202",
+          "32204",
+          "32205",
+          "32207",
+          "32441",
+          "32448",
+          "32449",
+          "32501",
+          "32505"
+        ],
+        "sourceKind": "statistics-bureau-economic-area",
+        "sourceTitle": "令和6年全国家計構造調査 都道府県内経済圏別市町村一覧",
+        "sourceUrl": "https://www.stat.go.jp/data/zenkokukakei/2024/zuhyou/keizaiken2024.xlsx"
+      },
+      {
+        "slug": "official-c",
+        "name": "隠岐地域",
+        "label": "隠岐",
+        "tone": "green",
+        "municipalityCodes": [
+          "32525",
+          "32526",
+          "32527",
+          "32528"
+        ],
+        "sourceKind": "statistics-bureau-economic-area",
+        "sourceTitle": "令和6年全国家計構造調査 都道府県内経済圏別市町村一覧",
+        "sourceUrl": "https://www.stat.go.jp/data/zenkokukakei/2024/zuhyou/keizaiken2024.xlsx"
+      }
+    ],
+    "33": [
+      {
+        "slug": "official-a",
+        "name": "備前地区",
+        "label": "備前",
+        "tone": "pink",
+        "municipalityCodes": [
+          "33101",
+          "33102",
+          "33103",
+          "33104",
+          "33204",
+          "33211",
+          "33212",
+          "33213",
+          "33346",
+          "33681"
+        ],
+        "sourceKind": "statistics-bureau-economic-area",
+        "sourceTitle": "令和6年全国家計構造調査 都道府県内経済圏別市町村一覧",
+        "sourceUrl": "https://www.stat.go.jp/data/zenkokukakei/2024/zuhyou/keizaiken2024.xlsx"
+      },
+      {
+        "slug": "official-b",
+        "name": "備中地区",
+        "label": "備中",
+        "tone": "blue",
+        "municipalityCodes": [
+          "33202",
+          "33205",
+          "33207",
+          "33208",
+          "33209",
+          "33210",
+          "33216",
+          "33423",
+          "33445",
+          "33461"
+        ],
+        "sourceKind": "statistics-bureau-economic-area",
+        "sourceTitle": "令和6年全国家計構造調査 都道府県内経済圏別市町村一覧",
+        "sourceUrl": "https://www.stat.go.jp/data/zenkokukakei/2024/zuhyou/keizaiken2024.xlsx"
+      },
+      {
+        "slug": "official-c",
+        "name": "美作地区",
+        "label": "美作",
+        "tone": "green",
+        "municipalityCodes": [
+          "33203",
+          "33214",
+          "33215",
+          "33586",
+          "33606",
+          "33622",
+          "33623",
+          "33643",
+          "33663",
+          "33666"
+        ],
+        "sourceKind": "statistics-bureau-economic-area",
+        "sourceTitle": "令和6年全国家計構造調査 都道府県内経済圏別市町村一覧",
+        "sourceUrl": "https://www.stat.go.jp/data/zenkokukakei/2024/zuhyou/keizaiken2024.xlsx"
+      }
+    ],
+    "34": [
+      {
+        "slug": "official-a",
+        "name": "広島",
+        "label": "広島",
+        "tone": "pink",
+        "municipalityCodes": [
+          "34101",
+          "34102",
+          "34103",
+          "34104",
+          "34105",
+          "34106",
+          "34107",
+          "34108",
+          "34202",
+          "34203",
+          "34211",
+          "34212",
+          "34213",
+          "34214",
+          "34215",
+          "34302",
+          "34304",
+          "34307",
+          "34309",
+          "34368",
+          "34369",
+          "34431"
+        ],
+        "sourceKind": "statistics-bureau-economic-area",
+        "sourceTitle": "令和6年全国家計構造調査 都道府県内経済圏別市町村一覧",
+        "sourceUrl": "https://www.stat.go.jp/data/zenkokukakei/2024/zuhyou/keizaiken2024.xlsx"
+      },
+      {
+        "slug": "official-b",
+        "name": "備後・備北",
+        "label": "備後・備北",
+        "tone": "blue",
+        "municipalityCodes": [
+          "34204",
+          "34205",
+          "34207",
+          "34208",
+          "34209",
+          "34210",
+          "34462",
+          "34545"
+        ],
+        "sourceKind": "statistics-bureau-economic-area",
+        "sourceTitle": "令和6年全国家計構造調査 都道府県内経済圏別市町村一覧",
+        "sourceUrl": "https://www.stat.go.jp/data/zenkokukakei/2024/zuhyou/keizaiken2024.xlsx"
+      }
+    ],
+    "35": [
+      {
+        "slug": "iwakuni",
+        "name": "岩国圏域",
+        "label": "岩国",
+        "tone": "pink",
+        "municipalityCodes": [
+          "35208",
+          "35321"
+        ],
+        "sourceKind": "prefecture-administrative-area",
+        "sourceTitle": "山口県 行政上の8圏域",
+        "sourceUrl": "https://faq.pref.yamaguchi.lg.jp/faq/detail.aspx?id=1216"
+      },
+      {
+        "slug": "yanai",
+        "name": "柳井圏域",
+        "label": "柳井",
+        "tone": "blue",
+        "municipalityCodes": [
+          "35212",
+          "35305",
+          "35341",
+          "35343",
+          "35344"
+        ],
+        "sourceKind": "prefecture-administrative-area",
+        "sourceTitle": "山口県 行政上の8圏域",
+        "sourceUrl": "https://faq.pref.yamaguchi.lg.jp/faq/detail.aspx?id=1216"
+      },
+      {
+        "slug": "shunan",
+        "name": "周南圏域",
+        "label": "周南",
+        "tone": "green",
+        "municipalityCodes": [
+          "35207",
+          "35210",
+          "35215"
+        ],
+        "sourceKind": "prefecture-administrative-area",
+        "sourceTitle": "山口県 行政上の8圏域",
+        "sourceUrl": "https://faq.pref.yamaguchi.lg.jp/faq/detail.aspx?id=1216"
+      },
+      {
+        "slug": "yamaguchi-hofu",
+        "name": "山口・防府圏域",
+        "label": "山口・防府",
+        "tone": "yellow",
+        "municipalityCodes": [
+          "35203",
+          "35206"
+        ],
+        "sourceKind": "prefecture-administrative-area",
+        "sourceTitle": "山口県 行政上の8圏域",
+        "sourceUrl": "https://faq.pref.yamaguchi.lg.jp/faq/detail.aspx?id=1216"
+      },
+      {
+        "slug": "ube-onoda",
+        "name": "宇部・小野田圏域",
+        "label": "宇部・小野田",
+        "tone": "purple",
+        "municipalityCodes": [
+          "35202",
+          "35213",
+          "35216"
+        ],
+        "sourceKind": "prefecture-administrative-area",
+        "sourceTitle": "山口県 行政上の8圏域",
+        "sourceUrl": "https://faq.pref.yamaguchi.lg.jp/faq/detail.aspx?id=1216"
+      },
+      {
+        "slug": "shimonoseki",
+        "name": "下関圏域",
+        "label": "下関",
+        "tone": "teal",
+        "municipalityCodes": [
+          "35201"
+        ],
+        "sourceKind": "prefecture-administrative-area",
+        "sourceTitle": "山口県 行政上の8圏域",
+        "sourceUrl": "https://faq.pref.yamaguchi.lg.jp/faq/detail.aspx?id=1216"
+      },
+      {
+        "slug": "nagato",
+        "name": "長門圏域",
+        "label": "長門",
+        "tone": "orange",
+        "municipalityCodes": [
+          "35211"
+        ],
+        "sourceKind": "prefecture-administrative-area",
+        "sourceTitle": "山口県 行政上の8圏域",
+        "sourceUrl": "https://faq.pref.yamaguchi.lg.jp/faq/detail.aspx?id=1216"
+      },
+      {
+        "slug": "hagi",
+        "name": "萩圏域",
+        "label": "萩",
+        "tone": "rose",
+        "municipalityCodes": [
+          "35204",
+          "35502"
+        ],
+        "sourceKind": "prefecture-administrative-area",
+        "sourceTitle": "山口県 行政上の8圏域",
+        "sourceUrl": "https://faq.pref.yamaguchi.lg.jp/faq/detail.aspx?id=1216"
+      }
+    ],
+    "36": [
+      {
+        "slug": "official-a",
+        "name": "東部圏域",
+        "label": "東部",
+        "tone": "pink",
+        "municipalityCodes": [
+          "36201",
+          "36202",
+          "36203",
+          "36205",
+          "36206",
+          "36301",
+          "36302",
+          "36321",
+          "36341",
+          "36342",
+          "36401",
+          "36402",
+          "36403",
+          "36404",
+          "36405"
+        ],
+        "sourceKind": "statistics-bureau-economic-area",
+        "sourceTitle": "令和6年全国家計構造調査 都道府県内経済圏別市町村一覧",
+        "sourceUrl": "https://www.stat.go.jp/data/zenkokukakei/2024/zuhyou/keizaiken2024.xlsx"
+      },
+      {
+        "slug": "official-b",
+        "name": "南部圏域",
+        "label": "南部",
+        "tone": "blue",
+        "municipalityCodes": [
+          "36204",
+          "36368",
+          "36383",
+          "36387",
+          "36388"
+        ],
+        "sourceKind": "statistics-bureau-economic-area",
+        "sourceTitle": "令和6年全国家計構造調査 都道府県内経済圏別市町村一覧",
+        "sourceUrl": "https://www.stat.go.jp/data/zenkokukakei/2024/zuhyou/keizaiken2024.xlsx"
+      },
+      {
+        "slug": "official-c",
+        "name": "西部圏域",
+        "label": "西部",
+        "tone": "green",
+        "municipalityCodes": [
+          "36207",
+          "36208",
+          "36468",
+          "36489"
+        ],
+        "sourceKind": "statistics-bureau-economic-area",
+        "sourceTitle": "令和6年全国家計構造調査 都道府県内経済圏別市町村一覧",
+        "sourceUrl": "https://www.stat.go.jp/data/zenkokukakei/2024/zuhyou/keizaiken2024.xlsx"
+      }
+    ],
+    "37": [
+      {
+        "slug": "official-a",
+        "name": "東讃地域",
+        "label": "東讃",
+        "tone": "pink",
+        "municipalityCodes": [
+          "37201",
+          "37206",
+          "37207",
+          "37322",
+          "37324",
+          "37341",
+          "37364"
+        ],
+        "sourceKind": "statistics-bureau-economic-area",
+        "sourceTitle": "令和6年全国家計構造調査 都道府県内経済圏別市町村一覧",
+        "sourceUrl": "https://www.stat.go.jp/data/zenkokukakei/2024/zuhyou/keizaiken2024.xlsx"
+      },
+      {
+        "slug": "official-b",
+        "name": "西讃地域",
+        "label": "西讃",
+        "tone": "blue",
+        "municipalityCodes": [
+          "37202",
+          "37203",
+          "37204",
+          "37205",
+          "37208",
+          "37386",
+          "37387",
+          "37403",
+          "37404",
+          "37406"
+        ],
+        "sourceKind": "statistics-bureau-economic-area",
+        "sourceTitle": "令和6年全国家計構造調査 都道府県内経済圏別市町村一覧",
+        "sourceUrl": "https://www.stat.go.jp/data/zenkokukakei/2024/zuhyou/keizaiken2024.xlsx"
+      }
+    ],
+    "38": [
+      {
+        "slug": "official-a",
+        "name": "松山圏域",
+        "label": "松山",
+        "tone": "pink",
+        "municipalityCodes": [
+          "38201",
+          "38210",
+          "38215",
+          "38386",
+          "38401",
+          "38402"
+        ],
+        "sourceKind": "statistics-bureau-economic-area",
+        "sourceTitle": "令和6年全国家計構造調査 都道府県内経済圏別市町村一覧",
+        "sourceUrl": "https://www.stat.go.jp/data/zenkokukakei/2024/zuhyou/keizaiken2024.xlsx"
+      },
+      {
+        "slug": "official-b",
+        "name": "四国中央・新居浜・西条・今治圏域",
+        "label": "四国中央・新居浜・西条・今治",
+        "tone": "blue",
+        "municipalityCodes": [
+          "38202",
+          "38205",
+          "38206",
+          "38213",
+          "38356"
+        ],
+        "sourceKind": "statistics-bureau-economic-area",
+        "sourceTitle": "令和6年全国家計構造調査 都道府県内経済圏別市町村一覧",
+        "sourceUrl": "https://www.stat.go.jp/data/zenkokukakei/2024/zuhyou/keizaiken2024.xlsx"
+      },
+      {
+        "slug": "official-c",
+        "name": "八幡浜・大洲・西予・宇和島圏域",
+        "label": "八幡浜・大洲・西予・宇和島",
+        "tone": "green",
+        "municipalityCodes": [
+          "38203",
+          "38204",
+          "38207",
+          "38214",
+          "38422",
+          "38442",
+          "38484",
+          "38488",
+          "38506"
+        ],
+        "sourceKind": "statistics-bureau-economic-area",
+        "sourceTitle": "令和6年全国家計構造調査 都道府県内経済圏別市町村一覧",
+        "sourceUrl": "https://www.stat.go.jp/data/zenkokukakei/2024/zuhyou/keizaiken2024.xlsx"
+      }
+    ],
+    "39": [
+      {
+        "slug": "official-a",
+        "name": "高知市地域",
+        "label": "高知市",
+        "tone": "pink",
+        "municipalityCodes": [
+          "39201"
+        ],
+        "sourceKind": "statistics-bureau-economic-area",
+        "sourceTitle": "令和6年全国家計構造調査 都道府県内経済圏別市町村一覧",
+        "sourceUrl": "https://www.stat.go.jp/data/zenkokukakei/2024/zuhyou/keizaiken2024.xlsx"
+      },
+      {
+        "slug": "official-b",
+        "name": "県東部",
+        "label": "県東部",
+        "tone": "blue",
+        "municipalityCodes": [
+          "39202",
+          "39203",
+          "39204",
+          "39211",
+          "39212",
+          "39301",
+          "39302",
+          "39303",
+          "39304",
+          "39305",
+          "39306",
+          "39307",
+          "39341",
+          "39344",
+          "39363",
+          "39364"
+        ],
+        "sourceKind": "statistics-bureau-economic-area",
+        "sourceTitle": "令和6年全国家計構造調査 都道府県内経済圏別市町村一覧",
+        "sourceUrl": "https://www.stat.go.jp/data/zenkokukakei/2024/zuhyou/keizaiken2024.xlsx"
+      },
+      {
+        "slug": "official-c",
+        "name": "県西部",
+        "label": "県西部",
+        "tone": "green",
+        "municipalityCodes": [
+          "39205",
+          "39206",
+          "39208",
+          "39209",
+          "39210",
+          "39386",
+          "39387",
+          "39401",
+          "39402",
+          "39403",
+          "39405",
+          "39410",
+          "39411",
+          "39412",
+          "39424",
+          "39427",
+          "39428"
+        ],
+        "sourceKind": "statistics-bureau-economic-area",
+        "sourceTitle": "令和6年全国家計構造調査 都道府県内経済圏別市町村一覧",
+        "sourceUrl": "https://www.stat.go.jp/data/zenkokukakei/2024/zuhyou/keizaiken2024.xlsx"
+      }
+    ],
+    "40": [
+      {
+        "slug": "official-b",
+        "name": "北九州地域",
+        "label": "北九州",
+        "tone": "pink",
+        "municipalityCodes": [
+          "40101",
+          "40103",
+          "40105",
+          "40106",
+          "40107",
+          "40108",
+          "40109",
+          "40131",
+          "40132",
+          "40133",
+          "40134",
+          "40135",
+          "40136",
+          "40137",
+          "40213",
+          "40214",
+          "40215",
+          "40381",
+          "40382",
+          "40383",
+          "40384",
+          "40621",
+          "40625",
+          "40642",
+          "40646",
+          "40647"
+        ],
+        "sourceKind": "statistics-bureau-economic-area",
+        "sourceTitle": "令和6年全国家計構造調査 都道府県内経済圏別市町村一覧",
+        "sourceUrl": "https://www.stat.go.jp/data/zenkokukakei/2024/zuhyou/keizaiken2024.xlsx"
+      },
+      {
+        "slug": "official-d",
+        "name": "筑後地域",
+        "label": "筑後",
+        "tone": "blue",
+        "municipalityCodes": [
+          "40202",
+          "40203",
+          "40207",
+          "40210",
+          "40211",
+          "40212",
+          "40216",
+          "40225",
+          "40229",
+          "40503",
+          "40522",
+          "40544"
+        ],
+        "sourceKind": "statistics-bureau-economic-area",
+        "sourceTitle": "令和6年全国家計構造調査 都道府県内経済圏別市町村一覧",
+        "sourceUrl": "https://www.stat.go.jp/data/zenkokukakei/2024/zuhyou/keizaiken2024.xlsx"
+      },
+      {
+        "slug": "official-c",
+        "name": "筑豊地域",
+        "label": "筑豊",
+        "tone": "green",
+        "municipalityCodes": [
+          "40204",
+          "40205",
+          "40206",
+          "40226",
+          "40227",
+          "40401",
+          "40402",
+          "40421",
+          "40601",
+          "40602",
+          "40604",
+          "40605",
+          "40608",
+          "40609",
+          "40610"
+        ],
+        "sourceKind": "statistics-bureau-economic-area",
+        "sourceTitle": "令和6年全国家計構造調査 都道府県内経済圏別市町村一覧",
+        "sourceUrl": "https://www.stat.go.jp/data/zenkokukakei/2024/zuhyou/keizaiken2024.xlsx"
+      },
+      {
+        "slug": "official-a",
+        "name": "福岡地域",
+        "label": "福岡",
+        "tone": "yellow",
+        "municipalityCodes": [
+          "40217",
+          "40218",
+          "40219",
+          "40220",
+          "40221",
+          "40223",
+          "40224",
+          "40228",
+          "40230",
+          "40231",
+          "40341",
+          "40342",
+          "40343",
+          "40344",
+          "40345",
+          "40348",
+          "40349",
+          "40447",
+          "40448"
+        ],
+        "sourceKind": "statistics-bureau-economic-area",
+        "sourceTitle": "令和6年全国家計構造調査 都道府県内経済圏別市町村一覧",
+        "sourceUrl": "https://www.stat.go.jp/data/zenkokukakei/2024/zuhyou/keizaiken2024.xlsx"
+      }
+    ],
+    "41": [
+      {
+        "slug": "official-a",
+        "name": "佐城",
+        "label": "佐城",
+        "tone": "pink",
+        "municipalityCodes": [
+          "41201",
+          "41204",
+          "41208"
+        ],
+        "sourceKind": "statistics-bureau-economic-area",
+        "sourceTitle": "令和6年全国家計構造調査 都道府県内経済圏別市町村一覧",
+        "sourceUrl": "https://www.stat.go.jp/data/zenkokukakei/2024/zuhyou/keizaiken2024.xlsx"
+      },
+      {
+        "slug": "official-c",
+        "name": "東松",
+        "label": "東松",
+        "tone": "blue",
+        "municipalityCodes": [
+          "41202",
+          "41387"
+        ],
+        "sourceKind": "statistics-bureau-economic-area",
+        "sourceTitle": "令和6年全国家計構造調査 都道府県内経済圏別市町村一覧",
+        "sourceUrl": "https://www.stat.go.jp/data/zenkokukakei/2024/zuhyou/keizaiken2024.xlsx"
+      },
+      {
+        "slug": "official-b",
+        "name": "三神",
+        "label": "三神",
+        "tone": "green",
+        "municipalityCodes": [
+          "41203",
+          "41210",
+          "41327",
+          "41341",
+          "41345",
+          "41346"
+        ],
+        "sourceKind": "statistics-bureau-economic-area",
+        "sourceTitle": "令和6年全国家計構造調査 都道府県内経済圏別市町村一覧",
+        "sourceUrl": "https://www.stat.go.jp/data/zenkokukakei/2024/zuhyou/keizaiken2024.xlsx"
+      },
+      {
+        "slug": "official-d",
+        "name": "西杵藤",
+        "label": "西杵藤",
+        "tone": "yellow",
+        "municipalityCodes": [
+          "41205",
+          "41206",
+          "41207",
+          "41209",
+          "41401",
+          "41423",
+          "41424",
+          "41425",
+          "41441"
+        ],
+        "sourceKind": "statistics-bureau-economic-area",
+        "sourceTitle": "令和6年全国家計構造調査 都道府県内経済圏別市町村一覧",
+        "sourceUrl": "https://www.stat.go.jp/data/zenkokukakei/2024/zuhyou/keizaiken2024.xlsx"
+      }
+    ],
+    "42": [
+      {
+        "slug": "official-a",
+        "name": "長崎地域",
+        "label": "長崎",
+        "tone": "pink",
+        "municipalityCodes": [
+          "42201",
+          "42307",
+          "42308"
+        ],
+        "sourceKind": "statistics-bureau-economic-area",
+        "sourceTitle": "令和6年全国家計構造調査 都道府県内経済圏別市町村一覧",
+        "sourceUrl": "https://www.stat.go.jp/data/zenkokukakei/2024/zuhyou/keizaiken2024.xlsx"
+      },
+      {
+        "slug": "official-c",
+        "name": "県北地域",
+        "label": "県北",
+        "tone": "blue",
+        "municipalityCodes": [
+          "42202",
+          "42207",
+          "42208",
+          "42212",
+          "42321",
+          "42322",
+          "42323",
+          "42383",
+          "42391"
+        ],
+        "sourceKind": "statistics-bureau-economic-area",
+        "sourceTitle": "令和6年全国家計構造調査 都道府県内経済圏別市町村一覧",
+        "sourceUrl": "https://www.stat.go.jp/data/zenkokukakei/2024/zuhyou/keizaiken2024.xlsx"
+      },
+      {
+        "slug": "official-b",
+        "name": "県央・島原地域",
+        "label": "県央・島原",
+        "tone": "green",
+        "municipalityCodes": [
+          "42203",
+          "42204",
+          "42205",
+          "42213",
+          "42214"
+        ],
+        "sourceKind": "statistics-bureau-economic-area",
+        "sourceTitle": "令和6年全国家計構造調査 都道府県内経済圏別市町村一覧",
+        "sourceUrl": "https://www.stat.go.jp/data/zenkokukakei/2024/zuhyou/keizaiken2024.xlsx"
+      },
+      {
+        "slug": "official-d",
+        "name": "対馬地域",
+        "label": "対馬",
+        "tone": "yellow",
+        "municipalityCodes": [
+          "42209"
+        ],
+        "sourceKind": "statistics-bureau-economic-area",
+        "sourceTitle": "令和6年全国家計構造調査 都道府県内経済圏別市町村一覧",
+        "sourceUrl": "https://www.stat.go.jp/data/zenkokukakei/2024/zuhyou/keizaiken2024.xlsx"
+      },
+      {
+        "slug": "official-e",
+        "name": "壱岐地域",
+        "label": "壱岐",
+        "tone": "purple",
+        "municipalityCodes": [
+          "42210"
+        ],
+        "sourceKind": "statistics-bureau-economic-area",
+        "sourceTitle": "令和6年全国家計構造調査 都道府県内経済圏別市町村一覧",
+        "sourceUrl": "https://www.stat.go.jp/data/zenkokukakei/2024/zuhyou/keizaiken2024.xlsx"
+      },
+      {
+        "slug": "official-f",
+        "name": "五島地域",
+        "label": "五島",
+        "tone": "teal",
+        "municipalityCodes": [
+          "42211",
+          "42411"
+        ],
+        "sourceKind": "statistics-bureau-economic-area",
+        "sourceTitle": "令和6年全国家計構造調査 都道府県内経済圏別市町村一覧",
+        "sourceUrl": "https://www.stat.go.jp/data/zenkokukakei/2024/zuhyou/keizaiken2024.xlsx"
+      }
+    ],
+    "43": [
+      {
+        "slug": "official-a",
+        "name": "熊本中央地域",
+        "label": "熊本中央",
+        "tone": "pink",
+        "municipalityCodes": [
+          "43101",
+          "43102",
+          "43103",
+          "43104",
+          "43105",
+          "43211",
+          "43213",
+          "43348",
+          "43441",
+          "43442",
+          "43443",
+          "43444",
+          "43447"
+        ],
+        "sourceKind": "statistics-bureau-economic-area",
+        "sourceTitle": "令和6年全国家計構造調査 都道府県内経済圏別市町村一覧",
+        "sourceUrl": "https://www.stat.go.jp/data/zenkokukakei/2024/zuhyou/keizaiken2024.xlsx"
+      },
+      {
+        "slug": "official-c",
+        "name": "県南地域",
+        "label": "県南",
+        "tone": "blue",
+        "municipalityCodes": [
+          "43202",
+          "43203",
+          "43205",
+          "43468",
+          "43482",
+          "43484",
+          "43501",
+          "43505",
+          "43507",
+          "43510",
+          "43511",
+          "43512",
+          "43513",
+          "43514"
+        ],
+        "sourceKind": "statistics-bureau-economic-area",
+        "sourceTitle": "令和6年全国家計構造調査 都道府県内経済圏別市町村一覧",
+        "sourceUrl": "https://www.stat.go.jp/data/zenkokukakei/2024/zuhyou/keizaiken2024.xlsx"
+      },
+      {
+        "slug": "official-b",
+        "name": "県北地域",
+        "label": "県北",
+        "tone": "green",
+        "municipalityCodes": [
+          "43204",
+          "43206",
+          "43208",
+          "43210",
+          "43214",
+          "43216",
+          "43364",
+          "43367",
+          "43368",
+          "43369",
+          "43403",
+          "43404",
+          "43423",
+          "43424",
+          "43425",
+          "43428",
+          "43432",
+          "43433"
+        ],
+        "sourceKind": "statistics-bureau-economic-area",
+        "sourceTitle": "令和6年全国家計構造調査 都道府県内経済圏別市町村一覧",
+        "sourceUrl": "https://www.stat.go.jp/data/zenkokukakei/2024/zuhyou/keizaiken2024.xlsx"
+      },
+      {
+        "slug": "official-d",
+        "name": "天草地域",
+        "label": "天草",
+        "tone": "yellow",
+        "municipalityCodes": [
+          "43212",
+          "43215",
+          "43531"
+        ],
+        "sourceKind": "statistics-bureau-economic-area",
+        "sourceTitle": "令和6年全国家計構造調査 都道府県内経済圏別市町村一覧",
+        "sourceUrl": "https://www.stat.go.jp/data/zenkokukakei/2024/zuhyou/keizaiken2024.xlsx"
+      }
+    ],
+    "44": [
+      {
+        "slug": "official-a",
+        "name": "中部",
+        "label": "中部",
+        "tone": "pink",
+        "municipalityCodes": [
+          "44201",
+          "44213"
+        ],
+        "sourceKind": "statistics-bureau-economic-area",
+        "sourceTitle": "令和6年全国家計構造調査 都道府県内経済圏別市町村一覧",
+        "sourceUrl": "https://www.stat.go.jp/data/zenkokukakei/2024/zuhyou/keizaiken2024.xlsx"
+      },
+      {
+        "slug": "official-b",
+        "name": "東部",
+        "label": "東部",
+        "tone": "blue",
+        "municipalityCodes": [
+          "44202",
+          "44210",
+          "44214",
+          "44322",
+          "44341"
+        ],
+        "sourceKind": "statistics-bureau-economic-area",
+        "sourceTitle": "令和6年全国家計構造調査 都道府県内経済圏別市町村一覧",
+        "sourceUrl": "https://www.stat.go.jp/data/zenkokukakei/2024/zuhyou/keizaiken2024.xlsx"
+      },
+      {
+        "slug": "official-e",
+        "name": "北部",
+        "label": "北部",
+        "tone": "green",
+        "municipalityCodes": [
+          "44203",
+          "44209",
+          "44211"
+        ],
+        "sourceKind": "statistics-bureau-economic-area",
+        "sourceTitle": "令和6年全国家計構造調査 都道府県内経済圏別市町村一覧",
+        "sourceUrl": "https://www.stat.go.jp/data/zenkokukakei/2024/zuhyou/keizaiken2024.xlsx"
+      },
+      {
+        "slug": "official-d",
+        "name": "西部",
+        "label": "西部",
+        "tone": "yellow",
+        "municipalityCodes": [
+          "44204",
+          "44461",
+          "44462"
+        ],
+        "sourceKind": "statistics-bureau-economic-area",
+        "sourceTitle": "令和6年全国家計構造調査 都道府県内経済圏別市町村一覧",
+        "sourceUrl": "https://www.stat.go.jp/data/zenkokukakei/2024/zuhyou/keizaiken2024.xlsx"
+      },
+      {
+        "slug": "official-c",
+        "name": "南部・豊肥",
+        "label": "南部・豊肥",
+        "tone": "purple",
+        "municipalityCodes": [
+          "44205",
+          "44206",
+          "44207",
+          "44208",
+          "44212"
+        ],
+        "sourceKind": "statistics-bureau-economic-area",
+        "sourceTitle": "令和6年全国家計構造調査 都道府県内経済圏別市町村一覧",
+        "sourceUrl": "https://www.stat.go.jp/data/zenkokukakei/2024/zuhyou/keizaiken2024.xlsx"
+      }
+    ],
+    "45": [
+      {
+        "slug": "official-a",
+        "name": "県央",
+        "label": "県央",
+        "tone": "pink",
+        "municipalityCodes": [
+          "45201",
+          "45208",
+          "45382",
+          "45383",
+          "45401",
+          "45402",
+          "45403",
+          "45404",
+          "45405",
+          "45406"
+        ],
+        "sourceKind": "statistics-bureau-economic-area",
+        "sourceTitle": "令和6年全国家計構造調査 都道府県内経済圏別市町村一覧",
+        "sourceUrl": "https://www.stat.go.jp/data/zenkokukakei/2024/zuhyou/keizaiken2024.xlsx"
+      },
+      {
+        "slug": "official-b",
+        "name": "県南",
+        "label": "県南",
+        "tone": "blue",
+        "municipalityCodes": [
+          "45202",
+          "45204",
+          "45205",
+          "45207",
+          "45209",
+          "45341",
+          "45361"
+        ],
+        "sourceKind": "statistics-bureau-economic-area",
+        "sourceTitle": "令和6年全国家計構造調査 都道府県内経済圏別市町村一覧",
+        "sourceUrl": "https://www.stat.go.jp/data/zenkokukakei/2024/zuhyou/keizaiken2024.xlsx"
+      },
+      {
+        "slug": "official-c",
+        "name": "県北",
+        "label": "県北",
+        "tone": "green",
+        "municipalityCodes": [
+          "45203",
+          "45206",
+          "45421",
+          "45429",
+          "45430",
+          "45431",
+          "45441",
+          "45442",
+          "45443"
+        ],
+        "sourceKind": "statistics-bureau-economic-area",
+        "sourceTitle": "令和6年全国家計構造調査 都道府県内経済圏別市町村一覧",
+        "sourceUrl": "https://www.stat.go.jp/data/zenkokukakei/2024/zuhyou/keizaiken2024.xlsx"
+      }
+    ],
+    "46": [
+      {
+        "slug": "official-a",
+        "name": "鹿児島・北薩・南薩地域",
+        "label": "鹿児島・北薩・南薩",
+        "tone": "pink",
+        "municipalityCodes": [
+          "46201",
+          "46204",
+          "46206",
+          "46208",
+          "46210",
+          "46215",
+          "46216",
+          "46219",
+          "46220",
+          "46223",
+          "46303",
+          "46304",
+          "46392",
+          "46404"
+        ],
+        "sourceKind": "statistics-bureau-economic-area",
+        "sourceTitle": "令和6年全国家計構造調査 都道府県内経済圏別市町村一覧",
+        "sourceUrl": "https://www.stat.go.jp/data/zenkokukakei/2024/zuhyou/keizaiken2024.xlsx"
+      },
+      {
+        "slug": "official-c",
+        "name": "大隅地域",
+        "label": "大隅",
+        "tone": "blue",
+        "municipalityCodes": [
+          "46203",
+          "46214",
+          "46217",
+          "46221",
+          "46468",
+          "46482",
+          "46490",
+          "46491",
+          "46492"
+        ],
+        "sourceKind": "statistics-bureau-economic-area",
+        "sourceTitle": "令和6年全国家計構造調査 都道府県内経済圏別市町村一覧",
+        "sourceUrl": "https://www.stat.go.jp/data/zenkokukakei/2024/zuhyou/keizaiken2024.xlsx"
+      },
+      {
+        "slug": "official-d",
+        "name": "奄美・熊毛地域",
+        "label": "奄美・熊毛",
+        "tone": "green",
+        "municipalityCodes": [
+          "46213",
+          "46222",
+          "46501",
+          "46502",
+          "46505",
+          "46523",
+          "46524",
+          "46525",
+          "46527",
+          "46529",
+          "46530",
+          "46531",
+          "46532",
+          "46533",
+          "46534",
+          "46535"
+        ],
+        "sourceKind": "statistics-bureau-economic-area",
+        "sourceTitle": "令和6年全国家計構造調査 都道府県内経済圏別市町村一覧",
+        "sourceUrl": "https://www.stat.go.jp/data/zenkokukakei/2024/zuhyou/keizaiken2024.xlsx"
+      },
+      {
+        "slug": "official-b",
+        "name": "姶良・伊佐地域",
+        "label": "姶良・伊佐",
+        "tone": "yellow",
+        "municipalityCodes": [
+          "46218",
+          "46224",
+          "46225",
+          "46452"
+        ],
+        "sourceKind": "statistics-bureau-economic-area",
+        "sourceTitle": "令和6年全国家計構造調査 都道府県内経済圏別市町村一覧",
+        "sourceUrl": "https://www.stat.go.jp/data/zenkokukakei/2024/zuhyou/keizaiken2024.xlsx"
+      }
+    ],
+    "47": [
+      {
+        "slug": "official-a",
+        "name": "南部",
+        "label": "南部",
+        "tone": "pink",
+        "municipalityCodes": [
+          "47201",
+          "47210",
+          "47212",
+          "47215",
+          "47348",
+          "47350",
+          "47353",
+          "47354",
+          "47355",
+          "47356",
+          "47357",
+          "47358",
+          "47361",
+          "47362"
+        ],
+        "sourceKind": "statistics-bureau-economic-area",
+        "sourceTitle": "令和6年全国家計構造調査 都道府県内経済圏別市町村一覧",
+        "sourceUrl": "https://www.stat.go.jp/data/zenkokukakei/2024/zuhyou/keizaiken2024.xlsx"
+      },
+      {
+        "slug": "official-b",
+        "name": "中部",
+        "label": "中部",
+        "tone": "blue",
+        "municipalityCodes": [
+          "47205",
+          "47208",
+          "47211",
+          "47213",
+          "47324",
+          "47325",
+          "47326",
+          "47327",
+          "47328",
+          "47329"
+        ],
+        "sourceKind": "statistics-bureau-economic-area",
+        "sourceTitle": "令和6年全国家計構造調査 都道府県内経済圏別市町村一覧",
+        "sourceUrl": "https://www.stat.go.jp/data/zenkokukakei/2024/zuhyou/keizaiken2024.xlsx"
+      },
+      {
+        "slug": "official-d",
+        "name": "宮古・八重山",
+        "label": "宮古・八重山",
+        "tone": "green",
+        "municipalityCodes": [
+          "47207",
+          "47214",
+          "47375",
+          "47381",
+          "47382"
+        ],
+        "sourceKind": "statistics-bureau-economic-area",
+        "sourceTitle": "令和6年全国家計構造調査 都道府県内経済圏別市町村一覧",
+        "sourceUrl": "https://www.stat.go.jp/data/zenkokukakei/2024/zuhyou/keizaiken2024.xlsx"
+      },
+      {
+        "slug": "official-c",
+        "name": "北部",
+        "label": "北部",
+        "tone": "yellow",
+        "municipalityCodes": [
+          "47209",
+          "47301",
+          "47302",
+          "47303",
+          "47306",
+          "47308",
+          "47311",
+          "47313",
+          "47314",
+          "47315",
+          "47359",
+          "47360"
+        ],
+        "sourceKind": "statistics-bureau-economic-area",
+        "sourceTitle": "令和6年全国家計構造調査 都道府県内経済圏別市町村一覧",
+        "sourceUrl": "https://www.stat.go.jp/data/zenkokukakei/2024/zuhyou/keizaiken2024.xlsx"
+      }
+    ]
+  },
+  "validation": {
+    "01": {
+      "municipalityCount": 188,
+      "areaCount": 6,
+      "used2019Fallback": false
+    },
+    "02": {
+      "municipalityCount": 40,
+      "areaCount": 4,
+      "used2019Fallback": false
+    },
+    "03": {
+      "municipalityCount": 33,
+      "areaCount": 4,
+      "used2019Fallback": false
+    },
+    "04": {
+      "municipalityCount": 39,
+      "areaCount": 4,
+      "used2019Fallback": false
+    },
+    "05": {
+      "municipalityCount": 25,
+      "areaCount": 3,
+      "used2019Fallback": false
+    },
+    "06": {
+      "municipalityCount": 35,
+      "areaCount": 4,
+      "used2019Fallback": false
+    },
+    "07": {
+      "municipalityCount": 59,
+      "areaCount": 3,
+      "used2019Fallback": false
+    },
+    "08": {
+      "municipalityCount": 44,
+      "areaCount": 5,
+      "used2019Fallback": false
+    },
+    "09": {
+      "municipalityCount": 25,
+      "areaCount": 3,
+      "used2019Fallback": false
+    },
+    "10": {
+      "municipalityCount": 35,
+      "areaCount": 4,
+      "used2019Fallback": false
+    },
+    "11": {
+      "municipalityCount": 72,
+      "areaCount": 9,
+      "used2019Fallback": false
+    },
+    "12": {
+      "municipalityCount": 59,
+      "areaCount": 7,
+      "used2019Fallback": false
+    },
+    "13": {
+      "municipalityCount": 61,
+      "areaCount": 4,
+      "used2019Fallback": false
+    },
+    "14": {
+      "municipalityCount": 58,
+      "areaCount": 5,
+      "used2019Fallback": false
+    },
+    "15": {
+      "municipalityCount": 37,
+      "areaCount": 3,
+      "used2019Fallback": false
+    },
+    "16": {
+      "municipalityCount": 15,
+      "areaCount": 2,
+      "used2019Fallback": false
+    },
+    "17": {
+      "municipalityCount": 19,
+      "areaCount": 4,
+      "used2019Fallback": false
+    },
+    "18": {
+      "municipalityCount": 17,
+      "areaCount": 4,
+      "used2019Fallback": false
+    },
+    "19": {
+      "municipalityCount": 27,
+      "areaCount": 4,
+      "used2019Fallback": false
+    },
+    "20": {
+      "municipalityCount": 77,
+      "areaCount": 4,
+      "used2019Fallback": false
+    },
+    "21": {
+      "municipalityCount": 42,
+      "areaCount": 4,
+      "used2019Fallback": false
+    },
+    "22": {
+      "municipalityCount": 43,
+      "areaCount": 6,
+      "used2019Fallback": false
+    },
+    "23": {
+      "municipalityCount": 69,
+      "areaCount": 3,
+      "used2019Fallback": false
+    },
+    "24": {
+      "municipalityCount": 29,
+      "areaCount": 3,
+      "used2019Fallback": false
+    },
+    "25": {
+      "municipalityCount": 19,
+      "areaCount": 4,
+      "used2019Fallback": false
+    },
+    "26": {
+      "municipalityCount": 36,
+      "areaCount": 5,
+      "used2019Fallback": false
+    },
+    "27": {
+      "municipalityCount": 72,
+      "areaCount": 8,
+      "used2019Fallback": false
+    },
+    "28": {
+      "municipalityCount": 49,
+      "areaCount": 8,
+      "used2019Fallback": false
+    },
+    "29": {
+      "municipalityCount": 39,
+      "areaCount": 3,
+      "used2019Fallback": false
+    },
+    "30": {
+      "municipalityCount": 30,
+      "areaCount": 5,
+      "used2019Fallback": false
+    },
+    "31": {
+      "municipalityCount": 19,
+      "areaCount": 3,
+      "used2019Fallback": false
+    },
+    "32": {
+      "municipalityCount": 19,
+      "areaCount": 3,
+      "used2019Fallback": false
+    },
+    "33": {
+      "municipalityCount": 30,
+      "areaCount": 3,
+      "used2019Fallback": false
+    },
+    "34": {
+      "municipalityCount": 30,
+      "areaCount": 2,
+      "used2019Fallback": false
+    },
+    "35": {
+      "municipalityCount": 19,
+      "areaCount": 8,
+      "used2019Fallback": false,
+      "prefectureOverride": true
+    },
+    "36": {
+      "municipalityCount": 24,
+      "areaCount": 3,
+      "used2019Fallback": false
+    },
+    "37": {
+      "municipalityCount": 17,
+      "areaCount": 2,
+      "used2019Fallback": false
+    },
+    "38": {
+      "municipalityCount": 20,
+      "areaCount": 3,
+      "used2019Fallback": false
+    },
+    "39": {
+      "municipalityCount": 34,
+      "areaCount": 3,
+      "used2019Fallback": false
+    },
+    "40": {
+      "municipalityCount": 72,
+      "areaCount": 4,
+      "used2019Fallback": false
+    },
+    "41": {
+      "municipalityCount": 20,
+      "areaCount": 4,
+      "used2019Fallback": false
+    },
+    "42": {
+      "municipalityCount": 21,
+      "areaCount": 6,
+      "used2019Fallback": false
+    },
+    "43": {
+      "municipalityCount": 48,
+      "areaCount": 4,
+      "used2019Fallback": false
+    },
+    "44": {
+      "municipalityCount": 18,
+      "areaCount": 5,
+      "used2019Fallback": false
+    },
+    "45": {
+      "municipalityCount": 26,
+      "areaCount": 3,
+      "used2019Fallback": false
+    },
+    "46": {
+      "municipalityCount": 43,
+      "areaCount": 4,
+      "used2019Fallback": false
+    },
+    "47": {
+      "municipalityCount": 41,
+      "areaCount": 4,
+      "used2019Fallback": false
+    }
+  }
+}
