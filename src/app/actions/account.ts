@@ -1,0 +1,93 @@
+"use server";
+
+import { revalidatePath } from "next/cache";
+import { redirect } from "next/navigation";
+import { z } from "zod";
+import type { ActionState } from "@/components/form";
+import { toJapaneseError } from "@/lib/errors";
+import { getSiteUrl } from "@/lib/supabase/env";
+import { requireUser } from "@/lib/supabase/server";
+
+export async function updateProfileAction(_prev: ActionState, formData: FormData): Promise<ActionState> {
+  const values = {
+    displayName: String(formData.get("displayName") ?? "").trim(),
+    introduction: String(formData.get("introduction") ?? "").trim(),
+  };
+
+  const parsed = z
+    .object({
+      displayName: z
+        .string()
+        .min(1, "ニックネームを入力してください。")
+        .max(30, "ニックネームは30文字以内で入力してください。"),
+      introduction: z.string().max(300, "自己紹介は300文字以内で入力してください。"),
+    })
+    .safeParse(values);
+
+  if (!parsed.success) {
+    return { error: parsed.error.issues[0]?.message ?? "入力内容をご確認ください。", values };
+  }
+
+  let profileImagePath: string | null = null;
+  try {
+    const raw: unknown = JSON.parse(String(formData.get("profilePaths") ?? "[]"));
+    if (Array.isArray(raw) && typeof raw[0] === "string") profileImagePath = raw[0];
+  } catch {
+    // 画像がなくても保存できる
+  }
+
+  const { supabase, user } = await requireUser();
+
+  const { error } = await supabase
+    .from("profiles")
+    .update({
+      display_name: parsed.data.displayName,
+      introduction: parsed.data.introduction || null,
+      profile_image_url: profileImagePath,
+    })
+    .eq("user_id", user.id);
+
+  if (error) return { error: toJapaneseError(error, "プロフィールの更新に失敗しました。"), values };
+
+  revalidatePath("/mypage");
+  return { ok: true, message: "プロフィールを更新しました。", values };
+}
+
+export async function updateEmailAction(_prev: ActionState, formData: FormData): Promise<ActionState> {
+  const email = String(formData.get("email") ?? "")
+    .trim()
+    .toLowerCase();
+
+  const parsed = z.string().email("メールアドレスの形式が正しくありません。").safeParse(email);
+  if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "", values: { email } };
+
+  const { supabase } = await requireUser();
+  const { error } = await supabase.auth.updateUser(
+    { email: parsed.data },
+    { emailRedirectTo: `${getSiteUrl()}/auth/callback?next=/mypage/account` },
+  );
+
+  if (error) return { error: toJapaneseError(error, "メールアドレスの変更に失敗しました。"), values: { email } };
+
+  return {
+    ok: true,
+    message: "新しいメールアドレス宛に確認メールを送信しました。リンクを開くと変更が完了します。",
+    values: { email },
+  };
+}
+
+export async function deleteAccountAction(_prev: ActionState, formData: FormData): Promise<ActionState> {
+  const confirmText = String(formData.get("confirmText") ?? "").trim();
+
+  if (confirmText !== "削除") {
+    return { error: "確認のため「削除」と入力してください。" };
+  }
+
+  const { supabase } = await requireUser();
+  const { error } = await supabase.rpc("delete_own_account");
+
+  if (error) return { error: toJapaneseError(error, "アカウントの削除に失敗しました。") };
+
+  await supabase.auth.signOut();
+  redirect("/login?notice=account-deleted");
+}

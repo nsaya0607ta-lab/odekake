@@ -1,0 +1,192 @@
+@import "tailwindcss";
+
+@theme {
+  /* 生成り色を基調にした淡いパレット */
+  --color-paper: #fbf8f1;
+  --color-paper-deep: #f4efe3;
+  --color-card: #fffdf8;
+
+  --color-ink: #3f3a33;
+  --color-ink-soft: #6d675d;
+  --color-ink-faint: #9c9488;
+
+  --color-line: #e2dbcb;
+  --color-line-strong: #cfc5b0;
+
+  --color-leaf: #7fa568;
+  --color-leaf-soft: #dfeacf;
+  --color-leaf-deep: #5d8049;
+
+  --color-sky: #7fa8c9;
+  --color-sky-soft: #dcebf4;
+
+  --color-sun: #e0b862;
+  --color-sun-soft: #f7ecd0;
+
+  --color-blossom: #dd9aa6;
+  --color-blossom-soft: #f7e0e3;
+
+  --color-lilac: #a99bcb;
+  --color-lilac-soft: #e9e4f4;
+
+  --color-mint: #7cb8ac;
+  --color-mint-soft: #daeeea;
+
+  --color-apricot: #e2a377;
+  --color-apricot-soft: #f8e5d6;
+
+  --font-sans:
+    "Hiragino Maru Gothic ProN", "ヒラギノ丸ゴ ProN W4", "Zen Maru Gothic", "Yu Gothic Medium", "游ゴシック Medium",
+    YuGothic, "Hiragino Sans", "Noto Sans JP", system-ui, sans-serif;
+
+  --radius-blob: 1.5rem;
+}
+
+@layer base {
+  html {
+    -webkit-text-size-adjust: 100%;
+  }
+
+  body {
+    background-color: var(--color-paper);
+    color: var(--color-ink);
+    font-family: var(--font-sans);
+    /* うっすらとした紙の質感 */
+    background-image: radial-gradient(rgba(150, 138, 118, 0.055) 1px, transparent 1px);
+    background-size: 22px 22px;
+    -webkit-font-smoothing: antialiased;
+    overscroll-behavior-y: none;
+  }
+
+  /* 端末のセーフエリアを避ける */
+  :root {
+    --nav-height: 4.75rem;
+    --safe-bottom: env(safe-area-inset-bottom, 0px);
+  }
+
+  button,
+  a {
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  input,
+  textarea,
+  select {
+    font-family: inherit;
+    /* iOS の自動ズームを防ぐ */
+    font-size: 16px;
+  }
+}
+
+@layer components {
+  /* 手描き風にわずかに崩した角丸 */
+  .rough-card {
+    background-color: var(--color-card);
+    border: 1px solid var(--color-line);
+    border-radius: 22px 20px 24px 19px;
+    box-shadow: 0 1px 0 rgba(120, 108, 88, 0.06);
+  }
+
+  .rough-card-alt {
+    border-radius: 20px 24px 19px 23px;
+  }
+
+  .rough-pill {
+    border-radius: 999px;
+  }
+
+  .hand-underline {
+    background-image: linear-gradient(transparent 62%, var(--color-leaf-soft) 62%);
+    background-repeat: no-repeat;
+  }
+
+  /* フォーム部品の共通スタイル */
+  .field {
+    width: 100%;
+    min-height: 3rem;
+    padding: 0.75rem 0.9rem;
+    background-color: var(--color-card);
+    border: 1px solid var(--color-line-strong);
+    border-radius: 14px 13px 15px 12px;
+    color: var(--color-ink);
+    outline: none;
+    transition: border-color 120ms ease, box-shadow 120ms ease;
+  }
+
+  .field::placeholder {
+    color: var(--color-ink-faint);
+  }
+
+  .field:focus-visible {
+    border-color: var(--color-leaf);
+    box-shadow: 0 0 0 3px var(--color-leaf-soft);
+  }
+
+  .field-label {
+    display: block;
+    margin-bottom: 0.4rem;
+    font-size: 0.9rem;
+    font-weight: 600;
+    color: var(--color-ink-soft);
+  }
+
+  .btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.45rem;
+    min-height: 3rem;
+    padding: 0 1.25rem;
+    border-radius: 999px;
+    font-weight: 600;
+    transition: transform 120ms ease, background-color 120ms ease, opacity 120ms ease;
+  }
+
+  .btn:active:not(:disabled) {
+    transform: scale(0.975);
+  }
+
+  .btn:disabled {
+    opacity: 0.55;
+  }
+
+  .btn-primary {
+    background-color: var(--color-leaf-soft);
+    border: 1px solid var(--color-leaf);
+    color: var(--color-leaf-deep);
+  }
+
+  .btn-quiet {
+    background-color: var(--color-card);
+    border: 1px solid var(--color-line-strong);
+    color: var(--color-ink-soft);
+  }
+
+  .btn-danger {
+    background-color: var(--color-blossom-soft);
+    border: 1px solid var(--color-blossom);
+    color: #96525f;
+  }
+
+  /* 画面遷移は短いフェードのみ */
+  .fade-in {
+    animation: fade-in 180ms ease-out both;
+  }
+}
+
+@keyframes fade-in {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .fade-in {
+    animation: none;
+  }
+}
