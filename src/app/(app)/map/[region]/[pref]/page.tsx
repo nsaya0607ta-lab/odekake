@@ -1,11 +1,12 @@
 import { notFound } from "next/navigation";
-import { MunicipalityBrowser } from "@/components/municipality-browser";
 import { PageBody } from "@/components/page-body";
 import { PageHeader } from "@/components/page-header";
+import { PrefectureAreaBrowser } from "@/components/prefecture-area-browser";
 import { loadAreaIndex, shadeLevel } from "@/lib/data/areas";
 import { resolveWorkspace } from "@/lib/data/workspace";
 import { getMunicipalitiesByPrefecture, getPrefecture, insetsOfPrefecture, viewBoxFor } from "@/lib/geo";
 import { loadMunicipalityShapes } from "@/lib/geo/municipality-shapes";
+import { buildPrefectureAreas } from "@/lib/geo/prefecture-areas";
 import { getRegion } from "@/lib/geo/regions";
 import { requireUser } from "@/lib/supabase/server";
 
@@ -31,22 +32,24 @@ export default async function PrefecturePage({
   const workspace = await resolveWorkspace(supabase, user.id);
 
   // 境界データはその都道府県の分だけサーバー側で読み込む
-  const [areas, shapes] = await Promise.all([
+  const [areasIndex, shapes] = await Promise.all([
     loadAreaIndex(supabase, workspace.tripIds),
     loadMunicipalityShapes(prefecture.code),
   ]);
 
   const shapeByCode = new Map(shapes.map((shape) => [shape.code, shape]));
 
-  const municipalities = getMunicipalitiesByPrefecture(prefecture.code).map((m) => {
-    const entry = areas.municipality.get(m.code);
-    const shape = shapeByCode.get(m.code);
+  const municipalities = getMunicipalitiesByPrefecture(prefecture.code).map((municipality) => {
+    const entry = areasIndex.municipality.get(municipality.code);
+    const shape = shapeByCode.get(municipality.code);
     return {
-      code: m.code,
-      name: m.name,
+      code: municipality.code,
+      name: municipality.name,
       d: shape?.d ?? null,
       center: shape?.center ?? null,
       span: shape?.span ?? 0,
+      lat: municipality.lat,
+      lng: municipality.lng,
       spotCount: entry?.spotCount ?? 0,
       visitCount: entry?.visitCount ?? 0,
       favoriteCount: entry?.favoriteCount ?? 0,
@@ -54,8 +57,9 @@ export default async function PrefecturePage({
     };
   });
 
-  const prefectureEntry = areas.prefecture.get(prefecture.code);
-  const visitedCount = municipalities.filter((m) => m.level > 0).length;
+  const prefectureAreas = buildPrefectureAreas(municipalities);
+  const prefectureEntry = areasIndex.prefecture.get(prefecture.code);
+  const visitedCount = municipalities.filter((municipality) => municipality.level > 0).length;
 
   return (
     <>
@@ -77,16 +81,16 @@ export default async function PrefecturePage({
           </div>
           <div className="h-8 w-px bg-line" />
           <div>
-            <p className="text-2xl leading-none font-bold tabular-nums">{municipalities.length}</p>
-            <p className="mt-1 text-xs text-ink-soft">市区町村</p>
+            <p className="text-2xl leading-none font-bold tabular-nums">{prefectureAreas.length}</p>
+            <p className="mt-1 text-xs text-ink-soft">エリア</p>
           </div>
         </section>
 
-        <MunicipalityBrowser
+        <PrefectureAreaBrowser
           prefectureName={prefecture.name}
           viewBox={viewBoxFor([prefecture], "prefecture")}
           insets={insetsOfPrefecture("prefecture", prefecture.code)}
-          items={municipalities}
+          areas={prefectureAreas}
           hrefBase={`/map/${region.slug}/${prefecture.code}`}
           hasMap={shapes.length > 0}
         />
