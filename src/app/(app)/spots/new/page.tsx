@@ -23,6 +23,7 @@ export default async function NewSpotPage({
       <PageHeader title="スポットを登録" />
       <PageBody>
         <SpotForm
+          placeSearchEnabled={Boolean(process.env.GOOGLE_PLACES_API_KEY?.trim())}
           categories={[...categoryNames.entries()].map(([id, name]) => ({ id, name }))}
           location={{
             prefectureCode: municipality?.prefectureCode ?? pref ?? "",
