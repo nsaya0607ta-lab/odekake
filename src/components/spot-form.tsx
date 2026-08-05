@@ -4,7 +4,11 @@ import { useActionState } from "react";
 import { createSpotAction, updateSpotAction } from "@/app/actions/spots";
 import { FormDraft } from "@/components/form-draft";
 import { emptyActionState, Field, FormMessage, SubmitButton } from "@/components/form";
-import { LocationPicker, type SpotLocation } from "@/components/location-picker";
+import {
+  LocationPicker,
+  type PlaceAutofill,
+  type SpotLocation,
+} from "@/components/location-picker";
 
 export type SpotFormValues = {
   name: string;
@@ -30,21 +34,39 @@ const EMPTY: SpotFormValues = {
   memo: "",
 };
 
+function setInputValue(id: string, value: string) {
+  const element = document.getElementById(id);
+  if (!(element instanceof HTMLInputElement)) return;
+  const descriptor = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value");
+  if (descriptor?.set) descriptor.set.call(element, value);
+  else element.value = value;
+  element.dispatchEvent(new Event("input", { bubbles: true }));
+  element.dispatchEvent(new Event("change", { bubbles: true }));
+}
+
 export function SpotForm({
   categories,
   location,
   defaults = EMPTY,
   spotId,
+  placeSearchEnabled = false,
 }: {
   categories: Array<{ id: number; name: string }>;
   location: SpotLocation;
   defaults?: SpotFormValues;
   /** 指定すると編集、省略すると新規登録 */
   spotId?: string;
+  placeSearchEnabled?: boolean;
 }) {
   const isEdit = Boolean(spotId);
   const [state, formAction] = useActionState(isEdit ? updateSpotAction : createSpotAction, emptyActionState);
   const initial = { ...defaults, ...(state.values ?? {}) };
+
+  const applyPlaceAutofill = (place: PlaceAutofill) => {
+    setInputValue("name", place.name);
+    if (place.address) setInputValue("address", place.address);
+    if (place.postalCode) setInputValue("postalCode", place.postalCode);
+  };
 
   return (
     <form id="spot-form" action={formAction} className="space-y-4" noValidate>
@@ -75,7 +97,12 @@ export function SpotForm({
         </select>
       </Field>
 
-      <LocationPicker initial={location} error={state.fieldErrors?.municipalityCode} />
+      <LocationPicker
+        initial={location}
+        error={state.fieldErrors?.municipalityCode}
+        placeSearchEnabled={placeSearchEnabled}
+        onPlaceSelected={applyPlaceAutofill}
+      />
 
       <Field label="住所" htmlFor="address" optional error={state.fieldErrors?.address}>
         <input
