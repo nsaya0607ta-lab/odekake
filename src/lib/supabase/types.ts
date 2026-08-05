@@ -162,6 +162,7 @@ export type AreaStatsRow = {
   municipality_code: string;
   spot_count: number;
   visit_count: number;
+  favorite_count: number;
   last_visited_at: string | null;
 };
 
@@ -238,7 +239,7 @@ export type Database = {
     };
     Views: Record<string, never>;
     Functions: {
-      area_stats: { Args: Record<string, never>; Returns: AreaStatsRow[] };
+      area_stats: { Args: { p_trip_ids?: string[] }; Returns: AreaStatsRow[] };
       join_trip_by_code: { Args: { p_code: string }; Returns: { trip_id: string; title: string }[] };
       delete_own_account: { Args: Record<string, never>; Returns: undefined };
     };

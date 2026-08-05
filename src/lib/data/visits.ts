@@ -29,10 +29,14 @@ export type TimelineItem = {
 export type TimelineFilter = {
   tripType?: TripType | "all";
   tripId?: string;
+  /** 旅ワークスペースの旅行。空配列なら記録なしとして扱う */
+  tripIds?: string[];
   limit?: number;
 };
 
 export async function getTimeline(supabase: DB, filter: TimelineFilter = {}): Promise<TimelineItem[]> {
+  if (filter.tripIds && filter.tripIds.length === 0) return [];
+
   let query = supabase
     .from("visit_records")
     .select("*")
@@ -40,6 +44,7 @@ export async function getTimeline(supabase: DB, filter: TimelineFilter = {}): Pr
     .order("created_at", { ascending: false });
 
   if (filter.tripId) query = query.eq("trip_id", filter.tripId);
+  else if (filter.tripIds) query = query.in("trip_id", filter.tripIds);
   if (filter.limit) query = query.limit(filter.limit);
 
   const { data } = await query;

@@ -17,6 +17,7 @@ import { PhotoGallery } from "@/components/photo-gallery";
 import { StarRating, TripTypeBadge, formatDate } from "@/components/ui";
 import { getSpotDetail } from "@/lib/data/spots";
 import { getMunicipality, getPrefecture } from "@/lib/geo";
+import { resolveWorkspace } from "@/lib/data/workspace";
 import { requireUser } from "@/lib/supabase/server";
 import type { LocationSource } from "@/lib/supabase/types";
 
@@ -52,7 +53,8 @@ export default async function SpotDetailPage({
     requireUser(),
   ]);
 
-  const detail = await getSpotDetail(supabase, spotId);
+  const workspace = await resolveWorkspace(supabase, user.id);
+  const detail = await getSpotDetail(supabase, spotId, workspace.tripIds);
   if (!detail) notFound();
 
   const { spot, categoryName, summary, visits, galleryUrls } = detail;

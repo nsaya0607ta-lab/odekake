@@ -350,6 +350,18 @@ select pg_temp.expect_count('area_stats: bob には共有旅の1市区町村分�
 select pg_temp.expect_count('area_stats: carol には何も見えない', :'carol',
   'select * from public.area_stats()', 0);
 
+-- 旅ワークスペースの分離: 旅行を指定すると、その旅行の記録だけが集計される
+select pg_temp.expect_count('area_stats: 一人旅だけを指定すると1市区町村分', :'alice',
+  format($q$select * from public.area_stats(array[%L]::uuid[])$q$, :'solo'), 1);
+select pg_temp.expect_count('area_stats: 共有旅だけを指定すると1市区町村分', :'alice',
+  format($q$select * from public.area_stats(array[%L]::uuid[])$q$, :'shared'), 1);
+select pg_temp.record(
+  'area_stats: 一人旅と共有旅で市区町村が混ざらない',
+  (select municipality_code from public.area_stats(array[:'solo'::uuid])) = '21201'
+);
+select pg_temp.expect_count('area_stats: 参加していない旅行を指定しても集計されない', :'carol',
+  format($q$select * from public.area_stats(array[%L]::uuid[])$q$, :'shared'), 0);
+
 -- -------------------------------------------------------------
 -- ★ 活動履歴 trip_activities
 -- -------------------------------------------------------------

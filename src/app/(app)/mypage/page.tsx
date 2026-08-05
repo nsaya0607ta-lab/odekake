@@ -20,9 +20,14 @@ export const dynamic = "force-dynamic";
 export default async function MyPage() {
   const { supabase, user } = await requireUser();
 
+  // マイページはワークスペースをまたいだ合計を出す（アカウント全体の記録）
+  const { data: allTrips } = await supabase.from("trips").select("id");
   const [{ data: profile }, areas] = await Promise.all([
     supabase.from("profiles").select("*").eq("user_id", user.id).maybeSingle(),
-    loadAreaIndex(supabase),
+    loadAreaIndex(
+      supabase,
+      (allTrips ?? []).map((t) => t.id),
+    ),
   ]);
 
   const avatarUrl = await signPhotoPath(supabase, profile?.profile_image_url);

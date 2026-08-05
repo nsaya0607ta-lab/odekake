@@ -4,6 +4,7 @@ import { PageBody } from "@/components/page-body";
 import { PageHeader } from "@/components/page-header";
 import { getTripOptions } from "@/lib/data/trips";
 import { getVisitForEdit } from "@/lib/data/visits";
+import { resolveWorkspace } from "@/lib/data/workspace";
 import { requireUser } from "@/lib/supabase/server";
 import { VisitForm } from "../../visit-form";
 import { DeleteVisitButton } from "./delete-visit-button";
@@ -14,13 +15,14 @@ export const dynamic = "force-dynamic";
 export default async function EditVisitPage({ params }: { params: Promise<{ visitId: string }> }) {
   const [{ visitId }, { supabase, user }] = await Promise.all([params, requireUser()]);
 
+  const workspace = await resolveWorkspace(supabase, user.id);
   const detail = await getVisitForEdit(supabase, visitId);
   if (!detail || !detail.spot) notFound();
 
   const { record, spot, photos } = detail;
 
   const [trips, { data: tagRows }] = await Promise.all([
-    getTripOptions(supabase),
+    getTripOptions(supabase, workspace.tripIds),
     supabase.from("visit_record_tags").select("tag_id").eq("visit_record_id", visitId),
   ]);
 

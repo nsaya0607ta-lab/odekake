@@ -12,8 +12,16 @@ export {
   type Municipality,
 } from "./municipalities";
 
-/** 日本地図と地方地図では離島の寄せ先が違うため、図形を2種類持っている */
-export type MapScope = "national" | "regional";
+/**
+ * 地図の縮尺。離島の寄せ先が縮尺ごとに違うため、図形を3種類持っている。
+ *   national   … 日本地図（地方を選ぶ）
+ *   regional   … 地方地図（都道府県を選ぶ）
+ *   prefecture … 都道府県地図（市区町村を選ぶ）
+ */
+export type MapScope = "national" | "regional" | "prefecture";
+
+/** 図形の変換 [倍率, x の移動量, y の移動量]。x' = x * 倍率 + 移動量 */
+export type MapTransform = [number, number, number];
 
 export type PrefectureShape = {
   /** SVG の path データ（scripts/build-prefecture-paths.mjs で生成） */
@@ -28,6 +36,8 @@ export type Prefecture = PrefectureShape & {
   region: Region;
   /** 地方地図用の図形（離島の位置だけが異なる） */
   regional: PrefectureShape;
+  /** 都道府県地図用の図形 */
+  prefecture: PrefectureShape;
 };
 
 /** 位置を動かして描いている離島の枠。地図上に破線と見出しを描くために使う */
@@ -38,12 +48,10 @@ export type MapInset = {
   region: Region;
   /** この枠に入る緯度経度の範囲 [西, 南, 東, 北] */
   bounds: [number, number, number, number];
-  /** [x, y, width, height] */
-  national: [number, number, number, number];
-  regional: [number, number, number, number];
-  /** 図形を寄せるときに足した量。市区町村の点も同じだけ動かす */
-  nationalOffset: [number, number];
-  regionalOffset: [number, number];
+  /** 縮尺ごとの枠 [x, y, width, height]。寄せない縮尺では持たない */
+  frames: Partial<Record<MapScope, [number, number, number, number]>>;
+  /** 縮尺ごとの変換。市区町村の点にも同じものを適用する */
+  transforms: Partial<Record<MapScope, MapTransform>>;
 };
 
 type RawPrefecture = {
@@ -55,6 +63,9 @@ type RawPrefecture = {
   rd: string;
   rbbox: number[];
   rcenter: number[];
+  pd: string;
+  pbbox: number[];
+  pcenter: number[];
 };
 
 type RawInset = {
@@ -62,10 +73,12 @@ type RawInset = {
   label: string;
   prefectureCode: string;
   bounds: number[];
-  national: number[];
-  regional: number[];
-  nationalOffset: number[];
-  regionalOffset: number[];
+  national?: number[];
+  regional?: number[];
+  prefecture?: number[];
+  nationalTransform?: number[];
+  regionalTransform?: number[];
+  prefectureTransform?: number[];
 };
 
 const box = (values: number[]): [number, number, number, number] => [
@@ -75,7 +88,7 @@ const box = (values: number[]): [number, number, number, number] => [
   values[3] ?? 0,
 ];
 
-const pair = (values: number[]): [number, number] => [values[0] ?? 0, values[1] ?? 0];
+const triple = (values: number[]): MapTransform => [values[0] ?? 1, values[1] ?? 0, values[2] ?? 0];
 
 export const PREFECTURES: readonly Prefecture[] = (prefectureData as RawPrefecture[]).map((p) => {
   const region = getRegionByPrefecture(p.code);
@@ -92,22 +105,35 @@ export const PREFECTURES: readonly Prefecture[] = (prefectureData as RawPrefectu
       bbox: box(p.rbbox),
       center: [p.rcenter[0] ?? 0, p.rcenter[1] ?? 0],
     },
+    prefecture: {
+      d: p.pd,
+      bbox: box(p.pbbox),
+      center: [p.pcenter[0] ?? 0, p.pcenter[1] ?? 0],
+    },
   };
 });
 
 export const MAP_INSETS: readonly MapInset[] = (insetData as RawInset[]).map((inset) => {
   const region = getRegionByPrefecture(inset.prefectureCode);
   if (!region) throw new Error(`地方が未定義の都道府県コードです: ${inset.prefectureCode}`);
+
+  const frames: MapInset["frames"] = {};
+  const transforms: MapInset["transforms"] = {};
+  for (const scope of ["national", "regional", "prefecture"] as const) {
+    const frame = inset[scope];
+    const transform = inset[`${scope}Transform`];
+    if (frame) frames[scope] = box(frame);
+    if (transform) transforms[scope] = triple(transform);
+  }
+
   return {
     id: inset.id,
     label: inset.label,
     prefectureCode: inset.prefectureCode,
     region,
     bounds: box(inset.bounds),
-    national: box(inset.national),
-    regional: box(inset.regional),
-    nationalOffset: pair(inset.nationalOffset),
-    regionalOffset: pair(inset.regionalOffset),
+    frames,
+    transforms,
   };
 });
 
@@ -127,13 +153,14 @@ export function projectPoint(
   const inset = MAP_INSETS.find(
     (i) =>
       (!prefectureCode || i.prefectureCode === prefectureCode) &&
+      i.transforms[scope] &&
       lng >= i.bounds[0] &&
       lng <= i.bounds[2] &&
       lat >= i.bounds[1] &&
       lat <= i.bounds[3],
   );
-  const [dx, dy] = inset ? (scope === "national" ? inset.nationalOffset : inset.regionalOffset) : [0, 0];
-  return [lng * LAT_K + dx, -lat + dy];
+  const [scale, tx, ty] = inset?.transforms[scope] ?? [1, 0, 0];
+  return [lng * LAT_K * scale + tx, -lat * scale + ty];
 }
 
 /** projectPoint の逆変換。地図上でタップされた位置を緯度経度に戻す */
@@ -145,33 +172,41 @@ export function unprojectPoint(
 ): [number, number] {
   const inset = MAP_INSETS.find((i) => {
     if (prefectureCode && i.prefectureCode !== prefectureCode) return false;
-    const [fx, fy, fw, fh] = scope === "national" ? i.national : i.regional;
+    const frame = i.frames[scope];
+    if (!frame) return false;
+    const [fx, fy, fw, fh] = frame;
     return x >= fx && x <= fx + fw && y >= fy && y <= fy + fh;
   });
-  const [dx, dy] = inset ? (scope === "national" ? inset.nationalOffset : inset.regionalOffset) : [0, 0];
-  return [-(y - dy), (x - dx) / LAT_K];
+  const [scale, tx, ty] = inset?.transforms[scope] ?? [1, 0, 0];
+  return [-(y - ty) / scale, (x - tx) / (LAT_K * scale)];
 }
 
 /** 指定した縮尺での図形を取り出す */
 export function shapeOf(prefecture: Prefecture, scope: MapScope): PrefectureShape {
-  return scope === "national" ? prefecture : prefecture.regional;
+  if (scope === "national") return prefecture;
+  return scope === "regional" ? prefecture.regional : prefecture.prefecture;
 }
 
-const toFrame = (inset: MapInset, scope: MapScope) => ({
-  id: inset.id,
-  label: inset.label,
-  frame: scope === "national" ? inset.national : inset.regional,
-});
+export type MapInsetFrame = { id: string; label: string; frame: [number, number, number, number] };
 
-export function insetsFor(scope: MapScope, regionSlug?: string) {
-  return MAP_INSETS.filter((inset) => !regionSlug || inset.region.slug === regionSlug).map((inset) =>
-    toFrame(inset, scope),
+function framesOf(insets: readonly MapInset[], scope: MapScope): MapInsetFrame[] {
+  return insets.flatMap((inset) => {
+    const frame = inset.frames[scope];
+    return frame ? [{ id: inset.id, label: inset.label, frame }] : [];
+  });
+}
+
+export function insetsFor(scope: MapScope, regionSlug?: string): MapInsetFrame[] {
+  return framesOf(
+    MAP_INSETS.filter((inset) => !regionSlug || inset.region.slug === regionSlug),
+    scope,
   );
 }
 
-export function insetsOfPrefecture(scope: MapScope, prefectureCode: string) {
-  return MAP_INSETS.filter((inset) => inset.prefectureCode === prefectureCode).map((inset) =>
-    toFrame(inset, scope),
+export function insetsOfPrefecture(scope: MapScope, prefectureCode: string): MapInsetFrame[] {
+  return framesOf(
+    MAP_INSETS.filter((inset) => inset.prefectureCode === prefectureCode),
+    scope,
   );
 }
 
@@ -211,9 +246,10 @@ export function viewBoxFor(
   for (const p of prefectures) include(shapeOf(p, scope).bbox);
   for (const inset of MAP_INSETS) {
     if (!codes.has(inset.prefectureCode)) continue;
+    const frame = inset.frames[scope];
+    if (!frame) continue;
     hasInset = true;
-    const [x, y, w, h] = scope === "national" ? inset.national : inset.regional;
-    include([x, y, x + w, y + h]);
+    include([frame[0], frame[1], frame[0] + frame[2], frame[1] + frame[3]]);
   }
 
   // 枠の見出しは枠の上へ描くので、その分の余白を足す

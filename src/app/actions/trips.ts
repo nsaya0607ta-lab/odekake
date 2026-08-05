@@ -7,6 +7,8 @@ import type { ActionState } from "@/components/form";
 import { getMailer, renderTripInvitationMail } from "@/lib/email";
 import { toJapaneseError } from "@/lib/errors";
 import { finalizePhotoPaths } from "@/lib/photos";
+import { setCurrentWorkspace } from "@/app/actions/workspace";
+import { PERSONAL_WORKSPACE_ID } from "@/lib/data/workspace";
 import { getSiteUrl } from "@/lib/supabase/env";
 import { requireUser } from "@/lib/supabase/server";
 import type { DB } from "@/lib/data/client";
@@ -138,9 +140,12 @@ export async function createTripAction(_prev: ActionState, formData: FormData): 
     }
   }
 
+  // 共有旅は独立した空間なので、作成したらその空間へ移る
+  await setCurrentWorkspace(isShared ? tripId : PERSONAL_WORKSPACE_ID);
+
   revalidatePath("/home");
   revalidatePath("/records");
-  redirect(`/trips/${tripId}`);
+  redirect(isShared ? "/home" : `/trips/${tripId}`);
 }
 
 export async function updateTripAction(_prev: ActionState, formData: FormData): Promise<ActionState> {
@@ -176,9 +181,12 @@ export async function deleteTripAction(formData: FormData) {
   const tripId = String(formData.get("tripId") ?? "");
   const { supabase } = await requireUser();
   await supabase.from("trips").delete().eq("id", tripId);
+
+  await setCurrentWorkspace(PERSONAL_WORKSPACE_ID);
+
   revalidatePath("/home");
   revalidatePath("/records");
-  redirect("/records?tab=trips");
+  redirect("/home");
 }
 
 /**
@@ -352,8 +360,13 @@ export async function leaveTripAction(formData: FormData) {
   const tripId = String(formData.get("tripId") ?? "");
   const { supabase, user } = await requireUser();
   await supabase.from("trip_members").delete().eq("trip_id", tripId).eq("user_id", user.id);
+
+  // 退出した旅の空間は開けなくなるため、自分の旅へ戻す
+  await setCurrentWorkspace(PERSONAL_WORKSPACE_ID);
+
+  revalidatePath("/home");
   revalidatePath("/records");
-  redirect("/records?tab=trips");
+  redirect("/home");
 }
 
 export async function joinTripAction(_prev: ActionState, formData: FormData): Promise<ActionState> {
@@ -377,9 +390,12 @@ export async function joinTripAction(_prev: ActionState, formData: FormData): Pr
     return { error: "招待コードが見つかりません。コードをご確認ください。", values: { inviteCode: code } };
   }
 
+  // 参加した共有旅の空間へ移る
+  await setCurrentWorkspace(joined.trip_id);
+
   revalidatePath("/home");
   revalidatePath("/records");
-  redirect(`/trips/${joined.trip_id}`);
+  redirect("/home");
 }
 
 export async function addTripCommentAction(_prev: ActionState, formData: FormData): Promise<ActionState> {

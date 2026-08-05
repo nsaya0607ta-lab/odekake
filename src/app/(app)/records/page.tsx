@@ -8,6 +8,8 @@ import { EmptyState, TripTypeBadge } from "@/components/ui";
 import { getAllSpots } from "@/lib/data/spots";
 import { formatTripPeriod, getTripSummaries } from "@/lib/data/trips";
 import { getTimeline } from "@/lib/data/visits";
+import { resolveWorkspace, type Workspace } from "@/lib/data/workspace";
+import { WorkspaceBar } from "@/components/workspace-bar";
 import { requireUser } from "@/lib/supabase/server";
 import { RecordCalendar } from "./record-calendar";
 import { RecordTabs } from "./record-tabs";
@@ -35,18 +37,23 @@ export default async function RecordsPage({
   ]);
 
   const tab: Tab = TABS.some((t) => t.key === tabParam) ? (tabParam as Tab) : "timeline";
-  const tripType = typeParam === "solo" || typeParam === "shared" ? typeParam : "all";
+  const workspace = await resolveWorkspace(supabase, user.id);
+  // 共有旅の空間ではその旅行だけなので、一人旅・共有旅の絞り込みは出さない
+  const showTypeFilter = workspace.kind === "personal";
+  const tripType = showTypeFilter && (typeParam === "solo" || typeParam === "shared") ? typeParam : "all";
 
   return (
     <>
       <TopHeader title="記録" />
       <PageBody>
-        <RecordTabs tabs={TABS} current={tab} tripType={tripType} />
+        <WorkspaceBar workspace={workspace} />
 
-        {tab === "timeline" ? <TimelineTab supabase={supabase} tripType={tripType} /> : null}
-        {tab === "trips" ? <TripsTab supabase={supabase} userId={user.id} tripType={tripType} /> : null}
-        {tab === "spots" ? <SpotsTab supabase={supabase} /> : null}
-        {tab === "calendar" ? <CalendarTab supabase={supabase} tripType={tripType} /> : null}
+        <RecordTabs tabs={TABS} current={tab} tripType={tripType} showTypeFilter={false} />
+
+        {tab === "timeline" ? <TimelineTab supabase={supabase} workspace={workspace} /> : null}
+        {tab === "trips" ? <TripsTab supabase={supabase} userId={user.id} workspace={workspace} /> : null}
+        {tab === "spots" ? <SpotsTab supabase={supabase} workspace={workspace} /> : null}
+        {tab === "calendar" ? <CalendarTab supabase={supabase} workspace={workspace} /> : null}
       </PageBody>
     </>
   );
@@ -54,8 +61,8 @@ export default async function RecordsPage({
 
 type SupabaseArg = Awaited<ReturnType<typeof requireUser>>["supabase"];
 
-async function TimelineTab({ supabase, tripType }: { supabase: SupabaseArg; tripType: "all" | "solo" | "shared" }) {
-  const items = await getTimeline(supabase, { tripType });
+async function TimelineTab({ supabase, workspace }: { supabase: SupabaseArg; workspace: Workspace }) {
+  const items = await getTimeline(supabase, { tripIds: workspace.tripIds });
 
   if (items.length === 0) {
     return (
@@ -83,14 +90,14 @@ async function TimelineTab({ supabase, tripType }: { supabase: SupabaseArg; trip
 async function TripsTab({
   supabase,
   userId,
-  tripType,
+  workspace,
 }: {
   supabase: SupabaseArg;
   userId: string;
-  tripType: "all" | "solo" | "shared";
+  workspace: Workspace;
 }) {
   const all = await getTripSummaries(supabase, userId);
-  const trips = tripType === "all" ? all : all.filter((t) => t.trip.trip_type === tripType);
+  const trips = all.filter((t) => workspace.tripIds.includes(t.trip.id));
 
   if (trips.length === 0) {
     return (
@@ -131,8 +138,8 @@ async function TripsTab({
   );
 }
 
-async function SpotsTab({ supabase }: { supabase: SupabaseArg }) {
-  const spots = await getAllSpots(supabase);
+async function SpotsTab({ supabase, workspace }: { supabase: SupabaseArg; workspace: Workspace }) {
+  const spots = await getAllSpots(supabase, workspace.tripIds);
 
   if (spots.length === 0) {
     return (
@@ -156,8 +163,8 @@ async function SpotsTab({ supabase }: { supabase: SupabaseArg }) {
   );
 }
 
-async function CalendarTab({ supabase, tripType }: { supabase: SupabaseArg; tripType: "all" | "solo" | "shared" }) {
-  const items = await getTimeline(supabase, { tripType });
+async function CalendarTab({ supabase, workspace }: { supabase: SupabaseArg; workspace: Workspace }) {
+  const items = await getTimeline(supabase, { tripIds: workspace.tripIds });
 
   return (
     <RecordCalendar
