@@ -9,6 +9,7 @@ export default async function LoginPage({
   searchParams: Promise<{ next?: string; notice?: string }>;
 }) {
   const { next, notice } = await searchParams;
+  const nextPath = next?.startsWith("/") && !next.startsWith("//") ? next : "/home";
 
   const noticeText =
     notice === "signed-out"
@@ -28,7 +29,7 @@ export default async function LoginPage({
         <p className="mb-4 rounded-2xl border border-sky bg-sky-soft px-4 py-3 text-sm text-[#3f6480]">{noticeText}</p>
       ) : null}
 
-      <LoginForm next={next ?? "/home"} />
+      <LoginForm next={nextPath} />
 
       <div className="mt-6 space-y-2 text-center text-sm">
         <p>
@@ -38,7 +39,10 @@ export default async function LoginPage({
         </p>
         <p className="text-ink-soft">
           アカウントをお持ちでない方は{" "}
-          <Link href="/signup" className="font-semibold text-leaf-deep underline underline-offset-4">
+          <Link
+            href={`/signup?next=${encodeURIComponent(nextPath)}`}
+            className="font-semibold text-leaf-deep underline underline-offset-4"
+          >
             新規登録
           </Link>
         </p>
