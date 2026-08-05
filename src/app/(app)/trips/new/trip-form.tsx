@@ -11,6 +11,36 @@ export function TripForm({ userId, defaultType }: { userId: string; defaultType:
   const [tripType, setTripType] = useState<"solo" | "shared">(
     (state.values?.tripType as "solo" | "shared") ?? defaultType,
   );
+  const [tripTypeDraftReady, setTripTypeDraftReady] = useState(false);
+
+  // 旅行タイプはボタン型の制御コンポーネントなので、下書きから明示的に復元する。
+  useEffect(() => {
+    try {
+      const raw = window.localStorage.getItem("odekake:draft:trip-new");
+      if (raw) {
+        const draft = JSON.parse(raw) as Record<string, string>;
+        if (draft.tripType === "solo" || draft.tripType === "shared") setTripType(draft.tripType);
+      }
+    } catch {
+      // 壊れた下書きは FormDraft 側で処理する
+    } finally {
+      setTripTypeDraftReady(true);
+    }
+  }, []);
+
+  // ボタンを押したときも旅行タイプを下書きへ保存する。
+  useEffect(() => {
+    if (!tripTypeDraftReady) return;
+    try {
+      const key = "odekake:draft:trip-new";
+      const raw = window.localStorage.getItem(key);
+      const draft = raw ? (JSON.parse(raw) as Record<string, string>) : {};
+      draft.tripType = tripType;
+      window.localStorage.setItem(key, JSON.stringify(draft));
+    } catch {
+      // 保存できなくても入力は続けられる
+    }
+  }, [tripType, tripTypeDraftReady]);
 
   // 表紙画像の保存先パスを先に決めるため、旅行 ID を先に発行する
   const [tripId, setTripId] = useState("");
@@ -36,6 +66,7 @@ export function TripForm({ userId, defaultType }: { userId: string; defaultType:
     >
       <FormDraft formId="trip-form" storageKey="trip-new" />
       <input type="hidden" name="tripId" value={tripId} />
+      <input type="hidden" name="tripType" value={tripType} data-draft="true" />
 
       <FormMessage state={state} />
 
@@ -54,7 +85,6 @@ export function TripForm({ userId, defaultType }: { userId: string; defaultType:
 
       <fieldset>
         <legend className="field-label">旅行タイプ</legend>
-        <input type="hidden" name="tripType" value={tripType} />
         <div className="grid grid-cols-2 gap-2">
           {(
             [
