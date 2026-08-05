@@ -5,24 +5,33 @@ import { useState, type KeyboardEvent, type PointerEvent } from "react";
 
 export type MapTone = "pink" | "green" | "blue" | "yellow" | "purple" | "orange" | "teal" | "rose";
 
-const TONES: Record<MapTone, { fill: string; stroke: string }> = {
-  pink: { fill: "#f3d7dd", stroke: "#dda9b5" },
-  blue: { fill: "#d7e5f0", stroke: "#a6c2d8" },
-  green: { fill: "#dceacc", stroke: "#a7c289" },
-  yellow: { fill: "#f2dda0", stroke: "#d6b96f" },
-  purple: { fill: "#e4dcf1", stroke: "#b5a7d4" },
-  teal: { fill: "#d3eae4", stroke: "#96c6bb" },
-  orange: { fill: "#f7e0cd", stroke: "#deb18c" },
-  rose: { fill: "#f5d9d2", stroke: "#dcaa9b" },
+type ToneColors = {
+  fill: string;
+  stroke: string;
+  mutedFill: string;
+  mutedStroke: string;
+};
+
+const TONES: Record<MapTone, ToneColors> = {
+  pink: { fill: "#f3d7dd", stroke: "#dda9b5", mutedFill: "#faecef", mutedStroke: "#e8c5cd" },
+  blue: { fill: "#d7e5f0", stroke: "#a6c2d8", mutedFill: "#eaf2f8", mutedStroke: "#bfd3e2" },
+  green: { fill: "#dceacc", stroke: "#a7c289", mutedFill: "#edf4e6", mutedStroke: "#bfd1aa" },
+  yellow: { fill: "#f2dda0", stroke: "#d6b96f", mutedFill: "#faf1d8", mutedStroke: "#e4ce91" },
+  purple: { fill: "#e4dcf1", stroke: "#b5a7d4", mutedFill: "#f0ecf7", mutedStroke: "#cbbfe2" },
+  teal: { fill: "#d3eae4", stroke: "#96c6bb", mutedFill: "#e8f4f1", mutedStroke: "#afd5cc" },
+  orange: { fill: "#f7e0cd", stroke: "#deb18c", mutedFill: "#fbeee3", mutedStroke: "#e9c5a8" },
+  rose: { fill: "#f5d9d2", stroke: "#dcaa9b", mutedFill: "#faebe6", mutedStroke: "#e8c1b6" },
 };
 
 const UNVISITED = { fill: "#e6e3da", stroke: "#cdc7b8" };
 
 export type MapShape = {
-  /** 一意なキー（地方 slug または都道府県コード） */
+  /** 一意なキー（地方 slug、都道府県コード、エリア slug） */
   key: string;
   name: string;
-  /** この図形を構成する SVG パス（地方は複数県分をまとめる） */
+  /** 地図上に表示する短い名前。省略時は name */
+  label?: string;
+  /** この図形を構成する SVG パス */
   paths: string[];
   tone: MapTone;
   visited: boolean;
@@ -47,9 +56,19 @@ type Props = {
   insets?: MapInsetFrame[];
   className?: string;
   ariaLabel: string;
+  /** 未訪問でも各地域の識別色を薄く表示する */
+  colorUnvisited?: boolean;
 };
 
-export function AreaMap({ shapes, viewBox, labelSize = 0.62, insets = [], className, ariaLabel }: Props) {
+export function AreaMap({
+  shapes,
+  viewBox,
+  labelSize = 0.62,
+  insets = [],
+  className,
+  ariaLabel,
+  colorUnvisited = false,
+}: Props) {
   const router = useRouter();
   const [pressedKey, setPressedKey] = useState<string | null>(null);
 
@@ -122,7 +141,12 @@ export function AreaMap({ shapes, viewBox, labelSize = 0.62, insets = [], classN
       ))}
 
       {shapes.map((shape) => {
-        const tone = shape.visited ? TONES[shape.tone] : UNVISITED;
+        const palette = TONES[shape.tone];
+        const tone = shape.visited
+          ? palette
+          : colorUnvisited
+            ? { fill: palette.mutedFill, stroke: palette.mutedStroke }
+            : UNVISITED;
         const isPressed = pressedKey === shape.key;
 
         return (
@@ -180,7 +204,7 @@ export function AreaMap({ shapes, viewBox, labelSize = 0.62, insets = [], classN
             strokeLinejoin="round"
             pointerEvents="none"
           >
-            {shape.name}
+            {shape.label ?? shape.name}
           </text>
         ) : null,
       )}

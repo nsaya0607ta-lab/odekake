@@ -29,12 +29,18 @@ export type MapFrame = { id: string; label: string; frame: [number, number, numb
 const FILL = ["#efece2", "#dfead0", "#c6dcae", "#a8c98a", "#8fb36c"];
 const STROKE = ["#c9c2b1", "#b5c69c", "#9db684", "#82a76a", "#6b9455"];
 
+function mapLabel(name: string): string {
+  return name.replace(/^.+郡/, "");
+}
+
 export function MunicipalityMap({
   prefectureName,
   viewBox,
   insets,
   areas,
   hrefBase,
+  hrefSuffix = "",
+  showLabels = false,
   className,
 }: {
   prefectureName: string;
@@ -42,6 +48,8 @@ export function MunicipalityMap({
   insets: MapFrame[];
   areas: MunicipalityArea[];
   hrefBase: string;
+  hrefSuffix?: string;
+  showLabels?: boolean;
   className?: string;
 }) {
   const router = useRouter();
@@ -54,19 +62,22 @@ export function MunicipalityMap({
   // 指で押せる大きさに満たない市区町村には、丸い目印を重ねる
   const markerRadius = scale / 90;
   const smallThreshold = markerRadius * 2.4;
+  const labelSize = scale / (areas.length > 12 ? 44 : areas.length > 8 ? 38 : 32);
 
   const activeCode = pressed ?? active;
   const activeArea = areas.find((municipality) => municipality.code === activeCode) ?? null;
 
+  const hrefOf = (code: string) => `${hrefBase}/${code}${hrefSuffix}`;
+
   const beginPress = (code: string) => {
-    const href = `${hrefBase}/${code}`;
+    const href = hrefOf(code);
     setActive(code);
     setPressed(code);
     router.prefetch(href);
   };
 
   const open = (code: string) => {
-    const href = `${hrefBase}/${code}`;
+    const href = hrefOf(code);
     setActive(code);
     setPressed(code);
     router.push(href);
@@ -182,23 +193,45 @@ export function MunicipalityMap({
           );
         })}
 
-        {activeArea?.center ? (
-          <text
-            x={activeArea.center[0]}
-            y={activeArea.center[1] - markerRadius * 2.2}
-            textAnchor="middle"
-            fontSize={scale / 26}
-            fontWeight={700}
-            fill="#3c382f"
-            stroke="#fdfbf5"
-            strokeWidth={scale / 90}
-            paintOrder="stroke"
-            strokeLinejoin="round"
-            pointerEvents="none"
-          >
-            {activeArea.name}
-          </text>
-        ) : null}
+        {showLabels
+          ? areas.map((area) =>
+              area.center ? (
+                <text
+                  key={`label-${area.code}`}
+                  x={area.center[0]}
+                  y={area.center[1]}
+                  textAnchor="middle"
+                  dominantBaseline="middle"
+                  fontSize={labelSize}
+                  fontWeight={activeCode === area.code ? 700 : 600}
+                  fill={activeCode === area.code ? "#4f743d" : "#3c382f"}
+                  stroke="#fdfbf5"
+                  strokeWidth={labelSize * 0.4}
+                  paintOrder="stroke"
+                  strokeLinejoin="round"
+                  pointerEvents="none"
+                >
+                  {mapLabel(area.name)}
+                </text>
+              ) : null,
+            )
+          : activeArea?.center ? (
+              <text
+                x={activeArea.center[0]}
+                y={activeArea.center[1] - markerRadius * 2.2}
+                textAnchor="middle"
+                fontSize={scale / 26}
+                fontWeight={700}
+                fill="#3c382f"
+                stroke="#fdfbf5"
+                strokeWidth={scale / 90}
+                paintOrder="stroke"
+                strokeLinejoin="round"
+                pointerEvents="none"
+              >
+                {activeArea.name}
+              </text>
+            ) : null}
       </svg>
 
       <div className="mt-2 flex items-center justify-center gap-2 text-[11px] text-ink-faint">

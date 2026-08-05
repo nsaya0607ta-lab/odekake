@@ -12,8 +12,6 @@ export type MunicipalityListItem = MunicipalityArea;
  * 市区町村を選ぶ画面。
  *
  * 上に境界付きの地図、下に検索と一覧を置いたハイブリッド構成にしている。
- * 市区町村の多い都道府県では地図だけでは選びにくく、
- * 逆に一覧だけでは位置関係が分からないため、両方を同時に見せる。
  * 地図をタップしても一覧を押しても、同じ市区町村の画面へ移動する。
  */
 export function MunicipalityBrowser({
@@ -23,6 +21,10 @@ export function MunicipalityBrowser({
   items,
   hrefBase,
   hasMap,
+  showMapLabels = false,
+  hrefSuffix = "",
+  mapHeading = "地図から選ぶ",
+  mapInstruction = "市区町村をタップすると詳細へ",
 }: {
   prefectureName: string;
   viewBox: string;
@@ -31,30 +33,36 @@ export function MunicipalityBrowser({
   hrefBase: string;
   /** 境界データがある都道府県かどうか */
   hasMap: boolean;
+  /** 拡大されたエリア画面では市区町村名を常時表示する */
+  showMapLabels?: boolean;
+  /** 戻るエリアを維持するためのクエリ文字列 */
+  hrefSuffix?: string;
+  mapHeading?: string;
+  mapInstruction?: string;
 }) {
   const [keyword, setKeyword] = useState("");
   const [visitedOnly, setVisitedOnly] = useState(false);
 
   const filtered = useMemo(() => {
     const word = keyword.trim();
-    return items.filter((m) => {
-      if (visitedOnly && m.level === 0) return false;
-      if (word && !m.name.includes(word)) return false;
+    return items.filter((municipality) => {
+      if (visitedOnly && municipality.level === 0) return false;
+      if (word && !municipality.name.includes(word)) return false;
       return true;
     });
   }, [items, keyword, visitedOnly]);
 
-  const visitedCount = items.filter((m) => m.level > 0).length;
+  const visitedCount = items.filter((municipality) => municipality.level > 0).length;
 
   return (
     <div className="space-y-4">
       {hasMap ? (
         <section>
-          <h2 className="mb-2 px-1 text-base font-bold">地図から選ぶ</h2>
+          <h2 className="mb-2 px-1 text-base font-bold">{mapHeading}</h2>
           <div className="rough-card px-3 py-4">
             <p className="mb-2 text-center text-xs text-ink-soft">
               <span className="rough-pill bg-leaf-soft px-3 py-1 text-leaf-deep">
-                市区町村をタップすると詳細へ
+                {mapInstruction}
               </span>
             </p>
             <MunicipalityMap
@@ -63,6 +71,8 @@ export function MunicipalityBrowser({
               insets={insets}
               areas={items}
               hrefBase={hrefBase}
+              hrefSuffix={hrefSuffix}
+              showLabels={showMapLabels}
             />
             <p className="mt-2 text-center text-xs text-ink-soft">
               {items.length}件のうち <span className="font-bold text-ink tabular-nums">{visitedCount}</span> 件を訪問
@@ -82,7 +92,7 @@ export function MunicipalityBrowser({
             <input
               type="search"
               value={keyword}
-              onChange={(e) => setKeyword(e.target.value)}
+              onChange={(event) => setKeyword(event.target.value)}
               placeholder="市区町村を検索"
               aria-label="市区町村を検索"
               className="field pl-10"
@@ -90,9 +100,9 @@ export function MunicipalityBrowser({
           </div>
           <button
             type="button"
-            onClick={() => setVisitedOnly((v) => !v)}
+            onClick={() => setVisitedOnly((value) => !value)}
             aria-pressed={visitedOnly}
-            className={`rough-pill h-12 shrink-0 border px-4 text-sm font-semibold transition-colors ${
+            className={`rough-pill pressable h-12 shrink-0 border px-4 text-sm font-semibold transition-colors ${
               visitedOnly ? "border-leaf bg-leaf-soft text-leaf-deep" : "border-line-strong bg-card text-ink-soft"
             }`}
           >
@@ -108,19 +118,19 @@ export function MunicipalityBrowser({
           </p>
         ) : (
           <ul className="mt-2 space-y-2">
-            {filtered.map((m) => (
-              <li key={m.code}>
+            {filtered.map((municipality) => (
+              <li key={municipality.code}>
                 <Link
-                  href={`${hrefBase}/${m.code}`}
-                  className="rough-card flex items-center gap-3 px-4 py-3 transition-transform active:scale-[0.99]"
+                  href={`${hrefBase}/${municipality.code}${hrefSuffix}`}
+                  className="rough-card pressable flex items-center gap-3 px-4 py-3"
                 >
                   <span className="min-w-0 flex-1">
-                    <span className="block truncate font-semibold">{m.name}</span>
+                    <span className="block truncate font-semibold">{municipality.name}</span>
                     <span className="mt-1 flex items-center gap-1.5">
-                      <VisitedBadge visited={m.level > 0} />
+                      <VisitedBadge visited={municipality.level > 0} />
                       <span className="text-xs text-ink-faint">
-                        {m.spotCount}スポット
-                        {m.visitCount > 0 ? `・${m.visitCount}回訪問` : ""}
+                        {municipality.spotCount}スポット
+                        {municipality.visitCount > 0 ? `・${municipality.visitCount}回訪問` : ""}
                       </span>
                     </span>
                   </span>
