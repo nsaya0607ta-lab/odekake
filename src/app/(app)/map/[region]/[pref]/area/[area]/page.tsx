@@ -52,7 +52,10 @@ export default async function PrefectureAreaPage({
     };
   });
 
-  const selectedArea = findPrefectureArea(buildPrefectureAreas(municipalities), areaSlug);
+  const selectedArea = findPrefectureArea(
+    buildPrefectureAreas(prefecture.code, municipalities),
+    areaSlug,
+  );
   if (!selectedArea) notFound();
 
   const visitedCount = selectedArea.municipalities.filter((municipality) => municipality.level > 0).length;
