@@ -22,14 +22,26 @@ function fieldErrorsOf(error: z.ZodError): Record<string, string> {
   return result;
 }
 
+function safeNextPath(value: string | null | undefined): string {
+  if (!value || !value.startsWith("/") || value.startsWith("//")) return "/home";
+  return value;
+}
+
+function authCallbackUrl(next: string): string {
+  const callback = new URL("/auth/callback", getSiteUrl());
+  callback.searchParams.set("next", safeNextPath(next));
+  return callback.toString();
+}
+
 export async function signUpAction(_prev: ActionState, formData: FormData): Promise<ActionState> {
   const raw = {
     displayName: String(formData.get("displayName") ?? "").trim(),
     email: String(formData.get("email") ?? "").trim(),
     password: String(formData.get("password") ?? ""),
     passwordConfirm: String(formData.get("passwordConfirm") ?? ""),
+    next: safeNextPath(String(formData.get("next") ?? "/home")),
   };
-  const values = { displayName: raw.displayName, email: raw.email };
+  const values = { displayName: raw.displayName, email: raw.email, next: raw.next };
 
   const parsed = z
     .object({
@@ -37,6 +49,7 @@ export async function signUpAction(_prev: ActionState, formData: FormData): Prom
       email: emailSchema,
       password: passwordSchema,
       passwordConfirm: z.string(),
+      next: z.string(),
     })
     .refine((v) => v.password === v.passwordConfirm, {
       message: "パスワードが一致しません。",
@@ -54,7 +67,7 @@ export async function signUpAction(_prev: ActionState, formData: FormData): Prom
     password: parsed.data.password,
     options: {
       data: { display_name: parsed.data.displayName },
-      emailRedirectTo: `${getSiteUrl()}/auth/callback?next=/home`,
+      emailRedirectTo: authCallbackUrl(parsed.data.next),
     },
   });
 
@@ -62,13 +75,14 @@ export async function signUpAction(_prev: ActionState, formData: FormData): Prom
     return { error: toJapaneseError(error, "登録に失敗しました。"), values };
   }
 
-  redirect(`/signup/complete?email=${encodeURIComponent(parsed.data.email)}`);
+  const query = new URLSearchParams({ email: parsed.data.email, next: parsed.data.next });
+  redirect(`/signup/complete?${query.toString()}`);
 }
 
 export async function signInAction(_prev: ActionState, formData: FormData): Promise<ActionState> {
   const email = String(formData.get("email") ?? "").trim();
   const password = String(formData.get("password") ?? "");
-  const next = String(formData.get("next") ?? "/home");
+  const next = safeNextPath(String(formData.get("next") ?? "/home"));
   const values = { email };
 
   const parsed = z.object({ email: emailSchema, password: z.string().min(1, "パスワードを入力してください。") }).safeParse({
@@ -87,7 +101,7 @@ export async function signInAction(_prev: ActionState, formData: FormData): Prom
     return { error: toJapaneseError(error, "ログインに失敗しました。"), values };
   }
 
-  redirect(next.startsWith("/") ? next : "/home");
+  redirect(next);
 }
 
 export async function signOutAction() {
@@ -98,18 +112,19 @@ export async function signOutAction() {
 
 export async function resendConfirmationAction(_prev: ActionState, formData: FormData): Promise<ActionState> {
   const email = String(formData.get("email") ?? "").trim();
+  const next = safeNextPath(String(formData.get("next") ?? "/home"));
   const parsed = emailSchema.safeParse(email);
-  if (!parsed.success) return { error: "メールアドレスの形式が正しくありません。", values: { email } };
+  if (!parsed.success) return { error: "メールアドレスの形式が正しくありません。", values: { email, next } };
 
   const supabase = await createClient();
   const { error } = await supabase.auth.resend({
     type: "signup",
     email: parsed.data,
-    options: { emailRedirectTo: `${getSiteUrl()}/auth/callback?next=/home` },
+    options: { emailRedirectTo: authCallbackUrl(next) },
   });
 
-  if (error) return { error: toJapaneseError(error, "確認メールの再送に失敗しました。"), values: { email } };
-  return { ok: true, message: "確認メールを再送しました。メールボックスをご確認ください。", values: { email } };
+  if (error) return { error: toJapaneseError(error, "確認メールの再送に失敗しました。"), values: { email, next } };
+  return { ok: true, message: "確認メールを再送しました。メールボックスをご確認ください。", values: { email, next } };
 }
 
 export async function requestPasswordResetAction(_prev: ActionState, formData: FormData): Promise<ActionState> {
@@ -121,7 +136,7 @@ export async function requestPasswordResetAction(_prev: ActionState, formData: F
 
   const supabase = await createClient();
   const { error } = await supabase.auth.resetPasswordForEmail(parsed.data, {
-    redirectTo: `${getSiteUrl()}/auth/callback?next=/reset-password`,
+    redirectTo: authCallbackUrl("/reset-password"),
   });
 
   if (error) return { error: toJapaneseError(error, "メールの送信に失敗しました。"), values: { email } };
