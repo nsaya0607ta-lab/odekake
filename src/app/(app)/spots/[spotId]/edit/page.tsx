@@ -29,6 +29,7 @@ export default async function EditSpotPage({ params }: { params: Promise<{ spotI
       <PageBody>
         <SpotForm
           spotId={spot.id}
+          placeSearchEnabled={Boolean(process.env.GOOGLE_PLACES_API_KEY?.trim())}
           categories={[...categoryNames.entries()].map(([id, name]) => ({ id, name }))}
           location={{
             prefectureCode: spot.prefecture_code,
