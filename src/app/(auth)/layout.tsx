@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { IconLeaf } from "@/components/icons";
 
 export default function AuthLayout({ children }: { children: React.ReactNode }) {
@@ -12,6 +13,14 @@ export default function AuthLayout({ children }: { children: React.ReactNode }) 
           <p className="text-sm text-ink-soft">訪れた場所を、地図で振り返る。</p>
         </div>
         {children}
+        <p className="mt-6 flex justify-center gap-4 text-xs text-ink-faint">
+          <Link href="/terms" className="underline underline-offset-4">
+            利用規約
+          </Link>
+          <Link href="/privacy" className="underline underline-offset-4">
+            プライバシー
+          </Link>
+        </p>
       </div>
     </div>
   );
