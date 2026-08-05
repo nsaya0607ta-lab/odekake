@@ -17,6 +17,21 @@ const optionalText = (max: number) =>
     .transform((v) => (v === "" ? null : v))
     .nullable();
 
+const optionalHttpUrl = z
+  .string()
+  .trim()
+  .max(300, "公式URLは300文字以内で入力してください。")
+  .transform((value) => (value === "" ? null : value))
+  .refine((value) => {
+    if (value === null) return true;
+    try {
+      const url = new URL(value);
+      return (url.protocol === "https:" || url.protocol === "http:") && Boolean(url.hostname);
+    } catch {
+      return false;
+    }
+  }, "公式URLは https:// または http:// から始まる正しいURLを入力してください。");
+
 const optionalNumber = z
   .string()
   .trim()
@@ -33,7 +48,7 @@ const spotSchema = z.object({
   address: optionalText(200),
   postalCode: optionalText(10),
   phone: optionalText(20),
-  websiteUrl: optionalText(300),
+  websiteUrl: optionalHttpUrl,
   openingHours: optionalText(120),
   closedDays: optionalText(120),
   memo: optionalText(1000),

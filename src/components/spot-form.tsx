@@ -143,12 +143,15 @@ export function SpotForm({
             />
           </Field>
 
-          <Field label="公式URL" htmlFor="websiteUrl" optional>
+          <Field label="公式URL" htmlFor="websiteUrl" optional error={state.fieldErrors?.websiteUrl}>
             <input
               id="websiteUrl"
               name="websiteUrl"
               type="url"
               inputMode="url"
+              autoCapitalize="none"
+              autoCorrect="off"
+              spellCheck={false}
               className="field"
               defaultValue={initial.websiteUrl}
               placeholder="https://example.com"

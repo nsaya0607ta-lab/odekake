@@ -195,6 +195,14 @@
     opacity: 0.55;
   }
 
+  /* 写真の送信が終わるまで保存操作を受け付けない */
+  form[data-photo-upload-blocked="true"] button[type="submit"],
+  form[data-photo-upload-blocked="true"] input[type="submit"] {
+    pointer-events: none;
+    opacity: 0.55;
+    filter: grayscale(0.15);
+  }
+
   .btn-primary {
     background-color: var(--color-leaf-soft);
     border: 1px solid var(--color-leaf);

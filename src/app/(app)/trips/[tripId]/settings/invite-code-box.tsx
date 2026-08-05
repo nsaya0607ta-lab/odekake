@@ -25,20 +25,30 @@ export function InviteCodeBox({ code, link }: { code: string; link: string }) {
   }
 
   return (
-    <div className="rough-card space-y-3 p-4">
-      <div>
+    <div className="rough-card min-w-0 space-y-3 p-4">
+      <div className="min-w-0">
         <p className="text-xs text-ink-faint">招待コード</p>
-        <p className="mt-1 text-2xl font-bold tracking-[0.2em] tabular-nums">{code}</p>
+        <p className="mt-1 break-all text-xl font-bold tracking-[0.14em] tabular-nums sm:text-2xl sm:tracking-[0.2em]">
+          {code}
+        </p>
       </div>
 
-      <div className="flex gap-2">
-        <button type="button" onClick={() => void copy(code, "code")} className="btn btn-quiet flex-1">
+      <div className="grid grid-cols-1 gap-2 min-[360px]:grid-cols-2">
+        <button
+          type="button"
+          onClick={() => void copy(code, "code")}
+          className="btn btn-quiet min-w-0 w-full px-3 text-sm"
+        >
           {copied === "code" ? <IconCheck size={17} /> : null}
-          コードをコピー
+          <span className="truncate">コードをコピー</span>
         </button>
-        <button type="button" onClick={() => void copy(link, "link")} className="btn btn-quiet flex-1">
+        <button
+          type="button"
+          onClick={() => void copy(link, "link")}
+          className="btn btn-quiet min-w-0 w-full px-3 text-sm"
+        >
           {copied === "link" ? <IconCheck size={17} /> : <IconLink size={17} />}
-          リンクをコピー
+          <span className="truncate">リンクをコピー</span>
         </button>
       </div>
 
