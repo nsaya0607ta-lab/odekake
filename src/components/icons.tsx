@@ -218,3 +218,9 @@ export const IconSpinner = (p: IconProps) => (
     <path d="M12 4a8 8 0 1 1-5.7 2.4" />
   </Base>
 );
+
+export const IconChat = (p: IconProps) => (
+  <Base {...p}>
+    <path d="M20.2 12c0 3.8-3.7 6.9-8.2 6.9-1 0-2-.2-2.9-.5l-4.3 1.4 1.4-3.6C4.7 15 3.8 13.6 3.8 12c0-3.8 3.7-6.9 8.2-6.9s8.2 3.1 8.2 6.9Z" />
+  </Base>
+);

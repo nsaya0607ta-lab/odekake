@@ -1,4 +1,4 @@
-import type { TripMemberRow, TripRole, TripRow } from "@/lib/supabase/types";
+import type { TripActivityRow, TripMemberRow, TripRole, TripRow } from "@/lib/supabase/types";
 import type { DB } from "./client";
 import { signPhotoPath } from "./photos";
 
@@ -87,6 +87,51 @@ export async function getTripMembers(supabase: DB, tripId: string): Promise<Trip
     role: m.role,
     displayName: names.get(m.user_id) ?? "メンバー",
     joinedAt: m.joined_at,
+  }));
+}
+
+export type TripActivityEntry = {
+  id: string;
+  action: TripActivityRow["action"];
+  actorName: string;
+  targetLabel: string | null;
+  photoCount: number | null;
+  createdAt: string;
+};
+
+/**
+ * 共有旅の活動履歴。
+ * 「誰が」は保存時の actor_id から、「何を」は保存時に写した target_label から組み立てる
+ * （記録やスポットが消えても履歴は読める）。
+ */
+export async function getTripActivities(supabase: DB, tripId: string, limit = 30): Promise<TripActivityEntry[]> {
+  const { data } = await supabase
+    .from("trip_activities")
+    .select("*")
+    .eq("trip_id", tripId)
+    .order("created_at", { ascending: false })
+    .limit(limit);
+
+  const rows = (data ?? []) as TripActivityRow[];
+  if (rows.length === 0) return [];
+
+  const actorIds = [...new Set(rows.map((row) => row.actor_id).filter((id): id is string => Boolean(id)))];
+  const names = new Map<string, string>();
+  if (actorIds.length > 0) {
+    const { data: profiles } = await supabase
+      .from("profiles")
+      .select("user_id, display_name")
+      .in("user_id", actorIds);
+    for (const profile of profiles ?? []) names.set(profile.user_id, profile.display_name);
+  }
+
+  return rows.map((row) => ({
+    id: row.id,
+    action: row.action,
+    actorName: row.actor_id ? (names.get(row.actor_id) ?? "メンバー") : "退会したメンバー",
+    targetLabel: row.target_label,
+    photoCount: typeof row.detail?.count === "number" ? row.detail.count : null,
+    createdAt: row.created_at,
   }));
 }
 

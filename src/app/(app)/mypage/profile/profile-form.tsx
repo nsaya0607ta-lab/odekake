@@ -26,7 +26,8 @@ export function ProfileForm({
 
       <PhotoUploader
         name="profilePaths"
-        prefix={`users/${userId}/profile`}
+        userId={userId}
+        draftKey="profile"
         max={1}
         label="プロフィール画像"
         initial={imagePath && imageUrl ? [{ path: imagePath, url: imageUrl }] : []}

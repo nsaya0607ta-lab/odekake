@@ -1,11 +1,18 @@
 import { notFound } from "next/navigation";
+import { MunicipalityBrowser } from "@/components/municipality-browser";
 import { PageBody } from "@/components/page-body";
 import { PageHeader } from "@/components/page-header";
 import { loadAreaIndex } from "@/lib/data/areas";
-import { getMunicipalitiesByPrefecture, getPrefecture } from "@/lib/geo";
+import {
+  getMunicipalitiesByPrefecture,
+  getPrefecture,
+  insetsOfPrefecture,
+  projectPoint,
+  shapeOf,
+  viewBoxFor,
+} from "@/lib/geo";
 import { getRegion } from "@/lib/geo/regions";
 import { requireUser } from "@/lib/supabase/server";
-import { MunicipalityList } from "./municipality-list";
 
 export const dynamic = "force-dynamic";
 
@@ -28,11 +35,15 @@ export default async function PrefecturePage({
   const { supabase } = await requireUser();
   const areas = await loadAreaIndex(supabase);
 
+  // 地図に描く座標はここで求めて渡す（地図データを端末へ送らないため）
   const municipalities = getMunicipalitiesByPrefecture(prefecture.code).map((m) => {
     const entry = areas.municipality.get(m.code);
+    const point = m.lat !== null && m.lng !== null ? projectPoint(m.lat, m.lng, "regional", prefecture.code) : null;
     return {
       code: m.code,
       name: m.name,
+      x: point?.[0] ?? null,
+      y: point?.[1] ?? null,
       spotCount: entry?.spotCount ?? 0,
       visited: (entry?.visitCount ?? 0) > 0,
     };
@@ -63,8 +74,14 @@ export default async function PrefecturePage({
         </section>
 
         <section>
-          <h2 className="mb-2 px-1 text-base font-bold">市区町村から選ぶ</h2>
-          <MunicipalityList items={municipalities} hrefBase={`/map/${region.slug}/${prefecture.code}`} />
+          <MunicipalityBrowser
+            prefectureName={prefecture.name}
+            outline={shapeOf(prefecture, "regional").d}
+            viewBox={viewBoxFor([prefecture], "regional")}
+            insets={insetsOfPrefecture("regional", prefecture.code)}
+            items={municipalities}
+            hrefBase={`/map/${region.slug}/${prefecture.code}`}
+          />
         </section>
       </PageBody>
     </>

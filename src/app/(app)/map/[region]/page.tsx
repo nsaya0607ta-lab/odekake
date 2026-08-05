@@ -44,7 +44,7 @@ export default async function RegionPage({ params }: { params: Promise<{ region:
           <RegionMap
             regionSlug={region.slug}
             visitedPrefectures={visitedPrefectures}
-            className="mx-auto h-auto w-full max-h-[54vh]"
+            className="mx-auto w-full max-w-[min(100%,52vh)]"
           />
         </section>
 

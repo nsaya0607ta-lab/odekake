@@ -6,6 +6,7 @@ import { z } from "zod";
 import type { ActionState } from "@/components/form";
 import { toJapaneseError } from "@/lib/errors";
 import { MAX_PHOTOS_PER_VISIT } from "@/lib/image";
+import { finalizePhotoPaths } from "@/lib/photos";
 import { requireUser } from "@/lib/supabase/server";
 import type { DB } from "@/lib/data/client";
 
@@ -112,7 +113,20 @@ async function syncTags(supabase: DB, userId: string, visitId: string, rawTags: 
     .insert(tags.map((tag) => ({ visit_record_id: visitId, tag_id: tag.id })));
 }
 
-async function syncPhotos(supabase: DB, userId: string, visitId: string, paths: string[]) {
+async function syncPhotos(
+  supabase: DB,
+  userId: string,
+  tripId: string,
+  visitId: string,
+  requestedPaths: string[],
+) {
+  // 一時領域にある写真を、この訪問記録の保存先へ移す
+  const paths = await finalizePhotoPaths(
+    supabase,
+    requestedPaths,
+    `trips/${tripId}/visits/${visitId}`,
+  );
+
   const { data: existing } = await supabase
     .from("visit_photos")
     .select("id, storage_path")
@@ -186,7 +200,7 @@ export async function createVisitAction(_prev: ActionState, formData: FormData):
   }
 
   await Promise.all([
-    syncPhotos(supabase, user.id, visitId, parsePhotoPaths(formData)),
+    syncPhotos(supabase, user.id, parsed.data.tripId, visitId, parsePhotoPaths(formData)),
     syncTags(supabase, user.id, visitId, values.tags),
   ]);
 
@@ -228,7 +242,7 @@ export async function updateVisitAction(_prev: ActionState, formData: FormData):
   if (error) return { error: toJapaneseError(error, "訪問履歴の更新に失敗しました。"), values };
 
   await Promise.all([
-    syncPhotos(supabase, user.id, visitId, parsePhotoPaths(formData)),
+    syncPhotos(supabase, user.id, parsed.data.tripId, visitId, parsePhotoPaths(formData)),
     syncTags(supabase, user.id, visitId, values.tags),
   ]);
 

@@ -5,6 +5,7 @@ import { redirect } from "next/navigation";
 import { z } from "zod";
 import type { ActionState } from "@/components/form";
 import { toJapaneseError } from "@/lib/errors";
+import { finalizePhotoPaths, removeFolderRecursively, TMP_ROOT } from "@/lib/photos";
 import { getSiteUrl } from "@/lib/supabase/env";
 import { requireUser } from "@/lib/supabase/server";
 
@@ -37,6 +38,11 @@ export async function updateProfileAction(_prev: ActionState, formData: FormData
   }
 
   const { supabase, user } = await requireUser();
+
+  if (profileImagePath) {
+    const [moved] = await finalizePhotoPaths(supabase, [profileImagePath], `users/${user.id}/profile`);
+    profileImagePath = moved ?? null;
+  }
 
   const { error } = await supabase
     .from("profiles")
@@ -83,7 +89,17 @@ export async function deleteAccountAction(_prev: ActionState, formData: FormData
     return { error: "確認のため「削除」と入力してください。" };
   }
 
-  const { supabase } = await requireUser();
+  const { supabase, user } = await requireUser();
+
+  // データベースの行は外部キーの連鎖で消えるが、Storage のファイルは残るため
+  // ログインしているうちに消しておく（RLS で自分の分しか消せない）。
+  const { data: ownedTrips } = await supabase.from("trips").select("id").eq("owner_id", user.id);
+  for (const trip of ownedTrips ?? []) {
+    await removeFolderRecursively(supabase, `trips/${trip.id}`);
+  }
+  await removeFolderRecursively(supabase, `users/${user.id}`);
+  await removeFolderRecursively(supabase, `${TMP_ROOT}/${user.id}`);
+
   const { error } = await supabase.rpc("delete_own_account");
 
   if (error) return { error: toJapaneseError(error, "アカウントの削除に失敗しました。") };

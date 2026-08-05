@@ -4,8 +4,9 @@ import { IconPlus, IconSliders, IconUsers } from "@/components/icons";
 import { PageBody } from "@/components/page-body";
 import { PageHeader } from "@/components/page-header";
 import { TimelineCard } from "@/components/timeline-card";
+import { TripActivityList } from "@/components/trip-activity-list";
 import { EmptyState, TripTypeBadge, formatDate } from "@/components/ui";
-import { formatTripPeriod, getTripCoverUrl, getTripMembers } from "@/lib/data/trips";
+import { formatTripPeriod, getTripActivities, getTripCoverUrl, getTripMembers } from "@/lib/data/trips";
 import { getTimeline } from "@/lib/data/visits";
 import { loadDisplayNames } from "@/lib/data/spots";
 import { requireUser } from "@/lib/supabase/server";
@@ -29,10 +30,11 @@ export default async function TripDetailPage({ params }: { params: Promise<{ tri
   if (!tripData) notFound();
   const trip = tripData as TripRow;
 
-  const [members, visits, coverUrl, { data: commentRows }] = await Promise.all([
+  const [members, visits, coverUrl, activities, { data: commentRows }] = await Promise.all([
     getTripMembers(supabase, trip.id),
     getTimeline(supabase, { tripId: trip.id }),
     getTripCoverUrl(supabase, trip),
+    trip.trip_type === "shared" ? getTripActivities(supabase, trip.id, 30) : Promise.resolve([]),
     supabase.from("trip_comments").select("*").eq("trip_id", trip.id).order("created_at", { ascending: false }),
   ]);
 
@@ -45,22 +47,6 @@ export default async function TripDetailPage({ params }: { params: Promise<{ tri
   const isOwner = trip.owner_id === user.id;
   const isShared = trip.trip_type === "shared";
   const period = formatTripPeriod(trip);
-
-  // 「誰が何を追加したか」の履歴
-  const activity = [
-    ...visits.map((v) => ({
-      at: v.createdAt,
-      text:
-        v.photoCount > 0
-          ? `${v.authorName}さんが「${v.spotName}」と写真${v.photoCount}枚を追加しました`
-          : `${v.authorName}さんが「${v.spotName}」を追加しました`,
-    })),
-    ...members
-      .filter((m) => m.role !== "owner")
-      .map((m) => ({ at: m.joinedAt, text: `${m.displayName}さんが参加しました` })),
-  ]
-    .sort((a, b) => b.at.localeCompare(a.at))
-    .slice(0, 8);
 
   return (
     <>
@@ -120,17 +106,10 @@ export default async function TripDetailPage({ params }: { params: Promise<{ tri
           </section>
         ) : null}
 
-        {isShared && activity.length > 0 ? (
+        {isShared ? (
           <section>
             <h2 className="mb-2 px-1 text-base font-bold">みんなの動き</h2>
-            <ul className="rough-card divide-y divide-line">
-              {activity.map((entry, i) => (
-                <li key={`${entry.at}-${i}`} className="px-4 py-3">
-                  <p className="text-sm leading-relaxed">{entry.text}</p>
-                  <p className="mt-0.5 text-[11px] text-ink-faint tabular-nums">{formatDate(entry.at)}</p>
-                </li>
-              ))}
-            </ul>
+            <TripActivityList entries={activities} />
           </section>
         ) : null}
 

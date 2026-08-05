@@ -13,7 +13,7 @@ export default async function NewVisitPage({
 }: {
   searchParams: Promise<{ spot?: string; trip?: string; created?: string }>;
 }) {
-  const [{ supabase }, { spot: spotId, trip: tripId, created }] = await Promise.all([
+  const [{ supabase, user }, { spot: spotId, trip: tripId, created }] = await Promise.all([
     requireUser(),
     searchParams,
   ]);
@@ -37,6 +37,7 @@ export default async function NewVisitPage({
         ) : null}
 
         <VisitForm
+          userId={user.id}
           mode="create"
           spotId={spot.id}
           spotName={spot.name}
