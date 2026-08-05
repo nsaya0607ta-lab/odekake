@@ -104,8 +104,9 @@ function splitIntoGeographicClusters(items: PointItem[], targetCount: number): P
     if (splitIndex < 0) break;
 
     const cluster = clusters[splitIndex];
+    if (!cluster) break;
     const bounds = boundsOf(cluster);
-    const axis = bounds.width >= bounds.height ? 0 : 1;
+    const axis: 0 | 1 = bounds.width >= bounds.height ? 0 : 1;
     const sorted = [...cluster].sort((a, b) => a.point[axis] - b.point[axis]);
     const middle = Math.ceil(sorted.length / 2);
     const first = sorted.slice(0, middle);
@@ -146,14 +147,17 @@ function closestMunicipality(
   center: [number, number],
   allBounds: ReturnType<typeof boundsOf>,
 ): PointItem {
-  return [...items].sort((a, b) => {
+  const sorted = [...items].sort((a, b) => {
     const distanceOf = (item: PointItem) => {
       const x = (item.point[0] - center[0]) / allBounds.width;
       const y = (item.point[1] - center[1]) / allBounds.height;
       return Math.hypot(x, y);
     };
     return distanceOf(a) - distanceOf(b);
-  })[0];
+  });
+  const first = sorted[0];
+  if (!first) throw new Error("自治体のないエリアは作成できません。");
+  return first;
 }
 
 /** 全47都道府県を同じ規則で、拡大表示しやすいエリアへ分割する。 */
@@ -181,7 +185,7 @@ export function buildPrefectureAreas(items: PrefectureAreaMunicipality[]): Prefe
       slug: `m${anchor.code}`,
       name: `${direction}・${anchorName}周辺`,
       label: `${labelBase}周辺`,
-      tone: AREA_TONES[index % AREA_TONES.length],
+      tone: AREA_TONES[index % AREA_TONES.length] ?? "green",
       center,
       municipalities,
       spotCount: municipalities.reduce((sum, item) => sum + item.spotCount, 0),
