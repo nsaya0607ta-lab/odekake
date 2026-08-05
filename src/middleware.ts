@@ -2,7 +2,7 @@ import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 import { getSupabaseEnv } from "@/lib/supabase/env";
 
-/** 未ログインでも開ける画面 */
+/** 未ログインでも開ける画面・リソース */
 const PUBLIC_PATHS = [
   "/login",
   "/signup",
@@ -11,6 +11,7 @@ const PUBLIC_PATHS = [
   "/reset-password",
   "/setup",
   "/auth",
+  "/manifest.webmanifest",
 ];
 
 function isPublicPath(pathname: string) {
@@ -22,7 +23,7 @@ export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
   if (!env) {
-    if (pathname === "/setup") return NextResponse.next();
+    if (pathname === "/setup" || pathname === "/manifest.webmanifest") return NextResponse.next();
     const url = request.nextUrl.clone();
     url.pathname = "/setup";
     return NextResponse.redirect(url);
@@ -71,5 +72,7 @@ export async function middleware(request: NextRequest) {
 }
 
 export const config = {
-  matcher: ["/((?!_next/static|_next/image|favicon.ico|icon.svg|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)"],
+  matcher: [
+    "/((?!_next/static|_next/image|favicon.ico|icon.svg|manifest.webmanifest|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)",
+  ],
 };
