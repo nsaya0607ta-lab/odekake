@@ -65,7 +65,7 @@ export function MunicipalityMap({
   const smallThreshold = markerRadius * 2.4;
   const labelSize = scale / (areas.length > 18 ? 54 : areas.length > 12 ? 48 : areas.length > 8 ? 42 : 36);
   const aspect = boxHeight > 0 ? boxWidth / boxHeight : 1;
-  const frameHeight = Math.max(260, Math.min(560, 390 / Math.max(aspect, 0.62)));
+  const frameHeight = Math.max(420, Math.min(680, 760 / Math.max(aspect, 0.72)));
 
   const activeCode = pressed ?? active;
   const activeArea = areas.find((municipality) => municipality.code === activeCode) ?? null;
@@ -194,18 +194,24 @@ export function MunicipalityMap({
                   strokeWidth={isActive ? strokeWidth * 3 : strokeWidth}
                   strokeLinejoin="round"
                 />
+                {area.center ? (
+                  <circle
+                    cx={area.center[0]}
+                    cy={area.center[1]}
+                    r={Math.max(markerRadius * 2.6, scale / 55)}
+                    fill="transparent"
+                    pointerEvents="all"
+                  />
+                ) : null}
                 {area.center && area.span < smallThreshold ? (
-                  <>
-                    <circle
-                      cx={area.center[0]}
-                      cy={area.center[1]}
-                      r={markerRadius}
-                      fill={FILL[area.level] ?? FILL[0]}
-                      stroke={isActive ? "#5d8049" : (STROKE[area.level] ?? STROKE[0])}
-                      strokeWidth={isActive ? strokeWidth * 2.6 : strokeWidth * 1.4}
-                    />
-                    <circle cx={area.center[0]} cy={area.center[1]} r={markerRadius * 2.2} fill="transparent" />
-                  </>
+                  <circle
+                    cx={area.center[0]}
+                    cy={area.center[1]}
+                    r={markerRadius}
+                    fill={FILL[area.level] ?? FILL[0]}
+                    stroke={isActive ? "#5d8049" : (STROKE[area.level] ?? STROKE[0])}
+                    strokeWidth={isActive ? strokeWidth * 2.6 : strokeWidth * 1.4}
+                  />
                 ) : null}
               </g>
             );
