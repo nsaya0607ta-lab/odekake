@@ -4,6 +4,7 @@ import { IconPlus } from "@/components/icons";
 import { PageBody } from "@/components/page-body";
 import { PageHeader } from "@/components/page-header";
 import { SpotBrowser } from "@/components/spot-browser";
+import { SpotPinMap } from "@/components/spot-pin-map";
 import { EmptyState } from "@/components/ui";
 import { loadCategoryNames, getSpotsInMunicipality } from "@/lib/data/spots";
 import { getMunicipality, getPrefecture } from "@/lib/geo";
@@ -54,6 +55,7 @@ export default async function MunicipalityPage({
     area && /^m\d{5}$/.test(area)
       ? `/map/${region.slug}/${prefecture.code}/area/${area}`
       : `/map/${region.slug}/${prefecture.code}`;
+  const totalVisits = spots.reduce((sum, spot) => sum + spot.visitCount, 0);
 
   return (
     <>
@@ -73,9 +75,17 @@ export default async function MunicipalityPage({
       />
 
       <PageBody>
-        <p className="px-1 text-sm font-semibold text-ink-soft">
-          訪問スポット <span className="text-lg tabular-nums text-ink">{spots.length}</span> 件
-        </p>
+        <section className="rough-card flex items-center justify-around px-4 py-4 text-center">
+          <div>
+            <p className="text-2xl leading-none font-bold tabular-nums">{totalVisits}</p>
+            <p className="mt-1 text-xs text-ink-soft">訪問数</p>
+          </div>
+          <div className="h-8 w-px bg-line" />
+          <div>
+            <p className="text-2xl leading-none font-bold tabular-nums">{spots.length}</p>
+            <p className="mt-1 text-xs text-ink-soft">訪問スポット</p>
+          </div>
+        </section>
 
         {spots.length === 0 ? (
           <EmptyState
@@ -85,7 +95,13 @@ export default async function MunicipalityPage({
             actionLabel="スポットを登録する"
           />
         ) : (
-          <SpotBrowser spots={spots} categories={categories} municipalityName={municipality.name} />
+          <>
+            <SpotPinMap spots={spots} municipalityName={municipality.name} />
+            <section className="space-y-2">
+              <h2 className="px-1 text-base font-bold">訪問したスポット</h2>
+              <SpotBrowser spots={spots} categories={categories} municipalityName={municipality.name} />
+            </section>
+          </>
         )}
       </PageBody>
     </>
