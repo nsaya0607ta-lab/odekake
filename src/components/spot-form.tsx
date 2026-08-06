@@ -63,6 +63,7 @@ export function SpotForm({
   userId,
   trips = [],
   visitedAtDefault = "",
+  showTripPlanningLink = false,
 }: {
   categories: Array<{ id: number; name: string }>;
   location: SpotLocation;
@@ -73,6 +74,7 @@ export function SpotForm({
   userId?: string;
   trips?: SpotFormTrip[];
   visitedAtDefault?: string;
+  showTripPlanningLink?: boolean;
 }) {
   const isEdit = Boolean(spotId);
   const action = isEdit ? updateSpotAction : createVisitedSpotAction;
@@ -119,18 +121,6 @@ export function SpotForm({
         </>
       )}
       <FormMessage state={state} />
-
-      {!isEdit && trips.length === 0 ? (
-        <div className="rough-card space-y-3 p-4 text-center">
-          <p className="font-semibold">先に旅行を作成してください</p>
-          <p className="text-xs leading-relaxed text-ink-soft">
-            行った場所は、どの旅行で訪れたかと一緒に保存します。
-          </p>
-          <Link href="/trips/new/personal" className="btn btn-primary w-full">
-            個人旅をつくる
-          </Link>
-        </div>
-      ) : null}
 
       <section className="space-y-4">
         {!isEdit ? <h2 className="px-1 text-base font-bold">場所</h2> : null}
@@ -194,7 +184,7 @@ export function SpotForm({
             />
           </Field>
 
-          <Field label="旅行" htmlFor="tripId" error={state.fieldErrors?.tripId}>
+          <Field label="記録先" htmlFor="tripId" error={state.fieldErrors?.tripId}>
             <select
               id="tripId"
               name="tripId"
@@ -206,7 +196,7 @@ export function SpotForm({
               <option value="">選択してください</option>
               {trips.map((trip) => (
                 <option key={trip.id} value={trip.id}>
-                  {trip.title}（{trip.trip_type === "solo" ? "個人旅" : "共有旅"}）
+                  {trip.trip_type === "shared" ? `${trip.title}（共有旅）` : trip.title}
                 </option>
               ))}
             </select>
@@ -247,7 +237,7 @@ export function SpotForm({
             />
           ) : (
             <p className="rounded-2xl bg-paper-deep px-4 py-3 text-xs text-ink-soft">
-              写真を追加するには、先に旅行を選んでください。
+              写真を追加するには、先に記録先を選んでください。
             </p>
           )}
 
@@ -428,6 +418,12 @@ export function SpotForm({
         </div>
       </details>
 
+      {!isEdit && trips.length === 0 ? (
+        <p role="alert" className="rounded-2xl border border-blossom bg-blossom-soft px-4 py-3 text-sm text-[#8f4c59]">
+          記録先を準備できませんでした。画面を再読み込みして、もう一度お試しください。
+        </p>
+      ) : null}
+
       <SubmitButton
         pendingLabel="保存中…"
         disabled={!isEdit && (trips.length === 0 || !tripId || !visitId)}
@@ -436,6 +432,18 @@ export function SpotForm({
       </SubmitButton>
       {!isEdit ? (
         <p className="text-center text-xs text-ink-faint">場所と訪問履歴をまとめて保存し、日本地図へ反映します。</p>
+      ) : null}
+
+      {!isEdit && showTripPlanningLink ? (
+        <div className="rough-card space-y-3 p-4 text-center">
+          <p className="font-semibold">旅行としてまとめたい場合</p>
+          <p className="text-xs leading-relaxed text-ink-soft">
+            日程や表紙を設定して、複数の訪問記録をひとつの旅行としてまとめられます。普段のおでかけ記録には作成不要です。
+          </p>
+          <Link href="/trips/new/personal" className="btn btn-secondary w-full">
+            旅行の計画を立てる
+          </Link>
+        </div>
       ) : null}
     </form>
   );
