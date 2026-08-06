@@ -440,7 +440,7 @@ export function SpotForm({
           <p className="text-xs leading-relaxed text-ink-soft">
             日程や表紙を設定して、複数の訪問記録をひとつの旅行としてまとめられます。普段のおでかけ記録には作成不要です。
           </p>
-          <Link href="/trips/new/personal" className="btn btn-secondary w-full">
+          <Link href="/trips/new/personal" className="btn btn-quiet w-full">
             旅行の計画を立てる
           </Link>
         </div>
