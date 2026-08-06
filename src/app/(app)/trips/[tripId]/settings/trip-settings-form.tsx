@@ -42,7 +42,7 @@ export function TripSettingsForm({
             id="trip-start"
             name="startDate"
             type="date"
-            className="field"
+            className="field field-date-pair"
             defaultValue={state.values?.startDate ?? trip.start_date ?? ""}
           />
         </Field>
@@ -51,7 +51,7 @@ export function TripSettingsForm({
             id="trip-end"
             name="endDate"
             type="date"
-            className="field"
+            className="field field-date-pair"
             defaultValue={state.values?.endDate ?? trip.end_date ?? ""}
           />
         </Field>

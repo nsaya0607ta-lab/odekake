@@ -115,7 +115,7 @@ export function VisitForm({
           id="visitedAt"
           name="visitedAt"
           type="date"
-          className="field"
+          className="field field-date-solo"
           defaultValue={state.values?.visitedAt ?? defaults.visitedAt}
           required
         />

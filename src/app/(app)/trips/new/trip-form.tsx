@@ -81,7 +81,7 @@ export function TripForm({ userId, tripType }: { userId: string; tripType: TripT
             id="startDate"
             name="startDate"
             type="date"
-            className="field"
+            className="field field-date-pair"
             defaultValue={state.values?.startDate ?? ""}
           />
         </Field>
@@ -90,7 +90,7 @@ export function TripForm({ userId, tripType }: { userId: string; tripType: TripT
             id="endDate"
             name="endDate"
             type="date"
-            className="field"
+            className="field field-date-pair"
             defaultValue={state.values?.endDate ?? ""}
           />
         </Field>

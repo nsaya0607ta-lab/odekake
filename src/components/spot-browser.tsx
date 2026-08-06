@@ -151,7 +151,7 @@ export function SpotBrowser({
               <input
                 id="filter-from"
                 type="date"
-                className="field"
+                className="field field-date-pair"
                 value={visitedFrom}
                 onChange={(e) => setVisitedFrom(e.target.value)}
               />
@@ -163,7 +163,7 @@ export function SpotBrowser({
               <input
                 id="filter-to"
                 type="date"
-                className="field"
+                className="field field-date-pair"
                 value={visitedTo}
                 onChange={(e) => setVisitedTo(e.target.value)}
               />
