@@ -48,10 +48,7 @@ export function JapanMap({
         colorUnvisited
       />
       <p className="mt-1 text-center text-[11px] leading-relaxed text-ink-faint">
-        地方ごとの色で表示しています。訪問した地方は少し濃くなります。
-      </p>
-      <p className="mt-0.5 text-center text-[11px] leading-relaxed text-ink-faint">
-        破線の枠の中は、見やすさのため実際の位置から動かして描いています。
+        訪問した地方は色が濃くなります。タップすると都道府県一覧へ移動します。
       </p>
     </div>
   );

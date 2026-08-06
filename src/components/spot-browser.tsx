@@ -144,7 +144,7 @@ export function SpotBrowser({
                 <option value="4.5">★4.5以上</option>
               </select>
             </div>
-            <div className="col-span-2 sm:col-span-1">
+            <div>
               <label className="field-label" htmlFor="filter-from">
                 訪問日（から）
               </label>
@@ -156,7 +156,7 @@ export function SpotBrowser({
                 onChange={(e) => setVisitedFrom(e.target.value)}
               />
             </div>
-            <div className="col-span-2 sm:col-span-1">
+            <div>
               <label className="field-label" htmlFor="filter-to">
                 訪問日（まで）
               </label>

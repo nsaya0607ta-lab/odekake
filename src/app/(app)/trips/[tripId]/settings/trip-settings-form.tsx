@@ -18,7 +18,7 @@ export function TripSettingsForm({
   const [state, formAction] = useActionState(updateTripAction, emptyActionState);
 
   return (
-    <form action={formAction} className="rough-card space-y-4 p-4" noValidate>
+    <form action={formAction} className="rough-card space-y-5 p-4" noValidate>
       <input type="hidden" name="tripId" value={trip.id} />
       <input type="hidden" name="tripType" value={trip.trip_type} />
 
@@ -36,7 +36,7 @@ export function TripSettingsForm({
         />
       </Field>
 
-      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+      <div className="grid grid-cols-2 gap-3">
         <Field label="開始日" htmlFor="trip-start" optional>
           <input
             id="trip-start"
