@@ -106,7 +106,7 @@ export function SpotForm({
     <form
       id="spot-form"
       action={formAction}
-      className="space-y-4"
+      className="space-y-5"
       noValidate
       onSubmit={() => {
         if (!isEdit) window.sessionStorage.removeItem(visitIdStorageKey);

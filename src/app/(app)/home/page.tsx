@@ -72,26 +72,31 @@ export default async function HomePage({ searchParams }: { searchParams: Promise
           </p>
         ) : null}
 
+        <div className="flex items-center justify-between gap-2 px-1">
+          <p className="min-w-0 flex-1 truncate text-sm text-ink-soft">
+            <span className="font-bold text-ink">{user.displayName}</span>
+            さん、{isShared ? "今日はどこを記録しますか？" : "おでかけの記録を続けましょう"}
+          </p>
+          <Link
+            href="/workspaces"
+            className="shrink-0 rounded-full border border-line-strong bg-card px-3 py-1.5 text-xs font-semibold text-ink-soft"
+          >
+            旅を切替
+          </Link>
+        </div>
+
         <section className="rough-card px-5 py-5">
-          <div className="mb-4 flex items-center justify-between gap-2">
+          <div className="mb-3 flex items-center gap-2">
             <span
-              className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-full ${
+              className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full ${
                 isShared ? "bg-sky-soft text-[#42718f]" : "bg-blossom-soft text-[#95505e]"
               }`}
             >
-              {isShared ? <IconUsers size={17} /> : <IconFlag size={17} />}
+              {isShared ? <IconUsers size={14} /> : <IconFlag size={14} />}
             </span>
-            <p className="min-w-0 flex-1 text-center text-sm font-semibold text-ink-soft">
-              <span className="hand-underline px-1">
-                {isShared ? `${workspace.name} の共有記録` : `${user.displayName} さんの個人記録`}
-              </span>
+            <p className="min-w-0 flex-1 truncate text-xs font-semibold text-ink-soft">
+              {isShared ? `${workspace.name} の共有記録` : `${user.displayName} さんの個人記録`}
             </p>
-            <Link
-              href="/workspaces"
-              className="shrink-0 rounded-full border border-line-strong bg-card px-3 py-1.5 text-xs font-semibold text-ink-soft"
-            >
-              旅を切替
-            </Link>
           </div>
 
           <dl className="grid grid-cols-3 gap-2 text-center">
@@ -209,18 +214,6 @@ export default async function HomePage({ searchParams }: { searchParams: Promise
           </section>
         ) : null}
 
-        <section>
-          <SectionHeading title="日本地図" moreHref="/map" moreLabel="地図を開く" />
-          <div className="rough-card rough-card-alt px-3 py-4">
-            <p className="mb-2 text-center text-xs text-ink-soft">
-              <span className="rough-pill bg-leaf-soft px-3 py-1 text-leaf-deep">
-                {isShared ? "この共有旅で訪れた場所だけが色付きます" : "個人旅で訪れた場所だけが色付きます"}
-              </span>
-            </p>
-            <JapanMap visitedRegions={visitedRegions} />
-          </div>
-        </section>
-
         {isShared ? (
           <section>
             <SectionHeading title="みんなの動き" moreHref={`/trips/${workspace.id}`} />
@@ -267,6 +260,18 @@ export default async function HomePage({ searchParams }: { searchParams: Promise
               ))}
             </ul>
           )}
+        </section>
+
+        <section>
+          <SectionHeading title="日本地図" moreHref="/map" moreLabel="地図を開く" />
+          <div className="rough-card rough-card-alt px-3 py-4">
+            <p className="mb-2 text-center text-xs text-ink-soft">
+              <span className="rough-pill bg-leaf-soft px-3 py-1 text-leaf-deep">
+                {isShared ? "この共有旅で訪れた場所だけが色付きます" : "個人旅で訪れた場所だけが色付きます"}
+              </span>
+            </p>
+            <JapanMap visitedRegions={visitedRegions} />
+          </div>
         </section>
       </PageBody>
     </>

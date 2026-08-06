@@ -1,51 +1,49 @@
 import Link from "next/link";
 import { IconHeart, IconMapPin } from "./icons";
 import type { TimelineItem } from "@/lib/data/visits";
-import { StarRating, TripTypeBadge, formatDate } from "./ui";
+import { TripTypeBadge, formatDate } from "./ui";
 
 export function TimelineCard({ item, showTrip = true }: { item: TimelineItem; showTrip?: boolean }) {
   return (
-    <Link href={`/spots/${item.spotId}`} className="rough-card block space-y-2 p-4 transition-transform active:scale-[0.99]">
-      <div className="flex items-center justify-between gap-2">
-        <p className="text-sm font-semibold tabular-nums text-ink-soft">{formatDate(item.visitedAt)}</p>
-        {showTrip ? <TripTypeBadge type={item.tripType} /> : null}
-      </div>
-
-      <div className="flex items-start gap-2">
-        <h3 className="min-w-0 flex-1 truncate text-base font-bold">{item.spotName}</h3>
-        {item.favorite ? (
-          <span className="shrink-0 text-blossom" aria-label="お気に入り">
-            <IconHeart size={17} filled />
+    <Link
+      href={`/spots/${item.spotId}`}
+      className="rough-card flex items-center gap-3 px-3 py-3 transition-transform active:scale-[0.99]"
+    >
+      <span className="relative h-14 w-14 shrink-0 overflow-hidden rounded-xl bg-paper-deep">
+        {item.photoUrls[0] ? (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img src={item.photoUrls[0]} alt="" className="h-full w-full object-cover" />
+        ) : (
+          <span className="flex h-full w-full items-center justify-center text-ink-faint">
+            <IconMapPin size={20} />
+          </span>
+        )}
+        {item.photoCount > 1 ? (
+          <span className="absolute right-0.5 bottom-0.5 rounded-full bg-ink/70 px-1.5 py-px text-[10px] font-semibold text-white">
+            +{item.photoCount - 1}
           </span>
         ) : null}
-      </div>
+      </span>
 
-      <p className="flex flex-wrap items-center gap-x-2 text-xs text-ink-soft">
-        <span className="inline-flex items-center gap-0.5">
-          <IconMapPin size={13} />
-          {item.municipalityName || "場所未設定"}
-        </span>
-        {showTrip ? <span>・{item.tripTitle}</span> : null}
-        <span>・{item.authorName}さん</span>
-      </p>
-
-      {item.rating ? <StarRating value={item.rating} /> : null}
-
-      {item.photoUrls.length > 0 ? (
-        <div className="flex gap-2">
-          {item.photoUrls.map((url, i) => (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img key={`${url}-${i}`} src={url} alt="" className="h-20 w-20 rounded-2xl object-cover" />
-          ))}
-          {item.photoCount > item.photoUrls.length ? (
-            <span className="flex h-20 w-20 items-center justify-center rounded-2xl bg-paper-deep text-xs text-ink-soft">
-              +{item.photoCount - item.photoUrls.length}
+      <span className="min-w-0 flex-1">
+        <span className="flex items-center gap-1.5">
+          <span className="truncate text-base font-bold">{item.spotName}</span>
+          {item.favorite ? (
+            <span className="shrink-0 text-blossom" aria-label="お気に入り">
+              <IconHeart size={14} filled />
             </span>
           ) : null}
-        </div>
-      ) : null}
+        </span>
+        <span className="mt-0.5 flex flex-wrap items-center gap-x-1.5 text-xs text-ink-soft">
+          <span className="inline-flex items-center gap-0.5">
+            <IconMapPin size={12} />
+            {item.municipalityName || "場所未設定"}
+          </span>
+          <span className="tabular-nums">{formatDate(item.visitedAt)}</span>
+        </span>
+      </span>
 
-      {item.comment ? <p className="line-clamp-2 text-sm leading-relaxed text-ink-soft">{item.comment}</p> : null}
+      {showTrip ? <TripTypeBadge type={item.tripType} /> : null}
     </Link>
   );
 }

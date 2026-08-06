@@ -1,10 +1,13 @@
 import Link from "next/link";
 import { signOutAction } from "@/app/(auth)/actions";
 import {
+  IconCalendar,
+  IconChat,
   IconChevronRight,
+  IconFlag,
+  IconHeart,
   IconLogout,
   IconMail,
-  IconSliders,
   IconUser,
   IconUsers,
 } from "@/components/icons";
@@ -82,6 +85,15 @@ export default async function MyPage() {
 
         <nav>
           <ul className="rough-card divide-y divide-line overflow-hidden">
+            <MenuItem href="/mypage/favorites" icon={<IconHeart size={20} />} label="お気に入り" />
+            <MenuItem href="/mypage/wishlist" icon={<IconFlag size={20} />} label="行きたい場所" />
+            <MenuItem href="/records?tab=trips" icon={<IconCalendar size={20} />} label="旅行の計画" />
+          </ul>
+        </nav>
+
+        <nav>
+          <p className="mb-2 px-1 text-xs font-semibold text-ink-faint">設定</p>
+          <ul className="rough-card divide-y divide-line overflow-hidden">
             <MenuItem href="/mypage/profile" icon={<IconUser size={20} />} label="プロフィールを編集" />
             <MenuItem
               href="/invitations"
@@ -90,7 +102,7 @@ export default async function MyPage() {
               badge={invitationCount > 0 ? invitationCount : undefined}
             />
             <MenuItem href="/mypage/account" icon={<IconMail size={20} />} label="アカウント設定" />
-            <MenuItem href="/records?tab=trips" icon={<IconSliders size={20} />} label="旅行の一覧" />
+            <MenuItem href="/mypage/help" icon={<IconChat size={20} />} label="ヘルプ・お問い合わせ" />
           </ul>
         </nav>
 

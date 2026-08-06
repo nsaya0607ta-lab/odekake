@@ -15,8 +15,11 @@
   max-inline-size: 20rem;
 }
 
-/* 開始日・終了日など2列で並べる日付入力は列幅いっぱいに収め、中央の余白は grid の gap に任せる。 */
+/* 開始日・終了日など2列で並べる日付入力は列幅いっぱいに収め、中央の余白は grid の gap に任せる。
+   ネイティブの日付コントロール分の余裕を作るため、左右の内側余白を少し詰める。 */
 .field-date-pair {
   inline-size: 100%;
   max-inline-size: 100%;
+  min-inline-size: 0;
+  padding-inline: 0.6rem;
 }
