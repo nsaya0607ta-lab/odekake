@@ -92,11 +92,6 @@ function fieldErrorsOf(error: z.ZodError): Record<string, string> {
   return result;
 }
 
-/**
- * 座標と市区町村のつじつまを合わせる。
- * 座標が無いときは市区町村の代表地点を入れ、
- * 選んだ市区町村から極端に離れた座標は受け付けない。
- */
 function resolveLocation(parsed: SpotInput) {
   const municipality = getMunicipality(parsed.municipalityCode);
   if (!municipality) return { ok: false as const, error: "選択した市区町村が見つかりません。" };
@@ -112,7 +107,6 @@ function resolveLocation(parsed: SpotInput) {
     source = "municipality";
     accuracy = null;
   } else if (municipality.lat !== null && municipality.lng !== null) {
-    // 市区町村の代表地点から 100km 以上離れていたら、選び間違いとみなす
     if (distanceMeters(latitude, longitude, municipality.lat, municipality.lng) > 100_000) {
       return { ok: false as const, error: "選んだ市区町村と座標が大きく離れています。場所を選び直してください。" };
     }
@@ -148,6 +142,13 @@ function detailValues(parsed: SpotInput) {
   };
 }
 
+function spotSaveError(error: { code?: string; message?: string; details?: string; hint?: string } | null) {
+  if (error?.code === "23505" && /spots_place_ref_idx|place_provider|place_id/i.test(`${error.message ?? ""} ${error.details ?? ""}`)) {
+    return "この場所はすでにスポットへ登録されています。記録画面から既存のスポットを選んでください。";
+  }
+  return toJapaneseError(error, "スポットの登録に失敗しました。時間をおいてもう一度お試しください。");
+}
+
 export async function createSpotAction(_prev: ActionState, formData: FormData): Promise<ActionState> {
   const values = collect(formData);
   const parsed = spotSchema.safeParse(values);
@@ -168,7 +169,16 @@ export async function createSpotAction(_prev: ActionState, formData: FormData): 
     .single();
 
   if (error || !data) {
-    return { error: toJapaneseError(error, "スポットの登録に失敗しました。"), values };
+    console.error("Spot insert failed", {
+      code: error?.code,
+      message: error?.message,
+      details: error?.details,
+      hint: error?.hint,
+      municipalityCode: parsed.data.municipalityCode,
+      locationSource: parsed.data.locationSource,
+      hasPlaceId: Boolean(parsed.data.placeId),
+    });
+    return { error: spotSaveError(error), values };
   }
 
   revalidatePath("/home");
@@ -195,7 +205,10 @@ export async function updateSpotAction(_prev: ActionState, formData: FormData): 
     .update({ ...detailValues(parsed.data), ...location.values })
     .eq("id", spotId);
 
-  if (error) return { error: toJapaneseError(error, "スポットの更新に失敗しました。"), values };
+  if (error) {
+    console.error("Spot update failed", { code: error.code, message: error.message, details: error.details, hint: error.hint, spotId });
+    return { error: toJapaneseError(error, "スポットの更新に失敗しました。"), values };
+  }
 
   revalidatePath(`/spots/${spotId}`);
   revalidatePath("/map");
