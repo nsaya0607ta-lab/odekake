@@ -1,25 +1,17 @@
-import { PageBody } from "@/components/page-body";
-import { PageHeader } from "@/components/page-header";
+import { redirect } from "next/navigation";
+import { resolveWorkspace } from "@/lib/data/workspace";
 import { requireUser } from "@/lib/supabase/server";
-import { TripForm } from "./trip-form";
 
 export const metadata = { title: "新しい旅行 | おでかけ記録" };
 export const dynamic = "force-dynamic";
 
-export default async function NewTripPage({
-  searchParams,
-}: {
-  searchParams: Promise<{ type?: string }>;
-}) {
-  const [{ type }, { user }] = await Promise.all([searchParams, requireUser()]);
-  const defaultType = type === "shared" ? "shared" : "solo";
+/**
+ * 既存リンクとの互換用。
+ * 現在開いているワークスペースに応じて、個人旅または共有旅の専用画面へ送る。
+ */
+export default async function NewTripPage() {
+  const { supabase, user } = await requireUser();
+  const workspace = await resolveWorkspace(supabase, user.id);
 
-  return (
-    <>
-      <PageHeader title="新しい旅行" />
-      <PageBody>
-        <TripForm userId={user.id} defaultType={defaultType} />
-      </PageBody>
-    </>
-  );
+  redirect(workspace.kind === "trip" ? "/trips/new/shared" : "/trips/new/personal");
 }

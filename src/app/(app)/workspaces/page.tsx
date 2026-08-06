@@ -22,12 +22,18 @@ export default async function WorkspacesPage() {
       <PageHeader title="旅を選ぶ" backHref="/home" />
       <PageBody>
         <p className="rough-card px-4 py-3 text-sm leading-relaxed text-ink-soft">
-          旅ごとに、ホーム・地図・記録・スポットがそれぞれ独立しています。
-          選んだ旅の記録だけが地図に色付きます。
+          個人旅と共有旅は別々の画面として扱われます。選んだ画面の地図・記録・スポットだけが表示され、
+          新しい旅行も同じ種類で作成されます。
         </p>
 
         <section>
-          <h2 className="mb-2 px-1 text-base font-bold">自分の旅</h2>
+          <div className="mb-2 flex items-baseline justify-between gap-3 px-1">
+            <h2 className="text-base font-bold">個人旅</h2>
+            <Link href="/trips/new/personal" className="flex items-center gap-0.5 text-sm text-leaf-deep">
+              <IconPlus size={15} />
+              つくる
+            </Link>
+          </div>
           <ul className="space-y-2">
             {personal.map((workspace) => (
               <li key={workspace.id}>
@@ -45,7 +51,7 @@ export default async function WorkspacesPage() {
                 <span className="ml-1.5 text-sm font-normal text-ink-faint tabular-nums">{shared.length}件</span>
               ) : null}
             </h2>
-            <Link href="/trips/new?type=shared" className="flex items-center gap-0.5 text-sm text-leaf-deep">
+            <Link href="/trips/new/shared" className="flex items-center gap-0.5 text-sm text-leaf-deep">
               <IconPlus size={15} />
               つくる
             </Link>
@@ -69,7 +75,7 @@ export default async function WorkspacesPage() {
         </section>
 
         <Link href="/invitations" className="btn btn-quiet w-full">
-          招待コードで参加する
+          招待コードで共有旅に参加する
         </Link>
       </PageBody>
     </>
@@ -84,7 +90,7 @@ function WorkspaceRow({
   const period = workspace.trip ? formatTripPeriod(workspace.trip) : null;
   const subtitle =
     workspace.kind === "personal"
-      ? `一人旅 ${workspace.tripIds.length}件・${workspace.visitCount}件の記録`
+      ? `個人旅 ${workspace.tripIds.length}件・${workspace.visitCount}件の記録`
       : [period, `${workspace.visitCount}件の記録`].filter(Boolean).join("・");
 
   return (

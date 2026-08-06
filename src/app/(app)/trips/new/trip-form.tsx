@@ -6,69 +6,59 @@ import { FormDraft } from "@/components/form-draft";
 import { emptyActionState, Field, FormMessage, SubmitButton } from "@/components/form";
 import { PhotoUploader } from "@/components/photo-uploader";
 
-export function TripForm({ userId, defaultType }: { userId: string; defaultType: "solo" | "shared" }) {
+type TripType = "solo" | "shared";
+
+export function TripForm({ userId, tripType }: { userId: string; tripType: TripType }) {
   const [state, formAction] = useActionState(createTripAction, emptyActionState);
-  const [tripType, setTripType] = useState<"solo" | "shared">(
-    (state.values?.tripType as "solo" | "shared") ?? defaultType,
-  );
-  const [tripTypeDraftReady, setTripTypeDraftReady] = useState(false);
+  const formId = `trip-form-${tripType}`;
+  const draftKey = `trip-new-${tripType}`;
+  const tripIdStorageKey = `odekake:trip-id:${tripType}`;
 
-  // 旅行タイプはボタン型の制御コンポーネントなので、下書きから明示的に復元する。
-  useEffect(() => {
-    try {
-      const raw = window.localStorage.getItem("odekake:draft:trip-new");
-      if (raw) {
-        const draft = JSON.parse(raw) as Record<string, string>;
-        if (draft.tripType === "solo" || draft.tripType === "shared") setTripType(draft.tripType);
-      }
-    } catch {
-      // 壊れた下書きは FormDraft 側で処理する
-    } finally {
-      setTripTypeDraftReady(true);
-    }
-  }, []);
-
-  // ボタンを押したときも旅行タイプを下書きへ保存する。
-  useEffect(() => {
-    if (!tripTypeDraftReady) return;
-    try {
-      const key = "odekake:draft:trip-new";
-      const raw = window.localStorage.getItem(key);
-      const draft = raw ? (JSON.parse(raw) as Record<string, string>) : {};
-      draft.tripType = tripType;
-      window.localStorage.setItem(key, JSON.stringify(draft));
-    } catch {
-      // 保存できなくても入力は続けられる
-    }
-  }, [tripType, tripTypeDraftReady]);
-
-  // 表紙画像の保存先パスを先に決めるため、旅行 ID を先に発行する
+  // 表紙画像の保存先パスを先に決めるため、旅行 ID を先に発行する。
+  // 個人旅と共有旅で別のキーにし、画面を切り替えても入力が混ざらないようにする。
   const [tripId, setTripId] = useState("");
   useEffect(() => {
-    const key = "odekake:trip-id";
-    const saved = window.sessionStorage.getItem(key);
+    const saved = window.sessionStorage.getItem(tripIdStorageKey);
     if (saved) {
       setTripId(saved);
       return;
     }
     const generated = crypto.randomUUID();
-    window.sessionStorage.setItem(key, generated);
+    window.sessionStorage.setItem(tripIdStorageKey, generated);
     setTripId(generated);
-  }, []);
+  }, [tripIdStorageKey]);
+
+  const isShared = tripType === "shared";
 
   return (
     <form
-      id="trip-form"
+      id={formId}
       action={formAction}
       className="space-y-5"
       noValidate
-      onSubmit={() => window.sessionStorage.removeItem("odekake:trip-id")}
+      onSubmit={() => window.sessionStorage.removeItem(tripIdStorageKey)}
     >
-      <FormDraft formId="trip-form" storageKey="trip-new" />
+      <FormDraft formId={formId} storageKey={draftKey} />
       <input type="hidden" name="tripId" value={tripId} />
-      <input type="hidden" name="tripType" value={tripType} data-draft="true" />
+      <input type="hidden" name="tripType" value={tripType} />
 
       <FormMessage state={state} />
+
+      <div
+        className={`rough-card flex items-start gap-3 p-4 ${
+          isShared ? "border-sky bg-sky-soft" : "border-blossom bg-blossom-soft"
+        }`}
+      >
+        <span className="min-w-0 flex-1">
+          <span className="block text-xs font-semibold text-ink-faint">この画面で作成する旅行</span>
+          <span className="mt-1 block font-bold">{isShared ? "共有旅" : "個人旅"}</span>
+          <span className="mt-0.5 block text-xs leading-relaxed text-ink-soft">
+            {isShared
+              ? "友人や家族と同じ地図・スポット・訪問履歴を共有する旅行として登録します。"
+              : "自分だけが見られる旅行として登録します。共有旅へ変更することはできません。"}
+          </span>
+        </span>
+      </div>
 
       <Field label="旅行名" htmlFor="title" error={state.fieldErrors?.title}>
         <input
@@ -77,38 +67,11 @@ export function TripForm({ userId, defaultType }: { userId: string; defaultType:
           type="text"
           className="field"
           defaultValue={state.values?.title ?? ""}
-          placeholder="岐阜日帰り"
+          placeholder={isShared ? "友人との山口旅行" : "岐阜日帰り"}
           maxLength={60}
           required
         />
       </Field>
-
-      <fieldset>
-        <legend className="field-label">旅行タイプ</legend>
-        <div className="grid grid-cols-2 gap-2">
-          {(
-            [
-              { value: "solo", title: "一人旅", description: "自分だけが見られます" },
-              { value: "shared", title: "共有旅", description: "友人と一緒に記録します" },
-            ] as const
-          ).map((option) => (
-            <button
-              key={option.value}
-              type="button"
-              aria-pressed={tripType === option.value}
-              onClick={() => setTripType(option.value)}
-              className={`rounded-2xl border px-4 py-3 text-left transition-colors ${
-                tripType === option.value
-                  ? "border-leaf bg-leaf-soft"
-                  : "border-line-strong bg-card"
-              }`}
-            >
-              <span className="block font-semibold">{option.title}</span>
-              <span className="mt-0.5 block text-xs text-ink-soft">{option.description}</span>
-            </button>
-          ))}
-        </div>
-      </fieldset>
 
       <div className="grid grid-cols-2 gap-3">
         <Field label="開始日" htmlFor="startDate" optional error={state.fieldErrors?.startDate}>
@@ -138,20 +101,31 @@ export function TripForm({ userId, defaultType }: { userId: string; defaultType:
           rows={3}
           className="field"
           defaultValue={state.values?.description ?? ""}
-          placeholder="ひさしぶりの日帰り旅行"
+          placeholder={isShared ? "みんなで行く2泊3日の旅行" : "ひさしぶりの日帰り旅行"}
           maxLength={1000}
         />
       </Field>
 
-      <PhotoUploader name="coverPaths" userId={userId} draftKey="trip-new-cover" max={1} label="表紙画像" />
+      <PhotoUploader
+        name="coverPaths"
+        userId={userId}
+        draftKey={`trip-new-${tripType}-cover`}
+        max={1}
+        label="表紙画像"
+      />
 
-      {tripType === "shared" ? (
+      {isShared ? (
         <div className="rough-card space-y-3 p-4">
           <p className="font-semibold">メンバーを招待</p>
           <p className="text-xs leading-relaxed text-ink-soft">
             メールアドレスを入力すると招待を作成します。作成後の画面で招待コードとリンクを共有できます。
           </p>
-          <Field label="招待するメールアドレス" htmlFor="inviteEmails" optional hint="複数ある場合はカンマで区切ります。">
+          <Field
+            label="招待するメールアドレス"
+            htmlFor="inviteEmails"
+            optional
+            hint="複数ある場合はカンマで区切ります。"
+          >
             <textarea
               id="inviteEmails"
               name="inviteEmails"
@@ -164,7 +138,7 @@ export function TripForm({ userId, defaultType }: { userId: string; defaultType:
       ) : null}
 
       <SubmitButton pendingLabel="作成中…" disabled={!tripId}>
-        旅行をつくる
+        {isShared ? "共有旅をつくる" : "個人旅をつくる"}
       </SubmitButton>
     </form>
   );
