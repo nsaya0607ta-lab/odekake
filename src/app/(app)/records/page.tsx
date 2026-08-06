@@ -96,15 +96,20 @@ async function TripsTab({
   workspace: Workspace;
 }) {
   const all = await getTripSummaries(supabase, userId);
-  const trips = all.filter((t) => workspace.tripIds.includes(t.trip.id));
+  const trips = all.filter(
+    (t) =>
+      workspace.tripIds.includes(t.trip.id) &&
+      // 日程のない solo は「普段のおでかけ」の内部保存先なので旅行タブには出さない。
+      !(t.trip.trip_type === "solo" && !t.trip.start_date && !t.trip.end_date),
+  );
 
   if (trips.length === 0) {
     return (
       <EmptyState
-        title="旅行がありません"
-        description="一人旅または共有旅をつくって記録を始めましょう。"
+        title="旅行計画がありません"
+        description="日程のある旅行を作ると、ここに予定や過去の旅行が並びます。"
         actionHref="/trips/new"
-        actionLabel="旅行をつくる"
+        actionLabel="旅行の計画を立てる"
       />
     );
   }
