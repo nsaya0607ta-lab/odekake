@@ -65,17 +65,23 @@ async function attachSummaries(
   spots: SpotRow[],
   categoryNames: Map<number, string>,
   tripIds: string[],
+  includeUnvisited = false,
 ): Promise<SpotSummary[]> {
-  if (spots.length === 0 || tripIds.length === 0) return [];
+  if (spots.length === 0) return [];
+  if (tripIds.length === 0 && !includeUnvisited) return [];
 
   const spotIds = spots.map((s) => s.id);
-  const { data: visits } = await supabase
-    .from("visit_records")
-    .select("*")
-    .in("spot_id", spotIds)
-    .in("trip_id", tripIds)
-    .order("visited_at", { ascending: false });
+  const visitsQuery =
+    tripIds.length === 0
+      ? Promise.resolve({ data: [] as VisitRecordRow[] })
+      : supabase
+          .from("visit_records")
+          .select("*")
+          .in("spot_id", spotIds)
+          .in("trip_id", tripIds)
+          .order("visited_at", { ascending: false });
 
+  const { data: visits } = await visitsQuery;
   const visitList = (visits ?? []) as VisitRecordRow[];
   const visitsBySpot = new Map<string, VisitRecordRow[]>();
   for (const v of visitList) {
@@ -113,10 +119,9 @@ async function attachSummaries(
   );
   const coverBySpot = new Map(coverPaths.map(([id, path]) => [id, signed.get(path) ?? null]));
 
-  // いまの旅ワークスペースで訪問していないスポットは、この空間には出さない
   return spots.flatMap((spot) => {
     const spotVisits = visitsBySpot.get(spot.id) ?? [];
-    if (spotVisits.length === 0) return [];
+    if (!includeUnvisited && spotVisits.length === 0) return [];
     const stats = summarize(spotVisits);
     return [{
       id: spot.id,
@@ -152,13 +157,24 @@ export async function getSpotsInMunicipality(
   return attachSummaries(supabase, (spots ?? []) as SpotRow[], categoryNames, tripIds);
 }
 
-export async function getAllSpots(supabase: DB, tripIds: string[]): Promise<SpotSummary[]> {
-  if (tripIds.length === 0) return [];
+export async function getAllSpots(
+  supabase: DB,
+  tripIds: string[],
+  options?: { includeUnvisited?: boolean },
+): Promise<SpotSummary[]> {
+  const includeUnvisited = options?.includeUnvisited ?? false;
+  if (tripIds.length === 0 && !includeUnvisited) return [];
   const [{ data: spots }, categoryNames] = await Promise.all([
     supabase.from("spots").select("*").order("created_at", { ascending: false }),
     loadCategoryNames(supabase),
   ]);
-  return attachSummaries(supabase, (spots ?? []) as SpotRow[], categoryNames, tripIds);
+  return attachSummaries(
+    supabase,
+    (spots ?? []) as SpotRow[],
+    categoryNames,
+    tripIds,
+    includeUnvisited,
+  );
 }
 
 export type SpotDetail = {
