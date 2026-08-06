@@ -48,15 +48,15 @@ export function SpotPinMap({
     <section className="rough-card overflow-hidden">
       <div className="px-4 pt-4">
         <h2 className="text-base font-bold">{municipalityName}の訪問マップ</h2>
-        <p className="mt-1 text-xs text-ink-soft">市全体の地図に、行った場所を小さく表示しています。</p>
+        <p className="mt-1 text-xs text-ink-soft">市全体の地図に、訪れたスポットを小さくプロットしています。</p>
       </div>
 
-      <div className="mx-4 mt-3 overflow-hidden rounded-[20px] border border-line bg-[#fdfbf5]">
+      <div className="mx-4 mt-3 overflow-hidden rounded-[20px] border border-line bg-[radial-gradient(circle_at_20%_18%,rgba(223,234,208,0.55),transparent_28%),linear-gradient(180deg,#fffdf7_0%,#f8f4ea_100%)] p-3">
         <svg
           viewBox={shape.viewBox}
           role="img"
           aria-label={`${municipalityName}の市域と訪問スポット`}
-          className="block h-auto w-full"
+          className="block h-auto w-full drop-shadow-[0_8px_20px_rgba(117,132,91,0.08)]"
         >
           <path
             d={shape.d}
@@ -86,14 +86,20 @@ export function SpotPinMap({
                 }}
                 className="cursor-pointer outline-none"
               >
-                <circle cx={x} cy={y} r={radius * 1.9} fill="transparent" />
+                <circle cx={x} cy={y} r={radius * 2.1} fill="transparent" />
                 <circle
                   cx={x}
                   cy={y}
-                  r={radius}
-                  fill={selected ? "#6f925b" : "#dc9ca8"}
-                  stroke="#fdfbf5"
+                  r={radius * 1.45}
+                  fill="#fffdf7"
+                  stroke={selected ? "#6f925b" : "#d8a1aa"}
                   strokeWidth={radius * 0.45}
+                />
+                <circle
+                  cx={x}
+                  cy={y}
+                  r={radius * 0.78}
+                  fill={selected ? "#6f925b" : "#dc9ca8"}
                 />
               </g>
             );
@@ -115,12 +121,17 @@ export function SpotPinMap({
       </div>
 
       {active ? (
-        <Link href={`/spots/${active.id}`} className="pressable mx-4 my-4 flex items-center gap-3 rounded-2xl border border-line bg-card p-3">
+        <Link
+          href={`/spots/${active.id}`}
+          className="pressable mx-4 my-4 flex items-center gap-3 rounded-2xl border border-line bg-card p-3"
+        >
           {active.photoUrl ? (
             // eslint-disable-next-line @next/next/no-img-element
             <img src={active.photoUrl} alt="" className="h-14 w-14 shrink-0 rounded-xl object-cover" />
           ) : (
-            <span className="flex h-14 w-14 shrink-0 items-center justify-center rounded-xl bg-paper-deep text-xs text-ink-faint">写真なし</span>
+            <span className="flex h-14 w-14 shrink-0 items-center justify-center rounded-xl bg-paper-deep text-xs text-ink-faint">
+              写真なし
+            </span>
           )}
           <span className="min-w-0 flex-1">
             <span className="block truncate font-semibold">{active.name}</span>

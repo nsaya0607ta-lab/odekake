@@ -18,13 +18,11 @@ const SORT_LABELS: Record<SortKey, string> = {
 export function SpotBrowser({
   spots,
   categories,
-  municipalityName,
 }: {
   spots: SpotSummary[];
   categories: Array<{ id: number; name: string }>;
-  municipalityName: string;
+  municipalityName?: string;
 }) {
-  const [view, setView] = useState<"map" | "list">("list");
   const [showFilters, setShowFilters] = useState(false);
   const [categoryId, setCategoryId] = useState<string>("all");
   const [favoriteOnly, setFavoriteOnly] = useState(false);
@@ -69,33 +67,12 @@ export function SpotBrowser({
 
   return (
     <div className="space-y-3">
-      {/* 表示切り替え */}
-      <div className="flex items-center gap-2">
-        <div
-          role="tablist"
-          aria-label="表示方法"
-          className="flex flex-1 rounded-full border border-line-strong bg-card p-1"
-        >
-          {(["map", "list"] as const).map((key) => (
-            <button
-              key={key}
-              type="button"
-              role="tab"
-              aria-selected={view === key}
-              onClick={() => setView(key)}
-              className={`flex-1 rounded-full py-2 text-sm font-semibold transition-colors ${
-                view === key ? "bg-leaf-soft text-leaf-deep" : "text-ink-faint"
-              }`}
-            >
-              {key === "map" ? "地図表示" : "一覧表示"}
-            </button>
-          ))}
-        </div>
+      <div className="flex justify-end">
         <button
           type="button"
           onClick={() => setShowFilters((v) => !v)}
           aria-expanded={showFilters}
-          className={`rough-pill flex h-12 shrink-0 items-center gap-1.5 border px-4 text-sm font-semibold ${
+          className={`rough-pill flex h-11 shrink-0 items-center gap-1.5 border px-4 text-sm font-semibold ${
             activeFilterCount > 0
               ? "border-leaf bg-leaf-soft text-leaf-deep"
               : "border-line-strong bg-card text-ink-soft"
@@ -222,8 +199,6 @@ export function SpotBrowser({
         <p className="rough-card px-4 py-8 text-center text-sm text-ink-soft">
           条件に合うスポットがありません。
         </p>
-      ) : view === "map" ? (
-        <SpotScatterMap spots={filtered} municipalityName={municipalityName} />
       ) : (
         <ul className="space-y-2">
           {filtered.map((spot) => (
@@ -270,96 +245,5 @@ export function SpotCard({ spot }: { spot: SpotSummary }) {
         </span>
       </span>
     </Link>
-  );
-}
-
-/** 緯度経度を持つスポットを簡易的な散布図として表示する */
-function SpotScatterMap({ spots, municipalityName }: { spots: SpotSummary[]; municipalityName: string }) {
-  const located = spots.filter(
-    (s): s is SpotSummary & { latitude: number; longitude: number } =>
-      typeof s.latitude === "number" && typeof s.longitude === "number",
-  );
-  const missing = spots.filter((s) => typeof s.latitude !== "number" || typeof s.longitude !== "number");
-
-  if (located.length === 0) {
-    return (
-      <div className="space-y-2">
-        <p className="rough-card px-4 py-8 text-center text-sm leading-relaxed text-ink-soft">
-          地図に表示できる位置情報がありません。
-          <br />
-          スポットの登録時に住所を選ぶと地図に表示されます。
-        </p>
-        <ul className="space-y-2">
-          {missing.map((spot) => (
-            <li key={spot.id}>
-              <SpotCard spot={spot} />
-            </li>
-          ))}
-        </ul>
-      </div>
-    );
-  }
-
-  const lats = located.map((s) => s.latitude);
-  const lngs = located.map((s) => s.longitude);
-  const minLat = Math.min(...lats);
-  const maxLat = Math.max(...lats);
-  const minLng = Math.min(...lngs);
-  const maxLng = Math.max(...lngs);
-  const padLat = Math.max((maxLat - minLat) * 0.2, 0.01);
-  const padLng = Math.max((maxLng - minLng) * 0.2, 0.012);
-
-  const toX = (lng: number) => ((lng - (minLng - padLng)) / (maxLng - minLng + padLng * 2)) * 100;
-  const toY = (lat: number) => (1 - (lat - (minLat - padLat)) / (maxLat - minLat + padLat * 2)) * 100;
-
-  return (
-    <div className="space-y-2">
-      <div className="rough-card relative aspect-[4/5] w-full overflow-hidden">
-        {/* 方眼の下地 */}
-        <div
-          aria-hidden
-          className="absolute inset-0 opacity-70"
-          style={{
-            backgroundImage:
-              "linear-gradient(to right, rgba(160,150,130,0.12) 1px, transparent 1px), linear-gradient(to bottom, rgba(160,150,130,0.12) 1px, transparent 1px)",
-            backgroundSize: "12.5% 10%",
-          }}
-        />
-        <p className="absolute top-3 left-3 rough-pill bg-paper/80 px-3 py-1 text-[11px] font-semibold text-ink-soft">
-          {municipalityName}
-        </p>
-
-        {located.map((spot) => (
-          <Link
-            key={spot.id}
-            href={`/spots/${spot.id}`}
-            className="absolute flex -translate-x-1/2 -translate-y-full flex-col items-center"
-            style={{ left: `${toX(spot.longitude)}%`, top: `${toY(spot.latitude)}%` }}
-          >
-            <span className="max-w-24 truncate rounded-lg bg-paper/90 px-1.5 py-0.5 text-[10px] font-semibold text-ink shadow-sm">
-              {spot.name}
-            </span>
-            <span className={spot.favorite ? "text-blossom" : "text-leaf-deep"}>
-              <IconMapPin size={26} />
-            </span>
-          </Link>
-        ))}
-      </div>
-
-      {missing.length > 0 ? (
-        <details className="rough-card px-4 py-3">
-          <summary className="cursor-pointer text-sm font-semibold text-ink-soft">
-            位置情報のないスポット（{missing.length}件）
-          </summary>
-          <ul className="mt-3 space-y-2">
-            {missing.map((spot) => (
-              <li key={spot.id}>
-                <SpotCard spot={spot} />
-              </li>
-            ))}
-          </ul>
-        </details>
-      ) : null}
-    </div>
   );
 }
