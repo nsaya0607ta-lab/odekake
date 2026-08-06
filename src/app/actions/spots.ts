@@ -95,7 +95,6 @@ const visitedSpotSchema = spotSchema.extend({
 });
 
 type SpotInput = z.infer<typeof spotSchema>;
-type VisitedSpotInput = z.infer<typeof visitedSpotSchema>;
 
 type DbError = {
   code?: string;
