@@ -148,12 +148,54 @@ export function officialAreaDataCheckedAt(): string {
   return OFFICIAL_AREA_DATA.checkedAt;
 }
 
+function median(values: number[]): number {
+  const sorted = [...values].sort((a, b) => a - b);
+  const middle = Math.floor(sorted.length / 2);
+  if (sorted.length % 2 === 1) return sorted[middle] ?? 0;
+  return ((sorted[middle - 1] ?? 0) + (sorted[middle] ?? 0)) / 2;
+}
+
+/**
+ * 離島などが同じ公式エリアに含まれている場合、全地点をそのまま bounds に入れると
+ * 本島側の市区町村が数pxまで縮んでしまう。大きな距離ギャップがある場合だけ、
+ * 主要な市区町村群へフォーカスしてタップ可能な大きさを確保する。
+ */
+function focusMunicipalities(items: PrefectureAreaMunicipality[]): PrefectureAreaMunicipality[] {
+  const positioned = items.filter((item): item is PrefectureAreaMunicipality & { center: [number, number] } => item.center !== null);
+  if (positioned.length < 5) return positioned;
+
+  const medianX = median(positioned.map((item) => item.center[0]));
+  const medianY = median(positioned.map((item) => item.center[1]));
+  const ranked = positioned
+    .map((item) => ({
+      item,
+      distance: Math.hypot(item.center[0] - medianX, item.center[1] - medianY),
+    }))
+    .sort((a, b) => a.distance - b.distance);
+
+  const minimumKeep = Math.max(3, Math.ceil(ranked.length * 0.6));
+  let bestCut = ranked.length;
+  let bestRatio = 1;
+
+  for (let index = minimumKeep - 1; index < ranked.length - 1; index += 1) {
+    const current = ranked[index]?.distance ?? 0;
+    const next = ranked[index + 1]?.distance ?? current;
+    const ratio = next / Math.max(current, 0.0001);
+    if (ratio > 2.2 && ratio > bestRatio) {
+      bestRatio = ratio;
+      bestCut = index + 1;
+    }
+  }
+
+  return bestCut < ranked.length ? ranked.slice(0, bestCut).map(({ item }) => item) : positioned;
+}
+
 /** 選択したエリアだけを拡大表示するためのviewBoxを作る。 */
 export function viewBoxForMunicipalityArea(
   items: PrefectureAreaMunicipality[],
   fallbackViewBox: string,
 ): string {
-  const positioned = items.filter((item) => item.center !== null);
+  const positioned = focusMunicipalities(items);
   if (positioned.length === 0) return fallbackViewBox;
 
   let minX = Infinity;
@@ -172,6 +214,6 @@ export function viewBoxForMunicipalityArea(
 
   const width = Math.max(maxX - minX, 0.02);
   const height = Math.max(maxY - minY, 0.02);
-  const padding = Math.max(width, height) * 0.12;
+  const padding = Math.max(width, height) * 0.08;
   return `${(minX - padding).toFixed(4)} ${(minY - padding).toFixed(4)} ${(width + padding * 2).toFixed(4)} ${(height + padding * 2).toFixed(4)}`;
 }
