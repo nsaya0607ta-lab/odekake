@@ -43,7 +43,7 @@ export default async function HomePage({ searchParams }: { searchParams: Promise
   const isShared = workspace.kind === "trip";
   const sharedWorkspaces = workspaces.filter((w) => w.kind === "trip");
 
-  // 自分の旅では一人旅の一覧を、共有旅ではその旅行の活動履歴を出す
+  // 個人旅画面では個人旅だけ、共有旅画面では共有旅だけを扱う。
   const soloTrips = isShared
     ? []
     : (await getTripSummaries(supabase, user.id)).filter((t) => t.trip.trip_type === "solo");
@@ -71,7 +71,6 @@ export default async function HomePage({ searchParams }: { searchParams: Promise
           </p>
         ) : null}
 
-        {/* いまの旅と、この旅だけの集計 */}
         <section className="rough-card px-5 py-5">
           <div className="mb-4 flex items-center justify-between gap-2">
             <span
@@ -83,7 +82,7 @@ export default async function HomePage({ searchParams }: { searchParams: Promise
             </span>
             <p className="min-w-0 flex-1 text-center text-sm font-semibold text-ink-soft">
               <span className="hand-underline px-1">
-                {isShared ? `${workspace.name} の記録` : `${user.displayName} さんの記録`}
+                {isShared ? `${workspace.name} の共有記録` : `${user.displayName} さんの個人記録`}
               </span>
             </p>
             <Link
@@ -129,93 +128,91 @@ export default async function HomePage({ searchParams }: { searchParams: Promise
           ) : null}
         </section>
 
-        {/* 一人旅（自分の旅のときだけ） */}
         {isShared ? null : (
           <TripSection
-            title="一人旅"
+            title="個人旅"
             trips={soloTrips}
-            emptyTitle="一人旅はまだありません"
-            emptyDescription="ひとりのおでかけを記録しましょう。"
-            createHref="/trips/new?type=solo"
-            createLabel="一人旅をつくる"
+            emptyTitle="個人旅はまだありません"
+            emptyDescription="自分だけのおでかけを記録しましょう。"
+            createHref="/trips/new/personal"
+            createLabel="個人旅をつくる"
           />
         )}
 
-        {/* 共有旅の一覧。選ぶとその旅の空間へ切り替わる */}
-        <section>
-          <div className="mb-2 flex items-baseline justify-between gap-3 px-1">
-            <h2 className="text-base font-bold">
-              共有旅
-              {sharedWorkspaces.length > 0 ? (
-                <span className="ml-1.5 text-sm font-normal text-ink-faint tabular-nums">
-                  {sharedWorkspaces.length}件
-                </span>
-              ) : null}
-            </h2>
-            <Link href="/trips/new?type=shared" className="flex items-center gap-0.5 text-sm text-leaf-deep">
-              <IconPlus size={15} />
-              つくる
-            </Link>
-          </div>
+        {isShared ? (
+          <section>
+            <div className="mb-2 flex items-baseline justify-between gap-3 px-1">
+              <h2 className="text-base font-bold">
+                共有旅
+                {sharedWorkspaces.length > 0 ? (
+                  <span className="ml-1.5 text-sm font-normal text-ink-faint tabular-nums">
+                    {sharedWorkspaces.length}件
+                  </span>
+                ) : null}
+              </h2>
+              <Link href="/trips/new/shared" className="flex items-center gap-0.5 text-sm text-leaf-deep">
+                <IconPlus size={15} />
+                つくる
+              </Link>
+            </div>
 
-          {sharedWorkspaces.length === 0 ? (
-            <EmptyState
-              title="共有旅はまだありません"
-              description="友人を招待すると、その旅だけの地図と記録がつくられます。"
-              actionHref="/trips/new?type=shared"
-              actionLabel="共有旅をつくる"
-            />
-          ) : (
-            <ul className="space-y-2">
-              {sharedWorkspaces.map((item) => (
-                <li key={item.id}>
-                  <form action={switchWorkspaceAction}>
-                    <input type="hidden" name="workspaceId" value={item.id} />
-                    <button
-                      type="submit"
-                      className={`rough-card flex w-full items-center gap-3 px-4 py-3 text-left transition-transform active:scale-[0.99] ${
-                        item.isCurrent ? "border-leaf bg-leaf-soft" : ""
-                      }`}
-                    >
-                      <span className="min-w-0 flex-1">
-                        <span className="block truncate font-semibold">{item.name}</span>
-                        <span className="mt-0.5 block truncate text-xs text-ink-faint">
-                          {[item.trip ? formatTripPeriod(item.trip) : null, `${item.visitCount}件の記録`]
-                            .filter(Boolean)
-                            .join("・")}
+            {sharedWorkspaces.length === 0 ? (
+              <EmptyState
+                title="共有旅はまだありません"
+                description="友人を招待すると、その旅だけの地図と記録がつくられます。"
+                actionHref="/trips/new/shared"
+                actionLabel="共有旅をつくる"
+              />
+            ) : (
+              <ul className="space-y-2">
+                {sharedWorkspaces.map((item) => (
+                  <li key={item.id}>
+                    <form action={switchWorkspaceAction}>
+                      <input type="hidden" name="workspaceId" value={item.id} />
+                      <button
+                        type="submit"
+                        className={`rough-card flex w-full items-center gap-3 px-4 py-3 text-left transition-transform active:scale-[0.99] ${
+                          item.isCurrent ? "border-leaf bg-leaf-soft" : ""
+                        }`}
+                      >
+                        <span className="min-w-0 flex-1">
+                          <span className="block truncate font-semibold">{item.name}</span>
+                          <span className="mt-0.5 block truncate text-xs text-ink-faint">
+                            {[item.trip ? formatTripPeriod(item.trip) : null, `${item.visitCount}件の記録`]
+                              .filter(Boolean)
+                              .join("・")}
+                          </span>
                         </span>
-                      </span>
-                      <span className="flex shrink-0 items-center gap-1 rounded-full bg-sky-soft px-2.5 py-1 text-[11px] font-semibold text-[#42718f]">
-                        <IconUsers size={13} />
-                        <span className="tabular-nums">{item.memberCount}</span>人
-                      </span>
-                      {item.isCurrent ? (
-                        <span className="shrink-0 text-[11px] font-semibold text-leaf-deep">表示中</span>
-                      ) : (
-                        <IconChevronRight size={16} className="shrink-0 text-ink-faint" />
-                      )}
-                    </button>
-                  </form>
-                </li>
-              ))}
-            </ul>
-          )}
-        </section>
+                        <span className="flex shrink-0 items-center gap-1 rounded-full bg-sky-soft px-2.5 py-1 text-[11px] font-semibold text-[#42718f]">
+                          <IconUsers size={13} />
+                          <span className="tabular-nums">{item.memberCount}</span>人
+                        </span>
+                        {item.isCurrent ? (
+                          <span className="shrink-0 text-[11px] font-semibold text-leaf-deep">表示中</span>
+                        ) : (
+                          <IconChevronRight size={16} className="shrink-0 text-ink-faint" />
+                        )}
+                      </button>
+                    </form>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </section>
+        ) : null}
 
-        {/* この旅の日本地図 */}
         <section>
           <SectionHeading title="日本地図" moreHref="/map" moreLabel="地図を開く" />
           <div className="rough-card rough-card-alt px-3 py-4">
             <p className="mb-2 text-center text-xs text-ink-soft">
               <span className="rough-pill bg-leaf-soft px-3 py-1 text-leaf-deep">
-                {isShared ? "この共有旅で訪れた場所だけが色付きます" : "地図をタップして地域を選択"}
+                {isShared ? "この共有旅で訪れた場所だけが色付きます" : "個人旅で訪れた場所だけが色付きます"}
               </span>
             </p>
             <JapanMap visitedRegions={visitedRegions} />
           </div>
         </section>
 
-        {/* みんなの動き（共有旅のときだけ） */}
         {isShared ? (
           <section>
             <SectionHeading title="みんなの動き" moreHref={`/trips/${workspace.id}`} />
@@ -223,7 +220,6 @@ export default async function HomePage({ searchParams }: { searchParams: Promise
           </section>
         ) : null}
 
-        {/* 最近の記録 */}
         <section>
           <SectionHeading title="最近の記録" moreHref="/records" />
           {recent.length === 0 ? (
@@ -233,7 +229,7 @@ export default async function HomePage({ searchParams }: { searchParams: Promise
               description={
                 isShared
                   ? "この共有旅で訪れた場所を記録すると、ここに表示されます。"
-                  : "訪れた場所を記録すると、ここに表示されます。"
+                  : "個人旅で訪れた場所を記録すると、ここに表示されます。"
               }
               actionHref="/add"
               actionLabel="記録を追加する"
@@ -247,7 +243,6 @@ export default async function HomePage({ searchParams }: { searchParams: Promise
                     leading={
                       <span className="h-12 w-12 shrink-0 overflow-hidden rounded-xl bg-paper-deep">
                         {item.photoUrls[0] ? (
-                          // eslint-disable-next-line @next/next/no-img-element
                           <img src={item.photoUrls[0]} alt="" className="h-full w-full object-cover" />
                         ) : (
                           <span className="flex h-full w-full items-center justify-center text-ink-faint">
@@ -270,7 +265,6 @@ export default async function HomePage({ searchParams }: { searchParams: Promise
   );
 }
 
-/** 一人旅の一覧 */
 function TripSection({
   title,
   trips,

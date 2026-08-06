@@ -19,19 +19,34 @@ export default async function AddPage() {
   ]);
 
   const recentSpots = spots.slice(0, 5);
+  const isShared = workspace.kind === "trip";
 
   return (
     <>
       <TopHeader title="追加" />
       <PageBody>
+        <p
+          className={`rounded-2xl px-4 py-3 text-xs leading-relaxed ${
+            isShared ? "bg-sky-soft text-[#42718f]" : "bg-blossom-soft text-[#95505e]"
+          }`}
+        >
+          {isShared
+            ? `現在は「${workspace.name}」の共有旅画面です。この画面で追加した内容は共有旅の記録として扱われます。`
+            : "現在は個人旅の画面です。この画面では個人旅と自分だけの記録を追加します。"}
+        </p>
+
         <ul className="space-y-3">
           <li>
             <AddCard
-              href="/trips/new"
-              icon={<IconFlag size={24} />}
-              title="新しい旅行"
-              description="一人旅または共有旅をつくります"
-              tone="leaf"
+              href={isShared ? "/trips/new/shared" : "/trips/new/personal"}
+              icon={isShared ? <IconUsers size={24} /> : <IconFlag size={24} />}
+              title={isShared ? "新しい共有旅" : "新しい個人旅"}
+              description={
+                isShared
+                  ? "メンバーと記録を共有する旅行をつくります"
+                  : "自分だけが見られる旅行をつくります"
+              }
+              tone={isShared ? "sky" : "leaf"}
             />
           </li>
           <li>
@@ -39,7 +54,11 @@ export default async function AddPage() {
               href="/spots/new"
               icon={<IconMapPin size={24} />}
               title="新しいスポット"
-              description="訪れた場所を登録します"
+              description={
+                isShared
+                  ? "この共有旅で訪れた場所を登録します"
+                  : "個人旅で訪れた場所を登録します"
+              }
               tone="sky"
             />
           </li>
@@ -48,19 +67,25 @@ export default async function AddPage() {
               href="/records?tab=spots"
               icon={<IconNotebook size={24} />}
               title="新しい訪問履歴"
-              description="登録済みのスポットを選んで記録します"
+              description={
+                isShared
+                  ? "この共有旅の登録済みスポットから記録します"
+                  : "個人旅の登録済みスポットから記録します"
+              }
               tone="sun"
             />
           </li>
-          <li>
-            <AddCard
-              href="/invitations"
-              icon={<IconUsers size={24} />}
-              title="共有旅に参加"
-              description="招待コードを入力して参加します"
-              tone="blossom"
-            />
-          </li>
+          {isShared ? (
+            <li>
+              <AddCard
+                href="/invitations"
+                icon={<IconUsers size={24} />}
+                title="別の共有旅に参加"
+                description="招待コードを入力して共有旅に参加します"
+                tone="blossom"
+              />
+            </li>
+          ) : null}
         </ul>
 
         {recentSpots.length > 0 ? (
@@ -87,7 +112,7 @@ export default async function AddPage() {
 
         {trips.length === 0 ? (
           <p className="rounded-2xl bg-paper-deep px-4 py-3 text-xs leading-relaxed text-ink-soft">
-            訪問履歴はどの旅行の記録かを選んで保存します。まずは旅行をひとつ作成してください。
+            訪問履歴はどの旅行の記録かを選んで保存します。まずは個人旅をひとつ作成してください。
           </p>
         ) : null}
       </PageBody>
