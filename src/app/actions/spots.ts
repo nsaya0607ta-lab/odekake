@@ -62,6 +62,13 @@ const spotSchema = z.object({
 
 type SpotInput = z.infer<typeof spotSchema>;
 
+type DbError = {
+  code?: string;
+  message?: string;
+  details?: string;
+  hint?: string;
+} | null;
+
 function collect(formData: FormData) {
   return {
     name: String(formData.get("name") ?? ""),
@@ -128,13 +135,11 @@ function resolveLocation(parsed: SpotInput) {
   };
 }
 
-function detailValues(parsed: SpotInput) {
+function baseDetailValues(parsed: SpotInput) {
   return {
     name: parsed.name,
     category_id: parsed.categoryId,
     address: parsed.address,
-    postal_code: parsed.postalCode,
-    phone: parsed.phone,
     website_url: parsed.websiteUrl,
     opening_hours: parsed.openingHours,
     closed_days: parsed.closedDays,
@@ -142,11 +147,44 @@ function detailValues(parsed: SpotInput) {
   };
 }
 
-function spotSaveError(error: { code?: string; message?: string; details?: string; hint?: string } | null) {
+function extendedDetailValues(parsed: SpotInput) {
+  return {
+    ...baseDetailValues(parsed),
+    postal_code: parsed.postalCode,
+    phone: parsed.phone,
+  };
+}
+
+function legacyLocationValues(location: ReturnType<typeof resolveLocation> & { ok: true }) {
+  return {
+    prefecture_code: location.values.prefecture_code,
+    municipality_code: location.values.municipality_code,
+    latitude: location.values.latitude,
+    longitude: location.values.longitude,
+  };
+}
+
+function isMissingExtendedSpotColumn(error: DbError) {
+  return error?.code === "PGRST204" && /spots.*schema cache|column of 'spots'/i.test(error.message ?? "");
+}
+
+function spotSaveError(error: DbError) {
   if (error?.code === "23505" && /spots_place_ref_idx|place_provider|place_id/i.test(`${error.message ?? ""} ${error.details ?? ""}`)) {
     return "この場所はすでにスポットへ登録されています。記録画面から既存のスポットを選んでください。";
   }
   return toJapaneseError(error, "スポットの登録に失敗しました。時間をおいてもう一度お試しください。");
+}
+
+function logSpotError(label: string, error: DbError, parsed: SpotInput) {
+  console.error(label, {
+    code: error?.code,
+    message: error?.message,
+    details: error?.details,
+    hint: error?.hint,
+    municipalityCode: parsed.municipalityCode,
+    locationSource: parsed.locationSource,
+    hasPlaceId: Boolean(parsed.placeId),
+  });
 }
 
 export async function createSpotAction(_prev: ActionState, formData: FormData): Promise<ActionState> {
@@ -162,28 +200,38 @@ export async function createSpotAction(_prev: ActionState, formData: FormData): 
 
   const { supabase, user } = await requireUser();
 
-  const { data, error } = await supabase
+  let result = await supabase
     .from("spots")
-    .insert({ created_by: user.id, ...detailValues(parsed.data), ...location.values })
+    .insert({ created_by: user.id, ...extendedDetailValues(parsed.data), ...location.values })
     .select("id")
     .single();
 
-  if (error || !data) {
-    console.error("Spot insert failed", {
-      code: error?.code,
-      message: error?.message,
-      details: error?.details,
-      hint: error?.hint,
+  // 本番DBに位置情報拡張マイグレーションがまだ適用されていない場合でも、
+  // 初期スキーマに存在する列だけで保存を継続する。
+  if (isMissingExtendedSpotColumn(result.error)) {
+    console.warn("Extended spot columns are unavailable; retrying with legacy schema", {
+      missingColumnMessage: result.error?.message,
       municipalityCode: parsed.data.municipalityCode,
-      locationSource: parsed.data.locationSource,
-      hasPlaceId: Boolean(parsed.data.placeId),
     });
-    return { error: spotSaveError(error), values };
+    result = await supabase
+      .from("spots")
+      .insert({
+        created_by: user.id,
+        ...baseDetailValues(parsed.data),
+        ...legacyLocationValues(location),
+      })
+      .select("id")
+      .single();
+  }
+
+  if (result.error || !result.data) {
+    logSpotError("Spot insert failed", result.error, parsed.data);
+    return { error: spotSaveError(result.error), values };
   }
 
   revalidatePath("/home");
   revalidatePath("/map");
-  redirect(`/visits/new?spot=${data.id}&created=1`);
+  redirect(`/visits/new?spot=${result.data.id}&created=1`);
 }
 
 export async function updateSpotAction(_prev: ActionState, formData: FormData): Promise<ActionState> {
@@ -200,14 +248,21 @@ export async function updateSpotAction(_prev: ActionState, formData: FormData): 
 
   const { supabase } = await requireUser();
 
-  const { error } = await supabase
+  let result = await supabase
     .from("spots")
-    .update({ ...detailValues(parsed.data), ...location.values })
+    .update({ ...extendedDetailValues(parsed.data), ...location.values })
     .eq("id", spotId);
 
-  if (error) {
-    console.error("Spot update failed", { code: error.code, message: error.message, details: error.details, hint: error.hint, spotId });
-    return { error: toJapaneseError(error, "スポットの更新に失敗しました。"), values };
+  if (isMissingExtendedSpotColumn(result.error)) {
+    result = await supabase
+      .from("spots")
+      .update({ ...baseDetailValues(parsed.data), ...legacyLocationValues(location) })
+      .eq("id", spotId);
+  }
+
+  if (result.error) {
+    logSpotError("Spot update failed", result.error, parsed.data);
+    return { error: toJapaneseError(result.error, "スポットの更新に失敗しました。"), values };
   }
 
   revalidatePath(`/spots/${spotId}`);
