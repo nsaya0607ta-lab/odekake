@@ -2,7 +2,7 @@ import { PageBody } from "@/components/page-body";
 import { PageHeader } from "@/components/page-header";
 import { SpotForm } from "@/components/spot-form";
 import { loadCategoryNames } from "@/lib/data/spots";
-import { getTripOptions } from "@/lib/data/trips";
+import { ensurePersonalRecordTrip, getTripOptions } from "@/lib/data/trips";
 import { resolveWorkspace } from "@/lib/data/workspace";
 import { getMunicipality } from "@/lib/geo";
 import { requireUser } from "@/lib/supabase/server";
@@ -29,11 +29,16 @@ export default async function NewSpotPage({
     searchParams,
   ]);
   const workspace = await resolveWorkspace(supabase, user.id);
-  const [categoryNames, tripOptions] = await Promise.all([
+  const [categoryNames, initialTripOptions] = await Promise.all([
     loadCategoryNames(supabase),
     getTripOptions(supabase, workspace.tripIds),
   ]);
 
+  const personalRecordTrip =
+    workspace.kind === "personal" && initialTripOptions.length === 0
+      ? await ensurePersonalRecordTrip(supabase, user.id)
+      : null;
+  const tripOptions = personalRecordTrip ? [personalRecordTrip] : initialTripOptions;
   const trips = requestedTripId
     ? [...tripOptions].sort((a, b) => Number(b.id === requestedTripId) - Number(a.id === requestedTripId))
     : tripOptions;
@@ -51,6 +56,7 @@ export default async function NewSpotPage({
           userId={user.id}
           trips={trips}
           visitedAtDefault={todayInJapan()}
+          showTripPlanningLink={workspace.kind === "personal"}
           categories={[...categoryNames.entries()].map(([id, name]) => ({ id, name }))}
           location={{
             prefectureCode: municipality?.prefectureCode ?? pref ?? "",

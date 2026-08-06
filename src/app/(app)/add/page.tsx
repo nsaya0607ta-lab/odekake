@@ -2,7 +2,6 @@ import Link from "next/link";
 import { IconChevronRight, IconFlag, IconMapPin, IconNotebook, IconUsers } from "@/components/icons";
 import { PageBody } from "@/components/page-body";
 import { TopHeader } from "@/components/page-header";
-import { getTripOptions } from "@/lib/data/trips";
 import { getAllSpots } from "@/lib/data/spots";
 import { resolveWorkspace } from "@/lib/data/workspace";
 import { requireUser } from "@/lib/supabase/server";
@@ -13,10 +12,7 @@ export const dynamic = "force-dynamic";
 export default async function AddPage() {
   const { supabase, user } = await requireUser();
   const workspace = await resolveWorkspace(supabase, user.id);
-  const [trips, spots] = await Promise.all([
-    getTripOptions(supabase, workspace.tripIds),
-    getAllSpots(supabase, workspace.tripIds),
-  ]);
+  const spots = await getAllSpots(supabase, workspace.tripIds);
 
   const recentSpots = spots.slice(0, 5);
   const isShared = workspace.kind === "trip";
@@ -32,23 +28,10 @@ export default async function AddPage() {
         >
           {isShared
             ? `現在は「${workspace.name}」の共有旅画面です。この画面で追加した内容は共有旅の記録として扱われます。`
-            : "現在は個人旅の画面です。この画面では個人旅と自分だけの記録を追加します。"}
+            : "現在は自分の旅の画面です。普段のおでかけや、一人で行った場所を記録できます。"}
         </p>
 
         <ul className="space-y-3">
-          <li>
-            <AddCard
-              href={isShared ? "/trips/new/shared" : "/trips/new/personal"}
-              icon={isShared ? <IconUsers size={24} /> : <IconFlag size={24} />}
-              title={isShared ? "新しい共有旅" : "新しい個人旅"}
-              description={
-                isShared
-                  ? "メンバーと記録を共有する旅行をつくります"
-                  : "自分だけが見られる旅行をつくります"
-              }
-              tone={isShared ? "sky" : "leaf"}
-            />
-          </li>
           <li>
             <AddCard
               href="/spots/new"
@@ -86,6 +69,19 @@ export default async function AddPage() {
               />
             </li>
           ) : null}
+          <li>
+            <AddCard
+              href={isShared ? "/trips/new/shared" : "/trips/new/personal"}
+              icon={isShared ? <IconUsers size={24} /> : <IconFlag size={24} />}
+              title={isShared ? "新しい共有旅" : "旅行の計画を立てる"}
+              description={
+                isShared
+                  ? "メンバーと記録を共有する、新しい旅行をつくります"
+                  : "日程や表紙を決めて、訪問記録を旅行ごとにまとめます"
+              }
+              tone={isShared ? "sky" : "leaf"}
+            />
+          </li>
         </ul>
 
         {recentSpots.length > 0 ? (
@@ -108,12 +104,6 @@ export default async function AddPage() {
               ))}
             </ul>
           </section>
-        ) : null}
-
-        {trips.length === 0 ? (
-          <p className="rounded-2xl bg-paper-deep px-4 py-3 text-xs leading-relaxed text-ink-soft">
-            行った場所は、どの旅行で訪れたかと一緒に保存します。まずは個人旅をひとつ作成してください。
-          </p>
         ) : null}
       </PageBody>
     </>

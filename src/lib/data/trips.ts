@@ -75,6 +75,51 @@ export async function getTripOptions(
   return data ?? [];
 }
 
+/**
+ * 「自分の旅」は旅行計画ではなく、普段のおでかけを記録する常設の空間。
+ * DB上は訪問履歴に trip_id が必要なため、保存先がまだ無いユーザーだけ
+ * 日程なしの記録用データを自動作成する。ユーザーに作成操作は求めない。
+ */
+export async function ensurePersonalRecordTrip(
+  supabase: DB,
+  userId: string,
+): Promise<Pick<TripRow, "id" | "title" | "trip_type"> | null> {
+  const { data: existing } = await supabase
+    .from("trips")
+    .select("id, title, trip_type")
+    .eq("owner_id", userId)
+    .eq("trip_type", "solo")
+    .order("created_at", { ascending: true })
+    .limit(1)
+    .maybeSingle();
+
+  if (existing) return existing;
+
+  const { data, error } = await supabase
+    .from("trips")
+    .insert({
+      id: crypto.randomUUID(),
+      owner_id: userId,
+      title: "自分のおでかけ",
+      trip_type: "solo",
+      start_date: null,
+      end_date: null,
+      description: "普段のおでかけをまとめる記録先",
+    })
+    .select("id, title, trip_type")
+    .single();
+
+  if (error) {
+    console.error("Failed to prepare personal record trip", {
+      code: error.code,
+      message: error.message,
+    });
+    return null;
+  }
+
+  return data;
+}
+
 export async function getTripMembers(supabase: DB, tripId: string): Promise<TripMemberInfo[]> {
   const { data: members } = await supabase
     .from("trip_members")

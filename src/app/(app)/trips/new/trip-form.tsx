@@ -15,7 +15,7 @@ export function TripForm({ userId, tripType }: { userId: string; tripType: TripT
   const tripIdStorageKey = `odekake:trip-id:${tripType}`;
 
   // 表紙画像の保存先パスを先に決めるため、旅行 ID を先に発行する。
-  // 個人旅と共有旅で別のキーにし、画面を切り替えても入力が混ざらないようにする。
+  // 個人の旅行計画と共有旅で別のキーにし、画面を切り替えても入力が混ざらないようにする。
   const [tripId, setTripId] = useState("");
   useEffect(() => {
     const saved = window.sessionStorage.getItem(tripIdStorageKey);
@@ -50,12 +50,14 @@ export function TripForm({ userId, tripType }: { userId: string; tripType: TripT
         }`}
       >
         <span className="min-w-0 flex-1">
-          <span className="block text-xs font-semibold text-ink-faint">この画面で作成する旅行</span>
-          <span className="mt-1 block font-bold">{isShared ? "共有旅" : "個人旅"}</span>
+          <span className="block text-xs font-semibold text-ink-faint">
+            {isShared ? "この画面で作成する旅行" : "この画面で作成するもの"}
+          </span>
+          <span className="mt-1 block font-bold">{isShared ? "共有旅" : "旅行の計画"}</span>
           <span className="mt-0.5 block text-xs leading-relaxed text-ink-soft">
             {isShared
               ? "友人や家族と同じ地図・スポット・訪問履歴を共有する旅行として登録します。"
-              : "自分だけが見られる旅行として登録します。共有旅へ変更することはできません。"}
+              : "日程や表紙を設定し、複数の訪問記録をひとつの旅行としてまとめます。普段のおでかけ記録には作成不要です。"}
           </span>
         </span>
       </div>
@@ -138,7 +140,7 @@ export function TripForm({ userId, tripType }: { userId: string; tripType: TripT
       ) : null}
 
       <SubmitButton pendingLabel="作成中…" disabled={!tripId}>
-        {isShared ? "共有旅をつくる" : "個人旅をつくる"}
+        {isShared ? "共有旅をつくる" : "旅行計画を作る"}
       </SubmitButton>
     </form>
   );
