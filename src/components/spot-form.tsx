@@ -178,7 +178,7 @@ export function SpotForm({
               id="visitedAt"
               name="visitedAt"
               type="date"
-              className="field"
+              className="field field-date-solo"
               defaultValue={state.values?.visitedAt ?? visitedAtDefault}
               required
             />

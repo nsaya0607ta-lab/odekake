@@ -1,5 +1,6 @@
-/* 日付・時刻入力は内容に合う幅へ。親要素が狭い場合はその幅まで縮む。 */
-.field:is(input[type="date"], input[type="month"], input[type="week"]) {
+/* 単独で置く日付・月・週・時刻入力は内容に合う幅へ。親要素が狭い場合はその幅まで縮む。 */
+.field-date-solo,
+.field:is(input[type="month"], input[type="week"]) {
   inline-size: min(100%, 15rem);
   max-inline-size: 15rem;
 }
@@ -12,4 +13,10 @@
 .field:is(input[type="datetime-local"]) {
   inline-size: min(100%, 20rem);
   max-inline-size: 20rem;
+}
+
+/* 開始日・終了日など2列で並べる日付入力は列幅いっぱいに収め、中央の余白は grid の gap に任せる。 */
+.field-date-pair {
+  inline-size: 100%;
+  max-inline-size: 100%;
 }
