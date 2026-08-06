@@ -1,7 +1,7 @@
 import { notFound, redirect } from "next/navigation";
 import { PageBody } from "@/components/page-body";
 import { PageHeader } from "@/components/page-header";
-import { getTripOptions } from "@/lib/data/trips";
+import { ensurePersonalRecordTrip, getTripOptions } from "@/lib/data/trips";
 import { resolveWorkspace } from "@/lib/data/workspace";
 import { requireUser } from "@/lib/supabase/server";
 import { VisitForm } from "../visit-form";
@@ -25,7 +25,12 @@ export default async function NewVisitPage({
   if (!spot) notFound();
 
   const workspace = await resolveWorkspace(supabase, user.id);
-  const trips = await getTripOptions(supabase, workspace.tripIds);
+  const initialTrips = await getTripOptions(supabase, workspace.tripIds);
+  const personalRecordTrip =
+    workspace.kind === "personal" && initialTrips.length === 0
+      ? await ensurePersonalRecordTrip(supabase, user.id)
+      : null;
+  const trips = personalRecordTrip ? [personalRecordTrip] : initialTrips;
   const today = new Date().toISOString().slice(0, 10);
 
   return (
