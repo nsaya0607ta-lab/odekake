@@ -112,7 +112,14 @@ function googleProvider(enabled: boolean): PlaceSearchProvider {
         };
       }
 
-      const body = (await response.json()) as { suggestions?: PlaceSuggestion[] };
+      const body = (await response.json().catch(() => null)) as { suggestions?: PlaceSuggestion[] } | null;
+      if (!body) {
+        return {
+          status: "unavailable",
+          provider: "google_places",
+          message: "Google マップの検索候補を取得できませんでした。",
+        };
+      }
       return {
         status: "ok",
         provider: "google_places",
@@ -149,10 +156,17 @@ function googleProvider(enabled: boolean): PlaceSearchProvider {
         };
       }
 
-      const body = (await response.json()) as Omit<
+      const body = (await response.json().catch(() => null)) as Omit<
         PlaceCandidate,
         "name" | "category" | "distanceMeters" | "searchMode"
-      >;
+      > | null;
+      if (!body) {
+        return {
+          status: "unavailable",
+          provider: "google_places",
+          message: "選択した場所の詳細を取得できませんでした。",
+        };
+      }
       return {
         status: "ok",
         provider: "google_places",
