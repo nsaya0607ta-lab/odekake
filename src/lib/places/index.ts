@@ -1,12 +1,16 @@
 /** 店舗・施設検索のクライアント側インターフェース。 */
 import type { LocationSource } from "@/lib/supabase/types";
 
+export type PlaceSearchMode = "autocomplete" | "text_search";
+
 export type PlaceSuggestion = {
   placeId: string;
   name: string;
   address: string | null;
   /** 検索の基準地点からの直線距離。基準地点がない場合やGoogleが返さない場合はnull。 */
   distanceMeters: number | null;
+  /** 候補を取得したAPI。古い端末保存データでは未設定の場合がある。 */
+  searchMode?: PlaceSearchMode;
 };
 
 export type PlaceCandidate = PlaceSuggestion & {
@@ -118,8 +122,15 @@ function googleProvider(enabled: boolean): PlaceSearchProvider {
     async details(suggestion, sessionToken, signal) {
       if (!enabled) return noneProvider.details(suggestion, sessionToken, signal);
 
+      const query = new URLSearchParams({
+        searchMode: suggestion.searchMode ?? "text_search",
+      });
+      if (suggestion.searchMode === "autocomplete") {
+        query.set("sessionToken", sessionToken);
+      }
+
       const response = await fetch(
-        `/api/places/details/${encodeURIComponent(suggestion.placeId)}?sessionToken=${encodeURIComponent(sessionToken)}`,
+        `/api/places/details/${encodeURIComponent(suggestion.placeId)}?${query.toString()}`,
         { signal },
       ).catch(() => null);
 
@@ -140,7 +151,7 @@ function googleProvider(enabled: boolean): PlaceSearchProvider {
 
       const body = (await response.json()) as Omit<
         PlaceCandidate,
-        "name" | "category" | "distanceMeters"
+        "name" | "category" | "distanceMeters" | "searchMode"
       >;
       return {
         status: "ok",
@@ -151,6 +162,7 @@ function googleProvider(enabled: boolean): PlaceSearchProvider {
           name: suggestion.name,
           address: body.address ?? suggestion.address,
           distanceMeters: suggestion.distanceMeters,
+          searchMode: suggestion.searchMode,
           category: null,
         },
       };
