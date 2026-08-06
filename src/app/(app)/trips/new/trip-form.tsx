@@ -75,7 +75,7 @@ export function TripForm({ userId, tripType }: { userId: string; tripType: TripT
         />
       </Field>
 
-      <div className="grid grid-cols-2 gap-3">
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
         <Field label="開始日" htmlFor="startDate" optional error={state.fieldErrors?.startDate}>
           <input
             id="startDate"
