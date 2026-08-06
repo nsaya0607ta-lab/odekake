@@ -20,6 +20,7 @@ import { loadAreaIndex } from "@/lib/data/areas";
 import { formatTripPeriod, getTripActivities, getTripSummaries, type TripSummary } from "@/lib/data/trips";
 import { getTimeline } from "@/lib/data/visits";
 import { listWorkspaces, resolveWorkspace } from "@/lib/data/workspace";
+import { MUNICIPALITIES, PREFECTURES } from "@/lib/geo";
 import { REGIONS } from "@/lib/geo/regions";
 import { requireUser } from "@/lib/supabase/server";
 
@@ -97,17 +98,24 @@ export default async function HomePage({ searchParams }: { searchParams: Promise
             <Stat
               icon={<IconMapPin size={20} />}
               value={areas.totals.visitedPrefectures}
-              unit="/ 47"
-              label="訪問した都道府県"
+              unit={`/ ${PREFECTURES.length}`}
+              label="都道府県"
               tone="blossom"
             />
             <Stat
               icon={<IconHome size={20} />}
               value={areas.totals.visitedMunicipalities}
-              label="訪問した市区町村"
+              unit={`/ ${MUNICIPALITIES.length}`}
+              label="市区町村など"
               tone="sky"
             />
-            <Stat icon={<IconFlag size={20} />} value={areas.totals.spots} label="登録スポット" tone="leaf" />
+            <Stat
+              icon={<IconNotebook size={20} />}
+              value={areas.totals.visits}
+              unit="回"
+              label="訪問数"
+              tone="leaf"
+            />
           </dl>
 
           {isShared && workspace.trip ? (
