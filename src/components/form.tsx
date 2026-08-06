@@ -48,7 +48,7 @@ export function FormMessage({ state }: { state: ActionState }) {
     <p
       role="status"
       aria-live="polite"
-      className={`rounded-2xl border px-4 py-3 text-sm leading-relaxed ${
+      className={`max-w-full break-words rounded-2xl border px-4 py-3 text-sm leading-relaxed ${
         isError
           ? "border-blossom bg-blossom-soft text-[#8f4c59]"
           : "border-leaf bg-leaf-soft text-leaf-deep"
@@ -61,7 +61,7 @@ export function FormMessage({ state }: { state: ActionState }) {
 
 export function FieldError({ message }: { message?: string }) {
   if (!message) return null;
-  return <p className="mt-1 text-xs text-[#a85c6a]">{message}</p>;
+  return <p className="mt-1 max-w-full break-words text-xs text-[#a85c6a]">{message}</p>;
 }
 
 export function Field({
@@ -80,13 +80,13 @@ export function Field({
   children: ReactNode;
 }) {
   return (
-    <div>
-      <label className="field-label" htmlFor={htmlFor}>
+    <div className="min-w-0 max-w-full">
+      <label className="field-label max-w-full break-words" htmlFor={htmlFor}>
         {label}
         {optional ? <span className="ml-1.5 text-[11px] font-normal text-ink-faint">（任意）</span> : null}
       </label>
       {children}
-      {hint ? <p className="mt-1 text-xs text-ink-faint">{hint}</p> : null}
+      {hint ? <p className="mt-1 max-w-full break-words text-xs text-ink-faint">{hint}</p> : null}
       <FieldError message={error} />
     </div>
   );
