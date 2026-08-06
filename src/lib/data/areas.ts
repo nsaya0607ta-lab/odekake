@@ -36,6 +36,87 @@ function bump(map: Map<string, AreaEntry>, key: string, patch: Partial<AreaEntry
 }
 
 /**
+ * 本番DBに area_stats がまだ適用されていない場合の代替集計。
+ * 訪問履歴とスポットを通常のRLS付きクエリで読み、同じ形式へまとめる。
+ */
+async function loadAreaStatsDirect(supabase: DB, tripIds: string[]): Promise<AreaStatsRow[]> {
+  const { data: visits, error: visitError } = await supabase
+    .from("visit_records")
+    .select("spot_id, visited_at, favorite")
+    .in("trip_id", tripIds);
+
+  if (visitError) {
+    console.error("Failed to load visit records for area stats", {
+      code: visitError.code,
+      message: visitError.message,
+    });
+    return [];
+  }
+
+  const visitRows = visits ?? [];
+  const spotIds = [...new Set(visitRows.map((visit) => visit.spot_id))];
+  if (spotIds.length === 0) return [];
+
+  const { data: spots, error: spotError } = await supabase
+    .from("spots")
+    .select("id, prefecture_code, municipality_code")
+    .in("id", spotIds);
+
+  if (spotError) {
+    console.error("Failed to load spots for area stats", {
+      code: spotError.code,
+      message: spotError.message,
+    });
+    return [];
+  }
+
+  const spotById = new Map((spots ?? []).map((spot) => [spot.id, spot]));
+  const groups = new Map<
+    string,
+    {
+      prefectureCode: string;
+      municipalityCode: string;
+      spotIds: Set<string>;
+      visitCount: number;
+      favoriteCount: number;
+      lastVisitedAt: string | null;
+    }
+  >();
+
+  for (const visit of visitRows) {
+    const spot = spotById.get(visit.spot_id);
+    if (!spot) continue;
+
+    const key = `${spot.prefecture_code}:${spot.municipality_code}`;
+    const current = groups.get(key) ?? {
+      prefectureCode: spot.prefecture_code,
+      municipalityCode: spot.municipality_code,
+      spotIds: new Set<string>(),
+      visitCount: 0,
+      favoriteCount: 0,
+      lastVisitedAt: null,
+    };
+
+    current.spotIds.add(visit.spot_id);
+    current.visitCount += 1;
+    if (visit.favorite) current.favoriteCount += 1;
+    if (!current.lastVisitedAt || visit.visited_at > current.lastVisitedAt) {
+      current.lastVisitedAt = visit.visited_at;
+    }
+    groups.set(key, current);
+  }
+
+  return [...groups.values()].map((group) => ({
+    prefecture_code: group.prefectureCode,
+    municipality_code: group.municipalityCode,
+    spot_count: group.spotIds.size,
+    visit_count: group.visitCount,
+    favorite_count: group.favoriteCount,
+    last_visited_at: group.lastVisitedAt,
+  }));
+}
+
+/**
  * 地方 / 都道府県 / 市区町村ごとの訪問状況とスポット数をまとめて取得する。
  *
  * tripIds を渡すと、その旅行の記録だけを集計する（旅ワークスペースの分離）。
@@ -46,12 +127,23 @@ export async function loadAreaIndex(supabase: DB, tripIds: string[]): Promise<Ar
   const municipality = new Map<string, AreaEntry>();
   const region = new Map<string, AreaEntry>();
 
-  const statsResult =
-    tripIds.length === 0
-      ? { data: [] as AreaStatsRow[] }
-      : await supabase.rpc("area_stats", { p_trip_ids: tripIds });
+  let stats: AreaStatsRow[] = [];
+  if (tripIds.length > 0) {
+    const statsResult = await supabase.rpc("area_stats", { p_trip_ids: tripIds });
+    stats = (statsResult.data ?? []) as AreaStatsRow[];
 
-  const stats = (statsResult.data ?? []) as AreaStatsRow[];
+    // 本番DBへ集計関数が未適用、または空結果だった場合も、実際の訪問履歴から集計する。
+    if (statsResult.error || stats.length === 0) {
+      if (statsResult.error) {
+        console.warn("area_stats is unavailable; using direct area aggregation", {
+          code: statsResult.error.code,
+          message: statsResult.error.message,
+        });
+      }
+      stats = await loadAreaStatsDirect(supabase, tripIds);
+    }
+  }
+
   for (const row of stats) {
     const patch = {
       spotCount: Number(row.spot_count),
