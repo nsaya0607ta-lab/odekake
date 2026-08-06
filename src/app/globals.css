@@ -43,11 +43,21 @@
 }
 
 @layer base {
+  *,
+  *::before,
+  *::after {
+    box-sizing: border-box;
+  }
+
   html {
+    max-width: 100%;
+    overflow-x: clip;
     -webkit-text-size-adjust: 100%;
   }
 
   body {
+    max-width: 100%;
+    overflow-x: clip;
     background-color: var(--color-paper);
     color: var(--color-ink);
     font-family: var(--font-sans);
@@ -82,12 +92,43 @@
     }
   }
 
+  form,
+  fieldset,
+  details,
+  input,
+  textarea,
+  select {
+    min-width: 0;
+    max-width: 100%;
+  }
+
   input,
   textarea,
   select {
     font-family: inherit;
     /* iOS の自動ズームを防ぐ */
     font-size: 16px;
+  }
+
+  /* iOS Safari は日付系入力に大きい固有幅を持たせるため、親幅に収める */
+  input[type="date"],
+  input[type="time"],
+  input[type="datetime-local"],
+  input[type="month"],
+  input[type="week"] {
+    display: block;
+    inline-size: 100%;
+    min-inline-size: 0;
+    max-inline-size: 100%;
+  }
+
+  input[type="date"]::-webkit-date-and-time-value,
+  input[type="time"]::-webkit-date-and-time-value,
+  input[type="datetime-local"]::-webkit-date-and-time-value,
+  input[type="month"]::-webkit-date-and-time-value,
+  input[type="week"]::-webkit-date-and-time-value {
+    min-width: 0;
+    text-align: left;
   }
 }
 
@@ -138,7 +179,10 @@
 
   /* フォーム部品の共通スタイル */
   .field {
+    display: block;
     width: 100%;
+    min-width: 0;
+    max-width: 100%;
     min-height: 3rem;
     padding: 0.75rem 0.9rem;
     background-color: var(--color-card);
@@ -156,6 +200,17 @@
   .field:focus-visible {
     border-color: var(--color-leaf);
     box-shadow: 0 0 0 3px var(--color-leaf-soft);
+  }
+
+  select.field {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  textarea.field {
+    overflow-wrap: anywhere;
+    resize: vertical;
   }
 
   .field-label {
