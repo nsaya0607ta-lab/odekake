@@ -36,7 +36,12 @@ export function SpotPinMap({
     );
   }
 
-  const [minX, minY, width, height] = shape.viewBox.split(" ").map(Number);
+  const parts = shape.viewBox.split(" ").map(Number);
+  const minX = parts[0] ?? 0;
+  const minY = parts[1] ?? 0;
+  const width = parts[2] ?? 1;
+  const height = parts[3] ?? 1;
+  const mapScale = Math.max(width, height, 0.001);
   const active = plottable.find((spot) => spot.id === activeId) ?? null;
 
   return (
@@ -57,14 +62,14 @@ export function SpotPinMap({
             d={shape.d}
             fill="#e7efd9"
             stroke="#8daa75"
-            strokeWidth={Math.max(width, height) / 220}
+            strokeWidth={mapScale / 220}
             strokeLinejoin="round"
           />
 
           {plottable.map((spot) => {
             const [x, y] = projectPoint(spot.latitude, spot.longitude, "prefecture", shape.prefectureCode);
             const selected = activeId === spot.id;
-            const radius = Math.max(width, height) / (selected ? 58 : 72);
+            const radius = mapScale / (selected ? 58 : 72);
 
             return (
               <g
@@ -81,12 +86,7 @@ export function SpotPinMap({
                 }}
                 className="cursor-pointer outline-none"
               >
-                <circle
-                  cx={x}
-                  cy={y}
-                  r={radius * 1.9}
-                  fill="transparent"
-                />
+                <circle cx={x} cy={y} r={radius * 1.9} fill="transparent" />
                 <circle
                   cx={x}
                   cy={y}
@@ -105,7 +105,7 @@ export function SpotPinMap({
               y={minY + height / 2}
               textAnchor="middle"
               dominantBaseline="middle"
-              fontSize={Math.max(width, height) / 24}
+              fontSize={mapScale / 24}
               fill="#8a8478"
             >
               位置情報付きの訪問スポットはまだありません
