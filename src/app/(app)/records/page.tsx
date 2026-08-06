@@ -38,7 +38,6 @@ export default async function RecordsPage({
 
   const tab: Tab = TABS.some((t) => t.key === tabParam) ? (tabParam as Tab) : "timeline";
   const workspace = await resolveWorkspace(supabase, user.id);
-  // 共有旅の空間ではその旅行だけなので、一人旅・共有旅の絞り込みは出さない
   const showTypeFilter = workspace.kind === "personal";
   const tripType = showTypeFilter && (typeParam === "solo" || typeParam === "shared") ? typeParam : "all";
 
@@ -139,7 +138,11 @@ async function TripsTab({
 }
 
 async function SpotsTab({ supabase, workspace }: { supabase: SupabaseArg; workspace: Workspace }) {
-  const spots = await getAllSpots(supabase, workspace.tripIds);
+  const spots = await getAllSpots(supabase, workspace.tripIds, {
+    // 個人旅の空間では、スポット登録直後で訪問履歴がまだ無い場所も一覧に出す。
+    // 共有旅は旅行との関連が訪問履歴で決まるため、従来どおりその旅行で訪問した場所だけに限定する。
+    includeUnvisited: workspace.kind === "personal",
+  });
 
   if (spots.length === 0) {
     return (
