@@ -44,19 +44,23 @@ export async function GET(
 
   const { placeId: rawPlaceId } = await params;
   const placeId = rawPlaceId.trim();
-  const sessionToken = new URL(request.url).searchParams.get("sessionToken")?.trim() ?? "";
+  const searchParams = new URL(request.url).searchParams;
+  const searchMode = searchParams.get("searchMode") === "autocomplete" ? "autocomplete" : "text_search";
+  const sessionToken = searchParams.get("sessionToken")?.trim() ?? "";
 
   if (!/^[A-Za-z0-9_-]{5,300}$/.test(placeId)) {
     return json({ error: "選択した場所が正しくありません。" }, 400);
   }
-  if (!/^[A-Za-z0-9_-]{8,100}$/.test(sessionToken)) {
+  if (searchMode === "autocomplete" && !/^[A-Za-z0-9_-]{8,100}$/.test(sessionToken)) {
     return json({ error: "検索セッションが正しくありません。" }, 400);
   }
 
   const url = new URL(`https://places.googleapis.com/v1/places/${encodeURIComponent(placeId)}`);
   url.searchParams.set("languageCode", "ja");
   url.searchParams.set("regionCode", "jp");
-  url.searchParams.set("sessionToken", sessionToken);
+  if (searchMode === "autocomplete") {
+    url.searchParams.set("sessionToken", sessionToken);
+  }
 
   const response = await fetch(url, {
     headers: {
