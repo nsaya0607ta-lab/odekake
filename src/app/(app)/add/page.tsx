@@ -53,11 +53,11 @@ export default async function AddPage() {
             <AddCard
               href="/spots/new"
               icon={<IconMapPin size={24} />}
-              title="新しいスポット"
+              title="行った場所を登録"
               description={
                 isShared
-                  ? "この共有旅で訪れた場所を登録します"
-                  : "個人旅で訪れた場所を登録します"
+                  ? "場所・訪問日・感想・写真を、この共有旅へまとめて登録します"
+                  : "場所・訪問日・感想・写真を、まとめて登録します"
               }
               tone="sky"
             />
@@ -66,11 +66,11 @@ export default async function AddPage() {
             <AddCard
               href="/records?tab=spots"
               icon={<IconNotebook size={24} />}
-              title="新しい訪問履歴"
+              title="登録済みの場所に記録"
               description={
                 isShared
-                  ? "この共有旅の登録済みスポットから記録します"
-                  : "個人旅の登録済みスポットから記録します"
+                  ? "この共有旅で以前訪れた場所へ、再訪の記録を追加します"
+                  : "以前訪れた場所へ、もう一度行った記録を追加します"
               }
               tone="sun"
             />
@@ -90,7 +90,7 @@ export default async function AddPage() {
 
         {recentSpots.length > 0 ? (
           <section>
-            <h2 className="mb-2 px-1 text-base font-bold">最近のスポットに記録する</h2>
+            <h2 className="mb-2 px-1 text-base font-bold">最近の場所へもう一度行った</h2>
             <ul className="space-y-2">
               {recentSpots.map((spot) => (
                 <li key={spot.id}>
@@ -112,7 +112,7 @@ export default async function AddPage() {
 
         {trips.length === 0 ? (
           <p className="rounded-2xl bg-paper-deep px-4 py-3 text-xs leading-relaxed text-ink-soft">
-            訪問履歴はどの旅行の記録かを選んで保存します。まずは個人旅をひとつ作成してください。
+            行った場所は、どの旅行で訪れたかと一緒に保存します。まずは個人旅をひとつ作成してください。
           </p>
         ) : null}
       </PageBody>
