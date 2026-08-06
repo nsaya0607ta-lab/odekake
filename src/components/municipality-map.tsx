@@ -79,7 +79,7 @@ export function MunicipalityMap({
       try {
         const box = group.getBBox();
         if (!box.width || !box.height) return;
-        const pad = Math.max(box.width, box.height) * 0.06;
+        const pad = Math.max(box.width, box.height) * 0.04;
         setFittedViewBox([
           box.x - pad,
           box.y - pad,
@@ -137,27 +137,30 @@ export function MunicipalityMap({
 
   const labelCodes = useMemo(() => areas.filter((area) => area.center).map((area) => area.code), [areas]);
 
-  const recomputeLabels = () => {
-    if (!showLabels || !svgRef.current) return;
-    const nextHidden = new Set<string>();
-    const boxes: DOMRect[] = [];
-    for (const code of labelCodes) {
-      const node = svgRef.current.querySelector<SVGTextElement>(`[data-label-code="${code}"]`);
-      if (!node) continue;
-      const box = node.getBoundingClientRect();
-      if (boxes.some((other) => overlap(box, other))) {
-        nextHidden.add(code);
-      } else {
-        boxes.push(box);
+  const recomputeLabels = useMemo(
+    () => () => {
+      if (!showLabels || !svgRef.current) return;
+      const nextHidden = new Set<string>();
+      const boxes: DOMRect[] = [];
+      for (const code of labelCodes) {
+        const node = svgRef.current.querySelector<SVGTextElement>(`[data-label-code="${code}"]`);
+        if (!node) continue;
+        const box = node.getBoundingClientRect();
+        if (boxes.some((other) => overlap(box, other))) {
+          nextHidden.add(code);
+        } else {
+          boxes.push(box);
+        }
       }
-    }
-    setHiddenLabels(nextHidden);
-  };
+      setHiddenLabels(nextHidden);
+    },
+    [showLabels, labelCodes],
+  );
 
   useEffect(() => {
     const raf = window.requestAnimationFrame(recomputeLabels);
     return () => window.cancelAnimationFrame(raf);
-  }, [showLabels, fittedViewBox, labelCodes]);
+  }, [recomputeLabels, fittedViewBox]);
 
   return (
     <div className={className}>
