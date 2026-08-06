@@ -38,8 +38,18 @@ const EMAIL_STATUS_LABELS: Record<string, string> = {
   failed: "メール送信に失敗",
 };
 
-export default async function TripSettingsPage({ params }: { params: Promise<{ tripId: string }> }) {
-  const [{ tripId }, { supabase, user }] = await Promise.all([params, requireUser()]);
+export default async function TripSettingsPage({
+  params,
+  searchParams,
+}: {
+  params: Promise<{ tripId: string }>;
+  searchParams: Promise<{ error?: string }>;
+}) {
+  const [{ tripId }, { error }, { supabase, user }] = await Promise.all([
+    params,
+    searchParams,
+    requireUser(),
+  ]);
 
   const { data: tripData } = await supabase.from("trips").select("*").eq("id", tripId).maybeSingle();
   if (!tripData) notFound();
@@ -67,6 +77,12 @@ export default async function TripSettingsPage({ params }: { params: Promise<{ t
     <>
       <PageHeader title="旅行の設定" backHref={`/trips/${trip.id}`} />
       <PageBody>
+        {error === "delete" ? (
+          <p className="rounded-2xl border border-blossom bg-blossom-soft px-4 py-3 text-sm text-[#8f4c59]">
+            旅行を削除できませんでした。時間をおいてもう一度お試しください。
+          </p>
+        ) : null}
+
         <section>
           <h2 className="mb-2 px-1 text-base font-bold">旅行の情報</h2>
           <TripSettingsForm userId={user.id} trip={trip} coverUrl={coverUrl} />

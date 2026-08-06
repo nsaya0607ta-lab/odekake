@@ -341,6 +341,15 @@ export async function createVisitedSpotAction(_prev: ActionState, formData: Form
 
   const { supabase, user } = await requireUser();
 
+  // 二重送信の防止はスポットを作る前に行う。
+  // あとから確認すると、送信のたびに同じ場所のスポットが増えてしまう。
+  const { data: savedVisit } = await supabase
+    .from("visit_records")
+    .select("id, spot_id")
+    .eq("id", parsed.data.visitId)
+    .maybeSingle();
+  if (savedVisit) redirect(`/spots/${savedVisit.spot_id}?saved=1`);
+
   const spotResult = await insertSpot(supabase, user.id, parsed.data, location);
   let spotId = spotResult.data?.id ?? null;
   let createdSpot = Boolean(spotId);
@@ -370,48 +379,40 @@ export async function createVisitedSpotAction(_prev: ActionState, formData: Form
     return { error: spotSaveError(spotResult.error), values };
   }
 
-  const { data: existingVisit } = await supabase
-    .from("visit_records")
-    .select("id")
-    .eq("id", parsed.data.visitId)
-    .maybeSingle();
+  const { error: visitError } = await supabase.from("visit_records").insert({
+    id: parsed.data.visitId,
+    user_id: user.id,
+    trip_id: parsed.data.tripId,
+    spot_id: spotId,
+    visited_at: parsed.data.visitedAt,
+    rating: parsed.data.rating,
+    comment: parsed.data.comment,
+    note: parsed.data.note,
+    companions: parsed.data.companions,
+    amount: parsed.data.amount,
+    stay_minutes: parsed.data.stayMinutes,
+    congestion_level: parsed.data.congestionLevel,
+    revisit_wanted: values.revisitWanted === "on",
+    favorite: values.favorite === "on",
+  });
 
-  if (!existingVisit) {
-    const { error: visitError } = await supabase.from("visit_records").insert({
-      id: parsed.data.visitId,
-      user_id: user.id,
-      trip_id: parsed.data.tripId,
-      spot_id: spotId,
-      visited_at: parsed.data.visitedAt,
-      rating: parsed.data.rating,
-      comment: parsed.data.comment,
-      note: parsed.data.note,
-      companions: parsed.data.companions,
-      amount: parsed.data.amount,
-      stay_minutes: parsed.data.stayMinutes,
-      congestion_level: parsed.data.congestionLevel,
-      revisit_wanted: values.revisitWanted === "on",
-      favorite: values.favorite === "on",
+  if (visitError) {
+    if (createdSpot) await supabase.from("spots").delete().eq("id", spotId);
+    console.error("Visit insert after spot failed", {
+      code: visitError.code,
+      message: visitError.message,
+      details: visitError.details,
+      hint: visitError.hint,
+      tripId: parsed.data.tripId,
+      spotId,
     });
-
-    if (visitError) {
-      if (createdSpot) await supabase.from("spots").delete().eq("id", spotId);
-      console.error("Visit insert after spot failed", {
-        code: visitError.code,
-        message: visitError.message,
-        details: visitError.details,
-        hint: visitError.hint,
-        tripId: parsed.data.tripId,
-        spotId,
-      });
-      return { error: toJapaneseError(visitError, "行った場所の保存に失敗しました。"), values };
-    }
-
-    await Promise.all([
-      syncPhotos(supabase, user.id, parsed.data.tripId, parsed.data.visitId, parsePhotoPaths(formData)),
-      syncTags(supabase, user.id, parsed.data.visitId, values.tags),
-    ]);
+    return { error: toJapaneseError(visitError, "行った場所の保存に失敗しました。"), values };
   }
+
+  await Promise.all([
+    syncPhotos(supabase, user.id, parsed.data.tripId, parsed.data.visitId, parsePhotoPaths(formData)),
+    syncTags(supabase, user.id, parsed.data.visitId, values.tags),
+  ]);
 
   revalidatePath("/home");
   revalidatePath("/map");
@@ -484,8 +485,21 @@ export async function updateSpotAction(_prev: ActionState, formData: FormData): 
 export async function deleteSpotAction(formData: FormData) {
   const spotId = String(formData.get("spotId") ?? "");
   const { supabase } = await requireUser();
-  await supabase.from("spots").delete().eq("id", spotId);
+
+  // 権限がない場合はエラーではなく0件削除になるため、削除された行で判定する
+  const { data: deleted, error } = await supabase
+    .from("spots")
+    .delete()
+    .eq("id", spotId)
+    .select("id");
+
+  if (error || (deleted ?? []).length === 0) {
+    console.error("Spot delete failed", { spotId, code: error?.code, message: error?.message });
+    redirect(`/spots/${spotId}/edit?error=delete`);
+  }
+
   revalidatePath("/home");
   revalidatePath("/map");
+  revalidatePath("/records");
   redirect("/records?tab=spots");
 }

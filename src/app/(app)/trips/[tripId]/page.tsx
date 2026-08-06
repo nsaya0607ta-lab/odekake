@@ -22,8 +22,18 @@ export async function generateMetadata({ params }: { params: Promise<{ tripId: s
   return { title: data ? `${data.title} | おでかけ記録` : "おでかけ記録" };
 }
 
-export default async function TripDetailPage({ params }: { params: Promise<{ tripId: string }> }) {
-  const [{ tripId }, { supabase, user }] = await Promise.all([params, requireUser()]);
+export default async function TripDetailPage({
+  params,
+  searchParams,
+}: {
+  params: Promise<{ tripId: string }>;
+  searchParams: Promise<{ error?: string }>;
+}) {
+  const [{ tripId }, { error }, { supabase, user }] = await Promise.all([
+    params,
+    searchParams,
+    requireUser(),
+  ]);
 
   const { data: tripData } = await supabase.from("trips").select("*").eq("id", tripId).maybeSingle();
   // 参加していない旅行は RLS により取得できないため、存在しない扱いにする
@@ -67,6 +77,12 @@ export default async function TripDetailPage({ params }: { params: Promise<{ tri
       />
 
       <PageBody>
+        {error === "leave" ? (
+          <p className="rounded-2xl border border-blossom bg-blossom-soft px-4 py-3 text-sm text-[#8f4c59]">
+            この旅行から退出できませんでした。旅行の所有者は退出できません。
+          </p>
+        ) : null}
+
         <section className="rough-card overflow-hidden">
           {coverUrl ? (
             // eslint-disable-next-line @next/next/no-img-element
