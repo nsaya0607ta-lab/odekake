@@ -1,0 +1,15 @@
+/* 日付・時刻入力は内容に合う幅へ。親要素が狭い場合はその幅まで縮む。 */
+.field:is(input[type="date"], input[type="month"], input[type="week"]) {
+  inline-size: min(100%, 15rem);
+  max-inline-size: 15rem;
+}
+
+.field:is(input[type="time"]) {
+  inline-size: min(100%, 10rem);
+  max-inline-size: 10rem;
+}
+
+.field:is(input[type="datetime-local"]) {
+  inline-size: min(100%, 20rem);
+  max-inline-size: 20rem;
+}
