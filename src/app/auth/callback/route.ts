@@ -1,4 +1,5 @@
 import { NextResponse, type NextRequest } from "next/server";
+import { safeNextPath } from "@/lib/navigation";
 import { getSupabaseEnv } from "@/lib/supabase/env";
 import { createClient } from "@/lib/supabase/server";
 import type { EmailOtpType } from "@supabase/supabase-js";
@@ -9,8 +10,8 @@ import type { EmailOtpType } from "@supabase/supabase-js";
  */
 export async function GET(request: NextRequest) {
   const { searchParams, origin } = new URL(request.url);
-  const next = searchParams.get("next") ?? "/home";
-  const safeNext = next.startsWith("/") ? next : "/home";
+  // `//example.com` のようなプロトコル相対URLを弾き、自サイト内へのみ戻す
+  const safeNext = safeNextPath(searchParams.get("next"));
 
   if (!getSupabaseEnv()) {
     return NextResponse.redirect(`${origin}/setup`);

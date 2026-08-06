@@ -12,8 +12,18 @@ import { DeleteVisitButton } from "./delete-visit-button";
 export const metadata = { title: "訪問履歴を編集 | おでかけ記録" };
 export const dynamic = "force-dynamic";
 
-export default async function EditVisitPage({ params }: { params: Promise<{ visitId: string }> }) {
-  const [{ visitId }, { supabase, user }] = await Promise.all([params, requireUser()]);
+export default async function EditVisitPage({
+  params,
+  searchParams,
+}: {
+  params: Promise<{ visitId: string }>;
+  searchParams: Promise<{ error?: string }>;
+}) {
+  const [{ visitId }, { error }, { supabase, user }] = await Promise.all([
+    params,
+    searchParams,
+    requireUser(),
+  ]);
 
   const workspace = await resolveWorkspace(supabase, user.id);
   const detail = await getVisitForEdit(supabase, visitId);
@@ -42,6 +52,12 @@ export default async function EditVisitPage({ params }: { params: Promise<{ visi
     <>
       <PageHeader title="訪問履歴を編集" backHref={`/spots/${spot.id}`} />
       <PageBody>
+        {error === "delete" ? (
+          <p className="rounded-2xl border border-blossom bg-blossom-soft px-4 py-3 text-sm text-[#8f4c59]">
+            訪問履歴を削除できませんでした。時間をおいてもう一度お試しください。
+          </p>
+        ) : null}
+
         <VisitForm
           userId={user.id}
           mode="edit"

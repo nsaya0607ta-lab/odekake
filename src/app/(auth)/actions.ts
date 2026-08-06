@@ -4,6 +4,7 @@ import { redirect } from "next/navigation";
 import { z } from "zod";
 import type { ActionState } from "@/components/form";
 import { toJapaneseError } from "@/lib/errors";
+import { safeNextPath } from "@/lib/navigation";
 import { getSiteUrl } from "@/lib/supabase/env";
 import { createClient } from "@/lib/supabase/server";
 
@@ -20,11 +21,6 @@ function fieldErrorsOf(error: z.ZodError): Record<string, string> {
     if (!result[key]) result[key] = issue.message;
   }
   return result;
-}
-
-function safeNextPath(value: string | null | undefined): string {
-  if (!value || !value.startsWith("/") || value.startsWith("//")) return "/home";
-  return value;
 }
 
 function authCallbackUrl(next: string): string {

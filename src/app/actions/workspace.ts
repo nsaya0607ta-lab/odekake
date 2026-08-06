@@ -3,6 +3,7 @@
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { PERSONAL_WORKSPACE_ID, WORKSPACE_COOKIE } from "@/lib/data/workspace";
+import { safeNextPath } from "@/lib/navigation";
 import { requireUser } from "@/lib/supabase/server";
 
 const ONE_YEAR = 60 * 60 * 24 * 365;
@@ -21,7 +22,7 @@ export async function setCurrentWorkspace(workspaceId: string) {
 /** 旅ワークスペースを切り替える（Cookie に保存して、その空間のホームへ移動する） */
 export async function switchWorkspaceAction(formData: FormData) {
   const requested = String(formData.get("workspaceId") ?? PERSONAL_WORKSPACE_ID);
-  const next = String(formData.get("next") ?? "/home");
+  const next = safeNextPath(formData.get("next")?.toString());
 
   let workspaceId = PERSONAL_WORKSPACE_ID;
 
@@ -37,5 +38,5 @@ export async function switchWorkspaceAction(formData: FormData) {
   }
 
   await setCurrentWorkspace(workspaceId);
-  redirect(next.startsWith("/") ? next : "/home");
+  redirect(next);
 }

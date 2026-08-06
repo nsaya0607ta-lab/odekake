@@ -180,7 +180,18 @@ export async function updateTripAction(_prev: ActionState, formData: FormData): 
 export async function deleteTripAction(formData: FormData) {
   const tripId = String(formData.get("tripId") ?? "");
   const { supabase } = await requireUser();
-  await supabase.from("trips").delete().eq("id", tripId);
+
+  // 所有者でない場合はエラーではなく0件削除になるため、削除された行で判定する
+  const { data: deleted, error } = await supabase
+    .from("trips")
+    .delete()
+    .eq("id", tripId)
+    .select("id");
+
+  if (error || (deleted ?? []).length === 0) {
+    console.error("Trip delete failed", { tripId, code: error?.code, message: error?.message });
+    redirect(`/trips/${tripId}/settings?error=delete`);
+  }
 
   await setCurrentWorkspace(PERSONAL_WORKSPACE_ID);
 
@@ -225,6 +236,7 @@ async function createInvitation(
     tripId: input.tripId,
     code,
     message: input.message ?? null,
+    inviterId: input.invitedBy,
   });
 
   return { ok: true, code, sent };
@@ -232,14 +244,23 @@ async function createInvitation(
 
 async function deliverInvitation(
   supabase: DB,
-  input: { invitationId: string; email: string; tripId: string; code: string; message: string | null },
+  input: {
+    invitationId: string;
+    email: string;
+    tripId: string;
+    code: string;
+    message: string | null;
+    inviterId: string;
+  },
 ): Promise<boolean> {
   const mailer = getMailer();
   if (!mailer.enabled) return false;
 
+  // 共有旅では同じ旅のメンバーのプロフィールも読めるため、
+  // 招待した本人で絞り込まないと複数行が返って名前を取得できない。
   const [{ data: trip }, { data: profile }] = await Promise.all([
     supabase.from("trips").select("title").eq("id", input.tripId).maybeSingle(),
-    supabase.from("profiles").select("display_name").maybeSingle(),
+    supabase.from("profiles").select("display_name").eq("user_id", input.inviterId).maybeSingle(),
   ]);
 
   const result = await mailer
@@ -309,10 +330,10 @@ export async function resendInvitationAction(formData: FormData) {
   const invitationId = String(formData.get("invitationId") ?? "");
   const tripId = String(formData.get("tripId") ?? "");
 
-  const { supabase } = await requireUser();
+  const { supabase, user } = await requireUser();
   const { data } = await supabase
     .from("trip_invitations")
-    .select("id, email, invite_code, message, email_attempts")
+    .select("id, email, invite_code, message, email_attempts, invited_by")
     .eq("id", invitationId)
     .maybeSingle();
 
@@ -327,6 +348,7 @@ export async function resendInvitationAction(formData: FormData) {
       tripId,
       code: data.invite_code,
       message: data.message,
+      inviterId: data.invited_by ?? user.id,
     });
   }
 
@@ -359,7 +381,20 @@ export async function removeMemberAction(formData: FormData) {
 export async function leaveTripAction(formData: FormData) {
   const tripId = String(formData.get("tripId") ?? "");
   const { supabase, user } = await requireUser();
-  await supabase.from("trip_members").delete().eq("trip_id", tripId).eq("user_id", user.id);
+
+  // 所有者は退出できない（RLS で0件削除になる）。
+  // 抜けられていないのにホームへ戻すと退出できたように見えるため、結果を確かめる。
+  const { data: left, error } = await supabase
+    .from("trip_members")
+    .delete()
+    .eq("trip_id", tripId)
+    .eq("user_id", user.id)
+    .select("user_id");
+
+  if (error || (left ?? []).length === 0) {
+    console.error("Leave trip failed", { tripId, code: error?.code, message: error?.message });
+    redirect(`/trips/${tripId}?error=leave`);
+  }
 
   // 退出した旅の空間は開けなくなるため、自分の旅へ戻す
   await setCurrentWorkspace(PERSONAL_WORKSPACE_ID);

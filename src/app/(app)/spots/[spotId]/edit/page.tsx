@@ -11,8 +11,18 @@ import type { SpotRow } from "@/lib/supabase/types";
 export const metadata = { title: "スポットを編集 | おでかけ記録" };
 export const dynamic = "force-dynamic";
 
-export default async function EditSpotPage({ params }: { params: Promise<{ spotId: string }> }) {
-  const [{ spotId }, { supabase, user }] = await Promise.all([params, requireUser()]);
+export default async function EditSpotPage({
+  params,
+  searchParams,
+}: {
+  params: Promise<{ spotId: string }>;
+  searchParams: Promise<{ error?: string }>;
+}) {
+  const [{ spotId }, { error }, { supabase, user }] = await Promise.all([
+    params,
+    searchParams,
+    requireUser(),
+  ]);
 
   const { data } = await supabase.from("spots").select("*").eq("id", spotId).maybeSingle();
   if (!data) notFound();
@@ -27,6 +37,12 @@ export default async function EditSpotPage({ params }: { params: Promise<{ spotI
     <>
       <PageHeader title="スポットを編集" backHref={`/spots/${spot.id}`} />
       <PageBody>
+        {error === "delete" ? (
+          <p className="rounded-2xl border border-blossom bg-blossom-soft px-4 py-3 text-sm text-[#8f4c59]">
+            スポットを削除できませんでした。時間をおいてもう一度お試しください。
+          </p>
+        ) : null}
+
         <SpotForm
           spotId={spot.id}
           placeSearchEnabled={Boolean(process.env.GOOGLE_PLACES_API_KEY?.trim())}

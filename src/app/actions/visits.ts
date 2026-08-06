@@ -8,7 +8,7 @@ import { toJapaneseError } from "@/lib/errors";
 import { MAX_PHOTOS_PER_VISIT } from "@/lib/image";
 import { finalizePhotoPaths } from "@/lib/photos";
 import { requireUser } from "@/lib/supabase/server";
-import type { DB } from "@/lib/data/client";
+import { PHOTO_BUCKET, type DB } from "@/lib/data/client";
 
 const optionalText = (max: number) =>
   z
@@ -144,7 +144,7 @@ async function syncPhotos(
         "id",
         removed.map((p) => p.id),
       );
-    await supabase.storage.from("photos").remove(removed.map((p) => p.storage_path));
+    await supabase.storage.from(PHOTO_BUCKET).remove(removed.map((p) => p.storage_path));
   }
 
   const added = paths.filter((p) => !existingPaths.has(p));
@@ -261,10 +261,26 @@ export async function deleteVisitAction(formData: FormData) {
     .select("storage_path")
     .eq("visit_record_id", visitId);
 
-  await supabase.from("visit_records").delete().eq("id", visitId);
+  // 記録が実際に消えたことを確かめてから写真を消す。
+  // 権限がない場合はエラーではなく0件削除になるため、削除された行で判定する。
+  const { data: deleted, error } = await supabase
+    .from("visit_records")
+    .delete()
+    .eq("id", visitId)
+    .select("id");
+
+  if (error || (deleted ?? []).length === 0) {
+    console.error("Visit delete failed", {
+      visitId,
+      code: error?.code,
+      message: error?.message,
+      details: error?.details,
+    });
+    redirect(`/visits/${visitId}/edit?error=delete`);
+  }
 
   if (photos && photos.length > 0) {
-    await supabase.storage.from("photos").remove(photos.map((p) => p.storage_path));
+    await supabase.storage.from(PHOTO_BUCKET).remove(photos.map((p) => p.storage_path));
   }
 
   revalidatePath("/home");

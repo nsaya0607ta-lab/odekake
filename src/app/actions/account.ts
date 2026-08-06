@@ -5,6 +5,7 @@ import { redirect } from "next/navigation";
 import { z } from "zod";
 import type { ActionState } from "@/components/form";
 import { toJapaneseError } from "@/lib/errors";
+import { PHOTO_BUCKET } from "@/lib/data/client";
 import { finalizePhotoPaths, removeFolderRecursively, TMP_ROOT } from "@/lib/photos";
 import { getSiteUrl } from "@/lib/supabase/env";
 import { requireUser } from "@/lib/supabase/server";
@@ -103,6 +104,18 @@ export async function deleteAccountAction(_prev: ActionState, formData: FormData
 
   // データベースの行は外部キーの連鎖で消えるが、Storage のファイルは残るため
   // ログインしているうちに消しておく（RLS で自分の分しか消せない）。
+
+  // 参加しているだけの共有旅へ入れた写真は旅行フォルダごとには消せないため、
+  // 自分がアップロードした分を先に個別に消しておく。
+  const { data: ownPhotos } = await supabase
+    .from("visit_photos")
+    .select("storage_path")
+    .eq("user_id", user.id);
+  const ownPhotoPaths = (ownPhotos ?? []).map((photo) => photo.storage_path);
+  for (let i = 0; i < ownPhotoPaths.length; i += 100) {
+    await supabase.storage.from(PHOTO_BUCKET).remove(ownPhotoPaths.slice(i, i + 100));
+  }
+
   const { data: ownedTrips } = await supabase.from("trips").select("id").eq("owner_id", user.id);
   for (const trip of ownedTrips ?? []) {
     await removeFolderRecursively(supabase, `trips/${trip.id}`);
