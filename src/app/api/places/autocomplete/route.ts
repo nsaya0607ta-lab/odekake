@@ -17,6 +17,7 @@ type AutocompleteBody = {
 type GoogleSuggestion = {
   placePrediction?: {
     placeId?: string;
+    distanceMeters?: number;
     text?: { text?: string };
     structuredFormat?: {
       mainText?: { text?: string };
@@ -75,10 +76,12 @@ export async function POST(request: Request) {
   const latitude = body.near?.latitude;
   const longitude = body.near?.longitude;
   if (validCoordinate(latitude, -90, 90) && validCoordinate(longitude, -180, 180)) {
+    const origin = { latitude, longitude };
+    googleBody.origin = origin;
     googleBody.locationBias = {
       circle: {
-        center: { latitude, longitude },
-        radius: 50_000,
+        center: origin,
+        radius: 30_000,
       },
     };
   }
@@ -90,6 +93,7 @@ export async function POST(request: Request) {
       "X-Goog-Api-Key": apiKey,
       "X-Goog-FieldMask": [
         "suggestions.placePrediction.placeId",
+        "suggestions.placePrediction.distanceMeters",
         "suggestions.placePrediction.text.text",
         "suggestions.placePrediction.structuredFormat.mainText.text",
         "suggestions.placePrediction.structuredFormat.secondaryText.text",
@@ -122,8 +126,17 @@ export async function POST(request: Request) {
           placeId,
           name,
           address: prediction?.structuredFormat?.secondaryText?.text ?? null,
+          distanceMeters:
+            typeof prediction?.distanceMeters === "number" && Number.isFinite(prediction.distanceMeters)
+              ? Math.max(0, Math.round(prediction.distanceMeters))
+              : null,
         },
       ];
+    })
+    .sort((a, b) => {
+      if (a.distanceMeters === null) return 1;
+      if (b.distanceMeters === null) return -1;
+      return a.distanceMeters - b.distanceMeters;
     })
     .slice(0, 5);
 

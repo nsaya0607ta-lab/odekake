@@ -5,6 +5,8 @@ export type PlaceSuggestion = {
   placeId: string;
   name: string;
   address: string | null;
+  /** 検索の基準地点からの直線距離。基準地点がない場合やGoogleが返さない場合はnull。 */
+  distanceMeters: number | null;
 };
 
 export type PlaceCandidate = PlaceSuggestion & {
@@ -136,7 +138,10 @@ function googleProvider(enabled: boolean): PlaceSearchProvider {
         };
       }
 
-      const body = (await response.json()) as Omit<PlaceCandidate, "name" | "category">;
+      const body = (await response.json()) as Omit<
+        PlaceCandidate,
+        "name" | "category" | "distanceMeters"
+      >;
       return {
         status: "ok",
         provider: "google_places",
@@ -145,6 +150,7 @@ function googleProvider(enabled: boolean): PlaceSearchProvider {
           placeId: body.placeId || suggestion.placeId,
           name: suggestion.name,
           address: body.address ?? suggestion.address,
+          distanceMeters: suggestion.distanceMeters,
           category: null,
         },
       };
