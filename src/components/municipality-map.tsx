@@ -65,38 +65,42 @@ export function MunicipalityMap({
   const fallbackViewBox = useMemo(() => parseViewBox(viewBox), [viewBox]);
   const [fittedViewBox, setFittedViewBox] = useState<[number, number, number, number]>(fallbackViewBox);
   const svgRef = useRef<SVGSVGElement | null>(null);
-  const mapContentRef = useRef<SVGGElement | null>(null);
+  const pathGroupRef = useRef<SVGGElement | null>(null);
 
   useEffect(() => {
     setFittedViewBox(fallbackViewBox);
   }, [fallbackViewBox]);
 
   useEffect(() => {
-    const group = mapContentRef.current;
+    const group = pathGroupRef.current;
     if (!group) return;
 
     const fit = () => {
       try {
         const box = group.getBBox();
         if (!box.width || !box.height) return;
-        const pad = Math.max(box.width, box.height) * 0.04;
+
+        // 実際の市区町村pathだけを基準に表示範囲を決める。
+        // ラベル・透明タップ円・離島用inset枠はboundsに含めない。
+        const padX = box.width * 0.055;
+        const padY = box.height * 0.055;
         setFittedViewBox([
-          box.x - pad,
-          box.y - pad,
-          box.width + pad * 2,
-          box.height + pad * 2,
+          box.x - padX,
+          box.y - padY,
+          box.width + padX * 2,
+          box.height + padY * 2,
         ]);
       } catch {
         setFittedViewBox(fallbackViewBox);
       }
     };
 
-    const raf = window.requestAnimationFrame(() => {
+    const first = window.requestAnimationFrame(() => {
       fit();
       window.requestAnimationFrame(fit);
     });
-    return () => window.cancelAnimationFrame(raf);
-  }, [areas, insets, fallbackViewBox]);
+    return () => window.cancelAnimationFrame(first);
+  }, [areas, fallbackViewBox]);
 
   const [minX, minY, boxWidth, boxHeight] = fittedViewBox;
   const scale = Math.max(boxWidth, boxHeight);
@@ -174,32 +178,32 @@ export function MunicipalityMap({
           className="h-full w-full"
           style={{ touchAction: "manipulation" }}
         >
-          <g ref={mapContentRef}>
-            {insets.map((inset) => (
-              <g key={inset.id} pointerEvents="none">
-                <rect
-                  x={inset.frame[0]}
-                  y={inset.frame[1]}
-                  width={inset.frame[2]}
-                  height={inset.frame[3]}
-                  rx={scale / 50}
-                  fill="#fbf8f0"
-                  stroke="#c8c1b0"
-                  strokeWidth={strokeWidth * 1.3}
-                  strokeDasharray={`${strokeWidth * 5} ${strokeWidth * 4}`}
-                />
-                <text
-                  x={inset.frame[0] + inset.frame[2] / 2}
-                  y={inset.frame[1] - scale / 110}
-                  textAnchor="middle"
-                  fontSize={scale / 38}
-                  fill="#7b7466"
-                >
-                  {inset.label}
-                </text>
-              </g>
-            ))}
+          {insets.map((inset) => (
+            <g key={inset.id} pointerEvents="none">
+              <rect
+                x={inset.frame[0]}
+                y={inset.frame[1]}
+                width={inset.frame[2]}
+                height={inset.frame[3]}
+                rx={scale / 50}
+                fill="#fbf8f0"
+                stroke="#c8c1b0"
+                strokeWidth={strokeWidth * 1.3}
+                strokeDasharray={`${strokeWidth * 5} ${strokeWidth * 4}`}
+              />
+              <text
+                x={inset.frame[0] + inset.frame[2] / 2}
+                y={inset.frame[1] - scale / 110}
+                textAnchor="middle"
+                fontSize={scale / 38}
+                fill="#7b7466"
+              >
+                {inset.label}
+              </text>
+            </g>
+          ))}
 
+          <g ref={pathGroupRef}>
             {areas.map((area) => {
               if (!area.d) return null;
               const isActive = activeCode === area.code;
@@ -243,71 +247,80 @@ export function MunicipalityMap({
                     strokeLinejoin="round"
                     vectorEffect="non-scaling-stroke"
                   />
-                  {area.center ? (
-                    <circle
-                      cx={area.center[0]}
-                      cy={area.center[1]}
-                      r={Math.max(markerRadius * 2.6, scale / 55)}
-                      fill="transparent"
-                      pointerEvents="all"
-                    />
-                  ) : null}
-                  {area.center && area.span < smallThreshold ? (
-                    <circle
-                      cx={area.center[0]}
-                      cy={area.center[1]}
-                      r={markerRadius}
-                      fill={FILL[area.level] ?? FILL[0]}
-                      stroke={isActive ? "#5d8049" : (STROKE[area.level] ?? STROKE[0])}
-                      strokeWidth={isActive ? strokeWidth * 2.6 : strokeWidth * 1.4}
-                    />
-                  ) : null}
                 </g>
               );
             })}
+          </g>
 
-            {showLabels
-              ? areas.map((area) =>
-                  area.center ? (
-                    <text
-                      data-label-code={area.code}
-                      key={`label-${area.code}`}
-                      x={area.center[0]}
-                      y={area.center[1]}
-                      textAnchor="middle"
-                      dominantBaseline="middle"
-                      fontSize={labelSize}
-                      fontWeight={activeCode === area.code ? 700 : 600}
-                      fill={activeCode === area.code ? "#4f743d" : "#3c382f"}
-                      stroke="#fdfbf5"
-                      strokeWidth={labelSize * 0.36}
-                      paintOrder="stroke"
-                      strokeLinejoin="round"
-                      pointerEvents="none"
-                      opacity={hiddenLabels.has(area.code) ? 0 : 1}
-                    >
-                      {mapLabel(area.name)}
-                    </text>
-                  ) : null,
-                )
-              : activeArea?.center ? (
+          {areas.map((area) => {
+            if (!area.center) return null;
+            const isActive = activeCode === area.code;
+            return (
+              <g key={`overlay-${area.code}`} pointerEvents="none">
+                <circle
+                  cx={area.center[0]}
+                  cy={area.center[1]}
+                  r={Math.max(markerRadius * 2.6, scale / 55)}
+                  fill="transparent"
+                  pointerEvents="all"
+                  onPointerDown={() => beginPress(area.code)}
+                  onClick={() => open(area.code)}
+                />
+                {area.span < smallThreshold ? (
+                  <circle
+                    cx={area.center[0]}
+                    cy={area.center[1]}
+                    r={markerRadius}
+                    fill={FILL[area.level] ?? FILL[0]}
+                    stroke={isActive ? "#5d8049" : (STROKE[area.level] ?? STROKE[0])}
+                    strokeWidth={isActive ? strokeWidth * 2.6 : strokeWidth * 1.4}
+                  />
+                ) : null}
+              </g>
+            );
+          })}
+
+          {showLabels
+            ? areas.map((area) =>
+                area.center ? (
                   <text
-                    x={activeArea.center[0]}
-                    y={activeArea.center[1] - markerRadius * 2.2}
+                    data-label-code={area.code}
+                    key={`label-${area.code}`}
+                    x={area.center[0]}
+                    y={area.center[1]}
                     textAnchor="middle"
-                    fontSize={scale / 26}
-                    fontWeight={700}
-                    fill="#3c382f"
+                    dominantBaseline="middle"
+                    fontSize={labelSize}
+                    fontWeight={activeCode === area.code ? 700 : 600}
+                    fill={activeCode === area.code ? "#4f743d" : "#3c382f"}
                     stroke="#fdfbf5"
-                    strokeWidth={scale / 90}
+                    strokeWidth={labelSize * 0.36}
                     paintOrder="stroke"
                     strokeLinejoin="round"
                     pointerEvents="none"
+                    opacity={hiddenLabels.has(area.code) ? 0 : 1}
                   >
-                    {activeArea.name}
+                    {mapLabel(area.name)}
                   </text>
-                ) : null}
-          </g>
+                ) : null,
+              )
+            : activeArea?.center ? (
+                <text
+                  x={activeArea.center[0]}
+                  y={activeArea.center[1] - markerRadius * 2.2}
+                  textAnchor="middle"
+                  fontSize={scale / 26}
+                  fontWeight={700}
+                  fill="#3c382f"
+                  stroke="#fdfbf5"
+                  strokeWidth={scale / 90}
+                  paintOrder="stroke"
+                  strokeLinejoin="round"
+                  pointerEvents="none"
+                >
+                  {activeArea.name}
+                </text>
+              ) : null}
         </svg>
       </div>
 
