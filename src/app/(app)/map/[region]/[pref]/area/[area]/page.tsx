@@ -96,8 +96,9 @@ export default async function PrefectureAreaPage({
           hrefSuffix={`?area=${selectedArea.slug}`}
           hasMap={selectedArea.municipalities.some((municipality) => municipality.d !== null)}
           showMapLabels
+          mapLabelStyle="callout"
           mapHeading="市区町村を地図から選ぶ"
-          mapInstruction="市区町村名をタップするとスポット一覧へ"
+          mapInstruction="市区町村名または地図をタップするとスポット一覧へ"
         />
       </PageBody>
     </>

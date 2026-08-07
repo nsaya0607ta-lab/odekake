@@ -3,7 +3,12 @@
 import Link from "next/link";
 import { useMemo, useState } from "react";
 import { IconChevronRight, IconSearch } from "@/components/icons";
-import { MunicipalityMap, type MapFrame, type MunicipalityArea } from "@/components/municipality-map";
+import {
+  MunicipalityMap,
+  type MapFrame,
+  type MunicipalityArea,
+  type MunicipalityLabelStyle,
+} from "@/components/municipality-map";
 import { VisitedBadge } from "@/components/ui";
 
 export type MunicipalityListItem = MunicipalityArea;
@@ -22,6 +27,7 @@ export function MunicipalityBrowser({
   hrefBase,
   hasMap,
   showMapLabels = false,
+  mapLabelStyle = "inline",
   hrefSuffix = "",
   mapHeading = "地図から選ぶ",
   mapInstruction = "市区町村をタップすると詳細へ",
@@ -33,8 +39,10 @@ export function MunicipalityBrowser({
   hrefBase: string;
   /** 境界データがある都道府県かどうか */
   hasMap: boolean;
-  /** 拡大されたエリア画面では市区町村名を常時表示する */
+  /** 拡大されたエリア画面では市区町村名を表示する */
   showMapLabels?: boolean;
+  /** 市区町村名を地図内に置くか、左右の吹き出しで置くか */
+  mapLabelStyle?: MunicipalityLabelStyle;
   /** 戻るエリアを維持するためのクエリ文字列 */
   hrefSuffix?: string;
   mapHeading?: string;
@@ -59,8 +67,8 @@ export function MunicipalityBrowser({
       {hasMap ? (
         <section>
           <h2 className="mb-2 px-1 text-base font-bold">{mapHeading}</h2>
-          <div className="rough-card px-3 py-4">
-            <p className="mb-2 text-center text-xs text-ink-soft">
+          <div className="rough-card px-2 py-4 sm:px-3">
+            <p className="mb-1 text-center text-xs text-ink-soft">
               <span className="rough-pill bg-leaf-soft px-3 py-1 text-leaf-deep">
                 {mapInstruction}
               </span>
@@ -73,6 +81,7 @@ export function MunicipalityBrowser({
               hrefBase={hrefBase}
               hrefSuffix={hrefSuffix}
               showLabels={showMapLabels}
+              labelStyle={mapLabelStyle}
             />
             <p className="mt-2 text-center text-xs text-ink-soft">
               {items.length}件のうち <span className="font-bold text-ink tabular-nums">{visitedCount}</span> 件を訪問
