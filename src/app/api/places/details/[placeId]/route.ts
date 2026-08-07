@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { checkRateLimit } from "@/lib/rate-limit";
 import { createClient } from "@/lib/supabase/server";
 
 export const dynamic = "force-dynamic";
@@ -20,10 +21,11 @@ type GooglePlace = {
   error?: { message?: string };
 };
 
-async function isAuthenticated() {
+async function currentUserId(): Promise<string | null> {
   const supabase = await createClient();
   const { data } = await supabase.auth.getClaims();
-  return Boolean(data?.claims?.sub);
+  const sub = data?.claims?.sub;
+  return typeof sub === "string" ? sub : null;
 }
 
 function json(data: unknown, status = 200) {
@@ -37,7 +39,17 @@ export async function GET(
   request: Request,
   { params }: { params: Promise<{ placeId: string }> },
 ) {
-  if (!(await isAuthenticated())) return json({ error: "ログインが必要です。" }, 401);
+  const userId = await currentUserId();
+  if (!userId) return json({ error: "ログインが必要です。" }, 401);
+
+  // Google Places は呼ぶたびに課金される。1人が短時間に叩き続けられないようにする（60秒あたり30回）
+  const rate = checkRateLimit(`places:details:${userId}`, 30, 60_000);
+  if (!rate.allowed) {
+    return json(
+      { error: "検索の回数が多すぎます。少し時間をおいてからお試しください。" },
+      429,
+    );
+  }
 
   const apiKey = process.env.GOOGLE_PLACES_API_KEY?.trim();
   if (!apiKey) return json({ error: "Google Places API が未設定です。" }, 503);

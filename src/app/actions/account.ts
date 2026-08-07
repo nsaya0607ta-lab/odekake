@@ -77,6 +77,16 @@ export async function updateProfileAction(_prev: ActionState, formData: FormData
     },
   });
 
+  // updateUser はアクセストークンを作り直さないため、JWT の user_metadata は
+  // 古いままになる。requireUser() は JWT からニックネームを読むので、
+  // ここで作り直さないとホーム画面などが前の名前を出し続ける。
+  const { error: refreshError } = await supabase.auth.refreshSession();
+  if (refreshError) {
+    console.warn("Failed to refresh session after profile update", {
+      message: refreshError.message,
+    });
+  }
+
   revalidatePath("/home");
   revalidatePath("/mypage");
   return { ok: true, message: "プロフィールを更新しました。", values };

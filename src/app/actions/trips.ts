@@ -17,7 +17,7 @@ import type { DB } from "@/lib/data/client";
 
 const CODE_CHARS = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
 
-export async function generateInviteCode(length = 8): Promise<string> {
+async function generateInviteCode(length = 8): Promise<string> {
   const bytes = new Uint8Array(length);
   crypto.getRandomValues(bytes);
   return [...bytes].map((b) => CODE_CHARS[b % CODE_CHARS.length]).join("");
@@ -365,36 +365,70 @@ export async function resendInvitationAction(formData: FormData) {
     .eq("id", invitationId)
     .maybeSingle();
 
-  if (data?.email) {
-    await supabase
-      .from("trip_invitations")
-      .update({ email_attempts: (data.email_attempts ?? 0) + 1 })
-      .eq("id", invitationId);
-    await deliverInvitation(supabase, {
-      invitationId: data.id,
-      email: data.email,
-      tripId,
-      code: data.invite_code,
-      message: data.message,
-      inviterId: data.invited_by ?? user.id,
-    });
+  if (!data?.email) {
+    console.error("Resend invitation target not found", { invitationId });
+    redirect(settingsPath(tripId, "invitation"));
   }
 
+  await supabase
+    .from("trip_invitations")
+    .update({ email_attempts: (data.email_attempts ?? 0) + 1 })
+    .eq("id", invitationId);
+  await deliverInvitation(supabase, {
+    invitationId: data.id,
+    email: data.email,
+    tripId,
+    code: data.invite_code,
+    message: data.message,
+    inviterId: data.invited_by ?? user.id,
+  });
+
   revalidatePath(`/trips/${tripId}/settings`);
+}
+
+/**
+ * 設定画面の操作は、権限がないとエラーではなく0行更新になる。
+ * 何も起きていないのに画面だけ描き直すと成功したように見えるため、
+ * 影響した行を確かめて、駄目なら理由をクエリで返す。
+ */
+function settingsPath(tripId: string, error?: string) {
+  return error ? `/trips/${tripId}/settings?error=${error}` : `/trips/${tripId}/settings`;
 }
 
 export async function cancelInvitationAction(formData: FormData) {
   const invitationId = String(formData.get("invitationId") ?? "");
   const tripId = String(formData.get("tripId") ?? "");
   const { supabase } = await requireUser();
-  await supabase.from("trip_invitations").update({ status: "cancelled" }).eq("id", invitationId);
+
+  const { data, error } = await supabase
+    .from("trip_invitations")
+    .update({ status: "cancelled" })
+    .eq("id", invitationId)
+    .select("id");
+
+  if (error || (data ?? []).length === 0) {
+    console.error("Cancel invitation affected no rows", { invitationId, code: error?.code });
+    redirect(settingsPath(tripId, "invitation"));
+  }
+
   revalidatePath(`/trips/${tripId}/settings`);
 }
 
 export async function regenerateInviteCodeAction(formData: FormData) {
   const tripId = String(formData.get("tripId") ?? "");
   const { supabase } = await requireUser();
-  await supabase.from("trips").update({ invite_code: await generateInviteCode() }).eq("id", tripId);
+
+  const { data, error } = await supabase
+    .from("trips")
+    .update({ invite_code: await generateInviteCode() })
+    .eq("id", tripId)
+    .select("id");
+
+  if (error || (data ?? []).length === 0) {
+    console.error("Regenerate invite code affected no rows", { tripId, code: error?.code });
+    redirect(settingsPath(tripId, "invite-code"));
+  }
+
   revalidatePath(`/trips/${tripId}/settings`);
 }
 
@@ -402,7 +436,19 @@ export async function removeMemberAction(formData: FormData) {
   const tripId = String(formData.get("tripId") ?? "");
   const userId = String(formData.get("userId") ?? "");
   const { supabase } = await requireUser();
-  await supabase.from("trip_members").delete().eq("trip_id", tripId).eq("user_id", userId);
+
+  const { data, error } = await supabase
+    .from("trip_members")
+    .delete()
+    .eq("trip_id", tripId)
+    .eq("user_id", userId)
+    .select("user_id");
+
+  if (error || (data ?? []).length === 0) {
+    console.error("Remove member affected no rows", { tripId, code: error?.code });
+    redirect(settingsPath(tripId, "member"));
+  }
+
   revalidatePath(`/trips/${tripId}/settings`);
 }
 

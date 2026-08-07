@@ -437,6 +437,24 @@ select pg_temp.record('権限のないスポット更新も0行更新になる',
   pg_temp.affected_as(:'bob', format(
     $q$update public.spots set name = 'のっとり' where id = %L$q$, :'spot_solo')) = 'denied');
 
+-- 期限切れの招待。
+-- 画面は status だけで絞ると「一覧に出るのに参加できない招待」を並べてしまうため、
+-- status は pending のままでも期限で弾かれることを固定しておく。
+select pg_temp.expect_ok('期限切れの招待を作る', :'alice', format(
+  $q$insert into public.trip_invitations (trip_id, email, invite_code, invited_by, expires_at)
+     values (%L, 'expired@example.com', 'EXPIRED1', %L, now() - interval '1 day')$q$,
+  :'shared', :'alice'));
+
+select pg_temp.record('期限切れでも status は pending のまま',
+  (select status from public.trip_invitations where invite_code = 'EXPIRED1') = 'pending');
+
+select pg_temp.record('期限で絞ると一覧から外れる',
+  (select count(*) from public.trip_invitations
+    where invite_code = 'EXPIRED1' and status = 'pending' and expires_at >= now()) = 0);
+
+select pg_temp.expect_denied('期限切れの招待コードでは参加できない', :'carol',
+  $q$select public.join_trip_by_code('EXPIRED1')$q$);
+
 -- メンバーの退出・除外
 -- -------------------------------------------------------------
 select pg_temp.expect_blocked('オーナー自身は除外できない', :'alice', format(

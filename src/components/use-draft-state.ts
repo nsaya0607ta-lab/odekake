@@ -44,7 +44,7 @@ export function clearDraftState(key: string): void {
  * 送信が成立したときに下書きを消す。`anchorRef` から親フォームを探す。
  * 写真のアップロード中は送信が止められるため、そのときは消さない。
  */
-export function useClearDraftOnSubmit(key: string | null, anchorRef: RefObject<HTMLElement | null>) {
+function useClearDraftOnSubmit(key: string | null, anchorRef: RefObject<HTMLElement | null>) {
   useEffect(() => {
     if (!key) return;
     const form = anchorRef.current?.closest("form");

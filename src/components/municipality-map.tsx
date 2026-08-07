@@ -450,10 +450,18 @@ export function MunicipalityMap({
         </svg>
       </div>
 
+      {/*
+        ラベルの再配置は、フォントの読み込み後などに内部から呼ぶための口。
+        画面に意味のある操作ではないので、支援技術にもキーボードにも出さない。
+      */}
       {showLabels && labelStyle === "inline" ? (
-        <button type="button" className="sr-only" onClick={recomputeLabels}>
-          ラベル配置を再計算
-        </button>
+        <button
+          type="button"
+          aria-hidden
+          tabIndex={-1}
+          className="pointer-events-none absolute h-0 w-0 overflow-hidden opacity-0"
+          onClick={recomputeLabels}
+        />
       ) : null}
 
       <div className="mt-2 flex items-center justify-center gap-2 text-[11px] text-ink-faint">

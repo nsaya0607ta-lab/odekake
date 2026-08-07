@@ -1,21 +1,7 @@
-"use client";
-
-import { useState } from "react";
-import { IconCheck, IconLink } from "@/components/icons";
+import { CopyButton } from "@/components/copy-button";
+import { IconLink } from "@/components/icons";
 
 export function InviteCodeBox({ code, link }: { code: string; link: string }) {
-  const [copied, setCopied] = useState<"code" | "link" | null>(null);
-
-  const copy = async (value: string, kind: "code" | "link") => {
-    try {
-      await navigator.clipboard.writeText(value);
-      setCopied(kind);
-      window.setTimeout(() => setCopied(null), 2000);
-    } catch {
-      window.prompt("コピーできませんでした。手動でコピーしてください。", value);
-    }
-  };
-
   if (!code) {
     return (
       <p className="rough-card px-4 py-4 text-sm text-ink-soft">
@@ -34,22 +20,16 @@ export function InviteCodeBox({ code, link }: { code: string; link: string }) {
       </div>
 
       <div className="grid grid-cols-1 gap-2 min-[360px]:grid-cols-2">
-        <button
-          type="button"
-          onClick={() => void copy(code, "code")}
+        <CopyButton value={code} className="btn btn-quiet min-w-0 w-full px-3 text-sm">
+          コードをコピー
+        </CopyButton>
+        <CopyButton
+          value={link}
+          icon={<IconLink size={17} />}
           className="btn btn-quiet min-w-0 w-full px-3 text-sm"
         >
-          {copied === "code" ? <IconCheck size={17} /> : null}
-          <span className="truncate">コードをコピー</span>
-        </button>
-        <button
-          type="button"
-          onClick={() => void copy(link, "link")}
-          className="btn btn-quiet min-w-0 w-full px-3 text-sm"
-        >
-          {copied === "link" ? <IconCheck size={17} /> : <IconLink size={17} />}
-          <span className="truncate">リンクをコピー</span>
-        </button>
+          リンクをコピー
+        </CopyButton>
       </div>
 
       <p className="text-xs leading-relaxed text-ink-faint">

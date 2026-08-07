@@ -62,7 +62,7 @@ node scripts/verify-supabase.mjs  # 実 Supabase プロジェクトでの動作�
 ```
 
 `verify-rls.sh` は、素の PostgreSQL に Supabase 相当の土台を作って
-`supabase/migrations/*.sql` を適用し、公開範囲とアプリが前提にしている挙動を99項目確認します。
+`supabase/migrations/*.sql` を適用し、公開範囲とアプリが前提にしている挙動を103項目確認します。
 `verify-supabase.mjs` は、新規登録・確認メール・ログイン・公開範囲・写真・アカウント削除を
 実際のプロジェクトに対して順に確認します。
 
@@ -99,6 +99,13 @@ node scripts/verify-supabase.mjs  # 実 Supabase プロジェクトでの動作�
 - `src/lib/geo/regions.ts` — 8地方の区分
 
 政令指定都市の区と東京23区も、それぞれ独立した地域選択の単位として扱っています。
+
+地図の塗り分けは縮尺によって異なります。
+
+| 地図 | 塗り分け |
+| --- | --- |
+| 日本地図・地方地図 | 未訪問 / 訪問済みの2段階 |
+| 都道府県地図・エリア地図 | 訪問回数に応じた5段階（`shadeLevel()` が 0〜4 を返します） |
 
 本土から離れた島（沖縄本島・先島諸島・大東諸島・小笠原諸島）は、そのままの位置に描くと
 地図が横に広がって本土が小さくなるため、破線の枠に入れて海の余白へ寄せています
@@ -195,7 +202,6 @@ trips/{trip_id}/visits/{visit_record_id}/
 - 外部の店舗検索（`src/lib/places/` に提供元を足せば有効になります）
 - 招待メールの送信（`src/lib/email/` に送信元を足せば有効になります）
 - SNS 公開、いいね、フォロー、一般公開プロフィール、バッジ
-- 訪問回数による地図の濃淡（現在は「未訪問 / 訪問済み」の2段階。`shadeLevel()` は 0〜4 を返すので、色指定を増やせば段階を足せます）
 
 直近の変更内容は [`docs/changes-3.md`](docs/changes-3.md) と
 [`docs/changes-2.md`](docs/changes-2.md) に、

@@ -10,6 +10,7 @@ import {
   type MunicipalityLabelStyle,
 } from "@/components/municipality-map";
 import { VisitedBadge } from "@/components/ui";
+import { matchesSearch } from "@/lib/text";
 
 export type MunicipalityListItem = MunicipalityArea;
 
@@ -55,7 +56,7 @@ export function MunicipalityBrowser({
     const word = keyword.trim();
     return items.filter((municipality) => {
       if (visitedOnly && municipality.level === 0) return false;
-      if (word && !municipality.name.includes(word)) return false;
+      if (word && !matchesSearch(word, municipality.name)) return false;
       return true;
     });
   }, [items, keyword, visitedOnly]);

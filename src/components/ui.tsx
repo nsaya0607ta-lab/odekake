@@ -127,13 +127,6 @@ export function formatDate(value: string | null | undefined): string {
   return `${y}/${m}/${d}`;
 }
 
-export function formatDateShort(value: string | null | undefined): string {
-  if (!value) return "—";
-  const [, m, d] = value.slice(0, 10).split("-");
-  if (!m || !d) return value;
-  return `${Number(m)}月${Number(d)}日`;
-}
-
 /** カード全体をタップできるリンク行 */
 export function LinkRow({
   href,
