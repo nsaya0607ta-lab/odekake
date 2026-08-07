@@ -4,12 +4,10 @@ import {
   IconBell,
   IconCalendar,
   IconChevronRight,
-  IconFlag,
   IconHome,
   IconMapPin,
   IconNotebook,
   IconPlus,
-  IconSliders,
   IconUsers,
 } from "@/components/icons";
 import { TopHeader } from "@/components/page-header";
