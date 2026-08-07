@@ -86,24 +86,28 @@ export function TripForm({
       </Field>
 
       <div className="space-y-5">
-        <Field label="開始日" htmlFor="startDate" optional error={state.fieldErrors?.startDate}>
-          <input
-            id="startDate"
-            name="startDate"
-            type="date"
-            className="field w-full max-w-full min-w-0"
-            defaultValue={state.values?.startDate ?? ""}
-          />
-        </Field>
-        <Field label="終了日" htmlFor="endDate" optional error={state.fieldErrors?.endDate}>
-          <input
-            id="endDate"
-            name="endDate"
-            type="date"
-            className="field w-full max-w-full min-w-0"
-            defaultValue={state.values?.endDate ?? ""}
-          />
-        </Field>
+        <div className="w-1/2 min-w-0 pr-1.5">
+          <Field label="開始日" htmlFor="startDate" optional error={state.fieldErrors?.startDate}>
+            <input
+              id="startDate"
+              name="startDate"
+              type="date"
+              className="field w-full min-w-0 max-w-full"
+              defaultValue={state.values?.startDate ?? ""}
+            />
+          </Field>
+        </div>
+        <div className="w-1/2 min-w-0 pr-1.5">
+          <Field label="終了日" htmlFor="endDate" optional error={state.fieldErrors?.endDate}>
+            <input
+              id="endDate"
+              name="endDate"
+              type="date"
+              className="field w-full min-w-0 max-w-full"
+              defaultValue={state.values?.endDate ?? ""}
+            />
+          </Field>
+        </div>
       </div>
 
       <Field label="説明" htmlFor="description" optional>
