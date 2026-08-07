@@ -69,7 +69,8 @@ export function SpotPinMap({
           {plottable.map((spot) => {
             const [x, y] = projectPoint(spot.latitude, spot.longitude, "prefecture", shape.prefectureCode);
             const selected = activeId === spot.id;
-            const radius = mapScale / (selected ? 58 : 72);
+            const visibleRadius = mapScale / (selected ? 122 : 142);
+            const hitRadius = Math.max(visibleRadius * 4.2, mapScale / 42);
 
             return (
               <g
@@ -86,20 +87,32 @@ export function SpotPinMap({
                 }}
                 className="cursor-pointer outline-none"
               >
-                <circle cx={x} cy={y} r={radius * 2.1} fill="transparent" />
+                <circle cx={x} cy={y} r={hitRadius} fill="transparent" />
+                {selected ? (
+                  <circle
+                    cx={x}
+                    cy={y}
+                    r={visibleRadius * 1.85}
+                    fill="#dceacc"
+                    opacity="0.55"
+                    pointerEvents="none"
+                  />
+                ) : null}
                 <circle
                   cx={x}
                   cy={y}
-                  r={radius * 1.45}
+                  r={visibleRadius * 1.12}
                   fill="#fffdf7"
-                  stroke={selected ? "#6f925b" : "#d8a1aa"}
-                  strokeWidth={radius * 0.45}
+                  stroke={selected ? "#6f925b" : "#9bb885"}
+                  strokeWidth={visibleRadius * 0.28}
+                  pointerEvents="none"
                 />
                 <circle
                   cx={x}
                   cy={y}
-                  r={radius * 0.78}
-                  fill={selected ? "#6f925b" : "#dc9ca8"}
+                  r={visibleRadius * 0.5}
+                  fill={selected ? "#6f925b" : "#8daa75"}
+                  pointerEvents="none"
                 />
               </g>
             );
