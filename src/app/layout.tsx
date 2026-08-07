@@ -1,5 +1,6 @@
 import type { Metadata, Viewport } from "next";
 import { Yusei_Magic } from "next/font/google";
+import { StartupSplash } from "@/components/startup-splash";
 import "./globals.css";
 import "./compact-form-fields.css";
 
@@ -34,7 +35,9 @@ export const viewport: Viewport = {
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="ja" className={yuseiMagic.variable}>
-      <body>{children}</body>
+      <body>
+        <StartupSplash>{children}</StartupSplash>
+      </body>
     </html>
   );
 }
