@@ -74,5 +74,8 @@ export function toJapaneseStorageError(error: UnknownError): string {
   if (/mime type|not supported/i.test(message)) {
     return "この形式の画像には対応していません。JPEG・PNG・WebP をお使いください。";
   }
+  if (/row-level security|not authorized|unauthorized|forbidden/i.test(message) || error?.status === 403) {
+    return "画像を保存する権限がありません。ログインし直してから、もう一度お試しください。";
+  }
   return toJapaneseError(error, "画像のアップロードに失敗しました。もう一度お試しください。");
 }

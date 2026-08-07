@@ -323,6 +323,15 @@ select pg_temp.expect_denied('他人の一時領域へはアップロードで�
 select pg_temp.expect_count('他人の一時領域のファイルは見えない', :'bob',
   $q$select 1 from storage.objects where name like 'tmp/%'$q$, 0);
 
+-- tmp/ が使えないデータベース向けの予備の一時領域
+select pg_temp.expect_ok('自分のフォルダ内の一時領域へアップロードできる', :'alice', format(
+  $q$insert into storage.objects (bucket_id, name, owner) values ('photos', 'users/%s/uploads/draft1/a.jpg', %L)$q$,
+  :'alice', :'alice'));
+
+select pg_temp.expect_denied('他人のフォルダ内の一時領域へはアップロードできない', :'bob', format(
+  $q$insert into storage.objects (bucket_id, name, owner) values ('photos', 'users/%s/uploads/draft1/b.jpg', %L)$q$,
+  :'alice', :'bob'));
+
 select pg_temp.expect_ok('共有旅の写真をメンバーが置ける', :'bob', format(
   $q$insert into storage.objects (bucket_id, name, owner) values ('photos', 'trips/%s/visits/%s/p.jpg', %L)$q$,
   :'shared', :'visit_shared_b', :'bob'));
