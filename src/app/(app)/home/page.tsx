@@ -40,13 +40,6 @@ export default async function HomePage({ searchParams }: { searchParams: Promise
     ? []
     : (await getTripSummaries(supabase, user.id)).filter((t) => t.trip.trip_type === "solo");
   const activities = isShared ? await getTripActivities(supabase, workspace.id, 6) : [];
-
-  const now = new Date();
-  const weekStart = new Date(now);
-  weekStart.setHours(0, 0, 0, 0);
-  weekStart.setDate(now.getDate() - ((now.getDay() + 6) % 7));
-  const weekRecent = recent.filter((item) => new Date(item.visitedAt) >= weekStart);
-  const weeklyMunicipalities = new Set(weekRecent.map((item) => item.municipalityName)).size;
   const latest = recent[0] ?? null;
 
   return (
@@ -74,7 +67,7 @@ export default async function HomePage({ searchParams }: { searchParams: Promise
         <div className="flex items-center justify-between gap-2 px-1">
           <p className="min-w-0 flex-1 truncate text-sm text-ink-soft">
             <span className="font-bold text-ink">{user.displayName}</span>
-            さん、{isShared ? "今日はどこを記録しますか？" : "旅の記録を続けていきましょう！"}
+            さん、{isShared ? "今日はどこを記録しますか？" : "旅の記録を続けましょう！"}
           </p>
           <Link
             href="/workspaces"
@@ -89,22 +82,36 @@ export default async function HomePage({ searchParams }: { searchParams: Promise
             <div className="absolute -left-10 bottom-[-42px] h-28 w-64 rounded-[50%] bg-[#eef3e5]" />
             <div className="absolute left-32 bottom-[-52px] h-32 w-72 rounded-[50%] bg-[#e6eddc]" />
             <div className="absolute right-16 top-4 h-9 w-9 rounded-full border border-[#d7b87d] bg-[#f8e7ca]" />
-            <div className="relative z-10 max-w-[75%]">
+            <div className="relative z-10 pr-10">
               <p className="text-sm font-semibold text-ink-soft">{user.displayName}さん、</p>
-              <p className="mt-1 text-xl font-bold leading-snug text-ink">旅の記録を続けていきましょう！</p>
+              <p className="mt-1 whitespace-nowrap text-lg font-bold leading-snug text-ink sm:text-xl">
+                旅の記録を続けましょう！
+              </p>
             </div>
           </div>
 
-          <div className="grid grid-cols-4 divide-x divide-line px-2 py-4 text-center">
-            <DashboardStat icon={<IconMapPin size={18} />} value={areas.totals.visitedPrefectures} unit={`/ ${PREFECTURES.length}`} label="都道府県" tone="blossom" />
-            <DashboardStat icon={<IconHome size={18} />} value={areas.totals.visitedMunicipalities} unit={`/ ${MUNICIPALITIES.length}`} label="市区町村など" tone="sky" />
-            <DashboardStat icon={<IconNotebook size={18} />} value={areas.totals.visits} unit="回" label="訪問数" tone="leaf" />
-            <div className="flex min-w-0 flex-col items-center justify-center gap-1 rounded-2xl bg-sun-soft/60 px-1 py-2">
-              <span className="flex h-9 w-9 items-center justify-center rounded-full bg-card text-[#9b7440]">👟</span>
-              <span className="text-[11px] text-ink-soft">今日の歩数</span>
-              <span className="text-xl font-bold tabular-nums text-ink">—</span>
-              <span className="text-[10px] text-ink-faint">ヘルスケア連携前</span>
-            </div>
+          <div className="grid grid-cols-3 divide-x divide-line px-2 py-4 text-center">
+            <DashboardStat
+              icon={<IconMapPin size={18} />}
+              value={areas.totals.visitedPrefectures}
+              unit={`/ ${PREFECTURES.length}`}
+              label="都道府県"
+              tone="blossom"
+            />
+            <DashboardStat
+              icon={<IconHome size={18} />}
+              value={areas.totals.visitedMunicipalities}
+              unit={`/ ${MUNICIPALITIES.length}`}
+              label="市区町村など"
+              tone="sky"
+            />
+            <DashboardStat
+              icon={<IconNotebook size={18} />}
+              value={areas.totals.visits}
+              unit="回"
+              label="訪問数"
+              tone="leaf"
+            />
           </div>
         </section>
 
@@ -119,31 +126,46 @@ export default async function HomePage({ searchParams }: { searchParams: Promise
                       // eslint-disable-next-line @next/next/no-img-element
                       <img src={latest.photoUrls[0]} alt="" className="h-full w-full object-cover" />
                     ) : (
-                      <span className="flex h-full w-full items-center justify-center text-ink-faint"><IconMapPin size={20} /></span>
+                      <span className="flex h-full w-full items-center justify-center text-ink-faint">
+                        <IconMapPin size={20} />
+                      </span>
                     )}
                   </span>
                   <span className="min-w-0 flex-1">
                     <span className="block truncate font-bold">{latest.spotName}</span>
-                    <span className="mt-1 block truncate text-xs text-ink-soft">{latest.municipalityName}・{latest.tripTitle}</span>
-                    <span className="mt-2 flex items-center gap-1 text-xs text-ink-faint"><IconCalendar size={13} />{formatDate(latest.visitedAt)}</span>
+                    <span className="mt-1 block truncate text-xs text-ink-soft">
+                      {latest.municipalityName}・{latest.tripTitle}
+                    </span>
+                    <span className="mt-2 flex items-center gap-1 text-xs text-ink-faint">
+                      <IconCalendar size={13} />
+                      {formatDate(latest.visitedAt)}
+                    </span>
                   </span>
                   <IconChevronRight size={17} className="shrink-0 text-ink-faint" />
                 </div>
               </Link>
             ) : (
-              <EmptyState title="まだ記録がありません" description="訪れた場所を記録するとここに表示されます。" actionHref="/add" actionLabel="記録を追加する" />
+              <EmptyState
+                title="まだ記録がありません"
+                description="訪れた場所を記録するとここに表示されます。"
+                actionHref="/add"
+                actionLabel="記録を追加する"
+              />
             )}
           </section>
 
           <section className="min-w-0">
-            <h2 className="mb-2 px-1 text-base font-bold">今週の記録</h2>
-            <div className="rough-card h-full bg-leaf-soft/35 p-4">
-              <p className="text-xs text-ink-soft">記録した場所</p>
-              <p className="mt-1 text-2xl font-bold text-leaf-deep"><span className="tabular-nums">{weekRecent.length}</span><span className="ml-1 text-xs font-normal text-ink-soft">件</span></p>
-              <div className="my-3 border-t border-dashed border-line-strong" />
-              <p className="text-xs text-ink-soft">訪れた市区町村</p>
-              <p className="mt-1 text-2xl font-bold text-leaf-deep"><span className="tabular-nums">{weeklyMunicipalities}</span><span className="ml-1 text-xs font-normal text-ink-soft">か所</span></p>
-              <div className="mt-3 flex justify-end text-leaf-deep"><IconMapPin size={24} /></div>
+            <h2 className="mb-2 px-1 text-base font-bold">今日の歩数</h2>
+            <div className="rough-card flex h-full min-h-52 flex-col items-center justify-center bg-sun-soft/45 p-4 text-center">
+              <span className="flex h-14 w-14 items-center justify-center rounded-full border border-[#e8d4aa] bg-card text-2xl shadow-sm">
+                👟
+              </span>
+              <p className="mt-3 whitespace-nowrap text-xs text-ink-soft">今日のおでかけ</p>
+              <p className="mt-1 flex items-baseline justify-center gap-1 whitespace-nowrap text-ink">
+                <span className="text-3xl font-bold tabular-nums">—</span>
+                <span className="text-xs text-ink-soft">歩</span>
+              </p>
+              <p className="mt-3 whitespace-nowrap text-[10px] text-ink-faint">ヘルスケア連携前</p>
             </div>
           </section>
         </div>
@@ -164,25 +186,53 @@ export default async function HomePage({ searchParams }: { searchParams: Promise
             <div className="mb-2 flex items-baseline justify-between gap-3 px-1">
               <h2 className="text-base font-bold">
                 共有旅
-                {sharedWorkspaces.length > 0 ? <span className="ml-1.5 text-sm font-normal text-ink-faint tabular-nums">{sharedWorkspaces.length}件</span> : null}
+                {sharedWorkspaces.length > 0 ? (
+                  <span className="ml-1.5 text-sm font-normal text-ink-faint tabular-nums">
+                    {sharedWorkspaces.length}件
+                  </span>
+                ) : null}
               </h2>
-              <Link href="/trips/new/shared" className="flex items-center gap-0.5 text-sm text-leaf-deep"><IconPlus size={15} />つくる</Link>
+              <Link href="/trips/new/shared" className="flex items-center gap-0.5 text-sm text-leaf-deep">
+                <IconPlus size={15} />
+                つくる
+              </Link>
             </div>
             {sharedWorkspaces.length === 0 ? (
-              <EmptyState title="共有旅はまだありません" description="友人を招待すると、その旅だけの地図と記録がつくられます。" actionHref="/trips/new/shared" actionLabel="共有旅をつくる" />
+              <EmptyState
+                title="共有旅はまだありません"
+                description="友人を招待すると、その旅だけの地図と記録がつくられます。"
+                actionHref="/trips/new/shared"
+                actionLabel="共有旅をつくる"
+              />
             ) : (
               <ul className="space-y-2">
                 {sharedWorkspaces.map((item) => (
                   <li key={item.id}>
                     <form action={switchWorkspaceAction}>
                       <input type="hidden" name="workspaceId" value={item.id} />
-                      <button type="submit" className={`rough-card flex w-full items-center gap-3 px-4 py-3 text-left transition-transform active:scale-[0.99] ${item.isCurrent ? "border-leaf bg-leaf-soft" : ""}`}>
+                      <button
+                        type="submit"
+                        className={`rough-card flex w-full items-center gap-3 px-4 py-3 text-left transition-transform active:scale-[0.99] ${
+                          item.isCurrent ? "border-leaf bg-leaf-soft" : ""
+                        }`}
+                      >
                         <span className="min-w-0 flex-1">
                           <span className="block truncate font-semibold">{item.name}</span>
-                          <span className="mt-0.5 block truncate text-xs text-ink-faint">{[item.trip ? formatTripPeriod(item.trip) : null, `${item.visitCount}件の記録`].filter(Boolean).join("・")}</span>
+                          <span className="mt-0.5 block truncate text-xs text-ink-faint">
+                            {[item.trip ? formatTripPeriod(item.trip) : null, `${item.visitCount}件の記録`]
+                              .filter(Boolean)
+                              .join("・")}
+                          </span>
                         </span>
-                        <span className="flex shrink-0 items-center gap-1 rounded-full bg-sky-soft px-2.5 py-1 text-[11px] font-semibold text-[#42718f]"><IconUsers size={13} /><span className="tabular-nums">{item.memberCount}</span>人</span>
-                        {item.isCurrent ? <span className="shrink-0 text-[11px] font-semibold text-leaf-deep">表示中</span> : <IconChevronRight size={16} className="shrink-0 text-ink-faint" />}
+                        <span className="flex shrink-0 items-center gap-1 rounded-full bg-sky-soft px-2.5 py-1 text-[11px] font-semibold text-[#42718f]">
+                          <IconUsers size={13} />
+                          <span className="tabular-nums">{item.memberCount}</span>人
+                        </span>
+                        {item.isCurrent ? (
+                          <span className="shrink-0 text-[11px] font-semibold text-leaf-deep">表示中</span>
+                        ) : (
+                          <IconChevronRight size={16} className="shrink-0 text-ink-faint" />
+                        )}
                       </button>
                     </form>
                   </li>
@@ -203,32 +253,89 @@ export default async function HomePage({ searchParams }: { searchParams: Promise
   );
 }
 
-function TripSection({ title, trips, emptyTitle, emptyDescription, createHref, createLabel }: { title: string; trips: TripSummary[]; emptyTitle: string; emptyDescription: string; createHref: string; createLabel: string }) {
+function TripSection({
+  title,
+  trips,
+  emptyTitle,
+  emptyDescription,
+  createHref,
+  createLabel,
+}: {
+  title: string;
+  trips: TripSummary[];
+  emptyTitle: string;
+  emptyDescription: string;
+  createHref: string;
+  createLabel: string;
+}) {
   return (
     <section>
       <div className="mb-2 flex items-baseline justify-between gap-3 px-1">
-        <h2 className="text-base font-bold">{title}{trips.length > 0 ? <span className="ml-1.5 text-sm font-normal text-ink-faint tabular-nums">{trips.length}件</span> : null}</h2>
+        <h2 className="text-base font-bold">
+          {title}
+          {trips.length > 0 ? (
+            <span className="ml-1.5 text-sm font-normal text-ink-faint tabular-nums">{trips.length}件</span>
+          ) : null}
+        </h2>
         <div className="flex items-center gap-3">
-          <Link href={createHref} className="flex items-center gap-0.5 text-sm text-leaf-deep"><IconPlus size={15} />つくる</Link>
-          {trips.length > 3 ? <Link href="/records?tab=trips" className="flex items-center gap-0.5 text-sm text-leaf-deep">すべて見る<IconChevronRight size={15} /></Link> : null}
+          <Link href={createHref} className="flex items-center gap-0.5 text-sm text-leaf-deep">
+            <IconPlus size={15} />
+            つくる
+          </Link>
+          {trips.length > 3 ? (
+            <Link href="/records?tab=trips" className="flex items-center gap-0.5 text-sm text-leaf-deep">
+              すべて見る
+              <IconChevronRight size={15} />
+            </Link>
+          ) : null}
         </div>
       </div>
       {trips.length === 0 ? (
         <EmptyState title={emptyTitle} description={emptyDescription} actionHref={createHref} actionLabel={createLabel} />
       ) : (
-        <ul className="space-y-2">{trips.slice(0, 3).map(({ trip, visitCount }) => <li key={trip.id}><LinkRow href={`/trips/${trip.id}`} title={trip.title} subtitle={[formatTripPeriod(trip), `${visitCount}件の記録`].filter(Boolean).join("・")} /></li>)}</ul>
+        <ul className="space-y-2">
+          {trips.slice(0, 3).map(({ trip, visitCount }) => (
+            <li key={trip.id}>
+              <LinkRow
+                href={`/trips/${trip.id}`}
+                title={trip.title}
+                subtitle={[formatTripPeriod(trip), `${visitCount}件の記録`].filter(Boolean).join("・")}
+              />
+            </li>
+          ))}
+        </ul>
       )}
     </section>
   );
 }
 
-function DashboardStat({ icon, value, unit, label, tone }: { icon: React.ReactNode; value: number; unit?: string; label: string; tone: "blossom" | "sky" | "leaf" }) {
-  const toneClass = { blossom: "bg-blossom-soft text-[#95505e]", sky: "bg-sky-soft text-[#42718f]", leaf: "bg-leaf-soft text-leaf-deep" }[tone];
+function DashboardStat({
+  icon,
+  value,
+  unit,
+  label,
+  tone,
+}: {
+  icon: React.ReactNode;
+  value: number;
+  unit?: string;
+  label: string;
+  tone: "blossom" | "sky" | "leaf";
+}) {
+  const toneClass = {
+    blossom: "bg-blossom-soft text-[#95505e]",
+    sky: "bg-sky-soft text-[#42718f]",
+    leaf: "bg-leaf-soft text-leaf-deep",
+  }[tone];
+
   return (
     <div className="flex min-w-0 flex-col items-center gap-1 px-1">
       <span className={`flex h-9 w-9 items-center justify-center rounded-full ${toneClass}`}>{icon}</span>
-      <span className="mt-1 flex items-baseline gap-0.5"><span className="text-2xl leading-none font-bold tabular-nums">{value}</span>{unit ? <span className="text-[10px] text-ink-faint tabular-nums">{unit}</span> : null}</span>
-      <span className="text-[10px] leading-tight text-ink-soft">{label}</span>
+      <span className="mt-1 flex items-baseline gap-0.5">
+        <span className="text-2xl leading-none font-bold tabular-nums">{value}</span>
+        {unit ? <span className="text-[10px] text-ink-faint tabular-nums">{unit}</span> : null}
+      </span>
+      <span className="whitespace-nowrap text-[10px] leading-tight text-ink-soft">{label}</span>
     </div>
   );
 }
