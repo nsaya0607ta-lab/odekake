@@ -13,8 +13,18 @@ import { PHOTO_BUCKET, type DB } from "@/lib/data/client";
  * こうしておくと、フォームを保存せずに離れた写真は tmp/ に残るだけで、
  * 本来の場所を汚さない。残ったファイルは cleanupTemporaryPhotosAction()
  * が期限切れとして削除する。
+ *
+ * tmp/ を許可する Storage ポリシーが未適用のデータベースでは tmp/ へ書けないため、
+ * 予備の一時領域として users/{user_id}/uploads/{draft_token}/ も使う。
+ * users/{user_id}/ は最初のマイグレーションから自分専用の領域として許可されており、
+ * ポリシーの適用状況にかかわらず書き込める。
  */
 export const TMP_ROOT = "tmp";
+
+/** users/{user_id}/ 配下に置く予備の一時領域 */
+export const USER_TMP_SEGMENT = "uploads";
+
+const USER_TMP_PATTERN = new RegExp(`^users/[^/]+/${USER_TMP_SEGMENT}/`);
 
 /** 一時領域に置いたまま消してよくなるまでの時間 */
 export const TMP_RETENTION_HOURS = 12;
@@ -23,8 +33,18 @@ export function tmpPrefixFor(userId: string, draftToken: string): string {
   return `${TMP_ROOT}/${userId}/${draftToken}`;
 }
 
+/** tmp/ へ書けなかったときに使う、自分専用フォルダ内の一時領域 */
+export function userTmpPrefixFor(userId: string, draftToken: string): string {
+  return `users/${userId}/${USER_TMP_SEGMENT}/${draftToken}`;
+}
+
+/** 片づけ対象になる一時領域の根っこ（自分の分だけ） */
+export function tmpRootsFor(userId: string): string[] {
+  return [`${TMP_ROOT}/${userId}`, `users/${userId}/${USER_TMP_SEGMENT}`];
+}
+
 export function isTemporaryPath(path: string): boolean {
-  return path.startsWith(`${TMP_ROOT}/`);
+  return path.startsWith(`${TMP_ROOT}/`) || USER_TMP_PATTERN.test(path);
 }
 
 function basenameOf(path: string): string {
