@@ -8,7 +8,9 @@ import { getMailer, renderTripInvitationMail } from "@/lib/email";
 import { toJapaneseError } from "@/lib/errors";
 import { finalizePhotoPaths } from "@/lib/photos";
 import { setCurrentWorkspace } from "@/app/actions/workspace";
+import { PHOTO_BUCKET } from "@/lib/data/client";
 import { PERSONAL_WORKSPACE_ID } from "@/lib/data/workspace";
+import { safeNextPath } from "@/lib/navigation";
 import { getSiteUrl } from "@/lib/supabase/env";
 import { requireUser } from "@/lib/supabase/server";
 import type { DB } from "@/lib/data/client";
@@ -84,6 +86,12 @@ async function moveCover(supabase: DB, tripId: string, path: string | null): Pro
   return moved ?? null;
 }
 
+/** 差し替え前の表紙画像を消す。残しておくとストレージに孤立ファイルがたまる */
+async function removeReplacedCover(supabase: DB, previous: string | null, next: string | null) {
+  if (!previous || previous === next) return;
+  await supabase.storage.from(PHOTO_BUCKET).remove([previous]);
+}
+
 export async function createTripAction(_prev: ActionState, formData: FormData): Promise<ActionState> {
   const values = collect(formData);
   const parsed = tripSchema.safeParse(values);
@@ -145,6 +153,11 @@ export async function createTripAction(_prev: ActionState, formData: FormData): 
 
   revalidatePath("/home");
   revalidatePath("/records");
+
+  // 「旅行がないので先に作る」導線から来た場合は、書きかけの画面へ戻す
+  const requestedNext = String(formData.get("next") ?? "");
+  if (requestedNext) redirect(safeNextPath(requestedNext, `/trips/${tripId}`));
+
   redirect(isShared ? "/home" : `/trips/${tripId}`);
 }
 
@@ -160,7 +173,14 @@ export async function updateTripAction(_prev: ActionState, formData: FormData): 
   const { supabase } = await requireUser();
   const coverPath = await moveCover(supabase, tripId, firstPhotoPath(formData));
 
-  const { error } = await supabase
+  const { data: current } = await supabase
+    .from("trips")
+    .select("cover_image_url")
+    .eq("id", tripId)
+    .maybeSingle();
+
+  // 権限がない場合はエラーではなく0件更新になるため、更新された行で判定する
+  const { data: updated, error } = await supabase
     .from("trips")
     .update({
       title: parsed.data.title,
@@ -169,9 +189,17 @@ export async function updateTripAction(_prev: ActionState, formData: FormData): 
       description: parsed.data.description,
       cover_image_url: coverPath,
     })
-    .eq("id", tripId);
+    .eq("id", tripId)
+    .select("id");
 
   if (error) return { error: toJapaneseError(error, "旅行の更新に失敗しました。"), values };
+
+  if ((updated ?? []).length === 0) {
+    console.error("Trip update affected no rows", { tripId });
+    return { error: "この旅行を編集する権限がありません。", values };
+  }
+
+  await removeReplacedCover(supabase, current?.cover_image_url ?? null, coverPath);
 
   revalidatePath(`/trips/${tripId}`);
   return { ok: true, message: "旅行の情報を更新しました。", values };

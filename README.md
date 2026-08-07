@@ -38,7 +38,7 @@ cp .env.example .env.local
 | `NEXT_PUBLIC_SUPABASE_ANON_KEY` | anon（公開）キー |
 | `NEXT_PUBLIC_SITE_URL` | 確認メールやパスワード再設定リンクの戻り先 |
 | `EMAIL_PROVIDER` | 招待メールの送信元（任意。未設定なら送信しません） |
-| `NEXT_PUBLIC_PLACE_SEARCH_PROVIDER` | 店舗・施設検索の提供元（任意。未設定なら検索欄は使えません） |
+| `GOOGLE_PLACES_API_KEY` | Google Places API（New）のサーバー用キー（任意。未設定なら検索欄は出しません） |
 
 サービスロールキーはクライアント側でもサーバー側でも使用しません。アカウント削除は
 `delete_own_account()`（SECURITY DEFINER の RPC）経由で行います。
@@ -62,7 +62,7 @@ node scripts/verify-supabase.mjs  # 実 Supabase プロジェクトでの動作�
 ```
 
 `verify-rls.sh` は、素の PostgreSQL に Supabase 相当の土台を作って
-`supabase/migrations/*.sql` を適用し、公開範囲を91項目確認します。
+`supabase/migrations/*.sql` を適用し、公開範囲とアプリが前提にしている挙動を99項目確認します。
 `verify-supabase.mjs` は、新規登録・確認メール・ログイン・公開範囲・写真・アカウント削除を
 実際のプロジェクトに対して順に確認します。
 
@@ -82,6 +82,7 @@ node scripts/verify-supabase.mjs  # 実 Supabase プロジェクトでの動作�
 | 旅行の作成・詳細・設定 | `/trips/new` `/trips/[tripId]` `/trips/[tripId]/settings` |
 | 共有旅への参加 | `/join/[code]` `/invitations` |
 | 記録（タイムライン / 旅行 / スポット / カレンダー） | `/records` |
+| お気に入り / また行きたい場所 | `/mypage/favorites` `/mypage/wishlist` |
 | マイページ | `/mypage` `/mypage/profile` `/mypage/account` |
 
 ログイン後の主要画面には、画面下部に「ホーム / 地図 / 追加 / 記録 / マイページ」の固定ナビゲーションを表示します。
@@ -182,6 +183,8 @@ trips/{trip_id}/visits/{visit_record_id}/
 - エラーは日本語のメッセージに変換して表示します（`src/lib/errors.ts`）。
 - 入力エラーが起きても、入力済みの内容は保持されます。
 - 主要なフォームは入力内容を `localStorage` に下書き保存し、画面を閉じても復元できます。
+  文字の入力欄は `FormDraft` が DOM から復元し、場所・評価・写真のように React 側が
+  値を持つ入力は各コンポーネントが自分で保存します（`useDraftState`）。
 - 訪問履歴と旅行の作成は、同じ ID での二重登録を防いでいます。
 
 ## 初期版に含めていないもの
@@ -192,7 +195,7 @@ trips/{trip_id}/visits/{visit_record_id}/
 - 外部の店舗検索（`src/lib/places/` に提供元を足せば有効になります）
 - 招待メールの送信（`src/lib/email/` に送信元を足せば有効になります）
 - SNS 公開、いいね、フォロー、一般公開プロフィール、バッジ
-- 訪問回数による地図の濃淡（現在は「未訪問 / 訪問済み」の2段階。回数による塗り分けを後から追加できる構造にしています）
+- 訪問回数による地図の濃淡（現在は「未訪問 / 訪問済み」の2段階。`shadeLevel()` は 0〜4 を返すので、色指定を増やせば段階を足せます）
 
 直近の変更内容は [`docs/changes-3.md`](docs/changes-3.md) と
 [`docs/changes-2.md`](docs/changes-2.md) に、

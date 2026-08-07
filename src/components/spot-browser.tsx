@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useMemo, useState } from "react";
-import { IconHeart, IconMapPin, IconSliders } from "./icons";
+import { IconHeart, IconMapPin, IconSearch, IconSliders } from "./icons";
 import type { SpotSummary } from "@/lib/data/spots";
 import { StarRating, formatDate } from "./ui";
 
@@ -21,9 +21,9 @@ export function SpotBrowser({
 }: {
   spots: SpotSummary[];
   categories: Array<{ id: number; name: string }>;
-  municipalityName?: string;
 }) {
   const [showFilters, setShowFilters] = useState(false);
+  const [keyword, setKeyword] = useState("");
   const [categoryId, setCategoryId] = useState<string>("all");
   const [favoriteOnly, setFavoriteOnly] = useState(false);
   const [minRating, setMinRating] = useState<string>("0");
@@ -33,7 +33,15 @@ export function SpotBrowser({
 
   const filtered = useMemo(() => {
     const min = Number(minRating);
+    const needle = keyword.trim().toLowerCase();
     const result = spots.filter((spot) => {
+      if (
+        needle &&
+        !spot.name.toLowerCase().includes(needle) &&
+        !(spot.address ?? "").toLowerCase().includes(needle)
+      ) {
+        return false;
+      }
       if (categoryId !== "all" && String(spot.categoryId) !== categoryId) return false;
       if (favoriteOnly && !spot.favorite) return false;
       if (min > 0 && (spot.averageRating ?? 0) < min) return false;
@@ -56,9 +64,10 @@ export function SpotBrowser({
     });
 
     return result;
-  }, [spots, categoryId, favoriteOnly, minRating, visitedFrom, visitedTo, sort]);
+  }, [spots, keyword, categoryId, favoriteOnly, minRating, visitedFrom, visitedTo, sort]);
 
   const activeFilterCount =
+    (keyword.trim() ? 1 : 0) +
     (categoryId !== "all" ? 1 : 0) +
     (favoriteOnly ? 1 : 0) +
     (Number(minRating) > 0 ? 1 : 0) +
@@ -67,7 +76,20 @@ export function SpotBrowser({
 
   return (
     <div className="space-y-3">
-      <div className="flex justify-end">
+      <div className="flex gap-2">
+        <div className="relative min-w-0 flex-1">
+          <span className="pointer-events-none absolute top-1/2 left-3 -translate-y-1/2 text-ink-faint">
+            <IconSearch size={18} />
+          </span>
+          <input
+            type="search"
+            value={keyword}
+            onChange={(event) => setKeyword(event.target.value)}
+            placeholder="スポット名・住所で探す"
+            aria-label="スポットを検索"
+            className="field pl-10"
+          />
+        </div>
         <button
           type="button"
           onClick={() => setShowFilters((v) => !v)}
@@ -179,6 +201,7 @@ export function SpotBrowser({
             type="button"
             className="btn btn-quiet w-full"
             onClick={() => {
+              setKeyword("");
               setCategoryId("all");
               setFavoriteOnly(false);
               setMinRating("0");

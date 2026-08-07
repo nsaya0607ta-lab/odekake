@@ -64,6 +64,7 @@ export function SpotForm({
   trips = [],
   visitedAtDefault = "",
   showTripPlanningLink = false,
+  locationFromUrl = false,
 }: {
   categories: Array<{ id: number; name: string }>;
   location: SpotLocation;
@@ -75,6 +76,8 @@ export function SpotForm({
   trips?: SpotFormTrip[];
   visitedAtDefault?: string;
   showTripPlanningLink?: boolean;
+  /** 市区町村ページなどから場所を指定して開いた場合。下書きで上書きしない */
+  locationFromUrl?: boolean;
 }) {
   const isEdit = Boolean(spotId);
   const action = isEdit ? updateSpotAction : createVisitedSpotAction;
@@ -154,6 +157,7 @@ export function SpotForm({
           error={state.fieldErrors?.municipalityCode}
           placeSearchEnabled={placeSearchEnabled}
           onPlaceSelected={applyPlaceAutofill}
+          draftKey={isEdit || locationFromUrl ? null : "visited-place-new-location"}
         />
 
         <Field label="住所" htmlFor="address" optional error={state.fieldErrors?.address}>
@@ -214,7 +218,11 @@ export function SpotForm({
             />
           </Field>
 
-          <RatingInput name="rating" defaultValue={Number(state.values?.rating ?? 0) || 0} />
+          <RatingInput
+            name="rating"
+            defaultValue={Number(state.values?.rating ?? 0) || 0}
+            draftKey="visited-place-new-rating"
+          />
 
           <Field label="感想" htmlFor="comment" optional error={state.fieldErrors?.comment}>
             <textarea
@@ -234,12 +242,36 @@ export function SpotForm({
               userId={userId}
               draftKey={`visited-place-${visitId}`}
               max={MAX_PHOTOS_PER_VISIT}
+              persistDraft
             />
           ) : (
             <p className="rounded-2xl bg-paper-deep px-4 py-3 text-xs text-ink-soft">
               写真を追加するには、先に記録先を選んでください。
             </p>
           )}
+
+          {/* すぐ押せることに意味があるので、折りたたみの外に出しておく */}
+          <div className="rough-card space-y-2 px-4 py-3">
+            <label className="flex items-center gap-2 text-sm">
+              <input
+                type="checkbox"
+                name="revisitWanted"
+                defaultChecked={state.values?.revisitWanted === "on"}
+                className="h-5 w-5 accent-[#7fa568]"
+              />
+              また行きたい
+              <span className="text-xs text-ink-faint">（マイページにまとまります）</span>
+            </label>
+            <label className="flex items-center gap-2 text-sm">
+              <input
+                type="checkbox"
+                name="favorite"
+                defaultChecked={state.values?.favorite === "on"}
+                className="h-5 w-5 accent-[#dd9aa6]"
+              />
+              お気に入りに追加する
+            </label>
+          </div>
 
           <details className="rough-card px-4 py-3">
             <summary className="cursor-pointer text-sm font-semibold text-ink-soft">訪問内容をくわしく記録する</summary>
@@ -309,26 +341,6 @@ export function SpotForm({
                 />
               </Field>
 
-              <div className="space-y-2">
-                <label className="flex items-center gap-2 text-sm">
-                  <input
-                    type="checkbox"
-                    name="revisitWanted"
-                    defaultChecked={state.values?.revisitWanted === "on"}
-                    className="h-5 w-5 accent-[#7fa568]"
-                  />
-                  また行きたい
-                </label>
-                <label className="flex items-center gap-2 text-sm">
-                  <input
-                    type="checkbox"
-                    name="favorite"
-                    defaultChecked={state.values?.favorite === "on"}
-                    className="h-5 w-5 accent-[#dd9aa6]"
-                  />
-                  お気に入りに追加する
-                </label>
-              </div>
             </div>
           </details>
         </section>

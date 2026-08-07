@@ -1,6 +1,7 @@
 import { notFound, redirect } from "next/navigation";
 import { PageBody } from "@/components/page-body";
 import { PageHeader } from "@/components/page-header";
+import { todayInJapan } from "@/lib/date";
 import { ensurePersonalRecordTrip, getTripOptions } from "@/lib/data/trips";
 import { resolveWorkspace } from "@/lib/data/workspace";
 import { requireUser } from "@/lib/supabase/server";
@@ -31,7 +32,6 @@ export default async function NewVisitPage({
       ? await ensurePersonalRecordTrip(supabase, user.id)
       : null;
   const trips = personalRecordTrip ? [personalRecordTrip] : initialTrips;
-  const today = new Date().toISOString().slice(0, 10);
 
   return (
     <>
@@ -50,7 +50,7 @@ export default async function NewVisitPage({
           spotName={spot.name}
           trips={trips}
           defaults={{
-            visitedAt: today,
+            visitedAt: todayInJapan(),
             tripId: tripId ?? trips[0]?.id ?? "",
             rating: 0,
             comment: "",

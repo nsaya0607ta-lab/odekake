@@ -6,7 +6,9 @@ import { toJapaneseStorageError } from "@/lib/errors";
 import { ACCEPTED_IMAGE_TYPES, compressImage, extensionFor } from "@/lib/image";
 import { isTemporaryPath, tmpPrefixFor } from "@/lib/photos";
 import { createClient } from "@/lib/supabase/client";
+import { clearDraftState, readDraftState, writeDraftState } from "./use-draft-state";
 
+/** url が空文字のときは、署名付きURLを取れなかった保存済みの写真 */
 export type UploadedPhoto = { path: string; url: string };
 
 type StoredUploadedPhoto = UploadedPhoto & {
@@ -39,6 +41,7 @@ export function PhotoUploader({
   max = 10,
   initial = [],
   label = "写真",
+  persistDraft = false,
 }: {
   name: string;
   userId: string;
@@ -47,13 +50,20 @@ export function PhotoUploader({
   max?: number;
   initial?: UploadedPhoto[];
   label?: string;
+  /** 画面を離れても選んだ写真を覚えておく（新規作成フォーム向け） */
+  persistDraft?: boolean;
 }) {
   const [uploaded, setUploaded] = useState<StoredUploadedPhoto[]>(initial);
   const [pending, setPending] = useState<PendingItem[]>([]);
   const [draftToken, setDraftToken] = useState("");
   const [submitWarning, setSubmitWarning] = useState<string | null>(null);
+  const [rejectionNotice, setRejectionNotice] = useState<string | null>(null);
+  const [draftRestored, setDraftRestored] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
   const rootRef = useRef<HTMLDivElement>(null);
+  const draftStarted = useRef(false);
+
+  const draftStateKey = persistDraft ? `photos:${draftKey}` : null;
 
   useEffect(() => {
     const storageKey = `odekake:photo-draft:${draftKey}`;
@@ -66,6 +76,48 @@ export function PhotoUploader({
     window.sessionStorage.setItem(storageKey, generated);
     setDraftToken(generated);
   }, [draftKey]);
+
+  /**
+   * 保存せずに画面を離れても、選んだ写真が残るようにする。
+   * 署名付きURLは1時間で切れるため、保存するのはパスだけにして、
+   * 戻ってきたときに URL を取り直す。
+   */
+  useEffect(() => {
+    if (!draftStateKey || draftStarted.current) return;
+    draftStarted.current = true;
+
+    const saved = readDraftState<StoredUploadedPhoto[]>(draftStateKey);
+    if (saved === null) {
+      setDraftRestored(true);
+      return;
+    }
+
+    let cancelled = false;
+    void (async () => {
+      const supabase = createClient();
+      const restored = await Promise.all(
+        saved.slice(0, max).map(async (item) => {
+          const { data } = await supabase.storage.from("photos").createSignedUrl(item.path, 3600);
+          return { path: item.path, url: data?.signedUrl ?? "", removeOnDelete: item.removeOnDelete };
+        }),
+      );
+      if (cancelled) return;
+      setUploaded(restored);
+      setDraftRestored(true);
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [draftStateKey, max]);
+
+  useEffect(() => {
+    if (!draftStateKey || !draftRestored) return;
+    writeDraftState(
+      draftStateKey,
+      uploaded.map((photo) => ({ path: photo.path, removeOnDelete: photo.removeOnDelete })),
+    );
+  }, [draftStateKey, draftRestored, uploaded]);
 
   /**
    * 写真の送信中・失敗中は同じフォームの保存操作を止める。
@@ -93,14 +145,23 @@ export function PhotoUploader({
       );
     };
 
+    // 送信できたら写真の下書きも片づける
+    const clearDraft = (event: Event) => {
+      if (!draftStateKey) return;
+      if (event.defaultPrevented || form.dataset.photoUploadBlocked === "true") return;
+      clearDraftState(draftStateKey);
+    };
+
     form.addEventListener("submit", guardSubmit, true);
+    form.addEventListener("submit", clearDraft);
     if (!blocked) setSubmitWarning(null);
 
     return () => {
       form.removeEventListener("submit", guardSubmit, true);
+      form.removeEventListener("submit", clearDraft);
       delete form.dataset.photoUploadBlocked;
     };
-  }, [pending]);
+  }, [pending, draftStateKey]);
 
   const total = uploaded.length + pending.length;
   const remaining = Math.max(0, max - total);
@@ -170,9 +231,21 @@ export function PhotoUploader({
 
   const handleFiles = (files: FileList | null) => {
     if (!files) return;
-    const accepted = [...files]
-      .filter((f) => ACCEPTED_IMAGE_TYPES.includes(f.type))
-      .slice(0, remaining);
+
+    const chosen = [...files];
+    const supported = chosen.filter((file) => ACCEPTED_IMAGE_TYPES.includes(file.type));
+    const accepted = supported.slice(0, remaining);
+
+    // 対応外の形式や上限超過を黙って捨てると「選んだのに増えない」ように見えるため、理由を出す
+    const unsupported = chosen.length - supported.length;
+    const overflow = supported.length - accepted.length;
+    const reasons = [
+      unsupported > 0
+        ? `${unsupported}枚は対応していない形式のため追加できませんでした（JPEG・PNG・WebP をお使いください）。`
+        : null,
+      overflow > 0 ? `${overflow}枚は上限${max}枚を超えるため追加できませんでした。` : null,
+    ].filter(Boolean);
+    setRejectionNotice(reasons.length > 0 ? reasons.join("") : null);
 
     const items: PendingItem[] = accepted.map((file) => ({
       localId: crypto.randomUUID(),
@@ -214,8 +287,17 @@ export function PhotoUploader({
       <div className="grid grid-cols-4 gap-2">
         {uploaded.map((photo) => (
           <div key={photo.path} className="relative aspect-square overflow-hidden rounded-2xl bg-paper-deep">
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src={photo.url} alt="" className="h-full w-full object-cover" />
+            {photo.url ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img src={photo.url} alt="" className="h-full w-full object-cover" />
+            ) : (
+              // 署名付きURLを取れなかった保存済みの写真。
+              // ここで一覧から外すと、保存時に写真そのものが消えてしまう。
+              <span className="flex h-full w-full flex-col items-center justify-center gap-1 text-center text-[10px] text-ink-faint">
+                <IconCamera size={20} />
+                保存済み
+              </span>
+            )}
             <button
               type="button"
               onClick={() => void removeUploaded(photo.path)}
@@ -284,6 +366,12 @@ export function PhotoUploader({
       {pending.some((p) => p.status === "error") ? (
         <p className="mt-2 text-xs text-[#a85c6a]">
           {pending.find((p) => p.status === "error")?.error ?? "アップロードに失敗しました。"}
+        </p>
+      ) : null}
+
+      {rejectionNotice ? (
+        <p role="status" className="mt-2 text-xs leading-relaxed text-[#a85c6a]">
+          {rejectionNotice}
         </p>
       ) : null}
 

@@ -16,6 +16,8 @@ export type SpotSummary = {
   lastVisitedAt: string | null;
   averageRating: number | null;
   favorite: boolean;
+  /** いずれかの訪問履歴で「また行きたい」が付いている */
+  revisitWanted: boolean;
   photoUrl: string | null;
 };
 
@@ -31,6 +33,7 @@ function summarize(visits: VisitRecordRow[]) {
   let sum = 0;
   let rated = 0;
   let favorite = false;
+  let revisitWanted = false;
   let lastVisitedAt: string | null = null;
 
   for (const v of visits) {
@@ -39,6 +42,7 @@ function summarize(visits: VisitRecordRow[]) {
       rated += 1;
     }
     if (v.favorite) favorite = true;
+    if (v.revisit_wanted) revisitWanted = true;
     if (!lastVisitedAt || v.visited_at > lastVisitedAt) lastVisitedAt = v.visited_at;
   }
 
@@ -46,6 +50,7 @@ function summarize(visits: VisitRecordRow[]) {
     visitCount: visits.length,
     averageRating: rated > 0 ? Math.round((sum / rated) * 10) / 10 : null,
     favorite,
+    revisitWanted,
     lastVisitedAt,
   };
 }
@@ -157,24 +162,143 @@ export async function getSpotsInMunicipality(
   return attachSummaries(supabase, (spots ?? []) as SpotRow[], categoryNames, tripIds);
 }
 
-export async function getAllSpots(
+/**
+ * 一覧に並べるスポットの順番を、まず ID だけで決める。
+ *
+ * スポット本体・訪問履歴・写真をすべて読んでから絞り込むと、記録が増えるほど
+ * 1画面あたりの読み込み量が際限なく増える（PostgREST の既定上限に当たると、
+ * それ以上は黙って表示されなくなる）。先に軽い列だけで並び順を確定し、
+ * 実際に表示するぶんだけ本体を読む。
+ */
+const SPOT_ID_SCAN_LIMIT = 2000;
+
+async function orderedSpotIds(
   supabase: DB,
   tripIds: string[],
-  options?: { includeUnvisited?: boolean },
+  includeUnvisited: boolean,
+): Promise<string[]> {
+  const visitedOrder: string[] = [];
+  const seen = new Set<string>();
+
+  if (tripIds.length > 0) {
+    const { data: visits } = await supabase
+      .from("visit_records")
+      .select("spot_id, visited_at")
+      .in("trip_id", tripIds)
+      .order("visited_at", { ascending: false })
+      .order("created_at", { ascending: false })
+      .limit(SPOT_ID_SCAN_LIMIT);
+
+    for (const visit of visits ?? []) {
+      if (seen.has(visit.spot_id)) continue;
+      seen.add(visit.spot_id);
+      visitedOrder.push(visit.spot_id);
+    }
+  }
+
+  if (!includeUnvisited) return visitedOrder;
+
+  // 訪問履歴のないスポット（登録しただけの場所）を、新しい順で後ろに足す
+  const { data: spots } = await supabase
+    .from("spots")
+    .select("id")
+    .order("created_at", { ascending: false })
+    .limit(SPOT_ID_SCAN_LIMIT);
+
+  const rest = (spots ?? []).map((spot) => spot.id).filter((id) => !seen.has(id));
+  return [...visitedOrder, ...rest];
+}
+
+export type SpotPage = { spots: SpotSummary[]; hasMore: boolean };
+
+/** 指定した ID のスポットを、渡した順番のまま読み込む */
+async function loadSpotsByIds(
+  supabase: DB,
+  ids: string[],
+  tripIds: string[],
+  includeUnvisited: boolean,
 ): Promise<SpotSummary[]> {
-  const includeUnvisited = options?.includeUnvisited ?? false;
-  if (tripIds.length === 0 && !includeUnvisited) return [];
+  if (ids.length === 0) return [];
+
   const [{ data: spots }, categoryNames] = await Promise.all([
-    supabase.from("spots").select("*").order("created_at", { ascending: false }),
+    supabase.from("spots").select("*").in("id", ids),
     loadCategoryNames(supabase),
   ]);
-  return attachSummaries(
-    supabase,
-    (spots ?? []) as SpotRow[],
-    categoryNames,
-    tripIds,
-    includeUnvisited,
-  );
+
+  const byId = new Map(((spots ?? []) as SpotRow[]).map((spot) => [spot.id, spot]));
+  const ordered = ids.flatMap((id) => {
+    const spot = byId.get(id);
+    return spot ? [spot] : [];
+  });
+
+  return attachSummaries(supabase, ordered, categoryNames, tripIds, includeUnvisited);
+}
+
+/**
+ * スポット一覧を1ページ分だけ読み込む。
+ * `hasMore` は「次のページがある」ことを表す（もっと見るの表示に使う）。
+ */
+export async function getSpotPage(
+  supabase: DB,
+  tripIds: string[],
+  options?: { includeUnvisited?: boolean; limit?: number; offset?: number },
+): Promise<SpotPage> {
+  const includeUnvisited = options?.includeUnvisited ?? false;
+  const limit = options?.limit ?? 30;
+  const offset = options?.offset ?? 0;
+
+  if (tripIds.length === 0 && !includeUnvisited) return { spots: [], hasMore: false };
+
+  const ids = await orderedSpotIds(supabase, tripIds, includeUnvisited);
+  const pageIds = ids.slice(offset, offset + limit);
+
+  return {
+    spots: await loadSpotsByIds(supabase, pageIds, tripIds, includeUnvisited),
+    hasMore: ids.length > offset + limit,
+  };
+}
+
+/**
+ * 訪問履歴のフラグで絞ったスポット一覧。
+ * 「お気に入り」「また行きたい」は訪問履歴側に付くので、
+ * 全スポットを読んでから絞るのではなく、先に訪問履歴から対象を決める。
+ */
+async function getFlaggedSpots(
+  supabase: DB,
+  tripIds: string[],
+  column: "favorite" | "revisit_wanted",
+  limit = 100,
+): Promise<SpotSummary[]> {
+  if (tripIds.length === 0) return [];
+
+  const { data: visits } = await supabase
+    .from("visit_records")
+    .select("spot_id, visited_at")
+    .in("trip_id", tripIds)
+    .eq(column, true)
+    .order("visited_at", { ascending: false })
+    .limit(SPOT_ID_SCAN_LIMIT);
+
+  const ids: string[] = [];
+  const seen = new Set<string>();
+  for (const visit of visits ?? []) {
+    if (seen.has(visit.spot_id)) continue;
+    seen.add(visit.spot_id);
+    ids.push(visit.spot_id);
+    if (ids.length >= limit) break;
+  }
+
+  return loadSpotsByIds(supabase, ids, tripIds, false);
+}
+
+/** お気に入りが付いた訪問履歴のあるスポット */
+export function getFavoriteSpots(supabase: DB, tripIds: string[]): Promise<SpotSummary[]> {
+  return getFlaggedSpots(supabase, tripIds, "favorite");
+}
+
+/** 「また行きたい」が付いた訪問履歴のあるスポット */
+export function getRevisitWantedSpots(supabase: DB, tripIds: string[]): Promise<SpotSummary[]> {
+  return getFlaggedSpots(supabase, tripIds, "revisit_wanted");
 }
 
 export type SpotDetail = {

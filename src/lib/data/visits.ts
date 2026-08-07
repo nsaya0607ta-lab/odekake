@@ -27,28 +27,38 @@ export type TimelineItem = {
 };
 
 export type TimelineFilter = {
-  tripType?: TripType | "all";
   tripId?: string;
   /** 旅ワークスペースの旅行。空配列なら記録なしとして扱う */
   tripIds?: string[];
   limit?: number;
+  offset?: number;
 };
+
+/**
+ * 1回の取得に上限を設ける。
+ * 上限を決めずに読むと、記録が増えたときに写真の署名URL発行まで含めて
+ * 際限なく重くなり、PostgREST の既定上限を超えた分は黙って消える。
+ */
+const TIMELINE_DEFAULT_LIMIT = 50;
 
 export async function getTimeline(supabase: DB, filter: TimelineFilter = {}): Promise<TimelineItem[]> {
   if (filter.tripIds && filter.tripIds.length === 0) return [];
+
+  const limit = filter.limit ?? TIMELINE_DEFAULT_LIMIT;
+  const offset = filter.offset ?? 0;
 
   let query = supabase
     .from("visit_records")
     .select("*")
     .order("visited_at", { ascending: false })
-    .order("created_at", { ascending: false });
+    .order("created_at", { ascending: false })
+    .range(offset, offset + limit - 1);
 
   if (filter.tripId) query = query.eq("trip_id", filter.tripId);
   else if (filter.tripIds) query = query.in("trip_id", filter.tripIds);
-  if (filter.limit) query = query.limit(filter.limit);
 
   const { data } = await query;
-  let visits = (data ?? []) as VisitRecordRow[];
+  const visits = (data ?? []) as VisitRecordRow[];
   if (visits.length === 0) return [];
 
   const visitTripIds = visits.map((v) => v.trip_id);
@@ -69,11 +79,6 @@ export async function getTimeline(supabase: DB, filter: TimelineFilter = {}): Pr
     loadDisplayNames(supabase, authorIds),
     loadCategoryNames(supabase),
   ]);
-
-  if (filter.tripType && filter.tripType !== "all") {
-    visits = visits.filter((v) => tripLabels.get(v.trip_id)?.type === filter.tripType);
-    if (visits.length === 0) return [];
-  }
 
   const spotById = new Map(((spots ?? []) as SpotRow[]).map((s) => [s.id, s]));
 
@@ -119,6 +124,61 @@ export async function getTimeline(supabase: DB, filter: TimelineFilter = {}): Pr
           return url ? [url] : [];
         }),
         photoCount: visitPhotos.length,
+      },
+    ];
+  });
+}
+
+export type CalendarVisit = {
+  id: string;
+  visitedAt: string;
+  spotId: string;
+  spotName: string;
+  tripTitle: string;
+};
+
+/**
+ * カレンダー用の軽い取得。
+ * カレンダーは写真を出さないので、タイムラインと違って
+ * 写真の読み込みと署名URLの発行を行わない。
+ */
+export async function getCalendarVisits(
+  supabase: DB,
+  tripIds: string[],
+  limit = 500,
+): Promise<CalendarVisit[]> {
+  if (tripIds.length === 0) return [];
+
+  const { data } = await supabase
+    .from("visit_records")
+    .select("id, visited_at, spot_id, trip_id")
+    .in("trip_id", tripIds)
+    .order("visited_at", { ascending: false })
+    .limit(limit);
+
+  const visits = data ?? [];
+  if (visits.length === 0) return [];
+
+  const [{ data: spots }, tripLabels] = await Promise.all([
+    supabase
+      .from("spots")
+      .select("id, name")
+      .in("id", [...new Set(visits.map((visit) => visit.spot_id))]),
+    loadTripLabels(supabase, visits.map((visit) => visit.trip_id)),
+  ]);
+
+  const spotNames = new Map((spots ?? []).map((spot) => [spot.id, spot.name]));
+
+  return visits.flatMap((visit) => {
+    const spotName = spotNames.get(visit.spot_id);
+    if (!spotName) return [];
+    return [
+      {
+        id: visit.id,
+        visitedAt: visit.visited_at,
+        spotId: visit.spot_id,
+        spotName,
+        tripTitle: tripLabels.get(visit.trip_id)?.title ?? "旅行",
       },
     ];
   });

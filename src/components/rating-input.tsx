@@ -1,21 +1,28 @@
 "use client";
 
-import { useState } from "react";
+import { useRef } from "react";
 import { IconStar } from "./icons";
+import { useDraftState } from "./use-draft-state";
 
 export function RatingInput({
   name,
   defaultValue = 0,
   label = "評価",
+  draftKey = null,
 }: {
   name: string;
   defaultValue?: number;
   label?: string;
+  /** 指定すると、画面を離れても選んだ評価を覚えておく */
+  draftKey?: string | null;
 }) {
-  const [value, setValue] = useState(defaultValue);
+  // 評価は hidden input で送るため、FormDraft の DOM 復元では戻せない。
+  // React 側が値を持っているので、このコンポーネント自身で下書きを保存する。
+  const rootRef = useRef<HTMLFieldSetElement>(null);
+  const [value, setValue] = useDraftState(draftKey, defaultValue, rootRef);
 
   return (
-    <fieldset>
+    <fieldset ref={rootRef}>
       <legend className="field-label">
         {label}
         <span className="ml-1.5 text-[11px] font-normal text-ink-faint">（任意）</span>

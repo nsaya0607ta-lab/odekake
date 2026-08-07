@@ -244,6 +244,7 @@ export default async function HomePage({ searchParams }: { searchParams: Promise
                     leading={
                       <span className="h-12 w-12 shrink-0 overflow-hidden rounded-xl bg-paper-deep">
                         {item.photoUrls[0] ? (
+                          // eslint-disable-next-line @next/next/no-img-element
                           <img src={item.photoUrls[0]} alt="" className="h-full w-full object-cover" />
                         ) : (
                           <span className="flex h-full w-full items-center justify-center text-ink-faint">

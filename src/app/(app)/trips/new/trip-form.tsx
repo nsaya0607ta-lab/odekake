@@ -8,7 +8,16 @@ import { PhotoUploader } from "@/components/photo-uploader";
 
 type TripType = "solo" | "shared";
 
-export function TripForm({ userId, tripType }: { userId: string; tripType: TripType }) {
+export function TripForm({
+  userId,
+  tripType,
+  next = null,
+}: {
+  userId: string;
+  tripType: TripType;
+  /** 作成後の戻り先。「先に旅行を作る」導線から来たときに使う */
+  next?: string | null;
+}) {
   const [state, formAction] = useActionState(createTripAction, emptyActionState);
   const formId = `trip-form-${tripType}`;
   const draftKey = `trip-new-${tripType}`;
@@ -41,6 +50,7 @@ export function TripForm({ userId, tripType }: { userId: string; tripType: TripT
       <FormDraft formId={formId} storageKey={draftKey} />
       <input type="hidden" name="tripId" value={tripId} />
       <input type="hidden" name="tripType" value={tripType} />
+      {next ? <input type="hidden" name="next" value={next} /> : null}
 
       <FormMessage state={state} />
 
@@ -114,6 +124,7 @@ export function TripForm({ userId, tripType }: { userId: string; tripType: TripT
         draftKey={`trip-new-${tripType}-cover`}
         max={1}
         label="表紙画像"
+        persistDraft
       />
 
       {isShared ? (

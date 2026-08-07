@@ -1,5 +1,4 @@
 /** 店舗・施設検索のクライアント側インターフェース。 */
-import type { LocationSource } from "@/lib/supabase/types";
 
 export type PlaceSearchMode = "autocomplete" | "text_search";
 
@@ -186,16 +185,4 @@ function googleProvider(enabled: boolean): PlaceSearchProvider {
 
 export function getPlaceSearchProvider(enabled = false): PlaceSearchProvider {
   return googleProvider(enabled);
-}
-
-/** 検索結果をスポットの位置情報へ変換する */
-export function toSpotLocation(candidate: PlaceCandidate, provider: string) {
-  return {
-    latitude: candidate.latitude,
-    longitude: candidate.longitude,
-    locationSource: "place_search" as LocationSource,
-    locationAccuracyMeters: candidate.accuracyMeters,
-    placeProvider: provider,
-    placeId: candidate.placeId,
-  };
 }

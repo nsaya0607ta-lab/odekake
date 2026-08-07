@@ -78,7 +78,10 @@ export function VisitForm({
           <br />
           ふだんのおでかけ用に一人旅を1つ作っておくと便利です。
         </p>
-        <Link href={`/trips/new?type=solo&next=${encodeURIComponent(`/visits/new?spot=${spotId}`)}`} className="btn btn-primary w-full">
+        <Link
+          href={`/trips/new?type=solo&next=${encodeURIComponent(`/visits/new?spot=${spotId}`)}`}
+          className="btn btn-primary w-full"
+        >
           旅行をつくる
         </Link>
       </div>
@@ -151,7 +154,11 @@ export function VisitForm({
         />
       </Field>
 
-      <RatingInput name="rating" defaultValue={Number(state.values?.rating ?? defaults.rating) || 0} />
+      <RatingInput
+        name="rating"
+        defaultValue={Number(state.values?.rating ?? defaults.rating) || 0}
+        draftKey={mode === "create" && visitId ? `visit-new-${visitId}-rating` : null}
+      />
 
       <Field label="感想" htmlFor="comment" optional error={state.fieldErrors?.comment}>
         <textarea
@@ -172,12 +179,36 @@ export function VisitForm({
           draftKey={`visit-${visitId}`}
           max={MAX_PHOTOS_PER_VISIT}
           initial={initialPhotos}
+          persistDraft={mode === "create"}
         />
       ) : (
         <p className="rounded-2xl bg-paper-deep px-4 py-3 text-xs text-ink-soft">
           写真を追加するには、先に旅行を選んでください。
         </p>
       )}
+
+      {/* すぐ押せることに意味があるので、折りたたみの外に出しておく */}
+      <div className="rough-card space-y-2 px-4 py-3">
+        <label className="flex items-center gap-2 text-sm">
+          <input
+            type="checkbox"
+            name="revisitWanted"
+            defaultChecked={state.values ? state.values.revisitWanted === "on" : defaults.revisitWanted}
+            className="h-5 w-5 accent-[#7fa568]"
+          />
+          また行きたい
+          <span className="text-xs text-ink-faint">（マイページにまとまります）</span>
+        </label>
+        <label className="flex items-center gap-2 text-sm">
+          <input
+            type="checkbox"
+            name="favorite"
+            defaultChecked={state.values ? state.values.favorite === "on" : defaults.favorite}
+            className="h-5 w-5 accent-[#dd9aa6]"
+          />
+          お気に入りに追加する
+        </label>
+      </div>
 
       <details className="rough-card px-4 py-3">
         <summary className="cursor-pointer text-sm font-semibold text-ink-soft">くわしく記録する</summary>
@@ -247,28 +278,6 @@ export function VisitForm({
             />
           </Field>
 
-          <div className="space-y-2">
-            <label className="flex items-center gap-2 text-sm">
-              <input
-                type="checkbox"
-                name="revisitWanted"
-                defaultChecked={
-                  state.values ? state.values.revisitWanted === "on" : defaults.revisitWanted
-                }
-                className="h-5 w-5 accent-[#7fa568]"
-              />
-              また行きたい
-            </label>
-            <label className="flex items-center gap-2 text-sm">
-              <input
-                type="checkbox"
-                name="favorite"
-                defaultChecked={state.values ? state.values.favorite === "on" : defaults.favorite}
-                className="h-5 w-5 accent-[#dd9aa6]"
-              />
-              お気に入りに追加する
-            </label>
-          </div>
         </div>
       </details>
 

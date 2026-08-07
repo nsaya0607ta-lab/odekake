@@ -40,13 +40,18 @@ export default async function TripDetailPage({
   if (!tripData) notFound();
   const trip = tripData as TripRow;
 
-  const [members, visits, coverUrl, activities, { data: commentRows }] = await Promise.all([
+  // 1画面の読み込み量を抑えるため上限を設け、超えた分は記録画面へ誘導する
+  const VISIT_LIMIT = 50;
+  const [members, loadedVisits, coverUrl, activities, { data: commentRows }] = await Promise.all([
     getTripMembers(supabase, trip.id),
-    getTimeline(supabase, { tripId: trip.id }),
+    getTimeline(supabase, { tripId: trip.id, limit: VISIT_LIMIT + 1 }),
     getTripCoverUrl(supabase, trip),
     trip.trip_type === "shared" ? getTripActivities(supabase, trip.id, 30) : Promise.resolve([]),
     supabase.from("trip_comments").select("*").eq("trip_id", trip.id).order("created_at", { ascending: false }),
   ]);
+
+  const hasMoreVisits = loadedVisits.length > VISIT_LIMIT;
+  const visits = hasMoreVisits ? loadedVisits.slice(0, VISIT_LIMIT) : loadedVisits;
 
   const comments = (commentRows ?? []) as TripCommentRow[];
   const commentAuthors = await loadDisplayNames(
@@ -98,7 +103,12 @@ export default async function TripDetailPage({
               <p className="text-sm leading-relaxed whitespace-pre-wrap text-ink-soft">{trip.description}</p>
             ) : null}
             <p className="text-sm text-ink-soft">
-              訪問スポット <span className="font-bold text-ink tabular-nums">{visits.length}</span> 件
+              訪問スポット{" "}
+              <span className="font-bold text-ink tabular-nums">
+                {visits.length}
+                {hasMoreVisits ? "+" : ""}
+              </span>{" "}
+              件
             </p>
           </div>
         </section>
@@ -145,13 +155,20 @@ export default async function TripDetailPage({
               actionLabel="記録を追加する"
             />
           ) : (
-            <ul className="space-y-3">
-              {visits.map((item) => (
-                <li key={item.id}>
-                  <TimelineCard item={item} showTrip={false} />
-                </li>
-              ))}
-            </ul>
+            <>
+              <ul className="space-y-3">
+                {visits.map((item) => (
+                  <li key={item.id}>
+                    <TimelineCard item={item} showTrip={false} />
+                  </li>
+                ))}
+              </ul>
+              {hasMoreVisits ? (
+                <Link href="/records" className="btn btn-quiet mt-3 w-full">
+                  すべての記録を見る
+                </Link>
+              ) : null}
+            </>
           )}
         </section>
 

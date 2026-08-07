@@ -1,4 +1,4 @@
-import { PREFECTURES, getMunicipality } from "@/lib/geo";
+import { PREFECTURES } from "@/lib/geo";
 import { REGIONS } from "@/lib/geo/regions";
 import type { AreaStatsRow } from "@/lib/supabase/types";
 import type { DB } from "./client";
@@ -193,26 +193,12 @@ export async function loadAreaIndex(supabase: DB, tripIds: string[]): Promise<Ar
   };
 }
 
-export function areaEntry(map: Map<string, AreaEntry>, key: string): AreaEntry {
-  return map.get(key) ?? EMPTY;
-}
-
-/** 地図の色分けに使う基準。あとから増やせるように名前で切り替える */
-export type ShadeMetric = "visits" | "favorites";
-
-/**
- * 色の濃さを 0〜4 で返す。0 は未訪問。
- * いまは訪問回数を基準にしているが、お気に入り数へ切り替えられるようにしている。
- */
-export function shadeLevel(entry: AreaEntry, metric: ShadeMetric = "visits"): number {
-  const value = metric === "favorites" ? entry.favoriteCount : entry.visitCount;
-  if (entry.visitCount === 0) return 0;
+/** 訪問回数から色の濃さを 0〜4 で返す。0 は未訪問 */
+export function shadeLevel(entry: AreaEntry): number {
+  const value = entry.visitCount;
+  if (value === 0) return 0;
   if (value <= 1) return 1;
   if (value <= 3) return 2;
   if (value <= 7) return 3;
   return 4;
-}
-
-export function municipalityLabel(code: string): string {
-  return getMunicipality(code)?.name ?? "不明な市区町村";
 }

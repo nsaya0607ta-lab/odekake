@@ -45,6 +45,12 @@ export async function updateProfileAction(_prev: ActionState, formData: FormData
     profileImagePath = moved ?? null;
   }
 
+  const { data: current } = await supabase
+    .from("profiles")
+    .select("profile_image_url")
+    .eq("user_id", user.id)
+    .maybeSingle();
+
   const { error } = await supabase
     .from("profiles")
     .update({
@@ -55,6 +61,12 @@ export async function updateProfileAction(_prev: ActionState, formData: FormData
     .eq("user_id", user.id);
 
   if (error) return { error: toJapaneseError(error, "プロフィールの更新に失敗しました。"), values };
+
+  // 差し替え前の画像を消す。残しておくとストレージに孤立ファイルがたまる
+  const previous = current?.profile_image_url ?? null;
+  if (previous && previous !== profileImagePath) {
+    await supabase.storage.from(PHOTO_BUCKET).remove([previous]);
+  }
 
   // 通常画面は JWT の user_metadata からニックネームを即座に読めるようにする。
   // profiles と同じ値を保持することで、画面遷移ごとのプロフィール取得を不要にする。

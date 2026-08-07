@@ -132,7 +132,7 @@ export default async function MunicipalityPage({
         ) : (
           <section className="space-y-2">
             <h2 className="px-1 text-base font-bold">訪問したスポット</h2>
-            <SpotBrowser spots={spots} categories={categories} municipalityName={municipality.name} />
+            <SpotBrowser spots={spots} categories={categories} />
           </section>
         )}
       </PageBody>

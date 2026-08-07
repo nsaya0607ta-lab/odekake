@@ -59,6 +59,15 @@ function tripWorkspace(trip: TripRow, memberCount: number): Workspace {
   };
 }
 
+/**
+ * 読める旅行すべての ID。
+ * マイページ配下のようにアカウント全体をまとめて見せる画面で使う。
+ */
+export async function allReadableTripIds(supabase: DB): Promise<string[]> {
+  const { data } = await supabase.from("trips").select("id");
+  return (data ?? []).map((trip) => trip.id);
+}
+
 /** 参加しているすべてのワークスペースを、切替画面のために取り出す */
 export async function listWorkspaces(supabase: DB, userId: string): Promise<WorkspaceSummary[]> {
   const [currentId, tripSummaries] = await Promise.all([

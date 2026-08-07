@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import { toggleSpotFavoriteAction } from "@/app/actions/visits";
 import {
   IconCalendar,
   IconSliders,
@@ -20,6 +21,7 @@ import { getMunicipality, getPrefecture } from "@/lib/geo";
 import { resolveWorkspace } from "@/lib/data/workspace";
 import { requireUser } from "@/lib/supabase/server";
 import type { LocationSource } from "@/lib/supabase/types";
+import { FavoriteButton } from "./favorite-button";
 
 export const dynamic = "force-dynamic";
 
@@ -45,9 +47,9 @@ export default async function SpotDetailPage({
   searchParams,
 }: {
   params: Promise<{ spotId: string }>;
-  searchParams: Promise<{ saved?: string }>;
+  searchParams: Promise<{ saved?: string; error?: string }>;
 }) {
-  const [{ spotId }, { saved }, { supabase, user }] = await Promise.all([
+  const [{ spotId }, { saved, error }, { supabase, user }] = await Promise.all([
     params,
     searchParams,
     requireUser(),
@@ -60,6 +62,10 @@ export default async function SpotDetailPage({
   const { spot, categoryName, summary, visits, galleryUrls } = detail;
   const municipality = getMunicipality(spot.municipality_code);
   const prefecture = getPrefecture(spot.prefecture_code);
+  // お気に入りは自分の訪問履歴に付くので、自分の記録がないと切り替えられない
+  const myVisits = visits.filter((visit) => visit.record.user_id === user.id);
+  const myFavorite = myVisits.some((visit) => visit.record.favorite);
+
   const backHref =
     prefecture && municipality
       ? `/map/${prefecture.region.slug}/${prefecture.code}/${municipality.code}`
@@ -91,6 +97,12 @@ export default async function SpotDetailPage({
           </p>
         ) : null}
 
+        {error === "favorite" ? (
+          <p className="rounded-2xl border border-blossom bg-blossom-soft px-4 py-3 text-sm text-[#8f4c59]">
+            お気に入りは訪問の記録に付きます。先に訪問履歴を追加してください。
+          </p>
+        ) : null}
+
         <PhotoGallery urls={galleryUrls} />
 
         {/* 基本情報 */}
@@ -100,13 +112,19 @@ export default async function SpotDetailPage({
               <h2 className="truncate text-lg font-bold">{spot.name}</h2>
               <p className="mt-0.5 text-sm text-ink-soft">{categoryName ?? "カテゴリー未設定"}</p>
             </div>
-            {summary.favorite ? (
-              <span className="flex shrink-0 items-center gap-1 text-sm text-blossom">
-                <IconHeart size={18} filled />
-                お気に入り
-              </span>
-            ) : null}
+            <form action={toggleSpotFavoriteAction} className="shrink-0">
+              <input type="hidden" name="spotId" value={spot.id} />
+              <input type="hidden" name="favorite" value={myFavorite ? "" : "on"} />
+              <FavoriteButton favorite={myFavorite} disabled={myVisits.length === 0} />
+            </form>
           </div>
+
+          {summary.favorite && !myFavorite ? (
+            <p className="text-xs text-ink-faint">
+              <IconHeart size={12} filled className="mr-1 inline align-[-1px] text-blossom" />
+              他のメンバーがお気に入りに入れています。
+            </p>
+          ) : null}
 
           <StarRating value={summary.averageRating} size={18} />
 
