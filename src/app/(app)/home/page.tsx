@@ -119,14 +119,20 @@ export default async function HomePage({ searchParams }: { searchParams: Promise
         </section>
 
         <div className="grid grid-cols-2 items-stretch gap-3">
-          <section className="grid min-w-0 grid-rows-[auto_1fr]">
-            <SectionHeading title="最近の記録" moreHref="/records" />
+          <section className="grid min-w-0 grid-rows-[40px_240px]">
+            <div className="flex h-10 items-center justify-between gap-2 px-1">
+              <h2 className="truncate text-base font-bold">最近の記録</h2>
+              <Link href="/records" className="flex shrink-0 items-center gap-0.5 text-sm text-leaf-deep">
+                すべて見る
+                <IconChevronRight size={15} />
+              </Link>
+            </div>
             {latest ? (
               <Link
                 href={`/spots/${latest.spotId}`}
-                className="rough-card flex h-60 flex-col justify-between p-4 active:scale-[0.99]"
+                className="rough-card flex h-full min-h-0 flex-col justify-between overflow-hidden p-4 active:scale-[0.99]"
               >
-                <div>
+                <div className="min-h-0">
                   <span className="mb-3 flex h-14 w-14 overflow-hidden rounded-2xl bg-paper-deep">
                     {latest.photoUrls[0] ? (
                       // eslint-disable-next-line @next/next/no-img-element
@@ -151,15 +157,17 @@ export default async function HomePage({ searchParams }: { searchParams: Promise
                 </span>
               </Link>
             ) : (
-              <div className="rough-card flex h-60 flex-col items-center justify-center px-4 text-center">
-                <span className="flex h-12 w-12 items-center justify-center rounded-full bg-paper-deep text-ink-faint">
+              <div className="rough-card flex h-full min-h-0 flex-col items-center justify-center overflow-hidden px-4 text-center">
+                <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-paper-deep text-ink-faint">
                   <IconMapPin size={20} />
                 </span>
                 <p className="mt-3 text-sm font-bold">まだ記録がありません</p>
-                <p className="mt-2 text-[11px] leading-relaxed text-ink-soft">訪れた場所を記録するとここに表示されます。</p>
+                <p className="mt-2 line-clamp-2 text-[11px] leading-relaxed text-ink-soft">
+                  訪れた場所を記録するとここに表示されます。
+                </p>
                 <Link
                   href="/add"
-                  className="mt-4 rounded-full border border-leaf bg-leaf-soft px-4 py-2 text-xs font-semibold text-leaf-deep"
+                  className="mt-4 shrink-0 rounded-full border border-leaf bg-leaf-soft px-4 py-2 text-xs font-semibold text-leaf-deep"
                 >
                   記録を追加する
                 </Link>
@@ -167,10 +175,12 @@ export default async function HomePage({ searchParams }: { searchParams: Promise
             )}
           </section>
 
-          <section className="grid min-w-0 grid-rows-[auto_1fr]">
-            <h2 className="mb-2 px-1 text-base font-bold">今日の歩数</h2>
-            <div className="rough-card flex h-60 flex-col items-center justify-center bg-sun-soft/45 p-4 text-center">
-              <span className="flex h-14 w-14 items-center justify-center rounded-full border border-[#e8d4aa] bg-card text-2xl shadow-sm">
+          <section className="grid min-w-0 grid-rows-[40px_240px]">
+            <div className="flex h-10 items-center px-1">
+              <h2 className="truncate text-base font-bold">今日の歩数</h2>
+            </div>
+            <div className="rough-card flex h-full min-h-0 flex-col items-center justify-center overflow-hidden bg-sun-soft/45 p-4 text-center">
+              <span className="flex h-14 w-14 shrink-0 items-center justify-center rounded-full border border-[#e8d4aa] bg-card text-2xl shadow-sm">
                 👟
               </span>
               <p className="mt-3 whitespace-nowrap text-xs text-ink-soft">今日のおでかけ</p>
