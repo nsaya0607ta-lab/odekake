@@ -85,13 +85,13 @@ export function TripForm({
         />
       </Field>
 
-      <div className="grid grid-cols-2 gap-3">
+      <div className="space-y-5">
         <Field label="開始日" htmlFor="startDate" optional error={state.fieldErrors?.startDate}>
           <input
             id="startDate"
             name="startDate"
             type="date"
-            className="field field-date-pair"
+            className="field w-full max-w-full min-w-0"
             defaultValue={state.values?.startDate ?? ""}
           />
         </Field>
@@ -100,7 +100,7 @@ export function TripForm({
             id="endDate"
             name="endDate"
             type="date"
-            className="field field-date-pair"
+            className="field w-full max-w-full min-w-0"
             defaultValue={state.values?.endDate ?? ""}
           />
         </Field>
