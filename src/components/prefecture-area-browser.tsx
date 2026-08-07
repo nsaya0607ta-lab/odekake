@@ -42,7 +42,8 @@ export function PrefectureAreaBrowser({
     tone: area.tone,
     visited: area.visitedMunicipalityCount > 0,
     href: `${hrefBase}/area/${area.slug}`,
-    labelAt: area.center,
+    // 地区名は地図の中には描画せず、下の選択一覧にまとめる。
+    labelAt: null,
   }));
 
   return (
@@ -53,7 +54,7 @@ export function PrefectureAreaBrowser({
           <div className="rough-card px-3 py-4">
             <p className="mb-2 text-center text-xs text-ink-soft">
               <span className="rough-pill bg-leaf-soft px-3 py-1 text-leaf-deep">
-                地域をタップすると市区町村を拡大表示
+                地域名は地図の下から選択できます
               </span>
             </p>
             <AreaMap
@@ -61,7 +62,7 @@ export function PrefectureAreaBrowser({
               viewBox={viewBox}
               labelSize={labelSize}
               insets={insets}
-              ariaLabel={`${prefectureName}の公式地域区分地図。地域を選ぶと市区町村地図へ移動します`}
+              ariaLabel={`${prefectureName}の公式地域区分地図。地域名は地図の下の一覧から選択できます`}
               className="h-auto w-full"
               colorUnvisited
             />
@@ -73,7 +74,7 @@ export function PrefectureAreaBrowser({
       ) : null}
 
       <section>
-        <h2 className="mb-2 px-1 text-base font-bold">公式地域一覧</h2>
+        <h2 className="mb-2 px-1 text-base font-bold">地域を選ぶ</h2>
         <ul className="grid grid-cols-1 gap-2 min-[390px]:grid-cols-2">
           {areas.map((area) => (
             <li key={area.slug}>
