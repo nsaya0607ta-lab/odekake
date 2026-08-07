@@ -38,12 +38,17 @@ function midpoint(a: Point, b: Point): Point {
 
 function smoothClosedPath(points: readonly Point[]) {
   if (points.length < 3) return "";
-  const start = midpoint(points[points.length - 1], points[0]);
+  const first = points[0];
+  const last = points[points.length - 1];
+  if (!first || !last) return "";
+
+  const start = midpoint(last, first);
   let d = `M ${start[0]} ${start[1]}`;
 
   for (let index = 0; index < points.length; index += 1) {
     const point = points[index];
     const next = points[(index + 1) % points.length];
+    if (!point || !next) continue;
     const mid = midpoint(point, next);
     d += ` Q ${point[0]} ${point[1]} ${mid[0]} ${mid[1]}`;
   }
