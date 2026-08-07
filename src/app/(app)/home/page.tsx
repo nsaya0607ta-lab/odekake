@@ -14,6 +14,7 @@ import { TopHeader } from "@/components/page-header";
 import { PageBody } from "@/components/page-body";
 import { TripActivityList } from "@/components/trip-activity-list";
 import { EmptyState, LinkRow, SectionHeading, formatDate } from "@/components/ui";
+import { WanderingFrenchie } from "@/components/wandering-frenchie";
 import { loadAreaIndex } from "@/lib/data/areas";
 import { formatTripPeriod, getTripActivities, getTripSummaries, type TripSummary } from "@/lib/data/trips";
 import { getTimeline } from "@/lib/data/visits";
@@ -67,7 +68,7 @@ export default async function HomePage({ searchParams }: { searchParams: Promise
         <div className="flex items-center justify-between gap-2 px-1">
           <p className="min-w-0 flex-1 truncate text-sm text-ink-soft">
             <span className="font-bold text-ink">{user.displayName}</span>
-            さん、{isShared ? "今日はどこを記録しますか？" : "旅の記録を続けましょう！"}
+            さん、{isShared ? "今日はどこを記録しますか？" : "おでかけを記録しましょう"}
           </p>
           <Link
             href="/workspaces"
@@ -78,16 +79,18 @@ export default async function HomePage({ searchParams }: { searchParams: Promise
         </div>
 
         <section className="rough-card overflow-hidden">
-          <div className="relative min-h-28 overflow-hidden bg-leaf-soft px-5 py-5">
-            <div className="absolute -left-10 bottom-[-42px] h-28 w-64 rounded-[50%] bg-[#eef3e5]" />
-            <div className="absolute left-32 bottom-[-52px] h-32 w-72 rounded-[50%] bg-[#e6eddc]" />
-            <div className="absolute right-16 top-4 h-9 w-9 rounded-full border border-[#d7b87d] bg-[#f8e7ca]" />
-            <div className="relative z-10 pr-10">
-              <p className="text-sm font-semibold text-ink-soft">{user.displayName}さん、</p>
-              <p className="mt-1 whitespace-nowrap text-lg font-bold leading-snug text-ink sm:text-xl">
-                旅の記録を続けましょう！
-              </p>
-            </div>
+          <div className="relative h-40 overflow-hidden bg-leaf-soft">
+            <div className="absolute inset-x-0 bottom-0 h-24 bg-[#eef3e5]" />
+            <div className="absolute -left-14 bottom-[-42px] h-32 w-72 rounded-[50%] bg-[#e3ecd7]" />
+            <div className="absolute right-[-42px] bottom-[-54px] h-36 w-80 rounded-[50%] bg-[#dce8cf]" />
+            <div className="absolute left-[10%] top-6 h-4 w-10 rounded-full bg-white/55" />
+            <div className="absolute left-[32%] top-10 h-3 w-8 rounded-full bg-white/45" />
+            <div className="absolute right-12 top-5 h-10 w-10 rounded-full border border-[#d7b87d] bg-[#f8e7ca]" />
+            <div className="absolute bottom-5 left-[8%] h-6 w-2 rounded-full bg-[#91aa75]" />
+            <div className="absolute bottom-4 left-[7.2%] h-5 w-5 rounded-[50%] bg-[#b9cf9f]" />
+            <div className="absolute bottom-7 right-[12%] h-8 w-2 rounded-full bg-[#91aa75]" />
+            <div className="absolute bottom-6 right-[10.8%] h-6 w-6 rounded-[50%] bg-[#b9cf9f]" />
+            <WanderingFrenchie />
           </div>
 
           <div className="grid grid-cols-3 divide-x divide-line px-2 py-4 text-center">
@@ -115,13 +118,16 @@ export default async function HomePage({ searchParams }: { searchParams: Promise
           </div>
         </section>
 
-        <div className="grid grid-cols-[1.15fr_0.85fr] gap-3">
-          <section className="min-w-0">
+        <div className="grid grid-cols-2 items-stretch gap-3">
+          <section className="grid min-w-0 grid-rows-[auto_1fr]">
             <SectionHeading title="最近の記録" moreHref="/records" />
             {latest ? (
-              <Link href={`/spots/${latest.spotId}`} className="rough-card block h-full p-3 active:scale-[0.99]">
-                <div className="flex gap-3">
-                  <span className="h-14 w-14 shrink-0 overflow-hidden rounded-2xl bg-paper-deep">
+              <Link
+                href={`/spots/${latest.spotId}`}
+                className="rough-card flex h-60 flex-col justify-between p-4 active:scale-[0.99]"
+              >
+                <div>
+                  <span className="mb-3 flex h-14 w-14 overflow-hidden rounded-2xl bg-paper-deep">
                     {latest.photoUrls[0] ? (
                       // eslint-disable-next-line @next/next/no-img-element
                       <img src={latest.photoUrls[0]} alt="" className="h-full w-full object-cover" />
@@ -131,32 +137,39 @@ export default async function HomePage({ searchParams }: { searchParams: Promise
                       </span>
                     )}
                   </span>
-                  <span className="min-w-0 flex-1">
-                    <span className="block truncate font-bold">{latest.spotName}</span>
-                    <span className="mt-1 block truncate text-xs text-ink-soft">
-                      {latest.municipalityName}・{latest.tripTitle}
-                    </span>
-                    <span className="mt-2 flex items-center gap-1 text-xs text-ink-faint">
-                      <IconCalendar size={13} />
-                      {formatDate(latest.visitedAt)}
-                    </span>
+                  <span className="block line-clamp-2 font-bold leading-snug">{latest.spotName}</span>
+                  <span className="mt-1 block line-clamp-2 text-xs leading-relaxed text-ink-soft">
+                    {latest.municipalityName}・{latest.tripTitle}
                   </span>
-                  <IconChevronRight size={17} className="shrink-0 text-ink-faint" />
                 </div>
+                <span className="flex items-center justify-between gap-1 text-xs text-ink-faint">
+                  <span className="flex min-w-0 items-center gap-1 truncate">
+                    <IconCalendar size={13} />
+                    {formatDate(latest.visitedAt)}
+                  </span>
+                  <IconChevronRight size={17} className="shrink-0" />
+                </span>
               </Link>
             ) : (
-              <EmptyState
-                title="まだ記録がありません"
-                description="訪れた場所を記録するとここに表示されます。"
-                actionHref="/add"
-                actionLabel="記録を追加する"
-              />
+              <div className="rough-card flex h-60 flex-col items-center justify-center px-4 text-center">
+                <span className="flex h-12 w-12 items-center justify-center rounded-full bg-paper-deep text-ink-faint">
+                  <IconMapPin size={20} />
+                </span>
+                <p className="mt-3 text-sm font-bold">まだ記録がありません</p>
+                <p className="mt-2 text-[11px] leading-relaxed text-ink-soft">訪れた場所を記録するとここに表示されます。</p>
+                <Link
+                  href="/add"
+                  className="mt-4 rounded-full border border-leaf bg-leaf-soft px-4 py-2 text-xs font-semibold text-leaf-deep"
+                >
+                  記録を追加する
+                </Link>
+              </div>
             )}
           </section>
 
-          <section className="min-w-0">
+          <section className="grid min-w-0 grid-rows-[auto_1fr]">
             <h2 className="mb-2 px-1 text-base font-bold">今日の歩数</h2>
-            <div className="rough-card flex h-full min-h-52 flex-col items-center justify-center bg-sun-soft/45 p-4 text-center">
+            <div className="rough-card flex h-60 flex-col items-center justify-center bg-sun-soft/45 p-4 text-center">
               <span className="flex h-14 w-14 items-center justify-center rounded-full border border-[#e8d4aa] bg-card text-2xl shadow-sm">
                 👟
               </span>
