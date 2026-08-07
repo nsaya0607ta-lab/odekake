@@ -87,17 +87,25 @@ export default async function PrefectureAreaPage({
           </div>
         </section>
 
-        <MunicipalityBrowser
-          prefectureName={`${prefecture.name} ${selectedArea.name}`}
-          viewBox={areaViewBox}
-          insets={[]}
-          items={selectedArea.municipalities}
-          hrefBase={`/map/${region.slug}/${prefecture.code}`}
-          hrefSuffix={`?area=${selectedArea.slug}`}
-          hasMap={selectedArea.municipalities.some((municipality) => municipality.d !== null)}
-          mapHeading="市区町村マップ"
-          mapInstruction="市区町村名は地図の下から選択できます"
-        />
+        <div data-area-municipality-map>
+          <MunicipalityBrowser
+            prefectureName={`${prefecture.name} ${selectedArea.name}`}
+            viewBox={areaViewBox}
+            insets={[]}
+            items={selectedArea.municipalities}
+            hrefBase={`/map/${region.slug}/${prefecture.code}`}
+            hrefSuffix={`?area=${selectedArea.slug}`}
+            hasMap={selectedArea.municipalities.some((municipality) => municipality.d !== null)}
+            mapHeading="市区町村マップ"
+            mapInstruction="市区町村名は地図の下から選択できます"
+          />
+        </div>
+        <style>{`
+          [data-area-municipality-map] path[data-map-shape="true"] {
+            stroke-width: 1.6px;
+            stroke-opacity: 1;
+          }
+        `}</style>
       </PageBody>
     </>
   );
