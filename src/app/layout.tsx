@@ -1,6 +1,16 @@
 import type { Metadata, Viewport } from "next";
+import { Yusei_Magic } from "next/font/google";
 import "./globals.css";
 import "./compact-form-fields.css";
+
+// 手書き（サインペン）風の書体。日本語は分割数が多いため preload はしない。
+const yuseiMagic = Yusei_Magic({
+  weight: "400",
+  subsets: ["latin"],
+  display: "swap",
+  preload: false,
+  variable: "--font-handwritten",
+});
 
 export const metadata: Metadata = {
   title: "おでかけ記録",
@@ -23,7 +33,7 @@ export const viewport: Viewport = {
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="ja">
+    <html lang="ja" className={yuseiMagic.variable}>
       <body>{children}</body>
     </html>
   );

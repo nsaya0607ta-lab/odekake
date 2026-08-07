@@ -36,8 +36,8 @@
   --color-apricot-soft: #f8e5d6;
 
   --font-sans:
-    "Hiragino Maru Gothic ProN", "ヒラギノ丸ゴ ProN W4", "Zen Maru Gothic", "Yu Gothic Medium", "游ゴシック Medium",
-    YuGothic, "Hiragino Sans", "Noto Sans JP", system-ui, sans-serif;
+    var(--font-handwritten), "Hiragino Maru Gothic ProN", "ヒラギノ丸ゴ ProN W4", "Yu Gothic Medium",
+    "游ゴシック Medium", YuGothic, "Hiragino Sans", "Noto Sans JP", system-ui, sans-serif;
 
   --radius-blob: 1.5rem;
 }
@@ -66,6 +66,10 @@
     background-size: 22px 22px;
     -webkit-font-smoothing: antialiased;
     overscroll-behavior-y: none;
+    /* 手書き書体は太字データを持たないため、ブラウザが太らせると
+       画数の多い漢字が潰れる。合成をやめて字形をそのまま活かす。 */
+    font-synthesis: none;
+    font-synthesis-weight: none;
   }
 
   /* 端末のセーフエリアを避ける */
