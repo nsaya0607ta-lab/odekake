@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { safeNextPath } from "@/lib/navigation";
 import { LoginForm } from "./login-form";
 
 export const metadata = { title: "ログイン | おでかけ記録" };
@@ -9,7 +10,7 @@ export default async function LoginPage({
   searchParams: Promise<{ next?: string; notice?: string }>;
 }) {
   const { next, notice } = await searchParams;
-  const nextPath = next?.startsWith("/") && !next.startsWith("//") ? next : "/home";
+  const nextPath = safeNextPath(next);
 
   const noticeText =
     notice === "signed-out"

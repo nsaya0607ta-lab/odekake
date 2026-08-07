@@ -8,9 +8,11 @@ export function TripCommentForm({ tripId }: { tripId: string }) {
   const [state, formAction] = useActionState(addTripCommentAction, emptyActionState);
   const formRef = useRef<HTMLFormElement>(null);
 
+  // 依存を state.ok にすると、2回続けて投稿したとき値が true のままで
+  // エフェクトが動かず、入力欄が消えない。state ごと見る。
   useEffect(() => {
     if (state.ok) formRef.current?.reset();
-  }, [state.ok]);
+  }, [state]);
 
   return (
     <form ref={formRef} action={formAction} className="space-y-2">

@@ -36,7 +36,9 @@ export default async function MyPage() {
   const { data: pendingInvitations } = await supabase
     .from("trip_invitations")
     .select("id, email")
-    .eq("status", "pending");
+    .eq("status", "pending")
+    // status は期限切れでも pending のままなので、期限も見る
+    .gte("expires_at", new Date().toISOString());
 
   // RLS は「自分宛の招待」だけでなく「自分が主催者として送った招待」も返す。
   // ここは受け取った招待の件数なので、自分のメールアドレス宛だけを数える。

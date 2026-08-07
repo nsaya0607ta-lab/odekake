@@ -268,6 +268,26 @@ select pg_temp.expect_count('carol には旅行が1件も見えない', :'carol'
 select pg_temp.expect_count('bob に見える旅行は共有旅の1件だけ', :'bob', 'select 1 from public.trips', 1);
 select pg_temp.expect_count('alice には自分の2件が見える', :'alice', 'select 1 from public.trips', 2);
 
+-- 共有旅のスポットが「メンバーには見える」ことの確認。
+-- これまで未参加ユーザーに見えないことしか確かめておらず、
+-- spots_select を狭めてしまっても気づけない状態だった。
+-- 地図の色分け・タイムライン・スポット詳細がここに乗っている。
+select pg_temp.expect_count('共有旅のスポットはメンバーに見える', :'bob',
+  format($q$select 1 from public.spots where id = %L$q$, :'spot_shared'), 1);
+
+select pg_temp.record('spots に select ポリシーが1本だけある',
+  (select count(*) from pg_policies
+    where schemaname = 'public' and tablename = 'spots' and cmd = 'SELECT') = 1);
+
+-- タイムラインは、見える訪問記録すべてがスポットへ結び付くことを前提にしている
+-- （結び付かない記録はアプリ側で黙って落ちる）。件数の一致で確かめる。
+select pg_temp.record('見える訪問記録はすべてスポットへ結び付く',
+  pg_temp.count_as(:'bob', format($q$select 1 from public.visit_records where trip_id = %L$q$, :'shared'))
+  = pg_temp.count_as(:'bob', format(
+      $q$select 1 from public.visit_records vr
+           join public.spots s on s.id = vr.spot_id
+          where vr.trip_id = %L$q$, :'shared')));
+
 -- -------------------------------------------------------------
 -- 編集・削除の権限
 -- -------------------------------------------------------------
@@ -436,6 +456,24 @@ select pg_temp.record('権限のない更新は例外ではなく0行更新に�
 select pg_temp.record('権限のないスポット更新も0行更新になる',
   pg_temp.affected_as(:'bob', format(
     $q$update public.spots set name = 'のっとり' where id = %L$q$, :'spot_solo')) = 'denied');
+
+-- 期限切れの招待。
+-- 画面は status だけで絞ると「一覧に出るのに参加できない招待」を並べてしまうため、
+-- status は pending のままでも期限で弾かれることを固定しておく。
+select pg_temp.expect_ok('期限切れの招待を作る', :'alice', format(
+  $q$insert into public.trip_invitations (trip_id, email, invite_code, invited_by, expires_at)
+     values (%L, 'expired@example.com', 'EXPIRED1', %L, now() - interval '1 day')$q$,
+  :'shared', :'alice'));
+
+select pg_temp.record('期限切れでも status は pending のまま',
+  (select status from public.trip_invitations where invite_code = 'EXPIRED1') = 'pending');
+
+select pg_temp.record('期限で絞ると一覧から外れる',
+  (select count(*) from public.trip_invitations
+    where invite_code = 'EXPIRED1' and status = 'pending' and expires_at >= now()) = 0);
+
+select pg_temp.expect_denied('期限切れの招待コードでは参加できない', :'carol',
+  $q$select public.join_trip_by_code('EXPIRED1')$q$);
 
 -- メンバーの退出・除外
 -- -------------------------------------------------------------

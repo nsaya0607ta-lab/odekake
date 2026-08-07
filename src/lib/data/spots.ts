@@ -234,27 +234,59 @@ async function loadSpotsByIds(
   return attachSummaries(supabase, ordered, categoryNames, tripIds, includeUnvisited);
 }
 
+/** PostgREST の or 条件を壊さないよう、区切り文字を落とす */
+function escapeForFilter(value: string): string {
+  return value.replace(/[%,()"\\]/g, " ").trim();
+}
+
+/**
+ * 名前・住所の部分一致でスポットの ID を絞る。
+ *
+ * 一覧の絞り込みを読み込み済みのページ内だけで行うと、次のページにある
+ * スポットは検索しても出てこない。検索はサーバー側で全件に対して行う。
+ */
+async function searchSpotIds(supabase: DB, keyword: string): Promise<Set<string> | null> {
+  const escaped = escapeForFilter(keyword);
+  if (!escaped) return null;
+
+  const { data } = await supabase
+    .from("spots")
+    .select("id")
+    .or(`name.ilike.%${escaped}%,address.ilike.%${escaped}%`)
+    .limit(SPOT_ID_SCAN_LIMIT);
+
+  return new Set((data ?? []).map((spot) => spot.id));
+}
+
 /**
  * スポット一覧を1ページ分だけ読み込む。
  * `hasMore` は「次のページがある」ことを表す（もっと見るの表示に使う）。
+ * `keyword` を渡すと、読み込み済みの分だけでなく全件から探す。
  */
 export async function getSpotPage(
   supabase: DB,
   tripIds: string[],
-  options?: { includeUnvisited?: boolean; limit?: number; offset?: number },
-): Promise<SpotPage> {
+  options?: { includeUnvisited?: boolean; limit?: number; offset?: number; keyword?: string },
+): Promise<SpotPage & { total: number }> {
   const includeUnvisited = options?.includeUnvisited ?? false;
   const limit = options?.limit ?? 30;
   const offset = options?.offset ?? 0;
+  const keyword = options?.keyword?.trim() ?? "";
 
-  if (tripIds.length === 0 && !includeUnvisited) return { spots: [], hasMore: false };
+  if (tripIds.length === 0 && !includeUnvisited) return { spots: [], hasMore: false, total: 0 };
 
-  const ids = await orderedSpotIds(supabase, tripIds, includeUnvisited);
+  const [ordered, matched] = await Promise.all([
+    orderedSpotIds(supabase, tripIds, includeUnvisited),
+    keyword ? searchSpotIds(supabase, keyword) : Promise.resolve(null),
+  ]);
+
+  const ids = matched ? ordered.filter((id) => matched.has(id)) : ordered;
   const pageIds = ids.slice(offset, offset + limit);
 
   return {
     spots: await loadSpotsByIds(supabase, pageIds, tripIds, includeUnvisited),
     hasMore: ids.length > offset + limit,
+    total: ids.length,
   };
 }
 

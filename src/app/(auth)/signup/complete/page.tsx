@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { safeNextPath } from "@/lib/navigation";
 import { IconMail } from "@/components/icons";
 import { ResendForm } from "./resend-form";
 
@@ -10,7 +11,7 @@ export default async function SignUpCompletePage({
   searchParams: Promise<{ email?: string; next?: string }>;
 }) {
   const { email, next } = await searchParams;
-  const nextPath = next?.startsWith("/") && !next.startsWith("//") ? next : "/home";
+  const nextPath = safeNextPath(next);
 
   return (
     <div className="rough-card p-6 text-center">

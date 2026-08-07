@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useMemo, useState } from "react";
 import { IconHeart, IconMapPin, IconSearch, IconSliders } from "./icons";
 import type { SpotSummary } from "@/lib/data/spots";
+import { matchesSearch } from "@/lib/text";
 import { StarRating, formatDate } from "./ui";
 
 type SortKey = "recent" | "rating" | "visits" | "name";
@@ -18,9 +19,16 @@ const SORT_LABELS: Record<SortKey, string> = {
 export function SpotBrowser({
   spots,
   categories,
+  search,
 }: {
   spots: SpotSummary[];
   categories: Array<{ id: number; name: string }>;
+  /**
+   * 検索をサーバー側で行う場合の設定。
+   * 一覧をページ送りしている画面では、読み込み済みの分だけを絞ると
+   * 次のページのスポットが見つからないため、URL 経由で全件から探す。
+   */
+  search?: { action: string; keyword: string; hiddenFields?: Record<string, string> };
 }) {
   const [showFilters, setShowFilters] = useState(false);
   const [keyword, setKeyword] = useState("");
@@ -33,15 +41,10 @@ export function SpotBrowser({
 
   const filtered = useMemo(() => {
     const min = Number(minRating);
-    const needle = keyword.trim().toLowerCase();
+    // サーバー側で検索済みのときは、ここで重ねて絞らない
+    const needle = search ? "" : keyword.trim();
     const result = spots.filter((spot) => {
-      if (
-        needle &&
-        !spot.name.toLowerCase().includes(needle) &&
-        !(spot.address ?? "").toLowerCase().includes(needle)
-      ) {
-        return false;
-      }
+      if (needle && !matchesSearch(needle, spot.name, spot.address)) return false;
       if (categoryId !== "all" && String(spot.categoryId) !== categoryId) return false;
       if (favoriteOnly && !spot.favorite) return false;
       if (min > 0 && (spot.averageRating ?? 0) < min) return false;
@@ -64,32 +67,55 @@ export function SpotBrowser({
     });
 
     return result;
-  }, [spots, keyword, categoryId, favoriteOnly, minRating, visitedFrom, visitedTo, sort]);
+  }, [spots, search, keyword, categoryId, favoriteOnly, minRating, visitedFrom, visitedTo, sort]);
 
-  const activeFilterCount =
-    (keyword.trim() ? 1 : 0) +
+  const localFilterCount =
     (categoryId !== "all" ? 1 : 0) +
     (favoriteOnly ? 1 : 0) +
     (Number(minRating) > 0 ? 1 : 0) +
     (visitedFrom ? 1 : 0) +
     (visitedTo ? 1 : 0);
 
+  const activeFilterCount = localFilterCount + ((search ? search.keyword : keyword).trim() ? 1 : 0);
+  // 絞り込みは読み込み済みの分にしか効かない。件数の言い方をそれに合わせる
+  const localFilterApplied = localFilterCount > 0;
+
   return (
     <div className="space-y-3">
       <div className="flex gap-2">
-        <div className="relative min-w-0 flex-1">
-          <span className="pointer-events-none absolute top-1/2 left-3 -translate-y-1/2 text-ink-faint">
-            <IconSearch size={18} />
-          </span>
-          <input
-            type="search"
-            value={keyword}
-            onChange={(event) => setKeyword(event.target.value)}
-            placeholder="スポット名・住所で探す"
-            aria-label="スポットを検索"
-            className="field pl-10"
-          />
-        </div>
+        {search ? (
+          <form method="GET" action={search.action} className="relative min-w-0 flex-1">
+            {Object.entries(search.hiddenFields ?? {}).map(([name, value]) => (
+              <input key={name} type="hidden" name={name} value={value} />
+            ))}
+            <span className="pointer-events-none absolute top-1/2 left-3 -translate-y-1/2 text-ink-faint">
+              <IconSearch size={18} />
+            </span>
+            <input
+              type="search"
+              name="q"
+              defaultValue={search.keyword}
+              placeholder="スポット名・住所で探す"
+              aria-label="スポットを検索"
+              enterKeyHint="search"
+              className="field pl-10"
+            />
+          </form>
+        ) : (
+          <div className="relative min-w-0 flex-1">
+            <span className="pointer-events-none absolute top-1/2 left-3 -translate-y-1/2 text-ink-faint">
+              <IconSearch size={18} />
+            </span>
+            <input
+              type="search"
+              value={keyword}
+              onChange={(event) => setKeyword(event.target.value)}
+              placeholder="スポット名・住所で探す"
+              aria-label="スポットを検索"
+              className="field pl-10"
+            />
+          </div>
+        )}
         <button
           type="button"
           onClick={() => setShowFilters((v) => !v)}
@@ -215,8 +241,18 @@ export function SpotBrowser({
       ) : null}
 
       <p className="px-1 text-xs text-ink-faint">
-        {filtered.length}件を表示中（{SORT_LABELS[sort]}）
+        {localFilterApplied
+          ? `読み込み済みの${spots.length}件のうち${filtered.length}件`
+          : `${filtered.length}件を表示中`}
+        （{SORT_LABELS[sort]}）
       </p>
+
+      {localFilterApplied && search ? (
+        <p className="px-1 text-xs text-ink-faint">
+          カテゴリー・評価・訪問日の絞り込みは、いま読み込んでいる分にだけかかります。
+          もっと見るで読み込むと対象が増えます。
+        </p>
+      ) : null}
 
       {filtered.length === 0 ? (
         <p className="rough-card px-4 py-8 text-center text-sm text-ink-soft">

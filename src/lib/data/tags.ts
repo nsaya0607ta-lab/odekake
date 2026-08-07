@@ -4,7 +4,7 @@ const MAX_TAGS_PER_VISIT = 10;
 const MAX_TAG_LENGTH = 20;
 
 /** 入力欄の文字列をタグ名の配列に整える */
-export function parseTagNames(raw: string): string[] {
+function parseTagNames(raw: string): string[] {
   return [
     ...new Set(
       raw

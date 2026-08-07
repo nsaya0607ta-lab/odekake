@@ -31,6 +31,13 @@ const STATUS_LABELS: Record<string, string> = {
   cancelled: "取り消し",
 };
 
+const SETTINGS_ERRORS: Record<string, string> = {
+  delete: "旅行を削除できませんでした。時間をおいてもう一度お試しください。",
+  invitation: "招待を操作できませんでした。画面を開き直してもう一度お試しください。",
+  "invite-code": "招待コードを再発行できませんでした。時間をおいてもう一度お試しください。",
+  member: "メンバーを外せませんでした。画面を開き直してもう一度お試しください。",
+};
+
 const EMAIL_STATUS_LABELS: Record<string, string> = {
   not_sent: "メール未送信",
   queued: "メール送信中",
@@ -77,9 +84,9 @@ export default async function TripSettingsPage({
     <>
       <PageHeader title="旅行の設定" backHref={`/trips/${trip.id}`} />
       <PageBody>
-        {error === "delete" ? (
+        {SETTINGS_ERRORS[error ?? ""] ? (
           <p className="rounded-2xl border border-blossom bg-blossom-soft px-4 py-3 text-sm text-[#8f4c59]">
-            旅行を削除できませんでした。時間をおいてもう一度お試しください。
+            {SETTINGS_ERRORS[error ?? ""]}
           </p>
         ) : null}
 

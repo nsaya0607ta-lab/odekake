@@ -1,5 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import { deleteTripCommentAction, leaveTripAction } from "@/app/actions/trips";
+import { ConfirmSubmitButton } from "@/components/confirm-submit-button";
 import { IconPlus, IconSliders, IconUsers } from "@/components/icons";
 import { PageBody } from "@/components/page-body";
 import { PageHeader } from "@/components/page-header";
@@ -172,6 +174,26 @@ export default async function TripDetailPage({
           )}
         </section>
 
+        {isShared && !isOwner ? (
+          <section>
+            <h2 className="mb-2 px-1 text-base font-bold">この旅行から退出</h2>
+            <form action={leaveTripAction} className="rough-card space-y-3 p-4">
+              <input type="hidden" name="tripId" value={trip.id} />
+              <p className="text-sm leading-relaxed text-ink-soft">
+                退出すると、この共有旅の地図・記録・写真は見えなくなります。
+                自分が書いた記録は残るため、もう一度参加すればまた見られます。
+              </p>
+              <ConfirmSubmitButton
+                className="btn btn-quiet w-full"
+                message="この共有旅から退出します。よろしいですか？"
+                pendingLabel="退出中…"
+              >
+                この旅行から退出する
+              </ConfirmSubmitButton>
+            </form>
+          </section>
+        ) : null}
+
         {isShared ? (
           <section>
             <h2 className="mb-2 px-1 text-base font-bold">コメント</h2>
@@ -180,10 +202,25 @@ export default async function TripDetailPage({
               <ul className="mt-3 space-y-2">
                 {comments.map((comment) => (
                   <li key={comment.id} className="rough-card px-4 py-3">
-                    <p className="text-xs text-ink-faint">
-                      {commentAuthors.get(comment.user_id) ?? "メンバー"}さん・
-                      {formatDate(comment.created_at)}
-                    </p>
+                    <div className="flex items-start gap-3">
+                      <p className="min-w-0 flex-1 text-xs text-ink-faint">
+                        {commentAuthors.get(comment.user_id) ?? "メンバー"}さん・
+                        {formatDate(comment.created_at)}
+                      </p>
+                      {comment.user_id === user.id || isOwner ? (
+                        <form action={deleteTripCommentAction} className="shrink-0">
+                          <input type="hidden" name="commentId" value={comment.id} />
+                          <input type="hidden" name="tripId" value={trip.id} />
+                          <ConfirmSubmitButton
+                            className="text-xs text-[#95505e] underline underline-offset-4"
+                            message="このコメントを削除します。よろしいですか？"
+                            pendingLabel="削除中…"
+                          >
+                            削除
+                          </ConfirmSubmitButton>
+                        </form>
+                      ) : null}
+                    </div>
                     <p className="mt-1 text-sm leading-relaxed whitespace-pre-wrap">{comment.comment}</p>
                   </li>
                 ))}

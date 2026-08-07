@@ -12,11 +12,15 @@ export const dynamic = "force-dynamic";
 export default async function InvitationsPage() {
   const { supabase, user } = await requireUser();
 
-  // RLS により、自分のメールアドレス宛の招待だけが返る
+  // RLS は「自分宛の招待」だけでなく「自分が主催者として送った招待」も返す。
+  // また status は期限切れになっても pending のままなので、期限も見る。
+  // （参加時の RPC と旅行名の参照はどちらも expires_at を見るため、
+  //   ここで弾かないと「一覧に出るのに参加できない」招待が並ぶ）
   const { data } = await supabase
     .from("trip_invitations")
     .select("*")
     .eq("status", "pending")
+    .gte("expires_at", new Date().toISOString())
     .order("created_at", { ascending: false });
 
   const invitations = ((data ?? []) as TripInvitationRow[]).filter(

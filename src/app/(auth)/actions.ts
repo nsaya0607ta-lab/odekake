@@ -103,7 +103,7 @@ export async function signInAction(_prev: ActionState, formData: FormData): Prom
 export async function signOutAction() {
   const supabase = await createClient();
   await supabase.auth.signOut();
-  redirect("/login");
+  redirect("/login?notice=signed-out");
 }
 
 export async function resendConfirmationAction(_prev: ActionState, formData: FormData): Promise<ActionState> {

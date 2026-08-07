@@ -119,7 +119,11 @@ export default async function SpotDetailPage({
             </form>
           </div>
 
-          {summary.favorite && !myFavorite ? (
+          {myVisits.length === 0 ? (
+            <p className="text-xs text-ink-faint">
+              お気に入りは訪問の記録に付きます。下の「訪問履歴を追加する」から記録すると押せるようになります。
+            </p>
+          ) : summary.favorite && !myFavorite ? (
             <p className="text-xs text-ink-faint">
               <IconHeart size={12} filled className="mr-1 inline align-[-1px] text-blossom" />
               他のメンバーがお気に入りに入れています。

@@ -37,15 +37,16 @@ function parseShown(value: string | undefined): number {
 export default async function RecordsPage({
   searchParams,
 }: {
-  searchParams: Promise<{ tab?: string; shown?: string }>;
+  searchParams: Promise<{ tab?: string; shown?: string; q?: string }>;
 }) {
-  const [{ tab: tabParam, shown: shownParam }, { supabase, user }] = await Promise.all([
+  const [{ tab: tabParam, shown: shownParam, q }, { supabase, user }] = await Promise.all([
     searchParams,
     requireUser(),
   ]);
 
   const tab: RecordTab = TABS.some((t) => t.key === tabParam) ? (tabParam as RecordTab) : "timeline";
   const shown = parseShown(shownParam);
+  const keyword = (q ?? "").slice(0, 100);
   const workspace = await resolveWorkspace(supabase, user.id);
 
   return (
@@ -58,7 +59,9 @@ export default async function RecordsPage({
 
         {tab === "timeline" ? <TimelineTab supabase={supabase} workspace={workspace} shown={shown} /> : null}
         {tab === "trips" ? <TripsTab supabase={supabase} userId={user.id} workspace={workspace} /> : null}
-        {tab === "spots" ? <SpotsTab supabase={supabase} workspace={workspace} shown={shown} /> : null}
+        {tab === "spots" ? (
+          <SpotsTab supabase={supabase} workspace={workspace} shown={shown} keyword={keyword} />
+        ) : null}
         {tab === "calendar" ? <CalendarTab supabase={supabase} workspace={workspace} /> : null}
       </PageBody>
     </>
@@ -67,13 +70,12 @@ export default async function RecordsPage({
 
 type SupabaseArg = Awaited<ReturnType<typeof requireUser>>["supabase"];
 
-function MoreButton({ tab, shown }: { tab: RecordTab; shown: number }) {
+function MoreButton({ tab, shown, keyword }: { tab: RecordTab; shown: number; keyword?: string }) {
+  const params = new URLSearchParams({ tab, shown: String(shown + PAGE_SIZE) });
+  if (keyword) params.set("q", keyword);
+
   return (
-    <Link
-      href={`/records?tab=${tab}&shown=${shown + PAGE_SIZE}`}
-      scroll={false}
-      className="btn btn-quiet w-full"
-    >
+    <Link href={`/records?${params.toString()}`} scroll={false} className="btn btn-quiet w-full">
       もっと見る
     </Link>
   );
@@ -179,10 +181,12 @@ async function SpotsTab({
   supabase,
   workspace,
   shown,
+  keyword,
 }: {
   supabase: SupabaseArg;
   workspace: Workspace;
   shown: number;
+  keyword: string;
 }) {
   const [{ spots, hasMore }, categoryNames] = await Promise.all([
     getSpotPage(supabase, workspace.tripIds, {
@@ -190,12 +194,20 @@ async function SpotsTab({
       // 共有旅は旅行との関連が訪問履歴で決まるため、従来どおりその旅行で訪問した場所だけに限定する。
       includeUnvisited: workspace.kind === "personal",
       limit: shown,
+      keyword,
     }),
     loadCategoryNames(supabase),
   ]);
 
   if (spots.length === 0) {
-    return (
+    return keyword ? (
+      <EmptyState
+        title={`「${keyword}」に一致するスポットがありません`}
+        description="別の言葉で探すか、検索欄を空にして一覧に戻してください。"
+        actionHref="/records?tab=spots"
+        actionLabel="検索を解除する"
+      />
+    ) : (
       <EmptyState
         title="スポットがありません"
         description="訪れた場所を登録すると、ここに並びます。"
@@ -210,8 +222,9 @@ async function SpotsTab({
       <SpotBrowser
         spots={spots}
         categories={[...categoryNames.entries()].map(([id, name]) => ({ id, name }))}
+        search={{ action: "/records", keyword, hiddenFields: { tab: "spots" } }}
       />
-      {hasMore ? <MoreButton tab="spots" shown={shown} /> : null}
+      {hasMore ? <MoreButton tab="spots" shown={shown} keyword={keyword} /> : null}
     </div>
   );
 }
