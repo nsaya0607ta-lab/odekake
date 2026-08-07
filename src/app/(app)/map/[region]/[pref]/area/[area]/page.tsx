@@ -95,10 +95,8 @@ export default async function PrefectureAreaPage({
           hrefBase={`/map/${region.slug}/${prefecture.code}`}
           hrefSuffix={`?area=${selectedArea.slug}`}
           hasMap={selectedArea.municipalities.some((municipality) => municipality.d !== null)}
-          showMapLabels
-          mapLabelStyle="callout"
-          mapHeading="市区町村を地図から選ぶ"
-          mapInstruction="市区町村名または地図をタップするとスポット一覧へ"
+          mapHeading="市区町村マップ"
+          mapInstruction="市区町村名は地図の下から選択できます"
         />
       </PageBody>
     </>
