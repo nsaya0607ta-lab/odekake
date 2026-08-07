@@ -14,7 +14,7 @@ const STEPS = [
   },
   {
     title: "データベースを初期化する",
-    body: "supabase/migrations/0001_init.sql を SQL Editor に貼り付けて実行します。テーブル、RLS、ストレージ設定がまとめて作成されます。",
+    body: "supabase/migrations/ の SQL を番号順にすべて SQL Editor へ貼り付けて実行します。0001 だけでは集計関数や招待まわりが入らないため、必ず最後まで適用してください。Supabase CLI なら supabase db push でも構いません。",
   },
   {
     title: "メール認証を有効にする",

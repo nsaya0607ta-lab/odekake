@@ -62,7 +62,7 @@ node scripts/verify-supabase.mjs  # 実 Supabase プロジェクトでの動作�
 ```
 
 `verify-rls.sh` は、素の PostgreSQL に Supabase 相当の土台を作って
-`supabase/migrations/*.sql` を適用し、公開範囲とアプリが前提にしている挙動を103項目確認します。
+`supabase/migrations/*.sql` を適用し、公開範囲とアプリが前提にしている挙動を106項目確認します。
 `verify-supabase.mjs` は、新規登録・確認メール・ログイン・公開範囲・写真・アカウント削除を
 実際のプロジェクトに対して順に確認します。
 

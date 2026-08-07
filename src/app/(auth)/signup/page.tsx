@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { safeNextPath } from "@/lib/navigation";
 import { SignUpForm } from "./signup-form";
 
 export const metadata = { title: "新規登録 | おでかけ記録" };
@@ -9,7 +10,7 @@ export default async function SignUpPage({
   searchParams: Promise<{ next?: string }>;
 }) {
   const { next } = await searchParams;
-  const nextPath = next?.startsWith("/") && !next.startsWith("//") ? next : "/home";
+  const nextPath = safeNextPath(next);
 
   return (
     <div className="rough-card p-6">
