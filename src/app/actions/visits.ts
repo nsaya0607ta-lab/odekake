@@ -9,6 +9,7 @@ import { MAX_PHOTOS_PER_VISIT } from "@/lib/image";
 import { finalizePhotoPaths } from "@/lib/photos";
 import { requireUser } from "@/lib/supabase/server";
 import { PHOTO_BUCKET, type DB } from "@/lib/data/client";
+import { syncVisitTags } from "@/lib/data/tags";
 
 const optionalText = (max: number) =>
   z
@@ -45,6 +46,10 @@ const visitSchema = z.object({
     .transform((v) => (v === "" ? null : Number(v)))
     .refine((v) => v === null || [1, 2, 3].includes(v), "混雑状況を選び直してください。"),
 });
+
+function isUuid(value: string): boolean {
+  return /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(value);
+}
 
 function collect(formData: FormData) {
   return {
@@ -84,35 +89,6 @@ function parsePhotoPaths(formData: FormData): string[] {
   }
 }
 
-/** 入力されたタグ名を tags テーブルへ登録し、訪問記録に紐づける */
-async function syncTags(supabase: DB, userId: string, visitId: string, rawTags: string) {
-  const names = [
-    ...new Set(
-      rawTags
-        .split(/[,、\s]+/)
-        .map((t) => t.trim().replace(/^#/, ""))
-        .filter((t) => t.length > 0 && t.length <= 20),
-    ),
-  ].slice(0, 10);
-
-  await supabase.from("visit_record_tags").delete().eq("visit_record_id", visitId);
-  if (names.length === 0) return;
-
-  const { data: tags } = await supabase
-    .from("tags")
-    .upsert(
-      names.map((name) => ({ user_id: userId, name })),
-      { onConflict: "user_id,name" },
-    )
-    .select("id");
-
-  if (!tags || tags.length === 0) return;
-
-  await supabase
-    .from("visit_record_tags")
-    .insert(tags.map((tag) => ({ visit_record_id: visitId, tag_id: tag.id })));
-}
-
 async function syncPhotos(
   supabase: DB,
   userId: string,
@@ -120,12 +96,13 @@ async function syncPhotos(
   visitId: string,
   requestedPaths: string[],
 ) {
-  // 一時領域にある写真を、この訪問記録の保存先へ移す
-  const paths = await finalizePhotoPaths(
-    supabase,
-    requestedPaths,
-    `trips/${tripId}/visits/${visitId}`,
-  );
+  // 一時領域にある写真を、この訪問記録の保存先へ移す。
+  // 同じ写真が二重に入っていると表示順が重複するため、ここで重複を除く。
+  const paths = [
+    ...new Set(
+      await finalizePhotoPaths(supabase, requestedPaths, `trips/${tripId}/visits/${visitId}`),
+    ),
+  ];
 
   const { data: existing } = await supabase
     .from("visit_photos")
@@ -147,17 +124,19 @@ async function syncPhotos(
     await supabase.storage.from(PHOTO_BUCKET).remove(removed.map((p) => p.storage_path));
   }
 
-  const added = paths.filter((p) => !existingPaths.has(p));
-  if (added.length > 0) {
-    await supabase.from("visit_photos").insert(
-      added.map((path) => ({
-        user_id: userId,
-        visit_record_id: visitId,
-        storage_path: path,
-        display_order: paths.indexOf(path),
-      })),
-    );
-  }
+  const added = paths.flatMap((path, index) =>
+    existingPaths.has(path)
+      ? []
+      : [
+          {
+            user_id: userId,
+            visit_record_id: visitId,
+            storage_path: path,
+            display_order: index,
+          },
+        ],
+  );
+  if (added.length > 0) await supabase.from("visit_photos").insert(added);
 }
 
 export async function createVisitAction(_prev: ActionState, formData: FormData): Promise<ActionState> {
@@ -170,7 +149,7 @@ export async function createVisitAction(_prev: ActionState, formData: FormData):
 
   const { supabase, user } = await requireUser();
   const visitId = String(formData.get("visitId") ?? "");
-  if (!/^[0-9a-f-]{36}$/i.test(visitId)) {
+  if (!isUuid(visitId)) {
     return { error: "保存に失敗しました。画面を開き直してもう一度お試しください。", values };
   }
 
@@ -201,7 +180,7 @@ export async function createVisitAction(_prev: ActionState, formData: FormData):
 
   await Promise.all([
     syncPhotos(supabase, user.id, parsed.data.tripId, visitId, parsePhotoPaths(formData)),
-    syncTags(supabase, user.id, visitId, values.tags),
+    syncVisitTags(supabase, user.id, visitId, values.tags),
   ]);
 
   revalidatePath("/home");
@@ -220,9 +199,15 @@ export async function updateVisitAction(_prev: ActionState, formData: FormData):
     return { error: "入力内容をご確認ください。", fieldErrors: fieldErrorsOf(parsed.error), values };
   }
 
+  if (!isUuid(visitId)) {
+    return { error: "保存に失敗しました。画面を開き直してもう一度お試しください。", values };
+  }
+
   const { supabase, user } = await requireUser();
 
-  const { error } = await supabase
+  // 権限がない場合はエラーではなく0件更新になるため、更新された行で判定する。
+  // 確かめずに進めると、保存できていないのに「保存しました。」と表示してしまう。
+  const { data: updated, error } = await supabase
     .from("visit_records")
     .update({
       trip_id: parsed.data.tripId,
@@ -237,13 +222,19 @@ export async function updateVisitAction(_prev: ActionState, formData: FormData):
       revisit_wanted: values.revisitWanted === "on",
       favorite: values.favorite === "on",
     })
-    .eq("id", visitId);
+    .eq("id", visitId)
+    .select("id");
 
   if (error) return { error: toJapaneseError(error, "訪問履歴の更新に失敗しました。"), values };
 
+  if ((updated ?? []).length === 0) {
+    console.error("Visit update affected no rows", { visitId });
+    return { error: "この訪問履歴を更新する権限がありません。", values };
+  }
+
   await Promise.all([
     syncPhotos(supabase, user.id, parsed.data.tripId, visitId, parsePhotoPaths(formData)),
-    syncTags(supabase, user.id, visitId, values.tags),
+    syncVisitTags(supabase, user.id, visitId, values.tags),
   ]);
 
   revalidatePath("/records");
@@ -288,13 +279,41 @@ export async function deleteVisitAction(formData: FormData) {
   redirect(spotId ? `/spots/${spotId}` : "/records");
 }
 
-export async function toggleVisitFavoriteAction(formData: FormData) {
-  const visitId = String(formData.get("visitId") ?? "");
+/**
+ * スポット詳細のハートの切り替え。
+ *
+ * お気に入りは訪問履歴側に付き、スポットの表示は「いずれかの訪問履歴に
+ * 付いていればお気に入り」なので、
+ *   付ける … 自分の最新の訪問履歴に付ける
+ *   外す　 … このスポットにある自分の訪問履歴すべてから外す
+ * とする。自分の記録しか変えないので、共有旅で他の人の記録には触れない。
+ */
+export async function toggleSpotFavoriteAction(formData: FormData) {
   const spotId = String(formData.get("spotId") ?? "");
   const next = String(formData.get("favorite") ?? "") === "on";
 
-  const { supabase } = await requireUser();
-  await supabase.from("visit_records").update({ favorite: next }).eq("id", visitId);
+  if (!isUuid(spotId)) redirect("/records?tab=spots");
+
+  const { supabase, user } = await requireUser();
+
+  const { data: visits } = await supabase
+    .from("visit_records")
+    .select("id")
+    .eq("spot_id", spotId)
+    .eq("user_id", user.id)
+    .order("visited_at", { ascending: false })
+    .order("created_at", { ascending: false });
+
+  const ids = (visits ?? []).map((visit) => visit.id);
+  if (ids.length === 0) redirect(`/spots/${spotId}?error=favorite`);
+
+  if (next) {
+    await supabase.from("visit_records").update({ favorite: true }).eq("id", ids[0]!);
+  } else {
+    await supabase.from("visit_records").update({ favorite: false }).in("id", ids);
+  }
 
   revalidatePath(`/spots/${spotId}`);
+  revalidatePath("/mypage/favorites");
+  revalidatePath("/records");
 }

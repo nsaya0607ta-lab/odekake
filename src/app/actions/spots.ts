@@ -9,6 +9,7 @@ import { toJapaneseError } from "@/lib/errors";
 import { distanceMeters, getMunicipality } from "@/lib/geo";
 import { MAX_PHOTOS_PER_VISIT } from "@/lib/image";
 import { finalizePhotoPaths } from "@/lib/photos";
+import { syncVisitTags } from "@/lib/data/tags";
 import { requireUser } from "@/lib/supabase/server";
 import type { LocationSource } from "@/lib/supabase/types";
 
@@ -245,33 +246,6 @@ function parsePhotoPaths(formData: FormData): string[] {
   }
 }
 
-async function syncTags(supabase: DB, userId: string, visitId: string, rawTags: string) {
-  const names = [
-    ...new Set(
-      rawTags
-        .split(/[,、\s]+/)
-        .map((tag) => tag.trim().replace(/^#/, ""))
-        .filter((tag) => tag.length > 0 && tag.length <= 20),
-    ),
-  ].slice(0, 10);
-
-  if (names.length === 0) return;
-
-  const { data: tags } = await supabase
-    .from("tags")
-    .upsert(
-      names.map((name) => ({ user_id: userId, name })),
-      { onConflict: "user_id,name" },
-    )
-    .select("id");
-
-  if (!tags || tags.length === 0) return;
-
-  await supabase
-    .from("visit_record_tags")
-    .insert(tags.map((tag) => ({ visit_record_id: visitId, tag_id: tag.id })));
-}
-
 async function syncPhotos(
   supabase: DB,
   userId: string,
@@ -279,11 +253,12 @@ async function syncPhotos(
   visitId: string,
   requestedPaths: string[],
 ) {
-  const paths = await finalizePhotoPaths(
-    supabase,
-    requestedPaths,
-    `trips/${tripId}/visits/${visitId}`,
-  );
+  // 同じ写真が二重に入っていると表示順が重複するため、ここで重複を除く
+  const paths = [
+    ...new Set(
+      await finalizePhotoPaths(supabase, requestedPaths, `trips/${tripId}/visits/${visitId}`),
+    ),
+  ];
 
   if (paths.length === 0) return;
 
@@ -411,7 +386,7 @@ export async function createVisitedSpotAction(_prev: ActionState, formData: Form
 
   await Promise.all([
     syncPhotos(supabase, user.id, parsed.data.tripId, parsed.data.visitId, parsePhotoPaths(formData)),
-    syncTags(supabase, user.id, parsed.data.visitId, values.tags),
+    syncVisitTags(supabase, user.id, parsed.data.visitId, values.tags),
   ]);
 
   revalidatePath("/home");
@@ -420,30 +395,6 @@ export async function createVisitedSpotAction(_prev: ActionState, formData: Form
   revalidatePath(`/spots/${spotId}`);
   revalidatePath(`/trips/${parsed.data.tripId}`);
   redirect(`/spots/${spotId}?saved=1`);
-}
-
-export async function createSpotAction(_prev: ActionState, formData: FormData): Promise<ActionState> {
-  const values = collect(formData);
-  const parsed = spotSchema.safeParse(values);
-
-  if (!parsed.success) {
-    return { error: "入力内容をご確認ください。", fieldErrors: fieldErrorsOf(parsed.error), values };
-  }
-
-  const location = resolveLocation(parsed.data);
-  if (!location.ok) return { error: location.error, values };
-
-  const { supabase, user } = await requireUser();
-  const result = await insertSpot(supabase, user.id, parsed.data, location);
-
-  if (result.error || !result.data) {
-    logSpotError("Spot insert failed", result.error, parsed.data);
-    return { error: spotSaveError(result.error), values };
-  }
-
-  revalidatePath("/home");
-  revalidatePath("/map");
-  redirect(`/visits/new?spot=${result.data.id}&created=1`);
 }
 
 export async function updateSpotAction(_prev: ActionState, formData: FormData): Promise<ActionState> {
@@ -460,21 +411,29 @@ export async function updateSpotAction(_prev: ActionState, formData: FormData): 
 
   const { supabase } = await requireUser();
 
+  // 権限がない場合はエラーではなく0件更新になるため、更新された行で判定する
   let result = await supabase
     .from("spots")
     .update({ ...extendedDetailValues(parsed.data), ...location.values })
-    .eq("id", spotId);
+    .eq("id", spotId)
+    .select("id");
 
   if (isMissingExtendedSpotColumn(result.error)) {
     result = await supabase
       .from("spots")
       .update({ ...baseDetailValues(parsed.data), ...legacyLocationValues(location) })
-      .eq("id", spotId);
+      .eq("id", spotId)
+      .select("id");
   }
 
   if (result.error) {
     logSpotError("Spot update failed", result.error, parsed.data);
     return { error: toJapaneseError(result.error, "スポットの更新に失敗しました。"), values };
+  }
+
+  if ((result.data ?? []).length === 0) {
+    console.error("Spot update affected no rows", { spotId });
+    return { error: "このスポットを編集する権限がありません。", values };
   }
 
   revalidatePath(`/spots/${spotId}`);

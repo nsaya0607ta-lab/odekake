@@ -15,6 +15,7 @@ import { PageBody } from "@/components/page-body";
 import { TopHeader } from "@/components/page-header";
 import { loadAreaIndex } from "@/lib/data/areas";
 import { signPhotoPath } from "@/lib/data/photos";
+import { allReadableTripIds } from "@/lib/data/workspace";
 import { requireUser } from "@/lib/supabase/server";
 
 export const metadata = { title: "マイページ | おでかけ記録" };
@@ -24,23 +25,25 @@ export default async function MyPage() {
   const { supabase, user } = await requireUser();
 
   // マイページはワークスペースをまたいだ合計を出す（アカウント全体の記録）
-  const { data: allTrips } = await supabase.from("trips").select("id");
+  const allTripIds = await allReadableTripIds(supabase);
   const [{ data: profile }, areas] = await Promise.all([
     supabase.from("profiles").select("*").eq("user_id", user.id).maybeSingle(),
-    loadAreaIndex(
-      supabase,
-      (allTrips ?? []).map((t) => t.id),
-    ),
+    loadAreaIndex(supabase, allTripIds),
   ]);
 
   const avatarUrl = await signPhotoPath(supabase, profile?.profile_image_url);
 
   const { data: pendingInvitations } = await supabase
     .from("trip_invitations")
-    .select("id")
+    .select("id, email")
     .eq("status", "pending");
 
-  const invitationCount = (pendingInvitations ?? []).length;
+  // RLS は「自分宛の招待」だけでなく「自分が主催者として送った招待」も返す。
+  // ここは受け取った招待の件数なので、自分のメールアドレス宛だけを数える。
+  const invitationCount = (pendingInvitations ?? []).filter(
+    (invitation) =>
+      invitation.email && user.email && invitation.email.toLowerCase() === user.email.toLowerCase(),
+  ).length;
 
   return (
     <>
@@ -86,7 +89,7 @@ export default async function MyPage() {
         <nav>
           <ul className="rough-card divide-y divide-line overflow-hidden">
             <MenuItem href="/mypage/favorites" icon={<IconHeart size={20} />} label="お気に入り" />
-            <MenuItem href="/mypage/wishlist" icon={<IconFlag size={20} />} label="行きたい場所" />
+            <MenuItem href="/mypage/wishlist" icon={<IconFlag size={20} />} label="また行きたい場所" />
             <MenuItem href="/records?tab=trips" icon={<IconCalendar size={20} />} label="旅行の計画" />
           </ul>
         </nav>

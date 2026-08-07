@@ -2,7 +2,7 @@ import Link from "next/link";
 import { IconChevronRight, IconFlag, IconMapPin, IconNotebook, IconUsers } from "@/components/icons";
 import { PageBody } from "@/components/page-body";
 import { TopHeader } from "@/components/page-header";
-import { getAllSpots } from "@/lib/data/spots";
+import { getTimeline } from "@/lib/data/visits";
 import { resolveWorkspace } from "@/lib/data/workspace";
 import { requireUser } from "@/lib/supabase/server";
 
@@ -12,9 +12,11 @@ export const dynamic = "force-dynamic";
 export default async function AddPage() {
   const { supabase, user } = await requireUser();
   const workspace = await resolveWorkspace(supabase, user.id);
-  const spots = await getAllSpots(supabase, workspace.tripIds);
 
-  const recentSpots = spots.slice(0, 5);
+  // 最近の訪問履歴から場所を拾う。スポットを全件読んでから絞るより軽く、
+  // 「最近行った順」も正しく出る。
+  const recent = await getTimeline(supabase, { tripIds: workspace.tripIds, limit: 20 });
+  const recentSpots = [...new Map(recent.map((item) => [item.spotId, item])).values()].slice(0, 5);
   const isShared = workspace.kind === "trip";
 
   return (
@@ -88,15 +90,17 @@ export default async function AddPage() {
           <section>
             <h2 className="mb-2 px-1 text-base font-bold">最近の場所へもう一度行った</h2>
             <ul className="space-y-2">
-              {recentSpots.map((spot) => (
-                <li key={spot.id}>
+              {recentSpots.map((item) => (
+                <li key={item.spotId}>
                   <Link
-                    href={`/visits/new?spot=${spot.id}`}
+                    href={`/visits/new?spot=${item.spotId}`}
                     className="rough-card flex items-center gap-3 px-4 py-3 transition-transform active:scale-[0.99]"
                   >
                     <span className="min-w-0 flex-1">
-                      <span className="block truncate font-semibold">{spot.name}</span>
-                      <span className="text-xs text-ink-soft">{spot.categoryName ?? "カテゴリー未設定"}</span>
+                      <span className="block truncate font-semibold">{item.spotName}</span>
+                      <span className="text-xs text-ink-soft">
+                        {item.categoryName ?? item.municipalityName ?? "カテゴリー未設定"}
+                      </span>
                     </span>
                     <IconChevronRight size={18} className="shrink-0 text-ink-faint" />
                   </Link>

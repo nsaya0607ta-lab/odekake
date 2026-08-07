@@ -2,6 +2,7 @@
 
 import dynamic from "next/dynamic";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useDraftState } from "@/components/use-draft-state";
 import { IconCheck, IconChevronDown, IconMapPin, IconSearch, IconSpinner } from "@/components/icons";
 import {
   distanceMeters,
@@ -108,14 +109,20 @@ export function LocationPicker({
   error,
   placeSearchEnabled = false,
   onPlaceSelected,
+  draftKey = null,
 }: {
   initial: SpotLocation;
   error?: string;
   placeSearchEnabled?: boolean;
   onPlaceSelected?: (place: PlaceAutofill) => void;
+  /** 指定すると、画面を離れても選んだ場所を覚えておく */
+  draftKey?: string | null;
 }) {
   const provider = useMemo(() => getPlaceSearchProvider(placeSearchEnabled), [placeSearchEnabled]);
-  const [value, setValue] = useState<SpotLocation>(initial);
+  const rootRef = useRef<HTMLDivElement>(null);
+  // 場所は hidden input で送るため、FormDraft の DOM 復元では戻せない。
+  // React 側が値を持っているので、このコンポーネント自身で下書きを保存する。
+  const [value, setValue] = useDraftState<SpotLocation>(draftKey, initial, rootRef);
   // 現在地からの検索を最優先にするため、Places検索が使えないときだけ「別の場所から探す」を最初から開く
   const [showOther, setShowOther] = useState(!provider.enabled);
   const [otherTab, setOtherTab] = useState<OtherTab>("municipality");
@@ -127,7 +134,6 @@ export function LocationPicker({
   const [sessionToken, setSessionToken] = useState("");
   const [searchOrigin, setSearchOrigin] = useState<SearchOrigin | null>(null);
   const [searchLocationStatus, setSearchLocationStatus] = useState<SearchLocationStatus>("idle");
-  const autoLocationRequested = useRef(false);
 
   const options = value.prefectureCode ? getMunicipalitiesByPrefecture(value.prefectureCode) : [];
 
@@ -192,7 +198,7 @@ export function LocationPicker({
         placeId: place?.id ?? null,
       };
     });
-  }, []);
+  }, [setValue]);
 
   const requestSearchOrigin = useCallback(() => {
     if (!("geolocation" in navigator)) {
@@ -217,12 +223,6 @@ export function LocationPicker({
       { enableHighAccuracy: false, timeout: 8_000, maximumAge: 5 * 60_000 },
     );
   }, []);
-
-  useEffect(() => {
-    if (!provider.enabled || autoLocationRequested.current) return;
-    autoLocationRequested.current = true;
-    requestSearchOrigin();
-  }, [provider.enabled, requestSearchOrigin]);
 
   // 現在地の取得に失敗・拒否された場合は、自動的に地域から探す方法へ切り替える
   useEffect(() => {
@@ -319,7 +319,8 @@ export function LocationPicker({
     if (searchLocationStatus === "denied") return "現在地：許可されていません。地域から探してください";
     if (searchLocationStatus === "unsupported") return "現在地：この端末では利用できません";
     if (searchLocationStatus === "error") return "現在地：取得できませんでした";
-    return "現在地：未取得";
+    // 画面を開いただけで位置情報の許可を求めない。使うときに「取得する」を押してもらう
+    return "現在地：「取得する」を押すと近くから探せます";
   })();
 
   const otherTabOptions = [
@@ -328,7 +329,7 @@ export function LocationPicker({
   ] as const;
 
   return (
-    <div className="space-y-3">
+    <div ref={rootRef} className="space-y-3">
       <input type="hidden" name="municipalityCode" value={value.municipalityCode} />
       <input type="hidden" name="latitude" value={value.latitude ?? ""} />
       <input type="hidden" name="longitude" value={value.longitude ?? ""} />

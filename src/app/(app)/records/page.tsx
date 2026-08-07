@@ -2,44 +2,51 @@ import Link from "next/link";
 import { IconChevronRight, IconNotebook } from "@/components/icons";
 import { PageBody } from "@/components/page-body";
 import { TopHeader } from "@/components/page-header";
-import { SpotCard } from "@/components/spot-browser";
+import { SpotBrowser } from "@/components/spot-browser";
 import { TimelineCard } from "@/components/timeline-card";
 import { EmptyState, TripTypeBadge } from "@/components/ui";
-import { getAllSpots } from "@/lib/data/spots";
+import { loadCategoryNames, getSpotPage } from "@/lib/data/spots";
 import { formatTripPeriod, getTripSummaries } from "@/lib/data/trips";
-import { getTimeline } from "@/lib/data/visits";
+import { getCalendarVisits, getTimeline } from "@/lib/data/visits";
 import { resolveWorkspace, type Workspace } from "@/lib/data/workspace";
 import { WorkspaceBar } from "@/components/workspace-bar";
 import { requireUser } from "@/lib/supabase/server";
 import { RecordCalendar } from "./record-calendar";
-import { RecordTabs } from "./record-tabs";
+import { RecordTabs, type RecordTab } from "./record-tabs";
 
 export const metadata = { title: "記録 | おでかけ記録" };
 export const dynamic = "force-dynamic";
 
-type Tab = "timeline" | "trips" | "spots" | "calendar";
-
-const TABS: Array<{ key: Tab; label: string }> = [
+const TABS: Array<{ key: RecordTab; label: string }> = [
   { key: "timeline", label: "タイムライン" },
   { key: "trips", label: "旅行" },
   { key: "spots", label: "スポット" },
   { key: "calendar", label: "カレンダー" },
 ];
 
+/** 1回に読み込む件数。「もっと見る」で増やす */
+const PAGE_SIZE = 30;
+
+function parseShown(value: string | undefined): number {
+  const parsed = Number(value);
+  if (!Number.isInteger(parsed) || parsed <= 0) return PAGE_SIZE;
+  // URL をいじって極端な値を入れられても、1画面の読み込み量を抑える
+  return Math.min(parsed, PAGE_SIZE * 20);
+}
+
 export default async function RecordsPage({
   searchParams,
 }: {
-  searchParams: Promise<{ tab?: string; type?: string }>;
+  searchParams: Promise<{ tab?: string; shown?: string }>;
 }) {
-  const [{ tab: tabParam, type: typeParam }, { supabase, user }] = await Promise.all([
+  const [{ tab: tabParam, shown: shownParam }, { supabase, user }] = await Promise.all([
     searchParams,
     requireUser(),
   ]);
 
-  const tab: Tab = TABS.some((t) => t.key === tabParam) ? (tabParam as Tab) : "timeline";
+  const tab: RecordTab = TABS.some((t) => t.key === tabParam) ? (tabParam as RecordTab) : "timeline";
+  const shown = parseShown(shownParam);
   const workspace = await resolveWorkspace(supabase, user.id);
-  const showTypeFilter = workspace.kind === "personal";
-  const tripType = showTypeFilter && (typeParam === "solo" || typeParam === "shared") ? typeParam : "all";
 
   return (
     <>
@@ -47,11 +54,11 @@ export default async function RecordsPage({
       <PageBody>
         <WorkspaceBar workspace={workspace} />
 
-        <RecordTabs tabs={TABS} current={tab} tripType={tripType} showTypeFilter={false} />
+        <RecordTabs tabs={TABS} current={tab} />
 
-        {tab === "timeline" ? <TimelineTab supabase={supabase} workspace={workspace} /> : null}
+        {tab === "timeline" ? <TimelineTab supabase={supabase} workspace={workspace} shown={shown} /> : null}
         {tab === "trips" ? <TripsTab supabase={supabase} userId={user.id} workspace={workspace} /> : null}
-        {tab === "spots" ? <SpotsTab supabase={supabase} workspace={workspace} /> : null}
+        {tab === "spots" ? <SpotsTab supabase={supabase} workspace={workspace} shown={shown} /> : null}
         {tab === "calendar" ? <CalendarTab supabase={supabase} workspace={workspace} /> : null}
       </PageBody>
     </>
@@ -60,10 +67,33 @@ export default async function RecordsPage({
 
 type SupabaseArg = Awaited<ReturnType<typeof requireUser>>["supabase"];
 
-async function TimelineTab({ supabase, workspace }: { supabase: SupabaseArg; workspace: Workspace }) {
-  const items = await getTimeline(supabase, { tripIds: workspace.tripIds });
+function MoreButton({ tab, shown }: { tab: RecordTab; shown: number }) {
+  return (
+    <Link
+      href={`/records?tab=${tab}&shown=${shown + PAGE_SIZE}`}
+      scroll={false}
+      className="btn btn-quiet w-full"
+    >
+      もっと見る
+    </Link>
+  );
+}
 
-  if (items.length === 0) {
+async function TimelineTab({
+  supabase,
+  workspace,
+  shown,
+}: {
+  supabase: SupabaseArg;
+  workspace: Workspace;
+  shown: number;
+}) {
+  // 1件多く読んで、次のページがあるかを確かめる
+  const items = await getTimeline(supabase, { tripIds: workspace.tripIds, limit: shown + 1 });
+  const hasMore = items.length > shown;
+  const page = hasMore ? items.slice(0, shown) : items;
+
+  if (page.length === 0) {
     return (
       <EmptyState
         icon={<IconNotebook size={30} />}
@@ -76,13 +106,16 @@ async function TimelineTab({ supabase, workspace }: { supabase: SupabaseArg; wor
   }
 
   return (
-    <ul className="space-y-3">
-      {items.map((item) => (
-        <li key={item.id}>
-          <TimelineCard item={item} />
-        </li>
-      ))}
-    </ul>
+    <div className="space-y-3">
+      <ul className="space-y-3">
+        {page.map((item) => (
+          <li key={item.id}>
+            <TimelineCard item={item} />
+          </li>
+        ))}
+      </ul>
+      {hasMore ? <MoreButton tab="timeline" shown={shown} /> : null}
+    </div>
   );
 }
 
@@ -142,12 +175,24 @@ async function TripsTab({
   );
 }
 
-async function SpotsTab({ supabase, workspace }: { supabase: SupabaseArg; workspace: Workspace }) {
-  const spots = await getAllSpots(supabase, workspace.tripIds, {
-    // 個人旅の空間では、スポット登録直後で訪問履歴がまだ無い場所も一覧に出す。
-    // 共有旅は旅行との関連が訪問履歴で決まるため、従来どおりその旅行で訪問した場所だけに限定する。
-    includeUnvisited: workspace.kind === "personal",
-  });
+async function SpotsTab({
+  supabase,
+  workspace,
+  shown,
+}: {
+  supabase: SupabaseArg;
+  workspace: Workspace;
+  shown: number;
+}) {
+  const [{ spots, hasMore }, categoryNames] = await Promise.all([
+    getSpotPage(supabase, workspace.tripIds, {
+      // 個人旅の空間では、スポット登録直後で訪問履歴がまだ無い場所も一覧に出す。
+      // 共有旅は旅行との関連が訪問履歴で決まるため、従来どおりその旅行で訪問した場所だけに限定する。
+      includeUnvisited: workspace.kind === "personal",
+      limit: shown,
+    }),
+    loadCategoryNames(supabase),
+  ]);
 
   if (spots.length === 0) {
     return (
@@ -161,18 +206,18 @@ async function SpotsTab({ supabase, workspace }: { supabase: SupabaseArg; worksp
   }
 
   return (
-    <ul className="space-y-2">
-      {spots.map((spot) => (
-        <li key={spot.id}>
-          <SpotCard spot={spot} />
-        </li>
-      ))}
-    </ul>
+    <div className="space-y-3">
+      <SpotBrowser
+        spots={spots}
+        categories={[...categoryNames.entries()].map(([id, name]) => ({ id, name }))}
+      />
+      {hasMore ? <MoreButton tab="spots" shown={shown} /> : null}
+    </div>
   );
 }
 
 async function CalendarTab({ supabase, workspace }: { supabase: SupabaseArg; workspace: Workspace }) {
-  const items = await getTimeline(supabase, { tripIds: workspace.tripIds });
+  const items = await getCalendarVisits(supabase, workspace.tripIds);
 
   return (
     <RecordCalendar

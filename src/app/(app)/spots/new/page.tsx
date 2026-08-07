@@ -2,6 +2,7 @@ import { PageBody } from "@/components/page-body";
 import { PageHeader } from "@/components/page-header";
 import { SpotForm } from "@/components/spot-form";
 import { loadCategoryNames } from "@/lib/data/spots";
+import { todayInJapan } from "@/lib/date";
 import { ensurePersonalRecordTrip, getTripOptions } from "@/lib/data/trips";
 import { resolveWorkspace } from "@/lib/data/workspace";
 import { getMunicipality } from "@/lib/geo";
@@ -9,15 +10,6 @@ import { requireUser } from "@/lib/supabase/server";
 
 export const metadata = { title: "行った場所を登録 | おでかけ記録" };
 export const dynamic = "force-dynamic";
-
-function todayInJapan() {
-  return new Intl.DateTimeFormat("sv-SE", {
-    timeZone: "Asia/Tokyo",
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
-  }).format(new Date());
-}
 
 export default async function NewSpotPage({
   searchParams,
@@ -57,6 +49,7 @@ export default async function NewSpotPage({
           trips={trips}
           visitedAtDefault={todayInJapan()}
           showTripPlanningLink={workspace.kind === "personal"}
+          locationFromUrl={Boolean(municipality)}
           categories={[...categoryNames.entries()].map(([id, name]) => ({ id, name }))}
           location={{
             prefectureCode: municipality?.prefectureCode ?? pref ?? "",

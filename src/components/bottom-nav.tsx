@@ -11,7 +11,8 @@ const ITEMS = [
     href: "/add",
     label: "追加",
     icon: "/icons/navigation/add.png",
-    match: ["/add"],
+    // 「行った場所を登録」は追加の主導線なので、記録ではなく追加を選択中にする
+    match: ["/add", "/spots/new"],
     center: true,
   },
   {
@@ -28,8 +29,25 @@ const ITEMS = [
   },
 ] as const;
 
+/**
+ * 選択中のタブは、一致した文字列がいちばん長いものひとつに決める。
+ * `/spots/new` のように複数のタブに当てはまるパスで、両方が選択中に
+ * 見えてしまうのを防ぐ。
+ */
+function activeHref(pathname: string): string | null {
+  let best: { href: string; length: number } | null = null;
+  for (const item of ITEMS) {
+    for (const prefix of item.match) {
+      if (pathname !== prefix && !pathname.startsWith(`${prefix}/`)) continue;
+      if (!best || prefix.length > best.length) best = { href: item.href, length: prefix.length };
+    }
+  }
+  return best?.href ?? null;
+}
+
 export function BottomNav() {
   const pathname = usePathname();
+  const current = activeHref(pathname);
 
   return (
     <nav
@@ -38,9 +56,9 @@ export function BottomNav() {
       style={{ paddingBottom: "var(--safe-bottom)" }}
     >
       <ul className="mx-auto flex max-w-lg items-stretch justify-between px-2">
-        {ITEMS.map(({ href, label, icon, match, ...rest }) => {
+        {ITEMS.map(({ href, label, icon, ...rest }) => {
           const center = "center" in rest && rest.center;
-          const active = match.some((m) => pathname === m || pathname.startsWith(`${m}/`));
+          const active = current === href;
 
           if (center) {
             return (

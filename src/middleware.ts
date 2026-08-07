@@ -65,6 +65,8 @@ export async function middleware(request: NextRequest) {
   if (!isAuthenticated && !isPublicPath(pathname)) {
     const url = request.nextUrl.clone();
     url.pathname = "/login";
+    // 元の画面のクエリを /login にそのまま残さない（?tab=... などが紛れ込むため）
+    url.search = "";
     // ログイン後に元の画面へ戻す
     if (pathname !== "/") url.searchParams.set("next", pathname + request.nextUrl.search);
     return NextResponse.redirect(url);

@@ -399,6 +399,44 @@ select pg_temp.expect_denied('活動履歴はクライアントから直接追�
   :'shared', :'bob'));
 
 -- -------------------------------------------------------------
+-- -------------------------------------------------------------
+-- アプリの画面が前提にしている挙動
+-- -------------------------------------------------------------
+-- 「お気に入り」「また行きたい」はスポットではなく訪問記録に付く。
+-- マイページの一覧は訪問記録側のフラグで引くので、そこを確かめる。
+select pg_temp.expect_ok('自分の記録にお気に入りを付けられる', :'bob', format(
+  $q$update public.visit_records set favorite = true where id = %L$q$, :'visit_shared_b'));
+
+select pg_temp.expect_ok('自分の記録に「また行きたい」を付けられる', :'bob', format(
+  $q$update public.visit_records set revisit_wanted = true where id = %L$q$, :'visit_shared_b'));
+
+select pg_temp.record('お気に入りのスポットを訪問記録から引ける',
+  (select count(*) from public.visit_records v
+     join public.spots s on s.id = v.spot_id
+    where v.favorite and v.trip_id = :'shared') = 1);
+
+select pg_temp.record('また行きたいスポットを訪問記録から引ける',
+  (select count(*) from public.visit_records v
+     join public.spots s on s.id = v.spot_id
+    where v.revisit_wanted and v.trip_id = :'shared') = 1);
+
+-- 画面は「他人のお気に入りを勝手に外さない」ことを前提にしている
+select pg_temp.expect_blocked('他人の記録のお気に入りは外せない', :'carol', format(
+  $q$update public.visit_records set favorite = false where id = %L$q$, :'visit_shared_b'));
+
+select pg_temp.record('他人によるお気に入り解除は反映されない',
+  (select favorite from public.visit_records where id = :'visit_shared_b'));
+
+-- 更新系のサーバーアクションは「エラーが出ない＝保存できた」ではなく、
+-- 影響行数が 0 かどうかで成否を判定している。その前提を固定する。
+select pg_temp.record('権限のない更新は例外ではなく0行更新になる',
+  pg_temp.affected_as(:'carol', format(
+    $q$update public.visit_records set comment = 'のっとり' where id = %L$q$, :'visit_shared_b')) = 'denied');
+
+select pg_temp.record('権限のないスポット更新も0行更新になる',
+  pg_temp.affected_as(:'bob', format(
+    $q$update public.spots set name = 'のっとり' where id = %L$q$, :'spot_solo')) = 'denied');
+
 -- メンバーの退出・除外
 -- -------------------------------------------------------------
 select pg_temp.expect_blocked('オーナー自身は除外できない', :'alice', format(
