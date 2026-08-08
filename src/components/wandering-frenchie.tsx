@@ -73,15 +73,15 @@ const REQUIRED_LEVEL_BY_POSE = new Map(
  * STEP_MS × 2 で進む距離が釣り合うように決めてある。ここを崩すと
  * 足だけ動いて進まない／氷の上を滑る、のどちらかになる。
  */
-const SPEED = 7.5;
+const SPEED = 3.75;
 /** 立ち姿と踏み出しを入れ替える間隔（ms） */
-const STEP_MS = 340;
+const STEP_MS = 680;
 /** 振り向きにかける時間（ms）。止まっている間に終わる */
-const TURN_MS = 260;
+const TURN_MS = 520;
 
-/** 右側のレベル札へ犬が入らないよう、中心座標を左〜中央に限定する。 */
+/** 小さくなった右側のレベル看板を避けつつ、空いた中央右寄りまで歩かせる。 */
 const MIN_X = 18;
-const MAX_X = 31;
+const MAX_X = 45;
 
 type Walker = {
   x: number;
