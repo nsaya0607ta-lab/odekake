@@ -1,5 +1,5 @@
 import { PageBody } from "@/components/page-body";
-import { TopHeader } from "@/components/page-header";
+import { PageHeader } from "@/components/page-header";
 import { StepSyncSetup } from "@/components/step-sync-setup";
 import { getSiteUrl } from "@/lib/supabase/env";
 import { requireUser } from "@/lib/supabase/server";
@@ -13,7 +13,7 @@ export default async function StepSyncPage() {
 
   return (
     <>
-      <TopHeader title="iPhone歩数連携" backHref="/mypage" />
+      <PageHeader title="iPhone歩数連携" backHref="/mypage" />
       <PageBody>
         <StepSyncSetup endpoint={endpoint} />
       </PageBody>
