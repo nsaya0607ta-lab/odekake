@@ -5,6 +5,7 @@ import {
   IconCalendar,
   IconChevronRight,
   IconHome,
+  IconMail,
   IconMapPin,
   IconNotebook,
   IconPlus,
@@ -16,7 +17,13 @@ import { TripActivityList } from "@/components/trip-activity-list";
 import { EmptyState, LinkRow, SectionHeading, formatDate } from "@/components/ui";
 import { WanderingFrenchie } from "@/components/wandering-frenchie";
 import { loadAreaIndex } from "@/lib/data/areas";
-import { formatTripPeriod, getTripActivities, getTripSummaries, type TripSummary } from "@/lib/data/trips";
+import {
+  formatTripPeriod,
+  getTripActivities,
+  getTripSummaries,
+  listIncomingInvitations,
+  type TripSummary,
+} from "@/lib/data/trips";
 import { getTimeline } from "@/lib/data/visits";
 import { listWorkspaces, resolveWorkspace } from "@/lib/data/workspace";
 import { MUNICIPALITIES, PREFECTURES } from "@/lib/geo";
@@ -29,10 +36,11 @@ export default async function HomePage({ searchParams }: { searchParams: Promise
   const [{ supabase, user }, { notice }] = await Promise.all([requireUser(), searchParams]);
   const workspace = await resolveWorkspace(supabase, user.id);
 
-  const [areas, recent, workspaces] = await Promise.all([
+  const [areas, recent, workspaces, invitations] = await Promise.all([
     loadAreaIndex(supabase, workspace.tripIds),
     getTimeline(supabase, { tripIds: workspace.tripIds, limit: 4 }),
     listWorkspaces(supabase, user.id),
+    listIncomingInvitations(supabase, user.email),
   ]);
 
   const isShared = workspace.kind === "trip";
@@ -50,10 +58,18 @@ export default async function HomePage({ searchParams }: { searchParams: Promise
         action={
           <Link
             href="/invitations"
-            aria-label="招待のお知らせ"
-            className="flex h-10 w-10 items-center justify-center rounded-full text-ink-soft active:bg-paper-deep"
+            aria-label={
+              invitations.length > 0 ? `招待のお知らせ（${invitations.length}件）` : "招待のお知らせ"
+            }
+            className="relative flex h-10 w-10 items-center justify-center rounded-full text-ink-soft active:bg-paper-deep"
           >
             <IconBell />
+            {/* メールを送らない構成でも招待に気づけるよう、届いている件数を出す */}
+            {invitations.length > 0 ? (
+              <span className="absolute right-1 top-1 flex min-w-4 items-center justify-center rounded-full bg-[#c2697a] px-1 text-[10px] leading-4 font-bold text-white">
+                {invitations.length}
+              </span>
+            ) : null}
           </Link>
         }
       />
@@ -63,6 +79,20 @@ export default async function HomePage({ searchParams }: { searchParams: Promise
           <p className="rounded-2xl border border-leaf bg-leaf-soft px-4 py-3 text-sm text-leaf-deep">
             パスワードを変更しました。
           </p>
+        ) : null}
+
+        {/* 招待メールが届かない環境でも参加できるよう、ホームでも知らせる */}
+        {invitations.length > 0 ? (
+          <Link
+            href="/invitations"
+            className="flex items-center gap-3 rounded-2xl border border-blossom bg-blossom-soft px-4 py-3 text-sm text-[#8f4c59]"
+          >
+            <IconMail size={18} />
+            <span className="min-w-0 flex-1">
+              共有旅の招待が{invitations.length}件届いています
+            </span>
+            <IconChevronRight size={16} />
+          </Link>
         ) : null}
 
         <div className="flex items-center justify-between gap-2 px-1">

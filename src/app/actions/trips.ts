@@ -478,6 +478,28 @@ export async function leaveTripAction(formData: FormData) {
   redirect("/home");
 }
 
+/**
+ * 招待コードで共有旅に参加する。
+ * 呼び出し側で redirect() したいので、ここでは結果を返すだけにする。
+ */
+async function joinByCode(code: string): Promise<{ ok: true; tripId: string } | { ok: false; error: string }> {
+  const { supabase } = await requireUser();
+  const { data, error } = await supabase.rpc("join_trip_by_code", { p_code: code });
+
+  if (error) return { ok: false, error: toJapaneseError(error, "参加できませんでした。") };
+
+  const joined = Array.isArray(data) ? data[0] : null;
+  if (!joined) return { ok: false, error: "招待コードが見つかりません。コードをご確認ください。" };
+
+  // 参加した共有旅の空間へ移る
+  await setCurrentWorkspace(joined.trip_id);
+
+  revalidatePath("/home");
+  revalidatePath("/records");
+  revalidatePath("/invitations");
+  return { ok: true, tripId: joined.trip_id };
+}
+
 export async function joinTripAction(_prev: ActionState, formData: FormData): Promise<ActionState> {
   const code = String(formData.get("inviteCode") ?? "")
     .trim()
@@ -487,23 +509,24 @@ export async function joinTripAction(_prev: ActionState, formData: FormData): Pr
     return { error: "招待コードを入力してください。", values: { inviteCode: code } };
   }
 
-  const { supabase } = await requireUser();
-  const { data, error } = await supabase.rpc("join_trip_by_code", { p_code: code });
+  const result = await joinByCode(code);
+  if (!result.ok) return { error: result.error, values: { inviteCode: code } };
 
-  if (error) {
-    return { error: toJapaneseError(error, "参加できませんでした。"), values: { inviteCode: code } };
+  redirect("/home");
+}
+
+/** 招待のお知らせから、コードを打たずにそのまま参加する */
+export async function acceptInvitationAction(formData: FormData) {
+  const code = String(formData.get("inviteCode") ?? "")
+    .trim()
+    .toUpperCase();
+
+  const result = await joinByCode(code);
+  if (!result.ok) {
+    console.error("Accept invitation failed", { message: result.error });
+    redirect("/invitations?error=join");
   }
 
-  const joined = Array.isArray(data) ? data[0] : null;
-  if (!joined) {
-    return { error: "招待コードが見つかりません。コードをご確認ください。", values: { inviteCode: code } };
-  }
-
-  // 参加した共有旅の空間へ移る
-  await setCurrentWorkspace(joined.trip_id);
-
-  revalidatePath("/home");
-  revalidatePath("/records");
   redirect("/home");
 }
 
