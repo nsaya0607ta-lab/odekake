@@ -274,14 +274,15 @@ function getAdventureProgress({
   let level = 1;
 
   for (let i = LEVEL_THRESHOLDS.length - 1; i >= 0; i -= 1) {
-    if (totalExp >= LEVEL_THRESHOLDS[i]) {
+    const threshold = LEVEL_THRESHOLDS[i]!;
+    if (totalExp >= threshold) {
       level = i + 1;
       break;
     }
   }
 
-  const currentThreshold = LEVEL_THRESHOLDS[level - 1];
-  const nextThreshold = LEVEL_THRESHOLDS[Math.min(level, LEVEL_THRESHOLDS.length - 1)];
+  const currentThreshold = LEVEL_THRESHOLDS[level - 1]!;
+  const nextThreshold = LEVEL_THRESHOLDS[Math.min(level, LEVEL_THRESHOLDS.length - 1)]!;
   const isMax = level >= LEVEL_THRESHOLDS.length;
   const progressSpan = Math.max(1, nextThreshold - currentThreshold);
   const progressValue = isMax ? progressSpan : Math.min(progressSpan, Math.max(0, totalExp - currentThreshold));
@@ -292,7 +293,7 @@ function getAdventureProgress({
     totalExp,
     nextThreshold,
     progressPercent,
-    nextReward: isMax ? "すべて解放済み" : LEVEL_REWARDS[level],
+    nextReward: isMax ? "すべて解放済み" : (LEVEL_REWARDS[level] ?? "次のごほうび"),
     isMax,
   };
 }
