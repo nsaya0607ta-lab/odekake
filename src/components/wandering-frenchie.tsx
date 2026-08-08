@@ -47,8 +47,12 @@ const STEP_MS = 340;
 /** 振り向きにかける時間（ms）。止まっている間に終わる */
 const TURN_MS = 260;
 
+/**
+ * 右側にはレベル札を固定表示するため、犬の移動範囲はカード左〜中央に限定する。
+ * 犬の画像幅も考慮して MAX_X を 56% にし、札の下へ潜り込まない余白を残す。
+ */
 const MIN_X = 11;
-const MAX_X = 89;
+const MAX_X = 56;
 
 type Walker = {
   x: number;
@@ -95,10 +99,11 @@ export function WanderingFrenchie() {
     };
 
     const startWalk = (from: Walker) => {
-      // ちょこっと動いて止まる、を避けてある程度の距離を歩かせる
+      // ちょこっと動いて止まる、を避けてある程度の距離を歩かせる。
+      // 狭くした移動帯でも不自然な小刻み移動にならないよう最小距離も縮める。
       let target = rand(MIN_X, MAX_X);
-      if (Math.abs(target - from.x) < 24) {
-        target = from.x < (MIN_X + MAX_X) / 2 ? rand(62, MAX_X) : rand(MIN_X, 38);
+      if (Math.abs(target - from.x) < 15) {
+        target = from.x < (MIN_X + MAX_X) / 2 ? rand(39, MAX_X) : rand(MIN_X, 28);
       }
       const facing: 1 | -1 = target > from.x ? -1 : 1;
       const depth = Math.min(1, Math.max(0, from.depth + rand(-0.35, 0.35)));
