@@ -18,14 +18,14 @@ export default function TermsPage() {
         <section className="space-y-2">
           <h2 className="text-base font-bold text-ink">サービスについて</h2>
           <p>
-            おでかけ記録は、旅行、スポットおよび訪問履歴を保存し、共有旅の参加者と記録を共有できるサービスです。
+            おでかけ記録は、旅行、スポットおよび訪問履歴を保存し、あとから振り返るためのサービスです。
           </p>
         </section>
 
         <section className="space-y-2">
           <h2 className="text-base font-bold text-ink">利用者の責任</h2>
           <p>
-            利用者は、登録する文章、写真その他の情報について必要な権利を有し、第三者の権利や法令を侵害しないものとします。アカウント情報と招待コードは適切に管理してください。
+            利用者は、登録する文章、写真その他の情報について必要な権利を有し、第三者の権利や法令を侵害しないものとします。アカウント情報は適切に管理してください。
           </p>
         </section>
 

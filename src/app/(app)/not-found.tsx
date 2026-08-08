@@ -10,8 +10,6 @@ export default function AppNotFound() {
       <h1 className="text-lg font-bold">ページが見つかりません</h1>
       <p className="text-sm leading-relaxed text-ink-soft">
         削除されたか、閲覧できないデータの可能性があります。
-        <br />
-        共有旅は、参加しているメンバーだけが閲覧できます。
       </p>
       <Link href="/home" className="btn btn-primary w-full">
         ホームへ戻る

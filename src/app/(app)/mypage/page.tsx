@@ -9,14 +9,12 @@ import {
   IconLogout,
   IconMail,
   IconUser,
-  IconUsers,
 } from "@/components/icons";
 import { PageBody } from "@/components/page-body";
 import { TopHeader } from "@/components/page-header";
 import { loadAreaIndex } from "@/lib/data/areas";
 import { signPhotoPath } from "@/lib/data/photos";
-import { listIncomingInvitations } from "@/lib/data/trips";
-import { allReadableTripIds } from "@/lib/data/workspace";
+import { getRecordSpace } from "@/lib/data/space";
 import { requireUser } from "@/lib/supabase/server";
 
 export const metadata = { title: "マイページ | おでかけ記録" };
@@ -25,16 +23,13 @@ export const dynamic = "force-dynamic";
 export default async function MyPage() {
   const { supabase, user } = await requireUser();
 
-  // マイページはワークスペースをまたいだ合計を出す（アカウント全体の記録）
-  const allTripIds = await allReadableTripIds(supabase);
+  const space = await getRecordSpace(supabase, user.id);
   const [{ data: profile }, areas] = await Promise.all([
     supabase.from("profiles").select("*").eq("user_id", user.id).maybeSingle(),
-    loadAreaIndex(supabase, allTripIds),
+    loadAreaIndex(supabase, space.tripIds),
   ]);
 
   const avatarUrl = await signPhotoPath(supabase, profile?.profile_image_url);
-
-  const invitationCount = (await listIncomingInvitations(supabase, user.email)).length;
 
   return (
     <>
@@ -89,12 +84,6 @@ export default async function MyPage() {
           <p className="mb-2 px-1 text-xs font-semibold text-ink-faint">設定</p>
           <ul className="rough-card divide-y divide-line overflow-hidden">
             <MenuItem href="/mypage/profile" icon={<IconUser size={20} />} label="プロフィールを編集" />
-            <MenuItem
-              href="/invitations"
-              icon={<IconUsers size={20} />}
-              label="共有旅の招待"
-              badge={invitationCount > 0 ? invitationCount : undefined}
-            />
             <MenuItem href="/mypage/account" icon={<IconMail size={20} />} label="アカウント設定" />
             <MenuItem href="/mypage/help" icon={<IconChat size={20} />} label="ヘルプ・お問い合わせ" />
           </ul>
@@ -115,23 +104,16 @@ function MenuItem({
   href,
   icon,
   label,
-  badge,
 }: {
   href: string;
   icon: React.ReactNode;
   label: string;
-  badge?: number;
 }) {
   return (
     <li>
       <Link href={href} className="flex items-center gap-3 px-4 py-4 transition-colors active:bg-paper-deep">
         <span className="shrink-0 text-ink-faint">{icon}</span>
         <span className="min-w-0 flex-1 truncate font-semibold">{label}</span>
-        {badge ? (
-          <span className="rough-pill shrink-0 bg-blossom-soft px-2 py-0.5 text-[11px] font-bold text-[#95505e] tabular-nums">
-            {badge}
-          </span>
-        ) : null}
         <IconChevronRight size={18} className="shrink-0 text-ink-faint" />
       </Link>
     </li>

@@ -1,9 +1,9 @@
 import Link from "next/link";
-import { IconChevronRight, IconFlag, IconMapPin, IconNotebook, IconUsers } from "@/components/icons";
+import { IconChevronRight, IconFlag, IconMapPin, IconNotebook } from "@/components/icons";
 import { PageBody } from "@/components/page-body";
 import { TopHeader } from "@/components/page-header";
 import { getTimeline } from "@/lib/data/visits";
-import { resolveWorkspace } from "@/lib/data/workspace";
+import { getRecordSpace } from "@/lib/data/space";
 import { requireUser } from "@/lib/supabase/server";
 
 export const metadata = { title: "追加 | おでかけ記録" };
@@ -11,26 +11,19 @@ export const dynamic = "force-dynamic";
 
 export default async function AddPage() {
   const { supabase, user } = await requireUser();
-  const workspace = await resolveWorkspace(supabase, user.id);
+  const space = await getRecordSpace(supabase, user.id);
 
   // 最近の訪問履歴から場所を拾う。スポットを全件読んでから絞るより軽く、
   // 「最近行った順」も正しく出る。
-  const recent = await getTimeline(supabase, { tripIds: workspace.tripIds, limit: 20 });
+  const recent = await getTimeline(supabase, { tripIds: space.tripIds, limit: 20 });
   const recentSpots = [...new Map(recent.map((item) => [item.spotId, item])).values()].slice(0, 5);
-  const isShared = workspace.kind === "trip";
 
   return (
     <>
       <TopHeader title="追加" />
       <PageBody>
-        <p
-          className={`rounded-2xl px-4 py-3 text-xs leading-relaxed ${
-            isShared ? "bg-sky-soft text-[#42718f]" : "bg-blossom-soft text-[#95505e]"
-          }`}
-        >
-          {isShared
-            ? `現在は「${workspace.name}」の共有旅画面です。この画面で追加した内容は共有旅の記録として扱われます。`
-            : "現在は自分の旅の画面です。普段のおでかけや、一人で行った場所を記録できます。"}
+        <p className="rounded-2xl bg-blossom-soft px-4 py-3 text-xs leading-relaxed text-[#95505e]">
+          {`追加した内容は「${space.name}」の記録として保存されます。`}
         </p>
 
         <ul className="space-y-3">
@@ -39,11 +32,7 @@ export default async function AddPage() {
               href="/spots/new"
               icon={<IconMapPin size={24} />}
               title="行った場所を登録"
-              description={
-                isShared
-                  ? "場所・訪問日・感想・写真を、この共有旅へまとめて登録します"
-                  : "場所・訪問日・感想・写真を、まとめて登録します"
-              }
+              description="場所・訪問日・感想・写真を、まとめて登録します"
               tone="sky"
             />
           </li>
@@ -52,36 +41,17 @@ export default async function AddPage() {
               href="/records?tab=spots"
               icon={<IconNotebook size={24} />}
               title="登録済みの場所に記録"
-              description={
-                isShared
-                  ? "この共有旅で以前訪れた場所へ、再訪の記録を追加します"
-                  : "以前訪れた場所へ、もう一度行った記録を追加します"
-              }
+              description="以前訪れた場所へ、もう一度行った記録を追加します"
               tone="sun"
             />
           </li>
-          {isShared ? (
-            <li>
-              <AddCard
-                href="/invitations"
-                icon={<IconUsers size={24} />}
-                title="別の共有旅に参加"
-                description="招待コードを入力して共有旅に参加します"
-                tone="blossom"
-              />
-            </li>
-          ) : null}
           <li>
             <AddCard
-              href={isShared ? "/trips/new/shared" : "/trips/new/personal"}
-              icon={isShared ? <IconUsers size={24} /> : <IconFlag size={24} />}
-              title={isShared ? "新しい共有旅" : "旅行の計画を立てる"}
-              description={
-                isShared
-                  ? "メンバーと記録を共有する、新しい旅行をつくります"
-                  : "日程や表紙を決めて、訪問記録を旅行ごとにまとめます"
-              }
-              tone={isShared ? "sky" : "leaf"}
+              href="/trips/new"
+              icon={<IconFlag size={24} />}
+              title="旅行の計画を立てる"
+              description="日程や表紙を決めて、訪問記録を旅行ごとにまとめます"
+              tone="leaf"
             />
           </li>
         </ul>

@@ -3,7 +3,7 @@ import { PageBody } from "@/components/page-body";
 import { PageHeader } from "@/components/page-header";
 import { PrefectureAreaBrowser } from "@/components/prefecture-area-browser";
 import { loadAreaIndex, shadeLevel } from "@/lib/data/areas";
-import { resolveWorkspace } from "@/lib/data/workspace";
+import { getRecordSpace } from "@/lib/data/space";
 import { getMunicipalitiesByPrefecture, getPrefecture, insetsOfPrefecture, viewBoxFor } from "@/lib/geo";
 import { loadMunicipalityShapes } from "@/lib/geo/municipality-shapes";
 import { buildPrefectureAreas } from "@/lib/geo/prefecture-areas";
@@ -29,11 +29,11 @@ export default async function PrefecturePage({
   if (!region || !prefecture || prefecture.region.slug !== region.slug) notFound();
 
   const { supabase, user } = await requireUser();
-  const workspace = await resolveWorkspace(supabase, user.id);
+  const space = await getRecordSpace(supabase, user.id);
 
   // 境界データはその都道府県の分だけサーバー側で読み込む
   const [areasIndex, shapes] = await Promise.all([
-    loadAreaIndex(supabase, workspace.tripIds),
+    loadAreaIndex(supabase, space.tripIds),
     loadMunicipalityShapes(prefecture.code),
   ]);
 
@@ -65,7 +65,7 @@ export default async function PrefecturePage({
     <>
       <PageHeader
         title={prefecture.name}
-        subtitle={`${region.name}地方・${workspace.name}`}
+        subtitle={`${region.name}地方・${space.name}`}
         backHref={`/map/${region.slug}`}
       />
       <PageBody>

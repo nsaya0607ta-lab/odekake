@@ -29,7 +29,6 @@ export type SpotFormValues = {
 export type SpotFormTrip = {
   id: string;
   title: string;
-  trip_type: "solo" | "shared";
 };
 
 const EMPTY: SpotFormValues = {
@@ -200,7 +199,7 @@ export function SpotForm({
               <option value="">選択してください</option>
               {trips.map((trip) => (
                 <option key={trip.id} value={trip.id}>
-                  {trip.trip_type === "shared" ? `${trip.title}（共有旅）` : trip.title}
+                  {trip.title}
                 </option>
               ))}
             </select>
@@ -452,7 +451,7 @@ export function SpotForm({
           <p className="text-xs leading-relaxed text-ink-soft">
             日程や表紙を設定して、複数の訪問記録をひとつの旅行としてまとめられます。普段のおでかけ記録には作成不要です。
           </p>
-          <Link href="/trips/new/personal" className="btn btn-quiet w-full">
+          <Link href="/trips/new" className="btn btn-quiet w-full">
             旅行の計画を立てる
           </Link>
         </div>

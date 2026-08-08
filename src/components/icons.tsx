@@ -102,13 +102,6 @@ export const IconCamera = (p: IconProps) => (
   </Base>
 );
 
-export const IconBell = (p: IconProps) => (
-  <Base {...p}>
-    <path d="M6.5 17c.9-1.1 1.2-2.2 1.2-4.4C7.7 9 9.6 7 12 7s4.3 2 4.3 5.6c0 2.2.3 3.3 1.2 4.4Z" />
-    <path d="M10.4 20h3.2" />
-  </Base>
-);
-
 export const IconCalendar = (p: IconProps) => (
   <Base {...p}>
     <rect x="3.5" y="5.5" width="17" height="15" rx="3" />
@@ -120,13 +113,6 @@ export const IconClock = (p: IconProps) => (
   <Base {...p}>
     <circle cx="12" cy="12" r="8.2" />
     <path d="M12 7.6V12l3 1.8" />
-  </Base>
-);
-
-export const IconLink = (p: IconProps) => (
-  <Base {...p}>
-    <path d="M10.5 13.5a3.6 3.6 0 0 0 5.1 0l2.4-2.4a3.6 3.6 0 0 0-5.1-5.1l-1.2 1.2" />
-    <path d="M13.5 10.5a3.6 3.6 0 0 0-5.1 0L6 12.9a3.6 3.6 0 0 0 5.1 5.1l1.2-1.2" />
   </Base>
 );
 

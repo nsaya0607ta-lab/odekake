@@ -119,7 +119,7 @@ async function loadAreaStatsDirect(supabase: DB, tripIds: string[]): Promise<Are
 /**
  * 地方 / 都道府県 / 市区町村ごとの訪問状況とスポット数をまとめて取得する。
  *
- * tripIds を渡すと、その旅行の記録だけを集計する（旅ワークスペースの分離）。
+ * tripIds を渡すと、その旅行の記録だけを集計する。
  * 空配列を渡した場合は「まだ記録がない」として何も返さない。
  */
 export async function loadAreaIndex(supabase: DB, tripIds: string[]): Promise<AreaIndex> {

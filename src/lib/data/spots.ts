@@ -24,9 +24,7 @@ export type SpotSummary = {
 export type VisitDetail = {
   record: VisitRecordRow;
   photos: Array<{ id: string; url: string | null; caption: string | null }>;
-  authorName: string;
   tripTitle: string | null;
-  tripType: "solo" | "shared" | null;
 };
 
 function summarize(visits: VisitRecordRow[]) {
@@ -341,7 +339,7 @@ export type SpotDetail = {
   galleryUrls: string[];
 };
 
-/** スポットの詳細。訪問履歴はいまの旅ワークスペースの分だけを見せる */
+/** スポットの詳細 */
 export async function getSpotDetail(
   supabase: DB,
   spotId: string,
@@ -384,10 +382,7 @@ export async function getSpotDetail(
   const allPaths = [...photosByVisit.values()].flat().map((p) => p.storage_path);
   const signed = await signPhotoPaths(supabase, allPaths);
 
-  const [authorNames, tripInfo] = await Promise.all([
-    loadDisplayNames(supabase, visitList.map((v) => v.user_id)),
-    loadTripLabels(supabase, visitList.map((v) => v.trip_id)),
-  ]);
+  const tripTitles = await loadTripTitles(supabase, visitList.map((v) => v.trip_id));
 
   const visitDetails: VisitDetail[] = visitList.map((record) => ({
     record,
@@ -396,9 +391,7 @@ export async function getSpotDetail(
       url: signed.get(p.storage_path) ?? null,
       caption: p.caption,
     })),
-    authorName: authorNames.get(record.user_id) ?? "メンバー",
-    tripTitle: tripInfo.get(record.trip_id)?.title ?? null,
-    tripType: tripInfo.get(record.trip_id)?.type ?? null,
+    tripTitle: tripTitles.get(record.trip_id) ?? null,
   }));
 
   return {
@@ -410,19 +403,9 @@ export async function getSpotDetail(
   };
 }
 
-export async function loadDisplayNames(supabase: DB, userIds: string[]): Promise<Map<string, string>> {
-  const unique = [...new Set(userIds)];
-  if (unique.length === 0) return new Map();
-  const { data } = await supabase.from("profiles").select("user_id, display_name").in("user_id", unique);
-  return new Map((data ?? []).map((p) => [p.user_id, p.display_name]));
-}
-
-export async function loadTripLabels(
-  supabase: DB,
-  tripIds: string[],
-): Promise<Map<string, { title: string; type: "solo" | "shared" }>> {
+export async function loadTripTitles(supabase: DB, tripIds: string[]): Promise<Map<string, string>> {
   const unique = [...new Set(tripIds)];
   if (unique.length === 0) return new Map();
-  const { data } = await supabase.from("trips").select("id, title, trip_type").in("id", unique);
-  return new Map((data ?? []).map((t) => [t.id, { title: t.title, type: t.trip_type }]));
+  const { data } = await supabase.from("trips").select("id, title").in("id", unique);
+  return new Map((data ?? []).map((t) => [t.id, t.title]));
 }

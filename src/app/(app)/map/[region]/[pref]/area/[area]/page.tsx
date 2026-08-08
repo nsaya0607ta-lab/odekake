@@ -3,7 +3,7 @@ import { MunicipalityBrowser } from "@/components/municipality-browser";
 import { PageBody } from "@/components/page-body";
 import { PageHeader } from "@/components/page-header";
 import { loadAreaIndex, shadeLevel } from "@/lib/data/areas";
-import { resolveWorkspace } from "@/lib/data/workspace";
+import { getRecordSpace } from "@/lib/data/space";
 import { getMunicipalitiesByPrefecture, getPrefecture, viewBoxFor } from "@/lib/geo";
 import { loadMunicipalityShapes } from "@/lib/geo/municipality-shapes";
 import {
@@ -27,9 +27,9 @@ export default async function PrefectureAreaPage({
   if (!region || !prefecture || prefecture.region.slug !== region.slug) notFound();
 
   const { supabase, user } = await requireUser();
-  const workspace = await resolveWorkspace(supabase, user.id);
+  const space = await getRecordSpace(supabase, user.id);
   const [areasIndex, shapes] = await Promise.all([
-    loadAreaIndex(supabase, workspace.tripIds),
+    loadAreaIndex(supabase, space.tripIds),
     loadMunicipalityShapes(prefecture.code),
   ]);
 
@@ -66,7 +66,7 @@ export default async function PrefectureAreaPage({
     <>
       <PageHeader
         title={selectedArea.name}
-        subtitle={`${prefecture.name}・${workspace.name}`}
+        subtitle={`${prefecture.name}・${space.name}`}
         backHref={`/map/${region.slug}/${prefecture.code}`}
       />
       <PageBody>

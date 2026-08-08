@@ -4,17 +4,15 @@ import { PageHeader } from "@/components/page-header";
 import { SpotCard } from "@/components/spot-browser";
 import { EmptyState } from "@/components/ui";
 import { getRevisitWantedSpots } from "@/lib/data/spots";
-import { allReadableTripIds } from "@/lib/data/workspace";
+import { getRecordSpace } from "@/lib/data/space";
 import { requireUser } from "@/lib/supabase/server";
 
 export const metadata = { title: "また行きたい場所 | おでかけ記録" };
 export const dynamic = "force-dynamic";
 
 export default async function WishlistPage() {
-  const { supabase } = await requireUser();
-
-  // マイページ配下は、マイページ本体の合計と同じくアカウント全体を対象にする
-  const tripIds = await allReadableTripIds(supabase);
+  const { supabase, user } = await requireUser();
+  const { tripIds } = await getRecordSpace(supabase, user.id);
   const spots = await getRevisitWantedSpots(supabase, tripIds);
 
   return (

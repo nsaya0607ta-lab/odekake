@@ -1,21 +1,5 @@
-export type TripType = "solo" | "shared";
-export type TripRole = "owner" | "member" | "viewer";
-export type InvitationStatus = "pending" | "accepted" | "expired" | "cancelled";
 /** スポットの座標をどうやって決めたか */
 export type LocationSource = "municipality" | "address" | "map" | "device" | "place_search";
-export type InvitationEmailStatus = "not_sent" | "queued" | "sent" | "failed";
-export type TripActivityAction =
-  | "trip_created"
-  | "trip_updated"
-  | "member_joined"
-  | "member_left"
-  | "member_removed"
-  | "visit_added"
-  | "visit_updated"
-  | "visit_deleted"
-  | "photo_added"
-  | "photo_removed"
-  | "comment_added";
 
 export type ProfileRow = {
   id: string;
@@ -23,6 +7,8 @@ export type ProfileRow = {
   display_name: string;
   profile_image_url: string | null;
   introduction: string | null;
+  /** ホームや記録画面の上に出す、自分の記録全体の名前。未設定なら「自分の旅」 */
+  space_name: string | null;
   created_at: string;
   updated_at: string;
 };
@@ -39,22 +25,12 @@ export type TripRow = {
   id: string;
   owner_id: string;
   title: string;
-  trip_type: TripType;
   start_date: string | null;
   end_date: string | null;
   description: string | null;
   cover_image_url: string | null;
-  invite_code: string | null;
   created_at: string;
   updated_at: string;
-};
-
-export type TripMemberRow = {
-  id: string;
-  trip_id: string;
-  user_id: string;
-  role: TripRole;
-  joined_at: string;
 };
 
 export type SpotRow = {
@@ -118,45 +94,6 @@ export type TagRow = {
   created_at: string;
 };
 
-export type TripCommentRow = {
-  id: string;
-  trip_id: string;
-  user_id: string;
-  comment: string;
-  created_at: string;
-  updated_at: string;
-};
-
-export type TripInvitationRow = {
-  id: string;
-  trip_id: string;
-  email: string | null;
-  invite_code: string;
-  status: InvitationStatus;
-  expires_at: string;
-  created_at: string;
-  invited_by: string | null;
-  message: string | null;
-  email_status: InvitationEmailStatus;
-  email_sent_at: string | null;
-  email_error: string | null;
-  email_attempts: number;
-  accepted_by: string | null;
-  accepted_at: string | null;
-};
-
-export type TripActivityRow = {
-  id: string;
-  trip_id: string;
-  actor_id: string | null;
-  action: TripActivityAction;
-  target_type: string | null;
-  target_id: string | null;
-  target_label: string | null;
-  detail: Record<string, unknown>;
-  created_at: string;
-};
-
 export type AreaStatsRow = {
   prefecture_code: string;
   municipality_code: string;
@@ -175,12 +112,6 @@ export type Database = {
         Row: TripRow;
         Insert: Partial<TripRow> & { owner_id: string; title: string };
         Update: Partial<TripRow>;
-        Relationships: [];
-      };
-      trip_members: {
-        Row: TripMemberRow;
-        Insert: Partial<TripMemberRow> & { trip_id: string; user_id: string };
-        Update: Partial<TripMemberRow>;
         Relationships: [];
       };
       spots: {
@@ -218,37 +149,14 @@ export type Database = {
         Update: Partial<{ id: string; visit_record_id: string; tag_id: string }>;
         Relationships: [];
       };
-      trip_comments: {
-        Row: TripCommentRow;
-        Insert: Partial<TripCommentRow> & { trip_id: string; user_id: string; comment: string };
-        Update: Partial<TripCommentRow>;
-        Relationships: [];
-      };
-      trip_invitations: {
-        Row: TripInvitationRow;
-        Insert: Partial<TripInvitationRow> & { trip_id: string; invite_code: string };
-        Update: Partial<TripInvitationRow>;
-        Relationships: [];
-      };
-      trip_activities: {
-        Row: TripActivityRow;
-        Insert: never;
-        Update: never;
-        Relationships: [];
-      };
     };
     Views: Record<string, never>;
     Functions: {
       area_stats: { Args: { p_trip_ids?: string[] }; Returns: AreaStatsRow[] };
-      join_trip_by_code: { Args: { p_code: string }; Returns: { trip_id: string; title: string }[] };
       delete_own_account: { Args: Record<string, never>; Returns: undefined };
     };
     Enums: {
-      trip_type: TripType;
-      trip_role: TripRole;
-      invitation_status: InvitationStatus;
       location_source: LocationSource;
-      trip_activity_action: TripActivityAction;
     };
     CompositeTypes: Record<string, never>;
   };

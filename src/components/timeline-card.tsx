@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { IconHeart, IconMapPin } from "./icons";
 import type { TimelineItem } from "@/lib/data/visits";
-import { TripTypeBadge, formatDate } from "./ui";
+import { TripBadge, formatDate } from "./ui";
 
 export function TimelineCard({ item, showTrip = true }: { item: TimelineItem; showTrip?: boolean }) {
   return (
@@ -43,7 +43,7 @@ export function TimelineCard({ item, showTrip = true }: { item: TimelineItem; sh
         </span>
       </span>
 
-      {showTrip ? <TripTypeBadge type={item.tripType} /> : null}
+      {showTrip ? <TripBadge title={item.tripTitle} /> : null}
     </Link>
   );
 }

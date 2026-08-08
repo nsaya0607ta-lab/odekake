@@ -12,7 +12,7 @@ const securityHeaders = [
   { key: "Content-Security-Policy", value: "frame-ancestors 'none'" },
   // 中身から MIME を推測させない
   { key: "X-Content-Type-Options", value: "nosniff" },
-  // 外部サイトへは参照元のパスを渡さない（招待リンクなどが漏れないように）
+  // 外部サイトへは参照元のパスを渡さない（記録のURLが漏れないように）
   { key: "Referrer-Policy", value: "strict-origin-when-cross-origin" },
   // 使っていない端末機能は既定で拒否する（位置情報は場所の指定で使う）
   { key: "Permissions-Policy", value: "camera=(), microphone=(), geolocation=(self)" },

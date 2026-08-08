@@ -42,11 +42,22 @@ export function PageHeader({ title, backHref, subtitle, action }: Props) {
 }
 
 /** 戻るボタンを持たない画面（下部ナビの主要5画面）向け */
-export function TopHeader({ title, action }: { title: string; action?: ReactNode }) {
+export function TopHeader({
+  title,
+  subtitle,
+  action,
+}: {
+  title: string;
+  subtitle?: string;
+  action?: ReactNode;
+}) {
   return (
     <header className="sticky top-0 z-30 border-b border-line bg-paper/92 backdrop-blur-sm">
       <div className="mx-auto flex max-w-lg items-center gap-2 px-4 py-3">
-        <h1 className="min-w-0 flex-1 truncate text-[19px] font-bold">{title}</h1>
+        <span className="min-w-0 flex-1">
+          <h1 className="truncate text-[19px] font-bold">{title}</h1>
+          {subtitle ? <span className="block truncate text-xs text-ink-faint">{subtitle}</span> : null}
+        </span>
         {action}
       </div>
     </header>

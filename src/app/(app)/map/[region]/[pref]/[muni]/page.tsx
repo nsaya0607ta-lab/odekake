@@ -10,7 +10,7 @@ import { loadCategoryNames, getSpotsInMunicipality } from "@/lib/data/spots";
 import { getMunicipality, getPrefecture } from "@/lib/geo";
 import { loadMunicipalityShapes } from "@/lib/geo/municipality-shapes";
 import { getRegion } from "@/lib/geo/regions";
-import { resolveWorkspace } from "@/lib/data/workspace";
+import { getRecordSpace } from "@/lib/data/space";
 import { requireUser } from "@/lib/supabase/server";
 
 export const dynamic = "force-dynamic";
@@ -66,9 +66,9 @@ export default async function MunicipalityPage({
   }
 
   const { supabase, user } = await requireUser();
-  const workspace = await resolveWorkspace(supabase, user.id);
+  const space = await getRecordSpace(supabase, user.id);
   const [spots, categoryNames, shapes] = await Promise.all([
-    getSpotsInMunicipality(supabase, municipality.code, workspace.tripIds),
+    getSpotsInMunicipality(supabase, municipality.code, space.tripIds),
     loadCategoryNames(supabase),
     loadMunicipalityShapes(prefecture.code),
   ]);

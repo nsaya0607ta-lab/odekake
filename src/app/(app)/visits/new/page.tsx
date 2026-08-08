@@ -3,7 +3,7 @@ import { PageBody } from "@/components/page-body";
 import { PageHeader } from "@/components/page-header";
 import { todayInJapan } from "@/lib/date";
 import { ensurePersonalRecordTrip, getTripOptions } from "@/lib/data/trips";
-import { resolveWorkspace } from "@/lib/data/workspace";
+import { getRecordSpace } from "@/lib/data/space";
 import { requireUser } from "@/lib/supabase/server";
 import { VisitForm } from "../visit-form";
 
@@ -25,12 +25,10 @@ export default async function NewVisitPage({
   const { data: spot } = await supabase.from("spots").select("id, name").eq("id", spotId).maybeSingle();
   if (!spot) notFound();
 
-  const workspace = await resolveWorkspace(supabase, user.id);
-  const initialTrips = await getTripOptions(supabase, workspace.tripIds);
+  const space = await getRecordSpace(supabase, user.id);
+  const initialTrips = await getTripOptions(supabase, space.tripIds);
   const personalRecordTrip =
-    workspace.kind === "personal" && initialTrips.length === 0
-      ? await ensurePersonalRecordTrip(supabase, user.id)
-      : null;
+    initialTrips.length === 0 ? await ensurePersonalRecordTrip(supabase, user.id) : null;
   const trips = personalRecordTrip ? [personalRecordTrip] : initialTrips;
 
   return (
