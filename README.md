@@ -37,8 +37,16 @@ cp .env.example .env.local
 | `NEXT_PUBLIC_SUPABASE_URL` | Supabase プロジェクトの URL |
 | `NEXT_PUBLIC_SUPABASE_ANON_KEY` | anon（公開）キー |
 | `NEXT_PUBLIC_SITE_URL` | 確認メールやパスワード再設定リンクの戻り先 |
-| `EMAIL_PROVIDER` | 招待メールの送信元（任意。未設定なら送信しません） |
+| `EMAIL_PROVIDER` | 招待メールの送信元（`none` / `resend`。未設定なら送信しません） |
+| `RESEND_API_KEY` | Resend の API キー（`EMAIL_PROVIDER=resend` のとき必須） |
+| `EMAIL_FROM` | 招待メールの差出人（例 `おでかけ記録 <noreply@example.com>`。同上） |
+| `EMAIL_REPLY_TO` | 招待メールの返信先（任意） |
 | `GOOGLE_PLACES_API_KEY` | Google Places API（New）のサーバー用キー（任意。未設定なら検索欄は出しません） |
+
+招待メールを送るには `EMAIL_PROVIDER=resend` と `RESEND_API_KEY` / `EMAIL_FROM` を設定します。
+`EMAIL_FROM` のドメインは Resend 側で認証しておく必要があります（未認証だと送信が 403 で失敗し、
+理由が旅行の設定画面に表示されます）。未設定のままでも招待はアプリ内に届き、
+招待コードとリンクを共有して参加できます。
 
 サービスロールキーはクライアント側でもサーバー側でも使用しません。アカウント削除は
 `delete_own_account()`（SECURITY DEFINER の RPC）経由で行います。

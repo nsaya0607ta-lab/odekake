@@ -1,5 +1,11 @@
 import { cache } from "react";
-import type { TripActivityRow, TripMemberRow, TripRole, TripRow } from "@/lib/supabase/types";
+import type {
+  TripActivityRow,
+  TripInvitationRow,
+  TripMemberRow,
+  TripRole,
+  TripRow,
+} from "@/lib/supabase/types";
 import type { DB } from "./client";
 import { signPhotoPath } from "./photos";
 
@@ -59,6 +65,34 @@ export const getTripSummaries = cache(async function getTripSummaries(
     visitCount: visitCount.get(trip.id) ?? 0,
     role: myRole.get(trip.id) ?? (trip.owner_id === userId ? "owner" : null),
   }));
+});
+
+/**
+ * ログイン中のメールアドレス宛に届いている、まだ有効な招待。
+ *
+ * メールを送らない構成でも招待に気づけるよう、ホームのベルとマイページの
+ * バッジ、招待一覧がこの結果を共有する（React cache で1リクエスト1回）。
+ *
+ * RLS は「自分宛の招待」だけでなく「自分が主催者として送った招待」も返すため、
+ * 宛先で絞り込む。status は期限が過ぎても pending のままなので期限も見る
+ * （参加時の RPC は expires_at を見るため、弾かないと
+ *   「一覧に出るのに参加できない」招待が並ぶ）。
+ */
+export const listIncomingInvitations = cache(async function listIncomingInvitations(
+  supabase: DB,
+  email: string | null,
+): Promise<TripInvitationRow[]> {
+  if (!email) return [];
+
+  const { data } = await supabase
+    .from("trip_invitations")
+    .select("*")
+    .eq("status", "pending")
+    .gte("expires_at", new Date().toISOString())
+    .order("created_at", { ascending: false });
+
+  const target = email.toLowerCase();
+  return ((data ?? []) as TripInvitationRow[]).filter((row) => row.email?.toLowerCase() === target);
 });
 
 /** 訪問履歴の登録フォームで使う、旅行の選択肢（いまの旅ワークスペースの分だけ） */

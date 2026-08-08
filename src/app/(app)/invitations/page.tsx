@@ -1,31 +1,24 @@
+import { acceptInvitationAction } from "@/app/actions/trips";
 import { IconMail } from "@/components/icons";
 import { JoinTripForm } from "@/components/join-trip-form";
 import { PageBody } from "@/components/page-body";
 import { PageHeader } from "@/components/page-header";
+import { SubmitButton } from "@/components/form";
 import { formatDate } from "@/components/ui";
+import { listIncomingInvitations } from "@/lib/data/trips";
 import { requireUser } from "@/lib/supabase/server";
-import type { TripInvitationRow } from "@/lib/supabase/types";
 
 export const metadata = { title: "招待のお知らせ | おでかけ記録" };
 export const dynamic = "force-dynamic";
 
-export default async function InvitationsPage() {
-  const { supabase, user } = await requireUser();
+export default async function InvitationsPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ error?: string }>;
+}) {
+  const [{ error }, { supabase, user }] = await Promise.all([searchParams, requireUser()]);
 
-  // RLS は「自分宛の招待」だけでなく「自分が主催者として送った招待」も返す。
-  // また status は期限切れになっても pending のままなので、期限も見る。
-  // （参加時の RPC と旅行名の参照はどちらも expires_at を見るため、
-  //   ここで弾かないと「一覧に出るのに参加できない」招待が並ぶ）
-  const { data } = await supabase
-    .from("trip_invitations")
-    .select("*")
-    .eq("status", "pending")
-    .gte("expires_at", new Date().toISOString())
-    .order("created_at", { ascending: false });
-
-  const invitations = ((data ?? []) as TripInvitationRow[]).filter(
-    (i) => i.email && user.email && i.email.toLowerCase() === user.email.toLowerCase(),
-  );
+  const invitations = await listIncomingInvitations(supabase, user.email);
 
   const tripTitles = new Map<string, string>();
   if (invitations.length > 0) {
@@ -43,6 +36,12 @@ export default async function InvitationsPage() {
     <>
       <PageHeader title="招待のお知らせ" backHref="/mypage" />
       <PageBody>
+        {error === "join" ? (
+          <p className="rounded-2xl border border-blossom bg-blossom-soft px-4 py-3 text-sm text-[#8f4c59]">
+            参加できませんでした。招待が取り消されたか、期限が切れている可能性があります。
+          </p>
+        ) : null}
+
         <section>
           <h2 className="mb-2 px-1 text-base font-bold">届いている招待</h2>
           {invitations.length === 0 ? (
@@ -51,8 +50,11 @@ export default async function InvitationsPage() {
                 <IconMail size={30} />
               </span>
               <p className="font-semibold">届いている招待はありません</p>
+              {/* 「招待されたのに出てこない」の多くは宛先ちがい。見えるようにしておく */}
               <p className="text-sm leading-relaxed text-ink-soft">
-                招待コードを受け取っている場合は、下から参加できます。
+                ここには <span className="font-semibold break-all">{user.email ?? "登録しているメールアドレス"}</span>{" "}
+                宛の招待が出ます。
+                別のメールアドレスで招待されている場合は、下の招待コードから参加してください。
               </p>
             </div>
           ) : (
@@ -63,6 +65,15 @@ export default async function InvitationsPage() {
                   <p className="mt-1 text-xs text-ink-faint">
                     招待コード {invitation.invite_code}・{formatDate(invitation.expires_at)}まで有効
                   </p>
+                  {invitation.message ? (
+                    <p className="mt-2 text-sm leading-relaxed text-ink-soft">{invitation.message}</p>
+                  ) : null}
+                  <form action={acceptInvitationAction} className="mt-3">
+                    <input type="hidden" name="inviteCode" value={invitation.invite_code} />
+                    <SubmitButton className="btn btn-quiet w-full" pendingLabel="参加中…">
+                      参加する
+                    </SubmitButton>
+                  </form>
                 </li>
               ))}
             </ul>
