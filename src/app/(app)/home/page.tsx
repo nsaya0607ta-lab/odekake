@@ -21,72 +21,6 @@ import { requireUser } from "@/lib/supabase/server";
 export const metadata = { title: "あなたの旅 | おでかけ記録" };
 export const dynamic = "force-dynamic";
 
-const LEVEL_THRESHOLDS = [
-  0,
-  100,
-  220,
-  360,
-  520,
-  700,
-  900,
-  1120,
-  1360,
-  1620,
-  1900,
-  2200,
-  2520,
-  2860,
-  3220,
-  3600,
-  4000,
-  4420,
-  4860,
-  5320,
-  5800,
-  6300,
-  6820,
-  7360,
-  7920,
-  8500,
-  9100,
-  9720,
-  10360,
-  11020,
-] as const;
-
-const LEVEL_REWARDS = [
-  "基本スタート",
-  "伸びをする",
-  "首輪（グリーン）",
-  "表情：にっこり",
-  "バンダナ（レッド）",
-  "おもちゃ：ボール",
-  "顔をかく",
-  "表情：眠そう",
-  "帽子（キャップ）",
-  "ごろん",
-  "首輪（ブラウン）",
-  "小さなクッション",
-  "首をかしげる",
-  "表情：わくわく",
-  "旅リュック",
-  "観葉植物",
-  "飼い主を見る",
-  "表情：ドヤ顔",
-  "称号：旅なれフレブル",
-  "写真スポットでポーズ",
-  "犬用ベッド",
-  "走る",
-  "帽子（ハット）",
-  "表情：てへぺろ",
-  "穴を掘る",
-  "写真立て",
-  "バンダナ（ネイビー）",
-  "ぴょん",
-  "称号：おでかけマスター",
-  "特別コーデセット",
-] as const;
-
 export default async function HomePage({ searchParams }: { searchParams: Promise<{ notice?: string }> }) {
   const [{ supabase, user }, { notice }] = await Promise.all([requireUser(), searchParams]);
   const space = await getRecordSpace(supabase, user.id);
@@ -98,12 +32,6 @@ export default async function HomePage({ searchParams }: { searchParams: Promise
   ]);
 
   const latest = recent[0] ?? null;
-  const adventure = getAdventureProgress({
-    visits: areas.totals.visits,
-    spots: areas.totals.spots,
-    municipalities: areas.totals.visitedMunicipalities,
-    prefectures: areas.totals.visitedPrefectures,
-  });
 
   return (
     <>
@@ -130,7 +58,7 @@ export default async function HomePage({ searchParams }: { searchParams: Promise
         </div>
 
         <section className="rough-card overflow-hidden">
-          <div className="relative h-44 overflow-hidden bg-leaf-soft">
+          <div className="relative h-40 overflow-hidden bg-leaf-soft">
             <div className="absolute inset-x-0 bottom-0 h-24 bg-[#eef3e5]" />
             <div className="absolute -left-14 bottom-[-42px] h-32 w-72 rounded-[50%] bg-[#e3ecd7]" />
             <div className="absolute right-[-42px] bottom-[-54px] h-36 w-80 rounded-[50%] bg-[#dce8cf]" />
@@ -141,9 +69,7 @@ export default async function HomePage({ searchParams }: { searchParams: Promise
             <div className="absolute bottom-4 left-[7.2%] h-5 w-5 rounded-[50%] bg-[#b9cf9f]" />
             <div className="absolute bottom-7 right-[12%] h-8 w-2 rounded-full bg-[#91aa75]" />
             <div className="absolute bottom-6 right-[10.8%] h-6 w-6 rounded-[50%] bg-[#b9cf9f]" />
-
             <WanderingFrenchie />
-            <AdventureLevelTag {...adventure} />
           </div>
 
           <div className="grid grid-cols-3 divide-x divide-line px-2 py-4 text-center">
@@ -251,87 +177,9 @@ export default async function HomePage({ searchParams }: { searchParams: Promise
           emptyTitle="旅行計画はまだありません"
           emptyDescription="旅行としてまとめたい予定があるときだけ作成できます。"
         />
+
       </PageBody>
     </>
-  );
-}
-
-function getAdventureProgress({
-  visits,
-  spots,
-  municipalities,
-  prefectures,
-}: {
-  visits: number;
-  spots: number;
-  municipalities: number;
-  prefectures: number;
-}) {
-  // 現在DBに専用のEXP台帳がないため、すでに確実に集計できる訪問実績だけで暫定算出する。
-  // 初スポットは50EXP相当、再訪は10EXP、市区町村は+60、都道府県は+150。
-  // 写真・感想・評価・歩数のEXPは、専用台帳導入後にここへ統合する。
-  const totalExp = visits * 10 + spots * 40 + municipalities * 60 + prefectures * 150;
-  let level = 1;
-
-  for (let i = LEVEL_THRESHOLDS.length - 1; i >= 0; i -= 1) {
-    const threshold = LEVEL_THRESHOLDS[i]!;
-    if (totalExp >= threshold) {
-      level = i + 1;
-      break;
-    }
-  }
-
-  const currentThreshold = LEVEL_THRESHOLDS[level - 1]!;
-  const nextThreshold = LEVEL_THRESHOLDS[Math.min(level, LEVEL_THRESHOLDS.length - 1)]!;
-  const isMax = level >= LEVEL_THRESHOLDS.length;
-  const progressSpan = Math.max(1, nextThreshold - currentThreshold);
-  const progressValue = isMax ? progressSpan : Math.min(progressSpan, Math.max(0, totalExp - currentThreshold));
-  const progressPercent = isMax ? 100 : Math.round((progressValue / progressSpan) * 100);
-
-  return {
-    level,
-    totalExp,
-    nextThreshold,
-    progressPercent,
-    nextReward: isMax ? "すべて解放済み" : (LEVEL_REWARDS[level] ?? "次のごほうび"),
-    isMax,
-  };
-}
-
-function AdventureLevelTag({
-  level,
-  totalExp,
-  nextThreshold,
-  progressPercent,
-  nextReward,
-  isMax,
-}: ReturnType<typeof getAdventureProgress>) {
-  return (
-    <div className="absolute right-3 top-3 z-20 w-[42%] min-w-[148px] max-w-[184px] rounded-[22px] border border-[#d8ccb4] bg-[#fffdf7]/95 px-3 py-3 shadow-[0_5px_16px_rgba(91,73,51,0.10)] backdrop-blur-[2px]">
-      <p className="text-center text-[10px] font-semibold tracking-wide text-ink-soft">おでかけレベル</p>
-      <div className="mt-0.5 flex items-end justify-center gap-1 leading-none">
-        <span className="text-[10px] font-semibold text-leaf-deep">Lv.</span>
-        <span className="text-4xl font-bold tabular-nums text-ink">{level}</span>
-      </div>
-
-      <div className="mt-2 flex items-center gap-2">
-        <span className="text-[9px] font-bold text-ink-soft">EXP</span>
-        <div className="h-2 min-w-0 flex-1 overflow-hidden rounded-full border border-[#d8ccb4] bg-[#f1eee4]">
-          <div
-            className="h-full rounded-full bg-[#719457] transition-[width] duration-500"
-            style={{ width: `${progressPercent}%` }}
-          />
-        </div>
-      </div>
-      <p className="mt-1 text-right text-[9px] tabular-nums text-ink-faint">
-        {isMax ? `${totalExp} EXP` : `${totalExp} / ${nextThreshold}`}
-      </p>
-
-      <div className="mt-2 border-t border-dashed border-[#ddd1bd] pt-2">
-        <p className="text-[8px] text-ink-faint">次に解放</p>
-        <p className="mt-0.5 line-clamp-2 text-[10px] font-semibold leading-snug text-ink">{nextReward}</p>
-      </div>
-    </div>
   );
 }
 
