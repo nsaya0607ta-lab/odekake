@@ -90,7 +90,13 @@ export default async function HomePage({ searchParams }: { searchParams: Promise
             <div className="absolute bottom-4 left-[7.2%] h-5 w-5 rounded-[50%] bg-[#b9cf9f]" />
             <div className="absolute bottom-7 right-[12%] h-8 w-2 rounded-full bg-[#91aa75]" />
             <div className="absolute bottom-6 right-[10.8%] h-6 w-6 rounded-[50%] bg-[#b9cf9f]" />
-            <WanderingFrenchie />
+            <WanderingFrenchie
+              progress={{
+                prefectures: areas.totals.visitedPrefectures,
+                municipalities: areas.totals.visitedMunicipalities,
+                visits: areas.totals.visits,
+              }}
+            />
           </div>
 
           <div className="grid grid-cols-3 divide-x divide-line px-2 py-4 text-center">
@@ -222,6 +228,7 @@ export default async function HomePage({ searchParams }: { searchParams: Promise
             </div>
             {sharedWorkspaces.length === 0 ? (
               <EmptyState
+                mascot="stand-happy"
                 title="共有旅はまだありません"
                 description="友人を招待すると、その旅だけの地図と記録がつくられます。"
                 actionHref="/trips/new/shared"
@@ -314,7 +321,13 @@ function TripSection({
         </div>
       </div>
       {trips.length === 0 ? (
-        <EmptyState title={emptyTitle} description={emptyDescription} actionHref={createHref} actionLabel={createLabel} />
+        <EmptyState
+          mascot="sit"
+          title={emptyTitle}
+          description={emptyDescription}
+          actionHref={createHref}
+          actionLabel={createLabel}
+        />
       ) : (
         <ul className="space-y-2">
           {trips.slice(0, 3).map(({ trip, visitCount }) => (

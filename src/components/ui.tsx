@@ -1,5 +1,7 @@
 import Link from "next/link";
 import type { ReactNode } from "react";
+import type { FrenchiePose } from "@/lib/frenchie";
+import { FrenchieSticker } from "./frenchie-sticker";
 import { IconChevronRight, IconStar } from "./icons";
 
 export function SectionHeading({
@@ -33,16 +35,20 @@ export function EmptyState({
   actionHref,
   actionLabel,
   icon,
+  mascot,
 }: {
   title: string;
   description?: string;
   actionHref?: string;
   actionLabel?: string;
   icon?: ReactNode;
+  /** 置くとフレブルが顔を出す。何も無い画面の角を丸くする役 */
+  mascot?: FrenchiePose;
 }) {
   return (
     <div className="rough-card flex flex-col items-center gap-2 px-6 py-8 text-center">
-      {icon ? <span className="text-ink-faint">{icon}</span> : null}
+      {mascot ? <FrenchieSticker pose={mascot} width={116} className="-mb-1" /> : null}
+      {icon && !mascot ? <span className="text-ink-faint">{icon}</span> : null}
       <p className="font-semibold">{title}</p>
       {description ? <p className="text-sm leading-relaxed text-ink-soft">{description}</p> : null}
       {actionHref && actionLabel ? (

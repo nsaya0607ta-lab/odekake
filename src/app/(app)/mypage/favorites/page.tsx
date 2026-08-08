@@ -24,6 +24,7 @@ export default async function FavoritesPage() {
         {spots.length === 0 ? (
           <EmptyState
             icon={<IconHeart size={30} />}
+            mascot="sit"
             title="お気に入りはまだありません"
             description="スポットの詳細画面でハートを押すと、ここに表示されます。"
           />

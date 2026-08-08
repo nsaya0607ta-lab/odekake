@@ -24,6 +24,7 @@ export default async function WishlistPage() {
         {spots.length === 0 ? (
           <EmptyState
             icon={<IconFlag size={30} />}
+            mascot="wonder"
             title="また行きたい場所はまだありません"
             description="訪問の記録で「また行きたい」を付けると、ここにまとまります。"
             actionHref="/records"

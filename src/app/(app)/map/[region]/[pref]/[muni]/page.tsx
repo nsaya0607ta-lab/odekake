@@ -124,6 +124,7 @@ export default async function MunicipalityPage({
 
         {spots.length === 0 ? (
           <EmptyState
+            mascot="sniff"
             title="まだスポットがありません"
             description={`${municipality.name}で訪れた場所を登録してみましょう。`}
             actionHref={newSpotHref}

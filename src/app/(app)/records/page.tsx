@@ -99,6 +99,7 @@ async function TimelineTab({
     return (
       <EmptyState
         icon={<IconNotebook size={30} />}
+        mascot="sniff"
         title="まだ記録がありません"
         description="訪れた場所を記録すると、日付順に並びます。"
         actionHref="/add"
@@ -141,6 +142,7 @@ async function TripsTab({
   if (trips.length === 0) {
     return (
       <EmptyState
+        mascot="wonder"
         title="旅行計画がありません"
         description="日程のある旅行を作ると、ここに予定や過去の旅行が並びます。"
         actionHref="/trips/new"
@@ -202,6 +204,7 @@ async function SpotsTab({
   if (spots.length === 0) {
     return keyword ? (
       <EmptyState
+        mascot="wonder"
         title={`「${keyword}」に一致するスポットがありません`}
         description="別の言葉で探すか、検索欄を空にして一覧に戻してください。"
         actionHref="/records?tab=spots"
@@ -209,6 +212,7 @@ async function SpotsTab({
       />
     ) : (
       <EmptyState
+        mascot="sniff"
         title="スポットがありません"
         description="訪れた場所を登録すると、ここに並びます。"
         actionHref="/spots/new"

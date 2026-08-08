@@ -151,6 +151,7 @@ export default async function TripDetailPage({
           </div>
           {visits.length === 0 ? (
             <EmptyState
+              mascot="sniff"
               title="まだ記録がありません"
               description="訪れた場所を追加すると、ここに並びます。"
               actionHref="/add"

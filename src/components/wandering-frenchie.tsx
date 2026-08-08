@@ -1,6 +1,17 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import {
+  claimProgressMilestone,
+  daypartAt,
+  FRENCHIE_FRAME,
+  frenchieSrc,
+  MOODS,
+  posesForMood,
+  type Daypart,
+  type FrenchiePose,
+  type Progress,
+} from "@/lib/frenchie";
 
 /**
  * ホーム画面のバンドを歩き回るフレブル。
@@ -13,42 +24,13 @@ import { useEffect, useState } from "react";
  * transition と animation が同じ transform を奪い合って壊れる。
  */
 
-const POSES = {
-  stand: "/characters/frenchie/stand.webp",
-  walk: "/characters/frenchie/walk.webp",
-  sit: "/characters/frenchie/sit.webp",
-  sniff: "/characters/frenchie/sniff.webp",
-  happy: "/characters/frenchie/stand-happy.webp",
-  shake: "/characters/frenchie/shake.webp",
-  sleep: "/characters/frenchie/sleep.webp",
-} as const;
-
-type Pose = keyof typeof POSES;
-const POSE_KEYS = Object.keys(POSES) as Pose[];
-
-/** 立ち止まったときの仕草と、その長さ（ms） */
-const RESTS: ReadonlyArray<{ pose: Pose; min: number; max: number }> = [
-  { pose: "stand", min: 900, max: 1800 },
-  { pose: "sniff", min: 1600, max: 2600 },
-  { pose: "sit", min: 2200, max: 4000 },
-  { pose: "happy", min: 1400, max: 2400 },
-  { pose: "shake", min: 1100, max: 1700 },
-  { pose: "sleep", min: 3600, max: 6000 },
-];
-
-/**
- * バンド幅に対する移動速度（%/秒）。1歩ぶんの絵の踏み出し幅と
- * STEP_MS × 2 で進む距離が釣り合うように決めてある。ここを崩すと
- * 足だけ動いて進まない／氷の上を滑る、のどちらかになる。
- */
-const SPEED = 10.5;
-/** 立ち姿と踏み出しを入れ替える間隔（ms） */
-const STEP_MS = 340;
-/** 振り向きにかける時間（ms）。止まっている間に終わる */
 const TURN_MS = 260;
-
+const REACT_MS = 1600;
+const CHEER_MS = 2400;
 const MIN_X = 11;
 const MAX_X = 89;
+/** 時間帯をまたいだことに気づくための見張り */
+const DAYPART_POLL_MS = 5 * 60 * 1000;
 
 type Walker = {
   x: number;
@@ -56,103 +38,185 @@ type Walker = {
   depth: number;
   /** 1 = 左向き（素材のまま）、-1 = 右向き */
   facing: 1 | -1;
-  pose: Pose;
+  pose: FrenchiePose;
   walking: boolean;
   travelMs: number;
+};
+
+const INITIAL: Walker = {
+  x: 26,
+  depth: 0.45,
+  facing: 1,
+  pose: "stand",
+  walking: false,
+  travelMs: 0,
 };
 
 const rand = (min: number, max: number) => min + Math.random() * (max - min);
 const pick = <T,>(items: readonly T[]): T => items[Math.floor(Math.random() * items.length)] as T;
 
-export function WanderingFrenchie() {
-  const [walker, setWalker] = useState<Walker>({
-    x: 26,
-    depth: 0.45,
-    facing: 1,
-    pose: "stand",
-    walking: false,
-    travelMs: 0,
-  });
+export function WanderingFrenchie({ progress }: { progress?: Progress }) {
+  const [daypart, setDaypart] = useState<Daypart | null>(null);
+  const [walker, setWalker] = useState<Walker>(INITIAL);
   const [stepUp, setStepUp] = useState(false);
+  const [nudged, setNudged] = useState(false);
+  const pokeRef = useRef<(() => void) | null>(null);
+  const cheerRef = useRef(false);
+
+  // 時間帯はブラウザの時計で決まるので、描画が合うようマウント後に読む
+  useEffect(() => {
+    const read = () => setDaypart(daypartAt(new Date().getHours()));
+    read();
+    const id = setInterval(read, DAYPART_POLL_MS);
+    return () => clearInterval(id);
+  }, []);
+
+  // 前回見たときより記録が増えていたら、最初にひと喜びする
+  useEffect(() => {
+    if (progress) cheerRef.current = claimProgressMilestone(progress);
+  }, [progress]);
+
+  // なでられたとき用の絵は、ページが落ち着いてから静かに足す
+  const [warm, setWarm] = useState(false);
+  useEffect(() => {
+    const idle = window.requestIdleCallback;
+    if (idle) {
+      const id = idle(() => setWarm(true), { timeout: 4000 });
+      return () => window.cancelIdleCallback?.(id);
+    }
+    const id = setTimeout(() => setWarm(true), 2500);
+    return () => clearTimeout(id);
+  }, []);
+
+  const mood = daypart ? MOODS[daypart] : null;
+  const poses = useMemo(
+    () => (mood ? posesForMood(mood, warm) : (["stand", "walk"] as FrenchiePose[])),
+    [mood, warm],
+  );
 
   useEffect(() => {
-    if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+    if (!mood) return;
+    if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
+      // 動かさない。時間帯に合った姿でそこに居るだけにする
+      setWalker((w) => ({ ...w, pose: mood.rests[0]?.pose ?? "stand", walking: false }));
+      return;
+    }
 
     let cancelled = false;
-    const timers: ReturnType<typeof setTimeout>[] = [];
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    let latest: Walker = INITIAL;
+
     const wait = (ms: number, fn: () => void) => {
-      timers.push(
-        setTimeout(() => {
-          if (!cancelled) fn();
-        }, ms),
-      );
+      clearTimeout(timer);
+      timer = setTimeout(() => {
+        if (!cancelled) fn();
+      }, ms);
     };
 
-    const rest = (from: Walker) => {
-      const { pose, min, max } = pick(RESTS);
-      setWalker({ ...from, pose, walking: false, travelMs: 0 });
-      wait(rand(min, max), () => startWalk(from));
+    const settle = (next: Walker) => {
+      latest = next;
+      setWalker(next);
     };
 
-    const startWalk = (from: Walker) => {
+    /** 休憩が明けるたび、歩き出すかその場に留まるかを決める */
+    const beat = () => {
+      if (Math.random() < mood.walkChance) startWalk();
+      else rest();
+    };
+
+    const rest = () => {
+      const { pose, min, max } = pick(mood.rests);
+      settle({ ...latest, pose, walking: false, travelMs: 0 });
+      wait(rand(min, max), beat);
+    };
+
+    const startWalk = () => {
       // ちょこっと動いて止まる、を避けてある程度の距離を歩かせる
       let target = rand(MIN_X, MAX_X);
-      if (Math.abs(target - from.x) < 24) {
-        target = from.x < (MIN_X + MAX_X) / 2 ? rand(62, MAX_X) : rand(MIN_X, 38);
+      if (Math.abs(target - latest.x) < 24) {
+        target = latest.x < (MIN_X + MAX_X) / 2 ? rand(62, MAX_X) : rand(MIN_X, 38);
       }
-      const facing: 1 | -1 = target > from.x ? -1 : 1;
-      const depth = Math.min(1, Math.max(0, from.depth + rand(-0.35, 0.35)));
-      const travelMs = (Math.abs(target - from.x) / SPEED) * 1000;
-      const turning = facing !== from.facing;
+      const facing: 1 | -1 = target > latest.x ? -1 : 1;
+      const turning = facing !== latest.facing;
 
       // 振り向きは止まったまま済ませる
-      setWalker((current) => ({ ...current, facing, pose: "stand", walking: false }));
+      settle({ ...latest, facing, pose: "stand", walking: false, travelMs: 0 });
 
       wait(turning ? TURN_MS : 80, () => {
-        const next: Walker = { x: target, depth, facing, pose: "walk", walking: true, travelMs };
-        setWalker(next);
-        wait(travelMs, () => rest(next));
+        const travelMs = (Math.abs(target - latest.x) / mood.speed) * 1000;
+        settle({
+          ...latest,
+          x: target,
+          depth: Math.min(1, Math.max(0, latest.depth + rand(-0.35, 0.35))),
+          pose: "walk",
+          walking: true,
+          travelMs,
+        });
+        wait(travelMs, rest);
       });
     };
 
-    wait(700, () =>
-      startWalk({ x: 26, depth: 0.45, facing: 1, pose: "stand", walking: false, travelMs: 0 }),
-    );
+    /** なでられたとき、記録が増えたとき */
+    const react = (pose: FrenchiePose, hold: number) => {
+      settle({ ...latest, pose, walking: false, travelMs: 0 });
+      wait(hold, beat);
+    };
+
+    pokeRef.current = () => react(pick(mood.reactions), REACT_MS);
+
+    if (cheerRef.current) {
+      cheerRef.current = false;
+      react("cheer", CHEER_MS);
+    } else {
+      wait(700, beat);
+    }
 
     return () => {
       cancelled = true;
-      for (const id of timers) clearTimeout(id);
+      clearTimeout(timer);
+      pokeRef.current = null;
     };
-  }, []);
+  }, [mood]);
 
   // 歩いている間だけ、立ち姿と踏み出しを入れ替える
   useEffect(() => {
-    if (!walker.walking) {
+    if (!walker.walking || !mood) {
       setStepUp(false);
       return;
     }
-    const id = setInterval(() => setStepUp((v) => !v), STEP_MS);
+    const id = setInterval(() => setStepUp((v) => !v), mood.stepMs);
     return () => clearInterval(id);
-  }, [walker.walking]);
+  }, [walker.walking, mood]);
 
-  const activePose: Pose = walker.walking ? (stepUp ? "walk" : "stand") : walker.pose;
+  const onPoke = useCallback(() => {
+    setNudged(true);
+    window.setTimeout(() => setNudged(false), 320);
+    pokeRef.current?.();
+  }, []);
+
+  const activePose: FrenchiePose = walker.walking ? (stepUp ? "walk" : "stand") : walker.pose;
+  const stepMs = mood?.stepMs ?? 340;
 
   return (
-    <div className="pointer-events-none absolute inset-0 overflow-hidden" aria-hidden="true">
+    <div className="pointer-events-none absolute inset-0 overflow-hidden">
       <style>{`
         @keyframes frenchie-bob {
           0%, 100% { transform: translateY(0) rotate(-0.7deg); }
           50%      { transform: translateY(-3px) rotate(0.7deg); }
         }
-        .frenchie-bob { transform-origin: 50% 92%; }
-        .frenchie-walking .frenchie-bob {
-          animation: frenchie-bob ${STEP_MS * 2}ms ease-in-out infinite;
+        @keyframes frenchie-nudge {
+          0%   { transform: scale(1) translateY(0); }
+          40%  { transform: scale(1.08) translateY(-5px); }
+          100% { transform: scale(1) translateY(0); }
         }
+        .frenchie-bob { transform-origin: 50% 92%; }
+        .frenchie-walking .frenchie-bob { animation: frenchie-bob ${stepMs * 2}ms ease-in-out infinite; }
+        .frenchie-nudged .frenchie-bob { animation: frenchie-nudge 320ms ease-out; }
         /* 仕草の切り替えはふわっと。歩行のコマ送りは瞬時でないと足がぼやける */
         .frenchie-pose { transition: opacity 200ms ease; }
         .frenchie-walking .frenchie-pose { transition: none; }
         @media (prefers-reduced-motion: reduce) {
-          .frenchie-walking .frenchie-bob { animation: none; }
+          .frenchie-bob { animation: none !important; }
           .frenchie-pose { transition: none; }
         }
       `}</style>
@@ -161,7 +225,7 @@ export function WanderingFrenchie() {
       <div
         className={`absolute w-[138px] transition-[left,bottom,transform] ease-linear ${
           walker.walking ? "frenchie-walking" : ""
-        }`}
+        } ${nudged ? "frenchie-nudged" : ""}`}
         style={{
           left: `${walker.x}%`,
           bottom: `${4 + walker.depth * 15}%`,
@@ -170,33 +234,41 @@ export function WanderingFrenchie() {
           transformOrigin: "50% 100%",
         }}
       >
-        {/* 反転 */}
-        <div
-          className="transition-transform ease-out"
-          style={{ transform: `scaleX(${walker.facing})`, transitionDuration: `${TURN_MS}ms` }}
+        <button
+          type="button"
+          onClick={onPoke}
+          aria-label="フレブルをなでる"
+          className="pointer-events-auto block w-full cursor-pointer appearance-none border-0 bg-transparent p-0"
         >
-          {/* 上下の揺れ */}
-          <div className="frenchie-bob relative">
-            {/* 全ポーズを重ねて置き、表示だけ切り替える。切り替え時のちらつきを防ぐ */}
-            {POSE_KEYS.map((pose) => (
-              // eslint-disable-next-line @next/next/no-img-element
-              <img
-                key={pose}
-                src={POSES[pose]}
-                alt=""
-                width={300}
-                height={254}
-                decoding="async"
-                fetchPriority={pose === "stand" || pose === "walk" ? "high" : "low"}
-                draggable={false}
-                className={`frenchie-pose ${
-                  pose === "stand" ? "block" : "absolute inset-0"
-                } h-auto w-full select-none`}
-                style={{ opacity: pose === activePose ? 1 : 0 }}
-              />
-            ))}
-          </div>
-        </div>
+          {/* 反転 */}
+          <span
+            className="block transition-transform ease-out"
+            style={{ transform: `scaleX(${walker.facing})`, transitionDuration: `${TURN_MS}ms` }}
+          >
+            {/* 上下の揺れ */}
+            <span className="frenchie-bob relative block">
+              {/* 使う絵は重ねて置き、表示だけ切り替える。切り替えのたびに読み込みが
+                  走ってちらつくのを防ぐため */}
+              {poses.map((pose) => (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img
+                  key={pose}
+                  src={frenchieSrc(pose)}
+                  alt=""
+                  width={FRENCHIE_FRAME.width}
+                  height={FRENCHIE_FRAME.height}
+                  decoding="async"
+                  fetchPriority={pose === "stand" || pose === "walk" ? "high" : "low"}
+                  draggable={false}
+                  className={`frenchie-pose ${
+                    pose === "stand" ? "block" : "absolute inset-0"
+                  } h-auto w-full select-none`}
+                  style={{ opacity: pose === activePose ? 1 : 0 }}
+                />
+              ))}
+            </span>
+          </span>
+        </button>
       </div>
     </div>
   );
