@@ -93,17 +93,11 @@ export function StarRating({
   );
 }
 
-export function TripTypeBadge({ type, memberCount }: { type: "solo" | "shared"; memberCount?: number }) {
-  if (type === "solo") {
-    return (
-      <span className="rough-pill inline-flex items-center border border-sky bg-sky-soft px-2.5 py-0.5 text-[11px] font-semibold text-[#43718f]">
-        一人旅
-      </span>
-    );
-  }
+/** どの旅行の記録かを示す小さなラベル */
+export function TripBadge({ title }: { title: string }) {
   return (
-    <span className="rough-pill inline-flex items-center border border-blossom bg-blossom-soft px-2.5 py-0.5 text-[11px] font-semibold text-[#94525f]">
-      共有旅{typeof memberCount === "number" ? ` ${memberCount}人` : ""}
+    <span className="rough-pill inline-flex max-w-28 items-center truncate border border-sky bg-sky-soft px-2.5 py-0.5 text-[11px] font-semibold text-[#43718f]">
+      {title}
     </span>
   );
 }

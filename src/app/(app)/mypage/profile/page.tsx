@@ -1,6 +1,7 @@
 import { PageBody } from "@/components/page-body";
 import { PageHeader } from "@/components/page-header";
 import { signPhotoPath } from "@/lib/data/photos";
+import { DEFAULT_SPACE_NAME } from "@/lib/data/space";
 import { requireUser } from "@/lib/supabase/server";
 import { ProfileForm } from "./profile-form";
 
@@ -20,6 +21,8 @@ export default async function ProfilePage() {
         <ProfileForm
           userId={user.id}
           displayName={profile?.display_name ?? user.displayName}
+          spaceName={profile?.space_name ?? ""}
+          spaceNamePlaceholder={DEFAULT_SPACE_NAME}
           introduction={profile?.introduction ?? ""}
           imagePath={profile?.profile_image_url ?? null}
           imageUrl={avatarUrl}

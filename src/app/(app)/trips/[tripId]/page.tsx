@@ -1,19 +1,14 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { deleteTripCommentAction, leaveTripAction } from "@/app/actions/trips";
-import { ConfirmSubmitButton } from "@/components/confirm-submit-button";
-import { IconPlus, IconSliders, IconUsers } from "@/components/icons";
+import { IconPlus, IconSliders } from "@/components/icons";
 import { PageBody } from "@/components/page-body";
 import { PageHeader } from "@/components/page-header";
 import { TimelineCard } from "@/components/timeline-card";
-import { TripActivityList } from "@/components/trip-activity-list";
-import { EmptyState, TripTypeBadge, formatDate } from "@/components/ui";
-import { formatTripPeriod, getTripActivities, getTripCoverUrl, getTripMembers } from "@/lib/data/trips";
+import { EmptyState } from "@/components/ui";
+import { formatTripPeriod, getTripCoverUrl } from "@/lib/data/trips";
 import { getTimeline } from "@/lib/data/visits";
-import { loadDisplayNames } from "@/lib/data/spots";
 import { requireUser } from "@/lib/supabase/server";
-import type { TripCommentRow, TripRow } from "@/lib/supabase/types";
-import { TripCommentForm } from "./trip-comment-form";
+import type { TripRow } from "@/lib/supabase/types";
 
 export const dynamic = "force-dynamic";
 
@@ -24,45 +19,25 @@ export async function generateMetadata({ params }: { params: Promise<{ tripId: s
   return { title: data ? `${data.title} | おでかけ記録` : "おでかけ記録" };
 }
 
-export default async function TripDetailPage({
-  params,
-  searchParams,
-}: {
-  params: Promise<{ tripId: string }>;
-  searchParams: Promise<{ error?: string }>;
-}) {
-  const [{ tripId }, { error }, { supabase, user }] = await Promise.all([
-    params,
-    searchParams,
-    requireUser(),
-  ]);
+export default async function TripDetailPage({ params }: { params: Promise<{ tripId: string }> }) {
+  const [{ tripId }, { supabase, user }] = await Promise.all([params, requireUser()]);
 
   const { data: tripData } = await supabase.from("trips").select("*").eq("id", tripId).maybeSingle();
-  // 参加していない旅行は RLS により取得できないため、存在しない扱いにする
+  // 自分の旅行でなければ RLS により取得できないため、存在しない扱いにする
   if (!tripData) notFound();
   const trip = tripData as TripRow;
 
   // 1画面の読み込み量を抑えるため上限を設け、超えた分は記録画面へ誘導する
   const VISIT_LIMIT = 50;
-  const [members, loadedVisits, coverUrl, activities, { data: commentRows }] = await Promise.all([
-    getTripMembers(supabase, trip.id),
+  const [loadedVisits, coverUrl] = await Promise.all([
     getTimeline(supabase, { tripId: trip.id, limit: VISIT_LIMIT + 1 }),
     getTripCoverUrl(supabase, trip),
-    trip.trip_type === "shared" ? getTripActivities(supabase, trip.id, 30) : Promise.resolve([]),
-    supabase.from("trip_comments").select("*").eq("trip_id", trip.id).order("created_at", { ascending: false }),
   ]);
 
   const hasMoreVisits = loadedVisits.length > VISIT_LIMIT;
   const visits = hasMoreVisits ? loadedVisits.slice(0, VISIT_LIMIT) : loadedVisits;
 
-  const comments = (commentRows ?? []) as TripCommentRow[];
-  const commentAuthors = await loadDisplayNames(
-    supabase,
-    comments.map((c) => c.user_id),
-  );
-
   const isOwner = trip.owner_id === user.id;
-  const isShared = trip.trip_type === "shared";
   const period = formatTripPeriod(trip);
 
   return (
@@ -84,22 +59,13 @@ export default async function TripDetailPage({
       />
 
       <PageBody>
-        {error === "leave" ? (
-          <p className="rounded-2xl border border-blossom bg-blossom-soft px-4 py-3 text-sm text-[#8f4c59]">
-            この旅行から退出できませんでした。旅行の所有者は退出できません。
-          </p>
-        ) : null}
-
         <section className="rough-card overflow-hidden">
           {coverUrl ? (
             // eslint-disable-next-line @next/next/no-img-element
             <img src={coverUrl} alt="" className="aspect-[16/9] w-full object-cover" />
           ) : null}
           <div className="space-y-2 p-5">
-            <div className="flex items-start justify-between gap-3">
-              <h2 className="min-w-0 flex-1 text-lg font-bold">{trip.title}</h2>
-              <TripTypeBadge type={trip.trip_type} memberCount={isShared ? members.length : undefined} />
-            </div>
+            <h2 className="text-lg font-bold">{trip.title}</h2>
             {period ? <p className="text-sm text-ink-soft tabular-nums">{period}</p> : null}
             {trip.description ? (
               <p className="text-sm leading-relaxed whitespace-pre-wrap text-ink-soft">{trip.description}</p>
@@ -114,32 +80,6 @@ export default async function TripDetailPage({
             </p>
           </div>
         </section>
-
-        {isShared ? (
-          <section>
-            <h2 className="mb-2 px-1 text-base font-bold">参加メンバー</h2>
-            <ul className="rough-card divide-y divide-line">
-              {members.map((member) => (
-                <li key={member.userId} className="flex items-center gap-3 px-4 py-3">
-                  <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-paper-deep text-ink-faint">
-                    <IconUsers size={18} />
-                  </span>
-                  <span className="min-w-0 flex-1 truncate font-semibold">{member.displayName}</span>
-                  <span className="rough-pill shrink-0 bg-paper-deep px-2.5 py-0.5 text-[11px] text-ink-soft">
-                    {member.role === "owner" ? "オーナー" : member.role === "member" ? "メンバー" : "閲覧のみ"}
-                  </span>
-                </li>
-              ))}
-            </ul>
-          </section>
-        ) : null}
-
-        {isShared ? (
-          <section>
-            <h2 className="mb-2 px-1 text-base font-bold">みんなの動き</h2>
-            <TripActivityList entries={activities} />
-          </section>
-        ) : null}
 
         <section>
           <div className="mb-2 flex items-center justify-between px-1">
@@ -174,62 +114,6 @@ export default async function TripDetailPage({
           )}
         </section>
 
-        {isShared && !isOwner ? (
-          <section>
-            <h2 className="mb-2 px-1 text-base font-bold">この旅行から退出</h2>
-            <form action={leaveTripAction} className="rough-card space-y-3 p-4">
-              <input type="hidden" name="tripId" value={trip.id} />
-              <p className="text-sm leading-relaxed text-ink-soft">
-                退出すると、この共有旅の地図・記録・写真は見えなくなります。
-                自分が書いた記録は残るため、もう一度参加すればまた見られます。
-              </p>
-              <ConfirmSubmitButton
-                className="btn btn-quiet w-full"
-                message="この共有旅から退出します。よろしいですか？"
-                pendingLabel="退出中…"
-              >
-                この旅行から退出する
-              </ConfirmSubmitButton>
-            </form>
-          </section>
-        ) : null}
-
-        {isShared ? (
-          <section>
-            <h2 className="mb-2 px-1 text-base font-bold">コメント</h2>
-            <TripCommentForm tripId={trip.id} />
-            {comments.length > 0 ? (
-              <ul className="mt-3 space-y-2">
-                {comments.map((comment) => (
-                  <li key={comment.id} className="rough-card px-4 py-3">
-                    <div className="flex items-start gap-3">
-                      <p className="min-w-0 flex-1 text-xs text-ink-faint">
-                        {commentAuthors.get(comment.user_id) ?? "メンバー"}さん・
-                        {formatDate(comment.created_at)}
-                      </p>
-                      {comment.user_id === user.id || isOwner ? (
-                        <form action={deleteTripCommentAction} className="shrink-0">
-                          <input type="hidden" name="commentId" value={comment.id} />
-                          <input type="hidden" name="tripId" value={trip.id} />
-                          <ConfirmSubmitButton
-                            className="text-xs text-[#95505e] underline underline-offset-4"
-                            message="このコメントを削除します。よろしいですか？"
-                            pendingLabel="削除中…"
-                          >
-                            削除
-                          </ConfirmSubmitButton>
-                        </form>
-                      ) : null}
-                    </div>
-                    <p className="mt-1 text-sm leading-relaxed whitespace-pre-wrap">{comment.comment}</p>
-                  </li>
-                ))}
-              </ul>
-            ) : (
-              <p className="mt-3 text-center text-sm text-ink-faint">まだコメントはありません。</p>
-            )}
-          </section>
-        ) : null}
       </PageBody>
     </>
   );

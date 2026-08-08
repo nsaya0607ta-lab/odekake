@@ -6,7 +6,7 @@ import { PageBody } from "@/components/page-body";
 import { PageHeader } from "@/components/page-header";
 import { VisitedBadge } from "@/components/ui";
 import { loadAreaIndex } from "@/lib/data/areas";
-import { resolveWorkspace } from "@/lib/data/workspace";
+import { getRecordSpace } from "@/lib/data/space";
 import { getPrefecturesByRegion } from "@/lib/geo";
 import { getRegion } from "@/lib/geo/regions";
 import { requireUser } from "@/lib/supabase/server";
@@ -25,8 +25,8 @@ export default async function RegionPage({ params }: { params: Promise<{ region:
   if (!region) notFound();
 
   const { supabase, user } = await requireUser();
-  const workspace = await resolveWorkspace(supabase, user.id);
-  const areas = await loadAreaIndex(supabase, workspace.tripIds);
+  const space = await getRecordSpace(supabase, user.id);
+  const areas = await loadAreaIndex(supabase, space.tripIds);
   const prefectures = getPrefecturesByRegion(region.slug);
 
   const visitedPrefectures = Object.fromEntries(
@@ -35,7 +35,7 @@ export default async function RegionPage({ params }: { params: Promise<{ region:
 
   return (
     <>
-      <PageHeader title={`${region.name}地方`} subtitle={workspace.name} backHref="/map" />
+      <PageHeader title={`${region.name}地方`} subtitle={space.name} backHref="/map" />
       <PageBody>
         <section className="rough-card px-3 py-4">
           <p className="mb-2 text-center text-xs text-ink-soft">

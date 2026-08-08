@@ -1,31 +1,20 @@
 import Link from "next/link";
-import { switchWorkspaceAction } from "@/app/actions/workspace";
 import {
-  IconBell,
   IconCalendar,
   IconChevronRight,
   IconHome,
-  IconMail,
   IconMapPin,
   IconNotebook,
   IconPlus,
-  IconUsers,
 } from "@/components/icons";
 import { TopHeader } from "@/components/page-header";
 import { PageBody } from "@/components/page-body";
-import { TripActivityList } from "@/components/trip-activity-list";
-import { EmptyState, LinkRow, SectionHeading, formatDate } from "@/components/ui";
+import { EmptyState, LinkRow, formatDate } from "@/components/ui";
 import { WanderingFrenchie } from "@/components/wandering-frenchie";
 import { loadAreaIndex } from "@/lib/data/areas";
-import {
-  formatTripPeriod,
-  getTripActivities,
-  getTripSummaries,
-  listIncomingInvitations,
-  type TripSummary,
-} from "@/lib/data/trips";
+import { formatTripPeriod, getTripSummaries, type TripSummary } from "@/lib/data/trips";
 import { getTimeline } from "@/lib/data/visits";
-import { listWorkspaces, resolveWorkspace } from "@/lib/data/workspace";
+import { getRecordSpace } from "@/lib/data/space";
 import { MUNICIPALITIES, PREFECTURES } from "@/lib/geo";
 import { requireUser } from "@/lib/supabase/server";
 
@@ -34,45 +23,19 @@ export const dynamic = "force-dynamic";
 
 export default async function HomePage({ searchParams }: { searchParams: Promise<{ notice?: string }> }) {
   const [{ supabase, user }, { notice }] = await Promise.all([requireUser(), searchParams]);
-  const workspace = await resolveWorkspace(supabase, user.id);
+  const space = await getRecordSpace(supabase, user.id);
 
-  const [areas, recent, workspaces, invitations] = await Promise.all([
-    loadAreaIndex(supabase, workspace.tripIds),
-    getTimeline(supabase, { tripIds: workspace.tripIds, limit: 4 }),
-    listWorkspaces(supabase, user.id),
-    listIncomingInvitations(supabase, user.email),
+  const [areas, recent, trips] = await Promise.all([
+    loadAreaIndex(supabase, space.tripIds),
+    getTimeline(supabase, { tripIds: space.tripIds, limit: 4 }),
+    getTripSummaries(supabase),
   ]);
 
-  const isShared = workspace.kind === "trip";
-  const sharedWorkspaces = workspaces.filter((w) => w.kind === "trip");
-  const soloTrips = isShared
-    ? []
-    : (await getTripSummaries(supabase, user.id)).filter((t) => t.trip.trip_type === "solo");
-  const activities = isShared ? await getTripActivities(supabase, workspace.id, 6) : [];
   const latest = recent[0] ?? null;
 
   return (
     <>
-      <TopHeader
-        title={workspace.name}
-        action={
-          <Link
-            href="/invitations"
-            aria-label={
-              invitations.length > 0 ? `招待のお知らせ（${invitations.length}件）` : "招待のお知らせ"
-            }
-            className="relative flex h-10 w-10 items-center justify-center rounded-full text-ink-soft active:bg-paper-deep"
-          >
-            <IconBell />
-            {/* メールを送らない構成でも招待に気づけるよう、届いている件数を出す */}
-            {invitations.length > 0 ? (
-              <span className="absolute right-1 top-1 flex min-w-4 items-center justify-center rounded-full bg-[#c2697a] px-1 text-[10px] leading-4 font-bold text-white">
-                {invitations.length}
-              </span>
-            ) : null}
-          </Link>
-        }
-      />
+      <TopHeader title={space.name} />
 
       <PageBody>
         {notice === "password-updated" ? (
@@ -81,30 +44,16 @@ export default async function HomePage({ searchParams }: { searchParams: Promise
           </p>
         ) : null}
 
-        {/* 招待メールが届かない環境でも参加できるよう、ホームでも知らせる */}
-        {invitations.length > 0 ? (
-          <Link
-            href="/invitations"
-            className="flex items-center gap-3 rounded-2xl border border-blossom bg-blossom-soft px-4 py-3 text-sm text-[#8f4c59]"
-          >
-            <IconMail size={18} />
-            <span className="min-w-0 flex-1">
-              共有旅の招待が{invitations.length}件届いています
-            </span>
-            <IconChevronRight size={16} />
-          </Link>
-        ) : null}
-
         <div className="flex items-center justify-between gap-2 px-1">
           <p className="min-w-0 flex-1 truncate text-sm text-ink-soft">
             <span className="font-bold text-ink">{user.displayName}</span>
-            さん、{isShared ? "今日はどこを記録しますか？" : "おでかけを記録しましょう"}
+            さん、おでかけを記録しましょう
           </p>
           <Link
-            href="/workspaces"
+            href="/mypage/profile"
             className="shrink-0 rounded-full border border-line-strong bg-card px-3 py-1.5 text-xs font-semibold text-ink-soft"
           >
-            旅を切替
+            名前を変える
           </Link>
         </div>
 
@@ -223,109 +172,33 @@ export default async function HomePage({ searchParams }: { searchParams: Promise
           </section>
         </div>
 
-        {isShared ? null : (
-          <TripSection
-            title="個人旅"
-            trips={soloTrips}
-            emptyTitle="旅行計画はまだありません"
-            emptyDescription="旅行としてまとめたい予定があるときだけ作成できます。"
-            createHref="/trips/new/personal"
-            createLabel="旅行の計画を立てる"
-          />
-        )}
+        <TripSection
+          trips={trips}
+          emptyTitle="旅行計画はまだありません"
+          emptyDescription="旅行としてまとめたい予定があるときだけ作成できます。"
+        />
 
-        {isShared ? (
-          <section>
-            <div className="mb-2 flex items-baseline justify-between gap-3 px-1">
-              <h2 className="text-base font-bold">
-                共有旅
-                {sharedWorkspaces.length > 0 ? (
-                  <span className="ml-1.5 text-sm font-normal text-ink-faint tabular-nums">
-                    {sharedWorkspaces.length}件
-                  </span>
-                ) : null}
-              </h2>
-              <Link href="/trips/new/shared" className="flex items-center gap-0.5 text-sm text-leaf-deep">
-                <IconPlus size={15} />
-                つくる
-              </Link>
-            </div>
-            {sharedWorkspaces.length === 0 ? (
-              <EmptyState
-                title="共有旅はまだありません"
-                description="友人を招待すると、その旅だけの地図と記録がつくられます。"
-                actionHref="/trips/new/shared"
-                actionLabel="共有旅をつくる"
-              />
-            ) : (
-              <ul className="space-y-2">
-                {sharedWorkspaces.map((item) => (
-                  <li key={item.id}>
-                    <form action={switchWorkspaceAction}>
-                      <input type="hidden" name="workspaceId" value={item.id} />
-                      <button
-                        type="submit"
-                        className={`rough-card flex w-full items-center gap-3 px-4 py-3 text-left transition-transform active:scale-[0.99] ${
-                          item.isCurrent ? "border-leaf bg-leaf-soft" : ""
-                        }`}
-                      >
-                        <span className="min-w-0 flex-1">
-                          <span className="block truncate font-semibold">{item.name}</span>
-                          <span className="mt-0.5 block truncate text-xs text-ink-faint">
-                            {[item.trip ? formatTripPeriod(item.trip) : null, `${item.visitCount}件の記録`]
-                              .filter(Boolean)
-                              .join("・")}
-                          </span>
-                        </span>
-                        <span className="flex shrink-0 items-center gap-1 rounded-full bg-sky-soft px-2.5 py-1 text-[11px] font-semibold text-[#42718f]">
-                          <IconUsers size={13} />
-                          <span className="tabular-nums">{item.memberCount}</span>人
-                        </span>
-                        {item.isCurrent ? (
-                          <span className="shrink-0 text-[11px] font-semibold text-leaf-deep">表示中</span>
-                        ) : (
-                          <IconChevronRight size={16} className="shrink-0 text-ink-faint" />
-                        )}
-                      </button>
-                    </form>
-                  </li>
-                ))}
-              </ul>
-            )}
-          </section>
-        ) : null}
-
-        {isShared ? (
-          <section>
-            <SectionHeading title="みんなの動き" moreHref={`/trips/${workspace.id}`} />
-            <TripActivityList entries={activities} />
-          </section>
-        ) : null}
       </PageBody>
     </>
   );
 }
 
 function TripSection({
-  title,
   trips,
   emptyTitle,
   emptyDescription,
-  createHref,
-  createLabel,
 }: {
-  title: string;
   trips: TripSummary[];
   emptyTitle: string;
   emptyDescription: string;
-  createHref: string;
-  createLabel: string;
 }) {
+  const createHref = "/trips/new";
+
   return (
     <section>
       <div className="mb-2 flex items-baseline justify-between gap-3 px-1">
         <h2 className="text-base font-bold">
-          {title}
+          旅行
           {trips.length > 0 ? (
             <span className="ml-1.5 text-sm font-normal text-ink-faint tabular-nums">{trips.length}件</span>
           ) : null}
@@ -344,7 +217,12 @@ function TripSection({
         </div>
       </div>
       {trips.length === 0 ? (
-        <EmptyState title={emptyTitle} description={emptyDescription} actionHref={createHref} actionLabel={createLabel} />
+        <EmptyState
+          title={emptyTitle}
+          description={emptyDescription}
+          actionHref={createHref}
+          actionLabel="旅行の計画を立てる"
+        />
       ) : (
         <ul className="space-y-2">
           {trips.slice(0, 3).map(({ trip, visitCount }) => (

@@ -14,7 +14,6 @@ export function DeleteAccountForm() {
 
       <p className="text-sm leading-relaxed text-ink-soft">
         アカウントを削除すると、旅行・訪問記録・写真がすべて削除されます。元に戻すことはできません。
-        参加している共有旅からも退出します。
       </p>
 
       <Field label="確認のため「削除」と入力してください" htmlFor="confirmText">

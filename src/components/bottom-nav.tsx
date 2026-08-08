@@ -25,7 +25,7 @@ const ITEMS = [
     href: "/mypage",
     label: "マイページ",
     icon: "/icons/navigation/mypage.png",
-    match: ["/mypage", "/invitations"],
+    match: ["/mypage"],
   },
 ] as const;
 

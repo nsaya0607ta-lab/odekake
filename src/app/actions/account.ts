@@ -6,6 +6,7 @@ import { z } from "zod";
 import type { ActionState } from "@/components/form";
 import { toJapaneseError } from "@/lib/errors";
 import { PHOTO_BUCKET } from "@/lib/data/client";
+import { SPACE_NAME_MAX } from "@/lib/data/space";
 import { finalizePhotoPaths, removeFolderRecursively, TMP_ROOT } from "@/lib/photos";
 import { getSiteUrl } from "@/lib/supabase/env";
 import { requireUser } from "@/lib/supabase/server";
@@ -13,6 +14,7 @@ import { requireUser } from "@/lib/supabase/server";
 export async function updateProfileAction(_prev: ActionState, formData: FormData): Promise<ActionState> {
   const values = {
     displayName: String(formData.get("displayName") ?? "").trim(),
+    spaceName: String(formData.get("spaceName") ?? "").trim(),
     introduction: String(formData.get("introduction") ?? "").trim(),
   };
 
@@ -22,6 +24,8 @@ export async function updateProfileAction(_prev: ActionState, formData: FormData
         .string()
         .min(1, "ニックネームを入力してください。")
         .max(30, "ニックネームは30文字以内で入力してください。"),
+      // 未入力なら既定の「自分の旅」に戻す
+      spaceName: z.string().max(SPACE_NAME_MAX, `旅の名前は${SPACE_NAME_MAX}文字以内で入力してください。`),
       introduction: z.string().max(300, "自己紹介は300文字以内で入力してください。"),
     })
     .safeParse(values);
@@ -55,6 +59,7 @@ export async function updateProfileAction(_prev: ActionState, formData: FormData
     .from("profiles")
     .update({
       display_name: parsed.data.displayName,
+      space_name: parsed.data.spaceName || null,
       introduction: parsed.data.introduction || null,
       profile_image_url: profileImagePath,
     })
@@ -88,6 +93,7 @@ export async function updateProfileAction(_prev: ActionState, formData: FormData
   }
 
   revalidatePath("/home");
+  revalidatePath("/records");
   revalidatePath("/mypage");
   return { ok: true, message: "プロフィールを更新しました。", values };
 }
@@ -127,8 +133,8 @@ export async function deleteAccountAction(_prev: ActionState, formData: FormData
   // データベースの行は外部キーの連鎖で消えるが、Storage のファイルは残るため
   // ログインしているうちに消しておく（RLS で自分の分しか消せない）。
 
-  // 参加しているだけの共有旅へ入れた写真は旅行フォルダごとには消せないため、
-  // 自分がアップロードした分を先に個別に消しておく。
+  // 旅行フォルダの掃除から漏れる分がないよう、自分がアップロードした写真を
+  // 先に個別に消しておく。
   const { data: ownPhotos } = await supabase
     .from("visit_photos")
     .select("storage_path")

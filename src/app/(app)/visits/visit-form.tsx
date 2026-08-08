@@ -9,7 +9,7 @@ import { PhotoUploader, type UploadedPhoto } from "@/components/photo-uploader";
 import { RatingInput } from "@/components/rating-input";
 import { MAX_PHOTOS_PER_VISIT } from "@/lib/image";
 
-export type TripOption = { id: string; title: string; trip_type: "solo" | "shared" };
+export type TripOption = { id: string; title: string };
 
 export type VisitFormDefaults = {
   visitedAt: string;
@@ -76,10 +76,10 @@ export function VisitForm({
         <p className="text-sm leading-relaxed text-ink-soft">
           訪問履歴はどの旅行の記録かを選んで保存します。
           <br />
-          ふだんのおでかけ用に一人旅を1つ作っておくと便利です。
+          ふだんのおでかけ用に旅行を1つ作っておくと便利です。
         </p>
         <Link
-          href={`/trips/new?type=solo&next=${encodeURIComponent(`/visits/new?spot=${spotId}`)}`}
+          href={`/trips/new?next=${encodeURIComponent(`/visits/new?spot=${spotId}`)}`}
           className="btn btn-primary w-full"
         >
           旅行をつくる
@@ -136,7 +136,7 @@ export function VisitForm({
           <option value="">選択してください</option>
           {trips.map((trip) => (
             <option key={trip.id} value={trip.id}>
-              {trip.title}（{trip.trip_type === "solo" ? "一人旅" : "共有旅"}）
+              {trip.title}
             </option>
           ))}
         </select>

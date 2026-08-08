@@ -3,7 +3,7 @@
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useRef } from "react";
 
-const MAIN_ROUTES = ["/home", "/map", "/add", "/records", "/mypage", "/workspaces"];
+const MAIN_ROUTES = ["/home", "/map", "/add", "/records", "/mypage"];
 
 /**
  * スマホで下部ナビを押してから待たされないよう、主要画面だけ先に読み込む。

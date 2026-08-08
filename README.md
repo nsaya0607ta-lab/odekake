@@ -1,7 +1,7 @@
 # おでかけ記録
 
 訪れた都道府県・市区町村・スポットを記録し、日本地図から振り返るスマートフォン向けのライフログアプリです。
-一人旅と、友人と共同で記録する共有旅を分けて管理できます。
+記録は自分だけのもので、他の利用者からは見えません。
 
 - フロントエンド: Next.js 15（App Router）/ TypeScript / Tailwind CSS v4
 - バックエンド: Supabase（Database / Auth / Storage / Row Level Security）
@@ -37,16 +37,9 @@ cp .env.example .env.local
 | `NEXT_PUBLIC_SUPABASE_URL` | Supabase プロジェクトの URL |
 | `NEXT_PUBLIC_SUPABASE_ANON_KEY` | anon（公開）キー |
 | `NEXT_PUBLIC_SITE_URL` | 確認メールやパスワード再設定リンクの戻り先 |
-| `EMAIL_PROVIDER` | 招待メールの送信元（`none` / `resend`。未設定なら送信しません） |
-| `RESEND_API_KEY` | Resend の API キー（`EMAIL_PROVIDER=resend` のとき必須） |
-| `EMAIL_FROM` | 招待メールの差出人（例 `おでかけ記録 <noreply@example.com>`。同上） |
-| `EMAIL_REPLY_TO` | 招待メールの返信先（任意） |
 | `GOOGLE_PLACES_API_KEY` | Google Places API（New）のサーバー用キー（任意。未設定なら検索欄は出しません） |
 
-招待メールを送るには `EMAIL_PROVIDER=resend` と `RESEND_API_KEY` / `EMAIL_FROM` を設定します。
-`EMAIL_FROM` のドメインは Resend 側で認証しておく必要があります（未認証だと送信が 403 で失敗し、
-理由が旅行の設定画面に表示されます）。未設定のままでも招待はアプリ内に届き、
-招待コードとリンクを共有して参加できます。
+メール送信はアプリからは行いません（確認メール・パスワード再設定は Supabase Auth が送ります）。
 
 サービスロールキーはクライアント側でもサーバー側でも使用しません。アカウント削除は
 `delete_own_account()`（SECURITY DEFINER の RPC）経由で行います。
@@ -70,7 +63,7 @@ node scripts/verify-supabase.mjs  # 実 Supabase プロジェクトでの動作�
 ```
 
 `verify-rls.sh` は、素の PostgreSQL に Supabase 相当の土台を作って
-`supabase/migrations/*.sql` を適用し、公開範囲とアプリが前提にしている挙動を106項目確認します。
+`supabase/migrations/*.sql` を適用し、公開範囲とアプリが前提にしている挙動を73項目確認します。
 `verify-supabase.mjs` は、新規登録・確認メール・ログイン・公開範囲・写真・アカウント削除を
 実際のプロジェクトに対して順に確認します。
 
@@ -78,8 +71,7 @@ node scripts/verify-supabase.mjs  # 実 Supabase プロジェクトでの動作�
 
 | 画面 | パス |
 | --- | --- |
-| ホーム（いまの旅） | `/home` |
-| 旅を選ぶ（自分の旅 / 共有旅一覧） | `/workspaces` |
+| ホーム | `/home` |
 | 日本地図（地方選択） | `/map` |
 | 地方地図（都道府県選択） | `/map/[region]` |
 | 都道府県地図（市区町村の境界 ＋ 検索・一覧） | `/map/[region]/[pref]` |
@@ -88,7 +80,6 @@ node scripts/verify-supabase.mjs  # 実 Supabase プロジェクトでの動作�
 | スポット登録・編集 | `/spots/new` `/spots/[spotId]/edit` |
 | 訪問履歴の追加・編集 | `/visits/new` `/visits/[visitId]/edit` |
 | 旅行の作成・詳細・設定 | `/trips/new` `/trips/[tripId]` `/trips/[tripId]/settings` |
-| 共有旅への参加 | `/join/[code]` `/invitations` |
 | 記録（タイムライン / 旅行 / スポット / カレンダー） | `/records` |
 | お気に入り / また行きたい場所 | `/mypage/favorites` `/mypage/wishlist` |
 | マイページ | `/mypage` `/mypage/profile` `/mypage/account` |
@@ -137,41 +128,30 @@ node scripts/build-municipality-paths.mjs path/to/N03-21_210101.json src/lib/geo
 市区町村の境界は都道府県ごとにファイルを分け、開いている県の分だけを
 サーバー側で読み込みます（全国で約2MB。端末へは表示中の県の分だけが届きます）。
 
-## 旅ワークスペース
+## 自分の旅
 
-アプリは「自分の旅」と、共有旅ごとの独立した空間に分かれています。
+記録の置き場所はひとつだけで、ホームと記録画面の上に名前が出ます。
+既定は「自分の旅」で、マイページ →「プロフィールを編集」→「自分の旅の名前」から
+変更できます（`profiles.space_name`。空にすると既定へ戻ります）。
 
-```
-自分の旅        … 自分がつくった一人旅すべて
-共有旅①②③…    … 参加している共有旅ひとつずつ
-```
-
-ホーム・地図・記録・スポットは、選んでいる旅の記録だけを表示します。
-共有旅を新しくつくった直後の日本地図は、すべて未訪問から始まります
-（自分の旅や他の共有旅の記録は合算しません）。
-
-切り替えはホーム上部か `/workspaces` から行い、選択は Cookie
-（`odekake-workspace`）に保存します。マイページだけは、旅をまたいだ
-アカウント全体の合計を表示します。
+旅行（`trips`）は、日程のある旅をまとめたいときだけ作るものです。
+訪問記録は必ずどれかの旅行に属し、旅行を1つも持っていない利用者には
+「自分のおでかけ」が自動で1件だけ作られます。
 
 ## データ構造と公開範囲
 
-主なテーブルは `profiles` / `trips` / `trip_members` / `spots` / `visit_records` / `visit_photos` /
-`categories` / `tags` / `visit_record_tags` / `trip_comments` / `trip_invitations` /
-`trip_activities` です。
+主なテーブルは `profiles` / `trips` / `spots` / `visit_records` / `visit_photos` /
+`categories` / `tags` / `visit_record_tags` です。
 
-記録は原則として非公開で、Row Level Security により分離しています。
+記録はすべて非公開で、Row Level Security により利用者ごとに分離しています。
 
-- **一人旅** — 作成者のみ閲覧・編集できます。
-- **共有旅** — `trip_members` に登録されたメンバーのみ閲覧できます。URL を知っていても参加していなければ閲覧できません。
-- **訪問記録** — member は自分の記録のみ編集・削除でき、owner は旅行内すべてを管理できます。
+- **旅行** — 作成者のみ閲覧・編集できます。URL を知っていても他人からは見えません。
+- **訪問記録・スポット** — 作成者のみ閲覧・編集・削除できます。
 - **写真** — 紐づく訪問記録を閲覧できるユーザーのみ参照できます。
-- **活動履歴** — 共有旅のメンバーのみ閲覧できます。書き込みはトリガー経由に限っています。
+- **プロフィール** — 本人のみ閲覧・編集できます。
 
 ポリシー内の再帰を避けるため、権限判定は `can_access_trip()` / `is_trip_owner()` /
-`can_read_visit()` / `can_read_spot()` / `shares_trip_with()` の SECURITY DEFINER 関数に集約しています。
-
-`viewer` ロールは列挙型と権限判定に用意していますが、初期版では画面上の機能を割り当てていません。
+`can_read_visit()` / `can_read_spot()` の SECURITY DEFINER 関数に集約しています。
 
 ## 写真の保存
 
@@ -208,9 +188,9 @@ trips/{trip_id}/visits/{visit_record_id}/
 
 - レシート読み取り、AI 旅行記
 - 外部の店舗検索（`src/lib/places/` に提供元を足せば有効になります）
-- 招待メールの送信（`src/lib/email/` に送信元を足せば有効になります）
+- 共有旅（複数人での記録の共有）。第4版で廃止しました
 - SNS 公開、いいね、フォロー、一般公開プロフィール、バッジ
 
-直近の変更内容は [`docs/changes-3.md`](docs/changes-3.md) と
-[`docs/changes-2.md`](docs/changes-2.md) に、
+直近の変更内容は [`docs/changes-4.md`](docs/changes-4.md) と
+[`docs/changes-3.md`](docs/changes-3.md) に、
 そのほかの制限事項は [`docs/notes.md`](docs/notes.md) にまとめています。

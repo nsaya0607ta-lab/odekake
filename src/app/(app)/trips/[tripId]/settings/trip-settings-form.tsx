@@ -20,7 +20,6 @@ export function TripSettingsForm({
   return (
     <form action={formAction} className="rough-card space-y-5 p-4" noValidate>
       <input type="hidden" name="tripId" value={trip.id} />
-      <input type="hidden" name="tripType" value={trip.trip_type} />
 
       <FormMessage state={state} />
 

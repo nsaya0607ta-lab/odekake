@@ -44,10 +44,13 @@ for file in supabase/migrations/*.sql; do
   run "$file"
 done
 
-echo "== 冪等性の確認（もう一度適用） =="
-for file in supabase/migrations/*.sql; do
-  run "$file"
-done
+# 0008 は共有旅の列とテーブルを落とすため、そのあとで 0001 / 0002 を
+# もう一度流すことはできない（存在しない列を参照する関数の作成で失敗する）。
+# Supabase は適用済みのマイグレーションを再実行しないので、ここでは
+# 「最後のマイグレーションを二度流しても壊れない」ことだけを確かめる。
+LAST_MIGRATION="$(ls supabase/migrations/*.sql | tail -1)"
+echo "== 冪等性の確認（${LAST_MIGRATION} をもう一度適用） =="
+run "$LAST_MIGRATION"
 
 echo "== RLS テスト =="
 "${PSQL[@]}" -v ON_ERROR_STOP=1 -f supabase/tests/01_rls.test.sql

@@ -32,11 +32,8 @@ const DB_MESSAGES: Record<string, string> = {
 };
 
 const RPC_MESSAGES: Array<[RegExp, string]> = [
-  [/INVITATION_NOT_FOUND/, "招待コードが見つかりません。コードをご確認ください。"],
-  [/INVITATION_EXPIRED/, "招待コードの有効期限が切れています。旅行の作成者に再発行を依頼してください。"],
-  [/INVITATION_CANCELLED/, "この招待は取り消されています。"],
-  [/TRIP_NOT_SHARED/, "この旅行は共有旅ではないため参加できません。"],
   [/AUTH_REQUIRED/, "ログインが必要です。"],
+  [/ACCOUNT_DELETE_FAILED/, "アカウントを削除できませんでした。時間をおいて再度お試しください。"],
 ];
 
 export function toJapaneseError(

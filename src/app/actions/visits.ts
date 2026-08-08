@@ -286,7 +286,7 @@ export async function deleteVisitAction(formData: FormData) {
  * 付いていればお気に入り」なので、
  *   付ける … 自分の最新の訪問履歴に付ける
  *   外す　 … このスポットにある自分の訪問履歴すべてから外す
- * とする。自分の記録しか変えないので、共有旅で他の人の記録には触れない。
+ * とする。
  */
 export async function toggleSpotFavoriteAction(formData: FormData) {
   const spotId = String(formData.get("spotId") ?? "");

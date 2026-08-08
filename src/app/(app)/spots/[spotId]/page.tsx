@@ -15,10 +15,10 @@ import {
 import { PageBody } from "@/components/page-body";
 import { PageHeader } from "@/components/page-header";
 import { PhotoGallery } from "@/components/photo-gallery";
-import { StarRating, TripTypeBadge, formatDate } from "@/components/ui";
+import { StarRating, TripBadge, formatDate } from "@/components/ui";
 import { getSpotDetail } from "@/lib/data/spots";
 import { getMunicipality, getPrefecture } from "@/lib/geo";
-import { resolveWorkspace } from "@/lib/data/workspace";
+import { getRecordSpace } from "@/lib/data/space";
 import { requireUser } from "@/lib/supabase/server";
 import type { LocationSource } from "@/lib/supabase/types";
 import { FavoriteButton } from "./favorite-button";
@@ -55,8 +55,8 @@ export default async function SpotDetailPage({
     requireUser(),
   ]);
 
-  const workspace = await resolveWorkspace(supabase, user.id);
-  const detail = await getSpotDetail(supabase, spotId, workspace.tripIds);
+  const space = await getRecordSpace(supabase, user.id);
+  const detail = await getSpotDetail(supabase, spotId, space.tripIds);
   if (!detail) notFound();
 
   const { spot, categoryName, summary, visits, galleryUrls } = detail;
@@ -215,17 +215,12 @@ export default async function SpotDetailPage({
             </p>
           ) : (
             <ul className="space-y-3">
-              {visits.map(({ record, photos, authorName, tripTitle, tripType }) => (
+              {visits.map(({ record, photos, tripTitle }) => (
                 <li key={record.id} className="rough-card space-y-2 p-4">
                   <div className="flex items-center justify-between gap-2">
                     <p className="font-semibold tabular-nums">{formatDate(record.visited_at)}</p>
-                    {tripType ? <TripTypeBadge type={tripType} /> : null}
+                    {tripTitle ? <TripBadge title={tripTitle} /> : null}
                   </div>
-
-                  <p className="text-xs text-ink-faint">
-                    {tripTitle ? `${tripTitle}・` : ""}
-                    {authorName}さんの記録
-                  </p>
 
                   {record.rating ? <StarRating value={record.rating} /> : null}
 

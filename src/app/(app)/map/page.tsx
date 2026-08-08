@@ -5,8 +5,7 @@ import { PageBody } from "@/components/page-body";
 import { TopHeader } from "@/components/page-header";
 import { VisitedBadge } from "@/components/ui";
 import { loadAreaIndex } from "@/lib/data/areas";
-import { resolveWorkspace } from "@/lib/data/workspace";
-import { WorkspaceBar } from "@/components/workspace-bar";
+import { getRecordSpace } from "@/lib/data/space";
 import { MUNICIPALITIES, PREFECTURES } from "@/lib/geo";
 import { REGIONS } from "@/lib/geo/regions";
 import { requireUser } from "@/lib/supabase/server";
@@ -16,8 +15,8 @@ export const dynamic = "force-dynamic";
 
 export default async function MapPage() {
   const { supabase, user } = await requireUser();
-  const workspace = await resolveWorkspace(supabase, user.id);
-  const areas = await loadAreaIndex(supabase, workspace.tripIds);
+  const space = await getRecordSpace(supabase, user.id);
+  const areas = await loadAreaIndex(supabase, space.tripIds);
 
   const visitedRegions = Object.fromEntries(
     REGIONS.map((r) => [r.slug, (areas.region.get(r.slug)?.visitCount ?? 0) > 0]),
@@ -25,10 +24,8 @@ export default async function MapPage() {
 
   return (
     <>
-      <TopHeader title="日本地図" />
+      <TopHeader title="日本地図" subtitle={space.name} />
       <PageBody className="space-y-4">
-        <WorkspaceBar workspace={workspace} />
-
         <section className="rough-card px-2 py-3">
           <JapanMap visitedRegions={visitedRegions} />
         </section>

@@ -4,7 +4,7 @@ import { SpotForm } from "@/components/spot-form";
 import { loadCategoryNames } from "@/lib/data/spots";
 import { todayInJapan } from "@/lib/date";
 import { ensurePersonalRecordTrip, getTripOptions } from "@/lib/data/trips";
-import { resolveWorkspace } from "@/lib/data/workspace";
+import { getRecordSpace } from "@/lib/data/space";
 import { getMunicipality } from "@/lib/geo";
 import { requireUser } from "@/lib/supabase/server";
 
@@ -20,16 +20,14 @@ export default async function NewSpotPage({
     requireUser(),
     searchParams,
   ]);
-  const workspace = await resolveWorkspace(supabase, user.id);
+  const space = await getRecordSpace(supabase, user.id);
   const [categoryNames, initialTripOptions] = await Promise.all([
     loadCategoryNames(supabase),
-    getTripOptions(supabase, workspace.tripIds),
+    getTripOptions(supabase, space.tripIds),
   ]);
 
   const personalRecordTrip =
-    workspace.kind === "personal" && initialTripOptions.length === 0
-      ? await ensurePersonalRecordTrip(supabase, user.id)
-      : null;
+    initialTripOptions.length === 0 ? await ensurePersonalRecordTrip(supabase, user.id) : null;
   const tripOptions = personalRecordTrip ? [personalRecordTrip] : initialTripOptions;
   const trips = requestedTripId
     ? [...tripOptions].sort((a, b) => Number(b.id === requestedTripId) - Number(a.id === requestedTripId))
@@ -48,7 +46,7 @@ export default async function NewSpotPage({
           userId={user.id}
           trips={trips}
           visitedAtDefault={todayInJapan()}
-          showTripPlanningLink={workspace.kind === "personal"}
+          showTripPlanningLink
           locationFromUrl={Boolean(municipality)}
           categories={[...categoryNames.entries()].map(([id, name]) => ({ id, name }))}
           location={{
