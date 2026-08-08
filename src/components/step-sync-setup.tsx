@@ -1,19 +1,14 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useState } from "react";
 
 type Status = "idle" | "loading" | "ready" | "revoked" | "error";
 
-export function StepSyncSetup() {
+export function StepSyncSetup({ endpoint }: { endpoint: string }) {
   const [status, setStatus] = useState<Status>("idle");
   const [token, setToken] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
-
-  const endpoint = useMemo(() => {
-    if (typeof window === "undefined") return "/api/steps/sync";
-    return `${window.location.origin}/api/steps/sync`;
-  }, []);
 
   async function issueToken() {
     setStatus("loading");
@@ -74,7 +69,7 @@ export function StepSyncSetup() {
               キーはパスワードと同じ扱いです。SNSや他人には共有しないでください。
             </p>
           </div>
-          <span className="rounded-full bg-leaf-soft px-2.5 py-1 text-[10px] font-semibold text-leaf-deep">安全なBearerキー</span>
+          <span className="rounded-full bg-leaf-soft px-2.5 py-1 text-[10px] font-semibold text-leaf-deep">Bearerキー</span>
         </div>
 
         {token ? (
@@ -125,7 +120,7 @@ export function StepSyncSetup() {
         </p>
       ) : null}
 
-      <button type="button" className="btn btn-quiet w-full" onClick={revokeToken} disabled={status === "loading" || !token}>
+      <button type="button" className="btn btn-quiet w-full" onClick={revokeToken} disabled={status === "loading"}>
         歩数連携を解除
       </button>
     </div>
