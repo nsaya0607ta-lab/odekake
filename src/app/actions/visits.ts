@@ -184,6 +184,7 @@ export async function createVisitAction(_prev: ActionState, formData: FormData):
   ]);
 
   revalidatePath("/home");
+  revalidatePath("/mypage/exp-history");
   revalidatePath("/records");
   revalidatePath(`/spots/${parsed.data.spotId}`);
   revalidatePath(`/trips/${parsed.data.tripId}`);
@@ -238,6 +239,8 @@ export async function updateVisitAction(_prev: ActionState, formData: FormData):
   ]);
 
   revalidatePath("/records");
+  revalidatePath("/home");
+  revalidatePath("/mypage/exp-history");
   revalidatePath(`/spots/${parsed.data.spotId}`);
   redirect(`/spots/${parsed.data.spotId}?saved=1`);
 }

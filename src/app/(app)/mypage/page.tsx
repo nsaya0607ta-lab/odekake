@@ -8,6 +8,7 @@ import {
   IconHeart,
   IconLogout,
   IconMail,
+  IconStar,
   IconUser,
 } from "@/components/icons";
 import { PageBody } from "@/components/page-body";
@@ -77,6 +78,7 @@ export default async function MyPage() {
             <MenuItem href="/mypage/favorites" icon={<IconHeart size={20} />} label="お気に入り" />
             <MenuItem href="/mypage/wishlist" icon={<IconFlag size={20} />} label="また行きたい場所" />
             <MenuItem href="/records?tab=trips" icon={<IconCalendar size={20} />} label="旅行の計画" />
+            <MenuItem href="/mypage/exp-history" icon={<IconStar size={20} />} label="おでかけレベル・EXP履歴" />
           </ul>
         </nav>
 
