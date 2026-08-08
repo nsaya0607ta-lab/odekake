@@ -1,6 +1,8 @@
 /** スポットの座標をどうやって決めたか */
 export type LocationSource = "municipality" | "address" | "map" | "device" | "place_search";
 
+export type Json = string | number | boolean | null | { [key: string]: Json | undefined } | Json[];
+
 export type ProfileRow = {
   id: string;
   user_id: string;
@@ -103,6 +105,52 @@ export type AreaStatsRow = {
   last_visited_at: string | null;
 };
 
+export type UserExpRow = {
+  user_id: string;
+  total_exp: number;
+  updated_at: string;
+};
+
+export type ExpEventRow = {
+  id: string;
+  user_id: string;
+  event_type:
+    | "visit_created"
+    | "first_spot"
+    | "revisit"
+    | "photo"
+    | "comment"
+    | "rating"
+    | "first_municipality"
+    | "first_prefecture"
+    | "first_region"
+    | "municipality_5_spots"
+    | "prefecture_5_municipalities"
+    | "prefecture_50_percent"
+    | "prefecture_100_percent"
+    | "steps";
+  exp: number;
+  idempotency_key: string;
+  visit_record_id: string | null;
+  spot_id: string | null;
+  prefecture_code: string | null;
+  municipality_code: string | null;
+  event_date: string | null;
+  metadata: Json;
+  created_at: string;
+  updated_at: string;
+};
+
+export type DailyStepsRow = {
+  user_id: string;
+  step_date: string;
+  steps: number;
+  earned_exp: number;
+  source: string;
+  created_at: string;
+  updated_at: string;
+};
+
 export type Database = {
   public: {
     Tables: {
@@ -142,6 +190,35 @@ export type Database = {
         Update: Partial<VisitPhotoRow>;
         Relationships: [];
       };
+      user_exp: {
+        Row: UserExpRow;
+        Insert: Partial<UserExpRow> & { user_id: string };
+        Update: Partial<UserExpRow>;
+        Relationships: [];
+      };
+      exp_events: {
+        Row: ExpEventRow;
+        Insert: Partial<ExpEventRow> & {
+          user_id: string;
+          event_type: ExpEventRow["event_type"];
+          exp: number;
+          idempotency_key: string;
+        };
+        Update: Partial<ExpEventRow>;
+        Relationships: [];
+      };
+      daily_steps: {
+        Row: DailyStepsRow;
+        Insert: Partial<DailyStepsRow> & { user_id: string; step_date: string; steps: number };
+        Update: Partial<DailyStepsRow>;
+        Relationships: [];
+      };
+      prefecture_municipality_totals: {
+        Row: { prefecture_code: string; municipality_count: number };
+        Insert: { prefecture_code: string; municipality_count: number };
+        Update: Partial<{ municipality_count: number }>;
+        Relationships: [];
+      };
       tags: { Row: TagRow; Insert: Partial<TagRow> & { user_id: string; name: string }; Update: Partial<TagRow>; Relationships: [] };
       visit_record_tags: {
         Row: { id: string; visit_record_id: string; tag_id: string };
@@ -154,6 +231,7 @@ export type Database = {
     Functions: {
       area_stats: { Args: { p_trip_ids?: string[] }; Returns: AreaStatsRow[] };
       delete_own_account: { Args: Record<string, never>; Returns: undefined };
+      record_daily_steps: { Args: { p_step_date: string; p_steps: number }; Returns: number };
     };
     Enums: {
       location_source: LocationSource;

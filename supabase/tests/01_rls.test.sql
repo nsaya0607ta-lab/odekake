@@ -195,6 +195,18 @@ select pg_temp.expect_ok('2件目の訪問記録を追加', :'alice', format(
   $q$insert into public.visit_records (id, user_id, trip_id, spot_id, visited_at, rating) values (%L, %L, %L, %L, '2026-01-11', 5)$q$,
   :'visit_a2', :'alice', :'trip_a2', :'spot_a2'));
 
+select pg_temp.record('EXP: 訪問・初スポット・新地域・評価が台帳と合計へ保存される',
+  (select total_exp from public.user_exp where user_id = :'alice') = 925
+  and (select count(*) from public.exp_events where user_id = :'alice') = 11);
+
+select pg_temp.expect_count('EXP: 本人は自分の台帳を見られる', :'alice',
+  'select 1 from public.exp_events', 11);
+select pg_temp.expect_count('EXP: 他人の台帳は見えない', :'bob',
+  format($q$select 1 from public.exp_events where user_id = %L$q$, :'alice'), 0);
+select pg_temp.expect_denied('EXP: 台帳へ任意のEXPを直接追加できない', :'alice', format(
+  $q$insert into public.exp_events (user_id, event_type, exp, idempotency_key)
+     values (%L, 'steps', 600, 'manual-cheat')$q$, :'alice'));
+
 select pg_temp.expect_denied('他人の旅行には記録を追加できない', :'bob', format(
   $q$insert into public.visit_records (user_id, trip_id, spot_id, visited_at) values (%L, %L, %L, '2026-01-13')$q$,
   :'bob', :'trip_a1', :'spot_a1'));
@@ -245,6 +257,18 @@ select pg_temp.expect_ok('自分の訪問記録を編集できる', :'alice', fo
 
 select pg_temp.record('編集が反映される',
   (select comment from public.visit_records where id = :'visit_a2') = 'よかった');
+
+select pg_temp.record('EXP: 感想の初回追加だけ10EXP増える',
+  (select total_exp from public.user_exp where user_id = :'alice') = 935
+  and (select count(*) from public.exp_events
+         where user_id = :'alice' and event_type = 'comment') = 1);
+
+select pg_temp.expect_ok('同じ感想を再保存できる', :'alice', format(
+  $q$update public.visit_records set comment = 'よかった' where id = %L$q$, :'visit_a2'));
+select pg_temp.record('EXP: 感想の再保存では二重付与されない',
+  (select total_exp from public.user_exp where user_id = :'alice') = 935
+  and (select count(*) from public.exp_events
+         where user_id = :'alice' and event_type = 'comment') = 1);
 
 select pg_temp.expect_blocked('他人の訪問記録は編集できない', :'bob', format(
   $q$update public.visit_records set comment = 'かきかえ' where id = %L$q$, :'visit_a1'));
@@ -300,6 +324,49 @@ select pg_temp.expect_count('写真のメタ情報は他ユーザーから見え
   'select 1 from public.visit_photos', 0);
 select pg_temp.expect_count('写真のメタ情報は本人から見える', :'alice',
   'select 1 from public.visit_photos', 1);
+
+select pg_temp.record('EXP: 写真は訪問ごとに初回の10EXPだけ付く',
+  (select total_exp from public.user_exp where user_id = :'alice') = 945
+  and (select count(*) from public.exp_events
+         where user_id = :'alice' and event_type = 'photo') = 1);
+
+select pg_temp.expect_ok('同じ訪問へ2枚目の写真メタ情報を登録できる', :'alice', format(
+  $q$insert into public.visit_photos (user_id, visit_record_id, storage_path)
+     values (%L, %L, 'trips/%s/visits/%s/p2.jpg')$q$,
+  :'alice', :'visit_a2', :'trip_a2', :'visit_a2'));
+select pg_temp.record('EXP: 写真を増やしても二重付与されない',
+  (select total_exp from public.user_exp where user_id = :'alice') = 945
+  and (select count(*) from public.exp_events
+         where user_id = :'alice' and event_type = 'photo') = 1);
+
+-- -------------------------------------------------------------
+-- 歩数EXP（日付単位の累積・最大35EXP）
+-- -------------------------------------------------------------
+select pg_temp.expect_ok('歩数: 10000歩を日次同期できる', :'alice',
+  $q$select public.record_daily_steps('2026-01-12', 10000)$q$);
+select pg_temp.record('歩数: 10000歩は22EXP',
+  (select earned_exp from public.daily_steps
+    where user_id = :'alice' and step_date = '2026-01-12') = 22
+  and (select total_exp from public.user_exp where user_id = :'alice') = 967);
+
+select pg_temp.expect_ok('歩数: 同じ日の20000歩へ累積更新できる', :'alice',
+  $q$select public.record_daily_steps('2026-01-12', 20000)$q$);
+select pg_temp.record('歩数: 20000歩は日次最大35EXPで差分だけ増える',
+  (select earned_exp from public.daily_steps
+    where user_id = :'alice' and step_date = '2026-01-12') = 35
+  and (select total_exp from public.user_exp where user_id = :'alice') = 980
+  and (select count(*) from public.exp_events
+         where user_id = :'alice' and event_type = 'steps') = 1);
+
+select pg_temp.expect_ok('歩数: 同じ値を再同期できる', :'alice',
+  $q$select public.record_daily_steps('2026-01-12', 20000)$q$);
+select pg_temp.record('歩数: 同じ値の再同期では二重付与されない',
+  (select total_exp from public.user_exp where user_id = :'alice') = 980
+  and (select count(*) from public.exp_events
+         where user_id = :'alice' and event_type = 'steps') = 1);
+
+select pg_temp.expect_count('歩数: 他人の日次歩数は見えない', :'bob',
+  format($q$select 1 from public.daily_steps where user_id = %L$q$, :'alice'), 0);
 
 -- -------------------------------------------------------------
 -- プロフィールの公開範囲

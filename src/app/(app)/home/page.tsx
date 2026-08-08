@@ -9,12 +9,15 @@ import {
 } from "@/components/icons";
 import { TopHeader } from "@/components/page-header";
 import { PageBody } from "@/components/page-body";
+import { LevelTag } from "@/components/level-tag";
 import { EmptyState, LinkRow, formatDate } from "@/components/ui";
 import { WanderingFrenchie } from "@/components/wandering-frenchie";
 import { loadAreaIndex } from "@/lib/data/areas";
+import { getExpDashboard } from "@/lib/data/exp";
 import { formatTripPeriod, getTripSummaries, type TripSummary } from "@/lib/data/trips";
 import { getTimeline } from "@/lib/data/visits";
 import { getRecordSpace } from "@/lib/data/space";
+import { getExpProgress } from "@/lib/exp";
 import { MUNICIPALITIES, PREFECTURES } from "@/lib/geo";
 import { requireUser } from "@/lib/supabase/server";
 
@@ -25,13 +28,15 @@ export default async function HomePage({ searchParams }: { searchParams: Promise
   const [{ supabase, user }, { notice }] = await Promise.all([requireUser(), searchParams]);
   const space = await getRecordSpace(supabase, user.id);
 
-  const [areas, recent, trips] = await Promise.all([
+  const [areas, recent, trips, expDashboard] = await Promise.all([
     loadAreaIndex(supabase, space.tripIds),
     getTimeline(supabase, { tripIds: space.tripIds, limit: 4 }),
     getTripSummaries(supabase),
+    getExpDashboard(supabase, user.id),
   ]);
 
   const latest = recent[0] ?? null;
+  const expProgress = getExpProgress(expDashboard.totalExp);
 
   return (
     <>
@@ -58,7 +63,7 @@ export default async function HomePage({ searchParams }: { searchParams: Promise
         </div>
 
         <section className="rough-card overflow-hidden">
-          <div className="relative h-40 overflow-hidden bg-leaf-soft">
+          <div className="relative h-52 overflow-hidden bg-leaf-soft sm:h-56">
             <div className="absolute inset-x-0 bottom-0 h-24 bg-[#eef3e5]" />
             <div className="absolute -left-14 bottom-[-42px] h-32 w-72 rounded-[50%] bg-[#e3ecd7]" />
             <div className="absolute right-[-42px] bottom-[-54px] h-36 w-80 rounded-[50%] bg-[#dce8cf]" />
@@ -67,9 +72,10 @@ export default async function HomePage({ searchParams }: { searchParams: Promise
             <div className="absolute right-12 top-5 h-10 w-10 rounded-full border border-[#d7b87d] bg-[#f8e7ca]" />
             <div className="absolute bottom-5 left-[8%] h-6 w-2 rounded-full bg-[#91aa75]" />
             <div className="absolute bottom-4 left-[7.2%] h-5 w-5 rounded-[50%] bg-[#b9cf9f]" />
-            <div className="absolute bottom-7 right-[12%] h-8 w-2 rounded-full bg-[#91aa75]" />
-            <div className="absolute bottom-6 right-[10.8%] h-6 w-6 rounded-[50%] bg-[#b9cf9f]" />
-            <WanderingFrenchie />
+            <div className="absolute bottom-7 left-[43%] h-8 w-2 rounded-full bg-[#91aa75]" />
+            <div className="absolute bottom-6 left-[41.8%] h-6 w-6 rounded-[50%] bg-[#b9cf9f]" />
+            <WanderingFrenchie level={expProgress.level} />
+            <LevelTag progress={expProgress} />
           </div>
 
           <div className="grid grid-cols-3 divide-x divide-line px-2 py-4 text-center">
@@ -164,10 +170,16 @@ export default async function HomePage({ searchParams }: { searchParams: Promise
               </span>
               <p className="mt-3 whitespace-nowrap text-xs text-ink-soft">今日のおでかけ</p>
               <p className="mt-1 flex items-baseline justify-center gap-1 whitespace-nowrap text-ink">
-                <span className="text-3xl font-bold tabular-nums">—</span>
+                <span className="text-3xl font-bold tabular-nums">
+                  {expDashboard.todaySteps === null ? "—" : expDashboard.todaySteps.toLocaleString("ja-JP")}
+                </span>
                 <span className="text-xs text-ink-soft">歩</span>
               </p>
-              <p className="mt-3 whitespace-nowrap text-[10px] text-ink-faint">ヘルスケア連携前</p>
+              <p className="mt-3 whitespace-nowrap text-[10px] text-ink-faint">
+                {expDashboard.todaySteps === null
+                  ? "ヘルスケア連携前"
+                  : `今日の歩数EXP +${expDashboard.todayStepExp}`}
+              </p>
             </div>
           </section>
         </div>
