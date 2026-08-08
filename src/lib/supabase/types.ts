@@ -151,6 +151,13 @@ export type DailyStepsRow = {
   updated_at: string;
 };
 
+export type StepsSyncTokenRow = {
+  user_id: string;
+  token: string;
+  created_at: string;
+  updated_at: string;
+};
+
 export type Database = {
   public: {
     Tables: {
@@ -213,6 +220,12 @@ export type Database = {
         Update: Partial<DailyStepsRow>;
         Relationships: [];
       };
+      steps_sync_tokens: {
+        Row: StepsSyncTokenRow;
+        Insert: Partial<StepsSyncTokenRow> & { user_id: string; token: string };
+        Update: Partial<StepsSyncTokenRow>;
+        Relationships: [];
+      };
       prefecture_municipality_totals: {
         Row: { prefecture_code: string; municipality_count: number };
         Insert: { prefecture_code: string; municipality_count: number };
@@ -230,8 +243,14 @@ export type Database = {
     Views: Record<string, never>;
     Functions: {
       area_stats: { Args: { p_trip_ids?: string[] }; Returns: AreaStatsRow[] };
+      create_steps_sync_token: { Args: Record<string, never>; Returns: string };
       delete_own_account: { Args: Record<string, never>; Returns: undefined };
       record_daily_steps: { Args: { p_step_date: string; p_steps: number }; Returns: number };
+      record_daily_steps_with_token: {
+        Args: { p_token: string; p_step_date: string; p_steps: number };
+        Returns: number;
+      };
+      revoke_steps_sync_token: { Args: Record<string, never>; Returns: undefined };
     };
     Enums: {
       location_source: LocationSource;

@@ -85,6 +85,7 @@ export default async function MyPage() {
         <nav>
           <p className="mb-2 px-1 text-xs font-semibold text-ink-faint">設定</p>
           <ul className="rough-card divide-y divide-line overflow-hidden">
+            <MenuItem href="/mypage/step-sync" icon={<span className="text-lg leading-none">👟</span>} label="iPhone歩数連携" />
             <MenuItem href="/mypage/profile" icon={<IconUser size={20} />} label="プロフィールを編集" />
             <MenuItem href="/mypage/account" icon={<IconMail size={20} />} label="アカウント設定" />
             <MenuItem href="/mypage/help" icon={<IconChat size={20} />} label="ヘルプ・お問い合わせ" />
