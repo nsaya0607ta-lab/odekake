@@ -118,6 +118,45 @@ export function GearBoard({ currentLevel, initialEquipment }: Props) {
   );
 }
 
+const COLLAR_STYLE_BY_LEVEL: Partial<Record<number, { band: string; edge: string; charm: string }>> = {
+  4: { band: "#789a61", edge: "#587545", charm: "#9fc37f" },
+  11: { band: "#c8794f", edge: "#8e4f32", charm: "#e3a24d" },
+  21: { band: "#6a678d", edge: "#4a466d", charm: "#e7c35d" },
+};
+
+function CollarOverlay({ level }: { level: number }) {
+  const palette = COLLAR_STYLE_BY_LEVEL[level];
+  if (!palette) return null;
+
+  return (
+    <svg
+      viewBox="0 0 160 160"
+      className="pointer-events-none absolute inset-0 h-full w-full"
+      aria-hidden="true"
+    >
+      {/* 顎のすぐ下〜バンダナ上端の狭い範囲だけに沿わせる。前面に貼った帯に見えないよう、左右端を頬の後ろに潜らせる。 */}
+      <path
+        d="M44 88 C56 96, 104 96, 116 88"
+        fill="none"
+        stroke={palette.edge}
+        strokeWidth="8"
+        strokeLinecap="round"
+        opacity="0.96"
+      />
+      <path
+        d="M45 86.8 C58 94, 102 94, 115 86.8"
+        fill="none"
+        stroke={palette.band}
+        strokeWidth="5.4"
+        strokeLinecap="round"
+      />
+      <circle cx="80" cy="95" r="4.8" fill={palette.edge} />
+      <circle cx="80" cy="94" r="3.6" fill={palette.charm} />
+      <circle cx="78.9" cy="92.7" r="1" fill="#fff7de" opacity="0.8" />
+    </svg>
+  );
+}
+
 function PreviewCard({ equipment }: { equipment: EquipmentMap }) {
   const equippedSlots = ACCESSORY_SLOTS.filter((slot) => equipment[slot] !== undefined);
   const equippedTitle = equipment.title !== undefined
@@ -127,7 +166,6 @@ function PreviewCard({ equipment }: { equipment: EquipmentMap }) {
   const badgePosition: Partial<Record<EquipmentSlot, string>> = {
     hat: "left-[30%] top-[0%]",
     crown: "left-[54%] top-[0%]",
-    collar: "left-[28%] top-[50%]",
     bandana: "left-[50%] top-[54%]",
     backpack: "right-[4%] top-[38%]",
   };
@@ -143,6 +181,7 @@ function PreviewCard({ equipment }: { equipment: EquipmentMap }) {
       ) : null}
 
       <div className="relative mx-auto mt-1 h-40 w-40">
+        {/* 犬本体は固定。首輪だけを首の輪郭に沿うオーバーレイとして重ねる。 */}
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img
           src="/characters/frenchie/stand-happy.webp"
@@ -150,7 +189,8 @@ function PreviewCard({ equipment }: { equipment: EquipmentMap }) {
           className="absolute inset-0 h-full w-full object-contain"
           draggable={false}
         />
-        {ACCESSORY_SLOTS.map((slot) => {
+        {equipment.collar !== undefined ? <CollarOverlay level={equipment.collar} /> : null}
+        {ACCESSORY_SLOTS.filter((slot) => slot !== "collar").map((slot) => {
           const level = equipment[slot];
           if (level === undefined) return null;
           return (
@@ -185,7 +225,7 @@ function PreviewCard({ equipment }: { equipment: EquipmentMap }) {
       )}
 
       <p className="mt-3 text-center text-[10px] leading-relaxed text-ink-faint">
-        犬の絵そのものはまだ着せ替えできないため、装着中のものはここにアイコンで表示しています。
+        犬本体は変えず、首輪は首の形に沿うレイヤーとしてプレビューします。
       </p>
     </section>
   );
