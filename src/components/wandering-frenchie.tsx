@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 /**
  * ホーム画面のバンドを歩き回るフレブル。
@@ -49,7 +49,7 @@ const RESTS: readonly Rest[] = [
   { pose: "happy", min: 1400, max: 2400 },
   { pose: "shake", min: 1100, max: 1700 },
   { pose: "sleep", min: 3600, max: 6000 },
-  { pose: "wink", min: 1000, max: 1700, requiredLevel: 2 },
+  { pose: "wink", min: 1150, max: 1800, requiredLevel: 2 },
   { pose: "wave", min: 1300, max: 2200, requiredLevel: 3 },
   { pose: "camera", min: 1400, max: 2200, requiredLevel: 5 },
   { pose: "bow", min: 1500, max: 2300, requiredLevel: 7 },
@@ -67,6 +67,20 @@ const RESTS: readonly Rest[] = [
 const REQUIRED_LEVEL_BY_POSE = new Map(
   RESTS.filter((rest) => rest.requiredLevel !== undefined).map((rest) => [rest.pose, rest.requiredLevel!]),
 );
+
+/**
+ * 絵の差し替えでは出せない「動き」を CSS で足す仕草と、その再生用クラス。
+ *
+ * 素材はどれも独立した1枚絵で、目だけ違う対の絵は無い。コマ送りで瞬きを作ろうと
+ * すると体ごと入れ替わって二重写しになるので、ウインクは1枚絵のまま動かしている。
+ * ここに載っていない仕草はこれまでどおり静止画。
+ */
+const GESTURE_POSES: Partial<Record<Pose, string>> = {
+  wink: "frenchie-wink",
+};
+
+/** ウインクの動きの長さ（ms）。RESTS の最短より短くして必ず出し切る */
+const WINK_MS = 1000;
 
 /**
  * バンド幅に対する移動速度（%/秒）。1歩ぶんの絵の踏み出し幅と
@@ -108,6 +122,7 @@ export function WanderingFrenchie({ level = 1 }: { level?: number }) {
     travelMs: 0,
   });
   const [stepUp, setStepUp] = useState(false);
+  const poseNodes = useRef<Partial<Record<Pose, HTMLImageElement | null>>>({});
 
   useEffect(() => {
     if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
@@ -173,6 +188,19 @@ export function WanderingFrenchie({ level = 1 }: { level?: number }) {
 
   const activePose: Pose = walker.walking ? (stepUp ? "walk" : "stand") : walker.pose;
 
+  // 動きのある仕草は、その仕草に切り替わるたびに頭から再生し直す
+  useEffect(() => {
+    const playClass = GESTURE_POSES[activePose];
+    const node = poseNodes.current[activePose];
+    if (!playClass || !node) return;
+
+    node.classList.remove(playClass);
+    // クラスを外した状態を一度確定させてから付け直す。同じフレームで付け外しすると
+    // 相殺されて2回目以降が再生されない
+    void node.offsetWidth;
+    node.classList.add(playClass);
+  }, [activePose]);
+
   return (
     <div className="pointer-events-none absolute inset-0 overflow-hidden" aria-hidden="true">
       <style>{`
@@ -187,9 +215,28 @@ export function WanderingFrenchie({ level = 1 }: { level?: number }) {
         /* 仕草の切り替えはふわっと。歩行のコマ送りは瞬時でないと足がぼやける */
         .frenchie-pose { transition: opacity 200ms ease; }
         .frenchie-walking .frenchie-pose { transition: none; }
+
+        /* ウインク：ためて、顔を寄せながら跳ね、もう一度小さく弾んで戻る。
+           入りがゆっくりだと前の絵と重なって二重写しになるので短く切り替える */
+        .frenchie-gesture { transition: opacity 90ms ease; }
+        @keyframes frenchie-wink {
+          0%, 10%  { transform: translateY(0)    rotate(0deg)    scale(1, 1); }
+          20%      { transform: translateY(2px)  rotate(0deg)    scale(1.05, 0.94); }
+          36%      { transform: translateY(-7px) rotate(-6deg)   scale(0.97, 1.05); }
+          52%      { transform: translateY(0)    rotate(-3.5deg) scale(1, 1); }
+          66%      { transform: translateY(-4px) rotate(-5.5deg) scale(0.99, 1.02); }
+          80%      { transform: translateY(0)    rotate(-2.5deg) scale(1, 1); }
+          100%     { transform: translateY(0)    rotate(0deg)    scale(1, 1); }
+        }
+        .frenchie-wink {
+          transform-origin: 50% 92%;
+          animation: frenchie-wink ${WINK_MS}ms cubic-bezier(0.34, 1.2, 0.5, 1) both;
+        }
+
         @media (prefers-reduced-motion: reduce) {
           .frenchie-walking .frenchie-bob { animation: none; }
           .frenchie-pose { transition: none; }
+          .frenchie-wink { animation: none; }
         }
       `}</style>
 
@@ -218,6 +265,9 @@ export function WanderingFrenchie({ level = 1 }: { level?: number }) {
               // eslint-disable-next-line @next/next/no-img-element
               <img
                 key={pose}
+                ref={(node) => {
+                  poseNodes.current[pose] = node;
+                }}
                 src={POSES[pose]}
                 alt=""
                 width={300}
@@ -225,7 +275,7 @@ export function WanderingFrenchie({ level = 1 }: { level?: number }) {
                 decoding="async"
                 fetchPriority={pose === "stand" || pose === "walk" ? "high" : "low"}
                 draggable={false}
-                className={`frenchie-pose ${
+                className={`frenchie-pose ${GESTURE_POSES[pose] ? "frenchie-gesture" : ""} ${
                   pose === "stand" ? "block" : "absolute inset-0"
                 } h-auto w-full select-none`}
                 style={{ opacity: pose === activePose ? 1 : 0 }}
