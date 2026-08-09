@@ -45,6 +45,27 @@ async function currentUserId(): Promise<string | null> {
   return typeof sub === "string" ? sub : null;
 }
 
+async function registeredPlaceIds(userId: string): Promise<Set<string>> {
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from("spots")
+    .select("place_id")
+    .eq("created_by", userId)
+    .not("place_id", "is", null)
+    .limit(2000);
+
+  if (error) {
+    console.warn("Failed to load registered place ids", error.message);
+    return new Set();
+  }
+
+  return new Set(
+    (data ?? []).flatMap((spot) =>
+      typeof spot.place_id === "string" && spot.place_id.trim() ? [spot.place_id] : [],
+    ),
+  );
+}
+
 function validCoordinate(value: unknown, min: number, max: number): value is number {
   return typeof value === "number" && Number.isFinite(value) && value >= min && value <= max;
 }
@@ -103,6 +124,7 @@ export async function POST(request: Request) {
     return json({ error: "検索セッションが正しくありません。" }, 400);
   }
 
+  const excludedPlaceIds = await registeredPlaceIds(userId);
   const latitude = body.near?.latitude;
   const longitude = body.near?.longitude;
   const origin =
@@ -166,6 +188,7 @@ export async function POST(request: Request) {
               },
             ];
           })
+          .filter((place) => !excludedPlaceIds.has(place.placeId))
           .sort((a, b) => {
             if (a.distanceMeters === null) return 1;
             if (b.distanceMeters === null) return -1;
@@ -253,6 +276,7 @@ export async function POST(request: Request) {
         },
       ];
     })
+    .filter((place) => !excludedPlaceIds.has(place.placeId))
     .sort((a, b) => {
       if (a.distanceMeters === null) return 1;
       if (b.distanceMeters === null) return -1;
