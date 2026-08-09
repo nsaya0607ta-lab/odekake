@@ -2,8 +2,8 @@ import Link from "next/link";
 import { HomeLiveRefresh } from "@/components/home-live-refresh";
 import type { ExpProgress } from "@/lib/exp";
 
-/** public/characters/level-sign-clean.svg の viewBox 比（420×556）。 */
-const SIGN_ASPECT_RATIO = "420 / 556";
+/** 参照画像から作成した透過SVG（256×345）の比率。 */
+const SIGN_ASPECT_RATIO = "256 / 345";
 
 export function LevelTag({ progress }: { progress: ExpProgress }) {
   const nextLabel = progress.nextReward?.name ?? "すべて解放済み";
