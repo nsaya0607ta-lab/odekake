@@ -79,6 +79,21 @@ const GESTURE_POSES: Partial<Record<Pose, string>> = {
   wink: "frenchie-wink",
 };
 
+/**
+ * 素材ごとの描き位置のずれを打ち消す量（絵の幅に対する %）。
+ *
+ * walk.webp は胴体が stand.webp より 17px（300px 幅の 5.7%）左に描かれている。
+ * 上半身で重ねると差分が 0.106 → 0.035 まで落ちるので、絵柄の違いではなく
+ * キャンバス上の位置ずれ。そのまま入れ替えると 1歩ごとに犬全体が横に飛ぶので、
+ * 立ち姿を基準に踏み出しの絵を寄せて胴体を留める。前進ぶんは CSS の移動が持つ。
+ * 足元（下端）は全ポーズ揃っているので縦は触らない。
+ */
+const POSE_NUDGE_X: Partial<Record<Pose, number>> = {
+  walk: 5.7,
+  // stand-happy.webp も同じ 17px ずれ（横の描画範囲が walk と一致する）
+  happy: 5.7,
+};
+
 /** ウインクの動きの長さ（ms）。RESTS の最短より短くして必ず出し切る */
 const WINK_MS = 1000;
 
@@ -299,7 +314,10 @@ export function WanderingFrenchie({ level = 1 }: { level?: number }) {
                   className={`frenchie-pose ${GESTURE_POSES[pose] ? "frenchie-gesture" : ""} ${
                     pose === "stand" ? "block" : "absolute inset-0"
                   } h-auto w-full select-none`}
-                  style={{ opacity: pose === activePose ? 1 : 0 }}
+                  style={{
+                    opacity: pose === activePose ? 1 : 0,
+                    transform: POSE_NUDGE_X[pose] ? `translateX(${POSE_NUDGE_X[pose]}%)` : undefined,
+                  }}
                 />
               ))}
             </div>
