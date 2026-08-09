@@ -32,7 +32,7 @@ export default async function AddPage() {
               href="/spots/new"
               icon={<IconMapPin size={24} />}
               title="行った場所を登録"
-              description="場所・訪問日・感想・写真を、まとめて登録します"
+              description="普段のお出かけとして、場所・訪問日・感想・写真を登録します"
               tone="sky"
             />
           </li>
@@ -50,7 +50,7 @@ export default async function AddPage() {
               href="/trips/new"
               icon={<IconFlag size={24} />}
               title="旅行の計画を立てる"
-              description="日程や表紙を決めて、訪問記録を旅行ごとにまとめます"
+              description="旅行名・日程・表紙など、旅行の予定をスポット記録とは別に作成します"
               tone="leaf"
             />
           </li>
