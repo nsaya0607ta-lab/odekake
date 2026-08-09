@@ -15,7 +15,7 @@ export default async function NewVisitPage({
 }: {
   searchParams: Promise<{ spot?: string; trip?: string; created?: string }>;
 }) {
-  const [{ supabase, user }, { spot: spotId, trip: tripId, created }] = await Promise.all([
+  const [{ supabase, user }, { spot: spotId, trip: requestedTripId, created }] = await Promise.all([
     requireUser(),
     searchParams,
   ]);
@@ -26,10 +26,18 @@ export default async function NewVisitPage({
   if (!spot) notFound();
 
   const space = await getRecordSpace(supabase, user.id);
-  const initialTrips = await getTripOptions(supabase, space.tripIds);
-  const personalRecordTrip =
-    initialTrips.length === 0 ? await ensurePersonalRecordTrip(supabase, user.id) : null;
-  const trips = personalRecordTrip ? [personalRecordTrip] : initialTrips;
+  const [plannedTrips, personalRecordTrip] = await Promise.all([
+    getTripOptions(supabase, space.tripIds),
+    ensurePersonalRecordTrip(supabase, user.id),
+  ]);
+  const trips = [
+    ...(personalRecordTrip ? [{ ...personalRecordTrip, title: "お出かけ" }] : []),
+    ...plannedTrips.map((trip) => ({ ...trip, title: `旅行｜${trip.title}` })),
+  ];
+  const initialTripId =
+    requestedTripId && trips.some((trip) => trip.id === requestedTripId)
+      ? requestedTripId
+      : (personalRecordTrip?.id ?? trips[0]?.id ?? "");
 
   return (
     <>
@@ -49,7 +57,7 @@ export default async function NewVisitPage({
           trips={trips}
           defaults={{
             visitedAt: todayInJapan(),
-            tripId: tripId ?? trips[0]?.id ?? "",
+            tripId: initialTripId,
             rating: 0,
             comment: "",
             note: "",

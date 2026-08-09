@@ -21,14 +21,18 @@ export default async function NewSpotPage({
     searchParams,
   ]);
   const space = await getRecordSpace(supabase, user.id);
-  const [categoryNames, initialTripOptions] = await Promise.all([
+  const [categoryNames, plannedTrips, personalRecordTrip] = await Promise.all([
     loadCategoryNames(supabase),
     getTripOptions(supabase, space.tripIds),
+    ensurePersonalRecordTrip(supabase, user.id),
   ]);
 
-  const personalRecordTrip =
-    initialTripOptions.length === 0 ? await ensurePersonalRecordTrip(supabase, user.id) : null;
-  const tripOptions = personalRecordTrip ? [personalRecordTrip] : initialTripOptions;
+  // 「お出かけ」と、ユーザーが作った「旅行計画」を見た目でも明確に分ける。
+  // 通常のスポット登録は旅行へ自動分類せず、常設のお出かけ保存先を既定にする。
+  const tripOptions = [
+    ...(personalRecordTrip ? [{ ...personalRecordTrip, title: "お出かけ" }] : []),
+    ...plannedTrips.map((trip) => ({ ...trip, title: `旅行｜${trip.title}` })),
+  ];
   const trips = requestedTripId
     ? [...tripOptions].sort((a, b) => Number(b.id === requestedTripId) - Number(a.id === requestedTripId))
     : tripOptions;
@@ -39,7 +43,7 @@ export default async function NewSpotPage({
       <PageHeader title="行った場所を登録" />
       <PageBody>
         <p className="rounded-2xl bg-leaf-soft px-4 py-3 text-xs leading-relaxed text-leaf-deep">
-          場所と訪問日・感想・写真を一度に保存します。登録すると日本地図にも反映されます。
+          普段のお出かけは「お出かけ」へ保存します。作成済みの旅行に行った記録だけ、記録先で旅行を選べます。
         </p>
         <SpotForm
           placeSearchEnabled={Boolean(process.env.GOOGLE_PLACES_API_KEY?.trim())}
