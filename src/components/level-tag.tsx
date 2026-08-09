@@ -27,7 +27,7 @@ export function LevelTag({ progress }: { progress: ExpProgress }) {
         />
 
         <span
-          className="absolute flex flex-col items-center text-center"
+          className="absolute flex flex-col items-center justify-center text-center"
           style={{ left: "20%", right: "20%", top: "19%", bottom: "23%" }}
         >
           <span className="block w-full whitespace-nowrap text-[7px] font-bold tracking-[0.03em] text-[#67523a]">
