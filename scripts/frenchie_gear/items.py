@@ -131,6 +131,14 @@ def sky_bandana(pose: str, m: Masks) -> Layer:
 
 # ---------------------------------------------------------------- くびわ
 
+# 飾りの色。バンダナ（淡い緑や水色）の上でも沈まない明るさに寄せてある
+CHARM_FILL = {
+    "leaf": (198, 222, 148, 255),
+    "sun": (244, 196, 122, 255),
+    "star": (248, 214, 108, 255),
+}
+
+
 def _collar(pose: str, m: Masks, body: tuple[int, int, int], charm: str) -> Layer:
     """バンダナの襟もとをなぞって首輪を巻く。バンダナと一緒に着けても喧嘩しない。"""
     neck = m["neck"]
@@ -155,35 +163,47 @@ def _collar(pose: str, m: Masks, body: tuple[int, int, int], charm: str) -> Laye
     gloss = R.band(CANVAS, edge, (255, 255, 255, 60), offset=-thickness * 0.72, thickness=thickness * 0.3)
     layer = R.stamp(layer, gloss)
 
-    # 飾りは襟もとのいちばん下がったところに提げる
+    # 飾りは襟もとのいちばん下がったところに提げる。
+    # バンダナと色が近いと消えてしまうので、どの飾りも一段暗い縁を先に敷いてから塗る
     low = max(keep, key=lambda x: edge[x])
     big, d = R._canvas(CANVAS)
-    cx, cy = low * R.SS, (edge[low] + thickness * 0.1) * R.SS
-    r = thickness * 0.62 * R.SS
-    ring = (226, 218, 200, 255)
-    d.ellipse([cx - r * 0.34, cy - r * 0.6, cx + r * 0.34, cy + r * 0.25], outline=ring, width=max(1, int(r * 0.2)))
-    cy += r * 0.85
+    cx, cy = low * R.SS, (edge[low] + thickness * 0.15) * R.SS
+    r = thickness * 0.82 * R.SS
+    ring = (214, 204, 182, 255)
+    d.ellipse([cx - r * 0.3, cy - r * 0.55, cx + r * 0.3, cy + r * 0.3], outline=ring, width=max(1, int(r * 0.18)))
+    cy += r * 0.95
+    edge_color = (74, 62, 48, 235)
+
+    def stroked(points_for) -> None:
+        d.polygon(points_for(1.34), fill=edge_color)
+        d.polygon(points_for(1.0), fill=CHARM_FILL[charm])
+
     if charm == "leaf":
-        d.polygon(
-            [(cx, cy - r), (cx + r * 0.72, cy), (cx, cy + r), (cx - r * 0.72, cy)],
-            fill=(150, 190, 110, 255),
-        )
-        d.line([(cx, cy - r * 0.75), (cx, cy + r * 0.75)], fill=(112, 152, 84, 255), width=max(1, int(r * 0.16)))
+        stroked(lambda k: [(cx, cy - r * k), (cx + r * 0.74 * k, cy), (cx, cy + r * k), (cx - r * 0.74 * k, cy)])
+        d.line([(cx, cy - r * 0.7), (cx, cy + r * 0.7)], fill=(104, 146, 78, 255), width=max(1, int(r * 0.2)))
     elif charm == "sun":
-        d.ellipse([cx - r, cy - r, cx + r, cy + r], fill=(242, 192, 120, 255))
-        d.arc([cx - r * 0.62, cy - r * 0.5, cx + r * 0.62, cy + r * 0.74], 190, 350, fill=(226, 140, 96, 255), width=max(1, int(r * 0.3)))
+        d.ellipse([cx - r * 1.28, cy - r * 1.28, cx + r * 1.28, cy + r * 1.28], fill=edge_color)
+        d.ellipse([cx - r, cy - r, cx + r, cy + r], fill=CHARM_FILL[charm])
+        d.arc(
+            [cx - r * 0.62, cy - r * 0.5, cx + r * 0.62, cy + r * 0.74],
+            190, 350, fill=(222, 132, 88, 255), width=max(1, int(r * 0.3)),
+        )
     else:  # star
-        pts = []
-        for k in range(10):
-            a = math.radians(k * 36 - 90)
-            rr = r if k % 2 == 0 else r * 0.44
-            pts.append((cx + math.cos(a) * rr, cy + math.sin(a) * rr))
-        d.polygon(pts, fill=(240, 208, 110, 255))
+        def star(k: float) -> list[tuple[float, float]]:
+            pts = []
+            for i in range(10):
+                a = math.radians(i * 36 - 90)
+                rr = (r if i % 2 == 0 else r * 0.46) * k
+                pts.append((cx + math.cos(a) * rr, cy + math.sin(a) * rr))
+            return pts
+
+        stroked(star)
     return R.stamp(layer, R._shrink(big, CANVAS))
 
 
 def leaf_collar(pose: str, m: Masks) -> Layer:
-    return _collar(pose, m, (92, 142, 74), "leaf")
+    # バンダナと同系色なので、帯はぐっと深い緑にして輪郭を立てる
+    return _collar(pose, m, (66, 106, 62), "leaf")
 
 
 def sunset_collar(pose: str, m: Masks) -> Layer:
