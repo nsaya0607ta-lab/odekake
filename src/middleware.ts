@@ -38,6 +38,13 @@ export async function middleware(request: NextRequest) {
     return NextResponse.redirect(url);
   }
 
+  // iPhoneショートカットはSupabaseのログインCookieを持たない。
+  // /api/steps/sync はroute側でBearer連携キーを検証するため、
+  // ここでは認証処理もログイン画面へのリダイレクトも行わない。
+  if (pathname === "/api/steps/sync") {
+    return NextResponse.next();
+  }
+
   let response = NextResponse.next({ request });
 
   const supabase = createServerClient(env.url, env.anonKey, {
