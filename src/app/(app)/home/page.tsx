@@ -10,6 +10,7 @@ import {
 import { TopHeader } from "@/components/page-header";
 import { PageBody } from "@/components/page-body";
 import { LevelTag } from "@/components/level-tag";
+import { TodayStepsCard } from "@/components/today-steps-card";
 import { EmptyState, LinkRow, formatDate } from "@/components/ui";
 import { WanderingFrenchie } from "@/components/wandering-frenchie";
 import { loadAreaIndex } from "@/lib/data/areas";
@@ -164,23 +165,10 @@ export default async function HomePage({ searchParams }: { searchParams: Promise
             <div className="flex h-10 items-center px-1">
               <h2 className="truncate text-base font-bold">今日の歩数</h2>
             </div>
-            <div className="rough-card flex h-full min-h-0 flex-col items-center justify-center overflow-hidden bg-sun-soft/45 p-4 text-center">
-              <span className="flex h-14 w-14 shrink-0 items-center justify-center rounded-full border border-[#e8d4aa] bg-card text-2xl shadow-sm">
-                👟
-              </span>
-              <p className="mt-3 whitespace-nowrap text-xs text-ink-soft">今日のおでかけ</p>
-              <p className="mt-1 flex items-baseline justify-center gap-1 whitespace-nowrap text-ink">
-                <span className="text-3xl font-bold tabular-nums">
-                  {expDashboard.todaySteps === null ? "—" : expDashboard.todaySteps.toLocaleString("ja-JP")}
-                </span>
-                <span className="text-xs text-ink-soft">歩</span>
-              </p>
-              <p className="mt-3 whitespace-nowrap text-[10px] text-ink-faint">
-                {expDashboard.todaySteps === null
-                  ? "ヘルスケア連携前"
-                  : `今日の歩数EXP +${expDashboard.todayStepExp}`}
-              </p>
-            </div>
+            <TodayStepsCard
+              initialSteps={expDashboard.todaySteps}
+              initialStepExp={expDashboard.todayStepExp}
+            />
           </section>
         </div>
 
