@@ -2,8 +2,15 @@ import Link from "next/link";
 import { HomeLiveRefresh } from "@/components/home-live-refresh";
 import type { ExpProgress } from "@/lib/exp";
 
-/** 参照画像から作成した透過SVG（256×345）の比率。 */
-const SIGN_ASPECT_RATIO = "256 / 345";
+/** 元の看板画像（420×556）の比率。 */
+const SIGN_ASPECT_RATIO = "420 / 556";
+
+/**
+ * 元画像の看板本体・葉・草花だけをなぞったシルエット。
+ * PNGに焼き込まれた外周の影はこの範囲外になるため描画されない。
+ */
+const SIGN_CLIP_PATH =
+  "M 8 59 L 7 60 L 7 68 L 8 69 L 10 79 L 18 88 L 27 91 L 26 92 L 21 92 L 20 91 L 21 92 L 20 93 L 14 95 L 9 100 L 7 103 L 3 115 L 3 119 L 4 121 L 11 120 L 12 119 L 22 118 L 29 114 L 33 109 L 34 110 L 34 113 L 33 114 L 33 144 L 32 145 L 33 146 L 32 148 L 33 153 L 32 154 L 32 185 L 31 186 L 32 188 L 31 189 L 32 190 L 31 192 L 32 195 L 31 197 L 32 198 L 31 199 L 31 226 L 30 227 L 31 229 L 30 230 L 30 239 L 31 240 L 30 241 L 30 278 L 29 279 L 30 283 L 29 284 L 29 314 L 28 315 L 29 318 L 28 321 L 29 322 L 28 323 L 28 354 L 27 355 L 26 426 L 27 427 L 27 431 L 30 440 L 34 447 L 40 454 L 49 460 L 51 460 L 54 462 L 57 462 L 58 463 L 68 463 L 69 464 L 65 472 L 65 476 L 63 478 L 63 481 L 60 490 L 58 493 L 58 496 L 56 499 L 50 518 L 48 520 L 44 514 L 45 513 L 44 514 L 41 511 L 42 510 L 40 511 L 36 509 L 34 511 L 35 513 L 34 518 L 35 516 L 38 525 L 37 526 L 36 525 L 37 526 L 36 527 L 30 524 L 24 524 L 21 526 L 21 528 L 33 540 L 28 542 L 27 544 L 35 548 L 44 548 L 45 549 L 54 549 L 55 550 L 61 550 L 65 548 L 72 548 L 73 549 L 91 549 L 101 545 L 104 542 L 106 538 L 106 535 L 109 526 L 111 523 L 111 520 L 114 512 L 115 511 L 119 511 L 120 512 L 124 511 L 125 512 L 191 512 L 192 513 L 191 514 L 192 515 L 191 517 L 192 521 L 195 524 L 198 524 L 199 525 L 229 525 L 232 524 L 235 520 L 235 513 L 236 512 L 314 512 L 315 513 L 322 513 L 323 514 L 330 544 L 333 547 L 341 551 L 361 551 L 362 550 L 365 550 L 369 552 L 383 551 L 384 550 L 385 551 L 389 551 L 390 550 L 398 550 L 406 545 L 408 543 L 408 540 L 402 539 L 401 538 L 408 528 L 406 525 L 402 525 L 396 527 L 389 532 L 388 530 L 390 526 L 390 523 L 392 520 L 394 521 L 393 522 L 394 521 L 398 522 L 401 521 L 404 518 L 405 516 L 405 511 L 406 510 L 405 511 L 404 509 L 407 508 L 409 506 L 410 501 L 407 496 L 405 495 L 400 495 L 398 492 L 398 490 L 393 487 L 388 488 L 385 491 L 383 495 L 379 493 L 379 494 L 376 496 L 374 493 L 372 487 L 372 484 L 371 483 L 371 480 L 370 479 L 370 476 L 368 472 L 368 468 L 369 467 L 368 468 L 367 467 L 368 465 L 381 465 L 382 464 L 387 464 L 398 459 L 402 456 L 410 446 L 414 437 L 415 429 L 416 428 L 416 384 L 415 383 L 416 382 L 416 371 L 415 370 L 416 368 L 415 366 L 415 292 L 414 291 L 415 290 L 415 284 L 414 283 L 415 282 L 414 279 L 414 276 L 415 275 L 414 272 L 414 101 L 413 100 L 413 96 L 414 95 L 413 94 L 413 84 L 412 83 L 412 79 L 409 70 L 404 62 L 394 53 L 380 47 L 373 47 L 372 46 L 306 46 L 305 45 L 291 45 L 289 43 L 289 36 L 288 35 L 285 12 L 283 8 L 277 4 L 260 4 L 259 5 L 255 5 L 248 10 L 245 15 L 245 38 L 246 39 L 245 40 L 245 43 L 246 44 L 245 45 L 203 45 L 202 44 L 203 43 L 203 38 L 204 37 L 204 32 L 205 31 L 205 26 L 206 25 L 206 12 L 202 6 L 195 3 L 179 3 L 174 5 L 167 11 L 164 19 L 164 22 L 163 23 L 161 34 L 159 38 L 159 41 L 157 45 L 132 45 L 131 46 L 78 46 L 77 47 L 68 48 L 59 52 L 53 56 L 46 63 L 39 75 L 38 74 L 39 71 L 38 72 L 30 63 L 23 60 Z";
 
 export function LevelTag({ progress }: { progress: ExpProgress }) {
   const nextLabel = progress.nextReward?.name ?? "すべて解放済み";
@@ -17,15 +24,28 @@ export function LevelTag({ progress }: { progress: ExpProgress }) {
         className="absolute top-4 right-4 z-10 block w-[32%] min-w-[106px] max-w-[126px] active:scale-[0.98] sm:max-w-[130px]"
         style={{ aspectRatio: SIGN_ASPECT_RATIO, boxShadow: "none" }}
       >
-        {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img
-          src="/characters/level-sign-clean.svg"
-          alt=""
+        <svg
           aria-hidden="true"
-          draggable={false}
-          className="pointer-events-none absolute inset-0 h-full w-full select-none shadow-none"
-          style={{ boxShadow: "none", filter: "none" }}
-        />
+          viewBox="0 0 420 556"
+          preserveAspectRatio="none"
+          className="pointer-events-none absolute inset-0 h-full w-full select-none overflow-visible"
+          style={{ filter: "none", boxShadow: "none" }}
+        >
+          <defs>
+            <clipPath id="level-sign-silhouette" clipPathUnits="userSpaceOnUse">
+              <path d={SIGN_CLIP_PATH} />
+            </clipPath>
+          </defs>
+          <image
+            href="/characters/level-sign.png"
+            x="0"
+            y="0"
+            width="420"
+            height="556"
+            preserveAspectRatio="none"
+            clipPath="url(#level-sign-silhouette)"
+          />
+        </svg>
 
         <span
           className="absolute flex flex-col items-center justify-center text-center"
