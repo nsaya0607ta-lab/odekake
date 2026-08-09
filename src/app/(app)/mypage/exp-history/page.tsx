@@ -1,4 +1,5 @@
-import { IconStar } from "@/components/icons";
+import Link from "next/link";
+import { IconChevronRight, IconStar } from "@/components/icons";
 import { PageBody } from "@/components/page-body";
 import { PageHeader } from "@/components/page-header";
 import { getExpHistory } from "@/lib/data/exp";
@@ -64,6 +65,20 @@ export default async function ExpHistoryPage() {
               : "Lv.30の報酬まですべて解放済みです"}
           </p>
         </section>
+
+        <Link
+          href="/mypage/gear"
+          className="rough-card flex items-center gap-3 p-4 active:scale-[0.99]"
+        >
+          <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-leaf-soft text-lg">
+            🎒
+          </span>
+          <span className="min-w-0 flex-1">
+            <span className="block text-sm font-bold">獲得したアクセサリー・称号を見る</span>
+            <span className="mt-0.5 block text-[11px] text-ink-soft">「そうび」で装着できます</span>
+          </span>
+          <IconChevronRight size={18} className="shrink-0 text-ink-faint" />
+        </Link>
 
         <section>
           <h2 className="mb-2 px-1 text-sm font-bold">獲得したEXP</h2>

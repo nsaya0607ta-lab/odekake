@@ -163,6 +163,16 @@ export type CoinEventRow = {
   updated_at: string;
 };
 
+/** レベルアップ報酬のうち装着できるもの（首輪・バンダナ・帽子・リュック・クラウン・称号） */
+export type EquipmentSlot = "collar" | "bandana" | "hat" | "backpack" | "crown" | "title";
+
+export type UserEquipmentRow = {
+  user_id: string;
+  slot: EquipmentSlot;
+  level: number;
+  updated_at: string;
+};
+
 export type DailyStepsRow = {
   user_id: string;
   step_date: string;
@@ -253,6 +263,12 @@ export type Database = {
         Update: Partial<CoinEventRow>;
         Relationships: [];
       };
+      user_equipment: {
+        Row: UserEquipmentRow;
+        Insert: Partial<UserEquipmentRow> & { user_id: string; slot: EquipmentSlot; level: number };
+        Update: Partial<UserEquipmentRow>;
+        Relationships: [];
+      };
       daily_steps: {
         Row: DailyStepsRow;
         Insert: Partial<DailyStepsRow> & { user_id: string; step_date: string; steps: number };
@@ -290,6 +306,7 @@ export type Database = {
         Returns: number;
       };
       revoke_steps_sync_token: { Args: Record<string, never>; Returns: undefined };
+      set_equipped_item: { Args: { p_slot: string; p_level: number | null }; Returns: undefined };
     };
     Enums: {
       location_source: LocationSource;

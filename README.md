@@ -63,7 +63,7 @@ node scripts/verify-supabase.mjs  # 実 Supabase プロジェクトでの動作�
 ```
 
 `verify-rls.sh` は、素の PostgreSQL に Supabase 相当の土台を作って
-`supabase/migrations/*.sql` を適用し、公開範囲とアプリが前提にしている挙動を105項目確認します。
+`supabase/migrations/*.sql` を適用し、公開範囲とアプリが前提にしている挙動を118項目確認します。
 `verify-supabase.mjs` は、新規登録・確認メール・ログイン・公開範囲・写真・アカウント削除を
 実際のプロジェクトに対して順に確認します。
 
@@ -84,6 +84,7 @@ node scripts/verify-supabase.mjs  # 実 Supabase プロジェクトでの動作�
 | お気に入り / また行きたい場所 | `/mypage/favorites` `/mypage/wishlist` |
 | おでかけレベル・EXP履歴 | `/mypage/exp-history` |
 | おでかけコイン | `/mypage/coins` |
+| そうび（獲得したアクセサリー・称号） | `/mypage/gear` |
 | マイページ | `/mypage` `/mypage/profile` `/mypage/account` |
 
 ログイン後の主要画面には、画面下部に「ホーム / 地図 / 追加 / 記録 / マイページ」の固定ナビゲーションを表示します。
@@ -156,7 +157,23 @@ node scripts/build-municipality-paths.mjs path/to/N03-21_210101.json src/lib/geo
 - 付与量は `src/lib/coins.ts` と `supabase/migrations/0011_odekake_coins.sql` の両方に書いてあります。
   変えるときは必ず両方を揃えてください。
 - コインを使う機能（ガチャ・ショップ・着せ替え）はまだありません。コイン画面のガチャ／ショップは
-  カード（見た目）だけで、ボタンは押せません。「必要コイン」は解放にいくら必要かの目安表示です。
+  カード（見た目）だけで、ボタンは押せません。レベルアップ報酬の解放にコインは要りません
+  （レベルに到達すれば自動で解放されます）。
+
+## そうび（レベルアップ報酬の確認・装着）
+
+Lv.2〜30のレベルアップ報酬（`src/lib/exp.ts` の `LEVEL_REWARDS`）のうち、
+種類が `accessory`（首輪・バンダナ・帽子・リュック・クラウン）と `title`（称号）のものは、
+`/mypage/gear`（「そうび」画面）でいつでも見返して、装着・解除できます。
+
+- 首輪・バンダナ・帽子・リュック・クラウンは1スロットに1つだけ装着できます。称号も同時に1つです。
+- 装着・解除は `supabase/migrations/0012_user_equipment.sql` の `set_equipped_item()`
+  （SECURITY DEFINER の RPC）が行い、そのレベルに到達していない報酬は装着できません。
+- **犬の絵そのものはまだ着せ替えできません**（各ポーズの絵は固定の1枚絵で、素材を持っていないため）。
+  装着中のものは、この画面のプレビューにアイコンとして表示するだけです。
+- モーション・表情（`kind: "motion" | "expression"`）は装着の操作なしに、解放済みならおさんぽ中の
+  フレブルが自動で使います。お部屋（`kind: "room"`）は今後のお部屋づくり機能で使う想定で、
+  いまは一覧に出るだけです。
 
 ## データ構造と公開範囲
 
@@ -211,6 +228,6 @@ trips/{trip_id}/visits/{visit_record_id}/
 - 共有旅（複数人での記録の共有）。第4版で廃止しました
 - SNS 公開、いいね、フォロー、一般公開プロフィール、バッジ
 
-直近の変更内容は [`docs/changes-5.md`](docs/changes-5.md) と
-[`docs/changes-4.md`](docs/changes-4.md) に、
+直近の変更内容は [`docs/changes-6.md`](docs/changes-6.md) と
+[`docs/changes-5.md`](docs/changes-5.md) に、
 そのほかの制限事項は [`docs/notes.md`](docs/notes.md) にまとめています。

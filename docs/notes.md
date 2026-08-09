@@ -114,7 +114,7 @@
 
 | 場所 | 内容 |
 | --- | --- |
-| `src/lib/coins.ts` | 画面表示に使う付与量・必要コイン |
+| `src/lib/coins.ts` | 画面表示に使う付与量 |
 | `supabase/migrations/0011_odekake_coins.sql` | 実際に付与するときの計算（`coin_level_up_reward()` / `calculate_step_coins()`） |
 
 レベルの段階（`LEVEL_THRESHOLDS`）も同じ理由で、`src/lib/exp.ts` と
@@ -123,8 +123,24 @@
 EXPが減ってレベルが下がっても、一度もらったコインは戻しません（付与キーが `level:{レベル}`
 なので、同じレベルで再度もらうこともありません）。
 
-コインを使う画面（ショップ）はまだありません。画面に出る「必要コイン」は目安の表示で、
-報酬の解放は今までどおりレベルで決まります。詳しくは [`changes-5.md`](changes-5.md) を参照してください。
+レベルアップ報酬（アクションや見た目の解放）はレベルに到達すれば自動で解放され、
+コインは要りません。コインを使う画面（ショップ）はまだなく、いまはもらうだけの仕組みです。
+詳しくは [`changes-5.md`](changes-5.md) を参照してください。
+
+## そうび（レベルアップ報酬のアクセサリー・称号）
+
+`/mypage/gear` で、解放済みのアクセサリー・称号を見返し、装着・解除できます
+（`supabase/migrations/0012_user_equipment.sql`）。
+
+**犬の絵そのものは着せ替えできません。** 各ポーズの絵（`public/characters/frenchie/*.webp`）は
+差し替え用の素材を持たない固定の1枚絵のため、装着中のものは「そうび」画面のプレビューに
+アイコンを重ねて表示するだけです。ホーム画面のフレブルの見た目は変わりません。称号（文言）
+だけは実際に画面表示へ反映されます。
+
+スロットとレベルの対応（`src/lib/equipment.ts` の `SLOT_BY_LEVEL`）は、
+`supabase/migrations/0012_user_equipment.sql` の `equipment_slot_of()` と同じ内容です。
+アクセサリー・称号のレベルを変えるときは両方を揃えてください。詳しくは
+[`changes-6.md`](changes-6.md) を参照してください。
 
 ## 動作確認について
 
@@ -134,9 +150,9 @@ Supabase プロジェクトに接続した状態での実行確認は行って�
 代わりに、次の2つを用意しています。
 
 ```bash
-./scripts/verify-rls.sh          # ローカル PostgreSQL で RLS・RPC を検証（105項目）
+./scripts/verify-rls.sh          # ローカル PostgreSQL で RLS・RPC を検証（118項目）
 node scripts/verify-supabase.mjs # 実 Supabase プロジェクトでの動作確認
 ```
 
 型チェック・ESLint・本番ビルドは通っています。
-詳細は [`changes-5.md`](changes-5.md) と [`changes-4.md`](changes-4.md) を参照してください。
+詳細は [`changes-6.md`](changes-6.md) と [`changes-5.md`](changes-5.md) を参照してください。

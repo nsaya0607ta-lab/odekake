@@ -1,4 +1,4 @@
-import { LEVEL_REWARDS, LEVEL_THRESHOLDS, type LevelReward } from "@/lib/exp";
+import { LEVEL_THRESHOLDS } from "@/lib/exp";
 
 /**
  * おでかけコインの付与量。
@@ -29,17 +29,6 @@ export const STEP_COIN_TIERS = [
 /** 1日にもらえる歩数コインの上限 */
 export const MAX_DAILY_STEP_COINS = 70;
 
-/** 報酬を解放するのに必要なコイン（到達レベルごとの帯） */
-export const UNLOCK_COST_BANDS = [
-  { maxLevel: 5, coins: 1000 },
-  { maxLevel: 10, coins: 1500 },
-  { maxLevel: 15, coins: 2000 },
-  { maxLevel: 20, coins: 2500 },
-  { maxLevel: 25, coins: 3000 },
-  { maxLevel: 29, coins: 3500 },
-  { maxLevel: 30, coins: 5000 },
-] as const;
-
 const MAX_LEVEL = LEVEL_THRESHOLDS.length;
 
 function bandCoins(bands: readonly { maxLevel: number; coins: number }[], level: number): number {
@@ -63,17 +52,6 @@ export function getStepCoins(steps: number | null | undefined): number {
     0,
   );
   return Math.min(MAX_DAILY_STEP_COINS, total);
-}
-
-/** その報酬を解放するのに必要なコイン */
-export function getUnlockCost(reward: LevelReward | null | undefined): number {
-  if (!reward) return 0;
-  return bandCoins(UNLOCK_COST_BANDS, reward.level);
-}
-
-/** Lv.2〜30 をすべて解放するのに必要なコインの合計 */
-export function getTotalUnlockCost(): number {
-  return LEVEL_REWARDS.reduce((sum, reward) => sum + getUnlockCost(reward), 0);
 }
 
 export function formatCoins(coins: number): string {
