@@ -105,6 +105,27 @@
 旅ワークスペース（開いている旅を Cookie に保存して切り替える仕組み）は、
 共有旅の廃止にあわせて削除しました。記録の置き場所はひとつだけです。
 
+## おでかけコイン
+
+コインは EXP と同じく、台帳（`coin_events`）と残高（`user_coins`）に保存します。
+もらえるのはレベルアップ報酬（到達レベルごとに1回）と歩数報酬（1日ごと・最大70枚）だけです。
+
+付与量の定義が2か所にあります。**変えるときは必ず両方を揃えてください。**
+
+| 場所 | 内容 |
+| --- | --- |
+| `src/lib/coins.ts` | 画面表示に使う付与量・必要コイン |
+| `supabase/migrations/0011_odekake_coins.sql` | 実際に付与するときの計算（`coin_level_up_reward()` / `calculate_step_coins()`） |
+
+レベルの段階（`LEVEL_THRESHOLDS`）も同じ理由で、`src/lib/exp.ts` と
+`exp_level_of()` の両方にあります。
+
+EXPが減ってレベルが下がっても、一度もらったコインは戻しません（付与キーが `level:{レベル}`
+なので、同じレベルで再度もらうこともありません）。
+
+コインを使う画面（ショップ）はまだありません。画面に出る「必要コイン」は目安の表示で、
+報酬の解放は今までどおりレベルで決まります。詳しくは [`changes-5.md`](changes-5.md) を参照してください。
+
 ## 動作確認について
 
 Supabase プロジェクトに接続した状態での実行確認は行っていません
@@ -113,9 +134,9 @@ Supabase プロジェクトに接続した状態での実行確認は行って�
 代わりに、次の2つを用意しています。
 
 ```bash
-./scripts/verify-rls.sh          # ローカル PostgreSQL で RLS・RPC を検証（73項目）
+./scripts/verify-rls.sh          # ローカル PostgreSQL で RLS・RPC を検証（105項目）
 node scripts/verify-supabase.mjs # 実 Supabase プロジェクトでの動作確認
 ```
 
 型チェック・ESLint・本番ビルドは通っています。
-詳細は [`changes-4.md`](changes-4.md) と [`changes-3.md`](changes-3.md) を参照してください。
+詳細は [`changes-5.md`](changes-5.md) と [`changes-4.md`](changes-4.md) を参照してください。

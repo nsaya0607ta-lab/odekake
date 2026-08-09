@@ -63,7 +63,7 @@ node scripts/verify-supabase.mjs  # 実 Supabase プロジェクトでの動作�
 ```
 
 `verify-rls.sh` は、素の PostgreSQL に Supabase 相当の土台を作って
-`supabase/migrations/*.sql` を適用し、公開範囲とアプリが前提にしている挙動を73項目確認します。
+`supabase/migrations/*.sql` を適用し、公開範囲とアプリが前提にしている挙動を105項目確認します。
 `verify-supabase.mjs` は、新規登録・確認メール・ログイン・公開範囲・写真・アカウント削除を
 実際のプロジェクトに対して順に確認します。
 
@@ -82,6 +82,8 @@ node scripts/verify-supabase.mjs  # 実 Supabase プロジェクトでの動作�
 | 旅行の作成・詳細・設定 | `/trips/new` `/trips/[tripId]` `/trips/[tripId]/settings` |
 | 記録（タイムライン / 旅行 / スポット / カレンダー） | `/records` |
 | お気に入り / また行きたい場所 | `/mypage/favorites` `/mypage/wishlist` |
+| おでかけレベル・EXP履歴 | `/mypage/exp-history` |
+| おでかけコイン | `/mypage/coins` |
 | マイページ | `/mypage` `/mypage/profile` `/mypage/account` |
 
 ログイン後の主要画面には、画面下部に「ホーム / 地図 / 追加 / 記録 / マイページ」の固定ナビゲーションを表示します。
@@ -138,6 +140,23 @@ node scripts/build-municipality-paths.mjs path/to/N03-21_210101.json src/lib/geo
 訪問記録は必ずどれかの旅行に属し、旅行を1つも持っていない利用者には
 「自分のおでかけ」が自動で1件だけ作られます。
 
+## おでかけコイン
+
+おでかけレベル（EXP）とは別に、コインがたまります。もらえるのは次の2つです。
+
+| もらい方 | 量 |
+| --- | --- |
+| レベルアップ報酬（到達レベルごとに1回） | Lv.2〜5 は100枚 / Lv.6〜10 は150枚 / Lv.11〜15 は200枚 / Lv.16〜20 は250枚 / Lv.21〜25 は300枚 / Lv.26〜29 は400枚 / Lv.30 は1,000枚 |
+| 歩数報酬（1日ごと・最大70枚） | 3,000歩で10枚、5,000歩で+10枚、8,000歩で+15枚、10,000歩で+15枚、15,000歩で+20枚 |
+
+- 残高はホーム右上のコインボタン（`/mypage/coins`）に出ます。
+- EXP と同じく、台帳 `coin_events` と残高 `user_coins` に保存します。
+  付与キー（`level:{レベル}` / `steps:{日付}`）で重複付与を防ぎ、歩数は同じ日の差分だけ動きます。
+- 付与量は `src/lib/coins.ts` と `supabase/migrations/0011_odekake_coins.sql` の両方に書いてあります。
+  変えるときは必ず両方を揃えてください。
+- コインを使う画面（ショップ）はまだありません。ホームと `/mypage/coins` に出る「必要コイン」は、
+  解放にいくら必要かの目安表示です。
+
 ## データ構造と公開範囲
 
 主なテーブルは `profiles` / `trips` / `spots` / `visit_records` / `visit_photos` /
@@ -191,6 +210,6 @@ trips/{trip_id}/visits/{visit_record_id}/
 - 共有旅（複数人での記録の共有）。第4版で廃止しました
 - SNS 公開、いいね、フォロー、一般公開プロフィール、バッジ
 
-直近の変更内容は [`docs/changes-4.md`](docs/changes-4.md) と
-[`docs/changes-3.md`](docs/changes-3.md) に、
+直近の変更内容は [`docs/changes-5.md`](docs/changes-5.md) と
+[`docs/changes-4.md`](docs/changes-4.md) に、
 そのほかの制限事項は [`docs/notes.md`](docs/notes.md) にまとめています。

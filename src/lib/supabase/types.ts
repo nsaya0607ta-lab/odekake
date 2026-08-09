@@ -141,6 +141,28 @@ export type ExpEventRow = {
   updated_at: string;
 };
 
+export type UserCoinsRow = {
+  user_id: string;
+  balance: number;
+  total_earned: number;
+  updated_at: string;
+};
+
+export type CoinEventRow = {
+  id: string;
+  user_id: string;
+  /** unlock は将来のショップ用（現在は付与しない） */
+  event_type: "level_up" | "steps" | "unlock";
+  /** 正の値が獲得、負の値が消費 */
+  amount: number;
+  idempotency_key: string;
+  level: number | null;
+  event_date: string | null;
+  metadata: Json;
+  created_at: string;
+  updated_at: string;
+};
+
 export type DailyStepsRow = {
   user_id: string;
   step_date: string;
@@ -212,6 +234,23 @@ export type Database = {
           idempotency_key: string;
         };
         Update: Partial<ExpEventRow>;
+        Relationships: [];
+      };
+      user_coins: {
+        Row: UserCoinsRow;
+        Insert: Partial<UserCoinsRow> & { user_id: string };
+        Update: Partial<UserCoinsRow>;
+        Relationships: [];
+      };
+      coin_events: {
+        Row: CoinEventRow;
+        Insert: Partial<CoinEventRow> & {
+          user_id: string;
+          event_type: CoinEventRow["event_type"];
+          amount: number;
+          idempotency_key: string;
+        };
+        Update: Partial<CoinEventRow>;
         Relationships: [];
       };
       daily_steps: {
