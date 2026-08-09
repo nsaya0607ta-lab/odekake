@@ -14,7 +14,7 @@ import numpy as np
 from PIL import Image, ImageDraw
 
 from . import render as R
-from .masks import CANVAS
+from .masks import CANVAS, load
 
 Layer = Image.Image
 Masks = dict[str, np.ndarray]
@@ -140,8 +140,50 @@ CHARM_FILL = {
 }
 
 
+def _feather(keep: list[int]) -> np.ndarray:
+    """帯の左右の端をなめらかに透明へ落とす重み（x座標ぶん、0〜1）。
+
+    端をまっすぐ切ると、頬や首の後ろでぶつ切りになって貼り付けて見える。
+    先端3割ほどをイーズで消し、実際の首輪が肉に沈んで見えなくなる感じに近づける。
+    """
+    weight = np.zeros(CANVAS[0])
+    n = len(keep)
+    fade = max(2, int(n * 0.32))
+    for i, x in enumerate(keep):
+        if i < fade:
+            t = i / fade
+        elif i >= n - fade:
+            t = (n - 1 - i) / fade
+        else:
+            t = 1.0
+        t = max(0.0, min(1.0, t))
+        weight[x] = t * t * (3 - 2 * t)
+    return weight
+
+
+def _fade_ends(layer: Layer, keep: list[int]) -> Layer:
+    weight = _feather(keep)
+    arr = np.asarray(layer).astype(float)
+    arr[..., 3] *= weight[np.newaxis, :]
+    return Image.fromarray(np.clip(arr, 0, 255).astype(np.uint8), "RGBA")
+
+
+def _clip_to_dog(layer: Layer, pose: str) -> Layer:
+    """犬の輪郭の外にはみ出した分を消す。首輪は犬の絵の中だけに収まる。"""
+    dog_alpha = np.asarray(load(pose))[..., 3] > 10
+    arr = np.asarray(layer).astype(float)
+    arr[..., 3] *= dog_alpha
+    return Image.fromarray(np.clip(arr, 0, 255).astype(np.uint8), "RGBA")
+
+
 def _collar(pose: str, m: Masks, body: tuple[int, int, int], charm: str) -> Layer:
-    """バンダナの襟もとをなぞって首輪を巻く。バンダナと一緒に着けても喧嘩しない。"""
+    """バンダナの結び目の少し上、あごとの間の細い隙間に首輪を通す。
+
+    バンダナの上端そのものを帯の下端にすると、首輪の下側がバンダナに食い込んで
+    「胸に貼り付けた」ように見える。なので帯は上端より確実に上（gap ぶん）だけに描き、
+    バンダナの生地には一切かからないようにする。あご下の余白は数px しかないので、
+    帯は薄く、範囲は首の正面だけに絞り、両端は頬の後ろへ溶けるようフェードする。
+    """
     neck = m["neck"]
     if not neck.any():
         return _empty()
@@ -149,34 +191,37 @@ def _collar(pose: str, m: Masks, body: tuple[int, int, int], charm: str) -> Laye
     xs = sorted(edge)
     if len(xs) < 12:
         return _empty()
-    # 端は肩へ回り込んでいるので落とす。首の正面だけに帯を残す
-    keep = xs[int(len(xs) * 0.12) : int(len(xs) * 0.88)]
+    # 首の正面だけを使う。肩や頬まで帯を伸ばすと「巻いた」より「貼った」に見える
+    keep = xs[int(len(xs) * 0.24) : int(len(xs) * 0.80)]
+    if len(keep) < 6:
+        keep = xs
     edge = {x: edge[x] for x in keep}
     width = keep[-1] - keep[0]
-    thickness = max(5.0, width * 0.13)
+    thickness = min(5.4, max(3.0, width * 0.05))
+    gap = max(1.3, thickness * 0.4)  # バンダナの生地から離す余白
 
     layer = _empty()
     # 縁を一段暗くしてから本体を重ねる。線画の犬の中で帯だけ平らだと浮く
-    outline = R.band(CANVAS, edge, (60, 52, 44, 120), offset=-thickness * 0.95, thickness=thickness * 1.35)
+    outline = R.band(
+        CANVAS, edge, (60, 52, 44, 130), offset=-(gap + thickness * 1.18), thickness=thickness * 1.3
+    )
     layer = R.stamp(layer, outline)
-    strap = R.band(CANVAS, edge, (*body, 252), offset=-thickness * 0.8, thickness=thickness)
+    strap = R.band(CANVAS, edge, (*body, 252), offset=-(gap + thickness), thickness=thickness)
     layer = R.stamp(layer, strap)
-    gloss = R.band(CANVAS, edge, (255, 255, 255, 60), offset=-thickness * 0.72, thickness=thickness * 0.3)
+    gloss = R.band(
+        CANVAS, edge, (255, 255, 255, 60), offset=-(gap + thickness * 0.86), thickness=thickness * 0.24
+    )
     layer = R.stamp(layer, gloss)
+    layer = _fade_ends(layer, keep)
 
-    # 飾りは襟もとのいちばん下がったところに提げる。
-    # バンダナと色が近いと消えてしまうので、どの飾りも一段暗い縁を先に敷いてから塗る
+    # 飾りは帯そのものにかかった小さなビーズ。帯より下へ垂らすと、また
+    # バンダナへ近づいてしまうので、帯の真ん中に乗せるだけにする
     low = max(keep, key=lambda x: edge[x])
     big, d = R._canvas(CANVAS)
-    cx, cy = low * R.SS, (edge[low] + thickness * 0.15) * R.SS
-    r = thickness * 0.82 * R.SS
-    ring = (214, 204, 182, 255)
-    d.ellipse([cx - r * 0.3, cy - r * 0.55, cx + r * 0.3, cy + r * 0.3], outline=ring, width=max(1, int(r * 0.18)))
-    cy += r * 0.95
+    cx = low * R.SS
+    cy = (edge[low] - gap - thickness * 0.5) * R.SS
+    r = thickness * 0.6 * R.SS
     edge_color = (74, 62, 48, 235)
-
-    # 飾りの形はどれも同じ丸いビーズにする。葉や星の輪郭にすると首輪ごとに
-    # 印象がばらつくので、色とハイライトの向きだけで書き分ける
     fill, glow = CHARM_FILL[charm]
     d.ellipse([cx - r * 1.28, cy - r * 1.28, cx + r * 1.28, cy + r * 1.28], fill=edge_color)
     d.ellipse([cx - r, cy - r, cx + r, cy + r], fill=fill)
@@ -184,7 +229,8 @@ def _collar(pose: str, m: Masks, body: tuple[int, int, int], charm: str) -> Laye
         [cx - r * 0.62, cy - r * 0.5, cx + r * 0.62, cy + r * 0.74],
         190, 350, fill=glow, width=max(1, int(r * 0.3)),
     )
-    return R.stamp(layer, R._shrink(big, CANVAS))
+    layer = R.stamp(layer, R._shrink(big, CANVAS))
+    return _clip_to_dog(layer, pose)
 
 
 def leaf_collar(pose: str, m: Masks) -> Layer:
