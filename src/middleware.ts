@@ -14,6 +14,9 @@ const PUBLIC_PATHS = [
   "/privacy",
   "/terms",
   "/manifest.webmanifest",
+  // iPhoneショートカットはSupabaseのログインCookieを持たない。
+  // このAPI自身がBearer連携キーを検証するため、middlewareでは公開扱いにする。
+  "/api/steps/sync",
 ];
 
 function isPublicPath(pathname: string) {
