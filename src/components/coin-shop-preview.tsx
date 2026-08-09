@@ -37,7 +37,7 @@ const SAMPLES: readonly ShopSample[] = [
       <>
         <span className={FLOOR} />
         <span className="absolute inset-x-0 bottom-[22%] h-px bg-[#e0cba4]" />
-        <img src="/characters/frenchie/lie.webp" alt="" className={DOG} draggable={false} />
+        <img src="/characters/frenchie/sleep.webp" alt="" className={DOG} draggable={false} />
       </>
     ),
     after: (
@@ -93,7 +93,7 @@ const SAMPLES: readonly ShopSample[] = [
         <span className="absolute inset-0 bg-gradient-to-b from-[#dfe6ea] to-[#cdd8de]" />
         <RainDrops />
         <img
-          src="/characters/frenchie/sit-side.webp"
+          src="/characters/frenchie/sit.webp"
           alt=""
           className={`${DOG} opacity-90 saturate-50`}
           draggable={false}
