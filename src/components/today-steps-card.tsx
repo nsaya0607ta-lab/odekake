@@ -19,6 +19,7 @@ export function TodayStepsCard({ initialSteps, initialStepExp }: Props) {
   const [steps, setSteps] = useState(initialSteps);
   const [stepExp, setStepExp] = useState(initialStepExp);
   const latestSteps = useRef(initialSteps);
+  const latestStepExp = useRef(initialStepExp);
 
   const refresh = useCallback(async () => {
     try {
@@ -28,8 +29,11 @@ export function TodayStepsCard({ initialSteps, initialStepExp }: Props) {
       const body = (await response.json()) as TodayStepsResponse;
       if (!body.ok) return;
 
-      const changed = body.todaySteps !== latestSteps.current || body.todayStepExp !== stepExp;
+      const changed =
+        body.todaySteps !== latestSteps.current || body.todayStepExp !== latestStepExp.current;
+
       latestSteps.current = body.todaySteps;
+      latestStepExp.current = body.todayStepExp;
       setSteps(body.todaySteps);
       setStepExp(body.todayStepExp);
 
@@ -38,7 +42,7 @@ export function TodayStepsCard({ initialSteps, initialStepExp }: Props) {
     } catch {
       // 一時的な通信失敗では現在表示を維持する。
     }
-  }, [router, stepExp]);
+  }, [router]);
 
   useEffect(() => {
     void refresh();
