@@ -46,6 +46,10 @@ const POSE_PROFILES: Record<string, PoseProfile> = {
 };
 
 const outline = "#5b4b38";
+const HAT_FIT = "translate(12 -14) scale(.9)";
+const CROWN_FIT = "translate(12 -2) scale(.9)";
+const NECK_FIT = "translate(19 61) scale(.83)";
+const BACK_FIT = "translate(35 30) scale(.78)";
 
 function Headwear({ level }: { level: number }) {
   if (level === 18) {
@@ -183,16 +187,20 @@ export function DogEquipment({ equipment, pose = "stand", className }: Props) {
     >
       <g style={{ filter: "drop-shadow(0 2px 1px rgb(91 75 56 / 0.18))" }}>
         {backpackLevel !== undefined ? (
-          <g transform={profile.back}><Backpack level={backpackLevel} /></g>
+          <g transform={profile.back}><g transform={BACK_FIT}><Backpack level={backpackLevel} /></g></g>
         ) : null}
         {neckLevel !== undefined ? (
           <g transform={profile.neck}>
-            {equipment.bandana !== undefined ? <Bandana level={neckLevel} /> : <Collar level={neckLevel} />}
+            <g transform={NECK_FIT}>
+              {equipment.bandana !== undefined ? <Bandana level={neckLevel} /> : <Collar level={neckLevel} />}
+            </g>
           </g>
         ) : null}
         {headLevel !== undefined ? (
           <g transform={profile.head}>
-            {equipment.crown !== undefined ? <Crown /> : <Headwear level={headLevel} />}
+            <g transform={equipment.crown !== undefined ? CROWN_FIT : HAT_FIT}>
+              {equipment.crown !== undefined ? <Crown /> : <Headwear level={headLevel} />}
+            </g>
           </g>
         ) : null}
       </g>
