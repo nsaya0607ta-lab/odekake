@@ -1,11 +1,11 @@
 "use client";
 
+import { useRouter } from "next/navigation";
 import { useCallback, useState } from "react";
 import type { EquipmentMap } from "@/lib/data/equipment";
-import { ACCESSORY_SLOTS, getSlotRewards, slotOfLevel, type EquipmentSlot } from "@/lib/equipment";
-import { ACCESSORY_REWARD_LEVELS, equipmentForLevel } from "@/lib/equipment-visuals";
+import { ACCESSORY_SLOTS, SLOT_LABELS, getSlotRewards, type EquipmentSlot } from "@/lib/equipment";
 import { LEVEL_REWARDS, type LevelReward } from "@/lib/exp";
-import { EquipmentItemImage, LayeredFrenchie } from "./layered-frenchie";
+import { GearIcon } from "./gear-art";
 import { IconCheck, IconLock } from "./icons";
 
 type Props = {
@@ -13,9 +13,8 @@ type Props = {
   initialEquipment: EquipmentMap;
 };
 
-const CONFIRMATION_LEVELS = [null, 4, 6, 9, 18, 25, 27, 30] as const;
-
 export function GearBoard({ currentLevel, initialEquipment }: Props) {
+  const router = useRouter();
   const [equipment, setEquipment] = useState<EquipmentMap>(initialEquipment);
   const [pendingSlot, setPendingSlot] = useState<EquipmentSlot | null>(null);
   const [errorSlot, setErrorSlot] = useState<EquipmentSlot | null>(null);
@@ -39,6 +38,7 @@ export function GearBoard({ currentLevel, initialEquipment }: Props) {
           body: JSON.stringify({ slot, level }),
         });
         if (!response.ok) throw new Error();
+        router.refresh();
       } catch {
         setEquipment((current) => {
           const next = { ...current };
@@ -51,81 +51,66 @@ export function GearBoard({ currentLevel, initialEquipment }: Props) {
         setPendingSlot(null);
       }
     },
-    [equipment],
+    [equipment, router],
   );
 
   const toggle = (slot: EquipmentSlot, level: number) => {
     void setSlot(slot, equipment[slot] === level ? null : level);
   };
 
-  const motionRewards = LEVEL_REWARDS.filter((reward) => reward.kind === "motion");
-  const expressionRewards = LEVEL_REWARDS.filter((reward) => reward.kind === "expression");
+  const motionRewards = LEVEL_REWARDS.filter((reward) => reward.kind === "motion" || reward.kind === "expression");
   const roomRewards = LEVEL_REWARDS.filter((reward) => reward.kind === "room");
 
   return (
     <div className="space-y-4">
-      <CurrentEquipmentPreview equipment={equipment} />
+      <PreviewCard equipment={equipment} />
 
       <section className="rough-card overflow-hidden">
-        <div className="border-b border-line px-4 py-3">
-          <p className="font-bold">アクセサリー</p>
-          <p className="mt-1 text-[11px] leading-relaxed text-ink-soft">
-            左が装備単体、右が実際の犬に重ねた姿です。選ぶと上のプレビューへすぐ反映されます。
-          </p>
-        </div>
+        <p className="border-b border-line px-4 py-3 font-bold">アクセサリー</p>
         <div className="divide-y divide-line">
-          {ACCESSORY_REWARD_LEVELS.map((level) => {
-            const reward = LEVEL_REWARDS.find((item) => item.level === level)!;
-            const slot = slotOfLevel(level)!;
-            return (
-              <AccessoryRewardRow
-                key={level}
-                reward={reward}
-                equipped={equipment[slot] === level}
-                unlocked={level <= currentLevel}
-                pending={pendingSlot === slot}
-                error={errorSlot === slot}
-                onToggle={() => toggle(slot, level)}
-              />
-            );
-          })}
+          {ACCESSORY_SLOTS.map((slot) => (
+            <SlotRow
+              key={slot}
+              label={SLOT_LABELS[slot]}
+              rewards={getSlotRewards(slot)}
+              equippedLevel={equipment[slot] ?? null}
+              currentLevel={currentLevel}
+              pending={pendingSlot === slot}
+              error={errorSlot === slot}
+              onToggle={(level) => toggle(slot, level)}
+              renderIcon={(level, className) => <GearIcon level={level} className={className} />}
+            />
+          ))}
         </div>
       </section>
-
-      <MilestoneConfirmation />
 
       <section className="rough-card overflow-hidden">
         <p className="border-b border-line px-4 py-3 font-bold">称号</p>
         <div className="px-4 py-3">
-          <TitleSlot
+          <SlotRow
+            label={null}
             rewards={getSlotRewards("title")}
             equippedLevel={equipment.title ?? null}
             currentLevel={currentLevel}
             pending={pendingSlot === "title"}
             error={errorSlot === "title"}
             onToggle={(level) => toggle("title", level)}
+            renderIcon={() => <span aria-hidden="true">🎗️</span>}
           />
-          <p className="mt-2 text-[10px] text-ink-faint">称号は犬の画像ではなく、UI上の表示として管理します。</p>
+          <p className="mt-2 text-[10px] text-ink-faint">選んだ称号は、この画面と装着プレビューで確認できます。</p>
         </div>
       </section>
 
       <ReadOnlySection
-        title="しぐさ"
-        note="犬本体のアニメーションとして自動再生します。装備レイヤーとは独立しています。"
+        title="しぐさ・表情"
+        note="おさんぽ中のフレブルが自動で使います。ここで装着する必要はありません。"
         rewards={motionRewards}
         currentLevel={currentLevel}
       />
 
       <ReadOnlySection
-        title="表情"
-        note="顔の状態として犬本体のポーズへ反映します。アクセサリーは変更しません。"
-        rewards={expressionRewards}
-        currentLevel={currentLevel}
-      />
-
-      <ReadOnlySection
         title="おへや"
-        note="背景や家具の報酬です。犬本体・装備とは別に管理します。"
+        note="今後のお部屋づくり機能で使う予定です。いまはまだ見た目には反映されません。"
         rewards={roomRewards}
         currentLevel={currentLevel}
       />
@@ -133,158 +118,110 @@ export function GearBoard({ currentLevel, initialEquipment }: Props) {
   );
 }
 
-function CurrentEquipmentPreview({ equipment }: { equipment: EquipmentMap }) {
+function PreviewCard({ equipment }: { equipment: EquipmentMap }) {
   const equippedSlots = ACCESSORY_SLOTS.filter((slot) => equipment[slot] !== undefined);
   const equippedTitle = equipment.title !== undefined
     ? LEVEL_REWARDS.find((reward) => reward.level === equipment.title)
     : null;
 
+  const badgePosition: Partial<Record<EquipmentSlot, string>> = {
+    hat: "left-[30%] top-[0%]",
+    crown: "left-[54%] top-[0%]",
+    collar: "left-[28%] top-[50%]",
+    bandana: "left-[50%] top-[54%]",
+    backpack: "right-[4%] top-[38%]",
+  };
+
   return (
     <section className="rough-card overflow-hidden bg-leaf-soft/40 p-4">
-      <p className="text-center text-xs font-bold text-ink-soft">現在の犬・そうびプレビュー</p>
+      <p className="text-center text-xs font-bold text-ink-soft">そうびプレビュー</p>
       {equippedTitle ? (
-        <p className="mt-1 text-center text-[11px] font-bold text-leaf-deep">🎗️ {equippedTitle.name}</p>
+        <p className="mt-1 flex items-center justify-center gap-1 text-[11px] font-bold text-leaf-deep">
+          <span aria-hidden="true">🎗️</span>
+          {equippedTitle.name}
+        </p>
       ) : null}
 
-      <LayeredFrenchie
-        pose="happy"
-        equipment={equipment}
-        priority
-        className="mx-auto mt-1 w-44 max-w-full"
-        alt="現在の装備を着けたフレンチブルドッグ"
-      />
+      <div className="relative mx-auto mt-1 h-40 w-40">
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img
+          src="/characters/frenchie/stand-happy.webp"
+          alt=""
+          className="absolute inset-0 h-full w-full object-contain"
+          draggable={false}
+        />
+        {ACCESSORY_SLOTS.map((slot) => {
+          const level = equipment[slot];
+          if (level === undefined) return null;
+          return (
+            <span
+              key={slot}
+              className={`absolute h-7 w-7 -translate-x-1/2 rounded-full bg-card p-1 shadow-sm ${badgePosition[slot] ?? ""}`}
+            >
+              <GearIcon level={level} className="h-full w-full" />
+            </span>
+          );
+        })}
+      </div>
 
       {equippedSlots.length === 0 ? (
-        <p className="mt-2 text-center text-[11px] text-ink-faint">START：まだ何も装着していません</p>
+        <p className="mt-2 text-center text-[11px] text-ink-faint">まだ何も装着していません</p>
       ) : (
         <ul className="mt-2 flex flex-wrap justify-center gap-1.5">
           {equippedSlots.map((slot) => {
             const reward = LEVEL_REWARDS.find((item) => item.level === equipment[slot]);
             if (!reward) return null;
             return (
-              <li key={slot} className="rounded-full bg-card px-2 py-1 text-[10px] text-ink-soft shadow-sm">
+              <li
+                key={slot}
+                className="flex items-center gap-1 rounded-full bg-card px-2 py-1 text-[10px] text-ink-soft shadow-sm"
+              >
+                <GearIcon level={reward.level} className="h-3.5 w-3.5" />
                 {reward.name}
               </li>
             );
           })}
         </ul>
       )}
+
+      <p className="mt-3 text-center text-[10px] leading-relaxed text-ink-faint">
+        犬の絵そのものはまだ着せ替えできないため、装着中のものはここにアイコンで表示しています。
+      </p>
     </section>
   );
 }
 
-function AccessoryRewardRow({
-  reward,
-  equipped,
-  unlocked,
-  pending,
-  error,
-  onToggle,
-}: {
-  reward: LevelReward;
-  equipped: boolean;
-  unlocked: boolean;
-  pending: boolean;
-  error: boolean;
-  onToggle: () => void;
-}) {
-  return (
-    <article className="p-3">
-      <button
-        type="button"
-        disabled={!unlocked || pending}
-        onClick={onToggle}
-        aria-pressed={equipped}
-        className={`grid w-full grid-cols-[minmax(0,0.85fr)_minmax(0,1.15fr)] overflow-hidden rounded-2xl border text-left transition ${
-          equipped
-            ? "border-leaf bg-leaf-soft/60 shadow-sm"
-            : unlocked
-              ? "border-line-strong bg-card active:scale-[0.99]"
-              : "border-line bg-paper-deep/75"
-        }`}
-      >
-        <span className="flex min-w-0 flex-col border-r border-line p-3">
-          <span className="flex items-center justify-between gap-2">
-            <span className={`text-[11px] font-bold tabular-nums ${unlocked ? "text-leaf-deep" : "text-ink-faint"}`}>
-              Lv.{reward.level}
-            </span>
-            {equipped ? <IconCheck size={14} className="text-leaf-deep" /> : null}
-            {!unlocked ? <IconLock size={13} className="text-ink-faint" /> : null}
-          </span>
-          <span className="mt-1 min-h-8 text-xs font-bold leading-snug">{reward.name}</span>
-          <span className={`mx-auto mt-2 h-[78px] w-[78px] ${unlocked ? "" : "opacity-50 grayscale"}`}>
-            <EquipmentItemImage level={reward.level} />
-          </span>
-          <span className="mt-auto pt-1 text-center text-[9px] text-ink-faint">装備単体</span>
-        </span>
-
-        <span className={`flex min-w-0 flex-col items-center justify-end p-2 ${unlocked ? "" : "opacity-60"}`}>
-          <LayeredFrenchie
-            pose="happy"
-            equipment={equipmentForLevel(reward.level)}
-            className="w-full max-w-[150px]"
-            alt={`${reward.name}を着けたフレンチブルドッグ`}
-          />
-          <span className="mt-1 text-[9px] text-ink-faint">同じ犬に装着</span>
-        </span>
-      </button>
-      <div className="mt-1.5 flex min-h-4 items-center justify-between px-1 text-[10px]">
-        <span className={equipped ? "font-bold text-leaf-deep" : "text-ink-faint"}>
-          {equipped ? "装着中（タップで外す）" : unlocked ? "タップして装着" : `Lv.${reward.level}で獲得`}
-        </span>
-        {pending ? <span className="text-ink-faint">保存中…</span> : null}
-      </div>
-      {error ? <p className="mt-1 text-[10px] text-blossom">変更できませんでした。もう一度お試しください。</p> : null}
-    </article>
-  );
-}
-
-function MilestoneConfirmation() {
-  return (
-    <section className="rough-card overflow-hidden">
-      <div className="border-b border-line px-4 py-3">
-        <p className="font-bold">固定ベース確認プレビュー</p>
-        <p className="mt-1 text-[11px] text-ink-soft">全カードで犬本体は同じ画像です。表示されるのは指定レベルの装備だけです。</p>
-      </div>
-      <div className="grid grid-cols-2 gap-px bg-line sm:grid-cols-4">
-        {CONFIRMATION_LEVELS.map((level) => {
-          const reward = level === null ? null : LEVEL_REWARDS.find((item) => item.level === level)!;
-          return (
-            <div key={level ?? "start"} className="min-w-0 bg-card p-2 text-center">
-              <p className="text-[10px] font-bold text-leaf-deep">{level === null ? "START" : `Lv.${level}`}</p>
-              <LayeredFrenchie
-                pose="happy"
-                equipment={equipmentForLevel(level)}
-                className="mx-auto w-full max-w-[130px]"
-                alt={reward ? `${reward.name}を着けたフレンチブルドッグ` : "何も装備していないフレンチブルドッグ"}
-              />
-              <p className="truncate text-[9px] text-ink-soft">{reward?.name ?? "装備なし"}</p>
-            </div>
-          );
-        })}
-      </div>
-    </section>
-  );
-}
-
-function TitleSlot({
+function SlotRow({
+  label,
   rewards,
   equippedLevel,
   currentLevel,
   pending,
   error,
   onToggle,
+  renderIcon,
 }: {
+  label: string | null;
   rewards: LevelReward[];
   equippedLevel: number | null;
   currentLevel: number;
   pending: boolean;
   error: boolean;
   onToggle: (level: number) => void;
+  renderIcon: (level: number, className: string) => React.ReactNode;
 }) {
+  const equippedReward = rewards.find((reward) => reward.level === equippedLevel) ?? null;
+
   return (
-    <div>
-      <div className="flex flex-wrap gap-2">
+    <div className={label ? "px-4 py-3" : undefined}>
+      {label ? (
+        <div className="flex items-center justify-between gap-2">
+          <p className="text-xs font-bold text-ink-soft">{label}</p>
+          <p className="text-[11px] text-ink-faint">{equippedReward ? equippedReward.name : "未装着"}</p>
+        </div>
+      ) : null}
+
+      <div className={`flex flex-wrap gap-2 ${label ? "mt-2" : ""}`}>
         {rewards.map((reward) => {
           const unlocked = reward.level <= currentLevel;
           const equipped = reward.level === equippedLevel;
@@ -302,13 +239,14 @@ function TitleSlot({
                     : "border-line bg-paper-deep text-ink-faint"
               }`}
             >
-              {!unlocked ? <IconLock size={12} /> : <span aria-hidden="true">🎗️</span>}
+              {unlocked ? renderIcon(reward.level, "h-4 w-4 shrink-0") : <IconLock size={12} className="shrink-0" />}
               {unlocked ? reward.name : `Lv.${reward.level}で解放`}
-              {equipped ? <IconCheck size={12} /> : null}
+              {equipped ? <IconCheck size={12} className="shrink-0" /> : null}
             </button>
           );
         })}
       </div>
+
       {error ? <p className="mt-1.5 text-[10px] text-blossom">変更できませんでした。もう一度お試しください。</p> : null}
     </div>
   );
@@ -334,10 +272,16 @@ function ReadOnlySection({
           const unlocked = reward.level <= currentLevel;
           return (
             <li key={reward.level} className="flex items-center gap-3 px-4 py-2.5">
-              <span className={`flex h-7 w-11 shrink-0 items-center justify-center rounded-full text-[11px] font-bold tabular-nums ${unlocked ? "bg-leaf-soft text-leaf-deep" : "bg-paper-deep text-ink-faint"}`}>
+              <span
+                className={`flex h-7 w-11 shrink-0 items-center justify-center rounded-full text-[11px] font-bold tabular-nums ${
+                  unlocked ? "bg-leaf-soft text-leaf-deep" : "bg-paper-deep text-ink-faint"
+                }`}
+              >
                 Lv.{reward.level}
               </span>
-              <span className={`min-w-0 flex-1 truncate text-sm ${unlocked ? "font-bold" : "text-ink-faint"}`}>{reward.name}</span>
+              <span className={`min-w-0 flex-1 truncate text-sm ${unlocked ? "font-bold" : "text-ink-faint"}`}>
+                {reward.name}
+              </span>
               {!unlocked ? <IconLock size={13} className="shrink-0 text-ink-faint" /> : null}
             </li>
           );

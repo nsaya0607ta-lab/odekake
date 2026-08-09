@@ -1,14 +1,11 @@
 import { formatCoins } from "@/lib/coins";
-import type { EquipmentMap } from "@/lib/data/equipment";
 import { CoinArt, LeafArt, MeadowSceneArt, NoteArt, SparkleArt, TreasureChestArt } from "./coin-art";
 import { IconCalendar, IconClipboard, IconCoin } from "./icons";
-import { LayeredFrenchie } from "./layered-frenchie";
 
 type Props = {
   balance: number;
   /** 今日もらったコイン */
   todayCoins: number;
-  equipment: EquipmentMap;
 };
 
 /**
@@ -16,7 +13,7 @@ type Props = {
  * 右側の犬は、着せ替えしたときの見た目を確かめるプレビュー
  * （着せ替えの中身はまだないので、いまは今の姿をそのまま出している）。
  */
-export function CoinHero({ balance, todayCoins, equipment }: Props) {
+export function CoinHero({ balance, todayCoins }: Props) {
   return (
     <section className="rough-card relative overflow-hidden">
       <div className="relative h-[196px] sm:h-[208px]">
@@ -25,12 +22,14 @@ export function CoinHero({ balance, todayCoins, equipment }: Props) {
         {/* 着せ替えプレビュー */}
         <div className="pointer-events-none absolute inset-0 overflow-hidden" aria-hidden="true">
           <TreasureChestArt className="absolute bottom-1 right-[-3%] w-[68px] sm:w-[76px]" />
-          <LayeredFrenchie
-            pose="walk"
-            equipment={equipment}
-            priority
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src="/characters/frenchie/walk.webp"
             alt=""
-            className="absolute bottom-4 right-[11%] w-[38%] max-w-[152px]"
+            width={300}
+            height={254}
+            draggable={false}
+            className="absolute bottom-4 right-[11%] w-[38%] max-w-[152px] select-none"
           />
           <CoinArt className="absolute right-[6%] top-[10%] w-5 rotate-[18deg]" />
           <CoinArt className="absolute right-[18%] top-[21%] w-4 -rotate-12" />

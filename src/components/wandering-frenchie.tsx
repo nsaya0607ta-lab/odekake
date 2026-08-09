@@ -1,9 +1,6 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import type { EquipmentMap } from "@/lib/data/equipment";
-import { DOG_BASE_POSES, type DogPose } from "@/lib/equipment-visuals";
-import { DogEquipmentLayers } from "./layered-frenchie";
 
 /**
  * ホーム画面のバンドを歩き回るフレブル。
@@ -16,8 +13,30 @@ import { DogEquipmentLayers } from "./layered-frenchie";
  * transition と animation が同じ transform を奪い合って壊れる。
  */
 
-const POSES = DOG_BASE_POSES;
-type Pose = DogPose;
+const POSES = {
+  stand: "/characters/frenchie/stand.webp",
+  walk: "/characters/frenchie/walk.webp",
+  sit: "/characters/frenchie/sit.webp",
+  sniff: "/characters/frenchie/sniff.webp",
+  happy: "/characters/frenchie/stand-happy.webp",
+  shake: "/characters/frenchie/shake.webp",
+  sleep: "/characters/frenchie/sleep.webp",
+  wink: "/characters/frenchie/wink.webp",
+  wave: "/characters/frenchie/wave.webp",
+  camera: "/characters/frenchie/camera.webp",
+  bow: "/characters/frenchie/bow.webp",
+  cheer: "/characters/frenchie/cheer.webp",
+  smile: "/characters/frenchie/smile.webp",
+  dig: "/characters/frenchie/dig.webp",
+  treat: "/characters/frenchie/treat.webp",
+  roll: "/characters/frenchie/roll.webp",
+  drink: "/characters/frenchie/drink.webp",
+  doze: "/characters/frenchie/doze.webp",
+  yawn: "/characters/frenchie/yawn.webp",
+  lieWave: "/characters/frenchie/lie-wave.webp",
+} as const;
+
+type Pose = keyof typeof POSES;
 const POSE_KEYS = Object.keys(POSES) as Pose[];
 
 /** 立ち止まったときの仕草と、その長さ（ms） */
@@ -115,15 +134,7 @@ type Walker = {
 const rand = (min: number, max: number) => min + Math.random() * (max - min);
 const pick = <T,>(items: readonly T[]): T => items[Math.floor(Math.random() * items.length)] as T;
 
-const EMPTY_EQUIPMENT: EquipmentMap = {};
-
-export function WanderingFrenchie({
-  level = 1,
-  equipment = EMPTY_EQUIPMENT,
-}: {
-  level?: number;
-  equipment?: EquipmentMap;
-}) {
+export function WanderingFrenchie({ level = 1 }: { level?: number }) {
   const availablePoseKeys = POSE_KEYS.filter((pose) => (REQUIRED_LEVEL_BY_POSE.get(pose) ?? 1) <= level);
   const [walker, setWalker] = useState<Walker>({
     x: 26,
@@ -347,7 +358,6 @@ export function WanderingFrenchie({
                   }}
                 />
               ))}
-              <DogEquipmentLayers pose={activePose} equipment={equipment} priority />
             </div>
           </div>
         </div>

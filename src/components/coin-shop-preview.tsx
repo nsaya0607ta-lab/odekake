@@ -37,7 +37,7 @@ const SAMPLES: readonly ShopSample[] = [
       <>
         <span className={FLOOR} />
         <span className="absolute inset-x-0 bottom-[22%] h-px bg-[#e0cba4]" />
-        <img src="/characters/frenchie-base/sleep.webp" alt="" className={DOG} draggable={false} />
+        <img src="/characters/frenchie/lie.webp" alt="" className={DOG} draggable={false} />
       </>
     ),
     after: (
@@ -45,7 +45,7 @@ const SAMPLES: readonly ShopSample[] = [
         <span className={FLOOR} />
         <span className="absolute inset-x-0 bottom-[22%] h-px bg-[#e0cba4]" />
         <span className="absolute bottom-[10%] left-1/2 h-[34%] w-[80%] -translate-x-1/2 rounded-[50%] border-2 border-[#dfc79e] bg-[#f9efd8]" />
-        <img src="/characters/frenchie-base/doze.webp" alt="" className={DOG} draggable={false} />
+        <img src="/characters/frenchie/doze.webp" alt="" className={DOG} draggable={false} />
         <SparkleArt className="absolute right-[8%] top-[14%] w-3 text-sun" />
         <SparkleArt className="absolute left-[10%] top-[26%] w-2 text-sun" />
       </>
@@ -61,7 +61,7 @@ const SAMPLES: readonly ShopSample[] = [
       <>
         <span className={FLOOR} />
         <span className="absolute inset-x-0 bottom-[22%] h-px bg-[#e0cba4]" />
-        <img src="/characters/frenchie-base/lie-wave.webp" alt="" className={DOG} draggable={false} />
+        <img src="/characters/frenchie/lie-wave.webp" alt="" className={DOG} draggable={false} />
         <span className="absolute bottom-[14%] right-[12%] h-2.5 w-2.5 rounded-full bg-[#f2c6cd]" />
       </>
     ),
@@ -75,7 +75,7 @@ const SAMPLES: readonly ShopSample[] = [
         <span className="absolute bottom-[44%] right-[10%] h-2.5 w-2.5 rounded-full bg-[#cfe0bd]" />
         <span className="absolute bottom-[46%] right-[20%] h-2 w-2 rounded-full bg-[#f2c6cd]" />
         <span className="absolute bottom-[48%] right-[15%] h-2 w-2 rounded-full bg-[#cfd9ef]" />
-        <img src="/characters/frenchie-base/lie-wave.webp" alt="" className={DOG} draggable={false} />
+        <img src="/characters/frenchie/lie-wave.webp" alt="" className={DOG} draggable={false} />
         <span className="absolute bottom-[14%] left-[10%] h-2.5 w-2.5 rounded-full bg-[#f2c6cd]" />
         <span className="absolute bottom-[16%] left-[22%] h-2 w-2 rounded-full bg-[#cfe0bd]" />
         <SparkleArt className="absolute left-[8%] top-[16%] w-3 text-sun" />
@@ -93,7 +93,7 @@ const SAMPLES: readonly ShopSample[] = [
         <span className="absolute inset-0 bg-gradient-to-b from-[#dfe6ea] to-[#cdd8de]" />
         <RainDrops />
         <img
-          src="/characters/frenchie-base/sit.webp"
+          src="/characters/frenchie/sit-side.webp"
           alt=""
           className={`${DOG} opacity-90 saturate-50`}
           draggable={false}
@@ -107,7 +107,7 @@ const SAMPLES: readonly ShopSample[] = [
         <RainDrops />
         {/* 犬の絵に重ねると顔が隠れてしまうので、レインコートは横に並べて見せる */}
         <img
-          src="/characters/frenchie-base/stand-happy.webp"
+          src="/characters/frenchie/stand-happy.webp"
           alt=""
           className="absolute bottom-[8%] left-[40%] w-[70%] -translate-x-1/2 select-none"
           draggable={false}
