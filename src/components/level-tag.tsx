@@ -15,7 +15,7 @@ export function LevelTag({ progress }: { progress: ExpProgress }) {
         href="/mypage/exp-history"
         aria-label={`おでかけレベル ${progress.level}。EXP履歴を見る`}
         className="absolute top-4 right-4 z-10 block w-[32%] min-w-[106px] max-w-[126px] active:scale-[0.98] sm:max-w-[130px]"
-        style={{ aspectRatio: SIGN_ASPECT_RATIO }}
+        style={{ aspectRatio: SIGN_ASPECT_RATIO, boxShadow: "none" }}
       >
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img
@@ -23,10 +23,11 @@ export function LevelTag({ progress }: { progress: ExpProgress }) {
           alt=""
           aria-hidden="true"
           draggable={false}
-          className="pointer-events-none absolute inset-0 h-full w-full select-none"
+          className="pointer-events-none absolute inset-0 h-full w-full select-none shadow-none"
           style={{
             opacity: 0.96,
-            filter: "saturate(0.82) brightness(1.04) contrast(0.94) drop-shadow(0 1px 2px rgba(83, 61, 34, 0.08))",
+            filter: "saturate(0.82) brightness(1.04) contrast(0.94)",
+            boxShadow: "none",
           }}
         />
 
