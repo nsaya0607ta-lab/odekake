@@ -1,8 +1,6 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import type { EquipmentMap } from "@/lib/data/equipment";
-import { DogEquipment } from "./dog-equipment";
 
 /**
  * ホーム画面のバンドを歩き回るフレブル。
@@ -136,13 +134,7 @@ type Walker = {
 const rand = (min: number, max: number) => min + Math.random() * (max - min);
 const pick = <T,>(items: readonly T[]): T => items[Math.floor(Math.random() * items.length)] as T;
 
-export function WanderingFrenchie({
-  level = 1,
-  equipment = {},
-}: {
-  level?: number;
-  equipment?: EquipmentMap;
-}) {
+export function WanderingFrenchie({ level = 1 }: { level?: number }) {
   const availablePoseKeys = POSE_KEYS.filter((pose) => (REQUIRED_LEVEL_BY_POSE.get(pose) ?? 1) <= level);
   const [walker, setWalker] = useState<Walker>({
     x: 26,
@@ -366,11 +358,6 @@ export function WanderingFrenchie({
                   }}
                 />
               ))}
-              <DogEquipment
-                equipment={equipment}
-                pose={activePose}
-                className="pointer-events-none absolute inset-0 z-10 h-auto w-full select-none"
-              />
             </div>
           </div>
         </div>

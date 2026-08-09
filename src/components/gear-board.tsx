@@ -1,13 +1,11 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import Image from "next/image";
 import { useCallback, useState } from "react";
 import type { EquipmentMap } from "@/lib/data/equipment";
 import { ACCESSORY_SLOTS, SLOT_LABELS, getSlotRewards, type EquipmentSlot } from "@/lib/equipment";
 import { LEVEL_REWARDS, type LevelReward } from "@/lib/exp";
 import { GearIcon } from "./gear-art";
-import { DogEquipment } from "./dog-equipment";
 import { IconCheck, IconLock } from "./icons";
 
 type Props = {
@@ -126,6 +124,14 @@ function PreviewCard({ equipment }: { equipment: EquipmentMap }) {
     ? LEVEL_REWARDS.find((reward) => reward.level === equipment.title)
     : null;
 
+  const badgePosition: Partial<Record<EquipmentSlot, string>> = {
+    hat: "left-[30%] top-[0%]",
+    crown: "left-[54%] top-[0%]",
+    collar: "left-[28%] top-[50%]",
+    bandana: "left-[50%] top-[54%]",
+    backpack: "right-[4%] top-[38%]",
+  };
+
   return (
     <section className="rough-card overflow-hidden bg-leaf-soft/40 p-4">
       <p className="text-center text-xs font-bold text-ink-soft">そうびプレビュー</p>
@@ -136,16 +142,26 @@ function PreviewCard({ equipment }: { equipment: EquipmentMap }) {
         </p>
       ) : null}
 
-      <div className="relative mx-auto mt-1 aspect-[300/254] w-52 max-w-full">
-        <Image
+      <div className="relative mx-auto mt-1 h-40 w-40">
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img
           src="/characters/frenchie/stand-happy.webp"
           alt=""
-          fill
-          sizes="208px"
-          className="object-contain"
+          className="absolute inset-0 h-full w-full object-contain"
           draggable={false}
         />
-        <DogEquipment equipment={equipment} pose="happy" className="absolute inset-0 z-10 h-full w-full" />
+        {ACCESSORY_SLOTS.map((slot) => {
+          const level = equipment[slot];
+          if (level === undefined) return null;
+          return (
+            <span
+              key={slot}
+              className={`absolute h-7 w-7 -translate-x-1/2 rounded-full bg-card p-1 shadow-sm ${badgePosition[slot] ?? ""}`}
+            >
+              <GearIcon level={level} className="h-full w-full" />
+            </span>
+          );
+        })}
       </div>
 
       {equippedSlots.length === 0 ? (
@@ -169,7 +185,7 @@ function PreviewCard({ equipment }: { equipment: EquipmentMap }) {
       )}
 
       <p className="mt-3 text-center text-[10px] leading-relaxed text-ink-faint">
-        装備は犬の向きや動きに合わせて自然に追従します。重なる場合はクラウンとバンダナを優先して表示します。
+        犬の絵そのものはまだ着せ替えできないため、装着中のものはここにアイコンで表示しています。
       </p>
     </section>
   );

@@ -74,9 +74,9 @@ function StrawHat() {
 function CaptainHat() {
   return (
     <>
-      <ellipse cx="12" cy="16.4" rx="9" ry="2.2" fill="#2f4054" />
-      <path d="M5.5 15.6a6.5 5 0 0 1 13 0z" fill="#fffaf0" stroke="#5b4b38" strokeWidth=".8" />
-      <rect x="7.5" y="13" width="9" height="2.4" rx="1.1" fill="#2f4054" />
+      <ellipse cx="12" cy="16.4" rx="9" ry="2.2" fill="#2f4a63" />
+      <path d="M5.5 15.6a6.5 5 0 0 1 13 0z" fill="#3f6285" />
+      <rect x="7.5" y="13" width="9" height="2.4" rx="1.1" fill="#fffaf0" />
       <path d="M10.7 13.2 12 11.6l1.3 1.6" fill="none" stroke="#e0b862" strokeWidth={1.1} />
     </>
   );
@@ -87,7 +87,7 @@ function Crown() {
     <>
       <path
         d="M4 17.5 5.5 8l3.7 4.6L12 6l2.8 6.6L18.5 8 20 17.5Z"
-        fill="#c94f45"
+        fill="#f0be55"
         stroke="#d9a13c"
         strokeWidth={1.2}
       />
@@ -108,15 +108,15 @@ export function GearIcon({ level, className }: GearIconProps) {
       case 11:
         return <Collar color="#e2a377" />;
       case 21:
-        return <Collar color="#263f67" />;
+        return <Collar color="#a99bcb" />;
       case 6:
-        return <Bandana color="#78965d" pattern="flower" />;
+        return <Bandana color="#dd9aa6" pattern="flower" />;
       case 15:
         return <Bandana color="#7fa8c9" pattern="wave" />;
       case 9:
-        return <Backpack color="#758d55" strapColor="#a9bd78" />;
+        return <Backpack color="#e2a377" strapColor="#c9885a" />;
       case 25:
-        return <Backpack color="#b98d54" strapColor="#e0b86e" />;
+        return <Backpack color="#5d8049" strapColor="#48622f" />;
       case 18:
         return <StrawHat />;
       case 27:

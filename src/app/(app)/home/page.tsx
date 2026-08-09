@@ -17,7 +17,6 @@ import { WanderingFrenchie } from "@/components/wandering-frenchie";
 import { loadAreaIndex } from "@/lib/data/areas";
 import { getCoinSummary } from "@/lib/data/coins";
 import { getExpDashboard } from "@/lib/data/exp";
-import { getEquipment } from "@/lib/data/equipment";
 import { formatTripPeriod, getTripSummaries, type TripSummary } from "@/lib/data/trips";
 import { getTimeline } from "@/lib/data/visits";
 import { getRecordSpace } from "@/lib/data/space";
@@ -32,13 +31,12 @@ export default async function HomePage({ searchParams }: { searchParams: Promise
   const [{ supabase, user }, { notice }] = await Promise.all([requireUser(), searchParams]);
   const space = await getRecordSpace(supabase, user.id);
 
-  const [areas, recent, trips, expDashboard, coins, equipment] = await Promise.all([
+  const [areas, recent, trips, expDashboard, coins] = await Promise.all([
     loadAreaIndex(supabase, space.tripIds),
     getTimeline(supabase, { tripIds: space.tripIds, limit: 4 }),
     getTripSummaries(supabase),
     getExpDashboard(supabase, user.id),
     getCoinSummary(supabase, user.id),
-    getEquipment(supabase, user.id),
   ]);
 
   const latest = recent[0] ?? null;
@@ -80,7 +78,7 @@ export default async function HomePage({ searchParams }: { searchParams: Promise
             <div className="absolute bottom-4 left-[7.2%] h-5 w-5 rounded-[50%] bg-[#b9cf9f]" />
             <div className="absolute bottom-7 left-[43%] h-8 w-2 rounded-full bg-[#91aa75]" />
             <div className="absolute bottom-6 left-[41.8%] h-6 w-6 rounded-[50%] bg-[#b9cf9f]" />
-            <WanderingFrenchie level={expProgress.level} equipment={equipment} />
+            <WanderingFrenchie level={expProgress.level} />
             <LevelTag progress={expProgress} />
           </div>
 
