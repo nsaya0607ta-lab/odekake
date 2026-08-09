@@ -14,9 +14,6 @@ const PUBLIC_PATHS = [
   "/privacy",
   "/terms",
   "/manifest.webmanifest",
-  // iPhoneショートカットはSupabaseのログインCookieを持たない。
-  // このAPI自身がBearer連携キーを検証するため、middlewareでは公開扱いにする。
-  "/api/steps/sync",
 ];
 
 function isPublicPath(pathname: string) {
@@ -39,6 +36,13 @@ export async function middleware(request: NextRequest) {
     const url = request.nextUrl.clone();
     url.pathname = "/setup";
     return NextResponse.redirect(url);
+  }
+
+  // iPhoneショートカットはSupabaseのログインCookieを持たない。
+  // /api/steps/sync はroute側でBearer連携キーを検証するため、
+  // ここでは認証処理もログイン画面へのリダイレクトも行わない。
+  if (pathname === "/api/steps/sync") {
+    return NextResponse.next();
   }
 
   let response = NextResponse.next({ request });
