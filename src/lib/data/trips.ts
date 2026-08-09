@@ -8,6 +8,24 @@ export type TripSummary = {
   visitCount: number;
 };
 
+const PERSONAL_RECORD_TRIP_TITLE = "自分のおでかけ";
+const PERSONAL_RECORD_TRIP_DESCRIPTION = "普段のおでかけをまとめる記録先";
+
+/**
+ * DB上は visit_records.trip_id が必須なので、普段のおでかけにも内部用の保存先を1件持つ。
+ * これは旅行計画ではないため、旅行一覧や旅行件数には含めない。
+ */
+export function isPersonalRecordTrip(
+  trip: Pick<TripRow, "title" | "start_date" | "end_date" | "description">,
+): boolean {
+  return (
+    trip.title === PERSONAL_RECORD_TRIP_TITLE &&
+    trip.start_date === null &&
+    trip.end_date === null &&
+    trip.description === PERSONAL_RECORD_TRIP_DESCRIPTION
+  );
+}
+
 /**
  * 同じ画面内ではホーム・記録画面など複数箇所から呼ばれる。
  * React cache で1リクエスト中の重複したDB取得をまとめる。
@@ -19,7 +37,7 @@ export const getTripSummaries = cache(async function getTripSummaries(supabase: 
     .order("start_date", { ascending: false, nullsFirst: false })
     .order("created_at", { ascending: false });
 
-  const tripList = (trips ?? []) as TripRow[];
+  const tripList = ((trips ?? []) as TripRow[]).filter((trip) => !isPersonalRecordTrip(trip));
   if (tripList.length === 0) return [];
 
   const { data: visits } = await supabase
@@ -38,7 +56,7 @@ export const getTripSummaries = cache(async function getTripSummaries(supabase: 
   return tripList.map((trip) => ({ trip, visitCount: visitCount.get(trip.id) ?? 0 }));
 });
 
-/** 訪問履歴の登録フォームで使う、旅行の選択肢 */
+/** 訪問履歴の登録フォームで使う、ユーザーが作成した旅行計画の選択肢 */
 export async function getTripOptions(
   supabase: DB,
   tripIds: string[],
@@ -46,16 +64,19 @@ export async function getTripOptions(
   if (tripIds.length === 0) return [];
   const { data } = await supabase
     .from("trips")
-    .select("id, title")
+    .select("id, title, start_date, end_date, description")
     .in("id", tripIds)
     .order("created_at", { ascending: false });
-  return data ?? [];
+
+  return (data ?? [])
+    .filter((trip) => !isPersonalRecordTrip(trip))
+    .map(({ id, title }) => ({ id, title }));
 }
 
 /**
- * 「自分の旅」は旅行計画ではなく、普段のおでかけを記録する常設の空間。
- * DB上は訪問履歴に trip_id が必要なため、保存先がまだ無いユーザーだけ
- * 日程なしの記録用データを自動作成する。ユーザーに作成操作は求めない。
+ * 「お出かけ」は旅行計画ではなく、普段のおでかけを記録する常設の内部保存先。
+ * DB上は訪問履歴に trip_id が必要なため、ユーザーごとに1件だけ自動で用意する。
+ * 旅行がすでに存在していても必ずこの保存先を別に持つ。
  */
 export async function ensurePersonalRecordTrip(
   supabase: DB,
@@ -65,7 +86,10 @@ export async function ensurePersonalRecordTrip(
     .from("trips")
     .select("id, title")
     .eq("owner_id", userId)
-    .order("created_at", { ascending: true })
+    .eq("title", PERSONAL_RECORD_TRIP_TITLE)
+    .eq("description", PERSONAL_RECORD_TRIP_DESCRIPTION)
+    .is("start_date", null)
+    .is("end_date", null)
     .limit(1)
     .maybeSingle();
 
@@ -76,10 +100,10 @@ export async function ensurePersonalRecordTrip(
     .insert({
       id: crypto.randomUUID(),
       owner_id: userId,
-      title: "自分のおでかけ",
+      title: PERSONAL_RECORD_TRIP_TITLE,
       start_date: null,
       end_date: null,
-      description: "普段のおでかけをまとめる記録先",
+      description: PERSONAL_RECORD_TRIP_DESCRIPTION,
     })
     .select("id, title")
     .single();
