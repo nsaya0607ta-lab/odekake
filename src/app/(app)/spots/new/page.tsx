@@ -21,10 +21,15 @@ export default async function NewSpotPage({
     searchParams,
   ]);
   const space = await getRecordSpace(supabase, user.id);
-  const [categoryNames, plannedTrips, personalRecordTrip] = await Promise.all([
+  const [categoryNames, plannedTrips, personalRecordTrip, visitedPlaceRows] = await Promise.all([
     loadCategoryNames(supabase),
     getTripOptions(supabase, space.tripIds),
     ensurePersonalRecordTrip(supabase, user.id),
+    supabase
+      .from("spots")
+      .select("place_id")
+      .eq("created_by", user.id)
+      .not("place_id", "is", null),
   ]);
 
   // 「お出かけ」と、ユーザーが作った「旅行計画」を見た目でも明確に分ける。
@@ -37,6 +42,7 @@ export default async function NewSpotPage({
     ? [...tripOptions].sort((a, b) => Number(b.id === requestedTripId) - Number(a.id === requestedTripId))
     : tripOptions;
   const municipality = muni ? getMunicipality(muni) : undefined;
+  const visitedPlaceIds = (visitedPlaceRows.data ?? []).flatMap((row) => (row.place_id ? [row.place_id] : []));
 
   return (
     <>
@@ -49,6 +55,7 @@ export default async function NewSpotPage({
           placeSearchEnabled={Boolean(process.env.GOOGLE_PLACES_API_KEY?.trim())}
           userId={user.id}
           trips={trips}
+          visitedPlaceIds={visitedPlaceIds}
           visitedAtDefault={todayInJapan()}
           showTripPlanningLink
           locationFromUrl={Boolean(municipality)}
