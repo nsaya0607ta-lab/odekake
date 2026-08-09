@@ -423,6 +423,42 @@ select pg_temp.record('コイン: 直接の書き換えは反映されない',
   (select balance from public.user_coins where user_id = :'alice') = 720);
 
 -- -------------------------------------------------------------
+-- そうび（レベルアップ報酬のアクセサリー・称号）
+-- -------------------------------------------------------------
+-- ここまでで alice は Lv.7。Lv.4の首輪・Lv.6のバンダナは解放済み、Lv.8の称号は未解放。
+select pg_temp.expect_ok('そうび: 解放済みのアクセサリーを装着できる', :'alice',
+  $q$select public.set_equipped_item('collar', 4)$q$);
+select pg_temp.record('そうび: 装着した内容が保存される',
+  (select level from public.user_equipment where user_id = :'alice' and slot = 'collar') = 4);
+
+select pg_temp.expect_denied('そうび: まだ解放していないレベルの称号は装着できない', :'alice',
+  $q$select public.set_equipped_item('title', 8)$q$);
+
+select pg_temp.expect_denied('そうび: レベルとスロットが一致しないと装着できない', :'alice',
+  $q$select public.set_equipped_item('bandana', 4)$q$);
+
+select pg_temp.expect_ok('そうび: 別スロットのアクセサリーも装着できる', :'alice',
+  $q$select public.set_equipped_item('bandana', 6)$q$);
+
+select pg_temp.expect_count('そうび: 本人は自分のそうびを見られる', :'alice',
+  'select 1 from public.user_equipment', 2);
+select pg_temp.expect_count('そうび: 他人のそうびは見えない', :'bob',
+  format($q$select 1 from public.user_equipment where user_id = %L$q$, :'alice'), 0);
+
+select pg_temp.expect_ok('そうび: 装着中のスロットへ付け替えられる', :'alice',
+  $q$select public.set_equipped_item('collar', 4)$q$);
+select pg_temp.record('そうび: 付け替えでも1スロット1件のまま',
+  (select count(*) from public.user_equipment where user_id = :'alice' and slot = 'collar') = 1);
+
+select pg_temp.expect_ok('そうび: 解除できる', :'alice',
+  $q$select public.set_equipped_item('collar', null)$q$);
+select pg_temp.record('そうび: 解除するとその行が消える',
+  (select count(*) from public.user_equipment where user_id = :'alice' and slot = 'collar') = 0);
+
+select pg_temp.expect_denied('そうび: RPCを介さず直接装着できない', :'alice', format(
+  $q$insert into public.user_equipment (user_id, slot, level) values (%L, 'crown', 30)$q$, :'alice'));
+
+-- -------------------------------------------------------------
 -- プロフィールの公開範囲
 -- -------------------------------------------------------------
 select pg_temp.expect_count('自分のプロフィールは見える', :'alice',
@@ -526,6 +562,9 @@ select pg_temp.record('オーナー削除でEXPとコインの台帳・残高も
   and (select count(*) from public.user_exp) = 0
   and (select count(*) from public.coin_events) = 0
   and (select count(*) from public.user_coins) = 0);
+
+select pg_temp.record('オーナー削除でそうびも消える',
+  (select count(*) from public.user_equipment) = 0);
 
 -- -------------------------------------------------------------
 -- 結果
