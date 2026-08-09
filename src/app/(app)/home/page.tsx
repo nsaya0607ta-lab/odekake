@@ -14,7 +14,6 @@ import { LevelTag } from "@/components/level-tag";
 import { TodayStepsCard } from "@/components/today-steps-card";
 import { EmptyState, LinkRow, formatDate } from "@/components/ui";
 import { WanderingFrenchie } from "@/components/wandering-frenchie";
-import { getUnlockCost } from "@/lib/coins";
 import { loadAreaIndex } from "@/lib/data/areas";
 import { getCoinSummary } from "@/lib/data/coins";
 import { getExpDashboard } from "@/lib/data/exp";
@@ -174,7 +173,6 @@ export default async function HomePage({ searchParams }: { searchParams: Promise
               initialStepExp={expDashboard.todayStepExp}
               initialCoinBalance={coins.balance}
               nextRewardName={expProgress.nextReward?.name ?? null}
-              nextRewardCost={getUnlockCost(expProgress.nextReward)}
             />
           </section>
         </div>

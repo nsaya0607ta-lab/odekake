@@ -9,10 +9,8 @@ type Props = {
   initialSteps: number | null;
   initialStepExp: number;
   initialCoinBalance: number;
-  /** 次に解放できる報酬の名前。すべて解放済みなら null */
+  /** 次のレベルアップで解放される報酬の名前。すべて解放済みなら null */
   nextRewardName: string | null;
-  /** 次の報酬の解放に必要なコイン */
-  nextRewardCost: number;
 };
 
 type TodayStepsResponse = {
@@ -27,7 +25,6 @@ export function TodayStepsCard({
   initialStepExp,
   initialCoinBalance,
   nextRewardName,
-  nextRewardCost,
 }: Props) {
   const router = useRouter();
   const [steps, setSteps] = useState(initialSteps);
@@ -96,22 +93,11 @@ export function TodayStepsCard({
       </p>
 
       <div className="mt-2.5 w-full space-y-1.5">
-        <div className="rounded-xl border border-dashed border-[#e0cba4] px-2 py-1.5 text-left">
-          <p className="flex min-w-0 items-center gap-1 text-[10px] text-ink-soft">
-            <IconLock size={12} className="shrink-0 text-ink-faint" />
-            <span className="min-w-0 truncate">
-              次に解放：<span className="font-bold text-ink">{nextRewardName ?? "すべて解放済み"}</span>
-            </span>
-          </p>
-          {nextRewardName ? (
-            <p className="mt-1 flex min-w-0 items-center gap-1 text-[10px] text-ink-soft">
-              <IconCoin size={12} className="shrink-0" />
-              <span className="min-w-0 truncate">
-                必要コイン：
-                <span className="font-bold tabular-nums text-ink">{formatCoins(nextRewardCost)}</span>
-              </span>
-            </p>
-          ) : null}
+        <div className="flex min-w-0 items-center gap-1 rounded-xl border border-dashed border-[#e0cba4] px-2 py-1.5 text-left">
+          <IconLock size={12} className="shrink-0 text-ink-faint" />
+          <span className="min-w-0 truncate text-[10px] text-ink-soft">
+            次に解放：<span className="font-bold text-ink">{nextRewardName ?? "すべて解放済み"}</span>
+          </span>
         </div>
 
         <div className="flex min-w-0 items-center gap-1 rounded-xl border border-[#e8d4aa] bg-card/80 px-2 py-1.5 text-left">
