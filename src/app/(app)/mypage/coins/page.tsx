@@ -1,15 +1,24 @@
-import { IconCoin, IconLock } from "@/components/icons";
+import { CoinPill } from "@/components/coin-badge";
+import { CoinHero } from "@/components/coin-hero";
+import { CoinShopPreview } from "@/components/coin-shop-preview";
+import { CoinUseCards } from "@/components/coin-use-cards";
+import { IconCoin, IconHome, IconLock, IconMapPin, IconPaw } from "@/components/icons";
 import { PageBody } from "@/components/page-body";
-import { PageHeader } from "@/components/page-header";
+import { TopHeader } from "@/components/page-header";
 import {
   LEVEL_UP_COIN_BANDS,
   MAX_DAILY_STEP_COINS,
   STEP_COIN_TIERS,
   formatCoins,
+  getStepCoins,
   getUnlockCost,
 } from "@/lib/coins";
+import { loadAreaIndex } from "@/lib/data/areas";
 import { getCoinHistory, getCoinSummary } from "@/lib/data/coins";
+import { getExpDashboard } from "@/lib/data/exp";
+import { getRecordSpace } from "@/lib/data/space";
 import { getExpProgress, LEVEL_REWARDS } from "@/lib/exp";
+import { MUNICIPALITIES, PREFECTURES } from "@/lib/geo";
 import type { CoinEventRow, Json } from "@/lib/supabase/types";
 import { requireUser } from "@/lib/supabase/server";
 
@@ -18,13 +27,16 @@ export const dynamic = "force-dynamic";
 
 export default async function CoinsPage() {
   const { supabase, user } = await requireUser();
-  const [{ data: savedExp }, summary, history] = await Promise.all([
-    supabase.from("user_exp").select("total_exp").eq("user_id", user.id).maybeSingle(),
+  const space = await getRecordSpace(supabase, user.id);
+
+  const [summary, history, expDashboard, areas] = await Promise.all([
     getCoinSummary(supabase, user.id),
     getCoinHistory(supabase, user.id),
+    getExpDashboard(supabase, user.id),
+    loadAreaIndex(supabase, space.tripIds),
   ]);
 
-  const progress = getExpProgress(savedExp?.total_exp ?? 0);
+  const progress = getExpProgress(expDashboard.totalExp);
   const nextReward = progress.nextReward;
   const nextRewardCost = getUnlockCost(nextReward);
   const stepCoinTotals = STEP_COIN_TIERS.map((tier, index) => ({
@@ -34,20 +46,51 @@ export default async function CoinsPage() {
 
   return (
     <>
-      <PageHeader title="おでかけコイン" backHref="/mypage" />
+      <TopHeader
+        title={
+          <span className="flex min-w-0 items-center gap-1.5">
+            <span className="min-w-0 truncate">{space.name}</span>
+            <IconPaw size={15} className="shrink-0 text-ink-faint" />
+          </span>
+        }
+        subtitle="おでかけも、思い出も、いっしょに。"
+        action={<CoinPill balance={summary.balance} />}
+      />
+
       <PageBody>
-        <section className="rough-card overflow-hidden bg-sun-soft/45 p-5">
-          <p className="text-xs font-bold tracking-[0.08em] text-ink-soft">所持コイン</p>
-          <p className="mt-1 flex items-center gap-2">
-            <IconCoin size={30} />
-            <span className="text-4xl leading-none font-bold tabular-nums">
-              {formatCoins(summary.balance)}
-            </span>
-            <span className="pt-2 text-sm text-ink-soft">枚</span>
-          </p>
-          <p className="mt-3 text-xs text-ink-soft">
-            これまでに獲得したコイン {formatCoins(summary.totalEarned)}枚
-          </p>
+        {/* 画面全体の余白は PageBody（space-y-6）より詰めたいので、内側で持つ */}
+        <div className="space-y-4">
+        <CoinHero balance={summary.balance} todayCoins={getStepCoins(expDashboard.todaySteps)} />
+
+        <CoinUseCards />
+
+        <CoinShopPreview />
+
+        <section className="rough-card grid grid-cols-3 gap-1 px-2.5 py-3.5">
+          <RecordStat
+            icon={<IconMapPin size={16} />}
+            label="おでかけした場所"
+            value={areas.totals.visitedPrefectures}
+            unit={`/ ${PREFECTURES.length}`}
+            note="都道府県"
+            tone="blossom"
+          />
+          <RecordStat
+            icon={<IconHome size={16} />}
+            label="訪れたエリア"
+            value={areas.totals.visitedMunicipalities}
+            unit={`/ ${MUNICIPALITIES.length}`}
+            note="市区町村など"
+            tone="sky"
+          />
+          <RecordStat
+            icon={<IconPaw size={16} />}
+            label="訪問数"
+            value={areas.totals.visits}
+            unit="回"
+            note="記録したおでかけ"
+            tone="leaf"
+          />
         </section>
 
         <section className="rough-card overflow-hidden p-5">
@@ -81,7 +124,7 @@ export default async function CoinsPage() {
           )}
         </section>
 
-        <section className="rough-card overflow-hidden">
+        <section id="coin-how-to-get" className="rough-card overflow-hidden scroll-mt-20">
           <p className="border-b border-line px-4 py-3 font-bold">コインのもらい方</p>
 
           <div className="px-4 py-4">
@@ -194,8 +237,47 @@ export default async function CoinsPage() {
             })}
           </ul>
         </details>
+        </div>
       </PageBody>
     </>
+  );
+}
+
+function RecordStat({
+  icon,
+  label,
+  value,
+  unit,
+  note,
+  tone,
+}: {
+  icon: React.ReactNode;
+  label: string;
+  value: number;
+  unit: string;
+  note: string;
+  tone: "blossom" | "sky" | "leaf";
+}) {
+  const toneClass = {
+    blossom: "bg-blossom-soft text-[#95505e]",
+    sky: "bg-sky-soft text-[#42718f]",
+    leaf: "bg-leaf-soft text-leaf-deep",
+  }[tone];
+
+  return (
+    <div className="flex min-w-0 items-center gap-1.5">
+      <span className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full ${toneClass}`}>
+        {icon}
+      </span>
+      <span className="min-w-0">
+        <span className="block truncate text-[9px] leading-tight text-ink-soft">{label}</span>
+        <span className="flex items-baseline gap-0.5">
+          <span className="text-lg leading-none font-bold tabular-nums">{value}</span>
+          <span className="text-[9px] text-ink-faint tabular-nums">{unit}</span>
+        </span>
+        <span className="block truncate text-[9px] leading-tight text-ink-faint">{note}</span>
+      </span>
+    </div>
   );
 }
 

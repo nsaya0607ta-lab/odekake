@@ -211,18 +211,54 @@ export const IconChat = (p: IconProps) => (
   </Base>
 );
 
-/** おでかけコイン。金色は固定で、currentColor には従わない */
+/** おでかけコイン（肉球入りの金貨）。金色は固定で、currentColor には従わない */
 export const IconCoin = ({ size = 22, ...p }: IconProps) => (
   <svg width={size} height={size} viewBox="0 0 24 24" fill="none" aria-hidden="true" {...p}>
-    <circle cx="12" cy="12" r="9.2" fill="#f2c464" stroke="#d9a13c" strokeWidth={1.3} />
-    <circle cx="12" cy="12" r="6.3" fill="none" stroke="#e5b352" strokeWidth={1.1} />
-    <path
-      d="M12 8.6c1.9.5 2.8 1.9 2.2 3.7-2 .4-3-1.5-2.2-3.7Zm0 0c-1.9.5-2.8 1.9-2.2 3.7 2 .4 3-1.5 2.2-3.7Z"
-      fill="#fffaf0"
-      opacity={0.9}
-    />
-    <path d="M12 12.3v2.6" stroke="#fffaf0" strokeWidth={1.2} strokeLinecap="round" opacity={0.9} />
+    <circle cx="12" cy="12.5" r="9.4" fill="#e0ab41" />
+    <circle cx="12" cy="11.8" r="9.4" fill="#f5cd74" />
+    <circle cx="12" cy="11.8" r="6.8" fill="#efbe58" opacity={0.55} />
+    <g fill="#fffaf0">
+      <ellipse cx="12" cy="13.6" rx="2.9" ry="2.3" />
+      <circle cx="8.4" cy="10.7" r="1.2" />
+      <circle cx="10.6" cy="8.9" r="1.3" />
+      <circle cx="13.4" cy="8.9" r="1.3" />
+      <circle cx="15.6" cy="10.7" r="1.2" />
+    </g>
   </svg>
+);
+
+/** 肉球 */
+export const IconPaw = ({ size = 22, ...p }: IconProps) => (
+  <svg width={size} height={size} viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" {...p}>
+    <ellipse cx="12" cy="16" rx="4.3" ry="3.5" />
+    <circle cx="6.6" cy="11.4" r="1.9" />
+    <circle cx="9.9" cy="8.4" r="2.1" />
+    <circle cx="14.1" cy="8.4" r="2.1" />
+    <circle cx="17.4" cy="11.4" r="1.9" />
+  </svg>
+);
+
+export const IconBag = (p: IconProps) => (
+  <Base {...p}>
+    <path d="M5.5 8.5h13l1 11.5h-15z" />
+    <path d="M9 8.5V7a3 3 0 0 1 6 0v1.5" />
+  </Base>
+);
+
+export const IconQuestion = (p: IconProps) => (
+  <Base {...p}>
+    <circle cx="12" cy="12" r="8.5" />
+    <path d="M9.8 9.6A2.3 2.3 0 0 1 12 8c1.4 0 2.3.9 2.3 2.1 0 1.6-2.3 1.7-2.3 3.4" />
+    <path d="M12 16.6h.01" />
+  </Base>
+);
+
+export const IconClipboard = (p: IconProps) => (
+  <Base {...p}>
+    <rect x="5.5" y="4.5" width="13" height="15" rx="2.5" />
+    <path d="M9.5 4.5V3h5v1.5" />
+    <path d="M9 10h6M9 13.5h4" />
+  </Base>
 );
 
 export const IconLock = (p: IconProps) => (
