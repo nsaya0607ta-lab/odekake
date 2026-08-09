@@ -102,9 +102,17 @@ const WINK_MS = 1000;
  * STEP_MS × 2 で進む距離が釣り合うように決めてある。ここを崩すと
  * 足だけ動いて進まない／氷の上を滑る、のどちらかになる。
  */
-const SPEED = 3.75;
-/** 立ち姿と踏み出しを入れ替える間隔（ms） */
-const STEP_MS = 680;
+const SPEED = 6;
+/**
+ * 立ち姿と踏み出しを入れ替える間隔（ms）。
+ *
+ * 1歩の絵の踏み出し幅は決まっているので、間隔を詰めたぶんだけ速度を上げないと
+ * 足だけ動いて進まない。SPEED × STEP_MS × 2 ＝ 1歩の幅、の関係は保ってある
+ * （6 × 0.42 × 2 ＝ 5.04%、以前の 3.75 × 0.68 × 2 ＝ 5.1% とほぼ同じ）。
+ * 毎秒1.5枚だとどうしてもパラパラ漫画に見えるので、歩幅はそのままに毎秒2.4枚まで
+ * 上げてある。
+ */
+const STEP_MS = 420;
 /** 振り向きにかける時間（ms）。止まっている間に終わる */
 const TURN_MS = 520;
 
@@ -138,6 +146,7 @@ export function WanderingFrenchie({ level = 1 }: { level?: number }) {
   });
   const [stepUp, setStepUp] = useState(false);
   const poseNodes = useRef<Partial<Record<Pose, HTMLImageElement | null>>>({});
+  const bobNode = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
@@ -219,16 +228,30 @@ export function WanderingFrenchie({ level = 1 }: { level?: number }) {
     node.classList.add(playClass);
   }, [activePose]);
 
+  // 立ち止まって仕草が変わるたび、体をひと沈みさせて絵の入れ替わりを隠す
+  useEffect(() => {
+    const node = bobNode.current;
+    if (!node) return;
+    if (walker.walking) {
+      // 歩行中は同じ層を bob が使う。残しておくと取り合いになる
+      node.classList.remove("frenchie-settle");
+      return;
+    }
+    node.classList.remove("frenchie-settle");
+    void node.offsetWidth;
+    node.classList.add("frenchie-settle");
+  }, [walker.pose, walker.walking]);
+
   return (
     <div className="pointer-events-none absolute inset-0 overflow-hidden" aria-hidden="true">
       <style>{`
         /* 上下は1歩ごと、左右の揺れは2歩で1往復。踏み替え（0% / 50%）を必ず
            いちばん低いところに合わせると、絵が入れ替わる瞬間が沈み込みに隠れる */
         @keyframes frenchie-bob {
-          0%, 100% { transform: translateY(0)      rotate(-0.7deg); }
-          25%      { transform: translateY(-2.5px) rotate(-0.2deg); }
-          50%      { transform: translateY(0)      rotate(0.7deg); }
-          75%      { transform: translateY(-2.5px) rotate(0.2deg); }
+          0%, 100% { transform: translateY(1px)  rotate(-0.9deg) scale(1.03, 0.97); }
+          25%      { transform: translateY(-4px) rotate(-0.2deg) scale(0.985, 1.015); }
+          50%      { transform: translateY(1px)  rotate(0.9deg)  scale(1.03, 0.97); }
+          75%      { transform: translateY(-4px) rotate(0.2deg)  scale(0.985, 1.015); }
         }
         .frenchie-bob { transform-origin: 50% 92%; }
         .frenchie-walking .frenchie-bob {
@@ -245,9 +268,23 @@ export function WanderingFrenchie({ level = 1 }: { level?: number }) {
           animation: frenchie-breath 3400ms ease-in-out infinite;
         }
         .frenchie-walking .frenchie-breath { animation: none; }
-        /* 仕草の切り替えはふわっと。歩行のコマ送りは瞬時でないと足がぼやける */
-        .frenchie-pose { transition: opacity 200ms ease; }
+        /* 仕草の切り替え。長く重ねると別々に描かれた体が二重写しになるので、
+           下の frenchie-settle が沈み込んでいる間に切り替えを終わらせる */
+        .frenchie-pose { transition: opacity 120ms ease; }
         .frenchie-walking .frenchie-pose { transition: none; }
+
+        /* 立ち止まって仕草が変わる瞬間。絵が入れ替わるのに合わせて一度沈んで戻る。
+           クロスフェードを「動きの中」に隠すので、静止画が溶け合うのではなく
+           犬が姿勢を変えたように見える。歩行中は同じ層を bob が使うので流さない */
+        @keyframes frenchie-settle {
+          0%   { transform: translateY(3px)  scale(1.05, 0.94); }
+          45%  { transform: translateY(-3px) scale(0.98, 1.03); }
+          72%  { transform: translateY(1px)  scale(1.01, 0.99); }
+          100% { transform: translateY(0)    scale(1, 1); }
+        }
+        .frenchie-settle {
+          animation: frenchie-settle 460ms cubic-bezier(0.22, 1, 0.36, 1) both;
+        }
 
         /* ウインク：ためて、顔を寄せながら跳ね、もう一度小さく弾んで戻る。
            入りがゆっくりだと前の絵と重なって二重写しになるので短く切り替える */
@@ -269,6 +306,7 @@ export function WanderingFrenchie({ level = 1 }: { level?: number }) {
         @media (prefers-reduced-motion: reduce) {
           .frenchie-walking .frenchie-bob { animation: none; }
           .frenchie-breath { animation: none; }
+          .frenchie-settle { animation: none; }
           .frenchie-pose { transition: none; }
           .frenchie-wink { animation: none; }
         }
@@ -293,7 +331,7 @@ export function WanderingFrenchie({ level = 1 }: { level?: number }) {
           style={{ transform: `scaleX(${walker.facing})`, transitionDuration: `${TURN_MS}ms` }}
         >
           {/* 上下の揺れ */}
-          <div className="frenchie-bob">
+          <div ref={bobNode} className="frenchie-bob">
             {/* 呼吸。歩きの揺れや仕草の動きと transform を奪い合わないよう層を分ける */}
             <div className="frenchie-breath relative">
               {/* 全ポーズを重ねて置き、表示だけ切り替える。切り替え時のちらつきを防ぐ */}
