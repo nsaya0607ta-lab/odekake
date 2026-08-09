@@ -76,14 +76,12 @@ function readRecentPlaces(): PlaceSuggestion[] {
       if (!item || typeof item !== "object") return [];
       const candidate = item as Record<string, unknown>;
       if (typeof candidate.placeId !== "string" || typeof candidate.name !== "string") return [];
-      return [
-        {
-          placeId: candidate.placeId,
-          name: candidate.name,
-          address: typeof candidate.address === "string" ? candidate.address : null,
-          distanceMeters: null,
-        },
-      ];
+      return [{
+        placeId: candidate.placeId,
+        name: candidate.name,
+        address: typeof candidate.address === "string" ? candidate.address : null,
+        distanceMeters: null,
+      }];
     }).slice(0, RECENT_PLACES_MAX);
   } catch {
     return [];
@@ -110,6 +108,8 @@ export function LocationPicker({
   placeSearchEnabled = false,
   onPlaceSelected,
   draftKey = null,
+  excludedPlaceIds = [],
+  hideRecentPlaces = false,
 }: {
   initial: SpotLocation;
   error?: string;
@@ -117,13 +117,15 @@ export function LocationPicker({
   onPlaceSelected?: (place: PlaceAutofill) => void;
   /** 指定すると、画面を離れても選んだ場所を覚えておく */
   draftKey?: string | null;
+  /** 新規登録候補に出したくない、過去登録済みのGoogle Places placeId */
+  excludedPlaceIds?: string[];
+  /** 新規登録画面では、過去に選んだ場所の履歴を候補として出さない */
+  hideRecentPlaces?: boolean;
 }) {
   const provider = useMemo(() => getPlaceSearchProvider(placeSearchEnabled), [placeSearchEnabled]);
+  const excluded = useMemo(() => new Set(excludedPlaceIds), [excludedPlaceIds]);
   const rootRef = useRef<HTMLDivElement>(null);
-  // 場所は hidden input で送るため、FormDraft の DOM 復元では戻せない。
-  // React 側が値を持っているので、このコンポーネント自身で下書きを保存する。
   const [value, setValue] = useDraftState<SpotLocation>(draftKey, initial, rootRef);
-  // 現在地からの検索を最優先にするため、Places検索が使えないときだけ「別の場所から探す」を最初から開く
   const [showOther, setShowOther] = useState(!provider.enabled);
   const [otherTab, setOtherTab] = useState<OtherTab>("municipality");
   const [busy, setBusy] = useState(false);
@@ -142,8 +144,12 @@ export function LocationPicker({
   }, [placeSearchEnabled, sessionToken]);
 
   useEffect(() => {
-    setRecentPlaces(readRecentPlaces());
-  }, []);
+    if (hideRecentPlaces) {
+      setRecentPlaces([]);
+      return;
+    }
+    setRecentPlaces(readRecentPlaces().filter((place) => !excluded.has(place.placeId)));
+  }, [excluded, hideRecentPlaces]);
 
   const setMunicipalityCode = (code: string) => {
     const target = getMunicipality(code);
@@ -171,8 +177,7 @@ export function LocationPicker({
       const currentMunicipality = currentValue.municipalityCode
         ? getMunicipality(currentValue.municipalityCode)
         : undefined;
-      const found =
-        nearestMunicipality(lat, lng, currentValue.prefectureCode || undefined) ?? nearestMunicipality(lat, lng);
+      const found = nearestMunicipality(lat, lng, currentValue.prefectureCode || undefined) ?? nearestMunicipality(lat, lng);
       const keepCurrent =
         currentMunicipality &&
         currentMunicipality.lat !== null &&
@@ -224,7 +229,6 @@ export function LocationPicker({
     );
   }, []);
 
-  // 現在地の取得に失敗・拒否された場合は、自動的に地域から探す方法へ切り替える
   useEffect(() => {
     if (searchLocationStatus === "denied" || searchLocationStatus === "error" || searchLocationStatus === "unsupported") {
       setShowOther(true);
@@ -233,12 +237,8 @@ export function LocationPicker({
   }, [searchLocationStatus]);
 
   const searchNear = useMemo(() => {
-    if (searchOrigin) {
-      return { latitude: searchOrigin.latitude, longitude: searchOrigin.longitude };
-    }
-    if (value.latitude !== null && value.longitude !== null) {
-      return { latitude: value.latitude, longitude: value.longitude };
-    }
+    if (searchOrigin) return { latitude: searchOrigin.latitude, longitude: searchOrigin.longitude };
+    if (value.latitude !== null && value.longitude !== null) return { latitude: value.latitude, longitude: value.longitude };
     return null;
   }, [searchOrigin, value.latitude, value.longitude]);
 
@@ -269,17 +269,27 @@ export function LocationPicker({
         setNotice(result.message);
         return;
       }
-      setSuggestions(result.suggestions);
-      if (result.suggestions.length === 0) setNotice("該当する店舗・施設が見つかりませんでした。");
+      const visible = result.suggestions.filter((suggestion) => !excluded.has(suggestion.placeId));
+      setSuggestions(visible);
+      if (visible.length === 0) {
+        setNotice(result.suggestions.length > 0
+          ? "検索結果はすべて過去に登録済みです。別の場所を検索してください。"
+          : "該当する店舗・施設が見つかりませんでした。");
+      }
     }, 450);
 
     return () => {
       window.clearTimeout(timer);
       controller.abort();
     };
-  }, [keyword, provider, searchLocationStatus, searchNear, sessionToken]);
+  }, [excluded, keyword, provider, searchLocationStatus, searchNear, sessionToken]);
 
   const chooseSuggestion = async (suggestion: PlaceSuggestion) => {
+    if (excluded.has(suggestion.placeId)) {
+      setNotice("この場所は過去に登録済みです。記録タブから再訪を追加してください。");
+      return;
+    }
+
     const token = sessionToken || newSessionToken();
     setBusy(true);
     setNotice(null);
@@ -306,7 +316,7 @@ export function LocationPicker({
     });
     setKeyword(candidate.name);
     setSuggestions([]);
-    setRecentPlaces((current) => saveRecentPlace(suggestion, current));
+    if (!hideRecentPlaces) setRecentPlaces((current) => saveRecentPlace(suggestion, current));
     setSessionToken(newSessionToken());
   };
 
@@ -319,7 +329,6 @@ export function LocationPicker({
     if (searchLocationStatus === "denied") return "現在地：許可されていません。地域から探してください";
     if (searchLocationStatus === "unsupported") return "現在地：この端末では利用できません";
     if (searchLocationStatus === "error") return "現在地：取得できませんでした";
-    // 画面を開いただけで位置情報の許可を求めない。使うときに「取得する」を押してもらう
     return "現在地：「取得する」を押すと近くから探せます";
   })();
 
@@ -340,34 +349,6 @@ export function LocationPicker({
 
       {error ? <p className="text-xs text-[#a85c6a]">{error}</p> : null}
 
-      <div className="rough-card flex items-start justify-between gap-3 p-3">
-        <div className="min-w-0">
-          <p className="text-xs text-ink-faint">場所の指定</p>
-          <p className="mt-0.5 text-sm font-semibold">{SOURCE_LABELS[value.locationSource]}</p>
-          {value.latitude !== null && value.longitude !== null ? (
-            <p className="mt-0.5 text-[11px] text-ink-faint tabular-nums">
-              {value.latitude.toFixed(5)}, {value.longitude.toFixed(5)}
-              {formatAccuracy(value.locationAccuracyMeters) ? `・${formatAccuracy(value.locationAccuracyMeters)}` : ""}
-            </p>
-          ) : (
-            <p className="mt-0.5 text-[11px] text-ink-faint">現在地の検索または地域の選択で場所を指定します。</p>
-          )}
-        </div>
-        <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-leaf-soft text-leaf-deep">
-          <IconMapPin size={18} />
-        </span>
-      </div>
-
-      {busy ? (
-        <p className="flex items-center gap-2 px-1 text-xs text-ink-soft">
-          <IconSpinner size={16} />
-          取得しています…
-        </p>
-      ) : null}
-
-      {notice ? <p className="px-1 text-xs leading-relaxed text-[#95505e]">{notice}</p> : null}
-
-      {/* 現在地から探す：最も使う頻度が高いため一番上・最も目立つカードにする */}
       {provider.enabled ? (
         <div className="rough-card space-y-3 border-2 border-leaf bg-leaf-soft/50 p-4">
           <div className="flex items-center gap-2.5">
@@ -404,10 +385,10 @@ export function LocationPicker({
           </div>
 
           {keyword.trim().length < 2 ? (
-            <p className="px-1 text-[11px] text-ink-faint">2文字以上入力すると、現在地から近い順に候補を表示します。</p>
+            <p className="px-1 text-[11px] text-ink-faint">2文字以上入力すると、現在地から近い順に未登録の候補を表示します。</p>
           ) : null}
 
-          {keyword.trim().length < 2 && recentPlaces.length > 0 ? (
+          {!hideRecentPlaces && keyword.trim().length < 2 && recentPlaces.length > 0 ? (
             <div>
               <p className="mb-1.5 px-1 text-xs font-semibold text-ink-soft">最近選んだ場所</p>
               <div className="overflow-hidden rounded-2xl border border-line bg-card">
@@ -430,9 +411,7 @@ export function LocationPicker({
                 showDistance={Boolean(searchNear)}
               />
               <p className="border-t border-line px-4 py-2 text-right">
-                <span translate="no" className="whitespace-nowrap font-sans text-xs font-normal tracking-normal text-[#5e5e5e]">
-                  Google マップ
-                </span>
+                <span translate="no" className="whitespace-nowrap font-sans text-xs font-normal tracking-normal text-[#5e5e5e]">Google マップ</span>
               </p>
             </div>
           ) : null}
@@ -440,10 +419,7 @@ export function LocationPicker({
           {searchLocationStatus === "ready" ? (
             <button
               type="button"
-              onClick={() =>
-                searchOrigin &&
-                applyCoordinates(searchOrigin.latitude, searchOrigin.longitude, "device", searchOrigin.accuracyMeters)
-              }
+              onClick={() => searchOrigin && applyCoordinates(searchOrigin.latitude, searchOrigin.longitude, "device", searchOrigin.accuracyMeters)}
               className="px-1 text-left text-[11px] font-semibold text-leaf-deep underline underline-offset-2"
             >
               候補にない場合は、この現在地をそのまま使う
@@ -456,7 +432,33 @@ export function LocationPicker({
         </p>
       )}
 
-      {/* 別の場所から探す：都道府県・市区町村や地図からの指定は、必要なときだけ開く */}
+      {busy ? (
+        <p className="flex items-center gap-2 px-1 text-xs text-ink-soft">
+          <IconSpinner size={16} />
+          取得しています…
+        </p>
+      ) : null}
+
+      {notice ? <p className="px-1 text-xs leading-relaxed text-[#95505e]">{notice}</p> : null}
+
+      <div className="rough-card flex items-start justify-between gap-3 p-3">
+        <div className="min-w-0">
+          <p className="text-xs text-ink-faint">場所の指定</p>
+          <p className="mt-0.5 text-sm font-semibold">{SOURCE_LABELS[value.locationSource]}</p>
+          {value.latitude !== null && value.longitude !== null ? (
+            <p className="mt-0.5 text-[11px] text-ink-faint tabular-nums">
+              {value.latitude.toFixed(5)}, {value.longitude.toFixed(5)}
+              {formatAccuracy(value.locationAccuracyMeters) ? `・${formatAccuracy(value.locationAccuracyMeters)}` : ""}
+            </p>
+          ) : (
+            <p className="mt-0.5 text-[11px] text-ink-faint">現在地の検索または地域の選択で場所を指定します。</p>
+          )}
+        </div>
+        <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-leaf-soft text-leaf-deep">
+          <IconMapPin size={18} />
+        </span>
+      </div>
+
       <div className="rough-card overflow-hidden">
         <button
           type="button"
@@ -478,9 +480,7 @@ export function LocationPicker({
                   aria-pressed={otherTab === option.value}
                   onClick={() => setOtherTab(option.value)}
                   className={`rough-pill border px-3 py-1.5 text-xs font-semibold transition-colors ${
-                    otherTab === option.value
-                      ? "border-leaf bg-leaf-soft text-leaf-deep"
-                      : "border-line-strong bg-card text-ink-soft"
+                    otherTab === option.value ? "border-leaf bg-leaf-soft text-leaf-deep" : "border-line-strong bg-card text-ink-soft"
                   }`}
                 >
                   {option.label}
@@ -580,18 +580,12 @@ function PlaceSuggestionList({
                 <span className="flex items-baseline gap-2">
                   <span className="block min-w-0 flex-1 truncate text-sm font-semibold">{suggestion.name}</span>
                   {distance ? (
-                    <span className="shrink-0 rounded-full bg-leaf-soft px-2 py-0.5 text-[10px] font-semibold text-leaf-deep tabular-nums">
-                      {distance}
-                    </span>
+                    <span className="shrink-0 rounded-full bg-leaf-soft px-2 py-0.5 text-[10px] font-semibold text-leaf-deep tabular-nums">{distance}</span>
                   ) : null}
                 </span>
-                {suggestion.address ? (
-                  <span className="mt-0.5 block truncate text-[11px] text-ink-faint">{suggestion.address}</span>
-                ) : null}
+                {suggestion.address ? <span className="mt-0.5 block truncate text-[11px] text-ink-faint">{suggestion.address}</span> : null}
               </span>
-              {selectedPlaceId === suggestion.placeId ? (
-                <IconCheck size={16} className="shrink-0 text-leaf-deep" />
-              ) : null}
+              {selectedPlaceId === suggestion.placeId ? <IconCheck size={16} className="shrink-0 text-leaf-deep" /> : null}
             </button>
           </li>
         );

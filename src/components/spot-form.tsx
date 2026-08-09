@@ -61,6 +61,7 @@ export function SpotForm({
   placeSearchEnabled = false,
   userId,
   trips = [],
+  visitedPlaceIds = [],
   visitedAtDefault = "",
   showTripPlanningLink = false,
   locationFromUrl = false,
@@ -73,6 +74,8 @@ export function SpotForm({
   placeSearchEnabled?: boolean;
   userId?: string;
   trips?: SpotFormTrip[];
+  /** このユーザーが過去に登録したGoogle PlacesのplaceId。新規候補から除外する */
+  visitedPlaceIds?: string[];
   visitedAtDefault?: string;
   showTripPlanningLink?: boolean;
   /** 市区町村ページなどから場所を指定して開いた場合。下書きで上書きしない */
@@ -127,6 +130,18 @@ export function SpotForm({
       <section className="space-y-4">
         {!isEdit ? <h2 className="px-1 text-base font-bold">場所</h2> : null}
 
+        {!isEdit ? (
+          <LocationPicker
+            initial={location}
+            error={state.fieldErrors?.municipalityCode}
+            placeSearchEnabled={placeSearchEnabled}
+            onPlaceSelected={applyPlaceAutofill}
+            draftKey={locationFromUrl ? null : "visited-place-new-location"}
+            excludedPlaceIds={visitedPlaceIds}
+            hideRecentPlaces
+          />
+        ) : null}
+
         <Field label="スポット名" htmlFor="name" error={state.fieldErrors?.name}>
           <input
             id="name"
@@ -151,13 +166,15 @@ export function SpotForm({
           </select>
         </Field>
 
-        <LocationPicker
-          initial={location}
-          error={state.fieldErrors?.municipalityCode}
-          placeSearchEnabled={placeSearchEnabled}
-          onPlaceSelected={applyPlaceAutofill}
-          draftKey={isEdit || locationFromUrl ? null : "visited-place-new-location"}
-        />
+        {isEdit ? (
+          <LocationPicker
+            initial={location}
+            error={state.fieldErrors?.municipalityCode}
+            placeSearchEnabled={placeSearchEnabled}
+            onPlaceSelected={applyPlaceAutofill}
+            draftKey={null}
+          />
+        ) : null}
 
         <Field label="住所" htmlFor="address" optional error={state.fieldErrors?.address}>
           <input
@@ -249,7 +266,6 @@ export function SpotForm({
             </p>
           )}
 
-          {/* すぐ押せることに意味があるので、折りたたみの外に出しておく */}
           <div className="rough-card space-y-2 px-4 py-3">
             <label className="flex items-center gap-2 text-sm">
               <input
@@ -289,39 +305,15 @@ export function SpotForm({
 
               <div className="grid grid-cols-2 gap-3">
                 <Field label="使用金額" htmlFor="amount" optional error={state.fieldErrors?.amount}>
-                  <input
-                    id="amount"
-                    name="amount"
-                    type="number"
-                    inputMode="numeric"
-                    min={0}
-                    className="field"
-                    defaultValue={state.values?.amount ?? ""}
-                    placeholder="1200"
-                  />
+                  <input id="amount" name="amount" type="number" inputMode="numeric" min={0} className="field" defaultValue={state.values?.amount ?? ""} placeholder="1200" />
                 </Field>
-
                 <Field label="滞在時間（分）" htmlFor="stayMinutes" optional error={state.fieldErrors?.stayMinutes}>
-                  <input
-                    id="stayMinutes"
-                    name="stayMinutes"
-                    type="number"
-                    inputMode="numeric"
-                    min={0}
-                    className="field"
-                    defaultValue={state.values?.stayMinutes ?? ""}
-                    placeholder="60"
-                  />
+                  <input id="stayMinutes" name="stayMinutes" type="number" inputMode="numeric" min={0} className="field" defaultValue={state.values?.stayMinutes ?? ""} placeholder="60" />
                 </Field>
               </div>
 
               <Field label="混雑状況" htmlFor="congestionLevel" optional>
-                <select
-                  id="congestionLevel"
-                  name="congestionLevel"
-                  className="field"
-                  defaultValue={state.values?.congestionLevel ?? ""}
-                >
+                <select id="congestionLevel" name="congestionLevel" className="field" defaultValue={state.values?.congestionLevel ?? ""}>
                   <option value="">選択しない</option>
                   <option value="1">空いていた</option>
                   <option value="2">ふつう</option>
@@ -330,16 +322,8 @@ export function SpotForm({
               </Field>
 
               <Field label="タグ" htmlFor="tags" optional hint="スペースやカンマで区切って入力できます。">
-                <input
-                  id="tags"
-                  name="tags"
-                  type="text"
-                  className="field"
-                  defaultValue={state.values?.tags ?? ""}
-                  placeholder="ランチ ひとり時間"
-                />
+                <input id="tags" name="tags" type="text" className="field" defaultValue={state.values?.tags ?? ""} placeholder="ランチ ひとり時間" />
               </Field>
-
             </div>
           </details>
         </section>
@@ -350,81 +334,24 @@ export function SpotForm({
         <div className="mt-4 space-y-4">
           <div className="grid grid-cols-2 gap-3">
             <Field label="郵便番号" htmlFor="postalCode" optional>
-              <input
-                id="postalCode"
-                name="postalCode"
-                type="text"
-                inputMode="numeric"
-                className="field"
-                defaultValue={initial.postalCode}
-                placeholder="500-8701"
-                maxLength={10}
-              />
+              <input id="postalCode" name="postalCode" type="text" inputMode="numeric" className="field" defaultValue={initial.postalCode} placeholder="500-8701" maxLength={10} />
             </Field>
             <Field label="電話番号" htmlFor="phone" optional>
-              <input
-                id="phone"
-                name="phone"
-                type="tel"
-                inputMode="tel"
-                className="field"
-                defaultValue={initial.phone}
-                placeholder="058-000-0000"
-                maxLength={20}
-              />
+              <input id="phone" name="phone" type="tel" inputMode="tel" className="field" defaultValue={initial.phone} placeholder="058-000-0000" maxLength={20} />
             </Field>
           </div>
 
           <Field label="営業時間" htmlFor="openingHours" optional>
-            <input
-              id="openingHours"
-              name="openingHours"
-              type="text"
-              className="field"
-              defaultValue={initial.openingHours}
-              placeholder="10:00〜18:00"
-              maxLength={120}
-            />
+            <input id="openingHours" name="openingHours" type="text" className="field" defaultValue={initial.openingHours} placeholder="10:00〜18:00" maxLength={120} />
           </Field>
-
           <Field label="定休日" htmlFor="closedDays" optional>
-            <input
-              id="closedDays"
-              name="closedDays"
-              type="text"
-              className="field"
-              defaultValue={initial.closedDays}
-              placeholder="水曜日"
-              maxLength={120}
-            />
+            <input id="closedDays" name="closedDays" type="text" className="field" defaultValue={initial.closedDays} placeholder="水曜日" maxLength={120} />
           </Field>
-
           <Field label="公式URL" htmlFor="websiteUrl" optional error={state.fieldErrors?.websiteUrl}>
-            <input
-              id="websiteUrl"
-              name="websiteUrl"
-              type="url"
-              inputMode="url"
-              autoCapitalize="none"
-              autoCorrect="off"
-              spellCheck={false}
-              className="field"
-              defaultValue={initial.websiteUrl}
-              placeholder="https://example.com"
-              maxLength={300}
-            />
+            <input id="websiteUrl" name="websiteUrl" type="url" inputMode="url" autoCapitalize="none" autoCorrect="off" spellCheck={false} className="field" defaultValue={initial.websiteUrl} placeholder="https://example.com" maxLength={300} />
           </Field>
-
           <Field label="場所メモ" htmlFor="memo" optional>
-            <textarea
-              id="memo"
-              name="memo"
-              rows={3}
-              className="field"
-              defaultValue={initial.memo}
-              placeholder="落ち着いた雰囲気のカフェ"
-              maxLength={1000}
-            />
+            <textarea id="memo" name="memo" rows={3} className="field" defaultValue={initial.memo} placeholder="落ち着いた雰囲気のカフェ" maxLength={1000} />
           </Field>
         </div>
       </details>
@@ -435,25 +362,18 @@ export function SpotForm({
         </p>
       ) : null}
 
-      <SubmitButton
-        pendingLabel="保存中…"
-        disabled={!isEdit && (trips.length === 0 || !tripId || !visitId)}
-      >
+      <SubmitButton pendingLabel="保存中…" disabled={!isEdit && (trips.length === 0 || !tripId || !visitId)}>
         {isEdit ? "変更を保存する" : "行った場所を登録する"}
       </SubmitButton>
-      {!isEdit ? (
-        <p className="text-center text-xs text-ink-faint">場所と訪問履歴をまとめて保存し、日本地図へ反映します。</p>
-      ) : null}
+      {!isEdit ? <p className="text-center text-xs text-ink-faint">場所と訪問履歴をまとめて保存し、日本地図へ反映します。</p> : null}
 
       {!isEdit && showTripPlanningLink ? (
-        <div className="rough-card space-y-3 p-4 text-center">
-          <p className="font-semibold">旅行としてまとめたい場合</p>
-          <p className="text-xs leading-relaxed text-ink-soft">
-            日程や表紙を設定して、複数の訪問記録をひとつの旅行としてまとめられます。普段のおでかけ記録には作成不要です。
-          </p>
-          <Link href="/trips/new" className="btn btn-quiet w-full">
-            旅行の計画を立てる
-          </Link>
+        <div className="rough-card space-y-3 p-4">
+          <div>
+            <p className="font-semibold">旅行としてまとめたい場合</p>
+            <p className="mt-1 text-xs leading-relaxed text-ink-soft">先に旅行の予定を作ると、記録先でその旅行を選べます。</p>
+          </div>
+          <Link href="/trips/new" className="btn btn-quiet w-full">旅行の計画を立てる</Link>
         </div>
       ) : null}
     </form>
