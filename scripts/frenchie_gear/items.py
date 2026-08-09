@@ -131,11 +131,12 @@ def sky_bandana(pose: str, m: Masks) -> Layer:
 
 # ---------------------------------------------------------------- くびわ
 
-# 飾りの色。バンダナ（淡い緑や水色）の上でも沈まない明るさに寄せてある
+# 飾りの色（本体, ハイライトの弧）。バンダナ（淡い緑や水色）の上でも沈まない明るさに
+# 寄せてある。形はどれも同じ丸いビーズで、色だけ首輪ごとに変える
 CHARM_FILL = {
-    "leaf": (198, 222, 148, 255),
-    "sun": (244, 196, 122, 255),
-    "star": (248, 214, 108, 255),
+    "leaf": ((172, 208, 122, 255), (118, 162, 90, 255)),
+    "sun": ((244, 196, 122, 255), (222, 132, 88, 255)),
+    "star": ((150, 176, 224, 255), (94, 122, 176, 255)),
 }
 
 
@@ -174,30 +175,15 @@ def _collar(pose: str, m: Masks, body: tuple[int, int, int], charm: str) -> Laye
     cy += r * 0.95
     edge_color = (74, 62, 48, 235)
 
-    def stroked(points_for) -> None:
-        d.polygon(points_for(1.34), fill=edge_color)
-        d.polygon(points_for(1.0), fill=CHARM_FILL[charm])
-
-    if charm == "leaf":
-        stroked(lambda k: [(cx, cy - r * k), (cx + r * 0.74 * k, cy), (cx, cy + r * k), (cx - r * 0.74 * k, cy)])
-        d.line([(cx, cy - r * 0.7), (cx, cy + r * 0.7)], fill=(104, 146, 78, 255), width=max(1, int(r * 0.2)))
-    elif charm == "sun":
-        d.ellipse([cx - r * 1.28, cy - r * 1.28, cx + r * 1.28, cy + r * 1.28], fill=edge_color)
-        d.ellipse([cx - r, cy - r, cx + r, cy + r], fill=CHARM_FILL[charm])
-        d.arc(
-            [cx - r * 0.62, cy - r * 0.5, cx + r * 0.62, cy + r * 0.74],
-            190, 350, fill=(222, 132, 88, 255), width=max(1, int(r * 0.3)),
-        )
-    else:  # star
-        def star(k: float) -> list[tuple[float, float]]:
-            pts = []
-            for i in range(10):
-                a = math.radians(i * 36 - 90)
-                rr = (r if i % 2 == 0 else r * 0.46) * k
-                pts.append((cx + math.cos(a) * rr, cy + math.sin(a) * rr))
-            return pts
-
-        stroked(star)
+    # 飾りの形はどれも同じ丸いビーズにする。葉や星の輪郭にすると首輪ごとに
+    # 印象がばらつくので、色とハイライトの向きだけで書き分ける
+    fill, glow = CHARM_FILL[charm]
+    d.ellipse([cx - r * 1.28, cy - r * 1.28, cx + r * 1.28, cy + r * 1.28], fill=edge_color)
+    d.ellipse([cx - r, cy - r, cx + r, cy + r], fill=fill)
+    d.arc(
+        [cx - r * 0.62, cy - r * 0.5, cx + r * 0.62, cy + r * 0.74],
+        190, 350, fill=glow, width=max(1, int(r * 0.3)),
+    )
     return R.stamp(layer, R._shrink(big, CANVAS))
 
 
@@ -212,14 +198,8 @@ def sunset_collar(pose: str, m: Masks) -> Layer:
 
 
 def starry_collar(pose: str, m: Masks) -> Layer:
-    layer = _collar(pose, m, (63, 78, 126), "star")
-    neck = m["neck"]
-    if not neck.any():
-        return layer
-    # 帯の上にだけ星を散らす。帯の外にこぼれないよう、描いた帯を型紙にする
-    strap = np.asarray(layer)[..., 3] > 120
-    stars = R.pattern_dots(CANVAS, strap, (244, 214, 122, 255), shape="star", spacing=9, radius=1.5)
-    return R.stamp(layer, stars, strap)
+    # 若葉・夕焼けと同じ帯＋丸いビーズの形。色だけ夜空の紺にする
+    return _collar(pose, m, (63, 78, 126), "star")
 
 
 # ---------------------------------------------------------------- リュック
