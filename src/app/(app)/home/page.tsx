@@ -108,7 +108,7 @@ export default async function HomePage({ searchParams }: { searchParams: Promise
         </section>
 
         <div className="grid grid-cols-2 items-stretch gap-3">
-          <section className="grid min-w-0 grid-rows-[40px_272px]">
+          <section className="grid min-w-0 grid-rows-[40px_240px]">
             <div className="flex h-10 items-center justify-between gap-2 px-1">
               <h2 className="truncate text-base font-bold">最近の記録</h2>
               <Link href="/records" className="flex shrink-0 items-center gap-0.5 text-sm text-leaf-deep">
@@ -164,15 +164,13 @@ export default async function HomePage({ searchParams }: { searchParams: Promise
             )}
           </section>
 
-          <section className="grid min-w-0 grid-rows-[40px_272px]">
+          <section className="grid min-w-0 grid-rows-[40px_240px]">
             <div className="flex h-10 items-center px-1">
               <h2 className="truncate text-base font-bold">今日の歩数</h2>
             </div>
             <TodayStepsCard
               initialSteps={expDashboard.todaySteps}
               initialStepExp={expDashboard.todayStepExp}
-              initialCoinBalance={coins.balance}
-              nextRewardName={expProgress.nextReward?.name ?? null}
             />
           </section>
         </div>
