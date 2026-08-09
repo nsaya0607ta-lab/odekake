@@ -4,6 +4,7 @@ import {
   IconCalendar,
   IconChat,
   IconChevronRight,
+  IconCoin,
   IconFlag,
   IconHeart,
   IconLogout,
@@ -79,6 +80,7 @@ export default async function MyPage() {
             <MenuItem href="/mypage/wishlist" icon={<IconFlag size={20} />} label="また行きたい場所" />
             <MenuItem href="/records?tab=trips" icon={<IconCalendar size={20} />} label="旅行の計画" />
             <MenuItem href="/mypage/exp-history" icon={<IconStar size={20} />} label="おでかけレベル・EXP履歴" />
+            <MenuItem href="/mypage/coins" icon={<IconCoin size={20} />} label="おでかけコイン" />
           </ul>
         </nav>
 

@@ -342,24 +342,25 @@ select pg_temp.record('EXP: 写真を増やしても二重付与されない',
 -- -------------------------------------------------------------
 -- 歩数EXP（日付単位の累積・最大35EXP）
 -- -------------------------------------------------------------
+-- 歩数RPCは8日以上前の日付を受け付けないため、日付は固定せず「日本時間の今日」を使う。
 select pg_temp.expect_ok('歩数: 10000歩を日次同期できる', :'alice',
-  $q$select public.record_daily_steps('2026-01-12', 10000)$q$);
+  $q$select public.record_daily_steps((timezone('Asia/Tokyo', now()))::date, 10000)$q$);
 select pg_temp.record('歩数: 10000歩は22EXP',
   (select earned_exp from public.daily_steps
-    where user_id = :'alice' and step_date = '2026-01-12') = 22
+    where user_id = :'alice' and step_date = (timezone('Asia/Tokyo', now()))::date) = 22
   and (select total_exp from public.user_exp where user_id = :'alice') = 967);
 
 select pg_temp.expect_ok('歩数: 同じ日の20000歩へ累積更新できる', :'alice',
-  $q$select public.record_daily_steps('2026-01-12', 20000)$q$);
+  $q$select public.record_daily_steps((timezone('Asia/Tokyo', now()))::date, 20000)$q$);
 select pg_temp.record('歩数: 20000歩は日次最大35EXPで差分だけ増える',
   (select earned_exp from public.daily_steps
-    where user_id = :'alice' and step_date = '2026-01-12') = 35
+    where user_id = :'alice' and step_date = (timezone('Asia/Tokyo', now()))::date) = 35
   and (select total_exp from public.user_exp where user_id = :'alice') = 980
   and (select count(*) from public.exp_events
          where user_id = :'alice' and event_type = 'steps') = 1);
 
 select pg_temp.expect_ok('歩数: 同じ値を再同期できる', :'alice',
-  $q$select public.record_daily_steps('2026-01-12', 20000)$q$);
+  $q$select public.record_daily_steps((timezone('Asia/Tokyo', now()))::date, 20000)$q$);
 select pg_temp.record('歩数: 同じ値の再同期では二重付与されない',
   (select total_exp from public.user_exp where user_id = :'alice') = 980
   and (select count(*) from public.exp_events
@@ -367,6 +368,59 @@ select pg_temp.record('歩数: 同じ値の再同期では二重付与されな�
 
 select pg_temp.expect_count('歩数: 他人の日次歩数は見えない', :'bob',
   format($q$select 1 from public.daily_steps where user_id = %L$q$, :'alice'), 0);
+
+-- -------------------------------------------------------------
+-- おでかけコイン（レベルアップ報酬 ＋ 歩数報酬）
+-- -------------------------------------------------------------
+-- ここまでで alice は 980EXP = Lv.7。
+-- レベルアップ報酬 Lv.2〜5 が各100枚、Lv.6〜7 が各150枚で 700枚。
+-- 歩数報酬は 20000歩なので日次上限の70枚。
+select pg_temp.record('コイン: alice は Lv.7 になっている',
+  public.exp_level_of((select total_exp from public.user_exp where user_id = :'alice')) = 7);
+
+select pg_temp.record('コイン: レベルアップ報酬が到達レベルごとに1回だけ入る',
+  (select count(*) from public.coin_events
+     where user_id = :'alice' and event_type = 'level_up') = 6
+  and (select sum(amount) from public.coin_events
+         where user_id = :'alice' and event_type = 'level_up') = 700);
+
+select pg_temp.record('コイン: 歩数報酬は1日1行で最大70枚',
+  (select count(*) from public.coin_events
+     where user_id = :'alice' and event_type = 'steps') = 1
+  and (select amount from public.coin_events
+         where user_id = :'alice' and event_type = 'steps') = 70);
+
+select pg_temp.record('コイン: 残高は台帳の合計と一致する',
+  (select balance from public.user_coins where user_id = :'alice') = 770
+  and (select total_earned from public.user_coins where user_id = :'alice') = 770
+  and (select sum(amount) from public.coin_events where user_id = :'alice') = 770);
+
+select pg_temp.record('コイン: 3000歩未満ではもらえない',
+  public.calculate_step_coins(2999) = 0 and public.calculate_step_coins(3000) = 10);
+
+select pg_temp.expect_ok('コイン: 歩数を減らして再同期できる', :'alice',
+  $q$select public.record_daily_steps((timezone('Asia/Tokyo', now()))::date, 5000)$q$);
+select pg_temp.record('コイン: 歩数が減ると歩数コインも減る（レベル分は残る）',
+  (select amount from public.coin_events
+     where user_id = :'alice' and event_type = 'steps') = 20
+  and (select balance from public.user_coins where user_id = :'alice') = 720);
+
+select pg_temp.expect_count('コイン: 本人は自分の台帳を見られる', :'alice',
+  'select 1 from public.coin_events', 7);
+select pg_temp.expect_count('コイン: 他人の台帳は見えない', :'bob',
+  format($q$select 1 from public.coin_events where user_id = %L$q$, :'alice'), 0);
+select pg_temp.expect_count('コイン: 他人の残高は見えない', :'bob',
+  format($q$select 1 from public.user_coins where user_id = %L$q$, :'alice'), 0);
+select pg_temp.expect_count('コイン: 本人は自分の残高を見られる', :'alice',
+  'select 1 from public.user_coins', 1);
+
+select pg_temp.expect_denied('コイン: 台帳へ任意のコインを直接追加できない', :'alice', format(
+  $q$insert into public.coin_events (user_id, event_type, amount, idempotency_key)
+     values (%L, 'level_up', 9999, 'manual-cheat')$q$, :'alice'));
+select pg_temp.expect_blocked('コイン: 残高を直接書き換えられない', :'alice', format(
+  $q$update public.user_coins set balance = 99999 where user_id = %L$q$, :'alice'));
+select pg_temp.record('コイン: 直接の書き換えは反映されない',
+  (select balance from public.user_coins where user_id = :'alice') = 720);
 
 -- -------------------------------------------------------------
 -- プロフィールの公開範囲
@@ -466,6 +520,12 @@ select pg_temp.record('オーナー削除で旅行・記録・スポットがす
   (select count(*) from public.trips) = 0
   and (select count(*) from public.visit_records) = 0
   and (select count(*) from public.spots) = 0);
+
+select pg_temp.record('オーナー削除でEXPとコインの台帳・残高も消える',
+  (select count(*) from public.exp_events) = 0
+  and (select count(*) from public.user_exp) = 0
+  and (select count(*) from public.coin_events) = 0
+  and (select count(*) from public.user_coins) = 0);
 
 -- -------------------------------------------------------------
 -- 結果

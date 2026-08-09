@@ -210,3 +210,24 @@ export const IconChat = (p: IconProps) => (
     <path d="M20.2 12c0 3.8-3.7 6.9-8.2 6.9-1 0-2-.2-2.9-.5l-4.3 1.4 1.4-3.6C4.7 15 3.8 13.6 3.8 12c0-3.8 3.7-6.9 8.2-6.9s8.2 3.1 8.2 6.9Z" />
   </Base>
 );
+
+/** おでかけコイン。金色は固定で、currentColor には従わない */
+export const IconCoin = ({ size = 22, ...p }: IconProps) => (
+  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" aria-hidden="true" {...p}>
+    <circle cx="12" cy="12" r="9.2" fill="#f2c464" stroke="#d9a13c" strokeWidth={1.3} />
+    <circle cx="12" cy="12" r="6.3" fill="none" stroke="#e5b352" strokeWidth={1.1} />
+    <path
+      d="M12 8.6c1.9.5 2.8 1.9 2.2 3.7-2 .4-3-1.5-2.2-3.7Zm0 0c-1.9.5-2.8 1.9-2.2 3.7 2 .4 3-1.5 2.2-3.7Z"
+      fill="#fffaf0"
+      opacity={0.9}
+    />
+    <path d="M12 12.3v2.6" stroke="#fffaf0" strokeWidth={1.2} strokeLinecap="round" opacity={0.9} />
+  </svg>
+);
+
+export const IconLock = (p: IconProps) => (
+  <Base {...p}>
+    <rect x="5" y="10.5" width="14" height="9.5" rx="2.4" />
+    <path d="M8.5 10.5V8a3.5 3.5 0 0 1 7 0v2.5" />
+  </Base>
+);

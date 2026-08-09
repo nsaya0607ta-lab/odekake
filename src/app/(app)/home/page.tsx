@@ -9,11 +9,14 @@ import {
 } from "@/components/icons";
 import { TopHeader } from "@/components/page-header";
 import { PageBody } from "@/components/page-body";
+import { CoinBadge } from "@/components/coin-badge";
 import { LevelTag } from "@/components/level-tag";
 import { TodayStepsCard } from "@/components/today-steps-card";
 import { EmptyState, LinkRow, formatDate } from "@/components/ui";
 import { WanderingFrenchie } from "@/components/wandering-frenchie";
+import { getUnlockCost } from "@/lib/coins";
 import { loadAreaIndex } from "@/lib/data/areas";
+import { getCoinSummary } from "@/lib/data/coins";
 import { getExpDashboard } from "@/lib/data/exp";
 import { formatTripPeriod, getTripSummaries, type TripSummary } from "@/lib/data/trips";
 import { getTimeline } from "@/lib/data/visits";
@@ -29,11 +32,12 @@ export default async function HomePage({ searchParams }: { searchParams: Promise
   const [{ supabase, user }, { notice }] = await Promise.all([requireUser(), searchParams]);
   const space = await getRecordSpace(supabase, user.id);
 
-  const [areas, recent, trips, expDashboard] = await Promise.all([
+  const [areas, recent, trips, expDashboard, coins] = await Promise.all([
     loadAreaIndex(supabase, space.tripIds),
     getTimeline(supabase, { tripIds: space.tripIds, limit: 4 }),
     getTripSummaries(supabase),
     getExpDashboard(supabase, user.id),
+    getCoinSummary(supabase, user.id),
   ]);
 
   const latest = recent[0] ?? null;
@@ -41,7 +45,7 @@ export default async function HomePage({ searchParams }: { searchParams: Promise
 
   return (
     <>
-      <TopHeader title={space.name} />
+      <TopHeader title={space.name} action={<CoinBadge balance={coins.balance} />} />
 
       <PageBody>
         {notice === "password-updated" ? (
@@ -105,7 +109,7 @@ export default async function HomePage({ searchParams }: { searchParams: Promise
         </section>
 
         <div className="grid grid-cols-2 items-stretch gap-3">
-          <section className="grid min-w-0 grid-rows-[40px_240px]">
+          <section className="grid min-w-0 grid-rows-[40px_272px]">
             <div className="flex h-10 items-center justify-between gap-2 px-1">
               <h2 className="truncate text-base font-bold">最近の記録</h2>
               <Link href="/records" className="flex shrink-0 items-center gap-0.5 text-sm text-leaf-deep">
@@ -161,13 +165,16 @@ export default async function HomePage({ searchParams }: { searchParams: Promise
             )}
           </section>
 
-          <section className="grid min-w-0 grid-rows-[40px_240px]">
+          <section className="grid min-w-0 grid-rows-[40px_272px]">
             <div className="flex h-10 items-center px-1">
               <h2 className="truncate text-base font-bold">今日の歩数</h2>
             </div>
             <TodayStepsCard
               initialSteps={expDashboard.todaySteps}
               initialStepExp={expDashboard.todayStepExp}
+              initialCoinBalance={coins.balance}
+              nextRewardName={expProgress.nextReward?.name ?? null}
+              nextRewardCost={getUnlockCost(expProgress.nextReward)}
             />
           </section>
         </div>
