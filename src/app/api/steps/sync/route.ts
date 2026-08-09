@@ -5,8 +5,25 @@ import { todayInJapan } from "@/lib/date";
 import { requireSupabaseEnv } from "@/lib/supabase/env";
 import type { Database } from "@/lib/supabase/types";
 
+/**
+ * iPhoneショートカットのJSONフィールドは、画面上では「数字」の変数でも
+ * フィールド型がテキストのままだと "1234" や "1,234 歩" として届くことがある。
+ * 歩数として明確に解釈できる文字列だけ数値へ変換し、それ以外は従来どおり拒否する。
+ */
+const stepsSchema = z.preprocess((value) => {
+  if (typeof value !== "string") return value;
+
+  const normalized = value
+    .trim()
+    .replace(/[，,\s]/g, "")
+    .replace(/歩$/u, "");
+
+  if (!/^\d+$/.test(normalized)) return value;
+  return Number(normalized);
+}, z.number().int().min(0).max(200000));
+
 const bodySchema = z.object({
-  steps: z.number().int().min(0).max(200000),
+  steps: stepsSchema,
   date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
 });
 
