@@ -84,7 +84,24 @@ export function SpotForm({
   const initial = { ...defaults, ...(state.values ?? {}) };
   const [tripId, setTripId] = useState(state.values?.tripId ?? trips[0]?.id ?? "");
   const [visitId, setVisitId] = useState("");
+  const [locationPickerReady, setLocationPickerReady] = useState(isEdit);
   const visitIdStorageKey = "odekake:visited-place-id";
+
+  useEffect(() => {
+    if (isEdit) {
+      setLocationPickerReady(true);
+      return;
+    }
+
+    // 新規登録画面では、以前選択した場所を候補として再表示しない。
+    // 登録済みの Google Place は API 側でも候補から除外する。
+    try {
+      window.localStorage.removeItem("odekake:recent-place-searches");
+    } catch {
+      // ローカル履歴を消せなくても登録自体は続けられる
+    }
+    setLocationPickerReady(true);
+  }, [isEdit]);
 
   useEffect(() => {
     if (isEdit) return;
@@ -114,6 +131,20 @@ export function SpotForm({
         if (!isEdit) window.sessionStorage.removeItem(visitIdStorageKey);
       }}
     >
+      <style>{`
+        .location-picker-top > div {
+          display: flex;
+          flex-direction: column;
+          gap: 0.75rem;
+        }
+        .location-picker-top > div > * {
+          margin-block: 0 !important;
+        }
+        .location-picker-top > div > .border-2.border-leaf {
+          order: -10;
+        }
+      `}</style>
+
       {isEdit ? (
         <input type="hidden" name="spotId" value={spotId} />
       ) : (
@@ -126,6 +157,18 @@ export function SpotForm({
 
       <section className="space-y-4">
         {!isEdit ? <h2 className="px-1 text-base font-bold">場所</h2> : null}
+
+        {locationPickerReady ? (
+          <div className="location-picker-top">
+            <LocationPicker
+              initial={location}
+              error={state.fieldErrors?.municipalityCode}
+              placeSearchEnabled={placeSearchEnabled}
+              onPlaceSelected={applyPlaceAutofill}
+              draftKey={isEdit || locationFromUrl ? null : "visited-place-new-location"}
+            />
+          </div>
+        ) : null}
 
         <Field label="スポット名" htmlFor="name" error={state.fieldErrors?.name}>
           <input
@@ -150,14 +193,6 @@ export function SpotForm({
             ))}
           </select>
         </Field>
-
-        <LocationPicker
-          initial={location}
-          error={state.fieldErrors?.municipalityCode}
-          placeSearchEnabled={placeSearchEnabled}
-          onPlaceSelected={applyPlaceAutofill}
-          draftKey={isEdit || locationFromUrl ? null : "visited-place-new-location"}
-        />
 
         <Field label="住所" htmlFor="address" optional error={state.fieldErrors?.address}>
           <input
