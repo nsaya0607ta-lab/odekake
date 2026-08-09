@@ -248,10 +248,10 @@ export function WanderingFrenchie({ level = 1 }: { level?: number }) {
         /* 上下は1歩ごと、左右の揺れは2歩で1往復。踏み替え（0% / 50%）を必ず
            いちばん低いところに合わせると、絵が入れ替わる瞬間が沈み込みに隠れる */
         @keyframes frenchie-bob {
-          0%, 100% { transform: translateY(1px)  rotate(-0.9deg) scale(1.03, 0.97); }
-          25%      { transform: translateY(-4px) rotate(-0.2deg) scale(0.985, 1.015); }
-          50%      { transform: translateY(1px)  rotate(0.9deg)  scale(1.03, 0.97); }
-          75%      { transform: translateY(-4px) rotate(0.2deg)  scale(0.985, 1.015); }
+          0%, 100% { transform: translateY(0.5px) rotate(-0.7deg) scale(1.015, 0.99); }
+          25%      { transform: translateY(-2px)  rotate(-0.15deg) scale(0.995, 1.008); }
+          50%      { transform: translateY(0.5px) rotate(0.7deg)  scale(1.015, 0.99); }
+          75%      { transform: translateY(-2px)  rotate(0.15deg) scale(0.995, 1.008); }
         }
         .frenchie-bob { transform-origin: 50% 92%; }
         .frenchie-walking .frenchie-bob {
