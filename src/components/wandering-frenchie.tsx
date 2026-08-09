@@ -182,6 +182,9 @@ export function WanderingFrenchie({ level = 1 }: { level?: number }) {
       setStepUp(false);
       return;
     }
+    // 歩き出しは踏み出しの絵から。ここを立ち姿のまま始めると、最初の1歩ぶん
+    // （STEP_MS）だけ足を止めたまま横に滑る
+    setStepUp(true);
     const id = setInterval(() => setStepUp((v) => !v), STEP_MS);
     return () => clearInterval(id);
   }, [walker.walking]);
@@ -204,14 +207,29 @@ export function WanderingFrenchie({ level = 1 }: { level?: number }) {
   return (
     <div className="pointer-events-none absolute inset-0 overflow-hidden" aria-hidden="true">
       <style>{`
+        /* 上下は1歩ごと、左右の揺れは2歩で1往復。踏み替え（0% / 50%）を必ず
+           いちばん低いところに合わせると、絵が入れ替わる瞬間が沈み込みに隠れる */
         @keyframes frenchie-bob {
-          0%, 100% { transform: translateY(0) rotate(-0.7deg); }
-          50%      { transform: translateY(-3px) rotate(0.7deg); }
+          0%, 100% { transform: translateY(0)      rotate(-0.7deg); }
+          25%      { transform: translateY(-2.5px) rotate(-0.2deg); }
+          50%      { transform: translateY(0)      rotate(0.7deg); }
+          75%      { transform: translateY(-2.5px) rotate(0.2deg); }
         }
         .frenchie-bob { transform-origin: 50% 92%; }
         .frenchie-walking .frenchie-bob {
           animation: frenchie-bob ${STEP_MS * 2}ms ease-in-out infinite;
         }
+
+        /* 立ち止まっている間の呼吸。1枚絵のままだと完全に固まって見える */
+        @keyframes frenchie-breath {
+          0%, 100% { transform: translateY(0)    scale(1, 1); }
+          50%      { transform: translateY(-1px) scale(0.995, 1.012); }
+        }
+        .frenchie-breath {
+          transform-origin: 50% 100%;
+          animation: frenchie-breath 3400ms ease-in-out infinite;
+        }
+        .frenchie-walking .frenchie-breath { animation: none; }
         /* 仕草の切り替えはふわっと。歩行のコマ送りは瞬時でないと足がぼやける */
         .frenchie-pose { transition: opacity 200ms ease; }
         .frenchie-walking .frenchie-pose { transition: none; }
@@ -235,6 +253,7 @@ export function WanderingFrenchie({ level = 1 }: { level?: number }) {
 
         @media (prefers-reduced-motion: reduce) {
           .frenchie-walking .frenchie-bob { animation: none; }
+          .frenchie-breath { animation: none; }
           .frenchie-pose { transition: none; }
           .frenchie-wink { animation: none; }
         }
@@ -259,28 +278,31 @@ export function WanderingFrenchie({ level = 1 }: { level?: number }) {
           style={{ transform: `scaleX(${walker.facing})`, transitionDuration: `${TURN_MS}ms` }}
         >
           {/* 上下の揺れ */}
-          <div className="frenchie-bob relative">
-            {/* 全ポーズを重ねて置き、表示だけ切り替える。切り替え時のちらつきを防ぐ */}
-            {availablePoseKeys.map((pose) => (
-              // eslint-disable-next-line @next/next/no-img-element
-              <img
-                key={pose}
-                ref={(node) => {
-                  poseNodes.current[pose] = node;
-                }}
-                src={POSES[pose]}
-                alt=""
-                width={300}
-                height={254}
-                decoding="async"
-                fetchPriority={pose === "stand" || pose === "walk" ? "high" : "low"}
-                draggable={false}
-                className={`frenchie-pose ${GESTURE_POSES[pose] ? "frenchie-gesture" : ""} ${
-                  pose === "stand" ? "block" : "absolute inset-0"
-                } h-auto w-full select-none`}
-                style={{ opacity: pose === activePose ? 1 : 0 }}
-              />
-            ))}
+          <div className="frenchie-bob">
+            {/* 呼吸。歩きの揺れや仕草の動きと transform を奪い合わないよう層を分ける */}
+            <div className="frenchie-breath relative">
+              {/* 全ポーズを重ねて置き、表示だけ切り替える。切り替え時のちらつきを防ぐ */}
+              {availablePoseKeys.map((pose) => (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img
+                  key={pose}
+                  ref={(node) => {
+                    poseNodes.current[pose] = node;
+                  }}
+                  src={POSES[pose]}
+                  alt=""
+                  width={300}
+                  height={254}
+                  decoding="async"
+                  fetchPriority={pose === "stand" || pose === "walk" ? "high" : "low"}
+                  draggable={false}
+                  className={`frenchie-pose ${GESTURE_POSES[pose] ? "frenchie-gesture" : ""} ${
+                    pose === "stand" ? "block" : "absolute inset-0"
+                  } h-auto w-full select-none`}
+                  style={{ opacity: pose === activePose ? 1 : 0 }}
+                />
+              ))}
+            </div>
           </div>
         </div>
       </div>
