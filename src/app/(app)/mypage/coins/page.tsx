@@ -10,6 +10,7 @@ import { getStepCoins } from "@/lib/coins";
 import { getCoinSummary } from "@/lib/data/coins";
 import { getExpDashboard } from "@/lib/data/exp";
 import { getRecordSpace } from "@/lib/data/space";
+import { getExpProgress } from "@/lib/exp";
 import { requireUser } from "@/lib/supabase/server";
 
 export const metadata = { title: "おでかけコイン | おでかけ記録" };
@@ -40,7 +41,11 @@ export default async function CoinsPage() {
       <PageBody>
         {/* 画面全体の余白は PageBody（space-y-6）より詰めたいので、内側で持つ */}
         <div className="space-y-4">
-          <CoinHero balance={summary.balance} todayCoins={getStepCoins(expDashboard.todaySteps)} />
+          <CoinHero
+            balance={summary.balance}
+            todayCoins={getStepCoins(expDashboard.todaySteps)}
+            level={getExpProgress(expDashboard.totalExp).level}
+          />
 
           <CoinUseCards />
 

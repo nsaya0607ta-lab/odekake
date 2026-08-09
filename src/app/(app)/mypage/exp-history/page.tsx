@@ -2,7 +2,7 @@ import { IconStar } from "@/components/icons";
 import { PageBody } from "@/components/page-body";
 import { PageHeader } from "@/components/page-header";
 import { getExpHistory } from "@/lib/data/exp";
-import { getExpProgress, LEVEL_REWARDS } from "@/lib/exp";
+import { GEAR_SLOT_NAMES, getEquippedGear, getExpProgress, LEVEL_REWARDS } from "@/lib/exp";
 import { getMunicipality } from "@/lib/geo/municipalities";
 import { PREFECTURE_NAMES } from "@/lib/geo/prefecture-names";
 import type { ExpEventRow, Json } from "@/lib/supabase/types";
@@ -30,6 +30,8 @@ export default async function ExpHistoryPage() {
   ]);
   const progress = getExpProgress(savedExp?.total_exp ?? 0);
   const unlockedCount = LEVEL_REWARDS.filter((reward) => reward.level <= progress.level).length;
+  const equipped = getEquippedGear(progress.level);
+  const equippedGear = new Set(equipped.map((item) => item.reward.gear));
 
   return (
     <>
@@ -64,6 +66,41 @@ export default async function ExpHistoryPage() {
               : "Lv.30の報酬まですべて解放済みです"}
           </p>
         </section>
+
+        {equipped.length > 0 && (
+          <section className="rough-card overflow-hidden p-4">
+            <h2 className="px-1 text-sm font-bold">いま身につけているもの</h2>
+            <p className="mt-1 px-1 text-[11px] text-ink-soft">
+              同じ場所のものは、いちばん新しく解放したものを身につけます。
+            </p>
+            <ul className="mt-3 grid grid-cols-2 gap-2">
+              {equipped.map(({ slot, reward }) => (
+                <li key={slot} className="flex min-w-0 items-center gap-2.5 rounded-xl bg-paper-deep/60 px-3 py-2">
+                  <span className="relative h-11 w-11 shrink-0 overflow-hidden rounded-lg bg-paper">
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img
+                      src="/characters/frenchie/stand.webp"
+                      alt=""
+                      aria-hidden="true"
+                      className="absolute inset-0 h-full w-full object-cover object-top"
+                    />
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img
+                      src={`/characters/frenchie/gear/${reward.gear}/stand.webp`}
+                      alt=""
+                      aria-hidden="true"
+                      className="absolute inset-0 h-full w-full object-cover object-top"
+                    />
+                  </span>
+                  <span className="min-w-0">
+                    <span className="block text-[10px] text-ink-faint">{GEAR_SLOT_NAMES[slot]}</span>
+                    <span className="block truncate text-xs font-bold">{reward.name}</span>
+                  </span>
+                </li>
+              ))}
+            </ul>
+          </section>
+        )}
 
         <section>
           <h2 className="mb-2 px-1 text-sm font-bold">獲得したEXP</h2>
@@ -115,7 +152,13 @@ export default async function ExpHistoryPage() {
                   <span className={`min-w-0 flex-1 truncate text-sm ${unlocked ? "font-bold" : "text-ink-faint"}`}>
                     {reward.name}
                   </span>
-                  <span className="shrink-0 text-[10px] text-ink-faint">{unlocked ? "解放済み" : "未解放"}</span>
+                  {reward.gear && equippedGear.has(reward.gear) ? (
+                    <span className="shrink-0 rounded-full bg-leaf-soft px-2 py-0.5 text-[10px] font-bold text-leaf-deep">
+                      装備中
+                    </span>
+                  ) : (
+                    <span className="shrink-0 text-[10px] text-ink-faint">{unlocked ? "解放済み" : "未解放"}</span>
+                  )}
                 </li>
               );
             })}

@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { getEquippedGear, type GearSlot } from "@/lib/exp";
 
 /**
  * ホーム画面のバンドを歩き回るフレブル。
@@ -38,6 +39,19 @@ const POSES = {
 
 type Pose = keyof typeof POSES;
 const POSE_KEYS = Object.keys(POSES) as Pose[];
+
+/** 素材名。POSES の URL 末尾と揃えてあるので、装備の重ね絵も同じ名前で引ける */
+const POSE_FILES: Record<Pose, string> = Object.fromEntries(
+  POSE_KEYS.map((pose) => [pose, POSES[pose].replace(/^.*\/|\.webp$/g, "")]),
+) as Record<Pose, string>;
+
+/**
+ * 装備を重ねる順。
+ *
+ * 型紙は場所ごとに分かれているので普通は重ならないが、首輪だけはバンダナの襟もとに
+ * かかる。首輪をあとに置かないと、バンダナの下に潜って見えなくなる。
+ */
+const GEAR_ORDER: GearSlot[] = ["pack", "bandana", "collar", "hat"];
 
 /** 立ち止まったときの仕草と、その長さ（ms） */
 type Rest = { pose: Pose; min: number; max: number; requiredLevel?: number };
@@ -136,6 +150,12 @@ const pick = <T,>(items: readonly T[]): T => items[Math.floor(Math.random() * it
 
 export function WanderingFrenchie({ level = 1 }: { level?: number }) {
   const availablePoseKeys = POSE_KEYS.filter((pose) => (REQUIRED_LEVEL_BY_POSE.get(pose) ?? 1) <= level);
+  const gear = useMemo(() => {
+    const equipped = getEquippedGear(level);
+    return GEAR_ORDER.flatMap((slot) => equipped.filter((item) => item.slot === slot)).map(
+      (item) => item.reward.gear!,
+    );
+  }, [level]);
   const [walker, setWalker] = useState<Walker>({
     x: 26,
     depth: 0.45,
@@ -145,7 +165,7 @@ export function WanderingFrenchie({ level = 1 }: { level?: number }) {
     travelMs: 0,
   });
   const [stepUp, setStepUp] = useState(false);
-  const poseNodes = useRef<Partial<Record<Pose, HTMLImageElement | null>>>({});
+  const poseNodes = useRef<Partial<Record<Pose, HTMLDivElement | null>>>({});
   const bobNode = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -334,29 +354,48 @@ export function WanderingFrenchie({ level = 1 }: { level?: number }) {
           <div ref={bobNode} className="frenchie-bob">
             {/* 呼吸。歩きの揺れや仕草の動きと transform を奪い合わないよう層を分ける */}
             <div className="frenchie-breath relative">
-              {/* 全ポーズを重ねて置き、表示だけ切り替える。切り替え時のちらつきを防ぐ */}
+              {/* 全ポーズを重ねて置き、表示だけ切り替える。切り替え時のちらつきを防ぐ。
+                  装備は同じ 300×254 の重ね絵なので、犬の絵とまとめて1枚として扱う */}
               {availablePoseKeys.map((pose) => (
-                // eslint-disable-next-line @next/next/no-img-element
-                <img
+                <div
                   key={pose}
                   ref={(node) => {
                     poseNodes.current[pose] = node;
                   }}
-                  src={POSES[pose]}
-                  alt=""
-                  width={300}
-                  height={254}
-                  decoding="async"
-                  fetchPriority={pose === "stand" || pose === "walk" ? "high" : "low"}
-                  draggable={false}
                   className={`frenchie-pose ${GESTURE_POSES[pose] ? "frenchie-gesture" : ""} ${
-                    pose === "stand" ? "block" : "absolute inset-0"
-                  } h-auto w-full select-none`}
+                    pose === "stand" ? "relative block" : "absolute inset-0"
+                  }`}
                   style={{
                     opacity: pose === activePose ? 1 : 0,
                     transform: POSE_NUDGE_X[pose] ? `translateX(${POSE_NUDGE_X[pose]}%)` : undefined,
                   }}
-                />
+                >
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img
+                    src={POSES[pose]}
+                    alt=""
+                    width={300}
+                    height={254}
+                    decoding="async"
+                    fetchPriority={pose === "stand" || pose === "walk" ? "high" : "low"}
+                    draggable={false}
+                    className="block h-auto w-full select-none"
+                  />
+                  {gear.map((item) => (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img
+                      key={item}
+                      src={`/characters/frenchie/gear/${item}/${POSE_FILES[pose]}.webp`}
+                      alt=""
+                      width={300}
+                      height={254}
+                      decoding="async"
+                      fetchPriority={pose === "stand" || pose === "walk" ? "high" : "low"}
+                      draggable={false}
+                      className="absolute inset-0 h-auto w-full select-none"
+                    />
+                  ))}
+                </div>
               ))}
             </div>
           </div>
