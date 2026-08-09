@@ -2,7 +2,7 @@ import Link from "next/link";
 import { HomeLiveRefresh } from "@/components/home-live-refresh";
 import type { ExpProgress } from "@/lib/exp";
 
-/** public/characters/level-sign.png の実ピクセル比（420×556）。絶対に変えない。 */
+/** public/characters/level-sign-clean.svg の viewBox 比（420×556）。 */
 const SIGN_ASPECT_RATIO = "420 / 556";
 
 export function LevelTag({ progress }: { progress: ExpProgress }) {
@@ -19,16 +19,12 @@ export function LevelTag({ progress }: { progress: ExpProgress }) {
       >
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img
-          src="/characters/level-sign.png"
+          src="/characters/level-sign-clean.svg"
           alt=""
           aria-hidden="true"
           draggable={false}
           className="pointer-events-none absolute inset-0 h-full w-full select-none shadow-none"
-          style={{
-            opacity: 0.96,
-            filter: "saturate(0.82) brightness(1.04) contrast(0.94)",
-            boxShadow: "none",
-          }}
+          style={{ boxShadow: "none", filter: "none" }}
         />
 
         <span
