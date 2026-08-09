@@ -4,21 +4,46 @@ import { todayInJapan } from "@/lib/date";
 import { requireSupabaseEnv } from "@/lib/supabase/env";
 
 /**
- * iPhoneショートカットのJSONフィールドは、画面上では「数字」の変数でも
- * フィールド型がテキストのままだと "1234" や "1,234 歩" として届くことがある。
- * 歩数として明確に解釈できる文字列だけ数値へ変換し、それ以外は拒否する。
+ * iPhoneショートカットの「統計を計算」の合計は、JSON欄では数値に見えても
+ * 端末のロケールや型変換によって "1,234.00" / "1,234 歩" / "1,234 steps"
+ * のような文字列や、valueを持つオブジェクトとして届くことがある。
+ * 明確に整数の歩数へ解釈できるものだけ正規化する。
  */
-const stepsSchema = z.preprocess((value) => {
-  if (typeof value !== "string") return value;
+function normalizeStepValue(value: unknown): unknown {
+  if (typeof value === "number") return value;
 
-  const normalized = value
-    .trim()
-    .replace(/[，,\s]/g, "")
-    .replace(/歩$/u, "");
+  if (typeof value === "string") {
+    const normalized = value
+      .normalize("NFKC")
+      .trim()
+      .replace(/[，,\s]/g, "")
+      .replace(/(?:歩数?|steps?|counts?)$/iu, "");
 
-  if (!/^\d+$/.test(normalized)) return value;
-  return Number(normalized);
-}, z.number().int().min(0).max(200000));
+    // Shortcutsが整数を "1234.00" のように書式化するケースも許可する。
+    if (!/^\d+(?:\.0+)?$/.test(normalized)) return value;
+
+    const parsed = Number(normalized);
+    return Number.isSafeInteger(parsed) ? parsed : value;
+  }
+
+  if (Array.isArray(value) && value.length === 1) {
+    return normalizeStepValue(value[0]);
+  }
+
+  if (value && typeof value === "object") {
+    const record = value as Record<string, unknown>;
+    for (const key of ["value", "number", "amount", "magnitude"]) {
+      if (key in record) return normalizeStepValue(record[key]);
+    }
+  }
+
+  return value;
+}
+
+const stepsSchema = z.preprocess(
+  normalizeStepValue,
+  z.number().int().min(0).max(200000),
+);
 
 const bodySchema = z.object({
   steps: stepsSchema,
@@ -34,6 +59,24 @@ type SupabaseRpcError = {
 
 function diagnostics(requestId: string, stage: string, extra?: Record<string, unknown>) {
   return { requestId, stage, ...extra };
+}
+
+function describeReceivedSteps(body: unknown): Record<string, unknown> {
+  if (!body || typeof body !== "object" || Array.isArray(body)) {
+    return { receivedBodyType: Array.isArray(body) ? "array" : typeof body };
+  }
+
+  const steps = (body as Record<string, unknown>).steps;
+  const type = Array.isArray(steps) ? "array" : typeof steps;
+  let preview: string | number | null = null;
+
+  if (typeof steps === "string") preview = steps.slice(0, 40);
+  if (typeof steps === "number") preview = steps;
+
+  return {
+    receivedStepsType: type,
+    receivedStepsPreview: preview,
+  };
 }
 
 export async function POST(request: Request) {
@@ -52,20 +95,33 @@ export async function POST(request: Request) {
     );
   }
 
-  let input: z.infer<typeof bodySchema>;
+  let rawBody: unknown;
   try {
-    input = bodySchema.parse(await request.json());
+    rawBody = await request.json();
   } catch {
     return NextResponse.json(
       {
         ok: false,
-        error: "steps は0〜200000の整数で送信してください。",
-        diagnostic: diagnostics(requestId, "request-body"),
+        error: "JSON本文を読み取れませんでした。",
+        diagnostic: diagnostics(requestId, "request-json"),
       },
       { status: 400 },
     );
   }
 
+  const parsedBody = bodySchema.safeParse(rawBody);
+  if (!parsedBody.success) {
+    return NextResponse.json(
+      {
+        ok: false,
+        error: "steps は0〜200000の整数で送信してください。",
+        diagnostic: diagnostics(requestId, "request-body", describeReceivedSteps(rawBody)),
+      },
+      { status: 400 },
+    );
+  }
+
+  const input = parsedBody.data;
   const { url, anonKey } = requireSupabaseEnv();
   const stepDate = input.date ?? todayInJapan();
   const rpcUrl = `${url.replace(/\/$/, "")}/rest/v1/rpc/record_daily_steps_with_token`;
