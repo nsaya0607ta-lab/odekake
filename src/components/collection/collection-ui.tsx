@@ -79,7 +79,14 @@ export function ItemGrid({
   owned: ReadonlySet<string>;
 }) {
   if (items.length === 0) {
-    return <p className="rough-card px-4 py-6 text-center text-sm text-ink-soft">アイテムがありません。</p>;
+    return (
+      <div className="rough-card px-6 py-8 text-center">
+        <p className="text-sm font-semibold text-ink-soft">まだアイテムがありません</p>
+        <p className="mt-1.5 text-xs leading-relaxed text-ink-faint">
+          アイテムが増えるとここに並びます。
+        </p>
+      </div>
+    );
   }
 
   return (

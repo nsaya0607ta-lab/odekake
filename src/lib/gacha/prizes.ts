@@ -31,10 +31,27 @@ export const GACHA_PRIZES: readonly GachaPrize[] = [
     // TODO: 夏スキンの画像を用意したらパスを入れる（例: /gacha/summer_frenchie.webp）
     image: null,
   },
+  {
+    id: "hiking_frenchie",
+    name: "登山のフレブル",
+    rarity: "SR",
+    type: "dog_skin",
+    // TODO: 登山スキンの画像を用意したらパスを入れる
+    image: null,
+  },
+  {
+    id: "snow_frenchie",
+    name: "雪国のフレブル",
+    rarity: "SR",
+    type: "dog_skin",
+    // TODO: 雪国スキンの画像を用意したらパスを入れる
+    image: null,
+  },
 
   // --- 以下は抽選を動かすための仮の景品 ---------------------------------
   // TODO: 本番の景品に差し替える。N / R / SSR に景品が1つも無いと、
   //       そのレアリティが当たったときに配るものが無くなるため置いてある。
+  //       図鑑には出さない（src/lib/collection/items.ts の HIDDEN_PRIZE_IDS）。
   { id: "placeholder_n", name: "おさんぽメダル", rarity: "N", type: "item", image: null },
   { id: "placeholder_r", name: "きらきらリボン", rarity: "R", type: "item", image: null },
   { id: "placeholder_ssr", name: "ゴールドクラウン", rarity: "SSR", type: "item", image: null },

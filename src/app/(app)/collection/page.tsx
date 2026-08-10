@@ -101,19 +101,24 @@ function RegularTab({
 
       <CollectionProgress owned={countOwned(REGULAR_ITEMS, owned)} total={REGULAR_ITEMS.length} />
 
-      <div className="-mx-4 flex gap-2 overflow-x-auto px-4 pb-1">
-        {chips.map((chip) => (
-          <Link
-            key={chip.key}
-            href={chip.href}
-            className={`rough-pill shrink-0 border px-3.5 py-1.5 text-xs font-semibold transition-colors ${
-              chip.active ? "border-leaf bg-leaf-soft text-leaf-deep" : "border-line-strong bg-card text-ink-soft"
-            }`}
-          >
-            {chip.label}
-          </Link>
-        ))}
-      </div>
+      {/* アイテムが1つも無いうちは、押しても何も起きないチップを並べない */}
+      {REGULAR_ITEMS.length > 0 ? (
+        <div className="-mx-4 flex gap-2 overflow-x-auto px-4 pb-1">
+          {chips.map((chip) => (
+            <Link
+              key={chip.key}
+              href={chip.href}
+              className={`rough-pill shrink-0 border px-3.5 py-1.5 text-xs font-semibold transition-colors ${
+                chip.active
+                  ? "border-leaf bg-leaf-soft text-leaf-deep"
+                  : "border-line-strong bg-card text-ink-soft"
+              }`}
+            >
+              {chip.label}
+            </Link>
+          ))}
+        </div>
+      ) : null}
 
       <ItemGrid items={shown} owned={owned} />
     </div>
