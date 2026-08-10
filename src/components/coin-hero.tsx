@@ -24,7 +24,7 @@ export function CoinHero({ balance, todayCoins }: Props) {
           <TreasureChestArt className="absolute bottom-1 right-[-3%] w-[68px] sm:w-[76px]" />
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img
-            src="/characters/frenchie/walk.webp"
+            src="/characters/frenchie/normal/walk.webp"
             alt=""
             width={300}
             height={254}
