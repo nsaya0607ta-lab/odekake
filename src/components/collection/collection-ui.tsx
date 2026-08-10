@@ -4,6 +4,7 @@
  */
 import { IconStar } from "@/components/icons";
 import { RARITY_STARS, type CollectionItem } from "@/lib/collection/items";
+import { ExactSilhouette, hasExactSilhouette } from "./exact-silhouette";
 import { ItemArt } from "./item-art";
 
 /** 「25 / 60 (41%)」と進捗バー */
@@ -52,12 +53,18 @@ function RarityStars({ item }: { item: CollectionItem }) {
 
 /** 1マス。未取得は黒いシルエット＋「???」 */
 export function ItemCard({ item, owned }: { item: CollectionItem; owned: boolean }) {
+  const useExactSilhouette = !owned && hasExactSilhouette(item.art);
+
   return (
     <div
       className={`rough-card flex flex-col items-center px-1.5 py-2.5 ${owned ? "" : "bg-paper-deep/60"}`}
     >
       <span className="flex h-14 w-14 items-center justify-center">
-        <ItemArt art={item.art} image={item.image} name={item.name} silhouette={!owned} />
+        {useExactSilhouette ? (
+          <ExactSilhouette art={item.art} />
+        ) : (
+          <ItemArt art={item.art} image={item.image} name={item.name} silhouette={!owned} />
+        )}
       </span>
       <span
         className={`mt-1.5 line-clamp-2 w-full text-center text-[11px] leading-tight font-semibold ${
