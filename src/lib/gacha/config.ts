@@ -32,10 +32,10 @@ export function isGachaPlanId(value: unknown): value is GachaPlanId {
   return typeof value === "string" && value in GACHA_PLANS;
 }
 
-/** レアリティの見た目。演出は後から差し替える前提で、色だけ持たせている */
+/** レアリティの見た目。結果画面のやわらかい配色と揃える */
 export const RARITY_STYLES: Record<GachaRarity, { text: string; badge: string }> = {
   N: { text: "text-ink-soft", badge: "bg-line text-ink-soft" },
   R: { text: "text-sky-700", badge: "bg-sky-100 text-sky-700" },
-  SR: { text: "text-leaf-deep", badge: "bg-leaf-soft text-leaf-deep" },
-  SSR: { text: "text-amber-700", badge: "bg-sun-soft text-amber-700" },
+  SR: { text: "text-amber-700", badge: "bg-sun-soft text-amber-700" },
+  SSR: { text: "text-rose-700", badge: "bg-rose-100 text-rose-700" },
 };
