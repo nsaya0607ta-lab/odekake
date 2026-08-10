@@ -3,6 +3,7 @@ import { CoinEarnMethods } from "@/components/coin-earn-methods";
 import { CoinHero } from "@/components/coin-hero";
 import { CoinShopPreview } from "@/components/coin-shop-preview";
 import { CoinUseCards } from "@/components/coin-use-cards";
+import { GachaSection } from "@/components/gacha-section";
 import { IconPaw } from "@/components/icons";
 import { PageBody } from "@/components/page-body";
 import { TopHeader } from "@/components/page-header";
@@ -43,6 +44,8 @@ export default async function CoinsPage() {
           <CoinHero balance={summary.balance} todayCoins={getStepCoins(expDashboard.todaySteps)} />
 
           <CoinUseCards />
+
+          <GachaSection balance={summary.balance} />
 
           <CoinShopPreview />
 
