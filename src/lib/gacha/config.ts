@@ -9,15 +9,14 @@ export const GACHA_RARITIES = ["N", "R", "SR", "SSR"] as const;
 export type GachaRarity = (typeof GACHA_RARITIES)[number];
 
 /**
- * レアリティごとの排出率（%）。合計は100にする。
- * 数値を変えるだけで排出率が変わる。景品数の偏りは結果に影響しない
- * （まずレアリティを引き、その中から等確率で1つ選ぶため）。
+ * 現在は「夏のフレブル」だけの限定ガチャなので SR 100%。
+ * 通常ガチャを追加するときに N / R / SR / SSR の通常配分へ切り替える。
  */
 export const GACHA_RARITY_RATES: Record<GachaRarity, number> = {
-  N: 50,
-  R: 30,
-  SR: 15,
-  SSR: 5,
+  N: 0,
+  R: 0,
+  SR: 100,
+  SSR: 0,
 };
 
 /** 引き方（1回 / 10連）と消費コイン */
