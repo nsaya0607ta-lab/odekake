@@ -44,7 +44,7 @@ function RarityLabel({ item }: { item: CollectionItem }) {
 
   return (
     <span
-      className={`mt-1 rounded-full px-2 py-0.5 text-[9px] font-black leading-none ${style.badge}`}
+      className={`rounded-full px-2 py-0.5 text-[9px] font-black leading-none ${style.badge}`}
       aria-label={`レアリティ${item.rarity}`}
     >
       {item.rarity}
@@ -58,9 +58,9 @@ export function ItemCard({ item, owned }: { item: CollectionItem; owned: boolean
 
   return (
     <div
-      className={`rough-card flex flex-col items-center px-1.5 py-2.5 ${owned ? "" : "bg-paper-deep/60"}`}
+      className={`rough-card flex h-[132px] flex-col items-center px-1.5 py-2.5 ${owned ? "" : "bg-paper-deep/60"}`}
     >
-      <span className="flex h-14 w-14 items-center justify-center">
+      <span className="flex h-14 w-14 shrink-0 items-center justify-center">
         {useExactSilhouette ? (
           <ExactSilhouette art={item.art} />
         ) : (
@@ -68,13 +68,15 @@ export function ItemCard({ item, owned }: { item: CollectionItem; owned: boolean
         )}
       </span>
       <span
-        className={`mt-1.5 line-clamp-2 w-full text-center text-[11px] leading-tight font-semibold ${
+        className={`mt-1.5 flex min-h-[28px] w-full items-center justify-center line-clamp-2 text-center text-[11px] leading-tight font-semibold ${
           owned ? "text-ink" : "text-ink-faint"
         }`}
       >
         {owned ? item.name : "???"}
       </span>
-      {owned ? <RarityLabel item={item} /> : null}
+      <span className="mt-auto flex h-4 items-center justify-center">
+        {owned ? <RarityLabel item={item} /> : null}
+      </span>
     </div>
   );
 }
