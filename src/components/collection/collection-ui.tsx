@@ -95,7 +95,7 @@ const RARITY_CARD_STYLES: Record<GachaRarity, CardStyle> = {
 
 function PawMark({ className = "" }: { className?: string }) {
   return (
-    <span aria-hidden="true" className={`relative block h-3 w-3 opacity-55 ${className}`}>
+    <span aria-hidden="true" className={`pointer-events-none block h-3 w-3 opacity-55 ${className}`}>
       <span className="absolute bottom-0 left-[3px] h-[6px] w-[7px] rounded-[50%] bg-current" />
       <span className="absolute left-0 top-[2px] h-[3px] w-[3px] rounded-full bg-current" />
       <span className="absolute left-[4px] top-0 h-[3px] w-[3px] rounded-full bg-current" />
