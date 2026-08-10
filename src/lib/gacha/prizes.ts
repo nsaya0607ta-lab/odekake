@@ -182,11 +182,27 @@ export const GACHA_PRIZES: readonly GachaPrize[] = [
     image: "/collection/items/golden-crown-ball.webp",
   },
 
-  // --- 夏限定 -----------------------------------------------------------
+  // --- 犬スキン（すべてSSR・共通ガチャから排出） ----------------------
+  {
+    id: "hiking_frenchie",
+    name: "登山のフレブル",
+    rarity: "SSR",
+    type: "dog_skin",
+    pool: "regular",
+    image: "/collection/skins/hiking-frenchie.svg",
+  },
+  {
+    id: "snow_frenchie",
+    name: "雪国のフレブル",
+    rarity: "SSR",
+    type: "dog_skin",
+    pool: "regular",
+    image: "/collection/skins/snow-frenchie.svg",
+  },
   {
     id: "summer_frenchie",
     name: "夏のフレブル",
-    rarity: "SR",
+    rarity: "SSR",
     type: "dog_skin",
     pool: "summer",
     image: "/collection/skins/summer-frenchie.webp",
