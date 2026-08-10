@@ -1,0 +1,41 @@
+/**
+ * ガチャの設定
+ * =============================================================
+ * 排出率と値段はここだけを書き換えれば変わる。
+ * 抽選はサーバー側（src/app/api/gacha/route.ts）でこの値を読んで行う。
+ */
+
+export const GACHA_RARITIES = ["N", "R", "SR", "SSR"] as const;
+export type GachaRarity = (typeof GACHA_RARITIES)[number];
+
+/**
+ * レアリティごとの排出率（%）。合計は100にする。
+ * 数値を変えるだけで排出率が変わる。景品数の偏りは結果に影響しない
+ * （まずレアリティを引き、その中から等確率で1つ選ぶため）。
+ */
+export const GACHA_RARITY_RATES: Record<GachaRarity, number> = {
+  N: 50,
+  R: 30,
+  SR: 15,
+  SSR: 5,
+};
+
+/** 引き方（1回 / 10連）と消費コイン */
+export const GACHA_PLANS = {
+  single: { draws: 1, cost: 100, label: "1回まわす" },
+  multi: { draws: 10, cost: 900, label: "10回まわす" },
+} as const;
+
+export type GachaPlanId = keyof typeof GACHA_PLANS;
+
+export function isGachaPlanId(value: unknown): value is GachaPlanId {
+  return typeof value === "string" && value in GACHA_PLANS;
+}
+
+/** レアリティの見た目。演出は後から差し替える前提で、色だけ持たせている */
+export const RARITY_STYLES: Record<GachaRarity, { text: string; badge: string }> = {
+  N: { text: "text-ink-soft", badge: "bg-line text-ink-soft" },
+  R: { text: "text-sky-700", badge: "bg-sky-100 text-sky-700" },
+  SR: { text: "text-leaf-deep", badge: "bg-leaf-soft text-leaf-deep" },
+  SSR: { text: "text-amber-700", badge: "bg-sun-soft text-amber-700" },
+};

@@ -459,6 +459,92 @@ select pg_temp.expect_denied('そうび: RPCを介さず直接装着できない
   $q$insert into public.user_equipment (user_id, slot, level) values (%L, 'crown', 30)$q$, :'alice'));
 
 -- -------------------------------------------------------------
+-- コインガチャ
+-- -------------------------------------------------------------
+-- ここまでで alice の残高は 720。抽選そのものはアプリ側で行うので、
+-- ここでは「減らし方」だけを確かめる。とくに、同じ request_id で
+-- 2回呼ばれてもコインが二重に減らないことを固定する。
+
+-- 引いた結果の置き場。判定と同じ式の中で RPC を呼ぶと、状態を見る副問い合わせが
+-- 先に評価されてしまうことがあるので、「引く」と「確かめる」を別の文に分ける。
+create temp table gacha_last (result jsonb) on commit drop;
+
+create or replace function pg_temp.gacha_as(p_user uuid, p_sql text)
+returns void language plpgsql as $$
+declare v jsonb;
+begin
+  perform public.test_login(p_user);
+  set local role authenticated;
+  execute p_sql into v;
+  set local role postgres;
+  delete from gacha_last;
+  insert into gacha_last (result) values (v);
+end $$;
+
+select pg_temp.gacha_as(:'bob',
+  $q$select public.commit_gacha_draw(100, 'req-bob-0001', array['placeholder_n'])$q$);
+select pg_temp.record('ガチャ: コインが足りないと引けない',
+  (select result ->> 'reason' from gacha_last) = 'insufficient_coins'
+  -- bob はコインをもらったことがないので、残高の行そのものが無い
+  and coalesce((select balance from public.user_coins where user_id = :'bob'), 0) = 0);
+
+select pg_temp.gacha_as(:'alice',
+  $q$select public.commit_gacha_draw(100, 'req-alice-0001', array['summer_frenchie'])$q$);
+select pg_temp.record('ガチャ: 1回まわすと100コイン減る',
+  (select (result ->> 'balance')::integer from gacha_last) = 620
+  and (select balance from public.user_coins where user_id = :'alice') = 620);
+
+select pg_temp.record('ガチャ: 引いたものが所持に入り、NEW として返る',
+  (select result -> 'new_item_ids' from gacha_last) = '["summer_frenchie"]'::jsonb
+  and (select count = 1 from public.user_gacha_items
+        where user_id = :'alice' and item_id = 'summer_frenchie'));
+
+-- 連打・再送よけ。同じ request_id は台帳が1件のままで、残高も動かない。
+select pg_temp.gacha_as(:'alice',
+  $q$select public.commit_gacha_draw(100, 'req-alice-0001', array['placeholder_ssr'])$q$);
+select pg_temp.record('ガチャ: 同じリクエストを送り直しても二重に減らない',
+  (select result ->> 'applied' from gacha_last) = 'false'
+  and (select balance from public.user_coins where user_id = :'alice') = 620
+  and (select count(*) from public.coin_events
+        where user_id = :'alice' and idempotency_key = 'gacha:req-alice-0001') = 1);
+
+select pg_temp.record('ガチャ: 再送では1回目に引いたものが返る',
+  (select result -> 'item_ids' from gacha_last) = '["summer_frenchie"]'::jsonb);
+
+select pg_temp.record('ガチャ: 再送で所持が増えない',
+  (select count = 1 from public.user_gacha_items
+    where user_id = :'alice' and item_id = 'summer_frenchie')
+  and (select count(*) from public.user_gacha_items where user_id = :'alice') = 1);
+
+-- 2回目の当選。同じものが出たら個数だけ増え、NEW ではなくなる。
+select pg_temp.gacha_as(:'alice',
+  $q$select public.commit_gacha_draw(100, 'req-alice-0002', array['summer_frenchie'])$q$);
+select pg_temp.record('ガチャ: 同じものが出ると個数が増え NEW にならない',
+  (select result -> 'new_item_ids' from gacha_last) = '[]'::jsonb
+  and (select count = 2 from public.user_gacha_items
+        where user_id = :'alice' and item_id = 'summer_frenchie'));
+
+select pg_temp.gacha_as(:'alice',
+  $q$select public.commit_gacha_draw(900, 'req-alice-0003',
+    array['placeholder_n','placeholder_n','placeholder_n','placeholder_n','placeholder_n',
+          'placeholder_n','placeholder_n','placeholder_n','placeholder_n','placeholder_n'])$q$);
+select pg_temp.record('ガチャ: 10連ぶんの残高がなければ引けない',
+  (select result ->> 'reason' from gacha_last) = 'insufficient_coins'
+  and (select balance from public.user_coins where user_id = :'alice') = 520);
+
+select pg_temp.record('ガチャ: 消費は台帳に負の値で残る',
+  (select sum(amount) from public.coin_events
+    where user_id = :'alice' and event_type = 'gacha') = -200);
+
+select pg_temp.expect_denied('ガチャ: RPCを介さず所持を書き足せない', :'alice', format(
+  $q$insert into public.user_gacha_items (user_id, item_id) values (%L, 'cheat')$q$, :'alice'));
+
+select pg_temp.expect_count('ガチャ: 本人は自分の所持を見られる', :'alice',
+  'select 1 from public.user_gacha_items', 1);
+select pg_temp.expect_count('ガチャ: 他人の所持は見えない', :'bob',
+  format($q$select 1 from public.user_gacha_items where user_id = %L$q$, :'alice'), 0);
+
+-- -------------------------------------------------------------
 -- プロフィールの公開範囲
 -- -------------------------------------------------------------
 select pg_temp.expect_count('自分のプロフィールは見える', :'alice',
