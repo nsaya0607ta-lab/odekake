@@ -56,8 +56,6 @@ const REQUIRED_LEVEL_BY_POSE = new Map(
 );
 
 const GESTURE_POSES: Partial<Record<Pose, string>> = { wink: "frenchie-wink" };
-
-// Whole-pixel positioning avoids transform-based resampling for the two offset frames.
 const POSE_NUDGE_PX: Partial<Record<Pose, number>> = { walk: 6, happy: 6 };
 
 const WINK_MS = 1000;
@@ -74,12 +72,8 @@ const crispImageCache = new Map<string, string>();
 const crispImagePending = new Map<string, Promise<string>>();
 
 /**
- * Remove every source-image halo before it reaches the DOM:
- * - low/medium alpha pixels are discarded
- * - the outermost one-pixel ring is trimmed
- * - surviving pixels get fully opaque alpha
- * - transparent RGB is zeroed so no old matte color can bleed on resampling
- * - output is lossless PNG in memory
+ * 表示前に犬画像の透過フチを完全に作り直す。
+ * 半透明の霞を捨て、外周を1pxだけ内側へ詰め、透明画素のRGBも0にする。
  */
 function makeCrispImage(src: string): Promise<string> {
   const cached = crispImageCache.get(src);
@@ -108,12 +102,10 @@ function makeCrispImage(src: string): Promise<string> {
       const pixels = frame.data;
       const hardMask = new Uint8Array(width * height);
 
-      // High alpha threshold removes the broad semi-transparent white/pink haze.
       for (let i = 0; i < hardMask.length; i += 1) {
-        hardMask[i] = pixels[i * 4 + 3] >= 224 ? 1 : 0;
+        hardMask[i] = pixels[i * 4 + 3]! >= 224 ? 1 : 0;
       }
 
-      // Trim one source pixel from the silhouette to remove any opaque matte/fringe.
       const trimmed = new Uint8Array(hardMask.length);
       for (let y = 1; y < height - 1; y += 1) {
         for (let x = 1; x < width - 1; x += 1) {
@@ -184,7 +176,7 @@ export function WanderingFrenchie({ level = 1 }: { level?: number }) {
   });
   const [stepUp, setStepUp] = useState(false);
   const poseNodes = useRef<Partial<Record<Pose, HTMLImageElement | null>>>({});
-  const bobNode = useRef<HTMLDivElement>(null);
+  const bobNode = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -237,7 +229,7 @@ export function WanderingFrenchie({ level = 1 }: { level?: number }) {
     );
     return () => {
       cancelled = true;
-      timers.forEach(clearTimeout);
+      for (const timer of timers) clearTimeout(timer);
     };
   }, [level]);
 
@@ -347,7 +339,7 @@ export function WanderingFrenchie({ level = 1 }: { level?: number }) {
                   // eslint-disable-next-line @next/next/no-img-element
                   <img
                     key={pose}
-                    ref={(node) => {
+                    ref={(node: HTMLImageElement | null) => {
                       poseNodes.current[pose] = node;
                     }}
                     src={src}
