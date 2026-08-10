@@ -259,10 +259,10 @@ const CURATED_ITEMS: readonly CollectionItem[] = [
   {
     id: "hiking_frenchie",
     name: "登山のフレブル",
-    image: null,
+    image: "/collection/skins/hiking-frenchie.svg",
     category: "other",
     series: "hiking",
-    rarity: "SR",
+    rarity: "SSR",
     art: "dogHiking",
   },
 
@@ -270,10 +270,10 @@ const CURATED_ITEMS: readonly CollectionItem[] = [
   {
     id: "snow_frenchie",
     name: "雪国のフレブル",
-    image: null,
+    image: "/collection/skins/snow-frenchie.svg",
     category: "other",
     series: "snow",
-    rarity: "SR",
+    rarity: "SSR",
     art: "dogSnow",
   },
 
@@ -284,7 +284,7 @@ const CURATED_ITEMS: readonly CollectionItem[] = [
     image: "/collection/skins/summer-frenchie.webp",
     category: "other",
     series: "summer",
-    rarity: "SR",
+    rarity: "SSR",
     art: "dogSummer",
   },
 ];
