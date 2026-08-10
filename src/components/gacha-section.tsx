@@ -3,16 +3,15 @@
 import { useRouter } from "next/navigation";
 import { useCallback, useRef, useState } from "react";
 import { formatCoins } from "@/lib/coins";
-import { GACHA_PLANS, GACHA_RARITY_RATES, RARITY_STYLES, type GachaPlanId, type GachaRarity } from "@/lib/gacha/config";
+import {
+  GACHA_PLANS,
+  GACHA_RARITY_RATES,
+  RARITY_STYLES,
+  type GachaPlanId,
+  type GachaRarity,
+} from "@/lib/gacha/config";
 import { GachaMachineArt, SparkleArt } from "./coin-art";
 import { IconClose, IconCoin } from "./icons";
-
-/**
- * コイン画面のガチャ
- * =============================================================
- * 大枠だけ。演出は入れず、結果は素朴なモーダルで出している。
- * 抽選・残高の減算はサーバー（/api/gacha）が行い、ここは投げて出すだけ。
- */
 
 type DrawResult = {
   id: string;
@@ -27,13 +26,41 @@ function rarityStyle(rarity: string) {
   return RARITY_STYLES[rarity as GachaRarity] ?? RARITY_STYLES.N;
 }
 
+function rarityTheme(rarity: string) {
+  switch (rarity) {
+    case "SSR":
+      return {
+        panel: "border-[#dfbdd7] bg-gradient-to-b from-[#fff4fb] via-[#fff9e7] to-[#eee8ff]",
+        badge: "border-[#d8b4cf] bg-[#f6d9ed] text-[#8d5079]",
+        glow: "bg-[#efcce2]/45",
+      };
+    case "SR":
+      return {
+        panel: "border-[#e7c96e] bg-gradient-to-b from-[#fff9e8] via-[#fffdf6] to-[#f6e9bd]",
+        badge: "border-[#d8b653] bg-[#f5d56c] text-[#79591c]",
+        glow: "bg-[#f4d86f]/45",
+      };
+    case "R":
+      return {
+        panel: "border-[#bfd6e8] bg-gradient-to-b from-[#f4fbff] to-[#e8f3fb]",
+        badge: "border-[#b4cee3] bg-[#dcecf8] text-[#527694]",
+        glow: "bg-[#bcdcf0]/35",
+      };
+    default:
+      return {
+        panel: "border-[#dfd7ca] bg-gradient-to-b from-[#fbf8f1] to-[#f0ebe2]",
+        badge: "border-[#d4cbbd] bg-[#e9e3d9] text-ink-soft",
+        glow: "bg-[#d9d0c4]/30",
+      };
+  }
+}
+
 export function GachaSection({ balance }: { balance: number }) {
   const router = useRouter();
   const [pending, setPending] = useState<GachaPlanId | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [results, setResults] = useState<DrawResult[] | null>(null);
   const [lastPlan, setLastPlan] = useState<GachaPlanId>("single");
-  // state の更新は次の描画までかかるので、連打はこの ref で同期的に止める
   const inFlight = useRef(false);
 
   const draw = useCallback(
@@ -60,7 +87,6 @@ export function GachaSection({ balance }: { balance: number }) {
 
         setLastPlan(planId);
         setResults(payload?.results ?? []);
-        // 残高の表示を作り直す
         router.refresh();
       } catch {
         setError("通信に失敗しました。");
@@ -73,24 +99,37 @@ export function GachaSection({ balance }: { balance: number }) {
   );
 
   return (
-    <section className="rough-card p-3.5">
-      <div className="flex items-start gap-2">
-        <h2 className="flex min-w-0 flex-1 items-center gap-1.5 text-base font-bold">
-          <SparkleArt className="w-3.5 shrink-0 text-sun" />
-          <span className="min-w-0 truncate">コインでガチャ</span>
-        </h2>
-        <GachaMachineArt className="h-11 w-auto shrink-0" />
+    <section className="rough-card flex min-w-0 flex-col overflow-hidden p-3.5">
+      <h2 className="flex items-center gap-1 text-[15px] font-bold">
+        <SparkleArt className="w-3.5 shrink-0 text-sun" />
+        <span className="min-w-0 truncate">コインでガチャ</span>
+      </h2>
+
+      <div className="mt-2 flex min-h-0 flex-1 items-start gap-0.5">
+        <div className="min-w-0 flex-1">
+          <p className="text-[10px] leading-[1.65] text-ink-soft">
+            <span className="block whitespace-nowrap">コインをつかって</span>
+            <span className="block whitespace-nowrap">限定アイテムをゲット！</span>
+          </p>
+          <p className="mt-1.5 flex items-center gap-1 text-[9px] font-bold text-ink-faint">
+            <IconCoin size={11} />
+            所持 {formatCoins(balance)}
+          </p>
+        </div>
+        <span className="flex h-[88px] w-[44%] shrink-0 items-end justify-center">
+          <GachaMachineArt className="h-full w-auto" />
+        </span>
       </div>
 
-      <ul className="mt-2 flex flex-wrap gap-x-3 gap-y-0.5 text-[10px] text-ink-faint">
+      <div className="mt-1 flex flex-wrap gap-x-1.5 gap-y-0.5 text-[8px] text-ink-faint" aria-label="排出率">
         {(Object.keys(GACHA_RARITY_RATES) as GachaRarity[]).map((rarity) => (
-          <li key={rarity}>
+          <span key={rarity} className="whitespace-nowrap">
             <span className={`font-bold ${rarityStyle(rarity).text}`}>{rarity}</span> {GACHA_RARITY_RATES[rarity]}%
-          </li>
+          </span>
         ))}
-      </ul>
+      </div>
 
-      <div className="mt-3 grid grid-cols-2 gap-2">
+      <div className="mt-3 space-y-1.5">
         {(Object.keys(GACHA_PLANS) as GachaPlanId[]).map((planId) => {
           const plan = GACHA_PLANS[planId];
           const short = balance < plan.cost;
@@ -100,11 +139,13 @@ export function GachaSection({ balance }: { balance: number }) {
               type="button"
               onClick={() => void draw(planId)}
               disabled={pending !== null || short}
-              className="flex flex-col items-center gap-0.5 rounded-2xl bg-leaf px-3 py-2.5 text-white shadow-sm disabled:opacity-45"
+              className="flex w-full items-center justify-between rounded-full bg-leaf px-3 py-2 text-white shadow-sm transition active:translate-y-px disabled:opacity-45"
             >
-              <span className="text-xs font-bold">{pending === planId ? "まわしています…" : plan.label}</span>
-              <span className="flex items-center gap-1 text-[11px] font-bold tabular-nums">
-                <IconCoin size={13} />
+              <span className="text-[11px] font-bold">
+                {pending === planId ? "まわしています…" : plan.label}
+              </span>
+              <span className="flex items-center gap-1 text-[10px] font-bold tabular-nums">
+                <IconCoin size={12} />
                 {formatCoins(plan.cost)}
               </span>
             </button>
@@ -113,9 +154,13 @@ export function GachaSection({ balance }: { balance: number }) {
       </div>
 
       {balance < GACHA_PLANS.single.cost && !error && (
-        <p className="mt-2 text-center text-[11px] text-ink-faint">コインが足りません</p>
+        <p className="mt-1.5 text-center text-[9px] text-ink-faint">コインが足りません</p>
       )}
-      {error && <p className="mt-2 text-center text-[11px] font-bold text-red-600">{error}</p>}
+      {error && (
+        <p className="mt-1.5 text-center text-[9px] font-bold text-red-600" role="status">
+          {error}
+        </p>
+      )}
 
       {results && (
         <GachaResultModal
@@ -146,25 +191,26 @@ function GachaResultModal({
   const only = plan === "single" && results.length === 1 ? results[0] : null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" role="dialog" aria-modal="true">
-      <div className="max-h-[86vh] w-full max-w-sm overflow-y-auto rounded-2xl bg-card p-4 shadow-lg">
-        <div className="flex items-center justify-between">
-          <h2 className="text-sm font-bold">ガチャ結果</h2>
-          <button type="button" onClick={onClose} aria-label="とじる" className="text-ink-faint">
-            <IconClose size={18} />
-          </button>
-        </div>
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-[#463b2f]/35 p-4 backdrop-blur-[1px]"
+      role="dialog"
+      aria-modal="true"
+      aria-label="ガチャ結果"
+    >
+      <div className="relative max-h-[90vh] w-full max-w-sm overflow-y-auto rounded-[28px] border border-[#eadfc8] bg-[#fffdf8] p-4 shadow-[0_18px_50px_rgba(75,56,36,0.22)]">
+        <button
+          type="button"
+          onClick={onClose}
+          aria-label="とじる"
+          className="absolute right-3 top-3 z-20 flex h-8 w-8 items-center justify-center rounded-full bg-white/80 text-ink-faint shadow-sm"
+        >
+          <IconClose size={17} />
+        </button>
 
         {only ? (
           <SingleResult result={only} />
         ) : (
-          <ul className="mt-3 grid grid-cols-3 gap-2">
-            {results.map((result, index) => (
-              <li key={`${result.id}-${index}`}>
-                <ResultCard result={result} />
-              </li>
-            ))}
-          </ul>
+          <MultiResult results={results} />
         )}
 
         <div className="mt-4 grid grid-cols-2 gap-2">
@@ -174,7 +220,7 @@ function GachaResultModal({
             disabled={busy}
             className="rounded-full bg-leaf px-3 py-2.5 text-xs font-bold text-white shadow-sm disabled:opacity-45"
           >
-            もう1回まわす
+            {plan === "multi" ? "もう10連まわす" : "もう1回まわす"}
           </button>
           <button
             type="button"
@@ -190,55 +236,118 @@ function GachaResultModal({
 }
 
 function SingleResult({ result }: { result: DrawResult }) {
-  const style = rarityStyle(result.rarity);
+  const theme = rarityTheme(result.rarity);
+  const acquisitionLabel =
+    result.id === "summer_frenchie"
+      ? "サマースキンをゲット！"
+      : result.type === "dog_skin"
+        ? "わんこスキンをゲット！"
+        : "アイテムをゲット！";
+
   return (
-    <div className="mt-3 flex flex-col items-center gap-2 rounded-2xl border border-line bg-sun-soft/30 p-4">
-      <span className={`rounded-full px-3 py-0.5 text-sm font-bold ${style.badge}`}>{result.rarity}</span>
-      <PrizeImage result={result} className="h-32 w-32" />
-      {/* NEW表示用の領域。高さを固定して、出ない回でも下がずれないようにする */}
-      <span className="flex h-5 items-center">
-        {result.isNew && (
-          <span className="rounded-full bg-red-500 px-2 py-0.5 text-[10px] font-bold text-white">NEW!</span>
-        )}
-      </span>
-      <p className="text-center text-base font-bold">{result.name}</p>
+    <div className={`relative overflow-hidden rounded-[24px] border p-4 ${theme.panel}`}>
+      <span className={`pointer-events-none absolute left-1/2 top-[42%] h-48 w-48 -translate-x-1/2 -translate-y-1/2 rounded-full blur-2xl ${theme.glow}`} />
+      <DecorativeSparkles />
+
+      <div className="relative z-10 flex flex-col items-center text-center">
+        <span className={`rounded-full border px-4 py-1 text-base font-black tracking-[0.12em] ${theme.badge}`}>
+          {result.rarity}
+        </span>
+        <p className="mt-2 text-[22px] font-black tracking-wide text-[#6e5a3c]">おめでとう！</p>
+
+        <div className="relative mt-3 flex h-44 w-44 items-center justify-center rounded-full border border-white/80 bg-white/55 shadow-[0_10px_28px_rgba(158,122,48,0.14)]">
+          <PrizeImage result={result} className="h-36 w-36" prominent />
+        </div>
+
+        <span className="mt-2 flex h-6 items-center">
+          {result.isNew && (
+            <span className="-rotate-3 rounded-full bg-[#ee7470] px-3 py-0.5 text-[11px] font-black tracking-wide text-white shadow-sm">
+              NEW!
+            </span>
+          )}
+        </span>
+
+        <p className="mt-1 text-xl font-black text-[#5b4934]">{result.name}</p>
+        <p className="mt-1 text-xs font-bold text-[#927a59]">{acquisitionLabel}</p>
+        <p className="mt-3 rounded-full bg-white/55 px-3 py-1 text-[10px] text-[#9b896f]">
+          {result.isNew ? "所持アイテムに追加されました" : "すでに持っているアイテムです"}
+        </p>
+      </div>
+    </div>
+  );
+}
+
+function MultiResult({ results }: { results: DrawResult[] }) {
+  return (
+    <div>
+      <div className="pr-9 text-center">
+        <p className="text-[11px] font-bold tracking-[0.18em] text-ink-faint">10連ガチャ</p>
+        <h2 className="mt-1 text-xl font-black text-[#6e5a3c]">結果発表！</h2>
+      </div>
+      <ul className="mt-4 grid grid-cols-2 gap-2.5">
+        {results.map((result, index) => (
+          <li key={`${result.id}-${index}`}>
+            <ResultCard result={result} />
+          </li>
+        ))}
+      </ul>
     </div>
   );
 }
 
 function ResultCard({ result }: { result: DrawResult }) {
-  const style = rarityStyle(result.rarity);
+  const theme = rarityTheme(result.rarity);
   return (
-    <div className="flex flex-col items-center gap-1 rounded-xl border border-line bg-card p-1.5">
-      <span className="flex w-full items-center justify-between">
-        <span className={`rounded-full px-1.5 py-0.5 text-[9px] font-bold ${style.badge}`}>{result.rarity}</span>
-        {/* NEW表示用の領域 */}
-        <span className="h-3.5">
-          {result.isNew && (
-            <span className="rounded-full bg-red-500 px-1 py-0.5 text-[8px] font-bold text-white">NEW</span>
-          )}
-        </span>
+    <div className={`relative flex min-h-[142px] flex-col items-center overflow-hidden rounded-2xl border p-2.5 text-center ${theme.panel}`}>
+      <span className={`rounded-full border px-2 py-0.5 text-[10px] font-black ${theme.badge}`}>{result.rarity}</span>
+      <PrizeImage result={result} className="mt-1.5 h-16 w-16" />
+      <span className="mt-1 flex h-4 items-center">
+        {result.isNew && (
+          <span className="rounded-full bg-[#ee7470] px-1.5 py-0.5 text-[8px] font-black text-white">NEW</span>
+        )}
       </span>
-      <PrizeImage result={result} className="h-14 w-14" />
-      <p className="w-full truncate text-center text-[10px] font-bold">{result.name}</p>
+      <p className="mt-0.5 w-full truncate text-[10px] font-bold text-[#5b4934]">{result.name}</p>
     </div>
   );
 }
 
-/** 景品の絵。まだ用意していない景品はプレースホルダーを出す */
-function PrizeImage({ result, className }: { result: DrawResult; className: string }) {
+function DecorativeSparkles() {
+  return (
+    <div className="pointer-events-none absolute inset-0" aria-hidden="true">
+      <SparkleArt className="absolute left-[9%] top-[18%] w-4 -rotate-12 text-[#e6bc4f]" />
+      <SparkleArt className="absolute right-[10%] top-[24%] w-3 rotate-12 text-[#e9c968]" />
+      <SparkleArt className="absolute left-[14%] top-[52%] w-2.5 text-[#f0cf70]" />
+      <SparkleArt className="absolute right-[13%] top-[57%] w-4 rotate-12 text-[#e6bc4f]" />
+      <span className="absolute left-[19%] top-[34%] h-2 w-2 rounded-full bg-[#f2a8a2]" />
+      <span className="absolute right-[20%] top-[41%] h-2 w-2 rounded-full bg-[#a9cee7]" />
+      <span className="absolute left-[25%] top-[70%] h-1.5 w-1.5 rotate-45 bg-[#b9d8ad]" />
+      <span className="absolute right-[27%] top-[72%] h-1.5 w-1.5 rotate-45 bg-[#efbe88]" />
+    </div>
+  );
+}
+
+function PrizeImage({
+  result,
+  className,
+  prominent = false,
+}: {
+  result: DrawResult;
+  className: string;
+  prominent?: boolean;
+}) {
   if (!result.image) {
     return (
       <span
-        className={`flex shrink-0 items-center justify-center rounded-xl border border-dashed border-line-strong bg-card text-ink-faint ${className}`}
-        aria-hidden="true"
+        className={`flex shrink-0 flex-col items-center justify-center rounded-2xl border border-dashed border-[#d7c8ad] bg-white/60 text-[#b2a188] ${className}`}
+        aria-label={`${result.name}の画像は準備中です`}
       >
-        ?
+        <span className={prominent ? "text-4xl font-black" : "text-xl font-black"}>?</span>
+        {prominent && <span className="mt-1 text-[9px] font-bold">画像準備中</span>}
       </span>
     );
   }
   return (
     // eslint-disable-next-line @next/next/no-img-element
-    <img src={result.image} alt="" draggable={false} className={`shrink-0 select-none object-contain ${className}`} />
+    <img src={result.image} alt={result.name} draggable={false} className={`shrink-0 select-none object-contain ${className}`} />
   );
 }
