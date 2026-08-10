@@ -2,8 +2,8 @@ import { LEVEL_THRESHOLDS } from "@/lib/exp";
 
 /**
  * おでかけコインの付与量。
- * 数値は supabase/migrations/0011_odekake_coins.sql の
- * coin_level_up_reward() / calculate_step_coins() と必ず同じにする。
+ * レベルアップ報酬は supabase/migrations/0011_odekake_coins.sql、
+ * 歩数報酬は supabase/migrations/0015_step_coins_every_500.sql と必ず同じにする。
  */
 
 /** そのレベルへ到達したときにもらえるコイン（上限レベルごとの帯） */
@@ -17,17 +17,16 @@ export const LEVEL_UP_COIN_BANDS = [
   { maxLevel: 30, coins: 1000 },
 ] as const;
 
-/** 1日の歩数の段階報酬。到達するごとに加算される */
-export const STEP_COIN_TIERS = [
-  { steps: 3000, coins: 10 },
-  { steps: 5000, coins: 10 },
-  { steps: 8000, coins: 15 },
-  { steps: 10000, coins: 15 },
-  { steps: 15000, coins: 20 },
-] as const;
+/** 歩数報酬：1日ごとに500歩達成するたび10コイン */
+export const STEP_COIN_INTERVAL = 500;
+export const STEP_COIN_AMOUNT = 10;
 
-/** 1日にもらえる歩数コインの上限 */
-export const MAX_DAILY_STEP_COINS = 70;
+/**
+ * 互換用。歩数報酬の表示は STEP_COIN_INTERVAL / STEP_COIN_AMOUNT を使う。
+ * API側の1日歩数上限（200,000歩）に基づく理論上の最大値。
+ */
+export const STEP_COIN_TIERS = [{ steps: STEP_COIN_INTERVAL, coins: STEP_COIN_AMOUNT }] as const;
+export const MAX_DAILY_STEP_COINS = (200000 / STEP_COIN_INTERVAL) * STEP_COIN_AMOUNT;
 
 const MAX_LEVEL = LEVEL_THRESHOLDS.length;
 
@@ -43,15 +42,11 @@ export function getLevelUpCoins(level: number): number {
   return bandCoins(LEVEL_UP_COIN_BANDS, target);
 }
 
-/** その日の歩数でもらえるコインの合計 */
+/** その日の歩数でもらえるコインの合計。500歩未満の端数は切り捨てる。 */
 export function getStepCoins(steps: number | null | undefined): number {
   if (steps === null || steps === undefined || !Number.isFinite(steps)) return 0;
   const safeSteps = Math.max(0, Math.floor(steps));
-  const total = STEP_COIN_TIERS.reduce(
-    (sum, tier) => (safeSteps >= tier.steps ? sum + tier.coins : sum),
-    0,
-  );
-  return Math.min(MAX_DAILY_STEP_COINS, total);
+  return Math.floor(safeSteps / STEP_COIN_INTERVAL) * STEP_COIN_AMOUNT;
 }
 
 export function formatCoins(coins: number): string {
