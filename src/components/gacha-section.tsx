@@ -5,12 +5,10 @@ import { useCallback, useRef, useState } from "react";
 import { formatCoins } from "@/lib/coins";
 import {
   GACHA_PLANS,
-  GACHA_RARITY_RATES_BY_TYPE,
-  GACHA_TYPE_LABELS,
+  GACHA_RARITY_RATES,
   RARITY_STYLES,
   type GachaPlanId,
   type GachaRarity,
-  type GachaType,
 } from "@/lib/gacha/config";
 import { GachaMachineArt, SparkleArt } from "./coin-art";
 import { IconClose, IconCoin } from "./icons";
@@ -59,16 +57,14 @@ function rarityTheme(rarity: string) {
 
 export function GachaSection({ balance }: { balance: number }) {
   const router = useRouter();
-  const [gachaType, setGachaType] = useState<GachaType>("regular");
   const [pending, setPending] = useState<GachaPlanId | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [results, setResults] = useState<DrawResult[] | null>(null);
   const [lastPlan, setLastPlan] = useState<GachaPlanId>("single");
-  const [lastGachaType, setLastGachaType] = useState<GachaType>("regular");
   const inFlight = useRef(false);
 
   const draw = useCallback(
-    async (planId: GachaPlanId, selectedType: GachaType) => {
+    async (planId: GachaPlanId) => {
       if (inFlight.current) return;
       inFlight.current = true;
       setPending(planId);
@@ -80,7 +76,6 @@ export function GachaSection({ balance }: { balance: number }) {
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
             plan: planId,
-            gachaType: selectedType,
             requestId: crypto.randomUUID(),
           }),
         });
@@ -94,7 +89,6 @@ export function GachaSection({ balance }: { balance: number }) {
         }
 
         setLastPlan(planId);
-        setLastGachaType(selectedType);
         setResults(payload?.results ?? []);
         router.refresh();
       } catch {
@@ -107,8 +101,7 @@ export function GachaSection({ balance }: { balance: number }) {
     [router],
   );
 
-  const rates = GACHA_RARITY_RATES_BY_TYPE[gachaType];
-  const isRegular = gachaType === "regular";
+  const rates = GACHA_RARITY_RATES;
 
   return (
     <section className="rough-card flex min-w-0 flex-col overflow-hidden p-3.5">
@@ -117,45 +110,13 @@ export function GachaSection({ balance }: { balance: number }) {
         <span className="min-w-0 truncate">コインでガチャ</span>
       </h2>
 
-      <div className="mt-2 grid grid-cols-2 gap-1 rounded-full bg-paper-deep p-1" role="tablist" aria-label="ガチャの種類">
-        {(["regular", "summer"] as const).map((type) => {
-          const active = gachaType === type;
-          return (
-            <button
-              key={type}
-              type="button"
-              role="tab"
-              aria-selected={active}
-              disabled={pending !== null}
-              onClick={() => {
-                setGachaType(type);
-                setError(null);
-              }}
-              className={`rounded-full px-2 py-1.5 text-[10px] font-bold transition ${
-                active
-                  ? type === "regular"
-                    ? "bg-leaf-soft text-leaf-deep shadow-sm"
-                    : "bg-sun-soft text-[#8a6a2a] shadow-sm"
-                  : "text-ink-faint"
-              } disabled:opacity-50`}
-            >
-              {GACHA_TYPE_LABELS[type]}
-            </button>
-          );
-        })}
-      </div>
-
       <div className="mt-2 flex min-h-0 flex-1 items-start gap-0.5">
         <div className="min-w-0 flex-1">
           <p className="text-[10px] leading-[1.65] text-ink-soft">
             <span className="block whitespace-nowrap">コインをつかって</span>
-            <span className="block whitespace-nowrap">
-              {isRegular ? "わんこのおもちゃをゲット！" : "夏限定スキンをゲット！"}
-            </span>
+            <span className="block whitespace-nowrap">おもちゃやシリーズアイテムをゲット！</span>
           </p>
-          <p className="mt-1 text-[9px] font-semibold text-ink-faint">
-            {isRegular ? "おもちゃ20種類" : "夏のフレブル"}
-          </p>
+          <p className="mt-1 text-[9px] font-semibold text-ink-faint">すべて同じガチャから出ます</p>
           <p className="mt-1.5 flex items-center gap-1 text-[9px] font-bold text-ink-faint">
             <IconCoin size={11} />
             所持 {formatCoins(balance)}
@@ -184,7 +145,7 @@ export function GachaSection({ balance }: { balance: number }) {
             <button
               key={planId}
               type="button"
-              onClick={() => void draw(planId, gachaType)}
+              onClick={() => void draw(planId)}
               disabled={pending !== null || short}
               className="flex w-full items-center justify-between rounded-full bg-leaf px-3 py-2 text-white shadow-sm transition active:translate-y-px disabled:opacity-45"
             >
@@ -214,7 +175,7 @@ export function GachaSection({ balance }: { balance: number }) {
           results={results}
           plan={lastPlan}
           busy={pending !== null}
-          onRetry={() => void draw(lastPlan, lastGachaType)}
+          onRetry={() => void draw(lastPlan)}
           onClose={() => setResults(null)}
         />
       )}
