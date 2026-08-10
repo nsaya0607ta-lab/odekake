@@ -27,7 +27,7 @@ export const GACHA_PRIZES: readonly GachaPrize[] = [
     name: "夏のフレブル",
     rarity: "SR",
     type: "dog_skin",
-    image: null,
+    image: "/collection/skins/summer-frenchie.webp",
   },
 ];
 
