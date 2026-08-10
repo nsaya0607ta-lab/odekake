@@ -2,8 +2,8 @@
  * 図鑑の共通パーツ（進捗バー・アイテムのカード・グリッド）。
  * 通常の図鑑・シリーズ図鑑・シリーズ詳細で同じものを使う。
  */
-import { IconStar } from "@/components/icons";
-import { RARITY_STARS, type CollectionItem } from "@/lib/collection/items";
+import { RARITY_STYLES } from "@/lib/gacha/config";
+import type { CollectionItem } from "@/lib/collection/items";
 import { ExactSilhouette, hasExactSilhouette } from "./exact-silhouette";
 import { ItemArt } from "./item-art";
 
@@ -38,15 +38,16 @@ export function CollectionProgress({
   );
 }
 
-/** レアリティの★ */
-function RarityStars({ item }: { item: CollectionItem }) {
-  const stars = RARITY_STARS[item.rarity] ?? 1;
+/** レアリティを N / R / SR / SSR で表示 */
+function RarityLabel({ item }: { item: CollectionItem }) {
+  const style = RARITY_STYLES[item.rarity];
 
   return (
-    <span className="mt-0.5 flex items-center justify-center gap-px text-sun" aria-label={`レアリティ${stars}`}>
-      {Array.from({ length: stars }, (_, index) => (
-        <IconStar key={index} size={10} filled strokeWidth={1.2} />
-      ))}
+    <span
+      className={`mt-1 rounded-full px-2 py-0.5 text-[9px] font-black leading-none ${style.badge}`}
+      aria-label={`レアリティ${item.rarity}`}
+    >
+      {item.rarity}
     </span>
   );
 }
@@ -73,7 +74,7 @@ export function ItemCard({ item, owned }: { item: CollectionItem; owned: boolean
       >
         {owned ? item.name : "???"}
       </span>
-      {owned ? <RarityStars item={item} /> : null}
+      {owned ? <RarityLabel item={item} /> : null}
     </div>
   );
 }
