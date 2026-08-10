@@ -18,7 +18,7 @@ export type GachaPrize = {
 };
 
 export const GACHA_PRIZES: readonly GachaPrize[] = [
-  // --- 通常ガチャ：わんこのおもちゃ ----------------------------------
+  // --- 通常ガチャ：わんこのおもちゃ 第1弾 ----------------------------
   {
     id: "toy_colorful_ball",
     name: "カラフルボール",
@@ -98,6 +98,88 @@ export const GACHA_PRIZES: readonly GachaPrize[] = [
     type: "item",
     pool: "regular",
     image: "/collection/items/rainbow-ball.webp",
+  },
+
+  // --- 通常ガチャ：わんこのおもちゃ 第2弾 ----------------------------
+  {
+    id: "toy_tennis_ball",
+    name: "テニスボール",
+    rarity: "N",
+    type: "item",
+    pool: "regular",
+    image: "/collection/items/tennis-ball.webp",
+  },
+  {
+    id: "toy_red_slipper",
+    name: "赤いスリッパ",
+    rarity: "N",
+    type: "item",
+    pool: "regular",
+    image: "/collection/items/red-slipper.webp",
+  },
+  {
+    id: "toy_wood_stick",
+    name: "木の枝",
+    rarity: "N",
+    type: "item",
+    pool: "regular",
+    image: "/collection/items/wood-stick.webp",
+  },
+  {
+    id: "toy_donut_rope",
+    name: "ドーナツ型ロープ",
+    rarity: "N",
+    type: "item",
+    pool: "regular",
+    image: "/collection/items/donut-rope.webp",
+  },
+  {
+    id: "toy_soccer_ball",
+    name: "サッカーボール",
+    rarity: "R",
+    type: "item",
+    pool: "regular",
+    image: "/collection/items/soccer-ball.webp",
+  },
+  {
+    id: "toy_taiyaki_plush",
+    name: "たい焼きぬいぐるみ",
+    rarity: "R",
+    type: "item",
+    pool: "regular",
+    image: "/collection/items/taiyaki-plush.webp",
+  },
+  {
+    id: "toy_bear_plush",
+    name: "くまのぬいぐるみ",
+    rarity: "R",
+    type: "item",
+    pool: "regular",
+    image: "/collection/items/bear-plush.webp",
+  },
+  {
+    id: "toy_meat",
+    name: "大きな肉のおもちゃ",
+    rarity: "SR",
+    type: "item",
+    pool: "regular",
+    image: "/collection/items/meat-toy.webp",
+  },
+  {
+    id: "toy_frenchie_cushion",
+    name: "フレブル型クッション",
+    rarity: "SR",
+    type: "item",
+    pool: "regular",
+    image: "/collection/items/frenchie-cushion.webp",
+  },
+  {
+    id: "toy_golden_crown_ball",
+    name: "王冠つき黄金ボール",
+    rarity: "SSR",
+    type: "item",
+    pool: "regular",
+    image: "/collection/items/golden-crown-ball.webp",
   },
 
   // --- 夏限定 -----------------------------------------------------------
