@@ -4,6 +4,7 @@ import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { formatCoins } from "@/lib/coins";
 import { todayInJapan } from "@/lib/date";
+import { getFrenchieSrc, type DogSkinId } from "@/lib/dog-skins";
 import { CoinArt } from "./coin-art";
 import { IconClose } from "./icons";
 
@@ -48,7 +49,7 @@ function waitForSplash(): Promise<void> {
   });
 }
 
-export function LoginBonus() {
+export function LoginBonus({ skin = "default" }: { skin?: DogSkinId }) {
   const router = useRouter();
   const [reward, setReward] = useState<Reward | null>(null);
   const closeButton = useRef<HTMLButtonElement>(null);
@@ -231,7 +232,7 @@ export function LoginBonus() {
 
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img
-            src="/characters/frenchie/cheer.webp"
+            src={getFrenchieSrc(skin, "cheer")}
             alt=""
             aria-hidden="true"
             draggable={false}

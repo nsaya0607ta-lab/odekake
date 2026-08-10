@@ -9,6 +9,7 @@ import { PageBody } from "@/components/page-body";
 import { TopHeader } from "@/components/page-header";
 import { getStepCoins } from "@/lib/coins";
 import { getCoinSummary } from "@/lib/data/coins";
+import { getCurrentDogSkin } from "@/lib/data/dog-skin";
 import { getExpDashboard } from "@/lib/data/exp";
 import { getRecordSpace } from "@/lib/data/space";
 import { requireUser } from "@/lib/supabase/server";
@@ -20,9 +21,10 @@ export default async function CoinsPage() {
   const { supabase, user } = await requireUser();
   const space = await getRecordSpace(supabase, user.id);
 
-  const [summary, expDashboard] = await Promise.all([
+  const [summary, expDashboard, skin] = await Promise.all([
     getCoinSummary(supabase, user.id),
     getExpDashboard(supabase, user.id),
+    getCurrentDogSkin(supabase, user.id),
   ]);
 
   return (
@@ -42,11 +44,11 @@ export default async function CoinsPage() {
       <PageBody>
         {/* 画面全体の余白は PageBody（space-y-6）より詰めたいので、内側で持つ */}
         <div className="space-y-4">
-          <CoinHero balance={summary.balance} todayCoins={getStepCoins(expDashboard.todaySteps)} />
+          <CoinHero balance={summary.balance} todayCoins={getStepCoins(expDashboard.todaySteps)} skin={skin} />
 
           <CoinUseCards balance={summary.balance} />
 
-          <CoinShopPreview />
+          <CoinShopPreview skin={skin} />
 
           <CoinEarnMethods />
         </div>

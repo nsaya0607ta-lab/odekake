@@ -545,6 +545,50 @@ select pg_temp.expect_count('ガチャ: 他人の所持は見えない', :'bob',
   format($q$select 1 from public.user_gacha_items where user_id = %L$q$, :'alice'), 0);
 
 -- -------------------------------------------------------------
+-- 犬スキン（重ね着せではなく、犬ごと丸ごと差し替え）
+-- -------------------------------------------------------------
+-- ここまでで alice は summer_frenchie を1つ所持、hiking_frenchie / snow_frenchie は未所持。
+-- bob はガチャに一度も成功していないので何も持っていない。
+
+select pg_temp.expect_ok('犬スキン: default はだれでも選べる', :'bob',
+  $q$select public.set_dog_skin('default')$q$);
+select pg_temp.record('犬スキン: 選んだ内容が保存される',
+  (select skin_id from public.user_dog_skin where user_id = :'bob') = 'default');
+
+select pg_temp.expect_denied('犬スキン: 持っていないスキンは選べない', :'bob',
+  $q$select public.set_dog_skin('summer')$q$);
+select pg_temp.record('犬スキン: 拒否された選択は保存されない',
+  (select skin_id from public.user_dog_skin where user_id = :'bob') = 'default');
+
+select pg_temp.expect_denied('犬スキン: 存在しないスキンIDは拒否される', :'alice',
+  $q$select public.set_dog_skin('ghost')$q$);
+
+select pg_temp.expect_ok('犬スキン: 所持しているスキンは選べる', :'alice',
+  $q$select public.set_dog_skin('summer')$q$);
+select pg_temp.record('犬スキン: 所持スキンへの切り替えが保存される',
+  (select skin_id from public.user_dog_skin where user_id = :'alice') = 'summer');
+
+select pg_temp.expect_denied('犬スキン: まだ手に入れていない登山犬は選べない', :'alice',
+  $q$select public.set_dog_skin('hiking')$q$);
+select pg_temp.record('犬スキン: 拒否されても選択中のスキンは変わらない',
+  (select skin_id from public.user_dog_skin where user_id = :'alice') = 'summer');
+
+select pg_temp.expect_ok('犬スキン: default へ戻すのはいつでもできる', :'alice',
+  $q$select public.set_dog_skin('default')$q$);
+select pg_temp.record('犬スキン: 切り替えても行は1件のまま',
+  (select count(*) from public.user_dog_skin where user_id = :'alice') = 1);
+
+select pg_temp.expect_count('犬スキン: 本人は自分の選択を見られる', :'alice',
+  'select 1 from public.user_dog_skin', 1);
+select pg_temp.expect_count('犬スキン: 他人の選択は見えない', :'bob',
+  format($q$select 1 from public.user_dog_skin where user_id = %L$q$, :'alice'), 0);
+
+select pg_temp.expect_denied('犬スキン: RPCを介さず直接書き込めない', :'alice', format(
+  $q$insert into public.user_dog_skin (user_id, skin_id) values (%L, 'hiking')$q$, :'alice'));
+select pg_temp.expect_blocked('犬スキン: RPCを介さず直接書き換えられない', :'alice', format(
+  $q$update public.user_dog_skin set skin_id = 'hiking' where user_id = %L$q$, :'alice'));
+
+-- -------------------------------------------------------------
 -- プロフィールの公開範囲
 -- -------------------------------------------------------------
 select pg_temp.expect_count('自分のプロフィールは見える', :'alice',
@@ -651,6 +695,9 @@ select pg_temp.record('オーナー削除でEXPとコインの台帳・残高も
 
 select pg_temp.record('オーナー削除でそうびも消える',
   (select count(*) from public.user_equipment) = 0);
+
+select pg_temp.record('オーナー削除で犬スキンの選択も消える',
+  (select count(*) from public.user_dog_skin) = 0);
 
 -- -------------------------------------------------------------
 -- 結果

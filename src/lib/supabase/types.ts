@@ -173,6 +173,12 @@ export type UserEquipmentRow = {
   updated_at: string;
 };
 
+export type UserDogSkinRow = {
+  user_id: string;
+  skin_id: string;
+  updated_at: string;
+};
+
 /** ガチャで手に入れたもの。item_id は src/lib/gacha/prizes.ts の GachaPrize.id */
 export type UserGachaItemRow = {
   user_id: string;
@@ -278,6 +284,12 @@ export type Database = {
         Update: Partial<UserEquipmentRow>;
         Relationships: [];
       };
+      user_dog_skin: {
+        Row: UserDogSkinRow;
+        Insert: Partial<UserDogSkinRow> & { user_id: string; skin_id: string };
+        Update: Partial<UserDogSkinRow>;
+        Relationships: [];
+      };
       user_gacha_items: {
         Row: UserGachaItemRow;
         Insert: Partial<UserGachaItemRow> & { user_id: string; item_id: string };
@@ -326,6 +338,7 @@ export type Database = {
         Returns: number;
       };
       revoke_steps_sync_token: { Args: Record<string, never>; Returns: undefined };
+      set_dog_skin: { Args: { p_skin_id: string }; Returns: undefined };
       set_equipped_item: { Args: { p_slot: string; p_level: number | null }; Returns: undefined };
     };
     Enums: {
