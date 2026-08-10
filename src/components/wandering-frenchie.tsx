@@ -13,6 +13,10 @@ import { useEffect, useRef, useState } from "react";
  * transition と animation が同じ transform を奪い合って壊れる。
  */
 
+/**
+ * Lv.1 からある基本動作。ここは変更・削除しない。
+ * 歩行処理（stand と walk の入れ替え）もこの7つに乗っている。
+ */
 const POSES = {
   stand: "/characters/frenchie/stand.webp",
   walk: "/characters/frenchie/walk.webp",
@@ -21,27 +25,91 @@ const POSES = {
   happy: "/characters/frenchie/stand-happy.webp",
   shake: "/characters/frenchie/shake.webp",
   sleep: "/characters/frenchie/sleep.webp",
-  wink: "/characters/frenchie/wink.webp",
-  wave: "/characters/frenchie/wave.webp",
-  camera: "/characters/frenchie/camera.webp",
-  bow: "/characters/frenchie/bow.webp",
-  cheer: "/characters/frenchie/cheer.webp",
-  smile: "/characters/frenchie/smile.webp",
-  dig: "/characters/frenchie/dig.webp",
-  treat: "/characters/frenchie/treat.webp",
-  roll: "/characters/frenchie/roll.webp",
-  drink: "/characters/frenchie/drink.webp",
-  doze: "/characters/frenchie/doze.webp",
-  yawn: "/characters/frenchie/yawn.webp",
-  lieWave: "/characters/frenchie/lie-wave.webp",
 } as const;
 
 type Pose = keyof typeof POSES;
 const POSE_KEYS = Object.keys(POSES) as Pose[];
 
-/** 立ち止まったときの仕草と、その長さ（ms） */
-type Rest = { pose: Pose; min: number; max: number; requiredLevel?: number };
+/**
+ * Lv.2〜30 のレベルアップ報酬モーション。
+ *
+ * 1件につき「土台にする1枚絵」と「CSS の translate / rotate / scale だけの
+ * キーフレーム」の組み合わせで作る。コマ送りも Canvas も小道具との absolute 配置も
+ * 使わない。動きの中身は下の @keyframes fm-<id> が持っていて、ここは土台の絵と
+ * 再生時間だけを決める。
+ *
+ * `art` は public/characters/frenchie/ の既存素材から選ぶ。犬の顔・毛色・体型・
+ * 絵柄は現在のフレブルで固定なので、モーションのために描き足したり差し替えたりは
+ * しない。土台が同じで動きだけ違う組み合わせがあるのは意図どおり（同じ URL なので
+ * 画像は1回しか読まれない）。
+ *
+ * Lv.1 の stand / walk / sit / sniff / happy / shake / sleep とは重複させない。
+ */
+type Motion = {
+  /** ポーズキー兼 CSS クラス名の一部。POSES のキーとは重ならないようにする */
+  id: string;
+  level: number;
+  /** 土台にする1枚絵（拡張子なしのファイル名） */
+  art: string;
+  /** 動きの長さ（ms） */
+  ms: number;
+  /** 動きの緩急。省略時は ease-in-out */
+  ease?: string;
+};
 
+const MOTIONS: readonly Motion[] = [
+  { id: "tilt", level: 2, art: "wonder", ms: 1400 },
+  { id: "paw", level: 3, art: "sit-side", ms: 1300 },
+  { id: "highfive", level: 4, art: "wave", ms: 1100, ease: "cubic-bezier(0.34, 1.4, 0.5, 1)" },
+  { id: "wink", level: 5, art: "wink", ms: 1000, ease: "cubic-bezier(0.34, 1.2, 0.5, 1)" },
+  { id: "grin", level: 6, art: "smile", ms: 1300 },
+  { id: "surprise", level: 7, art: "bark", ms: 1000, ease: "cubic-bezier(0.3, 1.5, 0.6, 1)" },
+  { id: "peekaboo", level: 8, art: "cheer", ms: 1500, ease: "cubic-bezier(0.34, 1.3, 0.5, 1)" },
+  { id: "spin", level: 9, art: "trot", ms: 1100 },
+  { id: "standup", level: 10, art: "cheer", ms: 1400, ease: "cubic-bezier(0.34, 1.2, 0.5, 1)" },
+  { id: "hop", level: 11, art: "front", ms: 900, ease: "cubic-bezier(0.3, 1.2, 0.5, 1)" },
+  { id: "hiccup", level: 12, art: "yawn", ms: 1200, ease: "cubic-bezier(0.3, 1.6, 0.6, 1)" },
+  { id: "tailwag", level: 13, art: "walk-tail", ms: 1400 },
+  { id: "earflick", level: 14, art: "front", ms: 1100 },
+  { id: "lookaround", level: 15, art: "wonder", ms: 1800 },
+  { id: "pawtap", level: 16, art: "lie-wave", ms: 1400 },
+  { id: "hipwiggle", level: 17, art: "bow-b", ms: 1500 },
+  { id: "stretch", level: 18, art: "bow", ms: 1600 },
+  { id: "lookback", level: 19, art: "walk-tail", ms: 1400 },
+  { id: "bowing", level: 20, art: "bow", ms: 1400 },
+  { id: "pawflail", level: 21, art: "cheer", ms: 1300 },
+  { id: "hideface", level: 22, art: "lie-wave", ms: 1500 },
+  { id: "onepaw", level: 23, art: "sit-side", ms: 1400 },
+  { id: "backstep", level: 24, art: "trot", ms: 1600 },
+  { id: "sneeze", level: 25, art: "bark", ms: 1100, ease: "cubic-bezier(0.3, 1.5, 0.6, 1)" },
+  { id: "howl", level: 26, art: "bark", ms: 1800 },
+  { id: "sidestep", level: 27, art: "trot", ms: 1700 },
+  { id: "headshake", level: 28, art: "smile", ms: 1200 },
+  { id: "pawcross", level: 29, art: "wave", ms: 1400 },
+  { id: "dance", level: 30, art: "cheer", ms: 2000 },
+];
+
+/** 表示キー（基本ポーズ or モーション id）から画像の URL を引く */
+const SRC: Record<string, string> = {
+  ...POSES,
+  ...Object.fromEntries(MOTIONS.map((motion) => [motion.id, `/characters/frenchie/${motion.art}.webp`])),
+};
+
+/**
+ * 絵の差し替えでは出せない「動き」を CSS で足す仕草と、その再生用クラス。
+ *
+ * 素材はどれも独立した1枚絵で、目だけ違う対の絵は無い。コマ送りで仕草を作ろうと
+ * すると体ごと入れ替わって二重写しになるので、報酬モーションは1枚絵のまま
+ * transform だけで動かしている。基本ポーズはこれまでどおり静止画。
+ */
+const GESTURE_CLASS: Record<string, string> = Object.fromEntries(
+  MOTIONS.map((motion) => [motion.id, `frenchie-m-${motion.id}`]),
+);
+
+/** 立ち止まったときの仕草と、その長さ（ms） */
+type Rest = { pose: string; min: number; max: number; requiredLevel?: number };
+
+/** Lv.1 の基本動作。ここは変更しない */
 const RESTS: readonly Rest[] = [
   { pose: "stand", min: 900, max: 1800 },
   { pose: "sniff", min: 1600, max: 2600 },
@@ -49,35 +117,21 @@ const RESTS: readonly Rest[] = [
   { pose: "happy", min: 1400, max: 2400 },
   { pose: "shake", min: 1100, max: 1700 },
   { pose: "sleep", min: 3600, max: 6000 },
-  { pose: "wink", min: 1150, max: 1800, requiredLevel: 2 },
-  { pose: "wave", min: 1300, max: 2200, requiredLevel: 3 },
-  { pose: "camera", min: 1400, max: 2200, requiredLevel: 5 },
-  { pose: "bow", min: 1500, max: 2300, requiredLevel: 7 },
-  { pose: "cheer", min: 1300, max: 2100, requiredLevel: 10 },
-  { pose: "smile", min: 1400, max: 2300, requiredLevel: 12 },
-  { pose: "dig", min: 1600, max: 2500, requiredLevel: 14 },
-  { pose: "treat", min: 1500, max: 2400, requiredLevel: 16 },
-  { pose: "roll", min: 1800, max: 2900, requiredLevel: 19 },
-  { pose: "drink", min: 1800, max: 2800, requiredLevel: 20 },
-  { pose: "doze", min: 2600, max: 4200, requiredLevel: 22 },
-  { pose: "yawn", min: 1400, max: 2200, requiredLevel: 24 },
-  { pose: "lieWave", min: 1900, max: 3000, requiredLevel: 26 },
 ];
 
-const REQUIRED_LEVEL_BY_POSE = new Map(
-  RESTS.filter((rest) => rest.requiredLevel !== undefined).map((rest) => [rest.pose, rest.requiredLevel!]),
-);
-
 /**
- * 絵の差し替えでは出せない「動き」を CSS で足す仕草と、その再生用クラス。
- *
- * 素材はどれも独立した1枚絵で、目だけ違う対の絵は無い。コマ送りで瞬きを作ろうと
- * すると体ごと入れ替わって二重写しになるので、ウインクは1枚絵のまま動かしている。
- * ここに載っていない仕草はこれまでどおり静止画。
+ * 報酬モーションも立ち止まりの一種として混ぜる。止まっている時間は動きより必ず
+ * 長くとって、再生の途中で歩き出さないようにする。
  */
-const GESTURE_POSES: Partial<Record<Pose, string>> = {
-  wink: "frenchie-wink",
-};
+const ALL_RESTS: readonly Rest[] = [
+  ...RESTS,
+  ...MOTIONS.map((motion) => ({
+    pose: motion.id,
+    min: motion.ms + 400,
+    max: motion.ms + 1200,
+    requiredLevel: motion.level,
+  })),
+];
 
 /**
  * 素材ごとの描き位置のずれを打ち消す量（絵の幅に対する %）。
@@ -88,14 +142,17 @@ const GESTURE_POSES: Partial<Record<Pose, string>> = {
  * 立ち姿を基準に踏み出しの絵を寄せて胴体を留める。前進ぶんは CSS の移動が持つ。
  * 足元（下端）は全ポーズ揃っているので縦は触らない。
  */
-const POSE_NUDGE_X: Partial<Record<Pose, number>> = {
+const POSE_NUDGE_X: Record<string, number> = {
   walk: 5.7,
   // stand-happy.webp も同じ 17px ずれ（横の描画範囲が walk と一致する）
   happy: 5.7,
 };
 
-/** ウインクの動きの長さ（ms）。RESTS の最短より短くして必ず出し切る */
-const WINK_MS = 1000;
+/** 報酬モーションの再生クラス。長さと緩急だけ差し替えて、動きは @keyframes が持つ */
+const MOTION_RULES = MOTIONS.map(
+  (motion) =>
+    `.frenchie-m-${motion.id}{animation:fm-${motion.id} ${motion.ms}ms ${motion.ease ?? "ease-in-out"} both;}`,
+).join("\n        ");
 
 /**
  * バンド幅に対する移動速度（%/秒）。1歩ぶんの絵の踏み出し幅と
@@ -126,7 +183,8 @@ type Walker = {
   depth: number;
   /** 1 = 左向き（素材のまま）、-1 = 右向き */
   facing: 1 | -1;
-  pose: Pose;
+  /** 表示キー。基本ポーズ名か、報酬モーションの id */
+  pose: string;
   walking: boolean;
   travelMs: number;
 };
@@ -135,7 +193,11 @@ const rand = (min: number, max: number) => min + Math.random() * (max - min);
 const pick = <T,>(items: readonly T[]): T => items[Math.floor(Math.random() * items.length)] as T;
 
 export function WanderingFrenchie({ level = 1 }: { level?: number }) {
-  const availablePoseKeys = POSE_KEYS.filter((pose) => (REQUIRED_LEVEL_BY_POSE.get(pose) ?? 1) <= level);
+  // 基本ポーズは常に、報酬モーションは解放済みのものだけ重ねて置く
+  const visibleKeys: string[] = [
+    ...POSE_KEYS,
+    ...MOTIONS.filter((motion) => motion.level <= level).map((motion) => motion.id),
+  ];
   const [walker, setWalker] = useState<Walker>({
     x: 26,
     depth: 0.45,
@@ -145,12 +207,12 @@ export function WanderingFrenchie({ level = 1 }: { level?: number }) {
     travelMs: 0,
   });
   const [stepUp, setStepUp] = useState(false);
-  const poseNodes = useRef<Partial<Record<Pose, HTMLImageElement | null>>>({});
+  const poseNodes = useRef<Record<string, HTMLImageElement | null>>({});
   const bobNode = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
-    const availableRests = RESTS.filter((rest) => (rest.requiredLevel ?? 1) <= level);
+    const availableRests = ALL_RESTS.filter((rest) => (rest.requiredLevel ?? 1) <= level);
 
     let cancelled = false;
     const timers: ReturnType<typeof setTimeout>[] = [];
@@ -213,11 +275,11 @@ export function WanderingFrenchie({ level = 1 }: { level?: number }) {
     return () => clearInterval(id);
   }, [walker.walking]);
 
-  const activePose: Pose = walker.walking ? (stepUp ? "walk" : "stand") : walker.pose;
+  const activePose: string = walker.walking ? (stepUp ? "walk" : "stand") : walker.pose;
 
   // 動きのある仕草は、その仕草に切り替わるたびに頭から再生し直す
   useEffect(() => {
-    const playClass = GESTURE_POSES[activePose];
+    const playClass = GESTURE_CLASS[activePose];
     const node = poseNodes.current[activePose];
     if (!playClass || !node) return;
 
@@ -286,10 +348,38 @@ export function WanderingFrenchie({ level = 1 }: { level?: number }) {
           animation: frenchie-settle 460ms cubic-bezier(0.22, 1, 0.36, 1) both;
         }
 
-        /* ウインク：ためて、顔を寄せながら跳ね、もう一度小さく弾んで戻る。
-           入りがゆっくりだと前の絵と重なって二重写しになるので短く切り替える */
-        .frenchie-gesture { transition: opacity 90ms ease; }
-        @keyframes frenchie-wink {
+        /* 報酬モーション共通。入りがゆっくりだと前の絵と重なって二重写しになるので
+           切り替えは短く。回転と拡縮の軸は足元に置く（腰から上だけが動いて見える） */
+        .frenchie-gesture { transition: opacity 90ms ease; transform-origin: 50% 92%; }
+
+        /* Lv.2 首をかしげる：ゆっくり傾けて、そのまま少し止めてから戻す */
+        @keyframes fm-tilt {
+          0%       { transform: rotate(0deg)    translateX(0); }
+          28%, 68% { transform: rotate(-9deg)   translateX(-2px); }
+          85%      { transform: rotate(2deg)    translateX(0.5px); }
+          100%     { transform: rotate(0deg)    translateX(0); }
+        }
+
+        /* Lv.3 お手：前へ体を預けて、前足を差し出すぶんだけ二度沈む */
+        @keyframes fm-paw {
+          0%, 100% { transform: translateX(0)    rotate(0deg)   scale(1, 1); }
+          22%      { transform: translateX(-5px) rotate(-5deg)  scale(1.01, 0.98); }
+          45%      { transform: translateX(-2px) rotate(-2deg)  scale(1, 1); }
+          68%      { transform: translateX(-5px) rotate(-5deg)  scale(1.01, 0.98); }
+        }
+
+        /* Lv.4 ハイタッチ：ためてから前足を高く突き上げ、跳ねて戻る */
+        @keyframes fm-highfive {
+          0%       { transform: translateY(0)     rotate(0deg)   scale(1, 1); }
+          18%      { transform: translateY(4px)   rotate(0deg)   scale(1.05, 0.94); }
+          42%      { transform: translateY(-12px) rotate(-7deg)  scale(0.96, 1.06); }
+          62%      { transform: translateY(-2px)  rotate(-3deg)  scale(1, 1); }
+          78%      { transform: translateY(-6px)  rotate(-5deg)  scale(0.99, 1.02); }
+          100%     { transform: translateY(0)     rotate(0deg)   scale(1, 1); }
+        }
+
+        /* Lv.5 ウインク：ためて、顔を寄せながら跳ね、もう一度小さく弾んで戻る */
+        @keyframes fm-wink {
           0%, 10%  { transform: translateY(0)    rotate(0deg)    scale(1, 1); }
           20%      { transform: translateY(2px)  rotate(0deg)    scale(1.05, 0.94); }
           36%      { transform: translateY(-7px) rotate(-6deg)   scale(0.97, 1.05); }
@@ -298,17 +388,248 @@ export function WanderingFrenchie({ level = 1 }: { level?: number }) {
           80%      { transform: translateY(0)    rotate(-2.5deg) scale(1, 1); }
           100%     { transform: translateY(0)    rotate(0deg)    scale(1, 1); }
         }
-        .frenchie-wink {
-          transform-origin: 50% 92%;
-          animation: frenchie-wink ${WINK_MS}ms cubic-bezier(0.34, 1.2, 0.5, 1) both;
+
+        /* Lv.6 にっこり：胸を張るように、やわらかく二度ふくらむ */
+        @keyframes fm-grin {
+          0%, 100% { transform: translateY(0)    scale(1, 1); }
+          30%      { transform: translateY(-3px) scale(1.03, 1.03); }
+          55%      { transform: translateY(-1px) scale(1.01, 1.01); }
+          78%      { transform: translateY(-3px) scale(1.03, 1.03); }
         }
+
+        /* Lv.7 びっくり：一瞬で跳ね上がって固まり、細かく震えて戻る */
+        @keyframes fm-surprise {
+          0%       { transform: translateY(0)     rotate(0deg)    scale(1, 1); }
+          12%      { transform: translateY(-13px) rotate(0deg)    scale(0.92, 1.1); }
+          30%      { transform: translateY(-9px)  rotate(2.5deg)  scale(1, 1); }
+          44%      { transform: translateY(-9px)  rotate(-2.5deg) scale(1, 1); }
+          58%      { transform: translateY(-6px)  rotate(1.5deg)  scale(1, 1); }
+          100%     { transform: translateY(0)     rotate(0deg)    scale(1, 1); }
+        }
+
+        /* Lv.8 いないいないばあ：小さくしゃがんで隠れ、勢いよく現れる */
+        @keyframes fm-peekaboo {
+          0%       { transform: translateY(0)    scale(1, 1); }
+          20%, 46% { transform: translateY(11px) scale(1.08, 0.78); }
+          64%      { transform: translateY(-8px) scale(0.94, 1.1); }
+          80%      { transform: translateY(1px)  scale(1.02, 0.98); }
+          100%     { transform: translateY(0)    scale(1, 1); }
+        }
+
+        /* Lv.9 くるっとターン：横幅をつぶし切って裏返り、正面まで戻る */
+        @keyframes fm-spin {
+          0%       { transform: scaleX(1)     rotate(0deg); }
+          25%      { transform: scaleX(0.12)  rotate(-3deg); }
+          50%      { transform: scaleX(-0.85) rotate(0deg); }
+          75%      { transform: scaleX(0.12)  rotate(3deg); }
+          100%     { transform: scaleX(1)     rotate(0deg); }
+        }
+
+        /* Lv.10 二足立ち：後ろ足に体重を移して立ち上がり、そのままふらつく */
+        @keyframes fm-standup {
+          0%       { transform: translateY(0)    rotate(0deg)   scale(1, 1); }
+          22%      { transform: translateY(2px)  rotate(0deg)   scale(1.04, 0.95); }
+          45%      { transform: translateY(-9px) rotate(-4deg)  scale(0.94, 1.09); }
+          62%      { transform: translateY(-9px) rotate(3deg)   scale(0.94, 1.09); }
+          78%      { transform: translateY(-9px) rotate(-2deg)  scale(0.94, 1.09); }
+          100%     { transform: translateY(0)    rotate(0deg)   scale(1, 1); }
+        }
+
+        /* Lv.11 小ジャンプ：沈み込み → 跳ぶ → 着地でつぶれる */
+        @keyframes fm-hop {
+          0%       { transform: translateY(0)     scale(1, 1); }
+          18%      { transform: translateY(5px)   scale(1.08, 0.9); }
+          45%      { transform: translateY(-18px) scale(0.93, 1.1); }
+          72%      { transform: translateY(0)     scale(1.06, 0.93); }
+          88%      { transform: translateY(-2px)  scale(0.99, 1.02); }
+          100%     { transform: translateY(0)     scale(1, 1); }
+        }
+
+        /* Lv.12 しゃっくり：不規則な間隔で三度、体ごと小さく跳ねる */
+        @keyframes fm-hiccup {
+          0%, 8%   { transform: translateY(0)    scale(1, 1); }
+          14%      { transform: translateY(-7px) scale(0.96, 1.06); }
+          24%      { transform: translateY(0)    scale(1, 1); }
+          44%      { transform: translateY(-6px) scale(0.97, 1.05); }
+          54%      { transform: translateY(0)    scale(1, 1); }
+          78%      { transform: translateY(-8px) scale(0.95, 1.07); }
+          88%, 100%{ transform: translateY(0)    scale(1, 1); }
+        }
+
+        /* Lv.13 しっぽフリフリ：腰から後ろだけを速く振る（軸を後ろ足に置く） */
+        .frenchie-m-tailwag { transform-origin: 78% 92%; }
+        @keyframes fm-tailwag {
+          0%, 100%           { transform: rotate(0deg)    scaleX(1); }
+          12%, 37%, 62%, 87% { transform: rotate(3.2deg)  scaleX(0.985); }
+          25%, 50%, 75%      { transform: rotate(-3.2deg) scaleX(0.985); }
+        }
+
+        /* Lv.14 耳ぴくぴく：ほとんど動かない。細かく速く、二度ずつ跳ねる */
+        @keyframes fm-earflick {
+          0%, 16%, 34%, 60%, 100% { transform: translateY(0)      rotate(0deg); }
+          22%                     { transform: translateY(-1.5px) rotate(-1.8deg); }
+          28%                     { transform: translateY(0)      rotate(0.8deg); }
+          46%                     { transform: translateY(-1.5px) rotate(1.8deg); }
+          52%                     { transform: translateY(0)      rotate(-0.8deg); }
+          72%                     { transform: translateY(-1.2px) rotate(-1.4deg); }
+        }
+
+        /* Lv.15 キョロキョロ：左を見て、右を見て、ゆっくり正面へ */
+        @keyframes fm-lookaround {
+          0%       { transform: translateX(0)    rotate(0deg); }
+          22%      { transform: translateX(-6px) rotate(-6deg); }
+          38%      { transform: translateX(-6px) rotate(-6deg); }
+          62%      { transform: translateX(6px)  rotate(6deg); }
+          78%      { transform: translateX(6px)  rotate(6deg); }
+          100%     { transform: translateX(0)    rotate(0deg); }
+        }
+
+        /* Lv.16 前足ちょいちょい：前足で小刻みに四回つつく */
+        @keyframes fm-pawtap {
+          0%, 100%        { transform: translateX(0)    translateY(0)    rotate(0deg); }
+          14%, 39%, 64%   { transform: translateX(-4px) translateY(-2px) rotate(-3.5deg); }
+          26%, 51%, 76%   { transform: translateX(0)    translateY(0)    rotate(0deg); }
+        }
+
+        /* Lv.17 おしりフリフリ：前足を軸にして、腰だけを大きく左右に振る */
+        .frenchie-m-hipwiggle { transform-origin: 22% 92%; }
+        @keyframes fm-hipwiggle {
+          0%, 100%      { transform: rotate(0deg)    translateY(0); }
+          15%, 45%, 75% { transform: rotate(5.5deg)  translateY(-1px); }
+          30%, 60%, 90% { transform: rotate(-5.5deg) translateY(-1px); }
+        }
+
+        /* Lv.18 のび〜っ：前足を伸ばして体を長く低く、たっぷり止めてから戻す */
+        @keyframes fm-stretch {
+          0%       { transform: translateY(0)   scale(1, 1); }
+          35%, 68% { transform: translateY(3px) scale(1.11, 0.9); }
+          85%      { transform: translateY(-2px) scale(0.98, 1.03); }
+          100%     { transform: translateY(0)   scale(1, 1); }
+        }
+
+        /* Lv.19 ふりむく：横幅をつぶして一気に裏返り、後ろを見たまま少し止めて戻る。
+           つぶれたところで止めると絵が潰れて見えるので、細いのは通過するだけにする */
+        @keyframes fm-lookback {
+          0%       { transform: scaleX(1)     rotate(0deg); }
+          22%      { transform: scaleX(0.3)   rotate(-3deg); }
+          40%, 60% { transform: scaleX(-0.92) rotate(0deg); }
+          78%      { transform: scaleX(0.3)   rotate(3deg); }
+          100%     { transform: scaleX(1)     rotate(0deg); }
+        }
+
+        /* Lv.20 おじぎ：前へ深く倒して、ひと呼吸置いてから起き上がる */
+        @keyframes fm-bowing {
+          0%       { transform: rotate(0deg)     translateY(0)   scale(1, 1); }
+          30%, 62% { transform: rotate(-13deg)   translateY(3px) scale(1.03, 0.96); }
+          84%      { transform: rotate(2.5deg)   translateY(-1px) scale(0.99, 1.02); }
+          100%     { transform: rotate(0deg)     translateY(0)   scale(1, 1); }
+        }
+
+        /* Lv.21 前足バタバタ：浮いたまま、左右に速く倒れ込む */
+        @keyframes fm-pawflail {
+          0%, 100%      { transform: translateY(0)    rotate(0deg); }
+          12%           { transform: translateY(-4px) rotate(-7deg); }
+          30%           { transform: translateY(-4px) rotate(7deg); }
+          48%           { transform: translateY(-4px) rotate(-7deg); }
+          66%           { transform: translateY(-4px) rotate(7deg); }
+          84%           { transform: translateY(-2px) rotate(-3deg); }
+        }
+
+        /* Lv.22 顔かくし：小さく縮こまって、細かく震えながら耐える */
+        @keyframes fm-hideface {
+          0%       { transform: translateY(0)   scale(1, 1)        rotate(0deg); }
+          20%      { transform: translateY(5px) scale(0.93, 0.93)  rotate(0deg); }
+          38%      { transform: translateY(5px) scale(0.93, 0.93)  rotate(2deg); }
+          52%      { transform: translateY(5px) scale(0.93, 0.93)  rotate(-2deg); }
+          66%      { transform: translateY(5px) scale(0.93, 0.93)  rotate(1.5deg); }
+          100%     { transform: translateY(0)   scale(1, 1)        rotate(0deg); }
+        }
+
+        /* Lv.23 片足あげ：片側へ重心を寄せて、そのまま止まって見せる */
+        @keyframes fm-onepaw {
+          0%       { transform: rotate(0deg)   translateX(0)   translateY(0); }
+          25%, 70% { transform: rotate(7deg)   translateX(4px) translateY(-2px); }
+          88%      { transform: rotate(-2deg)  translateX(-1px) translateY(0); }
+          100%     { transform: rotate(0deg)   translateX(0)   translateY(0); }
+        }
+
+        /* Lv.24 後ずさり：正面を向いたまま、三歩ぶん後ろへ下がる */
+        @keyframes fm-backstep {
+          0%       { transform: translateX(0)     translateY(0)    rotate(0deg); }
+          20%      { transform: translateX(5px)   translateY(-2px) rotate(1.5deg); }
+          40%      { transform: translateX(10px)  translateY(0)    rotate(0deg); }
+          60%      { transform: translateX(15px)  translateY(-2px) rotate(1.5deg); }
+          78%      { transform: translateX(15px)  translateY(0)    rotate(0deg); }
+          100%     { transform: translateX(0)     translateY(0)    rotate(0deg); }
+        }
+
+        /* Lv.25 くしゃみ：後ろへためて、勢いよく前へ弾け、余韻で二度揺れる */
+        @keyframes fm-sneeze {
+          0%       { transform: translateX(0)     rotate(0deg)    scale(1, 1); }
+          26%      { transform: translateX(6px)   rotate(5deg)    scale(0.98, 1.03); }
+          40%      { transform: translateX(-11px) rotate(-11deg)  scale(1.06, 0.93); }
+          58%      { transform: translateX(-2px)  rotate(-2deg)   scale(1, 1); }
+          74%      { transform: translateX(-5px)  rotate(-5deg)   scale(1.02, 0.98); }
+          100%     { transform: translateX(0)     rotate(0deg)    scale(1, 1); }
+        }
+
+        /* Lv.26 遠吠え：鼻先を持ち上げて反り、長く伸ばしてからゆっくり下ろす */
+        @keyframes fm-howl {
+          0%       { transform: translateY(0)    rotate(0deg)   scale(1, 1); }
+          16%      { transform: translateY(2px)  rotate(0deg)   scale(1.03, 0.97); }
+          34%      { transform: translateY(-7px) rotate(-9deg)  scale(0.97, 1.06); }
+          66%      { transform: translateY(-8px) rotate(-10deg) scale(0.97, 1.06); }
+          88%      { transform: translateY(-1px) rotate(-2deg)  scale(1, 1); }
+          100%     { transform: translateY(0)    rotate(0deg)   scale(1, 1); }
+        }
+
+        /* Lv.27 左右ステップ：踏み替えながら左へ、右へ、と body を送る */
+        @keyframes fm-sidestep {
+          0%, 100% { transform: translateX(0)     translateY(0)     rotate(0deg); }
+          18%      { transform: translateX(-9px)  translateY(-3px)  rotate(-3deg); }
+          34%      { transform: translateX(-9px)  translateY(0)     rotate(0deg); }
+          56%      { transform: translateX(9px)   translateY(-3px)  rotate(3deg); }
+          72%      { transform: translateX(9px)   translateY(0)     rotate(0deg); }
+          88%      { transform: translateX(-3px)  translateY(-1px)  rotate(-1deg); }
+        }
+
+        /* Lv.28 首ぶんぶん：水を切るように、速く大きく左右へ振り切る */
+        @keyframes fm-headshake {
+          0%, 100%           { transform: rotate(0deg)   scaleX(1); }
+          10%, 34%, 58%, 82% { transform: rotate(-9deg)  scaleX(0.97); }
+          22%, 46%, 70%      { transform: rotate(9deg)   scaleX(0.97); }
+        }
+
+        /* Lv.29 前足クロス：前足を組み替えるぶん、体が斜めに入れ替わる */
+        @keyframes fm-pawcross {
+          0%, 100% { transform: rotate(0deg)   translateX(0)    scaleX(1); }
+          22%      { transform: rotate(-6deg)  translateX(-4px) scaleX(0.94); }
+          44%      { transform: rotate(0deg)   translateX(0)    scaleX(1); }
+          66%      { transform: rotate(6deg)   translateX(4px)  scaleX(0.94); }
+          86%      { transform: rotate(-2deg)  translateX(-1px) scaleX(0.99); }
+        }
+
+        /* Lv.30 うれしいダンス：跳ねる・回る・伸びるを全部つなげた、いちばん派手なやつ */
+        @keyframes fm-dance {
+          0%       { transform: translateY(0)     rotate(0deg)   scale(1, 1); }
+          12%      { transform: translateY(-10px) rotate(-8deg)  scale(0.96, 1.07); }
+          24%      { transform: translateY(0)     rotate(0deg)   scale(1.06, 0.94); }
+          36%      { transform: translateY(-10px) rotate(8deg)   scale(0.96, 1.07); }
+          48%      { transform: translateY(0)     rotate(0deg)   scale(1.06, 0.94); }
+          60%      { transform: translateY(-6px)  rotate(0deg)   scale(0.9, 1.05); }
+          72%      { transform: translateY(-6px)  rotate(0deg)   scale(1.1, 1.05); }
+          86%      { transform: translateY(-9px)  rotate(-5deg)  scale(0.98, 1.04); }
+          100%     { transform: translateY(0)     rotate(0deg)   scale(1, 1); }
+        }
+
+        ${MOTION_RULES}
 
         @media (prefers-reduced-motion: reduce) {
           .frenchie-walking .frenchie-bob { animation: none; }
           .frenchie-breath { animation: none; }
           .frenchie-settle { animation: none; }
           .frenchie-pose { transition: none; }
-          .frenchie-wink { animation: none; }
+          .frenchie-gesture[class*="frenchie-m-"] { animation: none; }
         }
       `}</style>
 
@@ -335,26 +656,26 @@ export function WanderingFrenchie({ level = 1 }: { level?: number }) {
             {/* 呼吸。歩きの揺れや仕草の動きと transform を奪い合わないよう層を分ける */}
             <div className="frenchie-breath relative">
               {/* 全ポーズを重ねて置き、表示だけ切り替える。切り替え時のちらつきを防ぐ */}
-              {availablePoseKeys.map((pose) => (
+              {visibleKeys.map((key) => (
                 // eslint-disable-next-line @next/next/no-img-element
                 <img
-                  key={pose}
+                  key={key}
                   ref={(node) => {
-                    poseNodes.current[pose] = node;
+                    poseNodes.current[key] = node;
                   }}
-                  src={POSES[pose]}
+                  src={SRC[key]}
                   alt=""
                   width={300}
                   height={254}
                   decoding="async"
-                  fetchPriority={pose === "stand" || pose === "walk" ? "high" : "low"}
+                  fetchPriority={key === "stand" || key === "walk" ? "high" : "low"}
                   draggable={false}
-                  className={`frenchie-pose ${GESTURE_POSES[pose] ? "frenchie-gesture" : ""} ${
-                    pose === "stand" ? "block" : "absolute inset-0"
+                  className={`frenchie-pose ${GESTURE_CLASS[key] ? "frenchie-gesture" : ""} ${
+                    key === "stand" ? "block" : "absolute inset-0"
                   } h-auto w-full select-none`}
                   style={{
-                    opacity: pose === activePose ? 1 : 0,
-                    transform: POSE_NUDGE_X[pose] ? `translateX(${POSE_NUDGE_X[pose]}%)` : undefined,
+                    opacity: key === activePose ? 1 : 0,
+                    transform: POSE_NUDGE_X[key] ? `translateX(${POSE_NUDGE_X[key]}%)` : undefined,
                   }}
                 />
               ))}

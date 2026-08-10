@@ -60,46 +60,53 @@ export function GearBoard({ currentLevel, initialEquipment }: Props) {
 
   const motionRewards = LEVEL_REWARDS.filter((reward) => reward.kind === "motion" || reward.kind === "expression");
   const roomRewards = LEVEL_REWARDS.filter((reward) => reward.kind === "room");
+  // 装着できる報酬が1つも無いときは、空の枠だけが並ぶので丸ごと出さない
+  const accessorySlots = ACCESSORY_SLOTS.filter((slot) => getSlotRewards(slot).length > 0);
+  const titleRewards = getSlotRewards("title");
 
   return (
     <div className="space-y-4">
-      <PreviewCard equipment={equipment} />
+      {accessorySlots.length > 0 || titleRewards.length > 0 ? <PreviewCard equipment={equipment} /> : null}
 
-      <section className="rough-card overflow-hidden">
-        <p className="border-b border-line px-4 py-3 font-bold">アクセサリー</p>
-        <div className="divide-y divide-line">
-          {ACCESSORY_SLOTS.map((slot) => (
+      {accessorySlots.length > 0 ? (
+        <section className="rough-card overflow-hidden">
+          <p className="border-b border-line px-4 py-3 font-bold">アクセサリー</p>
+          <div className="divide-y divide-line">
+            {accessorySlots.map((slot) => (
+              <SlotRow
+                key={slot}
+                label={SLOT_LABELS[slot]}
+                rewards={getSlotRewards(slot)}
+                equippedLevel={equipment[slot] ?? null}
+                currentLevel={currentLevel}
+                pending={pendingSlot === slot}
+                error={errorSlot === slot}
+                onToggle={(level) => toggle(slot, level)}
+                renderIcon={(level, className) => <GearIcon level={level} className={className} />}
+              />
+            ))}
+          </div>
+        </section>
+      ) : null}
+
+      {titleRewards.length > 0 ? (
+        <section className="rough-card overflow-hidden">
+          <p className="border-b border-line px-4 py-3 font-bold">称号</p>
+          <div className="px-4 py-3">
             <SlotRow
-              key={slot}
-              label={SLOT_LABELS[slot]}
-              rewards={getSlotRewards(slot)}
-              equippedLevel={equipment[slot] ?? null}
+              label={null}
+              rewards={titleRewards}
+              equippedLevel={equipment.title ?? null}
               currentLevel={currentLevel}
-              pending={pendingSlot === slot}
-              error={errorSlot === slot}
-              onToggle={(level) => toggle(slot, level)}
-              renderIcon={(level, className) => <GearIcon level={level} className={className} />}
+              pending={pendingSlot === "title"}
+              error={errorSlot === "title"}
+              onToggle={(level) => toggle("title", level)}
+              renderIcon={() => <span aria-hidden="true">🎗️</span>}
             />
-          ))}
-        </div>
-      </section>
-
-      <section className="rough-card overflow-hidden">
-        <p className="border-b border-line px-4 py-3 font-bold">称号</p>
-        <div className="px-4 py-3">
-          <SlotRow
-            label={null}
-            rewards={getSlotRewards("title")}
-            equippedLevel={equipment.title ?? null}
-            currentLevel={currentLevel}
-            pending={pendingSlot === "title"}
-            error={errorSlot === "title"}
-            onToggle={(level) => toggle("title", level)}
-            renderIcon={() => <span aria-hidden="true">🎗️</span>}
-          />
-          <p className="mt-2 text-[10px] text-ink-faint">選んだ称号は、この画面と装着プレビューで確認できます。</p>
-        </div>
-      </section>
+            <p className="mt-2 text-[10px] text-ink-faint">選んだ称号は、この画面と装着プレビューで確認できます。</p>
+          </div>
+        </section>
+      ) : null}
 
       <ReadOnlySection
         title="しぐさ・表情"
@@ -108,12 +115,14 @@ export function GearBoard({ currentLevel, initialEquipment }: Props) {
         currentLevel={currentLevel}
       />
 
-      <ReadOnlySection
-        title="おへや"
-        note="今後のお部屋づくり機能で使う予定です。いまはまだ見た目には反映されません。"
-        rewards={roomRewards}
-        currentLevel={currentLevel}
-      />
+      {roomRewards.length > 0 ? (
+        <ReadOnlySection
+          title="おへや"
+          note="今後のお部屋づくり機能で使う予定です。いまはまだ見た目には反映されません。"
+          rewards={roomRewards}
+          currentLevel={currentLevel}
+        />
+      ) : null}
     </div>
   );
 }
