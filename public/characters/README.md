@@ -13,7 +13,7 @@ getFrenchieSrc("hiking",  "walk") => "/characters/hiking/walk.webp"
 - `default/` — 最初から使える犬（すでに全ファイル揃っています）
 - `hiking/` — 登山のフレブル（ガチャの `hiking_frenchie` で解放）
 - `snow/` — 雪国のフレブル（ガチャの `snow_frenchie` で解放）
-- `summer/` — 夏のフレブル（ガチャの `summer_frenchie` で解放）
+- `summer/` — 夏のフレブル（ガチャの `summer_frenchie` で解放、21ポーズ配置済み）
 
 ## 必要なファイル名
 
@@ -29,5 +29,6 @@ getFrenchieSrc("hiking",  "walk") => "/characters/hiking/walk.webp"
 用意できていない間は、他のスキンではその画像だけ 404 になります
 （アプリ自体は落ちません）。
 
-`hiking/` `snow/` `summer/` はまだ画像が入っていません。画像を置くだけで
-動くようにコード側は準備してあります。
+`default/` と `summer/` は、全ポーズを300×254pxの透過WebPで揃えています。
+`hiking/` と `snow/` はまだ専用ポーズ画像が入っていないため、代表画像へ
+フォールバックします。

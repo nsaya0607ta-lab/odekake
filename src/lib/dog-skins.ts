@@ -77,12 +77,10 @@ export function isSkinUnlocked(skin: DogSkin, ownedItemIds: ReadonlySet<string>)
  * 犬の画像URL。
  *
  * default は従来どおり public/characters/default/*.webp を使う。
- * summer は、デフォルトと同じ21ポーズを夏服へ着せ替えたSVGをビルド時に生成して使う。
+ * summer も、デフォルトと同じ300×254pxの透過WebPを直接使う。
  * hiking / snow は専用ポーズ画像がまだ未配置なので代表画像へフォールバックする。
  */
 export function getFrenchieSrc(skin: DogSkinId, pose: string): string {
-  if (skin === "summer") return `/characters/summer/${pose}.svg`;
-
   const dogSkin = getDogSkin(skin);
   return dogSkin.hasPoseSet ? `/characters/${skin}/${pose}.webp` : dogSkin.previewImage;
 }
