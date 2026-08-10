@@ -171,6 +171,7 @@ export default async function HomePage({ searchParams }: { searchParams: Promise
             <TodayStepsCard
               initialSteps={expDashboard.todaySteps}
               initialStepExp={expDashboard.todayStepExp}
+              initialCoinBalance={coins.balance}
             />
           </section>
         </div>

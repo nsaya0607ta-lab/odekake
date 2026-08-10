@@ -6,20 +6,26 @@ import { useCallback, useEffect, useRef, useState } from "react";
 type Props = {
   initialSteps: number | null;
   initialStepExp: number;
+  initialCoinBalance: number;
 };
 
 type TodayStepsResponse = {
   ok: boolean;
   todaySteps: number | null;
   todayStepExp: number;
+  todayStepCoins: number;
+  expectedStepCoins: number;
+  coinBalance: number;
+  coinRepairApplied: boolean;
 };
 
-export function TodayStepsCard({ initialSteps, initialStepExp }: Props) {
+export function TodayStepsCard({ initialSteps, initialStepExp, initialCoinBalance }: Props) {
   const router = useRouter();
   const [steps, setSteps] = useState(initialSteps);
   const [stepExp, setStepExp] = useState(initialStepExp);
   const latestSteps = useRef(initialSteps);
   const latestStepExp = useRef(initialStepExp);
+  const latestCoinBalance = useRef(initialCoinBalance);
 
   const refresh = useCallback(async () => {
     try {
@@ -30,14 +36,17 @@ export function TodayStepsCard({ initialSteps, initialStepExp }: Props) {
       if (!body.ok) return;
 
       const changed =
-        body.todaySteps !== latestSteps.current || body.todayStepExp !== latestStepExp.current;
+        body.todaySteps !== latestSteps.current ||
+        body.todayStepExp !== latestStepExp.current ||
+        body.coinBalance !== latestCoinBalance.current;
 
       latestSteps.current = body.todaySteps;
       latestStepExp.current = body.todayStepExp;
+      latestCoinBalance.current = body.coinBalance;
       setSteps(body.todaySteps);
       setStepExp(body.todayStepExp);
 
-      // 歩数EXPでレベル札も変わるため、歩数が更新されたときだけServer Componentも再取得する。
+      // 歩数・EXP・コイン残高のどれかが変わったときだけServer Componentも再取得する。
       if (changed) router.refresh();
     } catch {
       // 一時的な通信失敗では現在表示を維持する。

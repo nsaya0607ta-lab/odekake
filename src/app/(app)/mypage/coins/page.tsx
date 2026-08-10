@@ -1,6 +1,7 @@
 import { CoinPill } from "@/components/coin-badge";
 import { CoinEarnMethods } from "@/components/coin-earn-methods";
 import { CoinHero } from "@/components/coin-hero";
+import { CoinLiveRefresh } from "@/components/coin-live-refresh";
 import { CoinShopPreview } from "@/components/coin-shop-preview";
 import { CoinUseCards } from "@/components/coin-use-cards";
 import { IconPaw } from "@/components/icons";
@@ -26,6 +27,7 @@ export default async function CoinsPage() {
 
   return (
     <>
+      <CoinLiveRefresh />
       <TopHeader
         title={
           <span className="flex min-w-0 items-center gap-1.5">
