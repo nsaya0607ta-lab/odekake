@@ -23,7 +23,7 @@ export type DogSkin = {
   unlockItemId: string | null;
   /** 犬のすがた選択画面や、ポーズ画像がまだ揃っていないときに使う代表画像 */
   previewImage: string;
-  /** public/characters/<skin>/ に必要なポーズ画像一式が揃っているか */
+  /** アプリで使うポーズ一式が揃っているか */
   hasPoseSet: boolean;
 };
 
@@ -58,7 +58,7 @@ export const DOG_SKINS: readonly DogSkin[] = [
     description: "ガチャで手に入る夏すがた",
     unlockItemId: "summer_frenchie",
     previewImage: "/collection/skins/summer-frenchie.webp",
-    hasPoseSet: false,
+    hasPoseSet: true,
   },
 ] as const;
 
@@ -76,13 +76,13 @@ export function isSkinUnlocked(skin: DogSkin, ownedItemIds: ReadonlySet<string>)
 /**
  * 犬の画像URL。
  *
- * default はポーズ画像が揃っているので従来どおりポーズ別画像を返す。
- * 登山・雪国・夏は、専用ポーズ画像セットがまだ未配置なので代表画像へ
- * フォールバックする。これにより選択直後に404で犬が消えることを防ぐ。
- * 各スキンの画像セットを配置できたら hasPoseSet を true にするだけで、
- * 同じコードのままポーズ別画像へ切り替わる。
+ * default は従来どおり public/characters/default/*.webp を使う。
+ * summer は、デフォルトと同じ21ポーズを夏服へ着せ替えたSVGをビルド時に生成して使う。
+ * hiking / snow は専用ポーズ画像がまだ未配置なので代表画像へフォールバックする。
  */
 export function getFrenchieSrc(skin: DogSkinId, pose: string): string {
+  if (skin === "summer") return `/characters/summer/${pose}.svg`;
+
   const dogSkin = getDogSkin(skin);
   return dogSkin.hasPoseSet ? `/characters/${skin}/${pose}.webp` : dogSkin.previewImage;
 }
@@ -110,6 +110,4 @@ export const DOG_POSE_FILES = [
   "lie-wave",
   "bow-b",
   "bow",
-  "lie",
-  "doze",
 ] as const;
