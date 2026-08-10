@@ -1,4 +1,4 @@
-import { LEVEL_UP_COIN_BANDS, MAX_DAILY_STEP_COINS, STEP_COIN_TIERS, formatCoins } from "@/lib/coins";
+import { LEVEL_UP_COIN_BANDS, STEP_COIN_AMOUNT, STEP_COIN_INTERVAL, formatCoins } from "@/lib/coins";
 import { IconChevronDown, IconCoin } from "./icons";
 
 /**
@@ -37,20 +37,15 @@ export function CoinEarnMethods() {
         </div>
 
         <div>
-          <p className="font-bold text-ink-soft">歩数報酬（1日ごと・最大{MAX_DAILY_STEP_COINS}枚）</p>
+          <p className="font-bold text-ink-soft">歩数報酬（1日ごと）</p>
           <div className="mt-1.5 flex flex-wrap gap-1.5">
-            {STEP_COIN_TIERS.map((tier) => (
-              <span
-                key={tier.steps}
-                className="flex items-center gap-1 rounded-full bg-paper-deep px-2 py-1 tabular-nums"
-              >
-                {tier.steps.toLocaleString("ja-JP")}歩
-                <IconCoin size={11} />+{tier.coins}
-              </span>
-            ))}
+            <span className="flex items-center gap-1 rounded-full bg-paper-deep px-2 py-1 tabular-nums">
+              {STEP_COIN_INTERVAL.toLocaleString("ja-JP")}歩ごと
+              <IconCoin size={11} />+{STEP_COIN_AMOUNT}
+            </span>
           </div>
           <p className="mt-2 text-[10px] leading-relaxed text-ink-faint">
-            歩数は同じ日のうちに増えた分だけ足されます。歩数の連携はマイページの「iPhone歩数連携」から設定できます。
+            500歩達成するたびに10コイン増えます。歩数は同じ日のうちに増えた分だけ反映されます。歩数の連携はマイページの「iPhone歩数連携」から設定できます。
           </p>
         </div>
       </div>
