@@ -1,8 +1,86 @@
-/* ホームを歩くフレブルを少し小さく表示する。
- * モーション・移動座標・ポーズ画像そのものは変更しない。
- * 画像レイヤーの親だけを縮めることで、全ポーズを同じ倍率に揃える。
+/* ホームを歩くフレブルを少し小さく、輪郭をくっきり表示する。
+ * 画像素材・移動座標・ポーズ切替は変えず、ぼやけの原因になる
+ * 拡大縮小(scale)だけを描画時に無効化する。
  */
+
+/* 今の小さめサイズは維持。transform: scale() ではなく幅で縮める。 */
 .frenchie-breath {
   width: 85%;
   margin-inline: auto;
+  transform-origin: 50% 100%;
+  animation: frenchie-breath-crisp 3400ms ease-in-out infinite !important;
+}
+
+/* 奥行き表現の scale() を無効化する。
+ * 左右移動に必要な translateX(-50%) だけ残す。 */
+.pointer-events-none:has(.frenchie-bob) > .absolute {
+  transform: translateX(-50%) !important;
+  transition-property: left, bottom !important;
+  will-change: auto !important;
+}
+
+/* 歩行の上下動は位置・角度だけ。画像自体は伸縮させない。 */
+@keyframes frenchie-bob-crisp {
+  0%, 100% { transform: translateY(0.5px) rotate(-0.7deg); }
+  25%      { transform: translateY(-2px) rotate(-0.15deg); }
+  50%      { transform: translateY(0.5px) rotate(0.7deg); }
+  75%      { transform: translateY(-2px) rotate(0.15deg); }
+}
+
+.frenchie-walking .frenchie-bob {
+  animation: frenchie-bob-crisp 840ms ease-in-out infinite !important;
+}
+
+/* 呼吸も上下移動だけにして、scale() による輪郭の再サンプリングを防ぐ。 */
+@keyframes frenchie-breath-crisp {
+  0%, 100% { transform: translateY(0); }
+  50%      { transform: translateY(-1px); }
+}
+
+.frenchie-walking .frenchie-breath {
+  animation: none !important;
+}
+
+/* ポーズ切替の沈み込みも伸縮させない。 */
+@keyframes frenchie-settle-crisp {
+  0%   { transform: translateY(3px); }
+  45%  { transform: translateY(-3px); }
+  72%  { transform: translateY(1px); }
+  100% { transform: translateY(0); }
+}
+
+.frenchie-settle {
+  animation: frenchie-settle-crisp 460ms cubic-bezier(0.22, 1, 0.36, 1) both !important;
+}
+
+/* ウインクは跳ね・傾きだけ残し、拡大縮小はしない。 */
+@keyframes frenchie-wink-crisp {
+  0%, 10%  { transform: translateY(0) rotate(0deg); }
+  20%      { transform: translateY(2px) rotate(0deg); }
+  36%      { transform: translateY(-7px) rotate(-6deg); }
+  52%      { transform: translateY(0) rotate(-3.5deg); }
+  66%      { transform: translateY(-4px) rotate(-5.5deg); }
+  80%      { transform: translateY(0) rotate(-2.5deg); }
+  100%     { transform: translateY(0) rotate(0deg); }
+}
+
+.frenchie-wink {
+  animation: frenchie-wink-crisp 1000ms cubic-bezier(0.34, 1.2, 0.5, 1) both !important;
+}
+
+/* CSS 側のぼかし・影は一切かけない。 */
+.frenchie-pose {
+  filter: none !important;
+  -webkit-filter: none !important;
+  box-shadow: none !important;
+  will-change: auto !important;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .frenchie-walking .frenchie-bob,
+  .frenchie-breath,
+  .frenchie-settle,
+  .frenchie-wink {
+    animation: none !important;
+  }
 }
