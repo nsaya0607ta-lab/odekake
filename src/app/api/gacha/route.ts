@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { GACHA_PLANS, isGachaPlanId, isGachaType } from "@/lib/gacha/config";
+import { GACHA_PLANS, isGachaPlanId } from "@/lib/gacha/config";
 import { drawPrizes } from "@/lib/gacha/draw";
 import { getPrize } from "@/lib/gacha/prizes";
 import { checkRateLimit } from "@/lib/rate-limit";
@@ -28,7 +28,6 @@ export async function POST(request: Request) {
   const body = (await request.json().catch(() => null)) as {
     plan?: unknown;
     requestId?: unknown;
-    gachaType?: unknown;
   } | null;
 
   if (!body || !isGachaPlanId(body.plan)) {
@@ -38,8 +37,6 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "リクエストが正しくありません。" }, { status: 400 });
   }
 
-  // 古いクライアントからの呼び出しは通常ガチャとして扱う。
-  const gachaType = isGachaType(body.gachaType) ? body.gachaType : "regular";
   const plan = GACHA_PLANS[body.plan];
 
   const limit = checkRateLimit(`gacha:${user.id}`, 20, 60_000);
@@ -50,9 +47,9 @@ export async function POST(request: Request) {
     );
   }
 
-  const drawn = drawPrizes(plan.draws, gachaType);
+  const drawn = drawPrizes(plan.draws);
   if (drawn.length !== plan.draws) {
-    console.error("Gacha prize pool is empty", { plan: body.plan, gachaType, drawn: drawn.length });
+    console.error("Gacha prize pool is empty", { plan: body.plan, drawn: drawn.length });
     return NextResponse.json({ error: "ただいまガチャを準備中です。" }, { status: 503 });
   }
 
