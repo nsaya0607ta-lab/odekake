@@ -91,7 +91,7 @@ export function getSeries(id: CollectionSeriesId): CollectionSeries | null {
 }
 
 const CURATED_ITEMS: readonly CollectionItem[] = [
-  // --- 通常図鑑：おもちゃ ---------------------------------------------
+  // --- 通常図鑑：おもちゃ 第1弾 --------------------------------------
   {
     id: "toy_colorful_ball",
     name: "カラフルボール",
@@ -168,6 +168,88 @@ const CURATED_ITEMS: readonly CollectionItem[] = [
     id: "toy_rainbow_ball",
     name: "虹色わんこボール",
     image: "/collection/items/rainbow-ball.webp",
+    category: "toy",
+    series: null,
+    rarity: "SSR",
+  },
+
+  // --- 通常図鑑：おもちゃ 第2弾 --------------------------------------
+  {
+    id: "toy_tennis_ball",
+    name: "テニスボール",
+    image: "/collection/items/tennis-ball.webp",
+    category: "toy",
+    series: null,
+    rarity: "N",
+  },
+  {
+    id: "toy_red_slipper",
+    name: "赤いスリッパ",
+    image: "/collection/items/red-slipper.webp",
+    category: "toy",
+    series: null,
+    rarity: "N",
+  },
+  {
+    id: "toy_wood_stick",
+    name: "木の枝",
+    image: "/collection/items/wood-stick.webp",
+    category: "toy",
+    series: null,
+    rarity: "N",
+  },
+  {
+    id: "toy_donut_rope",
+    name: "ドーナツ型ロープ",
+    image: "/collection/items/donut-rope.webp",
+    category: "toy",
+    series: null,
+    rarity: "N",
+  },
+  {
+    id: "toy_soccer_ball",
+    name: "サッカーボール",
+    image: "/collection/items/soccer-ball.webp",
+    category: "toy",
+    series: null,
+    rarity: "R",
+  },
+  {
+    id: "toy_taiyaki_plush",
+    name: "たい焼きぬいぐるみ",
+    image: "/collection/items/taiyaki-plush.webp",
+    category: "toy",
+    series: null,
+    rarity: "R",
+  },
+  {
+    id: "toy_bear_plush",
+    name: "くまのぬいぐるみ",
+    image: "/collection/items/bear-plush.webp",
+    category: "toy",
+    series: null,
+    rarity: "R",
+  },
+  {
+    id: "toy_meat",
+    name: "大きな肉のおもちゃ",
+    image: "/collection/items/meat-toy.webp",
+    category: "toy",
+    series: null,
+    rarity: "SR",
+  },
+  {
+    id: "toy_frenchie_cushion",
+    name: "フレブル型クッション",
+    image: "/collection/items/frenchie-cushion.webp",
+    category: "toy",
+    series: null,
+    rarity: "SR",
+  },
+  {
+    id: "toy_golden_crown_ball",
+    name: "王冠つき黄金ボール",
+    image: "/collection/items/golden-crown-ball.webp",
     category: "toy",
     series: null,
     rarity: "SSR",
