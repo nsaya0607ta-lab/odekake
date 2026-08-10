@@ -3,6 +3,7 @@ import { Yusei_Magic } from "next/font/google";
 import { StartupSplash } from "@/components/startup-splash";
 import "./globals.css";
 import "./compact-form-fields.css";
+import "./frenchie-size.css";
 
 // 手書き（サインペン）風の書体。日本語は分割数が多いため preload はしない。
 const yuseiMagic = Yusei_Magic({
