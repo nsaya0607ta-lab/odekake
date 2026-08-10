@@ -17,10 +17,10 @@ import { useEffect, useRef, useState } from "react";
  * 見た目の切り替え（スキン）。動きには一切関わらない。
  *
  * 素材は 1ポーズ 1枚で、どのスキンも同じ20ポーズを同じファイル名で持つ。
- * 通常版と夏版はキャンバス（300x254）も足元の高さも水平中心も揃えてあるので、
+ * どのスキンもキャンバス（300x254）も足元の高さも水平中心も揃えてあるので、
  * 差し替えても犬の立ち位置は動かない。
  */
-export type FrenchieSkin = "normal" | "summer";
+export type FrenchieSkin = "normal" | "summer" | "winter" | "explorer";
 
 /** ポーズ名 → 素材のファイル名（スキンをまたいで共通） */
 const POSE_FILES = {
@@ -100,7 +100,7 @@ const GESTURE_POSES: Partial<Record<Pose, string>> = {
  * 立ち姿を基準に踏み出しの絵を寄せて胴体を留める。前進ぶんは CSS の移動が持つ。
  * 足元（下端）は全ポーズ揃っているので縦は触らない。
  *
- * ずれ幅は絵ごとの事情なのでスキンごとに持つ。夏版の値も同じ測り方
+ * ずれ幅は絵ごとの事情なのでスキンごとに持つ。夏版より後のスキンの値も同じ測り方
  * （上半身を横にずらして重ね、差分が最小になる量）で出してある。
  */
 const POSE_NUDGE_X: Record<FrenchieSkin, Partial<Record<Pose, number>>> = {
@@ -112,6 +112,14 @@ const POSE_NUDGE_X: Record<FrenchieSkin, Partial<Record<Pose, number>>> = {
   summer: {
     walk: 3.3, // 胴体が立ち姿より 10px 左
     happy: -7.0, // 上げた前足のぶん、こちらは 21px 右
+  },
+  winter: {
+    walk: 2.0, // 胴体が立ち姿より 6px 左
+    happy: -8.7, // 上げた前足のぶん、こちらは 26px 右
+  },
+  explorer: {
+    walk: 3.3, // 胴体が立ち姿より 10px 左
+    happy: -7.7, // 上げた前足のぶん、こちらは 23px 右
   },
 };
 

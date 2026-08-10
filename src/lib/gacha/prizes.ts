@@ -23,13 +23,28 @@ export type GachaPrize = {
 };
 
 export const GACHA_PRIZES: readonly GachaPrize[] = [
+  // 犬のスキン。絵は素材の立ち姿をそのまま使う（どのスキンも同じ大きさ・同じ位置で
+  // 描いてあるので、結果の並びで犬だけがずれることがない）
   {
     id: "summer_frenchie",
     name: "夏のフレブル",
     rarity: "SR",
     type: "dog_skin",
-    // TODO: 夏スキンの画像を用意したらパスを入れる（例: /gacha/summer_frenchie.webp）
-    image: null,
+    image: "/characters/frenchie/summer/stand.webp",
+  },
+  {
+    id: "winter_frenchie",
+    name: "冬のフレブル",
+    rarity: "SR",
+    type: "dog_skin",
+    image: "/characters/frenchie/winter/stand.webp",
+  },
+  {
+    id: "explorer_frenchie",
+    name: "探検のフレブル",
+    rarity: "SR",
+    type: "dog_skin",
+    image: "/characters/frenchie/explorer/stand.webp",
   },
 
   // --- 以下は抽選を動かすための仮の景品 ---------------------------------
