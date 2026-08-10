@@ -38,41 +38,85 @@ export function CollectionProgress({
   );
 }
 
+type CardStyle = {
+  card: string;
+  inner: string;
+  badge: string;
+  corner: string;
+  accent: string;
+};
+
 /**
- * 図鑑カード専用のレアリティ配色。
- * N=やさしいグリーン / R=爽やかなブルー / SR=落ち着いたゴールド /
- * SSR=パステルの虹色。未取得カードはレアリティを伏せるため共通のニュートラル色にする。
+ * 参考デザイン準拠の図鑑カード配色。
+ * N=淡いグリーン / R=澄んだ水色 / SR=アイボリー×上品な金 / SSR=パステル虹色。
  */
-const RARITY_CARD_STYLES: Record<
-  GachaRarity,
-  { card: string; badge: string; sparkle: string }
-> = {
+const RARITY_CARD_STYLES: Record<GachaRarity, CardStyle> = {
   N: {
     card:
-      "border-[#c7d7a5] bg-[linear-gradient(145deg,#fffdf5_0%,#f1f7df_100%)] shadow-[0_2px_8px_rgba(109,139,75,0.10)]",
-    badge: "border border-[#cbdba8] bg-[#edf5d5] text-[#5f7f3d]",
-    sparkle: "text-[#9fba72]",
+      "border-[#b8cc87] bg-[linear-gradient(145deg,#fffdf5_0%,#f5f8e7_42%,#edf3d7_100%)] shadow-[0_3px_8px_rgba(111,136,71,0.16),0_1px_0_rgba(255,255,255,0.95)_inset]",
+    inner: "border-[#d9e3b8]",
+    badge:
+      "border border-[#b9cc87] bg-[linear-gradient(180deg,#f3f8df_0%,#e3eec3_100%)] text-[#668244] shadow-[0_1px_2px_rgba(92,119,57,0.12)]",
+    corner:
+      "border-[#abc276] bg-[linear-gradient(180deg,#dce9b9_0%,#bdd58d_100%)] text-[#5f7e3f]",
+    accent: "text-[#9ab66d]",
   },
   R: {
     card:
-      "border-[#acd2ee] bg-[linear-gradient(145deg,#fcfeff_0%,#eaf6ff_100%)] shadow-[0_2px_8px_rgba(92,151,193,0.12)]",
-    badge: "border border-[#b7d9f2] bg-[#e4f3ff] text-[#3477a8]",
-    sparkle: "text-[#91c8ea]",
+      "border-[#84bde6] bg-[linear-gradient(145deg,#fcfeff_0%,#eef8ff_42%,#e4f3ff_100%)] shadow-[0_3px_9px_rgba(71,139,190,0.18),0_1px_0_rgba(255,255,255,0.98)_inset]",
+    inner: "border-[#b9dcf2]",
+    badge:
+      "border border-[#a4d2ef] bg-[linear-gradient(180deg,#eef9ff_0%,#d9effd_100%)] text-[#2372aa] shadow-[0_1px_2px_rgba(63,128,174,0.13)]",
+    corner:
+      "border-[#6eaddc] bg-[linear-gradient(180deg,#a8d7f5_0%,#70b6e6_100%)] text-white",
+    accent: "text-[#80bee7]",
   },
   SR: {
     card:
-      "border-[#e5bb5c] bg-[linear-gradient(145deg,#fffdf7_0%,#fff5d5_48%,#fff9e8_100%)] shadow-[0_3px_10px_rgba(190,142,43,0.16)]",
-    badge: "border border-[#e8c56d] bg-[#fff0bd] text-[#9a6a12]",
-    sparkle: "text-[#d9a82f]",
+      "border-[#dfa83a] bg-[linear-gradient(145deg,#fffdf8_0%,#fff8e8_40%,#ffefc5_100%)] shadow-[0_4px_10px_rgba(177,126,27,0.22),0_1px_0_rgba(255,255,255,0.98)_inset]",
+    inner: "border-[#f0ce83]",
+    badge:
+      "border border-[#e0b04c] bg-[linear-gradient(180deg,#fff4ce_0%,#f5d778_100%)] text-[#9b690a] shadow-[0_1px_2px_rgba(154,105,10,0.15)]",
+    corner:
+      "border-[#dca02a] bg-[linear-gradient(180deg,#ffd977_0%,#e8ae36_100%)] text-[#8a5b06]",
+    accent: "text-[#d8a129]",
   },
   SSR: {
     card:
-      "border-[#e6acd0] bg-[linear-gradient(135deg,#fff6fb_0%,#f5edff_22%,#eaf8ff_45%,#f3ffe9_67%,#fff4d8_84%,#fff4fa_100%)] shadow-[0_3px_12px_rgba(180,115,174,0.18)]",
+      "border-[#e7a7d7] bg-[linear-gradient(135deg,#fff2f8_0%,#f7eaff_20%,#eaf8ff_40%,#edffe9_60%,#fff6cf_80%,#fff0f6_100%)] shadow-[0_4px_12px_rgba(180,101,168,0.25),0_1px_0_rgba(255,255,255,0.98)_inset]",
+    inner: "border-[#f1c6e2]",
     badge:
-      "border border-[#e7b7da] bg-[linear-gradient(90deg,#ffe0ee_0%,#eadfff_45%,#fff0c9_100%)] text-[#a34785]",
-    sparkle: "text-[#d991c1]",
+      "border border-[#e9a8d3] bg-[linear-gradient(90deg,#ffd5e6_0%,#e7d5ff_33%,#d9efff_58%,#fff0bd_100%)] text-[#a33d7d] shadow-[0_1px_3px_rgba(155,64,124,0.18)]",
+    corner:
+      "border-[#e29acb] bg-[linear-gradient(135deg,#ffb8d7_0%,#d9c5ff_35%,#bfe9ff_62%,#ffe39a_100%)] text-white",
+    accent: "text-[#d884bd]",
   },
 };
+
+function PawMark({ className = "" }: { className?: string }) {
+  return (
+    <span aria-hidden="true" className={`relative block h-3 w-3 opacity-55 ${className}`}>
+      <span className="absolute bottom-0 left-[3px] h-[6px] w-[7px] rounded-[50%] bg-current" />
+      <span className="absolute left-0 top-[2px] h-[3px] w-[3px] rounded-full bg-current" />
+      <span className="absolute left-[4px] top-0 h-[3px] w-[3px] rounded-full bg-current" />
+      <span className="absolute right-0 top-[2px] h-[3px] w-[3px] rounded-full bg-current" />
+    </span>
+  );
+}
+
+function CornerBadge({ rarity }: { rarity: GachaRarity }) {
+  const style = RARITY_CARD_STYLES[rarity];
+
+  return (
+    <span
+      aria-hidden="true"
+      className={`pointer-events-none absolute left-[7px] top-[6px] z-[3] flex h-[28px] min-w-[27px] items-start justify-center border px-1 pt-[5px] text-[8px] font-black leading-none shadow-[0_1px_3px_rgba(80,70,55,0.14)] ${style.corner}`}
+      style={{ clipPath: "polygon(0 0,100% 0,100% 76%,50% 100%,0 76%)" }}
+    >
+      {rarity}
+    </span>
+  );
+}
 
 /** レアリティを N / R / SR / SSR で表示 */
 function RarityLabel({ item }: { item: CollectionItem }) {
@@ -80,7 +124,7 @@ function RarityLabel({ item }: { item: CollectionItem }) {
 
   return (
     <span
-      className={`rounded-full px-2.5 py-0.5 text-[9px] font-black leading-none ${style.badge}`}
+      className={`min-w-[32px] rounded-full px-2.5 py-[3px] text-center text-[9px] font-black leading-none ${style.badge}`}
       aria-label={`レアリティ${item.rarity}`}
     >
       {item.rarity}
@@ -88,27 +132,27 @@ function RarityLabel({ item }: { item: CollectionItem }) {
   );
 }
 
-/** 取得済みカードのレア感を出す、小さなきらめき */
-function RaritySparkles({ rarity }: { rarity: GachaRarity }) {
+/** 参考画像の「カード内装飾」。レア度ごとに密度を変える。 */
+function RarityDecorations({ rarity }: { rarity: GachaRarity }) {
   const style = RARITY_CARD_STYLES[rarity];
 
   if (rarity === "N") {
     return (
-      <span aria-hidden="true" className={`pointer-events-none absolute right-2 top-1.5 text-[9px] opacity-45 ${style.sparkle}`}>
-        ✦
-      </span>
+      <>
+        <PawMark className={`absolute right-2 top-2 ${style.accent}`} />
+        <span aria-hidden="true" className={`pointer-events-none absolute bottom-7 left-2 text-[11px] opacity-45 ${style.accent}`}>
+          ❧
+        </span>
+      </>
     );
   }
 
   if (rarity === "R") {
     return (
       <>
-        <span aria-hidden="true" className={`pointer-events-none absolute left-2 top-2 text-[10px] opacity-60 ${style.sparkle}`}>
-          ✧
-        </span>
-        <span aria-hidden="true" className={`pointer-events-none absolute right-2 top-5 text-[8px] opacity-45 ${style.sparkle}`}>
-          ✦
-        </span>
+        <span aria-hidden="true" className={`pointer-events-none absolute left-2 top-2 text-[11px] opacity-80 ${style.accent}`}>✦</span>
+        <span aria-hidden="true" className={`pointer-events-none absolute right-2 top-5 text-[8px] opacity-65 ${style.accent}`}>✧</span>
+        <PawMark className={`absolute bottom-7 right-2 ${style.accent}`} />
       </>
     );
   }
@@ -116,61 +160,65 @@ function RaritySparkles({ rarity }: { rarity: GachaRarity }) {
   if (rarity === "SR") {
     return (
       <>
-        <span aria-hidden="true" className={`pointer-events-none absolute left-2 top-2 text-[11px] opacity-75 ${style.sparkle}`}>
-          ✦
-        </span>
-        <span aria-hidden="true" className={`pointer-events-none absolute right-2 top-3 text-[9px] opacity-60 ${style.sparkle}`}>
-          ✦
-        </span>
+        <span aria-hidden="true" className={`pointer-events-none absolute left-2 top-2 text-[12px] opacity-85 ${style.accent}`}>✦</span>
+        <span aria-hidden="true" className={`pointer-events-none absolute right-2 top-3 text-[10px] opacity-75 ${style.accent}`}>✦</span>
+        <PawMark className={`absolute bottom-7 left-2 ${style.accent}`} />
       </>
     );
   }
 
   return (
     <>
-      <span aria-hidden="true" className={`pointer-events-none absolute left-2 top-1.5 text-[12px] opacity-80 ${style.sparkle}`}>
-        ✦
-      </span>
-      <span aria-hidden="true" className="pointer-events-none absolute right-2 top-2 text-[10px] text-[#9fcff0] opacity-75">
-        ✦
-      </span>
-      <span aria-hidden="true" className="pointer-events-none absolute bottom-7 left-2.5 text-[8px] text-[#e3b955] opacity-70">
-        ✧
-      </span>
+      <span aria-hidden="true" className={`pointer-events-none absolute left-2 top-2 text-[12px] opacity-90 ${style.accent}`}>✦</span>
+      <span aria-hidden="true" className="pointer-events-none absolute right-2 top-2 text-[10px] text-[#83c8ef] opacity-85">✦</span>
+      <span aria-hidden="true" className="pointer-events-none absolute right-3 top-7 text-[8px] text-[#e9b352] opacity-80">✧</span>
+      <span aria-hidden="true" className="pointer-events-none absolute bottom-7 left-2 text-[9px] text-[#b69be5] opacity-80">✦</span>
+      <PawMark className="absolute bottom-7 right-2 text-[#e6a4c9]" />
     </>
   );
 }
 
-/** 1マス。未取得は黒いシルエット＋「???」 */
+/** 1マス。未取得は黒いシルエット＋「???」。 */
 export function ItemCard({ item, owned }: { item: CollectionItem; owned: boolean }) {
   const useExactSilhouette = !owned && hasExactSilhouette(item.art);
   const rarityStyle = RARITY_CARD_STYLES[item.rarity];
 
   return (
     <div
-      className={`rough-card relative flex h-[132px] flex-col items-center overflow-hidden border px-1.5 py-2.5 transition-shadow ${
+      className={`relative flex h-[132px] flex-col items-center overflow-hidden rounded-[22px] border-2 px-1.5 pb-2 pt-2.5 transition-shadow ${
         owned
           ? rarityStyle.card
-          : "border-[#ddd6c7] bg-[linear-gradient(145deg,#faf8f2_0%,#f1eee6_100%)] shadow-[0_2px_7px_rgba(98,88,70,0.07)]"
+          : "border-[#d7d1c6] bg-[linear-gradient(145deg,#fbf9f3_0%,#f1eee7_100%)] shadow-[0_3px_8px_rgba(92,82,68,0.10),0_1px_0_rgba(255,255,255,0.9)_inset]"
       }`}
     >
-      {owned ? <RaritySparkles rarity={item.rarity} /> : null}
+      {/* 参考画像の二重フレーム */}
+      <span
+        aria-hidden="true"
+        className={`pointer-events-none absolute inset-[3px] z-0 rounded-[18px] border ${
+          owned ? rarityStyle.inner : "border-[#e5dfd4]"
+        }`}
+      />
 
-      <span className="relative z-[1] flex h-14 w-14 shrink-0 items-center justify-center">
+      {owned ? <CornerBadge rarity={item.rarity} /> : null}
+      {owned ? <RarityDecorations rarity={item.rarity} /> : null}
+
+      <span className="relative z-[2] flex h-14 w-14 shrink-0 items-center justify-center">
         {useExactSilhouette ? (
           <ExactSilhouette art={item.art} />
         ) : (
           <ItemArt art={item.art} image={item.image} name={item.name} silhouette={!owned} />
         )}
       </span>
+
       <span
-        className={`relative z-[1] mt-1.5 flex min-h-[28px] w-full items-center justify-center line-clamp-2 text-center text-[11px] leading-tight font-semibold ${
-          owned ? "text-ink" : "text-ink-faint"
+        className={`relative z-[2] mt-1 flex min-h-[28px] w-full items-center justify-center line-clamp-2 text-center text-[11px] leading-tight font-semibold ${
+          owned ? "text-[#403a33]" : "text-ink-faint"
         }`}
       >
         {owned ? item.name : "???"}
       </span>
-      <span className="relative z-[1] mt-auto flex h-4 items-center justify-center">
+
+      <span className="relative z-[2] mt-auto flex h-[17px] items-center justify-center">
         {owned ? <RarityLabel item={item} /> : null}
       </span>
     </div>
