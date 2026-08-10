@@ -5,7 +5,7 @@ import { getEquipment } from "@/lib/data/equipment";
 import { getExpProgress } from "@/lib/exp";
 import { requireUser } from "@/lib/supabase/server";
 
-export const metadata = { title: "そうび | おでかけ記録" };
+export const metadata = { title: "おぼえたしぐさ | おでかけ記録" };
 export const dynamic = "force-dynamic";
 
 export default async function GearPage() {
@@ -19,7 +19,7 @@ export default async function GearPage() {
 
   return (
     <>
-      <PageHeader title="そうび" backHref="/mypage" subtitle="レベルアップでもらえたもの" />
+      <PageHeader title="おぼえたしぐさ" backHref="/mypage" subtitle="レベルアップでふえた動き" />
       <PageBody>
         <GearBoard currentLevel={progress.level} initialEquipment={equipment} />
       </PageBody>
