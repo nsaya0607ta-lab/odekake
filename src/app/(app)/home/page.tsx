@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { CollectionBookArt } from "@/components/collection/collection-ui";
 import {
   IconCalendar,
   IconChevronRight,
@@ -14,8 +15,10 @@ import { LevelTag } from "@/components/level-tag";
 import { TodayStepsCard } from "@/components/today-steps-card";
 import { EmptyState, LinkRow, formatDate } from "@/components/ui";
 import { WanderingFrenchie } from "@/components/wandering-frenchie";
+import { COLLECTION_ITEMS, countOwned } from "@/lib/collection/items";
 import { loadAreaIndex } from "@/lib/data/areas";
 import { getCoinSummary } from "@/lib/data/coins";
+import { getOwnedItemIds } from "@/lib/data/collection";
 import { getExpDashboard } from "@/lib/data/exp";
 import { formatTripPeriod, getTripSummaries, type TripSummary } from "@/lib/data/trips";
 import { getTimeline } from "@/lib/data/visits";
@@ -31,16 +34,18 @@ export default async function HomePage({ searchParams }: { searchParams: Promise
   const [{ supabase, user }, { notice }] = await Promise.all([requireUser(), searchParams]);
   const space = await getRecordSpace(supabase, user.id);
 
-  const [areas, recent, trips, expDashboard, coins] = await Promise.all([
+  const [areas, recent, trips, expDashboard, coins, ownedItemIds] = await Promise.all([
     loadAreaIndex(supabase, space.tripIds),
     getTimeline(supabase, { tripIds: space.tripIds, limit: 4 }),
     getTripSummaries(supabase),
     getExpDashboard(supabase, user.id),
     getCoinSummary(supabase, user.id),
+    getOwnedItemIds(supabase, user.id),
   ]);
 
   const latest = recent[0] ?? null;
   const expProgress = getExpProgress(expDashboard.totalExp);
+  const collectedItems = countOwned(COLLECTION_ITEMS, ownedItemIds);
 
   return (
     <>
@@ -106,6 +111,25 @@ export default async function HomePage({ searchParams }: { searchParams: Promise
             />
           </div>
         </section>
+
+        <Link
+          href="/collection"
+          className="rough-card pressable flex items-center gap-3 px-4 py-3 active:border-line-strong active:bg-paper-deep"
+        >
+          <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-leaf-soft">
+            <CollectionBookArt className="w-7" />
+          </span>
+          <span className="min-w-0 flex-1">
+            <span className="block font-bold">図鑑を見る</span>
+            <span className="mt-0.5 block text-xs text-ink-soft">
+              集めたアイテムのコレクション
+              <span className="ml-1.5 tabular-nums">
+                {collectedItems} / {COLLECTION_ITEMS.length}
+              </span>
+            </span>
+          </span>
+          <IconChevronRight size={18} className="shrink-0 text-ink-faint" />
+        </Link>
 
         <div className="grid grid-cols-2 items-stretch gap-3">
           <section className="grid min-w-0 grid-rows-[40px_240px]">
