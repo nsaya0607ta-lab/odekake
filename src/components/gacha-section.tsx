@@ -154,7 +154,7 @@ export function GachaSection({ balance }: { balance: number }) {
             </span>
           </p>
           <p className="mt-1 text-[9px] font-semibold text-ink-faint">
-            {isRegular ? "おもちゃ10種類" : "夏のフレブル"}
+            {isRegular ? "おもちゃ20種類" : "夏のフレブル"}
           </p>
           <p className="mt-1.5 flex items-center gap-1 text-[9px] font-bold text-ink-faint">
             <IconCoin size={11} />
