@@ -3,8 +3,12 @@ import { LEVEL_THRESHOLDS } from "@/lib/exp";
 /**
  * おでかけコインの付与量。
  * レベルアップ報酬は supabase/migrations/0011_odekake_coins.sql、
- * 歩数報酬は supabase/migrations/0015_step_coins_every_500.sql と必ず同じにする。
+ * 歩数報酬は supabase/migrations/0015_step_coins_every_500.sql、
+ * ログインボーナスは supabase/migrations/0016_login_bonus.sql と必ず同じにする。
  */
+
+/** その日はじめてアプリを開いたときにもらえるコイン（1日1回） */
+export const LOGIN_BONUS_COINS = 100;
 
 /** そのレベルへ到達したときにもらえるコイン（上限レベルごとの帯） */
 export const LEVEL_UP_COIN_BANDS = [
