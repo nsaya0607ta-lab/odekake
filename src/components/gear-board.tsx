@@ -3,6 +3,7 @@
 import { useRouter } from "next/navigation";
 import { useCallback, useState } from "react";
 import type { EquipmentMap } from "@/lib/data/equipment";
+import { getFrenchieSrc, type DogSkinId } from "@/lib/dog-skins";
 import { ACCESSORY_SLOTS, SLOT_LABELS, getSlotRewards, type EquipmentSlot } from "@/lib/equipment";
 import { LEVEL_REWARDS, type LevelReward } from "@/lib/exp";
 import { GearIcon } from "./gear-art";
@@ -11,9 +12,10 @@ import { IconCheck, IconLock } from "./icons";
 type Props = {
   currentLevel: number;
   initialEquipment: EquipmentMap;
+  skin: DogSkinId;
 };
 
-export function GearBoard({ currentLevel, initialEquipment }: Props) {
+export function GearBoard({ currentLevel, initialEquipment, skin }: Props) {
   const router = useRouter();
   const [equipment, setEquipment] = useState<EquipmentMap>(initialEquipment);
   const [pendingSlot, setPendingSlot] = useState<EquipmentSlot | null>(null);
@@ -66,7 +68,9 @@ export function GearBoard({ currentLevel, initialEquipment }: Props) {
 
   return (
     <div className="space-y-4">
-      {accessorySlots.length > 0 || titleRewards.length > 0 ? <PreviewCard equipment={equipment} /> : null}
+      {accessorySlots.length > 0 || titleRewards.length > 0 ? (
+        <PreviewCard equipment={equipment} skin={skin} />
+      ) : null}
 
       {accessorySlots.length > 0 ? (
         <section className="rough-card overflow-hidden">
@@ -127,7 +131,7 @@ export function GearBoard({ currentLevel, initialEquipment }: Props) {
   );
 }
 
-function PreviewCard({ equipment }: { equipment: EquipmentMap }) {
+function PreviewCard({ equipment, skin }: { equipment: EquipmentMap; skin: DogSkinId }) {
   const equippedSlots = ACCESSORY_SLOTS.filter((slot) => equipment[slot] !== undefined);
   const equippedTitle = equipment.title !== undefined
     ? LEVEL_REWARDS.find((reward) => reward.level === equipment.title)
@@ -154,7 +158,7 @@ function PreviewCard({ equipment }: { equipment: EquipmentMap }) {
       <div className="relative mx-auto mt-1 h-40 w-40">
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img
-          src="/characters/frenchie/stand-happy.webp"
+          src={getFrenchieSrc(skin, "stand-happy")}
           alt=""
           className="absolute inset-0 h-full w-full object-contain"
           draggable={false}

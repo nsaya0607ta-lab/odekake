@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { formatCoins } from "@/lib/coins";
+import { getFrenchieSrc, type DogSkinId } from "@/lib/dog-skins";
 import { NoteArt, SparkleArt } from "./coin-art";
 import { IconBag, IconChevronRight, IconCoin, IconQuestion } from "./icons";
 
@@ -26,107 +27,111 @@ const FLOOR = "absolute inset-0 bg-gradient-to-b from-[#f7efe0] to-[#efe0c9]";
 const DOG = "absolute bottom-[8%] left-1/2 w-[74%] -translate-x-1/2 select-none";
 
 /* eslint-disable @next/next/no-img-element */
-const SAMPLES: readonly ShopSample[] = [
-  {
-    id: "bed",
-    name: "ふかふかベッド",
-    description: "ぐっすり眠れてEXPアップ！",
-    price: 800,
-    icon: <BedIcon />,
-    before: (
-      <>
-        <span className={FLOOR} />
-        <span className="absolute inset-x-0 bottom-[22%] h-px bg-[#e0cba4]" />
-        <img src="/characters/frenchie/lie.webp" alt="" className={DOG} draggable={false} />
-      </>
-    ),
-    after: (
-      <>
-        <span className={FLOOR} />
-        <span className="absolute inset-x-0 bottom-[22%] h-px bg-[#e0cba4]" />
-        <span className="absolute bottom-[10%] left-1/2 h-[34%] w-[80%] -translate-x-1/2 rounded-[50%] border-2 border-[#dfc79e] bg-[#f9efd8]" />
-        <img src="/characters/frenchie/doze.webp" alt="" className={DOG} draggable={false} />
-        <SparkleArt className="absolute right-[8%] top-[14%] w-3 text-sun" />
-        <SparkleArt className="absolute left-[10%] top-[26%] w-2 text-sun" />
-      </>
-    ),
-  },
-  {
-    id: "toybox",
-    name: "おもちゃ箱",
-    description: "お部屋がにぎやかに！",
-    price: 600,
-    icon: <ToyBoxIcon />,
-    before: (
-      <>
-        <span className={FLOOR} />
-        <span className="absolute inset-x-0 bottom-[22%] h-px bg-[#e0cba4]" />
-        <img src="/characters/frenchie/lie-wave.webp" alt="" className={DOG} draggable={false} />
-        <span className="absolute bottom-[14%] right-[12%] h-2.5 w-2.5 rounded-full bg-[#f2c6cd]" />
-      </>
-    ),
-    after: (
-      <>
-        <span className={FLOOR} />
-        <span className="absolute inset-x-0 bottom-[22%] h-px bg-[#e0cba4]" />
-        {/* おもちゃ箱 */}
-        <span className="absolute bottom-[16%] right-[6%] h-[34%] w-[30%] rounded-md border-2 border-[#a87b45] bg-[#c9954f]" />
-        <span className="absolute bottom-[38%] right-[8%] h-2 w-[26%] rounded-full bg-[#e0b862]" />
-        <span className="absolute bottom-[44%] right-[10%] h-2.5 w-2.5 rounded-full bg-[#cfe0bd]" />
-        <span className="absolute bottom-[46%] right-[20%] h-2 w-2 rounded-full bg-[#f2c6cd]" />
-        <span className="absolute bottom-[48%] right-[15%] h-2 w-2 rounded-full bg-[#cfd9ef]" />
-        <img src="/characters/frenchie/lie-wave.webp" alt="" className={DOG} draggable={false} />
-        <span className="absolute bottom-[14%] left-[10%] h-2.5 w-2.5 rounded-full bg-[#f2c6cd]" />
-        <span className="absolute bottom-[16%] left-[22%] h-2 w-2 rounded-full bg-[#cfe0bd]" />
-        <SparkleArt className="absolute left-[8%] top-[16%] w-3 text-sun" />
-      </>
-    ),
-  },
-  {
-    id: "raincoat",
-    name: "レインコート",
-    description: "雨の日もへっちゃら♪",
-    price: 900,
-    icon: <RaincoatIcon />,
-    before: (
-      <>
-        <span className="absolute inset-0 bg-gradient-to-b from-[#dfe6ea] to-[#cdd8de]" />
-        <RainDrops />
-        <img
-          src="/characters/frenchie/sit-side.webp"
-          alt=""
-          className={`${DOG} opacity-90 saturate-50`}
-          draggable={false}
-        />
-        <span className="absolute inset-x-0 bottom-0 h-[14%] bg-[#b9c8d1]/70" />
-      </>
-    ),
-    after: (
-      <>
-        <span className="absolute inset-0 bg-gradient-to-b from-[#e7f0e5] to-[#d3e3d3]" />
-        <RainDrops />
-        {/* 犬の絵に重ねると顔が隠れてしまうので、レインコートは横に並べて見せる */}
-        <img
-          src="/characters/frenchie/stand-happy.webp"
-          alt=""
-          className="absolute bottom-[8%] left-[40%] w-[70%] -translate-x-1/2 select-none"
-          draggable={false}
-        />
-        <span className="absolute bottom-[16%] right-[4%] w-[26%]">
-          <RaincoatIcon />
-        </span>
-        <span className="absolute inset-x-0 bottom-0 h-[14%] bg-[#bcd2bc]/70" />
-        <NoteArt className="absolute right-[10%] top-[16%] w-3 text-leaf-deep" />
-        <SparkleArt className="absolute left-[8%] top-[14%] w-2.5 text-sun" />
-      </>
-    ),
-  },
-];
+/** サンプルの犬の絵も、選択中のスキンに揃える */
+function buildSamples(skin: DogSkinId): readonly ShopSample[] {
+  return [
+    {
+      id: "bed",
+      name: "ふかふかベッド",
+      description: "ぐっすり眠れてEXPアップ！",
+      price: 800,
+      icon: <BedIcon />,
+      before: (
+        <>
+          <span className={FLOOR} />
+          <span className="absolute inset-x-0 bottom-[22%] h-px bg-[#e0cba4]" />
+          <img src={getFrenchieSrc(skin, "lie")} alt="" className={DOG} draggable={false} />
+        </>
+      ),
+      after: (
+        <>
+          <span className={FLOOR} />
+          <span className="absolute inset-x-0 bottom-[22%] h-px bg-[#e0cba4]" />
+          <span className="absolute bottom-[10%] left-1/2 h-[34%] w-[80%] -translate-x-1/2 rounded-[50%] border-2 border-[#dfc79e] bg-[#f9efd8]" />
+          <img src={getFrenchieSrc(skin, "doze")} alt="" className={DOG} draggable={false} />
+          <SparkleArt className="absolute right-[8%] top-[14%] w-3 text-sun" />
+          <SparkleArt className="absolute left-[10%] top-[26%] w-2 text-sun" />
+        </>
+      ),
+    },
+    {
+      id: "toybox",
+      name: "おもちゃ箱",
+      description: "お部屋がにぎやかに！",
+      price: 600,
+      icon: <ToyBoxIcon />,
+      before: (
+        <>
+          <span className={FLOOR} />
+          <span className="absolute inset-x-0 bottom-[22%] h-px bg-[#e0cba4]" />
+          <img src={getFrenchieSrc(skin, "lie-wave")} alt="" className={DOG} draggable={false} />
+          <span className="absolute bottom-[14%] right-[12%] h-2.5 w-2.5 rounded-full bg-[#f2c6cd]" />
+        </>
+      ),
+      after: (
+        <>
+          <span className={FLOOR} />
+          <span className="absolute inset-x-0 bottom-[22%] h-px bg-[#e0cba4]" />
+          {/* おもちゃ箱 */}
+          <span className="absolute bottom-[16%] right-[6%] h-[34%] w-[30%] rounded-md border-2 border-[#a87b45] bg-[#c9954f]" />
+          <span className="absolute bottom-[38%] right-[8%] h-2 w-[26%] rounded-full bg-[#e0b862]" />
+          <span className="absolute bottom-[44%] right-[10%] h-2.5 w-2.5 rounded-full bg-[#cfe0bd]" />
+          <span className="absolute bottom-[46%] right-[20%] h-2 w-2 rounded-full bg-[#f2c6cd]" />
+          <span className="absolute bottom-[48%] right-[15%] h-2 w-2 rounded-full bg-[#cfd9ef]" />
+          <img src={getFrenchieSrc(skin, "lie-wave")} alt="" className={DOG} draggable={false} />
+          <span className="absolute bottom-[14%] left-[10%] h-2.5 w-2.5 rounded-full bg-[#f2c6cd]" />
+          <span className="absolute bottom-[16%] left-[22%] h-2 w-2 rounded-full bg-[#cfe0bd]" />
+          <SparkleArt className="absolute left-[8%] top-[16%] w-3 text-sun" />
+        </>
+      ),
+    },
+    {
+      id: "raincoat",
+      name: "レインコート",
+      description: "雨の日もへっちゃら♪",
+      price: 900,
+      icon: <RaincoatIcon />,
+      before: (
+        <>
+          <span className="absolute inset-0 bg-gradient-to-b from-[#dfe6ea] to-[#cdd8de]" />
+          <RainDrops />
+          <img
+            src={getFrenchieSrc(skin, "sit-side")}
+            alt=""
+            className={`${DOG} opacity-90 saturate-50`}
+            draggable={false}
+          />
+          <span className="absolute inset-x-0 bottom-0 h-[14%] bg-[#b9c8d1]/70" />
+        </>
+      ),
+      after: (
+        <>
+          <span className="absolute inset-0 bg-gradient-to-b from-[#e7f0e5] to-[#d3e3d3]" />
+          <RainDrops />
+          {/* 犬の絵に重ねると顔が隠れてしまうので、レインコートは横に並べて見せる */}
+          <img
+            src={getFrenchieSrc(skin, "stand-happy")}
+            alt=""
+            className="absolute bottom-[8%] left-[40%] w-[70%] -translate-x-1/2 select-none"
+            draggable={false}
+          />
+          <span className="absolute bottom-[16%] right-[4%] w-[26%]">
+            <RaincoatIcon />
+          </span>
+          <span className="absolute inset-x-0 bottom-0 h-[14%] bg-[#bcd2bc]/70" />
+          <NoteArt className="absolute right-[10%] top-[16%] w-3 text-leaf-deep" />
+          <SparkleArt className="absolute left-[8%] top-[14%] w-2.5 text-sun" />
+        </>
+      ),
+    },
+  ];
+}
 /* eslint-enable @next/next/no-img-element */
 
-export function CoinShopPreview() {
+export function CoinShopPreview({ skin }: { skin: DogSkinId }) {
   const scroller = useRef<HTMLUListElement>(null);
   const [active, setActive] = useState(0);
+  const samples = buildSamples(skin);
 
   const onScroll = useCallback(() => {
     const node = scroller.current;
@@ -171,7 +176,7 @@ export function CoinShopPreview() {
         onScroll={onScroll}
         className="-mx-4 flex snap-x snap-mandatory gap-3 overflow-x-auto px-4 pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
       >
-        {SAMPLES.map((sample) => (
+        {samples.map((sample) => (
           <li key={sample.id} className="w-[47%] shrink-0 snap-start sm:w-[42%]">
             <div className="rough-card h-full overflow-hidden p-2.5">
               <p className="flex min-w-0 items-start gap-1.5">
@@ -202,7 +207,7 @@ export function CoinShopPreview() {
       </ul>
 
       <div className="mt-2 flex items-center justify-center gap-1.5" aria-hidden="true">
-        {SAMPLES.map((sample, index) => (
+        {samples.map((sample, index) => (
           <span
             key={sample.id}
             className={`h-1.5 rounded-full transition-all ${

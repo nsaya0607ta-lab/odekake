@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { getFrenchieSrc, type DogSkinId } from "@/lib/dog-skins";
 
 /**
  * ホーム画面のバンドを歩き回るフレブル。
@@ -18,13 +19,13 @@ import { useEffect, useRef, useState } from "react";
  * 歩行処理（stand と walk の入れ替え）もこの7つに乗っている。
  */
 const POSES = {
-  stand: "/characters/frenchie/stand.webp",
-  walk: "/characters/frenchie/walk.webp",
-  sit: "/characters/frenchie/sit.webp",
-  sniff: "/characters/frenchie/sniff.webp",
-  happy: "/characters/frenchie/stand-happy.webp",
-  shake: "/characters/frenchie/shake.webp",
-  sleep: "/characters/frenchie/sleep.webp",
+  stand: "stand",
+  walk: "walk",
+  sit: "sit",
+  sniff: "sniff",
+  happy: "stand-happy",
+  shake: "shake",
+  sleep: "sleep",
 } as const;
 
 type Pose = keyof typeof POSES;
@@ -38,10 +39,11 @@ const POSE_KEYS = Object.keys(POSES) as Pose[];
  * 使わない。動きの中身は下の @keyframes fm-<id> が持っていて、ここは土台の絵と
  * 再生時間だけを決める。
  *
- * `art` は public/characters/frenchie/ の既存素材から選ぶ。犬の顔・毛色・体型・
- * 絵柄は現在のフレブルで固定なので、モーションのために描き足したり差し替えたりは
- * しない。土台が同じで動きだけ違う組み合わせがあるのは意図どおり（同じ URL なので
- * 画像は1回しか読まれない）。
+ * `art` はスキンに関わらず共通のファイル名（拡張子なし）。実際の URL は
+ * 選択中スキンによって `/characters/<skin>/<art>.webp` に展開される
+ * （getFrenchieSrc）。犬の顔・毛色・体型・絵柄はスキンごとに固定なので、
+ * モーションのために描き足したり差し替えたりはしない。土台が同じで動きだけ
+ * 違う組み合わせがあるのは意図どおり（同じ URL なので画像は1回しか読まれない）。
  *
  * Lv.1 の stand / walk / sit / sniff / happy / shake / sleep とは重複させない。
  */
@@ -89,10 +91,10 @@ const MOTIONS: readonly Motion[] = [
   { id: "dance", level: 30, art: "cheer", ms: 2000 },
 ];
 
-/** 表示キー（基本ポーズ or モーション id）から画像の URL を引く */
-const SRC: Record<string, string> = {
+/** 表示キー（基本ポーズ or モーション id）から、土台にするファイル名（拡張子なし）を引く */
+const POSE_FILES: Record<string, string> = {
   ...POSES,
-  ...Object.fromEntries(MOTIONS.map((motion) => [motion.id, `/characters/frenchie/${motion.art}.webp`])),
+  ...Object.fromEntries(MOTIONS.map((motion) => [motion.id, motion.art])),
 };
 
 /**
@@ -192,7 +194,14 @@ type Walker = {
 const rand = (min: number, max: number) => min + Math.random() * (max - min);
 const pick = <T,>(items: readonly T[]): T => items[Math.floor(Math.random() * items.length)] as T;
 
-export function WanderingFrenchie({ level = 1 }: { level?: number }) {
+export function WanderingFrenchie({
+  level = 1,
+  skin = "default",
+}: {
+  level?: number;
+  /** 表示する犬スキン。所持していないスキンを渡さないのは呼び出し側の責任 */
+  skin?: DogSkinId;
+}) {
   // 基本ポーズは常に、報酬モーションは解放済みのものだけ重ねて置く
   const visibleKeys: string[] = [
     ...POSE_KEYS,
@@ -663,7 +672,7 @@ export function WanderingFrenchie({ level = 1 }: { level?: number }) {
                   ref={(node) => {
                     poseNodes.current[key] = node;
                   }}
-                  src={SRC[key]}
+                  src={getFrenchieSrc(skin, POSE_FILES[key]!)}
                   alt=""
                   width={300}
                   height={254}

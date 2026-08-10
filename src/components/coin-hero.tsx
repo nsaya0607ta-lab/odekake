@@ -1,4 +1,5 @@
 import { formatCoins } from "@/lib/coins";
+import { getFrenchieSrc, type DogSkinId } from "@/lib/dog-skins";
 import { CoinArt, LeafArt, MeadowSceneArt, NoteArt, SparkleArt, TreasureChestArt } from "./coin-art";
 import { IconCalendar, IconClipboard, IconCoin } from "./icons";
 
@@ -6,25 +7,23 @@ type Props = {
   balance: number;
   /** 今日もらったコイン */
   todayCoins: number;
+  /** 選択中の犬スキン。右側のプレビューをほかの画面と同じ姿に揃える */
+  skin: DogSkinId;
 };
 
-/**
- * コイン画面の上のカード。
- * 右側の犬は、着せ替えしたときの見た目を確かめるプレビュー
- * （着せ替えの中身はまだないので、いまは今の姿をそのまま出している）。
- */
-export function CoinHero({ balance, todayCoins }: Props) {
+/** コイン画面の上のカード。右側の犬は、選択中のスキンをそのまま映すプレビュー */
+export function CoinHero({ balance, todayCoins, skin }: Props) {
   return (
     <section className="rough-card relative overflow-hidden">
       <div className="relative h-[196px] sm:h-[208px]">
         <MeadowSceneArt />
 
-        {/* 着せ替えプレビュー */}
+        {/* 犬スキンのプレビュー */}
         <div className="pointer-events-none absolute inset-0 overflow-hidden" aria-hidden="true">
           <TreasureChestArt className="absolute bottom-1 right-[-3%] w-[68px] sm:w-[76px]" />
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img
-            src="/characters/frenchie/walk.webp"
+            src={getFrenchieSrc(skin, "walk")}
             alt=""
             width={300}
             height={254}
