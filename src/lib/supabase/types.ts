@@ -152,7 +152,7 @@ export type CoinEventRow = {
   id: string;
   user_id: string;
   /** unlock は将来のショップ用（現在は付与しない） */
-  event_type: "level_up" | "steps" | "unlock" | "gacha";
+  event_type: "level_up" | "steps" | "unlock" | "gacha" | "login";
   /** 正の値が獲得、負の値が消費 */
   amount: number;
   idempotency_key: string;
@@ -313,6 +313,7 @@ export type Database = {
     Views: Record<string, never>;
     Functions: {
       area_stats: { Args: { p_trip_ids?: string[] }; Returns: AreaStatsRow[] };
+      claim_login_bonus: { Args: Record<string, never>; Returns: Json };
       commit_gacha_draw: {
         Args: { p_cost: number; p_request_id: string; p_item_ids: string[] };
         Returns: Json;

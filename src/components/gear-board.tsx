@@ -110,7 +110,7 @@ export function GearBoard({ currentLevel, initialEquipment }: Props) {
 
       <ReadOnlySection
         title="しぐさ・表情"
-        note="おさんぽ中のフレブルが自動で使います。ここで装着する必要はありません。"
+        note="おさんぽ中のフレブルが、立ち止まるたびに解放済みのものから選んで使います。"
         rewards={motionRewards}
         currentLevel={currentLevel}
       />

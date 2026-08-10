@@ -1,4 +1,10 @@
-import { LEVEL_UP_COIN_BANDS, STEP_COIN_AMOUNT, STEP_COIN_INTERVAL, formatCoins } from "@/lib/coins";
+import {
+  LEVEL_UP_COIN_BANDS,
+  LOGIN_BONUS_COINS,
+  STEP_COIN_AMOUNT,
+  STEP_COIN_INTERVAL,
+  formatCoins,
+} from "@/lib/coins";
 import { IconChevronDown, IconCoin } from "./icons";
 
 /**
@@ -16,6 +22,19 @@ export function CoinEarnMethods() {
       </summary>
 
       <div className="rough-card mt-2 space-y-3 overflow-hidden p-3.5 text-[11px]">
+        <div>
+          <p className="font-bold text-ink-soft">ログインボーナス（1日1回）</p>
+          <div className="mt-1.5 flex flex-wrap gap-1.5">
+            <span className="flex items-center gap-1 rounded-full bg-paper-deep px-2 py-1 tabular-nums">
+              毎日
+              <IconCoin size={11} />+{formatCoins(LOGIN_BONUS_COINS)}
+            </span>
+          </div>
+          <p className="mt-2 text-[10px] leading-relaxed text-ink-faint">
+            その日はじめてアプリを開いたときに、自動で受け取ります。日付は日本時間で切り替わります。
+          </p>
+        </div>
+
         <div>
           <p className="font-bold text-ink-soft">レベルアップ報酬（到達レベルごとに1回）</p>
           <div className="mt-1.5 flex flex-wrap gap-1.5">
