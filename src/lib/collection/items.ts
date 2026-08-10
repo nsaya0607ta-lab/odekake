@@ -149,7 +149,7 @@ const CURATED_ITEMS: readonly CollectionItem[] = [
   {
     id: "summer_frenchie",
     name: "夏のフレブル",
-    image: null,
+    image: "/collection/skins/summer-frenchie.webp",
     category: "other",
     series: "summer",
     rarity: "SR",
