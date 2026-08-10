@@ -145,7 +145,7 @@ function PreviewCard({ equipment }: { equipment: EquipmentMap }) {
       <div className="relative mx-auto mt-1 h-40 w-40">
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img
-          src="/characters/frenchie/stand-happy.webp"
+          src="/characters/frenchie/normal/stand-happy.webp"
           alt=""
           className="absolute inset-0 h-full w-full object-contain"
           draggable={false}

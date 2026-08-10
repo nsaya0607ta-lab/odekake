@@ -13,31 +13,43 @@ import { useEffect, useRef, useState } from "react";
  * transition と animation が同じ transform を奪い合って壊れる。
  */
 
-const POSES = {
-  stand: "/characters/frenchie/stand.webp",
-  walk: "/characters/frenchie/walk.webp",
-  sit: "/characters/frenchie/sit.webp",
-  sniff: "/characters/frenchie/sniff.webp",
-  happy: "/characters/frenchie/stand-happy.webp",
-  shake: "/characters/frenchie/shake.webp",
-  sleep: "/characters/frenchie/sleep.webp",
-  wink: "/characters/frenchie/wink.webp",
-  wave: "/characters/frenchie/wave.webp",
-  camera: "/characters/frenchie/camera.webp",
-  bow: "/characters/frenchie/bow.webp",
-  cheer: "/characters/frenchie/cheer.webp",
-  smile: "/characters/frenchie/smile.webp",
-  dig: "/characters/frenchie/dig.webp",
-  treat: "/characters/frenchie/treat.webp",
-  roll: "/characters/frenchie/roll.webp",
-  drink: "/characters/frenchie/drink.webp",
-  doze: "/characters/frenchie/doze.webp",
-  yawn: "/characters/frenchie/yawn.webp",
-  lieWave: "/characters/frenchie/lie-wave.webp",
+/**
+ * 見た目の切り替え（スキン）。動きには一切関わらない。
+ *
+ * 素材は 1ポーズ 1枚で、どのスキンも同じ20ポーズを同じファイル名で持つ。
+ * どのスキンもキャンバス（300x254）も足元の高さも水平中心も揃えてあるので、
+ * 差し替えても犬の立ち位置は動かない。
+ */
+export type FrenchieSkin = "normal" | "summer" | "winter" | "explorer";
+
+/** ポーズ名 → 素材のファイル名（スキンをまたいで共通） */
+const POSE_FILES = {
+  stand: "stand",
+  walk: "walk",
+  sit: "sit",
+  sniff: "sniff",
+  happy: "stand-happy",
+  shake: "shake",
+  sleep: "sleep",
+  wink: "wink",
+  wave: "wave",
+  camera: "camera",
+  bow: "bow",
+  cheer: "cheer",
+  smile: "smile",
+  dig: "dig",
+  treat: "treat",
+  roll: "roll",
+  drink: "drink",
+  doze: "doze",
+  yawn: "yawn",
+  lieWave: "lie-wave",
 } as const;
 
-type Pose = keyof typeof POSES;
-const POSE_KEYS = Object.keys(POSES) as Pose[];
+type Pose = keyof typeof POSE_FILES;
+const POSE_KEYS = Object.keys(POSE_FILES) as Pose[];
+
+const poseSrc = (skin: FrenchieSkin, pose: Pose) => `/characters/frenchie/${skin}/${POSE_FILES[pose]}.webp`;
 
 /** 立ち止まったときの仕草と、その長さ（ms） */
 type Rest = { pose: Pose; min: number; max: number; requiredLevel?: number };
@@ -82,16 +94,33 @@ const GESTURE_POSES: Partial<Record<Pose, string>> = {
 /**
  * 素材ごとの描き位置のずれを打ち消す量（絵の幅に対する %）。
  *
- * walk.webp は胴体が stand.webp より 17px（300px 幅の 5.7%）左に描かれている。
+ * 通常版の walk.webp は胴体が stand.webp より 17px（300px 幅の 5.7%）左に描かれている。
  * 上半身で重ねると差分が 0.106 → 0.035 まで落ちるので、絵柄の違いではなく
  * キャンバス上の位置ずれ。そのまま入れ替えると 1歩ごとに犬全体が横に飛ぶので、
  * 立ち姿を基準に踏み出しの絵を寄せて胴体を留める。前進ぶんは CSS の移動が持つ。
  * 足元（下端）は全ポーズ揃っているので縦は触らない。
+ *
+ * ずれ幅は絵ごとの事情なのでスキンごとに持つ。夏版より後のスキンの値も同じ測り方
+ * （上半身を横にずらして重ね、差分が最小になる量）で出してある。
  */
-const POSE_NUDGE_X: Partial<Record<Pose, number>> = {
-  walk: 5.7,
-  // stand-happy.webp も同じ 17px ずれ（横の描画範囲が walk と一致する）
-  happy: 5.7,
+const POSE_NUDGE_X: Record<FrenchieSkin, Partial<Record<Pose, number>>> = {
+  normal: {
+    walk: 5.7,
+    // stand-happy.webp も同じ 17px ずれ（横の描画範囲が walk と一致する）
+    happy: 5.7,
+  },
+  summer: {
+    walk: 3.3, // 胴体が立ち姿より 10px 左
+    happy: -7.0, // 上げた前足のぶん、こちらは 21px 右
+  },
+  winter: {
+    walk: 2.0, // 胴体が立ち姿より 6px 左
+    happy: -8.7, // 上げた前足のぶん、こちらは 26px 右
+  },
+  explorer: {
+    walk: 3.3, // 胴体が立ち姿より 10px 左
+    happy: -7.7, // 上げた前足のぶん、こちらは 23px 右
+  },
 };
 
 /** ウインクの動きの長さ（ms）。RESTS の最短より短くして必ず出し切る */
@@ -134,8 +163,9 @@ type Walker = {
 const rand = (min: number, max: number) => min + Math.random() * (max - min);
 const pick = <T,>(items: readonly T[]): T => items[Math.floor(Math.random() * items.length)] as T;
 
-export function WanderingFrenchie({ level = 1 }: { level?: number }) {
+export function WanderingFrenchie({ level = 1, skin = "normal" }: { level?: number; skin?: FrenchieSkin }) {
   const availablePoseKeys = POSE_KEYS.filter((pose) => (REQUIRED_LEVEL_BY_POSE.get(pose) ?? 1) <= level);
+  const nudgeX = POSE_NUDGE_X[skin];
   const [walker, setWalker] = useState<Walker>({
     x: 26,
     depth: 0.45,
@@ -342,7 +372,7 @@ export function WanderingFrenchie({ level = 1 }: { level?: number }) {
                   ref={(node) => {
                     poseNodes.current[pose] = node;
                   }}
-                  src={POSES[pose]}
+                  src={poseSrc(skin, pose)}
                   alt=""
                   width={300}
                   height={254}
@@ -354,7 +384,7 @@ export function WanderingFrenchie({ level = 1 }: { level?: number }) {
                   } h-auto w-full select-none`}
                   style={{
                     opacity: pose === activePose ? 1 : 0,
-                    transform: POSE_NUDGE_X[pose] ? `translateX(${POSE_NUDGE_X[pose]}%)` : undefined,
+                    transform: nudgeX[pose] ? `translateX(${nudgeX[pose]}%)` : undefined,
                   }}
                 />
               ))}
