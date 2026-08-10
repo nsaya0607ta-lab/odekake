@@ -152,7 +152,7 @@ export type CoinEventRow = {
   id: string;
   user_id: string;
   /** unlock は将来のショップ用（現在は付与しない） */
-  event_type: "level_up" | "steps" | "unlock";
+  event_type: "level_up" | "steps" | "unlock" | "gacha";
   /** 正の値が獲得、負の値が消費 */
   amount: number;
   idempotency_key: string;
@@ -170,6 +170,15 @@ export type UserEquipmentRow = {
   user_id: string;
   slot: EquipmentSlot;
   level: number;
+  updated_at: string;
+};
+
+/** ガチャで手に入れたもの。item_id は src/lib/gacha/prizes.ts の GachaPrize.id */
+export type UserGachaItemRow = {
+  user_id: string;
+  item_id: string;
+  count: number;
+  first_obtained_at: string;
   updated_at: string;
 };
 
@@ -269,6 +278,12 @@ export type Database = {
         Update: Partial<UserEquipmentRow>;
         Relationships: [];
       };
+      user_gacha_items: {
+        Row: UserGachaItemRow;
+        Insert: Partial<UserGachaItemRow> & { user_id: string; item_id: string };
+        Update: Partial<UserGachaItemRow>;
+        Relationships: [];
+      };
       daily_steps: {
         Row: DailyStepsRow;
         Insert: Partial<DailyStepsRow> & { user_id: string; step_date: string; steps: number };
@@ -298,6 +313,10 @@ export type Database = {
     Views: Record<string, never>;
     Functions: {
       area_stats: { Args: { p_trip_ids?: string[] }; Returns: AreaStatsRow[] };
+      commit_gacha_draw: {
+        Args: { p_cost: number; p_request_id: string; p_item_ids: string[] };
+        Returns: Json;
+      };
       create_steps_sync_token: { Args: Record<string, never>; Returns: string };
       delete_own_account: { Args: Record<string, never>; Returns: undefined };
       record_daily_steps: { Args: { p_step_date: string; p_steps: number }; Returns: number };
