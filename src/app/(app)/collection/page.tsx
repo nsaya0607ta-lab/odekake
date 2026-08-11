@@ -13,7 +13,7 @@ import {
   isCollectionCategory,
   type CollectionCategory,
 } from "@/lib/collection/items";
-import { getOwnedItemIds } from "@/lib/data/collection";
+import { getOwnedItemCounts } from "@/lib/data/collection";
 import { requireUser } from "@/lib/supabase/server";
 
 export const metadata = { title: "図鑑 | おでかけ記録" };
@@ -27,7 +27,8 @@ export default async function CollectionPage({
   searchParams: Promise<{ tab?: string; category?: string }>;
 }) {
   const [{ supabase, user }, params] = await Promise.all([requireUser(), searchParams]);
-  const owned = await getOwnedItemIds(supabase, user.id);
+  const counts = await getOwnedItemCounts(supabase, user.id);
+  const owned = new Set(counts.keys());
 
   const tab: Tab = params.tab === "series" ? "series" : "regular";
   const category = isCollectionCategory(params.category) ? params.category : null;
@@ -40,7 +41,14 @@ export default async function CollectionPage({
         {/* 画面全体の余白は PageBody（space-y-6）より詰めたいので、内側で持つ */}
         <div className="space-y-4">
           <CollectionTabs current={tab} />
-          {tab === "regular" ? <RegularTab owned={owned} category={category} /> : <SeriesTab owned={owned} />}
+          <p className="rough-pill border border-line-strong bg-card px-3 py-2 text-center text-[10px] font-semibold leading-relaxed text-ink-soft">
+            同じアイテムが出ると、カードの「出た回数」が増えます
+          </p>
+          {tab === "regular" ? (
+            <RegularTab owned={owned} counts={counts} category={category} />
+          ) : (
+            <SeriesTab owned={owned} counts={counts} />
+          )}
           <p className="pb-2 text-center text-xs text-ink-faint">
             持っていないアイテムはシルエットで表示されます
           </p>
@@ -78,9 +86,11 @@ function CollectionTabs({ current }: { current: Tab }) {
 /** 通常の図鑑。カテゴリのチップで絞り込む */
 function RegularTab({
   owned,
+  counts,
   category,
 }: {
   owned: ReadonlySet<string>;
+  counts: ReadonlyMap<string, number>;
   category: CollectionCategory | null;
 }) {
   const shown = category ? REGULAR_ITEMS.filter((item) => item.category === category) : REGULAR_ITEMS;
@@ -120,13 +130,13 @@ function RegularTab({
         </div>
       ) : null}
 
-      <ItemGrid items={shown} owned={owned} />
+      <ItemGrid items={shown} owned={owned} counts={counts} />
     </div>
   );
 }
 
 /** シリーズ図鑑。シリーズごとにまとめて並べ、見出しから詳細へ行ける */
-function SeriesTab({ owned }: { owned: ReadonlySet<string> }) {
+function SeriesTab({ owned, counts }: { owned: ReadonlySet<string>; counts: ReadonlyMap<string, number> }) {
   const allSeriesItems = COLLECTION_SERIES.flatMap((series) => getSeriesItems(series.id));
 
   return (
@@ -156,7 +166,7 @@ function SeriesTab({ owned }: { owned: ReadonlySet<string> }) {
               </span>
               <IconChevronRight size={16} className="shrink-0" />
             </Link>
-            <ItemGrid items={items} owned={owned} />
+            <ItemGrid items={items} owned={owned} counts={counts} />
           </section>
         );
       })}
