@@ -13,7 +13,7 @@ create index if not exists visit_records_journey_id_idx on public.visit_records(
 
 -- 個人旅行を持つユーザー全員に、地図の親となる常設の個人旅を用意する。
 insert into public.trips (owner_id, title, trip_type, start_date, end_date, description)
-select distinct t.owner_id, '自分のおでかけ', 'personal', null, null,
+select distinct t.owner_id, '自分のおでかけ', 'personal', null::date, null::date,
   '普段のおでかけをまとめる記録先'
 from public.trips t
 where t.trip_type = 'personal'
