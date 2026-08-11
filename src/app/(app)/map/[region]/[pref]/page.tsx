@@ -3,7 +3,7 @@ import { PageBody } from "@/components/page-body";
 import { PageHeader } from "@/components/page-header";
 import { PrefectureAreaBrowser } from "@/components/prefecture-area-browser";
 import { loadAreaIndex, shadeLevel } from "@/lib/data/areas";
-import { getRecordSpace } from "@/lib/data/space";
+import { getMapScope, mapScopeHref } from "@/lib/data/map-scope";
 import { getMunicipalitiesByPrefecture, getPrefecture, insetsOfPrefecture, viewBoxFor } from "@/lib/geo";
 import { loadMunicipalityShapes } from "@/lib/geo/municipality-shapes";
 import { buildPrefectureAreas } from "@/lib/geo/prefecture-areas";
@@ -20,20 +20,22 @@ export async function generateMetadata({ params }: { params: Promise<{ pref: str
 
 export default async function PrefecturePage({
   params,
+  searchParams,
 }: {
   params: Promise<{ region: string; pref: string }>;
+  searchParams: Promise<{ trip?: string }>;
 }) {
-  const { region: regionSlug, pref } = await params;
+  const [{ region: regionSlug, pref }, { trip }] = await Promise.all([params, searchParams]);
   const region = getRegion(regionSlug);
   const prefecture = getPrefecture(pref);
   if (!region || !prefecture || prefecture.region.slug !== region.slug) notFound();
 
   const { supabase, user } = await requireUser();
-  const space = await getRecordSpace(supabase, user.id);
+  const scope = await getMapScope(supabase, user.id, trip);
 
   // 境界データはその都道府県の分だけサーバー側で読み込む
   const [areasIndex, shapes] = await Promise.all([
-    loadAreaIndex(supabase, space.tripIds),
+    loadAreaIndex(supabase, scope.tripIds),
     loadMunicipalityShapes(prefecture.code),
   ]);
 
@@ -65,8 +67,8 @@ export default async function PrefecturePage({
     <>
       <PageHeader
         title={prefecture.name}
-        subtitle={`${region.name}地方・${space.name}`}
-        backHref={`/map/${region.slug}`}
+        subtitle={`${region.name}地方・${scope.name}`}
+        backHref={mapScopeHref(`/map/${region.slug}`, scope)}
       />
       <PageBody>
         <section className="rough-card flex items-center justify-around px-4 py-4 text-center">
@@ -92,6 +94,7 @@ export default async function PrefecturePage({
           insets={insetsOfPrefecture("prefecture", prefecture.code)}
           areas={prefectureAreas}
           hrefBase={`/map/${region.slug}/${prefecture.code}`}
+          hrefSuffix={scope.kind === "shared" ? `?trip=${scope.value}` : ""}
           hasMap={shapes.length > 0}
         />
       </PageBody>

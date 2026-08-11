@@ -10,7 +10,7 @@ import { loadCategoryNames, getSpotsInMunicipality } from "@/lib/data/spots";
 import { getMunicipality, getPrefecture } from "@/lib/geo";
 import { loadMunicipalityShapes } from "@/lib/geo/municipality-shapes";
 import { getRegion } from "@/lib/geo/regions";
-import { getRecordSpace } from "@/lib/data/space";
+import { getMapScope, mapScopeHref } from "@/lib/data/map-scope";
 import { requireUser } from "@/lib/supabase/server";
 
 export const dynamic = "force-dynamic";
@@ -48,9 +48,9 @@ export default async function MunicipalityPage({
   searchParams,
 }: {
   params: Promise<{ region: string; pref: string; muni: string }>;
-  searchParams: Promise<{ area?: string }>;
+  searchParams: Promise<{ area?: string; trip?: string }>;
 }) {
-  const [{ region: regionSlug, pref, muni }, { area }] = await Promise.all([params, searchParams]);
+  const [{ region: regionSlug, pref, muni }, { area, trip }] = await Promise.all([params, searchParams]);
   const region = getRegion(regionSlug);
   const prefecture = getPrefecture(pref);
   const municipality = getMunicipality(muni);
@@ -66,9 +66,9 @@ export default async function MunicipalityPage({
   }
 
   const { supabase, user } = await requireUser();
-  const space = await getRecordSpace(supabase, user.id);
+  const scope = await getMapScope(supabase, user.id, trip);
   const [spots, categoryNames, shapes] = await Promise.all([
-    getSpotsInMunicipality(supabase, municipality.code, space.tripIds),
+    getSpotsInMunicipality(supabase, municipality.code, scope.tripIds),
     loadCategoryNames(supabase),
     loadMunicipalityShapes(prefecture.code),
   ]);
@@ -83,18 +83,21 @@ export default async function MunicipalityPage({
     : null;
 
   const categories = [...categoryNames.entries()].map(([id, name]) => ({ id, name }));
-  const newSpotHref = `/spots/new?pref=${prefecture.code}&muni=${municipality.code}`;
+  const newSpotHref = mapScopeHref("/spots/new", scope, {
+    pref: prefecture.code,
+    muni: municipality.code,
+  });
   const backHref =
     area && /^m\d{5}$/.test(area)
-      ? `/map/${region.slug}/${prefecture.code}/area/${area}`
-      : `/map/${region.slug}/${prefecture.code}`;
+      ? mapScopeHref(`/map/${region.slug}/${prefecture.code}/area/${area}`, scope)
+      : mapScopeHref(`/map/${region.slug}/${prefecture.code}`, scope);
   const totalVisits = spots.reduce((sum, spot) => sum + spot.visitCount, 0);
 
   return (
     <>
       <PageHeader
         title={municipality.name}
-        subtitle={prefecture.name}
+        subtitle={`${prefecture.name}・${scope.name}`}
         backHref={backHref}
         action={
           <Link

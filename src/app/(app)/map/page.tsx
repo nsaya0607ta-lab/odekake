@@ -1,11 +1,12 @@
 import Link from "next/link";
 import { IconChevronRight } from "@/components/icons";
 import { JapanMap } from "@/components/japan-map";
+import { MapScopeSwitcher } from "@/components/map-scope-switcher";
 import { PageBody } from "@/components/page-body";
 import { TopHeader } from "@/components/page-header";
 import { VisitedBadge } from "@/components/ui";
 import { loadAreaIndex } from "@/lib/data/areas";
-import { getRecordSpace } from "@/lib/data/space";
+import { getMapScope, mapScopeHref } from "@/lib/data/map-scope";
 import { MUNICIPALITIES, PREFECTURES } from "@/lib/geo";
 import { REGIONS } from "@/lib/geo/regions";
 import { requireUser } from "@/lib/supabase/server";
@@ -13,10 +14,15 @@ import { requireUser } from "@/lib/supabase/server";
 export const metadata = { title: "日本地図 | おでかけ記録" };
 export const dynamic = "force-dynamic";
 
-export default async function MapPage() {
-  const { supabase, user } = await requireUser();
-  const space = await getRecordSpace(supabase, user.id);
-  const areas = await loadAreaIndex(supabase, space.tripIds);
+export default async function MapPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ trip?: string }>;
+}) {
+  const [{ supabase, user }, { trip }] = await Promise.all([requireUser(), searchParams]);
+  const scope = await getMapScope(supabase, user.id, trip);
+  const areas = await loadAreaIndex(supabase, scope.tripIds);
+  const hrefSuffix = scope.kind === "shared" ? `?trip=${scope.value}` : "";
 
   const visitedRegions = Object.fromEntries(
     REGIONS.map((r) => [r.slug, (areas.region.get(r.slug)?.visitCount ?? 0) > 0]),
@@ -24,10 +30,14 @@ export default async function MapPage() {
 
   return (
     <>
-      <TopHeader title="日本地図" subtitle={space.name} />
+      <TopHeader
+        title="日本地図"
+        subtitle={`${scope.kind === "shared" ? "共有旅" : "個人の旅"}｜${scope.name}`}
+        action={<MapScopeSwitcher options={scope.options} selectedValue={scope.value} />}
+      />
       <PageBody className="space-y-4">
         <section className="rough-card px-2 py-3">
-          <JapanMap visitedRegions={visitedRegions} />
+          <JapanMap visitedRegions={visitedRegions} hrefSuffix={hrefSuffix} />
         </section>
 
         <section className="rough-card grid grid-cols-2 divide-x divide-line px-2 py-3 text-center">
@@ -56,7 +66,7 @@ export default async function MapPage() {
               return (
                 <li key={region.slug}>
                   <Link
-                    href={`/map/${region.slug}`}
+                    href={mapScopeHref(`/map/${region.slug}`, scope)}
                     className="rough-card flex h-full items-center gap-2 px-3 py-2.5 transition-transform active:scale-[0.99]"
                   >
                     <span className="min-w-0 flex-1">

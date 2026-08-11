@@ -22,6 +22,7 @@ export function PrefectureAreaBrowser({
   insets,
   areas,
   hrefBase,
+  hrefSuffix = "",
   hasMap,
 }: {
   prefectureName: string;
@@ -29,6 +30,7 @@ export function PrefectureAreaBrowser({
   insets: MapFrame[];
   areas: PrefectureArea[];
   hrefBase: string;
+  hrefSuffix?: string;
   hasMap: boolean;
 }) {
   const viewBoxWidth = Number(viewBox.split(" ")[2] ?? 1);
@@ -41,7 +43,7 @@ export function PrefectureAreaBrowser({
     paths: area.municipalities.flatMap((municipality) => (municipality.d ? [municipality.d] : [])),
     tone: area.tone,
     visited: area.visitedMunicipalityCount > 0,
-    href: `${hrefBase}/area/${area.slug}`,
+    href: `${hrefBase}/area/${area.slug}${hrefSuffix}`,
     // 地区名は地図の中には描画せず、下の選択一覧にまとめる。
     labelAt: null,
   }));
@@ -79,7 +81,7 @@ export function PrefectureAreaBrowser({
           {areas.map((area) => (
             <li key={area.slug}>
               <Link
-                href={`${hrefBase}/area/${area.slug}`}
+                href={`${hrefBase}/area/${area.slug}${hrefSuffix}`}
                 className="rough-card pressable flex h-full items-center gap-3 px-4 py-3"
               >
                 <span

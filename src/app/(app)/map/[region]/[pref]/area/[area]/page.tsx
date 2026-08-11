@@ -3,7 +3,7 @@ import { MunicipalityBrowser } from "@/components/municipality-browser";
 import { PageBody } from "@/components/page-body";
 import { PageHeader } from "@/components/page-header";
 import { loadAreaIndex, shadeLevel } from "@/lib/data/areas";
-import { getRecordSpace } from "@/lib/data/space";
+import { getMapScope, mapScopeHref } from "@/lib/data/map-scope";
 import { getMunicipalitiesByPrefecture, getPrefecture, viewBoxFor } from "@/lib/geo";
 import { loadMunicipalityShapes } from "@/lib/geo/municipality-shapes";
 import {
@@ -18,18 +18,20 @@ export const dynamic = "force-dynamic";
 
 export default async function PrefectureAreaPage({
   params,
+  searchParams,
 }: {
   params: Promise<{ region: string; pref: string; area: string }>;
+  searchParams: Promise<{ trip?: string }>;
 }) {
-  const { region: regionSlug, pref, area: areaSlug } = await params;
+  const [{ region: regionSlug, pref, area: areaSlug }, { trip }] = await Promise.all([params, searchParams]);
   const region = getRegion(regionSlug);
   const prefecture = getPrefecture(pref);
   if (!region || !prefecture || prefecture.region.slug !== region.slug) notFound();
 
   const { supabase, user } = await requireUser();
-  const space = await getRecordSpace(supabase, user.id);
+  const scope = await getMapScope(supabase, user.id, trip);
   const [areasIndex, shapes] = await Promise.all([
-    loadAreaIndex(supabase, space.tripIds),
+    loadAreaIndex(supabase, scope.tripIds),
     loadMunicipalityShapes(prefecture.code),
   ]);
 
@@ -66,8 +68,8 @@ export default async function PrefectureAreaPage({
     <>
       <PageHeader
         title={selectedArea.name}
-        subtitle={`${prefecture.name}・${space.name}`}
-        backHref={`/map/${region.slug}/${prefecture.code}`}
+        subtitle={`${prefecture.name}・${scope.name}`}
+        backHref={mapScopeHref(`/map/${region.slug}/${prefecture.code}`, scope)}
       />
       <PageBody>
         <section className="rough-card flex items-center justify-around px-4 py-4 text-center">
@@ -94,7 +96,7 @@ export default async function PrefectureAreaPage({
             insets={[]}
             items={selectedArea.municipalities}
             hrefBase={`/map/${region.slug}/${prefecture.code}`}
-            hrefSuffix={`?area=${selectedArea.slug}`}
+            hrefSuffix={mapScopeHref("", scope, { area: selectedArea.slug })}
             hasMap={selectedArea.municipalities.some((municipality) => municipality.d !== null)}
             mapHeading="市区町村マップ"
             mapInstruction="市区町村名は地図の下から選択できます"

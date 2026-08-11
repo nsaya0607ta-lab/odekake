@@ -6,7 +6,7 @@ import { PageBody } from "@/components/page-body";
 import { PageHeader } from "@/components/page-header";
 import { VisitedBadge } from "@/components/ui";
 import { loadAreaIndex } from "@/lib/data/areas";
-import { getRecordSpace } from "@/lib/data/space";
+import { getMapScope, mapScopeHref } from "@/lib/data/map-scope";
 import { getPrefecturesByRegion } from "@/lib/geo";
 import { getRegion } from "@/lib/geo/regions";
 import { requireUser } from "@/lib/supabase/server";
@@ -19,14 +19,21 @@ export async function generateMetadata({ params }: { params: Promise<{ region: s
   return { title: found ? `${found.name}地方 | おでかけ記録` : "おでかけ記録" };
 }
 
-export default async function RegionPage({ params }: { params: Promise<{ region: string }> }) {
-  const { region: regionSlug } = await params;
+export default async function RegionPage({
+  params,
+  searchParams,
+}: {
+  params: Promise<{ region: string }>;
+  searchParams: Promise<{ trip?: string }>;
+}) {
+  const [{ region: regionSlug }, { trip }] = await Promise.all([params, searchParams]);
   const region = getRegion(regionSlug);
   if (!region) notFound();
 
   const { supabase, user } = await requireUser();
-  const space = await getRecordSpace(supabase, user.id);
-  const areas = await loadAreaIndex(supabase, space.tripIds);
+  const scope = await getMapScope(supabase, user.id, trip);
+  const areas = await loadAreaIndex(supabase, scope.tripIds);
+  const hrefSuffix = scope.kind === "shared" ? `?trip=${scope.value}` : "";
   const prefectures = getPrefecturesByRegion(region.slug);
 
   const visitedPrefectures = Object.fromEntries(
@@ -35,7 +42,11 @@ export default async function RegionPage({ params }: { params: Promise<{ region:
 
   return (
     <>
-      <PageHeader title={`${region.name}地方`} subtitle={space.name} backHref="/map" />
+      <PageHeader
+        title={`${region.name}地方`}
+        subtitle={scope.name}
+        backHref={mapScopeHref("/map", scope)}
+      />
       <PageBody>
         <section className="rough-card px-3 py-4">
           <p className="mb-2 text-center text-xs text-ink-soft">
@@ -46,6 +57,7 @@ export default async function RegionPage({ params }: { params: Promise<{ region:
           <RegionMap
             regionSlug={region.slug}
             visitedPrefectures={visitedPrefectures}
+            hrefSuffix={hrefSuffix}
             className="mx-auto w-full max-w-[min(100%,52vh)]"
           />
         </section>
@@ -58,7 +70,7 @@ export default async function RegionPage({ params }: { params: Promise<{ region:
               return (
                 <li key={p.code}>
                   <Link
-                    href={`/map/${region.slug}/${p.code}`}
+                    href={mapScopeHref(`/map/${region.slug}/${p.code}`, scope)}
                     className="rough-card flex items-center gap-3 px-4 py-3 transition-transform active:scale-[0.99]"
                   >
                     <span className="min-w-0 flex-1">

@@ -23,9 +23,11 @@ const framesOf = (scope: "national" | "regional", regionSlug?: string): MapInset
 export function JapanMap({
   visitedRegions,
   className,
+  hrefSuffix = "",
 }: {
   visitedRegions: Record<string, boolean>;
   className?: string;
+  hrefSuffix?: string;
 }) {
   const shapes: MapShape[] = REGIONS.map((region) => ({
     key: region.slug,
@@ -33,7 +35,7 @@ export function JapanMap({
     paths: getPrefecturesByRegion(region.slug).map((p) => p.d),
     tone: region.tone,
     visited: Boolean(visitedRegions[region.slug]),
-    href: `/map/${region.slug}`,
+    href: `/map/${region.slug}${hrefSuffix}`,
     labelAt: REGION_LABEL[region.slug] ?? null,
   }));
 
@@ -61,10 +63,12 @@ export function RegionMap({
   regionSlug,
   visitedPrefectures,
   className,
+  hrefSuffix = "",
 }: {
   regionSlug: string;
   visitedPrefectures: Record<string, boolean>;
   className?: string;
+  hrefSuffix?: string;
 }) {
   const prefectures = getPrefecturesByRegion(regionSlug);
   const box = viewBoxFor(prefectures, "regional", 0.2);
@@ -97,7 +101,7 @@ export function RegionMap({
       paths: [shape.d],
       tone: p.region.tone,
       visited: Boolean(visitedPrefectures[p.code]),
-      href: `/map/${regionSlug}/${p.code}`,
+      href: `/map/${regionSlug}/${p.code}${hrefSuffix}`,
       labelAt: showLabel.has(p.code) ? shape.center : null,
     };
   });
