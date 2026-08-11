@@ -47,6 +47,12 @@ export async function getFriendsSetupStatus(supabase: DB): Promise<FriendsSetupS
   const { data, error } = await supabase.rpc("get_friends_health");
 
   if (error) {
+    console.error("[friends/health] Database health check failed", {
+      code: error.code,
+      message: error.message,
+      details: error.details,
+      hint: error.hint,
+    });
     if (error.code && FRIENDS_UNAVAILABLE_CODES.has(error.code)) {
       return { ready: false, reason: "migration_required" };
     }
