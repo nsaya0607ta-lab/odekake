@@ -2,7 +2,7 @@ import { notFound, redirect } from "next/navigation";
 import { PageBody } from "@/components/page-body";
 import { PageHeader } from "@/components/page-header";
 import { todayInJapan } from "@/lib/date";
-import { ensurePersonalRecordTrip, getTripOptions } from "@/lib/data/trips";
+import { getRecordDestinationOptions } from "@/lib/data/trips";
 import { getRecordSpace } from "@/lib/data/space";
 import { requireUser } from "@/lib/supabase/server";
 import { VisitForm } from "../visit-form";
@@ -26,18 +26,12 @@ export default async function NewVisitPage({
   if (!spot) notFound();
 
   const space = await getRecordSpace(supabase, user.id);
-  const [plannedTrips, personalRecordTrip] = await Promise.all([
-    getTripOptions(supabase, space.tripIds),
-    ensurePersonalRecordTrip(supabase, user.id),
-  ]);
-  const trips = [
-    ...(personalRecordTrip ? [{ ...personalRecordTrip, title: "お出かけ" }] : []),
-    ...plannedTrips.map((trip) => ({ ...trip, title: `旅行｜${trip.title}` })),
-  ];
+  const destinations = await getRecordDestinationOptions(supabase, user.id, space.name, space.tripIds);
+  const trips = destinations.options;
   const initialTripId =
     requestedTripId && trips.some((trip) => trip.id === requestedTripId)
       ? requestedTripId
-      : (personalRecordTrip?.id ?? trips[0]?.id ?? "");
+      : (destinations.personalTripId ?? trips[0]?.id ?? "");
 
   return (
     <>
