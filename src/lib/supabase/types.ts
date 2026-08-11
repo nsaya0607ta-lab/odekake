@@ -27,6 +27,7 @@ export type TripRow = {
   id: string;
   owner_id: string;
   title: string;
+  trip_type: "personal" | "shared";
   start_date: string | null;
   end_date: string | null;
   description: string | null;
