@@ -115,6 +115,20 @@ export async function ensurePersonalRecordTrip(
   supabase: DB,
   userId: string,
 ): Promise<Pick<TripRow, "id" | "title"> | null> {
+  // 共有旅導入後もRLSや旧トリガーの状態に左右されず、本人用を必ず1件用意する。
+  const { data: ensured, error: ensureError } = await supabase
+    .rpc("ensure_personal_record_trip")
+    .maybeSingle();
+  if (ensured) return { id: ensured.trip_id, title: ensured.title };
+
+  // 0024適用前の環境でも、従来の直接取得・作成を試して画面を維持する。
+  if (ensureError && ensureError.code !== "PGRST202" && ensureError.code !== "42883") {
+    console.error("Personal record trip RPC failed", {
+      code: ensureError.code,
+      message: ensureError.message,
+    });
+  }
+
   const { data: existing } = await supabase
     .from("trips")
     .select("id, title")
