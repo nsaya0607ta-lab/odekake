@@ -270,7 +270,7 @@ const CURATED_ITEMS: readonly CollectionItem[] = [
   {
     id: "snow_frenchie",
     name: "雪国のフレブル",
-    image: "/collection/skins/snow-frenchie.svg",
+    image: "/collection/skins/snow-frenchie.webp",
     category: "other",
     series: "snow",
     rarity: "SSR",
