@@ -142,13 +142,14 @@ function RaritySparkles({ rarity }: { rarity: GachaRarity }) {
 }
 
 /** 1マス。未取得は黒いシルエット＋「???」 */
-export function ItemCard({ item, owned }: { item: CollectionItem; owned: boolean }) {
+export function ItemCard({ item, owned, count = 0 }: { item: CollectionItem; owned: boolean; count?: number }) {
   const useExactSilhouette = !owned && hasExactSilhouette(item.art);
   const rarityStyle = RARITY_CARD_STYLES[item.rarity];
+  const drawCount = owned ? Math.max(1, count) : 0;
 
   return (
     <div
-      className={`rough-card relative flex h-[132px] flex-col items-center overflow-hidden border px-1.5 py-2.5 transition-shadow ${
+      className={`rough-card relative flex h-[150px] flex-col items-center overflow-hidden border px-1.5 py-2.5 transition-shadow ${
         owned
           ? rarityStyle.card
           : "border-[#ddd6c7] bg-[linear-gradient(145deg,#faf8f2_0%,#f1eee6_100%)] shadow-[0_2px_7px_rgba(98,88,70,0.07)]"
@@ -173,6 +174,14 @@ export function ItemCard({ item, owned }: { item: CollectionItem; owned: boolean
       <span className="relative z-[1] mt-auto flex h-4 items-center justify-center">
         {owned ? <RarityLabel item={item} /> : null}
       </span>
+      <span
+        className={`relative z-[1] mt-1 h-3.5 text-[9px] font-semibold leading-none tabular-nums ${
+          owned ? "text-ink-soft" : "invisible"
+        }`}
+        aria-hidden={!owned}
+      >
+        出た回数 {drawCount}回
+      </span>
     </div>
   );
 }
@@ -180,9 +189,11 @@ export function ItemCard({ item, owned }: { item: CollectionItem; owned: boolean
 export function ItemGrid({
   items,
   owned,
+  counts,
 }: {
   items: readonly CollectionItem[];
   owned: ReadonlySet<string>;
+  counts?: ReadonlyMap<string, number>;
 }) {
   if (items.length === 0) {
     return (
@@ -197,11 +208,14 @@ export function ItemGrid({
 
   return (
     <ul className="grid grid-cols-3 gap-2.5">
-      {items.map((item) => (
-        <li key={item.id}>
-          <ItemCard item={item} owned={owned.has(item.id)} />
-        </li>
-      ))}
+      {items.map((item) => {
+        const isOwned = owned.has(item.id);
+        return (
+          <li key={item.id}>
+            <ItemCard item={item} owned={isOwned} count={counts?.get(item.id) ?? (isOwned ? 1 : 0)} />
+          </li>
+        );
+      })}
     </ul>
   );
 }
