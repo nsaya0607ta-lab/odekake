@@ -22,6 +22,7 @@ import { getRecordSpace } from "@/lib/data/space";
 import { requireUser } from "@/lib/supabase/server";
 import type { LocationSource } from "@/lib/supabase/types";
 import { FavoriteButton } from "./favorite-button";
+import { SpotLocationRepair } from "./spot-location-repair";
 
 export const dynamic = "force-dynamic";
 
@@ -69,6 +70,12 @@ export default async function SpotDetailPage({
     spot.location_accuracy_m >= 0
       ? spot.location_accuracy_m
       : null;
+  const locationRepairNeeded =
+    spot.created_by === user.id &&
+    (Boolean(
+      municipality &&
+      (municipality.prefectureCode !== spot.prefecture_code || municipality.code !== spot.municipality_code),
+    ) || (spot.location_accuracy_m !== null && validLocationAccuracy === null));
   // お気に入りは自分の訪問履歴に付くので、自分の記録がないと切り替えられない
   const myVisits = visits.filter((visit) => visit.record.user_id === user.id);
   const myFavorite = myVisits.some((visit) => visit.record.favorite);
@@ -80,6 +87,7 @@ export default async function SpotDetailPage({
 
   return (
     <>
+      <SpotLocationRepair spotId={spot.id} needed={locationRepairNeeded} />
       <PageHeader
         title={spot.name}
         subtitle={municipality ? `${prefecture?.name ?? ""}${municipality.name}` : undefined}
