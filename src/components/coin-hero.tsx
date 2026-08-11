@@ -1,18 +1,16 @@
 import { formatCoins } from "@/lib/coins";
 import { getFrenchieSrc, type DogSkinId } from "@/lib/dog-skins";
 import { CoinArt, LeafArt, MeadowSceneArt, NoteArt, SparkleArt, TreasureChestArt } from "./coin-art";
-import { IconCalendar, IconClipboard, IconCoin } from "./icons";
+import { IconCoin } from "./icons";
 
 type Props = {
   balance: number;
-  /** 今日もらったコイン */
-  todayCoins: number;
   /** 選択中の犬スキン。右側のプレビューをほかの画面と同じ姿に揃える */
   skin: DogSkinId;
 };
 
 /** コイン画面の上のカード。右側の犬は、選択中のスキンをそのまま映すプレビュー */
-export function CoinHero({ balance, todayCoins, skin }: Props) {
+export function CoinHero({ balance, skin }: Props) {
   return (
     <section className="rough-card relative overflow-hidden">
       <div className="relative h-[196px] sm:h-[208px]">
@@ -58,25 +56,6 @@ export function CoinHero({ balance, todayCoins, skin }: Props) {
             <p className="mt-2 text-[9px] leading-tight text-ink-soft">
               コインでガチャやショップを楽しもう！
             </p>
-          </div>
-
-          <div className="mt-1.5 flex items-stretch gap-1">
-            <span className="flex min-w-0 flex-1 items-center gap-0.5 rounded-xl border border-[#e8d9b6] bg-card/85 px-1 py-1">
-              <IconCalendar size={11} className="shrink-0 text-blossom" />
-              <span className="min-w-0">
-                <span className="block truncate text-[8.5px] leading-tight text-ink-soft">今日のボーナス</span>
-                <span className="flex items-center gap-0.5 text-[10px] leading-tight font-bold text-ink">
-                  <IconCoin size={11} />+{formatCoins(todayCoins)}
-                </span>
-              </span>
-            </span>
-            <span className="flex min-w-0 flex-1 items-center gap-0.5 rounded-xl border border-[#e8d9b6] bg-card/85 px-1 py-1">
-              <IconClipboard size={11} className="shrink-0 text-sky" />
-              <span className="min-w-0">
-                <span className="block truncate text-[8.5px] leading-tight text-ink-soft">コインミッション</span>
-                <span className="block truncate text-[9.5px] leading-tight font-bold text-ink">達成でGET！</span>
-              </span>
-            </span>
           </div>
         </div>
       </div>
