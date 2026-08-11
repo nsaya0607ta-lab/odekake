@@ -28,6 +28,7 @@ export type TripRow = {
   owner_id: string;
   title: string;
   trip_type: "personal" | "shared";
+  parent_trip_id: string | null;
   start_date: string | null;
   end_date: string | null;
   description: string | null;
@@ -65,6 +66,7 @@ export type VisitRecordRow = {
   id: string;
   user_id: string;
   trip_id: string;
+  journey_id: string | null;
   spot_id: string;
   visited_at: string;
   rating: number | null;

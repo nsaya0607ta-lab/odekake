@@ -30,7 +30,7 @@ export default async function TripDetailPage({ params }: { params: Promise<{ tri
   // 1画面の読み込み量を抑えるため上限を設け、超えた分は記録画面へ誘導する
   const VISIT_LIMIT = 50;
   const [loadedVisits, coverUrl] = await Promise.all([
-    getTimeline(supabase, { tripId: trip.id, limit: VISIT_LIMIT + 1 }),
+    getTimeline(supabase, { journeyId: trip.id, limit: VISIT_LIMIT + 1 }),
     getTripCoverUrl(supabase, trip),
   ]);
 
@@ -84,7 +84,7 @@ export default async function TripDetailPage({ params }: { params: Promise<{ tri
         <section>
           <div className="mb-2 flex items-center justify-between px-1">
             <h2 className="text-base font-bold">訪問スポット</h2>
-            <Link href="/add" className="flex items-center gap-1 text-sm text-leaf-deep">
+            <Link href={trip.parent_trip_id ? `/spots/new?trip=${trip.parent_trip_id}&journey=${trip.id}` : "/add"} className="flex items-center gap-1 text-sm text-leaf-deep">
               <IconPlus size={15} />
               記録を追加
             </Link>
@@ -93,7 +93,7 @@ export default async function TripDetailPage({ params }: { params: Promise<{ tri
             <EmptyState
               title="まだ記録がありません"
               description="訪れた場所を追加すると、ここに並びます。"
-              actionHref="/add"
+              actionHref={trip.parent_trip_id ? `/spots/new?trip=${trip.parent_trip_id}&journey=${trip.id}` : "/add"}
               actionLabel="記録を追加する"
             />
           ) : (

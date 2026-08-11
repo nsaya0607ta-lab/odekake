@@ -2,7 +2,7 @@ import { notFound, redirect } from "next/navigation";
 import { PageBody } from "@/components/page-body";
 import { PageHeader } from "@/components/page-header";
 import { todayInJapan } from "@/lib/date";
-import { getRecordDestinationOptions } from "@/lib/data/trips";
+import { getRecordDestinationHierarchy } from "@/lib/data/trips";
 import { getRecordSpace } from "@/lib/data/space";
 import { requireUser } from "@/lib/supabase/server";
 import { VisitForm } from "../visit-form";
@@ -13,9 +13,9 @@ export const dynamic = "force-dynamic";
 export default async function NewVisitPage({
   searchParams,
 }: {
-  searchParams: Promise<{ spot?: string; trip?: string; created?: string }>;
+  searchParams: Promise<{ spot?: string; trip?: string; journey?: string; created?: string }>;
 }) {
-  const [{ supabase, user }, { spot: spotId, trip: requestedTripId, created }] = await Promise.all([
+  const [{ supabase, user }, { spot: spotId, trip: requestedTripId, journey: requestedJourneyId, created }] = await Promise.all([
     requireUser(),
     searchParams,
   ]);
@@ -26,15 +26,12 @@ export default async function NewVisitPage({
   if (!spot) notFound();
 
   const space = await getRecordSpace(supabase, user.id);
-  const destinations = await getRecordDestinationOptions(supabase, user.id, space.name, space.tripIds);
-  const trips = destinations.options;
-  const initialTripId =
-    requestedTripId && trips.some((trip) => trip.id === requestedTripId)
-      ? requestedTripId
-      : (destinations.personalTripId ?? trips[0]?.id ?? "");
-  const lockedTripId = requestedTripId && trips.some((trip) => trip.id === requestedTripId)
-    ? requestedTripId
-    : undefined;
+  const destinations = await getRecordDestinationHierarchy(supabase, user.id, space.name);
+  const roots = [...(destinations.personal ? [destinations.personal] : []), ...destinations.shared];
+  const initialRoot = roots.find((root) => root.id === requestedTripId) ?? destinations.personal ?? roots[0];
+  const initialJourneyId = initialRoot?.journeys.some((item) => item.id === requestedJourneyId)
+    ? requestedJourneyId!
+    : "";
 
   return (
     <>
@@ -51,11 +48,11 @@ export default async function NewVisitPage({
           mode="create"
           spotId={spot.id}
           spotName={spot.name}
-          trips={trips}
-          lockedTripId={lockedTripId}
+          destinations={destinations}
           defaults={{
             visitedAt: todayInJapan(),
-            tripId: initialTripId,
+            tripId: initialRoot?.id ?? "",
+            journeyId: initialJourneyId,
             rating: 0,
             comment: "",
             note: "",

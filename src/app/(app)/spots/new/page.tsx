@@ -3,7 +3,7 @@ import { PageHeader } from "@/components/page-header";
 import { SpotForm } from "@/components/spot-form";
 import { loadCategoryNames } from "@/lib/data/spots";
 import { todayInJapan } from "@/lib/date";
-import { getRecordDestinationOptions } from "@/lib/data/trips";
+import { getRecordDestinationHierarchy } from "@/lib/data/trips";
 import { getRecordSpace } from "@/lib/data/space";
 import { getMunicipality } from "@/lib/geo";
 import { requireUser } from "@/lib/supabase/server";
@@ -14,25 +14,23 @@ export const dynamic = "force-dynamic";
 export default async function NewSpotPage({
   searchParams,
 }: {
-  searchParams: Promise<{ pref?: string; muni?: string; trip?: string }>;
+  searchParams: Promise<{ pref?: string; muni?: string; trip?: string; journey?: string }>;
 }) {
-  const [{ supabase, user }, { pref, muni, trip: requestedTripId }] = await Promise.all([
+  const [{ supabase, user }, { pref, muni, trip: requestedTripId, journey: requestedJourneyId }] = await Promise.all([
     requireUser(),
     searchParams,
   ]);
   const space = await getRecordSpace(supabase, user.id);
   const [categoryNames, destinations] = await Promise.all([
     loadCategoryNames(supabase),
-    getRecordDestinationOptions(supabase, user.id, space.name, space.tripIds),
+    getRecordDestinationHierarchy(supabase, user.id, space.name),
   ]);
 
-  const tripOptions = destinations.options;
-  const lockedTripId = requestedTripId && tripOptions.some((trip) => trip.id === requestedTripId)
-    ? requestedTripId
+  const roots = [...(destinations.personal ? [destinations.personal] : []), ...destinations.shared];
+  const initialRoot = roots.find((root) => root.id === requestedTripId) ?? destinations.personal ?? roots[0];
+  const initialJourneyId = initialRoot?.journeys.some((item) => item.id === requestedJourneyId)
+    ? requestedJourneyId
     : undefined;
-  const trips = requestedTripId
-    ? [...tripOptions].sort((a, b) => Number(b.id === requestedTripId) - Number(a.id === requestedTripId))
-    : tripOptions;
   const municipality = muni ? getMunicipality(muni) : undefined;
 
   return (
@@ -45,8 +43,9 @@ export default async function NewSpotPage({
         <SpotForm
           placeSearchEnabled={Boolean(process.env.GOOGLE_PLACES_API_KEY?.trim())}
           userId={user.id}
-          trips={trips}
-          lockedTripId={lockedTripId}
+          destinations={destinations}
+          initialTripId={initialRoot?.id}
+          initialJourneyId={initialJourneyId}
           visitedAtDefault={todayInJapan()}
           showTripPlanningLink
           locationFromUrl={Boolean(municipality)}

@@ -34,7 +34,8 @@ export async function getMapScope(
       .from("trips")
       .select("id")
       .eq("owner_id", userId)
-      .eq("trip_type", "personal"),
+      .eq("trip_type", "personal")
+      .is("parent_trip_id", null),
   ]);
 
   if (personalTripsResult.error) {

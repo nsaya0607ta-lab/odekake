@@ -30,6 +30,7 @@ const optionalInt = (max: number, label: string) =>
 const visitSchema = z.object({
   spotId: z.string().uuid("スポットを選んでください。"),
   tripId: z.string().uuid("旅行を選んでください。"),
+  journeyId: z.string().trim().transform((v) => v === "" ? null : v).refine((v) => v === null || isUuid(v), "旅行を選び直してください。"),
   visitedAt: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "訪問日を入力してください。"),
   rating: z
     .string()
@@ -56,6 +57,7 @@ function collect(formData: FormData) {
   return {
     spotId: String(formData.get("spotId") ?? ""),
     tripId: String(formData.get("tripId") ?? ""),
+    journeyId: String(formData.get("journeyId") ?? ""),
     visitedAt: String(formData.get("visitedAt") ?? ""),
     rating: String(formData.get("rating") ?? ""),
     comment: String(formData.get("comment") ?? ""),
@@ -162,6 +164,7 @@ export async function createVisitAction(_prev: ActionState, formData: FormData):
     id: visitId,
     user_id: user.id,
     trip_id: parsed.data.tripId,
+    journey_id: parsed.data.journeyId,
     spot_id: parsed.data.spotId,
     visited_at: parsed.data.visitedAt,
     rating: parsed.data.rating,
@@ -213,6 +216,7 @@ export async function updateVisitAction(_prev: ActionState, formData: FormData):
     .from("visit_records")
     .update({
       trip_id: parsed.data.tripId,
+      journey_id: parsed.data.journeyId,
       visited_at: parsed.data.visitedAt,
       rating: parsed.data.rating,
       comment: parsed.data.comment,

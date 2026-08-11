@@ -48,9 +48,9 @@ export default async function SpotDetailPage({
   searchParams,
 }: {
   params: Promise<{ spotId: string }>;
-  searchParams: Promise<{ saved?: string; error?: string; trip?: string }>;
+  searchParams: Promise<{ saved?: string; error?: string; trip?: string; recordTrip?: string; recordJourney?: string }>;
 }) {
-  const [{ spotId }, { saved, error, trip }, { supabase, user }] = await Promise.all([
+  const [{ spotId }, { saved, error, trip, recordTrip, recordJourney }, { supabase, user }] = await Promise.all([
     params,
     searchParams,
     requireUser(),
@@ -311,7 +311,12 @@ export default async function SpotDetailPage({
           )}
         </section>
 
-        <Link href={mapScopeHref("/visits/new", scope, { spot: spot.id })} className="btn btn-primary w-full">
+        <Link
+          href={recordTrip
+            ? `/visits/new?${new URLSearchParams({ spot: spot.id, trip: recordTrip, ...(recordJourney ? { journey: recordJourney } : {}) })}`
+            : mapScopeHref("/visits/new", scope, { spot: spot.id })}
+          className="btn btn-primary w-full"
+        >
           訪問履歴を追加する
         </Link>
       </PageBody>

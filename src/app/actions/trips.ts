@@ -27,6 +27,19 @@ const optionalDate = z
 
 const tripSchema = z
   .object({
+    parentTripId: z.string().uuid("所属先を選んでください。"),
+    title: z.string().trim().min(1, "旅行名を入力してください。").max(60, "旅行名は60文字以内で入力してください。"),
+    startDate: optionalDate,
+    endDate: optionalDate,
+    description: optionalText(1000),
+  })
+  .refine((v) => !v.startDate || !v.endDate || v.startDate <= v.endDate, {
+    message: "終了日は開始日より後にしてください。",
+    path: ["endDate"],
+  });
+
+const updateTripSchema = z
+  .object({
     title: z.string().trim().min(1, "旅行名を入力してください。").max(60, "旅行名は60文字以内で入力してください。"),
     startDate: optionalDate,
     endDate: optionalDate,
@@ -39,6 +52,7 @@ const tripSchema = z
 
 function collect(formData: FormData) {
   return {
+    parentTripId: String(formData.get("parentTripId") ?? ""),
     title: String(formData.get("title") ?? ""),
     startDate: String(formData.get("startDate") ?? ""),
     endDate: String(formData.get("endDate") ?? ""),
@@ -93,6 +107,14 @@ export async function createTripAction(_prev: ActionState, formData: FormData): 
 
   const { supabase, user } = await requireUser();
 
+  const { data: parent } = await supabase
+    .from("trips")
+    .select("id, trip_type, parent_trip_id")
+    .eq("id", parsed.data.parentTripId)
+    .is("parent_trip_id", null)
+    .maybeSingle();
+  if (!parent) return { error: "所属先を選び直してください。", values };
+
   // 二重送信の防止
   const { data: existing } = await supabase.from("trips").select("id").eq("id", tripId).maybeSingle();
   if (existing) redirect(`/trips/${tripId}`);
@@ -101,6 +123,8 @@ export async function createTripAction(_prev: ActionState, formData: FormData): 
     id: tripId,
     owner_id: user.id,
     title: parsed.data.title,
+    trip_type: parent.trip_type,
+    parent_trip_id: parent.id,
     start_date: parsed.data.startDate,
     end_date: parsed.data.endDate,
     description: parsed.data.description,
@@ -127,7 +151,7 @@ export async function createTripAction(_prev: ActionState, formData: FormData): 
 export async function updateTripAction(_prev: ActionState, formData: FormData): Promise<ActionState> {
   const tripId = String(formData.get("tripId") ?? "");
   const values = collect(formData);
-  const parsed = tripSchema.safeParse(values);
+  const parsed = updateTripSchema.safeParse(values);
 
   if (!parsed.success) {
     return { error: "入力内容をご確認ください。", fieldErrors: fieldErrorsOf(parsed.error), values };

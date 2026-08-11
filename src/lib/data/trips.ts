@@ -8,6 +8,25 @@ export type TripSummary = {
   visitCount: number;
 };
 
+export type JourneyOption = {
+  id: string;
+  title: string;
+  startDate: string | null;
+  endDate: string | null;
+};
+
+export type RecordDestinationRoot = {
+  id: string;
+  title: string;
+  kind: "personal" | "shared";
+  journeys: JourneyOption[];
+};
+
+export type RecordDestinationHierarchy = {
+  personal: RecordDestinationRoot | null;
+  shared: RecordDestinationRoot[];
+};
+
 const PERSONAL_RECORD_TRIP_TITLE = "自分のおでかけ";
 const PERSONAL_RECORD_TRIP_DESCRIPTION = "普段のおでかけをまとめる記録先";
 
@@ -37,72 +56,68 @@ export const getTripSummaries = cache(async function getTripSummaries(supabase: 
     .order("start_date", { ascending: false, nullsFirst: false })
     .order("created_at", { ascending: false });
 
-  const tripList = ((trips ?? []) as TripRow[]).filter((trip) => !isPersonalRecordTrip(trip));
+  const tripList = ((trips ?? []) as TripRow[]).filter((trip) => trip.parent_trip_id !== null);
   if (tripList.length === 0) return [];
 
   const { data: visits } = await supabase
     .from("visit_records")
-    .select("id, trip_id")
+    .select("id, journey_id")
     .in(
-      "trip_id",
+      "journey_id",
       tripList.map((t) => t.id),
     );
 
   const visitCount = new Map<string, number>();
   for (const v of visits ?? []) {
-    visitCount.set(v.trip_id, (visitCount.get(v.trip_id) ?? 0) + 1);
+    if (v.journey_id) visitCount.set(v.journey_id, (visitCount.get(v.journey_id) ?? 0) + 1);
   }
 
   return tripList.map((trip) => ({ trip, visitCount: visitCount.get(trip.id) ?? 0 }));
 });
 
-/** 訪問履歴の登録フォームで使う、ユーザーが作成した旅行計画の選択肢 */
-export async function getTripOptions(
-  supabase: DB,
-  tripIds: string[],
-): Promise<Array<Pick<TripRow, "id" | "title" | "owner_id" | "trip_type">>> {
-  if (tripIds.length === 0) return [];
-  const { data } = await supabase
-    .from("trips")
-    .select("id, title, owner_id, trip_type, start_date, end_date, description")
-    .in("id", tripIds)
-    .order("created_at", { ascending: false });
-
-  return (data ?? [])
-    .filter((trip) => !isPersonalRecordTrip(trip))
-    .map(({ id, title, owner_id, trip_type }) => ({ id, title, owner_id, trip_type }));
-}
-
-export type RecordDestinationOption = { id: string; title: string };
-
-/** 記録先に、名前を設定した個人旅と参加可能な旅行・共有旅を並べる。 */
-export async function getRecordDestinationOptions(
+/** 親の記録先と、その直下の旅行グループを分けて返す。 */
+export async function getRecordDestinationHierarchy(
   supabase: DB,
   userId: string,
   personalSpaceName: string,
-  tripIds: string[],
-): Promise<{ options: RecordDestinationOption[]; personalTripId: string | null }> {
-  const [otherTrips, ensuredPersonalTrip] = await Promise.all([
-    getTripOptions(supabase, tripIds),
-    ensurePersonalRecordTrip(supabase, userId),
-  ]);
+): Promise<RecordDestinationHierarchy> {
+  const ensuredPersonalTrip = await ensurePersonalRecordTrip(supabase, userId);
+  const { data, error } = await supabase
+    .from("trips")
+    .select("id, title, owner_id, trip_type, parent_trip_id, start_date, end_date, description")
+    .order("created_at", { ascending: false });
 
-  // 旧DBなどで専用保存先を作れない場合も、本人所有の個人旅を候補に残す。
-  const personalTrip =
-    ensuredPersonalTrip ?? otherTrips.find((trip) => trip.owner_id === userId && trip.trip_type === "personal") ?? null;
-  const personalTripId = personalTrip?.id ?? null;
+  if (error) {
+    console.error("Record destination hierarchy failed", { code: error.code, message: error.message });
+    return { personal: null, shared: [] };
+  }
 
+  const rows = (data ?? []) as Array<Pick<TripRow,
+    "id" | "title" | "owner_id" | "trip_type" | "parent_trip_id" | "start_date" | "end_date" | "description"
+  >>;
+  const personalRoot = rows.find((trip) =>
+    trip.id === ensuredPersonalTrip?.id ||
+    (trip.owner_id === userId && trip.trip_type === "personal" && trip.parent_trip_id === null && isPersonalRecordTrip(trip)),
+  ) ?? null;
+
+  const journeysFor = (rootId: string): JourneyOption[] => rows
+    .filter((trip) => trip.parent_trip_id === rootId)
+    .map((trip) => ({ id: trip.id, title: trip.title, startDate: trip.start_date, endDate: trip.end_date }));
+
+  const sharedRoots = rows.filter((trip) => trip.trip_type === "shared" && trip.parent_trip_id === null);
   return {
-    personalTripId,
-    options: [
-      ...(personalTripId ? [{ id: personalTripId, title: `個人｜${personalSpaceName}` }] : []),
-      ...otherTrips
-        .filter((trip) => trip.id !== personalTripId)
-        .map((trip) => ({
-          id: trip.id,
-          title: trip.trip_type === "shared" ? `共有旅｜${trip.title}` : `旅行｜${trip.title}`,
-        })),
-    ],
+    personal: personalRoot ? {
+      id: personalRoot.id,
+      title: personalSpaceName,
+      kind: "personal",
+      journeys: journeysFor(personalRoot.id),
+    } : null,
+    shared: sharedRoots.map((trip) => ({
+      id: trip.id,
+      title: trip.title,
+      kind: "shared" as const,
+      journeys: journeysFor(trip.id),
+    })),
   };
 }
 

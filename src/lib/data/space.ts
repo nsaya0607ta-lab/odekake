@@ -27,7 +27,12 @@ export const getRecordSpace = cache(async function getRecordSpace(
 ): Promise<RecordSpace> {
   const [{ data: profile }, { data: trips }] = await Promise.all([
     supabase.from("profiles").select("space_name").eq("user_id", userId).maybeSingle(),
-    supabase.from("trips").select("id"),
+    supabase
+      .from("trips")
+      .select("id")
+      .eq("owner_id", userId)
+      .eq("trip_type", "personal")
+      .is("parent_trip_id", null),
   ]);
 
   return {

@@ -36,9 +36,9 @@ function parseShown(value: string | undefined): number {
 export default async function RecordsPage({
   searchParams,
 }: {
-  searchParams: Promise<{ tab?: string; shown?: string; q?: string }>;
+  searchParams: Promise<{ tab?: string; shown?: string; q?: string; recordTrip?: string; recordJourney?: string }>;
 }) {
-  const [{ tab: tabParam, shown: shownParam, q }, { supabase, user }] = await Promise.all([
+  const [{ tab: tabParam, shown: shownParam, q, recordTrip, recordJourney }, { supabase, user }] = await Promise.all([
     searchParams,
     requireUser(),
   ]);
@@ -47,6 +47,16 @@ export default async function RecordsPage({
   const shown = parseShown(shownParam);
   const keyword = (q ?? "").slice(0, 100);
   const space = await getRecordSpace(supabase, user.id);
+  let spotSpace = space;
+  if (recordTrip) {
+    const { data: accessibleRoot } = await supabase
+      .from("trips")
+      .select("id")
+      .eq("id", recordTrip)
+      .is("parent_trip_id", null)
+      .maybeSingle();
+    if (accessibleRoot) spotSpace = { ...space, tripIds: [accessibleRoot.id] };
+  }
 
   return (
     <>
@@ -56,7 +66,7 @@ export default async function RecordsPage({
 
         {tab === "timeline" ? <TimelineTab supabase={supabase} space={space} shown={shown} /> : null}
         {tab === "trips" ? <TripsTab supabase={supabase} /> : null}
-        {tab === "spots" ? <SpotsTab supabase={supabase} space={space} shown={shown} keyword={keyword} /> : null}
+        {tab === "spots" ? <SpotsTab supabase={supabase} space={spotSpace} shown={shown} keyword={keyword} recordTrip={recordTrip} recordJourney={recordJourney} /> : null}
         {tab === "calendar" ? <CalendarTab supabase={supabase} space={space} /> : null}
       </PageBody>
     </>
@@ -159,11 +169,15 @@ async function SpotsTab({
   space,
   shown,
   keyword,
+  recordTrip,
+  recordJourney,
 }: {
   supabase: SupabaseArg;
   space: RecordSpace;
   shown: number;
   keyword: string;
+  recordTrip?: string;
+  recordJourney?: string;
 }) {
   const [{ spots, hasMore }, categoryNames] = await Promise.all([
     getSpotPage(supabase, space.tripIds, {
@@ -198,7 +212,12 @@ async function SpotsTab({
       <SpotBrowser
         spots={spots}
         categories={[...categoryNames.entries()].map(([id, name]) => ({ id, name }))}
-        search={{ action: "/records", keyword, hiddenFields: { tab: "spots" } }}
+        search={{ action: "/records", keyword, hiddenFields: {
+          tab: "spots",
+          ...(recordTrip ? { recordTrip } : {}),
+          ...(recordJourney ? { recordJourney } : {}),
+        } }}
+        detailHrefSuffix={recordTrip ? `?recordTrip=${encodeURIComponent(recordTrip)}${recordJourney ? `&recordJourney=${encodeURIComponent(recordJourney)}` : ""}` : ""}
       />
       {hasMore ? <MoreButton tab="spots" shown={shown} keyword={keyword} /> : null}
     </div>

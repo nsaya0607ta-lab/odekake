@@ -12,7 +12,9 @@ import {
 } from "@/components/location-picker";
 import { PhotoUploader } from "@/components/photo-uploader";
 import { RatingInput } from "@/components/rating-input";
+import { RecordDestinationPicker } from "@/components/record-destination-picker";
 import { MAX_PHOTOS_PER_VISIT } from "@/lib/image";
+import type { RecordDestinationHierarchy } from "@/lib/data/trips";
 
 export type SpotFormValues = {
   name: string;
@@ -24,11 +26,6 @@ export type SpotFormValues = {
   openingHours: string;
   closedDays: string;
   memo: string;
-};
-
-export type SpotFormTrip = {
-  id: string;
-  title: string;
 };
 
 const EMPTY: SpotFormValues = {
@@ -60,7 +57,9 @@ export function SpotForm({
   spotId,
   placeSearchEnabled = false,
   userId,
-  trips = [],
+  destinations,
+  initialTripId,
+  initialJourneyId,
   lockedTripId,
   visitedAtDefault = "",
   showTripPlanningLink = false,
@@ -73,7 +72,9 @@ export function SpotForm({
   spotId?: string;
   placeSearchEnabled?: boolean;
   userId?: string;
-  trips?: SpotFormTrip[];
+  destinations?: RecordDestinationHierarchy;
+  initialTripId?: string;
+  initialJourneyId?: string;
   lockedTripId?: string;
   visitedAtDefault?: string;
   showTripPlanningLink?: boolean;
@@ -84,7 +85,7 @@ export function SpotForm({
   const action = isEdit ? updateSpotAction : createVisitedSpotAction;
   const [state, formAction] = useActionState(action, emptyActionState);
   const initial = { ...defaults, ...(state.values ?? {}) };
-  const [tripId, setTripId] = useState(state.values?.tripId ?? trips[0]?.id ?? "");
+  const [tripId, setTripId] = useState(state.values?.tripId ?? initialTripId ?? destinations?.personal?.id ?? "");
   const [visitId, setVisitId] = useState("");
   const [locationPickerReady, setLocationPickerReady] = useState(isEdit);
   const visitIdStorageKey = "odekake:visited-place-id";
@@ -225,32 +226,15 @@ export function SpotForm({
             />
           </Field>
 
-          <Field label="記録先" htmlFor="tripId" error={state.fieldErrors?.tripId}>
-            {lockedTripId ? (
-              <>
-                <input type="hidden" id="tripId" name="tripId" value={lockedTripId} />
-                <p className="field flex items-center bg-paper-deep font-semibold">
-                  {trips.find((trip) => trip.id === lockedTripId)?.title ?? "選択中の旅"}
-                </p>
-              </>
-            ) : (
-              <select
-                id="tripId"
-                name="tripId"
-                className="field"
-                value={tripId}
-                onChange={(event) => setTripId(event.target.value)}
-                required
-              >
-                <option value="">選択してください</option>
-                {trips.map((trip) => (
-                  <option key={trip.id} value={trip.id}>
-                    {trip.title}
-                  </option>
-                ))}
-              </select>
-            )}
-          </Field>
+          {destinations ? (
+            <RecordDestinationPicker
+              destinations={destinations}
+              initialTripId={state.values?.tripId ?? initialTripId}
+              initialJourneyId={state.values?.journeyId ?? initialJourneyId}
+              lockedTripId={lockedTripId}
+              onChange={(value) => setTripId(value.tripId)}
+            />
+          ) : null}
 
           <Field label="一緒に行った人" htmlFor="companions" optional>
             <input
@@ -476,7 +460,7 @@ export function SpotForm({
         </div>
       </details>
 
-      {!isEdit && trips.length === 0 ? (
+      {!isEdit && !destinations?.personal && !destinations?.shared.length ? (
         <p role="alert" className="rounded-2xl border border-blossom bg-blossom-soft px-4 py-3 text-sm text-[#8f4c59]">
           記録先を準備できませんでした。画面を再読み込みして、もう一度お試しください。
         </p>
@@ -484,7 +468,7 @@ export function SpotForm({
 
       <SubmitButton
         pendingLabel="保存中…"
-        disabled={!isEdit && (trips.length === 0 || !tripId || !visitId)}
+        disabled={!isEdit && ((!destinations?.personal && !destinations?.shared.length) || !tripId || !visitId)}
       >
         {isEdit ? "変更を保存する" : "行った場所を登録する"}
       </SubmitButton>

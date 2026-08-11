@@ -77,6 +77,7 @@ const spotSchema = z.object({
 const visitedSpotSchema = spotSchema.extend({
   visitId: z.string().uuid("保存の準備が完了していません。画面を開き直してください。"),
   tripId: z.string().uuid("旅行を選んでください。"),
+  journeyId: z.string().trim().transform((v) => v === "" ? null : v).refine((v) => v === null || /^[0-9a-f-]{36}$/i.test(v), "旅行を選び直してください。"),
   visitedAt: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "訪問日を入力してください。"),
   rating: z
     .string()
@@ -124,6 +125,7 @@ function collect(formData: FormData) {
     placeId: String(formData.get("placeId") ?? ""),
     visitId: String(formData.get("visitId") ?? ""),
     tripId: String(formData.get("tripId") ?? ""),
+    journeyId: String(formData.get("journeyId") ?? ""),
     visitedAt: String(formData.get("visitedAt") ?? ""),
     rating: String(formData.get("rating") ?? ""),
     comment: String(formData.get("comment") ?? ""),
@@ -370,6 +372,7 @@ export async function createVisitedSpotAction(_prev: ActionState, formData: Form
     id: parsed.data.visitId,
     user_id: user.id,
     trip_id: parsed.data.tripId,
+    journey_id: parsed.data.journeyId,
     spot_id: spotId,
     visited_at: parsed.data.visitedAt,
     rating: parsed.data.rating,

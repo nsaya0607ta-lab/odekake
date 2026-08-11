@@ -2,7 +2,7 @@ import { notFound } from "next/navigation";
 import { deleteVisitAction } from "@/app/actions/visits";
 import { PageBody } from "@/components/page-body";
 import { PageHeader } from "@/components/page-header";
-import { getRecordDestinationOptions } from "@/lib/data/trips";
+import { getRecordDestinationHierarchy } from "@/lib/data/trips";
 import { getVisitForEdit } from "@/lib/data/visits";
 import { getRecordSpace } from "@/lib/data/space";
 import { requireUser } from "@/lib/supabase/server";
@@ -32,10 +32,9 @@ export default async function EditVisitPage({
   const { record, spot, photos } = detail;
 
   const [destinations, { data: tagRows }] = await Promise.all([
-    getRecordDestinationOptions(supabase, user.id, space.name, space.tripIds),
+    getRecordDestinationHierarchy(supabase, user.id, space.name),
     supabase.from("visit_record_tags").select("tag_id").eq("visit_record_id", visitId),
   ]);
-  const trips = destinations.options;
 
   let tags = "";
   if (tagRows && tagRows.length > 0) {
@@ -65,11 +64,12 @@ export default async function EditVisitPage({
           visitId={record.id}
           spotId={spot.id}
           spotName={spot.name}
-          trips={trips}
+          destinations={destinations}
           initialPhotos={photos.flatMap((p) => (p.url ? [{ path: p.storagePath, url: p.url }] : []))}
           defaults={{
             visitedAt: record.visited_at,
             tripId: record.trip_id,
+            journeyId: record.journey_id ?? "",
             rating: record.rating ?? 0,
             comment: record.comment ?? "",
             note: record.note ?? "",

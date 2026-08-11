@@ -9,10 +9,14 @@ import { PhotoUploader } from "@/components/photo-uploader";
 export function TripForm({
   userId,
   next = null,
+  roots,
+  initialParentId,
 }: {
   userId: string;
   /** 作成後の戻り先。「先に旅行を作る」導線から来たときに使う */
   next?: string | null;
+  roots: Array<{ id: string; title: string; kind: "personal" | "shared" }>;
+  initialParentId?: string;
 }) {
   const [state, formAction] = useActionState(createTripAction, emptyActionState);
   const formId = "trip-form";
@@ -45,6 +49,23 @@ export function TripForm({
       {next ? <input type="hidden" name="next" value={next} /> : null}
 
       <FormMessage state={state} />
+
+      <Field label="所属先" htmlFor="parentTripId" error={state.fieldErrors?.parentTripId}>
+        <select
+          id="parentTripId"
+          name="parentTripId"
+          className="field"
+          defaultValue={state.values?.parentTripId ?? initialParentId ?? ""}
+          required
+        >
+          <option value="">選択してください</option>
+          {roots.map((root) => (
+            <option key={root.id} value={root.id}>
+              {root.kind === "personal" ? "個人旅" : "共有旅"}｜{root.title}
+            </option>
+          ))}
+        </select>
+      </Field>
 
       <div className="rough-card flex items-start gap-3 border-blossom bg-blossom-soft p-4">
         <span className="min-w-0 flex-1">

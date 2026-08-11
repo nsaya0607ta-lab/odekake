@@ -25,6 +25,7 @@ export type TimelineItem = {
 
 export type TimelineFilter = {
   tripId?: string;
+  journeyId?: string;
   /** 対象の旅行。空配列なら記録なしとして扱う */
   tripIds?: string[];
   limit?: number;
@@ -53,12 +54,13 @@ export async function getTimeline(supabase: DB, filter: TimelineFilter = {}): Pr
 
   if (filter.tripId) query = query.eq("trip_id", filter.tripId);
   else if (filter.tripIds) query = query.in("trip_id", filter.tripIds);
+  if (filter.journeyId) query = query.eq("journey_id", filter.journeyId);
 
   const { data } = await query;
   const visits = (data ?? []) as VisitRecordRow[];
   if (visits.length === 0) return [];
 
-  const visitTripIds = visits.map((v) => v.trip_id);
+  const visitTripIds = visits.map((v) => v.journey_id ?? v.trip_id);
   const visitSpotIds = visits.map((v) => v.spot_id);
   const visitIds = visits.map((v) => v.id);
 
@@ -106,7 +108,7 @@ export async function getTimeline(supabase: DB, filter: TimelineFilter = {}): Pr
         municipalityCode: spot.municipality_code,
         prefectureCode: spot.prefecture_code,
         tripId: visit.trip_id,
-        tripTitle: tripTitles.get(visit.trip_id) ?? "旅行",
+        tripTitle: tripTitles.get(visit.journey_id ?? visit.trip_id) ?? "普段のおでかけ",
         rating: visit.rating,
         comment: visit.comment,
         favorite: visit.favorite,
@@ -142,7 +144,7 @@ export async function getCalendarVisits(
 
   const { data } = await supabase
     .from("visit_records")
-    .select("id, visited_at, spot_id, trip_id")
+    .select("id, visited_at, spot_id, trip_id, journey_id")
     .in("trip_id", tripIds)
     .order("visited_at", { ascending: false })
     .limit(limit);
@@ -155,7 +157,7 @@ export async function getCalendarVisits(
       .from("spots")
       .select("id, name")
       .in("id", [...new Set(visits.map((visit) => visit.spot_id))]),
-    loadTripTitles(supabase, visits.map((visit) => visit.trip_id)),
+    loadTripTitles(supabase, visits.map((visit) => visit.journey_id ?? visit.trip_id)),
   ]);
 
   const spotNames = new Map((spots ?? []).map((spot) => [spot.id, spot.name]));
@@ -169,7 +171,7 @@ export async function getCalendarVisits(
         visitedAt: visit.visited_at,
         spotId: visit.spot_id,
         spotName,
-        tripTitle: tripTitles.get(visit.trip_id) ?? "旅行",
+        tripTitle: tripTitles.get(visit.journey_id ?? visit.trip_id) ?? "普段のおでかけ",
       },
     ];
   });
