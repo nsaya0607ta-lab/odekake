@@ -8,7 +8,7 @@ import type {
   FriendRecentVisitRow,
 } from "@/lib/supabase/types";
 
-type DataError = { code?: string; message?: string };
+type DataError = { code?: string; message?: string; details?: string; hint?: string };
 
 const FRIENDS_UNAVAILABLE_CODES = new Set(["42P01", "42883", "PGRST202", "PGRST205"]);
 const FRIENDS_SCHEMA_VERSION = 2;
@@ -28,10 +28,15 @@ export function isFriendsUnavailableError(error: unknown): error is FriendsUnava
 }
 
 function throwDataError(error: DataError | null, context: string): never {
+  console.error(`[friends/data] ${context}`, {
+    code: error?.code,
+    message: error?.message,
+    details: error?.details,
+    hint: error?.hint,
+  });
   if (error?.code && FRIENDS_UNAVAILABLE_CODES.has(error.code)) {
     throw new FriendsUnavailableError();
   }
-  console.error(context, { code: error?.code, message: error?.message });
   throw new Error(context);
 }
 
