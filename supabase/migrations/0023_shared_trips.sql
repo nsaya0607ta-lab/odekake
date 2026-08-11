@@ -2,11 +2,19 @@
 -- 共有旅 第1段階: 一覧・作成・フレンド招待・参加確認
 -- =============================================================
 
-alter table public.trips add column if not exists trip_type text not null default 'personal';
-do $$ begin
-  alter table public.trips add constraint trips_trip_type_check
-    check (trip_type in ('personal', 'shared'));
-exception when duplicate_object then null; end $$;
+-- 0008を未適用のDBでは、旧enum型（solo/shared）のtrip_typeが残っている。
+-- 一度textへ統一し、soloだけpersonalへ読み替えることで両方のDBに対応する。
+alter table public.trips add column if not exists trip_type text;
+alter table public.trips alter column trip_type drop default;
+alter table public.trips
+  alter column trip_type type text
+  using case when trip_type::text = 'solo' then 'personal' else trip_type::text end;
+update public.trips set trip_type = 'personal' where trip_type is null or trip_type = 'solo';
+alter table public.trips alter column trip_type set default 'personal';
+alter table public.trips alter column trip_type set not null;
+alter table public.trips drop constraint if exists trips_trip_type_check;
+alter table public.trips add constraint trips_trip_type_check
+  check (trip_type in ('personal', 'shared'));
 
 create table if not exists public.trip_members (
   id uuid primary key default gen_random_uuid(),
@@ -20,6 +28,28 @@ create table if not exists public.trip_members (
   updated_at timestamptz not null default now(),
   unique (trip_id, user_id)
 );
+
+-- 旧共有旅テーブルが残るDBでは不足列を追加し、enumのroleをtextへ統一する。
+alter table public.trip_members add column if not exists status text;
+alter table public.trip_members add column if not exists invited_by uuid references auth.users(id) on delete set null;
+alter table public.trip_members add column if not exists created_at timestamptz not null default now();
+alter table public.trip_members add column if not exists updated_at timestamptz not null default now();
+alter table public.trip_members alter column role drop default;
+alter table public.trip_members alter column role type text using role::text;
+alter table public.trip_members alter column role set default 'member';
+alter table public.trip_members alter column joined_at drop not null;
+alter table public.trip_members alter column joined_at drop default;
+update public.trip_members set status = 'accepted' where status is null;
+alter table public.trip_members alter column status set default 'invited';
+alter table public.trip_members alter column status set not null;
+alter table public.trip_members drop constraint if exists trip_members_role_check;
+alter table public.trip_members add constraint trip_members_role_check check (role in ('owner', 'member'));
+alter table public.trip_members drop constraint if exists trip_members_status_check;
+alter table public.trip_members add constraint trip_members_status_check check (status in ('invited', 'accepted', 'declined', 'left'));
+
+-- 旧版の自動owner追加トリガーは、共有旅作成RPCの明示処理と重複するため外す。
+drop trigger if exists trips_add_owner_member on public.trips;
+drop function if exists public.add_trip_owner_as_member();
 
 create index if not exists trip_members_user_status_idx on public.trip_members(user_id, status);
 create index if not exists trip_members_trip_status_idx on public.trip_members(trip_id, status);
@@ -88,7 +118,9 @@ begin
   returning id into v_trip_id;
 
   insert into public.trip_members (trip_id, user_id, role, status, invited_by, joined_at)
-  values (v_trip_id, v_user_id, 'owner', 'accepted', v_user_id, now());
+  values (v_trip_id, v_user_id, 'owner', 'accepted', v_user_id, now())
+  on conflict (trip_id, user_id) do update
+    set role = 'owner', status = 'accepted', joined_at = coalesce(public.trip_members.joined_at, now());
 
   insert into public.trip_members (trip_id, user_id, role, status, invited_by)
   select v_trip_id, x, 'member', 'invited', v_user_id from unnest(v_friend_ids) x
