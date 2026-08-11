@@ -5,6 +5,47 @@
 -- user_gacha_items の RLS は変更しない。
 -- フレンドへ公開する情報は、以下の SECURITY DEFINER RPC だけを通して返す。
 
+-- SQL Editor から実行中にどこか1か所でも失敗した場合、途中までの状態を
+-- 残さない。すでに一度適用済みでも安全に再実行できる。
+begin;
+
+create extension if not exists "pgcrypto";
+
+-- このマイグレーションが依存する既存テーブルを先に検査する。
+-- 接続先を間違えた場合や、古いDBへ適用した場合は変更前に停止する。
+do $$
+declare
+  v_missing text[] := '{}';
+  v_table text;
+begin
+  foreach v_table in array array[
+    'profiles',
+    'user_exp',
+    'visit_records',
+    'spots',
+    'user_gacha_items'
+  ] loop
+    if to_regclass('public.' || v_table) is null then
+      v_missing := array_append(v_missing, 'public.' || v_table);
+    end if;
+  end loop;
+
+  if cardinality(v_missing) > 0 then
+    raise exception using
+      errcode = 'P0001',
+      message = 'FRIENDS_MIGRATION_MISSING_DEPENDENCIES: ' || array_to_string(v_missing, ', '),
+      hint = 'odekakeアプリが現在利用しているSupabaseプロジェクトで実行してください。Vercelの環境変数は変更しないでください。';
+  end if;
+
+  if to_regprocedure('public.set_updated_at()') is null then
+    raise exception using
+      errcode = 'P0001',
+      message = 'FRIENDS_MIGRATION_MISSING_DEPENDENCY: public.set_updated_at()',
+      hint = '先に既存のodekakeマイグレーションを適用してください。';
+  end if;
+end;
+$$;
+
 create table if not exists public.friend_codes (
   user_id uuid primary key references auth.users(id) on delete cascade,
   code text not null unique,
@@ -444,6 +485,27 @@ as $$
   limit least(greatest(coalesce(p_limit, 5), 1), 20);
 $$;
 
+-- アプリが「SQL未適用」「古いSQL」「接続先違い」を曖昧な画面にせず
+-- 判別するための軽量ヘルスチェック。秘密情報やDB識別子は返さない。
+create or replace function public.get_friends_health()
+returns jsonb
+language plpgsql
+security definer
+stable
+set search_path = public
+as $$
+begin
+  if auth.uid() is null then
+    raise exception using errcode = 'P0001', message = 'AUTH_REQUIRED';
+  end if;
+
+  return jsonb_build_object(
+    'ready', true,
+    'version', 2
+  );
+end;
+$$;
+
 revoke all on function public.get_or_create_friend_code() from public, anon;
 revoke all on function public.regenerate_friend_code() from public, anon;
 revoke all on function public.add_friend_by_code(text) from public, anon;
@@ -453,6 +515,7 @@ revoke all on function public.get_friend_overview(uuid) from public, anon;
 revoke all on function public.get_friend_prefectures(uuid) from public, anon;
 revoke all on function public.get_friend_collection(uuid) from public, anon;
 revoke all on function public.get_friend_recent_visits(uuid, integer) from public, anon;
+revoke all on function public.get_friends_health() from public, anon;
 
 grant execute on function public.get_or_create_friend_code() to authenticated;
 grant execute on function public.regenerate_friend_code() to authenticated;
@@ -463,3 +526,19 @@ grant execute on function public.get_friend_overview(uuid) to authenticated;
 grant execute on function public.get_friend_prefectures(uuid) to authenticated;
 grant execute on function public.get_friend_collection(uuid) to authenticated;
 grant execute on function public.get_friend_recent_visits(uuid, integer) to authenticated;
+grant execute on function public.get_friends_health() to authenticated;
+
+commit;
+
+-- PostgRESTへ新しいRPCを即時認識させる。環境変数やAuth設定は変更しない。
+notify pgrst, 'reload schema';
+
+-- SQL EditorのResultsに FRIENDS_V2_READY / true が1行表示されれば成功。
+select
+  'FRIENDS_V2_READY'::text as status,
+  to_regclass('public.friend_codes') is not null as friend_codes_ok,
+  to_regclass('public.friendships') is not null as friendships_ok,
+  to_regclass('public.friend_privacy_settings') is not null as privacy_ok,
+  to_regprocedure('public.get_friends_health()') is not null as health_rpc_ok,
+  to_regprocedure('public.get_or_create_friend_code()') is not null as code_rpc_ok,
+  to_regprocedure('public.get_friend_list()') is not null as list_rpc_ok;
