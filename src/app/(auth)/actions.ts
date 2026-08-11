@@ -5,7 +5,7 @@ import { z } from "zod";
 import type { ActionState } from "@/components/form";
 import { toJapaneseError } from "@/lib/errors";
 import { safeNextPath } from "@/lib/navigation";
-import { getSiteUrl } from "@/lib/supabase/env";
+import { getSiteUrl, getSupabaseEnv } from "@/lib/supabase/env";
 import { createClient } from "@/lib/supabase/server";
 
 const emailSchema = z.string().trim().min(1, "メールアドレスを入力してください。").email("メールアドレスの形式が正しくありません。");
@@ -94,6 +94,23 @@ export async function signInAction(_prev: ActionState, formData: FormData): Prom
   const { error } = await supabase.auth.signInWithPassword({ email: parsed.data.email, password });
 
   if (error) {
+    const supabaseUrl = getSupabaseEnv()?.url;
+    let projectRef = "unknown";
+    if (supabaseUrl) {
+      try {
+        projectRef = new URL(supabaseUrl).hostname.split(".")[0] || "unknown";
+      } catch {
+        projectRef = "invalid-url";
+      }
+    }
+
+    console.error("[auth/sign-in] Supabase login failed", {
+      code: error.code,
+      status: error.status,
+      name: error.name,
+      message: error.message,
+      projectRef,
+    });
     return { error: toJapaneseError(error, "ログインに失敗しました。"), values };
   }
 
