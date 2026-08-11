@@ -297,27 +297,33 @@ function GachaAnimationModal({
           </h2>
         </div>
 
-        <div className="gacha-scene relative mt-2 h-[236px] overflow-hidden rounded-[24px] border border-[#eee4cf] bg-gradient-to-b from-[#fffdf8] via-[#faf5e9] to-[#f1ead9]">
-          <span className={`gacha-machine-stage absolute left-[29%] top-2 h-[206px] -translate-x-1/2 ${singlePhase === "machine" || isMulti ? "is-running" : ""}`}>
-            <GachaMachineArt className="h-full w-auto drop-shadow-[0_6px_5px_rgba(91,75,48,0.12)]" />
-            <span className={`gacha-knob absolute left-[48.5%] top-[68%] h-9 w-9 -translate-x-1/2 rounded-full ${singlePhase === "machine" || isMulti ? "is-turning" : ""}`} />
-          </span>
+        <div className="gacha-scene relative mt-2 aspect-video overflow-hidden rounded-[24px] border border-[#eee4cf] bg-[#fbf6ed]">
+          {!isMulti && singlePhase === "open" && draw.results[0] ? (
+            <ReferenceOpenScene result={draw.results[0]} />
+          ) : (
+            <>
+              <span className={`gacha-machine-stage absolute left-[29%] top-[2%] h-[95%] -translate-x-1/2 ${singlePhase === "machine" || isMulti ? "is-running" : ""}`}>
+                <GachaMachineArt className="h-full w-auto select-none object-contain" />
+                <span className={`gacha-knob absolute left-[66%] top-[64%] h-10 w-10 -translate-x-1/2 rounded-full ${singlePhase === "machine" || isMulti ? "is-turning" : ""}`} />
+              </span>
 
-          {!isMulti && visibleCount > 0 && draw.results[0] && (
-            <div className={`absolute bottom-5 right-[6%] ${singlePhase === "open" ? "gacha-capsule-open" : "gacha-capsule-rollout"}`}>
-              <Capsule result={draw.results[0]} open={singlePhase === "open"} large />
-            </div>
+              {!isMulti && visibleCount > 0 && draw.results[0] && (
+                <div className="gacha-capsule-rollout absolute bottom-5 right-[6%]">
+                  <Capsule result={draw.results[0]} large />
+                </div>
+              )}
+
+              {currentResult && (
+                <div key={`${currentResult.id}-${visibleCount}`} className="gacha-capsule-rollout gacha-capsule-sequence absolute bottom-5 right-[8%]">
+                  <Capsule result={currentResult} large />
+                </div>
+              )}
+
+              <span className="absolute bottom-3 left-[4%] right-[4%] h-2 rounded-[50%] bg-[#d9c7a4]/25 blur-sm" />
+              <span className="gacha-motion-line absolute bottom-[72px] right-[37%] h-px w-7 bg-[#bfa77f]/65" />
+              <span className="gacha-motion-line absolute bottom-[58px] right-[34%] h-px w-5 bg-[#bfa77f]/55" />
+            </>
           )}
-
-          {currentResult && (
-            <div key={`${currentResult.id}-${visibleCount}`} className="gacha-capsule-rollout gacha-capsule-sequence absolute bottom-5 right-[8%]">
-              <Capsule result={currentResult} large />
-            </div>
-          )}
-
-          <span className="absolute bottom-3 left-[4%] right-[4%] h-2 rounded-[50%] bg-[#d9c7a4]/25 blur-sm" />
-          <span className="gacha-motion-line absolute bottom-[72px] right-[37%] h-px w-7 bg-[#bfa77f]/65" />
-          <span className="gacha-motion-line absolute bottom-[58px] right-[34%] h-px w-5 bg-[#bfa77f]/55" />
         </div>
 
         {isMulti ? (
@@ -349,6 +355,27 @@ function GachaAnimationModal({
           </div>
         )}
       </div>
+    </div>
+  );
+}
+
+function ReferenceOpenScene({ result }: { result: DrawResult }) {
+  return (
+    <div className="gacha-reference-open absolute inset-0" data-rarity={result.rarity}>
+      {/* eslint-disable-next-line @next/next/no-img-element */}
+      <img
+        src="/gacha/reference/lucky-paws-open.webp"
+        alt="カプセルが開いた様子"
+        draggable={false}
+        className="absolute inset-0 h-full w-full select-none object-contain"
+      />
+      <span className="gacha-reference-tint pointer-events-none absolute left-[57.2%] top-[62%] h-[25%] w-[18.5%] rounded-b-[50%] rounded-t-[24%]" />
+      <span className="gacha-reference-prize absolute left-[66.7%] top-[63%] flex h-[19%] w-[15%] -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full bg-[#fff8e9]/90 shadow-[0_0_18px_rgba(255,242,183,.9)]">
+        <PrizeImage result={result} className="h-[92%] w-[92%]" />
+      </span>
+      <span className="absolute right-[4%] top-[7%] rounded-full border border-white/80 bg-white/85 px-2.5 py-1 text-[10px] font-black text-[#7a654c] shadow-sm">
+        {result.rarity}
+      </span>
     </div>
   );
 }
