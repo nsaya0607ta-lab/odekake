@@ -2,6 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useId, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { formatCoins } from "@/lib/coins";
 import {
   GACHA_PLANS,
@@ -201,16 +202,18 @@ export function GachaSection({ balance }: { balance: number }) {
         </p>
       )}
 
-      {results && (
-        <GachaResultModal
-          results={results}
-          plan={lastPlan}
-          busy={pending !== null}
-          onRetry={retry}
-          onClose={closeResults}
-        />
-      )}
-      {animation && <GachaAnimationModal draw={animation} onComplete={finishAnimation} />}
+      {results &&
+        createPortal(
+          <GachaResultModal
+            results={results}
+            plan={lastPlan}
+            busy={pending !== null}
+            onRetry={retry}
+            onClose={closeResults}
+          />,
+          document.body,
+        )}
+      {animation && createPortal(<GachaAnimationModal draw={animation} onComplete={finishAnimation} />, document.body)}
     </section>
   );
 }
@@ -274,7 +277,7 @@ function GachaAnimationModal({
 
   return (
     <div
-      className={`gacha-animation-backdrop fixed inset-0 z-[60] flex items-center justify-center p-4 ${ssrIsVisible ? "gacha-ssr-flash" : ""}`}
+      className={`gacha-animation-backdrop fixed inset-0 z-[120] flex items-center justify-center p-4 ${ssrIsVisible ? "gacha-ssr-flash" : ""}`}
       role="dialog"
       aria-modal="true"
       aria-label={isMulti ? "10連ガチャ演出" : "1回ガチャ演出"}
@@ -389,7 +392,7 @@ function Capsule({ result, open = false, large = false }: { result: DrawResult; 
 
   return (
     <span className={`gacha-capsule relative block ${size} ${open ? "is-open" : ""}`} data-rarity={validRarity} aria-label={`${validRarity}カプセル`}>
-      {result.image && (
+      {open && result.image && (
         <span className="gacha-capsule-prize pointer-events-none absolute left-1/2 top-[43%] z-[1] flex h-[48%] w-[48%] -translate-x-1/2 -translate-y-1/2 items-center justify-center">
           <PrizeImage result={result} className="h-full w-full" />
         </span>
@@ -447,12 +450,12 @@ function GachaResultModal({
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-[#463b2f]/35 p-4 backdrop-blur-[1px]"
+      className="fixed inset-0 z-[120] flex items-center justify-center overflow-y-auto bg-[#463b2f]/35 p-4 backdrop-blur-[1px]"
       role="dialog"
       aria-modal="true"
       aria-label="ガチャ結果"
     >
-      <div className="relative max-h-[90vh] w-full max-w-sm overflow-y-auto rounded-[28px] border border-[#eadfc8] bg-[#fffdf8] p-4 shadow-[0_18px_50px_rgba(75,56,36,0.22)]">
+      <div className="relative max-h-[calc(100dvh-2rem)] w-full max-w-sm overflow-y-auto rounded-[28px] border border-[#eadfc8] bg-[#fffdf8] p-4 shadow-[0_18px_50px_rgba(75,56,36,0.22)]">
         <button
           type="button"
           onClick={onClose}
