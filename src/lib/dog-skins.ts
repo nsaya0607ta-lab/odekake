@@ -41,8 +41,8 @@ export const DOG_SKINS: readonly DogSkin[] = [
     name: "登山のフレブル",
     description: "ガチャで手に入る山すがた",
     unlockItemId: "hiking_frenchie",
-    previewImage: "/collection/skins/hiking-frenchie.svg",
-    hasPoseSet: false,
+    previewImage: "/collection/skins/hiking-frenchie.webp",
+    hasPoseSet: true,
   },
   {
     id: "snow",
@@ -77,8 +77,8 @@ export function isSkinUnlocked(skin: DogSkin, ownedItemIds: ReadonlySet<string>)
  * 犬の画像URL。
  *
  * default は従来どおり public/characters/default/*.webp を使う。
- * summer も、デフォルトと同じ300×254pxの透過WebPを直接使う。
- * hiking / snow は専用ポーズ画像がまだ未配置なので代表画像へフォールバックする。
+ * hiking / summer も、デフォルトと同じ300×254pxの透過WebPを直接使う。
+ * snow は専用ポーズ画像がまだ未配置なので代表画像へフォールバックする。
  */
 export function getFrenchieSrc(skin: DogSkinId, pose: string): string {
   const dogSkin = getDogSkin(skin);

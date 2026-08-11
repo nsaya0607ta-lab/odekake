@@ -189,7 +189,7 @@ export const GACHA_PRIZES: readonly GachaPrize[] = [
     rarity: "SSR",
     type: "dog_skin",
     pool: "regular",
-    image: "/collection/skins/hiking-frenchie.svg",
+    image: "/collection/skins/hiking-frenchie.webp",
   },
   {
     id: "snow_frenchie",

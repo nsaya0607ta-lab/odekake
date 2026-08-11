@@ -259,7 +259,7 @@ const CURATED_ITEMS: readonly CollectionItem[] = [
   {
     id: "hiking_frenchie",
     name: "登山のフレブル",
-    image: "/collection/skins/hiking-frenchie.svg",
+    image: "/collection/skins/hiking-frenchie.webp",
     category: "other",
     series: "hiking",
     rarity: "SSR",

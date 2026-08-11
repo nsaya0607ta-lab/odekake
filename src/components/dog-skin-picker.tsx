@@ -59,21 +59,29 @@ export function DogSkinPicker({ currentSkin, ownedItemIds }: Props) {
               disabled={!unlocked || pending}
               onClick={() => choose(skin.id)}
               aria-pressed={active}
+              aria-label={unlocked ? skin.name : "シークレット（未所持）"}
               className={`rough-card overflow-hidden p-3 text-left transition ${
-                active ? "border-leaf ring-2 ring-leaf/40" : unlocked ? "active:bg-paper-deep" : "opacity-90"
+                active ? "border-leaf ring-2 ring-leaf/40" : unlocked ? "active:bg-paper-deep" : "border-ink-faint/30"
               }`}
             >
-              <span className="relative block aspect-square overflow-hidden rounded-xl bg-paper-deep">
+              <span className={`relative block aspect-square overflow-hidden rounded-xl ${unlocked ? "bg-paper-deep" : "bg-stone-200"}`}>
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img
                   src={getFrenchieSrc(skin.id, "stand-happy")}
                   alt=""
                   draggable={false}
-                  className={`h-full w-full object-contain p-3 ${unlocked ? "" : "opacity-35 grayscale"}`}
+                  className={`h-full w-full object-contain p-3 ${
+                    unlocked ? "" : "grayscale brightness-75 contrast-125 opacity-80"
+                  }`}
                 />
                 {!unlocked ? (
-                  <span className="absolute inset-0 flex items-center justify-center bg-paper/35">
-                    <IconLock size={20} className="text-ink-faint" />
+                  <span className="absolute inset-0 flex flex-col items-center justify-center gap-1 bg-gradient-to-b from-transparent via-paper/10 to-ink/15">
+                    <span className="flex h-8 w-8 items-center justify-center rounded-full bg-ink/70 text-white shadow-sm">
+                      <IconLock size={17} />
+                    </span>
+                    <span className="rounded-full bg-ink/70 px-2 py-0.5 text-[9px] font-bold tracking-wider text-white">
+                      シークレット
+                    </span>
                   </span>
                 ) : null}
                 {active ? (
@@ -84,10 +92,10 @@ export function DogSkinPicker({ currentSkin, ownedItemIds }: Props) {
               </span>
 
               <p className={`mt-2 truncate text-sm font-bold ${unlocked ? "text-ink" : "text-ink-faint"}`}>
-                {skin.name}
+                {unlocked ? skin.name : "シークレット"}
               </p>
               <p className="mt-0.5 truncate text-[10px] text-ink-faint">
-                {unlocked ? skin.description : "ガチャで手に入ります"}
+                {unlocked ? skin.description : "ガチャで手に入れると解放"}
               </p>
             </button>
           );
