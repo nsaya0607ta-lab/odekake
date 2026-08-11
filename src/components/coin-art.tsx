@@ -49,34 +49,58 @@ export function TreasureChestArt({ className }: ArtProps) {
 /** ガチャ（カプセルトイの機械） */
 export function GachaMachineArt({ className }: ArtProps) {
   return (
-    <svg viewBox="0 0 120 148" className={className} aria-hidden="true">
-      {/* ガラス球 */}
-      <circle cx="60" cy="54" r="42" fill="#eaf2f7" stroke="#c6d7e1" strokeWidth="3" />
-      {/* カプセル */}
-      <g stroke="#ffffff" strokeWidth="1.4">
-        <circle cx="44" cy="66" r="10" fill="#f2c6cd" />
-        <circle cx="66" cy="70" r="11" fill="#cfe0bd" />
-        <circle cx="78" cy="52" r="9" fill="#f7d795" />
-        <circle cx="53" cy="46" r="9" fill="#cfd9ef" />
-        <circle cx="70" cy="34" r="8" fill="#e6d2ef" />
-        <circle cx="38" cy="46" r="7" fill="#f7ecd0" />
+    <svg viewBox="0 0 150 184" className={className} aria-hidden="true">
+      <defs>
+        <linearGradient id="gacha-dome" x1="25" y1="30" x2="124" y2="121" gradientUnits="userSpaceOnUse">
+          <stop stopColor="#fbffff" stopOpacity=".9" />
+          <stop offset=".55" stopColor="#eaf2f2" stopOpacity=".72" />
+          <stop offset="1" stopColor="#dce9e8" stopOpacity=".86" />
+        </linearGradient>
+        <linearGradient id="gacha-body" x1="28" y1="109" x2="121" y2="174" gradientUnits="userSpaceOnUse">
+          <stop stopColor="#fff8e9" />
+          <stop offset="1" stopColor="#f1dfbd" />
+        </linearGradient>
+      </defs>
+
+      {/* ガラスドームと中のカプセル */}
+      <path d="M24 39c4-17 16-27 32-29h38c17 2 29 12 33 29l8 57c2 17-9 29-27 29H42c-18 0-29-12-27-29Z" fill="url(#gacha-dome)" stroke="#88927c" strokeWidth="3" />
+      <g stroke="#fff" strokeWidth="2" opacity=".94">
+        <circle cx="43" cy="88" r="16" fill="#efb7bf" />
+        <circle cx="69" cy="94" r="17" fill="#b9d3a1" />
+        <circle cx="103" cy="92" r="17" fill="#eec9d9" />
+        <circle cx="52" cy="63" r="16" fill="#b9d6eb" />
+        <circle cx="81" cy="58" r="18" fill="#f4cf7c" />
+        <circle cx="108" cy="64" r="15" fill="#c9d9bb" />
+        <circle cx="78" cy="84" r="17" fill="#c4d9e9" />
       </g>
-      {/* 光沢 */}
-      <path d="M36 32a30 30 0 0 1 18-10" stroke="#ffffff" strokeWidth="5" strokeLinecap="round" fill="none" opacity="0.85" />
-      {/* 本体 */}
-      <path d="M20 94h80l8 46H12z" fill="#cfe0bd" stroke="#a3bf8c" strokeWidth="3" />
-      <rect x="14" y="88" width="92" height="10" rx="5" fill="#b9d3a1" stroke="#a3bf8c" strokeWidth="2.4" />
-      {/* 取り出し口 */}
-      <rect x="40" y="118" width="40" height="16" rx="5" fill="#fffdf8" stroke="#a3bf8c" strokeWidth="2.4" />
-      {/* つまみ（肉球） */}
-      <circle cx="60" cy="107" r="10" fill="#fffdf8" stroke="#a3bf8c" strokeWidth="2.4" />
-      <g fill="#a3bf8c">
-        <ellipse cx="60" cy="109.4" rx="2.6" ry="2" />
-        <circle cx="56.6" cy="106.4" r="1.1" />
-        <circle cx="58.8" cy="104.6" r="1.2" />
-        <circle cx="61.2" cy="104.6" r="1.2" />
-        <circle cx="63.4" cy="106.4" r="1.1" />
+      <g fill="none" stroke="#fff" strokeLinecap="round" opacity=".7">
+        <path d="M25 67c3-20 11-33 24-41" strokeWidth="7" />
+        <path d="M112 30c8 8 11 17 12 28" strokeWidth="5" />
       </g>
+
+      {/* 丸いふたとロゴ */}
+      <path d="M20 34c0-17 13-29 31-31h48c18 2 31 14 31 31 0 7-5 11-12 11H32c-7 0-12-4-12-11Z" fill="#b9c78f" stroke="#78825f" strokeWidth="3" />
+      <rect x="47" y="15" width="57" height="19" rx="9.5" fill="#fff7e8" stroke="#d9c7a0" strokeWidth="1.5" />
+      <text x="75.5" y="28" textAnchor="middle" fill="#8d6846" fontSize="8" fontWeight="700">Lucky Paws</text>
+      <path d="M31 17c16-9 54-10 78-2" fill="none" stroke="#e8efce" strokeWidth="5" strokeLinecap="round" opacity=".75" />
+
+      {/* クリーム色の本体 */}
+      <path d="M22 117h106l9 59H13Z" fill="url(#gacha-body)" stroke="#8f8268" strokeWidth="3" />
+      <rect x="17" y="111" width="116" height="12" rx="6" fill="#b6c889" stroke="#78825f" strokeWidth="2.5" />
+      <path d="M10 174h130v8H10Z" fill="#aebe7f" stroke="#78825f" strokeWidth="3" strokeLinejoin="round" />
+
+      {/* 肉球・つまみ・取り出し口 */}
+      <g fill="#efaaa7">
+        <ellipse cx="35" cy="150" rx="5" ry="4" />
+        <circle cx="29" cy="144" r="2.2" />
+        <circle cx="34" cy="141.5" r="2.3" />
+        <circle cx="39" cy="144" r="2.2" />
+      </g>
+      <circle cx="73" cy="143" r="18" fill="#b7c88b" stroke="#78825f" strokeWidth="2.5" />
+      <rect x="59" y="139" width="28" height="8" rx="4" fill="#e8edcf" stroke="#78825f" strokeWidth="2" />
+      <path d="M59 134c6-5 22-5 28 0" fill="none" stroke="#fff" strokeWidth="2" opacity=".7" />
+      <path d="M103 139h19a7 7 0 0 1 7 7v26h-34v-25a8 8 0 0 1 8-8Z" fill="#5f674d" stroke="#78825f" strokeWidth="2.5" />
+      <path d="M99 163h26v10H99Z" fill="#e7e8c7" stroke="#78825f" strokeWidth="2" />
     </svg>
   );
 }

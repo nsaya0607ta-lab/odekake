@@ -1,7 +1,7 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useId, useRef, useState } from "react";
 import { formatCoins } from "@/lib/coins";
 import {
   GACHA_PLANS,
@@ -242,6 +242,7 @@ function GachaAnimationModal({
   }, []);
 
   const ssrIsVisible = draw.results.slice(0, visibleCount).some((result) => result.rarity === "SSR");
+  const currentResult = isMulti && visibleCount > 0 ? draw.results[visibleCount - 1] : null;
 
   useEffect(() => {
     const reduced = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
@@ -256,9 +257,9 @@ function GachaAnimationModal({
       later(complete, 450);
     } else if (isMulti) {
       draw.results.forEach((_, index) => {
-        later(() => setVisibleCount(index + 1), 850 + index * 480);
+        later(() => setVisibleCount(index + 1), 850 + index * 520);
       });
-      later(complete, 850 + draw.results.length * 480 + 650);
+      later(complete, 850 + draw.results.length * 520 + 650);
     } else {
       later(() => {
         setVisibleCount(1);
@@ -278,7 +279,7 @@ function GachaAnimationModal({
       aria-modal="true"
       aria-label={isMulti ? "10連ガチャ演出" : "1回ガチャ演出"}
     >
-      <div className="relative w-full max-w-sm overflow-hidden rounded-[30px] border border-[#e6d9bf] bg-[#fffdf7] px-4 pb-5 pt-4 shadow-[0_22px_60px_rgba(74,58,37,0.24)]">
+      <div className="relative w-full max-w-md overflow-hidden rounded-[30px] border border-[#e6d9bf] bg-[#fffdf7] px-3.5 pb-5 pt-4 shadow-[0_22px_60px_rgba(74,58,37,0.24)] sm:px-5">
         {isMulti && (
           <button
             type="button"
@@ -296,17 +297,27 @@ function GachaAnimationModal({
           </h2>
         </div>
 
-        <div className="relative mt-2 flex h-[176px] items-center justify-center rounded-[24px] bg-gradient-to-b from-[#f5f0df] via-[#eef4e6] to-[#e1edcf]">
-          <span className={`gacha-machine-stage absolute left-1/2 top-2 h-36 -translate-x-1/2 ${singlePhase === "machine" || isMulti ? "is-running" : ""}`}>
+        <div className="gacha-scene relative mt-2 h-[236px] overflow-hidden rounded-[24px] border border-[#eee4cf] bg-gradient-to-b from-[#fffdf8] via-[#faf5e9] to-[#f1ead9]">
+          <span className={`gacha-machine-stage absolute left-[29%] top-2 h-[206px] -translate-x-1/2 ${singlePhase === "machine" || isMulti ? "is-running" : ""}`}>
             <GachaMachineArt className="h-full w-auto drop-shadow-[0_6px_5px_rgba(91,75,48,0.12)]" />
-            <span className={`gacha-knob absolute left-1/2 top-[67%] h-5 w-5 -translate-x-1/2 rounded-full ${singlePhase === "machine" || isMulti ? "is-turning" : ""}`} />
+            <span className={`gacha-knob absolute left-[48.5%] top-[68%] h-9 w-9 -translate-x-1/2 rounded-full ${singlePhase === "machine" || isMulti ? "is-turning" : ""}`} />
           </span>
 
           {!isMulti && visibleCount > 0 && draw.results[0] && (
-            <div className={`absolute bottom-2 left-1/2 -translate-x-1/2 ${singlePhase === "open" ? "gacha-capsule-open" : "gacha-capsule-drop"}`}>
-              <Capsule rarity={draw.results[0].rarity} open={singlePhase === "open"} large />
+            <div className={`absolute bottom-5 right-[6%] ${singlePhase === "open" ? "gacha-capsule-open" : "gacha-capsule-rollout"}`}>
+              <Capsule result={draw.results[0]} open={singlePhase === "open"} large />
             </div>
           )}
+
+          {currentResult && (
+            <div key={`${currentResult.id}-${visibleCount}`} className="gacha-capsule-rollout gacha-capsule-sequence absolute bottom-5 right-[8%]">
+              <Capsule result={currentResult} large />
+            </div>
+          )}
+
+          <span className="absolute bottom-3 left-[4%] right-[4%] h-2 rounded-[50%] bg-[#d9c7a4]/25 blur-sm" />
+          <span className="gacha-motion-line absolute bottom-[72px] right-[37%] h-px w-7 bg-[#bfa77f]/65" />
+          <span className="gacha-motion-line absolute bottom-[58px] right-[34%] h-px w-5 bg-[#bfa77f]/55" />
         </div>
 
         {isMulti ? (
@@ -317,7 +328,7 @@ function GachaAnimationModal({
                 <li key={`${result.id}-${index}`} className="flex min-w-0 flex-col items-center">
                   <span className="mb-1 text-[9px] font-bold text-[#9a896f]">{index + 1}</span>
                   <span className={visible ? "gacha-capsule-pop" : "opacity-0"}>
-                    <Capsule rarity={result.rarity} />
+                    <Capsule result={result} />
                   </span>
                 </li>
               );
@@ -342,17 +353,23 @@ function GachaAnimationModal({
   );
 }
 
-function Capsule({ rarity, open = false, large = false }: { rarity: string; open?: boolean; large?: boolean }) {
-  const validRarity = (["N", "R", "SR", "SSR"] as const).includes(rarity as GachaRarity)
-    ? (rarity as GachaRarity)
+function Capsule({ result, open = false, large = false }: { result: DrawResult; open?: boolean; large?: boolean }) {
+  const validRarity = (["N", "R", "SR", "SSR"] as const).includes(result.rarity as GachaRarity)
+    ? (result.rarity as GachaRarity)
     : "N";
-  const size = large ? "h-[86px] w-[86px]" : "h-[46px] w-[46px]";
+  const gradientId = `capsule-${useId().replaceAll(":", "")}`;
+  const size = large ? "h-[112px] w-[112px]" : "h-[52px] w-[52px]";
 
   return (
     <span className={`gacha-capsule relative block ${size} ${open ? "is-open" : ""}`} data-rarity={validRarity} aria-label={`${validRarity}カプセル`}>
-      <svg viewBox="0 0 100 100" className="h-full w-full overflow-visible drop-shadow-[0_7px_5px_rgba(81,70,49,0.18)]" aria-hidden="true">
+      {result.image && (
+        <span className="gacha-capsule-prize pointer-events-none absolute left-1/2 top-[43%] z-[1] flex h-[48%] w-[48%] -translate-x-1/2 -translate-y-1/2 items-center justify-center">
+          <PrizeImage result={result} className="h-full w-full" />
+        </span>
+      )}
+      <svg viewBox="0 0 100 100" className="relative z-[2] h-full w-full overflow-visible drop-shadow-[0_7px_5px_rgba(81,70,49,0.18)]" aria-hidden="true">
         <defs>
-          <linearGradient id={`capsule-${validRarity}`} x1="12" y1="8" x2="88" y2="92" gradientUnits="userSpaceOnUse">
+          <linearGradient id={gradientId} x1="12" y1="52" x2="88" y2="94" gradientUnits="userSpaceOnUse">
             {validRarity === "SSR" ? (
               <>
                 <stop stopColor="#f7c8d8" />
@@ -370,14 +387,16 @@ function Capsule({ rarity, open = false, large = false }: { rarity: string; open
           </linearGradient>
         </defs>
         <g className="gacha-capsule-top">
-          <path d="M10 48a40 40 0 0 1 80 0Z" fill={`url(#capsule-${validRarity})`} stroke="#8e826c" strokeWidth="2" />
-          <path d="M25 28c8-10 19-13 30-11" fill="none" stroke="white" strokeWidth="6" strokeLinecap="round" opacity=".65" />
+          <path d="M10 48a40 40 0 0 1 80 0Z" fill="#f8fdff" fillOpacity=".54" stroke="#9aa4a6" strokeWidth="2" />
+          <path d="M24 28c8-10 20-14 31-11" fill="none" stroke="white" strokeWidth="7" strokeLinecap="round" opacity=".9" />
+          <path d="M71 20c7 6 11 13 13 21" fill="none" stroke="#dbe5e7" strokeWidth="3" strokeLinecap="round" opacity=".7" />
         </g>
         <g className="gacha-capsule-bottom">
-          <path d="M10 52a40 40 0 0 0 80 0Z" fill={`url(#capsule-${validRarity})`} stroke="#8e826c" strokeWidth="2" />
+          <path d="M10 52a40 40 0 0 0 80 0Z" fill={`url(#${gradientId})`} stroke="#8e826c" strokeWidth="2" />
           <path d="M17 54h66" stroke="white" strokeWidth="3" opacity=".48" />
+          <path d="M24 70c5 12 14 17 25 19" fill="none" stroke="white" strokeWidth="5" strokeLinecap="round" opacity=".26" />
         </g>
-        <rect x="8" y="47" width="84" height="7" rx="3.5" fill="#fffdf5" stroke="#8e826c" strokeWidth="1.5" />
+        <rect x="8" y="47" width="84" height="7" rx="3.5" fill="#fffdf5" fillOpacity=".9" stroke="#8e826c" strokeWidth="1.5" />
         {validRarity === "SSR" && <path d="m77 16 2.4 6.2 6.6 2.4-6.6 2.4-2.4 6.2-2.4-6.2-6.6-2.4 6.6-2.4Z" fill="#fff8ce" />}
       </svg>
     </span>
