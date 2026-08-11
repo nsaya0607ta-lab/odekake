@@ -5,7 +5,6 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useDraftState } from "@/components/use-draft-state";
 import { IconCheck, IconChevronDown, IconMapPin, IconSearch, IconSpinner } from "@/components/icons";
 import {
-  distanceMeters,
   getMunicipality,
   getMunicipalitiesByPrefecture,
   nearestMunicipality,
@@ -52,7 +51,7 @@ const SOURCE_LABELS: Record<LocationSource, string> = {
 };
 
 const formatAccuracy = (meters: number | null) => {
-  if (meters === null) return null;
+  if (meters === null || !Number.isFinite(meters) || meters < 0) return null;
   if (meters < 1000) return `およそ ±${Math.round(meters)}m`;
   return `およそ ±${(meters / 1000).toFixed(1)}km`;
 };
@@ -165,21 +164,18 @@ export function LocationPicker({
     lng: number,
     source: LocationSource,
     accuracy: number | null,
-    place?: { provider: string; id: string },
+    place?: { provider: string; id: string; municipalityCode?: string | null },
   ) => {
     setValue((currentValue) => {
-      const currentMunicipality = currentValue.municipalityCode
-        ? getMunicipality(currentValue.municipalityCode)
+      const addressMunicipality = place?.municipalityCode
+        ? getMunicipality(place.municipalityCode)
         : undefined;
-      const found =
-        nearestMunicipality(lat, lng, currentValue.prefectureCode || undefined) ?? nearestMunicipality(lat, lng);
-      const keepCurrent =
-        currentMunicipality &&
-        currentMunicipality.lat !== null &&
-        currentMunicipality.lng !== null &&
-        found &&
-        distanceMeters(lat, lng, currentMunicipality.lat, currentMunicipality.lng) <= found.distanceMeters + 1;
-      const chosen = keepCurrent ? currentMunicipality : found?.municipality;
+      // Google検索・現在地は、前の下書きに残った都道府県で絞らない。
+      // 都道府県地図をタップした場合だけ、利用者が選んだ県内に限定する。
+      const found = source === "map" && currentValue.prefectureCode
+        ? nearestMunicipality(lat, lng, currentValue.prefectureCode)
+        : nearestMunicipality(lat, lng);
+      const chosen = addressMunicipality ?? found?.municipality;
 
       if (chosen && chosen.code !== currentValue.municipalityCode) {
         setNotice(`市区町村を「${chosen.name}」に合わせました。`);
@@ -297,7 +293,7 @@ export function LocationPicker({
       candidate.longitude,
       "place_search",
       candidate.accuracyMeters,
-      { provider: provider.id, id: candidate.placeId },
+      { provider: provider.id, id: candidate.placeId, municipalityCode: candidate.municipalityCode },
     );
     onPlaceSelected?.({
       name: candidate.name,

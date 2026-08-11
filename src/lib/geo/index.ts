@@ -7,6 +7,7 @@ export {
   distanceMeters,
   getMunicipalitiesByPrefecture,
   getMunicipality,
+  municipalityFromAddress,
   nearestMunicipality,
   parentCityOf,
   type Municipality,
@@ -261,4 +262,3 @@ export function viewBoxFor(
     .map((v) => v.toFixed(3))
     .join(" ");
 }
-

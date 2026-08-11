@@ -6,7 +6,7 @@ import { z } from "zod";
 import type { ActionState } from "@/components/form";
 import type { DB } from "@/lib/data/client";
 import { toJapaneseError } from "@/lib/errors";
-import { distanceMeters, getMunicipality } from "@/lib/geo";
+import { distanceMeters, getMunicipality, municipalityFromAddress, nearestMunicipality } from "@/lib/geo";
 import { MAX_PHOTOS_PER_VISIT } from "@/lib/image";
 import { finalizePhotoPaths } from "@/lib/photos";
 import { syncVisitTags } from "@/lib/data/tags";
@@ -148,13 +148,25 @@ function fieldErrorsOf(error: z.ZodError): Record<string, string> {
 }
 
 function resolveLocation(parsed: SpotInput) {
-  const municipality = getMunicipality(parsed.municipalityCode);
+  let municipality = getMunicipality(parsed.municipalityCode);
   if (!municipality) return { ok: false as const, error: "選択した市区町村が見つかりません。" };
 
   let latitude = parsed.latitude;
   let longitude = parsed.longitude;
   let source: LocationSource = parsed.locationSource;
   let accuracy = parsed.locationAccuracy;
+
+  // 店舗検索の住所を最優先にする。前の下書きに残った県・市区町村が
+  // hidden input に残っていても、Googleの住所と座標に合わせて保存する。
+  if (source === "place_search") {
+    municipality = municipalityFromAddress(parsed.address) ?? (
+      latitude !== null && longitude !== null
+        ? nearestMunicipality(latitude, longitude)?.municipality
+        : undefined
+    ) ?? municipality;
+  } else if (source === "device" && latitude !== null && longitude !== null) {
+    municipality = nearestMunicipality(latitude, longitude)?.municipality ?? municipality;
+  }
 
   if (latitude === null || longitude === null) {
     latitude = municipality.lat;

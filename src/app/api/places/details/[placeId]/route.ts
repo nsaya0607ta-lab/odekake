@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { checkRateLimit } from "@/lib/rate-limit";
+import { municipalityFromAddress } from "@/lib/geo/municipalities";
 import { createClient } from "@/lib/supabase/server";
 
 export const dynamic = "force-dynamic";
@@ -99,6 +100,7 @@ export async function GET(
 
   const postalCode =
     payload.addressComponents?.find((component) => component.types?.includes("postal_code"))?.longText ?? null;
+  const municipality = municipalityFromAddress(payload.formattedAddress);
 
   return json({
     placeId: payload.id ?? placeId,
@@ -107,5 +109,7 @@ export async function GET(
     latitude,
     longitude,
     accuracyMeters: null,
+    prefectureCode: municipality?.prefectureCode ?? null,
+    municipalityCode: municipality?.code ?? null,
   });
 }

@@ -5,6 +5,7 @@
  * 市区町村の選択だけが必要な画面で、地図データまで読み込まないようにするため。
  */
 import municipalityData from "./municipalities.json";
+import { PREFECTURE_NAMES } from "./prefecture-names";
 
 export type Municipality = {
   code: string;
@@ -31,6 +32,23 @@ export function getMunicipality(code: string): Municipality | undefined {
 
 export function getMunicipalitiesByPrefecture(prefectureCode: string): Municipality[] {
   return MUNICIPALITIES_BY_PREFECTURE.get(prefectureCode) ?? [];
+}
+
+/** Googleなどが返す日本の住所から、市区町村マスタの項目を特定する。 */
+export function municipalityFromAddress(address: string | null | undefined): Municipality | undefined {
+  const normalized = address?.replace(/[\s　]/g, "") ?? "";
+  if (!normalized) return undefined;
+
+  const prefecture = PREFECTURE_NAMES.find((item) => normalized.includes(item.name));
+  if (!prefecture) return undefined;
+
+  // 「○○市」と「○○市△△区」が同時に一致する場合は、より具体的な長い名称を優先する。
+  return getMunicipalitiesByPrefecture(prefecture.code)
+    .filter((item) => normalized.includes(item.name.replace(/[\s　]/g, "")))
+    .reduce<Municipality | undefined>(
+      (best, item) => (!best || item.name.length > best.name.length ? item : best),
+      undefined,
+    );
 }
 
 /** 2点間のおおよその距離（メートル） */

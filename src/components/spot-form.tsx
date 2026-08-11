@@ -165,7 +165,8 @@ export function SpotForm({
               error={state.fieldErrors?.municipalityCode}
               placeSearchEnabled={placeSearchEnabled}
               onPlaceSelected={applyPlaceAutofill}
-              draftKey={isEdit || locationFromUrl ? null : "visited-place-new-location"}
+              // v2で、旧判定ロジックが保存した都道府県・市区町村の下書きを破棄する。
+              draftKey={isEdit || locationFromUrl ? null : "visited-place-new-location-v2"}
             />
           </div>
         ) : null}
