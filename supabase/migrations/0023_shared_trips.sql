@@ -30,6 +30,14 @@ create table if not exists public.trip_members (
 );
 
 -- 旧共有旅テーブルが残るDBでは不足列を追加し、enumのroleをtextへ統一する。
+-- roleを参照する旧RLSポリシーと活動履歴トリガーは、型変換より先に外す。
+drop policy if exists trip_members_select on public.trip_members;
+drop policy if exists trip_members_insert on public.trip_members;
+drop policy if exists trip_members_update on public.trip_members;
+drop policy if exists trip_members_delete on public.trip_members;
+drop trigger if exists trip_members_log_activity on public.trip_members;
+drop function if exists public.tg_trip_member_activity();
+
 alter table public.trip_members add column if not exists status text;
 alter table public.trip_members add column if not exists invited_by uuid references auth.users(id) on delete set null;
 alter table public.trip_members add column if not exists created_at timestamptz not null default now();
