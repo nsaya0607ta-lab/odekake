@@ -119,7 +119,7 @@ set search_path = public
 as $$
 declare
   v_chars constant text := 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
-  v_bytes bytea := gen_random_bytes(8);
+  v_bytes bytea := uuid_send(gen_random_uuid());
   v_code text := '';
   v_index integer;
 begin
@@ -450,7 +450,9 @@ as $$
   order by ugi.first_obtained_at desc;
 $$;
 
-create or replace function public.get_friend_recent_visits(
+drop function if exists public.get_friend_recent_visits(uuid, integer);
+
+create function public.get_friend_recent_visits(
   p_friend_user_id uuid,
   p_limit integer default 5
 )
@@ -459,7 +461,8 @@ returns table (
   spot_name text,
   visited_at date,
   prefecture_code text,
-  municipality_code text
+  municipality_code text,
+  photo_path text
 )
 language sql
 security definer
@@ -471,9 +474,18 @@ as $$
     s.name as spot_name,
     vr.visited_at,
     s.prefecture_code,
-    s.municipality_code
+    s.municipality_code,
+    photo.storage_path
   from public.visit_records vr
   join public.spots s on s.id = vr.spot_id
+  left join lateral (
+    select vp.storage_path
+    from public.visit_photos vp
+    where vp.visit_record_id = vr.id
+      and vp.user_id = p_friend_user_id
+    order by vp.display_order, vp.created_at
+    limit 1
+  ) photo on true
   where vr.user_id = p_friend_user_id
     and public.is_friend(p_friend_user_id)
     and coalesce((
@@ -501,7 +513,7 @@ begin
 
   return jsonb_build_object(
     'ready', true,
-    'version', 2
+    'version', 3
   );
 end;
 $$;
