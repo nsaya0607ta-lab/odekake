@@ -417,6 +417,7 @@ export type Database = {
       };
       create_steps_sync_token: { Args: Record<string, never>; Returns: string };
       get_or_create_friend_code: { Args: Record<string, never>; Returns: string };
+      get_friends_health: { Args: Record<string, never>; Returns: Json };
       regenerate_friend_code: { Args: Record<string, never>; Returns: string };
       add_friend_by_code: { Args: { p_code: string }; Returns: string };
       remove_friend: { Args: { p_friend_user_id: string }; Returns: undefined };

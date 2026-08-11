@@ -7,7 +7,9 @@ import { COLLECTION_ITEMS } from "@/lib/collection/items";
 import {
   FriendsUnavailableError,
   getFriendList,
+  getFriendsSetupStatus,
   getMyFriendCode,
+  type FriendsSetupStatus,
 } from "@/lib/data/friends";
 import { signPhotoPaths } from "@/lib/data/photos";
 import { getExpProgress } from "@/lib/exp";
@@ -25,19 +27,24 @@ export default async function FriendsPage({
   const [{ supabase }, params] = await Promise.all([requireUser(), searchParams]);
   let friendCode = "";
   let friends: FriendListRow[] = [];
-  let unavailable = false;
+  let setupStatus: FriendsSetupStatus = { ready: false, reason: "migration_required" };
 
   try {
-    [friendCode, friends] = await Promise.all([
-      getMyFriendCode(supabase),
-      getFriendList(supabase),
-    ]);
+    setupStatus = await getFriendsSetupStatus(supabase);
+    if (setupStatus.ready) {
+      [friendCode, friends] = await Promise.all([
+        getMyFriendCode(supabase),
+        getFriendList(supabase),
+      ]);
+    }
   } catch (error) {
-    if (error instanceof FriendsUnavailableError) unavailable = true;
+    if (error instanceof FriendsUnavailableError) {
+      setupStatus = { ready: false, reason: "migration_required" };
+    }
     else throw error;
   }
 
-  const avatarUrls = unavailable
+  const avatarUrls = !setupStatus.ready
     ? new Map<string, string>()
     : await signPhotoPaths(
         supabase,
@@ -60,8 +67,8 @@ export default async function FriendsPage({
         }
       />
       <PageBody>
-        {unavailable ? (
-          <PreparingCard />
+        {!setupStatus.ready ? (
+          <PreparingCard reason={setupStatus.reason} />
         ) : (
           <>
             {params.removed === "1" ? (
@@ -133,15 +140,27 @@ export default async function FriendsPage({
     </>
   );
 }
-function PreparingCard() {
+function PreparingCard({
+  reason,
+}: {
+  reason: "migration_required" | "outdated_migration";
+}) {
   return (
     <div className="rough-card px-6 py-10 text-center">
       <span className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-paper-deep text-ink-faint">
         <IconUsers size={28} />
       </span>
-      <h2 className="mt-3 font-bold">フレンド機能を準備中です</h2>
+      <h2 className="mt-3 font-bold">データベース設定が必要です</h2>
       <p className="mt-1.5 text-xs leading-relaxed text-ink-faint">
-        データベースの準備が完了すると、ここからフレンドを追加できます。
+        {reason === "outdated_migration"
+          ? "フレンド機能のSQLが古いため、最新版をもう一度実行してください。"
+          : "Supabaseでフレンド機能のSQLを実行すると利用できます。"}
+      </p>
+      <p className="mt-3 rounded-2xl bg-paper-deep px-3 py-2 text-xs font-semibold text-ink-soft">
+        supabase/migrations/0019_friends.sql
+      </p>
+      <p className="mt-3 text-[11px] leading-relaxed text-ink-faint">
+        Vercelの環境変数は変更しないでください。
       </p>
     </div>
   );

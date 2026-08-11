@@ -11,6 +11,11 @@ import type {
 type DataError = { code?: string; message?: string };
 
 const FRIENDS_UNAVAILABLE_CODES = new Set(["42P01", "42883", "PGRST202", "PGRST205"]);
+const FRIENDS_SCHEMA_VERSION = 2;
+
+export type FriendsSetupStatus =
+  | { ready: true; version: number }
+  | { ready: false; reason: "migration_required" | "outdated_migration" };
 
 export class FriendsUnavailableError extends Error {
   constructor() {
@@ -28,6 +33,35 @@ function throwDataError(error: DataError | null, context: string): never {
   }
   console.error(context, { code: error?.code, message: error?.message });
   throw new Error(context);
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+/**
+ * フレンド機能だけのDB準備状態を確認する。
+ * AuthやVercel環境変数の変更はせず、専用RPCの有無とバージョンだけを見る。
+ */
+export async function getFriendsSetupStatus(supabase: DB): Promise<FriendsSetupStatus> {
+  const { data, error } = await supabase.rpc("get_friends_health");
+
+  if (error) {
+    if (error.code && FRIENDS_UNAVAILABLE_CODES.has(error.code)) {
+      return { ready: false, reason: "migration_required" };
+    }
+    throwDataError(error, "Friend database health check failed");
+  }
+
+  if (!isRecord(data) || data.ready !== true || typeof data.version !== "number") {
+    return { ready: false, reason: "outdated_migration" };
+  }
+
+  if (data.version < FRIENDS_SCHEMA_VERSION) {
+    return { ready: false, reason: "outdated_migration" };
+  }
+
+  return { ready: true, version: data.version };
 }
 
 export function formatFriendCode(code: string): string {
