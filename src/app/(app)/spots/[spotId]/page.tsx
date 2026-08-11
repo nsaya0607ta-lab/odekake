@@ -17,7 +17,7 @@ import { PageHeader } from "@/components/page-header";
 import { PhotoGallery } from "@/components/photo-gallery";
 import { StarRating, TripBadge, formatDate } from "@/components/ui";
 import { getSpotDetail } from "@/lib/data/spots";
-import { getMunicipality, getPrefecture } from "@/lib/geo";
+import { getMunicipality, getPrefecture, municipalityFromAddress } from "@/lib/geo";
 import { getRecordSpace } from "@/lib/data/space";
 import { requireUser } from "@/lib/supabase/server";
 import type { LocationSource } from "@/lib/supabase/types";
@@ -60,8 +60,15 @@ export default async function SpotDetailPage({
   if (!detail) notFound();
 
   const { spot, categoryName, summary, visits, galleryUrls } = detail;
-  const municipality = getMunicipality(spot.municipality_code);
-  const prefecture = getPrefecture(spot.prefecture_code);
+  // 既存データの行政区分が誤っていても、修復SQLの適用前から正しい住所を表示する。
+  const municipality = municipalityFromAddress(spot.address) ?? getMunicipality(spot.municipality_code);
+  const prefecture = getPrefecture(municipality?.prefectureCode ?? spot.prefecture_code);
+  const validLocationAccuracy =
+    spot.location_accuracy_m !== null &&
+    Number.isFinite(spot.location_accuracy_m) &&
+    spot.location_accuracy_m >= 0
+      ? spot.location_accuracy_m
+      : null;
   // お気に入りは自分の訪問履歴に付くので、自分の記録がないと切り替えられない
   const myVisits = visits.filter((visit) => visit.record.user_id === user.id);
   const myFavorite = myVisits.some((visit) => visit.record.favorite);
@@ -172,11 +179,11 @@ export default async function SpotDetailPage({
                 </span>
                 <span className="mt-0.5 block text-xs text-ink-faint">
                   {LOCATION_SOURCE_LABELS[spot.location_source]}
-                  {spot.location_accuracy_m !== null
+                  {validLocationAccuracy !== null
                     ? `・およそ ±${
-                        spot.location_accuracy_m < 1000
-                          ? `${Math.round(spot.location_accuracy_m)}m`
-                          : `${(spot.location_accuracy_m / 1000).toFixed(1)}km`
+                        validLocationAccuracy < 1000
+                          ? `${Math.round(validLocationAccuracy)}m`
+                          : `${(validLocationAccuracy / 1000).toFixed(1)}km`
                       }`
                     : ""}
                 </span>

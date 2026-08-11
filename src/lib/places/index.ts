@@ -19,6 +19,9 @@ export type PlaceCandidate = PlaceSuggestion & {
   accuracyMeters: number | null;
   postalCode: string | null;
   category: string | null;
+  /** Googleの住所から特定できた行政区分。特定できない場合はnull。 */
+  prefectureCode: string | null;
+  municipalityCode: string | null;
 };
 
 export type PlaceSearchQuery = {
@@ -177,6 +180,8 @@ function googleProvider(enabled: boolean): PlaceSearchProvider {
           distanceMeters: suggestion.distanceMeters,
           searchMode: suggestion.searchMode,
           category: null,
+          prefectureCode: body.prefectureCode ?? null,
+          municipalityCode: body.municipalityCode ?? null,
         },
       };
     },
