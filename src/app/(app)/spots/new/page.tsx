@@ -3,7 +3,7 @@ import { PageHeader } from "@/components/page-header";
 import { SpotForm } from "@/components/spot-form";
 import { loadCategoryNames } from "@/lib/data/spots";
 import { todayInJapan } from "@/lib/date";
-import { ensurePersonalRecordTrip, getTripOptions } from "@/lib/data/trips";
+import { getRecordDestinationOptions } from "@/lib/data/trips";
 import { getRecordSpace } from "@/lib/data/space";
 import { getMunicipality } from "@/lib/geo";
 import { requireUser } from "@/lib/supabase/server";
@@ -21,18 +21,12 @@ export default async function NewSpotPage({
     searchParams,
   ]);
   const space = await getRecordSpace(supabase, user.id);
-  const [categoryNames, plannedTrips, personalRecordTrip] = await Promise.all([
+  const [categoryNames, destinations] = await Promise.all([
     loadCategoryNames(supabase),
-    getTripOptions(supabase, space.tripIds),
-    ensurePersonalRecordTrip(supabase, user.id),
+    getRecordDestinationOptions(supabase, user.id, space.name, space.tripIds),
   ]);
 
-  // 「お出かけ」と、ユーザーが作った「旅行計画」を見た目でも明確に分ける。
-  // 通常のスポット登録は旅行へ自動分類せず、常設のお出かけ保存先を既定にする。
-  const tripOptions = [
-    ...(personalRecordTrip ? [{ ...personalRecordTrip, title: "お出かけ" }] : []),
-    ...plannedTrips.map((trip) => ({ ...trip, title: `旅行｜${trip.title}` })),
-  ];
+  const tripOptions = destinations.options;
   const trips = requestedTripId
     ? [...tripOptions].sort((a, b) => Number(b.id === requestedTripId) - Number(a.id === requestedTripId))
     : tripOptions;
