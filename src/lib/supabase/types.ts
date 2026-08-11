@@ -201,6 +201,22 @@ export type FriendshipRow = {
   created_at: string;
 };
 
+export type SharedTripListRow = {
+  trip_id: string;
+  title: string;
+  description: string | null;
+  start_date: string | null;
+  end_date: string | null;
+  cover_image_url: string | null;
+  owner_id: string;
+  owner_name: string;
+  my_role: "owner" | "member";
+  my_status: "invited" | "accepted";
+  member_count: number;
+  member_names: string[];
+  updated_at: string;
+};
+
 export type FriendPrivacySettingsRow = {
   user_id: string;
   show_prefectures: boolean;
@@ -438,6 +454,22 @@ export type Database = {
       get_friend_recent_visits: {
         Args: { p_friend_user_id: string; p_limit?: number };
         Returns: FriendRecentVisitRow[];
+      };
+      get_shared_trips_health: { Args: Record<string, never>; Returns: Json };
+      get_shared_trip_list: { Args: Record<string, never>; Returns: SharedTripListRow[] };
+      create_shared_trip: {
+        Args: {
+          p_title: string;
+          p_friend_user_ids: string[];
+          p_start_date?: string | null;
+          p_end_date?: string | null;
+          p_description?: string | null;
+        };
+        Returns: string;
+      };
+      respond_shared_trip_invitation: {
+        Args: { p_trip_id: string; p_accept: boolean };
+        Returns: undefined;
       };
       delete_own_account: { Args: Record<string, never>; Returns: undefined };
       record_daily_steps: { Args: { p_step_date: string; p_steps: number }; Returns: number };

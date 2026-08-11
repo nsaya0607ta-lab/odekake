@@ -11,6 +11,7 @@ import {
 import { TopHeader } from "@/components/page-header";
 import { PageBody } from "@/components/page-body";
 import { CoinBadge } from "@/components/coin-badge";
+import { SharedTripBadge } from "@/components/shared-trip-badge";
 import { LevelTag } from "@/components/level-tag";
 import { TodayStepsCard } from "@/components/today-steps-card";
 import { EmptyState, LinkRow, formatDate } from "@/components/ui";
@@ -51,7 +52,15 @@ export default async function HomePage({ searchParams }: { searchParams: Promise
 
   return (
     <>
-      <TopHeader title={space.name} action={<CoinBadge balance={coins.balance} />} />
+      <TopHeader
+        title={space.name}
+        action={
+          <div className="flex items-center gap-2">
+            <CoinBadge balance={coins.balance} />
+            <SharedTripBadge />
+          </div>
+        }
+      />
 
       <PageBody>
         {notice === "password-updated" ? (
