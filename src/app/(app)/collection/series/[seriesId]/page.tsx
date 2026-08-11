@@ -9,7 +9,7 @@ import {
   getSeriesItems,
   isCollectionSeriesId,
 } from "@/lib/collection/items";
-import { getOwnedItemIds } from "@/lib/data/collection";
+import { getOwnedItemCounts } from "@/lib/data/collection";
 import { requireUser } from "@/lib/supabase/server";
 
 export const dynamic = "force-dynamic";
@@ -30,7 +30,8 @@ export default async function CollectionSeriesPage({
   if (!series) notFound();
 
   const { supabase, user } = await requireUser();
-  const owned = await getOwnedItemIds(supabase, user.id);
+  const counts = await getOwnedItemCounts(supabase, user.id);
+  const owned = new Set(counts.keys());
   const items = getSeriesItems(series.id);
 
   return (
@@ -44,7 +45,7 @@ export default async function CollectionSeriesPage({
             total={items.length}
             barClass={series.tone.bar}
           />
-          <ItemGrid items={items} owned={owned} />
+          <ItemGrid items={items} owned={owned} counts={counts} />
           <p className="pb-2 text-center text-xs text-ink-faint">
             持っていないアイテムはシルエットで表示されます
           </p>
