@@ -28,6 +28,43 @@ type AnimationDraw = {
   results: DrawResult[];
 };
 
+/** iOS Safariを含め、モーダル表示中に背面ページがスクロールしないよう固定する。 */
+function useBodyScrollLock() {
+  useEffect(() => {
+    const body = document.body;
+    const root = document.documentElement;
+    const scrollY = window.scrollY;
+    const previous = {
+      position: body.style.position,
+      top: body.style.top,
+      left: body.style.left,
+      right: body.style.right,
+      width: body.style.width,
+      overflow: body.style.overflow,
+      overscrollBehavior: root.style.overscrollBehavior,
+    };
+
+    body.style.position = "fixed";
+    body.style.top = `-${scrollY}px`;
+    body.style.left = "0";
+    body.style.right = "0";
+    body.style.width = "100%";
+    body.style.overflow = "hidden";
+    root.style.overscrollBehavior = "none";
+
+    return () => {
+      body.style.position = previous.position;
+      body.style.top = previous.top;
+      body.style.left = previous.left;
+      body.style.right = previous.right;
+      body.style.width = previous.width;
+      body.style.overflow = previous.overflow;
+      root.style.overscrollBehavior = previous.overscrollBehavior;
+      window.scrollTo(0, scrollY);
+    };
+  }, []);
+}
+
 function rarityStyle(rarity: string) {
   return RARITY_STYLES[rarity as GachaRarity] ?? RARITY_STYLES.N;
 }
@@ -225,6 +262,7 @@ function GachaAnimationModal({
   draw: AnimationDraw;
   onComplete: (draw: AnimationDraw) => void;
 }) {
+  useBodyScrollLock();
   const isMulti = draw.plan === "multi";
   const isSsr = draw.results.some((result) => result.rarity === "SSR");
   const [visibleCount, setVisibleCount] = useState(0);
@@ -277,7 +315,7 @@ function GachaAnimationModal({
 
   return (
     <div
-      className={`gacha-animation-backdrop fixed inset-0 z-[120] flex items-center justify-center p-4 ${ssrIsVisible ? "gacha-ssr-flash" : ""}`}
+      className={`gacha-animation-backdrop fixed inset-0 z-[120] flex items-center justify-center overscroll-none p-4 ${ssrIsVisible ? "gacha-ssr-flash" : ""}`}
       role="dialog"
       aria-modal="true"
       aria-label={isMulti ? "10連ガチャ演出" : "1回ガチャ演出"}
@@ -446,16 +484,17 @@ function GachaResultModal({
   onRetry: () => void;
   onClose: () => void;
 }) {
+  useBodyScrollLock();
   const only = plan === "single" && results.length === 1 ? results[0] : null;
 
   return (
     <div
-      className="fixed inset-0 z-[120] flex items-center justify-center overflow-y-auto bg-[#463b2f]/35 p-4 backdrop-blur-[1px]"
+      className="fixed inset-0 z-[120] flex items-center justify-center overflow-y-auto overscroll-none bg-[#463b2f]/35 p-4 backdrop-blur-[1px]"
       role="dialog"
       aria-modal="true"
       aria-label="ガチャ結果"
     >
-      <div className="relative max-h-[calc(100dvh-2rem)] w-full max-w-sm overflow-y-auto rounded-[28px] border border-[#eadfc8] bg-[#fffdf8] p-4 shadow-[0_18px_50px_rgba(75,56,36,0.22)]">
+      <div className="relative max-h-[calc(100dvh-2rem)] w-full max-w-sm touch-pan-y overflow-y-auto overscroll-contain rounded-[28px] border border-[#eadfc8] bg-[#fffdf8] p-4 shadow-[0_18px_50px_rgba(75,56,36,0.22)]">
         <button
           type="button"
           onClick={onClose}
