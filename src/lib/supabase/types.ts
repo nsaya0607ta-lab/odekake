@@ -188,6 +188,73 @@ export type UserGachaItemRow = {
   updated_at: string;
 };
 
+export type FriendCodeRow = {
+  user_id: string;
+  code: string;
+  created_at: string;
+  updated_at: string;
+};
+
+export type FriendshipRow = {
+  user_id: string;
+  friend_user_id: string;
+  created_at: string;
+};
+
+export type FriendPrivacySettingsRow = {
+  user_id: string;
+  show_prefectures: boolean;
+  show_collection: boolean;
+  show_recent_visits: boolean;
+  updated_at: string;
+};
+
+export type FriendListRow = {
+  friend_user_id: string;
+  display_name: string;
+  profile_image_url: string | null;
+  total_exp: number;
+  visited_prefectures: number;
+  visited_municipalities: number;
+  visit_count: number;
+  collection_owned_count: number | null;
+  show_collection: boolean;
+  friend_since: string;
+};
+
+export type FriendOverviewRow = {
+  friend_user_id: string;
+  display_name: string;
+  profile_image_url: string | null;
+  introduction: string | null;
+  total_exp: number;
+  visited_prefecture_count: number;
+  visited_municipality_count: number;
+  visit_count: number;
+  show_prefectures: boolean;
+  show_collection: boolean;
+  show_recent_visits: boolean;
+};
+
+export type FriendPrefectureRow = {
+  prefecture_code: string;
+  visit_count: number;
+  last_visited_at: string;
+};
+
+export type FriendCollectionRow = {
+  item_id: string;
+  count: number;
+};
+
+export type FriendRecentVisitRow = {
+  spot_id: string;
+  spot_name: string;
+  visited_at: string;
+  prefecture_code: string;
+  municipality_code: string;
+};
+
 export type DailyStepsRow = {
   user_id: string;
   step_date: string;
@@ -296,6 +363,24 @@ export type Database = {
         Update: Partial<UserGachaItemRow>;
         Relationships: [];
       };
+      friend_codes: {
+        Row: FriendCodeRow;
+        Insert: Partial<FriendCodeRow> & { user_id: string; code: string };
+        Update: Partial<FriendCodeRow>;
+        Relationships: [];
+      };
+      friendships: {
+        Row: FriendshipRow;
+        Insert: FriendshipRow;
+        Update: Partial<FriendshipRow>;
+        Relationships: [];
+      };
+      friend_privacy_settings: {
+        Row: FriendPrivacySettingsRow;
+        Insert: Partial<FriendPrivacySettingsRow> & { user_id: string };
+        Update: Partial<FriendPrivacySettingsRow>;
+        Relationships: [];
+      };
       daily_steps: {
         Row: DailyStepsRow;
         Insert: Partial<DailyStepsRow> & { user_id: string; step_date: string; steps: number };
@@ -331,6 +416,27 @@ export type Database = {
         Returns: Json;
       };
       create_steps_sync_token: { Args: Record<string, never>; Returns: string };
+      get_or_create_friend_code: { Args: Record<string, never>; Returns: string };
+      regenerate_friend_code: { Args: Record<string, never>; Returns: string };
+      add_friend_by_code: { Args: { p_code: string }; Returns: string };
+      remove_friend: { Args: { p_friend_user_id: string }; Returns: undefined };
+      get_friend_list: { Args: Record<string, never>; Returns: FriendListRow[] };
+      get_friend_overview: {
+        Args: { p_friend_user_id: string };
+        Returns: FriendOverviewRow[];
+      };
+      get_friend_prefectures: {
+        Args: { p_friend_user_id: string };
+        Returns: FriendPrefectureRow[];
+      };
+      get_friend_collection: {
+        Args: { p_friend_user_id: string };
+        Returns: FriendCollectionRow[];
+      };
+      get_friend_recent_visits: {
+        Args: { p_friend_user_id: string; p_limit?: number };
+        Returns: FriendRecentVisitRow[];
+      };
       delete_own_account: { Args: Record<string, never>; Returns: undefined };
       record_daily_steps: { Args: { p_step_date: string; p_steps: number }; Returns: number };
       record_daily_steps_with_token: {
