@@ -2,7 +2,7 @@ import { notFound } from "next/navigation";
 import { deleteVisitAction } from "@/app/actions/visits";
 import { PageBody } from "@/components/page-body";
 import { PageHeader } from "@/components/page-header";
-import { getTripOptions } from "@/lib/data/trips";
+import { getRecordDestinationOptions } from "@/lib/data/trips";
 import { getVisitForEdit } from "@/lib/data/visits";
 import { getRecordSpace } from "@/lib/data/space";
 import { requireUser } from "@/lib/supabase/server";
@@ -31,10 +31,11 @@ export default async function EditVisitPage({
 
   const { record, spot, photos } = detail;
 
-  const [trips, { data: tagRows }] = await Promise.all([
-    getTripOptions(supabase, space.tripIds),
+  const [destinations, { data: tagRows }] = await Promise.all([
+    getRecordDestinationOptions(supabase, user.id, space.name, space.tripIds),
     supabase.from("visit_record_tags").select("tag_id").eq("visit_record_id", visitId),
   ]);
+  const trips = destinations.options;
 
   let tags = "";
   if (tagRows && tagRows.length > 0) {
