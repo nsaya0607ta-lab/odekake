@@ -253,6 +253,7 @@ export type FriendRecentVisitRow = {
   visited_at: string;
   prefecture_code: string;
   municipality_code: string;
+  photo_path: string | null;
 };
 
 export type DailyStepsRow = {
