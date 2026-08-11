@@ -46,7 +46,13 @@ export async function updateProfileAction(_prev: ActionState, formData: FormData
 
   if (profileImagePath) {
     const [moved] = await finalizePhotoPaths(supabase, [profileImagePath], `users/${user.id}/profile`);
-    profileImagePath = moved ?? null;
+    if (!moved) {
+      return {
+        error: "プロフィール画像を保存できませんでした。画像を選び直して、もう一度お試しください。",
+        values,
+      };
+    }
+    profileImagePath = moved;
   }
 
   const { data: current } = await supabase
@@ -55,17 +61,40 @@ export async function updateProfileAction(_prev: ActionState, formData: FormData
     .eq("user_id", user.id)
     .maybeSingle();
 
+  // 古いDBに space_name 列がまだない場合でも、画像・名前・自己紹介まで
+  // 巻き添えで保存できなくならないよう、基本プロフィールと旅の名前を分ける。
   const { error } = await supabase
     .from("profiles")
     .update({
       display_name: parsed.data.displayName,
-      space_name: parsed.data.spaceName || null,
       introduction: parsed.data.introduction || null,
       profile_image_url: profileImagePath,
     })
     .eq("user_id", user.id);
 
-  if (error) return { error: toJapaneseError(error, "プロフィールの更新に失敗しました。"), values };
+  if (error) {
+    console.error("[profile/update] Failed to update profile", {
+      code: error.code,
+      message: error.message,
+      details: error.details,
+      hint: error.hint,
+    });
+    return { error: toJapaneseError(error, "プロフィールの更新に失敗しました。"), values };
+  }
+
+  const { error: spaceNameError } = await supabase
+    .from("profiles")
+    .update({ space_name: parsed.data.spaceName || null })
+    .eq("user_id", user.id);
+
+  if (spaceNameError) {
+    console.error("[profile/update] Failed to update space name", {
+      code: spaceNameError.code,
+      message: spaceNameError.message,
+      details: spaceNameError.details,
+      hint: spaceNameError.hint,
+    });
+  }
 
   // 差し替え前の画像を消す。残しておくとストレージに孤立ファイルがたまる
   const previous = current?.profile_image_url ?? null;
@@ -95,7 +124,13 @@ export async function updateProfileAction(_prev: ActionState, formData: FormData
   revalidatePath("/home");
   revalidatePath("/records");
   revalidatePath("/mypage");
-  return { ok: true, message: "プロフィールを更新しました。", values };
+  return {
+    ok: true,
+    message: spaceNameError
+      ? "プロフィールを更新しました。旅の名前はデータベース設定後に変更できます。"
+      : "プロフィールを更新しました。",
+    values,
+  };
 }
 
 export async function updateEmailAction(_prev: ActionState, formData: FormData): Promise<ActionState> {
