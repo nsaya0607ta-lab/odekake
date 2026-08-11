@@ -61,6 +61,7 @@ export function SpotForm({
   initialTripId,
   initialJourneyId,
   lockedTripId,
+  hideDestinationPicker = false,
   visitedAtDefault = "",
   showTripPlanningLink = false,
   locationFromUrl = false,
@@ -76,6 +77,8 @@ export function SpotForm({
   initialTripId?: string;
   initialJourneyId?: string;
   lockedTripId?: string;
+  /** 追加画面ですでに選んだ記録先をhidden項目として保持する */
+  hideDestinationPicker?: boolean;
   visitedAtDefault?: string;
   showTripPlanningLink?: boolean;
   /** 市区町村ページなどから場所を指定して開いた場合。下書きで上書きしない */
@@ -227,13 +230,20 @@ export function SpotForm({
           </Field>
 
           {destinations ? (
-            <RecordDestinationPicker
-              destinations={destinations}
-              initialTripId={state.values?.tripId ?? initialTripId}
-              initialJourneyId={state.values?.journeyId ?? initialJourneyId}
-              lockedTripId={lockedTripId}
-              onChange={(value) => setTripId(value.tripId)}
-            />
+            hideDestinationPicker ? (
+              <>
+                <input type="hidden" name="tripId" value={state.values?.tripId ?? initialTripId ?? ""} />
+                <input type="hidden" name="journeyId" value={state.values?.journeyId ?? initialJourneyId ?? ""} />
+              </>
+            ) : (
+              <RecordDestinationPicker
+                destinations={destinations}
+                initialTripId={state.values?.tripId ?? initialTripId}
+                initialJourneyId={state.values?.journeyId ?? initialJourneyId}
+                lockedTripId={lockedTripId}
+                onChange={(value) => setTripId(value.tripId)}
+              />
+            )
           ) : null}
 
           <Field label="一緒に行った人" htmlFor="companions" optional>

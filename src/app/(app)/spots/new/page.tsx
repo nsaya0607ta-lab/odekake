@@ -37,15 +37,13 @@ export default async function NewSpotPage({
     <>
       <PageHeader title="行った場所を登録" />
       <PageBody>
-        <p className="rounded-2xl bg-leaf-soft px-4 py-3 text-xs leading-relaxed text-leaf-deep">
-          普段のお出かけは「お出かけ」へ保存します。作成済みの旅行に行った記録だけ、記録先で旅行を選べます。
-        </p>
         <SpotForm
           placeSearchEnabled={Boolean(process.env.GOOGLE_PLACES_API_KEY?.trim())}
           userId={user.id}
           destinations={destinations}
           initialTripId={initialRoot?.id}
           initialJourneyId={initialJourneyId}
+          hideDestinationPicker={Boolean(requestedTripId && initialRoot?.id === requestedTripId)}
           visitedAtDefault={todayInJapan()}
           showTripPlanningLink
           locationFromUrl={Boolean(municipality)}
