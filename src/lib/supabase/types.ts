@@ -218,6 +218,11 @@ export type SharedTripListRow = {
   updated_at: string;
 };
 
+export type PersonalRecordTripRow = {
+  trip_id: string;
+  title: string;
+};
+
 export type FriendPrivacySettingsRow = {
   user_id: string;
   show_prefectures: boolean;
@@ -471,6 +476,10 @@ export type Database = {
       respond_shared_trip_invitation: {
         Args: { p_trip_id: string; p_accept: boolean };
         Returns: undefined;
+      };
+      ensure_personal_record_trip: {
+        Args: Record<string, never>;
+        Returns: PersonalRecordTripRow[];
       };
       delete_own_account: { Args: Record<string, never>; Returns: undefined };
       record_daily_steps: { Args: { p_step_date: string; p_steps: number }; Returns: number };
