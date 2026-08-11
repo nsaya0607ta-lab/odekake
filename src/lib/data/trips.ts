@@ -60,17 +60,50 @@ export const getTripSummaries = cache(async function getTripSummaries(supabase: 
 export async function getTripOptions(
   supabase: DB,
   tripIds: string[],
-): Promise<Array<Pick<TripRow, "id" | "title">>> {
+): Promise<Array<Pick<TripRow, "id" | "title" | "owner_id" | "trip_type">>> {
   if (tripIds.length === 0) return [];
   const { data } = await supabase
     .from("trips")
-    .select("id, title, start_date, end_date, description")
+    .select("id, title, owner_id, trip_type, start_date, end_date, description")
     .in("id", tripIds)
     .order("created_at", { ascending: false });
 
   return (data ?? [])
     .filter((trip) => !isPersonalRecordTrip(trip))
-    .map(({ id, title }) => ({ id, title }));
+    .map(({ id, title, owner_id, trip_type }) => ({ id, title, owner_id, trip_type }));
+}
+
+export type RecordDestinationOption = { id: string; title: string };
+
+/** 記録先に、名前を設定した個人旅と参加可能な旅行・共有旅を並べる。 */
+export async function getRecordDestinationOptions(
+  supabase: DB,
+  userId: string,
+  personalSpaceName: string,
+  tripIds: string[],
+): Promise<{ options: RecordDestinationOption[]; personalTripId: string | null }> {
+  const [otherTrips, ensuredPersonalTrip] = await Promise.all([
+    getTripOptions(supabase, tripIds),
+    ensurePersonalRecordTrip(supabase, userId),
+  ]);
+
+  // 旧DBなどで専用保存先を作れない場合も、本人所有の個人旅を候補に残す。
+  const personalTrip =
+    ensuredPersonalTrip ?? otherTrips.find((trip) => trip.owner_id === userId && trip.trip_type === "personal") ?? null;
+  const personalTripId = personalTrip?.id ?? null;
+
+  return {
+    personalTripId,
+    options: [
+      ...(personalTripId ? [{ id: personalTripId, title: `個人｜${personalSpaceName}` }] : []),
+      ...otherTrips
+        .filter((trip) => trip.id !== personalTripId)
+        .map((trip) => ({
+          id: trip.id,
+          title: trip.trip_type === "shared" ? `共有旅｜${trip.title}` : `旅行｜${trip.title}`,
+        })),
+    ],
+  };
 }
 
 /**
@@ -101,6 +134,7 @@ export async function ensurePersonalRecordTrip(
       id: crypto.randomUUID(),
       owner_id: userId,
       title: PERSONAL_RECORD_TRIP_TITLE,
+      trip_type: "personal",
       start_date: null,
       end_date: null,
       description: PERSONAL_RECORD_TRIP_DESCRIPTION,
