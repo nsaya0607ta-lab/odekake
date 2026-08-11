@@ -13,7 +13,7 @@ import {
   getFriendPrefectures,
   getFriendRecentVisits,
 } from "@/lib/data/friends";
-import { signPhotoPath } from "@/lib/data/photos";
+import { signPhotoPath, signPhotoPaths } from "@/lib/data/photos";
 import { getExpProgress } from "@/lib/exp";
 import { getMunicipality } from "@/lib/geo/municipalities";
 import { PREFECTURE_NAMES } from "@/lib/geo/prefecture-names";
@@ -53,7 +53,13 @@ export default async function FriendDetailPage({
       overview.show_collection ? getFriendCollection(supabase, friendId) : Promise.resolve([]),
       overview.show_recent_visits ? getFriendRecentVisits(supabase, friendId, 5) : Promise.resolve([]),
     ]);
-    const avatarUrl = await signPhotoPath(supabase, overview.profile_image_url);
+    const [avatarUrl, visitPhotoUrls] = await Promise.all([
+      signPhotoPath(supabase, overview.profile_image_url),
+      signPhotoPaths(
+        supabase,
+        recentVisits.flatMap((visit) => (visit.photo_path ? [visit.photo_path] : [])),
+      ),
+    ]);
     const level = getExpProgress(overview.total_exp).level;
 
     return (
@@ -94,7 +100,11 @@ export default async function FriendDetailPage({
 
           <PrefectureSection visible={overview.show_prefectures} prefectures={prefectures} />
           <CollectionSection visible={overview.show_collection} collection={collection} friendId={friendId} />
-          <RecentVisitsSection visible={overview.show_recent_visits} visits={recentVisits} />
+          <RecentVisitsSection
+            visible={overview.show_recent_visits}
+            visits={recentVisits}
+            photoUrls={visitPhotoUrls}
+          />
 
           <form action={removeFriendAction}>
             <input type="hidden" name="friendUserId" value={friendId} />
@@ -223,7 +233,15 @@ function CollectionSection({
   );
 }
 
-function RecentVisitsSection({ visible, visits }: { visible: boolean; visits: FriendRecentVisitRow[] }) {
+function RecentVisitsSection({
+  visible,
+  visits,
+  photoUrls,
+}: {
+  visible: boolean;
+  visits: FriendRecentVisitRow[];
+  photoUrls: Map<string, string>;
+}) {
   return (
     <section className="space-y-3">
       <SectionTitle>最近のおでかけ</SectionTitle>
@@ -236,6 +254,7 @@ function RecentVisitsSection({ visible, visits }: { visible: boolean; visits: Fr
           {visits.map((visit, index) => {
             const prefecture = PREFECTURE_BY_CODE.get(visit.prefecture_code) ?? visit.prefecture_code;
             const municipality = getMunicipality(visit.municipality_code)?.name ?? visit.municipality_code;
+            const photoUrl = visit.photo_path ? photoUrls.get(visit.photo_path) ?? null : null;
             return (
               <li key={`${visit.spot_id}-${visit.visited_at}-${index}`} className="flex gap-3 px-4 py-4">
                 <span className="w-11 shrink-0 text-sm font-bold text-leaf-deep tabular-nums">
@@ -248,6 +267,15 @@ function RecentVisitsSection({ visible, visits }: { visible: boolean; visits: Fr
                     {prefecture} {municipality}
                   </span>
                 </span>
+                {photoUrl ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img
+                    src={photoUrl}
+                    alt=""
+                    className="h-16 w-16 shrink-0 rounded-2xl border border-line object-cover"
+                    loading="lazy"
+                  />
+                ) : null}
               </li>
             );
           })}
