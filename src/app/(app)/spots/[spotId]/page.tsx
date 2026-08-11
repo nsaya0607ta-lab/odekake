@@ -17,8 +17,8 @@ import { PageHeader } from "@/components/page-header";
 import { PhotoGallery } from "@/components/photo-gallery";
 import { StarRating, TripBadge, formatDate } from "@/components/ui";
 import { getSpotDetail } from "@/lib/data/spots";
+import { getMapScope, mapScopeHref } from "@/lib/data/map-scope";
 import { getMunicipality, getPrefecture, municipalityFromAddress } from "@/lib/geo";
-import { getRecordSpace } from "@/lib/data/space";
 import { requireUser } from "@/lib/supabase/server";
 import type { LocationSource } from "@/lib/supabase/types";
 import { FavoriteButton } from "./favorite-button";
@@ -48,16 +48,16 @@ export default async function SpotDetailPage({
   searchParams,
 }: {
   params: Promise<{ spotId: string }>;
-  searchParams: Promise<{ saved?: string; error?: string }>;
+  searchParams: Promise<{ saved?: string; error?: string; trip?: string }>;
 }) {
-  const [{ spotId }, { saved, error }, { supabase, user }] = await Promise.all([
+  const [{ spotId }, { saved, error, trip }, { supabase, user }] = await Promise.all([
     params,
     searchParams,
     requireUser(),
   ]);
 
-  const space = await getRecordSpace(supabase, user.id);
-  const detail = await getSpotDetail(supabase, spotId, space.tripIds);
+  const scope = await getMapScope(supabase, user.id, trip);
+  const detail = await getSpotDetail(supabase, spotId, scope.tripIds);
   if (!detail) notFound();
 
   const { spot, categoryName, summary, visits, galleryUrls } = detail;
@@ -82,7 +82,7 @@ export default async function SpotDetailPage({
 
   const backHref =
     prefecture && municipality
-      ? `/map/${prefecture.region.slug}/${prefecture.code}/${municipality.code}`
+      ? mapScopeHref(`/map/${prefecture.region.slug}/${prefecture.code}/${municipality.code}`, scope)
       : "/records?tab=spots";
 
   return (
@@ -90,7 +90,9 @@ export default async function SpotDetailPage({
       <SpotLocationRepair spotId={spot.id} needed={locationRepairNeeded} />
       <PageHeader
         title={spot.name}
-        subtitle={municipality ? `${prefecture?.name ?? ""}${municipality.name}` : undefined}
+        subtitle={`${scope.kind === "shared" ? "共有旅" : "個人の旅"}・${scope.name}${
+          municipality ? `・${prefecture?.name ?? ""}${municipality.name}` : ""
+        }`}
         backHref={backHref}
         action={
           spot.created_by === user.id ? (
@@ -130,6 +132,7 @@ export default async function SpotDetailPage({
             <form action={toggleSpotFavoriteAction} className="shrink-0">
               <input type="hidden" name="spotId" value={spot.id} />
               <input type="hidden" name="favorite" value={myFavorite ? "" : "on"} />
+              <input type="hidden" name="scopeTrip" value={scope.value} />
               <FavoriteButton favorite={myFavorite} disabled={myVisits.length === 0} />
             </form>
           </div>
@@ -213,7 +216,10 @@ export default async function SpotDetailPage({
 
           {municipality && prefecture ? (
             <Link
-              href={`/map/${prefecture.region.slug}/${prefecture.code}/${municipality.code}`}
+              href={mapScopeHref(
+                `/map/${prefecture.region.slug}/${prefecture.code}/${municipality.code}`,
+                scope,
+              )}
               className="block text-center text-sm text-leaf-deep underline underline-offset-4"
             >
               {municipality.name}のスポット一覧を見る
@@ -305,7 +311,7 @@ export default async function SpotDetailPage({
           )}
         </section>
 
-        <Link href={`/visits/new?spot=${spot.id}`} className="btn btn-primary w-full">
+        <Link href={mapScopeHref("/visits/new", scope, { spot: spot.id })} className="btn btn-primary w-full">
           訪問履歴を追加する
         </Link>
       </PageBody>

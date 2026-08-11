@@ -92,6 +92,7 @@ export default async function MunicipalityPage({
       ? mapScopeHref(`/map/${region.slug}/${prefecture.code}/area/${area}`, scope)
       : mapScopeHref(`/map/${region.slug}/${prefecture.code}`, scope);
   const totalVisits = spots.reduce((sum, spot) => sum + spot.visitCount, 0);
+  const detailHrefSuffix = scope.kind === "shared" ? `?trip=${encodeURIComponent(scope.value)}` : "";
 
   return (
     <>
@@ -123,7 +124,12 @@ export default async function MunicipalityPage({
           </div>
         </section>
 
-        <SpotPinMap spots={spots} municipalityName={municipality.name} shape={shapeForPins} />
+        <SpotPinMap
+          spots={spots}
+          municipalityName={municipality.name}
+          shape={shapeForPins}
+          detailHrefSuffix={detailHrefSuffix}
+        />
 
         {spots.length === 0 ? (
           <EmptyState
@@ -135,7 +141,7 @@ export default async function MunicipalityPage({
         ) : (
           <section className="space-y-2">
             <h2 className="px-1 text-base font-bold">訪問したスポット</h2>
-            <SpotBrowser spots={spots} categories={categories} />
+            <SpotBrowser spots={spots} categories={categories} detailHrefSuffix={detailHrefSuffix} />
           </section>
         )}
       </PageBody>

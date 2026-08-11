@@ -35,6 +35,7 @@ export function VisitForm({
   trips,
   defaults,
   initialPhotos = [],
+  lockedTripId,
 }: {
   userId: string;
   mode: "create" | "edit";
@@ -45,6 +46,7 @@ export function VisitForm({
   trips: TripOption[];
   defaults: VisitFormDefaults;
   initialPhotos?: UploadedPhoto[];
+  lockedTripId?: string;
 }) {
   const action = mode === "create" ? createVisitAction : updateVisitAction;
   const [state, formAction] = useActionState(action, emptyActionState);
@@ -125,21 +127,30 @@ export function VisitForm({
       </Field>
 
       <Field label="旅行" htmlFor="tripId" error={state.fieldErrors?.tripId}>
-        <select
-          id="tripId"
-          name="tripId"
-          className="field"
-          value={tripId}
-          onChange={(e) => setTripId(e.target.value)}
-          required
-        >
-          <option value="">選択してください</option>
-          {trips.map((trip) => (
-            <option key={trip.id} value={trip.id}>
-              {trip.title}
-            </option>
-          ))}
-        </select>
+        {lockedTripId ? (
+          <>
+            <input type="hidden" id="tripId" name="tripId" value={lockedTripId} />
+            <p className="field flex items-center bg-paper-deep font-semibold">
+              {trips.find((trip) => trip.id === lockedTripId)?.title ?? "選択中の旅"}
+            </p>
+          </>
+        ) : (
+          <select
+            id="tripId"
+            name="tripId"
+            className="field"
+            value={tripId}
+            onChange={(e) => setTripId(e.target.value)}
+            required
+          >
+            <option value="">選択してください</option>
+            {trips.map((trip) => (
+              <option key={trip.id} value={trip.id}>
+                {trip.title}
+              </option>
+            ))}
+          </select>
+        )}
       </Field>
 
       <Field label="一緒に行った人" htmlFor="companions" optional>

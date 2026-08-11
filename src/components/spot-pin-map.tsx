@@ -17,10 +17,12 @@ export function SpotPinMap({
   spots,
   municipalityName,
   shape,
+  detailHrefSuffix = "",
 }: {
   spots: SpotSummary[];
   municipalityName: string;
   shape: MunicipalityShapeForPins | null;
+  detailHrefSuffix?: string;
 }) {
   const plottable = useMemo(
     () => spots.filter((spot): spot is PinSpot => spot.latitude !== null && spot.longitude !== null),
@@ -135,7 +137,7 @@ export function SpotPinMap({
 
       {active ? (
         <Link
-          href={`/spots/${active.id}`}
+          href={`/spots/${active.id}${detailHrefSuffix}`}
           className="pressable mx-4 my-4 flex items-center gap-3 rounded-2xl border border-line bg-card p-3"
         >
           {active.photoUrl ? (

@@ -335,7 +335,7 @@ export async function createVisitedSpotAction(_prev: ActionState, formData: Form
     .select("id, spot_id")
     .eq("id", parsed.data.visitId)
     .maybeSingle();
-  if (savedVisit) redirect(`/spots/${savedVisit.spot_id}?saved=1`);
+  if (savedVisit) redirect(`/spots/${savedVisit.spot_id}?saved=1&trip=${parsed.data.tripId}`);
 
   const spotResult = await insertSpot(supabase, user.id, parsed.data, location);
   let spotId = spotResult.data?.id ?? null;
@@ -406,7 +406,7 @@ export async function createVisitedSpotAction(_prev: ActionState, formData: Form
   revalidatePath("/records");
   revalidatePath(`/spots/${spotId}`);
   revalidatePath(`/trips/${parsed.data.tripId}`);
-  redirect(`/spots/${spotId}?saved=1`);
+  redirect(`/spots/${spotId}?saved=1&trip=${parsed.data.tripId}`);
 }
 
 export async function updateSpotAction(_prev: ActionState, formData: FormData): Promise<ActionState> {

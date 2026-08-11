@@ -20,9 +20,11 @@ export function SpotBrowser({
   spots,
   categories,
   search,
+  detailHrefSuffix = "",
 }: {
   spots: SpotSummary[];
   categories: Array<{ id: number; name: string }>;
+  detailHrefSuffix?: string;
   /**
    * 検索をサーバー側で行う場合の設定。
    * 一覧をページ送りしている画面では、読み込み済みの分だけを絞ると
@@ -262,7 +264,7 @@ export function SpotBrowser({
         <ul className="space-y-2">
           {filtered.map((spot) => (
             <li key={spot.id}>
-              <SpotCard spot={spot} />
+              <SpotCard spot={spot} detailHrefSuffix={detailHrefSuffix} />
             </li>
           ))}
         </ul>
@@ -271,10 +273,16 @@ export function SpotBrowser({
   );
 }
 
-export function SpotCard({ spot }: { spot: SpotSummary }) {
+export function SpotCard({
+  spot,
+  detailHrefSuffix = "",
+}: {
+  spot: SpotSummary;
+  detailHrefSuffix?: string;
+}) {
   return (
     <Link
-      href={`/spots/${spot.id}`}
+      href={`/spots/${spot.id}${detailHrefSuffix}`}
       className="rough-card flex gap-3 p-3 transition-transform active:scale-[0.99]"
     >
       <span className="h-20 w-20 shrink-0 overflow-hidden rounded-2xl bg-paper-deep">

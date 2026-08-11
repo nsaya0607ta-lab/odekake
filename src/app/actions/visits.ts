@@ -10,6 +10,7 @@ import { finalizePhotoPaths } from "@/lib/photos";
 import { requireUser } from "@/lib/supabase/server";
 import { PHOTO_BUCKET, type DB } from "@/lib/data/client";
 import { syncVisitTags } from "@/lib/data/tags";
+import { getMapScope, mapScopeHref } from "@/lib/data/map-scope";
 
 const optionalText = (max: number) =>
   z
@@ -155,7 +156,7 @@ export async function createVisitAction(_prev: ActionState, formData: FormData):
 
   // 二重送信の防止: 同じ ID がすでに保存済みなら詳細へ進む
   const { data: existing } = await supabase.from("visit_records").select("id").eq("id", visitId).maybeSingle();
-  if (existing) redirect(`/spots/${parsed.data.spotId}?saved=1`);
+  if (existing) redirect(`/spots/${parsed.data.spotId}?saved=1&trip=${parsed.data.tripId}`);
 
   const { error } = await supabase.from("visit_records").insert({
     id: visitId,
@@ -188,7 +189,7 @@ export async function createVisitAction(_prev: ActionState, formData: FormData):
   revalidatePath("/records");
   revalidatePath(`/spots/${parsed.data.spotId}`);
   revalidatePath(`/trips/${parsed.data.tripId}`);
-  redirect(`/spots/${parsed.data.spotId}?saved=1`);
+  redirect(`/spots/${parsed.data.spotId}?saved=1&trip=${parsed.data.tripId}`);
 }
 
 export async function updateVisitAction(_prev: ActionState, formData: FormData): Promise<ActionState> {
@@ -242,7 +243,7 @@ export async function updateVisitAction(_prev: ActionState, formData: FormData):
   revalidatePath("/home");
   revalidatePath("/mypage/exp-history");
   revalidatePath(`/spots/${parsed.data.spotId}`);
-  redirect(`/spots/${parsed.data.spotId}?saved=1`);
+  redirect(`/spots/${parsed.data.spotId}?saved=1&trip=${parsed.data.tripId}`);
 }
 
 export async function deleteVisitAction(formData: FormData) {
@@ -294,21 +295,31 @@ export async function deleteVisitAction(formData: FormData) {
 export async function toggleSpotFavoriteAction(formData: FormData) {
   const spotId = String(formData.get("spotId") ?? "");
   const next = String(formData.get("favorite") ?? "") === "on";
+  const requestedScope = String(formData.get("scopeTrip") ?? "");
 
   if (!isUuid(spotId)) redirect("/records?tab=spots");
 
   const { supabase, user } = await requireUser();
+  const scope = await getMapScope(
+    supabase,
+    user.id,
+    requestedScope && requestedScope !== "personal" ? requestedScope : undefined,
+  );
 
-  const { data: visits } = await supabase
+  let visitsQuery = supabase
     .from("visit_records")
     .select("id")
     .eq("spot_id", spotId)
-    .eq("user_id", user.id)
+    .eq("user_id", user.id);
+  if (scope.tripIds.length > 0) visitsQuery = visitsQuery.in("trip_id", scope.tripIds);
+  else visitsQuery = visitsQuery.eq("trip_id", "00000000-0000-0000-0000-000000000000");
+
+  const { data: visits } = await visitsQuery
     .order("visited_at", { ascending: false })
     .order("created_at", { ascending: false });
 
   const ids = (visits ?? []).map((visit) => visit.id);
-  if (ids.length === 0) redirect(`/spots/${spotId}?error=favorite`);
+  if (ids.length === 0) redirect(mapScopeHref(`/spots/${spotId}`, scope, { error: "favorite" }));
 
   if (next) {
     await supabase.from("visit_records").update({ favorite: true }).eq("id", ids[0]!);

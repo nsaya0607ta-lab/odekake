@@ -32,6 +32,9 @@ export default async function NewVisitPage({
     requestedTripId && trips.some((trip) => trip.id === requestedTripId)
       ? requestedTripId
       : (destinations.personalTripId ?? trips[0]?.id ?? "");
+  const lockedTripId = requestedTripId && trips.some((trip) => trip.id === requestedTripId)
+    ? requestedTripId
+    : undefined;
 
   return (
     <>
@@ -49,6 +52,7 @@ export default async function NewVisitPage({
           spotId={spot.id}
           spotName={spot.name}
           trips={trips}
+          lockedTripId={lockedTripId}
           defaults={{
             visitedAt: todayInJapan(),
             tripId: initialTripId,

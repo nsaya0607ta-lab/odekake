@@ -61,6 +61,7 @@ export function SpotForm({
   placeSearchEnabled = false,
   userId,
   trips = [],
+  lockedTripId,
   visitedAtDefault = "",
   showTripPlanningLink = false,
   locationFromUrl = false,
@@ -73,6 +74,7 @@ export function SpotForm({
   placeSearchEnabled?: boolean;
   userId?: string;
   trips?: SpotFormTrip[];
+  lockedTripId?: string;
   visitedAtDefault?: string;
   showTripPlanningLink?: boolean;
   /** 市区町村ページなどから場所を指定して開いた場合。下書きで上書きしない */
@@ -224,21 +226,30 @@ export function SpotForm({
           </Field>
 
           <Field label="記録先" htmlFor="tripId" error={state.fieldErrors?.tripId}>
-            <select
-              id="tripId"
-              name="tripId"
-              className="field"
-              value={tripId}
-              onChange={(event) => setTripId(event.target.value)}
-              required
-            >
-              <option value="">選択してください</option>
-              {trips.map((trip) => (
-                <option key={trip.id} value={trip.id}>
-                  {trip.title}
-                </option>
-              ))}
-            </select>
+            {lockedTripId ? (
+              <>
+                <input type="hidden" id="tripId" name="tripId" value={lockedTripId} />
+                <p className="field flex items-center bg-paper-deep font-semibold">
+                  {trips.find((trip) => trip.id === lockedTripId)?.title ?? "選択中の旅"}
+                </p>
+              </>
+            ) : (
+              <select
+                id="tripId"
+                name="tripId"
+                className="field"
+                value={tripId}
+                onChange={(event) => setTripId(event.target.value)}
+                required
+              >
+                <option value="">選択してください</option>
+                {trips.map((trip) => (
+                  <option key={trip.id} value={trip.id}>
+                    {trip.title}
+                  </option>
+                ))}
+              </select>
+            )}
           </Field>
 
           <Field label="一緒に行った人" htmlFor="companions" optional>

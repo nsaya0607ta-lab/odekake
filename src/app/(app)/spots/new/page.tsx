@@ -27,6 +27,9 @@ export default async function NewSpotPage({
   ]);
 
   const tripOptions = destinations.options;
+  const lockedTripId = requestedTripId && tripOptions.some((trip) => trip.id === requestedTripId)
+    ? requestedTripId
+    : undefined;
   const trips = requestedTripId
     ? [...tripOptions].sort((a, b) => Number(b.id === requestedTripId) - Number(a.id === requestedTripId))
     : tripOptions;
@@ -43,6 +46,7 @@ export default async function NewSpotPage({
           placeSearchEnabled={Boolean(process.env.GOOGLE_PLACES_API_KEY?.trim())}
           userId={user.id}
           trips={trips}
+          lockedTripId={lockedTripId}
           visitedAtDefault={todayInJapan()}
           showTripPlanningLink
           locationFromUrl={Boolean(municipality)}
