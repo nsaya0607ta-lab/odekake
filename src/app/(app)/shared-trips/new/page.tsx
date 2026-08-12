@@ -9,17 +9,22 @@ import { SharedTripForm } from "./shared-trip-form";
 export const metadata = { title: "共有旅を作る | おでかけ記録" };
 export const dynamic = "force-dynamic";
 
-export default async function NewSharedTripPage() {
-  const { supabase } = await requireUser();
+export default async function NewSharedTripPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ from?: string }>;
+}) {
+  const [{ supabase }, params] = await Promise.all([requireUser(), searchParams]);
   const [friendsStatus, sharedStatus] = await Promise.all([
     getFriendsSetupStatus(supabase),
     getSharedTripsSetupStatus(supabase),
   ]);
   const friends = friendsStatus.ready && sharedStatus.ready ? await getFriendList(supabase) : [];
+  const backHref = params.from === "friends" ? "/mypage/friends" : "/shared-trips";
 
   return (
     <>
-      <PageHeader title="共有旅を作る" backHref="/shared-trips" />
+      <PageHeader title="共有旅を作る" backHref={backHref} />
       <PageBody>
         {!sharedStatus.ready ? <SetupCard /> : friends.length === 0 ? (
           <div className="rough-card px-6 py-9 text-center">

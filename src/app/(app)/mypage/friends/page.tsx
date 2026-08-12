@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { FriendCodeControls } from "@/components/friends/friend-controls";
-import { IconChevronRight, IconSliders, IconUser, IconUsers } from "@/components/icons";
+import { IconChevronRight, IconPlus, IconSliders, IconUser, IconUsers } from "@/components/icons";
 import { PageBody } from "@/components/page-body";
 import { PageHeader } from "@/components/page-header";
 import { COLLECTION_ITEMS } from "@/lib/collection/items";
@@ -40,8 +40,7 @@ export default async function FriendsPage({
   } catch (error) {
     if (error instanceof FriendsUnavailableError) {
       setupStatus = { ready: false, reason: "migration_required" };
-    }
-    else throw error;
+    } else throw error;
   }
 
   const avatarUrls = !setupStatus.ready
@@ -55,7 +54,7 @@ export default async function FriendsPage({
     <>
       <PageHeader
         title="フレンド"
-        backHref="/mypage"
+        backHref="/home"
         action={
           <Link
             href="/mypage/friends/settings"
@@ -77,6 +76,11 @@ export default async function FriendsPage({
               </p>
             ) : null}
             <FriendCodeControls initialCode={friendCode} />
+
+            <Link href="/shared-trips/new?from=friends" className="btn btn-primary w-full">
+              <IconPlus size={18} />
+              フレンドと共有旅を作る
+            </Link>
 
             <section className="space-y-3">
               <div className="flex items-center justify-between px-1">
@@ -140,6 +144,7 @@ export default async function FriendsPage({
     </>
   );
 }
+
 function PreparingCard({
   reason,
 }: {
