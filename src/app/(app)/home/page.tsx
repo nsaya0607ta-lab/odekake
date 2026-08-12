@@ -1,20 +1,13 @@
 import Link from "next/link";
 import { CollectionBookArt } from "@/components/collection/collection-ui";
-import {
-  IconCalendar,
-  IconChevronRight,
-  IconHome,
-  IconMapPin,
-  IconNotebook,
-  IconPlus,
-  IconUser,
-} from "@/components/icons";
+import { IconCalendar, IconChevronRight, IconMapPin, IconPlus, IconUser } from "@/components/icons";
 import { JourneyScopeSwitcher, type JourneyScopeOption } from "@/components/journey-scope-switcher";
 import { TopHeader } from "@/components/page-header";
 import { PageBody } from "@/components/page-body";
 import { CoinBadge } from "@/components/coin-badge";
 import { SharedTripBadge } from "@/components/shared-trip-badge";
 import { HomeScene } from "@/components/home-scene";
+import { HomeStatsCard } from "@/components/home-stats-card";
 import { LevelTag } from "@/components/level-tag";
 import { StepsTag } from "@/components/steps-tag";
 import { TodayStepsCard } from "@/components/today-steps-card";
@@ -137,31 +130,15 @@ export default async function HomePage({
             {/* 犬はカード全体を基準に歩くので、絵の箱の外に置く */}
             <WanderingFrenchie level={expProgress.level} skin={dogSkin} />
           </div>
-
-          <div className="grid grid-cols-3 divide-x divide-line px-2 py-4 text-center">
-            <DashboardStat
-              icon={<IconMapPin size={18} />}
-              value={areas.totals.visitedPrefectures}
-              unit={`/ ${PREFECTURES.length}`}
-              label="都道府県"
-              tone="blossom"
-            />
-            <DashboardStat
-              icon={<IconHome size={18} />}
-              value={areas.totals.visitedMunicipalities}
-              unit={`/ ${MUNICIPALITIES.length}`}
-              label="市区町村など"
-              tone="sky"
-            />
-            <DashboardStat
-              icon={<IconNotebook size={18} />}
-              value={areas.totals.visits}
-              unit="回"
-              label="訪問数"
-              tone="leaf"
-            />
-          </div>
         </section>
+
+        <HomeStatsCard
+          prefectures={areas.totals.visitedPrefectures}
+          prefectureTotal={PREFECTURES.length}
+          municipalities={areas.totals.visitedMunicipalities}
+          municipalityTotal={MUNICIPALITIES.length}
+          visits={areas.totals.visits}
+        />
 
         <Link
           href="/collection"
@@ -339,36 +316,5 @@ function TripSection({
         </ul>
       )}
     </section>
-  );
-}
-
-function DashboardStat({
-  icon,
-  value,
-  unit,
-  label,
-  tone,
-}: {
-  icon: React.ReactNode;
-  value: number;
-  unit?: string;
-  label: string;
-  tone: "blossom" | "sky" | "leaf";
-}) {
-  const toneClass = {
-    blossom: "bg-blossom-soft text-[#95505e]",
-    sky: "bg-sky-soft text-[#42718f]",
-    leaf: "bg-leaf-soft text-leaf-deep",
-  }[tone];
-
-  return (
-    <div className="flex min-w-0 flex-col items-center gap-1 px-1">
-      <span className={`flex h-9 w-9 items-center justify-center rounded-full ${toneClass}`}>{icon}</span>
-      <span className="mt-1 flex items-baseline gap-0.5">
-        <span className="text-2xl leading-none font-bold tabular-nums">{value}</span>
-        {unit ? <span className="text-[10px] text-ink-faint tabular-nums">{unit}</span> : null}
-      </span>
-      <span className="whitespace-nowrap text-[10px] leading-tight text-ink-soft">{label}</span>
-    </div>
   );
 }
