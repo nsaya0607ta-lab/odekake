@@ -60,7 +60,7 @@ export function HomeStatsCard({
   visits: number;
 }) {
   return (
-    <section aria-label="訪れたところ">
+    <section aria-label="訪れたところ" className="-mx-3">
       <div className="relative" style={{ aspectRatio: CARD_RATIO }}>
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img
