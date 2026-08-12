@@ -16,6 +16,7 @@
 export const SCENE_RATIO = "1440 / 768";
 
 const SCENE_SRC = "/characters/home-scene.webp";
+const FRAME_SRC = "/home-scene-frame.svg";
 
 /**
  * 板の位置（絵の箱に対する％）。元画像 1717×916 上で実測した座標から出している。
@@ -76,6 +77,15 @@ export function HomeScene({ children }: { children?: React.ReactNode }) {
         className="pointer-events-none absolute inset-0 h-full w-full select-none"
       />
       {children}
+      {/* アップロードされた額縁デザインを、犬や背景の上に透明オーバーレイする */}
+      {/* eslint-disable-next-line @next/next/no-img-element */}
+      <img
+        src={FRAME_SRC}
+        alt=""
+        aria-hidden="true"
+        draggable={false}
+        className="pointer-events-none absolute inset-0 z-50 h-full w-full select-none"
+      />
     </div>
   );
 }
