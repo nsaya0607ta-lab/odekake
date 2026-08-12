@@ -60,7 +60,7 @@ export default async function HomePage({
         }
       />
 
-      <PageBody>
+      <PageBody className="!space-y-3 !py-2">
         {notice === "password-updated" ? (
           <p className="rounded-2xl border border-leaf bg-leaf-soft px-4 py-3 text-sm text-leaf-deep">
             パスワードを変更しました。
@@ -103,7 +103,7 @@ export default async function HomePage({
           </span>
         </Link>
 
-        <div className="space-y-3">
+        <div className="space-y-2">
           <section className="rough-card overflow-visible">
             <div className="relative aspect-[1440/768] overflow-visible bg-transparent">
               <HomeScene>
