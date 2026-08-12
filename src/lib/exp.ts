@@ -53,6 +53,46 @@ export const LEVEL_REWARDS: readonly LevelReward[] = [
   { level: 30, name: "うれしいダンス", kind: "motion", pose: "dance" },
 ] as const;
 
+/**
+ * 歩数EXPがもらえる歩数のライン。
+ *
+ * supabase/migrations/0009_odekake_exp.sql の record_daily_steps と同じ段階にしてある。
+ * EXP を配るのは DB 側なので、ここは「あと何歩で次のEXPか」を表示するためだけに使う。
+ * 片方だけ変えると表示と実際の付与がずれるので、必ず両方そろえて直す。
+ */
+export const STEP_EXP_MILESTONES = [
+  1000, 2000, 3000, 4000, 5000, 6000, 7000, 8000, 9000, 10000, 12000, 15000, 20000,
+] as const;
+
+export type StepProgress = {
+  /** 次にEXPがもらえる歩数。すべて到達済みなら null */
+  nextMilestone: number | null;
+  /** 次のラインまでの残り歩数。すべて到達済みなら null */
+  remainingSteps: number | null;
+  /** ひとつ前のラインから次のラインまでの進み具合（%） */
+  progressPercent: number;
+};
+
+/** 今日の歩数から「次の歩数EXPまで」の進み具合を出す */
+export function getStepProgress(steps: number | null | undefined): StepProgress {
+  const safeSteps = Math.max(0, Math.floor(steps ?? 0));
+  const nextMilestone = STEP_EXP_MILESTONES.find((milestone) => safeSteps < milestone) ?? null;
+
+  if (nextMilestone === null) {
+    return { nextMilestone: null, remainingSteps: null, progressPercent: 100 };
+  }
+
+  const passed = STEP_EXP_MILESTONES.filter((milestone) => milestone <= safeSteps);
+  const previousMilestone = passed.at(-1) ?? 0;
+  const span = nextMilestone - previousMilestone;
+
+  return {
+    nextMilestone,
+    remainingSteps: nextMilestone - safeSteps,
+    progressPercent: Math.min(100, Math.max(0, ((safeSteps - previousMilestone) / span) * 100)),
+  };
+}
+
 export type ExpProgress = {
   level: number;
   totalExp: number;

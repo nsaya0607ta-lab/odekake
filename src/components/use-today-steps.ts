@@ -3,12 +3,6 @@
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useRef, useState } from "react";
 
-type Props = {
-  initialSteps: number | null;
-  initialStepExp: number;
-  initialCoinBalance: number;
-};
-
 type TodayStepsResponse = {
   ok: boolean;
   todaySteps: number | null;
@@ -19,7 +13,22 @@ type TodayStepsResponse = {
   coinRepairApplied: boolean;
 };
 
-export function TodayStepsCard({ initialSteps, initialStepExp, initialCoinBalance }: Props) {
+/**
+ * 今日の歩数・歩数EXPを /api/steps/today で最新に保つ。
+ *
+ * 表示側（おさんぽ看板）から取り出したもので、取得の間隔・タイミングは
+ * 以前の TodayStepsCard のまま変えていない。歩数コインの補填も
+ * このエンドポイント側で走るので、呼び出しを止めないこと。
+ */
+export function useTodaySteps({
+  initialSteps,
+  initialStepExp,
+  initialCoinBalance,
+}: {
+  initialSteps: number | null;
+  initialStepExp: number;
+  initialCoinBalance: number;
+}) {
   const router = useRouter();
   const [steps, setSteps] = useState(initialSteps);
   const [stepExp, setStepExp] = useState(initialStepExp);
@@ -74,19 +83,5 @@ export function TodayStepsCard({ initialSteps, initialStepExp, initialCoinBalanc
     };
   }, [refresh]);
 
-  return (
-    <div className="rough-card flex h-full min-h-0 flex-col items-center justify-center overflow-hidden bg-sun-soft/45 p-4 text-center">
-      <span className="flex h-14 w-14 shrink-0 items-center justify-center rounded-full border border-[#e8d4aa] bg-card text-2xl shadow-sm">
-        👟
-      </span>
-      <p className="mt-3 whitespace-nowrap text-xs text-ink-soft">今日のおでかけ</p>
-      <p className="mt-1 flex items-baseline justify-center gap-1 whitespace-nowrap text-ink" aria-live="polite">
-        <span className="text-3xl font-bold tabular-nums">{steps === null ? "—" : steps.toLocaleString("ja-JP")}</span>
-        <span className="text-xs text-ink-soft">歩</span>
-      </p>
-      <p className="mt-3 whitespace-nowrap text-[10px] text-ink-faint">
-        {steps === null ? "ショートカット連携前" : `今日の歩数EXP +${stepExp}`}
-      </p>
-    </div>
-  );
+  return { steps, stepExp };
 }

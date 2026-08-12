@@ -175,9 +175,26 @@ const STEP_MS = 420;
 /** 振り向きにかける時間（ms）。止まっている間に終わる */
 const TURN_MS = 520;
 
-/** 小さくなった右側のレベル看板を避けつつ、空いた中央右寄りまで歩かせる。 */
-const MIN_X = 18;
-const MAX_X = 45;
+/**
+ * 散歩エリアの左 1/3 は「おでかけレベル」「今日のおさんぽ」の看板が占めている。
+ * 犬はそこへ入らず、右 2/3 だけを歩く（WalkSigns の横幅と必ずそろえる）。
+ */
+const WALK_ZONE_LEFT = 36;
+/** 足元の高さ（エリア下端からの %）。手前ほど低く、奥ほど高い位置に立つ */
+const BOTTOM_MIN = 4;
+const BOTTOM_SPAN = 15;
+
+/**
+ * 歩ける範囲。左右は犬の幅の半分ぶん、上は犬の高さぶん内側に寄せて、
+ * どの端でもエリアからはみ出さないようにする。
+ */
+type Field = { minX: number; maxX: number; maxBottom: number };
+
+const DEFAULT_FIELD: Field = {
+  minX: WALK_ZONE_LEFT + 16,
+  maxX: 84,
+  maxBottom: BOTTOM_MIN + BOTTOM_SPAN,
+};
 
 type Walker = {
   x: number;
@@ -208,7 +225,7 @@ export function WanderingFrenchie({
     ...MOTIONS.filter((motion) => motion.level <= level).map((motion) => motion.id),
   ];
   const [walker, setWalker] = useState<Walker>({
-    x: 26,
+    x: DEFAULT_FIELD.minX + (DEFAULT_FIELD.maxX - DEFAULT_FIELD.minX) / 2,
     depth: 0.45,
     facing: 1,
     pose: "stand",
@@ -218,6 +235,54 @@ export function WanderingFrenchie({
   const [stepUp, setStepUp] = useState(false);
   const poseNodes = useRef<Record<string, HTMLImageElement | null>>({});
   const bobNode = useRef<HTMLDivElement>(null);
+  const fieldNode = useRef<HTMLDivElement>(null);
+  const walkerNode = useRef<HTMLDivElement>(null);
+  // 歩く範囲は実寸から決める。歩行ループの途中でも読めるよう ref に持ち、
+  // 立ち位置の上限だけは描画に効くので state にも映す。
+  const fieldRef = useRef<Field>(DEFAULT_FIELD);
+  const [maxBottom, setMaxBottom] = useState(DEFAULT_FIELD.maxBottom);
+
+  useEffect(() => {
+    const field = fieldNode.current;
+    const dog = walkerNode.current;
+    if (!field || !dog) return;
+
+    const measure = () => {
+      const fieldWidth = field.clientWidth;
+      const fieldHeight = field.clientHeight;
+      if (!fieldWidth || !fieldHeight) return;
+
+      // 絵は translateX(-50%) で置いてあるので、左右とも幅の半分だけ余白がいる。
+      // 奥行きの縮小（最大 16%）は幅を小さくする方向なので、等倍で見ておけば足りる。
+      const halfWidth = (dog.offsetWidth / fieldWidth) * 50;
+      const minX = WALK_ZONE_LEFT + halfWidth;
+      const maxX = 100 - halfWidth;
+      const middle = (WALK_ZONE_LEFT + 100) / 2;
+      const fitsX = minX < maxX;
+
+      const nextMaxBottom = Math.max(
+        0,
+        Math.min(BOTTOM_MIN + BOTTOM_SPAN, ((fieldHeight - dog.offsetHeight) / fieldHeight) * 100),
+      );
+
+      fieldRef.current = {
+        minX: fitsX ? minX : middle,
+        maxX: fitsX ? maxX : middle,
+        maxBottom: nextMaxBottom,
+      };
+      setMaxBottom(nextMaxBottom);
+      setWalker((current) => ({
+        ...current,
+        x: Math.min(fieldRef.current.maxX, Math.max(fieldRef.current.minX, current.x)),
+      }));
+    };
+
+    measure();
+    const observer = new ResizeObserver(measure);
+    observer.observe(field);
+    observer.observe(dog);
+    return () => observer.disconnect();
+  }, []);
 
   useEffect(() => {
     if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
@@ -240,11 +305,12 @@ export function WanderingFrenchie({
     };
 
     const startWalk = (from: Walker) => {
+      const { minX, maxX } = fieldRef.current;
       // ちょこっと動いて止まる、を避けてある程度の距離を歩かせる
-      let target = rand(MIN_X, MAX_X);
-      if (Math.abs(target - from.x) < 7) {
-        const middle = (MIN_X + MAX_X) / 2;
-        target = from.x < middle ? rand(middle + 2, MAX_X) : rand(MIN_X, middle - 2);
+      let target = rand(minX, maxX);
+      if (Math.abs(target - from.x) < 7 && maxX - minX > 4) {
+        const middle = (minX + maxX) / 2;
+        target = from.x < middle ? rand(middle + 2, maxX) : rand(minX, middle - 2);
       }
       const facing: 1 | -1 = target > from.x ? -1 : 1;
       const depth = Math.min(1, Math.max(0, from.depth + rand(-0.35, 0.35)));
@@ -261,9 +327,11 @@ export function WanderingFrenchie({
       });
     };
 
-    wait(700, () =>
-      startWalk({ x: 26, depth: 0.45, facing: 1, pose: "stand", walking: false, travelMs: 0 }),
-    );
+    wait(700, () => {
+      const { minX, maxX } = fieldRef.current;
+      const x = minX + (maxX - minX) / 2;
+      startWalk({ x, depth: 0.45, facing: 1, pose: "stand", walking: false, travelMs: 0 });
+    });
 
     return () => {
       cancelled = true;
@@ -314,7 +382,11 @@ export function WanderingFrenchie({
   }, [walker.pose, walker.walking]);
 
   return (
-    <div className="pointer-events-none absolute inset-0 overflow-hidden" aria-hidden="true">
+    <div
+      ref={fieldNode}
+      className="pointer-events-none absolute inset-0 overflow-hidden"
+      aria-hidden="true"
+    >
       <style>{`
         /* 上下は1歩ごと、左右の揺れは2歩で1往復。踏み替え（0% / 50%）を必ず
            いちばん低いところに合わせると、絵が入れ替わる瞬間が沈み込みに隠れる */
@@ -644,12 +716,13 @@ export function WanderingFrenchie({
 
       {/* 移動 */}
       <div
+        ref={walkerNode}
         className={`absolute w-[118px] transition-[left,bottom,transform] ease-linear sm:w-[132px] ${
           walker.walking ? "frenchie-walking" : ""
         }`}
         style={{
           left: `${walker.x}%`,
-          bottom: `${4 + walker.depth * 15}%`,
+          bottom: `${Math.min(BOTTOM_MIN + walker.depth * BOTTOM_SPAN, maxBottom)}%`,
           transitionDuration: `${walker.travelMs || 420}ms`,
           transform: `translateX(-50%) scale(${1 - walker.depth * 0.16})`,
           transformOrigin: "50% 100%",

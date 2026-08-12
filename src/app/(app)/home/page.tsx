@@ -14,9 +14,9 @@ import { TopHeader } from "@/components/page-header";
 import { PageBody } from "@/components/page-body";
 import { CoinBadge } from "@/components/coin-badge";
 import { SharedTripBadge } from "@/components/shared-trip-badge";
-import { LevelTag } from "@/components/level-tag";
-import { TodayStepsCard } from "@/components/today-steps-card";
 import { EmptyState, LinkRow, formatDate } from "@/components/ui";
+import { WalkSceneArt } from "@/components/walk-scene-art";
+import { WalkSigns } from "@/components/walk-signs";
 import { WanderingFrenchie } from "@/components/wandering-frenchie";
 import { COLLECTION_ITEMS, countOwned } from "@/lib/collection/items";
 import { loadAreaIndex } from "@/lib/data/areas";
@@ -120,19 +120,16 @@ export default async function HomePage({
         </Link>
 
         <section className="rough-card overflow-hidden">
-          <div className="relative h-52 overflow-hidden bg-leaf-soft sm:h-56">
-            <div className="absolute inset-x-0 bottom-0 h-24 bg-[#eef3e5]" />
-            <div className="absolute -left-14 bottom-[-42px] h-32 w-72 rounded-[50%] bg-[#e3ecd7]" />
-            <div className="absolute right-[-42px] bottom-[-54px] h-36 w-80 rounded-[50%] bg-[#dce8cf]" />
-            <div className="absolute left-[10%] top-6 h-4 w-10 rounded-full bg-white/55" />
-            <div className="absolute left-[32%] top-10 h-3 w-8 rounded-full bg-white/45" />
-            <div className="absolute right-12 top-5 h-10 w-10 rounded-full border border-[#d7b87d] bg-[#f8e7ca]" />
-            <div className="absolute bottom-5 left-[8%] h-6 w-2 rounded-full bg-[#91aa75]" />
-            <div className="absolute bottom-4 left-[7.2%] h-5 w-5 rounded-[50%] bg-[#b9cf9f]" />
-            <div className="absolute bottom-7 left-[43%] h-8 w-2 rounded-full bg-[#91aa75]" />
-            <div className="absolute bottom-6 left-[41.8%] h-6 w-6 rounded-[50%] bg-[#b9cf9f]" />
+          {/* おさんぽ広場。左1/3は看板、右2/3が犬の歩くエリア */}
+          <div className="relative h-[300px] overflow-hidden bg-leaf-soft sm:h-[336px]">
+            <WalkSceneArt />
             <WanderingFrenchie level={expProgress.level} skin={dogSkin} />
-            <LevelTag progress={expProgress} />
+            <WalkSigns
+              progress={expProgress}
+              initialSteps={expDashboard.todaySteps}
+              initialStepExp={expDashboard.todayStepExp}
+              initialCoinBalance={coins.balance}
+            />
           </div>
 
           <div className="grid grid-cols-3 divide-x divide-line px-2 py-4 text-center">
@@ -179,74 +176,62 @@ export default async function HomePage({
           <IconChevronRight size={18} className="shrink-0 text-ink-faint" />
         </Link>
 
-        <div className="grid grid-cols-2 items-stretch gap-3">
-          <section className="grid min-w-0 grid-rows-[40px_240px]">
-            <div className="flex h-10 items-center justify-between gap-2 px-1">
-              <h2 className="truncate text-base font-bold">最近の記録</h2>
-              <Link href="/records" className="flex shrink-0 items-center gap-0.5 text-sm text-leaf-deep">
-                すべて見る
-                <IconChevronRight size={15} />
-              </Link>
-            </div>
-            {latest ? (
-              <Link
-                href={`/spots/${latest.spotId}`}
-                className="rough-card flex h-full min-h-0 flex-col justify-between overflow-hidden p-4 active:scale-[0.99]"
-              >
-                <div className="min-h-0">
-                  <span className="mb-3 flex h-14 w-14 overflow-hidden rounded-2xl bg-paper-deep">
-                    {latest.photoUrls[0] ? (
-                      // eslint-disable-next-line @next/next/no-img-element
-                      <img src={latest.photoUrls[0]} alt="" className="h-full w-full object-cover" />
-                    ) : (
-                      <span className="flex h-full w-full items-center justify-center text-ink-faint">
-                        <IconMapPin size={20} />
-                      </span>
-                    )}
-                  </span>
-                  <span className="block line-clamp-2 font-bold leading-snug">{latest.spotName}</span>
-                  <span className="mt-1 block line-clamp-2 text-xs leading-relaxed text-ink-soft">
-                    {latest.municipalityName}・{latest.tripTitle}
-                  </span>
-                </div>
-                <span className="flex items-center justify-between gap-1 text-xs text-ink-faint">
-                  <span className="flex min-w-0 items-center gap-1 truncate">
-                    <IconCalendar size={13} />
-                    {formatDate(latest.visitedAt)}
-                  </span>
-                  <IconChevronRight size={17} className="shrink-0" />
+        {/* 今日の歩数はおさんぽ広場の看板へ移したので、最近の記録は1列で並ぶ */}
+        <section className="grid min-w-0 grid-rows-[40px_240px]">
+          <div className="flex h-10 items-center justify-between gap-2 px-1">
+            <h2 className="truncate text-base font-bold">最近の記録</h2>
+            <Link href="/records" className="flex shrink-0 items-center gap-0.5 text-sm text-leaf-deep">
+              すべて見る
+              <IconChevronRight size={15} />
+            </Link>
+          </div>
+          {latest ? (
+            <Link
+              href={`/spots/${latest.spotId}`}
+              className="rough-card flex h-full min-h-0 flex-col justify-between overflow-hidden p-4 active:scale-[0.99]"
+            >
+              <div className="min-h-0">
+                <span className="mb-3 flex h-14 w-14 overflow-hidden rounded-2xl bg-paper-deep">
+                  {latest.photoUrls[0] ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img src={latest.photoUrls[0]} alt="" className="h-full w-full object-cover" />
+                  ) : (
+                    <span className="flex h-full w-full items-center justify-center text-ink-faint">
+                      <IconMapPin size={20} />
+                    </span>
+                  )}
                 </span>
-              </Link>
-            ) : (
-              <div className="rough-card flex h-full min-h-0 flex-col items-center justify-center overflow-hidden px-4 text-center">
-                <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-paper-deep text-ink-faint">
-                  <IconMapPin size={20} />
+                <span className="block line-clamp-2 font-bold leading-snug">{latest.spotName}</span>
+                <span className="mt-1 block line-clamp-2 text-xs leading-relaxed text-ink-soft">
+                  {latest.municipalityName}・{latest.tripTitle}
                 </span>
-                <p className="mt-3 text-sm font-bold">まだ記録がありません</p>
-                <p className="mt-2 line-clamp-2 text-[11px] leading-relaxed text-ink-soft">
-                  訪れた場所を記録するとここに表示されます。
-                </p>
-                <Link
-                  href="/add"
-                  className="mt-4 shrink-0 rounded-full border border-leaf bg-leaf-soft px-4 py-2 text-xs font-semibold text-leaf-deep"
-                >
-                  記録を追加する
-                </Link>
               </div>
-            )}
-          </section>
-
-          <section className="grid min-w-0 grid-rows-[40px_240px]">
-            <div className="flex h-10 items-center px-1">
-              <h2 className="truncate text-base font-bold">今日の歩数</h2>
+              <span className="flex items-center justify-between gap-1 text-xs text-ink-faint">
+                <span className="flex min-w-0 items-center gap-1 truncate">
+                  <IconCalendar size={13} />
+                  {formatDate(latest.visitedAt)}
+                </span>
+                <IconChevronRight size={17} className="shrink-0" />
+              </span>
+            </Link>
+          ) : (
+            <div className="rough-card flex h-full min-h-0 flex-col items-center justify-center overflow-hidden px-4 text-center">
+              <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-paper-deep text-ink-faint">
+                <IconMapPin size={20} />
+              </span>
+              <p className="mt-3 text-sm font-bold">まだ記録がありません</p>
+              <p className="mt-2 line-clamp-2 text-[11px] leading-relaxed text-ink-soft">
+                訪れた場所を記録するとここに表示されます。
+              </p>
+              <Link
+                href="/add"
+                className="mt-4 shrink-0 rounded-full border border-leaf bg-leaf-soft px-4 py-2 text-xs font-semibold text-leaf-deep"
+              >
+                記録を追加する
+              </Link>
             </div>
-            <TodayStepsCard
-              initialSteps={expDashboard.todaySteps}
-              initialStepExp={expDashboard.todayStepExp}
-              initialCoinBalance={coins.balance}
-            />
-          </section>
-        </div>
+          )}
+        </section>
 
         <TripSection
           trips={trips}
