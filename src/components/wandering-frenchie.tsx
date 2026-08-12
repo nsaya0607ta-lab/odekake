@@ -175,9 +175,15 @@ const STEP_MS = 420;
 /** 振り向きにかける時間（ms）。止まっている間に終わる */
 const TURN_MS = 520;
 
-/** 小さくなった右側のレベル看板を避けつつ、空いた中央右寄りまで歩かせる。 */
-const MIN_X = 18;
-const MAX_X = 45;
+/**
+ * 歩き回れる範囲（カード幅に対する％。犬の中心の位置）。
+ *
+ * 左半分はレベル・歩数の看板が占めているので、犬は空いている右側を歩く。犬の絵は
+ * 118px 幅で中心合わせなので、右端いっぱいまで行かせるとカードから半身はみ出して
+ * 切れる。左は看板に、右はカードの縁に、それぞれ被らないところで止めてある。
+ */
+const MIN_X = 60;
+const MAX_X = 83;
 
 type Walker = {
   x: number;
@@ -208,7 +214,7 @@ export function WanderingFrenchie({
     ...MOTIONS.filter((motion) => motion.level <= level).map((motion) => motion.id),
   ];
   const [walker, setWalker] = useState<Walker>({
-    x: 26,
+    x: 70,
     depth: 0.45,
     facing: 1,
     pose: "stand",
@@ -262,7 +268,7 @@ export function WanderingFrenchie({
     };
 
     wait(700, () =>
-      startWalk({ x: 26, depth: 0.45, facing: 1, pose: "stand", walking: false, travelMs: 0 }),
+      startWalk({ x: 70, depth: 0.45, facing: 1, pose: "stand", walking: false, travelMs: 0 }),
     );
 
     return () => {
