@@ -1,6 +1,8 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { toggleSpotFavoriteAction } from "@/app/actions/visits";
+import { deleteMySpotRecordsAction } from "@/app/actions/spot-records";
+import { deleteVisitAction, toggleSpotFavoriteAction } from "@/app/actions/visits";
+import { ConfirmSubmitButton } from "@/components/confirm-submit-button";
 import {
   IconCalendar,
   IconSliders,
@@ -117,6 +119,12 @@ export default async function SpotDetailPage({
         {error === "favorite" ? (
           <p className="rounded-2xl border border-blossom bg-blossom-soft px-4 py-3 text-sm text-[#8f4c59]">
             お気に入りは訪問の記録に付きます。先に訪問履歴を追加してください。
+          </p>
+        ) : null}
+
+        {error === "delete" ? (
+          <p className="rounded-2xl border border-blossom bg-blossom-soft px-4 py-3 text-sm text-[#8f4c59]">
+            記録を削除できませんでした。もう一度お試しください。
           </p>
         ) : null}
 
@@ -298,12 +306,25 @@ export default async function SpotDetailPage({
                   ) : null}
 
                   {record.user_id === user.id ? (
-                    <Link
-                      href={`/visits/${record.id}/edit`}
-                      className="inline-block text-sm text-leaf-deep underline underline-offset-4"
-                    >
-                      この記録を編集する
-                    </Link>
+                    <div className="flex items-center gap-4 border-t border-line pt-2">
+                      <Link
+                        href={`/visits/${record.id}/edit`}
+                        className="text-sm text-leaf-deep underline underline-offset-4"
+                      >
+                        編集する
+                      </Link>
+                      <form action={deleteVisitAction}>
+                        <input type="hidden" name="visitId" value={record.id} />
+                        <input type="hidden" name="spotId" value={spot.id} />
+                        <ConfirmSubmitButton
+                          message={`${formatDate(record.visited_at)}の訪問記録を削除します。写真も削除されます。よろしいですか？`}
+                          pendingLabel="削除中…"
+                          className="text-sm font-semibold text-[#a85858] underline underline-offset-4 disabled:opacity-50"
+                        >
+                          削除する
+                        </ConfirmSubmitButton>
+                      </form>
+                    </div>
                   ) : null}
                 </li>
               ))}
@@ -319,6 +340,29 @@ export default async function SpotDetailPage({
         >
           訪問履歴を追加する
         </Link>
+
+        {myVisits.length > 0 ? (
+          <section className="rough-card space-y-3 border-blossom p-5">
+            <div>
+              <h2 className="font-bold">この場所を自分の記録から消す</h2>
+              <p className="mt-1.5 text-xs leading-relaxed text-ink-soft">
+                この場所にある自分の訪問履歴を{myVisits.length}件すべて削除します。地図やスポット一覧からも自分の訪問として表示されなくなります。
+              </p>
+              <p className="mt-1 text-[11px] leading-relaxed text-ink-faint">
+                場所そのものは他のユーザーも使うため削除しません。
+              </p>
+            </div>
+            <form action={deleteMySpotRecordsAction}>
+              <input type="hidden" name="spotId" value={spot.id} />
+              <ConfirmSubmitButton
+                message={`「${spot.name}」にある自分の訪問記録${myVisits.length}件をすべて削除します。写真も削除され、元に戻せません。よろしいですか？`}
+                pendingLabel="削除中…"
+              >
+                この場所の自分の記録をすべて削除
+              </ConfirmSubmitButton>
+            </form>
+          </section>
+        ) : null}
       </PageBody>
     </>
   );
