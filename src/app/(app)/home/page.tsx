@@ -8,6 +8,7 @@ import {
   IconNotebook,
   IconPlus,
 } from "@/components/icons";
+import { JourneyScopeSwitcher, type JourneyScopeOption } from "@/components/journey-scope-switcher";
 import { TopHeader } from "@/components/page-header";
 import { PageBody } from "@/components/page-body";
 import { CoinBadge } from "@/components/coin-badge";
@@ -22,7 +23,12 @@ import { getCoinSummary } from "@/lib/data/coins";
 import { getOwnedItemIds } from "@/lib/data/collection";
 import { getCurrentDogSkin } from "@/lib/data/dog-skin";
 import { getExpDashboard } from "@/lib/data/exp";
-import { formatTripPeriod, getTripSummaries, type TripSummary } from "@/lib/data/trips";
+import {
+  formatTripPeriod,
+  getRecordDestinationHierarchy,
+  getTripSummaries,
+  type TripSummary,
+} from "@/lib/data/trips";
 import { getTimeline } from "@/lib/data/visits";
 import { getRecordSpace } from "@/lib/data/space";
 import { getExpProgress } from "@/lib/exp";
@@ -32,11 +38,24 @@ import { requireUser } from "@/lib/supabase/server";
 export const metadata = { title: "あなたの旅 | おでかけ記録" };
 export const dynamic = "force-dynamic";
 
-export default async function HomePage({ searchParams }: { searchParams: Promise<{ notice?: string }> }) {
-  const [{ supabase, user }, { notice }] = await Promise.all([requireUser(), searchParams]);
+export default async function HomePage({
+  searchParams,
+}: {
+  searchParams: Promise<{ notice?: string; scopeTrip?: string }>;
+}) {
+  const [{ supabase, user }, { notice, scopeTrip }] = await Promise.all([requireUser(), searchParams]);
   const space = await getRecordSpace(supabase, user.id);
+  const destinations = await getRecordDestinationHierarchy(supabase, user.id, space.name);
+  const roots = [...(destinations.personal ? [destinations.personal] : []), ...destinations.shared];
+  const selectedRoot = roots.find((root) => root.kind === "shared" && root.id === scopeTrip) ?? destinations.personal ?? roots[0] ?? null;
+  const scopeOptions: JourneyScopeOption[] = roots.map((root) => ({
+    value: root.kind === "personal" ? "personal" : root.id,
+    name: root.title,
+    kind: root.kind,
+  }));
+  const selectedScopeValue = selectedRoot?.kind === "shared" ? selectedRoot.id : "personal";
 
-  const [areas, recent, trips, expDashboard, coins, ownedItemIds, dogSkin] = await Promise.all([
+  const [areas, recent, allTrips, expDashboard, coins, ownedItemIds, dogSkin] = await Promise.all([
     loadAreaIndex(supabase, space.tripIds),
     getTimeline(supabase, { tripIds: space.tripIds, limit: 4 }),
     getTripSummaries(supabase),
@@ -46,6 +65,9 @@ export default async function HomePage({ searchParams }: { searchParams: Promise
     getCurrentDogSkin(supabase, user.id),
   ]);
 
+  const trips = selectedRoot
+    ? allTrips.filter((summary) => summary.trip.parent_trip_id === selectedRoot.id)
+    : allTrips;
   const latest = recent[0] ?? null;
   const expProgress = getExpProgress(expDashboard.totalExp);
   const collectedItems = countOwned(COLLECTION_ITEMS, ownedItemIds);
@@ -215,8 +237,11 @@ export default async function HomePage({ searchParams }: { searchParams: Promise
           trips={trips}
           emptyTitle="旅行計画はまだありません"
           emptyDescription="旅行としてまとめたい予定があるときだけ作成できます。"
+          scopeOptions={scopeOptions}
+          selectedScopeValue={selectedScopeValue}
+          selectedRootId={selectedRoot?.id}
+          selectedSharedRootId={selectedRoot?.kind === "shared" ? selectedRoot.id : undefined}
         />
-
       </PageBody>
     </>
   );
@@ -226,29 +251,49 @@ function TripSection({
   trips,
   emptyTitle,
   emptyDescription,
+  scopeOptions,
+  selectedScopeValue,
+  selectedRootId,
+  selectedSharedRootId,
 }: {
   trips: TripSummary[];
   emptyTitle: string;
   emptyDescription: string;
+  scopeOptions: JourneyScopeOption[];
+  selectedScopeValue: string;
+  selectedRootId?: string;
+  selectedSharedRootId?: string;
 }) {
-  const createHref = "/trips/new";
+  const createHref = selectedRootId ? `/trips/new?parent=${encodeURIComponent(selectedRootId)}` : "/trips/new";
+  const recordsHref = `/records?tab=trips${selectedSharedRootId ? `&scopeTrip=${encodeURIComponent(selectedSharedRootId)}` : ""}`;
 
   return (
     <section>
-      <div className="mb-2 flex items-baseline justify-between gap-3 px-1">
-        <h2 className="text-base font-bold">
-          旅行
-          {trips.length > 0 ? (
-            <span className="ml-1.5 text-sm font-normal text-ink-faint tabular-nums">{trips.length}件</span>
+      <div className="mb-2 flex flex-wrap items-center justify-between gap-2 px-1">
+        <div className="flex min-w-0 items-center gap-2">
+          <h2 className="text-base font-bold">
+            旅行
+            {trips.length > 0 ? (
+              <span className="ml-1.5 text-sm font-normal text-ink-faint tabular-nums">{trips.length}件</span>
+            ) : null}
+          </h2>
+          {scopeOptions.length > 1 ? (
+            <JourneyScopeSwitcher
+              options={scopeOptions}
+              selectedValue={selectedScopeValue}
+              basePath="/home"
+              queryKey="scopeTrip"
+              triggerLabel="切り替え"
+            />
           ) : null}
-        </h2>
+        </div>
         <div className="flex items-center gap-3">
           <Link href={createHref} className="flex items-center gap-0.5 text-sm text-leaf-deep">
             <IconPlus size={15} />
             つくる
           </Link>
           {trips.length > 3 ? (
-            <Link href="/records?tab=trips" className="flex items-center gap-0.5 text-sm text-leaf-deep">
+            <Link href={recordsHref} className="flex items-center gap-0.5 text-sm text-leaf-deep">
               すべて見る
               <IconChevronRight size={15} />
             </Link>

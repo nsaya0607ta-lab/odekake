@@ -1,12 +1,13 @@
 import Link from "next/link";
 import { IconChevronRight, IconNotebook } from "@/components/icons";
+import { JourneyScopeSwitcher, type JourneyScopeOption } from "@/components/journey-scope-switcher";
 import { PageBody } from "@/components/page-body";
 import { TopHeader } from "@/components/page-header";
 import { SpotBrowser } from "@/components/spot-browser";
 import { TimelineCard } from "@/components/timeline-card";
 import { EmptyState } from "@/components/ui";
 import { loadCategoryNames, getSpotPage } from "@/lib/data/spots";
-import { formatTripPeriod, getTripSummaries } from "@/lib/data/trips";
+import { formatTripPeriod, getRecordDestinationHierarchy, getTripSummaries } from "@/lib/data/trips";
 import { getCalendarVisits, getTimeline } from "@/lib/data/visits";
 import { getRecordSpace, type RecordSpace } from "@/lib/data/space";
 import { requireUser } from "@/lib/supabase/server";
@@ -29,25 +30,45 @@ const PAGE_SIZE = 30;
 function parseShown(value: string | undefined): number {
   const parsed = Number(value);
   if (!Number.isInteger(parsed) || parsed <= 0) return PAGE_SIZE;
-  // URL をいじって極端な値を入れられても、1画面の読み込み量を抑える
   return Math.min(parsed, PAGE_SIZE * 20);
 }
 
 export default async function RecordsPage({
   searchParams,
 }: {
-  searchParams: Promise<{ tab?: string; shown?: string; q?: string; recordTrip?: string; recordJourney?: string }>;
+  searchParams: Promise<{
+    tab?: string;
+    shown?: string;
+    q?: string;
+    recordTrip?: string;
+    recordJourney?: string;
+    scopeTrip?: string;
+  }>;
 }) {
-  const [{ tab: tabParam, shown: shownParam, q, recordTrip, recordJourney }, { supabase, user }] = await Promise.all([
-    searchParams,
-    requireUser(),
-  ]);
+  const [
+    { tab: tabParam, shown: shownParam, q, recordTrip, recordJourney, scopeTrip },
+    { supabase, user },
+  ] = await Promise.all([searchParams, requireUser()]);
 
   const tab: RecordTab = TABS.some((t) => t.key === tabParam) ? (tabParam as RecordTab) : "timeline";
   const shown = parseShown(shownParam);
   const keyword = (q ?? "").slice(0, 100);
-  const space = await getRecordSpace(supabase, user.id);
-  let spotSpace = space;
+  const personalSpace = await getRecordSpace(supabase, user.id);
+  const destinations = await getRecordDestinationHierarchy(supabase, user.id, personalSpace.name);
+  const roots = [...(destinations.personal ? [destinations.personal] : []), ...destinations.shared];
+  const selectedRoot = roots.find((root) => root.kind === "shared" && root.id === scopeTrip) ?? destinations.personal ?? roots[0] ?? null;
+
+  const scopeOptions: JourneyScopeOption[] = roots.map((root) => ({
+    value: root.kind === "personal" ? "personal" : root.id,
+    name: root.title,
+    kind: root.kind,
+  }));
+  const selectedScopeValue = selectedRoot?.kind === "shared" ? selectedRoot.id : "personal";
+  const scopeSpace: RecordSpace = selectedRoot
+    ? { name: selectedRoot.title, tripIds: [selectedRoot.id] }
+    : personalSpace;
+
+  let spotSpace = scopeSpace;
   if (recordTrip) {
     const { data: accessibleRoot } = await supabase
       .from("trips")
@@ -55,19 +76,51 @@ export default async function RecordsPage({
       .eq("id", recordTrip)
       .is("parent_trip_id", null)
       .maybeSingle();
-    if (accessibleRoot) spotSpace = { ...space, tripIds: [accessibleRoot.id] };
+    if (accessibleRoot) spotSpace = { ...scopeSpace, tripIds: [accessibleRoot.id] };
   }
 
   return (
     <>
-      <TopHeader title="記録" subtitle={space.name} />
+      <TopHeader
+        title="記録"
+        subtitle={scopeSpace.name}
+        action={
+          scopeOptions.length > 1 ? (
+            <JourneyScopeSwitcher
+              options={scopeOptions}
+              selectedValue={selectedScopeValue}
+              basePath="/records"
+              queryKey="scopeTrip"
+              triggerLabel="旅を切り替え"
+              preserveParams={{ tab }}
+            />
+          ) : undefined
+        }
+      />
       <PageBody>
-        <RecordTabs tabs={TABS} current={tab} />
+        <RecordTabs tabs={TABS} current={tab} scopeTrip={selectedRoot?.kind === "shared" ? selectedRoot.id : undefined} />
 
-        {tab === "timeline" ? <TimelineTab supabase={supabase} space={space} shown={shown} /> : null}
-        {tab === "trips" ? <TripsTab supabase={supabase} /> : null}
-        {tab === "spots" ? <SpotsTab supabase={supabase} space={spotSpace} shown={shown} keyword={keyword} recordTrip={recordTrip} recordJourney={recordJourney} /> : null}
-        {tab === "calendar" ? <CalendarTab supabase={supabase} space={space} /> : null}
+        {tab === "timeline" ? (
+          <TimelineTab
+            supabase={supabase}
+            space={scopeSpace}
+            shown={shown}
+            scopeTrip={selectedRoot?.kind === "shared" ? selectedRoot.id : undefined}
+          />
+        ) : null}
+        {tab === "trips" ? <TripsTab supabase={supabase} rootId={selectedRoot?.id} /> : null}
+        {tab === "spots" ? (
+          <SpotsTab
+            supabase={supabase}
+            space={spotSpace}
+            shown={shown}
+            keyword={keyword}
+            recordTrip={recordTrip}
+            recordJourney={recordJourney}
+            scopeTrip={selectedRoot?.kind === "shared" ? selectedRoot.id : undefined}
+          />
+        ) : null}
+        {tab === "calendar" ? <CalendarTab supabase={supabase} space={scopeSpace} /> : null}
       </PageBody>
     </>
   );
@@ -75,9 +128,20 @@ export default async function RecordsPage({
 
 type SupabaseArg = Awaited<ReturnType<typeof requireUser>>["supabase"];
 
-function MoreButton({ tab, shown, keyword }: { tab: RecordTab; shown: number; keyword?: string }) {
+function MoreButton({
+  tab,
+  shown,
+  keyword,
+  scopeTrip,
+}: {
+  tab: RecordTab;
+  shown: number;
+  keyword?: string;
+  scopeTrip?: string;
+}) {
   const params = new URLSearchParams({ tab, shown: String(shown + PAGE_SIZE) });
   if (keyword) params.set("q", keyword);
+  if (scopeTrip) params.set("scopeTrip", scopeTrip);
 
   return (
     <Link href={`/records?${params.toString()}`} scroll={false} className="btn btn-quiet w-full">
@@ -90,12 +154,13 @@ async function TimelineTab({
   supabase,
   space,
   shown,
+  scopeTrip,
 }: {
   supabase: SupabaseArg;
   space: RecordSpace;
   shown: number;
+  scopeTrip?: string;
 }) {
-  // 1件多く読んで、次のページがあるかを確かめる
   const items = await getTimeline(supabase, { tripIds: space.tripIds, limit: shown + 1 });
   const hasMore = items.length > shown;
   const page = hasMore ? items.slice(0, shown) : items;
@@ -121,22 +186,25 @@ async function TimelineTab({
           </li>
         ))}
       </ul>
-      {hasMore ? <MoreButton tab="timeline" shown={shown} /> : null}
+      {hasMore ? <MoreButton tab="timeline" shown={shown} scopeTrip={scopeTrip} /> : null}
     </div>
   );
 }
 
-async function TripsTab({ supabase }: { supabase: SupabaseArg }) {
+async function TripsTab({ supabase, rootId }: { supabase: SupabaseArg; rootId?: string }) {
   const all = await getTripSummaries(supabase);
-  // 日程のない旅行は「普段のおでかけ」の内部保存先なので旅行タブには出さない
-  const trips = all.filter((t) => t.trip.start_date || t.trip.end_date);
+  const trips = all.filter(
+    (t) =>
+      (t.trip.start_date || t.trip.end_date) &&
+      (!rootId || t.trip.parent_trip_id === rootId),
+  );
 
   if (trips.length === 0) {
     return (
       <EmptyState
         title="旅行計画がありません"
         description="日程のある旅行を作ると、ここに予定や過去の旅行が並びます。"
-        actionHref="/trips/new"
+        actionHref={rootId ? `/trips/new?parent=${encodeURIComponent(rootId)}` : "/trips/new"}
         actionLabel="旅行の計画を立てる"
       />
     );
@@ -171,6 +239,7 @@ async function SpotsTab({
   keyword,
   recordTrip,
   recordJourney,
+  scopeTrip,
 }: {
   supabase: SupabaseArg;
   space: RecordSpace;
@@ -178,10 +247,10 @@ async function SpotsTab({
   keyword: string;
   recordTrip?: string;
   recordJourney?: string;
+  scopeTrip?: string;
 }) {
   const [{ spots, hasMore }, categoryNames] = await Promise.all([
     getSpotPage(supabase, space.tripIds, {
-      // スポット登録直後で訪問履歴がまだ無い場所も一覧に出す
       includeUnvisited: true,
       limit: shown,
       keyword,
@@ -194,7 +263,7 @@ async function SpotsTab({
       <EmptyState
         title={`「${keyword}」に一致するスポットがありません`}
         description="別の言葉で探すか、検索欄を空にして一覧に戻してください。"
-        actionHref="/records?tab=spots"
+        actionHref={`/records?tab=spots${scopeTrip ? `&scopeTrip=${encodeURIComponent(scopeTrip)}` : ""}`}
         actionLabel="検索を解除する"
       />
     ) : (
@@ -212,14 +281,19 @@ async function SpotsTab({
       <SpotBrowser
         spots={spots}
         categories={[...categoryNames.entries()].map(([id, name]) => ({ id, name }))}
-        search={{ action: "/records", keyword, hiddenFields: {
-          tab: "spots",
-          ...(recordTrip ? { recordTrip } : {}),
-          ...(recordJourney ? { recordJourney } : {}),
-        } }}
+        search={{
+          action: "/records",
+          keyword,
+          hiddenFields: {
+            tab: "spots",
+            ...(scopeTrip ? { scopeTrip } : {}),
+            ...(recordTrip ? { recordTrip } : {}),
+            ...(recordJourney ? { recordJourney } : {}),
+          },
+        }}
         detailHrefSuffix={recordTrip ? `?recordTrip=${encodeURIComponent(recordTrip)}${recordJourney ? `&recordJourney=${encodeURIComponent(recordJourney)}` : ""}` : ""}
       />
-      {hasMore ? <MoreButton tab="spots" shown={shown} keyword={keyword} /> : null}
+      {hasMore ? <MoreButton tab="spots" shown={shown} keyword={keyword} scopeTrip={scopeTrip} /> : null}
     </div>
   );
 }
