@@ -3,7 +3,7 @@
 import dynamic from "next/dynamic";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useDraftState } from "@/components/use-draft-state";
-import { IconCheck, IconChevronDown, IconMapPin, IconSearch, IconSpinner } from "@/components/icons";
+import { IconCheck, IconMapPin, IconSearch, IconSpinner } from "@/components/icons";
 import {
   getMunicipality,
   getMunicipalitiesByPrefecture,
@@ -36,6 +36,7 @@ export type SpotLocation = {
 export type PlaceAutofill = Pick<PlaceCandidate, "name" | "address" | "postalCode">;
 
 type OtherTab = "municipality" | "map";
+type SearchMode = "nearby" | "keyword" | "region";
 type SearchOrigin = { latitude: number; longitude: number; accuracyMeters: number | null };
 type SearchLocationStatus = "idle" | "loading" | "ready" | "denied" | "error" | "unsupported";
 
@@ -48,12 +49,6 @@ const SOURCE_LABELS: Record<LocationSource, string> = {
   map: "地図で選んだ地点",
   device: "現在地",
   place_search: "Google マップの検索結果",
-};
-
-const formatAccuracy = (meters: number | null) => {
-  if (meters === null || !Number.isFinite(meters) || meters < 0) return null;
-  if (meters < 1000) return `およそ ±${Math.round(meters)}m`;
-  return `およそ ±${(meters / 1000).toFixed(1)}km`;
 };
 
 const formatDistance = (meters: number | null) => {
@@ -119,11 +114,12 @@ export function LocationPicker({
 }) {
   const provider = useMemo(() => getPlaceSearchProvider(placeSearchEnabled), [placeSearchEnabled]);
   const rootRef = useRef<HTMLDivElement>(null);
+  const searchInputRef = useRef<HTMLInputElement>(null);
   // 場所は hidden input で送るため、FormDraft の DOM 復元では戻せない。
   // React 側が値を持っているので、このコンポーネント自身で下書きを保存する。
   const [value, setValue] = useDraftState<SpotLocation>(draftKey, initial, rootRef);
   // 現在地からの検索を最優先にするため、Places検索が使えないときだけ「別の場所から探す」を最初から開く
-  const [showOther, setShowOther] = useState(!provider.enabled);
+  const [searchMode, setSearchMode] = useState<SearchMode>(provider.enabled ? "nearby" : "region");
   const [otherTab, setOtherTab] = useState<OtherTab>("municipality");
   const [busy, setBusy] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
@@ -133,6 +129,7 @@ export function LocationPicker({
   const [sessionToken, setSessionToken] = useState("");
   const [searchOrigin, setSearchOrigin] = useState<SearchOrigin | null>(null);
   const [searchLocationStatus, setSearchLocationStatus] = useState<SearchLocationStatus>("idle");
+  const [selectedPlace, setSelectedPlace] = useState<{ name: string; address: string | null } | null>(null);
 
   const options = value.prefectureCode ? getMunicipalitiesByPrefecture(value.prefectureCode) : [];
 
@@ -223,20 +220,20 @@ export function LocationPicker({
   // 現在地の取得に失敗・拒否された場合は、自動的に地域から探す方法へ切り替える
   useEffect(() => {
     if (searchLocationStatus === "denied" || searchLocationStatus === "error" || searchLocationStatus === "unsupported") {
-      setShowOther(true);
+      setSearchMode("region");
       setOtherTab("municipality");
     }
   }, [searchLocationStatus]);
 
   const searchNear = useMemo(() => {
-    if (searchOrigin) {
+    if (searchMode === "nearby" && searchOrigin) {
       return { latitude: searchOrigin.latitude, longitude: searchOrigin.longitude };
     }
-    if (value.latitude !== null && value.longitude !== null) {
+    if (searchMode === "nearby" && value.latitude !== null && value.longitude !== null) {
       return { latitude: value.latitude, longitude: value.longitude };
     }
     return null;
-  }, [searchOrigin, value.latitude, value.longitude]);
+  }, [searchMode, searchOrigin, value.latitude, value.longitude]);
 
   useEffect(() => {
     if (!provider.enabled || !sessionToken) return;
@@ -301,6 +298,7 @@ export function LocationPicker({
       postalCode: candidate.postalCode,
     });
     setKeyword(candidate.name);
+    setSelectedPlace({ name: candidate.name, address: candidate.address });
     setSuggestions([]);
     setRecentPlaces((current) => saveRecentPlace(suggestion, current));
     setSessionToken(newSessionToken());
@@ -308,10 +306,7 @@ export function LocationPicker({
 
   const searchLocationText = (() => {
     if (searchLocationStatus === "loading") return "現在地を確認しています…";
-    if (searchLocationStatus === "ready") {
-      const accuracy = formatAccuracy(searchOrigin?.accuracyMeters ?? null);
-      return accuracy ? `現在地：取得済み ${accuracy}` : "現在地：取得済み";
-    }
+    if (searchLocationStatus === "ready") return "現在地：取得済み";
     if (searchLocationStatus === "denied") return "現在地：許可されていません。地域から探してください";
     if (searchLocationStatus === "unsupported") return "現在地：この端末では利用できません";
     if (searchLocationStatus === "error") return "現在地：取得できませんでした";
@@ -322,6 +317,12 @@ export function LocationPicker({
   const otherTabOptions = [
     { value: "municipality", label: "都道府県・市区町村から探す" },
     { value: "map", label: "地図から選ぶ" },
+  ] as const;
+
+  const searchModes = [
+    { value: "nearby", label: "現在地から" },
+    { value: "keyword", label: "店名検索" },
+    { value: "region", label: "地域から" },
   ] as const;
 
   return (
@@ -336,22 +337,20 @@ export function LocationPicker({
 
       {error ? <p className="text-xs text-[#a85c6a]">{error}</p> : null}
 
-      <div className="rough-card flex items-start justify-between gap-3 p-3">
-        <div className="min-w-0">
-          <p className="text-xs text-ink-faint">場所の指定</p>
-          <p className="mt-0.5 text-sm font-semibold">{SOURCE_LABELS[value.locationSource]}</p>
-          {value.latitude !== null && value.longitude !== null ? (
-            <p className="mt-0.5 text-[11px] text-ink-faint tabular-nums">
-              {value.latitude.toFixed(5)}, {value.longitude.toFixed(5)}
-              {formatAccuracy(value.locationAccuracyMeters) ? `・${formatAccuracy(value.locationAccuracyMeters)}` : ""}
-            </p>
-          ) : (
-            <p className="mt-0.5 text-[11px] text-ink-faint">現在地の検索または地域の選択で場所を指定します。</p>
-          )}
-        </div>
-        <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-leaf-soft text-leaf-deep">
-          <IconMapPin size={18} />
-        </span>
+      <div className="grid grid-cols-3 overflow-hidden rounded-2xl border border-line-strong bg-card">
+        {searchModes.map((mode) => (
+          <button
+            key={mode.value}
+            type="button"
+            aria-pressed={searchMode === mode.value}
+            onClick={() => setSearchMode(mode.value)}
+            className={`min-h-12 border-r border-line px-2 text-xs font-semibold last:border-r-0 ${
+              searchMode === mode.value ? "bg-leaf-soft text-leaf-deep" : "text-ink-soft"
+            }`}
+          >
+            {mode.label}
+          </button>
+        ))}
       </div>
 
       {busy ? (
@@ -363,15 +362,14 @@ export function LocationPicker({
 
       {notice ? <p className="px-1 text-xs leading-relaxed text-[#95505e]">{notice}</p> : null}
 
-      {/* 現在地から探す：最も使う頻度が高いため一番上・最も目立つカードにする */}
-      {provider.enabled ? (
-        <div className="rough-card space-y-3 border-2 border-leaf bg-leaf-soft/50 p-4">
-          <div className="flex items-center gap-2.5">
+      {provider.enabled && searchMode !== "region" ? (
+        <div className="space-y-3">
+          {searchMode === "nearby" ? <div className="rough-card flex items-center gap-2.5 border border-leaf bg-leaf-soft/40 p-3">
             <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-leaf text-white">
               <IconMapPin size={20} />
             </span>
             <div className="min-w-0 flex-1">
-              <p className="text-sm font-bold text-leaf-deep">📍 現在地から探す</p>
+              <p className="text-sm font-bold text-leaf-deep">現在地から近い順に探す</p>
               <p className="mt-0.5 text-[11px] text-ink-soft">{searchLocationText}</p>
             </div>
             <button
@@ -382,25 +380,26 @@ export function LocationPicker({
             >
               {searchLocationStatus === "ready" ? "更新" : "取得する"}
             </button>
-          </div>
+          </div> : null}
 
           <div className="relative">
             <span className="pointer-events-none absolute top-1/2 left-3 -translate-y-1/2 text-ink-faint">
               <IconSearch size={18} />
             </span>
             <input
+              ref={searchInputRef}
               type="search"
               value={keyword}
               onChange={(event) => setKeyword(event.target.value)}
-              placeholder="店名・施設名を入力"
+              placeholder="店名・施設名を検索"
               aria-label="現在地から近い店舗・施設を検索"
               autoComplete="off"
-              className="field pl-10"
+              className="field bg-card pl-10"
             />
           </div>
 
           {keyword.trim().length < 2 ? (
-            <p className="px-1 text-[11px] text-ink-faint">2文字以上入力すると、現在地から近い順に候補を表示します。</p>
+            <p className="px-1 text-[11px] text-ink-faint">2文字以上入力すると候補を表示します。</p>
           ) : null}
 
           {keyword.trim().length < 2 && recentPlaces.length > 0 ? (
@@ -446,26 +445,14 @@ export function LocationPicker({
             </button>
           ) : null}
         </div>
-      ) : (
+      ) : !provider.enabled && searchMode !== "region" ? (
         <p className="rough-card p-3 text-[11px] leading-relaxed text-ink-faint">
           Google Places APIキーを設定すると、現在地から近い店舗・施設を検索できます。
         </p>
-      )}
+      ) : null}
 
-      {/* 別の場所から探す：都道府県・市区町村や地図からの指定は、必要なときだけ開く */}
-      <div className="rough-card overflow-hidden">
-        <button
-          type="button"
-          onClick={() => setShowOther((v) => !v)}
-          aria-expanded={showOther}
-          className="flex w-full items-center justify-between gap-2 px-4 py-3 text-left"
-        >
-          <span className="text-sm font-semibold text-ink-soft">別の場所から探す</span>
-          <IconChevronDown size={18} className={`shrink-0 text-ink-faint transition-transform ${showOther ? "rotate-180" : ""}`} />
-        </button>
-
-        {showOther ? (
-          <div className="space-y-3 border-t border-line p-4">
+      {searchMode === "region" ? (
+        <div className="rough-card space-y-3 p-4">
             <div className="flex flex-wrap gap-2">
               {otherTabOptions.map((option) => (
                 <button
@@ -543,8 +530,32 @@ export function LocationPicker({
                 <p className="text-xs text-ink-soft">先に「都道府県・市区町村から探す」で都道府県を選んでください。</p>
               )
             ) : null}
-          </div>
-        ) : null}
+        </div>
+      ) : null}
+
+      <div className="rough-card flex items-center gap-3 border border-leaf/70 p-3.5">
+        <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-leaf-soft text-leaf-deep">
+          <IconMapPin size={21} />
+        </span>
+        <div className="min-w-0 flex-1">
+          <p className="text-[11px] font-semibold text-leaf-deep">選択中の場所</p>
+          <p className="mt-0.5 truncate text-sm font-bold">
+            {selectedPlace?.name ?? SOURCE_LABELS[value.locationSource]}
+          </p>
+          <p className="mt-0.5 truncate text-[11px] text-ink-faint">
+            {selectedPlace?.address ?? (value.municipalityCode ? "場所を指定済み" : "場所を検索または選択してください")}
+          </p>
+        </div>
+        <button
+          type="button"
+          onClick={() => {
+            setSearchMode(provider.enabled ? "keyword" : "region");
+            window.setTimeout(() => searchInputRef.current?.focus(), 0);
+          }}
+          className="shrink-0 rounded-full border border-leaf px-3 py-1.5 text-xs font-semibold text-leaf-deep"
+        >
+          変更
+        </button>
       </div>
     </div>
   );
