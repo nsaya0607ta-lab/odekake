@@ -162,7 +162,7 @@ export function SpotForm({
       <FormMessage state={state} />
 
       <section className="space-y-4">
-        {!isEdit ? <h2 className="px-1 text-base font-bold">場所</h2> : null}
+        {!isEdit ? <h2 className="px-1 text-lg font-bold text-ink">場所を選ぶ</h2> : null}
 
         {locationPickerReady ? (
           <div className="location-picker-top">
@@ -190,33 +190,13 @@ export function SpotForm({
           />
         </Field>
 
-        <Field label="カテゴリー" htmlFor="categoryId" error={state.fieldErrors?.categoryId}>
-          <select id="categoryId" name="categoryId" className="field" defaultValue={initial.categoryId}>
-            <option value="">選択しない</option>
-            {categories.map((category) => (
-              <option key={category.id} value={String(category.id)}>
-                {category.name}
-              </option>
-            ))}
-          </select>
-        </Field>
-
-        <Field label="住所" htmlFor="address" optional error={state.fieldErrors?.address}>
-          <input
-            id="address"
-            name="address"
-            type="text"
-            className="field"
-            defaultValue={initial.address}
-            placeholder="岐阜市〇〇町1-2-3"
-            maxLength={200}
-          />
-        </Field>
       </section>
 
       {!isEdit ? (
         <section className="space-y-4 border-t border-line pt-5">
-          <h2 className="px-1 text-base font-bold">訪問の記録</h2>
+          <h2 className="px-1 text-lg font-bold text-ink">訪問の記録</h2>
+
+          <div className="rough-card space-y-4 p-4">
 
           <Field label="訪問日" htmlFor="visitedAt" error={state.fieldErrors?.visitedAt}>
             <input
@@ -246,6 +226,51 @@ export function SpotForm({
             )
           ) : null}
 
+          <RatingInput
+            name="rating"
+            defaultValue={Number(state.values?.rating ?? 0) || 0}
+            draftKey="visited-place-new-rating"
+          />
+
+          {userId && visitId && tripId ? (
+            <PhotoUploader
+              name="photoPaths"
+              userId={userId}
+              draftKey={`visited-place-${visitId}`}
+              max={MAX_PHOTOS_PER_VISIT}
+              label="写真を追加"
+              persistDraft
+            />
+          ) : (
+            <p className="rounded-2xl bg-paper-deep px-4 py-3 text-xs text-ink-soft">
+              写真を追加するには、先に記録先を選んでください。
+            </p>
+          )}
+
+          <Field label="ひとこと・思い出" htmlFor="comment" optional error={state.fieldErrors?.comment}>
+            <textarea
+              id="comment"
+              name="comment"
+              rows={3}
+              className="field"
+              defaultValue={state.values?.comment ?? ""}
+              placeholder="美味しかった。また行きたい。"
+              maxLength={2000}
+            />
+          </Field>
+          </div>
+
+          <details className="group rough-card px-4 py-3">
+            <summary className="cursor-pointer list-none">
+              <span className="flex items-center justify-between gap-3">
+                <span>
+                  <span className="block text-sm font-semibold text-ink">詳しい情報</span>
+                  <span className="mt-0.5 block text-[11px] font-normal text-ink-faint">一緒に行った人・金額・タグなど</span>
+                </span>
+                <span className="text-xl text-ink-faint transition-transform group-open:rotate-180">⌄</span>
+              </span>
+            </summary>
+            <div className="mt-4 space-y-4 border-t border-line pt-4">
           <Field label="一緒に行った人" htmlFor="companions" optional>
             <input
               id="companions"
@@ -258,40 +283,7 @@ export function SpotForm({
             />
           </Field>
 
-          <RatingInput
-            name="rating"
-            defaultValue={Number(state.values?.rating ?? 0) || 0}
-            draftKey="visited-place-new-rating"
-          />
-
-          <Field label="感想" htmlFor="comment" optional error={state.fieldErrors?.comment}>
-            <textarea
-              id="comment"
-              name="comment"
-              rows={4}
-              className="field"
-              defaultValue={state.values?.comment ?? ""}
-              placeholder="美味しかった。また行きたい。"
-              maxLength={2000}
-            />
-          </Field>
-
-          {userId && visitId && tripId ? (
-            <PhotoUploader
-              name="photoPaths"
-              userId={userId}
-              draftKey={`visited-place-${visitId}`}
-              max={MAX_PHOTOS_PER_VISIT}
-              persistDraft
-            />
-          ) : (
-            <p className="rounded-2xl bg-paper-deep px-4 py-3 text-xs text-ink-soft">
-              写真を追加するには、先に記録先を選んでください。
-            </p>
-          )}
-
-          {/* すぐ押せることに意味があるので、折りたたみの外に出しておく */}
-          <div className="rough-card space-y-2 px-4 py-3">
+          <div className="space-y-2 rounded-2xl bg-paper-deep px-4 py-3">
             <label className="flex items-center gap-2 text-sm">
               <input
                 type="checkbox"
@@ -313,9 +305,6 @@ export function SpotForm({
             </label>
           </div>
 
-          <details className="rough-card px-4 py-3">
-            <summary className="cursor-pointer text-sm font-semibold text-ink-soft">訪問内容をくわしく記録する</summary>
-            <div className="mt-4 space-y-4">
               <Field label="メモ" htmlFor="note" optional>
                 <textarea
                   id="note"
@@ -387,8 +376,28 @@ export function SpotForm({
       ) : null}
 
       <details className="rough-card px-4 py-3">
-        <summary className="cursor-pointer text-sm font-semibold text-ink-soft">場所のくわしい情報を入力する</summary>
+        <summary className="cursor-pointer text-sm font-semibold text-ink-soft">場所の詳細情報</summary>
         <div className="mt-4 space-y-4">
+          <Field label="カテゴリー" htmlFor="categoryId" error={state.fieldErrors?.categoryId}>
+            <select id="categoryId" name="categoryId" className="field" defaultValue={initial.categoryId}>
+              <option value="">選択しない</option>
+              {categories.map((category) => (
+                <option key={category.id} value={String(category.id)}>{category.name}</option>
+              ))}
+            </select>
+          </Field>
+
+          <Field label="住所" htmlFor="address" optional error={state.fieldErrors?.address}>
+            <input
+              id="address"
+              name="address"
+              type="text"
+              className="field"
+              defaultValue={initial.address}
+              placeholder="岐阜市〇〇町1-2-3"
+              maxLength={200}
+            />
+          </Field>
           <div className="grid grid-cols-2 gap-3">
             <Field label="郵便番号" htmlFor="postalCode" optional>
               <input
@@ -476,12 +485,14 @@ export function SpotForm({
         </p>
       ) : null}
 
-      <SubmitButton
-        pendingLabel="保存中…"
-        disabled={!isEdit && ((!destinations?.personal && !destinations?.shared.length) || !tripId || !visitId)}
-      >
-        {isEdit ? "変更を保存する" : "行った場所を登録する"}
-      </SubmitButton>
+      <div className="sticky bottom-20 z-20 rounded-2xl bg-paper/95 p-2 shadow-[0_-6px_18px_rgba(83,74,58,0.08)] backdrop-blur-sm">
+        <SubmitButton
+          pendingLabel="保存中…"
+          disabled={!isEdit && ((!destinations?.personal && !destinations?.shared.length) || !tripId || !visitId)}
+        >
+          {isEdit ? "変更を保存する" : "この場所を登録する"}
+        </SubmitButton>
+      </div>
       {!isEdit ? (
         <p className="text-center text-xs text-ink-faint">場所と訪問履歴をまとめて保存し、日本地図へ反映します。</p>
       ) : null}
