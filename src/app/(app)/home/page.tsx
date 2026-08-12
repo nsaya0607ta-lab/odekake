@@ -14,7 +14,9 @@ import { TopHeader } from "@/components/page-header";
 import { PageBody } from "@/components/page-body";
 import { CoinBadge } from "@/components/coin-badge";
 import { SharedTripBadge } from "@/components/shared-trip-badge";
+import { HomeScene } from "@/components/home-scene";
 import { LevelTag } from "@/components/level-tag";
+import { StepsTag } from "@/components/steps-tag";
 import { TodayStepsCard } from "@/components/today-steps-card";
 import { EmptyState, LinkRow, formatDate } from "@/components/ui";
 import { WanderingFrenchie } from "@/components/wandering-frenchie";
@@ -120,19 +122,18 @@ export default async function HomePage({
         </Link>
 
         <section className="rough-card overflow-hidden">
-          <div className="relative h-52 overflow-hidden bg-leaf-soft sm:h-56">
-            <div className="absolute inset-x-0 bottom-0 h-24 bg-[#eef3e5]" />
-            <div className="absolute -left-14 bottom-[-42px] h-32 w-72 rounded-[50%] bg-[#e3ecd7]" />
-            <div className="absolute right-[-42px] bottom-[-54px] h-36 w-80 rounded-[50%] bg-[#dce8cf]" />
-            <div className="absolute left-[10%] top-6 h-4 w-10 rounded-full bg-white/55" />
-            <div className="absolute left-[32%] top-10 h-3 w-8 rounded-full bg-white/45" />
-            <div className="absolute right-12 top-5 h-10 w-10 rounded-full border border-[#d7b87d] bg-[#f8e7ca]" />
-            <div className="absolute bottom-5 left-[8%] h-6 w-2 rounded-full bg-[#91aa75]" />
-            <div className="absolute bottom-4 left-[7.2%] h-5 w-5 rounded-[50%] bg-[#b9cf9f]" />
-            <div className="absolute bottom-7 left-[43%] h-8 w-2 rounded-full bg-[#91aa75]" />
-            <div className="absolute bottom-6 left-[41.8%] h-6 w-6 rounded-[50%] bg-[#b9cf9f]" />
+          <div className="relative h-72 overflow-hidden bg-[#dbeeea] sm:h-80">
+            <HomeScene />
             <WanderingFrenchie level={expProgress.level} skin={dogSkin} />
-            <LevelTag progress={expProgress} />
+            {/* 2枚の看板は縄でつながっているので、上下に積んだ1つのまとまりとして置く */}
+            <div className="absolute top-[2%] left-[3%] z-10 flex w-[40%] max-w-[168px] flex-col">
+              <LevelTag progress={expProgress} />
+              <StepsTag
+                initialSteps={expDashboard.todaySteps}
+                initialStepExp={expDashboard.todayStepExp}
+                initialCoinBalance={coins.balance}
+              />
+            </div>
           </div>
 
           <div className="grid grid-cols-3 divide-x divide-line px-2 py-4 text-center">
