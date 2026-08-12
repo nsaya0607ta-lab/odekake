@@ -20,14 +20,14 @@ const CARD_SRC = "/home-stats.webp";
 /**
  * 数を置く位置。元画像 1596×986 上で焼き込み文字を実測した座標から出している。
  *
- * - 数字は元位置より少し上に寄せ、カード内の破線との間隔を整える
+ * - 数字は元位置と前回の上寄せ位置のちょうど中間にする
  * - 「/」の左端: x 408 / 796 / 1284。数と「/」の間は、絵の中の「/ 47」と同じ 18px あける
  *
  * 3列とも「/ 分母」を絵の中で右へずらし（それぞれの破線の右端 x517 / x973 / x1366 に
  * 分母の右端をそろえた）、左側に数を書ける幅を広げてある。とくに訪問数は 220px あるので、
  * 10000回を超えて6桁になっても区切り線に当たらない。
  */
-const VALUE_BOTTOM = "42%";
+const VALUE_BOTTOM = "40.75%";
 const VALUE_RIGHT = {
   prefectures: "75.6%",
   municipalities: "51.3%",
@@ -63,7 +63,7 @@ export function HomeStatsCard({
     <section
       aria-label="訪れたところ"
       className="relative top-2"
-      style={{ marginLeft: "-3.15%", marginRight: 0 }}
+      style={{ marginLeft: "-3.15%", marginRight: "-2.245%" }}
     >
       <div className="relative" style={{ aspectRatio: CARD_RATIO }}>
         {/* eslint-disable-next-line @next/next/no-img-element */}
