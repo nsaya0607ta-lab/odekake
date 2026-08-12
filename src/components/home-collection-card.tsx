@@ -44,11 +44,10 @@ export function HomeCollectionCard({
   return (
     <Link
       href="/collection"
-      className="pressable relative -top-2 block active:scale-[0.99]"
-      style={{ marginLeft: "-3.15%", marginRight: "-4.49%" }}
+      className="pressable relative -top-2 block w-full active:scale-[0.99]"
       aria-label={`図鑑を見る（${collected} / ${total}）`}
     >
-      <div className="relative" style={{ aspectRatio: CARD_RATIO }}>
+      <div className="relative w-full" style={{ aspectRatio: CARD_RATIO }}>
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img
           src={CARD_SRC}
