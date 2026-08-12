@@ -1,0 +1,1 @@
+Reference image for the new home walk-card background is supplied externally in this ChatGPT task. This placeholder exists so the branch carries the home walk-card implementation changes; the binary asset must be added separately if repository upload tooling for binary files is unavailable.

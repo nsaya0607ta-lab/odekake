@@ -6,7 +6,6 @@ import {
   IconHome,
   IconMapPin,
   IconNotebook,
-  IconPlus,
   IconUser,
 } from "@/components/icons";
 import { JourneyScopeSwitcher, type JourneyScopeOption } from "@/components/journey-scope-switcher";
@@ -14,7 +13,6 @@ import { TopHeader } from "@/components/page-header";
 import { PageBody } from "@/components/page-body";
 import { CoinBadge } from "@/components/coin-badge";
 import { SharedTripBadge } from "@/components/shared-trip-badge";
-import { LevelTag } from "@/components/level-tag";
 import { TodayStepsCard } from "@/components/today-steps-card";
 import { EmptyState, LinkRow, formatDate } from "@/components/ui";
 import { WanderingFrenchie } from "@/components/wandering-frenchie";
@@ -120,19 +118,66 @@ export default async function HomePage({
         </Link>
 
         <section className="rough-card overflow-hidden">
-          <div className="relative h-52 overflow-hidden bg-leaf-soft sm:h-56">
-            <div className="absolute inset-x-0 bottom-0 h-24 bg-[#eef3e5]" />
-            <div className="absolute -left-14 bottom-[-42px] h-32 w-72 rounded-[50%] bg-[#e3ecd7]" />
-            <div className="absolute right-[-42px] bottom-[-54px] h-36 w-80 rounded-[50%] bg-[#dce8cf]" />
-            <div className="absolute left-[10%] top-6 h-4 w-10 rounded-full bg-white/55" />
-            <div className="absolute left-[32%] top-10 h-3 w-8 rounded-full bg-white/45" />
-            <div className="absolute right-12 top-5 h-10 w-10 rounded-full border border-[#d7b87d] bg-[#f8e7ca]" />
-            <div className="absolute bottom-5 left-[8%] h-6 w-2 rounded-full bg-[#91aa75]" />
-            <div className="absolute bottom-4 left-[7.2%] h-5 w-5 rounded-[50%] bg-[#b9cf9f]" />
-            <div className="absolute bottom-7 left-[43%] h-8 w-2 rounded-full bg-[#91aa75]" />
-            <div className="absolute bottom-6 left-[41.8%] h-6 w-6 rounded-[50%] bg-[#b9cf9f]" />
-            <WanderingFrenchie level={expProgress.level} skin={dogSkin} />
-            <LevelTag progress={expProgress} />
+          <div className="relative h-60 overflow-hidden bg-[#edf5e6] sm:h-64">
+            <div className="absolute inset-0 bg-[radial-gradient(circle_at_74%_20%,rgba(255,255,255,0.9)_0_5%,transparent_6%),linear-gradient(180deg,#e8f3ef_0%,#edf5e4_42%,#dfecc6_43%,#dfecc6_100%)]" />
+            <div className="absolute inset-x-0 top-[36%] h-[24%] bg-[linear-gradient(155deg,transparent_0_10%,rgba(173,204,157,0.35)_11%_28%,transparent_29%_36%,rgba(154,190,151,0.28)_37%_55%,transparent_56%)]" />
+            <div className="absolute left-0 top-0 h-20 w-[48%] origin-left -rotate-6 rounded-br-[75%] bg-[#8c6d35]/90" />
+            <div className="absolute left-[4%] top-0 h-16 w-[42%] origin-left -rotate-3 rounded-br-[70%] bg-[#b08a48]" />
+            <div className="absolute left-[7%] top-2 h-6 w-6 rounded-full bg-[#8fb76e] shadow-[28px_2px_0_0_#9bc57a,58px_6px_0_0_#87b16a,88px_-2px_0_0_#9ac377,118px_2px_0_0_#7faa64,148px_8px_0_0_#9cc47c]" />
+            <div className="absolute left-0 right-0 bottom-0 h-[46%] bg-[linear-gradient(180deg,rgba(223,236,198,0)_0%,rgba(220,236,188,0.6)_15%,#d9e9b5_100%)]" />
+            <div className="absolute bottom-8 left-[2%] h-12 w-5 rounded-[50%] bg-[#8fb570]" />
+            <div className="absolute bottom-7 left-[0.7%] h-12 w-12 rounded-full bg-[#a4ca81]" />
+            <div className="absolute bottom-10 right-[7%] h-20 w-5 rounded-[50%] bg-[#8b6a3e]" />
+            <div className="absolute bottom-14 right-[2%] h-16 w-16 rounded-full bg-[#8fbd68]" />
+            <div className="absolute bottom-[18%] left-[5%] right-[4%] h-5 opacity-50 [background-image:radial-gradient(circle,#a77b43_0_25%,transparent_27%),linear-gradient(90deg,transparent_0_65%,#b58c58_66%_78%,transparent_79%)] [background-size:34px_18px,34px_18px]" />
+
+            <div className="absolute left-2 top-2 z-20 w-[34%] min-w-[118px] max-w-[150px] sm:left-4 sm:top-3 sm:w-[31%]">
+              <Link
+                href="/mypage/exp-history"
+                className="block rounded-[24px] border-2 border-[#d7b47b] bg-[#fff5db]/95 p-2.5 shadow-[0_3px_0_rgba(137,93,42,0.15)] active:scale-[0.98]"
+              >
+                <div className="mx-auto -mt-4 mb-1 w-[88%] rounded-full bg-[#6f9b50] px-2 py-1 text-center text-[9px] font-bold text-white shadow-sm">
+                  おでかけレベル
+                </div>
+                <div className="flex items-end justify-center gap-1 text-[#4d4032]">
+                  <span className="pb-0.5 text-[10px] font-semibold">Lv.</span>
+                  <span className="text-[26px] font-bold leading-none tabular-nums">{expProgress.level}</span>
+                </div>
+                <div className="mt-2 flex items-center gap-1 text-[8px] text-[#6d5a42]">
+                  <span className="font-bold">EXP</span>
+                  <span className="h-1.5 flex-1 overflow-hidden rounded-full bg-[#dfc79e]/80">
+                    <span className="block h-full rounded-full bg-[#6f9b50]" style={{ width: `${expProgress.progressPercent}%` }} />
+                  </span>
+                  <span className="tabular-nums">{expProgress.totalExp} / {expProgress.nextLevelExp}</span>
+                </div>
+              </Link>
+
+              <div className="mx-auto h-5 w-[2px] bg-[#a97844] shadow-[58px_0_0_0_#a97844]" />
+
+              <div className="rounded-[26px] border-2 border-[#d9a08c] bg-[#fff5db]/95 p-2.5 shadow-[0_3px_0_rgba(137,93,42,0.15)]">
+                <div className="mx-auto -mt-4 mb-1 w-[82%] rounded-full bg-[#e6a38f] px-2 py-1 text-center text-[9px] font-bold text-[#6f493d] shadow-sm">
+                  今日のおさんぽ
+                </div>
+                <div className="flex items-center justify-center gap-1.5 text-[#4d4032]">
+                  <span aria-hidden="true" className="text-base">👟</span>
+                  <span className="text-[28px] font-bold leading-none tabular-nums">{(expDashboard.todaySteps ?? 0).toLocaleString("ja-JP")}</span>
+                  <span className="pt-2 text-[10px] font-bold">歩</span>
+                </div>
+                <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-[#dfc79e]/80">
+                  <span
+                    className="block h-full rounded-full bg-[#dc8d7b]"
+                    style={{ width: `${Math.min(100, ((expDashboard.todaySteps ?? 0) / 5000) * 100)}%` }}
+                  />
+                </div>
+                <p className="mt-1 text-center text-[8px] font-semibold text-[#6d5a42]">
+                  目標まであと {Math.max(0, 5000 - (expDashboard.todaySteps ?? 0)).toLocaleString("ja-JP")} 歩
+                </p>
+              </div>
+            </div>
+
+            <div className="absolute inset-y-0 left-[33%] right-0 z-10">
+              <WanderingFrenchie level={expProgress.level} skin={dogSkin} />
+            </div>
           </div>
 
           <div className="grid grid-cols-3 divide-x divide-line px-2 py-4 text-center">
@@ -262,6 +307,37 @@ export default async function HomePage({
   );
 }
 
+function DashboardStat({
+  icon,
+  value,
+  unit,
+  label,
+  tone,
+}: {
+  icon: React.ReactNode;
+  value: number;
+  unit: string;
+  label: string;
+  tone: "blossom" | "sky" | "leaf";
+}) {
+  const tones = {
+    blossom: "bg-blossom-soft text-[#9f5765]",
+    sky: "bg-sky-soft text-[#477da2]",
+    leaf: "bg-leaf-soft text-leaf-deep",
+  };
+
+  return (
+    <div className="px-2">
+      <span className={`mx-auto flex h-10 w-10 items-center justify-center rounded-full ${tones[tone]}`}>{icon}</span>
+      <p className="mt-2 whitespace-nowrap text-3xl font-bold tabular-nums">
+        {value}
+        <span className="ml-1 text-[10px] font-normal text-ink-faint">{unit}</span>
+      </p>
+      <p className="mt-1 whitespace-nowrap text-xs font-semibold text-ink-soft">{label}</p>
+    </div>
+  );
+}
+
 function TripSection({
   trips,
   emptyTitle,
@@ -279,93 +355,43 @@ function TripSection({
   selectedRootId?: string;
   selectedSharedRootId?: string;
 }) {
-  const createHref = selectedRootId ? `/trips/new?parent=${encodeURIComponent(selectedRootId)}` : "/trips/new";
-  const recordsHref = `/records?tab=trips${selectedSharedRootId ? `&scopeTrip=${encodeURIComponent(selectedSharedRootId)}` : ""}`;
-
   return (
     <section>
-      <div className="mb-2 flex flex-wrap items-center justify-between gap-2 px-1">
+      <div className="mb-2 flex items-center justify-between gap-2 px-1">
         <div className="flex min-w-0 items-center gap-2">
-          <h2 className="text-base font-bold">
-            旅行
-            {trips.length > 0 ? (
-              <span className="ml-1.5 text-sm font-normal text-ink-faint tabular-nums">{trips.length}件</span>
-            ) : null}
-          </h2>
+          <h2 className="shrink-0 text-base font-bold">旅行</h2>
           {scopeOptions.length > 1 ? (
             <JourneyScopeSwitcher
               options={scopeOptions}
               selectedValue={selectedScopeValue}
-              basePath="/home"
               queryKey="scopeTrip"
-              triggerLabel="切り替え"
+              compact
             />
           ) : null}
         </div>
-        <div className="flex items-center gap-3">
-          <Link href={createHref} className="flex items-center gap-0.5 text-sm text-leaf-deep">
-            <IconPlus size={15} />
-            つくる
-          </Link>
-          {trips.length > 3 ? (
-            <Link href={recordsHref} className="flex items-center gap-0.5 text-sm text-leaf-deep">
-              すべて見る
-              <IconChevronRight size={15} />
-            </Link>
-          ) : null}
-        </div>
+        <Link
+          href={`/trips/new${selectedRootId ? `?parent=${selectedRootId}` : ""}`}
+          className="flex shrink-0 items-center gap-1 text-sm text-leaf-deep"
+        >
+          ＋ つくる
+        </Link>
       </div>
+
       {trips.length === 0 ? (
-        <EmptyState
-          title={emptyTitle}
-          description={emptyDescription}
-          actionHref={createHref}
-          actionLabel="旅行の計画を立てる"
-        />
+        <EmptyState title={emptyTitle} description={emptyDescription} actionHref={selectedRootId ? `/trips/new?parent=${selectedRootId}` : "/trips/new"} actionLabel="旅行をつくる" />
       ) : (
         <ul className="space-y-2">
-          {trips.slice(0, 3).map(({ trip, visitCount }) => (
+          {trips.map(({ trip, visitCount }) => (
             <li key={trip.id}>
               <LinkRow
-                href={`/trips/${trip.id}`}
+                href={`/trips/${trip.id}${selectedSharedRootId ? `?scopeTrip=${selectedSharedRootId}` : ""}`}
                 title={trip.title}
-                subtitle={[formatTripPeriod(trip), `${visitCount}件の記録`].filter(Boolean).join("・")}
+                subtitle={`${formatTripPeriod(trip) ?? "日程未設定"}・${visitCount}件の記録`}
               />
             </li>
           ))}
         </ul>
       )}
     </section>
-  );
-}
-
-function DashboardStat({
-  icon,
-  value,
-  unit,
-  label,
-  tone,
-}: {
-  icon: React.ReactNode;
-  value: number;
-  unit?: string;
-  label: string;
-  tone: "blossom" | "sky" | "leaf";
-}) {
-  const toneClass = {
-    blossom: "bg-blossom-soft text-[#95505e]",
-    sky: "bg-sky-soft text-[#42718f]",
-    leaf: "bg-leaf-soft text-leaf-deep",
-  }[tone];
-
-  return (
-    <div className="flex min-w-0 flex-col items-center gap-1 px-1">
-      <span className={`flex h-9 w-9 items-center justify-center rounded-full ${toneClass}`}>{icon}</span>
-      <span className="mt-1 flex items-baseline gap-0.5">
-        <span className="text-2xl leading-none font-bold tabular-nums">{value}</span>
-        {unit ? <span className="text-[10px] text-ink-faint tabular-nums">{unit}</span> : null}
-      </span>
-      <span className="whitespace-nowrap text-[10px] leading-tight text-ink-soft">{label}</span>
-    </div>
   );
 }
