@@ -122,18 +122,20 @@ export default async function HomePage({
         </Link>
 
         <section className="rough-card overflow-hidden">
-          <div className="relative h-72 overflow-hidden bg-[#dbeeea] sm:h-80">
-            <HomeScene />
-            <WanderingFrenchie level={expProgress.level} skin={dogSkin} />
-            {/* 2枚の看板は縄でつながっているので、上下に積んだ1つのまとまりとして置く */}
-            <div className="absolute top-[2%] left-[3%] z-10 flex w-[40%] max-w-[168px] flex-col">
+          {/* 絵は高さに合わせて敷くので、カードの縦横比を固定しないと端末幅ごとに
+              看板の占める割合が変わって、犬の歩ける幅がなくなる */}
+          <div className="relative aspect-[5/4] max-h-[22rem] overflow-hidden bg-[#dcefe6]">
+            {/* 看板の文字は絵の中の板に乗せるので、必ず HomeScene の中に入れる */}
+            <HomeScene>
               <LevelTag progress={expProgress} />
               <StepsTag
                 initialSteps={expDashboard.todaySteps}
                 initialStepExp={expDashboard.todayStepExp}
                 initialCoinBalance={coins.balance}
               />
-            </div>
+            </HomeScene>
+            {/* 犬はカード全体を基準に歩くので、絵の箱の外に置く */}
+            <WanderingFrenchie level={expProgress.level} skin={dogSkin} />
           </div>
 
           <div className="grid grid-cols-3 divide-x divide-line px-2 py-4 text-center">

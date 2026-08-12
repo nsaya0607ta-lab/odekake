@@ -178,12 +178,13 @@ const TURN_MS = 520;
 /**
  * 歩き回れる範囲（カード幅に対する％。犬の中心の位置）。
  *
- * 左半分はレベル・歩数の看板が占めているので、犬は空いている右側を歩く。犬の絵は
- * 118px 幅で中心合わせなので、右端いっぱいまで行かせるとカードから半身はみ出して
- * 切れる。左は看板に、右はカードの縁に、それぞれ被らないところで止めてある。
+ * 背景の絵の左端に看板が2枚あり、カード幅の 45% くらいまでを占める。犬はその右側の
+ * 空いた芝を歩く。犬の幅はカード幅の 32%（中心合わせなので左右に 16% ずつ）なので、
+ * 左は看板に、右はカードの縁に、それぞれ被らないところで止めてある。
+ * カードは縦横比を固定してあるので、この％はどの端末幅でもそのまま通用する。
  */
-const MIN_X = 60;
-const MAX_X = 83;
+const MIN_X = 64;
+const MAX_X = 84;
 
 type Walker = {
   x: number;
@@ -214,7 +215,7 @@ export function WanderingFrenchie({
     ...MOTIONS.filter((motion) => motion.level <= level).map((motion) => motion.id),
   ];
   const [walker, setWalker] = useState<Walker>({
-    x: 70,
+    x: 74,
     depth: 0.45,
     facing: 1,
     pose: "stand",
@@ -268,7 +269,7 @@ export function WanderingFrenchie({
     };
 
     wait(700, () =>
-      startWalk({ x: 70, depth: 0.45, facing: 1, pose: "stand", walking: false, travelMs: 0 }),
+      startWalk({ x: 74, depth: 0.45, facing: 1, pose: "stand", walking: false, travelMs: 0 }),
     );
 
     return () => {
@@ -650,12 +651,12 @@ export function WanderingFrenchie({
 
       {/* 移動 */}
       <div
-        className={`absolute w-[118px] transition-[left,bottom,transform] ease-linear sm:w-[132px] ${
+        className={`absolute w-[32%] transition-[left,bottom,transform] ease-linear ${
           walker.walking ? "frenchie-walking" : ""
         }`}
         style={{
           left: `${walker.x}%`,
-          bottom: `${4 + walker.depth * 15}%`,
+          bottom: `${3 + walker.depth * 11}%`,
           transitionDuration: `${walker.travelMs || 420}ms`,
           transform: `translateX(-50%) scale(${1 - walker.depth * 0.16})`,
           transformOrigin: "50% 100%",

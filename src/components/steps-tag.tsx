@@ -1,12 +1,12 @@
 "use client";
 
 import Link from "next/link";
-import { STEPS_SIGN, StepsSignArt } from "@/components/home-scene";
+import { STEPS_BANNER, STEPS_BOARD, STEPS_PANEL } from "@/components/home-scene";
 import { useTodaySteps } from "@/lib/use-today-steps";
 
 /**
- * ヒーローカードの下の看板。今日の歩数を出す。
- * 板の絵は StepsSignArt が描き、ここは板の面に載せる文字だけを持つ。
+ * 背景の絵に描かれている下の看板へ、今日の歩数を書き込む。
+ * 位置は home-scene.tsx の実測値に合わせてあるので、勝手にずらさない。
  */
 export function StepsTag({
   initialSteps,
@@ -29,18 +29,18 @@ export function StepsTag({
       aria-label={
         steps === null ? "今日の歩数は未連携。歩数の連携設定を開く" : `今日の歩数 ${steps}歩。歩数の連携設定を開く`
       }
-      className="relative block w-full active:scale-[0.98]"
-      style={{ aspectRatio: STEPS_SIGN.ratio }}
+      className="absolute z-10 block active:scale-[0.98]"
+      style={STEPS_BOARD}
     >
-      <StepsSignArt />
-
-      <span className="absolute flex items-center justify-center text-center leading-none" style={STEPS_SIGN.banner}>
-        <span className="whitespace-nowrap text-[7px] font-bold tracking-[0.04em] text-white">今日の歩数</span>
+      <span className="absolute flex items-center justify-center" style={STEPS_BANNER}>
+        <span className="whitespace-nowrap text-[7px] leading-none font-bold tracking-[0.04em] text-white">
+          今日の歩数
+        </span>
       </span>
 
-      <span className="absolute flex flex-col justify-center" style={STEPS_SIGN.panel}>
+      <span className="absolute flex flex-col justify-center" style={STEPS_PANEL}>
         <span
-          className="flex items-baseline justify-center gap-1 leading-none whitespace-nowrap text-[#4d4032]"
+          className="flex items-baseline justify-center gap-1 leading-none whitespace-nowrap text-[#5b4a35]"
           aria-live="polite"
         >
           <span className="text-[19px] font-bold tabular-nums">
@@ -48,7 +48,7 @@ export function StepsTag({
           </span>
           <span className="text-[8px] font-semibold">歩</span>
         </span>
-        <span className="mt-1 block truncate text-center text-[6.5px] text-[#80694d]">
+        <span className="mt-1 block truncate text-center text-[6.5px] leading-none text-[#8b7355]">
           {steps === null ? "ショートカット連携前" : `歩数EXP +${stepExp.toLocaleString("ja-JP")}`}
         </span>
       </span>
