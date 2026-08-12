@@ -61,10 +61,11 @@ export const SIGN_TEXT = {
 /**
  * 絵と、その上に載せる看板を入れる箱。カードの縦横比は必ず SCENE_RATIO にする。
  * 看板（children）は必ずこの中に入れる。カード直下に置くと位置がずれる。
+ * 額縁はカードの外側へ少しはみ出す前提なので、親側では overflow を切らない。
  */
 export function HomeScene({ children }: { children?: React.ReactNode }) {
   return (
-    <div className="absolute inset-0">
+    <div className="absolute inset-0 overflow-visible">
       {/* eslint-disable-next-line @next/next/no-img-element */}
       <img
         src={SCENE_SRC}
@@ -74,10 +75,10 @@ export function HomeScene({ children }: { children?: React.ReactNode }) {
         height={768}
         fetchPriority="high"
         draggable={false}
-        className="pointer-events-none absolute inset-0 h-full w-full select-none"
+        className="pointer-events-none absolute inset-0 h-full w-full select-none rounded-[21px_19px_23px_18px]"
       />
       {children}
-      {/* 額縁の内側の線が犬カードの外周に重なるように拡大し、外側の線はカード外へ逃がす。 */}
+      {/* 額縁の内側の線が犬カード外周に重なるように拡大。外側の線・花・葉はカード外へ出して見せる。 */}
       {/* eslint-disable-next-line @next/next/no-img-element */}
       <img
         src={FRAME_SRC}
