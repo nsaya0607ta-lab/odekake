@@ -77,7 +77,7 @@ export function HomeScene({ children }: { children?: React.ReactNode }) {
         className="pointer-events-none absolute inset-0 h-full w-full select-none"
       />
       {children}
-      {/* 額縁素材の余白をカード外へ逃がし、見えている枠線をカード外周へ合わせる。 */}
+      {/* 額縁の内側の線が犬カードの外周に重なるように拡大し、外側の線はカード外へ逃がす。 */}
       {/* eslint-disable-next-line @next/next/no-img-element */}
       <img
         src={FRAME_SRC}
@@ -86,10 +86,10 @@ export function HomeScene({ children }: { children?: React.ReactNode }) {
         draggable={false}
         className="pointer-events-none absolute z-50 max-w-none select-none"
         style={{
-          left: "-1.9%",
-          top: "-24.8%",
-          width: "104.5%",
-          height: "157.2%",
+          left: "-3.15%",
+          top: "-30.82%",
+          width: "107.64%",
+          height: "167.87%",
         }}
       />
     </div>
