@@ -9,6 +9,7 @@ import { finalizePhotoPaths } from "@/lib/photos";
 import { PHOTO_BUCKET } from "@/lib/data/client";
 import { safeNextPath } from "@/lib/navigation";
 import { requireUser } from "@/lib/supabase/server";
+import { readTripDestinationAreas } from "@/lib/trip-destinations";
 import type { DB } from "@/lib/data/client";
 
 const optionalText = (max: number) =>
@@ -25,12 +26,21 @@ const optionalDate = z
   .transform((v) => (v === "" ? null : v))
   .refine((v) => v === null || /^\d{4}-\d{2}-\d{2}$/.test(v), "日付を正しく入力してください。");
 
+const destinationAreas = z.string().transform((value, ctx) => {
+  const parsed = readTripDestinationAreas(value);
+  if (!parsed.valid) {
+    ctx.addIssue({ code: "custom", message: "行き先を選び直してください。" });
+  }
+  return parsed.areas;
+});
+
 const tripSchema = z
   .object({
     parentTripId: z.string().uuid("所属先を選んでください。"),
     title: z.string().trim().min(1, "旅行名を入力してください。").max(60, "旅行名は60文字以内で入力してください。"),
     startDate: optionalDate,
     endDate: optionalDate,
+    destinationAreas,
     description: optionalText(1000),
   })
   .refine((v) => !v.startDate || !v.endDate || v.startDate <= v.endDate, {
@@ -43,6 +53,7 @@ const updateTripSchema = z
     title: z.string().trim().min(1, "旅行名を入力してください。").max(60, "旅行名は60文字以内で入力してください。"),
     startDate: optionalDate,
     endDate: optionalDate,
+    destinationAreas,
     description: optionalText(1000),
   })
   .refine((v) => !v.startDate || !v.endDate || v.startDate <= v.endDate, {
@@ -56,6 +67,7 @@ function collect(formData: FormData) {
     title: String(formData.get("title") ?? ""),
     startDate: String(formData.get("startDate") ?? ""),
     endDate: String(formData.get("endDate") ?? ""),
+    destinationAreas: String(formData.get("destinationAreas") ?? "[]"),
     description: String(formData.get("description") ?? ""),
   };
 }
@@ -77,6 +89,14 @@ function firstPhotoPath(formData: FormData): string | null {
     // 画像がなくても保存できる
   }
   return null;
+}
+
+function isMissingDestinationAreasColumn(error: { code?: string; message?: string } | null) {
+  return Boolean(
+    error &&
+      (error.code === "PGRST204" || error.code === "42703") &&
+      /destination_areas/i.test(error.message ?? ""),
+  );
 }
 
 /** 一時領域にある表紙画像を旅行の保存先へ移す */
@@ -119,7 +139,7 @@ export async function createTripAction(_prev: ActionState, formData: FormData): 
   const { data: existing } = await supabase.from("trips").select("id").eq("id", tripId).maybeSingle();
   if (existing) redirect(`/trips/${tripId}`);
 
-  const { error } = await supabase.from("trips").insert({
+  const baseTrip = {
     id: tripId,
     owner_id: user.id,
     title: parsed.data.title,
@@ -128,10 +148,27 @@ export async function createTripAction(_prev: ActionState, formData: FormData): 
     start_date: parsed.data.startDate,
     end_date: parsed.data.endDate,
     description: parsed.data.description,
-  });
+  };
 
-  if (error) {
-    return { error: toJapaneseError(error, "旅行の作成に失敗しました。"), values };
+  // destination_areas は0026で追加する。未適用DBでも、行き先未設定なら従来どおり旅行を作成できる。
+  let insertResult = await supabase.from("trips").insert({
+    ...baseTrip,
+    destination_areas: parsed.data.destinationAreas,
+  } as never);
+
+  if (isMissingDestinationAreasColumn(insertResult.error)) {
+    if (parsed.data.destinationAreas.length > 0) {
+      return {
+        error: "行き先を保存するための更新がまだ反映されていません。少し時間をおいてもう一度お試しください。",
+        fieldErrors: { destinationAreas: "行き先の保存機能を準備中です。" },
+        values,
+      };
+    }
+    insertResult = await supabase.from("trips").insert(baseTrip);
+  }
+
+  if (insertResult.error) {
+    return { error: toJapaneseError(insertResult.error, "旅行の作成に失敗しました。"), values };
   }
 
   // 表紙画像は旅行を作ってから移す（保存先の権限は旅行の存在を前提にしているため）
@@ -166,22 +203,38 @@ export async function updateTripAction(_prev: ActionState, formData: FormData): 
     .eq("id", tripId)
     .maybeSingle();
 
+  const baseUpdate = {
+    title: parsed.data.title,
+    start_date: parsed.data.startDate,
+    end_date: parsed.data.endDate,
+    description: parsed.data.description,
+    cover_image_url: coverPath,
+  };
+
   // 権限がない場合はエラーではなく0件更新になるため、更新された行で判定する
-  const { data: updated, error } = await supabase
+  let result = await supabase
     .from("trips")
     .update({
-      title: parsed.data.title,
-      start_date: parsed.data.startDate,
-      end_date: parsed.data.endDate,
-      description: parsed.data.description,
-      cover_image_url: coverPath,
-    })
+      ...baseUpdate,
+      destination_areas: parsed.data.destinationAreas,
+    } as never)
     .eq("id", tripId)
     .select("id");
 
-  if (error) return { error: toJapaneseError(error, "旅行の更新に失敗しました。"), values };
+  if (isMissingDestinationAreasColumn(result.error)) {
+    if (parsed.data.destinationAreas.length > 0) {
+      return {
+        error: "行き先を保存するための更新がまだ反映されていません。少し時間をおいてもう一度お試しください。",
+        fieldErrors: { destinationAreas: "行き先の保存機能を準備中です。" },
+        values,
+      };
+    }
+    result = await supabase.from("trips").update(baseUpdate).eq("id", tripId).select("id");
+  }
 
-  if ((updated ?? []).length === 0) {
+  if (result.error) return { error: toJapaneseError(result.error, "旅行の更新に失敗しました。"), values };
+
+  if ((result.data ?? []).length === 0) {
     console.error("Trip update affected no rows", { tripId });
     return { error: "この旅行を編集する権限がありません。", values };
   }
