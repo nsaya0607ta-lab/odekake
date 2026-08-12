@@ -84,7 +84,7 @@ export default async function HomePage({
           />
 
           {/* 元画像の丸窓の内側の線に、プロフィール画像の円周が沿うサイズ・位置に合わせる。 */}
-          <span className="absolute left-[15.7%] top-[14%] aspect-square w-[18.6%] overflow-hidden rounded-full bg-paper-deep">
+          <span className="absolute left-[15.3%] top-[14%] aspect-square w-[18.6%] overflow-hidden rounded-full bg-paper-deep">
             {avatarUrl ? (
               <>
                 {/* eslint-disable-next-line @next/next/no-img-element */}
