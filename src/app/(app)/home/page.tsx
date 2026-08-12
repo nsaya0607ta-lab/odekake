@@ -7,6 +7,7 @@ import {
   IconMapPin,
   IconNotebook,
   IconPlus,
+  IconUser,
 } from "@/components/icons";
 import { JourneyScopeSwitcher, type JourneyScopeOption } from "@/components/journey-scope-switcher";
 import { TopHeader } from "@/components/page-header";
@@ -23,6 +24,7 @@ import { getCoinSummary } from "@/lib/data/coins";
 import { getOwnedItemIds } from "@/lib/data/collection";
 import { getCurrentDogSkin } from "@/lib/data/dog-skin";
 import { getExpDashboard } from "@/lib/data/exp";
+import { signPhotoPath } from "@/lib/data/photos";
 import {
   formatTripPeriod,
   getRecordDestinationHierarchy,
@@ -55,7 +57,7 @@ export default async function HomePage({
   }));
   const selectedScopeValue = selectedRoot?.kind === "shared" ? selectedRoot.id : "personal";
 
-  const [areas, recent, allTrips, expDashboard, coins, ownedItemIds, dogSkin] = await Promise.all([
+  const [areas, recent, allTrips, expDashboard, coins, ownedItemIds, dogSkin, profileResult] = await Promise.all([
     loadAreaIndex(supabase, space.tripIds),
     getTimeline(supabase, { tripIds: space.tripIds, limit: 4 }),
     getTripSummaries(supabase),
@@ -63,7 +65,9 @@ export default async function HomePage({
     getCoinSummary(supabase, user.id),
     getOwnedItemIds(supabase, user.id),
     getCurrentDogSkin(supabase, user.id),
+    supabase.from("profiles").select("profile_image_url, introduction").eq("user_id", user.id).maybeSingle(),
   ]);
+  const avatarUrl = await signPhotoPath(supabase, profileResult.data?.profile_image_url);
 
   const trips = selectedRoot
     ? allTrips.filter((summary) => summary.trip.parent_trip_id === selectedRoot.id)
@@ -91,18 +95,29 @@ export default async function HomePage({
           </p>
         ) : null}
 
-        <div className="flex items-center justify-between gap-2 px-1">
-          <p className="min-w-0 flex-1 truncate text-sm text-ink-soft">
-            <span className="font-bold text-ink">{user.displayName}</span>
-            さん、おでかけを記録しましょう
-          </p>
-          <Link
-            href="/mypage/profile"
-            className="shrink-0 rounded-full border border-line-strong bg-card px-3 py-1.5 text-xs font-semibold text-ink-soft"
-          >
-            名前を変える
-          </Link>
-        </div>
+        <Link
+          href="/mypage/profile"
+          className="rough-card pressable flex items-center gap-3 px-4 py-3 active:border-line-strong active:bg-paper-deep"
+        >
+          <span className="h-12 w-12 shrink-0 overflow-hidden rounded-full bg-paper-deep">
+            {avatarUrl ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img src={avatarUrl} alt="" className="h-full w-full object-cover" />
+            ) : (
+              <span className="flex h-full w-full items-center justify-center text-ink-faint">
+                <IconUser size={22} />
+              </span>
+            )}
+          </span>
+          <span className="min-w-0 flex-1">
+            <span className="block truncate font-bold">{user.displayName}</span>
+            <span className="mt-0.5 block truncate text-xs text-ink-faint">{user.email}</span>
+            {profileResult.data?.introduction ? (
+              <span className="mt-1 block line-clamp-1 text-xs text-ink-soft">{profileResult.data.introduction}</span>
+            ) : null}
+          </span>
+          <IconChevronRight size={18} className="shrink-0 text-ink-faint" />
+        </Link>
 
         <section className="rough-card overflow-hidden">
           <div className="relative h-52 overflow-hidden bg-leaf-soft sm:h-56">
