@@ -114,33 +114,35 @@ export default async function HomePage({
           <IconChevronRight size={18} className="shrink-0 text-ink-faint" />
         </Link>
 
-        <section className="rough-card overflow-hidden">
-          {/* 絵を切らずに全部出すので、カードの縦横比は絵と同じにする（SCENE_RATIO）。
-              ここを変えると板と文字がずれる */}
-          <div className="relative aspect-[1440/768] overflow-hidden bg-[#dcefe6]">
-            {/* 看板の文字は絵の中の板に乗せるので、必ず HomeScene の中に入れる */}
-            <HomeScene>
-              <LevelTag progress={expProgress} />
-              <StepsTag
-                initialSteps={expDashboard.todaySteps}
-                initialStepExp={expDashboard.todayStepExp}
-                initialCoinBalance={coins.balance}
-              />
-            </HomeScene>
-            {/* 犬はカード全体を基準に歩くので、絵の箱の外に置く */}
-            <WanderingFrenchie level={expProgress.level} skin={dogSkin} />
-          </div>
-        </section>
+        <div className="space-y-3">
+          <section className="rough-card overflow-hidden">
+            {/* 絵を切らずに全部出すので、カードの縦横比は絵と同じにする（SCENE_RATIO）。
+                ここを変えると板と文字がずれる */}
+            <div className="relative aspect-[1440/768] overflow-hidden bg-[#dcefe6]">
+              {/* 看板の文字は絵の中の板に乗せるので、必ず HomeScene の中に入れる */}
+              <HomeScene>
+                <LevelTag progress={expProgress} />
+                <StepsTag
+                  initialSteps={expDashboard.todaySteps}
+                  initialStepExp={expDashboard.todayStepExp}
+                  initialCoinBalance={coins.balance}
+                />
+              </HomeScene>
+              {/* 犬はカード全体を基準に歩くので、絵の箱の外に置く */}
+              <WanderingFrenchie level={expProgress.level} skin={dogSkin} />
+            </div>
+          </section>
 
-        <HomeStatsCard
-          prefectures={areas.totals.visitedPrefectures}
-          prefectureTotal={PREFECTURES.length}
-          municipalities={areas.totals.visitedMunicipalities}
-          municipalityTotal={MUNICIPALITIES.length}
-          visits={areas.totals.visits}
-        />
+          <HomeStatsCard
+            prefectures={areas.totals.visitedPrefectures}
+            prefectureTotal={PREFECTURES.length}
+            municipalities={areas.totals.visitedMunicipalities}
+            municipalityTotal={MUNICIPALITIES.length}
+            visits={areas.totals.visits}
+          />
 
-        <HomeCollectionCard collected={collectedItems} total={COLLECTION_ITEMS.length} />
+          <HomeCollectionCard collected={collectedItems} total={COLLECTION_ITEMS.length} />
+        </div>
 
         <div className="grid grid-cols-2 items-stretch gap-3">
           <section className="grid min-w-0 grid-rows-[40px_240px]">
