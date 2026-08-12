@@ -122,9 +122,9 @@ export default async function HomePage({
         </Link>
 
         <section className="rough-card overflow-hidden">
-          {/* 絵は高さに合わせて敷くので、カードの縦横比を固定しないと端末幅ごとに
-              看板の占める割合が変わって、犬の歩ける幅がなくなる */}
-          <div className="relative aspect-[5/4] max-h-[22rem] overflow-hidden bg-[#dcefe6]">
+          {/* 絵を切らずに全部出すので、カードの縦横比は絵と同じにする（SCENE_RATIO）。
+              ここを変えると板と文字がずれる */}
+          <div className="relative aspect-[1440/768] overflow-hidden bg-[#dcefe6]">
             {/* 看板の文字は絵の中の板に乗せるので、必ず HomeScene の中に入れる */}
             <HomeScene>
               <LevelTag progress={expProgress} />

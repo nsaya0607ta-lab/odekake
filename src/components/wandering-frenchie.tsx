@@ -160,8 +160,12 @@ const MOTION_RULES = MOTIONS.map(
  * バンド幅に対する移動速度（%/秒）。1歩ぶんの絵の踏み出し幅と
  * STEP_MS × 2 で進む距離が釣り合うように決めてある。ここを崩すと
  * 足だけ動いて進まない／氷の上を滑る、のどちらかになる。
+ *
+ * 踏み出し幅は犬の絵の幅の 15.4%。犬はカード幅の 22%（DOG_WIDTH）なので
+ * 1歩 ＝ カード幅の 3.4%、これを STEP_MS × 2 で進む速さにしてある。
+ * 犬の大きさを変えたら、同じ比で必ずここも直すこと。
  */
-const SPEED = 6;
+const SPEED = 4;
 /**
  * 立ち姿と踏み出しを入れ替える間隔（ms）。
  *
@@ -176,15 +180,20 @@ const STEP_MS = 420;
 const TURN_MS = 520;
 
 /**
+ * 犬の大きさ（カード幅に対する％）。px で固定すると、端末幅ごとに背景の絵との
+ * 大小関係が変わってしまう。カードは縦横比が固定なので、％なら絵と一緒に伸び縮みする。
+ */
+const DOG_WIDTH = 22;
+
+/**
  * 歩き回れる範囲（カード幅に対する％。犬の中心の位置）。
  *
- * 背景の絵の左端に看板が2枚あり、カード幅の 45% くらいまでを占める。犬はその右側の
- * 空いた芝を歩く。犬の幅はカード幅の 32%（中心合わせなので左右に 16% ずつ）なので、
- * 左は看板に、右はカードの縁に、それぞれ被らないところで止めてある。
- * カードは縦横比を固定してあるので、この％はどの端末幅でもそのまま通用する。
+ * 背景の絵の左端に看板が2枚あり、カード幅の 30% までを占める。犬はその右側の空いた芝を
+ * 歩く。中心合わせなので、犬の左右には DOG_WIDTH の半分（11%）ずつ体がある。左は看板に、
+ * 右はカードの縁に、それぞれ被らないところで止めてある。
  */
-const MIN_X = 64;
-const MAX_X = 84;
+const MIN_X = 44;
+const MAX_X = 88;
 
 type Walker = {
   x: number;
@@ -215,7 +224,7 @@ export function WanderingFrenchie({
     ...MOTIONS.filter((motion) => motion.level <= level).map((motion) => motion.id),
   ];
   const [walker, setWalker] = useState<Walker>({
-    x: 74,
+    x: 66,
     depth: 0.45,
     facing: 1,
     pose: "stand",
@@ -269,7 +278,7 @@ export function WanderingFrenchie({
     };
 
     wait(700, () =>
-      startWalk({ x: 74, depth: 0.45, facing: 1, pose: "stand", walking: false, travelMs: 0 }),
+      startWalk({ x: 66, depth: 0.45, facing: 1, pose: "stand", walking: false, travelMs: 0 }),
     );
 
     return () => {
@@ -651,12 +660,14 @@ export function WanderingFrenchie({
 
       {/* 移動 */}
       <div
-        className={`absolute w-[32%] transition-[left,bottom,transform] ease-linear ${
+        className={`absolute transition-[left,bottom,transform] ease-linear ${
           walker.walking ? "frenchie-walking" : ""
         }`}
         style={{
+          width: `${DOG_WIDTH}%`,
           left: `${walker.x}%`,
-          bottom: `${3 + walker.depth * 11}%`,
+          // 絵の芝は下から 44% までなので、奥へ行っても地平線を越えないところで止める
+          bottom: `${4 + walker.depth * 7}%`,
           transitionDuration: `${walker.travelMs || 420}ms`,
           transform: `translateX(-50%) scale(${1 - walker.depth * 0.16})`,
           transformOrigin: "50% 100%",

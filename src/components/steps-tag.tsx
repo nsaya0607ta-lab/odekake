@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { STEPS_BANNER, STEPS_BOARD, STEPS_PANEL } from "@/components/home-scene";
+import { SIGN_TEXT, STEPS_BANNER, STEPS_BOARD, STEPS_PANEL } from "@/components/home-scene";
 import { useTodaySteps } from "@/lib/use-today-steps";
 
 /**
@@ -33,22 +33,30 @@ export function StepsTag({
       style={STEPS_BOARD}
     >
       <span className="absolute flex items-center justify-center" style={STEPS_BANNER}>
-        <span className="whitespace-nowrap text-[7px] leading-none font-bold tracking-[0.04em] text-white">
+        <span
+          className="whitespace-nowrap leading-none font-bold tracking-[0.04em] text-white"
+          style={{ fontSize: SIGN_TEXT.banner }}
+        >
           今日の歩数
         </span>
       </span>
 
       <span className="absolute flex flex-col justify-center" style={STEPS_PANEL}>
         <span
-          className="flex items-baseline justify-center gap-1 leading-none whitespace-nowrap text-[#5b4a35]"
+          className="flex shrink-0 items-baseline justify-center gap-1 leading-none whitespace-nowrap text-[#5b4a35]"
           aria-live="polite"
         >
-          <span className="text-[19px] font-bold tabular-nums">
+          <span className="font-bold tabular-nums" style={{ fontSize: SIGN_TEXT.steps }}>
             {steps === null ? "—" : steps.toLocaleString("ja-JP")}
           </span>
-          <span className="text-[8px] font-semibold">歩</span>
+          <span className="font-semibold" style={{ fontSize: SIGN_TEXT.unit }}>
+            歩
+          </span>
         </span>
-        <span className="mt-1 block truncate text-center text-[6.5px] leading-none text-[#8b7355]">
+        <span
+          className="mt-0.5 block shrink-0 truncate text-center leading-none text-[#8b7355]"
+          style={{ fontSize: SIGN_TEXT.small }}
+        >
           {steps === null ? "ショートカット連携前" : `歩数EXP +${stepExp.toLocaleString("ja-JP")}`}
         </span>
       </span>
