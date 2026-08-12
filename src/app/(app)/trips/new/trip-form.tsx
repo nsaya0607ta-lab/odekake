@@ -4,8 +4,9 @@ import { useActionState, useEffect, useState } from "react";
 import { createTripAction } from "@/app/actions/trips";
 import { FormDraft } from "@/components/form-draft";
 import { emptyActionState, FieldError, FormMessage, SubmitButton } from "@/components/form";
-import { IconChevronRight, IconMapPin, IconUser, IconUsers } from "@/components/icons";
+import { IconChevronRight, IconUser, IconUsers } from "@/components/icons";
 import { PhotoUploader } from "@/components/photo-uploader";
+import { TripDestinationPicker } from "@/components/trip-destination-picker";
 
 export function TripForm({
   userId,
@@ -158,20 +159,10 @@ export function TripForm({
         <FieldError message={state.fieldErrors?.startDate ?? state.fieldErrors?.endDate} />
       </section>
 
-      <section className="space-y-2">
-        <p className="field-label mb-0">
-          行き先 <span className="ml-1 text-[11px] font-normal text-ink-faint">（任意）</span>
-        </p>
-        <div className="rough-card flex min-h-[62px] items-center gap-3 px-4 py-3">
-          <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-leaf-soft text-leaf-deep">
-            <IconMapPin size={19} />
-          </span>
-          <span className="min-w-0 flex-1">
-            <span className="block text-sm font-semibold text-ink-soft">都道府県・地域はあとから追加できます</span>
-            <span className="mt-0.5 block text-[11px] text-ink-faint">訪問スポットを登録すると旅行にも反映されます</span>
-          </span>
-        </div>
-      </section>
+      <TripDestinationPicker
+        initial={state.values?.destinationAreas ?? []}
+        error={state.fieldErrors?.destinationAreas}
+      />
 
       <section className="space-y-2">
         <p className="field-label mb-0">
