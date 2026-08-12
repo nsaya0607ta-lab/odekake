@@ -58,12 +58,11 @@ export async function signUpAction(_prev: ActionState, formData: FormData): Prom
   }
 
   const supabase = await createClient();
-  const { error } = await supabase.auth.signUp({
+  const { data, error } = await supabase.auth.signUp({
     email: parsed.data.email,
     password: parsed.data.password,
     options: {
       data: { display_name: parsed.data.displayName },
-      emailRedirectTo: authCallbackUrl(parsed.data.next),
     },
   });
 
@@ -71,8 +70,16 @@ export async function signUpAction(_prev: ActionState, formData: FormData): Prom
     return { error: toJapaneseError(error, "登録に失敗しました。"), values };
   }
 
-  const query = new URLSearchParams({ email: parsed.data.email, next: parsed.data.next });
-  redirect(`/signup/complete?${query.toString()}`);
+  // Supabase の「Confirm email」が無効なら、登録と同時にセッションが発行される。
+  // そのままアプリへ進ませ、確認メール画面は挟まない。
+  if (data.session) {
+    redirect(parsed.data.next);
+  }
+
+  return {
+    error: "登録は作成されましたが、メール確認がまだ必須になっています。SupabaseのAuthentication設定でConfirm emailを無効にしてください。",
+    values,
+  };
 }
 
 export async function signInAction(_prev: ActionState, formData: FormData): Promise<ActionState> {
