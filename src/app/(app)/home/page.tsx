@@ -41,6 +41,7 @@ export default async function HomePage({
     getCoinSummary(supabase, user.id),
     getOwnedItemIds(supabase, user.id),
     getCurrentDogSkin(supabase, user.id),
+    getExpDashboard(supabase, user.id),
     supabase.from("profiles").select("profile_image_url, introduction").eq("user_id", user.id).maybeSingle(),
   ]);
   const avatarUrl = await signPhotoPath(supabase, profileResult.data?.profile_image_url);
@@ -83,8 +84,8 @@ export default async function HomePage({
             className="pointer-events-none absolute left-0 top-[-70%] w-full max-w-none select-none"
           />
 
-          {/* 元画像の丸い窓の内側いっぱいにプロフィール画像が収まるよう調整。 */}
-          <span className="absolute left-[17.1%] top-[16%] aspect-square w-[16.4%] overflow-hidden rounded-full bg-paper-deep">
+          {/* 元画像の丸窓の内側の線に、プロフィール画像の円周が沿うサイズ・位置に合わせる。 */}
+          <span className="absolute left-[15.7%] top-[14%] aspect-square w-[18.6%] overflow-hidden rounded-full bg-paper-deep">
             {avatarUrl ? (
               <>
                 {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -92,7 +93,7 @@ export default async function HomePage({
               </>
             ) : (
               <span className="flex h-full w-full items-center justify-center text-ink-faint">
-                <IconUser size={22} />
+                <IconUser size={24} />
               </span>
             )}
           </span>
