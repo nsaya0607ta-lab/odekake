@@ -30,10 +30,6 @@ export type RecordDestinationHierarchy = {
 const PERSONAL_RECORD_TRIP_TITLE = "自分のおでかけ";
 const PERSONAL_RECORD_TRIP_DESCRIPTION = "普段のおでかけをまとめる記録先";
 
-/**
- * DB上は visit_records.trip_id が必須なので、普段のおでかけにも内部用の保存先を1件持つ。
- * これは旅行計画ではないため、旅行一覧や旅行件数には含めない。
- */
 export function isPersonalRecordTrip(
   trip: Pick<TripRow, "title" | "start_date" | "end_date" | "description">,
 ): boolean {
@@ -45,10 +41,6 @@ export function isPersonalRecordTrip(
   );
 }
 
-/**
- * 同じ画面内ではホーム・記録画面など複数箇所から呼ばれる。
- * React cache で1リクエスト中の重複したDB取得をまとめる。
- */
 export const getTripSummaries = cache(async function getTripSummaries(supabase: DB): Promise<TripSummary[]> {
   const { data: trips } = await supabase
     .from("trips")
@@ -62,10 +54,7 @@ export const getTripSummaries = cache(async function getTripSummaries(supabase: 
   const { data: visits } = await supabase
     .from("visit_records")
     .select("id, journey_id")
-    .in(
-      "journey_id",
-      tripList.map((t) => t.id),
-    );
+    .in("journey_id", tripList.map((t) => t.id));
 
   const visitCount = new Map<string, number>();
   for (const v of visits ?? []) {
@@ -75,13 +64,12 @@ export const getTripSummaries = cache(async function getTripSummaries(supabase: 
   return tripList.map((trip) => ({ trip, visitCount: visitCount.get(trip.id) ?? 0 }));
 });
 
-/** 親の記録先と、その直下の旅行グループを分けて返す。 */
+/** 親の記録先と、その直下の旅行グループを分けて返す。閲覧時はDBを変更しない。 */
 export async function getRecordDestinationHierarchy(
   supabase: DB,
   userId: string,
   personalSpaceName: string,
 ): Promise<RecordDestinationHierarchy> {
-  const ensuredPersonalTrip = await ensurePersonalRecordTrip(supabase, userId);
   const { data, error } = await supabase
     .from("trips")
     .select("id, title, owner_id, trip_type, parent_trip_id, start_date, end_date, description")
@@ -95,10 +83,31 @@ export async function getRecordDestinationHierarchy(
   const rows = (data ?? []) as Array<Pick<TripRow,
     "id" | "title" | "owner_id" | "trip_type" | "parent_trip_id" | "start_date" | "end_date" | "description"
   >>;
-  const personalRoot = rows.find((trip) =>
-    trip.id === ensuredPersonalTrip?.id ||
-    (trip.owner_id === userId && trip.trip_type === "personal" && trip.parent_trip_id === null && isPersonalRecordTrip(trip)),
+
+  // 通常は既に常設の個人記録先が存在するため、閲覧のたびに ensure RPC を呼ばず
+  // 取得済みの行から直接見つける。存在しない古いアカウントだけフォールバックする。
+  let personalRoot = rows.find((trip) =>
+    trip.owner_id === userId &&
+    trip.trip_type === "personal" &&
+    trip.parent_trip_id === null &&
+    isPersonalRecordTrip(trip),
   ) ?? null;
+
+  if (!personalRoot) {
+    const ensuredPersonalTrip = await ensurePersonalRecordTrip(supabase, userId);
+    if (ensuredPersonalTrip) {
+      personalRoot = {
+        id: ensuredPersonalTrip.id,
+        title: ensuredPersonalTrip.title,
+        owner_id: userId,
+        trip_type: "personal",
+        parent_trip_id: null,
+        start_date: null,
+        end_date: null,
+        description: PERSONAL_RECORD_TRIP_DESCRIPTION,
+      };
+    }
+  }
 
   const journeysFor = (rootId: string): JourneyOption[] => rows
     .filter((trip) => trip.parent_trip_id === rootId)
@@ -121,22 +130,15 @@ export async function getRecordDestinationHierarchy(
   };
 }
 
-/**
- * 「お出かけ」は旅行計画ではなく、普段のおでかけを記録する常設の内部保存先。
- * DB上は訪問履歴に trip_id が必要なため、ユーザーごとに1件だけ自動で用意する。
- * 旅行がすでに存在していても必ずこの保存先を別に持つ。
- */
 export async function ensurePersonalRecordTrip(
   supabase: DB,
   userId: string,
 ): Promise<Pick<TripRow, "id" | "title"> | null> {
-  // 共有旅導入後もRLSや旧トリガーの状態に左右されず、本人用を必ず1件用意する。
   const { data: ensured, error: ensureError } = await supabase
     .rpc("ensure_personal_record_trip")
     .maybeSingle();
   if (ensured) return { id: ensured.trip_id, title: ensured.title };
 
-  // 0024適用前の環境でも、従来の直接取得・作成を試して画面を維持する。
   if (ensureError && ensureError.code !== "PGRST202" && ensureError.code !== "42883") {
     console.error("Personal record trip RPC failed", {
       code: ensureError.code,
