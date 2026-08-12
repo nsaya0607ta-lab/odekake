@@ -42,7 +42,11 @@ export function HomeCollectionCard({
   total: number;
 }) {
   return (
-    <Link href="/collection" className="pressable block active:scale-[0.99]" aria-label={`図鑑を見る（${collected} / ${total}）`}>
+    <Link
+      href="/collection"
+      className="pressable relative -top-2 -mx-3 block active:scale-[0.99]"
+      aria-label={`図鑑を見る（${collected} / ${total}）`}
+    >
       <div className="relative" style={{ aspectRatio: CARD_RATIO }}>
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img
