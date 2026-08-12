@@ -2,7 +2,6 @@ import { BottomNav } from "@/components/bottom-nav";
 import { GlobalInteractionFeedback } from "@/components/global-interaction-feedback";
 import { LoginBonus } from "@/components/login-bonus";
 import { PhotoCleanup } from "@/components/photo-cleanup";
-import { RoutePreloader } from "@/components/route-preloader";
 import { getCurrentDogSkin } from "@/lib/data/dog-skin";
 import { requireUser } from "@/lib/supabase/server";
 
@@ -17,7 +16,6 @@ export default async function AppLayout({ children }: { children: React.ReactNod
     <div className="min-h-dvh" style={{ paddingBottom: "calc(var(--nav-height) + var(--safe-bottom))" }}>
       {children}
       <GlobalInteractionFeedback />
-      <RoutePreloader />
       <BottomNav />
       <PhotoCleanup />
       {/* ホームに限らず、その日はじめて開いた画面で出す。
