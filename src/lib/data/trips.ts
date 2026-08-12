@@ -51,31 +51,14 @@ export const getTripSummaries = cache(async function getTripSummaries(supabase: 
   const tripList = ((trips ?? []) as TripRow[]).filter((trip) => trip.parent_trip_id !== null);
   if (tripList.length === 0) return [];
 
-  const journeyIds = tripList.map((t) => t.id);
+  const { data: visits } = await supabase
+    .from("visit_records")
+    .select("id, journey_id")
+    .in("journey_id", tripList.map((t) => t.id));
+
   const visitCount = new Map<string, number>();
-
-  // 0027適用後は件数だけをDB側でgroup byして返す。
-  // 訪問記録が数千件あっても、全レコードをアプリへ転送しない。
-  const rpc = supabase.rpc as unknown as (
-    fn: string,
-    args: { p_journey_ids: string[] },
-  ) => Promise<{ data: Array<{ journey_id: string; visit_count: number | string }> | null; error: { code?: string } | null }>;
-  const { data: counts, error: countError } = await rpc("get_journey_visit_counts", {
-    p_journey_ids: journeyIds,
-  });
-
-  if (!countError && counts) {
-    for (const row of counts) visitCount.set(row.journey_id, Number(row.visit_count) || 0);
-  } else {
-    // 0027未適用のDBでも従来どおり動く安全なフォールバック。
-    const { data: visits } = await supabase
-      .from("visit_records")
-      .select("id, journey_id")
-      .in("journey_id", journeyIds);
-
-    for (const v of visits ?? []) {
-      if (v.journey_id) visitCount.set(v.journey_id, (visitCount.get(v.journey_id) ?? 0) + 1);
-    }
+  for (const v of visits ?? []) {
+    if (v.journey_id) visitCount.set(v.journey_id, (visitCount.get(v.journey_id) ?? 0) + 1);
   }
 
   return tripList.map((trip) => ({ trip, visitCount: visitCount.get(trip.id) ?? 0 }));
