@@ -1,61 +1,64 @@
 import Link from "next/link";
 import { HomeLiveRefresh } from "@/components/home-live-refresh";
-import { LEVEL_SIGN, LevelSignArt } from "@/components/home-scene";
+import { LEVEL_BANNER, LEVEL_BOARD, LEVEL_PANEL, SIGN_TEXT } from "@/components/home-scene";
 import type { ExpProgress } from "@/lib/exp";
 
 /**
- * ヒーローカードの上の看板。板の絵は LevelSignArt が描き、ここは板の面に載せる
- * 文字だけを持つ。位置は LEVEL_SIGN の％に合わせてあるので、勝手にずらさない。
+ * 背景の絵に描かれている上の看板へ、おでかけレベルを書き込む。
+ * 位置は home-scene.tsx の実測値に合わせてあるので、勝手にずらさない。
+ *
+ * 板の面は「レベル・EXP・バー」の3行でちょうど埋まる。次に解放される報酬まで載せると
+ * 板からはみ出すので、そちらは板をタップした先（EXP履歴）に置いている。
+ * 高さを持つ行に shrink-0 が要る。付け忘れると flex が縮めて EXPバーが消える。
  */
 export function LevelTag({ progress }: { progress: ExpProgress }) {
-  const nextLabel = progress.nextReward?.name ?? "すべて解放済み";
-
   return (
     <>
       <HomeLiveRefresh />
       <Link
         href="/mypage/exp-history"
-        aria-label={`おでかけレベル ${progress.level}。EXP履歴を見る`}
-        className="relative block w-full active:scale-[0.98]"
-        style={{ aspectRatio: LEVEL_SIGN.ratio }}
+        aria-label={`おでかけレベル ${progress.level}。次に解放されるのは${
+          progress.nextReward?.name ?? "すべて解放済み"
+        }。EXP履歴を見る`}
+        className="absolute z-10 block active:scale-[0.98]"
+        style={LEVEL_BOARD}
       >
-        <LevelSignArt />
-
-        <span
-          className="absolute flex items-center justify-center text-center leading-none"
-          style={LEVEL_SIGN.banner}
-        >
-          <span className="whitespace-nowrap text-[7px] font-bold tracking-[0.04em] text-white">
+        <span className="absolute flex items-center justify-center" style={LEVEL_BANNER}>
+          <span
+            className="whitespace-nowrap leading-none font-bold tracking-[0.04em] text-white"
+            style={{ fontSize: SIGN_TEXT.banner }}
+          >
             おでかけレベル
           </span>
         </span>
 
-        <span className="absolute flex flex-col justify-center" style={LEVEL_SIGN.panel}>
-          <span className="flex items-end justify-center gap-1 leading-none text-[#4d4032]">
-            <span className="pb-0.5 text-[8px] font-semibold">Lv.</span>
-            <span className="text-[21px] font-bold tabular-nums">{progress.level}</span>
+        <span className="absolute flex flex-col justify-center" style={LEVEL_PANEL}>
+          <span className="flex shrink-0 items-end justify-center gap-1 leading-none text-[#5b4a35]">
+            <span className="pb-px font-semibold" style={{ fontSize: SIGN_TEXT.unit }}>
+              Lv.
+            </span>
+            <span className="font-bold tabular-nums" style={{ fontSize: SIGN_TEXT.level }}>
+              {progress.level}
+            </span>
           </span>
 
-          <span aria-hidden="true" className="mt-1 block h-px w-full bg-[#c9a06e]/45" />
-
-          <span className="mt-1 flex w-full items-center justify-between gap-1 text-[6.5px] text-[#6d5a42]">
+          <span
+            className="mt-px flex w-full shrink-0 items-center justify-between gap-1 leading-none text-[#7a6449]"
+            style={{ fontSize: SIGN_TEXT.small }}
+          >
             <span className="font-bold">EXP</span>
             <span className="min-w-0 truncate tabular-nums">
               {progress.totalExp.toLocaleString("ja-JP")} / {progress.nextLevelExp.toLocaleString("ja-JP")}
             </span>
           </span>
-          <span className="mt-0.5 block h-1.5 w-full overflow-hidden rounded-full bg-[#dfc79e]/80" aria-hidden="true">
+          <span
+            className="mt-px block h-[3px] w-full shrink-0 overflow-hidden rounded-full bg-[#bb9463]/45"
+            aria-hidden="true"
+          >
             <span
-              className="block h-full rounded-full bg-gradient-to-r from-leaf to-leaf-deep transition-[width] duration-500"
+              className="block h-full rounded-full bg-leaf-deep transition-[width] duration-500"
               style={{ width: `${progress.progressPercent}%` }}
             />
-          </span>
-
-          <span aria-hidden="true" className="mt-1 block h-px w-full border-t border-dashed border-[#b99463]/70" />
-
-          <span className="mt-1 flex min-w-0 items-baseline justify-center gap-1">
-            <span className="shrink-0 text-[6.5px] text-[#80694d]">次に解放</span>
-            <span className="min-w-0 truncate text-[7.5px] font-bold text-[#5c4935]">{nextLabel}</span>
           </span>
         </span>
       </Link>
