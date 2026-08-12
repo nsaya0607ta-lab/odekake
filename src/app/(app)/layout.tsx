@@ -18,9 +18,9 @@ export default async function AppLayout({ children }: { children: React.ReactNod
       <GlobalInteractionFeedback />
       <BottomNav />
       <PhotoCleanup />
-      {/* ホームに限らず、その日はじめて開いた画面で出す。
-          画面を移っても付け直されないよう、レイアウト側に置いている */}
-      <LoginBonus skin={skin} />
+      {/* ユーザーごと・日本時間の日付ごとに1回だけ表示する。
+          DB側でも同じ user_id + 日付で二重付与を防ぐ。 */}
+      <LoginBonus skin={skin} userId={user.id} />
     </div>
   );
 }
