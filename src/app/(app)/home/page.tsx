@@ -86,8 +86,10 @@ export default async function HomePage({
           {/* 元画像の丸い窓の内側いっぱいにプロフィール画像が収まるよう調整。 */}
           <span className="absolute left-[17.1%] top-[16%] aspect-square w-[16.4%] overflow-hidden rounded-full bg-paper-deep">
             {avatarUrl ? (
-              // eslint-disable-next-line @next/next/no-img-element */}
-              <img src={avatarUrl} alt="" className="h-full w-full object-cover" />
+              <>
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src={avatarUrl} alt="" className="h-full w-full object-cover" />
+              </>
             ) : (
               <span className="flex h-full w-full items-center justify-center text-ink-faint">
                 <IconUser size={22} />
