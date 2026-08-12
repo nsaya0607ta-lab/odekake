@@ -104,7 +104,8 @@ export function JourneyScopeSwitcher({
   }, [open]);
 
   function selectOption(option: JourneyScopeOption) {
-    if (option.value === optimisticValue) {
+    if (option.value === selectedValue) {
+      setOptimisticValue(selectedValue);
       setOpen(false);
       return;
     }
