@@ -124,7 +124,14 @@ export function RecordDestinationPicker({
             />
             普段のおでかけ
           </label>
-          <label className="flex items-center gap-3 rounded-2xl bg-paper-deep px-3 py-3 text-sm font-semibold">
+          <label
+            aria-disabled={root.journeys.length === 0}
+            className={`flex items-center gap-3 rounded-2xl px-3 py-3 text-sm font-semibold ${
+              root.journeys.length === 0
+                ? "cursor-not-allowed bg-[#e8e6df] text-ink-faint opacity-70"
+                : "cursor-pointer bg-paper-deep"
+            }`}
+          >
             <input
               type="radio"
               checked={mode === "journey"}
@@ -135,9 +142,12 @@ export function RecordDestinationPicker({
                 setJourneyByRoot((current) => ({ ...current, [root.id]: next }));
                 emit(root.id, next);
               }}
-              className="h-5 w-5 accent-[#7fa568]"
+              className="h-5 w-5 accent-[#7fa568] disabled:cursor-not-allowed disabled:accent-[#aaa79f]"
             />
-            旅行を選択
+            <span>
+              旅行を選択
+              {root.journeys.length === 0 ? <span className="ml-2 text-xs">（旅行がありません）</span> : null}
+            </span>
           </label>
           {mode === "journey" ? (
             root.journeys.length > 0 ? (
