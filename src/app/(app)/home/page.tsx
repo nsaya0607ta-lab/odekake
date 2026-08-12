@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { IconChevronRight, IconUser } from "@/components/icons";
+import { IconUser } from "@/components/icons";
 import { TopHeader } from "@/components/page-header";
 import { PageBody } from "@/components/page-body";
 import { CoinBadge } from "@/components/coin-badge";
@@ -24,6 +24,8 @@ import { requireUser } from "@/lib/supabase/server";
 
 export const metadata = { title: "あなたの旅 | おでかけ記録" };
 export const dynamic = "force-dynamic";
+
+const PROFILE_TICKET_SRC = "/B42684BD-FCE9-4F37-A698-4EEE3884ECA8.png";
 
 export default async function HomePage({
   searchParams,
@@ -67,9 +69,22 @@ export default async function HomePage({
 
         <Link
           href="/mypage/profile"
-          className="rough-card pressable flex items-center gap-3 px-4 py-3 active:border-line-strong active:bg-paper-deep"
+          className="pressable relative block w-full overflow-hidden active:scale-[0.99]"
+          style={{ aspectRatio: "1536 / 420" }}
+          aria-label={`${user.displayName}のプロフィールを見る`}
         >
-          <span className="h-12 w-12 shrink-0 overflow-hidden rounded-full bg-paper-deep">
+          {/* 元画像は上下に透明余白があるため、画像自体を上へずらしてチケット部分だけをカード内に見せる。 */}
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src={PROFILE_TICKET_SRC}
+            alt=""
+            aria-hidden="true"
+            draggable={false}
+            className="pointer-events-none absolute left-0 top-[-70%] w-full max-w-none select-none"
+          />
+
+          {/* チケット左側の丸い窓に、現在のプロフィール画像を重ねる。 */}
+          <span className="absolute left-[18.3%] top-[22%] aspect-square w-[14.6%] overflow-hidden rounded-full bg-paper-deep">
             {avatarUrl ? (
               // eslint-disable-next-line @next/next/no-img-element
               <img src={avatarUrl} alt="" className="h-full w-full object-cover" />
@@ -79,22 +94,16 @@ export default async function HomePage({
               </span>
             )}
           </span>
-          <span className="min-w-0 flex-1">
-            <span className="block truncate font-bold">{user.displayName}</span>
-            <span className="mt-0.5 block truncate text-xs text-ink-faint">{user.email}</span>
-            {profileResult.data?.introduction ? (
-              <span className="mt-1 block line-clamp-1 text-xs text-ink-soft">{profileResult.data.introduction}</span>
-            ) : null}
+
+          <span className="absolute left-[36%] top-1/2 w-[30%] -translate-y-1/2 min-w-0">
+            <span className="block truncate text-sm font-bold text-[#3f2d17]">{user.displayName}</span>
+            <span className="mt-0.5 block truncate text-[11px] text-[#7b684d]">{user.email}</span>
           </span>
-          <IconChevronRight size={18} className="shrink-0 text-ink-faint" />
         </Link>
 
         <div className="space-y-3">
           <section className="rough-card overflow-visible">
-            {/* 絵を切らずに全部出すので、カードの縦横比は絵と同じにする（SCENE_RATIO）。
-                ここを変えると板と文字がずれる */}
             <div className="relative aspect-[1440/768] overflow-visible bg-transparent">
-              {/* 看板の文字は絵の中の板に乗せるので、必ず HomeScene の中に入れる */}
               <HomeScene>
                 <LevelTag progress={expProgress} />
                 <StepsTag
@@ -103,7 +112,6 @@ export default async function HomePage({
                   initialCoinBalance={coins.balance}
                 />
               </HomeScene>
-              {/* 犬はカード全体を基準に歩くので、絵の箱の外に置く */}
               <WanderingFrenchie level={expProgress.level} skin={dogSkin} />
             </div>
           </section>
