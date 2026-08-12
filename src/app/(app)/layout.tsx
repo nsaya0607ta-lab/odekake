@@ -1,4 +1,5 @@
 import { BottomNav } from "@/components/bottom-nav";
+import { GlobalInteractionFeedback } from "@/components/global-interaction-feedback";
 import { LoginBonus } from "@/components/login-bonus";
 import { PhotoCleanup } from "@/components/photo-cleanup";
 import { RoutePreloader } from "@/components/route-preloader";
@@ -15,6 +16,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   return (
     <div className="min-h-dvh" style={{ paddingBottom: "calc(var(--nav-height) + var(--safe-bottom))" }}>
       {children}
+      <GlobalInteractionFeedback />
       <RoutePreloader />
       <BottomNav />
       <PhotoCleanup />
