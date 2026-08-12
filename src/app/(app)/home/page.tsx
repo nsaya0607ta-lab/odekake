@@ -1,5 +1,4 @@
 import Link from "next/link";
-import { CollectionBookArt } from "@/components/collection/collection-ui";
 import { IconCalendar, IconChevronRight, IconMapPin, IconPlus, IconUser } from "@/components/icons";
 import { JourneyScopeSwitcher, type JourneyScopeOption } from "@/components/journey-scope-switcher";
 import { TopHeader } from "@/components/page-header";
@@ -7,6 +6,7 @@ import { PageBody } from "@/components/page-body";
 import { CoinBadge } from "@/components/coin-badge";
 import { SharedTripBadge } from "@/components/shared-trip-badge";
 import { HomeScene } from "@/components/home-scene";
+import { HomeCollectionCard } from "@/components/home-collection-card";
 import { HomeStatsCard } from "@/components/home-stats-card";
 import { LevelTag } from "@/components/level-tag";
 import { StepsTag } from "@/components/steps-tag";
@@ -140,24 +140,7 @@ export default async function HomePage({
           visits={areas.totals.visits}
         />
 
-        <Link
-          href="/collection"
-          className="rough-card pressable flex items-center gap-3 px-4 py-3 active:border-line-strong active:bg-paper-deep"
-        >
-          <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-leaf-soft">
-            <CollectionBookArt className="w-7" />
-          </span>
-          <span className="min-w-0 flex-1">
-            <span className="block font-bold">図鑑を見る</span>
-            <span className="mt-0.5 block text-xs text-ink-soft">
-              集めたアイテムのコレクション
-              <span className="ml-1.5 tabular-nums">
-                {collectedItems} / {COLLECTION_ITEMS.length}
-              </span>
-            </span>
-          </span>
-          <IconChevronRight size={18} className="shrink-0 text-ink-faint" />
-        </Link>
+        <HomeCollectionCard collected={collectedItems} total={COLLECTION_ITEMS.length} />
 
         <div className="grid grid-cols-2 items-stretch gap-3">
           <section className="grid min-w-0 grid-rows-[40px_240px]">
