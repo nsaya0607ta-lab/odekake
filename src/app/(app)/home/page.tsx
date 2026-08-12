@@ -69,35 +69,39 @@ export default async function HomePage({
 
         <Link
           href="/mypage/profile"
-          className="pressable relative block w-full overflow-hidden active:scale-[0.99]"
-          style={{ aspectRatio: "1536 / 420" }}
+          className="pressable relative block overflow-hidden active:scale-[0.99]"
+          style={{
+            aspectRatio: "1536 / 420",
+            marginLeft: "-3.15%",
+            marginRight: "-2.245%",
+          }}
           aria-label={`${user.displayName}のプロフィールを見る`}
         >
-          {/* 元画像は上下に透明余白があるため、画像自体を上へずらしてチケット部分だけをカード内に見せる。 */}
+          {/* チケット自体にも少し余白があるため、カードいっぱいに見えるよう数％拡大する。 */}
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img
             src={PROFILE_TICKET_SRC}
             alt=""
             aria-hidden="true"
             draggable={false}
-            className="pointer-events-none absolute left-0 top-[-70%] w-full max-w-none select-none"
+            className="pointer-events-none absolute left-[-1.5%] top-[-78%] w-[103%] max-w-none select-none"
           />
 
-          {/* チケット左側の丸い窓に、現在のプロフィール画像を重ねる。 */}
-          <span className="absolute left-[18.3%] top-[22%] aspect-square w-[14.6%] overflow-hidden rounded-full bg-paper-deep">
+          {/* チケット左側の丸い窓に、現在のプロフィール画像を大きめに重ねる。 */}
+          <span className="absolute left-[17.2%] top-[14%] aspect-square w-[17.2%] overflow-hidden rounded-full bg-paper-deep">
             {avatarUrl ? (
               // eslint-disable-next-line @next/next/no-img-element
               <img src={avatarUrl} alt="" className="h-full w-full object-cover" />
             ) : (
               <span className="flex h-full w-full items-center justify-center text-ink-faint">
-                <IconUser size={22} />
+                <IconUser size={24} />
               </span>
             )}
           </span>
 
-          <span className="absolute left-[36%] top-1/2 w-[30%] -translate-y-1/2 min-w-0">
-            <span className="block truncate text-sm font-bold text-[#3f2d17]">{user.displayName}</span>
-            <span className="mt-0.5 block truncate text-[11px] text-[#7b684d]">{user.email}</span>
+          <span className="absolute left-[36.5%] top-1/2 w-[29%] -translate-y-1/2 min-w-0">
+            <span className="block truncate text-base font-bold text-[#3f2d17]">{user.displayName}</span>
+            <span className="mt-0.5 block truncate text-xs text-[#7b684d]">{user.email}</span>
           </span>
         </Link>
 
