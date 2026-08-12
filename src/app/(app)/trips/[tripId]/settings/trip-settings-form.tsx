@@ -4,6 +4,7 @@ import { useActionState } from "react";
 import { updateTripAction } from "@/app/actions/trips";
 import { emptyActionState, Field, FormMessage, SubmitButton } from "@/components/form";
 import { PhotoUploader } from "@/components/photo-uploader";
+import { TripDestinationPicker } from "@/components/trip-destination-picker";
 import type { TripRow } from "@/lib/supabase/types";
 
 export function TripSettingsForm({
@@ -16,6 +17,7 @@ export function TripSettingsForm({
   coverUrl: string | null;
 }) {
   const [state, formAction] = useActionState(updateTripAction, emptyActionState);
+  const destinationAreas = (trip as TripRow & { destination_areas?: unknown }).destination_areas ?? [];
 
   return (
     <form action={formAction} className="rough-card space-y-5 p-4" noValidate>
@@ -55,6 +57,11 @@ export function TripSettingsForm({
           />
         </Field>
       </div>
+
+      <TripDestinationPicker
+        initial={state.values?.destinationAreas ?? destinationAreas}
+        error={state.fieldErrors?.destinationAreas}
+      />
 
       <Field label="説明" htmlFor="trip-description" optional>
         <textarea

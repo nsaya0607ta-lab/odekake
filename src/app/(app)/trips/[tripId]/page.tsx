@@ -1,12 +1,13 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { IconPlus, IconSliders } from "@/components/icons";
+import { IconMapPin, IconPlus, IconSliders } from "@/components/icons";
 import { PageBody } from "@/components/page-body";
 import { PageHeader } from "@/components/page-header";
 import { TimelineCard } from "@/components/timeline-card";
 import { EmptyState } from "@/components/ui";
 import { formatTripPeriod, getTripCoverUrl } from "@/lib/data/trips";
 import { getTimeline } from "@/lib/data/visits";
+import { parseTripDestinationAreas, tripDestinationAreaLabel } from "@/lib/trip-destinations";
 import { requireUser } from "@/lib/supabase/server";
 import type { TripRow } from "@/lib/supabase/types";
 
@@ -39,6 +40,9 @@ export default async function TripDetailPage({ params }: { params: Promise<{ tri
 
   const isOwner = trip.owner_id === user.id;
   const period = formatTripPeriod(trip);
+  const destinationAreas = parseTripDestinationAreas(
+    (trip as TripRow & { destination_areas?: unknown }).destination_areas,
+  );
 
   return (
     <>
@@ -67,6 +71,15 @@ export default async function TripDetailPage({ params }: { params: Promise<{ tri
           <div className="space-y-2 p-5">
             <h2 className="text-lg font-bold">{trip.title}</h2>
             {period ? <p className="text-sm text-ink-soft tabular-nums">{period}</p> : null}
+            {destinationAreas.length > 0 ? (
+              <div className="flex items-start gap-2 text-sm text-ink-soft">
+                <IconMapPin size={17} className="mt-0.5 shrink-0 text-leaf-deep" />
+                <p>
+                  <span className="mr-2 text-xs font-semibold text-ink-faint">行き先</span>
+                  {destinationAreas.map(tripDestinationAreaLabel).join("・")}
+                </p>
+              </div>
+            ) : null}
             {trip.description ? (
               <p className="text-sm leading-relaxed whitespace-pre-wrap text-ink-soft">{trip.description}</p>
             ) : null}
