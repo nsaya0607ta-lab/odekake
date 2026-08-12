@@ -1,3 +1,79 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1532 684" preserveAspectRatio="none">
-  <image href="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAABfwAAAKsCAYAAABU2CwSAA...TRUNCATED..." x="0" y="0" width="1532" height="684" preserveAspectRatio="none"/>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1536 1024" preserveAspectRatio="none">
+  <defs>
+    <filter id="paper" x="-10%" y="-10%" width="120%" height="120%">
+      <feTurbulence type="fractalNoise" baseFrequency="0.015" numOctaves="2" seed="8" result="noise"/>
+      <feColorMatrix in="noise" type="saturate" values="0" result="gray"/>
+      <feComponentTransfer in="gray" result="fade"><feFuncA type="table" tableValues="0 0.07"/></feComponentTransfer>
+      <feBlend in="SourceGraphic" in2="fade" mode="multiply"/>
+    </filter>
+  </defs>
+  <g fill="none" stroke-linecap="round" stroke-linejoin="round" filter="url(#paper)">
+    <rect x="31" y="159" width="1474" height="666" rx="55" stroke="#ead9ad" stroke-width="22"/>
+    <rect x="44" y="171" width="1448" height="642" rx="46" stroke="#a86f2b" stroke-width="4"/>
+    <rect x="57" y="184" width="1422" height="616" rx="38" stroke="#d4b773" stroke-width="7"/>
+    <rect x="67" y="194" width="1402" height="596" rx="31" stroke="#9f6b2b" stroke-width="3"/>
+  </g>
+
+  <!-- top-left flowers -->
+  <g transform="translate(46 160)">
+    <path d="M18 34 C28 18, 41 8, 55 2" fill="none" stroke="#6f8a2d" stroke-width="5"/>
+    <ellipse cx="53" cy="5" rx="18" ry="8" transform="rotate(-28 53 5)" fill="#8fb348" stroke="#66872c" stroke-width="3"/>
+    <ellipse cx="34" cy="21" rx="16" ry="7" transform="rotate(31 34 21)" fill="#8fb348" stroke="#66872c" stroke-width="3"/>
+    <g transform="translate(7 31)">
+      <circle r="8" fill="#e6ad32"/>
+      <g fill="#fffdf4" stroke="#b77a31" stroke-width="3">
+        <ellipse cx="0" cy="-18" rx="9" ry="14"/><ellipse cx="17" cy="-6" rx="9" ry="14" transform="rotate(65 17 -6)"/>
+        <ellipse cx="11" cy="14" rx="9" ry="14" transform="rotate(145 11 14)"/><ellipse cx="-11" cy="14" rx="9" ry="14" transform="rotate(-145 -11 14)"/>
+        <ellipse cx="-17" cy="-6" rx="9" ry="14" transform="rotate(-65 -17 -6)"/>
+      </g>
+      <circle r="7" fill="#efbd3f" stroke="#b77a31" stroke-width="2"/>
+    </g>
+  </g>
+
+  <!-- top-right leaves -->
+  <g transform="translate(1457 163)">
+    <path d="M16 31 C5 20, -3 11, -7 1" fill="none" stroke="#6f8a2d" stroke-width="5"/>
+    <ellipse cx="-10" cy="3" rx="17" ry="8" transform="rotate(28 -10 3)" fill="#8fb348" stroke="#66872c" stroke-width="3"/>
+    <ellipse cx="7" cy="18" rx="15" ry="7" transform="rotate(-28 7 18)" fill="#8fb348" stroke="#66872c" stroke-width="3"/>
+    <ellipse cx="18" cy="31" rx="14" ry="7" transform="rotate(25 18 31)" fill="#8fb348" stroke="#66872c" stroke-width="3"/>
+  </g>
+
+  <!-- bottom-left leaves + small flower -->
+  <g transform="translate(42 785)">
+    <path d="M16 1 C4 -19, -1 -42, 0 -67" fill="none" stroke="#6f8a2d" stroke-width="5"/>
+    <ellipse cx="0" cy="-58" rx="16" ry="8" transform="rotate(-58 0 -58)" fill="#8fb348" stroke="#66872c" stroke-width="3"/>
+    <ellipse cx="9" cy="-38" rx="15" ry="7" transform="rotate(38 9 -38)" fill="#8fb348" stroke="#66872c" stroke-width="3"/>
+    <ellipse cx="-2" cy="-18" rx="15" ry="7" transform="rotate(-48 -2 -18)" fill="#8fb348" stroke="#66872c" stroke-width="3"/>
+    <g transform="translate(22 -2)">
+      <g fill="#fffdf4" stroke="#b77a31" stroke-width="2">
+        <ellipse cx="0" cy="-10" rx="5" ry="8"/><ellipse cx="9" cy="-2" rx="5" ry="8" transform="rotate(65 9 -2)"/>
+        <ellipse cx="6" cy="8" rx="5" ry="8" transform="rotate(145 6 8)"/><ellipse cx="-6" cy="8" rx="5" ry="8" transform="rotate(-145 -6 8)"/>
+        <ellipse cx="-9" cy="-2" rx="5" ry="8" transform="rotate(-65 -9 -2)"/>
+      </g>
+      <circle r="4" fill="#efbd3f" stroke="#b77a31" stroke-width="1.5"/>
+    </g>
+  </g>
+
+  <!-- bottom-right flowers + leaves -->
+  <g transform="translate(1454 788)">
+    <path d="M4 0 C19 -14, 30 -31, 39 -52" fill="none" stroke="#6f8a2d" stroke-width="5"/>
+    <ellipse cx="42" cy="-54" rx="16" ry="8" transform="rotate(-33 42 -54)" fill="#8fb348" stroke="#66872c" stroke-width="3"/>
+    <ellipse cx="24" cy="-31" rx="15" ry="7" transform="rotate(34 24 -31)" fill="#8fb348" stroke="#66872c" stroke-width="3"/>
+    <g transform="translate(0 0)">
+      <g fill="#fffdf4" stroke="#b77a31" stroke-width="3">
+        <ellipse cx="0" cy="-17" rx="8" ry="13"/><ellipse cx="16" cy="-5" rx="8" ry="13" transform="rotate(65 16 -5)"/>
+        <ellipse cx="10" cy="13" rx="8" ry="13" transform="rotate(145 10 13)"/><ellipse cx="-10" cy="13" rx="8" ry="13" transform="rotate(-145 -10 13)"/>
+        <ellipse cx="-16" cy="-5" rx="8" ry="13" transform="rotate(-65 -16 -5)"/>
+      </g>
+      <circle r="6" fill="#efbd3f" stroke="#b77a31" stroke-width="2"/>
+    </g>
+    <g transform="translate(29 15) scale(.82)">
+      <g fill="#fffdf4" stroke="#b77a31" stroke-width="3">
+        <ellipse cx="0" cy="-17" rx="8" ry="13"/><ellipse cx="16" cy="-5" rx="8" ry="13" transform="rotate(65 16 -5)"/>
+        <ellipse cx="10" cy="13" rx="8" ry="13" transform="rotate(145 10 13)"/><ellipse cx="-10" cy="13" rx="8" ry="13" transform="rotate(-145 -10 13)"/>
+        <ellipse cx="-16" cy="-5" rx="8" ry="13" transform="rotate(-65 -16 -5)"/>
+      </g>
+      <circle r="6" fill="#efbd3f" stroke="#b77a31" stroke-width="2"/>
+    </g>
+  </g>
 </svg>
