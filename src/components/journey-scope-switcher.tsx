@@ -1,7 +1,7 @@
 "use client";
 
-import Link from "next/link";
-import { useEffect, useId, useRef, useState } from "react";
+import { useRouter } from "next/navigation";
+import { useEffect, useId, useMemo, useRef, useState, useTransition } from "react";
 import { createPortal } from "react-dom";
 import { IconCheck, IconChevronDown, IconLayers } from "@/components/icons";
 
@@ -26,10 +26,37 @@ export function JourneyScopeSwitcher({
   triggerLabel?: string;
   preserveParams?: Record<string, string | undefined>;
 }) {
+  const router = useRouter();
   const [open, setOpen] = useState(false);
+  const [optimisticValue, setOptimisticValue] = useState(selectedValue);
+  const [isPending, startTransition] = useTransition();
   const dialogTitleId = useId();
   const triggerRef = useRef<HTMLButtonElement>(null);
-  const selectedLinkRef = useRef<HTMLAnchorElement>(null);
+  const selectedButtonRef = useRef<HTMLButtonElement>(null);
+
+  const hrefs = useMemo(() => {
+    const map = new Map<string, string>();
+    for (const option of options) {
+      const params = new URLSearchParams();
+      for (const [key, value] of Object.entries(preserveParams)) {
+        if (value) params.set(key, value);
+      }
+      if (option.kind === "shared") params.set(queryKey, option.value);
+      const query = params.toString();
+      map.set(option.value, query ? `${basePath}?${query}` : basePath);
+    }
+    return map;
+  }, [basePath, options, preserveParams, queryKey]);
+
+  useEffect(() => {
+    setOptimisticValue(selectedValue);
+  }, [selectedValue]);
+
+  // メニューを開く前に遷移先を先読みする。
+  // ダイアログ内のLinkは開くまでDOMに存在しなかったため、従来はタップ後に初めて取得が始まっていた。
+  useEffect(() => {
+    for (const href of new Set(hrefs.values())) router.prefetch(href);
+  }, [hrefs, router]);
 
   useEffect(() => {
     if (!open) return;
@@ -61,7 +88,7 @@ export function JourneyScopeSwitcher({
       }
     };
     document.addEventListener("keydown", onKeyDown);
-    requestAnimationFrame(() => selectedLinkRef.current?.focus());
+    requestAnimationFrame(() => selectedButtonRef.current?.focus());
 
     return () => {
       document.removeEventListener("keydown", onKeyDown);
@@ -76,14 +103,19 @@ export function JourneyScopeSwitcher({
     };
   }, [open]);
 
-  function hrefFor(option: JourneyScopeOption) {
-    const params = new URLSearchParams();
-    for (const [key, value] of Object.entries(preserveParams)) {
-      if (value) params.set(key, value);
+  function selectOption(option: JourneyScopeOption) {
+    if (option.value === optimisticValue) {
+      setOpen(false);
+      return;
     }
-    if (option.kind === "shared") params.set(queryKey, option.value);
-    const query = params.toString();
-    return query ? `${basePath}?${query}` : basePath;
+
+    const href = hrefs.get(option.value);
+    if (!href) return;
+
+    // まず見た目だけ即時に切り替え、その後のサーバー更新はtransitionで行う。
+    setOptimisticValue(option.value);
+    setOpen(false);
+    startTransition(() => router.push(href, { scroll: false }));
   }
 
   return (
@@ -93,11 +125,14 @@ export function JourneyScopeSwitcher({
         type="button"
         aria-haspopup="dialog"
         aria-expanded={open}
+        aria-busy={isPending}
         onClick={() => setOpen(true)}
-        className="pressable flex h-9 shrink-0 items-center gap-1 rounded-full border border-leaf bg-card px-3 text-xs font-semibold text-leaf-deep shadow-sm"
+        className={`pressable flex h-9 shrink-0 items-center gap-1 rounded-full border bg-card px-3 text-xs font-semibold shadow-sm transition-colors ${
+          isPending ? "border-leaf bg-leaf-soft text-leaf-deep" : "border-leaf text-leaf-deep"
+        }`}
       >
         <IconLayers size={15} />
-        {triggerLabel}
+        {isPending ? "切替中…" : triggerLabel}
         <IconChevronDown size={13} className={open ? "rotate-180" : undefined} />
       </button>
 
@@ -116,15 +151,19 @@ export function JourneyScopeSwitcher({
                 </p>
                 <nav aria-label="表示する旅" className="max-h-[60dvh] touch-pan-y overflow-y-auto overscroll-contain">
                   {options.map((option) => {
-                    const selected = option.value === selectedValue;
+                    const selected = option.value === optimisticValue;
                     return (
-                      <Link
-                        ref={selected ? selectedLinkRef : undefined}
+                      <button
+                        ref={selected ? selectedButtonRef : undefined}
                         key={`${option.kind}-${option.value}`}
-                        href={hrefFor(option)}
+                        type="button"
                         aria-current={selected ? "page" : undefined}
-                        onClick={() => setOpen(false)}
-                        className={`flex min-h-14 items-center gap-2 rounded-2xl px-4 py-2 text-sm transition-colors active:bg-paper-deep ${
+                        onPointerDown={() => {
+                          // iPhoneでも押した瞬間に選択色を変えて、反応待ち感をなくす。
+                          if (option.value !== optimisticValue) setOptimisticValue(option.value);
+                        }}
+                        onClick={() => selectOption(option)}
+                        className={`flex min-h-14 w-full items-center gap-2 rounded-2xl px-4 py-2 text-left text-sm transition-colors active:bg-paper-deep ${
                           selected ? "bg-leaf-soft font-semibold text-leaf-deep" : "text-ink"
                         }`}
                       >
@@ -135,7 +174,7 @@ export function JourneyScopeSwitcher({
                           <span className="mt-0.5 block truncate text-base">{option.name}</span>
                         </span>
                         {selected ? <IconCheck size={18} className="shrink-0" /> : null}
-                      </Link>
+                      </button>
                     );
                   })}
                 </nav>
