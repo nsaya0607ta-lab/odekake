@@ -41,7 +41,6 @@ export default async function HomePage({
     getCoinSummary(supabase, user.id),
     getOwnedItemIds(supabase, user.id),
     getCurrentDogSkin(supabase, user.id),
-    getExpDashboard(supabase, user.id),
     supabase.from("profiles").select("profile_image_url, introduction").eq("user_id", user.id).maybeSingle(),
   ]);
   const avatarUrl = await signPhotoPath(supabase, profileResult.data?.profile_image_url);
