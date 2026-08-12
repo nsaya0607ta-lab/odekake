@@ -12,24 +12,17 @@ import { IconClose } from "./icons";
  * ログインボーナス。その日はじめてアプリを開いたときに1回だけ出る。
  *
  * 二重付与を止めているのは DB 側（claim_login_bonus の一意キー）で、ここの
- * localStorage は「今日はもう確かめた」を覚えて通信を減らすだけ。消されても、
- * 端末の時計をずらされても、コインが増えないのは変わらない。
+ * localStorage は「今日はもう確かめた」を覚えて通信を減らすだけ。
  *
- * 覚える日付はサーバーが数えた日本時間の日付を優先する。端末の時計が進んで
- * いると、自分で数えた日付では受け取れる日をまたいで飛ばしてしまうため。
+ * 以前は端末全体で1つのキーを使っていたため、同じ端末で別アカウントへ
+ * 切り替えたとき、先にログインしたユーザーの「確認済み」が次のユーザーにも
+ * 引き継がれてしまっていた。現在は userId ごとにキーを分ける。
  */
 
-const SEEN_KEY = "odekake:login-bonus-checked-on";
+const SEEN_KEY_PREFIX = "odekake:login-bonus-checked-on";
 
 type Reward = { amount: number; balance: number };
 
-/**
- * 起動スプラッシュ（.app-splash / z-index 9999）が消えるまで待つ。
- *
- * スプラッシュはこのポップより手前に出るので、待たずに出すと演出がぜんぶ裏で
- * 終わってしまい、明けたときには止まった絵だけが残る。秒数を写して持つと
- * スプラッシュ側を変えたときにずれるので、要素が消えたかどうかで見る。
- */
 function waitForSplash(): Promise<void> {
   return new Promise((resolve) => {
     if (!document.querySelector(".app-splash")) return resolve();
@@ -44,26 +37,25 @@ function waitForSplash(): Promise<void> {
     });
     observer.observe(document.body, { childList: true, subtree: true });
 
-    // 監視が何かの拍子に外れても、受け取り自体は済んでいるので必ず出す
     const fallback = window.setTimeout(done, 8000);
   });
 }
 
-export function LoginBonus({ skin = "default" }: { skin?: DogSkinId }) {
+export function LoginBonus({ skin = "default", userId }: { skin?: DogSkinId; userId: string }) {
   const router = useRouter();
   const [reward, setReward] = useState<Reward | null>(null);
   const closeButton = useRef<HTMLButtonElement>(null);
 
   useEffect(() => {
     let cancelled = false;
+    const seenKey = `${SEEN_KEY_PREFIX}:${userId}`;
 
     const claim = async () => {
       const today = todayInJapan();
       try {
-        if (window.localStorage.getItem(SEEN_KEY) === today) return;
+        if (window.localStorage.getItem(seenKey) === today) return;
       } catch {
-        // プライベートモードなどで localStorage が使えない端末では、
-        // 毎回1回だけ問い合わせる。付与はDBが1日1回に絞る。
+        // localStorage が使えない場合も DB 側で二重付与を防ぐため、そのまま問い合わせる。
       }
 
       try {
@@ -81,22 +73,20 @@ export function LoginBonus({ skin = "default" }: { skin?: DogSkinId }) {
         };
 
         try {
-          window.localStorage.setItem(SEEN_KEY, data.date ?? today);
+          window.localStorage.setItem(seenKey, data.date ?? today);
         } catch {
-          // 保存できなくても支障はない（次に開いたときにもう一度問い合わせるだけ）
+          // 保存できなくても支障はない。
         }
 
         if (cancelled || !data.granted) return;
 
-        // ヘッダーの残高など、サーバーで描いている表示を新しくする。
-        // ポップより先に走らせて、明けたときには数字が揃っているようにする
         router.refresh();
 
         await waitForSplash();
         if (cancelled) return;
         setReward({ amount: data.amount ?? 0, balance: data.balance ?? 0 });
       } catch {
-        // 圏外なら次に開いたときに試す。ここで騒いでも直せない
+        // 圏外なら次に開いたときに再試行する。
       }
     };
 
@@ -104,7 +94,7 @@ export function LoginBonus({ skin = "default" }: { skin?: DogSkinId }) {
     return () => {
       cancelled = true;
     };
-  }, [router]);
+  }, [router, userId]);
 
   const close = useCallback(() => setReward(null), []);
 
@@ -132,7 +122,6 @@ export function LoginBonus({ skin = "default" }: { skin?: DogSkinId }) {
         @keyframes lb-backdrop { from { opacity: 0 } to { opacity: 1 } }
         .lb-backdrop { animation: lb-backdrop 200ms ease both; }
 
-        /* 下から跳ね上がって、少し行き過ぎてから収まる */
         @keyframes lb-card {
           0%   { transform: translateY(26px) scale(0.92); opacity: 0 }
           55%  { transform: translateY(-6px) scale(1.02); opacity: 1 }
@@ -141,7 +130,6 @@ export function LoginBonus({ skin = "default" }: { skin?: DogSkinId }) {
         }
         .lb-card { animation: lb-card 460ms cubic-bezier(0.22, 1, 0.36, 1) both; }
 
-        /* コインは上から落ちてきて弾む。カードが出きってから動かす */
         @keyframes lb-coin {
           0%   { transform: translateY(-26px) scale(0.7) rotate(-18deg); opacity: 0 }
           45%  { transform: translateY(3px)   scale(1.08) rotate(4deg);  opacity: 1 }
@@ -151,7 +139,6 @@ export function LoginBonus({ skin = "default" }: { skin?: DogSkinId }) {
         }
         .lb-coin { animation: lb-coin 620ms cubic-bezier(0.3, 1.3, 0.5, 1) 220ms both; }
 
-        /* 枚数はコインが着いた拍子に、ひと押し出てくる */
         @keyframes lb-amount {
           0%   { transform: scale(0.7); opacity: 0 }
           60%  { transform: scale(1.09); opacity: 1 }
@@ -159,7 +146,6 @@ export function LoginBonus({ skin = "default" }: { skin?: DogSkinId }) {
         }
         .lb-amount { animation: lb-amount 420ms cubic-bezier(0.3, 1.4, 0.5, 1) 420ms both; }
 
-        /* 犬はコインに気づいて、ぴょんと跳ねる */
         @keyframes lb-dog {
           0%, 100% { transform: translateY(0)    scale(1, 1) }
           25%      { transform: translateY(3px)  scale(1.05, 0.95) }
@@ -168,7 +154,6 @@ export function LoginBonus({ skin = "default" }: { skin?: DogSkinId }) {
         }
         .lb-dog { transform-origin: 50% 92%; animation: lb-dog 700ms cubic-bezier(0.3, 1.2, 0.5, 1) 560ms both; }
 
-        /* まわりの光。ゆっくり開いて、そのまま残す */
         @keyframes lb-glow {
           from { transform: scale(0.6); opacity: 0 }
           to   { transform: scale(1);   opacity: 1 }
@@ -189,7 +174,6 @@ export function LoginBonus({ skin = "default" }: { skin?: DogSkinId }) {
         }
       `}</style>
 
-      {/* カードの中を押しても閉じない */}
       <div
         className="lb-card relative w-full max-w-[320px] overflow-hidden rounded-[28px] border border-[#eadfc8] bg-[#fffdf8] shadow-[0_18px_50px_rgba(75,56,36,0.22)]"
         onClick={(event) => event.stopPropagation()}
@@ -204,8 +188,6 @@ export function LoginBonus({ skin = "default" }: { skin?: DogSkinId }) {
           <IconClose size={17} />
         </button>
 
-        {/* 上半分：朝の空。ここでコインと犬を見せる */}
-        {/* とじるボタンと見出しがぶつからないよう、上は広めにとる */}
         <div className="relative overflow-hidden bg-gradient-to-b from-[#fdf1d4] to-[#f7e8cd] px-5 pb-4 pt-11">
           <span className="lb-glow pointer-events-none absolute left-1/2 top-20 h-44 w-44 -translate-x-1/2 -translate-y-1/2 rounded-full bg-[#f7d380]/45 blur-2xl" />
           <Sparkle className="left-[12%] top-[20%] h-3.5 w-3.5" delay={520} />
@@ -230,7 +212,6 @@ export function LoginBonus({ skin = "default" }: { skin?: DogSkinId }) {
             </span>
           </div>
 
-          {/* eslint-disable-next-line @next/next/no-img-element */}
           <img
             src={getFrenchieSrc(skin, "cheer")}
             alt=""
@@ -242,7 +223,6 @@ export function LoginBonus({ skin = "default" }: { skin?: DogSkinId }) {
           />
         </div>
 
-        {/* 下半分：文章と残高 */}
         <div className="px-5 pb-5 pt-4 text-center">
           <p className="text-[15px] font-bold text-ink">今日のぶん、受け取りました！</p>
           <p className="mt-1 text-[11px] leading-relaxed text-ink-soft">
@@ -270,7 +250,6 @@ export function LoginBonus({ skin = "default" }: { skin?: DogSkinId }) {
   );
 }
 
-/** 飾りのキラキラ。位置と出るタイミングだけ変えて使い回す */
 function Sparkle({ className, delay }: { className: string; delay: number }) {
   return (
     <span
