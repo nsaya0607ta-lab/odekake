@@ -42,18 +42,6 @@ export const GACHA_PRIZES: readonly GachaPrize[] = [
   { id: "toy_frenchie_cushion", name: "フレブル型クッション", rarity: "SR", type: "item", pool: "regular", image: "/collection/items/frenchie-cushion.webp" },
   { id: "toy_golden_crown_ball", name: "王冠つき黄金ボール", rarity: "SSR", type: "item", pool: "regular", image: "/collection/items/golden-crown-ball.webp" },
 
-  // --- 通常ガチャ：おでかけ小物 第1弾 --------------------------------
-  { id: "item_paw_cushion", name: "肉球クッション", rarity: "N", type: "item", pool: "regular", image: "/collection/items/paw-cushion.svg" },
-  { id: "item_yellow_raincoat", name: "黄色いレインコート", rarity: "R", type: "item", pool: "regular", image: "/collection/items/yellow-raincoat.svg" },
-  { id: "item_mini_camping_lantern", name: "ミニキャンプランタン", rarity: "R", type: "item", pool: "regular", image: "/collection/items/mini-camping-lantern.svg" },
-  { id: "item_bubble_set", name: "シャボン玉セット", rarity: "N", type: "item", pool: "regular", image: "/collection/items/bubble-set.svg" },
-  { id: "item_knit_hat", name: "ニットぼうし", rarity: "N", type: "item", pool: "regular", image: "/collection/items/knit-hat.svg" },
-  { id: "item_portable_water_bottle", name: "携帯ウォーターボトル", rarity: "N", type: "item", pool: "regular", image: "/collection/items/portable-water-bottle.svg" },
-  { id: "item_cooling_mat", name: "ひんやりマット", rarity: "N", type: "item", pool: "regular", image: "/collection/items/cooling-mat.svg" },
-  { id: "item_pilot_goggles", name: "パイロットゴーグル", rarity: "R", type: "item", pool: "regular", image: "/collection/items/pilot-goggles.svg" },
-  { id: "item_sacoche_bag", name: "サコッシュバッグ", rarity: "R", type: "item", pool: "regular", image: "/collection/items/sacoche-bag.svg" },
-  { id: "item_camera_charm", name: "カメラチャーム", rarity: "R", type: "item", pool: "regular", image: "/collection/items/camera-charm.svg" },
-
   // --- 犬スキン（すべてSSR・共通ガチャから排出） ----------------------
   { id: "hiking_frenchie", name: "登山のフレブル", rarity: "SSR", type: "dog_skin", pool: "regular", image: "/collection/skins/hiking-frenchie.webp" },
   { id: "snow_frenchie", name: "雪国のフレブル", rarity: "SSR", type: "dog_skin", pool: "regular", image: "/collection/skins/snow-frenchie.webp" },
