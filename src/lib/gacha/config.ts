@@ -19,10 +19,10 @@ export const GACHA_TYPE_LABELS: Record<GachaType, string> = {
 export const GACHA_RARITY_RATES_BY_TYPE: Record<GachaType, Record<GachaRarity, number>> = {
   regular: {
     N: 50,
-    R: 30,
-    SR: 15,
-    SSR: 4,
-    UR: 1,
+    R: 25,
+    SR: 16,
+    SSR: 6,
+    UR: 3,
   },
   summer: {
     N: 0,
