@@ -39,149 +39,66 @@ export function CollectionProgress({
 }
 
 /**
- * 図鑑カード専用のレアリティ配色。
- * N=やさしいグリーン / R=爽やかなブルー / SR=落ち着いたゴールド /
- * SSR=パステルの虹色。未取得カードはレアリティを伏せるため共通のニュートラル色にする。
+ * 生成したレアリティカードのテンプレート。
+ * 元画像の縦横比 561:701 を維持したまま、カード全面へ敷く。
+ * UR は将来追加用として public/collection/rarity-frames/ur.webp に配置済み。
  */
-const RARITY_CARD_STYLES: Record<
-  GachaRarity,
-  { card: string; badge: string; sparkle: string }
-> = {
-  N: {
-    card:
-      "border-[#c7d7a5] bg-[linear-gradient(145deg,#fffdf5_0%,#f1f7df_100%)] shadow-[0_2px_8px_rgba(109,139,75,0.10)]",
-    badge: "border border-[#cbdba8] bg-[#edf5d5] text-[#5f7f3d]",
-    sparkle: "text-[#9fba72]",
-  },
-  R: {
-    card:
-      "border-[#acd2ee] bg-[linear-gradient(145deg,#fcfeff_0%,#eaf6ff_100%)] shadow-[0_2px_8px_rgba(92,151,193,0.12)]",
-    badge: "border border-[#b7d9f2] bg-[#e4f3ff] text-[#3477a8]",
-    sparkle: "text-[#91c8ea]",
-  },
-  SR: {
-    card:
-      "border-[#e5bb5c] bg-[linear-gradient(145deg,#fffdf7_0%,#fff5d5_48%,#fff9e8_100%)] shadow-[0_3px_10px_rgba(190,142,43,0.16)]",
-    badge: "border border-[#e8c56d] bg-[#fff0bd] text-[#9a6a12]",
-    sparkle: "text-[#d9a82f]",
-  },
-  SSR: {
-    card:
-      "border-[#e6acd0] bg-[linear-gradient(135deg,#fff6fb_0%,#f5edff_22%,#eaf8ff_45%,#f3ffe9_67%,#fff4d8_84%,#fff4fa_100%)] shadow-[0_3px_12px_rgba(180,115,174,0.18)]",
-    badge:
-      "border border-[#e7b7da] bg-[linear-gradient(90deg,#ffe0ee_0%,#eadfff_45%,#fff0c9_100%)] text-[#a34785]",
-    sparkle: "text-[#d991c1]",
-  },
+const RARITY_FRAME_PATHS: Record<GachaRarity, string> = {
+  N: "/collection/rarity-frames/n.webp",
+  R: "/collection/rarity-frames/r.webp",
+  SR: "/collection/rarity-frames/sr.webp",
+  SSR: "/collection/rarity-frames/ssr.webp",
 };
 
-/** レアリティを N / R / SR / SSR で表示 */
-function RarityLabel({ item }: { item: CollectionItem }) {
-  const style = RARITY_CARD_STYLES[item.rarity];
-
-  return (
-    <span
-      className={`rounded-full px-2.5 py-0.5 text-[9px] font-black leading-none ${style.badge}`}
-      aria-label={`レアリティ${item.rarity}`}
-    >
-      {item.rarity}
-    </span>
-  );
-}
-
-/** 取得済みカードのレア感を出す、小さなきらめき */
-function RaritySparkles({ rarity }: { rarity: GachaRarity }) {
-  const style = RARITY_CARD_STYLES[rarity];
-
-  if (rarity === "N") {
-    return (
-      <span aria-hidden="true" className={`pointer-events-none absolute right-2 top-1.5 text-[9px] opacity-45 ${style.sparkle}`}>
-        ✦
-      </span>
-    );
-  }
-
-  if (rarity === "R") {
-    return (
-      <>
-        <span aria-hidden="true" className={`pointer-events-none absolute left-2 top-2 text-[10px] opacity-60 ${style.sparkle}`}>
-          ✧
-        </span>
-        <span aria-hidden="true" className={`pointer-events-none absolute right-2 top-5 text-[8px] opacity-45 ${style.sparkle}`}>
-          ✦
-        </span>
-      </>
-    );
-  }
-
-  if (rarity === "SR") {
-    return (
-      <>
-        <span aria-hidden="true" className={`pointer-events-none absolute left-2 top-2 text-[11px] opacity-75 ${style.sparkle}`}>
-          ✦
-        </span>
-        <span aria-hidden="true" className={`pointer-events-none absolute right-2 top-3 text-[9px] opacity-60 ${style.sparkle}`}>
-          ✦
-        </span>
-      </>
-    );
-  }
-
-  return (
-    <>
-      <span aria-hidden="true" className={`pointer-events-none absolute left-2 top-1.5 text-[12px] opacity-80 ${style.sparkle}`}>
-        ✦
-      </span>
-      <span aria-hidden="true" className="pointer-events-none absolute right-2 top-2 text-[10px] text-[#9fcff0] opacity-75">
-        ✦
-      </span>
-      <span aria-hidden="true" className="pointer-events-none absolute bottom-7 left-2.5 text-[8px] text-[#e3b955] opacity-70">
-        ✧
-      </span>
-    </>
-  );
-}
-
-/** 1マス。未取得は黒いシルエット＋「???」 */
+/** 1マス。未取得はこれまで通りレアリティを伏せ、黒いシルエット＋「???」 */
 export function ItemCard({ item, owned, count = 0 }: { item: CollectionItem; owned: boolean; count?: number }) {
   const useExactSilhouette = !owned && hasExactSilhouette(item.art);
-  const rarityStyle = RARITY_CARD_STYLES[item.rarity];
   const drawCount = owned ? Math.max(1, count) : 0;
 
   return (
     <div
-      className={`rough-card relative flex h-[150px] flex-col items-center overflow-hidden border px-1.5 py-2.5 transition-shadow ${
+      className={`relative aspect-[561/701] w-full overflow-hidden rounded-[16px] transition-shadow ${
         owned
-          ? rarityStyle.card
-          : "border-[#ddd6c7] bg-[linear-gradient(145deg,#faf8f2_0%,#f1eee6_100%)] shadow-[0_2px_7px_rgba(98,88,70,0.07)]"
+          ? "bg-transparent shadow-[0_3px_10px_rgba(94,78,53,0.10)]"
+          : "border border-[#ddd6c7] bg-[linear-gradient(145deg,#faf8f2_0%,#f1eee6_100%)] shadow-[0_2px_7px_rgba(98,88,70,0.07)]"
       }`}
     >
-      {owned ? <RaritySparkles rarity={item.rarity} /> : null}
+      {owned ? (
+        // eslint-disable-next-line @next/next/no-img-element
+        <img
+          src={RARITY_FRAME_PATHS[item.rarity]}
+          alt=""
+          aria-hidden="true"
+          className="pointer-events-none absolute inset-0 h-full w-full object-contain"
+        />
+      ) : null}
 
-      <span className="relative z-[1] flex h-14 w-14 shrink-0 items-center justify-center">
-        {useExactSilhouette ? (
-          <ExactSilhouette art={item.art} />
-        ) : (
-          <ItemArt art={item.art} image={item.image} name={item.name} silhouette={!owned} />
-        )}
-      </span>
-      <span
-        className={`relative z-[1] mt-1.5 flex min-h-[28px] w-full items-center justify-center line-clamp-2 text-center text-[11px] leading-tight font-semibold ${
-          owned ? "text-ink" : "text-ink-faint"
-        }`}
-      >
-        {owned ? item.name : "???"}
-      </span>
-      <span className="relative z-[1] mt-auto flex h-4 items-center justify-center">
-        {owned ? <RarityLabel item={item} /> : null}
-      </span>
-      <span
-        className={`relative z-[1] mt-1 h-3.5 text-[9px] font-semibold leading-none tabular-nums ${
-          owned ? "text-ink-soft" : "invisible"
-        }`}
-        aria-hidden={!owned}
-      >
-        出た回数 {drawCount}回
-      </span>
+      <div className="relative z-[1] flex h-full w-full flex-col items-center px-[7%] pt-[14%] pb-[7%]">
+        <span className="flex h-[43%] w-[64%] shrink-0 items-center justify-center">
+          {useExactSilhouette ? (
+            <ExactSilhouette art={item.art} />
+          ) : (
+            <ItemArt art={item.art} image={item.image} name={item.name} silhouette={!owned} />
+          )}
+        </span>
+
+        <span
+          className={`mt-[3%] flex min-h-[17%] w-full items-center justify-center line-clamp-2 text-center text-[11px] font-semibold leading-tight ${
+            owned ? "text-[#514a42]" : "text-ink-faint"
+          }`}
+        >
+          {owned ? item.name : "???"}
+        </span>
+
+        <span
+          className={`mt-[1%] text-center text-[9px] font-semibold leading-none tabular-nums ${
+            owned ? "text-[#6d655c]" : "invisible"
+          }`}
+          aria-hidden={!owned}
+        >
+          出た回数 {drawCount}回
+        </span>
+      </div>
     </div>
   );
 }
