@@ -69,7 +69,8 @@ export function ItemCard({ item, owned, count = 0 }: { item: CollectionItem; own
           src={RARITY_FRAME_PATHS[item.rarity]}
           alt=""
           aria-hidden="true"
-          className="pointer-events-none absolute inset-0 h-full w-full object-contain"
+          className="pointer-events-none absolute inset-0 h-full w-full max-w-none object-fill"
+          style={{ transform: "scaleX(1.18) scaleY(1.06)" }}
         />
       ) : null}
 
