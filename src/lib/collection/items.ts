@@ -123,6 +123,7 @@ const CURATED_ITEMS: readonly CollectionItem[] = [
 
   // --- 通常図鑑：その他 ----------------------------------------------
   { id: "other_azubee", name: "あずびー", image: "/collection/items/two-dogs-icon-transparent.webp", category: "other", series: null, rarity: "UR" },
+  { id: "other_omojii", name: "おもじぃ", image: "/collection/items/8B027535-244F-4729-86F5-A69CDD91D103.png", category: "other", series: null, rarity: "UR" },
 
   // --- 登山シリーズ ----------------------------------------------------
   { id: "hiking_frenchie", name: "登山のフレブル", image: "/collection/skins/hiking-frenchie.webp", category: "other", series: "hiking", rarity: "SSR", art: "dogHiking" },
