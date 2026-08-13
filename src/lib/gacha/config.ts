@@ -4,7 +4,7 @@
  * ガチャ種別ごとの排出率と値段をまとめて管理する。
  */
 
-export const GACHA_RARITIES = ["N", "R", "SR", "SSR"] as const;
+export const GACHA_RARITIES = ["N", "R", "SR", "SSR", "UR"] as const;
 export type GachaRarity = (typeof GACHA_RARITIES)[number];
 
 export const GACHA_TYPES = ["regular", "summer"] as const;
@@ -21,13 +21,15 @@ export const GACHA_RARITY_RATES_BY_TYPE: Record<GachaType, Record<GachaRarity, n
     N: 50,
     R: 30,
     SR: 15,
-    SSR: 5,
+    SSR: 4,
+    UR: 1,
   },
   summer: {
     N: 0,
     R: 0,
     SR: 100,
     SSR: 0,
+    UR: 0,
   },
 };
 
@@ -56,4 +58,5 @@ export const RARITY_STYLES: Record<GachaRarity, { text: string; badge: string }>
   R: { text: "text-sky-700", badge: "bg-sky-100 text-sky-700" },
   SR: { text: "text-amber-700", badge: "bg-sun-soft text-amber-700" },
   SSR: { text: "text-rose-700", badge: "bg-rose-100 text-rose-700" },
+  UR: { text: "text-red-800", badge: "bg-red-100 text-red-800" },
 };
