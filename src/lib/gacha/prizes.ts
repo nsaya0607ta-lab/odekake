@@ -17,7 +17,7 @@ export type GachaPrize = {
   image: string | null;
 };
 
-const PAW_FOOD_BOWL_IMAGE = "/collection/items/paw-food-bowl.png";
+const PAW_FOOD_BOWL_IMAGE = "/collection/items/paw-food-bowl.svg";
 
 export const GACHA_PRIZES: readonly GachaPrize[] = [
   { id: "toy_colorful_ball", name: "カラフルボール", rarity: "N", type: "item", pool: "regular", image: "/collection/items/colorful-ball.webp" },
