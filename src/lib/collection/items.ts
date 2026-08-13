@@ -92,201 +92,47 @@ export function getSeries(id: CollectionSeriesId): CollectionSeries | null {
 
 const CURATED_ITEMS: readonly CollectionItem[] = [
   // --- 通常図鑑：おもちゃ 第1弾 --------------------------------------
-  {
-    id: "toy_colorful_ball",
-    name: "カラフルボール",
-    image: "/collection/items/colorful-ball.webp",
-    category: "toy",
-    series: null,
-    rarity: "N",
-  },
-  {
-    id: "toy_rope",
-    name: "ロープおもちゃ",
-    image: "/collection/items/rope-toy.webp",
-    category: "toy",
-    series: null,
-    rarity: "N",
-  },
-  {
-    id: "toy_bone",
-    name: "ほねのおもちゃ",
-    image: "/collection/items/bone-toy.webp",
-    category: "toy",
-    series: null,
-    rarity: "N",
-  },
-  {
-    id: "toy_squeaky_ball",
-    name: "ぴこぴこボール",
-    image: "/collection/items/squeaky-ball.webp",
-    category: "toy",
-    series: null,
-    rarity: "N",
-  },
-  {
-    id: "toy_duck_plush",
-    name: "あひるのぬいぐるみ",
-    image: "/collection/items/duck-plush.webp",
-    category: "toy",
-    series: null,
-    rarity: "R",
-  },
-  {
-    id: "toy_carrot",
-    name: "にんじんトイ",
-    image: "/collection/items/carrot-toy.webp",
-    category: "toy",
-    series: null,
-    rarity: "R",
-  },
-  {
-    id: "toy_frisbee",
-    name: "フリスビー",
-    image: "/collection/items/frisbee.webp",
-    category: "toy",
-    series: null,
-    rarity: "R",
-  },
-  {
-    id: "toy_treasure_puzzle",
-    name: "宝箱おやつパズル",
-    image: "/collection/items/treasure-puzzle.webp",
-    category: "toy",
-    series: null,
-    rarity: "SR",
-  },
-  {
-    id: "toy_frenchie_plush",
-    name: "フレブルぬいぐるみ",
-    image: "/collection/items/frenchie-plush.webp",
-    category: "toy",
-    series: null,
-    rarity: "SR",
-  },
-  {
-    id: "toy_rainbow_ball",
-    name: "虹色わんこボール",
-    image: "/collection/items/rainbow-ball.webp",
-    category: "toy",
-    series: null,
-    rarity: "SSR",
-  },
+  { id: "toy_colorful_ball", name: "カラフルボール", image: "/collection/items/colorful-ball.webp", category: "toy", series: null, rarity: "N" },
+  { id: "toy_rope", name: "ロープおもちゃ", image: "/collection/items/rope-toy.webp", category: "toy", series: null, rarity: "N" },
+  { id: "toy_bone", name: "ほねのおもちゃ", image: "/collection/items/bone-toy.webp", category: "toy", series: null, rarity: "N" },
+  { id: "toy_squeaky_ball", name: "ぴこぴこボール", image: "/collection/items/squeaky-ball.webp", category: "toy", series: null, rarity: "N" },
+  { id: "toy_duck_plush", name: "あひるのぬいぐるみ", image: "/collection/items/duck-plush.webp", category: "toy", series: null, rarity: "R" },
+  { id: "toy_carrot", name: "にんじんトイ", image: "/collection/items/carrot-toy.webp", category: "toy", series: null, rarity: "R" },
+  { id: "toy_frisbee", name: "フリスビー", image: "/collection/items/frisbee.webp", category: "toy", series: null, rarity: "R" },
+  { id: "toy_treasure_puzzle", name: "宝箱おやつパズル", image: "/collection/items/treasure-puzzle.webp", category: "toy", series: null, rarity: "SR" },
+  { id: "toy_frenchie_plush", name: "フレブルぬいぐるみ", image: "/collection/items/frenchie-plush.webp", category: "toy", series: null, rarity: "SR" },
+  { id: "toy_rainbow_ball", name: "虹色わんこボール", image: "/collection/items/rainbow-ball.webp", category: "toy", series: null, rarity: "SSR" },
 
   // --- 通常図鑑：おもちゃ 第2弾 --------------------------------------
-  {
-    id: "toy_tennis_ball",
-    name: "テニスボール",
-    image: "/collection/items/tennis-ball.webp",
-    category: "toy",
-    series: null,
-    rarity: "N",
-  },
-  {
-    id: "toy_red_slipper",
-    name: "赤いスリッパ",
-    image: "/collection/items/red-slipper.webp",
-    category: "toy",
-    series: null,
-    rarity: "N",
-  },
-  {
-    id: "toy_wood_stick",
-    name: "木の枝",
-    image: "/collection/items/wood-stick.webp",
-    category: "toy",
-    series: null,
-    rarity: "N",
-  },
-  {
-    id: "toy_donut_rope",
-    name: "ドーナツ型ロープ",
-    image: "/collection/items/donut-rope.webp",
-    category: "toy",
-    series: null,
-    rarity: "N",
-  },
-  {
-    id: "toy_soccer_ball",
-    name: "サッカーボール",
-    image: "/collection/items/soccer-ball.webp",
-    category: "toy",
-    series: null,
-    rarity: "R",
-  },
-  {
-    id: "toy_taiyaki_plush",
-    name: "たい焼きぬいぐるみ",
-    image: "/collection/items/taiyaki-plush.webp",
-    category: "toy",
-    series: null,
-    rarity: "R",
-  },
-  {
-    id: "toy_bear_plush",
-    name: "くまのぬいぐるみ",
-    image: "/collection/items/bear-plush.webp",
-    category: "toy",
-    series: null,
-    rarity: "R",
-  },
-  {
-    id: "toy_meat",
-    name: "大きな肉のおもちゃ",
-    image: "/collection/items/meat-toy.webp",
-    category: "toy",
-    series: null,
-    rarity: "SR",
-  },
-  {
-    id: "toy_frenchie_cushion",
-    name: "フレブル型クッション",
-    image: "/collection/items/frenchie-cushion.webp",
-    category: "toy",
-    series: null,
-    rarity: "SR",
-  },
-  {
-    id: "toy_golden_crown_ball",
-    name: "王冠つき黄金ボール",
-    image: "/collection/items/golden-crown-ball.webp",
-    category: "toy",
-    series: null,
-    rarity: "SSR",
-  },
+  { id: "toy_tennis_ball", name: "テニスボール", image: "/collection/items/tennis-ball.webp", category: "toy", series: null, rarity: "N" },
+  { id: "toy_red_slipper", name: "赤いスリッパ", image: "/collection/items/red-slipper.webp", category: "toy", series: null, rarity: "N" },
+  { id: "toy_wood_stick", name: "木の枝", image: "/collection/items/wood-stick.webp", category: "toy", series: null, rarity: "N" },
+  { id: "toy_donut_rope", name: "ドーナツ型ロープ", image: "/collection/items/donut-rope.webp", category: "toy", series: null, rarity: "N" },
+  { id: "toy_soccer_ball", name: "サッカーボール", image: "/collection/items/soccer-ball.webp", category: "toy", series: null, rarity: "R" },
+  { id: "toy_taiyaki_plush", name: "たい焼きぬいぐるみ", image: "/collection/items/taiyaki-plush.webp", category: "toy", series: null, rarity: "R" },
+  { id: "toy_bear_plush", name: "くまのぬいぐるみ", image: "/collection/items/bear-plush.webp", category: "toy", series: null, rarity: "R" },
+  { id: "toy_meat", name: "大きな肉のおもちゃ", image: "/collection/items/meat-toy.webp", category: "toy", series: null, rarity: "SR" },
+  { id: "toy_frenchie_cushion", name: "フレブル型クッション", image: "/collection/items/frenchie-cushion.webp", category: "toy", series: null, rarity: "SR" },
+  { id: "toy_golden_crown_ball", name: "王冠つき黄金ボール", image: "/collection/items/golden-crown-ball.webp", category: "toy", series: null, rarity: "SSR" },
+
+  // --- 通常図鑑：おでかけ小物 第1弾 ----------------------------------
+  { id: "item_paw_cushion", name: "肉球クッション", image: "/collection/items/paw-cushion.svg", category: "interior", series: null, rarity: "N" },
+  { id: "item_yellow_raincoat", name: "黄色いレインコート", image: "/collection/items/yellow-raincoat.svg", category: "other", series: null, rarity: "R" },
+  { id: "item_mini_camping_lantern", name: "ミニキャンプランタン", image: "/collection/items/mini-camping-lantern.svg", category: "other", series: null, rarity: "R" },
+  { id: "item_bubble_set", name: "シャボン玉セット", image: "/collection/items/bubble-set.svg", category: "toy", series: null, rarity: "N" },
+  { id: "item_knit_hat", name: "ニットぼうし", image: "/collection/items/knit-hat.svg", category: "other", series: null, rarity: "N" },
+  { id: "item_portable_water_bottle", name: "携帯ウォーターボトル", image: "/collection/items/portable-water-bottle.svg", category: "other", series: null, rarity: "N" },
+  { id: "item_cooling_mat", name: "ひんやりマット", image: "/collection/items/cooling-mat.svg", category: "interior", series: null, rarity: "N" },
+  { id: "item_pilot_goggles", name: "パイロットゴーグル", image: "/collection/items/pilot-goggles.svg", category: "other", series: null, rarity: "R" },
+  { id: "item_sacoche_bag", name: "サコッシュバッグ", image: "/collection/items/sacoche-bag.svg", category: "other", series: null, rarity: "R" },
+  { id: "item_camera_charm", name: "カメラチャーム", image: "/collection/items/camera-charm.svg", category: "other", series: null, rarity: "R" },
 
   // --- 登山シリーズ ----------------------------------------------------
-  {
-    id: "hiking_frenchie",
-    name: "登山のフレブル",
-    image: "/collection/skins/hiking-frenchie.webp",
-    category: "other",
-    series: "hiking",
-    rarity: "SSR",
-    art: "dogHiking",
-  },
-
+  { id: "hiking_frenchie", name: "登山のフレブル", image: "/collection/skins/hiking-frenchie.webp", category: "other", series: "hiking", rarity: "SSR", art: "dogHiking" },
   // --- 雪国シリーズ ----------------------------------------------------
-  {
-    id: "snow_frenchie",
-    name: "雪国のフレブル",
-    image: "/collection/skins/snow-frenchie.webp",
-    category: "other",
-    series: "snow",
-    rarity: "SSR",
-    art: "dogSnow",
-  },
-
+  { id: "snow_frenchie", name: "雪国のフレブル", image: "/collection/skins/snow-frenchie.webp", category: "other", series: "snow", rarity: "SSR", art: "dogSnow" },
   // --- 夏シリーズ ------------------------------------------------------
-  {
-    id: "summer_frenchie",
-    name: "夏のフレブル",
-    image: "/collection/skins/summer-frenchie.webp",
-    category: "other",
-    series: "summer",
-    rarity: "SSR",
-    art: "dogSummer",
-  },
+  { id: "summer_frenchie", name: "夏のフレブル", image: "/collection/skins/summer-frenchie.webp", category: "other", series: "summer", rarity: "SSR", art: "dogSummer" },
 ];
 
 const CURATED_IDS = new Set(CURATED_ITEMS.map((item) => item.id));
@@ -305,9 +151,7 @@ const UNLISTED_PRIZES: readonly CollectionItem[] = GACHA_PRIZES.filter(
 
 export const COLLECTION_ITEMS: readonly CollectionItem[] = [...CURATED_ITEMS, ...UNLISTED_PRIZES];
 
-export const REGULAR_ITEMS: readonly CollectionItem[] = COLLECTION_ITEMS.filter(
-  (item) => item.series === null,
-);
+export const REGULAR_ITEMS: readonly CollectionItem[] = COLLECTION_ITEMS.filter((item) => item.series === null);
 
 export function getSeriesItems(seriesId: CollectionSeriesId): CollectionItem[] {
   return COLLECTION_ITEMS.filter((item) => item.series === seriesId);
