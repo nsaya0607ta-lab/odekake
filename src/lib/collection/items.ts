@@ -115,6 +115,9 @@ const CURATED_ITEMS: readonly CollectionItem[] = [
   { id: "toy_frenchie_cushion", name: "フレブル型クッション", image: "/collection/items/frenchie-cushion.webp", category: "toy", series: null, rarity: "SR" },
   { id: "toy_golden_crown_ball", name: "王冠つき黄金ボール", image: "/collection/items/golden-crown-ball.webp", category: "toy", series: null, rarity: "SSR" },
 
+  // --- 通常図鑑：食べもの 試作 ----------------------------------------
+  { id: "food_dog_biscuit", name: "わんこビスケット", image: "/collection/items/dog-biscuit.webp", category: "food", series: null, rarity: "N" },
+
   // --- 登山シリーズ ----------------------------------------------------
   { id: "hiking_frenchie", name: "登山のフレブル", image: "/collection/skins/hiking-frenchie.webp", category: "other", series: "hiking", rarity: "SSR", art: "dogHiking" },
   // --- 雪国シリーズ ----------------------------------------------------
