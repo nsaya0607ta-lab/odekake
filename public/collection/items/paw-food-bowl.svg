@@ -1,0 +1,31 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" role="img" aria-label="肉球フードボウル">
+  <defs>
+    <linearGradient id="b" x1="0" x2="0" y1="0" y2="1">
+      <stop offset="0" stop-color="#8fc7ea"/><stop offset="1" stop-color="#5da4d6"/>
+    </linearGradient>
+    <linearGradient id="r" x1="0" x2="0" y1="0" y2="1">
+      <stop offset="0" stop-color="#fff6df"/><stop offset="1" stop-color="#ead6b2"/>
+    </linearGradient>
+  </defs>
+  <g stroke="#6e5146" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M39 104h178l-16 91c-2 13-13 22-26 22H81c-13 0-24-9-26-22z" fill="url(#b)" stroke-width="6"/>
+    <ellipse cx="128" cy="105" rx="94" ry="45" fill="url(#r)" stroke-width="6"/>
+    <ellipse cx="128" cy="106" rx="76" ry="31" fill="#5f8fba" stroke-width="4"/>
+    <g fill="#b96d3e" stroke-width="2.5">
+      <ellipse cx="82" cy="104" rx="11" ry="7"/><ellipse cx="101" cy="92" rx="12" ry="8"/><ellipse cx="121" cy="107" rx="12" ry="8"/>
+      <ellipse cx="142" cy="91" rx="11" ry="8"/><ellipse cx="162" cy="106" rx="12" ry="8"/><ellipse cx="181" cy="96" rx="10" ry="7"/>
+      <ellipse cx="96" cy="115" rx="11" ry="7"/><ellipse cx="149" cy="116" rx="11" ry="7"/>
+    </g>
+    <g fill="#f4ba50" stroke-width="2.5">
+      <path d="M74 93c-8-8 2-18 10-11 7-7 17 3 9 11 8 8-2 18-10 11-7 7-17-3-9-11z"/>
+      <path d="M126 89c-8-8 2-18 10-11 7-7 17 3 9 11 8 8-2 18-10 11-7 7-17-3-9-11z"/>
+      <path d="M166 118c-8-8 2-18 10-11 7-7 17 3 9 11 8 8-2 18-10 11-7 7-17-3-9-11z"/>
+    </g>
+    <g fill="#fff0cf" stroke-width="3">
+      <ellipse cx="128" cy="164" rx="15" ry="13"/>
+      <circle cx="110" cy="149" r="7"/><circle cx="123" cy="142" r="7"/><circle cx="138" cy="142" r="7"/><circle cx="151" cy="149" r="7"/>
+    </g>
+    <path d="M52 197h152" fill="none" stroke="#f7dfbc" stroke-width="7" opacity=".9"/>
+    <path d="M63 131c8 18 4 36 1 47" fill="none" stroke="#cde8f7" stroke-width="6" opacity=".65"/>
+  </g>
+</svg>
