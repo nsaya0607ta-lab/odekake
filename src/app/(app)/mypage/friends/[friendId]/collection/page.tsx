@@ -4,6 +4,7 @@ import { IconLock } from "@/components/icons";
 import { PageBody } from "@/components/page-body";
 import { PageHeader } from "@/components/page-header";
 import { COLLECTION_ITEMS } from "@/lib/collection/items";
+import { getOwnedItemIds } from "@/lib/data/collection";
 import {
   FriendsUnavailableError,
   getFriendCollection,
@@ -21,16 +22,19 @@ export default async function FriendCollectionPage({
 }: {
   params: Promise<{ friendId: string }>;
 }) {
-  const [{ supabase }, { friendId }] = await Promise.all([requireUser(), params]);
+  const [{ supabase, user }, { friendId }] = await Promise.all([requireUser(), params]);
   if (!UUID_PATTERN.test(friendId)) notFound();
 
   try {
     const overview = await getFriendOverview(supabase, friendId);
     if (!overview) notFound();
 
-    const collection = overview.show_collection
-      ? await getFriendCollection(supabase, friendId)
-      : [];
+    const [collection, viewerOwned] = overview.show_collection
+      ? await Promise.all([
+          getFriendCollection(supabase, friendId),
+          getOwnedItemIds(supabase, user.id),
+        ])
+      : [[], new Set<string>()];
     const counts = new Map(collection.map((item) => [item.item_id, item.count]));
     const owned = new Set(counts.keys());
 
@@ -49,12 +53,18 @@ export default async function FriendCollectionPage({
           ) : (
             <div className="space-y-4">
               <p className="rough-pill border border-line-strong bg-card px-3 py-2 text-center text-[10px] font-semibold leading-relaxed text-ink-soft">
-                持っているアイテムと、ガチャから出た回数を表示しています
+                自分も持っているアイテムは内容を表示し、未所持のアイテムは出た回数だけ確認できます
               </p>
               <CollectionProgress owned={owned.size} total={COLLECTION_ITEMS.length} />
-              <ItemGrid items={COLLECTION_ITEMS} owned={owned} counts={counts} />
+              <ItemGrid
+                items={COLLECTION_ITEMS}
+                owned={owned}
+                counts={counts}
+                revealedOwned={viewerOwned}
+                showCountWhenHidden
+              />
               <p className="pb-2 text-center text-xs text-ink-faint">
-                持っていないアイテムはシルエットで表示されます
+                自分が持っていないアイテムはシークレット表示されます
               </p>
             </div>
           )}
