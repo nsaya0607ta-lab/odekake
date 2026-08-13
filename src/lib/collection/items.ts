@@ -118,6 +118,9 @@ const CURATED_ITEMS: readonly CollectionItem[] = [
   // --- 通常図鑑：食べもの --------------------------------------------
   { id: "food_paw_bowl", name: "肉球フードボウル", image: "/collection/items/paw-food-bowl.webp", category: "food", series: null, rarity: "R" },
 
+  // --- 通常図鑑：インテリア ------------------------------------------
+  { id: "interior_anball", name: "アンボール", image: "/collection/items/anball.webp", category: "interior", series: null, rarity: "UR" },
+
   // --- 登山シリーズ ----------------------------------------------------
   { id: "hiking_frenchie", name: "登山のフレブル", image: "/collection/skins/hiking-frenchie.webp", category: "other", series: "hiking", rarity: "SSR", art: "dogHiking" },
   // --- 雪国シリーズ ----------------------------------------------------
@@ -152,4 +155,4 @@ export function countOwned(items: readonly CollectionItem[], owned: ReadonlySet<
   return items.reduce((count, item) => (owned.has(item.id) ? count + 1 : count), 0);
 }
 
-export const RARITY_STARS: Record<GachaRarity, number> = { N: 1, R: 2, SR: 3, SSR: 4 };
+export const RARITY_STARS: Record<GachaRarity, number> = { N: 1, R: 2, SR: 3, SSR: 4, UR: 5 };
