@@ -6,7 +6,6 @@
  */
 import type { GachaRarity } from "@/lib/gacha/config";
 import { GACHA_PRIZES } from "@/lib/gacha/prizes";
-import { PAW_FOOD_BOWL_IMAGE } from "@/lib/collection/generated-images";
 
 export const COLLECTION_CATEGORIES = ["toy", "food", "interior", "other"] as const;
 export type CollectionCategory = (typeof COLLECTION_CATEGORIES)[number];
@@ -91,8 +90,9 @@ export function getSeries(id: CollectionSeriesId): CollectionSeries | null {
   return SERIES_BY_ID.get(id) ?? null;
 }
 
+const PAW_FOOD_BOWL_IMAGE = "/collection/items/paw-food-bowl.png";
+
 const CURATED_ITEMS: readonly CollectionItem[] = [
-  // --- 通常図鑑：おもちゃ 第1弾 --------------------------------------
   { id: "toy_colorful_ball", name: "カラフルボール", image: "/collection/items/colorful-ball.webp", category: "toy", series: null, rarity: "N" },
   { id: "toy_rope", name: "ロープおもちゃ", image: "/collection/items/rope-toy.webp", category: "toy", series: null, rarity: "N" },
   { id: "toy_bone", name: "ほねのおもちゃ", image: "/collection/items/bone-toy.webp", category: "toy", series: null, rarity: "N" },
@@ -103,8 +103,6 @@ const CURATED_ITEMS: readonly CollectionItem[] = [
   { id: "toy_treasure_puzzle", name: "宝箱おやつパズル", image: "/collection/items/treasure-puzzle.webp", category: "toy", series: null, rarity: "SR" },
   { id: "toy_frenchie_plush", name: "フレブルぬいぐるみ", image: "/collection/items/frenchie-plush.webp", category: "toy", series: null, rarity: "SR" },
   { id: "toy_rainbow_ball", name: "虹色わんこボール", image: "/collection/items/rainbow-ball.webp", category: "toy", series: null, rarity: "SSR" },
-
-  // --- 通常図鑑：おもちゃ 第2弾 --------------------------------------
   { id: "toy_tennis_ball", name: "テニスボール", image: "/collection/items/tennis-ball.webp", category: "toy", series: null, rarity: "N" },
   { id: "toy_red_slipper", name: "赤いスリッパ", image: "/collection/items/red-slipper.webp", category: "toy", series: null, rarity: "N" },
   { id: "toy_wood_stick", name: "木の枝", image: "/collection/items/wood-stick.webp", category: "toy", series: null, rarity: "N" },
@@ -115,22 +113,14 @@ const CURATED_ITEMS: readonly CollectionItem[] = [
   { id: "toy_meat", name: "大きな肉のおもちゃ", image: "/collection/items/meat-toy.webp", category: "toy", series: null, rarity: "SR" },
   { id: "toy_frenchie_cushion", name: "フレブル型クッション", image: "/collection/items/frenchie-cushion.webp", category: "toy", series: null, rarity: "SR" },
   { id: "toy_golden_crown_ball", name: "王冠つき黄金ボール", image: "/collection/items/golden-crown-ball.webp", category: "toy", series: null, rarity: "SSR" },
-
-  // --- 通常図鑑：食べもの 試作 ----------------------------------------
-  { id: "food_dog_biscuit", name: "わんこビスケット", image: "/collection/items/dog-biscuit.webp", category: "food", series: null, rarity: "N" },
   { id: "food_paw_bowl", name: "肉球フードボウル", image: PAW_FOOD_BOWL_IMAGE, category: "food", series: null, rarity: "R" },
-
-  // --- 登山シリーズ ----------------------------------------------------
   { id: "hiking_frenchie", name: "登山のフレブル", image: "/collection/skins/hiking-frenchie.webp", category: "other", series: "hiking", rarity: "SSR", art: "dogHiking" },
-  // --- 雪国シリーズ ----------------------------------------------------
   { id: "snow_frenchie", name: "雪国のフレブル", image: "/collection/skins/snow-frenchie.webp", category: "other", series: "snow", rarity: "SSR", art: "dogSnow" },
-  // --- 夏シリーズ ------------------------------------------------------
   { id: "summer_frenchie", name: "夏のフレブル", image: "/collection/skins/summer-frenchie.webp", category: "other", series: "summer", rarity: "SSR", art: "dogSummer" },
 ];
 
 const CURATED_IDS = new Set(CURATED_ITEMS.map((item) => item.id));
 
-/** 未整理の新規ガチャ景品は通常図鑑の「その他」へ自動追加する */
 const UNLISTED_PRIZES: readonly CollectionItem[] = GACHA_PRIZES.filter(
   (prize) => !CURATED_IDS.has(prize.id),
 ).map((prize) => ({
@@ -143,7 +133,6 @@ const UNLISTED_PRIZES: readonly CollectionItem[] = GACHA_PRIZES.filter(
 }));
 
 export const COLLECTION_ITEMS: readonly CollectionItem[] = [...CURATED_ITEMS, ...UNLISTED_PRIZES];
-
 export const REGULAR_ITEMS: readonly CollectionItem[] = COLLECTION_ITEMS.filter((item) => item.series === null);
 
 export function getSeriesItems(seriesId: CollectionSeriesId): CollectionItem[] {
@@ -151,7 +140,7 @@ export function getSeriesItems(seriesId: CollectionSeriesId): CollectionItem[] {
 }
 
 export function countOwned(items: readonly CollectionItem[], owned: ReadonlySet<string>): number {
-  return items.reduce((count, item) => owned.has(item.id) ? count + 1 : count, 0);
+  return items.reduce((count, item) => (owned.has(item.id) ? count + 1 : count), 0);
 }
 
 export const RARITY_STARS: Record<GachaRarity, number> = { N: 1, R: 2, SR: 3, SSR: 4 };
