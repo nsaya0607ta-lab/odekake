@@ -6,6 +6,7 @@
  */
 import type { GachaRarity } from "@/lib/gacha/config";
 import { GACHA_PRIZES } from "@/lib/gacha/prizes";
+import { PAW_FOOD_BOWL_IMAGE } from "@/lib/collection/generated-images";
 
 export const COLLECTION_CATEGORIES = ["toy", "food", "interior", "other"] as const;
 export type CollectionCategory = (typeof COLLECTION_CATEGORIES)[number];
@@ -117,6 +118,7 @@ const CURATED_ITEMS: readonly CollectionItem[] = [
 
   // --- 通常図鑑：食べもの 試作 ----------------------------------------
   { id: "food_dog_biscuit", name: "わんこビスケット", image: "/collection/items/dog-biscuit.webp", category: "food", series: null, rarity: "N" },
+  { id: "food_paw_bowl", name: "肉球フードボウル", image: PAW_FOOD_BOWL_IMAGE, category: "food", series: null, rarity: "R" },
 
   // --- 登山シリーズ ----------------------------------------------------
   { id: "hiking_frenchie", name: "登山のフレブル", image: "/collection/skins/hiking-frenchie.webp", category: "other", series: "hiking", rarity: "SSR", art: "dogHiking" },
@@ -149,7 +151,7 @@ export function getSeriesItems(seriesId: CollectionSeriesId): CollectionItem[] {
 }
 
 export function countOwned(items: readonly CollectionItem[], owned: ReadonlySet<string>): number {
-  return items.reduce((count, item) => (owned.has(item.id) ? count + 1 : count), 0);
+  return items.reduce((count, item) => owned.has(item.id) ? count + 1 : count, 0);
 }
 
 export const RARITY_STARS: Record<GachaRarity, number> = { N: 1, R: 2, SR: 3, SSR: 4 };
