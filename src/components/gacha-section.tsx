@@ -28,6 +28,19 @@ type AnimationDraw = {
   results: DrawResult[];
 };
 
+const RARITY_FRAME_PATHS: Record<GachaRarity, string> = {
+  N: "/collection/rarity-frames/n.webp",
+  R: "/collection/rarity-frames/r.webp",
+  SR: "/collection/rarity-frames/sr.webp",
+  SSR: "/collection/rarity-frames/ssr.webp",
+};
+
+function validRarity(rarity: string): GachaRarity {
+  return (["N", "R", "SR", "SSR"] as const).includes(rarity as GachaRarity)
+    ? (rarity as GachaRarity)
+    : "N";
+}
+
 /** iOS Safariを含め、モーダル表示中に背面ページがスクロールしないよう固定する。 */
 function useBodyScrollLock() {
   useEffect(() => {
@@ -67,35 +80,6 @@ function useBodyScrollLock() {
 
 function rarityStyle(rarity: string) {
   return RARITY_STYLES[rarity as GachaRarity] ?? RARITY_STYLES.N;
-}
-
-function rarityTheme(rarity: string) {
-  switch (rarity) {
-    case "SSR":
-      return {
-        panel: "border-[#dfbdd7] bg-gradient-to-b from-[#fff4fb] via-[#fff9e7] to-[#eee8ff]",
-        badge: "border-[#d8b4cf] bg-[#f6d9ed] text-[#8d5079]",
-        glow: "bg-[#efcce2]/45",
-      };
-    case "SR":
-      return {
-        panel: "border-[#e7c96e] bg-gradient-to-b from-[#fff9e8] via-[#fffdf6] to-[#f6e9bd]",
-        badge: "border-[#d8b653] bg-[#f5d56c] text-[#79591c]",
-        glow: "bg-[#f4d86f]/45",
-      };
-    case "R":
-      return {
-        panel: "border-[#bfd6e8] bg-gradient-to-b from-[#f4fbff] to-[#e8f3fb]",
-        badge: "border-[#b4cee3] bg-[#dcecf8] text-[#527694]",
-        glow: "bg-[#bcdcf0]/35",
-      };
-    default:
-      return {
-        panel: "border-[#dfd7ca] bg-gradient-to-b from-[#fbf8f1] to-[#f0ebe2]",
-        badge: "border-[#d4cbbd] bg-[#e9e3d9] text-ink-soft",
-        glow: "bg-[#d9d0c4]/30",
-      };
-  }
 }
 
 export function GachaSection({ balance }: { balance: number }) {
@@ -422,14 +406,12 @@ function ReferenceOpenScene({ result }: { result: DrawResult }) {
 }
 
 function Capsule({ result, open = false, large = false }: { result: DrawResult; open?: boolean; large?: boolean }) {
-  const validRarity = (["N", "R", "SR", "SSR"] as const).includes(result.rarity as GachaRarity)
-    ? (result.rarity as GachaRarity)
-    : "N";
+  const rarity = validRarity(result.rarity);
   const gradientId = `capsule-${useId().replaceAll(":", "")}`;
   const size = large ? "h-[112px] w-[112px]" : "h-[52px] w-[52px]";
 
   return (
-    <span className={`gacha-capsule relative block ${size} ${open ? "is-open" : ""}`} data-rarity={validRarity} aria-label={`${validRarity}カプセル`}>
+    <span className={`gacha-capsule relative block ${size} ${open ? "is-open" : ""}`} data-rarity={rarity} aria-label={`${rarity}カプセル`}>
       {open && result.image && (
         <span className="gacha-capsule-prize pointer-events-none absolute left-1/2 top-[43%] z-[1] flex h-[48%] w-[48%] -translate-x-1/2 -translate-y-1/2 items-center justify-center">
           <PrizeImage result={result} className="h-full w-full" />
@@ -438,7 +420,7 @@ function Capsule({ result, open = false, large = false }: { result: DrawResult; 
       <svg viewBox="0 0 100 100" className="relative z-[2] h-full w-full overflow-visible drop-shadow-[0_7px_5px_rgba(81,70,49,0.18)]" aria-hidden="true">
         <defs>
           <linearGradient id={gradientId} x1="12" y1="52" x2="88" y2="94" gradientUnits="userSpaceOnUse">
-            {validRarity === "SSR" ? (
+            {rarity === "SSR" ? (
               <>
                 <stop stopColor="#f7c8d8" />
                 <stop offset="0.28" stopColor="#f8df96" />
@@ -448,8 +430,8 @@ function Capsule({ result, open = false, large = false }: { result: DrawResult; 
               </>
             ) : (
               <>
-                <stop stopColor={validRarity === "N" ? "#dceab8" : validRarity === "R" ? "#d9ecf8" : "#fff0b7"} />
-                <stop offset="1" stopColor={validRarity === "N" ? "#9fc476" : validRarity === "R" ? "#76add4" : "#e3b74e"} />
+                <stop stopColor={rarity === "N" ? "#dceab8" : rarity === "R" ? "#d9ecf8" : "#fff0b7"} />
+                <stop offset="1" stopColor={rarity === "N" ? "#9fc476" : rarity === "R" ? "#76add4" : "#e3b74e"} />
               </>
             )}
           </linearGradient>
@@ -465,7 +447,7 @@ function Capsule({ result, open = false, large = false }: { result: DrawResult; 
           <path d="M24 70c5 12 14 17 25 19" fill="none" stroke="white" strokeWidth="5" strokeLinecap="round" opacity=".26" />
         </g>
         <rect x="8" y="47" width="84" height="7" rx="3.5" fill="#fffdf5" fillOpacity=".9" stroke="#8e826c" strokeWidth="1.5" />
-        {validRarity === "SSR" && <path d="m77 16 2.4 6.2 6.6 2.4-6.6 2.4-2.4 6.2-2.4-6.2-6.6-2.4 6.6-2.4Z" fill="#fff8ce" />}
+        {rarity === "SSR" && <path d="m77 16 2.4 6.2 6.6 2.4-6.6 2.4-2.4 6.2-2.4-6.2-6.6-2.4 6.6-2.4Z" fill="#fff8ce" />}
       </svg>
     </span>
   );
@@ -528,8 +510,56 @@ function GachaResultModal({
   );
 }
 
+function RarityResultCard({ result, large = false }: { result: DrawResult; large?: boolean }) {
+  const rarity = validRarity(result.rarity);
+
+  return (
+    <div
+      className={`relative aspect-[561/701] w-full overflow-hidden rounded-[16px] bg-transparent text-center shadow-[0_3px_10px_rgba(94,78,53,0.10)] ${
+        large ? "rounded-[22px]" : ""
+      }`}
+    >
+      {/* 図鑑と同じWebPテンプレートを、そのまま同じ拡大率で使用する。 */}
+      {/* eslint-disable-next-line @next/next/no-img-element */}
+      <img
+        src={RARITY_FRAME_PATHS[rarity]}
+        alt=""
+        aria-hidden="true"
+        draggable={false}
+        className="pointer-events-none absolute inset-0 h-full w-full max-w-none select-none object-fill"
+        style={{ transform: "scaleX(1.18) scaleY(1.06)" }}
+      />
+
+      <div className="relative z-[1] flex h-full w-full flex-col items-center px-[7%] pb-[7%] pt-[13%]">
+        <span className={`flex h-[43%] shrink-0 items-center justify-center ${large ? "w-[68%]" : "w-[64%]"}`}>
+          <PrizeImage result={result} className="h-full w-full" prominent={large} />
+        </span>
+
+        <span className="mt-[1%] flex h-[11%] items-center justify-center">
+          {result.isNew && (
+            <span
+              className={`rounded-full bg-[#ee7470] font-black tracking-wide text-white shadow-sm ${
+                large ? "px-3 py-0.5 text-[11px]" : "px-2 py-0.5 text-[8px]"
+              }`}
+            >
+              NEW{large ? "!" : ""}
+            </span>
+          )}
+        </span>
+
+        <p
+          className={`mt-[1%] flex min-h-[17%] w-full items-center justify-center line-clamp-2 font-bold leading-tight text-[#514a42] ${
+            large ? "text-base" : "text-[10px]"
+          }`}
+        >
+          {result.name}
+        </p>
+      </div>
+    </div>
+  );
+}
+
 function SingleResult({ result }: { result: DrawResult }) {
-  const theme = rarityTheme(result.rarity);
   const acquisitionLabel =
     result.id === "summer_frenchie"
       ? "サマースキンをゲット！"
@@ -538,34 +568,18 @@ function SingleResult({ result }: { result: DrawResult }) {
         : "おもちゃをゲット！";
 
   return (
-    <div className={`relative overflow-hidden rounded-[24px] border p-4 ${theme.panel}`}>
-      <span className={`pointer-events-none absolute left-1/2 top-[42%] h-48 w-48 -translate-x-1/2 -translate-y-1/2 rounded-full blur-2xl ${theme.glow}`} />
-      <DecorativeSparkles />
+    <div className="pt-1 text-center">
+      <p className="pr-9 text-[11px] font-bold tracking-[0.18em] text-ink-faint">1回ガチャ</p>
+      <h2 className="mt-1 pr-9 text-xl font-black text-[#6e5a3c]">おめでとう！</h2>
 
-      <div className="relative z-10 flex flex-col items-center text-center">
-        <span className={`rounded-full border px-4 py-1 text-base font-black tracking-[0.12em] ${theme.badge}`}>
-          {result.rarity}
-        </span>
-        <p className="mt-2 text-[22px] font-black tracking-wide text-[#6e5a3c]">おめでとう！</p>
-
-        <div className="relative mt-3 flex h-44 w-44 items-center justify-center rounded-full border border-white/80 bg-white/55 shadow-[0_10px_28px_rgba(158,122,48,0.14)]">
-          <PrizeImage result={result} className="h-36 w-36" prominent />
-        </div>
-
-        <span className="mt-2 flex h-6 items-center">
-          {result.isNew && (
-            <span className="-rotate-3 rounded-full bg-[#ee7470] px-3 py-0.5 text-[11px] font-black tracking-wide text-white shadow-sm">
-              NEW!
-            </span>
-          )}
-        </span>
-
-        <p className="mt-1 text-xl font-black text-[#5b4934]">{result.name}</p>
-        <p className="mt-1 text-xs font-bold text-[#927a59]">{acquisitionLabel}</p>
-        <p className="mt-3 rounded-full bg-white/55 px-3 py-1 text-[10px] text-[#9b896f]">
-          {result.isNew ? "所持アイテムに追加されました" : "すでに持っているアイテムです"}
-        </p>
+      <div className="mx-auto mt-4 w-[76%]">
+        <RarityResultCard result={result} large />
       </div>
+
+      <p className="mt-3 text-xs font-bold text-[#927a59]">{acquisitionLabel}</p>
+      <p className="mx-auto mt-2 w-fit rounded-full bg-[#f7f1e7] px-3 py-1 text-[10px] text-[#9b896f]">
+        {result.isNew ? "所持アイテムに追加されました" : "すでに持っているアイテムです"}
+      </p>
     </div>
   );
 }
@@ -589,34 +603,7 @@ function MultiResult({ results }: { results: DrawResult[] }) {
 }
 
 function ResultCard({ result }: { result: DrawResult }) {
-  const theme = rarityTheme(result.rarity);
-  return (
-    <div className={`relative flex min-h-[142px] flex-col items-center overflow-hidden rounded-2xl border p-2.5 text-center ${theme.panel}`}>
-      <span className={`rounded-full border px-2 py-0.5 text-[10px] font-black ${theme.badge}`}>{result.rarity}</span>
-      <PrizeImage result={result} className="mt-1.5 h-16 w-16" />
-      <span className="mt-1 flex h-4 items-center">
-        {result.isNew && (
-          <span className="rounded-full bg-[#ee7470] px-1.5 py-0.5 text-[8px] font-black text-white">NEW</span>
-        )}
-      </span>
-      <p className="mt-0.5 w-full truncate text-[10px] font-bold text-[#5b4934]">{result.name}</p>
-    </div>
-  );
-}
-
-function DecorativeSparkles() {
-  return (
-    <div className="pointer-events-none absolute inset-0" aria-hidden="true">
-      <SparkleArt className="absolute left-[9%] top-[18%] w-4 -rotate-12 text-[#e6bc4f]" />
-      <SparkleArt className="absolute right-[10%] top-[24%] w-3 rotate-12 text-[#e9c968]" />
-      <SparkleArt className="absolute left-[14%] top-[52%] w-2.5 text-[#f0cf70]" />
-      <SparkleArt className="absolute right-[13%] top-[57%] w-4 rotate-12 text-[#e6bc4f]" />
-      <span className="absolute left-[19%] top-[34%] h-2 w-2 rounded-full bg-[#f2a8a2]" />
-      <span className="absolute right-[20%] top-[41%] h-2 w-2 rounded-full bg-[#a9cee7]" />
-      <span className="absolute left-[25%] top-[70%] h-1.5 w-1.5 rotate-45 bg-[#b9d8ad]" />
-      <span className="absolute right-[27%] top-[72%] h-1.5 w-1.5 rotate-45 bg-[#efbe88]" />
-    </div>
-  );
+  return <RarityResultCard result={result} />;
 }
 
 function PrizeImage({
