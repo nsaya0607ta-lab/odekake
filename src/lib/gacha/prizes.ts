@@ -50,6 +50,7 @@ export const GACHA_PRIZES: readonly GachaPrize[] = [
 
   // --- 通常ガチャ：その他 --------------------------------------------
   { id: "other_azubee", name: "あずびー", rarity: "UR", type: "item", pool: "regular", image: "/collection/items/two-dogs-icon-transparent.webp" },
+  { id: "other_omojii", name: "おもじぃ", rarity: "UR", type: "item", pool: "regular", image: "/collection/items/8B027535-244F-4729-86F5-A69CDD91D103.png" },
 
   // --- 犬スキン（すべてSSR・共通ガチャから排出） ----------------------
   { id: "hiking_frenchie", name: "登山のフレブル", rarity: "SSR", type: "dog_skin", pool: "regular", image: "/collection/skins/hiking-frenchie.webp" },
