@@ -29,10 +29,15 @@ type Entity = {
 };
 
 const ROUND_SECONDS = 30;
-const BOX_WIDTH = 46;
+const BOX_IMAGE = "/C6B05575-E7C3-40E5-BAC9-6290C2BA6429.png";
+const BOX_WIDTH = 54;
 const BOX_HALF = BOX_WIDTH / 2;
-const BOX_LIP_Y = 82;
-const INNER_OPENING_HALF = 15.5;
+const BOX_HEIGHT = BOX_WIDTH * 0.75;
+const BOX_BOTTOM = 0.5;
+const BOX_TOP = 100 - BOX_BOTTOM - BOX_HEIGHT;
+const BOX_LIP_Y = BOX_TOP + BOX_HEIGHT * 0.52;
+const BOX_FLAP_TOP_Y = BOX_TOP + BOX_HEIGHT * 0.14;
+const INNER_OPENING_HALF = BOX_WIDTH * 0.315;
 const BOX_MIN_X = BOX_HALF + 1;
 const BOX_MAX_X = 100 - BOX_HALF - 1;
 const POINTS: Record<FrenchieCatchItem["rarity"], number> = { N: 10, R: 20, SR: 40, SSR: 70, UR: 100 };
@@ -52,10 +57,20 @@ function overlap(leftA: number, rightA: number, leftB: number, rightB: number) {
   return Math.max(0, Math.min(rightA, rightB) - Math.max(leftA, leftB));
 }
 
+function isCardboardTap(localX: number, localY: number) {
+  const front = localY >= 0.52 && localY <= 0.97 && localX >= 0.15 && localX <= 0.85;
+  const backFlap = localY >= 0.05 && localY <= 0.32 && localX >= 0.18 && localX <= 0.82;
+  const leftFlap = localY >= 0.14 && localY <= 0.55 && localX >= 0.02 && localX <= 0.22;
+  const rightFlap = localY >= 0.14 && localY <= 0.55 && localX >= 0.78 && localX <= 0.98;
+  return front || backFlap || leftFlap || rightFlap;
+}
+
 export function FrenchieCatchGame({ ownedItems }: { ownedItems: FrenchieCatchItem[] }) {
   const boardRef = useRef<HTMLDivElement | null>(null);
+  const catcherRef = useRef<HTMLDivElement | null>(null);
   const entitiesRef = useRef<Entity[]>([]);
   const draggingRef = useRef(false);
+  const dragOffsetRef = useRef(0);
   const boxXRef = useRef(50);
   const nextIdRef = useRef(1);
   const startAtRef = useRef(0);
@@ -184,24 +199,27 @@ export function FrenchieCatchGame({ ownedItems }: { ownedItems: FrenchieCatchIte
         const hitRight = entity.x + hitboxWidth / 2;
         const bottom = entity.y + entity.size * (entity.kind === "dog" ? 0.34 : 0.31);
 
-        // フチで跳ねた物体は、いったん箱より上まで戻ったら再キャッチ可能にする。
-        // 上昇中に判定を戻しておけば、次に下降してフチを横切ったときだけ再判定される。
-        if (entity.status === "bounced" && entity.rimChecked && entity.vy < 0 && bottom < BOX_LIP_Y - 3) {
+        if (entity.status === "bounced" && entity.rimChecked && entity.vy < 0 && bottom < BOX_FLAP_TOP_Y - 2) {
           entity.rimChecked = false;
         }
 
-        if (!entity.rimChecked && entity.vy > 0 && bottom >= BOX_LIP_Y) {
-          entity.rimChecked = true;
+        if (!entity.rimChecked && entity.vy > 0 && bottom >= BOX_FLAP_TOP_Y) {
           const center = boxXRef.current;
           const innerRatio = overlap(hitLeft, hitRight, center - INNER_OPENING_HALF, center + INNER_OPENING_HALF) / Math.max(0.01, hitboxWidth);
-          const touchesBox = overlap(hitLeft, hitRight, center - BOX_HALF, center + BOX_HALF) > 0;
+          const localX = (entity.x - (center - BOX_HALF)) / BOX_WIDTH;
+          const localY = (bottom - BOX_TOP) / BOX_HEIGHT;
+          const leftFlapHit = localX >= 0.02 && localX <= 0.22 && localY >= 0.14 && localY <= 0.55;
+          const rightFlapHit = localX >= 0.78 && localX <= 0.98 && localY >= 0.14 && localY <= 0.55;
+          const backFlapHit = localX >= 0.18 && localX <= 0.82 && localY >= 0.05 && localY <= 0.32
+            && (entity.status === "bounced" || Math.abs(entity.vx) > 5 || localX < 0.23 || localX > 0.77);
+          const touchesFront = bottom >= BOX_LIP_Y && overlap(hitLeft, hitRight, center - BOX_HALF, center + BOX_HALF) > 0;
+          const canCatch = bottom >= BOX_LIP_Y && innerRatio >= 0.58;
 
-          if (innerRatio >= 0.58) {
+          if (canCatch) {
+            entity.rimChecked = true;
             const points = entity.kind === "dog" ? 15 : POINTS[entity.rarity!];
             entity.status = "caught";
             entity.ttl = 0.48;
-            // 箱の中心へ吸い寄せず、その位置のまま自然に中へ落とす。
-            // 箱本体のほうが z-index が高いため、落下すると前面の段ボールに自然に隠れる。
             entity.vx *= 0.2;
             entity.vy = Math.max(entity.vy, 18);
             entity.spin *= 0.2;
@@ -214,7 +232,8 @@ export function FrenchieCatchGame({ ownedItems }: { ownedItems: FrenchieCatchIte
             setCaught(caughtRef.current);
             setMaxCombo(maxComboRef.current);
             showCatch(entity, points);
-          } else if (touchesBox) {
+          } else if (leftFlapHit || rightFlapHit || backFlapHit || touchesFront) {
+            entity.rimChecked = true;
             const direction = entity.x <= center ? -1 : 1;
             entity.status = "bounced";
             entity.vx = direction * (13 + Math.random() * 6);
@@ -256,6 +275,8 @@ export function FrenchieCatchGame({ ownedItems }: { ownedItems: FrenchieCatchIte
     maxComboRef.current = 0;
     caughtRef.current = 0;
     boxXRef.current = 50;
+    draggingRef.current = false;
+    dragOffsetRef.current = 0;
     setEntities([]);
     setBoxX(50);
     setScore(0);
@@ -273,16 +294,24 @@ export function FrenchieCatchGame({ ownedItems }: { ownedItems: FrenchieCatchIte
   const moveBox = useCallback((clientX: number) => {
     const rect = boardRef.current?.getBoundingClientRect();
     if (!rect || rect.width <= 0) return;
-    const nextX = clamp(((clientX - rect.left) / rect.width) * 100, BOX_MIN_X, BOX_MAX_X);
+    const pointerX = ((clientX - rect.left) / rect.width) * 100;
+    const nextX = clamp(pointerX - dragOffsetRef.current, BOX_MIN_X, BOX_MAX_X);
     boxXRef.current = nextX;
     setBoxX(nextX);
   }, []);
 
   const pointerDown = (event: ReactPointerEvent<HTMLDivElement>) => {
     if (phase !== "playing") return;
+    const catcherRect = catcherRef.current?.getBoundingClientRect();
+    const boardRect = boardRef.current?.getBoundingClientRect();
+    if (!catcherRect || !boardRect || catcherRect.width <= 0 || catcherRect.height <= 0 || boardRect.width <= 0) return;
+    const localX = (event.clientX - catcherRect.left) / catcherRect.width;
+    const localY = (event.clientY - catcherRect.top) / catcherRect.height;
+    if (!isCardboardTap(localX, localY)) return;
+    const pointerX = ((event.clientX - boardRect.left) / boardRect.width) * 100;
+    dragOffsetRef.current = pointerX - boxXRef.current;
     draggingRef.current = true;
     event.currentTarget.setPointerCapture(event.pointerId);
-    moveBox(event.clientX);
   };
   const pointerMove = (event: ReactPointerEvent<HTMLDivElement>) => {
     if (phase === "playing" && draggingRef.current) moveBox(event.clientX);
@@ -302,7 +331,7 @@ export function FrenchieCatchGame({ ownedItems }: { ownedItems: FrenchieCatchIte
         <span className="rounded-full bg-leaf-soft px-2.5 py-1 text-[10px] font-bold text-leaf-deep">30秒チャレンジ</span>
       </div>
 
-      <div ref={boardRef} className="relative aspect-[3/4] w-full touch-none select-none overflow-hidden bg-[#dff3fa]" onPointerDown={pointerDown} onPointerMove={pointerMove} onPointerUp={pointerEnd} onPointerCancel={pointerEnd}>
+      <div ref={boardRef} className="relative aspect-[3/4] w-full select-none overflow-hidden bg-[#dff3fa]">
         <div className="absolute inset-0 bg-[linear-gradient(180deg,#caeef9_0%,#eff9f2_70%,#d9ebbd_100%)]" />
         <div className="absolute -left-8 top-[18%] h-20 w-36 rounded-full bg-white/50 blur-xl" />
         <div className="absolute -right-10 top-[34%] h-24 w-40 rounded-full bg-white/50 blur-xl" />
@@ -324,15 +353,21 @@ export function FrenchieCatchGame({ ownedItems }: { ownedItems: FrenchieCatchIte
         {impactX !== null ? <div className="pointer-events-none absolute z-40 -translate-x-1/2 -translate-y-1/2 animate-ping text-xl font-black text-[#d7684f]" style={{ left: `${impactX}%`, top: `${BOX_LIP_Y}%` }}>✦</div> : null}
         {feedback ? <div className="pointer-events-none absolute left-1/2 top-[69%] z-40 -translate-x-1/2 text-center"><p className="text-lg font-black text-[#c87527]">CATCH!</p><p className="-mt-1 text-sm font-black text-[#c87527]">+{feedback.points}</p><p className="mt-0.5 max-w-40 truncate rounded-full bg-white/80 px-2 py-0.5 text-[9px] font-bold text-ink-soft">{feedback.name}</p></div> : null}
 
-        <div aria-hidden="true" className={`absolute bottom-[3%] z-30 h-[15%] w-[46%] -translate-x-1/2 transition-transform duration-100 ${boxBounce ? "scale-x-[1.04] scale-y-[0.94]" : "scale-100"}`} style={{ left: `${boxX}%` }}>
-          <div className="absolute left-[10%] top-0 h-[25%] w-[80%] rounded-[50%] border-2 border-[#8b6034] bg-[#6d4828] shadow-inner" />
-          <div className="absolute -left-[8%] top-[7%] h-[32%] w-[34%] border border-[#9b6c3e] bg-[#c68a4f]" style={{ clipPath: "polygon(100% 0,100% 72%,0 100%,13% 15%)" }} />
-          <div className="absolute -right-[8%] top-[7%] h-[32%] w-[34%] border border-[#9b6c3e] bg-[#c68a4f]" style={{ clipPath: "polygon(0 0,87% 15%,100% 100%,0 72%)" }} />
-          <div className="absolute inset-x-0 bottom-0 top-[18%] rounded-b-lg border-2 border-[#9b6c3e] bg-[linear-gradient(180deg,#c98e52_0%,#b97b43_100%)] shadow-[0_6px_10px_rgba(93,61,35,0.2)]"><div className="absolute left-1/2 top-[48%] -translate-x-1/2 text-[11px] font-black tracking-[0.14em] text-[#704722]/45">CATCH</div></div>
-          <div className="absolute left-[16%] right-[16%] top-[4%] h-[15%] rounded-[50%] border border-[#e8bd76]/50 bg-[#4e331e]/80" />
+        <div
+          ref={catcherRef}
+          role="button"
+          aria-label="拾ってくだブーの段ボールを左右に動かす"
+          className={`absolute bottom-[0.5%] z-30 aspect-square w-[54%] touch-none -translate-x-1/2 select-none transition-transform duration-100 ${boxBounce ? "scale-[1.015]" : "scale-100"}`}
+          style={{ left: `${boxX}%` }}
+          onPointerDown={pointerDown}
+          onPointerMove={pointerMove}
+          onPointerUp={pointerEnd}
+          onPointerCancel={pointerEnd}
+        >
+          <Image src={BOX_IMAGE} alt="拾ってくだブーと書かれた段ボール" fill priority draggable={false} sizes="54vw" className="pointer-events-none object-contain" />
         </div>
 
-        {phase === "playing" ? <div className="pointer-events-none absolute bottom-[1%] left-1/2 z-40 -translate-x-1/2 rounded-full bg-white/70 px-2 py-0.5 text-[9px] font-bold text-ink-faint">← 指で左右に動かす →</div> : null}
+        {phase === "playing" ? <div className="pointer-events-none absolute bottom-[0.5%] left-1/2 z-40 -translate-x-1/2 rounded-full bg-white/70 px-2 py-0.5 text-[9px] font-bold text-ink-faint">箱を押さえて左右にドラッグ</div> : null}
 
         {phase !== "playing" ? (
           <div className="absolute inset-0 z-50 flex items-center justify-center bg-[#f9f3e7]/70 px-6 backdrop-blur-[2px]">
@@ -340,7 +375,7 @@ export function FrenchieCatchGame({ ownedItems }: { ownedItems: FrenchieCatchIte
               {phase === "finished" ? (
                 <><p className="text-[10px] font-black tracking-[0.18em] text-ink-faint">RESULT</p><p className="mt-1 text-4xl font-black tabular-nums text-ink">{score.toLocaleString("ja-JP")}</p><div className="mt-3 grid grid-cols-2 gap-2 text-xs"><div className="rounded-xl bg-paper-deep px-2 py-2"><p className="text-[9px] text-ink-faint">キャッチ</p><p className="font-black text-ink">{caught}個</p></div><div className="rounded-xl bg-paper-deep px-2 py-2"><p className="text-[9px] text-ink-faint">MAX COMBO</p><p className="font-black text-ink">{maxCombo}</p></div></div></>
               ) : (
-                <><p className="text-[10px] font-black tracking-[0.18em] text-leaf-deep">FRENCHIE CATCH</p><p className="mt-1 text-xl font-black text-ink">箱でキャッチしよう！</p><p className="mt-2 text-[11px] leading-relaxed text-ink-soft">所持している図鑑アイテムと初期フレブルが降ってきます。箱の内側にしっかり入れると得点！</p><div className="mt-3 rounded-xl bg-[#fff5df] px-3 py-2 text-[10px] leading-relaxed text-[#8d6231]">フチに少しだけ当たると、外へはじかれることがあります。</div></>
+                <><p className="text-[10px] font-black tracking-[0.18em] text-leaf-deep">FRENCHIE CATCH</p><p className="mt-1 text-xl font-black text-ink">箱でキャッチしよう！</p><p className="mt-2 text-[11px] leading-relaxed text-ink-soft">所持している図鑑アイテムと初期フレブルが降ってきます。箱の内側にしっかり入れると得点！</p><div className="mt-3 rounded-xl bg-[#fff5df] px-3 py-2 text-[10px] leading-relaxed text-[#8d6231]">3枚のフタやフチに当たるとバウンド。跳ねたあとも、もう一度キャッチできます。</div></>
               )}
               <button type="button" onClick={startGame} className="mt-4 w-full rounded-full bg-leaf px-4 py-3 text-sm font-black text-white shadow-md active:translate-y-px">{phase === "finished" ? "もう一度あそぶ" : "START"}</button>
               <p className="mt-2 text-[9px] text-ink-faint">所持アイテム {itemPool.length}種類 + 初期フレブル</p>
