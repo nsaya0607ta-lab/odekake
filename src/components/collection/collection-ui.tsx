@@ -41,13 +41,13 @@ export function CollectionProgress({
 /**
  * 生成したレアリティカードのテンプレート。
  * 元画像の縦横比 561:701 を維持したまま、カード全面へ敷く。
- * UR は将来追加用として public/collection/rarity-frames/ur.webp に配置済み。
  */
 const RARITY_FRAME_PATHS: Record<GachaRarity, string> = {
   N: "/collection/rarity-frames/n.webp",
   R: "/collection/rarity-frames/r.webp",
   SR: "/collection/rarity-frames/sr.webp",
   SSR: "/collection/rarity-frames/ssr.webp",
+  UR: "/collection/rarity-frames/ur.webp",
 };
 
 /** 1マス。未取得はこれまで通りレアリティを伏せ、黒いシルエット＋「???」 */
