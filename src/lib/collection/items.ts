@@ -115,18 +115,6 @@ const CURATED_ITEMS: readonly CollectionItem[] = [
   { id: "toy_frenchie_cushion", name: "フレブル型クッション", image: "/collection/items/frenchie-cushion.webp", category: "toy", series: null, rarity: "SR" },
   { id: "toy_golden_crown_ball", name: "王冠つき黄金ボール", image: "/collection/items/golden-crown-ball.webp", category: "toy", series: null, rarity: "SSR" },
 
-  // --- 通常図鑑：おでかけ小物 第1弾 ----------------------------------
-  { id: "item_paw_cushion", name: "肉球クッション", image: "/collection/items/paw-cushion.svg", category: "interior", series: null, rarity: "N" },
-  { id: "item_yellow_raincoat", name: "黄色いレインコート", image: "/collection/items/yellow-raincoat.svg", category: "other", series: null, rarity: "R" },
-  { id: "item_mini_camping_lantern", name: "ミニキャンプランタン", image: "/collection/items/mini-camping-lantern.svg", category: "other", series: null, rarity: "R" },
-  { id: "item_bubble_set", name: "シャボン玉セット", image: "/collection/items/bubble-set.svg", category: "toy", series: null, rarity: "N" },
-  { id: "item_knit_hat", name: "ニットぼうし", image: "/collection/items/knit-hat.svg", category: "other", series: null, rarity: "N" },
-  { id: "item_portable_water_bottle", name: "携帯ウォーターボトル", image: "/collection/items/portable-water-bottle.svg", category: "other", series: null, rarity: "N" },
-  { id: "item_cooling_mat", name: "ひんやりマット", image: "/collection/items/cooling-mat.svg", category: "interior", series: null, rarity: "N" },
-  { id: "item_pilot_goggles", name: "パイロットゴーグル", image: "/collection/items/pilot-goggles.svg", category: "other", series: null, rarity: "R" },
-  { id: "item_sacoche_bag", name: "サコッシュバッグ", image: "/collection/items/sacoche-bag.svg", category: "other", series: null, rarity: "R" },
-  { id: "item_camera_charm", name: "カメラチャーム", image: "/collection/items/camera-charm.svg", category: "other", series: null, rarity: "R" },
-
   // --- 登山シリーズ ----------------------------------------------------
   { id: "hiking_frenchie", name: "登山のフレブル", image: "/collection/skins/hiking-frenchie.webp", category: "other", series: "hiking", rarity: "SSR", art: "dogHiking" },
   // --- 雪国シリーズ ----------------------------------------------------
