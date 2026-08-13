@@ -90,7 +90,7 @@ export function getSeries(id: CollectionSeriesId): CollectionSeries | null {
   return SERIES_BY_ID.get(id) ?? null;
 }
 
-const PAW_FOOD_BOWL_IMAGE = "/collection/items/paw-food-bowl.svg";
+const PAW_FOOD_BOWL_IMAGE = "/collection/items/paw-food-bowl.webp";
 
 const CURATED_ITEMS: readonly CollectionItem[] = [
   { id: "toy_colorful_ball", name: "カラフルボール", image: "/collection/items/colorful-ball.webp", category: "toy", series: null, rarity: "N" },
