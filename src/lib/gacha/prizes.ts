@@ -4,6 +4,7 @@
  * id は user_gacha_items.item_id に保存されるため、一度公開した id は変更しない。
  */
 import type { GachaRarity, GachaType } from "./config";
+import { PAW_FOOD_BOWL_IMAGE } from "@/lib/collection/generated-images";
 
 export type GachaPrizeType = "dog_skin" | "item";
 
@@ -42,8 +43,9 @@ export const GACHA_PRIZES: readonly GachaPrize[] = [
   { id: "toy_frenchie_cushion", name: "フレブル型クッション", rarity: "SR", type: "item", pool: "regular", image: "/collection/items/frenchie-cushion.webp" },
   { id: "toy_golden_crown_ball", name: "王冠つき黄金ボール", rarity: "SSR", type: "item", pool: "regular", image: "/collection/items/golden-crown-ball.webp" },
 
-  // --- 通常ガチャ：食べもの 試作 --------------------------------------
+  // --- 通常ガチャ：食べもの --------------------------------------------
   { id: "food_dog_biscuit", name: "わんこビスケット", rarity: "N", type: "item", pool: "regular", image: "/collection/items/dog-biscuit.webp" },
+  { id: "food_paw_bowl", name: "肉球フードボウル", rarity: "R", type: "item", pool: "regular", image: PAW_FOOD_BOWL_IMAGE },
 
   // --- 犬スキン（すべてSSR・共通ガチャから排出） ----------------------
   { id: "hiking_frenchie", name: "登山のフレブル", rarity: "SSR", type: "dog_skin", pool: "regular", image: "/collection/skins/hiking-frenchie.webp" },
