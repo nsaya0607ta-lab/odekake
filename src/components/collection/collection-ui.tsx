@@ -50,20 +50,38 @@ const RARITY_FRAME_PATHS: Record<GachaRarity, string> = {
   UR: "/collection/rarity-frames/ur.webp",
 };
 
-/** 1マス。未取得はこれまで通りレアリティを伏せ、黒いシルエット＋「???」 */
-export function ItemCard({ item, owned, count = 0 }: { item: CollectionItem; owned: boolean; count?: number }) {
-  const useExactSilhouette = !owned && hasExactSilhouette(item.art);
+/**
+ * 1マス。
+ * owned は「その図鑑の持ち主が所持しているか」、revealed は「閲覧者に中身を見せてよいか」。
+ * フレンド図鑑では、相手が所持していても自分が未所持ならシークレットのまま回数だけ表示できる。
+ */
+export function ItemCard({
+  item,
+  owned,
+  count = 0,
+  revealed = owned,
+  showCountWhenHidden = false,
+}: {
+  item: CollectionItem;
+  owned: boolean;
+  count?: number;
+  revealed?: boolean;
+  showCountWhenHidden?: boolean;
+}) {
+  const isRevealed = owned && revealed;
+  const useExactSilhouette = !isRevealed && hasExactSilhouette(item.art);
   const drawCount = owned ? Math.max(1, count) : 0;
+  const showCount = owned && (isRevealed || showCountWhenHidden);
 
   return (
     <div
       className={`relative aspect-[561/701] w-full overflow-hidden rounded-[16px] transition-shadow ${
-        owned
+        isRevealed
           ? "bg-transparent shadow-[0_3px_10px_rgba(94,78,53,0.10)]"
           : "border border-[#ddd6c7] bg-[linear-gradient(145deg,#faf8f2_0%,#f1eee6_100%)] shadow-[0_2px_7px_rgba(98,88,70,0.07)]"
       }`}
     >
-      {owned ? (
+      {isRevealed ? (
         // eslint-disable-next-line @next/next/no-img-element
         <img
           src={RARITY_FRAME_PATHS[item.rarity]}
@@ -79,23 +97,23 @@ export function ItemCard({ item, owned, count = 0 }: { item: CollectionItem; own
           {useExactSilhouette ? (
             <ExactSilhouette art={item.art} />
           ) : (
-            <ItemArt art={item.art} image={item.image} name={item.name} silhouette={!owned} />
+            <ItemArt art={item.art} image={item.image} name={item.name} silhouette={!isRevealed} />
           )}
         </span>
 
         <span
           className={`mt-[3%] flex min-h-[17%] w-full items-center justify-center line-clamp-2 text-center text-[11px] font-semibold leading-tight ${
-            owned ? "text-[#514a42]" : "text-ink-faint"
+            isRevealed ? "text-[#514a42]" : "text-ink-faint"
           }`}
         >
-          {owned ? item.name : "???"}
+          {isRevealed ? item.name : "???"}
         </span>
 
         <span
           className={`mt-[1%] text-center text-[9px] font-semibold leading-none tabular-nums ${
-            owned ? "text-[#6d655c]" : "invisible"
+            showCount ? "text-[#6d655c]" : "invisible"
           }`}
-          aria-hidden={!owned}
+          aria-hidden={!showCount}
         >
           出た回数 {drawCount}回
         </span>
@@ -108,10 +126,14 @@ export function ItemGrid({
   items,
   owned,
   counts,
+  revealedOwned,
+  showCountWhenHidden = false,
 }: {
   items: readonly CollectionItem[];
   owned: ReadonlySet<string>;
   counts?: ReadonlyMap<string, number>;
+  revealedOwned?: ReadonlySet<string>;
+  showCountWhenHidden?: boolean;
 }) {
   if (items.length === 0) {
     return (
@@ -128,9 +150,16 @@ export function ItemGrid({
     <ul className="grid grid-cols-3 gap-2.5">
       {items.map((item) => {
         const isOwned = owned.has(item.id);
+        const isRevealed = isOwned && (revealedOwned ? revealedOwned.has(item.id) : true);
         return (
           <li key={item.id}>
-            <ItemCard item={item} owned={isOwned} count={counts?.get(item.id) ?? (isOwned ? 1 : 0)} />
+            <ItemCard
+              item={item}
+              owned={isOwned}
+              revealed={isRevealed}
+              count={counts?.get(item.id) ?? (isOwned ? 1 : 0)}
+              showCountWhenHidden={showCountWhenHidden}
+            />
           </li>
         );
       })}
