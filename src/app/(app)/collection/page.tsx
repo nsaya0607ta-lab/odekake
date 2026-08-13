@@ -7,11 +7,13 @@ import {
   CATEGORY_LABELS,
   COLLECTION_CATEGORIES,
   COLLECTION_SERIES,
+  RARITY_STARS,
   REGULAR_ITEMS,
   countOwned,
   getSeriesItems,
   isCollectionCategory,
   type CollectionCategory,
+  type CollectionItem,
 } from "@/lib/collection/items";
 import { getOwnedItemCounts } from "@/lib/data/collection";
 import { requireUser } from "@/lib/supabase/server";
@@ -20,11 +22,59 @@ export const metadata = { title: "図鑑 | おでかけ記録" };
 export const dynamic = "force-dynamic";
 
 type Tab = "regular" | "series";
+type SortKey = "default" | "rarity" | "name" | "count";
+
+function isSortKey(value: string | undefined): value is SortKey {
+  return value === "default" || value === "rarity" || value === "name" || value === "count";
+}
+
+function regularHref(category: CollectionCategory | null, sort: SortKey) {
+  const params = new URLSearchParams();
+  if (category) params.set("category", category);
+  if (sort !== "default") params.set("sort", sort);
+  const query = params.toString();
+  return query ? `/collection?${query}` : "/collection";
+}
+
+function sortItems(
+  items: readonly CollectionItem[],
+  owned: ReadonlySet<string>,
+  counts: ReadonlyMap<string, number>,
+  sort: SortKey,
+): CollectionItem[] {
+  if (sort === "default") return [...items];
+
+  return items
+    .map((item, index) => ({ item, index }))
+    .sort((a, b) => {
+      const aOwned = owned.has(a.item.id);
+      const bOwned = owned.has(b.item.id);
+
+      // 未取得アイテムの名前・レアリティを並び順から推測しにくいよう、
+      // 並べ替えは取得済みを先に行い、未取得同士は元の順番を維持する。
+      if (aOwned !== bOwned) return aOwned ? -1 : 1;
+      if (!aOwned && !bOwned) return a.index - b.index;
+
+      if (sort === "rarity") {
+        const rarityDiff = RARITY_STARS[b.item.rarity] - RARITY_STARS[a.item.rarity];
+        if (rarityDiff !== 0) return rarityDiff;
+      } else if (sort === "name") {
+        const nameDiff = a.item.name.localeCompare(b.item.name, "ja");
+        if (nameDiff !== 0) return nameDiff;
+      } else if (sort === "count") {
+        const countDiff = (counts.get(b.item.id) ?? 0) - (counts.get(a.item.id) ?? 0);
+        if (countDiff !== 0) return countDiff;
+      }
+
+      return a.index - b.index;
+    })
+    .map(({ item }) => item);
+}
 
 export default async function CollectionPage({
   searchParams,
 }: {
-  searchParams: Promise<{ tab?: string; category?: string }>;
+  searchParams: Promise<{ tab?: string; category?: string; sort?: string }>;
 }) {
   const [{ supabase, user }, params] = await Promise.all([requireUser(), searchParams]);
   const counts = await getOwnedItemCounts(supabase, user.id);
@@ -32,6 +82,7 @@ export default async function CollectionPage({
 
   const tab: Tab = params.tab === "series" ? "series" : "regular";
   const category = isCollectionCategory(params.category) ? params.category : null;
+  const sort: SortKey = isSortKey(params.sort) ? params.sort : "default";
 
   return (
     <>
@@ -45,7 +96,7 @@ export default async function CollectionPage({
             同じアイテムが出ると、カードの「出た回数」が増えます
           </p>
           {tab === "regular" ? (
-            <RegularTab owned={owned} counts={counts} category={category} />
+            <RegularTab owned={owned} counts={counts} category={category} sort={sort} />
           ) : (
             <SeriesTab owned={owned} counts={counts} />
           )}
@@ -83,26 +134,36 @@ function CollectionTabs({ current }: { current: Tab }) {
   );
 }
 
-/** 通常の図鑑。カテゴリのチップで絞り込む */
+/** 通常の図鑑。カテゴリのチップで絞り込み、取得済みカードを任意の順で並べ替える。 */
 function RegularTab({
   owned,
   counts,
   category,
+  sort,
 }: {
   owned: ReadonlySet<string>;
   counts: ReadonlyMap<string, number>;
   category: CollectionCategory | null;
+  sort: SortKey;
 }) {
-  const shown = category ? REGULAR_ITEMS.filter((item) => item.category === category) : REGULAR_ITEMS;
+  const filtered = category ? REGULAR_ITEMS.filter((item) => item.category === category) : REGULAR_ITEMS;
+  const shown = sortItems(filtered, owned, counts, sort);
 
   const chips: Array<{ key: string; label: string; href: string; active: boolean }> = [
-    { key: "all", label: "すべて", href: "/collection", active: category === null },
+    { key: "all", label: "すべて", href: regularHref(null, sort), active: category === null },
     ...COLLECTION_CATEGORIES.map((key) => ({
       key,
       label: CATEGORY_LABELS[key],
-      href: `/collection?category=${key}`,
+      href: regularHref(key, sort),
       active: category === key,
     })),
+  ];
+
+  const sorts: Array<{ key: SortKey; label: string }> = [
+    { key: "default", label: "標準" },
+    { key: "rarity", label: "レア順" },
+    { key: "name", label: "名前順" },
+    { key: "count", label: "出た回数順" },
   ];
 
   return (
@@ -113,21 +174,43 @@ function RegularTab({
 
       {/* アイテムが1つも無いうちは、押しても何も起きないチップを並べない */}
       {REGULAR_ITEMS.length > 0 ? (
-        <div className="-mx-4 flex gap-2 overflow-x-auto px-4 pb-1">
-          {chips.map((chip) => (
-            <Link
-              key={chip.key}
-              href={chip.href}
-              className={`rough-pill shrink-0 border px-3.5 py-1.5 text-xs font-semibold transition-colors ${
-                chip.active
-                  ? "border-leaf bg-leaf-soft text-leaf-deep"
-                  : "border-line-strong bg-card text-ink-soft"
-              }`}
-            >
-              {chip.label}
-            </Link>
-          ))}
-        </div>
+        <>
+          <div className="-mx-4 flex gap-2 overflow-x-auto px-4 pb-1">
+            {chips.map((chip) => (
+              <Link
+                key={chip.key}
+                href={chip.href}
+                className={`rough-pill shrink-0 border px-3.5 py-1.5 text-xs font-semibold transition-colors ${
+                  chip.active
+                    ? "border-leaf bg-leaf-soft text-leaf-deep"
+                    : "border-line-strong bg-card text-ink-soft"
+                }`}
+              >
+                {chip.label}
+              </Link>
+            ))}
+          </div>
+
+          <div className="space-y-1.5">
+            <p className="px-1 text-[10px] font-semibold text-ink-faint">並べ替え</p>
+            <div className="-mx-4 flex gap-2 overflow-x-auto px-4 pb-1" aria-label="図鑑の並べ替え">
+              {sorts.map((option) => (
+                <Link
+                  key={option.key}
+                  href={regularHref(category, option.key)}
+                  aria-current={sort === option.key ? "true" : undefined}
+                  className={`rough-pill shrink-0 border px-3 py-1.5 text-[11px] font-semibold transition-colors ${
+                    sort === option.key
+                      ? "border-[#b9a36e] bg-[#fff5d9] text-[#765f2e] shadow-sm"
+                      : "border-line-strong bg-card text-ink-soft"
+                  }`}
+                >
+                  {option.label}
+                </Link>
+              ))}
+            </div>
+          </div>
+        </>
       ) : null}
 
       <ItemGrid items={shown} owned={owned} counts={counts} />
