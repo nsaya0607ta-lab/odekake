@@ -4,7 +4,6 @@
  * id は user_gacha_items.item_id に保存されるため、一度公開した id は変更しない。
  */
 import type { GachaRarity, GachaType } from "./config";
-import { PAW_FOOD_BOWL_IMAGE } from "@/lib/collection/generated-images";
 
 export type GachaPrizeType = "dog_skin" | "item";
 
@@ -18,8 +17,9 @@ export type GachaPrize = {
   image: string | null;
 };
 
+const PAW_FOOD_BOWL_IMAGE = "/collection/items/paw-food-bowl.png";
+
 export const GACHA_PRIZES: readonly GachaPrize[] = [
-  // --- 通常ガチャ：わんこのおもちゃ 第1弾 ----------------------------
   { id: "toy_colorful_ball", name: "カラフルボール", rarity: "N", type: "item", pool: "regular", image: "/collection/items/colorful-ball.webp" },
   { id: "toy_rope", name: "ロープおもちゃ", rarity: "N", type: "item", pool: "regular", image: "/collection/items/rope-toy.webp" },
   { id: "toy_bone", name: "ほねのおもちゃ", rarity: "N", type: "item", pool: "regular", image: "/collection/items/bone-toy.webp" },
@@ -30,8 +30,6 @@ export const GACHA_PRIZES: readonly GachaPrize[] = [
   { id: "toy_treasure_puzzle", name: "宝箱おやつパズル", rarity: "SR", type: "item", pool: "regular", image: "/collection/items/treasure-puzzle.webp" },
   { id: "toy_frenchie_plush", name: "フレブルぬいぐるみ", rarity: "SR", type: "item", pool: "regular", image: "/collection/items/frenchie-plush.webp" },
   { id: "toy_rainbow_ball", name: "虹色わんこボール", rarity: "SSR", type: "item", pool: "regular", image: "/collection/items/rainbow-ball.webp" },
-
-  // --- 通常ガチャ：わんこのおもちゃ 第2弾 ----------------------------
   { id: "toy_tennis_ball", name: "テニスボール", rarity: "N", type: "item", pool: "regular", image: "/collection/items/tennis-ball.webp" },
   { id: "toy_red_slipper", name: "赤いスリッパ", rarity: "N", type: "item", pool: "regular", image: "/collection/items/red-slipper.webp" },
   { id: "toy_wood_stick", name: "木の枝", rarity: "N", type: "item", pool: "regular", image: "/collection/items/wood-stick.webp" },
@@ -42,12 +40,7 @@ export const GACHA_PRIZES: readonly GachaPrize[] = [
   { id: "toy_meat", name: "大きな肉のおもちゃ", rarity: "SR", type: "item", pool: "regular", image: "/collection/items/meat-toy.webp" },
   { id: "toy_frenchie_cushion", name: "フレブル型クッション", rarity: "SR", type: "item", pool: "regular", image: "/collection/items/frenchie-cushion.webp" },
   { id: "toy_golden_crown_ball", name: "王冠つき黄金ボール", rarity: "SSR", type: "item", pool: "regular", image: "/collection/items/golden-crown-ball.webp" },
-
-  // --- 通常ガチャ：食べもの --------------------------------------------
-  { id: "food_dog_biscuit", name: "わんこビスケット", rarity: "N", type: "item", pool: "regular", image: "/collection/items/dog-biscuit.webp" },
   { id: "food_paw_bowl", name: "肉球フードボウル", rarity: "R", type: "item", pool: "regular", image: PAW_FOOD_BOWL_IMAGE },
-
-  // --- 犬スキン（すべてSSR・共通ガチャから排出） ----------------------
   { id: "hiking_frenchie", name: "登山のフレブル", rarity: "SSR", type: "dog_skin", pool: "regular", image: "/collection/skins/hiking-frenchie.webp" },
   { id: "snow_frenchie", name: "雪国のフレブル", rarity: "SSR", type: "dog_skin", pool: "regular", image: "/collection/skins/snow-frenchie.webp" },
   { id: "summer_frenchie", name: "夏のフレブル", rarity: "SSR", type: "dog_skin", pool: "summer", image: "/collection/skins/summer-frenchie.webp" },
