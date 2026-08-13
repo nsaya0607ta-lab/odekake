@@ -33,10 +33,11 @@ const RARITY_FRAME_PATHS: Record<GachaRarity, string> = {
   R: "/collection/rarity-frames/r.webp",
   SR: "/collection/rarity-frames/sr.webp",
   SSR: "/collection/rarity-frames/ssr.webp",
+  UR: "/collection/rarity-frames/ur.webp",
 };
 
 function validRarity(rarity: string): GachaRarity {
-  return (["N", "R", "SR", "SSR"] as const).includes(rarity as GachaRarity)
+  return (["N", "R", "SR", "SSR", "UR"] as const).includes(rarity as GachaRarity)
     ? (rarity as GachaRarity)
     : "N";
 }
@@ -248,7 +249,7 @@ function GachaAnimationModal({
 }) {
   useBodyScrollLock();
   const isMulti = draw.plan === "multi";
-  const isSsr = draw.results.some((result) => result.rarity === "SSR");
+  const isSsr = draw.results.some((result) => result.rarity === "SSR" || result.rarity === "UR");
   const [visibleCount, setVisibleCount] = useState(0);
   const [singlePhase, setSinglePhase] = useState<"machine" | "capsule" | "open">("machine");
   const completed = useRef(false);
@@ -266,7 +267,9 @@ function GachaAnimationModal({
     completeRef.current(drawRef.current);
   }, []);
 
-  const ssrIsVisible = draw.results.slice(0, visibleCount).some((result) => result.rarity === "SSR");
+  const ssrIsVisible = draw.results
+    .slice(0, visibleCount)
+    .some((result) => result.rarity === "SSR" || result.rarity === "UR");
   const currentResult = isMulti && visibleCount > 0 ? draw.results[visibleCount - 1] : null;
 
   useEffect(() => {
@@ -385,6 +388,8 @@ function GachaAnimationModal({
 }
 
 function ReferenceOpenScene({ result }: { result: DrawResult }) {
+  const isUr = result.rarity === "UR";
+
   return (
     <div className="gacha-reference-open absolute inset-0" data-rarity={result.rarity}>
       {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -394,7 +399,10 @@ function ReferenceOpenScene({ result }: { result: DrawResult }) {
         draggable={false}
         className="absolute inset-0 h-full w-full select-none object-contain"
       />
-      <span className="gacha-reference-tint pointer-events-none absolute left-[57.2%] top-[62%] h-[25%] w-[18.5%] rounded-b-[50%] rounded-t-[24%]" />
+      <span
+        className="gacha-reference-tint pointer-events-none absolute left-[57.2%] top-[62%] h-[25%] w-[18.5%] rounded-b-[50%] rounded-t-[24%]"
+        style={isUr ? { background: "#b51f2b", opacity: 0.72 } : undefined}
+      />
       <span className="gacha-reference-prize absolute left-[66.7%] top-[63%] flex h-[19%] w-[15%] -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full bg-[#fff8e9]/90 shadow-[0_0_18px_rgba(255,242,183,.9)]">
         <PrizeImage result={result} className="h-[92%] w-[92%]" />
       </span>
@@ -420,7 +428,13 @@ function Capsule({ result, open = false, large = false }: { result: DrawResult; 
       <svg viewBox="0 0 100 100" className="relative z-[2] h-full w-full overflow-visible drop-shadow-[0_7px_5px_rgba(81,70,49,0.18)]" aria-hidden="true">
         <defs>
           <linearGradient id={gradientId} x1="12" y1="52" x2="88" y2="94" gradientUnits="userSpaceOnUse">
-            {rarity === "SSR" ? (
+            {rarity === "UR" ? (
+              <>
+                <stop stopColor="#ff9a9a" />
+                <stop offset="0.48" stopColor="#d73535" />
+                <stop offset="1" stopColor="#8f111b" />
+              </>
+            ) : rarity === "SSR" ? (
               <>
                 <stop stopColor="#f7c8d8" />
                 <stop offset="0.28" stopColor="#f8df96" />
@@ -447,7 +461,7 @@ function Capsule({ result, open = false, large = false }: { result: DrawResult; 
           <path d="M24 70c5 12 14 17 25 19" fill="none" stroke="white" strokeWidth="5" strokeLinecap="round" opacity=".26" />
         </g>
         <rect x="8" y="47" width="84" height="7" rx="3.5" fill="#fffdf5" fillOpacity=".9" stroke="#8e826c" strokeWidth="1.5" />
-        {rarity === "SSR" && <path d="m77 16 2.4 6.2 6.6 2.4-6.6 2.4-2.4 6.2-2.4-6.2-6.6-2.4 6.6-2.4Z" fill="#fff8ce" />}
+        {(rarity === "SSR" || rarity === "UR") && <path d="m77 16 2.4 6.2 6.6 2.4-6.6 2.4-2.4 6.2-2.4-6.2-6.6-2.4 6.6-2.4Z" fill="#fff8ce" />}
       </svg>
     </span>
   );
