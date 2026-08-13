@@ -166,8 +166,10 @@ export function FrenchieCatchGame({ ownedItems }: { ownedItems: FrenchieCatchIte
       for (const entity of entitiesRef.current) {
         if (entity.status === "caught") {
           entity.ttl -= dt;
-          entity.y += 16 * dt;
-          entity.size *= Math.max(0.9, 1 - dt * 3.2);
+          entity.vy += 18 * dt;
+          entity.x += entity.vx * dt;
+          entity.y += entity.vy * dt;
+          entity.rotation += entity.spin * dt;
           if (entity.ttl > 0) next.push(entity);
           continue;
         }
@@ -182,6 +184,12 @@ export function FrenchieCatchGame({ ownedItems }: { ownedItems: FrenchieCatchIte
         const hitRight = entity.x + hitboxWidth / 2;
         const bottom = entity.y + entity.size * (entity.kind === "dog" ? 0.34 : 0.31);
 
+        // フチで跳ねた物体は、いったん箱より上まで戻ったら再キャッチ可能にする。
+        // 上昇中に判定を戻しておけば、次に下降してフチを横切ったときだけ再判定される。
+        if (entity.status === "bounced" && entity.rimChecked && entity.vy < 0 && bottom < BOX_LIP_Y - 3) {
+          entity.rimChecked = false;
+        }
+
         if (!entity.rimChecked && entity.vy > 0 && bottom >= BOX_LIP_Y) {
           entity.rimChecked = true;
           const center = boxXRef.current;
@@ -191,9 +199,12 @@ export function FrenchieCatchGame({ ownedItems }: { ownedItems: FrenchieCatchIte
           if (innerRatio >= 0.58) {
             const points = entity.kind === "dog" ? 15 : POINTS[entity.rarity!];
             entity.status = "caught";
-            entity.ttl = 0.2;
-            entity.vx = (center - entity.x) * 1.4;
-            entity.vy = 24;
+            entity.ttl = 0.48;
+            // 箱の中心へ吸い寄せず、その位置のまま自然に中へ落とす。
+            // 箱本体のほうが z-index が高いため、落下すると前面の段ボールに自然に隠れる。
+            entity.vx *= 0.2;
+            entity.vy = Math.max(entity.vy, 18);
+            entity.spin *= 0.2;
             scoreRef.current += points;
             comboRef.current += 1;
             caughtRef.current += 1;
@@ -304,7 +315,7 @@ export function FrenchieCatchGame({ ownedItems }: { ownedItems: FrenchieCatchIte
         </div>
 
         {entities.map((entity) => (
-          <div key={entity.id} className={`absolute z-20 will-change-transform ${entity.status === "caught" ? "opacity-40" : "opacity-100"} ${entity.rarity ? RARITY_STYLE[entity.rarity] : "drop-shadow-[0_5px_7px_rgba(75,58,43,0.22)]"}`} style={{ left: `${entity.x}%`, top: `${entity.y}%`, width: `${entity.size}%`, transform: `translate(-50%, -50%) rotate(${entity.rotation}deg)` }}>
+          <div key={entity.id} className={`absolute z-20 will-change-transform opacity-100 ${entity.rarity ? RARITY_STYLE[entity.rarity] : "drop-shadow-[0_5px_7px_rgba(75,58,43,0.22)]"}`} style={{ left: `${entity.x}%`, top: `${entity.y}%`, width: `${entity.size}%`, transform: `translate(-50%, -50%) rotate(${entity.rotation}deg)` }}>
             <Image src={entity.image} alt="" width={160} height={160} draggable={false} className="h-auto w-full object-contain" />
             {entity.rarity === "UR" ? <span className="absolute -inset-2 -z-10 animate-pulse rounded-full bg-[#e95c4d]/15 blur-md" /> : null}
           </div>
