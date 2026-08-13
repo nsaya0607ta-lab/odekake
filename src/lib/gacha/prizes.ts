@@ -42,6 +42,9 @@ export const GACHA_PRIZES: readonly GachaPrize[] = [
   { id: "toy_frenchie_cushion", name: "フレブル型クッション", rarity: "SR", type: "item", pool: "regular", image: "/collection/items/frenchie-cushion.webp" },
   { id: "toy_golden_crown_ball", name: "王冠つき黄金ボール", rarity: "SSR", type: "item", pool: "regular", image: "/collection/items/golden-crown-ball.webp" },
 
+  // --- 通常ガチャ：食べもの 試作 --------------------------------------
+  { id: "food_dog_biscuit", name: "わんこビスケット", rarity: "N", type: "item", pool: "regular", image: "/collection/items/dog-biscuit.webp" },
+
   // --- 犬スキン（すべてSSR・共通ガチャから排出） ----------------------
   { id: "hiking_frenchie", name: "登山のフレブル", rarity: "SSR", type: "dog_skin", pool: "regular", image: "/collection/skins/hiking-frenchie.webp" },
   { id: "snow_frenchie", name: "雪国のフレブル", rarity: "SSR", type: "dog_skin", pool: "regular", image: "/collection/skins/snow-frenchie.webp" },
