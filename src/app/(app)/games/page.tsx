@@ -4,7 +4,7 @@ import { TopHeader } from "@/components/page-header";
 
 export const metadata = { title: "各種ゲーム | おでかけ記録" };
 
-const ITEM_CATCH_CARD_SRC = "/item-catch-card.webp";
+const ITEM_CATCH_CARD_SRC = "/140352b4-d7ad-4b73-8b9d-4136fc5e27a4.png";
 
 export default function GamesPage() {
   return (
@@ -28,7 +28,7 @@ export default function GamesPage() {
               href="/games/item-catch"
               className="pressable group flex items-center gap-3 rounded-[22px] border border-[#d8c79e] bg-[#fffaf0] p-3 shadow-[0_3px_10px_rgba(85,63,31,0.08)] active:scale-[0.99]"
             >
-              <span className="relative flex h-16 w-16 shrink-0 items-center justify-center overflow-hidden rounded-2xl bg-[#fffaf0]">
+              <span className="relative flex h-20 w-20 shrink-0 items-center justify-center overflow-hidden rounded-2xl bg-[#fffaf0]">
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img
                   src={ITEM_CATCH_CARD_SRC}
