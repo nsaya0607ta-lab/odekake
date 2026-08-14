@@ -195,7 +195,7 @@ export function FrenchieCatchGame({ ownedItems }: { ownedItems: FrenchieCatchIte
       for (const entity of entitiesRef.current) {
         if (entity.status === "caught") {
           entity.ttl -= dt;
-          entity.vy += 18 * dt;
+          entity.vy += 42 * dt;
           entity.x += entity.vx * dt;
           entity.y += entity.vy * dt;
           entity.rotation += entity.spin * dt;
@@ -237,11 +237,11 @@ export function FrenchieCatchGame({ ownedItems }: { ownedItems: FrenchieCatchIte
             entity.rimChecked = true;
             const points = entity.kind === "dog" ? 15 : POINTS[entity.rarity!];
             entity.status = "caught";
-            // すぐ消さず、少し勢いを残して箱の中へ落ちていく動きを見せる。
-            entity.ttl = 0.72;
-            entity.vx *= 0.5;
-            entity.vy = Math.max(entity.vy, 20);
-            entity.spin *= 0.6;
+            // 箱の中へ沈んだ直後に消し、キャッチ済みだと分かるようにする。
+            entity.ttl = 0.16;
+            entity.vx *= 0.35;
+            entity.vy = Math.max(entity.vy, 32);
+            entity.spin *= 0.45;
             scoreRef.current += points;
             comboRef.current += 1;
             caughtRef.current += 1;
@@ -259,11 +259,25 @@ export function FrenchieCatchGame({ ownedItems }: { ownedItems: FrenchieCatchIte
 
             if (leftEdgeHit || rightEdgeHit) {
               entity.rimChecked = true;
-              const direction = leftEdgeHit && !rightEdgeHit ? 1 : rightEdgeHit && !leftEdgeHit ? -1 : entity.x <= center ? -1 : 1;
+              const side = leftEdgeHit && !rightEdgeHit ? "left" : rightEdgeHit && !leftEdgeHit ? "right" : entity.x <= center ? "left" : "right";
+              const incomingVx = entity.vx;
+              const normalX = side === "left" ? 0.58 : -0.58;
+              const normalY = -0.815;
+              const normalLength = Math.hypot(normalX, normalY);
+              const nx = normalX / normalLength;
+              const ny = normalY / normalLength;
+              const tx = -ny;
+              const ty = nx;
+              const normalSpeed = entity.vx * nx + entity.vy * ny;
+              const tangentSpeed = entity.vx * tx + entity.vy * ty;
+              const bouncedNormalSpeed = -normalSpeed * 0.72;
+              const bouncedTangentSpeed = tangentSpeed * 0.90;
+              const reflectedVx = tx * bouncedTangentSpeed + nx * bouncedNormalSpeed;
+              const reflectedVy = ty * bouncedTangentSpeed + ny * bouncedNormalSpeed;
               entity.status = "bounced";
-              entity.vx = direction * (13 + Math.random() * 6);
-              entity.vy = -(9 + Math.random() * 5);
-              entity.spin = direction * (220 + Math.random() * 130);
+              entity.vx = reflectedVx;
+              entity.vy = reflectedVy;
+              entity.spin = clamp(entity.spin + (reflectedVx - incomingVx) * 14, -420, 420);
               comboRef.current = 0;
               setCombo(0);
               showImpact(clamp(entity.x, 4, 96));
