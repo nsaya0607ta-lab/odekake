@@ -2,12 +2,15 @@
 
 import Image from "next/image";
 import { useCallback, useEffect, useMemo, useRef, useState, type PointerEvent as ReactPointerEvent } from "react";
+import { MAX_SKILL_LEVEL } from "@/lib/gacha/skill-levels";
 
 export type FrenchieCatchItem = {
   id: string;
   name: string;
   image: string;
   rarity: "N" | "R" | "SR" | "SSR" | "UR";
+  /** スキルレベル(1〜5)。Nや未所持は0。user_gacha_items.countから判定済みの値を渡す。 */
+  level: number;
 };
 
 type Entity = {
@@ -17,6 +20,7 @@ type Entity = {
   name: string;
   image: string;
   rarity: FrenchieCatchItem["rarity"] | null;
+  level: number;
   x: number;
   y: number;
   vx: number;
@@ -55,6 +59,8 @@ const BOX_WIDE_SCALE_DEFAULT = 1.5;
 const BOX_WIDE_SCALE_STRONG = 1.7;
 const MAGNET_WEAK_RANGE = 14;
 const MAGNET_WEAK_PULL = 16;
+const MAGNET_MEDIUM_RANGE = 20;
+const MAGNET_MEDIUM_PULL = 30;
 const MAGNET_STRONG_RANGE = 28;
 const MAGNET_STRONG_PULL = 48;
 const FALL_SPEED_BOOST = 1.7;
@@ -80,6 +86,65 @@ const MYSTERY_SKILL_ITEM_IDS = [
   "other_kamunayo", "hiking_frenchie", "snow_frenchie", "summer_frenchie", "interior_kinoko_azubee",
   "other_komochi", "other_azuki", "other_kobee",
 ];
+
+/** アイテムごとのLv1〜5パラメータ（item_skill_levels_colored.xlsxの「スキル一覧」シート通り） */
+const LV = {
+  DUCK_SEC: [2, 3, 4, 5, 7],
+  CARROT_SEC: [2, 3, 4, 6, 8],
+  FRISBEE_MULT: [2, 2.2, 2.4, 2.7, 3],
+  SOCCER_PT: [10, 15, 20, 30, 40],
+  TAIYAKI_PT: [5, 7, 10, 13, 15],
+  BEAR_SHIELD: [1, 1, 2, 2, 3],
+  BEAR_PT: [0, 10, 0, 20, 0],
+  BOWL_PT: [5, 7, 10, 13, 15],
+  PUDDING_PT: [15, 20, 30, 40, 50],
+  MELON_SEC: [2, 3, 4, 5, 7],
+  MELON_PT: [5, 10, 15, 20, 30],
+  TREASURE_LOW: [20, 25, 30, 40, 50],
+  TREASURE_HIGH: [40, 50, 60, 80, 100],
+  TREASURE_SEC: [3, 4, 5, 6, 8],
+  FRENCHIE_PLUSH_COUNT: [3, 3, 4, 4, 5],
+  FRENCHIE_PLUSH_PT: [10, 13, 15, 20, 25],
+  MEAT_SEC: [5, 6, 7, 8, 10],
+  MEAT_MULT: [1.5, 1.5, 1.6, 1.7, 1.8],
+  CUSHION_PT: [30, 40, 50, 65, 80],
+  MACARON_SEC: [3, 4, 5, 6, 8],
+  STARWAND_MULT: [2, 2.3, 2.6, 3, 3.5],
+  STRAWBERRY_COUNT: [1, 1, 1, 2, 2],
+  STRAWBERRY_MULT: [1.5, 1.7, 2, 2, 2.5],
+  CUPCAKE_SEC: [4, 5, 6, 7, 10],
+  SLEEPY_SHIELD: [3, 4, 5, 6, 8],
+  SPRING_SEC: [5, 6, 7, 9, 12],
+  SPARKLE_SEC: [4, 5, 6, 8, 10],
+  SPARKLE_STRENGTH: ["weak", "weak", "weak", "weak", "medium"] as const,
+  RAINBOW_STEP: [10, 12, 15, 20, 25],
+  GOLDEN_COUNT: [2, 2, 3, 3, 4],
+  GOLDEN_MULT: [2, 2.2, 2.2, 2.5, 2.5],
+  NAKAYOSHI_PT: [30, 40, 50, 65, 80],
+  NAKAYOSHI_SHIELD: [2, 2, 3, 4, 5],
+  KAMUNAYO_SEC: [5, 6, 8, 10, 13],
+  HIKING_SEC: [5, 6, 7, 9, 12],
+  SNOW_SEC: [5, 6, 7, 9, 12],
+  SUMMER_ADD: [5, 6, 7, 9, 12],
+  SUMMER_MULTSEC: [5, 6, 7, 8, 10],
+  SUMMER_MULT: [1.5, 1.5, 1.6, 1.7, 1.8],
+  ANBALL_PT: [100, 125, 150, 180, 220],
+  ANBALL_SEC: [3, 4, 5, 7, 10],
+  AZUBEE_SEC: [6, 7, 8, 10, 12],
+  AZUBEE_MULT: [2, 2, 2.1, 2.2, 2.5],
+  OMOJII_SEC: [10, 13, 16, 20, 25],
+  OMOJII_PT: [30, 45, 60, 80, 100],
+  KINOKO_SEC: [6, 7, 8, 10, 12],
+  KINOKO_FALL: [1.7, 1.8, 1.9, 2, 2.2],
+  KINOKO_SCORE: [1.5, 1.5, 1.6, 1.7, 2],
+  KOMOCHI_COUNT: [5, 5, 6, 7, 8],
+  KOMOCHI_MULT: [2, 2.1, 2.2, 2.3, 2.5],
+  KOMOCHI_SHIELD: [5, 6, 7, 8, 10],
+  AZUKI_SEC: [5, 7, 9, 12, 15],
+  AZUKI_PT: [50, 65, 80, 100, 130],
+  KOBEE_PT: [50, 65, 80, 100, 130],
+  KOBEE_SEC: [8, 9, 11, 13, 16],
+} as const;
 const POINTS: Record<FrenchieCatchItem["rarity"], number> = { N: 10, R: 20, SR: 40, SSR: 70, UR: 100 };
 const RARITY_FALL_SPEED: Record<FrenchieCatchItem["rarity"], number> = { N: 1, R: 1.08, SR: 1.18, SSR: 1.32, UR: 1.5 };
 const DEFAULT_ITEM_SPAWN_WEIGHT = 100;
@@ -165,18 +230,23 @@ export function FrenchieCatchGame({ ownedItems }: { ownedItems: FrenchieCatchIte
   const nextMultiplierRef = useRef(1);
   const nextMultiplierCountRef = useRef(0);
   const nextBonus5Ref = useRef(0);
+  const nextBonus5ValueRef = useRef(5);
   const nextBonus10Ref = useRef(0);
+  const nextBonus10ValueRef = useRef(10);
   const comboShieldRef = useRef(0);
   const multiplier15UntilRef = useRef(0);
+  const multiplier15ValueRef = useRef(1.5);
   const multiplier2UntilRef = useRef(0);
+  const multiplier2ValueRef = useRef(2);
   const boxWideUntilRef = useRef(0);
   const boxWideScaleRef = useRef(BOX_WIDE_SCALE_DEFAULT);
   const comboInvincibleUntilRef = useRef(0);
   const comboMultiplierBoostUntilRef = useRef(0);
   const magnetUntilRef = useRef(0);
-  const magnetStrengthRef = useRef<"weak" | "strong">("weak");
+  const magnetStrengthRef = useRef<"weak" | "medium" | "strong">("weak");
   const urBoostRef = useRef(0);
   const fallSpeedBoostUntilRef = useRef(0);
+  const fallSpeedValueRef = useRef(FALL_SPEED_BOOST);
   const feedbackTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const impactTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -197,18 +267,22 @@ export function FrenchieCatchGame({ ownedItems }: { ownedItems: FrenchieCatchIte
   const [rewardError, setRewardError] = useState<string | null>(null);
 
   const itemPool = useMemo(() => ownedItems.filter((item) => item.image.length > 0), [ownedItems]);
+  const itemLevelByIdRef = useRef<Map<string, number>>(new Map());
+  useEffect(() => {
+    itemLevelByIdRef.current = new Map(ownedItems.map((item) => [item.id, item.level]));
+  }, [ownedItems]);
 
   const refreshEffectStatus = useCallback((now: number) => {
     const labels: string[] = [];
-    if (now < multiplier2UntilRef.current) labels.push("得点 ×2");
-    else if (now < multiplier15UntilRef.current) labels.push("得点 ×1.5");
+    if (now < multiplier2UntilRef.current) labels.push(`得点 ×${multiplier2ValueRef.current}`);
+    else if (now < multiplier15UntilRef.current) labels.push(`得点 ×${multiplier15ValueRef.current}`);
     if (nextMultiplierCountRef.current > 0) labels.push(`次の${nextMultiplierCountRef.current}個 ×${nextMultiplierRef.current}`);
     if (nextBonus10Ref.current > 0) labels.push(`あと${nextBonus10Ref.current}個 +10pt`);
     if (nextBonus5Ref.current > 0) labels.push(`あと${nextBonus5Ref.current}個 +5pt`);
     if (comboShieldRef.current > 0) labels.push(`コンボ保護 ×${comboShieldRef.current}`);
     if (now < comboInvincibleUntilRef.current) labels.push("無敵コンボ中");
     if (now < comboMultiplierBoostUntilRef.current) labels.push("コンボ倍率アップ中");
-    if (now < magnetUntilRef.current) labels.push(magnetStrengthRef.current === "strong" ? "マグネット発動中" : "ミニマグネット発動中");
+    if (now < magnetUntilRef.current) labels.push(magnetStrengthRef.current === "weak" ? "ミニマグネット発動中" : "マグネット発動中");
     if (now < fallSpeedBoostUntilRef.current) labels.push("落下速度アップ中");
     if (now < boxWideUntilRef.current) labels.push(`ダンボール×${boxWideScaleRef.current}拡大中`);
     if (urBoostRef.current > 0) labels.push(`UR出現率+${Math.min(urBoostRef.current, UR_BOOST_MAX)}`);
@@ -216,7 +290,7 @@ export function FrenchieCatchGame({ ownedItems }: { ownedItems: FrenchieCatchIte
   }, []);
 
   const createEntity = useCallback((): Entity => {
-    const fallSpeedBoost = performance.now() < fallSpeedBoostUntilRef.current ? FALL_SPEED_BOOST : 1;
+    const fallSpeedBoost = performance.now() < fallSpeedBoostUntilRef.current ? fallSpeedValueRef.current : 1;
     const base = {
       id: nextIdRef.current++,
       x: 9 + Math.random() * 82,
@@ -240,6 +314,7 @@ export function FrenchieCatchGame({ ownedItems }: { ownedItems: FrenchieCatchIte
         name: "犬のうんち",
         image: POOP_IMAGE,
         rarity: null,
+        level: 0,
         size: 12 + Math.random() * 3,
         spin: (Math.random() - 0.5) * 40,
       };
@@ -252,6 +327,7 @@ export function FrenchieCatchGame({ ownedItems }: { ownedItems: FrenchieCatchIte
         name: "？アイテム",
         image: MYSTERY_IMAGE,
         rarity: null,
+        level: 0,
         size: 13 + Math.random() * 3,
         spin: (Math.random() - 0.5) * 50,
       };
@@ -265,6 +341,7 @@ export function FrenchieCatchGame({ ownedItems }: { ownedItems: FrenchieCatchIte
         name: "初期フレブル",
         image: "/characters/default/front.webp",
         rarity: null,
+        level: 0,
         size: 19,
         spin: (Math.random() - 0.5) * 20,
       };
@@ -290,6 +367,7 @@ export function FrenchieCatchGame({ ownedItems }: { ownedItems: FrenchieCatchIte
           name: skin.name,
           image: skin.image,
           rarity: skin.rarity,
+          level: skin.level,
           vy: base.vy * RARITY_FALL_SPEED[skin.rarity],
           size: 15.5 + Math.random() * 3.5,
           spin: (Math.random() - 0.5) * 20,
@@ -302,6 +380,7 @@ export function FrenchieCatchGame({ ownedItems }: { ownedItems: FrenchieCatchIte
         name: "初期フレブル",
         image: "/characters/default/front.webp",
         rarity: null,
+        level: 0,
         size: 19,
         spin: (Math.random() - 0.5) * 20,
       };
@@ -324,6 +403,7 @@ export function FrenchieCatchGame({ ownedItems }: { ownedItems: FrenchieCatchIte
       name: item.name,
       image: item.image,
       rarity: item.rarity,
+      level: item.level,
       vy: base.vy * RARITY_FALL_SPEED[item.rarity],
       size: 12.5 + Math.random() * 3.5,
       spin: (Math.random() - 0.5) * 65,
@@ -421,8 +501,16 @@ export function FrenchieCatchGame({ ownedItems }: { ownedItems: FrenchieCatchIte
       const effBoxHalf = boxWide ? BOX_HALF * boxWideScaleRef.current : BOX_HALF;
       const effBoxWidth = boxWide ? BOX_WIDTH * boxWideScaleRef.current : BOX_WIDTH;
       const magnetActive = now < magnetUntilRef.current;
-      const magnetRange = magnetStrengthRef.current === "strong" ? MAGNET_STRONG_RANGE : MAGNET_WEAK_RANGE;
-      const magnetPull = magnetStrengthRef.current === "strong" ? MAGNET_STRONG_PULL : MAGNET_WEAK_PULL;
+      const magnetRange = magnetStrengthRef.current === "strong"
+        ? MAGNET_STRONG_RANGE
+        : magnetStrengthRef.current === "medium"
+          ? MAGNET_MEDIUM_RANGE
+          : MAGNET_WEAK_RANGE;
+      const magnetPull = magnetStrengthRef.current === "strong"
+        ? MAGNET_STRONG_PULL
+        : magnetStrengthRef.current === "medium"
+          ? MAGNET_MEDIUM_PULL
+          : MAGNET_WEAK_PULL;
 
       const next: Entity[] = [];
       for (const entity of entitiesRef.current) {
@@ -511,20 +599,20 @@ export function FrenchieCatchGame({ ownedItems }: { ownedItems: FrenchieCatchIte
             let statusChanged = false;
 
             if (nextBonus5Ref.current > 0) {
-              pendingBonus += 5;
+              pendingBonus += nextBonus5ValueRef.current;
               nextBonus5Ref.current -= 1;
               statusChanged = true;
             }
             if (nextBonus10Ref.current > 0) {
-              pendingBonus += 10;
+              pendingBonus += nextBonus10ValueRef.current;
               nextBonus10Ref.current -= 1;
               statusChanged = true;
             }
 
             const timedMultiplier = now < multiplier2UntilRef.current
-              ? 2
+              ? multiplier2ValueRef.current
               : now < multiplier15UntilRef.current
-                ? 1.5
+                ? multiplier15ValueRef.current
                 : 1;
             let nextMultiplier = 1;
             if (nextMultiplierCountRef.current > 0) {
@@ -541,6 +629,10 @@ export function FrenchieCatchGame({ ownedItems }: { ownedItems: FrenchieCatchIte
             const skillId = isMystery
               ? MYSTERY_SKILL_ITEM_IDS[Math.floor(Math.random() * MYSTERY_SKILL_ITEM_IDS.length)]!
               : entity.itemId;
+            const skillLevel = isMystery
+              ? (itemLevelByIdRef.current.get(skillId) ?? 1)
+              : (entity.level || 1);
+            const lv = clamp(skillLevel, 1, MAX_SKILL_LEVEL) - 1;
 
             const addBonusTime = (seconds: number) => {
               endAtRef.current += seconds * 1000;
@@ -548,202 +640,217 @@ export function FrenchieCatchGame({ ownedItems }: { ownedItems: FrenchieCatchIte
               return seconds;
             };
 
+            const lvTag = skillLevel >= MAX_SKILL_LEVEL ? " [Lv.MAX]" : skillLevel > 1 ? ` [Lv${skillLevel}]` : "";
+
             switch (skillId) {
               case "toy_soccer_ball":
-                points += 10;
-                effectLabel = "+10ptボーナス";
+                points += LV.SOCCER_PT[lv]!;
+                effectLabel = `+${LV.SOCCER_PT[lv]}ptボーナス${lvTag}`;
                 break;
               case "toy_taiyaki_plush":
                 nextBonus5Ref.current += 2;
-                effectLabel = "次の2個 +5pt";
+                nextBonus5ValueRef.current = LV.TAIYAKI_PT[lv]!;
+                effectLabel = `次の2個 +${LV.TAIYAKI_PT[lv]}pt${lvTag}`;
                 statusChanged = true;
                 break;
-              case "toy_bear_plush":
-                comboShieldRef.current += 1;
-                effectLabel = "コンボ1回保護";
+              case "toy_bear_plush": {
+                const shield = LV.BEAR_SHIELD[lv]!;
+                const bonusPt = LV.BEAR_PT[lv]!;
+                comboShieldRef.current += shield;
+                points += bonusPt;
+                effectLabel = bonusPt > 0 ? `コンボ${shield}回保護 +${bonusPt}pt${lvTag}` : `コンボ${shield}回保護${lvTag}`;
                 statusChanged = true;
                 break;
+              }
               case "toy_duck_plush": {
-                const applied = addBonusTime(2);
-                effectLabel = `+${applied}秒`;
+                const applied = addBonusTime(LV.DUCK_SEC[lv]!);
+                effectLabel = `+${applied}秒${lvTag}`;
                 break;
               }
               case "toy_carrot": {
-                const applied = addBonusTime(2);
-                effectLabel = `+${applied}秒`;
+                const applied = addBonusTime(LV.CARROT_SEC[lv]!);
+                effectLabel = `+${applied}秒${lvTag}`;
                 break;
               }
               case "toy_frisbee":
-                nextMultiplierRef.current = 2;
+                nextMultiplierRef.current = LV.FRISBEE_MULT[lv]!;
                 nextMultiplierCountRef.current = 1;
-                effectLabel = "次の1個 ×2";
+                effectLabel = `次の1個 ×${LV.FRISBEE_MULT[lv]}${lvTag}`;
                 statusChanged = true;
                 break;
               case "food_paw_bowl":
                 nextBonus5Ref.current += 3;
-                effectLabel = "次の3個 +5pt";
+                nextBonus5ValueRef.current = LV.BOWL_PT[lv]!;
+                effectLabel = `次の3個 +${LV.BOWL_PT[lv]}pt${lvTag}`;
                 statusChanged = true;
                 break;
               case "toy_meat":
-                multiplier15UntilRef.current = now + 5000;
-                effectLabel = "5秒間 ×1.5";
+                multiplier15UntilRef.current = now + LV.MEAT_SEC[lv]! * 1000;
+                multiplier15ValueRef.current = LV.MEAT_MULT[lv]!;
+                effectLabel = `${LV.MEAT_SEC[lv]}秒間 ×${LV.MEAT_MULT[lv]}${lvTag}`;
                 statusChanged = true;
                 break;
               case "toy_frenchie_cushion":
-                points += 30;
-                effectLabel = "+30ptボーナス";
+                points += LV.CUSHION_PT[lv]!;
+                effectLabel = `+${LV.CUSHION_PT[lv]}ptボーナス${lvTag}`;
                 break;
               case "toy_treasure_puzzle": {
                 const roll = Math.floor(Math.random() * 3);
                 if (roll === 0) {
-                  points += 20;
-                  effectLabel = "宝箱 +20pt";
+                  points += LV.TREASURE_LOW[lv]!;
+                  effectLabel = `宝箱 +${LV.TREASURE_LOW[lv]}pt${lvTag}`;
                 } else if (roll === 1) {
-                  points += 40;
-                  effectLabel = "宝箱 +40pt";
+                  points += LV.TREASURE_HIGH[lv]!;
+                  effectLabel = `宝箱 +${LV.TREASURE_HIGH[lv]}pt${lvTag}`;
                 } else {
-                  const applied = addBonusTime(3);
-                  effectLabel = `宝箱 +${applied}秒`;
+                  const applied = addBonusTime(LV.TREASURE_SEC[lv]!);
+                  effectLabel = `宝箱 +${applied}秒${lvTag}`;
                 }
                 break;
               }
               case "toy_frenchie_plush":
-                nextBonus10Ref.current += 3;
-                effectLabel = "次の3個 +10pt";
+                nextBonus10Ref.current += LV.FRENCHIE_PLUSH_COUNT[lv]!;
+                nextBonus10ValueRef.current = LV.FRENCHIE_PLUSH_PT[lv]!;
+                effectLabel = `次の${LV.FRENCHIE_PLUSH_COUNT[lv]}個 +${LV.FRENCHIE_PLUSH_PT[lv]}pt${lvTag}`;
                 statusChanged = true;
                 break;
               case "toy_rainbow_ball":
-                urBoostRef.current = Math.min(UR_BOOST_MAX, urBoostRef.current + UR_BOOST_STEP);
-                effectLabel = `UR出現率 +${UR_BOOST_STEP}（ゲーム終了まで）`;
+                urBoostRef.current = Math.min(UR_BOOST_MAX, urBoostRef.current + LV.RAINBOW_STEP[lv]!);
+                effectLabel = `UR出現率 +${LV.RAINBOW_STEP[lv]}（ゲーム終了まで）${lvTag}`;
                 statusChanged = true;
                 break;
               case "toy_golden_crown_ball":
-                nextMultiplierRef.current = 2;
-                nextMultiplierCountRef.current = 2;
-                effectLabel = "次の2個 ×2";
+                nextMultiplierRef.current = LV.GOLDEN_MULT[lv]!;
+                nextMultiplierCountRef.current = LV.GOLDEN_COUNT[lv]!;
+                effectLabel = `次の${LV.GOLDEN_COUNT[lv]}個 ×${LV.GOLDEN_MULT[lv]}${lvTag}`;
                 statusChanged = true;
                 break;
               case "interior_anball": {
-                points += 100;
-                const applied = addBonusTime(3);
-                effectLabel = `+100pt / +${applied}秒`;
+                points += LV.ANBALL_PT[lv]!;
+                const applied = addBonusTime(LV.ANBALL_SEC[lv]!);
+                effectLabel = `+${LV.ANBALL_PT[lv]}pt / +${applied}秒${lvTag}`;
                 break;
               }
               case "other_azubee":
-                multiplier2UntilRef.current = now + 6000;
-                effectLabel = "6秒間 ×2";
+                multiplier2UntilRef.current = now + LV.AZUBEE_SEC[lv]! * 1000;
+                multiplier2ValueRef.current = LV.AZUBEE_MULT[lv]!;
+                effectLabel = `${LV.AZUBEE_SEC[lv]}秒間 ×${LV.AZUBEE_MULT[lv]}${lvTag}`;
                 statusChanged = true;
                 break;
               case "other_omojii": {
-                const applied = addBonusTime(10);
-                points += 30;
-                effectLabel = `+${applied}秒 / +30pt`;
+                const applied = addBonusTime(LV.OMOJII_SEC[lv]!);
+                points += LV.OMOJII_PT[lv]!;
+                effectLabel = `+${applied}秒 / +${LV.OMOJII_PT[lv]}pt${lvTag}`;
                 break;
               }
               case "food_paw_pudding":
-                points += 15;
-                effectLabel = "+15ptボーナス";
+                points += LV.PUDDING_PT[lv]!;
+                effectLabel = `+${LV.PUDDING_PT[lv]}ptボーナス${lvTag}`;
                 break;
               case "food_paw_melon_bread": {
-                const applied = addBonusTime(2);
-                points += 5;
-                effectLabel = `+${applied}秒 / +5pt`;
+                const applied = addBonusTime(LV.MELON_SEC[lv]!);
+                points += LV.MELON_PT[lv]!;
+                effectLabel = `+${applied}秒 / +${LV.MELON_PT[lv]}pt${lvTag}`;
                 break;
               }
               case "food_paw_cupcake":
-                boxWideUntilRef.current = now + 4000;
+                boxWideUntilRef.current = now + LV.CUPCAKE_SEC[lv]! * 1000;
                 boxWideScaleRef.current = BOX_WIDE_SCALE_DEFAULT;
-                effectLabel = "4秒間 ダンボール1.5倍拡大";
+                effectLabel = `${LV.CUPCAKE_SEC[lv]}秒間 ダンボール1.5倍拡大${lvTag}`;
                 statusChanged = true;
                 break;
               case "toy_paw_macaron":
-                boxWideUntilRef.current = now + 3000;
+                boxWideUntilRef.current = now + LV.MACARON_SEC[lv]! * 1000;
                 boxWideScaleRef.current = BOX_WIDE_SCALE_DEFAULT;
-                effectLabel = "3秒間 ダンボール1.5倍拡大";
+                effectLabel = `${LV.MACARON_SEC[lv]}秒間 ダンボール1.5倍拡大${lvTag}`;
                 statusChanged = true;
                 break;
               case "food_strawberry_roll_cake":
-                nextMultiplierRef.current = 1.5;
-                nextMultiplierCountRef.current = 1;
-                effectLabel = "次の1個 ×1.5";
+                nextMultiplierRef.current = LV.STRAWBERRY_MULT[lv]!;
+                nextMultiplierCountRef.current = LV.STRAWBERRY_COUNT[lv]!;
+                effectLabel = `次の${LV.STRAWBERRY_COUNT[lv]}個 ×${LV.STRAWBERRY_MULT[lv]}${lvTag}`;
                 statusChanged = true;
                 break;
               case "toy_star_wan_wand": {
-                const timeBonus = Math.round(Math.max(0, (endAtRef.current - now) / 1000)) * 2;
+                const remainingSec = Math.round(Math.max(0, (endAtRef.current - now) / 1000));
+                const timeBonus = Math.round(remainingSec * LV.STARWAND_MULT[lv]!);
                 points += timeBonus;
-                effectLabel = `残り時間ボーナス +${timeBonus}pt`;
+                effectLabel = `残り時間ボーナス +${timeBonus}pt${lvTag}`;
                 break;
               }
               case "interior_sleepy_moon":
-                comboShieldRef.current += 3;
-                effectLabel = "コンボ保護+3回";
+                comboShieldRef.current += LV.SLEEPY_SHIELD[lv]!;
+                effectLabel = `コンボ保護+${LV.SLEEPY_SHIELD[lv]}回${lvTag}`;
                 statusChanged = true;
                 break;
               case "interior_spring_flower_wreath":
-                comboMultiplierBoostUntilRef.current = now + 5000;
-                effectLabel = "5秒間 コンボ倍率アップ";
+                comboMultiplierBoostUntilRef.current = now + LV.SPRING_SEC[lv]! * 1000;
+                effectLabel = `${LV.SPRING_SEC[lv]}秒間 コンボ倍率アップ${lvTag}`;
                 statusChanged = true;
                 break;
               case "other_sparkle_rope_crown":
-                magnetUntilRef.current = now + 4000;
-                magnetStrengthRef.current = "weak";
-                effectLabel = "4秒間 ミニマグネット";
+                magnetUntilRef.current = now + LV.SPARKLE_SEC[lv]! * 1000;
+                magnetStrengthRef.current = LV.SPARKLE_STRENGTH[lv]!;
+                effectLabel = `${LV.SPARKLE_SEC[lv]}秒間 ミニマグネット${lvTag}`;
                 statusChanged = true;
                 break;
               case "other_nakayoshi_azubee":
-                points += 30;
-                comboShieldRef.current += 2;
-                effectLabel = "+30pt / コンボ保護+2回";
+                points += LV.NAKAYOSHI_PT[lv]!;
+                comboShieldRef.current += LV.NAKAYOSHI_SHIELD[lv]!;
+                effectLabel = `+${LV.NAKAYOSHI_PT[lv]}pt / コンボ保護+${LV.NAKAYOSHI_SHIELD[lv]}回${lvTag}`;
                 statusChanged = true;
                 break;
               case "other_kamunayo":
-                comboInvincibleUntilRef.current = now + 5000;
-                effectLabel = "5秒間 無敵コンボ";
+                comboInvincibleUntilRef.current = now + LV.KAMUNAYO_SEC[lv]! * 1000;
+                effectLabel = `${LV.KAMUNAYO_SEC[lv]}秒間 無敵コンボ${lvTag}`;
                 statusChanged = true;
                 break;
               case "hiking_frenchie":
-                magnetUntilRef.current = now + 5000;
+                magnetUntilRef.current = now + LV.HIKING_SEC[lv]! * 1000;
                 magnetStrengthRef.current = "strong";
-                effectLabel = "5秒間 マグネット";
+                effectLabel = `${LV.HIKING_SEC[lv]}秒間 マグネット${lvTag}`;
                 statusChanged = true;
                 break;
               case "snow_frenchie":
-                boxWideUntilRef.current = now + 5000;
+                boxWideUntilRef.current = now + LV.SNOW_SEC[lv]! * 1000;
                 boxWideScaleRef.current = BOX_WIDE_SCALE_STRONG;
-                effectLabel = "5秒間 ダンボール1.7倍拡大";
+                effectLabel = `${LV.SNOW_SEC[lv]}秒間 ダンボール1.7倍拡大${lvTag}`;
                 statusChanged = true;
                 break;
               case "summer_frenchie": {
-                const applied = addBonusTime(5);
-                multiplier15UntilRef.current = now + 5000;
-                effectLabel = `+${applied}秒 / 5秒間 ×1.5`;
+                const applied = addBonusTime(LV.SUMMER_ADD[lv]!);
+                multiplier15UntilRef.current = now + LV.SUMMER_MULTSEC[lv]! * 1000;
+                multiplier15ValueRef.current = LV.SUMMER_MULT[lv]!;
+                effectLabel = `+${applied}秒 / ${LV.SUMMER_MULTSEC[lv]}秒間×${LV.SUMMER_MULT[lv]}${lvTag}`;
                 statusChanged = true;
                 break;
               }
               case "interior_kinoko_azubee":
-                fallSpeedBoostUntilRef.current = now + 6000;
-                comboInvincibleUntilRef.current = now + 6000;
-                multiplier15UntilRef.current = now + 6000;
-                effectLabel = "6秒間 高速+無敵コンボ+得点×1.5";
+                fallSpeedBoostUntilRef.current = now + LV.KINOKO_SEC[lv]! * 1000;
+                fallSpeedValueRef.current = LV.KINOKO_FALL[lv]!;
+                comboInvincibleUntilRef.current = now + LV.KINOKO_SEC[lv]! * 1000;
+                multiplier15UntilRef.current = now + LV.KINOKO_SEC[lv]! * 1000;
+                multiplier15ValueRef.current = LV.KINOKO_SCORE[lv]!;
+                effectLabel = `${LV.KINOKO_SEC[lv]}秒間 落下×${LV.KINOKO_FALL[lv]}+無敵+得点×${LV.KINOKO_SCORE[lv]}${lvTag}`;
                 statusChanged = true;
                 break;
               case "other_komochi":
-                nextMultiplierRef.current = 2;
-                nextMultiplierCountRef.current = 5;
-                comboShieldRef.current += 5;
-                effectLabel = "次の5個 ×2 / コンボ保護+5回";
+                nextMultiplierRef.current = LV.KOMOCHI_MULT[lv]!;
+                nextMultiplierCountRef.current = LV.KOMOCHI_COUNT[lv]!;
+                comboShieldRef.current += LV.KOMOCHI_SHIELD[lv]!;
+                effectLabel = `次の${LV.KOMOCHI_COUNT[lv]}個 ×${LV.KOMOCHI_MULT[lv]} / コンボ保護+${LV.KOMOCHI_SHIELD[lv]}回${lvTag}`;
                 statusChanged = true;
                 break;
               case "other_azuki": {
-                const applied = addBonusTime(5);
-                points += 50;
-                effectLabel = `+${applied}秒 / +50pt`;
+                const applied = addBonusTime(LV.AZUKI_SEC[lv]!);
+                points += LV.AZUKI_PT[lv]!;
+                effectLabel = `+${applied}秒 / +${LV.AZUKI_PT[lv]}pt${lvTag}`;
                 break;
               }
               case "other_kobee":
-                points += 50;
-                comboInvincibleUntilRef.current = now + 8000;
-                effectLabel = "+50pt / 8秒間 無敵コンボ";
+                points += LV.KOBEE_PT[lv]!;
+                comboInvincibleUntilRef.current = now + LV.KOBEE_SEC[lv]! * 1000;
+                effectLabel = `+${LV.KOBEE_PT[lv]}pt / ${LV.KOBEE_SEC[lv]}秒間 無敵コンボ${lvTag}`;
                 statusChanged = true;
                 break;
               default:
@@ -881,10 +988,14 @@ export function FrenchieCatchGame({ ownedItems }: { ownedItems: FrenchieCatchIte
     nextMultiplierRef.current = 1;
     nextMultiplierCountRef.current = 0;
     nextBonus5Ref.current = 0;
+    nextBonus5ValueRef.current = 5;
     nextBonus10Ref.current = 0;
+    nextBonus10ValueRef.current = 10;
     comboShieldRef.current = 0;
     multiplier15UntilRef.current = 0;
+    multiplier15ValueRef.current = 1.5;
     multiplier2UntilRef.current = 0;
+    multiplier2ValueRef.current = 2;
     boxWideUntilRef.current = 0;
     boxWideScaleRef.current = BOX_WIDE_SCALE_DEFAULT;
     comboInvincibleUntilRef.current = 0;
@@ -893,6 +1004,7 @@ export function FrenchieCatchGame({ ownedItems }: { ownedItems: FrenchieCatchIte
     magnetStrengthRef.current = "weak";
     urBoostRef.current = 0;
     fallSpeedBoostUntilRef.current = 0;
+    fallSpeedValueRef.current = FALL_SPEED_BOOST;
     setEntities([]);
     setBoxX(50);
     setScore(0);
@@ -1041,7 +1153,7 @@ export function FrenchieCatchGame({ ownedItems }: { ownedItems: FrenchieCatchIte
                 <>
                   <p className="text-[10px] font-black tracking-[0.18em] text-leaf-deep">ITEM CATCH</p>
                   <p className="mt-1 text-xl font-black text-ink">箱でキャッチしよう！</p>
-                  <p className="mt-2 text-[11px] leading-relaxed text-ink-soft">所持している図鑑アイテムと初期フレブルが降ってきます。一部アイテムには得点・時間・コンボの特殊効果があります。</p>
+                  <p className="mt-2 text-[11px] leading-relaxed text-ink-soft">所持している図鑑アイテムと初期フレブルが降ってきます。一部アイテムには得点・時間・コンボの特殊効果があり、ガチャで同じアイテムを多く手に入れるほどスキルレベルが上がって効果が強化されます（Lv1〜Lv.MAX）。</p>
                   <div className="mt-3 rounded-xl bg-[#fff5df] px-3 py-2 text-[10px] leading-relaxed text-[#8d6231]">レアなアイテムほど速く落ちます。5コンボから得点倍率が上がり、最大30コンボで×2になります。箱の中央でキャッチすると獲得pt×1.25のJUSTボーナス。うんちは避けよう（-10pt）、？アイテムはランダムなスキルが発動！遊びきると25スコアごとに1コインもらえます。</div>
                   <button type="button" onClick={startGame} className="mt-4 w-full rounded-full bg-leaf px-4 py-3 text-sm font-black text-white shadow-md active:translate-y-px">START</button>
                 </>

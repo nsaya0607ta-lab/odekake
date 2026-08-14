@@ -21,7 +21,13 @@ type DrawResult = {
   type: string;
   image: string | null;
   isNew: boolean;
+  previousLevel: number;
+  newLevel: number;
 };
+
+function formatLevelTag(level: number): string {
+  return level >= 5 ? "Lv.MAX" : `Lv${level}`;
+}
 
 type AnimationDraw = {
   plan: GachaPlanId;
@@ -549,7 +555,7 @@ function RarityResultCard({ result, large = false }: { result: DrawResult; large
           <PrizeImage result={result} className="h-full w-full" prominent={large} />
         </span>
 
-        <span className="mt-[1%] flex h-[11%] items-center justify-center">
+        <span className="mt-[1%] flex h-[11%] items-center justify-center gap-1">
           {result.isNew && (
             <span
               className={`rounded-full bg-[#ee7470] font-black tracking-wide text-white shadow-sm ${
@@ -557,6 +563,15 @@ function RarityResultCard({ result, large = false }: { result: DrawResult; large
               }`}
             >
               NEW{large ? "!" : ""}
+            </span>
+          )}
+          {result.newLevel > result.previousLevel && (
+            <span
+              className={`rounded-full bg-[#f1c969] font-black tracking-wide text-[#6e4f10] shadow-sm ${
+                large ? "px-3 py-0.5 text-[11px]" : "px-2 py-0.5 text-[8px]"
+              }`}
+            >
+              {result.previousLevel > 0 ? `${formatLevelTag(result.previousLevel)}→${formatLevelTag(result.newLevel)}` : formatLevelTag(result.newLevel)}
             </span>
           )}
         </span>
@@ -594,6 +609,11 @@ function SingleResult({ result }: { result: DrawResult }) {
       <p className="mx-auto mt-2 w-fit rounded-full bg-[#f7f1e7] px-3 py-1 text-[10px] text-[#9b896f]">
         {result.isNew ? "所持アイテムに追加されました" : "すでに持っているアイテムです"}
       </p>
+      {result.newLevel > result.previousLevel && (
+        <p className="mx-auto mt-2 w-fit rounded-full bg-[#fff1cf] px-3 py-1 text-[10px] font-bold text-[#a67c2d]">
+          スキルレベルアップ！{result.previousLevel > 0 ? `${formatLevelTag(result.previousLevel)} → ${formatLevelTag(result.newLevel)}` : formatLevelTag(result.newLevel)}
+        </p>
+      )}
     </div>
   );
 }
