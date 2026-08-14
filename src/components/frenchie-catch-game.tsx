@@ -40,7 +40,8 @@ const BOX_TOP = 100 - BOX_BOTTOM - BOX_HEIGHT;
 // 新しい箱画像の開口部。左右の斜めの縁だけをバウンド対象にする。
 const OPEN_TOP_LOCAL_Y = 0.17;
 const OPEN_BOTTOM_LOCAL_Y = 0.48;
-const CATCH_START_LOCAL_Y = 0.25;
+// 見た目でも十分に箱の中へ入ってからキャッチ扱いにする。
+const CATCH_START_LOCAL_Y = 0.36;
 const BOX_OPEN_TOP_Y = BOX_TOP + BOX_HEIGHT * OPEN_TOP_LOCAL_Y;
 const BOX_LIP_Y = BOX_TOP + BOX_HEIGHT * OPEN_BOTTOM_LOCAL_Y;
 const BOX_MIN_X = BOX_HALF + 1;
@@ -227,19 +228,20 @@ export function FrenchieCatchGame({ ownedItems }: { ownedItems: FrenchieCatchIte
           const opening = openingBoundsAt(localY);
           const openingRatio = overlap(localHitLeft, localHitRight, opening.left, opening.right) / localHitWidth;
 
-          // 最優先：箱の開いている範囲へ十分入ったら、bounced状態でも必ずキャッチ。
+          // 箱の奥まで入り、開口部との重なりが十分な時だけキャッチ。
           const canCatch = localY >= CATCH_START_LOCAL_Y
-            && localY <= OPEN_BOTTOM_LOCAL_Y + 0.08
-            && openingRatio >= 0.52;
+            && localY <= OPEN_BOTTOM_LOCAL_Y + 0.10
+            && openingRatio >= 0.64;
 
           if (canCatch) {
             entity.rimChecked = true;
             const points = entity.kind === "dog" ? 15 : POINTS[entity.rarity!];
             entity.status = "caught";
-            entity.ttl = 0.48;
-            entity.vx *= 0.2;
-            entity.vy = Math.max(entity.vy, 18);
-            entity.spin *= 0.2;
+            // すぐ消さず、少し勢いを残して箱の中へ落ちていく動きを見せる。
+            entity.ttl = 0.72;
+            entity.vx *= 0.5;
+            entity.vy = Math.max(entity.vy, 20);
+            entity.spin *= 0.6;
             scoreRef.current += points;
             comboRef.current += 1;
             caughtRef.current += 1;
