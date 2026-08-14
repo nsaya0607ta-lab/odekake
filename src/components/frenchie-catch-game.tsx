@@ -25,22 +25,19 @@ type Entity = {
   spin: number;
   status: "falling" | "bounced" | "caught";
   rimChecked: boolean;
+  enteredOpening: boolean;
   ttl: number;
 };
 
 const ROUND_SECONDS = 30;
 const BOX_IMAGE = "/4EA485D9-BB37-47F3-97F0-111CF0E4AF7E.png";
-// 直前の54%サイズから70%へ縮小。
 const BOX_WIDTH = 37.8;
 const BOX_HALF = BOX_WIDTH / 2;
-// catcherは正方形だが、ゲーム盤は3:4なので盤面Y座標では0.75倍になる。
 const BOX_HEIGHT = BOX_WIDTH * 0.75;
 const BOX_BOTTOM = 0.5;
 const BOX_TOP = 100 - BOX_BOTTOM - BOX_HEIGHT;
-// 新しい箱画像の開口部。左右の斜めの縁だけをバウンド対象にする。
 const OPEN_TOP_LOCAL_Y = 0.17;
 const OPEN_BOTTOM_LOCAL_Y = 0.48;
-// 見た目でも十分に箱の中へ入ってからキャッチ扱いにする。
 const CATCH_START_LOCAL_Y = 0.36;
 const BOX_OPEN_TOP_Y = BOX_TOP + BOX_HEIGHT * OPEN_TOP_LOCAL_Y;
 const BOX_LIP_Y = BOX_TOP + BOX_HEIGHT * OPEN_BOTTOM_LOCAL_Y;
@@ -65,14 +62,12 @@ function overlap(leftA: number, rightA: number, leftB: number, rightB: number) {
 
 function openingBoundsAt(localY: number) {
   const t = clamp((localY - OPEN_TOP_LOCAL_Y) / (OPEN_BOTTOM_LOCAL_Y - OPEN_TOP_LOCAL_Y), 0, 1);
-  // 画像の開口部は上側が少し狭く、手前ほど左右へ広がる台形。
   const left = 0.145 - t * 0.055;
   const right = 0.855 + t * 0.055;
   return { left, right };
 }
 
 function isCardboardTap(localX: number, localY: number) {
-  // 穴の中を押しても動かさず、実際の段ボール部分を押した時だけドラッグ開始。
   const front = localY >= 0.47 && localY <= 0.94 && localX >= 0.07 && localX <= 0.93;
   const leftSide = localY >= 0.16 && localY <= 0.50 && localX >= 0.055 && localX <= 0.18;
   const rightSide = localY >= 0.16 && localY <= 0.50 && localX >= 0.82 && localX <= 0.945;
@@ -121,6 +116,7 @@ export function FrenchieCatchGame({ ownedItems }: { ownedItems: FrenchieCatchIte
       rotation: (Math.random() - 0.5) * 12,
       status: "falling" as const,
       rimChecked: false,
+      enteredOpening: false,
       ttl: 0,
     };
 
@@ -203,6 +199,7 @@ export function FrenchieCatchGame({ ownedItems }: { ownedItems: FrenchieCatchIte
           continue;
         }
 
+        const previousY = entity.y;
         if (entity.status === "bounced") entity.vy += 38 * dt;
         entity.x += entity.vx * dt;
         entity.y += entity.vy * dt;
@@ -211,25 +208,37 @@ export function FrenchieCatchGame({ ownedItems }: { ownedItems: FrenchieCatchIte
         const hitboxWidth = entity.size * (entity.kind === "dog" ? 0.56 : 0.62);
         const hitLeft = entity.x - hitboxWidth / 2;
         const hitRight = entity.x + hitboxWidth / 2;
-        const bottom = entity.y + entity.size * (entity.kind === "dog" ? 0.34 : 0.31);
+        const bottomOffset = entity.size * (entity.kind === "dog" ? 0.34 : 0.31);
+        const previousBottom = previousY + bottomOffset;
+        const bottom = entity.y + bottomOffset;
 
-        // 一度サイドで跳ねても、上まで戻ったら再度サイド判定を有効化する。
-        // キャッチ判定はrimCheckedに関係なく常に優先する。
-        if (entity.status === "bounced" && entity.rimChecked && entity.vy < 0 && bottom < BOX_OPEN_TOP_Y - 1.5) {
-          entity.rimChecked = false;
+        if (entity.vy < 0 && bottom < BOX_OPEN_TOP_Y - 1.5) {
+          entity.enteredOpening = false;
+          if (entity.status === "bounced") entity.rimChecked = false;
         }
 
         if (entity.vy > 0 && bottom >= BOX_OPEN_TOP_Y) {
           const center = boxXRef.current;
           const localY = (bottom - BOX_TOP) / BOX_HEIGHT;
+          const previousLocalY = (previousBottom - BOX_TOP) / BOX_HEIGHT;
           const localHitLeft = (hitLeft - (center - BOX_HALF)) / BOX_WIDTH;
           const localHitRight = (hitRight - (center - BOX_HALF)) / BOX_WIDTH;
           const localHitWidth = Math.max(0.001, localHitRight - localHitLeft);
+          const localCenterX = (entity.x - (center - BOX_HALF)) / BOX_WIDTH;
           const opening = openingBoundsAt(localY);
           const openingRatio = overlap(localHitLeft, localHitRight, opening.left, opening.right) / localHitWidth;
 
-          // 箱の奥まで入り、開口部との重なりが十分な時だけキャッチ。
-          const canCatch = localY >= CATCH_START_LOCAL_Y
+          if (!entity.enteredOpening && previousLocalY < OPEN_TOP_LOCAL_Y && localY >= OPEN_TOP_LOCAL_Y) {
+            const entryOpening = openingBoundsAt(OPEN_TOP_LOCAL_Y);
+            const entryRatio = overlap(localHitLeft, localHitRight, entryOpening.left, entryOpening.right) / localHitWidth;
+            const entryInset = 0.035;
+            entity.enteredOpening = entryRatio >= 0.68
+              && localCenterX >= entryOpening.left + entryInset
+              && localCenterX <= entryOpening.right - entryInset;
+          }
+
+          const canCatch = entity.enteredOpening
+            && localY >= CATCH_START_LOCAL_Y
             && localY <= OPEN_BOTTOM_LOCAL_Y + 0.10
             && openingRatio >= 0.64;
 
@@ -237,7 +246,6 @@ export function FrenchieCatchGame({ ownedItems }: { ownedItems: FrenchieCatchIte
             entity.rimChecked = true;
             const points = entity.kind === "dog" ? 15 : POINTS[entity.rarity!];
             entity.status = "caught";
-            // 箱の中へ沈んだ直後に消し、キャッチ済みだと分かるようにする。
             entity.ttl = 0.16;
             entity.vx *= 0.35;
             entity.vy = Math.max(entity.vy, 32);
@@ -251,15 +259,14 @@ export function FrenchieCatchGame({ ownedItems }: { ownedItems: FrenchieCatchIte
             setCaught(caughtRef.current);
             setMaxCombo(maxComboRef.current);
             showCatch(entity, points);
-          } else if (!entity.rimChecked && localY >= OPEN_TOP_LOCAL_Y - 0.02 && localY <= OPEN_BOTTOM_LOCAL_Y + 0.05) {
-            // キャッチできなかった時だけ、左右サイドの細い縁をバウンド判定する。
-            const edgeBand = 0.035;
-            const leftEdgeHit = overlap(localHitLeft, localHitRight, opening.left - edgeBand, opening.left + edgeBand) > 0;
-            const rightEdgeHit = overlap(localHitLeft, localHitRight, opening.right - edgeBand, opening.right + edgeBand) > 0;
+          } else if (!entity.rimChecked && localY >= OPEN_TOP_LOCAL_Y - 0.02 && localY <= OPEN_BOTTOM_LOCAL_Y + 0.10) {
+            const wallInnerPadding = 0.025;
+            const leftWallHit = overlap(localHitLeft, localHitRight, 0.045, opening.left + wallInnerPadding) > 0;
+            const rightWallHit = overlap(localHitLeft, localHitRight, opening.right - wallInnerPadding, 0.955) > 0;
 
-            if (leftEdgeHit || rightEdgeHit) {
+            if (leftWallHit || rightWallHit) {
               entity.rimChecked = true;
-              const side = leftEdgeHit && !rightEdgeHit ? "left" : rightEdgeHit && !leftEdgeHit ? "right" : entity.x <= center ? "left" : "right";
+              const side = leftWallHit && !rightWallHit ? "left" : rightWallHit && !leftWallHit ? "right" : entity.x <= center ? "left" : "right";
               const contactLocalX = side === "left" ? opening.left : opening.right;
               const contactX = center - BOX_HALF + contactLocalX * BOX_WIDTH;
               const impactOffset = clamp((contactX - entity.x) / Math.max(hitboxWidth / 2, 0.001), -1, 1);
@@ -267,8 +274,6 @@ export function FrenchieCatchGame({ ownedItems }: { ownedItems: FrenchieCatchIte
               const incomingVy = entity.vy;
               const impactSpeed = Math.hypot(incomingVx, incomingVy);
 
-              // アイテムの右半分が縁に当たったら左へ、左半分なら右へ跳ねる。
-              // 中央付近だけは直前の横速度と接触した縁から自然な方向を決める。
               let direction: -1 | 1;
               if (impactOffset > 0.06) direction = -1;
               else if (impactOffset < -0.06) direction = 1;
@@ -283,6 +288,7 @@ export function FrenchieCatchGame({ ownedItems }: { ownedItems: FrenchieCatchIte
               entity.status = "bounced";
               entity.vx = direction * horizontalSpeed;
               entity.vy = -verticalSpeed;
+              entity.x += direction * Math.max(0.7, hitboxWidth * 0.08);
               entity.spin = clamp(entity.spin + direction * (110 + Math.abs(impactOffset) * 210), -420, 420);
               comboRef.current = 0;
               setCombo(0);
@@ -423,7 +429,7 @@ export function FrenchieCatchGame({ ownedItems }: { ownedItems: FrenchieCatchIte
               {phase === "finished" ? (
                 <><p className="text-[10px] font-black tracking-[0.18em] text-ink-faint">RESULT</p><p className="mt-1 text-4xl font-black tabular-nums text-ink">{score.toLocaleString("ja-JP")}</p><div className="mt-3 grid grid-cols-2 gap-2 text-xs"><div className="rounded-xl bg-paper-deep px-2 py-2"><p className="text-[9px] text-ink-faint">キャッチ</p><p className="font-black text-ink">{caught}個</p></div><div className="rounded-xl bg-paper-deep px-2 py-2"><p className="text-[9px] text-ink-faint">MAX COMBO</p><p className="font-black text-ink">{maxCombo}</p></div></div></>
               ) : (
-                <><p className="text-[10px] font-black tracking-[0.18em] text-leaf-deep">FRENCHIE CATCH</p><p className="mt-1 text-xl font-black text-ink">箱でキャッチしよう！</p><p className="mt-2 text-[11px] leading-relaxed text-ink-soft">所持している図鑑アイテムと初期フレブルが降ってきます。箱の開いているところに入れば得点！</p><div className="mt-3 rounded-xl bg-[#fff5df] px-3 py-2 text-[10px] leading-relaxed text-[#8d6231]">左右サイドの縁に当たるとバウンド。跳ねたあとでも、開口部に入ればキャッチできます。</div></>
+                <><p className="text-[10px] font-black tracking-[0.18em] text-leaf-deep">FRENCHIE CATCH</p><p className="mt-1 text-xl font-black text-ink">箱でキャッチしよう！</p><p className="mt-2 text-[11px] leading-relaxed text-ink-soft">所持している図鑑アイテムと初期フレブルが降ってきます。箱の開いているところに入れば得点！</p><div className="mt-3 rounded-xl bg-[#fff5df] px-3 py-2 text-[10px] leading-relaxed text-[#8d6231]">左右サイドは壁なので横からは入れません。上から開口部へ入った物だけキャッチできます。</div></>
               )}
               <button type="button" onClick={startGame} className="mt-4 w-full rounded-full bg-leaf px-4 py-3 text-sm font-black text-white shadow-md active:translate-y-px">{phase === "finished" ? "もう一度あそぶ" : "START"}</button>
               <p className="mt-2 text-[9px] text-ink-faint">所持アイテム {itemPool.length}種類 + 初期フレブル</p>
