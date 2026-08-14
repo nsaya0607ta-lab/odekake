@@ -132,6 +132,11 @@ export function FrenchieCatchGame({ ownedItems }: { ownedItems: FrenchieCatchIte
   const comboShieldRef = useRef(0);
   const multiplier15UntilRef = useRef(0);
   const multiplier2UntilRef = useRef(0);
+  const wideCatchUntilRef = useRef(0);
+  const nextBigRef = useRef(false);
+  const spawnSlowUntilRef = useRef(0);
+  const comboKeepRef = useRef(0);
+  const rainbowUntilRef = useRef(0);
   const feedbackTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const impactTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -161,6 +166,11 @@ export function FrenchieCatchGame({ ownedItems }: { ownedItems: FrenchieCatchIte
     if (nextBonus10Ref.current > 0) labels.push(`あと${nextBonus10Ref.current}個 +10pt`);
     if (nextBonus5Ref.current > 0) labels.push(`あと${nextBonus5Ref.current}個 +5pt`);
     if (comboShieldRef.current > 0) labels.push(`コンボ保護 ×${comboShieldRef.current}`);
+    if (comboKeepRef.current > 0) labels.push(`コンボ据え置き ×${comboKeepRef.current}`);
+    if (now < wideCatchUntilRef.current) labels.push("キャッチ判定拡大中");
+    if (now < spawnSlowUntilRef.current) labels.push("小休憩中");
+    if (now < rainbowUntilRef.current) labels.push("虹色エフェクト中");
+    if (nextBigRef.current) labels.push("次の1個 拡大表示");
     setActiveEffects(labels);
   }, []);
 
@@ -238,6 +248,9 @@ export function FrenchieCatchGame({ ownedItems }: { ownedItems: FrenchieCatchIte
       }
     }
 
+    const isBig = nextBigRef.current;
+    if (isBig) nextBigRef.current = false;
+
     return {
       ...base,
       itemId: item.id,
@@ -246,7 +259,7 @@ export function FrenchieCatchGame({ ownedItems }: { ownedItems: FrenchieCatchIte
       image: item.image,
       rarity: item.rarity,
       vy: base.vy * RARITY_FALL_SPEED[item.rarity],
-      size: 12.5 + Math.random() * 3.5,
+      size: (12.5 + Math.random() * 3.5) * (isBig ? 1.4 : 1),
       spin: (Math.random() - 0.5) * 65,
     };
   }, [itemPool]);
@@ -296,11 +309,28 @@ export function FrenchieCatchGame({ ownedItems }: { ownedItems: FrenchieCatchIte
         multiplier15UntilRef.current = 0;
         timedEffectChanged = true;
       }
+      if (wideCatchUntilRef.current > 0 && now >= wideCatchUntilRef.current) {
+        wideCatchUntilRef.current = 0;
+        timedEffectChanged = true;
+      }
+      if (spawnSlowUntilRef.current > 0 && now >= spawnSlowUntilRef.current) {
+        spawnSlowUntilRef.current = 0;
+        timedEffectChanged = true;
+      }
+      if (rainbowUntilRef.current > 0 && now >= rainbowUntilRef.current) {
+        rainbowUntilRef.current = 0;
+        timedEffectChanged = true;
+      }
       if (timedEffectChanged) refreshEffectStatus(now);
 
       const breakCombo = (entity: Entity) => {
         if (entity.missHandled) return;
         entity.missHandled = true;
+        if (comboKeepRef.current > 0) {
+          comboKeepRef.current -= 1;
+          refreshEffectStatus(now);
+          return;
+        }
         if (comboRef.current > 0 && comboShieldRef.current > 0) {
           comboShieldRef.current -= 1;
           refreshEffectStatus(now);
@@ -314,7 +344,8 @@ export function FrenchieCatchGame({ ownedItems }: { ownedItems: FrenchieCatchIte
       last = now;
       if (now >= nextSpawnRef.current && entitiesRef.current.length < 10) {
         entitiesRef.current.push(createEntity());
-        nextSpawnRef.current = now + 790 - Math.min(1, elapsed / ROUND_SECONDS) * 250 + Math.random() * 170;
+        const spawnSlowExtra = now < spawnSlowUntilRef.current ? 600 : 0;
+        nextSpawnRef.current = now + 790 - Math.min(1, elapsed / ROUND_SECONDS) * 250 + Math.random() * 170 + spawnSlowExtra;
       }
 
       const next: Entity[] = [];
@@ -356,17 +387,19 @@ export function FrenchieCatchGame({ ownedItems }: { ownedItems: FrenchieCatchIte
           const localHitWidth = Math.max(0.001, localHitRight - localHitLeft);
           const localCenterX = (entity.x - (center - BOX_HALF)) / BOX_WIDTH;
           const opening = openingBoundsAt(localY);
+          const catchMargin = now < wideCatchUntilRef.current ? 0.05 : 0;
+          const catchOpening = { left: opening.left - catchMargin, right: opening.right + catchMargin };
 
           if (!entity.enteredOpening && previousLocalY < OPEN_TOP_LOCAL_Y && localY >= OPEN_TOP_LOCAL_Y) {
             const entryOpening = openingBoundsAt(OPEN_TOP_LOCAL_Y);
-            const entryRatio = overlap(localHitLeft, localHitRight, entryOpening.left, entryOpening.right) / localHitWidth;
+            const entryRatio = overlap(localHitLeft, localHitRight, entryOpening.left - catchMargin, entryOpening.right + catchMargin) / localHitWidth;
             const entryInset = 0.035;
             entity.enteredOpening = entryRatio >= 0.68
-              && localCenterX >= entryOpening.left + entryInset
-              && localCenterX <= entryOpening.right - entryInset;
+              && localCenterX >= entryOpening.left - catchMargin + entryInset
+              && localCenterX <= entryOpening.right + catchMargin - entryInset;
           }
 
-          const widthFullyInsideOpening = localHitLeft >= opening.left && localHitRight <= opening.right;
+          const widthFullyInsideOpening = localHitLeft >= catchOpening.left && localHitRight <= catchOpening.right;
           const canCatch = entity.enteredOpening
             && localY >= CATCH_START_LOCAL_Y
             && localY <= OPEN_BOTTOM_LOCAL_Y + 0.10
@@ -501,25 +534,53 @@ export function FrenchieCatchGame({ ownedItems }: { ownedItems: FrenchieCatchIte
                 effectLabel = `+${applied}秒`;
                 break;
               }
-              default: {
-                if (entity.rarity === "R") {
-                  nextBonus5Ref.current += 1;
-                  effectLabel = "+5ptボーナス";
-                  statusChanged = true;
-                } else if (entity.rarity === "SR") {
-                  const applied = addBonusTime(2);
-                  effectLabel = `+${applied}秒`;
-                } else if (entity.rarity === "SSR") {
-                  multiplier15UntilRef.current = now + 4000;
-                  effectLabel = "4秒間 ×1.5";
-                  statusChanged = true;
-                } else if (entity.rarity === "UR") {
-                  nextMultiplierRef.current = 2;
-                  effectLabel = "次の1個 ×2";
-                  statusChanged = true;
-                }
+              case "food_paw_pudding":
+              case "food_paw_melon_bread":
+                points += 15;
+                effectLabel = "+15ptボーナス";
+                break;
+              case "toy_paw_macaron":
+              case "food_paw_cupcake":
+                wideCatchUntilRef.current = now + 3000;
+                effectLabel = "3秒間 キャッチ判定拡大";
+                statusChanged = true;
+                break;
+              case "food_strawberry_roll_cake":
+                nextBigRef.current = true;
+                effectLabel = "次の1個 拡大表示";
+                statusChanged = true;
+                break;
+              case "toy_star_wan_wand": {
+                const timeBonus = Math.round(Math.max(0, (endAtRef.current - now) / 1000));
+                points += timeBonus;
+                effectLabel = `残り時間ボーナス +${timeBonus}pt`;
                 break;
               }
+              case "interior_sleepy_moon":
+              case "interior_spring_flower_wreath":
+                spawnSlowUntilRef.current = now + 4000;
+                effectLabel = "4秒間 小休憩";
+                statusChanged = true;
+                break;
+              case "other_sparkle_rope_crown":
+                effectLabel = "きらきらボーナス";
+                break;
+              case "other_nakayoshi_azubee":
+              case "other_kamunayo":
+                comboKeepRef.current += 1;
+                effectLabel = "コンボ据え置き1回";
+                statusChanged = true;
+                break;
+              case "interior_kinoko_azubee":
+              case "other_komochi":
+              case "other_azuki":
+              case "other_kobee":
+                rainbowUntilRef.current = now + 6000;
+                effectLabel = "6秒間 虹色エフェクト";
+                statusChanged = true;
+                break;
+              default:
+                break;
             }
 
             const nextCombo = comboRef.current + 1;
@@ -750,7 +811,7 @@ export function FrenchieCatchGame({ ownedItems }: { ownedItems: FrenchieCatchIte
           ref={catcherRef}
           role="button"
           aria-label="拾ってくだブーの段ボールを左右に動かす"
-          className={`absolute bottom-[0.5%] z-30 aspect-square w-[37.8%] touch-none -translate-x-1/2 select-none transition-transform duration-100 ${boxBounce ? "scale-[1.015]" : "scale-100"}`}
+          className={`absolute bottom-[0.5%] z-30 aspect-square w-[37.8%] touch-none -translate-x-1/2 select-none rounded-3xl transition-transform duration-100 ${boxBounce ? "scale-[1.015]" : "scale-100"} ${Date.now() < rainbowUntilRef.current ? "animate-pulse shadow-[0_0_25px_8px_rgba(230,120,220,0.55)] ring-4 ring-pink-300/70" : ""}`}
           style={{ left: `${boxX}%` }}
           onPointerDown={pointerDown}
           onPointerMove={pointerMove}
