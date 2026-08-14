@@ -1,9 +1,10 @@
+import Link from "next/link";
 import { CoinPill } from "@/components/coin-badge";
 import { CoinEarnMethods } from "@/components/coin-earn-methods";
 import { CoinHero } from "@/components/coin-hero";
 import { CoinLiveRefresh } from "@/components/coin-live-refresh";
 import { CoinUseCards } from "@/components/coin-use-cards";
-import { IconPaw } from "@/components/icons";
+import { IconChevronRight, IconPaw } from "@/components/icons";
 import { PageBody } from "@/components/page-body";
 import { TopHeader } from "@/components/page-header";
 import { getCoinSummary } from "@/lib/data/coins";
@@ -41,6 +42,16 @@ export default async function CoinsPage() {
       <PageBody>
         <div className="space-y-4">
           <CoinHero balance={summary.balance} skin={skin} />
+          <Link
+            href="/mypage/coin-history"
+            className="rough-card flex items-center gap-3 p-4 active:scale-[0.99]"
+          >
+            <span className="min-w-0 flex-1">
+              <span className="block text-sm font-bold">コイン獲得履歴を見る</span>
+              <span className="mt-0.5 block text-[11px] text-ink-soft">獲得・利用した理由を振り返れます</span>
+            </span>
+            <IconChevronRight size={18} className="shrink-0 text-ink-faint" />
+          </Link>
           <CoinUseCards balance={summary.balance} />
           <CoinEarnMethods />
         </div>
