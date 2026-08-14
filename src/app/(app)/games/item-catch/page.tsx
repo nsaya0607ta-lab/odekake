@@ -1,4 +1,5 @@
 import { FrenchieCatchGame } from "@/components/frenchie-catch-game";
+import { ItemCatchRanking } from "@/components/item-catch-ranking";
 import { PageBody } from "@/components/page-body";
 import { TopHeader } from "@/components/page-header";
 import { COLLECTION_ITEMS } from "@/lib/collection/items";
@@ -27,6 +28,7 @@ export default async function ItemCatchPage() {
 
       <PageBody className="!space-y-3 !py-3">
         <FrenchieCatchGame ownedItems={catchItems} />
+        <ItemCatchRanking />
       </PageBody>
     </>
   );
