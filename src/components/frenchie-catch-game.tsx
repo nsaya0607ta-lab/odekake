@@ -226,7 +226,6 @@ export function FrenchieCatchGame({ ownedItems }: { ownedItems: FrenchieCatchIte
           const localHitWidth = Math.max(0.001, localHitRight - localHitLeft);
           const localCenterX = (entity.x - (center - BOX_HALF)) / BOX_WIDTH;
           const opening = openingBoundsAt(localY);
-          const openingRatio = overlap(localHitLeft, localHitRight, opening.left, opening.right) / localHitWidth;
 
           if (!entity.enteredOpening && previousLocalY < OPEN_TOP_LOCAL_Y && localY >= OPEN_TOP_LOCAL_Y) {
             const entryOpening = openingBoundsAt(OPEN_TOP_LOCAL_Y);
@@ -237,10 +236,12 @@ export function FrenchieCatchGame({ ownedItems }: { ownedItems: FrenchieCatchIte
               && localCenterX <= entryOpening.right - entryInset;
           }
 
+          const widthFullyInsideOpening = localHitLeft >= opening.left
+            && localHitRight <= opening.right;
           const canCatch = entity.enteredOpening
             && localY >= CATCH_START_LOCAL_Y
             && localY <= OPEN_BOTTOM_LOCAL_Y + 0.10
-            && openingRatio >= 0.64;
+            && widthFullyInsideOpening;
 
           if (canCatch) {
             entity.rimChecked = true;
