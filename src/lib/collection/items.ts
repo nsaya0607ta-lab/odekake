@@ -125,6 +125,11 @@ const CURATED_ITEMS: readonly CollectionItem[] = [
   { id: "food_paw_melon_bread", name: "肉球メロンパン", image: "/collection/items/paw-melon-bread.webp", category: "food", series: null, rarity: "R" },
   { id: "food_smile_onigiri", name: "にこにこおにぎり", image: "/collection/items/smile-onigiri.webp", category: "food", series: null, rarity: "N" },
   { id: "food_paw_cupcake", name: "肉球カップケーキ", image: "/collection/items/paw-cupcake.webp", category: "food", series: null, rarity: "SR" },
+  { id: "food_paw_taiyaki", name: "にくきゅうたい焼き", image: "/collection/items/paw-taiyaki.webp", category: "food", series: null, rarity: "N" },
+  { id: "food_dog_milk", name: "わんこミルク", image: "/collection/items/dog-milk.webp", category: "food", series: null, rarity: "N" },
+  { id: "food_cheese_cubes", name: "ころころチーズ", image: "/collection/items/cheese-cubes.webp", category: "food", series: null, rarity: "N" },
+  { id: "food_roasted_sweet_potato", name: "ほくほく焼きいも", image: "/collection/items/roasted-sweet-potato.webp", category: "food", series: null, rarity: "N" },
+  { id: "food_honey_butter_toast", name: "はちみつバタートースト", image: "/collection/items/honey-butter-toast.webp", category: "food", series: null, rarity: "N" },
 
   // --- 通常図鑑：インテリア ------------------------------------------
   { id: "interior_anball", name: "アンボール", image: "/collection/items/anball.webp", category: "interior", series: null, rarity: "UR" },
