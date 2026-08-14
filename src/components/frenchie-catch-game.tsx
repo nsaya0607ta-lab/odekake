@@ -260,27 +260,33 @@ export function FrenchieCatchGame({ ownedItems }: { ownedItems: FrenchieCatchIte
             if (leftEdgeHit || rightEdgeHit) {
               entity.rimChecked = true;
               const side = leftEdgeHit && !rightEdgeHit ? "left" : rightEdgeHit && !leftEdgeHit ? "right" : entity.x <= center ? "left" : "right";
+              const contactLocalX = side === "left" ? opening.left : opening.right;
+              const contactX = center - BOX_HALF + contactLocalX * BOX_WIDTH;
+              const impactOffset = clamp((contactX - entity.x) / Math.max(hitboxWidth / 2, 0.001), -1, 1);
               const incomingVx = entity.vx;
-              const normalX = side === "left" ? 0.58 : -0.58;
-              const normalY = -0.815;
-              const normalLength = Math.hypot(normalX, normalY);
-              const nx = normalX / normalLength;
-              const ny = normalY / normalLength;
-              const tx = -ny;
-              const ty = nx;
-              const normalSpeed = entity.vx * nx + entity.vy * ny;
-              const tangentSpeed = entity.vx * tx + entity.vy * ty;
-              const bouncedNormalSpeed = -normalSpeed * 0.72;
-              const bouncedTangentSpeed = tangentSpeed * 0.90;
-              const reflectedVx = tx * bouncedTangentSpeed + nx * bouncedNormalSpeed;
-              const reflectedVy = ty * bouncedTangentSpeed + ny * bouncedNormalSpeed;
+              const incomingVy = entity.vy;
+              const impactSpeed = Math.hypot(incomingVx, incomingVy);
+
+              // アイテムの右半分が縁に当たったら左へ、左半分なら右へ跳ねる。
+              // 中央付近だけは直前の横速度と接触した縁から自然な方向を決める。
+              let direction: -1 | 1;
+              if (impactOffset > 0.06) direction = -1;
+              else if (impactOffset < -0.06) direction = 1;
+              else if (incomingVx > 0.3) direction = -1;
+              else if (incomingVx < -0.3) direction = 1;
+              else direction = side === "left" ? 1 : -1;
+
+              const lateralFactor = 0.58 + Math.abs(impactOffset) * 0.62;
+              const horizontalSpeed = clamp(impactSpeed * 0.48 * lateralFactor, 6.5, 20);
+              const verticalSpeed = clamp(Math.abs(incomingVy) * 0.52 + impactSpeed * 0.10, 7.5, 16);
+
               entity.status = "bounced";
-              entity.vx = reflectedVx;
-              entity.vy = reflectedVy;
-              entity.spin = clamp(entity.spin + (reflectedVx - incomingVx) * 14, -420, 420);
+              entity.vx = direction * horizontalSpeed;
+              entity.vy = -verticalSpeed;
+              entity.spin = clamp(entity.spin + direction * (110 + Math.abs(impactOffset) * 210), -420, 420);
               comboRef.current = 0;
               setCombo(0);
-              showImpact(clamp(entity.x, 4, 96));
+              showImpact(clamp(contactX, 4, 96));
             }
           }
         }
