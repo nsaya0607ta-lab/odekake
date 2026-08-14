@@ -26,6 +26,7 @@ export const metadata = { title: "あなたの旅 | おでかけ記録" };
 export const dynamic = "force-dynamic";
 
 const PROFILE_TICKET_SRC = "/B42684BD-FCE9-4F37-A698-4EEE3884ECA8.png";
+const MINI_GAME_BUTTON_SRC = "https://raw.githubusercontent.com/nsaya0607ta-lab/odekake/main/public/mini-game-button.webp";
 
 export default async function HomePage({
   searchParams,
@@ -123,7 +124,7 @@ export default async function HomePage({
               >
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img
-                  src="/mini-game-button.webp"
+                  src={MINI_GAME_BUTTON_SRC}
                   alt="ミニゲーム"
                   className="block h-auto w-full object-contain drop-shadow-[0_2px_6px_rgba(77,58,30,0.14)]"
                 />
