@@ -43,7 +43,7 @@ export async function POST(request: Request) {
     );
   }
 
-  const rpc = supabase.rpc as unknown as (
+  const rpc = supabase.rpc.bind(supabase) as unknown as (
     fn: "record_item_catch_result",
     args: { p_round_id: string; p_score: number; p_caught_count: number; p_duration_seconds: number },
   ) => Promise<RpcResponse>;
