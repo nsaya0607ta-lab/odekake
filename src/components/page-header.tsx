@@ -41,19 +41,30 @@ export function PageHeader({ title, backHref, subtitle, action }: Props) {
   );
 }
 
-/** 戻るボタンを持たない画面（下部ナビの主要5画面）向け */
+/** 下部ナビの主要画面向け。backHref を指定した場合だけ戻るボタンを表示する */
 export function TopHeader({
   title,
   subtitle,
   action,
+  backHref,
 }: {
   title: ReactNode;
   subtitle?: string;
   action?: ReactNode;
+  backHref?: string;
 }) {
   return (
     <header className="sticky top-0 z-30 border-b border-line bg-paper/92 backdrop-blur-sm">
       <div className="mx-auto flex max-w-lg items-center gap-2 px-4 py-3">
+        {backHref ? (
+          <Link
+            href={backHref}
+            aria-label="戻る"
+            className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-ink-soft transition-colors active:bg-paper-deep"
+          >
+            <IconChevronLeft />
+          </Link>
+        ) : null}
         <span className="min-w-0 flex-1">
           <h1 className="truncate text-[19px] font-bold">{title}</h1>
           {subtitle ? <span className="block truncate text-xs text-ink-faint">{subtitle}</span> : null}

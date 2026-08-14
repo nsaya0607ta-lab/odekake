@@ -1,4 +1,3 @@
-import Link from "next/link";
 import { FrenchieCatchGame } from "@/components/frenchie-catch-game";
 import { PageBody } from "@/components/page-body";
 import { TopHeader } from "@/components/page-header";
@@ -21,16 +20,9 @@ export default async function ItemCatchPage() {
   return (
     <>
       <TopHeader
+        backHref="/games"
         title="アイテムキャッチ"
         subtitle="30秒でどこまでキャッチできる？"
-        action={
-          <Link
-            href="/games"
-            className="pressable rounded-full border border-line bg-card px-3 py-1.5 text-[10px] font-bold text-ink-soft shadow-sm active:scale-[0.97]"
-          >
-            ゲーム一覧
-          </Link>
-        }
       />
 
       <PageBody className="!space-y-3 !py-3">

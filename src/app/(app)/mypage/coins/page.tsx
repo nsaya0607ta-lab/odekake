@@ -27,6 +27,7 @@ export default async function CoinsPage() {
     <>
       <CoinLiveRefresh />
       <TopHeader
+        backHref="/home"
         title={
           <span className="flex min-w-0 items-center gap-1.5">
             <span className="min-w-0 truncate">{space.name}</span>

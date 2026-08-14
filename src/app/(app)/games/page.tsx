@@ -7,7 +7,11 @@ export const metadata = { title: "各種ゲーム | おでかけ記録" };
 export default function GamesPage() {
   return (
     <>
-      <TopHeader title="各種ゲーム" subtitle="ちょっと遊べる、おでかけミニゲーム。" />
+      <TopHeader
+        backHref="/home"
+        title="各種ゲーム"
+        subtitle="ちょっと遊べる、おでかけミニゲーム。"
+      />
 
       <PageBody className="!space-y-3 !py-3">
         <section className="rough-card overflow-hidden p-4">
