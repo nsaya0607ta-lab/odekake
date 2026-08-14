@@ -8,6 +8,7 @@ import { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
 import type { GachaRarity } from "@/lib/gacha/config";
 import type { CollectionItem } from "@/lib/collection/items";
+import { formatSkillLevel, getNextLevelRemaining } from "@/lib/gacha/skill-levels";
 import { ExactSilhouette, hasExactSilhouette } from "./exact-silhouette";
 import { ItemArt } from "./item-art";
 
@@ -76,6 +77,8 @@ export function ItemCard({
   const useExactSilhouette = !isRevealed && hasExactSilhouette(item.art);
   const drawCount = owned ? Math.max(1, count) : 0;
   const showCount = owned && (isRevealed || showCountWhenHidden);
+  const skillLevelLabel = isRevealed ? formatSkillLevel(item.rarity, drawCount) : null;
+  const nextLevelRemaining = isRevealed ? getNextLevelRemaining(item.rarity, drawCount) : null;
 
   return (
     <div
@@ -121,6 +124,15 @@ export function ItemCard({
         >
           出た回数 {drawCount}回
         </span>
+
+        {skillLevelLabel ? (
+          <span className="mt-[1%] flex items-center gap-1 text-center text-[9px] font-bold leading-none text-[#a67c2d]">
+            <span className="rounded-full bg-[#fff1cf] px-1.5 py-[1px]">{skillLevelLabel}</span>
+            {nextLevelRemaining !== null ? (
+              <span className="text-[#8d8375]">次まであと{nextLevelRemaining}</span>
+            ) : null}
+          </span>
+        ) : null}
       </div>
     </div>
   );

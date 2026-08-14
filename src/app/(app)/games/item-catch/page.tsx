@@ -3,7 +3,8 @@ import { ItemCatchRanking } from "@/components/item-catch-ranking";
 import { PageBody } from "@/components/page-body";
 import { TopHeader } from "@/components/page-header";
 import { COLLECTION_ITEMS } from "@/lib/collection/items";
-import { getOwnedItemIds } from "@/lib/data/collection";
+import { getOwnedItemCounts } from "@/lib/data/collection";
+import { getSkillLevel } from "@/lib/gacha/skill-levels";
 import { requireUser } from "@/lib/supabase/server";
 
 export const metadata = { title: "アイテムキャッチ | おでかけ記録" };
@@ -11,11 +12,18 @@ export const dynamic = "force-dynamic";
 
 export default async function ItemCatchPage() {
   const { supabase, user } = await requireUser();
-  const ownedItemIds = await getOwnedItemIds(supabase, user.id);
+  const ownedItemCounts = await getOwnedItemCounts(supabase, user.id);
 
   const catchItems = COLLECTION_ITEMS.flatMap((item) => {
-    if (!ownedItemIds.has(item.id) || !item.image || item.art) return [];
-    return [{ id: item.id, name: item.name, image: item.image, rarity: item.rarity }];
+    const count = ownedItemCounts.get(item.id) ?? 0;
+    if (count <= 0 || !item.image) return [];
+    return [{
+      id: item.id,
+      name: item.name,
+      image: item.image,
+      rarity: item.rarity,
+      level: getSkillLevel(item.rarity, count),
+    }];
   });
 
   return (

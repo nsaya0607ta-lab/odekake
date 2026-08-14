@@ -7,8 +7,8 @@ type RpcResponse = {
   error: { code?: string; message: string } | null;
 };
 
-const MAX_CAUGHT_COUNT = 80;
-const MAX_SCORE_PER_CATCH = 500;
+const MAX_CAUGHT_COUNT = 180;
+const MAX_SCORE_PER_CATCH = 1500;
 const MAX_SCORE_PER_RPC = 8000;
 
 function toRecord(value: unknown): Record<string, unknown> {
@@ -61,7 +61,7 @@ export async function POST(request: Request) {
     || body.caughtCount < 0
     || body.caughtCount > MAX_CAUGHT_COUNT
     || (body.caughtCount === 0 && body.score !== 0)
-    || (body.caughtCount > 0 && (body.score < body.caughtCount * 10 || body.score > body.caughtCount * MAX_SCORE_PER_CATCH))
+    || (body.caughtCount > 0 && body.score > body.caughtCount * MAX_SCORE_PER_CATCH)
   ) {
     return NextResponse.json({ error: "ゲーム結果が正しくありません。" }, { status: 400 });
   }
