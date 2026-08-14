@@ -26,10 +26,14 @@ export default function GamesPage() {
               href="/games/item-catch"
               className="pressable group flex items-center gap-3 rounded-[22px] border border-[#d8c79e] bg-[#fffaf0] p-3 shadow-[0_3px_10px_rgba(85,63,31,0.08)] active:scale-[0.99]"
             >
-              <span className="relative flex h-16 w-16 shrink-0 items-end justify-center rounded-2xl bg-[linear-gradient(180deg,#dff3fa_0%,#edf8ef_68%,#e9d5af_69%,#e9d5af_100%)]">
-                <span className="mb-2 h-7 w-10 rounded-b-md border-2 border-[#9b6c3e] bg-[#c98e52] shadow-sm">
-                  <span className="mx-auto mt-1 block h-1.5 w-7 rounded-full bg-[#704722]/35" />
-                </span>
+              <span className="relative flex h-16 w-16 shrink-0 items-center justify-center overflow-hidden rounded-2xl bg-[#fffaf0]">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img
+                  src="/item-catch-card.webp"
+                  alt=""
+                  aria-hidden="true"
+                  className="h-full w-full object-contain"
+                />
               </span>
 
               <span className="min-w-0 flex-1">
