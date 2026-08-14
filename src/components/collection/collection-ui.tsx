@@ -53,6 +53,7 @@ const RARITY_FRAME_PATHS: Record<GachaRarity, string> = {
   SR: "/collection/rarity-frames/sr.webp",
   SSR: "/collection/rarity-frames/ssr.webp",
   UR: "/collection/rarity-frames/ur.webp",
+  LR: "/collection/rarity-frames/lr.webp",
 };
 
 /**
@@ -79,6 +80,7 @@ export function ItemCard({
   const showCount = owned && (isRevealed || showCountWhenHidden);
   const skillLevelLabel = isRevealed ? formatSkillLevel(item.rarity, drawCount) : null;
   const nextLevelRemaining = isRevealed ? getNextLevelRemaining(item.rarity, drawCount) : null;
+  const isBrightFrame = isRevealed && (item.rarity === "UR" || item.rarity === "LR");
 
   return (
     <div
@@ -110,7 +112,7 @@ export function ItemCard({
 
         <span
           className={`mt-[3%] flex min-h-[17%] w-full items-center justify-center line-clamp-2 text-center text-[11px] font-semibold leading-tight ${
-            isRevealed ? "text-[#514a42]" : "text-ink-faint"
+            isRevealed ? (isBrightFrame ? "text-white" : "text-[#514a42]") : "text-ink-faint"
           }`}
         >
           {isRevealed ? item.name : "???"}
@@ -118,7 +120,7 @@ export function ItemCard({
 
         <span
           className={`mt-[1%] text-center text-[9px] font-semibold leading-none tabular-nums ${
-            showCount ? "text-[#6d655c]" : "invisible"
+            showCount ? (isBrightFrame ? "text-white" : "text-[#6d655c]") : "invisible"
           }`}
           aria-hidden={!showCount}
         >
@@ -203,7 +205,11 @@ function ItemPreviewModal({ item, onClose }: { item: CollectionItem; onClose: ()
             )}
           </div>
 
-          <p className="mt-[5%] flex min-h-[14%] w-full items-center justify-center text-center text-[20px] font-bold leading-tight text-[#514a42]">
+          <p
+            className={`mt-[5%] flex min-h-[14%] w-full items-center justify-center text-center text-[20px] font-bold leading-tight ${
+              item.rarity === "UR" || item.rarity === "LR" ? "text-white" : "text-[#514a42]"
+            }`}
+          >
             {item.name}
           </p>
         </div>

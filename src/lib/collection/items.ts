@@ -136,6 +136,7 @@ const CURATED_ITEMS: readonly CollectionItem[] = [
   { id: "interior_kinoko_azubee", name: "きのこあずびー", image: "/collection/items/3365FE0A-4198-4C04-BA73-A7BAC18F73F5.png", category: "interior", series: null, rarity: "UR" },
   { id: "interior_sleepy_moon", name: "おやすみムーン", image: "/collection/items/sleepy-moon.webp", category: "interior", series: null, rarity: "SR" },
   { id: "interior_spring_flower_wreath", name: "はるいろフラワーリース", image: "/collection/items/spring-flower-wreath.webp", category: "interior", series: null, rarity: "SR" },
+  { id: "interior_shikkoku_no_ar", name: "漆黒のアー", image: "/collection/items/shikkoku-no-ar.webp", category: "interior", series: null, rarity: "LR" },
 
   // --- 通常図鑑：アクセサリー ----------------------------------------
   { id: "other_sparkle_rope_crown", name: "きらきらロープクラウン", image: "/collection/items/sparkle-rope-crown.webp", category: "accessory", series: null, rarity: "SR" },
@@ -183,4 +184,4 @@ export function countOwned(items: readonly CollectionItem[], owned: ReadonlySet<
   return items.reduce((count, item) => (owned.has(item.id) ? count + 1 : count), 0);
 }
 
-export const RARITY_STARS: Record<GachaRarity, number> = { N: 1, R: 2, SR: 3, SSR: 4, UR: 5 };
+export const RARITY_STARS: Record<GachaRarity, number> = { N: 1, R: 2, SR: 3, SSR: 4, UR: 5, LR: 6 };
