@@ -60,6 +60,26 @@ const MAGNET_STRONG_PULL = 48;
 const FALL_SPEED_BOOST = 1.7;
 const UR_BOOST_STEP = 10;
 const UR_BOOST_MAX = 30;
+const POOP_ITEM_ID = "hazard_poop";
+const POOP_IMAGE = "/collection/items/dog-poop.webp";
+const POOP_SPAWN_CHANCE = 0.07;
+const POOP_PENALTY = 10;
+const MYSTERY_ITEM_ID = "mystery_item";
+const MYSTERY_IMAGE = "/collection/items/mystery-question.webp";
+const MYSTERY_SPAWN_CHANCE = 0.05;
+const MYSTERY_BASE_POINTS = 10;
+const JUST_RADIUS_RATIO = 0.3;
+const JUST_MULTIPLIER = 1.25;
+const MYSTERY_SKILL_ITEM_IDS = [
+  "toy_soccer_ball", "toy_taiyaki_plush", "toy_bear_plush", "toy_duck_plush", "toy_carrot",
+  "toy_frisbee", "food_paw_bowl", "toy_meat", "toy_frenchie_cushion", "toy_treasure_puzzle",
+  "toy_frenchie_plush", "toy_rainbow_ball", "toy_golden_crown_ball", "interior_anball",
+  "other_azubee", "other_omojii", "food_paw_pudding", "food_paw_melon_bread", "food_paw_cupcake",
+  "toy_paw_macaron", "food_strawberry_roll_cake", "toy_star_wan_wand", "interior_sleepy_moon",
+  "interior_spring_flower_wreath", "other_sparkle_rope_crown", "other_nakayoshi_azubee",
+  "other_kamunayo", "hiking_frenchie", "snow_frenchie", "summer_frenchie", "interior_kinoko_azubee",
+  "other_komochi", "other_azuki", "other_kobee",
+];
 const POINTS: Record<FrenchieCatchItem["rarity"], number> = { N: 10, R: 20, SR: 40, SSR: 70, UR: 100 };
 const RARITY_FALL_SPEED: Record<FrenchieCatchItem["rarity"], number> = { N: 1, R: 1.08, SR: 1.18, SSR: 1.32, UR: 1.5 };
 const DEFAULT_ITEM_SPAWN_WEIGHT = 100;
@@ -210,6 +230,32 @@ export function FrenchieCatchGame({ ownedItems }: { ownedItems: FrenchieCatchIte
       missHandled: false,
       ttl: 0,
     };
+
+    const hazardRoll = Math.random();
+    if (hazardRoll < POOP_SPAWN_CHANCE) {
+      return {
+        ...base,
+        itemId: POOP_ITEM_ID,
+        kind: "item",
+        name: "犬のうんち",
+        image: POOP_IMAGE,
+        rarity: null,
+        size: 12 + Math.random() * 3,
+        spin: (Math.random() - 0.5) * 40,
+      };
+    }
+    if (hazardRoll < POOP_SPAWN_CHANCE + MYSTERY_SPAWN_CHANCE) {
+      return {
+        ...base,
+        itemId: MYSTERY_ITEM_ID,
+        kind: "item",
+        name: "？アイテム",
+        image: MYSTERY_IMAGE,
+        rarity: null,
+        size: 13 + Math.random() * 3,
+        spin: (Math.random() - 0.5) * 50,
+      };
+    }
 
     if (itemPool.length === 0) {
       return {
@@ -446,7 +492,21 @@ export function FrenchieCatchGame({ ownedItems }: { ownedItems: FrenchieCatchIte
             entity.vy = Math.max(entity.vy, 32);
             entity.spin *= 0.45;
 
-            const basePoints = entity.kind === "dog" ? 15 : POINTS[entity.rarity!];
+            if (entity.itemId === POOP_ITEM_ID) {
+              scoreRef.current = Math.max(0, scoreRef.current - POOP_PENALTY);
+              caughtRef.current += 1;
+              setScore(scoreRef.current);
+              setCaught(caughtRef.current);
+              showCatch(entity, -POOP_PENALTY, "うんちを踏んじゃった…");
+              next.push(entity);
+              continue;
+            }
+
+            const basePoints = entity.kind === "dog"
+              ? 15
+              : entity.itemId === MYSTERY_ITEM_ID
+                ? MYSTERY_BASE_POINTS
+                : POINTS[entity.rarity!];
             let pendingBonus = 0;
             let statusChanged = false;
 
@@ -477,13 +537,18 @@ export function FrenchieCatchGame({ ownedItems }: { ownedItems: FrenchieCatchIte
             let points = Math.round((basePoints + pendingBonus) * multiplier);
             let effectLabel: string | undefined;
 
+            const isMystery = entity.itemId === MYSTERY_ITEM_ID;
+            const skillId = isMystery
+              ? MYSTERY_SKILL_ITEM_IDS[Math.floor(Math.random() * MYSTERY_SKILL_ITEM_IDS.length)]!
+              : entity.itemId;
+
             const addBonusTime = (seconds: number) => {
               endAtRef.current += seconds * 1000;
               setTimeLeft(Math.ceil(Math.max(0, (endAtRef.current - now) / 1000)));
               return seconds;
             };
 
-            switch (entity.itemId) {
+            switch (skillId) {
               case "toy_soccer_ball":
                 points += 10;
                 effectLabel = "+10ptボーナス";
@@ -685,6 +750,14 @@ export function FrenchieCatchGame({ ownedItems }: { ownedItems: FrenchieCatchIte
                 break;
             }
 
+            if (isMystery && effectLabel) effectLabel = `？発動 / ${effectLabel}`;
+
+            const isJust = Math.abs(entity.x - center) <= effBoxHalf * JUST_RADIUS_RATIO;
+            if (isJust) {
+              points = Math.round(points * JUST_MULTIPLIER);
+              effectLabel = effectLabel ? `${effectLabel} / JUST!×${JUST_MULTIPLIER}` : `JUST!×${JUST_MULTIPLIER}`;
+            }
+
             const nextCombo = comboRef.current + 1;
             const comboMultiplier = comboScoreMultiplier(nextCombo, now < comboMultiplierBoostUntilRef.current);
             if (comboMultiplier > 1) points = Math.round(points * comboMultiplier);
@@ -738,7 +811,7 @@ export function FrenchieCatchGame({ ownedItems }: { ownedItems: FrenchieCatchIte
         }
 
         if (entity.y > 110 || entity.x < -18 || entity.x > 118) {
-          if (entity.status !== "caught") breakCombo(entity);
+          if (entity.status !== "caught" && entity.itemId !== POOP_ITEM_ID) breakCombo(entity);
           continue;
         }
         next.push(entity);
@@ -969,7 +1042,7 @@ export function FrenchieCatchGame({ ownedItems }: { ownedItems: FrenchieCatchIte
                   <p className="text-[10px] font-black tracking-[0.18em] text-leaf-deep">ITEM CATCH</p>
                   <p className="mt-1 text-xl font-black text-ink">箱でキャッチしよう！</p>
                   <p className="mt-2 text-[11px] leading-relaxed text-ink-soft">所持している図鑑アイテムと初期フレブルが降ってきます。一部アイテムには得点・時間・コンボの特殊効果があります。</p>
-                  <div className="mt-3 rounded-xl bg-[#fff5df] px-3 py-2 text-[10px] leading-relaxed text-[#8d6231]">レアなアイテムほど速く落ちます。5コンボから得点倍率が上がり、最大30コンボで×2になります。遊びきると25スコアごとに1コインもらえます。</div>
+                  <div className="mt-3 rounded-xl bg-[#fff5df] px-3 py-2 text-[10px] leading-relaxed text-[#8d6231]">レアなアイテムほど速く落ちます。5コンボから得点倍率が上がり、最大30コンボで×2になります。箱の中央でキャッチすると獲得pt×1.25のJUSTボーナス。うんちは避けよう（-10pt）、？アイテムはランダムなスキルが発動！遊びきると25スコアごとに1コインもらえます。</div>
                   <button type="button" onClick={startGame} className="mt-4 w-full rounded-full bg-leaf px-4 py-3 text-sm font-black text-white shadow-md active:translate-y-px">START</button>
                 </>
               )}
