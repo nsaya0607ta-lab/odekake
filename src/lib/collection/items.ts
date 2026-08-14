@@ -120,6 +120,11 @@ const CURATED_ITEMS: readonly CollectionItem[] = [
 
   // --- 通常図鑑：食べもの --------------------------------------------
   { id: "food_paw_bowl", name: "肉球フードボウル", image: "/collection/items/paw-food-bowl.webp", category: "food", series: null, rarity: "R" },
+  { id: "food_strawberry_roll_cake", name: "いちごロールケーキ", image: "/collection/items/strawberry-roll-cake.webp", category: "food", series: null, rarity: "SR" },
+  { id: "food_paw_pudding", name: "肉球プリン", image: "/collection/items/paw-pudding.webp", category: "food", series: null, rarity: "R" },
+  { id: "food_paw_melon_bread", name: "肉球メロンパン", image: "/collection/items/paw-melon-bread.webp", category: "food", series: null, rarity: "R" },
+  { id: "food_smile_onigiri", name: "にこにこおにぎり", image: "/collection/items/smile-onigiri.webp", category: "food", series: null, rarity: "N" },
+  { id: "food_paw_cupcake", name: "肉球カップケーキ", image: "/collection/items/paw-cupcake.webp", category: "food", series: null, rarity: "SR" },
 
   // --- 通常図鑑：インテリア ------------------------------------------
   { id: "interior_anball", name: "アンボール", image: "/collection/items/anball.webp", category: "interior", series: null, rarity: "UR" },
