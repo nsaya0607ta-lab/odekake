@@ -55,6 +55,8 @@ const POINTS: Record<FrenchieCatchItem["rarity"], number> = { N: 10, R: 20, SR: 
 const RARITY_FALL_SPEED: Record<FrenchieCatchItem["rarity"], number> = { N: 1, R: 1.08, SR: 1.18, SSR: 1.32, UR: 1.5 };
 const DEFAULT_ITEM_SPAWN_WEIGHT = 100;
 const DOG_SPAWN_RATIO = 0.28;
+const FRENCHIE_SKIN_IDS = ["hiking_frenchie", "snow_frenchie", "summer_frenchie"];
+const FRENCHIE_SKIN_SPAWN_CHANCE = 0.18;
 const ITEM_SPAWN_WEIGHTS: Partial<Record<string, number>> = {
   toy_duck_plush: 50,
   toy_carrot: 35,
@@ -199,6 +201,21 @@ export function FrenchieCatchGame({ ownedItems }: { ownedItems: FrenchieCatchIte
     let roll = Math.random() * (dogWeight + itemWeightTotal);
 
     if (roll < dogWeight) {
+      const skinPool = itemPool.filter((item) => FRENCHIE_SKIN_IDS.includes(item.id));
+      if (skinPool.length > 0 && Math.random() < FRENCHIE_SKIN_SPAWN_CHANCE) {
+        const skin = skinPool[Math.floor(Math.random() * skinPool.length)]!;
+        return {
+          ...base,
+          itemId: skin.id,
+          kind: "item",
+          name: skin.name,
+          image: skin.image,
+          rarity: skin.rarity,
+          vy: base.vy * RARITY_FALL_SPEED[skin.rarity],
+          size: 15.5 + Math.random() * 3.5,
+          spin: (Math.random() - 0.5) * 20,
+        };
+      }
       return {
         ...base,
         itemId: null,
