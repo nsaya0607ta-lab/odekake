@@ -156,32 +156,45 @@ function ItemPreviewModal({ item, onClose }: { item: CollectionItem; onClose: ()
       aria-modal="true"
       aria-label={`${item.name}の拡大表示`}
     >
-      <div className="relative flex max-h-[calc(100dvh-48px)] w-full max-w-[420px] flex-col items-center rounded-[24px] border border-line-strong bg-card px-5 pb-5 pt-12 shadow-[0_18px_60px_rgba(35,29,22,0.35)]">
+      <div className="relative aspect-[561/701] w-full max-w-[380px] overflow-hidden rounded-[24px] shadow-[0_18px_60px_rgba(35,29,22,0.35)]">
+        {/* 図鑑カードと同じ既存のレアリティ背景を拡大表示でも使う。 */}
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img
+          src={RARITY_FRAME_PATHS[item.rarity]}
+          alt=""
+          aria-hidden="true"
+          className="pointer-events-none absolute inset-0 h-full w-full max-w-none object-fill"
+          style={{ transform: "scaleX(1.18) scaleY(1.06)" }}
+        />
+
         <button
           type="button"
           onClick={onClose}
-          className="absolute right-3 top-3 z-[1] flex h-9 w-9 items-center justify-center rounded-full border border-line-strong bg-paper text-2xl font-medium leading-none text-ink shadow-sm active:scale-95"
+          className="absolute right-3 top-3 z-[3] flex h-10 w-10 items-center justify-center rounded-full border border-line-strong bg-paper/95 text-2xl font-medium leading-none text-ink shadow-sm active:scale-95"
           aria-label="拡大表示を閉じる"
         >
           ×
         </button>
 
-        <div className="flex min-h-0 w-full flex-1 items-center justify-center overflow-hidden py-2">
-          {item.image ? (
-            // 元画像を引き伸ばして枠いっぱいにしない。大きい画像だけ画面内へ縮小する。
-            // eslint-disable-next-line @next/next/no-img-element
-            <img
-              src={item.image}
-              alt={item.name}
-              className="block h-auto w-auto max-h-[58dvh] max-w-full object-contain"
-            />
-          ) : (
-            <div className="flex h-[min(58dvh,360px)] w-full items-center justify-center">
+        <div className="relative z-[1] flex h-full w-full flex-col items-center px-[8%] pt-[14%] pb-[8%]">
+          <div className="flex h-[52%] w-[72%] shrink-0 items-center justify-center">
+            {item.image ? (
+              // 元画像を拡大補間しすぎないよう、実画像をobject-containで表示する。
+              // eslint-disable-next-line @next/next/no-img-element
+              <img
+                src={item.image}
+                alt={item.name}
+                className="block h-auto w-auto max-h-full max-w-full object-contain"
+              />
+            ) : (
               <ItemArt art={item.art} image={null} name={item.name} silhouette={false} />
-            </div>
-          )}
+            )}
+          </div>
+
+          <p className="mt-[5%] flex min-h-[14%] w-full items-center justify-center text-center text-[20px] font-bold leading-tight text-[#514a42]">
+            {item.name}
+          </p>
         </div>
-        <p className="mt-2 shrink-0 text-center text-sm font-bold text-ink">{item.name}</p>
       </div>
     </div>
   );
