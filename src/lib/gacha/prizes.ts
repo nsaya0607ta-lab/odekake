@@ -46,6 +46,11 @@ export const GACHA_PRIZES: readonly GachaPrize[] = [
 
   // --- 通常ガチャ：食べもの ------------------------------------------
   { id: "food_paw_bowl", name: "肉球フードボウル", rarity: "R", type: "item", pool: "regular", image: "/collection/items/paw-food-bowl.webp" },
+  { id: "food_strawberry_roll_cake", name: "いちごロールケーキ", rarity: "SR", type: "item", pool: "regular", image: "/collection/items/strawberry-roll-cake.webp" },
+  { id: "food_paw_pudding", name: "肉球プリン", rarity: "R", type: "item", pool: "regular", image: "/collection/items/paw-pudding.webp" },
+  { id: "food_paw_melon_bread", name: "肉球メロンパン", rarity: "R", type: "item", pool: "regular", image: "/collection/items/paw-melon-bread.webp" },
+  { id: "food_smile_onigiri", name: "にこにこおにぎり", rarity: "N", type: "item", pool: "regular", image: "/collection/items/smile-onigiri.webp" },
+  { id: "food_paw_cupcake", name: "肉球カップケーキ", rarity: "SR", type: "item", pool: "regular", image: "/collection/items/paw-cupcake.webp" },
 
   // --- 通常ガチャ：インテリア ----------------------------------------
   { id: "interior_anball", name: "アンボール", rarity: "UR", type: "item", pool: "regular", image: "/collection/items/anball.webp" },
