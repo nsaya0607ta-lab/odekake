@@ -5,6 +5,7 @@
  * 通常の図鑑・シリーズ図鑑・シリーズ詳細で同じものを使う。
  */
 import { useEffect, useState } from "react";
+import { createPortal } from "react-dom";
 import type { GachaRarity } from "@/lib/gacha/config";
 import type { CollectionItem } from "@/lib/collection/items";
 import { ExactSilhouette, hasExactSilhouette } from "./exact-silhouette";
@@ -127,11 +128,13 @@ export function ItemCard({
 
 function ItemPreviewModal({ item, onClose }: { item: CollectionItem; onClose: () => void }) {
   useEffect(() => {
-    const previousOverflow = document.body.style.overflow;
-    const previousOverscrollBehavior = document.body.style.overscrollBehavior;
+    const previousBodyOverflow = document.body.style.overflow;
+    const previousBodyOverscrollBehavior = document.body.style.overscrollBehavior;
+    const previousHtmlOverflow = document.documentElement.style.overflow;
 
     document.body.style.overflow = "hidden";
     document.body.style.overscrollBehavior = "none";
+    document.documentElement.style.overflow = "hidden";
 
     const handleKeyDown = (event: KeyboardEvent) => {
       if (event.key === "Escape") onClose();
@@ -139,36 +142,53 @@ function ItemPreviewModal({ item, onClose }: { item: CollectionItem; onClose: ()
     window.addEventListener("keydown", handleKeyDown);
 
     return () => {
-      document.body.style.overflow = previousOverflow;
-      document.body.style.overscrollBehavior = previousOverscrollBehavior;
+      document.body.style.overflow = previousBodyOverflow;
+      document.body.style.overscrollBehavior = previousBodyOverscrollBehavior;
+      document.documentElement.style.overflow = previousHtmlOverflow;
       window.removeEventListener("keydown", handleKeyDown);
     };
   }, [onClose]);
 
-  return (
+  const modal = (
     <div
-      className="fixed inset-0 z-[1000] flex touch-none items-center justify-center bg-[#2d2923]/55 px-5 py-8 backdrop-blur-[2px]"
+      className="fixed left-0 top-0 z-[9999] flex h-[100dvh] w-screen touch-none items-center justify-center bg-[#2d2923]/55 px-5 py-6"
       role="dialog"
       aria-modal="true"
       aria-label={`${item.name}の拡大表示`}
     >
-      <div className="relative flex w-full max-w-[520px] flex-col items-center rounded-[24px] border border-line-strong bg-card px-5 pb-5 pt-12 shadow-[0_18px_60px_rgba(35,29,22,0.35)]">
+      <div className="relative flex max-h-[calc(100dvh-48px)] w-full max-w-[420px] flex-col items-center rounded-[24px] border border-line-strong bg-card px-5 pb-5 pt-12 shadow-[0_18px_60px_rgba(35,29,22,0.35)]">
         <button
           type="button"
           onClick={onClose}
-          className="absolute right-3 top-3 flex h-9 w-9 items-center justify-center rounded-full border border-line-strong bg-paper text-2xl font-medium leading-none text-ink shadow-sm active:scale-95"
+          className="absolute right-3 top-3 z-[1] flex h-9 w-9 items-center justify-center rounded-full border border-line-strong bg-paper text-2xl font-medium leading-none text-ink shadow-sm active:scale-95"
           aria-label="拡大表示を閉じる"
         >
           ×
         </button>
 
-        <div className="flex aspect-square w-full max-w-[460px] items-center justify-center overflow-hidden">
-          <ItemArt art={item.art} image={item.image} name={item.name} silhouette={false} className="max-h-full max-w-full" />
+        <div className="flex min-h-0 w-full flex-1 items-center justify-center overflow-hidden py-2">
+          {item.image ? (
+            // 元画像を引き伸ばして枠いっぱいにしない。大きい画像だけ画面内へ縮小する。
+            // eslint-disable-next-line @next/next/no-img-element
+            <img
+              src={item.image}
+              alt={item.name}
+              className="block h-auto w-auto max-h-[58dvh] max-w-full object-contain"
+            />
+          ) : (
+            <div className="flex h-[min(58dvh,360px)] w-full items-center justify-center">
+              <ItemArt art={item.art} image={null} name={item.name} silhouette={false} />
+            </div>
+          )}
         </div>
-        <p className="mt-2 text-center text-sm font-bold text-ink">{item.name}</p>
+        <p className="mt-2 shrink-0 text-center text-sm font-bold text-ink">{item.name}</p>
       </div>
     </div>
   );
+
+  // 図鑑カードのレイアウト階層から切り離して body 直下へ出すことで、
+  // スクロール位置に関係なく「いま見えている画面」の中央へ固定する。
+  return createPortal(modal, document.body);
 }
 
 export function ItemGrid({
