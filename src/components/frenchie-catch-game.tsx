@@ -550,10 +550,14 @@ export function FrenchieCatchGame({ ownedItems }: { ownedItems: FrenchieCatchIte
                 points += 15;
                 effectLabel = "+15ptボーナス";
                 break;
-              case "toy_paw_macaron":
               case "food_paw_cupcake":
                 wideCatchUntilRef.current = now + 3000;
                 effectLabel = "3秒間 キャッチ判定拡大";
+                statusChanged = true;
+                break;
+              case "toy_paw_macaron":
+                boxWideUntilRef.current = now + 3000;
+                effectLabel = "3秒間 ダンボール拡大";
                 statusChanged = true;
                 break;
               case "food_strawberry_roll_cake":
