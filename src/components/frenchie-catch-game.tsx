@@ -38,7 +38,6 @@ type CatchFeedback = {
 };
 
 const ROUND_SECONDS = 30;
-const MAX_BONUS_SECONDS = 15;
 const BOX_IMAGE = "/4EA485D9-BB37-47F3-97F0-111CF0E4AF7E.png";
 const BOX_WIDTH = 37.8;
 const BOX_HALF = BOX_WIDTH / 2;
@@ -53,6 +52,14 @@ const BOX_LIP_Y = BOX_TOP + BOX_HEIGHT * OPEN_BOTTOM_LOCAL_Y;
 const BOX_MIN_X = BOX_HALF + 1;
 const BOX_MAX_X = 100 - BOX_HALF - 1;
 const POINTS: Record<FrenchieCatchItem["rarity"], number> = { N: 10, R: 20, SR: 40, SSR: 70, UR: 100 };
+const DEFAULT_ITEM_SPAWN_WEIGHT = 100;
+const DOG_SPAWN_RATIO = 0.28;
+const ITEM_SPAWN_WEIGHTS: Partial<Record<string, number>> = {
+  toy_duck_plush: 50,
+  toy_carrot: 35,
+  toy_treasure_puzzle: 30,
+  other_omojii: 8,
+};
 const RARITY_STYLE: Record<FrenchieCatchItem["rarity"], string> = {
   N: "drop-shadow-[0_4px_7px_rgba(80,120,80,0.22)]",
   R: "drop-shadow-[0_4px_9px_rgba(74,142,200,0.34)]",
@@ -100,7 +107,6 @@ export function FrenchieCatchGame({ ownedItems }: { ownedItems: FrenchieCatchIte
   const maxComboRef = useRef(0);
   const caughtRef = useRef(0);
   const roundIdRef = useRef<string | null>(null);
-  const bonusTimeSecondsRef = useRef(0);
   const nextMultiplierRef = useRef(1);
   const nextBonus5Ref = useRef(0);
   const nextBonus10Ref = useRef(0);
@@ -154,7 +160,7 @@ export function FrenchieCatchGame({ ownedItems }: { ownedItems: FrenchieCatchIte
       ttl: 0,
     };
 
-    if (itemPool.length === 0 || Math.random() < 0.28) {
+    if (itemPool.length === 0) {
       return {
         ...base,
         itemId: null,
@@ -167,7 +173,37 @@ export function FrenchieCatchGame({ ownedItems }: { ownedItems: FrenchieCatchIte
       };
     }
 
-    const item = itemPool[Math.floor(Math.random() * itemPool.length)] ?? itemPool[0]!;
+    const weightedItems = itemPool.map((item) => ({
+      item,
+      weight: ITEM_SPAWN_WEIGHTS[item.id] ?? DEFAULT_ITEM_SPAWN_WEIGHT,
+    }));
+    const itemWeightTotal = weightedItems.reduce((sum, entry) => sum + entry.weight, 0);
+    const dogWeight = itemPool.length * DEFAULT_ITEM_SPAWN_WEIGHT * (DOG_SPAWN_RATIO / (1 - DOG_SPAWN_RATIO));
+    let roll = Math.random() * (dogWeight + itemWeightTotal);
+
+    if (roll < dogWeight) {
+      return {
+        ...base,
+        itemId: null,
+        kind: "dog",
+        name: "初期フレブル",
+        image: "/characters/default/front.webp",
+        rarity: null,
+        size: 19,
+        spin: (Math.random() - 0.5) * 20,
+      };
+    }
+
+    roll -= dogWeight;
+    let item = weightedItems[weightedItems.length - 1]!.item;
+    for (const entry of weightedItems) {
+      roll -= entry.weight;
+      if (roll <= 0) {
+        item = entry.item;
+        break;
+      }
+    }
+
     return {
       ...base,
       itemId: item.id,
@@ -339,14 +375,9 @@ export function FrenchieCatchGame({ ownedItems }: { ownedItems: FrenchieCatchIte
             let effectLabel: string | undefined;
 
             const addBonusTime = (seconds: number) => {
-              const available = Math.max(0, MAX_BONUS_SECONDS - bonusTimeSecondsRef.current);
-              const applied = Math.min(seconds, available);
-              if (applied > 0) {
-                bonusTimeSecondsRef.current += applied;
-                endAtRef.current += applied * 1000;
-                setTimeLeft(Math.ceil(Math.max(0, (endAtRef.current - now) / 1000)));
-              }
-              return applied;
+              endAtRef.current += seconds * 1000;
+              setTimeLeft(Math.ceil(Math.max(0, (endAtRef.current - now) / 1000)));
+              return seconds;
             };
 
             switch (entity.itemId) {
@@ -365,12 +396,12 @@ export function FrenchieCatchGame({ ownedItems }: { ownedItems: FrenchieCatchIte
                 break;
               case "toy_duck_plush": {
                 const applied = addBonusTime(2);
-                effectLabel = applied > 0 ? `+${applied}秒` : "時間ボーナス上限";
+                effectLabel = `+${applied}秒`;
                 break;
               }
               case "toy_carrot": {
                 const applied = addBonusTime(3);
-                effectLabel = applied > 0 ? `+${applied}秒` : "時間ボーナス上限";
+                effectLabel = `+${applied}秒`;
                 break;
               }
               case "toy_frisbee":
@@ -402,7 +433,7 @@ export function FrenchieCatchGame({ ownedItems }: { ownedItems: FrenchieCatchIte
                   effectLabel = "宝箱 +50pt";
                 } else {
                   const applied = addBonusTime(5);
-                  effectLabel = applied > 0 ? `宝箱 +${applied}秒` : "宝箱：時間ボーナス上限";
+                  effectLabel = `宝箱 +${applied}秒`;
                 }
                 break;
               }
@@ -432,7 +463,7 @@ export function FrenchieCatchGame({ ownedItems }: { ownedItems: FrenchieCatchIte
                 break;
               case "other_omojii": {
                 const applied = addBonusTime(10);
-                effectLabel = applied > 0 ? `+${applied}秒` : "時間ボーナス上限";
+                effectLabel = `+${applied}秒`;
                 break;
               }
               default:
@@ -554,7 +585,6 @@ export function FrenchieCatchGame({ ownedItems }: { ownedItems: FrenchieCatchIte
     draggingRef.current = false;
     dragOffsetRef.current = 0;
     roundIdRef.current = crypto.randomUUID();
-    bonusTimeSecondsRef.current = 0;
     nextMultiplierRef.current = 1;
     nextBonus5Ref.current = 0;
     nextBonus10Ref.current = 0;
@@ -705,7 +735,7 @@ export function FrenchieCatchGame({ ownedItems }: { ownedItems: FrenchieCatchIte
                   <p className="text-[10px] font-black tracking-[0.18em] text-leaf-deep">ITEM CATCH</p>
                   <p className="mt-1 text-xl font-black text-ink">箱でキャッチしよう！</p>
                   <p className="mt-2 text-[11px] leading-relaxed text-ink-soft">所持している図鑑アイテムと初期フレブルが降ってきます。一部アイテムには得点・時間・コンボの特殊効果があります。</p>
-                  <div className="mt-3 rounded-xl bg-[#fff5df] px-3 py-2 text-[10px] leading-relaxed text-[#8d6231]">上から開口部へ入った物だけキャッチできます。時間追加は1プレイ合計+{MAX_BONUS_SECONDS}秒まで。遊びきると25スコアごとに1コインもらえます。</div>
+                  <div className="mt-3 rounded-xl bg-[#fff5df] px-3 py-2 text-[10px] leading-relaxed text-[#8d6231]">上から開口部へ入った物だけキャッチできます。時間追加アイテムは少し出現しにくく、取れた分だけ制限時間が延長されます。遊びきると25スコアごとに1コインもらえます。</div>
                   <button type="button" onClick={startGame} className="mt-4 w-full rounded-full bg-leaf px-4 py-3 text-sm font-black text-white shadow-md active:translate-y-px">START</button>
                 </>
               )}
