@@ -28,13 +28,17 @@ export default function GamesPage() {
               href="/games/item-catch"
               className="pressable group flex items-center gap-3 rounded-[22px] border border-[#d8c79e] bg-[#fffaf0] p-3 shadow-[0_3px_10px_rgba(85,63,31,0.08)] active:scale-[0.99]"
             >
-              <span className="relative flex h-20 w-20 shrink-0 items-center justify-center overflow-hidden rounded-2xl bg-transparent">
+              <span
+                className="relative flex h-20 w-20 shrink-0 items-center justify-center !bg-transparent"
+                style={{ background: "transparent" }}
+              >
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img
                   src={ITEM_CATCH_CARD_SRC}
                   alt=""
                   aria-hidden="true"
-                  className="h-full w-full bg-transparent object-contain"
+                  className="h-full w-full !bg-transparent object-contain"
+                  style={{ background: "transparent" }}
                 />
               </span>
 
