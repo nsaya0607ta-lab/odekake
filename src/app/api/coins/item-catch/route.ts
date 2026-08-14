@@ -7,8 +7,8 @@ type RpcResponse = {
   error: { code?: string; message: string } | null;
 };
 
-const MAX_CAUGHT_COUNT = 80;
-const MAX_SCORE_PER_CATCH = 500;
+const MAX_CAUGHT_COUNT = 150;
+const MAX_SCORE_PER_CATCH = 800;
 const MAX_SCORE_PER_RPC = 8000;
 
 function toRecord(value: unknown): Record<string, unknown> {
