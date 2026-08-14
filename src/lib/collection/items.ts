@@ -7,13 +7,14 @@
 import type { GachaRarity } from "@/lib/gacha/config";
 import { GACHA_PRIZES } from "@/lib/gacha/prizes";
 
-export const COLLECTION_CATEGORIES = ["toy", "food", "interior", "other"] as const;
+export const COLLECTION_CATEGORIES = ["toy", "food", "interior", "accessory", "other"] as const;
 export type CollectionCategory = (typeof COLLECTION_CATEGORIES)[number];
 
 export const CATEGORY_LABELS: Record<CollectionCategory, string> = {
   toy: "おもちゃ",
   food: "食べもの",
   interior: "インテリア",
+  accessory: "アクセサリー",
   other: "その他",
 };
 
@@ -126,6 +127,9 @@ const CURATED_ITEMS: readonly CollectionItem[] = [
   { id: "interior_sleepy_moon", name: "おやすみムーン", image: "/collection/items/sleepy-moon.webp", category: "interior", series: null, rarity: "SR" },
   { id: "interior_spring_flower_wreath", name: "はるいろフラワーリース", image: "/collection/items/spring-flower-wreath.webp", category: "interior", series: null, rarity: "SR" },
 
+  // --- 通常図鑑：アクセサリー ----------------------------------------
+  { id: "other_sparkle_rope_crown", name: "きらきらロープクラウン", image: "/collection/items/sparkle-rope-crown.webp", category: "accessory", series: null, rarity: "SR" },
+
   // --- 通常図鑑：その他 ----------------------------------------------
   { id: "other_azubee", name: "あずびー", image: "/collection/items/two-dogs-icon-transparent.webp", category: "other", series: null, rarity: "UR" },
   { id: "other_omojii", name: "おもじぃ", image: "/collection/items/8B027535-244F-4729-86F5-A69CDD91D103.png", category: "other", series: null, rarity: "UR" },
@@ -134,7 +138,6 @@ const CURATED_ITEMS: readonly CollectionItem[] = [
   { id: "other_azuki", name: "小豆(あずき)", image: "/collection/items/6F31AD19-B242-42D6-83D3-380A3F3D3FC0.png", category: "other", series: null, rarity: "UR" },
   { id: "other_kobee", name: "こびー", image: "/collection/items/C7DF48F4-588E-4B31-983E-A52623328924.png", category: "other", series: null, rarity: "UR" },
   { id: "other_kamunayo", name: "かむなよ", image: "/collection/items/7FEA86AD-6904-4151-BEA8-5A33F7C97B01.png", category: "other", series: null, rarity: "SSR" },
-  { id: "other_sparkle_rope_crown", name: "きらきらロープクラウン", image: "/collection/items/sparkle-rope-crown.webp", category: "other", series: null, rarity: "SR" },
 
   // --- 登山シリーズ ----------------------------------------------------
   { id: "hiking_frenchie", name: "登山のフレブル", image: "/collection/skins/hiking-frenchie.webp", category: "other", series: "hiking", rarity: "SSR", art: "dogHiking" },
