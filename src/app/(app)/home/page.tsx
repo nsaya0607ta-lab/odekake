@@ -115,6 +115,15 @@ export default async function HomePage({
                 />
               </HomeScene>
               <WanderingFrenchie level={expProgress.level} skin={dogSkin} />
+
+              <Link
+                href="/games"
+                aria-label="ミニゲーム一覧を開く"
+                className="pressable absolute right-3 top-3 z-40 inline-flex items-center gap-1.5 rounded-full border border-[#cdbb8f] bg-[#fffaf0]/92 px-2.5 py-1.5 text-[#5f4a2d] shadow-[0_2px_8px_rgba(77,58,30,0.12)] backdrop-blur-sm active:scale-[0.97]"
+              >
+                <span className="text-[7px] font-black tracking-[0.14em] text-[#9d875d]">GAME</span>
+                <span className="text-[10px] font-black">ミニゲーム</span>
+              </Link>
             </div>
           </section>
 

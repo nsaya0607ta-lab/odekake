@@ -381,7 +381,7 @@ export function FrenchieCatchGame({ ownedItems }: { ownedItems: FrenchieCatchIte
       <div className="flex items-center justify-between border-b border-line bg-card px-4 py-3">
         <div>
           <p className="text-[10px] font-bold tracking-[0.16em] text-ink-faint">MINI GAME</p>
-          <h2 className="mt-0.5 text-base font-black text-ink">フレブルキャッチ</h2>
+          <h2 className="mt-0.5 text-base font-black text-ink">アイテムキャッチ</h2>
         </div>
         <span className="rounded-full bg-leaf-soft px-2.5 py-1 text-[10px] font-bold text-leaf-deep">30秒チャレンジ</span>
       </div>
@@ -428,11 +428,27 @@ export function FrenchieCatchGame({ ownedItems }: { ownedItems: FrenchieCatchIte
           <div className="absolute inset-0 z-50 flex items-center justify-center bg-[#f9f3e7]/70 px-6 backdrop-blur-[2px]">
             <div className="w-full max-w-xs rounded-[28px] border border-white/90 bg-card/95 p-5 text-center shadow-xl">
               {phase === "finished" ? (
-                <><p className="text-[10px] font-black tracking-[0.18em] text-ink-faint">RESULT</p><p className="mt-1 text-4xl font-black tabular-nums text-ink">{score.toLocaleString("ja-JP")}</p><div className="mt-3 grid grid-cols-2 gap-2 text-xs"><div className="rounded-xl bg-paper-deep px-2 py-2"><p className="text-[9px] text-ink-faint">キャッチ</p><p className="font-black text-ink">{caught}個</p></div><div className="rounded-xl bg-paper-deep px-2 py-2"><p className="text-[9px] text-ink-faint">MAX COMBO</p><p className="font-black text-ink">{maxCombo}</p></div></div></>
+                <>
+                  <p className="text-[10px] font-black tracking-[0.18em] text-ink-faint">RESULT</p>
+                  <p className="mt-1 text-4xl font-black tabular-nums text-ink">{score.toLocaleString("ja-JP")}</p>
+                  <div className="mt-3 grid grid-cols-2 gap-2 text-xs">
+                    <div className="rounded-xl bg-paper-deep px-2 py-2"><p className="text-[9px] text-ink-faint">キャッチ</p><p className="font-black text-ink">{caught}個</p></div>
+                    <div className="rounded-xl bg-paper-deep px-2 py-2"><p className="text-[9px] text-ink-faint">MAX COMBO</p><p className="font-black text-ink">{maxCombo}</p></div>
+                  </div>
+                  <div className="mt-4 grid grid-cols-2 gap-2">
+                    <button type="button" onClick={startGame} className="rounded-full bg-leaf px-3 py-3 text-xs font-black text-white shadow-md active:translate-y-px">もう一度あそぶ</button>
+                    <button type="button" onClick={() => window.location.assign("/games")} className="rounded-full border border-line bg-card px-3 py-3 text-xs font-black text-ink-soft shadow-sm active:translate-y-px">終了する</button>
+                  </div>
+                </>
               ) : (
-                <><p className="text-[10px] font-black tracking-[0.18em] text-leaf-deep">FRENCHIE CATCH</p><p className="mt-1 text-xl font-black text-ink">箱でキャッチしよう！</p><p className="mt-2 text-[11px] leading-relaxed text-ink-soft">所持している図鑑アイテムと初期フレブルが降ってきます。箱の開いているところに入れば得点！</p><div className="mt-3 rounded-xl bg-[#fff5df] px-3 py-2 text-[10px] leading-relaxed text-[#8d6231]">左右サイドは壁なので横からは入れません。上から開口部へ入った物だけキャッチできます。</div></>
+                <>
+                  <p className="text-[10px] font-black tracking-[0.18em] text-leaf-deep">ITEM CATCH</p>
+                  <p className="mt-1 text-xl font-black text-ink">箱でキャッチしよう！</p>
+                  <p className="mt-2 text-[11px] leading-relaxed text-ink-soft">所持している図鑑アイテムと初期フレブルが降ってきます。箱の開いているところに入れば得点！</p>
+                  <div className="mt-3 rounded-xl bg-[#fff5df] px-3 py-2 text-[10px] leading-relaxed text-[#8d6231]">左右サイドは壁なので横からは入れません。上から開口部へ入った物だけキャッチできます。</div>
+                  <button type="button" onClick={startGame} className="mt-4 w-full rounded-full bg-leaf px-4 py-3 text-sm font-black text-white shadow-md active:translate-y-px">START</button>
+                </>
               )}
-              <button type="button" onClick={startGame} className="mt-4 w-full rounded-full bg-leaf px-4 py-3 text-sm font-black text-white shadow-md active:translate-y-px">{phase === "finished" ? "もう一度あそぶ" : "START"}</button>
               <p className="mt-2 text-[9px] text-ink-faint">所持アイテム {itemPool.length}種類 + 初期フレブル</p>
             </div>
           </div>
