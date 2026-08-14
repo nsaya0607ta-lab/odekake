@@ -1,7 +1,10 @@
+"use client";
+
 /**
  * 図鑑の共通パーツ（進捗バー・アイテムのカード・グリッド）。
  * 通常の図鑑・シリーズ図鑑・シリーズ詳細で同じものを使う。
  */
+import { useEffect, useState } from "react";
 import type { GachaRarity } from "@/lib/gacha/config";
 import type { CollectionItem } from "@/lib/collection/items";
 import { ExactSilhouette, hasExactSilhouette } from "./exact-silhouette";
@@ -122,6 +125,52 @@ export function ItemCard({
   );
 }
 
+function ItemPreviewModal({ item, onClose }: { item: CollectionItem; onClose: () => void }) {
+  useEffect(() => {
+    const previousOverflow = document.body.style.overflow;
+    const previousOverscrollBehavior = document.body.style.overscrollBehavior;
+
+    document.body.style.overflow = "hidden";
+    document.body.style.overscrollBehavior = "none";
+
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") onClose();
+    };
+    window.addEventListener("keydown", handleKeyDown);
+
+    return () => {
+      document.body.style.overflow = previousOverflow;
+      document.body.style.overscrollBehavior = previousOverscrollBehavior;
+      window.removeEventListener("keydown", handleKeyDown);
+    };
+  }, [onClose]);
+
+  return (
+    <div
+      className="fixed inset-0 z-[1000] flex touch-none items-center justify-center bg-[#2d2923]/55 px-5 py-8 backdrop-blur-[2px]"
+      role="dialog"
+      aria-modal="true"
+      aria-label={`${item.name}の拡大表示`}
+    >
+      <div className="relative flex w-full max-w-[520px] flex-col items-center rounded-[24px] border border-line-strong bg-card px-5 pb-5 pt-12 shadow-[0_18px_60px_rgba(35,29,22,0.35)]">
+        <button
+          type="button"
+          onClick={onClose}
+          className="absolute right-3 top-3 flex h-9 w-9 items-center justify-center rounded-full border border-line-strong bg-paper text-2xl font-medium leading-none text-ink shadow-sm active:scale-95"
+          aria-label="拡大表示を閉じる"
+        >
+          ×
+        </button>
+
+        <div className="flex aspect-square w-full max-w-[460px] items-center justify-center overflow-hidden">
+          <ItemArt art={item.art} image={item.image} name={item.name} silhouette={false} className="max-h-full max-w-full" />
+        </div>
+        <p className="mt-2 text-center text-sm font-bold text-ink">{item.name}</p>
+      </div>
+    </div>
+  );
+}
+
 export function ItemGrid({
   items,
   owned,
@@ -135,6 +184,8 @@ export function ItemGrid({
   revealedOwned?: ReadonlySet<string>;
   showCountWhenHidden?: boolean;
 }) {
+  const [previewItem, setPreviewItem] = useState<CollectionItem | null>(null);
+
   if (items.length === 0) {
     return (
       <div className="rough-card px-6 py-8 text-center">
@@ -147,12 +198,12 @@ export function ItemGrid({
   }
 
   return (
-    <ul className="grid grid-cols-3 gap-2.5">
-      {items.map((item) => {
-        const isOwned = owned.has(item.id);
-        const isRevealed = isOwned && (revealedOwned ? revealedOwned.has(item.id) : true);
-        return (
-          <li key={item.id}>
+    <>
+      <ul className="grid grid-cols-3 gap-2.5">
+        {items.map((item) => {
+          const isOwned = owned.has(item.id);
+          const isRevealed = isOwned && (revealedOwned ? revealedOwned.has(item.id) : true);
+          const card = (
             <ItemCard
               item={item}
               owned={isOwned}
@@ -160,10 +211,29 @@ export function ItemGrid({
               count={counts?.get(item.id) ?? (isOwned ? 1 : 0)}
               showCountWhenHidden={showCountWhenHidden}
             />
-          </li>
-        );
-      })}
-    </ul>
+          );
+
+          return (
+            <li key={item.id}>
+              {isRevealed ? (
+                <button
+                  type="button"
+                  onClick={() => setPreviewItem(item)}
+                  className="block w-full rounded-[16px] text-left active:scale-[0.98]"
+                  aria-label={`${item.name}を拡大表示`}
+                >
+                  {card}
+                </button>
+              ) : (
+                card
+              )}
+            </li>
+          );
+        })}
+      </ul>
+
+      {previewItem ? <ItemPreviewModal item={previewItem} onClose={() => setPreviewItem(null)} /> : null}
+    </>
   );
 }
 
