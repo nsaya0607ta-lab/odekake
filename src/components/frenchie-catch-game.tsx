@@ -155,6 +155,10 @@ const ITEM_SPAWN_WEIGHTS: Partial<Record<string, number>> = {
   toy_carrot: 35,
   toy_treasure_puzzle: 30,
   other_omojii: 8,
+  food_paw_melon_bread: 45,
+  interior_anball: 35,
+  summer_frenchie: 45,
+  other_azuki: 35,
 };
 const RARITY_STYLE: Record<FrenchieCatchItem["rarity"], string> = {
   N: "drop-shadow-[0_4px_7px_rgba(80,120,80,0.22)]",
