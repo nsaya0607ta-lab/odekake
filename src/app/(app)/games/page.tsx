@@ -4,7 +4,7 @@ import { TopHeader } from "@/components/page-header";
 
 export const metadata = { title: "各種ゲーム | おでかけ記録" };
 
-const ITEM_CATCH_CARD_SRC = "/140352b4-d7ad-4b73-8b9d-4136fc5e27a4.png";
+const ITEM_CATCH_CARD_SRC = "/item-catch-card.webp";
 
 export default function GamesPage() {
   return (
