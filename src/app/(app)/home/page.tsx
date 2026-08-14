@@ -26,7 +26,7 @@ export const metadata = { title: "あなたの旅 | おでかけ記録" };
 export const dynamic = "force-dynamic";
 
 const PROFILE_TICKET_SRC = "/B42684BD-FCE9-4F37-A698-4EEE3884ECA8.png";
-const MINI_GAME_BUTTON_SRC = "/1186522f-a808-462e-afe1-612fe83b4625.png";
+const MINI_GAME_BUTTON_SRC = "/mini-game-button.webp";
 
 export default async function HomePage({
   searchParams,
