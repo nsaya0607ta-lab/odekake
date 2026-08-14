@@ -5,8 +5,8 @@ import { useCallback, useEffect, useId, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { formatCoins } from "@/lib/coins";
 import {
+  GACHA_DISPLAY_RARITY_RATES,
   GACHA_PLANS,
-  GACHA_RARITY_RATES,
   RARITY_STYLES,
   type GachaPlanId,
   type GachaRarity,
@@ -40,10 +40,11 @@ const RARITY_FRAME_PATHS: Record<GachaRarity, string> = {
   SR: "/collection/rarity-frames/sr.webp",
   SSR: "/collection/rarity-frames/ssr.webp",
   UR: "/collection/rarity-frames/ur.webp",
+  LR: "/collection/rarity-frames/lr.webp",
 };
 
 function validRarity(rarity: string): GachaRarity {
-  return (["N", "R", "SR", "SSR", "UR"] as const).includes(rarity as GachaRarity)
+  return (["N", "R", "SR", "SSR", "UR", "LR"] as const).includes(rarity as GachaRarity)
     ? (rarity as GachaRarity)
     : "N";
 }
@@ -161,7 +162,7 @@ export function GachaSection({ balance }: { balance: number }) {
     void draw(lastPlan);
   }, [draw, lastPlan]);
 
-  const rates = GACHA_RARITY_RATES;
+  const rates = GACHA_DISPLAY_RARITY_RATES;
 
   return (
     <section className="rough-card flex min-w-0 flex-col overflow-hidden p-3.5">
@@ -434,7 +435,13 @@ function Capsule({ result, open = false, large = false }: { result: DrawResult; 
       <svg viewBox="0 0 100 100" className="relative z-[2] h-full w-full overflow-visible drop-shadow-[0_7px_5px_rgba(81,70,49,0.18)]" aria-hidden="true">
         <defs>
           <linearGradient id={gradientId} x1="12" y1="52" x2="88" y2="94" gradientUnits="userSpaceOnUse">
-            {rarity === "UR" ? (
+            {rarity === "LR" ? (
+              <>
+                <stop stopColor="#5c4a1f" />
+                <stop offset="0.48" stopColor="#1a1a1a" />
+                <stop offset="1" stopColor="#000000" />
+              </>
+            ) : rarity === "UR" ? (
               <>
                 <stop stopColor="#ff9a9a" />
                 <stop offset="0.48" stopColor="#d73535" />
@@ -467,7 +474,9 @@ function Capsule({ result, open = false, large = false }: { result: DrawResult; 
           <path d="M24 70c5 12 14 17 25 19" fill="none" stroke="white" strokeWidth="5" strokeLinecap="round" opacity=".26" />
         </g>
         <rect x="8" y="47" width="84" height="7" rx="3.5" fill="#fffdf5" fillOpacity=".9" stroke="#8e826c" strokeWidth="1.5" />
-        {(rarity === "SSR" || rarity === "UR") && <path d="m77 16 2.4 6.2 6.6 2.4-6.6 2.4-2.4 6.2-2.4-6.2-6.6-2.4 6.6-2.4Z" fill="#fff8ce" />}
+        {(rarity === "SSR" || rarity === "UR" || rarity === "LR") && (
+          <path d="m77 16 2.4 6.2 6.6 2.4-6.6 2.4-2.4 6.2-2.4-6.2-6.6-2.4 6.6-2.4Z" fill="#fff8ce" />
+        )}
       </svg>
     </span>
   );
@@ -577,9 +586,9 @@ function RarityResultCard({ result, large = false }: { result: DrawResult; large
         </span>
 
         <p
-          className={`mt-[1%] flex min-h-[17%] w-full items-center justify-center line-clamp-2 font-bold leading-tight text-[#514a42] ${
-            large ? "text-base" : "text-[10px]"
-          }`}
+          className={`mt-[1%] flex min-h-[17%] w-full items-center justify-center line-clamp-2 font-bold leading-tight ${
+            rarity === "UR" || rarity === "LR" ? "text-white" : "text-[#514a42]"
+          } ${large ? "text-base" : "text-[10px]"}`}
         >
           {result.name}
         </p>

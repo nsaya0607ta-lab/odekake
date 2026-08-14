@@ -62,6 +62,7 @@ export const GACHA_PRIZES: readonly GachaPrize[] = [
   { id: "interior_kinoko_azubee", name: "きのこあずびー", rarity: "UR", type: "item", pool: "regular", image: "/collection/items/3365FE0A-4198-4C04-BA73-A7BAC18F73F5.png" },
   { id: "interior_sleepy_moon", name: "おやすみムーン", rarity: "SR", type: "item", pool: "regular", image: "/collection/items/sleepy-moon.webp" },
   { id: "interior_spring_flower_wreath", name: "はるいろフラワーリース", rarity: "SR", type: "item", pool: "regular", image: "/collection/items/spring-flower-wreath.webp" },
+  { id: "interior_shikkoku_no_ar", name: "漆黒のアー", rarity: "LR", type: "item", pool: "regular", image: "/collection/items/shikkoku-no-ar.webp" },
 
   // --- 通常ガチャ：その他 --------------------------------------------
   { id: "other_azubee", name: "あずびー", rarity: "UR", type: "item", pool: "regular", image: "/collection/items/two-dogs-icon-transparent.webp" },
