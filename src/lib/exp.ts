@@ -1,8 +1,12 @@
+/** Lv.1〜30 は公開済みの成長カーブをそのまま維持する。 */
 export const LEVEL_THRESHOLDS = [
   0, 100, 220, 360, 520, 700, 900, 1120, 1360, 1620,
   1900, 2200, 2520, 2860, 3220, 3600, 4000, 4420, 4860, 5320,
   5800, 6300, 6820, 7360, 7920, 8500, 9100, 9720, 10360, 11020,
 ] as const;
+
+export const LAST_MOTION_REWARD_LEVEL = 30;
+export const LEVEL_30_TOTAL_EXP = LEVEL_THRESHOLDS[LAST_MOTION_REWARD_LEVEL - 1];
 
 export type RewardKind = "motion" | "expression" | "accessory" | "room" | "title";
 
@@ -15,7 +19,8 @@ export type LevelReward = {
 };
 
 /**
- * Lv.2〜30。すべて犬のモーション／表情の報酬にしてある。
+ * Lv.2〜30。ここまでは犬のモーション／表情も解放する。
+ * Lv.31以降はレベル上限なしで、レベルアップ報酬はコインのみ。
  *
  * `pose` は src/components/wandering-frenchie.tsx の MOTIONS の id と必ず同じにする。
  * Lv.1 からある基本動作（stand / walk / sit / sniff / happy / shake / sleep）とは
@@ -53,6 +58,56 @@ export const LEVEL_REWARDS: readonly LevelReward[] = [
   { level: 30, name: "うれしいダンス", kind: "motion", pose: "dance" },
 ] as const;
 
+/** そのレベルへ上がるために、直前のレベルから必要なEXP。 */
+export function getRequiredExpForLevel(level: number): number {
+  if (!Number.isFinite(level)) return 0;
+  const target = Math.floor(level);
+  if (target < 2) return 0;
+
+  if (target <= LAST_MOTION_REWARD_LEVEL) {
+    return LEVEL_THRESHOLDS[target - 1]! - LEVEL_THRESHOLDS[target - 2]!;
+  }
+
+  // Lv.31 = 700。以降は1レベルごとに +50EXP。
+  return 700 + 50 * (target - 31);
+}
+
+/** そのレベルに到達するために必要な累計EXP。 */
+export function getTotalExpForLevel(level: number): number {
+  if (!Number.isFinite(level)) return 0;
+  const target = Math.max(1, Math.floor(level));
+  if (target <= 1) return 0;
+  if (target <= LAST_MOTION_REWARD_LEVEL) return LEVEL_THRESHOLDS[target - 1]!;
+
+  const levelsAfter30 = target - LAST_MOTION_REWARD_LEVEL;
+  // 700 + 750 + ... を等差数列で足す。
+  return LEVEL_30_TOTAL_EXP + 700 * levelsAfter30 + 25 * levelsAfter30 * (levelsAfter30 - 1);
+}
+
+/** 累計EXPからレベルを求める。Lv.30以降も上限を設けない。 */
+export function getLevelFromTotalExp(totalExp: number): number {
+  const safeTotal = Math.max(0, Math.floor(Number.isFinite(totalExp) ? totalExp : 0));
+
+  if (safeTotal < LEVEL_30_TOTAL_EXP) {
+    let level = 1;
+    for (let index = 0; index < LEVEL_THRESHOLDS.length; index += 1) {
+      if (safeTotal >= LEVEL_THRESHOLDS[index]!) level = index + 1;
+      else break;
+    }
+    return level;
+  }
+
+  const delta = safeTotal - LEVEL_30_TOTAL_EXP;
+  // Lv.30+n の追加必要EXP = 25n^2 + 675n。
+  const estimate = Math.floor((-675 + Math.sqrt(675 * 675 + 100 * delta)) / 50);
+  let level = LAST_MOTION_REWARD_LEVEL + Math.max(0, estimate);
+
+  // 浮動小数点の丸め誤差が境界で出ても必ず正しいレベルへ補正する。
+  while (getTotalExpForLevel(level + 1) <= safeTotal) level += 1;
+  while (level > 1 && getTotalExpForLevel(level) > safeTotal) level -= 1;
+  return level;
+}
+
 export type ExpProgress = {
   level: number;
   totalExp: number;
@@ -63,20 +118,14 @@ export type ExpProgress = {
 };
 
 export function getExpProgress(totalExp: number): ExpProgress {
-  const safeTotal = Math.max(0, Math.floor(totalExp));
-  let level = 1;
-
-  for (let index = 0; index < LEVEL_THRESHOLDS.length; index += 1) {
-    if (safeTotal >= LEVEL_THRESHOLDS[index]!) level = index + 1;
-    else break;
-  }
-
-  const currentLevelExp = LEVEL_THRESHOLDS[level - 1]!;
-  const atMaxLevel = level === LEVEL_THRESHOLDS.length;
-  const nextLevelExp = atMaxLevel ? LEVEL_THRESHOLDS.at(-1)! : LEVEL_THRESHOLDS[level]!;
-  const progressPercent = atMaxLevel
-    ? 100
-    : Math.min(100, ((safeTotal - currentLevelExp) / (nextLevelExp - currentLevelExp)) * 100);
+  const safeTotal = Math.max(0, Math.floor(Number.isFinite(totalExp) ? totalExp : 0));
+  const level = getLevelFromTotalExp(safeTotal);
+  const currentLevelExp = getTotalExpForLevel(level);
+  const nextLevelExp = getTotalExpForLevel(level + 1);
+  const progressPercent = Math.min(
+    100,
+    ((safeTotal - currentLevelExp) / Math.max(1, nextLevelExp - currentLevelExp)) * 100,
+  );
 
   return {
     level,
@@ -84,7 +133,6 @@ export function getExpProgress(totalExp: number): ExpProgress {
     currentLevelExp,
     nextLevelExp,
     progressPercent,
-    nextReward: atMaxLevel ? null : (LEVEL_REWARDS.find((reward) => reward.level === level + 1) ?? null),
+    nextReward: LEVEL_REWARDS.find((reward) => reward.level === level + 1) ?? null,
   };
 }
-

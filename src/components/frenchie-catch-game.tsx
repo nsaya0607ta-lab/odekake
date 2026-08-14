@@ -89,6 +89,7 @@ export function FrenchieCatchGame({ ownedItems }: { ownedItems: FrenchieCatchIte
   const comboRef = useRef(0);
   const maxComboRef = useRef(0);
   const caughtRef = useRef(0);
+  const roundIdRef = useRef<string | null>(null);
   const feedbackTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const impactTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -103,6 +104,9 @@ export function FrenchieCatchGame({ ownedItems }: { ownedItems: FrenchieCatchIte
   const [feedback, setFeedback] = useState<{ name: string; points: number } | null>(null);
   const [impactX, setImpactX] = useState<number | null>(null);
   const [boxBounce, setBoxBounce] = useState(false);
+  const [coinReward, setCoinReward] = useState<number | null>(null);
+  const [rewardPending, setRewardPending] = useState(false);
+  const [rewardError, setRewardError] = useState<string | null>(null);
 
   const itemPool = useMemo(() => ownedItems.filter((item) => item.image.length > 0), [ownedItems]);
 
@@ -236,8 +240,7 @@ export function FrenchieCatchGame({ ownedItems }: { ownedItems: FrenchieCatchIte
               && localCenterX <= entryOpening.right - entryInset;
           }
 
-          const widthFullyInsideOpening = localHitLeft >= opening.left
-            && localHitRight <= opening.right;
+          const widthFullyInsideOpening = localHitLeft >= opening.left && localHitRight <= opening.right;
           const canCatch = entity.enteredOpening
             && localY >= CATCH_START_LOCAL_Y
             && localY <= OPEN_BOTTOM_LOCAL_Y + 0.10
@@ -320,6 +323,43 @@ export function FrenchieCatchGame({ ownedItems }: { ownedItems: FrenchieCatchIte
     };
   }, [createEntity, phase, showCatch, showImpact]);
 
+  useEffect(() => {
+    if (phase !== "finished" || !roundIdRef.current) return;
+    const roundId = roundIdRef.current;
+    let cancelled = false;
+
+    const grantReward = async () => {
+      setRewardPending(true);
+      setRewardError(null);
+      try {
+        const response = await fetch("/api/coins/item-catch", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            roundId,
+            score: scoreRef.current,
+            caughtCount: caughtRef.current,
+            durationSeconds: ROUND_SECONDS,
+          }),
+        });
+        const payload = (await response.json().catch(() => null)) as { coins?: number; error?: string } | null;
+        if (!response.ok) throw new Error(payload?.error ?? "コインを受け取れませんでした。");
+        if (cancelled) return;
+        setCoinReward(payload?.coins ?? 0);
+      } catch (error) {
+        if (cancelled) return;
+        setRewardError(error instanceof Error ? error.message : "コインを受け取れませんでした。");
+      } finally {
+        if (!cancelled) setRewardPending(false);
+      }
+    };
+
+    void grantReward();
+    return () => {
+      cancelled = true;
+    };
+  }, [phase]);
+
   const startGame = useCallback(() => {
     entitiesRef.current = [];
     nextIdRef.current = 1;
@@ -330,6 +370,7 @@ export function FrenchieCatchGame({ ownedItems }: { ownedItems: FrenchieCatchIte
     boxXRef.current = 50;
     draggingRef.current = false;
     dragOffsetRef.current = 0;
+    roundIdRef.current = crypto.randomUUID();
     setEntities([]);
     setBoxX(50);
     setScore(0);
@@ -339,6 +380,9 @@ export function FrenchieCatchGame({ ownedItems }: { ownedItems: FrenchieCatchIte
     setTimeLeft(ROUND_SECONDS);
     setFeedback(null);
     setImpactX(null);
+    setCoinReward(null);
+    setRewardPending(false);
+    setRewardError(null);
     startAtRef.current = performance.now();
     nextSpawnRef.current = startAtRef.current;
     setPhase("playing");
@@ -390,7 +434,7 @@ export function FrenchieCatchGame({ ownedItems }: { ownedItems: FrenchieCatchIte
         <div className="absolute inset-0 bg-[linear-gradient(180deg,#caeef9_0%,#eff9f2_70%,#d9ebbd_100%)]" />
         <div className="absolute -left-8 top-[18%] h-20 w-36 rounded-full bg-white/50 blur-xl" />
         <div className="absolute -right-10 top-[34%] h-24 w-40 rounded-full bg-white/50 blur-xl" />
-        <div className="absolute inset-x-0 bottom-0 h-[18%] bg-[linear-gradient(180deg,rgba(208,232,171,0)_0%,#c9e29e_72%,#efdcb8_73%,#e9cfa5_100%)]" />
+        <div className="absolute inset-x-0 bottom-0 h-[18%] bg-[linear-gradient(180deg,rgba(208,232,171,0)_0%,#c9e29e_72%,#efdcb8_73%,#e9cfa5_73%,#e9cfa5_100%)]" />
 
         <div className="absolute left-3 right-3 top-3 z-30 flex items-start justify-between gap-2">
           <div className="rounded-2xl border border-white/80 bg-white/90 px-3 py-2 shadow-sm"><p className="text-[9px] font-bold tracking-widest text-ink-faint">SCORE</p><p className="text-xl font-black tabular-nums text-ink">{score.toLocaleString("ja-JP")}</p></div>
@@ -435,9 +479,18 @@ export function FrenchieCatchGame({ ownedItems }: { ownedItems: FrenchieCatchIte
                     <div className="rounded-xl bg-paper-deep px-2 py-2"><p className="text-[9px] text-ink-faint">キャッチ</p><p className="font-black text-ink">{caught}個</p></div>
                     <div className="rounded-xl bg-paper-deep px-2 py-2"><p className="text-[9px] text-ink-faint">MAX COMBO</p><p className="font-black text-ink">{maxCombo}</p></div>
                   </div>
+                  <div className="mt-3 rounded-xl bg-[#fff5df] px-3 py-2">
+                    {rewardPending ? (
+                      <p className="text-[11px] font-bold text-[#8d6231]">コインを受け取り中…</p>
+                    ) : rewardError ? (
+                      <p className="text-[10px] font-bold text-red-600">{rewardError}</p>
+                    ) : (
+                      <p className="flex items-center justify-center gap-1 text-sm font-black text-[#8d6231]">獲得コイン <span className="tabular-nums">+{coinReward ?? 0}</span></p>
+                    )}
+                  </div>
                   <div className="mt-4 grid grid-cols-2 gap-2">
-                    <button type="button" onClick={startGame} className="rounded-full bg-leaf px-3 py-3 text-xs font-black text-white shadow-md active:translate-y-px">もう一度あそぶ</button>
-                    <button type="button" onClick={() => window.location.assign("/games")} className="rounded-full border border-line bg-card px-3 py-3 text-xs font-black text-ink-soft shadow-sm active:translate-y-px">終了する</button>
+                    <button type="button" onClick={startGame} disabled={rewardPending} className="rounded-full bg-leaf px-3 py-3 text-xs font-black text-white shadow-md active:translate-y-px disabled:opacity-45">もう一度あそぶ</button>
+                    <button type="button" onClick={() => window.location.assign("/games")} disabled={rewardPending} className="rounded-full border border-line bg-card px-3 py-3 text-xs font-black text-ink-soft shadow-sm active:translate-y-px disabled:opacity-45">終了する</button>
                   </div>
                 </>
               ) : (
@@ -445,7 +498,7 @@ export function FrenchieCatchGame({ ownedItems }: { ownedItems: FrenchieCatchIte
                   <p className="text-[10px] font-black tracking-[0.18em] text-leaf-deep">ITEM CATCH</p>
                   <p className="mt-1 text-xl font-black text-ink">箱でキャッチしよう！</p>
                   <p className="mt-2 text-[11px] leading-relaxed text-ink-soft">所持している図鑑アイテムと初期フレブルが降ってきます。箱の開いているところに入れば得点！</p>
-                  <div className="mt-3 rounded-xl bg-[#fff5df] px-3 py-2 text-[10px] leading-relaxed text-[#8d6231]">左右サイドは壁なので横からは入れません。上から開口部へ入った物だけキャッチできます。</div>
+                  <div className="mt-3 rounded-xl bg-[#fff5df] px-3 py-2 text-[10px] leading-relaxed text-[#8d6231]">左右サイドは壁なので横からは入れません。上から開口部へ入った物だけキャッチできます。30秒遊びきると25スコアごとに1コインもらえます。</div>
                   <button type="button" onClick={startGame} className="mt-4 w-full rounded-full bg-leaf px-4 py-3 text-sm font-black text-white shadow-md active:translate-y-px">START</button>
                 </>
               )}
