@@ -62,7 +62,7 @@ const UR_BOOST_STEP = 10;
 const UR_BOOST_MAX = 30;
 const POOP_ITEM_ID = "hazard_poop";
 const POOP_IMAGE = "/collection/items/dog-poop.webp";
-const POOP_SPAWN_CHANCE = 0.07;
+const POOP_SPAWN_CHANCE = 0.04;
 const POOP_PENALTY = 10;
 const MYSTERY_ITEM_ID = "mystery_item";
 const MYSTERY_IMAGE = "/collection/items/mystery-question.webp";
@@ -436,7 +436,7 @@ export function FrenchieCatchGame({ ownedItems }: { ownedItems: FrenchieCatchIte
           continue;
         }
 
-        if (magnetActive && entity.status === "falling" && entity.y > 20) {
+        if (magnetActive && entity.status === "falling" && entity.y > 20 && entity.itemId !== POOP_ITEM_ID) {
           const dx = boxXRef.current - entity.x;
           if (Math.abs(dx) < magnetRange) entity.vx += Math.sign(dx) * magnetPull * dt;
         }
