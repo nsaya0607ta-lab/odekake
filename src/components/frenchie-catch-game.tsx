@@ -629,7 +629,7 @@ export function FrenchieCatchGame({ ownedItems }: { ownedItems: FrenchieCatchIte
               ? MYSTERY_SKILL_ITEM_IDS[Math.floor(Math.random() * MYSTERY_SKILL_ITEM_IDS.length)]!
               : entity.itemId;
             const skillLevel = isMystery
-              ? (itemLevelByIdRef.current.get(skillId) ?? 1)
+              ? (itemLevelByIdRef.current.get(skillId ?? "") ?? 1)
               : (entity.level || 1);
             const lv = clamp(skillLevel, 1, MAX_SKILL_LEVEL) - 1;
 
