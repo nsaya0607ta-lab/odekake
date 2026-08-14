@@ -52,6 +52,7 @@ const BOX_LIP_Y = BOX_TOP + BOX_HEIGHT * OPEN_BOTTOM_LOCAL_Y;
 const BOX_MIN_X = BOX_HALF + 1;
 const BOX_MAX_X = 100 - BOX_HALF - 1;
 const POINTS: Record<FrenchieCatchItem["rarity"], number> = { N: 10, R: 20, SR: 40, SSR: 70, UR: 100 };
+const RARITY_FALL_SPEED: Record<FrenchieCatchItem["rarity"], number> = { N: 1, R: 1.08, SR: 1.18, SSR: 1.32, UR: 1.5 };
 const DEFAULT_ITEM_SPAWN_WEIGHT = 100;
 const DOG_SPAWN_RATIO = 0.28;
 const ITEM_SPAWN_WEIGHTS: Partial<Record<string, number>> = {
@@ -74,6 +75,22 @@ function clamp(value: number, min: number, max: number) {
 
 function overlap(leftA: number, rightA: number, leftB: number, rightB: number) {
   return Math.max(0, Math.min(rightA, rightB) - Math.max(leftA, leftB));
+}
+
+function comboScoreMultiplier(combo: number) {
+  if (combo >= 30) return 2;
+  if (combo >= 20) return 1.5;
+  if (combo >= 10) return 1.25;
+  if (combo >= 5) return 1.1;
+  return 1;
+}
+
+function comboMilestoneLabel(combo: number) {
+  if (combo === 30) return "MAX COMBO! ×2";
+  if (combo === 20) return "SUPER COMBO! ×1.5";
+  if (combo === 10) return "GREAT! ×1.25";
+  if (combo === 5) return "GOOD! ×1.1";
+  return undefined;
 }
 
 function openingBoundsAt(localY: number) {
@@ -211,6 +228,7 @@ export function FrenchieCatchGame({ ownedItems }: { ownedItems: FrenchieCatchIte
       name: item.name,
       image: item.image,
       rarity: item.rarity,
+      vy: base.vy * RARITY_FALL_SPEED[item.rarity],
       size: 12.5 + Math.random() * 3.5,
       spin: (Math.random() - 0.5) * 65,
     };
@@ -470,8 +488,14 @@ export function FrenchieCatchGame({ ownedItems }: { ownedItems: FrenchieCatchIte
                 break;
             }
 
+            const nextCombo = comboRef.current + 1;
+            const comboMultiplier = comboScoreMultiplier(nextCombo);
+            if (comboMultiplier > 1) points = Math.round(points * comboMultiplier);
+            const milestoneLabel = comboMilestoneLabel(nextCombo);
+            if (milestoneLabel) effectLabel = effectLabel ? `${effectLabel} / ${milestoneLabel}` : milestoneLabel;
+
             scoreRef.current += points;
-            comboRef.current += 1;
+            comboRef.current = nextCombo;
             caughtRef.current += 1;
             maxComboRef.current = Math.max(maxComboRef.current, comboRef.current);
             setScore(scoreRef.current);
@@ -660,7 +684,7 @@ export function FrenchieCatchGame({ ownedItems }: { ownedItems: FrenchieCatchIte
 
         <div className="absolute left-3 right-3 top-3 z-30 flex items-start justify-between gap-2">
           <div className="rounded-2xl border border-white/80 bg-white/90 px-3 py-2 shadow-sm"><p className="text-[9px] font-bold tracking-widest text-ink-faint">SCORE</p><p className="text-xl font-black tabular-nums text-ink">{score.toLocaleString("ja-JP")}</p></div>
-          {combo >= 2 ? <div className="rounded-full border border-[#f1c969] bg-[#fff6cc]/95 px-3 py-1.5 text-center shadow-sm"><p className="text-lg font-black leading-none text-[#b77322]">{combo}</p><p className="text-[8px] font-black text-[#b77322]">COMBO!</p></div> : <span />}
+          {combo >= 2 ? <div className="rounded-full border border-[#f1c969] bg-[#fff6cc]/95 px-3 py-1.5 text-center shadow-sm"><p className="text-lg font-black leading-none text-[#b77322]">{combo}</p><p className="text-[8px] font-black text-[#b77322]">COMBO!{combo >= 5 ? ` ×${comboScoreMultiplier(combo)}` : ""}</p></div> : <span />}
           <div className="rounded-2xl border border-white/80 bg-white/90 px-3 py-2 text-right shadow-sm"><p className="text-[9px] font-bold tracking-widest text-ink-faint">TIME</p><p className="text-xl font-black tabular-nums text-ink">{timeLeft}</p></div>
         </div>
 
@@ -735,7 +759,7 @@ export function FrenchieCatchGame({ ownedItems }: { ownedItems: FrenchieCatchIte
                   <p className="text-[10px] font-black tracking-[0.18em] text-leaf-deep">ITEM CATCH</p>
                   <p className="mt-1 text-xl font-black text-ink">箱でキャッチしよう！</p>
                   <p className="mt-2 text-[11px] leading-relaxed text-ink-soft">所持している図鑑アイテムと初期フレブルが降ってきます。一部アイテムには得点・時間・コンボの特殊効果があります。</p>
-                  <div className="mt-3 rounded-xl bg-[#fff5df] px-3 py-2 text-[10px] leading-relaxed text-[#8d6231]">上から開口部へ入った物だけキャッチできます。時間追加アイテムは少し出現しにくく、取れた分だけ制限時間が延長されます。遊びきると25スコアごとに1コインもらえます。</div>
+                  <div className="mt-3 rounded-xl bg-[#fff5df] px-3 py-2 text-[10px] leading-relaxed text-[#8d6231]">レアなアイテムほど速く落ちます。5コンボから得点倍率が上がり、最大30コンボで×2になります。遊びきると25スコアごとに1コインもらえます。</div>
                   <button type="button" onClick={startGame} className="mt-4 w-full rounded-full bg-leaf px-4 py-3 text-sm font-black text-white shadow-md active:translate-y-px">START</button>
                 </>
               )}
