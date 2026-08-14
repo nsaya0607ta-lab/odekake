@@ -26,7 +26,7 @@ export const metadata = { title: "あなたの旅 | おでかけ記録" };
 export const dynamic = "force-dynamic";
 
 const PROFILE_TICKET_SRC = "/B42684BD-FCE9-4F37-A698-4EEE3884ECA8.png";
-const MINI_GAME_BUTTON_SRC = "/mini-game-button.webp";
+const MINI_GAME_BUTTON_SRC = "/1186522f-a808-462e-afe1-612fe83b4625.png";
 
 export default async function HomePage({
   searchParams,
@@ -120,7 +120,7 @@ export default async function HomePage({
               <Link
                 href="/games"
                 aria-label="ミニゲーム一覧を開く"
-                className="pressable absolute right-3 top-3 z-40 block w-[118px] active:scale-[0.97]"
+                className="pressable absolute right-2 top-2 z-40 block w-[132px] active:scale-[0.97]"
               >
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img
