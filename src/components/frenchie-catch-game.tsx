@@ -535,7 +535,6 @@ export function FrenchieCatchGame({ ownedItems }: { ownedItems: FrenchieCatchIte
               entity.vy = -verticalSpeed;
               entity.x += direction * Math.max(0.7, hitboxWidth * 0.08);
               entity.spin = clamp(entity.spin + direction * (110 + Math.abs(impactOffset) * 210), -420, 420);
-              breakCombo(entity);
               showImpact(clamp(contactX, 4, 96));
             }
           }
