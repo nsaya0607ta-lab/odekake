@@ -51,6 +51,11 @@ export const GACHA_PRIZES: readonly GachaPrize[] = [
   { id: "food_paw_melon_bread", name: "肉球メロンパン", rarity: "R", type: "item", pool: "regular", image: "/collection/items/paw-melon-bread.webp" },
   { id: "food_smile_onigiri", name: "にこにこおにぎり", rarity: "N", type: "item", pool: "regular", image: "/collection/items/smile-onigiri.webp" },
   { id: "food_paw_cupcake", name: "肉球カップケーキ", rarity: "SR", type: "item", pool: "regular", image: "/collection/items/paw-cupcake.webp" },
+  { id: "food_paw_taiyaki", name: "にくきゅうたい焼き", rarity: "N", type: "item", pool: "regular", image: "/collection/items/paw-taiyaki.webp" },
+  { id: "food_dog_milk", name: "わんこミルク", rarity: "N", type: "item", pool: "regular", image: "/collection/items/dog-milk.webp" },
+  { id: "food_cheese_cubes", name: "ころころチーズ", rarity: "N", type: "item", pool: "regular", image: "/collection/items/cheese-cubes.webp" },
+  { id: "food_roasted_sweet_potato", name: "ほくほく焼きいも", rarity: "N", type: "item", pool: "regular", image: "/collection/items/roasted-sweet-potato.webp" },
+  { id: "food_honey_butter_toast", name: "はちみつバタートースト", rarity: "N", type: "item", pool: "regular", image: "/collection/items/honey-butter-toast.webp" },
 
   // --- 通常ガチャ：インテリア ----------------------------------------
   { id: "interior_anball", name: "アンボール", rarity: "UR", type: "item", pool: "regular", image: "/collection/items/anball.webp" },
