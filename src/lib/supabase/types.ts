@@ -155,7 +155,7 @@ export type CoinEventRow = {
   id: string;
   user_id: string;
   /** unlock は将来のショップ用（現在は付与しない） */
-  event_type: "level_up" | "steps" | "unlock" | "gacha" | "login";
+  event_type: "level_up" | "steps" | "unlock" | "gacha" | "login" | "item_catch";
   /** 正の値が獲得、負の値が消費 */
   amount: number;
   idempotency_key: string;
