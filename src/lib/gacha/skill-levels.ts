@@ -14,6 +14,7 @@ export const SKILL_LEVEL_THRESHOLDS: Record<GachaRarity, readonly number[]> = {
   SR: [1, 6, 14, 25, 40],
   SSR: [1, 4, 9, 16, 26],
   UR: [1, 3, 5, 9, 15],
+  LR: [1, 2, 3, 5, 8],
 };
 
 export function isLevelableRarity(rarity: GachaRarity): boolean {
