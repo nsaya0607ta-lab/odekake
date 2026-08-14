@@ -6,7 +6,7 @@ export const LEVEL_THRESHOLDS = [
 ] as const;
 
 export const LAST_MOTION_REWARD_LEVEL = 30;
-export const LEVEL_30_TOTAL_EXP = LEVEL_THRESHOLDS[LAST_MOTION_REWARD_LEVEL - 1];
+export const LEVEL_30_TOTAL_EXP = LEVEL_THRESHOLDS[LAST_MOTION_REWARD_LEVEL - 1]!;
 
 export type RewardKind = "motion" | "expression" | "accessory" | "room" | "title";
 
