@@ -4,6 +4,8 @@ import { TopHeader } from "@/components/page-header";
 
 export const metadata = { title: "各種ゲーム | おでかけ記録" };
 
+const ITEM_CATCH_CARD_SRC = "https://raw.githubusercontent.com/nsaya0607ta-lab/odekake/main/public/item-catch-card.webp";
+
 export default function GamesPage() {
   return (
     <>
@@ -29,7 +31,7 @@ export default function GamesPage() {
               <span className="relative flex h-16 w-16 shrink-0 items-center justify-center overflow-hidden rounded-2xl bg-[#fffaf0]">
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img
-                  src="/item-catch-card.webp"
+                  src={ITEM_CATCH_CARD_SRC}
                   alt=""
                   aria-hidden="true"
                   className="h-full w-full object-contain"
