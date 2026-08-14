@@ -501,8 +501,25 @@ export function FrenchieCatchGame({ ownedItems }: { ownedItems: FrenchieCatchIte
                 effectLabel = `+${applied}秒`;
                 break;
               }
-              default:
+              default: {
+                if (entity.rarity === "R") {
+                  nextBonus5Ref.current += 1;
+                  effectLabel = "+5ptボーナス";
+                  statusChanged = true;
+                } else if (entity.rarity === "SR") {
+                  const applied = addBonusTime(2);
+                  effectLabel = `+${applied}秒`;
+                } else if (entity.rarity === "SSR") {
+                  multiplier15UntilRef.current = now + 4000;
+                  effectLabel = "4秒間 ×1.5";
+                  statusChanged = true;
+                } else if (entity.rarity === "UR") {
+                  nextMultiplierRef.current = 2;
+                  effectLabel = "次の1個 ×2";
+                  statusChanged = true;
+                }
                 break;
+              }
             }
 
             const nextCombo = comboRef.current + 1;
