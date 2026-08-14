@@ -51,6 +51,7 @@ const BOX_OPEN_TOP_Y = BOX_TOP + BOX_HEIGHT * OPEN_TOP_LOCAL_Y;
 const BOX_LIP_Y = BOX_TOP + BOX_HEIGHT * OPEN_BOTTOM_LOCAL_Y;
 const BOX_MIN_X = BOX_HALF + 1;
 const BOX_MAX_X = 100 - BOX_HALF - 1;
+const BOX_WIDE_SCALE = 1.25;
 const POINTS: Record<FrenchieCatchItem["rarity"], number> = { N: 10, R: 20, SR: 40, SSR: 70, UR: 100 };
 const RARITY_FALL_SPEED: Record<FrenchieCatchItem["rarity"], number> = { N: 1, R: 1.08, SR: 1.18, SSR: 1.32, UR: 1.5 };
 const DEFAULT_ITEM_SPAWN_WEIGHT = 100;
@@ -137,6 +138,7 @@ export function FrenchieCatchGame({ ownedItems }: { ownedItems: FrenchieCatchIte
   const spawnSlowUntilRef = useRef(0);
   const comboKeepRef = useRef(0);
   const rainbowUntilRef = useRef(0);
+  const boxWideUntilRef = useRef(0);
   const feedbackTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const impactTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -170,6 +172,7 @@ export function FrenchieCatchGame({ ownedItems }: { ownedItems: FrenchieCatchIte
     if (now < wideCatchUntilRef.current) labels.push("キャッチ判定拡大中");
     if (now < spawnSlowUntilRef.current) labels.push("小休憩中");
     if (now < rainbowUntilRef.current) labels.push("虹色エフェクト中");
+    if (now < boxWideUntilRef.current) labels.push("ダンボール拡大中");
     if (nextBigRef.current) labels.push("次の1個 拡大表示");
     setActiveEffects(labels);
   }, []);
@@ -321,6 +324,10 @@ export function FrenchieCatchGame({ ownedItems }: { ownedItems: FrenchieCatchIte
         rainbowUntilRef.current = 0;
         timedEffectChanged = true;
       }
+      if (boxWideUntilRef.current > 0 && now >= boxWideUntilRef.current) {
+        boxWideUntilRef.current = 0;
+        timedEffectChanged = true;
+      }
       if (timedEffectChanged) refreshEffectStatus(now);
 
       const breakCombo = (entity: Entity) => {
@@ -347,6 +354,10 @@ export function FrenchieCatchGame({ ownedItems }: { ownedItems: FrenchieCatchIte
         const spawnSlowExtra = now < spawnSlowUntilRef.current ? 600 : 0;
         nextSpawnRef.current = now + 790 - Math.min(1, elapsed / ROUND_SECONDS) * 250 + Math.random() * 170 + spawnSlowExtra;
       }
+
+      const boxWide = now < boxWideUntilRef.current;
+      const effBoxHalf = boxWide ? BOX_HALF * BOX_WIDE_SCALE : BOX_HALF;
+      const effBoxWidth = boxWide ? BOX_WIDTH * BOX_WIDE_SCALE : BOX_WIDTH;
 
       const next: Entity[] = [];
       for (const entity of entitiesRef.current) {
@@ -382,10 +393,10 @@ export function FrenchieCatchGame({ ownedItems }: { ownedItems: FrenchieCatchIte
           const center = boxXRef.current;
           const localY = (bottom - BOX_TOP) / BOX_HEIGHT;
           const previousLocalY = (previousBottom - BOX_TOP) / BOX_HEIGHT;
-          const localHitLeft = (hitLeft - (center - BOX_HALF)) / BOX_WIDTH;
-          const localHitRight = (hitRight - (center - BOX_HALF)) / BOX_WIDTH;
+          const localHitLeft = (hitLeft - (center - effBoxHalf)) / effBoxWidth;
+          const localHitRight = (hitRight - (center - effBoxHalf)) / effBoxWidth;
           const localHitWidth = Math.max(0.001, localHitRight - localHitLeft);
-          const localCenterX = (entity.x - (center - BOX_HALF)) / BOX_WIDTH;
+          const localCenterX = (entity.x - (center - effBoxHalf)) / effBoxWidth;
           const opening = openingBoundsAt(localY);
           const catchMargin = now < wideCatchUntilRef.current ? 0.05 : 0;
           const catchOpening = { left: opening.left - catchMargin, right: opening.right + catchMargin };
@@ -565,6 +576,11 @@ export function FrenchieCatchGame({ ownedItems }: { ownedItems: FrenchieCatchIte
               case "other_sparkle_rope_crown":
                 effectLabel = "きらきらボーナス";
                 break;
+              case "toy_wood_stick":
+                boxWideUntilRef.current = now + 3000;
+                effectLabel = "3秒間 ダンボール拡大";
+                statusChanged = true;
+                break;
               case "other_nakayoshi_azubee":
               case "other_kamunayo":
                 comboKeepRef.current += 1;
@@ -608,7 +624,7 @@ export function FrenchieCatchGame({ ownedItems }: { ownedItems: FrenchieCatchIte
               entity.rimChecked = true;
               const side = leftWallHit && !rightWallHit ? "left" : rightWallHit && !leftWallHit ? "right" : entity.x <= center ? "left" : "right";
               const contactLocalX = side === "left" ? opening.left : opening.right;
-              const contactX = center - BOX_HALF + contactLocalX * BOX_WIDTH;
+              const contactX = center - effBoxHalf + contactLocalX * effBoxWidth;
               const impactOffset = clamp((contactX - entity.x) / Math.max(hitboxWidth / 2, 0.001), -1, 1);
               const incomingVx = entity.vx;
               const incomingVy = entity.vy;
@@ -811,8 +827,11 @@ export function FrenchieCatchGame({ ownedItems }: { ownedItems: FrenchieCatchIte
           ref={catcherRef}
           role="button"
           aria-label="拾ってくだブーの段ボールを左右に動かす"
-          className={`absolute bottom-[0.5%] z-30 aspect-square w-[37.8%] touch-none -translate-x-1/2 select-none rounded-3xl transition-transform duration-100 ${boxBounce ? "scale-[1.015]" : "scale-100"} ${Date.now() < rainbowUntilRef.current ? "animate-pulse shadow-[0_0_25px_8px_rgba(230,120,220,0.55)] ring-4 ring-pink-300/70" : ""}`}
-          style={{ left: `${boxX}%` }}
+          className={`absolute bottom-[0.5%] z-30 aspect-square w-[37.8%] touch-none select-none rounded-3xl transition-transform duration-100 ${Date.now() < rainbowUntilRef.current ? "animate-pulse shadow-[0_0_25px_8px_rgba(230,120,220,0.55)] ring-4 ring-pink-300/70" : ""}`}
+          style={{
+            left: `${boxX}%`,
+            transform: `translateX(-50%) scaleX(${Date.now() < boxWideUntilRef.current ? BOX_WIDE_SCALE : 1}) scaleY(${boxBounce ? 1.015 : 1})`,
+          }}
           onPointerDown={pointerDown}
           onPointerMove={pointerMove}
           onPointerUp={pointerEnd}
