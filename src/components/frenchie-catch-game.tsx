@@ -64,7 +64,6 @@ const MAGNET_MEDIUM_PULL = 30;
 const MAGNET_STRONG_RANGE = 28;
 const MAGNET_STRONG_PULL = 48;
 const FALL_SPEED_BOOST = 1.7;
-const UR_BOOST_STEP = 10;
 const UR_BOOST_MAX = 30;
 const POOP_ITEM_ID = "hazard_poop";
 const POOP_IMAGE = "/collection/items/dog-poop.webp";
