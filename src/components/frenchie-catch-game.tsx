@@ -827,17 +827,19 @@ export function FrenchieCatchGame({ ownedItems }: { ownedItems: FrenchieCatchIte
           ref={catcherRef}
           role="button"
           aria-label="拾ってくだブーの段ボールを左右に動かす"
-          className={`absolute bottom-[0.5%] z-30 aspect-square w-[37.8%] touch-none select-none rounded-3xl transition-transform duration-100 ${Date.now() < rainbowUntilRef.current ? "animate-pulse shadow-[0_0_25px_8px_rgba(230,120,220,0.55)] ring-4 ring-pink-300/70" : ""}`}
+          className={`absolute bottom-[0.5%] z-30 touch-none select-none rounded-3xl transition-[width,transform] duration-200 ${Date.now() < rainbowUntilRef.current ? "animate-pulse shadow-[0_0_25px_8px_rgba(230,120,220,0.55)] ring-4 ring-pink-300/70" : ""}`}
           style={{
             left: `${boxX}%`,
-            transform: `translateX(-50%) scaleX(${Date.now() < boxWideUntilRef.current ? BOX_WIDE_SCALE : 1}) scaleY(${boxBounce ? 1.015 : 1})`,
+            width: `${BOX_WIDTH * (Date.now() < boxWideUntilRef.current ? BOX_WIDE_SCALE : 1)}%`,
+            height: `${BOX_HEIGHT}%`,
+            transform: `translateX(-50%) scaleY(${boxBounce ? 1.015 : 1})`,
           }}
           onPointerDown={pointerDown}
           onPointerMove={pointerMove}
           onPointerUp={pointerEnd}
           onPointerCancel={pointerEnd}
         >
-          <Image src={BOX_IMAGE} alt="拾ってくだブーと書かれた段ボール" fill priority draggable={false} sizes="38vw" className="pointer-events-none object-contain" />
+          <Image src={BOX_IMAGE} alt="拾ってくだブーと書かれた段ボール" fill priority draggable={false} sizes="38vw" className={`pointer-events-none ${Date.now() < boxWideUntilRef.current ? "object-fill" : "object-contain"}`} />
         </div>
 
         {phase === "playing" ? <div className="pointer-events-none absolute bottom-[0.5%] left-1/2 z-40 -translate-x-1/2 rounded-full bg-white/70 px-2 py-0.5 text-[9px] font-bold text-ink-faint">箱を押さえて左右にドラッグ</div> : null}
