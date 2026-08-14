@@ -149,8 +149,6 @@ export function FrenchieCatchGame({ ownedItems }: { ownedItems: FrenchieCatchIte
   const comboShieldRef = useRef(0);
   const multiplier15UntilRef = useRef(0);
   const multiplier2UntilRef = useRef(0);
-  const spawnSlowUntilRef = useRef(0);
-  const comboKeepRef = useRef(0);
   const boxWideUntilRef = useRef(0);
   const boxWideScaleRef = useRef(BOX_WIDE_SCALE_DEFAULT);
   const comboInvincibleUntilRef = useRef(0);
@@ -188,10 +186,8 @@ export function FrenchieCatchGame({ ownedItems }: { ownedItems: FrenchieCatchIte
     if (nextBonus10Ref.current > 0) labels.push(`あと${nextBonus10Ref.current}個 +10pt`);
     if (nextBonus5Ref.current > 0) labels.push(`あと${nextBonus5Ref.current}個 +5pt`);
     if (comboShieldRef.current > 0) labels.push(`コンボ保護 ×${comboShieldRef.current}`);
-    if (comboKeepRef.current > 0) labels.push(`コンボ据え置き ×${comboKeepRef.current}`);
     if (now < comboInvincibleUntilRef.current) labels.push("無敵コンボ中");
     if (now < comboMultiplierBoostUntilRef.current) labels.push("コンボ倍率アップ中");
-    if (now < spawnSlowUntilRef.current) labels.push("小休憩中");
     if (now < magnetUntilRef.current) labels.push(magnetStrengthRef.current === "strong" ? "マグネット発動中" : "ミニマグネット発動中");
     if (now < fallSpeedBoostUntilRef.current) labels.push("落下速度アップ中");
     if (now < boxWideUntilRef.current) labels.push(`ダンボール×${boxWideScaleRef.current}拡大中`);
@@ -333,10 +329,6 @@ export function FrenchieCatchGame({ ownedItems }: { ownedItems: FrenchieCatchIte
         multiplier15UntilRef.current = 0;
         timedEffectChanged = true;
       }
-      if (spawnSlowUntilRef.current > 0 && now >= spawnSlowUntilRef.current) {
-        spawnSlowUntilRef.current = 0;
-        timedEffectChanged = true;
-      }
       if (boxWideUntilRef.current > 0 && now >= boxWideUntilRef.current) {
         boxWideUntilRef.current = 0;
         timedEffectChanged = true;
@@ -363,11 +355,6 @@ export function FrenchieCatchGame({ ownedItems }: { ownedItems: FrenchieCatchIte
         if (entity.missHandled) return;
         entity.missHandled = true;
         if (now < comboInvincibleUntilRef.current) return;
-        if (comboKeepRef.current > 0) {
-          comboKeepRef.current -= 1;
-          refreshEffectStatus(now);
-          return;
-        }
         if (comboRef.current > 0 && comboShieldRef.current > 0) {
           comboShieldRef.current -= 1;
           refreshEffectStatus(now);
@@ -381,8 +368,7 @@ export function FrenchieCatchGame({ ownedItems }: { ownedItems: FrenchieCatchIte
       last = now;
       if (now >= nextSpawnRef.current && entitiesRef.current.length < 10) {
         entitiesRef.current.push(createEntity());
-        const spawnSlowExtra = now < spawnSlowUntilRef.current ? 600 : 0;
-        nextSpawnRef.current = now + 790 - Math.min(1, elapsed / ROUND_SECONDS) * 250 + Math.random() * 170 + spawnSlowExtra;
+        nextSpawnRef.current = now + 790 - Math.min(1, elapsed / ROUND_SECONDS) * 250 + Math.random() * 170;
       }
 
       const boxWide = now < boxWideUntilRef.current;
@@ -824,10 +810,8 @@ export function FrenchieCatchGame({ ownedItems }: { ownedItems: FrenchieCatchIte
     nextBonus5Ref.current = 0;
     nextBonus10Ref.current = 0;
     comboShieldRef.current = 0;
-    comboKeepRef.current = 0;
     multiplier15UntilRef.current = 0;
     multiplier2UntilRef.current = 0;
-    spawnSlowUntilRef.current = 0;
     boxWideUntilRef.current = 0;
     boxWideScaleRef.current = BOX_WIDE_SCALE_DEFAULT;
     comboInvincibleUntilRef.current = 0;
