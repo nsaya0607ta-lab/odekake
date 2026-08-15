@@ -57,6 +57,21 @@ const RARITY_FRAME_PATHS: Record<GachaRarity, string> = {
 };
 
 /**
+ * フレーム画像を敷くときの拡大率。N〜URの画像は元テンプレートに余白が
+ * 仕込まれている前提でscaleX/scaleYを別々にチューニングしてあるが、
+ * LRの画像はすでに余白なしでトリミング済みのため、同じ非対称倍率をかけると
+ * 中の絵柄だけ横に歪んで伸びて見える。LRだけ歪みのない均等倍率にする。
+ */
+const RARITY_FRAME_SCALE: Record<GachaRarity, string> = {
+  N: "scaleX(1.18) scaleY(1.06)",
+  R: "scaleX(1.18) scaleY(1.06)",
+  SR: "scaleX(1.18) scaleY(1.06)",
+  SSR: "scaleX(1.18) scaleY(1.06)",
+  UR: "scaleX(1.18) scaleY(1.06)",
+  LR: "scale(1.02)",
+};
+
+/**
  * 1マス。
  * owned は「その図鑑の持ち主が所持しているか」、revealed は「閲覧者に中身を見せてよいか」。
  * フレンド図鑑では、相手が所持していても自分が未所持ならシークレットのまま回数だけ表示できる。
@@ -97,7 +112,7 @@ export function ItemCard({
           alt=""
           aria-hidden="true"
           className="pointer-events-none absolute inset-0 h-full w-full max-w-none object-fill"
-          style={{ transform: "scaleX(1.18) scaleY(1.06)" }}
+          style={{ transform: RARITY_FRAME_SCALE[item.rarity] }}
         />
       ) : null}
 
@@ -178,7 +193,7 @@ function ItemPreviewModal({ item, onClose }: { item: CollectionItem; onClose: ()
           alt=""
           aria-hidden="true"
           className="pointer-events-none absolute inset-0 h-full w-full max-w-none object-fill"
-          style={{ transform: "scaleX(1.18) scaleY(1.06)" }}
+          style={{ transform: RARITY_FRAME_SCALE[item.rarity] }}
         />
 
         <button
