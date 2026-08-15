@@ -8,7 +8,7 @@ export type FrenchieCatchItem = {
   id: string;
   name: string;
   image: string;
-  rarity: "N" | "R" | "SR" | "SSR" | "UR";
+  rarity: "N" | "R" | "SR" | "SSR" | "UR" | "LR";
   /** スキルレベル(1〜5)。Nや未所持は0。user_gacha_items.countから判定済みの値を渡す。 */
   level: number;
 };
@@ -85,6 +85,7 @@ const MYSTERY_SKILL_ITEM_IDS = [
   "other_kamunayo", "hiking_frenchie", "snow_frenchie", "summer_frenchie", "interior_kinoko_azubee",
   "other_komochi", "other_azuki", "other_kobee", "other_hamigaki", "other_ikea", "other_orusuban",
   "other_pondeomo", "other_pondear", "other_kurumari_a",
+  "interior_shikkoku_no_ar", "interior_ragby_ar",
 ];
 
 /** アイテムごとのLv1〜5パラメータ（item_skill_levels_colored.xlsxの「スキル一覧」シート通り） */
@@ -152,10 +153,15 @@ const LV = {
   ORUSUBAN_SHIELD: [1, 1, 2, 2, 3],
   PONDEOMO_SEC: [4, 5, 6, 8, 10],
   PONDEAR_SEC: [4, 5, 6, 8, 10],
+  SHIKKOKU_SEC: [8, 10, 12, 15, 20],
+  SHIKKOKU_FALL: [2, 2.2, 2.4, 2.6, 3],
+  SHIKKOKU_MULT: [2, 2.2, 2.4, 2.7, 3],
+  RAGBY_SEC: [5, 6, 7, 9, 12],
 } as const;
 const SPAWN_RATE_BOOST = 2;
-const POINTS: Record<FrenchieCatchItem["rarity"], number> = { N: 10, R: 20, SR: 40, SSR: 70, UR: 100 };
-const RARITY_FALL_SPEED: Record<FrenchieCatchItem["rarity"], number> = { N: 1, R: 1.08, SR: 1.18, SSR: 1.32, UR: 1.5 };
+const RAGBY_SPAWN_RATE_BOOST = 3;
+const POINTS: Record<FrenchieCatchItem["rarity"], number> = { N: 10, R: 20, SR: 40, SSR: 70, UR: 100, LR: 150 };
+const RARITY_FALL_SPEED: Record<FrenchieCatchItem["rarity"], number> = { N: 1, R: 1.08, SR: 1.18, SSR: 1.32, UR: 1.5, LR: 1.75 };
 const DEFAULT_ITEM_SPAWN_WEIGHT = 100;
 const DOG_SPAWN_RATIO = 0.28;
 const FRENCHIE_SKIN_IDS = ["hiking_frenchie", "snow_frenchie", "summer_frenchie"];
@@ -176,6 +182,7 @@ const RARITY_STYLE: Record<FrenchieCatchItem["rarity"], string> = {
   SR: "drop-shadow-[0_0_10px_rgba(235,180,55,0.68)]",
   SSR: "drop-shadow-[0_0_13px_rgba(177,112,220,0.78)]",
   UR: "drop-shadow-[0_0_16px_rgba(201,66,55,0.92)]",
+  LR: "drop-shadow-[0_0_20px_rgba(230,180,60,0.95)]",
 };
 
 function clamp(value: number, min: number, max: number) {
@@ -264,6 +271,7 @@ export function FrenchieCatchGame({ ownedItems }: { ownedItems: FrenchieCatchIte
   const ikeaUntilRef = useRef(0);
   const ikeaCountRef = useRef(0);
   const spawnRateBoostUntilRef = useRef(0);
+  const spawnRateBoostValueRef = useRef(SPAWN_RATE_BOOST);
   const feedbackTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const impactTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -303,7 +311,7 @@ export function FrenchieCatchGame({ ownedItems }: { ownedItems: FrenchieCatchIte
     if (now < fallSpeedBoostUntilRef.current) labels.push("落下速度アップ中");
     if (now < poopSuppressUntilRef.current) labels.push("うんち出現なし");
     if (now < ikeaUntilRef.current) labels.push(`くみたて中 ${ikeaCountRef.current}個`);
-    if (now < spawnRateBoostUntilRef.current) labels.push(`アイテム出現量×${SPAWN_RATE_BOOST}中`);
+    if (now < spawnRateBoostUntilRef.current) labels.push(`アイテム出現量×${spawnRateBoostValueRef.current}中`);
     if (now < boxWideUntilRef.current) labels.push(`ダンボール×${boxWideScaleRef.current}拡大中`);
     if (urBoostRef.current > 0) labels.push(`UR出現率+${Math.min(urBoostRef.current, UR_BOOST_MAX)}`);
     setActiveEffects(labels);
@@ -540,7 +548,7 @@ export function FrenchieCatchGame({ ownedItems }: { ownedItems: FrenchieCatchIte
       last = now;
       if (now >= nextSpawnRef.current && entitiesRef.current.length < 10) {
         entitiesRef.current.push(createEntity());
-        const spawnRate = now < spawnRateBoostUntilRef.current ? SPAWN_RATE_BOOST : 1;
+        const spawnRate = now < spawnRateBoostUntilRef.current ? spawnRateBoostValueRef.current : 1;
         nextSpawnRef.current = now + (790 - Math.min(1, elapsed / ROUND_SECONDS) * 250 + Math.random() * 170) / spawnRate;
       }
 
@@ -959,6 +967,7 @@ export function FrenchieCatchGame({ ownedItems }: { ownedItems: FrenchieCatchIte
               case "other_pondeomo": {
                 const pondeomoSec = LV.PONDEOMO_SEC[lv]!;
                 spawnRateBoostUntilRef.current = now + pondeomoSec * 1000;
+                spawnRateBoostValueRef.current = SPAWN_RATE_BOOST;
                 effectLabel = `${pondeomoSec}秒間 アイテム出現量×${SPAWN_RATE_BOOST}${lvTag}`;
                 statusChanged = true;
                 break;
@@ -966,7 +975,27 @@ export function FrenchieCatchGame({ ownedItems }: { ownedItems: FrenchieCatchIte
               case "other_pondear": {
                 const pondearSec = LV.PONDEAR_SEC[lv]!;
                 spawnRateBoostUntilRef.current = now + pondearSec * 1000;
+                spawnRateBoostValueRef.current = SPAWN_RATE_BOOST;
                 effectLabel = `${pondearSec}秒間 アイテム出現量×${SPAWN_RATE_BOOST}${lvTag}`;
+                statusChanged = true;
+                break;
+              }
+              case "interior_shikkoku_no_ar": {
+                const shikkokuSec = LV.SHIKKOKU_SEC[lv]!;
+                fallSpeedBoostUntilRef.current = now + shikkokuSec * 1000;
+                fallSpeedValueRef.current = LV.SHIKKOKU_FALL[lv]!;
+                comboInvincibleUntilRef.current = now + shikkokuSec * 1000;
+                multiplier15UntilRef.current = now + shikkokuSec * 1000;
+                multiplier15ValueRef.current = LV.SHIKKOKU_MULT[lv]!;
+                effectLabel = `${shikkokuSec}秒間 落下×${LV.SHIKKOKU_FALL[lv]}+無敵+得点×${LV.SHIKKOKU_MULT[lv]}${lvTag}`;
+                statusChanged = true;
+                break;
+              }
+              case "interior_ragby_ar": {
+                const ragbySec = LV.RAGBY_SEC[lv]!;
+                spawnRateBoostUntilRef.current = now + ragbySec * 1000;
+                spawnRateBoostValueRef.current = RAGBY_SPAWN_RATE_BOOST;
+                effectLabel = `${ragbySec}秒間 アイテム出現量×${RAGBY_SPAWN_RATE_BOOST}${lvTag}`;
                 statusChanged = true;
                 break;
               }
@@ -1211,6 +1240,7 @@ export function FrenchieCatchGame({ ownedItems }: { ownedItems: FrenchieCatchIte
           <div key={entity.id} className={`absolute ${entity.enteredOpening && entity.status !== "bounced" ? "z-40" : "z-20"} will-change-transform opacity-100 ${entity.rarity ? RARITY_STYLE[entity.rarity] : "drop-shadow-[0_5px_7px_rgba(75,58,43,0.22)]"}`} style={{ left: `${entity.x}%`, top: `${entity.y}%`, width: `${entity.size}%`, transform: `translate(-50%, -50%) rotate(${entity.rotation}deg)` }}>
             <Image src={entity.image} alt="" width={160} height={160} draggable={false} className="h-auto w-full object-contain" />
             {entity.rarity === "UR" ? <span className="absolute -inset-2 -z-10 animate-pulse rounded-full bg-[#e95c4d]/15 blur-md" /> : null}
+            {entity.rarity === "LR" ? <span className="absolute -inset-3 -z-10 animate-pulse rounded-full bg-[#e6b43c]/25 blur-lg" /> : null}
           </div>
         ))}
 
