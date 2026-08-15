@@ -84,6 +84,7 @@ const MYSTERY_SKILL_ITEM_IDS = [
   "interior_spring_flower_wreath", "other_sparkle_rope_crown", "other_nakayoshi_azubee",
   "other_kamunayo", "hiking_frenchie", "snow_frenchie", "summer_frenchie", "interior_kinoko_azubee",
   "other_komochi", "other_azuki", "other_kobee", "other_hamigaki", "other_ikea", "other_orusuban",
+  "other_pondeomo", "other_pondear",
 ];
 
 /** アイテムごとのLv1〜5パラメータ（item_skill_levels_colored.xlsxの「スキル一覧」シート通り） */
@@ -148,7 +149,10 @@ const LV = {
   IKEA_SEC: [4, 5, 6, 7, 8],
   ORUSUBAN_SEC: [5, 6, 7, 8, 10],
   ORUSUBAN_FALL: [1.6, 1.8, 2, 2.2, 2.5],
+  PONDEOMO_SEC: [4, 5, 6, 8, 10],
+  PONDEAR_SEC: [4, 5, 6, 8, 10],
 } as const;
+const SPAWN_RATE_BOOST = 2;
 const POINTS: Record<FrenchieCatchItem["rarity"], number> = { N: 10, R: 20, SR: 40, SSR: 70, UR: 100 };
 const RARITY_FALL_SPEED: Record<FrenchieCatchItem["rarity"], number> = { N: 1, R: 1.08, SR: 1.18, SSR: 1.32, UR: 1.5 };
 const DEFAULT_ITEM_SPAWN_WEIGHT = 100;
@@ -258,6 +262,7 @@ export function FrenchieCatchGame({ ownedItems }: { ownedItems: FrenchieCatchIte
   const poopSuppressUntilRef = useRef(0);
   const ikeaUntilRef = useRef(0);
   const ikeaCountRef = useRef(0);
+  const spawnRateBoostUntilRef = useRef(0);
   const feedbackTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const impactTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -297,6 +302,7 @@ export function FrenchieCatchGame({ ownedItems }: { ownedItems: FrenchieCatchIte
     if (now < fallSpeedBoostUntilRef.current) labels.push("落下速度アップ中");
     if (now < poopSuppressUntilRef.current) labels.push("うんち出現なし");
     if (now < ikeaUntilRef.current) labels.push(`くみたて中 ${ikeaCountRef.current}個`);
+    if (now < spawnRateBoostUntilRef.current) labels.push(`アイテム出現量×${SPAWN_RATE_BOOST}中`);
     if (now < boxWideUntilRef.current) labels.push(`ダンボール×${boxWideScaleRef.current}拡大中`);
     if (urBoostRef.current > 0) labels.push(`UR出現率+${Math.min(urBoostRef.current, UR_BOOST_MAX)}`);
     setActiveEffects(labels);
@@ -510,6 +516,10 @@ export function FrenchieCatchGame({ ownedItems }: { ownedItems: FrenchieCatchIte
         }
         timedEffectChanged = true;
       }
+      if (spawnRateBoostUntilRef.current > 0 && now >= spawnRateBoostUntilRef.current) {
+        spawnRateBoostUntilRef.current = 0;
+        timedEffectChanged = true;
+      }
       if (timedEffectChanged) refreshEffectStatus(now);
 
       const breakCombo = (entity: Entity) => {
@@ -529,7 +539,8 @@ export function FrenchieCatchGame({ ownedItems }: { ownedItems: FrenchieCatchIte
       last = now;
       if (now >= nextSpawnRef.current && entitiesRef.current.length < 10) {
         entitiesRef.current.push(createEntity());
-        nextSpawnRef.current = now + 790 - Math.min(1, elapsed / ROUND_SECONDS) * 250 + Math.random() * 170;
+        const spawnRate = now < spawnRateBoostUntilRef.current ? SPAWN_RATE_BOOST : 1;
+        nextSpawnRef.current = now + (790 - Math.min(1, elapsed / ROUND_SECONDS) * 250 + Math.random() * 170) / spawnRate;
       }
 
       const boxWide = now < boxWideUntilRef.current;
@@ -941,6 +952,20 @@ export function FrenchieCatchGame({ ownedItems }: { ownedItems: FrenchieCatchIte
                 statusChanged = true;
                 break;
               }
+              case "other_pondeomo": {
+                const pondeomoSec = LV.PONDEOMO_SEC[lv]!;
+                spawnRateBoostUntilRef.current = now + pondeomoSec * 1000;
+                effectLabel = `${pondeomoSec}秒間 アイテム出現量×${SPAWN_RATE_BOOST}${lvTag}`;
+                statusChanged = true;
+                break;
+              }
+              case "other_pondear": {
+                const pondearSec = LV.PONDEAR_SEC[lv]!;
+                spawnRateBoostUntilRef.current = now + pondearSec * 1000;
+                effectLabel = `${pondearSec}秒間 アイテム出現量×${SPAWN_RATE_BOOST}${lvTag}`;
+                statusChanged = true;
+                break;
+              }
               default:
                 break;
             }
@@ -1096,6 +1121,7 @@ export function FrenchieCatchGame({ ownedItems }: { ownedItems: FrenchieCatchIte
     poopSuppressUntilRef.current = 0;
     ikeaUntilRef.current = 0;
     ikeaCountRef.current = 0;
+    spawnRateBoostUntilRef.current = 0;
     setEntities([]);
     setBoxX(50);
     setScore(0);
