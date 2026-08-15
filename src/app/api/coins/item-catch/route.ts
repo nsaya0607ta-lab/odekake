@@ -7,7 +7,7 @@ type RpcResponse = {
   error: { code?: string; message: string } | null;
 };
 
-const MAX_CAUGHT_COUNT = 180;
+const MAX_CAUGHT_COUNT = 2000;
 const MAX_SCORE_PER_CATCH = 1500;
 const MAX_SCORE_PER_RPC = 8000;
 
