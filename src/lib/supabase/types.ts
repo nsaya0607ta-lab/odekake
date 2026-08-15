@@ -479,6 +479,10 @@ export type Database = {
         Args: { p_trip_id: string; p_accept: boolean };
         Returns: undefined;
       };
+      leave_shared_trip: {
+        Args: { p_trip_id: string };
+        Returns: undefined;
+      };
       ensure_personal_record_trip: {
         Args: Record<string, never>;
         Returns: PersonalRecordTripRow[];

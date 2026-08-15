@@ -43,6 +43,16 @@ const RARITY_FRAME_PATHS: Record<GachaRarity, string> = {
   LR: "/collection/rarity-frames/lr.webp",
 };
 
+/** 全レアリティのフレーム画像とも余白をトリミング済みのため、歪みのない均等倍率にする。 */
+const RARITY_FRAME_SCALE: Record<GachaRarity, string> = {
+  N: "scale(1)",
+  R: "scale(1)",
+  SR: "scale(1)",
+  SSR: "scale(1)",
+  UR: "scale(1)",
+  LR: "scale(1)",
+};
+
 function validRarity(rarity: string): GachaRarity {
   return (["N", "R", "SR", "SSR", "UR", "LR"] as const).includes(rarity as GachaRarity)
     ? (rarity as GachaRarity)
@@ -556,7 +566,7 @@ function RarityResultCard({ result, large = false }: { result: DrawResult; large
         aria-hidden="true"
         draggable={false}
         className="pointer-events-none absolute inset-0 h-full w-full max-w-none select-none object-fill"
-        style={{ transform: "scaleX(1.18) scaleY(1.06)" }}
+        style={{ transform: RARITY_FRAME_SCALE[rarity] }}
       />
 
       <div className="relative z-[1] flex h-full w-full flex-col items-center px-[7%] pb-[7%] pt-[13%]">

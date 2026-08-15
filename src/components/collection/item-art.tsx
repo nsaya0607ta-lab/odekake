@@ -172,6 +172,9 @@ export function ItemArt({
         alt={label}
         className={`h-full w-full object-contain ${toneClass} ${className}`}
         loading="lazy"
+        draggable={silhouette ? false : undefined}
+        onContextMenu={silhouette ? (event) => event.preventDefault() : undefined}
+        style={silhouette ? { WebkitTouchCallout: "none", WebkitUserSelect: "none", userSelect: "none" } : undefined}
       />
     );
   }

@@ -26,7 +26,8 @@ export const metadata = { title: "あなたの旅 | おでかけ記録" };
 export const dynamic = "force-dynamic";
 
 const PROFILE_TICKET_SRC = "/B42684BD-FCE9-4F37-A698-4EEE3884ECA8.png";
-const MINI_GAME_BUTTON_SRC = "/1186522f-a808-462e-afe1-612fe83b4625.png";
+const MINI_GAME_BUTTON_SRC = "/3215A80A-2B64-45E2-8AA5-B7CAF2E0251D.png";
+const GACHA_BUTTON_SRC = "/4738ADDA-10DB-4664-B078-FE6262248CFB.png";
 
 export default async function HomePage({
   searchParams,
@@ -117,20 +118,37 @@ export default async function HomePage({
               </HomeScene>
               <WanderingFrenchie level={expProgress.level} skin={dogSkin} />
 
-              <Link
-                href="/games"
-                aria-label="ミニゲーム一覧を開く"
-                className="absolute right-2 top-2 z-40 block w-[132px] overflow-hidden rounded-full !border-0 !bg-transparent !p-0 !shadow-none active:scale-[0.97]"
-                style={{ background: "transparent", boxShadow: "none" }}
-              >
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img
-                  src={MINI_GAME_BUTTON_SRC}
-                  alt="ミニゲーム"
-                  className="block h-auto w-full !bg-transparent object-contain"
-                  style={{ background: "transparent" }}
-                />
-              </Link>
+              <div className="absolute right-2 top-2 z-40 flex w-[132px] flex-col" style={{ gap: 0 }}>
+                <Link
+                  href="/games"
+                  aria-label="ミニゲーム一覧を開く"
+                  className="block aspect-[3/1] w-full overflow-visible rounded-full !border-0 !bg-transparent !p-0 !shadow-none active:scale-[0.97]"
+                  style={{ background: "transparent", boxShadow: "none" }}
+                >
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img
+                    src={MINI_GAME_BUTTON_SRC}
+                    alt="ミニゲーム"
+                    className="block h-full w-full -translate-y-[6px] !bg-transparent object-contain"
+                    style={{ background: "transparent" }}
+                  />
+                </Link>
+
+                <Link
+                  href="/mypage/coins"
+                  aria-label="ガチャを引く"
+                  className="block aspect-[3/1] w-full overflow-visible rounded-full !border-0 !bg-transparent !p-0 !shadow-none active:scale-[0.97]"
+                  style={{ background: "transparent", boxShadow: "none", marginTop: -6 }}
+                >
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img
+                    src={GACHA_BUTTON_SRC}
+                    alt="ガチャを引く"
+                    className="block h-full w-full -translate-y-[9px] !bg-transparent object-contain"
+                    style={{ background: "transparent" }}
+                  />
+                </Link>
+              </div>
             </div>
           </section>
 

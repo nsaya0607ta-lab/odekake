@@ -77,6 +77,17 @@ export default async function FriendsPage({
             ) : null}
             <FriendCodeControls initialCode={friendCode} />
 
+            <Link href="/shared-trips" className="rough-card flex items-center gap-3 p-4 active:scale-[0.99]">
+              <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-leaf-soft text-leaf-deep">
+                <IconUsers size={21} />
+              </span>
+              <span className="min-w-0 flex-1">
+                <span className="block text-sm font-bold">共有旅を見る</span>
+                <span className="mt-0.5 block text-[11px] text-ink-soft">フレンドと一緒の旅の記録</span>
+              </span>
+              <IconChevronRight size={18} className="shrink-0 text-ink-faint" />
+            </Link>
+
             <Link href="/shared-trips/new?from=friends" className="btn btn-primary w-full">
               <IconPlus size={18} />
               フレンドと共有旅を作る
