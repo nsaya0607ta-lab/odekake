@@ -45,12 +45,12 @@ const RARITY_FRAME_PATHS: Record<GachaRarity, string> = {
 
 /** 全レアリティのフレーム画像とも余白をトリミング済みのため、歪みのない均等倍率にする。 */
 const RARITY_FRAME_SCALE: Record<GachaRarity, string> = {
-  N: "scale(1.02)",
-  R: "scale(1.02)",
-  SR: "scale(1.02)",
-  SSR: "scale(1.02)",
-  UR: "scale(1.02)",
-  LR: "scale(1.02)",
+  N: "scale(1.02) translateY(1.5%)",
+  R: "scale(1.02) translateY(1.5%)",
+  SR: "scale(1.02) translateY(1.5%)",
+  SSR: "scale(1.02) translateY(1.5%)",
+  UR: "scale(1.02) translateY(1.5%)",
+  LR: "scale(1.02) translateY(1.5%)",
 };
 
 function validRarity(rarity: string): GachaRarity {
