@@ -64,12 +64,12 @@ const RARITY_FRAME_PATHS: Record<GachaRarity, string> = {
  * 全レアリティ共通で歪みのない均等倍率にする。
  */
 const RARITY_FRAME_SCALE: Record<GachaRarity, string> = {
-  N: "scale(1.06)",
-  R: "scale(1.06)",
-  SR: "scale(1.06)",
-  SSR: "scale(1.06)",
-  UR: "scale(1.06)",
-  LR: "scale(1.06)",
+  N: "scale(1.02)",
+  R: "scale(1.02)",
+  SR: "scale(1.02)",
+  SSR: "scale(1.02)",
+  UR: "scale(1.02)",
+  LR: "scale(1.02)",
 };
 
 /**
