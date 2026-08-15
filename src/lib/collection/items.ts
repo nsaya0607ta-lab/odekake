@@ -145,9 +145,9 @@ const CURATED_ITEMS: readonly CollectionItem[] = [
   { id: "other_azubee", name: "あずびー", image: "/collection/items/two-dogs-icon-transparent.webp", category: "other", series: null, rarity: "UR" },
   { id: "other_omojii", name: "おもじぃ", image: "/collection/items/8B027535-244F-4729-86F5-A69CDD91D103.png", category: "other", series: null, rarity: "UR" },
   { id: "other_nakayoshi_azubee", name: "なかよしあずびー", image: "/collection/items/890D1313-B79F-493C-97C2-1898F7663C01.png", category: "other", series: null, rarity: "SSR" },
-  { id: "other_komochi", name: "こもち", image: "/collection/items/4FA70BBA-6CBA-42B2-9A96-4B07AFDF56E0.png", category: "other", series: null, rarity: "UR" },
+  { id: "other_komochi", name: "こもち", image: "/collection/items/C7DF48F4-588E-4B31-983E-A52623328924.png", category: "other", series: null, rarity: "UR" },
   { id: "other_azuki", name: "小豆(あずき)", image: "/collection/items/6F31AD19-B242-42D6-83D3-380A3F3D3FC0.png", category: "other", series: null, rarity: "UR" },
-  { id: "other_kobee", name: "こびー", image: "/collection/items/C7DF48F4-588E-4B31-983E-A52623328924.png", category: "other", series: null, rarity: "UR" },
+  { id: "other_kobee", name: "こびー", image: "/collection/items/4FA70BBA-6CBA-42B2-9A96-4B07AFDF56E0.png", category: "other", series: null, rarity: "UR" },
   { id: "other_kamunayo", name: "かむなよ", image: "/collection/items/7FEA86AD-6904-4151-BEA8-5A33F7C97B01.png", category: "other", series: null, rarity: "SSR" },
 
   // --- 通常図鑑：おでかけ小物 ------------------------------------------
