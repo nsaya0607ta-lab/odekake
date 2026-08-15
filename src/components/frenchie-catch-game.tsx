@@ -84,7 +84,7 @@ const MYSTERY_SKILL_ITEM_IDS = [
   "interior_spring_flower_wreath", "other_sparkle_rope_crown", "other_nakayoshi_azubee",
   "other_kamunayo", "hiking_frenchie", "snow_frenchie", "summer_frenchie", "interior_kinoko_azubee",
   "other_komochi", "other_azuki", "other_kobee", "other_hamigaki", "other_ikea", "other_orusuban",
-  "other_pondeomo", "other_pondear",
+  "other_pondeomo", "other_pondear", "other_kurumari_a",
 ];
 
 /** アイテムごとのLv1〜5パラメータ（item_skill_levels_colored.xlsxの「スキル一覧」シート通り） */
@@ -945,7 +945,8 @@ export function FrenchieCatchGame({ ownedItems }: { ownedItems: FrenchieCatchIte
                 statusChanged = true;
                 break;
               }
-              case "other_orusuban": {
+              case "other_orusuban":
+              case "other_kurumari_a": {
                 const orusubanSec = LV.ORUSUBAN_SEC[lv]!;
                 const orusubanShield = LV.ORUSUBAN_SHIELD[lv]!;
                 fallSpeedBoostUntilRef.current = now + orusubanSec * 1000;

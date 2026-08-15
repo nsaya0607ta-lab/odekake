@@ -153,6 +153,7 @@ const CURATED_ITEMS: readonly CollectionItem[] = [
   { id: "other_hamigaki", name: "はみがき", image: "/collection/items/hamigaki.webp", category: "other", series: null, rarity: "SSR" },
   { id: "other_ikea", name: "IKEA", image: "/collection/items/ikea.webp", category: "other", series: null, rarity: "SSR" },
   { id: "other_orusuban", name: "おるすばん", image: "/collection/items/orusuban.webp", category: "other", series: null, rarity: "SSR" },
+  { id: "other_kurumari_a", name: "くるまりアー", image: "/collection/items/kurumari-a.webp", category: "other", series: null, rarity: "SSR" },
   { id: "other_pondeomo", name: "ぽんでおも", image: "/collection/items/pondeomo.webp", category: "other", series: null, rarity: "SSR" },
   { id: "other_pondear", name: "ぽんでアー", image: "/collection/items/pondear.webp", category: "other", series: null, rarity: "SSR" },
 
