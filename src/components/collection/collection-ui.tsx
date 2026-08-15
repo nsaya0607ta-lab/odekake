@@ -57,17 +57,17 @@ const RARITY_FRAME_PATHS: Record<GachaRarity, string> = {
 };
 
 /**
- * フレーム画像を敷くときの拡大率。全レアリティの画像とも実際は余白なし
- * フルブリードだが、旧来scaleX(1.18) scaleY(1.06)という横だけ大きい
- * 非対称倍率がかかっており、絵柄が横方向に歪んで伸びて見えていた
- * （SR以下は単色グラデーション中心の絵柄だったため目立たなかっただけ）。
- * R/SR/SSR/LRは歪みのない均等倍率に変更。N/URは既存の見た目を保つため据え置き。
+ * フレーム画像を敷くときの拡大率。N〜URの画像は不透明なクリーム色の
+ * 余白が絵の中に焼き込まれており（透過ではない）、scaleX(1.18) scaleY(1.06)
+ * はその余白を除去するために正しくチューニングされた値。
+ * LRの画像だけは透過PNGで余白がほぼ0のため、同じ倍率をかけると
+ * 絵柄が横方向に歪んで伸びて見える。LRだけ歪みのない均等倍率にする。
  */
 const RARITY_FRAME_SCALE: Record<GachaRarity, string> = {
   N: "scaleX(1.18) scaleY(1.06)",
-  R: "scale(1.02)",
-  SR: "scale(1.02)",
-  SSR: "scale(1.02)",
+  R: "scaleX(1.18) scaleY(1.06)",
+  SR: "scaleX(1.18) scaleY(1.06)",
+  SSR: "scaleX(1.18) scaleY(1.06)",
   UR: "scaleX(1.18) scaleY(1.06)",
   LR: "scale(1.02)",
 };
