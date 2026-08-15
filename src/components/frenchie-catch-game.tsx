@@ -571,8 +571,23 @@ export function FrenchieCatchGame({ ownedItems }: { ownedItems: FrenchieCatchIte
         entity.rotation += entity.spin * dt;
 
         const hitboxWidth = entity.size * (entity.kind === "dog" ? 0.56 : 0.62);
-        const hitLeft = entity.x - hitboxWidth / 2;
-        const hitRight = entity.x + hitboxWidth / 2;
+        let hitLeft = entity.x - hitboxWidth / 2;
+        let hitRight = entity.x + hitboxWidth / 2;
+
+        if (hitLeft < 0 && entity.vx < 0) {
+          entity.x = hitboxWidth / 2;
+          entity.vx = Math.abs(entity.vx) * 0.7;
+          entity.spin = -entity.spin * 0.6;
+          hitLeft = entity.x - hitboxWidth / 2;
+          hitRight = entity.x + hitboxWidth / 2;
+        } else if (hitRight > 100 && entity.vx > 0) {
+          entity.x = 100 - hitboxWidth / 2;
+          entity.vx = -Math.abs(entity.vx) * 0.7;
+          entity.spin = -entity.spin * 0.6;
+          hitLeft = entity.x - hitboxWidth / 2;
+          hitRight = entity.x + hitboxWidth / 2;
+        }
+
         const bottomOffset = entity.size * (entity.kind === "dog" ? 0.34 : 0.31);
         const previousBottom = previousY + bottomOffset;
         const bottom = entity.y + bottomOffset;
