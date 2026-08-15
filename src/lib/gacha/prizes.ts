@@ -72,6 +72,7 @@ export const GACHA_PRIZES: readonly GachaPrize[] = [
   { id: "other_azuki", name: "小豆(あずき)", rarity: "UR", type: "item", pool: "regular", image: "/collection/items/6F31AD19-B242-42D6-83D3-380A3F3D3FC0.png" },
   { id: "other_kobee", name: "こびー", rarity: "UR", type: "item", pool: "regular", image: "/collection/items/4FA70BBA-6CBA-42B2-9A96-4B07AFDF56E0.png" },
   { id: "other_kamunayo", name: "かむなよ", rarity: "SSR", type: "item", pool: "regular", image: "/collection/items/7FEA86AD-6904-4151-BEA8-5A33F7C97B01.png" },
+  { id: "other_hamigaki", name: "はみがき", rarity: "SSR", type: "item", pool: "regular", image: "/collection/items/hamigaki.webp" },
   { id: "other_sparkle_rope_crown", name: "きらきらロープクラウン", rarity: "SR", type: "item", pool: "regular", image: "/collection/items/sparkle-rope-crown.webp" },
 
   // --- 通常ガチャ：おでかけ小物 ----------------------------------------
