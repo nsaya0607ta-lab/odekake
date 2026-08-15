@@ -26,8 +26,8 @@ export const metadata = { title: "あなたの旅 | おでかけ記録" };
 export const dynamic = "force-dynamic";
 
 const PROFILE_TICKET_SRC = "/B42684BD-FCE9-4F37-A698-4EEE3884ECA8.png";
-const MINI_GAME_BUTTON_SRC = "/1186522f-a808-462e-afe1-612fe83b4625.png";
-const GACHA_BUTTON_SRC = "/gacha-button.png";
+const MINI_GAME_BUTTON_SRC = "/4738ADDA-10DB-4664-B078-FE6262248CFB.png";
+const GACHA_BUTTON_SRC = "/3215A80A-2B64-45E2-8AA5-B7CAF2E0251D.png";
 
 export default async function HomePage({
   searchParams,
