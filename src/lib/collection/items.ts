@@ -152,6 +152,8 @@ const CURATED_ITEMS: readonly CollectionItem[] = [
   { id: "other_hamigaki", name: "はみがき", image: "/collection/items/hamigaki.webp", category: "other", series: null, rarity: "SSR" },
   { id: "other_ikea", name: "IKEA", image: "/collection/items/ikea.webp", category: "other", series: null, rarity: "SSR" },
   { id: "other_orusuban", name: "おるすばん", image: "/collection/items/orusuban.webp", category: "other", series: null, rarity: "SSR" },
+  { id: "other_pondeomo", name: "ぽんでおも", image: "/collection/items/pondeomo.webp", category: "other", series: null, rarity: "SSR" },
+  { id: "other_pondear", name: "ぽんでアー", image: "/collection/items/pondear.webp", category: "other", series: null, rarity: "SSR" },
 
   // --- 通常図鑑：おでかけ小物 ------------------------------------------
   { id: "other_yellow_rain_boots", name: "きいろのながぐつ", image: "/collection/items/yellow-rain-boots.webp", category: "other", series: null, rarity: "N" },
