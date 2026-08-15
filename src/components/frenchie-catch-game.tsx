@@ -73,6 +73,10 @@ const MYSTERY_ITEM_ID = "mystery_item";
 const MYSTERY_IMAGE = "/collection/items/mystery-question.webp";
 const MYSTERY_SPAWN_CHANCE = 0.05;
 const MYSTERY_BASE_POINTS = 10;
+const BAG_ITEM_ID = "hazard_bag";
+const BAG_IMAGE = "/collection/items/plastic-bag.webp";
+const BAG_SPAWN_CHANCE = 0.07;
+const BAG_MAX_STOCK = 3;
 const JUST_RADIUS_RATIO = 0.3;
 const JUST_MULTIPLIER = 1.25;
 const MYSTERY_SKILL_ITEM_IDS = [
@@ -270,6 +274,7 @@ export function FrenchieCatchGame({ ownedItems }: { ownedItems: FrenchieCatchIte
   const poopSuppressUntilRef = useRef(0);
   const ikeaUntilRef = useRef(0);
   const ikeaCountRef = useRef(0);
+  const bagStockRef = useRef(0);
   const spawnRateBoostUntilRef = useRef(0);
   const spawnRateBoostValueRef = useRef(SPAWN_RATE_BOOST);
   const feedbackTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -283,6 +288,7 @@ export function FrenchieCatchGame({ ownedItems }: { ownedItems: FrenchieCatchIte
   const [combo, setCombo] = useState(0);
   const [maxCombo, setMaxCombo] = useState(0);
   const [caught, setCaught] = useState(0);
+  const [bagStock, setBagStock] = useState(0);
   const [feedback, setFeedback] = useState<CatchFeedback | null>(null);
   const [activeEffects, setActiveEffects] = useState<string[]>([]);
   const [impactX, setImpactX] = useState<number | null>(null);
@@ -358,6 +364,19 @@ export function FrenchieCatchGame({ ownedItems }: { ownedItems: FrenchieCatchIte
         level: 0,
         size: 13 + Math.random() * 3,
         spin: (Math.random() - 0.5) * 50,
+      };
+    }
+    if (hazardRoll < POOP_SPAWN_CHANCE + MYSTERY_SPAWN_CHANCE + BAG_SPAWN_CHANCE && bagStockRef.current < BAG_MAX_STOCK) {
+      return {
+        ...base,
+        itemId: BAG_ITEM_ID,
+        kind: "item",
+        name: "ビニール袋",
+        image: BAG_IMAGE,
+        rarity: null,
+        level: 0,
+        size: 13 + Math.random() * 3,
+        spin: (Math.random() - 0.5) * 30,
       };
     }
 
@@ -651,11 +670,31 @@ export function FrenchieCatchGame({ ownedItems }: { ownedItems: FrenchieCatchIte
             entity.spin *= 0.45;
 
             if (entity.itemId === POOP_ITEM_ID) {
-              scoreRef.current = Math.max(0, scoreRef.current - POOP_PENALTY);
               caughtRef.current += 1;
-              setScore(scoreRef.current);
               setCaught(caughtRef.current);
-              showCatch(entity, -POOP_PENALTY, "うんちを踏んじゃった…");
+              if (bagStockRef.current > 0) {
+                bagStockRef.current -= 1;
+                setBagStock(bagStockRef.current);
+                showCatch(entity, 0, "ビニール袋でノーダメージ！");
+              } else {
+                scoreRef.current = Math.max(0, scoreRef.current - POOP_PENALTY);
+                setScore(scoreRef.current);
+                showCatch(entity, -POOP_PENALTY, "うんちを踏んじゃった…");
+              }
+              next.push(entity);
+              continue;
+            }
+
+            if (entity.itemId === BAG_ITEM_ID) {
+              caughtRef.current += 1;
+              setCaught(caughtRef.current);
+              if (bagStockRef.current < BAG_MAX_STOCK) {
+                bagStockRef.current += 1;
+                setBagStock(bagStockRef.current);
+                showCatch(entity, 0, `ビニール袋 ${bagStockRef.current}/${BAG_MAX_STOCK}`);
+              } else {
+                showCatch(entity, 0, "ビニール袋は満タン");
+              }
               next.push(entity);
               continue;
             }
@@ -1155,6 +1194,8 @@ export function FrenchieCatchGame({ ownedItems }: { ownedItems: FrenchieCatchIte
     ikeaUntilRef.current = 0;
     ikeaCountRef.current = 0;
     spawnRateBoostUntilRef.current = 0;
+    bagStockRef.current = 0;
+    setBagStock(0);
     setEntities([]);
     setBoxX(50);
     setScore(0);
@@ -1223,7 +1264,16 @@ export function FrenchieCatchGame({ ownedItems }: { ownedItems: FrenchieCatchIte
         <div className="absolute inset-x-0 bottom-0 h-[18%] bg-[linear-gradient(180deg,rgba(208,232,171,0)_0%,#c9e29e_72%,#efdcb8_73%,#e9cfa5_73%,#e9cfa5_100%)]" />
 
         <div className="absolute left-3 right-3 top-3 z-30 flex items-start justify-between gap-2">
-          <div className="rounded-2xl border border-white/80 bg-white/90 px-3 py-2 shadow-sm"><p className="text-[9px] font-bold tracking-widest text-ink-faint">SCORE</p><p className="text-xl font-black tabular-nums text-ink">{score.toLocaleString("ja-JP")}</p></div>
+          <div className="flex flex-col items-start gap-1">
+            <div className="rounded-2xl border border-white/80 bg-white/90 px-3 py-2 shadow-sm"><p className="text-[9px] font-bold tracking-widest text-ink-faint">SCORE</p><p className="text-xl font-black tabular-nums text-ink">{score.toLocaleString("ja-JP")}</p></div>
+            {bagStock > 0 ? (
+              <div className="flex flex-col items-start gap-0.5">
+                {Array.from({ length: bagStock }, (_, index) => (
+                  <Image key={index} src={BAG_IMAGE} alt="ビニール袋" width={28} height={28} draggable={false} className="h-6 w-6 object-contain drop-shadow-[0_2px_3px_rgba(0,0,0,0.25)]" />
+                ))}
+              </div>
+            ) : null}
+          </div>
           {combo >= 2 ? <div className="rounded-full border border-[#f1c969] bg-[#fff6cc]/95 px-3 py-1.5 text-center shadow-sm"><p className="text-lg font-black leading-none text-[#b77322]">{combo}</p><p className="text-[8px] font-black text-[#b77322]">COMBO!{combo >= 5 ? ` ×${comboScoreMultiplier(combo, performance.now() < comboMultiplierBoostUntilRef.current)}` : ""}</p></div> : <span />}
           <div className="rounded-2xl border border-white/80 bg-white/90 px-3 py-2 text-right shadow-sm"><p className="text-[9px] font-bold tracking-widest text-ink-faint">TIME</p><p className="text-xl font-black tabular-nums text-ink">{timeLeft}</p></div>
         </div>
