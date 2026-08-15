@@ -122,14 +122,14 @@ export default async function HomePage({
                 <Link
                   href="/games"
                   aria-label="ミニゲーム一覧を開く"
-                  className="block aspect-[3/1] w-full overflow-hidden rounded-full !border-0 !bg-transparent !p-0 !shadow-none active:scale-[0.97]"
+                  className="block aspect-[3/1] w-full overflow-visible rounded-full !border-0 !bg-transparent !p-0 !shadow-none active:scale-[0.97]"
                   style={{ background: "transparent", boxShadow: "none" }}
                 >
                   {/* eslint-disable-next-line @next/next/no-img-element */}
                   <img
                     src={MINI_GAME_BUTTON_SRC}
                     alt="ミニゲーム"
-                    className="block h-full w-full !bg-transparent object-contain"
+                    className="block h-full w-full -translate-y-[3px] !bg-transparent object-contain"
                     style={{ background: "transparent" }}
                   />
                 </Link>
@@ -137,14 +137,14 @@ export default async function HomePage({
                 <Link
                   href="/mypage/coins"
                   aria-label="ガチャを引く"
-                  className="block aspect-[3/1] w-full overflow-hidden rounded-full !border-0 !bg-transparent !p-0 !shadow-none active:scale-[0.97]"
-                  style={{ background: "transparent", boxShadow: "none", marginTop: 0 }}
+                  className="block aspect-[3/1] w-full overflow-visible rounded-full !border-0 !bg-transparent !p-0 !shadow-none active:scale-[0.97]"
+                  style={{ background: "transparent", boxShadow: "none", marginTop: -6 }}
                 >
                   {/* eslint-disable-next-line @next/next/no-img-element */}
                   <img
                     src={GACHA_BUTTON_SRC}
                     alt="ガチャを引く"
-                    className="block h-full w-full !bg-transparent object-contain"
+                    className="block h-full w-full -translate-y-[3px] !bg-transparent object-contain"
                     style={{ background: "transparent" }}
                   />
                 </Link>
