@@ -83,7 +83,7 @@ const MYSTERY_SKILL_ITEM_IDS = [
   "toy_paw_macaron", "food_strawberry_roll_cake", "toy_star_wan_wand", "interior_sleepy_moon",
   "interior_spring_flower_wreath", "other_sparkle_rope_crown", "other_nakayoshi_azubee",
   "other_kamunayo", "hiking_frenchie", "snow_frenchie", "summer_frenchie", "interior_kinoko_azubee",
-  "other_komochi", "other_azuki", "other_kobee", "other_hamigaki",
+  "other_komochi", "other_azuki", "other_kobee", "other_hamigaki", "other_ikea", "other_orusuban",
 ];
 
 /** アイテムごとのLv1〜5パラメータ（item_skill_levels_colored.xlsxの「スキル一覧」シート通り） */
@@ -145,6 +145,9 @@ const LV = {
   KOBEE_SEC: [8, 9, 11, 13, 16],
   HAMIGAKI_SEC: [0, 2, 3, 4, 5],
   HAMIGAKI_PT: [0, 0, 10, 15, 20],
+  IKEA_SEC: [4, 5, 6, 7, 8],
+  ORUSUBAN_SEC: [5, 6, 7, 8, 10],
+  ORUSUBAN_FALL: [1.6, 1.8, 2, 2.2, 2.5],
 } as const;
 const POINTS: Record<FrenchieCatchItem["rarity"], number> = { N: 10, R: 20, SR: 40, SSR: 70, UR: 100 };
 const RARITY_FALL_SPEED: Record<FrenchieCatchItem["rarity"], number> = { N: 1, R: 1.08, SR: 1.18, SSR: 1.32, UR: 1.5 };
@@ -253,6 +256,8 @@ export function FrenchieCatchGame({ ownedItems }: { ownedItems: FrenchieCatchIte
   const fallSpeedBoostUntilRef = useRef(0);
   const fallSpeedValueRef = useRef(FALL_SPEED_BOOST);
   const poopSuppressUntilRef = useRef(0);
+  const ikeaUntilRef = useRef(0);
+  const ikeaCountRef = useRef(0);
   const feedbackTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const impactTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -291,6 +296,7 @@ export function FrenchieCatchGame({ ownedItems }: { ownedItems: FrenchieCatchIte
     if (now < magnetUntilRef.current) labels.push(magnetStrengthRef.current === "weak" ? "ミニマグネット発動中" : "マグネット発動中");
     if (now < fallSpeedBoostUntilRef.current) labels.push("落下速度アップ中");
     if (now < poopSuppressUntilRef.current) labels.push("うんち出現なし");
+    if (now < ikeaUntilRef.current) labels.push(`くみたて中 ${ikeaCountRef.current}個`);
     if (now < boxWideUntilRef.current) labels.push(`ダンボール×${boxWideScaleRef.current}拡大中`);
     if (urBoostRef.current > 0) labels.push(`UR出現率+${Math.min(urBoostRef.current, UR_BOOST_MAX)}`);
     setActiveEffects(labels);
@@ -486,6 +492,24 @@ export function FrenchieCatchGame({ ownedItems }: { ownedItems: FrenchieCatchIte
         poopSuppressUntilRef.current = 0;
         timedEffectChanged = true;
       }
+      if (ikeaUntilRef.current > 0 && now >= ikeaUntilRef.current) {
+        ikeaUntilRef.current = 0;
+        const ikeaCount = ikeaCountRef.current;
+        ikeaCountRef.current = 0;
+        if (ikeaCount > 0) {
+          const ikeaBonus = ikeaCount * 10;
+          scoreRef.current += ikeaBonus;
+          setScore(scoreRef.current);
+          setFeedback({ name: "くみたてボーナス", points: ikeaBonus, effect: `くみたて完成！+${ikeaBonus}pt` });
+          setBoxBounce(true);
+          if (feedbackTimerRef.current) clearTimeout(feedbackTimerRef.current);
+          feedbackTimerRef.current = setTimeout(() => {
+            setFeedback(null);
+            setBoxBounce(false);
+          }, 900);
+        }
+        timedEffectChanged = true;
+      }
       if (timedEffectChanged) refreshEffectStatus(now);
 
       const breakCombo = (entity: Entity) => {
@@ -635,6 +659,11 @@ export function FrenchieCatchGame({ ownedItems }: { ownedItems: FrenchieCatchIte
             const multiplier = Math.max(timedMultiplier, nextMultiplier);
             let points = Math.round((basePoints + pendingBonus) * multiplier);
             let effectLabel: string | undefined;
+
+            if (now < ikeaUntilRef.current) {
+              ikeaCountRef.current += 1;
+              statusChanged = true;
+            }
 
             const isMystery = entity.itemId === MYSTERY_ITEM_ID;
             const skillId = isMystery
@@ -881,6 +910,22 @@ export function FrenchieCatchGame({ ownedItems }: { ownedItems: FrenchieCatchIte
                 statusChanged = true;
                 break;
               }
+              case "other_ikea": {
+                const addSec = LV.IKEA_SEC[lv]!;
+                const base = now < ikeaUntilRef.current ? ikeaUntilRef.current : now;
+                ikeaUntilRef.current = base + addSec * 1000;
+                effectLabel = `くみたて中 +${addSec}秒${lvTag}`;
+                statusChanged = true;
+                break;
+              }
+              case "other_orusuban": {
+                const orusubanSec = LV.ORUSUBAN_SEC[lv]!;
+                fallSpeedBoostUntilRef.current = now + orusubanSec * 1000;
+                fallSpeedValueRef.current = LV.ORUSUBAN_FALL[lv]!;
+                effectLabel = `${orusubanSec}秒間 落下速度×${LV.ORUSUBAN_FALL[lv]}${lvTag}`;
+                statusChanged = true;
+                break;
+              }
               default:
                 break;
             }
@@ -1034,6 +1079,8 @@ export function FrenchieCatchGame({ ownedItems }: { ownedItems: FrenchieCatchIte
     fallSpeedBoostUntilRef.current = 0;
     fallSpeedValueRef.current = FALL_SPEED_BOOST;
     poopSuppressUntilRef.current = 0;
+    ikeaUntilRef.current = 0;
+    ikeaCountRef.current = 0;
     setEntities([]);
     setBoxX(50);
     setScore(0);
