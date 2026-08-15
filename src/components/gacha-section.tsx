@@ -43,13 +43,13 @@ const RARITY_FRAME_PATHS: Record<GachaRarity, string> = {
   LR: "/collection/rarity-frames/lr.webp",
 };
 
-/** N〜URの画像は不透明なクリーム色の余白が焼き込まれており、scaleX(1.18) scaleY(1.06)はそれを除去するための値。LRだけ透過PNGで余白がほぼ0のため均等倍率にする。 */
+/** 全レアリティのフレーム画像とも余白をトリミング済みのため、歪みのない均等倍率にする。 */
 const RARITY_FRAME_SCALE: Record<GachaRarity, string> = {
-  N: "scaleX(1.18) scaleY(1.06)",
-  R: "scaleX(1.18) scaleY(1.06)",
-  SR: "scaleX(1.18) scaleY(1.06)",
-  SSR: "scaleX(1.18) scaleY(1.06)",
-  UR: "scaleX(1.18) scaleY(1.06)",
+  N: "scale(1.02)",
+  R: "scale(1.02)",
+  SR: "scale(1.02)",
+  SSR: "scale(1.02)",
+  UR: "scale(1.02)",
   LR: "scale(1.02)",
 };
 
