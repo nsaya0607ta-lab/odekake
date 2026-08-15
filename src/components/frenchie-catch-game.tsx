@@ -148,7 +148,8 @@ const LV = {
   HAMIGAKI_PT: [0, 0, 10, 15, 20],
   IKEA_SEC: [4, 5, 6, 7, 8],
   ORUSUBAN_SEC: [5, 6, 7, 8, 10],
-  ORUSUBAN_FALL: [1.6, 1.8, 2, 2.2, 2.5],
+  ORUSUBAN_FALL: [1.8, 2, 2.2, 2.4, 2.8],
+  ORUSUBAN_SHIELD: [1, 1, 2, 2, 3],
   PONDEOMO_SEC: [4, 5, 6, 8, 10],
   PONDEAR_SEC: [4, 5, 6, 8, 10],
 } as const;
@@ -946,9 +947,11 @@ export function FrenchieCatchGame({ ownedItems }: { ownedItems: FrenchieCatchIte
               }
               case "other_orusuban": {
                 const orusubanSec = LV.ORUSUBAN_SEC[lv]!;
+                const orusubanShield = LV.ORUSUBAN_SHIELD[lv]!;
                 fallSpeedBoostUntilRef.current = now + orusubanSec * 1000;
                 fallSpeedValueRef.current = LV.ORUSUBAN_FALL[lv]!;
-                effectLabel = `${orusubanSec}秒間 落下速度×${LV.ORUSUBAN_FALL[lv]}${lvTag}`;
+                comboShieldRef.current += orusubanShield;
+                effectLabel = `${orusubanSec}秒間 落下速度×${LV.ORUSUBAN_FALL[lv]} / コンボ保護+${orusubanShield}${lvTag}`;
                 statusChanged = true;
                 break;
               }
