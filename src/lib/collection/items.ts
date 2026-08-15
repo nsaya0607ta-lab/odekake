@@ -137,6 +137,7 @@ const CURATED_ITEMS: readonly CollectionItem[] = [
   { id: "interior_sleepy_moon", name: "おやすみムーン", image: "/collection/items/sleepy-moon.webp", category: "interior", series: null, rarity: "SR" },
   { id: "interior_spring_flower_wreath", name: "はるいろフラワーリース", image: "/collection/items/spring-flower-wreath.webp", category: "interior", series: null, rarity: "SR" },
   { id: "interior_shikkoku_no_ar", name: "漆黒のアー", image: "/collection/items/shikkoku-no-ar.webp", category: "interior", series: null, rarity: "LR" },
+  { id: "interior_ragby_ar", name: "ラグビーアー", image: "/collection/items/ragby-ar.png", category: "interior", series: null, rarity: "LR" },
 
   // --- 通常図鑑：アクセサリー ----------------------------------------
   { id: "other_sparkle_rope_crown", name: "きらきらロープクラウン", image: "/collection/items/sparkle-rope-crown.webp", category: "accessory", series: null, rarity: "SR" },
