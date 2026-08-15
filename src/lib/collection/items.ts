@@ -150,6 +150,18 @@ const CURATED_ITEMS: readonly CollectionItem[] = [
   { id: "other_kobee", name: "こびー", image: "/collection/items/C7DF48F4-588E-4B31-983E-A52623328924.png", category: "other", series: null, rarity: "UR" },
   { id: "other_kamunayo", name: "かむなよ", image: "/collection/items/7FEA86AD-6904-4151-BEA8-5A33F7C97B01.png", category: "other", series: null, rarity: "SSR" },
 
+  // --- 通常図鑑：おでかけ小物 ------------------------------------------
+  { id: "other_yellow_rain_boots", name: "きいろのながぐつ", image: "/collection/items/yellow-rain-boots.webp", category: "other", series: null, rarity: "N" },
+  { id: "accessory_red_bandana", name: "あかいバンダナ", image: "/collection/items/red-bandana.webp", category: "accessory", series: null, rarity: "N" },
+  { id: "other_acorns", name: "ころころどんぐり", image: "/collection/items/acorns.webp", category: "other", series: null, rarity: "N" },
+  { id: "toy_paper_airplane", name: "しろい紙ひこうき", image: "/collection/items/paper-airplane.webp", category: "toy", series: null, rarity: "N" },
+  { id: "other_walk_water_bottle", name: "おさんぽ水筒", image: "/collection/items/walk-water-bottle.webp", category: "other", series: null, rarity: "N" },
+  { id: "other_shiny_pinecone", name: "つやつやまつぼっくり", image: "/collection/items/pinecone.webp", category: "other", series: null, rarity: "N" },
+  { id: "accessory_blue_handkerchief", name: "あおいハンカチ", image: "/collection/items/paw-picnic-blanket.webp", category: "accessory", series: null, rarity: "N" },
+  { id: "toy_red_balloon", name: "あかい風船", image: "/collection/items/red-balloon.webp", category: "toy", series: null, rarity: "N" },
+  { id: "toy_sand_bucket", name: "おすなばバケツ", image: "/collection/items/flower-sand-bucket.webp", category: "toy", series: null, rarity: "N" },
+  { id: "accessory_walk_pouch", name: "おさんぽポーチ", image: "/collection/items/pet-outing-bag.webp", category: "accessory", series: null, rarity: "N" },
+
   // --- 登山シリーズ ----------------------------------------------------
   { id: "hiking_frenchie", name: "登山のフレブル", image: "/collection/skins/hiking-frenchie.webp", category: "other", series: "hiking", rarity: "SSR", art: "dogHiking" },
   // --- 雪国シリーズ ----------------------------------------------------
