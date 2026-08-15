@@ -118,7 +118,7 @@ export default async function HomePage({
               </HomeScene>
               <WanderingFrenchie level={expProgress.level} skin={dogSkin} />
 
-              <div className="absolute right-2 top-2 z-40 flex w-[132px] flex-col gap-0">
+              <div className="absolute right-2 top-2 z-40 flex w-[132px] flex-col" style={{ gap: 0 }}>
                 <Link
                   href="/games"
                   aria-label="ミニゲーム一覧を開く"
@@ -138,7 +138,7 @@ export default async function HomePage({
                   href="/mypage/coins"
                   aria-label="ガチャを引く"
                   className="block aspect-[3/1] w-full overflow-hidden rounded-full !border-0 !bg-transparent !p-0 !shadow-none active:scale-[0.97]"
-                  style={{ background: "transparent", boxShadow: "none" }}
+                  style={{ background: "transparent", boxShadow: "none", marginTop: 0 }}
                 >
                   {/* eslint-disable-next-line @next/next/no-img-element */}
                   <img
