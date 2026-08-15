@@ -77,6 +77,8 @@ const BAG_ITEM_ID = "hazard_bag";
 const BAG_IMAGE = "/collection/items/plastic-bag.webp";
 const BAG_SPAWN_CHANCE = 0.03;
 const BAG_MAX_STOCK = 3;
+const COMBO_SHIELD_MAX = 4;
+const COMBO_SHIELD_IMAGE = "/collection/items/combo-shield.webp";
 const JUST_RADIUS_RATIO = 0.3;
 const JUST_MULTIPLIER = 1.25;
 const MYSTERY_SKILL_ITEM_IDS = [
@@ -289,6 +291,7 @@ export function FrenchieCatchGame({ ownedItems }: { ownedItems: FrenchieCatchIte
   const [maxCombo, setMaxCombo] = useState(0);
   const [caught, setCaught] = useState(0);
   const [bagStock, setBagStock] = useState(0);
+  const [comboShield, setComboShield] = useState(0);
   const [feedback, setFeedback] = useState<CatchFeedback | null>(null);
   const [activeEffects, setActiveEffects] = useState<string[]>([]);
   const [impactX, setImpactX] = useState<number | null>(null);
@@ -556,6 +559,7 @@ export function FrenchieCatchGame({ ownedItems }: { ownedItems: FrenchieCatchIte
         if (now < comboInvincibleUntilRef.current) return;
         if (comboRef.current > 0 && comboShieldRef.current > 0) {
           comboShieldRef.current -= 1;
+          setComboShield(comboShieldRef.current);
           refreshEffectStatus(now);
           return;
         }
@@ -770,7 +774,8 @@ export function FrenchieCatchGame({ ownedItems }: { ownedItems: FrenchieCatchIte
               case "toy_bear_plush": {
                 const shield = LV.BEAR_SHIELD[lv]!;
                 const bonusPt = LV.BEAR_PT[lv]!;
-                comboShieldRef.current += shield;
+                comboShieldRef.current = Math.min(COMBO_SHIELD_MAX, comboShieldRef.current + shield);
+                setComboShield(comboShieldRef.current);
                 points += bonusPt;
                 effectLabel = bonusPt > 0 ? `コンボ${shield}回保護 +${bonusPt}pt${lvTag}` : `コンボ${shield}回保護${lvTag}`;
                 statusChanged = true;
@@ -893,7 +898,8 @@ export function FrenchieCatchGame({ ownedItems }: { ownedItems: FrenchieCatchIte
                 break;
               }
               case "interior_sleepy_moon":
-                comboShieldRef.current += LV.SLEEPY_SHIELD[lv]!;
+                comboShieldRef.current = Math.min(COMBO_SHIELD_MAX, comboShieldRef.current + LV.SLEEPY_SHIELD[lv]!);
+                setComboShield(comboShieldRef.current);
                 effectLabel = `コンボ保護+${LV.SLEEPY_SHIELD[lv]}回${lvTag}`;
                 statusChanged = true;
                 break;
@@ -910,7 +916,8 @@ export function FrenchieCatchGame({ ownedItems }: { ownedItems: FrenchieCatchIte
                 break;
               case "other_nakayoshi_azubee":
                 points += LV.NAKAYOSHI_PT[lv]!;
-                comboShieldRef.current += LV.NAKAYOSHI_SHIELD[lv]!;
+                comboShieldRef.current = Math.min(COMBO_SHIELD_MAX, comboShieldRef.current + LV.NAKAYOSHI_SHIELD[lv]!);
+                setComboShield(comboShieldRef.current);
                 effectLabel = `+${LV.NAKAYOSHI_PT[lv]}pt / コンボ保護+${LV.NAKAYOSHI_SHIELD[lv]}回${lvTag}`;
                 statusChanged = true;
                 break;
@@ -951,7 +958,8 @@ export function FrenchieCatchGame({ ownedItems }: { ownedItems: FrenchieCatchIte
               case "other_komochi":
                 nextMultiplierRef.current = LV.KOMOCHI_MULT[lv]!;
                 nextMultiplierCountRef.current = LV.KOMOCHI_COUNT[lv]!;
-                comboShieldRef.current += LV.KOMOCHI_SHIELD[lv]!;
+                comboShieldRef.current = Math.min(COMBO_SHIELD_MAX, comboShieldRef.current + LV.KOMOCHI_SHIELD[lv]!);
+                setComboShield(comboShieldRef.current);
                 effectLabel = `次の${LV.KOMOCHI_COUNT[lv]}個 ×${LV.KOMOCHI_MULT[lv]} / コンボ保護+${LV.KOMOCHI_SHIELD[lv]}回${lvTag}`;
                 statusChanged = true;
                 break;
@@ -998,7 +1006,8 @@ export function FrenchieCatchGame({ ownedItems }: { ownedItems: FrenchieCatchIte
                 const orusubanShield = LV.ORUSUBAN_SHIELD[lv]!;
                 fallSpeedBoostUntilRef.current = now + orusubanSec * 1000;
                 fallSpeedValueRef.current = LV.ORUSUBAN_FALL[lv]!;
-                comboShieldRef.current += orusubanShield;
+                comboShieldRef.current = Math.min(COMBO_SHIELD_MAX, comboShieldRef.current + orusubanShield);
+                setComboShield(comboShieldRef.current);
                 effectLabel = `${orusubanSec}秒間 落下速度×${LV.ORUSUBAN_FALL[lv]} / コンボ保護+${orusubanShield}${lvTag}`;
                 statusChanged = true;
                 break;
@@ -1177,6 +1186,7 @@ export function FrenchieCatchGame({ ownedItems }: { ownedItems: FrenchieCatchIte
     nextBonus10Ref.current = 0;
     nextBonus10ValueRef.current = 10;
     comboShieldRef.current = 0;
+    setComboShield(0);
     multiplier15UntilRef.current = 0;
     multiplier15ValueRef.current = 1.5;
     multiplier2UntilRef.current = 0;
@@ -1266,11 +1276,22 @@ export function FrenchieCatchGame({ ownedItems }: { ownedItems: FrenchieCatchIte
         <div className="absolute left-3 right-3 top-3 z-30 flex items-start justify-between gap-2">
           <div className="flex flex-col items-start gap-1">
             <div className="rounded-2xl border border-white/80 bg-white/90 px-3 py-2 shadow-sm"><p className="text-[9px] font-bold tracking-widest text-ink-faint">SCORE</p><p className="text-xl font-black tabular-nums text-ink">{score.toLocaleString("ja-JP")}</p></div>
-            {bagStock > 0 ? (
-              <div className="flex flex-col items-start gap-0.5">
-                {Array.from({ length: bagStock }, (_, index) => (
-                  <Image key={index} src={BAG_IMAGE} alt="ビニール袋" width={28} height={28} draggable={false} className="h-6 w-6 object-contain drop-shadow-[0_2px_3px_rgba(0,0,0,0.25)]" />
-                ))}
+            {bagStock > 0 || comboShield > 0 ? (
+              <div className="flex flex-row items-start gap-1.5">
+                {bagStock > 0 ? (
+                  <div className="flex flex-col items-start gap-0.5">
+                    {Array.from({ length: bagStock }, (_, index) => (
+                      <Image key={index} src={BAG_IMAGE} alt="ビニール袋" width={28} height={28} draggable={false} className="h-6 w-6 object-contain drop-shadow-[0_2px_3px_rgba(0,0,0,0.25)]" />
+                    ))}
+                  </div>
+                ) : null}
+                {comboShield > 0 ? (
+                  <div className="flex flex-col items-start gap-0.5">
+                    {Array.from({ length: comboShield }, (_, index) => (
+                      <Image key={index} src={COMBO_SHIELD_IMAGE} alt="コンボ保護" width={28} height={28} draggable={false} className="h-6 w-6 object-contain drop-shadow-[0_2px_3px_rgba(0,0,0,0.25)]" />
+                    ))}
+                  </div>
+                ) : null}
               </div>
             ) : null}
           </div>
