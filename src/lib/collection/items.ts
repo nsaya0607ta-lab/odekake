@@ -149,6 +149,7 @@ const CURATED_ITEMS: readonly CollectionItem[] = [
   { id: "other_azuki", name: "小豆(あずき)", image: "/collection/items/6F31AD19-B242-42D6-83D3-380A3F3D3FC0.png", category: "other", series: null, rarity: "UR" },
   { id: "other_kobee", name: "こびー", image: "/collection/items/4FA70BBA-6CBA-42B2-9A96-4B07AFDF56E0.png", category: "other", series: null, rarity: "UR" },
   { id: "other_kamunayo", name: "かむなよ", image: "/collection/items/7FEA86AD-6904-4151-BEA8-5A33F7C97B01.png", category: "other", series: null, rarity: "SSR" },
+  { id: "other_hamigaki", name: "はみがき", image: "/collection/items/hamigaki.webp", category: "other", series: null, rarity: "SSR" },
 
   // --- 通常図鑑：おでかけ小物 ------------------------------------------
   { id: "other_yellow_rain_boots", name: "きいろのながぐつ", image: "/collection/items/yellow-rain-boots.webp", category: "other", series: null, rarity: "N" },

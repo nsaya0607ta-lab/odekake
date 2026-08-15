@@ -83,7 +83,7 @@ const MYSTERY_SKILL_ITEM_IDS = [
   "toy_paw_macaron", "food_strawberry_roll_cake", "toy_star_wan_wand", "interior_sleepy_moon",
   "interior_spring_flower_wreath", "other_sparkle_rope_crown", "other_nakayoshi_azubee",
   "other_kamunayo", "hiking_frenchie", "snow_frenchie", "summer_frenchie", "interior_kinoko_azubee",
-  "other_komochi", "other_azuki", "other_kobee",
+  "other_komochi", "other_azuki", "other_kobee", "other_hamigaki",
 ];
 
 /** アイテムごとのLv1〜5パラメータ（item_skill_levels_colored.xlsxの「スキル一覧」シート通り） */
@@ -143,6 +143,8 @@ const LV = {
   AZUKI_PT: [50, 65, 80, 100, 130],
   KOBEE_PT: [50, 65, 80, 100, 130],
   KOBEE_SEC: [8, 9, 11, 13, 16],
+  HAMIGAKI_SEC: [0, 2, 3, 4, 5],
+  HAMIGAKI_PT: [0, 0, 10, 15, 20],
 } as const;
 const POINTS: Record<FrenchieCatchItem["rarity"], number> = { N: 10, R: 20, SR: 40, SSR: 70, UR: 100 };
 const RARITY_FALL_SPEED: Record<FrenchieCatchItem["rarity"], number> = { N: 1, R: 1.08, SR: 1.18, SSR: 1.32, UR: 1.5 };
@@ -250,6 +252,7 @@ export function FrenchieCatchGame({ ownedItems }: { ownedItems: FrenchieCatchIte
   const urBoostRef = useRef(0);
   const fallSpeedBoostUntilRef = useRef(0);
   const fallSpeedValueRef = useRef(FALL_SPEED_BOOST);
+  const poopSuppressUntilRef = useRef(0);
   const feedbackTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const impactTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -287,6 +290,7 @@ export function FrenchieCatchGame({ ownedItems }: { ownedItems: FrenchieCatchIte
     if (now < comboMultiplierBoostUntilRef.current) labels.push("コンボ倍率アップ中");
     if (now < magnetUntilRef.current) labels.push(magnetStrengthRef.current === "weak" ? "ミニマグネット発動中" : "マグネット発動中");
     if (now < fallSpeedBoostUntilRef.current) labels.push("落下速度アップ中");
+    if (now < poopSuppressUntilRef.current) labels.push("うんち出現なし");
     if (now < boxWideUntilRef.current) labels.push(`ダンボール×${boxWideScaleRef.current}拡大中`);
     if (urBoostRef.current > 0) labels.push(`UR出現率+${Math.min(urBoostRef.current, UR_BOOST_MAX)}`);
     setActiveEffects(labels);
@@ -309,7 +313,7 @@ export function FrenchieCatchGame({ ownedItems }: { ownedItems: FrenchieCatchIte
     };
 
     const hazardRoll = Math.random();
-    if (hazardRoll < POOP_SPAWN_CHANCE) {
+    if (hazardRoll < POOP_SPAWN_CHANCE && performance.now() >= poopSuppressUntilRef.current) {
       return {
         ...base,
         itemId: POOP_ITEM_ID,
@@ -476,6 +480,10 @@ export function FrenchieCatchGame({ ownedItems }: { ownedItems: FrenchieCatchIte
       }
       if (fallSpeedBoostUntilRef.current > 0 && now >= fallSpeedBoostUntilRef.current) {
         fallSpeedBoostUntilRef.current = 0;
+        timedEffectChanged = true;
+      }
+      if (poopSuppressUntilRef.current > 0 && now >= poopSuppressUntilRef.current) {
+        poopSuppressUntilRef.current = 0;
         timedEffectChanged = true;
       }
       if (timedEffectChanged) refreshEffectStatus(now);
@@ -856,6 +864,23 @@ export function FrenchieCatchGame({ ownedItems }: { ownedItems: FrenchieCatchIte
                 effectLabel = `+${LV.KOBEE_PT[lv]}pt / ${LV.KOBEE_SEC[lv]}秒間 無敵コンボ${lvTag}`;
                 statusChanged = true;
                 break;
+              case "other_hamigaki": {
+                entitiesRef.current.forEach((e) => {
+                  if (e.itemId === POOP_ITEM_ID && e.status !== "caught") e.y = 999;
+                });
+                const suppressSec = LV.HAMIGAKI_SEC[lv]!;
+                points += LV.HAMIGAKI_PT[lv]!;
+                if (suppressSec > 0) {
+                  poopSuppressUntilRef.current = now + suppressSec * 1000;
+                  effectLabel = LV.HAMIGAKI_PT[lv]! > 0
+                    ? `うんち一掃 / ${suppressSec}秒間 出現なし / +${LV.HAMIGAKI_PT[lv]}pt${lvTag}`
+                    : `うんち一掃 / ${suppressSec}秒間 出現なし${lvTag}`;
+                } else {
+                  effectLabel = `うんち一掃${lvTag}`;
+                }
+                statusChanged = true;
+                break;
+              }
               default:
                 break;
             }
@@ -1008,6 +1033,7 @@ export function FrenchieCatchGame({ ownedItems }: { ownedItems: FrenchieCatchIte
     urBoostRef.current = 0;
     fallSpeedBoostUntilRef.current = 0;
     fallSpeedValueRef.current = FALL_SPEED_BOOST;
+    poopSuppressUntilRef.current = 0;
     setEntities([]);
     setBoxX(50);
     setScore(0);
