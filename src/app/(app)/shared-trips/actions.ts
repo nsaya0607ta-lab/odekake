@@ -48,6 +48,20 @@ export async function createSharedTripAction(_prev: ActionState, formData: FormD
   redirect("/shared-trips?created=1");
 }
 
+export async function leaveSharedTripAction(formData: FormData) {
+  const tripId = String(formData.get("tripId") ?? "");
+  if (!/^[0-9a-f-]{36}$/i.test(tripId)) redirect("/shared-trips");
+
+  const { supabase } = await requireUser();
+  const { error } = await supabase.rpc("leave_shared_trip", { p_trip_id: tripId });
+  if (error) {
+    console.error("Leave shared trip failed", { code: error.code, message: error.message });
+    redirect("/shared-trips?error=leave");
+  }
+  revalidatePath("/shared-trips");
+  redirect("/shared-trips?left=1");
+}
+
 export async function respondSharedTripInvitationAction(formData: FormData) {
   const tripId = String(formData.get("tripId") ?? "");
   const accept = String(formData.get("response") ?? "") === "accept";
