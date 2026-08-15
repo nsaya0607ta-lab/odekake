@@ -16,7 +16,7 @@ export default async function ItemCatchPage() {
 
   const catchItems = COLLECTION_ITEMS.flatMap((item) => {
     const count = ownedItemCounts.get(item.id) ?? 0;
-    if (count <= 0 || !item.image || item.rarity === "LR") return [];
+    if (count <= 0 || !item.image) return [];
     return [{
       id: item.id,
       name: item.name,
