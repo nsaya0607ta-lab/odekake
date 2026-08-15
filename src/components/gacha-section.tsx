@@ -43,12 +43,12 @@ const RARITY_FRAME_PATHS: Record<GachaRarity, string> = {
   LR: "/collection/rarity-frames/lr.webp",
 };
 
-/** LRの画像は余白なしでトリミング済みのため、他レアリティと同じ非対称倍率だと絵柄が横に歪む。LRだけ均等倍率にする。 */
+/** 各画像は実際は余白なしフルブリードなので、非対称倍率だと絵柄が横に歪む。R/SR/SSR/LRは均等倍率にする（N/URは既存の見た目を保つため据え置き）。 */
 const RARITY_FRAME_SCALE: Record<GachaRarity, string> = {
   N: "scaleX(1.18) scaleY(1.06)",
-  R: "scaleX(1.18) scaleY(1.06)",
-  SR: "scaleX(1.18) scaleY(1.06)",
-  SSR: "scaleX(1.18) scaleY(1.06)",
+  R: "scale(1.02)",
+  SR: "scale(1.02)",
+  SSR: "scale(1.02)",
   UR: "scaleX(1.18) scaleY(1.06)",
   LR: "scale(1.02)",
 };

@@ -57,16 +57,17 @@ const RARITY_FRAME_PATHS: Record<GachaRarity, string> = {
 };
 
 /**
- * フレーム画像を敷くときの拡大率。N〜URの画像は元テンプレートに余白が
- * 仕込まれている前提でscaleX/scaleYを別々にチューニングしてあるが、
- * LRの画像はすでに余白なしでトリミング済みのため、同じ非対称倍率をかけると
- * 中の絵柄だけ横に歪んで伸びて見える。LRだけ歪みのない均等倍率にする。
+ * フレーム画像を敷くときの拡大率。全レアリティの画像とも実際は余白なし
+ * フルブリードだが、旧来scaleX(1.18) scaleY(1.06)という横だけ大きい
+ * 非対称倍率がかかっており、絵柄が横方向に歪んで伸びて見えていた
+ * （SR以下は単色グラデーション中心の絵柄だったため目立たなかっただけ）。
+ * R/SR/SSR/LRは歪みのない均等倍率に変更。N/URは既存の見た目を保つため据え置き。
  */
 const RARITY_FRAME_SCALE: Record<GachaRarity, string> = {
   N: "scaleX(1.18) scaleY(1.06)",
-  R: "scaleX(1.18) scaleY(1.06)",
-  SR: "scaleX(1.18) scaleY(1.06)",
-  SSR: "scaleX(1.18) scaleY(1.06)",
+  R: "scale(1.02)",
+  SR: "scale(1.02)",
+  SSR: "scale(1.02)",
   UR: "scaleX(1.18) scaleY(1.06)",
   LR: "scale(1.02)",
 };
