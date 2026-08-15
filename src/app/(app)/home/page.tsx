@@ -129,7 +129,7 @@ export default async function HomePage({
                   <img
                     src={MINI_GAME_BUTTON_SRC}
                     alt="ミニゲーム"
-                    className="block h-full w-full -translate-y-[3px] !bg-transparent object-contain"
+                    className="block h-full w-full -translate-y-[6px] !bg-transparent object-contain"
                     style={{ background: "transparent" }}
                   />
                 </Link>
@@ -144,7 +144,7 @@ export default async function HomePage({
                   <img
                     src={GACHA_BUTTON_SRC}
                     alt="ガチャを引く"
-                    className="block h-full w-full -translate-y-[3px] !bg-transparent object-contain"
+                    className="block h-full w-full -translate-y-[6px] !bg-transparent object-contain"
                     style={{ background: "transparent" }}
                   />
                 </Link>
