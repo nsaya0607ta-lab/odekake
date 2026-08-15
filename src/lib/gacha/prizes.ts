@@ -74,6 +74,18 @@ export const GACHA_PRIZES: readonly GachaPrize[] = [
   { id: "other_kamunayo", name: "かむなよ", rarity: "SSR", type: "item", pool: "regular", image: "/collection/items/7FEA86AD-6904-4151-BEA8-5A33F7C97B01.png" },
   { id: "other_sparkle_rope_crown", name: "きらきらロープクラウン", rarity: "SR", type: "item", pool: "regular", image: "/collection/items/sparkle-rope-crown.webp" },
 
+  // --- 通常ガチャ：おでかけ小物 ----------------------------------------
+  { id: "other_yellow_rain_boots", name: "きいろのながぐつ", rarity: "N", type: "item", pool: "regular", image: "/collection/items/yellow-rain-boots.webp" },
+  { id: "accessory_red_bandana", name: "あかいバンダナ", rarity: "N", type: "item", pool: "regular", image: "/collection/items/red-bandana.webp" },
+  { id: "other_acorns", name: "ころころどんぐり", rarity: "N", type: "item", pool: "regular", image: "/collection/items/acorns.webp" },
+  { id: "toy_paper_airplane", name: "しろい紙ひこうき", rarity: "N", type: "item", pool: "regular", image: "/collection/items/paper-airplane.webp" },
+  { id: "other_walk_water_bottle", name: "おさんぽ水筒", rarity: "N", type: "item", pool: "regular", image: "/collection/items/walk-water-bottle.webp" },
+  { id: "other_shiny_pinecone", name: "つやつやまつぼっくり", rarity: "N", type: "item", pool: "regular", image: "/collection/items/pinecone.webp" },
+  { id: "accessory_blue_handkerchief", name: "あおいハンカチ", rarity: "N", type: "item", pool: "regular", image: "/collection/items/paw-picnic-blanket.webp" },
+  { id: "toy_red_balloon", name: "あかい風船", rarity: "N", type: "item", pool: "regular", image: "/collection/items/red-balloon.webp" },
+  { id: "toy_sand_bucket", name: "おすなばバケツ", rarity: "N", type: "item", pool: "regular", image: "/collection/items/flower-sand-bucket.webp" },
+  { id: "accessory_walk_pouch", name: "おさんぽポーチ", rarity: "N", type: "item", pool: "regular", image: "/collection/items/pet-outing-bag.webp" },
+
   // --- 犬スキン（すべてSSR・共通ガチャから排出） ----------------------
   { id: "hiking_frenchie", name: "登山のフレブル", rarity: "SSR", type: "dog_skin", pool: "regular", image: "/collection/skins/hiking-frenchie.webp" },
   { id: "snow_frenchie", name: "雪国のフレブル", rarity: "SSR", type: "dog_skin", pool: "regular", image: "/collection/skins/snow-frenchie.webp" },
