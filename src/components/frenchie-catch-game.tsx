@@ -1300,7 +1300,10 @@ export function FrenchieCatchGame({ ownedItems }: { ownedItems: FrenchieCatchIte
         </div>
 
         {activeEffects.length > 0 ? (
-          <div className="pointer-events-none absolute left-1/2 top-[72px] z-30 flex w-[82%] -translate-x-1/2 flex-wrap justify-center gap-1">
+          <div
+            className="pointer-events-none absolute left-1/2 z-30 flex w-[82%] -translate-x-1/2 flex-wrap justify-center gap-1"
+            style={{ top: `${72 + Math.max(bagStock, comboShield) * 26}px` }}
+          >
             {activeEffects.map((effect) => (
               <span key={effect} className="rounded-full border border-[#f1c969] bg-[#fff6cc]/95 px-2 py-1 text-[9px] font-black text-[#9a6322] shadow-sm">{effect}</span>
             ))}
