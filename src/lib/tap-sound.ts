@@ -2,18 +2,13 @@
 // ネットワーク取得やデコードの待ち時間が発生しないようにする。
 // `new Audio(url).play()` を毎回呼ぶと、初回再生までに遅延が出るため。
 
-let context: AudioContext | null = null;
+import { getAudioContext, resumeAudioContext } from "./audio-context";
+
 let bufferPromise: Promise<AudioBuffer> | null = null;
 
-function getContext(): AudioContext {
-  if (!context) {
-    context = new AudioContext();
-  }
-  return context;
-}
-
-function loadBuffer(ctx: AudioContext): Promise<AudioBuffer> {
+function loadBuffer(): Promise<AudioBuffer> {
   if (!bufferPromise) {
+    const ctx = getAudioContext();
     bufferPromise = fetch("/audio/tap.mp3")
       .then((res) => res.arrayBuffer())
       .then((data) => ctx.decodeAudioData(data));
@@ -23,17 +18,14 @@ function loadBuffer(ctx: AudioContext): Promise<AudioBuffer> {
 
 /** 最初のユーザー操作までに、可能なら先読みしておく */
 export function preloadTapSound(): void {
-  const ctx = getContext();
-  loadBuffer(ctx).catch(() => {});
+  loadBuffer().catch(() => {});
 }
 
 export function playTapSound(gain: number): void {
   if (gain <= 0) return;
-  const ctx = getContext();
-  if (ctx.state === "suspended") {
-    ctx.resume().catch(() => {});
-  }
-  loadBuffer(ctx)
+  const ctx = getAudioContext();
+  resumeAudioContext();
+  loadBuffer()
     .then((buffer) => {
       const source = ctx.createBufferSource();
       source.buffer = buffer;

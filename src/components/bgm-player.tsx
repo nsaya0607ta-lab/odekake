@@ -1,11 +1,15 @@
 "use client";
 
-import { useEffect, useRef } from "react";
+import { useEffect } from "react";
 import { getBgmVolume, getTapVolume, sliderToGain, SOUND_SETTINGS_EVENT } from "@/lib/sound-settings";
+import { isAudioContextRunning, resumeAudioContext } from "@/lib/audio-context";
+import { isBgmPlaying, pauseBgm, playBgm, preloadBgm, setBgmGain } from "@/lib/bgm-engine";
 import { playTapSound, preloadTapSound } from "@/lib/tap-sound";
 
 /**
  * アプリ起動時にBGMをループ再生し、タップ操作には効果音を鳴らす。
+ * どちらもWeb Audio APIのGainNodeで音量制御する
+ * (<audio>要素の.volumeはiOS Safariでは変更できないため)。
  * 音量は設定ボタン(SettingsButton)で調整でき、localStorageで共有する。
  *
  * - ブラウザの自動再生制限があるため、即時再生を試みつつ、
@@ -14,18 +18,17 @@ import { playTapSound, preloadTapSound } from "@/lib/tap-sound";
  *   戻ってきたら再開する。サイトを閉じている間は鳴らさない
  */
 export function BgmPlayer() {
-  const audioRef = useRef<HTMLAudioElement | null>(null);
-
   useEffect(() => {
-    const audio = audioRef.current;
-    if (!audio) return;
+    preloadBgm();
+    preloadTapSound();
+    setBgmGain(sliderToGain(getBgmVolume()));
 
-    audio.volume = sliderToGain(getBgmVolume());
-
-    const tryPlay = () => {
+    const tryPlay = async () => {
       if (getBgmVolume() <= 0 || document.visibilityState !== "visible") return;
-      audio.play().catch(() => {
-        // 自動再生がブロックされた場合は、最初のユーザー操作で再試行する
+
+      await resumeAudioContext();
+      if (!isAudioContextRunning()) {
+        // 自動再生がブロックされている場合は、最初のユーザー操作で再試行する
         const resume = () => {
           tryPlay();
           window.removeEventListener("pointerdown", resume);
@@ -33,23 +36,26 @@ export function BgmPlayer() {
         };
         window.addEventListener("pointerdown", resume, { once: true });
         window.addEventListener("keydown", resume, { once: true });
-      });
+        return;
+      }
+
+      await playBgm();
     };
 
     const onVisibilityChange = () => {
       if (document.visibilityState === "visible") {
         tryPlay();
       } else {
-        audio.pause();
+        pauseBgm();
       }
     };
 
     const onSoundSettingsChange = () => {
       const volume = getBgmVolume();
-      audio.volume = sliderToGain(volume);
+      setBgmGain(sliderToGain(volume));
       if (volume <= 0) {
-        audio.pause();
-      } else if (audio.paused && document.visibilityState === "visible") {
+        pauseBgm();
+      } else if (!isBgmPlaying() && document.visibilityState === "visible") {
         tryPlay();
       }
     };
@@ -61,11 +67,6 @@ export function BgmPlayer() {
       document.removeEventListener("visibilitychange", onVisibilityChange);
       window.removeEventListener(SOUND_SETTINGS_EVENT, onSoundSettingsChange);
     };
-  }, []);
-
-  // タップ音を先読みしておき、実際に鳴らすときの遅延をなくす
-  useEffect(() => {
-    preloadTapSound();
   }, []);
 
   // ボタン・リンクを最後まで押し切って「クリック」が成立したときだけ操作音を鳴らす。
@@ -83,5 +84,5 @@ export function BgmPlayer() {
     return () => document.removeEventListener("click", onClick, true);
   }, []);
 
-  return <audio ref={audioRef} src="/audio/bgm.mp3" loop preload="auto" />;
+  return null;
 }
