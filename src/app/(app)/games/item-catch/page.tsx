@@ -1,4 +1,6 @@
+import Link from "next/link";
 import { FrenchieCatchGame } from "@/components/frenchie-catch-game";
+import { IconChevronRight, IconNotebook } from "@/components/icons";
 import { ItemCatchRanking } from "@/components/item-catch-ranking";
 import { PageBody } from "@/components/page-body";
 import { TopHeader } from "@/components/page-header";
@@ -36,6 +38,21 @@ export default async function ItemCatchPage() {
 
       <PageBody className="!space-y-3 !py-3">
         <FrenchieCatchGame ownedItems={catchItems} />
+
+        <Link
+          href="/games/item-catch/guide"
+          className="rough-card flex items-center gap-3 p-4 active:scale-[0.99]"
+        >
+          <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-leaf-soft text-leaf-deep">
+            <IconNotebook size={21} />
+          </span>
+          <span className="min-w-0 flex-1">
+            <span className="block text-sm font-bold">ルールとスキルを見る</span>
+            <span className="mt-0.5 block text-[11px] text-ink-soft">得点のしくみと、持っているスキルの効果</span>
+          </span>
+          <IconChevronRight size={18} className="shrink-0 text-ink-faint" />
+        </Link>
+
         <ItemCatchRanking />
       </PageBody>
     </>
