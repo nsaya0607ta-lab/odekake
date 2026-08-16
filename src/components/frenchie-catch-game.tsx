@@ -605,10 +605,10 @@ export function FrenchieCatchGame({ ownedItems }: { ownedItems: FrenchieCatchIte
     if (phase !== "playing" || performance.now() < stunUntilRef.current) return;
     let last = performance.now();
 
-    /** いつものフレブル(N)を取った回数×プレイ時間(秒)÷10を最後にまとめて加算する（小数点切り捨て） */
+    /** いつものフレブル(N)を取った回数×プレイ時間(秒)を最後にまとめて加算する（小数点切り捨て） */
     const finishRound = (now: number) => {
       const playSeconds = Math.max(0, (now - startAtRef.current) / 1000);
-      const dogBonus = Math.floor((dogCaughtRef.current * playSeconds) / 10);
+      const dogBonus = Math.floor(dogCaughtRef.current * playSeconds);
       if (dogBonus > 0) {
         scoreRef.current += dogBonus;
         setScore(scoreRef.current);
