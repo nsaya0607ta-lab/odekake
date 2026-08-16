@@ -312,6 +312,7 @@ export function FrenchieCatchGame({ ownedItems }: { ownedItems: FrenchieCatchIte
   const nextSpawnRef = useRef(0);
   const rafRef = useRef<number | null>(null);
   const scoreRef = useRef(0);
+  const dogCaughtRef = useRef(0);
   const comboRef = useRef(0);
   const maxComboRef = useRef(0);
   const caughtRef = useRef(0);
@@ -604,11 +605,22 @@ export function FrenchieCatchGame({ ownedItems }: { ownedItems: FrenchieCatchIte
     if (phase !== "playing" || performance.now() < stunUntilRef.current) return;
     let last = performance.now();
 
+    /** いつものフレブル(N)を取った回数×プレイ時間(秒)を最後にまとめて加算する（小数点切り捨て） */
+    const finishRound = (now: number) => {
+      const playSeconds = Math.max(0, (now - startAtRef.current) / 1000);
+      const dogBonus = Math.floor(dogCaughtRef.current * playSeconds);
+      if (dogBonus > 0) {
+        scoreRef.current += dogBonus;
+        setScore(scoreRef.current);
+      }
+      setPhase("finished");
+    };
+
     const frame = (now: number) => {
       const remaining = Math.max(0, (endAtRef.current - now) / 1000);
       setTimeLeft(Math.ceil(remaining));
       if (remaining <= 0) {
-        setPhase("finished");
+        finishRound(now);
         return;
       }
 
@@ -834,7 +846,7 @@ export function FrenchieCatchGame({ ownedItems }: { ownedItems: FrenchieCatchIte
                   const nextRemaining = Math.max(0, (endAtRef.current - now) / 1000);
                   setTimeLeft(Math.ceil(nextRemaining));
                   showCatch(entity, 0, "残り時間 -" + TIME_MINUS_SECONDS + "秒");
-                  if (endAtRef.current <= now) { endAtRef.current = now; setTimeLeft(0); setPhase("finished"); }
+                  if (endAtRef.current <= now) { endAtRef.current = now; setTimeLeft(0); finishRound(now); }
                 }
               } else if (entity.itemId === BOX_SHRINK_ITEM_ID) {
                 if (boxShrinkGuardRef.current > 0) {
@@ -863,7 +875,7 @@ export function FrenchieCatchGame({ ownedItems }: { ownedItems: FrenchieCatchIte
               } else if (entity.itemId === CHOCOLATE_ITEM_ID) {
                 endAtRef.current = now;
                 setTimeLeft(0);
-                setPhase("finished");
+                finishRound(now);
                 showCatch(entity, 0, "呪いのチョコレート…ゲーム終了！");
               }
               refreshEffectStatus(now);
@@ -1293,6 +1305,7 @@ export function FrenchieCatchGame({ ownedItems }: { ownedItems: FrenchieCatchIte
             if (milestoneLabel) effectLabel = effectLabel ? `${effectLabel} / ${milestoneLabel}` : milestoneLabel;
 
             scoreRef.current += points;
+            if (entity.kind === "dog") dogCaughtRef.current += 1;
             comboRef.current = nextCombo;
             caughtRef.current += 1;
             maxComboRef.current = Math.max(maxComboRef.current, comboRef.current);
@@ -1399,6 +1412,7 @@ export function FrenchieCatchGame({ ownedItems }: { ownedItems: FrenchieCatchIte
     entitiesRef.current = [];
     nextIdRef.current = 1;
     scoreRef.current = 0;
+    dogCaughtRef.current = 0;
     comboRef.current = 0;
     maxComboRef.current = 0;
     caughtRef.current = 0;

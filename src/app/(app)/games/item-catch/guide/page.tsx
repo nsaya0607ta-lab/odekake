@@ -97,6 +97,12 @@ export default async function ItemCatchGuidePage() {
               </div>
             ))}
           </div>
+          <div className="rounded-[22px] border border-[#d6c8a9] bg-gradient-to-r from-[#f5f0e4] to-[#fffaf0] p-3.5 shadow-[0_4px_12px_rgba(80,66,40,0.04)]">
+            <div className="flex items-start gap-3">
+              <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-[#d8c69b] bg-white text-sm shadow-sm">🐾</span>
+              <p className="text-[11px] leading-relaxed text-[#756854]"><b className="text-[#40362a]">いつものフレブル</b>(N)は、ゲーム終了時に<b className="text-[#40362a]">取った回数 × プレイ時間(秒)</b>(小数点切り捨て)のボーナスがまとめて加算されます。</p>
+            </div>
+          </div>
         </section>
 
         <section className="space-y-2">
