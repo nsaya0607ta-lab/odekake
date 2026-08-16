@@ -141,6 +141,10 @@ export default async function ItemCatchGuidePage() {
               { image: "/collection/items/dog-poop.webp", name: "犬のうんち", rate: "4%", body: "取ると −500pt。ビニール袋があればダメージを打ち消せます。", tone: "bg-gradient-to-br from-[#fff7f0] to-[#f9e7d8] border-[#e7cbb5]" },
               { image: "/collection/items/mystery-question.webp", name: "？アイテム", rate: "5%", body: "全アイテムからランダムに1つのスキルが発動。未所持ならLv1です。", tone: "bg-gradient-to-br from-[#f8f3fb] to-[#ece4f3] border-[#d8cae5]" },
               { image: "/collection/items/plastic-bag.webp", name: "ビニール袋", rate: "3%", body: "最大3つまで持てる「うんちよけ」。ダメージを1回打ち消します。", tone: "bg-gradient-to-br from-[#f2f8f4] to-[#e3f0e8] border-[#c7dccd]" },
+              { image: "/collection/items/hazard-time-minus.webp", name: "時間 -3秒", rate: "1.5%", body: "取ると残り時間が3秒減ります。0秒になるとその場でゲーム終了です。", tone: "bg-gradient-to-br from-[#fdf1f0] to-[#f6dcd9] border-[#e6bdb7]" },
+              { image: "/collection/items/hazard-box-shrink.webp", name: "ダンボール縮小", rate: "2%", body: "3秒間、段ボールの当たり判定が0.8倍に縮みます。", tone: "bg-gradient-to-br from-[#f4f1fb] to-[#e6e0f4] border-[#cec4e5]" },
+              { image: "/collection/items/hazard-blackout-squid.webp", name: "イカスミ", rate: "1%", body: "3秒間、画面の上半分が真っ黒になって見えなくなります。", tone: "bg-gradient-to-br from-[#eceef2] to-[#d8dbe3] border-[#b7bcc9]" },
+              { image: "/collection/items/hazard-stun-battery.webp", name: "しびれバッテリー", rate: "2%", body: "1秒間、段ボールが操作できなくなります。", tone: "bg-gradient-to-br from-[#fff8e8] to-[#fbecc4] border-[#e6cf8f]" },
             ].map((hazard) => (
               <div key={hazard.name} className={`rounded-[22px] border p-3 shadow-[0_5px_14px_rgba(80,66,40,0.045)] ${hazard.tone}`}>
                 <div className="flex items-center gap-3">

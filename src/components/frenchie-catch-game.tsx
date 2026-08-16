@@ -53,8 +53,6 @@ const OPEN_BOTTOM_LOCAL_Y = 0.48;
 const CATCH_START_LOCAL_Y = 0.36;
 const BOX_OPEN_TOP_Y = BOX_TOP + BOX_HEIGHT * OPEN_TOP_LOCAL_Y;
 const BOX_LIP_Y = BOX_TOP + BOX_HEIGHT * OPEN_BOTTOM_LOCAL_Y;
-const BOX_MIN_X = BOX_HALF + 1;
-const BOX_MAX_X = 100 - BOX_HALF - 1;
 const BOX_WIDE_SCALE_DEFAULT = 1.5;
 const BOX_WIDE_SCALE_STRONG = 1.7;
 const MAGNET_WEAK_RANGE = 14;
@@ -77,6 +75,29 @@ const BAG_ITEM_ID = "hazard_bag";
 const BAG_IMAGE = "/collection/items/plastic-bag.webp";
 const BAG_SPAWN_CHANCE = 0.03;
 const BAG_MAX_STOCK = 3;
+const TIME_MINUS_ITEM_ID = "hazard_time_minus";
+const TIME_MINUS_IMAGE = "/collection/items/hazard-time-minus.webp";
+const TIME_MINUS_SPAWN_CHANCE = 0.015;
+const TIME_MINUS_SECONDS = 3;
+const BOX_SHRINK_ITEM_ID = "hazard_box_shrink";
+const BOX_SHRINK_IMAGE = "/collection/items/hazard-box-shrink.webp";
+const BOX_SHRINK_SPAWN_CHANCE = 0.02;
+const BOX_SHRINK_SCALE = 0.8;
+const BOX_SHRINK_SECONDS = 3;
+const BLACKOUT_ITEM_ID = "hazard_blackout_squid";
+const BLACKOUT_IMAGE = "/collection/items/hazard-blackout-squid.webp";
+const BLACKOUT_SPAWN_CHANCE = 0.01;
+const BLACKOUT_SECONDS = 3;
+const STUN_ITEM_ID = "hazard_stun_battery";
+const STUN_IMAGE = "/collection/items/hazard-stun-battery.webp";
+const STUN_SPAWN_CHANCE = 0.02;
+const STUN_SECONDS = 1;
+const NEGATIVE_HAZARD_IDS = new Set([TIME_MINUS_ITEM_ID, BOX_SHRINK_ITEM_ID, BLACKOUT_ITEM_ID, STUN_ITEM_ID]);
+const SPAWN_INTERVAL_MIN_MS = 650;
+const SPAWN_INTERVAL_MAX_MS = 780;
+const NORMAL_ENTITY_CAP = 10;
+const DOUBLE_ENTITY_CAP = 15;
+const TRIPLE_ENTITY_CAP = 18;
 const COMBO_SHIELD_MAX = 4;
 const COMBO_SHIELD_IMAGE = "/collection/items/combo-shield.webp";
 const JUST_RADIUS_RATIO = 0.3;
@@ -279,6 +300,9 @@ export function FrenchieCatchGame({ ownedItems }: { ownedItems: FrenchieCatchIte
   const bagStockRef = useRef(0);
   const spawnRateBoostUntilRef = useRef(0);
   const spawnRateBoostValueRef = useRef(SPAWN_RATE_BOOST);
+  const boxShrinkUntilRef = useRef(0);
+  const blackoutUntilRef = useRef(0);
+  const stunUntilRef = useRef(0);
   const feedbackTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const impactTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -296,6 +320,8 @@ export function FrenchieCatchGame({ ownedItems }: { ownedItems: FrenchieCatchIte
   const [activeEffects, setActiveEffects] = useState<string[]>([]);
   const [impactX, setImpactX] = useState<number | null>(null);
   const [boxBounce, setBoxBounce] = useState(false);
+  const [blackoutActive, setBlackoutActive] = useState(false);
+  const [stunned, setStunned] = useState(false);
   const [coinReward, setCoinReward] = useState<number | null>(null);
   const [rewardPending, setRewardPending] = useState(false);
   const [rewardError, setRewardError] = useState<string | null>(null);
@@ -321,7 +347,10 @@ export function FrenchieCatchGame({ ownedItems }: { ownedItems: FrenchieCatchIte
     if (now < poopSuppressUntilRef.current) labels.push("うんち出現なし");
     if (now < ikeaUntilRef.current) labels.push(`くみたて中 ${ikeaCountRef.current}個`);
     if (now < spawnRateBoostUntilRef.current) labels.push(`アイテム出現量×${spawnRateBoostValueRef.current}中`);
-    if (now < boxWideUntilRef.current) labels.push(`ダンボール×${boxWideScaleRef.current}拡大中`);
+    if (now < boxShrinkUntilRef.current) labels.push("ダンボール0.8倍");
+    else if (now < boxWideUntilRef.current) labels.push(`ダンボール×${boxWideScaleRef.current}拡大中`);
+    if (now < blackoutUntilRef.current) labels.push("上半分ブラックアウト中");
+    if (now < stunUntilRef.current) labels.push("しびれ中");
     if (urBoostRef.current > 0) labels.push(`UR出現率+${Math.min(urBoostRef.current, UR_BOOST_MAX)}`);
     setActiveEffects(labels);
   }, []);
@@ -382,6 +411,15 @@ export function FrenchieCatchGame({ ownedItems }: { ownedItems: FrenchieCatchIte
         spin: (Math.random() - 0.5) * 30,
       };
     }
+
+    const timeMinusThreshold = POOP_SPAWN_CHANCE + MYSTERY_SPAWN_CHANCE + BAG_SPAWN_CHANCE + TIME_MINUS_SPAWN_CHANCE;
+    const shrinkThreshold = timeMinusThreshold + BOX_SHRINK_SPAWN_CHANCE;
+    const blackoutThreshold = shrinkThreshold + BLACKOUT_SPAWN_CHANCE;
+    const stunThreshold = blackoutThreshold + STUN_SPAWN_CHANCE;
+    if (hazardRoll < timeMinusThreshold) return { ...base, itemId: TIME_MINUS_ITEM_ID, kind: "item", name: "時間 -3秒", image: TIME_MINUS_IMAGE, rarity: null, level: 0, size: 13 + Math.random() * 3, spin: (Math.random() - 0.5) * 28 };
+    if (hazardRoll < shrinkThreshold) return { ...base, itemId: BOX_SHRINK_ITEM_ID, kind: "item", name: "ダンボール縮小", image: BOX_SHRINK_IMAGE, rarity: null, level: 0, size: 13 + Math.random() * 3, spin: (Math.random() - 0.5) * 28 };
+    if (hazardRoll < blackoutThreshold) return { ...base, itemId: BLACKOUT_ITEM_ID, kind: "item", name: "イカスミ", image: BLACKOUT_IMAGE, rarity: null, level: 0, size: 14 + Math.random() * 3, spin: (Math.random() - 0.5) * 22 };
+    if (hazardRoll < stunThreshold) return { ...base, itemId: STUN_ITEM_ID, kind: "item", name: "しびれバッテリー", image: STUN_IMAGE, rarity: null, level: 0, size: 12.5 + Math.random() * 3, spin: (Math.random() - 0.5) * 30 };
 
     if (itemPool.length === 0) {
       return {
@@ -484,11 +522,10 @@ export function FrenchieCatchGame({ ownedItems }: { ownedItems: FrenchieCatchIte
   }, []);
 
   useEffect(() => {
-    if (phase !== "playing") return;
+    if (phase !== "playing" || performance.now() < stunUntilRef.current) return;
     let last = performance.now();
 
     const frame = (now: number) => {
-      const elapsed = (now - startAtRef.current) / 1000;
       const remaining = Math.max(0, (endAtRef.current - now) / 1000);
       setTimeLeft(Math.ceil(remaining));
       if (remaining <= 0) {
@@ -551,6 +588,9 @@ export function FrenchieCatchGame({ ownedItems }: { ownedItems: FrenchieCatchIte
         spawnRateBoostUntilRef.current = 0;
         timedEffectChanged = true;
       }
+      if (boxShrinkUntilRef.current > 0 && now >= boxShrinkUntilRef.current) { boxShrinkUntilRef.current = 0; timedEffectChanged = true; }
+      if (blackoutUntilRef.current > 0 && now >= blackoutUntilRef.current) { blackoutUntilRef.current = 0; setBlackoutActive(false); timedEffectChanged = true; }
+      if (stunUntilRef.current > 0 && now >= stunUntilRef.current) { stunUntilRef.current = 0; setStunned(false); timedEffectChanged = true; }
       if (timedEffectChanged) refreshEffectStatus(now);
 
       const breakCombo = (entity: Entity) => {
@@ -569,15 +609,18 @@ export function FrenchieCatchGame({ ownedItems }: { ownedItems: FrenchieCatchIte
 
       const dt = Math.min(0.035, Math.max(0, (now - last) / 1000));
       last = now;
-      if (now >= nextSpawnRef.current && entitiesRef.current.length < 10) {
+      const spawnRate = now < spawnRateBoostUntilRef.current ? spawnRateBoostValueRef.current : 1;
+      const entityCap = spawnRate >= 3 ? TRIPLE_ENTITY_CAP : spawnRate >= 2 ? DOUBLE_ENTITY_CAP : NORMAL_ENTITY_CAP;
+      if (now >= nextSpawnRef.current && entitiesRef.current.length < entityCap) {
         entitiesRef.current.push(createEntity());
-        const spawnRate = now < spawnRateBoostUntilRef.current ? spawnRateBoostValueRef.current : 1;
-        nextSpawnRef.current = now + (790 - Math.min(1, elapsed / ROUND_SECONDS) * 250 + Math.random() * 170) / spawnRate;
+        nextSpawnRef.current = now + (SPAWN_INTERVAL_MIN_MS + Math.random() * (SPAWN_INTERVAL_MAX_MS - SPAWN_INTERVAL_MIN_MS)) / spawnRate;
       }
 
       const boxWide = now < boxWideUntilRef.current;
-      const effBoxHalf = boxWide ? BOX_HALF * boxWideScaleRef.current : BOX_HALF;
-      const effBoxWidth = boxWide ? BOX_WIDTH * boxWideScaleRef.current : BOX_WIDTH;
+      const boxShrink = now < boxShrinkUntilRef.current;
+      const effectiveBoxScale = boxShrink ? BOX_SHRINK_SCALE : boxWide ? boxWideScaleRef.current : 1;
+      const effBoxHalf = BOX_HALF * effectiveBoxScale;
+      const effBoxWidth = BOX_WIDTH * effectiveBoxScale;
       const magnetActive = now < magnetUntilRef.current;
       const magnetRange = magnetStrengthRef.current === "strong"
         ? MAGNET_STRONG_RANGE
@@ -602,7 +645,7 @@ export function FrenchieCatchGame({ ownedItems }: { ownedItems: FrenchieCatchIte
           continue;
         }
 
-        if (magnetActive && entity.status === "falling" && entity.y > 20 && entity.itemId !== POOP_ITEM_ID) {
+        if (magnetActive && entity.status === "falling" && entity.y > 20 && entity.itemId !== POOP_ITEM_ID && !NEGATIVE_HAZARD_IDS.has(entity.itemId ?? "")) {
           const dx = boxXRef.current - entity.x;
           if (Math.abs(dx) < magnetRange) entity.vx += Math.sign(dx) * magnetPull * dt;
         }
@@ -699,6 +742,33 @@ export function FrenchieCatchGame({ ownedItems }: { ownedItems: FrenchieCatchIte
               } else {
                 showCatch(entity, 0, "ビニール袋は満タン");
               }
+              next.push(entity);
+              continue;
+            }
+
+            if (NEGATIVE_HAZARD_IDS.has(entity.itemId ?? "")) {
+              caughtRef.current += 1;
+              setCaught(caughtRef.current);
+              if (entity.itemId === TIME_MINUS_ITEM_ID) {
+                endAtRef.current -= TIME_MINUS_SECONDS * 1000;
+                const nextRemaining = Math.max(0, (endAtRef.current - now) / 1000);
+                setTimeLeft(Math.ceil(nextRemaining));
+                showCatch(entity, 0, "残り時間 -" + TIME_MINUS_SECONDS + "秒");
+                if (endAtRef.current <= now) { endAtRef.current = now; setTimeLeft(0); setPhase("finished"); }
+              } else if (entity.itemId === BOX_SHRINK_ITEM_ID) {
+                boxShrinkUntilRef.current = now + BOX_SHRINK_SECONDS * 1000;
+                showCatch(entity, 0, BOX_SHRINK_SECONDS + "秒間 ダンボール0.8倍");
+              } else if (entity.itemId === BLACKOUT_ITEM_ID) {
+                blackoutUntilRef.current = now + BLACKOUT_SECONDS * 1000;
+                setBlackoutActive(true);
+                showCatch(entity, 0, BLACKOUT_SECONDS + "秒間 上半分が見えない！");
+              } else if (entity.itemId === STUN_ITEM_ID) {
+                stunUntilRef.current = now + STUN_SECONDS * 1000;
+                draggingRef.current = false;
+                setStunned(true);
+                showCatch(entity, 0, STUN_SECONDS + "秒間 しびれ！");
+              }
+              refreshEffectStatus(now);
               next.push(entity);
               continue;
             }
@@ -1112,7 +1182,7 @@ export function FrenchieCatchGame({ ownedItems }: { ownedItems: FrenchieCatchIte
         }
 
         if (entity.y > 110 || entity.x < -18 || entity.x > 118) {
-          if (entity.status !== "caught" && entity.itemId !== POOP_ITEM_ID) breakCombo(entity);
+          if (entity.status !== "caught" && entity.itemId !== POOP_ITEM_ID && !NEGATIVE_HAZARD_IDS.has(entity.itemId ?? "")) breakCombo(entity);
           continue;
         }
         next.push(entity);
@@ -1204,6 +1274,11 @@ export function FrenchieCatchGame({ ownedItems }: { ownedItems: FrenchieCatchIte
     ikeaUntilRef.current = 0;
     ikeaCountRef.current = 0;
     spawnRateBoostUntilRef.current = 0;
+    boxShrinkUntilRef.current = 0;
+    blackoutUntilRef.current = 0;
+    stunUntilRef.current = 0;
+    setBlackoutActive(false);
+    setStunned(false);
     bagStockRef.current = 0;
     setBagStock(0);
     setEntities([]);
@@ -1226,10 +1301,14 @@ export function FrenchieCatchGame({ ownedItems }: { ownedItems: FrenchieCatchIte
   }, []);
 
   const moveBox = useCallback((clientX: number) => {
+    if (performance.now() < stunUntilRef.current) return;
     const rect = boardRef.current?.getBoundingClientRect();
     if (!rect || rect.width <= 0) return;
     const pointerX = ((clientX - rect.left) / rect.width) * 100;
-    const nextX = clamp(pointerX - dragOffsetRef.current, BOX_MIN_X, BOX_MAX_X);
+    const now = performance.now();
+    const boxScale = now < boxShrinkUntilRef.current ? BOX_SHRINK_SCALE : now < boxWideUntilRef.current ? boxWideScaleRef.current : 1;
+    const dynamicHalf = BOX_HALF * boxScale;
+    const nextX = clamp(pointerX - dragOffsetRef.current, dynamicHalf + 1, 100 - dynamicHalf - 1);
     boxXRef.current = nextX;
     setBoxX(nextX);
   }, []);
@@ -1249,7 +1328,7 @@ export function FrenchieCatchGame({ ownedItems }: { ownedItems: FrenchieCatchIte
   };
 
   const pointerMove = (event: ReactPointerEvent<HTMLDivElement>) => {
-    if (phase === "playing" && draggingRef.current) moveBox(event.clientX);
+    if (phase === "playing" && draggingRef.current && performance.now() >= stunUntilRef.current) moveBox(event.clientX);
   };
 
   const pointerEnd = (event: ReactPointerEvent<HTMLDivElement>) => {
@@ -1273,7 +1352,7 @@ export function FrenchieCatchGame({ ownedItems }: { ownedItems: FrenchieCatchIte
         <div className="absolute -right-10 top-[34%] h-24 w-40 rounded-full bg-white/50 blur-xl" />
         <div className="absolute inset-x-0 bottom-0 h-[18%] bg-[linear-gradient(180deg,rgba(208,232,171,0)_0%,#c9e29e_72%,#efdcb8_73%,#e9cfa5_73%,#e9cfa5_100%)]" />
 
-        <div className="absolute left-3 right-3 top-3 z-30 flex items-start justify-between gap-2">
+        <div className="absolute left-3 right-3 top-3 z-50 flex items-start justify-between gap-2">
           <div className="flex flex-col items-start gap-1">
             <div className="rounded-2xl border border-white/80 bg-white/90 px-3 py-2 shadow-sm"><p className="text-[9px] font-bold tracking-widest text-ink-faint">SCORE</p><p className="text-xl font-black tabular-nums text-ink">{score.toLocaleString("ja-JP")}</p></div>
             {bagStock > 0 || comboShield > 0 ? (
@@ -1299,10 +1378,12 @@ export function FrenchieCatchGame({ ownedItems }: { ownedItems: FrenchieCatchIte
           <div className="rounded-2xl border border-white/80 bg-white/90 px-3 py-2 text-right shadow-sm"><p className="text-[9px] font-bold tracking-widest text-ink-faint">TIME</p><p className="text-xl font-black tabular-nums text-ink">{timeLeft}</p></div>
         </div>
 
+        {blackoutActive ? <div className="pointer-events-none absolute inset-x-0 top-0 z-[25] h-1/2 bg-black/95" aria-label="上半分ブラックアウト" /> : null}
+
         {activeEffects.length > 0 ? (
-          <div className="pointer-events-none absolute right-3 top-24 z-30 flex flex-col items-end gap-0.5">
+          <div className="pointer-events-none absolute right-3 top-24 z-50 flex flex-col items-end gap-0.5">
             {activeEffects.map((effect) => (
-              <span key={effect} className="rounded-full bg-white/40 px-2 py-0.5 text-[8px] font-bold text-ink-soft/70">{effect}</span>
+              <span key={effect} className="rounded-full bg-white/90 px-2 py-0.5 text-[8px] font-bold text-ink-soft shadow-sm">{effect}</span>
             ))}
           </div>
         ) : null}
@@ -1332,7 +1413,7 @@ export function FrenchieCatchGame({ ownedItems }: { ownedItems: FrenchieCatchIte
           className={`absolute bottom-[0.5%] z-30 touch-none select-none rounded-3xl transition-[width,transform] duration-200 ${performance.now() < magnetUntilRef.current ? "shadow-[0_0_20px_6px_rgba(120,170,240,0.55)] ring-4 ring-sky-300/70" : ""}`}
           style={{
             left: `${boxX}%`,
-            width: `${BOX_WIDTH * (performance.now() < boxWideUntilRef.current ? boxWideScaleRef.current : 1)}%`,
+            width: `${BOX_WIDTH * (performance.now() < boxShrinkUntilRef.current ? BOX_SHRINK_SCALE : performance.now() < boxWideUntilRef.current ? boxWideScaleRef.current : 1)}%`,
             height: `${BOX_HEIGHT}%`,
             transform: `translateX(-50%) scaleY(${boxBounce ? 1.015 : 1})`,
           }}
@@ -1341,7 +1422,8 @@ export function FrenchieCatchGame({ ownedItems }: { ownedItems: FrenchieCatchIte
           onPointerUp={pointerEnd}
           onPointerCancel={pointerEnd}
         >
-          <Image src={BOX_IMAGE} alt="拾ってくだブーと書かれた段ボール" fill priority draggable={false} sizes="38vw" className={`pointer-events-none ${performance.now() < boxWideUntilRef.current ? "object-fill" : "object-contain"}`} />
+          <Image src={BOX_IMAGE} alt="拾ってくだブーと書かれた段ボール" fill priority draggable={false} sizes="38vw" className={`pointer-events-none ${performance.now() < boxWideUntilRef.current && performance.now() >= boxShrinkUntilRef.current ? "object-fill" : "object-contain"}`} />
+          {stunned ? <span className="pointer-events-none absolute -right-4 top-1/2 -translate-y-1/2 text-2xl" aria-label="しびれ中">⚡</span> : null}
         </div>
 
         {phase === "playing" ? <div className="pointer-events-none absolute bottom-[0.5%] left-1/2 z-40 -translate-x-1/2 rounded-full bg-white/70 px-2 py-0.5 text-[9px] font-bold text-ink-faint">箱を押さえて左右にドラッグ</div> : null}
