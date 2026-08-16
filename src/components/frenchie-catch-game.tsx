@@ -209,6 +209,9 @@ const ITEM_SPAWN_WEIGHTS: Partial<Record<string, number>> = {
   summer_frenchie: 45,
   other_azuki: 35,
 };
+/** スキルLvが1上がるごとに出現ウェイトが+5されるアイテム */
+const LEVEL_SCALED_SPAWN_WEIGHT_IDS = new Set(["other_omojii", "summer_frenchie"]);
+const LEVEL_SPAWN_WEIGHT_STEP = 5;
 const RARITY_STYLE: Record<FrenchieCatchItem["rarity"], string> = {
   N: "drop-shadow-[0_4px_7px_rgba(80,120,80,0.22)]",
   R: "drop-shadow-[0_4px_9px_rgba(74,142,200,0.34)]",
@@ -449,10 +452,14 @@ export function FrenchieCatchGame({ ownedItems }: { ownedItems: FrenchieCatchIte
     }
 
     const urBoostFactor = 1 + Math.min(urBoostRef.current, UR_BOOST_MAX) / 100;
-    const weightedItems = itemPool.map((item) => ({
-      item,
-      weight: (ITEM_SPAWN_WEIGHTS[item.id] ?? DEFAULT_ITEM_SPAWN_WEIGHT) * (item.rarity === "UR" ? urBoostFactor : 1),
-    }));
+    const weightedItems = itemPool.map((item) => {
+      const baseWeight = ITEM_SPAWN_WEIGHTS[item.id] ?? DEFAULT_ITEM_SPAWN_WEIGHT;
+      const levelBonus = LEVEL_SCALED_SPAWN_WEIGHT_IDS.has(item.id) ? (item.level - 1) * LEVEL_SPAWN_WEIGHT_STEP : 0;
+      return {
+        item,
+        weight: (baseWeight + levelBonus) * (item.rarity === "UR" ? urBoostFactor : 1),
+      };
+    });
     const itemWeightTotal = weightedItems.reduce((sum, entry) => sum + entry.weight, 0);
     const dogWeight = itemPool.length * DEFAULT_ITEM_SPAWN_WEIGHT * (DOG_SPAWN_RATIO / (1 - DOG_SPAWN_RATIO));
     let roll = Math.random() * (dogWeight + itemWeightTotal);
