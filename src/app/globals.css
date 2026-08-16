@@ -442,6 +442,24 @@
     color: var(--color-ink-faint);
     font-size: .8rem;
   }
+
+  .app-splash-start {
+    margin-top: 28px;
+    padding: 12px 32px;
+    border: none;
+    border-radius: 999px;
+    background: var(--color-leaf, #5c8a4a);
+    color: #fff;
+    font-size: .95rem;
+    font-weight: 700;
+    letter-spacing: .04em;
+    animation: splash-start-pulse 1.6s ease-in-out infinite;
+  }
+
+  @keyframes splash-start-pulse {
+    0%, 100% { transform: scale(1); box-shadow: 0 4px 14px rgba(0, 0, 0, .14); }
+    50% { transform: scale(1.045); box-shadow: 0 6px 18px rgba(0, 0, 0, .18); }
+  }
 }
 
 @keyframes fade-in {

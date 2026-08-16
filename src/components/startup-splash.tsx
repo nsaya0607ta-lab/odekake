@@ -4,9 +4,13 @@ import { useEffect, useState } from "react";
 
 export function StartupSplash({ children }: { children: React.ReactNode }) {
   const [visible, setVisible] = useState(true);
+  const [ready, setReady] = useState(false);
 
   useEffect(() => {
-    const timer = window.setTimeout(() => setVisible(false), 3000);
+    // 少しだけ演出を見せてから「タップしてはじめる」に切り替える。
+    // BGMはブラウザの制約上ユーザー操作なしには鳴らせないため、
+    // ここでの最初のタップを再生開始のきっかけとして使う。
+    const timer = window.setTimeout(() => setReady(true), 900);
     return () => window.clearTimeout(timer);
   }, []);
 
@@ -16,8 +20,10 @@ export function StartupSplash({ children }: { children: React.ReactNode }) {
       {visible ? (
         <main
           className="app-splash"
-          aria-label="読み込み中。タップしてスキップ"
-          onPointerDown={() => setVisible(false)}
+          aria-label={ready ? "タップしてはじめる" : "読み込み中"}
+          onPointerDown={() => {
+            if (ready) setVisible(false);
+          }}
         >
           <div className="app-splash-scene" aria-hidden="true">
             <span className="app-splash-cloud app-splash-cloud-left" />
@@ -34,12 +40,20 @@ export function StartupSplash({ children }: { children: React.ReactNode }) {
           <section className="app-splash-copy">
             <h1>自分の旅</h1>
             <p>おでかけの記録を、<br />一生の思い出に。</p>
-            <div className="app-splash-dots" aria-hidden="true">
-              <span />
-              <span />
-              <span />
-            </div>
-            <span className="app-splash-loading">読み込み中...</span>
+            {ready ? (
+              <button type="button" className="app-splash-start">
+                タップしてはじめる
+              </button>
+            ) : (
+              <>
+                <div className="app-splash-dots" aria-hidden="true">
+                  <span />
+                  <span />
+                  <span />
+                </div>
+                <span className="app-splash-loading">読み込み中...</span>
+              </>
+            )}
           </section>
         </main>
       ) : null}
