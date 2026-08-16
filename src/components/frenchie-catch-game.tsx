@@ -109,8 +109,19 @@ const POOP_FLOOD_SPAWN_RATE = 4;
 const NORMAL_ENTITY_CAP = 10;
 const DOUBLE_ENTITY_CAP = 15;
 const TRIPLE_ENTITY_CAP = 18;
-const COMBO_SHIELD_MAX = 4;
-const COMBO_SHIELD_IMAGE = "/collection/items/combo-shield.webp";
+type HazardGuardKind = "stun" | "boxShrink" | "timeMinus";
+const HAZARD_GUARD_KINDS: readonly HazardGuardKind[] = ["stun", "boxShrink", "timeMinus"];
+const HAZARD_GUARD_LABELS: Record<HazardGuardKind, string> = {
+  stun: "しびれ防止",
+  boxShrink: "ダンボール縮小防止",
+  timeMinus: "時間減少防止",
+};
+/** ガードのアイコンは対応するハザード自体の画像を流用する */
+const HAZARD_GUARD_IMAGES: Record<HazardGuardKind, string> = {
+  stun: "/collection/items/hazard-stun-battery.webp",
+  boxShrink: "/collection/items/hazard-box-shrink.webp",
+  timeMinus: "/collection/items/hazard-time-minus.webp",
+};
 const JUST_RADIUS_RATIO = 0.3;
 const JUST_MULTIPLIER = 1.25;
 const MYSTERY_SKILL_ITEM_IDS = [
@@ -133,7 +144,6 @@ const LV = {
   FRISBEE_MULT: [2, 2.2, 2.4, 2.7, 3],
   SOCCER_PT: [10, 15, 20, 30, 40],
   TAIYAKI_PT: [5, 7, 10, 13, 15],
-  BEAR_SHIELD: [1, 1, 2, 2, 3],
   BEAR_PT: [0, 10, 0, 20, 0],
   BOWL_PT: [5, 7, 10, 13, 15],
   PUDDING_PT: [15, 20, 30, 40, 50],
@@ -152,7 +162,6 @@ const LV = {
   STRAWBERRY_COUNT: [1, 1, 1, 2, 2],
   STRAWBERRY_MULT: [1.5, 1.7, 2, 2, 2.5],
   CUPCAKE_SEC: [4, 5, 6, 7, 10],
-  SLEEPY_SHIELD: [3, 4, 5, 6, 8],
   SPRING_SEC: [5, 6, 7, 9, 12],
   SPARKLE_SEC: [4, 5, 6, 8, 10],
   SPARKLE_STRENGTH: ["weak", "weak", "weak", "weak", "medium"] as const,
@@ -160,7 +169,6 @@ const LV = {
   GOLDEN_COUNT: [2, 2, 3, 3, 4],
   GOLDEN_MULT: [2, 2.2, 2.2, 2.5, 2.5],
   NAKAYOSHI_PT: [30, 40, 50, 65, 80],
-  NAKAYOSHI_SHIELD: [2, 2, 3, 4, 5],
   KAMUNAYO_SEC: [5, 6, 8, 10, 13],
   HIKING_SEC: [5, 6, 7, 9, 12],
   SNOW_SEC: [5, 6, 7, 9, 12],
@@ -178,7 +186,6 @@ const LV = {
   KINOKO_SCORE: [1.5, 1.5, 1.6, 1.7, 2],
   KOMOCHI_COUNT: [5, 5, 6, 7, 8],
   KOMOCHI_MULT: [2, 2.1, 2.2, 2.3, 2.5],
-  KOMOCHI_SHIELD: [5, 6, 7, 8, 10],
   AZUKI_SEC: [5, 7, 9, 12, 15],
   AZUKI_PT: [50, 65, 80, 100, 130],
   KOBEE_PT: [50, 65, 80, 100, 130],
@@ -188,7 +195,6 @@ const LV = {
   IKEA_SEC: [4, 5, 6, 7, 8],
   ORUSUBAN_SEC: [5, 6, 7, 8, 10],
   ORUSUBAN_FALL: [1.8, 2, 2.2, 2.4, 2.8],
-  ORUSUBAN_SHIELD: [1, 1, 2, 2, 3],
   PONDEOMO_SEC: [4, 5, 6, 8, 10],
   PONDEAR_SEC: [4, 5, 6, 8, 10],
   JARE_A_SEC: [4, 5, 6, 8, 10],
@@ -198,7 +204,6 @@ const LV = {
   RAGBY_SEC: [5, 6, 7, 9, 12],
   OYATSU_PT: [80, 100, 120, 140, 180],
   KETSUNADE_SEC: [4, 5, 6, 8, 10],
-  KETSUNADE_SHIELD: [1, 1, 2, 2, 3],
 } as const;
 const SPAWN_RATE_BOOST = 2;
 const SLANT_VX_BOOST = 3.5;
@@ -314,7 +319,9 @@ export function FrenchieCatchGame({ ownedItems }: { ownedItems: FrenchieCatchIte
   const nextBonus10ValueRef = useRef(10);
   const rewardTimeCountRef = useRef(0);
   const rewardTimeValueRef = useRef(0);
-  const comboShieldRef = useRef(0);
+  const stunGuardRef = useRef(0);
+  const boxShrinkGuardRef = useRef(0);
+  const timeMinusGuardRef = useRef(0);
   const multiplier15UntilRef = useRef(0);
   const multiplier15ValueRef = useRef(1.5);
   const multiplier2UntilRef = useRef(0);
@@ -351,7 +358,9 @@ export function FrenchieCatchGame({ ownedItems }: { ownedItems: FrenchieCatchIte
   const [maxCombo, setMaxCombo] = useState(0);
   const [caught, setCaught] = useState(0);
   const [bagStock, setBagStock] = useState(0);
-  const [comboShield, setComboShield] = useState(0);
+  const [stunGuard, setStunGuard] = useState(0);
+  const [boxShrinkGuard, setBoxShrinkGuard] = useState(0);
+  const [timeMinusGuard, setTimeMinusGuard] = useState(0);
   const [feedback, setFeedback] = useState<CatchFeedback | null>(null);
   const [activeEffects, setActiveEffects] = useState<string[]>([]);
   const [impactX, setImpactX] = useState<number | null>(null);
@@ -376,7 +385,9 @@ export function FrenchieCatchGame({ ownedItems }: { ownedItems: FrenchieCatchIte
     if (nextBonus10Ref.current > 0) labels.push(`あと${nextBonus10Ref.current}個 +10pt`);
     if (rewardTimeCountRef.current > 0) labels.push(`次の1個 ${rewardTimeValueRef.current}pt確定`);
     if (nextBonus5Ref.current > 0) labels.push(`あと${nextBonus5Ref.current}個 +5pt`);
-    if (comboShieldRef.current > 0) labels.push(`コンボ保護 ×${comboShieldRef.current}`);
+    if (stunGuardRef.current > 0) labels.push(HAZARD_GUARD_LABELS.stun);
+    if (boxShrinkGuardRef.current > 0) labels.push(HAZARD_GUARD_LABELS.boxShrink);
+    if (timeMinusGuardRef.current > 0) labels.push(HAZARD_GUARD_LABELS.timeMinus);
     if (now < comboInvincibleUntilRef.current) labels.push("無敵コンボ中");
     if (now < comboMultiplierBoostUntilRef.current) labels.push("コンボ倍率アップ中");
     if (now < magnetUntilRef.current) labels.push(magnetStrengthRef.current === "weak" ? "ミニマグネット発動中" : "マグネット発動中");
@@ -658,12 +669,6 @@ export function FrenchieCatchGame({ ownedItems }: { ownedItems: FrenchieCatchIte
         if (entity.missHandled) return;
         entity.missHandled = true;
         if (now < comboInvincibleUntilRef.current) return;
-        if (comboRef.current > 0 && comboShieldRef.current > 0) {
-          comboShieldRef.current -= 1;
-          setComboShield(comboShieldRef.current);
-          refreshEffectStatus(now);
-          return;
-        }
         comboRef.current = 0;
         setCombo(0);
       };
@@ -813,23 +818,41 @@ export function FrenchieCatchGame({ ownedItems }: { ownedItems: FrenchieCatchIte
               caughtRef.current += 1;
               setCaught(caughtRef.current);
               if (entity.itemId === TIME_MINUS_ITEM_ID) {
-                endAtRef.current -= TIME_MINUS_SECONDS * 1000;
-                const nextRemaining = Math.max(0, (endAtRef.current - now) / 1000);
-                setTimeLeft(Math.ceil(nextRemaining));
-                showCatch(entity, 0, "残り時間 -" + TIME_MINUS_SECONDS + "秒");
-                if (endAtRef.current <= now) { endAtRef.current = now; setTimeLeft(0); setPhase("finished"); }
+                if (timeMinusGuardRef.current > 0) {
+                  timeMinusGuardRef.current = 0;
+                  setTimeMinusGuard(0);
+                  showCatch(entity, 0, `${HAZARD_GUARD_LABELS.timeMinus}で無効化！`);
+                } else {
+                  endAtRef.current -= TIME_MINUS_SECONDS * 1000;
+                  const nextRemaining = Math.max(0, (endAtRef.current - now) / 1000);
+                  setTimeLeft(Math.ceil(nextRemaining));
+                  showCatch(entity, 0, "残り時間 -" + TIME_MINUS_SECONDS + "秒");
+                  if (endAtRef.current <= now) { endAtRef.current = now; setTimeLeft(0); setPhase("finished"); }
+                }
               } else if (entity.itemId === BOX_SHRINK_ITEM_ID) {
-                boxShrinkUntilRef.current = now + BOX_SHRINK_SECONDS * 1000;
-                showCatch(entity, 0, BOX_SHRINK_SECONDS + "秒間 ダンボール0.8倍");
+                if (boxShrinkGuardRef.current > 0) {
+                  boxShrinkGuardRef.current = 0;
+                  setBoxShrinkGuard(0);
+                  showCatch(entity, 0, `${HAZARD_GUARD_LABELS.boxShrink}で無効化！`);
+                } else {
+                  boxShrinkUntilRef.current = now + BOX_SHRINK_SECONDS * 1000;
+                  showCatch(entity, 0, BOX_SHRINK_SECONDS + "秒間 ダンボール0.8倍");
+                }
               } else if (entity.itemId === BLACKOUT_ITEM_ID) {
                 blackoutUntilRef.current = now + BLACKOUT_SECONDS * 1000;
                 setBlackoutActive(true);
                 showCatch(entity, 0, BLACKOUT_SECONDS + "秒間 上半分が見えない！");
               } else if (entity.itemId === STUN_ITEM_ID) {
-                stunUntilRef.current = now + STUN_SECONDS * 1000;
-                draggingRef.current = false;
-                setStunned(true);
-                showCatch(entity, 0, STUN_SECONDS + "秒間 しびれ！");
+                if (stunGuardRef.current > 0) {
+                  stunGuardRef.current = 0;
+                  setStunGuard(0);
+                  showCatch(entity, 0, `${HAZARD_GUARD_LABELS.stun}で無効化！`);
+                } else {
+                  stunUntilRef.current = now + STUN_SECONDS * 1000;
+                  draggingRef.current = false;
+                  setStunned(true);
+                  showCatch(entity, 0, STUN_SECONDS + "秒間 しびれ！");
+                }
               }
               refreshEffectStatus(now);
               next.push(entity);
@@ -897,6 +920,21 @@ export function FrenchieCatchGame({ ownedItems }: { ownedItems: FrenchieCatchIte
               return seconds;
             };
 
+            /** しびれ/ダンボール縮小/時間減少のいずれかを1回だけ防ぐガードを、まだ持っていない種類からランダムで1つ付与する */
+            const grantRandomHazardGuard = (): HazardGuardKind | null => {
+              const candidates = HAZARD_GUARD_KINDS.filter((kind) => {
+                if (kind === "stun") return stunGuardRef.current === 0;
+                if (kind === "boxShrink") return boxShrinkGuardRef.current === 0;
+                return timeMinusGuardRef.current === 0;
+              });
+              if (candidates.length === 0) return null;
+              const kind = candidates[Math.floor(Math.random() * candidates.length)]!;
+              if (kind === "stun") { stunGuardRef.current = 1; setStunGuard(1); }
+              else if (kind === "boxShrink") { boxShrinkGuardRef.current = 1; setBoxShrinkGuard(1); }
+              else { timeMinusGuardRef.current = 1; setTimeMinusGuard(1); }
+              return kind;
+            };
+
             const lvTag = skillLevel >= MAX_SKILL_LEVEL ? " [Lv.MAX]" : skillLevel > 1 ? ` [Lv${skillLevel}]` : "";
 
             switch (skillId) {
@@ -911,12 +949,11 @@ export function FrenchieCatchGame({ ownedItems }: { ownedItems: FrenchieCatchIte
                 statusChanged = true;
                 break;
               case "toy_bear_plush": {
-                const shield = LV.BEAR_SHIELD[lv]!;
                 const bonusPt = LV.BEAR_PT[lv]!;
-                comboShieldRef.current = Math.min(COMBO_SHIELD_MAX, comboShieldRef.current + shield);
-                setComboShield(comboShieldRef.current);
+                const guard = grantRandomHazardGuard();
                 points += bonusPt;
-                effectLabel = bonusPt > 0 ? `コンボ${shield}回保護 +${bonusPt}pt${lvTag}` : `コンボ${shield}回保護${lvTag}`;
+                const guardLabel = guard ? HAZARD_GUARD_LABELS[guard] : "防止アイテムは満タン";
+                effectLabel = bonusPt > 0 ? `${guardLabel} +${bonusPt}pt${lvTag}` : `${guardLabel}${lvTag}`;
                 statusChanged = true;
                 break;
               }
@@ -1051,12 +1088,12 @@ export function FrenchieCatchGame({ ownedItems }: { ownedItems: FrenchieCatchIte
                 effectLabel = `残り時間ボーナス +${timeBonus}pt${lvTag}`;
                 break;
               }
-              case "interior_sleepy_moon":
-                comboShieldRef.current = Math.min(COMBO_SHIELD_MAX, comboShieldRef.current + LV.SLEEPY_SHIELD[lv]!);
-                setComboShield(comboShieldRef.current);
-                effectLabel = `コンボ保護+${LV.SLEEPY_SHIELD[lv]}回${lvTag}`;
+              case "interior_sleepy_moon": {
+                const guard = grantRandomHazardGuard();
+                effectLabel = `${guard ? HAZARD_GUARD_LABELS[guard] : "防止アイテムは満タン"}${lvTag}`;
                 statusChanged = true;
                 break;
+              }
               case "interior_spring_flower_wreath":
                 comboMultiplierBoostUntilRef.current = now + LV.SPRING_SEC[lv]! * 1000;
                 effectLabel = `${LV.SPRING_SEC[lv]}秒間 コンボ倍率アップ${lvTag}`;
@@ -1068,13 +1105,13 @@ export function FrenchieCatchGame({ ownedItems }: { ownedItems: FrenchieCatchIte
                 effectLabel = `${LV.SPARKLE_SEC[lv]}秒間 ミニマグネット${lvTag}`;
                 statusChanged = true;
                 break;
-              case "other_nakayoshi_azubee":
+              case "other_nakayoshi_azubee": {
                 points += LV.NAKAYOSHI_PT[lv]!;
-                comboShieldRef.current = Math.min(COMBO_SHIELD_MAX, comboShieldRef.current + LV.NAKAYOSHI_SHIELD[lv]!);
-                setComboShield(comboShieldRef.current);
-                effectLabel = `+${LV.NAKAYOSHI_PT[lv]}pt / コンボ保護+${LV.NAKAYOSHI_SHIELD[lv]}回${lvTag}`;
+                const guard = grantRandomHazardGuard();
+                effectLabel = `+${LV.NAKAYOSHI_PT[lv]}pt / ${guard ? HAZARD_GUARD_LABELS[guard] : "防止アイテムは満タン"}${lvTag}`;
                 statusChanged = true;
                 break;
+              }
               case "other_kamunayo":
                 comboInvincibleUntilRef.current = now + LV.KAMUNAYO_SEC[lv]! * 1000;
                 effectLabel = `${LV.KAMUNAYO_SEC[lv]}秒間 無敵コンボ${lvTag}`;
@@ -1109,14 +1146,14 @@ export function FrenchieCatchGame({ ownedItems }: { ownedItems: FrenchieCatchIte
                 effectLabel = `${LV.KINOKO_SEC[lv]}秒間 落下×${LV.KINOKO_FALL[lv]}+無敵+得点×${LV.KINOKO_SCORE[lv]}${lvTag}`;
                 statusChanged = true;
                 break;
-              case "other_komochi":
+              case "other_komochi": {
                 nextMultiplierRef.current = LV.KOMOCHI_MULT[lv]!;
                 nextMultiplierCountRef.current = LV.KOMOCHI_COUNT[lv]!;
-                comboShieldRef.current = Math.min(COMBO_SHIELD_MAX, comboShieldRef.current + LV.KOMOCHI_SHIELD[lv]!);
-                setComboShield(comboShieldRef.current);
-                effectLabel = `次の${LV.KOMOCHI_COUNT[lv]}個 ×${LV.KOMOCHI_MULT[lv]} / コンボ保護+${LV.KOMOCHI_SHIELD[lv]}回${lvTag}`;
+                const guard = grantRandomHazardGuard();
+                effectLabel = `次の${LV.KOMOCHI_COUNT[lv]}個 ×${LV.KOMOCHI_MULT[lv]} / ${guard ? HAZARD_GUARD_LABELS[guard] : "防止アイテムは満タン"}${lvTag}`;
                 statusChanged = true;
                 break;
+              }
               case "other_azuki": {
                 const applied = addBonusTime(LV.AZUKI_SEC[lv]!);
                 points += LV.AZUKI_PT[lv]!;
@@ -1157,12 +1194,10 @@ export function FrenchieCatchGame({ ownedItems }: { ownedItems: FrenchieCatchIte
               case "other_orusuban":
               case "other_kurumari_a": {
                 const orusubanSec = LV.ORUSUBAN_SEC[lv]!;
-                const orusubanShield = LV.ORUSUBAN_SHIELD[lv]!;
                 fallSpeedBoostUntilRef.current = now + orusubanSec * 1000;
                 fallSpeedValueRef.current = LV.ORUSUBAN_FALL[lv]!;
-                comboShieldRef.current = Math.min(COMBO_SHIELD_MAX, comboShieldRef.current + orusubanShield);
-                setComboShield(comboShieldRef.current);
-                effectLabel = `${orusubanSec}秒間 落下速度×${LV.ORUSUBAN_FALL[lv]} / コンボ保護+${orusubanShield}${lvTag}`;
+                const guard = grantRandomHazardGuard();
+                effectLabel = `${orusubanSec}秒間 落下速度×${LV.ORUSUBAN_FALL[lv]} / ${guard ? HAZARD_GUARD_LABELS[guard] : "防止アイテムは満タン"}${lvTag}`;
                 statusChanged = true;
                 break;
               }
@@ -1212,11 +1247,11 @@ export function FrenchieCatchGame({ ownedItems }: { ownedItems: FrenchieCatchIte
               }
               case "other_ketsunade_a": {
                 const ketsunadeSec = LV.KETSUNADE_SEC[lv]!;
-                const ketsunadeShield = LV.KETSUNADE_SHIELD[lv]!;
                 magnetUntilRef.current = now + ketsunadeSec * 1000;
                 magnetStrengthRef.current = "strong";
-                comboShieldRef.current = Math.min(COMBO_SHIELD_MAX, comboShieldRef.current + ketsunadeShield);
-                effectLabel = `${ketsunadeSec}秒間 なでなでマグネット / コンボ保護+${ketsunadeShield}${lvTag}`;
+                const guard = grantRandomHazardGuard();
+                effectLabel = `${ketsunadeSec}秒間 なでなでマグネット / ${guard ? HAZARD_GUARD_LABELS[guard] : "防止アイテムは満タン"}${lvTag}`;
+                statusChanged = true;
                 break;
               }
               case "other_oyatsu_no_jikan": {
@@ -1366,8 +1401,12 @@ export function FrenchieCatchGame({ ownedItems }: { ownedItems: FrenchieCatchIte
     nextBonus10Ref.current = 0;
     rewardTimeCountRef.current = 0;
     nextBonus10ValueRef.current = 10;
-    comboShieldRef.current = 0;
-    setComboShield(0);
+    stunGuardRef.current = 0;
+    setStunGuard(0);
+    boxShrinkGuardRef.current = 0;
+    setBoxShrinkGuard(0);
+    timeMinusGuardRef.current = 0;
+    setTimeMinusGuard(0);
     multiplier15UntilRef.current = 0;
     multiplier15ValueRef.current = 1.5;
     multiplier2UntilRef.current = 0;
@@ -1468,7 +1507,7 @@ export function FrenchieCatchGame({ ownedItems }: { ownedItems: FrenchieCatchIte
         <div className="absolute left-3 right-3 top-3 z-50 flex items-start justify-between gap-2">
           <div className="flex flex-col items-start gap-1">
             <div className="rounded-2xl border border-white/80 bg-white/90 px-3 py-2 shadow-sm"><p className="text-[9px] font-bold tracking-widest text-ink-faint">SCORE</p><p className="text-xl font-black tabular-nums text-ink">{score.toLocaleString("ja-JP")}</p></div>
-            {bagStock > 0 || comboShield > 0 ? (
+            {bagStock > 0 || stunGuard > 0 || boxShrinkGuard > 0 || timeMinusGuard > 0 ? (
               <div className="flex flex-row items-start gap-1.5">
                 {bagStock > 0 ? (
                   <div className="flex flex-col items-start gap-0.5">
@@ -1477,12 +1516,14 @@ export function FrenchieCatchGame({ ownedItems }: { ownedItems: FrenchieCatchIte
                     ))}
                   </div>
                 ) : null}
-                {comboShield > 0 ? (
-                  <div className="flex flex-col items-start gap-0.5">
-                    {Array.from({ length: comboShield }, (_, index) => (
-                      <Image key={index} src={COMBO_SHIELD_IMAGE} alt="コンボ保護" width={28} height={28} draggable={false} className="h-6 w-6 object-contain drop-shadow-[0_2px_3px_rgba(0,0,0,0.25)]" />
-                    ))}
-                  </div>
+                {stunGuard > 0 ? (
+                  <Image src={HAZARD_GUARD_IMAGES.stun} alt={HAZARD_GUARD_LABELS.stun} width={28} height={28} draggable={false} className="h-6 w-6 object-contain drop-shadow-[0_2px_3px_rgba(0,0,0,0.25)]" />
+                ) : null}
+                {boxShrinkGuard > 0 ? (
+                  <Image src={HAZARD_GUARD_IMAGES.boxShrink} alt={HAZARD_GUARD_LABELS.boxShrink} width={28} height={28} draggable={false} className="h-6 w-6 object-contain drop-shadow-[0_2px_3px_rgba(0,0,0,0.25)]" />
+                ) : null}
+                {timeMinusGuard > 0 ? (
+                  <Image src={HAZARD_GUARD_IMAGES.timeMinus} alt={HAZARD_GUARD_LABELS.timeMinus} width={28} height={28} draggable={false} className="h-6 w-6 object-contain drop-shadow-[0_2px_3px_rgba(0,0,0,0.25)]" />
                 ) : null}
               </div>
             ) : null}

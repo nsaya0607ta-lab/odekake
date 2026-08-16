@@ -127,8 +127,8 @@ export default async function ItemCatchGuidePage() {
           </div>
           <div className="rounded-[22px] border border-[#d6c8a9] bg-gradient-to-r from-[#f5f0e4] to-[#fffaf0] p-3.5 shadow-[0_4px_12px_rgba(80,66,40,0.04)]">
             <div className="flex items-start gap-3">
-              <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-[#d8c69b] bg-white text-sm shadow-sm">🛡️</span>
-              <p className="text-[11px] leading-relaxed text-[#756854]"><b className="text-[#40362a]">コンボ保護</b>があると、取り逃してもコンボを維持して保護を1つ消費します。最大<b className="text-[#40362a]">4つ</b>まで持てます。</p>
+              <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-[#d8c69b] bg-white text-sm shadow-sm">🚫</span>
+              <p className="text-[11px] leading-relaxed text-[#756854]"><b className="text-[#40362a]">妨害防止</b>スキルを取ると、しびれ・ダンボール縮小・時間減少のいずれか1つをランダムで防げます。1種類につき1回だけ、最大<b className="text-[#40362a]">3つ</b>まで同時に持てます。</p>
             </div>
           </div>
         </section>
