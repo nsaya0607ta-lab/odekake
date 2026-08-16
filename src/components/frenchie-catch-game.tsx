@@ -78,9 +78,9 @@ const BAG_SPAWN_CHANCE = 0.03;
 const BAG_MAX_STOCK = 3;
 const TIME_MINUS_ITEM_ID = "hazard_time_minus";
 const TIME_MINUS_IMAGE = "/collection/items/hazard-time-minus.webp";
-/** 基準の出現ウェイトを100とした場合の重み。60秒経過後はTIME_MINUS_BOOSTED_WEIGHT(200)相当に上がる */
+/** 基準の出現ウェイトを100とした場合の重み。60秒経過後はTIME_MINUS_BOOSTED_WEIGHT(300)相当に上がる */
 const TIME_MINUS_BASE_WEIGHT = 100;
-const TIME_MINUS_BOOSTED_WEIGHT = 200;
+const TIME_MINUS_BOOSTED_WEIGHT = 300;
 const TIME_MINUS_BOOST_AFTER_SEC = 60;
 const TIME_MINUS_SPAWN_CHANCE = 0.015;
 const TIME_MINUS_SECONDS = 3;
@@ -204,17 +204,19 @@ const POINTS: Record<FrenchieCatchItem["rarity"], number> = { N: 10, R: 20, SR: 
 const RARITY_FALL_SPEED: Record<FrenchieCatchItem["rarity"], number> = { N: 1, R: 1.08, SR: 1.18, SSR: 1.32, UR: 1.5, LR: 1.75 };
 /** 時間が増えるスキルを持つアイテムだけ、落下速度をレアリティ別倍率で上げる */
 const TIME_BONUS_ITEM_IDS = new Set([
-  "toy_duck_plush", "toy_carrot", "food_paw_melon_bread", "toy_treasure_puzzle",
+  "toy_duck_plush", "toy_carrot", "food_paw_melon_bread",
   "interior_anball", "other_omojii", "other_azuki", "summer_frenchie",
 ]);
 const TIME_BONUS_FALL_SPEED = 7;
+const TREASURE_ITEM_ID = "toy_treasure_puzzle";
+const TREASURE_FALL_SPEED = 4;
 const POOP_FLOOD_FALL_SPEED = 6;
 const TREASURE_POOP_FLOOD_COUNT = 15;
 const TREASURE_MINUS5_SEC = 5;
 const TREASURE_MINUS10_SEC = 10;
 const DEFAULT_ITEM_SPAWN_WEIGHT = 100;
 const ITEM_SPAWN_WEIGHTS: Partial<Record<string, number>> = {
-  toy_treasure_puzzle: 200,
+  toy_treasure_puzzle: 300,
 };
 const DOG_SPAWN_RATIO = 0.28;
 const FRENCHIE_SKIN_IDS = ["hiking_frenchie", "snow_frenchie", "summer_frenchie"];
@@ -241,6 +243,7 @@ function overlap(leftA: number, rightA: number, leftB: number, rightB: number) {
  * それ以外は通常どおりスキルによる落下速度アップ(boostedVy)を反映したレアリティ倍率になる。
  */
 function resolveFallVy(rawVy: number, boostedVy: number, itemId: string, rarity: FrenchieCatchItem["rarity"]) {
+  if (itemId === TREASURE_ITEM_ID) return rawVy * TREASURE_FALL_SPEED;
   return TIME_BONUS_ITEM_IDS.has(itemId) ? rawVy * TIME_BONUS_FALL_SPEED : boostedVy * RARITY_FALL_SPEED[rarity];
 }
 
