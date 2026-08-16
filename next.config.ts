@@ -1,3 +1,4 @@
+import path from "node:path";
 import type { NextConfig } from "next";
 
 /**
@@ -22,6 +23,17 @@ const nextConfig: NextConfig = {
   experimental: {
     // 画像アップロードを含むフォーム送信のためボディ上限を拡張
     serverActions: { bodySizeLimit: "4mb" },
+  },
+  webpack(config) {
+    config.module.rules.push({
+      test: /frenchie-catch-game\.tsx$/,
+      use: [
+        {
+          loader: path.resolve(process.cwd(), "scripts/preview-item-catch-hazards-loader.cjs"),
+        },
+      ],
+    });
+    return config;
   },
   async headers() {
     return [{ source: "/:path*", headers: securityHeaders }];
