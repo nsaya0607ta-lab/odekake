@@ -112,7 +112,7 @@ const MYSTERY_SKILL_ITEM_IDS = [
   "other_kamunayo", "hiking_frenchie", "snow_frenchie", "summer_frenchie", "interior_kinoko_azubee",
   "other_komochi", "other_azuki", "other_kobee", "other_hamigaki", "other_ikea", "other_orusuban",
   "other_pondeomo", "other_pondear", "other_kurumari_a",
-  "interior_shikkoku_no_ar", "interior_ragby_ar",
+  "interior_shikkoku_no_ar", "interior_ragby_ar", "other_oyatsu_no_jikan",
 ];
 
 /** アイテムごとのLv1〜5パラメータ（item_skill_levels_colored.xlsxの「スキル一覧」シート通り） */
@@ -184,6 +184,7 @@ const LV = {
   SHIKKOKU_FALL: [2, 2.2, 2.4, 2.6, 3],
   SHIKKOKU_MULT: [2, 2.2, 2.4, 2.7, 3],
   RAGBY_SEC: [5, 6, 7, 9, 12],
+  OYATSU_PT: [80, 100, 120, 140, 180],
 } as const;
 const SPAWN_RATE_BOOST = 2;
 const RAGBY_SPAWN_RATE_BOOST = 3;
@@ -280,6 +281,8 @@ export function FrenchieCatchGame({ ownedItems }: { ownedItems: FrenchieCatchIte
   const nextBonus5ValueRef = useRef(5);
   const nextBonus10Ref = useRef(0);
   const nextBonus10ValueRef = useRef(10);
+  const rewardTimeCountRef = useRef(0);
+  const rewardTimeValueRef = useRef(0);
   const comboShieldRef = useRef(0);
   const multiplier15UntilRef = useRef(0);
   const multiplier15ValueRef = useRef(1.5);
@@ -338,6 +341,7 @@ export function FrenchieCatchGame({ ownedItems }: { ownedItems: FrenchieCatchIte
     else if (now < multiplier15UntilRef.current) labels.push(`得点 ×${multiplier15ValueRef.current}`);
     if (nextMultiplierCountRef.current > 0) labels.push(`次の${nextMultiplierCountRef.current}個 ×${nextMultiplierRef.current}`);
     if (nextBonus10Ref.current > 0) labels.push(`あと${nextBonus10Ref.current}個 +10pt`);
+    if (rewardTimeCountRef.current > 0) labels.push(`次の1個 ${rewardTimeValueRef.current}pt確定`);
     if (nextBonus5Ref.current > 0) labels.push(`あと${nextBonus5Ref.current}個 +5pt`);
     if (comboShieldRef.current > 0) labels.push(`コンボ保護 ×${comboShieldRef.current}`);
     if (now < comboInvincibleUntilRef.current) labels.push("無敵コンボ中");
@@ -773,13 +777,19 @@ export function FrenchieCatchGame({ ownedItems }: { ownedItems: FrenchieCatchIte
               continue;
             }
 
-            const basePoints = entity.kind === "dog"
+            let basePoints = entity.kind === "dog"
               ? 15
               : entity.itemId === MYSTERY_ITEM_ID
                 ? MYSTERY_BASE_POINTS
                 : POINTS[entity.rarity!];
             let pendingBonus = 0;
             let statusChanged = false;
+
+            if (rewardTimeCountRef.current > 0) {
+              basePoints = rewardTimeValueRef.current;
+              rewardTimeCountRef.current -= 1;
+              statusChanged = true;
+            }
 
             if (nextBonus5Ref.current > 0) {
               pendingBonus += nextBonus5ValueRef.current;
@@ -1117,6 +1127,14 @@ export function FrenchieCatchGame({ ownedItems }: { ownedItems: FrenchieCatchIte
                 statusChanged = true;
                 break;
               }
+              case "other_oyatsu_no_jikan": {
+                const rewardPt = LV.OYATSU_PT[lv]!;
+                rewardTimeCountRef.current = 1;
+                rewardTimeValueRef.current = rewardPt;
+                effectLabel = `次の1個 ${rewardPt}pt確定${lvTag}`;
+                statusChanged = true;
+                break;
+              }
               default:
                 break;
             }
@@ -1254,6 +1272,7 @@ export function FrenchieCatchGame({ ownedItems }: { ownedItems: FrenchieCatchIte
     nextBonus5Ref.current = 0;
     nextBonus5ValueRef.current = 5;
     nextBonus10Ref.current = 0;
+    rewardTimeCountRef.current = 0;
     nextBonus10ValueRef.current = 10;
     comboShieldRef.current = 0;
     setComboShield(0);
