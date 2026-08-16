@@ -200,7 +200,7 @@ const TIME_BONUS_ITEM_IDS = new Set([
   "toy_duck_plush", "toy_carrot", "food_paw_melon_bread", "toy_treasure_puzzle",
   "interior_anball", "other_omojii", "other_azuki", "summer_frenchie",
 ]);
-const TIME_BONUS_RARITY_FALL_SPEED: Record<FrenchieCatchItem["rarity"], number> = { N: 1, R: 1.5, SR: 1.75, SSR: 2, UR: 2.5, LR: 3 };
+const TIME_BONUS_RARITY_FALL_SPEED: Record<FrenchieCatchItem["rarity"], number> = { N: 2, R: 2.5, SR: 2.75, SSR: 3, UR: 3.5, LR: 4 };
 const DEFAULT_ITEM_SPAWN_WEIGHT = 100;
 const DOG_SPAWN_RATIO = 0.28;
 const FRENCHIE_SKIN_IDS = ["hiking_frenchie", "snow_frenchie", "summer_frenchie"];
