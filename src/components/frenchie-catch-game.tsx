@@ -101,7 +101,12 @@ const STUN_ITEM_ID = "hazard_stun_battery";
 const STUN_IMAGE = "/collection/items/hazard-stun-battery.webp";
 const STUN_SPAWN_CHANCE = 0.02;
 const STUN_SECONDS = 1;
-const NEGATIVE_HAZARD_IDS = new Set([TIME_MINUS_ITEM_ID, BOX_SHRINK_ITEM_ID, BLACKOUT_ITEM_ID, STUN_ITEM_ID]);
+const CHOCOLATE_ITEM_ID = "hazard_chocolate_instant_end";
+const CHOCOLATE_IMAGE = "/collection/items/hazard-chocolate-instant-end.webp";
+/** 出現ウェイト50。TIME_MINUS_BASE_WEIGHT(100)=TIME_MINUS_SPAWN_CHANCEを基準に換算 */
+const CHOCOLATE_SPAWN_WEIGHT = 50;
+const CHOCOLATE_SPAWN_CHANCE = TIME_MINUS_SPAWN_CHANCE * (CHOCOLATE_SPAWN_WEIGHT / TIME_MINUS_BASE_WEIGHT);
+const NEGATIVE_HAZARD_IDS = new Set([TIME_MINUS_ITEM_ID, BOX_SHRINK_ITEM_ID, BLACKOUT_ITEM_ID, STUN_ITEM_ID, CHOCOLATE_ITEM_ID]);
 const SPAWN_INTERVAL_MIN_MS = 650;
 const SPAWN_INTERVAL_MAX_MS = 780;
 /** うんち祭り中の出現レート倍率（通常の4倍の頻度で降ってくる） */
@@ -488,10 +493,12 @@ export function FrenchieCatchGame({ ownedItems }: { ownedItems: FrenchieCatchIte
     const shrinkThreshold = timeMinusThreshold + BOX_SHRINK_SPAWN_CHANCE;
     const blackoutThreshold = shrinkThreshold + BLACKOUT_SPAWN_CHANCE;
     const stunThreshold = blackoutThreshold + STUN_SPAWN_CHANCE;
+    const chocolateThreshold = stunThreshold + CHOCOLATE_SPAWN_CHANCE;
     if (hazardRoll < timeMinusThreshold) return { ...base, itemId: TIME_MINUS_ITEM_ID, kind: "item", name: "時間 -3秒", image: TIME_MINUS_IMAGE, rarity: null, level: 0, vy: base.vy * TIME_MINUS_FALL_SPEED, size: 13 + Math.random() * 3, spin: (Math.random() - 0.5) * 28 };
     if (hazardRoll < shrinkThreshold) return { ...base, itemId: BOX_SHRINK_ITEM_ID, kind: "item", name: "ダンボール縮小", image: BOX_SHRINK_IMAGE, rarity: null, level: 0, size: 13 + Math.random() * 3, spin: (Math.random() - 0.5) * 28 };
     if (hazardRoll < blackoutThreshold) return { ...base, itemId: BLACKOUT_ITEM_ID, kind: "item", name: "イカスミ", image: BLACKOUT_IMAGE, rarity: null, level: 0, size: 14 + Math.random() * 3, spin: (Math.random() - 0.5) * 22 };
     if (hazardRoll < stunThreshold) return { ...base, itemId: STUN_ITEM_ID, kind: "item", name: "しびれバッテリー", image: STUN_IMAGE, rarity: null, level: 0, size: 12.5 + Math.random() * 3, spin: (Math.random() - 0.5) * 30 };
+    if (hazardRoll < chocolateThreshold) return { ...base, itemId: CHOCOLATE_ITEM_ID, kind: "item", name: "呪いのチョコレート", image: CHOCOLATE_IMAGE, rarity: null, level: 0, size: 13.5 + Math.random() * 3, spin: (Math.random() - 0.5) * 26 };
 
     if (itemPool.length === 0) {
       return {
@@ -853,6 +860,11 @@ export function FrenchieCatchGame({ ownedItems }: { ownedItems: FrenchieCatchIte
                   setStunned(true);
                   showCatch(entity, 0, STUN_SECONDS + "秒間 しびれ！");
                 }
+              } else if (entity.itemId === CHOCOLATE_ITEM_ID) {
+                endAtRef.current = now;
+                setTimeLeft(0);
+                setPhase("finished");
+                showCatch(entity, 0, "呪いのチョコレート…ゲーム終了！");
               }
               refreshEffectStatus(now);
               next.push(entity);
