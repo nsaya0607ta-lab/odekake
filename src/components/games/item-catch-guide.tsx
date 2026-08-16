@@ -9,7 +9,10 @@ import { MAX_SKILL_LEVEL } from "@/lib/gacha/skill-levels";
  * 得点の試算と、所持状況をふまえたスキル一覧をここで受け持つ。
  */
 
-/** 一覧に出す1件ぶん。所持まわりはサーバー側で解決してから渡す */
+/**
+ * 一覧に出す1件ぶん。
+ * 持っているアイテムだけをサーバー側で選んで渡すので、未所持はここに来ない。
+ */
 export type GuideSkill = {
   id: string;
   name: string;
@@ -17,10 +20,9 @@ export type GuideSkill = {
   rarity: GachaRarity;
   levels: readonly string[];
   note?: string;
-  owned: boolean;
   /** 累計の獲得数 */
   count: number;
-  /** 現在のスキルLv。未所持は0 */
+  /** 現在のスキルLv */
   level: number;
   /** 次のLvまでに必要な追加獲得数。Lv.MAXならnull */
   nextRemaining: number | null;
@@ -166,21 +168,25 @@ function PickButton({
 // ---------------------------------------------------------------
 const RARITY_TABS: (GachaRarity | "all")[] = ["all", "R", "SR", "SSR", "UR", "LR"];
 
-export function SkillCatalog({ skills }: { skills: GuideSkill[] }) {
+export function SkillCatalog({ skills, total }: { skills: GuideSkill[]; total: number }) {
   const [rarity, setRarity] = useState<GachaRarity | "all">("all");
-  const [ownedOnly, setOwnedOnly] = useState(false);
-
-  const ownedCount = useMemo(() => skills.filter((skill) => skill.owned).length, [skills]);
 
   const visible = useMemo(
-    () =>
-      skills.filter((skill) => {
-        if (rarity !== "all" && skill.rarity !== rarity) return false;
-        if (ownedOnly && !skill.owned) return false;
-        return true;
-      }),
-    [skills, rarity, ownedOnly],
+    () => (rarity === "all" ? skills : skills.filter((skill) => skill.rarity === rarity)),
+    [skills, rarity],
   );
+
+  if (skills.length === 0) {
+    return (
+      <div className="rounded-2xl border border-dashed border-line px-6 py-10 text-center">
+        <p className="text-xs leading-relaxed text-ink-faint">
+          まだスキルを持っていません。
+          <br />
+          ガチャでアイテムを集めると、ここに効果が出ます。
+        </p>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-3">
@@ -188,17 +194,17 @@ export function SkillCatalog({ skills }: { skills: GuideSkill[] }) {
         <div className="flex items-baseline gap-2">
           <span className="flex-1 text-xs font-black text-ink">使えるスキル</span>
           <span className="text-sm font-black tabular-nums text-leaf-deep">
-            {ownedCount} / {skills.length}
+            {skills.length} / {total}
           </span>
         </div>
         <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-line">
           <div
             className="h-full rounded-full bg-leaf transition-[width] duration-500"
-            style={{ width: `${skills.length ? (ownedCount / skills.length) * 100 : 0}%` }}
+            style={{ width: `${total ? (skills.length / total) * 100 : 0}%` }}
           />
         </div>
         <p className="mt-2 text-[10px] leading-relaxed text-ink-faint">
-          持っていないアイテムはうすく表示しています。ガチャで手に入れると使えるようになります。
+          持っているアイテムのスキルだけを出しています。ガチャで集めるとここに増えていきます。
         </p>
       </div>
 
@@ -210,23 +216,9 @@ export function SkillCatalog({ skills }: { skills: GuideSkill[] }) {
         ))}
       </div>
 
-      <label className="flex cursor-pointer items-center gap-2.5">
-        <input
-          type="checkbox"
-          checked={ownedOnly}
-          onChange={(event) => setOwnedOnly(event.target.checked)}
-          className="h-4 w-4 accent-leaf"
-        />
-        <span className="text-xs font-bold text-ink">持っているものだけ表示</span>
-      </label>
-
       {visible.length === 0 ? (
         <div className="rounded-2xl border border-dashed border-line px-6 py-10 text-center">
-          <p className="text-xs text-ink-faint">
-            あてはまるスキルがありません。
-            <br />
-            絞り込みを変えてみてください。
-          </p>
+          <p className="text-xs text-ink-faint">このレアリティのスキルはまだ持っていません。</p>
         </div>
       ) : (
         <div className="space-y-2">
@@ -243,17 +235,12 @@ function SkillRow({ skill }: { skill: GuideSkill }) {
   const tone = RARITY_STYLES[skill.rarity];
 
   return (
-    <article className={`rough-card p-3 ${skill.owned ? "" : "opacity-60"}`}>
+    <article className="rough-card p-3">
       <div className="flex items-center gap-2.5">
         <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-paper-deep">
           {skill.image ? (
             // eslint-disable-next-line @next/next/no-img-element
-            <img
-              src={skill.image}
-              alt=""
-              className={`h-9 w-9 object-contain ${skill.owned ? "" : "grayscale"}`}
-              loading="lazy"
-            />
+            <img src={skill.image} alt="" className="h-9 w-9 object-contain" loading="lazy" />
           ) : null}
         </span>
 
@@ -268,24 +255,18 @@ function SkillRow({ skill }: { skill: GuideSkill }) {
         </div>
 
         <span className="shrink-0 text-right">
-          {skill.owned ? (
-            <>
-              <span className="block text-[11px] font-black text-leaf-deep">
-                {skill.level >= MAX_SKILL_LEVEL ? "Lv.MAX" : `Lv${skill.level}`}
-              </span>
-              <span className="block text-[9px] text-ink-faint">
-                {skill.nextRemaining === null ? `${skill.count}個` : `あと${skill.nextRemaining}個`}
-              </span>
-            </>
-          ) : (
-            <span className="block text-[10px] font-bold text-ink-faint">未所持</span>
-          )}
+          <span className="block text-[11px] font-black text-leaf-deep">
+            {skill.level >= MAX_SKILL_LEVEL ? "Lv.MAX" : `Lv${skill.level}`}
+          </span>
+          <span className="block text-[9px] text-ink-faint">
+            {skill.nextRemaining === null ? `${skill.count}個` : `あと${skill.nextRemaining}個`}
+          </span>
         </span>
       </div>
 
       <div className="mt-2.5 grid grid-cols-5 gap-px overflow-hidden rounded-xl border border-line bg-line">
         {skill.levels.map((text, index) => {
-          const isCurrent = skill.owned && skill.level === index + 1;
+          const isCurrent = skill.level === index + 1;
           return (
             <div
               key={index}

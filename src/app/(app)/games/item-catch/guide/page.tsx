@@ -16,12 +16,14 @@ export default async function ItemCatchGuidePage() {
   const { supabase, user } = await requireUser();
   const counts = await getOwnedItemCounts(supabase, user.id);
 
-  // 図鑑のデータと突き合わせて、名前・絵・レアリティと所持状況をまとめる
+  // 図鑑のデータと突き合わせる。持っていないアイテムはここで落とすので画面には出ない
   const skills: GuideSkill[] = ITEM_CATCH_SKILLS.flatMap((skill) => {
     const item = ITEM_BY_ID.get(skill.id);
     if (!item) return [];
 
     const count = counts.get(skill.id) ?? 0;
+    if (count <= 0) return [];
+
     return [
       {
         id: skill.id,
@@ -30,17 +32,15 @@ export default async function ItemCatchGuidePage() {
         rarity: item.rarity,
         levels: skill.levels,
         note: skill.note,
-        owned: count > 0,
         count,
         level: getSkillLevel(item.rarity, count),
         nextRemaining: getNextLevelRemaining(item.rarity, count),
       },
     ];
   }).sort((a, b) => {
-    // レアリティの低い順、同じなら所持しているものを先に
+    // レアリティの低い順、同じなら名前順
     const byRarity = RARITY_STARS[a.rarity] - RARITY_STARS[b.rarity];
     if (byRarity !== 0) return byRarity;
-    if (a.owned !== b.owned) return a.owned ? -1 : 1;
     return a.name.localeCompare(b.name, "ja");
   });
 
@@ -55,14 +55,6 @@ export default async function ItemCatchGuidePage() {
             1プレイは30秒。落ちてくるアイテムを段ボールでキャッチして、スコアをのばします。
             レアリティで決まる基礎得点に、スキル倍率・JUST判定・コンボ倍率が順にかかります。
           </p>
-        </section>
-
-        <section className="space-y-2">
-          <SectionTitle eyebrow="得点のしくみ" title="スコアを試算する" />
-          <p className="text-xs leading-relaxed text-ink-soft">
-            条件を変えると、ゲームと同じ計算で1個あたりの得点が出ます。
-          </p>
-          <ScoreSimulator />
         </section>
 
         <section className="space-y-2">
@@ -84,6 +76,14 @@ export default async function ItemCatchGuidePage() {
               </div>
             ))}
           </div>
+        </section>
+
+        <section className="space-y-2">
+          <SectionTitle eyebrow="得点のしくみ" title="スコアを試算する" />
+          <p className="text-xs leading-relaxed text-ink-soft">
+            条件を変えると、ゲームと同じ計算で1個あたりの得点が出ます。
+          </p>
+          <ScoreSimulator />
         </section>
 
         <section className="space-y-2">
@@ -212,8 +212,8 @@ export default async function ItemCatchGuidePage() {
         </section>
 
         <section className="space-y-2">
-          <SectionTitle eyebrow={`全${skills.length}種`} title="スキル一覧" />
-          <SkillCatalog skills={skills} />
+          <SectionTitle eyebrow="持っているぶん" title="スキル一覧" />
+          <SkillCatalog skills={skills} total={ITEM_CATCH_SKILLS.length} />
         </section>
 
         <section className="space-y-2">
