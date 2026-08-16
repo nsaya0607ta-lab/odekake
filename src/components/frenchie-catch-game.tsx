@@ -112,7 +112,7 @@ const MYSTERY_SKILL_ITEM_IDS = [
   "interior_spring_flower_wreath", "other_sparkle_rope_crown", "other_nakayoshi_azubee",
   "other_kamunayo", "hiking_frenchie", "snow_frenchie", "summer_frenchie", "interior_kinoko_azubee",
   "other_komochi", "other_azuki", "other_kobee", "other_hamigaki", "other_ikea", "other_orusuban",
-  "other_pondeomo", "other_pondear", "other_kurumari_a", "other_jare_a",
+  "other_pondeomo", "other_pondear", "other_kurumari_a", "other_jare_a", "other_ketsunade_a",
   "interior_shikkoku_no_ar", "interior_ragby_ar", "other_oyatsu_no_jikan",
 ];
 
@@ -187,6 +187,8 @@ const LV = {
   SHIKKOKU_MULT: [2, 2.2, 2.4, 2.7, 3],
   RAGBY_SEC: [5, 6, 7, 9, 12],
   OYATSU_PT: [80, 100, 120, 140, 180],
+  KETSUNADE_SEC: [4, 5, 6, 8, 10],
+  KETSUNADE_SHIELD: [1, 1, 2, 2, 3],
 } as const;
 const SPAWN_RATE_BOOST = 2;
 const SLANT_VX_BOOST = 3.5;
@@ -1141,6 +1143,15 @@ export function FrenchieCatchGame({ ownedItems }: { ownedItems: FrenchieCatchIte
                 spawnRateBoostValueRef.current = RAGBY_SPAWN_RATE_BOOST;
                 effectLabel = `${ragbySec}秒間 アイテム出現量×${RAGBY_SPAWN_RATE_BOOST}${lvTag}`;
                 statusChanged = true;
+                break;
+              }
+              case "other_ketsunade_a": {
+                const ketsunadeSec = LV.KETSUNADE_SEC[lv]!;
+                const ketsunadeShield = LV.KETSUNADE_SHIELD[lv]!;
+                magnetUntilRef.current = now + ketsunadeSec * 1000;
+                magnetStrengthRef.current = "strong";
+                comboShieldRef.current = Math.min(COMBO_SHIELD_MAX, comboShieldRef.current + ketsunadeShield);
+                effectLabel = `${ketsunadeSec}秒間 なでなでマグネット / コンボ保護+${ketsunadeShield}${lvTag}`;
                 break;
               }
               case "other_oyatsu_no_jikan": {
