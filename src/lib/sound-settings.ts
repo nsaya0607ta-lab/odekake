@@ -39,12 +39,17 @@ export function setTapVolume(value: number): void {
  * スライダーの見た目上の位置(0〜1、線形)を、耳の感じ方に近づけた実際の
  * 再生ゲイン(0〜1)に変換する。
  *
- * 人の聴覚は音量を対数的に感じるため、そのまま線形の値を audio.volume に
+ * 人の聴覚は音量を対数(dB)的に感じるため、そのまま線形の値をゲインに
  * 渡すと、低〜中間あたりの変化がほとんど感じられず「0か100かのように」
- * 聞こえてしまう。2乗カーブにすることで、スライダー全体で音量差が
- * 感じられるようにする。
+ * 聞こえてしまう。実際のオーディオ機器のボリュームつまみと同様に、
+ * スライダー位置を dB のレンジに写像してから振幅に戻すことで、
+ * スライダー全体でなだらかに音量差が感じられるようにする。
  */
+const TAPER_RANGE_DB = 45;
+
 export function sliderToGain(position: number): number {
   const clamped = Math.min(1, Math.max(0, position));
-  return clamped * clamped;
+  if (clamped <= 0) return 0;
+  const db = (clamped - 1) * TAPER_RANGE_DB;
+  return Math.pow(10, db / 20);
 }
