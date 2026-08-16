@@ -78,8 +78,13 @@ const BAG_SPAWN_CHANCE = 0.03;
 const BAG_MAX_STOCK = 3;
 const TIME_MINUS_ITEM_ID = "hazard_time_minus";
 const TIME_MINUS_IMAGE = "/collection/items/hazard-time-minus.webp";
+/** 基準の出現ウェイトを100とした場合の重み。60秒経過後はTIME_MINUS_BOOSTED_WEIGHT(200)相当に上がる */
+const TIME_MINUS_BASE_WEIGHT = 100;
+const TIME_MINUS_BOOSTED_WEIGHT = 200;
+const TIME_MINUS_BOOST_AFTER_SEC = 60;
 const TIME_MINUS_SPAWN_CHANCE = 0.015;
 const TIME_MINUS_SECONDS = 3;
+const TIME_MINUS_FALL_SPEED = 3.5;
 const BOX_SHRINK_ITEM_ID = "hazard_box_shrink";
 const BOX_SHRINK_IMAGE = "/collection/items/hazard-box-shrink.webp";
 const BOX_SHRINK_SPAWN_CHANCE = 0.02;
@@ -447,11 +452,14 @@ export function FrenchieCatchGame({ ownedItems }: { ownedItems: FrenchieCatchIte
       };
     }
 
-    const timeMinusThreshold = POOP_SPAWN_CHANCE + MYSTERY_SPAWN_CHANCE + BAG_SPAWN_CHANCE + TIME_MINUS_SPAWN_CHANCE;
+    const elapsedSec = (performance.now() - startAtRef.current) / 1000;
+    const timeMinusWeightFactor = elapsedSec > TIME_MINUS_BOOST_AFTER_SEC ? TIME_MINUS_BOOSTED_WEIGHT / TIME_MINUS_BASE_WEIGHT : 1;
+    const timeMinusChance = TIME_MINUS_SPAWN_CHANCE * timeMinusWeightFactor;
+    const timeMinusThreshold = POOP_SPAWN_CHANCE + MYSTERY_SPAWN_CHANCE + BAG_SPAWN_CHANCE + timeMinusChance;
     const shrinkThreshold = timeMinusThreshold + BOX_SHRINK_SPAWN_CHANCE;
     const blackoutThreshold = shrinkThreshold + BLACKOUT_SPAWN_CHANCE;
     const stunThreshold = blackoutThreshold + STUN_SPAWN_CHANCE;
-    if (hazardRoll < timeMinusThreshold) return { ...base, itemId: TIME_MINUS_ITEM_ID, kind: "item", name: "時間 -3秒", image: TIME_MINUS_IMAGE, rarity: null, level: 0, size: 13 + Math.random() * 3, spin: (Math.random() - 0.5) * 28 };
+    if (hazardRoll < timeMinusThreshold) return { ...base, itemId: TIME_MINUS_ITEM_ID, kind: "item", name: "時間 -3秒", image: TIME_MINUS_IMAGE, rarity: null, level: 0, vy: base.vy * TIME_MINUS_FALL_SPEED, size: 13 + Math.random() * 3, spin: (Math.random() - 0.5) * 28 };
     if (hazardRoll < shrinkThreshold) return { ...base, itemId: BOX_SHRINK_ITEM_ID, kind: "item", name: "ダンボール縮小", image: BOX_SHRINK_IMAGE, rarity: null, level: 0, size: 13 + Math.random() * 3, spin: (Math.random() - 0.5) * 28 };
     if (hazardRoll < blackoutThreshold) return { ...base, itemId: BLACKOUT_ITEM_ID, kind: "item", name: "イカスミ", image: BLACKOUT_IMAGE, rarity: null, level: 0, size: 14 + Math.random() * 3, spin: (Math.random() - 0.5) * 22 };
     if (hazardRoll < stunThreshold) return { ...base, itemId: STUN_ITEM_ID, kind: "item", name: "しびれバッテリー", image: STUN_IMAGE, rarity: null, level: 0, size: 12.5 + Math.random() * 3, spin: (Math.random() - 0.5) * 30 };
