@@ -84,6 +84,9 @@ const TIME_MINUS_BOOSTED_WEIGHT = 300;
 const TIME_MINUS_BOOST_AFTER_SEC = 60;
 const TIME_MINUS_SPAWN_CHANCE = 0.015;
 const TIME_MINUS_SECONDS = 3;
+/** プレイ60秒経過後、画面上部1/5のアイテムを透明にする */
+const TOP_ZONE_HIDDEN_AFTER_SEC = 60;
+const TOP_ZONE_HIDDEN_LOCAL_Y = 20;
 const TIME_MINUS_FALL_SPEED = 3.5;
 const BOX_SHRINK_ITEM_ID = "hazard_box_shrink";
 const BOX_SHRINK_IMAGE = "/collection/items/hazard-box-shrink.webp";
@@ -385,6 +388,7 @@ export function FrenchieCatchGame({ ownedItems }: { ownedItems: FrenchieCatchIte
     if (now < boxShrinkUntilRef.current) labels.push("ダンボール0.8倍");
     else if (now < boxWideUntilRef.current) labels.push(`ダンボール×${boxWideScaleRef.current}拡大中`);
     if (now < blackoutUntilRef.current) labels.push("上半分ブラックアウト中");
+    if (now - startAtRef.current > TOP_ZONE_HIDDEN_AFTER_SEC * 1000) labels.push("画面上部が見えない");
     if (now < stunUntilRef.current) labels.push("しびれ中");
     if (urBoostRef.current > 0) labels.push(`UR出現率+${Math.min(urBoostRef.current, UR_BOOST_MAX)}`);
     setActiveEffects(labels);
@@ -1496,13 +1500,16 @@ export function FrenchieCatchGame({ ownedItems }: { ownedItems: FrenchieCatchIte
           </div>
         ) : null}
 
-        {entities.map((entity) => (
-          <div key={entity.id} className={`absolute ${entity.enteredOpening && entity.status !== "bounced" ? "z-40" : "z-20"} will-change-transform opacity-100 ${entity.rarity ? RARITY_STYLE[entity.rarity] : "drop-shadow-[0_5px_7px_rgba(75,58,43,0.22)]"}`} style={{ left: `${entity.x}%`, top: `${entity.y}%`, width: `${entity.size}%`, transform: `translate(-50%, -50%) rotate(${entity.rotation}deg)` }}>
+        {entities.map((entity) => {
+          const topZoneHidden = performance.now() - startAtRef.current > TOP_ZONE_HIDDEN_AFTER_SEC * 1000 && entity.y < TOP_ZONE_HIDDEN_LOCAL_Y;
+          return (
+          <div key={entity.id} className={`absolute ${entity.enteredOpening && entity.status !== "bounced" ? "z-40" : "z-20"} will-change-transform ${topZoneHidden ? "opacity-0" : "opacity-100"} ${entity.rarity ? RARITY_STYLE[entity.rarity] : "drop-shadow-[0_5px_7px_rgba(75,58,43,0.22)]"}`} style={{ left: `${entity.x}%`, top: `${entity.y}%`, width: `${entity.size}%`, transform: `translate(-50%, -50%) rotate(${entity.rotation}deg)` }}>
             <Image src={entity.image} alt="" width={160} height={160} draggable={false} className="h-auto w-full object-contain" />
             {entity.rarity === "UR" ? <span className="absolute -inset-2 -z-10 animate-pulse rounded-full bg-[#e95c4d]/15 blur-md" /> : null}
             {entity.rarity === "LR" ? <span className="absolute -inset-3 -z-10 animate-pulse rounded-full bg-[#e6b43c]/25 blur-lg" /> : null}
           </div>
-        ))}
+          );
+        })}
 
         {impactX !== null ? <div className="pointer-events-none absolute z-40 -translate-x-1/2 -translate-y-1/2 animate-ping text-xl font-black text-[#d7684f]" style={{ left: `${impactX}%`, top: `${BOX_LIP_Y}%` }}>✦</div> : null}
         {feedback ? (
