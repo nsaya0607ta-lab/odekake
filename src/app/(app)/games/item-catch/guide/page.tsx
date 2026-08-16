@@ -12,11 +12,21 @@ export const dynamic = "force-dynamic";
 
 const ITEM_BY_ID = new Map(COLLECTION_ITEMS.map((item) => [item.id, item]));
 
+const SCORE_CARDS = [
+  ["N", "10pt", "bg-[#eaf5e8] border-[#c9dfc5] text-[#466b45]"],
+  ["R", "20pt", "bg-[#e9f3fb] border-[#c5dcec] text-[#426c8c]"],
+  ["SR", "40pt", "bg-[#fff6d8] border-[#ead79d] text-[#8a6a19]"],
+  ["SSR", "70pt", "bg-gradient-to-br from-[#f7e8ff] via-[#e8f7ff] to-[#fff3d8] border-[#dccfea] text-[#6d5a86]"],
+  ["UR", "100pt", "bg-[#fff0ed] border-[#e9c2ba] text-[#9a463b]"],
+  ["LR", "150pt", "bg-[#f2eee8] border-[#d4c8b9] text-[#5c4b3a]"],
+  ["わんこ", "15pt", "bg-[#f7f0e5] border-[#e2d3bd] text-[#765f42]"],
+  ["？", "10pt〜", "bg-[#f0eee8] border-[#d9d4ca] text-[#665f55]"],
+] as const;
+
 export default async function ItemCatchGuidePage() {
   const { supabase, user } = await requireUser();
   const counts = await getOwnedItemCounts(supabase, user.id);
 
-  // 図鑑のデータと突き合わせる。持っていないアイテムはここで落とすので画面には出ない
   const skills: GuideSkill[] = ITEM_CATCH_SKILLS.flatMap((skill) => {
     const item = ITEM_BY_ID.get(skill.id);
     if (!item) return [];
@@ -38,7 +48,6 @@ export default async function ItemCatchGuidePage() {
       },
     ];
   }).sort((a, b) => {
-    // レアリティの低い順、同じなら名前順
     const byRarity = RARITY_STARS[a.rarity] - RARITY_STARS[b.rarity];
     if (byRarity !== 0) return byRarity;
     return a.name.localeCompare(b.name, "ja");
@@ -49,15 +58,15 @@ export default async function ItemCatchGuidePage() {
       <PageHeader title="ルールブック" backHref="/games/item-catch" />
 
       <PageBody className="!space-y-4 !py-3">
-        <section className="rough-card relative overflow-hidden px-5 py-5">
-          <div className="pointer-events-none absolute -right-7 -top-7 h-24 w-24 rounded-full bg-leaf-soft/70" />
-          <div className="pointer-events-none absolute -bottom-8 -left-6 h-20 w-20 rounded-full bg-paper-deep/70" />
+        <section className="relative overflow-hidden rounded-[28px] border border-[#d9d2c4] bg-gradient-to-br from-[#fffdf7] via-[#f4f7ea] to-[#edf4e8] px-5 py-5 shadow-[0_12px_30px_rgba(72,82,54,0.08)]">
+          <div className="pointer-events-none absolute -right-8 -top-8 h-28 w-28 rounded-full bg-[#bfd5aa]/35 blur-sm" />
+          <div className="pointer-events-none absolute -bottom-10 -left-7 h-24 w-24 rounded-full bg-[#e2c58f]/25 blur-sm" />
           <div className="relative">
-            <span className="inline-flex rounded-full border border-line bg-card/90 px-2.5 py-1 text-[9px] font-black tracking-[0.18em] text-ink-faint">
+            <span className="inline-flex rounded-full border border-[#cfd8c4] bg-white/75 px-2.5 py-1 text-[9px] font-black tracking-[0.18em] text-[#637155] shadow-sm">
               ITEM CATCH · RULE BOOK
             </span>
-            <h1 className="mt-3 text-xl font-black tracking-tight text-ink">30秒で、どこまで伸ばせる？</h1>
-            <p className="mt-1.5 max-w-[92%] text-xs leading-relaxed text-ink-soft">
+            <h1 className="mt-3 text-xl font-black tracking-tight text-[#3f382d]">30秒で、どこまで伸ばせる？</h1>
+            <p className="mt-1.5 max-w-[92%] text-xs leading-relaxed text-[#756b5d]">
               落ちてくるアイテムを段ボールでキャッチ。レア度・JUST・コンボ・スキルを重ねてハイスコアを狙います。
             </p>
 
@@ -67,10 +76,10 @@ export default async function ItemCatchGuidePage() {
                 ["COMBO", "×2.0", "最大倍率"],
                 ["REWARD", "÷25", "コイン換算"],
               ].map(([label, value, note]) => (
-                <div key={label} className="rounded-2xl border border-line bg-card/90 px-2 py-2.5 text-center">
-                  <span className="block text-[8px] font-black tracking-[0.12em] text-ink-faint">{label}</span>
-                  <span className="mt-0.5 block text-base font-black tabular-nums text-ink">{value}</span>
-                  <span className="block text-[9px] text-ink-faint">{note}</span>
+                <div key={label} className="rounded-2xl border border-white/80 bg-white/70 px-2 py-2.5 text-center shadow-[0_5px_16px_rgba(74,76,58,0.06)] backdrop-blur-sm">
+                  <span className="block text-[8px] font-black tracking-[0.12em] text-[#8a816f]">{label}</span>
+                  <span className="mt-0.5 block text-base font-black tabular-nums text-[#42583c]">{value}</span>
+                  <span className="block text-[9px] text-[#8a816f]">{note}</span>
                 </div>
               ))}
             </div>
@@ -80,19 +89,10 @@ export default async function ItemCatchGuidePage() {
         <section className="space-y-2">
           <SectionTitle number="01" eyebrow="SCORE" title="レアリティごとの基礎得点" />
           <div className="grid grid-cols-4 gap-1.5">
-            {[
-              ["N", "10pt"],
-              ["R", "20pt"],
-              ["SR", "40pt"],
-              ["SSR", "70pt"],
-              ["UR", "100pt"],
-              ["LR", "150pt"],
-              ["わんこ", "15pt"],
-              ["？", "10pt〜"],
-            ].map(([label, value]) => (
-              <div key={label} className="rounded-2xl border border-line bg-card px-1 py-2.5 text-center">
-                <span className="block text-[9px] font-black text-ink-faint">{label}</span>
-                <span className="mt-0.5 block text-sm font-black tabular-nums text-ink">{value}</span>
+            {SCORE_CARDS.map(([label, value, colors]) => (
+              <div key={label} className={`rounded-2xl border px-1 py-2.5 text-center shadow-[0_4px_12px_rgba(80,70,55,0.04)] ${colors}`}>
+                <span className="block text-[9px] font-black opacity-75">{label}</span>
+                <span className="mt-0.5 block text-sm font-black tabular-nums">{value}</span>
               </div>
             ))}
           </div>
@@ -100,8 +100,8 @@ export default async function ItemCatchGuidePage() {
 
         <section className="space-y-2">
           <SectionTitle number="02" eyebrow="SIMULATOR" title="スコアを試算する" />
-          <div className="rounded-2xl border border-line bg-card p-3">
-            <p className="mb-3 text-[11px] leading-relaxed text-ink-soft">
+          <div className="rounded-2xl border border-[#ded8ca] bg-[#fffdf8] p-3 shadow-[0_5px_16px_rgba(80,70,55,0.04)]">
+            <p className="mb-3 text-[11px] leading-relaxed text-[#756b5d]">
               条件を変えると、ゲーム本体と同じ計算で1個あたりの得点を確認できます。
             </p>
             <ScoreSimulator />
@@ -110,7 +110,7 @@ export default async function ItemCatchGuidePage() {
 
         <section className="space-y-2">
           <SectionTitle number="03" eyebrow="COMBO" title="つなぐほど倍率アップ" />
-          <div className="overflow-hidden rounded-2xl border border-line bg-card">
+          <div className="overflow-hidden rounded-2xl border border-[#d9d4c8] bg-[#fffdf8] shadow-[0_5px_16px_rgba(80,70,55,0.04)]">
             {[
               ["30 〜", "MAX COMBO", "×2.0", true],
               ["20 〜 29", "SUPER COMBO", "×1.5", false],
@@ -120,32 +120,24 @@ export default async function ItemCatchGuidePage() {
             ].map(([range, label, mult, isMax]) => (
               <div
                 key={String(range)}
-                className={`flex items-center gap-3 border-b border-line px-3.5 py-2.5 last:border-b-0 ${
-                  isMax ? "bg-leaf-soft/60" : "bg-card"
+                className={`flex items-center gap-3 border-b border-[#e7e1d5] px-3.5 py-2.5 last:border-b-0 ${
+                  isMax ? "bg-gradient-to-r from-[#e3f0da] to-[#f3f7ec]" : "bg-[#fffdf8]"
                 }`}
               >
-                <span
-                  className={`w-[62px] shrink-0 text-[11px] font-black tabular-nums ${
-                    isMax ? "text-leaf-deep" : "text-ink-faint"
-                  }`}
-                >
+                <span className={`w-[62px] shrink-0 text-[11px] font-black tabular-nums ${isMax ? "text-[#4f733f]" : "text-[#9a907f]"}`}>
                   {range}
                 </span>
-                <span className={`flex-1 text-[11px] font-bold ${isMax ? "text-leaf-deep" : "text-ink-soft"}`}>
-                  {label}
-                </span>
-                <span className={`text-sm font-black tabular-nums ${isMax ? "text-leaf-deep" : "text-ink"}`}>
-                  {mult}
-                </span>
+                <span className={`flex-1 text-[11px] font-bold ${isMax ? "text-[#4f733f]" : "text-[#756b5d]"}`}>{label}</span>
+                <span className={`text-sm font-black tabular-nums ${isMax ? "text-[#3f6b35]" : "text-[#4b4338]"}`}>{mult}</span>
               </div>
             ))}
           </div>
-          <div className="rounded-2xl border border-line bg-paper-deep/60 p-3.5">
+          <div className="rounded-2xl border border-[#d9d6c9] bg-[#f6f2e8] p-3.5">
             <div className="flex items-start gap-3">
-              <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-card text-sm">🛡️</span>
-              <p className="text-[11px] leading-relaxed text-ink-soft">
-                <b className="text-ink">コンボ保護</b>があると、取り逃してもコンボを維持して保護を1つ消費します。
-                最大<b className="text-ink">4つ</b>まで持てます。
+              <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-white text-sm shadow-sm">🛡️</span>
+              <p className="text-[11px] leading-relaxed text-[#756b5d]">
+                <b className="text-[#4b4338]">コンボ保護</b>があると、取り逃してもコンボを維持して保護を1つ消費します。
+                最大<b className="text-[#4b4338]">4つ</b>まで持てます。
               </p>
             </div>
           </div>
@@ -153,44 +145,25 @@ export default async function ItemCatchGuidePage() {
 
         <section className="space-y-2">
           <SectionTitle number="04" eyebrow="HAZARD" title="特殊アイテム" />
-          <p className="text-[11px] leading-relaxed text-ink-soft">
-            図鑑とは別枠。所持状況に関係なく、決まった確率で落ちてきます。
-          </p>
+          <p className="text-[11px] leading-relaxed text-[#756b5d]">図鑑とは別枠。所持状況に関係なく、決まった確率で落ちてきます。</p>
           <div className="grid gap-2">
             {[
-              {
-                image: "/collection/items/dog-poop.webp",
-                name: "犬のうんち",
-                rate: "4%",
-                body: "取ると −500pt。ビニール袋があればダメージを打ち消せます。",
-              },
-              {
-                image: "/collection/items/mystery-question.webp",
-                name: "？アイテム",
-                rate: "5%",
-                body: "全アイテムからランダムに1つのスキルが発動。未所持ならLv1です。",
-              },
-              {
-                image: "/collection/items/plastic-bag.webp",
-                name: "ビニール袋",
-                rate: "3%",
-                body: "最大3つまで持てる「うんちよけ」。ダメージを1回打ち消します。",
-              },
+              { image: "/collection/items/dog-poop.webp", name: "犬のうんち", rate: "4%", body: "取ると −500pt。ビニール袋があればダメージを打ち消せます。", tone: "bg-[#fff4ed] border-[#ecd6c7]" },
+              { image: "/collection/items/mystery-question.webp", name: "？アイテム", rate: "5%", body: "全アイテムからランダムに1つのスキルが発動。未所持ならLv1です。", tone: "bg-[#f3f0f8] border-[#ddd4e8]" },
+              { image: "/collection/items/plastic-bag.webp", name: "ビニール袋", rate: "3%", body: "最大3つまで持てる「うんちよけ」。ダメージを1回打ち消します。", tone: "bg-[#edf5f2] border-[#cfe0da]" },
             ].map((hazard) => (
-              <div key={hazard.name} className="rounded-2xl border border-line bg-card p-3">
+              <div key={hazard.name} className={`rounded-2xl border p-3 shadow-[0_4px_12px_rgba(80,70,55,0.035)] ${hazard.tone}`}>
                 <div className="flex items-center gap-3">
-                  <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-paper-deep">
+                  <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-white/75 shadow-sm">
                     {/* eslint-disable-next-line @next/next/no-img-element */}
                     <img src={hazard.image} alt="" className="h-9 w-9 object-contain" loading="lazy" />
                   </span>
                   <span className="min-w-0 flex-1">
                     <span className="flex items-center gap-2">
-                      <span className="truncate text-sm font-black text-ink">{hazard.name}</span>
-                      <span className="rounded-full bg-paper-deep px-2 py-0.5 text-[9px] font-black tabular-nums text-ink-faint">
-                        DROP {hazard.rate}
-                      </span>
+                      <span className="truncate text-sm font-black text-[#4b4338]">{hazard.name}</span>
+                      <span className="rounded-full bg-white/70 px-2 py-0.5 text-[9px] font-black tabular-nums text-[#7b7264]">DROP {hazard.rate}</span>
                     </span>
-                    <span className="mt-1 block text-[10px] leading-relaxed text-ink-soft">{hazard.body}</span>
+                    <span className="mt-1 block text-[10px] leading-relaxed text-[#756b5d]">{hazard.body}</span>
                   </span>
                 </div>
               </div>
@@ -200,20 +173,13 @@ export default async function ItemCatchGuidePage() {
 
         <section className="space-y-2">
           <SectionTitle number="05" eyebrow="SKILL LEVEL" title="重ねてスキルを育てる" />
-          <p className="text-[11px] leading-relaxed text-ink-soft">
-            同じアイテムを引くほど5段階で強化。Nと特殊アイテムはレベル対象外です。
-          </p>
-          <div className="rounded-2xl border border-line bg-card p-3.5">
+          <p className="text-[11px] leading-relaxed text-[#756b5d]">同じアイテムを引くほど5段階で強化。Nと特殊アイテムはレベル対象外です。</p>
+          <div className="rounded-2xl border border-[#d9d4c8] bg-[#fffdf8] p-3.5 shadow-[0_5px_16px_rgba(80,70,55,0.04)]">
             <table className="w-full border-collapse text-[11px]">
               <thead>
                 <tr>
                   {["レア", "Lv1", "Lv2", "Lv3", "Lv4", "MAX"].map((head) => (
-                    <th
-                      key={head}
-                      className="border-b border-line px-1 py-1.5 text-center text-[9px] font-black text-ink-faint first:text-left"
-                    >
-                      {head}
-                    </th>
+                    <th key={head} className="border-b border-[#ddd6c8] px-1 py-1.5 text-center text-[9px] font-black text-[#8d8373] first:text-left">{head}</th>
                   ))}
                 </tr>
               </thead>
@@ -227,20 +193,13 @@ export default async function ItemCatchGuidePage() {
                 ].map((row) => (
                   <tr key={String(row[0])}>
                     {row.map((cell, index) => (
-                      <td
-                        key={index}
-                        className="border-b border-line px-1 py-1.5 text-center font-bold tabular-nums text-ink last:border-b-0 first:text-left first:font-black"
-                      >
-                        {cell}
-                      </td>
+                      <td key={index} className="border-b border-[#eee8dd] px-1 py-1.5 text-center font-bold tabular-nums text-[#4b4338] last:border-b-0 first:text-left first:font-black">{cell}</td>
                     ))}
                   </tr>
                 ))}
               </tbody>
             </table>
-            <p className="mt-2 text-[10px] leading-relaxed text-ink-faint">
-              数字は累計獲得数です。同じアイテムをもう一度引くことでレベルが上がります。
-            </p>
+            <p className="mt-2 text-[10px] leading-relaxed text-[#928878]">数字は累計獲得数です。同じアイテムをもう一度引くことでレベルが上がります。</p>
           </div>
         </section>
 
@@ -251,23 +210,21 @@ export default async function ItemCatchGuidePage() {
 
         <section className="space-y-2">
           <SectionTitle number="07" eyebrow="REWARD" title="コインのもらい方" />
-          <div className="rough-card overflow-hidden">
-            <div className="bg-leaf-soft/60 px-4 py-5 text-center">
-              <p className="text-[9px] font-black tracking-[0.16em] text-leaf-deep">COIN REWARD</p>
-              <p className="mt-1 text-lg font-black tabular-nums text-leaf-deep">スコア ÷ 25 = 獲得コイン</p>
-              <p className="mt-1 text-[10px] text-leaf-deep">小数点以下は切り捨て · 最低1コイン</p>
+          <div className="overflow-hidden rounded-[24px] border border-[#d7cfbc] bg-[#fffdf8] shadow-[0_8px_22px_rgba(80,70,55,0.06)]">
+            <div className="bg-gradient-to-br from-[#e2efd7] via-[#eef4e6] to-[#fff5dc] px-4 py-5 text-center">
+              <p className="text-[9px] font-black tracking-[0.16em] text-[#678052]">COIN REWARD</p>
+              <p className="mt-1 text-lg font-black tabular-nums text-[#4b6a3c]">スコア ÷ 25 = 獲得コイン</p>
+              <p className="mt-1 text-[10px] text-[#6d7f5e]">小数点以下は切り捨て · 最低1コイン</p>
             </div>
-            <ul className="space-y-2 border-t border-line bg-card p-3.5 text-[11px] leading-relaxed text-ink-soft">
-              <li className="flex gap-2"><span className="font-black text-ink-faint">01</span><span>1点でも取れていれば、必ず1コインはもらえます。</span></li>
-              <li className="flex gap-2"><span className="font-black text-ink-faint">02</span><span>コインがもらえるのは1プレイにつき1回だけです。</span></li>
-              <li className="flex gap-2"><span className="font-black text-ink-faint">03</span><span>キャッチ数は1プレイ2000個まで、1個あたり1500ptまでです。</span></li>
+            <ul className="space-y-2 border-t border-[#e6dfd0] bg-[#fffdf8] p-3.5 text-[11px] leading-relaxed text-[#756b5d]">
+              <li className="flex gap-2"><span className="font-black text-[#b08b45]">01</span><span>1点でも取れていれば、必ず1コインはもらえます。</span></li>
+              <li className="flex gap-2"><span className="font-black text-[#b08b45]">02</span><span>コインがもらえるのは1プレイにつき1回だけです。</span></li>
+              <li className="flex gap-2"><span className="font-black text-[#b08b45]">03</span><span>キャッチ数は1プレイ2000個まで、1個あたり1500ptまでです。</span></li>
             </ul>
           </div>
         </section>
 
-        <p className="pb-2 pt-1 text-center text-[9px] tracking-wide text-ink-faint">
-          GAME DATA · 数値はゲーム本体の設定にもとづいています
-        </p>
+        <p className="pb-2 pt-1 text-center text-[9px] tracking-wide text-[#9a907f]">GAME DATA · 数値はゲーム本体の設定にもとづいています</p>
       </PageBody>
     </>
   );
@@ -276,12 +233,12 @@ export default async function ItemCatchGuidePage() {
 function SectionTitle({ number, eyebrow, title }: { number: string; eyebrow: string; title: string }) {
   return (
     <div className="flex items-end gap-3">
-      <span className="text-xl font-black tabular-nums text-ink-faint/50">{number}</span>
+      <span className="text-xl font-black tabular-nums text-[#b49b68]">{number}</span>
       <div className="min-w-0 pb-0.5">
-        <p className="text-[8px] font-black tracking-[0.18em] text-ink-faint">{eyebrow}</p>
-        <h2 className="mt-0.5 text-base font-black tracking-tight text-ink">{title}</h2>
+        <p className="text-[8px] font-black tracking-[0.18em] text-[#758567]">{eyebrow}</p>
+        <h2 className="mt-0.5 text-base font-black tracking-tight text-[#463e33]">{title}</h2>
       </div>
-      <span className="mb-1 h-px flex-1 bg-line" />
+      <span className="mb-1 h-px flex-1 bg-[#ddd4c4]" />
     </div>
   );
 }
