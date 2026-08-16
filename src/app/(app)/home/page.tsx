@@ -3,6 +3,7 @@ import { IconUser } from "@/components/icons";
 import { TopHeader } from "@/components/page-header";
 import { PageBody } from "@/components/page-body";
 import { CoinBadge } from "@/components/coin-badge";
+import { SoundSettingsButton } from "@/components/sound-settings-button";
 import { SharedTripBadge } from "@/components/shared-trip-badge";
 import { HomeScene } from "@/components/home-scene";
 import { HomeCollectionCard } from "@/components/home-collection-card";
@@ -56,6 +57,7 @@ export default async function HomePage({
         title={space.name}
         action={
           <div className="flex items-center gap-2">
+            <SoundSettingsButton />
             <CoinBadge balance={coins.balance} />
             <SharedTripBadge />
           </div>

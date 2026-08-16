@@ -267,3 +267,10 @@ export const IconLock = (p: IconProps) => (
     <path d="M8.5 10.5V8a3.5 3.5 0 0 1 7 0v2.5" />
   </Base>
 );
+
+export const IconSettings = (p: IconProps) => (
+  <Base {...p}>
+    <circle cx="12" cy="12" r="2.8" />
+    <path d="M12 3.6v2.1M12 18.3v2.1M20.4 12h-2.1M5.7 12H3.6M17.4 6.6l-1.5 1.5M8.1 15.9l-1.5 1.5M17.4 17.4l-1.5-1.5M8.1 8.1 6.6 6.6" />
+  </Base>
+);
