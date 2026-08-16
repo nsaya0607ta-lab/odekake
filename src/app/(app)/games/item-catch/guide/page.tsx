@@ -125,6 +125,7 @@ export default async function ItemCatchGuidePage() {
               { image: "/collection/items/hazard-box-shrink.webp", name: "ダンボール縮小", rate: "2%", body: "3秒間、段ボールの当たり判定が0.8倍に縮みます。", tone: "bg-gradient-to-br from-[#f4f1fb] to-[#e6e0f4] border-[#cec4e5]" },
               { image: "/collection/items/hazard-blackout-squid.webp", name: "イカスミ", rate: "1%", body: "3秒間、画面の上半分が真っ黒になって見えなくなります。", tone: "bg-gradient-to-br from-[#eceef2] to-[#d8dbe3] border-[#b7bcc9]" },
               { image: "/collection/items/hazard-stun-battery.webp", name: "しびれバッテリー", rate: "2%", body: "1秒間、段ボールが操作できなくなります。", tone: "bg-gradient-to-br from-[#fff8e8] to-[#fbecc4] border-[#e6cf8f]" },
+              { image: "/collection/items/hazard-chocolate-instant-end.webp", name: "呪いのチョコレート", rate: "0.75%", body: "取った瞬間、残り時間が0になりその場でゲーム終了です。", tone: "bg-gradient-to-br from-[#fbeee6] to-[#e9d3c2] border-[#c9a583]" },
             ].map((hazard) => (
               <div key={hazard.name} className={`rounded-[22px] border p-3 shadow-[0_5px_14px_rgba(80,66,40,0.045)] ${hazard.tone}`}>
                 <div className="flex items-center gap-3">
