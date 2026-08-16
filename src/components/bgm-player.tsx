@@ -64,7 +64,7 @@ export function BgmPlayer() {
       const target = event.target instanceof Element ? event.target : null;
       if (!target?.closest("a[href], button, [role='button']")) return;
       const tap = new Audio("/audio/tap.mp3");
-      tap.volume = 0.9;
+      tap.volume = 1.0;
       tap.play().catch(() => {});
     };
 
