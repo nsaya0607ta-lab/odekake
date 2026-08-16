@@ -1273,7 +1273,7 @@ export function FrenchieCatchGame({ ownedItems }: { ownedItems: FrenchieCatchIte
         <div className="absolute -right-10 top-[34%] h-24 w-40 rounded-full bg-white/50 blur-xl" />
         <div className="absolute inset-x-0 bottom-0 h-[18%] bg-[linear-gradient(180deg,rgba(208,232,171,0)_0%,#c9e29e_72%,#efdcb8_73%,#e9cfa5_73%,#e9cfa5_100%)]" />
 
-        <div className="absolute left-3 right-3 top-3 z-30 flex items-start justify-between gap-2">
+        <div className="absolute left-3 right-3 top-3 z-50 flex items-start justify-between gap-2">
           <div className="flex flex-col items-start gap-1">
             <div className="rounded-2xl border border-white/80 bg-white/90 px-3 py-2 shadow-sm"><p className="text-[9px] font-bold tracking-widest text-ink-faint">SCORE</p><p className="text-xl font-black tabular-nums text-ink">{score.toLocaleString("ja-JP")}</p></div>
             {bagStock > 0 || comboShield > 0 ? (
@@ -1300,7 +1300,7 @@ export function FrenchieCatchGame({ ownedItems }: { ownedItems: FrenchieCatchIte
         </div>
 
         {activeEffects.length > 0 ? (
-          <div className="pointer-events-none absolute right-3 top-24 z-30 flex flex-col items-end gap-0.5">
+          <div className="pointer-events-none absolute right-3 top-24 z-50 flex flex-col items-end gap-0.5">
             {activeEffects.map((effect) => (
               <span key={effect} className="rounded-full bg-white/40 px-2 py-0.5 text-[8px] font-bold text-ink-soft/70">{effect}</span>
             ))}
