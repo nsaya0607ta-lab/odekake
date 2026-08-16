@@ -29,6 +29,9 @@ const nextConfig: NextConfig = {
       test: /frenchie-catch-game\.tsx$/,
       use: [
         {
+          loader: path.resolve(process.cwd(), "scripts/preview-item-catch-followup-loader.cjs"),
+        },
+        {
           loader: path.resolve(process.cwd(), "scripts/preview-item-catch-hazards-loader.cjs"),
         },
       ],
