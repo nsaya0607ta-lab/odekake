@@ -194,24 +194,11 @@ const SPAWN_RATE_BOOST = 2;
 const SLANT_VX_BOOST = 3.5;
 const RAGBY_SPAWN_RATE_BOOST = 3;
 const POINTS: Record<FrenchieCatchItem["rarity"], number> = { N: 10, R: 20, SR: 40, SSR: 70, UR: 100, LR: 150 };
-const RARITY_FALL_SPEED: Record<FrenchieCatchItem["rarity"], number> = { N: 1, R: 1.08, SR: 1.18, SSR: 1.32, UR: 1.5, LR: 1.75 };
+const RARITY_FALL_SPEED: Record<FrenchieCatchItem["rarity"], number> = { N: 1, R: 1.5, SR: 1.75, SSR: 2, UR: 2.5, LR: 3 };
 const DEFAULT_ITEM_SPAWN_WEIGHT = 100;
 const DOG_SPAWN_RATIO = 0.28;
 const FRENCHIE_SKIN_IDS = ["hiking_frenchie", "snow_frenchie", "summer_frenchie"];
 const FRENCHIE_SKIN_SPAWN_CHANCE = 0.18;
-const ITEM_SPAWN_WEIGHTS: Partial<Record<string, number>> = {
-  toy_duck_plush: 50,
-  toy_carrot: 35,
-  toy_treasure_puzzle: 30,
-  other_omojii: 8,
-  food_paw_melon_bread: 45,
-  interior_anball: 35,
-  summer_frenchie: 45,
-  other_azuki: 35,
-};
-/** スキルLvが1上がるごとに出現ウェイトが+5されるアイテム */
-const LEVEL_SCALED_SPAWN_WEIGHT_IDS = new Set(["other_omojii", "summer_frenchie"]);
-const LEVEL_SPAWN_WEIGHT_STEP = 5;
 const RARITY_STYLE: Record<FrenchieCatchItem["rarity"], string> = {
   N: "drop-shadow-[0_4px_7px_rgba(80,120,80,0.22)]",
   R: "drop-shadow-[0_4px_9px_rgba(74,142,200,0.34)]",
@@ -452,14 +439,10 @@ export function FrenchieCatchGame({ ownedItems }: { ownedItems: FrenchieCatchIte
     }
 
     const urBoostFactor = 1 + Math.min(urBoostRef.current, UR_BOOST_MAX) / 100;
-    const weightedItems = itemPool.map((item) => {
-      const baseWeight = ITEM_SPAWN_WEIGHTS[item.id] ?? DEFAULT_ITEM_SPAWN_WEIGHT;
-      const levelBonus = LEVEL_SCALED_SPAWN_WEIGHT_IDS.has(item.id) ? (item.level - 1) * LEVEL_SPAWN_WEIGHT_STEP : 0;
-      return {
-        item,
-        weight: (baseWeight + levelBonus) * (item.rarity === "UR" ? urBoostFactor : 1),
-      };
-    });
+    const weightedItems = itemPool.map((item) => ({
+      item,
+      weight: DEFAULT_ITEM_SPAWN_WEIGHT * (item.rarity === "UR" ? urBoostFactor : 1),
+    }));
     const itemWeightTotal = weightedItems.reduce((sum, entry) => sum + entry.weight, 0);
     const dogWeight = itemPool.length * DEFAULT_ITEM_SPAWN_WEIGHT * (DOG_SPAWN_RATIO / (1 - DOG_SPAWN_RATIO));
     let roll = Math.random() * (dogWeight + itemWeightTotal);
