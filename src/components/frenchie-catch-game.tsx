@@ -111,7 +111,7 @@ const MYSTERY_SKILL_ITEM_IDS = [
   "interior_spring_flower_wreath", "other_sparkle_rope_crown", "other_nakayoshi_azubee",
   "other_kamunayo", "hiking_frenchie", "snow_frenchie", "summer_frenchie", "interior_kinoko_azubee",
   "other_komochi", "other_azuki", "other_kobee", "other_hamigaki", "other_ikea", "other_orusuban",
-  "other_pondeomo", "other_pondear", "other_kurumari_a",
+  "other_pondeomo", "other_pondear", "other_kurumari_a", "other_jare_a",
   "interior_shikkoku_no_ar", "interior_ragby_ar", "other_oyatsu_no_jikan",
 ];
 
@@ -180,6 +180,7 @@ const LV = {
   ORUSUBAN_SHIELD: [1, 1, 2, 2, 3],
   PONDEOMO_SEC: [4, 5, 6, 8, 10],
   PONDEAR_SEC: [4, 5, 6, 8, 10],
+  JARE_A_SEC: [4, 5, 6, 8, 10],
   SHIKKOKU_SEC: [8, 10, 12, 15, 20],
   SHIKKOKU_FALL: [2, 2.2, 2.4, 2.6, 3],
   SHIKKOKU_MULT: [2, 2.2, 2.4, 2.7, 3],
@@ -187,6 +188,7 @@ const LV = {
   OYATSU_PT: [80, 100, 120, 140, 180],
 } as const;
 const SPAWN_RATE_BOOST = 2;
+const SLANT_VX_BOOST = 3.5;
 const RAGBY_SPAWN_RATE_BOOST = 3;
 const POINTS: Record<FrenchieCatchItem["rarity"], number> = { N: 10, R: 20, SR: 40, SSR: 70, UR: 100, LR: 150 };
 const RARITY_FALL_SPEED: Record<FrenchieCatchItem["rarity"], number> = { N: 1, R: 1.08, SR: 1.18, SSR: 1.32, UR: 1.5, LR: 1.75 };
@@ -303,6 +305,7 @@ export function FrenchieCatchGame({ ownedItems }: { ownedItems: FrenchieCatchIte
   const bagStockRef = useRef(0);
   const spawnRateBoostUntilRef = useRef(0);
   const spawnRateBoostValueRef = useRef(SPAWN_RATE_BOOST);
+  const slantBoostUntilRef = useRef(0);
   const boxShrinkUntilRef = useRef(0);
   const blackoutUntilRef = useRef(0);
   const stunUntilRef = useRef(0);
@@ -351,6 +354,7 @@ export function FrenchieCatchGame({ ownedItems }: { ownedItems: FrenchieCatchIte
     if (now < poopSuppressUntilRef.current) labels.push("うんち出現なし");
     if (now < ikeaUntilRef.current) labels.push(`くみたて中 ${ikeaCountRef.current}個`);
     if (now < spawnRateBoostUntilRef.current) labels.push(`アイテム出現量×${spawnRateBoostValueRef.current}中`);
+    if (now < slantBoostUntilRef.current) labels.push("斜め落下中");
     if (now < boxShrinkUntilRef.current) labels.push("ダンボール0.8倍");
     else if (now < boxWideUntilRef.current) labels.push(`ダンボール×${boxWideScaleRef.current}拡大中`);
     if (now < blackoutUntilRef.current) labels.push("上半分ブラックアウト中");
@@ -361,11 +365,12 @@ export function FrenchieCatchGame({ ownedItems }: { ownedItems: FrenchieCatchIte
 
   const createEntity = useCallback((): Entity => {
     const fallSpeedBoost = performance.now() < fallSpeedBoostUntilRef.current ? fallSpeedValueRef.current : 1;
+    const slantBoost = performance.now() < slantBoostUntilRef.current ? SLANT_VX_BOOST : 1;
     const base = {
       id: nextIdRef.current++,
       x: 9 + Math.random() * 82,
       y: -13 - Math.random() * 5,
-      vx: (Math.random() - 0.5) * 2.4,
+      vx: (Math.random() - 0.5) * 2.4 * slantBoost,
       vy: (17 + Math.random() * 5) * fallSpeedBoost,
       rotation: (Math.random() - 0.5) * 12,
       status: "falling" as const,
@@ -1108,6 +1113,15 @@ export function FrenchieCatchGame({ ownedItems }: { ownedItems: FrenchieCatchIte
                 statusChanged = true;
                 break;
               }
+              case "other_jare_a": {
+                const jareASec = LV.JARE_A_SEC[lv]!;
+                spawnRateBoostUntilRef.current = now + jareASec * 1000;
+                spawnRateBoostValueRef.current = SPAWN_RATE_BOOST;
+                slantBoostUntilRef.current = now + jareASec * 1000;
+                effectLabel = `${jareASec}秒間 アイテム出現量×${SPAWN_RATE_BOOST}+斜め落下${lvTag}`;
+                statusChanged = true;
+                break;
+              }
               case "interior_shikkoku_no_ar": {
                 const shikkokuSec = LV.SHIKKOKU_SEC[lv]!;
                 fallSpeedBoostUntilRef.current = now + shikkokuSec * 1000;
@@ -1293,6 +1307,7 @@ export function FrenchieCatchGame({ ownedItems }: { ownedItems: FrenchieCatchIte
     ikeaUntilRef.current = 0;
     ikeaCountRef.current = 0;
     spawnRateBoostUntilRef.current = 0;
+    slantBoostUntilRef.current = 0;
     boxShrinkUntilRef.current = 0;
     blackoutUntilRef.current = 0;
     stunUntilRef.current = 0;
