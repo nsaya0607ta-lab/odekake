@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import { Yusei_Magic } from "next/font/google";
 import { StartupSplash } from "@/components/startup-splash";
+import { BgmPlayer } from "@/components/bgm-player";
 import "./globals.css";
 import "./compact-form-fields.css";
 import "./lr-aura.css";
@@ -38,6 +39,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
     <html lang="ja" className={yuseiMagic.variable}>
       <body>
         <StartupSplash>{children}</StartupSplash>
+        <BgmPlayer />
       </body>
     </html>
   );
