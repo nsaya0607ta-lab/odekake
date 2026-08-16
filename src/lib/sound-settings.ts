@@ -34,3 +34,17 @@ export function setTapVolume(value: number): void {
   window.localStorage.setItem(TAP_VOLUME_KEY, String(Math.min(1, Math.max(0, value))));
   window.dispatchEvent(new Event(SOUND_SETTINGS_EVENT));
 }
+
+/**
+ * スライダーの見た目上の位置(0〜1、線形)を、耳の感じ方に近づけた実際の
+ * 再生ゲイン(0〜1)に変換する。
+ *
+ * 人の聴覚は音量を対数的に感じるため、そのまま線形の値を audio.volume に
+ * 渡すと、低〜中間あたりの変化がほとんど感じられず「0か100かのように」
+ * 聞こえてしまう。2乗カーブにすることで、スライダー全体で音量差が
+ * 感じられるようにする。
+ */
+export function sliderToGain(position: number): number {
+  const clamped = Math.min(1, Math.max(0, position));
+  return clamped * clamped;
+}
