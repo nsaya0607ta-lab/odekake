@@ -13,9 +13,11 @@ import { playTapSound, preloadTapSound } from "@/lib/tap-sound";
  * 音量は設定ボタン(SettingsButton)で調整でき、localStorageで共有する。
  *
  * - ブラウザの自動再生制限があるため、即時再生を試みつつ、
- *   ブロックされた場合は最初のユーザー操作で再生を開始する
- * - タブが非表示(他アプリ切り替え・スリープ等)になったらBGMを一時停止し、
- *   戻ってきたら再開する。サイトを閉じている間は鳴らさない
+ *   ブロックされた場合は次のユーザー操作で再生を開始する
+ * - タブが非表示(他アプリ切り替え・スリープ等)になったらBGMを一時停止する。
+ *   復帰時にも自動再生を試みるが、iOSはバックグラウンドから戻った直後の
+ *   AudioContext再開をユーザー操作とみなさずブロックすることがあるため、
+ *   その場合は次に画面のどこかを操作した瞬間に再開する
  */
 export function BgmPlayer() {
   useEffect(() => {
@@ -25,22 +27,18 @@ export function BgmPlayer() {
 
     const tryPlay = async () => {
       if (getBgmVolume() <= 0 || document.visibilityState !== "visible") return;
-
       await resumeAudioContext();
-      if (!isAudioContextRunning()) {
-        // 自動再生がブロックされている場合は、最初のユーザー操作で再試行する。
-        // 起動スプラッシュのタップでも即座に始まるよう、複数の操作イベントを見る
-        // (iOS Safariはイベントの種類によって「有効な操作」と認識しないことがあるため)
-        const gestureEvents = ["pointerdown", "touchend", "keydown"] as const;
-        const resume = () => {
-          tryPlay();
-          gestureEvents.forEach((type) => window.removeEventListener(type, resume));
-        };
-        gestureEvents.forEach((type) => window.addEventListener(type, resume, { once: true }));
-        return;
-      }
-
+      if (!isAudioContextRunning()) return;
       await playBgm();
+    };
+
+    // 本来鳴っているべきなのに鳴っていない状態で操作があったら、そのタップを
+    // きっかけに再開を試みる。「一度だけ」ではなく毎回チェックすることで、
+    // バックグラウンド復帰のたびにブロックされても、次の操作で必ず復帰する。
+    const onUserGesture = () => {
+      if (getBgmVolume() > 0 && document.visibilityState === "visible" && !isBgmPlaying()) {
+        tryPlay();
+      }
     };
 
     const onVisibilityChange = () => {
@@ -63,9 +61,19 @@ export function BgmPlayer() {
 
     tryPlay();
     document.addEventListener("visibilitychange", onVisibilityChange);
+    window.addEventListener("pageshow", tryPlay);
+    window.addEventListener("focus", tryPlay);
+    window.addEventListener("pointerdown", onUserGesture);
+    window.addEventListener("touchend", onUserGesture);
+    window.addEventListener("keydown", onUserGesture);
     window.addEventListener(SOUND_SETTINGS_EVENT, onSoundSettingsChange);
     return () => {
       document.removeEventListener("visibilitychange", onVisibilityChange);
+      window.removeEventListener("pageshow", tryPlay);
+      window.removeEventListener("focus", tryPlay);
+      window.removeEventListener("pointerdown", onUserGesture);
+      window.removeEventListener("touchend", onUserGesture);
+      window.removeEventListener("keydown", onUserGesture);
       window.removeEventListener(SOUND_SETTINGS_EVENT, onSoundSettingsChange);
     };
   }, []);
