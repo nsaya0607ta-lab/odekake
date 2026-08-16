@@ -1,6 +1,7 @@
 "use client";
 
 import Image from "next/image";
+import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useRef, useState, type PointerEvent as ReactPointerEvent } from "react";
 import { MAX_SKILL_LEVEL } from "@/lib/gacha/skill-levels";
 
@@ -261,6 +262,7 @@ function isCardboardTap(localX: number, localY: number) {
 }
 
 export function FrenchieCatchGame({ ownedItems }: { ownedItems: FrenchieCatchItem[] }) {
+  const router = useRouter();
   const boardRef = useRef<HTMLDivElement | null>(null);
   const catcherRef = useRef<HTMLDivElement | null>(null);
   const entitiesRef = useRef<Entity[]>([]);
@@ -1484,7 +1486,7 @@ export function FrenchieCatchGame({ ownedItems }: { ownedItems: FrenchieCatchIte
                   </div>
                   <div className="mt-4 grid grid-cols-2 gap-2">
                     <button type="button" onClick={startGame} disabled={rewardPending} className="rounded-full bg-leaf px-3 py-3 text-xs font-black text-white shadow-md active:translate-y-px disabled:opacity-45">もう一度あそぶ</button>
-                    <button type="button" onClick={() => window.location.assign("/games")} disabled={rewardPending} className="rounded-full border border-line bg-card px-3 py-3 text-xs font-black text-ink-soft shadow-sm active:translate-y-px disabled:opacity-45">終了する</button>
+                    <button type="button" onClick={() => router.push("/games")} disabled={rewardPending} className="rounded-full border border-line bg-card px-3 py-3 text-xs font-black text-ink-soft shadow-sm active:translate-y-px disabled:opacity-45">終了する</button>
                   </div>
                 </>
               ) : (
