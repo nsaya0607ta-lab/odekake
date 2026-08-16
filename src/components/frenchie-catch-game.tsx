@@ -44,7 +44,7 @@ type CatchFeedback = {
 
 const ROUND_SECONDS = 30;
 const BOX_IMAGE = "/4EA485D9-BB37-47F3-97F0-111CF0E4AF7E.png";
-const BOX_WIDTH = 37.8;
+const BOX_WIDTH = 37.8 * 0.7;
 const BOX_HALF = BOX_WIDTH / 2;
 const BOX_HEIGHT = BOX_WIDTH * 0.75;
 const BOX_BOTTOM = 0.5;
@@ -55,7 +55,7 @@ const CATCH_START_LOCAL_Y = 0.36;
 const BOX_OPEN_TOP_Y = BOX_TOP + BOX_HEIGHT * OPEN_TOP_LOCAL_Y;
 const BOX_LIP_Y = BOX_TOP + BOX_HEIGHT * OPEN_BOTTOM_LOCAL_Y;
 const BOX_WIDE_SCALE_DEFAULT = 1.5;
-const BOX_WIDE_SCALE_STRONG = 1.7;
+const BOX_WIDE_SCALE_STRONG = 1.5;
 const MAGNET_WEAK_RANGE = 14;
 const MAGNET_WEAK_PULL = 16;
 const MAGNET_MEDIUM_RANGE = 20;
@@ -205,8 +205,8 @@ const TIME_BONUS_ITEM_IDS = new Set([
   "toy_duck_plush", "toy_carrot", "food_paw_melon_bread", "toy_treasure_puzzle",
   "interior_anball", "other_omojii", "other_azuki", "summer_frenchie",
 ]);
-const TIME_BONUS_FALL_SPEED = 4;
-const TREASURE_POOP_FLOOD_SEC = 2;
+const TIME_BONUS_FALL_SPEED = 7;
+const TREASURE_POOP_FLOOD_COUNT = 15;
 const TREASURE_MINUS5_SEC = 5;
 const TREASURE_MINUS10_SEC = 10;
 const DEFAULT_ITEM_SPAWN_WEIGHT = 100;
@@ -233,8 +233,12 @@ function overlap(leftA: number, rightA: number, leftB: number, rightB: number) {
   return Math.max(0, Math.min(rightA, rightB) - Math.max(leftA, leftB));
 }
 
-function fallSpeedMultiplier(itemId: string, rarity: FrenchieCatchItem["rarity"]) {
-  return TIME_BONUS_ITEM_IDS.has(itemId) ? TIME_BONUS_FALL_SPEED : RARITY_FALL_SPEED[rarity];
+/**
+ * 時間増加系アイテムは「落下速度アップ」スキルの影響を受けず、常に固定の倍率で落ちる。
+ * それ以外は通常どおりスキルによる落下速度アップ(boostedVy)を反映したレアリティ倍率になる。
+ */
+function resolveFallVy(rawVy: number, boostedVy: number, itemId: string, rarity: FrenchieCatchItem["rarity"]) {
+  return TIME_BONUS_ITEM_IDS.has(itemId) ? rawVy * TIME_BONUS_FALL_SPEED : boostedVy * RARITY_FALL_SPEED[rarity];
 }
 
 const COMBO_TIERS = [
@@ -315,7 +319,7 @@ export function FrenchieCatchGame({ ownedItems }: { ownedItems: FrenchieCatchIte
   const fallSpeedBoostUntilRef = useRef(0);
   const fallSpeedValueRef = useRef(FALL_SPEED_BOOST);
   const poopSuppressUntilRef = useRef(0);
-  const poopFloodUntilRef = useRef(0);
+  const poopFloodRemainingRef = useRef(0);
   const ikeaUntilRef = useRef(0);
   const ikeaCountRef = useRef(0);
   const bagStockRef = useRef(0);
@@ -368,7 +372,7 @@ export function FrenchieCatchGame({ ownedItems }: { ownedItems: FrenchieCatchIte
     if (now < magnetUntilRef.current) labels.push(magnetStrengthRef.current === "weak" ? "ミニマグネット発動中" : "マグネット発動中");
     if (now < fallSpeedBoostUntilRef.current) labels.push("落下速度アップ中");
     if (now < poopSuppressUntilRef.current) labels.push("うんち出現なし");
-    if (now < poopFloodUntilRef.current) labels.push("うんち祭り中");
+    if (poopFloodRemainingRef.current > 0) labels.push(`うんち祭り あと${poopFloodRemainingRef.current}個`);
     if (now < ikeaUntilRef.current) labels.push(`くみたて中 ${ikeaCountRef.current}個`);
     if (now < spawnRateBoostUntilRef.current) labels.push(`アイテム出現量×${spawnRateBoostValueRef.current}中`);
     if (now < slantBoostUntilRef.current) labels.push("斜め落下中");
@@ -383,12 +387,13 @@ export function FrenchieCatchGame({ ownedItems }: { ownedItems: FrenchieCatchIte
   const createEntity = useCallback((): Entity => {
     const fallSpeedBoost = performance.now() < fallSpeedBoostUntilRef.current ? fallSpeedValueRef.current : 1;
     const slantBoost = performance.now() < slantBoostUntilRef.current ? SLANT_VX_BOOST : 1;
+    const rawVy = (17 + Math.random() * 5) * 1.35;
     const base = {
       id: nextIdRef.current++,
       x: 9 + Math.random() * 82,
       y: -13 - Math.random() * 5,
       vx: (Math.random() - 0.5) * 2.4 * slantBoost,
-      vy: (17 + Math.random() * 5) * 1.35 * fallSpeedBoost,
+      vy: rawVy * fallSpeedBoost,
       rotation: (Math.random() - 0.5) * 12,
       status: "falling" as const,
       rimChecked: false,
@@ -397,7 +402,8 @@ export function FrenchieCatchGame({ ownedItems }: { ownedItems: FrenchieCatchIte
       ttl: 0,
     };
 
-    if (performance.now() < poopFloodUntilRef.current) {
+    if (poopFloodRemainingRef.current > 0) {
+      poopFloodRemainingRef.current -= 1;
       return {
         ...base,
         itemId: POOP_ITEM_ID,
@@ -499,7 +505,7 @@ export function FrenchieCatchGame({ ownedItems }: { ownedItems: FrenchieCatchIte
           image: skin.image,
           rarity: skin.rarity,
           level: skin.level,
-          vy: base.vy * fallSpeedMultiplier(skin.id, skin.rarity),
+          vy: resolveFallVy(rawVy, base.vy, skin.id, skin.rarity),
           size: 15.5 + Math.random() * 3.5,
           spin: (Math.random() - 0.5) * 20,
         };
@@ -535,7 +541,7 @@ export function FrenchieCatchGame({ ownedItems }: { ownedItems: FrenchieCatchIte
       image: item.image,
       rarity: item.rarity,
       level: item.level,
-      vy: base.vy * fallSpeedMultiplier(item.id, item.rarity),
+      vy: resolveFallVy(rawVy, base.vy, item.id, item.rarity),
       size: 12.5 + Math.random() * 3.5,
       spin: (Math.random() - 0.5) * 65,
     };
@@ -607,10 +613,6 @@ export function FrenchieCatchGame({ ownedItems }: { ownedItems: FrenchieCatchIte
       }
       if (poopSuppressUntilRef.current > 0 && now >= poopSuppressUntilRef.current) {
         poopSuppressUntilRef.current = 0;
-        timedEffectChanged = true;
-      }
-      if (poopFloodUntilRef.current > 0 && now >= poopFloodUntilRef.current) {
-        poopFloodUntilRef.current = 0;
         timedEffectChanged = true;
       }
       if (ikeaUntilRef.current > 0 && now >= ikeaUntilRef.current) {
@@ -948,8 +950,8 @@ export function FrenchieCatchGame({ ownedItems }: { ownedItems: FrenchieCatchIte
                   const applied = addBonusTime(LV.TREASURE_SEC[lv]!);
                   effectLabel = `宝箱 +${applied}秒${lvTag}`;
                 } else if (roll === 3) {
-                  poopFloodUntilRef.current = now + TREASURE_POOP_FLOOD_SEC * 1000;
-                  effectLabel = `宝箱 ${TREASURE_POOP_FLOOD_SEC}秒間 うんち祭り${lvTag}`;
+                  poopFloodRemainingRef.current += TREASURE_POOP_FLOOD_COUNT;
+                  effectLabel = `宝箱 うんち祭り(${TREASURE_POOP_FLOOD_COUNT}個)${lvTag}`;
                   statusChanged = true;
                 } else if (roll === 4) {
                   const applied = addBonusTime(-TREASURE_MINUS5_SEC);
@@ -1366,7 +1368,7 @@ export function FrenchieCatchGame({ ownedItems }: { ownedItems: FrenchieCatchIte
     fallSpeedBoostUntilRef.current = 0;
     fallSpeedValueRef.current = FALL_SPEED_BOOST;
     poopSuppressUntilRef.current = 0;
-    poopFloodUntilRef.current = 0;
+    poopFloodRemainingRef.current = 0;
     ikeaUntilRef.current = 0;
     ikeaCountRef.current = 0;
     spawnRateBoostUntilRef.current = 0;

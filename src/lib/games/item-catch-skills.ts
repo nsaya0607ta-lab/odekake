@@ -30,7 +30,7 @@ export const ITEM_CATCH_SKILLS: readonly ItemCatchSkill[] = [
   { id: "food_paw_melon_bread", levels: ["+2秒 +5pt", "+3秒 +10pt", "+4秒 +15pt", "+5秒 +20pt", "+7秒 +30pt"] },
 
   // --- SR --------------------------------------------------------
-  { id: "toy_treasure_puzzle", levels: ["+20pt / +40pt / +3秒", "+25pt / +50pt / +4秒", "+30pt / +60pt / +5秒", "+40pt / +80pt / +6秒", "+50pt / +100pt / +8秒"], note: "7つのうちどれか1つがランダムで出る（+低pt / +高pt / +秒 / 2秒間うんち祭り / -5秒 / -10秒 / 数秒間アイテム出現量×2）" },
+  { id: "toy_treasure_puzzle", levels: ["+20pt / +40pt / +3秒", "+25pt / +50pt / +4秒", "+30pt / +60pt / +5秒", "+40pt / +80pt / +6秒", "+50pt / +100pt / +8秒"], note: "7つのうちどれか1つがランダムで出る（+低pt / +高pt / +秒 / うんち祭り15個 / -5秒 / -10秒 / 数秒間アイテム出現量×2）" },
   { id: "toy_frenchie_plush", levels: ["次の3個 +10pt", "次の3個 +13pt", "次の4個 +15pt", "次の4個 +20pt", "次の5個 +25pt"] },
   { id: "toy_meat", levels: ["5秒間 ×1.5", "6秒間 ×1.5", "7秒間 ×1.6", "8秒間 ×1.7", "10秒間 ×1.8"], note: "その間ずっと得点倍率がかかる" },
   { id: "toy_frenchie_cushion", levels: ["+30pt", "+40pt", "+50pt", "+65pt", "+80pt"] },
