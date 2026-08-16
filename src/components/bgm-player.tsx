@@ -28,14 +28,15 @@ export function BgmPlayer() {
 
       await resumeAudioContext();
       if (!isAudioContextRunning()) {
-        // 自動再生がブロックされている場合は、最初のユーザー操作で再試行する
+        // 自動再生がブロックされている場合は、最初のユーザー操作で再試行する。
+        // 起動スプラッシュのタップでも即座に始まるよう、複数の操作イベントを見る
+        // (iOS Safariはイベントの種類によって「有効な操作」と認識しないことがあるため)
+        const gestureEvents = ["pointerdown", "touchend", "keydown"] as const;
         const resume = () => {
           tryPlay();
-          window.removeEventListener("pointerdown", resume);
-          window.removeEventListener("keydown", resume);
+          gestureEvents.forEach((type) => window.removeEventListener(type, resume));
         };
-        window.addEventListener("pointerdown", resume, { once: true });
-        window.addEventListener("keydown", resume, { once: true });
+        gestureEvents.forEach((type) => window.addEventListener(type, resume, { once: true }));
         return;
       }
 
