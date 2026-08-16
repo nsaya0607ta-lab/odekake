@@ -373,6 +373,7 @@ export function FrenchieCatchGame({ ownedItems }: { ownedItems: FrenchieCatchIte
   const [boxBounce, setBoxBounce] = useState(false);
   const [blackoutActive, setBlackoutActive] = useState(false);
   const [stunned, setStunned] = useState(false);
+  const [dogBonus, setDogBonus] = useState<{ count: number; bonus: number } | null>(null);
   const [coinReward, setCoinReward] = useState<number | null>(null);
   const [rewardPending, setRewardPending] = useState(false);
   const [rewardError, setRewardError] = useState<string | null>(null);
@@ -608,11 +609,13 @@ export function FrenchieCatchGame({ ownedItems }: { ownedItems: FrenchieCatchIte
     /** いつものフレブル(N)を取った回数×プレイ時間(秒)を最後にまとめて加算する（小数点切り捨て） */
     const finishRound = (now: number) => {
       const playSeconds = Math.max(0, (now - startAtRef.current) / 1000);
-      const dogBonus = Math.floor(dogCaughtRef.current * playSeconds);
-      if (dogBonus > 0) {
-        scoreRef.current += dogBonus;
+      const dogCount = dogCaughtRef.current;
+      const dogBonusPoints = Math.floor(dogCount * playSeconds);
+      if (dogBonusPoints > 0) {
+        scoreRef.current += dogBonusPoints;
         setScore(scoreRef.current);
       }
+      setDogBonus(dogCount > 0 ? { count: dogCount, bonus: dogBonusPoints } : null);
       setPhase("finished");
     };
 
@@ -1469,6 +1472,7 @@ export function FrenchieCatchGame({ ownedItems }: { ownedItems: FrenchieCatchIte
     setFeedback(null);
     setActiveEffects([]);
     setImpactX(null);
+    setDogBonus(null);
     setCoinReward(null);
     setRewardPending(false);
     setRewardError(null);
@@ -1622,6 +1626,12 @@ export function FrenchieCatchGame({ ownedItems }: { ownedItems: FrenchieCatchIte
                     <div className="rounded-xl bg-paper-deep px-2 py-2"><p className="text-[9px] text-ink-faint">キャッチ</p><p className="font-black text-ink">{caught}個</p></div>
                     <div className="rounded-xl bg-paper-deep px-2 py-2"><p className="text-[9px] text-ink-faint">MAX COMBO</p><p className="font-black text-ink">{maxCombo}</p></div>
                   </div>
+                  {dogBonus ? (
+                    <div className="mt-2 rounded-xl bg-paper-deep px-3 py-2 text-xs">
+                      <p className="text-[9px] text-ink-faint">いつものフレブル ボーナス</p>
+                      <p className="mt-0.5 font-black text-ink">{dogBonus.count}匹 × プレイ時間 = <span className="text-leaf-deep">+{dogBonus.bonus.toLocaleString("ja-JP")}pt</span></p>
+                    </div>
+                  ) : null}
                   <div className="mt-3 rounded-xl bg-[#fff5df] px-3 py-2">
                     {rewardPending ? (
                       <p className="text-[11px] font-bold text-[#8d6231]">コインを受け取り中…</p>
