@@ -101,6 +101,8 @@ const STUN_SECONDS = 1;
 const NEGATIVE_HAZARD_IDS = new Set([TIME_MINUS_ITEM_ID, BOX_SHRINK_ITEM_ID, BLACKOUT_ITEM_ID, STUN_ITEM_ID]);
 const SPAWN_INTERVAL_MIN_MS = 650;
 const SPAWN_INTERVAL_MAX_MS = 780;
+/** うんち祭り中の出現レート倍率（通常の4倍の頻度で降ってくる） */
+const POOP_FLOOD_SPAWN_RATE = 4;
 const NORMAL_ENTITY_CAP = 10;
 const DOUBLE_ENTITY_CAP = 15;
 const TRIPLE_ENTITY_CAP = 18;
@@ -658,7 +660,9 @@ export function FrenchieCatchGame({ ownedItems }: { ownedItems: FrenchieCatchIte
 
       const dt = Math.min(0.035, Math.max(0, (now - last) / 1000));
       last = now;
-      const spawnRate = now < spawnRateBoostUntilRef.current ? spawnRateBoostValueRef.current : 1;
+      const spawnRate = poopFloodRemainingRef.current > 0
+        ? POOP_FLOOD_SPAWN_RATE
+        : now < spawnRateBoostUntilRef.current ? spawnRateBoostValueRef.current : 1;
       const entityCap = spawnRate >= 3 ? TRIPLE_ENTITY_CAP : spawnRate >= 2 ? DOUBLE_ENTITY_CAP : NORMAL_ENTITY_CAP;
       if (now >= nextSpawnRef.current && entitiesRef.current.length < entityCap) {
         entitiesRef.current.push(createEntity());
