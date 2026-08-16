@@ -69,13 +69,12 @@ export default async function ItemCatchGuidePage() {
             </span>
             <h1 className="mt-3 text-[21px] font-black tracking-tight text-[#30291f]">30秒で、どこまで伸ばせる？</h1>
             <p className="mt-1.5 max-w-[92%] text-xs leading-relaxed text-[#6f6251]">
-              落ちてくるアイテムを段ボールでキャッチ。レア度・JUST・コンボ・スキルを重ねてハイスコアを狙います。
+              落ちてくるアイテムを段ボールでキャッチ。レア度・JUST・スキルを重ねてハイスコアを狙います。
             </p>
 
-            <div className="mt-4 grid grid-cols-3 gap-2">
+            <div className="mt-4 grid grid-cols-2 gap-2">
               {[
                 ["TIME", "30秒", "1プレイ"],
-                ["COMBO", "×2.0", "最大倍率"],
                 ["REWARD", "÷25", "コイン換算"],
               ].map(([label, value, note]) => (
                 <div key={label} className="rounded-2xl border border-[#dbcda6] bg-gradient-to-b from-white/95 to-[#fffaf0]/85 px-2 py-2.5 text-center shadow-[0_6px_16px_rgba(90,72,38,0.09)] backdrop-blur-sm">
@@ -109,33 +108,14 @@ export default async function ItemCatchGuidePage() {
         </section>
 
         <section className="space-y-2">
-          <SectionTitle number="03" eyebrow="COMBO" title="つなぐほど倍率アップ" />
-          <div className="overflow-hidden rounded-[22px] border border-[#d0c3a2] bg-[#fffdf8] shadow-[0_7px_20px_rgba(80,66,40,0.07)]">
-            {[
-              ["30 〜", "MAX COMBO", "×2.0", true],
-              ["20 〜 29", "SUPER COMBO", "×1.5", false],
-              ["10 〜 19", "GREAT", "×1.25", false],
-              ["5 〜 9", "GOOD", "×1.1", false],
-              ["0 〜 4", "通常", "×1.0", false],
-            ].map(([range, label, mult, isMax]) => (
-              <div key={String(range)} className={`flex items-center gap-3 border-b border-[#e4dcc8] px-3.5 py-2.5 last:border-b-0 ${isMax ? "bg-gradient-to-r from-[#dcebd0] via-[#edf4e4] to-[#fff6da]" : "bg-[#fffdf8]"}`}>
-                <span className={`w-[62px] shrink-0 text-[11px] font-black tabular-nums ${isMax ? "text-[#4d713e]" : "text-[#9b8f78]"}`}>{range}</span>
-                <span className={`flex-1 text-[11px] font-bold ${isMax ? "text-[#4d713e]" : "text-[#756854]"}`}>{label}</span>
-                <span className={`text-sm font-black tabular-nums ${isMax ? "text-[#3e6634]" : "text-[#4a4032]"}`}>{mult}</span>
-              </div>
-            ))}
-          </div>
+          <SectionTitle number="03" eyebrow="HAZARD" title="特殊アイテム" />
+          <p className="text-[11px] leading-relaxed text-[#756854]">図鑑とは別枠。所持状況に関係なく、決まった確率で落ちてきます。</p>
           <div className="rounded-[22px] border border-[#d6c8a9] bg-gradient-to-r from-[#f5f0e4] to-[#fffaf0] p-3.5 shadow-[0_4px_12px_rgba(80,66,40,0.04)]">
             <div className="flex items-start gap-3">
               <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-[#d8c69b] bg-white text-sm shadow-sm">🚫</span>
               <p className="text-[11px] leading-relaxed text-[#756854]"><b className="text-[#40362a]">妨害防止</b>スキルを取ると、しびれ・ダンボール縮小・時間減少のいずれか1つをランダムで防げます。1種類につき1回だけ、最大<b className="text-[#40362a]">3つ</b>まで同時に持てます。</p>
             </div>
           </div>
-        </section>
-
-        <section className="space-y-2">
-          <SectionTitle number="04" eyebrow="HAZARD" title="特殊アイテム" />
-          <p className="text-[11px] leading-relaxed text-[#756854]">図鑑とは別枠。所持状況に関係なく、決まった確率で落ちてきます。</p>
           <div className="grid gap-2">
             {[
               { image: "/collection/items/dog-poop.webp", name: "犬のうんち", rate: "4%", body: "取ると −500pt。ビニール袋があればダメージを打ち消せます。", tone: "bg-gradient-to-br from-[#fff7f0] to-[#f9e7d8] border-[#e7cbb5]" },
@@ -166,7 +146,7 @@ export default async function ItemCatchGuidePage() {
         </section>
 
         <section className="space-y-2">
-          <SectionTitle number="05" eyebrow="SKILL LEVEL" title="重ねてスキルを育てる" />
+          <SectionTitle number="04" eyebrow="SKILL LEVEL" title="重ねてスキルを育てる" />
           <p className="text-[11px] leading-relaxed text-[#756854]">同じアイテムを引くほど5段階で強化。Nと特殊アイテムはレベル対象外です。</p>
           <div className="rounded-[22px] border border-[#d2c4a2] bg-gradient-to-br from-[#fffefa] to-[#f8f2e7] p-3.5 shadow-[0_7px_20px_rgba(80,66,40,0.07)]">
             <table className="w-full border-collapse text-[11px]">
@@ -182,14 +162,14 @@ export default async function ItemCatchGuidePage() {
         </section>
 
         <section className="space-y-2">
-          <SectionTitle number="06" eyebrow="MY SKILLS" title="持っているスキル" />
+          <SectionTitle number="05" eyebrow="MY SKILLS" title="持っているスキル" />
           <div className="rounded-[24px] border border-[#d0c09a] bg-gradient-to-br from-[#fffefa] to-[#f7f1e5] p-1 shadow-[0_8px_22px_rgba(80,66,40,0.07)]">
             <SkillCatalog skills={skills} total={ITEM_CATCH_SKILLS.length} />
           </div>
         </section>
 
         <section className="space-y-2">
-          <SectionTitle number="07" eyebrow="REWARD" title="コインのもらい方" />
+          <SectionTitle number="06" eyebrow="REWARD" title="コインのもらい方" />
           <div className="overflow-hidden rounded-[26px] border border-[#b99a4f] bg-[#fffdf8] shadow-[0_10px_28px_rgba(98,72,24,0.12)]">
             <div className="relative bg-gradient-to-br from-[#dce9cf] via-[#f2f3df] to-[#f7df9d] px-4 py-5 text-center">
               <div className="pointer-events-none absolute inset-x-8 top-0 h-px bg-gradient-to-r from-transparent via-[#b9933e] to-transparent" />
