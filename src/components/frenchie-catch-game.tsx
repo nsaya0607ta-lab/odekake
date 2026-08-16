@@ -1493,8 +1493,6 @@ export function FrenchieCatchGame({ ownedItems }: { ownedItems: FrenchieCatchIte
                 <>
                   <p className="text-[10px] font-black tracking-[0.18em] text-leaf-deep">ITEM CATCH</p>
                   <p className="mt-1 text-xl font-black text-ink">箱でキャッチしよう！</p>
-                  <p className="mt-2 text-[11px] leading-relaxed text-ink-soft">所持している図鑑アイテムと初期フレブルが降ってきます。一部アイテムには得点・時間・コンボの特殊効果があり、ガチャで同じアイテムを多く手に入れるほどスキルレベルが上がって効果が強化されます（Lv1〜Lv.MAX）。</p>
-                  <div className="mt-3 rounded-xl bg-[#fff5df] px-3 py-2 text-[10px] leading-relaxed text-[#8d6231]">レアなアイテムほど速く落ちます。5コンボから得点倍率が上がり、最大30コンボで×2になります。箱の中央でキャッチすると獲得pt×1.25のJUSTボーナス。うんちは避けよう（-10pt）、？アイテムはランダムなスキルが発動！遊びきると25スコアごとに1コインもらえます。</div>
                   <button type="button" onClick={startGame} className="mt-4 w-full rounded-full bg-leaf px-4 py-3 text-sm font-black text-white shadow-md active:translate-y-px">START</button>
                 </>
               )}
