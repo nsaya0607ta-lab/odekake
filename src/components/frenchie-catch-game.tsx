@@ -44,7 +44,7 @@ type CatchFeedback = {
 
 const ROUND_SECONDS = 30;
 const BOX_IMAGE = "/4EA485D9-BB37-47F3-97F0-111CF0E4AF7E.png";
-const BOX_WIDTH = 37.8 * 0.7;
+const BOX_WIDTH = 37.8 * 0.9;
 const BOX_HALF = BOX_WIDTH / 2;
 const BOX_HEIGHT = BOX_WIDTH * 0.75;
 const BOX_BOTTOM = 0.5;
@@ -208,6 +208,7 @@ const TIME_BONUS_ITEM_IDS = new Set([
   "interior_anball", "other_omojii", "other_azuki", "summer_frenchie",
 ]);
 const TIME_BONUS_FALL_SPEED = 7;
+const POOP_FLOOD_FALL_SPEED = 6;
 const TREASURE_POOP_FLOOD_COUNT = 15;
 const TREASURE_MINUS5_SEC = 5;
 const TREASURE_MINUS10_SEC = 10;
@@ -414,6 +415,7 @@ export function FrenchieCatchGame({ ownedItems }: { ownedItems: FrenchieCatchIte
         image: POOP_IMAGE,
         rarity: null,
         level: 0,
+        vy: rawVy * POOP_FLOOD_FALL_SPEED,
         size: 12 + Math.random() * 3,
         spin: (Math.random() - 0.5) * 40,
       };
