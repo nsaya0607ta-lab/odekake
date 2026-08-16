@@ -53,6 +53,7 @@ export const ITEM_CATCH_SKILLS: readonly ItemCatchSkill[] = [
   { id: "other_kurumari_a", levels: ["5秒間 落下×1.8 保護1", "6秒間 落下×2 保護1", "7秒間 落下×2.2 保護2", "8秒間 落下×2.4 保護2", "10秒間 落下×2.8 保護3"], note: "おるすばんと同じスキル" },
   { id: "other_pondeomo", levels: ["4秒間", "5秒間", "6秒間", "8秒間", "10秒間"], note: "その間アイテムが2倍の量で降ってくる" },
   { id: "other_pondear", levels: ["4秒間", "5秒間", "6秒間", "8秒間", "10秒間"], note: "ぽんでおもと同じスキル" },
+  { id: "other_oyatsu_no_jikan", levels: ["80pt", "100pt", "120pt", "140pt", "180pt"], note: "次にキャッチする1個を、レアリティに関係なく固定得点に格上げする" },
   { id: "hiking_frenchie", levels: ["5秒間 強", "6秒間 強", "7秒間 強", "9秒間 強", "12秒間 強"], note: "アイテムを段ボールの方へ強く引き寄せる" },
   { id: "snow_frenchie", levels: ["5秒間", "6秒間", "7秒間", "9秒間", "12秒間"], note: "段ボールが1.7倍に広がる" },
   { id: "summer_frenchie", levels: ["+5秒 5秒間×1.5", "+6秒 6秒間×1.5", "+7秒 7秒間×1.6", "+9秒 8秒間×1.7", "+12秒 10秒間×1.8"] },
