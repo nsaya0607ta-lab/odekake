@@ -36,33 +36,20 @@ const SIM_RARITIES: GachaRarity[] = ["N", "R", "SR", "SSR", "UR", "LR"];
 const SIM_MULTIPLIERS = [1, 1.5, 2, 2.5, 3];
 const JUST_MULTIPLIER = 1.25;
 
-/** frenchie-catch-game.tsx の COMBO_TIERS と同じ段 */
-function comboMultiplier(combo: number) {
-  if (combo >= 30) return 2;
-  if (combo >= 20) return 1.5;
-  if (combo >= 10) return 1.25;
-  if (combo >= 5) return 1.1;
-  return 1;
-}
-
 export function ScoreSimulator() {
   const [rarity, setRarity] = useState<GachaRarity>("SSR");
   const [skillMultiplier, setSkillMultiplier] = useState(1);
-  const [combo, setCombo] = useState(12);
   const [just, setJust] = useState(false);
 
   // ゲーム本体と同じく、かけるたびに丸める
   const base = BASE_POINTS[rarity];
   const afterSkill = Math.round(base * skillMultiplier);
-  const afterJust = just ? Math.round(afterSkill * JUST_MULTIPLIER) : afterSkill;
-  const comboMult = comboMultiplier(combo);
-  const total = comboMult > 1 ? Math.round(afterJust * comboMult) : afterJust;
+  const total = just ? Math.round(afterSkill * JUST_MULTIPLIER) : afterSkill;
 
   const steps = [
     { label: `基礎 ${rarity}`, value: `${base}pt` },
     ...(skillMultiplier !== 1 ? [{ label: "スキル", value: `×${skillMultiplier}` }] : []),
     ...(just ? [{ label: "JUST", value: `×${JUST_MULTIPLIER}` }] : []),
-    { label: "コンボ", value: `×${comboMult}` },
   ];
 
   return (
@@ -87,24 +74,6 @@ export function ScoreSimulator() {
                 {m === 1 ? "なし" : `×${m}`}
               </PickButton>
             ))}
-          </div>
-        </div>
-
-        <div>
-          <p className="text-[10px] font-black tracking-[0.12em] text-ink-faint">コンボ数</p>
-          <div className="mt-1.5 flex items-center gap-3">
-            <input
-              type="range"
-              min={0}
-              max={40}
-              value={combo}
-              onChange={(event) => setCombo(Number(event.target.value))}
-              aria-label="コンボ数"
-              className="h-6 flex-1 accent-leaf"
-            />
-            <span className="w-[74px] shrink-0 text-right text-xs font-black tabular-nums text-ink">
-              {combo} コンボ
-            </span>
           </div>
         </div>
 
