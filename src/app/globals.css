@@ -67,6 +67,18 @@
     overscroll-behavior-y: none;
     font-synthesis: none;
     font-synthesis-weight: none;
+    -webkit-touch-callout: none;
+    -webkit-user-select: none;
+    user-select: none;
+  }
+
+  input,
+  textarea,
+  select,
+  [contenteditable="true"] {
+    -webkit-touch-callout: default;
+    -webkit-user-select: text;
+    user-select: text;
   }
 
   :root {
