@@ -21,7 +21,10 @@ export function StartupSplash({ children }: { children: React.ReactNode }) {
         <main
           className="app-splash"
           aria-label={ready ? "タップしてはじめる" : "読み込み中"}
-          onPointerDown={() => {
+          onClick={() => {
+            // pointerdown(押した瞬間)で閉じると、指を離した時の click が
+            // 下に隠れている画面のボタンまで突き抜けて反応してしまう
+            // (いわゆるゴーストクリック)。タップが完了する click まで待つ。
             if (ready) setVisible(false);
           }}
         >
