@@ -158,6 +158,7 @@ const CURATED_ITEMS: readonly CollectionItem[] = [
   { id: "other_pondear", name: "ぽんでアー", image: "/collection/items/pondear.webp", category: "other", series: null, rarity: "SSR" },
   { id: "other_oyatsu_no_jikan", name: "おやつのじかん", image: "/collection/items/oyatsu-no-jikan.webp", category: "other", series: null, rarity: "SSR" },
   { id: "other_jare_a", name: "じゃれアー", image: "/collection/items/jare-a.webp", category: "other", series: null, rarity: "SSR" },
+  { id: "other_ketsunade_a", name: "けつなでアー", image: "/collection/items/ketsunade-a.png", category: "other", series: null, rarity: "SSR" },
 
   // --- 通常図鑑：おでかけ小物 ------------------------------------------
   { id: "other_yellow_rain_boots", name: "きいろのながぐつ", image: "/collection/items/yellow-rain-boots.webp", category: "other", series: null, rarity: "N" },
