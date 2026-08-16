@@ -14,7 +14,11 @@ export function StartupSplash({ children }: { children: React.ReactNode }) {
     <>
       {children}
       {visible ? (
-        <main className="app-splash" aria-label="読み込み中">
+        <main
+          className="app-splash"
+          aria-label="読み込み中。タップしてスキップ"
+          onPointerDown={() => setVisible(false)}
+        >
           <div className="app-splash-scene" aria-hidden="true">
             <span className="app-splash-cloud app-splash-cloud-left" />
             <span className="app-splash-cloud app-splash-cloud-right" />
