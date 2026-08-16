@@ -200,8 +200,14 @@ const TIME_BONUS_ITEM_IDS = new Set([
   "toy_duck_plush", "toy_carrot", "food_paw_melon_bread", "toy_treasure_puzzle",
   "interior_anball", "other_omojii", "other_azuki", "summer_frenchie",
 ]);
-const TIME_BONUS_RARITY_FALL_SPEED: Record<FrenchieCatchItem["rarity"], number> = { N: 2, R: 2.5, SR: 2.75, SSR: 3, UR: 3.5, LR: 4 };
+const TIME_BONUS_FALL_SPEED = 4;
+const TREASURE_POOP_FLOOD_SEC = 2;
+const TREASURE_MINUS5_SEC = 5;
+const TREASURE_MINUS10_SEC = 10;
 const DEFAULT_ITEM_SPAWN_WEIGHT = 100;
+const ITEM_SPAWN_WEIGHTS: Partial<Record<string, number>> = {
+  toy_treasure_puzzle: 200,
+};
 const DOG_SPAWN_RATIO = 0.28;
 const FRENCHIE_SKIN_IDS = ["hiking_frenchie", "snow_frenchie", "summer_frenchie"];
 const FRENCHIE_SKIN_SPAWN_CHANCE = 0.18;
@@ -223,7 +229,7 @@ function overlap(leftA: number, rightA: number, leftB: number, rightB: number) {
 }
 
 function fallSpeedMultiplier(itemId: string, rarity: FrenchieCatchItem["rarity"]) {
-  return TIME_BONUS_ITEM_IDS.has(itemId) ? TIME_BONUS_RARITY_FALL_SPEED[rarity] : RARITY_FALL_SPEED[rarity];
+  return TIME_BONUS_ITEM_IDS.has(itemId) ? TIME_BONUS_FALL_SPEED : RARITY_FALL_SPEED[rarity];
 }
 
 const COMBO_TIERS = [
@@ -304,6 +310,7 @@ export function FrenchieCatchGame({ ownedItems }: { ownedItems: FrenchieCatchIte
   const fallSpeedBoostUntilRef = useRef(0);
   const fallSpeedValueRef = useRef(FALL_SPEED_BOOST);
   const poopSuppressUntilRef = useRef(0);
+  const poopFloodUntilRef = useRef(0);
   const ikeaUntilRef = useRef(0);
   const ikeaCountRef = useRef(0);
   const bagStockRef = useRef(0);
@@ -356,6 +363,7 @@ export function FrenchieCatchGame({ ownedItems }: { ownedItems: FrenchieCatchIte
     if (now < magnetUntilRef.current) labels.push(magnetStrengthRef.current === "weak" ? "ミニマグネット発動中" : "マグネット発動中");
     if (now < fallSpeedBoostUntilRef.current) labels.push("落下速度アップ中");
     if (now < poopSuppressUntilRef.current) labels.push("うんち出現なし");
+    if (now < poopFloodUntilRef.current) labels.push("うんち祭り中");
     if (now < ikeaUntilRef.current) labels.push(`くみたて中 ${ikeaCountRef.current}個`);
     if (now < spawnRateBoostUntilRef.current) labels.push(`アイテム出現量×${spawnRateBoostValueRef.current}中`);
     if (now < slantBoostUntilRef.current) labels.push("斜め落下中");
@@ -383,6 +391,20 @@ export function FrenchieCatchGame({ ownedItems }: { ownedItems: FrenchieCatchIte
       missHandled: false,
       ttl: 0,
     };
+
+    if (performance.now() < poopFloodUntilRef.current) {
+      return {
+        ...base,
+        itemId: POOP_ITEM_ID,
+        kind: "item",
+        name: "犬のうんち",
+        image: POOP_IMAGE,
+        rarity: null,
+        level: 0,
+        size: 12 + Math.random() * 3,
+        spin: (Math.random() - 0.5) * 40,
+      };
+    }
 
     const hazardRoll = Math.random();
     if (hazardRoll < POOP_SPAWN_CHANCE && performance.now() >= poopSuppressUntilRef.current) {
@@ -451,7 +473,7 @@ export function FrenchieCatchGame({ ownedItems }: { ownedItems: FrenchieCatchIte
     const urBoostFactor = 1 + Math.min(urBoostRef.current, UR_BOOST_MAX) / 100;
     const weightedItems = itemPool.map((item) => ({
       item,
-      weight: DEFAULT_ITEM_SPAWN_WEIGHT * (item.rarity === "UR" ? urBoostFactor : 1),
+      weight: (ITEM_SPAWN_WEIGHTS[item.id] ?? DEFAULT_ITEM_SPAWN_WEIGHT) * (item.rarity === "UR" ? urBoostFactor : 1),
     }));
     const itemWeightTotal = weightedItems.reduce((sum, entry) => sum + entry.weight, 0);
     const dogWeight = itemPool.length * DEFAULT_ITEM_SPAWN_WEIGHT * (DOG_SPAWN_RATIO / (1 - DOG_SPAWN_RATIO));
@@ -577,6 +599,10 @@ export function FrenchieCatchGame({ ownedItems }: { ownedItems: FrenchieCatchIte
       }
       if (poopSuppressUntilRef.current > 0 && now >= poopSuppressUntilRef.current) {
         poopSuppressUntilRef.current = 0;
+        timedEffectChanged = true;
+      }
+      if (poopFloodUntilRef.current > 0 && now >= poopFloodUntilRef.current) {
+        poopFloodUntilRef.current = 0;
         timedEffectChanged = true;
       }
       if (ikeaUntilRef.current > 0 && now >= ikeaUntilRef.current) {
@@ -903,16 +929,31 @@ export function FrenchieCatchGame({ ownedItems }: { ownedItems: FrenchieCatchIte
                 effectLabel = `+${LV.CUSHION_PT[lv]}ptボーナス${lvTag}`;
                 break;
               case "toy_treasure_puzzle": {
-                const roll = Math.floor(Math.random() * 3);
+                const roll = Math.floor(Math.random() * 7);
                 if (roll === 0) {
                   points += LV.TREASURE_LOW[lv]!;
                   effectLabel = `宝箱 +${LV.TREASURE_LOW[lv]}pt${lvTag}`;
                 } else if (roll === 1) {
                   points += LV.TREASURE_HIGH[lv]!;
                   effectLabel = `宝箱 +${LV.TREASURE_HIGH[lv]}pt${lvTag}`;
-                } else {
+                } else if (roll === 2) {
                   const applied = addBonusTime(LV.TREASURE_SEC[lv]!);
                   effectLabel = `宝箱 +${applied}秒${lvTag}`;
+                } else if (roll === 3) {
+                  poopFloodUntilRef.current = now + TREASURE_POOP_FLOOD_SEC * 1000;
+                  effectLabel = `宝箱 ${TREASURE_POOP_FLOOD_SEC}秒間 うんち祭り${lvTag}`;
+                  statusChanged = true;
+                } else if (roll === 4) {
+                  const applied = addBonusTime(-TREASURE_MINUS5_SEC);
+                  effectLabel = `宝箱 ${applied}秒${lvTag}`;
+                } else if (roll === 5) {
+                  const applied = addBonusTime(-TREASURE_MINUS10_SEC);
+                  effectLabel = `宝箱 ${applied}秒${lvTag}`;
+                } else {
+                  spawnRateBoostUntilRef.current = now + LV.TREASURE_SEC[lv]! * 1000;
+                  spawnRateBoostValueRef.current = SPAWN_RATE_BOOST;
+                  effectLabel = `宝箱 ${LV.TREASURE_SEC[lv]}秒間 アイテム出現量×${SPAWN_RATE_BOOST}${lvTag}`;
+                  statusChanged = true;
                 }
                 break;
               }
@@ -1317,6 +1358,7 @@ export function FrenchieCatchGame({ ownedItems }: { ownedItems: FrenchieCatchIte
     fallSpeedBoostUntilRef.current = 0;
     fallSpeedValueRef.current = FALL_SPEED_BOOST;
     poopSuppressUntilRef.current = 0;
+    poopFloodUntilRef.current = 0;
     ikeaUntilRef.current = 0;
     ikeaCountRef.current = 0;
     spawnRateBoostUntilRef.current = 0;
