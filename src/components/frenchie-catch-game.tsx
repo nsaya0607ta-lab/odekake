@@ -32,7 +32,6 @@ type Entity = {
   status: "falling" | "bounced" | "caught";
   rimChecked: boolean;
   enteredOpening: boolean;
-  missHandled: boolean;
   ttl: number;
 };
 
@@ -171,6 +170,7 @@ const LV = {
   STRAWBERRY_MULT: [1.5, 1.7, 2, 2, 2.5],
   CUPCAKE_SEC: [4, 5, 6, 7, 10],
   SPRING_SEC: [5, 6, 7, 9, 12],
+  SPRING_MULT: [1.2, 1.2, 1.25, 1.3, 1.4],
   SPARKLE_SEC: [4, 5, 6, 8, 10],
   SPARKLE_STRENGTH: ["weak", "weak", "weak", "weak", "medium"] as const,
   RAINBOW_STEP: [10, 12, 15, 20, 25],
@@ -178,6 +178,7 @@ const LV = {
   GOLDEN_MULT: [2, 2.2, 2.2, 2.5, 2.5],
   NAKAYOSHI_PT: [30, 40, 50, 65, 80],
   KAMUNAYO_SEC: [5, 6, 8, 10, 13],
+  KAMUNAYO_MULT: [1.3, 1.35, 1.4, 1.5, 1.6],
   HIKING_SEC: [5, 6, 7, 9, 12],
   SNOW_SEC: [5, 6, 7, 9, 12],
   SUMMER_ADD: [5, 6, 7, 9, 12],
@@ -198,6 +199,7 @@ const LV = {
   AZUKI_PT: [50, 65, 80, 100, 130],
   KOBEE_PT: [50, 65, 80, 100, 130],
   KOBEE_SEC: [8, 9, 11, 13, 16],
+  KOBEE_MULT: [1.4, 1.4, 1.5, 1.5, 1.6],
   HAMIGAKI_SEC: [0, 2, 3, 4, 5],
   HAMIGAKI_PT: [0, 0, 10, 15, 20],
   IKEA_SEC: [4, 5, 6, 7, 8],
@@ -264,29 +266,6 @@ function resolveFallVy(rawVy: number, boostedVy: number, itemId: string, rarity:
   return TIME_BONUS_ITEM_IDS.has(itemId) ? rawVy * TIME_BONUS_FALL_SPEED : boostedVy * RARITY_FALL_SPEED[rarity];
 }
 
-const COMBO_TIERS = [
-  { threshold: 30, mult: 2 },
-  { threshold: 20, mult: 1.5 },
-  { threshold: 10, mult: 1.25 },
-  { threshold: 5, mult: 1.1 },
-  { threshold: 0, mult: 1 },
-] as const;
-
-function comboScoreMultiplier(combo: number, boosted = false) {
-  let index = COMBO_TIERS.findIndex((tier) => combo >= tier.threshold);
-  if (index < 0) index = COMBO_TIERS.length - 1;
-  if (boosted && index > 0) index -= 1;
-  return COMBO_TIERS[index]!.mult;
-}
-
-function comboMilestoneLabel(combo: number) {
-  if (combo === 30) return "MAX COMBO! ×2";
-  if (combo === 20) return "SUPER COMBO! ×1.5";
-  if (combo === 10) return "GREAT! ×1.25";
-  if (combo === 5) return "GOOD! ×1.1";
-  return undefined;
-}
-
 function openingBoundsAt(localY: number) {
   const t = clamp((localY - OPEN_TOP_LOCAL_Y) / (OPEN_BOTTOM_LOCAL_Y - OPEN_TOP_LOCAL_Y), 0, 1);
   const left = 0.145 - t * 0.055;
@@ -316,8 +295,6 @@ export function FrenchieCatchGame({ ownedItems }: { ownedItems: FrenchieCatchIte
   const rafRef = useRef<number | null>(null);
   const scoreRef = useRef(0);
   const dogCaughtRef = useRef(0);
-  const comboRef = useRef(0);
-  const maxComboRef = useRef(0);
   const caughtRef = useRef(0);
   const roundIdRef = useRef<string | null>(null);
   const nextMultiplierRef = useRef(1);
@@ -337,8 +314,6 @@ export function FrenchieCatchGame({ ownedItems }: { ownedItems: FrenchieCatchIte
   const multiplier2ValueRef = useRef(2);
   const boxWideUntilRef = useRef(0);
   const boxWideScaleRef = useRef(BOX_WIDE_SCALE_DEFAULT);
-  const comboInvincibleUntilRef = useRef(0);
-  const comboMultiplierBoostUntilRef = useRef(0);
   const magnetUntilRef = useRef(0);
   const magnetStrengthRef = useRef<"weak" | "medium" | "strong">("weak");
   const urBoostRef = useRef(0);
@@ -363,8 +338,6 @@ export function FrenchieCatchGame({ ownedItems }: { ownedItems: FrenchieCatchIte
   const [boxX, setBoxX] = useState(50);
   const [timeLeft, setTimeLeft] = useState(ROUND_SECONDS);
   const [score, setScore] = useState(0);
-  const [combo, setCombo] = useState(0);
-  const [maxCombo, setMaxCombo] = useState(0);
   const [caught, setCaught] = useState(0);
   const [bagStock, setBagStock] = useState(0);
   const [stunGuard, setStunGuard] = useState(0);
@@ -398,8 +371,6 @@ export function FrenchieCatchGame({ ownedItems }: { ownedItems: FrenchieCatchIte
     if (stunGuardRef.current > 0) labels.push(HAZARD_GUARD_LABELS.stun);
     if (boxShrinkGuardRef.current > 0) labels.push(HAZARD_GUARD_LABELS.boxShrink);
     if (timeMinusGuardRef.current > 0) labels.push(HAZARD_GUARD_LABELS.timeMinus);
-    if (now < comboInvincibleUntilRef.current) labels.push("無敵コンボ中");
-    if (now < comboMultiplierBoostUntilRef.current) labels.push("コンボ倍率アップ中");
     if (now < magnetUntilRef.current) labels.push(magnetStrengthRef.current === "weak" ? "ミニマグネット発動中" : "マグネット発動中");
     if (now < fallSpeedBoostUntilRef.current) labels.push("落下速度アップ中");
     if (now < poopSuppressUntilRef.current) labels.push("うんち出現なし");
@@ -431,7 +402,6 @@ export function FrenchieCatchGame({ ownedItems }: { ownedItems: FrenchieCatchIte
       status: "falling" as const,
       rimChecked: false,
       enteredOpening: false,
-      missHandled: false,
       ttl: 0,
     };
 
@@ -644,14 +614,6 @@ export function FrenchieCatchGame({ ownedItems }: { ownedItems: FrenchieCatchIte
         boxWideUntilRef.current = 0;
         timedEffectChanged = true;
       }
-      if (comboInvincibleUntilRef.current > 0 && now >= comboInvincibleUntilRef.current) {
-        comboInvincibleUntilRef.current = 0;
-        timedEffectChanged = true;
-      }
-      if (comboMultiplierBoostUntilRef.current > 0 && now >= comboMultiplierBoostUntilRef.current) {
-        comboMultiplierBoostUntilRef.current = 0;
-        timedEffectChanged = true;
-      }
       if (magnetUntilRef.current > 0 && now >= magnetUntilRef.current) {
         magnetUntilRef.current = 0;
         timedEffectChanged = true;
@@ -690,14 +652,6 @@ export function FrenchieCatchGame({ ownedItems }: { ownedItems: FrenchieCatchIte
       if (blackoutUntilRef.current > 0 && now >= blackoutUntilRef.current) { blackoutUntilRef.current = 0; setBlackoutActive(false); timedEffectChanged = true; }
       if (stunUntilRef.current > 0 && now >= stunUntilRef.current) { stunUntilRef.current = 0; setStunned(false); timedEffectChanged = true; }
       if (timedEffectChanged) refreshEffectStatus(now);
-
-      const breakCombo = (entity: Entity) => {
-        if (entity.missHandled) return;
-        entity.missHandled = true;
-        if (now < comboInvincibleUntilRef.current) return;
-        comboRef.current = 0;
-        setCombo(0);
-      };
 
       const dt = Math.min(0.035, Math.max(0, (now - last) / 1000));
       last = now;
@@ -1126,8 +1080,9 @@ export function FrenchieCatchGame({ ownedItems }: { ownedItems: FrenchieCatchIte
                 break;
               }
               case "interior_spring_flower_wreath":
-                comboMultiplierBoostUntilRef.current = now + LV.SPRING_SEC[lv]! * 1000;
-                effectLabel = `${LV.SPRING_SEC[lv]}秒間 コンボ倍率アップ${lvTag}`;
+                multiplier15UntilRef.current = now + LV.SPRING_SEC[lv]! * 1000;
+                multiplier15ValueRef.current = LV.SPRING_MULT[lv]!;
+                effectLabel = `${LV.SPRING_SEC[lv]}秒間 ×${LV.SPRING_MULT[lv]}${lvTag}`;
                 statusChanged = true;
                 break;
               case "other_sparkle_rope_crown":
@@ -1144,8 +1099,9 @@ export function FrenchieCatchGame({ ownedItems }: { ownedItems: FrenchieCatchIte
                 break;
               }
               case "other_kamunayo":
-                comboInvincibleUntilRef.current = now + LV.KAMUNAYO_SEC[lv]! * 1000;
-                effectLabel = `${LV.KAMUNAYO_SEC[lv]}秒間 無敵コンボ${lvTag}`;
+                multiplier15UntilRef.current = now + LV.KAMUNAYO_SEC[lv]! * 1000;
+                multiplier15ValueRef.current = LV.KAMUNAYO_MULT[lv]!;
+                effectLabel = `${LV.KAMUNAYO_SEC[lv]}秒間 ×${LV.KAMUNAYO_MULT[lv]}${lvTag}`;
                 statusChanged = true;
                 break;
               case "hiking_frenchie":
@@ -1171,10 +1127,9 @@ export function FrenchieCatchGame({ ownedItems }: { ownedItems: FrenchieCatchIte
               case "interior_kinoko_azubee":
                 fallSpeedBoostUntilRef.current = now + LV.KINOKO_SEC[lv]! * 1000;
                 fallSpeedValueRef.current = LV.KINOKO_FALL[lv]!;
-                comboInvincibleUntilRef.current = now + LV.KINOKO_SEC[lv]! * 1000;
                 multiplier15UntilRef.current = now + LV.KINOKO_SEC[lv]! * 1000;
                 multiplier15ValueRef.current = LV.KINOKO_SCORE[lv]!;
-                effectLabel = `${LV.KINOKO_SEC[lv]}秒間 落下×${LV.KINOKO_FALL[lv]}+無敵+得点×${LV.KINOKO_SCORE[lv]}${lvTag}`;
+                effectLabel = `${LV.KINOKO_SEC[lv]}秒間 落下×${LV.KINOKO_FALL[lv]}+得点×${LV.KINOKO_SCORE[lv]}${lvTag}`;
                 statusChanged = true;
                 break;
               case "other_komochi": {
@@ -1193,8 +1148,9 @@ export function FrenchieCatchGame({ ownedItems }: { ownedItems: FrenchieCatchIte
               }
               case "other_kobee":
                 points += LV.KOBEE_PT[lv]!;
-                comboInvincibleUntilRef.current = now + LV.KOBEE_SEC[lv]! * 1000;
-                effectLabel = `+${LV.KOBEE_PT[lv]}pt / ${LV.KOBEE_SEC[lv]}秒間 無敵コンボ${lvTag}`;
+                multiplier15UntilRef.current = now + LV.KOBEE_SEC[lv]! * 1000;
+                multiplier15ValueRef.current = LV.KOBEE_MULT[lv]!;
+                effectLabel = `+${LV.KOBEE_PT[lv]}pt / ${LV.KOBEE_SEC[lv]}秒間 ×${LV.KOBEE_MULT[lv]}${lvTag}`;
                 statusChanged = true;
                 break;
               case "other_hamigaki": {
@@ -1261,10 +1217,9 @@ export function FrenchieCatchGame({ ownedItems }: { ownedItems: FrenchieCatchIte
                 const shikkokuSec = LV.SHIKKOKU_SEC[lv]!;
                 fallSpeedBoostUntilRef.current = now + shikkokuSec * 1000;
                 fallSpeedValueRef.current = LV.SHIKKOKU_FALL[lv]!;
-                comboInvincibleUntilRef.current = now + shikkokuSec * 1000;
                 multiplier15UntilRef.current = now + shikkokuSec * 1000;
                 multiplier15ValueRef.current = LV.SHIKKOKU_MULT[lv]!;
-                effectLabel = `${shikkokuSec}秒間 落下×${LV.SHIKKOKU_FALL[lv]}+無敵+得点×${LV.SHIKKOKU_MULT[lv]}${lvTag}`;
+                effectLabel = `${shikkokuSec}秒間 落下×${LV.SHIKKOKU_FALL[lv]}+得点×${LV.SHIKKOKU_MULT[lv]}${lvTag}`;
                 statusChanged = true;
                 break;
               }
@@ -1305,21 +1260,11 @@ export function FrenchieCatchGame({ ownedItems }: { ownedItems: FrenchieCatchIte
               effectLabel = effectLabel ? `${effectLabel} / JUST!×${JUST_MULTIPLIER}` : `JUST!×${JUST_MULTIPLIER}`;
             }
 
-            const nextCombo = comboRef.current + 1;
-            const comboMultiplier = comboScoreMultiplier(nextCombo, now < comboMultiplierBoostUntilRef.current);
-            if (comboMultiplier > 1) points = Math.round(points * comboMultiplier);
-            const milestoneLabel = comboMilestoneLabel(nextCombo);
-            if (milestoneLabel) effectLabel = effectLabel ? `${effectLabel} / ${milestoneLabel}` : milestoneLabel;
-
             scoreRef.current += points;
             if (entity.kind === "dog") dogCaughtRef.current += 1;
-            comboRef.current = nextCombo;
             caughtRef.current += 1;
-            maxComboRef.current = Math.max(maxComboRef.current, comboRef.current);
             setScore(scoreRef.current);
-            setCombo(comboRef.current);
             setCaught(caughtRef.current);
-            setMaxCombo(maxComboRef.current);
             if (statusChanged) refreshEffectStatus(now);
             showCatch(entity, points, effectLabel);
           } else if (!entity.rimChecked && localY >= OPEN_TOP_LOCAL_Y - 0.02 && localY <= OPEN_BOTTOM_LOCAL_Y + 0.10) {
@@ -1359,7 +1304,6 @@ export function FrenchieCatchGame({ ownedItems }: { ownedItems: FrenchieCatchIte
         }
 
         if (entity.y > 110 || entity.x < -18 || entity.x > 118) {
-          if (entity.status !== "caught" && entity.itemId !== POOP_ITEM_ID && !NEGATIVE_HAZARD_IDS.has(entity.itemId ?? "")) breakCombo(entity);
           continue;
         }
         next.push(entity);
@@ -1420,8 +1364,6 @@ export function FrenchieCatchGame({ ownedItems }: { ownedItems: FrenchieCatchIte
     nextIdRef.current = 1;
     scoreRef.current = 0;
     dogCaughtRef.current = 0;
-    comboRef.current = 0;
-    maxComboRef.current = 0;
     caughtRef.current = 0;
     boxXRef.current = 50;
     draggingRef.current = false;
@@ -1446,8 +1388,6 @@ export function FrenchieCatchGame({ ownedItems }: { ownedItems: FrenchieCatchIte
     multiplier2ValueRef.current = 2;
     boxWideUntilRef.current = 0;
     boxWideScaleRef.current = BOX_WIDE_SCALE_DEFAULT;
-    comboInvincibleUntilRef.current = 0;
-    comboMultiplierBoostUntilRef.current = 0;
     magnetUntilRef.current = 0;
     magnetStrengthRef.current = "weak";
     urBoostRef.current = 0;
@@ -1469,8 +1409,6 @@ export function FrenchieCatchGame({ ownedItems }: { ownedItems: FrenchieCatchIte
     setEntities([]);
     setBoxX(50);
     setScore(0);
-    setCombo(0);
-    setMaxCombo(0);
     setCaught(0);
     setTimeLeft(ROUND_SECONDS);
     setFeedback(null);
@@ -1562,7 +1500,7 @@ export function FrenchieCatchGame({ ownedItems }: { ownedItems: FrenchieCatchIte
               </div>
             ) : null}
           </div>
-          {combo >= 2 ? <div className="rounded-full border border-[#f1c969] bg-[#fff6cc]/95 px-3 py-1.5 text-center shadow-sm"><p className="text-lg font-black leading-none text-[#b77322]">{combo}</p><p className="text-[8px] font-black text-[#b77322]">COMBO!{combo >= 5 ? ` ×${comboScoreMultiplier(combo, performance.now() < comboMultiplierBoostUntilRef.current)}` : ""}</p></div> : <span />}
+          <span />
           <div className="rounded-2xl border border-white/80 bg-white/90 px-3 py-2 text-right shadow-sm"><p className="text-[9px] font-bold tracking-widest text-ink-faint">TIME</p><p className="text-xl font-black tabular-nums text-ink">{timeLeft}</p></div>
         </div>
 
@@ -1632,9 +1570,8 @@ export function FrenchieCatchGame({ ownedItems }: { ownedItems: FrenchieCatchIte
                 <>
                   <p className="text-[10px] font-black tracking-[0.18em] text-ink-faint">RESULT</p>
                   <p className="mt-1 text-4xl font-black tabular-nums text-ink">{score.toLocaleString("ja-JP")}</p>
-                  <div className="mt-3 grid grid-cols-2 gap-2 text-xs">
+                  <div className="mt-3 grid grid-cols-1 gap-2 text-xs">
                     <div className="rounded-xl bg-paper-deep px-2 py-2"><p className="text-[9px] text-ink-faint">キャッチ</p><p className="font-black text-ink">{caught}個</p></div>
-                    <div className="rounded-xl bg-paper-deep px-2 py-2"><p className="text-[9px] text-ink-faint">MAX COMBO</p><p className="font-black text-ink">{maxCombo}</p></div>
                   </div>
                   {dogBonus ? (
                     <div className="mt-2 rounded-xl bg-paper-deep px-3 py-2 text-xs">
