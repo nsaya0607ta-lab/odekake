@@ -200,13 +200,13 @@ const DOG_SPAWN_RATIO = 0.28;
 const FRENCHIE_SKIN_IDS = ["hiking_frenchie", "snow_frenchie", "summer_frenchie"];
 const FRENCHIE_SKIN_SPAWN_CHANCE = 0.18;
 const ITEM_SPAWN_WEIGHTS: Partial<Record<string, number>> = {
-  toy_duck_plush: 50,
-  toy_carrot: 35,
-  toy_treasure_puzzle: 30,
-  other_omojii: 8,
-  food_paw_melon_bread: 45,
+  toy_duck_plush: 70,
+  toy_carrot: 60,
+  toy_treasure_puzzle: 60,
+  other_omojii: 30,
+  food_paw_melon_bread: 70,
   interior_anball: 35,
-  summer_frenchie: 45,
+  summer_frenchie: 40,
   other_azuki: 35,
 };
 const RARITY_STYLE: Record<FrenchieCatchItem["rarity"], string> = {
