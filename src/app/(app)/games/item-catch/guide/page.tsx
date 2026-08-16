@@ -46,20 +46,40 @@ export default async function ItemCatchGuidePage() {
 
   return (
     <>
-      <PageHeader title="ルールとスキル" backHref="/games/item-catch" />
+      <PageHeader title="ルールブック" backHref="/games/item-catch" />
 
-      <PageBody className="!space-y-6">
-        <section className="space-y-2">
-          <h1 className="text-lg font-black text-ink">アイテムキャッチの遊び方</h1>
-          <p className="text-xs leading-relaxed text-ink-soft">
-            1プレイは30秒。落ちてくるアイテムを段ボールでキャッチして、スコアをのばします。
-            レアリティで決まる基礎得点に、スキル倍率・JUST判定・コンボ倍率が順にかかります。
-          </p>
+      <PageBody className="!space-y-4 !py-3">
+        <section className="rough-card relative overflow-hidden px-5 py-5">
+          <div className="pointer-events-none absolute -right-7 -top-7 h-24 w-24 rounded-full bg-leaf-soft/70" />
+          <div className="pointer-events-none absolute -bottom-8 -left-6 h-20 w-20 rounded-full bg-paper-deep/70" />
+          <div className="relative">
+            <span className="inline-flex rounded-full border border-line bg-card/90 px-2.5 py-1 text-[9px] font-black tracking-[0.18em] text-ink-faint">
+              ITEM CATCH · RULE BOOK
+            </span>
+            <h1 className="mt-3 text-xl font-black tracking-tight text-ink">30秒で、どこまで伸ばせる？</h1>
+            <p className="mt-1.5 max-w-[92%] text-xs leading-relaxed text-ink-soft">
+              落ちてくるアイテムを段ボールでキャッチ。レア度・JUST・コンボ・スキルを重ねてハイスコアを狙います。
+            </p>
+
+            <div className="mt-4 grid grid-cols-3 gap-2">
+              {[
+                ["TIME", "30秒", "1プレイ"],
+                ["COMBO", "×2.0", "最大倍率"],
+                ["REWARD", "÷25", "コイン換算"],
+              ].map(([label, value, note]) => (
+                <div key={label} className="rounded-2xl border border-line bg-card/90 px-2 py-2.5 text-center">
+                  <span className="block text-[8px] font-black tracking-[0.12em] text-ink-faint">{label}</span>
+                  <span className="mt-0.5 block text-base font-black tabular-nums text-ink">{value}</span>
+                  <span className="block text-[9px] text-ink-faint">{note}</span>
+                </div>
+              ))}
+            </div>
+          </div>
         </section>
 
         <section className="space-y-2">
-          <SectionTitle eyebrow="基礎得点" title="レアリティごとの点数" />
-          <div className="grid grid-cols-4 gap-px overflow-hidden rounded-2xl border border-line bg-line">
+          <SectionTitle number="01" eyebrow="SCORE" title="レアリティごとの基礎得点" />
+          <div className="grid grid-cols-4 gap-1.5">
             {[
               ["N", "10pt"],
               ["R", "20pt"],
@@ -70,8 +90,8 @@ export default async function ItemCatchGuidePage() {
               ["わんこ", "15pt"],
               ["？", "10pt〜"],
             ].map(([label, value]) => (
-              <div key={label} className="bg-card px-1 py-2.5 text-center">
-                <span className="block text-[10px] font-black text-ink-faint">{label}</span>
+              <div key={label} className="rounded-2xl border border-line bg-card px-1 py-2.5 text-center">
+                <span className="block text-[9px] font-black text-ink-faint">{label}</span>
                 <span className="mt-0.5 block text-sm font-black tabular-nums text-ink">{value}</span>
               </div>
             ))}
@@ -79,16 +99,18 @@ export default async function ItemCatchGuidePage() {
         </section>
 
         <section className="space-y-2">
-          <SectionTitle eyebrow="得点のしくみ" title="スコアを試算する" />
-          <p className="text-xs leading-relaxed text-ink-soft">
-            条件を変えると、ゲームと同じ計算で1個あたりの得点が出ます。
-          </p>
-          <ScoreSimulator />
+          <SectionTitle number="02" eyebrow="SIMULATOR" title="スコアを試算する" />
+          <div className="rounded-2xl border border-line bg-card p-3">
+            <p className="mb-3 text-[11px] leading-relaxed text-ink-soft">
+              条件を変えると、ゲーム本体と同じ計算で1個あたりの得点を確認できます。
+            </p>
+            <ScoreSimulator />
+          </div>
         </section>
 
         <section className="space-y-2">
-          <SectionTitle eyebrow="コンボ" title="つなぐほど倍率が上がる" />
-          <div className="overflow-hidden rounded-2xl border border-line">
+          <SectionTitle number="03" eyebrow="COMBO" title="つなぐほど倍率アップ" />
+          <div className="overflow-hidden rounded-2xl border border-line bg-card">
             {[
               ["30 〜", "MAX COMBO", "×2.0", true],
               ["20 〜 29", "SUPER COMBO", "×1.5", false],
@@ -98,79 +120,90 @@ export default async function ItemCatchGuidePage() {
             ].map(([range, label, mult, isMax]) => (
               <div
                 key={String(range)}
-                className={`flex items-baseline gap-3 border-b border-line px-3.5 py-2.5 last:border-b-0 ${
+                className={`flex items-center gap-3 border-b border-line px-3.5 py-2.5 last:border-b-0 ${
                   isMax ? "bg-leaf-soft/60" : "bg-card"
                 }`}
               >
                 <span
-                  className={`w-[58px] shrink-0 text-[11px] font-black tabular-nums ${
+                  className={`w-[62px] shrink-0 text-[11px] font-black tabular-nums ${
                     isMax ? "text-leaf-deep" : "text-ink-faint"
                   }`}
                 >
                   {range}
                 </span>
-                <span className={`flex-1 text-xs ${isMax ? "text-leaf-deep" : "text-ink-soft"}`}>{label}</span>
+                <span className={`flex-1 text-[11px] font-bold ${isMax ? "text-leaf-deep" : "text-ink-soft"}`}>
+                  {label}
+                </span>
                 <span className={`text-sm font-black tabular-nums ${isMax ? "text-leaf-deep" : "text-ink"}`}>
                   {mult}
                 </span>
               </div>
             ))}
           </div>
-          <div className="rough-card p-3.5">
-            <p className="text-xs leading-relaxed text-ink-soft">
-              <b className="text-ink">コンボ保護</b>があると、取り逃してもコンボが途切れず保護を1つ使います。
-              持てるのは<b className="text-ink">最大4つ</b>まで。スコアの下に盾のアイコンで出ます。
-            </p>
+          <div className="rounded-2xl border border-line bg-paper-deep/60 p-3.5">
+            <div className="flex items-start gap-3">
+              <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-card text-sm">🛡️</span>
+              <p className="text-[11px] leading-relaxed text-ink-soft">
+                <b className="text-ink">コンボ保護</b>があると、取り逃してもコンボを維持して保護を1つ消費します。
+                最大<b className="text-ink">4つ</b>まで持てます。
+              </p>
+            </div>
           </div>
         </section>
 
         <section className="space-y-2">
-          <SectionTitle eyebrow="ハザード枠" title="特殊アイテム" />
-          <p className="text-xs leading-relaxed text-ink-soft">
-            図鑑とは別枠で、持っているアイテムに関係なく決まった確率で落ちてきます。
+          <SectionTitle number="04" eyebrow="HAZARD" title="特殊アイテム" />
+          <p className="text-[11px] leading-relaxed text-ink-soft">
+            図鑑とは別枠。所持状況に関係なく、決まった確率で落ちてきます。
           </p>
-          <div className="overflow-hidden rounded-2xl border border-line">
+          <div className="grid gap-2">
             {[
               {
                 image: "/collection/items/dog-poop.webp",
                 name: "犬のうんち",
                 rate: "4%",
-                body: "取ると −500pt（スコアは0より下がりません）。ビニール袋があれば打ち消せます。",
+                body: "取ると −500pt。ビニール袋があればダメージを打ち消せます。",
               },
               {
                 image: "/collection/items/mystery-question.webp",
                 name: "？アイテム",
                 rate: "5%",
-                body: "全アイテムの中からランダムに1つのスキルが発動します。発動レベルは自分の所持レベル（未所持ならLv1）。",
+                body: "全アイテムからランダムに1つのスキルが発動。未所持ならLv1です。",
               },
               {
                 image: "/collection/items/plastic-bag.webp",
                 name: "ビニール袋",
                 rate: "3%",
-                body: "3つまで持てる「うんちよけ」。うんちを踏んだとき1つ使って、ダメージを打ち消します。",
+                body: "最大3つまで持てる「うんちよけ」。ダメージを1回打ち消します。",
               },
             ].map((hazard) => (
-              <div key={hazard.name} className="border-b border-line bg-card p-3 last:border-b-0">
-                <div className="flex items-center gap-2.5">
-                  <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-paper-deep">
+              <div key={hazard.name} className="rounded-2xl border border-line bg-card p-3">
+                <div className="flex items-center gap-3">
+                  <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-paper-deep">
                     {/* eslint-disable-next-line @next/next/no-img-element */}
-                    <img src={hazard.image} alt="" className="h-8 w-8 object-contain" loading="lazy" />
+                    <img src={hazard.image} alt="" className="h-9 w-9 object-contain" loading="lazy" />
                   </span>
-                  <span className="flex-1 text-sm font-black text-ink">{hazard.name}</span>
-                  <span className="text-[11px] font-black tabular-nums text-ink-faint">{hazard.rate}</span>
+                  <span className="min-w-0 flex-1">
+                    <span className="flex items-center gap-2">
+                      <span className="truncate text-sm font-black text-ink">{hazard.name}</span>
+                      <span className="rounded-full bg-paper-deep px-2 py-0.5 text-[9px] font-black tabular-nums text-ink-faint">
+                        DROP {hazard.rate}
+                      </span>
+                    </span>
+                    <span className="mt-1 block text-[10px] leading-relaxed text-ink-soft">{hazard.body}</span>
+                  </span>
                 </div>
-                <p className="mt-1.5 pl-[50px] text-[11px] leading-relaxed text-ink-soft">{hazard.body}</p>
               </div>
             ))}
           </div>
         </section>
 
         <section className="space-y-2">
-          <SectionTitle eyebrow="育て方" title="スキルレベル" />
-          <p className="text-xs leading-relaxed text-ink-soft">
-            同じアイテムを重ねて引くほど、スキルが5段階で強くなります。Nと特殊アイテムはレベルの対象外です。
+          <SectionTitle number="05" eyebrow="SKILL LEVEL" title="重ねてスキルを育てる" />
+          <p className="text-[11px] leading-relaxed text-ink-soft">
+            同じアイテムを引くほど5段階で強化。Nと特殊アイテムはレベル対象外です。
           </p>
-          <div className="rough-card p-3.5">
+          <div className="rounded-2xl border border-line bg-card p-3.5">
             <table className="w-full border-collapse text-[11px]">
               <thead>
                 <tr>
@@ -206,44 +239,49 @@ export default async function ItemCatchGuidePage() {
               </tbody>
             </table>
             <p className="mt-2 text-[10px] leading-relaxed text-ink-faint">
-              数字は累計の獲得数です。図鑑に載るだけでは上がらず、同じアイテムをもう一度引く必要があります。
+              数字は累計獲得数です。同じアイテムをもう一度引くことでレベルが上がります。
             </p>
           </div>
         </section>
 
         <section className="space-y-2">
-          <SectionTitle eyebrow="持っているぶん" title="スキル一覧" />
+          <SectionTitle number="06" eyebrow="MY SKILLS" title="持っているスキル" />
           <SkillCatalog skills={skills} total={ITEM_CATCH_SKILLS.length} />
         </section>
 
         <section className="space-y-2">
-          <SectionTitle eyebrow="報酬" title="コインのもらい方" />
-          <div className="rounded-2xl border border-line bg-leaf-soft/60 px-4 py-5 text-center">
-            <p className="text-base font-black tabular-nums text-leaf-deep">スコア ÷ 25 = 獲得コイン</p>
-            <p className="mt-1 text-[10px] text-leaf-deep">小数点以下は切り捨て・最低1コイン</p>
-          </div>
-          <div className="rough-card p-3.5">
-            <ul className="list-disc space-y-1.5 pl-4 text-xs leading-relaxed text-ink-soft">
-              <li>1点でも取れていれば、必ず1コインはもらえます。</li>
-              <li>コインがもらえるのは1プレイにつき1回だけです。</li>
-              <li>キャッチ数は1プレイ2000個まで、1個あたり1500ptまでという上限があります。</li>
+          <SectionTitle number="07" eyebrow="REWARD" title="コインのもらい方" />
+          <div className="rough-card overflow-hidden">
+            <div className="bg-leaf-soft/60 px-4 py-5 text-center">
+              <p className="text-[9px] font-black tracking-[0.16em] text-leaf-deep">COIN REWARD</p>
+              <p className="mt-1 text-lg font-black tabular-nums text-leaf-deep">スコア ÷ 25 = 獲得コイン</p>
+              <p className="mt-1 text-[10px] text-leaf-deep">小数点以下は切り捨て · 最低1コイン</p>
+            </div>
+            <ul className="space-y-2 border-t border-line bg-card p-3.5 text-[11px] leading-relaxed text-ink-soft">
+              <li className="flex gap-2"><span className="font-black text-ink-faint">01</span><span>1点でも取れていれば、必ず1コインはもらえます。</span></li>
+              <li className="flex gap-2"><span className="font-black text-ink-faint">02</span><span>コインがもらえるのは1プレイにつき1回だけです。</span></li>
+              <li className="flex gap-2"><span className="font-black text-ink-faint">03</span><span>キャッチ数は1プレイ2000個まで、1個あたり1500ptまでです。</span></li>
             </ul>
           </div>
         </section>
 
-        <p className="pb-2 text-center text-[10px] text-ink-faint">
-          数値はゲーム本体の設定にもとづいています。
+        <p className="pb-2 pt-1 text-center text-[9px] tracking-wide text-ink-faint">
+          GAME DATA · 数値はゲーム本体の設定にもとづいています
         </p>
       </PageBody>
     </>
   );
 }
 
-function SectionTitle({ eyebrow, title }: { eyebrow: string; title: string }) {
+function SectionTitle({ number, eyebrow, title }: { number: string; eyebrow: string; title: string }) {
   return (
-    <div>
-      <p className="text-[10px] font-black tracking-[0.14em] text-ink-faint">{eyebrow}</p>
-      <h2 className="mt-0.5 text-base font-black text-ink">{title}</h2>
+    <div className="flex items-end gap-3">
+      <span className="text-xl font-black tabular-nums text-ink-faint/50">{number}</span>
+      <div className="min-w-0 pb-0.5">
+        <p className="text-[8px] font-black tracking-[0.18em] text-ink-faint">{eyebrow}</p>
+        <h2 className="mt-0.5 text-base font-black tracking-tight text-ink">{title}</h2>
+      </div>
+      <span className="mb-1 h-px flex-1 bg-line" />
     </div>
   );
 }
