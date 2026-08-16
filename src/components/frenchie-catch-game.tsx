@@ -86,9 +86,9 @@ const TIME_MINUS_SECONDS = 3;
 /** プレイ60秒経過後、画面上部1/5のアイテムを透明にする */
 const TOP_ZONE_HIDDEN_AFTER_SEC = 60;
 const TOP_ZONE_HIDDEN_LOCAL_Y = 20;
-/** プレイ120秒経過後、画面上部2/5のアイテムを透明にする */
+/** プレイ120秒経過後、画面上部1/4のアイテムを透明にする */
 const TOP_ZONE_HIDDEN_AFTER_SEC_2 = 120;
-const TOP_ZONE_HIDDEN_LOCAL_Y_2 = 40;
+const TOP_ZONE_HIDDEN_LOCAL_Y_2 = 25;
 const TIME_MINUS_FALL_SPEED = 3.5;
 const BOX_SHRINK_ITEM_ID = "hazard_box_shrink";
 const BOX_SHRINK_IMAGE = "/collection/items/hazard-box-shrink.webp";
@@ -381,7 +381,7 @@ export function FrenchieCatchGame({ ownedItems }: { ownedItems: FrenchieCatchIte
     if (now < boxShrinkUntilRef.current) labels.push("ダンボール0.8倍");
     else if (now < boxWideUntilRef.current) labels.push(`ダンボール×${boxWideScaleRef.current}拡大中`);
     if (now < blackoutUntilRef.current) labels.push("上半分ブラックアウト中");
-    if (now - startAtRef.current > TOP_ZONE_HIDDEN_AFTER_SEC_2 * 1000) labels.push("画面上部2/5が見えない");
+    if (now - startAtRef.current > TOP_ZONE_HIDDEN_AFTER_SEC_2 * 1000) labels.push("画面上部1/4が見えない");
     else if (now - startAtRef.current > TOP_ZONE_HIDDEN_AFTER_SEC * 1000) labels.push("画面上部が見えない");
     if (now < stunUntilRef.current) labels.push("しびれ中");
     if (urBoostRef.current > 0) labels.push(`UR出現率+${Math.min(urBoostRef.current, UR_BOOST_MAX)}`);
