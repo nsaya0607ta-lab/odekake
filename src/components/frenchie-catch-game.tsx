@@ -373,7 +373,7 @@ export function FrenchieCatchGame({ ownedItems }: { ownedItems: FrenchieCatchIte
       x: 9 + Math.random() * 82,
       y: -13 - Math.random() * 5,
       vx: (Math.random() - 0.5) * 2.4 * slantBoost,
-      vy: (17 + Math.random() * 5) * fallSpeedBoost,
+      vy: (17 + Math.random() * 5) * 1.25 * fallSpeedBoost,
       rotation: (Math.random() - 0.5) * 12,
       status: "falling" as const,
       rimChecked: false,
