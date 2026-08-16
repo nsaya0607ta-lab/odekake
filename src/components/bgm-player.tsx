@@ -1,7 +1,8 @@
 "use client";
 
 import { useEffect, useRef } from "react";
-import { getBgmVolume, getTapVolume, SOUND_SETTINGS_EVENT } from "@/lib/sound-settings";
+import { getBgmVolume, getTapVolume, sliderToGain, SOUND_SETTINGS_EVENT } from "@/lib/sound-settings";
+import { playTapSound, preloadTapSound } from "@/lib/tap-sound";
 
 /**
  * アプリ起動時にBGMをループ再生し、タップ操作には効果音を鳴らす。
@@ -19,7 +20,7 @@ export function BgmPlayer() {
     const audio = audioRef.current;
     if (!audio) return;
 
-    audio.volume = getBgmVolume();
+    audio.volume = sliderToGain(getBgmVolume());
 
     const tryPlay = () => {
       if (getBgmVolume() <= 0 || document.visibilityState !== "visible") return;
@@ -45,7 +46,7 @@ export function BgmPlayer() {
 
     const onSoundSettingsChange = () => {
       const volume = getBgmVolume();
-      audio.volume = volume;
+      audio.volume = sliderToGain(volume);
       if (volume <= 0) {
         audio.pause();
       } else if (audio.paused && document.visibilityState === "visible") {
@@ -62,21 +63,24 @@ export function BgmPlayer() {
     };
   }, []);
 
-  // タップした要素(ボタン・リンク)ごとに軽い操作音を鳴らす
+  // タップ音を先読みしておき、実際に鳴らすときの遅延をなくす
   useEffect(() => {
-    const onPointerDown = (event: PointerEvent) => {
-      if (event.button !== 0) return;
+    preloadTapSound();
+  }, []);
+
+  // ボタン・リンクを最後まで押し切って「クリック」が成立したときだけ操作音を鳴らす。
+  // pointerdown(触れた瞬間)で鳴らすと、なぞっただけ・スクロール中でも反応してしまう。
+  useEffect(() => {
+    const onClick = (event: MouseEvent) => {
       const volume = getTapVolume();
       if (volume <= 0) return;
       const target = event.target instanceof Element ? event.target : null;
       if (!target?.closest("a[href], button, [role='button']")) return;
-      const tap = new Audio("/audio/tap.mp3");
-      tap.volume = volume;
-      tap.play().catch(() => {});
+      playTapSound(sliderToGain(volume));
     };
 
-    document.addEventListener("pointerdown", onPointerDown, true);
-    return () => document.removeEventListener("pointerdown", onPointerDown, true);
+    document.addEventListener("click", onClick, true);
+    return () => document.removeEventListener("click", onClick, true);
   }, []);
 
   return <audio ref={audioRef} src="/audio/bgm.mp3" loop preload="auto" />;
