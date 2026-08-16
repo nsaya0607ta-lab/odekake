@@ -194,7 +194,13 @@ const SPAWN_RATE_BOOST = 2;
 const SLANT_VX_BOOST = 3.5;
 const RAGBY_SPAWN_RATE_BOOST = 3;
 const POINTS: Record<FrenchieCatchItem["rarity"], number> = { N: 10, R: 20, SR: 40, SSR: 70, UR: 100, LR: 150 };
-const RARITY_FALL_SPEED: Record<FrenchieCatchItem["rarity"], number> = { N: 1, R: 1.5, SR: 1.75, SSR: 2, UR: 2.5, LR: 3 };
+const RARITY_FALL_SPEED: Record<FrenchieCatchItem["rarity"], number> = { N: 1, R: 1.08, SR: 1.18, SSR: 1.32, UR: 1.5, LR: 1.75 };
+/** 時間が増えるスキルを持つアイテムだけ、落下速度をレアリティ別倍率で上げる */
+const TIME_BONUS_ITEM_IDS = new Set([
+  "toy_duck_plush", "toy_carrot", "food_paw_melon_bread", "toy_treasure_puzzle",
+  "interior_anball", "other_omojii", "other_azuki", "summer_frenchie",
+]);
+const TIME_BONUS_RARITY_FALL_SPEED: Record<FrenchieCatchItem["rarity"], number> = { N: 1, R: 1.5, SR: 1.75, SSR: 2, UR: 2.5, LR: 3 };
 const DEFAULT_ITEM_SPAWN_WEIGHT = 100;
 const DOG_SPAWN_RATIO = 0.28;
 const FRENCHIE_SKIN_IDS = ["hiking_frenchie", "snow_frenchie", "summer_frenchie"];
@@ -214,6 +220,10 @@ function clamp(value: number, min: number, max: number) {
 
 function overlap(leftA: number, rightA: number, leftB: number, rightB: number) {
   return Math.max(0, Math.min(rightA, rightB) - Math.max(leftA, leftB));
+}
+
+function fallSpeedMultiplier(itemId: string, rarity: FrenchieCatchItem["rarity"]) {
+  return TIME_BONUS_ITEM_IDS.has(itemId) ? TIME_BONUS_RARITY_FALL_SPEED[rarity] : RARITY_FALL_SPEED[rarity];
 }
 
 const COMBO_TIERS = [
@@ -459,7 +469,7 @@ export function FrenchieCatchGame({ ownedItems }: { ownedItems: FrenchieCatchIte
           image: skin.image,
           rarity: skin.rarity,
           level: skin.level,
-          vy: base.vy * RARITY_FALL_SPEED[skin.rarity],
+          vy: base.vy * fallSpeedMultiplier(skin.id, skin.rarity),
           size: 15.5 + Math.random() * 3.5,
           spin: (Math.random() - 0.5) * 20,
         };
@@ -495,7 +505,7 @@ export function FrenchieCatchGame({ ownedItems }: { ownedItems: FrenchieCatchIte
       image: item.image,
       rarity: item.rarity,
       level: item.level,
-      vy: base.vy * RARITY_FALL_SPEED[item.rarity],
+      vy: base.vy * fallSpeedMultiplier(item.id, item.rarity),
       size: 12.5 + Math.random() * 3.5,
       spin: (Math.random() - 0.5) * 65,
     };
