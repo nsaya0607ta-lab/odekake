@@ -81,7 +81,7 @@ const RARITY_FRAME_SCALE: Record<GachaRarity, string> = {
 const RARITY_TEXT_CLASS: Record<GachaRarity, string> = {
   N: "text-white",
   R: "text-[#0b2a63]",
-  SR: "text-white",
+  SR: "text-[#0f4d2e]",
   SSR: "text-[#0b2a63]",
   UR: "text-white",
   LR: "text-white",
