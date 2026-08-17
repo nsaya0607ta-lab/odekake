@@ -227,7 +227,7 @@ const TIME_BONUS_ITEM_IDS = new Set([
   "toy_duck_plush", "toy_carrot", "food_paw_melon_bread",
   "interior_anball", "other_omojii", "other_azuki", "summer_frenchie",
 ]);
-const TIME_BONUS_FALL_SPEED = 7;
+const TIME_BONUS_FALL_SPEED = 6;
 const TREASURE_ITEM_ID = "toy_treasure_puzzle";
 const TREASURE_FALL_SPEED = 4;
 const POOP_FLOOD_FALL_SPEED = 6;
