@@ -98,8 +98,6 @@ export function ItemCard({
   const showCount = owned && (isRevealed || showCountWhenHidden);
   const skillLevelLabel = isRevealed ? formatSkillLevel(item.rarity, drawCount) : null;
   const nextLevelRemaining = isRevealed ? getNextLevelRemaining(item.rarity, drawCount) : null;
-  const isBrightFrame = isRevealed && (item.rarity === "UR" || item.rarity === "LR" || item.rarity === "MR");
-
   return (
     <div
       className={`relative aspect-[561/701] w-full overflow-hidden rounded-[16px] transition-shadow ${
@@ -119,8 +117,8 @@ export function ItemCard({
         />
       ) : null}
 
-      <div className="relative z-[1] flex h-full w-full flex-col items-center px-[7%] pt-[14%] pb-[7%]">
-        <span className="flex h-[43%] w-[64%] shrink-0 items-center justify-center">
+      <div className="relative z-[1] flex h-full w-full flex-col items-center px-[7%] pt-[16%] pb-[7%]">
+        <span className="mt-[2%] flex h-[43%] w-[64%] shrink-0 items-center justify-center">
           {useExactSilhouette ? (
             <ExactSilhouette art={item.art} />
           ) : (
@@ -130,7 +128,7 @@ export function ItemCard({
 
         <span
           className={`mt-[3%] flex min-h-[17%] w-full items-center justify-center line-clamp-2 text-center text-[11px] font-semibold leading-tight ${
-            isRevealed ? (isBrightFrame ? "text-white" : "text-[#514a42]") : "text-ink-faint"
+            isRevealed ? "text-white drop-shadow-[0_1px_2px_rgba(0,0,0,0.55)]" : "text-ink-faint"
           }`}
         >
           {isRevealed ? item.name : "???"}
@@ -138,7 +136,7 @@ export function ItemCard({
 
         <span
           className={`mt-[1%] text-center text-[9px] font-semibold leading-none tabular-nums ${
-            showCount ? (isBrightFrame ? "text-white" : "text-[#6d655c]") : "invisible"
+            showCount ? "text-white drop-shadow-[0_1px_2px_rgba(0,0,0,0.55)]" : "invisible"
           }`}
           aria-hidden={!showCount}
         >
@@ -146,11 +144,9 @@ export function ItemCard({
         </span>
 
         {skillLevelLabel ? (
-          <span className="mt-[1%] flex items-center gap-1 text-center text-[9px] font-bold leading-none text-[#a67c2d]">
-            <span className="rounded-full bg-[#fff1cf] px-1.5 py-[1px]">{skillLevelLabel}</span>
-            {nextLevelRemaining !== null ? (
-              <span className="text-[#8d8375]">次まであと{nextLevelRemaining}</span>
-            ) : null}
+          <span className="mt-[1%] flex items-center gap-1 text-center text-[9px] font-bold leading-none text-white drop-shadow-[0_1px_2px_rgba(0,0,0,0.55)]">
+            <span className="rounded-full bg-black/35 px-1.5 py-[1px]">{skillLevelLabel}</span>
+            {nextLevelRemaining !== null ? <span>次まであと{nextLevelRemaining}</span> : null}
           </span>
         ) : null}
       </div>
@@ -208,8 +204,8 @@ function ItemPreviewModal({ item, onClose }: { item: CollectionItem; onClose: ()
           ×
         </button>
 
-        <div className="relative z-[1] flex h-full w-full flex-col items-center px-[8%] pt-[14%] pb-[8%]">
-          <div className="flex h-[52%] w-[72%] shrink-0 items-center justify-center">
+        <div className="relative z-[1] flex h-full w-full flex-col items-center px-[8%] pt-[16%] pb-[8%]">
+          <div className="mt-[2%] flex h-[52%] w-[72%] shrink-0 items-center justify-center">
             {item.image ? (
               // 元画像を拡大補間しすぎないよう、実画像をobject-containで表示する。
               // eslint-disable-next-line @next/next/no-img-element
@@ -223,11 +219,7 @@ function ItemPreviewModal({ item, onClose }: { item: CollectionItem; onClose: ()
             )}
           </div>
 
-          <p
-            className={`mt-[5%] flex min-h-[14%] w-full items-center justify-center text-center text-[20px] font-bold leading-tight ${
-              item.rarity === "UR" || item.rarity === "LR" ? "text-white" : "text-[#514a42]"
-            }`}
-          >
+          <p className="mt-[5%] flex min-h-[14%] w-full items-center justify-center text-center text-[20px] font-bold leading-tight text-white drop-shadow-[0_1px_3px_rgba(0,0,0,0.55)]">
             {item.name}
           </p>
         </div>
