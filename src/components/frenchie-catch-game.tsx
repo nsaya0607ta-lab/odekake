@@ -235,6 +235,7 @@ const POOP_FLOOD_FALL_SPEED = 6;
 const TREASURE_POOP_FLOOD_COUNT = 15;
 const DOG_FLOOD_ITEM_ID = "other_listen_to_the_a";
 const DOG_FLOOD_SPAWN_RATE = 4;
+const DOG_FLOOD_FALL_SPEED = 2.5;
 const TREASURE_MINUS5_SEC = 5;
 const TREASURE_MINUS10_SEC = 10;
 const DEFAULT_ITEM_SPAWN_WEIGHT = 100;
@@ -430,6 +431,7 @@ export function FrenchieCatchGame({ ownedItems }: { ownedItems: FrenchieCatchIte
         image: "/characters/default/front.webp",
         rarity: null,
         level: 0,
+        vy: rawVy * DOG_FLOOD_FALL_SPEED,
         size: 19,
         spin: (Math.random() - 0.5) * 20,
       };
