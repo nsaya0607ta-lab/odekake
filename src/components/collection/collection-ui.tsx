@@ -118,7 +118,7 @@ export function ItemCard({
       ) : null}
 
       <div className="relative z-[1] flex h-full w-full flex-col items-center px-[7%] pt-[16%] pb-[7%]">
-        <span className="mt-[2%] flex h-[43%] w-[64%] shrink-0 items-center justify-center">
+        <span className="mt-[calc(2%+20px)] flex h-[43%] w-[64%] shrink-0 items-center justify-center">
           {useExactSilhouette ? (
             <ExactSilhouette art={item.art} />
           ) : (
@@ -205,7 +205,7 @@ function ItemPreviewModal({ item, onClose }: { item: CollectionItem; onClose: ()
         </button>
 
         <div className="relative z-[1] flex h-full w-full flex-col items-center px-[8%] pt-[16%] pb-[8%]">
-          <div className="mt-[2%] flex h-[52%] w-[72%] shrink-0 items-center justify-center">
+          <div className="mt-[calc(2%+20px)] flex h-[52%] w-[72%] shrink-0 items-center justify-center">
             {item.image ? (
               // 元画像を拡大補間しすぎないよう、実画像をobject-containで表示する。
               // eslint-disable-next-line @next/next/no-img-element
