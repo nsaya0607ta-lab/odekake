@@ -28,6 +28,7 @@ export const ITEM_CATCH_SKILLS: readonly ItemCatchSkill[] = [
   { id: "food_paw_bowl", levels: ["次の3個 +5pt", "次の3個 +7pt", "次の3個 +10pt", "次の3個 +13pt", "次の3個 +15pt"] },
   { id: "food_paw_pudding", levels: ["+15pt", "+20pt", "+30pt", "+40pt", "+50pt"] },
   { id: "food_paw_melon_bread", levels: ["+2秒 +5pt", "+3秒 +10pt", "+4秒 +15pt", "+5秒 +20pt", "+6秒 +30pt"] },
+  { id: "interior_stretch_rod", levels: ["3秒間 その他×0.5", "3秒間 その他×0.4", "3秒間 その他×0.3", "3秒間 その他×0.2", "3秒間 その他×0.1"], note: "3秒間、カテゴリーが「その他」のキャラの出現重みを下げる。Lvが上がるほど効果が強くなる" },
 
   // --- SR --------------------------------------------------------
   { id: "toy_treasure_puzzle", levels: ["+20pt / +40pt / +3秒", "+25pt / +50pt / +4秒", "+30pt / +60pt / +5秒", "+40pt / +80pt / +6秒", "+50pt / +100pt / +8秒"], note: "7つのうちどれか1つがランダムで出る（+低pt / +高pt / +秒 / うんち祭り15個 / -5秒 / -10秒 / 数秒間アイテム出現量×2）" },
@@ -72,6 +73,7 @@ export const ITEM_CATCH_SKILLS: readonly ItemCatchSkill[] = [
   // --- LR --------------------------------------------------------
   { id: "interior_shikkoku_no_ar", levels: ["8秒間 落下×2 得点×2", "10秒間 落下×2.2 得点×2.2", "12秒間 落下×2.4 得点×2.4", "15秒間 落下×2.6 得点×2.7", "20秒間 落下×3 得点×3"], note: "きのこあずびーの上位版。落下速度と得点倍率が同時にかかる" },
   { id: "interior_ragby_ar", levels: ["5秒間", "6秒間", "7秒間", "9秒間", "12秒間"], note: "その間アイテムが3倍の量で降ってくる" },
+  { id: "other_listen_to_the_a", levels: ["フレブル10体", "フレブル15体", "フレブル20体", "フレブル25体", "フレブル30体"], note: "捕まえると割と一気に初期フレブルが降ってくる（プレイ時間×捕まえた数がスコアになるため大量チャンス）" },
 ];
 
 const SKILL_BY_ID = new Map(ITEM_CATCH_SKILLS.map((skill) => [skill.id, skill]));

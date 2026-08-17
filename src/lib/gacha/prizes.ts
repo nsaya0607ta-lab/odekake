@@ -58,6 +58,7 @@ export const GACHA_PRIZES: readonly GachaPrize[] = [
   { id: "food_honey_butter_toast", name: "はちみつバタートースト", rarity: "N", type: "item", pool: "regular", image: "/collection/items/honey-butter-toast.webp" },
 
   // --- 通常ガチャ：インテリア ----------------------------------------
+  { id: "interior_stretch_rod", name: "ストレッチ棒", rarity: "R", type: "item", pool: "regular", image: "/collection/items/stretch-rod.png" },
   { id: "interior_anball", name: "アンボール", rarity: "UR", type: "item", pool: "regular", image: "/collection/items/anball.webp" },
   { id: "interior_kinoko_azubee", name: "きのこあずびー", rarity: "UR", type: "item", pool: "regular", image: "/collection/items/3365FE0A-4198-4C04-BA73-A7BAC18F73F5.png" },
   { id: "interior_sleepy_moon", name: "おやすみムーン", rarity: "SR", type: "item", pool: "regular", image: "/collection/items/sleepy-moon.webp" },
@@ -82,6 +83,7 @@ export const GACHA_PRIZES: readonly GachaPrize[] = [
   { id: "other_oyatsu_no_jikan", name: "おやつのじかん", rarity: "SSR", type: "item", pool: "regular", image: "/collection/items/oyatsu-no-jikan.webp" },
   { id: "other_jare_a", name: "じゃれアー", rarity: "SSR", type: "item", pool: "regular", image: "/collection/items/jare-a.webp" },
   { id: "other_ketsunade_a", name: "けつなでアー", rarity: "SSR", type: "item", pool: "regular", image: "/collection/items/ketsunade-a.png" },
+  { id: "other_listen_to_the_a", name: "Listen to the a-", rarity: "LR", type: "item", pool: "regular", image: "/collection/items/listen-to-the-a.png" },
   { id: "other_sparkle_rope_crown", name: "きらきらロープクラウン", rarity: "SR", type: "item", pool: "regular", image: "/collection/items/sparkle-rope-crown.webp" },
 
   // --- 通常ガチャ：おでかけ小物 ----------------------------------------

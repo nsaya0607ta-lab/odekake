@@ -4,6 +4,7 @@ import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useRef, useState, type PointerEvent as ReactPointerEvent } from "react";
 import { MAX_SKILL_LEVEL } from "@/lib/gacha/skill-levels";
+import { COLLECTION_ITEMS } from "@/lib/collection/items";
 
 export type FrenchieCatchItem = {
   id: string;
@@ -105,9 +106,8 @@ const STUN_SPAWN_CHANCE = 0.02;
 const STUN_SECONDS = 1;
 const CHOCOLATE_ITEM_ID = "hazard_chocolate_instant_end";
 const CHOCOLATE_IMAGE = "/collection/items/hazard-chocolate-instant-end.webp";
-/** 出現ウェイト50。TIME_MINUS_BASE_WEIGHT(100)=TIME_MINUS_SPAWN_CHANCEを基準に換算 */
-const CHOCOLATE_SPAWN_WEIGHT = 50;
-const CHOCOLATE_SPAWN_CHANCE = TIME_MINUS_SPAWN_CHANCE * (CHOCOLATE_SPAWN_WEIGHT / TIME_MINUS_BASE_WEIGHT);
+/** 出現確率そのものを直接指定（0.20%） */
+const CHOCOLATE_SPAWN_CHANCE = 0.002;
 const NEGATIVE_HAZARD_IDS = new Set([TIME_MINUS_ITEM_ID, BOX_SHRINK_ITEM_ID, BLACKOUT_ITEM_ID, STUN_ITEM_ID, CHOCOLATE_ITEM_ID]);
 const SPAWN_INTERVAL_MIN_MS = 650;
 const SPAWN_INTERVAL_MAX_MS = 780;
@@ -134,14 +134,14 @@ const JUST_MULTIPLIER = 1.25;
 const MYSTERY_SKILL_ITEM_IDS = [
   "toy_soccer_ball", "toy_taiyaki_plush", "toy_bear_plush", "toy_duck_plush", "toy_carrot",
   "toy_frisbee", "food_paw_bowl", "toy_meat", "toy_frenchie_cushion", "toy_treasure_puzzle",
-  "toy_frenchie_plush", "toy_rainbow_ball", "toy_golden_crown_ball", "interior_anball",
+  "toy_frenchie_plush", "toy_rainbow_ball", "toy_golden_crown_ball", "interior_anball", "interior_stretch_rod",
   "other_azubee", "other_omojii", "food_paw_pudding", "food_paw_melon_bread", "food_paw_cupcake",
   "toy_paw_macaron", "food_strawberry_roll_cake", "toy_star_wan_wand", "interior_sleepy_moon",
   "interior_spring_flower_wreath", "other_sparkle_rope_crown", "other_nakayoshi_azubee",
   "other_kamunayo", "hiking_frenchie", "snow_frenchie", "summer_frenchie", "interior_kinoko_azubee",
   "other_komochi", "other_azuki", "other_kobee", "other_hamigaki", "other_ikea", "other_orusuban",
   "other_pondeomo", "other_pondear", "other_kurumari_a", "other_jare_a", "other_ketsunade_a",
-  "interior_shikkoku_no_ar", "interior_ragby_ar", "other_oyatsu_no_jikan",
+  "interior_shikkoku_no_ar", "interior_ragby_ar", "other_oyatsu_no_jikan", "other_listen_to_the_a",
 ];
 
 /** アイテムごとのLv1〜5パラメータ（item_skill_levels_colored.xlsxの「スキル一覧」シート通り） */
@@ -186,6 +186,8 @@ const LV = {
   SUMMER_MULT: [1.5, 1.5, 1.6, 1.7, 1.8],
   ANBALL_PT: [100, 125, 150, 180, 220],
   ANBALL_SEC: [3, 4, 5, 6, 8],
+  STRETCH_ROD_MULT: [0.5, 0.4, 0.3, 0.2, 0.1],
+  LISTEN_DOG_COUNT: [10, 15, 20, 25, 30],
   AZUBEE_SEC: [6, 7, 8, 10, 12],
   AZUBEE_MULT: [2, 2, 2.1, 2.2, 2.5],
   OMOJII_SEC: [7, 13, 16, 17, 19],
@@ -230,13 +232,33 @@ const TREASURE_ITEM_ID = "toy_treasure_puzzle";
 const TREASURE_FALL_SPEED = 4;
 const POOP_FLOOD_FALL_SPEED = 6;
 const TREASURE_POOP_FLOOD_COUNT = 15;
+const DOG_FLOOD_ITEM_ID = "other_listen_to_the_a";
+const DOG_FLOOD_SPAWN_RATE = 4;
+const DOG_FLOOD_FALL_SPEED = 2.5;
 const TREASURE_MINUS5_SEC = 5;
 const TREASURE_MINUS10_SEC = 10;
 const DEFAULT_ITEM_SPAWN_WEIGHT = 100;
+/**
+ * interior_stretch_rod / other_listen_to_the_a の追加でプールが69→71種に増え、
+ * 時間増加系7種の出現確率が Total(69)/Total(71) ≈ ×0.9724 に薄まる。
+ * これを相殺するため、時間増加系7種の重みを Total(71)/Total(69) ≈ ×1.028426 だけ底上げしている。
+ * （minigametimebalance.md「新アイテムが『時間に無関係』でも影響が出る理由」参照）
+ */
 const ITEM_SPAWN_WEIGHTS: Partial<Record<string, number>> = {
   toy_treasure_puzzle: 300,
-  other_omojii: 80,
+  other_omojii: 82.27,
+  toy_duck_plush: 102.84,
+  toy_carrot: 102.84,
+  food_paw_melon_bread: 102.84,
+  interior_anball: 102.84,
+  other_azuki: 102.84,
+  summer_frenchie: 102.84,
 };
+const STRETCH_ROD_ITEM_ID = "interior_stretch_rod";
+const STRETCH_ROD_SECONDS = 3;
+const OTHER_CATEGORY_ITEM_IDS = new Set(
+  COLLECTION_ITEMS.filter((entry) => entry.category === "other").map((entry) => entry.id),
+);
 const DOG_SPAWN_RATIO = 0.28;
 const FRENCHIE_SKIN_IDS = ["hiking_frenchie", "snow_frenchie", "summer_frenchie"];
 const FRENCHIE_SKIN_SPAWN_CHANCE = 0.18;
@@ -326,6 +348,9 @@ export function FrenchieCatchGame({ ownedItems }: { ownedItems: FrenchieCatchIte
   const bagStockRef = useRef(0);
   const spawnRateBoostUntilRef = useRef(0);
   const spawnRateBoostValueRef = useRef(SPAWN_RATE_BOOST);
+  const otherSuppressUntilRef = useRef(0);
+  const otherSuppressValueRef = useRef(1);
+  const dogFloodRemainingRef = useRef(0);
   const slantBoostUntilRef = useRef(0);
   const boxShrinkUntilRef = useRef(0);
   const blackoutUntilRef = useRef(0);
@@ -375,8 +400,10 @@ export function FrenchieCatchGame({ ownedItems }: { ownedItems: FrenchieCatchIte
     if (now < fallSpeedBoostUntilRef.current) labels.push("落下速度アップ中");
     if (now < poopSuppressUntilRef.current) labels.push("うんち出現なし");
     if (poopFloodRemainingRef.current > 0) labels.push(`うんち祭り あと${poopFloodRemainingRef.current}個`);
+    if (dogFloodRemainingRef.current > 0) labels.push(`フレブル大量発生 あと${dogFloodRemainingRef.current}体`);
     if (now < ikeaUntilRef.current) labels.push(`くみたて中 ${ikeaCountRef.current}個`);
     if (now < spawnRateBoostUntilRef.current) labels.push(`アイテム出現量×${spawnRateBoostValueRef.current}中`);
+    if (now < otherSuppressUntilRef.current) labels.push(`その他カテゴリ出現×${otherSuppressValueRef.current}中`);
     if (now < slantBoostUntilRef.current) labels.push("斜め落下中");
     if (now < boxShrinkUntilRef.current) labels.push("ダンボール0.8倍");
     else if (now < boxWideUntilRef.current) labels.push(`ダンボール×${boxWideScaleRef.current}拡大中`);
@@ -404,6 +431,22 @@ export function FrenchieCatchGame({ ownedItems }: { ownedItems: FrenchieCatchIte
       enteredOpening: false,
       ttl: 0,
     };
+
+    if (dogFloodRemainingRef.current > 0) {
+      dogFloodRemainingRef.current -= 1;
+      return {
+        ...base,
+        itemId: null,
+        kind: "dog",
+        name: "初期フレブル",
+        image: "/characters/default/front.webp",
+        rarity: null,
+        level: 0,
+        vy: rawVy * DOG_FLOOD_FALL_SPEED,
+        size: 19,
+        spin: (Math.random() - 0.5) * 20,
+      };
+    }
 
     if (poopFloodRemainingRef.current > 0) {
       poopFloodRemainingRef.current -= 1;
@@ -491,9 +534,15 @@ export function FrenchieCatchGame({ ownedItems }: { ownedItems: FrenchieCatchIte
     }
 
     const urBoostFactor = 1 + Math.min(urBoostRef.current, UR_BOOST_MAX) / 100;
+    const otherSuppressActive = performance.now() < otherSuppressUntilRef.current;
     const weightedItems = itemPool.map((item) => ({
       item,
-      weight: (ITEM_SPAWN_WEIGHTS[item.id] ?? DEFAULT_ITEM_SPAWN_WEIGHT) * (item.rarity === "UR" ? urBoostFactor : 1),
+      weight:
+        (ITEM_SPAWN_WEIGHTS[item.id] ?? DEFAULT_ITEM_SPAWN_WEIGHT) *
+        (item.rarity === "UR" ? urBoostFactor : 1) *
+        (otherSuppressActive && item.id !== STRETCH_ROD_ITEM_ID && OTHER_CATEGORY_ITEM_IDS.has(item.id)
+          ? otherSuppressValueRef.current
+          : 1),
     }));
     const itemWeightTotal = weightedItems.reduce((sum, entry) => sum + entry.weight, 0);
     const dogWeight = itemPool.length * DEFAULT_ITEM_SPAWN_WEIGHT * (DOG_SPAWN_RATIO / (1 - DOG_SPAWN_RATIO));
@@ -655,7 +704,9 @@ export function FrenchieCatchGame({ ownedItems }: { ownedItems: FrenchieCatchIte
 
       const dt = Math.min(0.035, Math.max(0, (now - last) / 1000));
       last = now;
-      const spawnRate = poopFloodRemainingRef.current > 0
+      const spawnRate = dogFloodRemainingRef.current > 0
+        ? DOG_FLOOD_SPAWN_RATE
+        : poopFloodRemainingRef.current > 0
         ? POOP_FLOOD_SPAWN_RATE
         : now < spawnRateBoostUntilRef.current ? spawnRateBoostValueRef.current : 1;
       const entityCap = spawnRate >= 3 ? TRIPLE_ENTITY_CAP : spawnRate >= 2 ? DOUBLE_ENTITY_CAP : NORMAL_ENTITY_CAP;
@@ -1026,6 +1077,17 @@ export function FrenchieCatchGame({ ownedItems }: { ownedItems: FrenchieCatchIte
                 effectLabel = `+${LV.ANBALL_PT[lv]}pt / +${applied}秒${lvTag}`;
                 break;
               }
+              case STRETCH_ROD_ITEM_ID:
+                otherSuppressUntilRef.current = now + STRETCH_ROD_SECONDS * 1000;
+                otherSuppressValueRef.current = LV.STRETCH_ROD_MULT[lv]!;
+                effectLabel = `${STRETCH_ROD_SECONDS}秒間 その他×${LV.STRETCH_ROD_MULT[lv]}${lvTag}`;
+                statusChanged = true;
+                break;
+              case DOG_FLOOD_ITEM_ID:
+                dogFloodRemainingRef.current += LV.LISTEN_DOG_COUNT[lv]!;
+                effectLabel = `フレブル${LV.LISTEN_DOG_COUNT[lv]}体 大量発生${lvTag}`;
+                statusChanged = true;
+                break;
               case "other_azubee":
                 multiplier2UntilRef.current = now + LV.AZUBEE_SEC[lv]! * 1000;
                 multiplier2ValueRef.current = LV.AZUBEE_MULT[lv]!;
@@ -1398,6 +1460,9 @@ export function FrenchieCatchGame({ ownedItems }: { ownedItems: FrenchieCatchIte
     ikeaUntilRef.current = 0;
     ikeaCountRef.current = 0;
     spawnRateBoostUntilRef.current = 0;
+    otherSuppressUntilRef.current = 0;
+    otherSuppressValueRef.current = 1;
+    dogFloodRemainingRef.current = 0;
     slantBoostUntilRef.current = 0;
     boxShrinkUntilRef.current = 0;
     blackoutUntilRef.current = 0;
