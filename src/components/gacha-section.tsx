@@ -40,7 +40,7 @@ const RARITY_FRAME_PATHS: Record<GachaRarity, string> = {
   SR: "/collection/rarity-frames/sr.webp",
   SSR: "/collection/rarity-frames/ssr.webp",
   UR: "/collection/rarity-frames/ur.webp",
-  LR: "/collection/rarity-frames/lr.webp",
+  LR: "/collection/rarity-frames/lr-v2.webp",
   MR: "/collection/rarity-frames/mr.webp",
 };
 
