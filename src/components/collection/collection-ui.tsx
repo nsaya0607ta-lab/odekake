@@ -75,6 +75,20 @@ const RARITY_FRAME_SCALE: Record<GachaRarity, string> = {
 };
 
 /**
+ * カード上の文字色。デフォルトは白だが、背景が明るいR・SSRだけ
+ * 濃い青にして視認性を確保する。
+ */
+const RARITY_TEXT_CLASS: Record<GachaRarity, string> = {
+  N: "text-white",
+  R: "text-[#0b2a63]",
+  SR: "text-white",
+  SSR: "text-[#0b2a63]",
+  UR: "text-white",
+  LR: "text-white",
+  MR: "text-white",
+};
+
+/**
  * 1マス。
  * owned は「その図鑑の持ち主が所持しているか」、revealed は「閲覧者に中身を見せてよいか」。
  * フレンド図鑑では、相手が所持していても自分が未所持ならシークレットのまま回数だけ表示できる。
@@ -130,7 +144,7 @@ export function ItemCard({
           }`}
         >
           {isRevealed ? (
-            <span className="rounded-full bg-black/35 px-2 py-0.5 text-white">{item.name}</span>
+            <span className={RARITY_TEXT_CLASS[item.rarity]}>{item.name}</span>
           ) : (
             "???"
           )}
@@ -215,17 +229,23 @@ function ItemPreviewModal({ item, count, onClose }: { item: CollectionItem; coun
             )}
           </div>
 
-          <p className="mt-[5%] flex min-h-[14%] w-full items-center justify-center text-center text-[20px] font-bold leading-tight text-white drop-shadow-[0_1px_3px_rgba(0,0,0,0.55)]">
+          <p
+            className={`mt-[5%] flex min-h-[14%] w-full items-center justify-center text-center text-[20px] font-bold leading-tight ${RARITY_TEXT_CLASS[item.rarity]}`}
+          >
             {item.name}
           </p>
 
-          <p className="mt-[2%] text-center text-[12px] font-semibold leading-none tabular-nums text-white drop-shadow-[0_1px_2px_rgba(0,0,0,0.55)]">
+          <p
+            className={`mt-[2%] text-center text-[12px] font-semibold leading-none tabular-nums ${RARITY_TEXT_CLASS[item.rarity]}`}
+          >
             出た回数 {drawCount}回
           </p>
 
           {skillLevelLabel ? (
-            <p className="mt-[2%] flex items-center gap-1.5 text-center text-[11px] font-bold leading-none text-white drop-shadow-[0_1px_2px_rgba(0,0,0,0.55)]">
-              <span className="rounded-full bg-black/35 px-2 py-0.5">{skillLevelLabel}</span>
+            <p
+              className={`mt-[2%] flex items-center gap-1.5 text-center text-[11px] font-bold leading-none ${RARITY_TEXT_CLASS[item.rarity]}`}
+            >
+              <span>{skillLevelLabel}</span>
               {nextLevelRemaining !== null ? <span>次まであと{nextLevelRemaining}</span> : null}
             </p>
           ) : null}
