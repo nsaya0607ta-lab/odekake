@@ -628,6 +628,8 @@ export function FrenchieCatchGame({ ownedItems }: { ownedItems: FrenchieCatchIte
   useEffect(() => {
     if (phase !== "playing" || performance.now() < stunUntilRef.current) return;
     let last = performance.now();
+    let lastRender = 0;
+    const RENDER_INTERVAL_MS = 1000 / 30;
 
     /** いつものフレブル(N)を取った回数×プレイ時間(秒)を最後にまとめて加算する（小数点切り捨て） */
     const finishRound = (now: number) => {
@@ -1372,7 +1374,10 @@ export function FrenchieCatchGame({ ownedItems }: { ownedItems: FrenchieCatchIte
       }
 
       entitiesRef.current = next;
-      setEntities([...next]);
+      if (now - lastRender >= RENDER_INTERVAL_MS) {
+        lastRender = now;
+        setEntities([...next]);
+      }
       rafRef.current = requestAnimationFrame(frame);
     };
 
@@ -1589,7 +1594,8 @@ export function FrenchieCatchGame({ ownedItems }: { ownedItems: FrenchieCatchIte
           const topZoneHidden = entity.y < topZoneHiddenY;
           return (
           <div key={entity.id} className={`absolute ${entity.enteredOpening && entity.status !== "bounced" ? "z-40" : "z-20"} will-change-transform ${topZoneHidden ? "opacity-0" : "opacity-100"} ${entity.rarity ? RARITY_STYLE[entity.rarity] : "drop-shadow-[0_5px_7px_rgba(75,58,43,0.22)]"}`} style={{ left: `${entity.x}%`, top: `${entity.y}%`, width: `${entity.size}%`, transform: `translate(-50%, -50%) rotate(${entity.rotation}deg)` }}>
-            <Image src={entity.image} alt="" width={160} height={160} draggable={false} className="h-auto w-full object-contain" />
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src={entity.image} alt="" draggable={false} className="h-auto w-full object-contain" />
             {entity.rarity === "UR" ? <span className="absolute -inset-2 -z-10 animate-pulse rounded-full bg-[#e95c4d]/15 blur-md" /> : null}
             {entity.rarity === "LR" ? <span className="absolute -inset-3 -z-10 animate-pulse rounded-full bg-[#e6b43c]/25 blur-lg" /> : null}
           </div>
