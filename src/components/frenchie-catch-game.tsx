@@ -380,6 +380,16 @@ export function FrenchieCatchGame({ ownedItems }: { ownedItems: FrenchieCatchIte
   const [rewardError, setRewardError] = useState<string | null>(null);
 
   const itemPool = useMemo(() => ownedItems.filter((item) => item.image.length > 0), [ownedItems]);
+  const baseItemWeights = useMemo(
+    () =>
+      itemPool.map((item) => ({
+        item,
+        baseWeight: ITEM_SPAWN_WEIGHTS[item.id] ?? DEFAULT_ITEM_SPAWN_WEIGHT,
+        isUR: item.rarity === "UR",
+        isOtherSuppressible: item.id !== STRETCH_ROD_ITEM_ID && OTHER_CATEGORY_ITEM_IDS.has(item.id),
+      })),
+    [itemPool],
+  );
   const itemLevelByIdRef = useRef<Map<string, number>>(new Map());
   useEffect(() => {
     itemLevelByIdRef.current = new Map(ownedItems.map((item) => [item.id, item.level]));
@@ -535,16 +545,11 @@ export function FrenchieCatchGame({ ownedItems }: { ownedItems: FrenchieCatchIte
 
     const urBoostFactor = 1 + Math.min(urBoostRef.current, UR_BOOST_MAX) / 100;
     const otherSuppressActive = performance.now() < otherSuppressUntilRef.current;
-    const weightedItems = itemPool.map((item) => ({
-      item,
-      weight:
-        (ITEM_SPAWN_WEIGHTS[item.id] ?? DEFAULT_ITEM_SPAWN_WEIGHT) *
-        (item.rarity === "UR" ? urBoostFactor : 1) *
-        (otherSuppressActive && item.id !== STRETCH_ROD_ITEM_ID && OTHER_CATEGORY_ITEM_IDS.has(item.id)
-          ? otherSuppressValueRef.current
-          : 1),
-    }));
-    const itemWeightTotal = weightedItems.reduce((sum, entry) => sum + entry.weight, 0);
+    const otherSuppressMultiplier = otherSuppressActive ? otherSuppressValueRef.current : 1;
+    const weightOf = (entry: (typeof baseItemWeights)[number]) =>
+      entry.baseWeight * (entry.isUR ? urBoostFactor : 1) * (entry.isOtherSuppressible ? otherSuppressMultiplier : 1);
+    let itemWeightTotal = 0;
+    for (const entry of baseItemWeights) itemWeightTotal += weightOf(entry);
     const dogWeight = itemPool.length * DEFAULT_ITEM_SPAWN_WEIGHT * (DOG_SPAWN_RATIO / (1 - DOG_SPAWN_RATIO));
     let roll = Math.random() * (dogWeight + itemWeightTotal);
 
@@ -579,9 +584,9 @@ export function FrenchieCatchGame({ ownedItems }: { ownedItems: FrenchieCatchIte
     }
 
     roll -= dogWeight;
-    let item = weightedItems[weightedItems.length - 1]!.item;
-    for (const entry of weightedItems) {
-      roll -= entry.weight;
+    let item = baseItemWeights[baseItemWeights.length - 1]!.item;
+    for (const entry of baseItemWeights) {
+      roll -= weightOf(entry);
       if (roll <= 0) {
         item = entry.item;
         break;
@@ -600,7 +605,7 @@ export function FrenchieCatchGame({ ownedItems }: { ownedItems: FrenchieCatchIte
       size: 12.5 + Math.random() * 3.5,
       spin: (Math.random() - 0.5) * 65,
     };
-  }, [itemPool]);
+  }, [itemPool, baseItemWeights]);
 
   const showCatch = useCallback((entity: Entity, points: number, effect?: string) => {
     setFeedback({ name: entity.name, points, effect });
