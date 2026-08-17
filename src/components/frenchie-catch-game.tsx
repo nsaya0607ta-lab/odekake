@@ -10,7 +10,7 @@ export type FrenchieCatchItem = {
   id: string;
   name: string;
   image: string;
-  rarity: "N" | "R" | "SR" | "SSR" | "UR" | "LR";
+  rarity: "N" | "R" | "SR" | "SSR" | "UR" | "LR" | "MR";
   /** スキルレベル(1〜5)。Nや未所持は0。user_gacha_items.countから判定済みの値を渡す。 */
   level: number;
 };
@@ -216,12 +216,13 @@ const LV = {
   RAGBY_SEC: [5, 6, 7, 9, 12],
   OYATSU_PT: [80, 100, 120, 140, 180],
   KETSUNADE_SEC: [4, 5, 6, 8, 10],
+  BUREBUR_SEC: [4, 5, 6, 8, 10],
 } as const;
 const SPAWN_RATE_BOOST = 2;
 const SLANT_VX_BOOST = 3.5;
 const RAGBY_SPAWN_RATE_BOOST = 3;
-const POINTS: Record<FrenchieCatchItem["rarity"], number> = { N: 10, R: 20, SR: 40, SSR: 70, UR: 100, LR: 150 };
-const RARITY_FALL_SPEED: Record<FrenchieCatchItem["rarity"], number> = { N: 1, R: 1.08, SR: 1.18, SSR: 1.32, UR: 1.5, LR: 1.75 };
+const POINTS: Record<FrenchieCatchItem["rarity"], number> = { N: 10, R: 20, SR: 40, SSR: 70, UR: 100, LR: 150, MR: 220 };
+const RARITY_FALL_SPEED: Record<FrenchieCatchItem["rarity"], number> = { N: 1, R: 1.08, SR: 1.18, SSR: 1.32, UR: 1.5, LR: 1.75, MR: 2 };
 /** 時間が増えるスキルを持つアイテムだけ、落下速度をレアリティ別倍率で上げる */
 const TIME_BONUS_ITEM_IDS = new Set([
   "toy_duck_plush", "toy_carrot", "food_paw_melon_bread",
@@ -256,6 +257,9 @@ const ITEM_SPAWN_WEIGHTS: Partial<Record<string, number>> = {
 };
 const STRETCH_ROD_ITEM_ID = "interior_stretch_rod";
 const STRETCH_ROD_SECONDS = 3;
+const BUREBUR_ITEM_ID = "other_burebur";
+/** ブレブルの効果中、このレアリティ以外のアイテムは出現しなくなる */
+const HIGH_RARITY_LOCK_RARITIES = new Set<FrenchieCatchItem["rarity"]>(["SSR", "UR", "LR"]);
 const OTHER_CATEGORY_ITEM_IDS = new Set(
   COLLECTION_ITEMS.filter((entry) => entry.category === "other").map((entry) => entry.id),
 );
@@ -269,6 +273,7 @@ const RARITY_STYLE: Record<FrenchieCatchItem["rarity"], string> = {
   SSR: "drop-shadow-[0_0_13px_rgba(177,112,220,0.78)]",
   UR: "drop-shadow-[0_0_16px_rgba(201,66,55,0.92)]",
   LR: "drop-shadow-[0_0_20px_rgba(230,180,60,0.95)]",
+  MR: "drop-shadow-[0_0_22px_rgba(90,110,255,0.95)]",
 };
 
 function clamp(value: number, min: number, max: number) {
@@ -350,6 +355,7 @@ export function FrenchieCatchGame({ ownedItems }: { ownedItems: FrenchieCatchIte
   const spawnRateBoostValueRef = useRef(SPAWN_RATE_BOOST);
   const otherSuppressUntilRef = useRef(0);
   const otherSuppressValueRef = useRef(1);
+  const highRarityLockUntilRef = useRef(0);
   const dogFloodRemainingRef = useRef(0);
   const slantBoostUntilRef = useRef(0);
   const boxShrinkUntilRef = useRef(0);
@@ -404,6 +410,7 @@ export function FrenchieCatchGame({ ownedItems }: { ownedItems: FrenchieCatchIte
     if (now < ikeaUntilRef.current) labels.push(`くみたて中 ${ikeaCountRef.current}個`);
     if (now < spawnRateBoostUntilRef.current) labels.push(`アイテム出現量×${spawnRateBoostValueRef.current}中`);
     if (now < otherSuppressUntilRef.current) labels.push(`その他カテゴリ出現×${otherSuppressValueRef.current}中`);
+    if (now < highRarityLockUntilRef.current) labels.push("SSR/UR/LRのみ出現中");
     if (now < slantBoostUntilRef.current) labels.push("斜め落下中");
     if (now < boxShrinkUntilRef.current) labels.push("ダンボール0.8倍");
     else if (now < boxWideUntilRef.current) labels.push(`ダンボール×${boxWideScaleRef.current}拡大中`);
@@ -535,6 +542,7 @@ export function FrenchieCatchGame({ ownedItems }: { ownedItems: FrenchieCatchIte
 
     const urBoostFactor = 1 + Math.min(urBoostRef.current, UR_BOOST_MAX) / 100;
     const otherSuppressActive = performance.now() < otherSuppressUntilRef.current;
+    const highRarityLockActive = performance.now() < highRarityLockUntilRef.current;
     const weightedItems = itemPool.map((item) => ({
       item,
       weight:
@@ -542,7 +550,8 @@ export function FrenchieCatchGame({ ownedItems }: { ownedItems: FrenchieCatchIte
         (item.rarity === "UR" ? urBoostFactor : 1) *
         (otherSuppressActive && item.id !== STRETCH_ROD_ITEM_ID && OTHER_CATEGORY_ITEM_IDS.has(item.id)
           ? otherSuppressValueRef.current
-          : 1),
+          : 1) *
+        (highRarityLockActive && !HIGH_RARITY_LOCK_RARITIES.has(item.rarity) ? 0 : 1),
     }));
     const itemWeightTotal = weightedItems.reduce((sum, entry) => sum + entry.weight, 0);
     const dogWeight = itemPool.length * DEFAULT_ITEM_SPAWN_WEIGHT * (DOG_SPAWN_RATIO / (1 - DOG_SPAWN_RATIO));
@@ -1083,6 +1092,11 @@ export function FrenchieCatchGame({ ownedItems }: { ownedItems: FrenchieCatchIte
                 effectLabel = `${STRETCH_ROD_SECONDS}秒間 その他×${LV.STRETCH_ROD_MULT[lv]}${lvTag}`;
                 statusChanged = true;
                 break;
+              case BUREBUR_ITEM_ID:
+                highRarityLockUntilRef.current = now + LV.BUREBUR_SEC[lv]! * 1000;
+                effectLabel = `${LV.BUREBUR_SEC[lv]}秒間 SSR/UR/LRのみ出現${lvTag}`;
+                statusChanged = true;
+                break;
               case DOG_FLOOD_ITEM_ID:
                 dogFloodRemainingRef.current += LV.LISTEN_DOG_COUNT[lv]!;
                 effectLabel = `フレブル${LV.LISTEN_DOG_COUNT[lv]}体 大量発生${lvTag}`;
@@ -1462,6 +1476,7 @@ export function FrenchieCatchGame({ ownedItems }: { ownedItems: FrenchieCatchIte
     spawnRateBoostUntilRef.current = 0;
     otherSuppressUntilRef.current = 0;
     otherSuppressValueRef.current = 1;
+    highRarityLockUntilRef.current = 0;
     dogFloodRemainingRef.current = 0;
     slantBoostUntilRef.current = 0;
     boxShrinkUntilRef.current = 0;

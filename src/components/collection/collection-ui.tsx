@@ -54,6 +54,7 @@ const RARITY_FRAME_PATHS: Record<GachaRarity, string> = {
   SSR: "/collection/rarity-frames/ssr.webp",
   UR: "/collection/rarity-frames/ur.webp",
   LR: "/collection/rarity-frames/lr.webp",
+  MR: "/collection/rarity-frames/mr.webp",
 };
 
 /**
@@ -70,6 +71,7 @@ const RARITY_FRAME_SCALE: Record<GachaRarity, string> = {
   SSR: "scale(1)",
   UR: "scale(1)",
   LR: "scale(1)",
+  MR: "scale(1)",
 };
 
 /**
@@ -96,7 +98,7 @@ export function ItemCard({
   const showCount = owned && (isRevealed || showCountWhenHidden);
   const skillLevelLabel = isRevealed ? formatSkillLevel(item.rarity, drawCount) : null;
   const nextLevelRemaining = isRevealed ? getNextLevelRemaining(item.rarity, drawCount) : null;
-  const isBrightFrame = isRevealed && (item.rarity === "UR" || item.rarity === "LR");
+  const isBrightFrame = isRevealed && (item.rarity === "UR" || item.rarity === "LR" || item.rarity === "MR");
 
   return (
     <div

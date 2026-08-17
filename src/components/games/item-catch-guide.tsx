@@ -31,8 +31,8 @@ export type GuideSkill = {
 // ---------------------------------------------------------------
 // 得点の試算
 // ---------------------------------------------------------------
-const BASE_POINTS: Record<GachaRarity, number> = { N: 10, R: 20, SR: 40, SSR: 70, UR: 100, LR: 150 };
-const SIM_RARITIES: GachaRarity[] = ["N", "R", "SR", "SSR", "UR", "LR"];
+const BASE_POINTS: Record<GachaRarity, number> = { N: 10, R: 20, SR: 40, SSR: 70, UR: 100, LR: 150, MR: 220 };
+const SIM_RARITIES: GachaRarity[] = ["N", "R", "SR", "SSR", "UR", "LR", "MR"];
 const SIM_MULTIPLIERS = [1, 1.5, 2, 2.5, 3];
 const JUST_MULTIPLIER = 1.25;
 
@@ -135,7 +135,7 @@ function PickButton({
 // ---------------------------------------------------------------
 // スキル一覧
 // ---------------------------------------------------------------
-const RARITY_TABS: (GachaRarity | "all")[] = ["all", "R", "SR", "SSR", "UR", "LR"];
+const RARITY_TABS: (GachaRarity | "all")[] = ["all", "R", "SR", "SSR", "UR", "LR", "MR"];
 
 export function SkillCatalog({ skills, total }: { skills: GuideSkill[]; total: number }) {
   const [rarity, setRarity] = useState<GachaRarity | "all">("all");

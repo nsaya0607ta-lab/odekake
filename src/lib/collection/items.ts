@@ -162,6 +162,9 @@ const CURATED_ITEMS: readonly CollectionItem[] = [
   { id: "other_ketsunade_a", name: "けつなでアー", image: "/collection/items/ketsunade-a.png", category: "other", series: null, rarity: "SSR" },
   { id: "other_listen_to_the_a", name: "Listen to the a-", image: "/collection/items/listen-to-the-a.png", category: "other", series: null, rarity: "LR" },
 
+  // --- 通常図鑑：MR ----------------------------------------------------
+  { id: "other_burebur", name: "ブレブル", image: "/collection/items/burebur.webp", category: "other", series: null, rarity: "MR" },
+
   // --- 通常図鑑：おでかけ小物 ------------------------------------------
   { id: "other_yellow_rain_boots", name: "きいろのながぐつ", image: "/collection/items/yellow-rain-boots.webp", category: "other", series: null, rarity: "N" },
   { id: "accessory_red_bandana", name: "あかいバンダナ", image: "/collection/items/red-bandana.webp", category: "accessory", series: null, rarity: "N" },
@@ -208,4 +211,4 @@ export function countOwned(items: readonly CollectionItem[], owned: ReadonlySet<
   return items.reduce((count, item) => (owned.has(item.id) ? count + 1 : count), 0);
 }
 
-export const RARITY_STARS: Record<GachaRarity, number> = { N: 1, R: 2, SR: 3, SSR: 4, UR: 5, LR: 6 };
+export const RARITY_STARS: Record<GachaRarity, number> = { N: 1, R: 2, SR: 3, SSR: 4, UR: 5, LR: 6, MR: 7 };

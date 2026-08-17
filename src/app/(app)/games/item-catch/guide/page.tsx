@@ -19,6 +19,7 @@ const SCORE_CARDS = [
   ["SSR", "70pt", "bg-gradient-to-br from-[#f4ddff] via-[#dff4ff] to-[#fff0c9] border-[#d9c4e8] text-[#6b568a] shadow-[0_5px_14px_rgba(120,95,170,0.10)]"],
   ["UR", "100pt", "bg-gradient-to-br from-[#ffebe8] via-[#f7b5ab] to-[#c9362e] border-[#b72b24] text-[#7f1713] shadow-[0_6px_16px_rgba(182,45,38,0.22)]"],
   ["LR", "150pt", "bg-gradient-to-br from-[#2c2924] via-[#12110f] to-[#050505] border-[#c8a34b] text-[#f0cf72] shadow-[0_7px_18px_rgba(0,0,0,0.28),inset_0_0_0_1px_rgba(240,207,114,0.16)]"],
+  ["MR", "220pt", "bg-gradient-to-br from-[#151a4d] via-[#1f2470] to-[#3a2f7a] border-[#c9a53f] text-[#ffe9a8] shadow-[0_7px_18px_rgba(20,20,70,0.35),inset_0_0_0_1px_rgba(255,233,168,0.18)]"],
   ["わんこ", "15pt", "bg-gradient-to-br from-[#fbf4e9] to-[#efe1cc] border-[#ddc9aa] text-[#735b3d]"],
   ["？", "10pt〜", "bg-gradient-to-br from-[#f5f2ec] to-[#e7e1d8] border-[#d2c8ba] text-[#625b52]"],
 ] as const;
@@ -159,7 +160,7 @@ export default async function ItemCatchGuidePage() {
             <table className="w-full border-collapse text-[11px]">
               <thead><tr>{["レア", "Lv1", "Lv2", "Lv3", "Lv4", "MAX"].map((head) => <th key={head} className="border-b border-[#d9cba9] px-1 py-1.5 text-center text-[9px] font-black text-[#88754d] first:text-left">{head}</th>)}</tr></thead>
               <tbody>
-                {[["R", 1, 12, 30, 55, 90],["SR", 1, 6, 14, 25, 40],["SSR", 1, 4, 9, 16, 26],["UR", 1, 3, 5, 9, 15],["LR", 1, 2, 3, 5, 8]].map((row) => (
+                {[["R", 1, 12, 30, 55, 90],["SR", 1, 6, 14, 25, 40],["SSR", 1, 4, 9, 16, 26],["UR", 1, 3, 5, 9, 15],["LR", 1, 2, 3, 5, 8],["MR", 1, 2, 3, 4, 6]].map((row) => (
                   <tr key={String(row[0])}>{row.map((cell, index) => <td key={index} className="border-b border-[#ebe3d2] px-1 py-1.5 text-center font-bold tabular-nums text-[#443a2e] last:border-b-0 first:text-left first:font-black">{cell}</td>)}</tr>
                 ))}
               </tbody>
