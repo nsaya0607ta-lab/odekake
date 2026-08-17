@@ -239,9 +239,21 @@ const DOG_FLOOD_FALL_SPEED = 2.5;
 const TREASURE_MINUS5_SEC = 5;
 const TREASURE_MINUS10_SEC = 10;
 const DEFAULT_ITEM_SPAWN_WEIGHT = 100;
+/**
+ * interior_stretch_rod / other_listen_to_the_a の追加でプールが69→71種に増え、
+ * 時間増加系7種の出現確率が Total(69)/Total(71) ≈ ×0.9724 に薄まる。
+ * これを相殺するため、時間増加系7種の重みを Total(71)/Total(69) ≈ ×1.028426 だけ底上げしている。
+ * （minigametimebalance.md「新アイテムが『時間に無関係』でも影響が出る理由」参照）
+ */
 const ITEM_SPAWN_WEIGHTS: Partial<Record<string, number>> = {
   toy_treasure_puzzle: 300,
-  other_omojii: 80,
+  other_omojii: 82.27,
+  toy_duck_plush: 102.84,
+  toy_carrot: 102.84,
+  food_paw_melon_bread: 102.84,
+  interior_anball: 102.84,
+  other_azuki: 102.84,
+  summer_frenchie: 102.84,
 };
 const STRETCH_ROD_ITEM_ID = "interior_stretch_rod";
 const STRETCH_ROD_SECONDS = 3;
