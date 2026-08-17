@@ -315,7 +315,6 @@ export function FrenchieCatchGame({ ownedItems }: { ownedItems: FrenchieCatchIte
   const endAtRef = useRef(0);
   const nextSpawnRef = useRef(0);
   const rafRef = useRef<number | null>(null);
-  const renderFrameParityRef = useRef(0);
   const scoreRef = useRef(0);
   const dogCaughtRef = useRef(0);
   const caughtRef = useRef(0);
@@ -1378,10 +1377,7 @@ export function FrenchieCatchGame({ ownedItems }: { ownedItems: FrenchieCatchIte
       }
 
       entitiesRef.current = next;
-      renderFrameParityRef.current = (renderFrameParityRef.current + 1) % 2;
-      if (renderFrameParityRef.current === 0 || next.length === 0) {
-        setEntities([...next]);
-      }
+      setEntities([...next]);
       rafRef.current = requestAnimationFrame(frame);
     };
 
