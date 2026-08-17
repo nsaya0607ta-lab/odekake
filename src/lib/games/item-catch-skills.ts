@@ -73,6 +73,7 @@ export const ITEM_CATCH_SKILLS: readonly ItemCatchSkill[] = [
   // --- LR --------------------------------------------------------
   { id: "interior_shikkoku_no_ar", levels: ["8秒間 落下×2 得点×2", "10秒間 落下×2.2 得点×2.2", "12秒間 落下×2.4 得点×2.4", "15秒間 落下×2.6 得点×2.7", "20秒間 落下×3 得点×3"], note: "きのこあずびーの上位版。落下速度と得点倍率が同時にかかる" },
   { id: "interior_ragby_ar", levels: ["5秒間", "6秒間", "7秒間", "9秒間", "12秒間"], note: "その間アイテムが3倍の量で降ってくる" },
+  { id: "other_listen_to_the_a", levels: ["フレブル10体", "フレブル15体", "フレブル20体", "フレブル25体", "フレブル30体"], note: "捕まえると割と一気に初期フレブルが降ってくる（プレイ時間×捕まえた数がスコアになるため大量チャンス）" },
 ];
 
 const SKILL_BY_ID = new Map(ITEM_CATCH_SKILLS.map((skill) => [skill.id, skill]));

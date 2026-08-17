@@ -142,7 +142,7 @@ const MYSTERY_SKILL_ITEM_IDS = [
   "other_kamunayo", "hiking_frenchie", "snow_frenchie", "summer_frenchie", "interior_kinoko_azubee",
   "other_komochi", "other_azuki", "other_kobee", "other_hamigaki", "other_ikea", "other_orusuban",
   "other_pondeomo", "other_pondear", "other_kurumari_a", "other_jare_a", "other_ketsunade_a",
-  "interior_shikkoku_no_ar", "interior_ragby_ar", "other_oyatsu_no_jikan",
+  "interior_shikkoku_no_ar", "interior_ragby_ar", "other_oyatsu_no_jikan", "other_listen_to_the_a",
 ];
 
 /** アイテムごとのLv1〜5パラメータ（item_skill_levels_colored.xlsxの「スキル一覧」シート通り） */
@@ -188,6 +188,7 @@ const LV = {
   ANBALL_PT: [100, 125, 150, 180, 220],
   ANBALL_SEC: [3, 4, 5, 6, 8],
   STRETCH_ROD_MULT: [0.5, 0.4, 0.3, 0.2, 0.1],
+  LISTEN_DOG_COUNT: [10, 15, 20, 25, 30],
   AZUBEE_SEC: [6, 7, 8, 10, 12],
   AZUBEE_MULT: [2, 2, 2.1, 2.2, 2.5],
   OMOJII_SEC: [7, 13, 16, 17, 19],
@@ -232,6 +233,8 @@ const TREASURE_ITEM_ID = "toy_treasure_puzzle";
 const TREASURE_FALL_SPEED = 4;
 const POOP_FLOOD_FALL_SPEED = 6;
 const TREASURE_POOP_FLOOD_COUNT = 15;
+const DOG_FLOOD_ITEM_ID = "other_listen_to_the_a";
+const DOG_FLOOD_SPAWN_RATE = 4;
 const TREASURE_MINUS5_SEC = 5;
 const TREASURE_MINUS10_SEC = 10;
 const DEFAULT_ITEM_SPAWN_WEIGHT = 100;
@@ -335,6 +338,7 @@ export function FrenchieCatchGame({ ownedItems }: { ownedItems: FrenchieCatchIte
   const spawnRateBoostValueRef = useRef(SPAWN_RATE_BOOST);
   const otherSuppressUntilRef = useRef(0);
   const otherSuppressValueRef = useRef(1);
+  const dogFloodRemainingRef = useRef(0);
   const slantBoostUntilRef = useRef(0);
   const boxShrinkUntilRef = useRef(0);
   const blackoutUntilRef = useRef(0);
@@ -384,6 +388,7 @@ export function FrenchieCatchGame({ ownedItems }: { ownedItems: FrenchieCatchIte
     if (now < fallSpeedBoostUntilRef.current) labels.push("落下速度アップ中");
     if (now < poopSuppressUntilRef.current) labels.push("うんち出現なし");
     if (poopFloodRemainingRef.current > 0) labels.push(`うんち祭り あと${poopFloodRemainingRef.current}個`);
+    if (dogFloodRemainingRef.current > 0) labels.push(`フレブル大量発生 あと${dogFloodRemainingRef.current}体`);
     if (now < ikeaUntilRef.current) labels.push(`くみたて中 ${ikeaCountRef.current}個`);
     if (now < spawnRateBoostUntilRef.current) labels.push(`アイテム出現量×${spawnRateBoostValueRef.current}中`);
     if (now < otherSuppressUntilRef.current) labels.push(`その他カテゴリ出現×${otherSuppressValueRef.current}中`);
@@ -414,6 +419,21 @@ export function FrenchieCatchGame({ ownedItems }: { ownedItems: FrenchieCatchIte
       enteredOpening: false,
       ttl: 0,
     };
+
+    if (dogFloodRemainingRef.current > 0) {
+      dogFloodRemainingRef.current -= 1;
+      return {
+        ...base,
+        itemId: null,
+        kind: "dog",
+        name: "初期フレブル",
+        image: "/characters/default/front.webp",
+        rarity: null,
+        level: 0,
+        size: 19,
+        spin: (Math.random() - 0.5) * 20,
+      };
+    }
 
     if (poopFloodRemainingRef.current > 0) {
       poopFloodRemainingRef.current -= 1;
@@ -671,7 +691,9 @@ export function FrenchieCatchGame({ ownedItems }: { ownedItems: FrenchieCatchIte
 
       const dt = Math.min(0.035, Math.max(0, (now - last) / 1000));
       last = now;
-      const spawnRate = poopFloodRemainingRef.current > 0
+      const spawnRate = dogFloodRemainingRef.current > 0
+        ? DOG_FLOOD_SPAWN_RATE
+        : poopFloodRemainingRef.current > 0
         ? POOP_FLOOD_SPAWN_RATE
         : now < spawnRateBoostUntilRef.current ? spawnRateBoostValueRef.current : 1;
       const entityCap = spawnRate >= 3 ? TRIPLE_ENTITY_CAP : spawnRate >= 2 ? DOUBLE_ENTITY_CAP : NORMAL_ENTITY_CAP;
@@ -1048,6 +1070,11 @@ export function FrenchieCatchGame({ ownedItems }: { ownedItems: FrenchieCatchIte
                 effectLabel = `${STRETCH_ROD_SECONDS}秒間 その他×${LV.STRETCH_ROD_MULT[lv]}${lvTag}`;
                 statusChanged = true;
                 break;
+              case DOG_FLOOD_ITEM_ID:
+                dogFloodRemainingRef.current += LV.LISTEN_DOG_COUNT[lv]!;
+                effectLabel = `フレブル${LV.LISTEN_DOG_COUNT[lv]}体 大量発生${lvTag}`;
+                statusChanged = true;
+                break;
               case "other_azubee":
                 multiplier2UntilRef.current = now + LV.AZUBEE_SEC[lv]! * 1000;
                 multiplier2ValueRef.current = LV.AZUBEE_MULT[lv]!;
@@ -1422,6 +1449,7 @@ export function FrenchieCatchGame({ ownedItems }: { ownedItems: FrenchieCatchIte
     spawnRateBoostUntilRef.current = 0;
     otherSuppressUntilRef.current = 0;
     otherSuppressValueRef.current = 1;
+    dogFloodRemainingRef.current = 0;
     slantBoostUntilRef.current = 0;
     boxShrinkUntilRef.current = 0;
     blackoutUntilRef.current = 0;
