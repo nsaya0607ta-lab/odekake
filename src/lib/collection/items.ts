@@ -132,6 +132,7 @@ const CURATED_ITEMS: readonly CollectionItem[] = [
   { id: "food_honey_butter_toast", name: "はちみつバタートースト", image: "/collection/items/honey-butter-toast.webp", category: "food", series: null, rarity: "N" },
 
   // --- 通常図鑑：インテリア ------------------------------------------
+  { id: "interior_stretch_rod", name: "ストレッチ棒", image: "/collection/items/stretch-rod.png", category: "interior", series: null, rarity: "R" },
   { id: "interior_anball", name: "アンボール", image: "/collection/items/anball.webp", category: "interior", series: null, rarity: "UR" },
   { id: "interior_kinoko_azubee", name: "きのこあずびー", image: "/collection/items/3365FE0A-4198-4C04-BA73-A7BAC18F73F5.png", category: "interior", series: null, rarity: "UR" },
   { id: "interior_sleepy_moon", name: "おやすみムーン", image: "/collection/items/sleepy-moon.webp", category: "interior", series: null, rarity: "SR" },
