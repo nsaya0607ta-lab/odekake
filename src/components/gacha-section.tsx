@@ -41,6 +41,7 @@ const RARITY_FRAME_PATHS: Record<GachaRarity, string> = {
   SSR: "/collection/rarity-frames/ssr.webp",
   UR: "/collection/rarity-frames/ur.webp",
   LR: "/collection/rarity-frames/lr.webp",
+  MR: "/collection/rarity-frames/mr.webp",
 };
 
 /** 全レアリティのフレーム画像とも余白をトリミング済みのため、歪みのない均等倍率にする。 */
@@ -51,10 +52,11 @@ const RARITY_FRAME_SCALE: Record<GachaRarity, string> = {
   SSR: "scale(1)",
   UR: "scale(1)",
   LR: "scale(1)",
+  MR: "scale(1)",
 };
 
 function validRarity(rarity: string): GachaRarity {
-  return (["N", "R", "SR", "SSR", "UR", "LR"] as const).includes(rarity as GachaRarity)
+  return (["N", "R", "SR", "SSR", "UR", "LR", "MR"] as const).includes(rarity as GachaRarity)
     ? (rarity as GachaRarity)
     : "N";
 }
@@ -445,7 +447,14 @@ function Capsule({ result, open = false, large = false }: { result: DrawResult; 
       <svg viewBox="0 0 100 100" className="relative z-[2] h-full w-full overflow-visible drop-shadow-[0_7px_5px_rgba(81,70,49,0.18)]" aria-hidden="true">
         <defs>
           <linearGradient id={gradientId} x1="12" y1="52" x2="88" y2="94" gradientUnits="userSpaceOnUse">
-            {rarity === "LR" ? (
+            {rarity === "MR" ? (
+              <>
+                <stop stopColor="#ffe9a8" />
+                <stop offset="0.32" stopColor="#c9a53f" />
+                <stop offset="0.6" stopColor="#2a2f7a" />
+                <stop offset="1" stopColor="#0c0e33" />
+              </>
+            ) : rarity === "LR" ? (
               <>
                 <stop stopColor="#5c4a1f" />
                 <stop offset="0.48" stopColor="#1a1a1a" />
@@ -484,7 +493,7 @@ function Capsule({ result, open = false, large = false }: { result: DrawResult; 
           <path d="M24 70c5 12 14 17 25 19" fill="none" stroke="white" strokeWidth="5" strokeLinecap="round" opacity=".26" />
         </g>
         <rect x="8" y="47" width="84" height="7" rx="3.5" fill="#fffdf5" fillOpacity=".9" stroke="#8e826c" strokeWidth="1.5" />
-        {(rarity === "SSR" || rarity === "UR" || rarity === "LR") && (
+        {(rarity === "SSR" || rarity === "UR" || rarity === "LR" || rarity === "MR") && (
           <path d="m77 16 2.4 6.2 6.6 2.4-6.6 2.4-2.4 6.2-2.4-6.2-6.6-2.4 6.6-2.4Z" fill="#fff8ce" />
         )}
       </svg>

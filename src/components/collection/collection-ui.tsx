@@ -54,6 +54,7 @@ const RARITY_FRAME_PATHS: Record<GachaRarity, string> = {
   SSR: "/collection/rarity-frames/ssr.webp",
   UR: "/collection/rarity-frames/ur.webp",
   LR: "/collection/rarity-frames/lr.webp",
+  MR: "/collection/rarity-frames/mr.webp",
 };
 
 /**
@@ -70,6 +71,7 @@ const RARITY_FRAME_SCALE: Record<GachaRarity, string> = {
   SSR: "scale(1)",
   UR: "scale(1)",
   LR: "scale(1)",
+  MR: "scale(1)",
 };
 
 /**
@@ -94,10 +96,6 @@ export function ItemCard({
   const useExactSilhouette = !isRevealed && hasExactSilhouette(item.art);
   const drawCount = owned ? Math.max(1, count) : 0;
   const showCount = owned && (isRevealed || showCountWhenHidden);
-  const skillLevelLabel = isRevealed ? formatSkillLevel(item.rarity, drawCount) : null;
-  const nextLevelRemaining = isRevealed ? getNextLevelRemaining(item.rarity, drawCount) : null;
-  const isBrightFrame = isRevealed && (item.rarity === "UR" || item.rarity === "LR");
-
   return (
     <div
       className={`relative aspect-[561/701] w-full overflow-hidden rounded-[16px] transition-shadow ${
@@ -117,8 +115,8 @@ export function ItemCard({
         />
       ) : null}
 
-      <div className="relative z-[1] flex h-full w-full flex-col items-center px-[7%] pt-[14%] pb-[7%]">
-        <span className="flex h-[43%] w-[64%] shrink-0 items-center justify-center">
+      <div className="relative z-[1] flex h-full w-full flex-col items-center px-[7%] pt-[16%] pb-[7%]">
+        <span className="mt-[calc(2%+20px)] flex h-[43%] w-[64%] shrink-0 items-center justify-center">
           {useExactSilhouette ? (
             <ExactSilhouette art={item.art} />
           ) : (
@@ -128,27 +126,19 @@ export function ItemCard({
 
         <span
           className={`mt-[3%] flex min-h-[17%] w-full items-center justify-center line-clamp-2 text-center text-[11px] font-semibold leading-tight ${
-            isRevealed ? (isBrightFrame ? "text-white" : "text-[#514a42]") : "text-ink-faint"
+            isRevealed ? "" : "text-ink-faint"
           }`}
         >
-          {isRevealed ? item.name : "???"}
+          {isRevealed ? (
+            <span className="rounded-full bg-black/35 px-2 py-0.5 text-white">{item.name}</span>
+          ) : (
+            "???"
+          )}
         </span>
 
-        <span
-          className={`mt-[1%] text-center text-[9px] font-semibold leading-none tabular-nums ${
-            showCount ? (isBrightFrame ? "text-white" : "text-[#6d655c]") : "invisible"
-          }`}
-          aria-hidden={!showCount}
-        >
-          出た回数 {drawCount}回
-        </span>
-
-        {skillLevelLabel ? (
-          <span className="mt-[1%] flex items-center gap-1 text-center text-[9px] font-bold leading-none text-[#a67c2d]">
-            <span className="rounded-full bg-[#fff1cf] px-1.5 py-[1px]">{skillLevelLabel}</span>
-            {nextLevelRemaining !== null ? (
-              <span className="text-[#8d8375]">次まであと{nextLevelRemaining}</span>
-            ) : null}
+        {!isRevealed && showCount ? (
+          <span className="mt-[1%] text-center text-[9px] font-semibold leading-none tabular-nums text-ink-faint">
+            出た回数 {drawCount}回
           </span>
         ) : null}
       </div>
@@ -156,7 +146,11 @@ export function ItemCard({
   );
 }
 
-function ItemPreviewModal({ item, onClose }: { item: CollectionItem; onClose: () => void }) {
+function ItemPreviewModal({ item, count, onClose }: { item: CollectionItem; count: number; onClose: () => void }) {
+  const drawCount = Math.max(1, count);
+  const skillLevelLabel = formatSkillLevel(item.rarity, drawCount);
+  const nextLevelRemaining = getNextLevelRemaining(item.rarity, drawCount);
+
   useEffect(() => {
     const previousBodyOverflow = document.body.style.overflow;
     const previousBodyOverscrollBehavior = document.body.style.overscrollBehavior;
@@ -206,8 +200,8 @@ function ItemPreviewModal({ item, onClose }: { item: CollectionItem; onClose: ()
           ×
         </button>
 
-        <div className="relative z-[1] flex h-full w-full flex-col items-center px-[8%] pt-[14%] pb-[8%]">
-          <div className="flex h-[52%] w-[72%] shrink-0 items-center justify-center">
+        <div className="relative z-[1] flex h-full w-full flex-col items-center px-[8%] pt-[16%] pb-[8%]">
+          <div className="mt-[calc(2%+20px)] flex h-[52%] w-[72%] shrink-0 items-center justify-center">
             {item.image ? (
               // 元画像を拡大補間しすぎないよう、実画像をobject-containで表示する。
               // eslint-disable-next-line @next/next/no-img-element
@@ -221,13 +215,20 @@ function ItemPreviewModal({ item, onClose }: { item: CollectionItem; onClose: ()
             )}
           </div>
 
-          <p
-            className={`mt-[5%] flex min-h-[14%] w-full items-center justify-center text-center text-[20px] font-bold leading-tight ${
-              item.rarity === "UR" || item.rarity === "LR" ? "text-white" : "text-[#514a42]"
-            }`}
-          >
+          <p className="mt-[5%] flex min-h-[14%] w-full items-center justify-center text-center text-[20px] font-bold leading-tight text-white drop-shadow-[0_1px_3px_rgba(0,0,0,0.55)]">
             {item.name}
           </p>
+
+          <p className="mt-[2%] text-center text-[12px] font-semibold leading-none tabular-nums text-white drop-shadow-[0_1px_2px_rgba(0,0,0,0.55)]">
+            出た回数 {drawCount}回
+          </p>
+
+          {skillLevelLabel ? (
+            <p className="mt-[2%] flex items-center gap-1.5 text-center text-[11px] font-bold leading-none text-white drop-shadow-[0_1px_2px_rgba(0,0,0,0.55)]">
+              <span className="rounded-full bg-black/35 px-2 py-0.5">{skillLevelLabel}</span>
+              {nextLevelRemaining !== null ? <span>次まであと{nextLevelRemaining}</span> : null}
+            </p>
+          ) : null}
         </div>
       </div>
     </div>
@@ -251,7 +252,7 @@ export function ItemGrid({
   revealedOwned?: ReadonlySet<string>;
   showCountWhenHidden?: boolean;
 }) {
-  const [previewItem, setPreviewItem] = useState<CollectionItem | null>(null);
+  const [previewItem, setPreviewItem] = useState<{ item: CollectionItem; count: number } | null>(null);
 
   if (items.length === 0) {
     return (
@@ -270,12 +271,13 @@ export function ItemGrid({
         {items.map((item) => {
           const isOwned = owned.has(item.id);
           const isRevealed = isOwned && (revealedOwned ? revealedOwned.has(item.id) : true);
+          const itemCount = counts?.get(item.id) ?? (isOwned ? 1 : 0);
           const card = (
             <ItemCard
               item={item}
               owned={isOwned}
               revealed={isRevealed}
-              count={counts?.get(item.id) ?? (isOwned ? 1 : 0)}
+              count={itemCount}
               showCountWhenHidden={showCountWhenHidden}
             />
           );
@@ -285,7 +287,7 @@ export function ItemGrid({
               {isRevealed ? (
                 <button
                   type="button"
-                  onClick={() => setPreviewItem(item)}
+                  onClick={() => setPreviewItem({ item, count: itemCount })}
                   className="block w-full rounded-[16px] text-left active:scale-[0.98]"
                   aria-label={`${item.name}を拡大表示`}
                 >
@@ -299,7 +301,9 @@ export function ItemGrid({
         })}
       </ul>
 
-      {previewItem ? <ItemPreviewModal item={previewItem} onClose={() => setPreviewItem(null)} /> : null}
+      {previewItem ? (
+        <ItemPreviewModal item={previewItem.item} count={previewItem.count} onClose={() => setPreviewItem(null)} />
+      ) : null}
     </>
   );
 }

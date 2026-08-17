@@ -86,6 +86,9 @@ export const GACHA_PRIZES: readonly GachaPrize[] = [
   { id: "other_listen_to_the_a", name: "Listen to the a-", rarity: "LR", type: "item", pool: "regular", image: "/collection/items/listen-to-the-a.png" },
   { id: "other_sparkle_rope_crown", name: "きらきらロープクラウン", rarity: "SR", type: "item", pool: "regular", image: "/collection/items/sparkle-rope-crown.webp" },
 
+  // --- 通常ガチャ：MR --------------------------------------------------
+  { id: "other_burebur", name: "ブレブル", rarity: "MR", type: "item", pool: "regular", image: "/collection/items/burebur.webp" },
+
   // --- 通常ガチャ：おでかけ小物 ----------------------------------------
   { id: "other_yellow_rain_boots", name: "きいろのながぐつ", rarity: "N", type: "item", pool: "regular", image: "/collection/items/yellow-rain-boots.webp" },
   { id: "accessory_red_bandana", name: "あかいバンダナ", rarity: "N", type: "item", pool: "regular", image: "/collection/items/red-bandana.webp" },
