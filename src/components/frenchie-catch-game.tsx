@@ -271,6 +271,7 @@ const ITEM_SPAWN_WEIGHTS: Partial<Record<string, number>> = {
   interior_anball: 86,
   other_azuki: 86,
   summer_frenchie: 86,
+  other_listen_to_the_a: 50,
 };
 const STRETCH_ROD_ITEM_ID = "interior_stretch_rod";
 const STRETCH_ROD_SECONDS = 3;
