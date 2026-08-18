@@ -39,11 +39,11 @@ export function HomeNoticeCard() {
           draggable={false}
           className="pointer-events-none absolute inset-0 h-full w-full select-none"
         />
-        <div className="absolute inset-0 flex items-center gap-1" style={{ paddingLeft: "48%", paddingRight: "8%" }}>
+        <div className="absolute inset-0 flex items-center gap-1" style={{ paddingLeft: "37%", paddingRight: "8%" }}>
           <div className="flex min-w-0 flex-1 flex-col gap-1">
-            <p className="truncate text-sm font-bold text-ink">{summary}</p>
+            <p className="truncate text-base font-bold text-ink">{summary}</p>
             {notices.length > 0 ? (
-              <div className="flex flex-col gap-0.5">
+              <div className="flex flex-col" style={{ gap: 2 }}>
                 {notices.map((notice) => (
                   <p key={notice.id} className="truncate text-xs text-ink-soft">
                     ・{notice.title}
