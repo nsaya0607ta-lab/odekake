@@ -847,7 +847,7 @@ export function FrenchieCatchGame({ ownedItems }: { ownedItems: FrenchieCatchIte
                 const omochiPt = omochiPtValueRef.current;
                 scoreRef.current += omochiPt;
                 setScore(scoreRef.current);
-                showCatch(entity, omochiPt, `おもちだった！ +${omochiPt}pt`);
+                showCatch(entity, omochiPt, `こんどうが守ってくれた！ +${omochiPt}pt`);
               } else if (bagStockRef.current > 0) {
                 bagStockRef.current -= 1;
                 setBagStock(bagStockRef.current);
