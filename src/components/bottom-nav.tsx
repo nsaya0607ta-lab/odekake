@@ -5,12 +5,12 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 
 const ITEMS = [
-  { href: "/home", label: "ホーム", icon: "/icons/navigation/home.png", match: ["/home"] },
-  { href: "/map", label: "地図", icon: "/icons/navigation/map.png", match: ["/map"] },
+  { href: "/home", label: "ホーム", icon: "/icons/navigation/home.webp", match: ["/home"] },
+  { href: "/map", label: "地図", icon: "/icons/navigation/map.webp", match: ["/map"] },
   {
     href: "/add",
     label: "追加",
-    icon: "/icons/navigation/add.png",
+    icon: "/icons/navigation/add.webp",
     // 「行った場所を登録」は追加の主導線なので、記録ではなく追加を選択中にする
     match: ["/add", "/spots/new"],
     center: true,
@@ -18,13 +18,13 @@ const ITEMS = [
   {
     href: "/records",
     label: "記録",
-    icon: "/icons/navigation/records.png",
+    icon: "/icons/navigation/records.webp",
     match: ["/records", "/trips", "/visits", "/spots"],
   },
   {
     href: "/mypage",
     label: "マイページ",
-    icon: "/icons/navigation/mypage.png",
+    icon: "/icons/navigation/mypage.webp",
     match: ["/mypage"],
   },
 ] as const;
