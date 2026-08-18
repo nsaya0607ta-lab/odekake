@@ -1,25 +1,15 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState, type ReactNode, type TouchEvent } from "react";
-import { IconClock, IconMapPin, IconPaw, IconUser } from "@/components/icons";
+import { IconClock, IconFlag, IconMapPin, IconPaw, IconUser, IconUsers } from "@/components/icons";
 import { formatRelativeTimeJa } from "@/lib/date";
 
 const AUTO_ADVANCE_MS = 5000;
 const SWIPE_THRESHOLD_PX = 40;
 
-/** public/home-stats.webp の実ピクセル比（1440×890）。絶対に変えない。 */
-const CARD_RATIO = "1440 / 890";
-const STATS_CARD_SRC = "/home-stats.webp";
-
-/** 絵の中の焼き込み文字の位置に数を重ねる（home-stats-card.tsx の実測値を踏襲） */
-const VALUE_BOTTOM = "40.75%";
-const VALUE_RIGHT = {
-  prefectures: "75.6%",
-  municipalities: "51.3%",
-  visits: "20.7%",
-} as const;
-const VALUE_FONT_SIZE = "min(calc(4.33vw - 1.39px), 20.8px)";
-const VALUE_COLOR = "#3b260f";
+/** public/home-highlights-frame.webp の実ピクセル比（1536×1024）。3スライド共通の紙の枠。 */
+const CARD_RATIO = "1536 / 1024";
+const FRAME_SRC = "/home-highlights-frame.webp";
 
 export type HomeStatsSlideData = {
   prefectures: number;
@@ -52,9 +42,10 @@ type Slide =
  * 犬のメインカードの下にある実績エリアを、3種類の情報が自動で切り替わる
  * 1枠のカルーセルにする。
  *
- * - 自分の実績（都道府県・市区町村・訪問数）は常に表示する。これまでの
- *   home-stats.webp をそのまま使う
+ * - 自分の実績（都道府県・市区町村・訪問数）は常に表示する
  * - フレンドの最新おでかけ／歩数ランキングは、データがある時だけ差し込む
+ * - 3スライドとも同じ紙の枠画像（home-highlights-frame.webp）を土台にして、
+ *   中身だけを差し替えることで兄弟カードに見えるようにする
  * - 5秒ごとに自動で次のスライドへ。手動でスワイプした後も、しばらくすると自動再生に戻る
  */
 export function HomeHighlightsCarousel({
@@ -111,15 +102,17 @@ export function HomeHighlightsCarousel({
   };
 
   return (
-    <section aria-label="実績とフレンドの様子" className="relative top-2" style={{ marginLeft: "-3.15%", marginRight: "-2.245%" }}>
+    <section aria-label="実績とフレンドの様子" className="relative top-2">
       <div className="relative overflow-hidden" onTouchStart={handleTouchStart} onTouchEnd={handleTouchEnd}>
         <div
           className="flex transition-transform duration-500 ease-out"
           style={{ transform: `translateX(-${index * 100}%)` }}
         >
           {slides.map((slide, slideIndex) => (
-            <div key={slideIndex} className="w-full shrink-0 grow-0 basis-full">
-              <SlideContent slide={slide} />
+            <div key={slideIndex} className="w-full shrink-0 grow-0 basis-full px-0.5">
+              <FrameCard>
+                <SlideContent slide={slide} />
+              </FrameCard>
             </div>
           ))}
         </div>
@@ -149,72 +142,56 @@ export function HomeHighlightsCarousel({
   );
 }
 
-function SlideContent({ slide }: { slide: Slide }) {
-  if (slide.kind === "stats") return <StatsSlide data={slide.data} />;
-  if (slide.kind === "activity") return <PaperCard><ActivitySlide data={slide.data} /></PaperCard>;
-  return (
-    <PaperCard>
-      <StepsSlide data={slide.data} />
-    </PaperCard>
-  );
-}
-
-/** 元絵（home-stats.webp）そのままの実績スライド。数だけを絵に重ねる */
-function StatsSlide({ data }: { data: HomeStatsSlideData }) {
+/** 3スライド共通の紙の枠（テープ・花の水彩イラスト）を背景にして、中身を重ねる。 */
+function FrameCard({ children }: { children: ReactNode }) {
   return (
     <div className="relative w-full" style={{ aspectRatio: CARD_RATIO }}>
       {/* eslint-disable-next-line @next/next/no-img-element */}
       <img
-        src={STATS_CARD_SRC}
+        src={FRAME_SRC}
         alt=""
         aria-hidden="true"
-        width={1440}
-        height={890}
+        width={1536}
+        height={1024}
         draggable={false}
         className="pointer-events-none absolute inset-0 h-full w-full select-none"
       />
-      <StatValue value={data.prefectures} right={VALUE_RIGHT.prefectures} />
-      <StatValue value={data.municipalities} right={VALUE_RIGHT.municipalities} />
-      <StatValue value={data.visits} right={VALUE_RIGHT.visits} />
-      <p className="sr-only">
-        都道府県 {data.prefectures} / {data.prefectureTotal}、市区町村など {data.municipalities} /{" "}
-        {data.municipalityTotal}、訪問数 {data.visits} 回
-      </p>
+      <div className="absolute inset-0 flex items-center justify-center px-[11%] py-[13%]">{children}</div>
     </div>
   );
 }
 
-function StatValue({ value, right }: { value: number; right: string }) {
-  return (
-    <span
-      aria-hidden="true"
-      className="absolute leading-none whitespace-nowrap tabular-nums"
-      style={{
-        right,
-        bottom: VALUE_BOTTOM,
-        fontSize: VALUE_FONT_SIZE,
-        color: VALUE_COLOR,
-        transform: "translateY(0.175em)",
-      }}
-    >
-      {value}
-    </span>
-  );
+function SlideContent({ slide }: { slide: Slide }) {
+  if (slide.kind === "stats") return <StatsSlide data={slide.data} />;
+  if (slide.kind === "activity") return <ActivitySlide data={slide.data} />;
+  return <StepsSlide data={slide.data} />;
 }
 
-/**
- * フレンド系スライド用の紙カード。home-stats.webp と同じ縦横比の枠に、
- * 手帳の付箋のような紙とテープの装飾を CSS で再現する（画像は焼き込みなので流用できない）。
- */
-function PaperCard({ children }: { children: ReactNode }) {
+function StatsSlide({ data }: { data: HomeStatsSlideData }) {
+  const items = [
+    { icon: <IconMapPin size={18} />, value: data.prefectures, total: data.prefectureTotal, label: "都道府県", tone: "leaf" as const },
+    { icon: <IconUsers size={18} />, value: data.municipalities, total: data.municipalityTotal, label: "市区町村など", tone: "sky" as const },
+    { icon: <IconFlag size={18} />, value: data.visits, total: null, label: "訪問数", tone: "sun" as const },
+  ];
+
   return (
-    <div className="relative w-full overflow-hidden rounded-[22px] border border-line bg-card" style={{ aspectRatio: CARD_RATIO }}>
-      <span
-        aria-hidden="true"
-        className="absolute -top-1.5 -left-2 h-6 w-16 rounded-[2px] bg-[#e6dcb8] opacity-70"
-        style={{ transform: "rotate(-8deg)" }}
-      />
-      <div className="flex h-full w-full items-center justify-center px-5">{children}</div>
+    <div className="grid w-full grid-cols-3 gap-2">
+      {items.map((item) => (
+        <div key={item.label} className="flex flex-col items-center gap-1.5 text-center">
+          <span className={`flex h-10 w-10 items-center justify-center rounded-full ${toneBg(item.tone)}`}>
+            <span className={toneText(item.tone)}>{item.icon}</span>
+          </span>
+          <span className="leading-none font-bold tabular-nums text-ink">
+            <span className="text-lg">{item.value}</span>
+            {item.total !== null ? (
+              <span className="text-xs text-ink-faint"> / {item.total}</span>
+            ) : (
+              <span className="text-xs text-ink-faint">回</span>
+            )}
+          </span>
+          <span className="text-[11px] text-ink-soft">{item.label}</span>
+        </div>
+      ))}
     </div>
   );
 }
@@ -249,7 +226,7 @@ function StepsSlide({ data }: { data: FriendStepsSlideData }) {
   return (
     <div className="flex w-full flex-col gap-1.5">
       {data.slice(0, 3).map((friend, rankIndex) => (
-        <div key={friend.friendUserId} className="flex items-center gap-2 rounded-xl bg-paper-deep/60 px-2.5 py-1.5">
+        <div key={friend.friendUserId} className="flex items-center gap-2 rounded-xl bg-paper/70 px-2.5 py-1.5">
           <span
             className={`flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-[11px] font-bold ${toneBg(RANK_TONE[rankIndex] ?? "sky")} ${toneText(RANK_TONE[rankIndex] ?? "sky")}`}
           >
