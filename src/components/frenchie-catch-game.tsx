@@ -135,13 +135,13 @@ const MYSTERY_SKILL_ITEM_IDS = [
   "toy_soccer_ball", "toy_taiyaki_plush", "toy_bear_plush", "toy_duck_plush", "toy_carrot",
   "toy_frisbee", "food_paw_bowl", "toy_meat", "toy_frenchie_cushion", "toy_treasure_puzzle",
   "toy_frenchie_plush", "toy_rainbow_ball", "toy_golden_crown_ball", "interior_anball", "interior_stretch_rod",
-  "other_azubee", "other_omojii", "food_paw_pudding", "food_paw_melon_bread", "food_paw_cupcake",
+  "other_azubee", "other_omojii", "other_omoi_bashira", "food_paw_pudding", "food_paw_melon_bread", "food_paw_cupcake",
   "toy_paw_macaron", "food_strawberry_roll_cake", "toy_star_wan_wand", "interior_sleepy_moon",
   "interior_spring_flower_wreath", "other_sparkle_rope_crown", "other_nakayoshi_azubee",
   "other_kamunayo", "hiking_frenchie", "snow_frenchie", "summer_frenchie", "interior_kinoko_azubee",
   "other_komochi", "other_azuki", "other_kobee", "other_hamigaki", "other_ikea", "other_orusuban",
-  "other_pondeomo", "other_pondear", "other_kurumari_a", "other_jare_a", "other_ketsunade_a",
-  "interior_shikkoku_no_ar", "interior_ragby_ar", "other_oyatsu_no_jikan", "other_listen_to_the_a",
+  "other_pondeomo", "other_pondear", "other_kurumari_a", "other_jare_a", "other_ketsunade_a", "other_omochi_janai", "other_oyasumi", "other_nisoku_a",
+  "interior_shikkoku_no_ar", "interior_ragby_ar", "other_oyatsu_no_jikan", "other_listen_to_the_a", "other_okaeri",
 ];
 
 /** アイテムごとのLv1〜5パラメータ（item_skill_levels_colored.xlsxの「スキル一覧」シート通り） */
@@ -217,6 +217,19 @@ const LV = {
   OYATSU_PT: [80, 100, 120, 140, 180],
   KETSUNADE_SEC: [4, 5, 6, 8, 10],
   BUREBUR_SEC: [4, 5, 6, 8, 10],
+  XMAS_SEC: [6, 7, 9, 10, 12],
+  XMAS_FALL: [1.8, 2, 2.2, 2.4, 2.5],
+  XMAS_SCORE: [2, 2.2, 2.5, 2.7, 3],
+  XMAS_SPAWN: [1.5, 1.6, 1.7, 1.8, 2],
+  XMAS_DOG_COUNT: [5, 6, 7, 8, 9],
+  OMOCHI_SEC: [4, 5, 6, 8, 10],
+  OMOCHI_PT: [10, 15, 20, 25, 30],
+  OKAERI_SEC: 3,
+  OKAERI_PER_CATCH: [3, 4, 5, 6, 7],
+  OMOI_BASHIRA_SEC: [4, 5, 6, 8, 10],
+  OYASUMI_MULT: [3, 3.5, 4, 4.5, 6],
+  NISOKU_A_SEC: [4, 5, 6, 7, 8],
+  NISOKU_A_MULT: [3, 3.5, 4, 4.5, 5],
 } as const;
 /** 出現量アップ系は時間増加系アイテムの取得率まで底上げしてしまうため、控えめな倍率にしている */
 const SPAWN_RATE_BOOST = 1.5;
@@ -251,21 +264,31 @@ const DEFAULT_ITEM_SPAWN_WEIGHT = 100;
  */
 const ITEM_SPAWN_WEIGHTS: Partial<Record<string, number>> = {
   toy_treasure_puzzle: 300,
-  other_omojii: 65,
-  toy_duck_plush: 81,
-  toy_carrot: 81,
-  food_paw_melon_bread: 81,
-  interior_anball: 81,
-  other_azuki: 81,
-  summer_frenchie: 81,
+  other_omojii: 69,
+  toy_duck_plush: 86,
+  toy_carrot: 86,
+  food_paw_melon_bread: 86,
+  interior_anball: 86,
+  other_azuki: 86,
+  summer_frenchie: 86,
 };
 const STRETCH_ROD_ITEM_ID = "interior_stretch_rod";
 const STRETCH_ROD_SECONDS = 3;
 const BUREBUR_ITEM_ID = "other_burebur";
+const XMAS_PARTY_ITEM_ID = "other_xmas_party";
+const OMOCHI_ITEM_ID = "other_omochi_janai";
+const OKAERI_ITEM_ID = "other_okaeri";
+const OMOI_BASHIRA_ITEM_ID = "other_omoi_bashira";
+const OYASUMI_ITEM_ID = "other_oyasumi";
+const OYASUMI_SECONDS = 5;
+const NISOKU_A_ITEM_ID = "other_nisoku_a";
 /** ブレブルの効果中、このレアリティ以外のアイテムは出現しなくなる */
 const HIGH_RARITY_LOCK_RARITIES = new Set<FrenchieCatchItem["rarity"]>(["SSR", "UR", "LR"]);
 const OTHER_CATEGORY_ITEM_IDS = new Set(
   COLLECTION_ITEMS.filter((entry) => entry.category === "other").map((entry) => entry.id),
+);
+const FOOD_CATEGORY_ITEM_IDS = new Set(
+  COLLECTION_ITEMS.filter((entry) => entry.category === "food").map((entry) => entry.id),
 );
 const DOG_SPAWN_RATIO = 0.28;
 const FRENCHIE_SKIN_IDS = ["hiking_frenchie", "snow_frenchie", "summer_frenchie"];
@@ -360,6 +383,13 @@ export function FrenchieCatchGame({ ownedItems }: { ownedItems: FrenchieCatchIte
   const otherSuppressUntilRef = useRef(0);
   const otherSuppressValueRef = useRef(1);
   const highRarityLockUntilRef = useRef(0);
+  const omochiUntilRef = useRef(0);
+  const omochiPtValueRef = useRef(10);
+  const okaeriUntilRef = useRef(0);
+  const okaeriPerCatchValueRef = useRef(3);
+  const hazardShieldUntilRef = useRef(0);
+  const nisokuUntilRef = useRef(0);
+  const nisokuMultValueRef = useRef(3);
   const dogFloodRemainingRef = useRef(0);
   const slantBoostUntilRef = useRef(0);
   const boxShrinkUntilRef = useRef(0);
@@ -415,6 +445,10 @@ export function FrenchieCatchGame({ ownedItems }: { ownedItems: FrenchieCatchIte
     if (now < spawnRateBoostUntilRef.current) labels.push(`アイテム出現量×${spawnRateBoostValueRef.current}中`);
     if (now < otherSuppressUntilRef.current) labels.push(`その他カテゴリ出現×${otherSuppressValueRef.current}中`);
     if (now < highRarityLockUntilRef.current) labels.push("SSR/UR/LRのみ出現中");
+    if (now < omochiUntilRef.current) labels.push(`うんちがおもちに +${omochiPtValueRef.current}pt`);
+    if (now < okaeriUntilRef.current) labels.push(`1個ごとに+${okaeriPerCatchValueRef.current}秒`);
+    if (now < hazardShieldUntilRef.current) labels.push("ハザード出現なし");
+    if (now < nisokuUntilRef.current) labels.push(`食べ物カテゴリ得点×${nisokuMultValueRef.current}中`);
     if (now < slantBoostUntilRef.current) labels.push("斜め落下中");
     if (now < boxShrinkUntilRef.current) labels.push("ダンボール0.8倍");
     else if (now < boxWideUntilRef.current) labels.push(`ダンボール×${boxWideScaleRef.current}拡大中`);
@@ -516,6 +550,7 @@ export function FrenchieCatchGame({ ownedItems }: { ownedItems: FrenchieCatchIte
       };
     }
 
+    const hazardShieldActive = performance.now() < hazardShieldUntilRef.current;
     const elapsedSec = (performance.now() - startAtRef.current) / 1000;
     const timeMinusWeightFactor = elapsedSec > TIME_MINUS_BOOST_AFTER_SEC ? TIME_MINUS_BOOSTED_WEIGHT / TIME_MINUS_BASE_WEIGHT : 1;
     const timeMinusChance = TIME_MINUS_SPAWN_CHANCE * timeMinusWeightFactor;
@@ -524,11 +559,11 @@ export function FrenchieCatchGame({ ownedItems }: { ownedItems: FrenchieCatchIte
     const blackoutThreshold = shrinkThreshold + BLACKOUT_SPAWN_CHANCE;
     const stunThreshold = blackoutThreshold + STUN_SPAWN_CHANCE;
     const chocolateThreshold = stunThreshold + CHOCOLATE_SPAWN_CHANCE;
-    if (hazardRoll < timeMinusThreshold) return { ...base, itemId: TIME_MINUS_ITEM_ID, kind: "item", name: "時間 -3秒", image: TIME_MINUS_IMAGE, rarity: null, level: 0, vy: base.vy * TIME_MINUS_FALL_SPEED, size: 13 + Math.random() * 3, spin: (Math.random() - 0.5) * 28 };
-    if (hazardRoll < shrinkThreshold) return { ...base, itemId: BOX_SHRINK_ITEM_ID, kind: "item", name: "ダンボール縮小", image: BOX_SHRINK_IMAGE, rarity: null, level: 0, size: 13 + Math.random() * 3, spin: (Math.random() - 0.5) * 28 };
-    if (hazardRoll < blackoutThreshold) return { ...base, itemId: BLACKOUT_ITEM_ID, kind: "item", name: "イカスミ", image: BLACKOUT_IMAGE, rarity: null, level: 0, size: 14 + Math.random() * 3, spin: (Math.random() - 0.5) * 22 };
-    if (hazardRoll < stunThreshold) return { ...base, itemId: STUN_ITEM_ID, kind: "item", name: "しびれバッテリー", image: STUN_IMAGE, rarity: null, level: 0, size: 12.5 + Math.random() * 3, spin: (Math.random() - 0.5) * 30 };
-    if (hazardRoll < chocolateThreshold) return { ...base, itemId: CHOCOLATE_ITEM_ID, kind: "item", name: "呪いのチョコレート", image: CHOCOLATE_IMAGE, rarity: null, level: 0, size: 13.5 + Math.random() * 3, spin: (Math.random() - 0.5) * 26 };
+    if (!hazardShieldActive && hazardRoll < timeMinusThreshold) return { ...base, itemId: TIME_MINUS_ITEM_ID, kind: "item", name: "時間 -3秒", image: TIME_MINUS_IMAGE, rarity: null, level: 0, vy: base.vy * TIME_MINUS_FALL_SPEED, size: 13 + Math.random() * 3, spin: (Math.random() - 0.5) * 28 };
+    if (!hazardShieldActive && hazardRoll < shrinkThreshold) return { ...base, itemId: BOX_SHRINK_ITEM_ID, kind: "item", name: "ダンボール縮小", image: BOX_SHRINK_IMAGE, rarity: null, level: 0, size: 13 + Math.random() * 3, spin: (Math.random() - 0.5) * 28 };
+    if (!hazardShieldActive && hazardRoll < blackoutThreshold) return { ...base, itemId: BLACKOUT_ITEM_ID, kind: "item", name: "イカスミ", image: BLACKOUT_IMAGE, rarity: null, level: 0, size: 14 + Math.random() * 3, spin: (Math.random() - 0.5) * 22 };
+    if (!hazardShieldActive && hazardRoll < stunThreshold) return { ...base, itemId: STUN_ITEM_ID, kind: "item", name: "しびれバッテリー", image: STUN_IMAGE, rarity: null, level: 0, size: 12.5 + Math.random() * 3, spin: (Math.random() - 0.5) * 30 };
+    if (!hazardShieldActive && hazardRoll < chocolateThreshold) return { ...base, itemId: CHOCOLATE_ITEM_ID, kind: "item", name: "呪いのチョコレート", image: CHOCOLATE_IMAGE, rarity: null, level: 0, size: 13.5 + Math.random() * 3, spin: (Math.random() - 0.5) * 26 };
 
     if (itemPool.length === 0) {
       return {
@@ -831,7 +866,12 @@ export function FrenchieCatchGame({ ownedItems }: { ownedItems: FrenchieCatchIte
             if (entity.itemId === POOP_ITEM_ID) {
               caughtRef.current += 1;
               setCaught(caughtRef.current);
-              if (bagStockRef.current > 0) {
+              if (now < omochiUntilRef.current) {
+                const omochiPt = omochiPtValueRef.current;
+                scoreRef.current += omochiPt;
+                setScore(scoreRef.current);
+                showCatch(entity, omochiPt, `こんどうが守ってくれた！ +${omochiPt}pt`);
+              } else if (bagStockRef.current > 0) {
                 bagStockRef.current -= 1;
                 setBagStock(bagStockRef.current);
                 showCatch(entity, 0, "ビニール袋でノーダメージ！");
@@ -945,7 +985,10 @@ export function FrenchieCatchGame({ ownedItems }: { ownedItems: FrenchieCatchIte
               if (nextMultiplierCountRef.current === 0) nextMultiplierRef.current = 1;
               statusChanged = true;
             }
-            const multiplier = Math.max(timedMultiplier, nextMultiplier);
+            const foodMultiplier = now < nisokuUntilRef.current && FOOD_CATEGORY_ITEM_IDS.has(entity.itemId ?? "")
+              ? nisokuMultValueRef.current
+              : 1;
+            const multiplier = Math.max(timedMultiplier, nextMultiplier, foodMultiplier);
             let points = Math.round((basePoints + pendingBonus) * multiplier);
             let effectLabel: string | undefined;
 
@@ -968,6 +1011,11 @@ export function FrenchieCatchGame({ ownedItems }: { ownedItems: FrenchieCatchIte
               setTimeLeft(Math.ceil(Math.max(0, (endAtRef.current - now) / 1000)));
               return seconds;
             };
+
+            if (now < okaeriUntilRef.current) {
+              addBonusTime(okaeriPerCatchValueRef.current);
+              statusChanged = true;
+            }
 
             /** しびれ/ダンボール縮小/時間減少のいずれかを1回だけ防ぐガードを、まだ持っていない種類からランダムで1つ付与する */
             const grantRandomHazardGuard = (): HazardGuardKind | null => {
@@ -1101,6 +1149,19 @@ export function FrenchieCatchGame({ ownedItems }: { ownedItems: FrenchieCatchIte
                 effectLabel = `${LV.BUREBUR_SEC[lv]}秒間 SSR/UR/LRのみ出現${lvTag}`;
                 statusChanged = true;
                 break;
+              case XMAS_PARTY_ITEM_ID: {
+                const xmasSec = LV.XMAS_SEC[lv]!;
+                fallSpeedBoostUntilRef.current = now + xmasSec * 1000;
+                fallSpeedValueRef.current = LV.XMAS_FALL[lv]!;
+                multiplier15UntilRef.current = now + xmasSec * 1000;
+                multiplier15ValueRef.current = LV.XMAS_SCORE[lv]!;
+                spawnRateBoostUntilRef.current = now + xmasSec * 1000;
+                spawnRateBoostValueRef.current = LV.XMAS_SPAWN[lv]!;
+                dogFloodRemainingRef.current += LV.XMAS_DOG_COUNT[lv]!;
+                effectLabel = `${xmasSec}秒間 落下×${LV.XMAS_FALL[lv]}+得点×${LV.XMAS_SCORE[lv]}+出現量×${LV.XMAS_SPAWN[lv]} / フレブル${LV.XMAS_DOG_COUNT[lv]}体${lvTag}`;
+                statusChanged = true;
+                break;
+              }
               case DOG_FLOOD_ITEM_ID:
                 dogFloodRemainingRef.current += LV.LISTEN_DOG_COUNT[lv]!;
                 effectLabel = `フレブル${LV.LISTEN_DOG_COUNT[lv]}体 大量発生${lvTag}`;
@@ -1171,6 +1232,45 @@ export function FrenchieCatchGame({ ownedItems }: { ownedItems: FrenchieCatchIte
                 effectLabel = `${LV.SPARKLE_SEC[lv]}秒間 ミニマグネット${lvTag}`;
                 statusChanged = true;
                 break;
+              case NISOKU_A_ITEM_ID: {
+                const nisokuSec = LV.NISOKU_A_SEC[lv]!;
+                nisokuUntilRef.current = now + nisokuSec * 1000;
+                nisokuMultValueRef.current = LV.NISOKU_A_MULT[lv]!;
+                effectLabel = `${nisokuSec}秒間 食べ物カテゴリ得点×${LV.NISOKU_A_MULT[lv]}${lvTag}`;
+                statusChanged = true;
+                break;
+              }
+              case OYASUMI_ITEM_ID: {
+                blackoutUntilRef.current = now + OYASUMI_SECONDS * 1000;
+                setBlackoutActive(true);
+                multiplier15UntilRef.current = now + OYASUMI_SECONDS * 1000;
+                multiplier15ValueRef.current = LV.OYASUMI_MULT[lv]!;
+                effectLabel = `${OYASUMI_SECONDS}秒間 上半分ブラックアウト 得点×${LV.OYASUMI_MULT[lv]}${lvTag}`;
+                statusChanged = true;
+                break;
+              }
+              case OMOI_BASHIRA_ITEM_ID: {
+                const shieldSec = LV.OMOI_BASHIRA_SEC[lv]!;
+                hazardShieldUntilRef.current = now + shieldSec * 1000;
+                effectLabel = `${shieldSec}秒間 ハザード出現なし${lvTag}`;
+                statusChanged = true;
+                break;
+              }
+              case OKAERI_ITEM_ID: {
+                okaeriUntilRef.current = now + LV.OKAERI_SEC * 1000;
+                okaeriPerCatchValueRef.current = LV.OKAERI_PER_CATCH[lv]!;
+                effectLabel = `${LV.OKAERI_SEC}秒間 取った個数×${LV.OKAERI_PER_CATCH[lv]}秒${lvTag}`;
+                statusChanged = true;
+                break;
+              }
+              case OMOCHI_ITEM_ID: {
+                const omochiSec = LV.OMOCHI_SEC[lv]!;
+                omochiUntilRef.current = now + omochiSec * 1000;
+                omochiPtValueRef.current = LV.OMOCHI_PT[lv]!;
+                effectLabel = `${omochiSec}秒間 うんちがおもちに変身 +${LV.OMOCHI_PT[lv]}pt${lvTag}`;
+                statusChanged = true;
+                break;
+              }
               case "other_nakayoshi_azubee": {
                 points += LV.NAKAYOSHI_PT[lv]!;
                 const guard = grantRandomHazardGuard();
@@ -1481,6 +1581,13 @@ export function FrenchieCatchGame({ ownedItems }: { ownedItems: FrenchieCatchIte
     otherSuppressUntilRef.current = 0;
     otherSuppressValueRef.current = 1;
     highRarityLockUntilRef.current = 0;
+    omochiUntilRef.current = 0;
+    omochiPtValueRef.current = 10;
+    okaeriUntilRef.current = 0;
+    okaeriPerCatchValueRef.current = 3;
+    hazardShieldUntilRef.current = 0;
+    nisokuUntilRef.current = 0;
+    nisokuMultValueRef.current = 3;
     dogFloodRemainingRef.current = 0;
     slantBoostUntilRef.current = 0;
     boxShrinkUntilRef.current = 0;

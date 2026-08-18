@@ -72,6 +72,7 @@ export const GACHA_PRIZES: readonly GachaPrize[] = [
   { id: "other_nakayoshi_azubee", name: "なかよしあずびー", rarity: "SSR", type: "item", pool: "regular", image: "/collection/items/890D1313-B79F-493C-97C2-1898F7663C01.png" },
   { id: "other_komochi", name: "こもち", rarity: "UR", type: "item", pool: "regular", image: "/collection/items/C7DF48F4-588E-4B31-983E-A52623328924.png" },
   { id: "other_azuki", name: "小豆(あずき)", rarity: "UR", type: "item", pool: "regular", image: "/collection/items/6F31AD19-B242-42D6-83D3-380A3F3D3FC0.png" },
+  { id: "other_omoi_bashira", name: "一家の大オモ柱", rarity: "UR", type: "item", pool: "regular", image: "/collection/items/omoi-bashira.webp" },
   { id: "other_kobee", name: "こびー", rarity: "UR", type: "item", pool: "regular", image: "/collection/items/4FA70BBA-6CBA-42B2-9A96-4B07AFDF56E0.png" },
   { id: "other_kamunayo", name: "かむなよ", rarity: "SSR", type: "item", pool: "regular", image: "/collection/items/7FEA86AD-6904-4151-BEA8-5A33F7C97B01.png" },
   { id: "other_hamigaki", name: "はみがき", rarity: "SSR", type: "item", pool: "regular", image: "/collection/items/hamigaki.webp" },
@@ -83,11 +84,16 @@ export const GACHA_PRIZES: readonly GachaPrize[] = [
   { id: "other_oyatsu_no_jikan", name: "おやつのじかん", rarity: "SSR", type: "item", pool: "regular", image: "/collection/items/oyatsu-no-jikan.webp" },
   { id: "other_jare_a", name: "じゃれアー", rarity: "SSR", type: "item", pool: "regular", image: "/collection/items/jare-a.webp" },
   { id: "other_ketsunade_a", name: "けつなでアー", rarity: "SSR", type: "item", pool: "regular", image: "/collection/items/ketsunade-a.png" },
+  { id: "other_omochi_janai", name: "おもちじゃない...!?", rarity: "SSR", type: "item", pool: "regular", image: "/collection/items/omochi-janai.webp" },
+  { id: "other_oyasumi", name: "おやすみ", rarity: "SSR", type: "item", pool: "regular", image: "/collection/items/oyasumi.webp" },
+  { id: "other_nisoku_a", name: "二足アー", rarity: "SSR", type: "item", pool: "regular", image: "/collection/items/nisoku-a.webp" },
   { id: "other_listen_to_the_a", name: "Listen to the a-", rarity: "LR", type: "item", pool: "regular", image: "/collection/items/listen-to-the-a.png" },
+  { id: "other_okaeri", name: "おかえり", rarity: "LR", type: "item", pool: "regular", image: "/collection/items/okaeri.webp" },
   { id: "other_sparkle_rope_crown", name: "きらきらロープクラウン", rarity: "SR", type: "item", pool: "regular", image: "/collection/items/sparkle-rope-crown.webp" },
 
   // --- 通常ガチャ：MR --------------------------------------------------
   { id: "other_burebur", name: "ブレブル", rarity: "MR", type: "item", pool: "regular", image: "/collection/items/burebur.webp" },
+  { id: "other_xmas_party", name: "Xmas Party", rarity: "MR", type: "item", pool: "regular", image: "/collection/items/xmas-party.webp" },
 
   // --- 通常ガチャ：おでかけ小物 ----------------------------------------
   { id: "other_yellow_rain_boots", name: "きいろのながぐつ", rarity: "N", type: "item", pool: "regular", image: "/collection/items/yellow-rain-boots.webp" },
