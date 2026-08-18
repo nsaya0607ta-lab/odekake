@@ -214,7 +214,7 @@ function StatsSlide({ data }: { data: HomeStatsSlideData }) {
 function ActivitySlide({ data }: { data: FriendActivitySlideData }) {
   return (
     <div className="flex h-full w-full flex-col items-center">
-      <span className="text-base font-bold tracking-[0.15em] text-ink-soft" style={{ marginTop: -46 }}>
+      <span className="text-base font-bold tracking-[0.15em] text-ink-soft" style={{ marginTop: -31 }}>
         みんなのおでかけ
       </span>
       <div className="flex w-full flex-1 flex-col justify-center gap-1.5">
@@ -245,7 +245,7 @@ function StepsSlide({ data }: { data: FriendStepsSlideData }) {
 
   return (
     <div className="flex h-full w-full flex-col items-center">
-      <span className="text-base font-bold tracking-[0.15em] text-ink-soft" style={{ marginTop: -46 }}>
+      <span className="text-base font-bold tracking-[0.15em] text-ink-soft" style={{ marginTop: -31 }}>
         フレンドの歩数
       </span>
       <div className="flex w-full flex-1 flex-col justify-center gap-1.5">
