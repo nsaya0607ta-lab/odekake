@@ -26,7 +26,6 @@ import { requireUser } from "@/lib/supabase/server";
 export const metadata = { title: "あなたの旅 | おでかけ記録" };
 export const dynamic = "force-dynamic";
 
-const PROFILE_TICKET_SRC = "/B42684BD-FCE9-4F37-A698-4EEE3884ECA8.webp";
 const MINI_GAME_BUTTON_SRC = "/3215A80A-2B64-45E2-8AA5-B7CAF2E0251D.webp";
 const GACHA_BUTTON_SRC = "/4738ADDA-10DB-4664-B078-FE6262248CFB.webp";
 
@@ -82,42 +81,6 @@ export default async function HomePage({
             パスワードを変更しました。
           </p>
         ) : null}
-
-        <Link
-          href="/mypage/profile"
-          className="pressable relative block w-full overflow-hidden active:scale-[0.99]"
-          style={{ aspectRatio: "1536 / 420" }}
-          aria-label={`${user.displayName}のプロフィールを見る`}
-        >
-          {/* 元画像は上下に余白があるため、チケット部分だけがカード内に見える位置へ戻す。 */}
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img
-            src={PROFILE_TICKET_SRC}
-            alt=""
-            aria-hidden="true"
-            draggable={false}
-            className="pointer-events-none absolute left-0 top-[-70%] w-full max-w-none select-none"
-          />
-
-          {/* 元画像の丸窓の内側の線に、プロフィール画像の円周が沿うサイズ・位置に合わせる。 */}
-          <span className="absolute left-[15.31%] top-[14.02%] aspect-square w-[18.2%] overflow-hidden rounded-full bg-paper-deep">
-            {avatarUrl ? (
-              <>
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img src={avatarUrl} alt="" className="h-full w-full object-cover" />
-              </>
-            ) : (
-              <span className="flex h-full w-full items-center justify-center text-ink-faint">
-                <IconUser size={24} />
-              </span>
-            )}
-          </span>
-
-          <span className="absolute left-[36%] top-1/2 w-[30%] -translate-y-1/2 min-w-0">
-            <span className="block truncate text-sm font-bold text-[#3f2d17]">{user.displayName}</span>
-            <span className="mt-0.5 block truncate text-[11px] text-[#7b684d]">{user.email}</span>
-          </span>
-        </Link>
 
         <div className="space-y-2">
           <section className="rough-card overflow-visible">
