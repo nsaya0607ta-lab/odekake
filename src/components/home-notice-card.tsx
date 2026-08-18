@@ -43,7 +43,7 @@ export function HomeNoticeCard() {
           <div className="flex min-w-0 flex-1 flex-col gap-1">
             <p
               className="truncate text-sm font-bold text-ink"
-              style={{ marginLeft: "11%", transform: "translate(calc(10px + 3em), calc(-5px - 0.3em))" }}
+              style={{ marginLeft: "11%", transform: "translate(calc(10px + 3em), calc(-4px - 0.3em))" }}
             >
               {summary}
             </p>
