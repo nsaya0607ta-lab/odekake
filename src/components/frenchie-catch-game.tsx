@@ -140,7 +140,7 @@ const MYSTERY_SKILL_ITEM_IDS = [
   "interior_spring_flower_wreath", "other_sparkle_rope_crown", "other_nakayoshi_azubee",
   "other_kamunayo", "hiking_frenchie", "snow_frenchie", "summer_frenchie", "interior_kinoko_azubee",
   "other_komochi", "other_azuki", "other_kobee", "other_hamigaki", "other_ikea", "other_orusuban",
-  "other_pondeomo", "other_pondear", "other_kurumari_a", "other_jare_a", "other_ketsunade_a",
+  "other_pondeomo", "other_pondear", "other_kurumari_a", "other_jare_a", "other_ketsunade_a", "other_omochi_janai",
   "interior_shikkoku_no_ar", "interior_ragby_ar", "other_oyatsu_no_jikan", "other_listen_to_the_a",
 ];
 
@@ -222,6 +222,8 @@ const LV = {
   XMAS_SCORE: [2, 2.2, 2.5, 2.7, 3],
   XMAS_SPAWN: [1.5, 1.6, 1.7, 1.8, 2],
   XMAS_DOG_COUNT: [5, 6, 7, 8, 9],
+  OMOCHI_SEC: [4, 5, 6, 8, 10],
+  OMOCHI_PT: [10, 15, 20, 25, 30],
 } as const;
 /** 出現量アップ系は時間増加系アイテムの取得率まで底上げしてしまうため、控えめな倍率にしている */
 const SPAWN_RATE_BOOST = 1.5;
@@ -268,6 +270,7 @@ const STRETCH_ROD_ITEM_ID = "interior_stretch_rod";
 const STRETCH_ROD_SECONDS = 3;
 const BUREBUR_ITEM_ID = "other_burebur";
 const XMAS_PARTY_ITEM_ID = "other_xmas_party";
+const OMOCHI_ITEM_ID = "other_omochi_janai";
 /** ブレブルの効果中、このレアリティ以外のアイテムは出現しなくなる */
 const HIGH_RARITY_LOCK_RARITIES = new Set<FrenchieCatchItem["rarity"]>(["SSR", "UR", "LR"]);
 const OTHER_CATEGORY_ITEM_IDS = new Set(
@@ -366,6 +369,8 @@ export function FrenchieCatchGame({ ownedItems }: { ownedItems: FrenchieCatchIte
   const otherSuppressUntilRef = useRef(0);
   const otherSuppressValueRef = useRef(1);
   const highRarityLockUntilRef = useRef(0);
+  const omochiUntilRef = useRef(0);
+  const omochiPtValueRef = useRef(10);
   const dogFloodRemainingRef = useRef(0);
   const slantBoostUntilRef = useRef(0);
   const boxShrinkUntilRef = useRef(0);
@@ -421,6 +426,7 @@ export function FrenchieCatchGame({ ownedItems }: { ownedItems: FrenchieCatchIte
     if (now < spawnRateBoostUntilRef.current) labels.push(`アイテム出現量×${spawnRateBoostValueRef.current}中`);
     if (now < otherSuppressUntilRef.current) labels.push(`その他カテゴリ出現×${otherSuppressValueRef.current}中`);
     if (now < highRarityLockUntilRef.current) labels.push("SSR/UR/LRのみ出現中");
+    if (now < omochiUntilRef.current) labels.push(`うんちがおもちに +${omochiPtValueRef.current}pt`);
     if (now < slantBoostUntilRef.current) labels.push("斜め落下中");
     if (now < boxShrinkUntilRef.current) labels.push("ダンボール0.8倍");
     else if (now < boxWideUntilRef.current) labels.push(`ダンボール×${boxWideScaleRef.current}拡大中`);
@@ -837,7 +843,12 @@ export function FrenchieCatchGame({ ownedItems }: { ownedItems: FrenchieCatchIte
             if (entity.itemId === POOP_ITEM_ID) {
               caughtRef.current += 1;
               setCaught(caughtRef.current);
-              if (bagStockRef.current > 0) {
+              if (now < omochiUntilRef.current) {
+                const omochiPt = omochiPtValueRef.current;
+                scoreRef.current += omochiPt;
+                setScore(scoreRef.current);
+                showCatch(entity, omochiPt, `おもちだった！ +${omochiPt}pt`);
+              } else if (bagStockRef.current > 0) {
                 bagStockRef.current -= 1;
                 setBagStock(bagStockRef.current);
                 showCatch(entity, 0, "ビニール袋でノーダメージ！");
@@ -1190,6 +1201,14 @@ export function FrenchieCatchGame({ ownedItems }: { ownedItems: FrenchieCatchIte
                 effectLabel = `${LV.SPARKLE_SEC[lv]}秒間 ミニマグネット${lvTag}`;
                 statusChanged = true;
                 break;
+              case OMOCHI_ITEM_ID: {
+                const omochiSec = LV.OMOCHI_SEC[lv]!;
+                omochiUntilRef.current = now + omochiSec * 1000;
+                omochiPtValueRef.current = LV.OMOCHI_PT[lv]!;
+                effectLabel = `${omochiSec}秒間 うんちがおもちに変身 +${LV.OMOCHI_PT[lv]}pt${lvTag}`;
+                statusChanged = true;
+                break;
+              }
               case "other_nakayoshi_azubee": {
                 points += LV.NAKAYOSHI_PT[lv]!;
                 const guard = grantRandomHazardGuard();
@@ -1500,6 +1519,8 @@ export function FrenchieCatchGame({ ownedItems }: { ownedItems: FrenchieCatchIte
     otherSuppressUntilRef.current = 0;
     otherSuppressValueRef.current = 1;
     highRarityLockUntilRef.current = 0;
+    omochiUntilRef.current = 0;
+    omochiPtValueRef.current = 10;
     dogFloodRemainingRef.current = 0;
     slantBoostUntilRef.current = 0;
     boxShrinkUntilRef.current = 0;
