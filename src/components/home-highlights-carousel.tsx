@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState, type ReactNode, type TouchEvent } from "react";
-import { IconClock, IconFlag, IconMapPin, IconPaw, IconUser, IconUsers } from "@/components/icons";
+import { IconClock, IconMapPin, IconPaw, IconUser } from "@/components/icons";
 import { formatRelativeTimeJa } from "@/lib/date";
 
 const AUTO_ADVANCE_MS = 5000;
@@ -10,6 +10,12 @@ const SWIPE_THRESHOLD_PX = 40;
 /** public/home-highlights-frame.webp の実ピクセル比（1536×1024）。3スライド共通の紙の枠。 */
 const CARD_RATIO = "1536 / 1024";
 const FRAME_SRC = "/home-highlights-frame.webp";
+
+const STAT_ICON_SRC = {
+  prefectures: "/icon-prefectures.webp",
+  municipalities: "/icon-municipalities.webp",
+  visits: "/icon-visits.webp",
+} as const;
 
 export type HomeStatsSlideData = {
   prefectures: number;
@@ -169,23 +175,22 @@ function SlideContent({ slide }: { slide: Slide }) {
 
 function StatsSlide({ data }: { data: HomeStatsSlideData }) {
   const items = [
-    { icon: <IconMapPin size={26} />, value: data.prefectures, total: data.prefectureTotal, label: "都道府県", tone: "leaf" as const },
-    { icon: <IconUsers size={26} />, value: data.municipalities, total: data.municipalityTotal, label: "市区町村など", tone: "sky" as const },
-    { icon: <IconFlag size={26} />, value: data.visits, total: null, label: "訪問数", tone: "sun" as const },
+    { icon: STAT_ICON_SRC.prefectures, value: data.prefectures, total: data.prefectureTotal, label: "都道府県" },
+    { icon: STAT_ICON_SRC.municipalities, value: data.municipalities, total: data.municipalityTotal, label: "市区町村など" },
+    { icon: STAT_ICON_SRC.visits, value: data.visits, total: null, label: "訪問数" },
   ];
 
   return (
     <div className="flex h-full w-full flex-col items-center justify-center gap-4">
-      <span className="text-xs font-bold tracking-[0.2em] text-ink-faint">あなたの実績</span>
+      <span className="text-base font-bold tracking-[0.15em] text-ink-soft">あなたの実績</span>
       <div className="grid w-full grid-cols-3">
         {items.map((item, itemIndex) => (
           <div
             key={item.label}
             className={`flex flex-col items-center gap-2 px-1 text-center ${itemIndex > 0 ? "border-l border-line-strong/60" : ""}`}
           >
-            <span className={`flex h-14 w-14 items-center justify-center rounded-full ${toneBg(item.tone)}`}>
-              <span className={toneText(item.tone)}>{item.icon}</span>
-            </span>
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src={item.icon} alt="" aria-hidden="true" draggable={false} className="h-14 w-14 select-none" />
             <span className="leading-none font-bold tabular-nums text-ink">
               <span className="text-2xl">{item.value}</span>
               {item.total !== null ? (
