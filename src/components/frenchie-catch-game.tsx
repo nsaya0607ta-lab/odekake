@@ -140,7 +140,7 @@ const MYSTERY_SKILL_ITEM_IDS = [
   "interior_spring_flower_wreath", "other_sparkle_rope_crown", "other_nakayoshi_azubee",
   "other_kamunayo", "hiking_frenchie", "snow_frenchie", "summer_frenchie", "interior_kinoko_azubee",
   "other_komochi", "other_azuki", "other_kobee", "other_hamigaki", "other_ikea", "other_orusuban",
-  "other_pondeomo", "other_pondear", "other_kurumari_a", "other_jare_a", "other_ketsunade_a", "other_omochi_janai",
+  "other_pondeomo", "other_pondear", "other_kurumari_a", "other_jare_a", "other_ketsunade_a", "other_omochi_janai", "other_oyasumi",
   "interior_shikkoku_no_ar", "interior_ragby_ar", "other_oyatsu_no_jikan", "other_listen_to_the_a", "other_okaeri",
 ];
 
@@ -227,6 +227,7 @@ const LV = {
   OKAERI_SEC: 3,
   OKAERI_PER_CATCH: [3, 4, 5, 6, 7],
   OMOI_BASHIRA_SEC: [4, 5, 6, 8, 10],
+  OYASUMI_MULT: [3, 3.5, 4, 4.5, 6],
 } as const;
 /** 出現量アップ系は時間増加系アイテムの取得率まで底上げしてしまうため、控えめな倍率にしている */
 const SPAWN_RATE_BOOST = 1.5;
@@ -276,6 +277,8 @@ const XMAS_PARTY_ITEM_ID = "other_xmas_party";
 const OMOCHI_ITEM_ID = "other_omochi_janai";
 const OKAERI_ITEM_ID = "other_okaeri";
 const OMOI_BASHIRA_ITEM_ID = "other_omoi_bashira";
+const OYASUMI_ITEM_ID = "other_oyasumi";
+const OYASUMI_SECONDS = 5;
 /** ブレブルの効果中、このレアリティ以外のアイテムは出現しなくなる */
 const HIGH_RARITY_LOCK_RARITIES = new Set<FrenchieCatchItem["rarity"]>(["SSR", "UR", "LR"]);
 const OTHER_CATEGORY_ITEM_IDS = new Set(
@@ -1217,6 +1220,15 @@ export function FrenchieCatchGame({ ownedItems }: { ownedItems: FrenchieCatchIte
                 effectLabel = `${LV.SPARKLE_SEC[lv]}秒間 ミニマグネット${lvTag}`;
                 statusChanged = true;
                 break;
+              case OYASUMI_ITEM_ID: {
+                blackoutUntilRef.current = now + OYASUMI_SECONDS * 1000;
+                setBlackoutActive(true);
+                multiplier15UntilRef.current = now + OYASUMI_SECONDS * 1000;
+                multiplier15ValueRef.current = LV.OYASUMI_MULT[lv]!;
+                effectLabel = `${OYASUMI_SECONDS}秒間 上半分ブラックアウト 得点×${LV.OYASUMI_MULT[lv]}${lvTag}`;
+                statusChanged = true;
+                break;
+              }
               case OMOI_BASHIRA_ITEM_ID: {
                 const shieldSec = LV.OMOI_BASHIRA_SEC[lv]!;
                 hazardShieldUntilRef.current = now + shieldSec * 1000;

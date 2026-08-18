@@ -85,6 +85,7 @@ export const GACHA_PRIZES: readonly GachaPrize[] = [
   { id: "other_jare_a", name: "じゃれアー", rarity: "SSR", type: "item", pool: "regular", image: "/collection/items/jare-a.webp" },
   { id: "other_ketsunade_a", name: "けつなでアー", rarity: "SSR", type: "item", pool: "regular", image: "/collection/items/ketsunade-a.png" },
   { id: "other_omochi_janai", name: "おもちじゃない...!?", rarity: "SSR", type: "item", pool: "regular", image: "/collection/items/omochi-janai.webp" },
+  { id: "other_oyasumi", name: "おやすみ", rarity: "SSR", type: "item", pool: "regular", image: "/collection/items/oyasumi.webp" },
   { id: "other_listen_to_the_a", name: "Listen to the a-", rarity: "LR", type: "item", pool: "regular", image: "/collection/items/listen-to-the-a.png" },
   { id: "other_okaeri", name: "おかえり", rarity: "LR", type: "item", pool: "regular", image: "/collection/items/okaeri.webp" },
   { id: "other_sparkle_rope_crown", name: "きらきらロープクラウン", rarity: "SR", type: "item", pool: "regular", image: "/collection/items/sparkle-rope-crown.webp" },
