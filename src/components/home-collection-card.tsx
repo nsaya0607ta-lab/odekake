@@ -25,7 +25,7 @@ export function HomeCollectionCard({
   return (
     <Link
       href="/collection"
-      className="pressable relative block w-full active:scale-[0.99]"
+      className="pressable relative block active:scale-[0.99]"
       style={{ marginLeft: -9, marginRight: -12 }}
       aria-label={`図鑑を見る（${collected} / ${total}）`}
     >
@@ -40,12 +40,9 @@ export function HomeCollectionCard({
           draggable={false}
           className="pointer-events-none absolute inset-0 h-full w-full select-none"
         />
-        <div className="absolute inset-0 flex items-center" style={{ paddingLeft: "34%", paddingRight: "12%" }}>
+        <div className="absolute inset-0 flex items-center" style={{ paddingLeft: "37%", paddingRight: "12%" }}>
           <div className="flex w-full min-w-0 items-center justify-between gap-2">
-            <div className="min-w-0">
-              <p className="truncate text-base font-bold text-ink">図鑑を見る</p>
-              <p className="truncate text-xs text-ink-soft">集めたアイテムのコレクション</p>
-            </div>
+            <p className="min-w-0 truncate text-lg font-bold text-ink">図鑑を見る</p>
             <div className="flex shrink-0 items-center gap-1">
               <span className="text-lg font-bold tabular-nums text-leaf-deep">
                 {collected} / {total}
