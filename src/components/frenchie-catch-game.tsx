@@ -140,7 +140,7 @@ const MYSTERY_SKILL_ITEM_IDS = [
   "interior_spring_flower_wreath", "other_sparkle_rope_crown", "other_nakayoshi_azubee",
   "other_kamunayo", "hiking_frenchie", "snow_frenchie", "summer_frenchie", "interior_kinoko_azubee",
   "other_komochi", "other_azuki", "other_kobee", "other_hamigaki", "other_ikea", "other_orusuban",
-  "other_pondeomo", "other_pondear", "other_kurumari_a", "other_jare_a", "other_ketsunade_a", "other_omochi_janai", "other_oyasumi",
+  "other_pondeomo", "other_pondear", "other_kurumari_a", "other_jare_a", "other_ketsunade_a", "other_omochi_janai", "other_oyasumi", "other_nisoku_a",
   "interior_shikkoku_no_ar", "interior_ragby_ar", "other_oyatsu_no_jikan", "other_listen_to_the_a", "other_okaeri",
 ];
 
@@ -228,6 +228,8 @@ const LV = {
   OKAERI_PER_CATCH: [3, 4, 5, 6, 7],
   OMOI_BASHIRA_SEC: [4, 5, 6, 8, 10],
   OYASUMI_MULT: [3, 3.5, 4, 4.5, 6],
+  NISOKU_A_SEC: [4, 5, 6, 7, 8],
+  NISOKU_A_MULT: [3, 3.5, 4, 4.5, 5],
 } as const;
 /** 出現量アップ系は時間増加系アイテムの取得率まで底上げしてしまうため、控えめな倍率にしている */
 const SPAWN_RATE_BOOST = 1.5;
@@ -279,10 +281,14 @@ const OKAERI_ITEM_ID = "other_okaeri";
 const OMOI_BASHIRA_ITEM_ID = "other_omoi_bashira";
 const OYASUMI_ITEM_ID = "other_oyasumi";
 const OYASUMI_SECONDS = 5;
+const NISOKU_A_ITEM_ID = "other_nisoku_a";
 /** ブレブルの効果中、このレアリティ以外のアイテムは出現しなくなる */
 const HIGH_RARITY_LOCK_RARITIES = new Set<FrenchieCatchItem["rarity"]>(["SSR", "UR", "LR"]);
 const OTHER_CATEGORY_ITEM_IDS = new Set(
   COLLECTION_ITEMS.filter((entry) => entry.category === "other").map((entry) => entry.id),
+);
+const FOOD_CATEGORY_ITEM_IDS = new Set(
+  COLLECTION_ITEMS.filter((entry) => entry.category === "food").map((entry) => entry.id),
 );
 const DOG_SPAWN_RATIO = 0.28;
 const FRENCHIE_SKIN_IDS = ["hiking_frenchie", "snow_frenchie", "summer_frenchie"];
@@ -382,6 +388,8 @@ export function FrenchieCatchGame({ ownedItems }: { ownedItems: FrenchieCatchIte
   const okaeriUntilRef = useRef(0);
   const okaeriPerCatchValueRef = useRef(3);
   const hazardShieldUntilRef = useRef(0);
+  const nisokuUntilRef = useRef(0);
+  const nisokuMultValueRef = useRef(3);
   const dogFloodRemainingRef = useRef(0);
   const slantBoostUntilRef = useRef(0);
   const boxShrinkUntilRef = useRef(0);
@@ -440,6 +448,7 @@ export function FrenchieCatchGame({ ownedItems }: { ownedItems: FrenchieCatchIte
     if (now < omochiUntilRef.current) labels.push(`うんちがおもちに +${omochiPtValueRef.current}pt`);
     if (now < okaeriUntilRef.current) labels.push(`1個ごとに+${okaeriPerCatchValueRef.current}秒`);
     if (now < hazardShieldUntilRef.current) labels.push("ハザード出現なし");
+    if (now < nisokuUntilRef.current) labels.push(`食べ物カテゴリ得点×${nisokuMultValueRef.current}中`);
     if (now < slantBoostUntilRef.current) labels.push("斜め落下中");
     if (now < boxShrinkUntilRef.current) labels.push("ダンボール0.8倍");
     else if (now < boxWideUntilRef.current) labels.push(`ダンボール×${boxWideScaleRef.current}拡大中`);
@@ -976,7 +985,10 @@ export function FrenchieCatchGame({ ownedItems }: { ownedItems: FrenchieCatchIte
               if (nextMultiplierCountRef.current === 0) nextMultiplierRef.current = 1;
               statusChanged = true;
             }
-            const multiplier = Math.max(timedMultiplier, nextMultiplier);
+            const foodMultiplier = now < nisokuUntilRef.current && FOOD_CATEGORY_ITEM_IDS.has(entity.itemId ?? "")
+              ? nisokuMultValueRef.current
+              : 1;
+            const multiplier = Math.max(timedMultiplier, nextMultiplier, foodMultiplier);
             let points = Math.round((basePoints + pendingBonus) * multiplier);
             let effectLabel: string | undefined;
 
@@ -1220,6 +1232,14 @@ export function FrenchieCatchGame({ ownedItems }: { ownedItems: FrenchieCatchIte
                 effectLabel = `${LV.SPARKLE_SEC[lv]}秒間 ミニマグネット${lvTag}`;
                 statusChanged = true;
                 break;
+              case NISOKU_A_ITEM_ID: {
+                const nisokuSec = LV.NISOKU_A_SEC[lv]!;
+                nisokuUntilRef.current = now + nisokuSec * 1000;
+                nisokuMultValueRef.current = LV.NISOKU_A_MULT[lv]!;
+                effectLabel = `${nisokuSec}秒間 食べ物カテゴリ得点×${LV.NISOKU_A_MULT[lv]}${lvTag}`;
+                statusChanged = true;
+                break;
+              }
               case OYASUMI_ITEM_ID: {
                 blackoutUntilRef.current = now + OYASUMI_SECONDS * 1000;
                 setBlackoutActive(true);
@@ -1566,6 +1586,8 @@ export function FrenchieCatchGame({ ownedItems }: { ownedItems: FrenchieCatchIte
     okaeriUntilRef.current = 0;
     okaeriPerCatchValueRef.current = 3;
     hazardShieldUntilRef.current = 0;
+    nisokuUntilRef.current = 0;
+    nisokuMultValueRef.current = 3;
     dogFloodRemainingRef.current = 0;
     slantBoostUntilRef.current = 0;
     boxShrinkUntilRef.current = 0;
