@@ -264,13 +264,13 @@ const DEFAULT_ITEM_SPAWN_WEIGHT = 100;
  */
 const ITEM_SPAWN_WEIGHTS: Partial<Record<string, number>> = {
   toy_treasure_puzzle: 300,
-  other_omojii: 65,
-  toy_duck_plush: 81,
-  toy_carrot: 81,
-  food_paw_melon_bread: 81,
-  interior_anball: 81,
-  other_azuki: 81,
-  summer_frenchie: 81,
+  other_omojii: 69,
+  toy_duck_plush: 86,
+  toy_carrot: 86,
+  food_paw_melon_bread: 86,
+  interior_anball: 86,
+  other_azuki: 86,
+  summer_frenchie: 86,
 };
 const STRETCH_ROD_ITEM_ID = "interior_stretch_rod";
 const STRETCH_ROD_SECONDS = 3;
