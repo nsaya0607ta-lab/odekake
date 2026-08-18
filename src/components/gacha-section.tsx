@@ -55,6 +55,20 @@ const RARITY_FRAME_SCALE: Record<GachaRarity, string> = {
   MR: "scale(1)",
 };
 
+/**
+ * カード上の文字色。デフォルトは白だが、背景が明るいR・SSRだけ
+ * 濃い青にして視認性を確保する。図鑑（collection-ui.tsx）と同じ配色。
+ */
+const RARITY_TEXT_CLASS: Record<GachaRarity, string> = {
+  N: "text-white",
+  R: "text-[#0b2a63]",
+  SR: "text-[#0f4d2e]",
+  SSR: "text-[#0b2a63]",
+  UR: "text-white",
+  LR: "text-white",
+  MR: "text-white",
+};
+
 function validRarity(rarity: string): GachaRarity {
   return (["N", "R", "SR", "SSR", "UR", "LR", "MR"] as const).includes(rarity as GachaRarity)
     ? (rarity as GachaRarity)
@@ -606,7 +620,7 @@ function RarityResultCard({ result, large = false }: { result: DrawResult; large
 
         <p
           className={`mt-[1%] flex min-h-[17%] w-full items-center justify-center line-clamp-2 font-bold leading-tight ${
-            rarity === "UR" || rarity === "LR" ? "text-white" : "text-[#514a42]"
+            RARITY_TEXT_CLASS[rarity]
           } ${large ? "text-base" : "text-[10px]"}`}
         >
           {result.name}
