@@ -48,7 +48,7 @@ export function HomeNoticeCard() {
               {summary}
             </p>
             {notices.length > 0 ? (
-              <div className="flex flex-col" style={{ gap: 2, transform: "translateX(-1.5em)" }}>
+              <div className="flex flex-col" style={{ gap: 3, transform: "translateX(-1.5em)" }}>
                 {notices.map((notice) => (
                   <p key={notice.id} className="truncate text-xs text-ink-soft">
                     ・{notice.title}
