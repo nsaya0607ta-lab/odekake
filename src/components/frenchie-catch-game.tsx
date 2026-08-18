@@ -217,6 +217,11 @@ const LV = {
   OYATSU_PT: [80, 100, 120, 140, 180],
   KETSUNADE_SEC: [4, 5, 6, 8, 10],
   BUREBUR_SEC: [4, 5, 6, 8, 10],
+  XMAS_SEC: [6, 7, 9, 10, 12],
+  XMAS_FALL: [1.8, 2, 2.2, 2.4, 2.5],
+  XMAS_SCORE: [2, 2.2, 2.5, 2.7, 3],
+  XMAS_SPAWN: [1.5, 1.6, 1.7, 1.8, 2],
+  XMAS_DOG_COUNT: [5, 6, 7, 8, 9],
 } as const;
 /** 出現量アップ系は時間増加系アイテムの取得率まで底上げしてしまうため、控えめな倍率にしている */
 const SPAWN_RATE_BOOST = 1.5;
@@ -262,6 +267,7 @@ const ITEM_SPAWN_WEIGHTS: Partial<Record<string, number>> = {
 const STRETCH_ROD_ITEM_ID = "interior_stretch_rod";
 const STRETCH_ROD_SECONDS = 3;
 const BUREBUR_ITEM_ID = "other_burebur";
+const XMAS_PARTY_ITEM_ID = "other_xmas_party";
 /** ブレブルの効果中、このレアリティ以外のアイテムは出現しなくなる */
 const HIGH_RARITY_LOCK_RARITIES = new Set<FrenchieCatchItem["rarity"]>(["SSR", "UR", "LR"]);
 const OTHER_CATEGORY_ITEM_IDS = new Set(
@@ -1101,6 +1107,19 @@ export function FrenchieCatchGame({ ownedItems }: { ownedItems: FrenchieCatchIte
                 effectLabel = `${LV.BUREBUR_SEC[lv]}秒間 SSR/UR/LRのみ出現${lvTag}`;
                 statusChanged = true;
                 break;
+              case XMAS_PARTY_ITEM_ID: {
+                const xmasSec = LV.XMAS_SEC[lv]!;
+                fallSpeedBoostUntilRef.current = now + xmasSec * 1000;
+                fallSpeedValueRef.current = LV.XMAS_FALL[lv]!;
+                multiplier15UntilRef.current = now + xmasSec * 1000;
+                multiplier15ValueRef.current = LV.XMAS_SCORE[lv]!;
+                spawnRateBoostUntilRef.current = now + xmasSec * 1000;
+                spawnRateBoostValueRef.current = LV.XMAS_SPAWN[lv]!;
+                dogFloodRemainingRef.current += LV.XMAS_DOG_COUNT[lv]!;
+                effectLabel = `${xmasSec}秒間 落下×${LV.XMAS_FALL[lv]}+得点×${LV.XMAS_SCORE[lv]}+出現量×${LV.XMAS_SPAWN[lv]} / フレブル${LV.XMAS_DOG_COUNT[lv]}体${lvTag}`;
+                statusChanged = true;
+                break;
+              }
               case DOG_FLOOD_ITEM_ID:
                 dogFloodRemainingRef.current += LV.LISTEN_DOG_COUNT[lv]!;
                 effectLabel = `フレブル${LV.LISTEN_DOG_COUNT[lv]}体 大量発生${lvTag}`;
