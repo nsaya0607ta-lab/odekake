@@ -160,10 +160,16 @@ const CURATED_ITEMS: readonly CollectionItem[] = [
   { id: "other_oyatsu_no_jikan", name: "おやつのじかん", image: "/collection/items/oyatsu-no-jikan.webp", category: "other", series: null, rarity: "SSR" },
   { id: "other_jare_a", name: "じゃれアー", image: "/collection/items/jare-a.webp", category: "other", series: null, rarity: "SSR" },
   { id: "other_ketsunade_a", name: "けつなでアー", image: "/collection/items/ketsunade-a.png", category: "other", series: null, rarity: "SSR" },
+  { id: "other_omochi_janai", name: "おもちじゃない...!?", image: "/collection/items/omochi-janai.webp", category: "other", series: null, rarity: "SSR" },
+  { id: "other_oyasumi", name: "おやすみ", image: "/collection/items/oyasumi.webp", category: "other", series: null, rarity: "SSR" },
+  { id: "other_nisoku_a", name: "二足アー", image: "/collection/items/nisoku-a.webp", category: "other", series: null, rarity: "SSR" },
   { id: "other_listen_to_the_a", name: "Listen to the a-", image: "/collection/items/listen-to-the-a.png", category: "other", series: null, rarity: "LR" },
+  { id: "other_okaeri", name: "おかえり", image: "/collection/items/okaeri.webp", category: "other", series: null, rarity: "LR" },
+  { id: "other_omoi_bashira", name: "一家の大オモ柱", image: "/collection/items/omoi-bashira.webp", category: "other", series: null, rarity: "UR" },
 
   // --- 通常図鑑：MR ----------------------------------------------------
   { id: "other_burebur", name: "ブレブル", image: "/collection/items/burebur.webp", category: "other", series: null, rarity: "MR" },
+  { id: "other_xmas_party", name: "Xmas Party", image: "/collection/items/xmas-party.webp", category: "other", series: null, rarity: "MR" },
 
   // --- 通常図鑑：おでかけ小物 ------------------------------------------
   { id: "other_yellow_rain_boots", name: "きいろのながぐつ", image: "/collection/items/yellow-rain-boots.webp", category: "other", series: null, rarity: "N" },
