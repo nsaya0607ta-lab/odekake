@@ -72,6 +72,7 @@ export const GACHA_PRIZES: readonly GachaPrize[] = [
   { id: "other_nakayoshi_azubee", name: "なかよしあずびー", rarity: "SSR", type: "item", pool: "regular", image: "/collection/items/890D1313-B79F-493C-97C2-1898F7663C01.png" },
   { id: "other_komochi", name: "こもち", rarity: "UR", type: "item", pool: "regular", image: "/collection/items/C7DF48F4-588E-4B31-983E-A52623328924.png" },
   { id: "other_azuki", name: "小豆(あずき)", rarity: "UR", type: "item", pool: "regular", image: "/collection/items/6F31AD19-B242-42D6-83D3-380A3F3D3FC0.png" },
+  { id: "other_omoi_bashira", name: "一家の大オモ柱", rarity: "UR", type: "item", pool: "regular", image: "/collection/items/omoi-bashira.webp" },
   { id: "other_kobee", name: "こびー", rarity: "UR", type: "item", pool: "regular", image: "/collection/items/4FA70BBA-6CBA-42B2-9A96-4B07AFDF56E0.png" },
   { id: "other_kamunayo", name: "かむなよ", rarity: "SSR", type: "item", pool: "regular", image: "/collection/items/7FEA86AD-6904-4151-BEA8-5A33F7C97B01.png" },
   { id: "other_hamigaki", name: "はみがき", rarity: "SSR", type: "item", pool: "regular", image: "/collection/items/hamigaki.webp" },
