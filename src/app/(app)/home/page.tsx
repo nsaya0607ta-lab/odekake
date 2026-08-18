@@ -8,6 +8,7 @@ import { SharedTripBadge } from "@/components/shared-trip-badge";
 import { HomeScene } from "@/components/home-scene";
 import { HomeCollectionCard } from "@/components/home-collection-card";
 import { HomeHighlightsCarousel } from "@/components/home-highlights-carousel";
+import { HomeNoticeCard } from "@/components/home-notice-card";
 import { LevelTag } from "@/components/level-tag";
 import { StepsTag } from "@/components/steps-tag";
 import { WanderingFrenchie } from "@/components/wandering-frenchie";
@@ -137,6 +138,8 @@ export default async function HomePage({
         ) : null}
 
         <div className="mt-[10px] space-y-2">
+          <HomeNoticeCard />
+
           <section className="rough-card overflow-visible">
             <div className="relative aspect-[1440/768] overflow-visible bg-transparent">
               <HomeScene>
