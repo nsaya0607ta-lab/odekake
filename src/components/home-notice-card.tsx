@@ -57,7 +57,11 @@ export function HomeNoticeCard() {
               </div>
             ) : null}
           </div>
-          <IconChevronRight size={18} className="shrink-0 text-ink-faint" />
+          <IconChevronRight
+            size={18}
+            className="shrink-0 text-ink-faint"
+            style={{ transform: "translate(-2em, 12px)" }}
+          />
         </div>
       </div>
     </Link>
