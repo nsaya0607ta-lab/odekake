@@ -46,7 +46,7 @@ export default async function HomePage({
       getOwnedItemIds(supabase, user.id),
       getCurrentDogSkin(supabase, user.id),
       supabase.from("profiles").select("profile_image_url, introduction").eq("user_id", user.id).maybeSingle(),
-      getFriendsActivityFeed(supabase, 10),
+      getFriendsActivityFeed(supabase, 30),
       getFriendsStepsRanking(supabase, 20),
     ]);
 
@@ -62,15 +62,17 @@ export default async function HomePage({
   const expProgress = getExpProgress(expDashboard.totalExp);
   const collectedItems = countOwned(COLLECTION_ITEMS, ownedItemIds);
 
-  // フレンドごとに最新1件だけ残して、「みんなのおでかけ」に同じ人が並ばないようにする。
+  // フレンドごとに最新1件だけ残し、24時間より前の登録は「みんなのおでかけ」に出さない。
+  const ONE_DAY_MS = 24 * 60 * 60 * 1000;
+  const activityCutoff = Date.now() - ONE_DAY_MS;
   const seenFriendIds = new Set<string>();
   const latestFriendActivity = friendActivity
+    .filter((row) => new Date(row.registered_at).getTime() >= activityCutoff)
     .filter((row) => {
       if (seenFriendIds.has(row.friend_user_id)) return false;
       seenFriendIds.add(row.friend_user_id);
       return true;
     })
-    .slice(0, 3)
     .map((row) => ({
       key: row.friend_user_id,
       displayName: row.display_name,

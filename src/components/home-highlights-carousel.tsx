@@ -1,7 +1,8 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState, type ReactNode, type TouchEvent } from "react";
-import { IconMapPin, IconPaw, IconUser } from "@/components/icons";
+import { IconClock, IconMapPin, IconPaw, IconUser } from "@/components/icons";
+import { formatRelativeTimeJa } from "@/lib/date";
 
 const AUTO_ADVANCE_MS = 5000;
 const SWIPE_THRESHOLD_PX = 40;
@@ -255,9 +256,12 @@ function ActivitySlide({ data }: { data: FriendActivitySlideData }) {
       <span className="text-base font-bold tracking-[0.15em] text-ink-soft" style={{ marginTop: -31 }}>
         みんなのおでかけ
       </span>
-      <div className="flex w-full flex-1 flex-col justify-center gap-1.5">
-        {data.slice(0, 3).map((item) => (
-          <div key={item.key} className="flex items-center gap-2 rounded-xl bg-paper/70 px-2.5 py-1.5">
+      <div
+        className="flex w-full flex-1 flex-col gap-1.5 overflow-y-auto overscroll-contain py-1"
+        style={{ touchAction: "pan-y" }}
+      >
+        {data.map((item) => (
+          <div key={item.key} className="flex shrink-0 items-center gap-2 rounded-xl bg-paper/70 px-2.5 py-1.5">
             <span className="flex h-8 w-8 shrink-0 items-center justify-center overflow-hidden rounded-full bg-card">
               {item.avatarUrl ? (
                 // eslint-disable-next-line @next/next/no-img-element
@@ -267,9 +271,15 @@ function ActivitySlide({ data }: { data: FriendActivitySlideData }) {
               )}
             </span>
             <span className="min-w-0 flex-1 truncate text-sm font-bold text-ink">{item.displayName}</span>
-            <span className="flex min-w-0 shrink-0 items-center gap-1 text-sm font-bold text-leaf-deep">
-              <IconMapPin size={14} className="shrink-0" />
-              <span className="max-w-[120px] truncate">{item.spotName}</span>
+            <span className="flex min-w-0 shrink-0 flex-col items-end gap-0.5">
+              <span className="flex min-w-0 items-center gap-1 text-sm font-bold text-leaf-deep">
+                <IconMapPin size={14} className="shrink-0" />
+                <span className="max-w-[110px] truncate">{item.spotName}</span>
+              </span>
+              <span className="flex items-center gap-1 text-[10px] text-ink-faint">
+                <IconClock size={10} />
+                {formatRelativeTimeJa(item.registeredAt)}
+              </span>
             </span>
           </div>
         ))}
@@ -282,7 +292,7 @@ function StepsSlide({ data }: { data: FriendStepsSlideData }) {
   const RANK_TONE = ["sun", "sky", "apricot"] as const;
 
   return (
-    <div className="flex h-full w-full flex-col items-center overflow-hidden">
+    <div className="flex h-full w-full flex-col items-center">
       <span className="text-base font-bold tracking-[0.15em] text-ink-soft" style={{ marginTop: -31 }}>
         フレンドの歩数
       </span>
