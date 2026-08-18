@@ -141,7 +141,7 @@ const MYSTERY_SKILL_ITEM_IDS = [
   "other_kamunayo", "hiking_frenchie", "snow_frenchie", "summer_frenchie", "interior_kinoko_azubee",
   "other_komochi", "other_azuki", "other_kobee", "other_hamigaki", "other_ikea", "other_orusuban",
   "other_pondeomo", "other_pondear", "other_kurumari_a", "other_jare_a", "other_ketsunade_a", "other_omochi_janai",
-  "interior_shikkoku_no_ar", "interior_ragby_ar", "other_oyatsu_no_jikan", "other_listen_to_the_a",
+  "interior_shikkoku_no_ar", "interior_ragby_ar", "other_oyatsu_no_jikan", "other_listen_to_the_a", "other_okaeri",
 ];
 
 /** アイテムごとのLv1〜5パラメータ（item_skill_levels_colored.xlsxの「スキル一覧」シート通り） */
@@ -224,6 +224,8 @@ const LV = {
   XMAS_DOG_COUNT: [5, 6, 7, 8, 9],
   OMOCHI_SEC: [4, 5, 6, 8, 10],
   OMOCHI_PT: [10, 15, 20, 25, 30],
+  OKAERI_SEC: 3,
+  OKAERI_PER_CATCH: [3, 4, 5, 6, 7],
 } as const;
 /** 出現量アップ系は時間増加系アイテムの取得率まで底上げしてしまうため、控えめな倍率にしている */
 const SPAWN_RATE_BOOST = 1.5;
@@ -271,6 +273,7 @@ const STRETCH_ROD_SECONDS = 3;
 const BUREBUR_ITEM_ID = "other_burebur";
 const XMAS_PARTY_ITEM_ID = "other_xmas_party";
 const OMOCHI_ITEM_ID = "other_omochi_janai";
+const OKAERI_ITEM_ID = "other_okaeri";
 /** ブレブルの効果中、このレアリティ以外のアイテムは出現しなくなる */
 const HIGH_RARITY_LOCK_RARITIES = new Set<FrenchieCatchItem["rarity"]>(["SSR", "UR", "LR"]);
 const OTHER_CATEGORY_ITEM_IDS = new Set(
@@ -371,6 +374,8 @@ export function FrenchieCatchGame({ ownedItems }: { ownedItems: FrenchieCatchIte
   const highRarityLockUntilRef = useRef(0);
   const omochiUntilRef = useRef(0);
   const omochiPtValueRef = useRef(10);
+  const okaeriUntilRef = useRef(0);
+  const okaeriPerCatchValueRef = useRef(3);
   const dogFloodRemainingRef = useRef(0);
   const slantBoostUntilRef = useRef(0);
   const boxShrinkUntilRef = useRef(0);
@@ -427,6 +432,7 @@ export function FrenchieCatchGame({ ownedItems }: { ownedItems: FrenchieCatchIte
     if (now < otherSuppressUntilRef.current) labels.push(`その他カテゴリ出現×${otherSuppressValueRef.current}中`);
     if (now < highRarityLockUntilRef.current) labels.push("SSR/UR/LRのみ出現中");
     if (now < omochiUntilRef.current) labels.push(`うんちがおもちに +${omochiPtValueRef.current}pt`);
+    if (now < okaeriUntilRef.current) labels.push(`1個ごとに+${okaeriPerCatchValueRef.current}秒`);
     if (now < slantBoostUntilRef.current) labels.push("斜め落下中");
     if (now < boxShrinkUntilRef.current) labels.push("ダンボール0.8倍");
     else if (now < boxWideUntilRef.current) labels.push(`ダンボール×${boxWideScaleRef.current}拡大中`);
@@ -986,6 +992,11 @@ export function FrenchieCatchGame({ ownedItems }: { ownedItems: FrenchieCatchIte
               return seconds;
             };
 
+            if (now < okaeriUntilRef.current) {
+              addBonusTime(okaeriPerCatchValueRef.current);
+              statusChanged = true;
+            }
+
             /** しびれ/ダンボール縮小/時間減少のいずれかを1回だけ防ぐガードを、まだ持っていない種類からランダムで1つ付与する */
             const grantRandomHazardGuard = (): HazardGuardKind | null => {
               const candidates = HAZARD_GUARD_KINDS.filter((kind) => {
@@ -1201,6 +1212,13 @@ export function FrenchieCatchGame({ ownedItems }: { ownedItems: FrenchieCatchIte
                 effectLabel = `${LV.SPARKLE_SEC[lv]}秒間 ミニマグネット${lvTag}`;
                 statusChanged = true;
                 break;
+              case OKAERI_ITEM_ID: {
+                okaeriUntilRef.current = now + LV.OKAERI_SEC * 1000;
+                okaeriPerCatchValueRef.current = LV.OKAERI_PER_CATCH[lv]!;
+                effectLabel = `${LV.OKAERI_SEC}秒間 取った個数×${LV.OKAERI_PER_CATCH[lv]}秒${lvTag}`;
+                statusChanged = true;
+                break;
+              }
               case OMOCHI_ITEM_ID: {
                 const omochiSec = LV.OMOCHI_SEC[lv]!;
                 omochiUntilRef.current = now + omochiSec * 1000;
@@ -1521,6 +1539,8 @@ export function FrenchieCatchGame({ ownedItems }: { ownedItems: FrenchieCatchIte
     highRarityLockUntilRef.current = 0;
     omochiUntilRef.current = 0;
     omochiPtValueRef.current = 10;
+    okaeriUntilRef.current = 0;
+    okaeriPerCatchValueRef.current = 3;
     dogFloodRemainingRef.current = 0;
     slantBoostUntilRef.current = 0;
     boxShrinkUntilRef.current = 0;
