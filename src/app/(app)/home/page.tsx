@@ -46,7 +46,7 @@ export default async function HomePage({
       getOwnedItemIds(supabase, user.id),
       getCurrentDogSkin(supabase, user.id),
       supabase.from("profiles").select("profile_image_url, introduction").eq("user_id", user.id).maybeSingle(),
-      getFriendsActivityFeed(supabase, 1),
+      getFriendsActivityFeed(supabase, 10),
       getFriendsStepsRanking(supabase, 3),
     ]);
 
@@ -62,16 +62,22 @@ export default async function HomePage({
   const expProgress = getExpProgress(expDashboard.totalExp);
   const collectedItems = countOwned(COLLECTION_ITEMS, ownedItemIds);
 
-  const latestFriendActivity = friendActivity[0]
-    ? {
-        displayName: friendActivity[0].display_name,
-        avatarUrl: friendActivity[0].profile_image_url
-          ? (friendAvatarUrls.get(friendActivity[0].profile_image_url) ?? null)
-          : null,
-        spotName: friendActivity[0].spot_name,
-        registeredAt: friendActivity[0].registered_at,
-      }
-    : null;
+  // フレンドごとに最新1件だけ残して、「みんなのおでかけ」に同じ人が並ばないようにする。
+  const seenFriendIds = new Set<string>();
+  const latestFriendActivity = friendActivity
+    .filter((row) => {
+      if (seenFriendIds.has(row.friend_user_id)) return false;
+      seenFriendIds.add(row.friend_user_id);
+      return true;
+    })
+    .slice(0, 3)
+    .map((row) => ({
+      key: row.friend_user_id,
+      displayName: row.display_name,
+      avatarUrl: row.profile_image_url ? (friendAvatarUrls.get(row.profile_image_url) ?? null) : null,
+      spotName: row.spot_name,
+      registeredAt: row.registered_at,
+    }));
 
   const friendStepsRanking = friendSteps.map((row) => ({
     friendUserId: row.friend_user_id,
