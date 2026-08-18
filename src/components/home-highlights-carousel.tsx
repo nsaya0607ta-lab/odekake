@@ -108,7 +108,11 @@ export function HomeHighlightsCarousel({
   };
 
   return (
-    <section aria-label="実績とフレンドの様子" className="relative top-2">
+    <section
+      aria-label="実績とフレンドの様子"
+      className="relative top-2"
+      style={{ marginLeft: -25, marginRight: -33 }}
+    >
       <div className="relative overflow-hidden" onTouchStart={handleTouchStart} onTouchEnd={handleTouchEnd}>
         <div
           className="flex transition-transform duration-500 ease-out"
@@ -182,7 +186,9 @@ function StatsSlide({ data }: { data: HomeStatsSlideData }) {
 
   return (
     <div className="flex h-full w-full flex-col items-center">
-      <span className="mt-1 text-base font-bold tracking-[0.15em] text-ink-soft">あなたの実績</span>
+      <span className="text-base font-bold tracking-[0.15em] text-ink-soft" style={{ marginTop: -46 }}>
+        あなたの実績
+      </span>
       <div className="grid w-full flex-1 grid-cols-3 items-center">
         {items.map((item, itemIndex) => (
           <div
