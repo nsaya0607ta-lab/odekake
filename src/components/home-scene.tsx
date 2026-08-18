@@ -16,7 +16,7 @@
 export const SCENE_RATIO = "1440 / 768";
 
 const SCENE_SRC = "/characters/home-scene.webp";
-const FRAME_SRC = "/home-scene-frame.png";
+const FRAME_SRC = "/home-scene-frame.webp";
 
 /**
  * 板の位置（絵の箱に対する％）。元画像 1717×916 上で実測した座標から出している。

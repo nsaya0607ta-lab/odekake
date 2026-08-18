@@ -132,25 +132,25 @@ const CURATED_ITEMS: readonly CollectionItem[] = [
   { id: "food_honey_butter_toast", name: "はちみつバタートースト", image: "/collection/items/honey-butter-toast.webp", category: "food", series: null, rarity: "N" },
 
   // --- 通常図鑑：インテリア ------------------------------------------
-  { id: "interior_stretch_rod", name: "ストレッチ棒", image: "/collection/items/stretch-rod.png", category: "interior", series: null, rarity: "R" },
+  { id: "interior_stretch_rod", name: "ストレッチ棒", image: "/collection/items/stretch-rod.webp", category: "interior", series: null, rarity: "R" },
   { id: "interior_anball", name: "アンボール", image: "/collection/items/anball.webp", category: "interior", series: null, rarity: "UR" },
-  { id: "interior_kinoko_azubee", name: "きのこあずびー", image: "/collection/items/3365FE0A-4198-4C04-BA73-A7BAC18F73F5.png", category: "interior", series: null, rarity: "UR" },
+  { id: "interior_kinoko_azubee", name: "きのこあずびー", image: "/collection/items/3365FE0A-4198-4C04-BA73-A7BAC18F73F5.webp", category: "interior", series: null, rarity: "UR" },
   { id: "interior_sleepy_moon", name: "おやすみムーン", image: "/collection/items/sleepy-moon.webp", category: "interior", series: null, rarity: "SR" },
   { id: "interior_spring_flower_wreath", name: "はるいろフラワーリース", image: "/collection/items/spring-flower-wreath.webp", category: "interior", series: null, rarity: "SR" },
   { id: "interior_shikkoku_no_ar", name: "漆黒のアー", image: "/collection/items/shikkoku-no-ar.webp", category: "interior", series: null, rarity: "LR" },
-  { id: "interior_ragby_ar", name: "ラグビーアー", image: "/collection/items/ragby-ar.png", category: "interior", series: null, rarity: "LR" },
+  { id: "interior_ragby_ar", name: "ラグビーアー", image: "/collection/items/ragby-ar.webp", category: "interior", series: null, rarity: "LR" },
 
   // --- 通常図鑑：アクセサリー ----------------------------------------
   { id: "other_sparkle_rope_crown", name: "きらきらロープクラウン", image: "/collection/items/sparkle-rope-crown.webp", category: "accessory", series: null, rarity: "SR" },
 
   // --- 通常図鑑：その他 ----------------------------------------------
   { id: "other_azubee", name: "あずびー", image: "/collection/items/two-dogs-icon-transparent.webp", category: "other", series: null, rarity: "UR" },
-  { id: "other_omojii", name: "おもじぃ", image: "/collection/items/8B027535-244F-4729-86F5-A69CDD91D103.png", category: "other", series: null, rarity: "UR" },
-  { id: "other_nakayoshi_azubee", name: "なかよしあずびー", image: "/collection/items/890D1313-B79F-493C-97C2-1898F7663C01.png", category: "other", series: null, rarity: "SSR" },
-  { id: "other_komochi", name: "こもち", image: "/collection/items/C7DF48F4-588E-4B31-983E-A52623328924.png", category: "other", series: null, rarity: "UR" },
-  { id: "other_azuki", name: "小豆(あずき)", image: "/collection/items/6F31AD19-B242-42D6-83D3-380A3F3D3FC0.png", category: "other", series: null, rarity: "UR" },
-  { id: "other_kobee", name: "こびー", image: "/collection/items/4FA70BBA-6CBA-42B2-9A96-4B07AFDF56E0.png", category: "other", series: null, rarity: "UR" },
-  { id: "other_kamunayo", name: "かむなよ", image: "/collection/items/7FEA86AD-6904-4151-BEA8-5A33F7C97B01.png", category: "other", series: null, rarity: "SSR" },
+  { id: "other_omojii", name: "おもじぃ", image: "/collection/items/8B027535-244F-4729-86F5-A69CDD91D103.webp", category: "other", series: null, rarity: "UR" },
+  { id: "other_nakayoshi_azubee", name: "なかよしあずびー", image: "/collection/items/890D1313-B79F-493C-97C2-1898F7663C01.webp", category: "other", series: null, rarity: "SSR" },
+  { id: "other_komochi", name: "こもち", image: "/collection/items/C7DF48F4-588E-4B31-983E-A52623328924.webp", category: "other", series: null, rarity: "UR" },
+  { id: "other_azuki", name: "小豆(あずき)", image: "/collection/items/6F31AD19-B242-42D6-83D3-380A3F3D3FC0.webp", category: "other", series: null, rarity: "UR" },
+  { id: "other_kobee", name: "こびー", image: "/collection/items/4FA70BBA-6CBA-42B2-9A96-4B07AFDF56E0.webp", category: "other", series: null, rarity: "UR" },
+  { id: "other_kamunayo", name: "かむなよ", image: "/collection/items/7FEA86AD-6904-4151-BEA8-5A33F7C97B01.webp", category: "other", series: null, rarity: "SSR" },
   { id: "other_hamigaki", name: "はみがき", image: "/collection/items/hamigaki.webp", category: "other", series: null, rarity: "SSR" },
   { id: "other_ikea", name: "IKEA", image: "/collection/items/ikea.webp", category: "other", series: null, rarity: "SSR" },
   { id: "other_orusuban", name: "おるすばん", image: "/collection/items/orusuban.webp", category: "other", series: null, rarity: "SSR" },
@@ -159,11 +159,11 @@ const CURATED_ITEMS: readonly CollectionItem[] = [
   { id: "other_pondear", name: "ぽんでアー", image: "/collection/items/pondear.webp", category: "other", series: null, rarity: "SSR" },
   { id: "other_oyatsu_no_jikan", name: "おやつのじかん", image: "/collection/items/oyatsu-no-jikan.webp", category: "other", series: null, rarity: "SSR" },
   { id: "other_jare_a", name: "じゃれアー", image: "/collection/items/jare-a.webp", category: "other", series: null, rarity: "SSR" },
-  { id: "other_ketsunade_a", name: "けつなでアー", image: "/collection/items/ketsunade-a.png", category: "other", series: null, rarity: "SSR" },
+  { id: "other_ketsunade_a", name: "けつなでアー", image: "/collection/items/ketsunade-a.webp", category: "other", series: null, rarity: "SSR" },
   { id: "other_omochi_janai", name: "おもちじゃない...!?", image: "/collection/items/omochi-janai.webp", category: "other", series: null, rarity: "SSR" },
   { id: "other_oyasumi", name: "おやすみ", image: "/collection/items/oyasumi.webp", category: "other", series: null, rarity: "SSR" },
   { id: "other_nisoku_a", name: "二足アー", image: "/collection/items/nisoku-a.webp", category: "other", series: null, rarity: "SSR" },
-  { id: "other_listen_to_the_a", name: "Listen to the a-", image: "/collection/items/listen-to-the-a.png", category: "other", series: null, rarity: "LR" },
+  { id: "other_listen_to_the_a", name: "Listen to the a-", image: "/collection/items/listen-to-the-a.webp", category: "other", series: null, rarity: "LR" },
   { id: "other_okaeri", name: "おかえり", image: "/collection/items/okaeri.webp", category: "other", series: null, rarity: "LR" },
   { id: "other_omoi_bashira", name: "一家の大オモ柱", image: "/collection/items/omoi-bashira.webp", category: "other", series: null, rarity: "UR" },
 

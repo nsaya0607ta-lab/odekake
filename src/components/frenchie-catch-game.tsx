@@ -43,7 +43,7 @@ type CatchFeedback = {
 };
 
 const ROUND_SECONDS = 30;
-const BOX_IMAGE = "/4EA485D9-BB37-47F3-97F0-111CF0E4AF7E.png";
+const BOX_IMAGE = "/4EA485D9-BB37-47F3-97F0-111CF0E4AF7E.webp";
 const BOX_WIDTH = 37.8 * 0.9;
 const BOX_HALF = BOX_WIDTH / 2;
 const BOX_HEIGHT = BOX_WIDTH * 0.75;
