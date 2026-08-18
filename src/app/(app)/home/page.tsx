@@ -82,7 +82,7 @@ export default async function HomePage({
           </p>
         ) : null}
 
-        <div className="space-y-2">
+        <div className="mt-[10px] space-y-2">
           <section className="rough-card overflow-visible">
             <div className="relative aspect-[1440/768] overflow-visible bg-transparent">
               <HomeScene>
