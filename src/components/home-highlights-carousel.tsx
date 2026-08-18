@@ -33,10 +33,12 @@ export type FriendActivitySlideData = {
 }[];
 
 export type FriendStepsSlideData = {
-  friendUserId: string;
+  id: string;
   displayName: string;
   avatarUrl: string | null;
   steps: number;
+  rank: number;
+  isSelf: boolean;
 }[];
 
 type Slide =
@@ -189,7 +191,7 @@ function StatsSlide({ data }: { data: HomeStatsSlideData }) {
       <span className="text-base font-bold tracking-[0.15em] text-ink-soft" style={{ marginTop: -31 }}>
         あなたの実績
       </span>
-      <div className="grid w-full flex-1 grid-cols-3 items-center">
+      <div className="grid w-full flex-1 grid-cols-3 items-center" style={{ marginTop: 15 }}>
         {items.map((item, itemIndex) => (
           <div
             key={item.label}
@@ -242,33 +244,49 @@ function ActivitySlide({ data }: { data: FriendActivitySlideData }) {
 
 function StepsSlide({ data }: { data: FriendStepsSlideData }) {
   const RANK_TONE = ["sun", "sky", "apricot"] as const;
+  const top = data.filter((entry) => entry.rank <= 5);
+  const selfOutsideTop = data.find((entry) => entry.isSelf && entry.rank > 5);
+  const rows = selfOutsideTop ? [...top, selfOutsideTop] : top;
 
   return (
     <div className="flex h-full w-full flex-col items-center">
       <span className="text-base font-bold tracking-[0.15em] text-ink-soft" style={{ marginTop: -31 }}>
         フレンドの歩数
       </span>
-      <div className="flex w-full flex-1 flex-col justify-center gap-1.5">
-        {data.slice(0, 3).map((friend, rankIndex) => (
-          <div key={friend.friendUserId} className="flex items-center gap-2 rounded-xl bg-paper/70 px-2.5 py-1.5">
-            <span
-              className={`flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-[11px] font-bold ${toneBg(RANK_TONE[rankIndex] ?? "sky")} ${toneText(RANK_TONE[rankIndex] ?? "sky")}`}
+      <div className="flex w-full flex-1 flex-col justify-center gap-1">
+        {rows.map((entry, rowIndex) => (
+          <div key={entry.id}>
+            {selfOutsideTop && rowIndex === rows.length - 1 ? (
+              <div className="my-0.5 flex items-center justify-center text-[10px] text-ink-faint">…</div>
+            ) : null}
+            <div
+              className={`flex items-center gap-2 rounded-xl px-2.5 py-1 ${entry.isSelf ? "bg-leaf-soft/70 ring-1 ring-leaf/50" : "bg-paper/70"}`}
             >
-              {rankIndex + 1}
-            </span>
-            <span className="flex h-8 w-8 shrink-0 items-center justify-center overflow-hidden rounded-full bg-card">
-              {friend.avatarUrl ? (
-                // eslint-disable-next-line @next/next/no-img-element
-                <img src={friend.avatarUrl} alt="" className="h-full w-full object-cover" />
-              ) : (
-                <IconUser size={16} className="text-ink-faint" />
-              )}
-            </span>
-            <span className="min-w-0 flex-1 truncate text-sm font-bold text-ink">{friend.displayName}</span>
-            <span className="flex shrink-0 items-center gap-1 text-sm font-bold tabular-nums text-ink">
-              <IconPaw size={14} className="text-sun" />
-              {friend.steps.toLocaleString("ja-JP")}
-            </span>
+              <span
+                className={`flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-[11px] font-bold ${
+                  entry.rank <= 3 && RANK_TONE[entry.rank - 1]
+                    ? `${toneBg(RANK_TONE[entry.rank - 1]!)} ${toneText(RANK_TONE[entry.rank - 1]!)}`
+                    : "bg-paper-deep text-ink-soft"
+                }`}
+              >
+                {entry.rank}
+              </span>
+              <span className="flex h-7 w-7 shrink-0 items-center justify-center overflow-hidden rounded-full bg-card">
+                {entry.avatarUrl ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img src={entry.avatarUrl} alt="" className="h-full w-full object-cover" />
+                ) : (
+                  <IconUser size={14} className="text-ink-faint" />
+                )}
+              </span>
+              <span className="min-w-0 flex-1 truncate text-sm font-bold text-ink">
+                {entry.isSelf ? "あなた" : entry.displayName}
+              </span>
+              <span className="flex shrink-0 items-center gap-1 text-sm font-bold tabular-nums text-ink">
+                <IconPaw size={13} className="text-sun" />
+                {entry.steps.toLocaleString("ja-JP")}
+              </span>
+            </div>
           </div>
         ))}
       </div>

@@ -47,7 +47,7 @@ export default async function HomePage({
       getCurrentDogSkin(supabase, user.id),
       supabase.from("profiles").select("profile_image_url, introduction").eq("user_id", user.id).maybeSingle(),
       getFriendsActivityFeed(supabase, 10),
-      getFriendsStepsRanking(supabase, 3),
+      getFriendsStepsRanking(supabase, 10),
     ]);
 
   const friendAvatarPaths = [
@@ -79,11 +79,27 @@ export default async function HomePage({
       registeredAt: row.registered_at,
     }));
 
-  const friendStepsRanking = friendSteps.map((row) => ({
-    friendUserId: row.friend_user_id,
-    displayName: row.display_name,
-    avatarUrl: row.profile_image_url ? (friendAvatarUrls.get(row.profile_image_url) ?? null) : null,
-    steps: row.steps,
+  // フレンドの歩数ランキングに自分も加えて、自分の順位も分かるようにする。
+  const stepsRankingEntries = [
+    ...friendSteps.map((row) => ({
+      id: row.friend_user_id,
+      displayName: row.display_name,
+      avatarUrl: row.profile_image_url ? (friendAvatarUrls.get(row.profile_image_url) ?? null) : null,
+      steps: row.steps,
+      isSelf: false,
+    })),
+    {
+      id: user.id,
+      displayName: user.displayName,
+      avatarUrl,
+      steps: expDashboard.todaySteps ?? 0,
+      isSelf: true,
+    },
+  ].sort((a, b) => b.steps - a.steps);
+
+  const friendStepsRanking = stepsRankingEntries.map((entry, entryIndex) => ({
+    ...entry,
+    rank: entryIndex + 1,
   }));
 
   return (
