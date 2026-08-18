@@ -9,9 +9,11 @@ import { IconChevronRight } from "@/components/icons";
  * 件数が変わっても絵を描き直す必要はない）。
  *
  * 本のイラストは絵の左 32.4%、花のイラストは右 89.8% から始まるので、
- * 文字はその間（左 34% 〜 右 12% を除いた範囲）に収める。
+ * 文字はその間（左 37% 〜 右 12% を除いた範囲）に収める。
+ *
+ * 元絵の縦横比のままだとカードが縦に大きすぎるため、絵を縦だけ約15%圧縮して表示する。
  */
-const CARD_RATIO = "2172 / 724";
+const CARD_RATIO = "2172 / 615";
 
 const CARD_SRC = "/collection-card.webp";
 
@@ -42,7 +44,10 @@ export function HomeCollectionCard({
         />
         <div className="absolute inset-0 flex items-center" style={{ paddingLeft: "37%", paddingRight: "12%" }}>
           <div className="flex w-full min-w-0 items-center justify-between gap-2">
-            <p className="min-w-0 truncate text-lg font-bold text-ink">図鑑を見る</p>
+            <div className="min-w-0">
+              <p className="truncate text-lg font-bold text-ink">図鑑を見る</p>
+              <p className="whitespace-nowrap text-xs text-ink-faint">集めたアイテムを見る</p>
+            </div>
             <div className="flex shrink-0 items-center gap-1">
               <span className="text-lg font-bold tabular-nums text-leaf-deep">
                 {collected} / {total}
