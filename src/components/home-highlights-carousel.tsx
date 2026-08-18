@@ -181,23 +181,21 @@ function StatsSlide({ data }: { data: HomeStatsSlideData }) {
   ];
 
   return (
-    <div className="flex h-full w-full flex-col items-center justify-center gap-4">
-      <span className="text-base font-bold tracking-[0.15em] text-ink-soft">あなたの実績</span>
-      <div className="grid w-full grid-cols-3">
+    <div className="flex h-full w-full flex-col items-center">
+      <span className="mt-1 text-base font-bold tracking-[0.15em] text-ink-soft">あなたの実績</span>
+      <div className="grid w-full flex-1 grid-cols-3 items-center">
         {items.map((item, itemIndex) => (
           <div
             key={item.label}
-            className={`flex flex-col items-center gap-2 px-1 text-center ${itemIndex > 0 ? "border-l border-line-strong/60" : ""}`}
+            className={`flex flex-col items-center gap-2 px-0.5 text-center ${itemIndex > 0 ? "border-l border-line-strong/60" : ""}`}
           >
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img src={item.icon} alt="" aria-hidden="true" draggable={false} className="h-14 w-14 select-none" />
-            <span className="leading-none font-bold tabular-nums text-ink">
-              <span className="text-2xl">{item.value}</span>
-              {item.total !== null ? (
-                <span className="text-sm text-ink-faint"> / {item.total}</span>
-              ) : (
-                <span className="text-sm text-ink-faint">回</span>
-              )}
+            <span className="flex flex-col items-center gap-0.5 leading-none">
+              <span className="text-2xl font-bold tabular-nums text-ink">{item.value}</span>
+              <span className="text-[11px] font-bold whitespace-nowrap tabular-nums text-ink-faint">
+                {item.total !== null ? `/ ${item.total}` : "回"}
+              </span>
             </span>
             <span className="text-xs font-bold text-ink-soft">{item.label}</span>
           </div>
