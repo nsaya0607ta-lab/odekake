@@ -41,7 +41,12 @@ export function HomeNoticeCard() {
         />
         <div className="absolute inset-0 flex items-center gap-1" style={{ paddingLeft: "37%", paddingRight: "8%" }}>
           <div className="flex min-w-0 flex-1 flex-col gap-1">
-            <p className="truncate text-base font-bold text-ink">{summary}</p>
+            <p
+              className="truncate text-sm font-bold text-ink"
+              style={{ marginLeft: "11%", transform: "translate(10px, -5px)" }}
+            >
+              {summary}
+            </p>
             {notices.length > 0 ? (
               <div className="flex flex-col" style={{ gap: 2 }}>
                 {notices.map((notice) => (
