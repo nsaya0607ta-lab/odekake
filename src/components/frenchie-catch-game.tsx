@@ -261,16 +261,22 @@ const DEFAULT_ITEM_SPAWN_WEIGHT = 100;
  * 時間増加系7種＋おもじぃの出現重みをさらに下げて、Lv5でも最終プレイ時間が180秒程度に収まるよう調整している。
  * （出現量アップ側の重み・秒数を下げると、浮いた確率が時間増加系側に再配分されてかえって悪化するため、
  * 　時間増加系側の重みを絞るのが正しいレバーだった）
+ *
+ * other_listen_to_the_a（LR、一撃で大量スコアが出やすいため出現重みを半分に調整）は
+ * 時間・出現量には無関係だが、重みを下げた分だけプール全体の合計重みが減り、他アイテムの
+ * 取得確率が僅かに底上げされてLv5の最終プレイ時間が180秒を超えてしまう。
+ * そのため上と同じ「時間増加系7種＋宝箱」の重みを底上げ分だけ相殺し、Lv5の時間増加を打ち消している。
  */
 const ITEM_SPAWN_WEIGHTS: Partial<Record<string, number>> = {
-  toy_treasure_puzzle: 300,
-  other_omojii: 69,
-  toy_duck_plush: 86,
-  toy_carrot: 86,
-  food_paw_melon_bread: 86,
-  interior_anball: 86,
-  other_azuki: 86,
-  summer_frenchie: 86,
+  toy_treasure_puzzle: 298.4,
+  other_omojii: 68.6,
+  toy_duck_plush: 85.5,
+  toy_carrot: 85.5,
+  food_paw_melon_bread: 85.5,
+  interior_anball: 85.5,
+  other_azuki: 85.5,
+  summer_frenchie: 85.5,
+  other_listen_to_the_a: 50,
 };
 const STRETCH_ROD_ITEM_ID = "interior_stretch_rod";
 const STRETCH_ROD_SECONDS = 3;
