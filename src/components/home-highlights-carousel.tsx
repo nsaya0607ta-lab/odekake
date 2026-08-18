@@ -168,7 +168,12 @@ export function HomeHighlightsCarousel({
       </div>
 
       {slides.length > 1 ? (
-        <div className="mt-1.5 flex items-center justify-center gap-1.5" role="tablist" aria-label="表示切り替え">
+        <div
+          className="flex items-center justify-center gap-1.5"
+          style={{ marginTop: -9 }}
+          role="tablist"
+          aria-label="表示切り替え"
+        >
           {slides.map((_, dotIndex) => (
             <button
               key={dotIndex}
