@@ -170,7 +170,7 @@ export function HomeHighlightsCarousel({
       {slides.length > 1 ? (
         <div
           className="relative z-10 flex items-center justify-center gap-1.5"
-          style={{ marginTop: -24 }}
+          style={{ marginTop: -34 }}
           role="tablist"
           aria-label="表示切り替え"
         >
