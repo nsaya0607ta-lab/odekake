@@ -7,7 +7,7 @@ import { SoundSettingsButton } from "@/components/sound-settings-button";
 import { SharedTripBadge } from "@/components/shared-trip-badge";
 import { HomeScene } from "@/components/home-scene";
 import { HomeCollectionCard } from "@/components/home-collection-card";
-import { HomeStatsCard } from "@/components/home-stats-card";
+import { HomeHighlightsCarousel } from "@/components/home-highlights-carousel";
 import { LevelTag } from "@/components/level-tag";
 import { StepsTag } from "@/components/steps-tag";
 import { WanderingFrenchie } from "@/components/wandering-frenchie";
@@ -17,7 +17,8 @@ import { getCoinSummary } from "@/lib/data/coins";
 import { getOwnedItemIds } from "@/lib/data/collection";
 import { getCurrentDogSkin } from "@/lib/data/dog-skin";
 import { getExpDashboard } from "@/lib/data/exp";
-import { signPhotoPath } from "@/lib/data/photos";
+import { getFriendsActivityFeed, getFriendsStepsRanking } from "@/lib/data/friends";
+import { signPhotoPath, signPhotoPaths } from "@/lib/data/photos";
 import { getRecordSpace } from "@/lib/data/space";
 import { getExpProgress } from "@/lib/exp";
 import { MUNICIPALITIES, PREFECTURES } from "@/lib/geo";
@@ -37,18 +38,47 @@ export default async function HomePage({
   const [{ supabase, user }, { notice }] = await Promise.all([requireUser(), searchParams]);
   const space = await getRecordSpace(supabase, user.id);
 
-  const [areas, expDashboard, coins, ownedItemIds, dogSkin, profileResult] = await Promise.all([
-    loadAreaIndex(supabase, space.tripIds),
-    getExpDashboard(supabase, user.id),
-    getCoinSummary(supabase, user.id),
-    getOwnedItemIds(supabase, user.id),
-    getCurrentDogSkin(supabase, user.id),
-    supabase.from("profiles").select("profile_image_url, introduction").eq("user_id", user.id).maybeSingle(),
+  const [areas, expDashboard, coins, ownedItemIds, dogSkin, profileResult, friendActivity, friendSteps] =
+    await Promise.all([
+      loadAreaIndex(supabase, space.tripIds),
+      getExpDashboard(supabase, user.id),
+      getCoinSummary(supabase, user.id),
+      getOwnedItemIds(supabase, user.id),
+      getCurrentDogSkin(supabase, user.id),
+      supabase.from("profiles").select("profile_image_url, introduction").eq("user_id", user.id).maybeSingle(),
+      getFriendsActivityFeed(supabase, 1),
+      getFriendsStepsRanking(supabase, 3),
+    ]);
+
+  const friendAvatarPaths = [
+    ...friendActivity.flatMap((row) => (row.profile_image_url ? [row.profile_image_url] : [])),
+    ...friendSteps.flatMap((row) => (row.profile_image_url ? [row.profile_image_url] : [])),
+  ];
+  const [avatarUrl, friendAvatarUrls] = await Promise.all([
+    signPhotoPath(supabase, profileResult.data?.profile_image_url),
+    signPhotoPaths(supabase, friendAvatarPaths),
   ]);
-  const avatarUrl = await signPhotoPath(supabase, profileResult.data?.profile_image_url);
 
   const expProgress = getExpProgress(expDashboard.totalExp);
   const collectedItems = countOwned(COLLECTION_ITEMS, ownedItemIds);
+
+  const latestFriendActivity = friendActivity[0]
+    ? {
+        displayName: friendActivity[0].display_name,
+        avatarUrl: friendActivity[0].profile_image_url
+          ? (friendAvatarUrls.get(friendActivity[0].profile_image_url) ?? null)
+          : null,
+        spotName: friendActivity[0].spot_name,
+        registeredAt: friendActivity[0].registered_at,
+      }
+    : null;
+
+  const friendStepsRanking = friendSteps.map((row) => ({
+    friendUserId: row.friend_user_id,
+    displayName: row.display_name,
+    avatarUrl: row.profile_image_url ? (friendAvatarUrls.get(row.profile_image_url) ?? null) : null,
+    steps: row.steps,
+  }));
 
   return (
     <>
@@ -129,12 +159,16 @@ export default async function HomePage({
             </div>
           </section>
 
-          <HomeStatsCard
-            prefectures={areas.totals.visitedPrefectures}
-            prefectureTotal={PREFECTURES.length}
-            municipalities={areas.totals.visitedMunicipalities}
-            municipalityTotal={MUNICIPALITIES.length}
-            visits={areas.totals.visits}
+          <HomeHighlightsCarousel
+            stats={{
+              prefectures: areas.totals.visitedPrefectures,
+              prefectureTotal: PREFECTURES.length,
+              municipalities: areas.totals.visitedMunicipalities,
+              municipalityTotal: MUNICIPALITIES.length,
+              visits: areas.totals.visits,
+            }}
+            activity={latestFriendActivity}
+            stepsRanking={friendStepsRanking}
           />
 
           <HomeCollectionCard collected={collectedItems} total={COLLECTION_ITEMS.length} />

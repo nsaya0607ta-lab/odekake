@@ -280,6 +280,23 @@ export type FriendRecentVisitRow = {
   photo_path: string | null;
 };
 
+export type FriendActivityRow = {
+  friend_user_id: string;
+  display_name: string;
+  profile_image_url: string | null;
+  spot_name: string;
+  prefecture_code: string;
+  municipality_code: string;
+  registered_at: string;
+};
+
+export type FriendStepsRankingRow = {
+  friend_user_id: string;
+  display_name: string;
+  profile_image_url: string | null;
+  steps: number;
+};
+
 export type DailyStepsRow = {
   user_id: string;
   step_date: string;
@@ -463,6 +480,8 @@ export type Database = {
         Args: { p_friend_user_id: string; p_limit?: number };
         Returns: FriendRecentVisitRow[];
       };
+      get_friends_activity_feed: { Args: { p_limit?: number }; Returns: FriendActivityRow[] };
+      get_friends_steps_ranking: { Args: { p_limit?: number }; Returns: FriendStepsRankingRow[] };
       get_shared_trips_health: { Args: Record<string, never>; Returns: Json };
       get_shared_trip_list: { Args: Record<string, never>; Returns: SharedTripListRow[] };
       create_shared_trip: {

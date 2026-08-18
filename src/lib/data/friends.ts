@@ -1,11 +1,13 @@
 import type { DB } from "./client";
 import type {
+  FriendActivityRow,
   FriendCollectionRow,
   FriendListRow,
   FriendOverviewRow,
   FriendPrefectureRow,
   FriendPrivacySettingsRow,
   FriendRecentVisitRow,
+  FriendStepsRankingRow,
 } from "@/lib/supabase/types";
 
 type DataError = { code?: string; message?: string };
@@ -124,6 +126,29 @@ export async function getFriendRecentVisits(
     p_limit: limit,
   });
   if (error) throwDataError(error, "Friend visits are unavailable");
+  return data ?? [];
+}
+
+/**
+ * ホームのカルーセル用。フレンド全員分の最新おでかけ登録を、登録が新しい順にまとめて返す。
+ * フレンド機能が未設定のDB（マイグレーション未適用）では空配列を返し、ホームの表示は崩さない。
+ */
+export async function getFriendsActivityFeed(supabase: DB, limit = 10): Promise<FriendActivityRow[]> {
+  const { data, error } = await supabase.rpc("get_friends_activity_feed", { p_limit: limit });
+  if (error) {
+    if (error.code && FRIENDS_UNAVAILABLE_CODES.has(error.code)) return [];
+    throwDataError(error, "Friends activity feed is unavailable");
+  }
+  return data ?? [];
+}
+
+/** ホームのカルーセル用。フレンドの今日の歩数ランキング（多い順）。 */
+export async function getFriendsStepsRanking(supabase: DB, limit = 5): Promise<FriendStepsRankingRow[]> {
+  const { data, error } = await supabase.rpc("get_friends_steps_ranking", { p_limit: limit });
+  if (error) {
+    if (error.code && FRIENDS_UNAVAILABLE_CODES.has(error.code)) return [];
+    throwDataError(error, "Friends steps ranking is unavailable");
+  }
   return data ?? [];
 }
 
