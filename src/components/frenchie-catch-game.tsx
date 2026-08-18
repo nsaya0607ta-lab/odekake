@@ -218,9 +218,10 @@ const LV = {
   KETSUNADE_SEC: [4, 5, 6, 8, 10],
   BUREBUR_SEC: [4, 5, 6, 8, 10],
 } as const;
-const SPAWN_RATE_BOOST = 2;
+/** 出現量アップ系は時間増加系アイテムの取得率まで底上げしてしまうため、控えめな倍率にしている */
+const SPAWN_RATE_BOOST = 1.5;
 const SLANT_VX_BOOST = 3.5;
-const RAGBY_SPAWN_RATE_BOOST = 3;
+const RAGBY_SPAWN_RATE_BOOST = 2;
 const POINTS: Record<FrenchieCatchItem["rarity"], number> = { N: 10, R: 20, SR: 40, SSR: 70, UR: 100, LR: 150, MR: 220 };
 const RARITY_FALL_SPEED: Record<FrenchieCatchItem["rarity"], number> = { N: 1, R: 1.08, SR: 1.18, SSR: 1.32, UR: 1.5, LR: 1.75, MR: 2 };
 /** 時間が増えるスキルを持つアイテムだけ、落下速度をレアリティ別倍率で上げる */
@@ -240,20 +241,23 @@ const TREASURE_MINUS5_SEC = 5;
 const TREASURE_MINUS10_SEC = 10;
 const DEFAULT_ITEM_SPAWN_WEIGHT = 100;
 /**
- * interior_stretch_rod / other_listen_to_the_a の追加でプールが69→71種に増え、
- * 時間増加系7種の出現確率が Total(69)/Total(71) ≈ ×0.9724 に薄まる。
- * これを相殺するため、時間増加系7種の重みを Total(71)/Total(69) ≈ ×1.028426 だけ底上げしている。
- * （minigametimebalance.md「新アイテムが『時間に無関係』でも影響が出る理由」参照）
+ * 出現量アップ系スキル（宝箱の1/7枠・ぽんでおも・ぽんでアー・じゃれアー・ラグビーアー）は
+ * スポーン間隔そのものを割るため、有効中は時間増加系アイテムの取得率まで一緒に底上げしてしまう。
+ * 何もしないとLv5でr(1秒あたりの時間増加率)が1を超え、理論上ゲームが終わらなくなる。
+ * そのため出現量アップの倍率を抑えた上（SPAWN_RATE_BOOST/RAGBY_SPAWN_RATE_BOOST参照）、
+ * 時間増加系7種＋おもじぃの出現重みをさらに下げて、Lv5でも最終プレイ時間が180秒程度に収まるよう調整している。
+ * （出現量アップ側の重み・秒数を下げると、浮いた確率が時間増加系側に再配分されてかえって悪化するため、
+ * 　時間増加系側の重みを絞るのが正しいレバーだった）
  */
 const ITEM_SPAWN_WEIGHTS: Partial<Record<string, number>> = {
   toy_treasure_puzzle: 300,
-  other_omojii: 82.27,
-  toy_duck_plush: 102.84,
-  toy_carrot: 102.84,
-  food_paw_melon_bread: 102.84,
-  interior_anball: 102.84,
-  other_azuki: 102.84,
-  summer_frenchie: 102.84,
+  other_omojii: 65,
+  toy_duck_plush: 81,
+  toy_carrot: 81,
+  food_paw_melon_bread: 81,
+  interior_anball: 81,
+  other_azuki: 81,
+  summer_frenchie: 81,
 };
 const STRETCH_ROD_ITEM_ID = "interior_stretch_rod";
 const STRETCH_ROD_SECONDS = 3;
