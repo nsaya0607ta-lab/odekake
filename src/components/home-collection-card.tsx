@@ -44,7 +44,8 @@ export function HomeCollectionCard({
   return (
     <Link
       href="/collection"
-      className="pressable relative -top-2 block w-full active:scale-[0.99]"
+      className="pressable relative block w-full active:scale-[0.99]"
+      style={{ top: 12 }}
       aria-label={`図鑑を見る（${collected} / ${total}）`}
     >
       <div className="relative w-full" style={{ aspectRatio: CARD_RATIO }}>
