@@ -11,23 +11,8 @@ import {
   type GachaPlanId,
   type GachaRarity,
 } from "@/lib/gacha/config";
-import { getTapVolume, sliderToGain } from "@/lib/sound-settings";
-import { playTapSound } from "@/lib/tap-sound";
 import { GachaMachineArt, SparkleArt } from "./coin-art";
 import { IconClose, IconCoin } from "./icons";
-
-/** SSR以上は演出をひときわ豪華にする。LR・MRほど排出率が低いので、ここに含まれないと逆に地味に見えてしまう。 */
-function isCelebrationRarity(rarity: string): boolean {
-  return rarity === "SSR" || rarity === "UR" || rarity === "LR" || rarity === "MR";
-}
-
-/** カプセル開封の瞬間に鳴らす演出音。高レアほど音量を上げて手応えを出す。 */
-function playRevealSound(rarity: string): void {
-  const volume = getTapVolume();
-  if (volume <= 0) return;
-  const boost = isCelebrationRarity(rarity) ? 1 : 0.7;
-  playTapSound(sliderToGain(volume) * boost);
-}
 
 type DrawResult = {
   id: string;
@@ -283,7 +268,7 @@ function GachaAnimationModal({
 }) {
   useBodyScrollLock();
   const isMulti = draw.plan === "multi";
-  const isSsr = draw.results.some((result) => isCelebrationRarity(result.rarity));
+  const isSsr = draw.results.some((result) => result.rarity === "SSR" || result.rarity === "UR");
   const [visibleCount, setVisibleCount] = useState(0);
   const [singlePhase, setSinglePhase] = useState<"machine" | "capsule" | "open">("machine");
   const completed = useRef(false);
@@ -301,7 +286,9 @@ function GachaAnimationModal({
     completeRef.current(drawRef.current);
   }, []);
 
-  const ssrIsVisible = draw.results.slice(0, visibleCount).some((result) => isCelebrationRarity(result.rarity));
+  const ssrIsVisible = draw.results
+    .slice(0, visibleCount)
+    .some((result) => result.rarity === "SSR" || result.rarity === "UR");
   const currentResult = isMulti && visibleCount > 0 ? draw.results[visibleCount - 1] : null;
 
   useEffect(() => {
@@ -316,11 +303,8 @@ function GachaAnimationModal({
       setSinglePhase("open");
       later(complete, 450);
     } else if (isMulti) {
-      draw.results.forEach((result, index) => {
-        later(() => {
-          setVisibleCount(index + 1);
-          playRevealSound(result.rarity);
-        }, 850 + index * 520);
+      draw.results.forEach((_, index) => {
+        later(() => setVisibleCount(index + 1), 850 + index * 520);
       });
       later(complete, 850 + draw.results.length * 520 + 650);
     } else {
@@ -328,10 +312,7 @@ function GachaAnimationModal({
         setVisibleCount(1);
         setSinglePhase("capsule");
       }, 900);
-      later(() => {
-        setSinglePhase("open");
-        playRevealSound(draw.results[0]?.rarity ?? "N");
-      }, 1900);
+      later(() => setSinglePhase("open"), 1900);
       later(complete, isSsr ? 3200 : 2700);
     }
 
