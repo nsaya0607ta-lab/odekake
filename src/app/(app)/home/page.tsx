@@ -47,7 +47,7 @@ export default async function HomePage({
       getCurrentDogSkin(supabase, user.id),
       supabase.from("profiles").select("profile_image_url, introduction").eq("user_id", user.id).maybeSingle(),
       getFriendsActivityFeed(supabase, 10),
-      getFriendsStepsRanking(supabase, 10),
+      getFriendsStepsRanking(supabase, 20),
     ]);
 
   const friendAvatarPaths = [

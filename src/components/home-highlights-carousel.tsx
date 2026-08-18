@@ -74,37 +74,67 @@ export function HomeHighlightsCarousel({
 
   const [index, setIndex] = useState(0);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
-  const touchStartX = useRef<number | null>(null);
+  const touchStart = useRef<{ x: number; y: number } | null>(null);
+  const swipeDirection = useRef<"horizontal" | "vertical" | null>(null);
 
   useEffect(() => {
     if (index >= slides.length) setIndex(0);
   }, [slides.length, index]);
 
-  useEffect(() => {
-    if (slides.length <= 1) return;
+  const stopAutoplay = () => {
     if (timerRef.current) clearInterval(timerRef.current);
+    timerRef.current = null;
+  };
+
+  const startAutoplay = () => {
+    stopAutoplay();
+    if (slides.length <= 1) return;
     timerRef.current = setInterval(() => {
       setIndex((current) => (current + 1) % slides.length);
     }, AUTO_ADVANCE_MS);
-    return () => {
-      if (timerRef.current) clearInterval(timerRef.current);
-    };
+  };
+
+  useEffect(() => {
+    startAutoplay();
+    return stopAutoplay;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [slides.length, index]);
 
   const goTo = (next: number) => {
     setIndex(((next % slides.length) + slides.length) % slides.length);
   };
 
+  // カード内の縦スクロール（歩数一覧など）を触っている間は、横スワイプ扱いにしない。
+  // 指を離すまで自動送りも止めて、画面が勝手に動かないようにする。
   const handleTouchStart = (event: TouchEvent) => {
-    touchStartX.current = event.touches[0]?.clientX ?? null;
+    stopAutoplay();
+    const touch = event.touches[0];
+    touchStart.current = touch ? { x: touch.clientX, y: touch.clientY } : null;
+    swipeDirection.current = null;
+  };
+
+  const handleTouchMove = (event: TouchEvent) => {
+    const start = touchStart.current;
+    const touch = event.touches[0];
+    if (!start || !touch) return;
+    if (swipeDirection.current === null) {
+      const deltaX = touch.clientX - start.x;
+      const deltaY = touch.clientY - start.y;
+      if (Math.abs(deltaX) < 8 && Math.abs(deltaY) < 8) return;
+      swipeDirection.current = Math.abs(deltaX) > Math.abs(deltaY) ? "horizontal" : "vertical";
+    }
   };
 
   const handleTouchEnd = (event: TouchEvent) => {
-    const startX = touchStartX.current;
-    touchStartX.current = null;
-    if (startX === null || slides.length <= 1) return;
-    const endX = event.changedTouches[0]?.clientX ?? startX;
-    const deltaX = endX - startX;
+    const start = touchStart.current;
+    const direction = swipeDirection.current;
+    touchStart.current = null;
+    swipeDirection.current = null;
+    startAutoplay();
+
+    if (!start || slides.length <= 1 || direction !== "horizontal") return;
+    const endX = event.changedTouches[0]?.clientX ?? start.x;
+    const deltaX = endX - start.x;
     if (Math.abs(deltaX) < SWIPE_THRESHOLD_PX) return;
     goTo(deltaX < 0 ? index + 1 : index - 1);
   };
@@ -115,7 +145,13 @@ export function HomeHighlightsCarousel({
       className="relative top-2"
       style={{ marginLeft: -9, marginRight: -12 }}
     >
-      <div className="relative overflow-hidden" onTouchStart={handleTouchStart} onTouchEnd={handleTouchEnd}>
+      <div
+        className="relative overflow-hidden"
+        style={{ touchAction: "pan-y" }}
+        onTouchStart={handleTouchStart}
+        onTouchMove={handleTouchMove}
+        onTouchEnd={handleTouchEnd}
+      >
         <div
           className="flex transition-transform duration-500 ease-out"
           style={{ transform: `translateX(-${index * 100}%)` }}
@@ -244,49 +280,45 @@ function ActivitySlide({ data }: { data: FriendActivitySlideData }) {
 
 function StepsSlide({ data }: { data: FriendStepsSlideData }) {
   const RANK_TONE = ["sun", "sky", "apricot"] as const;
-  const top = data.filter((entry) => entry.rank <= 5);
-  const selfOutsideTop = data.find((entry) => entry.isSelf && entry.rank > 5);
-  const rows = selfOutsideTop ? [...top, selfOutsideTop] : top;
 
   return (
-    <div className="flex h-full w-full flex-col items-center">
+    <div className="flex h-full w-full flex-col items-center overflow-hidden">
       <span className="text-base font-bold tracking-[0.15em] text-ink-soft" style={{ marginTop: -31 }}>
         フレンドの歩数
       </span>
-      <div className="flex w-full flex-1 flex-col justify-center gap-1">
-        {rows.map((entry, rowIndex) => (
-          <div key={entry.id}>
-            {selfOutsideTop && rowIndex === rows.length - 1 ? (
-              <div className="my-0.5 flex items-center justify-center text-[10px] text-ink-faint">…</div>
-            ) : null}
-            <div
-              className={`flex items-center gap-2 rounded-xl px-2.5 py-1 ${entry.isSelf ? "bg-leaf-soft/70 ring-1 ring-leaf/50" : "bg-paper/70"}`}
+      <div
+        className="flex w-full flex-1 flex-col gap-1 overflow-y-auto overscroll-contain py-1"
+        style={{ touchAction: "pan-y" }}
+      >
+        {data.map((entry) => (
+          <div
+            key={entry.id}
+            className={`flex shrink-0 items-center gap-2 rounded-xl px-2.5 py-1 ${entry.isSelf ? "bg-leaf-soft/70 ring-1 ring-leaf/50" : "bg-paper/70"}`}
+          >
+            <span
+              className={`flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-[11px] font-bold ${
+                entry.rank <= 3 && RANK_TONE[entry.rank - 1]
+                  ? `${toneBg(RANK_TONE[entry.rank - 1]!)} ${toneText(RANK_TONE[entry.rank - 1]!)}`
+                  : "bg-paper-deep text-ink-soft"
+              }`}
             >
-              <span
-                className={`flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-[11px] font-bold ${
-                  entry.rank <= 3 && RANK_TONE[entry.rank - 1]
-                    ? `${toneBg(RANK_TONE[entry.rank - 1]!)} ${toneText(RANK_TONE[entry.rank - 1]!)}`
-                    : "bg-paper-deep text-ink-soft"
-                }`}
-              >
-                {entry.rank}
-              </span>
-              <span className="flex h-7 w-7 shrink-0 items-center justify-center overflow-hidden rounded-full bg-card">
-                {entry.avatarUrl ? (
-                  // eslint-disable-next-line @next/next/no-img-element
-                  <img src={entry.avatarUrl} alt="" className="h-full w-full object-cover" />
-                ) : (
-                  <IconUser size={14} className="text-ink-faint" />
-                )}
-              </span>
-              <span className="min-w-0 flex-1 truncate text-sm font-bold text-ink">
-                {entry.isSelf ? "あなた" : entry.displayName}
-              </span>
-              <span className="flex shrink-0 items-center gap-1 text-sm font-bold tabular-nums text-ink">
-                <IconPaw size={13} className="text-sun" />
-                {entry.steps.toLocaleString("ja-JP")}
-              </span>
-            </div>
+              {entry.rank}
+            </span>
+            <span className="flex h-7 w-7 shrink-0 items-center justify-center overflow-hidden rounded-full bg-card">
+              {entry.avatarUrl ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img src={entry.avatarUrl} alt="" className="h-full w-full object-cover" />
+              ) : (
+                <IconUser size={14} className="text-ink-faint" />
+              )}
+            </span>
+            <span className="min-w-0 flex-1 truncate text-sm font-bold text-ink">
+              {entry.isSelf ? "あなた" : entry.displayName}
+            </span>
+            <span className="flex shrink-0 items-center gap-1 text-sm font-bold tabular-nums text-ink">
+              <IconPaw size={13} className="text-sun" />
+              {entry.steps.toLocaleString("ja-JP")}
+            </span>
           </div>
         ))}
       </div>
