@@ -248,6 +248,7 @@ const DEFAULT_ITEM_SPAWN_WEIGHT = 100;
  * 時間増加系7種＋おもじぃの出現重みをさらに下げて、Lv5でも最終プレイ時間が180秒程度に収まるよう調整している。
  * （出現量アップ側の重み・秒数を下げると、浮いた確率が時間増加系側に再配分されてかえって悪化するため、
  * 　時間増加系側の重みを絞るのが正しいレバーだった）
+ * 計算式・基準値・新アイテム追加時の手順は docs/minigame-time-balance.md 参照。
  */
 const ITEM_SPAWN_WEIGHTS: Partial<Record<string, number>> = {
   toy_treasure_puzzle: 300,
