@@ -56,12 +56,12 @@ export default async function HomePage({
       <TopHeader
         title={
           <Link href="/mypage/profile" className="flex min-w-0 items-center gap-2" aria-label="マイページを見る">
-            <span className="flex h-8 w-8 shrink-0 items-center justify-center overflow-hidden rounded-full bg-paper-deep">
+            <span className="flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-full bg-paper-deep">
               {avatarUrl ? (
                 // eslint-disable-next-line @next/next/no-img-element
                 <img src={avatarUrl} alt="" className="h-full w-full object-cover" />
               ) : (
-                <IconUser size={18} className="text-ink-faint" />
+                <IconUser size={22} className="text-ink-faint" />
               )}
             </span>
             <span className="truncate text-[17px] font-bold">{user.displayName}</span>
