@@ -169,29 +169,35 @@ function SlideContent({ slide }: { slide: Slide }) {
 
 function StatsSlide({ data }: { data: HomeStatsSlideData }) {
   const items = [
-    { icon: <IconMapPin size={18} />, value: data.prefectures, total: data.prefectureTotal, label: "都道府県", tone: "leaf" as const },
-    { icon: <IconUsers size={18} />, value: data.municipalities, total: data.municipalityTotal, label: "市区町村など", tone: "sky" as const },
-    { icon: <IconFlag size={18} />, value: data.visits, total: null, label: "訪問数", tone: "sun" as const },
+    { icon: <IconMapPin size={26} />, value: data.prefectures, total: data.prefectureTotal, label: "都道府県", tone: "leaf" as const },
+    { icon: <IconUsers size={26} />, value: data.municipalities, total: data.municipalityTotal, label: "市区町村など", tone: "sky" as const },
+    { icon: <IconFlag size={26} />, value: data.visits, total: null, label: "訪問数", tone: "sun" as const },
   ];
 
   return (
-    <div className="grid w-full grid-cols-3 gap-2">
-      {items.map((item) => (
-        <div key={item.label} className="flex flex-col items-center gap-1.5 text-center">
-          <span className={`flex h-10 w-10 items-center justify-center rounded-full ${toneBg(item.tone)}`}>
-            <span className={toneText(item.tone)}>{item.icon}</span>
-          </span>
-          <span className="leading-none font-bold tabular-nums text-ink">
-            <span className="text-lg">{item.value}</span>
-            {item.total !== null ? (
-              <span className="text-xs text-ink-faint"> / {item.total}</span>
-            ) : (
-              <span className="text-xs text-ink-faint">回</span>
-            )}
-          </span>
-          <span className="text-[11px] text-ink-soft">{item.label}</span>
-        </div>
-      ))}
+    <div className="flex h-full w-full flex-col items-center justify-center gap-4">
+      <span className="text-xs font-bold tracking-[0.2em] text-ink-faint">あなたの実績</span>
+      <div className="grid w-full grid-cols-3">
+        {items.map((item, itemIndex) => (
+          <div
+            key={item.label}
+            className={`flex flex-col items-center gap-2 px-1 text-center ${itemIndex > 0 ? "border-l border-line-strong/60" : ""}`}
+          >
+            <span className={`flex h-14 w-14 items-center justify-center rounded-full ${toneBg(item.tone)}`}>
+              <span className={toneText(item.tone)}>{item.icon}</span>
+            </span>
+            <span className="leading-none font-bold tabular-nums text-ink">
+              <span className="text-2xl">{item.value}</span>
+              {item.total !== null ? (
+                <span className="text-sm text-ink-faint"> / {item.total}</span>
+              ) : (
+                <span className="text-sm text-ink-faint">回</span>
+              )}
+            </span>
+            <span className="text-xs font-bold text-ink-soft">{item.label}</span>
+          </div>
+        ))}
+      </div>
     </div>
   );
 }
