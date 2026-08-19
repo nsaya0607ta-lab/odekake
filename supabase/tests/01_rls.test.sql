@@ -722,6 +722,31 @@ select pg_temp.record('削除後はフィードから消える',
   pg_temp.count_as(:'alice', 'select * from public.get_sns_feed(30)') = 0);
 
 -- -------------------------------------------------------------
+-- SNS: 全体チャット
+-- -------------------------------------------------------------
+select pg_temp.expect_ok('フレンドは全体チャットに投稿できる', :'alice', $q$select public.create_friend_message('こんにちは')$q$);
+
+select pg_temp.record('自分の発言は自分にも見える',
+  pg_temp.count_as(:'alice', 'select * from public.get_friend_messages(50)') = 1);
+
+select pg_temp.record('フレンドの発言が見える（bob視点）',
+  pg_temp.count_as(:'bob', 'select * from public.get_friend_messages(50)') = 1);
+
+select pg_temp.record('友達でない人には見えない（carol視点）',
+  pg_temp.count_as(:'carol', 'select * from public.get_friend_messages(50)') = 0);
+
+select id as sns_message_a from public.friend_messages where user_id = :'alice' \gset
+
+select pg_temp.expect_denied('他人の発言は削除できない', :'bob', format(
+  $q$select public.delete_friend_message(%L)$q$, :'sns_message_a'));
+
+select pg_temp.expect_ok('本人は自分の発言を削除できる', :'alice', format(
+  $q$select public.delete_friend_message(%L)$q$, :'sns_message_a'));
+
+select pg_temp.record('削除後は全体チャットから消える',
+  pg_temp.count_as(:'alice', 'select * from public.get_friend_messages(50)') = 0);
+
+-- -------------------------------------------------------------
 -- SNS: フレンドグループ
 -- -------------------------------------------------------------
 -- alice がグループを作り、フレンドの bob を招待する。carol は友達ではないので追加されない。

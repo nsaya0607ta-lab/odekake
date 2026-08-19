@@ -393,6 +393,15 @@ export type FriendGroupMessageRow = {
   created_at: string;
 };
 
+export type FriendMessageRow = {
+  id: string;
+  user_id: string;
+  display_name: string;
+  profile_image_url: string | null;
+  body: string;
+  created_at: string;
+};
+
 export type Database = {
   public: {
     Tables: {
@@ -633,6 +642,9 @@ export type Database = {
         Returns: FriendGroupMessageRow[];
       };
       delete_friend_group_message: { Args: { p_message_id: string }; Returns: undefined };
+      create_friend_message: { Args: { p_body: string }; Returns: FriendMessageRow[] };
+      get_friend_messages: { Args: { p_limit?: number }; Returns: FriendMessageRow[] };
+      delete_friend_message: { Args: { p_message_id: string }; Returns: undefined };
     };
     Enums: {
       location_source: LocationSource;

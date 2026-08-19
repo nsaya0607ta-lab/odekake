@@ -152,6 +152,35 @@ export async function deleteFriendPhotoCommentAction(formData: FormData): Promis
 }
 
 // -------------------------------------------------------------
+// 全体チャット
+// -------------------------------------------------------------
+
+export async function createFriendMessageAction(_prev: ActionState, formData: FormData): Promise<ActionState> {
+  const body = String(formData.get("body") ?? "").trim();
+  if (body === "") return { error: "メッセージを入力してください。", values: { body: "" } };
+
+  const { supabase } = await requireUser();
+  const { error } = await supabase.rpc("create_friend_message", { p_body: body });
+  if (error) {
+    return { error: toJapaneseError(error, "メッセージの投稿に失敗しました。"), values: { body } };
+  }
+
+  revalidatePath("/sns");
+  return { ok: true };
+}
+
+export async function deleteFriendMessageAction(formData: FormData): Promise<void> {
+  const parsed = uuidSchema.safeParse(String(formData.get("messageId") ?? ""));
+  if (!parsed.success) redirect("/sns");
+
+  const { supabase } = await requireUser();
+  await supabase.rpc("delete_friend_message", { p_message_id: parsed.data });
+
+  revalidatePath("/sns");
+  redirect("/sns?view=chat");
+}
+
+// -------------------------------------------------------------
 // グループ
 // -------------------------------------------------------------
 

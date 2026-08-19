@@ -1,27 +1,23 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { deleteFriendGroupMessageAction, markFriendGroupReadAction } from "@/app/actions/sns";
-import { IconCamera, IconClose, IconSettings, IconUser } from "@/components/icons";
+import {
+  createFriendGroupMessageAction,
+  deleteFriendGroupMessageAction,
+  markFriendGroupReadAction,
+} from "@/app/actions/sns";
+import { IconCamera, IconSettings } from "@/components/icons";
 import { PageBody } from "@/components/page-body";
 import { PageHeader } from "@/components/page-header";
+import { SnsChatForm } from "@/components/sns/sns-chat-form";
+import { SnsChatList } from "@/components/sns/sns-chat-list";
 import { SnsPhotoGrid } from "@/components/sns/sns-photo-grid";
 import { SnsTabs } from "@/components/sns/sns-tabs";
+import { SnsViewTabs } from "@/components/sns/sns-view-tabs";
 import { signPhotoPaths } from "@/lib/data/photos";
 import { getFriendGroupMessages, getMyFriendGroups, getSnsGroupFeed } from "@/lib/data/sns";
 import { requireUser } from "@/lib/supabase/server";
-import { GroupChatForm } from "./group-chat-form";
 
 export const dynamic = "force-dynamic";
-
-function formatDateTime(iso: string): string {
-  return new Intl.DateTimeFormat("ja-JP", {
-    month: "long",
-    day: "numeric",
-    hour: "2-digit",
-    minute: "2-digit",
-    timeZone: "Asia/Tokyo",
-  }).format(new Date(iso));
-}
 
 export default async function SnsGroupPage({
   params,
@@ -40,6 +36,7 @@ export default async function SnsGroupPage({
   await markFriendGroupReadAction(groupId);
 
   const view = sp.view === "chat" ? "chat" : "photos";
+  const baseHref = `/sns/groups/${groupId}`;
 
   return (
     <>
@@ -48,7 +45,7 @@ export default async function SnsGroupPage({
         backHref="/sns"
         action={
           <Link
-            href={`/sns/groups/${groupId}/settings`}
+            href={`${baseHref}/settings`}
             aria-label="グループの設定"
             className="flex h-11 w-11 items-center justify-center rounded-full text-ink-soft active:bg-paper-deep"
           >
@@ -65,10 +62,7 @@ export default async function SnsGroupPage({
           </p>
         ) : null}
 
-        <div className="flex gap-1.5 px-1">
-          <ViewTab href={`/sns/groups/${groupId}?view=photos`} label="写真" active={view === "photos"} />
-          <ViewTab href={`/sns/groups/${groupId}?view=chat`} label="チャット" active={view === "chat"} />
-        </div>
+        <SnsViewTabs baseHref={baseHref} view={view} />
 
         {view === "photos" ? (
           <GroupPhotos groupId={groupId} />
@@ -77,19 +71,6 @@ export default async function SnsGroupPage({
         )}
       </PageBody>
     </>
-  );
-}
-
-function ViewTab({ href, label, active }: { href: string; label: string; active: boolean }) {
-  return (
-    <Link
-      href={href}
-      className={`tap-target flex-1 rounded-full py-2 text-center text-sm font-semibold transition-colors ${
-        active ? "bg-leaf-soft text-leaf-deep" : "bg-paper-deep text-ink-faint"
-      }`}
-    >
-      {label}
-    </Link>
   );
 }
 
@@ -132,50 +113,14 @@ async function GroupChat({ groupId, currentUserId }: { groupId: string; currentU
 
   return (
     <div className="space-y-4">
-      <GroupChatForm groupId={groupId} />
-      {messages.length === 0 ? (
-        <p className="px-1 text-center text-xs text-ink-faint">まだメッセージがありません。</p>
-      ) : (
-        <ul className="space-y-3">
-          {messages.map((message) => {
-            const avatarUrl = message.profile_image_url ? avatarUrls.get(message.profile_image_url) : null;
-            return (
-              <li key={message.id} className="flex items-start gap-2 px-1">
-                <span className="h-9 w-9 shrink-0 overflow-hidden rounded-full bg-paper-deep">
-                  {avatarUrl ? (
-                    // eslint-disable-next-line @next/next/no-img-element
-                    <img src={avatarUrl} alt="" className="h-full w-full object-cover" />
-                  ) : (
-                    <span className="flex h-full w-full items-center justify-center text-ink-faint">
-                      <IconUser size={18} />
-                    </span>
-                  )}
-                </span>
-                <div className="min-w-0 flex-1 rounded-2xl bg-paper-deep px-3 py-2">
-                  <div className="flex items-center justify-between gap-2">
-                    <span className="truncate text-xs font-bold">{message.display_name}</span>
-                    <span className="shrink-0 text-[10px] text-ink-faint">{formatDateTime(message.created_at)}</span>
-                  </div>
-                  <p className="mt-0.5 whitespace-pre-wrap text-sm leading-relaxed">{message.body}</p>
-                </div>
-                {message.user_id === currentUserId ? (
-                  <form action={deleteFriendGroupMessageAction} className="shrink-0">
-                    <input type="hidden" name="messageId" value={message.id} />
-                    <input type="hidden" name="groupId" value={groupId} />
-                    <button
-                      type="submit"
-                      aria-label="このメッセージを削除"
-                      className="flex h-7 w-7 items-center justify-center rounded-full text-ink-faint active:bg-paper-deep"
-                    >
-                      <IconClose size={14} />
-                    </button>
-                  </form>
-                ) : null}
-              </li>
-            );
-          })}
-        </ul>
-      )}
+      <SnsChatForm action={createFriendGroupMessageAction} hiddenFields={{ groupId }} />
+      <SnsChatList
+        messages={messages}
+        avatarUrls={avatarUrls}
+        currentUserId={currentUserId}
+        deleteAction={deleteFriendGroupMessageAction}
+        hiddenFieldsFor={(message) => ({ messageId: message.id, groupId })}
+      />
     </div>
   );
 }
