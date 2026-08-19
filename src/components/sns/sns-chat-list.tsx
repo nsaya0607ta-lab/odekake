@@ -71,8 +71,8 @@ export function SnsChatList({
                 </button>
               </form>
               <span className="shrink-0 text-[10px] text-ink-faint">{formatTime(message.created_at)}</span>
-              <div className="max-w-[72%] rounded-2xl rounded-br-md bg-leaf-soft px-3 py-2 text-leaf-deep">
-                <p className="whitespace-pre-wrap text-sm leading-relaxed">{message.body}</p>
+              <div className="max-w-[72%] rounded-2xl rounded-br-md border border-leaf bg-leaf-soft px-3.5 py-2.5">
+                <p className="whitespace-pre-wrap text-sm leading-relaxed text-leaf-deep">{message.body}</p>
               </div>
             </li>
           );
@@ -80,7 +80,7 @@ export function SnsChatList({
 
         return (
           <li key={message.id} ref={isLast ? bottomRef : undefined} className="flex items-start gap-2">
-            <span className="h-9 w-9 shrink-0 overflow-hidden rounded-full bg-paper-deep">
+            <span className="h-10 w-10 shrink-0 overflow-hidden rounded-full bg-paper-deep">
               {avatarUrl ? (
                 // eslint-disable-next-line @next/next/no-img-element
                 <img src={avatarUrl} alt="" className="h-full w-full object-cover" />
@@ -94,8 +94,8 @@ export function SnsChatList({
               <span className="block truncate px-1 text-[11px] font-semibold text-ink-faint">
                 {message.display_name}
               </span>
-              <div className="mt-0.5 flex items-end gap-1.5">
-                <div className="max-w-[72%] rounded-2xl rounded-bl-md bg-card px-3 py-2 shadow-sm">
+              <div className="mt-1 flex items-end gap-1.5">
+                <div className="max-w-[72%] rounded-2xl rounded-bl-md border border-line bg-card px-3.5 py-2.5 shadow-sm">
                   <p className="whitespace-pre-wrap text-sm leading-relaxed">{message.body}</p>
                 </div>
                 <span className="shrink-0 text-[10px] text-ink-faint">{formatTime(message.created_at)}</span>

@@ -107,7 +107,11 @@ async function GroupChat({ groupId, currentUserId }: { groupId: string; currentU
         deleteAction={deleteFriendGroupMessageAction}
         groupId={groupId}
       />
-      <SnsChatForm action={createFriendGroupMessageAction} hiddenFields={{ groupId }} />
+      <SnsChatForm
+        action={createFriendGroupMessageAction}
+        hiddenFields={{ groupId }}
+        postHref={`/sns/groups/${groupId}/new`}
+      />
     </div>
   );
 }
