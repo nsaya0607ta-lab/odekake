@@ -3,6 +3,7 @@ import { GlobalInteractionFeedback } from "@/components/global-interaction-feedb
 import { LoginBonus } from "@/components/login-bonus";
 import { PhotoCleanup } from "@/components/photo-cleanup";
 import { getCurrentDogSkin } from "@/lib/data/dog-skin";
+import { canAccessSns } from "@/lib/sns-access";
 import { requireUser } from "@/lib/supabase/server";
 
 export default async function AppLayout({ children }: { children: React.ReactNode }) {
@@ -16,7 +17,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
     <div className="min-h-dvh" style={{ paddingBottom: "calc(var(--nav-height) + var(--safe-bottom))" }}>
       {children}
       <GlobalInteractionFeedback />
-      <BottomNav />
+      <BottomNav snsLocked={!canAccessSns(user.email)} />
       <PhotoCleanup />
       {/* ユーザーごと・日本時間の日付ごとに1回だけ表示する。
           DB側でも同じ user_id + 日付で二重付与を防ぐ。 */}

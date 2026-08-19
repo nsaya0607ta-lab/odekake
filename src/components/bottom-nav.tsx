@@ -46,7 +46,7 @@ function activeHref(pathname: string): string | null {
   return best?.href ?? null;
 }
 
-export function BottomNav() {
+export function BottomNav({ snsLocked = false }: { snsLocked?: boolean }) {
   const pathname = usePathname();
   const current = activeHref(pathname);
 
@@ -60,6 +60,30 @@ export function BottomNav() {
         {ITEMS.map(({ href, label, icon, ...rest }) => {
           const center = "center" in rest && rest.center;
           const active = current === href;
+          const locked = href === "/sns" && snsLocked;
+
+          if (locked) {
+            return (
+              <li key={href} className="flex flex-1">
+                <span
+                  aria-disabled="true"
+                  className="tap-target relative flex w-full flex-col items-center justify-center gap-1 rounded-2xl py-2 text-ink-faint"
+                >
+                  <span className="absolute top-0 rounded-full bg-paper-deep px-1.5 py-0.5 text-[8px] font-bold whitespace-nowrap text-ink-faint">
+                    準備中
+                  </span>
+                  <Image
+                    src={icon}
+                    alt={label}
+                    width={30}
+                    height={30}
+                    className="h-[30px] w-[30px] object-contain opacity-30 grayscale"
+                  />
+                  <span className="text-[11px] opacity-50">{label}</span>
+                </span>
+              </li>
+            );
+          }
 
           if (center) {
             return (
