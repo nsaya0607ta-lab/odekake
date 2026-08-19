@@ -53,13 +53,11 @@ export function SnsPhotoGrid({
   photos,
   photoUrls,
   avatarUrls,
-  hrefFor,
   postHref,
 }: {
   photos: SnsFeedPhotoRow[];
   photoUrls: Map<string, string>;
   avatarUrls: Map<string, string>;
-  hrefFor: (photoId: string) => string;
   postHref: string;
 }) {
   const today = useMemo(() => todayInTokyo(), []);
@@ -141,7 +139,7 @@ export function SnsPhotoGrid({
             return (
               <Link
                 key={photo.id}
-                href={hrefFor(photo.id)}
+                href={`/sns/${photo.id}`}
                 className="relative aspect-square overflow-hidden rounded-2xl bg-paper-deep active:scale-[0.98]"
               >
                 {url ? (

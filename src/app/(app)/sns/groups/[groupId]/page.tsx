@@ -80,13 +80,7 @@ async function GroupPhotos({ groupId }: { groupId: string }) {
   const photoUrls = await signPhotoPaths(supabase, photos.map((p) => p.storage_path));
 
   return (
-    <SnsPhotoGrid
-      photos={photos}
-      photoUrls={photoUrls}
-      avatarUrls={avatarUrls}
-      hrefFor={(photoId) => `/sns/${photoId}`}
-      postHref={`/sns/groups/${groupId}/new`}
-    />
+    <SnsPhotoGrid photos={photos} photoUrls={photoUrls} avatarUrls={avatarUrls} postHref={`/sns/groups/${groupId}/new`} />
   );
 }
 
