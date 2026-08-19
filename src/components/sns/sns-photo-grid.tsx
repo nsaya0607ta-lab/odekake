@@ -62,37 +62,60 @@ export function SnsPhotoGrid({
 }) {
   const today = useMemo(() => todayInTokyo(), []);
   const days = useMemo(() => groupSnsFeedByDay(photos), [photos]);
-  const dateWindow = useMemo(() => {
-    const window = recentDateWindow(CHIP_WINDOW_DAYS);
-    const oldestWithPhotos = days.at(-1)?.photoDate;
-    const windowStart = window[0];
-    if (oldestWithPhotos && windowStart && oldestWithPhotos < windowStart) {
-      return [oldestWithPhotos, ...window];
-    }
-    return window;
-  }, [days]);
-
   const [selectedDate, setSelectedDate] = useState(() => days[0]?.photoDate ?? today);
+
+  // 直近14日分の窓に加えて、一番古い投稿日と（カレンダーで任意に選んだ日を含む）
+  // 選択中の日が窓の外にあれば足しておく
+  const dateWindow = useMemo(() => {
+    const dates = new Set(recentDateWindow(CHIP_WINDOW_DAYS));
+    const oldestWithPhotos = days.at(-1)?.photoDate;
+    if (oldestWithPhotos) dates.add(oldestWithPhotos);
+    dates.add(selectedDate);
+    return [...dates].sort();
+  }, [days, selectedDate]);
+
   const chipRefs = useRef(new Map<string, HTMLButtonElement>());
+  const dateInputRef = useRef<HTMLInputElement>(null);
 
   const selectedDay = days.find((d) => d.photoDate === selectedDate);
 
   function selectDate(date: string) {
     setSelectedDate(date);
-    chipRefs.current.get(date)?.scrollIntoView({ behavior: "smooth", inline: "center", block: "nearest" });
+    requestAnimationFrame(() => {
+      chipRefs.current.get(date)?.scrollIntoView({ behavior: "smooth", inline: "center", block: "nearest" });
+    });
+  }
+
+  function openDatePicker() {
+    const input = dateInputRef.current;
+    if (!input) return;
+    if (typeof input.showPicker === "function") {
+      input.showPicker();
+    } else {
+      input.click();
+    }
   }
 
   return (
     <div className="space-y-3 rounded-3xl border border-line bg-card p-3 shadow-sm">
       <div className="flex gap-1 overflow-x-auto pb-1" style={{ scrollbarWidth: "none" }}>
-        <button
-          type="button"
-          onClick={() => selectDate(today)}
-          aria-label="今日に移動"
-          className="tap-target flex h-12 w-10 shrink-0 flex-col items-center justify-center rounded-xl text-ink-faint active:bg-paper-deep"
+        <label
+          onClick={openDatePicker}
+          aria-label="日付を選ぶ"
+          className="tap-target relative flex h-12 w-10 shrink-0 flex-col items-center justify-center rounded-xl text-ink-faint active:bg-paper-deep"
         >
           <IconCalendar size={17} />
-        </button>
+          <input
+            ref={dateInputRef}
+            type="date"
+            value={selectedDate}
+            max={today}
+            onChange={(e) => {
+              if (e.target.value) selectDate(e.target.value);
+            }}
+            className="absolute inset-0 h-full w-full cursor-pointer opacity-0"
+          />
+        </label>
         {dateWindow.map((date) => {
           const { md, weekday } = formatChip(date);
           const active = date === selectedDate;
@@ -121,11 +144,14 @@ export function SnsPhotoGrid({
         })}
       </div>
 
-      <div className="flex items-center justify-between gap-2 border-t border-line pt-3">
-        <h2 className="text-sm font-bold text-ink-soft">{formatDayLabel(selectedDate)}</h2>
-        <Link href={postHref} className="btn btn-primary shrink-0 px-4 py-1.5 text-xs">
-          <IconPlus size={14} />
-          写真を投稿
+      <div className="flex items-center gap-2 border-t border-line pt-3">
+        <h2 className="min-w-0 flex-1 truncate text-sm font-bold text-ink-soft">{formatDayLabel(selectedDate)}</h2>
+        <Link
+          href={postHref}
+          aria-label="写真を投稿"
+          className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-leaf text-white active:opacity-80"
+        >
+          <IconPlus size={16} />
         </Link>
       </div>
 
