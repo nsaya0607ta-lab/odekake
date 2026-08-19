@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { IconCalendar, IconChat, IconHeart, IconPlus, IconUser } from "@/components/icons";
 import { groupSnsFeedByDay } from "@/lib/data/sns";
 import type { SnsFeedPhotoRow } from "@/lib/supabase/types";
@@ -10,23 +10,6 @@ const CHIP_WINDOW_DAYS = 14;
 
 function todayInTokyo(): string {
   return new Intl.DateTimeFormat("sv-SE", { timeZone: "Asia/Tokyo" }).format(new Date());
-}
-
-function formatDayLabel(dateStr: string): string {
-  const date = new Date(`${dateStr}T00:00:00+09:00`);
-  const today = new Date(`${todayInTokyo()}T00:00:00+09:00`);
-  const diffDays = Math.round((today.getTime() - date.getTime()) / 86_400_000);
-
-  const formatted = new Intl.DateTimeFormat("ja-JP", {
-    month: "long",
-    day: "numeric",
-    weekday: "short",
-    timeZone: "Asia/Tokyo",
-  }).format(date);
-
-  if (diffDays === 0) return `今日・${formatted}`;
-  if (diffDays === 1) return `昨日・${formatted}`;
-  return formatted;
 }
 
 function formatChip(dateStr: string): { md: string; weekday: string } {
@@ -74,10 +57,22 @@ export function SnsPhotoGrid({
     return [...dates].sort();
   }, [days, selectedDate]);
 
+  const chipRowRef = useRef<HTMLDivElement>(null);
   const chipRefs = useRef(new Map<string, HTMLButtonElement>());
   const dateInputRef = useRef<HTMLInputElement>(null);
+  const didInitialScroll = useRef(false);
 
   const selectedDay = days.find((d) => d.photoDate === selectedDate);
+
+  // 初回表示時は、日付の並びの始点が今日になるよう右端まで送っておく
+  useEffect(() => {
+    if (didInitialScroll.current) return;
+    const row = chipRowRef.current;
+    const todayChip = chipRefs.current.get(today);
+    if (!row || !todayChip) return;
+    didInitialScroll.current = true;
+    row.scrollLeft = todayChip.offsetLeft + todayChip.offsetWidth - row.clientWidth;
+  }, [today, dateWindow]);
 
   function selectDate(date: string) {
     setSelectedDate(date);
@@ -97,62 +92,57 @@ export function SnsPhotoGrid({
   }
 
   return (
-    <div className="space-y-3 rounded-3xl border border-line bg-card p-3 shadow-sm">
-      <div className="flex gap-1 overflow-x-auto pb-1" style={{ scrollbarWidth: "none" }}>
-        <label
-          onClick={openDatePicker}
-          aria-label="日付を選ぶ"
-          className="tap-target relative flex h-12 w-10 shrink-0 flex-col items-center justify-center rounded-xl text-ink-faint active:bg-paper-deep"
+    <div className="space-y-3">
+      <div className="sticky top-[7.25rem] z-20 -mx-4 border-b border-line bg-paper/92 px-4 backdrop-blur-sm">
+        <div
+          ref={chipRowRef}
+          className="mx-auto flex max-w-lg gap-1 overflow-x-auto py-1.5"
+          style={{ scrollbarWidth: "none" }}
         >
-          <IconCalendar size={17} />
-          <input
-            ref={dateInputRef}
-            type="date"
-            value={selectedDate}
-            max={today}
-            onChange={(e) => {
-              if (e.target.value) selectDate(e.target.value);
-            }}
-            className="absolute inset-0 h-full w-full cursor-pointer opacity-0"
-          />
-        </label>
-        {dateWindow.map((date) => {
-          const { md, weekday } = formatChip(date);
-          const active = date === selectedDate;
-          const hasPhotos = days.some((d) => d.photoDate === date);
-          return (
-            <button
-              key={date}
-              ref={(el) => {
-                if (el) chipRefs.current.set(date, el);
-                else chipRefs.current.delete(date);
+          <label
+            onClick={openDatePicker}
+            aria-label="日付を選ぶ"
+            className="tap-target relative flex h-11 w-9 shrink-0 flex-col items-center justify-center rounded-xl text-ink-faint active:bg-paper-deep"
+          >
+            <IconCalendar size={16} />
+            <input
+              ref={dateInputRef}
+              type="date"
+              value={selectedDate}
+              max={today}
+              onChange={(e) => {
+                if (e.target.value) selectDate(e.target.value);
               }}
-              type="button"
-              onClick={() => selectDate(date)}
-              className={`flex h-12 w-10 shrink-0 flex-col items-center justify-center gap-0.5 rounded-xl text-xs font-semibold transition-colors ${
-                active
-                  ? "bg-leaf text-white"
-                  : hasPhotos
-                    ? "text-ink active:bg-paper-deep"
-                    : "text-ink-faint active:bg-paper-deep"
-              }`}
-            >
-              <span>{md}</span>
-              <span className="text-[10px]">{weekday}</span>
-            </button>
-          );
-        })}
-      </div>
-
-      <div className="flex items-center gap-2 border-t border-line pt-3">
-        <h2 className="min-w-0 flex-1 truncate text-sm font-bold text-ink-soft">{formatDayLabel(selectedDate)}</h2>
-        <Link
-          href={postHref}
-          aria-label="写真を投稿"
-          className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-leaf text-white active:opacity-80"
-        >
-          <IconPlus size={16} />
-        </Link>
+              className="absolute inset-0 h-full w-full cursor-pointer opacity-0"
+            />
+          </label>
+          {dateWindow.map((date) => {
+            const { md, weekday } = formatChip(date);
+            const active = date === selectedDate;
+            const hasPhotos = days.some((d) => d.photoDate === date);
+            return (
+              <button
+                key={date}
+                ref={(el) => {
+                  if (el) chipRefs.current.set(date, el);
+                  else chipRefs.current.delete(date);
+                }}
+                type="button"
+                onClick={() => selectDate(date)}
+                className={`flex h-11 w-9 shrink-0 flex-col items-center justify-center gap-0.5 rounded-xl text-xs font-semibold transition-colors ${
+                  active
+                    ? "bg-leaf text-white"
+                    : hasPhotos
+                      ? "text-ink active:bg-paper-deep"
+                      : "text-ink-faint active:bg-paper-deep"
+                }`}
+              >
+                <span>{md}</span>
+                <span className="text-[10px]">{weekday}</span>
+              </button>
+            );
+          })}
+        </div>
       </div>
 
       {!selectedDay || selectedDay.photos.length === 0 ? (
@@ -206,6 +196,15 @@ export function SnsPhotoGrid({
           })}
         </div>
       )}
+
+      <Link
+        href={postHref}
+        aria-label="写真を投稿"
+        className="fixed right-4 z-30 flex h-14 w-14 items-center justify-center rounded-full bg-leaf text-white shadow-lg active:opacity-80"
+        style={{ bottom: "calc(var(--nav-height) + var(--safe-bottom) + 1rem)" }}
+      >
+        <IconPlus size={24} />
+      </Link>
     </div>
   );
 }
