@@ -6,6 +6,7 @@ import { usePathname } from "next/navigation";
 
 const ITEMS = [
   { href: "/home", label: "ホーム", icon: "/icons/navigation/home.webp", match: ["/home"] },
+  { href: "/sns", label: "SNS", icon: "/icons/navigation/sns.svg", match: ["/sns"] },
   { href: "/map", label: "地図", icon: "/icons/navigation/map.webp", match: ["/map"] },
   {
     href: "/add",

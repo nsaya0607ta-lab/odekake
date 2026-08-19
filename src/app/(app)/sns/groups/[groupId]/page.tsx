@@ -1,0 +1,126 @@
+import Link from "next/link";
+import { notFound } from "next/navigation";
+import {
+  createFriendGroupMessageAction,
+  deleteFriendGroupMessageAction,
+  markFriendGroupReadAction,
+} from "@/app/actions/sns";
+import { IconCamera, IconSettings } from "@/components/icons";
+import { PageBody } from "@/components/page-body";
+import { PageHeader } from "@/components/page-header";
+import { SnsChatForm } from "@/components/sns/sns-chat-form";
+import { SnsChatList } from "@/components/sns/sns-chat-list";
+import { SnsPhotoGrid } from "@/components/sns/sns-photo-grid";
+import { SnsTabs } from "@/components/sns/sns-tabs";
+import { SnsViewTabs } from "@/components/sns/sns-view-tabs";
+import { signPhotoPaths } from "@/lib/data/photos";
+import { getFriendGroupMessages, getMyFriendGroups, getSnsGroupFeed } from "@/lib/data/sns";
+import { requireUser } from "@/lib/supabase/server";
+
+export const dynamic = "force-dynamic";
+
+export default async function SnsGroupPage({
+  params,
+  searchParams,
+}: {
+  params: Promise<{ groupId: string }>;
+  searchParams: Promise<{ view?: string; posted?: string }>;
+}) {
+  const [{ groupId }, sp, { supabase, user }] = await Promise.all([params, searchParams, requireUser()]);
+
+  const groups = await getMyFriendGroups(supabase);
+  const group = groups.find((g) => g.id === groupId);
+  if (!group) notFound();
+
+  // 画面を開いたタイミングで既読にする
+  await markFriendGroupReadAction(groupId);
+
+  const view = sp.view === "chat" ? "chat" : "photos";
+  const baseHref = `/sns/groups/${groupId}`;
+
+  return (
+    <>
+      <PageHeader
+        title={group.name}
+        backHref="/sns"
+        action={
+          <Link
+            href={`${baseHref}/settings`}
+            aria-label="グループの設定"
+            className="flex h-11 w-11 items-center justify-center rounded-full text-ink-soft active:bg-paper-deep"
+          >
+            <IconSettings size={20} />
+          </Link>
+        }
+      />
+      <PageBody>
+        <SnsTabs groups={groups} activeGroupId={groupId} />
+
+        {sp.posted === "1" ? (
+          <p role="status" className="rounded-2xl border border-leaf bg-leaf-soft px-4 py-3 text-sm text-leaf-deep">
+            写真を投稿しました
+          </p>
+        ) : null}
+
+        <SnsViewTabs baseHref={baseHref} view={view} />
+
+        {view === "photos" ? (
+          <GroupPhotos groupId={groupId} />
+        ) : (
+          <GroupChat groupId={groupId} currentUserId={user.id} />
+        )}
+      </PageBody>
+    </>
+  );
+}
+
+async function GroupPhotos({ groupId }: { groupId: string }) {
+  const { supabase } = await requireUser();
+  const photos = await getSnsGroupFeed(supabase, groupId);
+  const avatarUrls = await signPhotoPaths(
+    supabase,
+    photos.flatMap((p) => (p.profile_image_url ? [p.profile_image_url] : [])),
+  );
+  const photoUrls = await signPhotoPaths(supabase, photos.map((p) => p.storage_path));
+
+  return (
+    <div className="space-y-6">
+      <Link href={`/sns/groups/${groupId}/new`} className="btn btn-primary w-full">
+        <IconCamera size={18} />
+        写真を投稿する
+      </Link>
+      {photos.length === 0 ? (
+        <p className="px-1 text-center text-xs text-ink-faint">まだ写真がありません。</p>
+      ) : (
+        <SnsPhotoGrid
+          photos={photos}
+          photoUrls={photoUrls}
+          avatarUrls={avatarUrls}
+          hrefFor={(photoId) => `/sns/${photoId}`}
+        />
+      )}
+    </div>
+  );
+}
+
+async function GroupChat({ groupId, currentUserId }: { groupId: string; currentUserId: string }) {
+  const { supabase } = await requireUser();
+  const messages = await getFriendGroupMessages(supabase, groupId);
+  const avatarUrls = await signPhotoPaths(
+    supabase,
+    messages.flatMap((m) => (m.profile_image_url ? [m.profile_image_url] : [])),
+  );
+
+  return (
+    <div className="space-y-4">
+      <SnsChatForm action={createFriendGroupMessageAction} hiddenFields={{ groupId }} />
+      <SnsChatList
+        messages={messages}
+        avatarUrls={avatarUrls}
+        currentUserId={currentUserId}
+        deleteAction={deleteFriendGroupMessageAction}
+        hiddenFieldsFor={(message) => ({ messageId: message.id, groupId })}
+      />
+    </div>
+  );
+}
