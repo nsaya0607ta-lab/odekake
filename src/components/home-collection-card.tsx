@@ -1,38 +1,21 @@
 import Link from "next/link";
+import { IconChevronRight } from "@/components/icons";
 
 /**
  * ホームの「図鑑を見る」カード。
  *
- * いただいた一枚絵（public/collection-card.webp）をそのまま出し、数だけを絵の中の
- * 「0 / 23」があった位置に重ねる。もとの絵に焼き込まれていた数字は消してあるので、
- * 分子（集めた数）も分母（アイテム総数）もここでは文字として出す。どちらも今後
- * 変わる値なので、絵に焼き込まず数だけをこの位置に乗せている。
+ * public/collection-card.webp は本と花の水彩イラストだけが描かれた透明背景の枠。
+ * タイトル・件数・矢印はすべて文字として重ねる（絵に焼き込まれていないので、
+ * 件数が変わっても絵を描き直す必要はない）。
  *
- * カードの縦横比を絵と同じ CARD_RATIO に固定し、数の位置は絵に対する％で持つ。
+ * 本のイラストは絵の左 32.4%、花のイラストは右 89.8% から始まるので、
+ * 文字はその間（左 37% 〜 右 12% を除いた範囲）に収める。
+ *
+ * 元絵の縦横比のままだとカードが縦に大きすぎるため、絵を縦だけ約15%圧縮して表示する。
  */
-const CARD_RATIO = "1440 / 416";
+const CARD_RATIO = "2172 / 615";
 
 const CARD_SRC = "/collection-card.webp";
-
-/**
- * 数を置く位置。元絵 1800×520 上で、焼き込まれていた「0 / 23」を実測した座標から出している。
- *
- * - 数字の下端: y 355 → 下から 31.7%
- * - 「0」の左端: x 1284 → 71.3%（左そろえ。桁が増えても右の矢印までは十分あく）
- */
-const VALUE_BOTTOM = "31.7%";
-const VALUE_LEFT = "71.3%";
-
-/**
- * 数の大きさ。絵の中にあった数字の高さ（47px / 幅1800px = 2.61%）に合わせる。
- * Yusei Magic は数字の高さが 0.68em なので、字は絵の幅の 3.84% になる。
- *
- * カードの幅は「画面幅 - 左右の余白32px」で、PageBody の max-w-lg により 480px で止まる。
- */
-const VALUE_FONT_SIZE = "min(calc(3.84vw - 1.23px), 18.4px)";
-
-/** 焼き込まれていた数字と同じインクの色。 */
-const VALUE_COLOR = "#6f7752";
 
 export function HomeCollectionCard({
   collected,
@@ -44,7 +27,8 @@ export function HomeCollectionCard({
   return (
     <Link
       href="/collection"
-      className="pressable relative -top-2 block w-full active:scale-[0.99]"
+      className="pressable relative block active:scale-[0.99]"
+      style={{ marginLeft: -9, marginRight: -12, marginTop: 16 }}
       aria-label={`図鑑を見る（${collected} / ${total}）`}
     >
       <div className="relative w-full" style={{ aspectRatio: CARD_RATIO }}>
@@ -53,24 +37,25 @@ export function HomeCollectionCard({
           src={CARD_SRC}
           alt=""
           aria-hidden="true"
-          width={1440}
-          height={416}
+          width={2172}
+          height={724}
           draggable={false}
           className="pointer-events-none absolute inset-0 h-full w-full select-none"
         />
-        <span
-          aria-hidden="true"
-          className="absolute leading-none whitespace-nowrap tabular-nums"
-          style={{
-            left: VALUE_LEFT,
-            bottom: VALUE_BOTTOM,
-            fontSize: VALUE_FONT_SIZE,
-            color: VALUE_COLOR,
-            transform: "translateY(0.175em)",
-          }}
-        >
-          {collected} / {total}
-        </span>
+        <div className="absolute inset-0 flex items-center" style={{ paddingLeft: "37%", paddingRight: "12%" }}>
+          <div className="flex w-full min-w-0 items-center justify-between gap-2">
+            <div className="min-w-0">
+              <p className="truncate text-lg font-bold text-ink">図鑑を見る</p>
+              <p className="whitespace-nowrap text-xs text-ink-faint">集めたアイテムを見る</p>
+            </div>
+            <div className="flex shrink-0 items-center gap-1">
+              <span className="text-lg font-bold tabular-nums text-leaf-deep">
+                {collected} / {total}
+              </span>
+              <IconChevronRight size={18} className="text-ink-faint" />
+            </div>
+          </div>
+        </div>
       </div>
     </Link>
   );

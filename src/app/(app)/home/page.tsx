@@ -7,7 +7,8 @@ import { SoundSettingsButton } from "@/components/sound-settings-button";
 import { SharedTripBadge } from "@/components/shared-trip-badge";
 import { HomeScene } from "@/components/home-scene";
 import { HomeCollectionCard } from "@/components/home-collection-card";
-import { HomeStatsCard } from "@/components/home-stats-card";
+import { HomeHighlightsCarousel } from "@/components/home-highlights-carousel";
+import { HomeNoticeCard } from "@/components/home-notice-card";
 import { LevelTag } from "@/components/level-tag";
 import { StepsTag } from "@/components/steps-tag";
 import { WanderingFrenchie } from "@/components/wandering-frenchie";
@@ -17,7 +18,9 @@ import { getCoinSummary } from "@/lib/data/coins";
 import { getOwnedItemIds } from "@/lib/data/collection";
 import { getCurrentDogSkin } from "@/lib/data/dog-skin";
 import { getExpDashboard } from "@/lib/data/exp";
-import { signPhotoPath } from "@/lib/data/photos";
+import { getFriendsActivityFeed, getFriendsStepsRanking } from "@/lib/data/friends";
+import { getNoticesFeed, getUnreadNoticeCount } from "@/lib/data/notices";
+import { signPhotoPath, signPhotoPaths } from "@/lib/data/photos";
 import { getRecordSpace } from "@/lib/data/space";
 import { getExpProgress } from "@/lib/exp";
 import { MUNICIPALITIES, PREFECTURES } from "@/lib/geo";
@@ -26,7 +29,6 @@ import { requireUser } from "@/lib/supabase/server";
 export const metadata = { title: "あなたの旅 | おでかけ記録" };
 export const dynamic = "force-dynamic";
 
-const PROFILE_TICKET_SRC = "/B42684BD-FCE9-4F37-A698-4EEE3884ECA8.webp";
 const MINI_GAME_BUTTON_SRC = "/3215A80A-2B64-45E2-8AA5-B7CAF2E0251D.webp";
 const GACHA_BUTTON_SRC = "/4738ADDA-10DB-4664-B078-FE6262248CFB.webp";
 
@@ -38,23 +40,100 @@ export default async function HomePage({
   const [{ supabase, user }, { notice }] = await Promise.all([requireUser(), searchParams]);
   const space = await getRecordSpace(supabase, user.id);
 
-  const [areas, expDashboard, coins, ownedItemIds, dogSkin, profileResult] = await Promise.all([
+  const [
+    areas,
+    expDashboard,
+    coins,
+    ownedItemIds,
+    dogSkin,
+    profileResult,
+    friendActivity,
+    friendSteps,
+    noticesFeed,
+    unreadNoticeCount,
+  ] = await Promise.all([
     loadAreaIndex(supabase, space.tripIds),
     getExpDashboard(supabase, user.id),
     getCoinSummary(supabase, user.id),
     getOwnedItemIds(supabase, user.id),
     getCurrentDogSkin(supabase, user.id),
     supabase.from("profiles").select("profile_image_url, introduction").eq("user_id", user.id).maybeSingle(),
+    getFriendsActivityFeed(supabase, 30),
+    getFriendsStepsRanking(supabase, 20),
+    getNoticesFeed(supabase, 3),
+    getUnreadNoticeCount(supabase),
   ]);
-  const avatarUrl = await signPhotoPath(supabase, profileResult.data?.profile_image_url);
+
+  const friendAvatarPaths = [
+    ...friendActivity.flatMap((row) => (row.profile_image_url ? [row.profile_image_url] : [])),
+    ...friendSteps.flatMap((row) => (row.profile_image_url ? [row.profile_image_url] : [])),
+  ];
+  const [avatarUrl, friendAvatarUrls] = await Promise.all([
+    signPhotoPath(supabase, profileResult.data?.profile_image_url),
+    signPhotoPaths(supabase, friendAvatarPaths),
+  ]);
 
   const expProgress = getExpProgress(expDashboard.totalExp);
   const collectedItems = countOwned(COLLECTION_ITEMS, ownedItemIds);
 
+  // フレンドごとに最新1件だけ残し、24時間より前の登録は「みんなのおでかけ」に出さない。
+  const ONE_DAY_MS = 24 * 60 * 60 * 1000;
+  const activityCutoff = Date.now() - ONE_DAY_MS;
+  const seenFriendIds = new Set<string>();
+  const latestFriendActivity = friendActivity
+    .filter((row) => new Date(row.registered_at).getTime() >= activityCutoff)
+    .filter((row) => {
+      if (seenFriendIds.has(row.friend_user_id)) return false;
+      seenFriendIds.add(row.friend_user_id);
+      return true;
+    })
+    .map((row) => ({
+      key: row.friend_user_id,
+      displayName: row.display_name,
+      avatarUrl: row.profile_image_url ? (friendAvatarUrls.get(row.profile_image_url) ?? null) : null,
+      spotName: row.spot_name,
+      registeredAt: row.registered_at,
+    }));
+
+  // フレンドの歩数ランキングに自分も加えて、自分の順位も分かるようにする。
+  const stepsRankingEntries = [
+    ...friendSteps.map((row) => ({
+      id: row.friend_user_id,
+      displayName: row.display_name,
+      avatarUrl: row.profile_image_url ? (friendAvatarUrls.get(row.profile_image_url) ?? null) : null,
+      steps: row.steps,
+      isSelf: false,
+    })),
+    {
+      id: user.id,
+      displayName: user.displayName,
+      avatarUrl,
+      steps: expDashboard.todaySteps ?? 0,
+      isSelf: true,
+    },
+  ].sort((a, b) => b.steps - a.steps);
+
+  const friendStepsRanking = stepsRankingEntries.map((entry, entryIndex) => ({
+    ...entry,
+    rank: entryIndex + 1,
+  }));
+
   return (
     <>
       <TopHeader
-        title={space.name}
+        title={
+          <Link href="/mypage/profile" className="flex min-w-0 items-center gap-2" aria-label="マイページを見る">
+            <span className="flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-full bg-paper-deep">
+              {avatarUrl ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img src={avatarUrl} alt="" className="h-full w-full object-cover" />
+              ) : (
+                <IconUser size={22} className="text-ink-faint" />
+              )}
+            </span>
+            <span className="truncate text-[17px] font-bold">{user.displayName}</span>
+          </Link>
+        }
         action={
           <div className="flex items-center gap-2">
             <SoundSettingsButton />
@@ -71,43 +150,7 @@ export default async function HomePage({
           </p>
         ) : null}
 
-        <Link
-          href="/mypage/profile"
-          className="pressable relative block w-full overflow-hidden active:scale-[0.99]"
-          style={{ aspectRatio: "1536 / 420" }}
-          aria-label={`${user.displayName}のプロフィールを見る`}
-        >
-          {/* 元画像は上下に余白があるため、チケット部分だけがカード内に見える位置へ戻す。 */}
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img
-            src={PROFILE_TICKET_SRC}
-            alt=""
-            aria-hidden="true"
-            draggable={false}
-            className="pointer-events-none absolute left-0 top-[-70%] w-full max-w-none select-none"
-          />
-
-          {/* 元画像の丸窓の内側の線に、プロフィール画像の円周が沿うサイズ・位置に合わせる。 */}
-          <span className="absolute left-[15.31%] top-[14.02%] aspect-square w-[18.2%] overflow-hidden rounded-full bg-paper-deep">
-            {avatarUrl ? (
-              <>
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img src={avatarUrl} alt="" className="h-full w-full object-cover" />
-              </>
-            ) : (
-              <span className="flex h-full w-full items-center justify-center text-ink-faint">
-                <IconUser size={24} />
-              </span>
-            )}
-          </span>
-
-          <span className="absolute left-[36%] top-1/2 w-[30%] -translate-y-1/2 min-w-0">
-            <span className="block truncate text-sm font-bold text-[#3f2d17]">{user.displayName}</span>
-            <span className="mt-0.5 block truncate text-[11px] text-[#7b684d]">{user.email}</span>
-          </span>
-        </Link>
-
-        <div className="space-y-2">
+        <div className="mt-[10px]">
           <section className="rough-card overflow-visible">
             <div className="relative aspect-[1440/768] overflow-visible bg-transparent">
               <HomeScene>
@@ -154,12 +197,18 @@ export default async function HomePage({
             </div>
           </section>
 
-          <HomeStatsCard
-            prefectures={areas.totals.visitedPrefectures}
-            prefectureTotal={PREFECTURES.length}
-            municipalities={areas.totals.visitedMunicipalities}
-            municipalityTotal={MUNICIPALITIES.length}
-            visits={areas.totals.visits}
+          <HomeNoticeCard unreadCount={unreadNoticeCount} notices={noticesFeed} />
+
+          <HomeHighlightsCarousel
+            stats={{
+              prefectures: areas.totals.visitedPrefectures,
+              prefectureTotal: PREFECTURES.length,
+              municipalities: areas.totals.visitedMunicipalities,
+              municipalityTotal: MUNICIPALITIES.length,
+              visits: areas.totals.visits,
+            }}
+            activity={latestFriendActivity}
+            stepsRanking={friendStepsRanking}
           />
 
           <HomeCollectionCard collected={collectedItems} total={COLLECTION_ITEMS.length} />
