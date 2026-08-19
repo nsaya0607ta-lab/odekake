@@ -3,10 +3,11 @@
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import type { ActionState } from "@/components/form";
-import { postAdminNotice } from "@/lib/data/notices";
+import { postAdminNotice, updateAdminNotice } from "@/lib/data/notices";
 import { requireUser } from "@/lib/supabase/server";
 
 const messageSchema = z.string().trim().min(1, "本文を入力してください").max(500, "500文字以内で入力してください");
+const noticeIdSchema = z.string().uuid();
 
 export async function postAdminNoticeAction(_previous: ActionState, formData: FormData): Promise<ActionState> {
   const parsed = messageSchema.safeParse(formData.get("message"));
@@ -28,6 +29,33 @@ export async function postAdminNoticeAction(_previous: ActionState, formData: Fo
   }
 
   revalidatePath("/notices");
+  revalidatePath("/notices/admin");
   revalidatePath("/home");
   return { ok: true, message: "お知らせを配信しました" };
+}
+
+export async function updateAdminNoticeAction(_previous: ActionState, formData: FormData): Promise<ActionState> {
+  const noticeId = noticeIdSchema.safeParse(formData.get("noticeId"));
+  const parsed = messageSchema.safeParse(formData.get("message"));
+  if (!noticeId.success || !parsed.success) {
+    return {
+      error: parsed.error?.issues[0]?.message ?? "入力内容を確認してください",
+      values: { message: String(formData.get("message") ?? "") },
+    };
+  }
+
+  const { supabase } = await requireUser();
+  try {
+    await updateAdminNotice(supabase, noticeId.data, parsed.data);
+  } catch {
+    return {
+      error: "お知らせを更新できませんでした。もう一度お試しください",
+      values: { message: parsed.data },
+    };
+  }
+
+  revalidatePath("/notices");
+  revalidatePath("/notices/admin");
+  revalidatePath("/home");
+  return { ok: true, message: "お知らせを更新しました" };
 }

@@ -498,6 +498,7 @@ export type Database = {
       get_unread_notice_count: { Args: Record<string, never>; Returns: number };
       mark_notices_read: { Args: { p_notice_ids: string[] }; Returns: undefined };
       post_admin_notice: { Args: { p_message: string }; Returns: string };
+      update_admin_notice: { Args: { p_notice_id: string; p_message: string }; Returns: undefined };
       is_notice_admin: { Args: Record<string, never>; Returns: boolean };
       get_shared_trips_health: { Args: Record<string, never>; Returns: Json };
       get_shared_trip_list: { Args: Record<string, never>; Returns: SharedTripListRow[] };

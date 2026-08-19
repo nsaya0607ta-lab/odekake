@@ -51,3 +51,8 @@ export async function postAdminNotice(supabase: DB, message: string): Promise<st
   if (error) throw new Error(error.message || "お知らせの投稿に失敗しました");
   return data;
 }
+
+export async function updateAdminNotice(supabase: DB, noticeId: string, message: string): Promise<void> {
+  const { error } = await supabase.rpc("update_admin_notice", { p_notice_id: noticeId, p_message: message });
+  if (error) throw new Error(error.message || "お知らせを更新できませんでした");
+}
