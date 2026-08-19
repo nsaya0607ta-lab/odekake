@@ -130,7 +130,8 @@ export async function getFriendRecentVisits(
 }
 
 /**
- * ホームのカルーセル用。フレンド全員分の最新おでかけ登録を、登録が新しい順にまとめて返す。
+ * ホームのカルーセル用。自分・フレンド・共有旅の参加者の最新おでかけ登録を、
+ * 登録が新しい順にまとめて返す。
  * フレンド機能が未設定のDB（マイグレーション未適用）では空配列を返し、ホームの表示は崩さない。
  */
 export async function getFriendsActivityFeed(supabase: DB, limit = 10): Promise<FriendActivityRow[]> {
