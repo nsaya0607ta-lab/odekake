@@ -298,9 +298,13 @@ const FOOD_CATEGORY_ITEM_IDS = new Set(
 const DOG_SPAWN_RATIO = 0.28;
 const FRENCHIE_SKIN_IDS = ["hiking_frenchie", "snow_frenchie", "summer_frenchie"];
 const FRENCHIE_SKIN_SPAWN_CHANCE = 0.18;
+/**
+ * N/Rは同時出現数が多いため、フィルターコストを避けてdrop-shadowなしにしている。
+ * SR以上は同時出現数が少ないため、見た目の演出としてdrop-shadowを維持。
+ */
 const RARITY_STYLE: Record<FrenchieCatchItem["rarity"], string> = {
-  N: "drop-shadow-[0_4px_7px_rgba(80,120,80,0.22)]",
-  R: "drop-shadow-[0_4px_9px_rgba(74,142,200,0.34)]",
+  N: "",
+  R: "",
   SR: "drop-shadow-[0_0_10px_rgba(235,180,55,0.68)]",
   SSR: "drop-shadow-[0_0_13px_rgba(177,112,220,0.78)]",
   UR: "drop-shadow-[0_0_16px_rgba(201,66,55,0.92)]",
@@ -1723,11 +1727,11 @@ export function FrenchieCatchGame({ ownedItems }: { ownedItems: FrenchieCatchIte
               : 0;
           const topZoneHidden = entity.y < topZoneHiddenY;
           return (
-          <div key={entity.id} className={`absolute ${entity.enteredOpening && entity.status !== "bounced" ? "z-40" : "z-20"} will-change-transform ${topZoneHidden ? "opacity-0" : "opacity-100"} ${entity.rarity ? RARITY_STYLE[entity.rarity] : "drop-shadow-[0_5px_7px_rgba(75,58,43,0.22)]"}`} style={{ left: `${entity.x}%`, top: `${entity.y}%`, width: `${entity.size}%`, transform: `translate(-50%, -50%) rotate(${entity.rotation}deg)` }}>
+          <div key={entity.id} className={`absolute ${entity.enteredOpening && entity.status !== "bounced" ? "z-40" : "z-20"} will-change-transform ${topZoneHidden ? "opacity-0" : "opacity-100"} ${entity.rarity ? RARITY_STYLE[entity.rarity] : ""}`} style={{ left: `${entity.x}%`, top: `${entity.y}%`, width: `${entity.size}%`, transform: `translate(-50%, -50%) rotate(${entity.rotation}deg)` }}>
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img src={entity.image} alt="" width={160} height={160} draggable={false} loading="eager" className="h-auto w-full object-contain" />
-            {entity.rarity === "UR" ? <span className="absolute -inset-2 -z-10 animate-pulse rounded-full bg-[#e95c4d]/15 blur-md" /> : null}
-            {entity.rarity === "LR" ? <span className="absolute -inset-3 -z-10 animate-pulse rounded-full bg-[#e6b43c]/25 blur-lg" /> : null}
+            {entity.rarity === "UR" ? <span className="absolute -inset-2 -z-10 animate-pulse rounded-full bg-[#e95c4d]/15 blur-sm" /> : null}
+            {entity.rarity === "LR" ? <span className="absolute -inset-3 -z-10 animate-pulse rounded-full bg-[#e6b43c]/25 blur" /> : null}
           </div>
           );
         })}
