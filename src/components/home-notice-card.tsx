@@ -30,7 +30,7 @@ export function HomeNoticeCard({
     <Link
       href="/notices"
       className="pressable relative block active:scale-[0.99]"
-      style={{ marginLeft: -9, marginRight: -12, marginTop: 10 }}
+      style={{ marginLeft: -9, marginRight: -12, marginTop: 13 }}
       aria-label={`お知らせ。${summary}`}
     >
       <div className="relative w-full" style={{ aspectRatio: CARD_RATIO }}>
