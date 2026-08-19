@@ -2,6 +2,7 @@ import { cache } from "react";
 import type { TripRow } from "@/lib/supabase/types";
 import type { DB } from "./client";
 import { signPhotoPath } from "./photos";
+import { getSharedTripList } from "./shared-trips";
 
 export type TripSummary = {
   trip: TripRow;
@@ -70,15 +71,22 @@ export async function getRecordDestinationHierarchy(
   userId: string,
   personalSpaceName: string,
 ): Promise<RecordDestinationHierarchy> {
-  const { data, error } = await supabase
-    .from("trips")
-    .select("id, title, owner_id, trip_type, parent_trip_id, start_date, end_date, description")
-    .order("created_at", { ascending: false });
+  const [{ data, error }, sharedTrips] = await Promise.all([
+    supabase
+      .from("trips")
+      .select("id, title, owner_id, trip_type, parent_trip_id, start_date, end_date, description")
+      .order("created_at", { ascending: false }),
+    getSharedTripList(supabase),
+  ]);
 
   if (error) {
     console.error("Record destination hierarchy failed", { code: error.code, message: error.message });
     return { personal: null, shared: [] };
   }
+
+  const acceptedSharedTripIds = new Set(
+    sharedTrips.filter((trip) => trip.my_status === "accepted").map((trip) => trip.trip_id),
+  );
 
   const rows = (data ?? []) as Array<Pick<TripRow,
     "id" | "title" | "owner_id" | "trip_type" | "parent_trip_id" | "start_date" | "end_date" | "description"
@@ -111,7 +119,9 @@ export async function getRecordDestinationHierarchy(
     .filter((trip) => trip.parent_trip_id === rootId)
     .map((trip) => ({ id: trip.id, title: trip.title, startDate: trip.start_date, endDate: trip.end_date }));
 
-  const sharedRoots = rows.filter((trip) => trip.trip_type === "shared" && trip.parent_trip_id === null);
+  const sharedRoots = rows.filter(
+    (trip) => trip.trip_type === "shared" && trip.parent_trip_id === null && acceptedSharedTripIds.has(trip.id),
+  );
   return {
     personal: personalRoot ? {
       id: personalRoot.id,
