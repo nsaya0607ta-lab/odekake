@@ -64,6 +64,9 @@ $$;
 revoke all on function public.create_friend_group(text, uuid[], text) from public, anon;
 grant execute on function public.create_friend_group(text, uuid[], text) to authenticated;
 
+-- 戻り値の列構成が変わるため、既存の関数を先に消してから作り直す
+drop function if exists public.get_my_friend_groups();
+
 create or replace function public.get_my_friend_groups()
 returns table (
   id uuid,
