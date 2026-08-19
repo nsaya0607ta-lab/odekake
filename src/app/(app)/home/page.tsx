@@ -19,6 +19,7 @@ import { getOwnedItemIds } from "@/lib/data/collection";
 import { getCurrentDogSkin } from "@/lib/data/dog-skin";
 import { getExpDashboard } from "@/lib/data/exp";
 import { getFriendsActivityFeed, getFriendsStepsRanking } from "@/lib/data/friends";
+import { getNoticesFeed, getUnreadNoticeCount } from "@/lib/data/notices";
 import { signPhotoPath, signPhotoPaths } from "@/lib/data/photos";
 import { getRecordSpace } from "@/lib/data/space";
 import { getExpProgress } from "@/lib/exp";
@@ -39,17 +40,29 @@ export default async function HomePage({
   const [{ supabase, user }, { notice }] = await Promise.all([requireUser(), searchParams]);
   const space = await getRecordSpace(supabase, user.id);
 
-  const [areas, expDashboard, coins, ownedItemIds, dogSkin, profileResult, friendActivity, friendSteps] =
-    await Promise.all([
-      loadAreaIndex(supabase, space.tripIds),
-      getExpDashboard(supabase, user.id),
-      getCoinSummary(supabase, user.id),
-      getOwnedItemIds(supabase, user.id),
-      getCurrentDogSkin(supabase, user.id),
-      supabase.from("profiles").select("profile_image_url, introduction").eq("user_id", user.id).maybeSingle(),
-      getFriendsActivityFeed(supabase, 30),
-      getFriendsStepsRanking(supabase, 20),
-    ]);
+  const [
+    areas,
+    expDashboard,
+    coins,
+    ownedItemIds,
+    dogSkin,
+    profileResult,
+    friendActivity,
+    friendSteps,
+    noticesFeed,
+    unreadNoticeCount,
+  ] = await Promise.all([
+    loadAreaIndex(supabase, space.tripIds),
+    getExpDashboard(supabase, user.id),
+    getCoinSummary(supabase, user.id),
+    getOwnedItemIds(supabase, user.id),
+    getCurrentDogSkin(supabase, user.id),
+    supabase.from("profiles").select("profile_image_url, introduction").eq("user_id", user.id).maybeSingle(),
+    getFriendsActivityFeed(supabase, 30),
+    getFriendsStepsRanking(supabase, 20),
+    getNoticesFeed(supabase, 3),
+    getUnreadNoticeCount(supabase),
+  ]);
 
   const friendAvatarPaths = [
     ...friendActivity.flatMap((row) => (row.profile_image_url ? [row.profile_image_url] : [])),
@@ -138,7 +151,7 @@ export default async function HomePage({
         ) : null}
 
         <div className="mt-[10px] space-y-2">
-          <HomeNoticeCard />
+          <HomeNoticeCard unreadCount={unreadNoticeCount} notices={noticesFeed} />
 
           <section className="rough-card overflow-visible">
             <div className="relative aspect-[1440/768] overflow-visible bg-transparent">

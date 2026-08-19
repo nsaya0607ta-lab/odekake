@@ -297,6 +297,18 @@ export type FriendStepsRankingRow = {
   steps: number;
 };
 
+export type NoticeType = "friend_spot" | "minigame_best" | "steps_10000" | "collection_rare" | "admin";
+
+export type NoticeFeedRow = {
+  id: string;
+  type: NoticeType;
+  created_at: string;
+  display_name: string | null;
+  avatar_url: string | null;
+  title: string;
+  is_read: boolean;
+};
+
 export type DailyStepsRow = {
   user_id: string;
   step_date: string;
@@ -482,6 +494,11 @@ export type Database = {
       };
       get_friends_activity_feed: { Args: { p_limit?: number }; Returns: FriendActivityRow[] };
       get_friends_steps_ranking: { Args: { p_limit?: number }; Returns: FriendStepsRankingRow[] };
+      get_notices_feed: { Args: { p_limit?: number }; Returns: NoticeFeedRow[] };
+      get_unread_notice_count: { Args: Record<string, never>; Returns: number };
+      mark_notices_read: { Args: { p_notice_ids: string[] }; Returns: undefined };
+      post_admin_notice: { Args: { p_message: string }; Returns: string };
+      is_notice_admin: { Args: Record<string, never>; Returns: boolean };
       get_shared_trips_health: { Args: Record<string, never>; Returns: Json };
       get_shared_trip_list: { Args: Record<string, never>; Returns: SharedTripListRow[] };
       create_shared_trip: {

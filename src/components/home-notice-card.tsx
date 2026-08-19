@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { IconChevronRight } from "@/components/icons";
-import { DUMMY_NOTICES } from "@/lib/dummy-notices";
+import type { NoticeFeedRow } from "@/lib/supabase/types";
 
 /**
  * ホームの「お知らせ」カード。犬のメインカードの上に置く。
@@ -8,17 +8,21 @@ import { DUMMY_NOTICES } from "@/lib/dummy-notices";
  * public/notice-card.webp は「お知らせ」タグ・切手・リュックのイラストが
  * 左側に焼き込まれた透明背景の枠。右側の空白に、新着件数と最大3件の
  * お知らせタイトルを文字で重ねる。
- *
- * お知らせ機能のDBがまだ無いので、一覧は src/lib/dummy-notices.ts の
- * ダミーデータを表示している。
  */
 const CARD_RATIO = "2172 / 724";
 
 const CARD_SRC = "/notice-card.webp";
 
-export function HomeNoticeCard() {
-  const notices = DUMMY_NOTICES.slice(0, 3);
-  const unreadCount = DUMMY_NOTICES.length;
+export function HomeNoticeCard({
+  unreadCount,
+  notices,
+}: {
+  /** 直近24時間に作成された、自分がまだ読んでいないお知らせの件数 */
+  unreadCount: number;
+  /** 新しい順の最新お知らせ（先頭3件を表示） */
+  notices: NoticeFeedRow[];
+}) {
+  const latest = notices.slice(0, 3);
   const summary = unreadCount > 0 ? `新着情報が${unreadCount}件あります` : "すべて既読済み";
 
   return (
@@ -47,15 +51,19 @@ export function HomeNoticeCard() {
             >
               {summary}
             </p>
-            {notices.length > 0 ? (
+            {latest.length > 0 ? (
               <div className="flex flex-col" style={{ gap: 6, transform: "translate(-1.5em, 3px)" }}>
-                {notices.map((notice) => (
+                {latest.map((notice) => (
                   <p key={notice.id} className="truncate text-xs text-ink-soft">
                     ・{notice.title}
                   </p>
                 ))}
               </div>
-            ) : null}
+            ) : (
+              <p className="truncate text-xs text-ink-faint" style={{ transform: "translate(-1.5em, 3px)" }}>
+                ・まだお知らせはありません
+              </p>
+            )}
           </div>
           <IconChevronRight
             size={18}
