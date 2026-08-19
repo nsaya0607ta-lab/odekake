@@ -2,7 +2,7 @@
 
 import Image from "next/image";
 import { useRouter } from "next/navigation";
-import { useCallback, useEffect, useMemo, useRef, useState, type PointerEvent as ReactPointerEvent } from "react";
+import { memo, useCallback, useEffect, useMemo, useRef, useState, type PointerEvent as ReactPointerEvent } from "react";
 import { MAX_SKILL_LEVEL } from "@/lib/gacha/skill-levels";
 import { COLLECTION_ITEMS } from "@/lib/collection/items";
 
@@ -343,6 +343,36 @@ function isCardboardTap(localX: number, localY: number) {
   const rightSide = localY >= 0.16 && localY <= 0.50 && localX >= 0.82 && localX <= 0.945;
   return front || leftSide || rightSide;
 }
+
+/**
+ * 位置・回転・不透明度・z-indexはマウント後、rAFループがrefのDOM要素へ直接書き込む。
+ * entity.idさえ変わらなければ再レンダリングしない（増減時のReact側の処理対象を最小化するため）。
+ */
+const FallingEntity = memo(function FallingEntity({
+  entity,
+  registerRef,
+}: {
+  entity: Entity;
+  registerRef: (el: HTMLDivElement | null) => void;
+}) {
+  return (
+    <div
+      ref={registerRef}
+      className={`absolute will-change-transform ${entity.rarity ? RARITY_STYLE[entity.rarity] : ""}`}
+      style={{
+        left: `${entity.x}%`,
+        top: `${entity.y}%`,
+        width: `${entity.size}%`,
+        zIndex: entity.enteredOpening && entity.status !== "bounced" ? 40 : 20,
+        transform: `translate(-50%, -50%) rotate(${entity.rotation}deg)`,
+      }}
+    >
+      <Image src={entity.image} alt="" width={96} height={96} draggable={false} loading="eager" className="h-auto w-full object-contain" />
+      {entity.rarity === "UR" ? <span className="absolute -inset-2 -z-10 animate-pulse rounded-full bg-[#e95c4d]/15 blur-sm" /> : null}
+      {entity.rarity === "LR" ? <span className="absolute -inset-3 -z-10 animate-pulse rounded-full bg-[#e6b43c]/25 blur" /> : null}
+    </div>
+  );
+}, (prev, next) => prev.entity.id === next.entity.id);
 
 export function FrenchieCatchGame({ ownedItems }: { ownedItems: FrenchieCatchItem[] }) {
   const router = useRouter();
@@ -1776,25 +1806,14 @@ export function FrenchieCatchGame({ ownedItems }: { ownedItems: FrenchieCatchIte
         ) : null}
 
         {entities.map((entity) => (
-          <div
+          <FallingEntity
             key={entity.id}
-            ref={(el) => {
+            entity={entity}
+            registerRef={(el) => {
               if (el) entityNodeRefs.current.set(entity.id, el);
               else entityNodeRefs.current.delete(entity.id);
             }}
-            className={`absolute will-change-transform ${entity.rarity ? RARITY_STYLE[entity.rarity] : ""}`}
-            style={{
-              left: `${entity.x}%`,
-              top: `${entity.y}%`,
-              width: `${entity.size}%`,
-              zIndex: entity.enteredOpening && entity.status !== "bounced" ? 40 : 20,
-              transform: `translate(-50%, -50%) rotate(${entity.rotation}deg)`,
-            }}
-          >
-            <Image src={entity.image} alt="" width={96} height={96} draggable={false} loading="eager" className="h-auto w-full object-contain" />
-            {entity.rarity === "UR" ? <span className="absolute -inset-2 -z-10 animate-pulse rounded-full bg-[#e95c4d]/15 blur-sm" /> : null}
-            {entity.rarity === "LR" ? <span className="absolute -inset-3 -z-10 animate-pulse rounded-full bg-[#e6b43c]/25 blur" /> : null}
-          </div>
+          />
         ))}
 
         {impactX !== null ? <div className="pointer-events-none absolute z-40 -translate-x-1/2 -translate-y-1/2 animate-ping text-xl font-black text-[#d7684f]" style={{ left: `${impactX}%`, top: `${BOX_LIP_Y}%` }}>✦</div> : null}
