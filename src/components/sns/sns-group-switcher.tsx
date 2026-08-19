@@ -186,7 +186,7 @@ export function SnsGroupSwitcher({ groups, activeGroupId }: { groups: FriendGrou
         </div>
       ))}
       <Link href="/sns/groups/new" aria-label="グループを作る" className="flex shrink-0 flex-col items-center gap-1">
-        <span className="tap-target flex h-14 w-14 items-center justify-center rounded-full border-2 border-dashed border-line-strong text-ink-faint active:bg-paper-deep">
+        <span className="tap-target flex h-14 w-14 items-center justify-center rounded-full border-2 border-dashed border-line text-ink-faint active:bg-paper-deep">
           <IconPlus size={20} />
         </span>
         <span className="max-w-[3.5rem] truncate text-[10px] text-ink-faint">追加</span>
@@ -213,7 +213,7 @@ function GroupIcon({
       <span className="relative">
         <span
           className={`tap-target flex h-14 w-14 items-center justify-center rounded-full border-2 text-2xl transition-colors ${
-            active ? "border-leaf bg-leaf-soft" : "border-line-strong bg-card"
+            active ? "border-leaf bg-leaf-soft" : "border-line bg-card"
           } ${dragging ? "shadow-md" : ""}`}
         >
           {icon}

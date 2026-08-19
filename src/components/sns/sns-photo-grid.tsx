@@ -89,7 +89,7 @@ export function SnsPhotoGrid({
           type="button"
           onClick={() => selectDate(today)}
           aria-label="今日に移動"
-          className="tap-target flex h-14 w-12 shrink-0 flex-col items-center justify-center gap-0.5 rounded-2xl border border-line-strong bg-card text-ink-faint active:bg-paper-deep"
+          className="tap-target flex h-14 w-12 shrink-0 flex-col items-center justify-center gap-0.5 rounded-2xl border border-line bg-card text-ink-faint active:bg-paper-deep"
         >
           <IconCalendar size={18} />
         </button>
@@ -110,8 +110,8 @@ export function SnsPhotoGrid({
                 active
                   ? "border-leaf bg-leaf text-white"
                   : hasPhotos
-                    ? "border-line-strong bg-card text-ink"
-                    : "border-line-strong bg-card text-ink-faint"
+                    ? "border-line bg-card text-ink"
+                    : "border-line bg-card text-ink-faint"
               }`}
             >
               <span>{md}</span>

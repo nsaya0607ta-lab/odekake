@@ -56,9 +56,10 @@ export default async function SnsGroupPage({
       />
       <PostedToast />
       <PageBody>
-        <SnsGroupSwitcher groups={groups} activeGroupId={groupId} />
-
-        <SnsViewTabs baseHref={baseHref} view={view} />
+        <div className="space-y-2">
+          <SnsGroupSwitcher groups={groups} activeGroupId={groupId} />
+          <SnsViewTabs baseHref={baseHref} view={view} />
+        </div>
 
         {view === "photos" ? (
           <GroupPhotos groupId={groupId} />
