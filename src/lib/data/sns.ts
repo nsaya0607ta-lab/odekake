@@ -3,7 +3,6 @@ import type {
   FriendGroupMemberRow,
   FriendGroupMessageRow,
   FriendGroupRow,
-  FriendMessageRow,
   SnsCommentRow,
   SnsFeedPhotoRow,
   SnsPhotoRow,
@@ -11,15 +10,6 @@ import type {
 
 /** フィードで遡って表示する日数 */
 export const SNS_FEED_DAYS = 30;
-
-export async function getSnsFeed(supabase: DB, days: number = SNS_FEED_DAYS): Promise<SnsFeedPhotoRow[]> {
-  const { data, error } = await supabase.rpc("get_sns_feed", { p_days: days });
-  if (error) {
-    console.error("SNS feed is unavailable", { code: error.code, message: error.message });
-    throw new Error("SNS写真の取得に失敗しました");
-  }
-  return data ?? [];
-}
 
 export async function getSnsGroupFeed(
   supabase: DB,
@@ -57,15 +47,6 @@ export async function getFriendGroupMembers(supabase: DB, groupId: string): Prom
   if (error) {
     console.error("Friend group members are unavailable", { code: error.code, message: error.message });
     throw new Error("メンバーの取得に失敗しました");
-  }
-  return data ?? [];
-}
-
-export async function getFriendMessages(supabase: DB, limit = 50): Promise<FriendMessageRow[]> {
-  const { data, error } = await supabase.rpc("get_friend_messages", { p_limit: limit });
-  if (error) {
-    console.error("Friend messages are unavailable", { code: error.code, message: error.message });
-    throw new Error("チャットの取得に失敗しました");
   }
   return data ?? [];
 }

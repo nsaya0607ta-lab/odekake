@@ -24,22 +24,29 @@ export function SnsChatForm({
   }, [state.ok]);
 
   return (
-    <form ref={formRef} action={formAction} className="space-y-2 px-1">
-      {hiddenFields
-        ? Object.entries(hiddenFields).map(([name, value]) => <input key={name} type="hidden" name={name} value={value} />)
-        : null}
-      <textarea
-        name="body"
-        rows={2}
-        maxLength={1000}
-        placeholder={placeholder}
-        defaultValue={state.values?.body ?? ""}
-        className="field"
-      />
+    <div
+      className="sticky z-10 -mx-4 border-t border-line bg-paper/95 px-4 pt-2 backdrop-blur-sm"
+      style={{ bottom: "calc(var(--nav-height) + var(--safe-bottom))" }}
+    >
+      <form ref={formRef} action={formAction} className="flex items-end gap-2 pb-2">
+        {hiddenFields
+          ? Object.entries(hiddenFields).map(([name, value]) => (
+              <input key={name} type="hidden" name={name} value={value} />
+            ))
+          : null}
+        <textarea
+          name="body"
+          rows={1}
+          maxLength={1000}
+          placeholder={placeholder}
+          defaultValue={state.values?.body ?? ""}
+          className="field flex-1 resize-none"
+        />
+        <SubmitButton className="btn btn-primary shrink-0 px-4 text-sm" pendingLabel="…">
+          送信
+        </SubmitButton>
+      </form>
       <FormMessage state={state} />
-      <SubmitButton className="btn btn-primary w-full text-sm" pendingLabel="送信中…">
-        投稿する
-      </SubmitButton>
-    </form>
+    </div>
   );
 }

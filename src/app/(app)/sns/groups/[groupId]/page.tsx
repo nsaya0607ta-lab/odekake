@@ -10,8 +10,8 @@ import { PageBody } from "@/components/page-body";
 import { PageHeader } from "@/components/page-header";
 import { SnsChatForm } from "@/components/sns/sns-chat-form";
 import { SnsChatList } from "@/components/sns/sns-chat-list";
+import { SnsGroupSwitcher } from "@/components/sns/sns-group-switcher";
 import { SnsPhotoGrid } from "@/components/sns/sns-photo-grid";
-import { SnsTabs } from "@/components/sns/sns-tabs";
 import { SnsViewTabs } from "@/components/sns/sns-view-tabs";
 import { signPhotoPaths } from "@/lib/data/photos";
 import { getFriendGroupMessages, getMyFriendGroups, getSnsGroupFeed } from "@/lib/data/sns";
@@ -54,7 +54,7 @@ export default async function SnsGroupPage({
         }
       />
       <PageBody>
-        <SnsTabs groups={groups} activeGroupId={groupId} />
+        <SnsGroupSwitcher groups={groups} activeGroupId={groupId} />
 
         {sp.posted === "1" ? (
           <p role="status" className="rounded-2xl border border-leaf bg-leaf-soft px-4 py-3 text-sm text-leaf-deep">
@@ -112,8 +112,7 @@ async function GroupChat({ groupId, currentUserId }: { groupId: string; currentU
   );
 
   return (
-    <div className="space-y-4">
-      <SnsChatForm action={createFriendGroupMessageAction} hiddenFields={{ groupId }} />
+    <div>
       <SnsChatList
         messages={messages}
         avatarUrls={avatarUrls}
@@ -121,6 +120,7 @@ async function GroupChat({ groupId, currentUserId }: { groupId: string; currentU
         deleteAction={deleteFriendGroupMessageAction}
         hiddenFieldsFor={(message) => ({ messageId: message.id, groupId })}
       />
+      <SnsChatForm action={createFriendGroupMessageAction} hiddenFields={{ groupId }} />
     </div>
   );
 }
