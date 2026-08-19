@@ -66,7 +66,7 @@ export function ItemCatchRanking() {
 
     const timer = window.setInterval(() => {
       if (document.visibilityState === "visible") void loadRanking(true);
-    }, 8000);
+    }, 5 * 60 * 1000);
 
     const refreshWhenVisible = () => {
       if (document.visibilityState === "visible") void loadRanking(true);
