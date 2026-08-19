@@ -160,49 +160,37 @@ export function SnsGroupSwitcher({ groups, activeGroupId }: { groups: FriendGrou
   }
 
   return (
-    <div className="relative -mx-4 overflow-hidden rounded-b-3xl">
-      {/* eslint-disable-next-line @next/next/no-img-element */}
-      <img
-        src="/backgrounds/gradient-bubbles.jpg"
-        alt=""
-        className="pointer-events-none absolute inset-0 h-full w-full object-cover"
-      />
-      <div aria-hidden className="pointer-events-none absolute inset-0 bg-paper/55" />
-      <div
-        className="relative flex items-center gap-3 overflow-x-auto px-4 py-3"
-        style={{ scrollbarWidth: "none" }}
-      >
-        {order.map((group, index) => (
-          <div key={group.id} className="flex shrink-0 items-center gap-3">
-            {index === 1 ? <span aria-hidden className="h-10 w-px shrink-0 bg-line-strong" /> : null}
-            <div
-              ref={(el) => {
-                if (el) itemRefs.current.set(group.id, el);
-                else itemRefs.current.delete(group.id);
-              }}
-              style={{ touchAction: "pan-x" }}
-              onPointerDown={(e) => handlePointerDown(e, group.id)}
-              onPointerMove={(e) => handlePointerMove(e, group.id)}
-              onPointerUp={() => handlePointerUp(group.id)}
-              onPointerCancel={() => handlePointerUp(group.id)}
-            >
-              <GroupIcon
-                icon={group.icon}
-                label={group.name}
-                active={activeGroupId === group.id}
-                unread={group.has_unread}
-                dragging={draggingId === group.id}
-              />
-            </div>
+    <div className="-mx-4 flex items-center gap-3 overflow-x-auto px-4 py-3" style={{ scrollbarWidth: "none" }}>
+      {order.map((group, index) => (
+        <div key={group.id} className="flex shrink-0 items-center gap-3">
+          {index === 1 ? <span aria-hidden className="h-10 w-px shrink-0 bg-line-strong" /> : null}
+          <div
+            ref={(el) => {
+              if (el) itemRefs.current.set(group.id, el);
+              else itemRefs.current.delete(group.id);
+            }}
+            style={{ touchAction: "pan-x" }}
+            onPointerDown={(e) => handlePointerDown(e, group.id)}
+            onPointerMove={(e) => handlePointerMove(e, group.id)}
+            onPointerUp={() => handlePointerUp(group.id)}
+            onPointerCancel={() => handlePointerUp(group.id)}
+          >
+            <GroupIcon
+              icon={group.icon}
+              label={group.name}
+              active={activeGroupId === group.id}
+              unread={group.has_unread}
+              dragging={draggingId === group.id}
+            />
           </div>
-        ))}
-        <Link href="/sns/groups/new" aria-label="グループを作る" className="flex shrink-0 flex-col items-center gap-1">
-          <span className="tap-target flex h-14 w-14 items-center justify-center rounded-full border-2 border-dashed border-line text-ink-faint active:bg-paper-deep">
-            <IconPlus size={20} />
-          </span>
-          <span className="max-w-[3.5rem] truncate text-[10px] text-ink-faint">追加</span>
-        </Link>
-      </div>
+        </div>
+      ))}
+      <Link href="/sns/groups/new" aria-label="グループを作る" className="flex shrink-0 flex-col items-center gap-1">
+        <span className="tap-target flex h-14 w-14 items-center justify-center rounded-full border-2 border-dashed border-line text-ink-faint active:bg-paper-deep">
+          <IconPlus size={20} />
+        </span>
+        <span className="max-w-[3.5rem] truncate text-[10px] text-ink-faint">追加</span>
+      </Link>
     </div>
   );
 }
