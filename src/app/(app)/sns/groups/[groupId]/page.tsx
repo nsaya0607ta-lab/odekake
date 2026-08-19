@@ -5,7 +5,7 @@ import {
   deleteFriendGroupMessageAction,
   markFriendGroupReadAction,
 } from "@/app/actions/sns";
-import { IconSettings } from "@/components/icons";
+import { IconPlus, IconSettings } from "@/components/icons";
 import { PageBody } from "@/components/page-body";
 import { PageHeader } from "@/components/page-header";
 import { PostedToast } from "@/components/sns/posted-toast";
@@ -65,6 +65,19 @@ export default async function SnsGroupPage({
           <GroupChat groupId={groupId} currentUserId={user.id} />
         )}
       </PageBody>
+      {view === "photos" ? (
+        // PageBody の fade-in アニメーションが transform を animate するせいで
+        // position:fixed の子が画面基準ではなくPageBody基準になってしまうため、
+        // FABはPageBodyの外に置く
+        <Link
+          href={`${baseHref}/new`}
+          aria-label="写真を投稿"
+          className="fixed right-4 z-30 flex h-14 w-14 items-center justify-center rounded-full bg-leaf text-white shadow-lg active:opacity-80"
+          style={{ bottom: "calc(var(--nav-height) + var(--safe-bottom) + 1rem)" }}
+        >
+          <IconPlus size={24} />
+        </Link>
+      ) : null}
     </>
   );
 }
@@ -78,9 +91,7 @@ async function GroupPhotos({ groupId }: { groupId: string }) {
   );
   const photoUrls = await signPhotoPaths(supabase, photos.map((p) => p.storage_path));
 
-  return (
-    <SnsPhotoGrid photos={photos} photoUrls={photoUrls} avatarUrls={avatarUrls} postHref={`/sns/groups/${groupId}/new`} />
-  );
+  return <SnsPhotoGrid photos={photos} photoUrls={photoUrls} avatarUrls={avatarUrls} />;
 }
 
 async function GroupChat({ groupId, currentUserId }: { groupId: string; currentUserId: string }) {

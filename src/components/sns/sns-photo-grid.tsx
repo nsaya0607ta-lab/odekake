@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { IconCalendar, IconChat, IconHeart, IconPlus, IconUser } from "@/components/icons";
+import { IconCalendar, IconChat, IconHeart, IconUser } from "@/components/icons";
 import { groupSnsFeedByDay } from "@/lib/data/sns";
 import type { SnsFeedPhotoRow } from "@/lib/supabase/types";
 
@@ -36,12 +36,10 @@ export function SnsPhotoGrid({
   photos,
   photoUrls,
   avatarUrls,
-  postHref,
 }: {
   photos: SnsFeedPhotoRow[];
   photoUrls: Map<string, string>;
   avatarUrls: Map<string, string>;
-  postHref: string;
 }) {
   const today = useMemo(() => todayInTokyo(), []);
   const days = useMemo(() => groupSnsFeedByDay(photos), [photos]);
@@ -196,15 +194,6 @@ export function SnsPhotoGrid({
           })}
         </div>
       )}
-
-      <Link
-        href={postHref}
-        aria-label="写真を投稿"
-        className="fixed right-4 z-30 flex h-14 w-14 items-center justify-center rounded-full bg-leaf text-white shadow-lg active:opacity-80"
-        style={{ bottom: "calc(var(--nav-height) + var(--safe-bottom) + 1rem)" }}
-      >
-        <IconPlus size={24} />
-      </Link>
     </div>
   );
 }
