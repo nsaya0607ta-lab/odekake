@@ -635,6 +635,7 @@ export type Database = {
       delete_friend_group: { Args: { p_group_id: string }; Returns: undefined };
       get_friend_group_members: { Args: { p_group_id: string }; Returns: FriendGroupMemberRow[] };
       get_my_friend_groups: { Args: Record<string, never>; Returns: FriendGroupRow[] };
+      reorder_friend_groups: { Args: { p_group_ids: string[] }; Returns: undefined };
       mark_friend_group_read: { Args: { p_group_id: string }; Returns: undefined };
       get_sns_group_feed: { Args: { p_group_id: string; p_days?: number }; Returns: SnsFeedPhotoRow[] };
       create_friend_group_message: {

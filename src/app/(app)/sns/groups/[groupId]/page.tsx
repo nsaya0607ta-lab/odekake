@@ -8,6 +8,7 @@ import {
 import { IconCamera, IconSettings } from "@/components/icons";
 import { PageBody } from "@/components/page-body";
 import { PageHeader } from "@/components/page-header";
+import { PostedToast } from "@/components/sns/posted-toast";
 import { SnsChatForm } from "@/components/sns/sns-chat-form";
 import { SnsChatList } from "@/components/sns/sns-chat-list";
 import { SnsGroupSwitcher } from "@/components/sns/sns-group-switcher";
@@ -24,7 +25,7 @@ export default async function SnsGroupPage({
   searchParams,
 }: {
   params: Promise<{ groupId: string }>;
-  searchParams: Promise<{ view?: string; posted?: string }>;
+  searchParams: Promise<{ view?: string }>;
 }) {
   const [{ groupId }, sp, { supabase, user }] = await Promise.all([params, searchParams, requireUser()]);
 
@@ -53,14 +54,9 @@ export default async function SnsGroupPage({
           </Link>
         }
       />
+      <PostedToast />
       <PageBody>
         <SnsGroupSwitcher groups={groups} activeGroupId={groupId} />
-
-        {sp.posted === "1" ? (
-          <p role="status" className="rounded-2xl border border-leaf bg-leaf-soft px-4 py-3 text-sm text-leaf-deep">
-            写真を投稿しました
-          </p>
-        ) : null}
 
         <SnsViewTabs baseHref={baseHref} view={view} />
 

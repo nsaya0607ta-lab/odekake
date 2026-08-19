@@ -180,6 +180,16 @@ export async function createFriendGroupAction(_prev: ActionState, formData: Form
   redirect(`/sns/groups/${groupId}`);
 }
 
+/** グループアイコンの長押しドラッグ並び替え用。フォームを介さず直接呼び出す */
+export async function reorderFriendGroupsAction(groupIds: string[]): Promise<void> {
+  const parsed = groupIds.filter((id) => uuidSchema.safeParse(id).success);
+  if (parsed.length === 0) return;
+
+  const { supabase } = await requireUser();
+  await supabase.rpc("reorder_friend_groups", { p_group_ids: parsed });
+  revalidatePath("/sns");
+}
+
 export async function addFriendGroupMembersAction(_prev: ActionState, formData: FormData): Promise<ActionState> {
   const groupId = String(formData.get("groupId") ?? "");
   const parsedGroupId = uuidSchema.safeParse(groupId);
