@@ -118,7 +118,7 @@ async function GroupChat({ groupId, currentUserId }: { groupId: string; currentU
         avatarUrls={avatarUrls}
         currentUserId={currentUserId}
         deleteAction={deleteFriendGroupMessageAction}
-        hiddenFieldsFor={(message) => ({ messageId: message.id, groupId })}
+        groupId={groupId}
       />
       <SnsChatForm action={createFriendGroupMessageAction} hiddenFields={{ groupId }} />
     </div>

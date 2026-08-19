@@ -29,13 +29,13 @@ export function SnsChatList({
   avatarUrls,
   currentUserId,
   deleteAction,
-  hiddenFieldsFor,
+  groupId,
 }: {
   messages: ChatMessage[];
   avatarUrls: Map<string, string>;
   currentUserId: string;
   deleteAction: DeleteAction;
-  hiddenFieldsFor: (message: ChatMessage) => Record<string, string>;
+  groupId: string;
 }) {
   const bottomRef = useRef<HTMLLIElement>(null);
 
@@ -60,9 +60,8 @@ export function SnsChatList({
           return (
             <li key={message.id} ref={isLast ? bottomRef : undefined} className="flex items-end justify-end gap-1.5">
               <form action={deleteAction} className="shrink-0">
-                {Object.entries(hiddenFieldsFor(message)).map(([name, value]) => (
-                  <input key={name} type="hidden" name={name} value={value} />
-                ))}
+                <input type="hidden" name="messageId" value={message.id} />
+                <input type="hidden" name="groupId" value={groupId} />
                 <button
                   type="submit"
                   aria-label="このメッセージを削除"
