@@ -110,7 +110,11 @@ export function SnsPhotoGrid({
             </Link>
           </div>
           <span aria-hidden className="h-8 w-px shrink-0 bg-line" />
-          <div ref={chipRowRef} className="flex min-w-0 flex-1 gap-1 overflow-x-auto" style={{ scrollbarWidth: "none" }}>
+          <div
+            ref={chipRowRef}
+            className="flex w-[17.25rem] shrink-0 gap-1 overflow-x-auto"
+            style={{ scrollbarWidth: "none" }}
+          >
             <label
               onClick={openDatePicker}
               aria-label="日付を選ぶ"
