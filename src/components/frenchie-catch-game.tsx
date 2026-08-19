@@ -1,6 +1,5 @@
 "use client";
 
-import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useRef, useState, type PointerEvent as ReactPointerEvent } from "react";
 import { MAX_SKILL_LEVEL } from "@/lib/gacha/skill-levels";
@@ -1681,18 +1680,22 @@ export function FrenchieCatchGame({ ownedItems }: { ownedItems: FrenchieCatchIte
                 {bagStock > 0 ? (
                   <div className="flex flex-col items-start gap-0.5">
                     {Array.from({ length: bagStock }, (_, index) => (
-                      <Image key={index} src={BAG_IMAGE} alt="ビニール袋" width={28} height={28} draggable={false} className="h-6 w-6 object-contain drop-shadow-[0_2px_3px_rgba(0,0,0,0.25)]" />
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img key={index} src={BAG_IMAGE} alt="ビニール袋" width={28} height={28} draggable={false} className="h-6 w-6 object-contain drop-shadow-[0_2px_3px_rgba(0,0,0,0.25)]" />
                     ))}
                   </div>
                 ) : null}
                 {stunGuard > 0 ? (
-                  <Image src={HAZARD_GUARD_IMAGES.stun} alt={HAZARD_GUARD_LABELS.stun} width={28} height={28} draggable={false} className="h-6 w-6 object-contain drop-shadow-[0_2px_3px_rgba(0,0,0,0.25)]" />
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img src={HAZARD_GUARD_IMAGES.stun} alt={HAZARD_GUARD_LABELS.stun} width={28} height={28} draggable={false} className="h-6 w-6 object-contain drop-shadow-[0_2px_3px_rgba(0,0,0,0.25)]" />
                 ) : null}
                 {boxShrinkGuard > 0 ? (
-                  <Image src={HAZARD_GUARD_IMAGES.boxShrink} alt={HAZARD_GUARD_LABELS.boxShrink} width={28} height={28} draggable={false} className="h-6 w-6 object-contain drop-shadow-[0_2px_3px_rgba(0,0,0,0.25)]" />
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img src={HAZARD_GUARD_IMAGES.boxShrink} alt={HAZARD_GUARD_LABELS.boxShrink} width={28} height={28} draggable={false} className="h-6 w-6 object-contain drop-shadow-[0_2px_3px_rgba(0,0,0,0.25)]" />
                 ) : null}
                 {timeMinusGuard > 0 ? (
-                  <Image src={HAZARD_GUARD_IMAGES.timeMinus} alt={HAZARD_GUARD_LABELS.timeMinus} width={28} height={28} draggable={false} className="h-6 w-6 object-contain drop-shadow-[0_2px_3px_rgba(0,0,0,0.25)]" />
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img src={HAZARD_GUARD_IMAGES.timeMinus} alt={HAZARD_GUARD_LABELS.timeMinus} width={28} height={28} draggable={false} className="h-6 w-6 object-contain drop-shadow-[0_2px_3px_rgba(0,0,0,0.25)]" />
                 ) : null}
               </div>
             ) : null}
@@ -1721,7 +1724,8 @@ export function FrenchieCatchGame({ ownedItems }: { ownedItems: FrenchieCatchIte
           const topZoneHidden = entity.y < topZoneHiddenY;
           return (
           <div key={entity.id} className={`absolute ${entity.enteredOpening && entity.status !== "bounced" ? "z-40" : "z-20"} will-change-transform ${topZoneHidden ? "opacity-0" : "opacity-100"} ${entity.rarity ? RARITY_STYLE[entity.rarity] : "drop-shadow-[0_5px_7px_rgba(75,58,43,0.22)]"}`} style={{ left: `${entity.x}%`, top: `${entity.y}%`, width: `${entity.size}%`, transform: `translate(-50%, -50%) rotate(${entity.rotation}deg)` }}>
-            <Image src={entity.image} alt="" width={160} height={160} draggable={false} className="h-auto w-full object-contain" />
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src={entity.image} alt="" width={160} height={160} draggable={false} loading="eager" className="h-auto w-full object-contain" />
             {entity.rarity === "UR" ? <span className="absolute -inset-2 -z-10 animate-pulse rounded-full bg-[#e95c4d]/15 blur-md" /> : null}
             {entity.rarity === "LR" ? <span className="absolute -inset-3 -z-10 animate-pulse rounded-full bg-[#e6b43c]/25 blur-lg" /> : null}
           </div>
@@ -1754,7 +1758,8 @@ export function FrenchieCatchGame({ ownedItems }: { ownedItems: FrenchieCatchIte
           onPointerUp={pointerEnd}
           onPointerCancel={pointerEnd}
         >
-          <Image src={BOX_IMAGE} alt="拾ってくだブーと書かれた段ボール" fill priority draggable={false} sizes="38vw" className={`pointer-events-none ${performance.now() < boxWideUntilRef.current && performance.now() >= boxShrinkUntilRef.current ? "object-fill" : "object-contain"}`} />
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src={BOX_IMAGE} alt="拾ってくだブーと書かれた段ボール" draggable={false} className={`pointer-events-none absolute inset-0 h-full w-full ${performance.now() < boxWideUntilRef.current && performance.now() >= boxShrinkUntilRef.current ? "object-fill" : "object-contain"}`} />
           {stunned ? <span className="pointer-events-none absolute -right-4 top-1/2 -translate-y-1/2 text-2xl" aria-label="しびれ中">⚡</span> : null}
         </div>
 
