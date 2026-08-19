@@ -151,8 +151,6 @@ export default async function HomePage({
         ) : null}
 
         <div className="mt-[10px] space-y-2">
-          <HomeNoticeCard unreadCount={unreadNoticeCount} notices={noticesFeed} />
-
           <section className="rough-card overflow-visible">
             <div className="relative aspect-[1440/768] overflow-visible bg-transparent">
               <HomeScene>
@@ -198,6 +196,8 @@ export default async function HomePage({
               </div>
             </div>
           </section>
+
+          <HomeNoticeCard unreadCount={unreadNoticeCount} notices={noticesFeed} />
 
           <HomeHighlightsCarousel
             stats={{

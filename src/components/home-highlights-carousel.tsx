@@ -144,7 +144,7 @@ export function HomeHighlightsCarousel({
   return (
     <section
       aria-label="実績とフレンドの様子"
-      className="relative top-2"
+      className="relative"
       style={{ marginLeft: -9, marginRight: -12 }}
     >
       <div
