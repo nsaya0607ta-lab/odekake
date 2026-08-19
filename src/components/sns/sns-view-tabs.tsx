@@ -4,7 +4,7 @@ import Link from "next/link";
  * スクロールしても常に押せるよう sticky にする */
 export function SnsViewTabs({ baseHref, view }: { baseHref: string; view: "photos" | "chat" }) {
   return (
-    <div className="sticky top-14 z-10 -mx-4 bg-paper/95 px-4 py-1 backdrop-blur-sm">
+    <div className="sticky top-14 z-10 -mx-4 -mt-4 bg-paper/95 px-4 py-1 backdrop-blur-sm">
       <div className="flex items-center justify-center gap-8 rounded-3xl border border-line bg-card py-1.5 shadow-sm">
         <ViewTab href={`${baseHref}?view=photos`} label="写真" src="/icons/sns/photo-toggle.png" active={view === "photos"} />
         <ViewTab href={`${baseHref}?view=chat`} label="チャット" src="/icons/sns/chat-toggle.png" active={view === "chat"} />
