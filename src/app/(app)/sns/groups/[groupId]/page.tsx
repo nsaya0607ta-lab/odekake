@@ -57,12 +57,14 @@ export default async function SnsGroupPage({
       <PostedToast />
       <PageBody>
         <SnsGroupSwitcher groups={groups} activeGroupId={groupId} />
-        <SnsViewTabs baseHref={baseHref} view={view} />
 
         {view === "photos" ? (
-          <GroupPhotos groupId={groupId} />
+          <GroupPhotos groupId={groupId} baseHref={baseHref} />
         ) : (
-          <GroupChat groupId={groupId} currentUserId={user.id} />
+          <>
+            <SnsViewTabs baseHref={baseHref} view={view} />
+            <GroupChat groupId={groupId} currentUserId={user.id} />
+          </>
         )}
       </PageBody>
       {view === "photos" ? (
@@ -82,7 +84,7 @@ export default async function SnsGroupPage({
   );
 }
 
-async function GroupPhotos({ groupId }: { groupId: string }) {
+async function GroupPhotos({ groupId, baseHref }: { groupId: string; baseHref: string }) {
   const { supabase } = await requireUser();
   const photos = await getSnsGroupFeed(supabase, groupId);
   const avatarUrls = await signPhotoPaths(
@@ -91,7 +93,7 @@ async function GroupPhotos({ groupId }: { groupId: string }) {
   );
   const photoUrls = await signPhotoPaths(supabase, photos.map((p) => p.storage_path));
 
-  return <SnsPhotoGrid photos={photos} photoUrls={photoUrls} avatarUrls={avatarUrls} />;
+  return <SnsPhotoGrid photos={photos} photoUrls={photoUrls} avatarUrls={avatarUrls} baseHref={baseHref} />;
 }
 
 async function GroupChat({ groupId, currentUserId }: { groupId: string; currentUserId: string }) {

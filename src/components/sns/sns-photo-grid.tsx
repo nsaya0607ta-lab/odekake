@@ -6,7 +6,7 @@ import { IconCalendar, IconChat, IconHeart, IconUser } from "@/components/icons"
 import { groupSnsFeedByDay } from "@/lib/data/sns";
 import type { SnsFeedPhotoRow } from "@/lib/supabase/types";
 
-const CHIP_WINDOW_DAYS = 14;
+const CHIP_WINDOW_DAYS = 10;
 
 function todayInTokyo(): string {
   return new Intl.DateTimeFormat("sv-SE", { timeZone: "Asia/Tokyo" }).format(new Date());
@@ -36,10 +36,12 @@ export function SnsPhotoGrid({
   photos,
   photoUrls,
   avatarUrls,
+  baseHref,
 }: {
   photos: SnsFeedPhotoRow[];
   photoUrls: Map<string, string>;
   avatarUrls: Map<string, string>;
+  baseHref: string;
 }) {
   const today = useMemo(() => todayInTokyo(), []);
   const days = useMemo(() => groupSnsFeedByDay(photos), [photos]);
@@ -91,55 +93,68 @@ export function SnsPhotoGrid({
 
   return (
     <div className="space-y-3">
-      <div className="sticky top-[7.25rem] z-20 -mx-4 border-b border-line bg-paper/92 px-4 backdrop-blur-sm">
-        <div
-          ref={chipRowRef}
-          className="mx-auto flex max-w-lg gap-1 overflow-x-auto py-1.5"
-          style={{ scrollbarWidth: "none" }}
-        >
-          <label
-            onClick={openDatePicker}
-            aria-label="日付を選ぶ"
-            className="tap-target relative flex h-11 w-9 shrink-0 flex-col items-center justify-center rounded-xl text-ink-faint active:bg-paper-deep"
-          >
-            <IconCalendar size={16} />
-            <input
-              ref={dateInputRef}
-              type="date"
-              value={selectedDate}
-              max={today}
-              onChange={(e) => {
-                if (e.target.value) selectDate(e.target.value);
-              }}
-              className="absolute inset-0 h-full w-full cursor-pointer opacity-0"
-            />
-          </label>
-          {dateWindow.map((date) => {
-            const { md, weekday } = formatChip(date);
-            const active = date === selectedDate;
-            const hasPhotos = days.some((d) => d.photoDate === date);
-            return (
-              <button
-                key={date}
-                ref={(el) => {
-                  if (el) chipRefs.current.set(date, el);
-                  else chipRefs.current.delete(date);
+      <div className="sticky top-14 z-20 -mx-4 border-b border-line bg-paper/92 px-4 backdrop-blur-sm">
+        <div className="mx-auto flex max-w-lg items-center gap-1.5 py-1.5">
+          <div className="flex shrink-0 items-center gap-0.5">
+            <Link href={`${baseHref}?view=photos`} aria-label="写真" aria-current className="tap-target flex h-11 w-9 items-center justify-center rounded-xl">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src="/icons/sns/photo-toggle.png" alt="" className="h-8 w-8 object-contain" />
+            </Link>
+            <Link
+              href={`${baseHref}?view=chat`}
+              aria-label="チャット"
+              className="tap-target flex h-11 w-9 items-center justify-center rounded-xl opacity-45"
+            >
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src="/icons/sns/chat-toggle.png" alt="" className="h-8 w-8 object-contain" />
+            </Link>
+          </div>
+          <span aria-hidden className="h-8 w-px shrink-0 bg-line" />
+          <div ref={chipRowRef} className="flex min-w-0 flex-1 gap-1 overflow-x-auto" style={{ scrollbarWidth: "none" }}>
+            <label
+              onClick={openDatePicker}
+              aria-label="日付を選ぶ"
+              className="tap-target relative flex h-11 w-9 shrink-0 flex-col items-center justify-center rounded-xl text-ink-faint active:bg-paper-deep"
+            >
+              <IconCalendar size={16} />
+              <input
+                ref={dateInputRef}
+                type="date"
+                value={selectedDate}
+                max={today}
+                onChange={(e) => {
+                  if (e.target.value) selectDate(e.target.value);
                 }}
-                type="button"
-                onClick={() => selectDate(date)}
-                className={`flex h-11 w-9 shrink-0 flex-col items-center justify-center gap-0.5 rounded-xl text-xs font-semibold transition-colors ${
-                  active
-                    ? "bg-leaf text-white"
-                    : hasPhotos
-                      ? "text-ink active:bg-paper-deep"
-                      : "text-ink-faint active:bg-paper-deep"
-                }`}
-              >
-                <span>{md}</span>
-                <span className="text-[10px]">{weekday}</span>
-              </button>
-            );
-          })}
+                className="absolute inset-0 h-full w-full cursor-pointer opacity-0"
+              />
+            </label>
+            {dateWindow.map((date) => {
+              const { md, weekday } = formatChip(date);
+              const active = date === selectedDate;
+              const hasPhotos = days.some((d) => d.photoDate === date);
+              return (
+                <button
+                  key={date}
+                  ref={(el) => {
+                    if (el) chipRefs.current.set(date, el);
+                    else chipRefs.current.delete(date);
+                  }}
+                  type="button"
+                  onClick={() => selectDate(date)}
+                  className={`flex h-11 w-9 shrink-0 flex-col items-center justify-center gap-0.5 rounded-xl text-xs font-semibold transition-colors ${
+                    active
+                      ? "bg-leaf text-white"
+                      : hasPhotos
+                        ? "text-ink active:bg-paper-deep"
+                        : "text-ink-faint active:bg-paper-deep"
+                  }`}
+                >
+                  <span>{md}</span>
+                  <span className="text-[10px]">{weekday}</span>
+                </button>
+              );
+            })}
+          </div>
         </div>
       </div>
 
