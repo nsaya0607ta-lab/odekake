@@ -83,15 +83,15 @@ export function SnsPhotoGrid({
   }
 
   return (
-    <div className="space-y-3">
-      <div className="-mx-4 flex gap-2 overflow-x-auto px-4 pb-1" style={{ scrollbarWidth: "none" }}>
+    <div className="space-y-3 rounded-3xl border border-line bg-card p-3 shadow-sm">
+      <div className="flex gap-1 overflow-x-auto pb-1" style={{ scrollbarWidth: "none" }}>
         <button
           type="button"
           onClick={() => selectDate(today)}
           aria-label="今日に移動"
-          className="tap-target flex h-14 w-12 shrink-0 flex-col items-center justify-center gap-0.5 rounded-2xl border border-line bg-card text-ink-faint active:bg-paper-deep"
+          className="tap-target flex h-12 w-10 shrink-0 flex-col items-center justify-center rounded-xl text-ink-faint active:bg-paper-deep"
         >
-          <IconCalendar size={18} />
+          <IconCalendar size={17} />
         </button>
         {dateWindow.map((date) => {
           const { md, weekday } = formatChip(date);
@@ -106,12 +106,12 @@ export function SnsPhotoGrid({
               }}
               type="button"
               onClick={() => selectDate(date)}
-              className={`flex h-14 w-12 shrink-0 flex-col items-center justify-center gap-0.5 rounded-2xl border text-xs font-semibold transition-colors ${
+              className={`flex h-12 w-10 shrink-0 flex-col items-center justify-center gap-0.5 rounded-xl text-xs font-semibold transition-colors ${
                 active
-                  ? "border-leaf bg-leaf text-white"
+                  ? "bg-leaf text-white"
                   : hasPhotos
-                    ? "border-line bg-card text-ink"
-                    : "border-line bg-card text-ink-faint"
+                    ? "text-ink active:bg-paper-deep"
+                    : "text-ink-faint active:bg-paper-deep"
               }`}
             >
               <span>{md}</span>
@@ -121,7 +121,7 @@ export function SnsPhotoGrid({
         })}
       </div>
 
-      <div className="flex items-center justify-between gap-2 px-1">
+      <div className="flex items-center justify-between gap-2 border-t border-line pt-3">
         <h2 className="text-sm font-bold text-ink-soft">{formatDayLabel(selectedDate)}</h2>
         <Link href={postHref} className="btn btn-primary shrink-0 px-4 py-1.5 text-xs">
           <IconPlus size={14} />
