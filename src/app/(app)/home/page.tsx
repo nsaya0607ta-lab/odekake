@@ -76,15 +76,16 @@ export default async function HomePage({
   const expProgress = getExpProgress(expDashboard.totalExp);
   const collectedItems = countOwned(COLLECTION_ITEMS, ownedItemIds);
 
-  // フレンドごとに最新1件だけ残し、24時間より前の登録は「みんなのおでかけ」に出さない。
+  // 登録者（自分・フレンド・共有旅の参加者）ごとに最新1件だけ残し、
+  // 24時間より前の登録は「みんなのおでかけ」に出さない。
   const ONE_DAY_MS = 24 * 60 * 60 * 1000;
   const activityCutoff = Date.now() - ONE_DAY_MS;
-  const seenFriendIds = new Set<string>();
+  const seenRegistrantIds = new Set<string>();
   const latestFriendActivity = friendActivity
     .filter((row) => new Date(row.registered_at).getTime() >= activityCutoff)
     .filter((row) => {
-      if (seenFriendIds.has(row.friend_user_id)) return false;
-      seenFriendIds.add(row.friend_user_id);
+      if (seenRegistrantIds.has(row.friend_user_id)) return false;
+      seenRegistrantIds.add(row.friend_user_id);
       return true;
     })
     .map((row) => ({
