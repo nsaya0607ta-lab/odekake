@@ -10,7 +10,7 @@ import { IconClose, IconTrash, IconUser } from "@/components/icons";
 import { PageBody } from "@/components/page-body";
 import { PageHeader } from "@/components/page-header";
 import { signPhotoPaths } from "@/lib/data/photos";
-import { getFriendPhotoComments, getSnsFeed } from "@/lib/data/sns";
+import { getFriendPhotoComments, getSnsPhoto } from "@/lib/data/sns";
 import { requireUser } from "@/lib/supabase/server";
 import { CommentForm } from "./comment-form";
 
@@ -37,10 +37,12 @@ export default async function SnsPhotoPage({
 }) {
   const [{ photoId }, sp, { supabase, user }] = await Promise.all([params, searchParams, requireUser()]);
 
-  // 一覧取得RPCは自分視点のフレンド範囲で絞られているので、ここで見つからなければ非公開扱い
-  const feed = await getSnsFeed(supabase, 366);
-  const photo = feed.find((p) => p.id === photoId);
+  // 取得RPCは自分視点の閲覧範囲（フレンド or 所属グループ）で絞られているので、
+  // ここで見つからなければ非公開扱い
+  const photo = await getSnsPhoto(supabase, photoId);
   if (!photo) notFound();
+
+  const backHref = photo.group_id ? `/sns/groups/${photo.group_id}` : "/sns";
 
   const comments = await getFriendPhotoComments(supabase, photoId);
   const commenterAvatarUrls = await signPhotoPaths(
@@ -58,7 +60,8 @@ export default async function SnsPhotoPage({
     <>
       <PageHeader
         title={photo.display_name}
-        backHref="/sns"
+        subtitle={photo.group_name ?? undefined}
+        backHref={backHref}
         action={
           isOwner ? (
             <form action={deleteFriendPhotoAction}>
@@ -187,7 +190,7 @@ export default async function SnsPhotoPage({
           )}
         </section>
 
-        <Link href="/sns" className="block text-center text-xs text-ink-faint underline underline-offset-2">
+        <Link href={backHref} className="block text-center text-xs text-ink-faint underline underline-offset-2">
           一覧へ戻る
         </Link>
       </PageBody>

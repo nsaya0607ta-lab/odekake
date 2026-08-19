@@ -1,5 +1,12 @@
 import type { DB } from "./client";
-import type { SnsCommentRow, SnsFeedPhotoRow } from "@/lib/supabase/types";
+import type {
+  FriendGroupMemberRow,
+  FriendGroupMessageRow,
+  FriendGroupRow,
+  SnsCommentRow,
+  SnsFeedPhotoRow,
+  SnsPhotoRow,
+} from "@/lib/supabase/types";
 
 /** フィードで遡って表示する日数 */
 export const SNS_FEED_DAYS = 30;
@@ -9,6 +16,59 @@ export async function getSnsFeed(supabase: DB, days: number = SNS_FEED_DAYS): Pr
   if (error) {
     console.error("SNS feed is unavailable", { code: error.code, message: error.message });
     throw new Error("SNS写真の取得に失敗しました");
+  }
+  return data ?? [];
+}
+
+export async function getSnsGroupFeed(
+  supabase: DB,
+  groupId: string,
+  days: number = SNS_FEED_DAYS,
+): Promise<SnsFeedPhotoRow[]> {
+  const { data, error } = await supabase.rpc("get_sns_group_feed", { p_group_id: groupId, p_days: days });
+  if (error) {
+    console.error("SNS group feed is unavailable", { code: error.code, message: error.message });
+    throw new Error("グループの写真の取得に失敗しました");
+  }
+  return data ?? [];
+}
+
+export async function getSnsPhoto(supabase: DB, photoId: string): Promise<SnsPhotoRow | null> {
+  const { data, error } = await supabase.rpc("get_sns_photo", { p_photo_id: photoId });
+  if (error) {
+    console.error("SNS photo is unavailable", { code: error.code, message: error.message });
+    throw new Error("写真の取得に失敗しました");
+  }
+  return data?.[0] ?? null;
+}
+
+export async function getMyFriendGroups(supabase: DB): Promise<FriendGroupRow[]> {
+  const { data, error } = await supabase.rpc("get_my_friend_groups");
+  if (error) {
+    console.error("Friend groups are unavailable", { code: error.code, message: error.message });
+    throw new Error("グループの取得に失敗しました");
+  }
+  return data ?? [];
+}
+
+export async function getFriendGroupMembers(supabase: DB, groupId: string): Promise<FriendGroupMemberRow[]> {
+  const { data, error } = await supabase.rpc("get_friend_group_members", { p_group_id: groupId });
+  if (error) {
+    console.error("Friend group members are unavailable", { code: error.code, message: error.message });
+    throw new Error("メンバーの取得に失敗しました");
+  }
+  return data ?? [];
+}
+
+export async function getFriendGroupMessages(
+  supabase: DB,
+  groupId: string,
+  limit = 50,
+): Promise<FriendGroupMessageRow[]> {
+  const { data, error } = await supabase.rpc("get_friend_group_messages", { p_group_id: groupId, p_limit: limit });
+  if (error) {
+    console.error("Friend group messages are unavailable", { code: error.code, message: error.message });
+    throw new Error("チャットの取得に失敗しました");
   }
   return data ?? [];
 }

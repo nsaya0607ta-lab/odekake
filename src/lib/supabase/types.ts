@@ -362,6 +362,37 @@ export type SnsCommentRow = {
   created_at: string;
 };
 
+export type SnsPhotoRow = SnsFeedPhotoRow & {
+  group_id: string | null;
+  group_name: string | null;
+};
+
+export type FriendGroupRow = {
+  id: string;
+  name: string;
+  owner_id: string;
+  member_count: number;
+  created_at: string;
+  has_unread: boolean;
+};
+
+export type FriendGroupMemberRow = {
+  user_id: string;
+  display_name: string;
+  profile_image_url: string | null;
+  is_owner: boolean;
+};
+
+export type FriendGroupMessageRow = {
+  id: string;
+  group_id: string;
+  user_id: string;
+  display_name: string;
+  profile_image_url: string | null;
+  body: string;
+  created_at: string;
+};
+
 export type Database = {
   public: {
     Tables: {
@@ -575,15 +606,33 @@ export type Database = {
       set_dog_skin: { Args: { p_skin_id: string }; Returns: undefined };
       set_equipped_item: { Args: { p_slot: string; p_level: number | null }; Returns: undefined };
       create_friend_photo: {
-        Args: { p_storage_path: string; p_caption?: string | null };
+        Args: { p_storage_path: string; p_caption?: string | null; p_group_id?: string | null };
         Returns: { id: string; photo_date: string; created_at: string }[];
       };
       delete_friend_photo: { Args: { p_photo_id: string }; Returns: string };
       get_sns_feed: { Args: { p_days?: number }; Returns: SnsFeedPhotoRow[] };
+      get_sns_photo: { Args: { p_photo_id: string }; Returns: SnsPhotoRow[] };
       set_friend_photo_reaction: { Args: { p_photo_id: string; p_emoji: string | null }; Returns: undefined };
       add_friend_photo_comment: { Args: { p_photo_id: string; p_body: string }; Returns: SnsCommentRow[] };
       get_friend_photo_comments: { Args: { p_photo_id: string }; Returns: SnsCommentRow[] };
       delete_friend_photo_comment: { Args: { p_comment_id: string }; Returns: undefined };
+      create_friend_group: { Args: { p_name: string; p_member_user_ids: string[] }; Returns: string };
+      add_friend_group_members: { Args: { p_group_id: string; p_member_user_ids: string[] }; Returns: undefined };
+      leave_friend_group: { Args: { p_group_id: string }; Returns: undefined };
+      delete_friend_group: { Args: { p_group_id: string }; Returns: undefined };
+      get_friend_group_members: { Args: { p_group_id: string }; Returns: FriendGroupMemberRow[] };
+      get_my_friend_groups: { Args: Record<string, never>; Returns: FriendGroupRow[] };
+      mark_friend_group_read: { Args: { p_group_id: string }; Returns: undefined };
+      get_sns_group_feed: { Args: { p_group_id: string; p_days?: number }; Returns: SnsFeedPhotoRow[] };
+      create_friend_group_message: {
+        Args: { p_group_id: string; p_body: string };
+        Returns: FriendGroupMessageRow[];
+      };
+      get_friend_group_messages: {
+        Args: { p_group_id: string; p_limit?: number };
+        Returns: FriendGroupMessageRow[];
+      };
+      delete_friend_group_message: { Args: { p_message_id: string }; Returns: undefined };
     };
     Enums: {
       location_source: LocationSource;

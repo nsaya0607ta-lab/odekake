@@ -721,6 +721,89 @@ select pg_temp.expect_ok('本人は自分の写真を削除できる', :'alice',
 select pg_temp.record('削除後はフィードから消える',
   pg_temp.count_as(:'alice', 'select * from public.get_sns_feed(30)') = 0);
 
+-- -------------------------------------------------------------
+-- SNS: フレンドグループ
+-- -------------------------------------------------------------
+-- alice がグループを作り、フレンドの bob を招待する。carol は友達ではないので追加されない。
+select pg_temp.expect_ok('グループを作成できる', :'alice', format(
+  $q$select public.create_friend_group('旅仲間', array[%L]::uuid[])$q$, :'bob'));
+
+select id as sns_group_a from public.friend_groups where owner_id = :'alice' \gset
+
+select pg_temp.record('友達だけがメンバーに入る（carolは入らない）',
+  (select count(*) from public.friend_group_members where group_id = :'sns_group_a'::uuid) = 2);
+
+select pg_temp.record('メンバー一覧はメンバーだけ見える（bob視点）',
+  pg_temp.count_as(:'bob', format('select * from public.get_friend_group_members(%L)', :'sns_group_a')) = 2);
+
+select pg_temp.record('メンバーでない人はグループの中身を見られない',
+  pg_temp.count_as(:'carol', format('select * from public.get_friend_group_members(%L)', :'sns_group_a')) = 0);
+
+select pg_temp.expect_ok('メンバーはグループへ写真を投稿できる', :'bob', format(
+  $q$select public.create_friend_photo('friend-photos/%s/group/%s/2026-01-01/b.webp', null, %L)$q$,
+  :'bob', :'sns_group_a', :'sns_group_a'));
+
+select pg_temp.expect_denied('メンバーでない人はグループへ写真を投稿できない', :'carol', format(
+  $q$select public.create_friend_photo('friend-photos/%s/group/%s/2026-01-01/c.webp', null, %L)$q$,
+  :'carol', :'sns_group_a', :'sns_group_a'));
+
+select pg_temp.record('グループの写真は全体フィードには出ない（bob視点）',
+  pg_temp.count_as(:'bob', 'select * from public.get_sns_feed(30)') = 0);
+
+select pg_temp.record('グループの写真はグループフィードに出る（alice視点）',
+  pg_temp.count_as(:'alice', format('select * from public.get_sns_group_feed(%L, 30)', :'sns_group_a')) = 1);
+
+select pg_temp.record('メンバーでない人はグループフィードを見られない',
+  pg_temp.count_as(:'carol', format('select * from public.get_sns_group_feed(%L, 30)', :'sns_group_a')) = 0);
+
+select pg_temp.expect_ok('メンバーはグループにメッセージを送れる', :'alice', format(
+  $q$select public.create_friend_group_message(%L, 'よろしく')$q$, :'sns_group_a'));
+
+select pg_temp.expect_denied('メンバーでない人はメッセージを送れない', :'carol', format(
+  $q$select public.create_friend_group_message(%L, 'なりすまし')$q$, :'sns_group_a'));
+
+select pg_temp.record('メッセージはメンバーだけ見える（bob視点）',
+  pg_temp.count_as(:'bob', format('select * from public.get_friend_group_messages(%L, 50)', :'sns_group_a')) = 1);
+
+select pg_temp.record('メンバーでない人はメッセージを見られない',
+  pg_temp.count_as(:'carol', format('select * from public.get_friend_group_messages(%L, 50)', :'sns_group_a')) = 0);
+
+select pg_temp.record('他人の投稿があると未読になる（bob視点、既読前・alice発言分）',
+  pg_temp.count_as(:'bob', format(
+    'select * from public.get_my_friend_groups() where id = %L and has_unread', :'sns_group_a')) = 1);
+
+select pg_temp.expect_ok('既読にできる', :'alice', format(
+  $q$select public.mark_friend_group_read(%L)$q$, :'sns_group_a'));
+
+select pg_temp.record('未読は自分の投稿では立たない（alice視点、既読後は自分の発言だけ）',
+  pg_temp.count_as(:'alice', format(
+    'select * from public.get_my_friend_groups() where id = %L and has_unread', :'sns_group_a')) = 0);
+
+select pg_temp.expect_ok('既読にできる（bob）', :'bob', format(
+  $q$select public.mark_friend_group_read(%L)$q$, :'sns_group_a'));
+
+select pg_temp.expect_denied('オーナー以外はメンバーを追加できない', :'bob', format(
+  $q$select public.add_friend_group_members(%L, array[]::uuid[])$q$, :'sns_group_a'));
+
+select pg_temp.expect_denied('オーナーはグループを退出できない', :'alice', format(
+  $q$select public.leave_friend_group(%L)$q$, :'sns_group_a'));
+
+select pg_temp.expect_ok('オーナー以外はグループを退出できる', :'bob', format(
+  $q$select public.leave_friend_group(%L)$q$, :'sns_group_a'));
+
+select pg_temp.record('退出後はメンバーから消える',
+  (select count(*) from public.friend_group_members where group_id = :'sns_group_a'::uuid) = 1);
+
+select pg_temp.expect_denied('オーナー以外はグループを削除できない', :'bob', format(
+  $q$select public.delete_friend_group(%L)$q$, :'sns_group_a'));
+
+select pg_temp.expect_ok('オーナーはグループを削除できる', :'alice', format(
+  $q$select public.delete_friend_group(%L)$q$, :'sns_group_a'));
+
+select pg_temp.record('グループ削除で写真とメッセージも消える',
+  (select count(*) from public.friend_photos where group_id = :'sns_group_a'::uuid) = 0
+  and (select count(*) from public.friend_group_messages where group_id = :'sns_group_a'::uuid) = 0);
+
 -- 後続のアカウント削除テストに影響しないよう、フレンド関係を戻しておく。
 delete from public.friendships where user_id in (:'alice', :'bob') and friend_user_id in (:'alice', :'bob');
 

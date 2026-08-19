@@ -40,6 +40,10 @@ const RPC_MESSAGES: Array<[RegExp, string]> = [
   [/COMMENT_EMPTY/, "コメントを入力してください。"],
   [/COMMENT_TOO_LONG/, "コメントは1000文字以内で入力してください。"],
   [/COMMENT_NOT_FOUND/, "このコメントは見つかりませんでした。"],
+  [/GROUP_NAME_INVALID/, "グループ名は1〜40文字で入力してください。"],
+  [/GROUP_NOT_FOUND/, "このグループは見つかりませんでした。"],
+  [/GROUP_OWNER_ONLY/, "この操作はグループの作成者だけができます。"],
+  [/OWNER_CANNOT_LEAVE/, "作成者はグループを退出できません。削除してください。"],
 ];
 
 export function toJapaneseError(
