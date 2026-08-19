@@ -1571,12 +1571,9 @@ export function FrenchieCatchGame({ ownedItems }: { ownedItems: FrenchieCatchIte
       for (const entity of next) {
         const el = entityNodeRefs.current.get(entity.id);
         if (!el) continue;
-        el.style.left = `${entity.x}%`;
-        el.style.top = `${entity.y}%`;
-        el.style.width = `${entity.size}%`;
-        el.style.transform = `translate(-50%, -50%) rotate(${entity.rotation}deg)`;
-        el.style.zIndex = entity.enteredOpening && entity.status !== "bounced" ? "40" : "20";
-        el.style.opacity = entity.y < topZoneHiddenY ? "0" : "1";
+        const zIndex = entity.enteredOpening && entity.status !== "bounced" ? 40 : 20;
+        const opacity = entity.y < topZoneHiddenY ? 0 : 1;
+        el.style.cssText = `position:absolute;left:${entity.x}%;top:${entity.y}%;width:${entity.size}%;z-index:${zIndex};opacity:${opacity};transform:translate(-50%,-50%) rotate(${entity.rotation}deg);will-change:transform;`;
       }
 
       rafRef.current = requestAnimationFrame(frame);
