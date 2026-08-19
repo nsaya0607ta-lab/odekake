@@ -11,15 +11,28 @@ export function AdminNoticeForm() {
     <form action={formAction} className="space-y-4" noValidate>
       <FormMessage state={state} />
 
-      <Field label="お知らせ本文" htmlFor="message" hint="500文字以内。送信すると全ユーザーのお知らせに表示されます。">
+      <Field label="タイトル" htmlFor="title" hint="100文字以内。お知らせ一覧にはこのタイトルだけが表示されます。">
+        <input
+          id="title"
+          name="title"
+          type="text"
+          className="field"
+          maxLength={100}
+          defaultValue={state.values?.title ?? ""}
+          placeholder="例：メンテナンスのお知らせ"
+          required
+        />
+      </Field>
+
+      <Field label="本文" htmlFor="message" hint="2000文字以内。タップして開いた詳細画面に表示されます。">
         <textarea
           id="message"
           name="message"
           className="field"
-          rows={5}
-          maxLength={500}
+          rows={6}
+          maxLength={2000}
           defaultValue={state.values?.message ?? ""}
-          placeholder="例：メンテナンスのお知らせ、新機能のご案内など"
+          placeholder="お知らせの詳しい内容を入力してください"
           required
         />
       </Field>
