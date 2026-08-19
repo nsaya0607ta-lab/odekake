@@ -51,19 +51,28 @@ export function HomeNoticeCard({
             >
               {summary}
             </p>
-            {latest.length > 0 ? (
-              <div className="flex flex-col" style={{ gap: 6, transform: "translate(-1.5em, 3px)" }}>
-                {latest.map((notice) => (
-                  <p key={notice.id} className="truncate text-xs text-ink-soft">
-                    ・{notice.title}
+            <div className="flex flex-col" style={{ gap: 6, transform: "translate(-1.5em, 3px)" }}>
+              {Array.from({ length: 3 }).map((_, rowIndex) => {
+                const notice = latest[rowIndex];
+                if (notice) {
+                  return (
+                    <p key={notice.id} className="truncate text-xs text-ink-soft">
+                      ・{notice.title}
+                    </p>
+                  );
+                }
+                // お知らせが3件無い時も高さが変わらないように、見えないダミー行で埋める。
+                return rowIndex === 0 ? (
+                  <p key={rowIndex} className="truncate text-xs text-ink-faint">
+                    ・まだお知らせはありません
                   </p>
-                ))}
-              </div>
-            ) : (
-              <p className="truncate text-xs text-ink-faint" style={{ transform: "translate(-1.5em, 3px)" }}>
-                ・まだお知らせはありません
-              </p>
-            )}
+                ) : (
+                  <p key={rowIndex} aria-hidden="true" className="truncate text-xs invisible">
+                    ・
+                  </p>
+                );
+              })}
+            </div>
           </div>
           <IconChevronRight
             size={18}
