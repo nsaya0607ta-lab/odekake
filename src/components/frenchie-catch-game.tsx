@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useRef, useState, type PointerEvent as ReactPointerEvent } from "react";
 import { MAX_SKILL_LEVEL } from "@/lib/gacha/skill-levels";
@@ -1770,8 +1771,7 @@ export function FrenchieCatchGame({ ownedItems }: { ownedItems: FrenchieCatchIte
               transform: `translate(-50%, -50%) rotate(${entity.rotation}deg)`,
             }}
           >
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src={entity.image} alt="" width={160} height={160} draggable={false} loading="eager" className="h-auto w-full object-contain" />
+            <Image src={entity.image} alt="" width={96} height={96} draggable={false} className="h-auto w-full object-contain" />
             {entity.rarity === "UR" ? <span className="absolute -inset-2 -z-10 animate-pulse rounded-full bg-[#e95c4d]/15 blur-sm" /> : null}
             {entity.rarity === "LR" ? <span className="absolute -inset-3 -z-10 animate-pulse rounded-full bg-[#e6b43c]/25 blur" /> : null}
           </div>
