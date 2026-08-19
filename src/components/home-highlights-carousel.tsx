@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState, type ReactNode, type TouchEvent } from "react";
 import { IconClock, IconMapPin, IconPaw, IconUser } from "@/components/icons";
+import { MarqueeText } from "@/components/marquee-text";
 import { formatRelativeTimeJa } from "@/lib/date";
 
 const AUTO_ADVANCE_MS = 5000;
@@ -279,7 +280,7 @@ function ActivitySlide({ data }: { data: FriendActivitySlideData }) {
             <span className="flex min-w-0 shrink-0 flex-col items-end gap-0.5">
               <span className="flex min-w-0 items-center gap-1 text-sm font-bold text-leaf-deep">
                 <IconMapPin size={14} className="shrink-0" />
-                <span className="max-w-[110px] truncate">{item.spotName}</span>
+                <MarqueeText text={item.spotName} className="max-w-[110px]" />
               </span>
               <span className="flex items-center gap-1 text-[10px] text-ink-faint">
                 <IconClock size={10} />

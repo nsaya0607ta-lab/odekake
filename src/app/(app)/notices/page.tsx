@@ -1,8 +1,9 @@
 import Link from "next/link";
+import { markNoticeReadAction } from "./actions";
 import { IconSettings } from "@/components/icons";
 import { PageBody } from "@/components/page-body";
 import { PageHeader } from "@/components/page-header";
-import { getNoticesFeed, isNoticeAdmin, markNoticesRead } from "@/lib/data/notices";
+import { getNoticesFeed, isNoticeAdmin } from "@/lib/data/notices";
 import { requireUser } from "@/lib/supabase/server";
 
 export const metadata = { title: "お知らせ | おでかけ記録" };
@@ -31,12 +32,6 @@ export default async function NoticesPage() {
   const { supabase } = await requireUser();
   const [notices, isAdmin] = await Promise.all([getNoticesFeed(supabase, 30), isNoticeAdmin(supabase)]);
 
-  // 一覧を開いた時点で、表示したお知らせを既読にする。
-  await markNoticesRead(
-    supabase,
-    notices.map((notice) => notice.id),
-  );
-
   return (
     <>
       <PageHeader
@@ -60,14 +55,26 @@ export default async function NoticesPage() {
         ) : (
           <ul className="space-y-2">
             {notices.map((notice) => (
-              <li key={notice.id} className="rough-card p-4">
-                <div className="flex items-center gap-2 text-xs text-ink-faint">
-                  <span className="rounded-full bg-paper-deep px-2 py-0.5 font-bold">
-                    {TYPE_LABEL[notice.type] ?? "お知らせ"}
-                  </span>
-                  <span>{formatDateTime(notice.created_at)}</span>
-                </div>
-                <p className="mt-1.5 font-semibold">{notice.title}</p>
+              <li key={notice.id} className={`rough-card ${notice.is_read ? "" : "border-leaf/60"}`}>
+                <form action={markNoticeReadAction}>
+                  <input type="hidden" name="noticeId" value={notice.id} />
+                  <button type="submit" className="block w-full p-4 text-left">
+                    <div className="flex items-center gap-2 text-xs text-ink-faint">
+                      <span className="rounded-full bg-paper-deep px-2 py-0.5 font-bold">
+                        {TYPE_LABEL[notice.type] ?? "お知らせ"}
+                      </span>
+                      <span>{formatDateTime(notice.created_at)}</span>
+                      {!notice.is_read ? (
+                        <span className="ml-auto rounded-full bg-blossom px-2 py-0.5 text-[10px] font-bold text-card">
+                          未読
+                        </span>
+                      ) : null}
+                    </div>
+                    <p className={`mt-1.5 ${notice.is_read ? "font-semibold text-ink-soft" : "font-bold text-ink"}`}>
+                      {notice.title}
+                    </p>
+                  </button>
+                </form>
               </li>
             ))}
           </ul>

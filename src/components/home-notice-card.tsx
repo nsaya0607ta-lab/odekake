@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { IconChevronRight } from "@/components/icons";
+import { MarqueeText } from "@/components/marquee-text";
 import type { NoticeFeedRow } from "@/lib/supabase/types";
 
 /**
@@ -56,9 +57,10 @@ export function HomeNoticeCard({
                 const notice = latest[rowIndex];
                 if (notice) {
                   return (
-                    <p key={notice.id} className="truncate text-xs text-ink-soft">
-                      ・{notice.title}
-                    </p>
+                    <div key={notice.id} className="flex min-w-0 items-baseline gap-0.5 text-xs text-ink-soft">
+                      <span className="shrink-0">・</span>
+                      <MarqueeText text={notice.title} className="min-w-0 flex-1" />
+                    </div>
                   );
                 }
                 // お知らせが3件無い時も高さが変わらないように、見えないダミー行で埋める。
