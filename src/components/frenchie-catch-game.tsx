@@ -437,6 +437,20 @@ export function FrenchieCatchGame({ ownedItems }: { ownedItems: FrenchieCatchIte
     itemLevelByIdRef.current = new Map(ownedItems.map((item) => [item.id, item.level]));
   }, [ownedItems]);
 
+  /**
+   * 落下中に出現するすべての画像を先読みしてブラウザキャッシュに乗せておく。
+   * これをしないと、初出現の画像はダウンロード+デコードが落下中に間に合わず
+   * 「途中の位置から突然描画される」ように見える（特にモバイルで顕著）。
+   */
+  const preloadImages = useMemo(() => {
+    const fixed = [
+      POOP_IMAGE, MYSTERY_IMAGE, BAG_IMAGE, TIME_MINUS_IMAGE,
+      BOX_SHRINK_IMAGE, BLACKOUT_IMAGE, STUN_IMAGE, CHOCOLATE_IMAGE, "/characters/default/front.webp",
+    ];
+    const dynamic = itemPool.map((item) => item.image);
+    return Array.from(new Set([...fixed, ...dynamic]));
+  }, [itemPool]);
+
   const refreshEffectStatus = useCallback((now: number) => {
     const labels: string[] = [];
     if (now < multiplier2UntilRef.current) labels.push(`得点 ×${multiplier2ValueRef.current}`);
@@ -1699,6 +1713,12 @@ export function FrenchieCatchGame({ ownedItems }: { ownedItems: FrenchieCatchIte
 
   return (
     <section className="rough-card overflow-hidden p-0">
+      <div aria-hidden className="hidden">
+        {preloadImages.map((src) => (
+          <Image key={src} src={src} alt="" width={96} height={96} loading="eager" />
+        ))}
+      </div>
+
       <div className="flex items-center justify-between border-b border-line bg-card px-4 py-3">
         <div>
           <p className="text-[10px] font-bold tracking-[0.16em] text-ink-faint">MINI GAME</p>
@@ -1771,7 +1791,7 @@ export function FrenchieCatchGame({ ownedItems }: { ownedItems: FrenchieCatchIte
               transform: `translate(-50%, -50%) rotate(${entity.rotation}deg)`,
             }}
           >
-            <Image src={entity.image} alt="" width={96} height={96} draggable={false} className="h-auto w-full object-contain" />
+            <Image src={entity.image} alt="" width={96} height={96} draggable={false} loading="eager" className="h-auto w-full object-contain" />
             {entity.rarity === "UR" ? <span className="absolute -inset-2 -z-10 animate-pulse rounded-full bg-[#e95c4d]/15 blur-sm" /> : null}
             {entity.rarity === "LR" ? <span className="absolute -inset-3 -z-10 animate-pulse rounded-full bg-[#e6b43c]/25 blur" /> : null}
           </div>
