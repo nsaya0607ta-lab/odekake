@@ -34,6 +34,12 @@ const DB_MESSAGES: Record<string, string> = {
 const RPC_MESSAGES: Array<[RegExp, string]> = [
   [/AUTH_REQUIRED/, "ログインが必要です。"],
   [/ACCOUNT_DELETE_FAILED/, "アカウントを削除できませんでした。時間をおいて再度お試しください。"],
+  [/CAPTION_TOO_LONG/, "コメントは300文字以内で入力してください。"],
+  [/STORAGE_PATH_REQUIRED/, "写真の送信が完了してから投稿してください。"],
+  [/PHOTO_NOT_FOUND/, "この写真は見つかりませんでした。"],
+  [/COMMENT_EMPTY/, "コメントを入力してください。"],
+  [/COMMENT_TOO_LONG/, "コメントは1000文字以内で入力してください。"],
+  [/COMMENT_NOT_FOUND/, "このコメントは見つかりませんでした。"],
 ];
 
 export function toJapaneseError(

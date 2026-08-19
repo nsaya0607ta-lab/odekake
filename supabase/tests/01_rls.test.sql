@@ -666,6 +666,65 @@ select pg_temp.record('権限のないスポット更新も0行更新になる',
     $q$update public.spots set name = 'のっとり' where id = %L$q$, :'spot_a1')) = 'denied');
 
 -- -------------------------------------------------------------
+-- SNS（フレンド間の日替わり写真共有）
+-- -------------------------------------------------------------
+-- alice と bob だけを相互フレンドにする（carol はどちらとも友達ではない）。
+insert into public.friendships (user_id, friend_user_id)
+values (:'alice', :'bob'), (:'bob', :'alice');
+
+select pg_temp.expect_ok('自分の写真を投稿できる', :'alice', format(
+  $q$select public.create_friend_photo('friend-photos/%s/2026-01-01/a.webp', 'テスト')$q$, :'alice'));
+
+select pg_temp.expect_denied('直接テーブルへは触れない（select）', :'alice',
+  'select * from public.friend_photos');
+
+select pg_temp.record('フィードにフレンドの投稿が含まれる（bob視点）',
+  pg_temp.count_as(:'bob', 'select * from public.get_sns_feed(30)') = 1);
+
+select pg_temp.record('フィードは友達でない相手には見えない（carol視点）',
+  pg_temp.count_as(:'carol', 'select * from public.get_sns_feed(30)') = 0);
+
+select pg_temp.record('自分の投稿は自分のフィードにも含まれる（alice視点）',
+  pg_temp.count_as(:'alice', 'select * from public.get_sns_feed(30)') = 1);
+
+select id as sns_photo_a1 from public.friend_photos where user_id = :'alice' \gset
+
+select pg_temp.expect_ok('フレンドはリアクションできる', :'bob', format(
+  $q$select public.set_friend_photo_reaction('%s', '😊')$q$, :'sns_photo_a1'));
+
+select pg_temp.expect_denied('友達でない相手はリアクションできない', :'carol', format(
+  $q$select public.set_friend_photo_reaction('%s', '😊')$q$, :'sns_photo_a1'));
+
+select pg_temp.record('リアクションは1件（絵文字の選び直し）',
+  (select count(*) from public.friend_photo_reactions where photo_id = :'sns_photo_a1'::uuid) = 1);
+
+select pg_temp.expect_ok('フレンドはコメントできる', :'bob', format(
+  $q$select public.add_friend_photo_comment('%s', 'いいね')$q$, :'sns_photo_a1'));
+
+select pg_temp.expect_denied('友達でない相手はコメントできない', :'carol', format(
+  $q$select public.add_friend_photo_comment('%s', 'なりすまし')$q$, :'sns_photo_a1'));
+
+select id as sns_comment_bob from public.friend_photo_comments where photo_id = :'sns_photo_a1'::uuid and user_id = :'bob' \gset
+
+select pg_temp.expect_denied('他人のコメントは削除できない', :'alice', format(
+  $q$select public.delete_friend_photo_comment('%s')$q$, :'sns_comment_bob'));
+
+select pg_temp.expect_ok('本人はコメントを削除できる', :'bob', format(
+  $q$select public.delete_friend_photo_comment('%s')$q$, :'sns_comment_bob'));
+
+select pg_temp.expect_denied('他人の写真は削除できない', :'bob', format(
+  $q$select public.delete_friend_photo('%s')$q$, :'sns_photo_a1'));
+
+select pg_temp.expect_ok('本人は自分の写真を削除できる', :'alice', format(
+  $q$select public.delete_friend_photo('%s')$q$, :'sns_photo_a1'));
+
+select pg_temp.record('削除後はフィードから消える',
+  pg_temp.count_as(:'alice', 'select * from public.get_sns_feed(30)') = 0);
+
+-- 後続のアカウント削除テストに影響しないよう、フレンド関係を戻しておく。
+delete from public.friendships where user_id in (:'alice', :'bob') and friend_user_id in (:'alice', :'bob');
+
+-- -------------------------------------------------------------
 -- ★ アカウント削除
 -- -------------------------------------------------------------
 select pg_temp.expect_ok('アカウント削除の RPC が成功する', :'carol', 'select public.delete_own_account()');

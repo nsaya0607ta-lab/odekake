@@ -338,6 +338,30 @@ export type StepsSyncTokenRow = {
   updated_at: string;
 };
 
+export type SnsFeedPhotoRow = {
+  id: string;
+  user_id: string;
+  display_name: string;
+  profile_image_url: string | null;
+  photo_date: string;
+  storage_path: string;
+  caption: string | null;
+  created_at: string;
+  my_reaction: string | null;
+  reaction_count: number;
+  comment_count: number;
+};
+
+export type SnsCommentRow = {
+  id: string;
+  photo_id: string;
+  user_id: string;
+  display_name: string;
+  profile_image_url: string | null;
+  body: string;
+  created_at: string;
+};
+
 export type Database = {
   public: {
     Tables: {
@@ -550,6 +574,16 @@ export type Database = {
       revoke_steps_sync_token: { Args: Record<string, never>; Returns: undefined };
       set_dog_skin: { Args: { p_skin_id: string }; Returns: undefined };
       set_equipped_item: { Args: { p_slot: string; p_level: number | null }; Returns: undefined };
+      create_friend_photo: {
+        Args: { p_storage_path: string; p_caption?: string | null };
+        Returns: { id: string; photo_date: string; created_at: string }[];
+      };
+      delete_friend_photo: { Args: { p_photo_id: string }; Returns: string };
+      get_sns_feed: { Args: { p_days?: number }; Returns: SnsFeedPhotoRow[] };
+      set_friend_photo_reaction: { Args: { p_photo_id: string; p_emoji: string | null }; Returns: undefined };
+      add_friend_photo_comment: { Args: { p_photo_id: string; p_body: string }; Returns: SnsCommentRow[] };
+      get_friend_photo_comments: { Args: { p_photo_id: string }; Returns: SnsCommentRow[] };
+      delete_friend_photo_comment: { Args: { p_comment_id: string }; Returns: undefined };
     };
     Enums: {
       location_source: LocationSource;

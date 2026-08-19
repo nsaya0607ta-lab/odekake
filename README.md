@@ -72,6 +72,7 @@ node scripts/verify-supabase.mjs  # 実 Supabase プロジェクトでの動作�
 | 画面 | パス |
 | --- | --- |
 | ホーム | `/home` |
+| SNS（フレンドと今日の写真を共有） | `/sns` `/sns/new` `/sns/[photoId]` |
 | 日本地図（地方選択） | `/map` |
 | 地方地図（都道府県選択） | `/map/[region]` |
 | 都道府県地図（市区町村の境界 ＋ 検索・一覧） | `/map/[region]/[pref]` |
@@ -87,7 +88,7 @@ node scripts/verify-supabase.mjs  # 実 Supabase プロジェクトでの動作�
 | そうび（獲得したアクセサリー・称号） | `/mypage/gear` |
 | マイページ | `/mypage` `/mypage/profile` `/mypage/account` |
 
-ログイン後の主要画面には、画面下部に「ホーム / 地図 / 追加 / 記録 / マイページ」の固定ナビゲーションを表示します。
+ログイン後の主要画面には、画面下部に「ホーム / SNS / 地図 / 追加 / 記録 / マイページ」の固定ナビゲーションを表示します。
 「追加」は中央に配置しています。
 
 ## 地図データ

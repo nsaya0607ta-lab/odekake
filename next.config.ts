@@ -23,6 +23,10 @@ const nextConfig: NextConfig = {
     // 画像アップロードを含むフォーム送信のためボディ上限を拡張
     serverActions: { bodySizeLimit: "4mb" },
   },
+  images: {
+    // ナビゲーションアイコン（自作のローカルSVG）を next/image で扱えるようにする
+    dangerouslyAllowSVG: true,
+  },
   async headers() {
     return [{ source: "/:path*", headers: securityHeaders }];
   },
