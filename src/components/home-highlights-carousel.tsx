@@ -145,7 +145,7 @@ export function HomeHighlightsCarousel({
     <section
       aria-label="実績とフレンドの様子"
       className="relative"
-      style={{ marginLeft: -9, marginRight: -12 }}
+      style={{ marginLeft: -9, marginRight: -12, marginTop: -5 }}
     >
       <div
         className="relative overflow-hidden"
