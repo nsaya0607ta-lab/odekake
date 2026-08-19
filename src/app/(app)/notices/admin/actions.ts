@@ -3,7 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import type { ActionState } from "@/components/form";
-import { postAdminNotice, updateAdminNotice } from "@/lib/data/notices";
+import { deleteAdminNotice, postAdminNotice, updateAdminNotice } from "@/lib/data/notices";
 import { requireUser } from "@/lib/supabase/server";
 
 const messageSchema = z.string().trim().min(1, "本文を入力してください").max(500, "500文字以内で入力してください");
@@ -58,4 +58,16 @@ export async function updateAdminNoticeAction(_previous: ActionState, formData: 
   revalidatePath("/notices/admin");
   revalidatePath("/home");
   return { ok: true, message: "お知らせを更新しました" };
+}
+
+export async function deleteAdminNoticeAction(formData: FormData): Promise<void> {
+  const noticeId = noticeIdSchema.safeParse(formData.get("noticeId"));
+  if (!noticeId.success) return;
+
+  const { supabase } = await requireUser();
+  await deleteAdminNotice(supabase, noticeId.data);
+
+  revalidatePath("/notices");
+  revalidatePath("/notices/admin");
+  revalidatePath("/home");
 }

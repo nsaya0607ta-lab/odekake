@@ -1,6 +1,8 @@
 import { notFound } from "next/navigation";
+import { deleteAdminNoticeAction } from "./actions";
 import { AdminNoticeEditForm } from "./admin-notice-edit-form";
 import { AdminNoticeForm } from "./admin-notice-form";
+import { ConfirmSubmitButton } from "@/components/confirm-submit-button";
 import { getNoticesFeed, isNoticeAdmin } from "@/lib/data/notices";
 import { PageBody } from "@/components/page-body";
 import { PageHeader } from "@/components/page-header";
@@ -47,6 +49,12 @@ export default async function AdminNoticePage() {
                   <details className="mt-1">
                     <summary className="cursor-pointer font-semibold">{notice.title}</summary>
                     <AdminNoticeEditForm noticeId={notice.id} initialMessage={notice.title} />
+                    <form action={deleteAdminNoticeAction} className="mt-2">
+                      <input type="hidden" name="noticeId" value={notice.id} />
+                      <ConfirmSubmitButton message="このお知らせを削除しますか？" pendingLabel="削除中…">
+                        削除する
+                      </ConfirmSubmitButton>
+                    </form>
                   </details>
                 </li>
               ))}

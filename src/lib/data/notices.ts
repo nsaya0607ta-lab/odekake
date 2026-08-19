@@ -56,3 +56,8 @@ export async function updateAdminNotice(supabase: DB, noticeId: string, message:
   const { error } = await supabase.rpc("update_admin_notice", { p_notice_id: noticeId, p_message: message });
   if (error) throw new Error(error.message || "お知らせを更新できませんでした");
 }
+
+export async function deleteAdminNotice(supabase: DB, noticeId: string): Promise<void> {
+  const { error } = await supabase.rpc("delete_admin_notice", { p_notice_id: noticeId });
+  if (error) throw new Error(error.message || "お知らせを削除できませんでした");
+}
