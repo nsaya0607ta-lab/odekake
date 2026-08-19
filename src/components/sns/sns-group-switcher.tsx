@@ -160,7 +160,7 @@ export function SnsGroupSwitcher({ groups, activeGroupId }: { groups: FriendGrou
   }
 
   return (
-    <div className="-mx-4 flex items-center gap-3 overflow-x-auto px-4 pb-1" style={{ scrollbarWidth: "none" }}>
+    <div className="-mx-4 flex items-center gap-3 overflow-x-auto px-4 py-3" style={{ scrollbarWidth: "none" }}>
       {order.map((group, index) => (
         <div key={group.id} className="flex shrink-0 items-center gap-3">
           {index === 1 ? <span aria-hidden className="h-10 w-px shrink-0 bg-line-strong" /> : null}
@@ -209,12 +209,12 @@ function GroupIcon({
   dragging?: boolean;
 }) {
   return (
-    <div className={`flex select-none flex-col items-center gap-1 transition-transform ${dragging ? "scale-110" : ""}`}>
+    <div className={`flex select-none flex-col items-center gap-1 transition-transform ${dragging ? "scale-105" : ""}`}>
       <span className="relative">
         <span
           className={`tap-target flex h-14 w-14 items-center justify-center rounded-full border-2 text-2xl transition-colors ${
             active ? "border-leaf bg-leaf-soft" : "border-line-strong bg-card"
-          } ${dragging ? "shadow-lg" : ""}`}
+          } ${dragging ? "shadow-md" : ""}`}
         >
           {icon}
         </span>
