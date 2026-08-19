@@ -5,7 +5,7 @@ import {
   deleteFriendGroupMessageAction,
   markFriendGroupReadAction,
 } from "@/app/actions/sns";
-import { IconCamera, IconSettings } from "@/components/icons";
+import { IconSettings } from "@/components/icons";
 import { PageBody } from "@/components/page-body";
 import { PageHeader } from "@/components/page-header";
 import { PostedToast } from "@/components/sns/posted-toast";
@@ -80,22 +80,13 @@ async function GroupPhotos({ groupId }: { groupId: string }) {
   const photoUrls = await signPhotoPaths(supabase, photos.map((p) => p.storage_path));
 
   return (
-    <div className="space-y-6">
-      <Link href={`/sns/groups/${groupId}/new`} className="btn btn-primary w-full">
-        <IconCamera size={18} />
-        写真を投稿する
-      </Link>
-      {photos.length === 0 ? (
-        <p className="px-1 text-center text-xs text-ink-faint">まだ写真がありません。</p>
-      ) : (
-        <SnsPhotoGrid
-          photos={photos}
-          photoUrls={photoUrls}
-          avatarUrls={avatarUrls}
-          hrefFor={(photoId) => `/sns/${photoId}`}
-        />
-      )}
-    </div>
+    <SnsPhotoGrid
+      photos={photos}
+      photoUrls={photoUrls}
+      avatarUrls={avatarUrls}
+      hrefFor={(photoId) => `/sns/${photoId}`}
+      postHref={`/sns/groups/${groupId}/new`}
+    />
   );
 }
 
