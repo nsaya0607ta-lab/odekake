@@ -348,6 +348,8 @@ export function FrenchieCatchGame({ ownedItems }: { ownedItems: FrenchieCatchIte
   const boardRef = useRef<HTMLDivElement | null>(null);
   const catcherRef = useRef<HTMLDivElement | null>(null);
   const entitiesRef = useRef<Entity[]>([]);
+  const entityNodeRefs = useRef<Map<number, HTMLDivElement>>(new Map());
+  const mountedEntityIdsRef = useRef<Set<number>>(new Set());
   const draggingRef = useRef(false);
   const dragOffsetRef = useRef(0);
   const boxXRef = useRef(50);
@@ -1499,7 +1501,39 @@ export function FrenchieCatchGame({ ownedItems }: { ownedItems: FrenchieCatchIte
       }
 
       entitiesRef.current = next;
-      setEntities([...next]);
+
+      const nextIds = new Set(next.map((entity) => entity.id));
+      let idsChanged = nextIds.size !== mountedEntityIdsRef.current.size;
+      if (!idsChanged) {
+        for (const id of nextIds) {
+          if (!mountedEntityIdsRef.current.has(id)) {
+            idsChanged = true;
+            break;
+          }
+        }
+      }
+      if (idsChanged) {
+        mountedEntityIdsRef.current = nextIds;
+        setEntities(next);
+      }
+
+      const elapsedSincePlayStart = now - startAtRef.current;
+      const topZoneHiddenY = elapsedSincePlayStart > TOP_ZONE_HIDDEN_AFTER_SEC_2 * 1000
+        ? TOP_ZONE_HIDDEN_LOCAL_Y_2
+        : elapsedSincePlayStart > TOP_ZONE_HIDDEN_AFTER_SEC * 1000
+          ? TOP_ZONE_HIDDEN_LOCAL_Y
+          : 0;
+      for (const entity of next) {
+        const el = entityNodeRefs.current.get(entity.id);
+        if (!el) continue;
+        el.style.left = `${entity.x}%`;
+        el.style.top = `${entity.y}%`;
+        el.style.width = `${entity.size}%`;
+        el.style.transform = `translate(-50%, -50%) rotate(${entity.rotation}deg)`;
+        el.style.zIndex = entity.enteredOpening && entity.status !== "bounced" ? "40" : "20";
+        el.style.opacity = entity.y < topZoneHiddenY ? "0" : "1";
+      }
+
       rafRef.current = requestAnimationFrame(frame);
     };
 
@@ -1550,6 +1584,8 @@ export function FrenchieCatchGame({ ownedItems }: { ownedItems: FrenchieCatchIte
   const startGame = useCallback(() => {
     const now = performance.now();
     entitiesRef.current = [];
+    entityNodeRefs.current.clear();
+    mountedEntityIdsRef.current = new Set();
     nextIdRef.current = 1;
     scoreRef.current = 0;
     dogCaughtRef.current = 0;
@@ -1718,23 +1754,28 @@ export function FrenchieCatchGame({ ownedItems }: { ownedItems: FrenchieCatchIte
           </div>
         ) : null}
 
-        {entities.map((entity) => {
-          const elapsedSincePlayStart = performance.now() - startAtRef.current;
-          const topZoneHiddenY = elapsedSincePlayStart > TOP_ZONE_HIDDEN_AFTER_SEC_2 * 1000
-            ? TOP_ZONE_HIDDEN_LOCAL_Y_2
-            : elapsedSincePlayStart > TOP_ZONE_HIDDEN_AFTER_SEC * 1000
-              ? TOP_ZONE_HIDDEN_LOCAL_Y
-              : 0;
-          const topZoneHidden = entity.y < topZoneHiddenY;
-          return (
-          <div key={entity.id} className={`absolute ${entity.enteredOpening && entity.status !== "bounced" ? "z-40" : "z-20"} will-change-transform ${topZoneHidden ? "opacity-0" : "opacity-100"} ${entity.rarity ? RARITY_STYLE[entity.rarity] : ""}`} style={{ left: `${entity.x}%`, top: `${entity.y}%`, width: `${entity.size}%`, transform: `translate(-50%, -50%) rotate(${entity.rotation}deg)` }}>
+        {entities.map((entity) => (
+          <div
+            key={entity.id}
+            ref={(el) => {
+              if (el) entityNodeRefs.current.set(entity.id, el);
+              else entityNodeRefs.current.delete(entity.id);
+            }}
+            className={`absolute will-change-transform ${entity.rarity ? RARITY_STYLE[entity.rarity] : ""}`}
+            style={{
+              left: `${entity.x}%`,
+              top: `${entity.y}%`,
+              width: `${entity.size}%`,
+              zIndex: entity.enteredOpening && entity.status !== "bounced" ? 40 : 20,
+              transform: `translate(-50%, -50%) rotate(${entity.rotation}deg)`,
+            }}
+          >
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img src={entity.image} alt="" width={160} height={160} draggable={false} loading="eager" className="h-auto w-full object-contain" />
             {entity.rarity === "UR" ? <span className="absolute -inset-2 -z-10 animate-pulse rounded-full bg-[#e95c4d]/15 blur-sm" /> : null}
             {entity.rarity === "LR" ? <span className="absolute -inset-3 -z-10 animate-pulse rounded-full bg-[#e6b43c]/25 blur" /> : null}
           </div>
-          );
-        })}
+        ))}
 
         {impactX !== null ? <div className="pointer-events-none absolute z-40 -translate-x-1/2 -translate-y-1/2 animate-ping text-xl font-black text-[#d7684f]" style={{ left: `${impactX}%`, top: `${BOX_LIP_Y}%` }}>✦</div> : null}
         {feedback ? (
