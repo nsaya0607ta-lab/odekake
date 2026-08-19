@@ -367,7 +367,7 @@ const FallingEntity = memo(function FallingEntity({
         transform: `translate(-50%, -50%) rotate(${entity.rotation}deg)`,
       }}
     >
-      <Image src={entity.image} alt="" width={96} height={96} draggable={false} loading="eager" className="h-auto w-full object-contain" />
+      <Image src={entity.image} alt="" width={96} height={96} quality={65} draggable={false} loading="eager" className="h-auto w-full object-contain" />
       {entity.rarity === "UR" ? <span className="absolute -inset-2 -z-10 animate-pulse rounded-full bg-[#e95c4d]/15 blur-sm" /> : null}
       {entity.rarity === "LR" ? <span className="absolute -inset-3 -z-10 animate-pulse rounded-full bg-[#e6b43c]/25 blur" /> : null}
     </div>
@@ -1745,7 +1745,7 @@ export function FrenchieCatchGame({ ownedItems }: { ownedItems: FrenchieCatchIte
     <section className="rough-card overflow-hidden p-0">
       <div aria-hidden className="hidden">
         {preloadImages.map((src) => (
-          <Image key={src} src={src} alt="" width={96} height={96} loading="eager" />
+          <Image key={src} src={src} alt="" width={96} height={96} quality={65} loading="eager" />
         ))}
       </div>
 
