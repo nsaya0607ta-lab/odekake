@@ -48,7 +48,11 @@ export default async function AdminNoticePage() {
                   <p className="text-xs text-ink-faint">{formatDateTime(notice.created_at)}</p>
                   <details className="mt-1">
                     <summary className="cursor-pointer font-semibold">{notice.title}</summary>
-                    <AdminNoticeEditForm noticeId={notice.id} initialMessage={notice.title} />
+                    <AdminNoticeEditForm
+                      noticeId={notice.id}
+                      initialTitle={notice.title}
+                      initialMessage={notice.content ?? notice.title}
+                    />
                     <form action={deleteAdminNoticeAction} className="mt-2">
                       <input type="hidden" name="noticeId" value={notice.id} />
                       <ConfirmSubmitButton message="このお知らせを削除しますか？" pendingLabel="削除中…">

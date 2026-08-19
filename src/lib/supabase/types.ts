@@ -306,6 +306,18 @@ export type NoticeFeedRow = {
   display_name: string | null;
   avatar_url: string | null;
   title: string;
+  content: string | null;
+  is_read: boolean;
+};
+
+export type NoticeDetailRow = {
+  id: string;
+  type: NoticeType;
+  created_at: string;
+  display_name: string | null;
+  avatar_url: string | null;
+  title: string;
+  content: string | null;
   is_read: boolean;
 };
 
@@ -495,10 +507,14 @@ export type Database = {
       get_friends_activity_feed: { Args: { p_limit?: number }; Returns: FriendActivityRow[] };
       get_friends_steps_ranking: { Args: { p_limit?: number }; Returns: FriendStepsRankingRow[] };
       get_notices_feed: { Args: { p_limit?: number }; Returns: NoticeFeedRow[] };
+      get_notice_detail: { Args: { p_notice_id: string }; Returns: NoticeDetailRow[] };
       get_unread_notice_count: { Args: Record<string, never>; Returns: number };
       mark_notices_read: { Args: { p_notice_ids: string[] }; Returns: undefined };
-      post_admin_notice: { Args: { p_message: string }; Returns: string };
-      update_admin_notice: { Args: { p_notice_id: string; p_message: string }; Returns: undefined };
+      post_admin_notice: { Args: { p_title: string; p_message: string }; Returns: string };
+      update_admin_notice: {
+        Args: { p_notice_id: string; p_title: string; p_message: string };
+        Returns: undefined;
+      };
       delete_admin_notice: { Args: { p_notice_id: string }; Returns: undefined };
       is_notice_admin: { Args: Record<string, never>; Returns: boolean };
       get_shared_trips_health: { Args: Record<string, never>; Returns: Json };

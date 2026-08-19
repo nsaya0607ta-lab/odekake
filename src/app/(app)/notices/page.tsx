@@ -1,5 +1,4 @@
 import Link from "next/link";
-import { markNoticeReadAction } from "./actions";
 import { IconSettings } from "@/components/icons";
 import { PageBody } from "@/components/page-body";
 import { PageHeader } from "@/components/page-header";
@@ -59,27 +58,24 @@ export default async function NoticesPage() {
                 key={notice.id}
                 className={`rough-card transition-opacity ${notice.is_read ? "opacity-55" : "border-leaf shadow-sm"}`}
               >
-                <form action={markNoticeReadAction}>
-                  <input type="hidden" name="noticeId" value={notice.id} />
-                  <button type="submit" className="block w-full p-4 text-left" disabled={notice.is_read}>
-                    <div className="flex items-center gap-2 text-xs text-ink-faint">
-                      <span className="rounded-full bg-paper-deep px-2 py-0.5 font-bold">
-                        {TYPE_LABEL[notice.type] ?? "お知らせ"}
+                <Link href={`/notices/${notice.id}`} className="block w-full p-4 text-left">
+                  <div className="flex items-center gap-2 text-xs text-ink-faint">
+                    <span className="rounded-full bg-paper-deep px-2 py-0.5 font-bold">
+                      {TYPE_LABEL[notice.type] ?? "お知らせ"}
+                    </span>
+                    <span>{formatDateTime(notice.created_at)}</span>
+                    {notice.is_read ? (
+                      <span className="ml-auto text-[10px] font-bold">既読</span>
+                    ) : (
+                      <span className="ml-auto rounded-full bg-blossom px-2 py-0.5 text-[10px] font-bold text-card">
+                        未読・タップで詳細
                       </span>
-                      <span>{formatDateTime(notice.created_at)}</span>
-                      {notice.is_read ? (
-                        <span className="ml-auto text-[10px] font-bold">既読</span>
-                      ) : (
-                        <span className="ml-auto rounded-full bg-blossom px-2 py-0.5 text-[10px] font-bold text-card">
-                          未読・タップで既読
-                        </span>
-                      )}
-                    </div>
-                    <p className={`mt-1.5 ${notice.is_read ? "font-semibold text-ink-soft" : "font-bold text-ink"}`}>
-                      {notice.title}
-                    </p>
-                  </button>
-                </form>
+                    )}
+                  </div>
+                  <p className={`mt-1.5 ${notice.is_read ? "font-semibold text-ink-soft" : "font-bold text-ink"}`}>
+                    {notice.title}
+                  </p>
+                </Link>
               </li>
             ))}
           </ul>

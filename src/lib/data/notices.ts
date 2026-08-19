@@ -1,5 +1,5 @@
 import type { DB } from "./client";
-import type { NoticeFeedRow } from "@/lib/supabase/types";
+import type { NoticeDetailRow, NoticeFeedRow } from "@/lib/supabase/types";
 
 const NOTICES_UNAVAILABLE_CODES = new Set(["42P01", "42883", "PGRST202", "PGRST205"]);
 
@@ -16,6 +16,16 @@ export async function getNoticesFeed(supabase: DB, limit = 20): Promise<NoticeFe
     throw new Error("Notices feed is unavailable");
   }
   return data ?? [];
+}
+
+export async function getNoticeDetail(supabase: DB, noticeId: string): Promise<NoticeDetailRow | null> {
+  const { data, error } = await supabase.rpc("get_notice_detail", { p_notice_id: noticeId });
+  if (error) {
+    if (isUnavailable(error)) return null;
+    console.error("Notice detail is unavailable", { code: error.code, message: error.message });
+    throw new Error("Notice detail is unavailable");
+  }
+  return data?.[0] ?? null;
 }
 
 export async function getUnreadNoticeCount(supabase: DB): Promise<number> {
@@ -46,14 +56,23 @@ export async function isNoticeAdmin(supabase: DB): Promise<boolean> {
   return data ?? false;
 }
 
-export async function postAdminNotice(supabase: DB, message: string): Promise<string> {
-  const { data, error } = await supabase.rpc("post_admin_notice", { p_message: message });
+export async function postAdminNotice(supabase: DB, title: string, message: string): Promise<string> {
+  const { data, error } = await supabase.rpc("post_admin_notice", { p_title: title, p_message: message });
   if (error) throw new Error(error.message || "お知らせの投稿に失敗しました");
   return data;
 }
 
-export async function updateAdminNotice(supabase: DB, noticeId: string, message: string): Promise<void> {
-  const { error } = await supabase.rpc("update_admin_notice", { p_notice_id: noticeId, p_message: message });
+export async function updateAdminNotice(
+  supabase: DB,
+  noticeId: string,
+  title: string,
+  message: string,
+): Promise<void> {
+  const { error } = await supabase.rpc("update_admin_notice", {
+    p_notice_id: noticeId,
+    p_title: title,
+    p_message: message,
+  });
   if (error) throw new Error(error.message || "お知らせを更新できませんでした");
 }
 
