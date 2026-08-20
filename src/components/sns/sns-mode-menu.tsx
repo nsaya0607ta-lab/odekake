@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { usePathname } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import { IconHome, IconMenu, IconUser, IconUsers } from "@/components/icons";
 import { useSnsMode } from "@/components/sns/sns-mode-context";
@@ -9,6 +10,10 @@ import { useSnsMode } from "@/components/sns/sns-mode-context";
  * ユーザー/グループの表示切替、未実装のDM導線をまとめて置いておく */
 export function SnsModeMenu() {
   const { mode, setMode } = useSnsMode();
+  const pathname = usePathname();
+  // グループ画面上ではページ遷移せずその場で切り替える。それ以外の画面（ホームなど）
+  // からは、切り替えバーを持つグループ画面へ選択したモードを引き継いで移動する
+  const onGroupScreen = pathname?.startsWith("/sns/groups/") ?? false;
   const [open, setOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
 
@@ -48,8 +53,31 @@ export function SnsModeMenu() {
             <IconHome size={18} />
             ホーム
           </Link>
-          <MenuItem label="ユーザー" icon={<IconUser size={18} />} active={mode === "user"} onClick={() => selectMode("user")} />
-          <MenuItem label="グループ" icon={<IconUsers size={18} />} active={mode === "group"} onClick={() => selectMode("group")} />
+          {onGroupScreen ? (
+            <>
+              <MenuItem
+                label="ユーザー"
+                icon={<IconUser size={18} />}
+                active={mode === "user"}
+                onClick={() => selectMode("user")}
+              />
+              <MenuItem
+                label="グループ"
+                icon={<IconUsers size={18} />}
+                active={mode === "group"}
+                onClick={() => selectMode("group")}
+              />
+            </>
+          ) : (
+            <>
+              <MenuLink href="/sns/groups?mode=user" icon={<IconUser size={18} />} onClick={() => setOpen(false)}>
+                ユーザー
+              </MenuLink>
+              <MenuLink href="/sns/groups?mode=group" icon={<IconUsers size={18} />} onClick={() => setOpen(false)}>
+                グループ
+              </MenuLink>
+            </>
+          )}
           <span className="flex items-center gap-2 px-4 py-2.5 text-sm text-ink-faint/60">
             DM
             <span className="ml-auto rounded-full bg-paper-deep px-2 py-0.5 text-[10px]">準備中</span>
@@ -83,5 +111,28 @@ function MenuItem({
       {icon}
       {label}
     </button>
+  );
+}
+
+function MenuLink({
+  href,
+  icon,
+  onClick,
+  children,
+}: {
+  href: string;
+  icon: React.ReactNode;
+  onClick: () => void;
+  children: React.ReactNode;
+}) {
+  return (
+    <Link
+      href={href}
+      onClick={onClick}
+      className="flex w-full items-center gap-2 px-4 py-2.5 text-left text-sm font-semibold text-ink-soft active:bg-paper-deep"
+    >
+      {icon}
+      {children}
+    </Link>
   );
 }

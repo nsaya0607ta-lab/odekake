@@ -4,6 +4,7 @@ import { PageBody } from "@/components/page-body";
 import { PageHeader } from "@/components/page-header";
 import { SnsBackgroundBand } from "@/components/sns/sns-background-band";
 import { SnsModeMenu } from "@/components/sns/sns-mode-menu";
+import { SnsModeProvider } from "@/components/sns/sns-mode-context";
 import { SnsTextFeed } from "@/components/sns/sns-text-feed";
 import { signThumbOrOriginalPaths } from "@/lib/data/photos";
 import { getPersonalTextFeed } from "@/lib/data/sns";
@@ -23,7 +24,7 @@ export default async function SnsHomePage() {
   );
 
   return (
-    <>
+    <SnsModeProvider>
       <PageHeader title="ホーム" showBack={false} leftAction={<SnsModeMenu />} />
       <SnsBackgroundBand />
       <PageBody>
@@ -37,6 +38,6 @@ export default async function SnsHomePage() {
       >
         <IconPlus size={24} />
       </Link>
-    </>
+    </SnsModeProvider>
   );
 }

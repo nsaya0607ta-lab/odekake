@@ -32,7 +32,7 @@ export default async function SnsGroupPage({
   searchParams,
 }: {
   params: Promise<{ groupId: string }>;
-  searchParams: Promise<{ view?: string }>;
+  searchParams: Promise<{ view?: string; mode?: string }>;
 }) {
   const [{ groupId }, sp, { supabase, user }] = await Promise.all([params, searchParams, requireUser()]);
 
@@ -50,10 +50,11 @@ export default async function SnsGroupPage({
   });
 
   const view = sp.view === "chat" ? "chat" : "photos";
+  const initialMode = sp.mode === "user" ? "user" : "group";
   const baseHref = `/sns/groups/${groupId}`;
 
   return (
-    <SnsModeProvider>
+    <SnsModeProvider initialMode={initialMode}>
       <PageHeader
         title={group.name}
         showBack={false}

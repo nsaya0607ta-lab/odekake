@@ -8,8 +8,8 @@ type SnsModeContextValue = { mode: SnsMode; setMode: (mode: SnsMode) => void };
 const SnsModeContext = createContext<SnsModeContextValue | null>(null);
 
 /** ユーザー/グループの表示切替を、ページ遷移せずヘッダーと切替バーの間で共有する */
-export function SnsModeProvider({ children }: { children: ReactNode }) {
-  const [mode, setMode] = useState<SnsMode>("group");
+export function SnsModeProvider({ children, initialMode = "group" }: { children: ReactNode; initialMode?: SnsMode }) {
+  const [mode, setMode] = useState<SnsMode>(initialMode);
   return <SnsModeContext.Provider value={{ mode, setMode }}>{children}</SnsModeContext.Provider>;
 }
 
