@@ -55,6 +55,16 @@ export default async function SnsGroupPage({
         }
       />
       <PostedToast />
+      {/* 写真/チャットの切替バーからナビゲーションバーまでの間だけ背景画像を敷く */}
+      <div
+        aria-hidden
+        className="pointer-events-none fixed inset-x-0 z-0"
+        style={{ top: "7.5rem", bottom: "calc(var(--nav-height) + var(--safe-bottom))" }}
+      >
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img src="/backgrounds/gradient-bubbles.jpg" alt="" className="h-full w-full object-cover" />
+        <div className="absolute inset-0 bg-paper/55" />
+      </div>
       <PageBody>
         <SnsGroupSwitcher groups={groups} activeGroupId={groupId} />
 

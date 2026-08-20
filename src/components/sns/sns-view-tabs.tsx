@@ -30,8 +30,8 @@ function ViewTab({
       href={href}
       aria-label={label}
       aria-current={active}
-      className={`tap-target flex flex-col items-center gap-0.5 px-2 py-1.5 transition-all ${
-        active ? "scale-105 opacity-100" : "opacity-45"
+      className={`tap-target flex flex-col items-center gap-0.5 rounded-2xl px-3 py-1.5 transition-all ${
+        active ? "scale-105 bg-leaf-soft opacity-100" : "opacity-40"
       }`}
     >
       {/* eslint-disable-next-line @next/next/no-img-element */}
