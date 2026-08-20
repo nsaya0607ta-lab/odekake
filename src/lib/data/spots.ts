@@ -1,6 +1,6 @@
 import type { SpotRow, VisitPhotoRow, VisitRecordRow } from "@/lib/supabase/types";
 import type { DB } from "./client";
-import { signPhotoPaths } from "./photos";
+import { signPhotoPaths, signThumbOrOriginalPaths } from "./photos";
 
 export type SpotSummary = {
   id: string;
@@ -116,7 +116,7 @@ async function attachSummaries(
     const path = pickCoverPath(visitsBySpot.get(spot.id) ?? [], photosByVisit);
     if (path) coverPaths.push([spot.id, path]);
   }
-  const signed = await signPhotoPaths(
+  const signed = await signThumbOrOriginalPaths(
     supabase,
     coverPaths.map(([, p]) => p),
   );

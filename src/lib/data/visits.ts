@@ -1,7 +1,7 @@
 import { getMunicipality } from "@/lib/geo";
 import type { SpotRow, VisitPhotoRow, VisitRecordRow } from "@/lib/supabase/types";
 import type { DB } from "./client";
-import { signPhotoPaths } from "./photos";
+import { signPhotoPaths, signThumbOrOriginalPaths } from "./photos";
 import { loadCategoryNames, loadTripTitles } from "./spots";
 
 export type TimelineItem = {
@@ -86,7 +86,7 @@ export async function getTimeline(supabase: DB, filter: TimelineFilter = {}): Pr
     else photosByVisit.set(p.visit_record_id, [p]);
   }
 
-  const signed = await signPhotoPaths(
+  const signed = await signThumbOrOriginalPaths(
     supabase,
     [...photosByVisit.values()].flat().map((p) => p.storage_path),
   );

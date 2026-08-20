@@ -5,7 +5,7 @@ import { IconUser } from "@/components/icons";
 import { PageBody } from "@/components/page-body";
 import { PageHeader } from "@/components/page-header";
 import { getFriendList } from "@/lib/data/friends";
-import { signPhotoPaths } from "@/lib/data/photos";
+import { signThumbOrOriginalPaths } from "@/lib/data/photos";
 import { getFriendGroupMembers, getMyFriendGroups, signGroupIconUrls } from "@/lib/data/sns";
 import { requireUser } from "@/lib/supabase/server";
 import { AddMembersForm } from "./add-members-form";
@@ -30,7 +30,7 @@ export default async function SnsGroupSettingsPage({
   const isOwner = group.owner_id === user.id;
   const groupIconUrls = await signGroupIconUrls(supabase, [group]);
   const members = await getFriendGroupMembers(supabase, groupId);
-  const avatarUrls = await signPhotoPaths(
+  const avatarUrls = await signThumbOrOriginalPaths(
     supabase,
     members.flatMap((m) => (m.profile_image_url ? [m.profile_image_url] : [])),
   );
@@ -39,7 +39,7 @@ export default async function SnsGroupSettingsPage({
   const memberIds = new Set(members.map((m) => m.user_id));
   const invitableFriends = friends.filter((f) => !memberIds.has(f.friend_user_id));
   const friendAvatarUrls = isOwner
-    ? await signPhotoPaths(
+    ? await signThumbOrOriginalPaths(
         supabase,
         invitableFriends.flatMap((f) => (f.profile_image_url ? [f.profile_image_url] : [])),
       )

@@ -13,7 +13,7 @@ import {
   getFriendPrefectures,
   getFriendRecentVisits,
 } from "@/lib/data/friends";
-import { signPhotoPath, signPhotoPaths } from "@/lib/data/photos";
+import { signThumbOrOriginalPaths } from "@/lib/data/photos";
 import { getExpProgress } from "@/lib/exp";
 import { getMunicipality } from "@/lib/geo/municipalities";
 import { PREFECTURE_NAMES } from "@/lib/geo/prefecture-names";
@@ -53,13 +53,14 @@ export default async function FriendDetailPage({
       overview.show_collection ? getFriendCollection(supabase, friendId) : Promise.resolve([]),
       overview.show_recent_visits ? getFriendRecentVisits(supabase, friendId, 5) : Promise.resolve([]),
     ]);
-    const [avatarUrl, visitPhotoUrls] = await Promise.all([
-      signPhotoPath(supabase, overview.profile_image_url),
-      signPhotoPaths(
+    const [avatarUrls, visitPhotoUrls] = await Promise.all([
+      signThumbOrOriginalPaths(supabase, overview.profile_image_url ? [overview.profile_image_url] : []),
+      signThumbOrOriginalPaths(
         supabase,
         recentVisits.flatMap((visit) => (visit.photo_path ? [visit.photo_path] : [])),
       ),
     ]);
+    const avatarUrl = overview.profile_image_url ? (avatarUrls.get(overview.profile_image_url) ?? null) : null;
     const level = getExpProgress(overview.total_exp).level;
 
     return (

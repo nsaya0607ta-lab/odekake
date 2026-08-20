@@ -1,5 +1,5 @@
 import type { DB } from "./client";
-import { signPhotoPaths } from "./photos";
+import { signThumbOrOriginalPaths } from "./photos";
 import type {
   FriendGroupMemberRow,
   FriendGroupMessageRow,
@@ -47,7 +47,7 @@ export async function getMyFriendGroups(supabase: DB): Promise<FriendGroupRow[]>
 export async function signGroupIconUrls(supabase: DB, groups: FriendGroupRow[]): Promise<Map<string, string>> {
   const paths = groups.flatMap((g) => (g.icon_path ? [g.icon_path] : []));
   if (paths.length === 0) return new Map();
-  return signPhotoPaths(supabase, paths);
+  return signThumbOrOriginalPaths(supabase, paths);
 }
 
 export async function getFriendGroupMembers(supabase: DB, groupId: string): Promise<FriendGroupMemberRow[]> {

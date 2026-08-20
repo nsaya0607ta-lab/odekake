@@ -2,7 +2,7 @@ import { IconUsers } from "@/components/icons";
 import { PageBody } from "@/components/page-body";
 import { PageHeader } from "@/components/page-header";
 import { getFriendList } from "@/lib/data/friends";
-import { signPhotoPaths } from "@/lib/data/photos";
+import { signThumbOrOriginalPaths } from "@/lib/data/photos";
 import { requireUser } from "@/lib/supabase/server";
 import { GroupForm } from "./group-form";
 
@@ -12,7 +12,7 @@ export const dynamic = "force-dynamic";
 export default async function NewSnsGroupPage() {
   const { supabase, user } = await requireUser();
   const friends = await getFriendList(supabase);
-  const avatarUrls = await signPhotoPaths(
+  const avatarUrls = await signThumbOrOriginalPaths(
     supabase,
     friends.flatMap((f) => (f.profile_image_url ? [f.profile_image_url] : [])),
   );
