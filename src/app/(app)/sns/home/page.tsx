@@ -26,7 +26,7 @@ export default async function SnsHomePage() {
   return (
     <SnsModeProvider>
       <PageHeader title="ホーム" showBack={false} leftAction={<SnsModeMenu />} />
-      <SnsBackgroundBand />
+      <SnsBackgroundBand hasToggleBar={false} />
       <PageBody>
         <SnsTextFeed posts={posts} avatarUrls={avatarUrls} currentUserId={user.id} />
       </PageBody>

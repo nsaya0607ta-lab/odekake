@@ -29,13 +29,13 @@ export function SnsTextFeed({
             <Link
               href={`/sns/users/${post.user_id}`}
               aria-label={`${post.display_name}のホーム`}
-              className="h-12 w-12 shrink-0 overflow-hidden rounded-full border border-line bg-paper-deep"
+              className="h-12 w-12 shrink-0 overflow-hidden rounded-full shadow-sm ring-2 ring-card"
             >
               {avatarUrl ? (
                 // eslint-disable-next-line @next/next/no-img-element
                 <img src={avatarUrl} alt="" className="h-full w-full object-cover" />
               ) : (
-                <span className="flex h-full w-full items-center justify-center text-ink-faint">
+                <span className="flex h-full w-full items-center justify-center bg-leaf-soft text-leaf-deep">
                   <IconUser size={22} />
                 </span>
               )}
