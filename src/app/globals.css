@@ -142,6 +142,12 @@
 }
 
 @layer components {
+  /* チャット入力欄にフォーカスしてキーボードが出ている間は、下ナビの分の
+     隙間が無駄になるので隠す（LINEなどと同じ、入力欄がキーボードに直付けの見た目にする） */
+  body.sns-chat-input-focused .app-bottom-nav {
+    display: none;
+  }
+
   /* SNSの写真/チャット切替バーの下だけに敷く背景 */
   .sns-bg-band {
     background-image: linear-gradient(rgba(251, 248, 241, 0.55), rgba(251, 248, 241, 0.55)),

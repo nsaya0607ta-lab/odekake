@@ -1,6 +1,6 @@
 "use client";
 
-import { useActionState, useEffect, useRef } from "react";
+import { useActionState, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import type { ActionState } from "@/components/form";
 import { emptyActionState, FormMessage, SubmitButton } from "@/components/form";
@@ -22,15 +22,27 @@ export function SnsChatForm({
 }) {
   const [state, formAction] = useActionState(action, emptyActionState);
   const formRef = useRef<HTMLFormElement>(null);
+  const [focused, setFocused] = useState(false);
 
   useEffect(() => {
     if (state.ok) formRef.current?.reset();
   }, [state.ok]);
 
+  // キーボードが出ている間は下ナビを隠す（bottom-nav.tsx 側のCSSと対）ので、
+  // 入力欄もナビ分の余白を空けずにキーボードへ直付けする
+  useEffect(() => {
+    document.body.classList.toggle("sns-chat-input-focused", focused);
+    return () => document.body.classList.remove("sns-chat-input-focused");
+  }, [focused]);
+
   return (
     <div
       className="fixed inset-x-0 z-20 border-t border-line bg-paper/95 backdrop-blur-sm"
-      style={{ bottom: "calc(var(--nav-height) + var(--safe-bottom))" }}
+      style={{
+        bottom: focused
+          ? "env(safe-area-inset-bottom, 0px)"
+          : "calc(var(--nav-height) + var(--safe-bottom) + 0.5rem)",
+      }}
     >
       <div className="mx-auto max-w-lg px-4 pt-2 pb-2">
         <form ref={formRef} action={formAction} className="flex items-center gap-2">
@@ -55,6 +67,8 @@ export function SnsChatForm({
               maxLength={1000}
               placeholder={placeholder}
               defaultValue={state.values?.body ?? ""}
+              onFocus={() => setFocused(true)}
+              onBlur={() => setFocused(false)}
               className="max-h-24 min-w-0 flex-1 resize-none bg-transparent text-base leading-relaxed outline-none placeholder:text-ink-faint"
               style={{ fontSize: "16px" }}
             />
