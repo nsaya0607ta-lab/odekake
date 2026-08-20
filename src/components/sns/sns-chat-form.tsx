@@ -32,7 +32,7 @@ export function SnsChatForm({
       className="sticky z-10 -mx-4 bg-paper/95 px-4 pt-2 backdrop-blur-sm"
       style={{ bottom: "calc(var(--nav-height) + var(--safe-bottom))" }}
     >
-      <form ref={formRef} action={formAction} className="flex items-center gap-2 pb-2">
+      <form ref={formRef} action={formAction} className="flex items-center gap-2 pb-1">
         {hiddenFields
           ? Object.entries(hiddenFields).map(([name, value]) => (
               <input key={name} type="hidden" name={name} value={value} />
@@ -54,7 +54,8 @@ export function SnsChatForm({
             maxLength={1000}
             placeholder={placeholder}
             defaultValue={state.values?.body ?? ""}
-            className="max-h-24 min-w-0 flex-1 resize-none bg-transparent text-sm leading-relaxed outline-none placeholder:text-ink-faint"
+            className="max-h-24 min-w-0 flex-1 resize-none bg-transparent text-base leading-relaxed outline-none placeholder:text-ink-faint"
+            style={{ fontSize: "16px" }}
           />
         </div>
         <SubmitButton
