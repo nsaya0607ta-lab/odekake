@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useLayoutEffect, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { reorderFriendGroupsAction } from "@/app/actions/sns";
 import { IconPlus } from "@/components/icons";
 import type { FriendGroupRow } from "@/lib/supabase/types";
@@ -46,6 +46,12 @@ export function SnsGroupSwitcher({
   } | null>(null);
 
   useLayoutEffect(() => setOrder(groups), [groups]);
+
+  // グループアイコンは <Link> ではなく手動のタップ判定なので、Next の自動プリフェッチが効かない。
+  // 表示された時点でルート（JSチャンク／RSCペイロード）を先読みしておき、実際にタップした時の待ち時間を減らす
+  useEffect(() => {
+    for (const g of groups) router.prefetch(`/sns/groups/${g.id}`);
+  }, [groups, router]);
 
   function captureOffsets() {
     const map = new Map<string, number>();

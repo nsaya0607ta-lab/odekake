@@ -20,6 +20,7 @@ import { SnsViewTabs } from "@/components/sns/sns-view-tabs";
 import { signThumbOrOriginalPaths } from "@/lib/data/photos";
 import { getFriendGroupMessages, getMyFriendGroups, getOwnSnsProfile, getSnsGroupFeed, signGroupIconUrls } from "@/lib/data/sns";
 import { requireUser } from "@/lib/supabase/server";
+import type { FriendGroupRow } from "@/lib/supabase/types";
 
 export const dynamic = "force-dynamic";
 
@@ -35,10 +36,6 @@ export default async function SnsGroupPage({
   const groups = await getMyFriendGroups(supabase, user.id);
   const group = groups.find((g) => g.id === groupId);
   if (!group) notFound();
-  const [groupIconUrls, ownProfile] = await Promise.all([
-    signGroupIconUrls(supabase, groups),
-    getOwnSnsProfile(supabase, user.id),
-  ]);
 
   // 画面を開いたタイミングで既読にする。表示をブロックしないようレスポンス送信後に実行する
   after(async () => {
@@ -70,13 +67,9 @@ export default async function SnsGroupPage({
       <PostedToast />
       <SnsBackgroundBand />
       <PageBody>
-        <SnsGroupSwitcher
-          groups={groups}
-          activeGroupId={groupId}
-          iconUrls={Object.fromEntries(groupIconUrls)}
-          personalIconUrl={ownProfile.iconUrl}
-          personalLabel={ownProfile.displayName}
-        />
+        <Suspense fallback={<SnsSwitcherSkeleton />}>
+          <GroupSwitcherSection groups={groups} groupId={groupId} userId={user.id} />
+        </Suspense>
 
         {view === "photos" ? (
           <Suspense fallback={<SnsGridSkeleton />}>
@@ -112,6 +105,42 @@ export default async function SnsGroupPage({
         />
       )}
     </>
+  );
+}
+
+async function GroupSwitcherSection({
+  groups,
+  groupId,
+  userId,
+}: {
+  groups: FriendGroupRow[];
+  groupId: string;
+  userId: string;
+}) {
+  const { supabase } = await requireUser();
+  const [groupIconUrls, ownProfile] = await Promise.all([
+    signGroupIconUrls(supabase, groups),
+    getOwnSnsProfile(supabase, userId),
+  ]);
+
+  return (
+    <SnsGroupSwitcher
+      groups={groups}
+      activeGroupId={groupId}
+      iconUrls={Object.fromEntries(groupIconUrls)}
+      personalIconUrl={ownProfile.iconUrl}
+      personalLabel={ownProfile.displayName}
+    />
+  );
+}
+
+function SnsSwitcherSkeleton() {
+  return (
+    <div className="-mx-4 -mt-5 flex items-center gap-3 bg-white px-4 py-1.5" aria-hidden="true">
+      {Array.from({ length: 5 }, (_, i) => (
+        <div key={i} className="h-14 w-14 shrink-0 animate-pulse rounded-full bg-paper-deep motion-reduce:animate-none" />
+      ))}
+    </div>
   );
 }
 
