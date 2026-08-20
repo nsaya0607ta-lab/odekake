@@ -29,10 +29,10 @@ export function SnsChatForm({
 
   return (
     <div
-      className="fixed inset-x-0 z-20 bg-paper/95 backdrop-blur-sm"
+      className="fixed inset-x-0 z-20 border-t border-line bg-paper/95 backdrop-blur-sm"
       style={{ bottom: "calc(var(--nav-height) + var(--safe-bottom))" }}
     >
-      <div className="mx-auto max-w-lg px-4 pt-2 pb-1">
+      <div className="mx-auto max-w-lg px-4 pt-2 pb-2">
         <form ref={formRef} action={formAction} className="flex items-center gap-2">
           {hiddenFields
             ? Object.entries(hiddenFields).map(([name, value]) => (
