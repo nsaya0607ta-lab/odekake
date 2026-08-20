@@ -10,7 +10,6 @@ import { finalizePhotoPaths } from "@/lib/photos";
 import { requireUser } from "@/lib/supabase/server";
 import { PHOTO_BUCKET } from "@/lib/data/client";
 import { getSnsPhoto } from "@/lib/data/sns";
-import { GROUP_ICON_CHOICES } from "@/lib/sns-group-icons";
 
 const uuidSchema = z.string().uuid();
 const optionalUuidSchema = z.string().uuid().optional().or(z.literal(""));
@@ -22,15 +21,19 @@ function todayInTokyo(): string {
   return new Intl.DateTimeFormat("sv-SE", { timeZone: "Asia/Tokyo" }).format(new Date());
 }
 
-function parsePhotoPaths(formData: FormData): string[] {
+function parseJsonPaths(formData: FormData, field: string): string[] {
   try {
-    const raw = String(formData.get("photoPaths") ?? "[]");
+    const raw = String(formData.get(field) ?? "[]");
     const parsed: unknown = JSON.parse(raw);
     if (!Array.isArray(parsed)) return [];
     return parsed.filter((p): p is string => typeof p === "string");
   } catch {
     return [];
   }
+}
+
+function parsePhotoPaths(formData: FormData): string[] {
+  return parseJsonPaths(formData, "photoPaths");
 }
 
 function parseMemberIds(formData: FormData): string[] {
@@ -160,8 +163,7 @@ export async function deleteFriendPhotoCommentAction(formData: FormData): Promis
 export async function createFriendGroupAction(_prev: ActionState, formData: FormData): Promise<ActionState> {
   const name = String(formData.get("name") ?? "").trim().slice(0, MAX_GROUP_NAME_LENGTH);
   const memberUserIds = parseMemberIds(formData);
-  const rawIcon = String(formData.get("icon") ?? "");
-  const icon = GROUP_ICON_CHOICES.includes(rawIcon) ? rawIcon : GROUP_ICON_CHOICES[0];
+  const iconPaths = parseJsonPaths(formData, "iconPaths");
 
   if (name === "") {
     return { error: "グループ名を入力してください。", values: { name } };
@@ -171,14 +173,70 @@ export async function createFriendGroupAction(_prev: ActionState, formData: Form
   const { data: groupId, error } = await supabase.rpc("create_friend_group", {
     p_name: name,
     p_member_user_ids: memberUserIds,
-    p_icon: icon,
   });
   if (error || !groupId) {
     return { error: toJapaneseError(error, "グループを作成できませんでした。"), values: { name } };
   }
 
+  if (iconPaths[0]) {
+    const [moved] = await finalizePhotoPaths(supabase, [iconPaths[0]], `groups/${groupId}/icon`);
+    if (moved) {
+      await supabase.rpc("update_friend_group", { p_group_id: groupId, p_icon_path: moved });
+    }
+  }
+
   revalidatePath("/sns");
   redirect(`/sns/groups/${groupId}`);
+}
+
+export async function updateFriendGroupAction(_prev: ActionState, formData: FormData): Promise<ActionState> {
+  const groupId = String(formData.get("groupId") ?? "");
+  const parsedGroupId = uuidSchema.safeParse(groupId);
+  if (!parsedGroupId.success) return { error: "このグループは見つかりませんでした。" };
+
+  const name = String(formData.get("name") ?? "").trim().slice(0, MAX_GROUP_NAME_LENGTH);
+  if (name === "") {
+    return { error: "グループ名を入力してください。", values: { name } };
+  }
+  const iconPaths = parseJsonPaths(formData, "iconPaths");
+
+  const { supabase } = await requireUser();
+
+  const { data: currentGroups } = await supabase.rpc("get_my_friend_groups");
+  const previousIconPath = currentGroups?.find((g) => g.id === groupId)?.icon_path ?? null;
+
+  // アイコンの入力欄が空で送られてきたら「アイコンを外した」と扱う
+  const removeIcon = iconPaths.length === 0 && previousIconPath !== null;
+
+  let iconPath: string | null | undefined;
+  if (removeIcon) {
+    iconPath = null;
+  } else if (iconPaths[0]) {
+    const [moved] = await finalizePhotoPaths(supabase, [iconPaths[0]], `groups/${groupId}/icon`);
+    if (!moved) {
+      return { error: "アイコン画像を保存できませんでした。もう一度お試しください。", values: { name } };
+    }
+    iconPath = moved;
+  }
+
+  const { error } = await supabase.rpc("update_friend_group", {
+    p_group_id: groupId,
+    p_name: name,
+    p_icon_path: iconPath,
+    p_remove_icon: removeIcon,
+  });
+  if (error) {
+    return { error: toJapaneseError(error, "グループの設定を更新できませんでした。"), values: { name } };
+  }
+
+  if (previousIconPath && iconPath !== undefined && previousIconPath !== iconPath) {
+    await supabase.storage.from(PHOTO_BUCKET).remove([previousIconPath]);
+  }
+
+  revalidatePath("/sns");
+  revalidatePath(`/sns/groups/${groupId}`);
+  revalidatePath(`/sns/groups/${groupId}/settings`);
+  return { ok: true, message: "グループの設定を更新しました。", values: { name } };
 }
 
 /** グループアイコンの長押しドラッグ並び替え用。フォームを介さず直接呼び出す */

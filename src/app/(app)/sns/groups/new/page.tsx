@@ -10,7 +10,7 @@ export const metadata = { title: "グループを作る | SNS" };
 export const dynamic = "force-dynamic";
 
 export default async function NewSnsGroupPage() {
-  const { supabase } = await requireUser();
+  const { supabase, user } = await requireUser();
   const friends = await getFriendList(supabase);
   const avatarUrls = await signPhotoPaths(
     supabase,
@@ -32,7 +32,7 @@ export default async function NewSnsGroupPage() {
             </p>
           </div>
         ) : (
-          <GroupForm friends={friends} avatarUrls={Object.fromEntries(avatarUrls)} />
+          <GroupForm userId={user.id} friends={friends} avatarUrls={Object.fromEntries(avatarUrls)} />
         )}
       </PageBody>
     </>

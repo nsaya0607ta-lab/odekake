@@ -16,7 +16,7 @@ import { SnsGroupSwitcher } from "@/components/sns/sns-group-switcher";
 import { SnsPhotoGrid } from "@/components/sns/sns-photo-grid";
 import { SnsViewTabs } from "@/components/sns/sns-view-tabs";
 import { signThumbOrOriginalPaths } from "@/lib/data/photos";
-import { getFriendGroupMessages, getMyFriendGroups, getSnsGroupFeed } from "@/lib/data/sns";
+import { getFriendGroupMessages, getMyFriendGroups, getSnsGroupFeed, signGroupIconUrls } from "@/lib/data/sns";
 import { requireUser } from "@/lib/supabase/server";
 
 export const dynamic = "force-dynamic";
@@ -33,6 +33,7 @@ export default async function SnsGroupPage({
   const groups = await getMyFriendGroups(supabase);
   const group = groups.find((g) => g.id === groupId);
   if (!group) notFound();
+  const groupIconUrls = await signGroupIconUrls(supabase, groups);
 
   // 画面を開いたタイミングで既読にする
   await markFriendGroupReadAction(groupId);
@@ -58,7 +59,7 @@ export default async function SnsGroupPage({
       <PostedToast />
       <SnsBackgroundBand />
       <PageBody>
-        <SnsGroupSwitcher groups={groups} activeGroupId={groupId} />
+        <SnsGroupSwitcher groups={groups} activeGroupId={groupId} iconUrls={Object.fromEntries(groupIconUrls)} />
 
         {view === "photos" ? (
           <GroupPhotos groupId={groupId} baseHref={baseHref} />

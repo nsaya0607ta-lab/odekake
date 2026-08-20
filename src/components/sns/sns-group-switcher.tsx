@@ -14,7 +14,15 @@ const SETTLE_TRANSITION = "transform 180ms cubic-bezier(0.2, 0, 0, 1)";
 /** /sns/groups/[groupId] の上部に出す、グループアイコンの横スクロール切り替え。
  * 一番左が既定のグループ（区切り線で示す）。長押しでドラッグして並び替えできる。
  * ドラッグ中の本人は指に追従、他のアイコンは FLIP でなめらかに位置を譲る */
-export function SnsGroupSwitcher({ groups, activeGroupId }: { groups: FriendGroupRow[]; activeGroupId?: string }) {
+export function SnsGroupSwitcher({
+  groups,
+  activeGroupId,
+  iconUrls = {},
+}: {
+  groups: FriendGroupRow[];
+  activeGroupId?: string;
+  iconUrls?: Record<string, string>;
+}) {
   const router = useRouter();
   const [order, setOrder] = useState(groups);
   const [draggingId, setDraggingId] = useState<string | null>(null);
@@ -177,6 +185,7 @@ export function SnsGroupSwitcher({ groups, activeGroupId }: { groups: FriendGrou
           >
             <GroupIcon
               icon={group.icon}
+              iconUrl={group.icon_path ? iconUrls[group.icon_path] : undefined}
               label={group.name}
               active={activeGroupId === group.id}
               unread={group.has_unread}
@@ -197,12 +206,14 @@ export function SnsGroupSwitcher({ groups, activeGroupId }: { groups: FriendGrou
 
 function GroupIcon({
   icon,
+  iconUrl,
   label,
   active,
   unread,
   dragging,
 }: {
   icon: string;
+  iconUrl?: string;
   label: string;
   active: boolean;
   unread?: boolean;
@@ -212,11 +223,16 @@ function GroupIcon({
     <div className={`flex select-none flex-col items-center gap-1 transition-transform ${dragging ? "scale-105" : ""}`}>
       <span className="relative">
         <span
-          className={`tap-target flex h-14 w-14 items-center justify-center rounded-full border-2 text-2xl transition-colors ${
+          className={`tap-target flex h-14 w-14 items-center justify-center overflow-hidden rounded-full border-2 text-2xl transition-colors ${
             active ? "border-leaf bg-leaf-soft" : "border-line bg-card"
           } ${dragging ? "shadow-md" : ""}`}
         >
-          {icon}
+          {iconUrl ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img src={iconUrl} alt="" className="h-full w-full object-cover" />
+          ) : (
+            icon
+          )}
         </span>
         {unread ? (
           <span className="absolute top-0 right-0 h-3 w-3 rounded-full bg-[#4a90d9] ring-2 ring-paper" />
