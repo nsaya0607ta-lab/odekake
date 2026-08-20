@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { IconUser } from "@/components/icons";
+import { IconChat, IconUser } from "@/components/icons";
 import { formatRelativeTimeJa } from "@/lib/date";
 import type { SnsTextPostRow } from "@/lib/supabase/types";
 import { PostOptionsMenu } from "@/components/sns/post-options-menu";
@@ -54,7 +54,17 @@ export function SnsTextFeed({
                   </span>
                 ) : null}
               </div>
-              <p className="mt-0.5 whitespace-pre-wrap break-words text-[15px] leading-normal">{post.body}</p>
+              <Link href={`/sns/posts/${post.id}`} className="mt-0.5 block">
+                <p className="whitespace-pre-wrap break-words text-[15px] leading-normal">{post.body}</p>
+              </Link>
+              <Link
+                href={`/sns/posts/${post.id}`}
+                aria-label="返信する"
+                className="mt-2.5 flex w-fit items-center gap-1.5 rounded-full px-1.5 py-1 text-ink-faint active:bg-paper-deep"
+              >
+                <IconChat size={16} />
+                {post.reply_count > 0 ? <span className="text-xs">{post.reply_count}</span> : null}
+              </Link>
             </div>
           </li>
         );

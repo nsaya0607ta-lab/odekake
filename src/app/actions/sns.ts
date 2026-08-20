@@ -96,13 +96,50 @@ export async function createFriendTextPostAction(_prev: ActionState, formData: F
 
 export async function deleteFriendTextPostAction(formData: FormData): Promise<void> {
   const parsed = uuidSchema.safeParse(String(formData.get("postId") ?? ""));
-  if (!parsed.success) return;
+  if (!parsed.success) redirect("/sns/home");
 
   const { supabase, user } = await requireUser();
   await supabase.rpc("delete_friend_text_post", { p_post_id: parsed.data });
 
   revalidatePath("/sns/home");
   revalidatePath(`/sns/users/${user.id}`);
+  redirect("/sns/home");
+}
+
+export async function addFriendTextPostReplyAction(_prev: ActionState, formData: FormData): Promise<ActionState> {
+  const postId = String(formData.get("postId") ?? "");
+  const parsedPostId = uuidSchema.safeParse(postId);
+  const body = String(formData.get("body") ?? "").trim();
+
+  if (!parsedPostId.success) return { error: "この投稿は見つかりませんでした。" };
+  if (body === "") return { error: "返信を入力してください。", values: { body: "" } };
+  if (body.length > 1000) return { error: "1000文字以内で入力してください。", values: { body } };
+
+  const { supabase } = await requireUser();
+  const { error } = await supabase.rpc("add_friend_text_post_reply", {
+    p_post_id: parsedPostId.data,
+    p_body: body,
+  });
+  if (error) {
+    return { error: toJapaneseError(error, "返信の投稿に失敗しました。"), values: { body } };
+  }
+
+  revalidatePath(`/sns/posts/${parsedPostId.data}`);
+  return { ok: true };
+}
+
+export async function deleteFriendTextPostReplyAction(formData: FormData): Promise<void> {
+  const replyId = String(formData.get("replyId") ?? "");
+  const postId = String(formData.get("postId") ?? "");
+  const parsedReplyId = uuidSchema.safeParse(replyId);
+  const parsedPostId = uuidSchema.safeParse(postId);
+  if (!parsedReplyId.success || !parsedPostId.success) redirect("/sns/home");
+
+  const { supabase } = await requireUser();
+  await supabase.rpc("delete_friend_text_post_reply", { p_reply_id: parsedReplyId.data });
+
+  revalidatePath(`/sns/posts/${parsedPostId.data}`);
+  redirect(`/sns/posts/${parsedPostId.data}`);
 }
 
 export async function deleteFriendPhotoAction(formData: FormData): Promise<void> {

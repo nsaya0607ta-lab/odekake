@@ -374,6 +374,17 @@ export type SnsTextPostRow = {
   profile_image_url: string | null;
   body: string;
   created_at: string;
+  reply_count: number;
+};
+
+export type SnsTextPostReplyRow = {
+  id: string;
+  post_id: string;
+  user_id: string;
+  display_name: string;
+  profile_image_url: string | null;
+  body: string;
+  created_at: string;
 };
 
 export type FriendGroupRow = {
@@ -641,6 +652,13 @@ export type Database = {
         Args: { p_user_id?: string | null; p_limit?: number };
         Returns: SnsTextPostRow[];
       };
+      get_personal_text_post: { Args: { p_post_id: string }; Returns: SnsTextPostRow[] };
+      add_friend_text_post_reply: {
+        Args: { p_post_id: string; p_body: string };
+        Returns: { id: string; created_at: string }[];
+      };
+      delete_friend_text_post_reply: { Args: { p_reply_id: string }; Returns: undefined };
+      get_friend_text_post_replies: { Args: { p_post_id: string }; Returns: SnsTextPostReplyRow[] };
       get_sns_photo: { Args: { p_photo_id: string }; Returns: SnsPhotoRow[] };
       set_friend_photo_reaction: { Args: { p_photo_id: string; p_emoji: string | null }; Returns: undefined };
       add_friend_photo_comment: { Args: { p_photo_id: string; p_body: string }; Returns: SnsCommentRow[] };
