@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { reorderFriendGroupsAction } from "@/app/actions/sns";
 import { IconPlus, IconUser } from "@/components/icons";
@@ -37,7 +37,8 @@ export function SnsGroupSwitcher({
   personalLabel: string;
 }) {
   const router = useRouter();
-  const [mode, setMode] = useState<"user" | "group">("group");
+  const searchParams = useSearchParams();
+  const mode = searchParams.get("mode") === "user" ? "user" : "group";
   const [order, setOrder] = useState(groups);
   const [draggingId, setDraggingId] = useState<string | null>(null);
   const itemRefs = useRef(new Map<string, HTMLDivElement>());
@@ -188,128 +189,80 @@ export function SnsGroupSwitcher({
   }
 
   return (
-    <div className="-mx-4 -mt-5 bg-paper-deep/50">
-      <div className="flex shrink-0 items-center gap-1.5 px-4 py-2">
-        <ModeToggleIcon
-          label="ユーザー"
-          active={mode === "user"}
-          onClick={() => setMode("user")}
-          src="/icons/sns/user-toggle.png"
-        />
-        <ModeToggleIcon
-          label="グループ"
-          active={mode === "group"}
-          onClick={() => setMode("group")}
-          src="/icons/sns/group-toggle.png"
-        />
-      </div>
+    <div className="-mx-4 -mt-5 flex items-center gap-3 overflow-x-auto bg-white px-4 py-1.5" style={{ scrollbarWidth: "none" }}>
+      <Link href={personalHref} className="flex shrink-0 flex-col items-center gap-1">
+        <span
+          className={`tap-target flex h-14 w-14 items-center justify-center overflow-hidden rounded-full border-2 text-2xl transition-colors ${
+            personalActive ? "border-leaf bg-leaf-soft" : "border-line bg-card"
+          }`}
+        >
+          {personalIconUrl ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img src={personalIconUrl} alt="" className="h-full w-full object-cover" />
+          ) : (
+            "👤"
+          )}
+        </span>
+        <span
+          className={`max-w-[3.5rem] truncate text-[10px] font-semibold ${personalActive ? "text-leaf-deep" : "text-ink-soft"}`}
+        >
+          {personalLabel}
+        </span>
+      </Link>
 
-      <div
-        className="flex items-center gap-3 overflow-x-auto border-t border-line bg-white px-4 py-1.5"
-        style={{ scrollbarWidth: "none" }}
-      >
-        <Link href={personalHref} className="flex shrink-0 flex-col items-center gap-1">
-          <span
-            className={`tap-target flex h-14 w-14 items-center justify-center overflow-hidden rounded-full border-2 text-2xl transition-colors ${
-              personalActive ? "border-leaf bg-leaf-soft" : "border-line bg-card"
-            }`}
-          >
-            {personalIconUrl ? (
-              // eslint-disable-next-line @next/next/no-img-element
-              <img src={personalIconUrl} alt="" className="h-full w-full object-cover" />
-            ) : (
-              "👤"
-            )}
-          </span>
-          <span
-            className={`max-w-[3.5rem] truncate text-[10px] font-semibold ${personalActive ? "text-leaf-deep" : "text-ink-soft"}`}
-          >
-            {personalLabel}
-          </span>
-        </Link>
-
-        {mode === "user" ? (
-          <>
-            {friends.length > 0 ? <span aria-hidden className="h-10 w-px shrink-0 bg-line-strong" /> : null}
-            {friends.map((friend) => (
-              <div key={friend.id} className="flex shrink-0 flex-col items-center gap-1">
-                <span className="tap-target flex h-14 w-14 items-center justify-center overflow-hidden rounded-full border-2 border-line bg-card text-2xl">
-                  {friend.iconUrl ? (
-                    // eslint-disable-next-line @next/next/no-img-element
-                    <img src={friend.iconUrl} alt="" className="h-full w-full object-cover" />
-                  ) : (
-                    <IconUser size={22} className="text-ink-faint" />
-                  )}
-                </span>
-                <span className="max-w-[3.5rem] truncate text-[10px] font-semibold text-ink-soft">{friend.label}</span>
-              </div>
-            ))}
-          </>
-        ) : (
-          <>
-            {groups.length > 0 ? <span aria-hidden className="h-10 w-px shrink-0 bg-line-strong" /> : null}
-            {order.map((group) => (
-              <div key={group.id} className="flex shrink-0 items-center gap-3">
-                <div
-                  ref={(el) => {
-                    if (el) itemRefs.current.set(group.id, el);
-                    else itemRefs.current.delete(group.id);
-                  }}
-                  style={{ touchAction: "pan-x" }}
-                  onPointerDown={(e) => handlePointerDown(e, group.id)}
-                  onPointerMove={(e) => handlePointerMove(e, group.id)}
-                  onPointerUp={() => handlePointerUp(group.id)}
-                  onPointerCancel={() => handlePointerUp(group.id)}
-                >
-                  <GroupIcon
-                    icon={group.icon}
-                    iconUrl={group.icon_path ? iconUrls[group.icon_path] : undefined}
-                    label={group.name}
-                    active={activeGroupId === group.id}
-                    unread={group.has_unread}
-                    dragging={draggingId === group.id}
-                  />
-                </div>
-              </div>
-            ))}
-            <Link href="/sns/groups/new" aria-label="グループを作る" className="flex shrink-0 flex-col items-center gap-1">
-              <span className="tap-target flex h-14 w-14 items-center justify-center rounded-full border-2 border-dashed border-line text-ink-faint active:bg-paper-deep">
-                <IconPlus size={20} />
+      {mode === "user" ? (
+        <>
+          {friends.length > 0 ? <span aria-hidden className="h-10 w-px shrink-0 bg-line-strong" /> : null}
+          {friends.map((friend) => (
+            <div key={friend.id} className="flex shrink-0 flex-col items-center gap-1">
+              <span className="tap-target flex h-14 w-14 items-center justify-center overflow-hidden rounded-full border-2 border-line bg-card text-2xl">
+                {friend.iconUrl ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img src={friend.iconUrl} alt="" className="h-full w-full object-cover" />
+                ) : (
+                  <IconUser size={22} className="text-ink-faint" />
+                )}
               </span>
-              <span className="max-w-[3.5rem] truncate text-[10px] text-ink-faint">追加</span>
-            </Link>
-          </>
-        )}
-      </div>
+              <span className="max-w-[3.5rem] truncate text-[10px] font-semibold text-ink-soft">{friend.label}</span>
+            </div>
+          ))}
+        </>
+      ) : (
+        <>
+          {groups.length > 0 ? <span aria-hidden className="h-10 w-px shrink-0 bg-line-strong" /> : null}
+          {order.map((group) => (
+            <div key={group.id} className="flex shrink-0 items-center gap-3">
+              <div
+                ref={(el) => {
+                  if (el) itemRefs.current.set(group.id, el);
+                  else itemRefs.current.delete(group.id);
+                }}
+                style={{ touchAction: "pan-x" }}
+                onPointerDown={(e) => handlePointerDown(e, group.id)}
+                onPointerMove={(e) => handlePointerMove(e, group.id)}
+                onPointerUp={() => handlePointerUp(group.id)}
+                onPointerCancel={() => handlePointerUp(group.id)}
+              >
+                <GroupIcon
+                  icon={group.icon}
+                  iconUrl={group.icon_path ? iconUrls[group.icon_path] : undefined}
+                  label={group.name}
+                  active={activeGroupId === group.id}
+                  unread={group.has_unread}
+                  dragging={draggingId === group.id}
+                />
+              </div>
+            </div>
+          ))}
+          <Link href="/sns/groups/new" aria-label="グループを作る" className="flex shrink-0 flex-col items-center gap-1">
+            <span className="tap-target flex h-14 w-14 items-center justify-center rounded-full border-2 border-dashed border-line text-ink-faint active:bg-paper-deep">
+              <IconPlus size={20} />
+            </span>
+            <span className="max-w-[3.5rem] truncate text-[10px] text-ink-faint">追加</span>
+          </Link>
+        </>
+      )}
     </div>
-  );
-}
-
-function ModeToggleIcon({
-  label,
-  active,
-  onClick,
-  src,
-}: {
-  label: string;
-  active: boolean;
-  onClick: () => void;
-  src: string;
-}) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      aria-label={label}
-      aria-pressed={active}
-      className={`tap-target flex h-9 items-center gap-1.5 rounded-full border px-3 text-[12px] font-semibold transition-colors ${
-        active ? "border-leaf bg-leaf-soft text-leaf-deep" : "border-line bg-card text-ink-faint"
-      }`}
-    >
-      {/* eslint-disable-next-line @next/next/no-img-element */}
-      <img src={src} alt="" className="h-5 w-5 object-contain" />
-      {label}
-    </button>
   );
 }
 

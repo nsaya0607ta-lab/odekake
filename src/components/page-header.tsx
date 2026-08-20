@@ -13,9 +13,11 @@ type Props = {
   showBack?: boolean;
   subtitle?: string;
   action?: ReactNode;
+  /** showBack が false のとき、戻るボタンの位置に代わりに出す左端のアクション */
+  leftAction?: ReactNode;
 };
 
-export function PageHeader({ title, backHref, showBack = true, subtitle, action }: Props) {
+export function PageHeader({ title, backHref, showBack = true, subtitle, action, leftAction }: Props) {
   const router = useRouter();
 
   const backButtonClass =
@@ -25,7 +27,7 @@ export function PageHeader({ title, backHref, showBack = true, subtitle, action 
     <header className="sticky top-0 z-30 border-b border-line bg-paper/92 backdrop-blur-sm">
       <div className="mx-auto flex max-w-lg items-center gap-1 px-2 py-2">
         {!showBack ? (
-          <span aria-hidden className="h-11 w-11 shrink-0" />
+          leftAction ?? <span aria-hidden className="h-11 w-11 shrink-0" />
         ) : backHref ? (
           <Link href={backHref} aria-label="戻る" className={backButtonClass}>
             <IconChevronLeft />
