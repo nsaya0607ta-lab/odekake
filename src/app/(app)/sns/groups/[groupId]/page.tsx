@@ -15,8 +15,10 @@ import { SnsBackgroundBand } from "@/components/sns/sns-background-band";
 import { SnsChatForm } from "@/components/sns/sns-chat-form";
 import { SnsChatList } from "@/components/sns/sns-chat-list";
 import { SnsGroupSwitcher } from "@/components/sns/sns-group-switcher";
+import type { SnsPersonRow } from "@/components/sns/sns-people-toggle-bar";
 import { SnsPhotoGrid } from "@/components/sns/sns-photo-grid";
 import { SnsViewTabs } from "@/components/sns/sns-view-tabs";
+import { getFriendList } from "@/lib/data/friends";
 import { signThumbOrOriginalPaths } from "@/lib/data/photos";
 import { getFriendGroupMessages, getMyFriendGroups, getOwnSnsProfile, getSnsGroupFeed, signGroupIconUrls } from "@/lib/data/sns";
 import { requireUser } from "@/lib/supabase/server";
@@ -118,14 +120,25 @@ async function GroupSwitcherSection({
   userId: string;
 }) {
   const { supabase } = await requireUser();
-  const [groupIconUrls, ownProfile] = await Promise.all([
+  const [groupIconUrls, ownProfile, friends] = await Promise.all([
     signGroupIconUrls(supabase, groups),
     getOwnSnsProfile(supabase, userId),
+    getFriendList(supabase),
   ]);
+  const friendAvatarUrls = await signThumbOrOriginalPaths(
+    supabase,
+    friends.flatMap((f) => (f.profile_image_url ? [f.profile_image_url] : [])),
+  );
+  const friendRows: SnsPersonRow[] = friends.map((friend) => ({
+    id: friend.friend_user_id,
+    label: friend.display_name,
+    iconUrl: friend.profile_image_url ? friendAvatarUrls.get(friend.profile_image_url) : undefined,
+  }));
 
   return (
     <SnsGroupSwitcher
       groups={groups}
+      friends={friendRows}
       activeGroupId={groupId}
       iconUrls={Object.fromEntries(groupIconUrls)}
       personalIconUrl={ownProfile.iconUrl}

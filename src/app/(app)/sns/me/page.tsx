@@ -40,6 +40,7 @@ export default async function SnsPersonalPage() {
       <PageBody>
         <SnsGroupSwitcher
           groups={groups}
+          friends={friendRows}
           iconUrls={Object.fromEntries(groupIconUrls)}
           personalActive
           personalIconUrl={ownProfile.iconUrl}
