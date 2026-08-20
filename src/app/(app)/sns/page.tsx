@@ -48,7 +48,7 @@ function PreparingCard() {
         Supabaseで SNS 機能のSQLを実行すると利用できます。
       </p>
       <p className="mt-3 rounded-2xl bg-paper-deep px-3 py-2 text-xs font-semibold text-ink-soft">
-        supabase/migrations/0044〜0052
+        supabase/migrations/0044〜0053
       </p>
     </div>
   );

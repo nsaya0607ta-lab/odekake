@@ -4,6 +4,7 @@ import { deleteFriendTextPostReplyAction } from "@/app/actions/sns";
 import { IconClose, IconUser } from "@/components/icons";
 import { PageBody } from "@/components/page-body";
 import { PageHeader } from "@/components/page-header";
+import { LikeButton } from "@/components/sns/like-button";
 import { PostOptionsMenu } from "@/components/sns/post-options-menu";
 import { signThumbOrOriginalPaths } from "@/lib/data/photos";
 import { getFriendTextPostReplies, getPersonalTextPost } from "@/lib/data/sns";
@@ -68,6 +69,9 @@ export default async function SnsTextPostPage({ params }: { params: Promise<{ po
             </div>
           </div>
           <p className="mt-3 whitespace-pre-wrap break-words text-[15px] leading-normal">{post.body}</p>
+          <div className="mt-2.5">
+            <LikeButton postId={post.id} authorUserId={post.user_id} liked={post.my_liked} count={post.like_count} />
+          </div>
         </div>
 
         <section className="space-y-3">

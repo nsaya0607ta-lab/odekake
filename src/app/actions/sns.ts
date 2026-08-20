@@ -106,6 +106,21 @@ export async function deleteFriendTextPostAction(formData: FormData): Promise<vo
   redirect("/sns/home");
 }
 
+export async function setFriendTextPostLikeAction(formData: FormData): Promise<void> {
+  const postId = String(formData.get("postId") ?? "");
+  const authorUserId = String(formData.get("authorUserId") ?? "");
+  const parsedPostId = uuidSchema.safeParse(postId);
+  if (!parsedPostId.success) return;
+
+  const liked = String(formData.get("liked") ?? "") === "1";
+  const { supabase } = await requireUser();
+  await supabase.rpc("set_friend_text_post_like", { p_post_id: parsedPostId.data, p_liked: liked });
+
+  revalidatePath("/sns/home");
+  revalidatePath(`/sns/posts/${parsedPostId.data}`);
+  if (uuidSchema.safeParse(authorUserId).success) revalidatePath(`/sns/users/${authorUserId}`);
+}
+
 export async function addFriendTextPostReplyAction(_prev: ActionState, formData: FormData): Promise<ActionState> {
   const postId = String(formData.get("postId") ?? "");
   const parsedPostId = uuidSchema.safeParse(postId);

@@ -375,6 +375,8 @@ export type SnsTextPostRow = {
   body: string;
   created_at: string;
   reply_count: number;
+  like_count: number;
+  my_liked: boolean;
 };
 
 export type SnsTextPostReplyRow = {
@@ -653,6 +655,7 @@ export type Database = {
         Returns: SnsTextPostRow[];
       };
       get_personal_text_post: { Args: { p_post_id: string }; Returns: SnsTextPostRow[] };
+      set_friend_text_post_like: { Args: { p_post_id: string; p_liked: boolean }; Returns: undefined };
       add_friend_text_post_reply: {
         Args: { p_post_id: string; p_body: string };
         Returns: { id: string; created_at: string }[];

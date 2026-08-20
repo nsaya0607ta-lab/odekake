@@ -2,6 +2,7 @@ import Link from "next/link";
 import { IconChat, IconUser } from "@/components/icons";
 import { formatRelativeTimeJa } from "@/lib/date";
 import type { SnsTextPostRow } from "@/lib/supabase/types";
+import { LikeButton } from "@/components/sns/like-button";
 import { PostOptionsMenu } from "@/components/sns/post-options-menu";
 
 /** Twitterのタイムラインのような、テキストだけの個人投稿一覧 */
@@ -57,14 +58,17 @@ export function SnsTextFeed({
               <Link href={`/sns/posts/${post.id}`} className="mt-0.5 block">
                 <p className="whitespace-pre-wrap break-words text-[15px] leading-normal">{post.body}</p>
               </Link>
-              <Link
-                href={`/sns/posts/${post.id}`}
-                aria-label="返信する"
-                className="mt-2.5 flex w-fit items-center gap-1.5 rounded-full px-1.5 py-1 text-ink-faint active:bg-paper-deep"
-              >
-                <IconChat size={16} />
-                {post.reply_count > 0 ? <span className="text-xs">{post.reply_count}</span> : null}
-              </Link>
+              <div className="mt-2.5 flex items-center gap-4">
+                <Link
+                  href={`/sns/posts/${post.id}`}
+                  aria-label="返信する"
+                  className="flex items-center gap-1.5 rounded-full px-1.5 py-1 text-ink-faint active:bg-paper-deep"
+                >
+                  <IconChat size={16} />
+                  {post.reply_count > 0 ? <span className="text-xs">{post.reply_count}</span> : null}
+                </Link>
+                <LikeButton postId={post.id} authorUserId={post.user_id} liked={post.my_liked} count={post.like_count} />
+              </div>
             </div>
           </li>
         );
