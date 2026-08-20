@@ -1,3 +1,4 @@
+import { unstable_cache } from "next/cache";
 import type { DB } from "./client";
 import { signThumbOrOriginalPaths } from "./photos";
 import type {
@@ -34,13 +35,29 @@ export async function getSnsPhoto(supabase: DB, photoId: string): Promise<SnsPho
   return data?.[0] ?? null;
 }
 
-export async function getMyFriendGroups(supabase: DB): Promise<FriendGroupRow[]> {
+async function fetchMyFriendGroups(supabase: DB): Promise<FriendGroupRow[]> {
   const { data, error } = await supabase.rpc("get_my_friend_groups");
   if (error) {
     console.error("Friend groups are unavailable", { code: error.code, message: error.message });
     throw new Error("グループの取得に失敗しました");
   }
   return data ?? [];
+}
+
+export function friendGroupsCacheTag(userId: string): string {
+  return `friend-groups:${userId}`;
+}
+
+/**
+ * 参加グループの一覧はグループの作成・脱退・並び替えなど以外ではほぼ変わらないため、
+ * ユーザーごとにキャッシュしてグループ切り替えのたびの再取得を避ける。
+ * 一覧を変更するアクション側で friendGroupsCacheTag(userId) を revalidateTag する
+ */
+export async function getMyFriendGroups(supabase: DB, userId: string): Promise<FriendGroupRow[]> {
+  const cached = unstable_cache(() => fetchMyFriendGroups(supabase), ["my-friend-groups", userId], {
+    tags: [friendGroupsCacheTag(userId)],
+  });
+  return cached();
 }
 
 /** グループアイコン画像の署名付きURLをまとめて取得する */

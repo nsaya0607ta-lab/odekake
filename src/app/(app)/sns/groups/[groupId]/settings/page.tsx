@@ -23,7 +23,7 @@ export default async function SnsGroupSettingsPage({
 }) {
   const [{ groupId }, sp, { supabase, user }] = await Promise.all([params, searchParams, requireUser()]);
 
-  const groups = await getMyFriendGroups(supabase);
+  const groups = await getMyFriendGroups(supabase, user.id);
   const group = groups.find((g) => g.id === groupId);
   if (!group) notFound();
 
