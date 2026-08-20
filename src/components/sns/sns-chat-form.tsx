@@ -1,45 +1,99 @@
 "use client";
 
-import { useActionState, useEffect, useRef } from "react";
+import { useActionState, useEffect, useRef, useState } from "react";
+import Link from "next/link";
 import type { ActionState } from "@/components/form";
 import { emptyActionState, FormMessage, SubmitButton } from "@/components/form";
+import { IconImage, IconSend } from "@/components/icons";
 
 type ChatAction = (prev: ActionState, formData: FormData) => Promise<ActionState>;
 
-/** 全体チャット・グループチャットで共通のTwitterのような投稿フォーム */
+/** 全体チャット・グループチャットで共通の、LINEのようなメッセージ入力欄 */
 export function SnsChatForm({
   action,
   hiddenFields,
-  placeholder = "今なにしてる？",
+  postHref,
+  placeholder = "メッセージを入力…",
 }: {
   action: ChatAction;
   hiddenFields?: Record<string, string>;
+  postHref?: string;
   placeholder?: string;
 }) {
   const [state, formAction] = useActionState(action, emptyActionState);
   const formRef = useRef<HTMLFormElement>(null);
+  const [keyboardOpen, setKeyboardOpen] = useState(false);
+  const openTimer = useRef<number | null>(null);
 
   useEffect(() => {
     if (state.ok) formRef.current?.reset();
   }, [state.ok]);
 
+  // キーボードが出ている間は下ナビを隠す（bottom-nav.tsx 側のCSSと対）
+  useEffect(() => {
+    document.body.classList.toggle("sns-chat-input-focused", keyboardOpen);
+    return () => document.body.classList.remove("sns-chat-input-focused");
+  }, [keyboardOpen]);
+
+  function handleFocus() {
+    // フォーカスと同じフレームで位置を動かすと、iOSでネイティブのキャレット表示が
+    // ずれることがあるので、キーボードのアニメーションが始まってから少し遅らせる
+    if (openTimer.current) window.clearTimeout(openTimer.current);
+    openTimer.current = window.setTimeout(() => setKeyboardOpen(true), 120);
+  }
+
+  function handleBlur() {
+    if (openTimer.current) window.clearTimeout(openTimer.current);
+    setKeyboardOpen(false);
+  }
+
   return (
-    <form ref={formRef} action={formAction} className="space-y-2 px-1">
-      {hiddenFields
-        ? Object.entries(hiddenFields).map(([name, value]) => <input key={name} type="hidden" name={name} value={value} />)
-        : null}
-      <textarea
-        name="body"
-        rows={2}
-        maxLength={1000}
-        placeholder={placeholder}
-        defaultValue={state.values?.body ?? ""}
-        className="field"
-      />
-      <FormMessage state={state} />
-      <SubmitButton className="btn btn-primary w-full text-sm" pendingLabel="送信中…">
-        投稿する
-      </SubmitButton>
-    </form>
+    <div
+      className="fixed inset-x-0 z-20 border-t border-line bg-paper/95 backdrop-blur-sm"
+      style={{
+        bottom: keyboardOpen
+          ? "env(safe-area-inset-bottom, 0px)"
+          : "calc(var(--nav-height) + var(--safe-bottom) + 0.5rem)",
+      }}
+    >
+      <div className="mx-auto max-w-lg px-4 pt-2 pb-2">
+        <form ref={formRef} action={formAction} className="flex items-center gap-2">
+          {hiddenFields
+            ? Object.entries(hiddenFields).map(([name, value]) => (
+                <input key={name} type="hidden" name={name} value={value} />
+              ))
+            : null}
+          {postHref ? (
+            <Link
+              href={postHref}
+              aria-label="写真を投稿"
+              className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full text-ink-faint active:bg-paper-deep"
+            >
+              <IconImage size={20} />
+            </Link>
+          ) : null}
+          <div className="flex min-w-0 flex-1 items-center rounded-full border border-line bg-card px-4 py-2">
+            <textarea
+              name="body"
+              rows={1}
+              maxLength={1000}
+              placeholder={placeholder}
+              defaultValue={state.values?.body ?? ""}
+              onFocus={handleFocus}
+              onBlur={handleBlur}
+              className="max-h-24 min-w-0 flex-1 resize-none bg-transparent text-base leading-relaxed outline-none placeholder:text-ink-faint"
+              style={{ fontSize: "16px" }}
+            />
+          </div>
+          <SubmitButton
+            className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-leaf text-white transition-opacity active:opacity-80 disabled:opacity-50"
+            pendingLabel=""
+          >
+            <IconSend size={18} />
+          </SubmitButton>
+        </form>
+        <FormMessage state={state} />
+      </div>
+    </div>
   );
 }

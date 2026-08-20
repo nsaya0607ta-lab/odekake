@@ -5,10 +5,12 @@ import { redirect } from "next/navigation";
 import { z } from "zod";
 import type { ActionState } from "@/components/form";
 import { toJapaneseError } from "@/lib/errors";
+import { toThumbPath } from "@/lib/image";
 import { finalizePhotoPaths } from "@/lib/photos";
 import { requireUser } from "@/lib/supabase/server";
 import { PHOTO_BUCKET } from "@/lib/data/client";
 import { getSnsPhoto } from "@/lib/data/sns";
+import { GROUP_ICON_CHOICES } from "@/lib/sns-group-icons";
 
 const uuidSchema = z.string().uuid();
 const optionalUuidSchema = z.string().uuid().optional().or(z.literal(""));
@@ -91,7 +93,7 @@ export async function deleteFriendPhotoAction(formData: FormData): Promise<void>
     redirect(`/sns/${parsed.data}?error=delete`);
   }
   if (storagePath) {
-    await supabase.storage.from(PHOTO_BUCKET).remove([storagePath]);
+    await supabase.storage.from(PHOTO_BUCKET).remove([storagePath, toThumbPath(storagePath)]);
   }
 
   revalidatePath("/sns");
@@ -152,41 +154,14 @@ export async function deleteFriendPhotoCommentAction(formData: FormData): Promis
 }
 
 // -------------------------------------------------------------
-// 全体チャット
-// -------------------------------------------------------------
-
-export async function createFriendMessageAction(_prev: ActionState, formData: FormData): Promise<ActionState> {
-  const body = String(formData.get("body") ?? "").trim();
-  if (body === "") return { error: "メッセージを入力してください。", values: { body: "" } };
-
-  const { supabase } = await requireUser();
-  const { error } = await supabase.rpc("create_friend_message", { p_body: body });
-  if (error) {
-    return { error: toJapaneseError(error, "メッセージの投稿に失敗しました。"), values: { body } };
-  }
-
-  revalidatePath("/sns");
-  return { ok: true };
-}
-
-export async function deleteFriendMessageAction(formData: FormData): Promise<void> {
-  const parsed = uuidSchema.safeParse(String(formData.get("messageId") ?? ""));
-  if (!parsed.success) redirect("/sns");
-
-  const { supabase } = await requireUser();
-  await supabase.rpc("delete_friend_message", { p_message_id: parsed.data });
-
-  revalidatePath("/sns");
-  redirect("/sns?view=chat");
-}
-
-// -------------------------------------------------------------
 // グループ
 // -------------------------------------------------------------
 
 export async function createFriendGroupAction(_prev: ActionState, formData: FormData): Promise<ActionState> {
   const name = String(formData.get("name") ?? "").trim().slice(0, MAX_GROUP_NAME_LENGTH);
   const memberUserIds = parseMemberIds(formData);
+  const rawIcon = String(formData.get("icon") ?? "");
+  const icon = GROUP_ICON_CHOICES.includes(rawIcon) ? rawIcon : GROUP_ICON_CHOICES[0];
 
   if (name === "") {
     return { error: "グループ名を入力してください。", values: { name } };
@@ -196,6 +171,7 @@ export async function createFriendGroupAction(_prev: ActionState, formData: Form
   const { data: groupId, error } = await supabase.rpc("create_friend_group", {
     p_name: name,
     p_member_user_ids: memberUserIds,
+    p_icon: icon,
   });
   if (error || !groupId) {
     return { error: toJapaneseError(error, "グループを作成できませんでした。"), values: { name } };
@@ -203,6 +179,16 @@ export async function createFriendGroupAction(_prev: ActionState, formData: Form
 
   revalidatePath("/sns");
   redirect(`/sns/groups/${groupId}`);
+}
+
+/** グループアイコンの長押しドラッグ並び替え用。フォームを介さず直接呼び出す */
+export async function reorderFriendGroupsAction(groupIds: string[]): Promise<void> {
+  const parsed = groupIds.filter((id) => uuidSchema.safeParse(id).success);
+  if (parsed.length === 0) return;
+
+  const { supabase } = await requireUser();
+  await supabase.rpc("reorder_friend_groups", { p_group_ids: parsed });
+  revalidatePath("/sns");
 }
 
 export async function addFriendGroupMembersAction(_prev: ActionState, formData: FormData): Promise<ActionState> {

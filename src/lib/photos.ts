@@ -1,4 +1,5 @@
 import { PHOTO_BUCKET, type DB } from "@/lib/data/client";
+import { toThumbPath } from "@/lib/image";
 
 /**
  * 写真の保存先
@@ -74,6 +75,8 @@ export async function finalizePhotoPaths(
 
     if (!error) {
       result.push(destination);
+      // サムネイルも一緒に移す。無ければ失敗するだけなので結果は見ない
+      void supabase.storage.from(PHOTO_BUCKET).move(toThumbPath(path), toThumbPath(destination));
       continue;
     }
 

@@ -1,9 +1,10 @@
 "use client";
 
-import { useActionState } from "react";
+import { useActionState, useState } from "react";
 import { createFriendGroupAction } from "@/app/actions/sns";
 import { emptyActionState, Field, FormMessage, SubmitButton } from "@/components/form";
 import { IconUser } from "@/components/icons";
+import { GROUP_ICON_CHOICES } from "@/lib/sns-group-icons";
 import type { FriendListRow } from "@/lib/supabase/types";
 
 export function GroupForm({
@@ -14,9 +15,32 @@ export function GroupForm({
   avatarUrls: Record<string, string>;
 }) {
   const [state, action] = useActionState(createFriendGroupAction, emptyActionState);
+  const [icon, setIcon] = useState(GROUP_ICON_CHOICES[0]);
 
   return (
     <form action={action} className="space-y-5">
+      <input type="hidden" name="icon" value={icon} />
+
+      <div>
+        <p className="field-label">アイコン</p>
+        <div className="mt-1 grid grid-cols-8 gap-2">
+          {GROUP_ICON_CHOICES.map((choice) => (
+            <button
+              key={choice}
+              type="button"
+              onClick={() => setIcon(choice)}
+              aria-label={`アイコン ${choice}`}
+              aria-pressed={icon === choice}
+              className={`flex aspect-square items-center justify-center rounded-full border text-lg transition-colors ${
+                icon === choice ? "border-leaf bg-leaf-soft" : "border-line-strong bg-card active:bg-paper-deep"
+              }`}
+            >
+              {choice}
+            </button>
+          ))}
+        </div>
+      </div>
+
       <Field label="グループ名" htmlFor="name" error={state.fieldErrors?.name}>
         <input
           id="name"

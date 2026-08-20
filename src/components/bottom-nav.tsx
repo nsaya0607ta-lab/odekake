@@ -53,7 +53,7 @@ export function BottomNav({ snsLocked = false }: { snsLocked?: boolean }) {
   return (
     <nav
       aria-label="メインナビゲーション"
-      className="fixed inset-x-0 bottom-0 z-40 border-t border-line bg-card/95 backdrop-blur-sm"
+      className="app-bottom-nav fixed inset-x-0 bottom-0 z-40 border-t border-line bg-card/95 backdrop-blur-sm"
       style={{ paddingBottom: "var(--safe-bottom)" }}
     >
       <ul className="mx-auto flex max-w-lg items-stretch justify-between px-2">

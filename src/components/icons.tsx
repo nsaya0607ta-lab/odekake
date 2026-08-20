@@ -253,6 +253,29 @@ export const IconQuestion = (p: IconProps) => (
   </Base>
 );
 
+export const IconImage = (p: IconProps) => (
+  <Base {...p}>
+    <rect x="3.5" y="4.5" width="17" height="15" rx="3" />
+    <circle cx="9" cy="9.8" r="1.6" />
+    <path d="m5.5 17 4.8-5.2a1.4 1.4 0 0 1 2.1.05L15 15.4l1.2-1.3a1.4 1.4 0 0 1 2.1 0l2.2 2.4" />
+  </Base>
+);
+
+export const IconSend = (p: IconProps) => (
+  <Base {...p}>
+    <path d="M4.5 12 19.5 4.5 15 19.5l-3.6-6.4L4.5 12Z" />
+    <path d="M11.4 13.1 19.5 4.5" />
+  </Base>
+);
+
+export const IconInfo = (p: IconProps) => (
+  <Base {...p}>
+    <circle cx="12" cy="12" r="8.5" />
+    <path d="M12 11v5.2" />
+    <path d="M12 7.8h.01" />
+  </Base>
+);
+
 export const IconClipboard = (p: IconProps) => (
   <Base {...p}>
     <rect x="5.5" y="4.5" width="13" height="15" rx="2.5" />

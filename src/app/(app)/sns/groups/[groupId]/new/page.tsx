@@ -1,7 +1,7 @@
 import { notFound } from "next/navigation";
-import { SnsPostForm } from "@/app/(app)/sns/new/sns-post-form";
 import { PageBody } from "@/components/page-body";
 import { PageHeader } from "@/components/page-header";
+import { SnsPostForm } from "@/components/sns/sns-post-form";
 import { getMyFriendGroups } from "@/lib/data/sns";
 import { requireUser } from "@/lib/supabase/server";
 

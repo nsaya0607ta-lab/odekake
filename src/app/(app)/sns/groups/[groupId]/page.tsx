@@ -5,15 +5,17 @@ import {
   deleteFriendGroupMessageAction,
   markFriendGroupReadAction,
 } from "@/app/actions/sns";
-import { IconCamera, IconSettings } from "@/components/icons";
+import { IconPlus, IconSettings } from "@/components/icons";
 import { PageBody } from "@/components/page-body";
 import { PageHeader } from "@/components/page-header";
+import { PostedToast } from "@/components/sns/posted-toast";
+import { SnsBackgroundBand } from "@/components/sns/sns-background-band";
 import { SnsChatForm } from "@/components/sns/sns-chat-form";
 import { SnsChatList } from "@/components/sns/sns-chat-list";
+import { SnsGroupSwitcher } from "@/components/sns/sns-group-switcher";
 import { SnsPhotoGrid } from "@/components/sns/sns-photo-grid";
-import { SnsTabs } from "@/components/sns/sns-tabs";
 import { SnsViewTabs } from "@/components/sns/sns-view-tabs";
-import { signPhotoPaths } from "@/lib/data/photos";
+import { signThumbOrOriginalPaths } from "@/lib/data/photos";
 import { getFriendGroupMessages, getMyFriendGroups, getSnsGroupFeed } from "@/lib/data/sns";
 import { requireUser } from "@/lib/supabase/server";
 
@@ -24,7 +26,7 @@ export default async function SnsGroupPage({
   searchParams,
 }: {
   params: Promise<{ groupId: string }>;
-  searchParams: Promise<{ view?: string; posted?: string }>;
+  searchParams: Promise<{ view?: string }>;
 }) {
   const [{ groupId }, sp, { supabase, user }] = await Promise.all([params, searchParams, requireUser()]);
 
@@ -53,73 +55,74 @@ export default async function SnsGroupPage({
           </Link>
         }
       />
+      <PostedToast />
+      <SnsBackgroundBand />
       <PageBody>
-        <SnsTabs groups={groups} activeGroupId={groupId} />
-
-        {sp.posted === "1" ? (
-          <p role="status" className="rounded-2xl border border-leaf bg-leaf-soft px-4 py-3 text-sm text-leaf-deep">
-            写真を投稿しました
-          </p>
-        ) : null}
-
-        <SnsViewTabs baseHref={baseHref} view={view} />
+        <SnsGroupSwitcher groups={groups} activeGroupId={groupId} />
 
         {view === "photos" ? (
-          <GroupPhotos groupId={groupId} />
+          <GroupPhotos groupId={groupId} baseHref={baseHref} />
         ) : (
-          <GroupChat groupId={groupId} currentUserId={user.id} />
+          <>
+            <SnsViewTabs baseHref={baseHref} view={view} />
+            <GroupChat groupId={groupId} currentUserId={user.id} />
+          </>
         )}
       </PageBody>
+      {/* PageBody の fade-in アニメーションが transform を animate するせいで、
+          position:fixed の子が画面基準ではなくPageBody基準になってしまう。
+          さらに sticky はコンテンツが短いと画面下に届かないので、
+          FABとチャット入力欄はどちらもPageBodyの外に fixed で置く */}
+      {view === "photos" ? (
+        <Link
+          href={`${baseHref}/new`}
+          aria-label="写真を投稿"
+          className="fixed right-4 z-30 flex h-14 w-14 items-center justify-center rounded-full bg-leaf text-white shadow-lg active:opacity-80"
+          style={{ bottom: "calc(var(--nav-height) + var(--safe-bottom) + 1rem)" }}
+        >
+          <IconPlus size={24} />
+        </Link>
+      ) : (
+        <SnsChatForm
+          action={createFriendGroupMessageAction}
+          hiddenFields={{ groupId }}
+          postHref={`${baseHref}/new`}
+        />
+      )}
     </>
   );
 }
 
-async function GroupPhotos({ groupId }: { groupId: string }) {
+async function GroupPhotos({ groupId, baseHref }: { groupId: string; baseHref: string }) {
   const { supabase } = await requireUser();
   const photos = await getSnsGroupFeed(supabase, groupId);
-  const avatarUrls = await signPhotoPaths(
+  const avatarUrls = await signThumbOrOriginalPaths(
     supabase,
     photos.flatMap((p) => (p.profile_image_url ? [p.profile_image_url] : [])),
   );
-  const photoUrls = await signPhotoPaths(supabase, photos.map((p) => p.storage_path));
+  // グリッドはサムネイル表示なので、原寸ではなく縮小版の署名URLを使う
+  const photoUrls = await signThumbOrOriginalPaths(supabase, photos.map((p) => p.storage_path));
 
-  return (
-    <div className="space-y-6">
-      <Link href={`/sns/groups/${groupId}/new`} className="btn btn-primary w-full">
-        <IconCamera size={18} />
-        写真を投稿する
-      </Link>
-      {photos.length === 0 ? (
-        <p className="px-1 text-center text-xs text-ink-faint">まだ写真がありません。</p>
-      ) : (
-        <SnsPhotoGrid
-          photos={photos}
-          photoUrls={photoUrls}
-          avatarUrls={avatarUrls}
-          hrefFor={(photoId) => `/sns/${photoId}`}
-        />
-      )}
-    </div>
-  );
+  return <SnsPhotoGrid photos={photos} photoUrls={photoUrls} avatarUrls={avatarUrls} baseHref={baseHref} />;
 }
 
 async function GroupChat({ groupId, currentUserId }: { groupId: string; currentUserId: string }) {
   const { supabase } = await requireUser();
   const messages = await getFriendGroupMessages(supabase, groupId);
-  const avatarUrls = await signPhotoPaths(
+  const avatarUrls = await signThumbOrOriginalPaths(
     supabase,
     messages.flatMap((m) => (m.profile_image_url ? [m.profile_image_url] : [])),
   );
 
   return (
-    <div className="space-y-4">
-      <SnsChatForm action={createFriendGroupMessageAction} hiddenFields={{ groupId }} />
+    // 下は固定表示のチャット入力欄と重ならないよう余白を空けておく
+    <div style={{ paddingBottom: "calc(var(--nav-height) + var(--safe-bottom) + 4.5rem)" }}>
       <SnsChatList
         messages={messages}
         avatarUrls={avatarUrls}
         currentUserId={currentUserId}
         deleteAction={deleteFriendGroupMessageAction}
-        hiddenFieldsFor={(message) => ({ messageId: message.id, groupId })}
+        groupId={groupId}
       />
     </div>
   );
