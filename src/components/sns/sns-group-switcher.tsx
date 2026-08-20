@@ -160,7 +160,7 @@ export function SnsGroupSwitcher({ groups, activeGroupId }: { groups: FriendGrou
   }
 
   return (
-    <div className="-mx-4 flex items-center gap-3 overflow-x-auto bg-white px-4 py-1.5" style={{ scrollbarWidth: "none" }}>
+    <div className="-mx-4 -mt-5 flex items-center gap-3 overflow-x-auto bg-white px-4 py-1.5" style={{ scrollbarWidth: "none" }}>
       {order.map((group, index) => (
         <div key={group.id} className="flex shrink-0 items-center gap-3">
           {index === 1 ? <span aria-hidden className="h-10 w-px shrink-0 bg-line-strong" /> : null}
