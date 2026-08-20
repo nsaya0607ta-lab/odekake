@@ -168,6 +168,9 @@ export async function createFriendGroupAction(_prev: ActionState, formData: Form
   if (name === "") {
     return { error: "グループ名を入力してください。", values: { name } };
   }
+  if (memberUserIds.length === 0) {
+    return { error: "メンバーを1人以上選んでください。", values: { name } };
+  }
 
   const { supabase } = await requireUser();
   const { data: groupId, error } = await supabase.rpc("create_friend_group", {

@@ -9,11 +9,13 @@ type Props = {
   title: string;
   /** 指定するとその URL へ戻る。省略時はブラウザ履歴を1つ戻る */
   backHref?: string;
+  /** false にすると戻るボタン自体を出さない（下部ナビの主要画面向け） */
+  showBack?: boolean;
   subtitle?: string;
   action?: ReactNode;
 };
 
-export function PageHeader({ title, backHref, subtitle, action }: Props) {
+export function PageHeader({ title, backHref, showBack = true, subtitle, action }: Props) {
   const router = useRouter();
 
   const backButtonClass =
@@ -22,7 +24,9 @@ export function PageHeader({ title, backHref, subtitle, action }: Props) {
   return (
     <header className="sticky top-0 z-30 border-b border-line bg-paper/92 backdrop-blur-sm">
       <div className="mx-auto flex max-w-lg items-center gap-1 px-2 py-2">
-        {backHref ? (
+        {!showBack ? (
+          <span aria-hidden className="h-11 w-11 shrink-0" />
+        ) : backHref ? (
           <Link href={backHref} aria-label="戻る" className={backButtonClass}>
             <IconChevronLeft />
           </Link>
