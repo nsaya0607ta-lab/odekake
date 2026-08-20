@@ -20,7 +20,7 @@ import { getCurrentDogSkin } from "@/lib/data/dog-skin";
 import { getExpDashboard } from "@/lib/data/exp";
 import { getFriendsActivityFeed, getFriendsStepsRanking } from "@/lib/data/friends";
 import { getNoticesFeed, getUnreadNoticeCount } from "@/lib/data/notices";
-import { signPhotoPath, signPhotoPaths } from "@/lib/data/photos";
+import { signThumbOrOriginalPaths } from "@/lib/data/photos";
 import { getRecordSpace } from "@/lib/data/space";
 import { getExpProgress } from "@/lib/exp";
 import { MUNICIPALITIES, PREFECTURES } from "@/lib/geo";
@@ -68,10 +68,12 @@ export default async function HomePage({
     ...friendActivity.flatMap((row) => (row.profile_image_url ? [row.profile_image_url] : [])),
     ...friendSteps.flatMap((row) => (row.profile_image_url ? [row.profile_image_url] : [])),
   ];
-  const [avatarUrl, friendAvatarUrls] = await Promise.all([
-    signPhotoPath(supabase, profileResult.data?.profile_image_url),
-    signPhotoPaths(supabase, friendAvatarPaths),
+  const ownAvatarPath = profileResult.data?.profile_image_url ?? null;
+  const [ownAvatarUrls, friendAvatarUrls] = await Promise.all([
+    signThumbOrOriginalPaths(supabase, ownAvatarPath ? [ownAvatarPath] : []),
+    signThumbOrOriginalPaths(supabase, friendAvatarPaths),
   ]);
+  const avatarUrl = ownAvatarPath ? (ownAvatarUrls.get(ownAvatarPath) ?? null) : null;
 
   const expProgress = getExpProgress(expDashboard.totalExp);
   const collectedItems = countOwned(COLLECTION_ITEMS, ownedItemIds);

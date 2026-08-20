@@ -5,10 +5,11 @@ import { IconUser } from "@/components/icons";
 import { PageBody } from "@/components/page-body";
 import { PageHeader } from "@/components/page-header";
 import { getFriendList } from "@/lib/data/friends";
-import { signPhotoPaths } from "@/lib/data/photos";
-import { getFriendGroupMembers, getMyFriendGroups } from "@/lib/data/sns";
+import { signThumbOrOriginalPaths } from "@/lib/data/photos";
+import { getFriendGroupMembers, getMyFriendGroups, signGroupIconUrls } from "@/lib/data/sns";
 import { requireUser } from "@/lib/supabase/server";
 import { AddMembersForm } from "./add-members-form";
+import { EditGroupForm } from "./edit-group-form";
 
 export const metadata = { title: "グループの設定 | SNS" };
 export const dynamic = "force-dynamic";
@@ -27,8 +28,9 @@ export default async function SnsGroupSettingsPage({
   if (!group) notFound();
 
   const isOwner = group.owner_id === user.id;
+  const groupIconUrls = await signGroupIconUrls(supabase, [group]);
   const members = await getFriendGroupMembers(supabase, groupId);
-  const avatarUrls = await signPhotoPaths(
+  const avatarUrls = await signThumbOrOriginalPaths(
     supabase,
     members.flatMap((m) => (m.profile_image_url ? [m.profile_image_url] : [])),
   );
@@ -37,7 +39,7 @@ export default async function SnsGroupSettingsPage({
   const memberIds = new Set(members.map((m) => m.user_id));
   const invitableFriends = friends.filter((f) => !memberIds.has(f.friend_user_id));
   const friendAvatarUrls = isOwner
-    ? await signPhotoPaths(
+    ? await signThumbOrOriginalPaths(
         supabase,
         invitableFriends.flatMap((f) => (f.profile_image_url ? [f.profile_image_url] : [])),
       )
@@ -52,6 +54,17 @@ export default async function SnsGroupSettingsPage({
             操作に失敗しました。
           </p>
         ) : null}
+
+        <section className="space-y-2">
+          <h2 className="px-1 text-sm font-bold text-ink-soft">グループ名・アイコン</h2>
+          <EditGroupForm
+            groupId={groupId}
+            userId={user.id}
+            name={group.name}
+            iconPath={group.icon_path}
+            iconUrl={group.icon_path ? (groupIconUrls.get(group.icon_path) ?? null) : null}
+          />
+        </section>
 
         <section className="space-y-2">
           <h2 className="px-1 text-sm font-bold text-ink-soft">メンバー（{members.length}人）</h2>

@@ -175,7 +175,7 @@ export function PhotoUploader({
         const sendTo = (prefix: string) =>
           supabase.storage
             .from("photos")
-            .upload(`${prefix}/${fileName}`, blob, { contentType, upsert: false });
+            .upload(`${prefix}/${fileName}`, blob, { contentType, upsert: false, cacheControl: "31536000" });
 
         let path = `${tmpPrefixFor(userId, token)}/${fileName}`;
         let { error } = await sendTo(tmpPrefixFor(userId, token));
@@ -195,7 +195,11 @@ export function PhotoUploader({
           const thumbPath = toThumbPath(path);
           await supabase.storage
             .from("photos")
-            .upload(thumbPath, thumbBlob, { contentType: thumbBlob.type || contentType, upsert: false });
+            .upload(thumbPath, thumbBlob, {
+              contentType: thumbBlob.type || contentType,
+              upsert: false,
+              cacheControl: "31536000",
+            });
         } catch {
           // サムネイルは無くても表示側が原寸にフォールバックするので無視してよい
         }

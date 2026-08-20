@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { signPhotoPaths } from "@/lib/data/photos";
+import { signThumbOrOriginalPaths } from "@/lib/data/photos";
 import { requireUser } from "@/lib/supabase/server";
 
 type RankingPeriod = "week" | "best";
@@ -82,7 +82,7 @@ export async function GET(request: Request) {
   const rows = Array.isArray(data)
     ? data.map(toRankingRow).filter((row): row is RankingDbRow => row !== null)
     : [];
-  const avatarUrls = await signPhotoPaths(
+  const avatarUrls = await signThumbOrOriginalPaths(
     supabase,
     rows.flatMap((row) => (row.profile_image_url ? [row.profile_image_url] : [])),
   );

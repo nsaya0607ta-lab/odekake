@@ -11,7 +11,7 @@ import {
   getMyFriendCode,
   type FriendsSetupStatus,
 } from "@/lib/data/friends";
-import { signPhotoPaths } from "@/lib/data/photos";
+import { signThumbOrOriginalPaths } from "@/lib/data/photos";
 import { getExpProgress } from "@/lib/exp";
 import { requireUser } from "@/lib/supabase/server";
 import type { FriendListRow } from "@/lib/supabase/types";
@@ -45,7 +45,7 @@ export default async function FriendsPage({
 
   const avatarUrls = !setupStatus.ready
     ? new Map<string, string>()
-    : await signPhotoPaths(
+    : await signThumbOrOriginalPaths(
         supabase,
         friends.flatMap((friend) => (friend.profile_image_url ? [friend.profile_image_url] : [])),
       );

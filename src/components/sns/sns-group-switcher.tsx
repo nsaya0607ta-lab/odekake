@@ -14,7 +14,24 @@ const SETTLE_TRANSITION = "transform 180ms cubic-bezier(0.2, 0, 0, 1)";
 /** /sns/groups/[groupId] の上部に出す、グループアイコンの横スクロール切り替え。
  * 一番左が既定のグループ（区切り線で示す）。長押しでドラッグして並び替えできる。
  * ドラッグ中の本人は指に追従、他のアイコンは FLIP でなめらかに位置を譲る */
-export function SnsGroupSwitcher({ groups, activeGroupId }: { groups: FriendGroupRow[]; activeGroupId?: string }) {
+export function SnsGroupSwitcher({
+  groups,
+  activeGroupId,
+  iconUrls = {},
+  personalActive = false,
+  personalHref = "/sns/me",
+  personalIconUrl,
+  personalLabel,
+}: {
+  groups: FriendGroupRow[];
+  activeGroupId?: string;
+  iconUrls?: Record<string, string>;
+  /** 個人アカウントが選択中かどうか */
+  personalActive?: boolean;
+  personalHref?: string;
+  personalIconUrl?: string;
+  personalLabel: string;
+}) {
   const router = useRouter();
   const [order, setOrder] = useState(groups);
   const [draggingId, setDraggingId] = useState<string | null>(null);
@@ -161,9 +178,28 @@ export function SnsGroupSwitcher({ groups, activeGroupId }: { groups: FriendGrou
 
   return (
     <div className="-mx-4 -mt-5 flex items-center gap-3 overflow-x-auto bg-white px-4 py-1.5" style={{ scrollbarWidth: "none" }}>
-      {order.map((group, index) => (
+      <Link href={personalHref} className="flex shrink-0 flex-col items-center gap-1">
+        <span
+          className={`tap-target flex h-14 w-14 items-center justify-center overflow-hidden rounded-full border-2 text-2xl transition-colors ${
+            personalActive ? "border-leaf bg-leaf-soft" : "border-line bg-card"
+          }`}
+        >
+          {personalIconUrl ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img src={personalIconUrl} alt="" className="h-full w-full object-cover" />
+          ) : (
+            "👤"
+          )}
+        </span>
+        <span
+          className={`max-w-[3.5rem] truncate text-[10px] font-semibold ${personalActive ? "text-leaf-deep" : "text-ink-soft"}`}
+        >
+          {personalLabel}
+        </span>
+      </Link>
+      {groups.length > 0 ? <span aria-hidden className="h-10 w-px shrink-0 bg-line-strong" /> : null}
+      {order.map((group) => (
         <div key={group.id} className="flex shrink-0 items-center gap-3">
-          {index === 1 ? <span aria-hidden className="h-10 w-px shrink-0 bg-line-strong" /> : null}
           <div
             ref={(el) => {
               if (el) itemRefs.current.set(group.id, el);
@@ -177,6 +213,7 @@ export function SnsGroupSwitcher({ groups, activeGroupId }: { groups: FriendGrou
           >
             <GroupIcon
               icon={group.icon}
+              iconUrl={group.icon_path ? iconUrls[group.icon_path] : undefined}
               label={group.name}
               active={activeGroupId === group.id}
               unread={group.has_unread}
@@ -197,12 +234,14 @@ export function SnsGroupSwitcher({ groups, activeGroupId }: { groups: FriendGrou
 
 function GroupIcon({
   icon,
+  iconUrl,
   label,
   active,
   unread,
   dragging,
 }: {
   icon: string;
+  iconUrl?: string;
   label: string;
   active: boolean;
   unread?: boolean;
@@ -212,11 +251,16 @@ function GroupIcon({
     <div className={`flex select-none flex-col items-center gap-1 transition-transform ${dragging ? "scale-105" : ""}`}>
       <span className="relative">
         <span
-          className={`tap-target flex h-14 w-14 items-center justify-center rounded-full border-2 text-2xl transition-colors ${
+          className={`tap-target flex h-14 w-14 items-center justify-center overflow-hidden rounded-full border-2 text-2xl transition-colors ${
             active ? "border-leaf bg-leaf-soft" : "border-line bg-card"
           } ${dragging ? "shadow-md" : ""}`}
         >
-          {icon}
+          {iconUrl ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img src={iconUrl} alt="" className="h-full w-full object-cover" />
+          ) : (
+            icon
+          )}
         </span>
         {unread ? (
           <span className="absolute top-0 right-0 h-3 w-3 rounded-full bg-[#4a90d9] ring-2 ring-paper" />

@@ -1,4 +1,5 @@
 import type { DB } from "./client";
+import { signThumbOrOriginalPaths } from "./photos";
 import type {
   FriendGroupMemberRow,
   FriendGroupMessageRow,
@@ -40,6 +41,27 @@ export async function getMyFriendGroups(supabase: DB): Promise<FriendGroupRow[]>
     throw new Error("グループの取得に失敗しました");
   }
   return data ?? [];
+}
+
+/** グループアイコン画像の署名付きURLをまとめて取得する */
+export async function signGroupIconUrls(supabase: DB, groups: FriendGroupRow[]): Promise<Map<string, string>> {
+  const paths = groups.flatMap((g) => (g.icon_path ? [g.icon_path] : []));
+  if (paths.length === 0) return new Map();
+  return signThumbOrOriginalPaths(supabase, paths);
+}
+
+/** SNSの切り替えバーに出す、自分（個人アカウント）の表示名とアイコンURL */
+export async function getOwnSnsProfile(supabase: DB, userId: string): Promise<{ displayName: string; iconUrl?: string }> {
+  const { data } = await supabase
+    .from("profiles")
+    .select("display_name, profile_image_url")
+    .eq("user_id", userId)
+    .maybeSingle();
+
+  const iconPath = data?.profile_image_url ?? null;
+  const iconUrl = iconPath ? (await signThumbOrOriginalPaths(supabase, [iconPath])).get(iconPath) : undefined;
+
+  return { displayName: data?.display_name ?? "自分", iconUrl };
 }
 
 export async function getFriendGroupMembers(supabase: DB, groupId: string): Promise<FriendGroupMemberRow[]> {

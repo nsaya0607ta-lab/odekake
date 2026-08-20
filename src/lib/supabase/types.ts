@@ -371,6 +371,7 @@ export type FriendGroupRow = {
   id: string;
   name: string;
   icon: string;
+  icon_path: string | null;
   owner_id: string;
   member_count: number;
   created_at: string;
@@ -627,8 +628,17 @@ export type Database = {
       get_friend_photo_comments: { Args: { p_photo_id: string }; Returns: SnsCommentRow[] };
       delete_friend_photo_comment: { Args: { p_comment_id: string }; Returns: undefined };
       create_friend_group: {
-        Args: { p_name: string; p_member_user_ids: string[]; p_icon?: string };
+        Args: { p_name: string; p_member_user_ids: string[]; p_icon?: string; p_icon_path?: string | null };
         Returns: string;
+      };
+      update_friend_group: {
+        Args: {
+          p_group_id: string;
+          p_name?: string | null;
+          p_icon_path?: string | null;
+          p_remove_icon?: boolean;
+        };
+        Returns: undefined;
       };
       add_friend_group_members: { Args: { p_group_id: string; p_member_user_ids: string[] }; Returns: undefined };
       leave_friend_group: { Args: { p_group_id: string }; Returns: undefined };
