@@ -18,6 +18,10 @@ $$;
 
 alter table public.friend_groups add column if not exists icon_path text;
 
+-- 旧シグネチャ（3引数）を残すと、アプリが p_name/p_member_user_ids の2引数だけで
+-- 呼んだときにデフォルト引数のせいでどちらの関数か曖昧になり呼び出しが失敗するため、先に消す
+drop function if exists public.create_friend_group(text, uuid[], text);
+
 -- p_icon はもう使わないが、既存呼び出しとの互換のため引数自体は残し、
 -- 画像パス（p_icon_path）だけを保存する。
 create or replace function public.create_friend_group(
