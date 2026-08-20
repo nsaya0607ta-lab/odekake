@@ -36,15 +36,17 @@ export function SnsChatForm({
   }, [focused]);
 
   return (
+    // このフォーカス中のtextareaを含む fixed 要素自体を動かすと、iOSでネイティブの
+    // キャレット表示がずれるバグが起きるので、外側の固定位置は常に一定にし、
+    // ナビの分の余白は内側のpaddingだけで出し入れする
     <div
       className="fixed inset-x-0 z-20 border-t border-line bg-paper/95 backdrop-blur-sm"
-      style={{
-        bottom: focused
-          ? "env(safe-area-inset-bottom, 0px)"
-          : "calc(var(--nav-height) + var(--safe-bottom) + 0.5rem)",
-      }}
+      style={{ bottom: "env(safe-area-inset-bottom, 0px)" }}
     >
-      <div className="mx-auto max-w-lg px-4 pt-2 pb-2">
+      <div
+        className="mx-auto max-w-lg px-4 pt-2"
+        style={{ paddingBottom: focused ? "0.5rem" : "calc(var(--nav-height) + 0.5rem)" }}
+      >
         <form ref={formRef} action={formAction} className="flex items-center gap-2">
           {hiddenFields
             ? Object.entries(hiddenFields).map(([name, value]) => (
