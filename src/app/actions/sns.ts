@@ -74,8 +74,10 @@ export async function createFriendPhotosAction(_prev: ActionState, formData: For
     }
   }
 
-  const redirectTo = groupId ? `/sns/groups/${groupId}?posted=1` : "/sns?posted=1";
+  const redirectTo = groupId ? `/sns/groups/${groupId}?posted=1` : "/sns/home?posted=1";
   revalidatePath("/sns");
+  revalidatePath("/sns/home");
+  revalidatePath(`/sns/users/${user.id}`);
   if (groupId) revalidatePath(`/sns/groups/${groupId}`);
   redirect(redirectTo);
 }

@@ -622,6 +622,10 @@ export type Database = {
       };
       delete_friend_photo: { Args: { p_photo_id: string }; Returns: string };
       get_sns_feed: { Args: { p_days?: number }; Returns: SnsFeedPhotoRow[] };
+      get_personal_sns_feed: {
+        Args: { p_user_id?: string | null; p_days?: number };
+        Returns: SnsFeedPhotoRow[];
+      };
       get_sns_photo: { Args: { p_photo_id: string }; Returns: SnsPhotoRow[] };
       set_friend_photo_reaction: { Args: { p_photo_id: string; p_emoji: string | null }; Returns: undefined };
       add_friend_photo_comment: { Args: { p_photo_id: string; p_body: string }; Returns: SnsCommentRow[] };

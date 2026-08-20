@@ -1,52 +1,6 @@
-import { PageBody } from "@/components/page-body";
-import { PageHeader } from "@/components/page-header";
-import { SnsBackgroundBand } from "@/components/sns/sns-background-band";
-import { SnsGroupSwitcher } from "@/components/sns/sns-group-switcher";
-import { SnsModeMenu } from "@/components/sns/sns-mode-menu";
-import { SnsModeProvider } from "@/components/sns/sns-mode-context";
-import { SnsPeopleToggleBar, type SnsPersonRow } from "@/components/sns/sns-people-toggle-bar";
-import { getFriendList } from "@/lib/data/friends";
-import { signThumbOrOriginalPaths } from "@/lib/data/photos";
-import { getMyFriendGroups, getOwnSnsProfile, signGroupIconUrls } from "@/lib/data/sns";
-import { requireUser } from "@/lib/supabase/server";
+import { redirect } from "next/navigation";
 
-export const metadata = { title: "個人アカウント | SNS" };
-export const dynamic = "force-dynamic";
-
-export default async function SnsPersonalPage() {
-  const { supabase, user } = await requireUser();
-
-  const [groups, friends, ownProfile] = await Promise.all([
-    getMyFriendGroups(supabase, user.id),
-    getFriendList(supabase),
-    getOwnSnsProfile(supabase, user.id),
-  ]);
-  const [groupIconUrls, friendAvatarUrls] = await Promise.all([
-    signGroupIconUrls(supabase, groups),
-    signThumbOrOriginalPaths(
-      supabase,
-      friends.flatMap((f) => (f.profile_image_url ? [f.profile_image_url] : [])),
-    ),
-  ]);
-
-  const friendRows: SnsPersonRow[] = friends.map((friend) => ({
-    id: friend.friend_user_id,
-    label: friend.display_name,
-    iconUrl: friend.profile_image_url ? friendAvatarUrls.get(friend.profile_image_url) : undefined,
-  }));
-
-  return (
-    <SnsModeProvider>
-      <PageHeader title={ownProfile.displayName} showBack={false} leftAction={<SnsModeMenu userId={user.id} />} />
-      <SnsBackgroundBand />
-      <PageBody>
-        <SnsGroupSwitcher groups={groups} friends={friendRows} iconUrls={Object.fromEntries(groupIconUrls)} />
-
-        <SnsPeopleToggleBar
-          own={{ id: user.id, label: ownProfile.displayName, iconUrl: ownProfile.iconUrl }}
-          friends={friendRows}
-        />
-      </PageBody>
-    </SnsModeProvider>
-  );
+/** 個人アカウント画面は /sns/home に統合された。旧リンク・ブックマーク互換のため転送する */
+export default function SnsPersonalPage() {
+  redirect("/sns/home");
 }

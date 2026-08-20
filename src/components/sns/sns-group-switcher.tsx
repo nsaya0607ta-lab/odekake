@@ -6,12 +6,17 @@ import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { reorderFriendGroupsAction } from "@/app/actions/sns";
 import { IconPlus, IconUser } from "@/components/icons";
 import { useSnsMode } from "@/components/sns/sns-mode-context";
-import type { SnsPersonRow } from "@/components/sns/sns-people-toggle-bar";
 import type { FriendGroupRow } from "@/lib/supabase/types";
 
 const LONG_PRESS_MS = 400;
 const MOVE_CANCEL_PX = 8;
 const SETTLE_TRANSITION = "transform 180ms cubic-bezier(0.2, 0, 0, 1)";
+
+export type SnsPersonRow = {
+  id: string;
+  label: string;
+  iconUrl?: string;
+};
 
 /** /sns/groups/[groupId] の上部に出す、グループアイコンの横スクロール切り替え。
  * 一番左が既定のグループ（区切り線で示す）。長押しでドラッグして並び替えできる。
@@ -19,12 +24,15 @@ const SETTLE_TRANSITION = "transform 180ms cubic-bezier(0.2, 0, 0, 1)";
 export function SnsGroupSwitcher({
   groups,
   friends = [],
+  own,
   activeGroupId,
   iconUrls = {},
 }: {
   groups: FriendGroupRow[];
   /** ユーザー表示モードで並べるフレンド一覧 */
   friends?: SnsPersonRow[];
+  /** ユーザー表示モードの左端に出す自分自身 */
+  own: SnsPersonRow;
   activeGroupId?: string;
   iconUrls?: Record<string, string>;
 }) {
@@ -183,22 +191,10 @@ export function SnsGroupSwitcher({
     <div className="-mx-4 -mt-5 flex items-center gap-3 overflow-x-auto bg-white px-4 py-1.5" style={{ scrollbarWidth: "none" }}>
       {mode === "user" ? (
         <>
+          <PersonIcon person={own} href={`/sns/users/${own.id}`} highlight />
+          {friends.length > 0 ? <span aria-hidden className="h-10 w-px shrink-0 bg-line-strong" /> : null}
           {friends.map((friend) => (
-            <Link
-              key={friend.id}
-              href={`/sns/users/${friend.id}`}
-              className="flex shrink-0 flex-col items-center gap-1"
-            >
-              <span className="tap-target flex h-14 w-14 items-center justify-center overflow-hidden rounded-full border-2 border-line bg-card text-2xl">
-                {friend.iconUrl ? (
-                  // eslint-disable-next-line @next/next/no-img-element
-                  <img src={friend.iconUrl} alt="" className="h-full w-full object-cover" />
-                ) : (
-                  <IconUser size={22} className="text-ink-faint" />
-                )}
-              </span>
-              <span className="max-w-[3.5rem] truncate text-[10px] font-semibold text-ink-soft">{friend.label}</span>
-            </Link>
+            <PersonIcon key={friend.id} person={friend} href={`/sns/users/${friend.id}`} />
           ))}
         </>
       ) : (
@@ -236,6 +232,38 @@ export function SnsGroupSwitcher({
         </>
       )}
     </div>
+  );
+}
+
+function PersonIcon({
+  person,
+  href,
+  highlight = false,
+}: {
+  person: SnsPersonRow;
+  href: string;
+  highlight?: boolean;
+}) {
+  return (
+    <Link href={href} className="flex shrink-0 flex-col items-center gap-1">
+      <span
+        className={`tap-target flex h-14 w-14 items-center justify-center overflow-hidden rounded-full border-2 text-2xl transition-colors ${
+          highlight ? "border-leaf bg-leaf-soft" : "border-line bg-card"
+        }`}
+      >
+        {person.iconUrl ? (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img src={person.iconUrl} alt="" className="h-full w-full object-cover" />
+        ) : (
+          <IconUser size={22} className="text-ink-faint" />
+        )}
+      </span>
+      <span
+        className={`max-w-[3.5rem] truncate text-[10px] font-semibold ${highlight ? "text-leaf-deep" : "text-ink-soft"}`}
+      >
+        {person.label}
+      </span>
+    </Link>
   );
 }
 

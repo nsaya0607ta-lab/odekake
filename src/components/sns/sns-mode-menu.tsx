@@ -5,9 +5,9 @@ import { useEffect, useRef, useState } from "react";
 import { IconHome, IconMenu, IconUser, IconUsers } from "@/components/icons";
 import { useSnsMode } from "@/components/sns/sns-mode-context";
 
-/** ヘッダー左端のハンバーガーメニュー。自分の個人投稿画面（ホーム）への導線と、
+/** ヘッダー左端のハンバーガーメニュー。個人投稿が集まるホームへの導線と、
  * ユーザー/グループの表示切替、未実装のDM導線をまとめて置いておく */
-export function SnsModeMenu({ userId }: { userId: string }) {
+export function SnsModeMenu() {
   const { mode, setMode } = useSnsMode();
   const [open, setOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
@@ -41,7 +41,7 @@ export function SnsModeMenu({ userId }: { userId: string }) {
       {open ? (
         <div className="absolute top-full left-0 z-40 mt-1 w-40 overflow-hidden rounded-2xl border border-line bg-card shadow-lg">
           <Link
-            href={`/sns/users/${userId}`}
+            href="/sns/home"
             onClick={() => setOpen(false)}
             className="flex w-full items-center gap-2 px-4 py-2.5 text-left text-sm font-semibold text-ink-soft active:bg-paper-deep"
           >

@@ -14,15 +14,14 @@ import { PostedToast } from "@/components/sns/posted-toast";
 import { SnsBackgroundBand } from "@/components/sns/sns-background-band";
 import { SnsChatForm } from "@/components/sns/sns-chat-form";
 import { SnsChatList } from "@/components/sns/sns-chat-list";
-import { SnsGroupSwitcher } from "@/components/sns/sns-group-switcher";
+import { SnsGroupSwitcher, type SnsPersonRow } from "@/components/sns/sns-group-switcher";
 import { SnsModeMenu } from "@/components/sns/sns-mode-menu";
 import { SnsGroupOnly, SnsModeProvider } from "@/components/sns/sns-mode-context";
-import type { SnsPersonRow } from "@/components/sns/sns-people-toggle-bar";
 import { SnsPhotoGrid } from "@/components/sns/sns-photo-grid";
 import { SnsViewTabs } from "@/components/sns/sns-view-tabs";
 import { getFriendList } from "@/lib/data/friends";
 import { signThumbOrOriginalPaths } from "@/lib/data/photos";
-import { getFriendGroupMessages, getMyFriendGroups, getSnsGroupFeed, signGroupIconUrls } from "@/lib/data/sns";
+import { getFriendGroupMessages, getMyFriendGroups, getOwnSnsProfile, getSnsGroupFeed, signGroupIconUrls } from "@/lib/data/sns";
 import { requireUser } from "@/lib/supabase/server";
 import type { FriendGroupRow } from "@/lib/supabase/types";
 
@@ -58,7 +57,7 @@ export default async function SnsGroupPage({
       <PageHeader
         title={group.name}
         showBack={false}
-        leftAction={<SnsModeMenu userId={user.id} />}
+        leftAction={<SnsModeMenu />}
         action={
           <Link
             href={`${baseHref}/settings`}
@@ -73,7 +72,7 @@ export default async function SnsGroupPage({
       <SnsBackgroundBand />
       <PageBody>
         <Suspense fallback={<SnsSwitcherSkeleton />}>
-          <GroupSwitcherSection groups={groups} groupId={groupId} />
+          <GroupSwitcherSection groups={groups} groupId={groupId} userId={user.id} />
         </Suspense>
 
         <SnsGroupOnly>
@@ -117,9 +116,21 @@ export default async function SnsGroupPage({
   );
 }
 
-async function GroupSwitcherSection({ groups, groupId }: { groups: FriendGroupRow[]; groupId: string }) {
+async function GroupSwitcherSection({
+  groups,
+  groupId,
+  userId,
+}: {
+  groups: FriendGroupRow[];
+  groupId: string;
+  userId: string;
+}) {
   const { supabase } = await requireUser();
-  const [groupIconUrls, friends] = await Promise.all([signGroupIconUrls(supabase, groups), getFriendList(supabase)]);
+  const [groupIconUrls, friends, ownProfile] = await Promise.all([
+    signGroupIconUrls(supabase, groups),
+    getFriendList(supabase),
+    getOwnSnsProfile(supabase, userId),
+  ]);
   const friendAvatarUrls = await signThumbOrOriginalPaths(
     supabase,
     friends.flatMap((f) => (f.profile_image_url ? [f.profile_image_url] : [])),
@@ -131,7 +142,13 @@ async function GroupSwitcherSection({ groups, groupId }: { groups: FriendGroupRo
   }));
 
   return (
-    <SnsGroupSwitcher groups={groups} friends={friendRows} activeGroupId={groupId} iconUrls={Object.fromEntries(groupIconUrls)} />
+    <SnsGroupSwitcher
+      groups={groups}
+      friends={friendRows}
+      own={{ id: userId, label: ownProfile.displayName, iconUrl: ownProfile.iconUrl }}
+      activeGroupId={groupId}
+      iconUrls={Object.fromEntries(groupIconUrls)}
+    />
   );
 }
 
