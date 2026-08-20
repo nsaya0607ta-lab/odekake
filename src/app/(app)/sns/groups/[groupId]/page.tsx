@@ -67,10 +67,11 @@ export default async function SnsGroupPage({
           </>
         )}
       </PageBody>
+      {/* PageBody の fade-in アニメーションが transform を animate するせいで、
+          position:fixed の子が画面基準ではなくPageBody基準になってしまう。
+          さらに sticky はコンテンツが短いと画面下に届かないので、
+          FABとチャット入力欄はどちらもPageBodyの外に fixed で置く */}
       {view === "photos" ? (
-        // PageBody の fade-in アニメーションが transform を animate するせいで
-        // position:fixed の子が画面基準ではなくPageBody基準になってしまうため、
-        // FABはPageBodyの外に置く
         <Link
           href={`${baseHref}/new`}
           aria-label="写真を投稿"
@@ -79,7 +80,13 @@ export default async function SnsGroupPage({
         >
           <IconPlus size={24} />
         </Link>
-      ) : null}
+      ) : (
+        <SnsChatForm
+          action={createFriendGroupMessageAction}
+          hiddenFields={{ groupId }}
+          postHref={`${baseHref}/new`}
+        />
+      )}
     </>
   );
 }
@@ -106,18 +113,14 @@ async function GroupChat({ groupId, currentUserId }: { groupId: string; currentU
   );
 
   return (
-    <div>
+    // 下は固定表示のチャット入力欄と重ならないよう余白を空けておく
+    <div style={{ paddingBottom: "calc(var(--nav-height) + var(--safe-bottom) + 4.5rem)" }}>
       <SnsChatList
         messages={messages}
         avatarUrls={avatarUrls}
         currentUserId={currentUserId}
         deleteAction={deleteFriendGroupMessageAction}
         groupId={groupId}
-      />
-      <SnsChatForm
-        action={createFriendGroupMessageAction}
-        hiddenFields={{ groupId }}
-        postHref={`/sns/groups/${groupId}/new`}
       />
     </div>
   );
