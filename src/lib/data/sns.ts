@@ -8,6 +8,7 @@ import type {
   SnsCommentRow,
   SnsFeedPhotoRow,
   SnsPhotoRow,
+  SnsTextPostRow,
 } from "@/lib/supabase/types";
 
 /** フィードで遡って表示する日数 */
@@ -26,16 +27,12 @@ export async function getSnsGroupFeed(
   return data ?? [];
 }
 
-/** グループに紐付かない個人投稿だけのフィード。userId を省略するとフレンド全員分をまとめた
- * ホームフィードに、指定するとそのユーザー1人分だけの投稿一覧になる */
-export async function getPersonalSnsFeed(
-  supabase: DB,
-  userId?: string,
-  days: number = SNS_FEED_DAYS,
-): Promise<SnsFeedPhotoRow[]> {
-  const { data, error } = await supabase.rpc("get_personal_sns_feed", { p_user_id: userId ?? null, p_days: days });
+/** グループに紐付かないテキストの個人投稿（つぶやき）だけのフィード。userId を省略すると
+ * フレンド全員分をまとめたホームフィードに、指定するとそのユーザー1人分だけの投稿一覧になる */
+export async function getPersonalTextFeed(supabase: DB, userId?: string, limit = 100): Promise<SnsTextPostRow[]> {
+  const { data, error } = await supabase.rpc("get_personal_text_feed", { p_user_id: userId ?? null, p_limit: limit });
   if (error) {
-    console.error("Personal SNS feed is unavailable", { code: error.code, message: error.message });
+    console.error("Personal text feed is unavailable", { code: error.code, message: error.message });
     throw new Error("投稿の取得に失敗しました");
   }
   return data ?? [];

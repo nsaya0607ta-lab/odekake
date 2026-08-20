@@ -38,14 +38,11 @@ export function SnsPhotoGrid({
   photoUrls,
   avatarUrls,
   baseHref,
-  showViewToggle = true,
 }: {
   photos: SnsFeedPhotoRow[];
   photoUrls: Map<string, string>;
   avatarUrls: Map<string, string>;
   baseHref: string;
-  /** グループ画面以外（個人のホームなど）では写真/チャット切替を出さない */
-  showViewToggle?: boolean;
 }) {
   const today = useMemo(() => todayInTokyo(), []);
   const days = useMemo(() => groupSnsFeedByDay(photos), [photos]);
@@ -99,12 +96,8 @@ export function SnsPhotoGrid({
     <div className="space-y-3">
       <div id="sns-toggle-bar" className="sticky top-14 z-20 -mx-4 -mt-6 border-b border-line bg-paper/92 px-4 backdrop-blur-sm">
         <div className="mx-auto flex max-w-lg items-center gap-1.5 py-1.5">
-          {showViewToggle ? (
-            <>
-              <SnsViewToggleIcons baseHref={baseHref} view="photos" />
-              <span aria-hidden className="h-8 w-px shrink-0 bg-line" />
-            </>
-          ) : null}
+          <SnsViewToggleIcons baseHref={baseHref} view="photos" />
+          <span aria-hidden className="h-8 w-px shrink-0 bg-line" />
           <div
             ref={chipRowRef}
             className="flex w-[17.25rem] shrink-0 gap-1 overflow-x-auto"

@@ -12,7 +12,6 @@ import { PHOTO_BUCKET } from "@/lib/data/client";
 import { friendGroupsCacheTag, getSnsPhoto } from "@/lib/data/sns";
 
 const uuidSchema = z.string().uuid();
-const optionalUuidSchema = z.string().uuid().optional().or(z.literal(""));
 const MAX_CAPTION_LENGTH = 300;
 const MAX_GROUP_NAME_LENGTH = 40;
 
@@ -46,17 +45,14 @@ function parseMemberIds(formData: FormData): string[] {
 export async function createFriendPhotosAction(_prev: ActionState, formData: FormData): Promise<ActionState> {
   const requestedPaths = parsePhotoPaths(formData);
   const caption = String(formData.get("caption") ?? "").trim().slice(0, MAX_CAPTION_LENGTH) || null;
-  const rawGroupId = String(formData.get("groupId") ?? "");
-  const groupId = optionalUuidSchema.safeParse(rawGroupId).success && rawGroupId !== "" ? rawGroupId : null;
+  const groupId = uuidSchema.parse(String(formData.get("groupId") ?? ""));
 
   if (requestedPaths.length === 0) {
     return { error: "写真を選んでください。" };
   }
 
   const { supabase, user } = await requireUser();
-  const destinationPrefix = groupId
-    ? `friend-photos/${user.id}/group/${groupId}/${todayInTokyo()}`
-    : `friend-photos/${user.id}/${todayInTokyo()}`;
+  const destinationPrefix = `friend-photos/${user.id}/group/${groupId}/${todayInTokyo()}`;
   const paths = [...new Set(await finalizePhotoPaths(supabase, requestedPaths, destinationPrefix))];
 
   if (paths.length === 0) {
@@ -74,12 +70,39 @@ export async function createFriendPhotosAction(_prev: ActionState, formData: For
     }
   }
 
-  const redirectTo = groupId ? `/sns/groups/${groupId}?posted=1` : "/sns/home?posted=1";
-  revalidatePath("/sns");
+  revalidatePath(`/sns/groups/${groupId}`);
+  redirect(`/sns/groups/${groupId}?posted=1`);
+}
+
+export async function createFriendTextPostAction(_prev: ActionState, formData: FormData): Promise<ActionState> {
+  const body = String(formData.get("body") ?? "").trim();
+  if (body === "") {
+    return { error: "つぶやきを入力してください。" };
+  }
+  if (body.length > 280) {
+    return { error: "280文字以内で入力してください。" };
+  }
+
+  const { supabase, user } = await requireUser();
+  const { error } = await supabase.rpc("create_friend_text_post", { p_body: body });
+  if (error) {
+    return { error: toJapaneseError(error, "投稿に失敗しました。") };
+  }
+
   revalidatePath("/sns/home");
   revalidatePath(`/sns/users/${user.id}`);
-  if (groupId) revalidatePath(`/sns/groups/${groupId}`);
-  redirect(redirectTo);
+  redirect("/sns/home?posted=1");
+}
+
+export async function deleteFriendTextPostAction(formData: FormData): Promise<void> {
+  const parsed = uuidSchema.safeParse(String(formData.get("postId") ?? ""));
+  if (!parsed.success) return;
+
+  const { supabase, user } = await requireUser();
+  await supabase.rpc("delete_friend_text_post", { p_post_id: parsed.data });
+
+  revalidatePath("/sns/home");
+  revalidatePath(`/sns/users/${user.id}`);
 }
 
 export async function deleteFriendPhotoAction(formData: FormData): Promise<void> {

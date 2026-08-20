@@ -3,33 +3,31 @@ import { IconPlus } from "@/components/icons";
 import { PageBody } from "@/components/page-body";
 import { PageHeader } from "@/components/page-header";
 import { SnsBackgroundBand } from "@/components/sns/sns-background-band";
-import { SnsPhotoGrid } from "@/components/sns/sns-photo-grid";
+import { SnsModeMenu } from "@/components/sns/sns-mode-menu";
+import { SnsTextFeed } from "@/components/sns/sns-text-feed";
 import { signThumbOrOriginalPaths } from "@/lib/data/photos";
-import { getPersonalSnsFeed } from "@/lib/data/sns";
+import { getPersonalTextFeed } from "@/lib/data/sns";
 import { requireUser } from "@/lib/supabase/server";
 
 export const metadata = { title: "ホーム | SNS" };
 export const dynamic = "force-dynamic";
 
-/** グループに紐付かない個人投稿を、フレンド全員分まとめて見られるホーム画面 */
+/** グループに紐付かない、フレンド全員分のテキスト投稿（つぶやき）をまとめて見られるホーム画面 */
 export default async function SnsHomePage() {
-  const { supabase } = await requireUser();
+  const { supabase, user } = await requireUser();
 
-  const photos = await getPersonalSnsFeed(supabase);
-  const [avatarUrls, photoUrls] = await Promise.all([
-    signThumbOrOriginalPaths(
-      supabase,
-      photos.flatMap((p) => (p.profile_image_url ? [p.profile_image_url] : [])),
-    ),
-    signThumbOrOriginalPaths(supabase, photos.map((p) => p.storage_path)),
-  ]);
+  const posts = await getPersonalTextFeed(supabase);
+  const avatarUrls = await signThumbOrOriginalPaths(
+    supabase,
+    posts.flatMap((p) => (p.profile_image_url ? [p.profile_image_url] : [])),
+  );
 
   return (
     <>
-      <PageHeader title="ホーム" />
+      <PageHeader title="ホーム" showBack={false} leftAction={<SnsModeMenu />} />
       <SnsBackgroundBand />
       <PageBody>
-        <SnsPhotoGrid photos={photos} photoUrls={photoUrls} avatarUrls={avatarUrls} baseHref="/sns/home" showViewToggle={false} />
+        <SnsTextFeed posts={posts} avatarUrls={avatarUrls} currentUserId={user.id} />
       </PageBody>
       <Link
         href="/sns/home/new"

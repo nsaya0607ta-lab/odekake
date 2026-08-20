@@ -367,6 +367,15 @@ export type SnsPhotoRow = SnsFeedPhotoRow & {
   group_name: string | null;
 };
 
+export type SnsTextPostRow = {
+  id: string;
+  user_id: string;
+  display_name: string;
+  profile_image_url: string | null;
+  body: string;
+  created_at: string;
+};
+
 export type FriendGroupRow = {
   id: string;
   name: string;
@@ -625,6 +634,12 @@ export type Database = {
       get_personal_sns_feed: {
         Args: { p_user_id?: string | null; p_days?: number };
         Returns: SnsFeedPhotoRow[];
+      };
+      create_friend_text_post: { Args: { p_body: string }; Returns: { id: string; created_at: string }[] };
+      delete_friend_text_post: { Args: { p_post_id: string }; Returns: undefined };
+      get_personal_text_feed: {
+        Args: { p_user_id?: string | null; p_limit?: number };
+        Returns: SnsTextPostRow[];
       };
       get_sns_photo: { Args: { p_photo_id: string }; Returns: SnsPhotoRow[] };
       set_friend_photo_reaction: { Args: { p_photo_id: string; p_emoji: string | null }; Returns: undefined };

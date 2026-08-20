@@ -5,16 +5,16 @@ import { createFriendPhotosAction } from "@/app/actions/sns";
 import { emptyActionState, Field, FormMessage, SubmitButton } from "@/components/form";
 import { PhotoUploader } from "@/components/photo-uploader";
 
-export function SnsPostForm({ userId, groupId }: { userId: string; groupId?: string }) {
+export function SnsPostForm({ userId, groupId }: { userId: string; groupId: string }) {
   const [state, action] = useActionState(createFriendPhotosAction, emptyActionState);
 
   return (
     <form action={action} className="space-y-5">
-      {groupId ? <input type="hidden" name="groupId" value={groupId} /> : null}
+      <input type="hidden" name="groupId" value={groupId} />
       <PhotoUploader
         name="photoPaths"
         userId={userId}
-        draftKey={groupId ? `sns-group-${groupId}-new` : "sns-home-new"}
+        draftKey={`sns-group-${groupId}-new`}
         max={10}
         label="写真"
       />
