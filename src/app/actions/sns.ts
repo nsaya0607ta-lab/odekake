@@ -5,6 +5,7 @@ import { redirect } from "next/navigation";
 import { z } from "zod";
 import type { ActionState } from "@/components/form";
 import { toJapaneseError } from "@/lib/errors";
+import { toThumbPath } from "@/lib/image";
 import { finalizePhotoPaths } from "@/lib/photos";
 import { requireUser } from "@/lib/supabase/server";
 import { PHOTO_BUCKET } from "@/lib/data/client";
@@ -92,7 +93,7 @@ export async function deleteFriendPhotoAction(formData: FormData): Promise<void>
     redirect(`/sns/${parsed.data}?error=delete`);
   }
   if (storagePath) {
-    await supabase.storage.from(PHOTO_BUCKET).remove([storagePath]);
+    await supabase.storage.from(PHOTO_BUCKET).remove([storagePath, toThumbPath(storagePath)]);
   }
 
   revalidatePath("/sns");

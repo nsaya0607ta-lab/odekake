@@ -14,7 +14,7 @@ import { SnsChatList } from "@/components/sns/sns-chat-list";
 import { SnsGroupSwitcher } from "@/components/sns/sns-group-switcher";
 import { SnsPhotoGrid } from "@/components/sns/sns-photo-grid";
 import { SnsViewTabs } from "@/components/sns/sns-view-tabs";
-import { signPhotoPaths } from "@/lib/data/photos";
+import { signThumbOrOriginalPaths } from "@/lib/data/photos";
 import { getFriendGroupMessages, getMyFriendGroups, getSnsGroupFeed } from "@/lib/data/sns";
 import { requireUser } from "@/lib/supabase/server";
 
@@ -87,11 +87,12 @@ export default async function SnsGroupPage({
 async function GroupPhotos({ groupId, baseHref }: { groupId: string; baseHref: string }) {
   const { supabase } = await requireUser();
   const photos = await getSnsGroupFeed(supabase, groupId);
-  const avatarUrls = await signPhotoPaths(
+  const avatarUrls = await signThumbOrOriginalPaths(
     supabase,
     photos.flatMap((p) => (p.profile_image_url ? [p.profile_image_url] : [])),
   );
-  const photoUrls = await signPhotoPaths(supabase, photos.map((p) => p.storage_path));
+  // グリッドはサムネイル表示なので、原寸ではなく縮小版の署名URLを使う
+  const photoUrls = await signThumbOrOriginalPaths(supabase, photos.map((p) => p.storage_path));
 
   return <SnsPhotoGrid photos={photos} photoUrls={photoUrls} avatarUrls={avatarUrls} baseHref={baseHref} />;
 }
@@ -99,7 +100,7 @@ async function GroupPhotos({ groupId, baseHref }: { groupId: string; baseHref: s
 async function GroupChat({ groupId, currentUserId }: { groupId: string; currentUserId: string }) {
   const { supabase } = await requireUser();
   const messages = await getFriendGroupMessages(supabase, groupId);
-  const avatarUrls = await signPhotoPaths(
+  const avatarUrls = await signThumbOrOriginalPaths(
     supabase,
     messages.flatMap((m) => (m.profile_image_url ? [m.profile_image_url] : [])),
   );

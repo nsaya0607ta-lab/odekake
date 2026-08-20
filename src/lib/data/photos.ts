@@ -1,4 +1,5 @@
 import { PHOTO_BUCKET, type DB } from "./client";
+import { toThumbPath } from "@/lib/image";
 
 const SIGNED_URL_TTL_SECONDS = 60 * 60;
 /** 実際の有効期限より早めに作り直し、期限切れギリギリのURLを配らないようにする猶予 */
@@ -48,4 +49,26 @@ export async function signPhotoPath(supabase: DB, path: string | null | undefine
   if (!path) return null;
   const map = await signPhotoPaths(supabase, [path]);
   return map.get(path) ?? null;
+}
+
+/**
+ * 一覧・アイコンなど小さい表示専用。サムネイル版があればそちらの署名URLを、
+ * 無ければ（古い投稿など）原寸にフォールバックする。返る Map は元のパスをキーにする
+ */
+export async function signThumbOrOriginalPaths(supabase: DB, paths: string[]): Promise<Map<string, string>> {
+  const unique = [...new Set(paths.filter(Boolean))];
+  if (unique.length === 0) return new Map();
+
+  const thumbPathFor = new Map(unique.map((path) => [path, toThumbPath(path)] as const));
+  const thumbUrls = await signPhotoPaths(supabase, [...thumbPathFor.values()]);
+
+  const missing = unique.filter((path) => !thumbUrls.has(thumbPathFor.get(path)!));
+  const fallbackUrls = missing.length > 0 ? await signPhotoPaths(supabase, missing) : new Map<string, string>();
+
+  const result = new Map<string, string>();
+  for (const path of unique) {
+    const url = thumbUrls.get(thumbPathFor.get(path)!) ?? fallbackUrls.get(path);
+    if (url) result.set(path, url);
+  }
+  return result;
 }

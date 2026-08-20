@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { IconCamera, IconClose, IconPlus, IconSpinner } from "./icons";
 import { toJapaneseStorageError } from "@/lib/errors";
-import { ACCEPTED_IMAGE_TYPES, compressImage, extensionFor } from "@/lib/image";
+import { ACCEPTED_IMAGE_TYPES, compressImage, compressThumbnail, extensionFor, toThumbPath } from "@/lib/image";
 import { isTemporaryPath, tmpPrefixFor, userTmpPrefixFor } from "@/lib/photos";
 import { createClient } from "@/lib/supabase/client";
 import { clearDraftState, readDraftState, writeDraftState } from "./use-draft-state";
@@ -188,6 +188,17 @@ export function PhotoUploader({
         }
 
         if (error) throw error;
+
+        // 一覧・アイコン表示用の縮小版。失敗しても本画像の投稿は止めない
+        try {
+          const thumbBlob = await compressThumbnail(item.file);
+          const thumbPath = toThumbPath(path);
+          await supabase.storage
+            .from("photos")
+            .upload(thumbPath, thumbBlob, { contentType: thumbBlob.type || contentType, upsert: false });
+        } catch {
+          // サムネイルは無くても表示側が原寸にフォールバックするので無視してよい
+        }
 
         const { data } = await supabase.storage.from("photos").createSignedUrl(path, 3600);
 

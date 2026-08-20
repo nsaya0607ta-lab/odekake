@@ -9,7 +9,7 @@ import { ConfirmSubmitButton } from "@/components/confirm-submit-button";
 import { IconClose, IconTrash, IconUser } from "@/components/icons";
 import { PageBody } from "@/components/page-body";
 import { PageHeader } from "@/components/page-header";
-import { signPhotoPaths } from "@/lib/data/photos";
+import { signPhotoPaths, signThumbOrOriginalPaths } from "@/lib/data/photos";
 import { getFriendPhotoComments, getSnsPhoto } from "@/lib/data/sns";
 import { requireUser } from "@/lib/supabase/server";
 import { CommentForm } from "./comment-form";
@@ -45,13 +45,14 @@ export default async function SnsPhotoPage({
   const backHref = photo.group_id ? `/sns/groups/${photo.group_id}` : "/sns";
 
   const comments = await getFriendPhotoComments(supabase, photoId);
-  const commenterAvatarUrls = await signPhotoPaths(
+  const commenterAvatarUrls = await signThumbOrOriginalPaths(
     supabase,
     comments.flatMap((c) => (c.profile_image_url ? [c.profile_image_url] : [])),
   );
+  // 一覧の写真は原寸で見せる（サムネイルはグリッド専用）
   const photoUrl = (await signPhotoPaths(supabase, [photo.storage_path])).get(photo.storage_path);
   const avatarUrl = photo.profile_image_url
-    ? (await signPhotoPaths(supabase, [photo.profile_image_url])).get(photo.profile_image_url)
+    ? (await signThumbOrOriginalPaths(supabase, [photo.profile_image_url])).get(photo.profile_image_url)
     : null;
 
   const isOwner = photo.user_id === user.id;
