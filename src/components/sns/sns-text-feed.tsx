@@ -1,8 +1,8 @@
 import Link from "next/link";
-import { IconChat, IconHeart, IconUser } from "@/components/icons";
+import { IconUser } from "@/components/icons";
 import { formatRelativeTimeJa } from "@/lib/date";
 import type { SnsTextPostRow } from "@/lib/supabase/types";
-import { DeletePostButton } from "@/components/sns/delete-post-button";
+import { PostOptionsMenu } from "@/components/sns/post-options-menu";
 
 /** Twitterのタイムラインのような、テキストだけの個人投稿一覧 */
 export function SnsTextFeed({
@@ -19,17 +19,17 @@ export function SnsTextFeed({
   }
 
   return (
-    <ul className="-mx-4 divide-y divide-line">
+    <ul className="space-y-3">
       {posts.map((post) => {
         const avatarUrl = post.profile_image_url ? avatarUrls.get(post.profile_image_url) : null;
         const isMine = post.user_id === currentUserId;
 
         return (
-          <li key={post.id} className="flex gap-3 px-4 py-3">
+          <li key={post.id} className="rough-card flex gap-3 p-3.5">
             <Link
               href={`/sns/users/${post.user_id}`}
               aria-label={`${post.display_name}のホーム`}
-              className="h-12 w-12 shrink-0 overflow-hidden rounded-full bg-paper-deep"
+              className="h-12 w-12 shrink-0 overflow-hidden rounded-full border border-line bg-paper-deep"
             >
               {avatarUrl ? (
                 // eslint-disable-next-line @next/next/no-img-element
@@ -50,19 +50,11 @@ export function SnsTextFeed({
                 </span>
                 {isMine ? (
                   <span className="ml-auto shrink-0">
-                    <DeletePostButton postId={post.id} />
+                    <PostOptionsMenu postId={post.id} />
                   </span>
                 ) : null}
               </div>
               <p className="mt-0.5 whitespace-pre-wrap break-words text-[15px] leading-normal">{post.body}</p>
-              <div className="mt-2.5 flex max-w-[220px] items-center justify-between text-ink-faint">
-                <span className="flex items-center gap-1.5">
-                  <IconChat size={16} />
-                </span>
-                <span className="flex items-center gap-1.5">
-                  <IconHeart size={16} />
-                </span>
-              </div>
             </div>
           </li>
         );
