@@ -93,7 +93,7 @@ export function SnsPhotoGrid({
 
   return (
     <div className="space-y-3">
-      <div className="sticky top-14 z-20 -mx-4 border-b border-line bg-paper/92 px-4 backdrop-blur-sm">
+      <div id="sns-toggle-bar" className="sticky top-14 z-20 -mx-4 border-b border-line bg-paper/92 px-4 backdrop-blur-sm">
         <div className="mx-auto flex max-w-lg items-center gap-1.5 py-1.5">
           <div className="flex shrink-0 items-center gap-0.5">
             <Link

@@ -9,6 +9,7 @@ import { IconPlus, IconSettings } from "@/components/icons";
 import { PageBody } from "@/components/page-body";
 import { PageHeader } from "@/components/page-header";
 import { PostedToast } from "@/components/sns/posted-toast";
+import { SnsBackgroundBand } from "@/components/sns/sns-background-band";
 import { SnsChatForm } from "@/components/sns/sns-chat-form";
 import { SnsChatList } from "@/components/sns/sns-chat-list";
 import { SnsGroupSwitcher } from "@/components/sns/sns-group-switcher";
@@ -55,16 +56,7 @@ export default async function SnsGroupPage({
         }
       />
       <PostedToast />
-      {/* 写真/チャットの切替バーからナビゲーションバーまでの間だけ背景画像を敷く */}
-      <div
-        aria-hidden
-        className="pointer-events-none fixed inset-x-0 z-0"
-        style={{ top: "7.5rem", bottom: "calc(var(--nav-height) + var(--safe-bottom))" }}
-      >
-        {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img src="/backgrounds/gradient-bubbles.jpg" alt="" className="h-full w-full object-cover" />
-        <div className="absolute inset-0 bg-paper/55" />
-      </div>
+      <SnsBackgroundBand />
       <PageBody>
         <SnsGroupSwitcher groups={groups} activeGroupId={groupId} />
 

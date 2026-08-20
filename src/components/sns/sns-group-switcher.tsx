@@ -160,39 +160,37 @@ export function SnsGroupSwitcher({ groups, activeGroupId }: { groups: FriendGrou
   }
 
   return (
-    <div className="-mx-4 bg-gradient-to-b from-leaf-soft/70 to-paper px-4">
-      <div className="flex items-center gap-2.5 overflow-x-auto py-2" style={{ scrollbarWidth: "none" }}>
-        {order.map((group, index) => (
-          <div key={group.id} className="flex shrink-0 items-center gap-2.5">
-            {index === 1 ? <span aria-hidden className="h-7 w-px shrink-0 bg-line-strong" /> : null}
-            <div
-              ref={(el) => {
-                if (el) itemRefs.current.set(group.id, el);
-                else itemRefs.current.delete(group.id);
-              }}
-              style={{ touchAction: "pan-x" }}
-              onPointerDown={(e) => handlePointerDown(e, group.id)}
-              onPointerMove={(e) => handlePointerMove(e, group.id)}
-              onPointerUp={() => handlePointerUp(group.id)}
-              onPointerCancel={() => handlePointerUp(group.id)}
-            >
-              <GroupIcon
-                icon={group.icon}
-                label={group.name}
-                active={activeGroupId === group.id}
-                unread={group.has_unread}
-                dragging={draggingId === group.id}
-              />
-            </div>
+    <div className="-mx-4 flex items-center gap-3 overflow-x-auto px-4 py-3" style={{ scrollbarWidth: "none" }}>
+      {order.map((group, index) => (
+        <div key={group.id} className="flex shrink-0 items-center gap-3">
+          {index === 1 ? <span aria-hidden className="h-10 w-px shrink-0 bg-line-strong" /> : null}
+          <div
+            ref={(el) => {
+              if (el) itemRefs.current.set(group.id, el);
+              else itemRefs.current.delete(group.id);
+            }}
+            style={{ touchAction: "pan-x" }}
+            onPointerDown={(e) => handlePointerDown(e, group.id)}
+            onPointerMove={(e) => handlePointerMove(e, group.id)}
+            onPointerUp={() => handlePointerUp(group.id)}
+            onPointerCancel={() => handlePointerUp(group.id)}
+          >
+            <GroupIcon
+              icon={group.icon}
+              label={group.name}
+              active={activeGroupId === group.id}
+              unread={group.has_unread}
+              dragging={draggingId === group.id}
+            />
           </div>
-        ))}
-        <Link href="/sns/groups/new" aria-label="グループを作る" className="flex shrink-0 flex-col items-center gap-0.5">
-          <span className="tap-target flex h-11 w-11 items-center justify-center rounded-full border-2 border-dashed border-line text-ink-faint active:bg-paper-deep">
-            <IconPlus size={17} />
-          </span>
-          <span className="max-w-[2.75rem] truncate text-[10px] text-ink-faint">追加</span>
-        </Link>
-      </div>
+        </div>
+      ))}
+      <Link href="/sns/groups/new" aria-label="グループを作る" className="flex shrink-0 flex-col items-center gap-1">
+        <span className="tap-target flex h-14 w-14 items-center justify-center rounded-full border-2 border-dashed border-line text-ink-faint active:bg-paper-deep">
+          <IconPlus size={20} />
+        </span>
+        <span className="max-w-[3.5rem] truncate text-[10px] text-ink-faint">追加</span>
+      </Link>
     </div>
   );
 }
@@ -211,10 +209,10 @@ function GroupIcon({
   dragging?: boolean;
 }) {
   return (
-    <div className={`flex select-none flex-col items-center gap-0.5 transition-transform ${dragging ? "scale-105" : ""}`}>
+    <div className={`flex select-none flex-col items-center gap-1 transition-transform ${dragging ? "scale-105" : ""}`}>
       <span className="relative">
         <span
-          className={`tap-target flex h-11 w-11 items-center justify-center rounded-full border-2 text-lg transition-colors ${
+          className={`tap-target flex h-14 w-14 items-center justify-center rounded-full border-2 text-2xl transition-colors ${
             active ? "border-leaf bg-leaf-soft" : "border-line bg-card"
           } ${dragging ? "shadow-md" : ""}`}
         >
@@ -224,7 +222,7 @@ function GroupIcon({
           <span className="absolute top-0 right-0 h-3 w-3 rounded-full bg-[#4a90d9] ring-2 ring-paper" />
         ) : null}
       </span>
-      <span className={`max-w-[2.75rem] truncate text-[10px] font-semibold ${active ? "text-leaf-deep" : "text-ink-soft"}`}>
+      <span className={`max-w-[3.5rem] truncate text-[10px] font-semibold ${active ? "text-leaf-deep" : "text-ink-soft"}`}>
         {label}
       </span>
     </div>
