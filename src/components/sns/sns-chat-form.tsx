@@ -22,31 +22,49 @@ export function SnsChatForm({
 }) {
   const [state, formAction] = useActionState(action, emptyActionState);
   const formRef = useRef<HTMLFormElement>(null);
-  const [focused, setFocused] = useState(false);
+  const [keyboardOpen, setKeyboardOpen] = useState(false);
 
   useEffect(() => {
     if (state.ok) formRef.current?.reset();
   }, [state.ok]);
 
-  // キーボードが出ている間は下ナビを隠す（bottom-nav.tsx 側のCSSと対）ので、
-  // 入力欄もナビ分の余白を空けずにキーボードへ直付けする
+  // フォーカスイベントに合わせて同期的に位置を変えると、iOSでネイティブのキャレット
+  // 表示がずれることがあるので、実際のキーボードの出現は visualViewport の変化で判定する
   useEffect(() => {
-    document.body.classList.toggle("sns-chat-input-focused", focused);
+    const viewport = window.visualViewport;
+    if (!viewport) return;
+
+    function update() {
+      if (!viewport) return;
+      const hidden = window.innerHeight - viewport.height - viewport.offsetTop;
+      setKeyboardOpen(hidden > 120);
+    }
+
+    update();
+    viewport.addEventListener("resize", update);
+    viewport.addEventListener("scroll", update);
+    return () => {
+      viewport.removeEventListener("resize", update);
+      viewport.removeEventListener("scroll", update);
+    };
+  }, []);
+
+  // キーボードが出ている間は下ナビを隠す（bottom-nav.tsx 側のCSSと対）
+  useEffect(() => {
+    document.body.classList.toggle("sns-chat-input-focused", keyboardOpen);
     return () => document.body.classList.remove("sns-chat-input-focused");
-  }, [focused]);
+  }, [keyboardOpen]);
 
   return (
-    // このフォーカス中のtextareaを含む fixed 要素自体を動かすと、iOSでネイティブの
-    // キャレット表示がずれるバグが起きるので、外側の固定位置は常に一定にし、
-    // ナビの分の余白は内側のpaddingだけで出し入れする
     <div
       className="fixed inset-x-0 z-20 border-t border-line bg-paper/95 backdrop-blur-sm"
-      style={{ bottom: "env(safe-area-inset-bottom, 0px)" }}
+      style={{
+        bottom: keyboardOpen
+          ? "env(safe-area-inset-bottom, 0px)"
+          : "calc(var(--nav-height) + var(--safe-bottom) + 0.5rem)",
+      }}
     >
-      <div
-        className="mx-auto max-w-lg px-4 pt-2"
-        style={{ paddingBottom: focused ? "0.5rem" : "calc(var(--nav-height) + 0.5rem)" }}
-      >
+      <div className="mx-auto max-w-lg px-4 pt-2 pb-2">
         <form ref={formRef} action={formAction} className="flex items-center gap-2">
           {hiddenFields
             ? Object.entries(hiddenFields).map(([name, value]) => (
@@ -69,8 +87,6 @@ export function SnsChatForm({
               maxLength={1000}
               placeholder={placeholder}
               defaultValue={state.values?.body ?? ""}
-              onFocus={() => setFocused(true)}
-              onBlur={() => setFocused(false)}
               className="max-h-24 min-w-0 flex-1 resize-none bg-transparent text-base leading-relaxed outline-none placeholder:text-ink-faint"
               style={{ fontSize: "16px" }}
             />
