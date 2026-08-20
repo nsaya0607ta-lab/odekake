@@ -1,10 +1,11 @@
 "use client";
 
 import Link from "next/link";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useRouter } from "next/navigation";
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { reorderFriendGroupsAction } from "@/app/actions/sns";
 import { IconPlus, IconUser } from "@/components/icons";
+import { useSnsMode } from "@/components/sns/sns-mode-context";
 import type { SnsPersonRow } from "@/components/sns/sns-people-toggle-bar";
 import type { FriendGroupRow } from "@/lib/supabase/types";
 
@@ -37,8 +38,7 @@ export function SnsGroupSwitcher({
   personalLabel: string;
 }) {
   const router = useRouter();
-  const searchParams = useSearchParams();
-  const mode = searchParams.get("mode") === "user" ? "user" : "group";
+  const { mode } = useSnsMode();
   const [order, setOrder] = useState(groups);
   const [draggingId, setDraggingId] = useState<string | null>(null);
   const itemRefs = useRef(new Map<string, HTMLDivElement>());

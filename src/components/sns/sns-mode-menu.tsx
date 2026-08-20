@@ -1,16 +1,13 @@
 "use client";
 
-import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import { IconMenu, IconUser, IconUsers } from "@/components/icons";
+import { useSnsMode } from "@/components/sns/sns-mode-context";
 
 /** ヘッダー左端のハンバーガーメニュー。ユーザー/グループの表示切替と、
  * 未実装のDM導線をまとめて置いておく */
 export function SnsModeMenu() {
-  const router = useRouter();
-  const pathname = usePathname();
-  const searchParams = useSearchParams();
-  const mode = searchParams.get("mode") === "user" ? "user" : "group";
+  const { mode, setMode } = useSnsMode();
   const [open, setOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
 
@@ -24,9 +21,7 @@ export function SnsModeMenu() {
   }, [open]);
 
   function selectMode(next: "user" | "group") {
-    const params = new URLSearchParams(searchParams.toString());
-    params.set("mode", next);
-    router.push(`${pathname}?${params.toString()}`);
+    setMode(next);
     setOpen(false);
   }
 

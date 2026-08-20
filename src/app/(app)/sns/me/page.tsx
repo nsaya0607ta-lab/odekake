@@ -3,6 +3,7 @@ import { PageHeader } from "@/components/page-header";
 import { SnsBackgroundBand } from "@/components/sns/sns-background-band";
 import { SnsGroupSwitcher } from "@/components/sns/sns-group-switcher";
 import { SnsModeMenu } from "@/components/sns/sns-mode-menu";
+import { SnsModeProvider } from "@/components/sns/sns-mode-context";
 import { SnsPeopleToggleBar, type SnsPersonRow } from "@/components/sns/sns-people-toggle-bar";
 import { getFriendList } from "@/lib/data/friends";
 import { signThumbOrOriginalPaths } from "@/lib/data/photos";
@@ -35,7 +36,7 @@ export default async function SnsPersonalPage() {
   }));
 
   return (
-    <>
+    <SnsModeProvider>
       <PageHeader title={ownProfile.displayName} showBack={false} leftAction={<SnsModeMenu />} />
       <SnsBackgroundBand />
       <PageBody>
@@ -53,6 +54,6 @@ export default async function SnsPersonalPage() {
           friends={friendRows}
         />
       </PageBody>
-    </>
+    </SnsModeProvider>
   );
 }

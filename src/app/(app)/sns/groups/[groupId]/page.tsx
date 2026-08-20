@@ -16,6 +16,7 @@ import { SnsChatForm } from "@/components/sns/sns-chat-form";
 import { SnsChatList } from "@/components/sns/sns-chat-list";
 import { SnsGroupSwitcher } from "@/components/sns/sns-group-switcher";
 import { SnsModeMenu } from "@/components/sns/sns-mode-menu";
+import { SnsModeProvider } from "@/components/sns/sns-mode-context";
 import type { SnsPersonRow } from "@/components/sns/sns-people-toggle-bar";
 import { SnsPhotoGrid } from "@/components/sns/sns-photo-grid";
 import { SnsViewTabs } from "@/components/sns/sns-view-tabs";
@@ -53,7 +54,7 @@ export default async function SnsGroupPage({
   const baseHref = `/sns/groups/${groupId}`;
 
   return (
-    <>
+    <SnsModeProvider>
       <PageHeader
         title={group.name}
         showBack={false}
@@ -108,7 +109,7 @@ export default async function SnsGroupPage({
           postHref={`${baseHref}/new`}
         />
       )}
-    </>
+    </SnsModeProvider>
   );
 }
 
