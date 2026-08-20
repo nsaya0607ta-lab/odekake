@@ -5,7 +5,7 @@ import Link from "next/link";
  * ヘッダーの続きに見えるようにする */
 export function SnsViewTabs({ baseHref, view }: { baseHref: string; view: "photos" | "chat" }) {
   return (
-    <div id="sns-toggle-bar" className="sticky top-14 z-20 -mx-4 -mt-4 border-b border-line bg-paper/92 px-4 backdrop-blur-sm">
+    <div id="sns-toggle-bar" className="sticky top-14 z-20 -mx-4 -mt-6 border-b border-line bg-paper/92 px-4 backdrop-blur-sm">
       <div className="mx-auto flex max-w-lg items-center justify-center gap-10">
         <ViewTab href={`${baseHref}?view=photos`} label="写真" src="/icons/sns/photo-toggle.png" active={view === "photos"} />
         <ViewTab href={`${baseHref}?view=chat`} label="チャット" src="/icons/sns/chat-toggle.png" active={view === "chat"} />
