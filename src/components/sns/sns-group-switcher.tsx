@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { reorderFriendGroupsAction } from "@/app/actions/sns";
-import { IconPlus, IconUser, IconUsers } from "@/components/icons";
+import { IconPlus, IconUser } from "@/components/icons";
 import type { SnsPersonRow } from "@/components/sns/sns-people-toggle-bar";
 import type { FriendGroupRow } from "@/lib/supabase/types";
 
@@ -188,23 +188,26 @@ export function SnsGroupSwitcher({
   }
 
   return (
-    <div className="-mx-4 -mt-5 bg-white px-4 py-1.5">
-      <div className="mb-1.5 flex shrink-0 items-center gap-1.5">
+    <div className="-mx-4 -mt-5 bg-paper-deep/50">
+      <div className="flex shrink-0 items-center gap-1.5 px-4 py-2">
         <ModeToggleIcon
           label="ユーザー"
           active={mode === "user"}
           onClick={() => setMode("user")}
-          icon={<IconUser size={18} />}
+          src="/icons/sns/user-toggle.png"
         />
         <ModeToggleIcon
           label="グループ"
           active={mode === "group"}
           onClick={() => setMode("group")}
-          icon={<IconUsers size={18} />}
+          src="/icons/sns/group-toggle.png"
         />
       </div>
 
-      <div className="flex items-center gap-3 overflow-x-auto" style={{ scrollbarWidth: "none" }}>
+      <div
+        className="flex items-center gap-3 overflow-x-auto border-t border-line bg-white px-4 py-1.5"
+        style={{ scrollbarWidth: "none" }}
+      >
         <Link href={personalHref} className="flex shrink-0 flex-col items-center gap-1">
           <span
             className={`tap-target flex h-14 w-14 items-center justify-center overflow-hidden rounded-full border-2 text-2xl transition-colors ${
@@ -286,12 +289,12 @@ function ModeToggleIcon({
   label,
   active,
   onClick,
-  icon,
+  src,
 }: {
   label: string;
   active: boolean;
   onClick: () => void;
-  icon: React.ReactNode;
+  src: string;
 }) {
   return (
     <button
@@ -299,11 +302,12 @@ function ModeToggleIcon({
       onClick={onClick}
       aria-label={label}
       aria-pressed={active}
-      className={`tap-target flex h-8 items-center gap-1 rounded-full border px-3 text-[11px] font-semibold transition-colors ${
+      className={`tap-target flex h-9 items-center gap-1.5 rounded-full border px-3 text-[12px] font-semibold transition-colors ${
         active ? "border-leaf bg-leaf-soft text-leaf-deep" : "border-line bg-card text-ink-faint"
       }`}
     >
-      {icon}
+      {/* eslint-disable-next-line @next/next/no-img-element */}
+      <img src={src} alt="" className="h-5 w-5 object-contain" />
       {label}
     </button>
   );
