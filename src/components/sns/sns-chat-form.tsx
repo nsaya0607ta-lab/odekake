@@ -23,37 +23,29 @@ export function SnsChatForm({
   const [state, formAction] = useActionState(action, emptyActionState);
   const formRef = useRef<HTMLFormElement>(null);
   const [keyboardOpen, setKeyboardOpen] = useState(false);
+  const openTimer = useRef<number | null>(null);
 
   useEffect(() => {
     if (state.ok) formRef.current?.reset();
   }, [state.ok]);
-
-  // フォーカスイベントに合わせて同期的に位置を変えると、iOSでネイティブのキャレット
-  // 表示がずれることがあるので、実際のキーボードの出現は visualViewport の変化で判定する
-  useEffect(() => {
-    const viewport = window.visualViewport;
-    if (!viewport) return;
-
-    function update() {
-      if (!viewport) return;
-      const hidden = window.innerHeight - viewport.height - viewport.offsetTop;
-      setKeyboardOpen(hidden > 120);
-    }
-
-    update();
-    viewport.addEventListener("resize", update);
-    viewport.addEventListener("scroll", update);
-    return () => {
-      viewport.removeEventListener("resize", update);
-      viewport.removeEventListener("scroll", update);
-    };
-  }, []);
 
   // キーボードが出ている間は下ナビを隠す（bottom-nav.tsx 側のCSSと対）
   useEffect(() => {
     document.body.classList.toggle("sns-chat-input-focused", keyboardOpen);
     return () => document.body.classList.remove("sns-chat-input-focused");
   }, [keyboardOpen]);
+
+  function handleFocus() {
+    // フォーカスと同じフレームで位置を動かすと、iOSでネイティブのキャレット表示が
+    // ずれることがあるので、キーボードのアニメーションが始まってから少し遅らせる
+    if (openTimer.current) window.clearTimeout(openTimer.current);
+    openTimer.current = window.setTimeout(() => setKeyboardOpen(true), 120);
+  }
+
+  function handleBlur() {
+    if (openTimer.current) window.clearTimeout(openTimer.current);
+    setKeyboardOpen(false);
+  }
 
   return (
     <div
@@ -87,6 +79,8 @@ export function SnsChatForm({
               maxLength={1000}
               placeholder={placeholder}
               defaultValue={state.values?.body ?? ""}
+              onFocus={handleFocus}
+              onBlur={handleBlur}
               className="max-h-24 min-w-0 flex-1 resize-none bg-transparent text-base leading-relaxed outline-none placeholder:text-ink-faint"
               style={{ fontSize: "16px" }}
             />
