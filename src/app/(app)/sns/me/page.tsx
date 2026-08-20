@@ -2,6 +2,9 @@ import { PageBody } from "@/components/page-body";
 import { PageHeader } from "@/components/page-header";
 import { SnsBackgroundBand } from "@/components/sns/sns-background-band";
 import { SnsGroupSwitcher } from "@/components/sns/sns-group-switcher";
+import { SnsPeopleToggleBar, type SnsPersonRow } from "@/components/sns/sns-people-toggle-bar";
+import { getFriendList } from "@/lib/data/friends";
+import { signThumbOrOriginalPaths } from "@/lib/data/photos";
 import { getMyFriendGroups, getOwnSnsProfile, signGroupIconUrls } from "@/lib/data/sns";
 import { requireUser } from "@/lib/supabase/server";
 
@@ -11,11 +14,24 @@ export const dynamic = "force-dynamic";
 export default async function SnsPersonalPage() {
   const { supabase, user } = await requireUser();
 
-  const groups = await getMyFriendGroups(supabase);
-  const [groupIconUrls, ownProfile] = await Promise.all([
-    signGroupIconUrls(supabase, groups),
+  const [groups, friends, ownProfile] = await Promise.all([
+    getMyFriendGroups(supabase),
+    getFriendList(supabase),
     getOwnSnsProfile(supabase, user.id),
   ]);
+  const [groupIconUrls, friendAvatarUrls] = await Promise.all([
+    signGroupIconUrls(supabase, groups),
+    signThumbOrOriginalPaths(
+      supabase,
+      friends.flatMap((f) => (f.profile_image_url ? [f.profile_image_url] : [])),
+    ),
+  ]);
+
+  const friendRows: SnsPersonRow[] = friends.map((friend) => ({
+    id: friend.friend_user_id,
+    label: friend.display_name,
+    iconUrl: friend.profile_image_url ? friendAvatarUrls.get(friend.profile_image_url) : undefined,
+  }));
 
   return (
     <>
@@ -30,15 +46,10 @@ export default async function SnsPersonalPage() {
           personalLabel={ownProfile.displayName}
         />
 
-        {/* 個人アカウントの中身は後で実装する。写真/チャット切替バーと高さだけ揃えておく */}
-        <div
-          id="sns-toggle-bar"
-          className="sticky top-14 z-20 -mx-4 -mt-6 border-b border-line bg-paper/92 px-4 backdrop-blur-sm"
-        >
-          <div className="mx-auto flex max-w-lg items-center gap-1.5 py-1.5">
-            <div className="h-11 w-full" />
-          </div>
-        </div>
+        <SnsPeopleToggleBar
+          own={{ id: user.id, label: ownProfile.displayName, iconUrl: ownProfile.iconUrl }}
+          friends={friendRows}
+        />
       </PageBody>
     </>
   );
