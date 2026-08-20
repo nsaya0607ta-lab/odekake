@@ -26,6 +26,17 @@ export async function getSnsGroupFeed(
   return data ?? [];
 }
 
+/** 自分と友達全員分の投稿（グループを問わない）をまとめて取得する。
+ * 個人のホーム画面で、特定ユーザーの投稿だけに絞り込むのに使う */
+export async function getSnsFeed(supabase: DB, days: number = SNS_FEED_DAYS): Promise<SnsFeedPhotoRow[]> {
+  const { data, error } = await supabase.rpc("get_sns_feed", { p_days: days });
+  if (error) {
+    console.error("SNS feed is unavailable", { code: error.code, message: error.message });
+    throw new Error("投稿の取得に失敗しました");
+  }
+  return data ?? [];
+}
+
 export async function getSnsPhoto(supabase: DB, photoId: string): Promise<SnsPhotoRow | null> {
   const { data, error } = await supabase.rpc("get_sns_photo", { p_photo_id: photoId });
   if (error) {

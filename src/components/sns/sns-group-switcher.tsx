@@ -21,21 +21,12 @@ export function SnsGroupSwitcher({
   friends = [],
   activeGroupId,
   iconUrls = {},
-  personalActive = false,
-  personalHref = "/sns/me",
-  personalIconUrl,
-  personalLabel,
 }: {
   groups: FriendGroupRow[];
   /** ユーザー表示モードで並べるフレンド一覧 */
   friends?: SnsPersonRow[];
   activeGroupId?: string;
   iconUrls?: Record<string, string>;
-  /** 個人アカウントが選択中かどうか */
-  personalActive?: boolean;
-  personalHref?: string;
-  personalIconUrl?: string;
-  personalLabel: string;
 }) {
   const router = useRouter();
   const { mode } = useSnsMode();
@@ -190,31 +181,14 @@ export function SnsGroupSwitcher({
 
   return (
     <div className="-mx-4 -mt-5 flex items-center gap-3 overflow-x-auto bg-white px-4 py-1.5" style={{ scrollbarWidth: "none" }}>
-      <Link href={personalHref} className="flex shrink-0 flex-col items-center gap-1">
-        <span
-          className={`tap-target flex h-14 w-14 items-center justify-center overflow-hidden rounded-full border-2 text-2xl transition-colors ${
-            personalActive ? "border-leaf bg-leaf-soft" : "border-line bg-card"
-          }`}
-        >
-          {personalIconUrl ? (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img src={personalIconUrl} alt="" className="h-full w-full object-cover" />
-          ) : (
-            "👤"
-          )}
-        </span>
-        <span
-          className={`max-w-[3.5rem] truncate text-[10px] font-semibold ${personalActive ? "text-leaf-deep" : "text-ink-soft"}`}
-        >
-          {personalLabel}
-        </span>
-      </Link>
-
       {mode === "user" ? (
         <>
-          {friends.length > 0 ? <span aria-hidden className="h-10 w-px shrink-0 bg-line-strong" /> : null}
           {friends.map((friend) => (
-            <div key={friend.id} className="flex shrink-0 flex-col items-center gap-1">
+            <Link
+              key={friend.id}
+              href={`/sns/users/${friend.id}`}
+              className="flex shrink-0 flex-col items-center gap-1"
+            >
               <span className="tap-target flex h-14 w-14 items-center justify-center overflow-hidden rounded-full border-2 border-line bg-card text-2xl">
                 {friend.iconUrl ? (
                   // eslint-disable-next-line @next/next/no-img-element
@@ -224,12 +198,11 @@ export function SnsGroupSwitcher({
                 )}
               </span>
               <span className="max-w-[3.5rem] truncate text-[10px] font-semibold text-ink-soft">{friend.label}</span>
-            </div>
+            </Link>
           ))}
         </>
       ) : (
         <>
-          {groups.length > 0 ? <span aria-hidden className="h-10 w-px shrink-0 bg-line-strong" /> : null}
           {order.map((group) => (
             <div key={group.id} className="flex shrink-0 items-center gap-3">
               <div

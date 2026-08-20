@@ -1,12 +1,13 @@
 "use client";
 
+import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
-import { IconMenu, IconUser, IconUsers } from "@/components/icons";
+import { IconHome, IconMenu, IconUser, IconUsers } from "@/components/icons";
 import { useSnsMode } from "@/components/sns/sns-mode-context";
 
-/** ヘッダー左端のハンバーガーメニュー。ユーザー/グループの表示切替と、
- * 未実装のDM導線をまとめて置いておく */
-export function SnsModeMenu() {
+/** ヘッダー左端のハンバーガーメニュー。自分の個人投稿画面（ホーム）への導線と、
+ * ユーザー/グループの表示切替、未実装のDM導線をまとめて置いておく */
+export function SnsModeMenu({ userId }: { userId: string }) {
   const { mode, setMode } = useSnsMode();
   const [open, setOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
@@ -39,6 +40,14 @@ export function SnsModeMenu() {
 
       {open ? (
         <div className="absolute top-full left-0 z-40 mt-1 w-40 overflow-hidden rounded-2xl border border-line bg-card shadow-lg">
+          <Link
+            href={`/sns/users/${userId}`}
+            onClick={() => setOpen(false)}
+            className="flex w-full items-center gap-2 px-4 py-2.5 text-left text-sm font-semibold text-ink-soft active:bg-paper-deep"
+          >
+            <IconHome size={18} />
+            ホーム
+          </Link>
           <MenuItem label="ユーザー" icon={<IconUser size={18} />} active={mode === "user"} onClick={() => selectMode("user")} />
           <MenuItem label="グループ" icon={<IconUsers size={18} />} active={mode === "group"} onClick={() => selectMode("group")} />
           <span className="flex items-center gap-2 px-4 py-2.5 text-sm text-ink-faint/60">

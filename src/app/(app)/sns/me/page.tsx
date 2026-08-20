@@ -37,17 +37,10 @@ export default async function SnsPersonalPage() {
 
   return (
     <SnsModeProvider>
-      <PageHeader title={ownProfile.displayName} showBack={false} leftAction={<SnsModeMenu />} />
+      <PageHeader title={ownProfile.displayName} showBack={false} leftAction={<SnsModeMenu userId={user.id} />} />
       <SnsBackgroundBand />
       <PageBody>
-        <SnsGroupSwitcher
-          groups={groups}
-          friends={friendRows}
-          iconUrls={Object.fromEntries(groupIconUrls)}
-          personalActive
-          personalIconUrl={ownProfile.iconUrl}
-          personalLabel={ownProfile.displayName}
-        />
+        <SnsGroupSwitcher groups={groups} friends={friendRows} iconUrls={Object.fromEntries(groupIconUrls)} />
 
         <SnsPeopleToggleBar
           own={{ id: user.id, label: ownProfile.displayName, iconUrl: ownProfile.iconUrl }}
