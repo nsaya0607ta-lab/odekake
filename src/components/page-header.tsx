@@ -15,9 +15,11 @@ type Props = {
   action?: ReactNode;
   /** showBack が false のとき、戻るボタンの位置に代わりに出す左端のアクション */
   leftAction?: ReactNode;
+  /** 指定すると、タイトルの左に丸いアイコン画像を添える（ユーザーのホームなど） */
+  avatarUrl?: string;
 };
 
-export function PageHeader({ title, backHref, showBack = true, subtitle, action, leftAction }: Props) {
+export function PageHeader({ title, backHref, showBack = true, subtitle, action, leftAction, avatarUrl }: Props) {
   const router = useRouter();
 
   const backButtonClass =
@@ -37,9 +39,17 @@ export function PageHeader({ title, backHref, showBack = true, subtitle, action,
             <IconChevronLeft />
           </button>
         )}
-        <div className="min-w-0 flex-1 text-center">
-          <h1 className="truncate text-[17px] font-bold">{title}</h1>
-          {subtitle ? <p className="truncate text-xs text-ink-faint">{subtitle}</p> : null}
+        <div className="flex min-w-0 flex-1 items-center justify-center gap-2">
+          {avatarUrl ? (
+            <span className="h-7 w-7 shrink-0 overflow-hidden rounded-full bg-paper-deep">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src={avatarUrl} alt="" className="h-full w-full object-cover" />
+            </span>
+          ) : null}
+          <div className="min-w-0 text-center">
+            <h1 className="truncate text-[17px] font-bold">{title}</h1>
+            {subtitle ? <p className="truncate text-xs text-ink-faint">{subtitle}</p> : null}
+          </div>
         </div>
         <div className="flex h-11 w-11 shrink-0 items-center justify-center">{action}</div>
       </div>

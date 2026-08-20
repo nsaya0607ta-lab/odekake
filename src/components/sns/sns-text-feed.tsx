@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { IconUser } from "@/components/icons";
 import { formatRelativeTimeJa } from "@/lib/date";
 import type { SnsTextPostRow } from "@/lib/supabase/types";
@@ -25,7 +26,11 @@ export function SnsTextFeed({
 
         return (
           <li key={post.id} className="flex gap-3 py-3.5">
-            <span className="h-11 w-11 shrink-0 overflow-hidden rounded-full bg-paper-deep">
+            <Link
+              href={`/sns/users/${post.user_id}`}
+              aria-label={`${post.display_name}のホーム`}
+              className="h-11 w-11 shrink-0 overflow-hidden rounded-full bg-paper-deep"
+            >
               {avatarUrl ? (
                 // eslint-disable-next-line @next/next/no-img-element
                 <img src={avatarUrl} alt="" className="h-full w-full object-cover" />
@@ -34,10 +39,12 @@ export function SnsTextFeed({
                   <IconUser size={20} />
                 </span>
               )}
-            </span>
+            </Link>
             <div className="min-w-0 flex-1">
               <div className="flex items-baseline gap-1.5">
-                <span className="truncate text-sm font-bold">{post.display_name}</span>
+                <Link href={`/sns/users/${post.user_id}`} className="truncate text-sm font-bold">
+                  {post.display_name}
+                </Link>
                 <span className="shrink-0 text-xs text-ink-faint">{formatRelativeTimeJa(post.created_at)}</span>
                 {isMine ? (
                   <span className="ml-auto shrink-0">

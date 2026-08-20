@@ -23,7 +23,7 @@ export default async function SnsUserHomePage({ params }: { params: Promise<{ us
 
   return (
     <>
-      <PageHeader title={profile.displayName} />
+      <PageHeader title={profile.displayName} avatarUrl={profile.iconUrl} />
       <SnsBackgroundBand />
       <PageBody>
         <SnsTextFeed posts={posts} avatarUrls={avatarUrls} currentUserId={user.id} />
