@@ -1,6 +1,6 @@
 "use server";
 
-import { revalidatePath } from "next/cache";
+import { revalidatePath, revalidateTag } from "next/cache";
 import { redirect } from "next/navigation";
 import { z } from "zod";
 import type { ActionState } from "@/components/form";
@@ -9,7 +9,7 @@ import { toThumbPath } from "@/lib/image";
 import { finalizePhotoPaths } from "@/lib/photos";
 import { requireUser } from "@/lib/supabase/server";
 import { PHOTO_BUCKET } from "@/lib/data/client";
-import { getSnsPhoto } from "@/lib/data/sns";
+import { friendGroupsCacheTag, getSnsPhoto } from "@/lib/data/sns";
 
 const uuidSchema = z.string().uuid();
 const optionalUuidSchema = z.string().uuid().optional().or(z.literal(""));
@@ -172,7 +172,7 @@ export async function createFriendGroupAction(_prev: ActionState, formData: Form
     return { error: "メンバーを1人以上選んでください。", values: { name } };
   }
 
-  const { supabase } = await requireUser();
+  const { supabase, user } = await requireUser();
   const { data: groupId, error } = await supabase.rpc("create_friend_group", {
     p_name: name,
     p_member_user_ids: memberUserIds,
@@ -189,6 +189,7 @@ export async function createFriendGroupAction(_prev: ActionState, formData: Form
   }
 
   revalidatePath("/sns");
+  revalidateTag(friendGroupsCacheTag(user.id));
   redirect(`/sns/groups/${groupId}`);
 }
 
@@ -203,7 +204,7 @@ export async function updateFriendGroupAction(_prev: ActionState, formData: Form
   }
   const iconPaths = parseJsonPaths(formData, "iconPaths");
 
-  const { supabase } = await requireUser();
+  const { supabase, user } = await requireUser();
 
   const { data: currentGroups } = await supabase.rpc("get_my_friend_groups");
   const previousIconPath = currentGroups?.find((g) => g.id === groupId)?.icon_path ?? null;
@@ -239,6 +240,7 @@ export async function updateFriendGroupAction(_prev: ActionState, formData: Form
   revalidatePath("/sns");
   revalidatePath(`/sns/groups/${groupId}`);
   revalidatePath(`/sns/groups/${groupId}/settings`);
+  revalidateTag(friendGroupsCacheTag(user.id));
   return { ok: true, message: "グループの設定を更新しました。", values: { name } };
 }
 
@@ -247,9 +249,10 @@ export async function reorderFriendGroupsAction(groupIds: string[]): Promise<voi
   const parsed = groupIds.filter((id) => uuidSchema.safeParse(id).success);
   if (parsed.length === 0) return;
 
-  const { supabase } = await requireUser();
+  const { supabase, user } = await requireUser();
   await supabase.rpc("reorder_friend_groups", { p_group_ids: parsed });
   revalidatePath("/sns");
+  revalidateTag(friendGroupsCacheTag(user.id));
 }
 
 export async function addFriendGroupMembersAction(_prev: ActionState, formData: FormData): Promise<ActionState> {
@@ -275,13 +278,14 @@ export async function leaveFriendGroupAction(formData: FormData): Promise<void> 
   const parsed = uuidSchema.safeParse(String(formData.get("groupId") ?? ""));
   if (!parsed.success) redirect("/sns");
 
-  const { supabase } = await requireUser();
+  const { supabase, user } = await requireUser();
   const { error } = await supabase.rpc("leave_friend_group", { p_group_id: parsed.data });
   if (error) {
     redirect(`/sns/groups/${parsed.data}/settings?error=leave`);
   }
 
   revalidatePath("/sns");
+  revalidateTag(friendGroupsCacheTag(user.id));
   redirect("/sns");
 }
 
@@ -289,13 +293,14 @@ export async function deleteFriendGroupAction(formData: FormData): Promise<void>
   const parsed = uuidSchema.safeParse(String(formData.get("groupId") ?? ""));
   if (!parsed.success) redirect("/sns");
 
-  const { supabase } = await requireUser();
+  const { supabase, user } = await requireUser();
   const { error } = await supabase.rpc("delete_friend_group", { p_group_id: parsed.data });
   if (error) {
     redirect(`/sns/groups/${parsed.data}/settings?error=delete`);
   }
 
   revalidatePath("/sns");
+  revalidateTag(friendGroupsCacheTag(user.id));
   redirect("/sns");
 }
 

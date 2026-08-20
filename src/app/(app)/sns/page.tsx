@@ -13,7 +13,7 @@ export const dynamic = "force-dynamic";
 
 /** /sns 単体には何も表示しない。一番左（既定）のグループへ即座に移す */
 export default async function SnsPage() {
-  const { supabase } = await requireUser();
+  const { supabase, user } = await requireUser();
 
   let setupStatus: FriendsSetupStatus = { ready: false, reason: "migration_required" };
   let groups: FriendGroupRow[] = [];
@@ -22,7 +22,7 @@ export default async function SnsPage() {
   try {
     setupStatus = await getFriendsSetupStatus(supabase);
     if (setupStatus.ready) {
-      groups = await getMyFriendGroups(supabase);
+      groups = await getMyFriendGroups(supabase, user.id);
     }
   } catch {
     unavailable = true;

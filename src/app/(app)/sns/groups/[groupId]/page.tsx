@@ -1,5 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import { after } from "next/server";
+import { Suspense } from "react";
 import {
   createFriendGroupMessageAction,
   deleteFriendGroupMessageAction,
@@ -18,6 +20,7 @@ import { SnsViewTabs } from "@/components/sns/sns-view-tabs";
 import { signThumbOrOriginalPaths } from "@/lib/data/photos";
 import { getFriendGroupMessages, getMyFriendGroups, getOwnSnsProfile, getSnsGroupFeed, signGroupIconUrls } from "@/lib/data/sns";
 import { requireUser } from "@/lib/supabase/server";
+import type { FriendGroupRow } from "@/lib/supabase/types";
 
 export const dynamic = "force-dynamic";
 
@@ -30,16 +33,18 @@ export default async function SnsGroupPage({
 }) {
   const [{ groupId }, sp, { supabase, user }] = await Promise.all([params, searchParams, requireUser()]);
 
-  const groups = await getMyFriendGroups(supabase);
+  const groups = await getMyFriendGroups(supabase, user.id);
   const group = groups.find((g) => g.id === groupId);
   if (!group) notFound();
-  const [groupIconUrls, ownProfile] = await Promise.all([
-    signGroupIconUrls(supabase, groups),
-    getOwnSnsProfile(supabase, user.id),
-  ]);
 
-  // 画面を開いたタイミングで既読にする
-  await markFriendGroupReadAction(groupId);
+  // 画面を開いたタイミングで既読にする。表示をブロックしないようレスポンス送信後に実行する
+  after(async () => {
+    try {
+      await markFriendGroupReadAction(groupId);
+    } catch (error) {
+      console.error("Failed to mark friend group as read", error);
+    }
+  });
 
   const view = sp.view === "chat" ? "chat" : "photos";
   const baseHref = `/sns/groups/${groupId}`;
@@ -62,20 +67,20 @@ export default async function SnsGroupPage({
       <PostedToast />
       <SnsBackgroundBand />
       <PageBody>
-        <SnsGroupSwitcher
-          groups={groups}
-          activeGroupId={groupId}
-          iconUrls={Object.fromEntries(groupIconUrls)}
-          personalIconUrl={ownProfile.iconUrl}
-          personalLabel={ownProfile.displayName}
-        />
+        <Suspense fallback={<SnsSwitcherSkeleton />}>
+          <GroupSwitcherSection groups={groups} groupId={groupId} userId={user.id} />
+        </Suspense>
 
         {view === "photos" ? (
-          <GroupPhotos groupId={groupId} baseHref={baseHref} />
+          <Suspense fallback={<SnsGridSkeleton />}>
+            <GroupPhotos groupId={groupId} baseHref={baseHref} />
+          </Suspense>
         ) : (
           <>
             <SnsViewTabs baseHref={baseHref} view={view} />
-            <GroupChat groupId={groupId} currentUserId={user.id} />
+            <Suspense fallback={<SnsChatSkeleton />}>
+              <GroupChat groupId={groupId} currentUserId={user.id} />
+            </Suspense>
           </>
         )}
       </PageBody>
@@ -103,17 +108,78 @@ export default async function SnsGroupPage({
   );
 }
 
+async function GroupSwitcherSection({
+  groups,
+  groupId,
+  userId,
+}: {
+  groups: FriendGroupRow[];
+  groupId: string;
+  userId: string;
+}) {
+  const { supabase } = await requireUser();
+  const [groupIconUrls, ownProfile] = await Promise.all([
+    signGroupIconUrls(supabase, groups),
+    getOwnSnsProfile(supabase, userId),
+  ]);
+
+  return (
+    <SnsGroupSwitcher
+      groups={groups}
+      activeGroupId={groupId}
+      iconUrls={Object.fromEntries(groupIconUrls)}
+      personalIconUrl={ownProfile.iconUrl}
+      personalLabel={ownProfile.displayName}
+    />
+  );
+}
+
+function SnsSwitcherSkeleton() {
+  return (
+    <div className="-mx-4 -mt-5 flex items-center gap-3 bg-white px-4 py-1.5" aria-hidden="true">
+      {Array.from({ length: 5 }, (_, i) => (
+        <div key={i} className="h-14 w-14 shrink-0 animate-pulse rounded-full bg-paper-deep motion-reduce:animate-none" />
+      ))}
+    </div>
+  );
+}
+
 async function GroupPhotos({ groupId, baseHref }: { groupId: string; baseHref: string }) {
   const { supabase } = await requireUser();
   const photos = await getSnsGroupFeed(supabase, groupId);
-  const avatarUrls = await signThumbOrOriginalPaths(
-    supabase,
-    photos.flatMap((p) => (p.profile_image_url ? [p.profile_image_url] : [])),
-  );
-  // グリッドはサムネイル表示なので、原寸ではなく縮小版の署名URLを使う
-  const photoUrls = await signThumbOrOriginalPaths(supabase, photos.map((p) => p.storage_path));
+  // グリッドはサムネイル表示なので、原寸ではなく縮小版の署名URLを使う。互いに独立しているので並列で取得する
+  const [avatarUrls, photoUrls] = await Promise.all([
+    signThumbOrOriginalPaths(
+      supabase,
+      photos.flatMap((p) => (p.profile_image_url ? [p.profile_image_url] : [])),
+    ),
+    signThumbOrOriginalPaths(supabase, photos.map((p) => p.storage_path)),
+  ]);
 
   return <SnsPhotoGrid photos={photos} photoUrls={photoUrls} avatarUrls={avatarUrls} baseHref={baseHref} />;
+}
+
+function SnsGridSkeleton() {
+  return (
+    <div className="grid grid-cols-3 gap-1" aria-hidden="true">
+      {Array.from({ length: 9 }, (_, i) => (
+        <div key={i} className="aspect-square animate-pulse bg-paper-deep motion-reduce:animate-none" />
+      ))}
+    </div>
+  );
+}
+
+function SnsChatSkeleton() {
+  return (
+    <div className="space-y-3 px-4 py-4" aria-hidden="true">
+      {[0, 1, 2, 3].map((i) => (
+        <div
+          key={i}
+          className={`h-12 w-2/3 animate-pulse rounded-2xl bg-paper-deep motion-reduce:animate-none ${i % 2 === 1 ? "ml-auto" : ""}`}
+        />
+      ))}
+    </div>
+  );
 }
 
 async function GroupChat({ groupId, currentUserId }: { groupId: string; currentUserId: string }) {

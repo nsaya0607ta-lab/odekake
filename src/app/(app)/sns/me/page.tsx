@@ -15,7 +15,7 @@ export default async function SnsPersonalPage() {
   const { supabase, user } = await requireUser();
 
   const [groups, friends, ownProfile] = await Promise.all([
-    getMyFriendGroups(supabase),
+    getMyFriendGroups(supabase, user.id),
     getFriendList(supabase),
     getOwnSnsProfile(supabase, user.id),
   ]);

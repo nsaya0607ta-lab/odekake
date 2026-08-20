@@ -11,7 +11,7 @@ export const dynamic = "force-dynamic";
 export default async function NewSnsGroupPhotoPage({ params }: { params: Promise<{ groupId: string }> }) {
   const [{ groupId }, { supabase, user }] = await Promise.all([params, requireUser()]);
 
-  const groups = await getMyFriendGroups(supabase);
+  const groups = await getMyFriendGroups(supabase, user.id);
   const group = groups.find((g) => g.id === groupId);
   if (!group) notFound();
 
