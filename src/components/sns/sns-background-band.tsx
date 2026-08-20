@@ -38,10 +38,12 @@ export function SnsBackgroundBand() {
   if (top === null) return null;
 
   return (
+    // 下は常に画面の一番下まで敷く（ナビが出ている間はナビの裏に隠れるだけなので害はなく、
+    // キーボード表示でナビが消えたときにチャット入力欄との間にすき間ができない）
     <div
       aria-hidden
       className="sns-bg-band pointer-events-none fixed inset-x-0 -z-10"
-      style={{ top, bottom: "calc(var(--nav-height) + var(--safe-bottom))" }}
+      style={{ top, bottom: "env(safe-area-inset-bottom, 0px)" }}
     />
   );
 }
