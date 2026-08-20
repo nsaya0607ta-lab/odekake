@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { IconCalendar, IconChat, IconHeart, IconUser } from "@/components/icons";
+import { SnsViewToggleIcons } from "@/components/sns/sns-view-toggle-icons";
 import { groupSnsFeedByDay } from "@/lib/data/sns";
 import type { SnsFeedPhotoRow } from "@/lib/supabase/types";
 
@@ -95,25 +96,7 @@ export function SnsPhotoGrid({
     <div className="space-y-3">
       <div id="sns-toggle-bar" className="sticky top-14 z-20 -mx-4 -mt-6 border-b border-line bg-paper/92 px-4 backdrop-blur-sm">
         <div className="mx-auto flex max-w-lg items-center gap-1.5 py-1.5">
-          <div className="flex shrink-0 items-center gap-0.5">
-            <Link
-              href={`${baseHref}?view=photos`}
-              aria-label="写真"
-              aria-current
-              className="tap-target flex h-11 w-9 items-center justify-center rounded-xl bg-leaf-soft"
-            >
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src="/icons/sns/photo-toggle.png" alt="" className="h-8 w-8 object-contain" />
-            </Link>
-            <Link
-              href={`${baseHref}?view=chat`}
-              aria-label="チャット"
-              className="tap-target flex h-11 w-9 items-center justify-center rounded-xl opacity-40"
-            >
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src="/icons/sns/chat-toggle.png" alt="" className="h-8 w-8 object-contain" />
-            </Link>
-          </div>
+          <SnsViewToggleIcons baseHref={baseHref} view="photos" />
           <span aria-hidden className="h-8 w-px shrink-0 bg-line" />
           <div
             ref={chipRowRef}
