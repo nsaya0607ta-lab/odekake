@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { IconCalendar, IconChat, IconHeart, IconUser } from "@/components/icons";
+import { IconCalendar, IconChat, IconHeart, IconImage, IconPlus, IconUser } from "@/components/icons";
 import { SnsViewToggleIcons } from "@/components/sns/sns-view-toggle-icons";
 import { groupSnsFeedByDay } from "@/lib/data/sns";
 import type { SnsFeedPhotoRow } from "@/lib/supabase/types";
@@ -46,6 +46,7 @@ export function SnsPhotoGrid({
 }) {
   const today = useMemo(() => todayInTokyo(), []);
   const days = useMemo(() => groupSnsFeedByDay(photos), [photos]);
+  const photoDates = useMemo(() => new Set(days.map((day) => day.photoDate)), [days]);
   const [selectedDate, setSelectedDate] = useState(() => days[0]?.photoDate ?? today);
 
   // 直近14日分の窓に加えて、一番古い投稿日と（カレンダーで任意に選んだ日を含む）
@@ -94,19 +95,18 @@ export function SnsPhotoGrid({
 
   return (
     <div className="space-y-3">
-      <div id="sns-toggle-bar" className="sticky top-14 z-20 -mx-4 -mt-6 border-b border-line bg-paper/92 px-4 backdrop-blur-sm">
-        <div className="mx-auto flex max-w-lg items-center gap-1.5 py-1.5">
+      <div id="sns-toggle-bar" className="sticky top-14 z-20 -mx-4 border-y border-line bg-paper/92 px-4 py-2 backdrop-blur-md">
+        <div className="mx-auto flex max-w-lg items-center gap-2">
           <SnsViewToggleIcons baseHref={baseHref} view="photos" />
-          <span aria-hidden className="h-8 w-px shrink-0 bg-line" />
           <div
             ref={chipRowRef}
-            className="flex w-[17.25rem] shrink-0 gap-1 overflow-x-auto"
+            className="flex min-w-0 flex-1 gap-1 overflow-x-auto"
             style={{ scrollbarWidth: "none" }}
           >
             <label
               onClick={openDatePicker}
               aria-label="日付を選ぶ"
-              className="tap-target relative flex h-11 w-9 shrink-0 flex-col items-center justify-center rounded-xl text-ink-faint active:bg-paper-deep"
+              className="tap-target relative flex h-11 w-10 shrink-0 flex-col items-center justify-center rounded-xl border border-line bg-card text-ink-faint shadow-sm active:bg-paper-deep"
             >
               <IconCalendar size={16} />
               <input
@@ -123,7 +123,7 @@ export function SnsPhotoGrid({
             {dateWindow.map((date) => {
               const { md, weekday } = formatChip(date);
               const active = date === selectedDate;
-              const hasPhotos = days.some((d) => d.photoDate === date);
+              const hasPhotos = photoDates.has(date);
               return (
                 <button
                   key={date}
@@ -133,7 +133,7 @@ export function SnsPhotoGrid({
                   }}
                   type="button"
                   onClick={() => selectDate(date)}
-                  className={`flex h-11 w-9 shrink-0 flex-col items-center justify-center gap-0.5 rounded-xl text-xs font-semibold transition-colors ${
+                  className={`flex h-11 w-10 shrink-0 flex-col items-center justify-center gap-0.5 rounded-xl text-xs font-semibold transition-colors ${
                     active
                       ? "bg-leaf text-white"
                       : hasPhotos
@@ -141,8 +141,8 @@ export function SnsPhotoGrid({
                         : "text-ink-faint active:bg-paper-deep"
                   }`}
                 >
-                  <span>{md}</span>
-                  <span className="text-[10px]">{weekday}</span>
+                  <span>{date === today ? "今日" : md}</span>
+                  <span className="text-[9px]">{date === today ? md : weekday}</span>
                 </button>
               );
             })}
@@ -150,10 +150,33 @@ export function SnsPhotoGrid({
         </div>
       </div>
 
+      <div className="flex items-end justify-between gap-3 px-1">
+        <div>
+          <p className="text-[10px] font-bold tracking-[0.16em] text-sky">GROUP ALBUM</p>
+          <h2 className="text-base font-bold">
+            {selectedDate === today ? "今日の写真" : `${formatChip(selectedDate).md}の写真`}
+          </h2>
+        </div>
+        <span className="rounded-full bg-card/80 px-2.5 py-1 text-[10px] font-bold text-ink-faint shadow-sm ring-1 ring-line">
+          {selectedDay?.photos.length ?? 0}枚
+        </span>
+      </div>
+
       {!selectedDay || selectedDay.photos.length === 0 ? (
-        <p className="px-1 py-6 text-center text-xs text-ink-faint">この日の写真はまだありません。</p>
+        <Link href={`${baseHref}/new`} className="sns-empty-album pressable">
+          <span className="flex h-14 w-14 items-center justify-center rounded-2xl bg-sky-soft text-sky shadow-sm">
+            <IconImage size={25} />
+          </span>
+          <span className="min-w-0 flex-1">
+            <span className="block text-sm font-bold">この日の最初の一枚を追加</span>
+            <span className="mt-0.5 block text-[11px] text-ink-faint">グループの思い出をアルバムに残そう</span>
+          </span>
+          <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-sky text-white">
+            <IconPlus size={17} />
+          </span>
+        </Link>
       ) : (
-        <div className="grid grid-cols-3 gap-1.5">
+        <div className="grid grid-cols-3 gap-1.5 rounded-[1.4rem] bg-card/60 p-1.5 shadow-sm ring-1 ring-line">
           {selectedDay.photos.map((photo) => {
             const url = photoUrls.get(photo.storage_path);
             const avatarUrl = photo.profile_image_url ? avatarUrls.get(photo.profile_image_url) : null;
@@ -161,41 +184,43 @@ export function SnsPhotoGrid({
               <Link
                 key={photo.id}
                 href={`/sns/${photo.id}`}
-                className="relative aspect-square overflow-hidden rounded-2xl bg-paper-deep active:scale-[0.98]"
+                className="sns-photo-tile pressable relative aspect-square overflow-hidden bg-paper-deep"
               >
                 {url ? (
                   // eslint-disable-next-line @next/next/no-img-element
                   <img src={url} alt="" className="h-full w-full object-cover" />
                 ) : null}
-                <span className="absolute top-1 left-1 flex max-w-[calc(100%-8px)] items-center gap-1 rounded-full bg-black/45 py-0.5 pr-2 pl-0.5">
-                  <span className="h-5 w-5 shrink-0 overflow-hidden rounded-full border border-white/70 bg-paper-deep">
-                    {avatarUrl ? (
-                      // eslint-disable-next-line @next/next/no-img-element
-                      <img src={avatarUrl} alt="" className="h-full w-full object-cover" />
-                    ) : (
-                      <span className="flex h-full w-full items-center justify-center text-ink-faint">
-                        <IconUser size={11} />
-                      </span>
-                    )}
+                <span className="absolute inset-x-0 bottom-0 flex items-end justify-between gap-1 bg-gradient-to-t from-black/70 via-black/30 to-transparent px-1.5 pt-6 pb-1.5">
+                  <span className="flex min-w-0 items-center gap-1">
+                    <span className="h-5 w-5 shrink-0 overflow-hidden rounded-full border border-white/70 bg-paper-deep">
+                      {avatarUrl ? (
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img src={avatarUrl} alt="" className="h-full w-full object-cover" />
+                      ) : (
+                        <span className="flex h-full w-full items-center justify-center text-ink-faint">
+                          <IconUser size={11} />
+                        </span>
+                      )}
+                    </span>
+                    <span className="truncate text-[10px] font-semibold text-white">{photo.display_name}</span>
                   </span>
-                  <span className="truncate text-[10px] font-semibold text-white">{photo.display_name}</span>
+                  {photo.reaction_count > 0 || photo.comment_count > 0 ? (
+                    <span className="flex shrink-0 items-center gap-1 text-[9px] font-semibold text-white">
+                      {photo.reaction_count > 0 ? (
+                        <span className="flex items-center gap-0.5">
+                          <IconHeart size={10} filled />
+                          {photo.reaction_count}
+                        </span>
+                      ) : null}
+                      {photo.comment_count > 0 ? (
+                        <span className="flex items-center gap-0.5">
+                          <IconChat size={10} />
+                          {photo.comment_count}
+                        </span>
+                      ) : null}
+                    </span>
+                  ) : null}
                 </span>
-                {photo.reaction_count > 0 || photo.comment_count > 0 ? (
-                  <span className="absolute right-1 bottom-1 flex items-center gap-1.5 rounded-full bg-black/45 px-1.5 py-0.5 text-[10px] font-semibold text-white">
-                    {photo.reaction_count > 0 ? (
-                      <span className="flex items-center gap-0.5">
-                        <IconHeart size={10} filled />
-                        {photo.reaction_count}
-                      </span>
-                    ) : null}
-                    {photo.comment_count > 0 ? (
-                      <span className="flex items-center gap-0.5">
-                        <IconChat size={10} />
-                        {photo.comment_count}
-                      </span>
-                    ) : null}
-                  </span>
-                ) : null}
               </Link>
             );
           })}

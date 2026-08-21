@@ -2,7 +2,8 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { IconPlus, IconUsers } from "@/components/icons";
 import { PageBody } from "@/components/page-body";
-import { TopHeader } from "@/components/page-header";
+import { PageHeader } from "@/components/page-header";
+import { SnsPrimaryNav } from "@/components/sns/sns-primary-nav";
 import { getMyFriendGroups } from "@/lib/data/sns";
 import { requireUser } from "@/lib/supabase/server";
 
@@ -20,9 +21,10 @@ export default async function SnsGroupsIndexPage({ searchParams }: { searchParam
 
   return (
     <>
-      <TopHeader title="グループ" backHref="/sns/home" />
-      <PageBody>
-        <div className="rough-card px-6 py-10 text-center">
+      <PageHeader title="SNS" subtitle="写真とチャットをグループで共有" showBack={false} />
+      <PageBody className="space-y-4">
+        <SnsPrimaryNav active="group" userHref={`/sns/users/${user.id}`} groupHref="/sns/groups" />
+        <div className="sns-empty-feed px-6 py-10">
           <span className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-leaf-soft text-leaf-deep">
             <IconUsers size={28} />
           </span>

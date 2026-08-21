@@ -10,10 +10,12 @@ export function SnsCommentToggle({
   postId,
   currentUserId,
   replyCount,
+  showLabel = false,
 }: {
   postId: string;
   currentUserId: string;
   replyCount: number;
+  showLabel?: boolean;
 }) {
   const [open, setOpen] = useState(false);
   const [replies, setReplies] = useState<SnsEnrichedReply[] | null>(null);
@@ -36,9 +38,10 @@ export function SnsCommentToggle({
         onClick={toggle}
         aria-expanded={open}
         aria-label="コメントする"
-        className="flex items-center gap-1.5 rounded-full px-1.5 py-1 text-ink-faint active:bg-paper-deep"
+        className="flex min-h-9 items-center gap-1.5 rounded-full px-2.5 py-1 text-ink-faint active:bg-paper-deep"
       >
         <IconChat size={16} />
+        {showLabel ? <span className="text-[11px] font-bold">返信</span> : null}
         {replyCount > 0 ? <span className="text-xs">{replyCount}</span> : null}
       </button>
       {open ? (

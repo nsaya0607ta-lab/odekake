@@ -4,40 +4,26 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { reorderFriendGroupsAction } from "@/app/actions/sns";
-import { IconPlus, IconUser } from "@/components/icons";
-import { useSnsMode } from "@/components/sns/sns-mode-context";
+import { IconPlus } from "@/components/icons";
 import type { FriendGroupRow } from "@/lib/supabase/types";
 
 const LONG_PRESS_MS = 400;
 const MOVE_CANCEL_PX = 8;
 const SETTLE_TRANSITION = "transform 180ms cubic-bezier(0.2, 0, 0, 1)";
 
-export type SnsPersonRow = {
-  id: string;
-  label: string;
-  iconUrl?: string;
-};
-
 /** /sns/groups/[groupId] の上部に出す、グループアイコンの横スクロール切り替え。
  * 一番左が既定のグループ（区切り線で示す）。長押しでドラッグして並び替えできる。
  * ドラッグ中の本人は指に追従、他のアイコンは FLIP でなめらかに位置を譲る */
 export function SnsGroupSwitcher({
   groups,
-  friends = [],
-  own,
   activeGroupId,
   iconUrls = {},
 }: {
   groups: FriendGroupRow[];
-  /** ユーザー表示モードで並べるフレンド一覧 */
-  friends?: SnsPersonRow[];
-  /** ユーザー表示モードの左端に出す自分自身 */
-  own: SnsPersonRow;
   activeGroupId?: string;
   iconUrls?: Record<string, string>;
 }) {
   const router = useRouter();
-  const { mode } = useSnsMode();
   const [order, setOrder] = useState(groups);
   const [draggingId, setDraggingId] = useState<string | null>(null);
   const itemRefs = useRef(new Map<string, HTMLDivElement>());
@@ -188,82 +174,53 @@ export function SnsGroupSwitcher({
   }
 
   return (
-    <div className="-mx-4 -mt-5 flex items-center gap-3 overflow-x-auto bg-white px-4 py-1.5" style={{ scrollbarWidth: "none" }}>
-      {mode === "user" ? (
-        <>
-          <PersonIcon person={own} href={`/sns/users/${own.id}`} highlight />
-          {friends.length > 0 ? <span aria-hidden className="h-10 w-px shrink-0 bg-line-strong" /> : null}
-          {friends.map((friend) => (
-            <PersonIcon key={friend.id} person={friend} href={`/sns/users/${friend.id}`} />
-          ))}
-        </>
-      ) : (
-        <>
-          {order.map((group) => (
-            <div key={group.id} className="flex shrink-0 items-center gap-3">
-              <div
-                ref={(el) => {
-                  if (el) itemRefs.current.set(group.id, el);
-                  else itemRefs.current.delete(group.id);
-                }}
-                style={{ touchAction: "pan-x" }}
-                onPointerDown={(e) => handlePointerDown(e, group.id)}
-                onPointerMove={(e) => handlePointerMove(e, group.id)}
-                onPointerUp={() => handlePointerUp(group.id)}
-                onPointerCancel={() => handlePointerUp(group.id)}
-              >
-                <GroupIcon
-                  icon={group.icon}
-                  iconUrl={group.icon_path ? iconUrls[group.icon_path] : undefined}
-                  label={group.name}
-                  active={activeGroupId === group.id}
-                  unread={group.has_unread}
-                  dragging={draggingId === group.id}
-                />
-              </div>
+    <section className="sns-rail-panel" aria-labelledby="sns-groups-title">
+      <div className="mb-3 flex items-end justify-between gap-3 px-1">
+        <div>
+          <p className="text-[10px] font-bold tracking-[0.16em] text-sky">SHARED ALBUM</p>
+          <h2 id="sns-groups-title" className="text-base font-bold">
+            グループ
+          </h2>
+        </div>
+        <p className="text-[10px] text-ink-faint">長押しで並び替え</p>
+      </div>
+      <div className="flex items-start gap-3 overflow-x-auto pb-1" style={{ scrollbarWidth: "none" }}>
+        {order.map((group) => (
+          <div key={group.id} className="flex shrink-0 items-center gap-3">
+            <div
+              ref={(el) => {
+                if (el) itemRefs.current.set(group.id, el);
+                else itemRefs.current.delete(group.id);
+              }}
+              style={{ touchAction: "pan-x" }}
+              onPointerDown={(e) => handlePointerDown(e, group.id)}
+              onPointerMove={(e) => handlePointerMove(e, group.id)}
+              onPointerUp={() => handlePointerUp(group.id)}
+              onPointerCancel={() => handlePointerUp(group.id)}
+            >
+              <GroupIcon
+                icon={group.icon}
+                iconUrl={group.icon_path ? iconUrls[group.icon_path] : undefined}
+                label={group.name}
+                active={activeGroupId === group.id}
+                unread={group.has_unread}
+                dragging={draggingId === group.id}
+              />
             </div>
-          ))}
-          <Link href="/sns/groups/new" aria-label="グループを作る" className="flex shrink-0 flex-col items-center gap-1">
-            <span className="tap-target flex h-14 w-14 items-center justify-center rounded-full border-2 border-dashed border-line text-ink-faint active:bg-paper-deep">
-              <IconPlus size={20} />
-            </span>
-            <span className="max-w-[3.5rem] truncate text-[10px] text-ink-faint">追加</span>
-          </Link>
-        </>
-      )}
-    </div>
-  );
-}
-
-function PersonIcon({
-  person,
-  href,
-  highlight = false,
-}: {
-  person: SnsPersonRow;
-  href: string;
-  highlight?: boolean;
-}) {
-  return (
-    <Link href={href} className="flex shrink-0 flex-col items-center gap-1">
-      <span
-        className={`tap-target flex h-14 w-14 items-center justify-center overflow-hidden rounded-full border-2 text-2xl transition-colors ${
-          highlight ? "border-leaf bg-leaf-soft" : "border-line bg-card"
-        }`}
-      >
-        {person.iconUrl ? (
-          // eslint-disable-next-line @next/next/no-img-element
-          <img src={person.iconUrl} alt="" className="h-full w-full object-cover" />
-        ) : (
-          <IconUser size={22} className="text-ink-faint" />
-        )}
-      </span>
-      <span
-        className={`max-w-[3.5rem] truncate text-[10px] font-semibold ${highlight ? "text-leaf-deep" : "text-ink-soft"}`}
-      >
-        {person.label}
-      </span>
-    </Link>
+          </div>
+        ))}
+        <Link
+          href="/sns/groups/new"
+          aria-label="グループを作る"
+          className="flex shrink-0 flex-col items-center gap-1"
+        >
+          <span className="tap-target flex h-16 w-16 items-center justify-center rounded-full border-2 border-dashed border-line-strong bg-card/70 text-ink-faint shadow-sm active:bg-paper-deep">
+            <IconPlus size={20} />
+          </span>
+          <span className="max-w-[4rem] truncate text-[10px] font-bold text-ink-faint">新規作成</span>
+        </Link>
+      </div>
+    </section>
   );
 }
 
@@ -286,8 +243,8 @@ function GroupIcon({
     <div className={`flex select-none flex-col items-center gap-1 transition-transform ${dragging ? "scale-105" : ""}`}>
       <span className="relative">
         <span
-          className={`tap-target flex h-14 w-14 items-center justify-center overflow-hidden rounded-full border-2 text-2xl transition-colors ${
-            active ? "border-leaf bg-leaf-soft" : "border-line bg-card"
+          className={`tap-target flex h-16 w-16 items-center justify-center overflow-hidden rounded-full border-[3px] text-2xl transition-colors ${
+            active ? "border-leaf bg-leaf-soft ring-4 ring-leaf-soft/80" : "border-card bg-card ring-1 ring-line"
           } ${dragging ? "shadow-md" : ""}`}
         >
           {iconUrl ? (
@@ -298,10 +255,10 @@ function GroupIcon({
           )}
         </span>
         {unread ? (
-          <span className="absolute top-0 right-0 h-3 w-3 rounded-full bg-[#4a90d9] ring-2 ring-paper" />
+          <span className="absolute top-0 right-0 h-3.5 w-3.5 rounded-full bg-sky ring-[3px] ring-card" />
         ) : null}
       </span>
-      <span className={`max-w-[3.5rem] truncate text-[10px] font-semibold ${active ? "text-leaf-deep" : "text-ink-soft"}`}>
+      <span className={`max-w-[4rem] truncate text-[10px] font-bold ${active ? "text-leaf-deep" : "text-ink-soft"}`}>
         {label}
       </span>
     </div>

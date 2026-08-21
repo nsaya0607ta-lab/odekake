@@ -156,6 +156,282 @@
     background-position: center;
   }
 
+  .sns-primary-nav {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 0.35rem;
+    padding: 0.4rem;
+    border: 1px solid color-mix(in srgb, var(--color-line) 85%, white);
+    border-radius: 1.35rem;
+    background:
+      linear-gradient(135deg, rgba(255, 255, 255, 0.86), rgba(251, 248, 241, 0.8)),
+      radial-gradient(circle at 12% 20%, var(--color-leaf-soft), transparent 42%);
+    box-shadow: 0 8px 24px rgba(93, 80, 58, 0.08);
+  }
+
+  .sns-primary-nav-item {
+    display: flex;
+    min-width: 0;
+    min-height: 3.25rem;
+    align-items: center;
+    justify-content: center;
+    gap: 0.42rem;
+    padding: 0.45rem 0.35rem;
+    border-radius: 1rem;
+    color: var(--color-ink-faint);
+  }
+
+  .sns-primary-nav-item.is-active {
+    color: var(--color-leaf-deep);
+    background: linear-gradient(145deg, #eff5e6, var(--color-leaf-soft));
+    box-shadow:
+      inset 0 0 0 1px rgba(127, 165, 104, 0.24),
+      0 4px 10px rgba(93, 128, 73, 0.12);
+  }
+
+  .sns-primary-nav-icon {
+    display: flex;
+    width: 2rem;
+    height: 2rem;
+    flex: 0 0 auto;
+    align-items: center;
+    justify-content: center;
+    border-radius: 0.75rem;
+    background: rgba(255, 255, 255, 0.7);
+    box-shadow: 0 1px 0 rgba(93, 80, 58, 0.08);
+  }
+
+  .sns-home-welcome {
+    position: relative;
+    overflow: hidden;
+    padding: 1rem 1.15rem;
+    border: 1px solid rgba(127, 165, 104, 0.24);
+    border-radius: 1.5rem 1.9rem 1.45rem 1.75rem;
+    background:
+      radial-gradient(circle at 92% 18%, rgba(226, 163, 119, 0.28), transparent 30%),
+      radial-gradient(circle at 75% 90%, rgba(127, 168, 201, 0.2), transparent 34%),
+      linear-gradient(135deg, rgba(255, 253, 248, 0.96), rgba(223, 234, 207, 0.78));
+    box-shadow: 0 8px 22px rgba(93, 80, 58, 0.08);
+  }
+
+  .sns-home-welcome::after {
+    content: "";
+    position: absolute;
+    width: 4.5rem;
+    height: 4.5rem;
+    right: -1.2rem;
+    bottom: -1.5rem;
+    border: 1px dashed rgba(93, 128, 73, 0.35);
+    border-radius: 999px;
+  }
+
+  .sns-home-welcome-stamp {
+    position: absolute;
+    top: 0.8rem;
+    right: 1rem;
+    transform: rotate(5deg);
+    padding: 0.25rem 0.55rem;
+    border: 1px solid rgba(226, 163, 119, 0.46);
+    border-radius: 999px;
+    color: #b87954;
+    font-size: 0.55rem;
+    font-weight: 800;
+    letter-spacing: 0.14em;
+  }
+
+  .sns-quick-compose,
+  .sns-empty-album,
+  .sns-compose-intro {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    padding: 0.75rem;
+    border: 1px solid var(--color-line);
+    border-radius: 1.35rem;
+    background: rgba(255, 253, 248, 0.9);
+    box-shadow: 0 5px 15px rgba(93, 80, 58, 0.07);
+  }
+
+  .sns-quick-compose {
+    background:
+      linear-gradient(rgba(255, 253, 248, 0.9), rgba(255, 253, 248, 0.9)),
+      url("/backgrounds/gradient-bubbles.jpg") center / cover;
+  }
+
+  .sns-rail-panel {
+    position: relative;
+    overflow: hidden;
+    padding: 0.9rem;
+    border: 1px solid var(--color-line);
+    border-radius: 1.45rem 1.8rem 1.4rem 1.7rem;
+    background:
+      radial-gradient(circle at 100% 0, rgba(127, 168, 201, 0.15), transparent 35%),
+      rgba(255, 253, 248, 0.9);
+    box-shadow: 0 6px 18px rgba(93, 80, 58, 0.07);
+  }
+
+  .sns-person-avatar {
+    position: relative;
+    display: flex;
+    width: 4rem;
+    height: 4rem;
+    align-items: center;
+    justify-content: center;
+    overflow: hidden;
+    border: 3px solid var(--color-card);
+    border-radius: 999px;
+    background: var(--color-paper-deep);
+    box-shadow:
+      0 0 0 1px var(--color-line),
+      0 4px 10px rgba(93, 80, 58, 0.09);
+  }
+
+  .sns-person-avatar.is-active {
+    box-shadow:
+      0 0 0 3px var(--color-leaf),
+      0 0 0 6px var(--color-leaf-soft),
+      0 5px 12px rgba(93, 128, 73, 0.16);
+  }
+
+  .sns-me-badge {
+    position: absolute;
+    right: -0.05rem;
+    bottom: 0.05rem;
+    padding: 0.1rem 0.27rem;
+    border-radius: 999px;
+    background: var(--color-leaf-deep);
+    color: white;
+    font-size: 0.45rem;
+    font-weight: 800;
+    box-shadow: 0 0 0 2px var(--color-card);
+  }
+
+  .sns-profile-hero {
+    position: relative;
+    display: flex;
+    min-height: 8.2rem;
+    align-items: center;
+    gap: 1rem;
+    overflow: hidden;
+    padding: 1.1rem;
+    border: 1px solid rgba(127, 165, 104, 0.26);
+    border-radius: 1.75rem 1.45rem 1.85rem 1.5rem;
+    background:
+      radial-gradient(circle at 84% 12%, rgba(224, 184, 98, 0.24), transparent 31%),
+      linear-gradient(135deg, rgba(255, 253, 248, 0.98), rgba(223, 234, 207, 0.72));
+    box-shadow: 0 9px 24px rgba(93, 80, 58, 0.09);
+  }
+
+  .sns-profile-avatar {
+    position: relative;
+    z-index: 1;
+    display: flex;
+    width: 5.1rem;
+    height: 5.1rem;
+    flex: 0 0 auto;
+    align-items: center;
+    justify-content: center;
+    overflow: hidden;
+    border: 4px solid var(--color-card);
+    border-radius: 999px;
+    background: var(--color-leaf-soft);
+    box-shadow:
+      0 0 0 1px var(--color-line),
+      0 6px 14px rgba(93, 80, 58, 0.12);
+  }
+
+  .sns-profile-orbit {
+    position: absolute;
+    width: 7rem;
+    height: 7rem;
+    left: -0.55rem;
+    border: 1px dashed rgba(93, 128, 73, 0.38);
+    border-radius: 999px;
+  }
+
+  .sns-floating-compose {
+    background: linear-gradient(135deg, var(--color-leaf), var(--color-leaf-deep));
+    box-shadow:
+      0 10px 22px rgba(93, 128, 73, 0.28),
+      inset 0 1px 0 rgba(255, 255, 255, 0.28);
+  }
+
+  .sns-post-card {
+    position: relative;
+    overflow: visible;
+    border: 1px solid var(--color-line);
+    border-radius: 1.45rem 1.2rem 1.55rem 1.3rem;
+    background:
+      linear-gradient(155deg, rgba(255, 255, 255, 0.4), transparent 35%),
+      var(--color-card);
+    box-shadow: 0 7px 20px rgba(93, 80, 58, 0.075);
+    content-visibility: auto;
+    contain-intrinsic-size: 220px;
+  }
+
+  .sns-post-tape {
+    position: absolute;
+    top: -0.35rem;
+    left: 2rem;
+    width: 2.6rem;
+    height: 0.75rem;
+    transform: rotate(-2deg);
+    border-radius: 0.15rem;
+    background: rgba(223, 234, 207, 0.84);
+    box-shadow: inset 0 0 0 1px rgba(127, 165, 104, 0.08);
+  }
+
+  .sns-empty-feed {
+    padding: 2rem 1rem;
+    border: 1px dashed var(--color-line-strong);
+    border-radius: 1.5rem;
+    background: rgba(255, 253, 248, 0.65);
+    text-align: center;
+  }
+
+  .sns-photo-tile {
+    border-radius: 0.85rem;
+    box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.26);
+  }
+
+  .sns-empty-album {
+    border-style: dashed;
+  }
+
+  .sns-compose-sheet {
+    padding: 1rem;
+    border: 1px solid var(--color-line);
+    border-radius: 1.6rem;
+    background:
+      radial-gradient(circle at 100% 0, rgba(226, 163, 119, 0.16), transparent 30%),
+      rgba(255, 253, 248, 0.9);
+    box-shadow: 0 8px 24px rgba(93, 80, 58, 0.08);
+  }
+
+  .sns-chat-stream {
+    border-radius: 1.5rem;
+    background:
+      linear-gradient(rgba(251, 248, 241, 0.76), rgba(251, 248, 241, 0.76)),
+      radial-gradient(circle at 12px 12px, rgba(127, 168, 201, 0.17) 1px, transparent 1.5px);
+    background-size: auto, 24px 24px;
+  }
+
+  .sns-chat-date {
+    width: max-content;
+    margin: 0.4rem auto 0.75rem;
+    padding: 0.25rem 0.65rem;
+    border-radius: 999px;
+    background: rgba(255, 253, 248, 0.88);
+    color: var(--color-ink-faint);
+    font-size: 0.625rem;
+    font-weight: 700;
+    box-shadow: 0 1px 5px rgba(93, 80, 58, 0.08);
+  }
+
+  .sns-chat-dock {
+    box-shadow: 0 -8px 24px rgba(93, 80, 58, 0.07);
+  }
+
   .rough-card {
     background-color: var(--color-card);
     border: 1px solid var(--color-line);

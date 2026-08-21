@@ -22,11 +22,17 @@ export function SnsTextFeed({
   currentUserId: string;
 }) {
   if (posts.length === 0) {
-    return <p className="px-1 py-10 text-center text-xs text-ink-faint">まだ投稿がありません。</p>;
+    return (
+      <div className="sns-empty-feed">
+        <span className="text-3xl" aria-hidden="true">📝</span>
+        <p className="mt-2 text-sm font-bold">まだつぶやきがありません</p>
+        <p className="mt-1 text-xs text-ink-faint">最初のおでかけメモを残してみましょう。</p>
+      </div>
+    );
   }
 
   return (
-    <ul className="space-y-3">
+    <ul className="space-y-3.5">
       {posts.map((post) => {
         const avatarUrl = post.profile_image_url ? avatarUrls.get(post.profile_image_url) : null;
         const isMine = post.user_id === currentUserId;
@@ -40,11 +46,12 @@ export function SnsTextFeed({
         });
 
         return (
-          <li key={post.id} className="rough-card flex gap-3 p-3.5">
+          <li key={post.id} className="sns-post-card flex gap-3 p-3.5">
+            <span className="sns-post-tape" aria-hidden="true" />
             <Link
               href={`/sns/users/${post.user_id}`}
               aria-label={`${post.display_name}のホーム`}
-              className="h-12 w-12 shrink-0 overflow-hidden rounded-full shadow-sm ring-2 ring-card"
+              className="h-12 w-12 shrink-0 overflow-hidden rounded-full bg-card shadow-sm ring-[3px] ring-card outline outline-1 outline-line"
             >
               {avatarUrl ? (
                 // eslint-disable-next-line @next/next/no-img-element
@@ -56,22 +63,22 @@ export function SnsTextFeed({
               )}
             </Link>
             <div className="min-w-0 flex-1">
-              <div className="flex items-center gap-1">
-                <Link href={`/sns/users/${post.user_id}`} className="truncate text-[15px] font-bold">
+              <div className="flex items-center gap-1.5 pr-7">
+                <Link href={`/sns/users/${post.user_id}`} className="truncate text-[15px] font-bold text-ink">
                   {post.display_name}
                 </Link>
-                <span className="shrink-0 text-[13px] text-ink-faint">
-                  ・{formatRelativeTimeJa(post.created_at)}
+                <span className="shrink-0 rounded-full bg-paper-deep px-2 py-0.5 text-[10px] font-semibold text-ink-faint">
+                  {formatRelativeTimeJa(post.created_at)}
                 </span>
                 {isMine ? (
-                  <span className="ml-auto shrink-0">
+                  <span className="absolute top-2.5 right-2.5 shrink-0">
                     <PostOptionsMenu postId={post.id} />
                   </span>
                 ) : null}
               </div>
               {post.body ? (
                 <Link href={`/sns/posts/${post.id}`} className="mt-0.5 block">
-                  <p className="whitespace-pre-wrap break-words text-[15px] leading-normal">{post.body}</p>
+                  <p className="whitespace-pre-wrap break-words text-[15px] leading-relaxed text-ink">{post.body}</p>
                 </Link>
               ) : null}
               {postPhotoUrls.length > 0 ? (
@@ -79,9 +86,20 @@ export function SnsTextFeed({
                   <SnsPostPhotoGrid photoUrls={postPhotoUrls} fullUrls={postFullPhotoUrls} />
                 </Link>
               ) : null}
-              <div className="mt-2.5 flex flex-wrap items-center gap-4">
-                <SnsCommentToggle postId={post.id} currentUserId={currentUserId} replyCount={post.reply_count} />
-                <LikeButton postId={post.id} authorUserId={post.user_id} liked={post.my_liked} count={post.like_count} />
+              <div className="mt-3 flex flex-wrap items-center gap-1 border-t border-dashed border-line pt-2">
+                <SnsCommentToggle
+                  postId={post.id}
+                  currentUserId={currentUserId}
+                  replyCount={post.reply_count}
+                  showLabel
+                />
+                <LikeButton
+                  postId={post.id}
+                  authorUserId={post.user_id}
+                  liked={post.my_liked}
+                  count={post.like_count}
+                  showLabel
+                />
               </div>
             </div>
           </li>

@@ -9,11 +9,13 @@ export function LikeButton({
   authorUserId,
   liked,
   count,
+  showLabel = false,
 }: {
   postId: string;
   authorUserId: string;
   liked: boolean;
   count: number;
+  showLabel?: boolean;
 }) {
   const [optimistic, setOptimistic] = useState({ liked, count });
   const [, startTransition] = useTransition();
@@ -41,11 +43,12 @@ export function LikeButton({
       onClick={toggle}
       aria-label={optimistic.liked ? "いいねを取り消す" : "いいねする"}
       aria-pressed={optimistic.liked}
-      className={`flex items-center gap-1.5 rounded-full px-1.5 py-1 transition-colors active:bg-paper-deep ${
-        optimistic.liked ? "text-blossom" : "text-ink-faint"
+      className={`flex min-h-9 items-center gap-1.5 rounded-full px-2.5 py-1 transition-colors active:bg-paper-deep ${
+        optimistic.liked ? "bg-blossom-soft text-blossom" : "text-ink-faint"
       }`}
     >
       <IconHeart size={16} filled={optimistic.liked} />
+      {showLabel ? <span className="text-[11px] font-bold">いいね</span> : null}
       {optimistic.count > 0 ? <span className="text-xs">{optimistic.count}</span> : null}
     </button>
   );

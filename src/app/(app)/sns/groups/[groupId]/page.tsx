@@ -14,14 +14,12 @@ import { PostedToast } from "@/components/sns/posted-toast";
 import { SnsBackgroundBand } from "@/components/sns/sns-background-band";
 import { SnsChatForm } from "@/components/sns/sns-chat-form";
 import { SnsChatList } from "@/components/sns/sns-chat-list";
-import { SnsGroupSwitcher, type SnsPersonRow } from "@/components/sns/sns-group-switcher";
-import { SnsModeMenu } from "@/components/sns/sns-mode-menu";
-import { SnsGroupOnly, SnsModeProvider } from "@/components/sns/sns-mode-context";
+import { SnsGroupSwitcher } from "@/components/sns/sns-group-switcher";
 import { SnsPhotoGrid } from "@/components/sns/sns-photo-grid";
+import { SnsPrimaryNav } from "@/components/sns/sns-primary-nav";
 import { SnsViewTabs } from "@/components/sns/sns-view-tabs";
-import { getFriendList } from "@/lib/data/friends";
 import { signThumbOrOriginalPaths } from "@/lib/data/photos";
-import { getFriendGroupMessages, getMyFriendGroups, getOwnSnsProfile, getSnsGroupFeed, signGroupIconUrls } from "@/lib/data/sns";
+import { getFriendGroupMessages, getMyFriendGroups, getSnsGroupFeed, signGroupIconUrls } from "@/lib/data/sns";
 import { requireUser } from "@/lib/supabase/server";
 import type { FriendGroupRow } from "@/lib/supabase/types";
 
@@ -32,7 +30,7 @@ export default async function SnsGroupPage({
   searchParams,
 }: {
   params: Promise<{ groupId: string }>;
-  searchParams: Promise<{ view?: string; mode?: string }>;
+  searchParams: Promise<{ view?: string }>;
 }) {
   const [{ groupId }, sp, { supabase, user }] = await Promise.all([params, searchParams, requireUser()]);
 
@@ -50,15 +48,14 @@ export default async function SnsGroupPage({
   });
 
   const view = sp.view === "chat" ? "chat" : "photos";
-  const initialMode = sp.mode === "user" ? "user" : "group";
   const baseHref = `/sns/groups/${groupId}`;
 
   return (
-    <SnsModeProvider initialMode={initialMode}>
+    <>
       <PageHeader
         title={group.name}
+        subtitle={`${group.member_count}人で共有中`}
         showBack={false}
-        leftAction={<SnsModeMenu />}
         action={
           <Link
             href={`${baseHref}/settings`}
@@ -71,82 +68,63 @@ export default async function SnsGroupPage({
       />
       <PostedToast />
       <SnsBackgroundBand />
-      <PageBody>
+      <PageBody className="space-y-4">
+        <SnsPrimaryNav active="group" userHref={`/sns/users/${user.id}`} groupHref={baseHref} />
         <Suspense fallback={<SnsSwitcherSkeleton />}>
-          <GroupSwitcherSection groups={groups} groupId={groupId} userId={user.id} />
+          <GroupSwitcherSection groups={groups} groupId={groupId} />
         </Suspense>
 
-        <SnsGroupOnly>
-          {view === "photos" ? (
-            <Suspense fallback={<SnsGridSkeleton />}>
-              <GroupPhotos groupId={groupId} baseHref={baseHref} />
+        {view === "photos" ? (
+          <Suspense fallback={<SnsGridSkeleton />}>
+            <GroupPhotos groupId={groupId} baseHref={baseHref} />
+          </Suspense>
+        ) : (
+          <>
+            <SnsViewTabs baseHref={baseHref} view={view} />
+            <Suspense fallback={<SnsChatSkeleton />}>
+              <GroupChat groupId={groupId} currentUserId={user.id} />
             </Suspense>
-          ) : (
-            <>
-              <SnsViewTabs baseHref={baseHref} view={view} />
-              <Suspense fallback={<SnsChatSkeleton />}>
-                <GroupChat groupId={groupId} currentUserId={user.id} />
-              </Suspense>
-            </>
-          )}
-        </SnsGroupOnly>
+          </>
+        )}
       </PageBody>
       {/* PageBody の fade-in アニメーションが transform を animate するせいで、
           position:fixed の子が画面基準ではなくPageBody基準になってしまう。
           さらに sticky はコンテンツが短いと画面下に届かないので、
           FABとチャット入力欄はどちらもPageBodyの外に fixed で置く */}
-      <SnsGroupOnly>
-        {view === "photos" ? (
-          <Link
-            href={`${baseHref}/new`}
-            aria-label="写真を投稿"
-            className="fixed right-4 z-30 flex h-14 w-14 items-center justify-center rounded-full bg-leaf text-white shadow-lg active:opacity-80"
-            style={{ bottom: "calc(var(--nav-height) + var(--safe-bottom) + 1rem)" }}
-          >
-            <IconPlus size={24} />
-          </Link>
-        ) : (
-          <SnsChatForm
-            action={createFriendGroupMessageAction}
-            hiddenFields={{ groupId }}
-            postHref={`${baseHref}/new`}
-          />
-        )}
-      </SnsGroupOnly>
-    </SnsModeProvider>
+      {view === "photos" ? (
+        <Link
+          href={`${baseHref}/new`}
+          aria-label="写真を投稿"
+          className="sns-floating-compose fixed right-4 z-30 flex h-14 items-center justify-center gap-1.5 rounded-full px-4 text-white shadow-lg active:opacity-80"
+          style={{ bottom: "calc(var(--nav-height) + var(--safe-bottom) + 1rem)" }}
+        >
+          <IconPlus size={21} />
+          <span className="text-sm font-bold">写真</span>
+        </Link>
+      ) : (
+        <SnsChatForm
+          action={createFriendGroupMessageAction}
+          hiddenFields={{ groupId }}
+          postHref={`${baseHref}/new`}
+        />
+      )}
+    </>
   );
 }
 
 async function GroupSwitcherSection({
   groups,
   groupId,
-  userId,
 }: {
   groups: FriendGroupRow[];
   groupId: string;
-  userId: string;
 }) {
   const { supabase } = await requireUser();
-  const [groupIconUrls, friends, ownProfile] = await Promise.all([
-    signGroupIconUrls(supabase, groups),
-    getFriendList(supabase),
-    getOwnSnsProfile(supabase, userId),
-  ]);
-  const friendAvatarUrls = await signThumbOrOriginalPaths(
-    supabase,
-    friends.flatMap((f) => (f.profile_image_url ? [f.profile_image_url] : [])),
-  );
-  const friendRows: SnsPersonRow[] = friends.map((friend) => ({
-    id: friend.friend_user_id,
-    label: friend.display_name,
-    iconUrl: friend.profile_image_url ? friendAvatarUrls.get(friend.profile_image_url) : undefined,
-  }));
+  const groupIconUrls = await signGroupIconUrls(supabase, groups);
 
   return (
     <SnsGroupSwitcher
       groups={groups}
-      friends={friendRows}
-      own={{ id: userId, label: ownProfile.displayName, iconUrl: ownProfile.iconUrl }}
       activeGroupId={groupId}
       iconUrls={Object.fromEntries(groupIconUrls)}
     />
@@ -155,10 +133,13 @@ async function GroupSwitcherSection({
 
 function SnsSwitcherSkeleton() {
   return (
-    <div className="-mx-4 -mt-5 flex items-center gap-3 bg-white px-4 py-1.5" aria-hidden="true">
-      {Array.from({ length: 5 }, (_, i) => (
-        <div key={i} className="h-14 w-14 shrink-0 animate-pulse rounded-full bg-paper-deep motion-reduce:animate-none" />
-      ))}
+    <div className="sns-rail-panel" aria-hidden="true">
+      <div className="mb-3 h-7 w-24 animate-pulse rounded-full bg-paper-deep motion-reduce:animate-none" />
+      <div className="flex gap-3">
+        {Array.from({ length: 5 }, (_, i) => (
+          <div key={i} className="h-16 w-16 shrink-0 animate-pulse rounded-full bg-paper-deep motion-reduce:animate-none" />
+        ))}
+      </div>
     </div>
   );
 }
