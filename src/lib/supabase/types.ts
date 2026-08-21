@@ -816,6 +816,10 @@ export type Database = {
       };
       set_sns_user_block: { Args: { p_user_id: string; p_blocked: boolean }; Returns: undefined };
       get_sns_blocked_users: { Args: Record<string, never>; Returns: SnsBlockedUserRow[] };
+      get_sns_hidden_user_ids: {
+        Args: Record<string, never>;
+        Returns: { user_id: string }[];
+      };
       report_sns_post: { Args: { p_post_id: string; p_reason?: string }; Returns: undefined };
       get_sns_mentions: { Args: { p_limit?: number }; Returns: SnsMentionNotificationRow[] };
       get_sns_unread_count: { Args: Record<string, never>; Returns: number };

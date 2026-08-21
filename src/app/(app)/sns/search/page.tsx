@@ -12,7 +12,7 @@ import {
   getMyFriendGroupSummaries,
   getOwnSnsProfile,
   getPersonalTextFeed,
-  getSnsBlockedUsers,
+  getSnsHiddenUserIds,
   getSnsTextPostAvatarPaths,
   getSnsTextPostPhotoPaths,
   signGroupIconUrls,
@@ -62,20 +62,19 @@ export default async function SnsSearchPage({
   const showPosts = scope === "all" || scope === "posts" || scope === "places";
   const showPeople = scope === "all" || scope === "users";
   const showGroups = scope === "all" || scope === "groups";
-  const [posts, friends, ownProfile, groups, blockedUsers] = await Promise.all([
+  const [posts, friends, ownProfile, groups, hiddenUserIds] = await Promise.all([
     showPosts ? getPersonalTextFeed(supabase, undefined, SEARCH_POST_LIMIT) : Promise.resolve([]),
     showPeople ? getFriendList(supabase) : Promise.resolve([]),
     showPeople
       ? getOwnSnsProfile(supabase, user.id)
       : Promise.resolve({ displayName: user.displayName, iconUrl: undefined as string | undefined }),
     showGroups ? getMyFriendGroupSummaries(supabase) : Promise.resolve([]),
-    showPeople ? getSnsBlockedUsers(supabase) : Promise.resolve([]),
+    showPeople ? getSnsHiddenUserIds(supabase) : Promise.resolve(new Set<string>()),
   ]);
-  const blockedIds = new Set(blockedUsers.map((blocked) => blocked.user_id));
   const people = [
     { id: user.id, displayName: ownProfile.displayName, profilePath: null as string | null, avatarUrl: ownProfile.iconUrl },
     ...friends
-      .filter((friend) => !blockedIds.has(friend.friend_user_id))
+      .filter((friend) => !hiddenUserIds.has(friend.friend_user_id))
       .map((friend) => ({
         id: friend.friend_user_id,
         displayName: friend.display_name,

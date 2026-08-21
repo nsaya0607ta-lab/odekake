@@ -1,4 +1,3 @@
-import { unstable_cache } from "next/cache";
 import type { DB } from "./client";
 import { signThumbOrOriginalPaths } from "./photos";
 import type {
@@ -224,20 +223,13 @@ export async function getMyFriendGroupSummaries(supabase: DB): Promise<FriendGro
   }));
 }
 
-export function friendGroupsCacheTag(userId: string): string {
-  return `friend-groups:${userId}`;
-}
-
-/**
- * 参加グループの一覧はグループの作成・脱退・並び替えなど以外ではほぼ変わらないため、
- * ユーザーごとにキャッシュしてグループ切り替えのたびの再取得を避ける。
- * 一覧を変更するアクション側で friendGroupsCacheTag(userId) を revalidateTag する
- */
+/** 参加可否・並び順・未読を含むため、リクエストをまたぐキャッシュは行わない。 */
 export async function getMyFriendGroups(supabase: DB, userId: string): Promise<FriendGroupRow[]> {
-  const cached = unstable_cache(() => fetchMyFriendGroups(supabase), ["my-friend-groups", userId], {
-    tags: [friendGroupsCacheTag(userId)],
-  });
-  return cached();
+  // 参加・退出直後のグループ判定と未読状態は常に最新である必要がある。
+  // Next のクロスリクエストキャッシュへ認証済み Supabase クライアントを閉じ込めると、
+  // 招待直後に「未参加」と誤判定したり別リクエストの古い未読を返すためキャッシュしない。
+  void userId;
+  return fetchMyFriendGroups(supabase);
 }
 
 /** グループアイコン画像の署名付きURLをまとめて取得する */
@@ -331,6 +323,20 @@ export async function getSnsBlockedUsers(supabase: DB): Promise<SnsBlockedUserRo
     throw new Error("ブロック一覧の取得に失敗しました");
   }
   return data ?? [];
+}
+
+/** 自分と相手のどちらか一方がブロックしている、SNS上で相互に非表示となるユーザーID。 */
+export async function getSnsHiddenUserIds(supabase: DB): Promise<Set<string>> {
+  const { data, error } = await supabase.rpc("get_sns_hidden_user_ids");
+  if (!error) return new Set((data ?? []).map((row) => row.user_id));
+
+  // 0061適用前のPreviewでも、自分からブロックした相手だけは従来どおり隠す。
+  if (error.code && SNS_FEATURE_UNAVAILABLE_CODES.has(error.code)) {
+    const blocked = await getSnsBlockedUsers(supabase);
+    return new Set(blocked.map((row) => row.user_id));
+  }
+  console.error("SNS hidden users are unavailable", { code: error.code, message: error.message });
+  throw new Error("ブロック情報の取得に失敗しました");
 }
 
 export async function getSnsMentions(supabase: DB, limit = 50): Promise<SnsMentionNotificationRow[]> {

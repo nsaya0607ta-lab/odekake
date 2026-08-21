@@ -26,6 +26,8 @@ export function SnsGroupSwitcher({
   const router = useRouter();
   const [order, setOrder] = useState(groups);
   const [draggingId, setDraggingId] = useState<string | null>(null);
+  const [saveMessage, setSaveMessage] = useState("");
+  const committedOrderRef = useRef(groups);
   const itemRefs = useRef(new Map<string, HTMLDivElement>());
   const prevOffsetsRef = useRef(new Map<string, number>());
   const dragStartOffsetRef = useRef(0);
@@ -36,7 +38,10 @@ export function SnsGroupSwitcher({
     moved: boolean;
   } | null>(null);
 
-  useLayoutEffect(() => setOrder(groups), [groups]);
+  useLayoutEffect(() => {
+    setOrder(groups);
+    committedOrderRef.current = groups;
+  }, [groups]);
 
   function captureOffsets() {
     const map = new Map<string, number>();
@@ -162,7 +167,23 @@ export function SnsGroupSwitcher({
       }
       setDraggingId(null);
       const ids = order.map((g) => g.id);
-      void reorderFriendGroupsAction(ids);
+      const previousOrder = committedOrderRef.current;
+      void (async () => {
+        try {
+          const result = await reorderFriendGroupsAction(ids);
+          if (!result.ok) {
+            setOrder(previousOrder);
+            setSaveMessage(result.error);
+          } else {
+            committedOrderRef.current = order;
+            setSaveMessage("並び順を保存しました。");
+          }
+        } catch {
+          setOrder(previousOrder);
+          setSaveMessage("並び順を保存できませんでした。");
+        }
+        window.setTimeout(() => setSaveMessage(""), 2400);
+      })();
     } else if (state && !state.moved) {
       navigator.vibrate?.(6);
       router.push(`/sns/groups/${id}`);
@@ -213,6 +234,7 @@ export function SnsGroupSwitcher({
           <span className="max-w-[4rem] truncate text-[10px] font-bold text-ink-faint">新規作成</span>
         </Link>
       </div>
+      {saveMessage ? <p className="sns-settings-inline-message mt-2" role="status">{saveMessage}</p> : null}
     </section>
   );
 }

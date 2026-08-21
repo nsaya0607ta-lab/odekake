@@ -1,19 +1,28 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useSyncExternalStore } from "react";
 
 const CACHE_MS = 5_000;
 let cachedCount = 0;
 let cachedAt = 0;
 let pendingRequest: Promise<number> | null = null;
+const listeners = new Set<() => void>();
 
 type IdleWindow = Window & typeof globalThis & {
   requestIdleCallback?: (callback: () => void, options?: { timeout: number }) => number;
   cancelIdleCallback?: (id: number) => void;
 };
 
-function requestUnreadCount(): Promise<number> {
-  if (Date.now() - cachedAt < CACHE_MS) return Promise.resolve(cachedCount);
+function publishUnreadCount(value: number) {
+  const next = Number.isFinite(value) ? Math.max(0, Math.floor(value)) : 0;
+  const changed = next !== cachedCount;
+  cachedCount = next;
+  cachedAt = Date.now();
+  if (changed) listeners.forEach((listener) => listener());
+}
+
+function requestUnreadCount(force = false): Promise<number> {
+  if (!force && Date.now() - cachedAt < CACHE_MS) return Promise.resolve(cachedCount);
   if (pendingRequest) return pendingRequest;
 
   const request = fetch("/api/sns/unread-count", {
@@ -24,8 +33,7 @@ function requestUnreadCount(): Promise<number> {
       if (!response.ok) throw new Error("SNS_UNREAD_FETCH_FAILED");
       const payload = (await response.json()) as { unreadCount?: unknown };
       const value = Number(payload.unreadCount);
-      cachedCount = Number.isFinite(value) ? Math.max(0, value) : 0;
-      cachedAt = Date.now();
+      publishUnreadCount(value);
       return cachedCount;
     })
     .catch(() => cachedCount)
@@ -37,32 +45,57 @@ function requestUnreadCount(): Promise<number> {
   return request;
 }
 
+function subscribe(listener: () => void) {
+  listeners.add(listener);
+  return () => listeners.delete(listener);
+}
+
+function getSnapshot() {
+  return cachedCount;
+}
+
+function getServerSnapshot() {
+  return 0;
+}
+
+/** 既読操作の直後など、サーバー再取得を待たず全表示へ同じ値を反映する。 */
+export function setSnsUnreadCount(value: number) {
+  publishUnreadCount(value);
+}
+
+/** 投稿・設定変更後に、共有ストアを強制的に最新化する。 */
+export function refreshSnsUnreadCount(force = true): Promise<number> {
+  return requestUnreadCount(force);
+}
+
 /** 初期表示の通信と競合させず、ブラウザが空いた時に通知数を取得する。 */
 export function useSnsUnreadCount(): number {
-  // SSRと初回hydrationは必ず同じ表示にし、既存キャッシュもeffect後に反映する。
-  const [unreadCount, setUnreadCount] = useState(0);
+  // ヘッダーと下部ナビが同じ外部ストアを購読し、一方だけ古い表示になるのを防ぐ。
+  const unreadCount = useSyncExternalStore(subscribe, getSnapshot, getServerSnapshot);
 
   useEffect(() => {
-    let active = true;
     const idleWindow = window as IdleWindow;
     const load = () => {
-      void requestUnreadCount().then((count) => {
-        if (active) setUnreadCount(count);
-      });
+      void requestUnreadCount();
     };
     const idleId = idleWindow.requestIdleCallback?.(load, { timeout: 900 });
     const timeoutId = idleId === undefined ? window.setTimeout(load, 180) : undefined;
 
     const refreshWhenVisible = () => {
-      if (document.visibilityState === "visible" && Date.now() - cachedAt > 30_000) load();
+      if (document.visibilityState === "visible") void requestUnreadCount(true);
     };
+    const pollingId = window.setInterval(() => {
+      if (document.visibilityState === "visible") void requestUnreadCount();
+    }, 30_000);
     document.addEventListener("visibilitychange", refreshWhenVisible);
+    window.addEventListener("focus", refreshWhenVisible);
 
     return () => {
-      active = false;
       if (idleId !== undefined) idleWindow.cancelIdleCallback?.(idleId);
       if (timeoutId !== undefined) window.clearTimeout(timeoutId);
+      window.clearInterval(pollingId);
       document.removeEventListener("visibilitychange", refreshWhenVisible);
+      window.removeEventListener("focus", refreshWhenVisible);
     };
   }, []);
 

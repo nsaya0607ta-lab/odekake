@@ -256,17 +256,27 @@ function ReplyRow({
   onReplyToggle?: () => void;
   compact?: boolean;
 }) {
-  const [, startTransition] = useTransition();
+  const [isDeleting, startTransition] = useTransition();
+  const [deleteError, setDeleteError] = useState("");
   const canDelete = reply.userId === currentUserId;
 
   function handleDelete() {
     if (!window.confirm("この返信を削除しますか？")) return;
+    setDeleteError("");
     startTransition(async () => {
       const formData = new FormData();
       formData.set("replyId", reply.id);
       formData.set("postId", postId);
-      await deleteFriendTextPostReplyAction(formData);
-      onDeleted();
+      try {
+        const result = await deleteFriendTextPostReplyAction(formData);
+        if (!result.ok) {
+          setDeleteError(result.error);
+          return;
+        }
+        onDeleted();
+      } catch {
+        setDeleteError("通信に失敗しました。もう一度お試しください。");
+      }
     });
   }
 
@@ -305,6 +315,7 @@ function ReplyRow({
             <button
               type="button"
               onClick={handleDelete}
+              disabled={isDeleting}
               aria-label="この返信を削除"
               className="pressable ml-auto flex h-11 w-11 items-center justify-center rounded-full text-ink-faint active:bg-paper"
             >
@@ -312,6 +323,7 @@ function ReplyRow({
             </button>
           ) : null}
         </div>
+        {deleteError ? <p className="mt-1 text-[11px] font-bold text-blossom" role="alert">{deleteError}</p> : null}
       </div>
     </div>
   );

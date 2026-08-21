@@ -8,7 +8,6 @@ import {
   deleteFriendGroupPollAction,
   voteFriendGroupPollAction,
 } from "@/app/actions/sns";
-import { ConfirmSubmitButton } from "@/components/confirm-submit-button";
 import { emptyActionState, FormMessage, SubmitButton } from "@/components/form";
 import { FormDraft } from "@/components/form-draft";
 import { IconCheck, IconClose, IconPlus, IconPoll, IconTrash } from "@/components/icons";
@@ -61,6 +60,30 @@ export function SnsGroupPolls({
     });
   }
 
+  function removePoll(pollId: string) {
+    if (!window.confirm("この投票を削除しますか？")) return;
+    const previous = polls;
+    setPolls((current) => current.filter((poll) => poll.id !== pollId));
+    startTransition(async () => {
+      const data = new FormData();
+      data.set("pollId", pollId);
+      data.set("groupId", groupId);
+      try {
+        const result = await deleteFriendGroupPollAction(data);
+        if (!result.ok) {
+          setPolls(previous);
+          setMessage(result.error);
+        } else {
+          setMessage("投票を削除しました。");
+        }
+      } catch {
+        setPolls(previous);
+        setMessage("通信に失敗しました。もう一度お試しください。");
+      }
+      window.setTimeout(() => setMessage(""), 2200);
+    });
+  }
+
   return (
     <section className="sns-group-polls">
       <div className="sns-polls-heading">
@@ -82,11 +105,13 @@ export function SnsGroupPolls({
               <span className="sns-poll-icon"><IconPoll size={18} /></span>
               <div className="min-w-0 flex-1"><h3>{poll.question}</h3><p>{poll.display_name}さん・{closed ? "終了" : deadlineLabel(poll.closes_at)}</p></div>
               {poll.user_id === currentUserId ? (
-                <form action={deleteFriendGroupPollAction}>
-                  <input type="hidden" name="pollId" value={poll.id} />
-                  <input type="hidden" name="groupId" value={groupId} />
-                  <ConfirmSubmitButton message="この投票を削除しますか？" pendingLabel="" className="pressable flex h-11 w-11 items-center justify-center rounded-full text-ink-faint"><IconTrash size={14} /><span className="sr-only">投票を削除</span></ConfirmSubmitButton>
-                </form>
+                <button
+                  type="button"
+                  onClick={() => removePoll(poll.id)}
+                  className="pressable flex h-11 w-11 items-center justify-center rounded-full text-ink-faint"
+                >
+                  <IconTrash size={14} /><span className="sr-only">投票を削除</span>
+                </button>
               ) : null}
             </div>
             <div className="mt-3 space-y-2">

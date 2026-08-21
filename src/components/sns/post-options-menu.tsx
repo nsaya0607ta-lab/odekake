@@ -1,13 +1,13 @@
 "use client";
 
 import { useRef, useState, useTransition } from "react";
+import { usePathname, useRouter } from "next/navigation";
 import {
   deleteFriendTextPostAction,
   reportSnsPostAction,
   setFriendTextPostPinAction,
   setSnsUserBlockAction,
 } from "@/app/actions/sns";
-import { ConfirmSubmitButton } from "@/components/confirm-submit-button";
 import { IconFlag, IconMore, IconPin, IconShield, IconTrash } from "@/components/icons";
 import { SnsActionSheet } from "@/components/sns/sns-action-sheet";
 
@@ -27,13 +27,21 @@ export function PostOptionsMenu({
   const [message, setMessage] = useState("");
   const [, startTransition] = useTransition();
   const triggerRef = useRef<HTMLButtonElement>(null);
+  const pathname = usePathname();
+  const router = useRouter();
 
-  function mutate(action: (data: FormData) => Promise<{ ok: boolean; error?: string }>, data: FormData, success: string) {
+  function mutate(
+    action: (data: FormData) => Promise<{ ok: boolean; error?: string }>,
+    data: FormData,
+    success: string,
+    onSuccess?: () => void,
+  ) {
     setOpen(false);
     startTransition(async () => {
       try {
         const result = await action(data);
         setMessage(result.ok ? success : result.error ?? "操作できませんでした。");
+        if (result.ok) onSuccess?.();
       } catch {
         setMessage("通信に失敗しました。時間をおいてもう一度お試しください。");
       }
@@ -62,34 +70,39 @@ export function PostOptionsMenu({
         returnFocusRef={triggerRef}
       >
         {isMine ? (
-            <>
-              <button
-                type="button"
-                className="pressable sns-post-option"
-                onClick={() => {
-                  const data = new FormData();
-                  data.set("postId", postId);
-                  data.set("pinned", pinned ? "0" : "1");
-                  mutate(setFriendTextPostPinAction, data, pinned ? "固定を解除しました。" : "プロフィールに固定しました。");
-                }}
-              >
-                <IconPin size={16} filled={pinned} />
-                {pinned ? "固定を解除" : "プロフィールに固定"}
-              </button>
-              <form action={deleteFriendTextPostAction}>
-                <input type="hidden" name="postId" value={postId} />
-                <ConfirmSubmitButton
-                  message="このつぶやきを削除しますか？"
-                  pendingLabel="削除中…"
-                  className="pressable sns-post-option is-danger"
-                >
-                  <IconTrash size={16} />
-                  削除
-                </ConfirmSubmitButton>
-              </form>
-            </>
+          <>
+            <button
+              type="button"
+              className="pressable sns-post-option"
+              onClick={() => {
+                const data = new FormData();
+                data.set("postId", postId);
+                data.set("pinned", pinned ? "0" : "1");
+                mutate(setFriendTextPostPinAction, data, pinned ? "固定を解除しました。" : "プロフィールに固定しました。");
+              }}
+            >
+              <IconPin size={16} filled={pinned} />
+              {pinned ? "固定を解除" : "プロフィールに固定"}
+            </button>
+            <button
+              type="button"
+              className="pressable sns-post-option is-danger"
+              onClick={() => {
+                if (!window.confirm("このつぶやきを削除しますか？")) return;
+                const data = new FormData();
+                data.set("postId", postId);
+                mutate(deleteFriendTextPostAction, data, "投稿を削除しました。", () => {
+                  if (pathname.startsWith("/sns/posts/")) router.replace("/sns/home");
+                  else router.refresh();
+                });
+              }}
+            >
+              <IconTrash size={16} />
+              削除
+            </button>
+          </>
         ) : (
-            <>
+          <>
               <button
                 type="button"
                 className="pressable sns-post-option"
@@ -118,7 +131,7 @@ export function PostOptionsMenu({
                 <IconShield size={16} />
                 ユーザーをブロック
               </button>
-            </>
+          </>
         )}
       </SnsActionSheet>
       {message ? <span className="sns-menu-toast" role="status">{message}</span> : null}

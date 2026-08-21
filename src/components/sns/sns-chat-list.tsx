@@ -1,7 +1,7 @@
 "use client";
 
-import { useEffect, useRef } from "react";
-import { ConfirmSubmitButton } from "@/components/confirm-submit-button";
+import { useEffect, useRef, useState, useTransition } from "react";
+import { useRouter } from "next/navigation";
 import { IconTrash, IconUser } from "@/components/icons";
 import { SnsRichText } from "@/components/sns/sns-rich-text";
 import type { SnsMentionRow } from "@/lib/supabase/types";
@@ -16,7 +16,7 @@ type ChatMessage = {
   mentions: SnsMentionRow[];
 };
 
-type DeleteAction = (formData: FormData) => void | Promise<void>;
+type DeleteAction = (formData: FormData) => Promise<{ ok: true } | { ok: false; error: string }>;
 
 const TIME_FORMATTER = new Intl.DateTimeFormat("ja-JP", {
   hour: "2-digit",
@@ -61,6 +61,9 @@ export function SnsChatList({
   groupId: string;
 }) {
   const bottomRef = useRef<HTMLLIElement>(null);
+  const router = useRouter();
+  const [deleteError, setDeleteError] = useState("");
+  const [isDeleting, startDelete] = useTransition();
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ block: "end" });
@@ -80,69 +83,89 @@ export function SnsChatList({
 
   const ordered = [...messages].reverse();
 
-  return (
-    <ul className="sns-chat-stream space-y-3 px-2 py-4">
-      {ordered.map((message, index) => {
-        const isLast = index === ordered.length - 1;
-        const isMine = message.user_id === currentUserId;
-        const avatarUrl = message.profile_image_url ? avatarUrls.get(message.profile_image_url) : null;
-        const showDate = index === 0 || dateKey(ordered[index - 1]!.created_at) !== dateKey(message.created_at);
+  function removeMessage(messageId: string) {
+    if (!window.confirm("このメッセージを削除しますか？")) return;
+    setDeleteError("");
+    startDelete(async () => {
+      const data = new FormData();
+      data.set("messageId", messageId);
+      data.set("groupId", groupId);
+      try {
+        const result = await deleteAction(data);
+        if (!result.ok) {
+          setDeleteError(result.error);
+          return;
+        }
+        router.refresh();
+      } catch {
+        setDeleteError("通信に失敗しました。もう一度お試しください。");
+      }
+    });
+  }
 
-        if (isMine) {
-          return (
-            <li key={message.id} ref={isLast ? bottomRef : undefined}>
-              {showDate ? <p className="sns-chat-date">{formatDate(message.created_at)}</p> : null}
-              <div className="flex items-end justify-end gap-1.5">
-                <form action={deleteAction} className="shrink-0">
-                  <input type="hidden" name="messageId" value={message.id} />
-                  <input type="hidden" name="groupId" value={groupId} />
-                  <ConfirmSubmitButton
-                    message="このメッセージを削除しますか？"
-                    pendingLabel=""
+  return (
+    <>
+      <ul className="sns-chat-stream space-y-3 px-2 py-4" aria-busy={isDeleting}>
+        {ordered.map((message, index) => {
+          const isLast = index === ordered.length - 1;
+          const isMine = message.user_id === currentUserId;
+          const avatarUrl = message.profile_image_url ? avatarUrls.get(message.profile_image_url) : null;
+          const showDate = index === 0 || dateKey(ordered[index - 1]!.created_at) !== dateKey(message.created_at);
+
+          if (isMine) {
+            return (
+              <li key={message.id} ref={isLast ? bottomRef : undefined}>
+                {showDate ? <p className="sns-chat-date">{formatDate(message.created_at)}</p> : null}
+                <div className="flex items-end justify-end gap-1.5">
+                  <button
+                    type="button"
+                    onClick={() => removeMessage(message.id)}
+                    disabled={isDeleting}
                     className="pressable flex h-11 w-11 items-center justify-center rounded-full text-ink-faint active:bg-paper-deep"
                   >
                     <IconTrash size={14} />
                     <span className="sr-only">このメッセージを削除</span>
-                  </ConfirmSubmitButton>
-                </form>
-                <span className="shrink-0 text-[10px] text-ink-faint">{formatTime(message.created_at)}</span>
-                <div className="sns-chat-bubble-mine max-w-[76%] rounded-[1.25rem] rounded-br-md px-3.5 py-2.5 shadow-sm">
-                  <SnsRichText body={message.body} mentions={message.mentions} className="whitespace-pre-wrap text-sm leading-relaxed text-white" />
+                  </button>
+                  <span className="shrink-0 text-[10px] text-ink-faint">{formatTime(message.created_at)}</span>
+                  <div className="sns-chat-bubble-mine max-w-[76%] rounded-[1.25rem] rounded-br-md px-3.5 py-2.5 shadow-sm">
+                    <SnsRichText body={message.body} mentions={message.mentions} className="whitespace-pre-wrap text-sm leading-relaxed text-white" />
+                  </div>
+                </div>
+              </li>
+            );
+          }
+
+          return (
+            <li key={message.id} ref={isLast ? bottomRef : undefined}>
+              {showDate ? <p className="sns-chat-date">{formatDate(message.created_at)}</p> : null}
+              <div className="flex items-start gap-2">
+                <span className="h-10 w-10 shrink-0 overflow-hidden rounded-full bg-paper-deep">
+                  {avatarUrl ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img src={avatarUrl} alt="" className="h-full w-full object-cover" />
+                  ) : (
+                    <span className="flex h-full w-full items-center justify-center text-ink-faint">
+                      <IconUser size={18} />
+                    </span>
+                  )}
+                </span>
+                <div className="min-w-0 flex-1">
+                  <span className="block truncate px-1 text-[11px] font-semibold text-ink-faint">
+                    {message.display_name}
+                  </span>
+                  <div className="mt-1 flex items-end gap-1.5">
+                    <div className="sns-chat-bubble-friend max-w-[76%] rounded-[1.25rem] rounded-bl-md px-3.5 py-2.5 shadow-sm">
+                      <SnsRichText body={message.body} mentions={message.mentions} className="whitespace-pre-wrap text-sm leading-relaxed" />
+                    </div>
+                    <span className="shrink-0 text-[10px] text-ink-faint">{formatTime(message.created_at)}</span>
+                  </div>
                 </div>
               </div>
             </li>
           );
-        }
-
-        return (
-          <li key={message.id} ref={isLast ? bottomRef : undefined}>
-            {showDate ? <p className="sns-chat-date">{formatDate(message.created_at)}</p> : null}
-            <div className="flex items-start gap-2">
-              <span className="h-10 w-10 shrink-0 overflow-hidden rounded-full bg-paper-deep">
-                {avatarUrl ? (
-                  // eslint-disable-next-line @next/next/no-img-element
-                  <img src={avatarUrl} alt="" className="h-full w-full object-cover" />
-                ) : (
-                  <span className="flex h-full w-full items-center justify-center text-ink-faint">
-                    <IconUser size={18} />
-                  </span>
-                )}
-              </span>
-              <div className="min-w-0 flex-1">
-                <span className="block truncate px-1 text-[11px] font-semibold text-ink-faint">
-                  {message.display_name}
-                </span>
-                <div className="mt-1 flex items-end gap-1.5">
-                  <div className="sns-chat-bubble-friend max-w-[76%] rounded-[1.25rem] rounded-bl-md px-3.5 py-2.5 shadow-sm">
-                    <SnsRichText body={message.body} mentions={message.mentions} className="whitespace-pre-wrap text-sm leading-relaxed" />
-                  </div>
-                  <span className="shrink-0 text-[10px] text-ink-faint">{formatTime(message.created_at)}</span>
-                </div>
-              </div>
-            </div>
-          </li>
-        );
-      })}
-    </ul>
+        })}
+      </ul>
+      {deleteError ? <p className="sns-menu-toast" role="alert">{deleteError}</p> : null}
+    </>
   );
 }

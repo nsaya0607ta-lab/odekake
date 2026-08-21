@@ -20,6 +20,7 @@ import { SnsGroupPolls } from "@/components/sns/sns-group-polls";
 import { SnsPhotoGrid } from "@/components/sns/sns-photo-grid";
 import { SnsPrimaryNav } from "@/components/sns/sns-primary-nav";
 import { SnsViewTabs } from "@/components/sns/sns-view-tabs";
+import { SnsUnreadRefresh } from "@/components/sns/sns-unread-sync";
 import { signThumbOrOriginalPaths } from "@/lib/data/photos";
 import {
   getFriendGroupMembers,
@@ -74,6 +75,7 @@ export default async function SnsGroupPage({
 
   return (
     <>
+      <SnsUnreadRefresh />
       <PageHeader
         title={group.name}
         subtitle={`${group.member_count}人で共有中`}
@@ -212,7 +214,13 @@ async function GroupPhotos({ groupId, baseHref, days }: { groupId: string; baseH
   const nextDays = days < 30 ? 30 : Math.min(MAX_GROUP_PHOTO_DAYS, days + 30);
   return (
     <>
-      <SnsPhotoGrid photos={photos} photoUrls={photoUrls} avatarUrls={avatarUrls} baseHref={baseHref} />
+      <SnsPhotoGrid
+        photos={photos}
+        photoUrls={photoUrls}
+        avatarUrls={avatarUrls}
+        baseHref={baseHref}
+        loadedDays={days}
+      />
       {days < MAX_GROUP_PHOTO_DAYS ? (
         <Link
           href={`${baseHref}?days=${nextDays}`}

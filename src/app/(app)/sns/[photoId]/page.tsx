@@ -3,14 +3,14 @@ import { notFound } from "next/navigation";
 import {
   deleteFriendPhotoAction,
   deleteFriendPhotoCommentAction,
-  setFriendPhotoReactionAction,
 } from "@/app/actions/sns";
-import { ConfirmSubmitButton } from "@/components/confirm-submit-button";
 import { IconTrash, IconUser } from "@/components/icons";
 import { PageBody } from "@/components/page-body";
 import { PageHeader } from "@/components/page-header";
 import { SnsBackgroundBand } from "@/components/sns/sns-background-band";
 import { SnsIllustratedHero } from "@/components/sns/sns-illustrated-hero";
+import { SnsConfirmMutationButton } from "@/components/sns/sns-confirm-mutation-button";
+import { SnsPhotoReactionTray } from "@/components/sns/sns-photo-reaction-tray";
 import { signPhotoPaths, signThumbOrOriginalPaths } from "@/lib/data/photos";
 import { getFriendPhotoComments, getSnsPhoto } from "@/lib/data/sns";
 import { requireUser } from "@/lib/supabase/server";
@@ -71,16 +71,15 @@ export default async function SnsPhotoPage({
         backHref={backHref}
         action={
           isOwner ? (
-            <form action={deleteFriendPhotoAction}>
-              <input type="hidden" name="photoId" value={photo.id} />
-              <ConfirmSubmitButton
+            <SnsConfirmMutationButton
+              action={deleteFriendPhotoAction}
+              fields={{ photoId: photo.id }}
                 className="flex h-11 w-11 items-center justify-center rounded-full text-ink-soft active:bg-paper-deep"
-                pendingLabel=""
                 message="この写真を削除しますか？"
-              >
+              successHref={backHref}
+            >
                 <IconTrash size={19} />
-              </ConfirmSubmitButton>
-            </form>
+            </SnsConfirmMutationButton>
           ) : null
         }
       />
@@ -120,33 +119,12 @@ export default async function SnsPhotoPage({
 
         {photo.caption ? <p className="sns-photo-detail-caption">{photo.caption}</p> : null}
 
-        <section className="sns-reaction-tray" aria-label="写真へのリアクション">
-          <span className="w-full text-[10px] font-black tracking-[0.12em] text-ink-faint">QUICK REACTION</span>
-          {REACTION_EMOJIS.map((emoji) => {
-            const selected = photo.my_reaction === emoji;
-            return (
-              <form key={emoji} action={setFriendPhotoReactionAction}>
-                <input type="hidden" name="photoId" value={photo.id} />
-                <input type="hidden" name="emoji" value={selected ? "" : emoji} />
-                <button
-                  type="submit"
-                  className={`sns-reaction-button pressable ${
-                    selected ? "is-selected" : ""
-                  }`}
-                  aria-pressed={selected}
-                  aria-label={`${emoji}でリアクション`}
-                >
-                  {emoji}
-                </button>
-              </form>
-            );
-          })}
-          {photo.reaction_count > 0 ? (
-            <span className="flex items-center px-2 text-xs font-semibold text-ink-faint">
-              {photo.reaction_count}件のリアクション
-            </span>
-          ) : null}
-        </section>
+        <SnsPhotoReactionTray
+          photoId={photo.id}
+          emojis={REACTION_EMOJIS}
+          initialReaction={photo.my_reaction}
+          initialCount={photo.reaction_count}
+        />
 
         <section className="sns-photo-comments-panel space-y-3">
           <SnsIllustratedHero
@@ -186,18 +164,17 @@ export default async function SnsPhotoPage({
                       <p className="mt-0.5 whitespace-pre-wrap text-sm leading-relaxed">{comment.body}</p>
                     </div>
                     {canDelete ? (
-                      <form action={deleteFriendPhotoCommentAction} className="shrink-0">
-                        <input type="hidden" name="commentId" value={comment.id} />
-                        <input type="hidden" name="photoId" value={photo.id} />
-                        <ConfirmSubmitButton
+                      <span className="shrink-0">
+                        <SnsConfirmMutationButton
+                          action={deleteFriendPhotoCommentAction}
+                          fields={{ commentId: comment.id, photoId: photo.id }}
                           message="このコメントを削除しますか？"
-                          pendingLabel=""
                           className="pressable flex h-11 w-11 items-center justify-center rounded-full text-ink-faint active:bg-paper-deep"
                         >
                           <IconTrash size={14} />
                           <span className="sr-only">このコメントを削除</span>
-                        </ConfirmSubmitButton>
-                      </form>
+                        </SnsConfirmMutationButton>
+                      </span>
                     ) : null}
                   </li>
                 );

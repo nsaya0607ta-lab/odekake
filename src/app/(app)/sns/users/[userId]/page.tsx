@@ -1,5 +1,6 @@
 import Image from "next/image";
 import Link from "next/link";
+import { notFound } from "next/navigation";
 import { IconPlus, IconSearch, IconUser } from "@/components/icons";
 import { PageBody } from "@/components/page-body";
 import { PageHeader } from "@/components/page-header";
@@ -16,6 +17,7 @@ import {
   getOwnSnsProfile,
   getPersonalTextFeed,
   getSavedFriendTextPosts,
+  getSnsHiddenUserIds,
   getSnsTextPostAvatarPaths,
   getSnsTextPostPhotoPaths,
 } from "@/lib/data/sns";
@@ -43,7 +45,7 @@ export default async function SnsUserHomePage({
   const postLimit = Number.isFinite(requestedLimit)
     ? Math.min(MAX_USER_POST_LIMIT, Math.max(INITIAL_USER_POST_LIMIT, requestedLimit))
     : INITIAL_USER_POST_LIMIT;
-  const [profile, fetchedPosts, friends, ownProfile, fetchedSavedPosts] = await Promise.all([
+  const [profile, fetchedPosts, allFriends, ownProfile, fetchedSavedPosts, hiddenUserIds] = await Promise.all([
     getFriendProfile(supabase, userId),
     getPersonalTextFeed(supabase, userId, postLimit + 1),
     getFriendList(supabase),
@@ -51,7 +53,10 @@ export default async function SnsUserHomePage({
     isMine && tab === "saved"
       ? getSavedFriendTextPosts(supabase, postLimit + 1)
       : Promise.resolve([]),
+    getSnsHiddenUserIds(supabase),
   ]);
+  if (!isMine && hiddenUserIds.has(userId)) notFound();
+  const friends = allFriends.filter((friend) => !hiddenUserIds.has(friend.friend_user_id));
   const hasMorePosts = fetchedPosts.length > postLimit;
   const hasMoreSavedPosts = fetchedSavedPosts.length > postLimit;
   const posts = fetchedPosts.slice(0, postLimit);
