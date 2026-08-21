@@ -38,6 +38,7 @@ export function SnsReplyThread({
   const [replies, setReplies] = useState(initialReplies);
   const [replyingTo, setReplyingTo] = useState<string | null>(null);
   const [showComposer, setShowComposer] = useState(false);
+  const [expandedThreads, setExpandedThreads] = useState<Set<string>>(new Set());
   const [, startTransition] = useTransition();
 
   function refresh() {
@@ -75,40 +76,60 @@ export function SnsReplyThread({
       {topLevel.length === 0 ? (
         <p className="px-1 text-xs text-ink-faint">まだ返信はありません。</p>
       ) : (
-        <ul className="space-y-3">
-          {topLevel.map((reply) => (
-            <li key={reply.id}>
-              <ReplyRow
-                reply={reply}
-                postId={postId}
-                currentUserId={currentUserId}
-                onDeleted={refresh}
-                onReplyToggle={() => setReplyingTo((cur) => (cur === reply.id ? null : reply.id))}
-              />
-              {replyingTo === reply.id ? (
-                <div className="mt-2 ml-10">
-                  <InlineComposer
-                    postId={postId}
-                    parentReplyId={reply.id}
-                    placeholder={`${reply.displayName}さんに返信`}
-                    onPosted={() => {
-                      refresh();
-                      setReplyingTo(null);
-                    }}
-                  />
-                </div>
-              ) : null}
-              {childrenOf(reply.id).length > 0 ? (
-                <ul className="mt-2 ml-8 space-y-2 border-l border-line pl-3">
-                  {childrenOf(reply.id).map((child) => (
-                    <li key={child.id}>
-                      <ReplyRow reply={child} postId={postId} currentUserId={currentUserId} onDeleted={refresh} compact />
-                    </li>
-                  ))}
-                </ul>
-              ) : null}
-            </li>
-          ))}
+        <ul className="divide-y divide-line">
+          {topLevel.map((reply) => {
+            const children = childrenOf(reply.id);
+            const expanded = expandedThreads.has(reply.id);
+            return (
+              <li key={reply.id} className="py-3 first:pt-0 last:pb-0">
+                <ReplyRow
+                  reply={reply}
+                  postId={postId}
+                  currentUserId={currentUserId}
+                  onDeleted={refresh}
+                  onReplyToggle={() => setReplyingTo((cur) => (cur === reply.id ? null : reply.id))}
+                />
+                {replyingTo === reply.id ? (
+                  <div className="mt-2 ml-10">
+                    <InlineComposer
+                      postId={postId}
+                      parentReplyId={reply.id}
+                      placeholder={`${reply.displayName}さんに返信`}
+                      onPosted={() => {
+                        refresh();
+                        setReplyingTo(null);
+                      }}
+                    />
+                  </div>
+                ) : null}
+                {children.length > 0 ? (
+                  expanded ? (
+                    <ul className="mt-2 ml-8 space-y-2 border-l border-line pl-3">
+                      {children.map((child) => (
+                        <li key={child.id}>
+                          <ReplyRow reply={child} postId={postId} currentUserId={currentUserId} onDeleted={refresh} compact />
+                        </li>
+                      ))}
+                    </ul>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={() =>
+                        setExpandedThreads((cur) => {
+                          const next = new Set(cur);
+                          next.add(reply.id);
+                          return next;
+                        })
+                      }
+                      className="mt-2 ml-10 text-xs font-semibold text-[#4a90d9]"
+                    >
+                      他{children.length}件の返信を見る
+                    </button>
+                  )
+                ) : null}
+              </li>
+            );
+          })}
         </ul>
       )}
     </div>
