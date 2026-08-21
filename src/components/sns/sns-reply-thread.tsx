@@ -274,11 +274,12 @@ function ReplyRow({
     <div className={`sns-reply-row ${compact ? "is-compact" : ""}`}>
       <Link
         href={`/sns/users/${reply.userId}`}
+        prefetch={false}
         className={`sns-reply-avatar pressable ${compact ? "is-compact" : ""}`}
       >
         {reply.avatarUrl ? (
           // eslint-disable-next-line @next/next/no-img-element
-          <img src={reply.avatarUrl} alt="" className="h-full w-full object-cover" />
+          <img src={reply.avatarUrl} alt="" loading="lazy" decoding="async" className="h-full w-full object-cover" />
         ) : (
           <span className="flex h-full w-full items-center justify-center text-ink-faint">
             <IconUser size={compact ? 14 : 16} />
@@ -287,7 +288,7 @@ function ReplyRow({
       </Link>
       <div className="sns-reply-bubble">
         <div className="flex items-center justify-between gap-2">
-          <Link href={`/sns/users/${reply.userId}`} className="truncate text-xs font-bold">
+          <Link href={`/sns/users/${reply.userId}`} prefetch={false} className="truncate text-xs font-bold">
             {reply.displayName}
           </Link>
           <span className="shrink-0 text-[10px] text-ink-faint">{formatRelativeTimeJa(reply.createdAt)}</span>

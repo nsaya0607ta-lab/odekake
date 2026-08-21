@@ -2758,6 +2758,22 @@
     backdrop-filter: blur(12px);
   }
 
+  .sns-lightbox-loading {
+    position: absolute;
+    z-index: 10;
+    top: calc(env(safe-area-inset-top, 0px) + 0.9rem);
+    left: 50%;
+    padding: 0.42rem 0.75rem;
+    border: 1px solid rgba(255, 255, 255, 0.22);
+    border-radius: 999px;
+    color: white;
+    background: rgba(29, 23, 47, 0.68);
+    font-size: 0.66rem;
+    font-weight: 850;
+    translate: -50% 0;
+    backdrop-filter: blur(8px);
+  }
+
   .sns-inline-thread {
     border-top: 1px solid rgba(106, 86, 159, 0.13);
   }
@@ -3037,6 +3053,21 @@
     background: linear-gradient(125deg, #7259d2, #4aaeca);
     font-size: 0.68rem;
     font-weight: 900;
+  }
+
+  .sns-feed-more {
+    display: flex;
+    min-height: 2.75rem;
+    align-items: center;
+    justify-content: center;
+    padding: 0.55rem 1rem;
+    border: 1px solid rgba(105, 83, 154, 0.13);
+    border-radius: 999px;
+    color: #6750a0;
+    background: rgba(255, 255, 255, 0.76);
+    font-size: 0.72rem;
+    font-weight: 900;
+    box-shadow: 0 5px 14px rgba(77, 59, 119, 0.07);
   }
 
   .sns-menu-toast {

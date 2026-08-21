@@ -37,6 +37,7 @@ export function SnsProfileTabs({
           <Link
             key={tab.id}
             href={href}
+            prefetch={false}
             scroll={false}
             aria-current={selected ? "page" : undefined}
             className={`pressable ${selected ? "is-active" : ""}`}

@@ -1,21 +1,12 @@
+"use client";
+
 import Link from "next/link";
-import { Suspense } from "react";
 import { IconBell } from "@/components/icons";
-import { getSnsUnreadCount } from "@/lib/data/sns-notifications";
-import { requireUser } from "@/lib/supabase/server";
+import { useSnsUnreadCount } from "./use-sns-unread-count";
 
-/** 通知取得を待たずにヘッダーを表示し、未読数だけ後からストリーミングする。 */
+/** 通知取得を初期描画から切り離し、ヘッダーを先に操作可能にする。 */
 export function SnsNotificationEntry() {
-  return (
-    <Suspense fallback={<SnsNotificationButton unreadCount={0} />}>
-      <SnsNotificationIndicator />
-    </Suspense>
-  );
-}
-
-async function SnsNotificationIndicator() {
-  const { supabase, user } = await requireUser();
-  const unreadCount = await getSnsUnreadCount(supabase, user.id);
+  const unreadCount = useSnsUnreadCount();
   return <SnsNotificationButton unreadCount={unreadCount} />;
 }
 
@@ -25,6 +16,7 @@ export function SnsNotificationButton({ unreadCount }: { unreadCount: number }) 
   return (
     <Link
       href="/sns/notifications"
+      prefetch={false}
       aria-label={unreadCount > 0 ? `通知、未読${unreadCount}件` : "通知"}
       className="sns-notification-button pressable relative flex h-11 w-11 items-center justify-center rounded-full"
     >

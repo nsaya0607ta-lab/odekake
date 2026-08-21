@@ -818,6 +818,7 @@ export type Database = {
       get_sns_blocked_users: { Args: Record<string, never>; Returns: SnsBlockedUserRow[] };
       report_sns_post: { Args: { p_post_id: string; p_reason?: string }; Returns: undefined };
       get_sns_mentions: { Args: { p_limit?: number }; Returns: SnsMentionNotificationRow[] };
+      get_sns_unread_count: { Args: Record<string, never>; Returns: number };
       create_friend_message: { Args: { p_body: string }; Returns: FriendMessageRow[] };
       get_friend_messages: { Args: { p_limit?: number }; Returns: FriendMessageRow[] };
       delete_friend_message: { Args: { p_message_id: string }; Returns: undefined };

@@ -9,8 +9,8 @@ import { toThumbPath } from "@/lib/image";
 import { finalizePhotoPaths } from "@/lib/photos";
 import { requireUser } from "@/lib/supabase/server";
 import { PHOTO_BUCKET } from "@/lib/data/client";
-import { signThumbOrOriginalPaths } from "@/lib/data/photos";
-import { friendGroupsCacheTag, getFriendTextPostReplies, getSnsPhoto } from "@/lib/data/sns";
+import { signPhotoPaths, signThumbOrOriginalPaths } from "@/lib/data/photos";
+import { friendGroupsCacheTag, getFriendTextPostReplies, getPersonalTextPost, getSnsPhoto } from "@/lib/data/sns";
 import {
   getSnsNotificationReadSnapshot,
   SNS_NOTIFICATION_LIKE_COUNTS_KEY,
@@ -25,6 +25,9 @@ const MAX_GROUP_NAME_LENGTH = 40;
 const SNS_FEATURE_MIGRATION_CODES = new Set(["42P01", "42883", "PGRST202", "PGRST205"]);
 
 export type SnsMutationResult = { ok: true } | { ok: false; error: string };
+export type SnsFullPhotoUrlsResult =
+  | { ok: true; urls: Record<string, string> }
+  | { ok: false; error: string };
 
 function snsMutationError(error: { code?: string; message?: string } | null, fallback: string): string {
   if (error?.code && SNS_FEATURE_MIGRATION_CODES.has(error.code)) {
@@ -58,6 +61,23 @@ function parseMemberIds(formData: FormData): string[] {
     .getAll("memberUserIds")
     .map((v) => String(v))
     .filter((v) => uuidSchema.safeParse(v).success);
+}
+
+/** 原寸写真は一覧表示時には署名せず、拡大表示を開いた時だけ取得する。 */
+export async function getFriendTextPostFullPhotoUrlsAction(postId: string): Promise<SnsFullPhotoUrlsResult> {
+  const parsedPostId = uuidSchema.safeParse(postId);
+  if (!parsedPostId.success) return { ok: false, error: "この投稿は見つかりませんでした。" };
+
+  try {
+    const { supabase } = await requireUser();
+    const post = await getPersonalTextPost(supabase, parsedPostId.data);
+    if (!post) return { ok: false, error: "この投稿は表示できません。" };
+    const paths = [...new Set([...post.photo_paths, ...post.quoted_photo_paths])];
+    const urls = await signPhotoPaths(supabase, paths);
+    return { ok: true, urls: Object.fromEntries(urls) };
+  } catch {
+    return { ok: false, error: "写真を読み込めませんでした。" };
+  }
 }
 
 export async function createFriendPhotosAction(_prev: ActionState, formData: FormData): Promise<ActionState> {
@@ -645,6 +665,23 @@ export async function setFriendGroupPinAction(_prev: ActionState, formData: Form
 
   revalidatePath(`/sns/groups/${parsedGroupId.data}`);
   return { ok: true, message: title ? "グループ上部に固定しました。" : "固定を解除しました。" };
+}
+
+/** 固定解除は保存フォームのsubmitter値に依存させず、専用アクションで確実に削除する。 */
+export async function clearFriendGroupPinAction(formData: FormData): Promise<SnsMutationResult> {
+  const parsedGroupId = uuidSchema.safeParse(String(formData.get("groupId") ?? ""));
+  if (!parsedGroupId.success) return { ok: false, error: "このグループは見つかりませんでした。" };
+
+  const { supabase } = await requireUser();
+  const { error } = await supabase.rpc("set_friend_group_pin", {
+    p_group_id: parsedGroupId.data,
+    p_title: "",
+    p_body: "",
+  });
+  if (error) return { ok: false, error: snsMutationError(error, "固定を解除できませんでした。") };
+
+  revalidatePath(`/sns/groups/${parsedGroupId.data}`);
+  return { ok: true };
 }
 
 export async function createFriendGroupPollAction(_prev: ActionState, formData: FormData): Promise<ActionState> {

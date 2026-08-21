@@ -24,13 +24,14 @@ export function SnsGroupList({
           <li key={group.id}>
             <Link
               href={`/sns/groups/${group.id}`}
+              prefetch={false}
               data-haptic="light"
               className={`sns-group-list-card pressable ${group.has_unread ? "is-unread" : ""}`}
             >
               <span className="sns-group-list-icon">
                 {iconUrl ? (
                   // eslint-disable-next-line @next/next/no-img-element
-                  <img src={iconUrl} alt="" className="h-full w-full object-cover" />
+                  <img src={iconUrl} alt="" loading="lazy" decoding="async" className="h-full w-full object-cover" />
                 ) : (
                   <span aria-hidden="true">{group.icon}</span>
                 )}

@@ -36,7 +36,7 @@ export function SnsRichText({
     const mentionedUserId = mentionByLabel.get(token);
     if (mentionedUserId) {
       pieces.push(
-        <Link key={`${index}:${token}`} href={`/sns/users/${mentionedUserId}`} className="sns-rich-link is-mention">
+        <Link key={`${index}:${token}`} href={`/sns/users/${mentionedUserId}`} prefetch={false} className="sns-rich-link is-mention">
           {token}
         </Link>,
       );
@@ -45,6 +45,7 @@ export function SnsRichText({
         <Link
           key={`${index}:${token}`}
           href={`/sns/search?q=${encodeURIComponent(token)}`}
+          prefetch={false}
           className="sns-rich-link is-hashtag"
         >
           {token}

@@ -10,7 +10,7 @@ import { SnsPrimaryNav } from "@/components/sns/sns-primary-nav";
 import { parseSnsProfileTab, SnsProfileTabs } from "@/components/sns/sns-profile-tabs";
 import { SnsTextFeed } from "@/components/sns/sns-text-feed";
 import { getFriendList } from "@/lib/data/friends";
-import { signPhotoPaths, signThumbOrOriginalPaths } from "@/lib/data/photos";
+import { signThumbOrOriginalPaths } from "@/lib/data/photos";
 import {
   getFriendProfile,
   getOwnSnsProfile,
@@ -51,10 +51,9 @@ export default async function SnsUserHomePage({
         ? ownPosts.filter((post) => post.linked_spot_id || post.quoted_linked_spot_id)
         : ownPosts;
   const allPhotoPaths = getSnsTextPostPhotoPaths(visiblePosts);
-  const [avatarUrls, photoUrls, fullPhotoUrls, friendAvatarUrls] = await Promise.all([
+  const [avatarUrls, photoUrls, friendAvatarUrls] = await Promise.all([
     signThumbOrOriginalPaths(supabase, getSnsTextPostAvatarPaths(visiblePosts)),
     signThumbOrOriginalPaths(supabase, allPhotoPaths),
-    signPhotoPaths(supabase, allPhotoPaths),
     signThumbOrOriginalPaths(
       supabase,
       friends.flatMap((friend) => (friend.profile_image_url ? [friend.profile_image_url] : [])),
@@ -84,7 +83,7 @@ export default async function SnsUserHomePage({
         showBack={false}
         leftAction={<SnsNotificationEntry />}
         action={(
-          <Link href="/sns/search" aria-label="SNSを検索" className="flex h-11 w-11 items-center justify-center rounded-full text-ink-soft active:bg-paper-deep">
+          <Link href="/sns/search" prefetch={false} aria-label="SNSを検索" className="flex h-11 w-11 items-center justify-center rounded-full text-ink-soft active:bg-paper-deep">
             <IconSearch size={20} />
           </Link>
         )}
@@ -153,7 +152,6 @@ export default async function SnsUserHomePage({
           posts={visiblePosts}
           avatarUrls={avatarUrls}
           photoUrls={photoUrls}
-          fullPhotoUrls={fullPhotoUrls}
           currentUserId={user.id}
           emptyTitle={
             tab === "saved"

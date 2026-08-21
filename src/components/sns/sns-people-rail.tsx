@@ -19,6 +19,7 @@ export function SnsPeopleRail({ people, activeUserId }: { people: SnsPersonRow[]
             <Link
               key={person.id}
               href={`/sns/users/${person.id}`}
+              prefetch={false}
               scroll={false}
               data-haptic="light"
               aria-current={active ? "page" : undefined}
@@ -27,7 +28,7 @@ export function SnsPeopleRail({ people, activeUserId }: { people: SnsPersonRow[]
               <span className={`sns-person-avatar is-compact pressable ${active ? "is-active" : ""}`}>
                 {person.iconUrl ? (
                   // eslint-disable-next-line @next/next/no-img-element
-                  <img src={person.iconUrl} alt="" className="h-full w-full object-cover" />
+                  <img src={person.iconUrl} alt="" loading="lazy" decoding="async" className="h-full w-full object-cover" />
                 ) : (
                   <IconUser size={23} className="text-ink-faint" />
                 )}

@@ -16,7 +16,6 @@ export function SnsTextFeed({
   posts,
   avatarUrls,
   photoUrls,
-  fullPhotoUrls,
   currentUserId,
   emptyTitle = "まだつぶやきがありません",
   emptyMessage = "最初のおでかけメモを残してみましょう。",
@@ -24,7 +23,6 @@ export function SnsTextFeed({
   posts: SnsTextPostRow[];
   avatarUrls: Map<string, string>;
   photoUrls: Map<string, string>;
-  fullPhotoUrls: Map<string, string>;
   currentUserId: string;
   emptyTitle?: string;
   emptyMessage?: string;
@@ -44,20 +42,14 @@ export function SnsTextFeed({
       {posts.map((post) => {
         const avatarUrl = post.profile_image_url ? avatarUrls.get(post.profile_image_url) : null;
         const isMine = post.user_id === currentUserId;
-        const postPhotoUrls = post.photo_paths.flatMap((path) => {
+        const postPhotoPaths = post.photo_paths.filter((path) => photoUrls.has(path));
+        const postPhotoUrls = postPhotoPaths.flatMap((path) => {
           const url = photoUrls.get(path);
           return url ? [url] : [];
         });
-        const postFullPhotoUrls = post.photo_paths.flatMap((path) => {
-          const url = fullPhotoUrls.get(path);
-          return url ? [url] : [];
-        });
-        const quotedPhotoUrls = post.quoted_photo_paths.flatMap((path) => {
+        const quotedPhotoPaths = post.quoted_photo_paths.filter((path) => photoUrls.has(path));
+        const quotedPhotoUrls = quotedPhotoPaths.flatMap((path) => {
           const url = photoUrls.get(path);
-          return url ? [url] : [];
-        });
-        const quotedFullPhotoUrls = post.quoted_photo_paths.flatMap((path) => {
-          const url = fullPhotoUrls.get(path);
           return url ? [url] : [];
         });
         const quotedAvatarUrl = post.quoted_profile_image_url
@@ -78,12 +70,13 @@ export function SnsTextFeed({
             ) : null}
             <Link
               href={`/sns/users/${post.user_id}`}
+              prefetch={false}
               aria-label={`${post.display_name}のホーム`}
               className="h-12 w-12 shrink-0 overflow-hidden rounded-full bg-card shadow-sm ring-[3px] ring-card outline outline-1 outline-line"
             >
               {avatarUrl ? (
                 // eslint-disable-next-line @next/next/no-img-element
-                <img src={avatarUrl} alt="" className="h-full w-full object-cover" />
+                <img src={avatarUrl} alt="" loading="lazy" decoding="async" className="h-full w-full object-cover" />
               ) : (
                 <span className="flex h-full w-full items-center justify-center bg-leaf-soft text-leaf-deep">
                   <IconUser size={22} />
@@ -92,7 +85,7 @@ export function SnsTextFeed({
             </Link>
             <div className="min-w-0 flex-1">
               <div className="flex items-center gap-1.5 pr-7">
-                <Link href={`/sns/users/${post.user_id}`} className="truncate text-[15px] font-bold text-ink">
+                <Link href={`/sns/users/${post.user_id}`} prefetch={false} className="truncate text-[15px] font-bold text-ink">
                   {post.display_name}
                 </Link>
                 <span className="shrink-0 rounded-full bg-paper-deep px-2 py-0.5 text-[10px] font-semibold text-ink-faint">
@@ -120,7 +113,7 @@ export function SnsTextFeed({
               {postPhotoUrls.length > 0 ? (
                 <SnsPostPhotoGrid
                   photoUrls={postPhotoUrls}
-                  fullUrls={postFullPhotoUrls}
+                  photoPaths={postPhotoPaths}
                   postId={post.id}
                   authorUserId={post.user_id}
                   liked={post.my_liked}
@@ -128,12 +121,12 @@ export function SnsTextFeed({
               ) : null}
               <SnsPostPlaceTag post={post} />
               {post.repost_of_post_id && post.quoted_user_id ? (
-                <Link href={`/sns/posts/${post.repost_of_post_id}`} className="sns-quoted-post pressable">
+                <Link href={`/sns/posts/${post.repost_of_post_id}`} prefetch={false} className="sns-quoted-post pressable">
                   <span className="flex items-center gap-2">
                     <span className="sns-quoted-avatar">
                       {quotedAvatarUrl ? (
                         // eslint-disable-next-line @next/next/no-img-element
-                        <img src={quotedAvatarUrl} alt="" className="h-full w-full object-cover" />
+                        <img src={quotedAvatarUrl} alt="" loading="lazy" decoding="async" className="h-full w-full object-cover" />
                       ) : (
                         <IconUser size={15} />
                       )}
@@ -147,7 +140,11 @@ export function SnsTextFeed({
                     </p>
                   ) : null}
                   {quotedPhotoUrls.length > 0 ? (
-                    <SnsPostPhotoGrid photoUrls={quotedPhotoUrls} fullUrls={quotedFullPhotoUrls} />
+                    <SnsPostPhotoGrid
+                      photoUrls={quotedPhotoUrls}
+                      photoPaths={quotedPhotoPaths}
+                      postId={post.repost_of_post_id}
+                    />
                   ) : null}
                   {post.quoted_linked_spot_name ? (
                     <span className="sns-quoted-place"><IconMapPin size={12} />{post.quoted_linked_spot_name}</span>

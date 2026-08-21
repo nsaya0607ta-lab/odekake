@@ -14,7 +14,7 @@ import { SnsReplyThread } from "@/components/sns/sns-reply-thread";
 import { SnsRepostButton } from "@/components/sns/sns-repost-button";
 import { SnsRichText } from "@/components/sns/sns-rich-text";
 import { SnsSaveButton } from "@/components/sns/sns-save-button";
-import { signPhotoPaths, signThumbOrOriginalPaths } from "@/lib/data/photos";
+import { signThumbOrOriginalPaths } from "@/lib/data/photos";
 import { getPersonalTextPost, getSnsTextPostAvatarPaths, getSnsTextPostPhotoPaths } from "@/lib/data/sns";
 import { requireUser } from "@/lib/supabase/server";
 
@@ -37,29 +37,22 @@ export default async function SnsTextPostPage({ params }: { params: Promise<{ po
   if (!post) notFound();
 
   const allPhotoPaths = getSnsTextPostPhotoPaths([post]);
-  const [replies, avatarUrlMap, postPhotoUrlMap, postFullPhotoUrlMap] = await Promise.all([
+  const [replies, avatarUrlMap, postPhotoUrlMap] = await Promise.all([
     getPostRepliesAction(postId),
     signThumbOrOriginalPaths(supabase, getSnsTextPostAvatarPaths([post])),
     signThumbOrOriginalPaths(supabase, allPhotoPaths),
-    signPhotoPaths(supabase, allPhotoPaths),
   ]);
   const postAvatarUrl = post.profile_image_url ? avatarUrlMap.get(post.profile_image_url) : undefined;
   const postPhotoUrls = post.photo_paths.flatMap((path) => {
     const url = postPhotoUrlMap.get(path);
     return url ? [url] : [];
   });
-  const postFullPhotoUrls = post.photo_paths.flatMap((path) => {
-    const url = postFullPhotoUrlMap.get(path);
-    return url ? [url] : [];
-  });
+  const postPhotoPaths = post.photo_paths.filter((path) => postPhotoUrlMap.has(path));
   const quotedPhotoUrls = post.quoted_photo_paths.flatMap((path) => {
     const url = postPhotoUrlMap.get(path);
     return url ? [url] : [];
   });
-  const quotedFullPhotoUrls = post.quoted_photo_paths.flatMap((path) => {
-    const url = postFullPhotoUrlMap.get(path);
-    return url ? [url] : [];
-  });
+  const quotedPhotoPaths = post.quoted_photo_paths.filter((path) => postPhotoUrlMap.has(path));
   const quotedAvatarUrl = post.quoted_profile_image_url
     ? avatarUrlMap.get(post.quoted_profile_image_url)
     : undefined;
@@ -102,7 +95,7 @@ export default async function SnsTextPostPage({ params }: { params: Promise<{ po
           {post.body ? (
             <SnsRichText body={post.body} mentions={post.mentions} className="mt-3 whitespace-pre-wrap break-words text-[15px] leading-normal" />
           ) : null}
-          <SnsPostPhotoGrid photoUrls={postPhotoUrls} fullUrls={postFullPhotoUrls} postId={post.id} authorUserId={post.user_id} liked={post.my_liked} />
+          <SnsPostPhotoGrid photoUrls={postPhotoUrls} photoPaths={postPhotoPaths} postId={post.id} authorUserId={post.user_id} liked={post.my_liked} />
           <SnsPostPlaceTag post={post} />
           {post.repost_of_post_id && post.quoted_user_id ? (
             <Link href={`/sns/posts/${post.repost_of_post_id}`} className="sns-quoted-post pressable">
@@ -117,7 +110,9 @@ export default async function SnsTextPostPage({ params }: { params: Promise<{ po
                 <span className="ml-auto shrink-0 text-[10px] font-bold text-ink-faint">元の投稿</span>
               </span>
               {post.quoted_body ? <p className="mt-2 whitespace-pre-wrap break-words text-sm leading-relaxed">{post.quoted_body}</p> : null}
-              {quotedPhotoUrls.length > 0 ? <SnsPostPhotoGrid photoUrls={quotedPhotoUrls} fullUrls={quotedFullPhotoUrls} /> : null}
+              {quotedPhotoUrls.length > 0 ? (
+                <SnsPostPhotoGrid photoUrls={quotedPhotoUrls} photoPaths={quotedPhotoPaths} postId={post.repost_of_post_id} />
+              ) : null}
               {post.quoted_linked_spot_name ? <span className="sns-quoted-place"><IconMapPin size={12} />{post.quoted_linked_spot_name}</span> : null}
             </Link>
           ) : null}

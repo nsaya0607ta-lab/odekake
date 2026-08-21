@@ -189,18 +189,19 @@ export function SnsPhotoGrid({
               <Link
                 key={photo.id}
                 href={`/sns/${photo.id}`}
+                prefetch={false}
                 className="sns-photo-tile pressable relative aspect-square overflow-hidden bg-paper-deep"
               >
                 {url ? (
                   // eslint-disable-next-line @next/next/no-img-element
-                  <img src={url} alt="" className="h-full w-full object-cover" />
+                  <img src={url} alt="" loading="lazy" decoding="async" className="h-full w-full object-cover" />
                 ) : null}
                 <span className="absolute inset-x-0 bottom-0 flex items-end justify-between gap-1 bg-gradient-to-t from-black/70 via-black/30 to-transparent px-1.5 pt-6 pb-1.5">
                   <span className="flex min-w-0 items-center gap-1">
                     <span className="h-5 w-5 shrink-0 overflow-hidden rounded-full border border-white/70 bg-paper-deep">
                       {avatarUrl ? (
                         // eslint-disable-next-line @next/next/no-img-element
-                        <img src={avatarUrl} alt="" className="h-full w-full object-cover" />
+                        <img src={avatarUrl} alt="" loading="lazy" decoding="async" className="h-full w-full object-cover" />
                       ) : (
                         <span className="flex h-full w-full items-center justify-center text-ink-faint">
                           <IconUser size={11} />

@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState, useTransition } from "react";
 import { createPortal } from "react-dom";
-import { setFriendTextPostLikeAction } from "@/app/actions/sns";
+import { getFriendTextPostFullPhotoUrlsAction, setFriendTextPostLikeAction } from "@/app/actions/sns";
 import { IconChevronLeft, IconChevronRight, IconClose, IconHeart } from "@/components/icons";
 
 /**
@@ -13,13 +13,13 @@ import { IconChevronLeft, IconChevronRight, IconClose, IconHeart } from "@/compo
  */
 export function SnsPostPhotoGrid({
   photoUrls,
-  fullUrls,
+  photoPaths = [],
   postId,
   authorUserId,
   liked = false,
 }: {
   photoUrls: string[];
-  fullUrls: string[];
+  photoPaths?: string[];
   postId?: string;
   authorUserId?: string;
   liked?: boolean;
@@ -27,6 +27,8 @@ export function SnsPostPhotoGrid({
   const [openIndex, setOpenIndex] = useState<number | null>(null);
   const [heartBurst, setHeartBurst] = useState(false);
   const [locallyLiked, setLocallyLiked] = useState(liked);
+  const [fullUrls, setFullUrls] = useState<string[] | null>(null);
+  const [loadingOriginals, startLoadingOriginals] = useTransition();
   const [, startTransition] = useTransition();
   const lastTapRef = useRef(0);
   const openTimerRef = useRef<number | null>(null);
@@ -37,6 +39,21 @@ export function SnsPostPhotoGrid({
   }, []);
 
   if (photoUrls.length === 0) return null;
+
+  function loadOriginals() {
+    if (!postId || fullUrls || loadingOriginals || photoPaths.length !== photoUrls.length) return;
+    startLoadingOriginals(async () => {
+      const result = await getFriendTextPostFullPhotoUrlsAction(postId);
+      if (!result.ok) return;
+      const resolved = photoPaths.map((path) => result.urls[path]).filter((url): url is string => Boolean(url));
+      if (resolved.length === photoUrls.length) setFullUrls(resolved);
+    });
+  }
+
+  function showLightbox(index: number) {
+    setOpenIndex(index);
+    loadOriginals();
+  }
 
   function open(index: number, e: React.MouseEvent) {
     e.preventDefault();
@@ -65,7 +82,7 @@ export function SnsPostPhotoGrid({
     }
 
     if (openTimerRef.current) window.clearTimeout(openTimerRef.current);
-    openTimerRef.current = window.setTimeout(() => setOpenIndex(index), postId ? 230 : 0);
+    openTimerRef.current = window.setTimeout(() => showLightbox(index), postId && authorUserId ? 230 : 0);
   }
 
   return (
@@ -78,10 +95,11 @@ export function SnsPostPhotoGrid({
       </div>
       {openIndex !== null ? (
         <Lightbox
-          urls={fullUrls.length === photoUrls.length ? fullUrls : photoUrls}
+          urls={fullUrls ?? photoUrls}
           index={openIndex}
           onIndexChange={setOpenIndex}
           onClose={() => setOpenIndex(null)}
+          loadingOriginals={loadingOriginals}
         />
       ) : null}
     </>
@@ -186,11 +204,13 @@ function Lightbox({
   index,
   onIndexChange,
   onClose,
+  loadingOriginals,
 }: {
   urls: string[];
   index: number;
   onIndexChange: (index: number) => void;
   onClose: () => void;
+  loadingOriginals: boolean;
 }) {
   const [zoom, setZoom] = useState(1);
   const gestureRef = useRef({ startX: 0, startDistance: 0, startZoom: 1 });
@@ -283,6 +303,7 @@ function Lightbox({
       onClick={close}
       className="sns-lightbox"
     >
+      {loadingOriginals ? <span className="sns-lightbox-loading" role="status">高画質を読み込み中…</span> : null}
       <button
         type="button"
         onClick={close}

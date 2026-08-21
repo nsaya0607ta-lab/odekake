@@ -35,12 +35,15 @@ import type { FriendGroupRow } from "@/lib/supabase/types";
 
 export const dynamic = "force-dynamic";
 
+const INITIAL_GROUP_PHOTO_DAYS = 10;
+const MAX_GROUP_PHOTO_DAYS = 90;
+
 export default async function SnsGroupPage({
   params,
   searchParams,
 }: {
   params: Promise<{ groupId: string }>;
-  searchParams: Promise<{ view?: string }>;
+  searchParams: Promise<{ view?: string; days?: string }>;
 }) {
   const [{ groupId }, sp, { supabase, user }] = await Promise.all([params, searchParams, requireUser()]);
 
@@ -58,6 +61,10 @@ export default async function SnsGroupPage({
   });
 
   const view = sp.view === "chat" ? "chat" : "photos";
+  const requestedPhotoDays = Number.parseInt(sp.days ?? "", 10);
+  const photoDays = Number.isFinite(requestedPhotoDays)
+    ? Math.min(MAX_GROUP_PHOTO_DAYS, Math.max(INITIAL_GROUP_PHOTO_DAYS, requestedPhotoDays))
+    : INITIAL_GROUP_PHOTO_DAYS;
   const baseHref = `/sns/groups/${groupId}`;
   const mentionOptions = view === "chat"
     ? (await getFriendGroupMembers(supabase, groupId))
@@ -88,13 +95,18 @@ export default async function SnsGroupPage({
         <Suspense fallback={<SnsSwitcherSkeleton />}>
           <GroupSwitcherSection groups={groups} groupId={groupId} />
         </Suspense>
-        <Suspense fallback={<SnsGroupExtrasSkeleton />}>
-          <GroupExtras groupId={groupId} currentUserId={user.id} />
-        </Suspense>
+        <div className="space-y-2.5">
+          <Suspense fallback={<SnsGroupPinSkeleton />}>
+            <GroupPinSection groupId={groupId} />
+          </Suspense>
+          <Suspense fallback={<SnsGroupPollsSkeleton />}>
+            <GroupPollsSection groupId={groupId} currentUserId={user.id} />
+          </Suspense>
+        </div>
 
         {view === "photos" ? (
           <Suspense fallback={<SnsGridSkeleton />}>
-            <GroupPhotos groupId={groupId} baseHref={baseHref} />
+            <GroupPhotos groupId={groupId} baseHref={baseHref} days={photoDays} />
           </Suspense>
         ) : (
           <>
@@ -133,27 +145,24 @@ export default async function SnsGroupPage({
   );
 }
 
-async function GroupExtras({ groupId, currentUserId }: { groupId: string; currentUserId: string }) {
+async function GroupPinSection({ groupId }: { groupId: string }) {
   const { supabase } = await requireUser();
-  const [pin, polls] = await Promise.all([
-    getFriendGroupPin(supabase, groupId),
-    getFriendGroupPolls(supabase, groupId),
-  ]);
-  return (
-    <div className="space-y-2.5">
-      <SnsGroupPinCard groupId={groupId} pin={pin} />
-      <SnsGroupPolls groupId={groupId} currentUserId={currentUserId} initialPolls={polls} />
-    </div>
-  );
+  const pin = await getFriendGroupPin(supabase, groupId);
+  return <SnsGroupPinCard groupId={groupId} pin={pin} />;
 }
 
-function SnsGroupExtrasSkeleton() {
-  return (
-    <div className="space-y-2" aria-hidden="true">
-      <div className="h-14 animate-pulse rounded-2xl bg-white/55 motion-reduce:animate-none" />
-      <div className="h-20 animate-pulse rounded-2xl bg-white/55 motion-reduce:animate-none" />
-    </div>
-  );
+async function GroupPollsSection({ groupId, currentUserId }: { groupId: string; currentUserId: string }) {
+  const { supabase } = await requireUser();
+  const polls = await getFriendGroupPolls(supabase, groupId);
+  return <SnsGroupPolls groupId={groupId} currentUserId={currentUserId} initialPolls={polls} />;
+}
+
+function SnsGroupPinSkeleton() {
+  return <div className="h-14 animate-pulse rounded-2xl bg-white/55 motion-reduce:animate-none" aria-hidden="true" />;
+}
+
+function SnsGroupPollsSkeleton() {
+  return <div className="h-20 animate-pulse rounded-2xl bg-white/55 motion-reduce:animate-none" aria-hidden="true" />;
 }
 
 async function GroupSwitcherSection({
@@ -188,9 +197,9 @@ function SnsSwitcherSkeleton() {
   );
 }
 
-async function GroupPhotos({ groupId, baseHref }: { groupId: string; baseHref: string }) {
+async function GroupPhotos({ groupId, baseHref, days }: { groupId: string; baseHref: string; days: number }) {
   const { supabase } = await requireUser();
-  const photos = await getSnsGroupFeed(supabase, groupId);
+  const photos = await getSnsGroupFeed(supabase, groupId, days);
   // グリッドはサムネイル表示なので、原寸ではなく縮小版の署名URLを使う。互いに独立しているので並列で取得する
   const [avatarUrls, photoUrls] = await Promise.all([
     signThumbOrOriginalPaths(
@@ -200,7 +209,22 @@ async function GroupPhotos({ groupId, baseHref }: { groupId: string; baseHref: s
     signThumbOrOriginalPaths(supabase, photos.map((p) => p.storage_path)),
   ]);
 
-  return <SnsPhotoGrid photos={photos} photoUrls={photoUrls} avatarUrls={avatarUrls} baseHref={baseHref} />;
+  const nextDays = days < 30 ? 30 : Math.min(MAX_GROUP_PHOTO_DAYS, days + 30);
+  return (
+    <>
+      <SnsPhotoGrid photos={photos} photoUrls={photoUrls} avatarUrls={avatarUrls} baseHref={baseHref} />
+      {days < MAX_GROUP_PHOTO_DAYS ? (
+        <Link
+          href={`${baseHref}?days=${nextDays}`}
+          prefetch={false}
+          scroll={false}
+          className="sns-feed-more pressable mt-3"
+        >
+          過去{nextDays}日分の写真を見る
+        </Link>
+      ) : null}
+    </>
+  );
 }
 
 function SnsGridSkeleton() {

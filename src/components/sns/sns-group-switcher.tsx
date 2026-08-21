@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useEffect, useLayoutEffect, useRef, useState } from "react";
+import { useLayoutEffect, useRef, useState } from "react";
 import { reorderFriendGroupsAction } from "@/app/actions/sns";
 import { IconPlus } from "@/components/icons";
 import type { FriendGroupRow } from "@/lib/supabase/types";
@@ -37,12 +37,6 @@ export function SnsGroupSwitcher({
   } | null>(null);
 
   useLayoutEffect(() => setOrder(groups), [groups]);
-
-  // グループアイコンは <Link> ではなく手動のタップ判定なので、Next の自動プリフェッチが効かない。
-  // 表示された時点でルート（JSチャンク／RSCペイロード）を先読みしておき、実際にタップした時の待ち時間を減らす
-  useEffect(() => {
-    for (const g of groups) router.prefetch(`/sns/groups/${g.id}`);
-  }, [groups, router]);
 
   function captureOffsets() {
     const map = new Map<string, number>();
@@ -83,6 +77,8 @@ export function SnsGroupSwitcher({
 
   function handlePointerDown(e: React.PointerEvent, id: string) {
     if (e.pointerType === "mouse" && e.button !== 0) return;
+    // 全グループを一斉取得するとモバイル回線を圧迫するため、触れた1件だけ先読みする。
+    router.prefetch(`/sns/groups/${id}`);
     dragState.current = { startX: e.clientX, longPressTimer: null, moved: false };
     const target = e.currentTarget;
     const timer = setTimeout(() => {
@@ -246,7 +242,7 @@ function GroupIcon({
         >
           {iconUrl ? (
             // eslint-disable-next-line @next/next/no-img-element
-            <img src={iconUrl} alt="" className="h-full w-full object-cover" />
+            <img src={iconUrl} alt="" loading="lazy" decoding="async" className="h-full w-full object-cover" />
           ) : (
             icon
           )}
