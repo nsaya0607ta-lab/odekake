@@ -1,19 +1,19 @@
+import Image from "next/image";
 import Link from "next/link";
-import { IconGlobe, IconImage, IconNotebook } from "@/components/icons";
 
 export type SnsFeedFilter = "all" | "photos" | "notes";
 
 const FILTERS = [
-  { key: "all", label: "ぜんぶ", icon: IconGlobe },
-  { key: "photos", label: "写真", icon: IconImage },
-  { key: "notes", label: "ひとこと", icon: IconNotebook },
+  { key: "all", label: "ぜんぶ", artSrc: "/illustrations/sns/filter-all-v2.webp" },
+  { key: "photos", label: "写真", artSrc: "/illustrations/sns/filter-photos-v2.webp" },
+  { key: "notes", label: "ひとこと", artSrc: "/illustrations/sns/filter-notes-v2.webp" },
 ] as const;
 
 /** 投稿の種類を1タップで絞り込む、ホームと個人ページ共通のフィルター。 */
 export function SnsFeedFilters({ active, baseHref }: { active: SnsFeedFilter; baseHref: string }) {
   return (
     <nav aria-label="投稿の種類で絞り込む" className="sns-feed-filters">
-      {FILTERS.map(({ key, label, icon: Icon }) => {
+      {FILTERS.map(({ key, label, artSrc }) => {
         const selected = active === key;
         const href = key === "all" ? baseHref : `${baseHref}?filter=${key}`;
 
@@ -26,8 +26,11 @@ export function SnsFeedFilters({ active, baseHref }: { active: SnsFeedFilter; ba
             aria-current={selected ? "page" : undefined}
             className={`sns-feed-filter pressable is-${key} ${selected ? "is-active" : ""}`}
           >
-            <Icon size={15} />
-            <span>{label}</span>
+            <span className="sns-feed-filter-art" aria-hidden="true">
+              <Image src={artSrc} alt="" width={40} height={40} sizes="40px" />
+              <span className="sns-feed-filter-sparkle">✦</span>
+            </span>
+            <span className="sns-feed-filter-label">{label}</span>
           </Link>
         );
       })}
