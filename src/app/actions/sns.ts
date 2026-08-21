@@ -11,6 +11,11 @@ import { requireUser } from "@/lib/supabase/server";
 import { PHOTO_BUCKET } from "@/lib/data/client";
 import { signThumbOrOriginalPaths } from "@/lib/data/photos";
 import { friendGroupsCacheTag, getFriendTextPostReplies, getSnsPhoto } from "@/lib/data/sns";
+import {
+  getSnsNotificationReadSnapshot,
+  SNS_NOTIFICATION_LIKE_COUNTS_KEY,
+  SNS_NOTIFICATION_SEEN_AT_KEY,
+} from "@/lib/data/sns-notifications";
 
 const uuidSchema = z.string().uuid();
 const MAX_CAPTION_LENGTH = 300;
@@ -493,6 +498,48 @@ export async function deleteFriendGroupMessageAction(formData: FormData): Promis
 export async function markFriendGroupReadAction(groupId: string): Promise<void> {
   const parsed = uuidSchema.safeParse(groupId);
   if (!parsed.success) return;
-  const { supabase } = await requireUser();
+  const { supabase, user } = await requireUser();
   await supabase.rpc("mark_friend_group_read", { p_group_id: parsed.data });
+  revalidateTag(friendGroupsCacheTag(user.id));
+  revalidatePath("/sns");
+}
+
+/** 通知一覧の現在値をスナップショットとして保存し、グループ未読もまとめて既読にする。 */
+export async function markSnsNotificationsReadAction(): Promise<void> {
+  const { supabase, user } = await requireUser();
+  const seenAt = new Date().toISOString();
+  const snapshot = await getSnsNotificationReadSnapshot(supabase, user.id);
+
+  const groupReadResults = await Promise.all(
+    snapshot.unreadGroupIds.map((groupId) =>
+      supabase.rpc("mark_friend_group_read", { p_group_id: groupId }),
+    ),
+  );
+  const groupReadError = groupReadResults.find((result) => result.error)?.error;
+
+  const { error } = await supabase.auth.updateUser({
+    data: {
+      [SNS_NOTIFICATION_SEEN_AT_KEY]: seenAt,
+      [SNS_NOTIFICATION_LIKE_COUNTS_KEY]: snapshot.likeCounts,
+    },
+  });
+
+  if (!error) {
+    const { error: refreshError } = await supabase.auth.refreshSession();
+    if (refreshError) {
+      console.warn("Failed to refresh SNS notification read state", { message: refreshError.message });
+    }
+  }
+  revalidateTag(friendGroupsCacheTag(user.id));
+  revalidatePath("/sns");
+
+  if (error || groupReadError) {
+    console.error("Failed to mark SNS notifications as read", {
+      authMessage: error?.message,
+      groupMessage: groupReadError?.message,
+    });
+    redirect("/sns/notifications?error=read");
+  }
+
+  redirect("/sns/notifications?read=1");
 }

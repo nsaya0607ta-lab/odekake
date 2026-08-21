@@ -76,6 +76,11 @@ async function fetchMyFriendGroups(supabase: DB): Promise<FriendGroupRow[]> {
   return data ?? [];
 }
 
+/** 未読状態をキャッシュせず取得する。通知バッジなど即時性が必要な表示で使う。 */
+export async function getMyFriendGroupsFresh(supabase: DB): Promise<FriendGroupRow[]> {
+  return fetchMyFriendGroups(supabase);
+}
+
 export function friendGroupsCacheTag(userId: string): string {
   return `friend-groups:${userId}`;
 }

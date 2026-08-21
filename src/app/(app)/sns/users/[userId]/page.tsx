@@ -9,6 +9,7 @@ import {
   SnsFeedFilters,
 } from "@/components/sns/sns-feed-filters";
 import { SnsPeopleRail, type SnsPersonRow } from "@/components/sns/sns-people-rail";
+import { SnsNotificationEntry } from "@/components/sns/sns-notification-button";
 import { SnsPrimaryNav } from "@/components/sns/sns-primary-nav";
 import { SnsTextFeed } from "@/components/sns/sns-text-feed";
 import { getFriendList } from "@/lib/data/friends";
@@ -65,7 +66,12 @@ export default async function SnsUserHomePage({
 
   return (
     <>
-      <PageHeader title="SNS" subtitle="ユーザーのつぶやき" showBack={false} />
+      <PageHeader
+        title="SNS"
+        subtitle="ユーザーのつぶやき"
+        showBack={false}
+        leftAction={<SnsNotificationEntry />}
+      />
       <SnsBackgroundBand hasToggleBar={false} />
       <PageBody className="space-y-4">
         <SnsPrimaryNav active="user" userHref={`/sns/users/${user.id}`} groupHref={groupHref} />

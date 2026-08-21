@@ -16,6 +16,7 @@ import { SnsChatForm } from "@/components/sns/sns-chat-form";
 import { SnsChatList } from "@/components/sns/sns-chat-list";
 import { SnsGroupSwitcher } from "@/components/sns/sns-group-switcher";
 import { SnsPhotoGrid } from "@/components/sns/sns-photo-grid";
+import { SnsNotificationEntry } from "@/components/sns/sns-notification-button";
 import { SnsPrimaryNav } from "@/components/sns/sns-primary-nav";
 import { SnsViewTabs } from "@/components/sns/sns-view-tabs";
 import { signThumbOrOriginalPaths } from "@/lib/data/photos";
@@ -56,6 +57,7 @@ export default async function SnsGroupPage({
         title={group.name}
         subtitle={`${group.member_count}人で共有中`}
         showBack={false}
+        leftAction={<SnsNotificationEntry />}
         action={
           <Link
             href={`${baseHref}/settings`}

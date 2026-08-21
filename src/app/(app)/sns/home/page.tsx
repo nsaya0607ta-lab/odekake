@@ -9,6 +9,7 @@ import {
   SnsFeedFilters,
 } from "@/components/sns/sns-feed-filters";
 import { SnsPrimaryNav } from "@/components/sns/sns-primary-nav";
+import { SnsNotificationEntry } from "@/components/sns/sns-notification-button";
 import { SnsTextFeed } from "@/components/sns/sns-text-feed";
 import { signPhotoPaths, signThumbOrOriginalPaths } from "@/lib/data/photos";
 import { getMyFriendGroups, getOwnSnsProfile, getPersonalTextFeed } from "@/lib/data/sns";
@@ -47,7 +48,12 @@ export default async function SnsHomePage({
 
   return (
     <>
-      <PageHeader title="SNS" subtitle="フレンドのおでかけが集まる場所" showBack={false} />
+      <PageHeader
+        title="SNS"
+        subtitle="フレンドのおでかけが集まる場所"
+        showBack={false}
+        leftAction={<SnsNotificationEntry />}
+      />
       <SnsBackgroundBand hasToggleBar={false} />
       <PageBody className="space-y-4">
         <SnsPrimaryNav active="home" userHref={`/sns/users/${user.id}`} groupHref={groupHref} />

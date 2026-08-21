@@ -192,6 +192,13 @@ export const IconMail = (p: IconProps) => (
   </Base>
 );
 
+export const IconBell = (p: IconProps) => (
+  <Base {...p}>
+    <path d="M6.5 10.2c0-3.4 2.1-5.7 5.5-5.7s5.5 2.3 5.5 5.7c0 3.6 1.5 4.8 2 5.6H4.5c.5-.8 2-2 2-5.6Z" />
+    <path d="M9.7 19c.5.8 1.3 1.2 2.3 1.2s1.8-.4 2.3-1.2" />
+  </Base>
+);
+
 export const IconLogout = (p: IconProps) => (
   <Base {...p}>
     <path d="M14 5.5H6.5a1 1 0 0 0-1 1v11a1 1 0 0 0 1 1H14" />
