@@ -74,19 +74,29 @@ export async function createFriendPhotosAction(_prev: ActionState, formData: For
   redirect(`/sns/groups/${groupId}?posted=1`);
 }
 
+const MAX_TEXT_POST_PHOTOS = 4;
+
 export async function createFriendTextPostAction(_prev: ActionState, formData: FormData): Promise<ActionState> {
   const body = String(formData.get("body") ?? "").trim();
-  if (body === "") {
-    return { error: "つぶやきを入力してください。" };
+  const requestedPhotoPaths = parsePhotoPaths(formData).slice(0, MAX_TEXT_POST_PHOTOS);
+
+  if (body === "" && requestedPhotoPaths.length === 0) {
+    return { error: "つぶやきを入力するか、写真を選んでください。", values: { body } };
   }
   if (body.length > 280) {
-    return { error: "280文字以内で入力してください。" };
+    return { error: "280文字以内で入力してください。", values: { body } };
   }
 
   const { supabase, user } = await requireUser();
-  const { error } = await supabase.rpc("create_friend_text_post", { p_body: body });
+  const destinationPrefix = `friend-photos/${user.id}/posts/${todayInTokyo()}`;
+  const photoPaths =
+    requestedPhotoPaths.length > 0
+      ? [...new Set(await finalizePhotoPaths(supabase, requestedPhotoPaths, destinationPrefix))]
+      : [];
+
+  const { error } = await supabase.rpc("create_friend_text_post", { p_body: body, p_photo_paths: photoPaths });
   if (error) {
-    return { error: toJapaneseError(error, "投稿に失敗しました。") };
+    return { error: toJapaneseError(error, "投稿に失敗しました。"), values: { body } };
   }
 
   revalidatePath("/sns/home");
@@ -99,7 +109,12 @@ export async function deleteFriendTextPostAction(formData: FormData): Promise<vo
   if (!parsed.success) redirect("/sns/home");
 
   const { supabase, user } = await requireUser();
-  await supabase.rpc("delete_friend_text_post", { p_post_id: parsed.data });
+  const { data: photoPaths } = await supabase.rpc("delete_friend_text_post", { p_post_id: parsed.data });
+
+  if (photoPaths && photoPaths.length > 0) {
+    const objectPaths = photoPaths.flatMap((path) => [path, toThumbPath(path)]);
+    await supabase.storage.from(PHOTO_BUCKET).remove(objectPaths);
+  }
 
   revalidatePath("/sns/home");
   revalidatePath(`/sns/users/${user.id}`);

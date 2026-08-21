@@ -18,17 +18,20 @@ export default async function SnsHomePage() {
   const { supabase, user } = await requireUser();
 
   const posts = await getPersonalTextFeed(supabase);
-  const avatarUrls = await signThumbOrOriginalPaths(
-    supabase,
-    posts.flatMap((p) => (p.profile_image_url ? [p.profile_image_url] : [])),
-  );
+  const [avatarUrls, photoUrls] = await Promise.all([
+    signThumbOrOriginalPaths(
+      supabase,
+      posts.flatMap((p) => (p.profile_image_url ? [p.profile_image_url] : [])),
+    ),
+    signThumbOrOriginalPaths(supabase, posts.flatMap((p) => p.photo_paths)),
+  ]);
 
   return (
     <SnsModeProvider>
       <PageHeader title="ホーム" showBack={false} leftAction={<SnsModeMenu />} />
       <SnsBackgroundBand hasToggleBar={false} />
       <PageBody>
-        <SnsTextFeed posts={posts} avatarUrls={avatarUrls} currentUserId={user.id} />
+        <SnsTextFeed posts={posts} avatarUrls={avatarUrls} photoUrls={photoUrls} currentUserId={user.id} />
       </PageBody>
       <Link
         href="/sns/home/new"

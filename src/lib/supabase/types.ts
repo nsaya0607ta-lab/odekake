@@ -373,6 +373,7 @@ export type SnsTextPostRow = {
   display_name: string;
   profile_image_url: string | null;
   body: string;
+  photo_paths: string[];
   created_at: string;
   reply_count: number;
   like_count: number;
@@ -648,8 +649,11 @@ export type Database = {
         Args: { p_user_id?: string | null; p_days?: number };
         Returns: SnsFeedPhotoRow[];
       };
-      create_friend_text_post: { Args: { p_body: string }; Returns: { id: string; created_at: string }[] };
-      delete_friend_text_post: { Args: { p_post_id: string }; Returns: undefined };
+      create_friend_text_post: {
+        Args: { p_body: string; p_photo_paths?: string[] };
+        Returns: { id: string; created_at: string }[];
+      };
+      delete_friend_text_post: { Args: { p_post_id: string }; Returns: string[] };
       get_personal_text_feed: {
         Args: { p_user_id?: string | null; p_limit?: number };
         Returns: SnsTextPostRow[];

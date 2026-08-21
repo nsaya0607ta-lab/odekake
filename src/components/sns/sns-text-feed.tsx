@@ -4,15 +4,18 @@ import { formatRelativeTimeJa } from "@/lib/date";
 import type { SnsTextPostRow } from "@/lib/supabase/types";
 import { LikeButton } from "@/components/sns/like-button";
 import { PostOptionsMenu } from "@/components/sns/post-options-menu";
+import { SnsPostPhotoGrid } from "@/components/sns/sns-post-photo-grid";
 
-/** Twitterのタイムラインのような、テキストだけの個人投稿一覧 */
+/** Twitterのタイムラインのような、テキスト＋写真の個人投稿一覧 */
 export function SnsTextFeed({
   posts,
   avatarUrls,
+  photoUrls,
   currentUserId,
 }: {
   posts: SnsTextPostRow[];
   avatarUrls: Map<string, string>;
+  photoUrls: Map<string, string>;
   currentUserId: string;
 }) {
   if (posts.length === 0) {
@@ -24,6 +27,10 @@ export function SnsTextFeed({
       {posts.map((post) => {
         const avatarUrl = post.profile_image_url ? avatarUrls.get(post.profile_image_url) : null;
         const isMine = post.user_id === currentUserId;
+        const postPhotoUrls = post.photo_paths.flatMap((path) => {
+          const url = photoUrls.get(path);
+          return url ? [url] : [];
+        });
 
         return (
           <li key={post.id} className="rough-card flex gap-3 p-3.5">
@@ -55,9 +62,16 @@ export function SnsTextFeed({
                   </span>
                 ) : null}
               </div>
-              <Link href={`/sns/posts/${post.id}`} className="mt-0.5 block">
-                <p className="whitespace-pre-wrap break-words text-[15px] leading-normal">{post.body}</p>
-              </Link>
+              {post.body ? (
+                <Link href={`/sns/posts/${post.id}`} className="mt-0.5 block">
+                  <p className="whitespace-pre-wrap break-words text-[15px] leading-normal">{post.body}</p>
+                </Link>
+              ) : null}
+              {postPhotoUrls.length > 0 ? (
+                <Link href={`/sns/posts/${post.id}`} className="block">
+                  <SnsPostPhotoGrid photoUrls={postPhotoUrls} />
+                </Link>
+              ) : null}
               <div className="mt-2.5 flex items-center gap-4">
                 <Link
                   href={`/sns/posts/${post.id}`}

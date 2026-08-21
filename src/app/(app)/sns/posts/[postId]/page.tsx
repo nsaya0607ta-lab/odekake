@@ -6,6 +6,7 @@ import { PageBody } from "@/components/page-body";
 import { PageHeader } from "@/components/page-header";
 import { LikeButton } from "@/components/sns/like-button";
 import { PostOptionsMenu } from "@/components/sns/post-options-menu";
+import { SnsPostPhotoGrid } from "@/components/sns/sns-post-photo-grid";
 import { signThumbOrOriginalPaths } from "@/lib/data/photos";
 import { getFriendTextPostReplies, getPersonalTextPost } from "@/lib/data/sns";
 import { requireUser } from "@/lib/supabase/server";
@@ -30,7 +31,7 @@ export default async function SnsTextPostPage({ params }: { params: Promise<{ po
   if (!post) notFound();
 
   const replies = await getFriendTextPostReplies(supabase, postId);
-  const [avatarUrls, postAvatarUrl] = await Promise.all([
+  const [avatarUrls, postAvatarUrl, postPhotoUrlMap] = await Promise.all([
     signThumbOrOriginalPaths(
       supabase,
       replies.flatMap((r) => (r.profile_image_url ? [r.profile_image_url] : [])),
@@ -38,7 +39,12 @@ export default async function SnsTextPostPage({ params }: { params: Promise<{ po
     post.profile_image_url
       ? signThumbOrOriginalPaths(supabase, [post.profile_image_url]).then((m) => m.get(post.profile_image_url!))
       : Promise.resolve(undefined),
+    signThumbOrOriginalPaths(supabase, post.photo_paths),
   ]);
+  const postPhotoUrls = post.photo_paths.flatMap((path) => {
+    const url = postPhotoUrlMap.get(path);
+    return url ? [url] : [];
+  });
 
   const isOwner = post.user_id === user.id;
 
@@ -68,7 +74,10 @@ export default async function SnsTextPostPage({ params }: { params: Promise<{ po
               <span className="block text-xs text-ink-faint">{formatDateTime(post.created_at)}</span>
             </div>
           </div>
-          <p className="mt-3 whitespace-pre-wrap break-words text-[15px] leading-normal">{post.body}</p>
+          {post.body ? (
+            <p className="mt-3 whitespace-pre-wrap break-words text-[15px] leading-normal">{post.body}</p>
+          ) : null}
+          <SnsPostPhotoGrid photoUrls={postPhotoUrls} />
           <div className="mt-2.5">
             <LikeButton postId={post.id} authorUserId={post.user_id} liked={post.my_liked} count={post.like_count} />
           </div>
