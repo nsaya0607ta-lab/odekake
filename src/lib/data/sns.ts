@@ -5,6 +5,7 @@ import type {
   FriendGroupMemberRow,
   FriendGroupMessageRow,
   FriendGroupRow,
+  FriendGroupSummaryRow,
   SnsCommentRow,
   SnsFeedPhotoRow,
   SnsPhotoRow,
@@ -128,6 +129,26 @@ async function fetchMyFriendGroups(supabase: DB): Promise<FriendGroupRow[]> {
 /** 未読状態をキャッシュせず取得する。通知バッジなど即時性が必要な表示で使う。 */
 export async function getMyFriendGroupsFresh(supabase: DB): Promise<FriendGroupRow[]> {
   return fetchMyFriendGroups(supabase);
+}
+
+/** グループ一覧用。最新投稿と正確な未読件数を1回のRPCでまとめて取得する。 */
+export async function getMyFriendGroupSummaries(supabase: DB): Promise<FriendGroupSummaryRow[]> {
+  const { data, error } = await supabase.rpc("get_my_friend_group_summaries");
+  if (!error) return data ?? [];
+
+  // 0058適用前でも一覧自体は利用できるよう、既存の軽いグループ取得へ戻す。
+  if (error.code !== "PGRST202" && error.code !== "42883") {
+    console.error("Friend group summaries are unavailable", { code: error.code, message: error.message });
+  }
+  const groups = await fetchMyFriendGroups(supabase);
+  return groups.map((group) => ({
+    ...group,
+    unread_count: group.has_unread ? 1 : 0,
+    latest_kind: null,
+    latest_preview: null,
+    latest_actor_name: null,
+    latest_at: null,
+  }));
 }
 
 export function friendGroupsCacheTag(userId: string): string {

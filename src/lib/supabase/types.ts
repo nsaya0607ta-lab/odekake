@@ -410,6 +410,14 @@ export type FriendGroupRow = {
   has_unread: boolean;
 };
 
+export type FriendGroupSummaryRow = FriendGroupRow & {
+  unread_count: number;
+  latest_kind: "photo" | "message" | null;
+  latest_preview: string | null;
+  latest_actor_name: string | null;
+  latest_at: string | null;
+};
+
 export type FriendGroupMemberRow = {
   user_id: string;
   display_name: string;
@@ -703,6 +711,7 @@ export type Database = {
       delete_friend_group: { Args: { p_group_id: string }; Returns: undefined };
       get_friend_group_members: { Args: { p_group_id: string }; Returns: FriendGroupMemberRow[] };
       get_my_friend_groups: { Args: Record<string, never>; Returns: FriendGroupRow[] };
+      get_my_friend_group_summaries: { Args: Record<string, never>; Returns: FriendGroupSummaryRow[] };
       reorder_friend_groups: { Args: { p_group_ids: string[] }; Returns: undefined };
       mark_friend_group_read: { Args: { p_group_id: string }; Returns: undefined };
       get_sns_group_feed: { Args: { p_group_id: string; p_days?: number }; Returns: SnsFeedPhotoRow[] };

@@ -814,6 +814,12 @@ select pg_temp.record('他人の投稿があると未読になる（bob視点、
   pg_temp.count_as(:'bob', format(
     'select * from public.get_my_friend_groups() where id = %L and has_unread', :'sns_group_a')) = 1);
 
+select pg_temp.record('グループ一覧に最新メッセージと正確な未読件数が出る（bob視点）',
+  pg_temp.count_as(:'bob', format(
+    $q$select * from public.get_my_friend_group_summaries()
+       where id = %L and latest_kind = 'message' and latest_preview = 'よろしく' and unread_count = 1$q$,
+    :'sns_group_a')) = 1);
+
 select pg_temp.expect_ok('既読にできる', :'alice', format(
   $q$select public.mark_friend_group_read(%L)$q$, :'sns_group_a'));
 
@@ -823,6 +829,11 @@ select pg_temp.record('未読は自分の投稿では立たない（alice視点�
 
 select pg_temp.expect_ok('既読にできる（bob）', :'bob', format(
   $q$select public.mark_friend_group_read(%L)$q$, :'sns_group_a'));
+
+select pg_temp.record('既読後はグループ一覧の未読件数が0になる（bob視点）',
+  pg_temp.count_as(:'bob', format(
+    'select * from public.get_my_friend_group_summaries() where id = %L and unread_count = 0 and not has_unread',
+    :'sns_group_a')) = 1);
 
 select pg_temp.expect_denied('オーナー以外はメンバーを追加できない', :'bob', format(
   $q$select public.add_friend_group_members(%L, array[]::uuid[])$q$, :'sns_group_a'));

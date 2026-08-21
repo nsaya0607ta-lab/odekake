@@ -14,7 +14,7 @@ import { SnsPrimaryNav } from "@/components/sns/sns-primary-nav";
 import { SnsTextFeed } from "@/components/sns/sns-text-feed";
 import { getFriendList } from "@/lib/data/friends";
 import { signPhotoPaths, signThumbOrOriginalPaths } from "@/lib/data/photos";
-import { getFriendProfile, getMyFriendGroups, getOwnSnsProfile, getPersonalTextFeed } from "@/lib/data/sns";
+import { getFriendProfile, getOwnSnsProfile, getPersonalTextFeed } from "@/lib/data/sns";
 import { requireUser } from "@/lib/supabase/server";
 
 export const dynamic = "force-dynamic";
@@ -29,12 +29,11 @@ export default async function SnsUserHomePage({
 }) {
   const [{ userId }, sp, { supabase, user }] = await Promise.all([params, searchParams, requireUser()]);
 
-  const [profile, posts, friends, ownProfile, groups] = await Promise.all([
+  const [profile, posts, friends, ownProfile] = await Promise.all([
     getFriendProfile(supabase, userId),
     getPersonalTextFeed(supabase, userId),
     getFriendList(supabase),
     getOwnSnsProfile(supabase, user.id),
-    getMyFriendGroups(supabase, user.id),
   ]);
   const filter = parseSnsFeedFilter(sp.filter);
   const visiblePosts = posts.filter((post) => matchesSnsFeedFilter(post, filter));
@@ -62,7 +61,6 @@ export default async function SnsUserHomePage({
     })),
   ];
   const isMine = userId === user.id;
-  const groupHref = groups[0] ? `/sns/groups/${groups[0].id}` : "/sns/groups";
 
   return (
     <>
@@ -74,7 +72,7 @@ export default async function SnsUserHomePage({
       />
       <SnsBackgroundBand hasToggleBar={false} />
       <PageBody className="space-y-4">
-        <SnsPrimaryNav active="user" userHref={`/sns/users/${user.id}`} groupHref={groupHref} />
+        <SnsPrimaryNav active="user" userHref={`/sns/users/${user.id}`} groupHref="/sns/groups" />
         <SnsPeopleRail people={people} activeUserId={userId} />
 
         <section className="sns-profile-hero">

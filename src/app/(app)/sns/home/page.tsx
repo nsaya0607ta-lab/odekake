@@ -12,7 +12,7 @@ import { SnsPrimaryNav } from "@/components/sns/sns-primary-nav";
 import { SnsNotificationEntry } from "@/components/sns/sns-notification-button";
 import { SnsTextFeed } from "@/components/sns/sns-text-feed";
 import { signPhotoPaths, signThumbOrOriginalPaths } from "@/lib/data/photos";
-import { getMyFriendGroups, getOwnSnsProfile, getPersonalTextFeed } from "@/lib/data/sns";
+import { getOwnSnsProfile, getPersonalTextFeed } from "@/lib/data/sns";
 import { requireUser } from "@/lib/supabase/server";
 
 export const metadata = { title: "ホーム | SNS" };
@@ -26,10 +26,9 @@ export default async function SnsHomePage({
 }) {
   const [{ supabase, user }, sp] = await Promise.all([requireUser(), searchParams]);
 
-  const [posts, ownProfile, groups] = await Promise.all([
+  const [posts, ownProfile] = await Promise.all([
     getPersonalTextFeed(supabase),
     getOwnSnsProfile(supabase, user.id),
-    getMyFriendGroups(supabase, user.id),
   ]);
   const filter = parseSnsFeedFilter(sp.filter);
   const visiblePosts = posts.filter((post) => matchesSnsFeedFilter(post, filter));
@@ -44,8 +43,6 @@ export default async function SnsHomePage({
     signPhotoPaths(supabase, allPhotoPaths),
   ]);
 
-  const groupHref = groups[0] ? `/sns/groups/${groups[0].id}` : "/sns/groups";
-
   return (
     <>
       <PageHeader
@@ -56,7 +53,7 @@ export default async function SnsHomePage({
       />
       <SnsBackgroundBand hasToggleBar={false} />
       <PageBody className="space-y-4">
-        <SnsPrimaryNav active="home" userHref={`/sns/users/${user.id}`} groupHref={groupHref} />
+        <SnsPrimaryNav active="home" userHref={`/sns/users/${user.id}`} groupHref="/sns/groups" />
 
         <section className="sns-home-welcome" aria-labelledby="sns-home-title">
           <span className="sns-home-sun" aria-hidden="true" />

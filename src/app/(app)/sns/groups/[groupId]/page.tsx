@@ -71,7 +71,7 @@ export default async function SnsGroupPage({
       <PostedToast />
       <SnsBackgroundBand />
       <PageBody className="space-y-4">
-        <SnsPrimaryNav active="group" userHref={`/sns/users/${user.id}`} groupHref={baseHref} />
+        <SnsPrimaryNav active="group" userHref={`/sns/users/${user.id}`} groupHref="/sns/groups" />
         <Suspense fallback={<SnsSwitcherSkeleton />}>
           <GroupSwitcherSection groups={groups} groupId={groupId} />
         </Suspense>
