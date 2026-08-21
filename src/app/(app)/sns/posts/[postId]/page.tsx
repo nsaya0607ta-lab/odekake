@@ -6,6 +6,8 @@ import { PageBody } from "@/components/page-body";
 import { PageHeader } from "@/components/page-header";
 import { LikeButton } from "@/components/sns/like-button";
 import { PostOptionsMenu } from "@/components/sns/post-options-menu";
+import { SnsBackgroundBand } from "@/components/sns/sns-background-band";
+import { SnsIllustratedHero } from "@/components/sns/sns-illustrated-hero";
 import { SnsPostPhotoGrid } from "@/components/sns/sns-post-photo-grid";
 import { SnsPostPlaceTag } from "@/components/sns/sns-post-place-tag";
 import { SnsReplyThread } from "@/components/sns/sns-reply-thread";
@@ -53,8 +55,11 @@ export default async function SnsTextPostPage({ params }: { params: Promise<{ po
   return (
     <>
       <PageHeader title="つぶやき" backHref="/sns/home" action={isOwner ? <PostOptionsMenu postId={post.id} /> : null} />
-      <PageBody>
-        <div className="rough-card p-3.5">
+      <SnsBackgroundBand hasToggleBar={false} />
+      <PageBody className="sns-page-shell sns-subpage-body space-y-4">
+        <article className="sns-detail-post-card">
+          <span className="sns-detail-post-tape" aria-hidden="true" />
+          <p className="sns-detail-post-eyebrow">TRAVEL POSTCARD</p>
           <div className="flex items-center gap-2">
             <Link
               href={`/sns/users/${post.user_id}`}
@@ -84,10 +89,16 @@ export default async function SnsTextPostPage({ params }: { params: Promise<{ po
           <div className="mt-2.5">
             <LikeButton postId={post.id} authorUserId={post.user_id} liked={post.my_liked} count={post.like_count} />
           </div>
-        </div>
+        </article>
 
-        <section className="space-y-3">
-          <h2 className="px-1 text-sm font-bold text-ink-soft">返信（{replies.length}）</h2>
+        <section className="sns-replies-panel space-y-3">
+          <SnsIllustratedHero
+            eyebrow="KEEP THE STORY GOING"
+            title="会話をひろげよう"
+            description={`${replies.length}件の返信。旅の余韻や次のおでかけを話そう。`}
+            artSrc="/illustrations/sns/conversation-v2.webp"
+            tone="conversation"
+          />
           <SnsReplyThread postId={post.id} currentUserId={user.id} initialReplies={replies} />
         </section>
       </PageBody>

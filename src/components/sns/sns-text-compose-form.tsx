@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useActionState, useState } from "react";
 import { createFriendTextPostAction } from "@/app/actions/sns";
 import { emptyActionState, FormMessage, SubmitButton } from "@/components/form";
-import { IconCalendar, IconMapPin } from "@/components/icons";
+import { IconCalendar, IconImage, IconMapPin, IconSend, IconUsers } from "@/components/icons";
 import { PhotoUploader } from "@/components/photo-uploader";
 import type { SnsLinkableVisit } from "@/lib/data/sns";
 
@@ -28,11 +28,23 @@ export function SnsTextComposeForm({
   const selectedVisit = visitOptions.find((visit) => visit.id === selectedVisitId);
 
   return (
-    <form action={action} className="sns-compose-sheet space-y-4">
-      <div>
+    <form action={action} className="sns-compose-sheet sns-form-panel space-y-4">
+      <div className="sns-form-audience" aria-label="公開範囲">
+        <span className="sns-form-audience-icon" aria-hidden="true"><IconUsers size={16} /></span>
+        <span className="min-w-0 flex-1">
+          <span className="block text-[10px] font-black tracking-[0.12em] text-ink-faint">SHARE WITH</span>
+          <span className="block text-xs font-black text-ink-soft">フレンドに公開</span>
+        </span>
+        <span className="sns-form-ready-dot" aria-hidden="true" />
+      </div>
+
+      <section className="sns-form-section is-message">
         <div className="mb-2 flex items-center justify-between gap-3">
-          <label htmlFor="sns-post-body" className="text-sm font-bold">ひとこと</label>
-          <span className={`text-[11px] font-bold ${length > 250 ? "text-blossom" : "text-ink-faint"}`}>
+          <label htmlFor="sns-post-body" className="flex items-center gap-2 text-sm font-black">
+            <span className="sns-form-step">1</span>
+            ひとこと
+          </label>
+          <span className={`sns-character-count ${length > 250 ? "is-near-limit" : ""}`}>
             {length} / 280
           </span>
         </div>
@@ -41,15 +53,21 @@ export function SnsTextComposeForm({
           name="body"
           rows={6}
           maxLength={280}
-          className="field border-0 bg-card/70 text-[16px] leading-relaxed shadow-inner ring-1 ring-line"
+          className="field sns-compose-textarea border-0 text-[16px] leading-relaxed"
           placeholder="今日のおでかけ、どんな気分？"
           defaultValue={initialBody}
           onChange={(event) => setLength(event.currentTarget.value.length)}
         />
-      </div>
-      <div className="rounded-2xl bg-card/65 p-3 ring-1 ring-line">
-        <PhotoUploader name="photoPaths" userId={userId} draftKey="sns-home-new" max={4} label="写真を添える（最大4枚）" />
-      </div>
+      </section>
+      <section className="sns-form-section is-photo">
+        <div className="mb-2 flex items-center gap-2">
+          <span className="sns-form-step">2</span>
+          <IconImage size={17} className="text-[#d94e86]" />
+          <p className="text-sm font-black">写真を添える</p>
+          <span className="sns-compose-optional">任意・最大4枚</span>
+        </div>
+        <PhotoUploader name="photoPaths" userId={userId} draftKey="sns-home-new" max={4} label="写真を選ぶ" persistDraft />
+      </section>
       <section className="sns-compose-visit-card">
         <div className="flex items-start gap-3">
           <span className="sns-compose-visit-icon" aria-hidden="true">
@@ -57,7 +75,8 @@ export function SnsTextComposeForm({
           </span>
           <div className="min-w-0 flex-1">
             <div className="flex items-center gap-2">
-              <label htmlFor="sns-linked-visit" className="text-sm font-bold">おでかけを添える</label>
+              <span className="sns-form-step">3</span>
+              <label htmlFor="sns-linked-visit" className="text-sm font-black">おでかけを添える</label>
               <span className="sns-compose-optional">任意</span>
             </div>
             <p className="mt-0.5 text-[11px] leading-relaxed text-ink-faint">
@@ -102,7 +121,11 @@ export function SnsTextComposeForm({
         )}
       </section>
       <FormMessage state={state} />
-      <SubmitButton pendingLabel="投稿中…" className="btn btn-primary w-full shadow-md">つぶやく</SubmitButton>
+      <SubmitButton pendingLabel="旅の便りを送信中…" className="sns-primary-submit pressable">
+        <IconSend size={18} />
+        つぶやく
+        <span aria-hidden="true">✦</span>
+      </SubmitButton>
     </form>
   );
 }

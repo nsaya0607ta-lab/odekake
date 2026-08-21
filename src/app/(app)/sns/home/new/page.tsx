@@ -1,7 +1,8 @@
 import { PageBody } from "@/components/page-body";
 import { PageHeader } from "@/components/page-header";
+import { SnsBackgroundBand } from "@/components/sns/sns-background-band";
+import { SnsIllustratedHero } from "@/components/sns/sns-illustrated-hero";
 import { SnsTextComposeForm } from "@/components/sns/sns-text-compose-form";
-import { IconSend } from "@/components/icons";
 import { getSnsLinkableVisits } from "@/lib/data/sns";
 import { requireUser } from "@/lib/supabase/server";
 
@@ -15,18 +16,15 @@ export default async function NewSnsHomePostPage() {
   return (
     <>
       <PageHeader title="つぶやく" backHref="/sns/home" />
-      <PageBody className="space-y-4">
-        <section className="sns-compose-intro">
-          <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-leaf text-white shadow-sm">
-            <IconSend size={18} />
-          </span>
-          <span>
-            <span className="block text-sm font-bold">フレンドに共有</span>
-            <span className="mt-0.5 block text-[11px] leading-relaxed text-ink-faint">
-              ひとことだけでも、写真だけでも投稿できます。
-            </span>
-          </span>
-        </section>
+      <SnsBackgroundBand hasToggleBar={false} />
+      <PageBody className="sns-page-shell sns-subpage-body space-y-4">
+        <SnsIllustratedHero
+          eyebrow="CREATE A MEMORY"
+          title="今日を、旅の便りに"
+          description="ひとこと・写真・場所を、好きな組み合わせでフレンドへ。"
+          artSrc="/illustrations/sns/compose-post-v2.webp"
+          tone="compose"
+        />
         <SnsTextComposeForm userId={user.id} visitOptions={visitOptions} />
       </PageBody>
     </>

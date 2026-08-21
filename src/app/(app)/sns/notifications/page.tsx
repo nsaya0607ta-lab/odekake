@@ -4,6 +4,7 @@ import { IconBell, IconCheck, IconHeart, IconUser, IconUsers } from "@/component
 import { PageBody } from "@/components/page-body";
 import { PageHeader } from "@/components/page-header";
 import { SnsBackgroundBand } from "@/components/sns/sns-background-band";
+import { SnsIllustratedHero } from "@/components/sns/sns-illustrated-hero";
 import { formatRelativeTimeJa } from "@/lib/date";
 import {
   getSnsNotificationCenter,
@@ -40,23 +41,21 @@ export default async function SnsNotificationsPage({
       />
       <SnsBackgroundBand hasToggleBar={false} />
       <PageBody className="sns-page-shell space-y-4">
-        <section className="sns-notification-hero is-compact">
-          <span className="sns-notification-hero-icon" aria-hidden="true">
-            <IconBell size={24} />
-          </span>
-          <span className="min-w-0 flex-1">
-            <span className="block text-[10px] font-black tracking-[0.16em] text-white/70">TRIP NEWS</span>
-            <span className="mt-0.5 block text-lg font-black text-white">旅の便り</span>
-          </span>
-          {center.unreadCount > 0 ? (
+        <SnsIllustratedHero
+          eyebrow="TRIP NEWS"
+          title={center.unreadCount > 0 ? `${center.unreadCount}件の新しい便り` : "旅の便りは確認済み"}
+          description="返信・いいね・グループの動きを、ここでまとめて確認。"
+          artSrc="/illustrations/sns/notification-bell-v2.webp"
+          tone="notice"
+          action={center.unreadCount > 0 ? (
             <form action={markSnsNotificationsReadAction}>
               <button type="submit" className="sns-mark-read pressable">
                 <IconCheck size={14} />
                 すべて既読
               </button>
             </form>
-          ) : null}
-        </section>
+          ) : undefined}
+        />
 
         {sp.read === "1" ? (
           <p className="rounded-2xl bg-leaf-soft px-3 py-2 text-center text-xs font-bold text-leaf-deep">
@@ -90,7 +89,7 @@ export default async function SnsNotificationsPage({
         </nav>
 
         {visibleItems.length > 0 ? (
-          <ul className="space-y-2.5">
+          <ul className="sns-notification-list space-y-2.5">
             {visibleItems.map((item) => (
               <NotificationRow key={item.id} item={item} />
             ))}

@@ -149,6 +149,20 @@ function Lightbox({
     };
   }, []);
 
+  useEffect(() => {
+    function handleKeyDown(event: KeyboardEvent) {
+      if (event.key === "Escape") onClose();
+      if (urls.length > 1 && event.key === "ArrowLeft") {
+        onIndexChange((index - 1 + urls.length) % urls.length);
+      }
+      if (urls.length > 1 && event.key === "ArrowRight") {
+        onIndexChange((index + 1) % urls.length);
+      }
+    }
+    document.addEventListener("keydown", handleKeyDown);
+    return () => document.removeEventListener("keydown", handleKeyDown);
+  }, [index, onClose, onIndexChange, urls.length]);
+
   function stop(e: React.SyntheticEvent) {
     e.preventDefault();
     e.stopPropagation();
@@ -176,13 +190,13 @@ function Lightbox({
       aria-label="写真を拡大表示"
       onClick={close}
       onTouchMove={stop}
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/90 p-4"
+      className="sns-lightbox"
     >
       <button
         type="button"
         onClick={close}
         aria-label="閉じる"
-        className="absolute top-[calc(env(safe-area-inset-top,0px)+0.75rem)] right-4 z-10 flex h-10 w-10 items-center justify-center rounded-full bg-black/50 text-white"
+        className="sns-lightbox-control is-close pressable"
       >
         <IconClose size={20} />
       </button>
@@ -193,7 +207,7 @@ function Lightbox({
             type="button"
             onClick={goPrev}
             aria-label="前の写真"
-            className="absolute left-2 z-10 flex h-11 w-11 items-center justify-center rounded-full bg-black/50 text-white"
+            className="sns-lightbox-control is-prev pressable"
           >
             <IconChevronLeft size={22} />
           </button>
@@ -201,18 +215,18 @@ function Lightbox({
             type="button"
             onClick={goNext}
             aria-label="次の写真"
-            className="absolute right-2 z-10 flex h-11 w-11 items-center justify-center rounded-full bg-black/50 text-white"
+            className="sns-lightbox-control is-next pressable"
           >
             <IconChevronRight size={22} />
           </button>
-          <span className="absolute bottom-[calc(env(safe-area-inset-bottom,0px)+0.75rem)] left-1/2 -translate-x-1/2 rounded-full bg-black/50 px-3 py-1 text-xs text-white">
+          <span className="sns-lightbox-counter" aria-live="polite">
             {index + 1} / {urls.length}
           </span>
         </>
       ) : null}
 
       {/* eslint-disable-next-line @next/next/no-img-element */}
-      <img src={urls[index]} alt="" className="max-h-full max-w-full object-contain" onClick={stop} />
+      <img src={urls[index]} alt="" className="sns-lightbox-image" onClick={stop} />
     </div>,
     document.body,
   );

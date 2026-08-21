@@ -39,7 +39,7 @@ export function SnsReplyThread({
   const [replyingTo, setReplyingTo] = useState<string | null>(null);
   const [showComposer, setShowComposer] = useState(false);
   const [expandedThreads, setExpandedThreads] = useState<Set<string>>(new Set());
-  const [, startTransition] = useTransition();
+  const [isRefreshing, startTransition] = useTransition();
 
   function refresh() {
     startTransition(async () => {
@@ -66,7 +66,8 @@ export function SnsReplyThread({
   }
 
   return (
-    <div className="space-y-3">
+    <div className="sns-reply-thread space-y-3" aria-busy={isRefreshing}>
+      {isRefreshing ? <span className="sns-reply-refresh-line" aria-hidden="true" /> : null}
       {showComposer ? (
         <InlineComposer
           postId={postId}
@@ -81,21 +82,26 @@ export function SnsReplyThread({
         <button
           type="button"
           onClick={() => setShowComposer(true)}
-          className="flex w-full items-center gap-2 rounded-full border border-line bg-card px-3.5 py-2 text-left text-sm text-ink-faint active:bg-paper-deep"
+          className="sns-reply-composer-trigger pressable"
+          data-haptic="light"
         >
-          <IconChat size={16} />
-          返信する
+          <span className="sns-reply-composer-icon" aria-hidden="true"><IconChat size={17} /></span>
+          <span className="min-w-0 flex-1">
+            <span className="block text-sm font-black text-ink-soft">返信する</span>
+            <span className="block truncate text-[10px] text-ink-faint">旅の余韻をひとこと残そう</span>
+          </span>
+          <span className="sns-reply-composer-arrow" aria-hidden="true">→</span>
         </button>
       )}
       {topLevel.length === 0 ? (
         <p className="px-1 text-xs text-ink-faint">まだ返信はありません。</p>
       ) : (
-        <ul className="divide-y divide-line">
+        <ul className="sns-reply-list">
           {topLevel.map((reply) => {
             const descendants = collectDescendants(reply.id);
             const expanded = expandedThreads.has(reply.id);
             return (
-              <li key={reply.id} className="py-3 first:pt-0 last:pb-0">
+              <li key={reply.id} className="sns-reply-list-item">
                 <ReplyRow
                   reply={reply}
                   postId={postId}
@@ -104,7 +110,7 @@ export function SnsReplyThread({
                   onReplyToggle={() => setReplyingTo((cur) => (cur === reply.id ? null : reply.id))}
                 />
                 {replyingTo === reply.id ? (
-                  <div className="mt-2 ml-10">
+                  <div className="sns-nested-composer">
                     <InlineComposer
                       postId={postId}
                       parentReplyId={reply.id}
@@ -118,7 +124,7 @@ export function SnsReplyThread({
                 ) : null}
                 {descendants.length > 0 ? (
                   expanded ? (
-                    <ul className="mt-2 ml-8 space-y-2 border-l border-line pl-3">
+                    <ul className="sns-reply-descendants">
                       {descendants.map((descendant) => (
                         <li key={descendant.id}>
                           <ReplyRow
@@ -130,7 +136,7 @@ export function SnsReplyThread({
                             compact
                           />
                           {replyingTo === descendant.id ? (
-                            <div className="mt-2 ml-9">
+                            <div className="sns-nested-composer is-deep">
                               <InlineComposer
                                 postId={postId}
                                 parentReplyId={descendant.id}
@@ -155,7 +161,8 @@ export function SnsReplyThread({
                           return next;
                         })
                       }
-                      className="mt-2 ml-10 text-xs font-semibold text-[#4a90d9]"
+                      className="sns-show-more-replies pressable"
+                      aria-expanded={false}
                     >
                       他{descendants.length}件の返信を見る
                     </button>
@@ -196,7 +203,7 @@ function InlineComposer({
   }, [state.ok]);
 
   return (
-    <form ref={formRef} action={action} className="space-y-2">
+    <form ref={formRef} action={action} className="sns-inline-composer space-y-2">
       <input type="hidden" name="postId" value={postId} />
       {parentReplyId ? <input type="hidden" name="parentReplyId" value={parentReplyId} /> : null}
       <textarea
@@ -205,10 +212,11 @@ function InlineComposer({
         maxLength={1000}
         placeholder={placeholder}
         defaultValue={state.values?.body ?? ""}
-        className="field text-sm"
+        className="field sns-inline-composer-field text-sm"
       />
       <FormMessage state={state} />
-      <SubmitButton className="btn btn-quiet w-full text-sm" pendingLabel="送信中…">
+      <SubmitButton className="sns-inline-submit pressable" pendingLabel="送信中…">
+        <IconChat size={15} />
         返信する
       </SubmitButton>
     </form>
@@ -244,10 +252,10 @@ function ReplyRow({
   }
 
   return (
-    <div className="flex items-start gap-2">
+    <div className={`sns-reply-row ${compact ? "is-compact" : ""}`}>
       <Link
         href={`/sns/users/${reply.userId}`}
-        className={`shrink-0 overflow-hidden rounded-full bg-paper-deep ${compact ? "h-7 w-7" : "h-8 w-8"}`}
+        className={`sns-reply-avatar pressable ${compact ? "is-compact" : ""}`}
       >
         {reply.avatarUrl ? (
           // eslint-disable-next-line @next/next/no-img-element
@@ -258,7 +266,7 @@ function ReplyRow({
           </span>
         )}
       </Link>
-      <div className="min-w-0 flex-1 rounded-2xl bg-paper-deep px-3 py-2">
+      <div className="sns-reply-bubble">
         <div className="flex items-center justify-between gap-2">
           <Link href={`/sns/users/${reply.userId}`} className="truncate text-xs font-bold">
             {reply.displayName}
@@ -269,7 +277,7 @@ function ReplyRow({
         <div className="mt-1 flex items-center gap-3">
           <SnsReplyLikeButton replyId={reply.id} postId={postId} liked={reply.myLiked} count={reply.likeCount} />
           {onReplyToggle ? (
-            <button type="button" onClick={onReplyToggle} className="text-[11px] text-ink-faint">
+            <button type="button" onClick={onReplyToggle} className="sns-reply-action pressable" data-haptic="light">
               返信
             </button>
           ) : null}

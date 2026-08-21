@@ -1,9 +1,9 @@
 "use client";
 
-import { useActionState } from "react";
+import { useActionState, useState } from "react";
 import { addFriendGroupMembersAction } from "@/app/actions/sns";
 import { emptyActionState, FormMessage, SubmitButton } from "@/components/form";
-import { IconUser } from "@/components/icons";
+import { IconCheck, IconUser } from "@/components/icons";
 import type { FriendListRow } from "@/lib/supabase/types";
 
 export function AddMembersForm({
@@ -16,21 +16,29 @@ export function AddMembersForm({
   avatarUrls: Record<string, string>;
 }) {
   const [state, action] = useActionState(addFriendGroupMembersAction, emptyActionState);
+  const [selectedCount, setSelectedCount] = useState(0);
 
   return (
     <form action={action} className="space-y-3">
       <input type="hidden" name="groupId" value={groupId} />
-      <ul className="rough-card divide-y divide-line overflow-hidden">
+      <div className="flex items-center justify-between px-1 text-[11px] text-ink-faint">
+        <span>追加するフレンドを選択</span>
+        <span className="sns-member-count" aria-live="polite">{selectedCount}人</span>
+      </div>
+      <ul className="sns-member-picker">
         {friends.map((friend) => {
           const avatarUrl = friend.profile_image_url ? avatarUrls[friend.profile_image_url] : null;
           return (
             <li key={friend.friend_user_id}>
-              <label className="flex cursor-pointer items-center gap-3 px-4 py-3">
+              <label className="sns-member-option pressable">
                 <input
                   type="checkbox"
                   name="memberUserIds"
                   value={friend.friend_user_id}
-                  className="h-5 w-5 shrink-0 accent-leaf"
+                  className="sns-member-checkbox"
+                  onChange={(event) =>
+                    setSelectedCount((count) => Math.max(0, count + (event.currentTarget.checked ? 1 : -1)))
+                  }
                 />
                 <span className="h-9 w-9 shrink-0 overflow-hidden rounded-full bg-paper-deep">
                   {avatarUrl ? (
@@ -42,15 +50,17 @@ export function AddMembersForm({
                     </span>
                   )}
                 </span>
-                <span className="min-w-0 flex-1 truncate font-semibold">{friend.display_name}</span>
+                <span className="min-w-0 flex-1 truncate text-sm font-bold">{friend.display_name}</span>
+                <span className="sns-member-checkmark" aria-hidden="true"><IconCheck size={14} /></span>
               </label>
             </li>
           );
         })}
       </ul>
       <FormMessage state={state} />
-      <SubmitButton className="btn btn-quiet w-full text-sm" pendingLabel="追加中…">
-        追加する
+      <SubmitButton className="sns-secondary-submit pressable" pendingLabel="追加中…" disabled={selectedCount === 0}>
+        <IconCheck size={16} />
+        {selectedCount > 0 ? `${selectedCount}人を追加` : "メンバーを選ぶ"}
       </SubmitButton>
     </form>
   );
