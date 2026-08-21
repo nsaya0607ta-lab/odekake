@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { IconPlus, IconSend, IconUser } from "@/components/icons";
+import { IconPlus } from "@/components/icons";
 import { PageBody } from "@/components/page-body";
 import { PageHeader } from "@/components/page-header";
 import { SnsBackgroundBand } from "@/components/sns/sns-background-band";
@@ -12,7 +12,7 @@ import { SnsPrimaryNav } from "@/components/sns/sns-primary-nav";
 import { SnsNotificationEntry } from "@/components/sns/sns-notification-button";
 import { SnsTextFeed } from "@/components/sns/sns-text-feed";
 import { signPhotoPaths, signThumbOrOriginalPaths } from "@/lib/data/photos";
-import { getOwnSnsProfile, getPersonalTextFeed } from "@/lib/data/sns";
+import { getPersonalTextFeed } from "@/lib/data/sns";
 import { requireUser } from "@/lib/supabase/server";
 
 export const metadata = { title: "ホーム | SNS" };
@@ -26,10 +26,7 @@ export default async function SnsHomePage({
 }) {
   const [{ supabase, user }, sp] = await Promise.all([requireUser(), searchParams]);
 
-  const [posts, ownProfile] = await Promise.all([
-    getPersonalTextFeed(supabase),
-    getOwnSnsProfile(supabase, user.id),
-  ]);
+  const posts = await getPersonalTextFeed(supabase);
   const filter = parseSnsFeedFilter(sp.filter);
   const visiblePosts = posts.filter((post) => matchesSnsFeedFilter(post, filter));
   const feedTitle = filter === "photos" ? "写真つきの投稿" : filter === "notes" ? "ひとこと投稿" : "新しいつぶやき";
@@ -55,46 +52,16 @@ export default async function SnsHomePage({
       <PageBody className="space-y-4">
         <SnsPrimaryNav active="home" userHref={`/sns/users/${user.id}`} groupHref="/sns/groups" />
 
-        <section className="sns-home-welcome" aria-labelledby="sns-home-title">
+        <section className="sns-home-welcome is-compact" aria-labelledby="sns-home-title">
           <span className="sns-home-sun" aria-hidden="true" />
-          <span className="sns-home-sparkles" aria-hidden="true">✦　·　✧</span>
           <span className="sns-home-welcome-stamp" aria-hidden="true">TODAY</span>
           <p className="relative text-[10px] font-bold tracking-[0.18em] text-white/75">FRIENDS TIMELINE</p>
-          <h2 id="sns-home-title" className="relative mt-0.5 text-xl font-bold text-white">みんなのおでかけ</h2>
-          <p className="relative mt-1 max-w-[16rem] text-xs leading-relaxed text-white/80">
-            フレンドのつぶやきや写真を、ここでまとめて楽しめます。
-          </p>
+          <span className="relative mt-0.5 flex items-center gap-2">
+            <h2 id="sns-home-title" className="text-lg font-black text-white">みんなのおでかけ</h2>
+            <span className="sns-home-count">{visiblePosts.length}件</span>
+          </span>
+          <p className="relative mt-0.5 text-[10px] font-semibold text-white/75">{feedTitle}</p>
         </section>
-
-        <Link href="/sns/home/new" className="sns-quick-compose pressable" aria-label="新しいつぶやきを投稿">
-          <span className="h-11 w-11 shrink-0 overflow-hidden rounded-full border-2 border-card bg-leaf-soft shadow-sm">
-            {ownProfile.iconUrl ? (
-              // eslint-disable-next-line @next/next/no-img-element
-              <img src={ownProfile.iconUrl} alt="" className="h-full w-full object-cover" />
-            ) : (
-              <span className="flex h-full w-full items-center justify-center text-leaf-deep">
-                <IconUser size={20} />
-              </span>
-            )}
-          </span>
-          <span className="min-w-0 flex-1">
-            <span className="block text-sm font-bold text-ink">いま、どこにいる？</span>
-            <span className="block truncate text-[11px] text-ink-faint">写真やひとことをフレンドに共有</span>
-          </span>
-          <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-leaf text-white shadow-sm">
-            <IconSend size={16} />
-          </span>
-        </Link>
-
-        <div className="flex items-end justify-between gap-3 px-1 pt-1">
-          <div>
-            <p className="text-[10px] font-bold tracking-[0.16em] text-apricot">LATEST</p>
-            <h2 className="text-base font-bold">{feedTitle}</h2>
-          </div>
-          <span className="rounded-full bg-card/80 px-2.5 py-1 text-[10px] font-bold text-ink-faint shadow-sm ring-1 ring-line">
-            {visiblePosts.length}件
-          </span>
-        </div>
 
         <SnsFeedFilters active={filter} baseHref="/sns/home" />
 

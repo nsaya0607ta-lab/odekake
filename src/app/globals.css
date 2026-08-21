@@ -285,11 +285,11 @@
   .sns-primary-nav-item {
     display: flex;
     min-width: 0;
-    min-height: 3.25rem;
+    min-height: 2.8rem;
     align-items: center;
     justify-content: center;
     gap: 0.42rem;
-    padding: 0.45rem 0.35rem;
+    padding: 0.35rem;
     border-radius: 1rem;
     color: var(--color-ink-faint);
   }
@@ -304,8 +304,8 @@
 
   .sns-primary-nav-icon {
     display: flex;
-    width: 2rem;
-    height: 2rem;
+    width: 1.8rem;
+    height: 1.8rem;
     flex: 0 0 auto;
     align-items: center;
     justify-content: center;
@@ -350,6 +350,48 @@
     font-size: 0.55rem;
     font-weight: 800;
     letter-spacing: 0.14em;
+  }
+
+  .sns-home-welcome.is-compact {
+    min-height: 5.7rem;
+    padding: 0.82rem 1rem;
+    border-radius: 1.35rem 1.65rem 1.25rem 1.5rem;
+  }
+
+  .sns-home-welcome.is-compact::after {
+    width: 4rem;
+    height: 4rem;
+    right: -1.1rem;
+    bottom: -2.1rem;
+  }
+
+  .sns-home-welcome.is-compact .sns-home-sun {
+    width: 3.5rem;
+    height: 3.5rem;
+    right: 1.1rem;
+    bottom: -1.35rem;
+  }
+
+  .sns-home-welcome.is-compact .sns-home-welcome-stamp {
+    top: 0.7rem;
+    right: 0.85rem;
+    padding: 0.18rem 0.45rem;
+  }
+
+  .sns-home-count {
+    display: inline-flex;
+    min-width: 1.75rem;
+    height: 1.35rem;
+    align-items: center;
+    justify-content: center;
+    padding: 0 0.45rem;
+    border: 1px solid rgba(255, 255, 255, 0.3);
+    border-radius: 999px;
+    color: white;
+    background: rgba(255, 255, 255, 0.16);
+    font-size: 0.6rem;
+    font-weight: 900;
+    backdrop-filter: blur(8px);
   }
 
   .sns-quick-compose,
