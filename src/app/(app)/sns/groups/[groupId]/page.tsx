@@ -16,7 +16,6 @@ import { SnsChatForm } from "@/components/sns/sns-chat-form";
 import { SnsChatList } from "@/components/sns/sns-chat-list";
 import { SnsGroupSwitcher } from "@/components/sns/sns-group-switcher";
 import { SnsPhotoGrid } from "@/components/sns/sns-photo-grid";
-import { SnsNotificationEntry } from "@/components/sns/sns-notification-button";
 import { SnsPrimaryNav } from "@/components/sns/sns-primary-nav";
 import { SnsViewTabs } from "@/components/sns/sns-view-tabs";
 import { signThumbOrOriginalPaths } from "@/lib/data/photos";
@@ -56,8 +55,7 @@ export default async function SnsGroupPage({
       <PageHeader
         title={group.name}
         subtitle={`${group.member_count}人で共有中`}
-        showBack={false}
-        leftAction={<SnsNotificationEntry />}
+        backHref="/sns/groups"
         action={
           <Link
             href={`${baseHref}/settings`}
@@ -70,13 +68,8 @@ export default async function SnsGroupPage({
       />
       <PostedToast />
       <SnsBackgroundBand />
-      <PageBody className="space-y-4">
-        <SnsPrimaryNav
-          active="group"
-          userHref={`/sns/users/${user.id}`}
-          groupHref="/sns/groups"
-          groupLabel="一覧へ戻る"
-        />
+      <PageBody className="space-y-3">
+        <SnsPrimaryNav active="group" userHref={`/sns/users/${user.id}`} groupHref="/sns/groups" />
         <Suspense fallback={<SnsSwitcherSkeleton />}>
           <GroupSwitcherSection groups={groups} groupId={groupId} />
         </Suspense>
@@ -140,11 +133,11 @@ async function GroupSwitcherSection({
 
 function SnsSwitcherSkeleton() {
   return (
-    <div className="sns-rail-panel" aria-hidden="true">
-      <div className="mb-3 h-7 w-24 animate-pulse rounded-full bg-paper-deep motion-reduce:animate-none" />
+    <div className="sns-rail-panel sns-group-switcher-panel" aria-hidden="true">
+      <div className="mb-2 h-5 w-24 animate-pulse rounded-full bg-paper-deep motion-reduce:animate-none" />
       <div className="flex gap-3">
         {Array.from({ length: 5 }, (_, i) => (
-          <div key={i} className="h-16 w-16 shrink-0 animate-pulse rounded-full bg-paper-deep motion-reduce:animate-none" />
+          <div key={i} className="h-14 w-14 shrink-0 animate-pulse rounded-full bg-paper-deep motion-reduce:animate-none" />
         ))}
       </div>
     </div>

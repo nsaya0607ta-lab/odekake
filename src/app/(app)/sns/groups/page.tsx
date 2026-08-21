@@ -35,20 +35,18 @@ export default async function SnsGroupsIndexPage({
         leftAction={<SnsNotificationEntry />}
       />
       <SnsBackgroundBand hasToggleBar={false} />
-      <PageBody className="space-y-4">
+      <PageBody className="space-y-3">
         <SnsPrimaryNav active="group" userHref={`/sns/users/${user.id}`} groupHref="/sns/groups" />
 
-        <section className="sns-groups-hero" aria-labelledby="sns-groups-title">
+        <section className="sns-groups-hero is-compact" aria-labelledby="sns-groups-title">
           <span className="sns-groups-hero-orbit" aria-hidden="true" />
           <span className="sns-groups-hero-icon" aria-hidden="true">
             <IconUsers size={28} />
           </span>
           <div className="relative min-w-0 flex-1">
-            <p className="text-[10px] font-black tracking-[0.18em] text-white/70">GROUP JOURNEYS</p>
-            <h1 id="sns-groups-title" className="mt-0.5 text-xl font-black text-white">みんなの旅部屋</h1>
-            <p className="mt-1 text-[11px] leading-relaxed text-white/80">
-              写真も会話も、仲間ごとにひとつの思い出へ。
-            </p>
+            <p className="text-[10px] font-black tracking-[0.18em] text-white/70">TRIP ROOMS</p>
+            <h1 id="sns-groups-title" className="mt-0.5 truncate text-lg font-black text-white">みんなの旅部屋</h1>
+            <p className="mt-0.5 text-[10px] font-bold text-white/75">{groups.length}グループ・未読 {totalUnread}件</p>
           </div>
           <Link href="/sns/groups/new" className="sns-groups-create pressable" aria-label="新しいグループを作る">
             <IconPlus size={18} />
@@ -58,22 +56,12 @@ export default async function SnsGroupsIndexPage({
 
         {groups.length > 0 ? (
           <>
-            <div className="flex items-end justify-between gap-3 px-1 pt-1">
-              <div>
-                <p className="text-[10px] font-black tracking-[0.16em] text-sky-700">YOUR GROUPS</p>
-                <h2 className="text-base font-black">参加中のグループ</h2>
-              </div>
-              <span className="rounded-full bg-card/85 px-2.5 py-1 text-[10px] font-bold text-ink-faint shadow-sm ring-1 ring-line">
-                {groups.length}グループ
-              </span>
-            </div>
-
             <nav className="sns-group-list-tabs" aria-label="グループの絞り込み">
-              <Link href="/sns/groups" className={view === "all" ? "is-active" : undefined}>
+              <Link href="/sns/groups" scroll={false} className={view === "all" ? "is-active" : undefined}>
                 すべて
                 <span>{groups.length}</span>
               </Link>
-              <Link href="/sns/groups?view=unread" className={view === "unread" ? "is-active" : undefined}>
+              <Link href="/sns/groups?view=unread" scroll={false} className={view === "unread" ? "is-active" : undefined}>
                 未読
                 <span>{totalUnread > 99 ? "99+" : totalUnread}</span>
               </Link>

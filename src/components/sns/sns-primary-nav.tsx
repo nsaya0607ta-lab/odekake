@@ -14,13 +14,10 @@ export function SnsPrimaryNav({
   active,
   userHref,
   groupHref,
-  groupLabel = "グループ",
 }: {
   active: SnsSection;
   userHref: string;
   groupHref: string;
-  /** グループ詳細では「一覧へ戻る」に変え、同じボタンの行き先を明確にする。 */
-  groupLabel?: string;
 }) {
   const hrefs: Record<SnsSection, string> = {
     home: "/sns/home",
@@ -32,7 +29,6 @@ export function SnsPrimaryNav({
     <nav aria-label="SNSの表示切り替え" className="sns-primary-nav">
       {ITEMS.map(({ key, label, icon: Icon }) => {
         const selected = active === key;
-        const visibleLabel = key === "group" ? groupLabel : label;
         return (
           <Link
             key={key}
@@ -43,7 +39,7 @@ export function SnsPrimaryNav({
             <span className="sns-primary-nav-icon" aria-hidden="true">
               <Icon size={19} />
             </span>
-            <span className="min-w-0 truncate text-[13px] font-bold leading-tight">{visibleLabel}</span>
+            <span className="min-w-0 truncate text-[13px] font-bold leading-tight">{label}</span>
           </Link>
         );
       })}

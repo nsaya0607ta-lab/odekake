@@ -174,15 +174,10 @@ export function SnsGroupSwitcher({
   }
 
   return (
-    <section className="sns-rail-panel" aria-labelledby="sns-groups-title">
-      <div className="mb-3 flex items-end justify-between gap-3 px-1">
-        <div>
-          <p className="text-[10px] font-bold tracking-[0.16em] text-sky">SHARED ALBUM</p>
-          <h2 id="sns-groups-title" className="text-base font-bold">
-            グループ
-          </h2>
-        </div>
-        <p className="text-[10px] text-ink-faint">長押しで並び替え</p>
+    <section className="sns-rail-panel sns-group-switcher-panel" aria-labelledby="sns-groups-title">
+      <div className="mb-2 flex items-center justify-between gap-3 px-1">
+        <h2 id="sns-groups-title" className="text-xs font-black text-ink-soft">グループを切り替える</h2>
+        <p className="text-[9px] text-ink-faint">長押しで並び替え</p>
       </div>
       <div className="flex items-start gap-3 overflow-x-auto pb-1" style={{ scrollbarWidth: "none" }}>
         {order.map((group) => (
@@ -212,9 +207,9 @@ export function SnsGroupSwitcher({
         <Link
           href="/sns/groups/new"
           aria-label="グループを作る"
-          className="flex shrink-0 flex-col items-center gap-1"
+          className="flex w-14 shrink-0 flex-col items-center gap-1"
         >
-          <span className="sns-new-group tap-target flex h-16 w-16 items-center justify-center rounded-full border-2 border-dashed text-ink-faint shadow-sm active:bg-paper-deep">
+          <span className="sns-new-group tap-target flex h-14 w-14 items-center justify-center rounded-full border-2 border-dashed text-ink-faint shadow-sm active:bg-paper-deep">
             <IconPlus size={20} />
           </span>
           <span className="max-w-[4rem] truncate text-[10px] font-bold text-ink-faint">新規作成</span>
@@ -240,10 +235,10 @@ function GroupIcon({
   dragging?: boolean;
 }) {
   return (
-    <div className={`flex select-none flex-col items-center gap-1 transition-transform ${dragging ? "scale-105" : ""}`}>
+    <div className={`flex w-14 select-none flex-col items-center gap-1 transition-transform ${dragging ? "scale-105" : ""}`}>
       <span className="relative">
         <span
-          className={`tap-target flex h-16 w-16 items-center justify-center overflow-hidden rounded-full border-[3px] text-2xl transition-colors ${
+          className={`tap-target flex h-14 w-14 items-center justify-center overflow-hidden rounded-full border-[3px] text-xl transition-colors ${
             active ? "sns-group-icon-active" : "border-card bg-card ring-1 ring-line"
           } ${dragging ? "shadow-md" : ""}`}
         >

@@ -28,6 +28,9 @@ export function LikeButton({
   function toggle() {
     const next = { liked: !optimistic.liked, count: optimistic.count + (optimistic.liked ? -1 : 1) };
     setOptimistic(next);
+    if (next.liked && typeof navigator !== "undefined" && "vibrate" in navigator) {
+      navigator.vibrate?.(10);
+    }
     startTransition(async () => {
       const formData = new FormData();
       formData.set("postId", postId);
@@ -43,7 +46,7 @@ export function LikeButton({
       onClick={toggle}
       aria-label={optimistic.liked ? "いいねを取り消す" : "いいねする"}
       aria-pressed={optimistic.liked}
-      className={`flex min-h-9 items-center gap-1.5 rounded-full px-2.5 py-1 transition-colors active:bg-paper-deep ${
+      className={`sns-like-button pressable flex min-h-9 items-center gap-1.5 rounded-full px-2.5 py-1 transition-colors active:bg-paper-deep ${
         optimistic.liked ? "bg-blossom-soft text-blossom" : "text-ink-faint"
       }`}
     >

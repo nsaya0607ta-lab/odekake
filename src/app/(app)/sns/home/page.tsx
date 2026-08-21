@@ -18,6 +18,28 @@ import { requireUser } from "@/lib/supabase/server";
 export const metadata = { title: "ホーム | SNS" };
 export const dynamic = "force-dynamic";
 
+const DAILY_PROMPTS = [
+  "帰り道の一枚",
+  "今日いちばん心に残った場所",
+  "また行きたいお店",
+  "空を見上げた瞬間",
+  "今日のおいしかったもの",
+  "小さな発見をひとつ",
+  "誰かに教えたい景色",
+] as const;
+
+/** 日本時間の日付だけで決まり、全員に同じテーマを毎日1つ表示する。 */
+function getDailyPrompt(): string {
+  const dayKey = new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Asia/Tokyo",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).format(new Date());
+  const hash = [...dayKey].reduce((sum, char) => sum + char.charCodeAt(0), 0);
+  return DAILY_PROMPTS[hash % DAILY_PROMPTS.length] ?? DAILY_PROMPTS[0];
+}
+
 /** グループに紐付かない、フレンド全員分のテキスト投稿（つぶやき）をまとめて見られるホーム画面 */
 export default async function SnsHomePage({
   searchParams,
@@ -28,6 +50,7 @@ export default async function SnsHomePage({
 
   const posts = await getPersonalTextFeed(supabase);
   const filter = parseSnsFeedFilter(sp.filter);
+  const dailyPrompt = getDailyPrompt();
   const visiblePosts = posts.filter((post) => matchesSnsFeedFilter(post, filter));
   const feedTitle = filter === "photos" ? "写真つきの投稿" : filter === "notes" ? "ひとこと投稿" : "新しいつぶやき";
   const allPhotoPaths = visiblePosts.flatMap((p) => p.photo_paths);
@@ -49,18 +72,18 @@ export default async function SnsHomePage({
         leftAction={<SnsNotificationEntry />}
       />
       <SnsBackgroundBand hasToggleBar={false} />
-      <PageBody className="space-y-4">
+      <PageBody className="space-y-3">
         <SnsPrimaryNav active="home" userHref={`/sns/users/${user.id}`} groupHref="/sns/groups" />
 
         <section className="sns-home-welcome is-compact" aria-labelledby="sns-home-title">
           <span className="sns-home-sun" aria-hidden="true" />
           <span className="sns-home-welcome-stamp" aria-hidden="true">TODAY</span>
-          <p className="relative text-[10px] font-bold tracking-[0.18em] text-white/75">FRIENDS TIMELINE</p>
-          <span className="relative mt-0.5 flex items-center gap-2">
-            <h2 id="sns-home-title" className="text-lg font-black text-white">みんなのおでかけ</h2>
+          <p className="relative text-[10px] font-bold tracking-[0.18em] text-white/75">TODAY&apos;S IDEA</p>
+          <span className="relative mt-0.5 flex min-w-0 items-center gap-2 pr-10">
+            <h2 id="sns-home-title" className="min-w-0 truncate text-lg font-black text-white">{dailyPrompt}</h2>
             <span className="sns-home-count">{visiblePosts.length}件</span>
           </span>
-          <p className="relative mt-0.5 text-[10px] font-semibold text-white/75">{feedTitle}</p>
+          <p className="relative mt-0.5 text-[10px] font-semibold text-white/75">みんなの{feedTitle}</p>
         </section>
 
         <SnsFeedFilters active={filter} baseHref="/sns/home" />

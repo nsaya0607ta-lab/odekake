@@ -40,16 +40,13 @@ export default async function SnsNotificationsPage({
       />
       <SnsBackgroundBand hasToggleBar={false} />
       <PageBody className="space-y-4">
-        <section className="sns-notification-hero">
+        <section className="sns-notification-hero is-compact">
           <span className="sns-notification-hero-icon" aria-hidden="true">
             <IconBell size={24} />
           </span>
           <span className="min-w-0 flex-1">
             <span className="block text-[10px] font-black tracking-[0.16em] text-white/70">TRIP NEWS</span>
             <span className="mt-0.5 block text-lg font-black text-white">旅の便り</span>
-            <span className="mt-1 block text-[11px] leading-relaxed text-white/78">
-              返信・いいね・グループの新着をまとめて確認できます。
-            </span>
           </span>
           {center.unreadCount > 0 ? (
             <form action={markSnsNotificationsReadAction}>
@@ -75,6 +72,7 @@ export default async function SnsNotificationsPage({
         <nav aria-label="通知の表示切り替え" className="sns-notification-tabs">
           <Link
             href="/sns/notifications"
+            scroll={false}
             aria-current={view === "all" ? "page" : undefined}
             className={`pressable ${view === "all" ? "is-active" : ""}`}
           >
@@ -82,6 +80,7 @@ export default async function SnsNotificationsPage({
           </Link>
           <Link
             href="/sns/notifications?view=unread"
+            scroll={false}
             aria-current={view === "unread" ? "page" : undefined}
             className={`pressable ${view === "unread" ? "is-active" : ""}`}
           >

@@ -24,6 +24,7 @@ function ToggleIcon({
   return (
     <Link
       href={href}
+      scroll={false}
       aria-label={label}
       aria-current={active ? "page" : undefined}
       className={`sns-view-toggle is-${active ? `active-${label === "写真" ? "photos" : "chat"}` : "idle"} tap-target flex h-10 min-w-[5.3rem] items-center justify-center gap-1.5 rounded-xl px-2 transition-all`}

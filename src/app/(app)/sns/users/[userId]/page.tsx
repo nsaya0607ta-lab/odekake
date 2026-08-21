@@ -37,7 +37,6 @@ export default async function SnsUserHomePage({
   ]);
   const filter = parseSnsFeedFilter(sp.filter);
   const visiblePosts = posts.filter((post) => matchesSnsFeedFilter(post, filter));
-  const feedTitle = filter === "photos" ? "写真つきの投稿" : filter === "notes" ? "ひとこと投稿" : "つぶやき";
   const allPhotoPaths = visiblePosts.flatMap((p) => p.photo_paths);
   const [avatarUrls, photoUrls, fullPhotoUrls, friendAvatarUrls] = await Promise.all([
     signThumbOrOriginalPaths(
@@ -71,11 +70,11 @@ export default async function SnsUserHomePage({
         leftAction={<SnsNotificationEntry />}
       />
       <SnsBackgroundBand hasToggleBar={false} />
-      <PageBody className="space-y-4">
+      <PageBody className="space-y-3">
         <SnsPrimaryNav active="user" userHref={`/sns/users/${user.id}`} groupHref="/sns/groups" />
         <SnsPeopleRail people={people} activeUserId={userId} />
 
-        <section className="sns-profile-hero">
+        <section className="sns-profile-hero is-compact">
           <span className="sns-profile-orbit" aria-hidden="true" />
           <span className="sns-profile-avatar">
             {profile.iconUrl ? (
@@ -86,12 +85,10 @@ export default async function SnsUserHomePage({
             )}
           </span>
           <div className="relative min-w-0 flex-1">
-            <p className="text-[10px] font-bold tracking-[0.16em] text-leaf-deep">PERSONAL NOTE</p>
-            <h1 className="truncate text-xl font-bold">{profile.displayName}</h1>
-            <p className="mt-1 text-xs text-ink-soft">おでかけのひとことと写真</p>
-            <div className="mt-2 flex items-center gap-2 text-[10px] font-bold text-ink-faint">
-              <span className="rounded-full bg-card/75 px-2.5 py-1 ring-1 ring-line">つぶやき {posts.length}</span>
-              {isMine ? <span className="rounded-full bg-leaf-soft px-2.5 py-1 text-leaf-deep">あなたのページ</span> : null}
+            <h1 className="truncate text-lg font-black">{profile.displayName}</h1>
+            <div className="mt-1 flex items-center gap-2 text-[10px] font-bold text-ink-faint">
+              <span>つぶやき {posts.length}</span>
+              {isMine ? <span className="sns-profile-me-chip">あなた</span> : null}
             </div>
           </div>
           {isMine ? (
@@ -104,13 +101,6 @@ export default async function SnsUserHomePage({
             </Link>
           ) : null}
         </section>
-
-        <div className="flex items-end justify-between gap-3 px-1 pt-1">
-          <div>
-            <p className="text-[10px] font-bold tracking-[0.16em] text-apricot">POSTS</p>
-            <h2 className="text-base font-bold">{feedTitle}</h2>
-          </div>
-        </div>
 
         <SnsFeedFilters active={filter} baseHref={`/sns/users/${userId}`} />
 

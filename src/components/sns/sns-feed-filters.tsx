@@ -21,6 +21,7 @@ export function SnsFeedFilters({ active, baseHref }: { active: SnsFeedFilter; ba
           <Link
             key={key}
             href={href}
+            scroll={false}
             aria-current={selected ? "page" : undefined}
             className={`sns-feed-filter pressable is-${key} ${selected ? "is-active" : ""}`}
           >
