@@ -51,6 +51,20 @@ export function SnsReplyThread({
   const topLevel = replies.filter((r) => !r.parentReplyId);
   const childrenOf = (id: string) => replies.filter((r) => r.parentReplyId === id);
 
+  // 返信への返信は何段でもできるが、見た目のインデントは1段のまま。
+  // ある返信にぶら下がる子孫すべてを、返信順（深さ優先）でフラットに並べる
+  function collectDescendants(rootId: string): SnsEnrichedReply[] {
+    const result: SnsEnrichedReply[] = [];
+    function walk(id: string) {
+      for (const child of childrenOf(id)) {
+        result.push(child);
+        walk(child.id);
+      }
+    }
+    walk(rootId);
+    return result;
+  }
+
   return (
     <div className="space-y-3">
       {showComposer ? (
@@ -78,7 +92,7 @@ export function SnsReplyThread({
       ) : (
         <ul className="divide-y divide-line">
           {topLevel.map((reply) => {
-            const children = childrenOf(reply.id);
+            const descendants = collectDescendants(reply.id);
             const expanded = expandedThreads.has(reply.id);
             return (
               <li key={reply.id} className="py-3 first:pt-0 last:pb-0">
@@ -102,12 +116,32 @@ export function SnsReplyThread({
                     />
                   </div>
                 ) : null}
-                {children.length > 0 ? (
+                {descendants.length > 0 ? (
                   expanded ? (
                     <ul className="mt-2 ml-8 space-y-2 border-l border-line pl-3">
-                      {children.map((child) => (
-                        <li key={child.id}>
-                          <ReplyRow reply={child} postId={postId} currentUserId={currentUserId} onDeleted={refresh} compact />
+                      {descendants.map((descendant) => (
+                        <li key={descendant.id}>
+                          <ReplyRow
+                            reply={descendant}
+                            postId={postId}
+                            currentUserId={currentUserId}
+                            onDeleted={refresh}
+                            onReplyToggle={() => setReplyingTo((cur) => (cur === descendant.id ? null : descendant.id))}
+                            compact
+                          />
+                          {replyingTo === descendant.id ? (
+                            <div className="mt-2 ml-9">
+                              <InlineComposer
+                                postId={postId}
+                                parentReplyId={descendant.id}
+                                placeholder={`${descendant.displayName}さんに返信`}
+                                onPosted={() => {
+                                  refresh();
+                                  setReplyingTo(null);
+                                }}
+                              />
+                            </div>
+                          ) : null}
                         </li>
                       ))}
                     </ul>
@@ -123,7 +157,7 @@ export function SnsReplyThread({
                       }
                       className="mt-2 ml-10 text-xs font-semibold text-[#4a90d9]"
                     >
-                      他{children.length}件の返信を見る
+                      他{descendants.length}件の返信を見る
                     </button>
                   )
                 ) : null}
@@ -234,7 +268,7 @@ function ReplyRow({
         <p className="mt-0.5 whitespace-pre-wrap text-sm leading-relaxed">{reply.body}</p>
         <div className="mt-1 flex items-center gap-3">
           <SnsReplyLikeButton replyId={reply.id} postId={postId} liked={reply.myLiked} count={reply.likeCount} />
-          {!compact && onReplyToggle ? (
+          {onReplyToggle ? (
             <button type="button" onClick={onReplyToggle} className="text-[11px] text-ink-faint">
               返信
             </button>
