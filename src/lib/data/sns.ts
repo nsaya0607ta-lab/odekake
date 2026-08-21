@@ -8,6 +8,8 @@ import type {
   SnsCommentRow,
   SnsFeedPhotoRow,
   SnsPhotoRow,
+  SnsTextPostReplyRow,
+  SnsTextPostRow,
 } from "@/lib/supabase/types";
 
 /** フィードで遡って表示する日数 */
@@ -22,6 +24,36 @@ export async function getSnsGroupFeed(
   if (error) {
     console.error("SNS group feed is unavailable", { code: error.code, message: error.message });
     throw new Error("グループの写真の取得に失敗しました");
+  }
+  return data ?? [];
+}
+
+/** グループに紐付かないテキストの個人投稿（つぶやき）だけのフィード。userId を省略すると
+ * フレンド全員分をまとめたホームフィードに、指定するとそのユーザー1人分だけの投稿一覧になる */
+export async function getPersonalTextFeed(supabase: DB, userId?: string, limit = 100): Promise<SnsTextPostRow[]> {
+  const { data, error } = await supabase.rpc("get_personal_text_feed", { p_user_id: userId ?? null, p_limit: limit });
+  if (error) {
+    console.error("Personal text feed is unavailable", { code: error.code, message: error.message });
+    throw new Error("投稿の取得に失敗しました");
+  }
+  return data ?? [];
+}
+
+/** つぶやき1件を取得する（返信画面のヘッダー用）。見えない・存在しない場合は null */
+export async function getPersonalTextPost(supabase: DB, postId: string): Promise<SnsTextPostRow | null> {
+  const { data, error } = await supabase.rpc("get_personal_text_post", { p_post_id: postId });
+  if (error) {
+    console.error("Personal text post is unavailable", { code: error.code, message: error.message });
+    throw new Error("投稿の取得に失敗しました");
+  }
+  return data?.[0] ?? null;
+}
+
+export async function getFriendTextPostReplies(supabase: DB, postId: string): Promise<SnsTextPostReplyRow[]> {
+  const { data, error } = await supabase.rpc("get_friend_text_post_replies", { p_post_id: postId });
+  if (error) {
+    console.error("Text post replies are unavailable", { code: error.code, message: error.message });
+    throw new Error("返信の取得に失敗しました");
   }
   return data ?? [];
 }
@@ -79,6 +111,22 @@ export async function getOwnSnsProfile(supabase: DB, userId: string): Promise<{ 
   const iconUrl = iconPath ? (await signThumbOrOriginalPaths(supabase, [iconPath])).get(iconPath) : undefined;
 
   return { displayName: data?.display_name ?? "自分", iconUrl };
+}
+
+/** 特定ユーザーの表示名とアイコンURL。フレンド視点の可視性チェックをした上で返す
+ * （profilesテーブルのRLSは本人の行しか読めないため、getOwnSnsProfileは他人には使えない） */
+export async function getFriendProfile(supabase: DB, userId: string): Promise<{ displayName: string; iconUrl?: string }> {
+  const { data, error } = await supabase.rpc("get_friend_profile", { p_user_id: userId });
+  if (error) {
+    console.error("Friend profile is unavailable", { code: error.code, message: error.message });
+    throw new Error("プロフィールの取得に失敗しました");
+  }
+
+  const row = data?.[0];
+  const iconPath = row?.profile_image_url ?? null;
+  const iconUrl = iconPath ? (await signThumbOrOriginalPaths(supabase, [iconPath])).get(iconPath) : undefined;
+
+  return { displayName: row?.display_name ?? "不明なユーザー", iconUrl };
 }
 
 export async function getFriendGroupMembers(supabase: DB, groupId: string): Promise<FriendGroupMemberRow[]> {

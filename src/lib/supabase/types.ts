@@ -367,6 +367,32 @@ export type SnsPhotoRow = SnsFeedPhotoRow & {
   group_name: string | null;
 };
 
+export type SnsTextPostRow = {
+  id: string;
+  user_id: string;
+  display_name: string;
+  profile_image_url: string | null;
+  body: string;
+  photo_paths: string[];
+  created_at: string;
+  reply_count: number;
+  like_count: number;
+  my_liked: boolean;
+};
+
+export type SnsTextPostReplyRow = {
+  id: string;
+  post_id: string;
+  parent_reply_id: string | null;
+  user_id: string;
+  display_name: string;
+  profile_image_url: string | null;
+  body: string;
+  created_at: string;
+  like_count: number;
+  my_liked: boolean;
+};
+
 export type FriendGroupRow = {
   id: string;
   name: string;
@@ -622,6 +648,32 @@ export type Database = {
       };
       delete_friend_photo: { Args: { p_photo_id: string }; Returns: string };
       get_sns_feed: { Args: { p_days?: number }; Returns: SnsFeedPhotoRow[] };
+      get_personal_sns_feed: {
+        Args: { p_user_id?: string | null; p_days?: number };
+        Returns: SnsFeedPhotoRow[];
+      };
+      create_friend_text_post: {
+        Args: { p_body: string; p_photo_paths?: string[] };
+        Returns: { id: string; created_at: string }[];
+      };
+      delete_friend_text_post: { Args: { p_post_id: string }; Returns: string[] };
+      get_personal_text_feed: {
+        Args: { p_user_id?: string | null; p_limit?: number };
+        Returns: SnsTextPostRow[];
+      };
+      get_personal_text_post: { Args: { p_post_id: string }; Returns: SnsTextPostRow[] };
+      get_friend_profile: {
+        Args: { p_user_id: string };
+        Returns: { display_name: string; profile_image_url: string | null }[];
+      };
+      set_friend_text_post_like: { Args: { p_post_id: string; p_liked: boolean }; Returns: undefined };
+      add_friend_text_post_reply: {
+        Args: { p_post_id: string; p_body: string; p_parent_reply_id?: string | null };
+        Returns: { id: string; created_at: string }[];
+      };
+      delete_friend_text_post_reply: { Args: { p_reply_id: string }; Returns: undefined };
+      get_friend_text_post_replies: { Args: { p_post_id: string }; Returns: SnsTextPostReplyRow[] };
+      set_friend_text_post_reply_like: { Args: { p_reply_id: string; p_liked: boolean }; Returns: undefined };
       get_sns_photo: { Args: { p_photo_id: string }; Returns: SnsPhotoRow[] };
       set_friend_photo_reaction: { Args: { p_photo_id: string; p_emoji: string | null }; Returns: undefined };
       add_friend_photo_comment: { Args: { p_photo_id: string; p_body: string }; Returns: SnsCommentRow[] };

@@ -9,10 +9,10 @@ import { toThumbPath } from "@/lib/image";
 import { finalizePhotoPaths } from "@/lib/photos";
 import { requireUser } from "@/lib/supabase/server";
 import { PHOTO_BUCKET } from "@/lib/data/client";
-import { friendGroupsCacheTag, getSnsPhoto } from "@/lib/data/sns";
+import { signThumbOrOriginalPaths } from "@/lib/data/photos";
+import { friendGroupsCacheTag, getFriendTextPostReplies, getSnsPhoto } from "@/lib/data/sns";
 
 const uuidSchema = z.string().uuid();
-const optionalUuidSchema = z.string().uuid().optional().or(z.literal(""));
 const MAX_CAPTION_LENGTH = 300;
 const MAX_GROUP_NAME_LENGTH = 40;
 
@@ -46,17 +46,14 @@ function parseMemberIds(formData: FormData): string[] {
 export async function createFriendPhotosAction(_prev: ActionState, formData: FormData): Promise<ActionState> {
   const requestedPaths = parsePhotoPaths(formData);
   const caption = String(formData.get("caption") ?? "").trim().slice(0, MAX_CAPTION_LENGTH) || null;
-  const rawGroupId = String(formData.get("groupId") ?? "");
-  const groupId = optionalUuidSchema.safeParse(rawGroupId).success && rawGroupId !== "" ? rawGroupId : null;
+  const groupId = uuidSchema.parse(String(formData.get("groupId") ?? ""));
 
   if (requestedPaths.length === 0) {
     return { error: "写真を選んでください。" };
   }
 
   const { supabase, user } = await requireUser();
-  const destinationPrefix = groupId
-    ? `friend-photos/${user.id}/group/${groupId}/${todayInTokyo()}`
-    : `friend-photos/${user.id}/${todayInTokyo()}`;
+  const destinationPrefix = `friend-photos/${user.id}/group/${groupId}/${todayInTokyo()}`;
   const paths = [...new Set(await finalizePhotoPaths(supabase, requestedPaths, destinationPrefix))];
 
   if (paths.length === 0) {
@@ -74,10 +71,161 @@ export async function createFriendPhotosAction(_prev: ActionState, formData: For
     }
   }
 
-  const redirectTo = groupId ? `/sns/groups/${groupId}?posted=1` : "/sns?posted=1";
-  revalidatePath("/sns");
-  if (groupId) revalidatePath(`/sns/groups/${groupId}`);
-  redirect(redirectTo);
+  revalidatePath(`/sns/groups/${groupId}`);
+  redirect(`/sns/groups/${groupId}?posted=1`);
+}
+
+const MAX_TEXT_POST_PHOTOS = 4;
+
+export async function createFriendTextPostAction(_prev: ActionState, formData: FormData): Promise<ActionState> {
+  const body = String(formData.get("body") ?? "").trim();
+  const requestedPhotoPaths = parsePhotoPaths(formData).slice(0, MAX_TEXT_POST_PHOTOS);
+
+  if (body === "" && requestedPhotoPaths.length === 0) {
+    return { error: "つぶやきを入力するか、写真を選んでください。", values: { body } };
+  }
+  if (body.length > 280) {
+    return { error: "280文字以内で入力してください。", values: { body } };
+  }
+
+  const { supabase, user } = await requireUser();
+  const destinationPrefix = `friend-photos/${user.id}/posts/${todayInTokyo()}`;
+  const photoPaths =
+    requestedPhotoPaths.length > 0
+      ? [...new Set(await finalizePhotoPaths(supabase, requestedPhotoPaths, destinationPrefix))]
+      : [];
+
+  const { error } = await supabase.rpc("create_friend_text_post", { p_body: body, p_photo_paths: photoPaths });
+  if (error) {
+    return { error: toJapaneseError(error, "投稿に失敗しました。"), values: { body } };
+  }
+
+  revalidatePath("/sns/home");
+  revalidatePath(`/sns/users/${user.id}`);
+  redirect("/sns/home?posted=1");
+}
+
+export async function deleteFriendTextPostAction(formData: FormData): Promise<void> {
+  const parsed = uuidSchema.safeParse(String(formData.get("postId") ?? ""));
+  if (!parsed.success) redirect("/sns/home");
+
+  const { supabase, user } = await requireUser();
+  const { data: photoPaths } = await supabase.rpc("delete_friend_text_post", { p_post_id: parsed.data });
+
+  if (photoPaths && photoPaths.length > 0) {
+    const objectPaths = photoPaths.flatMap((path) => [path, toThumbPath(path)]);
+    await supabase.storage.from(PHOTO_BUCKET).remove(objectPaths);
+  }
+
+  revalidatePath("/sns/home");
+  revalidatePath(`/sns/users/${user.id}`);
+  redirect("/sns/home");
+}
+
+export async function setFriendTextPostLikeAction(formData: FormData): Promise<void> {
+  const postId = String(formData.get("postId") ?? "");
+  const authorUserId = String(formData.get("authorUserId") ?? "");
+  const parsedPostId = uuidSchema.safeParse(postId);
+  if (!parsedPostId.success) return;
+
+  const liked = String(formData.get("liked") ?? "") === "1";
+  const { supabase } = await requireUser();
+  await supabase.rpc("set_friend_text_post_like", { p_post_id: parsedPostId.data, p_liked: liked });
+
+  revalidatePath("/sns/home");
+  revalidatePath(`/sns/posts/${parsedPostId.data}`);
+  if (uuidSchema.safeParse(authorUserId).success) revalidatePath(`/sns/users/${authorUserId}`);
+}
+
+export async function addFriendTextPostReplyAction(_prev: ActionState, formData: FormData): Promise<ActionState> {
+  const postId = String(formData.get("postId") ?? "");
+  const parsedPostId = uuidSchema.safeParse(postId);
+  const rawParentReplyId = String(formData.get("parentReplyId") ?? "");
+  const parentReplyId = uuidSchema.safeParse(rawParentReplyId).success ? rawParentReplyId : null;
+  const body = String(formData.get("body") ?? "").trim();
+
+  if (!parsedPostId.success) return { error: "この投稿は見つかりませんでした。" };
+  if (body === "") return { error: "返信を入力してください。", values: { body: "" } };
+  if (body.length > 1000) return { error: "1000文字以内で入力してください。", values: { body } };
+
+  const { supabase } = await requireUser();
+  const { error } = await supabase.rpc("add_friend_text_post_reply", {
+    p_post_id: parsedPostId.data,
+    p_body: body,
+    p_parent_reply_id: parentReplyId,
+  });
+  if (error) {
+    return { error: toJapaneseError(error, "返信の投稿に失敗しました。"), values: { body } };
+  }
+
+  revalidatePath(`/sns/posts/${parsedPostId.data}`);
+  revalidatePath("/sns/home");
+  return { ok: true };
+}
+
+export async function deleteFriendTextPostReplyAction(formData: FormData): Promise<void> {
+  const replyId = String(formData.get("replyId") ?? "");
+  const postId = String(formData.get("postId") ?? "");
+  const parsedReplyId = uuidSchema.safeParse(replyId);
+  const parsedPostId = uuidSchema.safeParse(postId);
+  if (!parsedReplyId.success || !parsedPostId.success) return;
+
+  const { supabase } = await requireUser();
+  await supabase.rpc("delete_friend_text_post_reply", { p_reply_id: parsedReplyId.data });
+
+  revalidatePath(`/sns/posts/${parsedPostId.data}`);
+  revalidatePath("/sns/home");
+}
+
+export async function setFriendTextPostReplyLikeAction(formData: FormData): Promise<void> {
+  const replyId = String(formData.get("replyId") ?? "");
+  const postId = String(formData.get("postId") ?? "");
+  const parsedReplyId = uuidSchema.safeParse(replyId);
+  if (!parsedReplyId.success) return;
+
+  const liked = String(formData.get("liked") ?? "") === "1";
+  const { supabase } = await requireUser();
+  await supabase.rpc("set_friend_text_post_reply_like", { p_reply_id: parsedReplyId.data, p_liked: liked });
+
+  if (uuidSchema.safeParse(postId).success) revalidatePath(`/sns/posts/${postId}`);
+  revalidatePath("/sns/home");
+}
+
+/** ホーム/ユーザー画面のカードでコメントアイコンを開いたときに、その場で返信一覧を取得する */
+export async function getPostRepliesAction(postId: string): Promise<
+  {
+    id: string;
+    parentReplyId: string | null;
+    userId: string;
+    displayName: string;
+    avatarUrl?: string;
+    body: string;
+    createdAt: string;
+    likeCount: number;
+    myLiked: boolean;
+  }[]
+> {
+  const parsedPostId = uuidSchema.safeParse(postId);
+  if (!parsedPostId.success) return [];
+
+  const { supabase } = await requireUser();
+  const replies = await getFriendTextPostReplies(supabase, parsedPostId.data);
+  const avatarUrls = await signThumbOrOriginalPaths(
+    supabase,
+    replies.flatMap((r) => (r.profile_image_url ? [r.profile_image_url] : [])),
+  );
+
+  return replies.map((r) => ({
+    id: r.id,
+    parentReplyId: r.parent_reply_id,
+    userId: r.user_id,
+    displayName: r.display_name,
+    avatarUrl: r.profile_image_url ? avatarUrls.get(r.profile_image_url) : undefined,
+    body: r.body,
+    createdAt: r.created_at,
+    likeCount: r.like_count,
+    myLiked: r.my_liked,
+  }));
 }
 
 export async function deleteFriendPhotoAction(formData: FormData): Promise<void> {
