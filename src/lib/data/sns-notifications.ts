@@ -2,12 +2,17 @@ import { cache } from "react";
 import type { DB } from "./client";
 import { signThumbOrOriginalPaths } from "./photos";
 import {
-  getFriendTextPostReplies,
+  getFriendTextPostRepliesBatch,
   getMyFriendGroupsFresh,
   getPersonalTextFeed,
   getSnsMentions,
 } from "./sns";
-import type { FriendGroupRow, SnsMentionNotificationRow, SnsTextPostRow } from "@/lib/supabase/types";
+import type {
+  FriendGroupRow,
+  SnsMentionNotificationRow,
+  SnsTextPostReplyRow,
+  SnsTextPostRow,
+} from "@/lib/supabase/types";
 
 const POST_LIMIT = 50;
 const REPLY_POST_LIMIT = 20;
@@ -148,12 +153,13 @@ export async function getSnsNotificationCenter(supabase: DB, userId: string): Pr
   const { ownPosts, groups, readState, mentions, preferences } = await getNotificationSources(supabase, userId);
   const seenAtMs = readState.seenAt ? Date.parse(readState.seenAt) : 0;
   const replyPosts = ownPosts.filter((post) => post.reply_count > 0).slice(0, REPLY_POST_LIMIT);
-  const replyLists = await Promise.all(
-    replyPosts.map((post) => getFriendTextPostReplies(supabase, post.id).catch(() => [])),
-  );
+  const repliesByPost = await getFriendTextPostRepliesBatch(
+    supabase,
+    replyPosts.map((post) => post.id),
+  ).catch(() => new Map<string, SnsTextPostReplyRow[]>());
 
-  const replyRows = replyPosts.flatMap((post, index) =>
-    (replyLists[index] ?? [])
+  const replyRows = replyPosts.flatMap((post) =>
+    (repliesByPost.get(post.id) ?? [])
       .filter((reply) => reply.user_id !== userId)
       .map((reply) => ({ post, reply })),
   );
@@ -276,9 +282,11 @@ export const getSnsUnreadCount = cache(async function getSnsUnreadCount(
   const { ownPosts, groups, readState, mentions, preferences } = await getNotificationSources(supabase, userId);
   const seenAtMs = readState.seenAt ? Date.parse(readState.seenAt) : 0;
   const replyPosts = ownPosts.filter((post) => post.reply_count > 0).slice(0, REPLY_POST_LIMIT);
-  const replyLists = await Promise.all(
-    replyPosts.map((post) => getFriendTextPostReplies(supabase, post.id).catch(() => [])),
-  );
+  const repliesByPost = await getFriendTextPostRepliesBatch(
+    supabase,
+    replyPosts.map((post) => post.id),
+  ).catch(() => new Map<string, SnsTextPostReplyRow[]>());
+  const replyLists = replyPosts.map((post) => repliesByPost.get(post.id) ?? []);
   const unreadReplies = preferences.replies ? replyLists.reduce(
     (sum, replies) =>
       sum + replies.filter((reply) => reply.user_id !== userId && Date.parse(reply.created_at) > seenAtMs).length,

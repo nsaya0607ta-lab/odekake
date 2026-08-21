@@ -180,6 +180,27 @@ export async function getFriendTextPostReplies(supabase: DB, postId: string): Pr
   return (data ?? []).map((row) => ({ ...row, mentions: normalizeMentions(row.mentions) }));
 }
 
+/** 複数投稿の返信を1回のRPCでまとめて取得する（通知センターの個別呼び出しを避けるため）。 */
+export async function getFriendTextPostRepliesBatch(
+  supabase: DB,
+  postIds: string[],
+): Promise<Map<string, SnsTextPostReplyRow[]>> {
+  const result = new Map<string, SnsTextPostReplyRow[]>();
+  if (postIds.length === 0) return result;
+  const { data, error } = await supabase.rpc("get_friend_text_post_replies_batch", { p_post_ids: postIds });
+  if (error) {
+    console.error("Batched text post replies are unavailable", { code: error.code, message: error.message });
+    throw new Error("返信の取得に失敗しました");
+  }
+  for (const row of data ?? []) {
+    const reply = { ...row, mentions: normalizeMentions(row.mentions) };
+    const list = result.get(reply.post_id);
+    if (list) list.push(reply);
+    else result.set(reply.post_id, [reply]);
+  }
+  return result;
+}
+
 export async function getSnsPhoto(supabase: DB, photoId: string): Promise<SnsPhotoRow | null> {
   const { data, error } = await supabase.rpc("get_sns_photo", { p_photo_id: photoId });
   if (error) {

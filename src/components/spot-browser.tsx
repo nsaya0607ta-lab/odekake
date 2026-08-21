@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useMemo, useState } from "react";
 import { IconHeart, IconMapPin, IconSearch, IconSliders } from "./icons";
 import type { SpotSummary } from "@/lib/data/spots";
@@ -32,8 +33,10 @@ export function SpotBrowser({
    */
   search?: { action: string; keyword: string; hiddenFields?: Record<string, string> };
 }) {
+  const router = useRouter();
   const [showFilters, setShowFilters] = useState(false);
   const [keyword, setKeyword] = useState("");
+  const [searchKeyword, setSearchKeyword] = useState(search?.keyword ?? "");
   const [categoryId, setCategoryId] = useState<string>("all");
   const [favoriteOnly, setFavoriteOnly] = useState(false);
   const [minRating, setMinRating] = useState<string>("0");
@@ -78,7 +81,7 @@ export function SpotBrowser({
     (visitedFrom ? 1 : 0) +
     (visitedTo ? 1 : 0);
 
-  const activeFilterCount = localFilterCount + ((search ? search.keyword : keyword).trim() ? 1 : 0);
+  const activeFilterCount = localFilterCount + ((search ? searchKeyword : keyword).trim() ? 1 : 0);
   // 絞り込みは読み込み済みの分にしか効かない。件数の言い方をそれに合わせる
   const localFilterApplied = localFilterCount > 0;
 
@@ -86,17 +89,25 @@ export function SpotBrowser({
     <div className="space-y-3">
       <div className="flex gap-2">
         {search ? (
-          <form method="GET" action={search.action} className="relative min-w-0 flex-1">
-            {Object.entries(search.hiddenFields ?? {}).map(([name, value]) => (
-              <input key={name} type="hidden" name={name} value={value} />
-            ))}
+          <form
+            className="relative min-w-0 flex-1"
+            onSubmit={(event) => {
+              event.preventDefault();
+              const params = new URLSearchParams(search.hiddenFields);
+              const trimmed = searchKeyword.trim();
+              if (trimmed) params.set("q", trimmed);
+              const suffix = params.toString();
+              router.push(suffix ? `${search.action}?${suffix}` : search.action);
+            }}
+          >
             <span className="pointer-events-none absolute top-1/2 left-3 -translate-y-1/2 text-ink-faint">
               <IconSearch size={18} />
             </span>
             <input
               type="search"
               name="q"
-              defaultValue={search.keyword}
+              value={searchKeyword}
+              onChange={(e) => setSearchKeyword(e.target.value)}
               placeholder="スポット名・住所で探す"
               aria-label="スポットを検索"
               enterKeyHint="search"

@@ -762,6 +762,7 @@ export type Database = {
       };
       delete_friend_text_post_reply: { Args: { p_reply_id: string }; Returns: undefined };
       get_friend_text_post_replies: { Args: { p_post_id: string }; Returns: SnsTextPostReplyRow[] };
+      get_friend_text_post_replies_batch: { Args: { p_post_ids: string[] }; Returns: SnsTextPostReplyRow[] };
       set_friend_text_post_reply_like: { Args: { p_reply_id: string; p_liked: boolean }; Returns: undefined };
       get_sns_photo: { Args: { p_photo_id: string }; Returns: SnsPhotoRow[] };
       set_friend_photo_reaction: { Args: { p_photo_id: string; p_emoji: string | null }; Returns: undefined };
