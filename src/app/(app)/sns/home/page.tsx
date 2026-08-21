@@ -6,7 +6,7 @@ import { SnsBackgroundBand } from "@/components/sns/sns-background-band";
 import { SnsModeMenu } from "@/components/sns/sns-mode-menu";
 import { SnsModeProvider } from "@/components/sns/sns-mode-context";
 import { SnsTextFeed } from "@/components/sns/sns-text-feed";
-import { signThumbOrOriginalPaths } from "@/lib/data/photos";
+import { signPhotoPaths, signThumbOrOriginalPaths } from "@/lib/data/photos";
 import { getPersonalTextFeed } from "@/lib/data/sns";
 import { requireUser } from "@/lib/supabase/server";
 
@@ -18,12 +18,14 @@ export default async function SnsHomePage() {
   const { supabase, user } = await requireUser();
 
   const posts = await getPersonalTextFeed(supabase);
-  const [avatarUrls, photoUrls] = await Promise.all([
+  const allPhotoPaths = posts.flatMap((p) => p.photo_paths);
+  const [avatarUrls, photoUrls, fullPhotoUrls] = await Promise.all([
     signThumbOrOriginalPaths(
       supabase,
       posts.flatMap((p) => (p.profile_image_url ? [p.profile_image_url] : [])),
     ),
-    signThumbOrOriginalPaths(supabase, posts.flatMap((p) => p.photo_paths)),
+    signThumbOrOriginalPaths(supabase, allPhotoPaths),
+    signPhotoPaths(supabase, allPhotoPaths),
   ]);
 
   return (
@@ -31,7 +33,13 @@ export default async function SnsHomePage() {
       <PageHeader title="ホーム" showBack={false} leftAction={<SnsModeMenu />} />
       <SnsBackgroundBand hasToggleBar={false} />
       <PageBody>
-        <SnsTextFeed posts={posts} avatarUrls={avatarUrls} photoUrls={photoUrls} currentUserId={user.id} />
+        <SnsTextFeed
+          posts={posts}
+          avatarUrls={avatarUrls}
+          photoUrls={photoUrls}
+          fullPhotoUrls={fullPhotoUrls}
+          currentUserId={user.id}
+        />
       </PageBody>
       <Link
         href="/sns/home/new"

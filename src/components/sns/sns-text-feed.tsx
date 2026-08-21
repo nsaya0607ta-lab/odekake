@@ -11,11 +11,13 @@ export function SnsTextFeed({
   posts,
   avatarUrls,
   photoUrls,
+  fullPhotoUrls,
   currentUserId,
 }: {
   posts: SnsTextPostRow[];
   avatarUrls: Map<string, string>;
   photoUrls: Map<string, string>;
+  fullPhotoUrls: Map<string, string>;
   currentUserId: string;
 }) {
   if (posts.length === 0) {
@@ -29,6 +31,10 @@ export function SnsTextFeed({
         const isMine = post.user_id === currentUserId;
         const postPhotoUrls = post.photo_paths.flatMap((path) => {
           const url = photoUrls.get(path);
+          return url ? [url] : [];
+        });
+        const postFullPhotoUrls = post.photo_paths.flatMap((path) => {
+          const url = fullPhotoUrls.get(path);
           return url ? [url] : [];
         });
 
@@ -69,7 +75,7 @@ export function SnsTextFeed({
               ) : null}
               {postPhotoUrls.length > 0 ? (
                 <Link href={`/sns/posts/${post.id}`} className="block">
-                  <SnsPostPhotoGrid photoUrls={postPhotoUrls} />
+                  <SnsPostPhotoGrid photoUrls={postPhotoUrls} fullUrls={postFullPhotoUrls} />
                 </Link>
               ) : null}
               <div className="mt-2.5 flex items-center gap-4">
