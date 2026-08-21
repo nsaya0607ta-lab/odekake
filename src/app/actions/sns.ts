@@ -9,7 +9,8 @@ import { toThumbPath } from "@/lib/image";
 import { finalizePhotoPaths } from "@/lib/photos";
 import { requireUser } from "@/lib/supabase/server";
 import { PHOTO_BUCKET } from "@/lib/data/client";
-import { friendGroupsCacheTag, getSnsPhoto } from "@/lib/data/sns";
+import { signThumbOrOriginalPaths } from "@/lib/data/photos";
+import { friendGroupsCacheTag, getFriendTextPostReplies, getSnsPhoto } from "@/lib/data/sns";
 
 const uuidSchema = z.string().uuid();
 const MAX_CAPTION_LENGTH = 300;
@@ -139,6 +140,8 @@ export async function setFriendTextPostLikeAction(formData: FormData): Promise<v
 export async function addFriendTextPostReplyAction(_prev: ActionState, formData: FormData): Promise<ActionState> {
   const postId = String(formData.get("postId") ?? "");
   const parsedPostId = uuidSchema.safeParse(postId);
+  const rawParentReplyId = String(formData.get("parentReplyId") ?? "");
+  const parentReplyId = uuidSchema.safeParse(rawParentReplyId).success ? rawParentReplyId : null;
   const body = String(formData.get("body") ?? "").trim();
 
   if (!parsedPostId.success) return { error: "この投稿は見つかりませんでした。" };
@@ -149,12 +152,14 @@ export async function addFriendTextPostReplyAction(_prev: ActionState, formData:
   const { error } = await supabase.rpc("add_friend_text_post_reply", {
     p_post_id: parsedPostId.data,
     p_body: body,
+    p_parent_reply_id: parentReplyId,
   });
   if (error) {
     return { error: toJapaneseError(error, "返信の投稿に失敗しました。"), values: { body } };
   }
 
   revalidatePath(`/sns/posts/${parsedPostId.data}`);
+  revalidatePath("/sns/home");
   return { ok: true };
 }
 
@@ -163,13 +168,64 @@ export async function deleteFriendTextPostReplyAction(formData: FormData): Promi
   const postId = String(formData.get("postId") ?? "");
   const parsedReplyId = uuidSchema.safeParse(replyId);
   const parsedPostId = uuidSchema.safeParse(postId);
-  if (!parsedReplyId.success || !parsedPostId.success) redirect("/sns/home");
+  if (!parsedReplyId.success || !parsedPostId.success) return;
 
   const { supabase } = await requireUser();
   await supabase.rpc("delete_friend_text_post_reply", { p_reply_id: parsedReplyId.data });
 
   revalidatePath(`/sns/posts/${parsedPostId.data}`);
-  redirect(`/sns/posts/${parsedPostId.data}`);
+  revalidatePath("/sns/home");
+}
+
+export async function setFriendTextPostReplyLikeAction(formData: FormData): Promise<void> {
+  const replyId = String(formData.get("replyId") ?? "");
+  const postId = String(formData.get("postId") ?? "");
+  const parsedReplyId = uuidSchema.safeParse(replyId);
+  if (!parsedReplyId.success) return;
+
+  const liked = String(formData.get("liked") ?? "") === "1";
+  const { supabase } = await requireUser();
+  await supabase.rpc("set_friend_text_post_reply_like", { p_reply_id: parsedReplyId.data, p_liked: liked });
+
+  if (uuidSchema.safeParse(postId).success) revalidatePath(`/sns/posts/${postId}`);
+  revalidatePath("/sns/home");
+}
+
+/** ホーム/ユーザー画面のカードでコメントアイコンを開いたときに、その場で返信一覧を取得する */
+export async function getPostRepliesAction(postId: string): Promise<
+  {
+    id: string;
+    parentReplyId: string | null;
+    userId: string;
+    displayName: string;
+    avatarUrl?: string;
+    body: string;
+    createdAt: string;
+    likeCount: number;
+    myLiked: boolean;
+  }[]
+> {
+  const parsedPostId = uuidSchema.safeParse(postId);
+  if (!parsedPostId.success) return [];
+
+  const { supabase } = await requireUser();
+  const replies = await getFriendTextPostReplies(supabase, parsedPostId.data);
+  const avatarUrls = await signThumbOrOriginalPaths(
+    supabase,
+    replies.flatMap((r) => (r.profile_image_url ? [r.profile_image_url] : [])),
+  );
+
+  return replies.map((r) => ({
+    id: r.id,
+    parentReplyId: r.parent_reply_id,
+    userId: r.user_id,
+    displayName: r.display_name,
+    avatarUrl: r.profile_image_url ? avatarUrls.get(r.profile_image_url) : undefined,
+    body: r.body,
+    createdAt: r.created_at,
+    likeCount: r.like_count,
+    myLiked: r.my_liked,
+  }));
 }
 
 export async function deleteFriendPhotoAction(formData: FormData): Promise<void> {

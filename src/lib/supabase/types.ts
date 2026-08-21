@@ -383,11 +383,14 @@ export type SnsTextPostRow = {
 export type SnsTextPostReplyRow = {
   id: string;
   post_id: string;
+  parent_reply_id: string | null;
   user_id: string;
   display_name: string;
   profile_image_url: string | null;
   body: string;
   created_at: string;
+  like_count: number;
+  my_liked: boolean;
 };
 
 export type FriendGroupRow = {
@@ -665,11 +668,12 @@ export type Database = {
       };
       set_friend_text_post_like: { Args: { p_post_id: string; p_liked: boolean }; Returns: undefined };
       add_friend_text_post_reply: {
-        Args: { p_post_id: string; p_body: string };
+        Args: { p_post_id: string; p_body: string; p_parent_reply_id?: string | null };
         Returns: { id: string; created_at: string }[];
       };
       delete_friend_text_post_reply: { Args: { p_reply_id: string }; Returns: undefined };
       get_friend_text_post_replies: { Args: { p_post_id: string }; Returns: SnsTextPostReplyRow[] };
+      set_friend_text_post_reply_like: { Args: { p_reply_id: string; p_liked: boolean }; Returns: undefined };
       get_sns_photo: { Args: { p_photo_id: string }; Returns: SnsPhotoRow[] };
       set_friend_photo_reaction: { Args: { p_photo_id: string; p_emoji: string | null }; Returns: undefined };
       add_friend_photo_comment: { Args: { p_photo_id: string; p_body: string }; Returns: SnsCommentRow[] };

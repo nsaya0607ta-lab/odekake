@@ -1,9 +1,10 @@
 import Link from "next/link";
-import { IconChat, IconUser } from "@/components/icons";
+import { IconUser } from "@/components/icons";
 import { formatRelativeTimeJa } from "@/lib/date";
 import type { SnsTextPostRow } from "@/lib/supabase/types";
 import { LikeButton } from "@/components/sns/like-button";
 import { PostOptionsMenu } from "@/components/sns/post-options-menu";
+import { SnsCommentToggle } from "@/components/sns/sns-comment-toggle";
 import { SnsPostPhotoGrid } from "@/components/sns/sns-post-photo-grid";
 
 /** Twitterのタイムラインのような、テキスト＋写真の個人投稿一覧 */
@@ -78,15 +79,8 @@ export function SnsTextFeed({
                   <SnsPostPhotoGrid photoUrls={postPhotoUrls} fullUrls={postFullPhotoUrls} />
                 </Link>
               ) : null}
-              <div className="mt-2.5 flex items-center gap-4">
-                <Link
-                  href={`/sns/posts/${post.id}`}
-                  aria-label="返信する"
-                  className="flex items-center gap-1.5 rounded-full px-1.5 py-1 text-ink-faint active:bg-paper-deep"
-                >
-                  <IconChat size={16} />
-                  {post.reply_count > 0 ? <span className="text-xs">{post.reply_count}</span> : null}
-                </Link>
+              <div className="mt-2.5 flex flex-wrap items-center gap-4">
+                <SnsCommentToggle postId={post.id} currentUserId={currentUserId} replyCount={post.reply_count} />
                 <LikeButton postId={post.id} authorUserId={post.user_id} liked={post.my_liked} count={post.like_count} />
               </div>
             </div>
