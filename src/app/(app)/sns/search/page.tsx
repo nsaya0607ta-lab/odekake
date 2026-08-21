@@ -1,10 +1,11 @@
 import Image from "next/image";
 import Link from "next/link";
-import { IconClose, IconSearch, IconUser, IconUsers } from "@/components/icons";
+import { IconSearch, IconUser, IconUsers } from "@/components/icons";
 import { PageBody } from "@/components/page-body";
 import { PageHeader } from "@/components/page-header";
 import { SnsBackgroundBand } from "@/components/sns/sns-background-band";
 import { SnsGroupList } from "@/components/sns/sns-group-list";
+import { SnsSearchBox } from "@/components/sns/sns-search-box";
 import { SnsTextFeed } from "@/components/sns/sns-text-feed";
 import { getFriendList } from "@/lib/data/friends";
 import { signThumbOrOriginalPaths } from "@/lib/data/photos";
@@ -17,30 +18,17 @@ import {
   getSnsTextPostPhotoPaths,
   signGroupIconUrls,
 } from "@/lib/data/sns";
+import { parseSnsSearchScope, snsSearchHref, type SnsSearchScope } from "@/lib/data/sns-search";
 import { requireUser } from "@/lib/supabase/server";
 
 export const metadata = { title: "検索 | SNS" };
 export const dynamic = "force-dynamic";
 
-type SearchScope = "all" | "posts" | "users" | "groups" | "places";
-
-function parseScope(value: string | undefined): SearchScope {
-  return value === "posts" || value === "users" || value === "groups" || value === "places" ? value : "all";
-}
-
 function normalize(value: string): string {
   return value.normalize("NFKC").toLocaleLowerCase("ja");
 }
 
-function searchHref(query: string, scope: SearchScope): string {
-  const params = new URLSearchParams();
-  if (query) params.set("q", query);
-  if (scope !== "all") params.set("scope", scope);
-  const suffix = params.toString();
-  return suffix ? `/sns/search?${suffix}` : "/sns/search";
-}
-
-const SCOPES: { id: SearchScope; label: string }[] = [
+const SCOPES: { id: SnsSearchScope; label: string }[] = [
   { id: "all", label: "すべて" },
   { id: "posts", label: "投稿" },
   { id: "users", label: "ユーザー" },
@@ -58,7 +46,7 @@ export default async function SnsSearchPage({
   const [{ supabase, user }, sp] = await Promise.all([requireUser(), searchParams]);
   const query = (sp.q ?? "").trim().slice(0, 60);
   const needle = normalize(query.replace(/^#/, ""));
-  const scope = parseScope(sp.scope);
+  const scope = parseSnsSearchScope(sp.scope);
   const showPosts = scope === "all" || scope === "posts" || scope === "places";
   const showPeople = scope === "all" || scope === "users";
   const showGroups = scope === "all" || scope === "groups";
@@ -128,19 +116,13 @@ export default async function SnsSearchPage({
           <Image src="/illustrations/sns/search-discovery-v2.webp" alt="" width={112} height={112} priority sizes="112px" />
         </section>
 
-        <form action="/sns/search" method="get" className="sns-search-box" role="search">
-          <IconSearch size={20} />
-          <input name="q" defaultValue={query} maxLength={60} autoFocus placeholder="キーワード、#タグ、場所を検索" aria-label="SNSを検索" />
-          {query ? (
-            <Link href="/sns/search" prefetch={false} aria-label="検索語を消す" className="pressable"><IconClose size={16} /></Link>
-          ) : null}
-        </form>
+        <SnsSearchBox query={query} scope={scope} />
 
         <nav className="sns-search-scopes" aria-label="検索対象">
           {SCOPES.map((item) => (
             <Link
               key={item.id}
-              href={searchHref(query, item.id)}
+              href={snsSearchHref(query, item.id)}
               prefetch={false}
               scroll={false}
               aria-current={scope === item.id ? "page" : undefined}
