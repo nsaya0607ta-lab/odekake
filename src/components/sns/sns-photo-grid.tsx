@@ -133,9 +133,9 @@ export function SnsPhotoGrid({
                   }}
                   type="button"
                   onClick={() => selectDate(date)}
-                  className={`flex h-11 w-10 shrink-0 flex-col items-center justify-center gap-0.5 rounded-xl text-xs font-semibold transition-colors ${
+                  className={`sns-date-chip flex h-11 w-10 shrink-0 flex-col items-center justify-center gap-0.5 rounded-xl text-xs font-semibold transition-colors ${
                     active
-                      ? "bg-leaf text-white"
+                      ? "is-active"
                       : hasPhotos
                         ? "text-ink active:bg-paper-deep"
                         : "text-ink-faint active:bg-paper-deep"

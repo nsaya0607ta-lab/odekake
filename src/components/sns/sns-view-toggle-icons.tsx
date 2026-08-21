@@ -26,9 +26,7 @@ function ToggleIcon({
       href={href}
       aria-label={label}
       aria-current={active ? "page" : undefined}
-      className={`tap-target flex h-10 min-w-[5.3rem] items-center justify-center gap-1.5 rounded-xl px-2 transition-all ${
-        active ? "bg-leaf text-white shadow-sm" : "text-ink-faint active:bg-paper-deep"
-      }`}
+      className={`sns-view-toggle is-${active ? `active-${label === "写真" ? "photos" : "chat"}` : "idle"} tap-target flex h-10 min-w-[5.3rem] items-center justify-center gap-1.5 rounded-xl px-2 transition-all`}
     >
       {/* eslint-disable-next-line @next/next/no-img-element */}
       <img src={src} alt="" className={`h-6 w-6 object-contain ${active ? "brightness-0 invert" : "opacity-70"}`} />

@@ -3,6 +3,11 @@ import { IconPlus, IconUser } from "@/components/icons";
 import { PageBody } from "@/components/page-body";
 import { PageHeader } from "@/components/page-header";
 import { SnsBackgroundBand } from "@/components/sns/sns-background-band";
+import {
+  matchesSnsFeedFilter,
+  parseSnsFeedFilter,
+  SnsFeedFilters,
+} from "@/components/sns/sns-feed-filters";
 import { SnsPeopleRail, type SnsPersonRow } from "@/components/sns/sns-people-rail";
 import { SnsPrimaryNav } from "@/components/sns/sns-primary-nav";
 import { SnsTextFeed } from "@/components/sns/sns-text-feed";
@@ -14,8 +19,14 @@ import { requireUser } from "@/lib/supabase/server";
 export const dynamic = "force-dynamic";
 
 /** 特定ユーザーの個人投稿画面。グループとは無関係に、そのユーザー自身のつぶやきだけを一覧できる */
-export default async function SnsUserHomePage({ params }: { params: Promise<{ userId: string }> }) {
-  const [{ userId }, { supabase, user }] = await Promise.all([params, requireUser()]);
+export default async function SnsUserHomePage({
+  params,
+  searchParams,
+}: {
+  params: Promise<{ userId: string }>;
+  searchParams: Promise<{ filter?: string }>;
+}) {
+  const [{ userId }, sp, { supabase, user }] = await Promise.all([params, searchParams, requireUser()]);
 
   const [profile, posts, friends, ownProfile, groups] = await Promise.all([
     getFriendProfile(supabase, userId),
@@ -24,11 +35,14 @@ export default async function SnsUserHomePage({ params }: { params: Promise<{ us
     getOwnSnsProfile(supabase, user.id),
     getMyFriendGroups(supabase, user.id),
   ]);
-  const allPhotoPaths = posts.flatMap((p) => p.photo_paths);
+  const filter = parseSnsFeedFilter(sp.filter);
+  const visiblePosts = posts.filter((post) => matchesSnsFeedFilter(post, filter));
+  const feedTitle = filter === "photos" ? "写真つきの投稿" : filter === "notes" ? "ひとこと投稿" : "つぶやき";
+  const allPhotoPaths = visiblePosts.flatMap((p) => p.photo_paths);
   const [avatarUrls, photoUrls, fullPhotoUrls, friendAvatarUrls] = await Promise.all([
     signThumbOrOriginalPaths(
       supabase,
-      posts.flatMap((p) => (p.profile_image_url ? [p.profile_image_url] : [])),
+      visiblePosts.flatMap((p) => (p.profile_image_url ? [p.profile_image_url] : [])),
     ),
     signThumbOrOriginalPaths(supabase, allPhotoPaths),
     signPhotoPaths(supabase, allPhotoPaths),
@@ -90,16 +104,26 @@ export default async function SnsUserHomePage({ params }: { params: Promise<{ us
         <div className="flex items-end justify-between gap-3 px-1 pt-1">
           <div>
             <p className="text-[10px] font-bold tracking-[0.16em] text-apricot">POSTS</p>
-            <h2 className="text-base font-bold">つぶやき</h2>
+            <h2 className="text-base font-bold">{feedTitle}</h2>
           </div>
         </div>
 
+        <SnsFeedFilters active={filter} baseHref={`/sns/users/${userId}`} />
+
         <SnsTextFeed
-          posts={posts}
+          posts={visiblePosts}
           avatarUrls={avatarUrls}
           photoUrls={photoUrls}
           fullPhotoUrls={fullPhotoUrls}
           currentUserId={user.id}
+          emptyTitle={
+            filter === "photos"
+              ? "写真つきの投稿はまだありません"
+              : filter === "notes"
+                ? "ひとこと投稿はまだありません"
+                : undefined
+          }
+          emptyMessage={filter === "all" ? undefined : "ほかの種類に切り替えると投稿を見られます。"}
         />
       </PageBody>
     </>

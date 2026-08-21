@@ -34,7 +34,7 @@ export function SnsPrimaryNav({
             key={key}
             href={hrefs[key]}
             aria-current={selected ? "page" : undefined}
-            className={`sns-primary-nav-item pressable ${selected ? "is-active" : ""}`}
+            className={`sns-primary-nav-item pressable is-${key} ${selected ? "is-active" : ""}`}
           >
             <span className="sns-primary-nav-icon" aria-hidden="true">
               <Icon size={19} />

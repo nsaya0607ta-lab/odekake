@@ -214,7 +214,7 @@ export function SnsGroupSwitcher({
           aria-label="グループを作る"
           className="flex shrink-0 flex-col items-center gap-1"
         >
-          <span className="tap-target flex h-16 w-16 items-center justify-center rounded-full border-2 border-dashed border-line-strong bg-card/70 text-ink-faint shadow-sm active:bg-paper-deep">
+          <span className="sns-new-group tap-target flex h-16 w-16 items-center justify-center rounded-full border-2 border-dashed text-ink-faint shadow-sm active:bg-paper-deep">
             <IconPlus size={20} />
           </span>
           <span className="max-w-[4rem] truncate text-[10px] font-bold text-ink-faint">新規作成</span>
@@ -244,7 +244,7 @@ function GroupIcon({
       <span className="relative">
         <span
           className={`tap-target flex h-16 w-16 items-center justify-center overflow-hidden rounded-full border-[3px] text-2xl transition-colors ${
-            active ? "border-leaf bg-leaf-soft ring-4 ring-leaf-soft/80" : "border-card bg-card ring-1 ring-line"
+            active ? "sns-group-icon-active" : "border-card bg-card ring-1 ring-line"
           } ${dragging ? "shadow-md" : ""}`}
         >
           {iconUrl ? (
@@ -255,10 +255,10 @@ function GroupIcon({
           )}
         </span>
         {unread ? (
-          <span className="absolute top-0 right-0 h-3.5 w-3.5 rounded-full bg-sky ring-[3px] ring-card" />
+          <span className="sns-unread-dot absolute top-0 right-0 h-3.5 w-3.5 rounded-full ring-[3px] ring-card" />
         ) : null}
       </span>
-      <span className={`max-w-[4rem] truncate text-[10px] font-bold ${active ? "text-leaf-deep" : "text-ink-soft"}`}>
+      <span className={`max-w-[4rem] truncate text-[10px] font-bold ${active ? "sns-group-label-active" : "text-ink-soft"}`}>
         {label}
       </span>
     </div>

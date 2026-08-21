@@ -14,19 +14,23 @@ export function SnsTextFeed({
   photoUrls,
   fullPhotoUrls,
   currentUserId,
+  emptyTitle = "まだつぶやきがありません",
+  emptyMessage = "最初のおでかけメモを残してみましょう。",
 }: {
   posts: SnsTextPostRow[];
   avatarUrls: Map<string, string>;
   photoUrls: Map<string, string>;
   fullPhotoUrls: Map<string, string>;
   currentUserId: string;
+  emptyTitle?: string;
+  emptyMessage?: string;
 }) {
   if (posts.length === 0) {
     return (
       <div className="sns-empty-feed">
         <span className="text-3xl" aria-hidden="true">📝</span>
-        <p className="mt-2 text-sm font-bold">まだつぶやきがありません</p>
-        <p className="mt-1 text-xs text-ink-faint">最初のおでかけメモを残してみましょう。</p>
+        <p className="mt-2 text-sm font-bold">{emptyTitle}</p>
+        <p className="mt-1 text-xs text-ink-faint">{emptyMessage}</p>
       </div>
     );
   }

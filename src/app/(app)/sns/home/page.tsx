@@ -3,6 +3,11 @@ import { IconPlus, IconSend, IconUser } from "@/components/icons";
 import { PageBody } from "@/components/page-body";
 import { PageHeader } from "@/components/page-header";
 import { SnsBackgroundBand } from "@/components/sns/sns-background-band";
+import {
+  matchesSnsFeedFilter,
+  parseSnsFeedFilter,
+  SnsFeedFilters,
+} from "@/components/sns/sns-feed-filters";
 import { SnsPrimaryNav } from "@/components/sns/sns-primary-nav";
 import { SnsTextFeed } from "@/components/sns/sns-text-feed";
 import { signPhotoPaths, signThumbOrOriginalPaths } from "@/lib/data/photos";
@@ -13,19 +18,26 @@ export const metadata = { title: "ホーム | SNS" };
 export const dynamic = "force-dynamic";
 
 /** グループに紐付かない、フレンド全員分のテキスト投稿（つぶやき）をまとめて見られるホーム画面 */
-export default async function SnsHomePage() {
-  const { supabase, user } = await requireUser();
+export default async function SnsHomePage({
+  searchParams,
+}: {
+  searchParams: Promise<{ filter?: string }>;
+}) {
+  const [{ supabase, user }, sp] = await Promise.all([requireUser(), searchParams]);
 
   const [posts, ownProfile, groups] = await Promise.all([
     getPersonalTextFeed(supabase),
     getOwnSnsProfile(supabase, user.id),
     getMyFriendGroups(supabase, user.id),
   ]);
-  const allPhotoPaths = posts.flatMap((p) => p.photo_paths);
+  const filter = parseSnsFeedFilter(sp.filter);
+  const visiblePosts = posts.filter((post) => matchesSnsFeedFilter(post, filter));
+  const feedTitle = filter === "photos" ? "写真つきの投稿" : filter === "notes" ? "ひとこと投稿" : "新しいつぶやき";
+  const allPhotoPaths = visiblePosts.flatMap((p) => p.photo_paths);
   const [avatarUrls, photoUrls, fullPhotoUrls] = await Promise.all([
     signThumbOrOriginalPaths(
       supabase,
-      posts.flatMap((p) => (p.profile_image_url ? [p.profile_image_url] : [])),
+      visiblePosts.flatMap((p) => (p.profile_image_url ? [p.profile_image_url] : [])),
     ),
     signThumbOrOriginalPaths(supabase, allPhotoPaths),
     signPhotoPaths(supabase, allPhotoPaths),
@@ -41,10 +53,12 @@ export default async function SnsHomePage() {
         <SnsPrimaryNav active="home" userHref={`/sns/users/${user.id}`} groupHref={groupHref} />
 
         <section className="sns-home-welcome" aria-labelledby="sns-home-title">
+          <span className="sns-home-sun" aria-hidden="true" />
+          <span className="sns-home-sparkles" aria-hidden="true">✦　·　✧</span>
           <span className="sns-home-welcome-stamp" aria-hidden="true">TODAY</span>
-          <p className="text-[10px] font-bold tracking-[0.18em] text-leaf-deep">FRIENDS TIMELINE</p>
-          <h2 id="sns-home-title" className="mt-0.5 text-xl font-bold">みんなのおでかけ</h2>
-          <p className="mt-1 text-xs leading-relaxed text-ink-soft">
+          <p className="relative text-[10px] font-bold tracking-[0.18em] text-white/75">FRIENDS TIMELINE</p>
+          <h2 id="sns-home-title" className="relative mt-0.5 text-xl font-bold text-white">みんなのおでかけ</h2>
+          <p className="relative mt-1 max-w-[16rem] text-xs leading-relaxed text-white/80">
             フレンドのつぶやきや写真を、ここでまとめて楽しめます。
           </p>
         </section>
@@ -72,19 +86,29 @@ export default async function SnsHomePage() {
         <div className="flex items-end justify-between gap-3 px-1 pt-1">
           <div>
             <p className="text-[10px] font-bold tracking-[0.16em] text-apricot">LATEST</p>
-            <h2 className="text-base font-bold">新しいつぶやき</h2>
+            <h2 className="text-base font-bold">{feedTitle}</h2>
           </div>
           <span className="rounded-full bg-card/80 px-2.5 py-1 text-[10px] font-bold text-ink-faint shadow-sm ring-1 ring-line">
-            {posts.length}件
+            {visiblePosts.length}件
           </span>
         </div>
 
+        <SnsFeedFilters active={filter} baseHref="/sns/home" />
+
         <SnsTextFeed
-          posts={posts}
+          posts={visiblePosts}
           avatarUrls={avatarUrls}
           photoUrls={photoUrls}
           fullPhotoUrls={fullPhotoUrls}
           currentUserId={user.id}
+          emptyTitle={
+            filter === "photos"
+              ? "写真つきの投稿はまだありません"
+              : filter === "notes"
+                ? "ひとこと投稿はまだありません"
+                : undefined
+          }
+          emptyMessage={filter === "all" ? undefined : "ほかの種類に切り替えると投稿を見られます。"}
         />
       </PageBody>
       <Link
