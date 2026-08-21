@@ -1,3 +1,4 @@
+import Image from "next/image";
 import Link from "next/link";
 import { IconPlus } from "@/components/icons";
 import { PageBody } from "@/components/page-body";
@@ -72,14 +73,22 @@ export default async function SnsHomePage({
         leftAction={<SnsNotificationEntry />}
       />
       <SnsBackgroundBand hasToggleBar={false} />
-      <PageBody className="space-y-3">
+      <PageBody className="sns-page-shell space-y-3">
         <SnsPrimaryNav active="home" userHref={`/sns/users/${user.id}`} groupHref="/sns/groups" />
 
         <section className="sns-home-welcome is-compact" aria-labelledby="sns-home-title">
-          <span className="sns-home-sun" aria-hidden="true" />
+          <Image
+            src="/illustrations/sns/nav-home-v2.webp"
+            alt=""
+            width={104}
+            height={94}
+            priority
+            sizes="104px"
+            className="sns-home-welcome-art"
+          />
           <span className="sns-home-welcome-stamp" aria-hidden="true">TODAY</span>
           <p className="relative text-[10px] font-bold tracking-[0.18em] text-white/75">TODAY&apos;S IDEA</p>
-          <span className="relative mt-0.5 flex min-w-0 items-center gap-2 pr-10">
+          <span className="relative mt-0.5 flex min-w-0 items-center gap-2 pr-[5.3rem]">
             <h2 id="sns-home-title" className="min-w-0 truncate text-lg font-black text-white">{dailyPrompt}</h2>
             <span className="sns-home-count">{visiblePosts.length}件</span>
           </span>
@@ -106,6 +115,7 @@ export default async function SnsHomePage({
       </PageBody>
       <Link
         href="/sns/home/new"
+        data-haptic="light"
         aria-label="投稿する"
         className="sns-floating-compose fixed right-4 z-30 flex h-14 items-center justify-center gap-1.5 rounded-full px-4 text-white shadow-lg active:opacity-80"
         style={{ bottom: "calc(var(--nav-height) + var(--safe-bottom) + 1rem)" }}

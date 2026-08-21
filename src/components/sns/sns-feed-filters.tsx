@@ -22,6 +22,7 @@ export function SnsFeedFilters({ active, baseHref }: { active: SnsFeedFilter; ba
             key={key}
             href={href}
             scroll={false}
+            data-haptic="light"
             aria-current={selected ? "page" : undefined}
             className={`sns-feed-filter pressable is-${key} ${selected ? "is-active" : ""}`}
           >

@@ -1,3 +1,4 @@
+import Image from "next/image";
 import Link from "next/link";
 import { IconPlus, IconUsers } from "@/components/icons";
 import { PageBody } from "@/components/page-body";
@@ -35,20 +36,32 @@ export default async function SnsGroupsIndexPage({
         leftAction={<SnsNotificationEntry />}
       />
       <SnsBackgroundBand hasToggleBar={false} />
-      <PageBody className="space-y-3">
+      <PageBody className="sns-page-shell space-y-3">
         <SnsPrimaryNav active="group" userHref={`/sns/users/${user.id}`} groupHref="/sns/groups" />
 
         <section className="sns-groups-hero is-compact" aria-labelledby="sns-groups-title">
           <span className="sns-groups-hero-orbit" aria-hidden="true" />
-          <span className="sns-groups-hero-icon" aria-hidden="true">
-            <IconUsers size={28} />
+          <span className="sns-groups-hero-art" aria-hidden="true">
+            <Image
+              src="/illustrations/sns/nav-group-v2.webp"
+              alt=""
+              width={68}
+              height={68}
+              priority
+              sizes="68px"
+            />
           </span>
           <div className="relative min-w-0 flex-1">
             <p className="text-[10px] font-black tracking-[0.18em] text-white/70">TRIP ROOMS</p>
             <h1 id="sns-groups-title" className="mt-0.5 truncate text-lg font-black text-white">みんなの旅部屋</h1>
             <p className="mt-0.5 text-[10px] font-bold text-white/75">{groups.length}グループ・未読 {totalUnread}件</p>
           </div>
-          <Link href="/sns/groups/new" className="sns-groups-create pressable" aria-label="新しいグループを作る">
+          <Link
+            href="/sns/groups/new"
+            data-haptic="light"
+            className="sns-groups-create pressable"
+            aria-label="新しいグループを作る"
+          >
             <IconPlus size={18} />
             <span>作る</span>
           </Link>
@@ -57,11 +70,11 @@ export default async function SnsGroupsIndexPage({
         {groups.length > 0 ? (
           <>
             <nav className="sns-group-list-tabs" aria-label="グループの絞り込み">
-              <Link href="/sns/groups" scroll={false} className={view === "all" ? "is-active" : undefined}>
+              <Link href="/sns/groups" scroll={false} data-haptic="light" className={view === "all" ? "is-active" : undefined}>
                 すべて
                 <span>{groups.length}</span>
               </Link>
-              <Link href="/sns/groups?view=unread" scroll={false} className={view === "unread" ? "is-active" : undefined}>
+              <Link href="/sns/groups?view=unread" scroll={false} data-haptic="light" className={view === "unread" ? "is-active" : undefined}>
                 未読
                 <span>{totalUnread > 99 ? "99+" : totalUnread}</span>
               </Link>

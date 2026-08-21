@@ -22,7 +22,11 @@ export function SnsGroupList({
 
         return (
           <li key={group.id}>
-            <Link href={`/sns/groups/${group.id}`} className={`sns-group-list-card pressable ${group.has_unread ? "is-unread" : ""}`}>
+            <Link
+              href={`/sns/groups/${group.id}`}
+              data-haptic="light"
+              className={`sns-group-list-card pressable ${group.has_unread ? "is-unread" : ""}`}
+            >
               <span className="sns-group-list-icon">
                 {iconUrl ? (
                   // eslint-disable-next-line @next/next/no-img-element

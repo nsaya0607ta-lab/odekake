@@ -1,3 +1,4 @@
+import Image from "next/image";
 import Link from "next/link";
 import { IconPlus, IconUser } from "@/components/icons";
 import { PageBody } from "@/components/page-body";
@@ -70,7 +71,7 @@ export default async function SnsUserHomePage({
         leftAction={<SnsNotificationEntry />}
       />
       <SnsBackgroundBand hasToggleBar={false} />
-      <PageBody className="space-y-3">
+      <PageBody className="sns-page-shell space-y-3">
         <SnsPrimaryNav active="user" userHref={`/sns/users/${user.id}`} groupHref="/sns/groups" />
         <SnsPeopleRail people={people} activeUserId={userId} />
 
@@ -91,11 +92,21 @@ export default async function SnsUserHomePage({
               {isMine ? <span className="sns-profile-me-chip">あなた</span> : null}
             </div>
           </div>
+          <span className="sns-profile-role-art" aria-hidden="true">
+            <Image
+              src="/illustrations/sns/nav-user-v2.webp"
+              alt=""
+              width={64}
+              height={64}
+              sizes="64px"
+            />
+          </span>
           {isMine ? (
             <Link
               href="/sns/home/new"
+              data-haptic="light"
               aria-label="つぶやく"
-              className="pressable relative flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-leaf text-white shadow-md"
+              className="sns-profile-compose pressable relative flex h-11 w-11 shrink-0 items-center justify-center overflow-hidden rounded-full text-white"
             >
               <IconPlus size={20} />
             </Link>

@@ -168,6 +168,7 @@ export function SnsGroupSwitcher({
       const ids = order.map((g) => g.id);
       void reorderFriendGroupsAction(ids);
     } else if (state && !state.moved) {
+      navigator.vibrate?.(6);
       router.push(`/sns/groups/${id}`);
     }
     dragState.current = null;
@@ -206,6 +207,7 @@ export function SnsGroupSwitcher({
         ))}
         <Link
           href="/sns/groups/new"
+          data-haptic="light"
           aria-label="グループを作る"
           className="flex w-14 shrink-0 flex-col items-center gap-1"
         >

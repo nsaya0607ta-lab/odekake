@@ -68,7 +68,7 @@ export default async function SnsGroupPage({
       />
       <PostedToast />
       <SnsBackgroundBand />
-      <PageBody className="space-y-3">
+      <PageBody className="sns-page-shell space-y-3">
         <SnsPrimaryNav active="group" userHref={`/sns/users/${user.id}`} groupHref="/sns/groups" />
         <Suspense fallback={<SnsSwitcherSkeleton />}>
           <GroupSwitcherSection groups={groups} groupId={groupId} />
@@ -94,6 +94,7 @@ export default async function SnsGroupPage({
       {view === "photos" ? (
         <Link
           href={`${baseHref}/new`}
+          data-haptic="light"
           aria-label="写真を投稿"
           className="sns-floating-compose fixed right-4 z-30 flex h-14 items-center justify-center gap-1.5 rounded-full px-4 text-white shadow-lg active:opacity-80"
           style={{ bottom: "calc(var(--nav-height) + var(--safe-bottom) + 1rem)" }}

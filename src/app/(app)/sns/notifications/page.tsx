@@ -39,7 +39,7 @@ export default async function SnsNotificationsPage({
         backHref="/sns/home"
       />
       <SnsBackgroundBand hasToggleBar={false} />
-      <PageBody className="space-y-4">
+      <PageBody className="sns-page-shell space-y-4">
         <section className="sns-notification-hero is-compact">
           <span className="sns-notification-hero-icon" aria-hidden="true">
             <IconBell size={24} />

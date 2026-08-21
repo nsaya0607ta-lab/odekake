@@ -1,8 +1,9 @@
 "use client";
 
+import Image from "next/image";
 import Link from "next/link";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { IconCalendar, IconChat, IconHeart, IconImage, IconPlus, IconUser } from "@/components/icons";
+import { IconCalendar, IconChat, IconHeart, IconPlus, IconUser } from "@/components/icons";
 import { SnsViewToggleIcons } from "@/components/sns/sns-view-toggle-icons";
 import { groupSnsFeedByDay } from "@/lib/data/sns";
 import type { SnsFeedPhotoRow } from "@/lib/supabase/types";
@@ -77,6 +78,9 @@ export function SnsPhotoGrid({
   }, [today, dateWindow]);
 
   function selectDate(date: string) {
+    if (date !== selectedDate && typeof navigator !== "undefined" && "vibrate" in navigator) {
+      navigator.vibrate?.(6);
+    }
     setSelectedDate(date);
     requestAnimationFrame(() => {
       chipRefs.current.get(date)?.scrollIntoView({ behavior: "smooth", inline: "center", block: "nearest" });
@@ -100,7 +104,7 @@ export function SnsPhotoGrid({
           <SnsViewToggleIcons baseHref={baseHref} view="photos" />
           <div
             ref={chipRowRef}
-            className="flex min-w-0 flex-1 gap-1 overflow-x-auto"
+            className="flex min-w-0 flex-1 snap-x snap-mandatory gap-1 overflow-x-auto"
             style={{ scrollbarWidth: "none" }}
           >
             <label
@@ -133,6 +137,7 @@ export function SnsPhotoGrid({
                   }}
                   type="button"
                   onClick={() => selectDate(date)}
+                  aria-pressed={active}
                   className={`sns-date-chip flex h-11 w-10 shrink-0 flex-col items-center justify-center gap-0.5 rounded-xl text-xs font-semibold transition-colors ${
                     active
                       ? "is-active"
@@ -163,9 +168,9 @@ export function SnsPhotoGrid({
       </div>
 
       {!selectedDay || selectedDay.photos.length === 0 ? (
-        <Link href={`${baseHref}/new`} className="sns-empty-album pressable">
-          <span className="flex h-14 w-14 items-center justify-center rounded-2xl bg-sky-soft text-sky shadow-sm">
-            <IconImage size={25} />
+        <Link href={`${baseHref}/new`} data-haptic="light" className="sns-empty-album pressable">
+          <span className="sns-empty-album-art" aria-hidden="true">
+            <Image src="/illustrations/sns/mode-photo-v2.webp" alt="" width={62} height={62} sizes="62px" />
           </span>
           <span className="min-w-0 flex-1">
             <span className="block text-sm font-bold">この日の最初の一枚を追加</span>

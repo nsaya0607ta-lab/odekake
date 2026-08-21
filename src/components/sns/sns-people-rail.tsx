@@ -20,6 +20,7 @@ export function SnsPeopleRail({ people, activeUserId }: { people: SnsPersonRow[]
               key={person.id}
               href={`/sns/users/${person.id}`}
               scroll={false}
+              data-haptic="light"
               aria-current={active ? "page" : undefined}
               className="group flex w-[3.6rem] shrink-0 flex-col items-center gap-1"
             >
