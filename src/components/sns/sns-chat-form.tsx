@@ -4,7 +4,9 @@ import { useActionState, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import type { ActionState } from "@/components/form";
 import { emptyActionState, FormMessage, SubmitButton } from "@/components/form";
+import { FormDraft } from "@/components/form-draft";
 import { IconImage, IconSend } from "@/components/icons";
+import { SnsMentionPicker, type SnsMentionOption } from "@/components/sns/sns-mention-picker";
 
 type ChatAction = (prev: ActionState, formData: FormData) => Promise<ActionState>;
 
@@ -13,17 +15,23 @@ export function SnsChatForm({
   action,
   hiddenFields,
   postHref,
+  mentionOptions = [],
+  draftKey = "sns-chat",
   placeholder = "メッセージを入力…",
 }: {
   action: ChatAction;
   hiddenFields?: Record<string, string>;
   postHref?: string;
+  mentionOptions?: SnsMentionOption[];
+  draftKey?: string;
   placeholder?: string;
 }) {
   const [state, formAction] = useActionState(action, emptyActionState);
   const formRef = useRef<HTMLFormElement>(null);
   const [keyboardOpen, setKeyboardOpen] = useState(false);
   const openTimer = useRef<number | null>(null);
+  const formId = `sns-chat-form-${draftKey.replace(/[^a-zA-Z0-9_-]/g, "-")}`;
+  const textareaId = `${formId}-body`;
 
   useEffect(() => {
     if (state.ok) formRef.current?.reset();
@@ -57,7 +65,8 @@ export function SnsChatForm({
       }}
     >
       <div className="mx-auto max-w-lg px-4 pt-2 pb-2">
-        <form ref={formRef} action={formAction} className="flex items-center gap-2">
+        <form id={formId} ref={formRef} action={formAction} className="flex items-center gap-1.5">
+          <FormDraft formId={formId} storageKey={draftKey} />
           {hiddenFields
             ? Object.entries(hiddenFields).map(([name, value]) => (
                 <input key={name} type="hidden" name={name} value={value} />
@@ -72,8 +81,10 @@ export function SnsChatForm({
               <IconImage size={20} />
             </Link>
           ) : null}
+          <SnsMentionPicker textareaId={textareaId} options={mentionOptions} compact />
           <div className="flex min-w-0 flex-1 items-center rounded-full border border-line-strong bg-card px-4 py-2 shadow-inner">
             <textarea
+              id={textareaId}
               name="body"
               rows={1}
               maxLength={1000}

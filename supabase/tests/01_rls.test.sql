@@ -675,6 +675,48 @@ values (:'alice', :'bob'), (:'bob', :'alice');
 select pg_temp.expect_ok('SNS投稿に自分の訪問場所と旅行を紐づけられる', :'alice', format(
   $q$select public.create_friend_text_post('喫茶店へ行った', array[]::text[], %L)$q$, :'visit_a1'));
 
+select id as sns_text_post_a from public.friend_text_posts where user_id = :'alice' order by created_at desc limit 1 \gset
+
+select pg_temp.expect_ok('SNS: フレンドの投稿を保存できる', :'bob', format(
+  $q$select public.set_friend_text_post_saved(%L, true)$q$, :'sns_text_post_a'));
+select pg_temp.record('SNS: 保存タブ用RPCに保存済み投稿が出る',
+  pg_temp.count_as(:'bob', format(
+    $q$select 1 from public.get_saved_friend_text_posts(100) where id = %L and my_saved$q$,
+    :'sns_text_post_a')) = 1);
+
+select pg_temp.expect_ok('SNS: フレンドの投稿をリポストできる', :'bob', format(
+  $q$select public.set_friend_text_post_repost(%L, true)$q$, :'sns_text_post_a'));
+select pg_temp.record('SNS: リポスト元と件数がフィードへ出る',
+  pg_temp.count_as(:'alice', format(
+    $q$select 1 from public.get_personal_text_feed(%L, 100)
+       where repost_of_post_id = %L and quoted_display_name = 'あかり' and body = ''$q$,
+    :'bob', :'sns_text_post_a')) = 1);
+
+select pg_temp.expect_ok('SNS: コメント付き引用とメンションを投稿できる', :'bob', format(
+  $q$select public.create_friend_text_post('@あかり また行きたい', array[]::text[], null, %L)$q$,
+  :'sns_text_post_a'));
+select pg_temp.record('SNS: @メンションが本人の通知RPCへ出る',
+  pg_temp.count_as(:'alice',
+    $q$select 1 from public.get_sns_mentions(50) where actor_display_name = 'ぼぶ' and kind = 'post'$q$) = 1);
+
+select pg_temp.expect_ok('SNS: 自分の投稿をプロフィールに固定できる', :'alice', format(
+  $q$select public.set_friend_text_post_pin(%L, true)$q$, :'sns_text_post_a'));
+select pg_temp.record('SNS: 固定状態がプロフィール用フィードへ出る',
+  pg_temp.count_as(:'bob', format(
+    $q$select 1 from public.get_personal_text_feed(%L, 100) where id = %L and is_pinned$q$,
+    :'alice', :'sns_text_post_a')) = 1);
+
+select pg_temp.expect_denied('SNS: 保存テーブルへは直接アクセスできない', :'bob',
+  'select * from public.friend_text_post_saves');
+
+select pg_temp.expect_ok('SNS: ユーザーをブロックできる', :'alice', format(
+  $q$select public.set_sns_user_block(%L, true)$q$, :'bob'));
+select pg_temp.record('SNS: ブロックした相手の投稿は互いに見えない',
+  pg_temp.count_as(:'alice', format(
+    $q$select 1 from public.get_personal_text_feed(%L, 100)$q$, :'bob')) = 0);
+select pg_temp.expect_ok('SNS: ブロックを解除できる', :'alice', format(
+  $q$select public.set_sns_user_block(%L, false)$q$, :'bob'));
+
 select pg_temp.record('フレンドには紐づけた場所と旅行名が表示される',
   pg_temp.count_as(:'bob', format(
     $q$select 1 from public.get_personal_text_feed(%L, 100)
@@ -833,6 +875,38 @@ select pg_temp.expect_ok('既読にできる（bob）', :'bob', format(
 select pg_temp.record('既読後はグループ一覧の未読件数が0になる（bob視点）',
   pg_temp.count_as(:'bob', format(
     'select * from public.get_my_friend_group_summaries() where id = %L and unread_count = 0 and not has_unread',
+    :'sns_group_a')) = 1);
+
+select pg_temp.expect_ok('SNSグループ: 集合情報を上部に固定できる', :'alice', format(
+  $q$select public.set_friend_group_pin(%L, '東京駅10時', '丸の内南口に集合')$q$,
+  :'sns_group_a'));
+select pg_temp.record('SNSグループ: 固定カードはメンバーだけが取得できる',
+  pg_temp.count_as(:'bob', format(
+    $q$select 1 from public.get_friend_group_pin(%L) where title = '東京駅10時'$q$,
+    :'sns_group_a')) = 1
+  and pg_temp.count_as(:'carol', format(
+    $q$select 1 from public.get_friend_group_pin(%L)$q$, :'sns_group_a')) = 0);
+
+select pg_temp.expect_ok('SNSグループ: メンバーは投票を作成できる', :'alice', format(
+  $q$select public.create_friend_group_poll(%L, 'ランチはどっち？', array['和食','洋食'])$q$,
+  :'sns_group_a'));
+select id as sns_poll_a from public.friend_group_polls where group_id = :'sns_group_a'::uuid order by created_at desc limit 1 \gset
+select id as sns_poll_option_a from public.friend_group_poll_options where poll_id = :'sns_poll_a'::uuid order by sort_order limit 1 \gset
+select pg_temp.expect_ok('SNSグループ: メンバーは投票できる', :'bob', format(
+  $q$select public.vote_friend_group_poll(%L, %L)$q$, :'sns_poll_a', :'sns_poll_option_a'));
+select pg_temp.expect_denied('SNSグループ: 非メンバーは投票できない', :'carol', format(
+  $q$select public.vote_friend_group_poll(%L, %L)$q$, :'sns_poll_a', :'sns_poll_option_a'));
+select pg_temp.record('SNSグループ: 投票結果と自分の選択が集計される',
+  pg_temp.count_as(:'bob', format(
+    $q$select 1 from public.get_friend_group_polls(%L, 5)
+       where id = %L and total_votes = 1 and my_option_id = %L$q$,
+    :'sns_group_a', :'sns_poll_a', :'sns_poll_option_a')) = 1);
+
+select pg_temp.expect_ok('SNSグループ: チャットでメンションできる', :'alice', format(
+  $q$select public.create_friend_group_message(%L, '@ぼぶ 次どこ行く？')$q$, :'sns_group_a'));
+select pg_temp.record('SNSグループ: メンションが通知RPCへ出る',
+  pg_temp.count_as(:'bob', format(
+    $q$select 1 from public.get_sns_mentions(50) where group_id = %L and kind = 'group'$q$,
     :'sns_group_a')) = 1);
 
 select pg_temp.expect_denied('オーナー以外はメンバーを追加できない', :'bob', format(

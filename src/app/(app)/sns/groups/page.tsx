@@ -1,6 +1,6 @@
 import Image from "next/image";
 import Link from "next/link";
-import { IconPlus, IconUsers } from "@/components/icons";
+import { IconPlus, IconSearch, IconUsers } from "@/components/icons";
 import { PageBody } from "@/components/page-body";
 import { PageHeader } from "@/components/page-header";
 import { SnsBackgroundBand } from "@/components/sns/sns-background-band";
@@ -34,6 +34,11 @@ export default async function SnsGroupsIndexPage({
         subtitle="写真とチャットをグループで共有"
         showBack={false}
         leftAction={<SnsNotificationEntry />}
+        action={(
+          <Link href="/sns/search?scope=groups" aria-label="グループを検索" className="pressable flex h-11 w-11 items-center justify-center rounded-full text-ink-soft active:bg-paper-deep">
+            <IconSearch size={20} />
+          </Link>
+        )}
       />
       <SnsBackgroundBand hasToggleBar={false} />
       <PageBody className="sns-page-shell space-y-3">

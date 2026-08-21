@@ -367,6 +367,11 @@ export type SnsPhotoRow = SnsFeedPhotoRow & {
   group_name: string | null;
 };
 
+export type SnsMentionRow = {
+  user_id: string;
+  display_name: string;
+};
+
 export type SnsTextPostRow = {
   id: string;
   user_id: string;
@@ -384,6 +389,23 @@ export type SnsTextPostRow = {
   reply_count: number;
   like_count: number;
   my_liked: boolean;
+  my_saved: boolean;
+  is_pinned: boolean;
+  repost_count: number;
+  my_reposted: boolean;
+  repost_of_post_id: string | null;
+  quoted_user_id: string | null;
+  quoted_display_name: string | null;
+  quoted_profile_image_url: string | null;
+  quoted_body: string | null;
+  quoted_photo_paths: string[];
+  quoted_linked_spot_id: string | null;
+  quoted_linked_spot_name: string | null;
+  quoted_linked_trip_id: string | null;
+  quoted_linked_trip_title: string | null;
+  quoted_linked_visited_at: string | null;
+  quoted_created_at: string | null;
+  mentions: SnsMentionRow[];
 };
 
 export type SnsTextPostReplyRow = {
@@ -397,6 +419,7 @@ export type SnsTextPostReplyRow = {
   created_at: string;
   like_count: number;
   my_liked: boolean;
+  mentions: SnsMentionRow[];
 };
 
 export type FriendGroupRow = {
@@ -431,6 +454,49 @@ export type FriendGroupMessageRow = {
   user_id: string;
   display_name: string;
   profile_image_url: string | null;
+  body: string;
+  created_at: string;
+  mentions: SnsMentionRow[];
+};
+
+export type FriendGroupPinRow = {
+  group_id: string;
+  title: string;
+  body: string;
+  updated_by_name: string;
+  updated_at: string;
+};
+
+export type FriendGroupPollRow = {
+  id: string;
+  group_id: string;
+  user_id: string;
+  display_name: string;
+  question: string;
+  closes_at: string | null;
+  created_at: string;
+  option_ids: string[];
+  option_labels: string[];
+  option_vote_counts: number[];
+  my_option_id: string | null;
+  total_votes: number;
+};
+
+export type SnsBlockedUserRow = {
+  user_id: string;
+  display_name: string;
+  profile_image_url: string | null;
+  blocked_at: string;
+};
+
+export type SnsMentionNotificationRow = {
+  id: string;
+  kind: "post" | "reply" | "group";
+  post_id: string | null;
+  group_id: string | null;
+  actor_user_id: string;
+  actor_display_name: string;
+  actor_profile_image_url: string | null;
   body: string;
   created_at: string;
 };
@@ -667,7 +733,12 @@ export type Database = {
         Returns: SnsFeedPhotoRow[];
       };
       create_friend_text_post: {
-        Args: { p_body: string; p_photo_paths?: string[]; p_visit_record_id?: string | null };
+        Args: {
+          p_body: string;
+          p_photo_paths?: string[];
+          p_visit_record_id?: string | null;
+          p_repost_of_post_id?: string | null;
+        };
         Returns: { id: string; created_at: string }[];
       };
       delete_friend_text_post: { Args: { p_post_id: string }; Returns: string[] };
@@ -676,6 +747,10 @@ export type Database = {
         Returns: SnsTextPostRow[];
       };
       get_personal_text_post: { Args: { p_post_id: string }; Returns: SnsTextPostRow[] };
+      get_saved_friend_text_posts: { Args: { p_limit?: number }; Returns: SnsTextPostRow[] };
+      set_friend_text_post_saved: { Args: { p_post_id: string; p_saved: boolean }; Returns: undefined };
+      set_friend_text_post_repost: { Args: { p_post_id: string; p_reposted: boolean }; Returns: undefined };
+      set_friend_text_post_pin: { Args: { p_post_id: string; p_pinned: boolean }; Returns: undefined };
       get_friend_profile: {
         Args: { p_user_id: string };
         Returns: { display_name: string; profile_image_url: string | null }[];
@@ -724,6 +799,25 @@ export type Database = {
         Returns: FriendGroupMessageRow[];
       };
       delete_friend_group_message: { Args: { p_message_id: string }; Returns: undefined };
+      set_friend_group_pin: {
+        Args: { p_group_id: string; p_title: string; p_body?: string };
+        Returns: undefined;
+      };
+      get_friend_group_pin: { Args: { p_group_id: string }; Returns: FriendGroupPinRow[] };
+      create_friend_group_poll: {
+        Args: { p_group_id: string; p_question: string; p_options: string[]; p_closes_at?: string | null };
+        Returns: string;
+      };
+      vote_friend_group_poll: { Args: { p_poll_id: string; p_option_id: string }; Returns: undefined };
+      delete_friend_group_poll: { Args: { p_poll_id: string }; Returns: undefined };
+      get_friend_group_polls: {
+        Args: { p_group_id: string; p_limit?: number };
+        Returns: FriendGroupPollRow[];
+      };
+      set_sns_user_block: { Args: { p_user_id: string; p_blocked: boolean }; Returns: undefined };
+      get_sns_blocked_users: { Args: Record<string, never>; Returns: SnsBlockedUserRow[] };
+      report_sns_post: { Args: { p_post_id: string; p_reason?: string }; Returns: undefined };
+      get_sns_mentions: { Args: { p_limit?: number }; Returns: SnsMentionNotificationRow[] };
       create_friend_message: { Args: { p_body: string }; Returns: FriendMessageRow[] };
       get_friend_messages: { Args: { p_limit?: number }; Returns: FriendMessageRow[] };
       delete_friend_message: { Args: { p_message_id: string }; Returns: undefined };

@@ -1,13 +1,30 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
-import { deleteFriendTextPostAction } from "@/app/actions/sns";
+import { useEffect, useRef, useState, useTransition } from "react";
+import {
+  deleteFriendTextPostAction,
+  reportSnsPostAction,
+  setFriendTextPostPinAction,
+  setSnsUserBlockAction,
+} from "@/app/actions/sns";
 import { ConfirmSubmitButton } from "@/components/confirm-submit-button";
-import { IconMore, IconTrash } from "@/components/icons";
+import { IconFlag, IconMore, IconPin, IconShield, IconTrash } from "@/components/icons";
 
-/** 自分の投稿カード右上に出す「…」メニュー。押すと削除だけを選べる */
-export function PostOptionsMenu({ postId }: { postId: string }) {
+/** 投稿右上の共通メニュー。自分は固定・削除、友達は通報・ブロックを表示する。 */
+export function PostOptionsMenu({
+  postId,
+  authorUserId,
+  isMine,
+  pinned,
+}: {
+  postId: string;
+  authorUserId: string;
+  isMine: boolean;
+  pinned: boolean;
+}) {
   const [open, setOpen] = useState(false);
+  const [message, setMessage] = useState("");
+  const [, startTransition] = useTransition();
   const menuRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -26,6 +43,15 @@ export function PostOptionsMenu({ postId }: { postId: string }) {
     };
   }, [open]);
 
+  function mutate(action: (data: FormData) => Promise<{ ok: boolean; error?: string }>, data: FormData, success: string) {
+    setOpen(false);
+    startTransition(async () => {
+      const result = await action(data);
+      setMessage(result.ok ? success : result.error ?? "操作できませんでした。");
+      window.setTimeout(() => setMessage(""), 2800);
+    });
+  }
+
   return (
     <div ref={menuRef} className="relative">
       <button
@@ -40,19 +66,68 @@ export function PostOptionsMenu({ postId }: { postId: string }) {
 
       {open ? (
         <div className="sns-post-options-popover">
-          <form action={deleteFriendTextPostAction}>
-            <input type="hidden" name="postId" value={postId} />
-            <ConfirmSubmitButton
-              message="このつぶやきを削除しますか？"
-              pendingLabel="削除中…"
-              className="pressable flex min-h-11 w-full items-center gap-2 px-3.5 py-2.5 text-left text-sm font-bold text-red-600 active:bg-paper-deep"
-            >
-              <IconTrash size={16} />
-              削除
-            </ConfirmSubmitButton>
-          </form>
+          {isMine ? (
+            <>
+              <button
+                type="button"
+                className="pressable sns-post-option"
+                onClick={() => {
+                  const data = new FormData();
+                  data.set("postId", postId);
+                  data.set("pinned", pinned ? "0" : "1");
+                  mutate(setFriendTextPostPinAction, data, pinned ? "固定を解除しました。" : "プロフィールに固定しました。");
+                }}
+              >
+                <IconPin size={16} filled={pinned} />
+                {pinned ? "固定を解除" : "プロフィールに固定"}
+              </button>
+              <form action={deleteFriendTextPostAction}>
+                <input type="hidden" name="postId" value={postId} />
+                <ConfirmSubmitButton
+                  message="このつぶやきを削除しますか？"
+                  pendingLabel="削除中…"
+                  className="pressable sns-post-option is-danger"
+                >
+                  <IconTrash size={16} />
+                  削除
+                </ConfirmSubmitButton>
+              </form>
+            </>
+          ) : (
+            <>
+              <button
+                type="button"
+                className="pressable sns-post-option"
+                onClick={() => {
+                  if (!window.confirm("この投稿を運営へ通報しますか？")) return;
+                  const data = new FormData();
+                  data.set("postId", postId);
+                  data.set("reason", "不適切な投稿");
+                  mutate(reportSnsPostAction, data, "通報を送信しました。");
+                }}
+              >
+                <IconFlag size={16} />
+                投稿を通報
+              </button>
+              <button
+                type="button"
+                className="pressable sns-post-option is-danger"
+                onClick={() => {
+                  if (!window.confirm("このユーザーをブロックしますか？投稿が表示されなくなります。")) return;
+                  const data = new FormData();
+                  data.set("userId", authorUserId);
+                  data.set("blocked", "1");
+                  mutate(setSnsUserBlockAction, data, "ユーザーをブロックしました。");
+                }}
+              >
+                <IconShield size={16} />
+                ユーザーをブロック
+              </button>
+            </>
+          )}
         </div>
       ) : null}
+      {message ? <span className="sns-menu-toast" role="status">{message}</span> : null}
     </div>
   );
 }

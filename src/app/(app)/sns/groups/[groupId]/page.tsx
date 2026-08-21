@@ -15,11 +15,21 @@ import { SnsBackgroundBand } from "@/components/sns/sns-background-band";
 import { SnsChatForm } from "@/components/sns/sns-chat-form";
 import { SnsChatList } from "@/components/sns/sns-chat-list";
 import { SnsGroupSwitcher } from "@/components/sns/sns-group-switcher";
+import { SnsGroupPinCard } from "@/components/sns/sns-group-pin-card";
+import { SnsGroupPolls } from "@/components/sns/sns-group-polls";
 import { SnsPhotoGrid } from "@/components/sns/sns-photo-grid";
 import { SnsPrimaryNav } from "@/components/sns/sns-primary-nav";
 import { SnsViewTabs } from "@/components/sns/sns-view-tabs";
 import { signThumbOrOriginalPaths } from "@/lib/data/photos";
-import { getFriendGroupMessages, getMyFriendGroups, getSnsGroupFeed, signGroupIconUrls } from "@/lib/data/sns";
+import {
+  getFriendGroupMembers,
+  getFriendGroupMessages,
+  getFriendGroupPin,
+  getFriendGroupPolls,
+  getMyFriendGroups,
+  getSnsGroupFeed,
+  signGroupIconUrls,
+} from "@/lib/data/sns";
 import { requireUser } from "@/lib/supabase/server";
 import type { FriendGroupRow } from "@/lib/supabase/types";
 
@@ -49,6 +59,11 @@ export default async function SnsGroupPage({
 
   const view = sp.view === "chat" ? "chat" : "photos";
   const baseHref = `/sns/groups/${groupId}`;
+  const mentionOptions = view === "chat"
+    ? (await getFriendGroupMembers(supabase, groupId))
+        .filter((member) => member.user_id !== user.id)
+        .map((member) => ({ id: member.user_id, label: member.display_name }))
+    : [];
 
   return (
     <>
@@ -72,6 +87,9 @@ export default async function SnsGroupPage({
         <SnsPrimaryNav active="group" userHref={`/sns/users/${user.id}`} groupHref="/sns/groups" />
         <Suspense fallback={<SnsSwitcherSkeleton />}>
           <GroupSwitcherSection groups={groups} groupId={groupId} />
+        </Suspense>
+        <Suspense fallback={<SnsGroupExtrasSkeleton />}>
+          <GroupExtras groupId={groupId} currentUserId={user.id} />
         </Suspense>
 
         {view === "photos" ? (
@@ -107,9 +125,34 @@ export default async function SnsGroupPage({
           action={createFriendGroupMessageAction}
           hiddenFields={{ groupId }}
           postHref={`${baseHref}/new`}
+          mentionOptions={mentionOptions}
+          draftKey={`sns-group-chat-${groupId}`}
         />
       )}
     </>
+  );
+}
+
+async function GroupExtras({ groupId, currentUserId }: { groupId: string; currentUserId: string }) {
+  const { supabase } = await requireUser();
+  const [pin, polls] = await Promise.all([
+    getFriendGroupPin(supabase, groupId),
+    getFriendGroupPolls(supabase, groupId),
+  ]);
+  return (
+    <div className="space-y-2.5">
+      <SnsGroupPinCard groupId={groupId} pin={pin} />
+      <SnsGroupPolls groupId={groupId} currentUserId={currentUserId} initialPolls={polls} />
+    </div>
+  );
+}
+
+function SnsGroupExtrasSkeleton() {
+  return (
+    <div className="space-y-2" aria-hidden="true">
+      <div className="h-14 animate-pulse rounded-2xl bg-white/55 motion-reduce:animate-none" />
+      <div className="h-20 animate-pulse rounded-2xl bg-white/55 motion-reduce:animate-none" />
+    </div>
   );
 }
 

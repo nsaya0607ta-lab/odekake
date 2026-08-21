@@ -8,9 +8,12 @@ import {
   getPostRepliesAction,
 } from "@/app/actions/sns";
 import { emptyActionState, FormMessage, SubmitButton } from "@/components/form";
+import { FormDraft } from "@/components/form-draft";
 import { IconChat, IconClose, IconUser } from "@/components/icons";
 import { formatRelativeTimeJa } from "@/lib/date";
 import { SnsReplyLikeButton } from "@/components/sns/sns-reply-like-button";
+import { SnsRichText } from "@/components/sns/sns-rich-text";
+import type { SnsMentionRow } from "@/lib/supabase/types";
 
 export type SnsEnrichedReply = {
   id: string;
@@ -22,6 +25,7 @@ export type SnsEnrichedReply = {
   createdAt: string;
   likeCount: number;
   myLiked: boolean;
+  mentions: SnsMentionRow[];
 };
 
 /** 投稿へのコメント欄。返信・いいね・返信への返信（ネスト1段）に対応する。
@@ -191,6 +195,7 @@ function InlineComposer({
   const [state, action] = useActionState(addFriendTextPostReplyAction, emptyActionState);
   const formRef = useRef<HTMLFormElement>(null);
   const postedRef = useRef(false);
+  const formId = `sns-reply-${postId}-${parentReplyId ?? "root"}`;
 
   useEffect(() => {
     if (state.ok && !postedRef.current) {
@@ -203,7 +208,8 @@ function InlineComposer({
   }, [state.ok]);
 
   return (
-    <form ref={formRef} action={action} className="sns-inline-composer space-y-2">
+    <form id={formId} ref={formRef} action={action} className="sns-inline-composer space-y-2">
+      <FormDraft formId={formId} storageKey={formId} />
       <input type="hidden" name="postId" value={postId} />
       {parentReplyId ? <input type="hidden" name="parentReplyId" value={parentReplyId} /> : null}
       <textarea
@@ -273,7 +279,7 @@ function ReplyRow({
           </Link>
           <span className="shrink-0 text-[10px] text-ink-faint">{formatRelativeTimeJa(reply.createdAt)}</span>
         </div>
-        <p className="mt-0.5 whitespace-pre-wrap text-sm leading-relaxed">{reply.body}</p>
+        <SnsRichText body={reply.body} mentions={reply.mentions} className="mt-0.5 whitespace-pre-wrap text-sm leading-relaxed" />
         <div className="mt-1 flex items-center gap-3">
           <SnsReplyLikeButton replyId={reply.id} postId={postId} liked={reply.myLiked} count={reply.likeCount} />
           {onReplyToggle ? (

@@ -318,3 +318,53 @@ export const IconMore = ({ size = 22, ...p }: IconProps) => (
     <circle cx="19" cy="12" r="1.4" fill="currentColor" stroke="none" />
   </Base>
 );
+
+export const IconBookmark = ({ filled, ...p }: IconProps & { filled?: boolean }) => (
+  <Base {...p} fill={filled ? "currentColor" : "none"}>
+    <path d="M6.5 4.2h11a1 1 0 0 1 1 1V20L12 16.2 5.5 20V5.2a1 1 0 0 1 1-1Z" />
+  </Base>
+);
+
+export const IconRepost = (p: IconProps) => (
+  <Base {...p}>
+    <path d="m7.5 6-3 3 3 3" />
+    <path d="M5 9h10.5a3 3 0 0 1 3 3v.5" />
+    <path d="m16.5 18 3-3-3-3" />
+    <path d="M19 15H8.5a3 3 0 0 1-3-3v-.5" />
+  </Base>
+);
+
+export const IconPin = ({ filled, ...p }: IconProps & { filled?: boolean }) => (
+  <Base {...p} fill={filled ? "currentColor" : "none"}>
+    <path d="m9 4 6 2-1.2 4 2.7 2.7-1.4 1.4-3.8-1.2L8 16.2 7.8 12 4.5 8.7l1.4-1.4L8 9.4 9 4Z" />
+    <path d="m8 16-3.5 3.5" />
+  </Base>
+);
+
+export const IconAt = (p: IconProps) => (
+  <Base {...p}>
+    <circle cx="12" cy="12" r="4" />
+    <path d="M16 12v1.2a2.3 2.3 0 0 0 4.5.6A8.7 8.7 0 1 1 18.8 7" />
+  </Base>
+);
+
+export const IconPoll = (p: IconProps) => (
+  <Base {...p}>
+    <path d="M5 19V9M12 19V5M19 19v-7" />
+    <path d="M3.5 19.5h17" />
+  </Base>
+);
+
+export const IconShield = (p: IconProps) => (
+  <Base {...p}>
+    <path d="M12 3.5 19 6v5.2c0 4.2-2.4 7.4-7 9.3-4.6-1.9-7-5.1-7-9.3V6l7-2.5Z" />
+    <path d="m9 12 2 2 4-4" />
+  </Base>
+);
+
+export const IconVolumeOff = (p: IconProps) => (
+  <Base {...p}>
+    <path d="M5 10h3l4-3v10l-4-3H5Z" />
+    <path d="m16 10 4 4M20 10l-4 4" />
+  </Base>
+);

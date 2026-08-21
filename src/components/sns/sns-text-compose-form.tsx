@@ -4,8 +4,10 @@ import Link from "next/link";
 import { useActionState, useState } from "react";
 import { createFriendTextPostAction } from "@/app/actions/sns";
 import { emptyActionState, FormMessage, SubmitButton } from "@/components/form";
-import { IconCalendar, IconImage, IconMapPin, IconSend, IconUsers } from "@/components/icons";
+import { FormDraft } from "@/components/form-draft";
+import { IconBookmark, IconCalendar, IconImage, IconMapPin, IconSend, IconUsers } from "@/components/icons";
 import { PhotoUploader } from "@/components/photo-uploader";
+import { SnsMentionPicker, type SnsMentionOption } from "@/components/sns/sns-mention-picker";
 import type { SnsLinkableVisit } from "@/lib/data/sns";
 
 function formatVisitDate(value: string): string {
@@ -17,18 +19,31 @@ function formatVisitDate(value: string): string {
 export function SnsTextComposeForm({
   userId,
   visitOptions,
+  mentionOptions,
+  quote,
 }: {
   userId: string;
   visitOptions: SnsLinkableVisit[];
+  mentionOptions: SnsMentionOption[];
+  quote?: {
+    id: string;
+    displayName: string;
+    body: string;
+    photoUrl?: string;
+    spotName?: string;
+  };
 }) {
   const [state, action] = useActionState(createFriendTextPostAction, emptyActionState);
   const initialBody = state.values?.body ?? "";
   const [length, setLength] = useState(initialBody.length);
   const [selectedVisitId, setSelectedVisitId] = useState(state.values?.linkedVisitId ?? "");
   const selectedVisit = visitOptions.find((visit) => visit.id === selectedVisitId);
+  const formId = "sns-text-compose-form";
 
   return (
-    <form action={action} className="sns-compose-sheet sns-form-panel space-y-4">
+    <form id={formId} action={action} className="sns-compose-sheet sns-form-panel space-y-4">
+      <FormDraft formId={formId} storageKey={quote ? `sns-home-new-quote-${quote.id}` : "sns-home-new"} />
+      {quote ? <input type="hidden" name="repostOfPostId" value={quote.id} /> : null}
       <div className="sns-form-audience" aria-label="公開範囲">
         <span className="sns-form-audience-icon" aria-hidden="true"><IconUsers size={16} /></span>
         <span className="min-w-0 flex-1">
@@ -58,7 +73,23 @@ export function SnsTextComposeForm({
           defaultValue={initialBody}
           onChange={(event) => setLength(event.currentTarget.value.length)}
         />
+        <div className="mt-2 flex items-center justify-between gap-2">
+          <SnsMentionPicker textareaId="sns-post-body" options={mentionOptions} />
+          <span className="sns-draft-saved"><IconBookmark size={12} filled />入力を自動保存</span>
+        </div>
       </section>
+      {quote ? (
+        <section className="sns-compose-quote-preview">
+          <span className="text-[10px] font-black tracking-[0.12em] text-ink-faint">QUOTE POST</span>
+          <span className="mt-1 block text-sm font-black">{quote.displayName}</span>
+          {quote.body ? <p className="mt-1 line-clamp-3 whitespace-pre-wrap text-sm leading-relaxed">{quote.body}</p> : null}
+          {quote.photoUrl ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img src={quote.photoUrl} alt="" className="mt-2 h-28 w-full rounded-xl object-cover" />
+          ) : null}
+          {quote.spotName ? <span className="sns-quoted-place"><IconMapPin size={12} />{quote.spotName}</span> : null}
+        </section>
+      ) : null}
       <section className="sns-form-section is-photo">
         <div className="mb-2 flex items-center gap-2">
           <span className="sns-form-step">2</span>
@@ -66,7 +97,7 @@ export function SnsTextComposeForm({
           <p className="text-sm font-black">写真を添える</p>
           <span className="sns-compose-optional">任意・最大4枚</span>
         </div>
-        <PhotoUploader name="photoPaths" userId={userId} draftKey="sns-home-new" max={4} label="写真を選ぶ" persistDraft />
+        <PhotoUploader name="photoPaths" userId={userId} draftKey={quote ? `sns-home-new-quote-${quote.id}` : "sns-home-new"} max={4} label="写真を選ぶ" persistDraft />
       </section>
       <section className="sns-compose-visit-card">
         <div className="flex items-start gap-3">

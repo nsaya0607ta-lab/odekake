@@ -1,21 +1,24 @@
 import Image from "next/image";
 import Link from "next/link";
-import { IconPlus, IconUser } from "@/components/icons";
+import { IconPlus, IconSearch, IconUser } from "@/components/icons";
 import { PageBody } from "@/components/page-body";
 import { PageHeader } from "@/components/page-header";
 import { SnsBackgroundBand } from "@/components/sns/sns-background-band";
-import {
-  matchesSnsFeedFilter,
-  parseSnsFeedFilter,
-  SnsFeedFilters,
-} from "@/components/sns/sns-feed-filters";
 import { SnsPeopleRail, type SnsPersonRow } from "@/components/sns/sns-people-rail";
 import { SnsNotificationEntry } from "@/components/sns/sns-notification-button";
 import { SnsPrimaryNav } from "@/components/sns/sns-primary-nav";
+import { parseSnsProfileTab, SnsProfileTabs } from "@/components/sns/sns-profile-tabs";
 import { SnsTextFeed } from "@/components/sns/sns-text-feed";
 import { getFriendList } from "@/lib/data/friends";
 import { signPhotoPaths, signThumbOrOriginalPaths } from "@/lib/data/photos";
-import { getFriendProfile, getOwnSnsProfile, getPersonalTextFeed } from "@/lib/data/sns";
+import {
+  getFriendProfile,
+  getOwnSnsProfile,
+  getPersonalTextFeed,
+  getSavedFriendTextPosts,
+  getSnsTextPostAvatarPaths,
+  getSnsTextPostPhotoPaths,
+} from "@/lib/data/sns";
 import { requireUser } from "@/lib/supabase/server";
 
 export const dynamic = "force-dynamic";
@@ -26,24 +29,30 @@ export default async function SnsUserHomePage({
   searchParams,
 }: {
   params: Promise<{ userId: string }>;
-  searchParams: Promise<{ filter?: string }>;
+  searchParams: Promise<{ tab?: string }>;
 }) {
   const [{ userId }, sp, { supabase, user }] = await Promise.all([params, searchParams, requireUser()]);
 
-  const [profile, posts, friends, ownProfile] = await Promise.all([
+  const isMine = userId === user.id;
+  const [profile, posts, friends, ownProfile, savedPosts] = await Promise.all([
     getFriendProfile(supabase, userId),
     getPersonalTextFeed(supabase, userId),
     getFriendList(supabase),
     getOwnSnsProfile(supabase, user.id),
+    isMine ? getSavedFriendTextPosts(supabase) : Promise.resolve([]),
   ]);
-  const filter = parseSnsFeedFilter(sp.filter);
-  const visiblePosts = posts.filter((post) => matchesSnsFeedFilter(post, filter));
-  const allPhotoPaths = visiblePosts.flatMap((p) => p.photo_paths);
+  const tab = parseSnsProfileTab(sp.tab, isMine);
+  const ownPosts = [...posts].sort((a, b) => Number(b.is_pinned) - Number(a.is_pinned));
+  const visiblePosts = tab === "saved"
+    ? savedPosts
+    : tab === "photos"
+      ? ownPosts.filter((post) => post.photo_paths.length > 0 || post.quoted_photo_paths.length > 0)
+      : tab === "places"
+        ? ownPosts.filter((post) => post.linked_spot_id || post.quoted_linked_spot_id)
+        : ownPosts;
+  const allPhotoPaths = getSnsTextPostPhotoPaths(visiblePosts);
   const [avatarUrls, photoUrls, fullPhotoUrls, friendAvatarUrls] = await Promise.all([
-    signThumbOrOriginalPaths(
-      supabase,
-      visiblePosts.flatMap((p) => (p.profile_image_url ? [p.profile_image_url] : [])),
-    ),
+    signThumbOrOriginalPaths(supabase, getSnsTextPostAvatarPaths(visiblePosts)),
     signThumbOrOriginalPaths(supabase, allPhotoPaths),
     signPhotoPaths(supabase, allPhotoPaths),
     signThumbOrOriginalPaths(
@@ -60,7 +69,12 @@ export default async function SnsUserHomePage({
       iconUrl: friend.profile_image_url ? friendAvatarUrls.get(friend.profile_image_url) : undefined,
     })),
   ];
-  const isMine = userId === user.id;
+  const counts = {
+    posts: posts.length,
+    photos: posts.filter((post) => post.photo_paths.length > 0 || post.quoted_photo_paths.length > 0).length,
+    places: posts.filter((post) => post.linked_spot_id || post.quoted_linked_spot_id).length,
+    saved: savedPosts.length,
+  };
 
   return (
     <>
@@ -69,6 +83,11 @@ export default async function SnsUserHomePage({
         subtitle="ユーザーのつぶやき"
         showBack={false}
         leftAction={<SnsNotificationEntry />}
+        action={(
+          <Link href="/sns/search" aria-label="SNSを検索" className="flex h-11 w-11 items-center justify-center rounded-full text-ink-soft active:bg-paper-deep">
+            <IconSearch size={20} />
+          </Link>
+        )}
       />
       <SnsBackgroundBand hasToggleBar={false} />
       <PageBody className="sns-page-shell space-y-3">
@@ -113,7 +132,22 @@ export default async function SnsUserHomePage({
           ) : null}
         </section>
 
-        <SnsFeedFilters active={filter} baseHref={`/sns/users/${userId}`} />
+        <SnsProfileTabs
+          active={tab}
+          baseHref={`/sns/users/${userId}`}
+          isMine={isMine}
+          counts={counts}
+        />
+
+        {tab === "saved" ? (
+          <section className="sns-saved-mini-hero">
+            <Image src="/illustrations/sns/saved-journey-v2.webp" alt="" width={90} height={90} sizes="90px" />
+            <span>
+              <strong>あとで行きたい場所をここに</strong>
+              <small>投稿の保存ボタンから、いつでも見返せます。</small>
+            </span>
+          </section>
+        ) : null}
 
         <SnsTextFeed
           posts={visiblePosts}
@@ -122,13 +156,15 @@ export default async function SnsUserHomePage({
           fullPhotoUrls={fullPhotoUrls}
           currentUserId={user.id}
           emptyTitle={
-            filter === "photos"
-              ? "写真つきの投稿はまだありません"
-              : filter === "notes"
-                ? "ひとこと投稿はまだありません"
-                : undefined
+            tab === "saved"
+              ? "保存した投稿はまだありません"
+              : tab === "photos"
+                ? "写真つきの投稿はまだありません"
+                : tab === "places"
+                  ? "場所つきの投稿はまだありません"
+                  : undefined
           }
-          emptyMessage={filter === "all" ? undefined : "ほかの種類に切り替えると投稿を見られます。"}
+          emptyMessage={tab === "saved" ? "気になる投稿の保存ボタンを押してみましょう。" : undefined}
         />
       </PageBody>
     </>

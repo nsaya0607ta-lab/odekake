@@ -1,6 +1,6 @@
 import Image from "next/image";
 import Link from "next/link";
-import { IconPlus } from "@/components/icons";
+import { IconPlus, IconSearch } from "@/components/icons";
 import { PageBody } from "@/components/page-body";
 import { PageHeader } from "@/components/page-header";
 import { SnsBackgroundBand } from "@/components/sns/sns-background-band";
@@ -13,7 +13,11 @@ import { SnsPrimaryNav } from "@/components/sns/sns-primary-nav";
 import { SnsNotificationEntry } from "@/components/sns/sns-notification-button";
 import { SnsTextFeed } from "@/components/sns/sns-text-feed";
 import { signPhotoPaths, signThumbOrOriginalPaths } from "@/lib/data/photos";
-import { getPersonalTextFeed } from "@/lib/data/sns";
+import {
+  getPersonalTextFeed,
+  getSnsTextPostAvatarPaths,
+  getSnsTextPostPhotoPaths,
+} from "@/lib/data/sns";
 import { requireUser } from "@/lib/supabase/server";
 
 export const metadata = { title: "ホーム | SNS" };
@@ -54,12 +58,9 @@ export default async function SnsHomePage({
   const dailyPrompt = getDailyPrompt();
   const visiblePosts = posts.filter((post) => matchesSnsFeedFilter(post, filter));
   const feedTitle = filter === "photos" ? "写真つきの投稿" : filter === "notes" ? "ひとこと投稿" : "新しいつぶやき";
-  const allPhotoPaths = visiblePosts.flatMap((p) => p.photo_paths);
+  const allPhotoPaths = getSnsTextPostPhotoPaths(visiblePosts);
   const [avatarUrls, photoUrls, fullPhotoUrls] = await Promise.all([
-    signThumbOrOriginalPaths(
-      supabase,
-      visiblePosts.flatMap((p) => (p.profile_image_url ? [p.profile_image_url] : [])),
-    ),
+    signThumbOrOriginalPaths(supabase, getSnsTextPostAvatarPaths(visiblePosts)),
     signThumbOrOriginalPaths(supabase, allPhotoPaths),
     signPhotoPaths(supabase, allPhotoPaths),
   ]);
@@ -71,6 +72,15 @@ export default async function SnsHomePage({
         subtitle="フレンドのおでかけが集まる場所"
         showBack={false}
         leftAction={<SnsNotificationEntry />}
+        action={(
+          <Link
+            href="/sns/search"
+            aria-label="SNSを検索"
+            className="pressable flex h-11 w-11 items-center justify-center rounded-full text-ink-soft active:bg-paper-deep"
+          >
+            <IconSearch size={20} />
+          </Link>
+        )}
       />
       <SnsBackgroundBand hasToggleBar={false} />
       <PageBody className="sns-page-shell space-y-3">

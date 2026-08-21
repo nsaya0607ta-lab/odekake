@@ -3,18 +3,21 @@
 import { useActionState, useEffect, useRef } from "react";
 import { addFriendPhotoCommentAction } from "@/app/actions/sns";
 import { emptyActionState, FormMessage, SubmitButton } from "@/components/form";
+import { FormDraft } from "@/components/form-draft";
 import { IconChat } from "@/components/icons";
 
 export function CommentForm({ photoId }: { photoId: string }) {
   const [state, action] = useActionState(addFriendPhotoCommentAction, emptyActionState);
   const formRef = useRef<HTMLFormElement>(null);
+  const formId = `sns-photo-comment-${photoId}`;
 
   useEffect(() => {
     if (state.ok) formRef.current?.reset();
   }, [state.ok]);
 
   return (
-    <form ref={formRef} action={action} className="sns-inline-composer space-y-2">
+    <form id={formId} ref={formRef} action={action} className="sns-inline-composer space-y-2">
+      <FormDraft formId={formId} storageKey={formId} />
       <input type="hidden" name="photoId" value={photoId} />
       <textarea
         name="body"

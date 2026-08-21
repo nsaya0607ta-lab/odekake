@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { markSnsNotificationsReadAction } from "@/app/actions/sns";
-import { IconBell, IconCheck, IconHeart, IconUser, IconUsers } from "@/components/icons";
+import { IconAt, IconBell, IconCheck, IconHeart, IconSettings, IconUser, IconUsers } from "@/components/icons";
 import { PageBody } from "@/components/page-body";
 import { PageHeader } from "@/components/page-header";
 import { SnsBackgroundBand } from "@/components/sns/sns-background-band";
@@ -19,6 +19,7 @@ export const dynamic = "force-dynamic";
 const KIND_LABELS: Record<SnsNotificationKind, string> = {
   reply: "返信",
   like: "いいね",
+  mention: "メンション",
   group: "グループ",
 };
 
@@ -38,13 +39,22 @@ export default async function SnsNotificationsPage({
         title="通知"
         subtitle={center.unreadCount > 0 ? `未読 ${center.unreadCount}件` : "すべて確認済み"}
         backHref="/sns/home"
+        action={(
+          <Link
+            href="/sns/settings"
+            aria-label="通知と安全の設定"
+            className="pressable flex h-11 w-11 items-center justify-center rounded-full text-ink-soft active:bg-paper-deep"
+          >
+            <IconSettings size={20} />
+          </Link>
+        )}
       />
       <SnsBackgroundBand hasToggleBar={false} />
       <PageBody className="sns-page-shell space-y-4">
         <SnsIllustratedHero
           eyebrow="TRIP NEWS"
           title={center.unreadCount > 0 ? `${center.unreadCount}件の新しい便り` : "旅の便りは確認済み"}
-          description="返信・いいね・グループの動きを、ここでまとめて確認。"
+          description="返信・いいね・メンション・グループの動きを、ここでまとめて確認。"
           artSrc="/illustrations/sns/notification-bell-v2.webp"
           tone="notice"
           action={center.unreadCount > 0 ? (
@@ -125,6 +135,8 @@ function NotificationRow({ item }: { item: SnsNotificationItem }) {
             <IconUser size={20} />
           ) : item.kind === "like" ? (
             <IconHeart size={20} filled />
+          ) : item.kind === "mention" ? (
+            <IconAt size={20} />
           ) : (
             <IconUsers size={20} />
           )}

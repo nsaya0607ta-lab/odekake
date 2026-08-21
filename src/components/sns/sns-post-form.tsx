@@ -3,14 +3,17 @@
 import { useActionState } from "react";
 import { createFriendPhotosAction } from "@/app/actions/sns";
 import { emptyActionState, Field, FormMessage, SubmitButton } from "@/components/form";
+import { FormDraft } from "@/components/form-draft";
 import { IconImage, IconLock, IconSend } from "@/components/icons";
 import { PhotoUploader } from "@/components/photo-uploader";
 
 export function SnsPostForm({ userId, groupId }: { userId: string; groupId: string }) {
   const [state, action] = useActionState(createFriendPhotosAction, emptyActionState);
+  const formId = `sns-group-photo-form-${groupId}`;
 
   return (
-    <form action={action} className="sns-form-panel space-y-4">
+    <form id={formId} action={action} className="sns-form-panel space-y-4">
+      <FormDraft formId={formId} storageKey={`sns-group-photo-${groupId}`} />
       <input type="hidden" name="groupId" value={groupId} />
       <div className="sns-form-audience">
         <span className="sns-form-audience-icon is-photo" aria-hidden="true"><IconLock size={15} /></span>
@@ -51,6 +54,7 @@ export function SnsPostForm({ userId, groupId }: { userId: string; groupId: stri
             className="field sns-compose-textarea"
             placeholder="今日の一枚"
             maxLength={300}
+            defaultValue={state.values?.caption ?? ""}
           />
         </Field>
         <p className="mt-2 text-[11px] leading-relaxed text-ink-faint">

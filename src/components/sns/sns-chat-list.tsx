@@ -2,6 +2,8 @@
 
 import { useEffect, useRef } from "react";
 import { IconClose, IconUser } from "@/components/icons";
+import { SnsRichText } from "@/components/sns/sns-rich-text";
+import type { SnsMentionRow } from "@/lib/supabase/types";
 
 type ChatMessage = {
   id: string;
@@ -10,6 +12,7 @@ type ChatMessage = {
   profile_image_url: string | null;
   body: string;
   created_at: string;
+  mentions: SnsMentionRow[];
 };
 
 type DeleteAction = (formData: FormData) => void | Promise<void>;
@@ -102,7 +105,7 @@ export function SnsChatList({
                 </form>
                 <span className="shrink-0 text-[10px] text-ink-faint">{formatTime(message.created_at)}</span>
                 <div className="sns-chat-bubble-mine max-w-[76%] rounded-[1.25rem] rounded-br-md px-3.5 py-2.5 shadow-sm">
-                  <p className="whitespace-pre-wrap text-sm leading-relaxed text-white">{message.body}</p>
+                  <SnsRichText body={message.body} mentions={message.mentions} className="whitespace-pre-wrap text-sm leading-relaxed text-white" />
                 </div>
               </div>
             </li>
@@ -129,7 +132,7 @@ export function SnsChatList({
                 </span>
                 <div className="mt-1 flex items-end gap-1.5">
                   <div className="sns-chat-bubble-friend max-w-[76%] rounded-[1.25rem] rounded-bl-md px-3.5 py-2.5 shadow-sm">
-                    <p className="whitespace-pre-wrap text-sm leading-relaxed">{message.body}</p>
+                    <SnsRichText body={message.body} mentions={message.mentions} className="whitespace-pre-wrap text-sm leading-relaxed" />
                   </div>
                   <span className="shrink-0 text-[10px] text-ink-faint">{formatTime(message.created_at)}</span>
                 </div>

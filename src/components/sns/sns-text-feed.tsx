@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { IconUser } from "@/components/icons";
+import { IconMapPin, IconPin, IconRepost, IconUser } from "@/components/icons";
 import { formatRelativeTimeJa } from "@/lib/date";
 import type { SnsTextPostRow } from "@/lib/supabase/types";
 import { LikeButton } from "@/components/sns/like-button";
@@ -7,6 +7,9 @@ import { PostOptionsMenu } from "@/components/sns/post-options-menu";
 import { SnsCommentToggle } from "@/components/sns/sns-comment-toggle";
 import { SnsPostPhotoGrid } from "@/components/sns/sns-post-photo-grid";
 import { SnsPostPlaceTag } from "@/components/sns/sns-post-place-tag";
+import { SnsRepostButton } from "@/components/sns/sns-repost-button";
+import { SnsRichText } from "@/components/sns/sns-rich-text";
+import { SnsSaveButton } from "@/components/sns/sns-save-button";
 
 /** Twitterのタイムラインのような、テキスト＋写真の個人投稿一覧 */
 export function SnsTextFeed({
@@ -49,10 +52,30 @@ export function SnsTextFeed({
           const url = fullPhotoUrls.get(path);
           return url ? [url] : [];
         });
+        const quotedPhotoUrls = post.quoted_photo_paths.flatMap((path) => {
+          const url = photoUrls.get(path);
+          return url ? [url] : [];
+        });
+        const quotedFullPhotoUrls = post.quoted_photo_paths.flatMap((path) => {
+          const url = fullPhotoUrls.get(path);
+          return url ? [url] : [];
+        });
+        const quotedAvatarUrl = post.quoted_profile_image_url
+          ? avatarUrls.get(post.quoted_profile_image_url)
+          : null;
+        const isPlainRepost = Boolean(
+          post.repost_of_post_id && !post.body && post.photo_paths.length === 0 && !post.linked_visit_id,
+        );
 
         return (
           <li key={post.id} className="sns-post-card flex gap-3 p-3.5">
             <span className="sns-post-tape" aria-hidden="true" />
+            {post.is_pinned ? (
+              <span className="sns-post-pinned-label">
+                <IconPin size={12} filled />
+                固定
+              </span>
+            ) : null}
             <Link
               href={`/sns/users/${post.user_id}`}
               aria-label={`${post.display_name}のホーム`}
@@ -75,23 +98,62 @@ export function SnsTextFeed({
                 <span className="shrink-0 rounded-full bg-paper-deep px-2 py-0.5 text-[10px] font-semibold text-ink-faint">
                   {formatRelativeTimeJa(post.created_at)}
                 </span>
-                {isMine ? (
-                  <span className="absolute top-2.5 right-2.5 shrink-0">
-                    <PostOptionsMenu postId={post.id} />
-                  </span>
-                ) : null}
+                <span className="absolute top-2.5 right-2.5 shrink-0">
+                  <PostOptionsMenu
+                    postId={post.id}
+                    authorUserId={post.user_id}
+                    isMine={isMine}
+                    pinned={post.is_pinned}
+                  />
+                </span>
               </div>
+              {isPlainRepost ? (
+                <span className="sns-reposted-by"><IconRepost size={12} />リポストしました</span>
+              ) : null}
               {post.body ? (
-                <Link href={`/sns/posts/${post.id}`} className="mt-0.5 block">
-                  <p className="whitespace-pre-wrap break-words text-[15px] leading-relaxed text-ink">{post.body}</p>
-                </Link>
+                <SnsRichText
+                  body={post.body}
+                  mentions={post.mentions}
+                  className="mt-0.5 whitespace-pre-wrap break-words text-[15px] leading-relaxed text-ink"
+                />
               ) : null}
               {postPhotoUrls.length > 0 ? (
-                <Link href={`/sns/posts/${post.id}`} className="block">
-                  <SnsPostPhotoGrid photoUrls={postPhotoUrls} fullUrls={postFullPhotoUrls} />
-                </Link>
+                <SnsPostPhotoGrid
+                  photoUrls={postPhotoUrls}
+                  fullUrls={postFullPhotoUrls}
+                  postId={post.id}
+                  authorUserId={post.user_id}
+                  liked={post.my_liked}
+                />
               ) : null}
               <SnsPostPlaceTag post={post} />
+              {post.repost_of_post_id && post.quoted_user_id ? (
+                <Link href={`/sns/posts/${post.repost_of_post_id}`} className="sns-quoted-post pressable">
+                  <span className="flex items-center gap-2">
+                    <span className="sns-quoted-avatar">
+                      {quotedAvatarUrl ? (
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img src={quotedAvatarUrl} alt="" className="h-full w-full object-cover" />
+                      ) : (
+                        <IconUser size={15} />
+                      )}
+                    </span>
+                    <span className="min-w-0 truncate text-xs font-black">{post.quoted_display_name}</span>
+                    <span className="ml-auto shrink-0 text-[10px] font-bold text-ink-faint">元の投稿</span>
+                  </span>
+                  {post.quoted_body ? (
+                    <p className="mt-2 line-clamp-4 whitespace-pre-wrap break-words text-sm leading-relaxed">
+                      {post.quoted_body}
+                    </p>
+                  ) : null}
+                  {quotedPhotoUrls.length > 0 ? (
+                    <SnsPostPhotoGrid photoUrls={quotedPhotoUrls} fullUrls={quotedFullPhotoUrls} />
+                  ) : null}
+                  {post.quoted_linked_spot_name ? (
+                    <span className="sns-quoted-place"><IconMapPin size={12} />{post.quoted_linked_spot_name}</span>
+                  ) : null}
+                </Link>
+              ) : null}
               <div className="mt-3 flex flex-wrap items-center gap-1 border-t border-dashed border-line pt-2">
                 <SnsCommentToggle
                   postId={post.id}
@@ -106,6 +168,12 @@ export function SnsTextFeed({
                   count={post.like_count}
                   showLabel
                 />
+                <SnsRepostButton
+                  postId={post.id}
+                  reposted={post.my_reposted}
+                  count={post.repost_count}
+                />
+                <SnsSaveButton postId={post.id} saved={post.my_saved} />
               </div>
             </div>
           </li>
