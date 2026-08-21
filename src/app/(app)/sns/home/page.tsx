@@ -131,7 +131,7 @@ export default async function SnsHomePage({
           }
           emptyMessage={filter === "all" ? undefined : "ほかの種類に切り替えると投稿を見られます。"}
         />
-        {hasMorePosts ? (
+        {hasMorePosts && postLimit < MAX_POST_LIMIT ? (
           <Link
             href={`/sns/home?${new URLSearchParams({
               ...(filter === "all" ? {} : { filter }),

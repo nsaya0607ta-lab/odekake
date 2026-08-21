@@ -25,7 +25,7 @@ export function SnsProfileTabs({
   active: SnsProfileTab;
   baseHref: string;
   isMine: boolean;
-  counts: Partial<Record<SnsProfileTab, number>>;
+  counts: Partial<Record<SnsProfileTab, number | string>>;
 }) {
   return (
     <nav aria-label="プロフィールの投稿切り替え" className="sns-profile-tabs">
@@ -44,7 +44,7 @@ export function SnsProfileTabs({
           >
             <Icon size={16} />
             <span>{tab.label}</span>
-            <small>{counts[tab.id] ?? 0}</small>
+            {counts[tab.id] !== undefined ? <small>{counts[tab.id]}</small> : null}
           </Link>
         );
       })}
