@@ -21,6 +21,7 @@ export function SnsFeedFilters({ active, baseHref }: { active: SnsFeedFilter; ba
           <Link
             key={key}
             href={href}
+            prefetch={false}
             scroll={false}
             data-haptic="light"
             aria-current={selected ? "page" : undefined}

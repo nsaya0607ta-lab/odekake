@@ -1,7 +1,7 @@
 "use client";
 
 import type { ReactNode } from "react";
-import { useActionState, useState, useTransition } from "react";
+import { useActionState, useEffect, useState, useTransition } from "react";
 import {
   setSnsUserBlockAction,
   updateSnsNotificationSettingsAction,
@@ -19,6 +19,7 @@ import {
   IconVolumeOff,
 } from "@/components/icons";
 import type { SnsNotificationPreferences } from "@/lib/data/sns-notifications";
+import { refreshSnsUnreadCount } from "@/components/sns/use-sns-unread-count";
 
 type GroupOption = { id: string; name: string; icon: string };
 type BlockedUser = { userId: string; displayName: string; avatarUrl?: string };
@@ -36,6 +37,10 @@ export function SnsSettingsForm({
   const [blockedUsers, setBlockedUsers] = useState(initialBlockedUsers);
   const [blockMessage, setBlockMessage] = useState("");
   const [, startTransition] = useTransition();
+
+  useEffect(() => {
+    if (state.ok) void refreshSnsUnreadCount();
+  }, [state.ok]);
 
   function unblock(userId: string) {
     startTransition(async () => {

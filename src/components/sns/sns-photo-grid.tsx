@@ -39,18 +39,24 @@ export function SnsPhotoGrid({
   photoUrls,
   avatarUrls,
   baseHref,
+  loadedDays,
 }: {
   photos: SnsFeedPhotoRow[];
   photoUrls: Map<string, string>;
   avatarUrls: Map<string, string>;
   baseHref: string;
+  loadedDays: number;
 }) {
   const today = useMemo(() => todayInTokyo(), []);
+  const earliestLoadedDate = useMemo(
+    () => recentDateWindow(Math.max(1, loadedDays))[0] ?? today,
+    [loadedDays, today],
+  );
   const days = useMemo(() => groupSnsFeedByDay(photos), [photos]);
   const photoDates = useMemo(() => new Set(days.map((day) => day.photoDate)), [days]);
   const [selectedDate, setSelectedDate] = useState(() => days[0]?.photoDate ?? today);
 
-  // 直近14日分の窓に加えて、一番古い投稿日と（カレンダーで任意に選んだ日を含む）
+  // 直近10日分の窓に加えて、一番古い投稿日と（カレンダーで選んだ日を含む）
   // 選択中の日が窓の外にあれば足しておく
   const dateWindow = useMemo(() => {
     const dates = new Set(recentDateWindow(CHIP_WINDOW_DAYS));
@@ -117,6 +123,7 @@ export function SnsPhotoGrid({
                 ref={dateInputRef}
                 type="date"
                 value={selectedDate}
+                min={earliestLoadedDate}
                 max={today}
                 onChange={(e) => {
                   if (e.target.value) selectDate(e.target.value);
@@ -168,13 +175,24 @@ export function SnsPhotoGrid({
       </div>
 
       {!selectedDay || selectedDay.photos.length === 0 ? (
-        <Link href={`${baseHref}/new`} data-haptic="light" className="sns-empty-album pressable">
+        <Link
+          href={`${baseHref}/new`}
+          data-haptic="light"
+          aria-label={selectedDate === today ? "今日の最初の写真を追加" : "今日の写真を追加"}
+          className="sns-empty-album pressable"
+        >
           <span className="sns-empty-album-art" aria-hidden="true">
             <Image src="/illustrations/sns/mode-photo-v2.webp" alt="" width={62} height={62} sizes="62px" />
           </span>
           <span className="min-w-0 flex-1">
-            <span className="block text-sm font-bold">この日の最初の一枚を追加</span>
-            <span className="mt-0.5 block text-[11px] text-ink-faint">グループの思い出をアルバムに残そう</span>
+            <span className="block text-sm font-bold">
+              {selectedDate === today ? "今日の最初の一枚を追加" : "この日の写真はありません"}
+            </span>
+            <span className="mt-0.5 block text-[11px] text-ink-faint">
+              {selectedDate === today
+                ? "グループの思い出をアルバムに残そう"
+                : "追加した写真は今日のアルバムに保存されます"}
+            </span>
           </span>
           <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-sky text-white">
             <IconPlus size={17} />
@@ -189,18 +207,19 @@ export function SnsPhotoGrid({
               <Link
                 key={photo.id}
                 href={`/sns/${photo.id}`}
+                prefetch={false}
                 className="sns-photo-tile pressable relative aspect-square overflow-hidden bg-paper-deep"
               >
                 {url ? (
                   // eslint-disable-next-line @next/next/no-img-element
-                  <img src={url} alt="" className="h-full w-full object-cover" />
+                  <img src={url} alt="" loading="lazy" decoding="async" className="h-full w-full object-cover" />
                 ) : null}
                 <span className="absolute inset-x-0 bottom-0 flex items-end justify-between gap-1 bg-gradient-to-t from-black/70 via-black/30 to-transparent px-1.5 pt-6 pb-1.5">
                   <span className="flex min-w-0 items-center gap-1">
                     <span className="h-5 w-5 shrink-0 overflow-hidden rounded-full border border-white/70 bg-paper-deep">
                       {avatarUrl ? (
                         // eslint-disable-next-line @next/next/no-img-element
-                        <img src={avatarUrl} alt="" className="h-full w-full object-cover" />
+                        <img src={avatarUrl} alt="" loading="lazy" decoding="async" className="h-full w-full object-cover" />
                       ) : (
                         <span className="flex h-full w-full items-center justify-center text-ink-faint">
                           <IconUser size={11} />

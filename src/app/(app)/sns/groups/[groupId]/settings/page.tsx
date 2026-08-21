@@ -8,7 +8,7 @@ import { SnsBackgroundBand } from "@/components/sns/sns-background-band";
 import { SnsIllustratedHero } from "@/components/sns/sns-illustrated-hero";
 import { getFriendList } from "@/lib/data/friends";
 import { signThumbOrOriginalPaths } from "@/lib/data/photos";
-import { getFriendGroupMembers, getMyFriendGroups, signGroupIconUrls } from "@/lib/data/sns";
+import { getFriendGroupMembers, getMyFriendGroups, getSnsHiddenUserIds, signGroupIconUrls } from "@/lib/data/sns";
 import { requireUser } from "@/lib/supabase/server";
 import { AddMembersForm } from "./add-members-form";
 import { EditGroupForm } from "./edit-group-form";
@@ -30,13 +30,16 @@ export default async function SnsGroupSettingsPage({
   if (!group) notFound();
 
   const isOwner = group.owner_id === user.id;
-  const [groupIconUrls, members, friends] = await Promise.all([
+  const [groupIconUrls, members, friends, hiddenUserIds] = await Promise.all([
     signGroupIconUrls(supabase, [group]),
     getFriendGroupMembers(supabase, groupId),
     isOwner ? getFriendList(supabase) : Promise.resolve([]),
+    isOwner ? getSnsHiddenUserIds(supabase) : Promise.resolve(new Set<string>()),
   ]);
   const memberIds = new Set(members.map((m) => m.user_id));
-  const invitableFriends = friends.filter((f) => !memberIds.has(f.friend_user_id));
+  const invitableFriends = friends.filter(
+    (friend) => !memberIds.has(friend.friend_user_id) && !hiddenUserIds.has(friend.friend_user_id),
+  );
   const [avatarUrls, friendAvatarUrls] = await Promise.all([
     signThumbOrOriginalPaths(
       supabase,

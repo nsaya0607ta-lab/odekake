@@ -5,6 +5,7 @@ import { SnsBackgroundBand } from "@/components/sns/sns-background-band";
 import { SnsIllustratedHero } from "@/components/sns/sns-illustrated-hero";
 import { getFriendList } from "@/lib/data/friends";
 import { signThumbOrOriginalPaths } from "@/lib/data/photos";
+import { getSnsHiddenUserIds } from "@/lib/data/sns";
 import { requireUser } from "@/lib/supabase/server";
 import { GroupForm } from "./group-form";
 
@@ -13,7 +14,11 @@ export const dynamic = "force-dynamic";
 
 export default async function NewSnsGroupPage() {
   const { supabase, user } = await requireUser();
-  const friends = await getFriendList(supabase);
+  const [allFriends, hiddenUserIds] = await Promise.all([
+    getFriendList(supabase),
+    getSnsHiddenUserIds(supabase),
+  ]);
+  const friends = allFriends.filter((friend) => !hiddenUserIds.has(friend.friend_user_id));
   const avatarUrls = await signThumbOrOriginalPaths(
     supabase,
     friends.flatMap((f) => (f.profile_image_url ? [f.profile_image_url] : [])),

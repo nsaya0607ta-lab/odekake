@@ -5,7 +5,7 @@ import { SnsIllustratedHero } from "@/components/sns/sns-illustrated-hero";
 import { SnsTextComposeForm } from "@/components/sns/sns-text-compose-form";
 import { getFriendList } from "@/lib/data/friends";
 import { signThumbOrOriginalPaths } from "@/lib/data/photos";
-import { getPersonalTextPost, getSnsLinkableVisits } from "@/lib/data/sns";
+import { getPersonalTextPost, getSnsHiddenUserIds, getSnsLinkableVisits } from "@/lib/data/sns";
 import { requireUser } from "@/lib/supabase/server";
 
 export const metadata = { title: "投稿する | SNS" };
@@ -18,10 +18,11 @@ export default async function NewSnsHomePostPage({
 }) {
   const [{ supabase, user }, sp] = await Promise.all([requireUser(), searchParams]);
   const quoteId = /^[0-9a-f]{8}-[0-9a-f-]{27}$/i.test(sp.quote ?? "") ? sp.quote : undefined;
-  const [visitOptions, friends, quotePost] = await Promise.all([
+  const [visitOptions, friends, quotePost, hiddenUserIds] = await Promise.all([
     getSnsLinkableVisits(supabase, user.id),
     getFriendList(supabase).catch(() => []),
     quoteId ? getPersonalTextPost(supabase, quoteId).catch(() => null) : Promise.resolve(null),
+    getSnsHiddenUserIds(supabase).catch(() => new Set<string>()),
   ]);
   const quotePhotoPath = quotePost?.photo_paths[0];
   const quotePhotoUrl = quotePhotoPath
@@ -43,7 +44,9 @@ export default async function NewSnsHomePostPage({
         <SnsTextComposeForm
           userId={user.id}
           visitOptions={visitOptions}
-          mentionOptions={friends.map((friend) => ({ id: friend.friend_user_id, label: friend.display_name }))}
+          mentionOptions={friends
+            .filter((friend) => !hiddenUserIds.has(friend.friend_user_id))
+            .map((friend) => ({ id: friend.friend_user_id, label: friend.display_name }))}
           quote={quotePost ? {
             id: quotePost.id,
             displayName: quotePost.display_name,

@@ -142,6 +142,13 @@
 }
 
 @layer components {
+  /* iOS Safariは16px未満の入力欄へフォーカスするとページを自動拡大する。
+     SNS内だけはTailwindのtext-sm等より優先し、すべて16px以上に固定する。 */
+  .sns-page-shell :where(input:not([type="hidden"]), textarea, select),
+  .sns-chat-dock :where(input:not([type="hidden"]), textarea, select) {
+    font-size: 16px !important;
+  }
+
   /* チャット入力欄にフォーカスしてキーボードが出ている間は、下ナビの分の
      隙間が無駄になるので隠す（LINEなどと同じ、入力欄がキーボードに直付けの見た目にする） */
   body.sns-chat-input-focused .app-bottom-nav {
@@ -2448,7 +2455,7 @@
 
   .sns-reply-action,
   .sns-show-more-replies {
-    min-height: 1.75rem;
+    min-height: 2.75rem;
     padding: 0.2rem 0.5rem;
     border-radius: 999px;
     color: #6750a0;
@@ -2660,22 +2667,6 @@
   .sns-notification-list > li:nth-child(4) { animation-delay: 120ms; }
   .sns-notification-list > li:nth-child(n + 5) { animation-delay: 150ms; }
 
-  .sns-post-options-popover {
-    position: absolute;
-    z-index: 40;
-    top: 100%;
-    right: 0;
-    width: 8.5rem;
-    margin-top: 0.25rem;
-    overflow: hidden;
-    border: 1px solid rgba(127, 87, 157, 0.18);
-    border-radius: 1rem;
-    background: rgba(255, 253, 250, 0.96);
-    box-shadow: 0 14px 30px rgba(65, 47, 99, 0.18), inset 0 1px 0 white;
-    backdrop-filter: blur(14px);
-    animation: sns-section-arrive 180ms cubic-bezier(0.2, 0.78, 0.25, 1) both;
-  }
-
   .sns-posted-toast {
     display: flex;
     align-items: center;
@@ -2767,6 +2758,22 @@
     backdrop-filter: blur(12px);
   }
 
+  .sns-lightbox-loading {
+    position: absolute;
+    z-index: 10;
+    top: calc(env(safe-area-inset-top, 0px) + 0.9rem);
+    left: 50%;
+    padding: 0.42rem 0.75rem;
+    border: 1px solid rgba(255, 255, 255, 0.22);
+    border-radius: 999px;
+    color: white;
+    background: rgba(29, 23, 47, 0.68);
+    font-size: 0.66rem;
+    font-weight: 850;
+    translate: -50% 0;
+    backdrop-filter: blur(8px);
+  }
+
   .sns-inline-thread {
     border-top: 1px solid rgba(106, 86, 159, 0.13);
   }
@@ -2849,7 +2856,7 @@
   .sns-save-button,
   .sns-repost-button {
     display: inline-flex;
-    min-height: 2.25rem;
+    min-height: 2.75rem;
     align-items: center;
     gap: 0.28rem;
     padding: 0.3rem 0.58rem;
@@ -2869,44 +2876,24 @@
     background: rgba(221, 248, 239, 0.88);
   }
 
-  .sns-repost-popover,
   .sns-action-error {
-    position: absolute;
-    z-index: 45;
-    bottom: calc(100% + 0.4rem);
-    left: 0;
-    min-width: 11.8rem;
-    overflow: hidden;
-    border: 1px solid rgba(113, 86, 171, 0.18);
-    border-radius: 1rem;
-    background: rgba(255, 253, 250, 0.97);
-    box-shadow: 0 14px 32px rgba(66, 48, 104, 0.2), inset 0 1px 0 white;
-    backdrop-filter: blur(16px);
-    animation: sns-section-arrive 180ms cubic-bezier(0.2, 0.78, 0.25, 1) both;
-  }
-
-  .sns-repost-popover > * {
-    display: flex;
-    width: 100%;
-    min-height: 2.8rem;
-    align-items: center;
-    gap: 0.55rem;
-    padding: 0.6rem 0.72rem;
-    color: var(--color-ink-soft);
-    text-align: left;
-    font-size: 0.72rem;
-    font-weight: 850;
-  }
-
-  .sns-repost-popover > * + * { border-top: 1px solid rgba(103, 83, 153, 0.1); }
-
-  .sns-action-error {
-    width: 13rem;
+    position: fixed;
+    z-index: 70;
+    bottom: calc(var(--nav-height) + var(--safe-bottom) + 5rem);
+    left: 50%;
+    width: min(18rem, calc(100vw - 2rem));
     padding: 0.55rem 0.65rem;
+    border: 1px solid rgba(178, 74, 103, 0.2);
+    border-radius: 1rem;
     color: #9a415c;
     background: rgba(255, 239, 244, 0.98);
     font-size: 0.66rem;
     font-weight: 800;
+    text-align: center;
+    box-shadow: 0 14px 32px rgba(66, 48, 104, 0.2), inset 0 1px 0 white;
+    translate: -50% 0;
+    backdrop-filter: blur(16px);
+    animation: sns-section-arrive 180ms cubic-bezier(0.2, 0.78, 0.25, 1) both;
   }
 
   .sns-post-option {
@@ -2922,9 +2909,166 @@
     font-weight: 850;
   }
 
-  .sns-post-option + .sns-post-option,
-  .sns-post-options-popover form { border-top: 1px solid rgba(105, 83, 154, 0.1); }
+  .sns-post-option + .sns-post-option { border-top: 1px solid rgba(105, 83, 154, 0.1); }
   .sns-post-option.is-danger { color: #b34d67; }
+
+  /* 投稿・リポスト操作はカード内ポップオーバーではなく、body直下の
+     操作シートへ出す。画面端・下端・親のoverflow/transformに影響されない。 */
+  .sns-action-sheet-layer {
+    position: fixed;
+    z-index: 100;
+    inset: 0;
+    display: flex;
+    align-items: flex-end;
+    justify-content: center;
+    padding: 1rem max(0.75rem, env(safe-area-inset-right)) max(0.75rem, env(safe-area-inset-bottom)) max(0.75rem, env(safe-area-inset-left));
+    background: rgba(25, 19, 39, 0.42);
+    overscroll-behavior: contain;
+    touch-action: pan-y;
+    backdrop-filter: blur(7px);
+    animation: sns-action-sheet-backdrop-in 180ms ease-out both;
+  }
+
+  .sns-action-sheet {
+    width: min(100%, 30rem);
+    max-height: min(78dvh, 32rem);
+    overflow-y: auto;
+    padding: 0.55rem 0.7rem 0.75rem;
+    border: 1px solid rgba(255, 255, 255, 0.66);
+    border-radius: 1.55rem 1.55rem 1.25rem 1.25rem;
+    outline: none;
+    background:
+      radial-gradient(circle at 100% 0, rgba(103, 196, 229, 0.14), transparent 32%),
+      radial-gradient(circle at 0 100%, rgba(239, 91, 143, 0.1), transparent 32%),
+      rgba(255, 253, 250, 0.98);
+    box-shadow: 0 22px 70px rgba(31, 23, 49, 0.34), inset 0 1px 0 white;
+    overscroll-behavior: contain;
+    touch-action: pan-y;
+    animation: sns-action-sheet-in 260ms cubic-bezier(0.2, 0.82, 0.24, 1.05) both;
+  }
+
+  .sns-action-sheet-handle {
+    display: block;
+    width: 2.6rem;
+    height: 0.28rem;
+    margin: 0 auto 0.35rem;
+    border-radius: 999px;
+    background: rgba(103, 84, 145, 0.2);
+  }
+
+  .sns-action-sheet-header {
+    display: flex;
+    min-height: 3.25rem;
+    align-items: center;
+    gap: 0.75rem;
+    padding: 0.25rem 0.25rem 0.55rem 0.45rem;
+  }
+
+  .sns-action-sheet-header strong {
+    display: block;
+    color: var(--color-ink);
+    font-size: 0.92rem;
+    font-weight: 950;
+  }
+
+  .sns-action-sheet-header small {
+    display: block;
+    margin-top: 0.12rem;
+    color: var(--color-ink-faint);
+    font-size: 0.68rem;
+    font-weight: 700;
+    line-height: 1.45;
+  }
+
+  .sns-action-sheet-close {
+    display: grid;
+    width: 2.75rem;
+    height: 2.75rem;
+    flex: 0 0 auto;
+    place-items: center;
+    border-radius: 999px;
+    color: var(--color-ink-soft);
+    background: rgba(111, 88, 164, 0.08);
+  }
+
+  .sns-action-sheet-list {
+    overflow: hidden;
+    border: 1px solid rgba(106, 84, 157, 0.12);
+    border-radius: 1.05rem;
+    background: rgba(255, 255, 255, 0.78);
+  }
+
+  .sns-action-sheet-list > button,
+  .sns-action-sheet-list > a,
+  .sns-action-sheet-list > form > button {
+    display: flex;
+    width: 100%;
+    min-height: 3.25rem;
+    align-items: center;
+    gap: 0.65rem;
+    padding: 0.7rem 0.85rem;
+    color: var(--color-ink-soft);
+    text-align: left;
+    font-size: 0.85rem;
+    font-weight: 850;
+  }
+
+  .sns-action-sheet-list > * + * {
+    border-top: 1px solid rgba(105, 83, 154, 0.1);
+  }
+
+  .sns-action-sheet-list > form {
+    display: block;
+    width: 100%;
+    min-height: 0;
+    padding: 0;
+  }
+
+  .sns-action-sheet-list .is-danger { color: #b34d67; }
+
+  .sns-reply-load-error {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.65rem;
+    padding: 0.65rem 0.75rem;
+    border: 1px solid rgba(178, 74, 103, 0.16);
+    border-radius: 0.95rem;
+    color: #91465b;
+    background: rgba(255, 241, 246, 0.9);
+    font-size: 0.68rem;
+    font-weight: 750;
+    line-height: 1.5;
+  }
+
+  .sns-reply-load-error.is-compact { margin-bottom: 0.5rem; }
+
+  .sns-reply-load-error button {
+    min-width: 5.5rem;
+    min-height: 2.75rem;
+    flex: 0 0 auto;
+    padding: 0.4rem 0.7rem;
+    border-radius: 999px;
+    color: white;
+    background: linear-gradient(125deg, #7259d2, #4aaeca);
+    font-size: 0.68rem;
+    font-weight: 900;
+  }
+
+  .sns-feed-more {
+    display: flex;
+    min-height: 2.75rem;
+    align-items: center;
+    justify-content: center;
+    padding: 0.55rem 1rem;
+    border: 1px solid rgba(105, 83, 154, 0.13);
+    border-radius: 999px;
+    color: #6750a0;
+    background: rgba(255, 255, 255, 0.76);
+    font-size: 0.72rem;
+    font-weight: 900;
+    box-shadow: 0 5px 14px rgba(77, 59, 119, 0.07);
+  }
 
   .sns-menu-toast {
     position: fixed;
@@ -3002,7 +3146,7 @@
 
   .sns-mention-trigger {
     display: inline-flex;
-    min-height: 2.25rem;
+    min-height: 2.75rem;
     align-items: center;
     gap: 0.35rem;
     padding: 0.35rem 0.65rem;
@@ -3015,8 +3159,8 @@
   }
 
   .sns-mention-picker.is-compact .sns-mention-trigger {
-    width: 2.55rem;
-    min-height: 2.55rem;
+    width: 2.75rem;
+    min-height: 2.75rem;
     justify-content: center;
     padding: 0;
     border: none;
@@ -3230,7 +3374,7 @@
   .sns-group-pin-badge { position: absolute; z-index: 2; top: -.48rem; left: .85rem; display: inline-flex; align-items: center; gap: .2rem; padding: .16rem .46rem; border-radius: 999px; color: white; background: linear-gradient(125deg,#e95e85,#b653bb); font-size: .52rem; font-weight: 900; letter-spacing: .08em; box-shadow: 0 4px 9px rgba(146,66,137,.18); }
   .sns-group-pin-edit { position: absolute; top: .42rem; right: .42rem; display: grid; width: 2rem; height: 2rem; place-items: center; border-radius: 999px; color: #7656ad; background: rgba(255,255,255,.72); }
   .sns-pin-clear,
-  .sns-pin-save { display: inline-flex; min-height: 2.55rem; flex: 1; align-items: center; justify-content: center; gap: .35rem; border-radius: .85rem; font-size: .7rem; font-weight: 900; }
+  .sns-pin-save { display: inline-flex; min-height: 2.75rem; flex: 1; align-items: center; justify-content: center; gap: .35rem; border-radius: .85rem; font-size: .7rem; font-weight: 900; }
   .sns-pin-clear { color: #a64a68; background: #ffe8ef; }
   .sns-pin-save { color: white; background: linear-gradient(125deg,#6d59d2,#bd52b7); box-shadow: 0 6px 14px rgba(106,66,165,.2); }
 
@@ -3241,13 +3385,13 @@
   .sns-polls-heading small { display: block; color: #5087a9; font-size: .5rem; font-weight: 950; letter-spacing: .14em; }
   .sns-polls-heading strong { display: block; font-size: .78rem; }
   .sns-polls-heading em { display: block; margin-top: .05rem; color: var(--color-ink-faint); font-size: .55rem; font-style: normal; }
-  .sns-poll-create { display: inline-flex; min-height: 2.2rem; align-items: center; gap: .25rem; padding: .32rem .55rem; border-radius: 999px; color: white; background: linear-gradient(125deg,#397fd0,#43b8bf); font-size: .62rem; font-weight: 900; box-shadow: 0 5px 12px rgba(52,126,163,.2); }
+  .sns-poll-create { display: inline-flex; min-height: 2.75rem; align-items: center; gap: .25rem; padding: .32rem .7rem; border-radius: 999px; color: white; background: linear-gradient(125deg,#397fd0,#43b8bf); font-size: .62rem; font-weight: 900; box-shadow: 0 5px 12px rgba(52,126,163,.2); }
   .sns-poll-composer { margin-top: .55rem; padding: .65rem; border-radius: 1rem; background: rgba(255,255,255,.82); animation: sns-section-arrive 230ms cubic-bezier(.2,.78,.25,1) both; }
   .sns-poll-card { margin-top: .5rem; padding: .72rem; border: 1px solid rgba(107,85,164,.13); border-radius: 1.05rem; background: rgba(255,255,255,.88); box-shadow: 0 4px 12px rgba(67,54,103,.06); }
   .sns-poll-card h3 { font-size: .78rem; font-weight: 900; line-height: 1.4; }
   .sns-poll-card h3 + p { margin-top: .08rem; color: var(--color-ink-faint); font-size: .56rem; }
   .sns-poll-icon { display: grid; width: 2.15rem; height: 2.15rem; flex: 0 0 auto; place-items: center; border-radius: .72rem; color: white; background: linear-gradient(145deg,#775ad5,#3caebd); }
-  .sns-poll-option { position: relative; isolation: isolate; display: flex; width: 100%; min-height: 2.55rem; align-items: center; gap: .45rem; overflow: hidden; padding: .4rem .58rem; border: 1px solid rgba(104,88,154,.12); border-radius: .8rem; text-align: left; background: #f9f8fc; }
+  .sns-poll-option { position: relative; isolation: isolate; display: flex; width: 100%; min-height: 2.75rem; align-items: center; gap: .45rem; overflow: hidden; padding: .4rem .58rem; border: 1px solid rgba(104,88,154,.12); border-radius: .8rem; text-align: left; background: #f9f8fc; }
   .sns-poll-option-fill { position: absolute; z-index: -1; inset: 0 auto 0 0; width: var(--poll-fill); background: linear-gradient(90deg,rgba(113,88,214,.18),rgba(62,180,198,.16)); transition: width 420ms cubic-bezier(.2,.75,.25,1); }
   .sns-poll-option.is-selected { border-color: rgba(103,81,199,.35); color: #5e47a7; box-shadow: 0 3px 10px rgba(82,65,155,.1); }
   .sns-poll-check { display: grid; width: 1.25rem; height: 1.25rem; flex: 0 0 auto; place-items: center; border: 1px solid rgba(106,89,154,.2); border-radius: 999px; background: white; }
@@ -3255,7 +3399,7 @@
   .sns-poll-option strong { min-width: 0; flex: 1; font-size: .68rem; }
   .sns-poll-option small { font-size: .61rem; font-weight: 900; }
   .sns-poll-total { margin-top: .45rem; text-align: right; color: var(--color-ink-faint); font-size: .57rem; font-weight: 750; }
-  .sns-polls-more { display: block; min-height: 2.3rem; margin: .4rem auto 0; padding: .3rem .7rem; border-radius: 999px; color: #536fa8; background: rgba(229,241,255,.78); font-size: .62rem; font-weight: 850; }
+  .sns-polls-more { display: block; min-height: 2.75rem; margin: .4rem auto 0; padding: .3rem .8rem; border-radius: 999px; color: #536fa8; background: rgba(229,241,255,.78); font-size: .62rem; font-weight: 850; }
   .sns-poll-toast { position: sticky; z-index: 5; top: 4.5rem; margin: .3rem auto; width: fit-content; padding: .35rem .65rem; border-radius: 999px; color: white; background: rgba(54,42,82,.9); font-size: .62rem; font-weight: 800; }
 
   .sns-notification-row.is-mention::before { background: linear-gradient(#7959d8,#3caec2); }
@@ -3731,6 +3875,16 @@
   100% { opacity: 0; transform: translate(-50%, -58%) scale(1.08); }
 }
 
+@keyframes sns-action-sheet-backdrop-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes sns-action-sheet-in {
+  from { opacity: 0; transform: translateY(1.5rem) scale(0.98); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+
 @keyframes sns-loading-bounce {
   0%, 100% { transform: translateY(1px) scale(0.82); opacity: 0.48; }
   50% { transform: translateY(-3px) scale(1.08); opacity: 1; }
@@ -3755,7 +3909,8 @@
   .sns-inline-composer,
   .sns-reply-refresh-line,
   .sns-notification-list > li,
-  .sns-post-options-popover,
+  .sns-action-sheet-layer,
+  .sns-action-sheet,
   .sns-lightbox,
   .sns-lightbox-image,
   .sns-photo-heart-burst,
@@ -3765,7 +3920,6 @@
   .sns-polls-art img,
   .sns-poll-composer,
   .sns-mention-options,
-  .sns-repost-popover,
   .sns-action-error,
   .sns-reply-loading > span[aria-hidden="true"],
   .sns-feed-filter::before,

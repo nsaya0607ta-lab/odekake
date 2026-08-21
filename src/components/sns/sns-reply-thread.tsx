@@ -9,7 +9,7 @@ import {
 } from "@/app/actions/sns";
 import { emptyActionState, FormMessage, SubmitButton } from "@/components/form";
 import { FormDraft } from "@/components/form-draft";
-import { IconChat, IconClose, IconUser } from "@/components/icons";
+import { IconChat, IconTrash, IconUser } from "@/components/icons";
 import { formatRelativeTimeJa } from "@/lib/date";
 import { SnsReplyLikeButton } from "@/components/sns/sns-reply-like-button";
 import { SnsRichText } from "@/components/sns/sns-rich-text";
@@ -43,12 +43,18 @@ export function SnsReplyThread({
   const [replyingTo, setReplyingTo] = useState<string | null>(null);
   const [showComposer, setShowComposer] = useState(false);
   const [expandedThreads, setExpandedThreads] = useState<Set<string>>(new Set());
+  const [refreshError, setRefreshError] = useState("");
   const [isRefreshing, startTransition] = useTransition();
 
   function refresh() {
+    setRefreshError("");
     startTransition(async () => {
-      const fresh = await getPostRepliesAction(postId);
-      setReplies(fresh);
+      try {
+        const fresh = await getPostRepliesAction(postId);
+        setReplies(fresh);
+      } catch {
+        setRefreshError("返信を更新できませんでした。もう一度お試しください。");
+      }
     });
   }
 
@@ -72,6 +78,12 @@ export function SnsReplyThread({
   return (
     <div className="sns-reply-thread space-y-3" aria-busy={isRefreshing}>
       {isRefreshing ? <span className="sns-reply-refresh-line" aria-hidden="true" /> : null}
+      {refreshError ? (
+        <div className="sns-reply-load-error is-compact" role="alert">
+          <p>{refreshError}</p>
+          <button type="button" onClick={refresh} disabled={isRefreshing} className="pressable">再読み込み</button>
+        </div>
+      ) : null}
       {showComposer ? (
         <InlineComposer
           postId={postId}
@@ -244,16 +256,27 @@ function ReplyRow({
   onReplyToggle?: () => void;
   compact?: boolean;
 }) {
-  const [, startTransition] = useTransition();
+  const [isDeleting, startTransition] = useTransition();
+  const [deleteError, setDeleteError] = useState("");
   const canDelete = reply.userId === currentUserId;
 
   function handleDelete() {
+    if (!window.confirm("この返信を削除しますか？")) return;
+    setDeleteError("");
     startTransition(async () => {
       const formData = new FormData();
       formData.set("replyId", reply.id);
       formData.set("postId", postId);
-      await deleteFriendTextPostReplyAction(formData);
-      onDeleted();
+      try {
+        const result = await deleteFriendTextPostReplyAction(formData);
+        if (!result.ok) {
+          setDeleteError(result.error);
+          return;
+        }
+        onDeleted();
+      } catch {
+        setDeleteError("通信に失敗しました。もう一度お試しください。");
+      }
     });
   }
 
@@ -261,11 +284,12 @@ function ReplyRow({
     <div className={`sns-reply-row ${compact ? "is-compact" : ""}`}>
       <Link
         href={`/sns/users/${reply.userId}`}
+        prefetch={false}
         className={`sns-reply-avatar pressable ${compact ? "is-compact" : ""}`}
       >
         {reply.avatarUrl ? (
           // eslint-disable-next-line @next/next/no-img-element
-          <img src={reply.avatarUrl} alt="" className="h-full w-full object-cover" />
+          <img src={reply.avatarUrl} alt="" loading="lazy" decoding="async" className="h-full w-full object-cover" />
         ) : (
           <span className="flex h-full w-full items-center justify-center text-ink-faint">
             <IconUser size={compact ? 14 : 16} />
@@ -274,7 +298,7 @@ function ReplyRow({
       </Link>
       <div className="sns-reply-bubble">
         <div className="flex items-center justify-between gap-2">
-          <Link href={`/sns/users/${reply.userId}`} className="truncate text-xs font-bold">
+          <Link href={`/sns/users/${reply.userId}`} prefetch={false} className="truncate text-xs font-bold">
             {reply.displayName}
           </Link>
           <span className="shrink-0 text-[10px] text-ink-faint">{formatRelativeTimeJa(reply.createdAt)}</span>
@@ -291,13 +315,15 @@ function ReplyRow({
             <button
               type="button"
               onClick={handleDelete}
+              disabled={isDeleting}
               aria-label="この返信を削除"
-              className="ml-auto flex h-6 w-6 items-center justify-center rounded-full text-ink-faint active:bg-paper"
+              className="pressable ml-auto flex h-11 w-11 items-center justify-center rounded-full text-ink-faint active:bg-paper"
             >
-              <IconClose size={12} />
+              <IconTrash size={14} />
             </button>
           ) : null}
         </div>
+        {deleteError ? <p className="mt-1 text-[11px] font-bold text-blossom" role="alert">{deleteError}</p> : null}
       </div>
     </div>
   );

@@ -1,6 +1,6 @@
 "use server";
 
-import { revalidatePath, revalidateTag } from "next/cache";
+import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { z } from "zod";
 import type { ActionState } from "@/components/form";
@@ -9,8 +9,8 @@ import { toThumbPath } from "@/lib/image";
 import { finalizePhotoPaths } from "@/lib/photos";
 import { requireUser } from "@/lib/supabase/server";
 import { PHOTO_BUCKET } from "@/lib/data/client";
-import { signThumbOrOriginalPaths } from "@/lib/data/photos";
-import { friendGroupsCacheTag, getFriendTextPostReplies, getSnsPhoto } from "@/lib/data/sns";
+import { signPhotoPaths, signThumbOrOriginalPaths } from "@/lib/data/photos";
+import { getFriendTextPostReplies, getPersonalTextPost, getSnsPhoto } from "@/lib/data/sns";
 import {
   getSnsNotificationReadSnapshot,
   SNS_NOTIFICATION_LIKE_COUNTS_KEY,
@@ -25,6 +25,9 @@ const MAX_GROUP_NAME_LENGTH = 40;
 const SNS_FEATURE_MIGRATION_CODES = new Set(["42P01", "42883", "PGRST202", "PGRST205"]);
 
 export type SnsMutationResult = { ok: true } | { ok: false; error: string };
+export type SnsFullPhotoUrlsResult =
+  | { ok: true; urls: Record<string, string> }
+  | { ok: false; error: string };
 
 function snsMutationError(error: { code?: string; message?: string } | null, fallback: string): string {
   if (error?.code && SNS_FEATURE_MIGRATION_CODES.has(error.code)) {
@@ -58,6 +61,23 @@ function parseMemberIds(formData: FormData): string[] {
     .getAll("memberUserIds")
     .map((v) => String(v))
     .filter((v) => uuidSchema.safeParse(v).success);
+}
+
+/** 原寸写真は一覧表示時には署名せず、拡大表示を開いた時だけ取得する。 */
+export async function getFriendTextPostFullPhotoUrlsAction(postId: string): Promise<SnsFullPhotoUrlsResult> {
+  const parsedPostId = uuidSchema.safeParse(postId);
+  if (!parsedPostId.success) return { ok: false, error: "この投稿は見つかりませんでした。" };
+
+  try {
+    const { supabase } = await requireUser();
+    const post = await getPersonalTextPost(supabase, parsedPostId.data);
+    if (!post) return { ok: false, error: "この投稿は表示できません。" };
+    const paths = [...new Set([...post.photo_paths, ...post.quoted_photo_paths])];
+    const urls = await signPhotoPaths(supabase, paths);
+    return { ok: true, urls: Object.fromEntries(urls) };
+  } catch {
+    return { ok: false, error: "写真を読み込めませんでした。" };
+  }
 }
 
 export async function createFriendPhotosAction(_prev: ActionState, formData: FormData): Promise<ActionState> {
@@ -169,12 +189,13 @@ export async function createFriendTextPostAction(_prev: ActionState, formData: F
   redirect("/sns/home?posted=1");
 }
 
-export async function deleteFriendTextPostAction(formData: FormData): Promise<void> {
+export async function deleteFriendTextPostAction(formData: FormData): Promise<SnsMutationResult> {
   const parsed = uuidSchema.safeParse(String(formData.get("postId") ?? ""));
-  if (!parsed.success) redirect("/sns/home");
+  if (!parsed.success) return { ok: false, error: "この投稿は見つかりませんでした。" };
 
   const { supabase, user } = await requireUser();
-  const { data: photoPaths } = await supabase.rpc("delete_friend_text_post", { p_post_id: parsed.data });
+  const { data: photoPaths, error } = await supabase.rpc("delete_friend_text_post", { p_post_id: parsed.data });
+  if (error) return { ok: false, error: snsMutationError(error, "投稿を削除できませんでした。") };
 
   if (photoPaths && photoPaths.length > 0) {
     const objectPaths = photoPaths.flatMap((path) => [path, toThumbPath(path)]);
@@ -183,22 +204,27 @@ export async function deleteFriendTextPostAction(formData: FormData): Promise<vo
 
   revalidatePath("/sns/home");
   revalidatePath(`/sns/users/${user.id}`);
-  redirect("/sns/home");
+  return { ok: true };
 }
 
-export async function setFriendTextPostLikeAction(formData: FormData): Promise<void> {
+export async function setFriendTextPostLikeAction(formData: FormData): Promise<SnsMutationResult> {
   const postId = String(formData.get("postId") ?? "");
   const authorUserId = String(formData.get("authorUserId") ?? "");
   const parsedPostId = uuidSchema.safeParse(postId);
-  if (!parsedPostId.success) return;
+  if (!parsedPostId.success) return { ok: false, error: "この投稿は見つかりませんでした。" };
 
   const liked = String(formData.get("liked") ?? "") === "1";
   const { supabase } = await requireUser();
-  await supabase.rpc("set_friend_text_post_like", { p_post_id: parsedPostId.data, p_liked: liked });
+  const { error } = await supabase.rpc("set_friend_text_post_like", {
+    p_post_id: parsedPostId.data,
+    p_liked: liked,
+  });
+  if (error) return { ok: false, error: toJapaneseError(error, "いいねを更新できませんでした。") };
 
   revalidatePath("/sns/home");
   revalidatePath(`/sns/posts/${parsedPostId.data}`);
   if (uuidSchema.safeParse(authorUserId).success) revalidatePath(`/sns/users/${authorUserId}`);
+  return { ok: true };
 }
 
 export async function setFriendTextPostSavedAction(formData: FormData): Promise<SnsMutationResult> {
@@ -283,32 +309,41 @@ export async function addFriendTextPostReplyAction(_prev: ActionState, formData:
   return { ok: true };
 }
 
-export async function deleteFriendTextPostReplyAction(formData: FormData): Promise<void> {
+export async function deleteFriendTextPostReplyAction(formData: FormData): Promise<SnsMutationResult> {
   const replyId = String(formData.get("replyId") ?? "");
   const postId = String(formData.get("postId") ?? "");
   const parsedReplyId = uuidSchema.safeParse(replyId);
   const parsedPostId = uuidSchema.safeParse(postId);
-  if (!parsedReplyId.success || !parsedPostId.success) return;
+  if (!parsedReplyId.success || !parsedPostId.success) {
+    return { ok: false, error: "この返信は見つかりませんでした。" };
+  }
 
   const { supabase } = await requireUser();
-  await supabase.rpc("delete_friend_text_post_reply", { p_reply_id: parsedReplyId.data });
+  const { error } = await supabase.rpc("delete_friend_text_post_reply", { p_reply_id: parsedReplyId.data });
+  if (error) return { ok: false, error: snsMutationError(error, "返信を削除できませんでした。") };
 
   revalidatePath(`/sns/posts/${parsedPostId.data}`);
   revalidatePath("/sns/home");
+  return { ok: true };
 }
 
-export async function setFriendTextPostReplyLikeAction(formData: FormData): Promise<void> {
+export async function setFriendTextPostReplyLikeAction(formData: FormData): Promise<SnsMutationResult> {
   const replyId = String(formData.get("replyId") ?? "");
   const postId = String(formData.get("postId") ?? "");
   const parsedReplyId = uuidSchema.safeParse(replyId);
-  if (!parsedReplyId.success) return;
+  if (!parsedReplyId.success) return { ok: false, error: "この返信は見つかりませんでした。" };
 
   const liked = String(formData.get("liked") ?? "") === "1";
   const { supabase } = await requireUser();
-  await supabase.rpc("set_friend_text_post_reply_like", { p_reply_id: parsedReplyId.data, p_liked: liked });
+  const { error } = await supabase.rpc("set_friend_text_post_reply_like", {
+    p_reply_id: parsedReplyId.data,
+    p_liked: liked,
+  });
+  if (error) return { ok: false, error: toJapaneseError(error, "返信のいいねを更新できませんでした。") };
 
   if (uuidSchema.safeParse(postId).success) revalidatePath(`/sns/posts/${postId}`);
   revalidatePath("/sns/home");
+  return { ok: true };
 }
 
 /** ホーム/ユーザー画面のカードでコメントアイコンを開いたときに、その場で返信一覧を取得する */
@@ -350,9 +385,9 @@ export async function getPostRepliesAction(postId: string): Promise<
   }));
 }
 
-export async function deleteFriendPhotoAction(formData: FormData): Promise<void> {
+export async function deleteFriendPhotoAction(formData: FormData): Promise<SnsMutationResult> {
   const parsed = uuidSchema.safeParse(String(formData.get("photoId") ?? ""));
-  if (!parsed.success) redirect("/sns");
+  if (!parsed.success) return { ok: false, error: "この写真は見つかりませんでした。" };
 
   const { supabase } = await requireUser();
   const photo = await getSnsPhoto(supabase, parsed.data).catch(() => null);
@@ -361,34 +396,37 @@ export async function deleteFriendPhotoAction(formData: FormData): Promise<void>
     p_photo_id: parsed.data,
   });
 
-  const fallback = photo?.group_id ? `/sns/groups/${photo.group_id}` : "/sns";
   if (error) {
-    redirect(`/sns/${parsed.data}?error=delete`);
+    return { ok: false, error: snsMutationError(error, "写真を削除できませんでした。") };
   }
   if (storagePath) {
-    await supabase.storage.from(PHOTO_BUCKET).remove([storagePath, toThumbPath(storagePath)]);
+    const { error: storageError } = await supabase.storage
+      .from(PHOTO_BUCKET)
+      .remove([storagePath, toThumbPath(storagePath)]);
+    if (storageError) console.warn("Deleted SNS photo row but storage cleanup failed", { message: storageError.message });
   }
 
   revalidatePath("/sns");
   if (photo?.group_id) revalidatePath(`/sns/groups/${photo.group_id}`);
-  redirect(fallback);
+  return { ok: true };
 }
 
-export async function setFriendPhotoReactionAction(formData: FormData): Promise<void> {
+export async function setFriendPhotoReactionAction(formData: FormData): Promise<SnsMutationResult> {
   const photoId = String(formData.get("photoId") ?? "");
   const parsedPhotoId = uuidSchema.safeParse(photoId);
-  if (!parsedPhotoId.success) redirect("/sns");
+  if (!parsedPhotoId.success) return { ok: false, error: "この写真は見つかりませんでした。" };
 
   const emoji = String(formData.get("emoji") ?? "").trim();
   const { supabase } = await requireUser();
-  await supabase.rpc("set_friend_photo_reaction", {
+  const { error } = await supabase.rpc("set_friend_photo_reaction", {
     p_photo_id: parsedPhotoId.data,
     p_emoji: emoji === "" ? null : emoji,
   });
+  if (error) return { ok: false, error: snsMutationError(error, "リアクションを更新できませんでした。") };
 
   revalidatePath(`/sns/${parsedPhotoId.data}`);
   revalidatePath("/sns");
-  redirect(`/sns/${parsedPhotoId.data}`);
+  return { ok: true };
 }
 
 export async function addFriendPhotoCommentAction(_prev: ActionState, formData: FormData): Promise<ActionState> {
@@ -412,18 +450,21 @@ export async function addFriendPhotoCommentAction(_prev: ActionState, formData: 
   return { ok: true };
 }
 
-export async function deleteFriendPhotoCommentAction(formData: FormData): Promise<void> {
+export async function deleteFriendPhotoCommentAction(formData: FormData): Promise<SnsMutationResult> {
   const commentId = String(formData.get("commentId") ?? "");
   const photoId = String(formData.get("photoId") ?? "");
   const parsedCommentId = uuidSchema.safeParse(commentId);
   const parsedPhotoId = uuidSchema.safeParse(photoId);
-  if (!parsedCommentId.success || !parsedPhotoId.success) redirect("/sns");
+  if (!parsedCommentId.success || !parsedPhotoId.success) {
+    return { ok: false, error: "このコメントは見つかりませんでした。" };
+  }
 
   const { supabase } = await requireUser();
-  await supabase.rpc("delete_friend_photo_comment", { p_comment_id: parsedCommentId.data });
+  const { error } = await supabase.rpc("delete_friend_photo_comment", { p_comment_id: parsedCommentId.data });
+  if (error) return { ok: false, error: snsMutationError(error, "コメントを削除できませんでした。") };
 
   revalidatePath(`/sns/${parsedPhotoId.data}`);
-  redirect(`/sns/${parsedPhotoId.data}`);
+  return { ok: true };
 }
 
 // -------------------------------------------------------------
@@ -442,7 +483,7 @@ export async function createFriendGroupAction(_prev: ActionState, formData: Form
     return { error: "メンバーを1人以上選んでください。", values: { name } };
   }
 
-  const { supabase, user } = await requireUser();
+  const { supabase } = await requireUser();
   const { data: groupId, error } = await supabase.rpc("create_friend_group", {
     p_name: name,
     p_member_user_ids: memberUserIds,
@@ -459,7 +500,6 @@ export async function createFriendGroupAction(_prev: ActionState, formData: Form
   }
 
   revalidatePath("/sns");
-  revalidateTag(friendGroupsCacheTag(user.id));
   redirect(`/sns/groups/${groupId}`);
 }
 
@@ -474,7 +514,7 @@ export async function updateFriendGroupAction(_prev: ActionState, formData: Form
   }
   const iconPaths = parseJsonPaths(formData, "iconPaths");
 
-  const { supabase, user } = await requireUser();
+  const { supabase } = await requireUser();
 
   const { data: currentGroups } = await supabase.rpc("get_my_friend_groups");
   const previousIconPath = currentGroups?.find((g) => g.id === groupId)?.icon_path ?? null;
@@ -510,19 +550,19 @@ export async function updateFriendGroupAction(_prev: ActionState, formData: Form
   revalidatePath("/sns");
   revalidatePath(`/sns/groups/${groupId}`);
   revalidatePath(`/sns/groups/${groupId}/settings`);
-  revalidateTag(friendGroupsCacheTag(user.id));
   return { ok: true, message: "グループの設定を更新しました。", values: { name } };
 }
 
 /** グループアイコンの長押しドラッグ並び替え用。フォームを介さず直接呼び出す */
-export async function reorderFriendGroupsAction(groupIds: string[]): Promise<void> {
+export async function reorderFriendGroupsAction(groupIds: string[]): Promise<SnsMutationResult> {
   const parsed = groupIds.filter((id) => uuidSchema.safeParse(id).success);
-  if (parsed.length === 0) return;
+  if (parsed.length === 0) return { ok: false, error: "並び順を確認してください。" };
 
-  const { supabase, user } = await requireUser();
-  await supabase.rpc("reorder_friend_groups", { p_group_ids: parsed });
+  const { supabase } = await requireUser();
+  const { error } = await supabase.rpc("reorder_friend_groups", { p_group_ids: parsed });
+  if (error) return { ok: false, error: snsMutationError(error, "並び順を保存できませんでした。") };
   revalidatePath("/sns");
-  revalidateTag(friendGroupsCacheTag(user.id));
+  return { ok: true };
 }
 
 export async function addFriendGroupMembersAction(_prev: ActionState, formData: FormData): Promise<ActionState> {
@@ -548,14 +588,13 @@ export async function leaveFriendGroupAction(formData: FormData): Promise<void> 
   const parsed = uuidSchema.safeParse(String(formData.get("groupId") ?? ""));
   if (!parsed.success) redirect("/sns");
 
-  const { supabase, user } = await requireUser();
+  const { supabase } = await requireUser();
   const { error } = await supabase.rpc("leave_friend_group", { p_group_id: parsed.data });
   if (error) {
     redirect(`/sns/groups/${parsed.data}/settings?error=leave`);
   }
 
   revalidatePath("/sns");
-  revalidateTag(friendGroupsCacheTag(user.id));
   redirect("/sns");
 }
 
@@ -563,14 +602,13 @@ export async function deleteFriendGroupAction(formData: FormData): Promise<void>
   const parsed = uuidSchema.safeParse(String(formData.get("groupId") ?? ""));
   if (!parsed.success) redirect("/sns");
 
-  const { supabase, user } = await requireUser();
+  const { supabase } = await requireUser();
   const { error } = await supabase.rpc("delete_friend_group", { p_group_id: parsed.data });
   if (error) {
     redirect(`/sns/groups/${parsed.data}/settings?error=delete`);
   }
 
   revalidatePath("/sns");
-  revalidateTag(friendGroupsCacheTag(user.id));
   redirect("/sns");
 }
 
@@ -598,18 +636,21 @@ export async function createFriendGroupMessageAction(
   return { ok: true };
 }
 
-export async function deleteFriendGroupMessageAction(formData: FormData): Promise<void> {
+export async function deleteFriendGroupMessageAction(formData: FormData): Promise<SnsMutationResult> {
   const messageId = String(formData.get("messageId") ?? "");
   const groupId = String(formData.get("groupId") ?? "");
   const parsedMessageId = uuidSchema.safeParse(messageId);
   const parsedGroupId = uuidSchema.safeParse(groupId);
-  if (!parsedMessageId.success || !parsedGroupId.success) redirect("/sns");
+  if (!parsedMessageId.success || !parsedGroupId.success) {
+    return { ok: false, error: "このメッセージは見つかりませんでした。" };
+  }
 
   const { supabase } = await requireUser();
-  await supabase.rpc("delete_friend_group_message", { p_message_id: parsedMessageId.data });
+  const { error } = await supabase.rpc("delete_friend_group_message", { p_message_id: parsedMessageId.data });
+  if (error) return { ok: false, error: snsMutationError(error, "メッセージを削除できませんでした。") };
 
   revalidatePath(`/sns/groups/${parsedGroupId.data}`);
-  redirect(`/sns/groups/${parsedGroupId.data}?view=chat`);
+  return { ok: true };
 }
 
 export async function setFriendGroupPinAction(_prev: ActionState, formData: FormData): Promise<ActionState> {
@@ -635,6 +676,23 @@ export async function setFriendGroupPinAction(_prev: ActionState, formData: Form
 
   revalidatePath(`/sns/groups/${parsedGroupId.data}`);
   return { ok: true, message: title ? "グループ上部に固定しました。" : "固定を解除しました。" };
+}
+
+/** 固定解除は保存フォームのsubmitter値に依存させず、専用アクションで確実に削除する。 */
+export async function clearFriendGroupPinAction(formData: FormData): Promise<SnsMutationResult> {
+  const parsedGroupId = uuidSchema.safeParse(String(formData.get("groupId") ?? ""));
+  if (!parsedGroupId.success) return { ok: false, error: "このグループは見つかりませんでした。" };
+
+  const { supabase } = await requireUser();
+  const { error } = await supabase.rpc("set_friend_group_pin", {
+    p_group_id: parsedGroupId.data,
+    p_title: "",
+    p_body: "",
+  });
+  if (error) return { ok: false, error: snsMutationError(error, "固定を解除できませんでした。") };
+
+  revalidatePath(`/sns/groups/${parsedGroupId.data}`);
+  return { ok: true };
 }
 
 export async function createFriendGroupPollAction(_prev: ActionState, formData: FormData): Promise<ActionState> {
@@ -702,21 +760,23 @@ export async function voteFriendGroupPollAction(formData: FormData): Promise<Sns
   return { ok: true };
 }
 
-export async function deleteFriendGroupPollAction(formData: FormData): Promise<void> {
+export async function deleteFriendGroupPollAction(formData: FormData): Promise<SnsMutationResult> {
   const pollId = uuidSchema.safeParse(String(formData.get("pollId") ?? ""));
   const groupId = uuidSchema.safeParse(String(formData.get("groupId") ?? ""));
-  if (!pollId.success || !groupId.success) return;
+  if (!pollId.success || !groupId.success) return { ok: false, error: "この投票は見つかりませんでした。" };
   const { supabase } = await requireUser();
-  await supabase.rpc("delete_friend_group_poll", { p_poll_id: pollId.data });
+  const { error } = await supabase.rpc("delete_friend_group_poll", { p_poll_id: pollId.data });
+  if (error) return { ok: false, error: snsMutationError(error, "投票を削除できませんでした。") };
   revalidatePath(`/sns/groups/${groupId.data}`);
+  return { ok: true };
 }
 
 export async function markFriendGroupReadAction(groupId: string): Promise<void> {
   const parsed = uuidSchema.safeParse(groupId);
   if (!parsed.success) return;
-  const { supabase, user } = await requireUser();
-  await supabase.rpc("mark_friend_group_read", { p_group_id: parsed.data });
-  revalidateTag(friendGroupsCacheTag(user.id));
+  const { supabase } = await requireUser();
+  const { error } = await supabase.rpc("mark_friend_group_read", { p_group_id: parsed.data });
+  if (error) throw new Error(snsMutationError(error, "グループを既読にできませんでした。"));
   revalidatePath("/sns");
 }
 
@@ -746,7 +806,6 @@ export async function markSnsNotificationsReadAction(): Promise<void> {
       console.warn("Failed to refresh SNS notification read state", { message: refreshError.message });
     }
   }
-  revalidateTag(friendGroupsCacheTag(user.id));
   revalidatePath("/sns");
 
   if (error || groupReadError) {

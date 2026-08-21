@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useEffect, useLayoutEffect, useRef, useState } from "react";
+import { useLayoutEffect, useRef, useState } from "react";
 import { reorderFriendGroupsAction } from "@/app/actions/sns";
 import { IconPlus } from "@/components/icons";
 import type { FriendGroupRow } from "@/lib/supabase/types";
@@ -26,6 +26,8 @@ export function SnsGroupSwitcher({
   const router = useRouter();
   const [order, setOrder] = useState(groups);
   const [draggingId, setDraggingId] = useState<string | null>(null);
+  const [saveMessage, setSaveMessage] = useState("");
+  const committedOrderRef = useRef(groups);
   const itemRefs = useRef(new Map<string, HTMLDivElement>());
   const prevOffsetsRef = useRef(new Map<string, number>());
   const dragStartOffsetRef = useRef(0);
@@ -36,13 +38,10 @@ export function SnsGroupSwitcher({
     moved: boolean;
   } | null>(null);
 
-  useLayoutEffect(() => setOrder(groups), [groups]);
-
-  // グループアイコンは <Link> ではなく手動のタップ判定なので、Next の自動プリフェッチが効かない。
-  // 表示された時点でルート（JSチャンク／RSCペイロード）を先読みしておき、実際にタップした時の待ち時間を減らす
-  useEffect(() => {
-    for (const g of groups) router.prefetch(`/sns/groups/${g.id}`);
-  }, [groups, router]);
+  useLayoutEffect(() => {
+    setOrder(groups);
+    committedOrderRef.current = groups;
+  }, [groups]);
 
   function captureOffsets() {
     const map = new Map<string, number>();
@@ -83,6 +82,8 @@ export function SnsGroupSwitcher({
 
   function handlePointerDown(e: React.PointerEvent, id: string) {
     if (e.pointerType === "mouse" && e.button !== 0) return;
+    // 全グループを一斉取得するとモバイル回線を圧迫するため、触れた1件だけ先読みする。
+    router.prefetch(`/sns/groups/${id}`);
     dragState.current = { startX: e.clientX, longPressTimer: null, moved: false };
     const target = e.currentTarget;
     const timer = setTimeout(() => {
@@ -166,7 +167,23 @@ export function SnsGroupSwitcher({
       }
       setDraggingId(null);
       const ids = order.map((g) => g.id);
-      void reorderFriendGroupsAction(ids);
+      const previousOrder = committedOrderRef.current;
+      void (async () => {
+        try {
+          const result = await reorderFriendGroupsAction(ids);
+          if (!result.ok) {
+            setOrder(previousOrder);
+            setSaveMessage(result.error);
+          } else {
+            committedOrderRef.current = order;
+            setSaveMessage("並び順を保存しました。");
+          }
+        } catch {
+          setOrder(previousOrder);
+          setSaveMessage("並び順を保存できませんでした。");
+        }
+        window.setTimeout(() => setSaveMessage(""), 2400);
+      })();
     } else if (state && !state.moved) {
       navigator.vibrate?.(6);
       router.push(`/sns/groups/${id}`);
@@ -217,6 +234,7 @@ export function SnsGroupSwitcher({
           <span className="max-w-[4rem] truncate text-[10px] font-bold text-ink-faint">新規作成</span>
         </Link>
       </div>
+      {saveMessage ? <p className="sns-settings-inline-message mt-2" role="status">{saveMessage}</p> : null}
     </section>
   );
 }
@@ -246,7 +264,7 @@ function GroupIcon({
         >
           {iconUrl ? (
             // eslint-disable-next-line @next/next/no-img-element
-            <img src={iconUrl} alt="" className="h-full w-full object-cover" />
+            <img src={iconUrl} alt="" loading="lazy" decoding="async" className="h-full w-full object-cover" />
           ) : (
             icon
           )}

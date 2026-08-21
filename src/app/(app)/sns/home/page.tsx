@@ -12,7 +12,7 @@ import {
 import { SnsPrimaryNav } from "@/components/sns/sns-primary-nav";
 import { SnsNotificationEntry } from "@/components/sns/sns-notification-button";
 import { SnsTextFeed } from "@/components/sns/sns-text-feed";
-import { signPhotoPaths, signThumbOrOriginalPaths } from "@/lib/data/photos";
+import { signThumbOrOriginalPaths } from "@/lib/data/photos";
 import {
   getPersonalTextFeed,
   getSnsTextPostAvatarPaths,
@@ -22,6 +22,10 @@ import { requireUser } from "@/lib/supabase/server";
 
 export const metadata = { title: "ホーム | SNS" };
 export const dynamic = "force-dynamic";
+
+const INITIAL_POST_LIMIT = 24;
+const POST_LIMIT_STEP = 24;
+const MAX_POST_LIMIT = 120;
 
 const DAILY_PROMPTS = [
   "帰り道の一枚",
@@ -49,20 +53,25 @@ function getDailyPrompt(): string {
 export default async function SnsHomePage({
   searchParams,
 }: {
-  searchParams: Promise<{ filter?: string }>;
+  searchParams: Promise<{ filter?: string; limit?: string }>;
 }) {
   const [{ supabase, user }, sp] = await Promise.all([requireUser(), searchParams]);
 
-  const posts = await getPersonalTextFeed(supabase);
+  const requestedLimit = Number.parseInt(sp.limit ?? "", 10);
+  const postLimit = Number.isFinite(requestedLimit)
+    ? Math.min(MAX_POST_LIMIT, Math.max(INITIAL_POST_LIMIT, requestedLimit))
+    : INITIAL_POST_LIMIT;
+  const fetchedPosts = await getPersonalTextFeed(supabase, undefined, postLimit + 1);
+  const hasMorePosts = fetchedPosts.length > postLimit;
+  const posts = fetchedPosts.slice(0, postLimit);
   const filter = parseSnsFeedFilter(sp.filter);
   const dailyPrompt = getDailyPrompt();
   const visiblePosts = posts.filter((post) => matchesSnsFeedFilter(post, filter));
   const feedTitle = filter === "photos" ? "写真つきの投稿" : filter === "notes" ? "ひとこと投稿" : "新しいつぶやき";
   const allPhotoPaths = getSnsTextPostPhotoPaths(visiblePosts);
-  const [avatarUrls, photoUrls, fullPhotoUrls] = await Promise.all([
+  const [avatarUrls, photoUrls] = await Promise.all([
     signThumbOrOriginalPaths(supabase, getSnsTextPostAvatarPaths(visiblePosts)),
     signThumbOrOriginalPaths(supabase, allPhotoPaths),
-    signPhotoPaths(supabase, allPhotoPaths),
   ]);
 
   return (
@@ -75,6 +84,7 @@ export default async function SnsHomePage({
         action={(
           <Link
             href="/sns/search"
+            prefetch={false}
             aria-label="SNSを検索"
             className="pressable flex h-11 w-11 items-center justify-center rounded-full text-ink-soft active:bg-paper-deep"
           >
@@ -111,7 +121,6 @@ export default async function SnsHomePage({
           posts={visiblePosts}
           avatarUrls={avatarUrls}
           photoUrls={photoUrls}
-          fullPhotoUrls={fullPhotoUrls}
           currentUserId={user.id}
           emptyTitle={
             filter === "photos"
@@ -122,6 +131,19 @@ export default async function SnsHomePage({
           }
           emptyMessage={filter === "all" ? undefined : "ほかの種類に切り替えると投稿を見られます。"}
         />
+        {hasMorePosts && postLimit < MAX_POST_LIMIT ? (
+          <Link
+            href={`/sns/home?${new URLSearchParams({
+              ...(filter === "all" ? {} : { filter }),
+              limit: String(Math.min(MAX_POST_LIMIT, postLimit + POST_LIMIT_STEP)),
+            }).toString()}`}
+            prefetch={false}
+            scroll={false}
+            className="sns-feed-more pressable"
+          >
+            以前の投稿をもっと見る
+          </Link>
+        ) : null}
       </PageBody>
       <Link
         href="/sns/home/new"

@@ -71,38 +71,41 @@ function parseLikeCounts(value: unknown): Record<string, number> {
   return counts;
 }
 
-async function getNotificationReadState(supabase: DB): Promise<NotificationReadState> {
-  const { data } = await supabase.auth.getClaims();
-  const claims = recordOf(data?.claims);
-  const metadata = recordOf(claims.user_metadata);
-  const rawSeenAt = metadata[SNS_NOTIFICATION_SEEN_AT_KEY];
-
-  return {
-    seenAt: typeof rawSeenAt === "string" && !Number.isNaN(Date.parse(rawSeenAt)) ? rawSeenAt : null,
-    likeCounts: parseLikeCounts(metadata[SNS_NOTIFICATION_LIKE_COUNTS_KEY]),
-  };
-}
-
 function parseBoolean(value: unknown, fallback: boolean): boolean {
   return typeof value === "boolean" ? value : fallback;
 }
 
-export async function getSnsNotificationPreferences(supabase: DB): Promise<SnsNotificationPreferences> {
+/** 通知の既読状態と設定は同じJWTメタデータにあるため、1回の検証でまとめて読む。 */
+const getNotificationMetadata = cache(async function getNotificationMetadata(supabase: DB): Promise<{
+  readState: NotificationReadState;
+  preferences: SnsNotificationPreferences;
+}> {
   const { data } = await supabase.auth.getClaims();
   const claims = recordOf(data?.claims);
   const metadata = recordOf(claims.user_metadata);
-  const raw = recordOf(metadata[SNS_NOTIFICATION_PREFERENCES_KEY]);
+  const rawSeenAt = metadata[SNS_NOTIFICATION_SEEN_AT_KEY];
+  const rawPreferences = recordOf(metadata[SNS_NOTIFICATION_PREFERENCES_KEY]);
   const muted = metadata[SNS_MUTED_GROUP_IDS_KEY];
 
   return {
-    replies: parseBoolean(raw.replies, true),
-    likes: parseBoolean(raw.likes, true),
-    mentions: parseBoolean(raw.mentions, true),
-    groups: parseBoolean(raw.groups, true),
-    mutedGroupIds: Array.isArray(muted)
-      ? muted.filter((id): id is string => typeof id === "string")
-      : [],
+    readState: {
+      seenAt: typeof rawSeenAt === "string" && !Number.isNaN(Date.parse(rawSeenAt)) ? rawSeenAt : null,
+      likeCounts: parseLikeCounts(metadata[SNS_NOTIFICATION_LIKE_COUNTS_KEY]),
+    },
+    preferences: {
+      replies: parseBoolean(rawPreferences.replies, true),
+      likes: parseBoolean(rawPreferences.likes, true),
+      mentions: parseBoolean(rawPreferences.mentions, true),
+      groups: parseBoolean(rawPreferences.groups, true),
+      mutedGroupIds: Array.isArray(muted)
+        ? muted.filter((id): id is string => typeof id === "string")
+        : [],
+    },
   };
+});
+
+export async function getSnsNotificationPreferences(supabase: DB): Promise<SnsNotificationPreferences> {
+  return (await getNotificationMetadata(supabase)).preferences;
 }
 
 function ownLikeCount(post: SnsTextPostRow): number {
@@ -125,14 +128,19 @@ async function getNotificationSources(
   mentions: SnsMentionNotificationRow[];
   preferences: SnsNotificationPreferences;
 }> {
-  const [ownPosts, groups, readState, mentions, preferences] = await Promise.all([
+  const [ownPosts, groups, metadata, mentions] = await Promise.all([
     getPersonalTextFeed(supabase, userId, POST_LIMIT).catch(() => []),
     getMyFriendGroupsFresh(supabase).catch(() => []),
-    getNotificationReadState(supabase),
+    getNotificationMetadata(supabase),
     getSnsMentions(supabase).catch(() => []),
-    getSnsNotificationPreferences(supabase),
   ]);
-  return { ownPosts, groups, readState, mentions, preferences };
+  return {
+    ownPosts,
+    groups,
+    readState: metadata.readState,
+    mentions,
+    preferences: metadata.preferences,
+  };
 }
 
 /** 返信・投稿いいね・グループ未読を、追加テーブルなしで1つの一覧にまとめる。 */
@@ -251,6 +259,20 @@ export const getSnsUnreadCount = cache(async function getSnsUnreadCount(
   supabase: DB,
   userId: string,
 ): Promise<number> {
+  // 0060適用後は、最大20件あった返信RPCをDB内の集計1回へまとめる。
+  // Preview DBへ未適用でも旧方式へ戻るため、段階的に公開できる。
+  const { data: fastCount, error: fastCountError } = await supabase.rpc("get_sns_unread_count");
+  if (!fastCountError) {
+    const count = Number(fastCount);
+    return Number.isFinite(count) ? Math.max(0, count) : 0;
+  }
+  if (!["42883", "PGRST202"].includes(fastCountError.code)) {
+    console.warn("Failed to use fast SNS unread count", {
+      code: fastCountError.code,
+      message: fastCountError.message,
+    });
+  }
+
   const { ownPosts, groups, readState, mentions, preferences } = await getNotificationSources(supabase, userId);
   const seenAtMs = readState.seenAt ? Date.parse(readState.seenAt) : 0;
   const replyPosts = ownPosts.filter((post) => post.reply_count > 0).slice(0, REPLY_POST_LIMIT);

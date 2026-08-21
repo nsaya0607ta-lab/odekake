@@ -7,12 +7,12 @@ import { SnsBackgroundBand } from "@/components/sns/sns-background-band";
 import { SnsGroupList } from "@/components/sns/sns-group-list";
 import { SnsTextFeed } from "@/components/sns/sns-text-feed";
 import { getFriendList } from "@/lib/data/friends";
-import { signPhotoPaths, signThumbOrOriginalPaths } from "@/lib/data/photos";
+import { signThumbOrOriginalPaths } from "@/lib/data/photos";
 import {
   getMyFriendGroupSummaries,
   getOwnSnsProfile,
   getPersonalTextFeed,
-  getSnsBlockedUsers,
+  getSnsHiddenUserIds,
   getSnsTextPostAvatarPaths,
   getSnsTextPostPhotoPaths,
   signGroupIconUrls,
@@ -48,6 +48,8 @@ const SCOPES: { id: SearchScope; label: string }[] = [
   { id: "places", label: "場所" },
 ];
 
+const SEARCH_POST_LIMIT = 80;
+
 export default async function SnsSearchPage({
   searchParams,
 }: {
@@ -57,18 +59,22 @@ export default async function SnsSearchPage({
   const query = (sp.q ?? "").trim().slice(0, 60);
   const needle = normalize(query.replace(/^#/, ""));
   const scope = parseScope(sp.scope);
-  const [posts, friends, ownProfile, groups, blockedUsers] = await Promise.all([
-    getPersonalTextFeed(supabase, undefined, 200),
-    getFriendList(supabase),
-    getOwnSnsProfile(supabase, user.id),
-    getMyFriendGroupSummaries(supabase),
-    getSnsBlockedUsers(supabase),
+  const showPosts = scope === "all" || scope === "posts" || scope === "places";
+  const showPeople = scope === "all" || scope === "users";
+  const showGroups = scope === "all" || scope === "groups";
+  const [posts, friends, ownProfile, groups, hiddenUserIds] = await Promise.all([
+    showPosts ? getPersonalTextFeed(supabase, undefined, SEARCH_POST_LIMIT) : Promise.resolve([]),
+    showPeople ? getFriendList(supabase) : Promise.resolve([]),
+    showPeople
+      ? getOwnSnsProfile(supabase, user.id)
+      : Promise.resolve({ displayName: user.displayName, iconUrl: undefined as string | undefined }),
+    showGroups ? getMyFriendGroupSummaries(supabase) : Promise.resolve([]),
+    showPeople ? getSnsHiddenUserIds(supabase) : Promise.resolve(new Set<string>()),
   ]);
-  const blockedIds = new Set(blockedUsers.map((blocked) => blocked.user_id));
   const people = [
     { id: user.id, displayName: ownProfile.displayName, profilePath: null as string | null, avatarUrl: ownProfile.iconUrl },
     ...friends
-      .filter((friend) => !blockedIds.has(friend.friend_user_id))
+      .filter((friend) => !hiddenUserIds.has(friend.friend_user_id))
       .map((friend) => ({
         id: friend.friend_user_id,
         displayName: friend.display_name,
@@ -92,22 +98,18 @@ export default async function SnsSearchPage({
     return haystack.includes(needle);
   });
   const placePosts = matchingPosts.filter((post) => post.linked_spot_id || post.quoted_linked_spot_id);
-  const visiblePosts = (scope === "places" ? placePosts : matchingPosts).slice(0, needle ? 80 : 20);
+  const visiblePosts = (scope === "places" ? placePosts : matchingPosts).slice(0, needle ? 60 : 12);
   const matchingPeople = people.filter((person) => !needle || normalize(person.displayName).includes(needle));
   const matchingGroups = groups.filter((group) => !needle || normalize(group.name).includes(needle));
   const allPhotoPaths = getSnsTextPostPhotoPaths(visiblePosts);
   const friendAvatarPaths = matchingPeople.flatMap((person) => person.profilePath ? [person.profilePath] : []);
-  const [avatarUrls, photoUrls, fullPhotoUrls, peopleAvatarUrls, groupIconUrls] = await Promise.all([
+  const [avatarUrls, photoUrls, peopleAvatarUrls, groupIconUrls] = await Promise.all([
     signThumbOrOriginalPaths(supabase, getSnsTextPostAvatarPaths(visiblePosts)),
     signThumbOrOriginalPaths(supabase, allPhotoPaths),
-    signPhotoPaths(supabase, allPhotoPaths),
     signThumbOrOriginalPaths(supabase, friendAvatarPaths),
     signGroupIconUrls(supabase, matchingGroups),
   ]);
   const hashtags = [...new Set(posts.flatMap((post) => post.body.match(/#[\p{L}\p{N}_ー]+/gu) ?? []))].slice(0, 7);
-  const showPosts = scope === "all" || scope === "posts" || scope === "places";
-  const showPeople = scope === "all" || scope === "users";
-  const showGroups = scope === "all" || scope === "groups";
   const totalMatches = (showPosts ? visiblePosts.length : 0)
     + (showPeople ? matchingPeople.length : 0)
     + (showGroups ? matchingGroups.length : 0);
@@ -130,7 +132,7 @@ export default async function SnsSearchPage({
           <IconSearch size={20} />
           <input name="q" defaultValue={query} maxLength={60} autoFocus placeholder="キーワード、#タグ、場所を検索" aria-label="SNSを検索" />
           {query ? (
-            <Link href="/sns/search" aria-label="検索語を消す" className="pressable"><IconClose size={16} /></Link>
+            <Link href="/sns/search" prefetch={false} aria-label="検索語を消す" className="pressable"><IconClose size={16} /></Link>
           ) : null}
         </form>
 
@@ -139,6 +141,7 @@ export default async function SnsSearchPage({
             <Link
               key={item.id}
               href={searchHref(query, item.id)}
+              prefetch={false}
               scroll={false}
               aria-current={scope === item.id ? "page" : undefined}
               className={`pressable ${scope === item.id ? "is-active" : ""}`}
@@ -153,7 +156,7 @@ export default async function SnsSearchPage({
             <span className="text-[11px] font-black text-ink-soft">いま見つかるタグ</span>
             <div className="mt-2 flex flex-wrap gap-2">
               {hashtags.map((tag) => (
-                <Link key={tag} href={`/sns/search?q=${encodeURIComponent(tag)}`} className="pressable">{tag}</Link>
+                <Link key={tag} href={`/sns/search?q=${encodeURIComponent(tag)}`} prefetch={false} className="pressable">{tag}</Link>
               ))}
             </div>
           </section>
@@ -174,10 +177,10 @@ export default async function SnsSearchPage({
               {matchingPeople.slice(0, scope === "users" ? 40 : 6).map((person) => {
                 const avatarUrl = person.avatarUrl ?? (person.profilePath ? peopleAvatarUrls.get(person.profilePath) : undefined);
                 return (
-                  <Link key={person.id} href={`/sns/users/${person.id}`} className="sns-search-person pressable">
+                  <Link key={person.id} href={`/sns/users/${person.id}`} prefetch={false} className="sns-search-person pressable">
                     <span>{avatarUrl ? (
                       // eslint-disable-next-line @next/next/no-img-element
-                      <img src={avatarUrl} alt="" />
+                      <img src={avatarUrl} alt="" loading="lazy" decoding="async" />
                     ) : <IconUser size={20} />}</span>
                     <strong>{person.displayName}</strong>
                     {person.id === user.id ? <small>あなた</small> : null}
@@ -202,7 +205,6 @@ export default async function SnsSearchPage({
               posts={visiblePosts}
               avatarUrls={avatarUrls}
               photoUrls={photoUrls}
-              fullPhotoUrls={fullPhotoUrls}
               currentUserId={user.id}
             />
           </section>

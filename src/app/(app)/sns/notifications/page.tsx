@@ -5,6 +5,7 @@ import { PageBody } from "@/components/page-body";
 import { PageHeader } from "@/components/page-header";
 import { SnsBackgroundBand } from "@/components/sns/sns-background-band";
 import { SnsIllustratedHero } from "@/components/sns/sns-illustrated-hero";
+import { SnsUnreadSync } from "@/components/sns/sns-unread-sync";
 import { formatRelativeTimeJa } from "@/lib/date";
 import {
   getSnsNotificationCenter,
@@ -35,6 +36,7 @@ export default async function SnsNotificationsPage({
 
   return (
     <>
+      <SnsUnreadSync count={center.unreadCount} />
       <PageHeader
         title="通知"
         subtitle={center.unreadCount > 0 ? `未読 ${center.unreadCount}件` : "すべて確認済み"}

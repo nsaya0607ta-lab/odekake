@@ -1,19 +1,10 @@
-import { Suspense } from "react";
-import { getSnsUnreadCount } from "@/lib/data/sns-notifications";
-import { requireUser } from "@/lib/supabase/server";
+"use client";
 
-/** 下部ナビを待たせず、未読があるときだけSNSカメラの右上へ光る丸を足す。 */
+import { useSnsUnreadCount } from "./use-sns-unread-count";
+
+/** 初期表示後に未読数を取得し、SNSカメラの右上へ光る丸を足す。 */
 export function SnsBottomNavIndicator() {
-  return (
-    <Suspense fallback={null}>
-      <UnreadDot />
-    </Suspense>
-  );
-}
-
-async function UnreadDot() {
-  const { supabase, user } = await requireUser();
-  const unreadCount = await getSnsUnreadCount(supabase, user.id);
+  const unreadCount = useSnsUnreadCount();
   if (unreadCount === 0) return null;
 
   return <span className="sns-bottom-unread-dot" aria-hidden="true" />;
