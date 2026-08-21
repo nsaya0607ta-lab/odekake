@@ -12,6 +12,13 @@ import type {
   SnsTextPostRow,
 } from "@/lib/supabase/types";
 
+export type SnsLinkableVisit = {
+  id: string;
+  spotName: string;
+  tripTitle: string;
+  visitedAt: string;
+};
+
 /** フィードで遡って表示する日数 */
 export const SNS_FEED_DAYS = 30;
 
@@ -47,6 +54,48 @@ export async function getPersonalTextPost(supabase: DB, postId: string): Promise
     throw new Error("投稿の取得に失敗しました");
   }
   return data?.[0] ?? null;
+}
+
+/** SNS投稿へ任意で添えられる、自分自身の訪問記録。1件を選ぶだけで場所と旅行を一緒に紐づける。 */
+export async function getSnsLinkableVisits(
+  supabase: DB,
+  userId: string,
+  limit = 80,
+): Promise<SnsLinkableVisit[]> {
+  const { data: visits, error } = await supabase
+    .from("visit_records")
+    .select("id, visited_at, spot_id, trip_id, journey_id")
+    .eq("user_id", userId)
+    .order("visited_at", { ascending: false })
+    .order("created_at", { ascending: false })
+    .limit(limit);
+
+  if (error) {
+    console.error("SNS linkable visits are unavailable", { code: error.code, message: error.message });
+    return [];
+  }
+  if (!visits || visits.length === 0) return [];
+
+  const spotIds = [...new Set(visits.map((visit) => visit.spot_id))];
+  const tripIds = [...new Set(visits.map((visit) => visit.journey_id ?? visit.trip_id))];
+  const [{ data: spots }, { data: trips }] = await Promise.all([
+    supabase.from("spots").select("id, name").in("id", spotIds),
+    supabase.from("trips").select("id, title").in("id", tripIds),
+  ]);
+  const spotNames = new Map((spots ?? []).map((spot) => [spot.id, spot.name]));
+  const tripTitles = new Map((trips ?? []).map((trip) => [trip.id, trip.title]));
+
+  return visits.flatMap((visit) => {
+    const spotName = spotNames.get(visit.spot_id);
+    if (!spotName) return [];
+    const tripId = visit.journey_id ?? visit.trip_id;
+    return [{
+      id: visit.id,
+      spotName,
+      tripTitle: tripTitles.get(tripId) ?? "普段のおでかけ",
+      visitedAt: visit.visited_at,
+    }];
+  });
 }
 
 export async function getFriendTextPostReplies(supabase: DB, postId: string): Promise<SnsTextPostReplyRow[]> {

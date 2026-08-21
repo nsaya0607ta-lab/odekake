@@ -6,6 +6,7 @@ import { LikeButton } from "@/components/sns/like-button";
 import { PostOptionsMenu } from "@/components/sns/post-options-menu";
 import { SnsCommentToggle } from "@/components/sns/sns-comment-toggle";
 import { SnsPostPhotoGrid } from "@/components/sns/sns-post-photo-grid";
+import { SnsPostPlaceTag } from "@/components/sns/sns-post-place-tag";
 
 /** Twitterのタイムラインのような、テキスト＋写真の個人投稿一覧 */
 export function SnsTextFeed({
@@ -90,6 +91,7 @@ export function SnsTextFeed({
                   <SnsPostPhotoGrid photoUrls={postPhotoUrls} fullUrls={postFullPhotoUrls} />
                 </Link>
               ) : null}
+              <SnsPostPlaceTag post={post} />
               <div className="mt-3 flex flex-wrap items-center gap-1 border-t border-dashed border-line pt-2">
                 <SnsCommentToggle
                   postId={post.id}

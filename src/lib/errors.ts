@@ -40,6 +40,7 @@ const RPC_MESSAGES: Array<[RegExp, string]> = [
   [/COMMENT_EMPTY/, "コメントを入力してください。"],
   [/COMMENT_TOO_LONG/, "コメントは1000文字以内で入力してください。"],
   [/COMMENT_NOT_FOUND/, "このコメントは見つかりませんでした。"],
+  [/LINKED_VISIT_NOT_FOUND/, "選択したおでかけ記録が見つかりません。もう一度選び直してください。"],
   [/GROUP_NAME_INVALID/, "グループ名は1〜40文字で入力してください。"],
   [/GROUP_NOT_FOUND/, "このグループは見つかりませんでした。"],
   [/GROUP_OWNER_ONLY/, "この操作はグループの作成者だけができます。"],

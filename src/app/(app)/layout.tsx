@@ -2,6 +2,7 @@ import { BottomNav } from "@/components/bottom-nav";
 import { GlobalInteractionFeedback } from "@/components/global-interaction-feedback";
 import { LoginBonus } from "@/components/login-bonus";
 import { PhotoCleanup } from "@/components/photo-cleanup";
+import { SnsBottomNavIndicator } from "@/components/sns/sns-bottom-nav-indicator";
 import { getCurrentDogSkin } from "@/lib/data/dog-skin";
 import { canAccessSns } from "@/lib/sns-access";
 import { requireUser } from "@/lib/supabase/server";
@@ -12,12 +13,16 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   // 通信は増えない。
   const { supabase, user } = await requireUser();
   const skin = await getCurrentDogSkin(supabase, user.id);
+  const snsAvailable = canAccessSns(user.email);
 
   return (
     <div className="min-h-dvh" style={{ paddingBottom: "calc(var(--nav-height) + var(--safe-bottom))" }}>
       {children}
       <GlobalInteractionFeedback />
-      <BottomNav snsLocked={!canAccessSns(user.email)} />
+      <BottomNav
+        snsLocked={!snsAvailable}
+        snsUnreadIndicator={snsAvailable ? <SnsBottomNavIndicator /> : null}
+      />
       <PhotoCleanup />
       {/* ユーザーごと・日本時間の日付ごとに1回だけ表示する。
           DB側でも同じ user_id + 日付で二重付与を防ぐ。 */}

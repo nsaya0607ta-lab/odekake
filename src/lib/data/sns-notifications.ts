@@ -1,3 +1,4 @@
+import { cache } from "react";
 import type { DB } from "./client";
 import { signThumbOrOriginalPaths } from "./photos";
 import {
@@ -171,7 +172,10 @@ export async function getSnsNotificationCenter(supabase: DB, userId: string): Pr
 }
 
 /** ヘッダーのバッジ用。署名付きアバターURLを作らず、未読数だけを計算する。 */
-export async function getSnsUnreadCount(supabase: DB, userId: string): Promise<number> {
+export const getSnsUnreadCount = cache(async function getSnsUnreadCount(
+  supabase: DB,
+  userId: string,
+): Promise<number> {
   const { ownPosts, groups, readState } = await getNotificationSources(supabase, userId);
   const seenAtMs = readState.seenAt ? Date.parse(readState.seenAt) : 0;
   const replyPosts = ownPosts.filter((post) => post.reply_count > 0).slice(0, REPLY_POST_LIMIT);
@@ -189,7 +193,7 @@ export async function getSnsUnreadCount(supabase: DB, userId: string): Promise<n
   }, 0);
   const unreadGroups = groups.filter((group) => group.has_unread).length;
   return unreadReplies + unreadLikes + unreadGroups;
-}
+});
 
 export async function getSnsNotificationReadSnapshot(
   supabase: DB,

@@ -672,6 +672,23 @@ select pg_temp.record('権限のないスポット更新も0行更新になる',
 insert into public.friendships (user_id, friend_user_id)
 values (:'alice', :'bob'), (:'bob', :'alice');
 
+select pg_temp.expect_ok('SNS投稿に自分の訪問場所と旅行を紐づけられる', :'alice', format(
+  $q$select public.create_friend_text_post('喫茶店へ行った', array[]::text[], %L)$q$, :'visit_a1'));
+
+select pg_temp.record('フレンドには紐づけた場所と旅行名が表示される',
+  pg_temp.count_as(:'bob', format(
+    $q$select 1 from public.get_personal_text_feed(%L, 100)
+       where linked_visit_id = %L and linked_spot_name = '秘密の喫茶店' and linked_trip_title = '秘密の旅'$q$,
+    :'alice', :'visit_a1')) = 1);
+
+select pg_temp.record('友達でない相手には紐づけ投稿も見えない',
+  pg_temp.count_as(:'carol', format(
+    $q$select 1 from public.get_personal_text_feed(%L, 100) where linked_visit_id = %L$q$,
+    :'alice', :'visit_a1')) = 0);
+
+select pg_temp.expect_denied('他人の訪問記録は自分の投稿へ紐づけられない', :'bob', format(
+  $q$select public.create_friend_text_post('なりすまし', array[]::text[], %L)$q$, :'visit_a1'));
+
 select pg_temp.expect_ok('自分の写真を投稿できる', :'alice', format(
   $q$select public.create_friend_photo('friend-photos/%s/2026-01-01/a.webp', 'テスト')$q$, :'alice'));
 

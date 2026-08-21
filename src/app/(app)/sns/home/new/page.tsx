@@ -2,13 +2,15 @@ import { PageBody } from "@/components/page-body";
 import { PageHeader } from "@/components/page-header";
 import { SnsTextComposeForm } from "@/components/sns/sns-text-compose-form";
 import { IconSend } from "@/components/icons";
+import { getSnsLinkableVisits } from "@/lib/data/sns";
 import { requireUser } from "@/lib/supabase/server";
 
 export const metadata = { title: "投稿する | SNS" };
 export const dynamic = "force-dynamic";
 
 export default async function NewSnsHomePostPage() {
-  const { user } = await requireUser();
+  const { supabase, user } = await requireUser();
+  const visitOptions = await getSnsLinkableVisits(supabase, user.id);
 
   return (
     <>
@@ -25,7 +27,7 @@ export default async function NewSnsHomePostPage() {
             </span>
           </span>
         </section>
-        <SnsTextComposeForm userId={user.id} />
+        <SnsTextComposeForm userId={user.id} visitOptions={visitOptions} />
       </PageBody>
     </>
   );

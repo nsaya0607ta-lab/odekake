@@ -85,12 +85,19 @@ const MAX_TEXT_POST_PHOTOS = 4;
 export async function createFriendTextPostAction(_prev: ActionState, formData: FormData): Promise<ActionState> {
   const body = String(formData.get("body") ?? "").trim();
   const requestedPhotoPaths = parsePhotoPaths(formData).slice(0, MAX_TEXT_POST_PHOTOS);
+  const linkedVisitValue = String(formData.get("linkedVisitId") ?? "");
+  const parsedLinkedVisitId = linkedVisitValue === "" ? null : uuidSchema.safeParse(linkedVisitValue);
+  const linkedVisitId = parsedLinkedVisitId?.success ? parsedLinkedVisitId.data : null;
+
+  if (linkedVisitValue !== "" && !parsedLinkedVisitId?.success) {
+    return { error: "選択したおでかけ記録を確認してください。", values: { body, linkedVisitId: "" } };
+  }
 
   if (body === "" && requestedPhotoPaths.length === 0) {
-    return { error: "つぶやきを入力するか、写真を選んでください。", values: { body } };
+    return { error: "つぶやきを入力するか、写真を選んでください。", values: { body, linkedVisitId: linkedVisitId ?? "" } };
   }
   if (body.length > 280) {
-    return { error: "280文字以内で入力してください。", values: { body } };
+    return { error: "280文字以内で入力してください。", values: { body, linkedVisitId: linkedVisitId ?? "" } };
   }
 
   const { supabase, user } = await requireUser();
@@ -100,9 +107,23 @@ export async function createFriendTextPostAction(_prev: ActionState, formData: F
       ? [...new Set(await finalizePhotoPaths(supabase, requestedPhotoPaths, destinationPrefix))]
       : [];
 
-  const { error } = await supabase.rpc("create_friend_text_post", { p_body: body, p_photo_paths: photoPaths });
+  let { error } = await supabase.rpc("create_friend_text_post", {
+    p_body: body,
+    p_photo_paths: photoPaths,
+    p_visit_record_id: linkedVisitId,
+  });
+  // DBマイグレーション適用前でも、紐づけなしの従来投稿は止めない。
+  if (error && linkedVisitId === null && (error.code === "PGRST202" || error.code === "42883")) {
+    ({ error } = await supabase.rpc("create_friend_text_post", { p_body: body, p_photo_paths: photoPaths }));
+  }
   if (error) {
-    return { error: toJapaneseError(error, "投稿に失敗しました。"), values: { body } };
+    const needsMigration = linkedVisitId !== null && (error.code === "PGRST202" || error.code === "42883");
+    return {
+      error: needsMigration
+        ? "場所・旅行の紐づけを保存するには、SupabaseのSQL更新が必要です。"
+        : toJapaneseError(error, "投稿に失敗しました。"),
+      values: { body, linkedVisitId: linkedVisitId ?? "" },
+    };
   }
 
   revalidatePath("/sns/home");

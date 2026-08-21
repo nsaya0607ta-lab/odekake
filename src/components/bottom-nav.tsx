@@ -3,6 +3,7 @@
 import Image from "next/image";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import type { ReactNode } from "react";
 
 const ITEMS = [
   { href: "/home", label: "ホーム", icon: "/icons/navigation/home.webp", match: ["/home"] },
@@ -46,7 +47,13 @@ function activeHref(pathname: string): string | null {
   return best?.href ?? null;
 }
 
-export function BottomNav({ snsLocked = false }: { snsLocked?: boolean }) {
+export function BottomNav({
+  snsLocked = false,
+  snsUnreadIndicator,
+}: {
+  snsLocked?: boolean;
+  snsUnreadIndicator?: ReactNode;
+}) {
   const pathname = usePathname();
   const current = activeHref(pathname);
 
@@ -117,14 +124,17 @@ export function BottomNav({ snsLocked = false }: { snsLocked?: boolean }) {
                   active ? "text-leaf-deep" : "text-ink-faint"
                 }`}
               >
-                <Image
-                  src={icon}
-                  alt={label}
-                  width={30}
-                  height={30}
-                  className="h-[30px] w-[30px] object-contain"
-                  style={{ opacity: active ? 1 : 0.6 }}
-                />
+                <span className="relative">
+                  <Image
+                    src={icon}
+                    alt={label}
+                    width={30}
+                    height={30}
+                    className="h-[30px] w-[30px] object-contain"
+                    style={{ opacity: active ? 1 : 0.6 }}
+                  />
+                  {href === "/sns" ? snsUnreadIndicator : null}
+                </span>
                 <span className={`text-[11px] ${active ? "font-semibold" : ""}`}>{label}</span>
               </Link>
             </li>

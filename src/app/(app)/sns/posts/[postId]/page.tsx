@@ -7,6 +7,7 @@ import { PageHeader } from "@/components/page-header";
 import { LikeButton } from "@/components/sns/like-button";
 import { PostOptionsMenu } from "@/components/sns/post-options-menu";
 import { SnsPostPhotoGrid } from "@/components/sns/sns-post-photo-grid";
+import { SnsPostPlaceTag } from "@/components/sns/sns-post-place-tag";
 import { SnsReplyThread } from "@/components/sns/sns-reply-thread";
 import { signPhotoPaths, signThumbOrOriginalPaths } from "@/lib/data/photos";
 import { getPersonalTextPost } from "@/lib/data/sns";
@@ -79,6 +80,7 @@ export default async function SnsTextPostPage({ params }: { params: Promise<{ po
             <p className="mt-3 whitespace-pre-wrap break-words text-[15px] leading-normal">{post.body}</p>
           ) : null}
           <SnsPostPhotoGrid photoUrls={postPhotoUrls} fullUrls={postFullPhotoUrls} />
+          <SnsPostPlaceTag post={post} />
           <div className="mt-2.5">
             <LikeButton postId={post.id} authorUserId={post.user_id} liked={post.my_liked} count={post.like_count} />
           </div>
