@@ -1,7 +1,8 @@
 "use client";
 
-import { useState } from "react";
-import { IconClose } from "@/components/icons";
+import { useEffect, useState } from "react";
+import { createPortal } from "react-dom";
+import { IconChevronLeft, IconChevronRight, IconClose } from "@/components/icons";
 
 /**
  * つぶやきに添付された写真（最大4枚）をTwitterのようなグリッドで並べる。
@@ -24,7 +25,12 @@ export function SnsPostPhotoGrid({ photoUrls, fullUrls }: { photoUrls: string[];
     <>
       <PhotoGridLayout photoUrls={photoUrls} onOpen={open} />
       {openIndex !== null ? (
-        <Lightbox src={fullUrls[openIndex] ?? photoUrls[openIndex] ?? ""} onClose={() => setOpenIndex(null)} />
+        <Lightbox
+          urls={fullUrls.length === photoUrls.length ? fullUrls : photoUrls}
+          index={openIndex}
+          onIndexChange={setOpenIndex}
+          onClose={() => setOpenIndex(null)}
+        />
       ) : null}
     </>
   );
@@ -123,25 +129,91 @@ function PhotoGridLayout({
   );
 }
 
-function Lightbox({ src, onClose }: { src: string; onClose: () => void }) {
-  return (
+function Lightbox({
+  urls,
+  index,
+  onIndexChange,
+  onClose,
+}: {
+  urls: string[];
+  index: number;
+  onIndexChange: (index: number) => void;
+  onClose: () => void;
+}) {
+  // 背景のスクロール・タップを完全に止める（body固定 + Portalでリンクの外に出す）
+  useEffect(() => {
+    const original = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.body.style.overflow = original;
+    };
+  }, []);
+
+  function stop(e: React.SyntheticEvent) {
+    e.preventDefault();
+    e.stopPropagation();
+  }
+
+  function close(e: React.SyntheticEvent) {
+    stop(e);
+    onClose();
+  }
+
+  function goPrev(e: React.SyntheticEvent) {
+    stop(e);
+    onIndexChange((index - 1 + urls.length) % urls.length);
+  }
+
+  function goNext(e: React.SyntheticEvent) {
+    stop(e);
+    onIndexChange((index + 1) % urls.length);
+  }
+
+  return createPortal(
     <div
       role="dialog"
       aria-modal="true"
       aria-label="写真を拡大表示"
-      onClick={onClose}
+      onClick={close}
+      onTouchMove={stop}
       className="fixed inset-0 z-50 flex items-center justify-center bg-black/90 p-4"
     >
       <button
         type="button"
-        onClick={onClose}
+        onClick={close}
         aria-label="閉じる"
-        className="absolute top-[calc(env(safe-area-inset-top,0px)+0.75rem)] right-4 flex h-10 w-10 items-center justify-center rounded-full bg-black/50 text-white"
+        className="absolute top-[calc(env(safe-area-inset-top,0px)+0.75rem)] right-4 z-10 flex h-10 w-10 items-center justify-center rounded-full bg-black/50 text-white"
       >
         <IconClose size={20} />
       </button>
+
+      {urls.length > 1 ? (
+        <>
+          <button
+            type="button"
+            onClick={goPrev}
+            aria-label="前の写真"
+            className="absolute left-2 z-10 flex h-11 w-11 items-center justify-center rounded-full bg-black/50 text-white"
+          >
+            <IconChevronLeft size={22} />
+          </button>
+          <button
+            type="button"
+            onClick={goNext}
+            aria-label="次の写真"
+            className="absolute right-2 z-10 flex h-11 w-11 items-center justify-center rounded-full bg-black/50 text-white"
+          >
+            <IconChevronRight size={22} />
+          </button>
+          <span className="absolute bottom-[calc(env(safe-area-inset-bottom,0px)+0.75rem)] left-1/2 -translate-x-1/2 rounded-full bg-black/50 px-3 py-1 text-xs text-white">
+            {index + 1} / {urls.length}
+          </span>
+        </>
+      ) : null}
+
       {/* eslint-disable-next-line @next/next/no-img-element */}
-      <img src={src} alt="" className="max-h-full max-w-full object-contain" onClick={(e) => e.stopPropagation()} />
-    </div>
+      <img src={urls[index]} alt="" className="max-h-full max-w-full object-contain" onClick={stop} />
+    </div>,
+    document.body,
   );
 }
