@@ -19,16 +19,26 @@ export function SnsCommentToggle({
 }) {
   const [open, setOpen] = useState(false);
   const [replies, setReplies] = useState<SnsEnrichedReply[] | null>(null);
+  const [loadError, setLoadError] = useState("");
   const [isPending, startTransition] = useTransition();
 
-  function toggle() {
-    setOpen((v) => !v);
-    if (replies === null) {
-      startTransition(async () => {
+  function loadReplies() {
+    if (isPending) return;
+    setLoadError("");
+    startTransition(async () => {
+      try {
         const data = await getPostRepliesAction(postId);
         setReplies(data);
-      });
-    }
+      } catch {
+        setLoadError("返信を読み込めませんでした。通信状態を確認して、もう一度お試しください。");
+      }
+    });
+  }
+
+  function toggle() {
+    const nextOpen = !open;
+    setOpen(nextOpen);
+    if (nextOpen && replies === null) loadReplies();
   }
 
   return (
@@ -38,7 +48,7 @@ export function SnsCommentToggle({
         onClick={toggle}
         aria-expanded={open}
         aria-label="コメントする"
-        className="pressable flex min-h-9 items-center gap-1.5 rounded-full px-2.5 py-1 text-ink-faint active:bg-paper-deep"
+        className="pressable flex min-h-11 items-center gap-1.5 rounded-full px-2.5 py-1 text-ink-faint active:bg-paper-deep"
         data-haptic="light"
       >
         <IconChat size={16} />
@@ -47,7 +57,14 @@ export function SnsCommentToggle({
       </button>
       {open ? (
         <div className="sns-inline-thread mt-1 w-full basis-full pt-3">
-          {replies === null ? (
+          {loadError ? (
+            <div className="sns-reply-load-error" role="alert">
+              <p>{loadError}</p>
+              <button type="button" onClick={loadReplies} disabled={isPending} className="pressable">
+                {isPending ? "再読み込み中…" : "再読み込み"}
+              </button>
+            </div>
+          ) : replies === null ? (
             <div className="sns-reply-loading" role="status">
               <span aria-hidden="true" />
               <span aria-hidden="true" />

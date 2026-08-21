@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { IconAt } from "@/components/icons";
 
 export type SnsMentionOption = { id: string; label: string };
@@ -16,6 +16,27 @@ export function SnsMentionPicker({
   compact?: boolean;
 }) {
   const [open, setOpen] = useState(false);
+  const rootRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!open) return;
+
+    function closeOnOutsidePress(event: PointerEvent) {
+      if (!rootRef.current?.contains(event.target as Node)) setOpen(false);
+    }
+
+    function closeOnEscape(event: KeyboardEvent) {
+      if (event.key === "Escape") setOpen(false);
+    }
+
+    document.addEventListener("pointerdown", closeOnOutsidePress);
+    document.addEventListener("keydown", closeOnEscape);
+    return () => {
+      document.removeEventListener("pointerdown", closeOnOutsidePress);
+      document.removeEventListener("keydown", closeOnEscape);
+    };
+  }, [open]);
+
   if (options.length === 0) return null;
 
   function insert(label: string) {
@@ -35,11 +56,12 @@ export function SnsMentionPicker({
   }
 
   return (
-    <div className={`sns-mention-picker ${compact ? "is-compact" : ""}`}>
+    <div ref={rootRef} className={`sns-mention-picker ${compact ? "is-compact" : ""}`}>
       <button
         type="button"
         onClick={() => setOpen((value) => !value)}
         aria-expanded={open}
+        aria-label="メンションする人を選ぶ"
         className="sns-mention-trigger pressable"
       >
         <IconAt size={16} />

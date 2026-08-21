@@ -85,7 +85,7 @@ export function SnsGroupPolls({
                 <form action={deleteFriendGroupPollAction}>
                   <input type="hidden" name="pollId" value={poll.id} />
                   <input type="hidden" name="groupId" value={groupId} />
-                  <ConfirmSubmitButton message="この投票を削除しますか？" pendingLabel="" className="pressable rounded-full p-2 text-ink-faint"><IconTrash size={14} /><span className="sr-only">投票を削除</span></ConfirmSubmitButton>
+                  <ConfirmSubmitButton message="この投票を削除しますか？" pendingLabel="" className="pressable flex h-11 w-11 items-center justify-center rounded-full text-ink-faint"><IconTrash size={14} /><span className="sr-only">投票を削除</span></ConfirmSubmitButton>
                 </form>
               ) : null}
             </div>

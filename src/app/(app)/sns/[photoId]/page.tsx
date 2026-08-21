@@ -6,7 +6,7 @@ import {
   setFriendPhotoReactionAction,
 } from "@/app/actions/sns";
 import { ConfirmSubmitButton } from "@/components/confirm-submit-button";
-import { IconClose, IconTrash, IconUser } from "@/components/icons";
+import { IconTrash, IconUser } from "@/components/icons";
 import { PageBody } from "@/components/page-body";
 import { PageHeader } from "@/components/page-header";
 import { SnsBackgroundBand } from "@/components/sns/sns-background-band";
@@ -189,13 +189,14 @@ export default async function SnsPhotoPage({
                       <form action={deleteFriendPhotoCommentAction} className="shrink-0">
                         <input type="hidden" name="commentId" value={comment.id} />
                         <input type="hidden" name="photoId" value={photo.id} />
-                        <button
-                          type="submit"
-                          aria-label="このコメントを削除"
-                          className="flex h-7 w-7 items-center justify-center rounded-full text-ink-faint active:bg-paper-deep"
+                        <ConfirmSubmitButton
+                          message="このコメントを削除しますか？"
+                          pendingLabel=""
+                          className="pressable flex h-11 w-11 items-center justify-center rounded-full text-ink-faint active:bg-paper-deep"
                         >
-                          <IconClose size={14} />
-                        </button>
+                          <IconTrash size={14} />
+                          <span className="sr-only">このコメントを削除</span>
+                        </ConfirmSubmitButton>
                       </form>
                     ) : null}
                   </li>

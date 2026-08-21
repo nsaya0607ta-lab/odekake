@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState, useTransition } from "react";
+import { useRef, useState, useTransition } from "react";
 import {
   deleteFriendTextPostAction,
   reportSnsPostAction,
@@ -9,6 +9,7 @@ import {
 } from "@/app/actions/sns";
 import { ConfirmSubmitButton } from "@/components/confirm-submit-button";
 import { IconFlag, IconMore, IconPin, IconShield, IconTrash } from "@/components/icons";
+import { SnsActionSheet } from "@/components/sns/sns-action-sheet";
 
 /** 投稿右上の共通メニュー。自分は固定・削除、友達は通報・ブロックを表示する。 */
 export function PostOptionsMenu({
@@ -25,36 +26,25 @@ export function PostOptionsMenu({
   const [open, setOpen] = useState(false);
   const [message, setMessage] = useState("");
   const [, startTransition] = useTransition();
-  const menuRef = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    if (!open) return;
-    function handleClick(e: MouseEvent) {
-      if (menuRef.current && !menuRef.current.contains(e.target as Node)) setOpen(false);
-    }
-    function handleKeyDown(e: KeyboardEvent) {
-      if (e.key === "Escape") setOpen(false);
-    }
-    document.addEventListener("mousedown", handleClick);
-    document.addEventListener("keydown", handleKeyDown);
-    return () => {
-      document.removeEventListener("mousedown", handleClick);
-      document.removeEventListener("keydown", handleKeyDown);
-    };
-  }, [open]);
+  const triggerRef = useRef<HTMLButtonElement>(null);
 
   function mutate(action: (data: FormData) => Promise<{ ok: boolean; error?: string }>, data: FormData, success: string) {
     setOpen(false);
     startTransition(async () => {
-      const result = await action(data);
-      setMessage(result.ok ? success : result.error ?? "操作できませんでした。");
+      try {
+        const result = await action(data);
+        setMessage(result.ok ? success : result.error ?? "操作できませんでした。");
+      } catch {
+        setMessage("通信に失敗しました。時間をおいてもう一度お試しください。");
+      }
       window.setTimeout(() => setMessage(""), 2800);
     });
   }
 
   return (
-    <div ref={menuRef} className="relative">
+    <div className="relative">
       <button
+        ref={triggerRef}
         type="button"
         aria-label="投稿のメニュー"
         aria-expanded={open}
@@ -64,9 +54,14 @@ export function PostOptionsMenu({
         <IconMore size={17} />
       </button>
 
-      {open ? (
-        <div className="sns-post-options-popover">
-          {isMine ? (
+      <SnsActionSheet
+        open={open}
+        onClose={() => setOpen(false)}
+        title="投稿の操作"
+        description={isMine ? "自分の投稿を管理できます" : "この投稿に対する操作を選んでください"}
+        returnFocusRef={triggerRef}
+      >
+        {isMine ? (
             <>
               <button
                 type="button"
@@ -93,7 +88,7 @@ export function PostOptionsMenu({
                 </ConfirmSubmitButton>
               </form>
             </>
-          ) : (
+        ) : (
             <>
               <button
                 type="button"
@@ -124,9 +119,8 @@ export function PostOptionsMenu({
                 ユーザーをブロック
               </button>
             </>
-          )}
-        </div>
-      ) : null}
+        )}
+      </SnsActionSheet>
       {message ? <span className="sns-menu-toast" role="status">{message}</span> : null}
     </div>
   );

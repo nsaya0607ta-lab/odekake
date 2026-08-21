@@ -9,7 +9,7 @@ import {
 } from "@/app/actions/sns";
 import { emptyActionState, FormMessage, SubmitButton } from "@/components/form";
 import { FormDraft } from "@/components/form-draft";
-import { IconChat, IconClose, IconUser } from "@/components/icons";
+import { IconChat, IconTrash, IconUser } from "@/components/icons";
 import { formatRelativeTimeJa } from "@/lib/date";
 import { SnsReplyLikeButton } from "@/components/sns/sns-reply-like-button";
 import { SnsRichText } from "@/components/sns/sns-rich-text";
@@ -43,12 +43,18 @@ export function SnsReplyThread({
   const [replyingTo, setReplyingTo] = useState<string | null>(null);
   const [showComposer, setShowComposer] = useState(false);
   const [expandedThreads, setExpandedThreads] = useState<Set<string>>(new Set());
+  const [refreshError, setRefreshError] = useState("");
   const [isRefreshing, startTransition] = useTransition();
 
   function refresh() {
+    setRefreshError("");
     startTransition(async () => {
-      const fresh = await getPostRepliesAction(postId);
-      setReplies(fresh);
+      try {
+        const fresh = await getPostRepliesAction(postId);
+        setReplies(fresh);
+      } catch {
+        setRefreshError("返信を更新できませんでした。もう一度お試しください。");
+      }
     });
   }
 
@@ -72,6 +78,12 @@ export function SnsReplyThread({
   return (
     <div className="sns-reply-thread space-y-3" aria-busy={isRefreshing}>
       {isRefreshing ? <span className="sns-reply-refresh-line" aria-hidden="true" /> : null}
+      {refreshError ? (
+        <div className="sns-reply-load-error is-compact" role="alert">
+          <p>{refreshError}</p>
+          <button type="button" onClick={refresh} disabled={isRefreshing} className="pressable">再読み込み</button>
+        </div>
+      ) : null}
       {showComposer ? (
         <InlineComposer
           postId={postId}
@@ -248,6 +260,7 @@ function ReplyRow({
   const canDelete = reply.userId === currentUserId;
 
   function handleDelete() {
+    if (!window.confirm("この返信を削除しますか？")) return;
     startTransition(async () => {
       const formData = new FormData();
       formData.set("replyId", reply.id);
@@ -292,9 +305,9 @@ function ReplyRow({
               type="button"
               onClick={handleDelete}
               aria-label="この返信を削除"
-              className="ml-auto flex h-6 w-6 items-center justify-center rounded-full text-ink-faint active:bg-paper"
+              className="pressable ml-auto flex h-11 w-11 items-center justify-center rounded-full text-ink-faint active:bg-paper"
             >
-              <IconClose size={12} />
+              <IconTrash size={14} />
             </button>
           ) : null}
         </div>

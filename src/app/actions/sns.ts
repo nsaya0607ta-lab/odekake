@@ -186,19 +186,24 @@ export async function deleteFriendTextPostAction(formData: FormData): Promise<vo
   redirect("/sns/home");
 }
 
-export async function setFriendTextPostLikeAction(formData: FormData): Promise<void> {
+export async function setFriendTextPostLikeAction(formData: FormData): Promise<SnsMutationResult> {
   const postId = String(formData.get("postId") ?? "");
   const authorUserId = String(formData.get("authorUserId") ?? "");
   const parsedPostId = uuidSchema.safeParse(postId);
-  if (!parsedPostId.success) return;
+  if (!parsedPostId.success) return { ok: false, error: "この投稿は見つかりませんでした。" };
 
   const liked = String(formData.get("liked") ?? "") === "1";
   const { supabase } = await requireUser();
-  await supabase.rpc("set_friend_text_post_like", { p_post_id: parsedPostId.data, p_liked: liked });
+  const { error } = await supabase.rpc("set_friend_text_post_like", {
+    p_post_id: parsedPostId.data,
+    p_liked: liked,
+  });
+  if (error) return { ok: false, error: toJapaneseError(error, "いいねを更新できませんでした。") };
 
   revalidatePath("/sns/home");
   revalidatePath(`/sns/posts/${parsedPostId.data}`);
   if (uuidSchema.safeParse(authorUserId).success) revalidatePath(`/sns/users/${authorUserId}`);
+  return { ok: true };
 }
 
 export async function setFriendTextPostSavedAction(formData: FormData): Promise<SnsMutationResult> {
@@ -297,18 +302,23 @@ export async function deleteFriendTextPostReplyAction(formData: FormData): Promi
   revalidatePath("/sns/home");
 }
 
-export async function setFriendTextPostReplyLikeAction(formData: FormData): Promise<void> {
+export async function setFriendTextPostReplyLikeAction(formData: FormData): Promise<SnsMutationResult> {
   const replyId = String(formData.get("replyId") ?? "");
   const postId = String(formData.get("postId") ?? "");
   const parsedReplyId = uuidSchema.safeParse(replyId);
-  if (!parsedReplyId.success) return;
+  if (!parsedReplyId.success) return { ok: false, error: "この返信は見つかりませんでした。" };
 
   const liked = String(formData.get("liked") ?? "") === "1";
   const { supabase } = await requireUser();
-  await supabase.rpc("set_friend_text_post_reply_like", { p_reply_id: parsedReplyId.data, p_liked: liked });
+  const { error } = await supabase.rpc("set_friend_text_post_reply_like", {
+    p_reply_id: parsedReplyId.data,
+    p_liked: liked,
+  });
+  if (error) return { ok: false, error: toJapaneseError(error, "返信のいいねを更新できませんでした。") };
 
   if (uuidSchema.safeParse(postId).success) revalidatePath(`/sns/posts/${postId}`);
   revalidatePath("/sns/home");
+  return { ok: true };
 }
 
 /** ホーム/ユーザー画面のカードでコメントアイコンを開いたときに、その場で返信一覧を取得する */

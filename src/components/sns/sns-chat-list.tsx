@@ -1,7 +1,8 @@
 "use client";
 
 import { useEffect, useRef } from "react";
-import { IconClose, IconUser } from "@/components/icons";
+import { ConfirmSubmitButton } from "@/components/confirm-submit-button";
+import { IconTrash, IconUser } from "@/components/icons";
 import { SnsRichText } from "@/components/sns/sns-rich-text";
 import type { SnsMentionRow } from "@/lib/supabase/types";
 
@@ -95,13 +96,14 @@ export function SnsChatList({
                 <form action={deleteAction} className="shrink-0">
                   <input type="hidden" name="messageId" value={message.id} />
                   <input type="hidden" name="groupId" value={groupId} />
-                  <button
-                    type="submit"
-                    aria-label="このメッセージを削除"
-                    className="flex h-6 w-6 items-center justify-center rounded-full text-ink-faint active:bg-paper-deep"
+                  <ConfirmSubmitButton
+                    message="このメッセージを削除しますか？"
+                    pendingLabel=""
+                    className="pressable flex h-11 w-11 items-center justify-center rounded-full text-ink-faint active:bg-paper-deep"
                   >
-                    <IconClose size={12} />
-                  </button>
+                    <IconTrash size={14} />
+                    <span className="sr-only">このメッセージを削除</span>
+                  </ConfirmSubmitButton>
                 </form>
                 <span className="shrink-0 text-[10px] text-ink-faint">{formatTime(message.created_at)}</span>
                 <div className="sns-chat-bubble-mine max-w-[76%] rounded-[1.25rem] rounded-br-md px-3.5 py-2.5 shadow-sm">
