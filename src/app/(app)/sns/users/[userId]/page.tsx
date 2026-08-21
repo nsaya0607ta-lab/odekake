@@ -3,7 +3,7 @@ import { PageHeader } from "@/components/page-header";
 import { SnsBackgroundBand } from "@/components/sns/sns-background-band";
 import { SnsTextFeed } from "@/components/sns/sns-text-feed";
 import { signPhotoPaths, signThumbOrOriginalPaths } from "@/lib/data/photos";
-import { getOwnSnsProfile, getPersonalTextFeed } from "@/lib/data/sns";
+import { getFriendProfile, getPersonalTextFeed } from "@/lib/data/sns";
 import { requireUser } from "@/lib/supabase/server";
 
 export const dynamic = "force-dynamic";
@@ -13,7 +13,7 @@ export default async function SnsUserHomePage({ params }: { params: Promise<{ us
   const [{ userId }, { supabase, user }] = await Promise.all([params, requireUser()]);
 
   const [profile, posts] = await Promise.all([
-    getOwnSnsProfile(supabase, userId),
+    getFriendProfile(supabase, userId),
     getPersonalTextFeed(supabase, userId),
   ]);
   const allPhotoPaths = posts.flatMap((p) => p.photo_paths);

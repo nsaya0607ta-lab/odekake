@@ -113,6 +113,22 @@ export async function getOwnSnsProfile(supabase: DB, userId: string): Promise<{ 
   return { displayName: data?.display_name ?? "自分", iconUrl };
 }
 
+/** 特定ユーザーの表示名とアイコンURL。フレンド視点の可視性チェックをした上で返す
+ * （profilesテーブルのRLSは本人の行しか読めないため、getOwnSnsProfileは他人には使えない） */
+export async function getFriendProfile(supabase: DB, userId: string): Promise<{ displayName: string; iconUrl?: string }> {
+  const { data, error } = await supabase.rpc("get_friend_profile", { p_user_id: userId });
+  if (error) {
+    console.error("Friend profile is unavailable", { code: error.code, message: error.message });
+    throw new Error("プロフィールの取得に失敗しました");
+  }
+
+  const row = data?.[0];
+  const iconPath = row?.profile_image_url ?? null;
+  const iconUrl = iconPath ? (await signThumbOrOriginalPaths(supabase, [iconPath])).get(iconPath) : undefined;
+
+  return { displayName: row?.display_name ?? "不明なユーザー", iconUrl };
+}
+
 export async function getFriendGroupMembers(supabase: DB, groupId: string): Promise<FriendGroupMemberRow[]> {
   const { data, error } = await supabase.rpc("get_friend_group_members", { p_group_id: groupId });
   if (error) {

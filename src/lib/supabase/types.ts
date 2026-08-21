@@ -659,6 +659,10 @@ export type Database = {
         Returns: SnsTextPostRow[];
       };
       get_personal_text_post: { Args: { p_post_id: string }; Returns: SnsTextPostRow[] };
+      get_friend_profile: {
+        Args: { p_user_id: string };
+        Returns: { display_name: string; profile_image_url: string | null }[];
+      };
       set_friend_text_post_like: { Args: { p_post_id: string; p_liked: boolean }; Returns: undefined };
       add_friend_text_post_reply: {
         Args: { p_post_id: string; p_body: string };
