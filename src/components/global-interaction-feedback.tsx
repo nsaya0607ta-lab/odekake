@@ -66,6 +66,7 @@ export function GlobalInteractionFeedback() {
       const href = internalHrefFromAnchor(anchor);
       if (!href) return;
       router.prefetch(href);
+      if (anchor.dataset.haptic === "light") navigator.vibrate?.(6);
       anchor.setAttribute("data-pressed", "true");
     };
 

@@ -9,6 +9,8 @@ import { ConfirmSubmitButton } from "@/components/confirm-submit-button";
 import { IconClose, IconTrash, IconUser } from "@/components/icons";
 import { PageBody } from "@/components/page-body";
 import { PageHeader } from "@/components/page-header";
+import { SnsBackgroundBand } from "@/components/sns/sns-background-band";
+import { SnsIllustratedHero } from "@/components/sns/sns-illustrated-hero";
 import { signPhotoPaths, signThumbOrOriginalPaths } from "@/lib/data/photos";
 import { getFriendPhotoComments, getSnsPhoto } from "@/lib/data/sns";
 import { requireUser } from "@/lib/supabase/server";
@@ -44,16 +46,20 @@ export default async function SnsPhotoPage({
 
   const backHref = photo.group_id ? `/sns/groups/${photo.group_id}` : "/sns";
 
-  const comments = await getFriendPhotoComments(supabase, photoId);
+  const [comments, photoUrlMap, avatarUrlMap] = await Promise.all([
+    getFriendPhotoComments(supabase, photoId),
+    signPhotoPaths(supabase, [photo.storage_path]),
+    photo.profile_image_url
+      ? signThumbOrOriginalPaths(supabase, [photo.profile_image_url])
+      : Promise.resolve(new Map<string, string>()),
+  ]);
   const commenterAvatarUrls = await signThumbOrOriginalPaths(
     supabase,
     comments.flatMap((c) => (c.profile_image_url ? [c.profile_image_url] : [])),
   );
   // 一覧の写真は原寸で見せる（サムネイルはグリッド専用）
-  const photoUrl = (await signPhotoPaths(supabase, [photo.storage_path])).get(photo.storage_path);
-  const avatarUrl = photo.profile_image_url
-    ? (await signThumbOrOriginalPaths(supabase, [photo.profile_image_url])).get(photo.profile_image_url)
-    : null;
+  const photoUrl = photoUrlMap.get(photo.storage_path);
+  const avatarUrl = photo.profile_image_url ? avatarUrlMap.get(photo.profile_image_url) : null;
 
   const isOwner = photo.user_id === user.id;
 
@@ -78,14 +84,15 @@ export default async function SnsPhotoPage({
           ) : null
         }
       />
-      <PageBody>
+      <SnsBackgroundBand hasToggleBar={false} />
+      <PageBody className="sns-page-shell sns-subpage-body space-y-4">
         {sp.error === "delete" ? (
           <p role="alert" className="rounded-2xl border border-blossom bg-blossom-soft px-4 py-3 text-sm text-[#8f4c59]">
             削除できませんでした。
           </p>
         ) : null}
 
-        <div className="flex items-center gap-2 px-1">
+        <div className="sns-photo-author-strip">
           <span className="h-9 w-9 shrink-0 overflow-hidden rounded-full bg-paper-deep">
             {avatarUrl ? (
               // eslint-disable-next-line @next/next/no-img-element
@@ -102,7 +109,7 @@ export default async function SnsPhotoPage({
           </span>
         </div>
 
-        <div className="overflow-hidden rounded-3xl bg-paper-deep">
+        <div className="sns-photo-detail-stage">
           {photoUrl ? (
             // eslint-disable-next-line @next/next/no-img-element
             <img src={photoUrl} alt="" className="w-full object-cover" />
@@ -111,9 +118,10 @@ export default async function SnsPhotoPage({
           )}
         </div>
 
-        {photo.caption ? <p className="whitespace-pre-wrap px-1 text-sm leading-relaxed">{photo.caption}</p> : null}
+        {photo.caption ? <p className="sns-photo-detail-caption">{photo.caption}</p> : null}
 
-        <section className="flex flex-wrap gap-2 px-1">
+        <section className="sns-reaction-tray" aria-label="写真へのリアクション">
+          <span className="w-full text-[10px] font-black tracking-[0.12em] text-ink-faint">QUICK REACTION</span>
           {REACTION_EMOJIS.map((emoji) => {
             const selected = photo.my_reaction === emoji;
             return (
@@ -122,8 +130,8 @@ export default async function SnsPhotoPage({
                 <input type="hidden" name="emoji" value={selected ? "" : emoji} />
                 <button
                   type="submit"
-                  className={`tap-target rounded-full border px-3 py-1.5 text-lg transition-colors ${
-                    selected ? "border-leaf bg-leaf-soft" : "border-line-strong bg-card active:bg-paper-deep"
+                  className={`sns-reaction-button pressable ${
+                    selected ? "is-selected" : ""
                   }`}
                   aria-pressed={selected}
                   aria-label={`${emoji}でリアクション`}
@@ -140,8 +148,14 @@ export default async function SnsPhotoPage({
           ) : null}
         </section>
 
-        <section className="space-y-3">
-          <h2 className="px-1 text-sm font-bold text-ink-soft">コメント（{comments.length}）</h2>
+        <section className="sns-photo-comments-panel space-y-3">
+          <SnsIllustratedHero
+            eyebrow="PHOTO TALK"
+            title="この一枚を囲んで"
+            description={`${comments.length}件のコメント。感じたことを気軽に残そう。`}
+            artSrc="/illustrations/sns/conversation-v2.webp"
+            tone="photo"
+          />
           <CommentForm photoId={photo.id} />
           {comments.length === 0 ? (
             <p className="px-1 text-xs text-ink-faint">まだコメントはありません。</p>
@@ -164,7 +178,7 @@ export default async function SnsPhotoPage({
                         </span>
                       )}
                     </span>
-                    <div className="min-w-0 flex-1 rounded-2xl bg-paper-deep px-3 py-2">
+                    <div className="sns-photo-comment-bubble">
                       <div className="flex items-center justify-between gap-2">
                         <span className="truncate text-xs font-bold">{comment.display_name}</span>
                         <span className="shrink-0 text-[10px] text-ink-faint">{formatDateTime(comment.created_at)}</span>
@@ -191,7 +205,7 @@ export default async function SnsPhotoPage({
           )}
         </section>
 
-        <Link href={backHref} className="block text-center text-xs text-ink-faint underline underline-offset-2">
+        <Link href={backHref} className="sns-back-to-list pressable">
           一覧へ戻る
         </Link>
       </PageBody>

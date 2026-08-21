@@ -9,11 +9,13 @@ export function LikeButton({
   authorUserId,
   liked,
   count,
+  showLabel = false,
 }: {
   postId: string;
   authorUserId: string;
   liked: boolean;
   count: number;
+  showLabel?: boolean;
 }) {
   const [optimistic, setOptimistic] = useState({ liked, count });
   const [, startTransition] = useTransition();
@@ -26,6 +28,9 @@ export function LikeButton({
   function toggle() {
     const next = { liked: !optimistic.liked, count: optimistic.count + (optimistic.liked ? -1 : 1) };
     setOptimistic(next);
+    if (next.liked && typeof navigator !== "undefined" && "vibrate" in navigator) {
+      navigator.vibrate?.(10);
+    }
     startTransition(async () => {
       const formData = new FormData();
       formData.set("postId", postId);
@@ -41,11 +46,12 @@ export function LikeButton({
       onClick={toggle}
       aria-label={optimistic.liked ? "いいねを取り消す" : "いいねする"}
       aria-pressed={optimistic.liked}
-      className={`flex items-center gap-1.5 rounded-full px-1.5 py-1 transition-colors active:bg-paper-deep ${
-        optimistic.liked ? "text-blossom" : "text-ink-faint"
+      className={`sns-like-button pressable flex min-h-9 items-center gap-1.5 rounded-full px-2.5 py-1 transition-colors active:bg-paper-deep ${
+        optimistic.liked ? "bg-blossom-soft text-blossom" : "text-ink-faint"
       }`}
     >
       <IconHeart size={16} filled={optimistic.liked} />
+      {showLabel ? <span className="text-[11px] font-bold">いいね</span> : null}
       {optimistic.count > 0 ? <span className="text-xs">{optimistic.count}</span> : null}
     </button>
   );

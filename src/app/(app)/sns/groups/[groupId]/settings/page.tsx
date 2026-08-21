@@ -1,9 +1,11 @@
 import { notFound } from "next/navigation";
 import { deleteFriendGroupAction, leaveFriendGroupAction } from "@/app/actions/sns";
 import { ConfirmSubmitButton } from "@/components/confirm-submit-button";
-import { IconUser } from "@/components/icons";
+import { IconSettings, IconUser, IconUsers } from "@/components/icons";
 import { PageBody } from "@/components/page-body";
 import { PageHeader } from "@/components/page-header";
+import { SnsBackgroundBand } from "@/components/sns/sns-background-band";
+import { SnsIllustratedHero } from "@/components/sns/sns-illustrated-hero";
 import { getFriendList } from "@/lib/data/friends";
 import { signThumbOrOriginalPaths } from "@/lib/data/photos";
 import { getFriendGroupMembers, getMyFriendGroups, signGroupIconUrls } from "@/lib/data/sns";
@@ -28,35 +30,52 @@ export default async function SnsGroupSettingsPage({
   if (!group) notFound();
 
   const isOwner = group.owner_id === user.id;
-  const groupIconUrls = await signGroupIconUrls(supabase, [group]);
-  const members = await getFriendGroupMembers(supabase, groupId);
-  const avatarUrls = await signThumbOrOriginalPaths(
-    supabase,
-    members.flatMap((m) => (m.profile_image_url ? [m.profile_image_url] : [])),
-  );
-
-  const friends = isOwner ? await getFriendList(supabase) : [];
+  const [groupIconUrls, members, friends] = await Promise.all([
+    signGroupIconUrls(supabase, [group]),
+    getFriendGroupMembers(supabase, groupId),
+    isOwner ? getFriendList(supabase) : Promise.resolve([]),
+  ]);
   const memberIds = new Set(members.map((m) => m.user_id));
   const invitableFriends = friends.filter((f) => !memberIds.has(f.friend_user_id));
-  const friendAvatarUrls = isOwner
-    ? await signThumbOrOriginalPaths(
+  const [avatarUrls, friendAvatarUrls] = await Promise.all([
+    signThumbOrOriginalPaths(
+      supabase,
+      members.flatMap((m) => (m.profile_image_url ? [m.profile_image_url] : [])),
+    ),
+    isOwner
+      ? signThumbOrOriginalPaths(
         supabase,
         invitableFriends.flatMap((f) => (f.profile_image_url ? [f.profile_image_url] : [])),
       )
-    : new Map<string, string>();
+      : Promise.resolve(new Map<string, string>()),
+  ]);
 
   return (
     <>
       <PageHeader title="グループの設定" backHref={`/sns/groups/${groupId}`} />
-      <PageBody>
+      <SnsBackgroundBand hasToggleBar={false} />
+      <PageBody className="sns-page-shell sns-subpage-body space-y-4">
+        <SnsIllustratedHero
+          eyebrow="CREW CONTROL"
+          title={`${group.name}を整える`}
+          description="目印とメンバーを、迷わずひとつの画面で管理。"
+          artSrc="/illustrations/sns/group-tools-v2.webp"
+          tone="group"
+        />
         {sp.error ? (
           <p role="alert" className="rounded-2xl border border-blossom bg-blossom-soft px-4 py-3 text-sm text-[#8f4c59]">
             操作に失敗しました。
           </p>
         ) : null}
 
-        <section className="space-y-2">
-          <h2 className="px-1 text-sm font-bold text-ink-soft">グループ名・アイコン</h2>
+        <section className="sns-settings-card space-y-3">
+          <div className="sns-section-heading">
+            <span className="sns-section-heading-icon is-violet" aria-hidden="true"><IconSettings size={17} /></span>
+            <span>
+              <span className="block text-sm font-black">グループの目印</span>
+              <span className="block text-[10px] text-ink-faint">名前とアイコン</span>
+            </span>
+          </div>
           <EditGroupForm
             groupId={groupId}
             userId={user.id}
@@ -66,13 +85,20 @@ export default async function SnsGroupSettingsPage({
           />
         </section>
 
-        <section className="space-y-2">
-          <h2 className="px-1 text-sm font-bold text-ink-soft">メンバー（{members.length}人）</h2>
-          <ul className="rough-card divide-y divide-line overflow-hidden">
+        <section className="sns-settings-card space-y-3">
+          <div className="sns-section-heading">
+            <span className="sns-section-heading-icon is-cyan" aria-hidden="true"><IconUsers size={17} /></span>
+            <span className="min-w-0 flex-1">
+              <span className="block text-sm font-black">現在のメンバー</span>
+              <span className="block text-[10px] text-ink-faint">このグループを見られる人</span>
+            </span>
+            <span className="sns-member-count">{members.length}人</span>
+          </div>
+          <ul className="sns-current-member-list">
             {members.map((member) => {
               const avatarUrl = member.profile_image_url ? avatarUrls.get(member.profile_image_url) : null;
               return (
-                <li key={member.user_id} className="flex items-center gap-3 px-4 py-3">
+                <li key={member.user_id} className="flex items-center gap-3 px-3 py-2.5">
                   <span className="h-9 w-9 shrink-0 overflow-hidden rounded-full bg-paper-deep">
                     {avatarUrl ? (
                       // eslint-disable-next-line @next/next/no-img-element
@@ -96,8 +122,14 @@ export default async function SnsGroupSettingsPage({
         </section>
 
         {isOwner && invitableFriends.length > 0 ? (
-          <section className="space-y-2">
-            <h2 className="px-1 text-sm font-bold text-ink-soft">メンバーを追加</h2>
+          <section className="sns-settings-card space-y-3">
+            <div className="sns-section-heading">
+              <span className="sns-section-heading-icon is-coral" aria-hidden="true">＋</span>
+              <span>
+                <span className="block text-sm font-black">仲間を追加</span>
+                <span className="block text-[10px] text-ink-faint">選んだフレンドを招待</span>
+              </span>
+            </div>
             <AddMembersForm
               groupId={groupId}
               friends={invitableFriends}
@@ -106,7 +138,8 @@ export default async function SnsGroupSettingsPage({
           </section>
         ) : null}
 
-        <section className="space-y-2">
+        <section className="sns-danger-zone space-y-2">
+          <p className="px-1 text-[10px] font-black tracking-[0.12em] text-[#a65668]">DANGER ZONE</p>
           {isOwner ? (
             <form action={deleteFriendGroupAction}>
               <input type="hidden" name="groupId" value={groupId} />

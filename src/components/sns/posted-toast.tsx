@@ -41,12 +41,16 @@ export function PostedToast() {
     >
       <div
         role="status"
-        className={`flex items-center gap-2 rounded-full border border-leaf bg-leaf-soft px-4 py-2 text-sm font-semibold text-leaf-deep shadow-lg transition-all duration-300 ${
+        className={`sns-posted-toast ${
           visible ? "translate-y-0 opacity-100" : "-translate-y-3 opacity-0"
         }`}
       >
-        <IconCheck size={16} />
-        写真を投稿しました
+        <span className="sns-posted-toast-check" aria-hidden="true"><IconCheck size={16} /></span>
+        <span>
+          <span className="block text-[10px] font-black tracking-[0.12em] text-white/70">MEMORY SAVED</span>
+          <span className="block text-xs font-black">写真を投稿しました</span>
+        </span>
+        <span className="text-[#ffe16d]" aria-hidden="true">✦</span>
       </div>
     </div>
   );

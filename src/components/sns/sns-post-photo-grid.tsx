@@ -1,8 +1,9 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState, useTransition } from "react";
 import { createPortal } from "react-dom";
-import { IconChevronLeft, IconChevronRight, IconClose } from "@/components/icons";
+import { setFriendTextPostLikeAction } from "@/app/actions/sns";
+import { IconChevronLeft, IconChevronRight, IconClose, IconHeart } from "@/components/icons";
 
 /**
  * つぶやきに添付された写真（最大4枚）をTwitterのようなグリッドで並べる。
@@ -10,20 +11,71 @@ import { IconChevronLeft, IconChevronRight, IconClose } from "@/components/icons
  * タップすると原寸（アップロード時に圧縮済みの本画像）を初めて読み込み、
  * 全画面で拡大表示する — 原寸は開いたときだけ読み込まれる
  */
-export function SnsPostPhotoGrid({ photoUrls, fullUrls }: { photoUrls: string[]; fullUrls: string[] }) {
+export function SnsPostPhotoGrid({
+  photoUrls,
+  fullUrls,
+  postId,
+  authorUserId,
+  liked = false,
+}: {
+  photoUrls: string[];
+  fullUrls: string[];
+  postId?: string;
+  authorUserId?: string;
+  liked?: boolean;
+}) {
   const [openIndex, setOpenIndex] = useState<number | null>(null);
+  const [heartBurst, setHeartBurst] = useState(false);
+  const [locallyLiked, setLocallyLiked] = useState(liked);
+  const [, startTransition] = useTransition();
+  const lastTapRef = useRef(0);
+  const openTimerRef = useRef<number | null>(null);
+
+  useEffect(() => setLocallyLiked(liked), [liked]);
+  useEffect(() => () => {
+    if (openTimerRef.current) window.clearTimeout(openTimerRef.current);
+  }, []);
 
   if (photoUrls.length === 0) return null;
 
   function open(index: number, e: React.MouseEvent) {
     e.preventDefault();
     e.stopPropagation();
-    setOpenIndex(index);
+    const now = Date.now();
+    const isDoubleTap = now - lastTapRef.current < 300;
+    lastTapRef.current = now;
+
+    if (isDoubleTap && postId && authorUserId) {
+      if (openTimerRef.current) window.clearTimeout(openTimerRef.current);
+      setHeartBurst(false);
+      requestAnimationFrame(() => setHeartBurst(true));
+      window.setTimeout(() => setHeartBurst(false), 720);
+      if (!locallyLiked) {
+        setLocallyLiked(true);
+        if ("vibrate" in navigator) navigator.vibrate?.(12);
+        startTransition(async () => {
+          const formData = new FormData();
+          formData.set("postId", postId);
+          formData.set("authorUserId", authorUserId);
+          formData.set("liked", "1");
+          await setFriendTextPostLikeAction(formData);
+        });
+      }
+      return;
+    }
+
+    if (openTimerRef.current) window.clearTimeout(openTimerRef.current);
+    openTimerRef.current = window.setTimeout(() => setOpenIndex(index), postId ? 230 : 0);
   }
 
   return (
     <>
-      <PhotoGridLayout photoUrls={photoUrls} onOpen={open} />
+      <div className="sns-post-photo-stage">
+        <PhotoGridLayout photoUrls={photoUrls} onOpen={open} />
+        {heartBurst ? (
+          <span className="sns-photo-heart-burst" aria-hidden="true"><IconHeart size={66} filled /></span>
+        ) : null}
+      </div>
       {openIndex !== null ? (
         <Lightbox
           urls={fullUrls.length === photoUrls.length ? fullUrls : photoUrls}
@@ -140,6 +192,10 @@ function Lightbox({
   onIndexChange: (index: number) => void;
   onClose: () => void;
 }) {
+  const [zoom, setZoom] = useState(1);
+  const gestureRef = useRef({ startX: 0, startDistance: 0, startZoom: 1 });
+
+  useEffect(() => setZoom(1), [index]);
   // 背景のスクロール・タップを完全に止める（body固定 + Portalでリンクの外に出す）
   useEffect(() => {
     const original = document.body.style.overflow;
@@ -148,6 +204,20 @@ function Lightbox({
       document.body.style.overflow = original;
     };
   }, []);
+
+  useEffect(() => {
+    function handleKeyDown(event: KeyboardEvent) {
+      if (event.key === "Escape") onClose();
+      if (urls.length > 1 && event.key === "ArrowLeft") {
+        onIndexChange((index - 1 + urls.length) % urls.length);
+      }
+      if (urls.length > 1 && event.key === "ArrowRight") {
+        onIndexChange((index + 1) % urls.length);
+      }
+    }
+    document.addEventListener("keydown", handleKeyDown);
+    return () => document.removeEventListener("keydown", handleKeyDown);
+  }, [index, onClose, onIndexChange, urls.length]);
 
   function stop(e: React.SyntheticEvent) {
     e.preventDefault();
@@ -169,20 +239,55 @@ function Lightbox({
     onIndexChange((index + 1) % urls.length);
   }
 
+  function distance(touches: React.TouchList): number {
+    if (touches.length < 2) return 0;
+    const first = touches.item(0);
+    const second = touches.item(1);
+    if (!first || !second) return 0;
+    return Math.hypot(second.clientX - first.clientX, second.clientY - first.clientY);
+  }
+
+  function handleTouchStart(event: React.TouchEvent) {
+    event.stopPropagation();
+    if (event.touches.length === 2) {
+      gestureRef.current.startDistance = distance(event.touches);
+      gestureRef.current.startZoom = zoom;
+    } else if (event.touches.length === 1) {
+      gestureRef.current.startX = event.touches[0]?.clientX ?? 0;
+    }
+  }
+
+  function handleTouchMove(event: React.TouchEvent) {
+    event.stopPropagation();
+    if (event.touches.length === 2 && gestureRef.current.startDistance > 0) {
+      event.preventDefault();
+      const ratio = distance(event.touches) / gestureRef.current.startDistance;
+      setZoom(Math.min(3.5, Math.max(1, gestureRef.current.startZoom * ratio)));
+    }
+  }
+
+  function handleTouchEnd(event: React.TouchEvent) {
+    event.stopPropagation();
+    if (zoom > 1 || urls.length < 2 || event.changedTouches.length !== 1) return;
+    const endX = event.changedTouches[0]?.clientX ?? gestureRef.current.startX;
+    const delta = endX - gestureRef.current.startX;
+    if (Math.abs(delta) < 48) return;
+    onIndexChange(delta > 0 ? (index - 1 + urls.length) % urls.length : (index + 1) % urls.length);
+  }
+
   return createPortal(
     <div
       role="dialog"
       aria-modal="true"
       aria-label="写真を拡大表示"
       onClick={close}
-      onTouchMove={stop}
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/90 p-4"
+      className="sns-lightbox"
     >
       <button
         type="button"
         onClick={close}
         aria-label="閉じる"
-        className="absolute top-[calc(env(safe-area-inset-top,0px)+0.75rem)] right-4 z-10 flex h-10 w-10 items-center justify-center rounded-full bg-black/50 text-white"
+        className="sns-lightbox-control is-close pressable"
       >
         <IconClose size={20} />
       </button>
@@ -193,7 +298,7 @@ function Lightbox({
             type="button"
             onClick={goPrev}
             aria-label="前の写真"
-            className="absolute left-2 z-10 flex h-11 w-11 items-center justify-center rounded-full bg-black/50 text-white"
+            className="sns-lightbox-control is-prev pressable"
           >
             <IconChevronLeft size={22} />
           </button>
@@ -201,18 +306,31 @@ function Lightbox({
             type="button"
             onClick={goNext}
             aria-label="次の写真"
-            className="absolute right-2 z-10 flex h-11 w-11 items-center justify-center rounded-full bg-black/50 text-white"
+            className="sns-lightbox-control is-next pressable"
           >
             <IconChevronRight size={22} />
           </button>
-          <span className="absolute bottom-[calc(env(safe-area-inset-bottom,0px)+0.75rem)] left-1/2 -translate-x-1/2 rounded-full bg-black/50 px-3 py-1 text-xs text-white">
+          <span className="sns-lightbox-counter" aria-live="polite">
             {index + 1} / {urls.length}
           </span>
         </>
       ) : null}
 
       {/* eslint-disable-next-line @next/next/no-img-element */}
-      <img src={urls[index]} alt="" className="max-h-full max-w-full object-contain" onClick={stop} />
+      <img
+        src={urls[index]}
+        alt=""
+        className="sns-lightbox-image"
+        style={{ transform: `scale(${zoom})` }}
+        onClick={stop}
+        onDoubleClick={(event) => {
+          stop(event);
+          setZoom((value) => value > 1 ? 1 : 2.25);
+        }}
+        onTouchStart={handleTouchStart}
+        onTouchMove={handleTouchMove}
+        onTouchEnd={handleTouchEnd}
+      />
     </div>,
     document.body,
   );

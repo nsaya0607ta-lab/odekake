@@ -3,6 +3,7 @@
 import { useActionState } from "react";
 import { updateFriendGroupAction } from "@/app/actions/sns";
 import { emptyActionState, Field, FormMessage, SubmitButton } from "@/components/form";
+import { IconCheck } from "@/components/icons";
 import { PhotoUploader } from "@/components/photo-uploader";
 
 export function EditGroupForm({
@@ -21,7 +22,7 @@ export function EditGroupForm({
   const [state, action] = useActionState(updateFriendGroupAction, emptyActionState);
 
   return (
-    <form action={action} className="space-y-5">
+    <form action={action} className="sns-settings-form space-y-4">
       <input type="hidden" name="groupId" value={groupId} />
 
       <PhotoUploader
@@ -33,11 +34,11 @@ export function EditGroupForm({
         initial={iconPath && iconUrl ? [{ path: iconPath, url: iconUrl }] : []}
       />
 
-      <Field label="グループ名" htmlFor="name" error={state.fieldErrors?.name}>
+      <Field label="グループ名" htmlFor="name" hint="40文字まで" error={state.fieldErrors?.name}>
         <input
           id="name"
           name="name"
-          className="field"
+          className="field sns-group-name-field"
           defaultValue={state.values?.name ?? name}
           maxLength={40}
           required
@@ -45,7 +46,8 @@ export function EditGroupForm({
       </Field>
 
       <FormMessage state={state} />
-      <SubmitButton className="btn btn-quiet w-full text-sm" pendingLabel="保存中…">
+      <SubmitButton className="sns-secondary-submit pressable" pendingLabel="保存中…">
+        <IconCheck size={16} />
         保存する
       </SubmitButton>
     </form>

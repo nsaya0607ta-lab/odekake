@@ -10,10 +10,12 @@ export function SnsCommentToggle({
   postId,
   currentUserId,
   replyCount,
+  showLabel = false,
 }: {
   postId: string;
   currentUserId: string;
   replyCount: number;
+  showLabel?: boolean;
 }) {
   const [open, setOpen] = useState(false);
   const [replies, setReplies] = useState<SnsEnrichedReply[] | null>(null);
@@ -36,15 +38,23 @@ export function SnsCommentToggle({
         onClick={toggle}
         aria-expanded={open}
         aria-label="コメントする"
-        className="flex items-center gap-1.5 rounded-full px-1.5 py-1 text-ink-faint active:bg-paper-deep"
+        className="pressable flex min-h-9 items-center gap-1.5 rounded-full px-2.5 py-1 text-ink-faint active:bg-paper-deep"
+        data-haptic="light"
       >
         <IconChat size={16} />
+        {showLabel ? <span className="text-[11px] font-bold">返信</span> : null}
         {replyCount > 0 ? <span className="text-xs">{replyCount}</span> : null}
       </button>
       {open ? (
-        <div className="mt-1 w-full basis-full border-t border-line pt-3">
+        <div className="sns-inline-thread mt-1 w-full basis-full pt-3">
           {replies === null ? (
-            <p className="px-1 text-xs text-ink-faint">{isPending ? "読み込み中…" : ""}</p>
+            <div className="sns-reply-loading" role="status">
+              <span aria-hidden="true" />
+              <span aria-hidden="true" />
+              <span aria-hidden="true" />
+              <span className="sr-only">返信を読み込んでいます</span>
+              {isPending ? <span className="text-[10px] font-bold text-ink-faint">会話を読み込み中</span> : null}
+            </div>
           ) : (
             <SnsReplyThread postId={postId} currentUserId={currentUserId} initialReplies={replies} />
           )}
