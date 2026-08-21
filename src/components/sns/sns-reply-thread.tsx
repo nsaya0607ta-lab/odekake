@@ -8,7 +8,7 @@ import {
   getPostRepliesAction,
 } from "@/app/actions/sns";
 import { emptyActionState, FormMessage, SubmitButton } from "@/components/form";
-import { IconClose, IconUser } from "@/components/icons";
+import { IconChat, IconClose, IconUser } from "@/components/icons";
 import { formatRelativeTimeJa } from "@/lib/date";
 import { SnsReplyLikeButton } from "@/components/sns/sns-reply-like-button";
 
@@ -37,6 +37,7 @@ export function SnsReplyThread({
 }) {
   const [replies, setReplies] = useState(initialReplies);
   const [replyingTo, setReplyingTo] = useState<string | null>(null);
+  const [showComposer, setShowComposer] = useState(false);
   const [, startTransition] = useTransition();
 
   function refresh() {
@@ -51,7 +52,26 @@ export function SnsReplyThread({
 
   return (
     <div className="space-y-3">
-      <InlineComposer postId={postId} parentReplyId={null} onPosted={refresh} placeholder="返信する" />
+      {showComposer ? (
+        <InlineComposer
+          postId={postId}
+          parentReplyId={null}
+          placeholder="返信する"
+          onPosted={() => {
+            refresh();
+            setShowComposer(false);
+          }}
+        />
+      ) : (
+        <button
+          type="button"
+          onClick={() => setShowComposer(true)}
+          className="flex w-full items-center gap-2 rounded-full border border-line bg-card px-3.5 py-2 text-left text-sm text-ink-faint active:bg-paper-deep"
+        >
+          <IconChat size={16} />
+          返信する
+        </button>
+      )}
       {topLevel.length === 0 ? (
         <p className="px-1 text-xs text-ink-faint">まだ返信はありません。</p>
       ) : (
