@@ -15,9 +15,22 @@ export function SnsPostPhotoGrid({ photoUrls }: { photoUrls: string[] }) {
     );
   }
 
+  if (photoUrls.length === 2) {
+    return (
+      <div className="mt-2.5 grid aspect-[16/9] grid-cols-2 gap-1 overflow-hidden rounded-2xl">
+        {photoUrls.map((url, i) => (
+          <div key={i} className="h-full w-full bg-paper-deep">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src={url} alt="" loading="lazy" decoding="async" className="h-full w-full object-cover" />
+          </div>
+        ))}
+      </div>
+    );
+  }
+
   if (photoUrls.length === 3) {
     return (
-      <div className="mt-2.5 grid aspect-[4/3] grid-cols-2 gap-1 overflow-hidden rounded-2xl">
+      <div className="mt-2.5 grid aspect-[4/3] grid-cols-2 grid-rows-2 gap-1 overflow-hidden rounded-2xl">
         <div className="row-span-2 h-full w-full bg-paper-deep">
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img src={photoUrls[0]} alt="" loading="lazy" decoding="async" className="h-full w-full object-cover" />
@@ -33,7 +46,7 @@ export function SnsPostPhotoGrid({ photoUrls }: { photoUrls: string[] }) {
   }
 
   return (
-    <div className="mt-2.5 grid aspect-square grid-cols-2 gap-1 overflow-hidden rounded-2xl">
+    <div className="mt-2.5 grid aspect-square grid-cols-2 grid-rows-2 gap-1 overflow-hidden rounded-2xl">
       {photoUrls.map((url, i) => (
         <div key={i} className="h-full w-full bg-paper-deep">
           {/* eslint-disable-next-line @next/next/no-img-element */}
