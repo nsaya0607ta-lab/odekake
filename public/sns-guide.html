@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta name="description" content="おでかけ記録アプリのSNS機能を、実際にさわれるデモつきで紹介する説明書です。">
+<meta name="description" content="おでかけ記録アプリのSNS機能を、実際の画面とあわせて紹介する説明書です。">
 <meta name="theme-color" content="#fbf8f1" media="(prefers-color-scheme: light)">
 <meta name="theme-color" content="#1c1815" media="(prefers-color-scheme: dark)">
 <link rel="icon" href="/icon-192.png">
@@ -18,7 +18,6 @@
   --paper:       #fbf8f1;
   --paper-deep:  #f4efe3;
   --card:        #fffdf8;
-  --sunk:        #f0ebdd;
   --ink:         #3f3a33;
   --ink-soft:    #6d675d;
   --ink-faint:   #9c9488;
@@ -34,14 +33,12 @@
   --rule-rose:   #c9707f;
   --rule-violet: #7f6cae;
 
+  --gold-glow:   rgba(224, 184, 98, .24);
   --coral-glow:  rgba(224, 138, 125, .20);
   --violet-glow: rgba(142, 124, 187, .20);
-  --sky-glow:    rgba(127, 168, 201, .22);
-  --gold-glow:   rgba(224, 184, 98, .24);
 
-  --scrim:       rgba(251, 248, 241, .82);
   --lift:        0 1px 2px rgba(63,58,51,.05), 0 12px 30px -20px rgba(63,58,51,.30);
-  --lift-lg:     0 2px 4px rgba(63,58,51,.05), 0 30px 60px -38px rgba(63,58,51,.42);
+  --lift-lg:     0 4px 14px rgba(63,58,51,.10), 0 34px 60px -30px rgba(63,58,51,.38);
 
   --display: "Yusei Magic", "Hiragino Maru Gothic ProN", "Zen Kaku Gothic New", system-ui, sans-serif;
   --body:    "Zen Kaku Gothic New", "Hiragino Sans", "Noto Sans JP", system-ui, sans-serif;
@@ -52,7 +49,7 @@
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme="light"]) {
     --paper:      #1c1815;  --paper-deep: #241f1a;
-    --card:       #292320;  --sunk:       #201b17;
+    --card:       #292320;
     --ink:        #f0e8db;  --ink-soft:   #beb4a4;  --ink-faint: #8e8676;
     --line:       #3a322a;  --line-firm:  #4e4438;
 
@@ -61,19 +58,17 @@
 
     --rule-sky:   #93bcdd;  --rule-rose:  #e6a6b2;  --rule-violet: #b6a8dc;
 
+    --gold-glow:   rgba(224, 184, 98, .26);
     --coral-glow:  rgba(224, 138, 125, .26);
     --violet-glow: rgba(160, 143, 204, .26);
-    --sky-glow:    rgba(147, 188, 221, .26);
-    --gold-glow:   rgba(224, 184, 98, .26);
 
-    --scrim:      rgba(28, 24, 21, .84);
     --lift:       0 1px 2px rgba(0,0,0,.34), 0 12px 30px -20px rgba(0,0,0,.8);
-    --lift-lg:    0 2px 4px rgba(0,0,0,.34), 0 30px 60px -38px rgba(0,0,0,.9);
+    --lift-lg:    0 4px 14px rgba(0,0,0,.4), 0 34px 60px -30px rgba(0,0,0,.85);
   }
 }
 :root[data-theme="dark"] {
   --paper:      #1c1815;  --paper-deep: #241f1a;
-  --card:       #292320;  --sunk:       #201b17;
+  --card:       #292320;
   --ink:        #f0e8db;  --ink-soft:   #beb4a4;  --ink-faint: #8e8676;
   --line:       #3a322a;  --line-firm:  #4e4438;
 
@@ -82,20 +77,15 @@
 
   --rule-sky:   #93bcdd;  --rule-rose:  #e6a6b2;  --rule-violet: #b6a8dc;
 
+  --gold-glow:   rgba(224, 184, 98, .26);
   --coral-glow:  rgba(224, 138, 125, .26);
   --violet-glow: rgba(160, 143, 204, .26);
-  --sky-glow:    rgba(147, 188, 221, .26);
-  --gold-glow:   rgba(224, 184, 98, .26);
 
-  --scrim:      rgba(28, 24, 21, .84);
   --lift:       0 1px 2px rgba(0,0,0,.34), 0 12px 30px -20px rgba(0,0,0,.8);
-  --lift-lg:    0 2px 4px rgba(0,0,0,.34), 0 30px 60px -38px rgba(0,0,0,.9);
+  --lift-lg:    0 4px 14px rgba(0,0,0,.4), 0 34px 60px -30px rgba(0,0,0,.85);
 }
 
 *, *::before, *::after { box-sizing: border-box; }
-
-html { scroll-behavior: smooth; }
-@media (prefers-reduced-motion: reduce) { html { scroll-behavior: auto; } }
 
 body {
   margin: 0;
@@ -109,71 +99,11 @@ body {
 }
 
 img { max-width: 100%; height: auto; display: block; }
-a { color: inherit; }
-button { font: inherit; color: inherit; }
+a { color: var(--leaf-ink); }
 
-:focus-visible {
-  outline: 2.5px solid var(--leaf-deep);
-  outline-offset: 3px;
-  border-radius: 6px;
-}
+:focus-visible { outline: 2.5px solid var(--leaf-deep); outline-offset: 3px; border-radius: 6px; }
 
-.sr {
-  position: absolute; width: 1px; height: 1px;
-  padding: 0; margin: -1px; overflow: hidden;
-  clip: rect(0 0 0 0); white-space: nowrap; border: 0;
-}
-
-.wrap {
-  width: 100%; max-width: 1140px;
-  margin-inline: auto;
-  padding-inline: clamp(1.15rem, 4.5vw, 2.75rem);
-}
-
-/* ══════════ 上部の帯 ══════════ */
-.topbar {
-  position: sticky; top: 0; z-index: 50;
-  background: var(--scrim);
-  backdrop-filter: blur(14px);
-  -webkit-backdrop-filter: blur(14px);
-  border-bottom: 1px solid var(--line);
-}
-
-.topbar-in { display: flex; align-items: center; gap: 1.25rem; height: 3.6rem; }
-
-.brand {
-  display: inline-flex; align-items: center; gap: .5rem;
-  font-family: var(--display); font-size: 1rem;
-  letter-spacing: .02em; text-decoration: none;
-  white-space: nowrap; flex: none;
-}
-
-.brand .pin {
-  width: 1.6rem; height: 1.6rem; flex: none;
-  border-radius: 999px; display: grid; place-items: center;
-  background: var(--leaf-wash); color: var(--leaf-ink);
-}
-.brand .pin svg { width: .95rem; height: .95rem; }
-
-.navscroll { min-width: 0; flex: 1; overflow-x: auto; scrollbar-width: none; }
-.navscroll::-webkit-scrollbar { display: none; }
-
-.nav { display: flex; gap: .1rem; list-style: none; margin: 0; padding: 0; white-space: nowrap; }
-
-.nav a {
-  display: inline-block; padding: .3rem .62rem;
-  border-radius: 8px; text-decoration: none;
-  font-size: .8rem; font-weight: 700; color: var(--ink-faint);
-  transition: color .18s, background-color .18s;
-}
-.nav a:hover { color: var(--ink); background: var(--paper-deep); }
-.nav a[aria-current="true"] { color: var(--leaf-ink); background: var(--leaf-wash); }
-
-.progress {
-  position: absolute; left: 0; bottom: -1px; height: 2px;
-  background: var(--leaf); width: 0%;
-  transition: width .1s linear;
-}
+.wrap { width: 100%; max-width: 1080px; margin-inline: auto; padding-inline: clamp(1.15rem, 4.5vw, 2.75rem); }
 
 /* ══════════ 見出しの型 ══════════ */
 .eyebrow {
@@ -185,25 +115,18 @@ button { font: inherit; color: inherit; }
 
 h2.sec-title {
   font-family: var(--display); font-weight: 400;
-  font-size: clamp(1.65rem, 3.9vw, 2.35rem);
-  line-height: 1.44; letter-spacing: .015em;
+  font-size: clamp(1.55rem, 3.6vw, 2.15rem);
+  line-height: 1.46; letter-spacing: .015em;
   text-wrap: balance; word-break: auto-phrase;
-  margin: .8rem 0 0;
-}
-
-.sub-title {
-  font-family: var(--display); font-weight: 400;
-  font-size: 1.22rem; letter-spacing: .02em; margin: 0;
+  margin: .75rem 0 0;
 }
 
 .sec-lead { max-width: 34em; margin: .95rem 0 0; color: var(--ink-soft); font-size: .98rem; }
 .sec-lead strong { color: var(--ink); font-weight: 700; }
-
-code.k { font-family: var(--mono); font-size: .85em; }
+code.k { font-family: var(--mono); font-size: .85em; background: var(--paper-deep); padding: .05em .35em; border-radius: 4px; }
 
 /* ══════════ ヒーロー ══════════ */
 .hero { position: relative; padding-block: clamp(3rem, 7vw, 5rem) clamp(2.5rem, 6vw, 4rem); overflow: hidden; }
-
 .hero-sky {
   position: absolute; inset: -30% -20% auto -20%; height: 130%;
   background:
@@ -212,586 +135,143 @@ code.k { font-family: var(--mono); font-size: .85em; }
     radial-gradient(50% 45% at 58% 8%,  var(--violet-glow), transparent 72%);
   pointer-events: none;
 }
-
 .hero .wrap { position: relative; z-index: 1; }
-
-.hero-grid {
-  display: grid; grid-template-columns: minmax(0, 1.14fr) minmax(0, .86fr);
-  gap: clamp(1.5rem, 5vw, 3.5rem); align-items: center;
-}
-
+.hero-grid { display: grid; grid-template-columns: minmax(0, 1.14fr) minmax(0, .86fr); gap: clamp(1.5rem, 5vw, 3.5rem); align-items: center; }
 .hero h1 {
   font-family: var(--display); font-weight: 400;
-  font-size: clamp(2.05rem, 5.4vw, 3.15rem);
-  line-height: 1.36; letter-spacing: .015em;
+  font-size: clamp(2rem, 5.2vw, 3.05rem);
+  line-height: 1.38; letter-spacing: .015em;
   text-wrap: balance; word-break: auto-phrase;
   margin: 1rem 0 0;
 }
-
 .hero h1 em { font-style: normal; position: relative; color: var(--leaf-ink); white-space: nowrap; }
 .hero h1 em::after {
-  content: ""; position: absolute;
-  left: -.06em; right: -.06em; bottom: .04em; height: .34em;
+  content: ""; position: absolute; left: -.06em; right: -.06em; bottom: .04em; height: .34em;
   border-radius: .2em; background: var(--leaf-wash); z-index: -1;
 }
-
 .hero-lead { max-width: 30em; margin: 1.2rem 0 0; font-size: 1.02rem; color: var(--ink-soft); }
-
 .hero-marks { display: flex; flex-wrap: wrap; gap: .5rem; margin-top: 1.7rem; }
-
 .mark {
-  display: inline-flex; align-items: center; gap: .45rem;
-  padding: .35rem .8rem .38rem;
-  border: 1px solid var(--line-firm); border-radius: 999px;
-  background: var(--card); font-size: .78rem; font-weight: 700;
-  color: var(--ink-soft); box-shadow: var(--lift);
+  display: inline-flex; align-items: center; gap: .45rem; padding: .35rem .8rem .38rem;
+  border: 1px solid var(--line-firm); border-radius: 999px; background: var(--card);
+  font-size: .78rem; font-weight: 700; color: var(--ink-soft); box-shadow: var(--lift);
 }
 .mark .dot { width: .42rem; height: .42rem; border-radius: 999px; background: var(--leaf); }
-
 .hero-art { position: relative; justify-self: center; width: min(100%, 27rem); }
-.hero-art img { width: 100%; filter: drop-shadow(0 26px 34px rgba(63,58,51,.18)); animation: bob 7s ease-in-out infinite; }
-
-@keyframes bob {
-  0%, 100% { transform: translateY(0) rotate(-.6deg); }
-  50%      { transform: translateY(-12px) rotate(.6deg); }
-}
-
-.hero-hint {
-  display: inline-flex; align-items: center; gap: .5rem;
-  margin-top: 1.8rem; padding: .4rem .85rem .42rem;
-  border-radius: 999px; background: var(--leaf-wash);
-  color: var(--leaf-ink); font-size: .78rem; font-weight: 700;
-}
-.hero-hint svg { width: .95rem; height: .95rem; flex: none; }
+.hero-art img { width: 100%; filter: drop-shadow(0 26px 34px rgba(63,58,51,.18)); }
 
 /* ══════════ 節 ══════════ */
-.stop {
-  position: relative;
-  padding-block: var(--stop-pad);
-  --stop-pad: clamp(2.75rem, 6.5vw, 4.5rem);
-  --stop-bg: var(--paper);
-  scroll-margin-top: 4.2rem;
-}
+.stop { position: relative; padding-block: clamp(2.75rem, 6.5vw, 4.5rem); }
+.tinted { background: var(--paper-deep); border-block: 1px solid var(--line); }
 
-.stop > .wrap { position: relative; }
-
-.stop > .wrap::before {
-  content: ""; position: absolute; left: 1.05rem;
-  top: calc(-1 * var(--stop-pad)); bottom: calc(-1 * var(--stop-pad));
-  border-left: 2px dashed var(--line-firm); opacity: .5; pointer-events: none;
-}
-
-.stop > .wrap::after {
-  content: ""; position: absolute; left: 1.05rem; top: .6rem;
-  width: .72rem; height: .72rem; margin-left: -.37rem;
-  border-radius: 999px; background: var(--leaf);
-  box-shadow: 0 0 0 4px var(--stop-bg), 0 0 0 5.5px var(--leaf-wash);
-  pointer-events: none;
-}
-
-@media (max-width: 1080px) {
-  .stop > .wrap::before, .stop > .wrap::after { display: none; }
-}
-
-.tinted { --stop-bg: var(--paper-deep); background: var(--paper-deep); border-block: 1px solid var(--line); }
-
-/* ══════════ 二段組（説明 ／ 実演）══════════ */
-.split {
-  display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
-  gap: clamp(1.75rem, 4vw, 3.25rem); align-items: start;
-  margin-top: 2.1rem;
-}
-.split.is-flipped > .split-demo { order: -1; }
-
-/* 機能の粒 */
-.beads { margin: 1.4rem 0 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: .75rem; }
-
-.beads li { display: grid; grid-template-columns: 1.55rem minmax(0, 1fr); gap: .1rem .55rem; }
-
-.beads .bead {
-  grid-row: span 2; width: 1.55rem; height: 1.55rem; margin-top: .3rem;
-  border-radius: 999px; background: var(--leaf-wash); color: var(--leaf-ink);
-  display: grid; place-items: center; font-size: .78rem;
-}
-.beads .bead svg { width: .9rem; height: .9rem; }
-.beads b { font-weight: 700; font-size: .94rem; }
-.beads .desc { grid-column: 2; font-size: .87rem; color: var(--ink-soft); line-height: 1.78; }
-
-/* ══════════ 実演の画面 ══════════ */
-.demo {
-  position: relative;
-  border: 1px solid var(--line-firm); border-radius: 22px;
-  background: var(--card); box-shadow: var(--lift-lg);
-  overflow: hidden;
-}
-
-.demo-bar {
-  display: flex; align-items: center; gap: .5rem;
-  padding: .6rem .9rem; border-bottom: 1px solid var(--line);
-  background: var(--paper-deep);
-}
-
-.demo-bar .title { font-size: .74rem; font-weight: 900; letter-spacing: .04em; }
-
-.demo-bar .live {
-  margin-left: auto; display: inline-flex; align-items: center; gap: .35rem;
-  font-family: var(--mono); font-size: .58rem; font-weight: 600;
-  letter-spacing: .12em; color: var(--leaf-ink);
-}
-.demo-bar .live::before {
-  content: ""; width: .4rem; height: .4rem; border-radius: 999px;
-  background: var(--leaf); animation: pulse 2.4s ease-in-out infinite;
-}
-@keyframes pulse { 0%,100% { opacity: 1 } 50% { opacity: .35 } }
-
-.demo-body { padding: .9rem; background: var(--sunk); }
-
-/* タブ */
-.tabs {
-  display: flex; gap: .3rem; padding: .35rem;
-  border-radius: 999px; background: var(--paper-deep);
-  border: 1px solid var(--line);
-}
-
-.tabs button {
-  flex: 1; min-width: 0; padding: .34rem .5rem;
-  border: 0; border-radius: 999px; background: transparent;
-  font-size: .76rem; font-weight: 700; color: var(--ink-faint);
-  cursor: pointer; white-space: nowrap;
-  transition: background-color .2s, color .2s;
-}
-.tabs button:hover { color: var(--ink); }
-.tabs button[aria-selected="true"] { background: var(--card); color: var(--leaf-ink); box-shadow: var(--lift); }
-
-.tabs .count {
-  display: inline-block; margin-left: .3rem;
-  font-family: var(--mono); font-size: .62rem;
-  font-variant-numeric: tabular-nums; opacity: .75;
-}
-
-/* 投稿カード */
-.feed { margin-top: .75rem; display: flex; flex-direction: column; gap: .55rem; }
-
-.post { padding: .75rem .85rem; border: 1px solid var(--line); border-radius: 15px; background: var(--card); }
-
-.post-head { display: flex; align-items: center; gap: .5rem; }
-
-.avatar {
-  width: 1.9rem; height: 1.9rem; flex: none; border-radius: 999px;
-  display: grid; place-items: center; font-size: .68rem; font-weight: 900; color: #fff;
-}
-.avatar.a1 { background: #566f42; }
-.avatar.a2 { background: #47627f; }
-.avatar.a3 { background: #8d5059; }
-.avatar.a4 { background: #63528a; }
-
-.post-head .who { font-size: .78rem; font-weight: 900; }
-.post-head .when { margin-left: auto; font-family: var(--mono); font-size: .6rem; color: var(--ink-faint); }
-
-.post-body { margin: .5rem 0 0; font-size: .82rem; line-height: 1.75; color: var(--ink); }
-
-.post-place {
-  display: inline-flex; align-items: center; gap: .3rem;
-  margin-top: .5rem; padding: .17rem .55rem;
-  border: 1px solid var(--line-firm); border-radius: 999px;
-  background: var(--paper); font-size: .68rem; font-weight: 700; color: var(--ink-soft);
-}
-.post-place svg { width: .7rem; height: .7rem; }
-
-.shots { display: flex; gap: .3rem; margin-top: .55rem; }
-.shots span { flex: 1; height: 4.6rem; border-radius: 8px; background: linear-gradient(140deg, var(--s1, #e8d9c4), var(--s2, #cfe0d6)); }
-
-.post-acts { display: flex; gap: .15rem; margin-top: .6rem; padding-top: .55rem; border-top: 1px dashed var(--line); }
-
-.act {
-  display: inline-flex; align-items: center; gap: .28rem;
-  padding: .22rem .5rem; border: 0; border-radius: 999px;
-  background: transparent; cursor: pointer;
-  font-size: .7rem; font-weight: 700; color: var(--ink-faint);
-  transition: background-color .18s, color .18s;
-}
-.act:hover { background: var(--paper-deep); color: var(--ink-soft); }
-.act svg { width: .88rem; height: .88rem; }
-.act .n { font-family: var(--mono); font-size: .66rem; font-variant-numeric: tabular-nums; }
-
-.act[aria-pressed="true"] { color: var(--leaf-ink); background: var(--leaf-wash); }
-.act.is-like[aria-pressed="true"] { color: var(--rule-rose); background: color-mix(in srgb, var(--rule-rose) 14%, transparent); }
-.act.is-pop { animation: pop .34s cubic-bezier(.3,1.4,.5,1); }
-@keyframes pop { 0% { transform: scale(1) } 45% { transform: scale(1.2) } 100% { transform: scale(1) } }
-
-.demo-empty { padding: 1.6rem .9rem; text-align: center; font-size: .78rem; color: var(--ink-faint); line-height: 1.8; }
-
-/* 作成デモ */
-.compose-audience {
-  display: flex; align-items: center; gap: .5rem;
-  padding: .45rem .65rem; border-radius: 11px;
-  background: var(--card); border: 1px solid var(--line);
-  font-size: .7rem; font-weight: 900; color: var(--ink-soft);
-}
-.compose-audience .ok { margin-left: auto; width: .45rem; height: .45rem; border-radius: 999px; background: var(--leaf); }
-
-.compose-field { margin-top: .55rem; border: 1px solid var(--line); border-radius: 13px; background: var(--card); overflow: hidden; }
-
-.compose-field textarea {
-  display: block; width: 100%; border: 0; resize: none;
-  padding: .7rem .8rem; background: transparent; color: var(--ink);
-  font-family: var(--body); font-size: .84rem; line-height: 1.8;
-}
-.compose-field textarea:focus { outline: none; }
-.compose-field:focus-within { border-color: var(--leaf); box-shadow: 0 0 0 3px var(--leaf-wash); }
-
-.compose-meter { display: flex; align-items: center; gap: .6rem; padding: .4rem .8rem .55rem; border-top: 1px dashed var(--line); }
-
-.meter-track { flex: 1; height: .3rem; border-radius: 999px; background: var(--paper-deep); overflow: hidden; }
-.meter-fill { height: 100%; width: 0%; border-radius: 999px; background: var(--leaf); transition: width .18s, background-color .25s; }
-
-.compose-count { font-family: var(--mono); font-size: .68rem; font-weight: 600; color: var(--ink-faint); font-variant-numeric: tabular-nums; }
-.compose-count.is-near { color: var(--rule-rose); }
-
-.slotrow { display: flex; gap: .35rem; margin-top: .6rem; }
-
-.slot {
-  flex: 1; aspect-ratio: 1; border-radius: 10px; cursor: pointer;
-  border: 1.5px dashed var(--line-firm); background: var(--card);
-  display: grid; place-items: center; color: var(--ink-faint);
-  transition: border-color .2s, background-color .2s, color .2s;
-}
-.slot:hover { border-color: var(--leaf); color: var(--leaf-ink); }
-.slot svg { width: 1rem; height: 1rem; }
-.slot.is-filled { border-style: solid; border-color: transparent; color: transparent; background: linear-gradient(140deg, var(--s1, #e8d9c4), var(--s2, #cfe0d6)); }
-
-.addons { display: flex; flex-wrap: wrap; gap: .35rem; margin-top: .6rem; }
-
-.addon {
-  display: inline-flex; align-items: center; gap: .3rem;
-  padding: .26rem .6rem; border-radius: 999px; cursor: pointer;
-  border: 1px solid var(--line-firm); background: var(--card);
-  font-size: .7rem; font-weight: 700; color: var(--ink-soft);
-  transition: background-color .2s, color .2s, border-color .2s;
-}
-.addon:hover { border-color: var(--leaf); }
-.addon svg { width: .78rem; height: .78rem; }
-.addon[aria-pressed="true"] { background: var(--leaf-wash); border-color: var(--leaf); color: var(--leaf-ink); }
-
-/* チャット */
-.chat { display: flex; flex-direction: column; gap: .45rem; max-height: 13rem; overflow-y: auto; }
-
-.bubble { max-width: 78%; padding: .45rem .7rem; border-radius: 14px; font-size: .78rem; line-height: 1.7; }
-.bubble.them { align-self: flex-start; background: var(--card); border: 1px solid var(--line); border-bottom-left-radius: 5px; }
-.bubble.me { align-self: flex-end; background: var(--leaf-wash); color: var(--leaf-ink); border-bottom-right-radius: 5px; }
-.bubble .nm { display: block; font-size: .62rem; font-weight: 900; color: var(--ink-faint); margin-bottom: .1rem; }
-.bubble .at { color: var(--leaf-ink); font-weight: 700; }
-
-.chatbar { display: flex; gap: .4rem; margin-top: .6rem; }
-.chatbar input {
-  flex: 1; min-width: 0; padding: .45rem .7rem;
-  border: 1px solid var(--line); border-radius: 999px;
-  background: var(--card); color: var(--ink);
-  font-family: var(--body); font-size: .78rem;
-}
-.chatbar input:focus { outline: none; border-color: var(--leaf); box-shadow: 0 0 0 3px var(--leaf-wash); }
-.chatbar button {
-  flex: none; width: 2.1rem; height: 2.1rem; border-radius: 999px;
-  border: 0; background: var(--leaf); color: #fff; cursor: pointer;
-  display: grid; place-items: center;
-}
-.chatbar button svg { width: .95rem; height: .95rem; }
-.chatbar button:disabled { opacity: .4; cursor: not-allowed; }
-
-/* 写真の格子 */
-.grid3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: .25rem; }
-.grid3 span { aspect-ratio: 1; border-radius: 6px; background: linear-gradient(140deg, var(--s1), var(--s2)); }
-
-.emoji-tray { display: flex; gap: .3rem; margin-top: .6rem; }
-.emoji-tray button {
-  flex: 1; padding: .3rem 0; border-radius: 10px; cursor: pointer;
-  border: 1px solid var(--line); background: var(--card); font-size: .95rem;
-  transition: background-color .18s, border-color .18s;
-}
-.emoji-tray button:hover { border-color: var(--leaf); }
-.emoji-tray button[aria-pressed="true"] { background: var(--leaf-wash); border-color: var(--leaf); }
-
-/* 投票 */
-.poll { margin-top: .6rem; padding: .75rem .85rem; border: 1px solid var(--line); border-radius: 15px; background: var(--card); }
-.poll h4 { margin: 0; font-size: .84rem; font-weight: 900; }
-.poll .by { font-size: .64rem; color: var(--ink-faint); margin: .15rem 0 0; }
-
-.poll-opts { margin-top: .6rem; display: flex; flex-direction: column; gap: .35rem; }
-
-.poll-opt {
-  position: relative; width: 100%; text-align: left; cursor: pointer;
-  padding: .42rem .65rem; border: 1px solid var(--line); border-radius: 10px;
-  background: var(--card); overflow: hidden;
-  font-size: .78rem; font-weight: 700;
-  display: flex; align-items: center; gap: .5rem;
-  transition: border-color .2s;
-}
-.poll-opt:hover { border-color: var(--leaf); }
-.poll-opt .fill { position: absolute; inset: 0 auto 0 0; width: 0%; background: var(--leaf-wash); transition: width .55s cubic-bezier(.2,.7,.3,1); }
-.poll-opt > span { position: relative; }
-.poll-opt > svg { position: relative; }
-.poll-opt .pct { margin-left: auto; font-family: var(--mono); font-size: .68rem; font-variant-numeric: tabular-nums; color: var(--ink-soft); }
-.poll-opt[aria-pressed="true"] { border-color: var(--leaf); color: var(--leaf-ink); }
-.poll-opt .tick { width: .85rem; height: .85rem; flex: none; opacity: 0; transition: opacity .2s; color: var(--leaf-ink); }
-.poll-opt[aria-pressed="true"] .tick { opacity: 1; }
-
-.poll-total { margin: .55rem 0 0; font-size: .68rem; color: var(--ink-faint); }
-
-/* ピン留め */
-.pin-card {
-  display: flex; gap: .55rem; align-items: flex-start;
-  padding: .6rem .75rem; border-radius: 13px;
-  border: 1px solid var(--leaf); background: var(--leaf-wash);
-}
-.pin-card > svg { width: .95rem; height: .95rem; flex: none; margin-top: .35rem; color: var(--leaf-ink); }
-.pin-card b { display: block; font-size: .78rem; color: var(--leaf-ink); }
-.pin-card small { font-size: .72rem; color: var(--ink-soft); line-height: 1.7; }
-
-/* 通知 */
-.notif { display: flex; flex-direction: column; gap: .4rem; }
-
-.notif-row {
-  display: flex; gap: .55rem; align-items: flex-start;
-  padding: .55rem .65rem; border-radius: 13px;
-  border: 1px solid var(--line); background: var(--card);
-  transition: background-color .25s, border-color .25s;
-}
-.notif-row.is-unread { border-color: var(--leaf); background: color-mix(in srgb, var(--leaf-wash) 55%, var(--card)); }
-
-.notif-ic { width: 1.75rem; height: 1.75rem; flex: none; border-radius: 999px; display: grid; place-items: center; color: #fff; }
-.notif-ic svg { width: .85rem; height: .85rem; }
-.notif-ic.k-reply   { background: #566f42; }
-.notif-ic.k-like    { background: #8d5059; }
-.notif-ic.k-mention { background: #47627f; }
-.notif-ic.k-group   { background: #63528a; }
-
-.notif-row .t { font-size: .76rem; font-weight: 700; display: block; }
-.notif-row .s { display: block; font-size: .68rem; color: var(--ink-faint); }
-.notif-row .badge { margin-left: auto; flex: none; align-self: center; width: .45rem; height: .45rem; border-radius: 999px; background: var(--leaf); }
-
-.demo-foot { display: flex; align-items: center; gap: .5rem; padding: .55rem .9rem; border-top: 1px solid var(--line); background: var(--paper-deep); }
-.demo-foot .hint { font-size: .68rem; color: var(--ink-faint); line-height: 1.6; }
-
-.btn-mini {
-  margin-left: auto; flex: none; padding: .26rem .7rem; cursor: pointer;
-  border: 1px solid var(--line-firm); border-radius: 999px;
-  background: var(--card); font-size: .7rem; font-weight: 700; color: var(--ink-soft);
-  transition: background-color .18s, border-color .18s, color .18s;
-}
-.btn-mini:hover { border-color: var(--leaf); color: var(--leaf-ink); }
-.btn-mini:disabled { opacity: .45; cursor: not-allowed; }
-
-/* 二段組のときだけ、一覧の丈を抑えて左右の釣り合いを取る
-   （実機の一覧も同じようにスクロールする）*/
-@media (min-width: 981px) {
-  #feed, #profileFeed, #searchResults { max-height: 21rem; overflow-y: auto; }
-}
-
-/* ══════════ 三つの入り口 ══════════ */
+/* 三つの入り口 */
 .pillars { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: clamp(.85rem, 2vw, 1.35rem); margin-top: 2.2rem; }
-
 .pillar {
-  display: flex; flex-direction: column;
-  padding: 1.5rem 1.4rem 1.6rem;
-  border: 1px solid var(--line); border-radius: 20px;
-  background: var(--card); box-shadow: var(--lift);
-  transition: transform .28s ease, box-shadow .28s ease;
+  display: flex; flex-direction: column; padding: 1.5rem 1.4rem 1.6rem;
+  border: 1px solid var(--line); border-radius: 20px; background: var(--card); box-shadow: var(--lift);
 }
-.pillar:hover { transform: translateY(-5px); box-shadow: var(--lift-lg); }
-
-.pillar-art { position: relative; width: 6rem; height: 6rem; margin-bottom: .8rem; display: grid; place-items: center; }
+.pillar-art { position: relative; width: 5.5rem; height: 5.5rem; margin-bottom: .8rem; display: grid; place-items: center; }
 .pillar-art::before { content: ""; position: absolute; inset: 8%; border-radius: 999px; background: var(--glow, var(--gold-glow)); filter: blur(11px); }
 .pillar-art img { position: relative; width: 100%; }
+.pillar h3 { font-family: var(--display); font-weight: 400; font-size: 1.15rem; letter-spacing: .02em; margin: 0; }
+.pillar p { margin: .5rem 0 0; font-size: .87rem; color: var(--ink-soft); line-height: 1.82; }
 
-.pillar h3 { font-family: var(--display); font-weight: 400; font-size: 1.2rem; letter-spacing: .02em; margin: 0; }
-.pillar p { margin: .5rem 0 0; font-size: .89rem; color: var(--ink-soft); line-height: 1.82; }
-.pillar .tag { margin-top: 1rem; align-self: flex-start; font-family: var(--mono); font-size: .62rem; font-weight: 600; letter-spacing: .14em; color: var(--ink-faint); }
-
-/* ══════════ 反応の四つ ══════════ */
-.reactions { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: clamp(.65rem, 1.8vw, 1rem); margin-top: 1.9rem; }
-
-.reaction { padding: 1.15rem 1.05rem 1.25rem; border: 1px solid var(--line); border-radius: 16px; background: var(--card); box-shadow: var(--lift); }
-.reaction .glyph { width: 2.3rem; height: 2.3rem; border-radius: 12px; display: grid; place-items: center; background: var(--leaf-wash); color: var(--leaf-ink); margin-bottom: .75rem; }
-.reaction .glyph svg { width: 1.15rem; height: 1.15rem; }
-.reaction h3 { font-family: var(--display); font-weight: 400; font-size: 1.02rem; margin: 0; letter-spacing: .02em; }
-.reaction p { margin: .4rem 0 0; font-size: .83rem; color: var(--ink-soft); line-height: 1.78; }
-
-/* ══════════ グループの道具 ══════════ */
-.tools { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: clamp(.75rem, 1.8vw, 1.1rem); margin-top: 2rem; }
-
-.tool {
-  display: grid; grid-template-columns: 4.2rem minmax(0, 1fr); gap: 0 1rem;
-  align-items: start; padding: 1.15rem 1.25rem;
-  border: 1px solid var(--line); border-radius: 16px;
-  background: var(--card); box-shadow: var(--lift);
+/* ══════════ 画面ごとの解説（テキスト＋実機画面） ══════════ */
+.screen {
+  display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: clamp(1.75rem, 4.5vw, 3.5rem); align-items: start;
+  margin-top: 2.1rem;
 }
-.tool-art { position: relative; width: 4.2rem; height: 4.2rem; grid-row: span 2; display: grid; place-items: center; }
-.tool-art::before { content: ""; position: absolute; inset: 4%; border-radius: 999px; background: var(--glow, var(--sky-glow)); filter: blur(9px); }
-.tool-art img { position: relative; width: 100%; }
-.tool h3 { font-family: var(--display); font-weight: 400; font-size: 1.04rem; margin: .2rem 0 0; letter-spacing: .02em; }
-.tool p { grid-column: 2; margin: .3rem 0 0; font-size: .85rem; color: var(--ink-soft); line-height: 1.78; }
+.screen.is-flipped > .screen-shot { order: -1; }
 
-/* ══════════ 安全 ══════════ */
-.safety-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: clamp(.85rem, 2.2vw, 1.5rem); margin-top: 2.1rem; }
-.safety-item { padding-top: 1rem; border-top: 2.5px solid var(--leaf); }
-.safety-item:nth-child(2) { border-top-color: var(--rule-sky); }
-.safety-item:nth-child(3) { border-top-color: var(--rule-rose); }
-.safety-item:nth-child(4) { border-top-color: var(--rule-violet); }
-.safety-item h3 { font-size: .93rem; font-weight: 900; margin: 0; letter-spacing: .02em; }
-.safety-item p { margin: .45rem 0 0; font-size: .85rem; color: var(--ink-soft); line-height: 1.82; }
+.screen-copy .kicker {
+  display: inline-block; margin-bottom: .5rem; padding: .18rem .6rem;
+  border-radius: 999px; background: var(--leaf-wash); color: var(--leaf-ink);
+  font-family: var(--mono); font-size: .64rem; font-weight: 600; letter-spacing: .08em;
+}
+
+.beads { margin: 1.4rem 0 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: .8rem; }
+.beads li { display: grid; grid-template-columns: .4rem minmax(0, 1fr); gap: 0 .7rem; }
+.beads li::before { content: ""; grid-row: span 2; width: .4rem; height: .4rem; margin-top: .55rem; border-radius: 999px; background: var(--leaf); }
+.beads b { font-weight: 700; font-size: .94rem; }
+.beads span.desc { grid-column: 2; font-size: .87rem; color: var(--ink-soft); line-height: 1.78; }
+
+.screen-shot { display: flex; justify-content: center; }
+.phone {
+  width: min(100%, 21rem); border-radius: 26px; overflow: hidden;
+  border: 1px solid var(--line-firm); background: var(--card); box-shadow: var(--lift-lg);
+}
+.phone img { display: block; width: 100%; }
+.phone figcaption {
+  padding: .55rem .9rem; border-top: 1px solid var(--line); background: var(--paper-deep);
+  font-family: var(--mono); font-size: .64rem; font-weight: 600; color: var(--ink-faint); text-align: center;
+}
+
+/* 縦に並ぶ二枚（グループの写真／チャットなど） */
+.screen-shot.is-pair { display: flex; flex-direction: column; gap: 1.4rem; align-items: center; }
+
+/* ══════════ 反応の四つ・安全の四つ（グリッド） ══════════ */
+.quad { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: clamp(.7rem, 2vw, 1.1rem); margin-top: 1.6rem; }
+.quad-item { padding: 1.05rem 1.1rem; border: 1px solid var(--line); border-radius: 15px; background: var(--card); box-shadow: var(--lift); }
+.quad-item b { display: block; font-size: .88rem; font-weight: 900; margin-bottom: .3rem; }
+.quad-item span { font-size: .82rem; color: var(--ink-soft); line-height: 1.75; }
 
 /* ══════════ 早見表 ══════════ */
-.table-tools { display: flex; flex-wrap: wrap; gap: .6rem; align-items: center; margin-top: 1.8rem; }
-
-.search { position: relative; flex: 1; min-width: 13rem; max-width: 22rem; }
-.search > svg { position: absolute; left: .75rem; top: 50%; transform: translateY(-50%); width: .95rem; height: .95rem; color: var(--ink-faint); pointer-events: none; }
-.search input {
-  width: 100%; padding: .5rem .8rem .5rem 2.15rem;
-  border: 1px solid var(--line-firm); border-radius: 999px;
-  background: var(--card); color: var(--ink);
-  font-family: var(--body); font-size: .85rem;
-}
-.search input:focus { outline: none; border-color: var(--leaf); box-shadow: 0 0 0 3px var(--leaf-wash); }
-
-.filters { display: flex; flex-wrap: wrap; gap: .3rem; }
-
-.filters button {
-  padding: .35rem .75rem; border-radius: 999px; cursor: pointer;
-  border: 1px solid var(--line-firm); background: var(--card);
-  font-size: .76rem; font-weight: 700; color: var(--ink-soft);
-  transition: background-color .18s, border-color .18s, color .18s;
-}
-.filters button:hover { border-color: var(--leaf); }
-.filters button[aria-pressed="true"] { background: var(--leaf-wash); border-color: var(--leaf); color: var(--leaf-ink); }
-
-.table-wrap { margin-top: 1rem; overflow-x: auto; border: 1px solid var(--line); border-radius: 15px; background: var(--card); }
-
+.table-wrap { margin-top: 1.8rem; overflow-x: auto; border: 1px solid var(--line); border-radius: 15px; background: var(--card); }
 table { width: 100%; border-collapse: collapse; font-size: .85rem; }
-
 thead th {
-  text-align: left; padding: .6rem .9rem;
-  font-size: .68rem; font-weight: 700; letter-spacing: .1em; text-transform: uppercase;
-  color: var(--ink-faint); background: var(--paper-deep);
-  border-bottom: 1px solid var(--line); white-space: nowrap;
+  text-align: left; padding: .6rem .9rem; font-size: .68rem; font-weight: 700; letter-spacing: .1em; text-transform: uppercase;
+  color: var(--ink-faint); background: var(--paper-deep); border-bottom: 1px solid var(--line); white-space: nowrap;
 }
 thead th.r { text-align: right; }
-
 tbody td { padding: .55rem .9rem; border-bottom: 1px solid var(--line); vertical-align: top; }
 tbody tr:last-child td { border-bottom: 0; }
-tbody tr[hidden] { display: none; }
-
 td.n { font-family: var(--mono); font-size: .8rem; font-variant-numeric: tabular-nums; white-space: nowrap; text-align: right; font-weight: 600; }
 td.w { color: var(--ink-soft); font-size: .8rem; white-space: nowrap; }
 
-mark { background: var(--leaf-wash); color: var(--leaf-ink); border-radius: 3px; padding: 0 .1em; }
-
-.table-none { padding: 1.6rem; text-align: center; font-size: .84rem; color: var(--ink-faint); margin: 0; }
-
 /* ══════════ よくある質問 ══════════ */
-.faq { margin-top: 2rem; display: flex; flex-direction: column; gap: .6rem; max-width: 46rem; }
-
-.faq details { border: 1px solid var(--line); border-radius: 15px; background: var(--card); box-shadow: var(--lift); overflow: hidden; }
-.faq summary { display: flex; align-items: center; gap: .7rem; padding: .85rem 1.05rem; cursor: pointer; font-size: .92rem; font-weight: 700; list-style: none; }
-.faq summary::-webkit-details-marker { display: none; }
-.faq summary::after {
-  content: ""; margin-left: auto; flex: none;
-  width: .55rem; height: .55rem;
-  border-right: 2px solid var(--ink-faint); border-bottom: 2px solid var(--ink-faint);
-  transform: rotate(45deg) translate(-2px, -2px);
-  transition: transform .25s;
+.faq { margin-top: 1.8rem; display: flex; flex-direction: column; gap: 1.3rem; max-width: 46rem; }
+.faq-item .q { display: flex; gap: .6rem; align-items: baseline; font-size: .93rem; font-weight: 700; }
+.faq-item .q .mark-q {
+  flex: none; width: 1.4rem; height: 1.4rem; border-radius: 999px; display: grid; place-items: center;
+  background: var(--leaf-wash); color: var(--leaf-ink); font-family: var(--mono); font-size: .65rem; font-weight: 600;
+  transform: translateY(1px);
 }
-.faq details[open] summary::after { transform: rotate(-135deg) translate(-2px, -2px); }
-.faq summary .q {
-  width: 1.5rem; height: 1.5rem; flex: none; border-radius: 999px;
-  display: grid; place-items: center; background: var(--leaf-wash); color: var(--leaf-ink);
-  font-family: var(--mono); font-size: .68rem; font-weight: 600;
-}
-.faq .a { padding: 0 1.05rem 1rem 3.25rem; font-size: .88rem; color: var(--ink-soft); line-height: 1.85; margin: 0; }
+.faq-item .a { margin: .5rem 0 0 2rem; font-size: .88rem; color: var(--ink-soft); line-height: 1.85; }
 
 /* ══════════ 結び ══════════ */
 .outro { position: relative; text-align: center; padding-block: clamp(3.5rem, 8vw, 5.5rem); overflow: hidden; }
 .outro::before { content: ""; position: absolute; inset: auto -10% -40% -10%; height: 130%; background: radial-gradient(50% 60% at 50% 78%, var(--gold-glow), transparent 70%); pointer-events: none; }
 .outro > .wrap { position: relative; z-index: 1; }
 .outro img { width: min(100%, 11rem); margin: 0 auto 1.3rem; filter: drop-shadow(0 18px 26px rgba(63,58,51,.16)); }
-.outro h2 { font-family: var(--display); font-weight: 400; font-size: clamp(1.6rem, 4.2vw, 2.3rem); line-height: 1.46; letter-spacing: .015em; text-wrap: balance; word-break: auto-phrase; margin: 0; }
+.outro h2 { font-family: var(--display); font-weight: 400; font-size: clamp(1.55rem, 4vw, 2.2rem); line-height: 1.5; letter-spacing: .015em; text-wrap: balance; word-break: auto-phrase; margin: 0; }
 .outro p { max-width: 30em; margin: 1rem auto 0; color: var(--ink-soft); }
 
 footer { border-top: 1px solid var(--line); padding-block: 1.6rem 2.4rem; font-size: .78rem; color: var(--ink-faint); text-align: center; }
 
-/* 上へ */
-.totop {
-  position: fixed; right: 1.1rem; bottom: 1.1rem; z-index: 40;
-  width: 2.8rem; height: 2.8rem; border-radius: 999px; cursor: pointer;
-  border: 1px solid var(--line-firm); background: var(--card); color: var(--ink-soft);
-  display: grid; place-items: center; box-shadow: var(--lift-lg);
-  opacity: 0; visibility: hidden; transform: translateY(10px);
-  transition: opacity .3s, transform .3s, visibility .3s;
+/* ══════════ 目次 ══════════ */
+.toc { margin-top: 2rem; display: flex; flex-wrap: wrap; gap: .4rem; }
+.toc a {
+  padding: .35rem .8rem; border: 1px solid var(--line-firm); border-radius: 999px;
+  background: var(--card); font-size: .78rem; font-weight: 700; color: var(--ink-soft); text-decoration: none;
 }
-.totop.is-on { opacity: 1; visibility: visible; transform: none; }
-.totop svg { width: 1.05rem; height: 1.05rem; }
-
-/* 現れかた */
-.rise { opacity: 0; transform: translateY(20px); transition: opacity .7s cubic-bezier(.2,.7,.3,1), transform .7s cubic-bezier(.2,.7,.3,1); }
-.rise.is-in { opacity: 1; transform: none; }
 
 /* ══════════ 狭い画面 ══════════ */
-@media (max-width: 980px) {
+@media (max-width: 900px) {
   .hero-grid { grid-template-columns: 1fr; }
   .hero-art { order: -1; width: min(72%, 19rem); }
-  .split { grid-template-columns: 1fr; }
-  .split.is-flipped > .split-demo { order: 0; }
-  .pillars, .reactions, .safety-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-  .tools { grid-template-columns: 1fr; }
+  .screen { grid-template-columns: 1fr; }
+  .screen.is-flipped > .screen-shot { order: 0; }
+  .screen-shot { order: -1; }
+  .pillars { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
-
-@media (max-width: 620px) {
+@media (max-width: 560px) {
   body { font-size: 15px; }
-  .topbar-in { height: 3.3rem; gap: .85rem; }
-  .brand .nm { display: none; }
-  .pillars, .reactions, .safety-grid { grid-template-columns: 1fr; }
-  .pillar { display: grid; grid-template-columns: 4.2rem minmax(0, 1fr); gap: 0 1rem; align-items: start; padding: 1.2rem 1.25rem 1.3rem; }
-  .pillar-art { grid-row: span 2; width: 4.2rem; height: 4.2rem; margin-bottom: 0; }
-  .pillar h3 { margin-top: .15rem; }
-  .pillar p { grid-column: 2; }
-  .pillar .tag { display: none; }
-  .tool { grid-template-columns: 3rem minmax(0, 1fr); gap: 0 .85rem; }
-  .tool-art { width: 3rem; height: 3rem; }
-  .tabs button { font-size: .71rem; padding: .32rem .3rem; }
-}
-
-@media (prefers-reduced-motion: reduce) {
-  *, *::before, *::after { animation: none !important; transition: none !important; }
-  .rise { opacity: 1; transform: none; }
+  .pillars, .quad { grid-template-columns: 1fr; }
 }
 </style>
 </head>
 <body>
-<!-- ═════════ 上部の帯 ═════════ -->
-<div class="topbar">
-  <div class="wrap topbar-in">
-    <a class="brand" href="#top">
-      <span class="pin" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M12 21s7-5.5 7-11a7 7 0 1 0-14 0c0 5.5 7 11 7 11Z"/><circle cx="12" cy="10" r="2.4"/></svg></span>
-      <span class="nm">おでかけSNS</span>
-    </a>
-    <div class="navscroll">
-      <ul class="nav" id="nav">
-        <li><a href="#doors">入り口</a></li>
-        <li><a href="#home">ホーム</a></li>
-        <li><a href="#compose">投稿</a></li>
-        <li><a href="#react">反応</a></li>
-        <li><a href="#profile">プロフィール</a></li>
-        <li><a href="#groups">グループ</a></li>
-        <li><a href="#photo">写真</a></li>
-        <li><a href="#search">検索</a></li>
-        <li><a href="#notify">通知</a></li>
-        <li><a href="#safety">安全</a></li>
-        <li><a href="#specs">早見表</a></li>
-        <li><a href="#faq">質問</a></li>
-      </ul>
-    </div>
-  </div>
-  <div class="progress" id="progress"></div>
-</div>
 
 <!-- ═════════ ヒーロー ═════════ -->
 <header class="hero" id="top">
@@ -805,16 +285,27 @@ footer { border-top: 1px solid var(--line); padding-block: 1.6rem 2.4rem; font-s
           写真も、ひとことも、行ってきた場所も。
           おでかけ記録アプリの中に、フレンドだけの小さなSNSがあります。
           知らない誰かに届くことはありません。
+          このページでは、実際の画面とあわせてできることを紹介します。
         </p>
         <div class="hero-marks">
           <span class="mark"><span class="dot"></span>フレンドだけに公開</span>
           <span class="mark"><span class="dot"></span>写真とひとこと</span>
           <span class="mark"><span class="dot"></span>グループで共有</span>
         </div>
-        <p class="hero-hint">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 11.5 6.5 9 4 11.5"/><path d="M6.5 9v6a4 4 0 0 0 4 4h3"/><circle cx="17" cy="19" r="2.5"/></svg>
-          このページの画面は、実際に触って試せます
-        </p>
+        <nav class="toc" aria-label="もくじ">
+          <a href="#doors">入り口</a>
+          <a href="#home">ホーム</a>
+          <a href="#compose">投稿</a>
+          <a href="#post">反応</a>
+          <a href="#profile">プロフィール</a>
+          <a href="#groups">グループ</a>
+          <a href="#photo">写真</a>
+          <a href="#search">検索</a>
+          <a href="#notify">通知</a>
+          <a href="#safety">安全</a>
+          <a href="#specs">早見表</a>
+          <a href="#faq">質問</a>
+        </nav>
       </div>
       <div class="hero-art">
         <img src="/illustrations/sns/nav-home-v2.webp" alt="ひらいた旅の手帖と、そこから飛び出す写真のイラスト" width="384" height="346" fetchpriority="high">
@@ -827,32 +318,28 @@ footer { border-top: 1px solid var(--line); padding-block: 1.6rem 2.4rem; font-s
 
   <!-- ═════════ 01 入り口 ═════════ -->
   <section class="stop" id="doors">
-    <div class="wrap rise">
+    <div class="wrap">
       <p class="eyebrow">01 — Three Doors</p>
       <h2 class="sec-title">入り口は、三つ。</h2>
       <p class="sec-lead">
         見たいものに合わせて場所を選べます。画面の上のボタンで、いつでも行き来できます。
         どこにいても、通知と検索には手が届きます。
       </p>
-
       <div class="pillars">
         <article class="pillar">
           <div class="pillar-art" style="--glow: var(--gold-glow)"><img src="/illustrations/sns/nav-home-v2.webp" alt="" width="384" height="346" loading="lazy"></div>
           <h3>ホーム</h3>
           <p>フレンド全員のつぶやきが、新しい順に流れてくる、いちばん広い場所。</p>
-          <span class="tag">Home</span>
         </article>
         <article class="pillar">
           <div class="pillar-art" style="--glow: var(--violet-glow)"><img src="/illustrations/sns/nav-user-v2.webp" alt="" width="384" height="384" loading="lazy"></div>
           <h3>ユーザー</h3>
           <p>自分や、気になるあの人の投稿だけを集めた場所。タブで種類を絞れます。</p>
-          <span class="tag">Profile</span>
         </article>
         <article class="pillar">
-          <div class="pillar-art" style="--glow: var(--sky-glow)"><img src="/illustrations/sns/nav-group-v2.webp" alt="" width="384" height="384" loading="lazy"></div>
+          <div class="pillar-art" style="--glow: var(--coral-glow)"><img src="/illustrations/sns/nav-group-v2.webp" alt="" width="384" height="384" loading="lazy"></div>
           <h3>グループ</h3>
           <p>選んだ数人だけで、写真とおしゃべりを共有する閉じた部屋。</p>
-          <span class="tag">Groups</span>
         </article>
       </div>
     </div>
@@ -860,50 +347,27 @@ footer { border-top: 1px solid var(--line); padding-block: 1.6rem 2.4rem; font-s
 
   <!-- ═════════ 02 ホーム ═════════ -->
   <section class="stop tinted" id="home">
-    <div class="wrap rise">
+    <div class="wrap">
       <p class="eyebrow">02 — Home</p>
       <h2 class="sec-title">今日のことが、流れてくる。</h2>
-
-      <div class="split">
-        <div>
+      <div class="screen">
+        <div class="screen-copy">
           <p class="sec-lead" style="margin-top:0">
             ホームには、グループに属さないつぶやきだけが新しい順に並びます。
             上には日替わりのお題がひとつ。七つの言葉から日本時間の日付で選ばれるので、
             同じ日はフレンド全員に同じお題が出ます。何を書くか迷ったときの糸口です。
           </p>
-
           <ul class="beads">
-            <li>
-              <span class="bead" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18M6 12h12M9 18h6"/></svg></span>
-              <b>三つのフィルタ</b>
-              <span class="desc">すべて／写真つき／ひとこと。見たい種類だけに絞れます。</span>
-            </li>
-            <li>
-              <span class="bead" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M5 12h14"/></svg></span>
-              <b>24件ずつ、120件まで</b>
-              <span class="desc">「もっと見る」で読み進めても、スクロール位置はそのままです。</span>
-            </li>
-            <li>
-              <span class="bead" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg></span>
-              <b>お題は毎日ひとつ</b>
-              <span class="desc">「帰り道の一枚」「また行きたいお店」など、七つが日替わりで。</span>
-            </li>
+            <li><b>三つのフィルタ</b><span class="desc">すべて／写真つき／ひとこと。見たい種類だけに絞れます。</span></li>
+            <li><b>24件ずつ、120件まで</b><span class="desc">「もっと見る」で読み進めても、スクロール位置はそのままです。</span></li>
+            <li><b>お題は毎日ひとつ</b><span class="desc">「帰り道の一枚」「また行きたいお店」など、七つが日替わりで。</span></li>
           </ul>
         </div>
-
-        <div class="split-demo">
-          <div class="demo" data-demo="feed">
-            <div class="demo-bar"><span class="title">ホーム</span><span class="live">TRY IT</span></div>
-            <div class="demo-body">
-              <div class="tabs" role="tablist" aria-label="投稿の種類">
-                <button role="tab" type="button" data-filter="all" aria-selected="true">すべて<span class="count" data-count="all"></span></button>
-                <button role="tab" type="button" data-filter="photo" aria-selected="false">写真つき<span class="count" data-count="photo"></span></button>
-                <button role="tab" type="button" data-filter="note" aria-selected="false">ひとこと<span class="count" data-count="note"></span></button>
-              </div>
-              <div class="feed" id="feed" role="region" aria-live="polite"></div>
-            </div>
-            <div class="demo-foot"><span class="hint">タブを押すと、その種類だけに絞られます</span></div>
-          </div>
+        <div class="screen-shot">
+          <figure class="phone">
+            <img src="/sns-guide-shots/home.webp" alt="ホーム画面。日替わりのお題カードと、フィルタタブ、フレンドのつぶやきが並んでいる。">
+            <figcaption>ホーム — /sns/home</figcaption>
+          </figure>
         </div>
       </div>
     </div>
@@ -911,166 +375,62 @@ footer { border-top: 1px solid var(--line); padding-block: 1.6rem 2.4rem; font-s
 
   <!-- ═════════ 03 投稿 ═════════ -->
   <section class="stop" id="compose">
-    <div class="wrap rise">
+    <div class="wrap">
       <p class="eyebrow">03 — Post</p>
       <h2 class="sec-title">その日のことを、ひとこと。</h2>
-
-      <div class="split is-flipped">
-        <div>
+      <div class="screen is-flipped">
+        <div class="screen-copy">
           <p class="sec-lead" style="margin-top:0">
             長い文章はいりません。写真を数枚と、短いひとこと。
             行ってきた場所を添えれば、記録がそのまま話のたねになります。
             公開範囲はいつもフレンド固定なので、宛先を迷うことはありません。
           </p>
-
           <ul class="beads">
-            <li>
-              <span class="bead" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M4 6h16M4 12h12M4 18h7"/></svg></span>
-              <b>280文字まで</b>
-              <span class="desc">250文字を超えると、残りの表示が色を変えて知らせます。</span>
-            </li>
-            <li>
-              <span class="bead" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="14" rx="3"/><circle cx="8.5" cy="10" r="1.6"/><path d="m4 17 4.5-4 4 3.2L16 13l4 4"/></svg></span>
-              <b>写真は4枚まで</b>
-              <span class="desc">その日のいちばんを選んで貼りましょう。</span>
-            </li>
-            <li>
-              <span class="bead" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 21s7-5.5 7-11a7 7 0 1 0-14 0c0 5.5 7 11 7 11Z"/><circle cx="12" cy="10" r="2.6"/></svg></span>
-              <b>行った場所を添える</b>
-              <span class="desc">記録済みの訪問先から選ぶと、投稿に場所の札がつきます。</span>
-            </li>
-            <li>
-              <span class="bead" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="4"/><path d="M16 8v5a3 3 0 0 0 6 0v-1a10 10 0 1 0-4 8"/></svg></span>
-              <b>フレンドを呼ぶ</b>
-              <span class="desc">名前を選ぶと本文に入り、相手に通知が届きます。</span>
-            </li>
-            <li>
-              <span class="bead" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linejoin="round"><path d="M6 3h12a1 1 0 0 1 1 1v17l-7-4.2L5 21V4a1 1 0 0 1 1-1Z"/></svg></span>
-              <b>書きかけは自動で残る</b>
-              <span class="desc">途中で他の画面に移っても、戻れば続きから書けます。</span>
-            </li>
+            <li><b>280文字まで</b><span class="desc">250文字を超えると、残りの表示が色を変えて知らせます。</span></li>
+            <li><b>写真は4枚まで</b><span class="desc">その日のいちばんを選んで貼りましょう。</span></li>
+            <li><b>行った場所を添える</b><span class="desc">記録済みの訪問先から選ぶと、投稿に場所の札がつきます。</span></li>
+            <li><b>フレンドを呼ぶ</b><span class="desc">名前を選ぶと本文に入り、相手に通知が届きます。</span></li>
+            <li><b>書きかけは自動で残る</b><span class="desc">途中で他の画面に移っても、戻れば続きから書けます。</span></li>
           </ul>
         </div>
-
-        <div class="split-demo">
-          <div class="demo" data-demo="compose">
-            <div class="demo-bar"><span class="title">つぶやく</span><span class="live">TRY IT</span></div>
-            <div class="demo-body">
-              <div class="compose-audience">
-                <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M16 20v-1.5a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4V20"/><circle cx="9" cy="7" r="3.2"/><path d="M17 11a3.2 3.2 0 0 0 0-6.4M22 20v-1.5a4 4 0 0 0-3-3.8"/></svg>
-                フレンドに公開
-                <span class="ok" aria-hidden="true"></span>
-              </div>
-
-              <div class="compose-field">
-                <label class="sr" for="composeText">つぶやきの本文（お試し）</label>
-                <textarea id="composeText" rows="4" maxlength="280" placeholder="今日のおでかけ、どんな気分？">鎌倉の海、風が気持ちよかった。</textarea>
-                <div class="compose-meter">
-                  <span class="meter-track"><span class="meter-fill" id="meterFill"></span></span>
-                  <span class="compose-count" id="composeCount">0 / 280</span>
-                </div>
-              </div>
-
-              <div class="slotrow" id="slots" role="group" aria-label="写真の枠（4枚まで）"></div>
-
-              <div class="addons">
-                <button class="addon" type="button" id="addPlace" aria-pressed="false">
-                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 21s7-5.5 7-11a7 7 0 1 0-14 0c0 5.5 7 11 7 11Z"/></svg>
-                  場所を添える
-                </button>
-                <button class="addon" type="button" id="addMention" aria-pressed="false">@ メンション</button>
-              </div>
-            </div>
-            <div class="demo-foot"><span class="hint" id="composeHint">文字を打つと残りが減ります</span></div>
-          </div>
+        <div class="screen-shot">
+          <figure class="phone">
+            <img src="/sns-guide-shots/compose.webp" alt="つぶやきの作成画面。フレンドに公開のラベルと、本文の入力欄、文字数の表示がある。">
+            <figcaption>つぶやく — /sns/home/new</figcaption>
+          </figure>
         </div>
       </div>
     </div>
   </section>
 
   <!-- ═════════ 04 反応 ═════════ -->
-  <section class="stop tinted" id="react">
-    <div class="wrap rise">
+  <section class="stop tinted" id="post">
+    <div class="wrap">
       <p class="eyebrow">04 — React</p>
       <h2 class="sec-title">四つの返しかた。</h2>
-      <p class="sec-lead">気持ちの伝えかたは、ひとつではありません。軽く押すだけのものから、言葉を返すものまで。</p>
-
-      <div class="reactions">
-        <article class="reaction">
-          <span class="glyph" aria-hidden="true"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 20.4 4.2 13a4.9 4.9 0 0 1 7-6.9l.8.8.8-.8a4.9 4.9 0 1 1 7 6.9Z"/></svg></span>
-          <h3>いいね</h3>
-          <p>ひとことも要らないとき。何度押しても、ひとりぶんだけ数えられます。</p>
-        </article>
-        <article class="reaction">
-          <span class="glyph" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a8 8 0 0 1-8 8H4l2-3a8 8 0 1 1 15-5Z"/></svg></span>
-          <h3>返信</h3>
-          <p>言葉で返す。返信に返信を重ねられ、返信そのものにもいいねを付けられます。</p>
-        </article>
-        <article class="reaction">
-          <span class="glyph" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 9V7a3 3 0 0 1 3-3h10l-2.5-2.5M20 15v2a3 3 0 0 1-3 3H7l2.5 2.5"/></svg></span>
-          <h3>リポスト</h3>
-          <p>いい投稿をみんなへ。そのまま広めるほか、引用して自分の言葉も添えられます。</p>
-        </article>
-        <article class="reaction">
-          <span class="glyph" aria-hidden="true"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M6 3h12a1 1 0 0 1 1 1v17l-7-4.2L5 21V4a1 1 0 0 1 1-1Z"/></svg></span>
-          <h3>保存</h3>
-          <p>あとで行きたい場所を、自分だけの棚に。プロフィールの「保存」に集まります。</p>
-        </article>
-      </div>
-
-      <div class="split">
-        <div>
-          <h3 class="sub-title">投稿のメニュー</h3>
+      <div class="screen">
+        <div class="screen-copy">
+          <p class="sec-lead" style="margin-top:0">
+            投稿の詳細画面では、気持ちの伝えかたを四つから選べます。
+            軽く押すだけのものから、言葉を返すものまで。
+          </p>
+          <div class="quad">
+            <div class="quad-item"><b>いいね</b><span>ひとことも要らないとき。何度押しても、ひとりぶんだけ数えられます。</span></div>
+            <div class="quad-item"><b>返信</b><span>言葉で返す。返信に返信を重ねられ、返信自体にもいいねを付けられます。</span></div>
+            <div class="quad-item"><b>リポスト</b><span>いい投稿をみんなへ。引用して自分の言葉を添えることもできます。</span></div>
+            <div class="quad-item"><b>保存</b><span>あとで行きたい場所を、自分だけの棚に。プロフィールの「保存」に集まります。</span></div>
+          </div>
           <p class="sec-lead">
             右上のメニューは、自分の投稿かどうかで中身が変わります。
             自分の投稿なら<strong>プロフィールへの固定</strong>と<strong>削除</strong>。
-            ほかの人の投稿なら<strong>通報</strong>と<strong>ブロック</strong>。
-            どちらも実行の前に確認が出ます。
-          </p>
-          <p class="sec-lead">
-            固定した投稿は、自分のプロフィールでいちばん上に並びます。
-            旅の予定や自己紹介など、いつも見てほしいものを置いておく場所です。
+            ほかの人の投稿なら<strong>通報</strong>と<strong>ブロック</strong>です。
           </p>
         </div>
-
-        <div class="split-demo">
-          <div class="demo" data-demo="react">
-            <div class="demo-bar"><span class="title">つぶやきの詳細</span><span class="live">TRY IT</span></div>
-            <div class="demo-body">
-              <div class="post">
-                <div class="post-head">
-                  <span class="avatar a1" aria-hidden="true">ミ</span>
-                  <span class="who">みなと</span>
-                  <span class="when">2時間前</span>
-                </div>
-                <p class="post-body">江ノ電の窓から海が見えた瞬間、みんなで声が出た。<br>次は夕暮れの時間に行きたい。</p>
-                <div class="shots" aria-hidden="true">
-                  <span style="--s1:#f0d9c0;--s2:#cfe0e8"></span>
-                  <span style="--s1:#e3c9d4;--s2:#d8e0c4"></span>
-                </div>
-                <span class="post-place"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M12 21s7-5.5 7-11a7 7 0 1 0-14 0c0 5.5 7 11 7 11Z"/></svg>鎌倉高校前</span>
-                <div class="post-acts" id="reactActs">
-                  <button class="act is-like" type="button" data-act="like" data-n="12" aria-pressed="false" aria-label="いいね">
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linejoin="round"><path d="M12 20.4 4.2 13a4.9 4.9 0 0 1 7-6.9l.8.8.8-.8a4.9 4.9 0 1 1 7 6.9Z"/></svg>
-                    <span class="n">12</span>
-                  </button>
-                  <button class="act" type="button" data-act="reply" data-n="3" aria-pressed="false" aria-label="返信を見る">
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a8 8 0 0 1-8 8H4l2-3a8 8 0 1 1 15-5Z"/></svg>
-                    <span class="n">3</span>
-                  </button>
-                  <button class="act" type="button" data-act="repost" data-n="1" aria-pressed="false" aria-label="リポスト">
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 9V7a3 3 0 0 1 3-3h10l-2.5-2.5M20 15v2a3 3 0 0 1-3 3H7l2.5 2.5"/></svg>
-                    <span class="n">1</span>
-                  </button>
-                  <button class="act" type="button" data-act="save" aria-pressed="false" aria-label="保存">
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linejoin="round"><path d="M6 3h12a1 1 0 0 1 1 1v17l-7-4.2L5 21V4a1 1 0 0 1 1-1Z"/></svg>
-                  </button>
-                </div>
-              </div>
-              <div class="feed" id="replyList"></div>
-            </div>
-            <div class="demo-foot"><span class="hint" id="reactHint">押すと数が変わります。もう一度押すと戻ります</span></div>
-          </div>
+        <div class="screen-shot">
+          <figure class="phone">
+            <img src="/sns-guide-shots/post.webp" alt="投稿の詳細画面。本文と写真、いいね・返信・リポスト・保存のボタン、返信のやりとりが表示されている。">
+            <figcaption>投稿の詳細 — /sns/posts/[postId]</figcaption>
+          </figure>
         </div>
       </div>
     </div>
@@ -1078,56 +438,30 @@ footer { border-top: 1px solid var(--line); padding-block: 1.6rem 2.4rem; font-s
 
   <!-- ═════════ 05 プロフィール ═════════ -->
   <section class="stop" id="profile">
-    <div class="wrap rise">
+    <div class="wrap">
       <p class="eyebrow">05 — Profile</p>
       <h2 class="sec-title">その人の記録が、ここに。</h2>
-
-      <div class="split">
-        <div>
+      <div class="screen is-flipped">
+        <div class="screen-copy">
           <p class="sec-lead" style="margin-top:0">
             その人のつぶやきだけを集めた画面です。上のレールでフレンドを切り替えられ、
             タブで見たい種類に絞り込めます。固定した投稿は、いつでもいちばん上に並びます。
           </p>
-
           <ul class="beads">
-            <li>
-              <span class="bead" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 6h16M4 12h16M4 18h10"/></svg></span>
-              <b>つぶやき</b>
-              <span class="desc">すべての投稿。固定したものが先頭に来ます。</span>
-            </li>
-            <li>
-              <span class="bead" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="14" rx="3"/><path d="m4 17 4.5-4 4 3.2L16 13l4 4"/></svg></span>
-              <b>写真・場所</b>
-              <span class="desc">写真つき、または訪問先がひも付いた投稿だけを見られます。</span>
-            </li>
-            <li>
-              <span class="bead" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linejoin="round"><path d="M6 3h12a1 1 0 0 1 1 1v17l-7-4.2L5 21V4a1 1 0 0 1 1-1Z"/></svg></span>
-              <b>保存（自分だけ）</b>
-              <span class="desc">保存タブは自分のページにだけ出ます。人には見えません。</span>
-            </li>
+            <li><b>つぶやき</b><span class="desc">すべての投稿。固定したものが先頭に来ます。</span></li>
+            <li><b>写真・場所</b><span class="desc">写真つき、または訪問先がひも付いた投稿だけを見られます。</span></li>
+            <li><b>保存（自分だけ）</b><span class="desc">保存タブは自分のページにだけ出ます。人には見えません。</span></li>
           </ul>
-
           <p class="sec-lead">
-            タブの数字は、いま読み込んでいる範囲での件数です。
-            まだ先があるときは <code class="k">24+</code> のように <code class="k">+</code> が付き、
-            読み進めると増えていきます。
+            タブの数字は、いま読み込んでいる範囲での件数です。まだ先があるときは
+            <code class="k">24+</code> のように付き、読み進めると増えていきます。
           </p>
         </div>
-
-        <div class="split-demo">
-          <div class="demo" data-demo="profile">
-            <div class="demo-bar"><span class="title">プロフィール</span><span class="live">TRY IT</span></div>
-            <div class="demo-body">
-              <div class="tabs" role="tablist" aria-label="プロフィールのタブ">
-                <button role="tab" type="button" data-ptab="posts"  aria-selected="true">つぶやき<span class="count" data-pcount="posts"></span></button>
-                <button role="tab" type="button" data-ptab="photos" aria-selected="false">写真<span class="count" data-pcount="photos"></span></button>
-                <button role="tab" type="button" data-ptab="places" aria-selected="false">場所<span class="count" data-pcount="places"></span></button>
-                <button role="tab" type="button" data-ptab="saved"  aria-selected="false">保存<span class="count" data-pcount="saved"></span></button>
-              </div>
-              <div class="feed" id="profileFeed" role="region" aria-live="polite"></div>
-            </div>
-            <div class="demo-foot"><span class="hint">「保存」は自分のページにだけ現れるタブです</span></div>
-          </div>
+        <div class="screen-shot">
+          <figure class="phone">
+            <img src="/sns-guide-shots/profile.webp" alt="プロフィール画面。フレンドの切り替えレール、投稿数などのタブ、その人のつぶやきが並んでいる。">
+            <figcaption>プロフィール — /sns/users/[userId]</figcaption>
+          </figure>
         </div>
       </div>
     </div>
@@ -1135,163 +469,61 @@ footer { border-top: 1px solid var(--line); padding-block: 1.6rem 2.4rem; font-s
 
   <!-- ═════════ 06 グループ ═════════ -->
   <section class="stop tinted" id="groups">
-    <div class="wrap rise">
+    <div class="wrap">
       <p class="eyebrow">06 — Groups</p>
       <h2 class="sec-title">みんなで決めて、みんなで残す。</h2>
-      <p class="sec-lead">
-        グループは、選んだ数人だけの部屋です。出かける前の相談から、帰ってきたあとの写真の共有まで、
-        ひとつの場所でつながったまま進みます。部屋を開いた時点で既読になるので、
-        「どこまで見たか」を気にする必要はありません。
-      </p>
-
-      <div class="split">
-        <div>
-          <ul class="beads" style="margin-top:0">
-            <li>
-              <span class="bead" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="14" rx="3"/><path d="m4 17 4.5-4 4 3.2L16 13l4 4"/></svg></span>
-              <b>写真タブ</b>
-              <span class="desc">日付ごとの格子で共有。初めは直近10日分、最大90日分まで遡れます。</span>
-            </li>
-            <li>
-              <span class="bead" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a8 8 0 0 1-8 8H4l2-3a8 8 0 1 1 15-5Z"/></svg></span>
-              <b>チャットタブ</b>
-              <span class="desc">部屋の中だけのおしゃべり。名前を呼べば、その人に通知が届きます。</span>
-            </li>
-            <li>
-              <span class="bead" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 4h6l-1 6 4 3H6l4-3Z"/><path d="M12 13v7"/></svg></span>
-              <b>ピン留め</b>
-              <span class="desc">集合時間や持ち物を部屋のいちばん上へ。流れて消えません。</span>
-            </li>
-            <li>
-              <span class="bead" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 20V10M12 20V4M19 20v-7"/></svg></span>
-              <b>投票</b>
-              <span class="desc">選択肢は最大4つ。締切を決めれば、だらだら続きません。</span>
-            </li>
-            <li>
-              <span class="bead" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 8v8M8 12h8"/></svg></span>
-              <b>並び替えと設定</b>
-              <span class="desc">上のアイコンを長押しして並び替え。名前とアイコンの変更、メンバー追加、退出もここから。</span>
-            </li>
+      <div class="screen">
+        <div class="screen-copy">
+          <p class="sec-lead" style="margin-top:0">
+            グループは、選んだ数人だけの部屋です。出かける前の相談から、帰ってきたあとの写真の共有まで、
+            ひとつの場所でつながったまま進みます。部屋を開いた時点で既読になるので、
+            「どこまで見たか」を気にする必要はありません。
+          </p>
+          <ul class="beads">
+            <li><b>写真タブ</b><span class="desc">日付ごとの格子で共有。初めは直近10日分、最大90日分まで遡れます。</span></li>
+            <li><b>チャットタブ</b><span class="desc">部屋の中だけのおしゃべり。名前を呼べば、その人に通知が届きます。</span></li>
+            <li><b>ピン留め</b><span class="desc">集合時間や持ち物を部屋のいちばん上へ。流れて消えません。</span></li>
+            <li><b>投票</b><span class="desc">選択肢は最大4つ。締切を決めれば、だらだら続きません。</span></li>
+            <li><b>並び替えと設定</b><span class="desc">上のアイコンを長押しして並び替え。名前とアイコンの変更、メンバー追加、退出もここから。</span></li>
           </ul>
         </div>
-
-        <div class="split-demo">
-          <div class="demo" data-demo="group">
-            <div class="demo-bar"><span class="title">鎌倉ひとめぐり</span><span class="live">TRY IT</span></div>
-            <div class="demo-body">
-              <div class="pin-card">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 4h6l-1 6 4 3H6l4-3Z"/><path d="M12 13v7"/></svg>
-                <span><b>9:40 藤沢駅の改札前</b><small>江ノ電の一日券は各自で。雨なら長谷寺へ変更します。</small></span>
-              </div>
-
-              <div class="poll">
-                <h4>お昼はどこにする？</h4>
-                <p class="by">みなとさん・あと2日</p>
-                <div class="poll-opts" id="pollOpts"></div>
-                <p class="poll-total" id="pollTotal"></p>
-              </div>
-
-              <div class="tabs" role="tablist" aria-label="グループの表示" style="margin-top:.7rem">
-                <button role="tab" type="button" data-gtab="photos" aria-selected="true">写真</button>
-                <button role="tab" type="button" data-gtab="chat" aria-selected="false">チャット</button>
-              </div>
-
-              <div id="gPhotos" style="margin-top:.7rem">
-                <div class="grid3" aria-hidden="true">
-                  <span style="--s1:#f0d9c0;--s2:#cfe0e8"></span>
-                  <span style="--s1:#e3c9d4;--s2:#d8e0c4"></span>
-                  <span style="--s1:#d5e2ea;--s2:#f0e2c8"></span>
-                  <span style="--s1:#e8d9c4;--s2:#cfe0d6"></span>
-                  <span style="--s1:#ddd0e6;--s2:#e9dcc6"></span>
-                  <span style="--s1:#cfe0e8;--s2:#efd8cc"></span>
-                </div>
-              </div>
-
-              <div id="gChat" hidden style="margin-top:.7rem">
-                <div class="chat" id="chatList"></div>
-                <form class="chatbar" id="chatForm">
-                  <label class="sr" for="chatInput">メッセージ（お試し）</label>
-                  <input id="chatInput" type="text" placeholder="メッセージを送る" maxlength="80" autocomplete="off">
-                  <button type="submit" id="chatSend" aria-label="送信" disabled>
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12 20 4l-8 16-2-6Z"/></svg>
-                  </button>
-                </form>
-              </div>
-            </div>
-            <div class="demo-foot"><span class="hint" id="groupHint">投票してみてください。タブでチャットにも切り替わります</span></div>
-          </div>
+        <div class="screen-shot is-pair">
+          <figure class="phone">
+            <img src="/sns-guide-shots/group.webp" alt="グループの写真タブ。ピン留めカードと投票、日付ごとの写真の格子が並んでいる。">
+            <figcaption>グループ（写真）— /sns/groups/[groupId]</figcaption>
+          </figure>
+          <figure class="phone">
+            <img src="/sns-guide-shots/chat.webp" alt="グループのチャットタブ。メンバーの吹き出しと、メンションつきのメッセージが並んでいる。">
+            <figcaption>グループ（チャット）— ?view=chat</figcaption>
+          </figure>
         </div>
-      </div>
-
-      <div class="tools">
-        <article class="tool">
-          <div class="tool-art" style="--glow: var(--sky-glow)"><img src="/illustrations/sns/mode-photo-v2.webp" alt="" width="320" height="320" loading="lazy"></div>
-          <h3>写真</h3>
-          <p>撮ってきた写真を日付ごとに並べて共有。絵文字とコメントで返せます。</p>
-        </article>
-        <article class="tool">
-          <div class="tool-art" style="--glow: var(--coral-glow)"><img src="/illustrations/sns/mode-chat-v2.webp" alt="" width="320" height="320" loading="lazy"></div>
-          <h3>チャット</h3>
-          <p>部屋の中だけのおしゃべり。名前を呼べば、その人に通知が届きます。</p>
-        </article>
-        <article class="tool">
-          <div class="tool-art" style="--glow: var(--gold-glow)"><img src="/illustrations/sns/group-poll-v2.webp" alt="" width="512" height="512" loading="lazy"></div>
-          <h3>投票</h3>
-          <p>質問は120文字、選択肢は4つまで。締切を過ぎると自動で閉じます。</p>
-        </article>
-        <article class="tool">
-          <div class="tool-art" style="--glow: var(--violet-glow)"><img src="/illustrations/sns/saved-journey-v2.webp" alt="" width="512" height="512" loading="lazy"></div>
-          <h3>ピン留め</h3>
-          <p>見出し60文字・本文300文字。書き換えればいつでも最新に保てます。</p>
-        </article>
       </div>
     </div>
   </section>
 
   <!-- ═════════ 07 写真 ═════════ -->
   <section class="stop" id="photo">
-    <div class="wrap rise">
+    <div class="wrap">
       <p class="eyebrow">07 — Photos</p>
       <h2 class="sec-title">一枚に、みんなの声を。</h2>
-
-      <div class="split is-flipped">
-        <div>
+      <div class="screen is-flipped">
+        <div class="screen-copy">
           <p class="sec-lead" style="margin-top:0">
             グループに上げた写真は、一枚ずつ開けます。
             絵文字でさっと気持ちを返すこともできますし、言葉でコメントを添えることもできます。
             リアクションはひとりひとつ。同じ絵文字をもう一度押すと取り消しになります。
           </p>
-
           <ul class="beads">
-            <li>
-              <span class="bead" aria-hidden="true">😊</span>
-              <b>6つの絵文字</b>
-              <span class="desc">😊 😂 😍 😮 👍 🎉 から、ひとつだけ選べます。</span>
-            </li>
-            <li>
-              <span class="bead" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a8 8 0 0 1-8 8H4l2-3a8 8 0 1 1 15-5Z"/></svg></span>
-              <b>コメント</b>
-              <span class="desc">写真ごとに時系列で並びます。自分のものはあとから消せます。</span>
-            </li>
-            <li>
-              <span class="bead" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7h16M4 12h16M4 17h9"/></svg></span>
-              <b>キャプション</b>
-              <span class="desc">300文字まで。その日の空気を短く添えられます。</span>
-            </li>
+            <li><b>6つの絵文字</b><span class="desc">😊 😂 😍 😮 👍 🎉 から、ひとつだけ選べます。</span></li>
+            <li><b>コメント</b><span class="desc">写真ごとに時系列で並びます。自分のものはあとから消せます。</span></li>
+            <li><b>キャプション</b><span class="desc">300文字まで。その日の空気を短く添えられます。</span></li>
           </ul>
         </div>
-
-        <div class="split-demo">
-          <div class="demo" data-demo="photo">
-            <div class="demo-bar"><span class="title">写真</span><span class="live">TRY IT</span></div>
-            <div class="demo-body">
-              <div style="aspect-ratio:4/3;border-radius:13px;background:linear-gradient(140deg,#f0d9c0,#cfe0e8)" aria-hidden="true"></div>
-              <p style="margin:.6rem 0 0;font-size:.8rem;color:var(--ink-soft)">由比ヶ浜、夕方。風がやんだ一瞬。</p>
-              <div class="emoji-tray" id="emojiTray" role="group" aria-label="リアクション"></div>
-              <p style="margin:.55rem 0 0;font-size:.7rem;color:var(--ink-faint)" id="emojiMsg">まだリアクションはありません</p>
-            </div>
-            <div class="demo-foot"><span class="hint">ひとつ選べます。同じものをもう一度押すと取り消し</span></div>
-          </div>
+        <div class="screen-shot">
+          <figure class="phone">
+            <img src="/sns-guide-shots/photo.webp" alt="写真の詳細画面。大きく表示された写真と、絵文字のリアクション、コメント欄への導線がある。">
+            <figcaption>写真の詳細 — /sns/[photoId]</figcaption>
+          </figure>
         </div>
       </div>
     </div>
@@ -1299,57 +531,27 @@ footer { border-top: 1px solid var(--line); padding-block: 1.6rem 2.4rem; font-s
 
   <!-- ═════════ 08 検索 ═════════ -->
   <section class="stop tinted" id="search">
-    <div class="wrap rise">
+    <div class="wrap">
       <p class="eyebrow">08 — Search</p>
       <h2 class="sec-title">探すのは、ひとつの窓口から。</h2>
-
-      <div class="split">
-        <div>
+      <div class="screen">
+        <div class="screen-copy">
           <p class="sec-lead" style="margin-top:0">
             人・投稿・グループ・場所を、横断して探せます。
             投稿は本文だけでなく、投稿者の名前や、ひも付いた場所・旅程の名前まで見にいきます。
             言葉を入れる前でも、いま使われているタグが候補として並びます。
           </p>
-
           <ul class="beads">
-            <li>
-              <span class="bead" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg></span>
-              <b>5つの対象</b>
-              <span class="desc">すべて／投稿／ユーザー／グループ／場所を、タブで切り替えます。</span>
-            </li>
-            <li>
-              <span class="bead" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M10 4 8 20M16 4l-2 16M4 9h16M3 15h16"/></svg></span>
-              <b>タグはそのまま貼れる</b>
-              <span class="desc">先頭の <code class="k">#</code> は自動で外して探します。</span>
-            </li>
-            <li>
-              <span class="bead" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12h16M12 4v16"/></svg></span>
-              <b>表記ゆれを吸収</b>
-              <span class="desc">全角・半角、大文字・小文字の違いは気にしなくて大丈夫です。</span>
-            </li>
+            <li><b>5つの対象</b><span class="desc">すべて／投稿／ユーザー／グループ／場所を、タブで切り替えます。</span></li>
+            <li><b>タグはそのまま貼れる</b><span class="desc">先頭の <code class="k">#</code> は自動で外して探します。</span></li>
+            <li><b>表記ゆれを吸収</b><span class="desc">全角・半角、大文字・小文字の違いは気にしなくて大丈夫です。</span></li>
           </ul>
         </div>
-
-        <div class="split-demo">
-          <div class="demo" data-demo="search">
-            <div class="demo-bar"><span class="title">SNS検索</span><span class="live">TRY IT</span></div>
-            <div class="demo-body">
-              <div class="search" style="max-width:none">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
-                <label class="sr" for="snsSearch">SNSを検索（お試し）</label>
-                <input id="snsSearch" type="search" placeholder="キーワード、#タグ、場所を検索" autocomplete="off">
-              </div>
-              <div class="tabs" role="tablist" aria-label="検索の対象" style="margin-top:.6rem">
-                <button role="tab" type="button" data-scope="all" aria-selected="true">すべて</button>
-                <button role="tab" type="button" data-scope="post" aria-selected="false">投稿</button>
-                <button role="tab" type="button" data-scope="user" aria-selected="false">ユーザー</button>
-                <button role="tab" type="button" data-scope="group" aria-selected="false">グループ</button>
-                <button role="tab" type="button" data-scope="place" aria-selected="false">場所</button>
-              </div>
-              <div class="feed" id="searchResults" role="region" aria-live="polite"></div>
-            </div>
-            <div class="demo-foot"><span class="hint" id="searchHint">「鎌倉」「海」「みなと」などで試せます</span></div>
-          </div>
+        <div class="screen-shot">
+          <figure class="phone">
+            <img src="/sns-guide-shots/search.webp" alt="SNS検索画面。検索キーワード欄、すべて・投稿・ユーザーなどの対象タブ、投稿の検索結果が表示されている。">
+            <figcaption>検索 — /sns/search</figcaption>
+          </figure>
         </div>
       </div>
     </div>
@@ -1357,57 +559,28 @@ footer { border-top: 1px solid var(--line); padding-block: 1.6rem 2.4rem; font-s
 
   <!-- ═════════ 09 通知 ═════════ -->
   <section class="stop" id="notify">
-    <div class="wrap rise">
+    <div class="wrap">
       <p class="eyebrow">09 — Notifications</p>
       <h2 class="sec-title">届いた反応は、ひとまとめに。</h2>
-
-      <div class="split is-flipped">
-        <div>
+      <div class="screen is-flipped">
+        <div class="screen-copy">
           <p class="sec-lead" style="margin-top:0">
             返信・いいね・メンション・グループの動きが、ひとつの一覧に集まります。
             未読だけを見るタブと、まとめて既読にするボタンがあるので、
             たまっても数回のタップで片付きます。
           </p>
-
           <ul class="beads">
-            <li>
-              <span class="bead" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a8 8 0 0 1-8 8H4l2-3a8 8 0 1 1 15-5Z"/></svg></span>
-              <b>返信</b>
-              <span class="desc">自分の投稿に付いた、ほかの人からの返信。</span>
-            </li>
-            <li>
-              <span class="bead" aria-hidden="true"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 20.4 4.2 13a4.9 4.9 0 0 1 7-6.9l.8.8.8-.8a4.9 4.9 0 1 1 7 6.9Z"/></svg></span>
-              <b>いいね</b>
-              <span class="desc">前に見たときからの増分を「新着 +3」のように出します。</span>
-            </li>
-            <li>
-              <span class="bead" aria-hidden="true">@</span>
-              <b>メンション</b>
-              <span class="desc">投稿・返信・グループチャットで名前を呼ばれたとき。</span>
-            </li>
-            <li>
-              <span class="bead" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="8" r="3"/><path d="M3 19a6 6 0 0 1 12 0M17 11a3 3 0 0 0 0-6M21 19a6 6 0 0 0-4-5.6"/></svg></span>
-              <b>グループ</b>
-              <span class="desc">参加中の部屋に、新しい写真やメッセージがあるとき。</span>
-            </li>
+            <li><b>返信</b><span class="desc">自分の投稿に付いた、ほかの人からの返信。</span></li>
+            <li><b>いいね</b><span class="desc">前に見たときからの増分を「新着 +3」のように出します。</span></li>
+            <li><b>メンション</b><span class="desc">投稿・返信・グループチャットで名前を呼ばれたとき。</span></li>
+            <li><b>グループ</b><span class="desc">参加中の部屋に、新しい写真やメッセージがあるとき。</span></li>
           </ul>
         </div>
-
-        <div class="split-demo">
-          <div class="demo" data-demo="notify">
-            <div class="demo-bar"><span class="title">通知</span><span class="live">TRY IT</span></div>
-            <div class="demo-body">
-              <div class="tabs" role="tablist" aria-label="通知の表示">
-                <button role="tab" type="button" data-ntab="all" aria-selected="true">すべて</button>
-                <button role="tab" type="button" data-ntab="unread" aria-selected="false">未読<span class="count" id="unreadCount"></span></button>
-              </div>
-              <div class="notif" id="notifList" style="margin-top:.7rem" role="region" aria-live="polite"></div>
-            </div>
-            <div class="demo-foot">
-              <span class="hint" id="notifHint"></span>
-              <button class="btn-mini" type="button" id="markAll">すべて既読</button>
-            </div>
-          </div>
+        <div class="screen-shot">
+          <figure class="phone">
+            <img src="/sns-guide-shots/notify.webp" alt="通知画面。返信・いいね・メンション・グループの通知が新しい順に並び、未読には印が付いている。">
+            <figcaption>通知 — /sns/notifications</figcaption>
+          </figure>
         </div>
       </div>
     </div>
@@ -1415,31 +588,29 @@ footer { border-top: 1px solid var(--line); padding-block: 1.6rem 2.4rem; font-s
 
   <!-- ═════════ 10 安全 ═════════ -->
   <section class="stop tinted" id="safety">
-    <div class="wrap rise">
+    <div class="wrap">
       <p class="eyebrow">10 — Safe &amp; Quiet</p>
       <h2 class="sec-title">心地よい距離で。</h2>
-      <p class="sec-lead">受け取るものは自分で選べます。合わないと感じたら、そっと離れることもできます。</p>
-
-      <div class="safety-grid">
-        <div class="safety-item">
-          <h3>フレンドだけ</h3>
-          <p>投稿はいつでもフレンドの内側まで。外の誰かに見えることはありません。</p>
+      <div class="screen">
+        <div class="screen-copy">
+          <p class="sec-lead" style="margin-top:0">
+            受け取るものは自分で選べます。合わないと感じたら、そっと離れることもできます。
+          </p>
+          <div class="quad">
+            <div class="quad-item"><b>フレンドだけ</b><span>投稿はいつでもフレンドの内側まで。外の誰かに見えることはありません。</span></div>
+            <div class="quad-item"><b>通知を選ぶ</b><span>返信・いいね・メンション・グループを、それぞれ個別に止められます。</span></div>
+            <div class="quad-item"><b>そっとミュート</b><span>グループは抜けないまま、その部屋の知らせだけを静かにできます。</span></div>
+            <div class="quad-item"><b>ブロックと通報</b><span>ブロックは両方向にはたらき、投稿もコメントも互いに見えなくなります。</span></div>
+          </div>
         </div>
-        <div class="safety-item">
-          <h3>通知を選ぶ</h3>
-          <p>返信・いいね・メンション・グループを、それぞれ個別に止められます。</p>
-        </div>
-        <div class="safety-item">
-          <h3>そっとミュート</h3>
-          <p>グループは抜けないまま、その部屋の知らせだけを静かにできます。</p>
-        </div>
-        <div class="safety-item">
-          <h3>ブロックと通報</h3>
-          <p>ブロックは両方向にはたらき、投稿もコメントも互いに見えなくなります。</p>
+        <div class="screen-shot">
+          <figure class="phone">
+            <img src="/sns-guide-shots/safety.webp" alt="通知と安全の設定画面。返信・いいね・メンション・グループの通知を個別に切り替えるトグルが並んでいる。">
+            <figcaption>通知と安全 — /sns/settings</figcaption>
+          </figure>
         </div>
       </div>
-
-      <p class="sec-lead">
+      <p class="sec-lead" style="margin-top:2rem">
         ブロックした相手とは、投稿・写真・コメントだけでなく、
         グループのメンバー一覧や投票の集計にいたるまで、互いに姿が見えなくなります。
         新しいグループへ招くこともできません。解除はいつでも「通知と安全」からできます。
@@ -1449,96 +620,79 @@ footer { border-top: 1px solid var(--line); padding-block: 1.6rem 2.4rem; font-s
 
   <!-- ═════════ 11 早見表 ═════════ -->
   <section class="stop" id="specs">
-    <div class="wrap rise">
+    <div class="wrap">
       <p class="eyebrow">11 — Reference</p>
       <h2 class="sec-title">数字の早見表。</h2>
-      <p class="sec-lead">入力と表示にかかわる上限をまとめました。言葉でも、場所でも絞り込めます。</p>
-
-      <div class="table-tools">
-        <div class="search">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
-          <label class="sr" for="specSearch">早見表を絞り込む</label>
-          <input id="specSearch" type="search" placeholder="「写真」「グループ」などで絞り込む" autocomplete="off">
-        </div>
-        <div class="filters" id="specFilters" role="group" aria-label="場所で絞り込む">
-          <button type="button" data-where="all" aria-pressed="true">すべて</button>
-          <button type="button" data-where="投稿" aria-pressed="false">投稿</button>
-          <button type="button" data-where="グループ" aria-pressed="false">グループ</button>
-          <button type="button" data-where="表示" aria-pressed="false">表示</button>
-        </div>
-      </div>
-
+      <p class="sec-lead">入力と表示にかかわる上限をまとめました。</p>
       <div class="table-wrap">
-        <table id="specTable">
-          <caption class="sr">SNS機能の制限値と表示件数の一覧</caption>
+        <table>
+          <caption style="position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);">SNS機能の制限値と表示件数の一覧</caption>
           <thead>
             <tr><th scope="col">項目</th><th scope="col" class="r">上限</th><th scope="col">場所</th></tr>
           </thead>
           <tbody>
-            <tr data-where="投稿"><td>つぶやきの本文</td><td class="n">280 字</td><td class="w">投稿の作成</td></tr>
-            <tr data-where="投稿"><td>1投稿の写真</td><td class="n">4 枚</td><td class="w">投稿の作成</td></tr>
-            <tr data-where="投稿"><td>通報の理由</td><td class="n">120 字</td><td class="w">投稿のメニュー</td></tr>
-            <tr data-where="グループ"><td>写真のキャプション</td><td class="n">300 字</td><td class="w">グループへの写真投稿</td></tr>
-            <tr data-where="グループ"><td>グループ名</td><td class="n">40 字</td><td class="w">グループの作成・編集</td></tr>
-            <tr data-where="グループ"><td>ピン留めの見出し</td><td class="n">60 字</td><td class="w">グループ</td></tr>
-            <tr data-where="グループ"><td>ピン留めの本文</td><td class="n">300 字</td><td class="w">グループ</td></tr>
-            <tr data-where="グループ"><td>投票の質問</td><td class="n">120 字</td><td class="w">グループ</td></tr>
-            <tr data-where="グループ"><td>投票の選択肢</td><td class="n">4 つ / 50 字</td><td class="w">グループ</td></tr>
-            <tr data-where="グループ"><td>作成に必要な人数</td><td class="n">自分 + 1 人</td><td class="w">グループの作成</td></tr>
-            <tr data-where="表示"><td>検索キーワード</td><td class="n">60 字</td><td class="w">検索</td></tr>
-            <tr data-where="表示"><td>ホームの表示件数</td><td class="n">24 → 120 件</td><td class="w">ホーム</td></tr>
-            <tr data-where="表示"><td>プロフィールの表示件数</td><td class="n">24 → 120 件</td><td class="w">プロフィール</td></tr>
-            <tr data-where="表示"><td>グループ写真の期間</td><td class="n">10 → 90 日</td><td class="w">グループ</td></tr>
-            <tr data-where="表示"><td>検索対象の投稿</td><td class="n">80 件</td><td class="w">検索</td></tr>
-            <tr data-where="表示"><td>タグの候補</td><td class="n">7 個</td><td class="w">検索</td></tr>
-            <tr data-where="表示"><td>写真のリアクション</td><td class="n">6 種 / 1人1つ</td><td class="w">写真の詳細</td></tr>
-            <tr data-where="表示"><td>お題の候補</td><td class="n">7 種（日替わり）</td><td class="w">ホーム</td></tr>
+            <tr><td>つぶやきの本文</td><td class="n">280 字</td><td class="w">投稿の作成</td></tr>
+            <tr><td>1投稿の写真</td><td class="n">4 枚</td><td class="w">投稿の作成</td></tr>
+            <tr><td>通報の理由</td><td class="n">120 字</td><td class="w">投稿のメニュー</td></tr>
+            <tr><td>写真のキャプション</td><td class="n">300 字</td><td class="w">グループへの写真投稿</td></tr>
+            <tr><td>グループ名</td><td class="n">40 字</td><td class="w">グループの作成・編集</td></tr>
+            <tr><td>ピン留めの見出し</td><td class="n">60 字</td><td class="w">グループ</td></tr>
+            <tr><td>ピン留めの本文</td><td class="n">300 字</td><td class="w">グループ</td></tr>
+            <tr><td>投票の質問</td><td class="n">120 字</td><td class="w">グループ</td></tr>
+            <tr><td>投票の選択肢</td><td class="n">4 つ / 50 字</td><td class="w">グループ</td></tr>
+            <tr><td>作成に必要な人数</td><td class="n">自分 + 1 人</td><td class="w">グループの作成</td></tr>
+            <tr><td>検索キーワード</td><td class="n">60 字</td><td class="w">検索</td></tr>
+            <tr><td>ホームの表示件数</td><td class="n">24 → 120 件</td><td class="w">ホーム</td></tr>
+            <tr><td>プロフィールの表示件数</td><td class="n">24 → 120 件</td><td class="w">プロフィール</td></tr>
+            <tr><td>グループ写真の期間</td><td class="n">10 → 90 日</td><td class="w">グループ</td></tr>
+            <tr><td>検索対象の投稿</td><td class="n">80 件</td><td class="w">検索</td></tr>
+            <tr><td>タグの候補</td><td class="n">7 個</td><td class="w">検索</td></tr>
+            <tr><td>写真のリアクション</td><td class="n">6 種 / 1人1つ</td><td class="w">写真の詳細</td></tr>
+            <tr><td>お題の候補</td><td class="n">7 種（日替わり）</td><td class="w">ホーム</td></tr>
           </tbody>
         </table>
-        <p class="table-none" id="specNone" hidden>あてはまる項目がありません。</p>
       </div>
     </div>
   </section>
 
   <!-- ═════════ 12 質問 ═════════ -->
   <section class="stop tinted" id="faq">
-    <div class="wrap rise">
+    <div class="wrap">
       <p class="eyebrow">12 — Questions</p>
       <h2 class="sec-title">よくある質問。</h2>
-
       <div class="faq">
-        <details>
-          <summary><span class="q" aria-hidden="true">Q</span>投稿は誰に見えますか？</summary>
+        <div class="faq-item">
+          <p class="q"><span class="mark-q">Q</span>投稿は誰に見えますか？</p>
           <p class="a">フレンドだけです。フレンドではない人や、アプリの外の誰かに見えることはありません。グループへの投稿は、さらにその部屋のメンバーだけに限られます。</p>
-        </details>
-        <details>
-          <summary><span class="q" aria-hidden="true">Q</span>投稿を消したくなったら？</summary>
+        </div>
+        <div class="faq-item">
+          <p class="q"><span class="mark-q">Q</span>投稿を消したくなったら？</p>
           <p class="a">自分の投稿は、右上のメニューからいつでも削除できます。確認のあと消えます。返信やコメントも、自分が書いたものは同じように消せます。</p>
-        </details>
-        <details>
-          <summary><span class="q" aria-hidden="true">Q</span>いいねを間違えて押しました。</summary>
+        </div>
+        <div class="faq-item">
+          <p class="q"><span class="mark-q">Q</span>いいねを間違えて押しました。</p>
           <p class="a">もう一度押せば取り消せます。何度押しても、ひとりぶんしか数えられない作りなので、連打しても数が増えることはありません。</p>
-        </details>
-        <details>
-          <summary><span class="q" aria-hidden="true">Q</span>保存した投稿は相手に伝わりますか？</summary>
+        </div>
+        <div class="faq-item">
+          <p class="q"><span class="mark-q">Q</span>保存した投稿は相手に伝わりますか？</p>
           <p class="a">伝わりません。保存はあなただけの棚です。自分のプロフィールの「保存」タブに集まり、そのタブはほかの人には表示されません。</p>
-        </details>
-        <details>
-          <summary><span class="q" aria-hidden="true">Q</span>グループを抜けたくないけれど、通知は止めたい。</summary>
+        </div>
+        <div class="faq-item">
+          <p class="q"><span class="mark-q">Q</span>グループを抜けたくないけれど、通知は止めたい。</p>
           <p class="a">「通知と安全」からグループをミュートできます。参加はそのままで、その部屋の未読だけが数えられなくなります。</p>
-        </details>
-        <details>
-          <summary><span class="q" aria-hidden="true">Q</span>ブロックすると相手に分かりますか？</summary>
+        </div>
+        <div class="faq-item">
+          <p class="q"><span class="mark-q">Q</span>ブロックすると相手に分かりますか？</p>
           <p class="a">通知は届きません。ブロックは両方向にはたらき、投稿・写真・コメント・グループのメンバー一覧まで、互いに見えなくなります。解除もいつでもできます。</p>
-        </details>
-        <details>
-          <summary><span class="q" aria-hidden="true">Q</span>書きかけの投稿は消えてしまいますか？</summary>
+        </div>
+        <div class="faq-item">
+          <p class="q"><span class="mark-q">Q</span>書きかけの投稿は消えてしまいますか？</p>
           <p class="a">残ります。入力した内容は下書きとして自動で保存されるので、途中で他の画面へ移っても、戻れば続きから書けます。引用リポストの下書きは、引用元ごとに別々に保たれます。</p>
-        </details>
-        <details>
-          <summary><span class="q" aria-hidden="true">Q</span>グループのメンバーは誰でも追加できますか？</summary>
+        </div>
+        <div class="faq-item">
+          <p class="q"><span class="mark-q">Q</span>グループのメンバーは誰でも追加できますか？</p>
           <p class="a">グループを作った人だけが追加できます。また、ブロック関係にある相手は追加できません。退出は誰でもいつでもできます。</p>
-        </details>
+        </div>
       </div>
     </div>
   </section>
@@ -1547,8 +701,8 @@ footer { border-top: 1px solid var(--line); padding-block: 1.6rem 2.4rem; font-s
 
 <!-- ═════════ 結び ═════════ -->
 <section class="outro">
-  <div class="wrap rise">
-    <img src="/illustrations/sns/conversation-v2.webp" alt="写真の上に浮かぶ二つの吹き出しと紙飛行機のイラスト" width="384" height="351" loading="lazy">
+  <div class="wrap">
+    <img src="/illustrations/sns/conversation-v2.webp" alt="写真の上に浮かぶ二つの吹き出しと紙飛行機のイラスト" width="384" height="351">
     <h2>おでかけは、<br>話したくなるものだから。</h2>
     <p>
       行った先のことを誰かに話すと、その日はもう一度おもしろくなります。
@@ -1559,506 +713,5 @@ footer { border-top: 1px solid var(--line); padding-block: 1.6rem 2.4rem; font-s
 
 <footer><div class="wrap">おでかけ記録アプリ — SNS機能のご案内</div></footer>
 
-<button class="totop" id="toTop" type="button" aria-label="ページの先頭へ戻る">
-  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M12 19V5M5 12l7-7 7 7"/></svg>
-</button>
-
-<script>
-(function () {
-  "use strict";
-  var reduced = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-  var $  = function (s, r) { return (r || document).querySelector(s); };
-  var $$ = function (s, r) { return Array.prototype.slice.call((r || document).querySelectorAll(s)); };
-  var esc = function (s) {
-    return String(s).replace(/[&<>"']/g, function (c) {
-      return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c];
-    });
-  };
-
-  var PIN_SVG = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M12 21s7-5.5 7-11a7 7 0 1 0-14 0c0 5.5 7 11 7 11Z"/></svg>';
-
-  /* 左右キーでも動くタブ */
-  function wireTabs(list, onPick, key) {
-    if (!list) return;
-    var tabs = $$('[role="tab"]', list);
-    function pick(btn) {
-      tabs.forEach(function (t) { t.setAttribute("aria-selected", String(t === btn)); });
-      onPick(btn.dataset[key], btn);
-    }
-    tabs.forEach(function (btn, i) {
-      btn.addEventListener("click", function () { pick(btn); });
-      btn.addEventListener("keydown", function (e) {
-        var d = e.key === "ArrowRight" ? 1 : e.key === "ArrowLeft" ? -1 : 0;
-        if (!d) return;
-        e.preventDefault();
-        var nx = tabs[(i + d + tabs.length) % tabs.length];
-        nx.focus(); pick(nx);
-      });
-    });
-  }
-
-  /* ══ 現れかた ══ */
-  (function reveal() {
-    var t = $$(".rise");
-    if (reduced || !("IntersectionObserver" in window)) {
-      t.forEach(function (el) { el.classList.add("is-in"); });
-      return;
-    }
-    var io = new IntersectionObserver(function (es) {
-      es.forEach(function (e) {
-        if (e.isIntersecting) { e.target.classList.add("is-in"); io.unobserve(e.target); }
-      });
-    }, { rootMargin: "0px 0px -10% 0px", threshold: 0.06 });
-    t.forEach(function (el) { io.observe(el); });
-  })();
-
-  /* ══ 読み進みと現在地 ══ */
-  (function navState() {
-    var bar = $("#progress"), top = $("#toTop"), strip = $(".navscroll");
-    var links = $$("#nav a");
-    var secs = links.map(function (a) { return $(a.getAttribute("href")); });
-    var ticking = false, last = -1;
-
-    function update() {
-      ticking = false;
-      var doc = document.documentElement;
-      var max = doc.scrollHeight - window.innerHeight;
-      var y = window.scrollY || doc.scrollTop;
-      bar.style.width = (max > 0 ? Math.min(100, (y / max) * 100) : 0) + "%";
-      top.classList.toggle("is-on", y > 700);
-
-      var cur = -1;
-      secs.forEach(function (s, i) { if (s && s.getBoundingClientRect().top <= 120) cur = i; });
-      if (cur === last) return;
-      last = cur;
-
-      links.forEach(function (a, i) {
-        if (i === cur) a.setAttribute("aria-current", "true");
-        else a.removeAttribute("aria-current");
-      });
-
-      var act = links[cur];
-      if (act && strip) {
-        var want = act.offsetLeft - strip.clientWidth / 2 + act.offsetWidth / 2;
-        strip.scrollTo({ left: Math.max(0, want), behavior: reduced ? "auto" : "smooth" });
-      }
-    }
-    function onScroll() { if (!ticking) { ticking = true; requestAnimationFrame(update); } }
-
-    window.addEventListener("scroll", onScroll, { passive: true });
-    window.addEventListener("resize", onScroll, { passive: true });
-    top.addEventListener("click", function () {
-      window.scrollTo({ top: 0, behavior: reduced ? "auto" : "smooth" });
-    });
-    update();
-  })();
-
-  /* ══ ホーム：フィルタ ══ */
-  (function feedDemo() {
-    var feed = $("#feed");
-    if (!feed) return;
-    var posts = [
-      { who: "みなと", av: "a1", ini: "ミ", when: "2時間前", body: "江ノ電の窓から海が見えた瞬間、みんなで声が出た。", kind: "photo", place: "鎌倉高校前", s1: "#f0d9c0", s2: "#cfe0e8" },
-      { who: "あおい", av: "a2", ini: "ア", when: "5時間前", body: "今日のいちばんは、帰り道に見つけた小さなパン屋さん。", kind: "note", place: "" },
-      { who: "そら",   av: "a3", ini: "ソ", when: "昨日",    body: "紫陽花、まだ間に合った。人は多かったけど行ってよかった。", kind: "photo", place: "明月院", s1: "#d5e2ea", s2: "#e3c9d4" },
-      { who: "りく",   av: "a4", ini: "リ", when: "昨日",    body: "次の休みはどこ行こう。海か山かで永遠に決まらない。", kind: "note", place: "" },
-      { who: "みなと", av: "a1", ini: "ミ", when: "3日前",   body: "朝いちの空気が、いちばん好きかもしれない。", kind: "photo", place: "由比ヶ浜", s1: "#e8d9c4", s2: "#cfe0d6" }
-    ];
-
-    function card(p) {
-      return '<article class="post">'
-        + '<div class="post-head"><span class="avatar ' + p.av + '" aria-hidden="true">' + p.ini + "</span>"
-        + '<span class="who">' + esc(p.who) + '</span><span class="when">' + esc(p.when) + "</span></div>"
-        + '<p class="post-body">' + esc(p.body) + "</p>"
-        + (p.kind === "photo" ? '<div class="shots" aria-hidden="true"><span style="--s1:' + p.s1 + ';--s2:' + p.s2 + '"></span></div>' : "")
-        + (p.place ? '<span class="post-place">' + PIN_SVG + esc(p.place) + "</span>" : "")
-        + "</article>";
-    }
-
-    function render(kind) {
-      var l = posts.filter(function (p) { return kind === "all" || p.kind === kind; });
-      feed.innerHTML = l.length ? l.map(card).join("") : '<p class="demo-empty">この種類の投稿はまだありません。</p>';
-    }
-
-    ["all", "photo", "note"].forEach(function (k) {
-      var el = $('[data-count="' + k + '"]');
-      if (el) el.textContent = k === "all" ? posts.length : posts.filter(function (p) { return p.kind === k; }).length;
-    });
-
-    wireTabs($('[data-demo="feed"] .tabs'), render, "filter");
-    render("all");
-  })();
-
-  /* ══ 投稿：文字数・写真・付加 ══ */
-  (function composeDemo() {
-    var ta = $("#composeText");
-    if (!ta) return;
-    var out = $("#composeCount"), fill = $("#meterFill"), slots = $("#slots"), hint = $("#composeHint");
-    var MAX = 280;
-    var tones = [["#f0d9c0", "#cfe0e8"], ["#e3c9d4", "#d8e0c4"], ["#d5e2ea", "#f0e2c8"], ["#ddd0e6", "#e9dcc6"]];
-
-    function count() {
-      var n = Array.from(ta.value).length;
-      out.textContent = n + " / " + MAX;
-      out.classList.toggle("is-near", n > 250);
-      fill.style.width = Math.min(100, (n / MAX) * 100) + "%";
-      fill.style.background = n > 250 ? "var(--rule-rose)" : "var(--leaf)";
-    }
-    ta.addEventListener("input", count);
-    count();
-
-    for (var i = 0; i < 4; i++) {
-      var b = document.createElement("button");
-      b.type = "button";
-      b.className = "slot";
-      b.dataset.i = String(i);
-      b.setAttribute("aria-label", (i + 1) + "枚目の写真を入れる");
-      b.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M5 12h14"/></svg>';
-      slots.appendChild(b);
-    }
-
-    slots.addEventListener("click", function (e) {
-      var b = e.target.closest(".slot");
-      if (!b) return;
-      var i = Number(b.dataset.i);
-      var on = b.classList.toggle("is-filled");
-      b.style.setProperty("--s1", tones[i][0]);
-      b.style.setProperty("--s2", tones[i][1]);
-      b.setAttribute("aria-label", (i + 1) + "枚目の写真を" + (on ? "外す" : "入れる"));
-      var n = $$(".slot.is-filled", slots).length;
-      hint.textContent = n === 4 ? "写真は4枚まで。これでいっぱいです"
-                       : n > 0   ? n + "枚を添付中（4枚まで）"
-                                 : "枠を押すと写真を足せます";
-    });
-
-    var place = $("#addPlace"), mention = $("#addMention");
-    place.addEventListener("click", function () {
-      var on = place.getAttribute("aria-pressed") !== "true";
-      place.setAttribute("aria-pressed", String(on));
-      hint.textContent = on ? "鎌倉高校前 を添えました" : "場所を外しました";
-    });
-    mention.addEventListener("click", function () {
-      var on = mention.getAttribute("aria-pressed") !== "true";
-      mention.setAttribute("aria-pressed", String(on));
-      if (on && ta.value.indexOf("@あおい") === -1) ta.value = ("@あおい " + ta.value).slice(0, MAX);
-      if (!on) ta.value = ta.value.replace(/@あおい\s?/, "");
-      count();
-      hint.textContent = on ? "@あおい を呼びました。相手に通知が届きます" : "メンションを外しました";
-    });
-  })();
-
-  /* ══ 反応：いいね・返信・リポスト・保存 ══ */
-  (function reactDemo() {
-    var acts = $("#reactActs");
-    if (!acts) return;
-    var hint = $("#reactHint"), list = $("#replyList");
-    var replies = [
-      { av: "a2", ini: "ア", who: "あおい", when: "1時間前", body: "わかる、あの一瞬のために乗ってる。" },
-      { av: "a3", ini: "ソ", who: "そら",   when: "40分前",  body: "夕暮れなら17時前後がよさそう！" }
-    ];
-    var words = { like: "いいね", reply: "返信", repost: "リポスト", save: "保存" };
-
-    acts.addEventListener("click", function (e) {
-      var b = e.target.closest(".act");
-      if (!b) return;
-      var on = b.getAttribute("aria-pressed") !== "true";
-      b.setAttribute("aria-pressed", String(on));
-
-      var nEl = $(".n", b);
-      if (nEl) nEl.textContent = String(Number(b.dataset.n) + (on ? 1 : 0));
-
-      if (!reduced) {
-        b.classList.remove("is-pop");
-        void b.offsetWidth;
-        b.classList.add("is-pop");
-      }
-
-      var kind = b.dataset.act;
-      if (kind === "reply") {
-        list.innerHTML = on ? replies.map(function (r) {
-          return '<article class="post"><div class="post-head">'
-            + '<span class="avatar ' + r.av + '" aria-hidden="true">' + r.ini + "</span>"
-            + '<span class="who">' + esc(r.who) + '</span><span class="when">' + esc(r.when) + "</span></div>"
-            + '<p class="post-body">' + esc(r.body) + "</p></article>";
-        }).join("") : "";
-        hint.textContent = on ? "返信を開きました。返信にも返信を重ねられます" : "返信を閉じました";
-        return;
-      }
-      hint.textContent = on
-        ? words[kind] + "しました" + (kind === "save" ? "（プロフィールの保存に入ります）" : "")
-        : words[kind] + "を取り消しました";
-    });
-  })();
-
-  /* ══ プロフィール：4つのタブ ══ */
-  (function profileDemo() {
-    var box = $("#profileFeed");
-    if (!box) return;
-    var items = [
-      { when: "2時間前", body: "江ノ電の窓から海が見えた瞬間、みんなで声が出た。", photo: true,  place: "鎌倉高校前", pin: true },
-      { when: "昨日",    body: "次はあじさいの時期にもう一度来たい。",             photo: false, place: "明月院" },
-      { when: "3日前",   body: "朝いちの空気が、いちばん好きかもしれない。",       photo: true,  place: "" },
-      { when: "先週",    body: "帰りの電車で寝落ちして一駅すぎた。",               photo: false, place: "" }
-    ];
-    var saved = [
-      { who: "あおい", av: "a2", ini: "ア", when: "保存済み", body: "稲村ヶ崎のサンセット、17時が正解。", photo: true,  place: "稲村ヶ崎" },
-      { who: "そら",   av: "a3", ini: "ソ", when: "保存済み", body: "北鎌倉の静かな喫茶店、また行きたい。", photo: false, place: "北鎌倉" }
-    ];
-    var counts = {
-      posts:  items.length,
-      photos: items.filter(function (i) { return i.photo; }).length,
-      places: items.filter(function (i) { return i.place; }).length,
-      saved:  saved.length
-    };
-    Object.keys(counts).forEach(function (k) {
-      var el = $('[data-pcount="' + k + '"]');
-      if (el) el.textContent = counts[k];
-    });
-
-    function card(p) {
-      var who = p.who || "みなと", av = p.av || "a1", ini = p.ini || "ミ";
-      var tags = (p.pin ? '<span class="post-place" style="border-color:var(--leaf);color:var(--leaf-ink)">固定</span> ' : "")
-               + (p.place ? '<span class="post-place">' + PIN_SVG + esc(p.place) + "</span>" : "");
-      return '<article class="post"><div class="post-head">'
-        + '<span class="avatar ' + av + '" aria-hidden="true">' + ini + "</span>"
-        + '<span class="who">' + esc(who) + '</span><span class="when">' + esc(p.when) + "</span></div>"
-        + '<p class="post-body">' + esc(p.body) + "</p>"
-        + (p.photo ? '<div class="shots" aria-hidden="true"><span></span></div>' : "")
-        + (tags ? "<div>" + tags + "</div>" : "")
-        + "</article>";
-    }
-
-    function render(tab) {
-      var l = tab === "saved"  ? saved
-            : tab === "photos" ? items.filter(function (i) { return i.photo; })
-            : tab === "places" ? items.filter(function (i) { return i.place; })
-            : items;
-      box.innerHTML = l.length ? l.map(card).join("") : '<p class="demo-empty">まだありません。</p>';
-    }
-
-    wireTabs($('[data-demo="profile"] .tabs'), render, "ptab");
-    render("posts");
-  })();
-
-  /* ══ グループ：投票・写真／チャット ══ */
-  (function groupDemo() {
-    var optsEl = $("#pollOpts");
-    if (!optsEl) return;
-    var totalEl = $("#pollTotal"), hint = $("#groupHint");
-    var opts = [
-      { label: "しらす丼のお店", votes: 4 },
-      { label: "駅前のカフェ", votes: 2 },
-      { label: "海の見えるテラス", votes: 5 }
-    ];
-    var mine = -1;
-
-    function draw() {
-      var total = opts.reduce(function (a, o) { return a + o.votes; }, 0);
-      optsEl.innerHTML = opts.map(function (o, i) {
-        var pct = total ? Math.round((o.votes / total) * 100) : 0;
-        return '<button class="poll-opt" type="button" data-i="' + i + '" aria-pressed="' + (mine === i) + '">'
-          + '<span class="fill" style="width:' + pct + '%"></span>'
-          + '<svg class="tick" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m5 13 4 4L19 7"/></svg>'
-          + "<span>" + esc(o.label) + '</span><span class="pct">' + pct + "%</span></button>";
-      }).join("");
-      totalEl.textContent = total + "票" + (mine >= 0 ? "・投票済み" : "・選んで投票");
-    }
-
-    optsEl.addEventListener("click", function (e) {
-      var b = e.target.closest(".poll-opt");
-      if (!b) return;
-      var i = Number(b.dataset.i);
-      if (mine === i) return;
-      if (mine >= 0) opts[mine].votes--;
-      opts[i].votes++;
-      mine = i;
-      draw();
-      hint.textContent = "「" + opts[i].label + "」に投票しました。選び直せます";
-    });
-    draw();
-
-    var photos = $("#gPhotos"), chat = $("#gChat");
-    wireTabs($('[data-demo="group"] .tabs'), function (tab) {
-      var isChat = tab === "chat";
-      photos.hidden = isChat;
-      chat.hidden = !isChat;
-      hint.textContent = isChat ? "メッセージを送ってみてください" : "写真は日付ごとに並びます";
-    }, "gtab");
-
-    var chatList = $("#chatList"), form = $("#chatForm"), input = $("#chatInput"), send = $("#chatSend");
-    var msgs = [
-      { me: false, who: "あおい", body: "9:40 藤沢でいい？" },
-      { me: false, who: "そら", body: "了解！ @みなと 一日券もう買った？", at: "@みなと" },
-      { me: true,  who: "", body: "まだ。当日でも大丈夫そうだよ" }
-    ];
-
-    function drawChat() {
-      chatList.innerHTML = msgs.map(function (m) {
-        var body = esc(m.body);
-        if (m.at) body = body.replace(esc(m.at), '<span class="at">' + esc(m.at) + "</span>");
-        return '<div class="bubble ' + (m.me ? "me" : "them") + '">'
-          + (m.me ? "" : '<span class="nm">' + esc(m.who) + "</span>") + body + "</div>";
-      }).join("");
-      chatList.scrollTop = chatList.scrollHeight;
-    }
-    drawChat();
-
-    input.addEventListener("input", function () { send.disabled = !input.value.trim(); });
-    form.addEventListener("submit", function (e) {
-      e.preventDefault();
-      var v = input.value.trim();
-      if (!v) return;
-      msgs.push({ me: true, who: "", body: v });
-      input.value = "";
-      send.disabled = true;
-      drawChat();
-      hint.textContent = "送信しました（この画面の中だけの見本です）";
-    });
-  })();
-
-  /* ══ 写真：絵文字リアクション ══ */
-  (function photoDemo() {
-    var tray = $("#emojiTray");
-    if (!tray) return;
-    var msg = $("#emojiMsg"), mine = null;
-
-    tray.innerHTML = ["😊", "😂", "😍", "😮", "👍", "🎉"].map(function (e) {
-      return '<button type="button" data-e="' + e + '" aria-pressed="false" aria-label="' + e + 'でリアクション">' + e + "</button>";
-    }).join("");
-
-    tray.addEventListener("click", function (ev) {
-      var b = ev.target.closest("button");
-      if (!b) return;
-      mine = mine === b.dataset.e ? null : b.dataset.e;
-      $$("button", tray).forEach(function (x) { x.setAttribute("aria-pressed", String(x.dataset.e === mine)); });
-      msg.textContent = mine ? mine + " でリアクションしました（もう一度押すと取り消し）" : "リアクションを取り消しました";
-    });
-  })();
-
-  /* ══ 検索：対象と語で絞る ══ */
-  (function searchDemo() {
-    var input = $("#snsSearch");
-    if (!input) return;
-    var box = $("#searchResults"), hint = $("#searchHint"), scope = "all";
-    var data = [
-      { type: "post",  title: "みなと", body: "江ノ電の窓から海が見えた瞬間、みんなで声が出た。", meta: "鎌倉高校前" },
-      { type: "post",  title: "そら",   body: "紫陽花、まだ間に合った。", meta: "明月院" },
-      { type: "post",  title: "あおい", body: "帰り道に見つけた小さなパン屋さん。", meta: "" },
-      { type: "user",  title: "みなと", body: "フレンド", meta: "" },
-      { type: "user",  title: "あおい", body: "フレンド", meta: "" },
-      { type: "group", title: "鎌倉ひとめぐり", body: "4人で共有中", meta: "" },
-      { type: "group", title: "海が好きな会", body: "3人で共有中", meta: "" },
-      { type: "place", title: "由比ヶ浜", body: "場所つきの投稿 2件", meta: "鎌倉市" },
-      { type: "place", title: "稲村ヶ崎", body: "場所つきの投稿 1件", meta: "鎌倉市" }
-    ];
-    var labels = { post: "投稿", user: "ユーザー", group: "グループ", place: "場所" };
-
-    function norm(s) { return String(s).normalize("NFKC").toLowerCase().replace(/^#/, ""); }
-
-    function hl(text, q) {
-      if (!q) return esc(text);
-      var i = norm(text).indexOf(q);
-      if (i < 0) return esc(text);
-      return esc(text.slice(0, i)) + "<mark>" + esc(text.slice(i, i + q.length)) + "</mark>" + esc(text.slice(i + q.length));
-    }
-
-    function render() {
-      var q = norm(input.value.trim());
-      var l = data.filter(function (d) {
-        if (scope !== "all" && d.type !== scope) return false;
-        return !q || norm(d.title + " " + d.body + " " + d.meta).indexOf(q) >= 0;
-      });
-
-      box.innerHTML = l.length ? l.map(function (d) {
-        return '<article class="post"><div class="post-head">'
-          + '<span class="post-place" style="margin:0">' + labels[d.type] + "</span>"
-          + '<span class="who" style="margin-left:.15rem">' + hl(d.title, q) + "</span></div>"
-          + '<p class="post-body">' + hl(d.body, q) + "</p>"
-          + (d.meta ? '<span class="post-place">' + PIN_SVG + hl(d.meta, q) + "</span>" : "")
-          + "</article>";
-      }).join("") : '<p class="demo-empty">一致するものがありません。<br>短い言葉や場所の名前でも試してみてください。</p>';
-
-      hint.textContent = q ? l.length + "件が見つかりました" : "「鎌倉」「海」「みなと」などで試せます";
-    }
-
-    input.addEventListener("input", render);
-    wireTabs($('[data-demo="search"] .tabs'), function (s) { scope = s; render(); }, "scope");
-    render();
-  })();
-
-  /* ══ 通知：未読と既読 ══ */
-  (function notifyDemo() {
-    var box = $("#notifList");
-    if (!box) return;
-    var badge = $("#unreadCount"), hint = $("#notifHint"), mark = $("#markAll"), view = "all";
-    var items = [
-      { kind: "reply",   t: "あおいさんが返信しました",     s: "わかる、あの一瞬のために乗ってる。",   unread: true },
-      { kind: "like",    t: "あなたの投稿にいいね",         s: "新着 +3・合計 12件",                  unread: true },
-      { kind: "mention", t: "そらさんがあなたをメンション", s: "@みなと 一日券もう買った？",           unread: true },
-      { kind: "group",   t: "鎌倉ひとめぐり",               s: "新しい写真またはメッセージがあります", unread: false },
-      { kind: "reply",   t: "りくさんが返信しました",       s: "次は海がいい！",                       unread: false }
-    ];
-    var ic = {
-      reply:   '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a8 8 0 0 1-8 8H4l2-3a8 8 0 1 1 15-5Z"/></svg>',
-      like:    '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 20.4 4.2 13a4.9 4.9 0 0 1 7-6.9l.8.8.8-.8a4.9 4.9 0 1 1 7 6.9Z"/></svg>',
-      mention: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="4"/><path d="M16 8v5a3 3 0 0 0 6 0v-1a10 10 0 1 0-4 8"/></svg>',
-      group:   '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="8" r="3"/><path d="M3 19a6 6 0 0 1 12 0"/></svg>'
-    };
-
-    function render() {
-      var l = view === "unread" ? items.filter(function (i) { return i.unread; }) : items;
-      box.innerHTML = l.length ? l.map(function (i) {
-        return '<div class="notif-row ' + (i.unread ? "is-unread" : "") + '">'
-          + '<span class="notif-ic k-' + i.kind + '" aria-hidden="true">' + ic[i.kind] + "</span>"
-          + '<span style="min-width:0"><span class="t">' + esc(i.t) + '</span><span class="s">' + esc(i.s) + "</span></span>"
-          + (i.unread ? '<span class="badge" aria-hidden="true"></span><span class="sr">未読</span>' : "")
-          + "</div>";
-      }).join("") : '<p class="demo-empty">未読の通知はありません。</p>';
-
-      var n = items.filter(function (i) { return i.unread; }).length;
-      badge.textContent = n > 0 ? n : "";
-      hint.textContent = n > 0 ? "未読 " + n + "件" : "すべて確認済み";
-      mark.disabled = n === 0;
-    }
-
-    wireTabs($('[data-demo="notify"] .tabs'), function (v) { view = v; render(); }, "ntab");
-    mark.addEventListener("click", function () {
-      items.forEach(function (i) { i.unread = false; });
-      render();
-      hint.textContent = "すべて既読にしました";
-    });
-    render();
-  })();
-
-  /* ══ 早見表：語と場所で絞る ══ */
-  (function specTable() {
-    var input = $("#specSearch");
-    if (!input) return;
-    var rows = $$("#specTable tbody tr"), none = $("#specNone"), filters = $("#specFilters"), where = "all";
-
-    function apply() {
-      var q = input.value.trim().toLowerCase();
-      var shown = 0;
-      rows.forEach(function (r) {
-        var on = (where === "all" || r.dataset.where === where)
-              && (!q || r.textContent.toLowerCase().indexOf(q) >= 0);
-        r.hidden = !on;
-        if (on) shown++;
-      });
-      none.hidden = shown > 0;
-    }
-
-    input.addEventListener("input", apply);
-    filters.addEventListener("click", function (e) {
-      var b = e.target.closest("button");
-      if (!b) return;
-      where = b.dataset.where;
-      $$("button", filters).forEach(function (x) { x.setAttribute("aria-pressed", String(x === b)); });
-      apply();
-    });
-    apply();
-  })();
-})();
-</script>
 </body>
 </html>

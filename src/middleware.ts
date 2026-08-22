@@ -5,6 +5,7 @@ import { getSupabaseEnv } from "@/lib/supabase/env";
 
 /** 未ログインでも開ける画面・リソース */
 const PUBLIC_PATHS = [
+  "/sns-guide.html",
   "/login",
   "/signup",
   "/signup/complete",
