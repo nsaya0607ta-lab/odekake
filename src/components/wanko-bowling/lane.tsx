@@ -245,7 +245,6 @@ export function Lane({ ballVisual, resetSignal, active, onRoll }: LaneProps) {
         .filter(([, body]) => body.standing)
         .map(([id]) => id),
     );
-    // 見た目の最終状態から推測せず、倒れた瞬間に記録する。
     const knockedThisThrow = new Set<number>();
 
     let bx = 50;
@@ -290,7 +289,9 @@ export function Lane({ ballVisual, resetSignal, active, onRoll }: LaneProps) {
         rotate += Math.hypot(bvx, bvy) * dt * 2.2;
 
         if (bx < LANE_LEFT || bx > LANE_RIGHT) {
-          ballGutter = true;
+          // ピンに当たった後の反動で横へ抜けてもガターにはしない。
+          // ガターは「1本も倒す前に側溝へ入った投球」だけ。
+          ballGutter = knockedThisThrow.size === 0;
           ballDone = true;
           bx = Math.min(Math.max(bx, LANE_LEFT - 4), LANE_RIGHT + 4);
         } else if (by <= PIN_ZONE_Y) {
