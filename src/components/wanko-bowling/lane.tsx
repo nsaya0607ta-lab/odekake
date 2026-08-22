@@ -51,13 +51,28 @@ export function Lane({ ballVisual, resetSignal, active, onRoll }: LaneProps) {
   const standingIdsRef = useRef(standingIds);
   standingIdsRef.current = standingIds;
 
+  // ボールをドック（下の待機位置）へ戻す。ピンをなぎ倒した位置からいきなり
+  // 消えて瞬間移動すると不自然なので、一瞬だけふわっとフェードしてから
+  // 定位置へ置き直す（ヒットした瞬間に消えるわけではない）。
   const dockBall = useCallback(() => {
     const el = ballRef.current;
     if (!el) return;
-    el.style.left = "50%";
-    el.style.top = `${DOCK_Y}%`;
-    el.style.transform = "translate(-50%, -50%) rotate(0deg)";
-    el.style.opacity = "1";
+    el.style.transition = "opacity 180ms ease";
+    el.style.opacity = "0";
+    window.setTimeout(() => {
+      const current = ballRef.current;
+      if (!current) return;
+      current.style.left = "50%";
+      current.style.top = `${DOCK_Y}%`;
+      current.style.transform = "translate(-50%, -50%) rotate(0deg)";
+      requestAnimationFrame(() => {
+        if (!ballRef.current) return;
+        ballRef.current.style.opacity = "1";
+        window.setTimeout(() => {
+          if (ballRef.current) ballRef.current.style.transition = "";
+        }, 200);
+      });
+    }, 180);
   }, []);
 
   useEffect(() => {
@@ -135,7 +150,11 @@ export function Lane({ ballVisual, resetSignal, active, onRoll }: LaneProps) {
     };
 
     const finish = (isGutter: boolean) => {
-      if (ballRef.current) ballRef.current.style.opacity = "0";
+      // ガター（レーン脇に落ちて見えなくなる）のときだけここで隠す。
+      // ピンに当たった場合は、ボールは止まった場所に見えたままにする
+      // （ピンが倒れきるまで消えない。次の投球に備えるときだけ dockBall() が
+      // ふわっとフェードして戻す）。
+      if (isGutter && ballRef.current) ballRef.current.style.opacity = "0";
       // ピンが倒れきる（wanko-bowl-pin-fall: 620ms）のを見せてから次へ進む
       window.setTimeout(() => {
         throwingRef.current = false;
