@@ -92,7 +92,6 @@ export function WankoBowlingGame({ ownedBalls }: { ownedBalls: OwnedBowlingBall[
   const [earnedCoins, setEarnedCoins] = useState<number | null>(null);
   const [lastRollPins, setLastRollPins] = useState<number | null>(null);
 
-  // 投球処理の正本はrefに置く。Reactの再描画を待たずに次投へ確実に引き継ぐ。
   const framesRef = useRef<BowlingFrame[]>(initialFrames);
   const frameIndexRef = useRef(0);
   const rollLockedRef = useRef(false);
@@ -151,6 +150,7 @@ export function WankoBowlingGame({ ownedBalls }: { ownedBalls: OwnedBowlingBall[
     setLastRollPins(null);
     setLaneResetSignal((value) => value + 1);
     setRollLock(false);
+    document.getElementById("wanko-bowling-scroll")?.scrollTo({ top: 0, behavior: "auto" });
     setPhase("playing");
   }, [commitFrameIndex, commitFrames, setRollLock]);
 
@@ -185,7 +185,6 @@ export function WankoBowlingGame({ ownedBalls }: { ownedBalls: OwnedBowlingBall[
   }, [loadBestScore]);
 
   const handleRoll = useCallback((result: LaneRollResult) => {
-    // 同一投球のfinishが重複しても二重加算しない。
     if (rollLockedRef.current) return;
     setRollLock(true);
 
@@ -198,10 +197,6 @@ export function WankoBowlingGame({ ownedBalls }: { ownedBalls: OwnedBowlingBall[
       ? [...currentFrame.gutters]
       : Array.from({ length: priorRolls.length }, () => false);
     const freshRack = isFreshRackRoll(currentFrameIndex, priorRolls);
-
-    // 倒したピン数を正本にする。
-    // 物理演算でピンに当たった後にボールが横へ抜けると isGutter が true になる場合があるため、
-    // 「gutterなら倒した本数を0にする」は禁止。ピンを1本以上倒していればガターではない。
     const roll = result.knockedIds.length;
     const isGutterRoll = result.isGutter && roll === 0;
 
@@ -216,7 +211,6 @@ export function WankoBowlingGame({ ownedBalls }: { ownedBalls: OwnedBowlingBall[
       index === currentFrameIndex ? newFrame : frame,
     );
 
-    // ここでrefを先に更新する。2投目は必ず1投目を含む配列を読む。
     commitFrames(nextFrames);
 
     if (freshRack) {
@@ -302,126 +296,130 @@ export function WankoBowlingGame({ ownedBalls }: { ownedBalls: OwnedBowlingBall[
 
   if (phase === "select") {
     return (
-      <BallPicker
-        ownedBalls={ownedBalls}
-        selectedId={selectedBallId}
-        onSelect={setSelectedBallId}
-        onConfirm={startGame}
-      />
+      <div className="h-full overflow-y-auto overscroll-none py-1">
+        <BallPicker
+          ownedBalls={ownedBalls}
+          selectedId={selectedBallId}
+          onSelect={setSelectedBallId}
+          onConfirm={startGame}
+        />
+      </div>
     );
   }
 
   if (phase === "result") {
     return (
-      <section className="rough-card overflow-hidden">
-        <div className="bg-leaf-soft px-4 py-7 text-center">
-          <p className="text-[10px] font-black tracking-[0.16em] text-leaf-deep">GAME CLEAR!</p>
-          <p className="mt-1 text-2xl font-black text-ink">5フレーム おつかれさま！</p>
-        </div>
-
-        <div className="grid grid-cols-2 gap-3 p-4">
-          <div className="rounded-[18px] bg-paper-deep px-3 py-4 text-center">
-            <p className="text-[9px] font-black tracking-wide text-ink-faint">SCORE</p>
-            <p className="mt-1 text-3xl font-black tabular-nums text-ink">{score.total}</p>
+      <div className="h-full overflow-y-auto overscroll-none py-1">
+        <section className="rough-card overflow-hidden">
+          <div className="bg-leaf-soft px-4 py-7 text-center">
+            <p className="text-[10px] font-black tracking-[0.16em] text-leaf-deep">GAME CLEAR!</p>
+            <p className="mt-1 text-2xl font-black text-ink">5フレーム おつかれさま！</p>
           </div>
-          <div className="rounded-[18px] bg-paper-deep px-3 py-4 text-center">
-            <p className="text-[9px] font-black tracking-wide text-ink-faint">
-              {isNewBest ? "NEW BEST!" : "ベストスコア"}
+
+          <div className="grid grid-cols-2 gap-3 p-4">
+            <div className="rounded-[18px] bg-paper-deep px-3 py-4 text-center">
+              <p className="text-[9px] font-black tracking-wide text-ink-faint">SCORE</p>
+              <p className="mt-1 text-3xl font-black tabular-nums text-ink">{score.total}</p>
+            </div>
+            <div className="rounded-[18px] bg-paper-deep px-3 py-4 text-center">
+              <p className="text-[9px] font-black tracking-wide text-ink-faint">
+                {isNewBest ? "NEW BEST!" : "ベストスコア"}
+              </p>
+              <p className={`mt-1 text-3xl font-black tabular-nums ${isNewBest ? "text-[#c9902f]" : "text-ink"}`}>
+                {bestScore ?? score.total}
+              </p>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-3 gap-2 px-4 pb-2 text-center">
+            <div className="rounded-[14px] bg-card px-2 py-2.5">
+              <p className="text-lg font-black tabular-nums text-ink">{score.strikeCount}</p>
+              <p className="text-[9px] font-bold text-ink-faint">STRIKE</p>
+            </div>
+            <div className="rounded-[14px] bg-card px-2 py-2.5">
+              <p className="text-lg font-black tabular-nums text-ink">{score.spareCount}</p>
+              <p className="text-[9px] font-bold text-ink-faint">SPARE</p>
+            </div>
+            <div className="rounded-[14px] bg-card px-2 py-2.5">
+              <p className="text-lg font-black tabular-nums text-ink">{score.gutterCount}</p>
+              <p className="text-[9px] font-bold text-ink-faint">GUTTER</p>
+            </div>
+          </div>
+
+          {earnedCoins !== null ? (
+            <p className="px-4 pb-2 text-center text-xs font-bold text-ink-soft">
+              +{earnedCoins.toLocaleString("ja-JP")} コイン獲得！
             </p>
-            <p className={`mt-1 text-3xl font-black tabular-nums ${isNewBest ? "text-[#c9902f]" : "text-ink"}`}>
-              {bestScore ?? score.total}
-            </p>
-          </div>
-        </div>
+          ) : null}
 
-        <div className="grid grid-cols-3 gap-2 px-4 pb-2 text-center">
-          <div className="rounded-[14px] bg-card px-2 py-2.5">
-            <p className="text-lg font-black tabular-nums text-ink">{score.strikeCount}</p>
-            <p className="text-[9px] font-bold text-ink-faint">STRIKE</p>
+          <div className="space-y-2 p-4 pt-2">
+            <button
+              type="button"
+              onClick={startGame}
+              className="btn pressable block w-full rounded-full bg-leaf-deep py-3 text-center text-sm font-black text-white active:scale-[0.98]"
+            >
+              もう一回あそぶ
+            </button>
+            <button
+              type="button"
+              onClick={() => setPhase("select")}
+              className="pressable block w-full rounded-full border border-line bg-card py-3 text-center text-sm font-black text-ink-soft active:scale-[0.98]"
+            >
+              ボールを変える
+            </button>
+            <button
+              type="button"
+              onClick={goToRanking}
+              className="pressable block w-full rounded-full border border-line bg-card py-3 text-center text-sm font-black text-ink-soft active:scale-[0.98]"
+            >
+              ランキングを見る
+            </button>
+            <Link
+              href="/games"
+              className="pressable block w-full rounded-full border border-line bg-card py-3 text-center text-sm font-black text-ink-soft active:scale-[0.98]"
+            >
+              ゲーム一覧へ戻る
+            </Link>
           </div>
-          <div className="rounded-[14px] bg-card px-2 py-2.5">
-            <p className="text-lg font-black tabular-nums text-ink">{score.spareCount}</p>
-            <p className="text-[9px] font-bold text-ink-faint">SPARE</p>
-          </div>
-          <div className="rounded-[14px] bg-card px-2 py-2.5">
-            <p className="text-lg font-black tabular-nums text-ink">{score.gutterCount}</p>
-            <p className="text-[9px] font-bold text-ink-faint">GUTTER</p>
-          </div>
-        </div>
-
-        {earnedCoins !== null ? (
-          <p className="px-4 pb-2 text-center text-xs font-bold text-ink-soft">
-            +{earnedCoins.toLocaleString("ja-JP")} コイン獲得！
-          </p>
-        ) : null}
-
-        <div className="space-y-2 p-4 pt-2">
-          <button
-            type="button"
-            onClick={startGame}
-            className="btn pressable block w-full rounded-full bg-leaf-deep py-3 text-center text-sm font-black text-white active:scale-[0.98]"
-          >
-            もう一回あそぶ
-          </button>
-          <button
-            type="button"
-            onClick={() => setPhase("select")}
-            className="pressable block w-full rounded-full border border-line bg-card py-3 text-center text-sm font-black text-ink-soft active:scale-[0.98]"
-          >
-            ボールを変える
-          </button>
-          <button
-            type="button"
-            onClick={goToRanking}
-            className="pressable block w-full rounded-full border border-line bg-card py-3 text-center text-sm font-black text-ink-soft active:scale-[0.98]"
-          >
-            ランキングを見る
-          </button>
-          <Link
-            href="/games"
-            className="pressable block w-full rounded-full border border-line bg-card py-3 text-center text-sm font-black text-ink-soft active:scale-[0.98]"
-          >
-            ゲーム一覧へ戻る
-          </Link>
-        </div>
-      </section>
+        </section>
+      </div>
     );
   }
 
   return (
-    <section className={`rough-card overflow-hidden ${shake ? "wanko-bowl-shake" : ""}`}>
-      <div className="border-b border-line px-4 py-2.5">
-        <div className="flex items-end justify-between gap-3">
+    <section className={`relative flex h-full min-h-0 flex-col overflow-hidden ${shake ? "wanko-bowl-shake" : ""}`}>
+      <div className="shrink-0 px-2 py-1.5">
+        <div className="flex items-end justify-between gap-3 px-1">
           <div>
-            <p className="text-[9px] font-black tracking-[0.14em] text-leaf-deep">LIVE SCORE</p>
-            <p className="mt-0.5 text-[10px] font-bold text-ink-faint">確定 {score.total}</p>
+            <p className="text-[8px] font-black tracking-[0.15em] text-leaf-deep">LIVE SCORE</p>
+            <p className="text-[9px] font-bold text-ink-faint">確定 {score.total}</p>
           </div>
-          <div className="flex items-end gap-3">
+          <div className="flex items-end gap-2.5">
             {lastRollPins !== null ? (
-              <p className="pb-0.5 text-[10px] font-black text-ink-soft">この投球 +{lastRollPins}本</p>
+              <p className="pb-0.5 text-[9px] font-black text-ink-soft">この投球 +{lastRollPins}本</p>
             ) : null}
-            <p className="text-3xl font-black tabular-nums leading-none text-ink">{liveScore}</p>
+            <p className="text-[28px] font-black tabular-nums leading-none text-ink">{liveScore}</p>
           </div>
         </div>
-        <div className="mt-2">
+        <div className="mt-1.5">
           <ScoreBoard frames={frames} score={score} currentFrameIndex={frameIndex} />
         </div>
       </div>
 
-      <div className="relative px-3 pb-3 pt-3">
+      <div className="relative min-h-0 flex-1 px-0.5 pb-0.5">
         <Lane ballVisual={ballVisual} resetSignal={laneResetSignal} active={!rollLocked} onRoll={handleRoll} />
 
+        <div className="pointer-events-none absolute bottom-7 right-2 z-10 origin-bottom-right scale-[0.72] opacity-95 sm:scale-[0.82]">
+          <DogReaction reaction={reaction} />
+        </div>
+
         {banner ? (
-          <div className="pointer-events-none absolute left-1/2 top-[38%] z-20 -translate-x-1/2">
-            <p className="wanko-bowl-banner whitespace-nowrap text-[clamp(2.4rem,13vw,4.5rem)] font-black leading-none text-[#a8442f] drop-shadow-[0_3px_0_rgba(255,255,255,0.7)]">
+          <div className="pointer-events-none absolute left-1/2 top-[35%] z-20 -translate-x-1/2">
+            <p className="wanko-bowl-banner whitespace-nowrap text-[clamp(2.2rem,12vw,4.2rem)] font-black leading-none text-[#a8442f] drop-shadow-[0_3px_0_rgba(255,255,255,0.72)]">
               {banner}
             </p>
           </div>
         ) : null}
-      </div>
-
-      <div className="border-t border-line px-4 py-3">
-        <DogReaction reaction={reaction} />
       </div>
     </section>
   );
