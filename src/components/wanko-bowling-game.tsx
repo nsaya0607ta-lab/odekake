@@ -198,20 +198,25 @@ export function WankoBowlingGame({ ownedBalls }: { ownedBalls: OwnedBowlingBall[
       ? [...currentFrame.gutters]
       : Array.from({ length: priorRolls.length }, () => false);
     const freshRack = isFreshRackRoll(currentFrameIndex, priorRolls);
-    const roll = result.isGutter ? 0 : result.knockedIds.length;
+
+    // 倒したピン数を正本にする。
+    // 物理演算でピンに当たった後にボールが横へ抜けると isGutter が true になる場合があるため、
+    // 「gutterなら倒した本数を0にする」は禁止。ピンを1本以上倒していればガターではない。
+    const roll = result.knockedIds.length;
+    const isGutterRoll = result.isGutter && roll === 0;
 
     setLastRollPins(roll);
 
     const newFrame: BowlingFrame = {
       rolls: [...priorRolls, roll],
-      gutters: [...priorGutters, result.isGutter],
+      gutters: [...priorGutters, isGutterRoll],
     };
     const done = isFrameDone(newFrame, currentFrameIndex);
     const nextFrames = baseFrames.map((frame, index) =>
       index === currentFrameIndex ? newFrame : frame,
     );
 
-    // ここでrefを先に更新するのが重要。2投目は必ず1投目を含む配列を読む。
+    // ここでrefを先に更新する。2投目は必ず1投目を含む配列を読む。
     commitFrames(nextFrames);
 
     if (freshRack) {
@@ -233,7 +238,7 @@ export function WankoBowlingGame({ ownedBalls }: { ownedBalls: OwnedBowlingBall[
       && (newRolls[1] ?? 0) + (newRolls[2] ?? 0) === 10;
     const spareCompleted = regularSpareCompleted || finalStrikeRackSpareCompleted;
 
-    if (result.isGutter || roll === 0) {
+    if (isGutterRoll || roll === 0) {
       nextReaction = "sad";
     } else if (roll === 10 && freshRack) {
       if (streakRef.current >= 3) {
