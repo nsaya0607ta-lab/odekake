@@ -14,10 +14,10 @@ export type PinLayout = {
 };
 
 /**
- * 物理寸法と画面表示は分離する。
- * 実ピンの径は物理側で使い、画面では遠近感が自然に見えるサイズにする。
+ * 物理上の中心間隔は公認12インチのまま維持する。
+ * 以前はピン画像が小さすぎて隙間が広く見えたため、表示だけ少し大きくする。
  */
-export const PIN_VISUAL_WIDTH_PCT = 3.3;
+export const PIN_VISUAL_WIDTH_PCT = 4.05;
 
 const halfSpacingM = JB_PIN_SPACING_M / 2;
 const rowDepthM = JB_PIN_SPACING_M * Math.sqrt(3) / 2;
