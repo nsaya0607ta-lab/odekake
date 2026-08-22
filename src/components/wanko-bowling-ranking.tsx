@@ -71,11 +71,17 @@ export function WankoBowlingRanking() {
     const refreshWhenVisible = () => {
       if (document.visibilityState === "visible") void loadRanking(true);
     };
+    const refreshAfterGame = () => {
+      void loadRanking(true);
+    };
+
     document.addEventListener("visibilitychange", refreshWhenVisible);
+    window.addEventListener("wanko-bowling-ranking-refresh", refreshAfterGame);
 
     return () => {
       window.clearInterval(timer);
       document.removeEventListener("visibilitychange", refreshWhenVisible);
+      window.removeEventListener("wanko-bowling-ranking-refresh", refreshAfterGame);
     };
   }, [loadRanking]);
 
