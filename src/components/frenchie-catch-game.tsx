@@ -1798,7 +1798,11 @@ export function FrenchieCatchGame({ ownedItems }: { ownedItems: FrenchieCatchIte
 
         <div className="absolute left-3 right-3 top-3 z-50 flex items-start justify-between gap-2">
           <div className="flex flex-col items-start gap-1">
-            <div className="rounded-2xl border border-white/80 bg-white/90 px-3 py-2 shadow-sm"><p className="text-[9px] font-bold tracking-widest text-ink-faint">SCORE</p><p className="text-xl font-black tabular-nums text-ink">{score.toLocaleString("ja-JP")}</p></div>
+            <div className="relative rounded-2xl border border-white/80 bg-white/90 px-3 py-2 shadow-sm">
+              <p className="text-[9px] font-bold tracking-widest text-ink-faint">SCORE</p>
+              <p className="text-xl font-black tabular-nums text-ink">{score.toLocaleString("ja-JP")}</p>
+              {feedback ? <span className="pointer-events-none absolute -right-2 -top-2 rounded-full bg-[#fff6cc]/95 px-2 py-0.5 text-[10px] font-black text-[#c87527] shadow-sm">+{feedback.points}</span> : null}
+            </div>
             {bagStock > 0 || stunGuard > 0 || boxShrinkGuard > 0 || timeMinusGuard > 0 ? (
               <div className="flex flex-row items-start gap-1.5">
                 {bagStock > 0 ? (
@@ -1853,8 +1857,6 @@ export function FrenchieCatchGame({ ownedItems }: { ownedItems: FrenchieCatchIte
         {feedback ? (
           <div className="pointer-events-none absolute left-1/2 top-[67%] z-40 -translate-x-1/2 text-center">
             <p className="text-lg font-black text-[#c87527]">CATCH!</p>
-            <p className="-mt-1 text-sm font-black text-[#c87527]">+{feedback.points}</p>
-            {feedback.effect ? <p className="mt-0.5 rounded-full bg-[#fff6cc]/95 px-2 py-0.5 text-[10px] font-black text-[#9a6322]">{feedback.effect}</p> : null}
             <p className="mt-0.5 max-w-40 truncate rounded-full bg-white/80 px-2 py-0.5 text-[9px] font-bold text-ink-soft">{feedback.name}</p>
           </div>
         ) : null}
