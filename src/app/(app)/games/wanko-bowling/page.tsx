@@ -2,7 +2,6 @@ import { notFound } from "next/navigation";
 import { WankoBowlingGame } from "@/components/wanko-bowling-game";
 import { WankoBowlingRanking } from "@/components/wanko-bowling-ranking";
 import { BowlingScreenLock } from "@/components/wanko-bowling/screen-lock";
-import { PageBody } from "@/components/page-body";
 import { TopHeader } from "@/components/page-header";
 import { COLLECTION_ITEMS } from "@/lib/collection/items";
 import { getOwnedItemCounts } from "@/lib/data/collection";
@@ -41,15 +40,19 @@ export default async function WankoBowlingPage() {
         )}
       />
 
-      <div className="min-h-0 flex-1 overflow-y-auto overscroll-none">
-        <PageBody className="!space-y-2 !px-2 !py-2">
+      <main className="min-h-0 flex-1 overflow-y-auto overscroll-none">
+        {/* 最初の1画面をゲーム専用領域にする。端末の残り高をそのままゲームへ渡す。 */}
+        <div
+          className="h-full min-h-0 px-1.5 pt-1.5"
+          style={{ paddingBottom: "max(6px, env(safe-area-inset-bottom))" }}
+        >
           <WankoBowlingGame ownedBalls={ownedBalls} />
+        </div>
 
-          <div id="wanko-bowling-ranking" className="pt-1">
-            <WankoBowlingRanking />
-          </div>
-        </PageBody>
-      </div>
+        <div id="wanko-bowling-ranking" className="px-2 pb-6 pt-3">
+          <WankoBowlingRanking />
+        </div>
+      </main>
     </div>
   );
 }
