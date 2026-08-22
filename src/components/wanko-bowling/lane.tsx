@@ -78,6 +78,14 @@ function createPinBody(pin: { x: number; y: number }): PinBody {
   return { x: pin.x, y: pin.y, vx: 0, vy: 0, angle: 0, angularVel: 0, standing: true, moving: false };
 }
 
+/** 座標・速度は0〜100の「%値」で持っているので、px化するときは/100を忘れないこと。 */
+function pctToPx(pct: number, scale: number): number {
+  return (pct / 100) * scale;
+}
+function pxToPct(px: number, scale: number): number {
+  return (px / scale) * 100;
+}
+
 /**
  * 2物体の弾性/非弾性衝突（運動量保存則）。位置・速度は%空間で受け取るが、
  * レーンは正方形でない（幅と高さでスケールが違う）ため、衝突の法線方向や
@@ -109,15 +117,15 @@ function resolvePairCollision(
   restitution: number,
   scaleX: number, scaleY: number,
 ): { avx: number; avy: number; bvx: number; bvy: number } | null {
-  const dxPx = (bx - ax) * scaleX;
-  const dyPx = (by - ay) * scaleY;
+  const dxPx = pctToPx(bx - ax, scaleX);
+  const dyPx = pctToPx(by - ay, scaleY);
   const dist = Math.hypot(dxPx, dyPx);
   if (dist < 0.0001) return null;
   const nx = dxPx / dist;
   const ny = dyPx / dist;
 
-  const avxPx = avx * scaleX, avyPx = avy * scaleY;
-  const bvxPx = bvx * scaleX, bvyPx = bvy * scaleY;
+  const avxPx = pctToPx(avx, scaleX), avyPx = pctToPx(avy, scaleY);
+  const bvxPx = pctToPx(bvx, scaleX), bvyPx = pctToPx(bvy, scaleY);
   const relVx = avxPx - bvxPx;
   const relVy = avyPx - bvyPx;
   const velAlongNormal = relVx * nx + relVy * ny;
@@ -128,10 +136,10 @@ function resolvePairCollision(
   const j = ((1 + restitution) * velAlongNormal) / (invA + invB);
 
   return {
-    avx: (avxPx - j * nx * invA) / scaleX,
-    avy: (avyPx - j * ny * invA) / scaleY,
-    bvx: (bvxPx + j * nx * invB) / scaleX,
-    bvy: (bvyPx + j * ny * invB) / scaleY,
+    avx: pxToPct(avxPx - j * nx * invA, scaleX),
+    avy: pxToPct(avyPx - j * ny * invA, scaleY),
+    bvx: pxToPct(bvxPx + j * nx * invB, scaleX),
+    bvy: pxToPct(bvyPx + j * ny * invB, scaleY),
   };
 }
 
@@ -308,16 +316,16 @@ export function Lane({ ballVisual, resetSignal, active, onRoll }: LaneProps) {
           // 前フレーム位置→今の位置までの軌跡（線分）でピンとの距離を見る。
           // 点だけの比較だと、速いボールが1フレームでピンの判定を飛び越えて
           // すり抜けてしまう（トンネリング）ことがあったため。
-          const prevBxPx = prevBx * scaleX;
-          const prevByPx = prevBy * scaleY;
-          const bxPx = bx * scaleX;
-          const byPx = by * scaleY;
+          const prevBxPx = pctToPx(prevBx, scaleX);
+          const prevByPx = pctToPx(prevBy, scaleY);
+          const bxPx = pctToPx(bx, scaleX);
+          const byPx = pctToPx(by, scaleY);
 
           for (const pin of PIN_LAYOUT) {
             const body = pinBodiesRef.current.get(pin.id);
             if (!body || !body.standing) continue;
-            const pinXPx = body.x * scaleX;
-            const pinYPx = body.y * scaleY;
+            const pinXPx = pctToPx(body.x, scaleX);
+            const pinYPx = pctToPx(body.y, scaleY);
             if (distancePointToSegment(pinXPx, pinYPx, prevBxPx, prevByPx, bxPx, byPx) > collideRadiusPx) continue;
 
             const result = resolvePairCollision(
@@ -349,8 +357,8 @@ export function Lane({ ballVisual, resetSignal, active, onRoll }: LaneProps) {
         for (let j = i + 1; j < ids.length; j += 1) {
           const bodyB = pinBodiesRef.current.get(ids[j]!)!;
           if (!bodyA.moving && !bodyB.moving) continue;
-          const dxPx = (bodyB.x - bodyA.x) * scaleX;
-          const dyPx = (bodyB.y - bodyA.y) * scaleY;
+          const dxPx = pctToPx(bodyB.x - bodyA.x, scaleX);
+          const dyPx = pctToPx(bodyB.y - bodyA.y, scaleY);
           if (Math.hypot(dxPx, dyPx) > pinPinRadiusPx) continue;
 
           const result = resolvePairCollision(
