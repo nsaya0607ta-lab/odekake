@@ -3,7 +3,6 @@
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { BallPicker } from "@/components/wanko-bowling/ball-picker";
-import { DogReaction, type DogReactionKind } from "@/components/wanko-bowling/dog-reaction";
 import { Lane, type LaneRollResult } from "@/components/wanko-bowling/lane";
 import { ScoreBoard } from "@/components/wanko-bowling/score-board";
 import {
@@ -85,7 +84,6 @@ export function WankoBowlingGame({ ownedBalls }: { ownedBalls: OwnedBowlingBall[
   const [laneResetSignal, setLaneResetSignal] = useState(0);
   const [rollLocked, setRollLocked] = useState(false);
   const [banner, setBanner] = useState<Banner>(null);
-  const [reaction, setReaction] = useState<DogReactionKind>("idle");
   const [shake, setShake] = useState(false);
   const [bestScore, setBestScore] = useState<number | null>(null);
   const [isNewBest, setIsNewBest] = useState(false);
@@ -144,7 +142,6 @@ export function WankoBowlingGame({ ownedBalls }: { ownedBalls: OwnedBowlingBall[
     submittedRef.current = false;
     roundIdRef.current = newRoundId();
     setBanner(null);
-    setReaction("idle");
     setEarnedCoins(null);
     setIsNewBest(false);
     setLastRollPins(null);
@@ -217,7 +214,6 @@ export function WankoBowlingGame({ ownedBalls }: { ownedBalls: OwnedBowlingBall[
       streakRef.current = roll === 10 ? streakRef.current + 1 : 0;
     }
 
-    let nextReaction: DogReactionKind = "idle";
     let nextBanner: Banner = null;
     const newRolls = newFrame.rolls;
     const regularSpareCompleted =
@@ -232,30 +228,14 @@ export function WankoBowlingGame({ ownedBalls }: { ownedBalls: OwnedBowlingBall[
       && (newRolls[1] ?? 0) + (newRolls[2] ?? 0) === 10;
     const spareCompleted = regularSpareCompleted || finalStrikeRackSpareCompleted;
 
-    if (isGutterRoll || roll === 0) {
-      nextReaction = "sad";
-    } else if (roll === 10 && freshRack) {
-      if (streakRef.current >= 3) {
-        nextBanner = "TURKEY!!";
-        nextReaction = "turkey";
-      } else {
-        nextBanner = "STRIKE!!";
-        nextReaction = "strike";
-      }
+    if (roll === 10 && freshRack) {
+      nextBanner = streakRef.current >= 3 ? "TURKEY!!" : "STRIKE!!";
       setShake(true);
       window.setTimeout(() => setShake(false), 450);
     } else if (spareCompleted) {
       nextBanner = "SPARE!!";
-      nextReaction = "spare";
-    } else if (roll >= 6) {
-      nextReaction = "veryHappy";
-    } else if (roll >= 1) {
-      nextReaction = "happy";
-    } else {
-      nextReaction = "sad";
     }
 
-    setReaction(nextReaction);
     setBanner(nextBanner);
     if (nextBanner) window.setTimeout(() => setBanner(null), 1500);
 
@@ -285,7 +265,6 @@ export function WankoBowlingGame({ ownedBalls }: { ownedBalls: OwnedBowlingBall[
       }
 
       setRollLock(false);
-      setReaction("idle");
     }, resumeDelay);
   }, [commitFrameIndex, commitFrames, setRollLock, submitResult]);
 
@@ -408,10 +387,6 @@ export function WankoBowlingGame({ ownedBalls }: { ownedBalls: OwnedBowlingBall[
 
       <div className="relative min-h-0 flex-1 px-0.5 pb-0.5">
         <Lane ballVisual={ballVisual} resetSignal={laneResetSignal} active={!rollLocked} onRoll={handleRoll} />
-
-        <div className="pointer-events-none absolute bottom-7 right-2 z-10 origin-bottom-right scale-[0.72] opacity-95 sm:scale-[0.82]">
-          <DogReaction reaction={reaction} />
-        </div>
 
         {banner ? (
           <div className="pointer-events-none absolute left-1/2 top-[35%] z-20 -translate-x-1/2">
