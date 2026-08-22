@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { canAccessWankoBowling } from "@/lib/games/wanko-bowling-access";
 import { BOWLING_PERFECT_SCORE, BOWLING_FRAME_COUNT } from "@/lib/games/wanko-bowling-score";
 import { checkRateLimit } from "@/lib/rate-limit";
 import { requireUser } from "@/lib/supabase/server";
@@ -14,6 +15,10 @@ function toRecord(value: unknown): Record<string, unknown> {
 
 export async function POST(request: Request) {
   const { supabase, user } = await requireUser();
+  // 実験中のため、許可アカウント以外は存在ごと知られないよう404で返す。
+  if (!canAccessWankoBowling(user.email)) {
+    return NextResponse.json({ error: "Not found" }, { status: 404 });
+  }
   const body = (await request.json().catch(() => null)) as {
     roundId?: unknown;
     score?: unknown;

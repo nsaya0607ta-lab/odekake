@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { signThumbOrOriginalPaths } from "@/lib/data/photos";
+import { canAccessWankoBowling } from "@/lib/games/wanko-bowling-access";
 import { requireUser } from "@/lib/supabase/server";
 
 type RankingPeriod = "week" | "best";
@@ -57,7 +58,11 @@ export async function GET(request: Request) {
   }
   const period: RankingPeriod = periodParam;
 
-  const { supabase } = await requireUser();
+  const { supabase, user } = await requireUser();
+  // 実験中のため、許可アカウント以外は存在ごと知られないよう404で返す。
+  if (!canAccessWankoBowling(user.email)) {
+    return NextResponse.json({ error: "Not found" }, { status: 404 });
+  }
   const rpc = supabase.rpc.bind(supabase) as unknown as (
     fn: "get_friend_wanko_bowling_ranking",
     args: { p_period: RankingPeriod },
