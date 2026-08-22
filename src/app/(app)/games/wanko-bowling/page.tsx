@@ -1,6 +1,7 @@
 import { notFound } from "next/navigation";
 import { WankoBowlingGame } from "@/components/wanko-bowling-game";
 import { WankoBowlingRanking } from "@/components/wanko-bowling-ranking";
+import { BowlingScreenLock } from "@/components/wanko-bowling/screen-lock";
 import { PageBody } from "@/components/page-body";
 import { TopHeader } from "@/components/page-header";
 import { COLLECTION_ITEMS } from "@/lib/collection/items";
@@ -28,6 +29,8 @@ export default async function WankoBowlingPage() {
 
   return (
     <div className="fixed inset-0 z-[50] flex h-dvh flex-col overflow-hidden bg-paper">
+      <BowlingScreenLock />
+
       <TopHeader
         backHref="/games"
         title="わんこボウリング"
