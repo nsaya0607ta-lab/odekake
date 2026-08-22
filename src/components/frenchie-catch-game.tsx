@@ -156,9 +156,10 @@ const LV = {
   PUDDING_PT: [15, 20, 30, 40, 50],
   MELON_SEC: [2, 3, 4, 5, 6],
   MELON_PT: [5, 10, 15, 20, 30],
-  TREASURE_LOW: [20, 25, 30, 40, 50],
-  TREASURE_HIGH: [40, 50, 60, 80, 100],
+  TREASURE_LOW: [25, 30, 40, 50, 60],
+  TREASURE_HIGH: [50, 65, 80, 100, 130],
   TREASURE_SEC: [3, 4, 5, 6, 8],
+  TREASURE_STREAK_PCT: [20, 25, 30, 35, 40],
   FRENCHIE_PLUSH_COUNT: [3, 3, 4, 4, 5],
   FRENCHIE_PLUSH_PT: [10, 13, 15, 20, 25],
   MEAT_SEC: [5, 6, 7, 8, 10],
@@ -246,12 +247,32 @@ const TIME_BONUS_FALL_SPEED = 6;
 const TREASURE_ITEM_ID = "toy_treasure_puzzle";
 const TREASURE_FALL_SPEED = 4;
 const POOP_FLOOD_FALL_SPEED = 6;
-const TREASURE_POOP_FLOOD_COUNT = 15;
+const TREASURE_POOP_FLOOD_COUNT = 10;
 const DOG_FLOOD_ITEM_ID = "other_listen_to_the_a";
 const DOG_FLOOD_SPAWN_RATE = 4;
 const DOG_FLOOD_FALL_SPEED = 2.5;
 const TREASURE_MINUS5_SEC = 5;
-const TREASURE_MINUS10_SEC = 10;
+const TREASURE_DOUBLE_MULT = 2;
+/** 宝箱の中身抽選（8択）。合計100、ハズレ(うんち祭り+マイナス秒)は合計20 */
+const TREASURE_OUTCOME_WEIGHTS: { outcome: string; weight: number }[] = [
+  { outcome: "low_pt", weight: 17 },
+  { outcome: "high_pt", weight: 10 },
+  { outcome: "time_plus", weight: 15 },
+  { outcome: "poop_flood", weight: 10 },
+  { outcome: "time_minus5", weight: 10 },
+  { outcome: "item_double", weight: 15 },
+  { outcome: "rare_lock", weight: 15 },
+  { outcome: "streak_bonus", weight: 8 },
+];
+function rollTreasureOutcome(): string {
+  const total = TREASURE_OUTCOME_WEIGHTS.reduce((sum, entry) => sum + entry.weight, 0);
+  let roll = Math.random() * total;
+  for (const entry of TREASURE_OUTCOME_WEIGHTS) {
+    roll -= entry.weight;
+    if (roll < 0) return entry.outcome;
+  }
+  return TREASURE_OUTCOME_WEIGHTS[TREASURE_OUTCOME_WEIGHTS.length - 1]!.outcome;
+}
 const DEFAULT_ITEM_SPAWN_WEIGHT = 100;
 /**
  * 出現量アップ系スキル（宝箱の1/7枠・ぽんでおも・ぽんでアー・じゃれアー・ラグビーアー）は
@@ -269,13 +290,13 @@ const DEFAULT_ITEM_SPAWN_WEIGHT = 100;
  */
 const ITEM_SPAWN_WEIGHTS: Partial<Record<string, number>> = {
   toy_treasure_puzzle: 200,
-  other_omojii: 68.7,
-  toy_duck_plush: 85.6,
-  toy_carrot: 85.6,
-  food_paw_melon_bread: 85.6,
-  interior_anball: 85.6,
-  other_azuki: 85.6,
-  summer_frenchie: 85.6,
+  other_omojii: 64.4,
+  toy_duck_plush: 80.3,
+  toy_carrot: 80.3,
+  food_paw_melon_bread: 80.3,
+  interior_anball: 80.3,
+  other_azuki: 80.3,
+  summer_frenchie: 80.3,
   other_listen_to_the_a: 50,
 };
 const STRETCH_ROD_ITEM_ID = "interior_stretch_rod";
@@ -425,6 +446,8 @@ export function FrenchieCatchGame({ ownedItems }: { ownedItems: FrenchieCatchIte
   const otherSuppressUntilRef = useRef(0);
   const otherSuppressValueRef = useRef(1);
   const highRarityLockUntilRef = useRef(0);
+  const treasureStreakActiveRef = useRef(false);
+  const treasureStreakMultRef = useRef(1);
   const omochiUntilRef = useRef(0);
   const omochiPtValueRef = useRef(10);
   const okaeriUntilRef = useRef(0);
@@ -501,6 +524,7 @@ export function FrenchieCatchGame({ ownedItems }: { ownedItems: FrenchieCatchIte
     if (now < spawnRateBoostUntilRef.current) labels.push(`アイテム出現量×${spawnRateBoostValueRef.current}中`);
     if (now < otherSuppressUntilRef.current) labels.push(`その他カテゴリ出現×${otherSuppressValueRef.current}中`);
     if (now < highRarityLockUntilRef.current) labels.push("SSR/UR/LRのみ出現中");
+    if (treasureStreakActiveRef.current) labels.push(`宝箱連続ボーナス 得点+${Math.round((treasureStreakMultRef.current - 1) * 100)}%`);
     if (now < omochiUntilRef.current) labels.push(`うんちがおもちに +${omochiPtValueRef.current}pt`);
     if (now < okaeriUntilRef.current) labels.push(`1個ごとに+${okaeriPerCatchValueRef.current}秒`);
     if (now < hazardShieldUntilRef.current) labels.push("ハザード出現なし");
@@ -1044,7 +1068,8 @@ export function FrenchieCatchGame({ ownedItems }: { ownedItems: FrenchieCatchIte
             const foodMultiplier = now < nisokuUntilRef.current && FOOD_CATEGORY_ITEM_IDS.has(entity.itemId ?? "")
               ? nisokuMultValueRef.current
               : 1;
-            const multiplier = Math.max(timedMultiplier, nextMultiplier, foodMultiplier);
+            const streakMultiplier = treasureStreakActiveRef.current ? treasureStreakMultRef.current : 1;
+            const multiplier = Math.max(timedMultiplier, nextMultiplier, foodMultiplier, streakMultiplier);
             let points = Math.round((basePoints + pendingBonus) * multiplier);
             let effectLabel: string | undefined;
 
@@ -1143,30 +1168,39 @@ export function FrenchieCatchGame({ ownedItems }: { ownedItems: FrenchieCatchIte
                 effectLabel = `+${LV.CUSHION_PT[lv]}ptボーナス${lvTag}`;
                 break;
               case "toy_treasure_puzzle": {
-                const roll = Math.floor(Math.random() * 7);
-                if (roll === 0) {
+                // 宝箱を取ると、前回の連続ボーナスはここで終了する（新しい抽選結果に上書き）
+                treasureStreakActiveRef.current = false;
+                const outcome = rollTreasureOutcome();
+                if (outcome === "low_pt") {
                   points += LV.TREASURE_LOW[lv]!;
                   effectLabel = `宝箱 +${LV.TREASURE_LOW[lv]}pt${lvTag}`;
-                } else if (roll === 1) {
+                } else if (outcome === "high_pt") {
                   points += LV.TREASURE_HIGH[lv]!;
                   effectLabel = `宝箱 +${LV.TREASURE_HIGH[lv]}pt${lvTag}`;
-                } else if (roll === 2) {
+                } else if (outcome === "time_plus") {
                   const applied = addBonusTime(LV.TREASURE_SEC[lv]!);
                   effectLabel = `宝箱 +${applied}秒${lvTag}`;
-                } else if (roll === 3) {
+                } else if (outcome === "poop_flood") {
                   poopFloodRemainingRef.current += TREASURE_POOP_FLOOD_COUNT;
                   effectLabel = `宝箱 うんち祭り(${TREASURE_POOP_FLOOD_COUNT}個)${lvTag}`;
                   statusChanged = true;
-                } else if (roll === 4) {
+                } else if (outcome === "time_minus5") {
                   const applied = addBonusTime(-TREASURE_MINUS5_SEC);
                   effectLabel = `宝箱 ${applied}秒${lvTag}`;
-                } else if (roll === 5) {
-                  const applied = addBonusTime(-TREASURE_MINUS10_SEC);
-                  effectLabel = `宝箱 ${applied}秒${lvTag}`;
+                } else if (outcome === "item_double") {
+                  multiplier15UntilRef.current = now + LV.TREASURE_SEC[lv]! * 1000;
+                  multiplier15ValueRef.current = TREASURE_DOUBLE_MULT;
+                  effectLabel = `宝箱 ${LV.TREASURE_SEC[lv]}秒間 得点×${TREASURE_DOUBLE_MULT}${lvTag}`;
+                  statusChanged = true;
+                } else if (outcome === "rare_lock") {
+                  highRarityLockUntilRef.current = now + LV.TREASURE_SEC[lv]! * 1000;
+                  effectLabel = `宝箱 ${LV.TREASURE_SEC[lv]}秒間 SSR/UR/LRのみ出現${lvTag}`;
+                  statusChanged = true;
                 } else {
-                  spawnRateBoostUntilRef.current = now + LV.TREASURE_SEC[lv]! * 1000;
-                  spawnRateBoostValueRef.current = SPAWN_RATE_BOOST;
-                  effectLabel = `宝箱 ${LV.TREASURE_SEC[lv]}秒間 アイテム出現量×${SPAWN_RATE_BOOST}${lvTag}`;
+                  const pct = LV.TREASURE_STREAK_PCT[lv]!;
+                  treasureStreakActiveRef.current = true;
+                  treasureStreakMultRef.current = 1 + pct / 100;
+                  effectLabel = `宝箱 次の宝箱まで得点+${pct}%${lvTag}`;
                   statusChanged = true;
                 }
                 break;
@@ -1668,6 +1702,8 @@ export function FrenchieCatchGame({ ownedItems }: { ownedItems: FrenchieCatchIte
     otherSuppressUntilRef.current = 0;
     otherSuppressValueRef.current = 1;
     highRarityLockUntilRef.current = 0;
+    treasureStreakActiveRef.current = false;
+    treasureStreakMultRef.current = 1;
     omochiUntilRef.current = 0;
     omochiPtValueRef.current = 10;
     okaeriUntilRef.current = 0;
