@@ -245,6 +245,8 @@ export function Lane({ ballVisual, resetSignal, active, onRoll }: LaneProps) {
         .filter(([, body]) => body.standing)
         .map(([id]) => id),
     );
+    // 見た目の最終状態から推測せず、倒れた瞬間に記録する。
+    const knockedThisThrow = new Set<number>();
 
     let bx = 50;
     let by = DOCK_Y;
@@ -269,9 +271,7 @@ export function Lane({ ballVisual, resetSignal, active, onRoll }: LaneProps) {
       if (ballGutter && ballRef.current) ballRef.current.style.opacity = "0";
       window.setTimeout(() => {
         throwingRef.current = false;
-        const knockedIds = [...preThrowStandingIds].filter(
-          (id) => !pinBodiesRef.current.get(id)?.standing,
-        );
+        const knockedIds = [...knockedThisThrow].filter((id) => preThrowStandingIds.has(id));
         onRoll({ knockedIds, isGutter: ballGutter, power });
       }, ballGutter ? 220 : 300);
     };
@@ -321,9 +321,6 @@ export function Lane({ ballVisual, resetSignal, active, onRoll }: LaneProps) {
             );
             if (distance > collideRadiusPx) continue;
 
-            // 移動後のボール座標ではなく「接触直前の座標」を使う。
-            // これにより、横からかすめた球が1フレームでピンを通り越しても
-            // 衝突方向が反転せず、きちんとピンへ力が伝わる。
             const result = resolvePairCollision(
               prevBx,
               prevBy,
@@ -346,13 +343,13 @@ export function Lane({ ballVisual, resetSignal, active, onRoll }: LaneProps) {
               body.vx = result.bvx;
               body.vy = result.bvy;
             } else {
-              // 極端なコマ落ちでも「見た目は当たったのに倒れない」を起こさない保険。
               body.vx += bvx * 0.38;
               body.vy += bvy * 0.38;
               bvx *= 0.76;
               bvy *= 0.76;
             }
 
+            knockedThisThrow.add(pin.id);
             body.standing = false;
             body.moving = true;
             body.angularVel = (Math.random() - 0.5) * 920 + (pinXPx >= bxPx ? 280 : -280);
@@ -377,6 +374,8 @@ export function Lane({ ballVisual, resetSignal, active, onRoll }: LaneProps) {
           const dyPx = pctToPx(bodyB.y - bodyA.y, scaleY);
           if (Math.hypot(dxPx, dyPx) > pinPinRadiusPx) continue;
 
+          const aWasStanding = bodyA.standing;
+          const bWasStanding = bodyB.standing;
           const result = resolvePairCollision(
             bodyA.x,
             bodyA.y,
@@ -398,8 +397,14 @@ export function Lane({ ballVisual, resetSignal, active, onRoll }: LaneProps) {
           bodyA.vy = result.avy;
           bodyB.vx = result.bvx;
           bodyB.vy = result.bvy;
-          if (bodyA.standing) bodyA.angularVel = (Math.random() - 0.5) * 900;
-          if (bodyB.standing) bodyB.angularVel = (Math.random() - 0.5) * 900;
+          if (aWasStanding) {
+            knockedThisThrow.add(ids[i]!);
+            bodyA.angularVel = (Math.random() - 0.5) * 900;
+          }
+          if (bWasStanding) {
+            knockedThisThrow.add(ids[j]!);
+            bodyB.angularVel = (Math.random() - 0.5) * 900;
+          }
           bodyA.standing = false;
           bodyA.moving = true;
           bodyB.standing = false;
@@ -526,6 +531,7 @@ export function Lane({ ballVisual, resetSignal, active, onRoll }: LaneProps) {
   return (
     <div
       ref={boardRef}
+      data-bowling-gesture-block="true"
       onPointerDown={onPointerDown}
       onPointerMove={onPointerMove}
       onPointerUp={onPointerUp}
