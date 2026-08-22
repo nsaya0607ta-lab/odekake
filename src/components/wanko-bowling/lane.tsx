@@ -31,7 +31,7 @@ const DOCK_Y = 94;
 const HEAD_PIN_SCREEN_Y = 13.5;
 const MIN_UPWARD_PCT = 8;
 const MAX_THROW_MS = 7000;
-const MAX_SWIPE_SAMPLES = 48;
+const MAX_SWIPE_SAMPLES = 64;
 const BALL_RADIUS_M = JB_BALL_DIAMETER_M / 2;
 const PIN_RADIUS_M = JB_PIN_DIAMETER_M / 2;
 const PIN_COLLISION_RADIUS_M = BALL_RADIUS_M + PIN_RADIUS_M + 0.006;
@@ -40,6 +40,7 @@ const BALL_EXIT_DISTANCE_M = JB_HEAD_PIN_DISTANCE_M + 1.15;
 const MAX_LAUNCH_ANGLE_RAD = 2.6 * Math.PI / 180;
 const OIL_BALL_DRAG_PER_SEC = 0.012;
 const DRY_BALL_DRAG_PER_SEC = 0.04;
+const GUTTER_BALL_DRAG_PER_SEC = 0.035;
 const FOUL_LINE_Y = 97;
 const PIN_ROW_DEPTH_M = JB_PIN_SPACING_M * Math.sqrt(3) / 2;
 const PIN_DECK_DEPTH_M = PIN_ROW_DEPTH_M * 3;
@@ -47,9 +48,49 @@ const PIN_DECK_SCREEN_DEPTH_PCT = 8.4;
 const TARGET_BOARDS = [5, 10, 15, 20, 25, 30, 35] as const;
 const GUIDE_DISTANCE_M = 7 * 0.3048;
 const TARGET_DISTANCE_M = 15 * 0.3048;
-const CURVE_DEAD_ZONE_RAD = 8 * Math.PI / 180;
-const CURVE_FULL_SCALE_RAD = 30 * Math.PI / 180;
-const MAX_CURVE_NORM = 0.24;
+
+// 指の小さな揺れは無視するが、意図的に曲げたスワイプにはすぐ反応させる。
+const CURVE_DEAD_ZONE_RAD = 2.5 * Math.PI / 180;
+const CURVE_FULL_SCALE_RAD = 16 * Math.PI / 180;
+const CURVE_BOW_DEAD_ZONE_PCT = 0.35;
+const CURVE_BOW_FULL_SCALE_PCT = 4.5;
+const MAX_CURVE_NORM = 0.9;
+
+type Point = { x: number; y: number; t: number };
+type GutterSide = "left" | "right" | null;
+
+type PinBody = {
+  xM: number;
+  yM: number;
+  vxMps: number;
+  vyMps: number;
+  angle: number;
+  angularVel: number;
+  fallProgress: number;
+  standing: boolean;
+  moving: boolean;
+  visible: boolean;
+};
+
+type CollisionResult = {
+  avx: number;
+  avy: number;
+  bvx: number;
+  bvy: number;
+};
+
+export type LaneRollResult = {
+  knockedIds: number[];
+  isGutter: boolean;
+  power: number;
+};
+
+type LaneProps = {
+  ballVisual: BowlingBallVisual;
+  resetSignal: number;
+  active: boolean;
+  onRoll: (result: LaneRollResult) => void;
+};
 
 function clamp(value: number, min: number, max: number): number {
   return Math.min(max, Math.max(min, value));
@@ -163,6 +204,90 @@ function screenDirectionAngle(a: Point, b: Point): number {
   return Math.atan2(dx, Math.max(1, upward));
 }
 
+/**
+ * 球速は「最後の160ms」を75%、ジェスチャー全体を25%で評価する。
+ * これにより最後に強く弾いた時の速さがそのまま球速へ反映される。
+ */
+function estimateReleaseSwipeRate(points: Point[], boardHeightPx: number): number {
+  if (points.length < 2) return 0;
+
+  const first = points[0]!;
+  const last = points[points.length - 1]!;
+  const overallDt = Math.max(0.04, (last.t - first.t) / 1000);
+  const overallUpPct = ((first.y - last.y) / Math.max(1, boardHeightPx)) * 100;
+  const overallRate = Math.max(0, overallUpPct / overallDt);
+
+  const recentCutoff = last.t - 160;
+  let recentStart = first;
+  for (let i = points.length - 2; i >= 0; i -= 1) {
+    const point = points[i]!;
+    recentStart = point;
+    if (point.t <= recentCutoff) break;
+  }
+
+  const recentDt = Math.max(0.025, (last.t - recentStart.t) / 1000);
+  const recentUpPct = ((recentStart.y - last.y) / Math.max(1, boardHeightPx)) * 100;
+  const recentRate = Math.max(0, recentUpPct / recentDt);
+
+  return recentRate * 0.75 + overallRate * 0.25;
+}
+
+/**
+ * 前半と後半の指の向きの変化を主成分にし、軌道の弓なり量も少し加える。
+ * 直線スワイプは0、意図的な曲線には±1近くまで反応する。
+ */
+function estimateCurveNorm(points: Point[], boardWidthPx: number): number {
+  if (points.length < 5) return 0;
+
+  const length = points.length;
+  const earlyEndIndex = clamp(Math.floor(length * 0.38), 2, length - 3);
+  const lateStartIndex = clamp(Math.floor(length * 0.58), earlyEndIndex + 1, length - 2);
+
+  const firstStart = averagePoint(points.slice(0, Math.min(3, earlyEndIndex)));
+  const firstEnd = averagePoint(points.slice(Math.max(0, earlyEndIndex - 2), earlyEndIndex + 1));
+  const secondStart = averagePoint(points.slice(lateStartIndex, Math.min(length, lateStartIndex + 3)));
+  const secondEnd = averagePoint(points.slice(-Math.min(3, length - lateStartIndex)));
+
+  const firstAngle = screenDirectionAngle(firstStart, firstEnd);
+  const secondAngle = screenDirectionAngle(secondStart, secondEnd);
+  const delta = normalizeAngle(secondAngle - firstAngle);
+  const angleMagnitude = Math.abs(delta);
+
+  let angleSignal = 0;
+  if (angleMagnitude > CURVE_DEAD_ZONE_RAD) {
+    const scaled = clamp(
+      (angleMagnitude - CURVE_DEAD_ZONE_RAD) / (CURVE_FULL_SCALE_RAD - CURVE_DEAD_ZONE_RAD),
+      0,
+      1,
+    );
+    angleSignal = Math.sign(delta) * scaled;
+  }
+
+  const start = averagePoint(points.slice(0, Math.min(2, length)));
+  const end = averagePoint(points.slice(-Math.min(2, length)));
+  const midStart = Math.max(1, Math.floor(length * 0.42));
+  const midEnd = Math.min(length - 1, Math.ceil(length * 0.62));
+  const mid = averagePoint(points.slice(midStart, midEnd + 1));
+  const totalUp = Math.max(1, start.y - end.y);
+  const progress = clamp((start.y - mid.y) / totalUp, 0, 1);
+  const straightX = start.x + (end.x - start.x) * progress;
+  const bowPct = ((mid.x - straightX) / Math.max(1, boardWidthPx)) * 100;
+  const bowMagnitude = Math.abs(bowPct);
+
+  let bowSignal = 0;
+  if (bowMagnitude > CURVE_BOW_DEAD_ZONE_PCT) {
+    const scaled = clamp(
+      (bowMagnitude - CURVE_BOW_DEAD_ZONE_PCT)
+        / (CURVE_BOW_FULL_SCALE_PCT - CURVE_BOW_DEAD_ZONE_PCT),
+      0,
+      1,
+    );
+    bowSignal = Math.sign(bowPct) * scaled;
+  }
+
+  return clamp(angleSignal * 0.78 + bowSignal * 0.22, -1, 1) * MAX_CURVE_NORM;
+}
+
 const NEAR_LANE_HALF = laneHalfWidthPct(0);
 const FAR_LANE_HALF = laneHalfWidthPct(JB_HEAD_PIN_DISTANCE_M);
 const NEAR_GUTTER = gutterVisualWidthPct(0);
@@ -182,41 +307,8 @@ const OIL_HALF = laneHalfWidthPct(GAME_OIL_LENGTH_M);
 const OIL_LEFT = 50 - OIL_HALF;
 const OIL_RIGHT = 50 + OIL_HALF;
 const BALL_START_X_M = JB_GUTTER_WIDTH_M + JB_LANE_WIDTH_M / 2;
-
-export type LaneRollResult = {
-  knockedIds: number[];
-  isGutter: boolean;
-  power: number;
-};
-
-type LaneProps = {
-  ballVisual: BowlingBallVisual;
-  resetSignal: number;
-  active: boolean;
-  onRoll: (result: LaneRollResult) => void;
-};
-
-type Point = { x: number; y: number; t: number };
-
-type PinBody = {
-  xM: number;
-  yM: number;
-  vxMps: number;
-  vyMps: number;
-  angle: number;
-  angularVel: number;
-  fallProgress: number;
-  standing: boolean;
-  moving: boolean;
-  visible: boolean;
-};
-
-type CollisionResult = {
-  avx: number;
-  avy: number;
-  bvx: number;
-  bvy: number;
-};
+const LEFT_GUTTER_CENTER_M = JB_GUTTER_WIDTH_M / 2;
+const RIGHT_GUTTER_CENTER_M = JB_GUTTER_WIDTH_M + JB_LANE_WIDTH_M + JB_GUTTER_WIDTH_M / 2;
 
 function createPinBody(pin: (typeof PIN_LAYOUT)[number]): PinBody {
   return {
@@ -405,7 +497,7 @@ export function Lane({ ballVisual, resetSignal, active, onRoll }: LaneProps) {
     let bvxMps = launch.speedMps * Math.sin(launch.launchAngleRad);
     let bvyMps = launch.speedMps * Math.cos(launch.launchAngleRad);
     let rotate = 0;
-    let ballGutter = false;
+    let gutterSide: GutterSide = null;
     let ballDone = false;
     let finished = false;
 
@@ -439,7 +531,6 @@ export function Lane({ ballVisual, resetSignal, active, onRoll }: LaneProps) {
     const finish = () => {
       if (finished) return;
       finished = true;
-      if (ballGutter && ballRef.current) ballRef.current.style.opacity = "0";
       const speedNorm = clamp(
         ((launch.speedMps * 3.6) - GAME_MIN_BALL_SPEED_KMH)
           / (GAME_MAX_BALL_SPEED_KMH - GAME_MIN_BALL_SPEED_KMH),
@@ -450,8 +541,8 @@ export function Lane({ ballVisual, resetSignal, active, onRoll }: LaneProps) {
       window.setTimeout(() => {
         throwingRef.current = false;
         const knockedIds = [...knockedThisThrow].filter((id) => preThrowStandingIds.has(id));
-        onRoll({ knockedIds, isGutter: ballGutter && knockedIds.length === 0, power: 0.3 + speedNorm * 0.7 });
-      }, ballGutter ? 180 : 280);
+        onRoll({ knockedIds, isGutter: gutterSide !== null && knockedIds.length === 0, power: 0.3 + speedNorm * 0.7 });
+      }, gutterSide ? 180 : 280);
     };
 
     const step = (now: number) => {
@@ -462,28 +553,53 @@ export function Lane({ ballVisual, resetSignal, active, onRoll }: LaneProps) {
         const prevBxM = bxM;
         const prevByM = byM;
         const onOil = byM < GAME_OIL_LENGTH_M;
-        const hookFactor = onOil ? OIL_HOOK_FACTOR : DRY_HOOK_FACTOR;
-        const drag = onOil ? OIL_BALL_DRAG_PER_SEC : DRY_BALL_DRAG_PER_SEC;
 
-        bvxMps += launch.curveNorm * BACKEND_HOOK_ACCEL_MPS2 * hookFactor * dt;
-        const ballDecay = Math.exp(-drag * dt);
-        bvxMps *= ballDecay;
-        bvyMps *= ballDecay;
+        if (gutterSide === null) {
+          const hookFactor = onOil ? OIL_HOOK_FACTOR : DRY_HOOK_FACTOR;
+          const drag = onOil ? OIL_BALL_DRAG_PER_SEC : DRY_BALL_DRAG_PER_SEC;
+          bvxMps += launch.curveNorm * BACKEND_HOOK_ACCEL_MPS2 * hookFactor * dt;
+          const ballDecay = Math.exp(-drag * dt);
+          bvxMps *= ballDecay;
+          bvyMps *= ballDecay;
+        } else {
+          // ガターに落ちても球は消さず、溝の中をそのまま奥へ走らせる。
+          const gutterDecay = Math.exp(-GUTTER_BALL_DRAG_PER_SEC * dt);
+          const lateralDecay = Math.exp(-9 * dt);
+          bvxMps *= lateralDecay;
+          bvyMps *= gutterDecay;
+        }
+
         bxM += bvxMps * dt;
         byM += bvyMps * dt;
+
+        const laneLeftM = JB_GUTTER_WIDTH_M;
+        const laneRightM = JB_GUTTER_WIDTH_M + JB_LANE_WIDTH_M;
+
+        // ボール中心がレーン端を越えた瞬間 = ボールの50%以上がガター側に入った状態。
+        if (gutterSide === null) {
+          if (bxM <= laneLeftM) gutterSide = "left";
+          else if (bxM >= laneRightM) gutterSide = "right";
+        }
+
+        if (gutterSide !== null) {
+          const targetX = gutterSide === "left" ? LEFT_GUTTER_CENTER_M : RIGHT_GUTTER_CENTER_M;
+          bxM += (targetX - bxM) * Math.min(1, dt * 7.5);
+
+          // 実寸ガター幅の中にボール中心を保持する。
+          if (gutterSide === "left") {
+            bxM = clamp(bxM, BALL_RADIUS_M, Math.max(BALL_RADIUS_M, JB_GUTTER_WIDTH_M - BALL_RADIUS_M));
+          } else {
+            const minX = laneRightM + BALL_RADIUS_M;
+            const maxX = JB_TOTAL_WIDTH_M - BALL_RADIUS_M;
+            bxM = clamp(bxM, Math.min(minX, maxX), maxX);
+          }
+        }
 
         const angularSpeedRad = Math.hypot(bvxMps, bvyMps) / BALL_RADIUS_M;
         rotate += angularSpeedRad * dt * (180 / Math.PI);
 
-        const laneLeftM = JB_GUTTER_WIDTH_M;
-        const laneRightM = JB_GUTTER_WIDTH_M + JB_LANE_WIDTH_M;
-        if (bxM - BALL_RADIUS_M < laneLeftM || bxM + BALL_RADIUS_M > laneRightM) {
-          ballGutter = knockedThisThrow.size === 0;
-          ballDone = true;
-          bxM = clamp(bxM, BALL_RADIUS_M * 0.4, JB_TOTAL_WIDTH_M - BALL_RADIUS_M * 0.4);
-        }
-
-        if (!ballDone && byM >= JB_HEAD_PIN_DISTANCE_M - 1.35) {
+        // ガターに入った後はピンへ戻らない。レーン上の球だけ衝突判定する。
+        if (gutterSide === null && byM >= JB_HEAD_PIN_DISTANCE_M - 1.35) {
           for (const pin of PIN_LAYOUT) {
             const body = pinBodiesRef.current.get(pin.id);
             if (!body || !body.standing || !body.visible) continue;
@@ -679,48 +795,31 @@ export function Lane({ ballVisual, resetSignal, active, onRoll }: LaneProps) {
     const end = averagePoint(points.slice(-sampleCount));
     const startXPct = ((start.x - rect.left) / rect.width) * 100;
     const startYPct = ((start.y - rect.top) / rect.height) * 100;
-    const endXPct = ((end.x - rect.left) / rect.width) * 100;
     const endYPct = ((end.y - rect.top) / rect.height) * 100;
     const upwardPct = startYPct - endYPct;
-    const durationSec = Math.max(0.05, (end.t - start.t) / 1000);
     if (upwardPct < MIN_UPWARD_PCT) return;
 
-    const swipeRate = upwardPct / durationSec;
-    const speedNorm = clamp((swipeRate - 45) / 175, 0, 1);
+    // 最後に指を弾く速さを強く反映。以前のようにすぐ同じ上限速度へ張り付かない。
+    const swipeRate = estimateReleaseSwipeRate(points, rect.height);
+    const rawSpeedNorm = clamp((swipeRate - 25) / 430, 0, 1);
+    const speedNorm = Math.pow(rawSpeedNorm, 0.72);
     const speedKmh = GAME_MIN_BALL_SPEED_KMH
       + (GAME_MAX_BALL_SPEED_KMH - GAME_MIN_BALL_SPEED_KMH) * speedNorm;
     const speedMps = speedKmh / 3.6;
 
-    // スワイプ線を画面上で1番ピンの高さまで延長し、そこを実レーン上の狙い位置に戻す。
-    const rayScaleToPins = (startYPct - HEAD_PIN_SCREEN_Y) / Math.max(1, upwardPct);
-    const aimScreenXPct = startXPct + (endXPct - startXPct) * rayScaleToPins;
+    // 初期方向はジェスチャー前半〜中央で決め、後半の曲げ操作はカーブとして分離する。
+    const directionIndex = Math.max(sampleCount, Math.min(points.length - 1, Math.floor(points.length * 0.56)));
+    const directionEnd = averagePoint(points.slice(Math.max(0, directionIndex - 2), directionIndex + 1));
+    const directionEndXPct = ((directionEnd.x - rect.left) / rect.width) * 100;
+    const directionEndYPct = ((directionEnd.y - rect.top) / rect.height) * 100;
+    const directionUpPct = Math.max(1, startYPct - directionEndYPct);
+    const rayScaleToPins = (startYPct - HEAD_PIN_SCREEN_Y) / directionUpPct;
+    const aimScreenXPct = startXPct + (directionEndXPct - startXPct) * rayScaleToPins;
     const targetWorldX = screenXToWorldX(aimScreenXPct, JB_HEAD_PIN_DISTANCE_M);
     const rawLaunchAngle = Math.atan2(targetWorldX - BALL_START_X_M, JB_HEAD_PIN_DISTANCE_M);
     const launchAngleRad = clamp(rawLaunchAngle, -MAX_LAUNCH_ANGLE_RAD, MAX_LAUNCH_ANGLE_RAD);
 
-    // 微妙な指ブレでは曲げない。明確に途中で方向を変えた時だけ弱いフックを付ける。
-    let curveNorm = 0;
-    if (points.length >= 8) {
-      const split = Math.floor(points.length / 2);
-      const firstStart = averagePoint(points.slice(0, Math.min(3, split)));
-      const firstEnd = averagePoint(points.slice(Math.max(0, split - 2), split + 1));
-      const secondStart = averagePoint(points.slice(split, Math.min(points.length, split + 3)));
-      const secondEnd = averagePoint(points.slice(-Math.min(3, points.length - split)));
-      const firstAngle = screenDirectionAngle(firstStart, firstEnd);
-      const secondAngle = screenDirectionAngle(secondStart, secondEnd);
-      const delta = normalizeAngle(secondAngle - firstAngle);
-      const magnitude = Math.abs(delta);
-
-      if (magnitude > CURVE_DEAD_ZONE_RAD) {
-        const scaled = clamp(
-          (magnitude - CURVE_DEAD_ZONE_RAD) / (CURVE_FULL_SCALE_RAD - CURVE_DEAD_ZONE_RAD),
-          0,
-          1,
-        );
-        curveNorm = Math.sign(delta) * scaled * MAX_CURVE_NORM;
-      }
-    }
-
+    const curveNorm = estimateCurveNorm(points, rect.width);
     runThrow({ speedMps, launchAngleRad, curveNorm });
   }, [active, runThrow]);
 
@@ -852,7 +951,7 @@ export function Lane({ ballVisual, resetSignal, active, onRoll }: LaneProps) {
 
       <div className="pointer-events-none absolute bottom-[1.8%] left-1/2 z-[900] -translate-x-1/2 text-center">
         <p className="whitespace-nowrap rounded-full bg-[#2f2119]/70 px-3 py-1.5 text-[10px] font-black tracking-[0.07em] text-[#fff7e8] backdrop-blur-sm">
-          {active ? "狙う方向へまっすぐスワイプ" : ""}
+          {active ? "速さ・方向・カーブをスワイプで操作" : ""}
         </p>
       </div>
     </div>
