@@ -1,21 +1,46 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState, type PointerEvent as ReactPointerEvent } from "react";
-import { PIN_ADJACENCY, PIN_LAYOUT, Pins } from "./pins";
+import { useCallback, useEffect, useRef, type PointerEvent as ReactPointerEvent } from "react";
+import { PIN_LAYOUT, Pins } from "./pins";
 import type { BowlingBallVisual } from "@/lib/games/wanko-bowling-balls";
 
 const DOCK_Y = 88;
 const PIN_ZONE_Y = 34;
-/** ピンの一番奥（10番/7番）より少し先。ここまで抜けたらボールがピン列を通過し終えたとみなす。 */
 const DECK_EXIT_Y = 6;
 const LANE_LEFT = 16;
 const LANE_RIGHT = 84;
-const PIN_HIT_RADIUS = 6.2;
-/** ピンと同じ列とみなすyの許容幅。ピン列は約6%間隔なので、その半分強に設定。 */
-const PIN_ROW_BAND = 3.6;
-/** ピン列に入ってからは弾みで少し減速させ、当たり判定のコマ落ちも防ぐ。 */
-const DECK_SPEED_SCALE = 0.45;
 const MIN_UPWARD_PX = 26;
+
+// ---------------------------------------------------------------
+// 物理定数（実測値ベース）
+// ---------------------------------------------------------------
+/** 8ポンドのボウリングボール（1ポンド=0.45359237kg）。 */
+const BALL_MASS_KG = 8 * 0.45359237;
+/** ボウリングピン1本の重さ。 */
+const PIN_MASS_KG = 1.5;
+/** ボール対ピンの反発係数（1=完全弾性、0=完全非弾性）。木・合成樹脂の実感に寄せた値。 */
+const BALL_PIN_RESTITUTION = 0.55;
+/** ピン同士がぶつかったときの反発係数。ボールよりロスが大きい。 */
+const PIN_PIN_RESTITUTION = 0.42;
+/** 衝突とみなす距離（レーン幅に対する%。px換算はスワイプ時のレーン実寸を使う）。 */
+const COLLIDE_RADIUS_PCT = 6.4;
+/**
+ * 20km/h ≈ 5.56m/s を基準速度とする。ピンデッキの奥行き（手前ピン〜最後列）を
+ * 現実のボウリングにおよそ合わせて1m ≈ レーン高さの30%とみなし、
+ * スワイプの強さで変わるボール速度を [%/秒] に変換する基準値として使う。
+ */
+const PCT_PER_METER = 30;
+const BASE_BALL_SPEED_PCT = (20 / 3.6) * PCT_PER_METER; // ≈166.7 %/秒 = 20km/h相当
+/** ピンデッキに入ったら一度だけ速度を落とす（当たり判定の解像度確保＋スロー演出）。 */
+const DECK_SPEED_SCALE = 0.5;
+/** カーブ（スワイプの弧）による横方向の加速度。 */
+const CURVE_ACCEL_PCT_PER_SEC2 = 260;
+/** 転がる/滑るときの減速の速さ（指数減衰の係数）。 */
+const FRICTION_PER_SEC = 3.4;
+/** これより遅くなったら「止まった」とみなす（%/秒）。 */
+const SETTLE_SPEED_PCT = 9;
+/** 万一物理演算が収束しない場合の打ち切り時間。 */
+const MAX_THROW_MS = 3200;
 
 export type LaneRollResult = {
   knockedIds: number[];
@@ -34,22 +59,92 @@ type LaneProps = {
 
 type Point = { x: number; y: number; t: number };
 
-function allPinIds(): Set<number> {
-  return new Set(PIN_LAYOUT.map((pin) => pin.id));
+type PinBody = {
+  x: number;
+  y: number;
+  vx: number;
+  vy: number;
+  angle: number;
+  angularVel: number;
+  /** まだ一度も当たっていない（このゲーム内でまだ立っている）。 */
+  standing: boolean;
+  /** 現在も速度を持って動いている最中か。 */
+  moving: boolean;
+};
+
+function createPinBody(pin: { x: number; y: number }): PinBody {
+  return { x: pin.x, y: pin.y, vx: 0, vy: 0, angle: 0, angularVel: 0, standing: true, moving: false };
+}
+
+/**
+ * 2物体の弾性/非弾性衝突（運動量保存則）。位置・速度は%空間で受け取るが、
+ * レーンは正方形でない（幅と高さでスケールが違う）ため、衝突の法線方向や
+ * 撃力の計算だけは実際の見た目のpx空間に変換してから行い、結果を%/秒へ戻す。
+ */
+function resolvePairCollision(
+  ax: number, ay: number, avx: number, avy: number, massA: number,
+  bx: number, by: number, bvx: number, bvy: number, massB: number,
+  restitution: number,
+  scaleX: number, scaleY: number,
+): { avx: number; avy: number; bvx: number; bvy: number } | null {
+  const dxPx = (bx - ax) * scaleX;
+  const dyPx = (by - ay) * scaleY;
+  const dist = Math.hypot(dxPx, dyPx);
+  if (dist < 0.0001) return null;
+  const nx = dxPx / dist;
+  const ny = dyPx / dist;
+
+  const avxPx = avx * scaleX, avyPx = avy * scaleY;
+  const bvxPx = bvx * scaleX, bvyPx = bvy * scaleY;
+  const relVx = avxPx - bvxPx;
+  const relVy = avyPx - bvyPx;
+  const velAlongNormal = relVx * nx + relVy * ny;
+  if (velAlongNormal <= 0) return null; // すでに離れていく向きなら衝突なし
+
+  const invA = 1 / massA;
+  const invB = 1 / massB;
+  const j = ((1 + restitution) * velAlongNormal) / (invA + invB);
+
+  return {
+    avx: (avxPx - j * nx * invA) / scaleX,
+    avy: (avyPx - j * ny * invA) / scaleY,
+    bvx: (bvxPx + j * nx * invB) / scaleX,
+    bvy: (bvyPx + j * ny * invB) / scaleY,
+  };
 }
 
 export function Lane({ ballVisual, resetSignal, active, onRoll }: LaneProps) {
-  const [standingIds, setStandingIds] = useState<Set<number>>(() => allPinIds());
-  const [fallingIds, setFallingIds] = useState<Set<number>>(() => new Set());
-
   const boardRef = useRef<HTMLDivElement>(null);
   const ballRef = useRef<HTMLDivElement>(null);
-  const trailRef = useRef<HTMLDivElement>(null);
   const throwingRef = useRef(false);
   const pointsRef = useRef<Point[]>([]);
   const activePointerRef = useRef<number | null>(null);
-  const standingIdsRef = useRef(standingIds);
-  standingIdsRef.current = standingIds;
+
+  const pinBodiesRef = useRef<Map<number, PinBody>>(
+    new Map(PIN_LAYOUT.map((pin) => [pin.id, createPinBody(pin)])),
+  );
+  const pinNodesRef = useRef<Map<number, HTMLDivElement>>(new Map());
+
+  const registerPinNode = useCallback((id: number, el: HTMLDivElement | null) => {
+    if (el) pinNodesRef.current.set(id, el);
+    else pinNodesRef.current.delete(id);
+  }, []);
+
+  const writePinNode = useCallback((id: number, body: PinBody) => {
+    const el = pinNodesRef.current.get(id);
+    if (!el) return;
+    el.style.left = `${body.x}%`;
+    el.style.top = `${body.y}%`;
+    el.style.transform = `translate(-50%, -50%) rotate(${body.angle}deg)`;
+  }, []);
+
+  const resetPins = useCallback(() => {
+    PIN_LAYOUT.forEach((pin) => {
+      const body = createPinBody(pin);
+      pinBodiesRef.current.set(pin.id, body);
+      writePinNode(pin.id, body);
+    });
+  }, [writePinNode]);
 
   // ボールをドック（下の待機位置）へ戻す。ピンをなぎ倒した位置からいきなり
   // 消えて瞬間移動すると不自然なので、一瞬だけふわっとフェードしてから
@@ -76,12 +171,10 @@ export function Lane({ ballVisual, resetSignal, active, onRoll }: LaneProps) {
   }, []);
 
   useEffect(() => {
-    setStandingIds(allPinIds());
-    setFallingIds(new Set());
+    resetPins();
     throwingRef.current = false;
     dockBall();
-    if (trailRef.current) trailRef.current.style.opacity = "0";
-  }, [resetSignal, dockBall]);
+  }, [resetSignal, resetPins, dockBall]);
 
   // 同じフレーム内の2投目（resetSignal は変わらず、ピンだけ一部残っている状態）でも、
   // 次の投球が可能になった瞬間（active が false→true）にボールを置き直す。
@@ -92,8 +185,6 @@ export function Lane({ ballVisual, resetSignal, active, onRoll }: LaneProps) {
 
   // left/top はレーン（親要素）に対する割合、transform の translate(-50%, -50%) は
   // ボール自身のサイズぶんを引いて中心合わせするためだけに使う。
-  // ここに translate(x%, y%) を混ぜると「要素自身のサイズ」基準になってしまい、
-  // レーン上の狙った座標からズレる（実際に起きていた不具合）。
   const setBallPosition = useCallback((xPct: number, yPct: number, rotateDeg: number) => {
     const el = ballRef.current;
     if (!el) return;
@@ -114,115 +205,162 @@ export function Lane({ ballVisual, resetSignal, active, onRoll }: LaneProps) {
       return;
     }
 
-    let x = 50;
-    let y = DOCK_Y;
-    let rotate = 0;
-    let speedY = launch.speedPctPerSec;
-    let last = performance.now();
-    let gutter = false;
-    const power = Math.min(1, Math.max(0.35, launch.speedPctPerSec / 220));
-    const knockedThisThrow = new Set<number>();
+    const rect = board.getBoundingClientRect();
+    const scaleX = rect.width;
+    const scaleY = rect.height;
+    const collideRadiusPx = (COLLIDE_RADIUS_PCT / 100) * scaleX;
 
-    // ぶつかったピンから隣接ピンへ、実際にぶつかった位置・勢いに応じて連鎖的に倒す。
-    // ボール自身は止まらず先へ進み続けるので、複数列にまたがって倒れうる。
-    const chainFrom = (hitPin: (typeof PIN_LAYOUT)[number], offsetRatio: number, impactPower: number) => {
-      const standingNow = standingIdsRef.current;
-      const visited = new Set<number>([hitPin.id, ...knockedThisThrow]);
-      let frontier = [hitPin.id];
-      let hop = 0;
-      while (frontier.length > 0 && hop < 3) {
-        const next: number[] = [];
-        const baseProb = (0.55 - hop * 0.15 + (1 - offsetRatio) * 0.15) * (0.55 + impactPower * 0.5);
-        for (const pinId of frontier) {
-          const neighbors = PIN_ADJACENCY[pinId] ?? [];
-          for (const neighborId of neighbors) {
-            if (visited.has(neighborId) || !standingNow.has(neighborId)) continue;
-            visited.add(neighborId);
-            if (Math.random() < baseProb) {
-              knockedThisThrow.add(neighborId);
-              next.push(neighborId);
-            }
-          }
-        }
-        frontier = next;
-        hop += 1;
-      }
+    const preThrowStandingIds = new Set(
+      [...pinBodiesRef.current.entries()].filter(([, body]) => body.standing).map(([id]) => id),
+    );
+
+    let bx = 50;
+    let by = DOCK_Y;
+    let bvx = launch.lateralPctPerSec;
+    let bvy = -launch.speedPctPerSec;
+    let rotate = 0;
+    let ballGutter = false;
+    let ballDone = false;
+    let deckSlowdownApplied = false;
+    const power = Math.min(1, Math.max(0.3, launch.speedPctPerSec / BASE_BALL_SPEED_PCT));
+
+    const startTime = performance.now();
+    let last = startTime;
+
+    const anyPinMoving = () => {
+      for (const body of pinBodiesRef.current.values()) if (body.moving) return true;
+      return false;
     };
 
-    const finish = (isGutter: boolean) => {
+    const finish = () => {
       // ガター（レーン脇に落ちて見えなくなる）のときだけここで隠す。
       // ピンに当たった場合は、ボールは止まった場所に見えたままにする
       // （ピンが倒れきるまで消えない。次の投球に備えるときだけ dockBall() が
       // ふわっとフェードして戻す）。
-      if (isGutter && ballRef.current) ballRef.current.style.opacity = "0";
-      // ピンが倒れきる（wanko-bowl-pin-fall: 620ms）のを見せてから次へ進む
+      if (ballGutter && ballRef.current) ballRef.current.style.opacity = "0";
       window.setTimeout(() => {
         throwingRef.current = false;
-        setFallingIds(new Set());
-        onRoll({ knockedIds: [...knockedThisThrow], isGutter, power });
-      }, isGutter ? 260 : 650);
+        const knockedIds = [...preThrowStandingIds].filter(
+          (id) => !pinBodiesRef.current.get(id)?.standing,
+        );
+        onRoll({ knockedIds, isGutter: ballGutter, power });
+      }, ballGutter ? 260 : 320);
     };
 
     const step = (now: number) => {
-      const dt = Math.min(48, now - last) / 1000;
+      const dt = Math.min(0.032, (now - last) / 1000);
       last = now;
 
-      const inDeck = y <= PIN_ZONE_Y;
-      const speedScale = inDeck ? DECK_SPEED_SCALE : 1;
-      const traveledRatio = Math.min(1, Math.max(0, (DOCK_Y - y) / (DOCK_Y - PIN_ZONE_Y)));
+      // --- ボール ---
+      if (!ballDone) {
+        bvx += launch.curveNorm * CURVE_ACCEL_PCT_PER_SEC2 * dt;
+        bx += bvx * dt;
+        by += bvy * dt;
+        rotate += Math.hypot(bvx, bvy) * dt * 2.4;
 
-      y -= speedY * speedScale * dt;
-      x += launch.lateralPctPerSec * speedScale * dt;
-      x += launch.curveNorm * 70 * traveledRatio * speedScale * dt;
-      rotate += 620 * dt * (speedY / 140);
+        const inDeck = by <= PIN_ZONE_Y;
+        if (!inDeck) {
+          if (bx < LANE_LEFT || bx > LANE_RIGHT) {
+            ballGutter = true;
+            ballDone = true;
+            bx = Math.min(Math.max(bx, LANE_LEFT - 4), LANE_RIGHT + 4);
+          }
+        } else {
+          if (!deckSlowdownApplied) {
+            // ピンデッキに入った瞬間だけ速度を落とす：当たり判定のコマ落ち防止と、
+            // 実際の質量比で弾き飛ぶ様子をきちんと見せるためのスロー演出を兼ねる。
+            bvx *= DECK_SPEED_SCALE;
+            bvy *= DECK_SPEED_SCALE;
+            deckSlowdownApplied = true;
+          }
+          bx = Math.min(Math.max(bx, LANE_LEFT - 3), LANE_RIGHT + 3);
 
-      if (!inDeck) {
-        if (x < LANE_LEFT || x > LANE_RIGHT) {
-          gutter = true;
-          x = Math.min(Math.max(x, LANE_LEFT - 4), LANE_RIGHT + 4);
+          for (const pin of PIN_LAYOUT) {
+            const body = pinBodiesRef.current.get(pin.id);
+            if (!body || !body.standing) continue;
+            const dxPx = (body.x - bx) * scaleX;
+            const dyPx = (body.y - by) * scaleY;
+            if (Math.hypot(dxPx, dyPx) > collideRadiusPx) continue;
+
+            const result = resolvePairCollision(
+              bx, by, bvx, bvy, BALL_MASS_KG,
+              body.x, body.y, body.vx, body.vy, PIN_MASS_KG,
+              BALL_PIN_RESTITUTION, scaleX, scaleY,
+            );
+            if (!result) continue;
+            bvx = result.avx;
+            bvy = result.avy;
+            body.vx = result.bvx;
+            body.vy = result.bvy;
+            body.standing = false;
+            body.moving = true;
+            body.angularVel = (Math.random() - 0.5) * 560 + (dxPx >= 0 ? 1 : -1) * 120;
+          }
+
+          if (by <= DECK_EXIT_Y || Math.hypot(bvx, bvy) < 10) ballDone = true;
         }
-        setBallPosition(x, y, rotate);
 
-        if (gutter) {
-          finish(true);
-          return;
+        setBallPosition(bx, by, rotate);
+      }
+
+      // --- ピン同士の衝突（動いているピンが立っている/動いている他のピンにぶつかる） ---
+      const ids = [...pinBodiesRef.current.keys()];
+      for (let i = 0; i < ids.length; i += 1) {
+        const bodyA = pinBodiesRef.current.get(ids[i]!)!;
+        if (bodyA.standing && !bodyA.moving) continue;
+        for (let j = i + 1; j < ids.length; j += 1) {
+          const bodyB = pinBodiesRef.current.get(ids[j]!)!;
+          if (!bodyA.moving && !bodyB.moving) continue;
+          const dxPx = (bodyB.x - bodyA.x) * scaleX;
+          const dyPx = (bodyB.y - bodyA.y) * scaleY;
+          if (Math.hypot(dxPx, dyPx) > collideRadiusPx) continue;
+
+          const result = resolvePairCollision(
+            bodyA.x, bodyA.y, bodyA.vx, bodyA.vy, PIN_MASS_KG,
+            bodyB.x, bodyB.y, bodyB.vx, bodyB.vy, PIN_MASS_KG,
+            PIN_PIN_RESTITUTION, scaleX, scaleY,
+          );
+          if (!result) continue;
+          bodyA.vx = result.avx;
+          bodyA.vy = result.avy;
+          bodyB.vx = result.bvx;
+          bodyB.vy = result.bvy;
+          bodyA.standing = false;
+          bodyA.moving = true;
+          bodyB.standing = false;
+          bodyB.moving = true;
         }
-        requestAnimationFrame(step);
-        return;
       }
 
-      // ピン列の中：レーン外へは弾かず、狙った軌道のまま通り抜けさせる
-      x = Math.min(Math.max(x, LANE_LEFT - 2), LANE_RIGHT + 2);
-      setBallPosition(x, y, rotate);
+      // --- 動いているピンの位置更新（摩擦で減速し、やがて止まる） ---
+      for (const [id, body] of pinBodiesRef.current) {
+        if (!body.moving) continue;
+        body.x += body.vx * dt;
+        body.y += body.vy * dt;
+        body.angle += body.angularVel * dt;
 
-      const standingNow = standingIdsRef.current;
-      let hitSomethingThisFrame = false;
-      for (const pin of PIN_LAYOUT) {
-        if (knockedThisThrow.has(pin.id) || !standingNow.has(pin.id)) continue;
-        if (Math.abs(pin.y - y) > PIN_ROW_BAND) continue;
-        const dx = pin.x - x;
-        if (Math.abs(dx) > PIN_HIT_RADIUS) continue;
+        const decay = Math.exp(-FRICTION_PER_SEC * dt);
+        body.vx *= decay;
+        body.vy *= decay;
+        body.angularVel *= decay;
 
-        knockedThisThrow.add(pin.id);
-        hitSomethingThisFrame = true;
-        const offsetRatio = Math.min(1, Math.abs(dx) / PIN_HIT_RADIUS);
-        chainFrom(pin, offsetRatio, power);
-        // 当たった弾みで少しだけ逸れる・減速する
-        x += (Math.random() - 0.5) * 3.2 * power;
-        speedY *= 0.93;
+        // 画面外へ飛んでいかないようレーン内側にとどめる
+        body.x = Math.min(Math.max(body.x, 2), 98);
+        body.y = Math.min(Math.max(body.y, 2), 60);
+
+        if (Math.hypot(body.vx, body.vy) < SETTLE_SPEED_PCT) {
+          body.moving = false;
+          body.vx = 0;
+          body.vy = 0;
+          body.angularVel = 0;
+        }
+
+        writePinNode(id, body);
       }
 
-      if (hitSomethingThisFrame) {
-        setFallingIds(new Set(knockedThisThrow));
-        setStandingIds((prev) => {
-          const nextSet = new Set(prev);
-          knockedThisThrow.forEach((id) => nextSet.delete(id));
-          return nextSet;
-        });
-      }
-
-      if (y <= DECK_EXIT_Y || knockedThisThrow.size >= PIN_LAYOUT.length) {
-        finish(false);
+      const elapsed = now - startTime;
+      if ((ballDone && !anyPinMoving()) || elapsed > MAX_THROW_MS) {
+        finish();
         return;
       }
 
@@ -230,7 +368,7 @@ export function Lane({ ballVisual, resetSignal, active, onRoll }: LaneProps) {
     };
 
     requestAnimationFrame(step);
-  }, [onRoll, setBallPosition]);
+  }, [onRoll, setBallPosition, writePinNode]);
 
   const onPointerDown = useCallback((event: ReactPointerEvent<HTMLDivElement>) => {
     if (!active || throwingRef.current) return;
@@ -269,8 +407,11 @@ export function Lane({ ballVisual, resetSignal, active, onRoll }: LaneProps) {
 
     if (-dyPx < MIN_UPWARD_PX) return; // 上向きに十分な距離を動かしていなければ投球にしない
 
+    // 基準は20km/h（BASE_BALL_SPEED_PCT）。スワイプが速いほど基準より速く、
+    // 遅いほど基準より遅く投げられる（だいたい12〜31km/h相当の範囲）。
     const speedPxPerMs = Math.hypot(dxPx, dyPx) / durationMs;
-    const speedPctPerSec = Math.min(340, Math.max(150, speedPxPerMs * 1000 * (100 / rect.height) * 0.62));
+    const rawSpeedPctPerSec = speedPxPerMs * 1000 * (100 / rect.height) * 0.62;
+    const speedPctPerSec = Math.min(260, Math.max(100, rawSpeedPctPerSec));
     const lateralPctPerSec = Math.max(-70, Math.min(70, (dxPx / durationMs) * 1000 * (100 / rect.width) * 0.4));
 
     // カーブは「スワイプの前半」と「後半」で横方向の勢いがどれだけ変化したかで検出する。
@@ -330,14 +471,7 @@ export function Lane({ ballVisual, resetSignal, active, onRoll }: LaneProps) {
       <div className="absolute inset-x-[13%] top-[59%] h-[3px] rounded-full bg-[#a8442f]" aria-hidden="true" />
       <div className="absolute inset-x-[13%] top-[calc(59%+3px)] h-[1px] bg-[#a8442f]/35" aria-hidden="true" />
 
-      <Pins standingIds={standingIds} fallingIds={fallingIds} />
-
-      {/* 軌跡 */}
-      <div
-        ref={trailRef}
-        className="pointer-events-none absolute h-1 w-1 rounded-full opacity-0"
-        aria-hidden="true"
-      />
+      <Pins registerNode={registerPinNode} />
 
       {/* ボール */}
       <div
