@@ -40,8 +40,7 @@ export default async function WankoBowlingPage() {
         )}
       />
 
-      <main className="min-h-0 flex-1 overflow-y-auto overscroll-none">
-        {/* 最初の1画面をゲーム専用領域にする。端末の残り高をそのままゲームへ渡す。 */}
+      <main id="wanko-bowling-scroll" className="min-h-0 flex-1 overflow-y-auto overscroll-none">
         <div
           className="h-full min-h-0 px-1.5 pt-1.5"
           style={{ paddingBottom: "max(6px, env(safe-area-inset-bottom))" }}
