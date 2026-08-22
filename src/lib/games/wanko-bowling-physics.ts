@@ -27,7 +27,7 @@ export const JB_PIN_HEIGHT_M = 0.38085;
 /** ボール直径規格 21.59〜21.83cm の中間値。 */
 export const JB_BALL_DIAMETER_M = (0.2159 + 0.2183) / 2;
 /**
- * ボール重量は規格上16lb（7.25kg）以下で下限なし。
+ * ボール重量は規格上16lb（7.25kg）以下。
  * ゲームでは全ボールの公平性を保つため14lb相当を共通値として採用する。
  */
 export const GAME_BALL_MASS_KG = 14 * 0.45359237;
@@ -35,9 +35,12 @@ export const GAME_BALL_MASS_KG = 14 * 0.45359237;
 /** JAPAN BOWLING掲載の大会パターン例 42ft。ゲームの標準オイル長として採用。 */
 export const GAME_OIL_LENGTH_M = 42 * 0.3048;
 
-/** スマホ操作を実投球らしい範囲へ収めるゲーム用速度レンジ。 */
-export const GAME_MIN_BALL_SPEED_KMH = 18;
-export const GAME_MAX_BALL_SPEED_KMH = 31;
+/**
+ * スワイプ速度の差を体感できるゲーム用速度レンジ。
+ * 規格値ではなく入力フィーリング用の近似値。
+ */
+export const GAME_MIN_BALL_SPEED_KMH = 13;
+export const GAME_MAX_BALL_SPEED_KMH = 38;
 
 /**
  * ピンが底縁を支点に倒れ始めるために必要な重心上昇を簡易モデル化。
@@ -53,7 +56,8 @@ export const PIN_CHAIN_KNOCK_SPEED_MPS = idealTipSpeedMps * 1.9;
 /** 公認42ftパターン例を使ったフック量のゲーム用近似。 */
 export const OIL_HOOK_FACTOR = 0.18;
 export const DRY_HOOK_FACTOR = 1;
-export const BACKEND_HOOK_ACCEL_MPS2 = 1.15;
+/** リリース時の曲げ操作が目で分かる強さまで引き上げる。 */
+export const BACKEND_HOOK_ACCEL_MPS2 = 1.65;
 
 /** 反発係数は公認規格値ではないため、過度にピンが飛び散らないようゲーム用近似とする。 */
 export const BALL_PIN_RESTITUTION = 0.38;
