@@ -1,29 +1,75 @@
 "use client";
 
 import { useCallback, useEffect, useRef, type PointerEvent as ReactPointerEvent } from "react";
-import { PIN_DIAMETER_PCT, PIN_LAYOUT, Pins } from "./pins";
+import { PIN_LAYOUT, Pins } from "./pins";
 import type { BowlingBallVisual } from "@/lib/games/wanko-bowling-balls";
+import {
+  BACKEND_HOOK_ACCEL_MPS2,
+  BALL_PIN_RESTITUTION,
+  DRY_HOOK_FACTOR,
+  GAME_BALL_MASS_KG,
+  GAME_MAX_BALL_SPEED_KMH,
+  GAME_MIN_BALL_SPEED_KMH,
+  GAME_OIL_LENGTH_M,
+  JB_BALL_DIAMETER_M,
+  JB_GUTTER_WIDTH_M,
+  JB_HEAD_PIN_DISTANCE_M,
+  JB_LANE_WIDTH_M,
+  JB_PIN_DIAMETER_M,
+  JB_PIN_MASS_KG,
+  JB_TOTAL_WIDTH_M,
+  OIL_HOOK_FACTOR,
+  PIN_CHAIN_KNOCK_SPEED_MPS,
+  PIN_DIRECT_KNOCK_SPEED_MPS,
+  PIN_FRICTION_PER_SEC,
+  PIN_PIN_RESTITUTION,
+  PIN_SETTLE_SPEED_MPS,
+} from "@/lib/games/wanko-bowling-physics";
 
-const DOCK_Y = 93;
-const PIN_ZONE_Y = 29;
-const DECK_EXIT_Y = 4;
-const LANE_LEFT = 16;
-const LANE_RIGHT = 84;
-const MIN_UPWARD_PCT = 7;
-const BALL_DIAMETER_PCT = 8.6;
-const COLLISION_PADDING_PCT = 1.55;
-const PIN_PAIR_PADDING_PCT = 1.45;
-const BASE_BALL_SPEED_PCT = 145;
-const DECK_SPEED_SCALE = 0.54;
-const CURVE_ACCEL_PCT_PER_SEC2 = 150;
-const FRICTION_PER_SEC = 3.2;
-const SETTLE_SPEED_PCT = 8;
-const MAX_THROW_MS = 4200;
+const DOCK_Y = 94;
+const HEAD_PIN_SCREEN_Y = 24;
+const LANE_TRAVEL_PCT = DOCK_Y - HEAD_PIN_SCREEN_Y;
+const MIN_UPWARD_PCT = 8;
+const MAX_THROW_MS = 7000;
 const MAX_SWIPE_SAMPLES = 48;
-const BALL_MASS_KG = 8 * 0.45359237;
-const PIN_MASS_KG = 1.5;
-const BALL_PIN_RESTITUTION = 0.58;
-const PIN_PIN_RESTITUTION = 0.46;
+const BALL_RADIUS_M = JB_BALL_DIAMETER_M / 2;
+const PIN_RADIUS_M = JB_PIN_DIAMETER_M / 2;
+const BALL_DIAMETER_PCT = (JB_BALL_DIAMETER_M / JB_TOTAL_WIDTH_M) * 100;
+const LANE_LEFT_PCT = (JB_GUTTER_WIDTH_M / JB_TOTAL_WIDTH_M) * 100;
+const LANE_RIGHT_PCT = 100 - LANE_LEFT_PCT;
+const LANE_WIDTH_PCT = (JB_LANE_WIDTH_M / JB_TOTAL_WIDTH_M) * 100;
+const PIN_COLLISION_RADIUS_M = BALL_RADIUS_M + PIN_RADIUS_M + 0.006;
+const PIN_PAIR_RADIUS_M = JB_PIN_DIAMETER_M + 0.006;
+const BALL_EXIT_DISTANCE_M = JB_HEAD_PIN_DISTANCE_M + 1.15;
+const MAX_LAUNCH_ANGLE_RAD = 11 * Math.PI / 180;
+const MAX_CURVE_ANGLE_RAD = 12 * Math.PI / 180;
+const OIL_BALL_DRAG_PER_SEC = 0.012;
+const DRY_BALL_DRAG_PER_SEC = 0.04;
+const FOUL_LINE_Y = 97;
+
+const TARGET_X_PCTS = [5, 10, 15, 20, 25, 30, 35].map((board) =>
+  LANE_LEFT_PCT + LANE_WIDTH_PCT * (board / 40),
+);
+
+function worldXToPct(xM: number): number {
+  return (xM / JB_TOTAL_WIDTH_M) * 100;
+}
+
+function pctXToWorld(xPct: number): number {
+  return (xPct / 100) * JB_TOTAL_WIDTH_M;
+}
+
+function worldYToPct(distanceFromFoulM: number): number {
+  return DOCK_Y - (distanceFromFoulM / JB_HEAD_PIN_DISTANCE_M) * LANE_TRAVEL_PCT;
+}
+
+function worldDeltaYToPct(distanceM: number): number {
+  return (distanceM / JB_HEAD_PIN_DISTANCE_M) * LANE_TRAVEL_PCT;
+}
+
+const GUIDE_DOTS_Y = worldYToPct(7 * 0.3048);
+const TARGET_ARROWS_Y = worldYToPct(15 * 0.3048);
+const OIL_END_Y = worldYToPct(GAME_OIL_LENGTH_M);
 
 export type LaneRollResult = {
   knockedIds: number[];
@@ -41,56 +87,38 @@ type LaneProps = {
 type Point = { x: number; y: number; t: number };
 
 type PinBody = {
-  x: number;
-  y: number;
-  vx: number;
-  vy: number;
+  xM: number;
+  yM: number;
+  vxMps: number;
+  vyMps: number;
   angle: number;
   angularVel: number;
   fallProgress: number;
   standing: boolean;
   moving: boolean;
+  visible: boolean;
 };
 
-function createPinBody(pin: { x: number; y: number }): PinBody {
+type CollisionResult = {
+  avx: number;
+  avy: number;
+  bvx: number;
+  bvy: number;
+};
+
+function createPinBody(pin: (typeof PIN_LAYOUT)[number]): PinBody {
   return {
-    x: pin.x,
-    y: pin.y,
-    vx: 0,
-    vy: 0,
+    xM: JB_TOTAL_WIDTH_M / 2 + pin.lateralM,
+    yM: JB_HEAD_PIN_DISTANCE_M + pin.forwardM,
+    vxMps: 0,
+    vyMps: 0,
     angle: 0,
     angularVel: 0,
     fallProgress: 0,
     standing: true,
     moving: false,
+    visible: true,
   };
-}
-
-function pctToPx(pct: number, scale: number): number {
-  return (pct / 100) * scale;
-}
-
-function pxToPct(px: number, scale: number): number {
-  return (px / scale) * 100;
-}
-
-function distancePointToSegment(
-  px: number,
-  py: number,
-  ax: number,
-  ay: number,
-  bx: number,
-  by: number,
-): number {
-  const abx = bx - ax;
-  const aby = by - ay;
-  const abLenSq = abx * abx + aby * aby;
-  const t = abLenSq > 0
-    ? Math.max(0, Math.min(1, ((px - ax) * abx + (py - ay) * aby) / abLenSq))
-    : 0;
-  const closestX = ax + abx * t;
-  const closestY = ay + aby * t;
-  return Math.hypot(px - closestX, py - closestY);
 }
 
 function resolvePairCollision(
@@ -105,33 +133,56 @@ function resolvePairCollision(
   bvy: number,
   massB: number,
   restitution: number,
-  scaleX: number,
-  scaleY: number,
-): { avx: number; avy: number; bvx: number; bvy: number } | null {
-  const dxPx = pctToPx(bx - ax, scaleX);
-  const dyPx = pctToPx(by - ay, scaleY);
-  const dist = Math.hypot(dxPx, dyPx);
-  if (dist < 0.0001) return null;
+): CollisionResult | null {
+  const dx = bx - ax;
+  const dy = by - ay;
+  const dist = Math.hypot(dx, dy);
+  if (dist < 0.000001) return null;
 
-  const nx = dxPx / dist;
-  const ny = dyPx / dist;
-  const avxPx = pctToPx(avx, scaleX);
-  const avyPx = pctToPx(avy, scaleY);
-  const bvxPx = pctToPx(bvx, scaleX);
-  const bvyPx = pctToPx(bvy, scaleY);
-  const velAlongNormal = (avxPx - bvxPx) * nx + (avyPx - bvyPx) * ny;
-  if (velAlongNormal <= 0) return null;
+  const nx = dx / dist;
+  const ny = dy / dist;
+  const velocityAlongNormal = (avx - bvx) * nx + (avy - bvy) * ny;
+  if (velocityAlongNormal <= 0) return null;
 
   const invA = 1 / massA;
   const invB = 1 / massB;
-  const impulse = ((1 + restitution) * velAlongNormal) / (invA + invB);
+  const impulse = ((1 + restitution) * velocityAlongNormal) / (invA + invB);
 
   return {
-    avx: pxToPct(avxPx - impulse * nx * invA, scaleX),
-    avy: pxToPct(avyPx - impulse * ny * invA, scaleY),
-    bvx: pxToPct(bvxPx + impulse * nx * invB, scaleX),
-    bvy: pxToPct(bvyPx + impulse * ny * invB, scaleY),
+    avx: avx - impulse * nx * invA,
+    avy: avy - impulse * ny * invA,
+    bvx: bvx + impulse * nx * invB,
+    bvy: bvy + impulse * ny * invB,
   };
+}
+
+function closestPointOnSegment(
+  px: number,
+  py: number,
+  ax: number,
+  ay: number,
+  bx: number,
+  by: number,
+): { distance: number; t: number; x: number; y: number } {
+  const abx = bx - ax;
+  const aby = by - ay;
+  const abLenSq = abx * abx + aby * aby;
+  const t = abLenSq > 0
+    ? Math.max(0, Math.min(1, ((px - ax) * abx + (py - ay) * aby) / abLenSq))
+    : 0;
+  const x = ax + abx * t;
+  const y = ay + aby * t;
+  return { distance: Math.hypot(px - x, py - y), t, x, y };
+}
+
+function clamp(value: number, min: number, max: number): number {
+  return Math.min(max, Math.max(min, value));
+}
+
+function directionAngle(a: Point, b: Point, width: number, height: number): number {
+  const dx = (b.x - a.x) / Math.max(1, width);
+  const dy = (b.y - a.y) / Math.max(1, height);
+  return Math.atan2(dx, -dy);
 }
 
 export function Lane({ ballVisual, resetSignal, active, onRoll }: LaneProps) {
@@ -154,8 +205,10 @@ export function Lane({ ballVisual, resetSignal, active, onRoll }: LaneProps) {
   const writePinNode = useCallback((id: number, body: PinBody) => {
     const el = pinNodesRef.current.get(id);
     if (!el) return;
-    el.style.left = `${body.x}%`;
-    el.style.top = `${body.y}%`;
+
+    el.style.left = `${worldXToPct(body.xM)}%`;
+    el.style.top = `${worldYToPct(body.yM)}%`;
+    el.style.opacity = body.visible ? "1" : "0";
     const squashY = 1 - 0.62 * body.fallProgress;
     el.style.transform = `translate(-50%, -50%) rotate(${body.angle}deg) scale(1, ${squashY})`;
   }, []);
@@ -168,12 +221,23 @@ export function Lane({ ballVisual, resetSignal, active, onRoll }: LaneProps) {
     });
   }, [writePinNode]);
 
+  const clearFallenPins = useCallback(() => {
+    for (const [id, body] of pinBodiesRef.current) {
+      if (body.standing) continue;
+      body.visible = false;
+      body.moving = false;
+      body.vxMps = 0;
+      body.vyMps = 0;
+      writePinNode(id, body);
+    }
+  }, [writePinNode]);
+
   const dockBall = useCallback(() => {
     const el = ballRef.current;
     if (!el) return;
 
     dockingRef.current = true;
-    el.style.transition = "opacity 130ms ease";
+    el.style.transition = "opacity 120ms ease";
     el.style.opacity = "0";
 
     window.setTimeout(() => {
@@ -195,9 +259,9 @@ export function Lane({ ballVisual, resetSignal, active, onRoll }: LaneProps) {
         window.setTimeout(() => {
           if (ballRef.current) ballRef.current.style.transition = "";
           dockingRef.current = false;
-        }, 150);
+        }, 130);
       });
-    }, 130);
+    }, 110);
   }, []);
 
   useEffect(() => {
@@ -209,36 +273,34 @@ export function Lane({ ballVisual, resetSignal, active, onRoll }: LaneProps) {
   }, [resetSignal, resetPins, dockBall]);
 
   useEffect(() => {
-    if (active) dockBall();
-  }, [active, dockBall]);
+    if (!active) return;
+    clearFallenPins();
+    dockBall();
+  }, [active, clearFallenPins, dockBall]);
 
-  const setBallPosition = useCallback((xPct: number, yPct: number, rotateDeg: number) => {
+  const setBallPosition = useCallback((xM: number, yM: number, rotateDeg: number) => {
     const el = ballRef.current;
     if (!el) return;
-    el.style.left = `${xPct}%`;
-    el.style.top = `${yPct}%`;
+    el.style.left = `${worldXToPct(xM)}%`;
+    el.style.top = `${worldYToPct(yM)}%`;
     el.style.transform = `translate(-50%, -50%) rotate(${rotateDeg}deg)`;
   }, []);
 
   const runThrow = useCallback((launch: {
-    speedPctPerSec: number;
-    lateralPctPerSec: number;
+    speedMps: number;
+    launchAngleRad: number;
     curveNorm: number;
   }) => {
     throwingRef.current = true;
-    const board = boardRef.current;
-    if (!board) {
-      throwingRef.current = false;
-      return;
-    }
 
-    const rect = board.getBoundingClientRect();
-    const scaleX = rect.width;
-    const scaleY = rect.height;
-    const ballRadiusPx = pctToPx(BALL_DIAMETER_PCT / 2, scaleX);
-    const pinRadiusPx = pctToPx(PIN_DIAMETER_PCT / 2, scaleX);
-    const collideRadiusPx = ballRadiusPx + pinRadiusPx + pctToPx(COLLISION_PADDING_PCT, scaleX);
-    const pinPinRadiusPx = pinRadiusPx * 2 + pctToPx(PIN_PAIR_PADDING_PCT, scaleX);
+    let bxM = JB_TOTAL_WIDTH_M / 2;
+    let byM = 0;
+    let bvxMps = launch.speedMps * Math.sin(launch.launchAngleRad);
+    let bvyMps = launch.speedMps * Math.cos(launch.launchAngleRad);
+    let rotate = 0;
+    let ballGutter = false;
+    let ballDone = false;
+    let finished = false;
 
     const preThrowStandingIds = new Set(
       [...pinBodiesRef.current.entries()]
@@ -246,16 +308,6 @@ export function Lane({ ballVisual, resetSignal, active, onRoll }: LaneProps) {
         .map(([id]) => id),
     );
     const knockedThisThrow = new Set<number>();
-
-    let bx = 50;
-    let by = DOCK_Y;
-    let bvx = launch.lateralPctPerSec;
-    let bvy = -launch.speedPctPerSec;
-    let rotate = 0;
-    let ballGutter = false;
-    let ballDone = false;
-    let deckSlowdownApplied = false;
-    const power = Math.min(1, Math.max(0.3, launch.speedPctPerSec / BASE_BALL_SPEED_PCT));
     const startTime = performance.now();
     let last = startTime;
 
@@ -266,170 +318,194 @@ export function Lane({ ballVisual, resetSignal, active, onRoll }: LaneProps) {
       return false;
     };
 
+    const markKnocked = (id: number, body: PinBody, vx: number, vy: number, hitFromX: number) => {
+      if (!body.standing) return;
+      knockedThisThrow.add(id);
+      body.standing = false;
+      body.moving = true;
+      body.visible = true;
+      body.vxMps = vx;
+      body.vyMps = vy;
+      body.angularVel = (Math.random() - 0.5) * 620 + (body.xM >= hitFromX ? 190 : -190);
+    };
+
     const finish = () => {
+      if (finished) return;
+      finished = true;
       if (ballGutter && ballRef.current) ballRef.current.style.opacity = "0";
+      const speedNorm = clamp(
+        ((launch.speedMps * 3.6) - GAME_MIN_BALL_SPEED_KMH)
+          / (GAME_MAX_BALL_SPEED_KMH - GAME_MIN_BALL_SPEED_KMH),
+        0,
+        1,
+      );
+
       window.setTimeout(() => {
         throwingRef.current = false;
         const knockedIds = [...knockedThisThrow].filter((id) => preThrowStandingIds.has(id));
-        onRoll({ knockedIds, isGutter: ballGutter, power });
-      }, ballGutter ? 220 : 300);
+        onRoll({ knockedIds, isGutter: ballGutter && knockedIds.length === 0, power: 0.3 + speedNorm * 0.7 });
+      }, ballGutter ? 180 : 280);
     };
 
     const step = (now: number) => {
-      const dt = Math.min(0.028, (now - last) / 1000);
+      const dt = Math.min(0.024, Math.max(0.001, (now - last) / 1000));
       last = now;
 
       if (!ballDone) {
-        const prevBx = bx;
-        const prevBy = by;
+        const prevBxM = bxM;
+        const prevByM = byM;
+        const onOil = byM < GAME_OIL_LENGTH_M;
+        const hookFactor = onOil ? OIL_HOOK_FACTOR : DRY_HOOK_FACTOR;
+        const drag = onOil ? OIL_BALL_DRAG_PER_SEC : DRY_BALL_DRAG_PER_SEC;
 
-        bvx += launch.curveNorm * CURVE_ACCEL_PCT_PER_SEC2 * dt;
-        bx += bvx * dt;
-        by += bvy * dt;
-        rotate += Math.hypot(bvx, bvy) * dt * 2.2;
+        bvxMps += launch.curveNorm * BACKEND_HOOK_ACCEL_MPS2 * hookFactor * dt;
+        const ballDecay = Math.exp(-drag * dt);
+        bvxMps *= ballDecay;
+        bvyMps *= ballDecay;
+        bxM += bvxMps * dt;
+        byM += bvyMps * dt;
 
-        if (bx < LANE_LEFT || bx > LANE_RIGHT) {
+        const angularSpeedRad = Math.hypot(bvxMps, bvyMps) / BALL_RADIUS_M;
+        rotate += angularSpeedRad * dt * (180 / Math.PI);
+
+        const laneLeftM = JB_GUTTER_WIDTH_M;
+        const laneRightM = JB_GUTTER_WIDTH_M + JB_LANE_WIDTH_M;
+        if (bxM - BALL_RADIUS_M < laneLeftM || bxM + BALL_RADIUS_M > laneRightM) {
           ballGutter = knockedThisThrow.size === 0;
           ballDone = true;
-          bx = Math.min(Math.max(bx, LANE_LEFT - 4), LANE_RIGHT + 4);
-        } else if (by <= PIN_ZONE_Y) {
-          if (!deckSlowdownApplied) {
-            bvx *= DECK_SPEED_SCALE;
-            bvy *= DECK_SPEED_SCALE;
-            deckSlowdownApplied = true;
-          }
-
-          const prevBxPx = pctToPx(prevBx, scaleX);
-          const prevByPx = pctToPx(prevBy, scaleY);
-          const bxPx = pctToPx(bx, scaleX);
-          const byPx = pctToPx(by, scaleY);
-
-          for (const pin of PIN_LAYOUT) {
-            const body = pinBodiesRef.current.get(pin.id);
-            if (!body || !body.standing) continue;
-
-            const pinXPx = pctToPx(body.x, scaleX);
-            const pinYPx = pctToPx(body.y, scaleY);
-            const distance = distancePointToSegment(
-              pinXPx,
-              pinYPx,
-              prevBxPx,
-              prevByPx,
-              bxPx,
-              byPx,
-            );
-            if (distance > collideRadiusPx) continue;
-
-            const result = resolvePairCollision(
-              prevBx,
-              prevBy,
-              bvx,
-              bvy,
-              BALL_MASS_KG,
-              body.x,
-              body.y,
-              body.vx,
-              body.vy,
-              PIN_MASS_KG,
-              BALL_PIN_RESTITUTION,
-              scaleX,
-              scaleY,
-            );
-
-            if (result) {
-              bvx = result.avx;
-              bvy = result.avy;
-              body.vx = result.bvx;
-              body.vy = result.bvy;
-            } else {
-              body.vx += bvx * 0.38;
-              body.vy += bvy * 0.38;
-              bvx *= 0.76;
-              bvy *= 0.76;
-            }
-
-            knockedThisThrow.add(pin.id);
-            body.standing = false;
-            body.moving = true;
-            body.angularVel = (Math.random() - 0.5) * 920 + (pinXPx >= bxPx ? 280 : -280);
-          }
-
-          if (by <= DECK_EXIT_Y) ballDone = true;
+          bxM = clamp(bxM, BALL_RADIUS_M * 0.4, JB_TOTAL_WIDTH_M - BALL_RADIUS_M * 0.4);
         }
 
-        setBallPosition(bx, by, rotate);
+        if (!ballDone && byM >= JB_HEAD_PIN_DISTANCE_M - 1.35) {
+          for (const pin of PIN_LAYOUT) {
+            const body = pinBodiesRef.current.get(pin.id);
+            if (!body || !body.standing || !body.visible) continue;
+
+            const closest = closestPointOnSegment(
+              body.xM,
+              body.yM,
+              prevBxM,
+              prevByM,
+              bxM,
+              byM,
+            );
+            if (closest.distance > PIN_COLLISION_RADIUS_M) continue;
+
+            const collision = resolvePairCollision(
+              closest.x,
+              closest.y,
+              bvxMps,
+              bvyMps,
+              GAME_BALL_MASS_KG,
+              body.xM,
+              body.yM,
+              body.vxMps,
+              body.vyMps,
+              JB_PIN_MASS_KG,
+              BALL_PIN_RESTITUTION,
+            );
+
+            if (collision) {
+              bvxMps = collision.avx;
+              bvyMps = collision.avy;
+              const pinSpeed = Math.hypot(collision.bvx, collision.bvy);
+              if (pinSpeed >= PIN_DIRECT_KNOCK_SPEED_MPS) {
+                markKnocked(pin.id, body, collision.bvx, collision.bvy, closest.x);
+              }
+            } else {
+              const fallbackVx = bvxMps * 0.32;
+              const fallbackVy = bvyMps * 0.32;
+              if (Math.hypot(fallbackVx, fallbackVy) >= PIN_DIRECT_KNOCK_SPEED_MPS) {
+                markKnocked(pin.id, body, fallbackVx, fallbackVy, closest.x);
+              }
+              bvxMps *= 0.86;
+              bvyMps *= 0.86;
+            }
+          }
+        }
+
+        if (byM >= BALL_EXIT_DISTANCE_M) ballDone = true;
+        setBallPosition(bxM, byM, rotate);
       }
 
       const ids = [...pinBodiesRef.current.keys()];
       for (let i = 0; i < ids.length; i += 1) {
-        const bodyA = pinBodiesRef.current.get(ids[i]!)!;
-        if (bodyA.standing && !bodyA.moving) continue;
+        const idA = ids[i]!;
+        const bodyA = pinBodiesRef.current.get(idA)!;
+        if (!bodyA.visible || (bodyA.standing && !bodyA.moving)) continue;
 
         for (let j = i + 1; j < ids.length; j += 1) {
-          const bodyB = pinBodiesRef.current.get(ids[j]!)!;
-          if (!bodyA.moving && !bodyB.moving) continue;
+          const idB = ids[j]!;
+          const bodyB = pinBodiesRef.current.get(idB)!;
+          if (!bodyB.visible || (!bodyA.moving && !bodyB.moving)) continue;
 
-          const dxPx = pctToPx(bodyB.x - bodyA.x, scaleX);
-          const dyPx = pctToPx(bodyB.y - bodyA.y, scaleY);
-          if (Math.hypot(dxPx, dyPx) > pinPinRadiusPx) continue;
+          const dx = bodyB.xM - bodyA.xM;
+          const dy = bodyB.yM - bodyA.yM;
+          if (Math.hypot(dx, dy) > PIN_PAIR_RADIUS_M) continue;
 
           const aWasStanding = bodyA.standing;
           const bWasStanding = bodyB.standing;
-          const result = resolvePairCollision(
-            bodyA.x,
-            bodyA.y,
-            bodyA.vx,
-            bodyA.vy,
-            PIN_MASS_KG,
-            bodyB.x,
-            bodyB.y,
-            bodyB.vx,
-            bodyB.vy,
-            PIN_MASS_KG,
+          const collision = resolvePairCollision(
+            bodyA.xM,
+            bodyA.yM,
+            bodyA.vxMps,
+            bodyA.vyMps,
+            JB_PIN_MASS_KG,
+            bodyB.xM,
+            bodyB.yM,
+            bodyB.vxMps,
+            bodyB.vyMps,
+            JB_PIN_MASS_KG,
             PIN_PIN_RESTITUTION,
-            scaleX,
-            scaleY,
           );
-          if (!result) continue;
+          if (!collision) continue;
 
-          bodyA.vx = result.avx;
-          bodyA.vy = result.avy;
-          bodyB.vx = result.bvx;
-          bodyB.vy = result.bvy;
+          bodyA.vxMps = collision.avx;
+          bodyA.vyMps = collision.avy;
+          bodyB.vxMps = collision.bvx;
+          bodyB.vyMps = collision.bvy;
+
           if (aWasStanding) {
-            knockedThisThrow.add(ids[i]!);
-            bodyA.angularVel = (Math.random() - 0.5) * 900;
+            const speedA = Math.hypot(collision.avx, collision.avy);
+            if (speedA >= PIN_CHAIN_KNOCK_SPEED_MPS) {
+              markKnocked(idA, bodyA, collision.avx, collision.avy, bodyB.xM);
+            } else {
+              bodyA.vxMps = 0;
+              bodyA.vyMps = 0;
+            }
           }
+
           if (bWasStanding) {
-            knockedThisThrow.add(ids[j]!);
-            bodyB.angularVel = (Math.random() - 0.5) * 900;
+            const speedB = Math.hypot(collision.bvx, collision.bvy);
+            if (speedB >= PIN_CHAIN_KNOCK_SPEED_MPS) {
+              markKnocked(idB, bodyB, collision.bvx, collision.bvy, bodyA.xM);
+            } else {
+              bodyB.vxMps = 0;
+              bodyB.vyMps = 0;
+            }
           }
-          bodyA.standing = false;
-          bodyA.moving = true;
-          bodyB.standing = false;
-          bodyB.moving = true;
         }
       }
 
       for (const [id, body] of pinBodiesRef.current) {
-        if (!body.moving) continue;
+        if (!body.moving || !body.visible) continue;
 
-        body.x += body.vx * dt;
-        body.y += body.vy * dt;
+        body.xM += body.vxMps * dt;
+        body.yM += body.vyMps * dt;
         body.angle += body.angularVel * dt;
-        body.fallProgress = Math.min(1, body.fallProgress + dt / 0.15);
+        body.fallProgress = Math.min(1, body.fallProgress + dt / 0.2);
 
-        const decay = Math.exp(-FRICTION_PER_SEC * dt);
-        body.vx *= decay;
-        body.vy *= decay;
+        const decay = Math.exp(-PIN_FRICTION_PER_SEC * dt);
+        body.vxMps *= decay;
+        body.vyMps *= decay;
         body.angularVel *= decay;
-        body.x = Math.min(Math.max(body.x, 2), 98);
-        body.y = Math.min(Math.max(body.y, 2), 60);
+        body.xM = clamp(body.xM, 0.02, JB_TOTAL_WIDTH_M - 0.02);
+        body.yM = clamp(body.yM, JB_HEAD_PIN_DISTANCE_M - 1.6, JB_HEAD_PIN_DISTANCE_M + 1.55);
 
-        if (Math.hypot(body.vx, body.vy) < SETTLE_SPEED_PCT) {
+        if (Math.hypot(body.vxMps, body.vyMps) < PIN_SETTLE_SPEED_MPS && body.fallProgress >= 0.92) {
           body.moving = false;
-          body.vx = 0;
-          body.vy = 0;
+          body.vxMps = 0;
+          body.vyMps = 0;
           body.angularVel = 0;
           body.fallProgress = 1;
         }
@@ -459,7 +535,9 @@ export function Lane({ ballVisual, resetSignal, active, onRoll }: LaneProps) {
     const rect = board.getBoundingClientRect();
     const relY = ((event.clientY - rect.top) / rect.height) * 100;
     const relX = ((event.clientX - rect.left) / rect.width) * 100;
-    if (relY < 72 || relX < 18 || relX > 82) return;
+
+    // 実際にボールを押し出す感覚に寄せるため、開始位置はボール周辺に限定する。
+    if (relY < 80 || relY > 99 || relX < 27 || relX > 73) return;
 
     activePointerRef.current = event.pointerId;
     event.currentTarget.setPointerCapture(event.pointerId);
@@ -494,32 +572,29 @@ export function Lane({ ballVisual, resetSignal, active, onRoll }: LaneProps) {
     const end = points[points.length - 1]!;
     const dxPct = ((end.x - start.x) / rect.width) * 100;
     const dyPct = ((end.y - start.y) / rect.height) * 100;
-    const durationSec = Math.max(0.016, (end.t - start.t) / 1000);
+    const durationSec = Math.max(0.05, (end.t - start.t) / 1000);
+    const upwardPct = -dyPct;
+    if (upwardPct < MIN_UPWARD_PCT) return;
 
-    if (-dyPct < MIN_UPWARD_PCT) return;
+    // 端末pxではなく、レーンに対するスワイプ割合/秒から18〜31km/hへ正規化する。
+    const swipeRate = upwardPct / durationSec;
+    const speedNorm = clamp((swipeRate - 45) / 175, 0, 1);
+    const speedKmh = GAME_MIN_BALL_SPEED_KMH
+      + (GAME_MAX_BALL_SPEED_KMH - GAME_MIN_BALL_SPEED_KMH) * speedNorm;
+    const speedMps = speedKmh / 3.6;
 
-    // pxではなくレーン幅/高さに対する割合で速度を作る。
-    // 端末サイズが違っても同じスワイプ感になり、長い端末だけ有利にならない。
-    const normalizedTravel = Math.hypot(dxPct * 0.65, dyPct);
-    const rawSpeedPctPerSec = (normalizedTravel / durationSec) * 0.50;
-    const speedPctPerSec = Math.min(210, Math.max(84, rawSpeedPctPerSec));
-    const lateralPctPerSec = Math.max(-50, Math.min(50, (dxPct / durationSec) * 0.30));
+    const rawLaunchAngle = Math.atan2(dxPct, Math.max(1, upwardPct));
+    const launchAngleRad = clamp(rawLaunchAngle, -MAX_LAUNCH_ANGLE_RAD, MAX_LAUNCH_ANGLE_RAD);
 
-    const avgSlopePctPerMs = (segment: Point[]) => {
-      if (segment.length < 2) return 0;
-      const a = segment[0]!;
-      const b = segment[segment.length - 1]!;
-      const ms = b.t - a.t;
-      if (ms <= 0) return 0;
-      return (((b.x - a.x) / rect.width) * 100) / ms;
-    };
+    let curveNorm = 0;
+    if (points.length >= 4) {
+      const split = Math.max(1, Math.floor(points.length / 2));
+      const firstAngle = directionAngle(points[0]!, points[split]!, rect.width, rect.height);
+      const secondAngle = directionAngle(points[split]!, points[points.length - 1]!, rect.width, rect.height);
+      curveNorm = clamp((secondAngle - firstAngle) / MAX_CURVE_ANGLE_RAD, -1, 1);
+    }
 
-    const midIndex = Math.max(1, Math.floor(points.length / 2));
-    const firstHalfSlope = avgSlopePctPerMs(points.slice(0, midIndex + 1));
-    const secondHalfSlope = avgSlopePctPerMs(points.slice(midIndex));
-    const curveNorm = Math.max(-1, Math.min(1, (secondHalfSlope - firstHalfSlope) / 0.30));
-
-    runThrow({ speedPctPerSec, lateralPctPerSec, curveNorm });
+    runThrow({ speedMps, launchAngleRad, curveNorm });
   }, [active, runThrow]);
 
   const onPointerCancel = useCallback((event: ReactPointerEvent<HTMLDivElement>) => {
@@ -542,38 +617,92 @@ export function Lane({ ballVisual, resetSignal, active, onRoll }: LaneProps) {
       style={{
         touchAction: "none",
         overscrollBehavior: "none",
-        borderRadius: "24px 22px 28px 22px",
-        background: "linear-gradient(180deg, #e8c997 0%, #d9ad72 42%, #c8935a 75%, #ad7645 100%)",
-        boxShadow: "inset 0 2px 0 rgba(255,255,255,0.4), inset 0 -18px 30px -20px rgba(76,48,24,0.58)",
+        borderRadius: "22px 22px 26px 26px",
+        background: "linear-gradient(180deg, #e7c38d 0%, #d9aa6b 48%, #c58b50 100%)",
+        boxShadow: "inset 0 2px 0 rgba(255,255,255,0.42), inset 0 -22px 34px -24px rgba(76,48,24,0.62)",
       }}
     >
+      {/* 規格比率: レーン約69%、両側ガター各約15.5%。 */}
       <div
-        className="absolute inset-x-[11%] top-[3%] bottom-[10%] rounded-[18px]"
+        className="absolute inset-y-0 left-0"
         style={{
-          background: "repeating-linear-gradient(90deg, rgba(255,255,255,0.2) 0 2px, transparent 2px 20px)",
-          maskImage: "linear-gradient(180deg, black 76%, transparent 100%)",
+          width: `${LANE_LEFT_PCT}%`,
+          background: "linear-gradient(90deg, #39291f, #66452d 70%, #7c5635)",
+          boxShadow: "inset -4px 0 8px rgba(0,0,0,0.32)",
         }}
         aria-hidden="true"
       />
       <div
-        className="absolute inset-y-[3%] left-0 w-[13%] rounded-l-[24px]"
-        style={{ background: "linear-gradient(90deg, #624025, #7b5230)", boxShadow: "inset -3px 0 7px rgba(0,0,0,0.28)" }}
+        className="absolute inset-y-0 right-0"
+        style={{
+          width: `${100 - LANE_RIGHT_PCT}%`,
+          background: "linear-gradient(270deg, #39291f, #66452d 70%, #7c5635)",
+          boxShadow: "inset 4px 0 8px rgba(0,0,0,0.32)",
+        }}
         aria-hidden="true"
       />
+
       <div
-        className="absolute inset-y-[3%] right-0 w-[13%] rounded-r-[24px]"
-        style={{ background: "linear-gradient(270deg, #624025, #7b5230)", boxShadow: "inset 3px 0 7px rgba(0,0,0,0.28)" }}
+        className="pointer-events-none absolute"
+        style={{
+          left: `${LANE_LEFT_PCT}%`,
+          right: `${100 - LANE_RIGHT_PCT}%`,
+          top: "0",
+          bottom: "0",
+          background: "repeating-linear-gradient(90deg, rgba(255,255,255,0.16) 0 1px, transparent 1px 8.2%)",
+        }}
         aria-hidden="true"
       />
-      <div className="absolute inset-x-[13%] top-[66%] h-[3px] rounded-full bg-[#a8442f]" aria-hidden="true" />
-      <div className="absolute inset-x-[13%] top-[calc(66%+3px)] h-px bg-[#a8442f]/35" aria-hidden="true" />
+
+      {/* 42ftオイルパターン例。実際のオイルは見えないため、ごく薄い艶だけ表現。 */}
+      <div
+        className="pointer-events-none absolute"
+        style={{
+          left: `${LANE_LEFT_PCT}%`,
+          right: `${100 - LANE_RIGHT_PCT}%`,
+          top: `${OIL_END_Y}%`,
+          bottom: `${100 - DOCK_Y}%`,
+          background: "linear-gradient(180deg, rgba(255,255,255,0.02), rgba(255,255,255,0.11))",
+        }}
+        aria-hidden="true"
+      />
+
+      {/* 公認規格で認められる6〜8ftガイド、12〜16ftターゲットに合わせた照準表示。 */}
+      {TARGET_X_PCTS.map((x, index) => (
+        <div key={`guide-${index}`} className="pointer-events-none absolute" style={{ left: `${x}%`, top: `${GUIDE_DOTS_Y}%` }} aria-hidden="true">
+          <span className="block h-[3px] w-[3px] -translate-x-1/2 -translate-y-1/2 rounded-full bg-[#654628]/55" />
+        </div>
+      ))}
+      {TARGET_X_PCTS.map((x, index) => (
+        <div
+          key={`arrow-${index}`}
+          className="pointer-events-none absolute -translate-x-1/2 -translate-y-1/2"
+          style={{
+            left: `${x}%`,
+            top: `${TARGET_ARROWS_Y}%`,
+            width: 0,
+            height: 0,
+            borderLeft: "4px solid transparent",
+            borderRight: "4px solid transparent",
+            borderBottom: "10px solid rgba(82,55,31,0.62)",
+          }}
+          aria-hidden="true"
+        />
+      ))}
+
+      <div
+        className="pointer-events-none absolute h-[2px] bg-[#7e3e30]/80"
+        style={{ left: `${LANE_LEFT_PCT}%`, right: `${100 - LANE_RIGHT_PCT}%`, top: `${FOUL_LINE_Y}%` }}
+        aria-hidden="true"
+      />
 
       <Pins registerNode={registerPinNode} />
 
       <div
         ref={ballRef}
-        className="pointer-events-none absolute aspect-square w-[8.6%] rounded-full shadow-[0_4px_8px_rgba(0,0,0,0.35)]"
+        className="pointer-events-none absolute aspect-square rounded-full shadow-[0_4px_10px_rgba(0,0,0,0.38)]"
         style={{
+          width: `${BALL_DIAMETER_PCT}%`,
           left: "50%",
           top: `${DOCK_Y}%`,
           transform: "translate(-50%, -50%)",
@@ -581,11 +710,15 @@ export function Lane({ ballVisual, resetSignal, active, onRoll }: LaneProps) {
           boxShadow: ballVisual.premiumEffect ? `0 0 14px 4px ${ballVisual.hitColor}` : undefined,
         }}
         aria-hidden="true"
-      />
+      >
+        <span className="absolute left-[34%] top-[28%] h-[10%] w-[10%] rounded-full bg-black/45" />
+        <span className="absolute left-[49%] top-[22%] h-[9%] w-[9%] rounded-full bg-black/45" />
+        <span className="absolute left-[52%] top-[38%] h-[9%] w-[9%] rounded-full bg-black/45" />
+      </div>
 
-      <div className="pointer-events-none absolute bottom-[1.4%] left-1/2 -translate-x-1/2 text-center">
-        <p className="whitespace-nowrap rounded-full bg-[#402817]/65 px-3 py-1.5 text-[10px] font-black tracking-[0.08em] text-[#fff7e8] backdrop-blur-sm">
-          {active ? "ボール付近から上へスワイプ" : ""}
+      <div className="pointer-events-none absolute bottom-[1.8%] left-1/2 z-30 -translate-x-1/2 text-center">
+        <p className="whitespace-nowrap rounded-full bg-[#2f2119]/72 px-3 py-1.5 text-[10px] font-black tracking-[0.07em] text-[#fff7e8] backdrop-blur-sm">
+          {active ? "ボールから上へスワイプ" : ""}
         </p>
       </div>
     </div>
