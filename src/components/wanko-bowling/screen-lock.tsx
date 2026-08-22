@@ -2,7 +2,7 @@
 
 import { useEffect } from "react";
 
-/** ボウリング中は背面のアプリ画面を完全に固定する。特にiOSのラバーバンドスクロール対策。 */
+/** ボウリング中は背面のアプリ画面を固定し、投球ジェスチャーをiOS側へ漏らさない。 */
 export function BowlingScreenLock() {
   useEffect(() => {
     const body = document.body;
@@ -27,7 +27,20 @@ export function BowlingScreenLock() {
     html.style.overflow = "hidden";
     html.style.overscrollBehavior = "none";
 
+    // iOS SafariではPointerEventのpreventDefaultだけでは、親のスクロールや
+    // ラバーバンドが動く場合がある。投球レーン上のtouchmoveだけをnativeの
+    // capture段階で止め、ゲーム外のスクロール操作には影響させない。
+    const blockLaneTouchMove = (event: TouchEvent) => {
+      const target = event.target instanceof Element ? event.target : null;
+      if (!target?.closest('[data-bowling-gesture-block="true"]')) return;
+      event.preventDefault();
+      event.stopPropagation();
+    };
+
+    document.addEventListener("touchmove", blockLaneTouchMove, { passive: false, capture: true });
+
     return () => {
+      document.removeEventListener("touchmove", blockLaneTouchMove, true);
       body.style.overflow = previous.bodyOverflow;
       body.style.position = previous.bodyPosition;
       body.style.top = previous.bodyTop;
