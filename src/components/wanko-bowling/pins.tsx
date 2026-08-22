@@ -66,7 +66,11 @@ export function Pins({ standingIds, fallingIds }: PinsProps) {
                 strokeWidth="1"
               />
               <rect x="4.6" y="12.4" width="10.8" height="2.4" rx="1.2" fill="#a8442f" />
-              <circle cx="10" cy="21" r="1.6" fill="#c9a06a" opacity="0.8" />
+              {/* 肉球マーク */}
+              <ellipse cx="10" cy="21.6" rx="2.1" ry="1.7" fill="#5d8049" opacity="0.9" />
+              <circle cx="7.3" cy="19.3" r="0.85" fill="#5d8049" opacity="0.9" />
+              <circle cx="10" cy="18.4" r="0.85" fill="#5d8049" opacity="0.9" />
+              <circle cx="12.7" cy="19.3" r="0.85" fill="#5d8049" opacity="0.9" />
             </svg>
           </div>
         );

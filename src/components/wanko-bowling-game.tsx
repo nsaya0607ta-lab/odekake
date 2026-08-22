@@ -298,12 +298,12 @@ export function WankoBowlingGame({ ownedBalls }: { ownedBalls: OwnedBowlingBall[
 
   return (
     <section className={`rough-card overflow-hidden ${shake ? "wanko-bowl-shake" : ""}`}>
-      <div className="flex items-center justify-between gap-3 border-b border-line px-4 py-3">
-        <div>
+      <div className="border-b border-line px-4 py-3">
+        <div className="flex items-baseline justify-between">
           <p className="text-[9px] font-black tracking-[0.16em] text-ink-faint">SCORE</p>
-          <p className="text-xl font-black tabular-nums text-ink">{score.total}</p>
+          <p className="text-2xl font-black tabular-nums text-ink">{score.total}</p>
         </div>
-        <div className="min-w-0 flex-1">
+        <div className="mt-2">
           <ScoreBoard frames={frames} score={score} currentFrameIndex={frameIndex} />
         </div>
       </div>

@@ -50,18 +50,24 @@ export function Lane({ ballVisual, resetSignal, active, onRoll }: LaneProps) {
     setFallingIds(new Set());
     throwingRef.current = false;
     if (ballRef.current) {
-      ballRef.current.style.transform = `translate(-50%, -50%) translate(50%, ${DOCK_Y}%) rotate(0deg)`;
+      ballRef.current.style.left = "50%";
+      ballRef.current.style.top = `${DOCK_Y}%`;
+      ballRef.current.style.transform = "translate(-50%, -50%) rotate(0deg)";
       ballRef.current.style.opacity = "1";
     }
     if (trailRef.current) trailRef.current.style.opacity = "0";
   }, [resetSignal]);
 
+  // left/top はレーン（親要素）に対する割合、transform の translate(-50%, -50%) は
+  // ボール自身のサイズぶんを引いて中心合わせするためだけに使う。
+  // ここに translate(x%, y%) を混ぜると「要素自身のサイズ」基準になってしまい、
+  // レーン上の狙った座標からズレる（実際に起きていた不具合）。
   const setBallPosition = useCallback((xPct: number, yPct: number, rotateDeg: number) => {
     const el = ballRef.current;
     if (!el) return;
-    el.style.left = "0%";
-    el.style.top = "0%";
-    el.style.transform = `translate(-50%, -50%) translate(${xPct}%, ${yPct}%) rotate(${rotateDeg}deg)`;
+    el.style.left = `${xPct}%`;
+    el.style.top = `${yPct}%`;
+    el.style.transform = `translate(-50%, -50%) rotate(${rotateDeg}deg)`;
   }, []);
 
   const runThrow = useCallback((launch: {
@@ -238,26 +244,36 @@ export function Lane({ ballVisual, resetSignal, active, onRoll }: LaneProps) {
       onPointerMove={onPointerMove}
       onPointerUp={onPointerUp}
       onPointerCancel={onPointerUp}
-      className="relative aspect-[3/4.4] w-full touch-none select-none overflow-hidden rounded-[26px]"
+      className="relative aspect-[3/4.4] w-full touch-none select-none overflow-hidden"
       style={{
-        background:
-          "linear-gradient(180deg, #b98a55 0%, #a9764a 46%, #8a5c39 78%, #6f472c 100%)",
+        borderRadius: "26px 22px 28px 20px",
+        background: "linear-gradient(180deg, #e3c08c 0%, #d3a568 40%, #c08d54 74%, #a97748 100%)",
+        boxShadow: "inset 0 2px 0 rgba(255,255,255,0.35), inset 0 -14px 26px -18px rgba(76,48,24,0.55)",
       }}
     >
       {/* レーンの奥行き板目 */}
       <div
-        className="absolute inset-x-[10%] top-[8%] bottom-[16%] rounded-[16px]"
+        className="absolute inset-x-[11%] top-[6%] bottom-[18%] rounded-[16px]"
         style={{
-          background: "repeating-linear-gradient(90deg, rgba(255,255,255,0.05) 0 3px, transparent 3px 22px)",
-          maskImage: "linear-gradient(180deg, black 70%, transparent 100%)",
+          background: "repeating-linear-gradient(90deg, rgba(255,255,255,0.22) 0 2px, transparent 2px 20px)",
+          maskImage: "linear-gradient(180deg, black 68%, transparent 100%)",
         }}
         aria-hidden="true"
       />
       {/* ガター */}
-      <div className="absolute inset-y-[8%] left-0 w-[13%] rounded-l-[26px] bg-[#4a301e]/70" aria-hidden="true" />
-      <div className="absolute inset-y-[8%] right-0 w-[13%] rounded-r-[26px] bg-[#4a301e]/70" aria-hidden="true" />
+      <div
+        className="absolute inset-y-[6%] left-0 w-[13%] rounded-l-[24px]"
+        style={{ background: "linear-gradient(90deg, #6b4428, #7a5330)", boxShadow: "inset -3px 0 6px rgba(0,0,0,0.25)" }}
+        aria-hidden="true"
+      />
+      <div
+        className="absolute inset-y-[6%] right-0 w-[13%] rounded-r-[24px]"
+        style={{ background: "linear-gradient(270deg, #6b4428, #7a5330)", boxShadow: "inset 3px 0 6px rgba(0,0,0,0.25)" }}
+        aria-hidden="true"
+      />
       {/* ファウルライン */}
-      <div className="absolute inset-x-[13%] top-[60%] h-[2px] bg-[#a8442f]/80" aria-hidden="true" />
+      <div className="absolute inset-x-[13%] top-[59%] h-[3px] rounded-full bg-[#a8442f]" aria-hidden="true" />
+      <div className="absolute inset-x-[13%] top-[calc(59%+3px)] h-[1px] bg-[#a8442f]/35" aria-hidden="true" />
 
       <Pins standingIds={standingIds} fallingIds={fallingIds} />
 
@@ -273,18 +289,18 @@ export function Lane({ ballVisual, resetSignal, active, onRoll }: LaneProps) {
         ref={ballRef}
         className="pointer-events-none absolute h-[9%] w-[9%] rounded-full shadow-[0_3px_6px_rgba(0,0,0,0.35)]"
         style={{
-          left: "0%",
-          top: "0%",
-          transform: `translate(-50%, -50%) translate(50%, ${DOCK_Y}%)`,
+          left: "50%",
+          top: `${DOCK_Y}%`,
+          transform: "translate(-50%, -50%)",
           background: `radial-gradient(circle at 32% 28%, ${ballVisual.bodyGradient[0]}, ${ballVisual.bodyGradient[1]})`,
           boxShadow: ballVisual.premiumEffect ? `0 0 12px 3px ${ballVisual.hitColor}` : undefined,
         }}
         aria-hidden="true"
       />
 
-      <div className="absolute bottom-[3%] left-1/2 -translate-x-1/2 text-center">
-        <p className="text-[10px] font-black tracking-[0.12em] text-[#fff3e0]/85">
-          {active ? "上へスワイプして投げよう" : ""}
+      <div className="pointer-events-none absolute bottom-[3%] left-1/2 -translate-x-1/2 text-center">
+        <p className="rounded-full bg-[#4a301e]/55 px-3 py-1 text-[10.5px] font-black tracking-[0.1em] text-[#fff6e6]">
+          {active ? "↑ 上へスワイプして投げよう" : ""}
         </p>
       </div>
     </div>

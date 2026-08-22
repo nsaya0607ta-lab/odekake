@@ -56,16 +56,16 @@ export function ScoreBoard({
             }`}
           >
             <p
-              className={`px-1 py-0.5 text-[8px] font-black tracking-[0.08em] ${
+              className={`px-1 py-1 text-[9px] font-black tracking-[0.06em] ${
                 isActive ? "text-leaf-deep" : "text-ink-faint"
               }`}
             >
               {index + 1}F
             </p>
-            <p className="border-t border-line/70 px-1 py-1 text-[11px] font-black tabular-nums text-ink">
+            <p className="border-t border-line/70 px-1 py-1.5 text-[13px] font-black tabular-nums leading-none text-ink">
               {frameLabel(frame, index) || "–"}
             </p>
-            <p className="border-t border-line/70 px-1 py-1 text-xs font-black tabular-nums text-ink">
+            <p className="border-t border-line/70 px-1 py-1.5 text-sm font-black tabular-nums leading-none text-ink">
               {result?.cumulativeScore ?? "–"}
             </p>
           </div>
