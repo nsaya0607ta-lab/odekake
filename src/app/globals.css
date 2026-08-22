@@ -4193,6 +4193,112 @@
   to { opacity: 1; transform: scale(1.2) rotate(8deg); }
 }
 
+/* =============================================================
+   わんこボウリング
+   ============================================================= */
+@keyframes wanko-bowl-pin-fall {
+  /* -50%,-50% の中心合わせを毎ステップに焼き込む（アニメーション中は transform を
+     まるごと上書きしてしまうので、非アニメーション時の translate ユーティリティと
+     足並みを揃えるにはここに含めるしかない）。 */
+  0% {
+    transform: translate(-50%, -50%) translate(0, 0) rotate(0deg) scale(1);
+    opacity: 1;
+  }
+  30% {
+    transform: translate(-50%, -50%) translate(calc(var(--pin-fall-x, 14px) * 0.3), 2px) rotate(calc(var(--pin-fall-r, 95deg) * 0.4)) scale(1.02);
+    opacity: 1;
+  }
+  70% {
+    transform: translate(-50%, -50%) translate(var(--pin-fall-x, 14px), 22px) rotate(var(--pin-fall-r, 95deg)) scale(0.96);
+    opacity: 1;
+  }
+  100% {
+    transform: translate(-50%, -50%) translate(calc(var(--pin-fall-x, 14px) * 1.15), 30px) rotate(calc(var(--pin-fall-r, 95deg) * 1.05)) scale(0.9);
+    opacity: 0;
+  }
+}
+
+.wanko-bowl-pin-fall {
+  animation: wanko-bowl-pin-fall 620ms cubic-bezier(0.45, 0, 0.7, 0.2) forwards;
+}
+
+@keyframes wanko-bowl-react-happy {
+  0%, 100% { transform: translateY(0) scale(1); }
+  35% { transform: translateY(-6px) scale(1.04); }
+  60% { transform: translateY(0) scale(1); }
+}
+
+@keyframes wanko-bowl-react-very-happy {
+  0%, 100% { transform: translateY(0) rotate(0deg) scale(1); }
+  25% { transform: translateY(-10px) rotate(-6deg) scale(1.08); }
+  50% { transform: translateY(0) rotate(0deg) scale(1); }
+  75% { transform: translateY(-10px) rotate(6deg) scale(1.08); }
+}
+
+@keyframes wanko-bowl-react-sad {
+  0%, 100% { transform: translateY(0) rotate(0deg); }
+  50% { transform: translateY(3px) rotate(-3deg); }
+}
+
+@keyframes wanko-bowl-react-jump {
+  0%, 100% { transform: translateY(0) scale(1); }
+  30% { transform: translateY(-16px) scale(1.05); }
+  55% { transform: translateY(0) scale(1); }
+  75% { transform: translateY(-8px) scale(1.03); }
+}
+
+@keyframes wanko-bowl-react-strike {
+  0% { transform: translateY(0) scale(1) rotate(0deg); }
+  20% { transform: translateY(-22px) scale(1.15) rotate(-8deg); }
+  40% { transform: translateY(0) scale(1) rotate(6deg); }
+  60% { transform: translateY(-14px) scale(1.1) rotate(-4deg); }
+  80% { transform: translateY(0) scale(1) rotate(3deg); }
+  100% { transform: translateY(0) scale(1) rotate(0deg); }
+}
+
+.wanko-bowl-react-happy { animation: wanko-bowl-react-happy 900ms ease-in-out; }
+.wanko-bowl-react-very-happy { animation: wanko-bowl-react-very-happy 1100ms ease-in-out; }
+.wanko-bowl-react-sad { animation: wanko-bowl-react-sad 900ms ease-in-out; }
+.wanko-bowl-react-jump { animation: wanko-bowl-react-jump 1000ms cubic-bezier(0.3, 1.3, 0.5, 1); }
+.wanko-bowl-react-strike { animation: wanko-bowl-react-strike 1300ms cubic-bezier(0.3, 1.3, 0.5, 1); }
+
+@keyframes wanko-bowl-banner-in {
+  0% { opacity: 0; transform: translate(-50%, -50%) scale(0.4) rotate(-4deg); }
+  55% { opacity: 1; transform: translate(-50%, -50%) scale(1.12) rotate(2deg); }
+  75% { transform: translate(-50%, -50%) scale(0.97) rotate(-1deg); }
+  100% { opacity: 1; transform: translate(-50%, -50%) scale(1) rotate(0deg); }
+}
+
+.wanko-bowl-banner {
+  animation: wanko-bowl-banner-in 520ms cubic-bezier(0.3, 1.4, 0.4, 1) both;
+}
+
+@keyframes wanko-bowl-shake {
+  0%, 100% { transform: translate3d(0, 0, 0); }
+  20% { transform: translate3d(-3px, 1px, 0); }
+  40% { transform: translate3d(3px, -1px, 0); }
+  60% { transform: translate3d(-2px, 1px, 0); }
+  80% { transform: translate3d(2px, -1px, 0); }
+}
+
+.wanko-bowl-shake { animation: wanko-bowl-shake 420ms ease-in-out; }
+
+@keyframes wanko-bowl-sparkle {
+  0% { opacity: 0; transform: scale(0.4) rotate(0deg); }
+  40% { opacity: 1; transform: scale(1.05) rotate(90deg); }
+  100% { opacity: 0; transform: scale(0.7) rotate(180deg); }
+}
+
+.wanko-bowl-sparkle { animation: wanko-bowl-sparkle 900ms ease-out both; }
+
+@keyframes wanko-bowl-score-pop {
+  0% { transform: scale(1); }
+  40% { transform: scale(1.22); }
+  100% { transform: scale(1); }
+}
+
+.wanko-bowl-score-pop { animation: wanko-bowl-score-pop 420ms ease-out; }
+
 @media (prefers-reduced-motion: reduce) {
   .fade-in,
   .route-progress,
@@ -4203,6 +4309,19 @@
   .pressable,
   .btn {
     transition-duration: 0.01ms;
+  }
+
+  .wanko-bowl-react-happy,
+  .wanko-bowl-react-very-happy,
+  .wanko-bowl-react-sad,
+  .wanko-bowl-react-jump,
+  .wanko-bowl-react-strike,
+  .wanko-bowl-banner,
+  .wanko-bowl-shake,
+  .wanko-bowl-sparkle,
+  .wanko-bowl-score-pop,
+  .wanko-bowl-pin-fall {
+    animation: none !important;
   }
 
   .gacha-animation-backdrop,
