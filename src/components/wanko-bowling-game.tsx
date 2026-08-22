@@ -18,7 +18,6 @@ import { getBowlingBallVisual, type OwnedBowlingBall } from "@/lib/games/wanko-b
 type Phase = "select" | "playing" | "result";
 type Banner = "SPARE!!" | "STRIKE!!" | "TURKEY!!" | null;
 
-/** その投球が10本そろった新しいラックへの1投目か。 */
 function isFreshRackRoll(frameIndex: number, priorRolls: number[]): boolean {
   if (frameIndex < BOWLING_FRAME_COUNT - 1) return priorRolls.length === 0;
   if (priorRolls.length === 0) return true;
@@ -33,10 +32,6 @@ function isFreshRackRoll(frameIndex: number, priorRolls: number[]): boolean {
   return false;
 }
 
-/**
- * 未確定のストライク/スペアも、現時点で分かっているボーナスまで含めて表示する。
- * 完了時には正式スコアと必ず一致する「LIVE SCORE」用の値。
- */
 function calculateLiveBowlingScore(frames: BowlingFrame[]): number {
   const flatRolls = frames.flatMap((frame) => frame.rolls);
   let cursor = 0;
@@ -80,34 +75,50 @@ function newRoundId(): string {
 }
 
 export function WankoBowlingGame({ ownedBalls }: { ownedBalls: OwnedBowlingBall[] }) {
+  const initialFrames = useMemo(() => createEmptyFrames(), []);
   const [phase, setPhase] = useState<Phase>("select");
   const [selectedBallId, setSelectedBallId] = useState<string>(
     () => ownedBalls[0]?.id ?? "default_paw_ball",
   );
-  const [frames, setFrames] = useState<BowlingFrame[]>(() => createEmptyFrames());
+  const [frames, setFrames] = useState<BowlingFrame[]>(initialFrames);
   const [frameIndex, setFrameIndex] = useState(0);
   const [laneResetSignal, setLaneResetSignal] = useState(0);
   const [rollLocked, setRollLocked] = useState(false);
   const [banner, setBanner] = useState<Banner>(null);
   const [reaction, setReaction] = useState<DogReactionKind>("idle");
   const [shake, setShake] = useState(false);
-  const [roundId, setRoundId] = useState(() => newRoundId());
   const [bestScore, setBestScore] = useState<number | null>(null);
   const [isNewBest, setIsNewBest] = useState(false);
   const [earnedCoins, setEarnedCoins] = useState<number | null>(null);
   const [lastRollPins, setLastRollPins] = useState<number | null>(null);
-  const rankingSectionIdRef = useRef("wanko-bowling-ranking");
 
-  const framesRef = useRef(frames);
-  framesRef.current = frames;
-  const frameIndexRef = useRef(frameIndex);
-  frameIndexRef.current = frameIndex;
+  // 投球処理の正本はrefに置く。Reactの再描画を待たずに次投へ確実に引き継ぐ。
+  const framesRef = useRef<BowlingFrame[]>(initialFrames);
+  const frameIndexRef = useRef(0);
+  const rollLockedRef = useRef(false);
   const streakRef = useRef(0);
   const submittedRef = useRef(false);
+  const roundIdRef = useRef(newRoundId());
+  const rankingSectionIdRef = useRef("wanko-bowling-ranking");
 
   const score = useMemo(() => calculateBowlingScore(frames), [frames]);
   const liveScore = useMemo(() => calculateLiveBowlingScore(frames), [frames]);
   const ballVisual = useMemo(() => getBowlingBallVisual(selectedBallId), [selectedBallId]);
+
+  const commitFrames = useCallback((nextFrames: BowlingFrame[]) => {
+    framesRef.current = nextFrames;
+    setFrames(nextFrames);
+  }, []);
+
+  const commitFrameIndex = useCallback((nextIndex: number) => {
+    frameIndexRef.current = nextIndex;
+    setFrameIndex(nextIndex);
+  }, []);
+
+  const setRollLock = useCallback((locked: boolean) => {
+    rollLockedRef.current = locked;
+    setRollLocked(locked);
+  }, []);
 
   const loadBestScore = useCallback(async () => {
     try {
@@ -118,7 +129,7 @@ export function WankoBowlingGame({ ownedBalls }: { ownedBalls: OwnedBowlingBall[
       const mine = payload?.entries?.find((entry) => entry.isMe);
       if (mine) setBestScore(mine.score);
     } catch {
-      // ランキングが読み込めなくても、通常プレイには影響させない
+      // ランキング取得失敗はプレイを止めない。
     }
   }, []);
 
@@ -127,20 +138,21 @@ export function WankoBowlingGame({ ownedBalls }: { ownedBalls: OwnedBowlingBall[
   }, [loadBestScore]);
 
   const startGame = useCallback(() => {
-    setFrames(createEmptyFrames());
-    setFrameIndex(0);
+    const emptyFrames = createEmptyFrames();
+    commitFrames(emptyFrames);
+    commitFrameIndex(0);
     streakRef.current = 0;
     submittedRef.current = false;
+    roundIdRef.current = newRoundId();
     setBanner(null);
     setReaction("idle");
     setEarnedCoins(null);
     setIsNewBest(false);
     setLastRollPins(null);
-    setRoundId(newRoundId());
     setLaneResetSignal((value) => value + 1);
-    setRollLocked(false);
+    setRollLock(false);
     setPhase("playing");
-  }, []);
+  }, [commitFrameIndex, commitFrames, setRollLock]);
 
   const submitResult = useCallback(async (finalScore: number, finalFrames: BowlingFrame[]) => {
     if (submittedRef.current) return;
@@ -151,17 +163,17 @@ export function WankoBowlingGame({ ownedBalls }: { ownedBalls: OwnedBowlingBall[
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          roundId,
+          roundId: roundIdRef.current,
           frames: finalFrames,
         }),
       });
-      const payload = (await response.json().catch(() => null)) as { coins?: number; score?: number } | null;
+      const payload = (await response.json().catch(() => null)) as { coins?: number } | null;
       if (response.ok) {
         if (typeof payload?.coins === "number") setEarnedCoins(payload.coins);
         window.dispatchEvent(new Event("wanko-bowling-ranking-refresh"));
       }
     } catch {
-      // コイン付与に失敗しても、結果表示自体は継続する
+      // コイン付与失敗でも結果表示は継続する。
     }
 
     setBestScore((prev) => {
@@ -170,39 +182,49 @@ export function WankoBowlingGame({ ownedBalls }: { ownedBalls: OwnedBowlingBall[
       return newBest ? finalScore : prev;
     });
     void loadBestScore();
-  }, [roundId, loadBestScore]);
+  }, [loadBestScore]);
 
   const handleRoll = useCallback((result: LaneRollResult) => {
+    // 同一投球のfinishが重複しても二重加算しない。
+    if (rollLockedRef.current) return;
+    setRollLock(true);
+
     const currentFrameIndex = frameIndexRef.current;
+    const baseFrames = framesRef.current;
     const isLastFrame = currentFrameIndex === BOWLING_FRAME_COUNT - 1;
-    const currentFrame = framesRef.current[currentFrameIndex] ?? { rolls: [], gutters: [] };
-    const priorRolls = currentFrame.rolls;
-    const priorGutters = currentFrame.gutters ?? Array.from({ length: priorRolls.length }, () => false);
+    const currentFrame = baseFrames[currentFrameIndex] ?? { rolls: [], gutters: [] };
+    const priorRolls = [...currentFrame.rolls];
+    const priorGutters = currentFrame.gutters
+      ? [...currentFrame.gutters]
+      : Array.from({ length: priorRolls.length }, () => false);
     const freshRack = isFreshRackRoll(currentFrameIndex, priorRolls);
     const roll = result.isGutter ? 0 : result.knockedIds.length;
+
     setLastRollPins(roll);
 
-    const newRolls = [...priorRolls, roll];
     const newFrame: BowlingFrame = {
-      rolls: newRolls,
+      rolls: [...priorRolls, roll],
       gutters: [...priorGutters, result.isGutter],
     };
     const done = isFrameDone(newFrame, currentFrameIndex);
+    const nextFrames = baseFrames.map((frame, index) =>
+      index === currentFrameIndex ? newFrame : frame,
+    );
 
-    const nextFrames = framesRef.current.map((frame, index) => (index === currentFrameIndex ? newFrame : frame));
-    setFrames(nextFrames);
+    // ここでrefを先に更新するのが重要。2投目は必ず1投目を含む配列を読む。
+    commitFrames(nextFrames);
 
     if (freshRack) {
       streakRef.current = roll === 10 ? streakRef.current + 1 : 0;
     }
 
-    setRollLocked(true);
-
     let nextReaction: DogReactionKind = "idle";
     let nextBanner: Banner = null;
-
+    const newRolls = newFrame.rolls;
     const regularSpareCompleted =
-      newRolls.length === 2 && (newRolls[0] ?? 0) < 10 && (newRolls[0] ?? 0) + (newRolls[1] ?? 0) === 10;
+      newRolls.length === 2
+      && (newRolls[0] ?? 0) < 10
+      && (newRolls[0] ?? 0) + (newRolls[1] ?? 0) === 10;
     const finalStrikeRackSpareCompleted =
       isLastFrame
       && newRolls.length === 3
@@ -240,8 +262,8 @@ export function WankoBowlingGame({ ownedBalls }: { ownedBalls: OwnedBowlingBall[
 
     let needsFreshRackNext = false;
     if (isLastFrame) {
-      if (!done) {
-        if ((freshRack && roll === 10) || regularSpareCompleted) needsFreshRackNext = true;
+      if (!done && ((freshRack && roll === 10) || regularSpareCompleted)) {
+        needsFreshRackNext = true;
       }
     } else {
       needsFreshRackNext = done;
@@ -253,7 +275,7 @@ export function WankoBowlingGame({ ownedBalls }: { ownedBalls: OwnedBowlingBall[
       if (needsFreshRackNext) setLaneResetSignal((value) => value + 1);
 
       if (!isLastFrame && done) {
-        setFrameIndex(currentFrameIndex + 1);
+        commitFrameIndex(currentFrameIndex + 1);
       }
 
       if (isLastFrame && done) {
@@ -263,10 +285,10 @@ export function WankoBowlingGame({ ownedBalls }: { ownedBalls: OwnedBowlingBall[
         return;
       }
 
-      setRollLocked(false);
+      setRollLock(false);
       setReaction("idle");
     }, resumeDelay);
-  }, [submitResult]);
+  }, [commitFrameIndex, commitFrames, setRollLock, submitResult]);
 
   const goToRanking = useCallback(() => {
     window.dispatchEvent(new Event("wanko-bowling-ranking-refresh"));
