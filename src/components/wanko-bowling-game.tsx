@@ -102,21 +102,16 @@ export function WankoBowlingGame({ ownedBalls }: { ownedBalls: OwnedBowlingBall[
     if (submittedRef.current) return;
     submittedRef.current = true;
 
-    const finalState = calculateBowlingScore(finalFrames);
     try {
       const response = await fetch("/api/coins/wanko-bowling", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           roundId,
-          score: finalState.total,
-          strikeCount: finalState.strikeCount,
-          spareCount: finalState.spareCount,
-          gutterCount: finalState.gutterCount,
-          frameCount: BOWLING_FRAME_COUNT,
+          frames: finalFrames,
         }),
       });
-      const payload = (await response.json().catch(() => null)) as { coins?: number } | null;
+      const payload = (await response.json().catch(() => null)) as { coins?: number; score?: number } | null;
       if (response.ok) {
         if (typeof payload?.coins === "number") setEarnedCoins(payload.coins);
         window.dispatchEvent(new Event("wanko-bowling-ranking-refresh"));
@@ -200,7 +195,6 @@ export function WankoBowlingGame({ ownedBalls }: { ownedBalls: OwnedBowlingBall[
     let needsFreshRackNext = false;
     if (isLastFrame) {
       if (!done) {
-        // ストライクでラックを一掃した直後、またはスペア成立直後は次投球用に10本へ戻す。
         if ((freshRack && roll === 10) || regularSpareCompleted) needsFreshRackNext = true;
       }
     } else {
