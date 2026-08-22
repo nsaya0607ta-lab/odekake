@@ -55,16 +55,8 @@ function worldXToPct(xM: number): number {
   return (xM / JB_TOTAL_WIDTH_M) * 100;
 }
 
-function pctXToWorld(xPct: number): number {
-  return (xPct / 100) * JB_TOTAL_WIDTH_M;
-}
-
 function worldYToPct(distanceFromFoulM: number): number {
   return DOCK_Y - (distanceFromFoulM / JB_HEAD_PIN_DISTANCE_M) * LANE_TRAVEL_PCT;
-}
-
-function worldDeltaYToPct(distanceM: number): number {
-  return (distanceM / JB_HEAD_PIN_DISTANCE_M) * LANE_TRAVEL_PCT;
 }
 
 const GUIDE_DOTS_Y = worldYToPct(7 * 0.3048);
@@ -536,7 +528,6 @@ export function Lane({ ballVisual, resetSignal, active, onRoll }: LaneProps) {
     const relY = ((event.clientY - rect.top) / rect.height) * 100;
     const relX = ((event.clientX - rect.left) / rect.width) * 100;
 
-    // 実際にボールを押し出す感覚に寄せるため、開始位置はボール周辺に限定する。
     if (relY < 80 || relY > 99 || relX < 27 || relX > 73) return;
 
     activePointerRef.current = event.pointerId;
@@ -576,7 +567,6 @@ export function Lane({ ballVisual, resetSignal, active, onRoll }: LaneProps) {
     const upwardPct = -dyPct;
     if (upwardPct < MIN_UPWARD_PCT) return;
 
-    // 端末pxではなく、レーンに対するスワイプ割合/秒から18〜31km/hへ正規化する。
     const swipeRate = upwardPct / durationSec;
     const speedNorm = clamp((swipeRate - 45) / 175, 0, 1);
     const speedKmh = GAME_MIN_BALL_SPEED_KMH
@@ -622,7 +612,6 @@ export function Lane({ ballVisual, resetSignal, active, onRoll }: LaneProps) {
         boxShadow: "inset 0 2px 0 rgba(255,255,255,0.42), inset 0 -22px 34px -24px rgba(76,48,24,0.62)",
       }}
     >
-      {/* 規格比率: レーン約69%、両側ガター各約15.5%。 */}
       <div
         className="absolute inset-y-0 left-0"
         style={{
@@ -654,7 +643,6 @@ export function Lane({ ballVisual, resetSignal, active, onRoll }: LaneProps) {
         aria-hidden="true"
       />
 
-      {/* 42ftオイルパターン例。実際のオイルは見えないため、ごく薄い艶だけ表現。 */}
       <div
         className="pointer-events-none absolute"
         style={{
@@ -667,7 +655,6 @@ export function Lane({ ballVisual, resetSignal, active, onRoll }: LaneProps) {
         aria-hidden="true"
       />
 
-      {/* 公認規格で認められる6〜8ftガイド、12〜16ftターゲットに合わせた照準表示。 */}
       {TARGET_X_PCTS.map((x, index) => (
         <div key={`guide-${index}`} className="pointer-events-none absolute" style={{ left: `${x}%`, top: `${GUIDE_DOTS_Y}%` }} aria-hidden="true">
           <span className="block h-[3px] w-[3px] -translate-x-1/2 -translate-y-1/2 rounded-full bg-[#654628]/55" />
@@ -711,13 +698,13 @@ export function Lane({ ballVisual, resetSignal, active, onRoll }: LaneProps) {
         }}
         aria-hidden="true"
       >
-        <span className="absolute left-[34%] top-[28%] h-[10%] w-[10%] rounded-full bg-black/45" />
-        <span className="absolute left-[49%] top-[22%] h-[9%] w-[9%] rounded-full bg-black/45" />
-        <span className="absolute left-[52%] top-[38%] h-[9%] w-[9%] rounded-full bg-black/45" />
+        <span className="absolute left-[34%] top-[28%] h-[10%] w-[10%] rounded-full bg-black/40" />
+        <span className="absolute left-[49%] top-[22%] h-[9%] w-[9%] rounded-full bg-black/40" />
+        <span className="absolute left-[52%] top-[38%] h-[9%] w-[9%] rounded-full bg-black/40" />
       </div>
 
       <div className="pointer-events-none absolute bottom-[1.8%] left-1/2 z-30 -translate-x-1/2 text-center">
-        <p className="whitespace-nowrap rounded-full bg-[#2f2119]/72 px-3 py-1.5 text-[10px] font-black tracking-[0.07em] text-[#fff7e8] backdrop-blur-sm">
+        <p className="whitespace-nowrap rounded-full bg-[#2f2119]/70 px-3 py-1.5 text-[10px] font-black tracking-[0.07em] text-[#fff7e8] backdrop-blur-sm">
           {active ? "ボールから上へスワイプ" : ""}
         </p>
       </div>
