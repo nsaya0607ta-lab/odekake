@@ -1,7 +1,7 @@
 import { notFound } from "next/navigation";
 import { WankoBowlingGame } from "@/components/wanko-bowling-game";
 import { WankoBowlingRanking } from "@/components/wanko-bowling-ranking";
-import { PageBody } from "@/components/page-body";
+import { BowlingScreenLock } from "@/components/wanko-bowling/screen-lock";
 import { TopHeader } from "@/components/page-header";
 import { COLLECTION_ITEMS } from "@/lib/collection/items";
 import { getOwnedItemCounts } from "@/lib/data/collection";
@@ -14,7 +14,6 @@ export const dynamic = "force-dynamic";
 
 export default async function WankoBowlingPage() {
   const { supabase, user } = await requireUser();
-  // 実験中のため、URLを直打ちされても許可アカウント以外には存在ごと見せない。
   if (!canAccessWankoBowling(user.email)) notFound();
 
   const ownedItemCounts = await getOwnedItemCounts(supabase, user.id);
@@ -28,20 +27,31 @@ export default async function WankoBowlingPage() {
   });
 
   return (
-    <>
+    <div className="fixed inset-0 z-[50] flex h-dvh flex-col overflow-hidden bg-paper">
+      <BowlingScreenLock />
+
       <TopHeader
         backHref="/games"
         title="わんこボウリング"
-        subtitle="お気に入りのボールでストライクを狙おう！"
+        action={(
+          <span className="rounded-full bg-leaf-soft px-2.5 py-1 text-[10px] font-black tracking-[0.12em] text-leaf-deep">
+            5 FRAME
+          </span>
+        )}
       />
 
-      <PageBody className="!space-y-3 !py-3">
-        <WankoBowlingGame ownedBalls={ownedBalls} />
+      <main id="wanko-bowling-scroll" className="min-h-0 flex-1 overflow-y-auto overscroll-none">
+        <div
+          className="h-full min-h-0 px-1.5 pt-1.5"
+          style={{ paddingBottom: "max(6px, env(safe-area-inset-bottom))" }}
+        >
+          <WankoBowlingGame ownedBalls={ownedBalls} />
+        </div>
 
-        <div id="wanko-bowling-ranking">
+        <div id="wanko-bowling-ranking" className="px-2 pb-6 pt-3">
           <WankoBowlingRanking />
         </div>
-      </PageBody>
-    </>
+      </main>
+    </div>
   );
 }

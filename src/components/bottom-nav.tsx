@@ -13,7 +13,6 @@ const ITEMS = [
     href: "/add",
     label: "追加",
     icon: "/icons/navigation/add.webp",
-    // 「行った場所を登録」は追加の主導線なので、記録ではなく追加を選択中にする
     match: ["/add", "/spots/new"],
     center: true,
   },
@@ -31,11 +30,6 @@ const ITEMS = [
   },
 ] as const;
 
-/**
- * 選択中のタブは、一致した文字列がいちばん長いものひとつに決める。
- * `/spots/new` のように複数のタブに当てはまるパスで、両方が選択中に
- * 見えてしまうのを防ぐ。
- */
 function activeHref(pathname: string): string | null {
   let best: { href: string; length: number } | null = null;
   for (const item of ITEMS) {
@@ -56,6 +50,9 @@ export function BottomNav({
 }) {
   const pathname = usePathname();
   const current = activeHref(pathname);
+
+  // ミニゲーム中はアプリ本体のナビを完全に外し、誤タップ・背面反応を防ぐ。
+  if (pathname.startsWith("/games/wanko-bowling")) return null;
 
   return (
     <nav
