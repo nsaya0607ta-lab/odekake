@@ -18,9 +18,19 @@ import { getBowlingBallVisual, type OwnedBowlingBall } from "@/lib/games/wanko-b
 type Phase = "select" | "playing" | "result";
 type Banner = "SPARE!!" | "STRIKE!!" | "TURKEY!!" | null;
 
-function isChainRoll(frameIndex: number, priorRolls: number[]): boolean {
+/** その投球が10本そろった新しいラックへの1投目か。 */
+function isFreshRackRoll(frameIndex: number, priorRolls: number[]): boolean {
   if (frameIndex < BOWLING_FRAME_COUNT - 1) return priorRolls.length === 0;
-  return priorRolls.every((roll) => roll === 10);
+  if (priorRolls.length === 0) return true;
+
+  const first = priorRolls[0] ?? 0;
+  const second = priorRolls[1] ?? 0;
+  if (priorRolls.length === 1) return first === 10;
+  if (priorRolls.length === 2) {
+    if (first === 10) return second === 10;
+    return first + second === 10;
+  }
+  return false;
 }
 
 function newRoundId(): string {
@@ -88,26 +98,24 @@ export function WankoBowlingGame({ ownedBalls }: { ownedBalls: OwnedBowlingBall[
     setPhase("playing");
   }, []);
 
-  const submitResult = useCallback(async (finalScore: number) => {
+  const submitResult = useCallback(async (finalScore: number, finalFrames: BowlingFrame[]) => {
     if (submittedRef.current) return;
     submittedRef.current = true;
 
-    const finalState = calculateBowlingScore(framesRef.current);
     try {
       const response = await fetch("/api/coins/wanko-bowling", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           roundId,
-          score: finalScore,
-          strikeCount: finalState.strikeCount,
-          spareCount: finalState.spareCount,
-          gutterCount: finalState.gutterCount,
-          frameCount: BOWLING_FRAME_COUNT,
+          frames: finalFrames,
         }),
       });
       const payload = (await response.json().catch(() => null)) as { coins?: number } | null;
-      if (response.ok && typeof payload?.coins === "number") setEarnedCoins(payload.coins);
+      if (response.ok) {
+        if (typeof payload?.coins === "number") setEarnedCoins(payload.coins);
+        window.dispatchEvent(new Event("wanko-bowling-ranking-refresh"));
+      }
     } catch {
       // コイン付与に失敗しても、結果表示自体は継続する
     }
@@ -123,17 +131,22 @@ export function WankoBowlingGame({ ownedBalls }: { ownedBalls: OwnedBowlingBall[
   const handleRoll = useCallback((result: LaneRollResult) => {
     const currentFrameIndex = frameIndexRef.current;
     const isLastFrame = currentFrameIndex === BOWLING_FRAME_COUNT - 1;
-    const priorRolls = framesRef.current[currentFrameIndex]?.rolls ?? [];
-    const chain = isChainRoll(currentFrameIndex, priorRolls);
+    const currentFrame = framesRef.current[currentFrameIndex] ?? { rolls: [], gutters: [] };
+    const priorRolls = currentFrame.rolls;
+    const priorGutters = currentFrame.gutters ?? Array.from({ length: priorRolls.length }, () => false);
+    const freshRack = isFreshRackRoll(currentFrameIndex, priorRolls);
     const roll = result.isGutter ? 0 : result.knockedIds.length;
     const newRolls = [...priorRolls, roll];
-    const newFrame: BowlingFrame = { rolls: newRolls };
+    const newFrame: BowlingFrame = {
+      rolls: newRolls,
+      gutters: [...priorGutters, result.isGutter],
+    };
     const done = isFrameDone(newFrame, currentFrameIndex);
 
     const nextFrames = framesRef.current.map((frame, index) => (index === currentFrameIndex ? newFrame : frame));
     setFrames(nextFrames);
 
-    if (chain) {
+    if (freshRack) {
       streakRef.current = roll === 10 ? streakRef.current + 1 : 0;
     }
 
@@ -142,12 +155,19 @@ export function WankoBowlingGame({ ownedBalls }: { ownedBalls: OwnedBowlingBall[
     let nextReaction: DogReactionKind = "idle";
     let nextBanner: Banner = null;
 
-    const spareCompleted =
+    const regularSpareCompleted =
       newRolls.length === 2 && (newRolls[0] ?? 0) < 10 && (newRolls[0] ?? 0) + (newRolls[1] ?? 0) === 10;
+    const finalStrikeRackSpareCompleted =
+      isLastFrame
+      && newRolls.length === 3
+      && (newRolls[0] ?? 0) === 10
+      && (newRolls[1] ?? 0) < 10
+      && (newRolls[1] ?? 0) + (newRolls[2] ?? 0) === 10;
+    const spareCompleted = regularSpareCompleted || finalStrikeRackSpareCompleted;
 
     if (result.isGutter || roll === 0) {
       nextReaction = "sad";
-    } else if (roll === 10 && chain) {
+    } else if (roll === 10 && freshRack) {
       if (streakRef.current >= 3) {
         nextBanner = "TURKEY!!";
         nextReaction = "turkey";
@@ -175,9 +195,8 @@ export function WankoBowlingGame({ ownedBalls }: { ownedBalls: OwnedBowlingBall[
     let needsFreshRackNext = false;
     if (isLastFrame) {
       if (!done) {
-        // ストライクでラック（10本）を一掃した直後、またはスペア成立直後は次の投球のためにフルリセットする。
-        // 2投連続ストライク（chain && roll===10）もこの条件でカバーする。
-        if ((chain && roll === 10) || spareCompleted) needsFreshRackNext = true;
+        // ストライクでラックを一掃した直後、またはスペア成立直後は次投球用に10本へ戻す。
+        if ((freshRack && roll === 10) || regularSpareCompleted) needsFreshRackNext = true;
       }
     } else {
       needsFreshRackNext = done;
@@ -194,7 +213,7 @@ export function WankoBowlingGame({ ownedBalls }: { ownedBalls: OwnedBowlingBall[
 
       if (isLastFrame && done) {
         const finalState = calculateBowlingScore(nextFrames);
-        void submitResult(finalState.total);
+        void submitResult(finalState.total, nextFrames);
         window.setTimeout(() => setPhase("result"), 500);
         return;
       }
@@ -205,6 +224,7 @@ export function WankoBowlingGame({ ownedBalls }: { ownedBalls: OwnedBowlingBall[
   }, [submitResult]);
 
   const goToRanking = useCallback(() => {
+    window.dispatchEvent(new Event("wanko-bowling-ranking-refresh"));
     document.getElementById(rankingSectionIdRef.current)?.scrollIntoView({ behavior: "smooth", block: "start" });
   }, []);
 
@@ -300,7 +320,7 @@ export function WankoBowlingGame({ ownedBalls }: { ownedBalls: OwnedBowlingBall[
     <section className={`rough-card overflow-hidden ${shake ? "wanko-bowl-shake" : ""}`}>
       <div className="border-b border-line px-4 py-3">
         <div className="flex items-baseline justify-between">
-          <p className="text-[9px] font-black tracking-[0.16em] text-ink-faint">SCORE</p>
+          <p className="text-[9px] font-black tracking-[0.14em] text-ink-faint">確定スコア</p>
           <p className="text-2xl font-black tabular-nums text-ink">{score.total}</p>
         </div>
         <div className="mt-2">
@@ -313,7 +333,7 @@ export function WankoBowlingGame({ ownedBalls }: { ownedBalls: OwnedBowlingBall[
 
         {banner ? (
           <div className="pointer-events-none absolute left-1/2 top-[38%] z-20 -translate-x-1/2">
-            <p className="wanko-bowl-banner whitespace-nowrap text-[13vw] font-black leading-none text-[#a8442f] drop-shadow-[0_3px_0_rgba(255,255,255,0.7)]">
+            <p className="wanko-bowl-banner whitespace-nowrap text-[clamp(2.4rem,13vw,4.5rem)] font-black leading-none text-[#a8442f] drop-shadow-[0_3px_0_rgba(255,255,255,0.7)]">
               {banner}
             </p>
           </div>
