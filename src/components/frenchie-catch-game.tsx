@@ -268,14 +268,14 @@ const DEFAULT_ITEM_SPAWN_WEIGHT = 100;
  * そのため上と同じ「時間増加系7種＋宝箱」の重みを底上げ分だけ相殺し、Lv5の時間増加を打ち消している。
  */
 const ITEM_SPAWN_WEIGHTS: Partial<Record<string, number>> = {
-  toy_treasure_puzzle: 298.4,
-  other_omojii: 68.6,
-  toy_duck_plush: 85.5,
-  toy_carrot: 85.5,
-  food_paw_melon_bread: 85.5,
-  interior_anball: 85.5,
-  other_azuki: 85.5,
-  summer_frenchie: 85.5,
+  toy_treasure_puzzle: 200,
+  other_omojii: 68.7,
+  toy_duck_plush: 85.6,
+  toy_carrot: 85.6,
+  food_paw_melon_bread: 85.6,
+  interior_anball: 85.6,
+  other_azuki: 85.6,
+  summer_frenchie: 85.6,
   other_listen_to_the_a: 50,
 };
 const STRETCH_ROD_ITEM_ID = "interior_stretch_rod";
