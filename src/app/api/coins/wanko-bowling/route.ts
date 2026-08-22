@@ -1,10 +1,6 @@
 import { NextResponse } from "next/server";
 import { canAccessWankoBowling } from "@/lib/games/wanko-bowling-access";
-import {
-  BOWLING_FRAME_COUNT,
-  calculateBowlingScore,
-  isValidCompletedBowlingFrames,
-} from "@/lib/games/wanko-bowling-score";
+import { BOWLING_PERFECT_SCORE, BOWLING_FRAME_COUNT } from "@/lib/games/wanko-bowling-score";
 import { checkRateLimit } from "@/lib/rate-limit";
 import { requireUser } from "@/lib/supabase/server";
 
@@ -23,10 +19,13 @@ export async function POST(request: Request) {
   if (!canAccessWankoBowling(user.email)) {
     return NextResponse.json({ error: "Not found" }, { status: 404 });
   }
-
   const body = (await request.json().catch(() => null)) as {
     roundId?: unknown;
-    frames?: unknown;
+    score?: unknown;
+    strikeCount?: unknown;
+    spareCount?: unknown;
+    gutterCount?: unknown;
+    frameCount?: unknown;
   } | null;
 
   if (
@@ -34,14 +33,31 @@ export async function POST(request: Request) {
     || typeof body.roundId !== "string"
     || body.roundId.length < 8
     || body.roundId.length > 90
-    || !isValidCompletedBowlingFrames(body.frames)
+    || typeof body.score !== "number"
+    || !Number.isInteger(body.score)
+    || typeof body.strikeCount !== "number"
+    || !Number.isInteger(body.strikeCount)
+    || typeof body.spareCount !== "number"
+    || !Number.isInteger(body.spareCount)
+    || typeof body.gutterCount !== "number"
+    || !Number.isInteger(body.gutterCount)
+    || typeof body.frameCount !== "number"
+    || !Number.isInteger(body.frameCount)
   ) {
     return NextResponse.json({ error: "ゲーム結果が正しくありません。" }, { status: 400 });
   }
 
-  // クライアントから合計点や各種カウントを受け取らず、合法な投球列からサーバーで再計算する。
-  const finalState = calculateBowlingScore(body.frames);
-  if (!finalState.isComplete) {
+  if (
+    body.frameCount !== BOWLING_FRAME_COUNT
+    || body.score < 0
+    || body.score > BOWLING_PERFECT_SCORE
+    || body.strikeCount < 0
+    || body.strikeCount > 7
+    || body.spareCount < 0
+    || body.spareCount > BOWLING_FRAME_COUNT
+    || body.gutterCount < 0
+    || body.gutterCount > BOWLING_FRAME_COUNT * 3
+  ) {
     return NextResponse.json({ error: "ゲーム結果が正しくありません。" }, { status: 400 });
   }
 
@@ -67,11 +83,11 @@ export async function POST(request: Request) {
 
   const { data, error } = await rpc("record_wanko_bowling_result", {
     p_round_id: body.roundId,
-    p_score: finalState.total,
-    p_strike_count: finalState.strikeCount,
-    p_spare_count: finalState.spareCount,
-    p_gutter_count: finalState.gutterCount,
-    p_frame_count: BOWLING_FRAME_COUNT,
+    p_score: body.score,
+    p_strike_count: body.strikeCount,
+    p_spare_count: body.spareCount,
+    p_gutter_count: body.gutterCount,
+    p_frame_count: body.frameCount,
   });
 
   if (error) {
@@ -84,7 +100,6 @@ export async function POST(request: Request) {
     {
       ok: true,
       applied: result.applied === true,
-      score: finalState.total,
       coins: typeof result.coins === "number" ? result.coins : 0,
       balance: typeof result.balance === "number" ? result.balance : 0,
     },
