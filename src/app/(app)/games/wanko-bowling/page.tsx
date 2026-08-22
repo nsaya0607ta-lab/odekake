@@ -14,7 +14,6 @@ export const dynamic = "force-dynamic";
 
 export default async function WankoBowlingPage() {
   const { supabase, user } = await requireUser();
-  // 実験中のため、URLを直打ちされても許可アカウント以外には存在ごと見せない。
   if (!canAccessWankoBowling(user.email)) notFound();
 
   const ownedItemCounts = await getOwnedItemCounts(supabase, user.id);
@@ -28,20 +27,26 @@ export default async function WankoBowlingPage() {
   });
 
   return (
-    <>
+    <div className="fixed inset-0 z-[50] flex h-dvh flex-col overflow-hidden bg-paper">
       <TopHeader
         backHref="/games"
         title="わんこボウリング"
-        subtitle="お気に入りのボールでストライクを狙おう！"
+        action={(
+          <span className="rounded-full bg-leaf-soft px-2.5 py-1 text-[10px] font-black tracking-[0.12em] text-leaf-deep">
+            5 FRAME
+          </span>
+        )}
       />
 
-      <PageBody className="!space-y-3 !py-3">
-        <WankoBowlingGame ownedBalls={ownedBalls} />
+      <div className="min-h-0 flex-1 overflow-y-auto overscroll-none">
+        <PageBody className="!space-y-2 !px-2 !py-2">
+          <WankoBowlingGame ownedBalls={ownedBalls} />
 
-        <div id="wanko-bowling-ranking">
-          <WankoBowlingRanking />
-        </div>
-      </PageBody>
-    </>
+          <div id="wanko-bowling-ranking" className="pt-1">
+            <WankoBowlingRanking />
+          </div>
+        </PageBody>
+      </div>
+    </div>
   );
 }
