@@ -22,8 +22,10 @@ const PIN_MASS_KG = 1.5;
 const BALL_PIN_RESTITUTION = 0.55;
 /** ピン同士がぶつかったときの反発係数。ボールよりロスが大きい。 */
 const PIN_PIN_RESTITUTION = 0.42;
-/** 衝突とみなす距離（レーン幅に対する%。px換算はスワイプ時のレーン実寸を使う）。 */
-const COLLIDE_RADIUS_PCT = 6.4;
+/** ボールの直径（コンテナ幅に対する%）。Lane 側のボール要素の w-[9%] と合わせる。 */
+const BALL_DIAMETER_PCT = 9;
+/** ピンのSVGは固定20pxで描画していて、コンテナサイズに合わせて拡縮しない。 */
+const PIN_VISUAL_RADIUS_PX = 10;
 /**
  * 20km/h ≈ 5.56m/s を基準速度とする。ピンデッキの奥行き（手前ピン〜最後列）を
  * 現実のボウリングにおよそ合わせて1m ≈ レーン高さの30%とみなし、
@@ -81,6 +83,26 @@ function createPinBody(pin: { x: number; y: number }): PinBody {
  * レーンは正方形でない（幅と高さでスケールが違う）ため、衝突の法線方向や
  * 撃力の計算だけは実際の見た目のpx空間に変換してから行い、結果を%/秒へ戻す。
  */
+/**
+ * 点(px, py)から線分(ax,ay)-(bx,by)までの最短距離（px空間）。
+ * ボールは1フレームで20px前後動くこともあり、移動後の「点」だけを見ていると
+ * ピンの当たり判定をすり抜けてしまう（トンネリング）。前フレーム位置から今の
+ * 位置までの軌跡を線分として判定することで、すり抜けを防ぐ。
+ */
+function distancePointToSegment(
+  px: number, py: number,
+  ax: number, ay: number,
+  bx: number, by: number,
+): number {
+  const abx = bx - ax;
+  const aby = by - ay;
+  const abLenSq = abx * abx + aby * aby;
+  const t = abLenSq > 0 ? Math.max(0, Math.min(1, ((px - ax) * abx + (py - ay) * aby) / abLenSq)) : 0;
+  const closestX = ax + abx * t;
+  const closestY = ay + aby * t;
+  return Math.hypot(px - closestX, py - closestY);
+}
+
 function resolvePairCollision(
   ax: number, ay: number, avx: number, avy: number, massA: number,
   bx: number, by: number, bvx: number, bvy: number, massB: number,
@@ -208,7 +230,12 @@ export function Lane({ ballVisual, resetSignal, active, onRoll }: LaneProps) {
     const rect = board.getBoundingClientRect();
     const scaleX = rect.width;
     const scaleY = rect.height;
-    const collideRadiusPx = (COLLIDE_RADIUS_PCT / 100) * scaleX;
+    // 半径は実際の見た目のサイズから出す（ボールはコンテナ幅の9%＝直径、
+    // ピンのSVGはコンテナに合わせて拡縮されない固定20pxなので、そのまま使う）。
+    // +αは「当たっているように見えるのに判定が出ない」を防ぐ多少の余裕。
+    const ballRadiusPx = (BALL_DIAMETER_PCT / 2 / 100) * scaleX;
+    const collideRadiusPx = ballRadiusPx + PIN_VISUAL_RADIUS_PX + 3;
+    const pinPinRadiusPx = PIN_VISUAL_RADIUS_PX * 2 + 2;
 
     const preThrowStandingIds = new Set(
       [...pinBodiesRef.current.entries()].filter(([, body]) => body.standing).map(([id]) => id),
@@ -253,6 +280,9 @@ export function Lane({ ballVisual, resetSignal, active, onRoll }: LaneProps) {
 
       // --- ボール ---
       if (!ballDone) {
+        const prevBx = bx;
+        const prevBy = by;
+
         bvx += launch.curveNorm * CURVE_ACCEL_PCT_PER_SEC2 * dt;
         bx += bvx * dt;
         by += bvy * dt;
@@ -275,12 +305,20 @@ export function Lane({ ballVisual, resetSignal, active, onRoll }: LaneProps) {
           }
           bx = Math.min(Math.max(bx, LANE_LEFT - 3), LANE_RIGHT + 3);
 
+          // 前フレーム位置→今の位置までの軌跡（線分）でピンとの距離を見る。
+          // 点だけの比較だと、速いボールが1フレームでピンの判定を飛び越えて
+          // すり抜けてしまう（トンネリング）ことがあったため。
+          const prevBxPx = prevBx * scaleX;
+          const prevByPx = prevBy * scaleY;
+          const bxPx = bx * scaleX;
+          const byPx = by * scaleY;
+
           for (const pin of PIN_LAYOUT) {
             const body = pinBodiesRef.current.get(pin.id);
             if (!body || !body.standing) continue;
-            const dxPx = (body.x - bx) * scaleX;
-            const dyPx = (body.y - by) * scaleY;
-            if (Math.hypot(dxPx, dyPx) > collideRadiusPx) continue;
+            const pinXPx = body.x * scaleX;
+            const pinYPx = body.y * scaleY;
+            if (distancePointToSegment(pinXPx, pinYPx, prevBxPx, prevByPx, bxPx, byPx) > collideRadiusPx) continue;
 
             const result = resolvePairCollision(
               bx, by, bvx, bvy, BALL_MASS_KG,
@@ -294,7 +332,7 @@ export function Lane({ ballVisual, resetSignal, active, onRoll }: LaneProps) {
             body.vy = result.bvy;
             body.standing = false;
             body.moving = true;
-            body.angularVel = (Math.random() - 0.5) * 560 + (dxPx >= 0 ? 1 : -1) * 120;
+            body.angularVel = (Math.random() - 0.5) * 560 + (pinXPx - bxPx >= 0 ? 1 : -1) * 120;
           }
 
           if (by <= DECK_EXIT_Y || Math.hypot(bvx, bvy) < 10) ballDone = true;
@@ -313,7 +351,7 @@ export function Lane({ ballVisual, resetSignal, active, onRoll }: LaneProps) {
           if (!bodyA.moving && !bodyB.moving) continue;
           const dxPx = (bodyB.x - bodyA.x) * scaleX;
           const dyPx = (bodyB.y - bodyA.y) * scaleY;
-          if (Math.hypot(dxPx, dyPx) > collideRadiusPx) continue;
+          if (Math.hypot(dxPx, dyPx) > pinPinRadiusPx) continue;
 
           const result = resolvePairCollision(
             bodyA.x, bodyA.y, bodyA.vx, bodyA.vy, PIN_MASS_KG,
