@@ -27,12 +27,12 @@ export function BowlingScreenLock() {
     html.style.overflow = "hidden";
     html.style.overscrollBehavior = "none";
 
-    // iOS SafariではPointerEventのpreventDefaultだけでは、親のスクロールや
-    // ラバーバンドが動く場合がある。投球レーン上のtouchmoveだけをnativeの
-    // capture段階で止め、ゲーム外のスクロール操作には影響させない。
+    // iOS SafariではPointerEventのpreventDefaultだけでは親スクロールや
+    // ラバーバンドが動くことがある。touch-noneの投球レーン上だけnativeの
+    // touchmoveをcapture段階で止め、ランキング等の通常スクロールは残す。
     const blockLaneTouchMove = (event: TouchEvent) => {
       const target = event.target instanceof Element ? event.target : null;
-      if (!target?.closest('[data-bowling-gesture-block="true"]')) return;
+      if (!target?.closest(".touch-none")) return;
       event.preventDefault();
       event.stopPropagation();
     };
