@@ -1,9 +1,11 @@
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
+import { DOG_SKIN_COOKIE, isDogSkinId } from "@/lib/dog-skins";
 import { getSupabaseEnv } from "@/lib/supabase/env";
 
 /** 未ログインでも開ける画面・リソース */
 const PUBLIC_PATHS = [
+  "/sns-guide.html",
   "/login",
   "/signup",
   "/signup/complete",
@@ -84,6 +86,26 @@ export async function middleware(request: NextRequest) {
     url.pathname = "/home";
     url.search = "";
     return NextResponse.redirect(url);
+  }
+
+  // 犬スキンのCookieが無い（切り替えたことがない）利用者は、(app)/layout.tsx の
+  // getCurrentDogSkin が画面遷移のたびにDBへ問い合わせてしまう。ここで一度だけ
+  // 結果をCookieへ焼いておけば、以降の遷移はCookie読み取りだけで済む。
+  const userId = typeof data?.claims?.sub === "string" ? data.claims.sub : null;
+  if (isAuthenticated && userId && !isDogSkinId(request.cookies.get(DOG_SKIN_COOKIE)?.value)) {
+    const { data: skinRow } = await supabase
+      .from("user_dog_skin")
+      .select("skin_id")
+      .eq("user_id", userId)
+      .maybeSingle();
+    const skinId = isDogSkinId(skinRow?.skin_id) ? skinRow.skin_id : "default";
+    response.cookies.set(DOG_SKIN_COOKIE, skinId, {
+      httpOnly: true,
+      sameSite: "lax",
+      secure: process.env.NODE_ENV === "production",
+      path: "/",
+      maxAge: 60 * 60 * 24 * 365,
+    });
   }
 
   return response;

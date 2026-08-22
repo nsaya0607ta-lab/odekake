@@ -1,0 +1,717 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="description" content="おでかけ記録アプリのSNS機能を、実際の画面とあわせて紹介する説明書です。">
+<meta name="theme-color" content="#fbf8f1" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#1c1815" media="(prefers-color-scheme: dark)">
+<link rel="icon" href="/icon-192.png">
+<title>おでかけSNSの歩き方</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Yusei+Magic&family=Zen+Kaku+Gothic+New:wght@400;500;700;900&family=IBM+Plex+Mono:wght@500;600&display=swap">
+
+<style>
+/* ══════════ 色 ─ 昼 ══════════ */
+:root {
+  --paper:       #fbf8f1;
+  --paper-deep:  #f4efe3;
+  --card:        #fffdf8;
+  --ink:         #3f3a33;
+  --ink-soft:    #6d675d;
+  --ink-faint:   #9c9488;
+  --line:        #e6dfd0;
+  --line-firm:   #cfc5b0;
+
+  --leaf:        #7fa568;
+  --leaf-deep:   #567a43;
+  --leaf-wash:   #eaf1e0;
+  --leaf-ink:    #4a6b39;
+
+  --rule-sky:    #6f9cc0;
+  --rule-rose:   #c9707f;
+  --rule-violet: #7f6cae;
+
+  --gold-glow:   rgba(224, 184, 98, .24);
+  --coral-glow:  rgba(224, 138, 125, .20);
+  --violet-glow: rgba(142, 124, 187, .20);
+
+  --lift:        0 1px 2px rgba(63,58,51,.05), 0 12px 30px -20px rgba(63,58,51,.30);
+  --lift-lg:     0 4px 14px rgba(63,58,51,.10), 0 34px 60px -30px rgba(63,58,51,.38);
+
+  --display: "Yusei Magic", "Hiragino Maru Gothic ProN", "Zen Kaku Gothic New", system-ui, sans-serif;
+  --body:    "Zen Kaku Gothic New", "Hiragino Sans", "Noto Sans JP", system-ui, sans-serif;
+  --mono:    "IBM Plex Mono", ui-monospace, Menlo, monospace;
+}
+
+/* ══════════ 色 ─ 夜 ══════════ */
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --paper:      #1c1815;  --paper-deep: #241f1a;
+    --card:       #292320;
+    --ink:        #f0e8db;  --ink-soft:   #beb4a4;  --ink-faint: #8e8676;
+    --line:       #3a322a;  --line-firm:  #4e4438;
+
+    --leaf:       #9cc484;  --leaf-deep:  #b8d9a1;
+    --leaf-wash:  #2a3724;  --leaf-ink:   #c7e3b2;
+
+    --rule-sky:   #93bcdd;  --rule-rose:  #e6a6b2;  --rule-violet: #b6a8dc;
+
+    --gold-glow:   rgba(224, 184, 98, .26);
+    --coral-glow:  rgba(224, 138, 125, .26);
+    --violet-glow: rgba(160, 143, 204, .26);
+
+    --lift:       0 1px 2px rgba(0,0,0,.34), 0 12px 30px -20px rgba(0,0,0,.8);
+    --lift-lg:    0 4px 14px rgba(0,0,0,.4), 0 34px 60px -30px rgba(0,0,0,.85);
+  }
+}
+:root[data-theme="dark"] {
+  --paper:      #1c1815;  --paper-deep: #241f1a;
+  --card:       #292320;
+  --ink:        #f0e8db;  --ink-soft:   #beb4a4;  --ink-faint: #8e8676;
+  --line:       #3a322a;  --line-firm:  #4e4438;
+
+  --leaf:       #9cc484;  --leaf-deep:  #b8d9a1;
+  --leaf-wash:  #2a3724;  --leaf-ink:   #c7e3b2;
+
+  --rule-sky:   #93bcdd;  --rule-rose:  #e6a6b2;  --rule-violet: #b6a8dc;
+
+  --gold-glow:   rgba(224, 184, 98, .26);
+  --coral-glow:  rgba(224, 138, 125, .26);
+  --violet-glow: rgba(160, 143, 204, .26);
+
+  --lift:       0 1px 2px rgba(0,0,0,.34), 0 12px 30px -20px rgba(0,0,0,.8);
+  --lift-lg:    0 4px 14px rgba(0,0,0,.4), 0 34px 60px -30px rgba(0,0,0,.85);
+}
+
+*, *::before, *::after { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  background: var(--paper);
+  color: var(--ink);
+  font-family: var(--body);
+  font-size: 16px;
+  line-height: 1.9;
+  -webkit-font-smoothing: antialiased;
+  overflow-x: hidden;
+}
+
+img { max-width: 100%; height: auto; display: block; }
+a { color: var(--leaf-ink); }
+
+:focus-visible { outline: 2.5px solid var(--leaf-deep); outline-offset: 3px; border-radius: 6px; }
+
+.wrap { width: 100%; max-width: 1080px; margin-inline: auto; padding-inline: clamp(1.15rem, 4.5vw, 2.75rem); }
+
+/* ══════════ 見出しの型 ══════════ */
+.eyebrow {
+  display: inline-flex; align-items: center; gap: .5rem;
+  font-family: var(--mono); font-size: .66rem; font-weight: 600;
+  letter-spacing: .2em; text-transform: uppercase; color: var(--ink-faint);
+}
+.eyebrow::before { content: ""; width: 1.4rem; height: 0; border-top: 1.5px dashed var(--line-firm); }
+
+h2.sec-title {
+  font-family: var(--display); font-weight: 400;
+  font-size: clamp(1.55rem, 3.6vw, 2.15rem);
+  line-height: 1.46; letter-spacing: .015em;
+  text-wrap: balance; word-break: auto-phrase;
+  margin: .75rem 0 0;
+}
+
+.sec-lead { max-width: 34em; margin: .95rem 0 0; color: var(--ink-soft); font-size: .98rem; }
+.sec-lead strong { color: var(--ink); font-weight: 700; }
+code.k { font-family: var(--mono); font-size: .85em; background: var(--paper-deep); padding: .05em .35em; border-radius: 4px; }
+
+/* ══════════ ヒーロー ══════════ */
+.hero { position: relative; padding-block: clamp(3rem, 7vw, 5rem) clamp(2.5rem, 6vw, 4rem); overflow: hidden; }
+.hero-sky {
+  position: absolute; inset: -30% -20% auto -20%; height: 130%;
+  background:
+    radial-gradient(60% 55% at 78% 22%, var(--gold-glow), transparent 68%),
+    radial-gradient(55% 50% at 88% 58%, var(--coral-glow), transparent 70%),
+    radial-gradient(50% 45% at 58% 8%,  var(--violet-glow), transparent 72%);
+  pointer-events: none;
+}
+.hero .wrap { position: relative; z-index: 1; }
+.hero-grid { display: grid; grid-template-columns: minmax(0, 1.14fr) minmax(0, .86fr); gap: clamp(1.5rem, 5vw, 3.5rem); align-items: center; }
+.hero h1 {
+  font-family: var(--display); font-weight: 400;
+  font-size: clamp(2rem, 5.2vw, 3.05rem);
+  line-height: 1.38; letter-spacing: .015em;
+  text-wrap: balance; word-break: auto-phrase;
+  margin: 1rem 0 0;
+}
+.hero h1 em { font-style: normal; position: relative; color: var(--leaf-ink); white-space: nowrap; }
+.hero h1 em::after {
+  content: ""; position: absolute; left: -.06em; right: -.06em; bottom: .04em; height: .34em;
+  border-radius: .2em; background: var(--leaf-wash); z-index: -1;
+}
+.hero-lead { max-width: 30em; margin: 1.2rem 0 0; font-size: 1.02rem; color: var(--ink-soft); }
+.hero-marks { display: flex; flex-wrap: wrap; gap: .5rem; margin-top: 1.7rem; }
+.mark {
+  display: inline-flex; align-items: center; gap: .45rem; padding: .35rem .8rem .38rem;
+  border: 1px solid var(--line-firm); border-radius: 999px; background: var(--card);
+  font-size: .78rem; font-weight: 700; color: var(--ink-soft); box-shadow: var(--lift);
+}
+.mark .dot { width: .42rem; height: .42rem; border-radius: 999px; background: var(--leaf); }
+.hero-art { position: relative; justify-self: center; width: min(100%, 27rem); }
+.hero-art img { width: 100%; filter: drop-shadow(0 26px 34px rgba(63,58,51,.18)); }
+
+/* ══════════ 節 ══════════ */
+.stop { position: relative; padding-block: clamp(2.75rem, 6.5vw, 4.5rem); }
+.tinted { background: var(--paper-deep); border-block: 1px solid var(--line); }
+
+/* 三つの入り口 */
+.pillars { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: clamp(.85rem, 2vw, 1.35rem); margin-top: 2.2rem; }
+.pillar {
+  display: flex; flex-direction: column; padding: 1.5rem 1.4rem 1.6rem;
+  border: 1px solid var(--line); border-radius: 20px; background: var(--card); box-shadow: var(--lift);
+}
+.pillar-art { position: relative; width: 5.5rem; height: 5.5rem; margin-bottom: .8rem; display: grid; place-items: center; }
+.pillar-art::before { content: ""; position: absolute; inset: 8%; border-radius: 999px; background: var(--glow, var(--gold-glow)); filter: blur(11px); }
+.pillar-art img { position: relative; width: 100%; }
+.pillar h3 { font-family: var(--display); font-weight: 400; font-size: 1.15rem; letter-spacing: .02em; margin: 0; }
+.pillar p { margin: .5rem 0 0; font-size: .87rem; color: var(--ink-soft); line-height: 1.82; }
+
+/* ══════════ 画面ごとの解説（テキスト＋実機画面） ══════════ */
+.screen {
+  display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: clamp(1.75rem, 4.5vw, 3.5rem); align-items: start;
+  margin-top: 2.1rem;
+}
+.screen.is-flipped > .screen-shot { order: -1; }
+
+.screen-copy .kicker {
+  display: inline-block; margin-bottom: .5rem; padding: .18rem .6rem;
+  border-radius: 999px; background: var(--leaf-wash); color: var(--leaf-ink);
+  font-family: var(--mono); font-size: .64rem; font-weight: 600; letter-spacing: .08em;
+}
+
+.beads { margin: 1.4rem 0 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: .8rem; }
+.beads li { display: grid; grid-template-columns: .4rem minmax(0, 1fr); gap: 0 .7rem; }
+.beads li::before { content: ""; grid-row: span 2; width: .4rem; height: .4rem; margin-top: .55rem; border-radius: 999px; background: var(--leaf); }
+.beads b { font-weight: 700; font-size: .94rem; }
+.beads span.desc { grid-column: 2; font-size: .87rem; color: var(--ink-soft); line-height: 1.78; }
+
+.screen-shot { display: flex; justify-content: center; }
+.phone {
+  width: min(100%, 21rem); border-radius: 26px; overflow: hidden;
+  border: 1px solid var(--line-firm); background: var(--card); box-shadow: var(--lift-lg);
+}
+.phone img { display: block; width: 100%; }
+.phone figcaption {
+  padding: .55rem .9rem; border-top: 1px solid var(--line); background: var(--paper-deep);
+  font-family: var(--mono); font-size: .64rem; font-weight: 600; color: var(--ink-faint); text-align: center;
+}
+
+/* 縦に並ぶ二枚（グループの写真／チャットなど） */
+.screen-shot.is-pair { display: flex; flex-direction: column; gap: 1.4rem; align-items: center; }
+
+/* ══════════ 反応の四つ・安全の四つ（グリッド） ══════════ */
+.quad { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: clamp(.7rem, 2vw, 1.1rem); margin-top: 1.6rem; }
+.quad-item { padding: 1.05rem 1.1rem; border: 1px solid var(--line); border-radius: 15px; background: var(--card); box-shadow: var(--lift); }
+.quad-item b { display: block; font-size: .88rem; font-weight: 900; margin-bottom: .3rem; }
+.quad-item span { font-size: .82rem; color: var(--ink-soft); line-height: 1.75; }
+
+/* ══════════ 早見表 ══════════ */
+.table-wrap { margin-top: 1.8rem; overflow-x: auto; border: 1px solid var(--line); border-radius: 15px; background: var(--card); }
+table { width: 100%; border-collapse: collapse; font-size: .85rem; }
+thead th {
+  text-align: left; padding: .6rem .9rem; font-size: .68rem; font-weight: 700; letter-spacing: .1em; text-transform: uppercase;
+  color: var(--ink-faint); background: var(--paper-deep); border-bottom: 1px solid var(--line); white-space: nowrap;
+}
+thead th.r { text-align: right; }
+tbody td { padding: .55rem .9rem; border-bottom: 1px solid var(--line); vertical-align: top; }
+tbody tr:last-child td { border-bottom: 0; }
+td.n { font-family: var(--mono); font-size: .8rem; font-variant-numeric: tabular-nums; white-space: nowrap; text-align: right; font-weight: 600; }
+td.w { color: var(--ink-soft); font-size: .8rem; white-space: nowrap; }
+
+/* ══════════ よくある質問 ══════════ */
+.faq { margin-top: 1.8rem; display: flex; flex-direction: column; gap: 1.3rem; max-width: 46rem; }
+.faq-item .q { display: flex; gap: .6rem; align-items: baseline; font-size: .93rem; font-weight: 700; }
+.faq-item .q .mark-q {
+  flex: none; width: 1.4rem; height: 1.4rem; border-radius: 999px; display: grid; place-items: center;
+  background: var(--leaf-wash); color: var(--leaf-ink); font-family: var(--mono); font-size: .65rem; font-weight: 600;
+  transform: translateY(1px);
+}
+.faq-item .a { margin: .5rem 0 0 2rem; font-size: .88rem; color: var(--ink-soft); line-height: 1.85; }
+
+/* ══════════ 結び ══════════ */
+.outro { position: relative; text-align: center; padding-block: clamp(3.5rem, 8vw, 5.5rem); overflow: hidden; }
+.outro::before { content: ""; position: absolute; inset: auto -10% -40% -10%; height: 130%; background: radial-gradient(50% 60% at 50% 78%, var(--gold-glow), transparent 70%); pointer-events: none; }
+.outro > .wrap { position: relative; z-index: 1; }
+.outro img { width: min(100%, 11rem); margin: 0 auto 1.3rem; filter: drop-shadow(0 18px 26px rgba(63,58,51,.16)); }
+.outro h2 { font-family: var(--display); font-weight: 400; font-size: clamp(1.55rem, 4vw, 2.2rem); line-height: 1.5; letter-spacing: .015em; text-wrap: balance; word-break: auto-phrase; margin: 0; }
+.outro p { max-width: 30em; margin: 1rem auto 0; color: var(--ink-soft); }
+
+footer { border-top: 1px solid var(--line); padding-block: 1.6rem 2.4rem; font-size: .78rem; color: var(--ink-faint); text-align: center; }
+
+/* ══════════ 目次 ══════════ */
+.toc { margin-top: 2rem; display: flex; flex-wrap: wrap; gap: .4rem; }
+.toc a {
+  padding: .35rem .8rem; border: 1px solid var(--line-firm); border-radius: 999px;
+  background: var(--card); font-size: .78rem; font-weight: 700; color: var(--ink-soft); text-decoration: none;
+}
+
+/* ══════════ 狭い画面 ══════════ */
+@media (max-width: 900px) {
+  .hero-grid { grid-template-columns: 1fr; }
+  .hero-art { order: -1; width: min(72%, 19rem); }
+  .screen { grid-template-columns: 1fr; }
+  .screen.is-flipped > .screen-shot { order: 0; }
+  .screen-shot { order: -1; }
+  .pillars { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+@media (max-width: 560px) {
+  body { font-size: 15px; }
+  .pillars, .quad { grid-template-columns: 1fr; }
+}
+</style>
+</head>
+<body>
+
+<!-- ═════════ ヒーロー ═════════ -->
+<header class="hero" id="top">
+  <div class="hero-sky" aria-hidden="true"></div>
+  <div class="wrap">
+    <div class="hero-grid">
+      <div>
+        <p class="eyebrow">Odekake — Friends &amp; Sharing</p>
+        <h1>おでかけを、<br><em>フレンドと</em>分けあう。</h1>
+        <p class="hero-lead">
+          写真も、ひとことも、行ってきた場所も。
+          おでかけ記録アプリの中に、フレンドだけの小さなSNSがあります。
+          知らない誰かに届くことはありません。
+          このページでは、実際の画面とあわせてできることを紹介します。
+        </p>
+        <div class="hero-marks">
+          <span class="mark"><span class="dot"></span>フレンドだけに公開</span>
+          <span class="mark"><span class="dot"></span>写真とひとこと</span>
+          <span class="mark"><span class="dot"></span>グループで共有</span>
+        </div>
+        <nav class="toc" aria-label="もくじ">
+          <a href="#doors">入り口</a>
+          <a href="#home">ホーム</a>
+          <a href="#compose">投稿</a>
+          <a href="#post">反応</a>
+          <a href="#profile">プロフィール</a>
+          <a href="#groups">グループ</a>
+          <a href="#photo">写真</a>
+          <a href="#search">検索</a>
+          <a href="#notify">通知</a>
+          <a href="#safety">安全</a>
+          <a href="#specs">早見表</a>
+          <a href="#faq">質問</a>
+        </nav>
+      </div>
+      <div class="hero-art">
+        <img src="/illustrations/sns/nav-home-v2.webp" alt="ひらいた旅の手帖と、そこから飛び出す写真のイラスト" width="384" height="346" fetchpriority="high">
+      </div>
+    </div>
+  </div>
+</header>
+
+<main>
+
+  <!-- ═════════ 01 入り口 ═════════ -->
+  <section class="stop" id="doors">
+    <div class="wrap">
+      <p class="eyebrow">01 — Three Doors</p>
+      <h2 class="sec-title">入り口は、三つ。</h2>
+      <p class="sec-lead">
+        見たいものに合わせて場所を選べます。画面の上のボタンで、いつでも行き来できます。
+        どこにいても、通知と検索には手が届きます。
+      </p>
+      <div class="pillars">
+        <article class="pillar">
+          <div class="pillar-art" style="--glow: var(--gold-glow)"><img src="/illustrations/sns/nav-home-v2.webp" alt="" width="384" height="346" loading="lazy"></div>
+          <h3>ホーム</h3>
+          <p>フレンド全員のつぶやきが、新しい順に流れてくる、いちばん広い場所。</p>
+        </article>
+        <article class="pillar">
+          <div class="pillar-art" style="--glow: var(--violet-glow)"><img src="/illustrations/sns/nav-user-v2.webp" alt="" width="384" height="384" loading="lazy"></div>
+          <h3>ユーザー</h3>
+          <p>自分や、気になるあの人の投稿だけを集めた場所。タブで種類を絞れます。</p>
+        </article>
+        <article class="pillar">
+          <div class="pillar-art" style="--glow: var(--coral-glow)"><img src="/illustrations/sns/nav-group-v2.webp" alt="" width="384" height="384" loading="lazy"></div>
+          <h3>グループ</h3>
+          <p>選んだ数人だけで、写真とおしゃべりを共有する閉じた部屋。</p>
+        </article>
+      </div>
+    </div>
+  </section>
+
+  <!-- ═════════ 02 ホーム ═════════ -->
+  <section class="stop tinted" id="home">
+    <div class="wrap">
+      <p class="eyebrow">02 — Home</p>
+      <h2 class="sec-title">今日のことが、流れてくる。</h2>
+      <div class="screen">
+        <div class="screen-copy">
+          <p class="sec-lead" style="margin-top:0">
+            ホームには、グループに属さないつぶやきだけが新しい順に並びます。
+            上には日替わりのお題がひとつ。七つの言葉から日本時間の日付で選ばれるので、
+            同じ日はフレンド全員に同じお題が出ます。何を書くか迷ったときの糸口です。
+          </p>
+          <ul class="beads">
+            <li><b>三つのフィルタ</b><span class="desc">すべて／写真つき／ひとこと。見たい種類だけに絞れます。</span></li>
+            <li><b>24件ずつ、120件まで</b><span class="desc">「もっと見る」で読み進めても、スクロール位置はそのままです。</span></li>
+            <li><b>お題は毎日ひとつ</b><span class="desc">「帰り道の一枚」「また行きたいお店」など、七つが日替わりで。</span></li>
+          </ul>
+        </div>
+        <div class="screen-shot">
+          <figure class="phone">
+            <img src="/sns-guide-shots/home.webp" alt="ホーム画面。日替わりのお題カードと、フィルタタブ、フレンドのつぶやきが並んでいる。">
+            <figcaption>ホーム — /sns/home</figcaption>
+          </figure>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ═════════ 03 投稿 ═════════ -->
+  <section class="stop" id="compose">
+    <div class="wrap">
+      <p class="eyebrow">03 — Post</p>
+      <h2 class="sec-title">その日のことを、ひとこと。</h2>
+      <div class="screen is-flipped">
+        <div class="screen-copy">
+          <p class="sec-lead" style="margin-top:0">
+            長い文章はいりません。写真を数枚と、短いひとこと。
+            行ってきた場所を添えれば、記録がそのまま話のたねになります。
+            公開範囲はいつもフレンド固定なので、宛先を迷うことはありません。
+          </p>
+          <ul class="beads">
+            <li><b>280文字まで</b><span class="desc">250文字を超えると、残りの表示が色を変えて知らせます。</span></li>
+            <li><b>写真は4枚まで</b><span class="desc">その日のいちばんを選んで貼りましょう。</span></li>
+            <li><b>行った場所を添える</b><span class="desc">記録済みの訪問先から選ぶと、投稿に場所の札がつきます。</span></li>
+            <li><b>フレンドを呼ぶ</b><span class="desc">名前を選ぶと本文に入り、相手に通知が届きます。</span></li>
+            <li><b>書きかけは自動で残る</b><span class="desc">途中で他の画面に移っても、戻れば続きから書けます。</span></li>
+          </ul>
+        </div>
+        <div class="screen-shot">
+          <figure class="phone">
+            <img src="/sns-guide-shots/compose.webp" alt="つぶやきの作成画面。フレンドに公開のラベルと、本文の入力欄、文字数の表示がある。">
+            <figcaption>つぶやく — /sns/home/new</figcaption>
+          </figure>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ═════════ 04 反応 ═════════ -->
+  <section class="stop tinted" id="post">
+    <div class="wrap">
+      <p class="eyebrow">04 — React</p>
+      <h2 class="sec-title">四つの返しかた。</h2>
+      <div class="screen">
+        <div class="screen-copy">
+          <p class="sec-lead" style="margin-top:0">
+            投稿の詳細画面では、気持ちの伝えかたを四つから選べます。
+            軽く押すだけのものから、言葉を返すものまで。
+          </p>
+          <div class="quad">
+            <div class="quad-item"><b>いいね</b><span>ひとことも要らないとき。何度押しても、ひとりぶんだけ数えられます。</span></div>
+            <div class="quad-item"><b>返信</b><span>言葉で返す。返信に返信を重ねられ、返信自体にもいいねを付けられます。</span></div>
+            <div class="quad-item"><b>リポスト</b><span>いい投稿をみんなへ。引用して自分の言葉を添えることもできます。</span></div>
+            <div class="quad-item"><b>保存</b><span>あとで行きたい場所を、自分だけの棚に。プロフィールの「保存」に集まります。</span></div>
+          </div>
+          <p class="sec-lead">
+            右上のメニューは、自分の投稿かどうかで中身が変わります。
+            自分の投稿なら<strong>プロフィールへの固定</strong>と<strong>削除</strong>。
+            ほかの人の投稿なら<strong>通報</strong>と<strong>ブロック</strong>です。
+          </p>
+        </div>
+        <div class="screen-shot">
+          <figure class="phone">
+            <img src="/sns-guide-shots/post.webp" alt="投稿の詳細画面。本文と写真、いいね・返信・リポスト・保存のボタン、返信のやりとりが表示されている。">
+            <figcaption>投稿の詳細 — /sns/posts/[postId]</figcaption>
+          </figure>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ═════════ 05 プロフィール ═════════ -->
+  <section class="stop" id="profile">
+    <div class="wrap">
+      <p class="eyebrow">05 — Profile</p>
+      <h2 class="sec-title">その人の記録が、ここに。</h2>
+      <div class="screen is-flipped">
+        <div class="screen-copy">
+          <p class="sec-lead" style="margin-top:0">
+            その人のつぶやきだけを集めた画面です。上のレールでフレンドを切り替えられ、
+            タブで見たい種類に絞り込めます。固定した投稿は、いつでもいちばん上に並びます。
+          </p>
+          <ul class="beads">
+            <li><b>つぶやき</b><span class="desc">すべての投稿。固定したものが先頭に来ます。</span></li>
+            <li><b>写真・場所</b><span class="desc">写真つき、または訪問先がひも付いた投稿だけを見られます。</span></li>
+            <li><b>保存（自分だけ）</b><span class="desc">保存タブは自分のページにだけ出ます。人には見えません。</span></li>
+          </ul>
+          <p class="sec-lead">
+            タブの数字は、いま読み込んでいる範囲での件数です。まだ先があるときは
+            <code class="k">24+</code> のように付き、読み進めると増えていきます。
+          </p>
+        </div>
+        <div class="screen-shot">
+          <figure class="phone">
+            <img src="/sns-guide-shots/profile.webp" alt="プロフィール画面。フレンドの切り替えレール、投稿数などのタブ、その人のつぶやきが並んでいる。">
+            <figcaption>プロフィール — /sns/users/[userId]</figcaption>
+          </figure>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ═════════ 06 グループ ═════════ -->
+  <section class="stop tinted" id="groups">
+    <div class="wrap">
+      <p class="eyebrow">06 — Groups</p>
+      <h2 class="sec-title">みんなで決めて、みんなで残す。</h2>
+      <div class="screen">
+        <div class="screen-copy">
+          <p class="sec-lead" style="margin-top:0">
+            グループは、選んだ数人だけの部屋です。出かける前の相談から、帰ってきたあとの写真の共有まで、
+            ひとつの場所でつながったまま進みます。部屋を開いた時点で既読になるので、
+            「どこまで見たか」を気にする必要はありません。
+          </p>
+          <ul class="beads">
+            <li><b>写真タブ</b><span class="desc">日付ごとの格子で共有。初めは直近10日分、最大90日分まで遡れます。</span></li>
+            <li><b>チャットタブ</b><span class="desc">部屋の中だけのおしゃべり。名前を呼べば、その人に通知が届きます。</span></li>
+            <li><b>ピン留め</b><span class="desc">集合時間や持ち物を部屋のいちばん上へ。流れて消えません。</span></li>
+            <li><b>投票</b><span class="desc">選択肢は最大4つ。締切を決めれば、だらだら続きません。</span></li>
+            <li><b>並び替えと設定</b><span class="desc">上のアイコンを長押しして並び替え。名前とアイコンの変更、メンバー追加、退出もここから。</span></li>
+          </ul>
+        </div>
+        <div class="screen-shot is-pair">
+          <figure class="phone">
+            <img src="/sns-guide-shots/group.webp" alt="グループの写真タブ。ピン留めカードと投票、日付ごとの写真の格子が並んでいる。">
+            <figcaption>グループ（写真）— /sns/groups/[groupId]</figcaption>
+          </figure>
+          <figure class="phone">
+            <img src="/sns-guide-shots/chat.webp" alt="グループのチャットタブ。メンバーの吹き出しと、メンションつきのメッセージが並んでいる。">
+            <figcaption>グループ（チャット）— ?view=chat</figcaption>
+          </figure>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ═════════ 07 写真 ═════════ -->
+  <section class="stop" id="photo">
+    <div class="wrap">
+      <p class="eyebrow">07 — Photos</p>
+      <h2 class="sec-title">一枚に、みんなの声を。</h2>
+      <div class="screen is-flipped">
+        <div class="screen-copy">
+          <p class="sec-lead" style="margin-top:0">
+            グループに上げた写真は、一枚ずつ開けます。
+            絵文字でさっと気持ちを返すこともできますし、言葉でコメントを添えることもできます。
+            リアクションはひとりひとつ。同じ絵文字をもう一度押すと取り消しになります。
+          </p>
+          <ul class="beads">
+            <li><b>6つの絵文字</b><span class="desc">😊 😂 😍 😮 👍 🎉 から、ひとつだけ選べます。</span></li>
+            <li><b>コメント</b><span class="desc">写真ごとに時系列で並びます。自分のものはあとから消せます。</span></li>
+            <li><b>キャプション</b><span class="desc">300文字まで。その日の空気を短く添えられます。</span></li>
+          </ul>
+        </div>
+        <div class="screen-shot">
+          <figure class="phone">
+            <img src="/sns-guide-shots/photo.webp" alt="写真の詳細画面。大きく表示された写真と、絵文字のリアクション、コメント欄への導線がある。">
+            <figcaption>写真の詳細 — /sns/[photoId]</figcaption>
+          </figure>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ═════════ 08 検索 ═════════ -->
+  <section class="stop tinted" id="search">
+    <div class="wrap">
+      <p class="eyebrow">08 — Search</p>
+      <h2 class="sec-title">探すのは、ひとつの窓口から。</h2>
+      <div class="screen">
+        <div class="screen-copy">
+          <p class="sec-lead" style="margin-top:0">
+            人・投稿・グループ・場所を、横断して探せます。
+            投稿は本文だけでなく、投稿者の名前や、ひも付いた場所・旅程の名前まで見にいきます。
+            言葉を入れる前でも、いま使われているタグが候補として並びます。
+          </p>
+          <ul class="beads">
+            <li><b>5つの対象</b><span class="desc">すべて／投稿／ユーザー／グループ／場所を、タブで切り替えます。</span></li>
+            <li><b>タグはそのまま貼れる</b><span class="desc">先頭の <code class="k">#</code> は自動で外して探します。</span></li>
+            <li><b>表記ゆれを吸収</b><span class="desc">全角・半角、大文字・小文字の違いは気にしなくて大丈夫です。</span></li>
+          </ul>
+        </div>
+        <div class="screen-shot">
+          <figure class="phone">
+            <img src="/sns-guide-shots/search.webp" alt="SNS検索画面。検索キーワード欄、すべて・投稿・ユーザーなどの対象タブ、投稿の検索結果が表示されている。">
+            <figcaption>検索 — /sns/search</figcaption>
+          </figure>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ═════════ 09 通知 ═════════ -->
+  <section class="stop" id="notify">
+    <div class="wrap">
+      <p class="eyebrow">09 — Notifications</p>
+      <h2 class="sec-title">届いた反応は、ひとまとめに。</h2>
+      <div class="screen is-flipped">
+        <div class="screen-copy">
+          <p class="sec-lead" style="margin-top:0">
+            返信・いいね・メンション・グループの動きが、ひとつの一覧に集まります。
+            未読だけを見るタブと、まとめて既読にするボタンがあるので、
+            たまっても数回のタップで片付きます。
+          </p>
+          <ul class="beads">
+            <li><b>返信</b><span class="desc">自分の投稿に付いた、ほかの人からの返信。</span></li>
+            <li><b>いいね</b><span class="desc">前に見たときからの増分を「新着 +3」のように出します。</span></li>
+            <li><b>メンション</b><span class="desc">投稿・返信・グループチャットで名前を呼ばれたとき。</span></li>
+            <li><b>グループ</b><span class="desc">参加中の部屋に、新しい写真やメッセージがあるとき。</span></li>
+          </ul>
+        </div>
+        <div class="screen-shot">
+          <figure class="phone">
+            <img src="/sns-guide-shots/notify.webp" alt="通知画面。返信・いいね・メンション・グループの通知が新しい順に並び、未読には印が付いている。">
+            <figcaption>通知 — /sns/notifications</figcaption>
+          </figure>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ═════════ 10 安全 ═════════ -->
+  <section class="stop tinted" id="safety">
+    <div class="wrap">
+      <p class="eyebrow">10 — Safe &amp; Quiet</p>
+      <h2 class="sec-title">心地よい距離で。</h2>
+      <div class="screen">
+        <div class="screen-copy">
+          <p class="sec-lead" style="margin-top:0">
+            受け取るものは自分で選べます。合わないと感じたら、そっと離れることもできます。
+          </p>
+          <div class="quad">
+            <div class="quad-item"><b>フレンドだけ</b><span>投稿はいつでもフレンドの内側まで。外の誰かに見えることはありません。</span></div>
+            <div class="quad-item"><b>通知を選ぶ</b><span>返信・いいね・メンション・グループを、それぞれ個別に止められます。</span></div>
+            <div class="quad-item"><b>そっとミュート</b><span>グループは抜けないまま、その部屋の知らせだけを静かにできます。</span></div>
+            <div class="quad-item"><b>ブロックと通報</b><span>ブロックは両方向にはたらき、投稿もコメントも互いに見えなくなります。</span></div>
+          </div>
+        </div>
+        <div class="screen-shot">
+          <figure class="phone">
+            <img src="/sns-guide-shots/safety.webp" alt="通知と安全の設定画面。返信・いいね・メンション・グループの通知を個別に切り替えるトグルが並んでいる。">
+            <figcaption>通知と安全 — /sns/settings</figcaption>
+          </figure>
+        </div>
+      </div>
+      <p class="sec-lead" style="margin-top:2rem">
+        ブロックした相手とは、投稿・写真・コメントだけでなく、
+        グループのメンバー一覧や投票の集計にいたるまで、互いに姿が見えなくなります。
+        新しいグループへ招くこともできません。解除はいつでも「通知と安全」からできます。
+      </p>
+    </div>
+  </section>
+
+  <!-- ═════════ 11 早見表 ═════════ -->
+  <section class="stop" id="specs">
+    <div class="wrap">
+      <p class="eyebrow">11 — Reference</p>
+      <h2 class="sec-title">数字の早見表。</h2>
+      <p class="sec-lead">入力と表示にかかわる上限をまとめました。</p>
+      <div class="table-wrap">
+        <table>
+          <caption style="position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);">SNS機能の制限値と表示件数の一覧</caption>
+          <thead>
+            <tr><th scope="col">項目</th><th scope="col" class="r">上限</th><th scope="col">場所</th></tr>
+          </thead>
+          <tbody>
+            <tr><td>つぶやきの本文</td><td class="n">280 字</td><td class="w">投稿の作成</td></tr>
+            <tr><td>1投稿の写真</td><td class="n">4 枚</td><td class="w">投稿の作成</td></tr>
+            <tr><td>通報の理由</td><td class="n">120 字</td><td class="w">投稿のメニュー</td></tr>
+            <tr><td>写真のキャプション</td><td class="n">300 字</td><td class="w">グループへの写真投稿</td></tr>
+            <tr><td>グループ名</td><td class="n">40 字</td><td class="w">グループの作成・編集</td></tr>
+            <tr><td>ピン留めの見出し</td><td class="n">60 字</td><td class="w">グループ</td></tr>
+            <tr><td>ピン留めの本文</td><td class="n">300 字</td><td class="w">グループ</td></tr>
+            <tr><td>投票の質問</td><td class="n">120 字</td><td class="w">グループ</td></tr>
+            <tr><td>投票の選択肢</td><td class="n">4 つ / 50 字</td><td class="w">グループ</td></tr>
+            <tr><td>作成に必要な人数</td><td class="n">自分 + 1 人</td><td class="w">グループの作成</td></tr>
+            <tr><td>検索キーワード</td><td class="n">60 字</td><td class="w">検索</td></tr>
+            <tr><td>ホームの表示件数</td><td class="n">24 → 120 件</td><td class="w">ホーム</td></tr>
+            <tr><td>プロフィールの表示件数</td><td class="n">24 → 120 件</td><td class="w">プロフィール</td></tr>
+            <tr><td>グループ写真の期間</td><td class="n">10 → 90 日</td><td class="w">グループ</td></tr>
+            <tr><td>検索対象の投稿</td><td class="n">80 件</td><td class="w">検索</td></tr>
+            <tr><td>タグの候補</td><td class="n">7 個</td><td class="w">検索</td></tr>
+            <tr><td>写真のリアクション</td><td class="n">6 種 / 1人1つ</td><td class="w">写真の詳細</td></tr>
+            <tr><td>お題の候補</td><td class="n">7 種（日替わり）</td><td class="w">ホーム</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </section>
+
+  <!-- ═════════ 12 質問 ═════════ -->
+  <section class="stop tinted" id="faq">
+    <div class="wrap">
+      <p class="eyebrow">12 — Questions</p>
+      <h2 class="sec-title">よくある質問。</h2>
+      <div class="faq">
+        <div class="faq-item">
+          <p class="q"><span class="mark-q">Q</span>投稿は誰に見えますか？</p>
+          <p class="a">フレンドだけです。フレンドではない人や、アプリの外の誰かに見えることはありません。グループへの投稿は、さらにその部屋のメンバーだけに限られます。</p>
+        </div>
+        <div class="faq-item">
+          <p class="q"><span class="mark-q">Q</span>投稿を消したくなったら？</p>
+          <p class="a">自分の投稿は、右上のメニューからいつでも削除できます。確認のあと消えます。返信やコメントも、自分が書いたものは同じように消せます。</p>
+        </div>
+        <div class="faq-item">
+          <p class="q"><span class="mark-q">Q</span>いいねを間違えて押しました。</p>
+          <p class="a">もう一度押せば取り消せます。何度押しても、ひとりぶんしか数えられない作りなので、連打しても数が増えることはありません。</p>
+        </div>
+        <div class="faq-item">
+          <p class="q"><span class="mark-q">Q</span>保存した投稿は相手に伝わりますか？</p>
+          <p class="a">伝わりません。保存はあなただけの棚です。自分のプロフィールの「保存」タブに集まり、そのタブはほかの人には表示されません。</p>
+        </div>
+        <div class="faq-item">
+          <p class="q"><span class="mark-q">Q</span>グループを抜けたくないけれど、通知は止めたい。</p>
+          <p class="a">「通知と安全」からグループをミュートできます。参加はそのままで、その部屋の未読だけが数えられなくなります。</p>
+        </div>
+        <div class="faq-item">
+          <p class="q"><span class="mark-q">Q</span>ブロックすると相手に分かりますか？</p>
+          <p class="a">通知は届きません。ブロックは両方向にはたらき、投稿・写真・コメント・グループのメンバー一覧まで、互いに見えなくなります。解除もいつでもできます。</p>
+        </div>
+        <div class="faq-item">
+          <p class="q"><span class="mark-q">Q</span>書きかけの投稿は消えてしまいますか？</p>
+          <p class="a">残ります。入力した内容は下書きとして自動で保存されるので、途中で他の画面へ移っても、戻れば続きから書けます。引用リポストの下書きは、引用元ごとに別々に保たれます。</p>
+        </div>
+        <div class="faq-item">
+          <p class="q"><span class="mark-q">Q</span>グループのメンバーは誰でも追加できますか？</p>
+          <p class="a">グループを作った人だけが追加できます。また、ブロック関係にある相手は追加できません。退出は誰でもいつでもできます。</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+</main>
+
+<!-- ═════════ 結び ═════════ -->
+<section class="outro">
+  <div class="wrap">
+    <img src="/illustrations/sns/conversation-v2.webp" alt="写真の上に浮かぶ二つの吹き出しと紙飛行機のイラスト" width="384" height="351">
+    <h2>おでかけは、<br>話したくなるものだから。</h2>
+    <p>
+      行った先のことを誰かに話すと、その日はもう一度おもしろくなります。
+      おでかけSNSは、そのための小さな場所です。
+    </p>
+  </div>
+</section>
+
+<footer><div class="wrap">おでかけ記録アプリ — SNS機能のご案内</div></footer>
+
+</body>
+</html>

@@ -3318,8 +3318,49 @@
   .sns-settings-feature-title { display: flex; align-items: center; gap: .65rem; }
   .sns-settings-feature-title > span { display: grid; width: 2.5rem; height: 2.5rem; flex: 0 0 auto; place-items: center; border-radius: .86rem; color: white; background: linear-gradient(145deg,#6d59d3,#c554b7); box-shadow: 0 5px 12px rgba(97,65,158,.22); }
   .sns-settings-feature-title.is-safety > span { background: linear-gradient(145deg,#3183c8,#3bb6ad); }
+  .sns-settings-feature-title.is-guide > span { background: linear-gradient(145deg,#5d8049,#7cb8ac); }
   .sns-settings-feature-title h2 { font-size: .86rem; font-weight: 900; }
   .sns-settings-feature-title p { margin-top: .1rem; color: var(--color-ink-faint); font-size: .62rem; }
+
+  .sns-guide-strip {
+    display: flex;
+    align-items: center;
+    gap: 0.6rem;
+    padding: 0.55rem 0.75rem;
+    border: 1px solid rgba(127, 165, 104, 0.28);
+    border-radius: 1rem;
+    background: linear-gradient(135deg, rgba(255, 253, 248, 0.95), rgba(223, 234, 207, 0.62));
+    color: var(--color-ink-soft);
+    text-decoration: none;
+  }
+  .sns-guide-strip-icon {
+    display: grid;
+    width: 1.7rem;
+    height: 1.7rem;
+    flex: 0 0 auto;
+    place-items: center;
+    border-radius: 999px;
+    color: white;
+    background: linear-gradient(145deg, #5d8049, #7cb8ac);
+  }
+  .sns-guide-strip strong { display: block; font-size: 0.72rem; font-weight: 900; color: var(--color-ink); }
+  .sns-guide-strip small { display: block; margin-top: 0.06rem; font-size: 0.6rem; color: var(--color-ink-faint); }
+
+  .sns-guide-card { display: block; color: inherit; text-decoration: none; }
+  /* .sns-settings-feature-title > span は先頭の大きな丸アイコン用。
+     矢印はその指定を受けないよう、詳細度を上げて打ち消す */
+  .sns-guide-card .sns-settings-feature-title > span.sns-guide-card-go {
+    display: grid;
+    width: 1.8rem;
+    height: 1.8rem;
+    flex: 0 0 auto;
+    place-items: center;
+    margin-left: auto;
+    border-radius: 999px;
+    color: var(--color-leaf-deep);
+    background: rgba(127, 165, 104, 0.16);
+    box-shadow: none;
+  }
 
   .sns-settings-toggle-list { overflow: hidden; border: 1px solid rgba(103,85,153,.11); border-radius: 1rem; background: rgba(255,255,255,.72); }
   .sns-settings-toggle-row { position: relative; display: flex; min-height: 3.65rem; align-items: center; gap: .6rem; padding: .5rem .65rem; }

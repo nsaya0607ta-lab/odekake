@@ -9,6 +9,7 @@ import {
   parseSnsFeedFilter,
   SnsFeedFilters,
 } from "@/components/sns/sns-feed-filters";
+import { SnsGuideStrip } from "@/components/sns/sns-guide-card";
 import { SnsPrimaryNav } from "@/components/sns/sns-primary-nav";
 import { SnsNotificationEntry } from "@/components/sns/sns-notification-button";
 import { SnsTextFeed } from "@/components/sns/sns-text-feed";
@@ -114,6 +115,8 @@ export default async function SnsHomePage({
           </span>
           <p className="relative mt-0.5 text-[10px] font-semibold text-white/75">みんなの{feedTitle}</p>
         </section>
+
+        <SnsGuideStrip />
 
         <SnsFeedFilters active={filter} baseHref="/sns/home" />
 
