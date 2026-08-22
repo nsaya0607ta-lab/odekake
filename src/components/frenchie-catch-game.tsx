@@ -42,6 +42,11 @@ type CatchFeedback = {
   effect?: string;
 };
 
+type RecentSkillEffect = {
+  id: number;
+  text: string;
+};
+
 const ROUND_SECONDS = 30;
 const BOX_IMAGE = "/4EA485D9-BB37-47F3-97F0-111CF0E4AF7E.webp";
 const BOX_WIDTH = 37.8 * 0.9;
@@ -462,6 +467,8 @@ export function FrenchieCatchGame({ ownedItems }: { ownedItems: FrenchieCatchIte
   const stunUntilRef = useRef(0);
   const feedbackTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const impactTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const recentSkillEffectIdRef = useRef(0);
+  const recentSkillEffectTimersRef = useRef<Map<number, ReturnType<typeof setTimeout>>>(new Map());
 
   const [phase, setPhase] = useState<"idle" | "playing" | "finished">("idle");
   const [entities, setEntities] = useState<Entity[]>([]);
@@ -475,6 +482,7 @@ export function FrenchieCatchGame({ ownedItems }: { ownedItems: FrenchieCatchIte
   const [timeMinusGuard, setTimeMinusGuard] = useState(0);
   const [feedback, setFeedback] = useState<CatchFeedback | null>(null);
   const [activeEffects, setActiveEffects] = useState<string[]>([]);
+  const [recentSkillEffects, setRecentSkillEffects] = useState<RecentSkillEffect[]>([]);
   const [impactX, setImpactX] = useState<number | null>(null);
   const [boxBounce, setBoxBounce] = useState(false);
   const [blackoutActive, setBlackoutActive] = useState(false);
@@ -730,6 +738,16 @@ export function FrenchieCatchGame({ ownedItems }: { ownedItems: FrenchieCatchIte
     };
   }, [itemPool]);
 
+  const pushRecentSkillEffect = useCallback((text: string) => {
+    const id = ++recentSkillEffectIdRef.current;
+    setRecentSkillEffects((prev) => [{ id, text }, ...prev].slice(0, 2));
+    const timer = setTimeout(() => {
+      setRecentSkillEffects((prev) => prev.filter((entry) => entry.id !== id));
+      recentSkillEffectTimersRef.current.delete(id);
+    }, 2400);
+    recentSkillEffectTimersRef.current.set(id, timer);
+  }, []);
+
   const showCatch = useCallback((entity: Entity, points: number, effect?: string) => {
     setFeedback({ name: entity.name, points, effect });
     setBoxBounce(true);
@@ -738,8 +756,9 @@ export function FrenchieCatchGame({ ownedItems }: { ownedItems: FrenchieCatchIte
       setFeedback(null);
       setBoxBounce(false);
     }, 900);
+    if (effect) pushRecentSkillEffect(effect);
     if (typeof navigator !== "undefined" && "vibrate" in navigator) navigator.vibrate?.(18);
-  }, []);
+  }, [pushRecentSkillEffect]);
 
   const showImpact = useCallback((x: number) => {
     setImpactX(x);
@@ -751,6 +770,8 @@ export function FrenchieCatchGame({ ownedItems }: { ownedItems: FrenchieCatchIte
     if (rafRef.current !== null) cancelAnimationFrame(rafRef.current);
     if (feedbackTimerRef.current) clearTimeout(feedbackTimerRef.current);
     if (impactTimerRef.current) clearTimeout(impactTimerRef.current);
+    recentSkillEffectTimersRef.current.forEach((timer) => clearTimeout(timer));
+    recentSkillEffectTimersRef.current.clear();
   }, []);
 
   useEffect(() => {
@@ -818,6 +839,7 @@ export function FrenchieCatchGame({ ownedItems }: { ownedItems: FrenchieCatchIte
             setFeedback(null);
             setBoxBounce(false);
           }, 900);
+          pushRecentSkillEffect(`くみたて完成！+${ikeaBonus}pt`);
         }
         timedEffectChanged = true;
       }
@@ -1727,6 +1749,9 @@ export function FrenchieCatchGame({ ownedItems }: { ownedItems: FrenchieCatchIte
     setTimeLeft(ROUND_SECONDS);
     setFeedback(null);
     setActiveEffects([]);
+    recentSkillEffectTimersRef.current.forEach((timer) => clearTimeout(timer));
+    recentSkillEffectTimersRef.current.clear();
+    setRecentSkillEffects([]);
     setImpactX(null);
     setDogBonus(null);
     setCoinReward(null);
@@ -1828,7 +1853,17 @@ export function FrenchieCatchGame({ ownedItems }: { ownedItems: FrenchieCatchIte
               </div>
             ) : null}
           </div>
-          <span />
+          {recentSkillEffects.length > 0 ? (
+            <div className="pointer-events-none flex flex-1 flex-col items-center gap-1 pt-1">
+              {recentSkillEffects.map((entry) => (
+                <span key={entry.id} className="animate-in fade-in zoom-in-95 rounded-full border border-[#f4d98f] bg-[#fff6cc]/95 px-3 py-1 text-center text-[12px] font-black leading-tight text-[#9a6322] shadow-md">
+                  {entry.text}
+                </span>
+              ))}
+            </div>
+          ) : (
+            <span className="flex-1" />
+          )}
           <div className="rounded-2xl border border-white/80 bg-white/90 px-3 py-2 text-right shadow-sm"><p className="text-[9px] font-bold tracking-widest text-ink-faint">TIME</p><p className="text-xl font-black tabular-nums text-ink">{timeLeft}</p></div>
         </div>
 
