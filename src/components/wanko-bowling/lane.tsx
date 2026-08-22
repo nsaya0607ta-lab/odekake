@@ -68,6 +68,10 @@ type PinBody = {
   vy: number;
   angle: number;
   angularVel: number;
+  /** 0=立っている、1=倒れきって寝ている。当たった瞬間から急速に1へ近づく
+   * （上から見て縦につぶれて見せることで「倒れた」感を出す。滑って移動する
+   * こと自体はそのまま続く）。 */
+  fallProgress: number;
   /** まだ一度も当たっていない（このゲーム内でまだ立っている）。 */
   standing: boolean;
   /** 現在も速度を持って動いている最中か。 */
@@ -75,7 +79,10 @@ type PinBody = {
 };
 
 function createPinBody(pin: { x: number; y: number }): PinBody {
-  return { x: pin.x, y: pin.y, vx: 0, vy: 0, angle: 0, angularVel: 0, standing: true, moving: false };
+  return {
+    x: pin.x, y: pin.y, vx: 0, vy: 0, angle: 0, angularVel: 0,
+    fallProgress: 0, standing: true, moving: false,
+  };
 }
 
 /** 座標・速度は0〜100の「%値」で持っているので、px化するときは/100を忘れないこと。 */
@@ -165,7 +172,11 @@ export function Lane({ ballVisual, resetSignal, active, onRoll }: LaneProps) {
     if (!el) return;
     el.style.left = `${body.x}%`;
     el.style.top = `${body.y}%`;
-    el.style.transform = `translate(-50%, -50%) rotate(${body.angle}deg)`;
+    // fallProgress で縦方向をつぶし、真上から見て「寝ている」シルエットに近づける。
+    // これがないと、回転＋移動だけでは「滑っている」ようにしか見えない。
+    const squashY = 1 - 0.6 * body.fallProgress;
+    el.style.transform =
+      `translate(-50%, -50%) rotate(${body.angle}deg) scale(1, ${squashY})`;
   }, []);
 
   const resetPins = useCallback(() => {
@@ -242,8 +253,8 @@ export function Lane({ ballVisual, resetSignal, active, onRoll }: LaneProps) {
     // ピンのSVGはコンテナに合わせて拡縮されない固定20pxなので、そのまま使う）。
     // +αは「当たっているように見えるのに判定が出ない」を防ぐ多少の余裕。
     const ballRadiusPx = (BALL_DIAMETER_PCT / 2 / 100) * scaleX;
-    const collideRadiusPx = ballRadiusPx + PIN_VISUAL_RADIUS_PX + 3;
-    const pinPinRadiusPx = PIN_VISUAL_RADIUS_PX * 2 + 2;
+    const collideRadiusPx = ballRadiusPx + PIN_VISUAL_RADIUS_PX + 6;
+    const pinPinRadiusPx = PIN_VISUAL_RADIUS_PX * 2 + 5;
 
     const preThrowStandingIds = new Set(
       [...pinBodiesRef.current.entries()].filter(([, body]) => body.standing).map(([id]) => id),
@@ -340,10 +351,15 @@ export function Lane({ ballVisual, resetSignal, active, onRoll }: LaneProps) {
             body.vy = result.bvy;
             body.standing = false;
             body.moving = true;
-            body.angularVel = (Math.random() - 0.5) * 560 + (pinXPx - bxPx >= 0 ? 1 : -1) * 120;
+            // 倒れる勢いよく回転させる（「滑る」ではなく「倒れる」に見せるため）。
+            body.angularVel = (Math.random() - 0.5) * 900 + (pinXPx - bxPx >= 0 ? 1 : -1) * 260;
           }
 
-          if (by <= DECK_EXIT_Y || Math.hypot(bvx, bvy) < 10) ballDone = true;
+          // ここでは速度で強制停止させない。実際のボウリングでもボールはピンを
+          // 押しのけながらデッキの奥まで進み続けるし、複数本に連続で当たると
+          // 数フレームで速度が閾値を割ってしまい、進路が曲がる様子が見える前に
+          // 止まって見えていた（＝角度が変わって見えない、の原因）。
+          if (by <= DECK_EXIT_Y) ballDone = true;
         }
 
         setBallPosition(bx, by, rotate);
@@ -371,6 +387,10 @@ export function Lane({ ballVisual, resetSignal, active, onRoll }: LaneProps) {
           bodyA.vy = result.avy;
           bodyB.vx = result.bvx;
           bodyB.vy = result.bvy;
+          // ぶつかったピン同士も勢いよく回転させて倒す（これが無いと、当たられた側の
+          // ピンは移動するだけで「倒れた」ようには見えなかった）。
+          if (bodyA.standing) bodyA.angularVel = (Math.random() - 0.5) * 900;
+          if (bodyB.standing) bodyB.angularVel = (Math.random() - 0.5) * 900;
           bodyA.standing = false;
           bodyA.moving = true;
           bodyB.standing = false;
@@ -384,6 +404,9 @@ export function Lane({ ballVisual, resetSignal, active, onRoll }: LaneProps) {
         body.x += body.vx * dt;
         body.y += body.vy * dt;
         body.angle += body.angularVel * dt;
+        // 当たってから約0.16秒でほぼ完全に「倒れきった」見た目にする
+        // （そのあとも滑って移動はし続ける）。
+        body.fallProgress = Math.min(1, body.fallProgress + dt / 0.16);
 
         const decay = Math.exp(-FRICTION_PER_SEC * dt);
         body.vx *= decay;
@@ -399,6 +422,7 @@ export function Lane({ ballVisual, resetSignal, active, onRoll }: LaneProps) {
           body.vx = 0;
           body.vy = 0;
           body.angularVel = 0;
+          body.fallProgress = 1;
         }
 
         writePinNode(id, body);
