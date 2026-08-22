@@ -4,21 +4,21 @@ import { useCallback, useEffect, useRef, type PointerEvent as ReactPointerEvent 
 import { PIN_DIAMETER_PCT, PIN_LAYOUT, Pins } from "./pins";
 import type { BowlingBallVisual } from "@/lib/games/wanko-bowling-balls";
 
-const DOCK_Y = 88;
-const PIN_ZONE_Y = 36;
-const DECK_EXIT_Y = 6;
+const DOCK_Y = 93;
+const PIN_ZONE_Y = 29;
+const DECK_EXIT_Y = 4;
 const LANE_LEFT = 16;
 const LANE_RIGHT = 84;
-const MIN_UPWARD_PCT = 6;
-const BALL_DIAMETER_PCT = 9;
-const COLLISION_PADDING_PCT = 1.8;
-const PIN_PAIR_PADDING_PCT = 1.6;
-const BASE_BALL_SPEED_PCT = (20 / 3.6) * 30;
-const DECK_SPEED_SCALE = 0.52;
-const CURVE_ACCEL_PCT_PER_SEC2 = 235;
+const MIN_UPWARD_PCT = 7;
+const BALL_DIAMETER_PCT = 8.6;
+const COLLISION_PADDING_PCT = 1.55;
+const PIN_PAIR_PADDING_PCT = 1.45;
+const BASE_BALL_SPEED_PCT = 145;
+const DECK_SPEED_SCALE = 0.54;
+const CURVE_ACCEL_PCT_PER_SEC2 = 150;
 const FRICTION_PER_SEC = 3.2;
 const SETTLE_SPEED_PCT = 8;
-const MAX_THROW_MS = 3200;
+const MAX_THROW_MS = 4200;
 const MAX_SWIPE_SAMPLES = 48;
 const BALL_MASS_KG = 8 * 0.45359237;
 const PIN_MASS_KG = 1.5;
@@ -289,8 +289,6 @@ export function Lane({ ballVisual, resetSignal, active, onRoll }: LaneProps) {
         rotate += Math.hypot(bvx, bvy) * dt * 2.2;
 
         if (bx < LANE_LEFT || bx > LANE_RIGHT) {
-          // ピンに当たった後の反動で横へ抜けてもガターにはしない。
-          // ガターは「1本も倒す前に側溝へ入った投球」だけ。
           ballGutter = knockedThisThrow.size === 0;
           ballDone = true;
           bx = Math.min(Math.max(bx, LANE_LEFT - 4), LANE_RIGHT + 4);
@@ -461,7 +459,7 @@ export function Lane({ ballVisual, resetSignal, active, onRoll }: LaneProps) {
     const rect = board.getBoundingClientRect();
     const relY = ((event.clientY - rect.top) / rect.height) * 100;
     const relX = ((event.clientX - rect.left) / rect.width) * 100;
-    if (relY < 66 || relX < 18 || relX > 82) return;
+    if (relY < 72 || relX < 18 || relX > 82) return;
 
     activePointerRef.current = event.pointerId;
     event.currentTarget.setPointerCapture(event.pointerId);
@@ -500,9 +498,12 @@ export function Lane({ ballVisual, resetSignal, active, onRoll }: LaneProps) {
 
     if (-dyPct < MIN_UPWARD_PCT) return;
 
-    const rawSpeedPctPerSec = (Math.hypot(dxPct, dyPct) / durationSec) * 0.62;
-    const speedPctPerSec = Math.min(260, Math.max(100, rawSpeedPctPerSec));
-    const lateralPctPerSec = Math.max(-72, Math.min(72, (dxPct / durationSec) * 0.42));
+    // pxではなくレーン幅/高さに対する割合で速度を作る。
+    // 端末サイズが違っても同じスワイプ感になり、長い端末だけ有利にならない。
+    const normalizedTravel = Math.hypot(dxPct * 0.65, dyPct);
+    const rawSpeedPctPerSec = (normalizedTravel / durationSec) * 0.50;
+    const speedPctPerSec = Math.min(210, Math.max(84, rawSpeedPctPerSec));
+    const lateralPctPerSec = Math.max(-50, Math.min(50, (dxPct / durationSec) * 0.30));
 
     const avgSlopePctPerMs = (segment: Point[]) => {
       if (segment.length < 2) return 0;
@@ -516,7 +517,7 @@ export function Lane({ ballVisual, resetSignal, active, onRoll }: LaneProps) {
     const midIndex = Math.max(1, Math.floor(points.length / 2));
     const firstHalfSlope = avgSlopePctPerMs(points.slice(0, midIndex + 1));
     const secondHalfSlope = avgSlopePctPerMs(points.slice(midIndex));
-    const curveNorm = Math.max(-1, Math.min(1, (secondHalfSlope - firstHalfSlope) / 0.24));
+    const curveNorm = Math.max(-1, Math.min(1, (secondHalfSlope - firstHalfSlope) / 0.30));
 
     runThrow({ speedPctPerSec, lateralPctPerSec, curveNorm });
   }, [active, runThrow]);
@@ -537,42 +538,41 @@ export function Lane({ ballVisual, resetSignal, active, onRoll }: LaneProps) {
       onPointerMove={onPointerMove}
       onPointerUp={onPointerUp}
       onPointerCancel={onPointerCancel}
-      className="relative w-full touch-none select-none overflow-hidden"
+      className="relative h-full min-h-0 w-full touch-none select-none overflow-hidden"
       style={{
-        height: "clamp(390px, calc(100dvh - 205px), 620px)",
         touchAction: "none",
         overscrollBehavior: "none",
-        borderRadius: "28px 24px 30px 22px",
+        borderRadius: "24px 22px 28px 22px",
         background: "linear-gradient(180deg, #e8c997 0%, #d9ad72 42%, #c8935a 75%, #ad7645 100%)",
         boxShadow: "inset 0 2px 0 rgba(255,255,255,0.4), inset 0 -18px 30px -20px rgba(76,48,24,0.58)",
       }}
     >
       <div
-        className="absolute inset-x-[11%] top-[5%] bottom-[17%] rounded-[18px]"
+        className="absolute inset-x-[11%] top-[3%] bottom-[10%] rounded-[18px]"
         style={{
           background: "repeating-linear-gradient(90deg, rgba(255,255,255,0.2) 0 2px, transparent 2px 20px)",
-          maskImage: "linear-gradient(180deg, black 72%, transparent 100%)",
+          maskImage: "linear-gradient(180deg, black 76%, transparent 100%)",
         }}
         aria-hidden="true"
       />
       <div
-        className="absolute inset-y-[5%] left-0 w-[13%] rounded-l-[26px]"
+        className="absolute inset-y-[3%] left-0 w-[13%] rounded-l-[24px]"
         style={{ background: "linear-gradient(90deg, #624025, #7b5230)", boxShadow: "inset -3px 0 7px rgba(0,0,0,0.28)" }}
         aria-hidden="true"
       />
       <div
-        className="absolute inset-y-[5%] right-0 w-[13%] rounded-r-[26px]"
+        className="absolute inset-y-[3%] right-0 w-[13%] rounded-r-[24px]"
         style={{ background: "linear-gradient(270deg, #624025, #7b5230)", boxShadow: "inset 3px 0 7px rgba(0,0,0,0.28)" }}
         aria-hidden="true"
       />
-      <div className="absolute inset-x-[13%] top-[59%] h-[3px] rounded-full bg-[#a8442f]" aria-hidden="true" />
-      <div className="absolute inset-x-[13%] top-[calc(59%+3px)] h-px bg-[#a8442f]/35" aria-hidden="true" />
+      <div className="absolute inset-x-[13%] top-[66%] h-[3px] rounded-full bg-[#a8442f]" aria-hidden="true" />
+      <div className="absolute inset-x-[13%] top-[calc(66%+3px)] h-px bg-[#a8442f]/35" aria-hidden="true" />
 
       <Pins registerNode={registerPinNode} />
 
       <div
         ref={ballRef}
-        className="pointer-events-none absolute aspect-square w-[9%] rounded-full shadow-[0_4px_8px_rgba(0,0,0,0.35)]"
+        className="pointer-events-none absolute aspect-square w-[8.6%] rounded-full shadow-[0_4px_8px_rgba(0,0,0,0.35)]"
         style={{
           left: "50%",
           top: `${DOCK_Y}%`,
@@ -583,8 +583,8 @@ export function Lane({ ballVisual, resetSignal, active, onRoll }: LaneProps) {
         aria-hidden="true"
       />
 
-      <div className="pointer-events-none absolute bottom-[2.5%] left-1/2 -translate-x-1/2 text-center">
-        <p className="whitespace-nowrap rounded-full bg-[#402817]/65 px-3 py-1.5 text-[10.5px] font-black tracking-[0.08em] text-[#fff7e8] backdrop-blur-sm">
+      <div className="pointer-events-none absolute bottom-[1.4%] left-1/2 -translate-x-1/2 text-center">
+        <p className="whitespace-nowrap rounded-full bg-[#402817]/65 px-3 py-1.5 text-[10px] font-black tracking-[0.08em] text-[#fff7e8] backdrop-blur-sm">
           {active ? "ボール付近から上へスワイプ" : ""}
         </p>
       </div>
