@@ -1,6 +1,7 @@
 import { PageBody } from "@/components/page-body";
 import { PageHeader } from "@/components/page-header";
 import { SnsBackgroundBand } from "@/components/sns/sns-background-band";
+import { SnsGuideCard } from "@/components/sns/sns-guide-card";
 import { SnsIllustratedHero } from "@/components/sns/sns-illustrated-hero";
 import { SnsSettingsForm } from "@/components/sns/sns-settings-form";
 import { signThumbOrOriginalPaths } from "@/lib/data/photos";
@@ -35,6 +36,7 @@ export default async function SnsSettingsPage() {
           artSrc="/illustrations/sns/notification-bell-v2.webp"
           tone="notice"
         />
+        <SnsGuideCard />
         <SnsSettingsForm
           preferences={preferences}
           groups={groups.map((group) => ({ id: group.id, name: group.name, icon: group.icon }))}
