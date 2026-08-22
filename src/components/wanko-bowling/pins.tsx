@@ -3,25 +3,26 @@
 export type PinLayout = { id: number; x: number; y: number };
 
 /** レーン幅に対するピンの見た目の幅。Lane 側の当たり判定と同じ値を使う。 */
-export const PIN_DIAMETER_PCT = 5.6;
+export const PIN_DIAMETER_PCT = 5.4;
 
-/** 10ピンの正三角形配置（%座標）。1がレーン側（手前）、10が奥の右端。 */
+/**
+ * 10ピンの正三角形配置（%座標）。
+ * フルスクリーン化に合わせてデッキを上へ寄せ、ボールから1番ピンまでの距離を長くする。
+ */
 export const PIN_LAYOUT: readonly PinLayout[] = [
-  { id: 1, x: 50, y: 33 },
-  { id: 2, x: 42, y: 27 },
-  { id: 3, x: 58, y: 27 },
-  { id: 4, x: 34, y: 21 },
-  { id: 5, x: 50, y: 21 },
-  { id: 6, x: 66, y: 21 },
-  { id: 7, x: 26, y: 15 },
-  { id: 8, x: 42, y: 15 },
-  { id: 9, x: 58, y: 15 },
-  { id: 10, x: 74, y: 15 },
+  { id: 1, x: 50, y: 24 },
+  { id: 2, x: 42, y: 20 },
+  { id: 3, x: 58, y: 20 },
+  { id: 4, x: 34, y: 16 },
+  { id: 5, x: 50, y: 16 },
+  { id: 6, x: 66, y: 16 },
+  { id: 7, x: 26, y: 12 },
+  { id: 8, x: 42, y: 12 },
+  { id: 9, x: 58, y: 12 },
+  { id: 10, x: 74, y: 12 },
 ];
 
 type PinsProps = {
-  /** ピンごとのDOMノードを Lane 側に渡す。位置・回転・不透明度はすべて
-   * Lane の物理シミュレーションが毎フレーム直接 style を書き換えて動かす。 */
   registerNode: (id: number, el: HTMLDivElement | null) => void;
 };
 
