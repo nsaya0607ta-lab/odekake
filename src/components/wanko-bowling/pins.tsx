@@ -1,16 +1,11 @@
 "use client";
 
-import {
-  JB_PIN_DIAMETER_M,
-  JB_PIN_SPACING_M,
-  JB_TOTAL_WIDTH_M,
-} from "@/lib/games/wanko-bowling-physics";
+import { JB_PIN_SPACING_M } from "@/lib/games/wanko-bowling-physics";
 
 export type PinLayout = {
   id: number;
-  /** レンダリング用横位置（レーン＋ガター全幅を100%とする） */
+  /** 初期表示用。投球中は Lane の透視投影で上書きする。 */
   x: number;
-  /** レンダリング用縦位置。物理上の前後距離は Lane 側で実寸計算する。 */
   y: number;
   /** 1番ピン中心から左右方向の実距離。 */
   lateralM: number;
@@ -18,33 +13,27 @@ export type PinLayout = {
   forwardM: number;
 };
 
-/** ピン最大胴径 12.105cm を、レーン＋ガター総幅に対する比率へ変換。 */
-export const PIN_DIAMETER_PCT = (JB_PIN_DIAMETER_M / JB_TOTAL_WIDTH_M) * 100;
+/**
+ * 物理寸法と画面表示は分離する。
+ * 実ピンの径は物理側で使い、画面では遠近感が自然に見えるサイズにする。
+ */
+export const PIN_VISUAL_WIDTH_PCT = 3.3;
 
 const halfSpacingM = JB_PIN_SPACING_M / 2;
 const rowDepthM = JB_PIN_SPACING_M * Math.sqrt(3) / 2;
-const centerX = 50;
-const pctPerMX = 100 / JB_TOTAL_WIDTH_M;
 
-function xFromLateral(lateralM: number): number {
-  return centerX + lateralM * pctPerMX;
-}
-
-/**
- * 横方向・前後方向の物理位置は12インチ中心間隔の正三角形。
- * y表示だけはスマホでピン形状を判別できるよう少し広げる。
- */
+/** 物理位置は12インチ中心間隔の正三角形。 */
 export const PIN_LAYOUT: readonly PinLayout[] = [
-  { id: 1, x: xFromLateral(0), y: 24.0, lateralM: 0, forwardM: 0 },
-  { id: 2, x: xFromLateral(-halfSpacingM), y: 20.8, lateralM: -halfSpacingM, forwardM: rowDepthM },
-  { id: 3, x: xFromLateral(halfSpacingM), y: 20.8, lateralM: halfSpacingM, forwardM: rowDepthM },
-  { id: 4, x: xFromLateral(-JB_PIN_SPACING_M), y: 17.6, lateralM: -JB_PIN_SPACING_M, forwardM: rowDepthM * 2 },
-  { id: 5, x: xFromLateral(0), y: 17.6, lateralM: 0, forwardM: rowDepthM * 2 },
-  { id: 6, x: xFromLateral(JB_PIN_SPACING_M), y: 17.6, lateralM: JB_PIN_SPACING_M, forwardM: rowDepthM * 2 },
-  { id: 7, x: xFromLateral(-JB_PIN_SPACING_M * 1.5), y: 14.4, lateralM: -JB_PIN_SPACING_M * 1.5, forwardM: rowDepthM * 3 },
-  { id: 8, x: xFromLateral(-halfSpacingM), y: 14.4, lateralM: -halfSpacingM, forwardM: rowDepthM * 3 },
-  { id: 9, x: xFromLateral(halfSpacingM), y: 14.4, lateralM: halfSpacingM, forwardM: rowDepthM * 3 },
-  { id: 10, x: xFromLateral(JB_PIN_SPACING_M * 1.5), y: 14.4, lateralM: JB_PIN_SPACING_M * 1.5, forwardM: rowDepthM * 3 },
+  { id: 1, x: 50, y: 13.5, lateralM: 0, forwardM: 0 },
+  { id: 2, x: 43.5, y: 10.7, lateralM: -halfSpacingM, forwardM: rowDepthM },
+  { id: 3, x: 56.5, y: 10.7, lateralM: halfSpacingM, forwardM: rowDepthM },
+  { id: 4, x: 37, y: 7.9, lateralM: -JB_PIN_SPACING_M, forwardM: rowDepthM * 2 },
+  { id: 5, x: 50, y: 7.9, lateralM: 0, forwardM: rowDepthM * 2 },
+  { id: 6, x: 63, y: 7.9, lateralM: JB_PIN_SPACING_M, forwardM: rowDepthM * 2 },
+  { id: 7, x: 30.5, y: 5.1, lateralM: -JB_PIN_SPACING_M * 1.5, forwardM: rowDepthM * 3 },
+  { id: 8, x: 43.5, y: 5.1, lateralM: -halfSpacingM, forwardM: rowDepthM * 3 },
+  { id: 9, x: 56.5, y: 5.1, lateralM: halfSpacingM, forwardM: rowDepthM * 3 },
+  { id: 10, x: 69.5, y: 5.1, lateralM: JB_PIN_SPACING_M * 1.5, forwardM: rowDepthM * 3 },
 ];
 
 type PinsProps = {
@@ -62,7 +51,7 @@ export function Pins({ registerNode }: PinsProps) {
           style={{
             left: `${pin.x}%`,
             top: `${pin.y}%`,
-            width: `${PIN_DIAMETER_PCT}%`,
+            width: `${PIN_VISUAL_WIDTH_PCT}%`,
             zIndex: 100 - Math.round(pin.y * 2),
             transform: "translate(-50%, -50%)",
           }}
