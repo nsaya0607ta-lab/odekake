@@ -53,6 +53,10 @@ export const MAX_DAILY_STEP_COINS =
 export const ITEM_CATCH_SCORE_PER_COIN = 25;
 export const ITEM_CATCH_MIN_COINS = 1;
 
+/** わんこボウリング：5フレーム完走で、倒したピン合計スコア5点ごとに1コイン、最低1コイン。 */
+export const WANKO_BOWLING_SCORE_PER_COIN = 5;
+export const WANKO_BOWLING_MIN_COINS = 1;
+
 /** ガチャで同じ景品が出たときの返却コイン。 */
 export const GACHA_DUPLICATE_COINS = {
   N: 5,
@@ -96,6 +100,13 @@ export function getItemCatchCoins(score: number): number {
   if (!Number.isFinite(score)) return ITEM_CATCH_MIN_COINS;
   const safeScore = Math.max(0, Math.floor(score));
   return Math.max(ITEM_CATCH_MIN_COINS, Math.floor(safeScore / ITEM_CATCH_SCORE_PER_COIN));
+}
+
+/** 5フレームのわんこボウリングを完走したときの報酬。 */
+export function getWankoBowlingCoins(score: number): number {
+  if (!Number.isFinite(score)) return WANKO_BOWLING_MIN_COINS;
+  const safeScore = Math.max(0, Math.floor(score));
+  return Math.max(WANKO_BOWLING_MIN_COINS, Math.floor(safeScore / WANKO_BOWLING_SCORE_PER_COIN));
 }
 
 export function formatCoins(coins: number): string {
