@@ -6,9 +6,15 @@ import type { BowlingBallVisual } from "@/lib/games/wanko-bowling-balls";
 
 const DOCK_Y = 88;
 const PIN_ZONE_Y = 34;
+/** ピンの一番奥（10番/7番）より少し先。ここまで抜けたらボールがピン列を通過し終えたとみなす。 */
+const DECK_EXIT_Y = 6;
 const LANE_LEFT = 16;
 const LANE_RIGHT = 84;
 const PIN_HIT_RADIUS = 6.2;
+/** ピンと同じ列とみなすyの許容幅。ピン列は約6%間隔なので、その半分強に設定。 */
+const PIN_ROW_BAND = 3.6;
+/** ピン列に入ってからは弾みで少し減速させ、当たり判定のコマ落ちも防ぐ。 */
+const DECK_SPEED_SCALE = 0.45;
 const MIN_UPWARD_PX = 26;
 
 export type LaneRollResult = {
@@ -96,104 +102,112 @@ export function Lane({ ballVisual, resetSignal, active, onRoll }: LaneProps) {
     let x = 50;
     let y = DOCK_Y;
     let rotate = 0;
+    let speedY = launch.speedPctPerSec;
     let last = performance.now();
     let gutter = false;
     const power = Math.min(1, Math.max(0.35, launch.speedPctPerSec / 220));
+    const knockedThisThrow = new Set<number>();
+
+    // ぶつかったピンから隣接ピンへ、実際にぶつかった位置・勢いに応じて連鎖的に倒す。
+    // ボール自身は止まらず先へ進み続けるので、複数列にまたがって倒れうる。
+    const chainFrom = (hitPin: (typeof PIN_LAYOUT)[number], offsetRatio: number, impactPower: number) => {
+      const standingNow = standingIdsRef.current;
+      const visited = new Set<number>([hitPin.id, ...knockedThisThrow]);
+      let frontier = [hitPin.id];
+      let hop = 0;
+      while (frontier.length > 0 && hop < 3) {
+        const next: number[] = [];
+        const baseProb = (0.55 - hop * 0.15 + (1 - offsetRatio) * 0.15) * (0.55 + impactPower * 0.5);
+        for (const pinId of frontier) {
+          const neighbors = PIN_ADJACENCY[pinId] ?? [];
+          for (const neighborId of neighbors) {
+            if (visited.has(neighborId) || !standingNow.has(neighborId)) continue;
+            visited.add(neighborId);
+            if (Math.random() < baseProb) {
+              knockedThisThrow.add(neighborId);
+              next.push(neighborId);
+            }
+          }
+        }
+        frontier = next;
+        hop += 1;
+      }
+    };
+
+    const finish = (isGutter: boolean) => {
+      if (ballRef.current) ballRef.current.style.opacity = "0";
+      // ピンが倒れきる（wanko-bowl-pin-fall: 620ms）のを見せてから次へ進む
+      window.setTimeout(() => {
+        throwingRef.current = false;
+        setFallingIds(new Set());
+        onRoll({ knockedIds: [...knockedThisThrow], isGutter, power });
+      }, isGutter ? 260 : 650);
+    };
 
     const step = (now: number) => {
       const dt = Math.min(48, now - last) / 1000;
       last = now;
 
+      const inDeck = y <= PIN_ZONE_Y;
+      const speedScale = inDeck ? DECK_SPEED_SCALE : 1;
       const traveledRatio = Math.min(1, Math.max(0, (DOCK_Y - y) / (DOCK_Y - PIN_ZONE_Y)));
-      y -= launch.speedPctPerSec * dt;
-      x += launch.lateralPctPerSec * dt;
-      x += launch.curveNorm * 46 * traveledRatio * dt;
-      rotate += 620 * dt * (launch.speedPctPerSec / 140);
 
-      if (x < LANE_LEFT || x > LANE_RIGHT) {
-        gutter = true;
-        x = Math.min(Math.max(x, LANE_LEFT - 4), LANE_RIGHT + 4);
+      y -= speedY * speedScale * dt;
+      x += launch.lateralPctPerSec * speedScale * dt;
+      x += launch.curveNorm * 70 * traveledRatio * speedScale * dt;
+      rotate += 620 * dt * (speedY / 140);
+
+      if (!inDeck) {
+        if (x < LANE_LEFT || x > LANE_RIGHT) {
+          gutter = true;
+          x = Math.min(Math.max(x, LANE_LEFT - 4), LANE_RIGHT + 4);
+        }
+        setBallPosition(x, y, rotate);
+
+        if (gutter) {
+          finish(true);
+          return;
+        }
+        requestAnimationFrame(step);
+        return;
       }
 
+      // ピン列の中：レーン外へは弾かず、狙った軌道のまま通り抜けさせる
+      x = Math.min(Math.max(x, LANE_LEFT - 2), LANE_RIGHT + 2);
       setBallPosition(x, y, rotate);
 
-      if (gutter && y > PIN_ZONE_Y - 6) {
-        // ガター：レーン脇へそれたまま少し進んで停止
-        window.setTimeout(() => {
-          if (ballRef.current) ballRef.current.style.opacity = "0";
-          window.setTimeout(() => {
-            throwingRef.current = false;
-            onRoll({ knockedIds: [], isGutter: true, power });
-          }, 260);
-        }, 120);
-        return;
+      const standingNow = standingIdsRef.current;
+      let hitSomethingThisFrame = false;
+      for (const pin of PIN_LAYOUT) {
+        if (knockedThisThrow.has(pin.id) || !standingNow.has(pin.id)) continue;
+        if (Math.abs(pin.y - y) > PIN_ROW_BAND) continue;
+        const dx = pin.x - x;
+        if (Math.abs(dx) > PIN_HIT_RADIUS) continue;
+
+        knockedThisThrow.add(pin.id);
+        hitSomethingThisFrame = true;
+        const offsetRatio = Math.min(1, Math.abs(dx) / PIN_HIT_RADIUS);
+        chainFrom(pin, offsetRatio, power);
+        // 当たった弾みで少しだけ逸れる・減速する
+        x += (Math.random() - 0.5) * 3.2 * power;
+        speedY *= 0.93;
       }
 
-      if (!gutter && y <= PIN_ZONE_Y) {
-        resolveCollision(x, power);
-        return;
-      }
-
-      requestAnimationFrame(step);
-    };
-
-    const resolveCollision = (impactX: number, impactPower: number) => {
-      const currentlyStanding = standingIdsRef.current;
-      // 手前（レーン側）から奥へ向かって、当たった列の最初のピンを探す
-      const rowsFrontToBack = [...PIN_LAYOUT].sort((a, b) => b.y - a.y);
-      let primary: (typeof PIN_LAYOUT)[number] | null = null;
-      for (const pin of rowsFrontToBack) {
-        if (!currentlyStanding.has(pin.id)) continue;
-        if (Math.abs(pin.x - impactX) <= PIN_HIT_RADIUS) {
-          primary = pin;
-          break;
-        }
-      }
-
-      const knocked = new Set<number>();
-      if (primary) {
-        const offsetRatio = Math.min(1, Math.abs(primary.x - impactX) / PIN_HIT_RADIUS);
-        knocked.add(primary.id);
-
-        const visited = new Set<number>([primary.id]);
-        let frontier = [primary.id];
-        let hop = 0;
-        while (frontier.length > 0 && hop < 3) {
-          const next: number[] = [];
-          const baseProb = (0.55 - hop * 0.15 + (1 - offsetRatio) * 0.15) * (0.55 + impactPower * 0.5);
-          for (const pinId of frontier) {
-            const neighbors = PIN_ADJACENCY[pinId] ?? [];
-            for (const neighborId of neighbors) {
-              if (visited.has(neighborId) || !currentlyStanding.has(neighborId)) continue;
-              visited.add(neighborId);
-              if (Math.random() < baseProb) {
-                knocked.add(neighborId);
-                next.push(neighborId);
-              }
-            }
-          }
-          frontier = next;
-          hop += 1;
-        }
-      }
-
-      if (knocked.size > 0) {
-        setFallingIds(knocked);
+      if (hitSomethingThisFrame) {
+        setFallingIds(new Set(knockedThisThrow));
         setStandingIds((prev) => {
           const nextSet = new Set(prev);
-          knocked.forEach((id) => nextSet.delete(id));
+          knockedThisThrow.forEach((id) => nextSet.delete(id));
           return nextSet;
         });
       }
 
-      if (ballRef.current) ballRef.current.style.opacity = "0";
+      if (y <= DECK_EXIT_Y || knockedThisThrow.size >= PIN_LAYOUT.length) {
+        finish(false);
+        return;
+      }
 
-      // ピンが倒れきる（wanko-bowl-pin-fall: 620ms）のを見せてから次へ進む
-      window.setTimeout(() => {
-        throwingRef.current = false;
-        setFallingIds(new Set());
-        onRoll({ knockedIds: [...knocked], isGutter: false, power: impactPower });
-      }, 650);
+      requestAnimationFrame(step);
     };
 
     requestAnimationFrame(step);
@@ -240,11 +254,21 @@ export function Lane({ ballVisual, resetSignal, active, onRoll }: LaneProps) {
     const speedPctPerSec = Math.min(340, Math.max(150, speedPxPerMs * 1000 * (100 / rect.height) * 0.62));
     const lateralPctPerSec = Math.max(-70, Math.min(70, (dxPx / durationMs) * 1000 * (100 / rect.width) * 0.4));
 
-    const mid = points[Math.floor(points.length / 2)] ?? end;
-    const midProgress = durationMs > 0 ? (mid.t - start.t) / durationMs : 0.5;
-    const idealMidX = start.x + dxPx * midProgress;
-    const curveDeviationPx = mid.x - idealMidX;
-    const curveNorm = Math.max(-1, Math.min(1, curveDeviationPx / (rect.width * 0.12)));
+    // カーブは「スワイプの前半」と「後半」で横方向の勢いがどれだけ変化したかで検出する。
+    // 一直線のスワイプなら前半・後半の傾きはほぼ同じ（＝カーブなし、狙いの左右だけ反映）。
+    // 弧を描くように（例：まっすぐ→最後だけ左に流す）スワイプすると傾きの差が出て、
+    // その差の向き・大きさがそのままボールのカーブになる。
+    const avgSlope = (segment: Point[]) => {
+      if (segment.length < 2) return 0;
+      const a = segment[0]!;
+      const b = segment[segment.length - 1]!;
+      const segDuration = b.t - a.t;
+      return segDuration > 0 ? (b.x - a.x) / segDuration : 0;
+    };
+    const midIndex = Math.max(1, Math.floor(points.length / 2));
+    const firstHalfSlope = avgSlope(points.slice(0, midIndex + 1));
+    const secondHalfSlope = avgSlope(points.slice(midIndex));
+    const curveNorm = Math.max(-1, Math.min(1, (secondHalfSlope - firstHalfSlope) / 0.75));
 
     runThrow({ speedPctPerSec, lateralPctPerSec, curveNorm });
   }, [active, runThrow]);
