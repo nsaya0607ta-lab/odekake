@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, type PointerEvent as ReactPointerEvent } from "react";
-import { PIN_LAYOUT, Pins } from "./pins";
+import { PIN_LAYOUT, PIN_VISUAL_WIDTH_PCT, Pins } from "./pins";
 import type { BowlingBallVisual } from "@/lib/games/wanko-bowling-balls";
 import {
   BACKEND_HOOK_ACCEL_MPS2,
@@ -17,6 +17,7 @@ import {
   JB_LANE_WIDTH_M,
   JB_PIN_DIAMETER_M,
   JB_PIN_MASS_KG,
+  JB_PIN_SPACING_M,
   JB_TOTAL_WIDTH_M,
   OIL_HOOK_FACTOR,
   PIN_CHAIN_KNOCK_SPEED_MPS,
@@ -27,17 +28,12 @@ import {
 } from "@/lib/games/wanko-bowling-physics";
 
 const DOCK_Y = 94;
-const HEAD_PIN_SCREEN_Y = 24;
-const LANE_TRAVEL_PCT = DOCK_Y - HEAD_PIN_SCREEN_Y;
+const HEAD_PIN_SCREEN_Y = 13.5;
 const MIN_UPWARD_PCT = 8;
 const MAX_THROW_MS = 7000;
 const MAX_SWIPE_SAMPLES = 48;
 const BALL_RADIUS_M = JB_BALL_DIAMETER_M / 2;
 const PIN_RADIUS_M = JB_PIN_DIAMETER_M / 2;
-const BALL_DIAMETER_PCT = (JB_BALL_DIAMETER_M / JB_TOTAL_WIDTH_M) * 100;
-const LANE_LEFT_PCT = (JB_GUTTER_WIDTH_M / JB_TOTAL_WIDTH_M) * 100;
-const LANE_RIGHT_PCT = 100 - LANE_LEFT_PCT;
-const LANE_WIDTH_PCT = (JB_LANE_WIDTH_M / JB_TOTAL_WIDTH_M) * 100;
 const PIN_COLLISION_RADIUS_M = BALL_RADIUS_M + PIN_RADIUS_M + 0.006;
 const PIN_PAIR_RADIUS_M = JB_PIN_DIAMETER_M + 0.006;
 const BALL_EXIT_DISTANCE_M = JB_HEAD_PIN_DISTANCE_M + 1.15;
@@ -46,22 +42,100 @@ const MAX_CURVE_ANGLE_RAD = 12 * Math.PI / 180;
 const OIL_BALL_DRAG_PER_SEC = 0.012;
 const DRY_BALL_DRAG_PER_SEC = 0.04;
 const FOUL_LINE_Y = 97;
+const PIN_ROW_DEPTH_M = JB_PIN_SPACING_M * Math.sqrt(3) / 2;
+const PIN_DECK_DEPTH_M = PIN_ROW_DEPTH_M * 3;
+const PIN_DECK_SCREEN_DEPTH_PCT = 8.4;
+const TARGET_BOARDS = [5, 10, 15, 20, 25, 30, 35] as const;
+const GUIDE_DISTANCE_M = 7 * 0.3048;
+const TARGET_DISTANCE_M = 15 * 0.3048;
 
-const TARGET_X_PCTS = [5, 10, 15, 20, 25, 30, 35].map((board) =>
-  LANE_LEFT_PCT + LANE_WIDTH_PCT * (board / 40),
-);
+function clamp(value: number, min: number, max: number): number {
+  return Math.min(max, Math.max(min, value));
+}
 
-function worldXToPct(xM: number): number {
-  return (xM / JB_TOTAL_WIDTH_M) * 100;
+/**
+ * 物理寸法とカメラ表示を分離する。
+ * 手前は広く、18.288m先のピンデッキは狭く見せる透視投影。
+ */
+function laneHalfWidthPct(distanceM: number): number {
+  const depth = clamp(distanceM / JB_HEAD_PIN_DISTANCE_M, 0, 1);
+  return 43 - 20 * Math.pow(depth, 0.68);
+}
+
+function gutterVisualWidthPct(distanceM: number): number {
+  const depth = clamp(distanceM / JB_HEAD_PIN_DISTANCE_M, 0, 1);
+  return 4.6 - 1.6 * Math.pow(depth, 0.72);
 }
 
 function worldYToPct(distanceFromFoulM: number): number {
-  return DOCK_Y - (distanceFromFoulM / JB_HEAD_PIN_DISTANCE_M) * LANE_TRAVEL_PCT;
+  if (distanceFromFoulM <= JB_HEAD_PIN_DISTANCE_M) {
+    const depth = clamp(distanceFromFoulM / JB_HEAD_PIN_DISTANCE_M, 0, 1);
+    return DOCK_Y - (DOCK_Y - HEAD_PIN_SCREEN_Y) * Math.pow(depth, 0.9);
+  }
+
+  const deckDepth = (distanceFromFoulM - JB_HEAD_PIN_DISTANCE_M) / PIN_DECK_DEPTH_M;
+  return HEAD_PIN_SCREEN_Y - deckDepth * PIN_DECK_SCREEN_DEPTH_PCT;
 }
 
-const GUIDE_DOTS_Y = worldYToPct(7 * 0.3048);
-const TARGET_ARROWS_Y = worldYToPct(15 * 0.3048);
+function worldXToPct(xM: number, distanceM: number): number {
+  const halfLane = laneHalfWidthPct(distanceM);
+  const gutterVisual = gutterVisualWidthPct(distanceM);
+  const leftLaneEdge = 50 - halfLane;
+  const rightLaneEdge = 50 + halfLane;
+  const physicalLeftLane = JB_GUTTER_WIDTH_M;
+  const physicalRightLane = JB_GUTTER_WIDTH_M + JB_LANE_WIDTH_M;
+
+  if (xM < physicalLeftLane) {
+    const gutterT = clamp(xM / JB_GUTTER_WIDTH_M, 0, 1);
+    return leftLaneEdge - gutterVisual * (1 - gutterT);
+  }
+
+  if (xM > physicalRightLane) {
+    const gutterT = clamp((xM - physicalRightLane) / JB_GUTTER_WIDTH_M, 0, 1);
+    return rightLaneEdge + gutterVisual * gutterT;
+  }
+
+  const laneT = clamp((xM - physicalLeftLane) / JB_LANE_WIDTH_M, 0, 1);
+  return leftLaneEdge + laneT * halfLane * 2;
+}
+
+function boardXToPct(board: number, distanceM: number): number {
+  const normalized = (board - 20) / 20;
+  return 50 + normalized * laneHalfWidthPct(distanceM);
+}
+
+function ballVisualWidthPct(distanceM: number): number {
+  const depth = clamp(distanceM / JB_HEAD_PIN_DISTANCE_M, 0, 1);
+  return 10.2 - 5 * Math.pow(depth, 0.72);
+}
+
+function pinVisualWidthPct(distanceM: number): number {
+  const deckDepth = clamp(
+    (distanceM - JB_HEAD_PIN_DISTANCE_M) / Math.max(0.001, PIN_DECK_DEPTH_M),
+    0,
+    1,
+  );
+  return PIN_VISUAL_WIDTH_PCT - deckDepth * 0.25;
+}
+
+const NEAR_LANE_HALF = laneHalfWidthPct(0);
+const FAR_LANE_HALF = laneHalfWidthPct(JB_HEAD_PIN_DISTANCE_M);
+const NEAR_GUTTER = gutterVisualWidthPct(0);
+const FAR_GUTTER = gutterVisualWidthPct(JB_HEAD_PIN_DISTANCE_M);
+const NEAR_LANE_LEFT = 50 - NEAR_LANE_HALF;
+const NEAR_LANE_RIGHT = 50 + NEAR_LANE_HALF;
+const FAR_LANE_LEFT = 50 - FAR_LANE_HALF;
+const FAR_LANE_RIGHT = 50 + FAR_LANE_HALF;
+const NEAR_OUTER_LEFT = NEAR_LANE_LEFT - NEAR_GUTTER;
+const NEAR_OUTER_RIGHT = NEAR_LANE_RIGHT + NEAR_GUTTER;
+const FAR_OUTER_LEFT = FAR_LANE_LEFT - FAR_GUTTER;
+const FAR_OUTER_RIGHT = FAR_LANE_RIGHT + FAR_GUTTER;
+const GUIDE_DOTS_Y = worldYToPct(GUIDE_DISTANCE_M);
+const TARGET_ARROWS_Y = worldYToPct(TARGET_DISTANCE_M);
 const OIL_END_Y = worldYToPct(GAME_OIL_LENGTH_M);
+const OIL_HALF = laneHalfWidthPct(GAME_OIL_LENGTH_M);
+const OIL_LEFT = 50 - OIL_HALF;
+const OIL_RIGHT = 50 + OIL_HALF;
 
 export type LaneRollResult = {
   knockedIds: number[];
@@ -155,20 +229,16 @@ function closestPointOnSegment(
   ay: number,
   bx: number,
   by: number,
-): { distance: number; t: number; x: number; y: number } {
+): { distance: number; x: number; y: number } {
   const abx = bx - ax;
   const aby = by - ay;
   const abLenSq = abx * abx + aby * aby;
   const t = abLenSq > 0
-    ? Math.max(0, Math.min(1, ((px - ax) * abx + (py - ay) * aby) / abLenSq))
+    ? clamp(((px - ax) * abx + (py - ay) * aby) / abLenSq, 0, 1)
     : 0;
   const x = ax + abx * t;
   const y = ay + aby * t;
-  return { distance: Math.hypot(px - x, py - y), t, x, y };
-}
-
-function clamp(value: number, min: number, max: number): number {
-  return Math.min(max, Math.max(min, value));
+  return { distance: Math.hypot(px - x, py - y), x, y };
 }
 
 function directionAngle(a: Point, b: Point, width: number, height: number): number {
@@ -198,9 +268,12 @@ export function Lane({ ballVisual, resetSignal, active, onRoll }: LaneProps) {
     const el = pinNodesRef.current.get(id);
     if (!el) return;
 
-    el.style.left = `${worldXToPct(body.xM)}%`;
-    el.style.top = `${worldYToPct(body.yM)}%`;
+    const screenY = worldYToPct(body.yM);
+    el.style.left = `${worldXToPct(body.xM, body.yM)}%`;
+    el.style.top = `${screenY}%`;
+    el.style.width = `${pinVisualWidthPct(body.yM)}%`;
     el.style.opacity = body.visible ? "1" : "0";
+    el.style.zIndex = String(500 + Math.round(screenY * 10));
     const squashY = 1 - 0.62 * body.fallProgress;
     el.style.transform = `translate(-50%, -50%) rotate(${body.angle}deg) scale(1, ${squashY})`;
   }, []);
@@ -240,6 +313,7 @@ export function Lane({ ballVisual, resetSignal, active, onRoll }: LaneProps) {
       }
       current.style.left = "50%";
       current.style.top = `${DOCK_Y}%`;
+      current.style.width = `${ballVisualWidthPct(0)}%`;
       current.style.transform = "translate(-50%, -50%) rotate(0deg)";
       requestAnimationFrame(() => {
         const next = ballRef.current;
@@ -273,8 +347,9 @@ export function Lane({ ballVisual, resetSignal, active, onRoll }: LaneProps) {
   const setBallPosition = useCallback((xM: number, yM: number, rotateDeg: number) => {
     const el = ballRef.current;
     if (!el) return;
-    el.style.left = `${worldXToPct(xM)}%`;
+    el.style.left = `${worldXToPct(xM, yM)}%`;
     el.style.top = `${worldYToPct(yM)}%`;
+    el.style.width = `${ballVisualWidthPct(yM)}%`;
     el.style.transform = `translate(-50%, -50%) rotate(${rotateDeg}deg)`;
   }, []);
 
@@ -608,78 +683,91 @@ export function Lane({ ballVisual, resetSignal, active, onRoll }: LaneProps) {
         touchAction: "none",
         overscrollBehavior: "none",
         borderRadius: "22px 22px 26px 26px",
-        background: "linear-gradient(180deg, #e7c38d 0%, #d9aa6b 48%, #c58b50 100%)",
-        boxShadow: "inset 0 2px 0 rgba(255,255,255,0.42), inset 0 -22px 34px -24px rgba(76,48,24,0.62)",
+        background: "linear-gradient(180deg, #241914 0%, #39251a 45%, #2b1b13 100%)",
+        boxShadow: "inset 0 1px 0 rgba(255,255,255,0.18), inset 0 -20px 32px -24px rgba(0,0,0,0.8)",
       }}
     >
+      {/* レーン表面。物理幅ではなくカメラ遠近法で台形表示する。 */}
       <div
-        className="absolute inset-y-0 left-0"
+        className="pointer-events-none absolute inset-0"
         style={{
-          width: `${LANE_LEFT_PCT}%`,
-          background: "linear-gradient(90deg, #39291f, #66452d 70%, #7c5635)",
-          boxShadow: "inset -4px 0 8px rgba(0,0,0,0.32)",
-        }}
-        aria-hidden="true"
-      />
-      <div
-        className="absolute inset-y-0 right-0"
-        style={{
-          width: `${100 - LANE_RIGHT_PCT}%`,
-          background: "linear-gradient(270deg, #39291f, #66452d 70%, #7c5635)",
-          boxShadow: "inset 4px 0 8px rgba(0,0,0,0.32)",
+          clipPath: `polygon(${FAR_LANE_LEFT}% 0%, ${FAR_LANE_RIGHT}% 0%, ${NEAR_LANE_RIGHT}% 100%, ${NEAR_LANE_LEFT}% 100%)`,
+          background: "linear-gradient(180deg, #e6bd7d 0%, #ddb170 42%, #d29d5b 100%)",
+          boxShadow: "inset 0 0 24px rgba(104,67,34,0.16)",
         }}
         aria-hidden="true"
       />
 
+      {/* 左右ガター。実寸は物理側、画面上では細い溝として圧縮する。 */}
       <div
-        className="pointer-events-none absolute"
+        className="pointer-events-none absolute inset-0"
         style={{
-          left: `${LANE_LEFT_PCT}%`,
-          right: `${100 - LANE_RIGHT_PCT}%`,
-          top: "0",
-          bottom: "0",
-          background: "repeating-linear-gradient(90deg, rgba(255,255,255,0.16) 0 1px, transparent 1px 8.2%)",
+          clipPath: `polygon(${FAR_OUTER_LEFT}% 0%, ${FAR_LANE_LEFT}% 0%, ${NEAR_LANE_LEFT}% 100%, ${NEAR_OUTER_LEFT}% 100%)`,
+          background: "linear-gradient(90deg, #3f2a1d, #654329 70%, #775034)",
+          boxShadow: "inset -3px 0 7px rgba(0,0,0,0.4)",
+        }}
+        aria-hidden="true"
+      />
+      <div
+        className="pointer-events-none absolute inset-0"
+        style={{
+          clipPath: `polygon(${FAR_LANE_RIGHT}% 0%, ${FAR_OUTER_RIGHT}% 0%, ${NEAR_OUTER_RIGHT}% 100%, ${NEAR_LANE_RIGHT}% 100%)`,
+          background: "linear-gradient(270deg, #3f2a1d, #654329 70%, #775034)",
+          boxShadow: "inset 3px 0 7px rgba(0,0,0,0.4)",
         }}
         aria-hidden="true"
       />
 
-      <div
-        className="pointer-events-none absolute"
-        style={{
-          left: `${LANE_LEFT_PCT}%`,
-          right: `${100 - LANE_RIGHT_PCT}%`,
-          top: `${OIL_END_Y}%`,
-          bottom: `${100 - DOCK_Y}%`,
-          background: "linear-gradient(180deg, rgba(255,255,255,0.02), rgba(255,255,255,0.11))",
-        }}
-        aria-hidden="true"
-      />
+      {/* 板目も奥へ収束させる。 */}
+      <svg className="pointer-events-none absolute inset-0 h-full w-full" viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true">
+        {[-0.8, -0.6, -0.4, -0.2, 0, 0.2, 0.4, 0.6, 0.8].map((n) => (
+          <line
+            key={n}
+            x1={50 + n * FAR_LANE_HALF}
+            y1="0"
+            x2={50 + n * NEAR_LANE_HALF}
+            y2="100"
+            stroke="rgba(255,255,255,0.14)"
+            strokeWidth="0.15"
+          />
+        ))}
+        <polygon
+          points={`${OIL_LEFT},${OIL_END_Y} ${OIL_RIGHT},${OIL_END_Y} ${NEAR_LANE_RIGHT},100 ${NEAR_LANE_LEFT},100`}
+          fill="rgba(255,255,255,0.035)"
+        />
+      </svg>
 
-      {TARGET_X_PCTS.map((x, index) => (
-        <div key={`guide-${index}`} className="pointer-events-none absolute" style={{ left: `${x}%`, top: `${GUIDE_DOTS_Y}%` }} aria-hidden="true">
+      {TARGET_BOARDS.map((board) => (
+        <div
+          key={`guide-${board}`}
+          className="pointer-events-none absolute"
+          style={{ left: `${boardXToPct(board, GUIDE_DISTANCE_M)}%`, top: `${GUIDE_DOTS_Y}%` }}
+          aria-hidden="true"
+        >
           <span className="block h-[3px] w-[3px] -translate-x-1/2 -translate-y-1/2 rounded-full bg-[#654628]/55" />
         </div>
       ))}
-      {TARGET_X_PCTS.map((x, index) => (
+
+      {TARGET_BOARDS.map((board) => (
         <div
-          key={`arrow-${index}`}
+          key={`arrow-${board}`}
           className="pointer-events-none absolute -translate-x-1/2 -translate-y-1/2"
           style={{
-            left: `${x}%`,
+            left: `${boardXToPct(board, TARGET_DISTANCE_M)}%`,
             top: `${TARGET_ARROWS_Y}%`,
             width: 0,
             height: 0,
-            borderLeft: "4px solid transparent",
-            borderRight: "4px solid transparent",
-            borderBottom: "10px solid rgba(82,55,31,0.62)",
+            borderLeft: "3.5px solid transparent",
+            borderRight: "3.5px solid transparent",
+            borderBottom: "9px solid rgba(82,55,31,0.6)",
           }}
           aria-hidden="true"
         />
       ))}
 
       <div
-        className="pointer-events-none absolute h-[2px] bg-[#7e3e30]/80"
-        style={{ left: `${LANE_LEFT_PCT}%`, right: `${100 - LANE_RIGHT_PCT}%`, top: `${FOUL_LINE_Y}%` }}
+        className="pointer-events-none absolute h-[2px] bg-[#8c4735]/75"
+        style={{ left: `${NEAR_LANE_LEFT}%`, right: `${100 - NEAR_LANE_RIGHT}%`, top: `${FOUL_LINE_Y}%` }}
         aria-hidden="true"
       />
 
@@ -689,7 +777,7 @@ export function Lane({ ballVisual, resetSignal, active, onRoll }: LaneProps) {
         ref={ballRef}
         className="pointer-events-none absolute aspect-square rounded-full shadow-[0_4px_10px_rgba(0,0,0,0.38)]"
         style={{
-          width: `${BALL_DIAMETER_PCT}%`,
+          width: `${ballVisualWidthPct(0)}%`,
           left: "50%",
           top: `${DOCK_Y}%`,
           transform: "translate(-50%, -50%)",
@@ -703,7 +791,7 @@ export function Lane({ ballVisual, resetSignal, active, onRoll }: LaneProps) {
         <span className="absolute left-[52%] top-[38%] h-[9%] w-[9%] rounded-full bg-black/40" />
       </div>
 
-      <div className="pointer-events-none absolute bottom-[1.8%] left-1/2 z-30 -translate-x-1/2 text-center">
+      <div className="pointer-events-none absolute bottom-[1.8%] left-1/2 z-[900] -translate-x-1/2 text-center">
         <p className="whitespace-nowrap rounded-full bg-[#2f2119]/70 px-3 py-1.5 text-[10px] font-black tracking-[0.07em] text-[#fff7e8] backdrop-blur-sm">
           {active ? "ボールから上へスワイプ" : ""}
         </p>
