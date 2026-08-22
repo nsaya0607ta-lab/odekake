@@ -3,34 +3,55 @@
 import type { BowlingFrame, BowlingScoreState } from "@/lib/games/wanko-bowling-score";
 import { BOWLING_FRAME_COUNT } from "@/lib/games/wanko-bowling-score";
 
+function normalMark(roll: number): string {
+  return roll === 0 ? "–" : String(roll);
+}
+
 function frameLabel(frame: BowlingFrame, frameIndex: number): string {
   const isLast = frameIndex === BOWLING_FRAME_COUNT - 1;
   if (frame.rolls.length === 0) return "";
 
-  const rollText = (roll: number, isFirstOfFrame: boolean, prevSum: number) => {
-    if (roll === 10 && (isFirstOfFrame || prevSum === 0)) return "X";
-    if (!isFirstOfFrame && prevSum + roll === 10) return "/";
-    return roll === 0 ? "–" : String(roll);
-  };
+  const first = frame.rolls[0] ?? 0;
+  const second = frame.rolls[1];
+  const third = frame.rolls[2];
 
   if (!isLast) {
-    const parts: string[] = [];
-    const first = frame.rolls[0] ?? 0;
-    parts.push(rollText(first, true, 0));
-    if (frame.rolls.length >= 2 && first !== 10) {
-      parts.push(rollText(frame.rolls[1] ?? 0, false, first));
+    if (first === 10) return "X";
+    const parts = [normalMark(first)];
+    if (second !== undefined) {
+      parts.push(first + second === 10 ? "/" : normalMark(second));
     }
     return parts.join(" ");
   }
 
   const parts: string[] = [];
-  let runningPrev = 0;
-  frame.rolls.forEach((roll, idx) => {
-    const isFirstOfSet = idx === 0 || (frame.rolls[idx - 1] ?? -1) === 10 || runningPrev === 10;
-    parts.push(rollText(roll, isFirstOfSet, isFirstOfSet ? 0 : runningPrev));
-    runningPrev = isFirstOfSet ? roll : runningPrev + roll;
-    if (roll === 10 || runningPrev === 10) runningPrev = 0;
-  });
+
+  if (first === 10) {
+    parts.push("X");
+    if (second === undefined) return parts.join(" ");
+
+    parts.push(second === 10 ? "X" : normalMark(second));
+    if (third === undefined) return parts.join(" ");
+
+    if (second === 10) {
+      parts.push(third === 10 ? "X" : normalMark(third));
+    } else {
+      parts.push(second + third === 10 ? "/" : normalMark(third));
+    }
+    return parts.join(" ");
+  }
+
+  parts.push(normalMark(first));
+  if (second === undefined) return parts.join(" ");
+
+  const firstSetIsSpare = first + second === 10;
+  parts.push(firstSetIsSpare ? "/" : normalMark(second));
+
+  if (third !== undefined) {
+    // 最終フレームのスペア後は新しい10本で投げるため、10本ならストライク表記。
+    parts.push(third === 10 ? "X" : normalMark(third));
+  }
+
   return parts.join(" ");
 }
 
