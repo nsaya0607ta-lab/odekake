@@ -13,6 +13,8 @@ export const PINS_PER_FRAME = 10;
 export type BowlingFrame = {
   /** そのフレームで倒したピン本数（投球ごと）。最終フレームは最大3投。 */
   rolls: number[];
+  /** 投球ごとのガター判定。古いデータとの互換性のため省略可能。 */
+  gutters?: boolean[];
 };
 
 export type BowlingFrameResult = {
@@ -27,8 +29,10 @@ export type BowlingScoreState = {
   frames: BowlingFrameResult[];
   /** 現在確定している最新の累積スコア。 */
   total: number;
+  /** ストライクになった投球数。最終フレームのボーナス投球も含む。 */
   strikeCount: number;
   spareCount: number;
+  /** ガターになった投球数。 */
   gutterCount: number;
   /** 3連続ストライク（ターキー）が発生した回数。 */
   turkeyCount: number;
@@ -48,6 +52,36 @@ function frameIsSpare(frame: BowlingFrame): boolean {
   const first = frame.rolls[0] ?? 0;
   const second = frame.rolls[1] ?? 0;
   return frame.rolls.length >= 2 && first + second === PINS_PER_FRAME;
+}
+
+function lastFrameStrikeRollCount(frame: BowlingFrame): number {
+  const first = frame.rolls[0];
+  const second = frame.rolls[1];
+  const third = frame.rolls[2];
+  let count = first === PINS_PER_FRAME ? 1 : 0;
+
+  // 1投目がストライクなら2投目は新しい10本。スペア成立後の3投目も新しい10本。
+  if (first === PINS_PER_FRAME && second === PINS_PER_FRAME) count += 1;
+  if (
+    third === PINS_PER_FRAME
+    && (
+      second === PINS_PER_FRAME
+      || (first !== undefined && first < PINS_PER_FRAME && (first + (second ?? 0)) === PINS_PER_FRAME)
+    )
+  ) {
+    count += 1;
+  }
+
+  return count;
+}
+
+function frameGutterCount(frame: BowlingFrame): number {
+  if (frame.gutters && frame.gutters.length === frame.rolls.length) {
+    return frame.gutters.filter(Boolean).length;
+  }
+  // 古い状態オブジェクトではガター投球を保持していなかったため、従来どおり
+  // 「全投球0のフレーム」を1回として扱い、既存表示を壊さない。
+  return frame.rolls.length > 0 && frame.rolls.every((roll) => roll === 0) ? 1 : 0;
 }
 
 /** そのフレームの投球が終わっているか（次フレームへ進めるか）を判定する。 */
@@ -87,6 +121,62 @@ export function pinsStandingForNextRoll(frame: BowlingFrame, frameIndex: number)
   return 0;
 }
 
+function isValidRoll(value: unknown): value is number {
+  return Number.isInteger(value) && typeof value === "number" && value >= 0 && value <= PINS_PER_FRAME;
+}
+
+/** APIで受け取った完了済みラウンドが、5フレームの合法な投球列かを検証する。 */
+export function isValidCompletedBowlingFrames(value: unknown): value is BowlingFrame[] {
+  if (!Array.isArray(value) || value.length !== BOWLING_FRAME_COUNT) return false;
+
+  return value.every((rawFrame, index) => {
+    if (!rawFrame || typeof rawFrame !== "object" || Array.isArray(rawFrame)) return false;
+    const frame = rawFrame as { rolls?: unknown; gutters?: unknown };
+    if (!Array.isArray(frame.rolls) || !frame.rolls.every(isValidRoll)) return false;
+    if (
+      frame.gutters !== undefined
+      && (!Array.isArray(frame.gutters)
+        || frame.gutters.length !== frame.rolls.length
+        || !frame.gutters.every((gutter) => typeof gutter === "boolean"))
+    ) {
+      return false;
+    }
+    if (
+      Array.isArray(frame.gutters)
+      && frame.gutters.some((gutter, rollIndex) => gutter && frame.rolls![rollIndex] !== 0)
+    ) {
+      return false;
+    }
+
+    const rolls = frame.rolls as number[];
+    const first = rolls[0];
+    const second = rolls[1];
+    const third = rolls[2];
+    const isLast = index === BOWLING_FRAME_COUNT - 1;
+
+    if (!isLast) {
+      if (first === PINS_PER_FRAME) return rolls.length === 1;
+      return rolls.length === 2
+        && first !== undefined
+        && second !== undefined
+        && first + second <= PINS_PER_FRAME;
+    }
+
+    if (first === undefined || second === undefined) return false;
+    if (first === PINS_PER_FRAME) {
+      if (rolls.length !== 3 || third === undefined) return false;
+      // 2投目がストライクでなければ、3投目は同じラックの残り本数まで。
+      return second === PINS_PER_FRAME || second + third <= PINS_PER_FRAME;
+    }
+
+    if (first + second > PINS_PER_FRAME) return false;
+    if (first + second === PINS_PER_FRAME) {
+      return rolls.length === 3 && third !== undefined;
+    }
+    return rolls.length === 2;
+  });
+}
+
 /**
  * フレーム配列からスコアを計算する。まだ全投球が終わっていなくても、
  * 確定できる範囲までのスコアを返す（ボーナス待ちのフレームは null）。
@@ -108,7 +198,10 @@ export function calculateBowlingScore(frames: BowlingFrame[]): BowlingScoreState
     const isLastFrame = index === BOWLING_FRAME_COUNT - 1;
     const strike = frameIsStrike(frame);
     const spare = frameIsSpare(frame);
-    const gutterFrame = frame.rolls.length > 0 && frame.rolls.every((roll) => roll === 0);
+    const gutterFrame = frame.rolls.length > 0
+      && (frame.gutters?.length === frame.rolls.length
+        ? frame.gutters.every(Boolean)
+        : frame.rolls.every((roll) => roll === 0));
 
     if (frame.rolls.length === 0) {
       results.push({ cumulativeScore: null, isStrike: false, isSpare: false, isGutterFrame: false });
@@ -116,9 +209,9 @@ export function calculateBowlingScore(frames: BowlingFrame[]): BowlingScoreState
       return;
     }
 
-    if (strike) strikeCount += 1;
+    strikeCount += isLastFrame ? lastFrameStrikeRollCount(frame) : (strike ? 1 : 0);
     if (spare) spareCount += 1;
-    if (gutterFrame) gutterCount += 1;
+    gutterCount += frameGutterCount(frame);
 
     if (strike) {
       runningStrikeStreak += 1;
@@ -201,7 +294,7 @@ export function calculateBowlingScore(frames: BowlingFrame[]): BowlingScoreState
 }
 
 export function createEmptyFrames(): BowlingFrame[] {
-  return Array.from({ length: BOWLING_FRAME_COUNT }, () => ({ rolls: [] }));
+  return Array.from({ length: BOWLING_FRAME_COUNT }, () => ({ rolls: [], gutters: [] }));
 }
 
 /** 5フレーム制の理論上の満点（オールストライク）。 */
