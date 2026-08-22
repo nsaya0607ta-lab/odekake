@@ -31,6 +31,7 @@ export type BowlingScoreState = {
   total: number;
   /** ストライクになった投球数。最終フレームのボーナス投球も含む。 */
   strikeCount: number;
+  /** スペアが成立した回数。最終フレームの X 7 / のようなボーナスラックも含む。 */
   spareCount: number;
   /** ガターになった投球数。 */
   gutterCount: number;
@@ -68,6 +69,28 @@ function lastFrameStrikeRollCount(frame: BowlingFrame): number {
       second === PINS_PER_FRAME
       || (first !== undefined && first < PINS_PER_FRAME && (first + (second ?? 0)) === PINS_PER_FRAME)
     )
+  ) {
+    count += 1;
+  }
+
+  return count;
+}
+
+function lastFrameSpareCount(frame: BowlingFrame): number {
+  const first = frame.rolls[0];
+  const second = frame.rolls[1];
+  const third = frame.rolls[2];
+  let count = 0;
+
+  if (first !== undefined && first < PINS_PER_FRAME && second !== undefined && first + second === PINS_PER_FRAME) {
+    count += 1;
+  }
+  if (
+    first === PINS_PER_FRAME
+    && second !== undefined
+    && second < PINS_PER_FRAME
+    && third !== undefined
+    && second + third === PINS_PER_FRAME
   ) {
     count += 1;
   }
@@ -122,7 +145,10 @@ export function pinsStandingForNextRoll(frame: BowlingFrame, frameIndex: number)
 }
 
 function isValidRoll(value: unknown): value is number {
-  return Number.isInteger(value) && typeof value === "number" && value >= 0 && value <= PINS_PER_FRAME;
+  return typeof value === "number"
+    && Number.isInteger(value)
+    && value >= 0
+    && value <= PINS_PER_FRAME;
 }
 
 /** APIで受け取った完了済みラウンドが、5フレームの合法な投球列かを検証する。 */
@@ -133,22 +159,23 @@ export function isValidCompletedBowlingFrames(value: unknown): value is BowlingF
     if (!rawFrame || typeof rawFrame !== "object" || Array.isArray(rawFrame)) return false;
     const frame = rawFrame as { rolls?: unknown; gutters?: unknown };
     if (!Array.isArray(frame.rolls) || !frame.rolls.every(isValidRoll)) return false;
+    const rolls = frame.rolls as number[];
+
     if (
       frame.gutters !== undefined
       && (!Array.isArray(frame.gutters)
-        || frame.gutters.length !== frame.rolls.length
+        || frame.gutters.length !== rolls.length
         || !frame.gutters.every((gutter) => typeof gutter === "boolean"))
     ) {
       return false;
     }
     if (
       Array.isArray(frame.gutters)
-      && frame.gutters.some((gutter, rollIndex) => gutter && frame.rolls![rollIndex] !== 0)
+      && frame.gutters.some((gutter, rollIndex) => gutter && rolls[rollIndex] !== 0)
     ) {
       return false;
     }
 
-    const rolls = frame.rolls as number[];
     const first = rolls[0];
     const second = rolls[1];
     const third = rolls[2];
@@ -210,7 +237,7 @@ export function calculateBowlingScore(frames: BowlingFrame[]): BowlingScoreState
     }
 
     strikeCount += isLastFrame ? lastFrameStrikeRollCount(frame) : (strike ? 1 : 0);
-    if (spare) spareCount += 1;
+    spareCount += isLastFrame ? lastFrameSpareCount(frame) : (spare ? 1 : 0);
     gutterCount += frameGutterCount(frame);
 
     if (strike) {
