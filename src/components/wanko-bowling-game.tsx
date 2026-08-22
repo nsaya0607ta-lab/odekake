@@ -102,13 +102,18 @@ export function WankoBowlingGame({ ownedBalls }: { ownedBalls: OwnedBowlingBall[
     if (submittedRef.current) return;
     submittedRef.current = true;
 
+    const finalState = calculateBowlingScore(finalFrames);
     try {
       const response = await fetch("/api/coins/wanko-bowling", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           roundId,
-          frames: finalFrames,
+          score: finalState.total,
+          strikeCount: finalState.strikeCount,
+          spareCount: finalState.spareCount,
+          gutterCount: finalState.gutterCount,
+          frameCount: BOWLING_FRAME_COUNT,
         }),
       });
       const payload = (await response.json().catch(() => null)) as { coins?: number } | null;
