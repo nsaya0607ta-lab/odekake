@@ -33,6 +33,47 @@ function isFreshRackRoll(frameIndex: number, priorRolls: number[]): boolean {
   return false;
 }
 
+/**
+ * 未確定のストライク/スペアも、現時点で分かっているボーナスまで含めて表示する。
+ * 完了時には正式スコアと必ず一致する「LIVE SCORE」用の値。
+ */
+function calculateLiveBowlingScore(frames: BowlingFrame[]): number {
+  const flatRolls = frames.flatMap((frame) => frame.rolls);
+  let cursor = 0;
+  let total = 0;
+
+  frames.forEach((frame, index) => {
+    if (frame.rolls.length === 0) return;
+    const isLast = index === BOWLING_FRAME_COUNT - 1;
+
+    if (isLast) {
+      total += frame.rolls.reduce((sum, roll) => sum + roll, 0);
+      cursor += frame.rolls.length;
+      return;
+    }
+
+    const first = frame.rolls[0] ?? 0;
+    const second = frame.rolls[1];
+
+    if (first === 10) {
+      total += 10 + (flatRolls[cursor + 1] ?? 0) + (flatRolls[cursor + 2] ?? 0);
+      cursor += 1;
+      return;
+    }
+
+    if (second !== undefined && first + second === 10) {
+      total += 10 + (flatRolls[cursor + 2] ?? 0);
+      cursor += 2;
+      return;
+    }
+
+    total += frame.rolls.reduce((sum, roll) => sum + roll, 0);
+    cursor += frame.rolls.length;
+  });
+
+  return total;
+}
+
 function newRoundId(): string {
   if (typeof crypto !== "undefined" && "randomUUID" in crypto) return crypto.randomUUID();
   return `round-${Date.now()}-${Math.random().toString(16).slice(2)}`;
@@ -54,6 +95,7 @@ export function WankoBowlingGame({ ownedBalls }: { ownedBalls: OwnedBowlingBall[
   const [bestScore, setBestScore] = useState<number | null>(null);
   const [isNewBest, setIsNewBest] = useState(false);
   const [earnedCoins, setEarnedCoins] = useState<number | null>(null);
+  const [lastRollPins, setLastRollPins] = useState<number | null>(null);
   const rankingSectionIdRef = useRef("wanko-bowling-ranking");
 
   const framesRef = useRef(frames);
@@ -64,6 +106,7 @@ export function WankoBowlingGame({ ownedBalls }: { ownedBalls: OwnedBowlingBall[
   const submittedRef = useRef(false);
 
   const score = useMemo(() => calculateBowlingScore(frames), [frames]);
+  const liveScore = useMemo(() => calculateLiveBowlingScore(frames), [frames]);
   const ballVisual = useMemo(() => getBowlingBallVisual(selectedBallId), [selectedBallId]);
 
   const loadBestScore = useCallback(async () => {
@@ -92,6 +135,7 @@ export function WankoBowlingGame({ ownedBalls }: { ownedBalls: OwnedBowlingBall[
     setReaction("idle");
     setEarnedCoins(null);
     setIsNewBest(false);
+    setLastRollPins(null);
     setRoundId(newRoundId());
     setLaneResetSignal((value) => value + 1);
     setRollLocked(false);
@@ -136,6 +180,8 @@ export function WankoBowlingGame({ ownedBalls }: { ownedBalls: OwnedBowlingBall[
     const priorGutters = currentFrame.gutters ?? Array.from({ length: priorRolls.length }, () => false);
     const freshRack = isFreshRackRoll(currentFrameIndex, priorRolls);
     const roll = result.isGutter ? 0 : result.knockedIds.length;
+    setLastRollPins(roll);
+
     const newRolls = [...priorRolls, roll];
     const newFrame: BowlingFrame = {
       rolls: newRolls,
@@ -317,10 +363,18 @@ export function WankoBowlingGame({ ownedBalls }: { ownedBalls: OwnedBowlingBall[
 
   return (
     <section className={`rough-card overflow-hidden ${shake ? "wanko-bowl-shake" : ""}`}>
-      <div className="border-b border-line px-4 py-3">
-        <div className="flex items-baseline justify-between">
-          <p className="text-[9px] font-black tracking-[0.14em] text-ink-faint">確定スコア</p>
-          <p className="text-2xl font-black tabular-nums text-ink">{score.total}</p>
+      <div className="border-b border-line px-4 py-2.5">
+        <div className="flex items-end justify-between gap-3">
+          <div>
+            <p className="text-[9px] font-black tracking-[0.14em] text-leaf-deep">LIVE SCORE</p>
+            <p className="mt-0.5 text-[10px] font-bold text-ink-faint">確定 {score.total}</p>
+          </div>
+          <div className="flex items-end gap-3">
+            {lastRollPins !== null ? (
+              <p className="pb-0.5 text-[10px] font-black text-ink-soft">この投球 +{lastRollPins}本</p>
+            ) : null}
+            <p className="text-3xl font-black tabular-nums leading-none text-ink">{liveScore}</p>
+          </div>
         </div>
         <div className="mt-2">
           <ScoreBoard frames={frames} score={score} currentFrameIndex={frameIndex} />
