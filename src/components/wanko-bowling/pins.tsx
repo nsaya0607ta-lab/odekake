@@ -49,10 +49,14 @@ export function Pins({ standingIds, fallingIds }: PinsProps) {
         return (
           <div
             key={pin.id}
-            className={`absolute -translate-x-1/2 -translate-y-1/2 ${falling ? "wanko-bowl-pin-fall" : ""}`}
+            className={`absolute ${falling ? "wanko-bowl-pin-fall" : ""}`}
             style={{
               left: `${pin.x}%`,
               top: `${pin.y}%`,
+              // -50%,-50% の中心合わせは wanko-bowl-pin-fall のキーフレーム側にも
+              // 焼き込んである（Tailwind の translate ユーティリティと transform を
+              // 奪い合わないようにするため）。ここでは倒れていない時だけ使う。
+              transform: falling ? undefined : "translate(-50%, -50%)",
               ["--pin-fall-x" as string]: fallX,
               ["--pin-fall-r" as string]: fallR,
             }}

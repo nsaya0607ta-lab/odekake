@@ -45,18 +45,29 @@ export function Lane({ ballVisual, resetSignal, active, onRoll }: LaneProps) {
   const standingIdsRef = useRef(standingIds);
   standingIdsRef.current = standingIds;
 
+  const dockBall = useCallback(() => {
+    const el = ballRef.current;
+    if (!el) return;
+    el.style.left = "50%";
+    el.style.top = `${DOCK_Y}%`;
+    el.style.transform = "translate(-50%, -50%) rotate(0deg)";
+    el.style.opacity = "1";
+  }, []);
+
   useEffect(() => {
     setStandingIds(allPinIds());
     setFallingIds(new Set());
     throwingRef.current = false;
-    if (ballRef.current) {
-      ballRef.current.style.left = "50%";
-      ballRef.current.style.top = `${DOCK_Y}%`;
-      ballRef.current.style.transform = "translate(-50%, -50%) rotate(0deg)";
-      ballRef.current.style.opacity = "1";
-    }
+    dockBall();
     if (trailRef.current) trailRef.current.style.opacity = "0";
-  }, [resetSignal]);
+  }, [resetSignal, dockBall]);
+
+  // 同じフレーム内の2投目（resetSignal は変わらず、ピンだけ一部残っている状態）でも、
+  // 次の投球が可能になった瞬間（active が false→true）にボールを置き直す。
+  useEffect(() => {
+    if (!active) return;
+    dockBall();
+  }, [active, dockBall]);
 
   // left/top はレーン（親要素）に対する割合、transform の translate(-50%, -50%) は
   // ボール自身のサイズぶんを引いて中心合わせするためだけに使う。
@@ -177,11 +188,12 @@ export function Lane({ ballVisual, resetSignal, active, onRoll }: LaneProps) {
 
       if (ballRef.current) ballRef.current.style.opacity = "0";
 
+      // ピンが倒れきる（wanko-bowl-pin-fall: 620ms）のを見せてから次へ進む
       window.setTimeout(() => {
         throwingRef.current = false;
         setFallingIds(new Set());
         onRoll({ knockedIds: [...knocked], isGutter: false, power: impactPower });
-      }, 480);
+      }, 650);
     };
 
     requestAnimationFrame(step);
@@ -287,7 +299,7 @@ export function Lane({ ballVisual, resetSignal, active, onRoll }: LaneProps) {
       {/* ボール */}
       <div
         ref={ballRef}
-        className="pointer-events-none absolute h-[9%] w-[9%] rounded-full shadow-[0_3px_6px_rgba(0,0,0,0.35)]"
+        className="pointer-events-none absolute aspect-square w-[9%] rounded-full shadow-[0_3px_6px_rgba(0,0,0,0.35)]"
         style={{
           left: "50%",
           top: `${DOCK_Y}%`,
