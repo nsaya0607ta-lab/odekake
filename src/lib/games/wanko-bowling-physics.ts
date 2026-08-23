@@ -45,13 +45,17 @@ export const GAME_MAX_BALL_SPEED_KMH = 38;
 /**
  * ピンが底縁を支点に倒れ始めるために必要な重心上昇を簡易モデル化。
  * 実際には摩擦・弾性・ピン形状が絡むため、計算値に安全係数を掛けてゲーム用閾値にする。
+ *
+ * ボール直撃は従来どおりある程度の速度を必要とする一方、
+ * すでに動いているピンからの横方向の衝突は、重心より上へ力が入りやすい状況を
+ * 2Dモデルで近似するため、連鎖側の閾値を少し低くする。
  */
 const PIN_BASE_RADIUS_M = 0.0254;
 const GRAVITY_MPS2 = 9.80665;
 const cogRiseM = Math.hypot(JB_PIN_COG_M, PIN_BASE_RADIUS_M) - JB_PIN_COG_M;
 const idealTipSpeedMps = Math.sqrt(2 * GRAVITY_MPS2 * cogRiseM);
 export const PIN_DIRECT_KNOCK_SPEED_MPS = idealTipSpeedMps * 1.55;
-export const PIN_CHAIN_KNOCK_SPEED_MPS = idealTipSpeedMps * 1.9;
+export const PIN_CHAIN_KNOCK_SPEED_MPS = idealTipSpeedMps * 1.38;
 
 /**
  * 公認42ftパターン例を土台にしたゲーム用フック近似。
@@ -65,10 +69,15 @@ export const BACKEND_HOOK_ACCEL_MPS2 = 1.85;
 
 /**
  * 反発係数は公認規格値ではないゲーム用近似。
- * 10lb化と合わせ、ボール→ピン衝突後は明確に減速するよう低めにする。
+ * ボール→ピンは大きく跳ね返らせず、ピン→ピンは少しだけエネルギーを残して
+ * 2番・3番ピン以降へ自然に衝撃が伝わるようにする。
  */
 export const BALL_PIN_RESTITUTION = 0.2;
-export const PIN_PIN_RESTITUTION = 0.32;
+export const PIN_PIN_RESTITUTION = 0.39;
 
-export const PIN_FRICTION_PER_SEC = 2.6;
-export const PIN_SETTLE_SPEED_MPS = 0.16;
+/**
+ * ピンは衝突直後に即停止させず、短時間だけデッキ上を滑って次のピンへ触れられるようにする。
+ * 値を下げすぎるとピンが飛び回るため、見た目とゲーム性の中間に寄せる。
+ */
+export const PIN_FRICTION_PER_SEC = 2.25;
+export const PIN_SETTLE_SPEED_MPS = 0.12;
