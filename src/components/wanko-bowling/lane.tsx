@@ -16,6 +16,7 @@ import {
   JB_HEAD_PIN_DISTANCE_M,
   JB_LANE_WIDTH_M,
   JB_PIN_DIAMETER_M,
+  JB_PIN_HEIGHT_M,
   JB_PIN_MASS_KG,
   JB_PIN_SPACING_M,
   JB_TOTAL_WIDTH_M,
@@ -36,6 +37,7 @@ const BALL_RADIUS_M = JB_BALL_DIAMETER_M / 2;
 const PIN_RADIUS_M = JB_PIN_DIAMETER_M / 2;
 const PIN_COLLISION_RADIUS_M = BALL_RADIUS_M + PIN_RADIUS_M + 0.006;
 const PIN_PAIR_RADIUS_M = JB_PIN_DIAMETER_M + 0.006;
+const FALLEN_PIN_EXTRA_REACH_M = Math.max(0, JB_PIN_HEIGHT_M / 2 - PIN_RADIUS_M) * 0.82;
 const BALL_EXIT_DISTANCE_M = JB_HEAD_PIN_DISTANCE_M + 1.15;
 const MAX_LAUNCH_ANGLE_RAD = 3.4 * Math.PI / 180;
 const OIL_BALL_DRAG_PER_SEC = 0.012;
@@ -57,9 +59,9 @@ const CURVE_BOW_FULL_SCALE_PCT = 6;
 const MAX_CURVE_NORM = 0.68;
 const CURVE_STRAIGHT_SNAP = 0.06;
 
-// ボールはピン衝突後に減速し、同じ勢いでラックを貫通しないようにする。
-const BALL_POST_HIT_SPEED_FACTOR = 0.86;
-const BALL_POST_HIT_FORWARD_FACTOR = 0.82;
+// 10lb球でもポケットヒット後にラック奥へ適度なエネルギーを残す。
+const BALL_POST_HIT_SPEED_FACTOR = 0.94;
+const BALL_POST_HIT_FORWARD_FACTOR = 0.92;
 
 // 2Dモデルで3Dの「横から押されて重心を外す」効果を近似する。
 const DIRECT_IMPULSE_WEIGHT = 0.16;
@@ -211,6 +213,11 @@ function pinVisualWidthPct(distanceM: number): number {
     1,
   );
   return PIN_VISUAL_WIDTH_PCT - deckDepth * 0.3;
+}
+
+function pinPairCollisionRadius(a: PinBody, b: PinBody): number {
+  const fallReach = Math.max(a.fallProgress, b.fallProgress) * FALLEN_PIN_EXTRA_REACH_M;
+  return PIN_PAIR_RADIUS_M + fallReach;
 }
 
 function screenDirectionAngle(a: Point, b: Point): number {
@@ -750,7 +757,7 @@ export function Lane({ ballVisual, resetSignal, active, onRoll }: LaneProps) {
       for (let i = 0; i < ids.length; i += 1) {
         const idA = ids[i]!;
         const bodyA = pinBodiesRef.current.get(idA)!;
-        if (!bodyA.visible || (bodyA.standing && !bodyA.moving)) continue;
+        if (!bodyA.visible) continue;
 
         for (let j = i + 1; j < ids.length; j += 1) {
           const idB = ids[j]!;
@@ -760,7 +767,7 @@ export function Lane({ ballVisual, resetSignal, active, onRoll }: LaneProps) {
           const dx = bodyB.xM - bodyA.xM;
           const dy = bodyB.yM - bodyA.yM;
           const pairDistance = Math.hypot(dx, dy);
-          if (pairDistance > PIN_PAIR_RADIUS_M) continue;
+          if (pairDistance > pinPairCollisionRadius(bodyA, bodyB)) continue;
 
           const aWasStanding = bodyA.standing;
           const bWasStanding = bodyB.standing;
