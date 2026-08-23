@@ -114,26 +114,23 @@ export const BALL_INT_DIFFERENTIAL_M = 0; // IntDiff
  *   omegaZ = spinMagnitude * sin(axisTilt)
  *
  * releaseSpeed=8.0m/s・axisRotation=45°で(-30,-30,+10)にほぼ一致することを
- * 検証済み（誤差0.1%未満）。この45°は論文の基準条件を再現するための値であり、
- * ゲーム内の実効最大値（MAX_AXIS_ROTATION_DEG）とは別。curveNorm（プレイヤーの
- * カーブ入力）はaxisRotationのみを決め、omegaYへ直接掛けることはしない。
+ * 検証済み（誤差0.1%未満）。curveNorm（プレイヤーのカーブ入力）は
+ * axisRotationのみを決め、omegaYへ直接掛けることはしない。
  */
 export const SPIN_MAGNITUDE_REF_RAD_S = Math.sqrt(30 * 30 + 30 * 30 + 10 * 10); // ≒43.589 rad/s
 export const SPIN_AXIS_TILT_DEG = 13.26;
 /**
- * axisRotationスイープ検証（0/10/15/…/45°）の結果、45°付近は
- * ガター率の急増が精度向上分を打ち消し、総合成績（ポケット率・7ピン以上率）が
- * 最下位だったため、実効最大値を35°に引き下げる。
+ * ユーザーが大きく曲げたスワイプでより強いフックを選べるよう、
+ * 実効最大値を論文基準条件と同じ45°まで許可する。
+ * 入力感度はAXIS_ROTATION_INPUT_EXPONENT=0.8のまま維持する。
  */
-export const MAX_AXIS_ROTATION_DEG = 35;
+export const MAX_AXIS_ROTATION_DEG = 45;
 /**
  * curve入力（0〜1）からaxisRotationへの変換指数。
- * スマホではスワイプ可能距離に限界がありcurveInputを大きくしにくいため、
- * 最大35°は維持したまま中〜小入力だけを持ち上げる。
+ * 入力感度は従来の0.8を維持し、小さなスワイプで急にカーブが強くならないようにする。
  * axisRotation = MAX_AXIS_ROTATION_DEG * curveInput^AXIS_ROTATION_INPUT_EXPONENT
- * 0.6なら、10%→約8.8°、25%→約15.2°、50%→約23.1°、100%→35°。
  */
-export const AXIS_ROTATION_INPUT_EXPONENT = 0.6;
+export const AXIS_ROTATION_INPUT_EXPONENT = 0.8;
 
 /** 慣性モーメント（Ix = m(RG+Diff)^2, Iy = m・RG^2, Iz = m(RG+Diff+IntDiff)^2）。 */
 export const BALL_INERTIA_X_KGM2 =
