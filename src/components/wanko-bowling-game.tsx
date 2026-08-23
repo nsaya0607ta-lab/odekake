@@ -292,7 +292,7 @@ export function WankoBowlingGame({ ownedBalls }: { ownedBalls: OwnedBowlingBall[
         <section className="rough-card overflow-hidden">
           <div className="bg-leaf-soft px-4 py-7 text-center">
             <p className="text-[10px] font-black tracking-[0.16em] text-leaf-deep">GAME CLEAR!</p>
-            <p className="mt-1 text-2xl font-black text-ink">5フレーム おつかれさま！</p>
+            <p className="mt-1 text-2xl font-black text-ink">10フレーム おつかれさま！</p>
           </div>
 
           <div className="grid grid-cols-2 gap-3 p-4">
