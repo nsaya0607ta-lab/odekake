@@ -58,6 +58,7 @@ export function Pins({ registerNode }: PinsProps) {
             width: `${PIN_VISUAL_WIDTH_PCT}%`,
             zIndex: 100 - Math.round(pin.y * 2),
             transform: "translate(-50%, -50%)",
+            transformOrigin: "50% 84%",
           }}
         >
           {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -67,6 +68,7 @@ export function Pins({ registerNode }: PinsProps) {
             aria-hidden="true"
             draggable={false}
             className="block h-auto w-full select-none"
+            style={{ filter: "drop-shadow(0 2px 1.4px rgba(54,35,22,0.38)) drop-shadow(0 -0.5px 0.5px rgba(255,255,255,0.26))" }}
           />
         </div>
       ))}

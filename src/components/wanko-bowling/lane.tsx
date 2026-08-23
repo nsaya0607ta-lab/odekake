@@ -64,8 +64,8 @@ const MAX_CURVE_NORM = 0.60;
 const CURVE_STRAIGHT_SNAP = 0.16;
 
 // 7lb球でもポケットヒット後にラック奥へ適度なエネルギーを残す。
-const BALL_POST_HIT_SPEED_FACTOR = 0.94;
-const BALL_POST_HIT_FORWARD_FACTOR = 0.92;
+const BALL_POST_HIT_SPEED_FACTOR = 0.90;
+const BALL_POST_HIT_FORWARD_FACTOR = 0.86;
 
 // 2Dモデルで3Dの「横から押されて重心を外す」効果を近似する。
 // 軽い接触でピンが連鎖しすぎないよう、横方向の補正を少し抑える。
@@ -523,17 +523,10 @@ export function Lane({ ballVisual, resetSignal, active, onRoll }: LaneProps) {
     el.style.top = `${ballWorldYToPct(yM)}%`;
     el.style.width = `${ballVisualWidthPct(yM)}%`;
 
-    // 1番ピンより奥ではボールをピットへ自然に消して、
-    // 遠近投影の切り替わりが「急加速」に見えないようにする。
-    if (yM > JB_HEAD_PIN_DISTANCE_M) {
-      const fade = clamp(
-        (yM - JB_HEAD_PIN_DISTANCE_M) / Math.max(0.001, PIN_DECK_DEPTH_M * 0.9),
-        0,
-        1,
-      );
-      el.style.opacity = String(1 - fade);
-    } else if (!dockingRef.current) {
-      el.style.opacity = '1';
+    // ピンに当たった後もボールを消さず、衝突後の軌道をそのまま見せる。
+    // ドッキング演出中だけ opacity は dockBall 側で制御する。
+    if (!dockingRef.current) {
+      el.style.opacity = "1";
     }
 
     const visualRollDeg = rotateDeg * 0.16;
@@ -543,7 +536,11 @@ export function Lane({ ballVisual, resetSignal, active, onRoll }: LaneProps) {
     if (curveStrength < 0.04) {
       const highlightY = 28 + Math.sin(phaseRad) * 12;
       const forwardRollDeg = visualRollDeg * 0.18;
-      el.style.background = `radial-gradient(circle at 32% ${highlightY}%, ${ballVisual.bodyGradient[0]}, ${ballVisual.bodyGradient[1]})`;
+      el.style.background = [
+        `radial-gradient(circle at 30% ${highlightY}%, rgba(255,255,255,0.58) 0 7%, rgba(255,255,255,0.20) 18%, transparent 34%)`,
+        "radial-gradient(circle at 72% 78%, rgba(31,18,12,0.34) 0%, rgba(31,18,12,0.12) 40%, transparent 62%)",
+        `radial-gradient(circle at 38% ${highlightY}%, ${ballVisual.bodyGradient[0]} 0%, ${ballVisual.bodyGradient[1]} 76%)`,
+      ].join(", ");
       el.style.transform = `translate(-50%, -50%) rotate(${forwardRollDeg}deg)`;
       return;
     }
@@ -554,7 +551,11 @@ export function Lane({ ballVisual, resetSignal, active, onRoll }: LaneProps) {
     const axisTiltDeg = curveDirection * (8 + curveStrength * 14) * surfaceFactor;
     const highlightX = 32 + Math.sin(phaseRad * curveDirection) * 10 * curveStrength * surfaceFactor;
     const highlightY = 28 + Math.cos(phaseRad) * 7 * curveStrength;
-    el.style.background = `radial-gradient(circle at ${highlightX}% ${highlightY}%, ${ballVisual.bodyGradient[0]}, ${ballVisual.bodyGradient[1]})`;
+    el.style.background = [
+      `radial-gradient(circle at ${highlightX}% ${highlightY}%, rgba(255,255,255,0.58) 0 7%, rgba(255,255,255,0.20) 18%, transparent 34%)`,
+      "radial-gradient(circle at 72% 78%, rgba(31,18,12,0.34) 0%, rgba(31,18,12,0.12) 40%, transparent 62%)",
+      `radial-gradient(circle at ${highlightX}% ${highlightY}%, ${ballVisual.bodyGradient[0]} 0%, ${ballVisual.bodyGradient[1]} 76%)`,
+    ].join(", ");
     el.style.transform = `translate(-50%, -50%) rotate(${sideSpinDeg + axisTiltDeg}deg)`;
   }, [ballVisual.bodyGradient]);
 
@@ -1092,8 +1093,8 @@ export function Lane({ ballVisual, resetSignal, active, onRoll }: LaneProps) {
         className="pointer-events-none absolute inset-0"
         style={{
           clipPath: `polygon(${FAR_LANE_LEFT}% 0%, ${FAR_LANE_RIGHT}% 0%, ${NEAR_LANE_RIGHT}% 100%, ${NEAR_LANE_LEFT}% 100%)`,
-          background: "linear-gradient(180deg, #e6bd7d 0%, #ddb170 42%, #d29d5b 100%)",
-          boxShadow: "inset 0 0 24px rgba(104,67,34,0.16)",
+          background: "radial-gradient(ellipse at 50% 8%, rgba(255,245,211,0.42) 0%, rgba(255,245,211,0.12) 34%, transparent 61%), linear-gradient(90deg, rgba(92,55,26,0.14) 0%, transparent 12%, transparent 88%, rgba(92,55,26,0.14) 100%), linear-gradient(180deg, #e5ba78 0%, #dcae6a 43%, #cf9854 100%)",
+          boxShadow: "inset 18px 0 28px -24px rgba(62,37,20,0.48), inset -18px 0 28px -24px rgba(62,37,20,0.48), inset 0 15px 20px -20px rgba(255,248,225,0.72)",
         }}
         aria-hidden="true"
       />
@@ -1102,8 +1103,8 @@ export function Lane({ ballVisual, resetSignal, active, onRoll }: LaneProps) {
         className="pointer-events-none absolute inset-0"
         style={{
           clipPath: `polygon(${FAR_OUTER_LEFT}% 0%, ${FAR_LANE_LEFT}% 0%, ${NEAR_LANE_LEFT}% 100%, ${NEAR_OUTER_LEFT}% 100%)`,
-          background: "linear-gradient(90deg, #3f2a1d, #654329 70%, #775034)",
-          boxShadow: "inset -3px 0 7px rgba(0,0,0,0.4)",
+          background: "linear-gradient(90deg, #241712 0%, #3c271c 50%, #69452e 82%, #9a6840 100%)",
+          boxShadow: "inset -7px 0 10px rgba(18,10,7,0.52), inset -1px 0 1px rgba(255,230,188,0.28)",
         }}
         aria-hidden="true"
       />
@@ -1111,8 +1112,18 @@ export function Lane({ ballVisual, resetSignal, active, onRoll }: LaneProps) {
         className="pointer-events-none absolute inset-0"
         style={{
           clipPath: `polygon(${FAR_LANE_RIGHT}% 0%, ${FAR_OUTER_RIGHT}% 0%, ${NEAR_OUTER_RIGHT}% 100%, ${NEAR_LANE_RIGHT}% 100%)`,
-          background: "linear-gradient(270deg, #3f2a1d, #654329 70%, #775034)",
-          boxShadow: "inset 3px 0 7px rgba(0,0,0,0.4)",
+          background: "linear-gradient(270deg, #241712 0%, #3c271c 50%, #69452e 82%, #9a6840 100%)",
+          boxShadow: "inset 7px 0 10px rgba(18,10,7,0.52), inset 1px 0 1px rgba(255,230,188,0.28)",
+        }}
+        aria-hidden="true"
+      />
+
+      <div
+        className="pointer-events-none absolute inset-0"
+        style={{
+          clipPath: `polygon(${FAR_LANE_LEFT}% 0%, ${FAR_LANE_RIGHT}% 0%, ${NEAR_LANE_RIGHT}% 100%, ${NEAR_LANE_LEFT}% 100%)`,
+          background: "linear-gradient(180deg, rgba(66,38,22,0.28) 0%, rgba(66,38,22,0.11) 14%, transparent 33%), radial-gradient(ellipse at 50% 20%, rgba(255,237,193,0.18) 0%, transparent 46%)",
+          boxShadow: "inset 0 22px 30px -26px rgba(33,19,12,0.72)",
         }}
         aria-hidden="true"
       />
@@ -1180,7 +1191,9 @@ export function Lane({ ballVisual, resetSignal, active, onRoll }: LaneProps) {
           top: `${DOCK_Y}%`,
           transform: "translate(-50%, -50%)",
           background: `radial-gradient(circle at 32% 28%, ${ballVisual.bodyGradient[0]}, ${ballVisual.bodyGradient[1]})`,
-          boxShadow: ballVisual.premiumEffect ? `0 0 14px 4px ${ballVisual.hitColor}` : undefined,
+          boxShadow: ballVisual.premiumEffect
+            ? `0 7px 14px rgba(37,22,14,0.46), inset -5px -7px 11px rgba(24,14,10,0.25), inset 4px 4px 8px rgba(255,255,255,0.20), 0 0 14px 4px ${ballVisual.hitColor}`
+            : "0 7px 14px rgba(37,22,14,0.46), inset -5px -7px 11px rgba(24,14,10,0.25), inset 4px 4px 8px rgba(255,255,255,0.20)",
         }}
         aria-hidden="true"
       >
