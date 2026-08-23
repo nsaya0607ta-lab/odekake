@@ -28,9 +28,9 @@ export const JB_PIN_HEIGHT_M = 0.38085;
 export const JB_BALL_DIAMETER_M = (0.2159 + 0.2183) / 2;
 /**
  * ボール重量は規格上16lb（7.25kg）以下。
- * ゲームでは全ボールの公平性を保つため14lb相当を共通値として採用する。
+ * 今回のゲーム設定では全ボールを10lb相当として統一する。
  */
-export const GAME_BALL_MASS_KG = 14 * 0.45359237;
+export const GAME_BALL_MASS_KG = 10 * 0.45359237;
 
 /** JAPAN BOWLING掲載の大会パターン例 42ft。ゲームの標準オイル長として採用。 */
 export const GAME_OIL_LENGTH_M = 42 * 0.3048;
@@ -56,14 +56,14 @@ export const PIN_CHAIN_KNOCK_SPEED_MPS = idealTipSpeedMps * 1.9;
 /** 公認42ftパターン例を使ったフック量のゲーム用近似。 */
 export const OIL_HOOK_FACTOR = 0.18;
 export const DRY_HOOK_FACTOR = 1;
-/** リリース時の曲げ操作が目で分かる強さまで引き上げる。 */
-export const BACKEND_HOOK_ACCEL_MPS2 = 1.65;
+/** まっすぐ投げやすさを優先し、以前よりフック加速度を抑える。 */
+export const BACKEND_HOOK_ACCEL_MPS2 = 1.2;
 
 /**
  * 反発係数は公認規格値ではないゲーム用近似。
- * ピン衝突後にボールが加速して見えないよう、ボール→ピンは低めにして明確にエネルギーを失わせる。
+ * 10lb化と合わせ、ボール→ピン衝突後は明確に減速するよう低めにする。
  */
-export const BALL_PIN_RESTITUTION = 0.24;
+export const BALL_PIN_RESTITUTION = 0.2;
 export const PIN_PIN_RESTITUTION = 0.32;
 
 export const PIN_FRICTION_PER_SEC = 2.6;
