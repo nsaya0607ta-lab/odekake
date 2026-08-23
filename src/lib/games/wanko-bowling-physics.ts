@@ -74,9 +74,16 @@ export const PIN_CHAIN_KNOCK_SPEED_MPS = idealTipSpeedMps * 1.45;
  * （x=レーン横方向, y=レーン奥行き方向, z=鉛直方向で、接触点オフセットを
  *  (0,0,-r)としたときの ω×offset から導出される標準的な接触点滑り速度式）
  *
- * 論文はスキッド区間の角速度ω自体の時間発展式を与えていないため、
- * このゲームでは投球時に決めたωを投球中一定として扱う
- * （ボウリング物理でよく使われる「スキッド区間は回転がほぼ変化しない」近似）。
+ * 摩擦力は接触点でボールに力積を与えるだけでなく、その反作用として
+ * 角速度（ω）にもトルクを与える。滑り速度が0に近づく＝ボールとレーンの
+ * 相対速度が無くなる（pure rolling）まで、並進と回転を同時に更新する。
+ *
+ *   torqueX = m・r・ay,  torqueY = -m・r・ax
+ *   alphaX = torqueX / Ix,  alphaY = torqueY / Iy
+ *   ωx += alphaX・dt,  ωy += alphaY・dt
+ *
+ * Ix・Iy・Izは論文の基準ボール仕様（RG・Diff・IntDiff）から算出した慣性モーメント。
+ * ωz（軸回転）はslipの式に寄与しないため、この論文の範囲では変化させず一定とする。
  */
 /** 接触点計算に使うボール半径。論文の基準値そのもの。 */
 export const BALL_SPIN_RADIUS_M = 0.1085;
@@ -88,14 +95,20 @@ export const GAME_REFERENCE_SPEED_MPS = 8.0;
 export const REFERENCE_OMEGA_X_RAD_S = -30;
 export const REFERENCE_OMEGA_Y_RAD_S = -30;
 export const REFERENCE_OMEGA_Z_RAD_S = 10;
-/**
- * 論文の基準条件に含まれる値だが、与えられた並進加速度の式（ax, ay）には
- * 登場しない（回転の時間発展式が別途必要になるため）。今回は未使用のまま
- * 記録だけしておき、将来スピン減衰などを追加する際の参照値とする。
- */
 export const BALL_RADIUS_OF_GYRATION_M = 0.0635; // RG
 export const BALL_DIFFERENTIAL_M = 0.001; // Diff
 export const BALL_INT_DIFFERENTIAL_M = 0; // IntDiff
+
+/** 慣性モーメント（Ix = m(RG+Diff)^2, Iy = m・RG^2, Iz = m(RG+Diff+IntDiff)^2）。 */
+export const BALL_INERTIA_X_KGM2 =
+  GAME_BALL_MASS_KG * (BALL_RADIUS_OF_GYRATION_M + BALL_DIFFERENTIAL_M) ** 2;
+export const BALL_INERTIA_Y_KGM2 = GAME_BALL_MASS_KG * BALL_RADIUS_OF_GYRATION_M ** 2;
+export const BALL_INERTIA_Z_KGM2 =
+  GAME_BALL_MASS_KG
+  * (BALL_RADIUS_OF_GYRATION_M + BALL_DIFFERENTIAL_M + BALL_INT_DIFFERENTIAL_M) ** 2;
+
+/** これ未満の滑り速度は pure rolling とみなし、動摩擦（クーロン摩擦）を止める。 */
+export const SLIP_EPSILON_MPS = 0.02;
 
 /**
  * 反発係数（公認規格値はないため実測・計測研究で報告される代表値を採用）。

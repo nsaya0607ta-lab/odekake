@@ -4,6 +4,8 @@ import { useCallback, useEffect, useRef, useState, type PointerEvent as ReactPoi
 import { PIN_LAYOUT, PIN_VISUAL_WIDTH_PCT, Pins } from "./pins";
 import type { BowlingBallVisual } from "@/lib/games/wanko-bowling-balls";
 import {
+  BALL_INERTIA_X_KGM2,
+  BALL_INERTIA_Y_KGM2,
   BALL_PIN_RESTITUTION,
   BALL_SPIN_RADIUS_M,
   DRY_FRICTION_MU,
@@ -30,6 +32,7 @@ import {
   PIN_SETTLE_SPEED_MPS,
   REFERENCE_OMEGA_X_RAD_S,
   REFERENCE_OMEGA_Y_RAD_S,
+  SLIP_EPSILON_MPS,
 } from "@/lib/games/wanko-bowling-physics";
 
 const DOCK_Y = 94;
@@ -47,9 +50,6 @@ const FALLEN_PIN_EXTRA_REACH_M = Math.max(0, JB_PIN_HEIGHT_M / 2 - PIN_RADIUS_M)
 const BALL_EXIT_DISTANCE_M = JB_HEAD_PIN_DISTANCE_M + 1.15;
 const MAX_LAUNCH_ANGLE_RAD = 3.4 * Math.PI / 180;
 const GUTTER_BALL_DRAG_PER_SEC = 0.035;
-// これ未満の滑り速度は「転がり抵抗のみ（実質すべり無し）」とみなし、
-// 摩擦式の0除算を避けつつ、その時点の速度・回転で直進させる。
-const MIN_SLIP_SPEED_MPS = 0.02;
 const FOUL_LINE_Y = 97;
 const PIN_ROW_DEPTH_M = JB_PIN_SPACING_M * Math.sqrt(3) / 2;
 const PIN_DECK_DEPTH_M = PIN_ROW_DEPTH_M * 3;
@@ -615,15 +615,15 @@ export function Lane({ ballVisual, resetSignal, active, onRoll }: LaneProps) {
     let ballDone = false;
     let finished = false;
 
-    // 論文はスキッド区間でのωの時間発展式を与えていないため、投球時に決めた
-    // 値を投球中一定として扱う（スキッド区間は回転がほぼ変化しないという近似）。
+    // リリース時の角速度（omegaX/omegaYはstep内で摩擦トルクにより毎フレーム更新される。
+    // omegaZは論文のslip式に寄与しないためリリース時の値のまま変化させない）。
     // omegaX（フォワードスピン）は投球速度のみに、omegaY（サイドロール＝フックの
     // 元になる回転）は投球速度とカーブ入力の両方に比例させ、論文の基準投球
     // （8m/s・最大カーブ）でちょうど論文の値（-30 rad/s）になるようスケールする。
     const speedRatio = launch.speedMps / GAME_REFERENCE_SPEED_MPS;
     const curveRatio = launch.curveNorm / MAX_CURVE_NORM;
-    const omegaXRadS = REFERENCE_OMEGA_X_RAD_S * speedRatio;
-    const omegaYRadS = REFERENCE_OMEGA_Y_RAD_S * speedRatio * curveRatio;
+    let omegaXRadS = REFERENCE_OMEGA_X_RAD_S * speedRatio;
+    let omegaYRadS = REFERENCE_OMEGA_Y_RAD_S * speedRatio * curveRatio;
 
     // レーン奥行き方向より横方向のほうが画面上のスケールがかなり大きいため、
     // フックやピンとの衝突で横速度だけが大きくなると、実際の速さ以上に
@@ -711,19 +711,26 @@ export function Lane({ ballVisual, resetSignal, active, onRoll }: LaneProps) {
         if (gutterSide === null) {
           // 論文の接触点すべり摩擦モデル：
           // slip = ボール中心速度 - 接触点における回転の寄与。ここから
-          // クーロン摩擦（大きさ一定 μg、向きはすべりと逆）で並進加速度を出す。
+          // クーロン摩擦（大きさ一定 μg、向きはすべりと逆）で並進加速度を出し、
+          // その反作用のトルクで角速度（omegaX/omegaY）も同時に更新する。
+          // slipSpeedがSLIP_EPSILON_MPSを下回ったら pure rolling とみなし、
+          // 動摩擦を止める（速度・回転ともその時点の値で以後変化しない）。
           const mu = onOil ? OIL_FRICTION_MU : DRY_FRICTION_MU;
           const slipX = bvxMps - BALL_SPIN_RADIUS_M * omegaYRadS;
           const slipY = bvyMps + BALL_SPIN_RADIUS_M * omegaXRadS;
           const slipSpeed = Math.hypot(slipX, slipY);
-          if (slipSpeed > MIN_SLIP_SPEED_MPS) {
+          if (slipSpeed > SLIP_EPSILON_MPS) {
             const ax = -mu * GRAVITY_MPS2 * (slipX / slipSpeed);
             const ay = -mu * GRAVITY_MPS2 * (slipY / slipSpeed);
+            const torqueX = GAME_BALL_MASS_KG * BALL_SPIN_RADIUS_M * ay;
+            const torqueY = -GAME_BALL_MASS_KG * BALL_SPIN_RADIUS_M * ax;
+            const alphaX = torqueX / BALL_INERTIA_X_KGM2;
+            const alphaY = torqueY / BALL_INERTIA_Y_KGM2;
             bvxMps += ax * dt;
             bvyMps += ay * dt;
+            omegaXRadS += alphaX * dt;
+            omegaYRadS += alphaY * dt;
           }
-          // すべりが無くなった（転がりが噛んだ）後は動摩擦が働かないため、
-          // その時点の速度のまま直進する。
           [bvxMps, bvyMps] = capLateralSpeed(bvxMps, bvyMps);
         } else {
           const gutterDecay = Math.exp(-GUTTER_BALL_DRAG_PER_SEC * dt);
