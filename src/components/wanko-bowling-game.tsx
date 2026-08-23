@@ -9,13 +9,14 @@ import {
   BOWLING_FRAME_COUNT,
   calculateBowlingScore,
   createEmptyFrames,
+  getBonusFrameIndex,
   isFrameDone,
   type BowlingFrame,
 } from "@/lib/games/wanko-bowling-score";
 import { getBowlingBallVisual, type OwnedBowlingBall } from "@/lib/games/wanko-bowling-balls";
 
 type Phase = "select" | "playing" | "result";
-type Banner = "SPARE!!" | "STRIKE!!" | "TURKEY!!" | null;
+type Banner = "SPARE!!" | "STRIKE!!" | "TURKEY!!" | "BONUS STRIKE!!" | null;
 
 function isFreshRackRoll(frameIndex: number, priorRolls: number[]): boolean {
   if (frameIndex < BOWLING_FRAME_COUNT - 1) return priorRolls.length === 0;
@@ -89,6 +90,8 @@ export function WankoBowlingGame({ ownedBalls }: { ownedBalls: OwnedBowlingBall[
   const [isNewBest, setIsNewBest] = useState(false);
   const [earnedCoins, setEarnedCoins] = useState<number | null>(null);
   const [lastRollPins, setLastRollPins] = useState<number | null>(null);
+  const [bonusFrameIndex, setBonusFrameIndex] = useState(() => getBonusFrameIndex(newRoundId()));
+  const [bonusAchieved, setBonusAchieved] = useState(false);
 
   const framesRef = useRef<BowlingFrame[]>(initialFrames);
   const frameIndexRef = useRef(0);
@@ -96,6 +99,8 @@ export function WankoBowlingGame({ ownedBalls }: { ownedBalls: OwnedBowlingBall[
   const streakRef = useRef(0);
   const submittedRef = useRef(false);
   const roundIdRef = useRef(newRoundId());
+  const bonusFrameIndexRef = useRef(bonusFrameIndex);
+  const bonusAchievedRef = useRef(false);
   const rankingSectionIdRef = useRef("wanko-bowling-ranking");
 
   const score = useMemo(() => calculateBowlingScore(frames), [frames]);
@@ -141,6 +146,11 @@ export function WankoBowlingGame({ ownedBalls }: { ownedBalls: OwnedBowlingBall[
     streakRef.current = 0;
     submittedRef.current = false;
     roundIdRef.current = newRoundId();
+    const nextBonusFrameIndex = getBonusFrameIndex(roundIdRef.current);
+    bonusFrameIndexRef.current = nextBonusFrameIndex;
+    bonusAchievedRef.current = false;
+    setBonusFrameIndex(nextBonusFrameIndex);
+    setBonusAchieved(false);
     setBanner(null);
     setEarnedCoins(null);
     setIsNewBest(false);
@@ -162,6 +172,7 @@ export function WankoBowlingGame({ ownedBalls }: { ownedBalls: OwnedBowlingBall[
         body: JSON.stringify({
           roundId: roundIdRef.current,
           frames: finalFrames,
+          bonusHit: bonusAchievedRef.current,
         }),
       });
       const payload = (await response.json().catch(() => null)) as { coins?: number } | null;
@@ -228,8 +239,15 @@ export function WankoBowlingGame({ ownedBalls }: { ownedBalls: OwnedBowlingBall[
       && (newRolls[1] ?? 0) + (newRolls[2] ?? 0) === 10;
     const spareCompleted = regularSpareCompleted || finalStrikeRackSpareCompleted;
 
+    const isBonusFrame = currentFrameIndex === bonusFrameIndexRef.current;
     if (roll === 10 && freshRack) {
-      nextBanner = streakRef.current >= 3 ? "TURKEY!!" : "STRIKE!!";
+      if (isBonusFrame && priorRolls.length === 0 && !bonusAchievedRef.current) {
+        bonusAchievedRef.current = true;
+        setBonusAchieved(true);
+        nextBanner = "BONUS STRIKE!!";
+      } else {
+        nextBanner = streakRef.current >= 3 ? "TURKEY!!" : "STRIKE!!";
+      }
       setShake(true);
       window.setTimeout(() => setShake(false), 450);
     } else if (spareCompleted) {
@@ -328,6 +346,9 @@ export function WankoBowlingGame({ ownedBalls }: { ownedBalls: OwnedBowlingBall[
           {earnedCoins !== null ? (
             <p className="px-4 pb-2 text-center text-xs font-bold text-ink-soft">
               +{earnedCoins.toLocaleString("ja-JP")} コイン獲得！
+              {bonusAchieved ? (
+                <span className="ml-1 font-black text-[#c9902f]">（ボーナスチャンス成功で2倍！）</span>
+              ) : null}
             </p>
           ) : null}
 
@@ -375,6 +396,8 @@ export function WankoBowlingGame({ ownedBalls }: { ownedBalls: OwnedBowlingBall[
           liveScore={liveScore}
           bestScore={bestScore}
           lastRollPins={lastRollPins}
+          bonusFrameIndex={bonusFrameIndex}
+          bonusAchieved={bonusAchieved}
         />
       </div>
 

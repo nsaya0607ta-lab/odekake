@@ -98,13 +98,24 @@ function DigitalNumber({ value, large = false }: { value: number | null; large?:
   );
 }
 
-export function ScoreBoard({ frames, score, currentFrameIndex, liveScore, bestScore, lastRollPins }: {
+export function ScoreBoard({
+  frames,
+  score,
+  currentFrameIndex,
+  liveScore,
+  bestScore,
+  lastRollPins,
+  bonusFrameIndex,
+  bonusAchieved,
+}: {
   frames: BowlingFrame[];
   score: BowlingScoreState;
   currentFrameIndex: number;
   liveScore: number;
   bestScore: number | null;
   lastRollPins: number | null;
+  bonusFrameIndex?: number;
+  bonusAchieved?: boolean;
 }) {
   return (
     <div className="relative -mx-2 -mt-2 w-[calc(100%+1rem)] overflow-hidden rounded-t-[22px] rounded-b-[10px] border border-white/15 bg-[#18251f]/92 px-1 py-1 shadow-[inset_0_1px_0_rgba(255,255,255,0.09),0_2px_5px_rgba(20,18,14,0.16)] backdrop-blur-[3px]" aria-label="10フレーム ボウリングスコアボード">
@@ -135,8 +146,20 @@ export function ScoreBoard({ frames, score, currentFrameIndex, liveScore, bestSc
           const marks = frameRollMarks(frame, index);
           const result = score.frames[index];
           const columns = index === BOWLING_FRAME_COUNT - 1 ? 3 : 2;
+          const isBonusFrame = bonusFrameIndex === index;
           return (
-            <div key={index} className={`min-w-0 overflow-hidden rounded-[5px] border px-0 pb-[2px] pt-[1px] text-center transition-all ${active ? "border-[#b9e58e]/85 bg-[#456348]/82 shadow-[0_0_8px_rgba(185,229,142,0.20)]" : "border-white/10 bg-[#111b17]/62"}`}>
+            <div
+              key={index}
+              className={`relative min-w-0 overflow-hidden rounded-[5px] border px-0 pb-[2px] pt-[1px] text-center transition-all ${active ? "border-[#b9e58e]/85 bg-[#456348]/82 shadow-[0_0_8px_rgba(185,229,142,0.20)]" : "border-white/10 bg-[#111b17]/62"} ${isBonusFrame ? "ring-1 ring-[#f1db91]/80" : ""}`}
+            >
+              {isBonusFrame ? (
+                <span
+                  className={`absolute -top-[3px] left-1/2 -translate-x-1/2 rounded-full px-[3px] text-[5px] font-black leading-[7px] ${bonusAchieved ? "bg-[#c9902f] text-white" : "bg-[#f1db91] text-[#5a3f12]"}`}
+                  aria-label={bonusAchieved ? "ボーナスチャンス成功" : "ボーナスチャンス"}
+                >
+                  {bonusAchieved ? "★" : "?"}
+                </span>
+              ) : null}
               <p className={`text-[6px] font-black leading-[8px] ${active ? "text-[#e4f7d1]" : "text-[#aeb9b0]"}`}>{index + 1}</p>
               <div className="grid h-[13px] items-center border-y border-white/10 bg-black/16" style={{ gridTemplateColumns: `repeat(${columns}, minmax(0, 1fr))` }}>
                 {marks.map((mark, markIndex) => <span key={markIndex} className={`text-[7px] font-black tabular-nums leading-none ${mark === "X" || mark === "/" ? "text-[#f1db91]" : "text-[#edf2ee]"}`}>{mark}</span>)}
