@@ -53,21 +53,49 @@ export const GAME_MAX_BALL_SPEED_KMH = 38;
  * 2Dモデルでは連鎖側の閾値を低めにしてピンキャリーを補正する。
  */
 const PIN_BASE_RADIUS_M = 0.0254;
-const GRAVITY_MPS2 = 9.80665;
+export const GRAVITY_MPS2 = 9.80665;
 const cogRiseM = Math.hypot(JB_PIN_COG_M, PIN_BASE_RADIUS_M) - JB_PIN_COG_M;
 const idealTipSpeedMps = Math.sqrt(2 * GRAVITY_MPS2 * cogRiseM);
 export const PIN_DIRECT_KNOCK_SPEED_MPS = idealTipSpeedMps * 1.55;
 export const PIN_CHAIN_KNOCK_SPEED_MPS = idealTipSpeedMps * 1.45;
 
 /**
- * 公認42ftパターン例を土台にしたゲーム用フック近似。
- * 直球の微小ブレでは曲げず、カーブ入力が入った時はオイル上でも少し軌道が作られ、
- * ドライ部分に入ってからはっきりブレイクするようにする。
+ * ボール軌道（ドラッグ／フック）のモデル。
+ * 出典: 2025年 AIP Advances掲載論文のボウリングボール転がり摩擦モデル。
+ * 固定のドラッグ／フック係数ではなく、ボールとレーンの接触点における
+ * 滑り速度（スリップベロシティ）とレーン摩擦係数から並進加速度を計算する。
+ *
+ *   slipX = vx - r・ωy
+ *   slipY = vy + r・ωx
+ *   slipSpeed = √(slipX² + slipY²)
+ *   ax = -μ・g・slipX / slipSpeed
+ *   ay = -μ・g・slipY / slipSpeed
+ *
+ * （x=レーン横方向, y=レーン奥行き方向, z=鉛直方向で、接触点オフセットを
+ *  (0,0,-r)としたときの ω×offset から導出される標準的な接触点滑り速度式）
+ *
+ * 論文はスキッド区間の角速度ω自体の時間発展式を与えていないため、
+ * このゲームでは投球時に決めたωを投球中一定として扱う
+ * （ボウリング物理でよく使われる「スキッド区間は回転がほぼ変化しない」近似）。
  */
-export const OIL_HOOK_FACTOR = 0.22;
-export const DRY_HOOK_FACTOR = 1.12;
-/** 意図的なカーブスワイプが画面上でも分かる強さまで戻す。 */
-export const BACKEND_HOOK_ACCEL_MPS2 = 1.85;
+/** 接触点計算に使うボール半径。論文の基準値そのもの。 */
+export const BALL_SPIN_RADIUS_M = 0.1085;
+/** レーン摩擦係数の代表値（オイル区間／ドライ区間）。 */
+export const OIL_FRICTION_MU = 0.04;
+export const DRY_FRICTION_MU = 0.20;
+/** 論文の基準投球条件（標準投球としてゲームの基準速度にも使う）。 */
+export const GAME_REFERENCE_SPEED_MPS = 8.0;
+export const REFERENCE_OMEGA_X_RAD_S = -30;
+export const REFERENCE_OMEGA_Y_RAD_S = -30;
+export const REFERENCE_OMEGA_Z_RAD_S = 10;
+/**
+ * 論文の基準条件に含まれる値だが、与えられた並進加速度の式（ax, ay）には
+ * 登場しない（回転の時間発展式が別途必要になるため）。今回は未使用のまま
+ * 記録だけしておき、将来スピン減衰などを追加する際の参照値とする。
+ */
+export const BALL_RADIUS_OF_GYRATION_M = 0.0635; // RG
+export const BALL_DIFFERENTIAL_M = 0.001; // Diff
+export const BALL_INT_DIFFERENTIAL_M = 0; // IntDiff
 
 /**
  * 反発係数（公認規格値はないため実測・計測研究で報告される代表値を採用）。

@@ -4,13 +4,15 @@ import { useCallback, useEffect, useRef, useState, type PointerEvent as ReactPoi
 import { PIN_LAYOUT, PIN_VISUAL_WIDTH_PCT, Pins } from "./pins";
 import type { BowlingBallVisual } from "@/lib/games/wanko-bowling-balls";
 import {
-  BACKEND_HOOK_ACCEL_MPS2,
   BALL_PIN_RESTITUTION,
-  DRY_HOOK_FACTOR,
+  BALL_SPIN_RADIUS_M,
+  DRY_FRICTION_MU,
   GAME_BALL_MASS_KG,
   GAME_MAX_BALL_SPEED_KMH,
   GAME_MIN_BALL_SPEED_KMH,
   GAME_OIL_LENGTH_M,
+  GAME_REFERENCE_SPEED_MPS,
+  GRAVITY_MPS2,
   JB_BALL_DIAMETER_M,
   JB_GUTTER_WIDTH_M,
   JB_HEAD_PIN_DISTANCE_M,
@@ -20,12 +22,14 @@ import {
   JB_PIN_MASS_KG,
   JB_PIN_SPACING_M,
   JB_TOTAL_WIDTH_M,
-  OIL_HOOK_FACTOR,
+  OIL_FRICTION_MU,
   PIN_CHAIN_KNOCK_SPEED_MPS,
   PIN_DIRECT_KNOCK_SPEED_MPS,
   PIN_FRICTION_PER_SEC,
   PIN_PIN_RESTITUTION,
   PIN_SETTLE_SPEED_MPS,
+  REFERENCE_OMEGA_X_RAD_S,
+  REFERENCE_OMEGA_Y_RAD_S,
 } from "@/lib/games/wanko-bowling-physics";
 
 const DOCK_Y = 94;
@@ -42,9 +46,10 @@ const PIN_PAIR_RADIUS_M = JB_PIN_DIAMETER_M;
 const FALLEN_PIN_EXTRA_REACH_M = Math.max(0, JB_PIN_HEIGHT_M / 2 - PIN_RADIUS_M) * 0.82;
 const BALL_EXIT_DISTANCE_M = JB_HEAD_PIN_DISTANCE_M + 1.15;
 const MAX_LAUNCH_ANGLE_RAD = 3.4 * Math.PI / 180;
-const OIL_BALL_DRAG_PER_SEC = 0.012;
-const DRY_BALL_DRAG_PER_SEC = 0.04;
 const GUTTER_BALL_DRAG_PER_SEC = 0.035;
+// これ未満の滑り速度は「転がり抵抗のみ（実質すべり無し）」とみなし、
+// 摩擦式の0除算を避けつつ、その時点の速度・回転で直進させる。
+const MIN_SLIP_SPEED_MPS = 0.02;
 const FOUL_LINE_Y = 97;
 const PIN_ROW_DEPTH_M = JB_PIN_SPACING_M * Math.sqrt(3) / 2;
 const PIN_DECK_DEPTH_M = PIN_ROW_DEPTH_M * 3;
@@ -610,6 +615,16 @@ export function Lane({ ballVisual, resetSignal, active, onRoll }: LaneProps) {
     let ballDone = false;
     let finished = false;
 
+    // 論文はスキッド区間でのωの時間発展式を与えていないため、投球時に決めた
+    // 値を投球中一定として扱う（スキッド区間は回転がほぼ変化しないという近似）。
+    // omegaX（フォワードスピン）は投球速度のみに、omegaY（サイドロール＝フックの
+    // 元になる回転）は投球速度とカーブ入力の両方に比例させ、論文の基準投球
+    // （8m/s・最大カーブ）でちょうど論文の値（-30 rad/s）になるようスケールする。
+    const speedRatio = launch.speedMps / GAME_REFERENCE_SPEED_MPS;
+    const curveRatio = launch.curveNorm / MAX_CURVE_NORM;
+    const omegaXRadS = REFERENCE_OMEGA_X_RAD_S * speedRatio;
+    const omegaYRadS = REFERENCE_OMEGA_Y_RAD_S * speedRatio * curveRatio;
+
     // レーン奥行き方向より横方向のほうが画面上のスケールがかなり大きいため、
     // フックやピンとの衝突で横速度だけが大きくなると、実際の速さ以上に
     // 「急に飛んでいった」ように見えてしまう。投球速度を基準に横速度の
@@ -694,22 +709,21 @@ export function Lane({ ballVisual, resetSignal, active, onRoll }: LaneProps) {
         const onOil = byM < GAME_OIL_LENGTH_M;
 
         if (gutterSide === null) {
-          const hookFactor = onOil ? OIL_HOOK_FACTOR : DRY_HOOK_FACTOR;
-          const drag = onOil ? OIL_BALL_DRAG_PER_SEC : DRY_BALL_DRAG_PER_SEC;
-          const speedBeforeHook = Math.hypot(bvxMps, bvyMps);
-          bvxMps += launch.curveNorm * BACKEND_HOOK_ACCEL_MPS2 * hookFactor * dt;
-          // フックは進行方向を曲げるだけにする。速度成分をそのまま足すと、
-          // カーブをかけるほどオイルからドライへ移った瞬間に玉自体が
-          // 加速して見えてしまうため、フック適用後も速さは変えずに向きだけ変える。
-          const speedAfterHook = Math.hypot(bvxMps, bvyMps);
-          if (speedAfterHook > speedBeforeHook && speedAfterHook > 0.0001) {
-            const hookScale = speedBeforeHook / speedAfterHook;
-            bvxMps *= hookScale;
-            bvyMps *= hookScale;
+          // 論文の接触点すべり摩擦モデル：
+          // slip = ボール中心速度 - 接触点における回転の寄与。ここから
+          // クーロン摩擦（大きさ一定 μg、向きはすべりと逆）で並進加速度を出す。
+          const mu = onOil ? OIL_FRICTION_MU : DRY_FRICTION_MU;
+          const slipX = bvxMps - BALL_SPIN_RADIUS_M * omegaYRadS;
+          const slipY = bvyMps + BALL_SPIN_RADIUS_M * omegaXRadS;
+          const slipSpeed = Math.hypot(slipX, slipY);
+          if (slipSpeed > MIN_SLIP_SPEED_MPS) {
+            const ax = -mu * GRAVITY_MPS2 * (slipX / slipSpeed);
+            const ay = -mu * GRAVITY_MPS2 * (slipY / slipSpeed);
+            bvxMps += ax * dt;
+            bvyMps += ay * dt;
           }
-          const ballDecay = Math.exp(-drag * dt);
-          bvxMps *= ballDecay;
-          bvyMps *= ballDecay;
+          // すべりが無くなった（転がりが噛んだ）後は動摩擦が働かないため、
+          // その時点の速度のまま直進する。
           [bvxMps, bvyMps] = capLateralSpeed(bvxMps, bvyMps);
         } else {
           const gutterDecay = Math.exp(-GUTTER_BALL_DRAG_PER_SEC * dt);
