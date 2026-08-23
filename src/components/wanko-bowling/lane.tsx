@@ -28,7 +28,7 @@ import {
 } from "@/lib/games/wanko-bowling-physics";
 
 const DOCK_Y = 94;
-const HEAD_PIN_SCREEN_Y = 13.5;
+const HEAD_PIN_SCREEN_Y = 21.5;
 const MIN_UPWARD_PCT = 8;
 const MAX_THROW_MS = 7000;
 const MAX_SWIPE_SAMPLES = 64;
