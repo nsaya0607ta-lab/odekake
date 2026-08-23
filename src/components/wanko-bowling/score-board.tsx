@@ -7,40 +7,42 @@ function normalMark(roll: number): string {
   return roll === 0 ? "–" : String(roll);
 }
 
-function frameLabel(frame: BowlingFrame, frameIndex: number): string {
+function frameRollMarks(frame: BowlingFrame, frameIndex: number): string[] {
   const isLast = frameIndex === BOWLING_FRAME_COUNT - 1;
-  if (frame.rolls.length === 0) return "";
-
-  const first = frame.rolls[0] ?? 0;
+  const first = frame.rolls[0];
   const second = frame.rolls[1];
   const third = frame.rolls[2];
 
   if (!isLast) {
-    if (first === 10) return "X";
-    const parts = [normalMark(first)];
-    if (second !== undefined) {
-      parts.push(first + second === 10 ? "/" : normalMark(second));
+    if (first === undefined) return ["", ""];
+    if (first === 10) return ["", "X"];
+    return [
+      normalMark(first),
+      second === undefined ? "" : first + second === 10 ? "/" : normalMark(second),
+    ];
+  }
+
+  if (first === undefined) return ["", "", ""];
+
+  const firstMark = first === 10 ? "X" : normalMark(first);
+  let secondMark = "";
+  let thirdMark = "";
+
+  if (second !== undefined) {
+    if (first === 10) secondMark = second === 10 ? "X" : normalMark(second);
+    else secondMark = first + second === 10 ? "/" : normalMark(second);
+  }
+
+  if (third !== undefined) {
+    if (first === 10) {
+      if (second === 10) thirdMark = third === 10 ? "X" : normalMark(third);
+      else thirdMark = (second ?? 0) + third === 10 ? "/" : normalMark(third);
+    } else {
+      thirdMark = third === 10 ? "X" : normalMark(third);
     }
-    return parts.join("  ");
   }
 
-  const parts: string[] = [];
-  if (first === 10) {
-    parts.push("X");
-    if (second === undefined) return parts.join(" ");
-    parts.push(second === 10 ? "X" : normalMark(second));
-    if (third === undefined) return parts.join(" ");
-    if (second === 10) parts.push(third === 10 ? "X" : normalMark(third));
-    else parts.push(second + third === 10 ? "/" : normalMark(third));
-    return parts.join(" ");
-  }
-
-  parts.push(normalMark(first));
-  if (second === undefined) return parts.join(" ");
-  const firstSetIsSpare = first + second === 10;
-  parts.push(firstSetIsSpare ? "/" : normalMark(second));
-  if (third !== undefined) parts.push(third === 10 ? "X" : normalMark(third));
-  return parts.join(" ");
+  return [firstMark, secondMark, thirdMark];
 }
 
 export function ScoreBoard({
@@ -54,48 +56,58 @@ export function ScoreBoard({
 }) {
   return (
     <div
-      className="relative h-[96px] w-full overflow-hidden rounded-[14px] bg-[#08151b] sm:h-[108px]"
+      className="relative h-[98px] w-full overflow-hidden sm:h-[112px]"
       style={{
         backgroundImage: "url('/games/wanko-bowling/scoreboard-monitor.svg')",
         backgroundRepeat: "no-repeat",
         backgroundPosition: "center",
         backgroundSize: "100% 100%",
       }}
-      aria-label="ボウリングスコアボード"
+      aria-label="5フレーム ボウリングスコアボード"
     >
       <div
-        className="absolute bottom-[14%] left-[3.3%] right-[3.3%] top-[14%] grid"
-        style={{ gridTemplateColumns: "repeat(5, minmax(0, 1fr)) 1.34fr" }}
+        className="absolute bottom-[6%] left-[1.5%] right-[1.5%] top-[6%] grid"
+        style={{
+          gridTemplateColumns: "repeat(5, minmax(0, 1fr))",
+          columnGap: "1.35%",
+        }}
       >
         {frames.map((frame, index) => {
           const isActive = index === currentFrameIndex;
+          const marks = frameRollMarks(frame, index);
           const result = score.frames[index];
+          const rollColumns = index === BOWLING_FRAME_COUNT - 1 ? 3 : 2;
+
           return (
             <div
               key={index}
-              className={`relative grid min-w-0 grid-rows-[31%_31%_38%] text-center ${
-                isActive ? "bg-[#63d1c8]/10 ring-1 ring-inset ring-[#8ae0d8]/60" : ""
+              className={`relative grid min-w-0 grid-rows-[21.2%_32.6%_46.2%] overflow-hidden rounded-[10px] text-center ${
+                isActive ? "bg-[#dcebc9]/45 ring-1 ring-inset ring-[#4f7d3b]/80" : ""
               }`}
             >
-              <p className={`self-center text-[8px] font-black tracking-[0.14em] ${isActive ? "text-[#9cf0df]" : "text-[#8cbac1]"}`}>
+              <p className={`self-center text-[8px] font-black tracking-[0.08em] sm:text-[9px] ${isActive ? "text-[#4f7d3b]" : "text-[#756655]"}`}>
                 {index + 1}F
               </p>
-              <p className="self-center whitespace-nowrap px-0.5 text-[12px] font-black tabular-nums leading-none text-[#f4dc88] sm:text-[13px]">
-                {frameLabel(frame, index) || "·"}
-              </p>
-              <p className="self-center text-[14px] font-black tabular-nums leading-none text-[#ecf7f5] sm:text-[16px]">
+
+              <div className="grid items-center" style={{ gridTemplateColumns: `repeat(${rollColumns}, minmax(0, 1fr))` }}>
+                {marks.map((mark, markIndex) => (
+                  <span
+                    key={markIndex}
+                    className={`self-center text-[12px] font-black tabular-nums leading-none sm:text-[14px] ${
+                      isActive ? "text-[#426d33]" : "text-[#4b3d32]"
+                    }`}
+                  >
+                    {mark}
+                  </span>
+                ))}
+              </div>
+
+              <p className={`self-center text-[16px] font-black tabular-nums leading-none sm:text-[19px] ${isActive ? "text-[#426d33]" : "text-[#3f342c]"}`}>
                 {result?.cumulativeScore ?? "–"}
               </p>
             </div>
           );
         })}
-
-        <div className="grid min-w-0 grid-rows-[31%_69%] text-center">
-          <p className="self-center text-[8px] font-black tracking-[0.14em] text-[#8cbac1]">TOTAL</p>
-          <p className="self-center text-[22px] font-black tabular-nums leading-none text-[#f4dc88] sm:text-[25px]">
-            {score.total}
-          </p>
-        </div>
       </div>
     </div>
   );
