@@ -59,7 +59,7 @@ const CURVE_BOW_FULL_SCALE_PCT = 6;
 const MAX_CURVE_NORM = 0.68;
 const CURVE_STRAIGHT_SNAP = 0.06;
 
-// 10lb球でもポケットヒット後にラック奥へ適度なエネルギーを残す。
+// 7lb球でもポケットヒット後にラック奥へ適度なエネルギーを残す。
 const BALL_POST_HIT_SPEED_FACTOR = 0.94;
 const BALL_POST_HIT_FORWARD_FACTOR = 0.92;
 
@@ -562,7 +562,9 @@ export function Lane({ ballVisual, resetSignal, active, onRoll }: LaneProps) {
     let byM = 0;
     let bvxMps = launch.speedMps * Math.sin(launch.launchAngleRad);
     let bvyMps = launch.speedMps * Math.cos(launch.launchAngleRad);
-    let rotate = 0;
+    let rollRotate = 0;
+    const curveStrength = clamp(Math.abs(launch.curveNorm) / MAX_CURVE_NORM, 0, 1);
+    const curveSpinDirection = Math.sign(launch.curveNorm) || 1;
     let gutterSide: GutterSide = null;
     let ballDone = false;
     let finished = false;
@@ -674,8 +676,16 @@ export function Lane({ ballVisual, resetSignal, active, onRoll }: LaneProps) {
           }
         }
 
-        const angularSpeedRad = Math.hypot(bvxMps, bvyMps) / BALL_RADIUS_M;
-        rotate += angularSpeedRad * dt * (180 / Math.PI);
+        // ストレートは滑らかな前転、カーブは左右のスピン方向と軸の揺れを見た目にも出す。
+        const angularStepDeg = (Math.hypot(bvxMps, bvyMps) / BALL_RADIUS_M) * dt * (180 / Math.PI);
+        rollRotate += angularStepDeg;
+        const curveSpinBoost = curveStrength < 0.08
+          ? 0
+          : curveStrength * (onOil ? 0.35 : 0.95);
+        const visualRotate = curveStrength < 0.08
+          ? rollRotate
+          : rollRotate * curveSpinDirection * (1 + curveSpinBoost)
+            + Math.sin(byM * 2.2) * curveStrength * 7;
 
         if (gutterSide === null && byM >= JB_HEAD_PIN_DISTANCE_M - 1.35) {
           for (const pin of PIN_LAYOUT) {
@@ -750,7 +760,7 @@ export function Lane({ ballVisual, resetSignal, active, onRoll }: LaneProps) {
         }
 
         if (byM >= BALL_EXIT_DISTANCE_M) ballDone = true;
-        setBallPosition(bxM, byM, rotate);
+        setBallPosition(bxM, byM, visualRotate);
       }
 
       const ids = [...pinBodiesRef.current.keys()];
