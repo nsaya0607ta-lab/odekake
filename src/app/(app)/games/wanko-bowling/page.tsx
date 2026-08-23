@@ -1,11 +1,9 @@
-import { notFound } from "next/navigation";
 import { WankoBowlingGame } from "@/components/wanko-bowling-game";
 import { WankoBowlingRanking } from "@/components/wanko-bowling-ranking";
 import { BowlingScreenLock } from "@/components/wanko-bowling/screen-lock";
 import { TopHeader } from "@/components/page-header";
 import { COLLECTION_ITEMS } from "@/lib/collection/items";
 import { getOwnedItemCounts } from "@/lib/data/collection";
-import { canAccessWankoBowling } from "@/lib/games/wanko-bowling-access";
 import { BOWLING_BALL_ITEM_IDS } from "@/lib/games/wanko-bowling-balls";
 import { requireUser } from "@/lib/supabase/server";
 
@@ -14,13 +12,6 @@ export const dynamic = "force-dynamic";
 
 export default async function WankoBowlingPage() {
   const { supabase, user } = await requireUser();
-  const { data: profile } = await supabase
-    .from("profiles")
-    .select("display_name")
-    .eq("id", user.id)
-    .maybeSingle();
-
-  if (!canAccessWankoBowling(user.email, profile?.display_name)) notFound();
 
   const ownedItemCounts = await getOwnedItemCounts(supabase, user.id);
   const ballItemIds = new Set<string>(BOWLING_BALL_ITEM_IDS);
