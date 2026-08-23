@@ -11,8 +11,14 @@ const ITEM_CATCH_CARD_SRC = "/140352b4-d7ad-4b73-8b9d-4136fc5e27a4.webp";
 const WANKO_BOWLING_CARD_SRC = "/games/wanko-bowling/icon.svg";
 
 export default async function GamesPage() {
-  const { user } = await requireUser();
-  const showWankoBowling = canAccessWankoBowling(user.email);
+  const { supabase, user } = await requireUser();
+  const { data: profile } = await supabase
+    .from("profiles")
+    .select("display_name")
+    .eq("id", user.id)
+    .maybeSingle();
+
+  const showWankoBowling = canAccessWankoBowling(user.email, profile?.display_name);
 
   return (
     <>
