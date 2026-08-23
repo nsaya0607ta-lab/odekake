@@ -73,7 +73,7 @@ export const BACKEND_HOOK_ACCEL_MPS2 = 1.85;
  * エネルギーを残して2番・3番ピン以降へ衝撃を伝える。
  */
 export const BALL_PIN_RESTITUTION = 0.2;
-export const PIN_PIN_RESTITUTION = 0.48;
+export const PIN_PIN_RESTITUTION = 0.58;
 
 /**
  * 倒れたピンがデッキ上を少し滑って次のピンへ当たり続けられるようにする。
