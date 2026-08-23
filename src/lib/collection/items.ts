@@ -130,11 +130,13 @@ const CURATED_ITEMS: readonly CollectionItem[] = [
   { id: "food_cheese_cubes", name: "ころころチーズ", image: "/collection/items/cheese-cubes.webp", category: "food", series: null, rarity: "N" },
   { id: "food_roasted_sweet_potato", name: "ほくほく焼きいも", image: "/collection/items/roasted-sweet-potato.webp", category: "food", series: null, rarity: "N" },
   { id: "food_honey_butter_toast", name: "はちみつバタートースト", image: "/collection/items/honey-butter-toast.webp", category: "food", series: null, rarity: "N" },
+  { id: "food_fruit_basket", name: "フルーツバスケット", image: "/collection/items/fruit-basket.webp", category: "food", series: null, rarity: "SR" },
 
   // --- 通常図鑑：インテリア ------------------------------------------
   { id: "interior_stretch_rod", name: "ストレッチ棒", image: "/collection/items/stretch-rod.webp", category: "interior", series: null, rarity: "R" },
   { id: "interior_anball", name: "アンボール", image: "/collection/items/anball.webp", category: "interior", series: null, rarity: "UR" },
   { id: "interior_kinoko_azubee", name: "きのこあずびー", image: "/collection/items/3365FE0A-4198-4C04-BA73-A7BAC18F73F5.webp", category: "interior", series: null, rarity: "UR" },
+  { id: "interior_gold_ball", name: "ゴールドボール", image: "/collection/items/gold-ball.webp", category: "interior", series: null, rarity: "SSR" },
   { id: "interior_sleepy_moon", name: "おやすみムーン", image: "/collection/items/sleepy-moon.webp", category: "interior", series: null, rarity: "SR" },
   { id: "interior_spring_flower_wreath", name: "はるいろフラワーリース", image: "/collection/items/spring-flower-wreath.webp", category: "interior", series: null, rarity: "SR" },
   { id: "interior_shikkoku_no_ar", name: "漆黒のアー", image: "/collection/items/shikkoku-no-ar.webp", category: "interior", series: null, rarity: "LR" },
