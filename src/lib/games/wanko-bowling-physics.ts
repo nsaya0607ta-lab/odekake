@@ -59,8 +59,11 @@ export const DRY_HOOK_FACTOR = 1;
 /** リリース時の曲げ操作が目で分かる強さまで引き上げる。 */
 export const BACKEND_HOOK_ACCEL_MPS2 = 1.65;
 
-/** 反発係数は公認規格値ではないため、過度にピンが飛び散らないようゲーム用近似とする。 */
-export const BALL_PIN_RESTITUTION = 0.38;
+/**
+ * 反発係数は公認規格値ではないゲーム用近似。
+ * ピン衝突後にボールが加速して見えないよう、ボール→ピンは低めにして明確にエネルギーを失わせる。
+ */
+export const BALL_PIN_RESTITUTION = 0.24;
 export const PIN_PIN_RESTITUTION = 0.32;
 
 export const PIN_FRICTION_PER_SEC = 2.6;
