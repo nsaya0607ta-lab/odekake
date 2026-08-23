@@ -8,6 +8,7 @@ export const metadata = { title: "各種ゲーム | おでかけ記録" };
 export const dynamic = "force-dynamic";
 
 const ITEM_CATCH_CARD_SRC = "/140352b4-d7ad-4b73-8b9d-4136fc5e27a4.webp";
+const WANKO_BOWLING_CARD_SRC = "/games/wanko-bowling/icon.svg";
 
 export default async function GamesPage() {
   const { user } = await requireUser();
@@ -64,21 +65,15 @@ export default async function GamesPage() {
                 href="/games/wanko-bowling"
                 className="pressable group flex items-center gap-3 rounded-[22px] border border-[#d8c79e] bg-[#fffaf0] p-3 shadow-[0_3px_10px_rgba(85,63,31,0.08)] active:scale-[0.99]"
               >
-                <span className="relative flex h-20 w-20 shrink-0 items-center justify-center rounded-2xl bg-leaf-soft">
-                  <svg width="44" height="44" viewBox="0 0 44 44" aria-hidden="true">
-                    <ellipse cx="22" cy="37" rx="14" ry="3" fill="rgba(93,128,73,0.18)" />
-                    <path
-                      d="M22 5c3.6 0 5.6 3.1 5 6.4-.5 2.3-2 3.7-2 6 0 2.6 4.5 6 6 11.7 1.4 5.3 1.4 10.7-.6 15.3-1.4 3.1-4.4 5.2-8.4 5.2s-7-2.1-8.4-5.2c-2-4.6-2-10-.6-15.3 1.5-5.7 6-9.1 6-11.7 0-2.3-1.5-3.7-2-6-.6-3.3 1.4-6.4 5-6.4Z"
-                      fill="#f6ecd6"
-                      stroke="rgba(93,66,40,0.3)"
-                      strokeWidth="1.2"
-                      transform="translate(0 -2) scale(0.62) translate(13.6 6)"
-                    />
-                    <circle cx="14" cy="30" r="7" fill="#c9a06a" stroke="rgba(93,66,40,0.3)" strokeWidth="1.2" />
-                    <circle cx="12" cy="27" r="1" fill="#5d8049" />
-                    <circle cx="16" cy="28" r="1" fill="#5d8049" />
-                    <circle cx="13" cy="31" r="1" fill="#5d8049" />
-                  </svg>
+                <span className="relative flex h-20 w-20 shrink-0 items-center justify-center overflow-hidden rounded-2xl bg-leaf-soft">
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img
+                    src={WANKO_BOWLING_CARD_SRC}
+                    alt=""
+                    aria-hidden="true"
+                    className="h-[72px] w-[72px] object-contain"
+                    style={{ background: "transparent" }}
+                  />
                 </span>
 
                 <span className="min-w-0 flex-1">
