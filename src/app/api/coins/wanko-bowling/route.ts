@@ -2,7 +2,9 @@ import { NextResponse } from "next/server";
 import {
   BOWLING_FRAME_COUNT,
   calculateBowlingScore,
+  getBonusFrameIndex,
   isValidCompletedBowlingFrames,
+  type BowlingFrame,
 } from "@/lib/games/wanko-bowling-score";
 import { checkRateLimit } from "@/lib/rate-limit";
 import { requireUser } from "@/lib/supabase/server";
@@ -34,12 +36,17 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "ゲーム結果が正しくありません。" }, { status: 400 });
   }
 
-  // 合計点やSTRIKE/SPARE/GUTTER回数はクライアント値を一切信用しない。
+  // 合計点やSTRIKE/SPARE/GUTTER回数、ボーナスチャンス成功はクライアント値を一切信用しない。
   // 合法な投球列だけ受け取り、同じ純粋関数でサーバー側から再計算する。
-  const finalState = calculateBowlingScore(body.frames);
+  const frames = body.frames as BowlingFrame[];
+  const finalState = calculateBowlingScore(frames);
   if (!finalState.isComplete) {
     return NextResponse.json({ error: "ゲーム結果が正しくありません。" }, { status: 400 });
   }
+
+  const bonusFrameIndex = getBonusFrameIndex(body.roundId);
+  const bonusFrame = frames[bonusFrameIndex];
+  const bonusHit = bonusFrame?.rolls[0] === 10;
 
   // 1ゲーム数十秒〜数分を想定。直接APIを連打してコインを稼ぐ被害も抑える。
   const limit = checkRateLimit(`wanko-bowling:${user.id}`, 30, 60 * 60_000);
@@ -59,6 +66,7 @@ export async function POST(request: Request) {
       p_spare_count: number;
       p_gutter_count: number;
       p_frame_count: number;
+      p_bonus_hit: boolean;
     },
   ) => Promise<RpcResponse>;
 
@@ -69,6 +77,7 @@ export async function POST(request: Request) {
     p_spare_count: finalState.spareCount,
     p_gutter_count: finalState.gutterCount,
     p_frame_count: BOWLING_FRAME_COUNT,
+    p_bonus_hit: bonusHit,
   });
 
   if (error) {

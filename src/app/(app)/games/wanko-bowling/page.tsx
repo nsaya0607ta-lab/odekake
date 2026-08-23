@@ -47,6 +47,7 @@ export default async function WankoBowlingPage() {
       <TopHeader
         backHref="/games"
         title="わんこボウリング"
+        subtitle="調整中：プレイはできますが、内容は今後変更されることがあります"
         action={(
           <a
             href="#wanko-bowling-ranking"

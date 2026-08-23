@@ -320,6 +320,19 @@ export function calculateBowlingScore(frames: BowlingFrame[]): BowlingScoreState
   };
 }
 
+/**
+ * ラウンドごとに1回だけ訪れる「ボーナスチャンス」フレームを round_id から決める。
+ * クライアントとサーバー（DB関数）が同じ規則で同じフレームを導けるよう、
+ * 単純な文字コード合計 mod BOWLING_FRAME_COUNT にしている。
+ */
+export function getBonusFrameIndex(roundId: string): number {
+  let sum = 0;
+  for (let i = 0; i < roundId.length; i += 1) {
+    sum = (sum + roundId.charCodeAt(i)) % BOWLING_FRAME_COUNT;
+  }
+  return sum;
+}
+
 export function createEmptyFrames(): BowlingFrame[] {
   return Array.from({ length: BOWLING_FRAME_COUNT }, () => ({ rolls: [], gutters: [] }));
 }
