@@ -27,10 +27,12 @@ export const JB_PIN_HEIGHT_M = 0.38085;
 /** ボール直径規格 21.59〜21.83cm の中間値。 */
 export const JB_BALL_DIAMETER_M = (0.2159 + 0.2183) / 2;
 /**
- * ボール重量は規格上16lb（7.25kg）以下。
- * 今回のゲーム設定では全ボールを7lb相当として統一する。
+ * ボール重量は規格上16lb（7.25kg）以下だが、実際に成人が使う球は
+ * 一般的に6.3〜7.3kg程度に集中する（中間値の目安は約6.8kg＝約15lb）。
+ * 7lb（3.175kg）は実際の平均よりかなり軽く、衝突時の質量比が
+ * 実物とずれてしまうため、この代表値を採用する。
  */
-export const GAME_BALL_MASS_KG = 7 * 0.45359237;
+export const GAME_BALL_MASS_KG = 6.8;
 
 /** JAPAN BOWLING掲載の大会パターン例 42ft。ゲームの標準オイル長として採用。 */
 export const GAME_OIL_LENGTH_M = 42 * 0.3048;
