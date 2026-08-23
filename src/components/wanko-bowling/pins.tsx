@@ -19,6 +19,7 @@ export type PinLayout = {
  */
 export const PIN_VISUAL_WIDTH_PCT = 4.5;
 
+const PIN_IMAGE_SRC = "/games/wanko-bowling/pin.webp";
 const halfSpacingM = JB_PIN_SPACING_M / 2;
 const rowDepthM = JB_PIN_SPACING_M * Math.sqrt(3) / 2;
 
@@ -59,17 +60,14 @@ export function Pins({ registerNode }: PinsProps) {
             transform: "translate(-50%, -50%)",
           }}
         >
-          <svg className="block h-auto w-full" viewBox="0 0 20 34" aria-hidden="true">
-            <ellipse cx="10" cy="31" rx="6.5" ry="2.4" fill="rgba(58,36,22,0.18)" />
-            <path
-              d="M10 1.5c2.3 0 3.6 2 3.2 4.1-.3 1.5-1.3 2.4-1.3 3.9 0 1.7 2.9 3.9 3.9 7.6.9 3.4.9 6.9-.4 9.9-.9 2-2.8 3.4-5.4 3.4s-4.5-1.4-5.4-3.4c-1.3-3-1.3-6.5-.4-9.9 1-3.7 3.9-5.9 3.9-7.6 0-1.5-1-2.4-1.3-3.9C6.4 3.5 7.7 1.5 10 1.5Z"
-              fill="#f7f2e8"
-              stroke="rgba(58,36,22,0.34)"
-              strokeWidth="1"
-            />
-            <rect x="4.3" y="11.8" width="11.4" height="1.9" rx="0.95" fill="#b53632" />
-            <rect x="4.7" y="14.2" width="10.6" height="1.7" rx="0.85" fill="#b53632" />
-          </svg>
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src={PIN_IMAGE_SRC}
+            alt=""
+            aria-hidden="true"
+            draggable={false}
+            className="block h-auto w-full select-none"
+          />
         </div>
       ))}
     </div>
