@@ -6,8 +6,16 @@
  */
 
 const WANKO_BOWLING_ALLOWED_EMAILS = new Set(["n.shunta0415_ny@icloud.com".toLowerCase()]);
+const WANKO_BOWLING_ALLOWED_DISPLAY_NAMES = new Set(["さやか"]);
 
-export function canAccessWankoBowling(email: string | null | undefined): boolean {
-  if (!email) return false;
-  return WANKO_BOWLING_ALLOWED_EMAILS.has(email.trim().toLowerCase());
+export function canAccessWankoBowling(
+  email: string | null | undefined,
+  displayName?: string | null,
+): boolean {
+  const normalizedEmail = email?.trim().toLowerCase();
+  if (normalizedEmail && WANKO_BOWLING_ALLOWED_EMAILS.has(normalizedEmail)) return true;
+
+  const normalizedDisplayName = displayName?.trim().normalize("NFKC");
+  if (!normalizedDisplayName) return false;
+  return WANKO_BOWLING_ALLOWED_DISPLAY_NAMES.has(normalizedDisplayName);
 }
