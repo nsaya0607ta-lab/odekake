@@ -36,6 +36,11 @@ export const GAME_BALL_MASS_KG = 6.8;
 
 /** JAPAN BOWLING掲載の大会パターン例 42ft。ゲームの標準オイル長として採用。 */
 export const GAME_OIL_LENGTH_M = 42 * 0.3048;
+/**
+ * 論文の基準条件（軌道再現テスト）で使われている40ftフラットオイルパターン。
+ * ゲーム本番では使わない検証専用の値（ゲーム本番は上のGAME_OIL_LENGTH_M=42ftを使う）。
+ */
+export const PAPER_REFERENCE_OIL_LENGTH_M = 40 * 0.3048;
 
 /**
  * スワイプ速度の差を体感できるゲーム用速度レンジ。
@@ -92,12 +97,29 @@ export const OIL_FRICTION_MU = 0.04;
 export const DRY_FRICTION_MU = 0.20;
 /** 論文の基準投球条件（標準投球としてゲームの基準速度にも使う）。 */
 export const GAME_REFERENCE_SPEED_MPS = 8.0;
-export const REFERENCE_OMEGA_X_RAD_S = -30;
-export const REFERENCE_OMEGA_Y_RAD_S = -30;
-export const REFERENCE_OMEGA_Z_RAD_S = 10;
 export const BALL_RADIUS_OF_GYRATION_M = 0.0635; // RG
 export const BALL_DIFFERENTIAL_M = 0.001; // Diff
 export const BALL_INT_DIFFERENTIAL_M = 0; // IntDiff
+
+/**
+ * リリース時の初期ωは、論文の基準条件(-30,-30,+10 rad/s)を
+ * 「416rpm相当の角速度ベクトルが、レーン面内で回転軸方位45°、
+ * 面に対する軸の傾き13.3°を向いているときの成分」として再解釈し、
+ * 軸の向き（axisRotation）から毎回組み立てる。
+ *
+ *   spinMagnitude = SPIN_MAGNITUDE_REF_RAD_S * (releaseSpeed / GAME_REFERENCE_SPEED_MPS)
+ *   horizontalSpin = spinMagnitude * cos(axisTilt)
+ *   omegaX = -horizontalSpin * cos(axisRotation)
+ *   omegaY = -sign(curveNorm) * horizontalSpin * sin(axisRotation)
+ *   omegaZ = spinMagnitude * sin(axisTilt)
+ *
+ * releaseSpeed=8.0m/s・axisRotation=45°で(-30,-30,+10)にほぼ一致することを
+ * 検証済み（誤差0.1%未満）。curveNorm（プレイヤーのカーブ入力）は
+ * axisRotationのみを決め、omegaYへ直接掛けることはしない。
+ */
+export const SPIN_MAGNITUDE_REF_RAD_S = Math.sqrt(30 * 30 + 30 * 30 + 10 * 10); // ≒43.589 rad/s
+export const SPIN_AXIS_TILT_DEG = 13.26;
+export const MAX_AXIS_ROTATION_DEG = 45;
 
 /** 慣性モーメント（Ix = m(RG+Diff)^2, Iy = m・RG^2, Iz = m(RG+Diff+IntDiff)^2）。 */
 export const BALL_INERTIA_X_KGM2 =

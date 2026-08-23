@@ -24,15 +24,16 @@ import {
   JB_PIN_MASS_KG,
   JB_PIN_SPACING_M,
   JB_TOTAL_WIDTH_M,
+  MAX_AXIS_ROTATION_DEG,
   OIL_FRICTION_MU,
   PIN_CHAIN_KNOCK_SPEED_MPS,
   PIN_DIRECT_KNOCK_SPEED_MPS,
   PIN_FRICTION_PER_SEC,
   PIN_PIN_RESTITUTION,
   PIN_SETTLE_SPEED_MPS,
-  REFERENCE_OMEGA_X_RAD_S,
-  REFERENCE_OMEGA_Y_RAD_S,
   SLIP_EPSILON_MPS,
+  SPIN_AXIS_TILT_DEG,
+  SPIN_MAGNITUDE_REF_RAD_S,
 } from "@/lib/games/wanko-bowling-physics";
 
 const DOCK_Y = 94;
@@ -48,7 +49,7 @@ const PIN_COLLISION_RADIUS_M = BALL_RADIUS_M + PIN_RADIUS_M;
 const PIN_PAIR_RADIUS_M = JB_PIN_DIAMETER_M;
 const FALLEN_PIN_EXTRA_REACH_M = Math.max(0, JB_PIN_HEIGHT_M / 2 - PIN_RADIUS_M) * 0.82;
 const BALL_EXIT_DISTANCE_M = JB_HEAD_PIN_DISTANCE_M + 1.15;
-const MAX_LAUNCH_ANGLE_RAD = 3.4 * Math.PI / 180;
+const MAX_LAUNCH_ANGLE_RAD = 6 * Math.PI / 180;
 const GUTTER_BALL_DRAG_PER_SEC = 0.035;
 const FOUL_LINE_Y = 97;
 const PIN_ROW_DEPTH_M = JB_PIN_SPACING_M * Math.sqrt(3) / 2;
@@ -615,15 +616,23 @@ export function Lane({ ballVisual, resetSignal, active, onRoll }: LaneProps) {
     let ballDone = false;
     let finished = false;
 
-    // リリース時の角速度（omegaX/omegaYはstep内で摩擦トルクにより毎フレーム更新される。
-    // omegaZは論文のslip式に寄与しないためリリース時の値のまま変化させない）。
-    // omegaX（フォワードスピン）は投球速度のみに、omegaY（サイドロール＝フックの
-    // 元になる回転）は投球速度とカーブ入力の両方に比例させ、論文の基準投球
-    // （8m/s・最大カーブ）でちょうど論文の値（-30 rad/s）になるようスケールする。
-    const speedRatio = launch.speedMps / GAME_REFERENCE_SPEED_MPS;
-    const curveRatio = launch.curveNorm / MAX_CURVE_NORM;
-    let omegaXRadS = REFERENCE_OMEGA_X_RAD_S * speedRatio;
-    let omegaYRadS = REFERENCE_OMEGA_Y_RAD_S * speedRatio * curveRatio;
+    // リリース時の角速度は「回転軸の向き（axisRotation）」から組み立てる。
+    // curveNormをomegaYへ直接掛けるのではなく、まず回転軸の水平面内での
+    // 向き（0〜45°）をcurveNormの大きさだけで決め、向き（左右）はcurveNormの
+    // 符号で反映する。スワイプ方向（launchAngleRad）とは完全に独立。
+    // omegaX/omegaYはstep内で摩擦トルクにより毎フレーム更新され、
+    // omegaZは論文のslip式に寄与しないためリリース時の値のまま変化させない。
+    const curve01 = clamp(Math.abs(launch.curveNorm) / MAX_CURVE_NORM, 0, 1);
+    const axisRotationRad = (MAX_AXIS_ROTATION_DEG * curve01) * Math.PI / 180;
+    const axisTiltRad = SPIN_AXIS_TILT_DEG * Math.PI / 180;
+    const spinMagnitudeRadS = SPIN_MAGNITUDE_REF_RAD_S * (launch.speedMps / GAME_REFERENCE_SPEED_MPS);
+    const horizontalSpinRadS = spinMagnitudeRadS * Math.cos(axisTiltRad);
+    const curveSign = Math.sign(launch.curveNorm);
+    let omegaXRadS = -horizontalSpinRadS * Math.cos(axisRotationRad);
+    let omegaYRadS = -curveSign * horizontalSpinRadS * Math.sin(axisRotationRad);
+    // omegaZは物理式に使わないため参考値として保持するのみ（一定値）。
+    const omegaZRadS = spinMagnitudeRadS * Math.sin(axisTiltRad);
+    void omegaZRadS;
 
     // レーン奥行き方向より横方向のほうが画面上のスケールがかなり大きいため、
     // フックやピンとの衝突で横速度だけが大きくなると、実際の速さ以上に
@@ -632,6 +641,12 @@ export function Lane({ ballVisual, resetSignal, active, onRoll }: LaneProps) {
     const maxLateralSpeedMps = Math.max(1.2, launch.speedMps * 0.55);
     const capLateralSpeed = (vx: number, vy: number): [number, number] => {
       if (Math.abs(vx) <= maxLateralSpeedMps) return [vx, vy];
+      // dev環境限定：通常軌道でこのログが出ないかを確認するための安全装置の発動記録。
+      if (process.env.NODE_ENV !== "production") {
+        console.debug(
+          `[wanko-bowling] capLateralSpeed fired: vx=${vx.toFixed(2)} > max=${maxLateralSpeedMps.toFixed(2)} (speed=${launch.speedMps.toFixed(2)}m/s, curveNorm=${launch.curveNorm.toFixed(2)})`,
+        );
+      }
       const speed = Math.hypot(vx, vy);
       const cappedVx = Math.sign(vx) * maxLateralSpeedMps;
       const remaining = Math.max(0, speed * speed - cappedVx * cappedVx);
