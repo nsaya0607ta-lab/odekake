@@ -45,21 +45,16 @@ const MAX_THROW_MS = 7000;
 const MAX_SWIPE_SAMPLES = 64;
 const BALL_RADIUS_M = JB_BALL_DIAMETER_M / 2;
 const PIN_RADIUS_M = JB_PIN_DIAMETER_M / 2;
-// ボールとピンの外周が実際に接触する距離ぴったりを当たり判定にする（余白なし）。
 const PIN_COLLISION_RADIUS_M = BALL_RADIUS_M + PIN_RADIUS_M;
-// ピン同士も外周同士が接触する距離（半径の合計＝直径）ぴったりにする。
 const PIN_PAIR_RADIUS_M = JB_PIN_DIAMETER_M;
 const FALLEN_PIN_EXTRA_REACH_M = Math.max(0, JB_PIN_HEIGHT_M / 2 - PIN_RADIUS_M) * 0.82;
 const BALL_EXIT_DISTANCE_M = JB_HEAD_PIN_DISTANCE_M + 1.15;
-// これまでの±6°までの狙い操作感はそのまま残し、強い斜めスワイプ時だけ±9°まで拡張する。
 const LEGACY_LAUNCH_ANGLE_RAD = 6 * Math.PI / 180;
 const MAX_LAUNCH_ANGLE_RAD = 9 * Math.PI / 180;
 const GUTTER_BALL_DRAG_PER_SEC = 0.035;
 const FOUL_LINE_Y = 97;
 const PIN_ROW_DEPTH_M = JB_PIN_SPACING_M * Math.sqrt(3) / 2;
 const PIN_DECK_DEPTH_M = PIN_ROW_DEPTH_M * 3;
-// ピンデッキは実距離を変えず、画面上だけ遠近感を強めてコンパクトなラックに見せる。
-// ボールとピンは同じworldYToPct/worldXToPctを使うため、衝突位置との見た目のズレは生じない。
 const PIN_DECK_SCREEN_DEPTH_PCT = 4.2;
 const PIN_DECK_LANE_CONVERGENCE_PCT = 2.5;
 const HEAD_PIN_LANE_HALF_PCT = 43 - 20;
@@ -71,20 +66,13 @@ const TARGET_BOARDS = [5, 10, 15, 20, 25, 30, 35] as const;
 const GUIDE_DISTANCE_M = 7 * 0.3048;
 const TARGET_DISTANCE_M = 15 * 0.3048;
 
-// スマホの自然な指ブレはストレートとして扱い、意図したカーブだけを拾う。
-// カーブの強さはスワイプの曲がり方から検出する。向きはlaunchAngleへ自動一致させる
-// （computeAxisRotation参照）ため、ここで検出した符号自体は使わず強さのみ使う。
 const CURVE_DEAD_ZONE_RAD = 6 * Math.PI / 180;
 const CURVE_FULL_SCALE_RAD = 22 * Math.PI / 180;
 const CURVE_BOW_DEAD_ZONE_PCT = 1.0;
 const CURVE_BOW_FULL_SCALE_PCT = 6;
-// 始点→終点の直線に対して、軌跡が同じ側へ継続的に膨らんでいるかを見る。
-// 斜め一直線＋指ブレだけでカーブ判定される誤検知を防ぐための一致度。
-const CURVE_ARC_CONSISTENCY_MIN = 0.60;
 const MAX_CURVE_NORM = 0.68;
 const CURVE_STRAIGHT_SNAP = 0.10;
 
-// 2Dモデルで3Dの「横から押されて重心を外す」効果を近似する。
 const DIRECT_IMPULSE_WEIGHT = 0.16;
 const CHAIN_IMPULSE_WEIGHT = 0.24;
 const DIRECT_SIDE_BONUS_MPS = 0.06;
@@ -94,6 +82,7 @@ const CHAIN_SIDE_THRESHOLD_REDUCTION = 0;
 type Point = { x: number; y: number; t: number };
 type GutterSide = "left" | "right" | null;
 type PointerMode = "place" | "throw" | null;
+type ThrowStyle = "straight" | "curve";
 
 type PinBody = {
   xM: number;
@@ -128,7 +117,6 @@ export type LaneRollResult = {
 type LaneProps = {
   ballVisual: BowlingBallVisual;
   resetSignal: number;
-  /** 新しいゲーム開始時だけインクリメントされる。開始位置を中央へ戻す。 */
   newGameSignal: number;
   active: boolean;
   onRoll: (result: LaneRollResult) => void;
@@ -159,9 +147,6 @@ function laneHalfWidthPct(distanceM: number): number {
   const approachHalf = 43 - 20 * Math.pow(depth, 0.68);
   if (distanceM <= JB_HEAD_PIN_DISTANCE_M) return approachHalf;
 
-  // 1番ピンより奥もレーン幅の遠近収束を続ける。
-  // 1番ピン地点の傾きから連続的に始める二次式なので、ボールがピンデッキへ
-  // 入った瞬間に横方向だけ急にワープして見えることはない。
   const deckM = clamp(distanceM - JB_HEAD_PIN_DISTANCE_M, 0, PIN_DECK_DEPTH_M);
   return HEAD_PIN_LANE_HALF_PCT
     - HEAD_PIN_LANE_APPROACH_SLOPE_PCT_PER_M * deckM
@@ -173,25 +158,11 @@ function gutterVisualWidthPct(distanceM: number): number {
   return 4.6 - 1.6 * Math.pow(depth, 0.72);
 }
 
-// 1番ピン手前の奥行きカーブの、1番ピン位置での傾き（%/m）。
-// ピンデッキ側をこの傾きで始めることで、1番ピンの前後で奥行きスケールが
-// 不連続にならないようにする（ボールとピンが同じ関数を使うため、この不連続は
-// 「ボールが一瞬だけ加速して見える」だけでなく「ボールとピンの表示位置がずれる」
-// 直接の原因にもなる）。
 const HEAD_PIN_APPROACH_SLOPE_PCT_PER_M = ((DOCK_Y - HEAD_PIN_SCREEN_Y) * 0.9) / JB_HEAD_PIN_DISTANCE_M;
-// ピンデッキ側は「1番ピンでの傾きから始まり、奥へ滑らかにつながる」二次カーブ。
-// 以前の8.4%は奥の列ほど間隔が広がってラックが縦長に見えていたため、
-// 物理位置はそのまま4.2%へ圧縮して遠景らしいまとまりを持たせる。
 const PIN_DECK_QUADRATIC_TERM_PCT_PER_M2 =
   (PIN_DECK_SCREEN_DEPTH_PCT - HEAD_PIN_APPROACH_SLOPE_PCT_PER_M * PIN_DECK_DEPTH_M)
   / (PIN_DECK_DEPTH_M * PIN_DECK_DEPTH_M);
 
-/**
- * ボールとピンの画面奥行き座標（top%）は、必ずこの一本の関数だけで計算する。
- * 別々の関数を使うと、物理的には同じY座標にあるボールとピンが画面上では
- * 別の位置に描画され、「衝突しているのに画面上ではまだ届いていないように見える」
- * ようなズレが発生する。
- */
 function worldYToPct(distanceFromFoulM: number): number {
   if (distanceFromFoulM <= JB_HEAD_PIN_DISTANCE_M) {
     const depth = distanceFromFoulM / JB_HEAD_PIN_DISTANCE_M;
@@ -249,12 +220,6 @@ function screenXToWorldX(screenXPct: number, distanceM: number): number {
   return JB_GUTTER_WIDTH_M + laneT * JB_LANE_WIDTH_M;
 }
 
-/**
- * 狙い角度の算出専用。画面上の狙い線がレーン外へ伸びてもclampせず、
- * レーン幅の投影をそのまま外側へ延長した「仮想ターゲット」に変換する。
- * これにより通常の小さい狙いは従来と同じまま、強い斜めスワイプだけ
- * ±6°を超えて新しい最大±9°まで使える。
- */
 function screenXToVirtualWorldX(screenXPct: number, distanceM: number): number {
   const halfLane = laneHalfWidthPct(distanceM);
   const leftLaneEdge = 50 - halfLane;
@@ -278,7 +243,6 @@ function pinVisualWidthPct(distanceM: number): number {
     0,
     1,
   );
-  // 奥の列ほど一段ずつ小さくし、遠景なのに全ピンが同じ大きさに見える違和感をなくす。
   return PIN_VISUAL_WIDTH_PCT - deckDepth * 0.8;
 }
 
@@ -287,17 +251,6 @@ function pinPairCollisionRadius(a: PinBody, b: PinBody): number {
   return PIN_PAIR_RADIUS_M + fallReach;
 }
 
-/**
- * curveNormからaxisRotationとcurveSignを決める。
- *
- * - axisRotation = MAX_AXIS_ROTATION_DEG * curveInput^AXIS_ROTATION_INPUT_EXPONENT
- *   （スイープ検証の結果、45°上限は総合成績が最下位だったため35°に、
- *   　線形マッピングは指数0.8の非線形マッピングに変更した）
- * - 通常モードではlaunchAngleとcurveの向きが逆になるとほぼ確実にガターになる
- *   （スイープ検証で確認済み）ため、launchAngleが0でない場合はcurveSignを
- *   launchAngleの符号に強制的に合わせる。プレイヤーはcurveの「強さ」だけを
- *   操作する形になる。launchAngle=0のときはcurveNorm自身の符号を使う。
- */
 function computeAxisRotation(launchAngleRad: number, curveNorm: number): { axisRotationRad: number; curveSign: number } {
   const curve01 = clamp(Math.abs(curveNorm) / MAX_CURVE_NORM, 0, 1);
   const axisRotationRad = (MAX_AXIS_ROTATION_DEG * Math.pow(curve01, AXIS_ROTATION_INPUT_EXPONENT)) * Math.PI / 180;
@@ -305,17 +258,12 @@ function computeAxisRotation(launchAngleRad: number, curveNorm: number): { axisR
   return { axisRotationRad, curveSign };
 }
 
-/**
- * スワイプ点列から launchAngle と curveNorm を算出する。onPointerUp の最終判定と、
- * onPointerMove 中のライブプレビューの両方で同じロジックを使うために共通化する。
- * curveNormの符号自体は使わない（方向はcomputeAxisRotationでlaunchAngleへ自動一致
- * させるため）が、スワイプの曲がり方で強さを直感的に調整できるようにする。
- */
 function computeAimFromPoints(
   points: Point[],
   rect: { left: number; top: number; width: number; height: number },
   startXM: number,
   minUpwardPct: number,
+  throwStyle: ThrowStyle,
 ): { launchAngleRad: number; curveNorm: number; targetWorldX: number } | null {
   if (points.length < 2) return null;
 
@@ -335,14 +283,11 @@ function computeAimFromPoints(
   const directionUpPct = Math.max(1, startYPct - directionEndYPct);
   const rayScaleToPins = (startYPct - HEAD_PIN_SCREEN_Y) / directionUpPct;
   const aimScreenXPct = startXPct + (directionEndXPct - startXPct) * rayScaleToPins;
-  // 画面表示用ターゲットは従来どおり物理レーン内へclampする。
   const targetWorldX = screenXToWorldX(aimScreenXPct, JB_HEAD_PIN_DISTANCE_M);
-  // launchAngleだけはレーン外へ延長した仮想ターゲットを使う。従来はここもclamp
-  // されていたため、UIから±6°付近すら実質的に到達できなかった。
   const virtualTargetWorldX = screenXToVirtualWorldX(aimScreenXPct, JB_HEAD_PIN_DISTANCE_M);
   const rawLaunchAngle = Math.atan2(virtualTargetWorldX - startXM, JB_HEAD_PIN_DISTANCE_M);
   const launchAngleRad = mapLaunchAngleInput(rawLaunchAngle);
-  const curveNorm = estimateCurveNorm(points, rect.width);
+  const curveNorm = throwStyle === "curve" ? estimateCurveNorm(points, rect.width) : 0;
   return { launchAngleRad, curveNorm, targetWorldX };
 }
 
@@ -376,11 +321,6 @@ function estimateReleaseSwipeRate(points: Point[], boardHeightPx: number): numbe
   return recentRate * 0.75 + overallRate * 0.25;
 }
 
-/**
- * 狙い操作の入力を launchAngle へ非線形マッピングする。
- * 従来の±6°範囲は式を一切変えず、小さいスワイプの操作感を完全に維持する。
- * 6°を超える強い斜めスワイプだけ線形に延長し、最大9°まで使えるようにする。
- */
 function mapLaunchAngleInput(rawAngleRad: number): number {
   const sign = Math.sign(rawAngleRad);
   const magnitude = Math.abs(rawAngleRad);
@@ -396,10 +336,9 @@ function mapLaunchAngleInput(rawAngleRad: number): number {
 }
 
 /**
- * カーブ判定は「斜めに投げたか」ではなく「指の軌跡そのものが弧を描いたか」で確定する。
- * 前半/後半の角度差は従来どおりカーブ強度の材料に使うが、それだけではカーブにしない。
- * 始点→終点を結んだ直線から中央区間が1%以上、かつ同じ側へ継続的に膨らんだときだけ
- * curveNormを返す。これにより、斜め一直線のスワイプや一瞬の指ブレはストレートになる。
+ * カーブモード専用の強度算出。
+ * ストレート/カーブの分類自体はプレイヤーがボタンで決めるため、ここでは
+ * 「カーブと認定できるか」は判定せず、スワイプの曲がり量だけを従来の式で強度へ変換する。
  */
 function estimateCurveNorm(points: Point[], boardWidthPx: number): number {
   if (points.length < 5) return 0;
@@ -430,39 +369,14 @@ function estimateCurveNorm(points: Point[], boardWidthPx: number): number {
 
   const start = averagePoint(points.slice(0, Math.min(2, length)));
   const end = averagePoint(points.slice(-Math.min(2, length)));
-  const chordX = end.x - start.x;
-  const chordY = end.y - start.y;
-  const chordLength = Math.max(1, Math.hypot(chordX, chordY));
-  const arcStartIndex = Math.max(1, Math.floor(length * 0.20));
-  const arcEndIndex = Math.min(length - 2, Math.ceil(length * 0.80));
-
-  let signedDeviationSumPx = 0;
-  let absoluteDeviationSumPx = 0;
-  let deviationSampleCount = 0;
-
-  for (let i = arcStartIndex; i <= arcEndIndex; i += 1) {
-    const point = points[i]!;
-    // 始点→終点の直線に対する符号付き垂直距離。
-    // 直線そのものが斜めでも距離はほぼ0なので、launchAngleとは独立して判定できる。
-    const signedDeviationPx =
-      (chordX * (point.y - start.y) - chordY * (point.x - start.x)) / chordLength;
-    signedDeviationSumPx += signedDeviationPx;
-    absoluteDeviationSumPx += Math.abs(signedDeviationPx);
-    deviationSampleCount += 1;
-  }
-
-  const averageSignedDeviationPx = signedDeviationSumPx / Math.max(1, deviationSampleCount);
-  const bowPct = (averageSignedDeviationPx / Math.max(1, boardWidthPx)) * 100;
+  const midStart = Math.max(1, Math.floor(length * 0.42));
+  const midEnd = Math.min(length - 1, Math.ceil(length * 0.62));
+  const mid = averagePoint(points.slice(midStart, midEnd + 1));
+  const totalUp = Math.max(1, start.y - end.y);
+  const progress = clamp((start.y - mid.y) / totalUp, 0, 1);
+  const straightX = start.x + (end.x - start.x) * progress;
+  const bowPct = ((mid.x - straightX) / Math.max(1, boardWidthPx)) * 100;
   const bowMagnitude = Math.abs(bowPct);
-  const arcConsistency = absoluteDeviationSumPx > 0.000001
-    ? Math.abs(signedDeviationSumPx) / absoluteDeviationSumPx
-    : 0;
-
-  // 角度差だけではカーブにしない。実際の軌跡が直線から十分に膨らみ、
-  // かつ中央区間の大半が同じ側へ曲がっていることを必須条件にする。
-  if (bowMagnitude <= CURVE_BOW_DEAD_ZONE_PCT || arcConsistency < CURVE_ARC_CONSISTENCY_MIN) {
-    return 0;
-  }
 
   let bowSignal = 0;
   if (bowMagnitude > CURVE_BOW_DEAD_ZONE_PCT) {
@@ -475,8 +389,6 @@ function estimateCurveNorm(points: Point[], boardWidthPx: number): number {
     bowSignal = Math.sign(bowPct) * scaled;
   }
 
-  // 強度マッピング自体は従来の78%/22%を維持する。
-  // 今回変えるのは「カーブ認定条件」であり、カーブの乗りやすさや最大値ではない。
   const combined = clamp(angleSignal * 0.78 + bowSignal * 0.22, -1, 1);
   if (Math.abs(combined) < CURVE_STRAIGHT_SNAP) return 0;
   return combined * MAX_CURVE_NORM;
@@ -598,10 +510,7 @@ const OIL_RIGHT = 50 + OIL_HALF;
 const DEFAULT_BALL_START_X_M = JB_GUTTER_WIDTH_M + JB_LANE_WIDTH_M / 2;
 const LEFT_GUTTER_CENTER_M = JB_GUTTER_WIDTH_M / 2;
 const RIGHT_GUTTER_CENTER_M = JB_GUTTER_WIDTH_M + JB_LANE_WIDTH_M + JB_GUTTER_WIDTH_M / 2;
-// レーン中心からのオフセットの絶対上限（laneHalfWidth - ballRadius ≈ 0.4249m）。
-// ボール中心がこの範囲を超えないようにする。
 const MAX_START_OFFSET_M = 0.4249;
-// 投球前スタート位置のスナップ位置（レーン中心からのオフセット、m）。
 const START_OFFSET_OPTIONS_M = [-0.30, -0.15, 0, 0.15, 0.30] as const;
 
 export function Lane({ ballVisual, resetSignal, newGameSignal, active, onRoll }: LaneProps) {
@@ -616,8 +525,8 @@ export function Lane({ ballVisual, resetSignal, newGameSignal, active, onRoll }:
   const positionLockedRef = useRef(false);
   const [positionLocked, setPositionLockedState] = useState(false);
   const [startOffsetM, setStartOffsetM] = useState<number>(0);
-  // throwingRefのReact状態版。操作UI（開始位置）の表示/操作可否の判定に使う。
   const [isThrowing, setIsThrowing] = useState(false);
+  const [throwStyle, setThrowStyle] = useState<ThrowStyle>("straight");
   const pinBodiesRef = useRef<Map<number, PinBody>>(
     new Map(PIN_LAYOUT.map((pin) => [pin.id, createPinBody(pin)])),
   );
@@ -682,19 +591,13 @@ export function Lane({ ballVisual, resetSignal, newGameSignal, active, onRoll }:
     el.style.left = `${worldXToPct(xM, yM)}%`;
     el.style.top = `${screenY}%`;
     el.style.width = `${ballVisualWidthPct(yM)}%`;
-    // ピン要素は奥行きに応じた z-index を持つため、ボールにも同じ基準で
-    // z-index を与えないとピンの陰に隠れて消えたように見えてしまう。
     el.style.zIndex = String(501 + Math.round(screenY * 10));
 
-    // 物理回転をそのまま描画すると速すぎて指穴が止まって見えるため、
-    // 見た目用の回転は減速してストレート/カーブの差を読み取りやすくする。
     const visualRollDeg = rotateDeg * 0.16;
     const phaseRad = visualRollDeg * Math.PI / 180;
     const curveStrength = clamp(Math.abs(curveNorm) / MAX_CURVE_NORM, 0, 1);
 
     if (curveStrength < 0.04) {
-      // ストレート: 光沢が上下方向に流れ、指穴はごく小さく回る。
-      // 横スピンではなく前転しているように見せる。
       const highlightY = 28 + Math.sin(phaseRad) * 12;
       const forwardRollDeg = visualRollDeg * 0.18;
       el.style.background = `radial-gradient(circle at 32% ${highlightY}%, ${ballVisual.bodyGradient[0]}, ${ballVisual.bodyGradient[1]})`;
@@ -702,8 +605,6 @@ export function Lane({ ballVisual, resetSignal, newGameSignal, active, onRoll }:
       return;
     }
 
-    // カーブ: 指穴が横方向へはっきり回り、光沢も斜めに周回する。
-    // ドライ部分では横スピン感を強めてフックとの連動を見せる。
     const curveDirection = Math.sign(curveNorm) || 1;
     const surfaceFactor = onOil ? 0.58 : 1;
     const sideSpinDeg = visualRollDeg * (0.55 + curveStrength * 0.75) * surfaceFactor * curveDirection;
@@ -720,7 +621,6 @@ export function Lane({ ballVisual, resetSignal, newGameSignal, active, onRoll }:
       -MAX_START_OFFSET_M,
       MAX_START_OFFSET_M,
     );
-    // 5段階のスナップ位置のうち最も近いものへ吸着させる。
     let snappedOffsetM: number = START_OFFSET_OPTIONS_M[0];
     let bestDist = Infinity;
     for (const option of START_OFFSET_OPTIONS_M) {
@@ -773,8 +673,6 @@ export function Lane({ ballVisual, resetSignal, newGameSignal, active, onRoll }:
     activePointerRef.current = null;
     pointerModeRef.current = null;
     pointsRef.current = [];
-    // ラック再セットでは位置固定を解除しない。
-    // Lane が新規マウントされたゲーム開始時だけ初期値 false になる。
     dockBall();
   }, [resetSignal, resetPins, dockBall]);
 
@@ -784,12 +682,11 @@ export function Lane({ ballVisual, resetSignal, newGameSignal, active, onRoll }:
     dockBall();
   }, [active, clearFallenPins, dockBall]);
 
-  // 新しいゲーム開始時だけ、開始位置を中央へ戻す。
-  // フレーム間（resetSignal）ではここに触れず、直前の投球位置を維持する。
   useEffect(() => {
     ballStartXRef.current = DEFAULT_BALL_START_X_M;
     setStartOffsetM(0);
     setPositionLocked(false);
+    setThrowStyle("straight");
     setBallPosition(DEFAULT_BALL_START_X_M, 0, 0);
   }, [newGameSignal, setPositionLocked, setBallPosition]);
 
@@ -811,9 +708,6 @@ export function Lane({ ballVisual, resetSignal, newGameSignal, active, onRoll }:
     let ballDone = false;
     let finished = false;
 
-    // リリース時の角速度は「回転軸の向き（axisRotation）」から組み立てる
-    // （computeAxisRotationで実ゲームと予測軌道の変換を共通化）。
-    // omegaX/omegaYはstep内で摩擦トルクにより毎フレーム更新される。
     const { axisRotationRad, curveSign } = computeAxisRotation(launch.launchAngleRad, launch.curveNorm);
     const axisTiltRad = SPIN_AXIS_TILT_DEG * Math.PI / 180;
     const spinMagnitudeRadS = SPIN_MAGNITUDE_REF_RAD_S * (launch.speedMps / GAME_REFERENCE_SPEED_MPS);
@@ -821,19 +715,11 @@ export function Lane({ ballVisual, resetSignal, newGameSignal, active, onRoll }:
     let omegaXRadS = -horizontalSpinRadS * Math.cos(axisRotationRad);
     let omegaYRadS = -curveSign * horizontalSpinRadS * Math.sin(axisRotationRad);
     let omegaZRadS = spinMagnitudeRadS * Math.sin(axisTiltRad);
-    // phi: 主慣性軸y'とレーン固定y軸との角度。式(15)との整合から、
-    // リリース時点の(omegaX, omegaY)の向きから初期値を決める
-    // （基準条件 omegaX=-30, omegaY=-30 で45°になる atan、atan2ではない）。
     let phiRad = Math.atan(omegaYRadS / omegaXRadS);
 
-    // レーン奥行き方向より横方向のほうが画面上のスケールがかなり大きいため、
-    // フックやピンとの衝突で横速度だけが大きくなると、実際の速さ以上に
-    // 「急に飛んでいった」ように見えてしまう。投球速度を基準に横速度の
-    // 上限を設け、曲がる・跳ね返る勢いは残しつつ体感の暴走を防ぐ。
     const maxLateralSpeedMps = Math.max(1.2, launch.speedMps * 0.55);
     const capLateralSpeed = (vx: number, vy: number): [number, number] => {
       if (Math.abs(vx) <= maxLateralSpeedMps) return [vx, vy];
-      // dev環境限定：通常軌道でこのログが出ないかを確認するための安全装置の発動記録。
       if (process.env.NODE_ENV !== "production") {
         console.debug(
           `[wanko-bowling] capLateralSpeed fired: vx=${vx.toFixed(2)} > max=${maxLateralSpeedMps.toFixed(2)} (speed=${launch.speedMps.toFixed(2)}m/s, curveNorm=${launch.curveNorm.toFixed(2)})`,
@@ -917,11 +803,6 @@ export function Lane({ ballVisual, resetSignal, newGameSignal, active, onRoll }:
         const onOil = byM < GAME_OIL_LENGTH_M;
 
         if (gutterSide === null) {
-          // 論文の接触点すべり摩擦モデル：
-          // slip = ボール中心速度 - 接触点における回転の寄与。ここから
-          // クーロン摩擦（大きさ一定 μg、向きはすべりと逆）で並進加速度(dvx,dvy)を出す。
-          // slipSpeedがSLIP_EPSILON_MPSを下回ったら pure rolling とみなし、
-          // 動摩擦（並進加速度）は止める。
           const mu = onOil ? OIL_FRICTION_MU : DRY_FRICTION_MU;
           const slipX = bvxMps - BALL_SPIN_RADIUS_M * omegaYRadS;
           const slipY = bvyMps + BALL_SPIN_RADIUS_M * omegaXRadS;
@@ -933,10 +814,6 @@ export function Lane({ ballVisual, resetSignal, newGameSignal, active, onRoll }:
             dvy = -mu * GRAVITY_MPS2 * (slipY / slipSpeed);
           }
 
-          // 論文の6連立方程式（並進2＋回転3＋phi1）。
-          // 摩擦が止まって dvx=dvy=0 になっても、Ix'≠Iy'≠Iz' によるジャイロ項
-          // （トルクフリー歳差運動）はゼロにならないため、omegaX/Y/Z・phiは
-          // pure rolling後も引き続き更新する（並進速度だけが一定になる）。
           const cosPhi = Math.cos(phiRad);
           const sinPhi = Math.sin(phiRad);
           const omegaXPrime = omegaXRadS * cosPhi + omegaYRadS * sinPhi;
@@ -1048,9 +925,6 @@ export function Lane({ ballVisual, resetSignal, newGameSignal, active, onRoll }:
                   },
                 );
               }
-              // 反発係数で正しく計算した結果をそのまま採用する。
-              // 画面の横スケールが縦より急なため、横方向にだけは
-              // 見た目の暴走を防ぐ上限（capLateralSpeed）をかける。
               const [nextVx, nextVy] = capLateralSpeed(collision.avx, collision.avy);
               bvxMps = nextVx;
               bvyMps = nextVy;
@@ -1067,8 +941,6 @@ export function Lane({ ballVisual, resetSignal, newGameSignal, active, onRoll }:
                 );
               }
             }
-            // collision が null（法線方向に近づいていない＝かすった/離れていく接触）の場合は、
-            // 実際の物理と同じく力積が発生しないので、ボールにもピンにも変化を加えない。
           }
         }
 
@@ -1261,7 +1133,7 @@ export function Lane({ ballVisual, resetSignal, newGameSignal, active, onRoll }:
     if (!board) return;
     const rect = board.getBoundingClientRect();
     const startXM = ballStartXRef.current;
-    const aim = computeAimFromPoints(points, rect, startXM, MIN_UPWARD_PCT);
+    const aim = computeAimFromPoints(points, rect, startXM, MIN_UPWARD_PCT, throwStyle);
     if (!aim) return;
 
     const swipeRate = estimateReleaseSwipeRate(points, rect.height);
@@ -1272,7 +1144,7 @@ export function Lane({ ballVisual, resetSignal, newGameSignal, active, onRoll }:
     const speedMps = speedKmh / 3.6;
 
     runThrow({ speedMps, launchAngleRad: aim.launchAngleRad, curveNorm: aim.curveNorm, startXM });
-  }, [active, runThrow]);
+  }, [active, runThrow, throwStyle]);
 
   const onPointerCancel = useCallback((event: ReactPointerEvent<HTMLDivElement>) => {
     if (activePointerRef.current !== event.pointerId) return;
@@ -1297,6 +1169,13 @@ export function Lane({ ballVisual, resetSignal, newGameSignal, active, onRoll }:
     setPositionLocked(false);
     setBallPosition(ballStartXRef.current, 0, 0);
   }, [active, setBallPosition, setPositionLocked]);
+
+  const selectThrowStyle = useCallback((style: ThrowStyle, event: ReactPointerEvent<HTMLButtonElement>) => {
+    event.preventDefault();
+    event.stopPropagation();
+    if (!active || throwingRef.current || dockingRef.current) return;
+    setThrowStyle(style);
+  }, [active]);
 
   return (
     <div
@@ -1449,37 +1328,71 @@ export function Lane({ ballVisual, resetSignal, newGameSignal, active, onRoll }:
       </div>
 
       {active && !isThrowing ? (
-        <div
-          className="absolute bottom-2 left-2 z-[1200] flex items-center gap-1.5 rounded-full bg-[#2f2119]/78 p-1 shadow-lg backdrop-blur-sm"
-          onPointerDown={(event) => {
-            event.stopPropagation();
-          }}
-        >
-          <button
-            type="button"
-            onPointerUp={handleConfirmPosition}
-            aria-pressed={positionLocked}
-            className={`min-w-[52px] rounded-full px-3 py-2 text-[11px] font-black transition ${
-              positionLocked
-                ? "bg-[#e8e0d2] text-[#807363]"
-                : "bg-[#6f9b58] text-white shadow-sm"
-            }`}
+        <>
+          <div
+            className="absolute bottom-2 left-2 z-[1200] flex items-center gap-1.5 rounded-full bg-[#2f2119]/78 p-1 shadow-lg backdrop-blur-sm"
+            onPointerDown={(event) => {
+              event.stopPropagation();
+            }}
           >
-            ✓ OK
-          </button>
-          <button
-            type="button"
-            onPointerUp={handleUnlockPosition}
-            aria-pressed={!positionLocked}
-            className={`h-8 w-8 rounded-full text-[16px] font-black leading-none transition ${
-              positionLocked
-                ? "bg-[#f4eadc] text-[#5b4637] shadow-sm"
-                : "bg-white/15 text-white/45"
-            }`}
+            <button
+              type="button"
+              onPointerUp={handleConfirmPosition}
+              aria-pressed={positionLocked}
+              className={`min-w-[52px] rounded-full px-3 py-2 text-[11px] font-black transition ${
+                positionLocked
+                  ? "bg-[#e8e0d2] text-[#807363]"
+                  : "bg-[#6f9b58] text-white shadow-sm"
+              }`}
+            >
+              ✓ OK
+            </button>
+            <button
+              type="button"
+              onPointerUp={handleUnlockPosition}
+              aria-pressed={!positionLocked}
+              className={`h-8 w-8 rounded-full text-[16px] font-black leading-none transition ${
+                positionLocked
+                  ? "bg-[#f4eadc] text-[#5b4637] shadow-sm"
+                  : "bg-white/15 text-white/45"
+              }`}
+            >
+              ×
+            </button>
+          </div>
+
+          <div
+            className="absolute bottom-2 right-2 z-[1200] flex items-center gap-1 rounded-full bg-[#2f2119]/78 p-1 shadow-lg backdrop-blur-sm"
+            onPointerDown={(event) => {
+              event.stopPropagation();
+            }}
           >
-            ×
-          </button>
-        </div>
+            <button
+              type="button"
+              onPointerUp={(event) => selectThrowStyle("straight", event)}
+              aria-pressed={throwStyle === "straight"}
+              className={`rounded-full px-2.5 py-2 text-[10px] font-black transition ${
+                throwStyle === "straight"
+                  ? "bg-[#f4eadc] text-[#4e3c30] shadow-sm"
+                  : "bg-white/10 text-white/55"
+              }`}
+            >
+              ストレート
+            </button>
+            <button
+              type="button"
+              onPointerUp={(event) => selectThrowStyle("curve", event)}
+              aria-pressed={throwStyle === "curve"}
+              className={`rounded-full px-2.5 py-2 text-[10px] font-black transition ${
+                throwStyle === "curve"
+                  ? "bg-[#c47745] text-white shadow-sm"
+                  : "bg-white/10 text-white/55"
+              }`}
+            >
+              カーブ
+            </button>
+          </div>
+        </>
       ) : null}
     </div>
   );
