@@ -83,6 +83,7 @@ export function WankoBowlingGame({ ownedBalls }: { ownedBalls: OwnedBowlingBall[
   const [frames, setFrames] = useState<BowlingFrame[]>(initialFrames);
   const [frameIndex, setFrameIndex] = useState(0);
   const [laneResetSignal, setLaneResetSignal] = useState(0);
+  const [newGameSignal, setNewGameSignal] = useState(0);
   const [rollLocked, setRollLocked] = useState(false);
   const [banner, setBanner] = useState<Banner>(null);
   const [shake, setShake] = useState(false);
@@ -156,6 +157,7 @@ export function WankoBowlingGame({ ownedBalls }: { ownedBalls: OwnedBowlingBall[
     setIsNewBest(false);
     setLastRollPins(null);
     setLaneResetSignal((value) => value + 1);
+    setNewGameSignal((value) => value + 1);
     setRollLock(false);
     document.getElementById("wanko-bowling-scroll")?.scrollTo({ top: 0, behavior: "auto" });
     setPhase("playing");
@@ -402,7 +404,13 @@ export function WankoBowlingGame({ ownedBalls }: { ownedBalls: OwnedBowlingBall[
       </div>
 
       <div className="relative -mt-px min-h-0 flex-1 [&>div]:!rounded-t-none">
-        <Lane ballVisual={ballVisual} resetSignal={laneResetSignal} active={!rollLocked} onRoll={handleRoll} />
+        <Lane
+          ballVisual={ballVisual}
+          resetSignal={laneResetSignal}
+          newGameSignal={newGameSignal}
+          active={!rollLocked}
+          onRoll={handleRoll}
+        />
 
         {banner ? (
           <div className="pointer-events-none absolute left-1/2 top-[35%] z-40 -translate-x-1/2">
