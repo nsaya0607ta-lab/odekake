@@ -28,22 +28,26 @@ import {
   PIN_SETTLE_SPEED_MPS,
 } from "@/lib/games/wanko-bowling-physics";
 
-const DOCK_Y = 94;
+// iPhone のホームジェスチャー帯から離して、上方向へ安全にスワイプできる位置にする。
+const DOCK_Y = 88;
 const HEAD_PIN_SCREEN_Y = 21.5;
-const MIN_UPWARD_PCT = 8;
+const MIN_UPWARD_PCT = 4.5;
+const AUTO_RELEASE_UPWARD_PCT = 6.5;
 const MAX_THROW_MS = 7000;
 const MAX_SWIPE_SAMPLES = 64;
 const BALL_RADIUS_M = JB_BALL_DIAMETER_M / 2;
 const PIN_RADIUS_M = JB_PIN_DIAMETER_M / 2;
 const PIN_COLLISION_RADIUS_M = BALL_RADIUS_M + PIN_RADIUS_M + 0.006;
 const PIN_PAIR_RADIUS_M = JB_PIN_DIAMETER_M + 0.006;
-const FALLEN_PIN_EXTRA_REACH_M = Math.max(0, JB_PIN_HEIGHT_M / 2 - PIN_RADIUS_M) * 0.82;
+const FALLEN_PIN_EXTRA_REACH_M = Math.max(0, JB_PIN_HEIGHT_M / 2 - PIN_RADIUS_M) * 0.65;
 const BALL_EXIT_DISTANCE_M = JB_HEAD_PIN_DISTANCE_M + 1.15;
-const MAX_LAUNCH_ANGLE_RAD = 3.4 * Math.PI / 180;
+const MAX_LAUNCH_ANGLE_RAD = 2.8 * Math.PI / 180;
+const STRAIGHT_AIM_DEAD_ZONE_RAD = 0.85 * Math.PI / 180;
+const STRAIGHT_AIM_SENSITIVITY = 0.72;
 const OIL_BALL_DRAG_PER_SEC = 0.012;
 const DRY_BALL_DRAG_PER_SEC = 0.04;
 const GUTTER_BALL_DRAG_PER_SEC = 0.035;
-const FOUL_LINE_Y = 97;
+const FOUL_LINE_Y = 91.5;
 const PIN_ROW_DEPTH_M = JB_PIN_SPACING_M * Math.sqrt(3) / 2;
 const PIN_DECK_DEPTH_M = PIN_ROW_DEPTH_M * 3;
 const PIN_DECK_SCREEN_DEPTH_PCT = 8.4;
@@ -52,22 +56,23 @@ const GUIDE_DISTANCE_M = 7 * 0.3048;
 const TARGET_DISTANCE_M = 15 * 0.3048;
 
 // スマホの自然な指ブレはストレートとして扱い、意図したカーブだけを拾う。
-const CURVE_DEAD_ZONE_RAD = 6 * Math.PI / 180;
-const CURVE_FULL_SCALE_RAD = 22 * Math.PI / 180;
-const CURVE_BOW_DEAD_ZONE_PCT = 1.0;
-const CURVE_BOW_FULL_SCALE_PCT = 6;
-const MAX_CURVE_NORM = 0.68;
-const CURVE_STRAIGHT_SNAP = 0.10;
+const CURVE_DEAD_ZONE_RAD = 9 * Math.PI / 180;
+const CURVE_FULL_SCALE_RAD = 24 * Math.PI / 180;
+const CURVE_BOW_DEAD_ZONE_PCT = 1.6;
+const CURVE_BOW_FULL_SCALE_PCT = 6.5;
+const MAX_CURVE_NORM = 0.60;
+const CURVE_STRAIGHT_SNAP = 0.16;
 
 // 7lb球でもポケットヒット後にラック奥へ適度なエネルギーを残す。
 const BALL_POST_HIT_SPEED_FACTOR = 0.94;
 const BALL_POST_HIT_FORWARD_FACTOR = 0.92;
 
 // 2Dモデルで3Dの「横から押されて重心を外す」効果を近似する。
-const DIRECT_IMPULSE_WEIGHT = 0.16;
-const CHAIN_IMPULSE_WEIGHT = 0.24;
-const DIRECT_SIDE_BONUS_MPS = 0.06;
-const CHAIN_SIDE_BONUS_MPS = 0.13;
+// 軽い接触でピンが連鎖しすぎないよう、横方向の補正を少し抑える。
+const DIRECT_IMPULSE_WEIGHT = 0.14;
+const CHAIN_IMPULSE_WEIGHT = 0.18;
+const DIRECT_SIDE_BONUS_MPS = 0.04;
+const CHAIN_SIDE_BONUS_MPS = 0.08;
 const CHAIN_SIDE_THRESHOLD_REDUCTION = 0;
 
 type Point = { x: number; y: number; t: number };
@@ -193,7 +198,7 @@ function screenXToWorldX(screenXPct: number, distanceM: number): number {
   }
 
   const laneT = (x - leftLaneEdge) / Math.max(0.001, halfLane * 2);
-  return JB_GUTTER_WIDTH_M + laneT * JB_LANE_WIDTH_M;
+  return leftLaneEdge + laneT * 0 + JB_GUTTER_WIDTH_M + laneT * JB_LANE_WIDTH_M;
 }
 
 function boardXToPct(board: number, distanceM: number): number {
@@ -224,6 +229,14 @@ function screenDirectionAngle(a: Point, b: Point): number {
   const dx = b.x - a.x;
   const upward = a.y - b.y;
   return Math.atan2(dx, Math.max(1, upward));
+}
+
+function stabilizeLaunchAngle(rawAngle: number): number {
+  const magnitude = Math.abs(rawAngle);
+  if (magnitude <= STRAIGHT_AIM_DEAD_ZONE_RAD) return 0;
+
+  const softened = (magnitude - STRAIGHT_AIM_DEAD_ZONE_RAD) * STRAIGHT_AIM_SENSITIVITY;
+  return clamp(Math.sign(rawAngle) * softened, -MAX_LAUNCH_ANGLE_RAD, MAX_LAUNCH_ANGLE_RAD);
 }
 
 function estimateReleaseSwipeRate(points: Point[], boardHeightPx: number): number {
@@ -496,15 +509,11 @@ export function Lane({ ballVisual, resetSignal, active, onRoll }: LaneProps) {
     el.style.top = `${worldYToPct(yM)}%`;
     el.style.width = `${ballVisualWidthPct(yM)}%`;
 
-    // 物理回転をそのまま描画すると速すぎて指穴が止まって見えるため、
-    // 見た目用の回転は減速してストレート/カーブの差を読み取りやすくする。
     const visualRollDeg = rotateDeg * 0.16;
     const phaseRad = visualRollDeg * Math.PI / 180;
     const curveStrength = clamp(Math.abs(curveNorm) / MAX_CURVE_NORM, 0, 1);
 
     if (curveStrength < 0.04) {
-      // ストレート: 光沢が上下方向に流れ、指穴はごく小さく回る。
-      // 横スピンではなく前転しているように見せる。
       const highlightY = 28 + Math.sin(phaseRad) * 12;
       const forwardRollDeg = visualRollDeg * 0.18;
       el.style.background = `radial-gradient(circle at 32% ${highlightY}%, ${ballVisual.bodyGradient[0]}, ${ballVisual.bodyGradient[1]})`;
@@ -512,8 +521,6 @@ export function Lane({ ballVisual, resetSignal, active, onRoll }: LaneProps) {
       return;
     }
 
-    // カーブ: 指穴が横方向へはっきり回り、光沢も斜めに周回する。
-    // ドライ部分では横スピン感を強めてフックとの連動を見せる。
     const curveDirection = Math.sign(curveNorm) || 1;
     const surfaceFactor = onOil ? 0.58 : 1;
     const sideSpinDeg = visualRollDeg * (0.55 + curveStrength * 0.75) * surfaceFactor * curveDirection;
@@ -568,8 +575,6 @@ export function Lane({ ballVisual, resetSignal, active, onRoll }: LaneProps) {
     activePointerRef.current = null;
     pointerModeRef.current = null;
     pointsRef.current = [];
-    // ラック再セットでは位置固定を解除しない。
-    // Lane が新規マウントされたゲーム開始時だけ初期値 false になる。
     dockBall();
   }, [resetSignal, resetPins, dockBall]);
 
@@ -880,6 +885,45 @@ export function Lane({ ballVisual, resetSignal, active, onRoll }: LaneProps) {
     requestAnimationFrame(step);
   }, [onRoll, setBallPosition, writePinNode]);
 
+  const launchFromPoints = useCallback((points: Point[], minimumUpPct: number): boolean => {
+    if (!active || throwingRef.current || dockingRef.current || points.length < 2) return false;
+
+    const board = boardRef.current;
+    if (!board) return false;
+    const rect = board.getBoundingClientRect();
+    const sampleCount = Math.min(3, Math.max(1, Math.floor(points.length / 3)));
+    const start = averagePoint(points.slice(0, sampleCount));
+    const end = averagePoint(points.slice(-sampleCount));
+    const startXPct = ((start.x - rect.left) / rect.width) * 100;
+    const startYPct = ((start.y - rect.top) / rect.height) * 100;
+    const endYPct = ((end.y - rect.top) / rect.height) * 100;
+    const upwardPct = startYPct - endYPct;
+    if (upwardPct < minimumUpPct) return false;
+
+    const swipeRate = estimateReleaseSwipeRate(points, rect.height);
+    const rawSpeedNorm = clamp((swipeRate - 20) / 400, 0, 1);
+    const speedNorm = Math.pow(rawSpeedNorm, 0.72);
+    const speedKmh = GAME_MIN_BALL_SPEED_KMH
+      + (GAME_MAX_BALL_SPEED_KMH - GAME_MIN_BALL_SPEED_KMH) * speedNorm;
+    const speedMps = speedKmh / 3.6;
+
+    const directionIndex = Math.max(sampleCount, Math.min(points.length - 1, Math.floor(points.length * 0.56)));
+    const directionEnd = averagePoint(points.slice(Math.max(0, directionIndex - 2), directionIndex + 1));
+    const directionEndXPct = ((directionEnd.x - rect.left) / rect.width) * 100;
+    const directionEndYPct = ((directionEnd.y - rect.top) / rect.height) * 100;
+    const directionUpPct = Math.max(1, startYPct - directionEndYPct);
+    const rayScaleToPins = (startYPct - HEAD_PIN_SCREEN_Y) / directionUpPct;
+    const aimScreenXPct = startXPct + (directionEndXPct - startXPct) * rayScaleToPins;
+    const targetWorldX = screenXToWorldX(aimScreenXPct, JB_HEAD_PIN_DISTANCE_M);
+    const startXM = ballStartXRef.current;
+    const rawLaunchAngle = Math.atan2(targetWorldX - startXM, JB_HEAD_PIN_DISTANCE_M);
+    const launchAngleRad = stabilizeLaunchAngle(rawLaunchAngle);
+
+    const curveNorm = estimateCurveNorm(points, rect.width);
+    runThrow({ speedMps, launchAngleRad, curveNorm, startXM });
+    return true;
+  }, [active, runThrow]);
+
   const onPointerDown = useCallback((event: ReactPointerEvent<HTMLDivElement>) => {
     event.preventDefault();
     event.stopPropagation();
@@ -891,7 +935,7 @@ export function Lane({ ballVisual, resetSignal, active, onRoll }: LaneProps) {
     const relY = ((event.clientY - rect.top) / rect.height) * 100;
     const relX = ((event.clientX - rect.left) / rect.width) * 100;
 
-    if (relY < 80 || relY > 99 || relX < NEAR_LANE_LEFT || relX > NEAR_LANE_RIGHT) return;
+    if (relY < 76 || relY > 97 || relX < NEAR_LANE_LEFT || relX > NEAR_LANE_RIGHT) return;
 
     activePointerRef.current = event.pointerId;
     event.currentTarget.setPointerCapture(event.pointerId);
@@ -904,8 +948,8 @@ export function Lane({ ballVisual, resetSignal, active, onRoll }: LaneProps) {
     }
 
     const currentBallXPct = worldXToPct(ballStartXRef.current, 0);
-    const ballHitRadiusXPct = ballVisualWidthPct(0) * 0.72;
-    const ballHitRadiusYPct = 7.5;
+    const ballHitRadiusXPct = ballVisualWidthPct(0) * 0.82;
+    const ballHitRadiusYPct = 9;
     const touchedBall =
       Math.abs(relX - currentBallXPct) <= ballHitRadiusXPct
       && Math.abs(relY - DOCK_Y) <= ballHitRadiusYPct;
@@ -942,7 +986,18 @@ export function Lane({ ballVisual, resetSignal, active, onRoll }: LaneProps) {
     if (pointsRef.current.length > MAX_SWIPE_SAMPLES) {
       pointsRef.current.splice(1, pointsRef.current.length - MAX_SWIPE_SAMPLES);
     }
-  }, [setStartPositionFromScreenX]);
+
+    // 指を大きく持ち上げ切る前に投球を始める。iPhone のホームジェスチャー帯まで
+    // スワイプし続けなくても反応するため、短いフリックでも気持ちよく投げられる。
+    if (pointsRef.current.length >= 4 && launchFromPoints(pointsRef.current, AUTO_RELEASE_UPWARD_PCT)) {
+      activePointerRef.current = null;
+      pointerModeRef.current = null;
+      pointsRef.current = [];
+      if (event.currentTarget.hasPointerCapture(event.pointerId)) {
+        event.currentTarget.releasePointerCapture(event.pointerId);
+      }
+    }
+  }, [launchFromPoints, setStartPositionFromScreenX]);
 
   const onPointerUp = useCallback((event: ReactPointerEvent<HTMLDivElement>) => {
     if (activePointerRef.current !== event.pointerId) return;
@@ -959,44 +1014,10 @@ export function Lane({ ballVisual, resetSignal, active, onRoll }: LaneProps) {
     }
     if (pointerMode !== "throw") return;
 
-    const points = pointsRef.current;
+    const points = [...pointsRef.current];
     pointsRef.current = [];
-    if (!active || throwingRef.current || dockingRef.current || points.length < 2) return;
-
-    const board = boardRef.current;
-    if (!board) return;
-    const rect = board.getBoundingClientRect();
-    const sampleCount = Math.min(3, Math.max(1, Math.floor(points.length / 3)));
-    const start = averagePoint(points.slice(0, sampleCount));
-    const end = averagePoint(points.slice(-sampleCount));
-    const startXPct = ((start.x - rect.left) / rect.width) * 100;
-    const startYPct = ((start.y - rect.top) / rect.height) * 100;
-    const endYPct = ((end.y - rect.top) / rect.height) * 100;
-    const upwardPct = startYPct - endYPct;
-    if (upwardPct < MIN_UPWARD_PCT) return;
-
-    const swipeRate = estimateReleaseSwipeRate(points, rect.height);
-    const rawSpeedNorm = clamp((swipeRate - 25) / 430, 0, 1);
-    const speedNorm = Math.pow(rawSpeedNorm, 0.72);
-    const speedKmh = GAME_MIN_BALL_SPEED_KMH
-      + (GAME_MAX_BALL_SPEED_KMH - GAME_MIN_BALL_SPEED_KMH) * speedNorm;
-    const speedMps = speedKmh / 3.6;
-
-    const directionIndex = Math.max(sampleCount, Math.min(points.length - 1, Math.floor(points.length * 0.56)));
-    const directionEnd = averagePoint(points.slice(Math.max(0, directionIndex - 2), directionIndex + 1));
-    const directionEndXPct = ((directionEnd.x - rect.left) / rect.width) * 100;
-    const directionEndYPct = ((directionEnd.y - rect.top) / rect.height) * 100;
-    const directionUpPct = Math.max(1, startYPct - directionEndYPct);
-    const rayScaleToPins = (startYPct - HEAD_PIN_SCREEN_Y) / directionUpPct;
-    const aimScreenXPct = startXPct + (directionEndXPct - startXPct) * rayScaleToPins;
-    const targetWorldX = screenXToWorldX(aimScreenXPct, JB_HEAD_PIN_DISTANCE_M);
-    const startXM = ballStartXRef.current;
-    const rawLaunchAngle = Math.atan2(targetWorldX - startXM, JB_HEAD_PIN_DISTANCE_M);
-    const launchAngleRad = clamp(rawLaunchAngle, -MAX_LAUNCH_ANGLE_RAD, MAX_LAUNCH_ANGLE_RAD);
-
-    const curveNorm = estimateCurveNorm(points, rect.width);
-    runThrow({ speedMps, launchAngleRad, curveNorm, startXM });
-  }, [active, runThrow]);
+    launchFromPoints(points, MIN_UPWARD_PCT);
+  }, [launchFromPoints]);
 
   const onPointerCancel = useCallback((event: ReactPointerEvent<HTMLDivElement>) => {
     if (activePointerRef.current !== event.pointerId) return;
@@ -1034,6 +1055,7 @@ export function Lane({ ballVisual, resetSignal, active, onRoll }: LaneProps) {
       style={{
         touchAction: "none",
         overscrollBehavior: "none",
+        WebkitUserSelect: "none",
         borderRadius: "22px 22px 26px 26px",
         background: "linear-gradient(180deg, #241914 0%, #39251a 45%, #2b1b13 100%)",
         boxShadow: "inset 0 1px 0 rgba(255,255,255,0.18), inset 0 -20px 32px -24px rgba(0,0,0,0.8)",
