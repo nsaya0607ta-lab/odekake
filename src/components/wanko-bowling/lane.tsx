@@ -496,20 +496,33 @@ export function Lane({ ballVisual, resetSignal, active, onRoll }: LaneProps) {
     el.style.top = `${worldYToPct(yM)}%`;
     el.style.width = `${ballVisualWidthPct(yM)}%`;
 
+    // 物理回転をそのまま描画すると速すぎて指穴が止まって見えるため、
+    // 見た目用の回転は減速してストレート/カーブの差を読み取りやすくする。
+    const visualRollDeg = rotateDeg * 0.16;
+    const phaseRad = visualRollDeg * Math.PI / 180;
     const curveStrength = clamp(Math.abs(curveNorm) / MAX_CURVE_NORM, 0, 1);
+
     if (curveStrength < 0.04) {
-      // ストレートは指穴が素直に縦方向へ回り続ける見え方。
-      el.style.transform = `translate(-50%, -50%) rotate(${rotateDeg}deg)`;
+      // ストレート: 光沢が上下方向に流れ、指穴はごく小さく回る。
+      // 横スピンではなく前転しているように見せる。
+      const highlightY = 28 + Math.sin(phaseRad) * 12;
+      const forwardRollDeg = visualRollDeg * 0.18;
+      el.style.background = `radial-gradient(circle at 32% ${highlightY}%, ${ballVisual.bodyGradient[0]}, ${ballVisual.bodyGradient[1]})`;
+      el.style.transform = `translate(-50%, -50%) rotate(${forwardRollDeg}deg)`;
       return;
     }
 
-    // カーブは回転軸を傾け、ドライ部分では横スピン感を強める。
+    // カーブ: 指穴が横方向へはっきり回り、光沢も斜めに周回する。
+    // ドライ部分では横スピン感を強めてフックとの連動を見せる。
     const curveDirection = Math.sign(curveNorm) || 1;
     const surfaceFactor = onOil ? 0.58 : 1;
-    const sideSpinDeg = rotateDeg * curveStrength * surfaceFactor * 0.72 * curveDirection;
+    const sideSpinDeg = visualRollDeg * (0.55 + curveStrength * 0.75) * surfaceFactor * curveDirection;
     const axisTiltDeg = curveDirection * (8 + curveStrength * 14) * surfaceFactor;
-    el.style.transform = `translate(-50%, -50%) rotate(${rotateDeg + sideSpinDeg + axisTiltDeg}deg)`;
-  }, []);
+    const highlightX = 32 + Math.sin(phaseRad * curveDirection) * 10 * curveStrength * surfaceFactor;
+    const highlightY = 28 + Math.cos(phaseRad) * 7 * curveStrength;
+    el.style.background = `radial-gradient(circle at ${highlightX}% ${highlightY}%, ${ballVisual.bodyGradient[0]}, ${ballVisual.bodyGradient[1]})`;
+    el.style.transform = `translate(-50%, -50%) rotate(${sideSpinDeg + axisTiltDeg}deg)`;
+  }, [ballVisual.bodyGradient]);
 
   const setStartPositionFromScreenX = useCallback((screenXPct: number) => {
     const laneLeftM = JB_GUTTER_WIDTH_M + BALL_RADIUS_M;
@@ -533,10 +546,7 @@ export function Lane({ ballVisual, resetSignal, active, onRoll }: LaneProps) {
         dockingRef.current = false;
         return;
       }
-      current.style.left = `${worldXToPct(ballStartXRef.current, 0)}%`;
-      current.style.top = `${DOCK_Y}%`;
-      current.style.width = `${ballVisualWidthPct(0)}%`;
-      current.style.transform = "translate(-50%, -50%) rotate(0deg)";
+      setBallPosition(ballStartXRef.current, 0, 0);
       requestAnimationFrame(() => {
         const next = ballRef.current;
         if (!next) {
@@ -550,7 +560,7 @@ export function Lane({ ballVisual, resetSignal, active, onRoll }: LaneProps) {
         }, 130);
       });
     }, 110);
-  }, []);
+  }, [setBallPosition]);
 
   useEffect(() => {
     resetPins();
