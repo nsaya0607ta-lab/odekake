@@ -35,8 +35,10 @@ const MAX_THROW_MS = 7000;
 const MAX_SWIPE_SAMPLES = 64;
 const BALL_RADIUS_M = JB_BALL_DIAMETER_M / 2;
 const PIN_RADIUS_M = JB_PIN_DIAMETER_M / 2;
-const PIN_COLLISION_RADIUS_M = BALL_RADIUS_M + PIN_RADIUS_M + 0.006;
-const PIN_PAIR_RADIUS_M = JB_PIN_DIAMETER_M + 0.006;
+// ボールとピンの外周が実際に接触する距離ぴったりを当たり判定にする（余白なし）。
+const PIN_COLLISION_RADIUS_M = BALL_RADIUS_M + PIN_RADIUS_M;
+// ピン同士も外周同士が接触する距離（半径の合計＝直径）ぴったりにする。
+const PIN_PAIR_RADIUS_M = JB_PIN_DIAMETER_M;
 const FALLEN_PIN_EXTRA_REACH_M = Math.max(0, JB_PIN_HEIGHT_M / 2 - PIN_RADIUS_M) * 0.82;
 const BALL_EXIT_DISTANCE_M = JB_HEAD_PIN_DISTANCE_M + 1.15;
 const MAX_LAUNCH_ANGLE_RAD = 3.4 * Math.PI / 180;
@@ -59,10 +61,6 @@ const CURVE_BOW_DEAD_ZONE_PCT = 1.0;
 const CURVE_BOW_FULL_SCALE_PCT = 6;
 const MAX_CURVE_NORM = 0.68;
 const CURVE_STRAIGHT_SNAP = 0.10;
-
-// 7lb球でもポケットヒット後にラック奥へ適度なエネルギーを残す。
-const BALL_POST_HIT_SPEED_FACTOR = 0.94;
-const BALL_POST_HIT_FORWARD_FACTOR = 0.92;
 
 // 2Dモデルで3Dの「横から押されて重心を外す」効果を近似する。
 const DIRECT_IMPULSE_WEIGHT = 0.16;
@@ -762,8 +760,6 @@ export function Lane({ ballVisual, resetSignal, active, onRoll }: LaneProps) {
             );
             if (closest.distance > PIN_COLLISION_RADIUS_M) continue;
 
-            const speedBeforeHit = Math.hypot(bvxMps, bvyMps);
-            const forwardBeforeHit = Math.max(0, bvyMps);
             const collision = resolvePairCollision(
               closest.x,
               closest.y,
@@ -779,21 +775,10 @@ export function Lane({ ballVisual, resetSignal, active, onRoll }: LaneProps) {
             );
 
             if (collision) {
-              let nextVx = collision.avx * BALL_POST_HIT_SPEED_FACTOR;
-              let nextVy = collision.avy * BALL_POST_HIT_SPEED_FACTOR;
-
-              const maxForwardAfter = forwardBeforeHit * BALL_POST_HIT_FORWARD_FACTOR;
-              if (nextVy > maxForwardAfter) nextVy = maxForwardAfter;
-
-              const collisionSpeed = Math.hypot(nextVx, nextVy);
-              const maxAfterHit = speedBeforeHit * BALL_POST_HIT_SPEED_FACTOR;
-              if (collisionSpeed > maxAfterHit && collisionSpeed > 0.0001) {
-                const scale = maxAfterHit / collisionSpeed;
-                nextVx *= scale;
-                nextVy *= scale;
-              }
-
-              [nextVx, nextVy] = capLateralSpeed(nextVx, nextVy);
+              // 反発係数で正しく計算した結果をそのまま採用する。
+              // 画面の横スケールが縦より急なため、横方向にだけは
+              // 見た目の暴走を防ぐ上限（capLateralSpeed）をかける。
+              const [nextVx, nextVy] = capLateralSpeed(collision.avx, collision.avy);
               bvxMps = nextVx;
               bvyMps = nextVy;
 
@@ -808,15 +793,9 @@ export function Lane({ ballVisual, resetSignal, active, onRoll }: LaneProps) {
                   collision.normalX,
                 );
               }
-            } else {
-              const fallbackVx = bvxMps * 0.3;
-              const fallbackVy = bvyMps * 0.3;
-              if (Math.hypot(fallbackVx, fallbackVy) >= PIN_DIRECT_KNOCK_SPEED_MPS) {
-                markKnocked(pin.id, body, fallbackVx, fallbackVy, closest.x);
-              }
-              bvxMps *= 0.78;
-              bvyMps *= 0.78;
             }
+            // collision が null（法線方向に近づいていない＝かすった/離れていく接触）の場合は、
+            // 実際の物理と同じく力積が発生しないので、ボールにもピンにも変化を加えない。
           }
         }
 

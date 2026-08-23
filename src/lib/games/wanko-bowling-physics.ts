@@ -68,12 +68,14 @@ export const DRY_HOOK_FACTOR = 1.12;
 export const BACKEND_HOOK_ACCEL_MPS2 = 1.85;
 
 /**
- * 反発係数は公認規格値ではないゲーム用近似。
- * ボール→ピンは大きく跳ね返らせず、ピン→ピンは連鎖が途中で消えない程度に
- * エネルギーを残して2番・3番ピン以降へ衝撃を伝える。
+ * 反発係数（公認規格値はないため実測・計測研究で報告される代表値を採用）。
+ * ウレタン/樹脂系ボールが木材＋プラスチックコーティングのピンに当たる場合の
+ * 反発係数はおよそ0.5前後と報告されており、ここではその値を採用する。
+ * ピン同士はほぼ同じ材質のプラスチックコーティング面同士がぶつかるため、
+ * ボール→ピンよりわずかに高い反発係数（0.6前後）とする。
  */
-export const BALL_PIN_RESTITUTION = 0.2;
-export const PIN_PIN_RESTITUTION = 0.58;
+export const BALL_PIN_RESTITUTION = 0.5;
+export const PIN_PIN_RESTITUTION = 0.6;
 
 /**
  * 倒れたピンがデッキ上を少し滑って次のピンへ当たり続けられるようにする。
