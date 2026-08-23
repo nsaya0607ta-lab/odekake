@@ -49,14 +49,21 @@ const TARGET_BOARDS = [5, 10, 15, 20, 25, 30, 35] as const;
 const GUIDE_DISTANCE_M = 7 * 0.3048;
 const TARGET_DISTANCE_M = 15 * 0.3048;
 
-const CURVE_DEAD_ZONE_RAD = 2.5 * Math.PI / 180;
-const CURVE_FULL_SCALE_RAD = 16 * Math.PI / 180;
-const CURVE_BOW_DEAD_ZONE_PCT = 0.35;
-const CURVE_BOW_FULL_SCALE_PCT = 4.5;
-const MAX_CURVE_NORM = 0.9;
+// 小さな指ブレはカーブにしない。明確に曲げた時だけフックさせる。
+const CURVE_DEAD_ZONE_RAD = 6 * Math.PI / 180;
+const CURVE_FULL_SCALE_RAD = 28 * Math.PI / 180;
+const CURVE_BOW_DEAD_ZONE_PCT = 0.9;
+const CURVE_BOW_FULL_SCALE_PCT = 7.5;
+const MAX_CURVE_NORM = 0.55;
+const CURVE_STRAIGHT_SNAP = 0.1;
+
+// ピン衝突後は総速度と前進速度の両方を必ず落とす。
+const BALL_POST_HIT_SPEED_FACTOR = 0.86;
+const BALL_POST_HIT_FORWARD_FACTOR = 0.82;
 
 type Point = { x: number; y: number; t: number };
 type GutterSide = "left" | "right" | null;
+type PointerMode = "place" | "throw" | null;
 
 type PinBody = {
   xM: number;
@@ -274,7 +281,9 @@ function estimateCurveNorm(points: Point[], boardWidthPx: number): number {
     bowSignal = Math.sign(bowPct) * scaled;
   }
 
-  return clamp(angleSignal * 0.78 + bowSignal * 0.22, -1, 1) * MAX_CURVE_NORM;
+  const combined = clamp(angleSignal * 0.78 + bowSignal * 0.22, -1, 1);
+  if (Math.abs(combined) < CURVE_STRAIGHT_SNAP) return 0;
+  return combined * MAX_CURVE_NORM;
 }
 
 function createPinBody(pin: (typeof PIN_LAYOUT)[number]): PinBody {
@@ -375,6 +384,7 @@ export function Lane({ ballVisual, resetSignal, active, onRoll }: LaneProps) {
   const dockingRef = useRef(false);
   const pointsRef = useRef<Point[]>([]);
   const activePointerRef = useRef<number | null>(null);
+  const pointerModeRef = useRef<PointerMode>(null);
   const ballStartXRef = useRef(DEFAULT_BALL_START_X_M);
   const pinBodiesRef = useRef<Map<number, PinBody>>(
     new Map(PIN_LAYOUT.map((pin) => [pin.id, createPinBody(pin)])),
@@ -428,6 +438,14 @@ export function Lane({ ballVisual, resetSignal, active, onRoll }: LaneProps) {
     el.style.transform = `translate(-50%, -50%) rotate(${rotateDeg}deg)`;
   }, []);
 
+  const setStartPositionFromScreenX = useCallback((screenXPct: number) => {
+    const laneLeftM = JB_GUTTER_WIDTH_M + BALL_RADIUS_M;
+    const laneRightM = JB_GUTTER_WIDTH_M + JB_LANE_WIDTH_M - BALL_RADIUS_M;
+    const startXM = clamp(screenXToWorldX(screenXPct, 0), laneLeftM, laneRightM);
+    ballStartXRef.current = startXM;
+    setBallPosition(startXM, 0, 0);
+  }, [setBallPosition]);
+
   const dockBall = useCallback(() => {
     const el = ballRef.current;
     if (!el) return;
@@ -465,6 +483,7 @@ export function Lane({ ballVisual, resetSignal, active, onRoll }: LaneProps) {
     resetPins();
     throwingRef.current = false;
     activePointerRef.current = null;
+    pointerModeRef.current = null;
     pointsRef.current = [];
     dockBall();
   }, [resetSignal, resetPins, dockBall]);
@@ -602,6 +621,7 @@ export function Lane({ ballVisual, resetSignal, active, onRoll }: LaneProps) {
             if (closest.distance > PIN_COLLISION_RADIUS_M) continue;
 
             const speedBeforeHit = Math.hypot(bvxMps, bvyMps);
+            const forwardBeforeHit = Math.max(0, bvyMps);
             const collision = resolvePairCollision(
               closest.x,
               closest.y,
@@ -617,15 +637,21 @@ export function Lane({ ballVisual, resetSignal, active, onRoll }: LaneProps) {
             );
 
             if (collision) {
-              let nextVx = collision.avx;
-              let nextVy = collision.avy;
+              let nextVx = collision.avx * BALL_POST_HIT_SPEED_FACTOR;
+              let nextVy = collision.avy * BALL_POST_HIT_SPEED_FACTOR;
+
+              // 横速度から前進速度へ変換されて「加速して見える」のも禁止する。
+              const maxForwardAfter = forwardBeforeHit * BALL_POST_HIT_FORWARD_FACTOR;
+              if (nextVy > maxForwardAfter) nextVy = maxForwardAfter;
+
               const collisionSpeed = Math.hypot(nextVx, nextVy);
-              const maxAfterHit = speedBeforeHit * 0.98;
+              const maxAfterHit = speedBeforeHit * BALL_POST_HIT_SPEED_FACTOR;
               if (collisionSpeed > maxAfterHit && collisionSpeed > 0.0001) {
                 const scale = maxAfterHit / collisionSpeed;
                 nextVx *= scale;
                 nextVy *= scale;
               }
+
               bvxMps = nextVx;
               bvyMps = nextVy;
 
@@ -634,13 +660,13 @@ export function Lane({ ballVisual, resetSignal, active, onRoll }: LaneProps) {
                 markKnocked(pin.id, body, collision.bvx, collision.bvy, closest.x);
               }
             } else {
-              const fallbackVx = bvxMps * 0.32;
-              const fallbackVy = bvyMps * 0.32;
+              const fallbackVx = bvxMps * 0.3;
+              const fallbackVy = bvyMps * 0.3;
               if (Math.hypot(fallbackVx, fallbackVy) >= PIN_DIRECT_KNOCK_SPEED_MPS) {
                 markKnocked(pin.id, body, fallbackVx, fallbackVy, closest.x);
               }
-              bvxMps *= 0.86;
-              bvyMps *= 0.86;
+              bvxMps *= 0.78;
+              bvyMps *= 0.78;
             }
           }
         }
@@ -759,33 +785,65 @@ export function Lane({ ballVisual, resetSignal, active, onRoll }: LaneProps) {
 
     if (relY < 80 || relY > 99 || relX < NEAR_LANE_LEFT || relX > NEAR_LANE_RIGHT) return;
 
-    const laneLeftM = JB_GUTTER_WIDTH_M + BALL_RADIUS_M;
-    const laneRightM = JB_GUTTER_WIDTH_M + JB_LANE_WIDTH_M - BALL_RADIUS_M;
-    const startXM = clamp(screenXToWorldX(relX, 0), laneLeftM, laneRightM);
-    ballStartXRef.current = startXM;
-    setBallPosition(startXM, 0, 0);
-
     activePointerRef.current = event.pointerId;
     event.currentTarget.setPointerCapture(event.pointerId);
+
+    const currentBallXPct = worldXToPct(ballStartXRef.current, 0);
+    const ballHitRadiusXPct = ballVisualWidthPct(0) * 0.72;
+    const ballHitRadiusYPct = 7.5;
+    const touchedBall =
+      Math.abs(relX - currentBallXPct) <= ballHitRadiusXPct
+      && Math.abs(relY - DOCK_Y) <= ballHitRadiusYPct;
+
+    if (!touchedBall) {
+      // ボール以外を触った時は位置決めだけ。ここから投球は開始しない。
+      pointerModeRef.current = "place";
+      pointsRef.current = [];
+      setStartPositionFromScreenX(relX);
+      return;
+    }
+
+    // ボール本体から始めた時だけ投球。既に決めた開始位置は変更しない。
+    pointerModeRef.current = "throw";
     pointsRef.current = [{ x: event.clientX, y: event.clientY, t: performance.now() }];
-  }, [active, setBallPosition]);
+  }, [active, setStartPositionFromScreenX]);
 
   const onPointerMove = useCallback((event: ReactPointerEvent<HTMLDivElement>) => {
     if (activePointerRef.current !== event.pointerId) return;
     event.preventDefault();
     event.stopPropagation();
 
+    if (pointerModeRef.current === "place") {
+      const board = boardRef.current;
+      if (!board) return;
+      const rect = board.getBoundingClientRect();
+      const relX = ((event.clientX - rect.left) / rect.width) * 100;
+      setStartPositionFromScreenX(clamp(relX, NEAR_LANE_LEFT, NEAR_LANE_RIGHT));
+      return;
+    }
+
+    if (pointerModeRef.current !== "throw") return;
+
     pointsRef.current.push({ x: event.clientX, y: event.clientY, t: performance.now() });
     if (pointsRef.current.length > MAX_SWIPE_SAMPLES) {
       pointsRef.current.splice(1, pointsRef.current.length - MAX_SWIPE_SAMPLES);
     }
-  }, []);
+  }, [setStartPositionFromScreenX]);
 
   const onPointerUp = useCallback((event: ReactPointerEvent<HTMLDivElement>) => {
     if (activePointerRef.current !== event.pointerId) return;
     event.preventDefault();
     event.stopPropagation();
     activePointerRef.current = null;
+
+    const pointerMode = pointerModeRef.current;
+    pointerModeRef.current = null;
+
+    if (pointerMode === "place") {
+      pointsRef.current = [];
+      return;
+    }
+    if (pointerMode !== "throw") return;
 
     const points = pointsRef.current;
     pointsRef.current = [];
@@ -831,6 +889,7 @@ export function Lane({ ballVisual, resetSignal, active, onRoll }: LaneProps) {
     event.preventDefault();
     event.stopPropagation();
     activePointerRef.current = null;
+    pointerModeRef.current = null;
     pointsRef.current = [];
   }, []);
 
