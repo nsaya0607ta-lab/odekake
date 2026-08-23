@@ -10,6 +10,9 @@ type RpcResponse = {
 const MAX_CAUGHT_COUNT = 2000;
 const MAX_SCORE_PER_CATCH = 1500;
 const MAX_SCORE_PER_RPC = 8000;
+/** ゴールドボール(SSR)のLv5(50コイン/個)を1ラウンドで現実的にありえない個数捕った想定でも
+ *  余裕を持って収まる上限。record_item_catch_result() 側の上限(600)と揃えている。 */
+const MAX_BONUS_COINS = 600;
 
 function toRecord(value: unknown): Record<string, unknown> {
   return value && typeof value === "object" ? (value as Record<string, unknown>) : {};
@@ -38,6 +41,7 @@ export async function POST(request: Request) {
     score?: unknown;
     caughtCount?: unknown;
     durationSeconds?: unknown;
+    bonusCoins?: unknown;
   } | null;
 
   if (
@@ -51,9 +55,12 @@ export async function POST(request: Request) {
     || !Number.isInteger(body.caughtCount)
     || typeof body.durationSeconds !== "number"
     || !Number.isInteger(body.durationSeconds)
+    || (body.bonusCoins !== undefined && (typeof body.bonusCoins !== "number" || !Number.isInteger(body.bonusCoins)))
   ) {
     return NextResponse.json({ error: "ゲーム結果が正しくありません。" }, { status: 400 });
   }
+
+  const bonusCoins = body.bonusCoins ?? 0;
 
   if (
     body.durationSeconds !== 30
@@ -62,6 +69,8 @@ export async function POST(request: Request) {
     || body.caughtCount > MAX_CAUGHT_COUNT
     || (body.caughtCount === 0 && body.score !== 0)
     || (body.caughtCount > 0 && body.score > body.caughtCount * MAX_SCORE_PER_CATCH)
+    || bonusCoins < 0
+    || bonusCoins > MAX_BONUS_COINS
   ) {
     return NextResponse.json({ error: "ゲーム結果が正しくありません。" }, { status: 400 });
   }
@@ -76,7 +85,7 @@ export async function POST(request: Request) {
 
   const rpc = supabase.rpc.bind(supabase) as unknown as (
     fn: "record_item_catch_result",
-    args: { p_round_id: string; p_score: number; p_caught_count: number; p_duration_seconds: number },
+    args: { p_round_id: string; p_score: number; p_caught_count: number; p_duration_seconds: number; p_bonus_coins: number },
   ) => Promise<RpcResponse>;
 
   const scoreChunks = splitScoreForLegacyValidation(body.score);
@@ -92,12 +101,15 @@ export async function POST(request: Request) {
       : scoreChunks.length === 1
         ? Math.max(body.caughtCount, Math.ceil(scoreChunk / 100))
         : Math.ceil(scoreChunk / 100);
+    // ボーナスコインはスコアが複数チャンクに分割された場合でも二重加算されないよう、最初の1回だけ渡す。
+    const bonusCoinsForChunk = index === 0 ? bonusCoins : 0;
 
     const { data, error } = await rpc("record_item_catch_result", {
       p_round_id: rpcRoundId,
       p_score: scoreChunk,
       p_caught_count: legacyCaughtCount,
       p_duration_seconds: body.durationSeconds,
+      p_bonus_coins: bonusCoinsForChunk,
     });
 
     if (error) {

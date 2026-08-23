@@ -62,6 +62,7 @@ export const GACHA_PRIZES: readonly GachaPrize[] = [
   { id: "interior_stretch_rod", name: "ストレッチ棒", rarity: "R", type: "item", pool: "regular", image: "/collection/items/stretch-rod.webp" },
   { id: "interior_anball", name: "アンボール", rarity: "UR", type: "item", pool: "regular", image: "/collection/items/anball.webp" },
   { id: "interior_kinoko_azubee", name: "きのこあずびー", rarity: "UR", type: "item", pool: "regular", image: "/collection/items/3365FE0A-4198-4C04-BA73-A7BAC18F73F5.webp" },
+  { id: "interior_gold_ball", name: "ゴールドボール", rarity: "SSR", type: "item", pool: "regular", image: "/collection/items/gold-ball.webp" },
   { id: "interior_sleepy_moon", name: "おやすみムーン", rarity: "SR", type: "item", pool: "regular", image: "/collection/items/sleepy-moon.webp" },
   { id: "interior_spring_flower_wreath", name: "はるいろフラワーリース", rarity: "SR", type: "item", pool: "regular", image: "/collection/items/spring-flower-wreath.webp" },
   { id: "interior_shikkoku_no_ar", name: "漆黒のアー", rarity: "LR", type: "item", pool: "regular", image: "/collection/items/shikkoku-no-ar.webp" },

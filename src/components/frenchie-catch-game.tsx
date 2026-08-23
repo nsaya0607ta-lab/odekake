@@ -147,7 +147,7 @@ const MYSTERY_SKILL_ITEM_IDS = [
   "other_komochi", "other_azuki", "other_kobee", "other_hamigaki", "other_ikea", "other_orusuban",
   "other_pondeomo", "other_pondear", "other_kurumari_a", "other_jare_a", "other_ketsunade_a", "other_omochi_janai", "other_oyasumi", "other_nisoku_a",
   "interior_shikkoku_no_ar", "interior_ragby_ar", "other_oyatsu_no_jikan", "other_listen_to_the_a", "other_okaeri",
-  "food_fruit_basket",
+  "food_fruit_basket", "interior_gold_ball",
 ];
 
 /** アイテムごとのLv1〜5パラメータ（item_skill_levels_colored.xlsxの「スキル一覧」シート通り） */
@@ -238,6 +238,7 @@ const LV = {
   NISOKU_A_SEC: [4, 5, 6, 7, 8],
   NISOKU_A_MULT: [3, 3.5, 4, 4.5, 5],
   FRUIT_BASKET_COUNT: [2, 3, 4, 5, 6],
+  GOLD_BALL_COINS: [10, 15, 20, 30, 50],
 } as const;
 /** 出現量アップ系は時間増加系アイテムの取得率まで底上げしてしまうため、控えめな倍率にしている */
 const SPAWN_RATE_BOOST = 1.5;
@@ -299,16 +300,20 @@ const DEFAULT_ITEM_SPAWN_WEIGHT = 100;
  * 78→79に増えたことで既存アイテムの取得確率が薄まり、Lv5の最終プレイ時間期待値が175秒→約166秒に
  * 短縮されてしまっていた。docs/minigame-time-balance.md の手順どおり「時間増加系7種の重みを
  * プール総数の増加率だけ底上げする」方針で、64.4→65.5・80.3→81.6（6種）に変更して相殺済み。
+ *
+ * interior_gold_ball（SSR、時間・出現量のどちらにも無関係）を追加した際も同様に、
+ * プール総数(N)が79→80に増えたことでLv5の最終プレイ時間期待値が175秒→約166秒に短縮されて
+ * いたため、時間増加系7種の重みを65.5→66.6・81.6→82.9（6種）に変更して相殺済み。
  */
 const ITEM_SPAWN_WEIGHTS: Partial<Record<string, number>> = {
   toy_treasure_puzzle: 200,
-  other_omojii: 65.5,
-  toy_duck_plush: 81.6,
-  toy_carrot: 81.6,
-  food_paw_melon_bread: 81.6,
-  interior_anball: 81.6,
-  other_azuki: 81.6,
-  summer_frenchie: 81.6,
+  other_omojii: 66.6,
+  toy_duck_plush: 82.9,
+  toy_carrot: 82.9,
+  food_paw_melon_bread: 82.9,
+  interior_anball: 82.9,
+  other_azuki: 82.9,
+  summer_frenchie: 82.9,
   other_listen_to_the_a: 50,
 };
 const STRETCH_ROD_ITEM_ID = "interior_stretch_rod";
@@ -322,6 +327,7 @@ const OYASUMI_ITEM_ID = "other_oyasumi";
 const OYASUMI_SECONDS = 5;
 const NISOKU_A_ITEM_ID = "other_nisoku_a";
 const FRUIT_BASKET_ITEM_ID = "food_fruit_basket";
+const GOLD_BALL_ITEM_ID = "interior_gold_ball";
 /** フルーツバスケットの効果中に降ってくる「人物の入ったキャラ」。本来のレアリティ・スキルのまま出現する */
 const PERSON_CHARACTER_ITEM_IDS = ["other_omochi_janai", "other_listen_to_the_a", "other_omoi_bashira", "other_xmas_party"];
 const PERSON_CHARACTER_ITEMS: CollectionItem[] = PERSON_CHARACTER_ITEM_IDS
@@ -475,6 +481,7 @@ export function FrenchieCatchGame({ ownedItems }: { ownedItems: FrenchieCatchIte
   const nisokuMultValueRef = useRef(3);
   const dogFloodRemainingRef = useRef(0);
   const personFloodRemainingRef = useRef(0);
+  const goldBonusCoinsRef = useRef(0);
   const slantBoostUntilRef = useRef(0);
   const boxShrinkUntilRef = useRef(0);
   const blackoutUntilRef = useRef(0);
@@ -1391,6 +1398,12 @@ export function FrenchieCatchGame({ ownedItems }: { ownedItems: FrenchieCatchIte
                 statusChanged = true;
                 break;
               }
+              case GOLD_BALL_ITEM_ID: {
+                const bonusCoins = LV.GOLD_BALL_COINS[lv]!;
+                goldBonusCoinsRef.current += bonusCoins;
+                effectLabel = `+${bonusCoins}コイン獲得${lvTag}`;
+                break;
+              }
               case OYASUMI_ITEM_ID: {
                 blackoutUntilRef.current = now + OYASUMI_SECONDS * 1000;
                 setBlackoutActive(true);
@@ -1698,6 +1711,7 @@ export function FrenchieCatchGame({ ownedItems }: { ownedItems: FrenchieCatchIte
             score: scoreRef.current,
             caughtCount: caughtRef.current,
             durationSeconds: ROUND_SECONDS,
+            bonusCoins: goldBonusCoinsRef.current,
           }),
         });
         const payload = (await response.json().catch(() => null)) as { coins?: number; error?: string } | null;
@@ -1774,6 +1788,7 @@ export function FrenchieCatchGame({ ownedItems }: { ownedItems: FrenchieCatchIte
     nisokuMultValueRef.current = 3;
     dogFloodRemainingRef.current = 0;
     personFloodRemainingRef.current = 0;
+    goldBonusCoinsRef.current = 0;
     slantBoostUntilRef.current = 0;
     boxShrinkUntilRef.current = 0;
     blackoutUntilRef.current = 0;
