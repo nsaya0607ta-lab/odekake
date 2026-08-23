@@ -114,12 +114,25 @@ export const BALL_INT_DIFFERENTIAL_M = 0; // IntDiff
  *   omegaZ = spinMagnitude * sin(axisTilt)
  *
  * releaseSpeed=8.0m/s・axisRotation=45°で(-30,-30,+10)にほぼ一致することを
- * 検証済み（誤差0.1%未満）。curveNorm（プレイヤーのカーブ入力）は
- * axisRotationのみを決め、omegaYへ直接掛けることはしない。
+ * 検証済み（誤差0.1%未満）。この45°は論文の基準条件を再現するための値であり、
+ * ゲーム内の実効最大値（MAX_AXIS_ROTATION_DEG）とは別。curveNorm（プレイヤーの
+ * カーブ入力）はaxisRotationのみを決め、omegaYへ直接掛けることはしない。
  */
 export const SPIN_MAGNITUDE_REF_RAD_S = Math.sqrt(30 * 30 + 30 * 30 + 10 * 10); // ≒43.589 rad/s
 export const SPIN_AXIS_TILT_DEG = 13.26;
-export const MAX_AXIS_ROTATION_DEG = 45;
+/**
+ * axisRotationスイープ検証（0/10/15/…/45°）の結果、45°付近は
+ * ガター率の急増が精度向上分を打ち消し、総合成績（ポケット率・7ピン以上率）が
+ * 最下位だったため、実効最大値を35°に引き下げる。
+ */
+export const MAX_AXIS_ROTATION_DEG = 35;
+/**
+ * curve入力（0〜1）からaxisRotationへの変換指数。
+ * axisRotation = MAX_AXIS_ROTATION_DEG * curveInput^AXIS_ROTATION_INPUT_EXPONENT
+ * 0.8にすることで、入力量に対してaxisRotationの立ち上がりが早くなる
+ * （25%入力で最大値の約1/3、50%で約57%まで到達）。
+ */
+export const AXIS_ROTATION_INPUT_EXPONENT = 0.8;
 
 /** 慣性モーメント（Ix = m(RG+Diff)^2, Iy = m・RG^2, Iz = m(RG+Diff+IntDiff)^2）。 */
 export const BALL_INERTIA_X_KGM2 =

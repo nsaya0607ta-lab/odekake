@@ -4,6 +4,7 @@ import { useCallback, useEffect, useRef, useState, type PointerEvent as ReactPoi
 import { PIN_LAYOUT, PIN_VISUAL_WIDTH_PCT, Pins } from "./pins";
 import type { BowlingBallVisual } from "@/lib/games/wanko-bowling-balls";
 import {
+  AXIS_ROTATION_INPUT_EXPONENT,
   BALL_INERTIA_X_KGM2,
   BALL_INERTIA_Y_KGM2,
   BALL_INERTIA_Z_KGM2,
@@ -253,6 +254,25 @@ function pinPairCollisionRadius(a: PinBody, b: PinBody): number {
  * 見た目だけのベジェ曲線などは使わず、実際にstep()と同じ式で前進計算する。
  * リリース速度はスワイプ前は未確定のため、基準投球速度（GAME_REFERENCE_SPEED_MPS）を使う。
  */
+/**
+ * curveNormからaxisRotationとcurveSignを決める。実ゲーム物理(runThrow)と
+ * 予測軌道(simulateTrajectoryPreview)で必ず同じ変換を使うよう共通化する。
+ *
+ * - axisRotation = MAX_AXIS_ROTATION_DEG * curveInput^AXIS_ROTATION_INPUT_EXPONENT
+ *   （スイープ検証の結果、45°上限は総合成績が最下位だったため35°に、
+ *   　線形マッピングは指数0.8の非線形マッピングに変更した）
+ * - 通常モードではlaunchAngleとcurveの向きが逆になるとほぼ確実にガターになる
+ *   （スイープ検証で確認済み）ため、launchAngleが0でない場合はcurveSignを
+ *   launchAngleの符号に強制的に合わせる。プレイヤーはcurveの「強さ」だけを
+ *   操作する形になる。launchAngle=0のときはcurveNorm自身の符号を使う。
+ */
+function computeAxisRotation(launchAngleRad: number, curveNorm: number): { axisRotationRad: number; curveSign: number } {
+  const curve01 = clamp(Math.abs(curveNorm) / MAX_CURVE_NORM, 0, 1);
+  const axisRotationRad = (MAX_AXIS_ROTATION_DEG * Math.pow(curve01, AXIS_ROTATION_INPUT_EXPONENT)) * Math.PI / 180;
+  const curveSign = launchAngleRad !== 0 ? Math.sign(launchAngleRad) : Math.sign(curveNorm);
+  return { axisRotationRad, curveSign };
+}
+
 function simulateTrajectoryPreview(
   startXM: number,
   launchAngleRad: number,
@@ -264,12 +284,10 @@ function simulateTrajectoryPreview(
   let bvxMps = speedMps * Math.sin(launchAngleRad);
   let bvyMps = speedMps * Math.cos(launchAngleRad);
 
-  const curve01 = clamp(Math.abs(curveNorm) / MAX_CURVE_NORM, 0, 1);
-  const axisRotationRad = (MAX_AXIS_ROTATION_DEG * curve01) * Math.PI / 180;
+  const { axisRotationRad, curveSign } = computeAxisRotation(launchAngleRad, curveNorm);
   const axisTiltRad = SPIN_AXIS_TILT_DEG * Math.PI / 180;
   const spinMagnitudeRadS = SPIN_MAGNITUDE_REF_RAD_S * (speedMps / GAME_REFERENCE_SPEED_MPS);
   const horizontalSpinRadS = spinMagnitudeRadS * Math.cos(axisTiltRad);
-  const curveSign = Math.sign(curveNorm);
   let omegaXRadS = -horizontalSpinRadS * Math.cos(axisRotationRad);
   let omegaYRadS = -curveSign * horizontalSpinRadS * Math.sin(axisRotationRad);
   let omegaZRadS = spinMagnitudeRadS * Math.sin(axisTiltRad);
@@ -800,18 +818,13 @@ export function Lane({ ballVisual, resetSignal, active, onRoll }: LaneProps) {
     let ballDone = false;
     let finished = false;
 
-    // リリース時の角速度は「回転軸の向き（axisRotation）」から組み立てる。
-    // curveNormをomegaYへ直接掛けるのではなく、まず回転軸の水平面内での
-    // 向き（0〜45°）をcurveNormの大きさだけで決め、向き（左右）はcurveNormの
-    // 符号で反映する。スワイプ方向（launchAngleRad）とは完全に独立。
-    // omegaX/omegaYはstep内で摩擦トルクにより毎フレーム更新され、
-    // omegaZは論文のslip式に寄与しないためリリース時の値のまま変化させない。
-    const curve01 = clamp(Math.abs(launch.curveNorm) / MAX_CURVE_NORM, 0, 1);
-    const axisRotationRad = (MAX_AXIS_ROTATION_DEG * curve01) * Math.PI / 180;
+    // リリース時の角速度は「回転軸の向き（axisRotation）」から組み立てる
+    // （computeAxisRotationで実ゲームと予測軌道の変換を共通化）。
+    // omegaX/omegaYはstep内で摩擦トルクにより毎フレーム更新される。
+    const { axisRotationRad, curveSign } = computeAxisRotation(launch.launchAngleRad, launch.curveNorm);
     const axisTiltRad = SPIN_AXIS_TILT_DEG * Math.PI / 180;
     const spinMagnitudeRadS = SPIN_MAGNITUDE_REF_RAD_S * (launch.speedMps / GAME_REFERENCE_SPEED_MPS);
     const horizontalSpinRadS = spinMagnitudeRadS * Math.cos(axisTiltRad);
-    const curveSign = Math.sign(launch.curveNorm);
     let omegaXRadS = -horizontalSpinRadS * Math.cos(axisRotationRad);
     let omegaYRadS = -curveSign * horizontalSpinRadS * Math.sin(axisRotationRad);
     let omegaZRadS = spinMagnitudeRadS * Math.sin(axisTiltRad);
