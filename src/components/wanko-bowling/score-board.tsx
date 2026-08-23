@@ -107,7 +107,7 @@ export function ScoreBoard({ frames, score, currentFrameIndex, liveScore, bestSc
   lastRollPins: number | null;
 }) {
   return (
-    <div className="relative -mx-2 -mt-2 w-[calc(100%+1rem)] overflow-hidden rounded-t-[22px] rounded-b-[10px] border border-white/15 bg-[#18251f]/92 px-1.5 py-1 shadow-[inset_0_1px_0_rgba(255,255,255,0.09),0_2px_5px_rgba(20,18,14,0.16)] backdrop-blur-[3px]" aria-label="5フレーム ボウリングスコアボード">
+    <div className="relative -mx-2 -mt-2 w-[calc(100%+1rem)] overflow-hidden rounded-t-[22px] rounded-b-[10px] border border-white/15 bg-[#18251f]/92 px-1 py-1 shadow-[inset_0_1px_0_rgba(255,255,255,0.09),0_2px_5px_rgba(20,18,14,0.16)] backdrop-blur-[3px]" aria-label="10フレーム ボウリングスコアボード">
       <style>{`
         .wb-digital-number{display:grid;grid-auto-flow:column;grid-auto-columns:max-content;align-items:start;justify-content:center;column-gap:1px;height:12px;line-height:0}
         .wb-digital-number.is-large{height:16px}
@@ -129,30 +129,30 @@ export function ScoreBoard({ frames, score, currentFrameIndex, liveScore, bestSc
         @media (prefers-reduced-motion:reduce){.wb-roll-strip,.wb-roll-strip.is-large{animation:none;transform:translate3d(0,-50%,0)}}
       `}</style>
 
-      <div className="grid grid-cols-[repeat(5,minmax(0,1fr))_1.24fr] gap-[2px]">
+      <div className="grid grid-cols-[repeat(10,minmax(0,1fr))_1.45fr] gap-px">
         {frames.map((frame, index) => {
           const active = index === currentFrameIndex;
           const marks = frameRollMarks(frame, index);
           const result = score.frames[index];
           const columns = index === BOWLING_FRAME_COUNT - 1 ? 3 : 2;
           return (
-            <div key={index} className={`min-w-0 overflow-hidden rounded-[7px] border px-[1px] pb-[3px] pt-[2px] text-center transition-all ${active ? "border-[#b9e58e]/85 bg-[#456348]/82 shadow-[0_0_10px_rgba(185,229,142,0.22)]" : "border-white/10 bg-[#111b17]/62"}`}>
-              <p className={`text-[6px] font-black leading-[9px] ${active ? "text-[#e4f7d1]" : "text-[#aeb9b0]"}`}>{index + 1}F</p>
-              <div className="grid h-[14px] items-center border-y border-white/10 bg-black/16" style={{ gridTemplateColumns: `repeat(${columns}, minmax(0, 1fr))` }}>
-                {marks.map((mark, markIndex) => <span key={markIndex} className={`text-[9px] font-black tabular-nums leading-none ${mark === "X" || mark === "/" ? "text-[#f1db91]" : "text-[#edf2ee]"}`}>{mark}</span>)}
+            <div key={index} className={`min-w-0 overflow-hidden rounded-[5px] border px-0 pb-[2px] pt-[1px] text-center transition-all ${active ? "border-[#b9e58e]/85 bg-[#456348]/82 shadow-[0_0_8px_rgba(185,229,142,0.20)]" : "border-white/10 bg-[#111b17]/62"}`}>
+              <p className={`text-[6px] font-black leading-[8px] ${active ? "text-[#e4f7d1]" : "text-[#aeb9b0]"}`}>{index + 1}</p>
+              <div className="grid h-[13px] items-center border-y border-white/10 bg-black/16" style={{ gridTemplateColumns: `repeat(${columns}, minmax(0, 1fr))` }}>
+                {marks.map((mark, markIndex) => <span key={markIndex} className={`text-[7px] font-black tabular-nums leading-none ${mark === "X" || mark === "/" ? "text-[#f1db91]" : "text-[#edf2ee]"}`}>{mark}</span>)}
               </div>
-              <div className="flex h-[20px] items-center justify-center"><DigitalNumber value={result?.cumulativeScore ?? null} /></div>
+              <div className="flex h-[19px] items-center justify-center"><DigitalNumber value={result?.cumulativeScore ?? null} /></div>
             </div>
           );
         })}
 
-        <div className="min-w-0 overflow-hidden rounded-[8px] border border-[#d8c47b]/75 bg-[#101915]/82 px-[2px] pb-[2px] pt-[2px] text-center shadow-[inset_0_0_10px_rgba(216,196,123,0.06)]">
-          <div className="flex h-[9px] items-center justify-center gap-1">
-            <span className="text-[6px] font-black tracking-[0.08em] text-[#eadca7]">TOTAL</span>
-            {lastRollPins !== null ? <span className="text-[5px] font-black text-white/55">+{lastRollPins}</span> : null}
+        <div className="min-w-0 overflow-hidden rounded-[6px] border border-[#d8c47b]/75 bg-[#101915]/82 px-[1px] pb-[1px] pt-[1px] text-center shadow-[inset_0_0_10px_rgba(216,196,123,0.06)]">
+          <div className="flex h-[8px] items-center justify-center gap-0.5">
+            <span className="text-[5px] font-black tracking-[0.06em] text-[#eadca7]">TOTAL</span>
+            {lastRollPins !== null ? <span className="text-[4px] font-black text-white/55">+{lastRollPins}</span> : null}
           </div>
           <div className="flex h-[24px] items-center justify-center border-y border-[#6d6445]/55 bg-black/18 leading-none"><DigitalNumber value={liveScore} large /></div>
-          <div className="flex h-[12px] items-center justify-center gap-1 text-[5px] font-black tracking-[0.03em] text-[#b8c4b9]"><span>BEST</span><span className="tabular-nums text-[#eadca7]">{bestScore ?? "---"}</span></div>
+          <div className="flex h-[11px] items-center justify-center gap-0.5 text-[4px] font-black tracking-[0.02em] text-[#b8c4b9]"><span>BEST</span><span className="tabular-nums text-[#eadca7]">{bestScore ?? "---"}</span></div>
         </div>
       </div>
     </div>
