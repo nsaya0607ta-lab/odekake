@@ -6,6 +6,7 @@ import type { BowlingBallVisual } from "@/lib/games/wanko-bowling-balls";
 import {
   BALL_INERTIA_X_KGM2,
   BALL_INERTIA_Y_KGM2,
+  BALL_INERTIA_Z_KGM2,
   BALL_PIN_RESTITUTION,
   BALL_SPIN_RADIUS_M,
   DRY_FRICTION_MU,
@@ -271,6 +272,8 @@ function simulateTrajectoryPreview(
   const curveSign = Math.sign(curveNorm);
   let omegaXRadS = -horizontalSpinRadS * Math.cos(axisRotationRad);
   let omegaYRadS = -curveSign * horizontalSpinRadS * Math.sin(axisRotationRad);
+  let omegaZRadS = spinMagnitudeRadS * Math.sin(axisTiltRad);
+  let phiRad = Math.atan(omegaYRadS / omegaXRadS);
 
   const maxLateralSpeedMps = Math.max(1.2, speedMps * 0.55);
   const laneLeftM = JB_GUTTER_WIDTH_M;
@@ -287,16 +290,41 @@ function simulateTrajectoryPreview(
     const slipX = bvxMps - BALL_SPIN_RADIUS_M * omegaYRadS;
     const slipY = bvyMps + BALL_SPIN_RADIUS_M * omegaXRadS;
     const slipSpeed = Math.hypot(slipX, slipY);
+    let dvx = 0;
+    let dvy = 0;
     if (slipSpeed > SLIP_EPSILON_MPS) {
-      const ax = -mu * GRAVITY_MPS2 * (slipX / slipSpeed);
-      const ay = -mu * GRAVITY_MPS2 * (slipY / slipSpeed);
-      const torqueX = GAME_BALL_MASS_KG * BALL_SPIN_RADIUS_M * ay;
-      const torqueY = -GAME_BALL_MASS_KG * BALL_SPIN_RADIUS_M * ax;
-      bvxMps += ax * dt;
-      bvyMps += ay * dt;
-      omegaXRadS += (torqueX / BALL_INERTIA_X_KGM2) * dt;
-      omegaYRadS += (torqueY / BALL_INERTIA_Y_KGM2) * dt;
+      dvx = -mu * GRAVITY_MPS2 * (slipX / slipSpeed);
+      dvy = -mu * GRAVITY_MPS2 * (slipY / slipSpeed);
     }
+
+    const cosPhi = Math.cos(phiRad);
+    const sinPhi = Math.sin(phiRad);
+    const omegaXPrime = omegaXRadS * cosPhi + omegaYRadS * sinPhi;
+    const omegaYPrime = -omegaXRadS * sinPhi + omegaYRadS * cosPhi;
+    const termA =
+      (GAME_BALL_MASS_KG * BALL_SPIN_RADIUS_M * (dvy * cosPhi + dvx * sinPhi)
+        + (BALL_INERTIA_Y_KGM2 - BALL_INERTIA_Z_KGM2) * omegaYPrime * omegaZRadS)
+      / BALL_INERTIA_X_KGM2;
+    const termB =
+      (GAME_BALL_MASS_KG * BALL_SPIN_RADIUS_M * (-dvy * sinPhi - dvx * cosPhi)
+        + (BALL_INERTIA_Z_KGM2 - BALL_INERTIA_X_KGM2) * omegaXPrime * omegaZRadS)
+      / BALL_INERTIA_Y_KGM2;
+    const domegaXdt = termA * cosPhi - termB * sinPhi;
+    const domegaYdt = termA * sinPhi + termB * cosPhi;
+    const domegaZdt =
+      ((BALL_INERTIA_X_KGM2 - BALL_INERTIA_Y_KGM2) / BALL_INERTIA_Z_KGM2) * omegaXPrime * omegaYPrime;
+    const omegaHorizSq = omegaXRadS * omegaXRadS + omegaYRadS * omegaYRadS;
+    const dphiDt = omegaHorizSq > 0
+      ? (domegaYdt * omegaXRadS - domegaXdt * omegaYRadS) / omegaHorizSq
+      : 0;
+
+    bvxMps += dvx * dt;
+    bvyMps += dvy * dt;
+    omegaXRadS += domegaXdt * dt;
+    omegaYRadS += domegaYdt * dt;
+    omegaZRadS += domegaZdt * dt;
+    phiRad += dphiDt * dt;
+
     if (Math.abs(bvxMps) > maxLateralSpeedMps) {
       const speed = Math.hypot(bvxMps, bvyMps);
       const cappedVx = Math.sign(bvxMps) * maxLateralSpeedMps;
@@ -786,9 +814,11 @@ export function Lane({ ballVisual, resetSignal, active, onRoll }: LaneProps) {
     const curveSign = Math.sign(launch.curveNorm);
     let omegaXRadS = -horizontalSpinRadS * Math.cos(axisRotationRad);
     let omegaYRadS = -curveSign * horizontalSpinRadS * Math.sin(axisRotationRad);
-    // omegaZは物理式に使わないため参考値として保持するのみ（一定値）。
-    const omegaZRadS = spinMagnitudeRadS * Math.sin(axisTiltRad);
-    void omegaZRadS;
+    let omegaZRadS = spinMagnitudeRadS * Math.sin(axisTiltRad);
+    // phi: 主慣性軸y'とレーン固定y軸との角度。式(15)との整合から、
+    // リリース時点の(omegaX, omegaY)の向きから初期値を決める
+    // （基準条件 omegaX=-30, omegaY=-30 で45°になる atan、atan2ではない）。
+    let phiRad = Math.atan(omegaYRadS / omegaXRadS);
 
     // レーン奥行き方向より横方向のほうが画面上のスケールがかなり大きいため、
     // フックやピンとの衝突で横速度だけが大きくなると、実際の速さ以上に
@@ -882,26 +912,55 @@ export function Lane({ ballVisual, resetSignal, active, onRoll }: LaneProps) {
         if (gutterSide === null) {
           // 論文の接触点すべり摩擦モデル：
           // slip = ボール中心速度 - 接触点における回転の寄与。ここから
-          // クーロン摩擦（大きさ一定 μg、向きはすべりと逆）で並進加速度を出し、
-          // その反作用のトルクで角速度（omegaX/omegaY）も同時に更新する。
+          // クーロン摩擦（大きさ一定 μg、向きはすべりと逆）で並進加速度(dvx,dvy)を出す。
           // slipSpeedがSLIP_EPSILON_MPSを下回ったら pure rolling とみなし、
-          // 動摩擦を止める（速度・回転ともその時点の値で以後変化しない）。
+          // 動摩擦（並進加速度）は止める。
           const mu = onOil ? OIL_FRICTION_MU : DRY_FRICTION_MU;
           const slipX = bvxMps - BALL_SPIN_RADIUS_M * omegaYRadS;
           const slipY = bvyMps + BALL_SPIN_RADIUS_M * omegaXRadS;
           const slipSpeed = Math.hypot(slipX, slipY);
+          let dvx = 0;
+          let dvy = 0;
           if (slipSpeed > SLIP_EPSILON_MPS) {
-            const ax = -mu * GRAVITY_MPS2 * (slipX / slipSpeed);
-            const ay = -mu * GRAVITY_MPS2 * (slipY / slipSpeed);
-            const torqueX = GAME_BALL_MASS_KG * BALL_SPIN_RADIUS_M * ay;
-            const torqueY = -GAME_BALL_MASS_KG * BALL_SPIN_RADIUS_M * ax;
-            const alphaX = torqueX / BALL_INERTIA_X_KGM2;
-            const alphaY = torqueY / BALL_INERTIA_Y_KGM2;
-            bvxMps += ax * dt;
-            bvyMps += ay * dt;
-            omegaXRadS += alphaX * dt;
-            omegaYRadS += alphaY * dt;
+            dvx = -mu * GRAVITY_MPS2 * (slipX / slipSpeed);
+            dvy = -mu * GRAVITY_MPS2 * (slipY / slipSpeed);
           }
+
+          // 論文の6連立方程式（並進2＋回転3＋phi1）。
+          // 摩擦が止まって dvx=dvy=0 になっても、Ix'≠Iy'≠Iz' によるジャイロ項
+          // （トルクフリー歳差運動）はゼロにならないため、omegaX/Y/Z・phiは
+          // pure rolling後も引き続き更新する（並進速度だけが一定になる）。
+          const cosPhi = Math.cos(phiRad);
+          const sinPhi = Math.sin(phiRad);
+          const omegaXPrime = omegaXRadS * cosPhi + omegaYRadS * sinPhi;
+          const omegaYPrime = -omegaXRadS * sinPhi + omegaYRadS * cosPhi;
+
+          const termA =
+            (GAME_BALL_MASS_KG * BALL_SPIN_RADIUS_M * (dvy * cosPhi + dvx * sinPhi)
+              + (BALL_INERTIA_Y_KGM2 - BALL_INERTIA_Z_KGM2) * omegaYPrime * omegaZRadS)
+            / BALL_INERTIA_X_KGM2;
+          const termB =
+            (GAME_BALL_MASS_KG * BALL_SPIN_RADIUS_M * (-dvy * sinPhi - dvx * cosPhi)
+              + (BALL_INERTIA_Z_KGM2 - BALL_INERTIA_X_KGM2) * omegaXPrime * omegaZRadS)
+            / BALL_INERTIA_Y_KGM2;
+
+          const domegaXdt = termA * cosPhi - termB * sinPhi;
+          const domegaYdt = termA * sinPhi + termB * cosPhi;
+          const domegaZdt =
+            ((BALL_INERTIA_X_KGM2 - BALL_INERTIA_Y_KGM2) / BALL_INERTIA_Z_KGM2)
+            * omegaXPrime * omegaYPrime;
+          const omegaHorizSq = omegaXRadS * omegaXRadS + omegaYRadS * omegaYRadS;
+          const dphiDt = omegaHorizSq > 0
+            ? (domegaYdt * omegaXRadS - domegaXdt * omegaYRadS) / omegaHorizSq
+            : 0;
+
+          bvxMps += dvx * dt;
+          bvyMps += dvy * dt;
+          omegaXRadS += domegaXdt * dt;
+          omegaYRadS += domegaYdt * dt;
+          omegaZRadS += domegaZdt * dt;
+          phiRad += dphiDt * dt;
+
           [bvxMps, bvyMps] = capLateralSpeed(bvxMps, bvyMps);
         } else {
           const gutterDecay = Math.exp(-GUTTER_BALL_DRAG_PER_SEC * dt);
