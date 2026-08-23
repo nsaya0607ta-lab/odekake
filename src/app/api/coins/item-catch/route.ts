@@ -10,9 +10,9 @@ type RpcResponse = {
 const MAX_CAUGHT_COUNT = 2000;
 const MAX_SCORE_PER_CATCH = 1500;
 const MAX_SCORE_PER_RPC = 8000;
-/** ゴールドボール(SSR)のLv5(50コイン/個)を1ラウンドで現実的にありえない個数捕った想定でも
- *  余裕を持って収まる上限。record_item_catch_result() 側の上限(600)と揃えている。 */
-const MAX_BONUS_COINS = 600;
+/** ゲームを介さずAPIを直接叩いて無限にコインを増やせてしまわないための固定上限。
+ *  record_item_catch_result() 側の上限(2000)と揃えている。 */
+const MAX_BONUS_COINS = 2000;
 
 function toRecord(value: unknown): Record<string, unknown> {
   return value && typeof value === "object" ? (value as Record<string, unknown>) : {};

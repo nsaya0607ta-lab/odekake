@@ -6,9 +6,9 @@
 -- 25で割った値だけをコインとして付与していたため、スコアと無関係な直接コイン加算を
 -- 受け取れる引数(p_bonus_coins)を追加する。
 --
--- 不正対策：p_bonus_coins は「ゴールドボール1個あたりの最大付与コイン(Lv5=50)」×
--- 現実的な1ラウンドあたりの最大キャッチ想定数(12個)を大きく超えないよう、
--- 固定上限(MAX_BONUS_COINS_PER_ROUND=600)でチェックする。
+-- 不正対策：p_bonus_coins は、ゲームを介さずAPIを直接叩いて無限にコインを
+-- 増やせてしまわないよう、現実的なプレイでは絶対に届かない固定上限
+-- (MAX_BONUS_COINS_PER_ROUND=2000)でチェックする。
 -- キャッチ数(p_caught_count)は「1ラウンドの合計」ではなく、スコアが大きい場合に
 -- 呼び出し側(src/app/api/coins/item-catch/route.ts)で複数RPC呼び出しに分割された
 -- 際の「チャンクごとの推定値」であり、上限が80に固定されているため、
@@ -53,7 +53,7 @@ declare
   v_existing_amount integer;
   v_balance integer;
   v_today date := (timezone('Asia/Tokyo', now()))::date;
-  v_max_bonus_coins constant integer := 600;
+  v_max_bonus_coins constant integer := 2000;
 begin
   if v_user_id is null then raise exception 'Authentication required'; end if;
   if p_round_id is null or length(p_round_id) not between 8 and 100 then raise exception 'Invalid round id'; end if;
