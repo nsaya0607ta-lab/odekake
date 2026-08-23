@@ -3,7 +3,7 @@
 import { useEffect } from "react";
 import { getBgmVolume, getTapVolume, sliderToGain, SOUND_SETTINGS_EVENT } from "@/lib/sound-settings";
 import { isAudioContextRunning, resumeAudioContext } from "@/lib/audio-context";
-import { isBgmPlaying, pauseBgm, playBgm, preloadBgm, setBgmGain } from "@/lib/bgm-engine";
+import { isBgmPlaying, pauseBgm, playBgm, setBgmGain } from "@/lib/bgm-engine";
 import { playTapSound, preloadTapSound } from "@/lib/tap-sound";
 
 /**
@@ -21,7 +21,6 @@ import { playTapSound, preloadTapSound } from "@/lib/tap-sound";
  */
 export function BgmPlayer() {
   useEffect(() => {
-    preloadBgm();
     preloadTapSound();
     setBgmGain(sliderToGain(getBgmVolume()));
 

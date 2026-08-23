@@ -13,6 +13,9 @@ import { signPhotoPaths, signThumbOrOriginalPaths } from "@/lib/data/photos";
 import { getFriendTextPostReplies, getPersonalTextPost, getSnsPhoto } from "@/lib/data/sns";
 import {
   getSnsNotificationReadSnapshot,
+  MAX_DISMISSED_IDS,
+  ownLikeCount,
+  SNS_NOTIFICATION_DISMISSED_IDS_KEY,
   SNS_NOTIFICATION_LIKE_COUNTS_KEY,
   SNS_MUTED_GROUP_IDS_KEY,
   SNS_NOTIFICATION_PREFERENCES_KEY,
@@ -778,6 +781,66 @@ export async function markFriendGroupReadAction(groupId: string): Promise<void> 
   const { error } = await supabase.rpc("mark_friend_group_read", { p_group_id: parsed.data });
   if (error) throw new Error(snsMutationError(error, "グループを既読にできませんでした。"));
   revalidatePath("/sns");
+  revalidatePath("/sns/notifications");
+}
+
+/**
+ * 通知を1件だけタップして開いたときに、その1件だけを既読にする。
+ * 返信・メンションはID単位で既読リストへ積み、いいねはその投稿の
+ * 現在のいいね数をスナップショットへ反映する。グループは既存の
+ * markFriendGroupReadAction 側で処理されるためここでは扱わない。
+ */
+export async function markSnsNotificationItemReadAction(itemId: string): Promise<void> {
+  const [kind, ...rest] = itemId.split(":");
+  const rawId = rest.join(":");
+  if (!rawId) return;
+
+  const { supabase } = await requireUser();
+
+  if (kind === "reply" || kind === "mention") {
+    const { data } = await supabase.auth.getClaims();
+    const metadata = (data?.claims?.user_metadata ?? {}) as Record<string, unknown>;
+    const existing = metadata[SNS_NOTIFICATION_DISMISSED_IDS_KEY];
+    const dismissedIds = new Set(Array.isArray(existing) ? existing.filter((id) => typeof id === "string") : []);
+    dismissedIds.add(itemId);
+    const trimmed = [...dismissedIds].slice(-MAX_DISMISSED_IDS);
+
+    const { error } = await supabase.auth.updateUser({
+      data: { [SNS_NOTIFICATION_DISMISSED_IDS_KEY]: trimmed },
+    });
+    if (error) {
+      console.error("Failed to mark SNS notification item as read", { message: error.message });
+      return;
+    }
+    await supabase.auth.refreshSession().catch(() => {});
+    revalidatePath("/sns/notifications");
+    return;
+  }
+
+  if (kind === "like") {
+    const postId = uuidSchema.safeParse(rawId);
+    if (!postId.success) return;
+    const post = await getPersonalTextPost(supabase, postId.data).catch(() => null);
+    if (!post) return;
+
+    const { data } = await supabase.auth.getClaims();
+    const metadata = (data?.claims?.user_metadata ?? {}) as Record<string, unknown>;
+    const existingCounts = metadata[SNS_NOTIFICATION_LIKE_COUNTS_KEY];
+    const likeCounts: Record<string, number> = existingCounts && typeof existingCounts === "object"
+      ? { ...(existingCounts as Record<string, number>) }
+      : {};
+    likeCounts[postId.data] = ownLikeCount(post);
+
+    const { error } = await supabase.auth.updateUser({
+      data: { [SNS_NOTIFICATION_LIKE_COUNTS_KEY]: likeCounts },
+    });
+    if (error) {
+      console.error("Failed to mark SNS like notification as read", { message: error.message });
+      return;
+    }
+    await supabase.auth.refreshSession().catch(() => {});
+    revalidatePath("/sns/notifications");
+  }
 }
 
 /** 通知一覧の現在値をスナップショットとして保存し、グループ未読もまとめて既読にする。 */
@@ -797,6 +860,7 @@ export async function markSnsNotificationsReadAction(): Promise<void> {
     data: {
       [SNS_NOTIFICATION_SEEN_AT_KEY]: seenAt,
       [SNS_NOTIFICATION_LIKE_COUNTS_KEY]: snapshot.likeCounts,
+      [SNS_NOTIFICATION_DISMISSED_IDS_KEY]: [],
     },
   });
 
@@ -807,6 +871,7 @@ export async function markSnsNotificationsReadAction(): Promise<void> {
     }
   }
   revalidatePath("/sns");
+  revalidatePath("/sns/notifications");
 
   if (error || groupReadError) {
     console.error("Failed to mark SNS notifications as read", {

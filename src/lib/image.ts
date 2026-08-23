@@ -53,7 +53,7 @@ export async function compressImage(file: File, maxEdge = 1600, quality = 0.82):
  * 一覧やアイコンなど小さい表示専用のサムネイルを作る。
  * 元画像がどれだけ大きくても、常にこのサイズまで縮小し直す
  */
-export async function compressThumbnail(file: File, maxEdge = 320, quality = 0.6): Promise<Blob> {
+export async function compressThumbnail(file: File, maxEdge = 480, quality = 0.75): Promise<Blob> {
   return resizeToJpeg(file, maxEdge, quality, { skipIfSmall: false });
 }
 

@@ -37,11 +37,6 @@ export function isBgmPlaying(): boolean {
   return playing;
 }
 
-/** 先読みしておく(実際の再生開始にはユーザー操作後の resume が必要) */
-export function preloadBgm(): void {
-  loadBuffer().catch(() => {});
-}
-
 export async function playBgm(): Promise<void> {
   if (playing) return;
   await resumeAudioContext();

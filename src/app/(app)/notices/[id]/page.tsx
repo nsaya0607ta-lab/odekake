@@ -1,7 +1,8 @@
 import { notFound } from "next/navigation";
 import { PageBody } from "@/components/page-body";
 import { PageHeader } from "@/components/page-header";
-import { getNoticeDetail, markNoticesRead } from "@/lib/data/notices";
+import { markNoticeReadAction } from "@/app/(app)/notices/actions";
+import { getNoticeDetail } from "@/lib/data/notices";
 import { requireUser } from "@/lib/supabase/server";
 
 export const metadata = { title: "お知らせ | おでかけ記録" };
@@ -33,7 +34,7 @@ export default async function NoticeDetailPage({ params }: { params: Promise<{ i
   if (!notice) notFound();
 
   if (!notice.is_read) {
-    await markNoticesRead(supabase, [notice.id]);
+    await markNoticeReadAction(notice.id);
   }
 
   return (
