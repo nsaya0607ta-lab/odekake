@@ -1,9 +1,9 @@
 import { notFound } from "next/navigation";
 import { PageBody } from "@/components/page-body";
 import { PageHeader } from "@/components/page-header";
-import { markNoticeReadAction } from "@/app/(app)/notices/actions";
 import { getNoticeDetail } from "@/lib/data/notices";
 import { requireUser } from "@/lib/supabase/server";
+import { MarkNoticeRead } from "./mark-notice-read";
 
 export const metadata = { title: "お知らせ | おでかけ記録" };
 export const dynamic = "force-dynamic";
@@ -33,12 +33,9 @@ export default async function NoticeDetailPage({ params }: { params: Promise<{ i
   const notice = await getNoticeDetail(supabase, id);
   if (!notice) notFound();
 
-  if (!notice.is_read) {
-    await markNoticeReadAction(notice.id);
-  }
-
   return (
     <>
+      {!notice.is_read ? <MarkNoticeRead noticeId={notice.id} /> : null}
       <PageHeader title="お知らせ" backHref="/notices" />
       <PageBody>
         <div className="rough-card p-4">
