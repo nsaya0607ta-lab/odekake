@@ -156,6 +156,20 @@ function worldYToPct(distanceFromFoulM: number): number {
   return HEAD_PIN_SCREEN_Y - deckDepth * PIN_DECK_SCREEN_DEPTH_PCT;
 }
 
+// ピンデッキに入った瞬間だけ画面上の移動量が急増しないよう、
+// ボールはレーン終端の投影速度を維持して奥へ抜けるように見せる。
+// 物理座標は従来どおり進めるので、衝突・スコア計算には影響しない。
+function ballWorldYToPct(distanceFromFoulM: number): number {
+  if (distanceFromFoulM <= JB_HEAD_PIN_DISTANCE_M) {
+    return worldYToPct(distanceFromFoulM);
+  }
+
+  const laneEndSlopePctPerM =
+    ((DOCK_Y - HEAD_PIN_SCREEN_Y) * 0.9) / JB_HEAD_PIN_DISTANCE_M;
+  const beyondHeadPinM = distanceFromFoulM - JB_HEAD_PIN_DISTANCE_M;
+  return HEAD_PIN_SCREEN_Y - beyondHeadPinM * laneEndSlopePctPerM;
+}
+
 function worldXToPct(xM: number, distanceM: number): number {
   const halfLane = laneHalfWidthPct(distanceM);
   const gutterVisual = gutterVisualWidthPct(distanceM);
@@ -198,7 +212,7 @@ function screenXToWorldX(screenXPct: number, distanceM: number): number {
   }
 
   const laneT = (x - leftLaneEdge) / Math.max(0.001, halfLane * 2);
-  return leftLaneEdge + laneT * 0 + JB_GUTTER_WIDTH_M + laneT * JB_LANE_WIDTH_M;
+  return JB_GUTTER_WIDTH_M + laneT * JB_LANE_WIDTH_M;
 }
 
 function boardXToPct(board: number, distanceM: number): number {
@@ -506,8 +520,21 @@ export function Lane({ ballVisual, resetSignal, active, onRoll }: LaneProps) {
     const el = ballRef.current;
     if (!el) return;
     el.style.left = `${worldXToPct(xM, yM)}%`;
-    el.style.top = `${worldYToPct(yM)}%`;
+    el.style.top = `${ballWorldYToPct(yM)}%`;
     el.style.width = `${ballVisualWidthPct(yM)}%`;
+
+    // 1番ピンより奥ではボールをピットへ自然に消して、
+    // 遠近投影の切り替わりが「急加速」に見えないようにする。
+    if (yM > JB_HEAD_PIN_DISTANCE_M) {
+      const fade = clamp(
+        (yM - JB_HEAD_PIN_DISTANCE_M) / Math.max(0.001, PIN_DECK_DEPTH_M * 0.9),
+        0,
+        1,
+      );
+      el.style.opacity = String(1 - fade);
+    } else if (!dockingRef.current) {
+      el.style.opacity = '1';
+    }
 
     const visualRollDeg = rotateDeg * 0.16;
     const phaseRad = visualRollDeg * Math.PI / 180;
