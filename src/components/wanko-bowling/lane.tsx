@@ -46,11 +46,8 @@ const GUTTER_BALL_DRAG_PER_SEC = 0.035;
 const FOUL_LINE_Y = 97;
 const PIN_ROW_DEPTH_M = JB_PIN_SPACING_M * Math.sqrt(3) / 2;
 const PIN_DECK_DEPTH_M = PIN_ROW_DEPTH_M * 3;
-// 1番ピン手前までの奥行きカーブと、ピンデッキ以降の奥行き変化率を一致させる。
-// ここが不連続だとボールがピンに当たった瞬間だけ急加速して見えてしまう。
-const HEAD_PIN_APPROACH_SLOPE_PCT_PER_M =
-  ((DOCK_Y - HEAD_PIN_SCREEN_Y) * 0.9) / JB_HEAD_PIN_DISTANCE_M;
-const PIN_DECK_SCREEN_DEPTH_PCT = HEAD_PIN_APPROACH_SLOPE_PCT_PER_M * PIN_DECK_DEPTH_M;
+// ピンデッキ表示専用（pinDeckYToPct）が使う奥行き量。ボールの移動には使わない。
+const PIN_DECK_SCREEN_DEPTH_PCT = 8.4;
 const TARGET_BOARDS = [5, 10, 15, 20, 25, 30, 35] as const;
 const GUIDE_DISTANCE_M = 7 * 0.3048;
 const TARGET_DISTANCE_M = 15 * 0.3048;
@@ -145,11 +142,22 @@ function gutterVisualWidthPct(distanceM: number): number {
   return 4.6 - 1.6 * Math.pow(depth, 0.72);
 }
 
+/**
+ * ボールの奥行き位置は、ファールラインから先まで一本の連続したカーブで計算する。
+ * ピン付近だけ別カーブに切り替えると、その境目でボールが一瞬だけ加速して見える。
+ */
 function worldYToPct(distanceFromFoulM: number): number {
-  if (distanceFromFoulM <= JB_HEAD_PIN_DISTANCE_M) {
-    const depth = clamp(distanceFromFoulM / JB_HEAD_PIN_DISTANCE_M, 0, 1);
-    return DOCK_Y - (DOCK_Y - HEAD_PIN_SCREEN_Y) * Math.pow(depth, 0.9);
-  }
+  const depth = distanceFromFoulM / JB_HEAD_PIN_DISTANCE_M;
+  return DOCK_Y - (DOCK_Y - HEAD_PIN_SCREEN_Y) * Math.pow(depth, 0.9);
+}
+
+/**
+ * ピンの表示位置だけは、実際のラックらしく見えるよう奥行きを少し誇張する。
+ * ピンは静止・転倒アニメーションのみでボールのように移動し続けるわけではないため、
+ * ここで曲率が変わってもボールの体感速度には影響しない。
+ */
+function pinDeckYToPct(distanceFromFoulM: number): number {
+  if (distanceFromFoulM <= JB_HEAD_PIN_DISTANCE_M) return worldYToPct(distanceFromFoulM);
 
   const deckDepth = (distanceFromFoulM - JB_HEAD_PIN_DISTANCE_M) / PIN_DECK_DEPTH_M;
   return HEAD_PIN_SCREEN_Y - deckDepth * PIN_DECK_SCREEN_DEPTH_PCT;
@@ -458,7 +466,7 @@ export function Lane({ ballVisual, resetSignal, active, onRoll }: LaneProps) {
     const el = pinNodesRef.current.get(id);
     if (!el) return;
 
-    const screenY = worldYToPct(body.yM);
+    const screenY = pinDeckYToPct(body.yM);
     el.style.left = `${worldXToPct(body.xM, body.yM)}%`;
     el.style.top = `${screenY}%`;
     el.style.width = `${pinVisualWidthPct(body.yM)}%`;
