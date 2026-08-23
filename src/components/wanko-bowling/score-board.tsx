@@ -3,35 +3,46 @@
 import type { BowlingFrame, BowlingScoreState } from "@/lib/games/wanko-bowling-score";
 import { BOWLING_FRAME_COUNT } from "@/lib/games/wanko-bowling-score";
 
-function frameLabel(frame: BowlingFrame, frameIndex: number): string {
-  const isLast = frameIndex === BOWLING_FRAME_COUNT - 1;
-  if (frame.rolls.length === 0) return "";
+function normalMark(roll: number): string {
+  return roll === 0 ? "–" : String(roll);
+}
 
-  const rollText = (roll: number, isFirstOfFrame: boolean, prevSum: number) => {
-    if (roll === 10 && (isFirstOfFrame || prevSum === 0)) return "X";
-    if (!isFirstOfFrame && prevSum + roll === 10) return "/";
-    return roll === 0 ? "–" : String(roll);
-  };
+function frameRollMarks(frame: BowlingFrame, frameIndex: number): string[] {
+  const isLast = frameIndex === BOWLING_FRAME_COUNT - 1;
+  const first = frame.rolls[0];
+  const second = frame.rolls[1];
+  const third = frame.rolls[2];
 
   if (!isLast) {
-    const parts: string[] = [];
-    const first = frame.rolls[0] ?? 0;
-    parts.push(rollText(first, true, 0));
-    if (frame.rolls.length >= 2 && first !== 10) {
-      parts.push(rollText(frame.rolls[1] ?? 0, false, first));
-    }
-    return parts.join(" ");
+    if (first === undefined) return ["", ""];
+    if (first === 10) return ["", "X"];
+    return [
+      normalMark(first),
+      second === undefined ? "" : first + second === 10 ? "/" : normalMark(second),
+    ];
   }
 
-  const parts: string[] = [];
-  let runningPrev = 0;
-  frame.rolls.forEach((roll, idx) => {
-    const isFirstOfSet = idx === 0 || (frame.rolls[idx - 1] ?? -1) === 10 || runningPrev === 10;
-    parts.push(rollText(roll, isFirstOfSet, isFirstOfSet ? 0 : runningPrev));
-    runningPrev = isFirstOfSet ? roll : runningPrev + roll;
-    if (roll === 10 || runningPrev === 10) runningPrev = 0;
-  });
-  return parts.join(" ");
+  if (first === undefined) return ["", "", ""];
+
+  const firstMark = first === 10 ? "X" : normalMark(first);
+  let secondMark = "";
+  let thirdMark = "";
+
+  if (second !== undefined) {
+    if (first === 10) secondMark = second === 10 ? "X" : normalMark(second);
+    else secondMark = first + second === 10 ? "/" : normalMark(second);
+  }
+
+  if (third !== undefined) {
+    if (first === 10) {
+      if (second === 10) thirdMark = third === 10 ? "X" : normalMark(third);
+      else thirdMark = (second ?? 0) + third === 10 ? "/" : normalMark(third);
+    } else {
+      thirdMark = third === 10 ? "X" : normalMark(third);
+    }
+  }
+
+  return [firstMark, secondMark, thirdMark];
 }
 
 export function ScoreBoard({
@@ -44,33 +55,60 @@ export function ScoreBoard({
   currentFrameIndex: number;
 }) {
   return (
-    <div className="grid grid-cols-5 gap-1.5">
-      {frames.map((frame, index) => {
-        const isActive = index === currentFrameIndex;
-        const result = score.frames[index];
-        return (
-          <div
-            key={index}
-            className={`overflow-hidden rounded-[14px] border text-center ${
-              isActive ? "border-leaf-deep bg-leaf-soft" : "border-line bg-card"
-            }`}
-          >
-            <p
-              className={`px-1 py-1 text-[9px] font-black tracking-[0.06em] ${
-                isActive ? "text-leaf-deep" : "text-ink-faint"
+    <div
+      className="relative h-[98px] w-full overflow-hidden sm:h-[112px]"
+      style={{
+        backgroundImage: "url('/games/wanko-bowling/scoreboard-monitor.svg')",
+        backgroundRepeat: "no-repeat",
+        backgroundPosition: "center",
+        backgroundSize: "100% 100%",
+      }}
+      aria-label="5フレーム ボウリングスコアボード"
+    >
+      <div
+        className="absolute bottom-[6%] left-[1.5%] right-[1.5%] top-[6%] grid"
+        style={{
+          gridTemplateColumns: "repeat(5, minmax(0, 1fr))",
+          columnGap: "1.35%",
+        }}
+      >
+        {frames.map((frame, index) => {
+          const isActive = index === currentFrameIndex;
+          const marks = frameRollMarks(frame, index);
+          const result = score.frames[index];
+          const rollColumns = index === BOWLING_FRAME_COUNT - 1 ? 3 : 2;
+
+          return (
+            <div
+              key={index}
+              className={`relative grid min-w-0 grid-rows-[21.2%_32.6%_46.2%] overflow-hidden rounded-[10px] text-center ${
+                isActive ? "bg-[#dcebc9]/45 ring-1 ring-inset ring-[#4f7d3b]/80" : ""
               }`}
             >
-              {index + 1}F
-            </p>
-            <p className="border-t border-line/70 px-1 py-1.5 text-[13px] font-black tabular-nums leading-none text-ink">
-              {frameLabel(frame, index) || "–"}
-            </p>
-            <p className="border-t border-line/70 px-1 py-1.5 text-sm font-black tabular-nums leading-none text-ink">
-              {result?.cumulativeScore ?? "–"}
-            </p>
-          </div>
-        );
-      })}
+              <p className={`self-center text-[8px] font-black tracking-[0.08em] sm:text-[9px] ${isActive ? "text-[#4f7d3b]" : "text-[#756655]"}`}>
+                {index + 1}F
+              </p>
+
+              <div className="grid items-center" style={{ gridTemplateColumns: `repeat(${rollColumns}, minmax(0, 1fr))` }}>
+                {marks.map((mark, markIndex) => (
+                  <span
+                    key={markIndex}
+                    className={`self-center text-[12px] font-black tabular-nums leading-none sm:text-[14px] ${
+                      isActive ? "text-[#426d33]" : "text-[#4b3d32]"
+                    }`}
+                  >
+                    {mark}
+                  </span>
+                ))}
+              </div>
+
+              <p className={`self-center text-[16px] font-black tabular-nums leading-none sm:text-[19px] ${isActive ? "text-[#426d33]" : "text-[#3f342c]"}`}>
+                {result?.cumulativeScore ?? "–"}
+              </p>
+            </div>
+          );
+        })}
+      </div>
     </div>
   );
 }
