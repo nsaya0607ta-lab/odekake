@@ -55,7 +55,7 @@ const GRAVITY_MPS2 = 9.80665;
 const cogRiseM = Math.hypot(JB_PIN_COG_M, PIN_BASE_RADIUS_M) - JB_PIN_COG_M;
 const idealTipSpeedMps = Math.sqrt(2 * GRAVITY_MPS2 * cogRiseM);
 export const PIN_DIRECT_KNOCK_SPEED_MPS = idealTipSpeedMps * 1.55;
-export const PIN_CHAIN_KNOCK_SPEED_MPS = idealTipSpeedMps * 1.28;
+export const PIN_CHAIN_KNOCK_SPEED_MPS = idealTipSpeedMps * 1.35;
 
 /**
  * 公認42ftパターン例を土台にしたゲーム用フック近似。
