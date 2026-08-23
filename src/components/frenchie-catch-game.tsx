@@ -237,7 +237,7 @@ const LV = {
   OYASUMI_MULT: [3, 3.5, 4, 4.5, 6],
   NISOKU_A_SEC: [4, 5, 6, 7, 8],
   NISOKU_A_MULT: [3, 3.5, 4, 4.5, 5],
-  FRUIT_BASKET_COUNT: [1, 1, 2, 2, 3],
+  FRUIT_BASKET_COUNT: [2, 3, 4, 5, 6],
 } as const;
 /** 出現量アップ系は時間増加系アイテムの取得率まで底上げしてしまうため、控えめな倍率にしている */
 const SPAWN_RATE_BOOST = 1.5;
