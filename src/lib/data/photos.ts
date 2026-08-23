@@ -1,74 +1,44 @@
-import { PHOTO_BUCKET, type DB } from "./client";
-import { toThumbPath } from "@/lib/image";
-
-const SIGNED_URL_TTL_SECONDS = 60 * 60;
-/** 実際の有効期限より早めに作り直し、期限切れギリギリのURLを配らないようにする猶予 */
-const SIGNED_URL_REFRESH_MARGIN_MS = 5 * 60 * 1000;
-
-type CachedSignedUrl = { signedUrl: string; expiresAt: number };
+import type { DB } from "./client";
 
 /**
- * サーバープロセス内で使い回す署名URLキャッシュ。
- * 同じストレージパスへの署名URLを短時間に何度も発行し直さないようにするためのもので、
- * 永続化はしない（プロセスが再起動すれば消える簡易キャッシュ）。
+ * ストレージパスを、/api/photo プロキシ経由の配信URLに変換する。
+ *
+ * 以前は Supabase の署名付きURLをここで直接発行していたが、署名URLは
+ * クエリの token/expires が毎回変わるためブラウザキャッシュが効かず、
+ * Storage の egress（配信量）を無駄に消費していた。
+ * ここではパスから決まる安定した URL だけを返し、実際の署名・配信は
+ * リクエストの都度 /api/photo/[...path] ルートが行う（認可チェックもそちら）。
  */
-const signedUrlCache = new Map<string, CachedSignedUrl>();
+function photoProxyUrl(path: string, opts?: { thumb?: boolean }): string {
+  const encodedPath = path
+    .split("/")
+    .map((segment) => encodeURIComponent(segment))
+    .join("/");
+  return opts?.thumb ? `/api/photo/${encodedPath}?thumb=1` : `/api/photo/${encodedPath}`;
+}
 
-/** ストレージのパス群を署名付き URL に変換する。失敗したものは除外する */
-export async function signPhotoPaths(supabase: DB, paths: string[]): Promise<Map<string, string>> {
+export async function signPhotoPaths(_supabase: DB, paths: string[]): Promise<Map<string, string>> {
   const result = new Map<string, string>();
-  const unique = [...new Set(paths.filter(Boolean))];
-  if (unique.length === 0) return result;
-
-  const now = Date.now();
-  const toFetch: string[] = [];
-  for (const path of unique) {
-    const cached = signedUrlCache.get(path);
-    if (cached && cached.expiresAt > now) {
-      result.set(path, cached.signedUrl);
-    } else {
-      toFetch.push(path);
-    }
-  }
-  if (toFetch.length === 0) return result;
-
-  const { data, error } = await supabase.storage.from(PHOTO_BUCKET).createSignedUrls(toFetch, SIGNED_URL_TTL_SECONDS);
-  if (error || !data) return result;
-
-  const expiresAt = now + SIGNED_URL_TTL_SECONDS * 1000 - SIGNED_URL_REFRESH_MARGIN_MS;
-  for (const item of data) {
-    if (item.signedUrl && item.path) {
-      result.set(item.path, item.signedUrl);
-      signedUrlCache.set(item.path, { signedUrl: item.signedUrl, expiresAt });
-    }
+  for (const path of new Set(paths.filter(Boolean))) {
+    result.set(path, photoProxyUrl(path));
   }
   return result;
 }
 
-export async function signPhotoPath(supabase: DB, path: string | null | undefined): Promise<string | null> {
+export async function signPhotoPath(_supabase: DB, path: string | null | undefined): Promise<string | null> {
   if (!path) return null;
-  const map = await signPhotoPaths(supabase, [path]);
-  return map.get(path) ?? null;
+  return photoProxyUrl(path);
 }
 
 /**
- * 一覧・アイコンなど小さい表示専用。サムネイル版があればそちらの署名URLを、
- * 無ければ（古い投稿など）原寸にフォールバックする。返る Map は元のパスをキーにする
+ * 一覧・アイコンなど小さい表示専用。サムネイル版があればそちらを、
+ * 無ければ（古い投稿など）原寸にフォールバックする配信URLを返す。
+ * サムネイルが実際に存在するかどうかの判定はリクエスト時に /api/photo 側で行う
  */
-export async function signThumbOrOriginalPaths(supabase: DB, paths: string[]): Promise<Map<string, string>> {
-  const unique = [...new Set(paths.filter(Boolean))];
-  if (unique.length === 0) return new Map();
-
-  const thumbPathFor = new Map(unique.map((path) => [path, toThumbPath(path)] as const));
-  const thumbUrls = await signPhotoPaths(supabase, [...thumbPathFor.values()]);
-
-  const missing = unique.filter((path) => !thumbUrls.has(thumbPathFor.get(path)!));
-  const fallbackUrls = missing.length > 0 ? await signPhotoPaths(supabase, missing) : new Map<string, string>();
-
+export async function signThumbOrOriginalPaths(_supabase: DB, paths: string[]): Promise<Map<string, string>> {
   const result = new Map<string, string>();
-  for (const path of unique) {
-    const url = thumbUrls.get(thumbPathFor.get(path)!) ?? fallbackUrls.get(path);
-    if (url) result.set(path, url);
+  for (const path of new Set(paths.filter(Boolean))) {
+    result.set(path, photoProxyUrl(path, { thumb: true }));
   }
   return result;
 }
