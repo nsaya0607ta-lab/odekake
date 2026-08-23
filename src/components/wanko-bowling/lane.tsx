@@ -68,7 +68,7 @@ const DIRECT_IMPULSE_WEIGHT = 0.16;
 const CHAIN_IMPULSE_WEIGHT = 0.24;
 const DIRECT_SIDE_BONUS_MPS = 0.06;
 const CHAIN_SIDE_BONUS_MPS = 0.13;
-const CHAIN_SIDE_THRESHOLD_REDUCTION = 0.16;
+const CHAIN_SIDE_THRESHOLD_REDUCTION = 0;
 
 type Point = { x: number; y: number; t: number };
 type GutterSide = "left" | "right" | null;
