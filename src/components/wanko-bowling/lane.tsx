@@ -78,6 +78,9 @@ const CURVE_DEAD_ZONE_RAD = 6 * Math.PI / 180;
 const CURVE_FULL_SCALE_RAD = 22 * Math.PI / 180;
 const CURVE_BOW_DEAD_ZONE_PCT = 1.0;
 const CURVE_BOW_FULL_SCALE_PCT = 6;
+// 始点→終点の直線に対して、軌跡が同じ側へ継続的に膨らんでいるかを見る。
+// 斜め一直線＋指ブレだけでカーブ判定される誤検知を防ぐための一致度。
+const CURVE_ARC_CONSISTENCY_MIN = 0.60;
 const MAX_CURVE_NORM = 0.68;
 const CURVE_STRAIGHT_SNAP = 0.10;
 
@@ -392,6 +395,12 @@ function mapLaunchAngleInput(rawAngleRad: number): number {
   return sign * (LEGACY_LAUNCH_ANGLE_RAD + extraRange * extraU);
 }
 
+/**
+ * カーブ判定は「斜めに投げたか」ではなく「指の軌跡そのものが弧を描いたか」で確定する。
+ * 前半/後半の角度差は従来どおりカーブ強度の材料に使うが、それだけではカーブにしない。
+ * 始点→終点を結んだ直線から中央区間が1%以上、かつ同じ側へ継続的に膨らんだときだけ
+ * curveNormを返す。これにより、斜め一直線のスワイプや一瞬の指ブレはストレートになる。
+ */
 function estimateCurveNorm(points: Point[], boardWidthPx: number): number {
   if (points.length < 5) return 0;
 
@@ -421,14 +430,39 @@ function estimateCurveNorm(points: Point[], boardWidthPx: number): number {
 
   const start = averagePoint(points.slice(0, Math.min(2, length)));
   const end = averagePoint(points.slice(-Math.min(2, length)));
-  const midStart = Math.max(1, Math.floor(length * 0.42));
-  const midEnd = Math.min(length - 1, Math.ceil(length * 0.62));
-  const mid = averagePoint(points.slice(midStart, midEnd + 1));
-  const totalUp = Math.max(1, start.y - end.y);
-  const progress = clamp((start.y - mid.y) / totalUp, 0, 1);
-  const straightX = start.x + (end.x - start.x) * progress;
-  const bowPct = ((mid.x - straightX) / Math.max(1, boardWidthPx)) * 100;
+  const chordX = end.x - start.x;
+  const chordY = end.y - start.y;
+  const chordLength = Math.max(1, Math.hypot(chordX, chordY));
+  const arcStartIndex = Math.max(1, Math.floor(length * 0.20));
+  const arcEndIndex = Math.min(length - 2, Math.ceil(length * 0.80));
+
+  let signedDeviationSumPx = 0;
+  let absoluteDeviationSumPx = 0;
+  let deviationSampleCount = 0;
+
+  for (let i = arcStartIndex; i <= arcEndIndex; i += 1) {
+    const point = points[i]!;
+    // 始点→終点の直線に対する符号付き垂直距離。
+    // 直線そのものが斜めでも距離はほぼ0なので、launchAngleとは独立して判定できる。
+    const signedDeviationPx =
+      (chordX * (point.y - start.y) - chordY * (point.x - start.x)) / chordLength;
+    signedDeviationSumPx += signedDeviationPx;
+    absoluteDeviationSumPx += Math.abs(signedDeviationPx);
+    deviationSampleCount += 1;
+  }
+
+  const averageSignedDeviationPx = signedDeviationSumPx / Math.max(1, deviationSampleCount);
+  const bowPct = (averageSignedDeviationPx / Math.max(1, boardWidthPx)) * 100;
   const bowMagnitude = Math.abs(bowPct);
+  const arcConsistency = absoluteDeviationSumPx > 0.000001
+    ? Math.abs(signedDeviationSumPx) / absoluteDeviationSumPx
+    : 0;
+
+  // 角度差だけではカーブにしない。実際の軌跡が直線から十分に膨らみ、
+  // かつ中央区間の大半が同じ側へ曲がっていることを必須条件にする。
+  if (bowMagnitude <= CURVE_BOW_DEAD_ZONE_PCT || arcConsistency < CURVE_ARC_CONSISTENCY_MIN) {
+    return 0;
+  }
 
   let bowSignal = 0;
   if (bowMagnitude > CURVE_BOW_DEAD_ZONE_PCT) {
@@ -441,6 +475,8 @@ function estimateCurveNorm(points: Point[], boardWidthPx: number): number {
     bowSignal = Math.sign(bowPct) * scaled;
   }
 
+  // 強度マッピング自体は従来の78%/22%を維持する。
+  // 今回変えるのは「カーブ認定条件」であり、カーブの乗りやすさや最大値ではない。
   const combined = clamp(angleSignal * 0.78 + bowSignal * 0.22, -1, 1);
   if (Math.abs(combined) < CURVE_STRAIGHT_SNAP) return 0;
   return combined * MAX_CURVE_NORM;
