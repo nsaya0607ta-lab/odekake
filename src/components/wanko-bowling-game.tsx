@@ -366,20 +366,20 @@ export function WankoBowlingGame({ ownedBalls }: { ownedBalls: OwnedBowlingBall[
   }
 
   return (
-    <section className={`relative h-full min-h-0 overflow-hidden ${shake ? "wanko-bowl-shake" : ""}`}>
-      <div className="relative h-full min-h-0 px-0.5 pb-0.5">
-        <Lane ballVisual={ballVisual} resetSignal={laneResetSignal} active={!rollLocked} onRoll={handleRoll} />
+    <section className={`relative flex h-full min-h-0 flex-col overflow-hidden ${shake ? "wanko-bowl-shake" : ""}`}>
+      <div className="pointer-events-none relative z-30 shrink-0 [&>div]:!mx-0 [&>div]:!mt-0 [&>div]:!w-full [&>div]:!rounded-b-none [&>div]:!shadow-none">
+        <ScoreBoard
+          frames={frames}
+          score={score}
+          currentFrameIndex={frameIndex}
+          liveScore={liveScore}
+          bestScore={bestScore}
+          lastRollPins={lastRollPins}
+        />
+      </div>
 
-        <div className="pointer-events-none absolute left-2 right-2 top-2 z-30">
-          <ScoreBoard
-            frames={frames}
-            score={score}
-            currentFrameIndex={frameIndex}
-            liveScore={liveScore}
-            bestScore={bestScore}
-            lastRollPins={lastRollPins}
-          />
-        </div>
+      <div className="relative -mt-px min-h-0 flex-1 [&>div]:!rounded-t-none">
+        <Lane ballVisual={ballVisual} resetSignal={laneResetSignal} active={!rollLocked} onRoll={handleRoll} />
 
         {banner ? (
           <div className="pointer-events-none absolute left-1/2 top-[35%] z-40 -translate-x-1/2">
