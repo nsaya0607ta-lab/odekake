@@ -39,7 +39,7 @@ import {
 } from "@/lib/games/wanko-bowling-physics";
 
 const DOCK_Y = 94;
-const HEAD_PIN_SCREEN_Y = 21.5;
+const HEAD_PIN_SCREEN_Y = 19.5;
 const MIN_UPWARD_PCT = 8;
 const MAX_THROW_MS = 7000;
 const MAX_SWIPE_SAMPLES = 64;
@@ -56,9 +56,15 @@ const GUTTER_BALL_DRAG_PER_SEC = 0.035;
 const FOUL_LINE_Y = 97;
 const PIN_ROW_DEPTH_M = JB_PIN_SPACING_M * Math.sqrt(3) / 2;
 const PIN_DECK_DEPTH_M = PIN_ROW_DEPTH_M * 3;
-// ピンデッキ全体（1番ピン〜奥のピン列）が画面上で占める奥行き量。
-// ボールとピンが同じworldYToPctを使うための係数として使う（下記コメント参照）。
-const PIN_DECK_SCREEN_DEPTH_PCT = 8.4;
+// ピンデッキは実距離を変えず、画面上だけ遠近感を強めてコンパクトなラックに見せる。
+// ボールとピンは同じworldYToPct/worldXToPctを使うため、衝突位置との見た目のズレは生じない。
+const PIN_DECK_SCREEN_DEPTH_PCT = 4.2;
+const PIN_DECK_LANE_CONVERGENCE_PCT = 2.5;
+const HEAD_PIN_LANE_HALF_PCT = 43 - 20;
+const HEAD_PIN_LANE_APPROACH_SLOPE_PCT_PER_M = (20 * 0.68) / JB_HEAD_PIN_DISTANCE_M;
+const PIN_DECK_LANE_QUADRATIC_TERM_PCT_PER_M2 =
+  (PIN_DECK_LANE_CONVERGENCE_PCT - HEAD_PIN_LANE_APPROACH_SLOPE_PCT_PER_M * PIN_DECK_DEPTH_M)
+  / (PIN_DECK_DEPTH_M * PIN_DECK_DEPTH_M);
 const TARGET_BOARDS = [5, 10, 15, 20, 25, 30, 35] as const;
 const GUIDE_DISTANCE_M = 7 * 0.3048;
 const TARGET_DISTANCE_M = 15 * 0.3048;
@@ -145,7 +151,16 @@ function averagePoint(points: Point[]): Point {
 
 function laneHalfWidthPct(distanceM: number): number {
   const depth = clamp(distanceM / JB_HEAD_PIN_DISTANCE_M, 0, 1);
-  return 43 - 20 * Math.pow(depth, 0.68);
+  const approachHalf = 43 - 20 * Math.pow(depth, 0.68);
+  if (distanceM <= JB_HEAD_PIN_DISTANCE_M) return approachHalf;
+
+  // 1番ピンより奥もレーン幅の遠近収束を続ける。
+  // 1番ピン地点の傾きから連続的に始める二次式なので、ボールがピンデッキへ
+  // 入った瞬間に横方向だけ急にワープして見えることはない。
+  const deckM = clamp(distanceM - JB_HEAD_PIN_DISTANCE_M, 0, PIN_DECK_DEPTH_M);
+  return HEAD_PIN_LANE_HALF_PCT
+    - HEAD_PIN_LANE_APPROACH_SLOPE_PCT_PER_M * deckM
+    - PIN_DECK_LANE_QUADRATIC_TERM_PCT_PER_M2 * deckM * deckM;
 }
 
 function gutterVisualWidthPct(distanceM: number): number {
@@ -159,8 +174,9 @@ function gutterVisualWidthPct(distanceM: number): number {
 // 「ボールが一瞬だけ加速して見える」だけでなく「ボールとピンの表示位置がずれる」
 // 直接の原因にもなる）。
 const HEAD_PIN_APPROACH_SLOPE_PCT_PER_M = ((DOCK_Y - HEAD_PIN_SCREEN_Y) * 0.9) / JB_HEAD_PIN_DISTANCE_M;
-// ピンデッキ側は「1番ピンでの傾きから始まり、奥に向かって滑らかに加速する」
-// 二次カーブにして、傾きの不連続なしに従来と同じ奥行き（PIN_DECK_SCREEN_DEPTH_PCT）に到達させる。
+// ピンデッキ側は「1番ピンでの傾きから始まり、奥へ滑らかにつながる」二次カーブ。
+// 以前の8.4%は奥の列ほど間隔が広がってラックが縦長に見えていたため、
+// 物理位置はそのまま4.2%へ圧縮して遠景らしいまとまりを持たせる。
 const PIN_DECK_QUADRATIC_TERM_PCT_PER_M2 =
   (PIN_DECK_SCREEN_DEPTH_PCT - HEAD_PIN_APPROACH_SLOPE_PCT_PER_M * PIN_DECK_DEPTH_M)
   / (PIN_DECK_DEPTH_M * PIN_DECK_DEPTH_M);
@@ -244,7 +260,8 @@ function pinVisualWidthPct(distanceM: number): number {
     0,
     1,
   );
-  return PIN_VISUAL_WIDTH_PCT - deckDepth * 0.3;
+  // 奥の列ほど一段ずつ小さくし、遠景なのに全ピンが同じ大きさに見える違和感をなくす。
+  return PIN_VISUAL_WIDTH_PCT - deckDepth * 0.8;
 }
 
 function pinPairCollisionRadius(a: PinBody, b: PinBody): number {
