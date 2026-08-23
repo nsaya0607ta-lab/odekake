@@ -253,14 +253,7 @@ function pinPairCollisionRadius(a: PinBody, b: PinBody): number {
 }
 
 /**
- * 予測ライン用に、実際の投球物理（摩擦＋回転モデル、ball-pin衝突は含まない）を
- * ピンライン到達まで短時間シミュレーションし、画面座標(%)のサンプル列を返す。
- * 見た目だけのベジェ曲線などは使わず、実際にstep()と同じ式で前進計算する。
- * リリース速度はスワイプ前は未確定のため、基準投球速度（GAME_REFERENCE_SPEED_MPS）を使う。
- */
-/**
- * curveNormからaxisRotationとcurveSignを決める。実ゲーム物理(runThrow)と
- * 予測軌道(simulateTrajectoryPreview)で必ず同じ変換を使うよう共通化する。
+ * curveNormからaxisRotationとcurveSignを決める。
  *
  * - axisRotation = MAX_AXIS_ROTATION_DEG * curveInput^AXIS_ROTATION_INPUT_EXPONENT
  *   （スイープ検証の結果、45°上限は総合成績が最下位だったため35°に、
@@ -275,100 +268,6 @@ function computeAxisRotation(launchAngleRad: number, curveNorm: number): { axisR
   const axisRotationRad = (MAX_AXIS_ROTATION_DEG * Math.pow(curve01, AXIS_ROTATION_INPUT_EXPONENT)) * Math.PI / 180;
   const curveSign = launchAngleRad !== 0 ? Math.sign(launchAngleRad) : Math.sign(curveNorm);
   return { axisRotationRad, curveSign };
-}
-
-function simulateTrajectoryPreview(
-  startXM: number,
-  launchAngleRad: number,
-  curveNorm: number,
-  speedMps: number = GAME_REFERENCE_SPEED_MPS,
-): { xPct: number; yPct: number }[] {
-  let bxM = startXM;
-  let byM = 0;
-  let bvxMps = speedMps * Math.sin(launchAngleRad);
-  let bvyMps = speedMps * Math.cos(launchAngleRad);
-
-  const { axisRotationRad, curveSign } = computeAxisRotation(launchAngleRad, curveNorm);
-  const axisTiltRad = SPIN_AXIS_TILT_DEG * Math.PI / 180;
-  const spinMagnitudeRadS = SPIN_MAGNITUDE_REF_RAD_S * (speedMps / GAME_REFERENCE_SPEED_MPS);
-  const horizontalSpinRadS = spinMagnitudeRadS * Math.cos(axisTiltRad);
-  let omegaXRadS = -horizontalSpinRadS * Math.cos(axisRotationRad);
-  let omegaYRadS = -curveSign * horizontalSpinRadS * Math.sin(axisRotationRad);
-  let omegaZRadS = spinMagnitudeRadS * Math.sin(axisTiltRad);
-  let phiRad = Math.atan(omegaYRadS / omegaXRadS);
-
-  const maxLateralSpeedMps = Math.max(1.2, speedMps * 0.55);
-  const laneLeftM = JB_GUTTER_WIDTH_M;
-  const laneRightM = JB_GUTTER_WIDTH_M + JB_LANE_WIDTH_M;
-
-  const samples: { xPct: number; yPct: number }[] = [
-    { xPct: worldXToPct(bxM, byM), yPct: worldYToPct(byM) },
-  ];
-  const dt = 1 / 60;
-  let steps = 0;
-  while (byM < JB_HEAD_PIN_DISTANCE_M && steps < 900) {
-    const onOil = byM < GAME_OIL_LENGTH_M;
-    const mu = onOil ? OIL_FRICTION_MU : DRY_FRICTION_MU;
-    const slipX = bvxMps - BALL_SPIN_RADIUS_M * omegaYRadS;
-    const slipY = bvyMps + BALL_SPIN_RADIUS_M * omegaXRadS;
-    const slipSpeed = Math.hypot(slipX, slipY);
-    let dvx = 0;
-    let dvy = 0;
-    if (slipSpeed > SLIP_EPSILON_MPS) {
-      dvx = -mu * GRAVITY_MPS2 * (slipX / slipSpeed);
-      dvy = -mu * GRAVITY_MPS2 * (slipY / slipSpeed);
-    }
-
-    const cosPhi = Math.cos(phiRad);
-    const sinPhi = Math.sin(phiRad);
-    const omegaXPrime = omegaXRadS * cosPhi + omegaYRadS * sinPhi;
-    const omegaYPrime = -omegaXRadS * sinPhi + omegaYRadS * cosPhi;
-    const termA =
-      (GAME_BALL_MASS_KG * BALL_SPIN_RADIUS_M * (dvy * cosPhi + dvx * sinPhi)
-        + (BALL_INERTIA_Y_KGM2 - BALL_INERTIA_Z_KGM2) * omegaYPrime * omegaZRadS)
-      / BALL_INERTIA_X_KGM2;
-    const termB =
-      (GAME_BALL_MASS_KG * BALL_SPIN_RADIUS_M * (-dvy * sinPhi - dvx * cosPhi)
-        + (BALL_INERTIA_Z_KGM2 - BALL_INERTIA_X_KGM2) * omegaXPrime * omegaZRadS)
-      / BALL_INERTIA_Y_KGM2;
-    const domegaXdt = termA * cosPhi - termB * sinPhi;
-    const domegaYdt = termA * sinPhi + termB * cosPhi;
-    const domegaZdt =
-      ((BALL_INERTIA_X_KGM2 - BALL_INERTIA_Y_KGM2) / BALL_INERTIA_Z_KGM2) * omegaXPrime * omegaYPrime;
-    const omegaHorizSq = omegaXRadS * omegaXRadS + omegaYRadS * omegaYRadS;
-    const dphiDt = omegaHorizSq > 0
-      ? (domegaYdt * omegaXRadS - domegaXdt * omegaYRadS) / omegaHorizSq
-      : 0;
-
-    bvxMps += dvx * dt;
-    bvyMps += dvy * dt;
-    omegaXRadS += domegaXdt * dt;
-    omegaYRadS += domegaYdt * dt;
-    omegaZRadS += domegaZdt * dt;
-    phiRad += dphiDt * dt;
-
-    if (Math.abs(bvxMps) > maxLateralSpeedMps) {
-      const speed = Math.hypot(bvxMps, bvyMps);
-      const cappedVx = Math.sign(bvxMps) * maxLateralSpeedMps;
-      const remaining = Math.max(0, speed * speed - cappedVx * cappedVx);
-      bvyMps = Math.sign(bvyMps || 1) * Math.sqrt(remaining);
-      bvxMps = cappedVx;
-    }
-
-    bxM += bvxMps * dt;
-    byM += bvyMps * dt;
-    if (bxM <= laneLeftM || bxM >= laneRightM) {
-      samples.push({ xPct: worldXToPct(clamp(bxM, laneLeftM, laneRightM), byM), yPct: worldYToPct(byM) });
-      break;
-    }
-
-    steps += 1;
-    if (steps % 3 === 0) {
-      samples.push({ xPct: worldXToPct(bxM, byM), yPct: worldYToPct(byM) });
-    }
-  }
-
-  return samples;
 }
 
 /**
@@ -645,12 +544,6 @@ export function Lane({ ballVisual, resetSignal, newGameSignal, active, onRoll }:
     new Map(PIN_LAYOUT.map((pin) => [pin.id, createPinBody(pin)])),
   );
   const pinNodesRef = useRef<Map<number, HTMLDivElement>>(new Map());
-  const [aimPreview, setAimPreview] = useState<{
-    trajectory: { xPct: number; yPct: number }[];
-    aimLine: { x1: number; y1: number; x2: number; y2: number };
-    curveNorm: number;
-    launchAngleDeg: number;
-  } | null>(null);
 
   const setPositionLocked = useCallback((locked: boolean) => {
     positionLockedRef.current = locked;
@@ -1237,7 +1130,6 @@ export function Lane({ ballVisual, resetSignal, newGameSignal, active, onRoll }:
       activePointerRef.current = null;
       pointerModeRef.current = null;
       pointsRef.current = [];
-      setAimPreview(null);
       return;
     }
 
@@ -1266,31 +1158,6 @@ export function Lane({ ballVisual, resetSignal, newGameSignal, active, onRoll }:
     if (pointsRef.current.length > MAX_SWIPE_SAMPLES) {
       pointsRef.current.splice(1, pointsRef.current.length - MAX_SWIPE_SAMPLES);
     }
-
-    const board = boardRef.current;
-    if (!board) return;
-    const rect = board.getBoundingClientRect();
-    const startXM = ballStartXRef.current;
-    // プレビューは投球判定より早く出したいので、しきい値をゆるめにする。
-    const aim = computeAimFromPoints(pointsRef.current, rect, startXM, MIN_UPWARD_PCT * 0.4);
-    if (!aim) {
-      setAimPreview(null);
-      return;
-    }
-
-    const trajectory = simulateTrajectoryPreview(startXM, aim.launchAngleRad, aim.curveNorm);
-    const aimWorldX = startXM + JB_HEAD_PIN_DISTANCE_M * Math.tan(aim.launchAngleRad);
-    setAimPreview({
-      trajectory,
-      aimLine: {
-        x1: worldXToPct(startXM, 0),
-        y1: worldYToPct(0),
-        x2: worldXToPct(aimWorldX, JB_HEAD_PIN_DISTANCE_M),
-        y2: HEAD_PIN_SCREEN_Y,
-      },
-      curveNorm: aim.curveNorm,
-      launchAngleDeg: aim.launchAngleRad * 180 / Math.PI,
-    });
   }, [setStartPositionFromScreenX]);
 
   const onPointerUp = useCallback((event: ReactPointerEvent<HTMLDivElement>) => {
@@ -1310,7 +1177,6 @@ export function Lane({ ballVisual, resetSignal, newGameSignal, active, onRoll }:
 
     const points = pointsRef.current;
     pointsRef.current = [];
-    setAimPreview(null);
     if (!active || throwingRef.current || dockingRef.current || points.length < 2) return;
 
     const board = boardRef.current;
@@ -1337,7 +1203,6 @@ export function Lane({ ballVisual, resetSignal, newGameSignal, active, onRoll }:
     activePointerRef.current = null;
     pointerModeRef.current = null;
     pointsRef.current = [];
-    setAimPreview(null);
   }, []);
 
   const handleConfirmPosition = useCallback((event: ReactPointerEvent<HTMLButtonElement>) => {
@@ -1448,54 +1313,6 @@ export function Lane({ ballVisual, resetSignal, newGameSignal, active, onRoll }:
               }}
             />
           )}
-        </div>
-      )}
-
-      {aimPreview && (
-        <svg
-          className="pointer-events-none absolute inset-0 h-full w-full"
-          viewBox="0 0 100 100"
-          preserveAspectRatio="none"
-          aria-hidden="true"
-        >
-          <line
-            x1={aimPreview.aimLine.x1}
-            y1={aimPreview.aimLine.y1}
-            x2={aimPreview.aimLine.x2}
-            y2={aimPreview.aimLine.y2}
-            stroke="rgba(255,255,255,0.4)"
-            strokeWidth="0.25"
-            strokeDasharray="1.2,1.2"
-          />
-          <polyline
-            points={aimPreview.trajectory.map((p) => `${p.xPct},${p.yPct}`).join(" ")}
-            fill="none"
-            stroke={aimPreview.curveNorm >= 0 ? "rgba(255,196,90,0.75)" : "rgba(122,196,255,0.75)"}
-            strokeWidth="0.4"
-            strokeLinecap="round"
-          />
-          {aimPreview.trajectory.length >= 2 && (() => {
-            const tip = aimPreview.trajectory[aimPreview.trajectory.length - 1]!;
-            const prev = aimPreview.trajectory[aimPreview.trajectory.length - 2]!;
-            const angleDeg = Math.atan2(tip.xPct - prev.xPct, prev.yPct - tip.yPct) * 180 / Math.PI;
-            return (
-              <polygon
-                points="0,-1.6 0.9,0.9 -0.9,0.9"
-                fill={aimPreview.curveNorm >= 0 ? "rgba(255,196,90,0.9)" : "rgba(122,196,255,0.9)"}
-                transform={`translate(${tip.xPct} ${tip.yPct}) rotate(${angleDeg})`}
-              />
-            );
-          })()}
-        </svg>
-      )}
-
-      {aimPreview && (
-        <div
-          className="pointer-events-none absolute left-1/2 top-2 z-[1200] -translate-x-1/2 rounded-full bg-[#2f2119]/78 px-3 py-1 text-[11px] font-black text-white shadow-lg backdrop-blur-sm"
-          aria-hidden="true"
-        >
-          角度 {aimPreview.launchAngleDeg >= 0 ? "+" : ""}{aimPreview.launchAngleDeg.toFixed(1)}°
-          ・カーブ {Math.round((Math.abs(aimPreview.curveNorm) / MAX_CURVE_NORM) * 100)}%
         </div>
       )}
 
