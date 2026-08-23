@@ -51,13 +51,17 @@ export default async function WankoBowlingPage() {
         backHref="/games"
         title="わんこボウリング"
         action={(
-          <span className="rounded-full bg-leaf-soft px-2.5 py-1 text-[10px] font-black tracking-[0.12em] text-leaf-deep">
-            10 FRAME
-          </span>
+          <a
+            href="#wanko-bowling-ranking"
+            className="pressable shrink-0 rounded-full border border-[#c9b88e] bg-[#fffaf0] px-2.5 py-2 text-[9px] font-black leading-none text-leaf-deep shadow-[0_2px_7px_rgba(85,63,31,0.08)] active:scale-[0.97]"
+            aria-label="フレンドのスコアを見る"
+          >
+            フレンドのスコアを見る
+          </a>
         )}
       />
 
-      <main id="wanko-bowling-scroll" className="min-h-0 flex-1 overflow-y-auto overscroll-none">
+      <main id="wanko-bowling-scroll" className="min-h-0 flex-1 overflow-y-auto overscroll-none scroll-smooth">
         <div
           className="h-full min-h-0 px-1.5 pt-1.5"
           style={{ paddingBottom: "max(6px, env(safe-area-inset-bottom))" }}
@@ -65,7 +69,7 @@ export default async function WankoBowlingPage() {
           <WankoBowlingGame ownedBalls={ownedBalls} />
         </div>
 
-        <div id="wanko-bowling-ranking" className="px-2 pb-6 pt-3">
+        <div id="wanko-bowling-ranking" className="scroll-mt-3 px-2 pb-6 pt-3">
           <WankoBowlingRanking />
         </div>
       </main>
