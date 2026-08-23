@@ -15,9 +15,9 @@ export type PinLayout = {
 
 /**
  * 物理上の中心間隔は公認12インチのまま維持する。
- * スマホでは遠近で隙間が強調されるため、表示だけ少し大きくして実際のラックらしく見せる。
+ * 正面視点では遠くのピンが小さく見えすぎないよう、表示だけ少し大きくする。
  */
-export const PIN_VISUAL_WIDTH_PCT = 4.5;
+export const PIN_VISUAL_WIDTH_PCT = 5.0;
 
 const PIN_IMAGE_SRC = "/games/wanko-bowling/pin.webp";
 const halfSpacingM = JB_PIN_SPACING_M / 2;
@@ -68,7 +68,9 @@ export function Pins({ registerNode }: PinsProps) {
             aria-hidden="true"
             draggable={false}
             className="block h-auto w-full select-none"
-            style={{ filter: "drop-shadow(0 2px 1.4px rgba(54,35,22,0.38)) drop-shadow(0 -0.5px 0.5px rgba(255,255,255,0.26))" }}
+            style={{
+              filter: "drop-shadow(0 3px 2px rgba(38,30,22,0.44)) drop-shadow(0 -0.7px 0.7px rgba(255,255,255,0.30))",
+            }}
           />
         </div>
       ))}
