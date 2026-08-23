@@ -28,9 +28,9 @@ export const JB_PIN_HEIGHT_M = 0.38085;
 export const JB_BALL_DIAMETER_M = (0.2159 + 0.2183) / 2;
 /**
  * ボール重量は規格上16lb（7.25kg）以下。
- * 今回のゲーム設定では全ボールを10lb相当として統一する。
+ * 今回のゲーム設定では全ボールを7lb相当として統一する。
  */
-export const GAME_BALL_MASS_KG = 10 * 0.45359237;
+export const GAME_BALL_MASS_KG = 7 * 0.45359237;
 
 /** JAPAN BOWLING掲載の大会パターン例 42ft。ゲームの標準オイル長として採用。 */
 export const GAME_OIL_LENGTH_M = 42 * 0.3048;
@@ -45,13 +45,17 @@ export const GAME_MAX_BALL_SPEED_KMH = 38;
 /**
  * ピンが底縁を支点に倒れ始めるために必要な重心上昇を簡易モデル化。
  * 実際には摩擦・弾性・ピン形状が絡むため、計算値に安全係数を掛けてゲーム用閾値にする。
+ *
+ * ボール直撃は従来どおりある程度の速度を必要とする一方、
+ * すでに動いているピンからの衝撃は実物では横倒し・滑走・回転が加わるため、
+ * 2Dモデルでは連鎖側の閾値を低めにしてピンキャリーを補正する。
  */
 const PIN_BASE_RADIUS_M = 0.0254;
 const GRAVITY_MPS2 = 9.80665;
 const cogRiseM = Math.hypot(JB_PIN_COG_M, PIN_BASE_RADIUS_M) - JB_PIN_COG_M;
 const idealTipSpeedMps = Math.sqrt(2 * GRAVITY_MPS2 * cogRiseM);
 export const PIN_DIRECT_KNOCK_SPEED_MPS = idealTipSpeedMps * 1.55;
-export const PIN_CHAIN_KNOCK_SPEED_MPS = idealTipSpeedMps * 1.9;
+export const PIN_CHAIN_KNOCK_SPEED_MPS = idealTipSpeedMps * 1.45;
 
 /**
  * 公認42ftパターン例を土台にしたゲーム用フック近似。
@@ -65,10 +69,15 @@ export const BACKEND_HOOK_ACCEL_MPS2 = 1.85;
 
 /**
  * 反発係数は公認規格値ではないゲーム用近似。
- * 10lb化と合わせ、ボール→ピン衝突後は明確に減速するよう低めにする。
+ * ボール→ピンは大きく跳ね返らせず、ピン→ピンは連鎖が途中で消えない程度に
+ * エネルギーを残して2番・3番ピン以降へ衝撃を伝える。
  */
 export const BALL_PIN_RESTITUTION = 0.2;
-export const PIN_PIN_RESTITUTION = 0.32;
+export const PIN_PIN_RESTITUTION = 0.58;
 
-export const PIN_FRICTION_PER_SEC = 2.6;
-export const PIN_SETTLE_SPEED_MPS = 0.16;
+/**
+ * 倒れたピンがデッキ上を少し滑って次のピンへ当たり続けられるようにする。
+ * ピン同士の干渉を強めつつ、飛び回りすぎない範囲に抑える。
+ */
+export const PIN_FRICTION_PER_SEC = 1.85;
+export const PIN_SETTLE_SPEED_MPS = 0.09;

@@ -292,7 +292,7 @@ export function WankoBowlingGame({ ownedBalls }: { ownedBalls: OwnedBowlingBall[
         <section className="rough-card overflow-hidden">
           <div className="bg-leaf-soft px-4 py-7 text-center">
             <p className="text-[10px] font-black tracking-[0.16em] text-leaf-deep">GAME CLEAR!</p>
-            <p className="mt-1 text-2xl font-black text-ink">5フレーム おつかれさま！</p>
+            <p className="mt-1 text-2xl font-black text-ink">10フレーム おつかれさま！</p>
           </div>
 
           <div className="grid grid-cols-2 gap-3 p-4">
@@ -367,29 +367,22 @@ export function WankoBowlingGame({ ownedBalls }: { ownedBalls: OwnedBowlingBall[
 
   return (
     <section className={`relative flex h-full min-h-0 flex-col overflow-hidden ${shake ? "wanko-bowl-shake" : ""}`}>
-      <div className="shrink-0 px-2 py-1.5">
-        <div className="flex items-end justify-between gap-3 px-1">
-          <div>
-            <p className="text-[8px] font-black tracking-[0.15em] text-leaf-deep">LIVE SCORE</p>
-            <p className="text-[9px] font-bold text-ink-faint">確定 {score.total}</p>
-          </div>
-          <div className="flex items-end gap-2.5">
-            {lastRollPins !== null ? (
-              <p className="pb-0.5 text-[9px] font-black text-ink-soft">この投球 +{lastRollPins}本</p>
-            ) : null}
-            <p className="text-[28px] font-black tabular-nums leading-none text-ink">{liveScore}</p>
-          </div>
-        </div>
-        <div className="mt-1.5">
-          <ScoreBoard frames={frames} score={score} currentFrameIndex={frameIndex} />
-        </div>
+      <div className="pointer-events-none relative z-30 shrink-0 [&>div]:!mx-0 [&>div]:!mt-0 [&>div]:!w-full [&>div]:!rounded-b-none [&>div]:!shadow-none">
+        <ScoreBoard
+          frames={frames}
+          score={score}
+          currentFrameIndex={frameIndex}
+          liveScore={liveScore}
+          bestScore={bestScore}
+          lastRollPins={lastRollPins}
+        />
       </div>
 
-      <div className="relative min-h-0 flex-1 px-0.5 pb-0.5">
+      <div className="relative -mt-px min-h-0 flex-1 [&>div]:!rounded-t-none">
         <Lane ballVisual={ballVisual} resetSignal={laneResetSignal} active={!rollLocked} onRoll={handleRoll} />
 
         {banner ? (
-          <div className="pointer-events-none absolute left-1/2 top-[35%] z-20 -translate-x-1/2">
+          <div className="pointer-events-none absolute left-1/2 top-[35%] z-40 -translate-x-1/2">
             <p className="wanko-bowl-banner whitespace-nowrap text-[clamp(2.2rem,12vw,4.2rem)] font-black leading-none text-[#a8442f] drop-shadow-[0_3px_0_rgba(255,255,255,0.72)]">
               {banner}
             </p>

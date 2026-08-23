@@ -1,13 +1,13 @@
 /**
  * わんこボウリングのスコア計算
  * =============================================================
- * 通常の10フレームではなく5フレーム制。基本ルールは一般的なボウリングと同じ：
+ * 本来のボウリングと同じ10フレーム制：
  * - 1フレーム最大2投（ストライクなら1投で終了）
  * - ストライク・スペアのボーナス加算あり
- * - 最終（5）フレームだけストライク/スペア時にボーナス投球が発生する
+ * - 最終（10）フレームだけストライク/スペア時にボーナス投球が発生する
  */
 
-export const BOWLING_FRAME_COUNT = 5;
+export const BOWLING_FRAME_COUNT = 10;
 export const PINS_PER_FRAME = 10;
 
 export type BowlingFrame = {
@@ -151,7 +151,7 @@ function isValidRoll(value: unknown): value is number {
     && value <= PINS_PER_FRAME;
 }
 
-/** APIで受け取った完了済みラウンドが、5フレームの合法な投球列かを検証する。 */
+/** APIで受け取った完了済みラウンドが、10フレームの合法な投球列かを検証する。 */
 export function isValidCompletedBowlingFrames(value: unknown): value is BowlingFrame[] {
   if (!Array.isArray(value) || value.length !== BOWLING_FRAME_COUNT) return false;
 
@@ -324,7 +324,7 @@ export function createEmptyFrames(): BowlingFrame[] {
   return Array.from({ length: BOWLING_FRAME_COUNT }, () => ({ rolls: [], gutters: [] }));
 }
 
-/** 5フレーム制の理論上の満点（オールストライク）。 */
+/** 10フレーム制の理論上の満点（オールストライク）= 300点。 */
 export const BOWLING_PERFECT_SCORE = (() => {
   const perfectFrames: BowlingFrame[] = Array.from({ length: BOWLING_FRAME_COUNT }, (_, index) =>
     index === BOWLING_FRAME_COUNT - 1 ? { rolls: [10, 10, 10] } : { rolls: [10] });

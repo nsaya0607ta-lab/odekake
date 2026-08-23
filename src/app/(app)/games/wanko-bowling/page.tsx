@@ -29,17 +29,18 @@ export default async function WankoBowlingPage() {
   return (
     <div className="fixed inset-0 z-[50] flex h-dvh flex-col overflow-hidden bg-paper">
       <style>{`
-        /* 位置決めUIをボールの投球開始領域から離す。 */
+        /* 位置決めUIはレーン左上に固定し、投球開始領域から離す。 */
         [data-bowling-gesture-block="true"] > div:has(> button[aria-pressed]) {
           left: 12px !important;
-          bottom: 12% !important;
+          top: 12px !important;
+          bottom: auto !important;
           transform: scale(0.92);
-          transform-origin: left bottom;
+          transform-origin: left top;
         }
 
         @media (max-height: 720px) {
           [data-bowling-gesture-block="true"] > div:has(> button[aria-pressed]) {
-            bottom: 14% !important;
+            top: 10px !important;
           }
         }
       `}</style>
@@ -51,7 +52,7 @@ export default async function WankoBowlingPage() {
         title="わんこボウリング"
         action={(
           <span className="rounded-full bg-leaf-soft px-2.5 py-1 text-[10px] font-black tracking-[0.12em] text-leaf-deep">
-            5 FRAME
+            10 FRAME
           </span>
         )}
       />
