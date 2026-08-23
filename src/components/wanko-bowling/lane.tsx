@@ -684,7 +684,17 @@ export function Lane({ ballVisual, resetSignal, active, onRoll }: LaneProps) {
         if (gutterSide === null) {
           const hookFactor = onOil ? OIL_HOOK_FACTOR : DRY_HOOK_FACTOR;
           const drag = onOil ? OIL_BALL_DRAG_PER_SEC : DRY_BALL_DRAG_PER_SEC;
+          const speedBeforeHook = Math.hypot(bvxMps, bvyMps);
           bvxMps += launch.curveNorm * BACKEND_HOOK_ACCEL_MPS2 * hookFactor * dt;
+          // フックは進行方向を曲げるだけにする。速度成分をそのまま足すと、
+          // カーブをかけるほどオイルからドライへ移った瞬間に玉自体が
+          // 加速して見えてしまうため、フック適用後も速さは変えずに向きだけ変える。
+          const speedAfterHook = Math.hypot(bvxMps, bvyMps);
+          if (speedAfterHook > speedBeforeHook && speedAfterHook > 0.0001) {
+            const hookScale = speedBeforeHook / speedAfterHook;
+            bvxMps *= hookScale;
+            bvyMps *= hookScale;
+          }
           const ballDecay = Math.exp(-drag * dt);
           bvxMps *= ballDecay;
           bvyMps *= ballDecay;
