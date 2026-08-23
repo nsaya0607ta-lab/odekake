@@ -51,13 +51,13 @@ const TARGET_BOARDS = [5, 10, 15, 20, 25, 30, 35] as const;
 const GUIDE_DISTANCE_M = 7 * 0.3048;
 const TARGET_DISTANCE_M = 15 * 0.3048;
 
-// 直球は維持しつつ、意図したカーブは拾う。
-const CURVE_DEAD_ZONE_RAD = 4 * Math.PI / 180;
+// スマホの自然な指ブレはストレートとして扱い、意図したカーブだけを拾う。
+const CURVE_DEAD_ZONE_RAD = 6 * Math.PI / 180;
 const CURVE_FULL_SCALE_RAD = 22 * Math.PI / 180;
-const CURVE_BOW_DEAD_ZONE_PCT = 0.6;
+const CURVE_BOW_DEAD_ZONE_PCT = 1.0;
 const CURVE_BOW_FULL_SCALE_PCT = 6;
 const MAX_CURVE_NORM = 0.68;
-const CURVE_STRAIGHT_SNAP = 0.06;
+const CURVE_STRAIGHT_SNAP = 0.10;
 
 // 7lb球でもポケットヒット後にラック奥へ適度なエネルギーを残す。
 const BALL_POST_HIT_SPEED_FACTOR = 0.94;
@@ -483,13 +483,32 @@ export function Lane({ ballVisual, resetSignal, active, onRoll }: LaneProps) {
     }
   }, [writePinNode]);
 
-  const setBallPosition = useCallback((xM: number, yM: number, rotateDeg: number) => {
+  const setBallPosition = useCallback((
+    xM: number,
+    yM: number,
+    rotateDeg: number,
+    curveNorm = 0,
+    onOil = true,
+  ) => {
     const el = ballRef.current;
     if (!el) return;
     el.style.left = `${worldXToPct(xM, yM)}%`;
     el.style.top = `${worldYToPct(yM)}%`;
     el.style.width = `${ballVisualWidthPct(yM)}%`;
-    el.style.transform = `translate(-50%, -50%) rotate(${rotateDeg}deg)`;
+
+    const curveStrength = clamp(Math.abs(curveNorm) / MAX_CURVE_NORM, 0, 1);
+    if (curveStrength < 0.04) {
+      // ストレートは指穴が素直に縦方向へ回り続ける見え方。
+      el.style.transform = `translate(-50%, -50%) rotate(${rotateDeg}deg)`;
+      return;
+    }
+
+    // カーブは回転軸を傾け、ドライ部分では横スピン感を強める。
+    const curveDirection = Math.sign(curveNorm) || 1;
+    const surfaceFactor = onOil ? 0.58 : 1;
+    const sideSpinDeg = rotateDeg * curveStrength * surfaceFactor * 0.72 * curveDirection;
+    const axisTiltDeg = curveDirection * (8 + curveStrength * 14) * surfaceFactor;
+    el.style.transform = `translate(-50%, -50%) rotate(${rotateDeg + sideSpinDeg + axisTiltDeg}deg)`;
   }, []);
 
   const setStartPositionFromScreenX = useCallback((screenXPct: number) => {
@@ -562,9 +581,7 @@ export function Lane({ ballVisual, resetSignal, active, onRoll }: LaneProps) {
     let byM = 0;
     let bvxMps = launch.speedMps * Math.sin(launch.launchAngleRad);
     let bvyMps = launch.speedMps * Math.cos(launch.launchAngleRad);
-    let rollRotate = 0;
-    const curveStrength = clamp(Math.abs(launch.curveNorm) / MAX_CURVE_NORM, 0, 1);
-    const curveSpinDirection = Math.sign(launch.curveNorm) || 1;
+    let rotate = 0;
     let gutterSide: GutterSide = null;
     let ballDone = false;
     let finished = false;
@@ -676,16 +693,8 @@ export function Lane({ ballVisual, resetSignal, active, onRoll }: LaneProps) {
           }
         }
 
-        // ストレートは滑らかな前転、カーブは左右のスピン方向と軸の揺れを見た目にも出す。
-        const angularStepDeg = (Math.hypot(bvxMps, bvyMps) / BALL_RADIUS_M) * dt * (180 / Math.PI);
-        rollRotate += angularStepDeg;
-        const curveSpinBoost = curveStrength < 0.08
-          ? 0
-          : curveStrength * (onOil ? 0.35 : 0.95);
-        const visualRotate = curveStrength < 0.08
-          ? rollRotate
-          : rollRotate * curveSpinDirection * (1 + curveSpinBoost)
-            + Math.sin(byM * 2.2) * curveStrength * 7;
+        const angularSpeedRad = Math.hypot(bvxMps, bvyMps) / BALL_RADIUS_M;
+        rotate += angularSpeedRad * dt * (180 / Math.PI);
 
         if (gutterSide === null && byM >= JB_HEAD_PIN_DISTANCE_M - 1.35) {
           for (const pin of PIN_LAYOUT) {
@@ -760,7 +769,7 @@ export function Lane({ ballVisual, resetSignal, active, onRoll }: LaneProps) {
         }
 
         if (byM >= BALL_EXIT_DISTANCE_M) ballDone = true;
-        setBallPosition(bxM, byM, visualRotate);
+        setBallPosition(bxM, byM, rotate, launch.curveNorm, onOil);
       }
 
       const ids = [...pinBodiesRef.current.keys()];
