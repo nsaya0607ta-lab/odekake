@@ -5,6 +5,7 @@ import { BgmPlayer } from "@/components/bgm-player";
 import "./globals.css";
 import "./compact-form-fields.css";
 import "./lr-aura.css";
+import "./wanko-bowling-controls.css";
 
 // 手書き（サインペン）風の書体。日本語は分割数が多いため preload はしない。
 const yuseiMagic = Yusei_Magic({
