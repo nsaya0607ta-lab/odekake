@@ -1,7 +1,6 @@
 import { notFound } from "next/navigation";
 import { WankoBowlingGame } from "@/components/wanko-bowling-game";
 import { WankoBowlingRanking } from "@/components/wanko-bowling-ranking";
-import { BowlingPositionLockKeeper } from "@/components/wanko-bowling/position-lock-keeper";
 import { BowlingScreenLock } from "@/components/wanko-bowling/screen-lock";
 import { TopHeader } from "@/components/page-header";
 import { COLLECTION_ITEMS } from "@/lib/collection/items";
@@ -47,7 +46,6 @@ export default async function WankoBowlingPage() {
       `}</style>
 
       <BowlingScreenLock />
-      <BowlingPositionLockKeeper />
 
       <TopHeader
         backHref="/games"
