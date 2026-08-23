@@ -5,6 +5,7 @@ import { PageBody } from "@/components/page-body";
 import { PageHeader } from "@/components/page-header";
 import { SnsBackgroundBand } from "@/components/sns/sns-background-band";
 import { SnsIllustratedHero } from "@/components/sns/sns-illustrated-hero";
+import { SnsNotificationLink } from "@/components/sns/sns-notification-link";
 import { SnsUnreadSync } from "@/components/sns/sns-unread-sync";
 import { formatRelativeTimeJa } from "@/lib/date";
 import {
@@ -125,7 +126,9 @@ function NotificationRow({ item }: { item: SnsNotificationItem }) {
 
   return (
     <li>
-      <Link
+      <SnsNotificationLink
+        id={item.id}
+        kind={item.kind}
         href={item.href}
         className={`sns-notification-row pressable is-${item.kind} ${item.isUnread ? "is-unread" : ""}`}
       >
@@ -159,7 +162,7 @@ function NotificationRow({ item }: { item: SnsNotificationItem }) {
             {timeLabel ? <span className="text-ink-faint">{timeLabel}</span> : null}
           </span>
         </span>
-      </Link>
+      </SnsNotificationLink>
     </li>
   );
 }

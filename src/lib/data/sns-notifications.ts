@@ -19,8 +19,12 @@ const REPLY_POST_LIMIT = 20;
 
 export const SNS_NOTIFICATION_SEEN_AT_KEY = "sns_notifications_seen_at";
 export const SNS_NOTIFICATION_LIKE_COUNTS_KEY = "sns_notification_like_counts";
+export const SNS_NOTIFICATION_DISMISSED_IDS_KEY = "sns_notification_dismissed_ids";
 export const SNS_NOTIFICATION_PREFERENCES_KEY = "sns_notification_preferences";
 export const SNS_MUTED_GROUP_IDS_KEY = "sns_muted_group_ids";
+
+/** 個別既読IDの保存上限。無制限に増え続けないよう、直近分だけ残す */
+export const MAX_DISMISSED_IDS = 300;
 
 export type SnsNotificationKind = "reply" | "like" | "mention" | "group";
 
@@ -61,6 +65,7 @@ export type SnsNotificationCenter = {
 type NotificationReadState = {
   seenAt: string | null;
   likeCounts: Record<string, number>;
+  dismissedIds: Set<string>;
 };
 
 function recordOf(value: unknown): Record<string, unknown> {
@@ -80,6 +85,11 @@ function parseBoolean(value: unknown, fallback: boolean): boolean {
   return typeof value === "boolean" ? value : fallback;
 }
 
+function parseDismissedIds(value: unknown): Set<string> {
+  if (!Array.isArray(value)) return new Set();
+  return new Set(value.filter((id): id is string => typeof id === "string"));
+}
+
 /** 通知の既読状態と設定は同じJWTメタデータにあるため、1回の検証でまとめて読む。 */
 const getNotificationMetadata = cache(async function getNotificationMetadata(supabase: DB): Promise<{
   readState: NotificationReadState;
@@ -96,6 +106,7 @@ const getNotificationMetadata = cache(async function getNotificationMetadata(sup
     readState: {
       seenAt: typeof rawSeenAt === "string" && !Number.isNaN(Date.parse(rawSeenAt)) ? rawSeenAt : null,
       likeCounts: parseLikeCounts(metadata[SNS_NOTIFICATION_LIKE_COUNTS_KEY]),
+      dismissedIds: parseDismissedIds(metadata[SNS_NOTIFICATION_DISMISSED_IDS_KEY]),
     },
     preferences: {
       replies: parseBoolean(rawPreferences.replies, true),
@@ -113,7 +124,7 @@ export async function getSnsNotificationPreferences(supabase: DB): Promise<SnsNo
   return (await getNotificationMetadata(supabase)).preferences;
 }
 
-function ownLikeCount(post: SnsTextPostRow): number {
+export function ownLikeCount(post: SnsTextPostRow): number {
   return Math.max(0, Number(post.like_count) - (post.my_liked ? 1 : 0));
 }
 
@@ -174,9 +185,10 @@ export async function getSnsNotificationCenter(supabase: DB, userId: string): Pr
   ).catch(() => new Map<string, string>());
 
   const replyItems: SnsNotificationItem[] = preferences.replies ? replyRows.map(({ post, reply }) => {
-    const isUnread = Date.parse(reply.created_at) > seenAtMs;
+    const id = `reply:${reply.id}`;
+    const isUnread = Date.parse(reply.created_at) > seenAtMs && !readState.dismissedIds.has(id);
     return {
-      id: `reply:${reply.id}`,
+      id,
       kind: "reply",
       href: `/sns/posts/${post.id}`,
       title: `${reply.display_name}さんが返信しました`,
@@ -209,14 +221,15 @@ export async function getSnsNotificationCenter(supabase: DB, userId: string): Pr
   const replyNotificationIds = new Set(replyItems.map((item) => item.id));
   const mentionItems: SnsNotificationItem[] = preferences.mentions ? mentions.flatMap((mention) => {
     if (replyNotificationIds.has(mention.id)) return [];
-    const isUnread = Date.parse(mention.created_at) > seenAtMs;
+    const id = `mention:${mention.id}`;
+    const isUnread = Date.parse(mention.created_at) > seenAtMs && !readState.dismissedIds.has(id);
     const href = mention.group_id
       ? `/sns/groups/${mention.group_id}?view=chat`
       : mention.post_id
         ? `/sns/posts/${mention.post_id}`
         : "/sns/home";
     return [{
-      id: `mention:${mention.id}`,
+      id,
       kind: "mention" as const,
       href,
       title: `${mention.actor_display_name}さんがあなたをメンションしました`,
@@ -267,16 +280,21 @@ export const getSnsUnreadCount = cache(async function getSnsUnreadCount(
 ): Promise<number> {
   // 0060適用後は、最大20件あった返信RPCをDB内の集計1回へまとめる。
   // Preview DBへ未適用でも旧方式へ戻るため、段階的に公開できる。
-  const { data: fastCount, error: fastCountError } = await supabase.rpc("get_sns_unread_count");
-  if (!fastCountError) {
-    const count = Number(fastCount);
-    return Number.isFinite(count) ? Math.max(0, count) : 0;
-  }
-  if (!["42883", "PGRST202"].includes(fastCountError.code)) {
-    console.warn("Failed to use fast SNS unread count", {
-      code: fastCountError.code,
-      message: fastCountError.message,
-    });
+  // ただし個別既読(dismissedIds)はDB側の集計には反映されないため、
+  // 個別既読が1件でもある間は正確な件数を出せる低速経路にフォールバックする。
+  const { dismissedIds } = (await getNotificationMetadata(supabase)).readState;
+  if (dismissedIds.size === 0) {
+    const { data: fastCount, error: fastCountError } = await supabase.rpc("get_sns_unread_count");
+    if (!fastCountError) {
+      const count = Number(fastCount);
+      return Number.isFinite(count) ? Math.max(0, count) : 0;
+    }
+    if (!["42883", "PGRST202"].includes(fastCountError.code)) {
+      console.warn("Failed to use fast SNS unread count", {
+        code: fastCountError.code,
+        message: fastCountError.message,
+      });
+    }
   }
 
   const { ownPosts, groups, readState, mentions, preferences } = await getNotificationSources(supabase, userId);
@@ -289,7 +307,11 @@ export const getSnsUnreadCount = cache(async function getSnsUnreadCount(
   const replyLists = replyPosts.map((post) => repliesByPost.get(post.id) ?? []);
   const unreadReplies = preferences.replies ? replyLists.reduce(
     (sum, replies) =>
-      sum + replies.filter((reply) => reply.user_id !== userId && Date.parse(reply.created_at) > seenAtMs).length,
+      sum + replies.filter((reply) =>
+        reply.user_id !== userId &&
+        Date.parse(reply.created_at) > seenAtMs &&
+        !readState.dismissedIds.has(`reply:${reply.id}`),
+      ).length,
     0,
   ) : 0;
   const unreadLikes = preferences.likes ? ownPosts.reduce((sum, post) => {
@@ -301,7 +323,10 @@ export const getSnsUnreadCount = cache(async function getSnsUnreadCount(
     : new Set<string>();
   const unreadMentions = preferences.mentions
     ? mentions.filter(
-        (mention) => !replyNotificationIds.has(mention.id) && Date.parse(mention.created_at) > seenAtMs,
+        (mention) =>
+          !replyNotificationIds.has(mention.id) &&
+          Date.parse(mention.created_at) > seenAtMs &&
+          !readState.dismissedIds.has(`mention:${mention.id}`),
       ).length
     : 0;
   const mutedGroupIds = new Set(preferences.mutedGroupIds);
