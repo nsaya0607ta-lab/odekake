@@ -46,7 +46,11 @@ const GUTTER_BALL_DRAG_PER_SEC = 0.035;
 const FOUL_LINE_Y = 97;
 const PIN_ROW_DEPTH_M = JB_PIN_SPACING_M * Math.sqrt(3) / 2;
 const PIN_DECK_DEPTH_M = PIN_ROW_DEPTH_M * 3;
-const PIN_DECK_SCREEN_DEPTH_PCT = 8.4;
+// 1番ピン手前までの奥行きカーブと、ピンデッキ以降の奥行き変化率を一致させる。
+// ここが不連続だとボールがピンに当たった瞬間だけ急加速して見えてしまう。
+const HEAD_PIN_APPROACH_SLOPE_PCT_PER_M =
+  ((DOCK_Y - HEAD_PIN_SCREEN_Y) * 0.9) / JB_HEAD_PIN_DISTANCE_M;
+const PIN_DECK_SCREEN_DEPTH_PCT = HEAD_PIN_APPROACH_SLOPE_PCT_PER_M * PIN_DECK_DEPTH_M;
 const TARGET_BOARDS = [5, 10, 15, 20, 25, 30, 35] as const;
 const GUIDE_DISTANCE_M = 7 * 0.3048;
 const TARGET_DISTANCE_M = 15 * 0.3048;
@@ -492,9 +496,13 @@ export function Lane({ ballVisual, resetSignal, active, onRoll }: LaneProps) {
   ) => {
     const el = ballRef.current;
     if (!el) return;
+    const screenY = worldYToPct(yM);
     el.style.left = `${worldXToPct(xM, yM)}%`;
-    el.style.top = `${worldYToPct(yM)}%`;
+    el.style.top = `${screenY}%`;
     el.style.width = `${ballVisualWidthPct(yM)}%`;
+    // ピン要素は奥行きに応じた z-index を持つため、ボールにも同じ基準で
+    // z-index を与えないとピンの陰に隠れて消えたように見えてしまう。
+    el.style.zIndex = String(501 + Math.round(screenY * 10));
 
     // 物理回転をそのまま描画すると速すぎて指穴が止まって見えるため、
     // 見た目用の回転は減速してストレート/カーブの差を読み取りやすくする。
