@@ -612,6 +612,20 @@ export function Lane({ ballVisual, resetSignal, active, onRoll }: LaneProps) {
     let ballDone = false;
     let finished = false;
 
+    // レーン奥行き方向より横方向のほうが画面上のスケールがかなり大きいため、
+    // フックやピンとの衝突で横速度だけが大きくなると、実際の速さ以上に
+    // 「急に飛んでいった」ように見えてしまう。投球速度を基準に横速度の
+    // 上限を設け、曲がる・跳ね返る勢いは残しつつ体感の暴走を防ぐ。
+    const maxLateralSpeedMps = Math.max(1.2, launch.speedMps * 0.55);
+    const capLateralSpeed = (vx: number, vy: number): [number, number] => {
+      if (Math.abs(vx) <= maxLateralSpeedMps) return [vx, vy];
+      const speed = Math.hypot(vx, vy);
+      const cappedVx = Math.sign(vx) * maxLateralSpeedMps;
+      const remaining = Math.max(0, speed * speed - cappedVx * cappedVx);
+      const cappedVy = Math.sign(vy || 1) * Math.sqrt(remaining);
+      return [cappedVx, cappedVy];
+    };
+
     const preThrowStandingIds = new Set(
       [...pinBodiesRef.current.entries()]
         .filter(([, body]) => body.standing)
@@ -698,6 +712,7 @@ export function Lane({ ballVisual, resetSignal, active, onRoll }: LaneProps) {
           const ballDecay = Math.exp(-drag * dt);
           bvxMps *= ballDecay;
           bvyMps *= ballDecay;
+          [bvxMps, bvyMps] = capLateralSpeed(bvxMps, bvyMps);
         } else {
           const gutterDecay = Math.exp(-GUTTER_BALL_DRAG_PER_SEC * dt);
           const lateralDecay = Math.exp(-9 * dt);
@@ -778,6 +793,7 @@ export function Lane({ ballVisual, resetSignal, active, onRoll }: LaneProps) {
                 nextVy *= scale;
               }
 
+              [nextVx, nextVy] = capLateralSpeed(nextVx, nextVy);
               bvxMps = nextVx;
               bvyMps = nextVy;
 
