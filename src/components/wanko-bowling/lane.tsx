@@ -63,9 +63,15 @@ const TARGET_BOARDS = [5, 10, 15, 20, 25, 30, 35] as const;
 const GUIDE_DISTANCE_M = 7 * 0.3048;
 const TARGET_DISTANCE_M = 15 * 0.3048;
 
-// カーブは投球スワイプの形状からは検出せず、専用UI（0〜100%スライダー）で
-// 直接指定する。方向はlaunchAngleへ自動一致（computeAxisRotation参照）。
+// スマホの自然な指ブレはストレートとして扱い、意図したカーブだけを拾う。
+// カーブの強さはスワイプの曲がり方から検出する。向きはlaunchAngleへ自動一致させる
+// （computeAxisRotation参照）ため、ここで検出した符号自体は使わず強さのみ使う。
+const CURVE_DEAD_ZONE_RAD = 6 * Math.PI / 180;
+const CURVE_FULL_SCALE_RAD = 22 * Math.PI / 180;
+const CURVE_BOW_DEAD_ZONE_PCT = 1.0;
+const CURVE_BOW_FULL_SCALE_PCT = 6;
 const MAX_CURVE_NORM = 0.68;
+const CURVE_STRAIGHT_SNAP = 0.10;
 
 // 2Dモデルで3Dの「横から押されて重心を外す」効果を近似する。
 const DIRECT_IMPULSE_WEIGHT = 0.16;
@@ -111,7 +117,7 @@ export type LaneRollResult = {
 type LaneProps = {
   ballVisual: BowlingBallVisual;
   resetSignal: number;
-  /** 新しいゲーム開始時だけインクリメントされる。開始位置・カーブ強度を中央/0%へ戻す。 */
+  /** 新しいゲーム開始時だけインクリメントされる。開始位置を中央へ戻す。 */
   newGameSignal: number;
   active: boolean;
   onRoll: (result: LaneRollResult) => void;
@@ -119,6 +125,13 @@ type LaneProps = {
 
 function clamp(value: number, min: number, max: number): number {
   return Math.min(max, Math.max(min, value));
+}
+
+function normalizeAngle(angle: number): number {
+  let value = angle;
+  while (value > Math.PI) value -= Math.PI * 2;
+  while (value < -Math.PI) value += Math.PI * 2;
+  return value;
 }
 
 function averagePoint(points: Point[]): Point {
@@ -359,16 +372,17 @@ function simulateTrajectoryPreview(
 }
 
 /**
- * スワイプ点列から launchAngle を算出する。onPointerUp の最終判定と、
+ * スワイプ点列から launchAngle と curveNorm を算出する。onPointerUp の最終判定と、
  * onPointerMove 中のライブプレビューの両方で同じロジックを使うために共通化する。
- * カーブは投球スワイプの形状からは検出しない（専用UIで直接指定するため）。
+ * curveNormの符号自体は使わない（方向はcomputeAxisRotationでlaunchAngleへ自動一致
+ * させるため）が、スワイプの曲がり方で強さを直感的に調整できるようにする。
  */
 function computeAimFromPoints(
   points: Point[],
   rect: { left: number; top: number; width: number; height: number },
   startXM: number,
   minUpwardPct: number,
-): { launchAngleRad: number; targetWorldX: number } | null {
+): { launchAngleRad: number; curveNorm: number; targetWorldX: number } | null {
   if (points.length < 2) return null;
 
   const sampleCount = Math.min(3, Math.max(1, Math.floor(points.length / 3)));
@@ -390,7 +404,14 @@ function computeAimFromPoints(
   const targetWorldX = screenXToWorldX(aimScreenXPct, JB_HEAD_PIN_DISTANCE_M);
   const rawLaunchAngle = Math.atan2(targetWorldX - startXM, JB_HEAD_PIN_DISTANCE_M);
   const launchAngleRad = mapLaunchAngleInput(rawLaunchAngle);
-  return { launchAngleRad, targetWorldX };
+  const curveNorm = estimateCurveNorm(points, rect.width);
+  return { launchAngleRad, curveNorm, targetWorldX };
+}
+
+function screenDirectionAngle(a: Point, b: Point): number {
+  const dx = b.x - a.x;
+  const upward = a.y - b.y;
+  return Math.atan2(dx, Math.max(1, upward));
 }
 
 function estimateReleaseSwipeRate(points: Point[], boardHeightPx: number): number {
@@ -428,6 +449,60 @@ function estimateReleaseSwipeRate(points: Point[], boardHeightPx: number): numbe
 function mapLaunchAngleInput(rawAngleRad: number): number {
   const u = clamp(Math.abs(rawAngleRad) / MAX_LAUNCH_ANGLE_RAD, 0, 1);
   return Math.sign(rawAngleRad) * MAX_LAUNCH_ANGLE_RAD * u * u;
+}
+
+function estimateCurveNorm(points: Point[], boardWidthPx: number): number {
+  if (points.length < 5) return 0;
+
+  const length = points.length;
+  const earlyEndIndex = clamp(Math.floor(length * 0.38), 2, length - 3);
+  const lateStartIndex = clamp(Math.floor(length * 0.58), earlyEndIndex + 1, length - 2);
+
+  const firstStart = averagePoint(points.slice(0, Math.min(3, earlyEndIndex)));
+  const firstEnd = averagePoint(points.slice(Math.max(0, earlyEndIndex - 2), earlyEndIndex + 1));
+  const secondStart = averagePoint(points.slice(lateStartIndex, Math.min(length, lateStartIndex + 3)));
+  const secondEnd = averagePoint(points.slice(-Math.min(3, length - lateStartIndex)));
+
+  const firstAngle = screenDirectionAngle(firstStart, firstEnd);
+  const secondAngle = screenDirectionAngle(secondStart, secondEnd);
+  const delta = normalizeAngle(secondAngle - firstAngle);
+  const angleMagnitude = Math.abs(delta);
+
+  let angleSignal = 0;
+  if (angleMagnitude > CURVE_DEAD_ZONE_RAD) {
+    const scaled = clamp(
+      (angleMagnitude - CURVE_DEAD_ZONE_RAD) / (CURVE_FULL_SCALE_RAD - CURVE_DEAD_ZONE_RAD),
+      0,
+      1,
+    );
+    angleSignal = Math.sign(delta) * scaled;
+  }
+
+  const start = averagePoint(points.slice(0, Math.min(2, length)));
+  const end = averagePoint(points.slice(-Math.min(2, length)));
+  const midStart = Math.max(1, Math.floor(length * 0.42));
+  const midEnd = Math.min(length - 1, Math.ceil(length * 0.62));
+  const mid = averagePoint(points.slice(midStart, midEnd + 1));
+  const totalUp = Math.max(1, start.y - end.y);
+  const progress = clamp((start.y - mid.y) / totalUp, 0, 1);
+  const straightX = start.x + (end.x - start.x) * progress;
+  const bowPct = ((mid.x - straightX) / Math.max(1, boardWidthPx)) * 100;
+  const bowMagnitude = Math.abs(bowPct);
+
+  let bowSignal = 0;
+  if (bowMagnitude > CURVE_BOW_DEAD_ZONE_PCT) {
+    const scaled = clamp(
+      (bowMagnitude - CURVE_BOW_DEAD_ZONE_PCT)
+        / (CURVE_BOW_FULL_SCALE_PCT - CURVE_BOW_DEAD_ZONE_PCT),
+      0,
+      1,
+    );
+    bowSignal = Math.sign(bowPct) * scaled;
+  }
+
+  const combined = clamp(angleSignal * 0.78 + bowSignal * 0.22, -1, 1);
+  if (Math.abs(combined) < CURVE_STRAIGHT_SNAP) return 0;
+  return combined * MAX_CURVE_NORM;
 }
 
 function createPinBody(pin: (typeof PIN_LAYOUT)[number]): PinBody {
@@ -564,12 +639,7 @@ export function Lane({ ballVisual, resetSignal, newGameSignal, active, onRoll }:
   const positionLockedRef = useRef(false);
   const [positionLocked, setPositionLockedState] = useState(false);
   const [startOffsetM, setStartOffsetM] = useState<number>(0);
-  // カーブの強さ（0〜100%）。向きはlaunchAngleへ自動一致するため、ここでは強さのみ保持する。
-  const curveStrengthRef = useRef(0);
-  const [curveStrengthPct, setCurveStrengthPctState] = useState(0);
-  const curveTrackRef = useRef<HTMLDivElement>(null);
-  const curveTrackPointerIdRef = useRef<number | null>(null);
-  // throwingRefのReact状態版。操作UI（開始位置・カーブ強度）の表示/操作可否の判定に使う。
+  // throwingRefのReact状態版。操作UI（開始位置）の表示/操作可否の判定に使う。
   const [isThrowing, setIsThrowing] = useState(false);
   const pinBodiesRef = useRef<Map<number, PinBody>>(
     new Map(PIN_LAYOUT.map((pin) => [pin.id, createPinBody(pin)])),
@@ -581,12 +651,6 @@ export function Lane({ ballVisual, resetSignal, newGameSignal, active, onRoll }:
     curveNorm: number;
     launchAngleDeg: number;
   } | null>(null);
-
-  const setCurveStrengthPct = useCallback((pct: number) => {
-    const clamped = clamp(Math.round(pct), 0, 100);
-    curveStrengthRef.current = clamped;
-    setCurveStrengthPctState(clamped);
-  }, []);
 
   const setPositionLocked = useCallback((locked: boolean) => {
     positionLockedRef.current = locked;
@@ -749,15 +813,14 @@ export function Lane({ ballVisual, resetSignal, newGameSignal, active, onRoll }:
     dockBall();
   }, [active, clearFallenPins, dockBall]);
 
-  // 新しいゲーム開始時だけ、開始位置とカーブ強度を中央/0%へ戻す。
-  // フレーム間（resetSignal）ではここに触れず、直前の投球設定を維持する。
+  // 新しいゲーム開始時だけ、開始位置を中央へ戻す。
+  // フレーム間（resetSignal）ではここに触れず、直前の投球位置を維持する。
   useEffect(() => {
     ballStartXRef.current = DEFAULT_BALL_START_X_M;
     setStartOffsetM(0);
-    setCurveStrengthPct(0);
     setPositionLocked(false);
     setBallPosition(DEFAULT_BALL_START_X_M, 0, 0);
-  }, [newGameSignal, setCurveStrengthPct, setPositionLocked, setBallPosition]);
+  }, [newGameSignal, setPositionLocked, setBallPosition]);
 
   const runThrow = useCallback((launch: {
     speedMps: number;
@@ -1215,8 +1278,7 @@ export function Lane({ ballVisual, resetSignal, newGameSignal, active, onRoll }:
       return;
     }
 
-    const curveNorm = (curveStrengthRef.current / 100) * MAX_CURVE_NORM;
-    const trajectory = simulateTrajectoryPreview(startXM, aim.launchAngleRad, curveNorm);
+    const trajectory = simulateTrajectoryPreview(startXM, aim.launchAngleRad, aim.curveNorm);
     const aimWorldX = startXM + JB_HEAD_PIN_DISTANCE_M * Math.tan(aim.launchAngleRad);
     setAimPreview({
       trajectory,
@@ -1226,7 +1288,7 @@ export function Lane({ ballVisual, resetSignal, newGameSignal, active, onRoll }:
         x2: worldXToPct(aimWorldX, JB_HEAD_PIN_DISTANCE_M),
         y2: HEAD_PIN_SCREEN_Y,
       },
-      curveNorm,
+      curveNorm: aim.curveNorm,
       launchAngleDeg: aim.launchAngleRad * 180 / Math.PI,
     });
   }, [setStartPositionFromScreenX]);
@@ -1265,8 +1327,7 @@ export function Lane({ ballVisual, resetSignal, newGameSignal, active, onRoll }:
       + (GAME_MAX_BALL_SPEED_KMH - GAME_MIN_BALL_SPEED_KMH) * speedNorm;
     const speedMps = speedKmh / 3.6;
 
-    const curveNorm = (curveStrengthRef.current / 100) * MAX_CURVE_NORM;
-    runThrow({ speedMps, launchAngleRad: aim.launchAngleRad, curveNorm, startXM });
+    runThrow({ speedMps, launchAngleRad: aim.launchAngleRad, curveNorm: aim.curveNorm, startXM });
   }, [active, runThrow]);
 
   const onPointerCancel = useCallback((event: ReactPointerEvent<HTMLDivElement>) => {
@@ -1293,37 +1354,6 @@ export function Lane({ ballVisual, resetSignal, newGameSignal, active, onRoll }:
     setPositionLocked(false);
     setBallPosition(ballStartXRef.current, 0, 0);
   }, [active, setBallPosition, setPositionLocked]);
-
-  const updateCurveStrengthFromClientX = useCallback((clientX: number) => {
-    const track = curveTrackRef.current;
-    if (!track) return;
-    const rect = track.getBoundingClientRect();
-    const pct = ((clientX - rect.left) / rect.width) * 100;
-    setCurveStrengthPct(pct);
-  }, [setCurveStrengthPct]);
-
-  const onCurveTrackPointerDown = useCallback((event: ReactPointerEvent<HTMLDivElement>) => {
-    event.preventDefault();
-    event.stopPropagation();
-    if (!active || throwingRef.current || dockingRef.current) return;
-    curveTrackPointerIdRef.current = event.pointerId;
-    event.currentTarget.setPointerCapture(event.pointerId);
-    updateCurveStrengthFromClientX(event.clientX);
-  }, [active, updateCurveStrengthFromClientX]);
-
-  const onCurveTrackPointerMove = useCallback((event: ReactPointerEvent<HTMLDivElement>) => {
-    if (curveTrackPointerIdRef.current !== event.pointerId) return;
-    event.preventDefault();
-    event.stopPropagation();
-    updateCurveStrengthFromClientX(event.clientX);
-  }, [updateCurveStrengthFromClientX]);
-
-  const onCurveTrackPointerUp = useCallback((event: ReactPointerEvent<HTMLDivElement>) => {
-    if (curveTrackPointerIdRef.current !== event.pointerId) return;
-    event.preventDefault();
-    event.stopPropagation();
-    curveTrackPointerIdRef.current = null;
-  }, []);
 
   return (
     <div
@@ -1465,7 +1495,7 @@ export function Lane({ ballVisual, resetSignal, newGameSignal, active, onRoll }:
           aria-hidden="true"
         >
           角度 {aimPreview.launchAngleDeg >= 0 ? "+" : ""}{aimPreview.launchAngleDeg.toFixed(1)}°
-          ・カーブ {curveStrengthPct}%
+          ・カーブ {Math.round((Math.abs(aimPreview.curveNorm) / MAX_CURVE_NORM) * 100)}%
         </div>
       )}
 
@@ -1554,35 +1584,6 @@ export function Lane({ ballVisual, resetSignal, newGameSignal, active, onRoll }:
           >
             ×
           </button>
-        </div>
-      ) : null}
-
-      {active && !isThrowing ? (
-        <div
-          className="absolute bottom-2 right-2 z-[1200] flex items-center gap-2 rounded-full bg-[#2f2119]/78 py-1.5 pl-3 pr-2 shadow-lg backdrop-blur-sm"
-          onPointerDown={(event) => {
-            event.stopPropagation();
-          }}
-        >
-          <span className="text-[10px] font-bold text-white/70">カーブ</span>
-          <div
-            ref={curveTrackRef}
-            className="relative h-6 w-24 touch-none rounded-full bg-white/15"
-            onPointerDown={onCurveTrackPointerDown}
-            onPointerMove={onCurveTrackPointerMove}
-            onPointerUp={onCurveTrackPointerUp}
-            onPointerCancel={onCurveTrackPointerUp}
-          >
-            <div
-              className="absolute inset-y-0 left-0 rounded-full bg-gradient-to-r from-[#7ac4ff] to-[#ffc45a] transition-[width]"
-              style={{ width: `${curveStrengthPct}%` }}
-            />
-            <div
-              className="absolute top-1/2 h-4 w-4 -translate-x-1/2 -translate-y-1/2 rounded-full bg-white shadow"
-              style={{ left: `${curveStrengthPct}%` }}
-            />
-          </div>
-          <span className="min-w-[2.4em] text-right text-[11px] font-black text-white">{curveStrengthPct}%</span>
         </div>
       ) : null}
     </div>
