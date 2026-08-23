@@ -14,7 +14,13 @@ export const dynamic = "force-dynamic";
 
 export default async function WankoBowlingPage() {
   const { supabase, user } = await requireUser();
-  if (!canAccessWankoBowling(user.email)) notFound();
+  const { data: profile } = await supabase
+    .from("profiles")
+    .select("display_name")
+    .eq("id", user.id)
+    .maybeSingle();
+
+  if (!canAccessWankoBowling(user.email, profile?.display_name)) notFound();
 
   const ownedItemCounts = await getOwnedItemCounts(supabase, user.id);
   const ballItemIds = new Set<string>(BOWLING_BALL_ITEM_IDS);
