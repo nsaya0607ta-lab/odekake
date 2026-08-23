@@ -53,11 +53,15 @@ const idealTipSpeedMps = Math.sqrt(2 * GRAVITY_MPS2 * cogRiseM);
 export const PIN_DIRECT_KNOCK_SPEED_MPS = idealTipSpeedMps * 1.55;
 export const PIN_CHAIN_KNOCK_SPEED_MPS = idealTipSpeedMps * 1.9;
 
-/** 公認42ftパターン例を使ったフック量のゲーム用近似。 */
-export const OIL_HOOK_FACTOR = 0.18;
-export const DRY_HOOK_FACTOR = 1;
-/** まっすぐ投げやすさを優先し、以前よりフック加速度を抑える。 */
-export const BACKEND_HOOK_ACCEL_MPS2 = 1.2;
+/**
+ * 公認42ftパターン例を土台にしたゲーム用フック近似。
+ * 直球の微小ブレでは曲げず、カーブ入力が入った時はオイル上でも少し軌道が作られ、
+ * ドライ部分に入ってからはっきりブレイクするようにする。
+ */
+export const OIL_HOOK_FACTOR = 0.22;
+export const DRY_HOOK_FACTOR = 1.12;
+/** 意図的なカーブスワイプが画面上でも分かる強さまで戻す。 */
+export const BACKEND_HOOK_ACCEL_MPS2 = 1.85;
 
 /**
  * 反発係数は公認規格値ではないゲーム用近似。
