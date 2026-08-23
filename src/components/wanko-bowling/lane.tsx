@@ -30,7 +30,7 @@ import {
 
 // iPhone のホームジェスチャー帯から離して、上方向へ安全にスワイプできる位置にする。
 const DOCK_Y = 88;
-const HEAD_PIN_SCREEN_Y = 21.5;
+const HEAD_PIN_SCREEN_Y = 18.8;
 const MIN_UPWARD_PCT = 4.5;
 const AUTO_RELEASE_UPWARD_PCT = 6.5;
 const MAX_THROW_MS = 7000;
@@ -50,7 +50,7 @@ const GUTTER_BALL_DRAG_PER_SEC = 0.035;
 const FOUL_LINE_Y = 91.5;
 const PIN_ROW_DEPTH_M = JB_PIN_SPACING_M * Math.sqrt(3) / 2;
 const PIN_DECK_DEPTH_M = PIN_ROW_DEPTH_M * 3;
-const PIN_DECK_SCREEN_DEPTH_PCT = 8.4;
+const PIN_DECK_SCREEN_DEPTH_PCT = 5.2;
 const TARGET_BOARDS = [5, 10, 15, 20, 25, 30, 35] as const;
 const GUIDE_DISTANCE_M = 7 * 0.3048;
 const TARGET_DISTANCE_M = 15 * 0.3048;
@@ -138,12 +138,12 @@ function averagePoint(points: Point[]): Point {
 
 function laneHalfWidthPct(distanceM: number): number {
   const depth = clamp(distanceM / JB_HEAD_PIN_DISTANCE_M, 0, 1);
-  return 43 - 20 * Math.pow(depth, 0.68);
+  return 44 - 10 * Math.pow(depth, 0.82);
 }
 
 function gutterVisualWidthPct(distanceM: number): number {
   const depth = clamp(distanceM / JB_HEAD_PIN_DISTANCE_M, 0, 1);
-  return 4.6 - 1.6 * Math.pow(depth, 0.72);
+  return 6.2 - 1.2 * Math.pow(depth, 0.82);
 }
 
 function worldYToPct(distanceFromFoulM: number): number {
@@ -1085,16 +1085,16 @@ export function Lane({ ballVisual, resetSignal, active, onRoll }: LaneProps) {
         overscrollBehavior: "none",
         WebkitUserSelect: "none",
         borderRadius: "22px 22px 26px 26px",
-        background: "linear-gradient(180deg, #241914 0%, #39251a 45%, #2b1b13 100%)",
-        boxShadow: "inset 0 1px 0 rgba(255,255,255,0.18), inset 0 -20px 32px -24px rgba(0,0,0,0.8)",
+        background: "linear-gradient(180deg, #171614 0%, #272522 22%, #4b4137 100%)",
+        boxShadow: "inset 0 1px 0 rgba(255,255,255,0.22), inset 0 -20px 32px -24px rgba(0,0,0,0.72)",
       }}
     >
       <div
         className="pointer-events-none absolute inset-0"
         style={{
           clipPath: `polygon(${FAR_LANE_LEFT}% 0%, ${FAR_LANE_RIGHT}% 0%, ${NEAR_LANE_RIGHT}% 100%, ${NEAR_LANE_LEFT}% 100%)`,
-          background: "radial-gradient(ellipse at 50% 8%, rgba(255,245,211,0.42) 0%, rgba(255,245,211,0.12) 34%, transparent 61%), linear-gradient(90deg, rgba(92,55,26,0.14) 0%, transparent 12%, transparent 88%, rgba(92,55,26,0.14) 100%), linear-gradient(180deg, #e5ba78 0%, #dcae6a 43%, #cf9854 100%)",
-          boxShadow: "inset 18px 0 28px -24px rgba(62,37,20,0.48), inset -18px 0 28px -24px rgba(62,37,20,0.48), inset 0 15px 20px -20px rgba(255,248,225,0.72)",
+          background: "radial-gradient(ellipse at 50% 6%, rgba(255,255,246,0.58) 0%, rgba(255,247,221,0.18) 32%, transparent 58%), repeating-linear-gradient(90deg, rgba(118,82,43,0.10) 0 1px, transparent 1px 8.2%), linear-gradient(180deg, #efd9aa 0%, #e6c789 46%, #d7ad68 100%)",
+          boxShadow: "inset 14px 0 24px -20px rgba(82,57,34,0.34), inset -14px 0 24px -20px rgba(82,57,34,0.34), inset 0 18px 24px -22px rgba(255,255,247,0.88)",
         }}
         aria-hidden="true"
       />
@@ -1103,8 +1103,8 @@ export function Lane({ ballVisual, resetSignal, active, onRoll }: LaneProps) {
         className="pointer-events-none absolute inset-0"
         style={{
           clipPath: `polygon(${FAR_OUTER_LEFT}% 0%, ${FAR_LANE_LEFT}% 0%, ${NEAR_LANE_LEFT}% 100%, ${NEAR_OUTER_LEFT}% 100%)`,
-          background: "linear-gradient(90deg, #241712 0%, #3c271c 50%, #69452e 82%, #9a6840 100%)",
-          boxShadow: "inset -7px 0 10px rgba(18,10,7,0.52), inset -1px 0 1px rgba(255,230,188,0.28)",
+          background: "linear-gradient(90deg, #252824 0%, #545b55 38%, #9a9c91 68%, #d0c6ae 82%, #5c625c 100%)",
+          boxShadow: "inset -8px 0 12px rgba(20,23,21,0.58), inset -2px 0 2px rgba(255,250,232,0.42), 3px 0 8px rgba(45,35,25,0.18)",
         }}
         aria-hidden="true"
       />
@@ -1112,8 +1112,8 @@ export function Lane({ ballVisual, resetSignal, active, onRoll }: LaneProps) {
         className="pointer-events-none absolute inset-0"
         style={{
           clipPath: `polygon(${FAR_LANE_RIGHT}% 0%, ${FAR_OUTER_RIGHT}% 0%, ${NEAR_OUTER_RIGHT}% 100%, ${NEAR_LANE_RIGHT}% 100%)`,
-          background: "linear-gradient(270deg, #241712 0%, #3c271c 50%, #69452e 82%, #9a6840 100%)",
-          boxShadow: "inset 7px 0 10px rgba(18,10,7,0.52), inset 1px 0 1px rgba(255,230,188,0.28)",
+          background: "linear-gradient(270deg, #252824 0%, #545b55 38%, #9a9c91 68%, #d0c6ae 82%, #5c625c 100%)",
+          boxShadow: "inset 8px 0 12px rgba(20,23,21,0.58), inset 2px 0 2px rgba(255,250,232,0.42), -3px 0 8px rgba(45,35,25,0.18)",
         }}
         aria-hidden="true"
       />
@@ -1122,11 +1122,46 @@ export function Lane({ ballVisual, resetSignal, active, onRoll }: LaneProps) {
         className="pointer-events-none absolute inset-0"
         style={{
           clipPath: `polygon(${FAR_LANE_LEFT}% 0%, ${FAR_LANE_RIGHT}% 0%, ${NEAR_LANE_RIGHT}% 100%, ${NEAR_LANE_LEFT}% 100%)`,
-          background: "linear-gradient(180deg, rgba(66,38,22,0.28) 0%, rgba(66,38,22,0.11) 14%, transparent 33%), radial-gradient(ellipse at 50% 20%, rgba(255,237,193,0.18) 0%, transparent 46%)",
-          boxShadow: "inset 0 22px 30px -26px rgba(33,19,12,0.72)",
+          background: "linear-gradient(180deg, rgba(70,49,31,0.18) 0%, rgba(70,49,31,0.06) 13%, transparent 30%), radial-gradient(ellipse at 50% 18%, rgba(255,252,232,0.24) 0%, transparent 48%)",
+          boxShadow: "inset 0 22px 30px -26px rgba(33,19,12,0.54)",
         }}
         aria-hidden="true"
       />
+
+      {/* 正面から見たボウリング場らしいピンデッキとマスキングユニット。 */}
+      <div
+        className="pointer-events-none absolute z-[40]"
+        style={{
+          left: `${FAR_OUTER_LEFT - 4}%`,
+          right: `${100 - FAR_OUTER_RIGHT - 4}%`,
+          top: "0%",
+          height: "24%",
+          background: "linear-gradient(180deg, #181816 0%, #292824 48%, #151513 100%)",
+          boxShadow: "inset 0 -12px 22px rgba(0,0,0,0.54), 0 10px 18px rgba(45,31,19,0.16)",
+        }}
+        aria-hidden="true"
+      />
+      <div
+        className="pointer-events-none absolute z-[45]"
+        style={{
+          left: `${FAR_OUTER_LEFT - 5.5}%`,
+          right: `${100 - FAR_OUTER_RIGHT - 5.5}%`,
+          top: "0%",
+          height: "6.5%",
+          borderRadius: "0 0 18px 18px",
+          background: "linear-gradient(180deg, #a66b46 0%, #805038 100%)",
+          boxShadow: "0 5px 10px rgba(40,26,17,0.30), inset 0 -1px 0 rgba(255,236,211,0.28)",
+        }}
+        aria-hidden="true"
+      />
+      {[36, 50, 64].map((left) => (
+        <span
+          key={`deck-light-${left}`}
+          className="pointer-events-none absolute z-[46] h-[4px] w-[10px] -translate-x-1/2 rounded-full bg-[#fff3d7]/85 shadow-[0_5px_13px_rgba(255,225,173,0.72)]"
+          style={{ left: `${left}%`, top: "5.4%" }}
+          aria-hidden="true"
+        />
+      ))}
 
       <svg className="pointer-events-none absolute inset-0 h-full w-full" viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true">
         {[-0.8, -0.6, -0.4, -0.2, 0, 0.2, 0.4, 0.6, 0.8].map((n) => (
