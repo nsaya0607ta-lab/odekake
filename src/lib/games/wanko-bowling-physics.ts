@@ -28,9 +28,9 @@ export const JB_PIN_HEIGHT_M = 0.38085;
 export const JB_BALL_DIAMETER_M = (0.2159 + 0.2183) / 2;
 /**
  * ボール重量は規格上16lb（7.25kg）以下。
- * 今回のゲーム設定では全ボールを10lb相当として統一する。
+ * 今回のゲーム設定では全ボールを7lb相当として統一する。
  */
-export const GAME_BALL_MASS_KG = 10 * 0.45359237;
+export const GAME_BALL_MASS_KG = 7 * 0.45359237;
 
 /** JAPAN BOWLING掲載の大会パターン例 42ft。ゲームの標準オイル長として採用。 */
 export const GAME_OIL_LENGTH_M = 42 * 0.3048;
