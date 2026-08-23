@@ -130,6 +130,7 @@ const CURATED_ITEMS: readonly CollectionItem[] = [
   { id: "food_cheese_cubes", name: "ころころチーズ", image: "/collection/items/cheese-cubes.webp", category: "food", series: null, rarity: "N" },
   { id: "food_roasted_sweet_potato", name: "ほくほく焼きいも", image: "/collection/items/roasted-sweet-potato.webp", category: "food", series: null, rarity: "N" },
   { id: "food_honey_butter_toast", name: "はちみつバタートースト", image: "/collection/items/honey-butter-toast.webp", category: "food", series: null, rarity: "N" },
+  { id: "food_fruit_basket", name: "フルーツバスケット", image: "/collection/items/fruit-basket.webp", category: "food", series: null, rarity: "SR" },
 
   // --- 通常図鑑：インテリア ------------------------------------------
   { id: "interior_stretch_rod", name: "ストレッチ棒", image: "/collection/items/stretch-rod.webp", category: "interior", series: null, rarity: "R" },

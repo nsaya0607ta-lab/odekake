@@ -42,6 +42,7 @@ export const ITEM_CATCH_SKILLS: readonly ItemCatchSkill[] = [
   { id: "interior_sleepy_moon", levels: ["防止付与", "防止付与", "防止付与", "防止付与", "防止付与"], note: "しびれ/ダンボール縮小/時間減少のいずれかをランダムで1つ防ぐ（1回のみ）" },
   { id: "interior_spring_flower_wreath", levels: ["5秒間 ×1.2", "6秒間 ×1.2", "7秒間 ×1.25", "9秒間 ×1.3", "12秒間 ×1.4"], note: "その間ずっと得点倍率がかかる" },
   { id: "other_sparkle_rope_crown", levels: ["4秒間 弱", "5秒間 弱", "6秒間 弱", "8秒間 弱", "10秒間 中"], note: "アイテムを段ボールの方へ引き寄せる" },
+  { id: "food_fruit_basket", levels: ["1体", "1体", "2体", "2体", "3体"], note: "「人物の入ったキャラ」（おもちじゃない...!? / Listen to the a- / 一家の大オモ柱 / Xmas Party）の中からランダムで指定数、通常の出現枠とは別に降ってくる。それぞれ本来のレアリティ得点とスキル効果もそのまま発動する" },
 
   // --- SSR -------------------------------------------------------
   { id: "toy_rainbow_ball", levels: ["UR出現率 +10", "UR出現率 +12", "UR出現率 +15", "UR出現率 +20", "UR出現率 +25"], note: "ゲーム終了まで積み上がる（合計+30まで）" },

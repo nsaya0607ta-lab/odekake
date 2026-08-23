@@ -4,7 +4,7 @@ import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { memo, useCallback, useEffect, useMemo, useRef, useState, type PointerEvent as ReactPointerEvent } from "react";
 import { MAX_SKILL_LEVEL } from "@/lib/gacha/skill-levels";
-import { COLLECTION_ITEMS } from "@/lib/collection/items";
+import { COLLECTION_ITEMS, type CollectionItem } from "@/lib/collection/items";
 
 export type FrenchieCatchItem = {
   id: string;
@@ -147,6 +147,7 @@ const MYSTERY_SKILL_ITEM_IDS = [
   "other_komochi", "other_azuki", "other_kobee", "other_hamigaki", "other_ikea", "other_orusuban",
   "other_pondeomo", "other_pondear", "other_kurumari_a", "other_jare_a", "other_ketsunade_a", "other_omochi_janai", "other_oyasumi", "other_nisoku_a",
   "interior_shikkoku_no_ar", "interior_ragby_ar", "other_oyatsu_no_jikan", "other_listen_to_the_a", "other_okaeri",
+  "food_fruit_basket",
 ];
 
 /** アイテムごとのLv1〜5パラメータ（item_skill_levels_colored.xlsxの「スキル一覧」シート通り） */
@@ -236,6 +237,7 @@ const LV = {
   OYASUMI_MULT: [3, 3.5, 4, 4.5, 6],
   NISOKU_A_SEC: [4, 5, 6, 7, 8],
   NISOKU_A_MULT: [3, 3.5, 4, 4.5, 5],
+  FRUIT_BASKET_COUNT: [1, 1, 2, 2, 3],
 } as const;
 /** 出現量アップ系は時間増加系アイテムの取得率まで底上げしてしまうため、控えめな倍率にしている */
 const SPAWN_RATE_BOOST = 1.5;
@@ -292,16 +294,21 @@ const DEFAULT_ITEM_SPAWN_WEIGHT = 100;
  * 時間・出現量には無関係だが、重みを下げた分だけプール全体の合計重みが減り、他アイテムの
  * 取得確率が僅かに底上げされてLv5の最終プレイ時間が180秒を超えてしまう。
  * そのため上と同じ「時間増加系7種＋宝箱」の重みを底上げ分だけ相殺し、Lv5の時間増加を打ち消している。
+ *
+ * food_fruit_basket（SR、時間・出現量のどちらにも無関係）を追加した際も、プール総数(N)が
+ * 78→79に増えたことで既存アイテムの取得確率が薄まり、Lv5の最終プレイ時間期待値が175秒→約166秒に
+ * 短縮されてしまっていた。docs/minigame-time-balance.md の手順どおり「時間増加系7種の重みを
+ * プール総数の増加率だけ底上げする」方針で、64.4→65.5・80.3→81.6（6種）に変更して相殺済み。
  */
 const ITEM_SPAWN_WEIGHTS: Partial<Record<string, number>> = {
   toy_treasure_puzzle: 200,
-  other_omojii: 64.4,
-  toy_duck_plush: 80.3,
-  toy_carrot: 80.3,
-  food_paw_melon_bread: 80.3,
-  interior_anball: 80.3,
-  other_azuki: 80.3,
-  summer_frenchie: 80.3,
+  other_omojii: 65.5,
+  toy_duck_plush: 81.6,
+  toy_carrot: 81.6,
+  food_paw_melon_bread: 81.6,
+  interior_anball: 81.6,
+  other_azuki: 81.6,
+  summer_frenchie: 81.6,
   other_listen_to_the_a: 50,
 };
 const STRETCH_ROD_ITEM_ID = "interior_stretch_rod";
@@ -314,6 +321,12 @@ const OMOI_BASHIRA_ITEM_ID = "other_omoi_bashira";
 const OYASUMI_ITEM_ID = "other_oyasumi";
 const OYASUMI_SECONDS = 5;
 const NISOKU_A_ITEM_ID = "other_nisoku_a";
+const FRUIT_BASKET_ITEM_ID = "food_fruit_basket";
+/** フルーツバスケットの効果中に降ってくる「人物の入ったキャラ」。本来のレアリティ・スキルのまま出現する */
+const PERSON_CHARACTER_ITEM_IDS = ["other_omochi_janai", "other_listen_to_the_a", "other_omoi_bashira", "other_xmas_party"];
+const PERSON_CHARACTER_ITEMS: CollectionItem[] = PERSON_CHARACTER_ITEM_IDS
+  .map((id) => COLLECTION_ITEMS.find((entry) => entry.id === id))
+  .filter((entry): entry is CollectionItem => entry != null);
 /** ブレブルの効果中、このレアリティ以外のアイテムは出現しなくなる */
 const HIGH_RARITY_LOCK_RARITIES = new Set<FrenchieCatchItem["rarity"]>(["SSR", "UR", "LR"]);
 const OTHER_CATEGORY_ITEM_IDS = new Set(
@@ -461,6 +474,7 @@ export function FrenchieCatchGame({ ownedItems }: { ownedItems: FrenchieCatchIte
   const nisokuUntilRef = useRef(0);
   const nisokuMultValueRef = useRef(3);
   const dogFloodRemainingRef = useRef(0);
+  const personFloodRemainingRef = useRef(0);
   const slantBoostUntilRef = useRef(0);
   const boxShrinkUntilRef = useRef(0);
   const blackoutUntilRef = useRef(0);
@@ -528,6 +542,7 @@ export function FrenchieCatchGame({ ownedItems }: { ownedItems: FrenchieCatchIte
     if (now < poopSuppressUntilRef.current) labels.push("うんち出現なし");
     if (poopFloodRemainingRef.current > 0) labels.push(`うんち祭り あと${poopFloodRemainingRef.current}個`);
     if (dogFloodRemainingRef.current > 0) labels.push(`フレブル大量発生 あと${dogFloodRemainingRef.current}体`);
+    if (personFloodRemainingRef.current > 0) labels.push(`人物入りキャラ大量発生 あと${personFloodRemainingRef.current}体`);
     if (now < ikeaUntilRef.current) labels.push(`くみたて中 ${ikeaCountRef.current}個`);
     if (now < spawnRateBoostUntilRef.current) labels.push(`アイテム出現量×${spawnRateBoostValueRef.current}中`);
     if (now < otherSuppressUntilRef.current) labels.push(`その他カテゴリ出現×${otherSuppressValueRef.current}中`);
@@ -578,6 +593,23 @@ export function FrenchieCatchGame({ ownedItems }: { ownedItems: FrenchieCatchIte
         vy: rawVy * DOG_FLOOD_FALL_SPEED,
         size: 19,
         spin: (Math.random() - 0.5) * 20,
+      };
+    }
+
+    if (personFloodRemainingRef.current > 0 && PERSON_CHARACTER_ITEMS.length > 0) {
+      personFloodRemainingRef.current -= 1;
+      const character = PERSON_CHARACTER_ITEMS[Math.floor(Math.random() * PERSON_CHARACTER_ITEMS.length)]!;
+      return {
+        ...base,
+        itemId: character.id,
+        kind: "item",
+        name: character.name,
+        image: character.image ?? "",
+        rarity: character.rarity,
+        level: itemLevelByIdRef.current.get(character.id) ?? 0,
+        vy: resolveFallVy(rawVy, base.vy, character.id, character.rarity),
+        size: 12.5 + Math.random() * 3.5,
+        spin: (Math.random() - 0.5) * 65,
       };
     }
 
@@ -1352,6 +1384,13 @@ export function FrenchieCatchGame({ ownedItems }: { ownedItems: FrenchieCatchIte
                 statusChanged = true;
                 break;
               }
+              case FRUIT_BASKET_ITEM_ID: {
+                const fruitCount = LV.FRUIT_BASKET_COUNT[lv]!;
+                personFloodRemainingRef.current += fruitCount;
+                effectLabel = `人物入りキャラ${fruitCount}体 大量発生${lvTag}`;
+                statusChanged = true;
+                break;
+              }
               case OYASUMI_ITEM_ID: {
                 blackoutUntilRef.current = now + OYASUMI_SECONDS * 1000;
                 setBlackoutActive(true);
@@ -1734,6 +1773,7 @@ export function FrenchieCatchGame({ ownedItems }: { ownedItems: FrenchieCatchIte
     nisokuUntilRef.current = 0;
     nisokuMultValueRef.current = 3;
     dogFloodRemainingRef.current = 0;
+    personFloodRemainingRef.current = 0;
     slantBoostUntilRef.current = 0;
     boxShrinkUntilRef.current = 0;
     blackoutUntilRef.current = 0;

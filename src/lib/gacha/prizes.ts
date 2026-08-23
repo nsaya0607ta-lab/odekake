@@ -56,6 +56,7 @@ export const GACHA_PRIZES: readonly GachaPrize[] = [
   { id: "food_cheese_cubes", name: "ころころチーズ", rarity: "N", type: "item", pool: "regular", image: "/collection/items/cheese-cubes.webp" },
   { id: "food_roasted_sweet_potato", name: "ほくほく焼きいも", rarity: "N", type: "item", pool: "regular", image: "/collection/items/roasted-sweet-potato.webp" },
   { id: "food_honey_butter_toast", name: "はちみつバタートースト", rarity: "N", type: "item", pool: "regular", image: "/collection/items/honey-butter-toast.webp" },
+  { id: "food_fruit_basket", name: "フルーツバスケット", rarity: "SR", type: "item", pool: "regular", image: "/collection/items/fruit-basket.webp" },
 
   // --- 通常ガチャ：インテリア ----------------------------------------
   { id: "interior_stretch_rod", name: "ストレッチ棒", rarity: "R", type: "item", pool: "regular", image: "/collection/items/stretch-rod.webp" },
