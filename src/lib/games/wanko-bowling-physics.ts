@@ -128,11 +128,12 @@ export const SPIN_AXIS_TILT_DEG = 13.26;
 export const MAX_AXIS_ROTATION_DEG = 35;
 /**
  * curve入力（0〜1）からaxisRotationへの変換指数。
+ * スマホではスワイプ可能距離に限界がありcurveInputを大きくしにくいため、
+ * 最大35°は維持したまま中〜小入力だけを持ち上げる。
  * axisRotation = MAX_AXIS_ROTATION_DEG * curveInput^AXIS_ROTATION_INPUT_EXPONENT
- * 0.8にすることで、入力量に対してaxisRotationの立ち上がりが早くなる
- * （25%入力で最大値の約1/3、50%で約57%まで到達）。
+ * 0.6なら、10%→約8.8°、25%→約15.2°、50%→約23.1°、100%→35°。
  */
-export const AXIS_ROTATION_INPUT_EXPONENT = 0.8;
+export const AXIS_ROTATION_INPUT_EXPONENT = 0.6;
 
 /** 慣性モーメント（Ix = m(RG+Diff)^2, Iy = m・RG^2, Iz = m(RG+Diff+IntDiff)^2）。 */
 export const BALL_INERTIA_X_KGM2 =
