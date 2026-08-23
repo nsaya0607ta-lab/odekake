@@ -28,6 +28,22 @@ export default async function WankoBowlingPage() {
 
   return (
     <div className="fixed inset-0 z-[50] flex h-dvh flex-col overflow-hidden bg-paper">
+      <style>{`
+        /* 位置決めUIをボールの投球開始領域から離す。 */
+        [data-bowling-gesture-block="true"] > div:has(> button[aria-pressed]) {
+          left: 12px !important;
+          bottom: 12% !important;
+          transform: scale(0.92);
+          transform-origin: left bottom;
+        }
+
+        @media (max-height: 720px) {
+          [data-bowling-gesture-block="true"] > div:has(> button[aria-pressed]) {
+            bottom: 14% !important;
+          }
+        }
+      `}</style>
+
       <BowlingScreenLock />
 
       <TopHeader
