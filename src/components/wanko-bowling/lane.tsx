@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useRef, type PointerEvent as ReactPointerEvent } from "react";
+import { useCallback, useEffect, useRef, useState, type PointerEvent as ReactPointerEvent } from "react";
 import { PIN_LAYOUT, PIN_VISUAL_WIDTH_PCT, Pins } from "./pins";
 import type { BowlingBallVisual } from "@/lib/games/wanko-bowling-balls";
 import {
@@ -49,13 +49,13 @@ const TARGET_BOARDS = [5, 10, 15, 20, 25, 30, 35] as const;
 const GUIDE_DISTANCE_M = 7 * 0.3048;
 const TARGET_DISTANCE_M = 15 * 0.3048;
 
-// 小さな指ブレはカーブにしない。明確に曲げた時だけフックさせる。
-const CURVE_DEAD_ZONE_RAD = 6 * Math.PI / 180;
-const CURVE_FULL_SCALE_RAD = 28 * Math.PI / 180;
-const CURVE_BOW_DEAD_ZONE_PCT = 0.9;
-const CURVE_BOW_FULL_SCALE_PCT = 7.5;
-const MAX_CURVE_NORM = 0.55;
-const CURVE_STRAIGHT_SNAP = 0.1;
+// 直球は維持しつつ、意図したカーブは前回より少し拾いやすくする。
+const CURVE_DEAD_ZONE_RAD = 4 * Math.PI / 180;
+const CURVE_FULL_SCALE_RAD = 22 * Math.PI / 180;
+const CURVE_BOW_DEAD_ZONE_PCT = 0.6;
+const CURVE_BOW_FULL_SCALE_PCT = 6;
+const MAX_CURVE_NORM = 0.68;
+const CURVE_STRAIGHT_SNAP = 0.06;
 
 // ピン衝突後は総速度と前進速度の両方を必ず落とす。
 const BALL_POST_HIT_SPEED_FACTOR = 0.86;
@@ -386,10 +386,20 @@ export function Lane({ ballVisual, resetSignal, active, onRoll }: LaneProps) {
   const activePointerRef = useRef<number | null>(null);
   const pointerModeRef = useRef<PointerMode>(null);
   const ballStartXRef = useRef(DEFAULT_BALL_START_X_M);
+  const positionLockedRef = useRef(false);
+  const [positionLocked, setPositionLockedState] = useState(false);
   const pinBodiesRef = useRef<Map<number, PinBody>>(
     new Map(PIN_LAYOUT.map((pin) => [pin.id, createPinBody(pin)])),
   );
   const pinNodesRef = useRef<Map<number, HTMLDivElement>>(new Map());
+
+  const setPositionLocked = useCallback((locked: boolean) => {
+    positionLockedRef.current = locked;
+    setPositionLockedState(locked);
+    activePointerRef.current = null;
+    pointerModeRef.current = null;
+    pointsRef.current = [];
+  }, []);
 
   const registerPinNode = useCallback((id: number, el: HTMLDivElement | null) => {
     if (el) pinNodesRef.current.set(id, el);
@@ -485,6 +495,8 @@ export function Lane({ ballVisual, resetSignal, active, onRoll }: LaneProps) {
     activePointerRef.current = null;
     pointerModeRef.current = null;
     pointsRef.current = [];
+    positionLockedRef.current = false;
+    setPositionLockedState(false);
     dockBall();
   }, [resetSignal, resetPins, dockBall]);
 
@@ -640,7 +652,6 @@ export function Lane({ ballVisual, resetSignal, active, onRoll }: LaneProps) {
               let nextVx = collision.avx * BALL_POST_HIT_SPEED_FACTOR;
               let nextVy = collision.avy * BALL_POST_HIT_SPEED_FACTOR;
 
-              // 横速度から前進速度へ変換されて「加速して見える」のも禁止する。
               const maxForwardAfter = forwardBeforeHit * BALL_POST_HIT_FORWARD_FACTOR;
               if (nextVy > maxForwardAfter) nextVy = maxForwardAfter;
 
@@ -788,6 +799,14 @@ export function Lane({ ballVisual, resetSignal, active, onRoll }: LaneProps) {
     activePointerRef.current = event.pointerId;
     event.currentTarget.setPointerCapture(event.pointerId);
 
+    if (!positionLockedRef.current) {
+      // OK前は完全に位置決め専用。ボール本体から触っても投球しない。
+      pointerModeRef.current = "place";
+      pointsRef.current = [];
+      setStartPositionFromScreenX(relX);
+      return;
+    }
+
     const currentBallXPct = worldXToPct(ballStartXRef.current, 0);
     const ballHitRadiusXPct = ballVisualWidthPct(0) * 0.72;
     const ballHitRadiusYPct = 7.5;
@@ -796,14 +815,13 @@ export function Lane({ ballVisual, resetSignal, active, onRoll }: LaneProps) {
       && Math.abs(relY - DOCK_Y) <= ballHitRadiusYPct;
 
     if (!touchedBall) {
-      // ボール以外を触った時は位置決めだけ。ここから投球は開始しない。
-      pointerModeRef.current = "place";
+      activePointerRef.current = null;
+      pointerModeRef.current = null;
       pointsRef.current = [];
-      setStartPositionFromScreenX(relX);
       return;
     }
 
-    // ボール本体から始めた時だけ投球。既に決めた開始位置は変更しない。
+    // OK後はボール本体から始めたスワイプだけ投球。開始位置は絶対に更新しない。
     pointerModeRef.current = "throw";
     pointsRef.current = [{ x: event.clientX, y: event.clientY, t: performance.now() }];
   }, [active, setStartPositionFromScreenX]);
@@ -814,6 +832,7 @@ export function Lane({ ballVisual, resetSignal, active, onRoll }: LaneProps) {
     event.stopPropagation();
 
     if (pointerModeRef.current === "place") {
+      if (positionLockedRef.current) return;
       const board = boardRef.current;
       if (!board) return;
       const rect = board.getBoundingClientRect();
@@ -892,6 +911,21 @@ export function Lane({ ballVisual, resetSignal, active, onRoll }: LaneProps) {
     pointerModeRef.current = null;
     pointsRef.current = [];
   }, []);
+
+  const handleConfirmPosition = useCallback((event: ReactPointerEvent<HTMLButtonElement>) => {
+    event.preventDefault();
+    event.stopPropagation();
+    if (!active || throwingRef.current || dockingRef.current) return;
+    setPositionLocked(true);
+  }, [active, setPositionLocked]);
+
+  const handleUnlockPosition = useCallback((event: ReactPointerEvent<HTMLButtonElement>) => {
+    event.preventDefault();
+    event.stopPropagation();
+    if (!active || throwingRef.current || dockingRef.current) return;
+    setPositionLocked(false);
+    setBallPosition(ballStartXRef.current, 0, 0);
+  }, [active, setBallPosition, setPositionLocked]);
 
   return (
     <div
@@ -1010,6 +1044,40 @@ export function Lane({ ballVisual, resetSignal, active, onRoll }: LaneProps) {
         <span className="absolute left-[49%] top-[22%] h-[9%] w-[9%] rounded-full bg-black/40" />
         <span className="absolute left-[52%] top-[38%] h-[9%] w-[9%] rounded-full bg-black/40" />
       </div>
+
+      {active ? (
+        <div
+          className="absolute bottom-2 left-2 z-[1200] flex items-center gap-1.5 rounded-full bg-[#2f2119]/78 p-1 shadow-lg backdrop-blur-sm"
+          onPointerDown={(event) => {
+            event.stopPropagation();
+          }}
+        >
+          <button
+            type="button"
+            onPointerUp={handleConfirmPosition}
+            aria-pressed={positionLocked}
+            className={`min-w-[52px] rounded-full px-3 py-2 text-[11px] font-black transition ${
+              positionLocked
+                ? "bg-[#e8e0d2] text-[#807363]"
+                : "bg-[#6f9b58] text-white shadow-sm"
+            }`}
+          >
+            ✓ OK
+          </button>
+          <button
+            type="button"
+            onPointerUp={handleUnlockPosition}
+            aria-pressed={!positionLocked}
+            className={`h-8 w-8 rounded-full text-[16px] font-black leading-none transition ${
+              positionLocked
+                ? "bg-[#f4eadc] text-[#5b4637] shadow-sm"
+                : "bg-white/15 text-white/45"
+            }`}
+          >
+            ×
+          </button>
+        </div>
+      ) : null}
     </div>
   );
 }
