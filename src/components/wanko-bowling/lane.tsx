@@ -51,7 +51,9 @@ const PIN_COLLISION_RADIUS_M = BALL_RADIUS_M + PIN_RADIUS_M;
 const PIN_PAIR_RADIUS_M = JB_PIN_DIAMETER_M;
 const FALLEN_PIN_EXTRA_REACH_M = Math.max(0, JB_PIN_HEIGHT_M / 2 - PIN_RADIUS_M) * 0.82;
 const BALL_EXIT_DISTANCE_M = JB_HEAD_PIN_DISTANCE_M + 1.15;
-const MAX_LAUNCH_ANGLE_RAD = 6 * Math.PI / 180;
+// これまでの±6°までの狙い操作感はそのまま残し、強い斜めスワイプ時だけ±9°まで拡張する。
+const LEGACY_LAUNCH_ANGLE_RAD = 6 * Math.PI / 180;
+const MAX_LAUNCH_ANGLE_RAD = 9 * Math.PI / 180;
 const GUTTER_BALL_DRAG_PER_SEC = 0.035;
 const FOUL_LINE_Y = 97;
 const PIN_ROW_DEPTH_M = JB_PIN_SPACING_M * Math.sqrt(3) / 2;
@@ -244,6 +246,19 @@ function screenXToWorldX(screenXPct: number, distanceM: number): number {
   return JB_GUTTER_WIDTH_M + laneT * JB_LANE_WIDTH_M;
 }
 
+/**
+ * 狙い角度の算出専用。画面上の狙い線がレーン外へ伸びてもclampせず、
+ * レーン幅の投影をそのまま外側へ延長した「仮想ターゲット」に変換する。
+ * これにより通常の小さい狙いは従来と同じまま、強い斜めスワイプだけ
+ * ±6°を超えて新しい最大±9°まで使える。
+ */
+function screenXToVirtualWorldX(screenXPct: number, distanceM: number): number {
+  const halfLane = laneHalfWidthPct(distanceM);
+  const leftLaneEdge = 50 - halfLane;
+  const laneT = (screenXPct - leftLaneEdge) / Math.max(0.001, halfLane * 2);
+  return JB_GUTTER_WIDTH_M + laneT * JB_LANE_WIDTH_M;
+}
+
 function boardXToPct(board: number, distanceM: number): number {
   const normalized = (board - 20) / 20;
   return 50 + normalized * laneHalfWidthPct(distanceM);
@@ -317,8 +332,12 @@ function computeAimFromPoints(
   const directionUpPct = Math.max(1, startYPct - directionEndYPct);
   const rayScaleToPins = (startYPct - HEAD_PIN_SCREEN_Y) / directionUpPct;
   const aimScreenXPct = startXPct + (directionEndXPct - startXPct) * rayScaleToPins;
+  // 画面表示用ターゲットは従来どおり物理レーン内へclampする。
   const targetWorldX = screenXToWorldX(aimScreenXPct, JB_HEAD_PIN_DISTANCE_M);
-  const rawLaunchAngle = Math.atan2(targetWorldX - startXM, JB_HEAD_PIN_DISTANCE_M);
+  // launchAngleだけはレーン外へ延長した仮想ターゲットを使う。従来はここもclamp
+  // されていたため、UIから±6°付近すら実質的に到達できなかった。
+  const virtualTargetWorldX = screenXToVirtualWorldX(aimScreenXPct, JB_HEAD_PIN_DISTANCE_M);
+  const rawLaunchAngle = Math.atan2(virtualTargetWorldX - startXM, JB_HEAD_PIN_DISTANCE_M);
   const launchAngleRad = mapLaunchAngleInput(rawLaunchAngle);
   const curveNorm = estimateCurveNorm(points, rect.width);
   return { launchAngleRad, curveNorm, targetWorldX };
@@ -356,15 +375,21 @@ function estimateReleaseSwipeRate(points: Point[], boardHeightPx: number): numbe
 
 /**
  * 狙い操作の入力を launchAngle へ非線形マッピングする。
- * 小さい操作では細かく狙え、大きくスワイプした場合だけ最大角度まで使えるように、
- * 入力の絶対値を正規化した u（0〜1）の2乗でスケールする。
- *   u = clamp(|rawAngle| / MAX_LAUNCH_ANGLE_RAD, 0, 1)
- *   launchAngle = sign(rawAngle) * MAX_LAUNCH_ANGLE_RAD * u^2
- * 例: 入力25%→0.375°, 50%→1.5°, 70.7%→3°, 100%→6°。
+ * 従来の±6°範囲は式を一切変えず、小さいスワイプの操作感を完全に維持する。
+ * 6°を超える強い斜めスワイプだけ線形に延長し、最大9°まで使えるようにする。
  */
 function mapLaunchAngleInput(rawAngleRad: number): number {
-  const u = clamp(Math.abs(rawAngleRad) / MAX_LAUNCH_ANGLE_RAD, 0, 1);
-  return Math.sign(rawAngleRad) * MAX_LAUNCH_ANGLE_RAD * u * u;
+  const sign = Math.sign(rawAngleRad);
+  const magnitude = Math.abs(rawAngleRad);
+
+  if (magnitude <= LEGACY_LAUNCH_ANGLE_RAD) {
+    const u = clamp(magnitude / LEGACY_LAUNCH_ANGLE_RAD, 0, 1);
+    return sign * LEGACY_LAUNCH_ANGLE_RAD * u * u;
+  }
+
+  const extraRange = MAX_LAUNCH_ANGLE_RAD - LEGACY_LAUNCH_ANGLE_RAD;
+  const extraU = clamp((magnitude - LEGACY_LAUNCH_ANGLE_RAD) / Math.max(0.000001, extraRange), 0, 1);
+  return sign * (LEGACY_LAUNCH_ANGLE_RAD + extraRange * extraU);
 }
 
 function estimateCurveNorm(points: Point[], boardWidthPx: number): number {
