@@ -136,7 +136,7 @@ export function ScoreBoard({
 }) {
   return (
     <div
-      className="relative w-full overflow-hidden rounded-[14px] border border-white/20 bg-[#18251f]/82 px-1.5 py-1 shadow-[0_6px_18px_rgba(20,18,14,0.28),inset_0_1px_0_rgba(255,255,255,0.10)] backdrop-blur-[5px]"
+      className="relative -mx-2 -mt-2 w-[calc(100%+1rem)] overflow-hidden rounded-t-[22px] rounded-b-[10px] border-x border-t border-b border-white/15 bg-[#18251f]/92 px-1.5 py-1 shadow-[inset_0_1px_0_rgba(255,255,255,0.09),0_2px_5px_rgba(20,18,14,0.16)] backdrop-blur-[3px]"
       aria-label="5フレーム ボウリングスコアボード"
     >
       <style>{`
