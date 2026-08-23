@@ -23,11 +23,11 @@ declare
 begin
   if v_user_id is null then raise exception 'Authentication required'; end if;
   if p_round_id is null or length(p_round_id) not between 8 and 100 then raise exception 'Invalid round id'; end if;
-  if p_frame_count <> 5 then raise exception 'Round was not completed'; end if;
-  if p_score is null or p_score < 0 or p_score > 150 then raise exception 'Invalid score'; end if;
-  if p_strike_count is null or p_strike_count < 0 or p_strike_count > 7 then raise exception 'Invalid strike count'; end if;
-  if p_spare_count is null or p_spare_count < 0 or p_spare_count > 5 then raise exception 'Invalid spare count'; end if;
-  if p_gutter_count is null or p_gutter_count < 0 or p_gutter_count > 15 then raise exception 'Invalid gutter count'; end if;
+  if p_frame_count <> 10 then raise exception 'Round was not completed'; end if;
+  if p_score is null or p_score < 0 or p_score > 300 then raise exception 'Invalid score'; end if;
+  if p_strike_count is null or p_strike_count < 0 or p_strike_count > 12 then raise exception 'Invalid strike count'; end if;
+  if p_spare_count is null or p_spare_count < 0 or p_spare_count > 10 then raise exception 'Invalid spare count'; end if;
+  if p_gutter_count is null or p_gutter_count < 0 or p_gutter_count > 21 then raise exception 'Invalid gutter count'; end if;
 
   v_key := 'wanko-bowling:' || p_round_id;
   v_reward := greatest(1, p_score);
