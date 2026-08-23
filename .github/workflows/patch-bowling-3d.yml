@@ -1,0 +1,127 @@
+name: Patch bowling 3D visuals
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - .github/workflows/patch-bowling-3d.yml
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+
+      - name: Enhance lane depth and ball motion
+        shell: bash
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          def replace_once(text: str, old: str, new: str, label: str) -> str:
+              if old not in text:
+                  raise SystemExit(f"replacement target not found: {label}")
+              return text.replace(old, new, 1)
+
+          lane_path = Path("src/components/wanko-bowling/lane.tsx")
+          lane = lane_path.read_text()
+
+          lane = replace_once(
+              lane,
+              'const BALL_POST_HIT_SPEED_FACTOR = 0.94;\nconst BALL_POST_HIT_FORWARD_FACTOR = 0.92;',
+              'const BALL_POST_HIT_SPEED_FACTOR = 0.90;\nconst BALL_POST_HIT_FORWARD_FACTOR = 0.86;',
+              'post-hit speed',
+          )
+
+          lane = replace_once(
+              lane,
+              '''    // 1番ピンより奥ではボールをピットへ自然に消して、\n    // 遠近投影の切り替わりが「急加速」に見えないようにする。\n    if (yM > JB_HEAD_PIN_DISTANCE_M) {\n      const fade = clamp(\n        (yM - JB_HEAD_PIN_DISTANCE_M) / Math.max(0.001, PIN_DECK_DEPTH_M * 0.9),\n        0,\n        1,\n      );\n      el.style.opacity = String(1 - fade);\n    } else if (!dockingRef.current) {\n      el.style.opacity = '1';\n    }''',
+              '''    // ピンに当たった後もボールを消さず、衝突後の軌道をそのまま見せる。\n    // ドッキング演出中だけ opacity は dockBall 側で制御する。\n    if (!dockingRef.current) {\n      el.style.opacity = "1";\n    }''',
+              'remove post-pin fade',
+          )
+
+          lane = replace_once(
+              lane,
+              '      el.style.background = `radial-gradient(circle at 32% ${highlightY}%, ${ballVisual.bodyGradient[0]}, ${ballVisual.bodyGradient[1]})`;',
+              '''      el.style.background = [\n        `radial-gradient(circle at 30% ${highlightY}%, rgba(255,255,255,0.58) 0 7%, rgba(255,255,255,0.20) 18%, transparent 34%)`,\n        "radial-gradient(circle at 72% 78%, rgba(31,18,12,0.34) 0%, rgba(31,18,12,0.12) 40%, transparent 62%)",\n        `radial-gradient(circle at 38% ${highlightY}%, ${ballVisual.bodyGradient[0]} 0%, ${ballVisual.bodyGradient[1]} 76%)`,\n      ].join(", ");''',
+              'straight ball shading',
+          )
+
+          lane = replace_once(
+              lane,
+              '    el.style.background = `radial-gradient(circle at ${highlightX}% ${highlightY}%, ${ballVisual.bodyGradient[0]}, ${ballVisual.bodyGradient[1]})`;',
+              '''    el.style.background = [\n      `radial-gradient(circle at ${highlightX}% ${highlightY}%, rgba(255,255,255,0.58) 0 7%, rgba(255,255,255,0.20) 18%, transparent 34%)`,\n      "radial-gradient(circle at 72% 78%, rgba(31,18,12,0.34) 0%, rgba(31,18,12,0.12) 40%, transparent 62%)",\n      `radial-gradient(circle at ${highlightX}% ${highlightY}%, ${ballVisual.bodyGradient[0]} 0%, ${ballVisual.bodyGradient[1]} 76%)`,\n    ].join(", ");''',
+              'curve ball shading',
+          )
+
+          lane = replace_once(
+              lane,
+              '''          background: "linear-gradient(180deg, #e6bd7d 0%, #ddb170 42%, #d29d5b 100%)",\n          boxShadow: "inset 0 0 24px rgba(104,67,34,0.16)",''',
+              '''          background: "radial-gradient(ellipse at 50% 8%, rgba(255,245,211,0.42) 0%, rgba(255,245,211,0.12) 34%, transparent 61%), linear-gradient(90deg, rgba(92,55,26,0.14) 0%, transparent 12%, transparent 88%, rgba(92,55,26,0.14) 100%), linear-gradient(180deg, #e5ba78 0%, #dcae6a 43%, #cf9854 100%)",\n          boxShadow: "inset 18px 0 28px -24px rgba(62,37,20,0.48), inset -18px 0 28px -24px rgba(62,37,20,0.48), inset 0 15px 20px -20px rgba(255,248,225,0.72)",''',
+              'lane surface',
+          )
+
+          lane = replace_once(
+              lane,
+              '''          background: "linear-gradient(90deg, #3f2a1d, #654329 70%, #775034)",\n          boxShadow: "inset -3px 0 7px rgba(0,0,0,0.4)",''',
+              '''          background: "linear-gradient(90deg, #241712 0%, #3c271c 50%, #69452e 82%, #9a6840 100%)",\n          boxShadow: "inset -7px 0 10px rgba(18,10,7,0.52), inset -1px 0 1px rgba(255,230,188,0.28)",''',
+              'left gutter',
+          )
+
+          lane = replace_once(
+              lane,
+              '''          background: "linear-gradient(270deg, #3f2a1d, #654329 70%, #775034)",\n          boxShadow: "inset 3px 0 7px rgba(0,0,0,0.4)",''',
+              '''          background: "linear-gradient(270deg, #241712 0%, #3c271c 50%, #69452e 82%, #9a6840 100%)",\n          boxShadow: "inset 7px 0 10px rgba(18,10,7,0.52), inset 1px 0 1px rgba(255,230,188,0.28)",''',
+              'right gutter',
+          )
+
+          lane = replace_once(
+              lane,
+              '''      <svg className="pointer-events-none absolute inset-0 h-full w-full" viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true">''',
+              '''      <div\n        className="pointer-events-none absolute inset-0"\n        style={{\n          clipPath: `polygon(${FAR_LANE_LEFT}% 0%, ${FAR_LANE_RIGHT}% 0%, ${NEAR_LANE_RIGHT}% 100%, ${NEAR_LANE_LEFT}% 100%)`,\n          background: "linear-gradient(180deg, rgba(66,38,22,0.28) 0%, rgba(66,38,22,0.11) 14%, transparent 33%), radial-gradient(ellipse at 50% 20%, rgba(255,237,193,0.18) 0%, transparent 46%)",\n          boxShadow: "inset 0 22px 30px -26px rgba(33,19,12,0.72)",\n        }}\n        aria-hidden="true"\n      />\n\n      <svg className="pointer-events-none absolute inset-0 h-full w-full" viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true">''',
+              'horizon depth overlay',
+          )
+
+          lane = replace_once(
+              lane,
+              '''          boxShadow: ballVisual.premiumEffect ? `0 0 14px 4px ${ballVisual.hitColor}` : undefined,''',
+              '''          boxShadow: ballVisual.premiumEffect\n            ? `0 7px 14px rgba(37,22,14,0.46), inset -5px -7px 11px rgba(24,14,10,0.25), inset 4px 4px 8px rgba(255,255,255,0.20), 0 0 14px 4px ${ballVisual.hitColor}`\n            : "0 7px 14px rgba(37,22,14,0.46), inset -5px -7px 11px rgba(24,14,10,0.25), inset 4px 4px 8px rgba(255,255,255,0.20)",''',
+              'ball 3d shadow',
+          )
+
+          lane_path.write_text(lane)
+
+          pins_path = Path("src/components/wanko-bowling/pins.tsx")
+          pins = pins_path.read_text()
+          pins = replace_once(
+              pins,
+              '            transform: "translate(-50%, -50%)",',
+              '            transform: "translate(-50%, -50%)",\n            transformOrigin: "50% 84%",',
+              'pin transform origin',
+          )
+          pins = replace_once(
+              pins,
+              '            className="block h-auto w-full select-none"',
+              '            className="block h-auto w-full select-none"\n            style={{ filter: "drop-shadow(0 2px 1.4px rgba(54,35,22,0.38)) drop-shadow(0 -0.5px 0.5px rgba(255,255,255,0.26))" }}',
+              'pin depth shadow',
+          )
+          pins_path.write_text(pins)
+
+          workflow = Path(".github/workflows/patch-bowling-3d.yml")
+          if workflow.exists():
+              workflow.unlink()
+          PY
+
+      - name: Commit patch
+        shell: bash
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git commit -m "Enhance bowling 3D visuals and ball motion"
+          git push origin main
