@@ -15,9 +15,9 @@ export type PinLayout = {
 
 /**
  * 物理上の中心間隔は公認12インチのまま維持する。
- * 以前はピン画像が小さすぎて隙間が広く見えたため、表示だけ少し大きくする。
+ * スマホでは遠近で隙間が強調されるため、表示だけ少し大きくして実際のラックらしく見せる。
  */
-export const PIN_VISUAL_WIDTH_PCT = 4.05;
+export const PIN_VISUAL_WIDTH_PCT = 4.5;
 
 const halfSpacingM = JB_PIN_SPACING_M / 2;
 const rowDepthM = JB_PIN_SPACING_M * Math.sqrt(3) / 2;
