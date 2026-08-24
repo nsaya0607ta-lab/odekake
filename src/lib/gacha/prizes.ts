@@ -97,6 +97,9 @@ export const GACHA_PRIZES: readonly GachaPrize[] = [
   { id: "other_burebur", name: "ブレブル", rarity: "MR", type: "item", pool: "regular", image: "/collection/items/burebur.webp" },
   { id: "other_xmas_party", name: "Xmas Party", rarity: "MR", type: "item", pool: "regular", image: "/collection/items/xmas-party.webp" },
 
+  // --- 通常ガチャ：その他 追加分 --------------------------------------
+  { id: "other_clawd", name: "Clawd", rarity: "SSR", type: "item", pool: "regular", image: "/collection/items/clawd.webp" },
+
   // --- 通常ガチャ：おでかけ小物 ----------------------------------------
   { id: "other_yellow_rain_boots", name: "きいろのながぐつ", rarity: "N", type: "item", pool: "regular", image: "/collection/items/yellow-rain-boots.webp" },
   { id: "accessory_red_bandana", name: "あかいバンダナ", rarity: "N", type: "item", pool: "regular", image: "/collection/items/red-bandana.webp" },

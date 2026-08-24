@@ -147,7 +147,7 @@ const MYSTERY_SKILL_ITEM_IDS = [
   "other_komochi", "other_azuki", "other_kobee", "other_hamigaki", "other_ikea", "other_orusuban",
   "other_pondeomo", "other_pondear", "other_kurumari_a", "other_jare_a", "other_ketsunade_a", "other_omochi_janai", "other_oyasumi", "other_nisoku_a",
   "interior_shikkoku_no_ar", "interior_ragby_ar", "other_oyatsu_no_jikan", "other_listen_to_the_a", "other_okaeri",
-  "food_fruit_basket", "interior_gold_ball",
+  "food_fruit_basket", "interior_gold_ball", "other_clawd",
 ];
 
 /** アイテムごとのLv1〜5パラメータ（item_skill_levels_colored.xlsxの「スキル一覧」シート通り） */
@@ -239,6 +239,7 @@ const LV = {
   NISOKU_A_MULT: [3, 3.5, 4, 4.5, 5],
   FRUIT_BASKET_COUNT: [2, 3, 4, 5, 6],
   GOLD_BALL_COINS: [10, 15, 20, 30, 50],
+  CLAWD_BALL_COUNT: [5, 8, 10, 12, 14],
 } as const;
 /** 出現量アップ系は時間増加系アイテムの取得率まで底上げしてしまうため、控えめな倍率にしている */
 const SPAWN_RATE_BOOST = 1.5;
@@ -304,16 +305,20 @@ const DEFAULT_ITEM_SPAWN_WEIGHT = 100;
  * interior_gold_ball（SSR、時間・出現量のどちらにも無関係）を追加した際も同様に、
  * プール総数(N)が79→80に増えたことでLv5の最終プレイ時間期待値が175秒→約166秒に短縮されて
  * いたため、時間増加系7種の重みを65.5→66.6・81.6→82.9（6種）に変更して相殺済み。
+ *
+ * other_clawd（SSR、時間・出現量のどちらにも無関係）を追加した際も同様に、プール総数(N)が
+ * 80→81に増えたため、時間増加系7種の重みをプール総数の増加率（Total(81)/Total(80)≈1.0126）
+ * だけ底上げして相殺し、66.6→67.4・82.9→83.9（6種）に変更した。
  */
 const ITEM_SPAWN_WEIGHTS: Partial<Record<string, number>> = {
   toy_treasure_puzzle: 200,
-  other_omojii: 66.6,
-  toy_duck_plush: 82.9,
-  toy_carrot: 82.9,
-  food_paw_melon_bread: 82.9,
-  interior_anball: 82.9,
-  other_azuki: 82.9,
-  summer_frenchie: 82.9,
+  other_omojii: 67.4,
+  toy_duck_plush: 83.9,
+  toy_carrot: 83.9,
+  food_paw_melon_bread: 83.9,
+  interior_anball: 83.9,
+  other_azuki: 83.9,
+  summer_frenchie: 83.9,
   other_listen_to_the_a: 50,
 };
 const STRETCH_ROD_ITEM_ID = "interior_stretch_rod";
@@ -333,6 +338,12 @@ const PERSON_CHARACTER_ITEM_IDS = ["other_omochi_janai", "other_listen_to_the_a"
 const PERSON_CHARACTER_ITEMS: CollectionItem[] = PERSON_CHARACTER_ITEM_IDS
   .map((id) => COLLECTION_ITEMS.find((entry) => entry.id === id))
   .filter((entry): entry is CollectionItem => entry != null);
+const CLAWD_ITEM_ID = "other_clawd";
+/** Clawdの効果中に降ってくる「サッカーボール／ゴールドボール」。本来のレアリティ・スキルのまま出現する */
+const CLAWD_SOCCER_BALL_ITEM = COLLECTION_ITEMS.find((entry) => entry.id === "toy_soccer_ball") ?? null;
+const CLAWD_GOLD_BALL_ITEM = COLLECTION_ITEMS.find((entry) => entry.id === "interior_gold_ball") ?? null;
+/** 降ってくるボールのうちゴールドボールになる確率 */
+const CLAWD_GOLD_BALL_CHANCE = 0.2;
 /** ブレブルの効果中、このレアリティ以外のアイテムは出現しなくなる */
 const HIGH_RARITY_LOCK_RARITIES = new Set<FrenchieCatchItem["rarity"]>(["SSR", "UR", "LR"]);
 const OTHER_CATEGORY_ITEM_IDS = new Set(
@@ -481,6 +492,7 @@ export function FrenchieCatchGame({ ownedItems }: { ownedItems: FrenchieCatchIte
   const nisokuMultValueRef = useRef(3);
   const dogFloodRemainingRef = useRef(0);
   const personFloodRemainingRef = useRef(0);
+  const clawdBallFloodRemainingRef = useRef(0);
   const goldBonusCoinsRef = useRef(0);
   const slantBoostUntilRef = useRef(0);
   const boxShrinkUntilRef = useRef(0);
@@ -550,6 +562,7 @@ export function FrenchieCatchGame({ ownedItems }: { ownedItems: FrenchieCatchIte
     if (poopFloodRemainingRef.current > 0) labels.push(`うんち祭り あと${poopFloodRemainingRef.current}個`);
     if (dogFloodRemainingRef.current > 0) labels.push(`フレブル大量発生 あと${dogFloodRemainingRef.current}体`);
     if (personFloodRemainingRef.current > 0) labels.push(`人物入りキャラ大量発生 あと${personFloodRemainingRef.current}体`);
+    if (clawdBallFloodRemainingRef.current > 0) labels.push(`サッカーボール/ゴールドボール大量発生 あと${clawdBallFloodRemainingRef.current}個`);
     if (now < ikeaUntilRef.current) labels.push(`くみたて中 ${ikeaCountRef.current}個`);
     if (now < spawnRateBoostUntilRef.current) labels.push(`アイテム出現量×${spawnRateBoostValueRef.current}中`);
     if (now < otherSuppressUntilRef.current) labels.push(`その他カテゴリ出現×${otherSuppressValueRef.current}中`);
@@ -615,6 +628,24 @@ export function FrenchieCatchGame({ ownedItems }: { ownedItems: FrenchieCatchIte
         rarity: character.rarity,
         level: itemLevelByIdRef.current.get(character.id) ?? 0,
         vy: resolveFallVy(rawVy, base.vy, character.id, character.rarity),
+        size: 12.5 + Math.random() * 3.5,
+        spin: (Math.random() - 0.5) * 65,
+      };
+    }
+
+    if (clawdBallFloodRemainingRef.current > 0 && (CLAWD_SOCCER_BALL_ITEM || CLAWD_GOLD_BALL_ITEM)) {
+      clawdBallFloodRemainingRef.current -= 1;
+      const rollGold = Math.random() < CLAWD_GOLD_BALL_CHANCE;
+      const ball = (rollGold ? CLAWD_GOLD_BALL_ITEM : CLAWD_SOCCER_BALL_ITEM) ?? CLAWD_SOCCER_BALL_ITEM ?? CLAWD_GOLD_BALL_ITEM!;
+      return {
+        ...base,
+        itemId: ball.id,
+        kind: "item",
+        name: ball.name,
+        image: ball.image ?? "",
+        rarity: ball.rarity,
+        level: itemLevelByIdRef.current.get(ball.id) ?? 0,
+        vy: resolveFallVy(rawVy, base.vy, ball.id, ball.rarity),
         size: 12.5 + Math.random() * 3.5,
         spin: (Math.random() - 0.5) * 65,
       };
@@ -1404,6 +1435,13 @@ export function FrenchieCatchGame({ ownedItems }: { ownedItems: FrenchieCatchIte
                 effectLabel = `+${bonusCoins}コイン獲得${lvTag}`;
                 break;
               }
+              case CLAWD_ITEM_ID: {
+                const ballCount = LV.CLAWD_BALL_COUNT[lv]!;
+                clawdBallFloodRemainingRef.current += ballCount;
+                effectLabel = `サッカーボール/ゴールドボール${ballCount}個 大量発生${lvTag}`;
+                statusChanged = true;
+                break;
+              }
               case OYASUMI_ITEM_ID: {
                 blackoutUntilRef.current = now + OYASUMI_SECONDS * 1000;
                 setBlackoutActive(true);
@@ -1788,6 +1826,7 @@ export function FrenchieCatchGame({ ownedItems }: { ownedItems: FrenchieCatchIte
     nisokuMultValueRef.current = 3;
     dogFloodRemainingRef.current = 0;
     personFloodRemainingRef.current = 0;
+    clawdBallFloodRemainingRef.current = 0;
     goldBonusCoinsRef.current = 0;
     slantBoostUntilRef.current = 0;
     boxShrinkUntilRef.current = 0;
