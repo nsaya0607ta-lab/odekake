@@ -10,12 +10,10 @@ import {
   BALL_INERTIA_Z_KGM2,
   BALL_PIN_RESTITUTION,
   BALL_SPIN_RADIUS_M,
-  DRY_FRICTION_MU,
   GAME_BALL_MASS_KG,
   GAME_MAX_BALL_SPEED_KMH,
   GAME_MIN_BALL_SPEED_KMH,
   GAME_OIL_LENGTH_M,
-  GAME_REFERENCE_SPEED_MPS,
   GRAVITY_MPS2,
   JB_BALL_DIAMETER_M,
   JB_GUTTER_WIDTH_M,
@@ -26,16 +24,16 @@ import {
   JB_PIN_MASS_KG,
   JB_PIN_SPACING_M,
   JB_TOTAL_WIDTH_M,
+  laneFrictionMuAt,
   MAX_AXIS_ROTATION_DEG,
-  OIL_FRICTION_MU,
   PIN_CHAIN_KNOCK_SPEED_MPS,
   PIN_DIRECT_KNOCK_SPEED_MPS,
   PIN_FRICTION_PER_SEC,
   PIN_PIN_RESTITUTION,
   PIN_SETTLE_SPEED_MPS,
   SLIP_EPSILON_MPS,
+  spinMagnitudeRadSAtSpeed,
   SPIN_AXIS_TILT_DEG,
-  SPIN_MAGNITUDE_REF_RAD_S,
 } from "@/lib/games/wanko-bowling-physics";
 
 const DOCK_Y = 94;
@@ -70,7 +68,16 @@ const CURVE_FULL_SCALE_RAD = 20 * Math.PI / 180;
 const CURVE_BOW_DEAD_ZONE_PCT = 0.8;
 const CURVE_BOW_FULL_SCALE_PCT = 5;
 const MAX_CURVE_NORM = 0.85;
-const CURVE_STRAIGHT_SNAP = 0.08;
+/**
+ * axis rotationにして7度まではストレート判定にする。
+ * computeAxisRotationの axisRotationRad = MAX_AXIS_ROTATION_DEG * curve01^EXPONENT
+ * の逆算（curve01 = combinedとほぼ同義）で、7度に相当するcombinedのしきい値を求める。
+ */
+const CURVE_STRAIGHT_SNAP_DEG = 7;
+const CURVE_STRAIGHT_SNAP = Math.pow(
+  CURVE_STRAIGHT_SNAP_DEG / MAX_AXIS_ROTATION_DEG,
+  1 / AXIS_ROTATION_INPUT_EXPONENT,
+);
 
 const DIRECT_IMPULSE_WEIGHT = 0.16;
 const CHAIN_IMPULSE_WEIGHT = 0.24;
@@ -685,7 +692,7 @@ export function Lane({ ballVisual, resetSignal, newGameSignal, active, onRoll }:
 
     const { axisRotationRad, curveSign } = computeAxisRotation(launch.launchAngleRad, launch.curveNorm);
     const axisTiltRad = SPIN_AXIS_TILT_DEG * Math.PI / 180;
-    const spinMagnitudeRadS = SPIN_MAGNITUDE_REF_RAD_S * (launch.speedMps / GAME_REFERENCE_SPEED_MPS);
+    const spinMagnitudeRadS = spinMagnitudeRadSAtSpeed(launch.speedMps);
     const horizontalSpinRadS = spinMagnitudeRadS * Math.cos(axisTiltRad);
     let omegaXRadS = -horizontalSpinRadS * Math.cos(axisRotationRad);
     let omegaYRadS = -curveSign * horizontalSpinRadS * Math.sin(axisRotationRad);
@@ -778,7 +785,7 @@ export function Lane({ ballVisual, resetSignal, newGameSignal, active, onRoll }:
         const onOil = byM < GAME_OIL_LENGTH_M;
 
         if (gutterSide === null) {
-          const mu = onOil ? OIL_FRICTION_MU : DRY_FRICTION_MU;
+          const mu = laneFrictionMuAt(byM);
           const slipX = bvxMps - BALL_SPIN_RADIUS_M * omegaYRadS;
           const slipY = bvyMps + BALL_SPIN_RADIUS_M * omegaXRadS;
           const slipSpeed = Math.hypot(slipX, slipY);
@@ -1280,6 +1287,7 @@ export function Lane({ ballVisual, resetSignal, newGameSignal, active, onRoll }:
 
       {active && !isThrowing ? (
         <div
+          data-bowling-position-controls="true"
           className="absolute bottom-2 left-2 z-[1200] flex items-center gap-1.5 rounded-full bg-[#2f2119]/78 p-1 shadow-lg backdrop-blur-sm"
           onPointerDown={(event) => {
             event.stopPropagation();

@@ -27,7 +27,7 @@ export default async function WankoBowlingPage() {
     <div className="fixed inset-0 z-[50] flex h-dvh flex-col overflow-hidden bg-paper">
       <style>{`
         /* 位置決めUIはレーン左上に固定し、投球開始領域から離す。 */
-        [data-bowling-gesture-block="true"] > div:has(> button[aria-pressed]) {
+        [data-bowling-gesture-block="true"] > div[data-bowling-position-controls="true"] {
           left: 12px !important;
           top: 12px !important;
           bottom: auto !important;
@@ -36,7 +36,7 @@ export default async function WankoBowlingPage() {
         }
 
         @media (max-height: 720px) {
-          [data-bowling-gesture-block="true"] > div:has(> button[aria-pressed]) {
+          [data-bowling-gesture-block="true"] > div[data-bowling-position-controls="true"] {
             top: 10px !important;
           }
         }
