@@ -23,20 +23,21 @@ const halfSpacingM = JB_PIN_SPACING_M / 2;
 const rowDepthM = JB_PIN_SPACING_M * Math.sqrt(3) / 2;
 
 /**
- * スコアHUDと重ならないよう、ピンデッキ全体を画面上で少し手前へ配置する。
- * 物理座標（lateralM / forwardM）は変更しない。
+ * 初期描画の一瞬だけ使う画面座標。Lane側の共通透視投影に近い値を入れて、
+ * マウント直後にピンが大きく位置移動して見えないようにする。
+ * 物理座標（lateralM / forwardM）は公認12インチ間隔のまま変更しない。
  */
 export const PIN_LAYOUT: readonly PinLayout[] = [
-  { id: 1, x: 50, y: 21.5, lateralM: 0, forwardM: 0 },
-  { id: 2, x: 43.5, y: 18.7, lateralM: -halfSpacingM, forwardM: rowDepthM },
-  { id: 3, x: 56.5, y: 18.7, lateralM: halfSpacingM, forwardM: rowDepthM },
-  { id: 4, x: 37, y: 15.9, lateralM: -JB_PIN_SPACING_M, forwardM: rowDepthM * 2 },
-  { id: 5, x: 50, y: 15.9, lateralM: 0, forwardM: rowDepthM * 2 },
-  { id: 6, x: 63, y: 15.9, lateralM: JB_PIN_SPACING_M, forwardM: rowDepthM * 2 },
-  { id: 7, x: 30.5, y: 13.1, lateralM: -JB_PIN_SPACING_M * 1.5, forwardM: rowDepthM * 3 },
-  { id: 8, x: 43.5, y: 13.1, lateralM: -halfSpacingM, forwardM: rowDepthM * 3 },
-  { id: 9, x: 56.5, y: 13.1, lateralM: halfSpacingM, forwardM: rowDepthM * 3 },
-  { id: 10, x: 69.5, y: 13.1, lateralM: JB_PIN_SPACING_M * 1.5, forwardM: rowDepthM * 3 },
+  { id: 1, x: 50, y: 19.5, lateralM: 0, forwardM: 0 },
+  { id: 2, x: 43.47, y: 18.39, lateralM: -halfSpacingM, forwardM: rowDepthM },
+  { id: 3, x: 56.53, y: 18.39, lateralM: halfSpacingM, forwardM: rowDepthM },
+  { id: 4, x: 37.42, y: 16.99, lateralM: -JB_PIN_SPACING_M, forwardM: rowDepthM * 2 },
+  { id: 5, x: 50, y: 16.99, lateralM: 0, forwardM: rowDepthM * 2 },
+  { id: 6, x: 62.58, y: 16.99, lateralM: JB_PIN_SPACING_M, forwardM: rowDepthM * 2 },
+  { id: 7, x: 32.22, y: 15.3, lateralM: -JB_PIN_SPACING_M * 1.5, forwardM: rowDepthM * 3 },
+  { id: 8, x: 44.07, y: 15.3, lateralM: -halfSpacingM, forwardM: rowDepthM * 3 },
+  { id: 9, x: 55.93, y: 15.3, lateralM: halfSpacingM, forwardM: rowDepthM * 3 },
+  { id: 10, x: 67.78, y: 15.3, lateralM: JB_PIN_SPACING_M * 1.5, forwardM: rowDepthM * 3 },
 ];
 
 type PinsProps = {

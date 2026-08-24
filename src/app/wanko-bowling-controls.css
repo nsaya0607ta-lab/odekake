@@ -1,0 +1,42 @@
+/* わんこボウリング：投球スタイル切替をレーン右端のガター内に収める。 */
+[data-bowling-gesture-block="true"] > .right-2.bottom-2 {
+  top: auto !important;
+  left: auto !important;
+  right: 2px !important;
+  bottom: 10px !important;
+  width: 26px !important;
+  flex-direction: column !important;
+  align-items: center !important;
+  gap: 3px !important;
+  padding: 3px 2px !important;
+  border-radius: 9999px !important;
+  background: rgba(47, 33, 25, 0.88) !important;
+}
+
+[data-bowling-gesture-block="true"] > .right-2.bottom-2 > button {
+  box-sizing: border-box;
+  width: 22px !important;
+  min-width: 22px !important;
+  height: auto !important;
+  padding: 7px 4px !important;
+  border-radius: 9999px !important;
+  font-size: 9px !important;
+  line-height: 1 !important;
+  letter-spacing: 0.04em;
+  writing-mode: vertical-rl;
+  text-orientation: upright;
+  white-space: nowrap;
+}
+
+@media (min-width: 640px) {
+  [data-bowling-gesture-block="true"] > .right-2.bottom-2 {
+    right: 5px !important;
+    width: 30px !important;
+  }
+
+  [data-bowling-gesture-block="true"] > .right-2.bottom-2 > button {
+    width: 26px !important;
+    min-width: 26px !important;
+    font-size: 10px !important;
+  }
+}
