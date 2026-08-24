@@ -44,12 +44,14 @@ export const PAPER_REFERENCE_OIL_LENGTH_M = 40 * 0.3048;
 
 /**
  * スワイプ速度の差を体感できるゲーム用速度レンジ。
- * 実物のリリース速度27〜30km/h程度（USBCの実測研究でピンキャリー率が
+ * 下限27km/hは実物のリリース速度（USBCの実測研究でピンキャリー率が
  * 最大になるとされる16〜18mph＝約26〜29km/h帯や、論文の基準投球条件
  * 8.0m/s=28.8km/hとも重なる範囲）に合わせている。
+ * 上限45km/hはゲームの爽快感を優先した値で、実物のプロボウラーの
+ * 上限（20〜24mph≒32〜39km/h）よりやや高め。
  */
 export const GAME_MIN_BALL_SPEED_KMH = 27;
-export const GAME_MAX_BALL_SPEED_KMH = 30;
+export const GAME_MAX_BALL_SPEED_KMH = 45;
 
 /**
  * ピンが底縁を支点に倒れ始めるために必要な重心上昇を簡易モデル化。

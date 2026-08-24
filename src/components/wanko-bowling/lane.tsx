@@ -263,17 +263,6 @@ function computeAxisRotation(launchAngleRad: number, curveNorm: number): { axisR
   return { axisRotationRad, curveSign };
 }
 
-/**
- * 精密モード用: computeAxisRotationの逆変換。
- * スライダーで指定したaxis rotation角度（0〜MAX_AXIS_ROTATION_DEG）から、
- * 同じ角度をcomputeAxisRotationが再現するcurveNormを逆算する。
- */
-function axisRotationDegToCurveNorm(axisRotationDeg: number): number {
-  const clampedDeg = clamp(axisRotationDeg, 0, MAX_AXIS_ROTATION_DEG);
-  const curve01 = Math.pow(clampedDeg / MAX_AXIS_ROTATION_DEG, 1 / AXIS_ROTATION_INPUT_EXPONENT);
-  return curve01 * MAX_CURVE_NORM;
-}
-
 function computeAimFromPoints(
   points: Point[],
   rect: { left: number; top: number; width: number; height: number },
@@ -530,10 +519,6 @@ export function Lane({ ballVisual, resetSignal, newGameSignal, active, onRoll }:
   const [positionLocked, setPositionLockedState] = useState(false);
   const [startOffsetM, setStartOffsetM] = useState<number>(0);
   const [isThrowing, setIsThrowing] = useState(false);
-  const precisionModeRef = useRef(false);
-  const [precisionMode, setPrecisionModeState] = useState(false);
-  const precisionCurveDegRef = useRef(0);
-  const [precisionCurveDeg, setPrecisionCurveDegState] = useState(0);
   const pinBodiesRef = useRef<Map<number, PinBody>>(
     new Map(PIN_LAYOUT.map((pin) => [pin.id, createPinBody(pin)])),
   );
@@ -545,16 +530,6 @@ export function Lane({ ballVisual, resetSignal, newGameSignal, active, onRoll }:
     activePointerRef.current = null;
     pointerModeRef.current = null;
     pointsRef.current = [];
-  }, []);
-
-  const setPrecisionMode = useCallback((on: boolean) => {
-    precisionModeRef.current = on;
-    setPrecisionModeState(on);
-  }, []);
-
-  const setPrecisionCurveDeg = useCallback((deg: number) => {
-    precisionCurveDegRef.current = deg;
-    setPrecisionCurveDegState(deg);
   }, []);
 
   const registerPinNode = useCallback((id: number, el: HTMLDivElement | null) => {
@@ -1150,11 +1125,7 @@ export function Lane({ ballVisual, resetSignal, newGameSignal, active, onRoll }:
       + (GAME_MAX_BALL_SPEED_KMH - GAME_MIN_BALL_SPEED_KMH) * speedNorm;
     const speedMps = speedKmh / 3.6;
 
-    const curveNorm = precisionModeRef.current
-      ? axisRotationDegToCurveNorm(precisionCurveDegRef.current)
-      : aim.curveNorm;
-
-    runThrow({ speedMps, launchAngleRad: aim.launchAngleRad, curveNorm, startXM });
+    runThrow({ speedMps, launchAngleRad: aim.launchAngleRad, curveNorm: aim.curveNorm, startXM });
   }, [active, runThrow]);
 
   const onPointerCancel = useCallback((event: ReactPointerEvent<HTMLDivElement>) => {
@@ -1346,44 +1317,6 @@ export function Lane({ ballVisual, resetSignal, newGameSignal, active, onRoll }:
           >
             ×
           </button>
-        </div>
-      ) : null}
-
-      {active && !isThrowing ? (
-        <div
-          className="absolute bottom-3 right-2 z-[1200] flex items-center gap-1.5 rounded-full bg-[#2f2119]/78 p-1 pr-2.5 shadow-lg backdrop-blur-sm"
-          onPointerDown={(event) => {
-            event.stopPropagation();
-          }}
-        >
-          <button
-            type="button"
-            onPointerUp={() => setPrecisionMode(!precisionMode)}
-            aria-pressed={precisionMode}
-            className={`min-w-[52px] rounded-full px-3 py-2 text-[11px] font-black transition ${
-              precisionMode
-                ? "bg-[#6f9b58] text-white shadow-sm"
-                : "bg-white/15 text-white/70"
-            }`}
-          >
-            精密
-          </button>
-          {precisionMode ? (
-            <div className="flex items-center gap-1.5 pl-0.5">
-              <input
-                type="range"
-                min={0}
-                max={MAX_AXIS_ROTATION_DEG}
-                step={1}
-                value={precisionCurveDeg}
-                onChange={(event) => setPrecisionCurveDeg(Number(event.target.value))}
-                className="h-1.5 w-[92px] accent-[#e8c25a]"
-              />
-              <span className="min-w-[32px] text-right text-[11px] font-black tabular-nums text-white/90">
-                {precisionCurveDeg}°
-              </span>
-            </div>
-          ) : null}
         </div>
       ) : null}
     </div>
