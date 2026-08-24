@@ -10,7 +10,6 @@ import {
   BALL_INERTIA_Z_KGM2,
   BALL_PIN_RESTITUTION,
   BALL_SPIN_RADIUS_M,
-  DRY_FRICTION_MU,
   GAME_BALL_MASS_KG,
   GAME_MAX_BALL_SPEED_KMH,
   GAME_MIN_BALL_SPEED_KMH,
@@ -26,8 +25,8 @@ import {
   JB_PIN_MASS_KG,
   JB_PIN_SPACING_M,
   JB_TOTAL_WIDTH_M,
+  laneFrictionMuAt,
   MAX_AXIS_ROTATION_DEG,
-  OIL_FRICTION_MU,
   PIN_CHAIN_KNOCK_SPEED_MPS,
   PIN_DIRECT_KNOCK_SPEED_MPS,
   PIN_FRICTION_PER_SEC,
@@ -778,7 +777,7 @@ export function Lane({ ballVisual, resetSignal, newGameSignal, active, onRoll }:
         const onOil = byM < GAME_OIL_LENGTH_M;
 
         if (gutterSide === null) {
-          const mu = onOil ? OIL_FRICTION_MU : DRY_FRICTION_MU;
+          const mu = laneFrictionMuAt(byM);
           const slipX = bvxMps - BALL_SPIN_RADIUS_M * omegaYRadS;
           const slipY = bvyMps + BALL_SPIN_RADIUS_M * omegaXRadS;
           const slipSpeed = Math.hypot(slipX, slipY);

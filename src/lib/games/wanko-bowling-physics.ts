@@ -98,9 +98,38 @@ export const PIN_CHAIN_KNOCK_SPEED_MPS = idealTipSpeedMps * 1.45;
  */
 /** 接触点計算に使うボール半径。論文の基準値そのもの。 */
 export const BALL_SPIN_RADIUS_M = 0.1085;
-/** レーン摩擦係数の代表値（オイル区間／ドライ区間）。 */
+/** レーン摩擦係数の代表値（オイル区間／ドライ区間）。Banerjee & McPhee (2014) の実測値と一致。 */
 export const OIL_FRICTION_MU = 0.04;
 export const DRY_FRICTION_MU = 0.20;
+
+/**
+ * レーン奥行き方向（y）に沿った動摩擦係数のプロファイル。
+ * 実際のオイルパターンはコンディショナーの塗布量がパターン全長で均一ではなく、
+ * パターン終盤（研究では概ね最後の1/3）にかけて塗布量が減り摩擦係数が
+ * 急激に高まる（2倍以上になる）ことが報告されている。
+ * これを踏まえ、従来の「オイル終端で瞬時に0.04→0.20へ切り替わる階段関数」を、
+ * 3区間の滑らかなカーブに置き換える。
+ *
+ *   1) 0 〜 OIL_RAMP_START_M（オイル長の2/3地点）: OIL_FRICTION_MUで一定
+ *   2) OIL_RAMP_START_M 〜 OIL_RAMP_END_M: OIL_FRICTION_MUからDRY_FRICTION_MUへ
+ *      スムーズステップ（3t²-2t³）で連続的に遷移
+ *   3) OIL_RAMP_END_M以降: DRY_FRICTION_MUで一定
+ *
+ * OIL_RAMP_END_MはGAME_OIL_LENGTH_Mより少し先（1.5m）に置き、
+ * 見た目上のオイル終端（OIL_END_Y表示）を跨いで遷移が続くようにすることで、
+ * 描画上のオイル境界とボール挙動の急変が一致しないようにしている。
+ */
+const OIL_RAMP_START_M = GAME_OIL_LENGTH_M * (2 / 3);
+const OIL_RAMP_END_M = GAME_OIL_LENGTH_M + 1.5;
+
+export function laneFrictionMuAt(downLaneM: number): number {
+  if (downLaneM <= OIL_RAMP_START_M) return OIL_FRICTION_MU;
+  if (downLaneM >= OIL_RAMP_END_M) return DRY_FRICTION_MU;
+  const t = (downLaneM - OIL_RAMP_START_M) / (OIL_RAMP_END_M - OIL_RAMP_START_M);
+  const smoothT = t * t * (3 - 2 * t);
+  return OIL_FRICTION_MU + (DRY_FRICTION_MU - OIL_FRICTION_MU) * smoothT;
+}
+
 /** 論文の基準投球条件（標準投球としてゲームの基準速度にも使う）。 */
 export const GAME_REFERENCE_SPEED_MPS = 8.0;
 export const BALL_RADIUS_OF_GYRATION_M = 0.0635; // RG
