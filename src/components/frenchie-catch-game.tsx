@@ -356,6 +356,8 @@ const CLAWD_GOLD_BALL_ITEM = COLLECTION_ITEMS.find((entry) => entry.id === "inte
 /** 降ってくるボールのうちゴールドボールになる確率 */
 const CLAWD_GOLD_BALL_CHANCE = 0.2;
 const MOCCHURIN_ITEM_ID = "food_mocchurin";
+/** Lv4(lv index=3)以降は直前に捕まえた2つ分のスキルをエコーする */
+const MOCCHURIN_DOUBLE_ECHO_MIN_LV = 3;
 /** ブレブルの効果中、このレアリティ以外のアイテムは出現しなくなる */
 const HIGH_RARITY_LOCK_RARITIES = new Set<FrenchieCatchItem["rarity"]>(["SSR", "UR", "LR"]);
 const OTHER_CATEGORY_ITEM_IDS = new Set(
@@ -505,7 +507,8 @@ export function FrenchieCatchGame({ ownedItems }: { ownedItems: FrenchieCatchIte
   const dogFloodRemainingRef = useRef(0);
   const personFloodRemainingRef = useRef(0);
   const clawdBallFloodRemainingRef = useRef(0);
-  const lastSkillCatchRef = useRef<{ itemId: string; level: number } | null>(null);
+  /** もっちゅりんのエコー用に、直前に捕まえたアイテムを新しい順に最大2件保持する */
+  const lastSkillCatchesRef = useRef<{ itemId: string; level: number }[]>([]);
   const goldBonusCoinsRef = useRef(0);
   const slantBoostUntilRef = useRef(0);
   const boxShrinkUntilRef = useRef(0);
@@ -1676,8 +1679,9 @@ export function FrenchieCatchGame({ ownedItems }: { ownedItems: FrenchieCatchIte
             if (mainSkillResult.statusChanged) statusChanged = true;
 
             if (skillId === MOCCHURIN_ITEM_ID) {
-              const lastSkill = lastSkillCatchRef.current;
-              if (lastSkill && lastSkill.itemId !== MOCCHURIN_ITEM_ID) {
+              const echoCount = lv >= MOCCHURIN_DOUBLE_ECHO_MIN_LV ? 2 : 1;
+              const echoTargets = lastSkillCatchesRef.current.slice(0, echoCount);
+              for (const lastSkill of echoTargets) {
                 const echoLv = clamp(lastSkill.level, 1, MAX_SKILL_LEVEL) - 1;
                 const echoLvTag = lastSkill.level >= MAX_SKILL_LEVEL ? " [Lv.MAX]" : lastSkill.level > 1 ? ` [Lv${lastSkill.level}]` : "";
                 const echoResult = runItemSkillEffect(lastSkill.itemId, echoLv, echoLvTag);
@@ -1690,7 +1694,7 @@ export function FrenchieCatchGame({ ownedItems }: { ownedItems: FrenchieCatchIte
             }
 
             if (skillId && skillId !== MOCCHURIN_ITEM_ID) {
-              lastSkillCatchRef.current = { itemId: skillId, level: skillLevel };
+              lastSkillCatchesRef.current = [{ itemId: skillId, level: skillLevel }, ...lastSkillCatchesRef.current].slice(0, 2);
             }
 
             if (isMystery && effectLabel) effectLabel = `？発動 / ${effectLabel}`;
@@ -1886,7 +1890,7 @@ export function FrenchieCatchGame({ ownedItems }: { ownedItems: FrenchieCatchIte
     dogFloodRemainingRef.current = 0;
     personFloodRemainingRef.current = 0;
     clawdBallFloodRemainingRef.current = 0;
-    lastSkillCatchRef.current = null;
+    lastSkillCatchesRef.current = [];
     goldBonusCoinsRef.current = 0;
     slantBoostUntilRef.current = 0;
     boxShrinkUntilRef.current = 0;
