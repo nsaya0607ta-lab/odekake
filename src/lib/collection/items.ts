@@ -173,6 +173,9 @@ const CURATED_ITEMS: readonly CollectionItem[] = [
   { id: "other_burebur", name: "ブレブル", image: "/collection/items/burebur.webp", category: "other", series: null, rarity: "MR" },
   { id: "other_xmas_party", name: "Xmas Party", image: "/collection/items/xmas-party.webp", category: "other", series: null, rarity: "MR" },
 
+  // --- 通常図鑑：その他 追加分 ------------------------------------------
+  { id: "other_clawd", name: "Clawd", image: "/collection/items/clawd.webp", category: "other", series: null, rarity: "SSR" },
+
   // --- 通常図鑑：おでかけ小物 ------------------------------------------
   { id: "other_yellow_rain_boots", name: "きいろのながぐつ", image: "/collection/items/yellow-rain-boots.webp", category: "other", series: null, rarity: "N" },
   { id: "accessory_red_bandana", name: "あかいバンダナ", image: "/collection/items/red-bandana.webp", category: "accessory", series: null, rarity: "N" },
