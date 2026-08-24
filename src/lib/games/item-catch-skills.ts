@@ -27,6 +27,7 @@ export const ITEM_CATCH_SKILLS: readonly ItemCatchSkill[] = [
   { id: "toy_bear_plush", levels: ["防止付与", "防止付与 +10pt", "防止付与", "防止付与 +20pt", "防止付与"], note: "しびれ/ダンボール縮小/時間減少のいずれかをランダムで1つ防ぐ（1回のみ）" },
   { id: "food_paw_bowl", levels: ["次の3個 +5pt", "次の3個 +7pt", "次の3個 +10pt", "次の3個 +13pt", "次の3個 +15pt"] },
   { id: "food_paw_pudding", levels: ["+15pt", "+20pt", "+30pt", "+40pt", "+50pt"] },
+  { id: "food_kamikami", levels: ["+10pt", "+15pt", "+25pt", "+35pt", "+45pt"] },
   { id: "food_paw_melon_bread", levels: ["+2秒 +5pt", "+3秒 +10pt", "+4秒 +15pt", "+5秒 +20pt", "+6秒 +30pt"] },
   { id: "interior_stretch_rod", levels: ["3秒間 その他×0.5", "3秒間 その他×0.4", "3秒間 その他×0.3", "3秒間 その他×0.2", "3秒間 その他×0.1"], note: "3秒間、カテゴリーが「その他」のキャラの出現重みを下げる。Lvが上がるほど効果が強くなる" },
 
