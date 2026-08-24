@@ -241,8 +241,7 @@ const LV = {
   GOLD_BALL_COINS: [10, 15, 20, 30, 50],
   CLAWD_BALL_COUNT: [5, 8, 10, 12, 14],
   KAMIKAMI_PT: [10, 15, 25, 35, 45],
-  MOCCHURIN_PT: [20, 25, 30, 40, 50],
-  MOCCHURIN_ECHO_CHANCE: [0.4, 0.55, 0.7, 0.85, 1],
+  MOCCHURIN_PT: [30, 45, 60, 80, 100],
 } as const;
 /** 出現量アップ系は時間増加系アイテムの取得率まで底上げしてしまうため、控えめな倍率にしている */
 const SPAWN_RATE_BOOST = 1.5;
@@ -1679,17 +1678,14 @@ export function FrenchieCatchGame({ ownedItems }: { ownedItems: FrenchieCatchIte
             if (skillId === MOCCHURIN_ITEM_ID) {
               const lastSkill = lastSkillCatchRef.current;
               if (lastSkill && lastSkill.itemId !== MOCCHURIN_ITEM_ID) {
-                const echoChance = LV.MOCCHURIN_ECHO_CHANCE[lv]!;
-                if (Math.random() < echoChance) {
-                  const echoLv = clamp(lastSkill.level, 1, MAX_SKILL_LEVEL) - 1;
-                  const echoLvTag = lastSkill.level >= MAX_SKILL_LEVEL ? " [Lv.MAX]" : lastSkill.level > 1 ? ` [Lv${lastSkill.level}]` : "";
-                  const echoResult = runItemSkillEffect(lastSkill.itemId, echoLv, echoLvTag);
-                  points += echoResult.points;
-                  if (echoResult.effectLabel) {
-                    effectLabel = effectLabel ? `${effectLabel} / エコー: ${echoResult.effectLabel}` : `エコー: ${echoResult.effectLabel}`;
-                  }
-                  if (echoResult.statusChanged) statusChanged = true;
+                const echoLv = clamp(lastSkill.level, 1, MAX_SKILL_LEVEL) - 1;
+                const echoLvTag = lastSkill.level >= MAX_SKILL_LEVEL ? " [Lv.MAX]" : lastSkill.level > 1 ? ` [Lv${lastSkill.level}]` : "";
+                const echoResult = runItemSkillEffect(lastSkill.itemId, echoLv, echoLvTag);
+                points += echoResult.points;
+                if (echoResult.effectLabel) {
+                  effectLabel = effectLabel ? `${effectLabel} / エコー: ${echoResult.effectLabel}` : `エコー: ${echoResult.effectLabel}`;
                 }
+                if (echoResult.statusChanged) statusChanged = true;
               }
             }
 
