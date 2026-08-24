@@ -68,7 +68,16 @@ const CURVE_FULL_SCALE_RAD = 20 * Math.PI / 180;
 const CURVE_BOW_DEAD_ZONE_PCT = 0.8;
 const CURVE_BOW_FULL_SCALE_PCT = 5;
 const MAX_CURVE_NORM = 0.85;
-const CURVE_STRAIGHT_SNAP = 0.08;
+/**
+ * axis rotationにして7度まではストレート判定にする。
+ * computeAxisRotationの axisRotationRad = MAX_AXIS_ROTATION_DEG * curve01^EXPONENT
+ * の逆算（curve01 = combinedとほぼ同義）で、7度に相当するcombinedのしきい値を求める。
+ */
+const CURVE_STRAIGHT_SNAP_DEG = 7;
+const CURVE_STRAIGHT_SNAP = Math.pow(
+  CURVE_STRAIGHT_SNAP_DEG / MAX_AXIS_ROTATION_DEG,
+  1 / AXIS_ROTATION_INPUT_EXPONENT,
+);
 
 const DIRECT_IMPULSE_WEIGHT = 0.16;
 const CHAIN_IMPULSE_WEIGHT = 0.24;
