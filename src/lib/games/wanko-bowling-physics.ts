@@ -44,16 +44,12 @@ export const PAPER_REFERENCE_OIL_LENGTH_M = 40 * 0.3048;
 
 /**
  * スワイプ速度の差を体感できるゲーム用速度レンジ。
- * 規格値ではなく入力フィーリング用の近似値。
- *
- * 下限は実物のボウリングを参考に引き上げている。USBCの実測研究では
- * ファウルライン速度16〜18mph（約26〜29km/h）でピンキャリー率が最大になると
- * 報告されており、上記の論文が採用する基準投球条件（8.0m/s=28.8km/h、
- * GAME_REFERENCE_SPEED_MPS参照）もこの帯に入る。旧値13km/h（≒8mph）は
- * 実物ではほぼ転がらない極端に遅い投球に相当するため非現実的だった。
+ * 実物のリリース速度27〜30km/h程度（USBCの実測研究でピンキャリー率が
+ * 最大になるとされる16〜18mph＝約26〜29km/h帯や、論文の基準投球条件
+ * 8.0m/s=28.8km/hとも重なる範囲）に合わせている。
  */
-export const GAME_MIN_BALL_SPEED_KMH = 26;
-export const GAME_MAX_BALL_SPEED_KMH = 38;
+export const GAME_MIN_BALL_SPEED_KMH = 27;
+export const GAME_MAX_BALL_SPEED_KMH = 30;
 
 /**
  * ピンが底縁を支点に倒れ始めるために必要な重心上昇を簡易モデル化。
@@ -142,24 +138,48 @@ export const BALL_INT_DIFFERENTIAL_M = 0; // IntDiff
  * 面に対する軸の傾き13.3°を向いているときの成分」として再解釈し、
  * 軸の向き（axisRotation）から毎回組み立てる。
  *
- *   spinMagnitude = SPIN_MAGNITUDE_REF_RAD_S * (releaseSpeed / GAME_REFERENCE_SPEED_MPS)
+ *   spinMagnitude = spinMagnitudeRadSAtSpeed(releaseSpeed)
  *   horizontalSpin = spinMagnitude * cos(axisTilt)
  *   omegaX = -horizontalSpin * cos(axisRotation)
  *   omegaY = -sign(curveNorm) * horizontalSpin * sin(axisRotation)
  *   omegaZ = spinMagnitude * sin(axisTilt)
  *
  * releaseSpeed=8.0m/s・axisRotation=45°で(-30,-30,+10)にほぼ一致することを
- * 検証済み（誤差0.1%未満）。curveNorm（プレイヤーのカーブ入力）は
+ * 検証済み（誤差0.1%未満、GAME_REFERENCE_SPEED_MPS・SPIN_MAGNITUDE_REF_RAD_S
+ * は検証用の参照値として残す）。curveNorm（プレイヤーのカーブ入力）は
  * axisRotationのみを決め、omegaYへ直接掛けることはしない。
  */
-export const SPIN_MAGNITUDE_REF_RAD_S = Math.sqrt(30 * 30 + 30 * 30 + 10 * 10); // ≒43.589 rad/s
+export const SPIN_MAGNITUDE_REF_RAD_S = Math.sqrt(30 * 30 + 30 * 30 + 10 * 10); // ≒43.589 rad/s ≒416rpm
 export const SPIN_AXIS_TILT_DEG = 13.26;
+
+/**
+ * ゲーム本番の回転量（スピンの大きさ）。実際のボウラーのレブ数は
+ * リリース速度に単純比例するわけではない（同じ速度でも手首の使い方で
+ * レブ数は変わる）ため、論文の基準条件そのままの比例スケーリングではなく、
+ * 一般的なレクリエーションボウラーのレブ数目安（約275rpm）から上級者・
+ * 論文基準条件相当（約416rpm、SPIN_MAGNITUDE_REF_RAD_S参照）までを、
+ * リリース速度レンジ（GAME_MIN/MAX_BALL_SPEED_KMH）と同じ正規化係数で
+ * 線形補間する。
+ */
+export const GAME_MIN_SPIN_RPM = 275;
+export const GAME_MAX_SPIN_RPM = 416;
+
+export function spinMagnitudeRadSAtSpeed(speedMps: number): number {
+  const speedKmh = speedMps * 3.6;
+  const speedNorm = Math.min(1, Math.max(
+    0,
+    (speedKmh - GAME_MIN_BALL_SPEED_KMH) / (GAME_MAX_BALL_SPEED_KMH - GAME_MIN_BALL_SPEED_KMH),
+  ));
+  const rpm = GAME_MIN_SPIN_RPM + (GAME_MAX_SPIN_RPM - GAME_MIN_SPIN_RPM) * speedNorm;
+  return rpm * (2 * Math.PI / 60);
+}
+
 /**
  * ユーザーが大きく曲げたスワイプでより強いフックを選べるよう、
- * 実効最大値を論文基準条件と同じ45°まで許可する。
+ * 実効最大値を競技者の実測レンジ上限45〜55°程度に合わせて55°まで許可する。
  * 入力感度はAXIS_ROTATION_INPUT_EXPONENT=0.8のまま維持する。
  */
-export const MAX_AXIS_ROTATION_DEG = 45;
+export const MAX_AXIS_ROTATION_DEG = 55;
 /**
  * curve入力（0〜1）からaxisRotationへの変換指数。
  * 入力感度は従来の0.8を維持し、小さなスワイプで急にカーブが強くならないようにする。

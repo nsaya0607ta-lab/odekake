@@ -14,7 +14,6 @@ import {
   GAME_MAX_BALL_SPEED_KMH,
   GAME_MIN_BALL_SPEED_KMH,
   GAME_OIL_LENGTH_M,
-  GAME_REFERENCE_SPEED_MPS,
   GRAVITY_MPS2,
   JB_BALL_DIAMETER_M,
   JB_GUTTER_WIDTH_M,
@@ -33,8 +32,8 @@ import {
   PIN_PIN_RESTITUTION,
   PIN_SETTLE_SPEED_MPS,
   SLIP_EPSILON_MPS,
+  spinMagnitudeRadSAtSpeed,
   SPIN_AXIS_TILT_DEG,
-  SPIN_MAGNITUDE_REF_RAD_S,
 } from "@/lib/games/wanko-bowling-physics";
 
 const DOCK_Y = 94;
@@ -684,7 +683,7 @@ export function Lane({ ballVisual, resetSignal, newGameSignal, active, onRoll }:
 
     const { axisRotationRad, curveSign } = computeAxisRotation(launch.launchAngleRad, launch.curveNorm);
     const axisTiltRad = SPIN_AXIS_TILT_DEG * Math.PI / 180;
-    const spinMagnitudeRadS = SPIN_MAGNITUDE_REF_RAD_S * (launch.speedMps / GAME_REFERENCE_SPEED_MPS);
+    const spinMagnitudeRadS = spinMagnitudeRadSAtSpeed(launch.speedMps);
     const horizontalSpinRadS = spinMagnitudeRadS * Math.cos(axisTiltRad);
     let omegaXRadS = -horizontalSpinRadS * Math.cos(axisRotationRad);
     let omegaYRadS = -curveSign * horizontalSpinRadS * Math.sin(axisRotationRad);
