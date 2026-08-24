@@ -2,18 +2,21 @@
  * ガチャの設定
  * =============================================================
  * ガチャ種別ごとの排出率と値段をまとめて管理する。
+ * シリーズ限定ガチャ（hiking/snow/summer など）の定義は series.ts を
+ * 唯一の真実源とし、ここではそれを通常ガチャと合わせて GachaType に展開する。
  */
+import { SERIES, SERIES_IDS, type SeriesId } from "@/lib/series";
 
 export const GACHA_RARITIES = ["N", "R", "SR", "SSR", "UR", "LR", "MR"] as const;
 export type GachaRarity = (typeof GACHA_RARITIES)[number];
 
-export const GACHA_TYPES = ["regular", "summer"] as const;
-export type GachaType = (typeof GACHA_TYPES)[number];
+export const GACHA_TYPES = ["regular", ...SERIES_IDS] as const;
+export type GachaType = "regular" | SeriesId;
 
 export const GACHA_TYPE_LABELS: Record<GachaType, string> = {
   regular: "通常ガチャ",
-  summer: "夏限定",
-};
+  ...Object.fromEntries(SERIES.map((series) => [series.id, series.gachaLabel])),
+} as Record<GachaType, string>;
 
 /**
  * ガチャ種別ごとのレアリティ排出率（合計100%）。実際の抽選に使う内部値。
@@ -30,16 +33,8 @@ export const GACHA_RARITY_RATES_BY_TYPE: Record<GachaType, Record<GachaRarity, n
     LR: 0.5,
     MR: 0.1,
   },
-  summer: {
-    N: 0,
-    R: 0,
-    SR: 100,
-    SSR: 0,
-    UR: 0,
-    LR: 0,
-    MR: 0,
-  },
-};
+  ...Object.fromEntries(SERIES.map((series) => [series.id, series.rarityRates])),
+} as Record<GachaType, Record<GachaRarity, number>>;
 
 /** 旧参照向け。通常ガチャを標準とする */
 export const GACHA_RARITY_RATES = GACHA_RARITY_RATES_BY_TYPE.regular;
@@ -55,8 +50,8 @@ export const GACHA_DISPLAY_RARITY_RATES_BY_TYPE: Record<GachaType, Record<GachaR
     LR: 0.5,
     MR: 0,
   },
-  summer: GACHA_RARITY_RATES_BY_TYPE.summer,
-};
+  ...Object.fromEntries(SERIES.map((series) => [series.id, series.rarityRates])),
+} as Record<GachaType, Record<GachaRarity, number>>;
 
 /** 旧参照向け。通常ガチャを標準とする */
 export const GACHA_DISPLAY_RARITY_RATES = GACHA_DISPLAY_RARITY_RATES_BY_TYPE.regular;

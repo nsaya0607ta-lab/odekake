@@ -5,11 +5,14 @@ import { useCallback, useEffect, useId, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { formatCoins } from "@/lib/coins";
 import {
-  GACHA_DISPLAY_RARITY_RATES,
+  GACHA_DISPLAY_RARITY_RATES_BY_TYPE,
   GACHA_PLANS,
+  GACHA_TYPES,
+  GACHA_TYPE_LABELS,
   RARITY_STYLES,
   type GachaPlanId,
   type GachaRarity,
+  type GachaType,
 } from "@/lib/gacha/config";
 import { GachaMachineArt, SparkleArt } from "./coin-art";
 import { IconClose, IconCoin } from "./icons";
@@ -31,6 +34,13 @@ function formatLevelTag(level: number): string {
 
 type AnimationDraw = {
   plan: GachaPlanId;
+  pool: GachaType;
+  results: DrawResult[];
+};
+
+type ResultState = {
+  plan: GachaPlanId;
+  pool: GachaType;
   results: DrawResult[];
 };
 
@@ -120,13 +130,13 @@ export function GachaSection({ balance }: { balance: number }) {
   const router = useRouter();
   const [pending, setPending] = useState<GachaPlanId | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [results, setResults] = useState<DrawResult[] | null>(null);
+  const [pool, setPool] = useState<GachaType>("regular");
+  const [results, setResults] = useState<ResultState | null>(null);
   const [animation, setAnimation] = useState<AnimationDraw | null>(null);
-  const [lastPlan, setLastPlan] = useState<GachaPlanId>("single");
   const inFlight = useRef(false);
 
   const draw = useCallback(
-    async (planId: GachaPlanId) => {
+    async (planId: GachaPlanId, drawPool: GachaType) => {
       if (inFlight.current) return;
       inFlight.current = true;
       setPending(planId);
@@ -138,6 +148,7 @@ export function GachaSection({ balance }: { balance: number }) {
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
             plan: planId,
+            pool: drawPool,
             requestId: crypto.randomUUID(),
           }),
         });
@@ -151,8 +162,7 @@ export function GachaSection({ balance }: { balance: number }) {
         }
 
         const confirmedResults = payload?.results ?? [];
-        setLastPlan(planId);
-        setAnimation({ plan: planId, results: confirmedResults });
+        setAnimation({ plan: planId, pool: drawPool, results: confirmedResults });
         router.refresh();
       } catch {
         setError("通信に失敗しました。");
@@ -163,8 +173,7 @@ export function GachaSection({ balance }: { balance: number }) {
 
   const finishAnimation = useCallback((draw: AnimationDraw) => {
     setAnimation(null);
-    setLastPlan(draw.plan);
-    setResults(draw.results);
+    setResults({ plan: draw.plan, pool: draw.pool, results: draw.results });
     inFlight.current = false;
     setPending(null);
   }, []);
@@ -184,11 +193,13 @@ export function GachaSection({ balance }: { balance: number }) {
   }, []);
 
   const retry = useCallback(() => {
+    if (!results) return;
+    const { plan, pool: retryPool } = results;
     setResults(null);
-    void draw(lastPlan);
-  }, [draw, lastPlan]);
+    void draw(plan, retryPool);
+  }, [draw, results]);
 
-  const rates = GACHA_DISPLAY_RARITY_RATES;
+  const rates = GACHA_DISPLAY_RARITY_RATES_BY_TYPE[pool];
 
   return (
     <section className="rough-card flex min-w-0 flex-col overflow-hidden p-3.5">
@@ -203,7 +214,6 @@ export function GachaSection({ balance }: { balance: number }) {
             <span className="block whitespace-nowrap">コインをつかって</span>
             <span className="block whitespace-nowrap">おもちゃやシリーズアイテムをゲット！</span>
           </p>
-          <p className="mt-1 text-[9px] font-semibold text-ink-faint">すべて同じガチャから出ます</p>
           <p className="mt-1.5 flex items-center gap-1 text-[9px] font-bold text-ink-faint">
             <IconCoin size={11} />
             所持 {formatCoins(balance)}
@@ -212,6 +222,24 @@ export function GachaSection({ balance }: { balance: number }) {
         <span className="flex h-[88px] w-[44%] shrink-0 items-end justify-center">
           <GachaMachineArt className="h-full w-auto" />
         </span>
+      </div>
+
+      <div role="tablist" aria-label="ガチャの種類" className="rough-pill mt-2 flex gap-1 overflow-x-auto bg-paper-deep p-1">
+        {GACHA_TYPES.map((type) => (
+          <button
+            key={type}
+            type="button"
+            role="tab"
+            aria-selected={pool === type}
+            onClick={() => setPool(type)}
+            disabled={pending !== null}
+            className={`rough-pill shrink-0 px-3 py-1.5 text-[10px] font-bold transition-colors disabled:opacity-60 ${
+              pool === type ? "bg-leaf-soft text-leaf-deep shadow-sm" : "text-ink-soft"
+            }`}
+          >
+            {GACHA_TYPE_LABELS[type]}
+          </button>
+        ))}
       </div>
 
       <div className="mt-1 flex flex-wrap gap-x-1.5 gap-y-0.5 text-[8px] text-ink-faint" aria-label="排出率">
@@ -232,7 +260,7 @@ export function GachaSection({ balance }: { balance: number }) {
             <button
               key={planId}
               type="button"
-              onClick={() => void draw(planId)}
+              onClick={() => void draw(planId, pool)}
               disabled={pending !== null || short}
               className="flex w-full items-center justify-between rounded-full bg-leaf px-3 py-2 text-white shadow-sm transition active:translate-y-px disabled:opacity-45"
             >
@@ -260,8 +288,9 @@ export function GachaSection({ balance }: { balance: number }) {
       {results &&
         createPortal(
           <GachaResultModal
-            results={results}
-            plan={lastPlan}
+            results={results.results}
+            plan={results.plan}
+            pool={results.pool}
             busy={pending !== null}
             onRetry={retry}
             onClose={closeResults}
@@ -518,12 +547,14 @@ function Capsule({ result, open = false, large = false }: { result: DrawResult; 
 function GachaResultModal({
   results,
   plan,
+  pool,
   busy,
   onRetry,
   onClose,
 }: {
   results: DrawResult[];
   plan: GachaPlanId;
+  pool: GachaType;
   busy: boolean;
   onRetry: () => void;
   onClose: () => void;
@@ -548,7 +579,7 @@ function GachaResultModal({
           <IconClose size={17} />
         </button>
 
-        {only ? <SingleResult result={only} /> : <MultiResult results={results} />}
+        {only ? <SingleResult result={only} pool={pool} /> : <MultiResult results={results} />}
 
         <div className="mt-4 grid grid-cols-2 gap-2">
           <button
@@ -630,13 +661,13 @@ function RarityResultCard({ result, large = false }: { result: DrawResult; large
   );
 }
 
-function SingleResult({ result }: { result: DrawResult }) {
+function SingleResult({ result, pool }: { result: DrawResult; pool: GachaType }) {
   const acquisitionLabel =
-    result.id === "summer_frenchie"
-      ? "サマースキンをゲット！"
-      : result.type === "dog_skin"
+    result.type === "dog_skin"
+      ? pool === "regular"
         ? "わんこスキンをゲット！"
-        : "おもちゃをゲット！";
+        : `${GACHA_TYPE_LABELS[pool]}スキンをゲット！`
+      : "おもちゃをゲット！";
 
   return (
     <div className="pt-1 text-center">

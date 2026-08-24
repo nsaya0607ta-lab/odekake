@@ -3,9 +3,11 @@
  * =============================================================
  * id はガチャ景品 id / user_gacha_items.item_id と一致させる。
  * series: null は通常図鑑、hiking / snow / summer はシリーズ図鑑。
+ * シリーズそのものの定義（名前・見た目・排出率）は series.ts を唯一の真実源とする。
  */
 import type { GachaRarity } from "@/lib/gacha/config";
 import { GACHA_PRIZES } from "@/lib/gacha/prizes";
+import { SERIES, SERIES_IDS, isSeriesId, type SeriesId } from "@/lib/series";
 
 export const COLLECTION_CATEGORIES = ["toy", "food", "interior", "accessory", "other"] as const;
 export type CollectionCategory = (typeof COLLECTION_CATEGORIES)[number];
@@ -18,12 +20,10 @@ export const CATEGORY_LABELS: Record<CollectionCategory, string> = {
   other: "その他",
 };
 
-export const COLLECTION_SERIES_IDS = ["hiking", "snow", "summer"] as const;
-export type CollectionSeriesId = (typeof COLLECTION_SERIES_IDS)[number];
+export const COLLECTION_SERIES_IDS = SERIES_IDS;
+export type CollectionSeriesId = SeriesId;
 
-export function isCollectionSeriesId(value: unknown): value is CollectionSeriesId {
-  return typeof value === "string" && (COLLECTION_SERIES_IDS as readonly string[]).includes(value);
-}
+export const isCollectionSeriesId = isSeriesId;
 
 export function isCollectionCategory(value: unknown): value is CollectionCategory {
   return typeof value === "string" && (COLLECTION_CATEGORIES as readonly string[]).includes(value);
@@ -52,38 +52,12 @@ export type CollectionSeries = {
   };
 };
 
-export const COLLECTION_SERIES: readonly CollectionSeries[] = [
-  {
-    id: "hiking",
-    name: "登山シリーズ",
-    description: "山のおでかけで集まるアイテム",
-    tone: {
-      header: "border-leaf bg-leaf-soft text-leaf-deep",
-      accent: "border-leaf bg-leaf-soft text-leaf-deep",
-      bar: "bg-leaf",
-    },
-  },
-  {
-    id: "snow",
-    name: "雪国シリーズ",
-    description: "雪のまちで集まるアイテム",
-    tone: {
-      header: "border-sky bg-sky-soft text-[#42718f]",
-      accent: "border-sky bg-sky-soft text-[#42718f]",
-      bar: "bg-sky",
-    },
-  },
-  {
-    id: "summer",
-    name: "夏シリーズ",
-    description: "夏のおでかけで集まるアイテム",
-    tone: {
-      header: "border-sun bg-sun-soft text-[#8a6a2a]",
-      accent: "border-sun bg-sun-soft text-[#8a6a2a]",
-      bar: "bg-sun",
-    },
-  },
-];
+export const COLLECTION_SERIES: readonly CollectionSeries[] = SERIES.map((series) => ({
+  id: series.id,
+  name: series.name,
+  description: series.description,
+  tone: series.tone,
+}));
 
 const SERIES_BY_ID = new Map(COLLECTION_SERIES.map((series) => [series.id, series]));
 
