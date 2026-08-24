@@ -45,8 +45,14 @@ export const PAPER_REFERENCE_OIL_LENGTH_M = 40 * 0.3048;
 /**
  * スワイプ速度の差を体感できるゲーム用速度レンジ。
  * 規格値ではなく入力フィーリング用の近似値。
+ *
+ * 下限は実物のボウリングを参考に引き上げている。USBCの実測研究では
+ * ファウルライン速度16〜18mph（約26〜29km/h）でピンキャリー率が最大になると
+ * 報告されており、上記の論文が採用する基準投球条件（8.0m/s=28.8km/h、
+ * GAME_REFERENCE_SPEED_MPS参照）もこの帯に入る。旧値13km/h（≒8mph）は
+ * 実物ではほぼ転がらない極端に遅い投球に相当するため非現実的だった。
  */
-export const GAME_MIN_BALL_SPEED_KMH = 13;
+export const GAME_MIN_BALL_SPEED_KMH = 26;
 export const GAME_MAX_BALL_SPEED_KMH = 38;
 
 /**
