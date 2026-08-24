@@ -42,15 +42,14 @@ const DOCK_Y = 94;
 const HEAD_PIN_SCREEN_Y = 19.5;
 const MIN_UPWARD_PCT = 8;
 const MAX_THROW_MS = 7000;
-const MAX_SWIPE_SAMPLES = 64;
+const MAX_SWIPE_SAMPLES = 96;
 const BALL_RADIUS_M = JB_BALL_DIAMETER_M / 2;
 const PIN_RADIUS_M = JB_PIN_DIAMETER_M / 2;
 const PIN_COLLISION_RADIUS_M = BALL_RADIUS_M + PIN_RADIUS_M;
 const PIN_PAIR_RADIUS_M = JB_PIN_DIAMETER_M;
 const FALLEN_PIN_EXTRA_REACH_M = Math.max(0, JB_PIN_HEIGHT_M / 2 - PIN_RADIUS_M) * 0.82;
 const BALL_EXIT_DISTANCE_M = JB_HEAD_PIN_DISTANCE_M + 1.15;
-const LEGACY_LAUNCH_ANGLE_RAD = 6 * Math.PI / 180;
-const MAX_LAUNCH_ANGLE_RAD = 9 * Math.PI / 180;
+const MAX_LAUNCH_ANGLE_RAD = 16 * Math.PI / 180;
 const GUTTER_BALL_DRAG_PER_SEC = 0.035;
 const FOUL_LINE_Y = 97;
 const PIN_ROW_DEPTH_M = JB_PIN_SPACING_M * Math.sqrt(3) / 2;
@@ -66,12 +65,12 @@ const TARGET_BOARDS = [5, 10, 15, 20, 25, 30, 35] as const;
 const GUIDE_DISTANCE_M = 7 * 0.3048;
 const TARGET_DISTANCE_M = 15 * 0.3048;
 
-const CURVE_DEAD_ZONE_RAD = 6 * Math.PI / 180;
-const CURVE_FULL_SCALE_RAD = 22 * Math.PI / 180;
-const CURVE_BOW_DEAD_ZONE_PCT = 1.0;
-const CURVE_BOW_FULL_SCALE_PCT = 6;
-const MAX_CURVE_NORM = 0.68;
-const CURVE_STRAIGHT_SNAP = 0.10;
+const CURVE_DEAD_ZONE_RAD = 2 * Math.PI / 180;
+const CURVE_FULL_SCALE_RAD = 20 * Math.PI / 180;
+const CURVE_BOW_DEAD_ZONE_PCT = 0.4;
+const CURVE_BOW_FULL_SCALE_PCT = 5;
+const MAX_CURVE_NORM = 0.85;
+const CURVE_STRAIGHT_SNAP = 0.03;
 
 const DIRECT_IMPULSE_WEIGHT = 0.16;
 const CHAIN_IMPULSE_WEIGHT = 0.24;
@@ -82,7 +81,6 @@ const CHAIN_SIDE_THRESHOLD_REDUCTION = 0;
 type Point = { x: number; y: number; t: number };
 type GutterSide = "left" | "right" | null;
 type PointerMode = "place" | "throw" | null;
-type ThrowStyle = "straight" | "curve";
 
 type PinBody = {
   xM: number;
@@ -263,7 +261,6 @@ function computeAimFromPoints(
   rect: { left: number; top: number; width: number; height: number },
   startXM: number,
   minUpwardPct: number,
-  throwStyle: ThrowStyle,
 ): { launchAngleRad: number; curveNorm: number; targetWorldX: number } | null {
   if (points.length < 2) return null;
 
@@ -287,7 +284,7 @@ function computeAimFromPoints(
   const virtualTargetWorldX = screenXToVirtualWorldX(aimScreenXPct, JB_HEAD_PIN_DISTANCE_M);
   const rawLaunchAngle = Math.atan2(virtualTargetWorldX - startXM, JB_HEAD_PIN_DISTANCE_M);
   const launchAngleRad = mapLaunchAngleInput(rawLaunchAngle);
-  const curveNorm = throwStyle === "curve" ? estimateCurveNorm(points, rect.width) : 0;
+  const curveNorm = estimateCurveNorm(points, rect.width);
   return { launchAngleRad, curveNorm, targetWorldX };
 }
 
@@ -322,23 +319,13 @@ function estimateReleaseSwipeRate(points: Point[], boardHeightPx: number): numbe
 }
 
 function mapLaunchAngleInput(rawAngleRad: number): number {
-  const sign = Math.sign(rawAngleRad);
-  const magnitude = Math.abs(rawAngleRad);
-
-  if (magnitude <= LEGACY_LAUNCH_ANGLE_RAD) {
-    const u = clamp(magnitude / LEGACY_LAUNCH_ANGLE_RAD, 0, 1);
-    return sign * LEGACY_LAUNCH_ANGLE_RAD * u * u;
-  }
-
-  const extraRange = MAX_LAUNCH_ANGLE_RAD - LEGACY_LAUNCH_ANGLE_RAD;
-  const extraU = clamp((magnitude - LEGACY_LAUNCH_ANGLE_RAD) / Math.max(0.000001, extraRange), 0, 1);
-  return sign * (LEGACY_LAUNCH_ANGLE_RAD + extraRange * extraU);
+  return clamp(rawAngleRad, -MAX_LAUNCH_ANGLE_RAD, MAX_LAUNCH_ANGLE_RAD);
 }
 
 /**
- * カーブモード専用の強度算出。
- * ストレート/カーブの分類自体はプレイヤーがボタンで決めるため、ここでは
- * 「カーブと認定できるか」は判定せず、スワイプの曲がり量だけを従来の式で強度へ変換する。
+ * スワイプの軌跡（角度変化＋横方向の膨らみ）だけからカーブ強度を推定する。
+ * ストレート/カーブの分類はボタンではなくこの推定値そのもので決まる
+ * （デッドゾーン以下ならほぼ0になり、自然にストレート投球になる）。
  */
 function estimateCurveNorm(points: Point[], boardWidthPx: number): number {
   if (points.length < 5) return 0;
@@ -511,7 +498,6 @@ const DEFAULT_BALL_START_X_M = JB_GUTTER_WIDTH_M + JB_LANE_WIDTH_M / 2;
 const LEFT_GUTTER_CENTER_M = JB_GUTTER_WIDTH_M / 2;
 const RIGHT_GUTTER_CENTER_M = JB_GUTTER_WIDTH_M + JB_LANE_WIDTH_M + JB_GUTTER_WIDTH_M / 2;
 const MAX_START_OFFSET_M = 0.4249;
-const START_OFFSET_OPTIONS_M = [-0.30, -0.15, 0, 0.15, 0.30] as const;
 
 export function Lane({ ballVisual, resetSignal, newGameSignal, active, onRoll }: LaneProps) {
   const boardRef = useRef<HTMLDivElement>(null);
@@ -526,7 +512,6 @@ export function Lane({ ballVisual, resetSignal, newGameSignal, active, onRoll }:
   const [positionLocked, setPositionLockedState] = useState(false);
   const [startOffsetM, setStartOffsetM] = useState<number>(0);
   const [isThrowing, setIsThrowing] = useState(false);
-  const [throwStyle, setThrowStyle] = useState<ThrowStyle>("straight");
   const pinBodiesRef = useRef<Map<number, PinBody>>(
     new Map(PIN_LAYOUT.map((pin) => [pin.id, createPinBody(pin)])),
   );
@@ -616,23 +601,14 @@ export function Lane({ ballVisual, resetSignal, newGameSignal, active, onRoll }:
   }, [ballVisual.bodyGradient]);
 
   const setStartPositionFromScreenX = useCallback((screenXPct: number) => {
-    const rawOffsetM = clamp(
+    const offsetM = clamp(
       screenXToWorldX(screenXPct, 0) - DEFAULT_BALL_START_X_M,
       -MAX_START_OFFSET_M,
       MAX_START_OFFSET_M,
     );
-    let snappedOffsetM: number = START_OFFSET_OPTIONS_M[0];
-    let bestDist = Infinity;
-    for (const option of START_OFFSET_OPTIONS_M) {
-      const dist = Math.abs(option - rawOffsetM);
-      if (dist < bestDist) {
-        bestDist = dist;
-        snappedOffsetM = option;
-      }
-    }
-    const startXM = DEFAULT_BALL_START_X_M + snappedOffsetM;
+    const startXM = DEFAULT_BALL_START_X_M + offsetM;
     ballStartXRef.current = startXM;
-    setStartOffsetM(snappedOffsetM);
+    setStartOffsetM(offsetM);
     setBallPosition(startXM, 0, 0);
   }, [setBallPosition]);
 
@@ -686,7 +662,6 @@ export function Lane({ ballVisual, resetSignal, newGameSignal, active, onRoll }:
     ballStartXRef.current = DEFAULT_BALL_START_X_M;
     setStartOffsetM(0);
     setPositionLocked(false);
-    setThrowStyle("straight");
     setBallPosition(DEFAULT_BALL_START_X_M, 0, 0);
   }, [newGameSignal, setPositionLocked, setBallPosition]);
 
@@ -1133,7 +1108,7 @@ export function Lane({ ballVisual, resetSignal, newGameSignal, active, onRoll }:
     if (!board) return;
     const rect = board.getBoundingClientRect();
     const startXM = ballStartXRef.current;
-    const aim = computeAimFromPoints(points, rect, startXM, MIN_UPWARD_PCT, throwStyle);
+    const aim = computeAimFromPoints(points, rect, startXM, MIN_UPWARD_PCT);
     if (!aim) return;
 
     const swipeRate = estimateReleaseSwipeRate(points, rect.height);
@@ -1144,7 +1119,7 @@ export function Lane({ ballVisual, resetSignal, newGameSignal, active, onRoll }:
     const speedMps = speedKmh / 3.6;
 
     runThrow({ speedMps, launchAngleRad: aim.launchAngleRad, curveNorm: aim.curveNorm, startXM });
-  }, [active, runThrow, throwStyle]);
+  }, [active, runThrow]);
 
   const onPointerCancel = useCallback((event: ReactPointerEvent<HTMLDivElement>) => {
     if (activePointerRef.current !== event.pointerId) return;
@@ -1169,13 +1144,6 @@ export function Lane({ ballVisual, resetSignal, newGameSignal, active, onRoll }:
     setPositionLocked(false);
     setBallPosition(ballStartXRef.current, 0, 0);
   }, [active, setBallPosition, setPositionLocked]);
-
-  const selectThrowStyle = useCallback((style: ThrowStyle, event: ReactPointerEvent<HTMLButtonElement>) => {
-    event.preventDefault();
-    event.stopPropagation();
-    if (!active || throwingRef.current || dockingRef.current) return;
-    setThrowStyle(style);
-  }, [active]);
 
   return (
     <div
@@ -1243,33 +1211,16 @@ export function Lane({ ballVisual, resetSignal, newGameSignal, active, onRoll }:
 
       {active && !isThrowing && (
         <div className="pointer-events-none absolute" style={{ top: `${DOCK_Y}%`, left: 0, right: 0 }} aria-hidden="true">
-          {!positionLocked && START_OFFSET_OPTIONS_M.map((offset) => {
-            const isSelected = offset === startOffsetM;
-            return (
-              <span
-                key={offset}
-                className="absolute -translate-x-1/2 -translate-y-1/2 rounded-full transition-all"
-                style={{
-                  left: `${worldXToPct(DEFAULT_BALL_START_X_M + offset, 0)}%`,
-                  width: isSelected ? "10px" : "5px",
-                  height: isSelected ? "10px" : "5px",
-                  background: isSelected ? "#ffd76a" : "rgba(255,255,255,0.35)",
-                  boxShadow: isSelected ? "0 0 6px 1px rgba(255,215,106,0.7)" : undefined,
-                }}
-              />
-            );
-          })}
-          {positionLocked && (
-            <span
-              className="absolute -translate-x-1/2 rounded-full bg-[#ffd76a]/70"
-              style={{
-                left: `${worldXToPct(DEFAULT_BALL_START_X_M + startOffsetM, 0)}%`,
-                top: "9px",
-                width: "18px",
-                height: "3px",
-              }}
-            />
-          )}
+          <span
+            className="absolute -translate-x-1/2 -translate-y-1/2 rounded-full"
+            style={{
+              left: `${worldXToPct(DEFAULT_BALL_START_X_M + startOffsetM, 0)}%`,
+              width: positionLocked ? "10px" : "8px",
+              height: positionLocked ? "10px" : "8px",
+              background: "#ffd76a",
+              boxShadow: "0 0 6px 1px rgba(255,215,106,0.7)",
+            }}
+          />
         </div>
       )}
 
@@ -1328,71 +1279,37 @@ export function Lane({ ballVisual, resetSignal, newGameSignal, active, onRoll }:
       </div>
 
       {active && !isThrowing ? (
-        <>
-          <div
-            className="absolute bottom-2 left-2 z-[1200] flex items-center gap-1.5 rounded-full bg-[#2f2119]/78 p-1 shadow-lg backdrop-blur-sm"
-            onPointerDown={(event) => {
-              event.stopPropagation();
-            }}
+        <div
+          className="absolute bottom-2 left-2 z-[1200] flex items-center gap-1.5 rounded-full bg-[#2f2119]/78 p-1 shadow-lg backdrop-blur-sm"
+          onPointerDown={(event) => {
+            event.stopPropagation();
+          }}
+        >
+          <button
+            type="button"
+            onPointerUp={handleConfirmPosition}
+            aria-pressed={positionLocked}
+            className={`min-w-[52px] rounded-full px-3 py-2 text-[11px] font-black transition ${
+              positionLocked
+                ? "bg-[#e8e0d2] text-[#807363]"
+                : "bg-[#6f9b58] text-white shadow-sm"
+            }`}
           >
-            <button
-              type="button"
-              onPointerUp={handleConfirmPosition}
-              aria-pressed={positionLocked}
-              className={`min-w-[52px] rounded-full px-3 py-2 text-[11px] font-black transition ${
-                positionLocked
-                  ? "bg-[#e8e0d2] text-[#807363]"
-                  : "bg-[#6f9b58] text-white shadow-sm"
-              }`}
-            >
-              ✓ OK
-            </button>
-            <button
-              type="button"
-              onPointerUp={handleUnlockPosition}
-              aria-pressed={!positionLocked}
-              className={`h-8 w-8 rounded-full text-[16px] font-black leading-none transition ${
-                positionLocked
-                  ? "bg-[#f4eadc] text-[#5b4637] shadow-sm"
-                  : "bg-white/15 text-white/45"
-              }`}
-            >
-              ×
-            </button>
-          </div>
-
-          <div
-            className="absolute bottom-2 right-2 z-[1200] flex items-center gap-1 rounded-full bg-[#2f2119]/78 p-1 shadow-lg backdrop-blur-sm"
-            onPointerDown={(event) => {
-              event.stopPropagation();
-            }}
+            ✓ OK
+          </button>
+          <button
+            type="button"
+            onPointerUp={handleUnlockPosition}
+            aria-pressed={!positionLocked}
+            className={`h-8 w-8 rounded-full text-[16px] font-black leading-none transition ${
+              positionLocked
+                ? "bg-[#f4eadc] text-[#5b4637] shadow-sm"
+                : "bg-white/15 text-white/45"
+            }`}
           >
-            <button
-              type="button"
-              onPointerUp={(event) => selectThrowStyle("straight", event)}
-              aria-pressed={throwStyle === "straight"}
-              className={`rounded-full px-2.5 py-2 text-[10px] font-black transition ${
-                throwStyle === "straight"
-                  ? "bg-[#f4eadc] text-[#4e3c30] shadow-sm"
-                  : "bg-white/10 text-white/55"
-              }`}
-            >
-              ストレート
-            </button>
-            <button
-              type="button"
-              onPointerUp={(event) => selectThrowStyle("curve", event)}
-              aria-pressed={throwStyle === "curve"}
-              className={`rounded-full px-2.5 py-2 text-[10px] font-black transition ${
-                throwStyle === "curve"
-                  ? "bg-[#c47745] text-white shadow-sm"
-                  : "bg-white/10 text-white/55"
-              }`}
-            >
-              カーブ
-            </button>
-          </div>
-        </>
+            ×
+          </button>
+        </div>
       ) : null}
     </div>
   );
