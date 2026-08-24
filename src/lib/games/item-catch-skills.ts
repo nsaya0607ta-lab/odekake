@@ -27,6 +27,7 @@ export const ITEM_CATCH_SKILLS: readonly ItemCatchSkill[] = [
   { id: "toy_bear_plush", levels: ["防止付与", "防止付与 +10pt", "防止付与", "防止付与 +20pt", "防止付与"], note: "しびれ/ダンボール縮小/時間減少のいずれかをランダムで1つ防ぐ（1回のみ）" },
   { id: "food_paw_bowl", levels: ["次の3個 +5pt", "次の3個 +7pt", "次の3個 +10pt", "次の3個 +13pt", "次の3個 +15pt"] },
   { id: "food_paw_pudding", levels: ["+15pt", "+20pt", "+30pt", "+40pt", "+50pt"] },
+  { id: "food_kamikami", levels: ["+10pt", "+15pt", "+25pt", "+35pt", "+45pt"] },
   { id: "food_paw_melon_bread", levels: ["+2秒 +5pt", "+3秒 +10pt", "+4秒 +15pt", "+5秒 +20pt", "+6秒 +30pt"] },
   { id: "interior_stretch_rod", levels: ["3秒間 その他×0.5", "3秒間 その他×0.4", "3秒間 その他×0.3", "3秒間 その他×0.2", "3秒間 その他×0.1"], note: "3秒間、カテゴリーが「その他」のキャラの出現重みを下げる。Lvが上がるほど効果が強くなる" },
 
@@ -68,6 +69,7 @@ export const ITEM_CATCH_SKILLS: readonly ItemCatchSkill[] = [
   { id: "summer_frenchie", levels: ["+6秒 5秒間×1.5", "+7秒 6秒間×1.5", "+8秒 7秒間×1.6", "+9秒 8秒間×1.7", "+10秒 10秒間×1.8"] },
 
   // --- UR --------------------------------------------------------
+  { id: "food_mocchurin", levels: ["+30pt / エコー1個", "+45pt / エコー1個", "+60pt / エコー1個", "+80pt / エコー2個", "+100pt / エコー2個"], note: "捕まえた瞬間、自分より直前に捕まえたアイテムのスキルを確定でもう一度発動する（エコー）。Lv1〜3は直前の1個、Lv4以降は直前の2個分をまとめてエコーする。エコー対象はそれぞれ本来のレベルのまま再発動する" },
   { id: "interior_anball", levels: ["+100pt +3秒", "+125pt +4秒", "+150pt +5秒", "+180pt +6秒", "+220pt +8秒"] },
   { id: "other_azubee", levels: ["6秒間 ×2", "7秒間 ×2", "8秒間 ×2.1", "10秒間 ×2.2", "12秒間 ×2.5"], note: "その間ずっと得点倍率がかかる" },
   { id: "other_omojii", levels: ["+7秒 +30pt", "+13秒 +45pt", "+16秒 +60pt", "+17秒 +80pt", "+19秒 +100pt"] },

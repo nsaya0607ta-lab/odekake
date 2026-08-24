@@ -147,7 +147,7 @@ const MYSTERY_SKILL_ITEM_IDS = [
   "other_komochi", "other_azuki", "other_kobee", "other_hamigaki", "other_ikea", "other_orusuban",
   "other_pondeomo", "other_pondear", "other_kurumari_a", "other_jare_a", "other_ketsunade_a", "other_omochi_janai", "other_oyasumi", "other_nisoku_a",
   "interior_shikkoku_no_ar", "interior_ragby_ar", "other_oyatsu_no_jikan", "other_listen_to_the_a", "other_okaeri",
-  "food_fruit_basket", "interior_gold_ball", "other_clawd",
+  "food_fruit_basket", "interior_gold_ball", "other_clawd", "food_kamikami", "food_mocchurin",
 ];
 
 /** アイテムごとのLv1〜5パラメータ（item_skill_levels_colored.xlsxの「スキル一覧」シート通り） */
@@ -240,6 +240,8 @@ const LV = {
   FRUIT_BASKET_COUNT: [2, 3, 4, 5, 6],
   GOLD_BALL_COINS: [10, 15, 20, 30, 50],
   CLAWD_BALL_COUNT: [5, 8, 10, 12, 14],
+  KAMIKAMI_PT: [10, 15, 25, 35, 45],
+  MOCCHURIN_PT: [30, 45, 60, 80, 100],
 } as const;
 /** 出現量アップ系は時間増加系アイテムの取得率まで底上げしてしまうため、控えめな倍率にしている */
 const SPAWN_RATE_BOOST = 1.5;
@@ -309,16 +311,25 @@ const DEFAULT_ITEM_SPAWN_WEIGHT = 100;
  * other_clawd（SSR、時間・出現量のどちらにも無関係）を追加した際も同様に、プール総数(N)が
  * 80→81に増えたため、時間増加系7種の重みをプール総数の増加率（Total(81)/Total(80)≈1.0126）
  * だけ底上げして相殺し、66.6→67.4・82.9→83.9（6種）に変更した。
+ *
+ * food_kamikami（R、時間・出現量のどちらにも無関係）を追加した際も同様に、プール総数(N)が
+ * 81→82に増えたため、時間増加系7種の重みをプール総数の増加率（Total(82)/Total(81)≈1.0124）
+ * だけ底上げして相殺し、67.4→68.2・83.9→84.9（6種）に変更した。
+ *
+ * food_mocchurin（SSR、時間・出現量のどちらにも無関係。直前に捕まえたアイテムのスキルを
+ * 確率でもう一度発動する「エコー」系）を追加した際も同様に、プール総数(N)が82→83に増えたため、
+ * 時間増加系7種の重みをプール総数の増加率（Total(83)/Total(82)≈1.0123）だけ底上げして相殺し、
+ * 68.2→69.0・84.9→85.9（6種）に変更した。
  */
 const ITEM_SPAWN_WEIGHTS: Partial<Record<string, number>> = {
   toy_treasure_puzzle: 200,
-  other_omojii: 67.4,
-  toy_duck_plush: 83.9,
-  toy_carrot: 83.9,
-  food_paw_melon_bread: 83.9,
-  interior_anball: 83.9,
-  other_azuki: 83.9,
-  summer_frenchie: 83.9,
+  other_omojii: 69.0,
+  toy_duck_plush: 85.9,
+  toy_carrot: 85.9,
+  food_paw_melon_bread: 85.9,
+  interior_anball: 85.9,
+  other_azuki: 85.9,
+  summer_frenchie: 85.9,
   other_listen_to_the_a: 50,
 };
 const STRETCH_ROD_ITEM_ID = "interior_stretch_rod";
@@ -344,6 +355,9 @@ const CLAWD_SOCCER_BALL_ITEM = COLLECTION_ITEMS.find((entry) => entry.id === "to
 const CLAWD_GOLD_BALL_ITEM = COLLECTION_ITEMS.find((entry) => entry.id === "interior_gold_ball") ?? null;
 /** 降ってくるボールのうちゴールドボールになる確率 */
 const CLAWD_GOLD_BALL_CHANCE = 0.2;
+const MOCCHURIN_ITEM_ID = "food_mocchurin";
+/** Lv4(lv index=3)以降は直前に捕まえた2つ分のスキルをエコーする */
+const MOCCHURIN_DOUBLE_ECHO_MIN_LV = 3;
 /** ブレブルの効果中、このレアリティ以外のアイテムは出現しなくなる */
 const HIGH_RARITY_LOCK_RARITIES = new Set<FrenchieCatchItem["rarity"]>(["SSR", "UR", "LR"]);
 const OTHER_CATEGORY_ITEM_IDS = new Set(
@@ -493,6 +507,8 @@ export function FrenchieCatchGame({ ownedItems }: { ownedItems: FrenchieCatchIte
   const dogFloodRemainingRef = useRef(0);
   const personFloodRemainingRef = useRef(0);
   const clawdBallFloodRemainingRef = useRef(0);
+  /** もっちゅりんのエコー用に、直前に捕まえたアイテムを新しい順に最大2件保持する */
+  const lastSkillCatchesRef = useRef<{ itemId: string; level: number }[]>([]);
   const goldBonusCoinsRef = useRef(0);
   const slantBoostUntilRef = useRef(0);
   const boxShrinkUntilRef = useRef(0);
@@ -1207,7 +1223,20 @@ export function FrenchieCatchGame({ ownedItems }: { ownedItems: FrenchieCatchIte
 
             const lvTag = skillLevel >= MAX_SKILL_LEVEL ? " [Lv.MAX]" : skillLevel > 1 ? ` [Lv${skillLevel}]` : "";
 
-            switch (skillId) {
+            /**
+             * もっちゅりんの「エコー」で任意のアイテムのスキルを再発動できるよう、
+             * switch本体を関数化。呼び出し側は差分のpoints/effectLabel/statusChangedを受け取り、
+             * 通常の1回目の発動とエコーの2回目の発動の両方で同じロジックを共有する。
+             */
+            const runItemSkillEffect = (
+              skillId: string | null,
+              lv: number,
+              lvTag: string,
+            ): { points: number; effectLabel?: string; statusChanged: boolean } => {
+              let points = 0;
+              let effectLabel: string | undefined;
+              let statusChanged = false;
+              switch (skillId) {
               case "toy_soccer_ball":
                 points += LV.SOCCER_PT[lv]!;
                 effectLabel = `+${LV.SOCCER_PT[lv]}ptボーナス${lvTag}`;
@@ -1364,6 +1393,14 @@ export function FrenchieCatchGame({ ownedItems }: { ownedItems: FrenchieCatchIte
               case "food_paw_pudding":
                 points += LV.PUDDING_PT[lv]!;
                 effectLabel = `+${LV.PUDDING_PT[lv]}ptボーナス${lvTag}`;
+                break;
+              case "food_kamikami":
+                points += LV.KAMIKAMI_PT[lv]!;
+                effectLabel = `+${LV.KAMIKAMI_PT[lv]}ptボーナス${lvTag}`;
+                break;
+              case MOCCHURIN_ITEM_ID:
+                points += LV.MOCCHURIN_PT[lv]!;
+                effectLabel = `+${LV.MOCCHURIN_PT[lv]}ptボーナス${lvTag}`;
                 break;
               case "food_paw_melon_bread": {
                 const applied = addBonusTime(LV.MELON_SEC[lv]!);
@@ -1632,6 +1669,32 @@ export function FrenchieCatchGame({ ownedItems }: { ownedItems: FrenchieCatchIte
               }
               default:
                 break;
+              }
+              return { points, effectLabel, statusChanged };
+            };
+
+            const mainSkillResult = runItemSkillEffect(skillId, lv, lvTag);
+            points += mainSkillResult.points;
+            if (mainSkillResult.effectLabel) effectLabel = mainSkillResult.effectLabel;
+            if (mainSkillResult.statusChanged) statusChanged = true;
+
+            if (skillId === MOCCHURIN_ITEM_ID) {
+              const echoCount = lv >= MOCCHURIN_DOUBLE_ECHO_MIN_LV ? 2 : 1;
+              const echoTargets = lastSkillCatchesRef.current.slice(0, echoCount);
+              for (const lastSkill of echoTargets) {
+                const echoLv = clamp(lastSkill.level, 1, MAX_SKILL_LEVEL) - 1;
+                const echoLvTag = lastSkill.level >= MAX_SKILL_LEVEL ? " [Lv.MAX]" : lastSkill.level > 1 ? ` [Lv${lastSkill.level}]` : "";
+                const echoResult = runItemSkillEffect(lastSkill.itemId, echoLv, echoLvTag);
+                points += echoResult.points;
+                if (echoResult.effectLabel) {
+                  effectLabel = effectLabel ? `${effectLabel} / エコー: ${echoResult.effectLabel}` : `エコー: ${echoResult.effectLabel}`;
+                }
+                if (echoResult.statusChanged) statusChanged = true;
+              }
+            }
+
+            if (skillId && skillId !== MOCCHURIN_ITEM_ID) {
+              lastSkillCatchesRef.current = [{ itemId: skillId, level: skillLevel }, ...lastSkillCatchesRef.current].slice(0, 2);
             }
 
             if (isMystery && effectLabel) effectLabel = `？発動 / ${effectLabel}`;
@@ -1827,6 +1890,7 @@ export function FrenchieCatchGame({ ownedItems }: { ownedItems: FrenchieCatchIte
     dogFloodRemainingRef.current = 0;
     personFloodRemainingRef.current = 0;
     clawdBallFloodRemainingRef.current = 0;
+    lastSkillCatchesRef.current = [];
     goldBonusCoinsRef.current = 0;
     slantBoostUntilRef.current = 0;
     boxShrinkUntilRef.current = 0;
