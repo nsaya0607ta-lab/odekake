@@ -339,9 +339,10 @@ function MultiCapsuleIntro({ results, onComplete, onSkipAll }: MultiCapsuleIntro
                 <span className={styles.capsuleBand} />
                 {sparkling ? (
                   <span className={styles.capsuleSparkles} aria-hidden="true">
-                    <i /><i /><i /><i />
+                    <i /><i /><i /><i /><i /><i /><i /><i />
                   </span>
                 ) : null}
+                <span className={styles.batchRarity}>{rarity}</span>
                 <span className={styles.batchNumber}>{index + 1}</span>
               </div>
             );
