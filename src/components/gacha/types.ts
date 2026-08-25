@@ -1,4 +1,4 @@
-import type { GachaPlanId } from "@/lib/gacha/config";
+import type { GachaPlanId, GachaRarity } from "@/lib/gacha/config";
 
 export type DrawResult = {
   id: string;
@@ -14,5 +14,9 @@ export type DrawResult = {
 export type AnimationDraw = {
   plan: GachaPlanId;
   results: DrawResult[];
+  promotion?: {
+    index: number;
+    fromRarity: Extract<GachaRarity, "N" | "R">;
+    toRarity: Extract<GachaRarity, "LR" | "MR">;
+  };
 };
-
