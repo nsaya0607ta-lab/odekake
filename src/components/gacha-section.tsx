@@ -34,6 +34,11 @@ type AnimationDraw = {
   results: DrawResult[];
 };
 
+type ResultState = {
+  plan: GachaPlanId;
+  results: DrawResult[];
+};
+
 const RARITY_FRAME_PATHS: Record<GachaRarity, string> = {
   N: "/collection/rarity-frames/n.webp",
   R: "/collection/rarity-frames/r.webp",
@@ -120,9 +125,8 @@ export function GachaSection({ balance }: { balance: number }) {
   const router = useRouter();
   const [pending, setPending] = useState<GachaPlanId | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [results, setResults] = useState<DrawResult[] | null>(null);
+  const [results, setResults] = useState<ResultState | null>(null);
   const [animation, setAnimation] = useState<AnimationDraw | null>(null);
-  const [lastPlan, setLastPlan] = useState<GachaPlanId>("single");
   const inFlight = useRef(false);
 
   const draw = useCallback(
@@ -151,7 +155,6 @@ export function GachaSection({ balance }: { balance: number }) {
         }
 
         const confirmedResults = payload?.results ?? [];
-        setLastPlan(planId);
         setAnimation({ plan: planId, results: confirmedResults });
         router.refresh();
       } catch {
@@ -163,8 +166,7 @@ export function GachaSection({ balance }: { balance: number }) {
 
   const finishAnimation = useCallback((draw: AnimationDraw) => {
     setAnimation(null);
-    setLastPlan(draw.plan);
-    setResults(draw.results);
+    setResults({ plan: draw.plan, results: draw.results });
     inFlight.current = false;
     setPending(null);
   }, []);
@@ -184,9 +186,11 @@ export function GachaSection({ balance }: { balance: number }) {
   }, []);
 
   const retry = useCallback(() => {
+    if (!results) return;
+    const { plan } = results;
     setResults(null);
-    void draw(lastPlan);
-  }, [draw, lastPlan]);
+    void draw(plan);
+  }, [draw, results]);
 
   const rates = GACHA_DISPLAY_RARITY_RATES;
 
@@ -260,8 +264,8 @@ export function GachaSection({ balance }: { balance: number }) {
       {results &&
         createPortal(
           <GachaResultModal
-            results={results}
-            plan={lastPlan}
+            results={results.results}
+            plan={results.plan}
             busy={pending !== null}
             onRetry={retry}
             onClose={closeResults}
@@ -631,12 +635,7 @@ function RarityResultCard({ result, large = false }: { result: DrawResult; large
 }
 
 function SingleResult({ result }: { result: DrawResult }) {
-  const acquisitionLabel =
-    result.id === "summer_frenchie"
-      ? "サマースキンをゲット！"
-      : result.type === "dog_skin"
-        ? "わんこスキンをゲット！"
-        : "おもちゃをゲット！";
+  const acquisitionLabel = result.type === "dog_skin" ? "わんこスキンをゲット！" : "おもちゃをゲット！";
 
   return (
     <div className="pt-1 text-center">
