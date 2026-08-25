@@ -157,7 +157,7 @@ export default function GachaPreviewPage() {
         </button>
 
         <div className="mt-7 rounded-[24px] border border-[#dfd1b9] bg-white/70 p-4 text-xs font-semibold leading-6 text-[#7d6d58]">
-          通常の10連では、全カプセル着地後に1%で確変します。対象はN/Rの1個だけで、LR 70%・MR 30%に昇格します。保存やコイン消費は行いません。
+          通常の10連では、全カプセル着地後に10連1回につき1%で確変します。対象はN/Rの1個だけで、LR 70%・MR 30%に昇格します。保存やコイン消費は行いません。
         </div>
       </div>
 
