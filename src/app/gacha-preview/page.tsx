@@ -61,12 +61,30 @@ const BUTTON_STYLES = {
   MR: "from-indigo-950 via-violet-700 to-cyan-400 text-white",
 } as const;
 
+const TEN_PULL_RESULTS: DrawResult[] = [
+  { ...PREVIEW_RESULTS.SSR, id: "preview-10-1", name: "虹色わんこボール" },
+  { ...PREVIEW_RESULTS.UR, id: "preview-10-2", name: "あずびー" },
+  { ...PREVIEW_RESULTS.LR, id: "preview-10-3", name: "漆黒のアー" },
+  { ...PREVIEW_RESULTS.MR, id: "preview-10-4", name: "ブレブル" },
+  { ...PREVIEW_RESULTS.SSR, id: "preview-10-5", name: "虹色わんこボール", isNew: false },
+  { ...PREVIEW_RESULTS.UR, id: "preview-10-6", name: "あずびー", isNew: false },
+  { ...PREVIEW_RESULTS.SSR, id: "preview-10-7", name: "虹色わんこボール", isNew: false },
+  { ...PREVIEW_RESULTS.LR, id: "preview-10-8", name: "漆黒のアー", isNew: false },
+  { ...PREVIEW_RESULTS.UR, id: "preview-10-9", name: "あずびー", isNew: false },
+  { ...PREVIEW_RESULTS.MR, id: "preview-10-10", name: "ブレブル", isNew: false },
+];
+
 export default function GachaPreviewPage() {
   const [active, setActive] = useState<AnimationDraw | null>(null);
 
   const play = (rarity: keyof typeof PREVIEW_RESULTS) => {
     primeGachaAudio();
     setActive({ plan: "single", results: [PREVIEW_RESULTS[rarity]] });
+  };
+
+  const playTen = () => {
+    primeGachaAudio();
+    setActive({ plan: "multi", results: TEN_PULL_RESULTS });
   };
 
   return (
@@ -94,8 +112,17 @@ export default function GachaPreviewPage() {
           ))}
         </div>
 
+        <button
+          type="button"
+          onClick={playTen}
+          className="mt-4 min-h-24 w-full rounded-[28px] bg-gradient-to-r from-[#222034] via-[#7848c9] to-[#2ba8c7] p-5 text-left text-white shadow-[0_14px_28px_rgba(73,59,43,.2)] active:scale-[.98]"
+        >
+          <span className="block text-2xl font-black tracking-[0.08em]">10連を再生</span>
+          <span className="mt-2 block text-[11px] font-black text-white/80">1 / 10から順番に、全10個の演出を確認</span>
+        </button>
+
         <div className="mt-7 rounded-[24px] border border-[#dfd1b9] bg-white/70 p-4 text-xs font-semibold leading-6 text-[#7d6d58]">
-          実際のガチャ画面では、既存APIが返した結果のうち最高レアリティに合わせて同じ演出を再生し、その後に従来の結果カードを表示します。
+          10連では既存APIが返した順番どおりに10個すべての演出を再生し、その後に従来の10連結果カードを表示します。
         </div>
       </div>
 
@@ -103,4 +130,3 @@ export default function GachaPreviewPage() {
     </main>
   );
 }
-
