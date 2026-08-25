@@ -16,6 +16,9 @@ type ParticleHandle = {
 };
 
 const RARITY_POWER: Record<GachaRarity, number> = { N: 0, R: 1, SR: 2, SSR: 3, UR: 4, LR: 5, MR: 6 };
+const MULTI_DROP_STAGGER = 0.168;
+const MULTI_DROP_DURATION = 0.768;
+const MULTI_REVEAL_TIME_SCALE = 1.4;
 
 function validRarity(rarity: string): GachaRarity {
   return (["N", "R", "SR", "SSR", "UR", "LR", "MR"] as const).includes(rarity as GachaRarity)
@@ -269,17 +272,18 @@ function MultiCapsuleIntro({ results, onComplete, onSkipAll }: MultiCapsuleIntro
 
       capsules.forEach((capsule, index) => {
         const column = index % 5;
-        const at = `capsuleDrop+=${(index * 0.14).toFixed(2)}`;
+        const at = `capsuleDrop+=${(index * MULTI_DROP_STAGGER).toFixed(3)}`;
         tl.call(() => playGachaCue("drop"), undefined, at)
           .fromTo(
             capsule,
             { opacity: 0, x: (2 - column) * 48, y: -210 - (index % 2) * 22, scale: 0.34, rotation: -150 + index * 19 },
-            { opacity: 1, x: 0, y: 0, scale: 1, rotation: 0, duration: 0.64, ease: "bounce.out" },
+            { opacity: 1, x: 0, y: 0, scale: 1, rotation: 0, duration: MULTI_DROP_DURATION, ease: "bounce.out" },
             at,
           );
       });
 
-      tl.to(machineRef.current, { opacity: 0.34, scale: 0.9, duration: 0.35 }, `capsuleDrop+=${(capsules.length * 0.14 + 0.48).toFixed(2)}`)
+      const dropSequenceDuration = Math.max(0, capsules.length - 1) * MULTI_DROP_STAGGER + MULTI_DROP_DURATION;
+      tl.to(machineRef.current, { opacity: 0.34, scale: 0.9, duration: 0.35 }, `capsuleDrop+=${dropSequenceDuration.toFixed(3)}`)
         .call(() => {
           if (rareResults.length > 0) particlesRef.current?.burst(featuredRarity, "normal");
           if (rareResults.length > 0) playGachaCue("charge");
@@ -586,6 +590,7 @@ function GachaCinematicScene({ result, current, total, capsuleOnly, onSceneCompl
       }
 
       reveal(tl, ">");
+      if (capsuleOnly) tl.timeScale(MULTI_REVEAL_TIME_SCALE);
     });
 
     return () => {
