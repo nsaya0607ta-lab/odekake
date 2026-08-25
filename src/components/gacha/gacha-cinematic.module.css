@@ -252,6 +252,43 @@
   box-shadow: 0 2px 4px rgb(0 0 0 / 22%);
 }
 
+.root[data-rarity="SSR"] .capsule {
+  border-color: rgb(255 255 255 / 94%);
+  background:
+    linear-gradient(180deg, rgb(255 255 255 / 36%) 0 43%, rgb(255 255 255 / 94%) 44% 55%, transparent 56%),
+    conic-gradient(from 25deg, #ff5c8a, #ffdc62, #5effb2, #54cfff, #9a6cff, #ff76d4, #ff5c8a);
+  box-shadow: inset 10px 9px 13px rgb(255 255 255 / 42%), inset -10px -12px 18px rgb(45 18 75 / 34%), 0 0 25px #ff7bd5, 0 14px 18px rgb(0 0 0 / 44%);
+}
+
+.root[data-rarity="UR"] .capsule {
+  border-color: #ffe3a4;
+  background:
+    linear-gradient(180deg, rgb(255 255 255 / 30%) 0 43%, #ffd775 44% 55%, transparent 56%),
+    radial-gradient(circle at 34% 24%, #ff9185 0 12%, #f32638 40%, #74000d 78%, #260004 100%);
+  box-shadow: inset 10px 9px 13px rgb(255 255 255 / 34%), inset -10px -12px 18px rgb(65 0 5 / 54%), 0 0 30px #ff263e, 0 0 12px #ffd775, 0 14px 18px rgb(0 0 0 / 48%);
+}
+
+.root[data-rarity="LR"] .capsule {
+  border-color: #ffe28a;
+  background:
+    linear-gradient(180deg, rgb(255 224 128 / 16%) 0 43%, #e9b949 44% 55%, transparent 56%),
+    radial-gradient(circle at 34% 24%, #454545 0 10%, #111 42%, #020202 76%, #6e4a00 100%);
+  box-shadow: inset 10px 9px 13px rgb(255 239 180 / 23%), inset -10px -12px 18px rgb(0 0 0 / 70%), 0 0 34px #e9b949, 0 0 12px #fff0a0, 0 14px 18px rgb(0 0 0 / 58%);
+}
+
+.root[data-rarity="MR"] .capsule {
+  border-color: #bff4ff;
+  background:
+    linear-gradient(180deg, rgb(255 255 255 / 30%) 0 43%, #8beaff 44% 55%, transparent 56%),
+    conic-gradient(from 30deg, #301477, #704cff, #21c9ff, #b84dff, #4522a8, #54d6ff, #301477);
+  box-shadow: inset 10px 9px 13px rgb(255 255 255 / 38%), inset -10px -12px 18px rgb(9 3 47 / 62%), 0 0 42px #765cff, 0 0 18px #54d6ff, 0 14px 18px rgb(0 0 0 / 50%);
+}
+
+.root[data-rarity="SSR"] .capsuleBand { background: linear-gradient(90deg, #ff76c8, #fff083, #65e8ff, #b983ff); }
+.root[data-rarity="UR"] .capsuleBand { border-color: #ffefa8; background: linear-gradient(90deg, #b70014, #ffd66c, #ff253b); }
+.root[data-rarity="LR"] .capsuleBand { border-color: #fff0a0; background: linear-gradient(90deg, #4e3500, #f7d56f, #fff4b5, #5d3d00); }
+.root[data-rarity="MR"] .capsuleBand { border-color: #bff4ff; background: linear-gradient(90deg, #392080, #58ddff, #c05cff, #392080); }
+
 .beam {
   position: absolute;
   z-index: 4;
@@ -571,10 +608,10 @@
 
 .batchCapsule[data-rarity="R"] { --fx-primary: #71cbff; --fx-secondary: #dff5ff; --fx-deep: #144d74; }
 .batchCapsule[data-rarity="SR"] { --fx-primary: #ffd75e; --fx-secondary: #fff4b8; --fx-deep: #754a0b; }
-.batchCapsule[data-rarity="SSR"] { --fx-primary: #ff77ce; --fx-secondary: #fff59b; --fx-deep: #4b2d82; }
-.batchCapsule[data-rarity="UR"] { --fx-primary: #ff3b3b; --fx-secondary: #ffbf76; --fx-deep: #570008; }
-.batchCapsule[data-rarity="LR"] { --fx-primary: #e9b949; --fx-secondary: #fff0a0; --fx-deep: #080808; }
-.batchCapsule[data-rarity="MR"] { --fx-primary: #7e65ff; --fx-secondary: #54d6ff; --fx-deep: #09052d; }
+.batchCapsule[data-rarity="SSR"] { --fx-primary: #ff77ce; --fx-secondary: #fff59b; --fx-deep: #4b2d82; --rare-glow-opacity: .78; --rare-glow-speed: 1.12s; }
+.batchCapsule[data-rarity="UR"] { --fx-primary: #ff263e; --fx-secondary: #ffd775; --fx-deep: #570008; --rare-glow-opacity: .88; --rare-glow-speed: .98s; }
+.batchCapsule[data-rarity="LR"] { --fx-primary: #e9b949; --fx-secondary: #fff0a0; --fx-deep: #080808; --rare-glow-opacity: .96; --rare-glow-speed: .86s; }
+.batchCapsule[data-rarity="MR"] { --fx-primary: #765cff; --fx-secondary: #54d6ff; --fx-deep: #09052d; --rare-glow-opacity: 1; --rare-glow-speed: .72s; }
 
 .batchCapsule .capsule {
   inset: 5%;
@@ -589,6 +626,49 @@
   height: 11%;
 }
 
+.batchCapsule[data-rarity="N"] .capsule {
+  background: linear-gradient(180deg, rgb(255 255 255 / 38%) 0 44%, #f5ffdf 45% 55%, transparent 56%), linear-gradient(145deg, #c7ff9b, #5dca45 55%, #174e14);
+}
+
+.batchCapsule[data-rarity="R"] .capsule {
+  background: linear-gradient(180deg, rgb(255 255 255 / 38%) 0 44%, #e8f9ff 45% 55%, transparent 56%), linear-gradient(145deg, #bceeff, #38aef2 55%, #0b4772);
+}
+
+.batchCapsule[data-rarity="SR"] .capsule {
+  border-color: #fff1a8;
+  background: linear-gradient(180deg, rgb(255 255 255 / 32%) 0 44%, #fff2a8 45% 55%, transparent 56%), linear-gradient(145deg, #fff7a6, #f1b92c 54%, #774206);
+  box-shadow: inset 6px 5px 8px rgb(255 255 255 / 40%), inset -6px -7px 10px rgb(91 48 0 / 34%), 0 0 12px rgb(255 205 66 / 58%), 0 8px 10px rgb(0 0 0 / 48%);
+}
+
+.batchCapsule[data-rarity="SSR"] .capsule {
+  border-color: #fff;
+  background: linear-gradient(180deg, rgb(255 255 255 / 30%) 0 44%, rgb(255 255 255 / 92%) 45% 55%, transparent 56%), conic-gradient(from 20deg, #ff4f89, #ffe15d, #57efac, #48cfff, #a06cff, #ff6bce, #ff4f89);
+  box-shadow: inset 6px 5px 8px rgb(255 255 255 / 48%), inset -6px -7px 10px rgb(55 24 78 / 32%), 0 0 15px #ff76ce, 0 8px 10px rgb(0 0 0 / 48%);
+}
+
+.batchCapsule[data-rarity="UR"] .capsule {
+  border-color: #ffe49a;
+  background: linear-gradient(180deg, rgb(255 255 255 / 26%) 0 44%, #ffd36b 45% 55%, transparent 56%), radial-gradient(circle at 34% 24%, #ff8a7e 0 11%, #ef233c 39%, #76000d 76%, #260004 100%);
+  box-shadow: inset 6px 5px 8px rgb(255 255 255 / 38%), inset -6px -7px 10px rgb(75 0 7 / 55%), 0 0 19px #ff263e, 0 0 7px #ffd775, 0 8px 10px rgb(0 0 0 / 52%);
+}
+
+.batchCapsule[data-rarity="LR"] .capsule {
+  border-color: #ffe489;
+  background: linear-gradient(180deg, rgb(255 224 128 / 14%) 0 44%, #e7b63f 45% 55%, transparent 56%), radial-gradient(circle at 34% 24%, #4b4b4b 0 9%, #111 40%, #020202 76%, #684600 100%);
+  box-shadow: inset 6px 5px 8px rgb(255 239 180 / 24%), inset -6px -7px 10px rgb(0 0 0 / 72%), 0 0 23px #e9b949, 0 0 9px #fff0a0, 0 8px 10px rgb(0 0 0 / 60%);
+}
+
+.batchCapsule[data-rarity="MR"] .capsule {
+  border-color: #c6f7ff;
+  background: linear-gradient(180deg, rgb(255 255 255 / 28%) 0 44%, #75e2ff 45% 55%, transparent 56%), conic-gradient(from 25deg, #2d116f, #704cff, #20caff, #bd4fff, #4923b5, #54d6ff, #2d116f);
+  box-shadow: inset 6px 5px 8px rgb(255 255 255 / 42%), inset -6px -7px 10px rgb(9 3 47 / 64%), 0 0 28px #765cff, 0 0 12px #54d6ff, 0 8px 10px rgb(0 0 0 / 54%);
+}
+
+.batchCapsule[data-rarity="SSR"] .capsuleBand { background: linear-gradient(90deg, #ff72c8, #ffed7c, #63e8ff, #b47aff); }
+.batchCapsule[data-rarity="UR"] .capsuleBand { border-color: #ffe891; background: linear-gradient(90deg, #a90012, #ffd66c, #ff263e); }
+.batchCapsule[data-rarity="LR"] .capsuleBand { border-color: #fff0a0; background: linear-gradient(90deg, #4a3100, #f4d166, #fff3ab, #543700); }
+.batchCapsule[data-rarity="MR"] .capsuleBand { border-color: #bff4ff; background: linear-gradient(90deg, #37207d, #57ddff, #bd58ff, #37207d); }
+
 .batchCapsuleGlow {
   position: absolute;
   inset: -20%;
@@ -598,13 +678,28 @@
 }
 
 .batchCapsuleRare .batchCapsuleGlow {
-  opacity: .92;
-  animation: capsuleRareGlow 1.05s ease-in-out infinite alternate;
+  opacity: var(--rare-glow-opacity, .78);
+  animation: capsuleRareGlow var(--rare-glow-speed, 1.12s) ease-in-out infinite alternate;
 }
 
 .batchCapsuleRare {
   filter: drop-shadow(0 0 8px var(--fx-primary));
 }
+
+.batchCapsuleRare::before {
+  content: "";
+  position: absolute;
+  z-index: 1;
+  inset: -5%;
+  border: 1px solid color-mix(in srgb, var(--fx-secondary) 82%, transparent);
+  border-radius: 50%;
+  opacity: .64;
+  animation: capsuleRarityRing var(--rare-glow-speed, 1.12s) ease-out infinite;
+}
+
+.batchCapsule[data-rarity="UR"] { filter: drop-shadow(0 0 11px var(--fx-primary)); }
+.batchCapsule[data-rarity="LR"] { filter: drop-shadow(0 0 14px var(--fx-primary)); }
+.batchCapsule[data-rarity="MR"] { filter: drop-shadow(0 0 18px var(--fx-primary)) drop-shadow(0 0 7px var(--fx-secondary)); }
 
 .capsuleSparkles {
   position: absolute;
@@ -628,6 +723,39 @@
 .capsuleSparkles i:nth-child(2) { right: 0; top: 20%; width: 9px; animation-delay: -.7s; }
 .capsuleSparkles i:nth-child(3) { right: 11%; bottom: 3%; width: 11px; animation-delay: -.38s; }
 .capsuleSparkles i:nth-child(4) { left: 4%; bottom: 15%; width: 7px; animation-delay: -.92s; }
+.capsuleSparkles i:nth-child(n + 5) { display: none; }
+.capsuleSparkles i:nth-child(5) { left: 42%; top: -6%; width: 8px; animation-delay: -.52s; }
+.capsuleSparkles i:nth-child(6) { right: -8%; bottom: 38%; width: 10px; animation-delay: -.24s; }
+.capsuleSparkles i:nth-child(7) { left: 34%; bottom: -11%; width: 9px; animation-delay: -.81s; }
+.capsuleSparkles i:nth-child(8) { left: -9%; top: 43%; width: 11px; animation-delay: -.43s; }
+.batchCapsule[data-rarity="UR"] .capsuleSparkles i:nth-child(5),
+.batchCapsule[data-rarity="LR"] .capsuleSparkles i:nth-child(5),
+.batchCapsule[data-rarity="LR"] .capsuleSparkles i:nth-child(6),
+.batchCapsule[data-rarity="MR"] .capsuleSparkles i:nth-child(n + 5) { display: block; }
+.batchCapsule[data-rarity="UR"] .capsuleSparkles i { animation-duration: .98s; }
+.batchCapsule[data-rarity="LR"] .capsuleSparkles i { animation-duration: .86s; filter: drop-shadow(0 0 7px #ffd45f); }
+.batchCapsule[data-rarity="MR"] .capsuleSparkles i { animation-duration: .72s; filter: drop-shadow(0 0 7px #69ddff) drop-shadow(0 0 4px #bd58ff); }
+
+.batchRarity {
+  position: absolute;
+  z-index: 6;
+  left: 50%;
+  top: 47%;
+  min-width: 23px;
+  border: 1px solid rgb(255 255 255 / 68%);
+  border-radius: 999px;
+  padding: 1px 4px;
+  background: color-mix(in srgb, var(--fx-deep) 84%, transparent);
+  color: var(--fx-secondary);
+  font-size: clamp(6px, 1.8vw, 9px);
+  font-weight: 950;
+  letter-spacing: .04em;
+  line-height: 1.25;
+  text-align: center;
+  text-shadow: 0 1px 2px #000;
+  transform: translate(-50%, -50%);
+  box-shadow: 0 0 6px color-mix(in srgb, var(--fx-primary) 64%, transparent);
+}
 
 .batchNumber {
   position: absolute;
@@ -673,6 +801,11 @@
   48% { opacity: 1; transform: scale(1.2) rotate(90deg); }
 }
 
+@keyframes capsuleRarityRing {
+  0% { opacity: .72; transform: scale(.82); }
+  75%, 100% { opacity: 0; transform: scale(1.22); }
+}
+
 @keyframes batchHintPulse {
   from { opacity: .68; transform: translateX(-50%) scale(.97); }
   to { opacity: 1; transform: translateX(-50%) scale(1.03); }
@@ -699,6 +832,7 @@
   .beam { display: none; }
 
   .batchCapsuleRare .batchCapsuleGlow,
+  .batchCapsuleRare::before,
   .capsuleSparkles i,
   .batchHint { animation: none; }
 }
