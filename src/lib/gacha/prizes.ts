@@ -135,6 +135,7 @@ export const GACHA_PRIZES: readonly GachaPrize[] = [
   { id: "accessory_jinbei", name: "甚平", rarity: "SR", type: "item", pool: "summer", image: "/collection/items/jinbei.webp" },
   { id: "other_sparkler", name: "線香花火", rarity: "SR", type: "item", pool: "summer", image: "/collection/items/sparkler.webp" },
   { id: "other_goldfish_scoop", name: "金魚すくい", rarity: "SSR", type: "item", pool: "summer", image: "/collection/items/goldfish-scoop.webp" },
+  { id: "interior_beach_parasol", name: "ビーチパラソル", rarity: "SSR", type: "item", pool: "summer", image: "/collection/items/beach-parasol.webp" },
   { id: "toy_fireworks_set", name: "花火セット", rarity: "UR", type: "item", pool: "summer", image: "/collection/items/fireworks-set.webp" },
 ];
 

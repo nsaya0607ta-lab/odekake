@@ -185,6 +185,7 @@ const CURATED_ITEMS: readonly CollectionItem[] = [
   { id: "accessory_jinbei", name: "甚平", image: "/collection/items/jinbei.webp", category: "accessory", series: "summer", rarity: "SR" },
   { id: "other_sparkler", name: "線香花火", image: "/collection/items/sparkler.webp", category: "other", series: "summer", rarity: "SR" },
   { id: "other_goldfish_scoop", name: "金魚すくい", image: "/collection/items/goldfish-scoop.webp", category: "other", series: "summer", rarity: "SSR" },
+  { id: "interior_beach_parasol", name: "ビーチパラソル", image: "/collection/items/beach-parasol.webp", category: "interior", series: "summer", rarity: "SSR" },
   { id: "toy_fireworks_set", name: "花火セット", image: "/collection/items/fireworks-set.webp", category: "toy", series: "summer", rarity: "UR" },
 ];
 
