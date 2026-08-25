@@ -3,7 +3,8 @@
  * =============================================================
  * id はガチャ景品 id / user_gacha_items.item_id と一致させる。
  * series: null は通常図鑑、hiking / snow / summer はシリーズ図鑑。
- * シリーズそのものの定義（名前・見た目・排出率）は series.ts を唯一の真実源とする。
+ * シリーズそのものの定義（名前・見た目）は series.ts を唯一の真実源とする。
+ * シリーズのアイテムもガチャは分けず、通常ガチャから排出される。
  */
 import type { GachaRarity } from "@/lib/gacha/config";
 import { GACHA_PRIZES } from "@/lib/gacha/prizes";

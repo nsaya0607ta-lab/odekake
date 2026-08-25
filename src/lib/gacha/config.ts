@@ -1,60 +1,37 @@
 /**
  * ガチャの設定
  * =============================================================
- * ガチャ種別ごとの排出率と値段をまとめて管理する。
- * シリーズ限定ガチャ（hiking/snow/summer など）の定義は series.ts を
- * 唯一の真実源とし、ここではそれを通常ガチャと合わせて GachaType に展開する。
+ * 排出率と値段をまとめて管理する。ガチャは単一で、通常・シリーズを分けない。
  */
-import { SERIES, SERIES_IDS, type SeriesId } from "@/lib/series";
 
 export const GACHA_RARITIES = ["N", "R", "SR", "SSR", "UR", "LR", "MR"] as const;
 export type GachaRarity = (typeof GACHA_RARITIES)[number];
 
-export const GACHA_TYPES = ["regular", ...SERIES_IDS] as const;
-export type GachaType = "regular" | SeriesId;
-
-export const GACHA_TYPE_LABELS: Record<GachaType, string> = {
-  regular: "通常ガチャ",
-  ...Object.fromEntries(SERIES.map((series) => [series.id, series.gachaLabel])),
-} as Record<GachaType, string>;
-
 /**
- * ガチャ種別ごとのレアリティ排出率（合計100%）。実際の抽選に使う内部値。
+ * レアリティ排出率（合計100%）。実際の抽選に使う内部値。
  * MR は0.1%のぶんNから差し引いてある。画面の排出率表示ではLRまでは公開し、
- * MRの存在自体は出さない（Nに合算して見せる。GACHA_DISPLAY_RARITY_RATES_BY_TYPE を参照）。
+ * MRの存在自体は出さない（Nに合算して見せる。GACHA_DISPLAY_RARITY_RATES を参照）。
  */
-export const GACHA_RARITY_RATES_BY_TYPE: Record<GachaType, Record<GachaRarity, number>> = {
-  regular: {
-    N: 49.4,
-    R: 25,
-    SR: 16,
-    SSR: 6,
-    UR: 3,
-    LR: 0.5,
-    MR: 0.1,
-  },
-  ...Object.fromEntries(SERIES.map((series) => [series.id, series.rarityRates])),
-} as Record<GachaType, Record<GachaRarity, number>>;
-
-/** 旧参照向け。通常ガチャを標準とする */
-export const GACHA_RARITY_RATES = GACHA_RARITY_RATES_BY_TYPE.regular;
+export const GACHA_RARITY_RATES: Record<GachaRarity, number> = {
+  N: 49.4,
+  R: 25,
+  SR: 16,
+  SSR: 6,
+  UR: 3,
+  LR: 0.5,
+  MR: 0.1,
+};
 
 /** 画面の排出率表示専用。MRだけ伏せて、そのぶんをNに合算して見せる。LRまでは公開する。 */
-export const GACHA_DISPLAY_RARITY_RATES_BY_TYPE: Record<GachaType, Record<GachaRarity, number>> = {
-  regular: {
-    N: 49.5,
-    R: 25,
-    SR: 16,
-    SSR: 6,
-    UR: 3,
-    LR: 0.5,
-    MR: 0,
-  },
-  ...Object.fromEntries(SERIES.map((series) => [series.id, series.rarityRates])),
-} as Record<GachaType, Record<GachaRarity, number>>;
-
-/** 旧参照向け。通常ガチャを標準とする */
-export const GACHA_DISPLAY_RARITY_RATES = GACHA_DISPLAY_RARITY_RATES_BY_TYPE.regular;
+export const GACHA_DISPLAY_RARITY_RATES: Record<GachaRarity, number> = {
+  N: 49.5,
+  R: 25,
+  SR: 16,
+  SSR: 6,
+  UR: 3,
+  LR: 0.5,
+  MR: 0,
+};
 
 /** 引き方（1回 / 10連）と消費コイン */
 export const GACHA_PLANS = {
@@ -66,10 +43,6 @@ export type GachaPlanId = keyof typeof GACHA_PLANS;
 
 export function isGachaPlanId(value: unknown): value is GachaPlanId {
   return typeof value === "string" && value in GACHA_PLANS;
-}
-
-export function isGachaType(value: unknown): value is GachaType {
-  return typeof value === "string" && (GACHA_TYPES as readonly string[]).includes(value);
 }
 
 /** レアリティの見た目。結果画面のやわらかい配色と揃える */
