@@ -10,6 +10,7 @@ type Phase = "準備中" | "ガチャ起動" | "カプセル排出" | "カプセ
 type BurstIntensity = "normal" | "large" | "mega";
 type GsapModule = typeof import("gsap");
 type GsapTimeline = ReturnType<GsapModule["gsap"]["timeline"]>;
+type GachaPromotion = NonNullable<AnimationDraw["promotion"]>;
 
 type ParticleHandle = {
   burst: (rarity: GachaRarity, intensity?: BurstIntensity) => void;
@@ -29,6 +30,12 @@ function validRarity(rarity: string): GachaRarity {
 
 function isSparklingRarity(rarity: GachaRarity): boolean {
   return rarity === "SSR" || rarity === "UR" || rarity === "LR" || rarity === "MR";
+}
+
+function applyPromotedCapsuleStyle(capsule: HTMLDivElement, rarity: Extract<GachaRarity, "LR" | "MR">) {
+  capsule.dataset.rarity = rarity;
+  const rareClassName = styles.batchCapsuleRare;
+  if (rareClassName) capsule.classList.add(rareClassName);
 }
 
 function useBodyScrollLock() {
@@ -197,16 +204,19 @@ const PixiEffects = forwardRef<ParticleHandle, { enabled: boolean }>(function Pi
 
 type MultiCapsuleIntroProps = {
   results: DrawResult[];
+  promotion?: GachaPromotion;
   onComplete: () => void;
   onSkipAll: () => void;
 };
 
-function MultiCapsuleIntro({ results, onComplete, onSkipAll }: MultiCapsuleIntroProps) {
+function MultiCapsuleIntro({ results, promotion, onComplete, onSkipAll }: MultiCapsuleIntroProps) {
+  const [batchPhase, setBatchPhase] = useState("10個のカプセル排出！");
   const rootRef = useRef<HTMLDivElement>(null);
   const machineRef = useRef<HTMLDivElement>(null);
   const knobRef = useRef<HTMLSpanElement>(null);
   const capsuleRefs = useRef<HTMLDivElement[]>([]);
   const flashRef = useRef<HTMLDivElement>(null);
+  const promotionCopyRef = useRef<HTMLDivElement>(null);
   const particlesRef = useRef<ParticleHandle>(null);
   const timelineRef = useRef<GsapTimeline | null>(null);
   const completedRef = useRef(false);
@@ -246,6 +256,10 @@ function MultiCapsuleIntro({ results, onComplete, onSkipAll }: MultiCapsuleIntro
 
     if (reducedMotion) {
       for (const capsule of capsules) capsule.style.opacity = "1";
+      const promotionTarget = promotion ? capsules[promotion.index] : undefined;
+      if (promotionTarget && promotion) {
+        applyPromotedCapsuleStyle(promotionTarget, promotion.toRarity);
+      }
       const id = window.setTimeout(complete, 1000);
       return () => window.clearTimeout(id);
     }
@@ -254,7 +268,10 @@ function MultiCapsuleIntro({ results, onComplete, onSkipAll }: MultiCapsuleIntro
       if (disposed || !rootRef.current || !machineRef.current || !knobRef.current) return;
 
       const rareResults = results
-        .map((result, index) => ({ rarity: validRarity(result.rarity), index }))
+        .map((result, index) => ({
+          rarity: promotion?.index === index ? promotion.fromRarity : validRarity(result.rarity),
+          index,
+        }))
         .filter(({ rarity }) => isSparklingRarity(rarity));
       const featuredRarity = rareResults.reduce<GachaRarity>(
         (best, entry) => RARITY_POWER[entry.rarity] > RARITY_POWER[best] ? entry.rarity : best,
@@ -262,6 +279,7 @@ function MultiCapsuleIntro({ results, onComplete, onSkipAll }: MultiCapsuleIntro
       );
       const tl = gsap.timeline({ defaults: { ease: "power2.out" } });
       timelineRef.current = tl;
+      gsap.set(promotionCopyRef.current, { opacity: 0, scale: 0.54 });
 
       tl.fromTo(machineRef.current, { opacity: 0, scale: 0.78, y: 22 }, { opacity: 1, scale: 1, y: 0, duration: 0.4, ease: "back.out(1.4)" })
         .call(() => playGachaCue("turn"))
@@ -282,16 +300,53 @@ function MultiCapsuleIntro({ results, onComplete, onSkipAll }: MultiCapsuleIntro
       });
 
       const dropSequenceDuration = Math.max(0, capsules.length - 1) * MULTI_DROP_INTERVAL + MULTI_DROP_DURATION;
-      tl.to(machineRef.current, { opacity: 0.34, scale: 0.9, duration: 0.35 }, `capsuleDrop+=${dropSequenceDuration.toFixed(3)}`)
-        .call(() => {
+      tl.to(machineRef.current, { opacity: 0.34, scale: 0.9, duration: 0.35 }, `capsuleDrop+=${dropSequenceDuration.toFixed(3)}`);
+
+      const promotionTarget = promotion ? capsules[promotion.index] : undefined;
+      if (promotion && promotionTarget) {
+        const otherCapsules = capsules.filter((_, index) => index !== promotion.index);
+        tl.to({}, { duration: 0.54 })
+          .call(() => {
+            setBatchPhase("……");
+            playGachaCue("charge");
+          })
+          .to(otherCapsules, { opacity: 0.24, scale: 0.9, duration: 0.28 }, "<")
+          .to(promotionTarget, {
+            keyframes: [{ x: -5, rotation: -5 }, { x: 6, rotation: 5 }, { x: -4, rotation: -4 }, { x: 5, rotation: 4 }, { x: 0, rotation: 0 }],
+            scale: 1.16,
+            duration: 0.58,
+            ease: "none",
+          })
+          .call(() => {
+            setBatchPhase("確変発生！");
+            playGachaCue("crack");
+          })
+          .to(promotionCopyRef.current, { opacity: 1, scale: 1, duration: 0.22, ease: "back.out(2)" }, "<")
+          .to(flashRef.current, { opacity: 1, duration: 0.07 })
+          .call(() => {
+            applyPromotedCapsuleStyle(promotionTarget, promotion.toRarity);
+            particlesRef.current?.burst(promotion.toRarity, promotion.toRarity === "MR" ? "mega" : "large");
+            playGachaCue("explosion");
+            if (navigator.vibrate) navigator.vibrate(promotion.toRarity === "MR" ? [40, 30, 60] : [35, 25, 40]);
+          }, undefined, "<")
+          .to(flashRef.current, { opacity: 0, duration: 0.3 })
+          .to(promotionTarget, { scale: 1.34, duration: 0.24, ease: "back.out(1.8)" }, "<")
+          .to(promotionTarget, { scale: 1, duration: 0.46, ease: "elastic.out(1, .45)" })
+          .to(otherCapsules, { opacity: 1, scale: 1, duration: 0.34 }, "<0.12")
+          .to(promotionCopyRef.current, { opacity: 0, scale: 1.18, duration: 0.24 }, "<")
+          .to({}, { duration: 0.78 })
+          .call(complete);
+      } else {
+        tl.call(() => {
           if (rareResults.length > 0) particlesRef.current?.burst(featuredRarity, "normal");
           if (rareResults.length > 0) playGachaCue("charge");
         }, undefined, "<")
-        .to(flashRef.current, { opacity: rareResults.length > 0 ? 0.42 : 0.18, duration: 0.08 }, "<0.08")
-        .to(flashRef.current, { opacity: 0, duration: 0.32 })
-        .call(() => particlesRef.current?.burst(featuredRarity, rareResults.length >= 2 ? "large" : "normal"), undefined, "<")
-        .to({}, { duration: 1.05 })
-        .call(complete);
+          .to(flashRef.current, { opacity: rareResults.length > 0 ? 0.42 : 0.18, duration: 0.08 }, "<0.08")
+          .to(flashRef.current, { opacity: 0, duration: 0.32 })
+          .call(() => particlesRef.current?.burst(featuredRarity, rareResults.length >= 2 ? "large" : "normal"), undefined, "<")
+          .to({}, { duration: 1.05 })
+          .call(complete);
+      }
     });
 
     return () => {
@@ -299,7 +354,7 @@ function MultiCapsuleIntro({ results, onComplete, onSkipAll }: MultiCapsuleIntro
       timelineRef.current?.kill();
       timelineRef.current = null;
     };
-  }, [complete, results]);
+  }, [complete, promotion, results]);
 
   return (
     <div ref={rootRef} className={`${styles.root} ${styles.batchRoot}`} role="dialog" aria-modal="true" aria-label="10連ガチャのカプセル排出演出">
@@ -309,7 +364,7 @@ function MultiCapsuleIntro({ results, onComplete, onSkipAll }: MultiCapsuleIntro
       <div className={styles.hud}>
         <div>
           <p className={styles.eyebrow}>10連ガチャ</p>
-          <p className={styles.phase} aria-live="polite">10個のカプセル排出！</p>
+          <p className={styles.phase} aria-live="polite">{batchPhase}</p>
         </div>
       </div>
       <button type="button" className={styles.skip} onClick={skipAll}>すべてスキップ</button>
@@ -323,8 +378,11 @@ function MultiCapsuleIntro({ results, onComplete, onSkipAll }: MultiCapsuleIntro
 
         <div className={styles.batchTray} aria-label="排出された10個のカプセル">
           {results.map((result, index) => {
-            const rarity = validRarity(result.rarity);
+            const finalRarity = validRarity(result.rarity);
+            const isPromotionTarget = promotion?.index === index;
+            const rarity = isPromotionTarget ? promotion.fromRarity : finalRarity;
             const sparkling = isSparklingRarity(rarity);
+            const willSparkle = sparkling || isSparklingRarity(finalRarity);
             return (
               <div
                 key={`${result.id}-${index}`}
@@ -336,7 +394,7 @@ function MultiCapsuleIntro({ results, onComplete, onSkipAll }: MultiCapsuleIntro
                 <span className={styles.batchCapsuleGlow} />
                 <span className={styles.capsule} />
                 <span className={styles.capsuleBand} />
-                {sparkling ? (
+                {willSparkle ? (
                   <span className={styles.capsuleSparkles} aria-hidden="true">
                     <i /><i /><i /><i /><i /><i /><i /><i />
                   </span>
@@ -346,6 +404,7 @@ function MultiCapsuleIntro({ results, onComplete, onSkipAll }: MultiCapsuleIntro
             );
           })}
         </div>
+        <div ref={promotionCopyRef} className={styles.batchPromotionCopy} aria-live="assertive">確変！</div>
       </div>
 
       <PixiEffects ref={particlesRef} enabled />
@@ -738,6 +797,7 @@ export function GachaCinematic({ draw, onComplete }: { draw: AnimationDraw; onCo
     return (
       <MultiCapsuleIntro
         results={draw.results}
+        promotion={draw.promotion}
         onComplete={() => setBatchIntroComplete(true)}
         onSkipAll={finishAll}
       />
