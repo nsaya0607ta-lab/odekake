@@ -19,6 +19,8 @@ export default async function ItemCatchPage() {
   const catchItems = COLLECTION_ITEMS.flatMap((item) => {
     const count = ownedItemCounts.get(item.id) ?? 0;
     if (count <= 0 || !item.image) return [];
+    // シリーズの小物アイテムはミニゲーム用スキルが未整備なので、犬スキン(art持ち)以外は出現させない
+    if (item.series !== null && item.art === undefined) return [];
     return [{
       id: item.id,
       name: item.name,
