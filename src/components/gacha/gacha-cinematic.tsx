@@ -1,6 +1,6 @@
 "use client";
 
-import { forwardRef, useCallback, useEffect, useImperativeHandle, useMemo, useRef, useState } from "react";
+import { forwardRef, useCallback, useEffect, useImperativeHandle, useRef, useState } from "react";
 import type { GachaRarity } from "@/lib/gacha/config";
 import { playGachaCue } from "./audio";
 import styles from "./gacha-cinematic.module.css";
@@ -15,22 +15,10 @@ type ParticleHandle = {
   burst: (rarity: GachaRarity, intensity?: BurstIntensity) => void;
 };
 
-const RARITY_ORDER: Record<GachaRarity, number> = { N: 0, R: 1, SR: 2, SSR: 3, UR: 4, LR: 5, MR: 6 };
-
 function validRarity(rarity: string): GachaRarity {
-  return (Object.keys(RARITY_ORDER) as GachaRarity[]).includes(rarity as GachaRarity)
+  return (["N", "R", "SR", "SSR", "UR", "LR", "MR"] as const).includes(rarity as GachaRarity)
     ? (rarity as GachaRarity)
     : "N";
-}
-
-function featuredResult(results: DrawResult[]): DrawResult | null {
-  let featured: DrawResult | null = null;
-  for (const result of results) {
-    if (!featured || RARITY_ORDER[validRarity(result.rarity)] > RARITY_ORDER[validRarity(featured.rarity)]) {
-      featured = result;
-    }
-  }
-  return featured;
 }
 
 function useBodyScrollLock() {
@@ -197,11 +185,40 @@ const PixiEffects = forwardRef<ParticleHandle, { enabled: boolean }>(function Pi
   return <div ref={hostRef} className={styles.particleHost} aria-hidden="true" />;
 });
 
-export function GachaCinematic({ draw, onComplete }: { draw: AnimationDraw; onComplete: (draw: AnimationDraw) => void }) {
-  useBodyScrollLock();
-  const result = useMemo(() => featuredResult(draw.results), [draw.results]);
-  const rarity = validRarity(result?.rarity ?? "N");
+type SceneProps = {
+  result: DrawResult;
+  current: number;
+  total: number;
+  onSceneComplete: () => void;
+  onSkipAll: () => void;
+};
+
+function GachaCinematicScene({ result, current, total, onSceneComplete, onSkipAll }: SceneProps) {
+  const rarity = validRarity(result.rarity);
   const [phase, setPhase] = useState<Phase>("準備中");
+  const completeRef = useRef(false);
+  const sceneCompleteRef = useRef(onSceneComplete);
+  const skipAllRef = useRef(onSkipAll);
+
+  useEffect(() => {
+    sceneCompleteRef.current = onSceneComplete;
+    skipAllRef.current = onSkipAll;
+  }, [onSceneComplete, onSkipAll]);
+
+  const completeScene = useCallback(() => {
+    if (completeRef.current) return;
+    completeRef.current = true;
+    timelineRef.current?.kill();
+    sceneCompleteRef.current();
+  }, []);
+
+  const skipAll = useCallback(() => {
+    if (completeRef.current) return;
+    completeRef.current = true;
+    timelineRef.current?.kill();
+    skipAllRef.current();
+  }, []);
+
   const rootRef = useRef<HTMLDivElement>(null);
   const machineRef = useRef<HTMLDivElement>(null);
   const knobRef = useRef<HTMLSpanElement>(null);
@@ -224,33 +241,18 @@ export function GachaCinematic({ draw, onComplete }: { draw: AnimationDraw; onCo
   const freezeRef = useRef<HTMLDivElement>(null);
   const particlesRef = useRef<ParticleHandle>(null);
   const timelineRef = useRef<GsapTimeline | null>(null);
-  const completedRef = useRef(false);
-  const onCompleteRef = useRef(onComplete);
-  const drawRef = useRef(draw);
-
-  useEffect(() => {
-    onCompleteRef.current = onComplete;
-    drawRef.current = draw;
-  }, [draw, onComplete]);
-
-  const finish = useCallback(() => {
-    if (completedRef.current) return;
-    completedRef.current = true;
-    timelineRef.current?.kill();
-    onCompleteRef.current(drawRef.current);
-  }, []);
 
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key === "Escape") finish();
+      if (event.key === "Escape") skipAll();
     };
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
-  }, [finish]);
+  }, [skipAll]);
 
   useEffect(() => {
-    if (!result || !rootRef.current) {
-      const id = window.setTimeout(finish, 150);
+    if (!rootRef.current) {
+      const id = window.setTimeout(completeScene, 150);
       return () => window.clearTimeout(id);
     }
 
@@ -268,7 +270,7 @@ export function GachaCinematic({ draw, onComplete }: { draw: AnimationDraw; onCo
         itemCopyRef.current.style.opacity = "1";
         itemCopyRef.current.style.transform = "translate(-50%, 0)";
       }
-      const id = window.setTimeout(finish, 1100);
+      const id = window.setTimeout(completeScene, 1100);
       return () => window.clearTimeout(id);
     }
 
@@ -313,7 +315,7 @@ export function GachaCinematic({ draw, onComplete }: { draw: AnimationDraw; onCo
           .fromTo(itemCopy, { opacity: 0, y: 18 }, { opacity: 1, y: 0, duration: 0.48, ease: "power3.out" }, "<0.18")
           .call(() => playGachaCue("reveal"), undefined, "<")
           .to(item, { scale: 1.035, duration: 0.85, repeat: 1, yoyo: true, ease: "sine.inOut" })
-          .call(finish, undefined, ">+=0.42");
+          .call(completeScene, undefined, ">+=0.42");
       };
 
       const tl = gsap.timeline({ defaults: { ease: "power2.out" } });
@@ -409,13 +411,11 @@ export function GachaCinematic({ draw, onComplete }: { draw: AnimationDraw; onCo
       timelineRef.current?.kill();
       timelineRef.current = null;
     };
-  }, [finish, rarity, result]);
-
-  if (!result) return null;
+  }, [completeScene, rarity, result]);
 
   const image = result.image;
   return (
-    <div ref={rootRef} className={styles.root} data-rarity={rarity} role="dialog" aria-modal="true" aria-label={`${draw.plan === "multi" ? "10連" : "1回"}ガチャ演出`}>
+    <div ref={rootRef} className={styles.root} data-rarity={rarity} role="dialog" aria-modal="true" aria-label={`${total > 1 ? `${current}個目` : "1回"}のガチャ演出`}>
       <div className={styles.backdrop} />
       <div className={styles.ambient} />
       <div ref={atmosphereRef} className={styles.rarityAtmosphere} />
@@ -423,11 +423,13 @@ export function GachaCinematic({ draw, onComplete }: { draw: AnimationDraw; onCo
 
       <div className={styles.hud}>
         <div>
-          <p className={styles.eyebrow}>{draw.plan === "multi" ? "10 PULL CINEMATIC" : "GACHA CINEMATIC"}</p>
+          <p className={styles.eyebrow}>{total > 1 ? `10連ガチャ　${current} / ${total}` : "GACHA CINEMATIC"}</p>
           <p className={styles.phase} aria-live="polite">{phase}</p>
         </div>
       </div>
-      <button type="button" className={styles.skip} onClick={finish} aria-label="ガチャ演出をスキップ">スキップ</button>
+      <button type="button" className={styles.skip} onClick={skipAll} aria-label="残りのガチャ演出をすべてスキップ">
+        {total > 1 ? "すべてスキップ" : "スキップ"}
+      </button>
 
       <div className={styles.stage}>
         <div className={styles.floor} />
@@ -501,5 +503,58 @@ export function GachaCinematic({ draw, onComplete }: { draw: AnimationDraw; onCo
       <div ref={blackoutRef} className={styles.blackout} />
       <div ref={flashRef} className={styles.flash} />
     </div>
+  );
+}
+
+export function GachaCinematic({ draw, onComplete }: { draw: AnimationDraw; onComplete: (draw: AnimationDraw) => void }) {
+  useBodyScrollLock();
+  const [currentIndex, setCurrentIndex] = useState(0);
+  const finishedRef = useRef(false);
+  const onCompleteRef = useRef(onComplete);
+  const drawRef = useRef(draw);
+
+  useEffect(() => {
+    onCompleteRef.current = onComplete;
+    drawRef.current = draw;
+  }, [draw, onComplete]);
+
+  useEffect(() => {
+    for (const result of draw.results) {
+      if (!result.image) continue;
+      const image = new Image();
+      image.src = result.image;
+    }
+  }, [draw.results]);
+
+  const finishAll = useCallback(() => {
+    if (finishedRef.current) return;
+    finishedRef.current = true;
+    onCompleteRef.current(drawRef.current);
+  }, []);
+
+  const completeCurrentScene = useCallback(() => {
+    if (currentIndex + 1 >= draw.results.length) {
+      finishAll();
+      return;
+    }
+    setCurrentIndex(currentIndex + 1);
+  }, [currentIndex, draw.results.length, finishAll]);
+
+  useEffect(() => {
+    if (draw.results.length === 0) finishAll();
+  }, [draw.results.length, finishAll]);
+
+  const result = draw.results[currentIndex];
+  if (!result) return null;
+
+  return (
+    <GachaCinematicScene
+      key={`${currentIndex}-${result.id}`}
+      result={result}
+      current={currentIndex + 1}
+      total={draw.results.length}
+      onSceneComplete={completeCurrentScene}
+      onSkipAll={finishAll}
+    />
   );
 }
