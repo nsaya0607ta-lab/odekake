@@ -62,17 +62,43 @@ const BUTTON_STYLES = {
 } as const;
 
 const TEN_PULL_RESULTS: DrawResult[] = [
-  { ...PREVIEW_RESULTS.SSR, id: "preview-10-1", name: "虹色わんこボール" },
-  { ...PREVIEW_RESULTS.UR, id: "preview-10-2", name: "あずびー" },
-  { ...PREVIEW_RESULTS.LR, id: "preview-10-3", name: "漆黒のアー" },
-  { ...PREVIEW_RESULTS.MR, id: "preview-10-4", name: "ブレブル" },
-  { ...PREVIEW_RESULTS.SSR, id: "preview-10-5", name: "虹色わんこボール", isNew: false },
-  { ...PREVIEW_RESULTS.UR, id: "preview-10-6", name: "あずびー", isNew: false },
-  { ...PREVIEW_RESULTS.SSR, id: "preview-10-7", name: "虹色わんこボール", isNew: false },
-  { ...PREVIEW_RESULTS.LR, id: "preview-10-8", name: "漆黒のアー", isNew: false },
-  { ...PREVIEW_RESULTS.UR, id: "preview-10-9", name: "あずびー", isNew: false },
-  { ...PREVIEW_RESULTS.MR, id: "preview-10-10", name: "ブレブル", isNew: false },
+  { id: "preview-10-1", name: "カラフルボール", rarity: "N", type: "item", image: "/collection/items/colorful-ball.webp", isNew: true, previousLevel: 0, newLevel: 1 },
+  { id: "preview-10-2", name: "あひるのぬいぐるみ", rarity: "R", type: "item", image: "/collection/items/duck-plush.webp", isNew: true, previousLevel: 0, newLevel: 1 },
+  { id: "preview-10-3", name: "ロープおもちゃ", rarity: "N", type: "item", image: "/collection/items/rope-toy.webp", isNew: false, previousLevel: 1, newLevel: 1 },
+  { id: "preview-10-4", name: "にんじんトイ", rarity: "R", type: "item", image: "/collection/items/carrot-toy.webp", isNew: false, previousLevel: 1, newLevel: 1 },
+  { id: "preview-10-5", name: "ほねのおもちゃ", rarity: "N", type: "item", image: "/collection/items/bone-toy.webp", isNew: true, previousLevel: 0, newLevel: 1 },
+  { ...PREVIEW_RESULTS.SSR, id: "preview-10-6", isNew: false },
+  { id: "preview-10-7", name: "フリスビー", rarity: "R", type: "item", image: "/collection/items/frisbee.webp", isNew: false, previousLevel: 1, newLevel: 1 },
+  { id: "preview-10-8", name: "ぴこぴこボール", rarity: "N", type: "item", image: "/collection/items/squeaky-ball.webp", isNew: false, previousLevel: 1, newLevel: 1 },
+  { ...PREVIEW_RESULTS.UR, id: "preview-10-9", isNew: false },
+  { id: "preview-10-10", name: "宝箱おやつパズル", rarity: "SR", type: "item", image: "/collection/items/treasure-puzzle.webp", isNew: true, previousLevel: 0, newLevel: 1 },
 ];
+
+const PROMOTION_RATE = 0.01;
+const LR_PROMOTION_RATE = 0.7;
+
+function createTenPull(forcePromotion: boolean): AnimationDraw {
+  const results = TEN_PULL_RESULTS.map((result) => ({ ...result }));
+  if (!forcePromotion && Math.random() >= PROMOTION_RATE) return { plan: "multi", results };
+
+  const eligibleIndexes = results.flatMap((result, index) => result.rarity === "N" || result.rarity === "R" ? [index] : []);
+  const index = eligibleIndexes[Math.floor(Math.random() * eligibleIndexes.length)];
+  if (index === undefined) return { plan: "multi", results };
+
+  const original = results[index];
+  if (!original) return { plan: "multi", results };
+  const fromRarity = original.rarity as "N" | "R";
+  const toRarity = Math.random() < LR_PROMOTION_RATE ? "LR" : "MR";
+  results[index] = {
+    ...PREVIEW_RESULTS[toRarity],
+    id: `${PREVIEW_RESULTS[toRarity].id}-promotion-${index}`,
+    isNew: original.isNew,
+    previousLevel: original.previousLevel,
+    newLevel: original.newLevel,
+  };
+
+  return { plan: "multi", results, promotion: { index, fromRarity, toRarity } };
+}
 
 export default function GachaPreviewPage() {
   const [active, setActive] = useState<AnimationDraw | null>(null);
@@ -82,9 +108,9 @@ export default function GachaPreviewPage() {
     setActive({ plan: "single", results: [PREVIEW_RESULTS[rarity]] });
   };
 
-  const playTen = () => {
+  const playTen = (forcePromotion = false) => {
     primeGachaAudio();
-    setActive({ plan: "multi", results: TEN_PULL_RESULTS });
+    setActive(createTenPull(forcePromotion));
   };
 
   return (
@@ -114,15 +140,24 @@ export default function GachaPreviewPage() {
 
         <button
           type="button"
-          onClick={playTen}
+          onClick={() => playTen()}
           className="mt-4 min-h-24 w-full rounded-[28px] bg-gradient-to-r from-[#222034] via-[#7848c9] to-[#2ba8c7] p-5 text-left text-white shadow-[0_14px_28px_rgba(73,59,43,.2)] active:scale-[.98]"
         >
           <span className="block text-2xl font-black tracking-[0.08em]">10連を再生</span>
           <span className="mt-2 block text-[11px] font-black text-white/80">1 / 10から順番に、全10個の演出を確認</span>
         </button>
 
+        <button
+          type="button"
+          onClick={() => playTen(true)}
+          className="mt-3 min-h-20 w-full rounded-[24px] border-2 border-[#6947b8] bg-[#29203d] p-4 text-left text-white shadow-[0_12px_24px_rgba(67,43,116,.22)] active:scale-[.98]"
+        >
+          <span className="block text-lg font-black">確変を強制再生</span>
+          <span className="mt-1 block text-[10px] font-bold text-white/75">プレビュー確認用：N/Rの1個がLR 70%・MR 30%で昇格</span>
+        </button>
+
         <div className="mt-7 rounded-[24px] border border-[#dfd1b9] bg-white/70 p-4 text-xs font-semibold leading-6 text-[#7d6d58]">
-          10連では既存APIが返した順番どおりに10個すべての演出を再生し、その後に従来の10連結果カードを表示します。
+          通常の10連では、全カプセル着地後に1%で確変します。対象はN/Rの1個だけで、LR 70%・MR 30%に昇格します。保存やコイン消費は行いません。
         </div>
       </div>
 
