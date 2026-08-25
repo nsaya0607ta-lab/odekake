@@ -165,11 +165,11 @@ const CURATED_ITEMS: readonly CollectionItem[] = [
   { id: "accessory_walk_pouch", name: "おさんぽポーチ", image: "/collection/items/pet-outing-bag.webp", category: "accessory", series: null, rarity: "N" },
 
   // --- 登山シリーズ ----------------------------------------------------
-  { id: "hiking_frenchie", name: "登山のフレブル", image: "/collection/skins/hiking-frenchie.webp", category: "other", series: "hiking", rarity: "SSR", art: "dogHiking" },
+  { id: "hiking_frenchie", name: "登山のフレブル", image: "/collection/skins/hiking-frenchie.webp", category: "other", series: "hiking", rarity: "LR", art: "dogHiking" },
   // --- 雪国シリーズ ----------------------------------------------------
-  { id: "snow_frenchie", name: "雪国のフレブル", image: "/collection/skins/snow-frenchie.webp", category: "other", series: "snow", rarity: "SSR", art: "dogSnow" },
+  { id: "snow_frenchie", name: "雪国のフレブル", image: "/collection/skins/snow-frenchie.webp", category: "other", series: "snow", rarity: "LR", art: "dogSnow" },
   // --- 夏シリーズ ------------------------------------------------------
-  { id: "summer_frenchie", name: "夏のフレブル", image: "/collection/skins/summer-frenchie.webp", category: "other", series: "summer", rarity: "SSR", art: "dogSummer" },
+  { id: "summer_frenchie", name: "夏のフレブル", image: "/collection/skins/summer-frenchie.webp", category: "other", series: "summer", rarity: "LR", art: "dogSummer" },
   { id: "toy_beach_ball", name: "ビーチボール", image: "/collection/items/beach-ball.webp", category: "toy", series: "summer", rarity: "N" },
   { id: "toy_bug_net", name: "虫取り網", image: "/collection/items/bug-net.webp", category: "toy", series: "summer", rarity: "N" },
   { id: "food_watermelon", name: "スイカ", image: "/collection/items/watermelon.webp", category: "food", series: "summer", rarity: "N" },

@@ -114,10 +114,10 @@ export const GACHA_PRIZES: readonly GachaPrize[] = [
   { id: "toy_sand_bucket", name: "おすなばバケツ", rarity: "N", type: "item", pool: "regular", image: "/collection/items/flower-sand-bucket.webp" },
   { id: "accessory_walk_pouch", name: "おさんぽポーチ", rarity: "N", type: "item", pool: "regular", image: "/collection/items/pet-outing-bag.webp" },
 
-  // --- 犬スキン（すべてSSR・シリーズ限定ガチャから排出） ----------------
-  { id: "hiking_frenchie", name: "登山のフレブル", rarity: "SSR", type: "dog_skin", pool: "hiking", image: "/collection/skins/hiking-frenchie.webp" },
-  { id: "snow_frenchie", name: "雪国のフレブル", rarity: "SSR", type: "dog_skin", pool: "snow", image: "/collection/skins/snow-frenchie.webp" },
-  { id: "summer_frenchie", name: "夏のフレブル", rarity: "SSR", type: "dog_skin", pool: "summer", image: "/collection/skins/summer-frenchie.webp" },
+  // --- 犬スキン（すべてLR・シリーズ限定ガチャから排出） -----------------
+  { id: "hiking_frenchie", name: "登山のフレブル", rarity: "LR", type: "dog_skin", pool: "hiking", image: "/collection/skins/hiking-frenchie.webp" },
+  { id: "snow_frenchie", name: "雪国のフレブル", rarity: "LR", type: "dog_skin", pool: "snow", image: "/collection/skins/snow-frenchie.webp" },
+  { id: "summer_frenchie", name: "夏のフレブル", rarity: "LR", type: "dog_skin", pool: "summer", image: "/collection/skins/summer-frenchie.webp" },
 
   // --- 夏シリーズ限定ガチャ：小物 -------------------------------------
   { id: "toy_beach_ball", name: "ビーチボール", rarity: "N", type: "item", pool: "summer", image: "/collection/items/beach-ball.webp" },
