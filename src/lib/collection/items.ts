@@ -188,6 +188,23 @@ const CURATED_ITEMS: readonly CollectionItem[] = [
   { id: "other_goldfish_scoop", name: "金魚すくい", image: "/collection/items/goldfish-scoop.webp", category: "other", series: "summer", rarity: "SSR" },
   { id: "interior_beach_parasol", name: "ビーチパラソル", image: "/collection/items/beach-parasol.webp", category: "interior", series: "summer", rarity: "SSR" },
   { id: "toy_fireworks_set", name: "花火セット", image: "/collection/items/fireworks-set.webp", category: "toy", series: "summer", rarity: "UR" },
+  { id: "toy_yoyo_scoop", name: "ヨーヨー釣り", image: "/collection/items/yoyo-scoop.webp", category: "toy", series: "summer", rarity: "N" },
+  { id: "toy_bubbles", name: "シャボン玉", image: "/collection/items/bubbles.webp", category: "toy", series: "summer", rarity: "N" },
+  { id: "toy_water_balloon", name: "水風船", image: "/collection/items/water-balloon.webp", category: "toy", series: "summer", rarity: "N" },
+  { id: "toy_watermelon_bat", name: "スイカ割りバット", image: "/collection/items/watermelon-bat.webp", category: "toy", series: "summer", rarity: "R" },
+  { id: "food_grilled_corn", name: "焼きとうもろこし", image: "/collection/items/grilled-corn.webp", category: "food", series: "summer", rarity: "N" },
+  { id: "food_takoyaki", name: "たこ焼き", image: "/collection/items/takoyaki.webp", category: "food", series: "summer", rarity: "R" },
+  { id: "food_melon_soda", name: "メロンソーダ", image: "/collection/items/melon-soda.webp", category: "food", series: "summer", rarity: "R" },
+  { id: "food_fruit_punch", name: "フルーツポンチ", image: "/collection/items/fruit-punch.webp", category: "food", series: "summer", rarity: "R" },
+  { id: "food_hiyashi_chuka", name: "冷やし中華", image: "/collection/items/hiyashi-chuka.webp", category: "food", series: "summer", rarity: "R" },
+  { id: "interior_uchiwa", name: "うちわ", image: "/collection/items/uchiwa.webp", category: "interior", series: "summer", rarity: "N" },
+  { id: "interior_mosquito_coil", name: "蚊取り線香", image: "/collection/items/mosquito-coil.webp", category: "interior", series: "summer", rarity: "SR" },
+  { id: "interior_hammock", name: "ハンモック", image: "/collection/items/hammock.webp", category: "interior", series: "summer", rarity: "SR" },
+  { id: "accessory_beach_sandals", name: "ビーチサンダル", image: "/collection/items/beach-sandals.webp", category: "accessory", series: "summer", rarity: "R" },
+  { id: "accessory_shell_bracelet", name: "貝殻のブレスレット", image: "/collection/items/shell-bracelet.webp", category: "accessory", series: "summer", rarity: "R" },
+  { id: "accessory_yukata_kanzashi", name: "花柄の浴衣かんざし", image: "/collection/items/yukata-kanzashi.webp", category: "accessory", series: "summer", rarity: "SR" },
+  { id: "other_lantern", name: "提灯", image: "/collection/items/lantern.webp", category: "other", series: "summer", rarity: "SSR" },
+  { id: "other_shooting_gallery", name: "射的セット", image: "/collection/items/shooting-gallery.webp", category: "other", series: "summer", rarity: "SSR" },
 ];
 
 const CURATED_IDS = new Set(CURATED_ITEMS.map((item) => item.id));

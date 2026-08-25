@@ -137,6 +137,25 @@ export const GACHA_PRIZES: readonly GachaPrize[] = [
   { id: "other_goldfish_scoop", name: "金魚すくい", rarity: "SSR", type: "item", image: "/collection/items/goldfish-scoop.webp" },
   { id: "interior_beach_parasol", name: "ビーチパラソル", rarity: "SSR", type: "item", image: "/collection/items/beach-parasol.webp" },
   { id: "toy_fireworks_set", name: "花火セット", rarity: "UR", type: "item", image: "/collection/items/fireworks-set.webp" },
+
+  // --- 夏シリーズの小物 追加分 ------------------------------------------
+  { id: "toy_yoyo_scoop", name: "ヨーヨー釣り", rarity: "N", type: "item", image: "/collection/items/yoyo-scoop.webp" },
+  { id: "toy_bubbles", name: "シャボン玉", rarity: "N", type: "item", image: "/collection/items/bubbles.webp" },
+  { id: "toy_water_balloon", name: "水風船", rarity: "N", type: "item", image: "/collection/items/water-balloon.webp" },
+  { id: "toy_watermelon_bat", name: "スイカ割りバット", rarity: "R", type: "item", image: "/collection/items/watermelon-bat.webp" },
+  { id: "food_grilled_corn", name: "焼きとうもろこし", rarity: "N", type: "item", image: "/collection/items/grilled-corn.webp" },
+  { id: "food_takoyaki", name: "たこ焼き", rarity: "R", type: "item", image: "/collection/items/takoyaki.webp" },
+  { id: "food_melon_soda", name: "メロンソーダ", rarity: "R", type: "item", image: "/collection/items/melon-soda.webp" },
+  { id: "food_fruit_punch", name: "フルーツポンチ", rarity: "R", type: "item", image: "/collection/items/fruit-punch.webp" },
+  { id: "food_hiyashi_chuka", name: "冷やし中華", rarity: "R", type: "item", image: "/collection/items/hiyashi-chuka.webp" },
+  { id: "interior_uchiwa", name: "うちわ", rarity: "N", type: "item", image: "/collection/items/uchiwa.webp" },
+  { id: "interior_mosquito_coil", name: "蚊取り線香", rarity: "SR", type: "item", image: "/collection/items/mosquito-coil.webp" },
+  { id: "interior_hammock", name: "ハンモック", rarity: "SR", type: "item", image: "/collection/items/hammock.webp" },
+  { id: "accessory_beach_sandals", name: "ビーチサンダル", rarity: "R", type: "item", image: "/collection/items/beach-sandals.webp" },
+  { id: "accessory_shell_bracelet", name: "貝殻のブレスレット", rarity: "R", type: "item", image: "/collection/items/shell-bracelet.webp" },
+  { id: "accessory_yukata_kanzashi", name: "花柄の浴衣かんざし", rarity: "SR", type: "item", image: "/collection/items/yukata-kanzashi.webp" },
+  { id: "other_lantern", name: "提灯", rarity: "SSR", type: "item", image: "/collection/items/lantern.webp" },
+  { id: "other_shooting_gallery", name: "射的セット", rarity: "SSR", type: "item", image: "/collection/items/shooting-gallery.webp" },
 ];
 
 const PRIZE_BY_ID = new Map(GACHA_PRIZES.map((prize) => [prize.id, prize]));
