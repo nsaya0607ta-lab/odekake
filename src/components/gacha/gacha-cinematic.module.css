@@ -523,9 +523,170 @@
   backdrop-filter: grayscale(.7) contrast(1.22);
 }
 
+.batchRoot {
+  --fx-primary: #f7cf68;
+  --fx-secondary: #fff4c7;
+  --fx-deep: #59401a;
+}
+
+.batchStage {
+  position: absolute;
+  z-index: 5;
+  inset: 64px 0 max(32px, env(safe-area-inset-bottom));
+  overflow: hidden;
+}
+
+.batchMachineWrap {
+  position: absolute;
+  left: 50%;
+  top: 24%;
+  width: min(39vw, 184px);
+  transform: translate(-50%, -50%);
+  transform-origin: 50% 88%;
+  will-change: transform, opacity;
+}
+
+.batchTray {
+  position: absolute;
+  z-index: 8;
+  left: 50%;
+  top: 53%;
+  display: grid;
+  width: min(92vw, 430px);
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: clamp(7px, 2.4vw, 13px);
+  transform: translateX(-50%);
+}
+
+.batchCapsule {
+  --fx-primary: #9be96b;
+  --fx-secondary: #eaffd8;
+  --fx-deep: #245417;
+  position: relative;
+  width: 100%;
+  aspect-ratio: 1;
+  opacity: 0;
+  will-change: transform, opacity;
+}
+
+.batchCapsule[data-rarity="R"] { --fx-primary: #71cbff; --fx-secondary: #dff5ff; --fx-deep: #144d74; }
+.batchCapsule[data-rarity="SR"] { --fx-primary: #ffd75e; --fx-secondary: #fff4b8; --fx-deep: #754a0b; }
+.batchCapsule[data-rarity="SSR"] { --fx-primary: #ff77ce; --fx-secondary: #fff59b; --fx-deep: #4b2d82; }
+.batchCapsule[data-rarity="UR"] { --fx-primary: #ff3b3b; --fx-secondary: #ffbf76; --fx-deep: #570008; }
+.batchCapsule[data-rarity="LR"] { --fx-primary: #e9b949; --fx-secondary: #fff0a0; --fx-deep: #080808; }
+.batchCapsule[data-rarity="MR"] { --fx-primary: #7e65ff; --fx-secondary: #54d6ff; --fx-deep: #09052d; }
+
+.batchCapsule .capsule {
+  inset: 5%;
+  border-width: 2px;
+  box-shadow:
+    inset 6px 5px 8px rgb(255 255 255 / 34%),
+    inset -6px -7px 10px rgb(0 0 0 / 28%),
+    0 8px 10px rgb(0 0 0 / 48%);
+}
+
+.batchCapsule .capsuleBand {
+  height: 11%;
+}
+
+.batchCapsuleGlow {
+  position: absolute;
+  inset: -20%;
+  border-radius: 50%;
+  background: radial-gradient(circle, color-mix(in srgb, var(--fx-primary) 58%, white), color-mix(in srgb, var(--fx-primary) 26%, transparent) 38%, transparent 70%);
+  opacity: 0;
+}
+
+.batchCapsuleRare .batchCapsuleGlow {
+  opacity: .92;
+  animation: capsuleRareGlow 1.05s ease-in-out infinite alternate;
+}
+
+.batchCapsuleRare {
+  filter: drop-shadow(0 0 8px var(--fx-primary));
+}
+
+.capsuleSparkles {
+  position: absolute;
+  z-index: 5;
+  inset: -18%;
+  pointer-events: none;
+}
+
+.capsuleSparkles i {
+  position: absolute;
+  display: block;
+  width: 12px;
+  aspect-ratio: 1;
+  background: #fff;
+  clip-path: polygon(50% 0, 61% 38%, 100% 50%, 61% 62%, 50% 100%, 39% 62%, 0 50%, 39% 38%);
+  filter: drop-shadow(0 0 5px var(--fx-secondary));
+  animation: capsuleSparkle 1.15s ease-in-out infinite;
+}
+
+.capsuleSparkles i:nth-child(1) { left: 3%; top: 9%; animation-delay: -.15s; }
+.capsuleSparkles i:nth-child(2) { right: 0; top: 20%; width: 9px; animation-delay: -.7s; }
+.capsuleSparkles i:nth-child(3) { right: 11%; bottom: 3%; width: 11px; animation-delay: -.38s; }
+.capsuleSparkles i:nth-child(4) { left: 4%; bottom: 15%; width: 7px; animation-delay: -.92s; }
+
+.batchNumber {
+  position: absolute;
+  z-index: 6;
+  right: -2px;
+  bottom: -2px;
+  display: grid;
+  width: 19px;
+  aspect-ratio: 1;
+  place-items: center;
+  border: 1px solid rgb(255 255 255 / 52%);
+  border-radius: 50%;
+  background: rgb(5 7 9 / 82%);
+  color: #fff;
+  font-size: 9px;
+  font-weight: 950;
+}
+
+.batchHint {
+  position: absolute;
+  left: 50%;
+  bottom: 4%;
+  width: max-content;
+  max-width: 88vw;
+  margin: 0;
+  transform: translateX(-50%);
+  color: #fff4be;
+  font-size: clamp(13px, 4vw, 17px);
+  font-weight: 950;
+  letter-spacing: .07em;
+  text-align: center;
+  text-shadow: 0 0 12px #ffd45f, 0 2px 3px #000;
+  animation: batchHintPulse .82s ease-in-out infinite alternate;
+}
+
+@keyframes capsuleRareGlow {
+  from { transform: scale(.86); filter: blur(4px); }
+  to { transform: scale(1.14); filter: blur(7px); }
+}
+
+@keyframes capsuleSparkle {
+  0%, 100% { opacity: .2; transform: scale(.35) rotate(0); }
+  48% { opacity: 1; transform: scale(1.2) rotate(90deg); }
+}
+
+@keyframes batchHintPulse {
+  from { opacity: .68; transform: translateX(-50%) scale(.97); }
+  to { opacity: 1; transform: translateX(-50%) scale(1.03); }
+}
+
 @media (min-width: 700px) {
   .machineWrap { width: min(38vw, 300px); }
   .capsuleWrap { width: 148px; }
+}
+
+@media (max-height: 680px) {
+  .batchMachineWrap { top: 22%; width: min(34vw, 154px); }
+  .batchTray { top: 50%; width: min(88vw, 390px); }
+  .batchHint { bottom: 1%; }
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -536,4 +697,8 @@
   .lightning,
   .cracks,
   .beam { display: none; }
+
+  .batchCapsuleRare .batchCapsuleGlow,
+  .capsuleSparkles i,
+  .batchHint { animation: none; }
 }
