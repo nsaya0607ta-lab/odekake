@@ -16,8 +16,9 @@ type ParticleHandle = {
 };
 
 const RARITY_POWER: Record<GachaRarity, number> = { N: 0, R: 1, SR: 2, SSR: 3, UR: 4, LR: 5, MR: 6 };
-const MULTI_DROP_STAGGER = 0.168;
 const MULTI_DROP_DURATION = 0.768;
+const MULTI_DROP_GAP = 0.08;
+const MULTI_DROP_INTERVAL = MULTI_DROP_DURATION + MULTI_DROP_GAP;
 const MULTI_REVEAL_TIME_SCALE = 1.4;
 
 function validRarity(rarity: string): GachaRarity {
@@ -211,8 +212,6 @@ function MultiCapsuleIntro({ results, onComplete, onSkipAll }: MultiCapsuleIntro
   const completedRef = useRef(false);
   const completeRef = useRef(onComplete);
   const skipRef = useRef(onSkipAll);
-  const hasSparklingCapsule = results.some((result) => isSparklingRarity(validRarity(result.rarity)));
-
   useEffect(() => {
     completeRef.current = onComplete;
     skipRef.current = onSkipAll;
@@ -272,7 +271,7 @@ function MultiCapsuleIntro({ results, onComplete, onSkipAll }: MultiCapsuleIntro
 
       capsules.forEach((capsule, index) => {
         const column = index % 5;
-        const at = `capsuleDrop+=${(index * MULTI_DROP_STAGGER).toFixed(3)}`;
+        const at = `capsuleDrop+=${(index * MULTI_DROP_INTERVAL).toFixed(3)}`;
         tl.call(() => playGachaCue("drop"), undefined, at)
           .fromTo(
             capsule,
@@ -282,7 +281,7 @@ function MultiCapsuleIntro({ results, onComplete, onSkipAll }: MultiCapsuleIntro
           );
       });
 
-      const dropSequenceDuration = Math.max(0, capsules.length - 1) * MULTI_DROP_STAGGER + MULTI_DROP_DURATION;
+      const dropSequenceDuration = Math.max(0, capsules.length - 1) * MULTI_DROP_INTERVAL + MULTI_DROP_DURATION;
       tl.to(machineRef.current, { opacity: 0.34, scale: 0.9, duration: 0.35 }, `capsuleDrop+=${dropSequenceDuration.toFixed(3)}`)
         .call(() => {
           if (rareResults.length > 0) particlesRef.current?.burst(featuredRarity, "normal");
@@ -342,13 +341,11 @@ function MultiCapsuleIntro({ results, onComplete, onSkipAll }: MultiCapsuleIntro
                     <i /><i /><i /><i /><i /><i /><i /><i />
                   </span>
                 ) : null}
-                <span className={styles.batchRarity}>{rarity}</span>
                 <span className={styles.batchNumber}>{index + 1}</span>
               </div>
             );
           })}
         </div>
-        {hasSparklingCapsule ? <p className={styles.batchHint}>レアカプセルが輝いている…！</p> : null}
       </div>
 
       <PixiEffects ref={particlesRef} enabled />
