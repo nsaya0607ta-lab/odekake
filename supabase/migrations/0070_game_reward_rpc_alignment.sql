@@ -21,10 +21,47 @@ begin
 end;
 $$;
 
--- ボウリング報酬をcoin_eventsへ記録できるよう、現在利用中の種別をすべて許可する。
-alter table public.coin_events drop constraint if exists coin_events_event_type_check;
-alter table public.coin_events add constraint coin_events_event_type_check
-  check (event_type in ('level_up', 'steps', 'unlock', 'gacha', 'login', 'item_catch', 'wanko_bowling'));
+-- 既存・将来のevent_typeを消さず、wanko_bowlingだけ不足時に追加する。
+-- CHECK制約内の既存文字列を取り出して再利用するため、後続マイグレーションで
+-- 種別が増えていても固定リストで上書きしない。
+do $$
+declare
+  v_constraint_oid oid;
+  v_allowed_values text[];
+begin
+  select c.oid
+    into v_constraint_oid
+    from pg_constraint c
+    join pg_class t on t.oid = c.conrelid
+    join pg_namespace n on n.oid = t.relnamespace
+   where n.nspname = 'public'
+     and t.relname = 'coin_events'
+     and c.conname = 'coin_events_event_type_check';
+
+  if v_constraint_oid is not null then
+    select array_agg(distinct m.value[1])
+      into v_allowed_values
+      from regexp_matches(
+        pg_get_constraintdef(v_constraint_oid),
+        '''([^'']+)''',
+        'g'
+      ) as m(value);
+
+    if v_allowed_values is null then
+      raise exception 'Unsupported coin_events_event_type_check definition';
+    end if;
+
+    if not ('wanko_bowling' = any(v_allowed_values)) then
+      v_allowed_values := array_append(v_allowed_values, 'wanko_bowling');
+      execute 'alter table public.coin_events drop constraint coin_events_event_type_check';
+      execute format(
+        'alter table public.coin_events add constraint coin_events_event_type_check check (event_type = any (%L::text[]))',
+        v_allowed_values::text
+      );
+    end if;
+  end if;
+end;
+$$;
 
 -- -------------------------------------------------------------
 -- アイテムキャッチ
