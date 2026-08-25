@@ -90,6 +90,8 @@ export function WankoBowlingGame({ ownedBalls }: { ownedBalls: OwnedBowlingBall[
   const [bestScore, setBestScore] = useState<number | null>(null);
   const [isNewBest, setIsNewBest] = useState(false);
   const [earnedCoins, setEarnedCoins] = useState<number | null>(null);
+  const [rewardPending, setRewardPending] = useState(false);
+  const [rewardError, setRewardError] = useState<string | null>(null);
   const [lastRollPins, setLastRollPins] = useState<number | null>(null);
   const [bonusFrameIndex, setBonusFrameIndex] = useState(() => getBonusFrameIndex(newRoundId()));
   const [bonusAchieved, setBonusAchieved] = useState(false);
@@ -154,6 +156,8 @@ export function WankoBowlingGame({ ownedBalls }: { ownedBalls: OwnedBowlingBall[
     setBonusAchieved(false);
     setBanner(null);
     setEarnedCoins(null);
+    setRewardPending(false);
+    setRewardError(null);
     setIsNewBest(false);
     setLastRollPins(null);
     setLaneResetSignal((value) => value + 1);
@@ -166,6 +170,8 @@ export function WankoBowlingGame({ ownedBalls }: { ownedBalls: OwnedBowlingBall[
   const submitResult = useCallback(async (finalScore: number, finalFrames: BowlingFrame[]) => {
     if (submittedRef.current) return;
     submittedRef.current = true;
+    setRewardPending(true);
+    setRewardError(null);
 
     try {
       const response = await fetch("/api/coins/wanko-bowling", {
@@ -177,13 +183,14 @@ export function WankoBowlingGame({ ownedBalls }: { ownedBalls: OwnedBowlingBall[
           bonusHit: bonusAchievedRef.current,
         }),
       });
-      const payload = (await response.json().catch(() => null)) as { coins?: number } | null;
-      if (response.ok) {
-        if (typeof payload?.coins === "number") setEarnedCoins(payload.coins);
-        window.dispatchEvent(new Event("wanko-bowling-ranking-refresh"));
-      }
-    } catch {
-      // コイン付与失敗でも結果表示は継続する。
+      const payload = (await response.json().catch(() => null)) as { coins?: number; error?: string } | null;
+      if (!response.ok) throw new Error(payload?.error ?? "コインを受け取れませんでした。");
+      setEarnedCoins(typeof payload?.coins === "number" ? payload.coins : 0);
+      window.dispatchEvent(new Event("wanko-bowling-ranking-refresh"));
+    } catch (error) {
+      setRewardError(error instanceof Error ? error.message : "コインを受け取れませんでした。");
+    } finally {
+      setRewardPending(false);
     }
 
     setBestScore((prev) => {
@@ -193,6 +200,11 @@ export function WankoBowlingGame({ ownedBalls }: { ownedBalls: OwnedBowlingBall[
     });
     void loadBestScore();
   }, [loadBestScore]);
+
+  const retryReward = useCallback(() => {
+    submittedRef.current = false;
+    void submitResult(score.total, framesRef.current);
+  }, [score.total, submitResult]);
 
   const handleRoll = useCallback((result: LaneRollResult) => {
     if (rollLockedRef.current) return;
@@ -345,7 +357,22 @@ export function WankoBowlingGame({ ownedBalls }: { ownedBalls: OwnedBowlingBall[
             </div>
           </div>
 
-          {earnedCoins !== null ? (
+          {rewardPending ? (
+            <p className="px-4 pb-2 text-center text-xs font-bold text-ink-soft" aria-live="polite">
+              スコアを保存してコインを受け取り中…
+            </p>
+          ) : rewardError ? (
+            <div className="mx-4 mb-2 rounded-[14px] border border-red-200 bg-red-50 px-3 py-3 text-center" role="alert">
+              <p className="text-[11px] font-bold text-red-700">{rewardError}</p>
+              <button
+                type="button"
+                onClick={retryReward}
+                className="mt-2 rounded-full bg-red-600 px-4 py-2 text-[11px] font-black text-white active:scale-[0.98]"
+              >
+                コイン受取を再試行
+              </button>
+            </div>
+          ) : earnedCoins !== null ? (
             <p className="px-4 pb-2 text-center text-xs font-bold text-ink-soft">
               +{earnedCoins.toLocaleString("ja-JP")} コイン獲得！
               {bonusAchieved ? (
@@ -358,7 +385,8 @@ export function WankoBowlingGame({ ownedBalls }: { ownedBalls: OwnedBowlingBall[
             <button
               type="button"
               onClick={startGame}
-              className="btn pressable block w-full rounded-full bg-leaf-deep py-3 text-center text-sm font-black text-white active:scale-[0.98]"
+              disabled={rewardPending}
+              className="btn pressable block w-full rounded-full bg-leaf-deep py-3 text-center text-sm font-black text-white active:scale-[0.98] disabled:opacity-45"
             >
               もう一回あそぶ
             </button>
