@@ -118,6 +118,24 @@ export const GACHA_PRIZES: readonly GachaPrize[] = [
   { id: "hiking_frenchie", name: "登山のフレブル", rarity: "SSR", type: "dog_skin", pool: "hiking", image: "/collection/skins/hiking-frenchie.webp" },
   { id: "snow_frenchie", name: "雪国のフレブル", rarity: "SSR", type: "dog_skin", pool: "snow", image: "/collection/skins/snow-frenchie.webp" },
   { id: "summer_frenchie", name: "夏のフレブル", rarity: "SSR", type: "dog_skin", pool: "summer", image: "/collection/skins/summer-frenchie.webp" },
+
+  // --- 夏シリーズ限定ガチャ：小物 -------------------------------------
+  { id: "toy_beach_ball", name: "ビーチボール", rarity: "N", type: "item", pool: "summer", image: "/collection/items/beach-ball.webp" },
+  { id: "toy_bug_net", name: "虫取り網", rarity: "N", type: "item", pool: "summer", image: "/collection/items/bug-net.webp" },
+  { id: "food_watermelon", name: "スイカ", rarity: "N", type: "item", pool: "summer", image: "/collection/items/watermelon.webp" },
+  { id: "food_ramune", name: "ラムネ", rarity: "N", type: "item", pool: "summer", image: "/collection/items/ramune.webp" },
+  { id: "food_popsicle", name: "アイスキャンディー", rarity: "N", type: "item", pool: "summer", image: "/collection/items/popsicle.webp" },
+  { id: "toy_water_gun", name: "水鉄砲", rarity: "R", type: "item", pool: "summer", image: "/collection/items/water-gun.webp" },
+  { id: "food_shaved_ice", name: "かき氷", rarity: "R", type: "item", pool: "summer", image: "/collection/items/shaved-ice.webp" },
+  { id: "food_somen", name: "そうめん", rarity: "R", type: "item", pool: "summer", image: "/collection/items/somen.webp" },
+  { id: "interior_sudare", name: "すだれ", rarity: "R", type: "item", pool: "summer", image: "/collection/items/sudare.webp" },
+  { id: "accessory_straw_hat", name: "麦わら帽子", rarity: "R", type: "item", pool: "summer", image: "/collection/items/straw-hat.webp" },
+  { id: "accessory_sunglasses", name: "サングラス", rarity: "R", type: "item", pool: "summer", image: "/collection/items/sunglasses.webp" },
+  { id: "other_cotton_candy", name: "縁日わたあめ", rarity: "R", type: "item", pool: "summer", image: "/collection/items/cotton-candy.webp" },
+  { id: "accessory_jinbei", name: "甚平", rarity: "SR", type: "item", pool: "summer", image: "/collection/items/jinbei.webp" },
+  { id: "other_sparkler", name: "線香花火", rarity: "SR", type: "item", pool: "summer", image: "/collection/items/sparkler.webp" },
+  { id: "other_goldfish_scoop", name: "金魚すくい", rarity: "SSR", type: "item", pool: "summer", image: "/collection/items/goldfish-scoop.webp" },
+  { id: "toy_fireworks_set", name: "花火セット", rarity: "UR", type: "item", pool: "summer", image: "/collection/items/fireworks-set.webp" },
 ];
 
 const PRIZE_BY_ID = new Map(GACHA_PRIZES.map((prize) => [prize.id, prize]));

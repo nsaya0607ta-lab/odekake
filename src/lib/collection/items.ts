@@ -170,6 +170,22 @@ const CURATED_ITEMS: readonly CollectionItem[] = [
   { id: "snow_frenchie", name: "雪国のフレブル", image: "/collection/skins/snow-frenchie.webp", category: "other", series: "snow", rarity: "SSR", art: "dogSnow" },
   // --- 夏シリーズ ------------------------------------------------------
   { id: "summer_frenchie", name: "夏のフレブル", image: "/collection/skins/summer-frenchie.webp", category: "other", series: "summer", rarity: "SSR", art: "dogSummer" },
+  { id: "toy_beach_ball", name: "ビーチボール", image: "/collection/items/beach-ball.webp", category: "toy", series: "summer", rarity: "N" },
+  { id: "toy_bug_net", name: "虫取り網", image: "/collection/items/bug-net.webp", category: "toy", series: "summer", rarity: "N" },
+  { id: "food_watermelon", name: "スイカ", image: "/collection/items/watermelon.webp", category: "food", series: "summer", rarity: "N" },
+  { id: "food_ramune", name: "ラムネ", image: "/collection/items/ramune.webp", category: "food", series: "summer", rarity: "N" },
+  { id: "food_popsicle", name: "アイスキャンディー", image: "/collection/items/popsicle.webp", category: "food", series: "summer", rarity: "N" },
+  { id: "toy_water_gun", name: "水鉄砲", image: "/collection/items/water-gun.webp", category: "toy", series: "summer", rarity: "R" },
+  { id: "food_shaved_ice", name: "かき氷", image: "/collection/items/shaved-ice.webp", category: "food", series: "summer", rarity: "R" },
+  { id: "food_somen", name: "そうめん", image: "/collection/items/somen.webp", category: "food", series: "summer", rarity: "R" },
+  { id: "interior_sudare", name: "すだれ", image: "/collection/items/sudare.webp", category: "interior", series: "summer", rarity: "R" },
+  { id: "accessory_straw_hat", name: "麦わら帽子", image: "/collection/items/straw-hat.webp", category: "accessory", series: "summer", rarity: "R" },
+  { id: "accessory_sunglasses", name: "サングラス", image: "/collection/items/sunglasses.webp", category: "accessory", series: "summer", rarity: "R" },
+  { id: "other_cotton_candy", name: "縁日わたあめ", image: "/collection/items/cotton-candy.webp", category: "other", series: "summer", rarity: "R" },
+  { id: "accessory_jinbei", name: "甚平", image: "/collection/items/jinbei.webp", category: "accessory", series: "summer", rarity: "SR" },
+  { id: "other_sparkler", name: "線香花火", image: "/collection/items/sparkler.webp", category: "other", series: "summer", rarity: "SR" },
+  { id: "other_goldfish_scoop", name: "金魚すくい", image: "/collection/items/goldfish-scoop.webp", category: "other", series: "summer", rarity: "SSR" },
+  { id: "toy_fireworks_set", name: "花火セット", image: "/collection/items/fireworks-set.webp", category: "toy", series: "summer", rarity: "UR" },
 ];
 
 const CURATED_IDS = new Set(CURATED_ITEMS.map((item) => item.id));

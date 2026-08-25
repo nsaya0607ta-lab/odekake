@@ -67,7 +67,7 @@ export const SERIES: readonly SeriesDefinition[] = [
       bar: "bg-sun",
     },
     gachaLabel: "夏限定",
-    rarityRates: { N: 0, R: 0, SR: 0, SSR: 100, UR: 0, LR: 0, MR: 0 },
+    rarityRates: { N: 45, R: 30, SR: 15, SSR: 8, UR: 2, LR: 0, MR: 0 },
   },
 ] as const;
 
