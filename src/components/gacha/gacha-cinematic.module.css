@@ -151,6 +151,14 @@
   width: 100%;
   height: auto;
   user-select: none;
+  clip-path: polygon(
+    26% 9%, 39% 7.8%, 62% 7.7%, 76% 8.7%, 84% 11.5%, 88% 15%, 89% 20%,
+    87% 21.5%, 90% 25%, 92.5% 31%, 93% 38%, 92% 44.5%, 89.5% 49%, 86.5% 52.5%,
+    87.5% 77%, 91% 80%, 92% 84.5%, 89% 87%, 81% 87.5%, 75% 88.5%, 70% 90%,
+    42% 90%, 33% 89%, 25% 87%, 20% 84%, 19.5% 79.5%, 21.5% 77%, 22% 53%,
+    19.5% 49%, 17.5% 44%, 17% 37%, 18% 31%, 20.5% 26%, 24.5% 21.5%, 24% 19%,
+    25% 14%, 28% 11%
+  );
   filter: drop-shadow(0 24px 22px rgb(0 0 0 / 48%));
 }
 
@@ -628,27 +636,14 @@
 .batchPromotionCopy::after { left: calc(100% + 10px); transform: rotate(180deg); }
 
 .batchCapsule {
-  --fx-primary: #d8d1c3;
-  --fx-secondary: #fffdf7;
-  --fx-deep: #5d574f;
+  --fx-primary: #9be96b;
+  --fx-secondary: #eaffd8;
+  --fx-deep: #245417;
   position: relative;
   width: 100%;
   aspect-ratio: 1;
   opacity: 0;
   will-change: transform, opacity;
-}
-
-.batchCapsule[data-rarity="concealed"] .capsule {
-  border-color: rgb(255 255 255 / 86%);
-  background:
-    linear-gradient(180deg, rgb(255 255 255 / 42%) 0 44%, #fffdf7 45% 55%, transparent 56%),
-    linear-gradient(145deg, #f5efe4, #c9c1b4 56%, #6f685f);
-  box-shadow: inset 6px 5px 8px rgb(255 255 255 / 40%), inset -6px -7px 10px rgb(50 45 40 / 28%), 0 8px 10px rgb(0 0 0 / 48%);
-}
-
-.batchCapsule[data-rarity="concealed"] .capsuleBand {
-  border-color: rgb(80 72 62 / 38%);
-  background: #fffdf7;
 }
 
 .batchCapsule[data-rarity="R"] { --fx-primary: #71cbff; --fx-secondary: #dff5ff; --fx-deep: #144d74; }
@@ -742,9 +737,9 @@
   animation: capsuleRarityRing var(--rare-glow-speed, 1.12s) ease-out infinite;
 }
 
-.batchCapsule[data-rarity="UR"] { filter: drop-shadow(0 0 11px var(--fx-primary)); }
-.batchCapsule[data-rarity="LR"] { filter: drop-shadow(0 0 14px var(--fx-primary)); }
-.batchCapsule[data-rarity="MR"] { filter: drop-shadow(0 0 18px var(--fx-primary)) drop-shadow(0 0 7px var(--fx-secondary)); }
+.batchCapsuleRare[data-rarity="UR"] { filter: drop-shadow(0 0 11px var(--fx-primary)); }
+.batchCapsuleRare[data-rarity="LR"] { filter: drop-shadow(0 0 14px var(--fx-primary)); }
+.batchCapsuleRare[data-rarity="MR"] { filter: drop-shadow(0 0 18px var(--fx-primary)) drop-shadow(0 0 7px var(--fx-secondary)); }
 
 .capsuleSparkles {
   position: absolute;
