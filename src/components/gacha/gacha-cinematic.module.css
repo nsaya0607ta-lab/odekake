@@ -164,11 +164,11 @@
 
 .knob {
   position: absolute;
-  left: 66%;
-  top: 65%;
-  width: 25%;
+  left: 67.2%;
+  top: 65.9%;
+  width: 20%;
   aspect-ratio: 1;
-  margin: -12.5% 0 0 -12.5%;
+  margin: -10% 0 0 -10%;
   border-radius: 50%;
   transform-origin: 50% 50%;
   will-change: transform;
@@ -180,13 +180,24 @@
   position: absolute;
   left: 50%;
   top: 50%;
-  border-radius: 999px;
-  background: linear-gradient(90deg, #73522c, #d7af74 48%, #634421);
-  box-shadow: 0 2px 5px rgb(0 0 0 / 42%), inset 0 1px 1px rgb(255 255 255 / 44%);
+  border: 1px solid rgb(78 82 47 / 48%);
+  background: linear-gradient(180deg, #e4e2b7 0%, #a8ad6b 48%, #747a42 100%);
+  box-shadow: 0 2px 4px rgb(0 0 0 / 34%), inset 0 2px 2px rgb(255 255 255 / 50%);
 }
 
-.knob::before { width: 76%; height: 22%; transform: translate(-50%, -50%); }
-.knob::after { width: 22%; height: 76%; transform: translate(-50%, -50%); }
+.knob::before {
+  width: 72%;
+  height: 20%;
+  border-radius: 999px;
+  transform: translate(-50%, -50%);
+}
+
+.knob::after {
+  width: 24%;
+  aspect-ratio: 1;
+  border-radius: 50%;
+  transform: translate(-50%, -50%);
+}
 
 .floor {
   position: absolute;
