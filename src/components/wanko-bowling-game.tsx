@@ -90,6 +90,8 @@ export function WankoBowlingGame({ ownedBalls }: { ownedBalls: OwnedBowlingBall[
   const [bestScore, setBestScore] = useState<number | null>(null);
   const [isNewBest, setIsNewBest] = useState(false);
   const [earnedCoins, setEarnedCoins] = useState<number | null>(null);
+  const [rewardPending, setRewardPending] = useState(false);
+  const [rewardError, setRewardError] = useState<string | null>(null);
   const [lastRollPins, setLastRollPins] = useState<number | null>(null);
   const [bonusFrameIndex, setBonusFrameIndex] = useState(() => getBonusFrameIndex(newRoundId()));
   const [bonusAchieved, setBonusAchieved] = useState(false);
@@ -154,6 +156,8 @@ export function WankoBowlingGame({ ownedBalls }: { ownedBalls: OwnedBowlingBall[
     setBonusAchieved(false);
     setBanner(null);
     setEarnedCoins(null);
+    setRewardPending(false);
+    setRewardError(null);
     setIsNewBest(false);
     setLastRollPins(null);
     setLaneResetSignal((value) => value + 1);
@@ -166,6 +170,8 @@ export function WankoBowlingGame({ ownedBalls }: { ownedBalls: OwnedBowlingBall[
   const submitResult = useCallback(async (finalScore: number, finalFrames: BowlingFrame[]) => {
     if (submittedRef.current) return;
     submittedRef.current = true;
+    setRewardPending(true);
+    setRewardError(null);
 
     try {
       const response = await fetch("/api/coins/wanko-bowling", {
@@ -177,13 +183,14 @@ export function WankoBowlingGame({ ownedBalls }: { ownedBalls: OwnedBowlingBall[
           bonusHit: bonusAchievedRef.current,
         }),
       });
-      const payload = (await response.json().catch(() => null)) as { coins?: number } | null;
-      if (response.ok) {
-        if (typeof payload?.coins === "number") setEarnedCoins(payload.coins);
-        window.dispatchEvent(new Event("wanko-bowling-ranking-refresh"));
-      }
-    } catch {
-      // コイン付与失敗でも結果表示は継続する。
+      const payload = (await response.json().catch(() => null)) as { coins?: number; error?: string } | null;
+      if (!response.ok) throw new Error(payload?.error ?? "コインを受け取れませんでした。");
+      setEarnedCoins(typeof payload?.coins === "number" ? payload.coins : 0);
+      window.dispatchEvent(new Event("wanko-bowling-ranking-refresh"));
+    } catch (error) {
+      setRewardError(error instanceof Error ? error.message : "コインを受け取れませんでした。");
+    } finally {
+      setRewardPending(false);
     }
 
     setBestScore((prev) => {
@@ -193,6 +200,11 @@ export function WankoBowlingGame({ ownedBalls }: { ownedBalls: OwnedBowlingBall[
     });
     void loadBestScore();
   }, [loadBestScore]);
+
+  const retryReward = useCallback(() => {
+    submittedRef.current = false;
+    void submitResult(score.total, framesRef.current);
+  }, [score.total, submitResult]);
 
   const handleRoll = useCallback((result: LaneRollResult) => {
     if (rollLockedRef.current) return;
@@ -309,76 +321,96 @@ export function WankoBowlingGame({ ownedBalls }: { ownedBalls: OwnedBowlingBall[
   if (phase === "result") {
     return (
       <div className="h-full overflow-y-auto overscroll-none py-1">
-        <section className="rough-card overflow-hidden">
-          <div className="bg-leaf-soft px-4 py-7 text-center">
-            <p className="text-[10px] font-black tracking-[0.16em] text-leaf-deep">GAME CLEAR!</p>
-            <p className="mt-1 text-2xl font-black text-ink">10フレーム おつかれさま！</p>
-          </div>
-
-          <div className="grid grid-cols-2 gap-3 p-4">
-            <div className="rounded-[18px] bg-paper-deep px-3 py-4 text-center">
-              <p className="text-[9px] font-black tracking-wide text-ink-faint">SCORE</p>
-              <p className="mt-1 text-3xl font-black tabular-nums text-ink">{score.total}</p>
-            </div>
-            <div className="rounded-[18px] bg-paper-deep px-3 py-4 text-center">
-              <p className="text-[9px] font-black tracking-wide text-ink-faint">
-                {isNewBest ? "NEW BEST!" : "ベストスコア"}
+        <section className="overflow-hidden rounded-[24px] border border-[#26394d] bg-[#09131e] text-white shadow-[0_20px_55px_rgba(0,0,0,0.42)]">
+          <div className="relative overflow-hidden border-b border-white/10 px-4 py-6 text-center">
+            <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_50%_10%,rgba(84,216,255,0.24),transparent_58%)]" />
+            <div className="relative">
+              <p className="text-[9px] font-black tracking-[0.28em] text-[#54d8ff]">FINAL RESULT</p>
+              <p className="mt-1 text-base font-black tracking-wide text-white/75">10 FRAMES COMPLETE</p>
+              <p className="mt-4 text-[10px] font-black tracking-[0.18em] text-white/40">FINAL SCORE</p>
+              <p className="mt-0.5 font-mono text-[64px] font-black leading-none tracking-[-0.08em] text-white drop-shadow-[0_0_22px_rgba(84,216,255,0.4)]">
+                {score.total}
               </p>
-              <p className={`mt-1 text-3xl font-black tabular-nums ${isNewBest ? "text-[#c9902f]" : "text-ink"}`}>
-                {bestScore ?? score.total}
-              </p>
+              {isNewBest ? (
+                <p className="mx-auto mt-3 w-fit rounded-full border border-[#ffc95c]/50 bg-[#ffc95c]/10 px-4 py-1 text-[10px] font-black tracking-[0.18em] text-[#ffc95c]">
+                  NEW PERSONAL BEST
+                </p>
+              ) : (
+                <p className="mt-3 text-[10px] font-bold text-white/45">
+                  PERSONAL BEST <span className="ml-1 font-mono text-white/80">{bestScore ?? score.total}</span>
+                </p>
+              )}
             </div>
           </div>
 
-          <div className="grid grid-cols-3 gap-2 px-4 pb-2 text-center">
-            <div className="rounded-[14px] bg-card px-2 py-2.5">
-              <p className="text-lg font-black tabular-nums text-ink">{score.strikeCount}</p>
-              <p className="text-[9px] font-bold text-ink-faint">STRIKE</p>
+          <div className="grid grid-cols-3 gap-2 p-4 text-center">
+            <div className="rounded-[14px] border border-white/10 bg-white/[0.04] px-2 py-3">
+              <p className="font-mono text-2xl font-black tabular-nums text-[#54d8ff]">{score.strikeCount}</p>
+              <p className="mt-0.5 text-[8px] font-black tracking-[0.14em] text-white/40">STRIKE</p>
             </div>
-            <div className="rounded-[14px] bg-card px-2 py-2.5">
-              <p className="text-lg font-black tabular-nums text-ink">{score.spareCount}</p>
-              <p className="text-[9px] font-bold text-ink-faint">SPARE</p>
+            <div className="rounded-[14px] border border-white/10 bg-white/[0.04] px-2 py-3">
+              <p className="font-mono text-2xl font-black tabular-nums text-[#ffc95c]">{score.spareCount}</p>
+              <p className="mt-0.5 text-[8px] font-black tracking-[0.14em] text-white/40">SPARE</p>
             </div>
-            <div className="rounded-[14px] bg-card px-2 py-2.5">
-              <p className="text-lg font-black tabular-nums text-ink">{score.gutterCount}</p>
-              <p className="text-[9px] font-bold text-ink-faint">GUTTER</p>
+            <div className="rounded-[14px] border border-white/10 bg-white/[0.04] px-2 py-3">
+              <p className="font-mono text-2xl font-black tabular-nums text-white">{score.gutterCount}</p>
+              <p className="mt-0.5 text-[8px] font-black tracking-[0.14em] text-white/40">GUTTER</p>
             </div>
           </div>
 
-          {earnedCoins !== null ? (
-            <p className="px-4 pb-2 text-center text-xs font-bold text-ink-soft">
-              +{earnedCoins.toLocaleString("ja-JP")} コイン獲得！
-              {bonusAchieved ? (
-                <span className="ml-1 font-black text-[#c9902f]">（ボーナスチャンス成功で2倍！）</span>
-              ) : null}
+          {rewardPending ? (
+            <p className="px-4 pb-2 text-center text-xs font-bold text-white/65" aria-live="polite">
+              スコアを保存してコインを受け取り中…
             </p>
+          ) : rewardError ? (
+            <div className="mx-4 mb-2 rounded-[14px] border border-red-400/35 bg-red-500/10 px-3 py-3 text-center" role="alert">
+              <p className="text-[11px] font-bold text-red-200">{rewardError}</p>
+              <button
+                type="button"
+                onClick={retryReward}
+                className="mt-2 rounded-full bg-red-600 px-4 py-2 text-[11px] font-black text-white active:scale-[0.98]"
+              >
+                コイン受取を再試行
+              </button>
+            </div>
+          ) : earnedCoins !== null ? (
+            <div className="mx-4 mb-2 rounded-[14px] border border-[#ffc95c]/30 bg-[#ffc95c]/10 px-4 py-3 text-center">
+              <p className="text-[8px] font-black tracking-[0.18em] text-[#ffc95c]/70">COIN REWARD</p>
+              <p className="mt-0.5 font-mono text-xl font-black text-[#ffc95c]">
+                +{earnedCoins.toLocaleString("ja-JP")} COIN
+              </p>
+              {bonusAchieved ? (
+                <p className="mt-1 text-[9px] font-black text-[#ffc95c]">ボーナスチャンス成功・獲得量2倍</p>
+              ) : null}
+            </div>
           ) : null}
 
           <div className="space-y-2 p-4 pt-2">
             <button
               type="button"
               onClick={startGame}
-              className="btn pressable block w-full rounded-full bg-leaf-deep py-3 text-center text-sm font-black text-white active:scale-[0.98]"
+              disabled={rewardPending}
+              className="pressable block w-full rounded-[14px] bg-gradient-to-r from-[#12aee0] to-[#54d8ff] py-3.5 text-center text-sm font-black text-[#04101a] shadow-[0_8px_24px_rgba(34,190,235,0.25)] active:scale-[0.98] disabled:opacity-45"
             >
-              もう一回あそぶ
+              もう一度プレイ
             </button>
             <button
               type="button"
               onClick={() => setPhase("select")}
-              className="pressable block w-full rounded-full border border-line bg-card py-3 text-center text-sm font-black text-ink-soft active:scale-[0.98]"
+              className="pressable block w-full rounded-[14px] border border-white/15 bg-white/[0.04] py-3 text-center text-sm font-black text-white/80 active:scale-[0.98]"
             >
               ボールを変える
             </button>
             <button
               type="button"
               onClick={goToRanking}
-              className="pressable block w-full rounded-full border border-line bg-card py-3 text-center text-sm font-black text-ink-soft active:scale-[0.98]"
+              className="pressable block w-full rounded-[14px] border border-white/15 bg-white/[0.04] py-3 text-center text-sm font-black text-white/80 active:scale-[0.98]"
             >
               ランキングを見る
             </button>
             <Link
               href="/games"
-              className="pressable block w-full rounded-full border border-line bg-card py-3 text-center text-sm font-black text-ink-soft active:scale-[0.98]"
+              className="pressable block w-full rounded-[14px] border border-white/15 bg-white/[0.04] py-3 text-center text-sm font-black text-white/80 active:scale-[0.98]"
             >
               ゲーム一覧へ戻る
             </Link>
@@ -414,7 +446,7 @@ export function WankoBowlingGame({ ownedBalls }: { ownedBalls: OwnedBowlingBall[
 
         {banner ? (
           <div className="pointer-events-none absolute left-1/2 top-[35%] z-40 -translate-x-1/2">
-            <p className="wanko-bowl-banner whitespace-nowrap text-[clamp(2.2rem,12vw,4.2rem)] font-black leading-none text-[#a8442f] drop-shadow-[0_3px_0_rgba(255,255,255,0.72)]">
+            <p className="wanko-bowl-banner whitespace-nowrap bg-gradient-to-b from-white via-[#ffc95c] to-[#ef7b18] bg-clip-text text-[clamp(2.2rem,12vw,4.2rem)] font-black italic leading-none text-transparent drop-shadow-[0_4px_0_rgba(49,19,0,0.85)]">
               {banner}
             </p>
           </div>
