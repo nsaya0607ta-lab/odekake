@@ -628,14 +628,27 @@
 .batchPromotionCopy::after { left: calc(100% + 10px); transform: rotate(180deg); }
 
 .batchCapsule {
-  --fx-primary: #9be96b;
-  --fx-secondary: #eaffd8;
-  --fx-deep: #245417;
+  --fx-primary: #d8d1c3;
+  --fx-secondary: #fffdf7;
+  --fx-deep: #5d574f;
   position: relative;
   width: 100%;
   aspect-ratio: 1;
   opacity: 0;
   will-change: transform, opacity;
+}
+
+.batchCapsule[data-rarity="concealed"] .capsule {
+  border-color: rgb(255 255 255 / 86%);
+  background:
+    linear-gradient(180deg, rgb(255 255 255 / 42%) 0 44%, #fffdf7 45% 55%, transparent 56%),
+    linear-gradient(145deg, #f5efe4, #c9c1b4 56%, #6f685f);
+  box-shadow: inset 6px 5px 8px rgb(255 255 255 / 40%), inset -6px -7px 10px rgb(50 45 40 / 28%), 0 8px 10px rgb(0 0 0 / 48%);
+}
+
+.batchCapsule[data-rarity="concealed"] .capsuleBand {
+  border-color: rgb(80 72 62 / 38%);
+  background: #fffdf7;
 }
 
 .batchCapsule[data-rarity="R"] { --fx-primary: #71cbff; --fx-secondary: #dff5ff; --fx-deep: #144d74; }
@@ -737,8 +750,12 @@
   position: absolute;
   z-index: 5;
   inset: -18%;
+  opacity: 0;
   pointer-events: none;
+  transition: opacity .12s ease-out;
 }
+
+.batchCapsuleRare .capsuleSparkles { opacity: 1; }
 
 .capsuleSparkles i {
   position: absolute;
@@ -767,23 +784,6 @@
 .batchCapsule[data-rarity="UR"] .capsuleSparkles i { animation-duration: .98s; }
 .batchCapsule[data-rarity="LR"] .capsuleSparkles i { animation-duration: .86s; filter: drop-shadow(0 0 7px #ffd45f); }
 .batchCapsule[data-rarity="MR"] .capsuleSparkles i { animation-duration: .72s; filter: drop-shadow(0 0 7px #69ddff) drop-shadow(0 0 4px #bd58ff); }
-
-.batchNumber {
-  position: absolute;
-  z-index: 6;
-  right: -2px;
-  bottom: -2px;
-  display: grid;
-  width: 19px;
-  aspect-ratio: 1;
-  place-items: center;
-  border: 1px solid rgb(255 255 255 / 52%);
-  border-radius: 50%;
-  background: rgb(5 7 9 / 82%);
-  color: #fff;
-  font-size: 9px;
-  font-weight: 950;
-}
 
 @keyframes capsuleRareGlow {
   from { transform: scale(.86); filter: blur(4px); }
