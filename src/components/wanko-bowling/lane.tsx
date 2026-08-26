@@ -509,6 +509,8 @@ const MAX_START_OFFSET_M = 0.4249;
 export function Lane({ ballVisual, resetSignal, newGameSignal, active, onRoll }: LaneProps) {
   const boardRef = useRef<HTMLDivElement>(null);
   const ballRef = useRef<HTMLDivElement>(null);
+  const swipeGuideRef = useRef<SVGPathElement>(null);
+  const swipeTargetRef = useRef<SVGCircleElement>(null);
   const throwingRef = useRef(false);
   const dockingRef = useRef(false);
   const pointsRef = useRef<Point[]>([]);
@@ -530,6 +532,35 @@ export function Lane({ ballVisual, resetSignal, newGameSignal, active, onRoll }:
     activePointerRef.current = null;
     pointerModeRef.current = null;
     pointsRef.current = [];
+    if (swipeGuideRef.current) swipeGuideRef.current.style.opacity = "0";
+    if (swipeTargetRef.current) swipeTargetRef.current.style.opacity = "0";
+  }, []);
+
+  const updateSwipeGuide = useCallback((points: Point[]) => {
+    const board = boardRef.current;
+    const path = swipeGuideRef.current;
+    const target = swipeTargetRef.current;
+    if (!board || !path || !target || points.length < 2) return;
+
+    const rect = board.getBoundingClientRect();
+    const first = points[0]!;
+    const last = points[points.length - 1]!;
+    const startX = ((first.x - rect.left) / rect.width) * 100;
+    const startY = ((first.y - rect.top) / rect.height) * 100;
+    const lastX = ((last.x - rect.left) / rect.width) * 100;
+    const lastY = ((last.y - rect.top) / rect.height) * 100;
+    const upward = startY - lastY;
+    if (upward < 2) return;
+
+    const scale = (startY - HEAD_PIN_SCREEN_Y) / upward;
+    const targetX = clamp(startX + (lastX - startX) * scale, FAR_OUTER_LEFT, FAR_OUTER_RIGHT);
+    const controlX = clamp(lastX, 4, 96);
+    const controlY = clamp(lastY, HEAD_PIN_SCREEN_Y + 7, startY - 7);
+    path.setAttribute("d", `M ${startX.toFixed(2)} ${startY.toFixed(2)} Q ${controlX.toFixed(2)} ${controlY.toFixed(2)} ${targetX.toFixed(2)} ${HEAD_PIN_SCREEN_Y}`);
+    path.style.opacity = "1";
+    target.setAttribute("cx", targetX.toFixed(2));
+    target.setAttribute("cy", String(HEAD_PIN_SCREEN_Y));
+    target.style.opacity = "1";
   }, []);
 
   const registerPinNode = useCallback((id: number, el: HTMLDivElement | null) => {
@@ -1090,7 +1121,8 @@ export function Lane({ ballVisual, resetSignal, newGameSignal, active, onRoll }:
     if (pointsRef.current.length > MAX_SWIPE_SAMPLES) {
       pointsRef.current.splice(1, pointsRef.current.length - MAX_SWIPE_SAMPLES);
     }
-  }, [setStartPositionFromScreenX]);
+    updateSwipeGuide(pointsRef.current);
+  }, [setStartPositionFromScreenX, updateSwipeGuide]);
 
   const onPointerUp = useCallback((event: ReactPointerEvent<HTMLDivElement>) => {
     if (activePointerRef.current !== event.pointerId) return;
@@ -1109,6 +1141,8 @@ export function Lane({ ballVisual, resetSignal, newGameSignal, active, onRoll }:
 
     const points = pointsRef.current;
     pointsRef.current = [];
+    if (swipeGuideRef.current) swipeGuideRef.current.style.opacity = "0";
+    if (swipeTargetRef.current) swipeTargetRef.current.style.opacity = "0";
     if (!active || throwingRef.current || dockingRef.current || points.length < 2) return;
 
     const board = boardRef.current;
@@ -1135,6 +1169,8 @@ export function Lane({ ballVisual, resetSignal, newGameSignal, active, onRoll }:
     activePointerRef.current = null;
     pointerModeRef.current = null;
     pointsRef.current = [];
+    if (swipeGuideRef.current) swipeGuideRef.current.style.opacity = "0";
+    if (swipeTargetRef.current) swipeTargetRef.current.style.opacity = "0";
   }, []);
 
   const handleConfirmPosition = useCallback((event: ReactPointerEvent<HTMLButtonElement>) => {
@@ -1214,7 +1250,30 @@ export function Lane({ ballVisual, resetSignal, newGameSignal, active, onRoll }:
           points={`${OIL_LEFT},${OIL_END_Y} ${OIL_RIGHT},${OIL_END_Y} ${NEAR_LANE_RIGHT},100 ${NEAR_LANE_LEFT},100`}
           fill="rgba(255,255,255,0.035)"
         />
+        {active && positionLocked && !isThrowing ? (
+          <path
+            d={`M ${worldXToPct(DEFAULT_BALL_START_X_M + startOffsetM, 0)} ${DOCK_Y} L 50 ${HEAD_PIN_SCREEN_Y}`}
+            fill="none"
+            stroke="rgba(92,221,255,0.5)"
+            strokeWidth="0.55"
+            strokeDasharray="2.2 2"
+            vectorEffect="non-scaling-stroke"
+          />
+        ) : null}
+        <path ref={swipeGuideRef} d="" fill="none" stroke="#72e6ff" strokeWidth="1" strokeLinecap="round" vectorEffect="non-scaling-stroke" style={{ opacity: 0, filter: "drop-shadow(0 0 3px #27bfe9)" }} />
+        <circle ref={swipeTargetRef} cx="50" cy={HEAD_PIN_SCREEN_Y} r="1.5" fill="none" stroke="#ffd76a" strokeWidth="0.8" vectorEffect="non-scaling-stroke" style={{ opacity: 0, filter: "drop-shadow(0 0 3px #ffd76a)" }} />
       </svg>
+
+      {active ? (
+        <div className="pointer-events-none absolute left-1/2 top-2 z-[1500] w-[min(72%,280px)] -translate-x-1/2 rounded-xl border border-[#5f7891]/55 bg-[#08131f]/88 px-3 py-2 text-center shadow-[0_5px_18px_rgba(0,0,0,0.35)] backdrop-blur-md">
+          <p className="text-[8px] font-black tracking-[0.18em] text-[#75dfff]">
+            {isThrowing ? "BALL IN MOTION" : positionLocked ? "READY TO THROW" : "SET POSITION"}
+          </p>
+          <p className="mt-0.5 text-[11px] font-black text-white">
+            {isThrowing ? "投球中…" : positionLocked ? "ボールを上へスワイプして投球" : "ボールを左右に動かして位置を調整"}
+          </p>
+        </div>
+      ) : null}
 
       {active && !isThrowing && (
         <div className="pointer-events-none absolute" style={{ top: `${DOCK_Y}%`, left: 0, right: 0 }} aria-hidden="true">
@@ -1288,35 +1347,20 @@ export function Lane({ ballVisual, resetSignal, newGameSignal, active, onRoll }:
       {active && !isThrowing ? (
         <div
           data-bowling-position-controls="true"
-          className="absolute bottom-2 left-2 z-[1200] flex items-center gap-1.5 rounded-full bg-[#2f2119]/78 p-1 shadow-lg backdrop-blur-sm"
+          className="absolute left-2 top-[62px] z-[1600] flex items-center rounded-xl border border-white/15 bg-[#08131f]/90 p-1 shadow-[0_6px_18px_rgba(0,0,0,0.38)] backdrop-blur-md"
           onPointerDown={(event) => {
             event.stopPropagation();
           }}
         >
-          <button
-            type="button"
-            onPointerUp={handleConfirmPosition}
-            aria-pressed={positionLocked}
-            className={`min-w-[52px] rounded-full px-3 py-2 text-[11px] font-black transition ${
-              positionLocked
-                ? "bg-[#e8e0d2] text-[#807363]"
-                : "bg-[#6f9b58] text-white shadow-sm"
-            }`}
-          >
-            ✓ OK
-          </button>
-          <button
-            type="button"
-            onPointerUp={handleUnlockPosition}
-            aria-pressed={!positionLocked}
-            className={`h-8 w-8 rounded-full text-[16px] font-black leading-none transition ${
-              positionLocked
-                ? "bg-[#f4eadc] text-[#5b4637] shadow-sm"
-                : "bg-white/15 text-white/45"
-            }`}
-          >
-            ×
-          </button>
+          {positionLocked ? (
+            <button type="button" onPointerUp={handleUnlockPosition} className="min-h-10 rounded-lg border border-[#638099] bg-[#142638] px-3 text-[10px] font-black text-[#cfeeff] active:scale-[0.98]">
+              ↺ 位置を変更
+            </button>
+          ) : (
+            <button type="button" onPointerUp={handleConfirmPosition} className="min-h-10 rounded-lg bg-[linear-gradient(135deg,#1b9bc4,#16749b)] px-4 text-[11px] font-black text-white shadow-[0_0_16px_rgba(45,190,229,0.25)] active:scale-[0.98]">
+              ✓ この位置に決定
+            </button>
+          )}
         </div>
       ) : null}
     </div>
