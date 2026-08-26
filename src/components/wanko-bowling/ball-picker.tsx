@@ -24,15 +24,43 @@ export function BallPicker({
   onConfirm: () => void;
 }) {
   const balls = [DEFAULT_BALL, ...ownedBalls];
+  const selectedBall = balls.find((ball) => ball.id === selectedId) ?? DEFAULT_BALL;
 
   return (
-    <section className="rough-card overflow-hidden">
-      <div className="border-b border-line px-4 py-4">
-        <p className="text-[9px] font-black tracking-[0.16em] text-ink-faint">TODAY&apos;S BALL</p>
-        <h2 className="mt-0.5 text-base font-black text-ink">今日のボールを選ぼう</h2>
-        <p className="mt-1 text-[10px] leading-relaxed text-ink-faint">
-          どのボールでも性能は同じ。見た目や演出だけが変わります。
-        </p>
+    <section className="overflow-hidden rounded-[24px] border border-[#26394d] bg-[#09131e] text-white shadow-[0_20px_55px_rgba(0,0,0,0.42)]">
+      <div className="relative overflow-hidden border-b border-white/10 px-4 pb-4 pt-5">
+        <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_85%_0%,rgba(31,202,255,0.20),transparent_48%)]" />
+        <div className="relative">
+          <p className="text-[9px] font-black tracking-[0.24em] text-[#54d8ff]">PLAYER EQUIPMENT</p>
+          <h2 className="mt-1 text-xl font-black tracking-tight">ボールを選択</h2>
+          <p className="mt-1.5 text-[11px] leading-relaxed text-white/55">
+            性能はすべて同じです。お気に入りのボールで挑戦しよう。
+          </p>
+          <ol className="mt-4 grid grid-cols-3 gap-1.5" aria-label="ゲームの流れ">
+            {[
+              ["01", "BALL"],
+              ["02", "POSITION"],
+              ["03", "THROW"],
+            ].map(([number, label], index) => (
+              <li
+                key={label}
+                className={`rounded-lg border px-2 py-2 ${
+                  index === 0
+                    ? "border-[#54d8ff]/70 bg-[#54d8ff]/12"
+                    : "border-white/10 bg-white/[0.035]"
+                }`}
+              >
+                <span className="block text-[8px] font-black tracking-[0.12em] text-[#54d8ff]">{number}</span>
+                <span className="mt-0.5 block text-[8px] font-black tracking-[0.08em] text-white/80">{label}</span>
+              </li>
+            ))}
+          </ol>
+        </div>
+      </div>
+
+      <div className="border-b border-white/10 bg-[#0c1926] px-4 py-3" aria-live="polite">
+        <p className="text-[8px] font-black tracking-[0.18em] text-white/40">SELECTED BALL</p>
+        <p className="mt-0.5 truncate text-sm font-black text-white">{selectedBall.name}</p>
       </div>
 
       <div className="grid grid-cols-3 gap-2.5 p-4">
@@ -43,12 +71,15 @@ export function BallPicker({
               key={ball.id}
               type="button"
               onClick={() => onSelect(ball.id)}
-              className={`relative flex flex-col items-center gap-1.5 rounded-[18px] border p-2.5 pt-3 transition-colors active:scale-[0.98] ${
-                selected ? "border-leaf-deep bg-leaf-soft" : "border-line bg-paper-deep"
+              aria-pressed={selected}
+              className={`relative flex min-h-[116px] flex-col items-center gap-1.5 rounded-[16px] border p-2.5 pt-3 transition active:scale-[0.98] ${
+                selected
+                  ? "border-[#54d8ff] bg-[#153348] shadow-[0_0_22px_rgba(84,216,255,0.22)]"
+                  : "border-white/10 bg-white/[0.035] hover:border-white/25"
               }`}
             >
               {selected ? (
-                <span className="absolute right-1.5 top-1.5 flex h-5 w-5 items-center justify-center rounded-full bg-leaf-deep text-white">
+                <span className="absolute right-1.5 top-1.5 flex h-5 w-5 items-center justify-center rounded-full bg-[#54d8ff] text-[#06101a] shadow-[0_0_12px_rgba(84,216,255,0.7)]">
                   <IconCheck size={12} />
                 </span>
               ) : null}
@@ -63,16 +94,16 @@ export function BallPicker({
                   />
                 )}
               </span>
-              <span className="line-clamp-2 text-center text-[10px] font-bold leading-tight text-ink">
+              <span className="line-clamp-2 text-center text-[10px] font-bold leading-tight text-white">
                 {ball.name}
               </span>
               {ball.rarity ? (
-                <span className="text-[8px] font-black tracking-wide text-ink-faint">
+                <span className="text-[8px] font-black tracking-wide text-white/45">
                   {ball.rarity}
-                  <span className="ml-0.5 text-[#e0b862]">{"★".repeat(RARITY_STARS[ball.rarity])}</span>
+                  <span className="ml-0.5 text-[#ffc95c]">{"★".repeat(RARITY_STARS[ball.rarity])}</span>
                 </span>
               ) : (
-                <span className="text-[8px] font-black tracking-wide text-ink-faint">はじめから</span>
+                <span className="text-[8px] font-black tracking-wide text-white/45">STANDARD</span>
               )}
             </button>
           );
@@ -83,9 +114,9 @@ export function BallPicker({
         <button
           type="button"
           onClick={onConfirm}
-          className="btn pressable block w-full rounded-full bg-leaf-deep py-3 text-center text-sm font-black text-white active:scale-[0.98]"
+          className="pressable block w-full rounded-[14px] bg-gradient-to-r from-[#12aee0] to-[#54d8ff] py-3.5 text-center text-sm font-black text-[#04101a] shadow-[0_8px_24px_rgba(34,190,235,0.25)] active:scale-[0.98]"
         >
-          このボールで遊ぶ
+          このボールでゲームスタート
         </button>
       </div>
     </section>
