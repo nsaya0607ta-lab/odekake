@@ -463,21 +463,39 @@
 
 .reveal {
   position: absolute;
-  z-index: 22;
+  z-index: 32;
   left: 50%;
   top: 50%;
-  width: min(72vw, 340px);
+  width: min(82vw, 390px);
   transform: translate(-50%, -50%);
   text-align: center;
+}
+
+.itemFocus {
+  position: absolute;
+  z-index: 0;
+  left: 50%;
+  top: 45%;
+  width: min(78vw, 370px);
+  aspect-ratio: 1;
+  border-radius: 50%;
+  opacity: 0;
+  transform: translate(-50%, -50%) scale(.56);
+  background:
+    radial-gradient(circle, rgb(255 255 255 / 46%) 0 11%, color-mix(in srgb, var(--fx-primary) 42%, transparent) 30%, rgb(9 15 31 / 72%) 54%, transparent 72%);
+  filter: drop-shadow(0 0 24px var(--fx-primary));
+  backdrop-filter: blur(3px);
+  will-change: transform, opacity;
 }
 
 .silhouette,
 .item {
   position: absolute;
+  z-index: 2;
   left: 50%;
   top: 45%;
-  width: min(58vw, 270px);
-  height: min(58vw, 270px);
+  width: min(66vw, 310px);
+  height: min(66vw, 310px);
   object-fit: contain;
   transform: translate(-50%, -50%) scale(.7);
   user-select: none;
@@ -514,8 +532,9 @@
 
 .itemCopy {
   position: absolute;
+  z-index: 3;
   left: 50%;
-  top: calc(45% + min(36vw, 174px));
+  top: calc(45% + min(41vw, 194px));
   width: min(88vw, 430px);
   opacity: 0;
   transform: translate(-50%, 18px);
