@@ -74,15 +74,10 @@ export default async function GamesPage() {
               </span>
 
               <span className="min-w-0 flex-1">
-                <span className="flex items-center gap-1.5">
-                  <span className="text-[9px] font-black tracking-[0.13em] text-leaf-deep">QUICK BOWL</span>
-                  <span className="rounded-full bg-[#a8442f] px-1.5 py-0.5 text-[8px] font-black leading-none text-white">
-                    調整中
-                  </span>
-                </span>
+                <span className="text-[9px] font-black tracking-[0.13em] text-leaf-deep">QUICK BOWL</span>
                 <span className="mt-0.5 block text-base font-black text-ink">わんこボウリング</span>
                 <span className="mt-1 block text-[10px] leading-relaxed text-ink-soft">
-                  お気に入りのボールでストライクを狙おう！（プレイ可能・現在調整中です）
+                  お気に入りのボールでストライクを狙おう！
                 </span>
               </span>
 
