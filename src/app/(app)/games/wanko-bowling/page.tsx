@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { WankoBowlingGame } from "@/components/wanko-bowling-game";
 import { WankoBowlingRanking } from "@/components/wanko-bowling-ranking";
+import { BowlingPlayGuide } from "@/components/wanko-bowling/play-guide";
 import { BowlingScreenLock } from "@/components/wanko-bowling/screen-lock";
 import { COLLECTION_ITEMS } from "@/lib/collection/items";
 import { getOwnedItemCounts } from "@/lib/data/collection";
@@ -33,9 +34,10 @@ export default async function WankoBowlingPage() {
           <p className="text-[7px] font-black tracking-[0.16em] text-[#71dfff]">おでかけスポーツ</p>
           <h1 className="truncate text-[15px] font-black tracking-[0.04em]">わんこボウリング</h1>
         </div>
+          <BowlingPlayGuide />
           <a
             href="#wanko-bowling-ranking"
-            className="pressable shrink-0 rounded-full border border-[#4b6a83] bg-[#102538] px-3 py-2 text-[9px] font-black leading-none text-[#cbeeff] active:scale-[0.97]"
+            className="pressable flex h-8 shrink-0 items-center rounded-full border border-[#4b6a83] bg-[#102538] px-2.5 text-[9px] font-black leading-none text-[#cbeeff] active:scale-[0.97]"
             aria-label="フレンドのスコアを見る"
           >
             フレンド

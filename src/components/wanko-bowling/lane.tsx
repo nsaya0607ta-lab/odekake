@@ -118,6 +118,7 @@ export type LaneRollResult = {
 
 type LaneProps = {
   ballVisual: BowlingBallVisual;
+  goldenPinId?: number | null;
   resetSignal: number;
   newGameSignal: number;
   active: boolean;
@@ -496,7 +497,7 @@ const LEFT_GUTTER_CENTER_M = JB_GUTTER_WIDTH_M / 2;
 const RIGHT_GUTTER_CENTER_M = JB_GUTTER_WIDTH_M + JB_LANE_WIDTH_M + JB_GUTTER_WIDTH_M / 2;
 const MAX_START_OFFSET_M = 0.4249;
 
-export function Lane({ ballVisual, resetSignal, newGameSignal, active, onRoll }: LaneProps) {
+export function Lane({ ballVisual, goldenPinId = null, resetSignal, newGameSignal, active, onRoll }: LaneProps) {
   const boardRef = useRef<HTMLDivElement>(null);
   const ballRef = useRef<HTMLDivElement>(null);
   const throwingRef = useRef(false);
@@ -1221,7 +1222,7 @@ export function Lane({ ballVisual, resetSignal, newGameSignal, active, onRoll }:
         aria-hidden="true"
       />
 
-      <Pins registerNode={registerPinNode} />
+      <Pins registerNode={registerPinNode} goldenPinId={goldenPinId} />
 
       <div
         ref={ballRef}

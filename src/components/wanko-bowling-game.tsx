@@ -9,28 +9,17 @@ import {
   BOWLING_FRAME_COUNT,
   calculateBowlingScore,
   createEmptyFrames,
-  getBonusFrameIndex,
+  getGoldenPinTargets,
+  isFreshRackRoll,
   isFrameDone,
   type BowlingFrame,
+  type BowlingPinFalls,
+  type GoldenPinTarget,
 } from "@/lib/games/wanko-bowling-score";
 import { getBowlingBallVisual, type OwnedBowlingBall } from "@/lib/games/wanko-bowling-balls";
 
 type Phase = "select" | "playing" | "result";
-type Banner = "スペア！" | "ストライク！" | "ターキー！" | "ボーナスストライク！" | null;
-
-function isFreshRackRoll(frameIndex: number, priorRolls: number[]): boolean {
-  if (frameIndex < BOWLING_FRAME_COUNT - 1) return priorRolls.length === 0;
-  if (priorRolls.length === 0) return true;
-
-  const first = priorRolls[0] ?? 0;
-  const second = priorRolls[1] ?? 0;
-  if (priorRolls.length === 1) return first === 10;
-  if (priorRolls.length === 2) {
-    if (first === 10) return second === 10;
-    return first + second === 10;
-  }
-  return false;
-}
+type Banner = "スペア！" | "ストライク！" | "ターキー！" | null;
 
 function calculateLiveBowlingScore(frames: BowlingFrame[]): number {
   const flatRolls = frames.flatMap((frame) => frame.rolls);
@@ -74,6 +63,10 @@ function newRoundId(): string {
   return `round-${Date.now()}-${Math.random().toString(16).slice(2)}`;
 }
 
+function createEmptyPinFalls(): BowlingPinFalls {
+  return Array.from({ length: BOWLING_FRAME_COUNT }, () => []);
+}
+
 export function WankoBowlingGame({ ownedBalls }: { ownedBalls: OwnedBowlingBall[] }) {
   const initialFrames = useMemo(() => createEmptyFrames(), []);
   const [phase, setPhase] = useState<Phase>("select");
@@ -93,8 +86,9 @@ export function WankoBowlingGame({ ownedBalls }: { ownedBalls: OwnedBowlingBall[
   const [rewardPending, setRewardPending] = useState(false);
   const [rewardError, setRewardError] = useState<string | null>(null);
   const [lastRollPins, setLastRollPins] = useState<number | null>(null);
-  const [bonusFrameIndex, setBonusFrameIndex] = useState(() => getBonusFrameIndex(newRoundId()));
-  const [bonusAchieved, setBonusAchieved] = useState(false);
+  const [goldenPinTargets, setGoldenPinTargets] = useState<GoldenPinTarget[]>([]);
+  const [goldenHitCount, setGoldenHitCount] = useState(0);
+  const [goldenNotice, setGoldenNotice] = useState(false);
 
   const framesRef = useRef<BowlingFrame[]>(initialFrames);
   const frameIndexRef = useRef(0);
@@ -102,13 +96,18 @@ export function WankoBowlingGame({ ownedBalls }: { ownedBalls: OwnedBowlingBall[
   const streakRef = useRef(0);
   const submittedRef = useRef(false);
   const roundIdRef = useRef(newRoundId());
-  const bonusFrameIndexRef = useRef(bonusFrameIndex);
-  const bonusAchievedRef = useRef(false);
+  const pinFallsRef = useRef<BowlingPinFalls>(createEmptyPinFalls());
+  const goldenPinTargetsRef = useRef<GoldenPinTarget[]>([]);
+  const goldenHitFramesRef = useRef<Set<number>>(new Set());
   const rankingSectionIdRef = useRef("wanko-bowling-ranking");
 
   const score = useMemo(() => calculateBowlingScore(frames), [frames]);
   const liveScore = useMemo(() => calculateLiveBowlingScore(frames), [frames]);
   const ballVisual = useMemo(() => getBowlingBallVisual(selectedBallId), [selectedBallId]);
+  const currentGoldenTarget = goldenPinTargets.find((item) => item.frameIndex === frameIndex);
+  const currentGoldenPinId = currentGoldenTarget && !goldenHitFramesRef.current.has(frameIndex)
+    ? currentGoldenTarget.pinId
+    : null;
 
   const commitFrames = useCallback((nextFrames: BowlingFrame[]) => {
     framesRef.current = nextFrames;
@@ -148,12 +147,15 @@ export function WankoBowlingGame({ ownedBalls }: { ownedBalls: OwnedBowlingBall[
     commitFrameIndex(0);
     streakRef.current = 0;
     submittedRef.current = false;
-    roundIdRef.current = newRoundId();
-    const nextBonusFrameIndex = getBonusFrameIndex(roundIdRef.current);
-    bonusFrameIndexRef.current = nextBonusFrameIndex;
-    bonusAchievedRef.current = false;
-    setBonusFrameIndex(nextBonusFrameIndex);
-    setBonusAchieved(false);
+    const nextRoundId = newRoundId();
+    const nextGoldenPinTargets = getGoldenPinTargets(nextRoundId);
+    roundIdRef.current = nextRoundId;
+    pinFallsRef.current = createEmptyPinFalls();
+    goldenPinTargetsRef.current = nextGoldenPinTargets;
+    goldenHitFramesRef.current = new Set();
+    setGoldenPinTargets(nextGoldenPinTargets);
+    setGoldenHitCount(0);
+    setGoldenNotice(false);
     setBanner(null);
     setEarnedCoins(null);
     setRewardPending(false);
@@ -180,12 +182,17 @@ export function WankoBowlingGame({ ownedBalls }: { ownedBalls: OwnedBowlingBall[
         body: JSON.stringify({
           roundId: roundIdRef.current,
           frames: finalFrames,
-          bonusHit: bonusAchievedRef.current,
+          pinFalls: pinFallsRef.current,
         }),
       });
-      const payload = (await response.json().catch(() => null)) as { coins?: number; error?: string } | null;
+      const payload = (await response.json().catch(() => null)) as {
+        coins?: number;
+        goldenHits?: number;
+        error?: string;
+      } | null;
       if (!response.ok) throw new Error(payload?.error ?? "コインを受け取れませんでした。");
       setEarnedCoins(typeof payload?.coins === "number" ? payload.coins : 0);
+      if (typeof payload?.goldenHits === "number") setGoldenHitCount(payload.goldenHits);
       window.dispatchEvent(new Event("wanko-bowling-ranking-refresh"));
     } catch (error) {
       setRewardError(error instanceof Error ? error.message : "コインを受け取れませんでした。");
@@ -222,6 +229,22 @@ export function WankoBowlingGame({ ownedBalls }: { ownedBalls: OwnedBowlingBall[
     const roll = result.knockedIds.length;
     const isGutterRoll = result.isGutter && roll === 0;
 
+    const framePinFalls = pinFallsRef.current[currentFrameIndex] ?? [];
+    pinFallsRef.current[currentFrameIndex] = [...framePinFalls, [...result.knockedIds]];
+    const goldenTarget = goldenPinTargetsRef.current.find(
+      (target) => target.frameIndex === currentFrameIndex,
+    );
+    if (
+      goldenTarget
+      && !goldenHitFramesRef.current.has(currentFrameIndex)
+      && result.knockedIds.includes(goldenTarget.pinId)
+    ) {
+      goldenHitFramesRef.current.add(currentFrameIndex);
+      setGoldenHitCount(goldenHitFramesRef.current.size);
+      setGoldenNotice(true);
+      window.setTimeout(() => setGoldenNotice(false), 1300);
+    }
+
     setLastRollPins(roll);
 
     const newFrame: BowlingFrame = {
@@ -253,15 +276,8 @@ export function WankoBowlingGame({ ownedBalls }: { ownedBalls: OwnedBowlingBall[
       && (newRolls[1] ?? 0) + (newRolls[2] ?? 0) === 10;
     const spareCompleted = regularSpareCompleted || finalStrikeRackSpareCompleted;
 
-    const isBonusFrame = currentFrameIndex === bonusFrameIndexRef.current;
     if (roll === 10 && freshRack) {
-      if (isBonusFrame && priorRolls.length === 0 && !bonusAchievedRef.current) {
-        bonusAchievedRef.current = true;
-        setBonusAchieved(true);
-        nextBanner = "ボーナスストライク！";
-      } else {
-        nextBanner = streakRef.current >= 3 ? "ターキー！" : "ストライク！";
-      }
+      nextBanner = streakRef.current >= 3 ? "ターキー！" : "ストライク！";
       setShake(true);
       window.setTimeout(() => setShake(false), 450);
     } else if (spareCompleted) {
@@ -379,9 +395,9 @@ export function WankoBowlingGame({ ownedBalls }: { ownedBalls: OwnedBowlingBall[
               <p className="mt-0.5 font-mono text-xl font-black text-[#ffc95c]">
                 +{earnedCoins.toLocaleString("ja-JP")} コイン
               </p>
-              {bonusAchieved ? (
-                <p className="mt-1 text-[9px] font-black text-[#ffc95c]">ボーナスチャンス成功・獲得量2倍</p>
-              ) : null}
+              <p className="mt-1 text-[9px] font-black text-[#ffc95c]">
+                スコア {score.total} ＋ ゴールデンピン {goldenHitCount}本 × 10
+              </p>
             </div>
           ) : null}
 
@@ -430,14 +446,13 @@ export function WankoBowlingGame({ ownedBalls }: { ownedBalls: OwnedBowlingBall[
           liveScore={liveScore}
           bestScore={bestScore}
           lastRollPins={lastRollPins}
-          bonusFrameIndex={bonusFrameIndex}
-          bonusAchieved={bonusAchieved}
         />
       </div>
 
       <div className="relative -mt-px min-h-0 flex-1 [&>div]:!rounded-t-none">
         <Lane
           ballVisual={ballVisual}
+          goldenPinId={currentGoldenPinId}
           resetSignal={laneResetSignal}
           newGameSignal={newGameSignal}
           active={!rollLocked}
@@ -449,6 +464,12 @@ export function WankoBowlingGame({ ownedBalls }: { ownedBalls: OwnedBowlingBall[
             <p className="wanko-bowl-banner whitespace-nowrap bg-gradient-to-b from-white via-[#ffc95c] to-[#ef7b18] bg-clip-text text-[clamp(2.2rem,12vw,4.2rem)] font-black italic leading-none text-transparent drop-shadow-[0_4px_0_rgba(49,19,0,0.85)]">
               {banner}
             </p>
+          </div>
+        ) : null}
+
+        {goldenNotice ? (
+          <div className="pointer-events-none absolute left-1/2 top-[48%] z-50 -translate-x-1/2 rounded-full border border-[#ffd75f]/55 bg-[#2b1900]/90 px-4 py-2 shadow-[0_0_24px_rgba(255,191,35,0.5)]">
+            <p className="whitespace-nowrap text-sm font-black text-[#ffe47e]">ゴールデンピン！ ＋10コイン</p>
           </div>
         ) : null}
       </div>
