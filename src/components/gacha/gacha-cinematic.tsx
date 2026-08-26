@@ -16,8 +16,8 @@ type ParticleHandle = {
   burst: (rarity: GachaRarity, intensity?: BurstIntensity) => void;
 };
 
-const MULTI_DROP_DURATION = 0.768;
-const MULTI_DROP_GAP = 0.08;
+const MULTI_DROP_DURATION = 0.62;
+const MULTI_DROP_GAP = 0.045;
 const MULTI_DROP_INTERVAL = MULTI_DROP_DURATION + MULTI_DROP_GAP;
 const MULTI_REVEAL_TIME_SCALE = 1.4;
 
@@ -285,7 +285,7 @@ function MultiCapsuleIntro({ results, promotion, onComplete, onSkipAll }: MultiC
       });
 
       const dropSequenceDuration = Math.max(0, capsules.length - 1) * MULTI_DROP_INTERVAL + MULTI_DROP_DURATION;
-      tl.to(machineRef.current, { opacity: 0.34, scale: 0.9, duration: 0.35 }, `capsuleDrop+=${dropSequenceDuration.toFixed(3)}`);
+      tl.to(machineRef.current, { opacity: 0.68, scale: 0.94, duration: 0.3 }, `capsuleDrop+=${dropSequenceDuration.toFixed(3)}`);
 
       const promotionTarget = promotion ? capsules[promotion.index] : undefined;
       if (promotion && promotionTarget) {
@@ -560,7 +560,9 @@ function GachaCinematicScene({ result, current, total, capsuleOnly, onSceneCompl
           .to(capsule, { xPercent: 0, yPercent: -8, scale: 2.18, duration: 0.72, ease: "power3.inOut" });
       }
 
-      tl.to(blackout, { opacity: rarity === "LR" ? 1 : 0.88, duration: 0.52 }, capsuleOnly ? "<0.12" : "<")
+      const blackoutOpacity = rarity === "LR" ? 1 : rarity === "MR" ? 0.72 : rarity === "UR" ? 0.64 : rarity === "SSR" ? 0.48 : 0.56;
+
+      tl.to(blackout, { opacity: blackoutOpacity, duration: 0.46 }, capsuleOnly ? "<0.12" : "<")
         .call(() => {
           setPhase("力をためている…");
           playGachaCue("charge");
@@ -571,7 +573,7 @@ function GachaCinematicScene({ result, current, total, capsuleOnly, onSceneCompl
         .to(crackLines, { strokeDashoffset: 0, duration: 0.32, stagger: 0.035, ease: "power3.out" }, "<")
         .call(() => playGachaCue("crack"), undefined, "<")
         .to(beam, { opacity: 0.94, scaleX: 1, duration: 0.45, ease: "power3.out" })
-        .to(atmosphere, { opacity: rarity === "SSR" ? 0.34 : 0.68, rotation: 48, duration: 0.58 }, "<")
+        .to(atmosphere, { opacity: rarity === "SSR" ? 0.92 : 0.72, rotation: 48, duration: 0.58 }, "<")
         .to(aura, { opacity: 0.86, scale: 1, rotation: 42, duration: 0.58 }, "<")
         .to(flash, { opacity: 1, duration: 0.08 })
         .call(() => playGachaCue("flash"), undefined, "<")
