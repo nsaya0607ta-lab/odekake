@@ -129,6 +129,43 @@
   backdrop-filter: blur(10px);
 }
 
+.speed {
+  position: absolute;
+  z-index: 70;
+  top: max(16px, env(safe-area-inset-top));
+  left: 14px;
+  display: grid;
+  min-width: 58px;
+  min-height: 38px;
+  grid-template-columns: auto auto;
+  align-items: center;
+  justify-content: center;
+  gap: 3px;
+  border: 1px solid rgb(255 255 255 / 28%);
+  border-radius: 999px;
+  background: rgb(12 24 42 / 66%);
+  color: rgb(255 255 255 / 88%);
+  font: inherit;
+  backdrop-filter: blur(10px);
+}
+
+.speed span {
+  font-size: 13px;
+  font-weight: 950;
+}
+
+.speed small {
+  font-size: 9px;
+  font-weight: 800;
+}
+
+.speed[data-active="true"] {
+  border-color: rgb(255 225 125 / 82%);
+  background: linear-gradient(135deg, rgb(255 198 74 / 84%), rgb(239 112 59 / 82%));
+  color: #fff;
+  box-shadow: 0 0 18px rgb(255 176 68 / 42%);
+}
+
 .stage {
   position: absolute;
   z-index: 5;
