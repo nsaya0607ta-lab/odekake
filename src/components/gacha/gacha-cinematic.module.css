@@ -7,7 +7,7 @@
   z-index: 140;
   overflow: hidden;
   isolation: isolate;
-  background: #070807;
+  background: #11182d;
   color: #fff;
   touch-action: none;
   overscroll-behavior: none;
@@ -40,8 +40,8 @@
 .backdrop {
   z-index: -5;
   background:
-    radial-gradient(circle at 50% 56%, color-mix(in srgb, var(--fx-primary) 22%, transparent), transparent 42%),
-    linear-gradient(180deg, #1f2b29 0%, #101817 42%, #050606 100%);
+    radial-gradient(circle at 50% 54%, color-mix(in srgb, var(--fx-primary) 36%, transparent), transparent 48%),
+    linear-gradient(180deg, #314260 0%, #1d3047 44%, #111629 100%);
 }
 
 .ambient {
@@ -77,7 +77,7 @@
 
 .vignette {
   z-index: 30;
-  box-shadow: inset 0 0 120px 28px rgb(0 0 0 / 78%);
+  box-shadow: inset 0 0 104px 18px rgb(0 0 0 / 46%);
 }
 
 .hud {
@@ -572,6 +572,19 @@
   --fx-primary: #f7cf68;
   --fx-secondary: #fff4c7;
   --fx-deep: #59401a;
+}
+
+.batchRoot .backdrop {
+  background:
+    radial-gradient(circle at 50% 63%, rgb(255 214 103 / 38%), transparent 36%),
+    radial-gradient(circle at 18% 20%, rgb(87 202 255 / 25%), transparent 34%),
+    linear-gradient(180deg, #324b68 0%, #1e354d 52%, #151a32 100%);
+}
+
+.batchRoot .ambient { opacity: .9; }
+
+.batchRoot .vignette {
+  box-shadow: inset 0 0 92px 12px rgb(3 8 18 / 38%);
 }
 
 .batchStage {
