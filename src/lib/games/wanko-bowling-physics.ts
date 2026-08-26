@@ -34,6 +34,9 @@ export const JB_BALL_DIAMETER_M = (0.2159 + 0.2183) / 2;
  */
 export const GAME_BALL_MASS_KG = 6.8;
 
+/** ポンド→キログラム換算係数。特別なボール（ゴールドボール等）の重量指定に使う。 */
+export const LB_TO_KG = 0.45359237;
+
 /**
  * Ji et al. (AIP Advances, 2025, DOI: 10.1063/5.0247761) の
  * 基準軌道で使われている40ftフラットオイルパターン。
@@ -166,11 +169,15 @@ export const SPIN_AXIS_TILT_DEG = 13.26;
 export const GAME_MIN_SPIN_RPM = 275;
 export const GAME_MAX_SPIN_RPM = 416;
 
-export function spinMagnitudeRadSAtSpeed(speedMps: number): number {
+export function spinMagnitudeRadSAtSpeed(
+  speedMps: number,
+  minSpeedKmh: number = GAME_MIN_BALL_SPEED_KMH,
+  maxSpeedKmh: number = GAME_MAX_BALL_SPEED_KMH,
+): number {
   const speedKmh = speedMps * 3.6;
   const speedNorm = Math.min(1, Math.max(
     0,
-    (speedKmh - GAME_MIN_BALL_SPEED_KMH) / (GAME_MAX_BALL_SPEED_KMH - GAME_MIN_BALL_SPEED_KMH),
+    (speedKmh - minSpeedKmh) / (maxSpeedKmh - minSpeedKmh),
   ));
   const rpm = GAME_MIN_SPIN_RPM + (GAME_MAX_SPIN_RPM - GAME_MIN_SPIN_RPM) * speedNorm;
   return rpm * (2 * Math.PI / 60);
@@ -188,13 +195,20 @@ export const MAX_AXIS_ROTATION_DEG = 55;
  */
 export const AXIS_ROTATION_INPUT_EXPONENT = 0.8;
 
-/** 慣性モーメント（Ix = m(RG+Diff)^2, Iy = m・RG^2, Iz = m(RG+Diff+IntDiff)^2）。 */
-export const BALL_INERTIA_X_KGM2 =
-  GAME_BALL_MASS_KG * (BALL_RADIUS_OF_GYRATION_M + BALL_DIFFERENTIAL_M) ** 2;
-export const BALL_INERTIA_Y_KGM2 = GAME_BALL_MASS_KG * BALL_RADIUS_OF_GYRATION_M ** 2;
-export const BALL_INERTIA_Z_KGM2 =
-  GAME_BALL_MASS_KG
-  * (BALL_RADIUS_OF_GYRATION_M + BALL_DIFFERENTIAL_M + BALL_INT_DIFFERENTIAL_M) ** 2;
+/** 慣性モーメント（Ix = m(RG+Diff)^2, Iy = m・RG^2, Iz = m(RG+Diff+IntDiff)^2）。質量が違うボール用に関数化する。 */
+export function ballInertiaXKgm2(massKg: number): number {
+  return massKg * (BALL_RADIUS_OF_GYRATION_M + BALL_DIFFERENTIAL_M) ** 2;
+}
+export function ballInertiaYKgm2(massKg: number): number {
+  return massKg * BALL_RADIUS_OF_GYRATION_M ** 2;
+}
+export function ballInertiaZKgm2(massKg: number): number {
+  return massKg * (BALL_RADIUS_OF_GYRATION_M + BALL_DIFFERENTIAL_M + BALL_INT_DIFFERENTIAL_M) ** 2;
+}
+
+export const BALL_INERTIA_X_KGM2 = ballInertiaXKgm2(GAME_BALL_MASS_KG);
+export const BALL_INERTIA_Y_KGM2 = ballInertiaYKgm2(GAME_BALL_MASS_KG);
+export const BALL_INERTIA_Z_KGM2 = ballInertiaZKgm2(GAME_BALL_MASS_KG);
 
 /** これ未満の滑り速度は pure rolling とみなし、動摩擦（クーロン摩擦）を止める。 */
 export const SLIP_EPSILON_MPS = 0.02;
