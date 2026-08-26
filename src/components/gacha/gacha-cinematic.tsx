@@ -16,7 +16,6 @@ type ParticleHandle = {
   burst: (rarity: GachaRarity, intensity?: BurstIntensity) => void;
 };
 
-const RARITY_POWER: Record<GachaRarity, number> = { N: 0, R: 1, SR: 2, SSR: 3, UR: 4, LR: 5, MR: 6 };
 const MULTI_DROP_DURATION = 0.768;
 const MULTI_DROP_GAP = 0.08;
 const MULTI_DROP_INTERVAL = MULTI_DROP_DURATION + MULTI_DROP_GAP;
@@ -26,10 +25,6 @@ function validRarity(rarity: string): GachaRarity {
   return (["N", "R", "SR", "SSR", "UR", "LR", "MR"] as const).includes(rarity as GachaRarity)
     ? (rarity as GachaRarity)
     : "N";
-}
-
-function isSparklingRarity(rarity: GachaRarity): boolean {
-  return rarity === "SSR" || rarity === "UR" || rarity === "LR" || rarity === "MR";
 }
 
 function applyPromotedCapsuleStyle(capsule: HTMLDivElement, rarity: Extract<GachaRarity, "LR" | "MR">) {
@@ -267,16 +262,6 @@ function MultiCapsuleIntro({ results, promotion, onComplete, onSkipAll }: MultiC
     void import("gsap").then(({ gsap }) => {
       if (disposed || !rootRef.current || !machineRef.current || !knobRef.current) return;
 
-      const rareResults = results
-        .map((result, index) => ({
-          rarity: promotion?.index === index ? promotion.fromRarity : validRarity(result.rarity),
-          index,
-        }))
-        .filter(({ rarity }) => isSparklingRarity(rarity));
-      const featuredRarity = rareResults.reduce<GachaRarity>(
-        (best, entry) => RARITY_POWER[entry.rarity] > RARITY_POWER[best] ? entry.rarity : best,
-        "SR",
-      );
       const tl = gsap.timeline({ defaults: { ease: "power2.out" } });
       timelineRef.current = tl;
       gsap.set(promotionCopyRef.current, { opacity: 0, scale: 0.54 });
@@ -337,14 +322,7 @@ function MultiCapsuleIntro({ results, promotion, onComplete, onSkipAll }: MultiC
           .to({}, { duration: 0.78 })
           .call(complete);
       } else {
-        tl.call(() => {
-          if (rareResults.length > 0) particlesRef.current?.burst(featuredRarity, "normal");
-          if (rareResults.length > 0) playGachaCue("charge");
-        }, undefined, "<")
-          .to(flashRef.current, { opacity: rareResults.length > 0 ? 0.42 : 0.18, duration: 0.08 }, "<0.08")
-          .to(flashRef.current, { opacity: 0, duration: 0.32 })
-          .call(() => particlesRef.current?.burst(featuredRarity, rareResults.length >= 2 ? "large" : "normal"), undefined, "<")
-          .to({}, { duration: 1.05 })
+        tl.to({}, { duration: 0.82 })
           .call(complete);
       }
     });
@@ -378,28 +356,23 @@ function MultiCapsuleIntro({ results, promotion, onComplete, onSkipAll }: MultiC
 
         <div className={styles.batchTray} aria-label="排出された10個のカプセル">
           {results.map((result, index) => {
-            const finalRarity = validRarity(result.rarity);
             const isPromotionTarget = promotion?.index === index;
-            const rarity = isPromotionTarget ? promotion.fromRarity : finalRarity;
-            const sparkling = isSparklingRarity(rarity);
-            const willSparkle = sparkling || isSparklingRarity(finalRarity);
             return (
               <div
                 key={`${result.id}-${index}`}
                 ref={(node) => { if (node) capsuleRefs.current[index] = node; }}
-                className={`${styles.batchCapsule} ${sparkling ? styles.batchCapsuleRare : ""}`}
-                data-rarity={rarity}
+                className={styles.batchCapsule}
+                data-rarity="concealed"
                 aria-label={`${index + 1}個目のカプセル`}
               >
                 <span className={styles.batchCapsuleGlow} />
                 <span className={styles.capsule} />
                 <span className={styles.capsuleBand} />
-                {willSparkle ? (
+                {isPromotionTarget ? (
                   <span className={styles.capsuleSparkles} aria-hidden="true">
                     <i /><i /><i /><i /><i /><i /><i /><i />
                   </span>
                 ) : null}
-                <span className={styles.batchNumber}>{index + 1}</span>
               </div>
             );
           })}
