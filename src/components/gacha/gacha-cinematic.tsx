@@ -11,7 +11,7 @@ type BurstIntensity = "normal" | "large" | "mega";
 type GsapModule = typeof import("gsap");
 type GsapTimeline = ReturnType<GsapModule["gsap"]["timeline"]>;
 type GachaPromotion = NonNullable<AnimationDraw["promotion"]>;
-type PlaybackRate = 1 | 2;
+type PlaybackRate = 1 | 2 | 3;
 
 type ParticleHandle = {
   burst: (rarity: GachaRarity, intensity?: BurstIntensity) => void;
@@ -355,7 +355,7 @@ function MultiCapsuleIntro({ results, promotion, playbackRate, onTogglePlaybackR
           <p className={styles.phase} aria-live="polite">{batchPhase}</p>
         </div>
       </div>
-      <button type="button" className={styles.speed} data-active={playbackRate === 2} onClick={onTogglePlaybackRate} aria-label={`演出速度 ${playbackRate}倍`} aria-pressed={playbackRate === 2}>
+      <button type="button" className={styles.speed} data-active={playbackRate > 1} onClick={onTogglePlaybackRate} aria-label={`演出速度 ${playbackRate}倍`} aria-pressed={playbackRate > 1}>
         <span>×{playbackRate}</span><small>倍速</small>
       </button>
       <button type="button" className={styles.skip} onClick={skipAll}>すべてスキップ</button>
@@ -454,6 +454,7 @@ function GachaCinematicScene({ result, current, total, capsuleOnly, playbackRate
   const lightningRef = useRef<HTMLDivElement>(null);
   const shockwaveRefs = useRef<HTMLSpanElement[]>([]);
   const silhouetteRef = useRef<HTMLImageElement>(null);
+  const itemFocusRef = useRef<HTMLSpanElement>(null);
   const itemRef = useRef<HTMLImageElement>(null);
   const placeholderRef = useRef<HTMLDivElement>(null);
   const itemCopyRef = useRef<HTMLDivElement>(null);
@@ -517,6 +518,7 @@ function GachaCinematicScene({ result, current, total, capsuleOnly, playbackRate
       const cracks = cracksRef.current;
       const lightning = lightningRef.current;
       const silhouette = silhouetteRef.current;
+      const itemFocus = itemFocusRef.current;
       const item = itemRef.current ?? placeholderRef.current;
       const itemCopy = itemCopyRef.current;
       const fakeResult = fakeResultRef.current;
@@ -534,20 +536,27 @@ function GachaCinematicScene({ result, current, total, capsuleOnly, playbackRate
       };
 
       const reveal = (timeline: GsapTimeline, at: string | number) => {
+        const silhouetteOutAt = typeof at === "number" ? at + 0.3 : `${at}+=0.3`;
+        const itemRevealAt = typeof at === "number" ? at + 0.44 : `${at}+=0.44`;
         timeline
           .call(() => setPhase("結果発表"), undefined, at)
-          .fromTo(silhouette, { opacity: 0, scale: 0.68 }, { opacity: 1, scale: 1.03, duration: 0.34, ease: "power2.out" }, at)
-          .to(silhouette, { opacity: 0, scale: 1.16, duration: 0.26, ease: "power2.in" }, `${typeof at === "number" ? at + 0.38 : at}+=0.38`)
-          .fromTo(item, { opacity: 0, scale: 0.36, rotation: -5 }, { opacity: 1, scale: 1, rotation: 0, duration: 0.72, ease: "back.out(1.75)" }, `${typeof at === "number" ? at + 0.52 : at}+=0.52`)
-          .fromTo(itemCopy, { opacity: 0, y: 18 }, { opacity: 1, y: 0, duration: 0.48, ease: "power3.out" }, "<0.18")
+          .to([beam, aura, cracks, lightning, atmosphere], { opacity: 0, duration: 0.24 }, at)
+          .to(blackout, { opacity: rarity === "LR" ? 0.66 : 0.26, duration: 0.3 }, at)
+          .fromTo(silhouette, { opacity: 0, scale: 0.72 }, { opacity: 0.82, scale: 1.04, duration: 0.28, ease: "power2.out" }, at)
+          .to(silhouette, { opacity: 0, scale: 1.14, duration: 0.2, ease: "power2.in" }, silhouetteOutAt)
+          .fromTo(itemFocus, { opacity: 0, scale: 0.56 }, { opacity: 1, scale: 1, duration: 0.38, ease: "power3.out" }, itemRevealAt)
+          .fromTo(item, { opacity: 0, scale: 0.46, rotation: -3 }, { opacity: 1, scale: 1.08, rotation: 0, duration: 0.5, ease: "back.out(1.65)" }, itemRevealAt)
+          .to(item, { scale: 1, duration: 0.22, ease: "power2.out" })
+          .fromTo(itemCopy, { opacity: 0, y: 18 }, { opacity: 1, y: 0, duration: 0.4, ease: "power3.out" }, "<0.02")
           .call(() => playGachaCue("reveal"), undefined, "<")
-          .to(item, { scale: 1.035, duration: 0.85, repeat: 1, yoyo: true, ease: "sine.inOut" })
-          .call(completeScene, undefined, ">+=0.42");
+          .to({}, { duration: 0.92 })
+          .to(item, { scale: 1.025, duration: 0.38, repeat: 1, yoyo: true, ease: "sine.inOut" })
+          .call(completeScene, undefined, ">+=0.34");
       };
 
       const tl = gsap.timeline({ defaults: { ease: "power2.out" } });
       timelineRef.current = tl;
-      gsap.set([blackout, atmosphere, aura, beam, flash, cracks, lightning, silhouette, item, itemCopy, fakeResult, freeze], { opacity: 0 });
+      gsap.set([blackout, atmosphere, aura, beam, flash, cracks, lightning, silhouette, itemFocus, item, itemCopy, fakeResult, freeze], { opacity: 0 });
       gsap.set(shockwaves, { opacity: 0, scale: 0.12 });
       gsap.set(crackLines, { strokeDashoffset: 380 });
 
@@ -671,7 +680,7 @@ function GachaCinematicScene({ result, current, total, capsuleOnly, playbackRate
           <p className={styles.phase} aria-live="polite">{phase}</p>
         </div>
       </div>
-      <button type="button" className={styles.speed} data-active={playbackRate === 2} onClick={onTogglePlaybackRate} aria-label={`演出速度 ${playbackRate}倍`} aria-pressed={playbackRate === 2}>
+      <button type="button" className={styles.speed} data-active={playbackRate > 1} onClick={onTogglePlaybackRate} aria-label={`演出速度 ${playbackRate}倍`} aria-pressed={playbackRate > 1}>
         <span>×{playbackRate}</span><small>倍速</small>
       </button>
       <button type="button" className={styles.skip} onClick={skipAll} aria-label="残りのガチャ演出をすべてスキップ">
@@ -707,6 +716,7 @@ function GachaCinematicScene({ result, current, total, capsuleOnly, playbackRate
         </div>
 
         <div className={styles.reveal}>
+          <span ref={itemFocusRef} className={styles.itemFocus} aria-hidden="true" />
           {image ? (
             <>
               {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -774,7 +784,7 @@ export function GachaCinematic({ draw, onComplete }: { draw: AnimationDraw; onCo
   }, [playbackRate]);
 
   const togglePlaybackRate = useCallback(() => {
-    setPlaybackRate((currentRate) => currentRate === 1 ? 2 : 1);
+    setPlaybackRate((currentRate) => currentRate === 1 ? 2 : currentRate === 2 ? 3 : 1);
   }, []);
 
   useEffect(() => {
