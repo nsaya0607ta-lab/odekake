@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { BowlingFrame, BowlingScoreState } from "@/lib/games/wanko-bowling-score";
 import { BOWLING_FRAME_COUNT } from "@/lib/games/wanko-bowling-score";
 
@@ -117,65 +117,78 @@ export function ScoreBoard({
   bonusFrameIndex?: number;
   bonusAchieved?: boolean;
 }) {
+  const activeFrameRef = useRef<HTMLDivElement>(null);
+  const currentRoll = Math.min(3, (frames[currentFrameIndex]?.rolls.length ?? 0) + 1);
+
+  useEffect(() => {
+    activeFrameRef.current?.scrollIntoView({ behavior: "smooth", block: "nearest", inline: "center" });
+  }, [currentFrameIndex]);
+
   return (
-    <div className="relative -mx-2 -mt-2 w-[calc(100%+1rem)] overflow-hidden rounded-t-[22px] rounded-b-[10px] border border-white/15 bg-[#18251f]/92 px-1 py-1 shadow-[inset_0_1px_0_rgba(255,255,255,0.09),0_2px_5px_rgba(20,18,14,0.16)] backdrop-blur-[3px]" aria-label="10フレーム ボウリングスコアボード">
+    <div className="relative overflow-hidden border-b border-[#30435a] bg-[linear-gradient(180deg,#111b29_0%,#07101a_100%)] px-2 pb-2 pt-1.5 shadow-[0_8px_22px_rgba(0,0,0,0.36)]" aria-label="10フレーム ボウリングスコアボード">
       <style>{`
-        .wb-digital-number{display:grid;grid-auto-flow:column;grid-auto-columns:max-content;align-items:start;justify-content:center;column-gap:1px;height:12px;line-height:0}
-        .wb-digital-number.is-large{height:16px}
-        .wb-seven-digit{position:relative;display:block;width:7px;height:12px;flex:none;line-height:0}
-        .wb-seven-digit.is-large{width:9px;height:16px}
-        .wb-segment{position:absolute;display:block;border-radius:999px;background:rgba(191,234,153,.09);box-shadow:none;transition:background .12s ease,box-shadow .12s ease}
-        .wb-segment.is-on{background:#c7f3a2;box-shadow:0 0 4px rgba(199,243,162,.48)}
+        .wb-digital-number{display:grid;grid-auto-flow:column;grid-auto-columns:max-content;align-items:start;justify-content:center;column-gap:1px;height:13px;line-height:0}
+        .wb-digital-number.is-large{height:24px;column-gap:2px}
+        .wb-seven-digit{position:relative;display:block;width:8px;height:13px;flex:none;line-height:0}
+        .wb-seven-digit.is-large{width:14px;height:24px}
+        .wb-segment{position:absolute;display:block;border-radius:999px;background:rgba(113,210,255,.08);box-shadow:none;transition:background .12s ease,box-shadow .12s ease}
+        .wb-segment.is-on{background:#79e2ff;box-shadow:0 0 6px rgba(74,205,255,.68)}
         .wb-segment-a,.wb-segment-d,.wb-segment-g{left:1.2px;width:4.6px;height:1.35px}
-        .wb-seven-digit.is-large .wb-segment-a,.wb-seven-digit.is-large .wb-segment-d,.wb-seven-digit.is-large .wb-segment-g{left:1.7px;width:5.7px;height:1.6px}
-        .wb-segment-a{top:0}.wb-segment-g{top:5.25px}.wb-segment-d{bottom:0}.wb-seven-digit.is-large .wb-segment-g{top:7.1px}
+        .wb-seven-digit.is-large .wb-segment-a,.wb-seven-digit.is-large .wb-segment-d,.wb-seven-digit.is-large .wb-segment-g{left:2px;width:10px;height:2px}
+        .wb-segment-a{top:0}.wb-segment-g{top:5.7px}.wb-segment-d{bottom:0}.wb-seven-digit.is-large .wb-segment-g{top:11px}
         .wb-segment-b,.wb-segment-c,.wb-segment-e,.wb-segment-f{width:1.35px;height:4.35px}
-        .wb-seven-digit.is-large .wb-segment-b,.wb-seven-digit.is-large .wb-segment-c,.wb-seven-digit.is-large .wb-segment-e,.wb-seven-digit.is-large .wb-segment-f{width:1.6px;height:5.6px}
+        .wb-seven-digit.is-large .wb-segment-b,.wb-seven-digit.is-large .wb-segment-c,.wb-seven-digit.is-large .wb-segment-e,.wb-seven-digit.is-large .wb-segment-f{width:2px;height:9px}
         .wb-segment-b{right:0;top:.8px}.wb-segment-c{right:0;bottom:.8px}.wb-segment-e{left:0;bottom:.8px}.wb-segment-f{left:0;top:.8px}
-        .wb-roll-window{position:relative;display:block;width:7px;height:12px;overflow:hidden;flex:none;line-height:0}
-        .wb-roll-window.is-large{width:9px;height:16px}
-        .wb-roll-strip{position:absolute;left:0;top:0;display:grid;grid-template-rows:repeat(2,12px);width:100%;height:24px;align-items:start;animation:wb-score-roll .36s cubic-bezier(.2,.8,.2,1) both}
-        .wb-roll-strip.is-large{grid-template-rows:repeat(2,16px);height:32px;animation-duration:.48s}
+        .wb-roll-window{position:relative;display:block;width:8px;height:13px;overflow:hidden;flex:none;line-height:0}
+        .wb-roll-window.is-large{width:14px;height:24px}
+        .wb-roll-strip{position:absolute;left:0;top:0;display:grid;grid-template-rows:repeat(2,13px);width:100%;height:26px;align-items:start;animation:wb-score-roll .36s cubic-bezier(.2,.8,.2,1) both}
+        .wb-roll-strip.is-large{grid-template-rows:repeat(2,24px);height:48px;animation-duration:.48s}
         @keyframes wb-score-roll{from{transform:translate3d(0,0,0)}to{transform:translate3d(0,-50%,0)}}
         @media (prefers-reduced-motion:reduce){.wb-roll-strip,.wb-roll-strip.is-large{animation:none;transform:translate3d(0,-50%,0)}}
       `}</style>
 
-      <div className="grid grid-cols-[repeat(10,minmax(0,1fr))_1.45fr] gap-px">
+      <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-2 px-1 pb-1.5">
+        <div>
+          <p className="text-[7px] font-black tracking-[0.18em] text-[#7f96ac]">CURRENT</p>
+          <p className="mt-0.5 whitespace-nowrap text-[12px] font-black text-white">
+            FRAME {currentFrameIndex + 1}<span className="ml-1 text-[9px] text-[#79e2ff]">/ ROLL {currentRoll}</span>
+          </p>
+        </div>
+        <div className="rounded-[10px] border border-[#35536c] bg-black/35 px-3 py-1 text-center shadow-[inset_0_0_12px_rgba(64,190,255,0.08)]">
+          <p className="mb-1 text-[6px] font-black tracking-[0.2em] text-[#8da3b7]">LIVE SCORE</p>
+          <DigitalNumber value={liveScore} large />
+        </div>
+        <div className="text-right">
+          <p className="text-[7px] font-black tracking-[0.18em] text-[#7f96ac]">PERSONAL BEST</p>
+          <p className="mt-0.5 text-[18px] font-black tabular-nums text-[#ffd66c]">{bestScore ?? "---"}</p>
+          {lastRollPins !== null ? <p className="text-[7px] font-bold text-white/55">LAST +{lastRollPins}</p> : null}
+        </div>
+      </div>
+
+      <div className="overflow-x-auto overscroll-x-contain [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+        <div className="flex min-w-max gap-1">
         {frames.map((frame, index) => {
           const active = index === currentFrameIndex;
           const marks = frameRollMarks(frame, index);
           const result = score.frames[index];
-          const columns = index === BOWLING_FRAME_COUNT - 1 ? 3 : 2;
           const isBonusFrame = bonusFrameIndex === index;
           return (
             <div
               key={index}
-              className={`relative min-w-0 overflow-hidden rounded-[5px] border px-0 pb-[2px] pt-[1px] text-center transition-all ${active ? "border-[#b9e58e]/85 bg-[#456348]/82 shadow-[0_0_8px_rgba(185,229,142,0.20)]" : "border-white/10 bg-[#111b17]/62"} ${isBonusFrame ? "ring-1 ring-[#f1db91]/80" : ""}`}
+              ref={active ? activeFrameRef : undefined}
+              className={`relative w-[48px] overflow-hidden rounded-[8px] border text-center transition-all ${active ? "border-[#63d9ff] bg-[#19384b] shadow-[0_0_12px_rgba(78,206,255,0.28)]" : "border-white/10 bg-[#0a141f]"} ${isBonusFrame ? "ring-1 ring-[#ffd66c]/85" : ""}`}
             >
               {isBonusFrame ? (
-                <span
-                  className={`absolute -top-[3px] left-1/2 -translate-x-1/2 rounded-full px-[3px] text-[5px] font-black leading-[7px] ${bonusAchieved ? "bg-[#c9902f] text-white" : "bg-[#f1db91] text-[#5a3f12]"}`}
-                  aria-label={bonusAchieved ? "ボーナスチャンス成功" : "ボーナスチャンス"}
-                >
-                  {bonusAchieved ? "★" : "?"}
-                </span>
+                <span className={`absolute right-0.5 top-0.5 text-[7px] ${bonusAchieved ? "text-[#ffd66c]" : "text-white/55"}`} aria-label={bonusAchieved ? "ボーナスチャンス成功" : "ボーナスチャンス"}>{bonusAchieved ? "★" : "◆"}</span>
               ) : null}
-              <p className={`text-[6px] font-black leading-[8px] ${active ? "text-[#e4f7d1]" : "text-[#aeb9b0]"}`}>{index + 1}</p>
-              <div className="grid h-[13px] items-center border-y border-white/10 bg-black/16" style={{ gridTemplateColumns: `repeat(${columns}, minmax(0, 1fr))` }}>
-                {marks.map((mark, markIndex) => <span key={markIndex} className={`text-[7px] font-black tabular-nums leading-none ${mark === "X" || mark === "/" ? "text-[#f1db91]" : "text-[#edf2ee]"}`}>{mark}</span>)}
+              <p className={`h-[13px] text-[7px] font-black leading-[13px] ${active ? "text-[#8fe8ff]" : "text-[#8292a1]"}`}>{index + 1}</p>
+              <div className="flex h-[16px] items-center justify-center gap-1 border-y border-white/10 bg-black/20">
+                {marks.map((mark, markIndex) => <span key={markIndex} className={`text-[9px] font-black tabular-nums leading-none ${mark === "X" || mark === "/" ? "text-[#ffd66c]" : "text-[#eef7ff]"}`}>{mark || "·"}</span>)}
               </div>
-              <div className="flex h-[19px] items-center justify-center"><DigitalNumber value={result?.cumulativeScore ?? null} /></div>
+              <div className="flex h-[21px] items-center justify-center"><DigitalNumber value={result?.cumulativeScore ?? null} /></div>
             </div>
           );
         })}
-
-        <div className="min-w-0 overflow-hidden rounded-[6px] border border-[#d8c47b]/75 bg-[#101915]/82 px-[1px] pb-[1px] pt-[1px] text-center shadow-[inset_0_0_10px_rgba(216,196,123,0.06)]">
-          <div className="flex h-[8px] items-center justify-center gap-0.5">
-            <span className="text-[5px] font-black tracking-[0.06em] text-[#eadca7]">TOTAL</span>
-            {lastRollPins !== null ? <span className="text-[4px] font-black text-white/55">+{lastRollPins}</span> : null}
-          </div>
-          <div className="flex h-[24px] items-center justify-center border-y border-[#6d6445]/55 bg-black/18 leading-none"><DigitalNumber value={liveScore} large /></div>
-          <div className="flex h-[11px] items-center justify-center gap-0.5 text-[4px] font-black tracking-[0.02em] text-[#b8c4b9]"><span>BEST</span><span className="tabular-nums text-[#eadca7]">{bestScore ?? "---"}</span></div>
         </div>
       </div>
     </div>
