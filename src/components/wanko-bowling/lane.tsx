@@ -37,7 +37,7 @@ import {
   SPIN_AXIS_TILT_DEG,
 } from "@/lib/games/wanko-bowling-physics";
 
-const DOCK_Y = 94;
+const DOCK_Y = 90;
 const HEAD_PIN_SCREEN_Y = 19.5;
 const MIN_UPWARD_PCT = 8;
 const MAX_THROW_MS = 7000;
