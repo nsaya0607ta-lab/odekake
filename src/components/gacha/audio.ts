@@ -2,6 +2,11 @@ type GachaCue = "turn" | "drop" | "charge" | "crack" | "flash" | "explosion" | "
 
 let audioContext: AudioContext | null = null;
 let masterGain: GainNode | null = null;
+let cuePlaybackRate = 1;
+
+export function setGachaAudioPlaybackRate(rate: 1 | 2) {
+  cuePlaybackRate = rate;
+}
 
 function getAudioContext(): AudioContext | null {
   if (typeof window === "undefined") return null;
@@ -42,19 +47,20 @@ function tone(
   type: OscillatorType = "sine",
   delay = 0,
 ) {
-  const start = context.currentTime + delay;
+  const scaledDuration = duration / cuePlaybackRate;
+  const start = context.currentTime + delay / cuePlaybackRate;
   const oscillator = context.createOscillator();
   const gain = context.createGain();
   oscillator.type = type;
   oscillator.frequency.setValueAtTime(frequency, start);
-  oscillator.frequency.exponentialRampToValueAtTime(Math.max(20, endFrequency), start + duration);
+  oscillator.frequency.exponentialRampToValueAtTime(Math.max(20, endFrequency), start + scaledDuration);
   gain.gain.setValueAtTime(0.0001, start);
-  gain.gain.exponentialRampToValueAtTime(Math.max(0.0001, volume), start + Math.min(0.025, duration / 3));
-  gain.gain.exponentialRampToValueAtTime(0.0001, start + duration);
+  gain.gain.exponentialRampToValueAtTime(Math.max(0.0001, volume), start + Math.min(0.025 / cuePlaybackRate, scaledDuration / 3));
+  gain.gain.exponentialRampToValueAtTime(0.0001, start + scaledDuration);
   oscillator.connect(gain);
   gain.connect(masterGain ?? context.destination);
   oscillator.start(start);
-  oscillator.stop(start + duration + 0.02);
+  oscillator.stop(start + scaledDuration + 0.02);
 }
 
 type NoiseOptions = {
@@ -66,8 +72,9 @@ type NoiseOptions = {
 };
 
 function noise(context: AudioContext, duration: number, volume: number, options: NoiseOptions = {}) {
-  const start = context.currentTime + (options.delay ?? 0);
-  const length = Math.ceil(context.sampleRate * duration);
+  const scaledDuration = duration / cuePlaybackRate;
+  const start = context.currentTime + (options.delay ?? 0) / cuePlaybackRate;
+  const length = Math.ceil(context.sampleRate * scaledDuration);
   const buffer = context.createBuffer(1, length, context.sampleRate);
   const data = buffer.getChannelData(0);
   for (let index = 0; index < length; index += 1) {
@@ -83,13 +90,13 @@ function noise(context: AudioContext, duration: number, volume: number, options:
   filter.frequency.value = options.frequency ?? 900;
   filter.Q.value = options.q ?? 0.7;
   gain.gain.setValueAtTime(0.0001, start);
-  gain.gain.exponentialRampToValueAtTime(Math.max(0.0001, volume), start + Math.min(options.attack ?? 0.008, duration / 3));
-  gain.gain.exponentialRampToValueAtTime(0.0001, start + duration);
+  gain.gain.exponentialRampToValueAtTime(Math.max(0.0001, volume), start + Math.min((options.attack ?? 0.008) / cuePlaybackRate, scaledDuration / 3));
+  gain.gain.exponentialRampToValueAtTime(0.0001, start + scaledDuration);
   source.connect(filter);
   filter.connect(gain);
   gain.connect(masterGain ?? context.destination);
   source.start(start);
-  source.stop(start + duration + 0.02);
+  source.stop(start + scaledDuration + 0.02);
 }
 
 function ratchetClick(context: AudioContext, delay: number, pitch: number) {
