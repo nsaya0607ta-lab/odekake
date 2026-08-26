@@ -145,19 +145,19 @@ export function ScoreBoard({
 
       <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-2 px-1 pb-1.5">
         <div>
-          <p className="text-[7px] font-black tracking-[0.18em] text-[#7f96ac]">CURRENT</p>
+          <p className="text-[7px] font-black tracking-[0.12em] text-[#7f96ac]">現在</p>
           <p className="mt-0.5 whitespace-nowrap text-[12px] font-black text-white">
-            FRAME {currentFrameIndex + 1}<span className="ml-1 text-[9px] text-[#79e2ff]">/ ROLL {currentRoll}</span>
+            第{currentFrameIndex + 1}フレーム<span className="ml-1 text-[9px] text-[#79e2ff]">/ {currentRoll}投目</span>
           </p>
         </div>
         <div className="rounded-[10px] border border-[#35536c] bg-black/35 px-3 py-1 text-center shadow-[inset_0_0_12px_rgba(64,190,255,0.08)]">
-          <p className="mb-1 text-[6px] font-black tracking-[0.2em] text-[#8da3b7]">LIVE SCORE</p>
+          <p className="mb-1 text-[6px] font-black tracking-[0.12em] text-[#8da3b7]">現在スコア</p>
           <DigitalNumber value={liveScore} large />
         </div>
         <div className="text-right">
-          <p className="text-[7px] font-black tracking-[0.18em] text-[#7f96ac]">PERSONAL BEST</p>
+          <p className="text-[7px] font-black tracking-[0.1em] text-[#7f96ac]">自己ベスト</p>
           <p className="mt-0.5 text-[18px] font-black tabular-nums text-[#ffd66c]">{bestScore ?? "---"}</p>
-          {lastRollPins !== null ? <p className="text-[7px] font-bold text-white/55">LAST +{lastRollPins}</p> : null}
+          {lastRollPins !== null ? <p className="text-[7px] font-bold text-white/55">前投 +{lastRollPins}</p> : null}
         </div>
       </div>
 

@@ -31,16 +31,16 @@ export function BallPicker({
       <div className="relative overflow-hidden border-b border-white/10 px-4 pb-4 pt-5">
         <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_85%_0%,rgba(31,202,255,0.20),transparent_48%)]" />
         <div className="relative">
-          <p className="text-[9px] font-black tracking-[0.24em] text-[#54d8ff]">PLAYER EQUIPMENT</p>
+          <p className="text-[9px] font-black tracking-[0.16em] text-[#54d8ff]">プレイヤー装備</p>
           <h2 className="mt-1 text-xl font-black tracking-tight">ボールを選択</h2>
           <p className="mt-1.5 text-[11px] leading-relaxed text-white/55">
             性能はすべて同じです。お気に入りのボールで挑戦しよう。
           </p>
           <ol className="mt-4 grid grid-cols-3 gap-1.5" aria-label="ゲームの流れ">
             {[
-              ["01", "BALL"],
-              ["02", "POSITION"],
-              ["03", "THROW"],
+              ["01", "ボール"],
+              ["02", "位置決め"],
+              ["03", "投球"],
             ].map(([number, label], index) => (
               <li
                 key={label}
@@ -59,7 +59,7 @@ export function BallPicker({
       </div>
 
       <div className="border-b border-white/10 bg-[#0c1926] px-4 py-3" aria-live="polite">
-        <p className="text-[8px] font-black tracking-[0.18em] text-white/40">SELECTED BALL</p>
+        <p className="text-[8px] font-black tracking-[0.12em] text-white/40">選択中のボール</p>
         <p className="mt-0.5 truncate text-sm font-black text-white">{selectedBall.name}</p>
       </div>
 
@@ -103,7 +103,7 @@ export function BallPicker({
                   <span className="ml-0.5 text-[#ffc95c]">{"★".repeat(RARITY_STARS[ball.rarity])}</span>
                 </span>
               ) : (
-                <span className="text-[8px] font-black tracking-wide text-white/45">STANDARD</span>
+                <span className="text-[8px] font-black tracking-wide text-white/45">標準</span>
               )}
             </button>
           );

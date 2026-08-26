@@ -16,7 +16,7 @@ import {
 import { getBowlingBallVisual, type OwnedBowlingBall } from "@/lib/games/wanko-bowling-balls";
 
 type Phase = "select" | "playing" | "result";
-type Banner = "SPARE!!" | "STRIKE!!" | "TURKEY!!" | "BONUS STRIKE!!" | null;
+type Banner = "スペア！" | "ストライク！" | "ターキー！" | "ボーナスストライク！" | null;
 
 function isFreshRackRoll(frameIndex: number, priorRolls: number[]): boolean {
   if (frameIndex < BOWLING_FRAME_COUNT - 1) return priorRolls.length === 0;
@@ -258,14 +258,14 @@ export function WankoBowlingGame({ ownedBalls }: { ownedBalls: OwnedBowlingBall[
       if (isBonusFrame && priorRolls.length === 0 && !bonusAchievedRef.current) {
         bonusAchievedRef.current = true;
         setBonusAchieved(true);
-        nextBanner = "BONUS STRIKE!!";
+        nextBanner = "ボーナスストライク！";
       } else {
-        nextBanner = streakRef.current >= 3 ? "TURKEY!!" : "STRIKE!!";
+        nextBanner = streakRef.current >= 3 ? "ターキー！" : "ストライク！";
       }
       setShake(true);
       window.setTimeout(() => setShake(false), 450);
     } else if (spareCompleted) {
-      nextBanner = "SPARE!!";
+      nextBanner = "スペア！";
     }
 
     setBanner(nextBanner);
@@ -325,19 +325,19 @@ export function WankoBowlingGame({ ownedBalls }: { ownedBalls: OwnedBowlingBall[
           <div className="relative overflow-hidden border-b border-white/10 px-4 py-6 text-center">
             <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_50%_10%,rgba(84,216,255,0.24),transparent_58%)]" />
             <div className="relative">
-              <p className="text-[9px] font-black tracking-[0.28em] text-[#54d8ff]">FINAL RESULT</p>
-              <p className="mt-1 text-base font-black tracking-wide text-white/75">10 FRAMES COMPLETE</p>
-              <p className="mt-4 text-[10px] font-black tracking-[0.18em] text-white/40">FINAL SCORE</p>
+              <p className="text-[9px] font-black tracking-[0.18em] text-[#54d8ff]">最終結果</p>
+              <p className="mt-1 text-base font-black tracking-wide text-white/75">全10フレーム終了</p>
+              <p className="mt-4 text-[10px] font-black tracking-[0.12em] text-white/40">最終スコア</p>
               <p className="mt-0.5 font-mono text-[64px] font-black leading-none tracking-[-0.08em] text-white drop-shadow-[0_0_22px_rgba(84,216,255,0.4)]">
                 {score.total}
               </p>
               {isNewBest ? (
                 <p className="mx-auto mt-3 w-fit rounded-full border border-[#ffc95c]/50 bg-[#ffc95c]/10 px-4 py-1 text-[10px] font-black tracking-[0.18em] text-[#ffc95c]">
-                  NEW PERSONAL BEST
+                  自己ベスト更新
                 </p>
               ) : (
                 <p className="mt-3 text-[10px] font-bold text-white/45">
-                  PERSONAL BEST <span className="ml-1 font-mono text-white/80">{bestScore ?? score.total}</span>
+                  自己ベスト <span className="ml-1 font-mono text-white/80">{bestScore ?? score.total}</span>
                 </p>
               )}
             </div>
@@ -346,15 +346,15 @@ export function WankoBowlingGame({ ownedBalls }: { ownedBalls: OwnedBowlingBall[
           <div className="grid grid-cols-3 gap-2 p-4 text-center">
             <div className="rounded-[14px] border border-white/10 bg-white/[0.04] px-2 py-3">
               <p className="font-mono text-2xl font-black tabular-nums text-[#54d8ff]">{score.strikeCount}</p>
-              <p className="mt-0.5 text-[8px] font-black tracking-[0.14em] text-white/40">STRIKE</p>
+              <p className="mt-0.5 text-[8px] font-black tracking-[0.08em] text-white/40">ストライク</p>
             </div>
             <div className="rounded-[14px] border border-white/10 bg-white/[0.04] px-2 py-3">
               <p className="font-mono text-2xl font-black tabular-nums text-[#ffc95c]">{score.spareCount}</p>
-              <p className="mt-0.5 text-[8px] font-black tracking-[0.14em] text-white/40">SPARE</p>
+              <p className="mt-0.5 text-[8px] font-black tracking-[0.08em] text-white/40">スペア</p>
             </div>
             <div className="rounded-[14px] border border-white/10 bg-white/[0.04] px-2 py-3">
               <p className="font-mono text-2xl font-black tabular-nums text-white">{score.gutterCount}</p>
-              <p className="mt-0.5 text-[8px] font-black tracking-[0.14em] text-white/40">GUTTER</p>
+              <p className="mt-0.5 text-[8px] font-black tracking-[0.08em] text-white/40">ガター</p>
             </div>
           </div>
 
@@ -375,9 +375,9 @@ export function WankoBowlingGame({ ownedBalls }: { ownedBalls: OwnedBowlingBall[
             </div>
           ) : earnedCoins !== null ? (
             <div className="mx-4 mb-2 rounded-[14px] border border-[#ffc95c]/30 bg-[#ffc95c]/10 px-4 py-3 text-center">
-              <p className="text-[8px] font-black tracking-[0.18em] text-[#ffc95c]/70">COIN REWARD</p>
+              <p className="text-[8px] font-black tracking-[0.12em] text-[#ffc95c]/70">獲得コイン</p>
               <p className="mt-0.5 font-mono text-xl font-black text-[#ffc95c]">
-                +{earnedCoins.toLocaleString("ja-JP")} COIN
+                +{earnedCoins.toLocaleString("ja-JP")} コイン
               </p>
               {bonusAchieved ? (
                 <p className="mt-1 text-[9px] font-black text-[#ffc95c]">ボーナスチャンス成功・獲得量2倍</p>

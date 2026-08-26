@@ -30,15 +30,15 @@ export default async function WankoBowlingPage() {
       <header className="flex shrink-0 items-center gap-3 border-b border-[#26384b] bg-[linear-gradient(180deg,#121e2d,#08111c)] px-3 py-2 text-white shadow-[0_4px_18px_rgba(0,0,0,0.32)]">
         <Link href="/games" className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-white/15 bg-white/5 text-lg font-black active:scale-95" aria-label="ゲーム一覧へ戻る">‹</Link>
         <div className="min-w-0 flex-1">
-          <p className="text-[7px] font-black tracking-[0.24em] text-[#71dfff]">ODEKAKE SPORTS</p>
-          <h1 className="truncate text-[15px] font-black tracking-[0.04em]">WANKO BOWLING</h1>
+          <p className="text-[7px] font-black tracking-[0.16em] text-[#71dfff]">おでかけスポーツ</p>
+          <h1 className="truncate text-[15px] font-black tracking-[0.04em]">わんこボウリング</h1>
         </div>
           <a
             href="#wanko-bowling-ranking"
             className="pressable shrink-0 rounded-full border border-[#4b6a83] bg-[#102538] px-3 py-2 text-[9px] font-black leading-none text-[#cbeeff] active:scale-[0.97]"
             aria-label="フレンドのスコアを見る"
           >
-            RANKING
+            フレンド
           </a>
       </header>
 
@@ -50,7 +50,7 @@ export default async function WankoBowlingPage() {
           <WankoBowlingGame ownedBalls={ownedBalls} />
         </div>
 
-        <div id="wanko-bowling-ranking" className="scroll-mt-3 bg-paper px-2 pb-6 pt-3">
+        <div id="wanko-bowling-ranking" className="scroll-mt-3 bg-[#050a11] px-2 pb-6 pt-3">
           <WankoBowlingRanking />
         </div>
       </main>
