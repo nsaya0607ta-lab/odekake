@@ -4,7 +4,7 @@ let audioContext: AudioContext | null = null;
 let masterGain: GainNode | null = null;
 let cuePlaybackRate = 1;
 
-export function setGachaAudioPlaybackRate(rate: 1 | 2) {
+export function setGachaAudioPlaybackRate(rate: 1 | 2 | 3) {
   cuePlaybackRate = rate;
 }
 
