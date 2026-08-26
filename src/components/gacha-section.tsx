@@ -1,5 +1,6 @@
 "use client";
 
+import dynamic from "next/dynamic";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useId, useRef, useState } from "react";
 import { createPortal } from "react-dom";
@@ -12,27 +13,25 @@ import {
   type GachaRarity,
 } from "@/lib/gacha/config";
 import { GachaMachineArt, SparkleArt } from "./coin-art";
+import { primeGachaAudio } from "./gacha/audio";
+import type { AnimationDraw, DrawResult } from "./gacha/types";
 import { IconClose, IconCoin } from "./icons";
 
-type DrawResult = {
-  id: string;
-  name: string;
-  rarity: string;
-  type: string;
-  image: string | null;
-  isNew: boolean;
-  previousLevel: number;
-  newLevel: number;
-};
+const GachaCinematic = dynamic(
+  () => import("./gacha/gacha-cinematic").then((module) => module.GachaCinematic),
+  {
+    ssr: false,
+    loading: () => (
+      <div className="fixed inset-0 z-[140] grid place-items-center bg-[#070807] text-sm font-black tracking-[0.12em] text-white">
+        演出準備中…
+      </div>
+    ),
+  },
+);
 
 function formatLevelTag(level: number): string {
   return level >= 5 ? "Lv.MAX" : `Lv${level}`;
 }
-
-type AnimationDraw = {
-  plan: GachaPlanId;
-  results: DrawResult[];
-};
 
 type ResultState = {
   plan: GachaPlanId;
@@ -132,6 +131,7 @@ export function GachaSection({ balance }: { balance: number }) {
   const draw = useCallback(
     async (planId: GachaPlanId) => {
       if (inFlight.current) return;
+      primeGachaAudio();
       inFlight.current = true;
       setPending(planId);
       setError(null);
@@ -272,12 +272,12 @@ export function GachaSection({ balance }: { balance: number }) {
           />,
           document.body,
         )}
-      {animation && createPortal(<GachaAnimationModal draw={animation} onComplete={finishAnimation} />, document.body)}
+      {animation && createPortal(<GachaCinematic draw={animation} onComplete={finishAnimation} />, document.body)}
     </section>
   );
 }
 
-function GachaAnimationModal({
+export function LegacyGachaAnimationModal({
   draw,
   onComplete,
 }: {
@@ -364,7 +364,7 @@ function GachaAnimationModal({
 
         <div className="gacha-scene relative mt-2 aspect-video overflow-hidden rounded-[24px] border border-[#eee4cf] bg-[#fbf6ed]">
           {!isMulti && singlePhase === "open" && draw.results[0] ? (
-            <ReferenceOpenScene result={draw.results[0]} />
+            <_ReferenceOpenScene result={draw.results[0]} />
           ) : (
             <>
               <span className={`gacha-machine-stage absolute left-[29%] top-[2%] h-[95%] -translate-x-1/2 ${singlePhase === "machine" || isMulti ? "is-running" : ""}`}>
@@ -374,13 +374,13 @@ function GachaAnimationModal({
 
               {!isMulti && visibleCount > 0 && draw.results[0] && (
                 <div className="gacha-capsule-rollout absolute bottom-5 right-[6%]">
-                  <Capsule result={draw.results[0]} large />
+                  <LegacyCapsule result={draw.results[0]} large />
                 </div>
               )}
 
               {currentResult && (
                 <div key={`${currentResult.id}-${visibleCount}`} className="gacha-capsule-rollout gacha-capsule-sequence absolute bottom-5 right-[8%]">
-                  <Capsule result={currentResult} large />
+                  <LegacyCapsule result={currentResult} large />
                 </div>
               )}
 
@@ -399,7 +399,7 @@ function GachaAnimationModal({
                 <li key={`${result.id}-${index}`} className="flex min-w-0 flex-col items-center">
                   <span className="mb-1 text-[9px] font-bold text-[#9a896f]">{index + 1}</span>
                   <span className={visible ? "gacha-capsule-pop" : "opacity-0"}>
-                    <Capsule result={result} />
+                    <LegacyCapsule result={result} />
                   </span>
                 </li>
               );
@@ -424,7 +424,7 @@ function GachaAnimationModal({
   );
 }
 
-function ReferenceOpenScene({ result }: { result: DrawResult }) {
+function _ReferenceOpenScene({ result }: { result: DrawResult }) {
   const isUr = result.rarity === "UR";
 
   return (
@@ -450,7 +450,7 @@ function ReferenceOpenScene({ result }: { result: DrawResult }) {
   );
 }
 
-function Capsule({ result, open = false, large = false }: { result: DrawResult; open?: boolean; large?: boolean }) {
+export function LegacyCapsule({ result, open = false, large = false }: { result: DrawResult; open?: boolean; large?: boolean }) {
   const rarity = validRarity(result.rarity);
   const gradientId = `capsule-${useId().replaceAll(":", "")}`;
   const size = large ? "h-[112px] w-[112px]" : "h-[52px] w-[52px]";

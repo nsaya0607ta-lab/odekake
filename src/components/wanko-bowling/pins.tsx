@@ -42,37 +42,57 @@ export const PIN_LAYOUT: readonly PinLayout[] = [
 
 type PinsProps = {
   registerNode: (id: number, el: HTMLDivElement | null) => void;
+  goldenPinId?: number | null;
 };
 
-export function Pins({ registerNode }: PinsProps) {
+export function Pins({ registerNode, goldenPinId = null }: PinsProps) {
   return (
     <div className="pointer-events-none absolute inset-0">
-      {PIN_LAYOUT.map((pin) => (
-        <div
-          key={pin.id}
-          ref={(el) => registerNode(pin.id, el)}
-          className="absolute"
-          style={{
-            left: `${pin.x}%`,
-            top: `${pin.y}%`,
-            width: `${PIN_VISUAL_WIDTH_PCT}%`,
-            zIndex: 100 - Math.round(pin.y * 2),
-            transform: "translate(-50%, -50%)",
-          }}
-        >
-          <svg className="block h-auto w-full" viewBox="0 0 20 34" aria-hidden="true">
-            <ellipse cx="10" cy="31" rx="6.5" ry="2.4" fill="rgba(58,36,22,0.18)" />
-            <path
-              d="M10 1.5c2.3 0 3.6 2 3.2 4.1-.3 1.5-1.3 2.4-1.3 3.9 0 1.7 2.9 3.9 3.9 7.6.9 3.4.9 6.9-.4 9.9-.9 2-2.8 3.4-5.4 3.4s-4.5-1.4-5.4-3.4c-1.3-3-1.3-6.5-.4-9.9 1-3.7 3.9-5.9 3.9-7.6 0-1.5-1-2.4-1.3-3.9C6.4 3.5 7.7 1.5 10 1.5Z"
-              fill="#f7f2e8"
-              stroke="rgba(58,36,22,0.34)"
-              strokeWidth="1"
-            />
-            <rect x="4.3" y="11.8" width="11.4" height="1.9" rx="0.95" fill="#b53632" />
-            <rect x="4.7" y="14.2" width="10.6" height="1.7" rx="0.85" fill="#b53632" />
-          </svg>
-        </div>
-      ))}
+      {PIN_LAYOUT.map((pin) => {
+        const golden = pin.id === goldenPinId;
+        return (
+          <div
+            key={pin.id}
+            ref={(el) => registerNode(pin.id, el)}
+            className="absolute"
+            style={{
+              left: `${pin.x}%`,
+              top: `${pin.y}%`,
+              width: `${PIN_VISUAL_WIDTH_PCT}%`,
+              zIndex: 100 - Math.round(pin.y * 2),
+              transform: "translate(-50%, -50%)",
+              filter: golden
+                ? "drop-shadow(0 0 3px rgba(255,211,77,0.95)) drop-shadow(0 0 7px rgba(255,157,0,0.7))"
+                : undefined,
+            }}
+          >
+            {golden ? (
+              <span className="absolute left-1/2 top-1/2 h-[145%] w-[190%] -translate-x-1/2 -translate-y-1/2 animate-pulse rounded-full bg-[#ffd34d]/20 blur-[3px]" />
+            ) : null}
+            <svg className="relative block h-auto w-full" viewBox="0 0 20 34" aria-hidden="true">
+              {golden ? (
+                <defs>
+                  <linearGradient id={`golden-pin-${pin.id}`} x1="3" y1="2" x2="17" y2="31" gradientUnits="userSpaceOnUse">
+                    <stop stopColor="#fff7b0" />
+                    <stop offset="0.34" stopColor="#ffd64f" />
+                    <stop offset="0.72" stopColor="#d99108" />
+                    <stop offset="1" stopColor="#8a4a00" />
+                  </linearGradient>
+                </defs>
+              ) : null}
+              <ellipse cx="10" cy="31" rx="6.5" ry="2.4" fill={golden ? "rgba(255,185,30,0.36)" : "rgba(58,36,22,0.18)"} />
+              <path
+                d="M10 1.5c2.3 0 3.6 2 3.2 4.1-.3 1.5-1.3 2.4-1.3 3.9 0 1.7 2.9 3.9 3.9 7.6.9 3.4.9 6.9-.4 9.9-.9 2-2.8 3.4-5.4 3.4s-4.5-1.4-5.4-3.4c-1.3-3-1.3-6.5-.4-9.9 1-3.7 3.9-5.9 3.9-7.6 0-1.5-1-2.4-1.3-3.9C6.4 3.5 7.7 1.5 10 1.5Z"
+                fill={golden ? `url(#golden-pin-${pin.id})` : "#f7f2e8"}
+                stroke={golden ? "rgba(255,238,142,0.9)" : "rgba(58,36,22,0.34)"}
+                strokeWidth="1"
+              />
+              <rect x="4.3" y="11.8" width="11.4" height="1.9" rx="0.95" fill={golden ? "#fff0a0" : "#b53632"} />
+              <rect x="4.7" y="14.2" width="10.6" height="1.7" rx="0.85" fill={golden ? "#a65a00" : "#b53632"} />
+            </svg>
+          </div>
+        );
+      })}
     </div>
   );
 }

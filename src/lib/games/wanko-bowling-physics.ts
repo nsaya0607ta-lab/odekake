@@ -34,24 +34,21 @@ export const JB_BALL_DIAMETER_M = (0.2159 + 0.2183) / 2;
  */
 export const GAME_BALL_MASS_KG = 6.8;
 
-/** JAPAN BOWLING掲載の大会パターン例 42ft。ゲームの標準オイル長として採用。 */
-export const GAME_OIL_LENGTH_M = 42 * 0.3048;
 /**
- * 論文の基準条件（軌道再現テスト）で使われている40ftフラットオイルパターン。
- * ゲーム本番では使わない検証専用の値（ゲーム本番は上のGAME_OIL_LENGTH_M=42ftを使う）。
+ * Ji et al. (AIP Advances, 2025, DOI: 10.1063/5.0247761) の
+ * 基準軌道で使われている40ftフラットオイルパターン。
  */
-export const PAPER_REFERENCE_OIL_LENGTH_M = 40 * 0.3048;
+export const GAME_OIL_LENGTH_M = 40 * 0.3048;
+/** 既存の軌道再現テストとの互換用エイリアス。 */
+export const PAPER_REFERENCE_OIL_LENGTH_M = GAME_OIL_LENGTH_M;
 
 /**
- * スワイプ速度の差を体感できるゲーム用速度レンジ。
- * 下限27km/hは実物のリリース速度（USBCの実測研究でピンキャリー率が
- * 最大になるとされる16〜18mph＝約26〜29km/h帯や、論文の基準投球条件
- * 8.0m/s=28.8km/hとも重なる範囲）に合わせている。
- * 上限45km/hはゲームの爽快感を優先した値で、実物のプロボウラーの
- * 上限（20〜24mph≒32〜39km/h）よりやや高め。
+ * プレイヤーのスワイプから作るリリース初速レンジ。
+ * 25〜40km/h（6.94〜11.11m/s）へ必ずクランプし、論文の基準投球
+ * 8.0m/s（28.8km/h）もこの範囲に含める。
  */
-export const GAME_MIN_BALL_SPEED_KMH = 27;
-export const GAME_MAX_BALL_SPEED_KMH = 45;
+export const GAME_MIN_BALL_SPEED_KMH = 25;
+export const GAME_MAX_BALL_SPEED_KMH = 40;
 
 /**
  * ピンが底縁を支点に倒れ始めるために必要な重心上昇を簡易モデル化。
@@ -96,7 +93,10 @@ export const PIN_CHAIN_KNOCK_SPEED_MPS = idealTipSpeedMps * 1.45;
  */
 /** 接触点計算に使うボール半径。論文の基準値そのもの。 */
 export const BALL_SPIN_RADIUS_M = 0.1085;
-/** レーン摩擦係数の代表値（オイル区間／ドライ区間）。Banerjee & McPhee (2014) の実測値と一致。 */
+/**
+ * Ji et al. のシミュレーションで使われる代表的な動摩擦係数。
+ * オイル面 μ=0.04、ドライ面 μ=0.20。
+ */
 export const OIL_FRICTION_MU = 0.04;
 export const DRY_FRICTION_MU = 0.20;
 
@@ -146,9 +146,9 @@ export const BALL_INT_DIFFERENTIAL_M = 0; // IntDiff
  *   omegaY = -sign(curveNorm) * horizontalSpin * sin(axisRotation)
  *   omegaZ = spinMagnitude * sin(axisTilt)
  *
- * releaseSpeed=8.0m/s・axisRotation=45°で(-30,-30,+10)にほぼ一致することを
- * 検証済み（誤差0.1%未満、GAME_REFERENCE_SPEED_MPS・SPIN_MAGNITUDE_REF_RAD_S
- * は検証用の参照値として残す）。curveNorm（プレイヤーのカーブ入力）は
+ * 論文基準の回転量416rpm・axisRotation=45°では(-30,-30,+10)にほぼ一致する。
+ * ゲーム本番では投球速度に応じて275〜416rpmへ補間するため、8.0m/s時の
+ * 回転量は基準ベクトルより小さい。curveNorm（プレイヤーのカーブ入力）は
  * axisRotationのみを決め、omegaYへ直接掛けることはしない。
  */
 export const SPIN_MAGNITUDE_REF_RAD_S = Math.sqrt(30 * 30 + 30 * 30 + 10 * 10); // ≒43.589 rad/s ≒416rpm
@@ -177,9 +177,8 @@ export function spinMagnitudeRadSAtSpeed(speedMps: number): number {
 }
 
 /**
- * ユーザーが大きく曲げたスワイプでより強いフックを選べるよう、
- * 実効最大値を競技者の実測レンジ上限45〜55°程度に合わせて55°まで許可する。
- * 入力感度はAXIS_ROTATION_INPUT_EXPONENT=0.8のまま維持する。
+ * USBC Ball Motion Study のロボット投球条件（axis rotation 55°）を
+ * カーブ入力の上限として採用する。
  */
 export const MAX_AXIS_ROTATION_DEG = 55;
 /**

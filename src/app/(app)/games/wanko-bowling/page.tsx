@@ -1,7 +1,8 @@
+import Link from "next/link";
 import { WankoBowlingGame } from "@/components/wanko-bowling-game";
 import { WankoBowlingRanking } from "@/components/wanko-bowling-ranking";
+import { BowlingPlayGuide } from "@/components/wanko-bowling/play-guide";
 import { BowlingScreenLock } from "@/components/wanko-bowling/screen-lock";
-import { TopHeader } from "@/components/page-header";
 import { COLLECTION_ITEMS } from "@/lib/collection/items";
 import { getOwnedItemCounts } from "@/lib/data/collection";
 import { BOWLING_BALL_ITEM_IDS } from "@/lib/games/wanko-bowling-balls";
@@ -24,40 +25,24 @@ export default async function WankoBowlingPage() {
   });
 
   return (
-    <div className="fixed inset-0 z-[50] flex h-dvh flex-col overflow-hidden bg-paper">
-      <style>{`
-        /* 位置決めUIはレーン左上に固定し、投球開始領域から離す。 */
-        [data-bowling-gesture-block="true"] > div[data-bowling-position-controls="true"] {
-          left: 12px !important;
-          top: 12px !important;
-          bottom: auto !important;
-          transform: scale(0.92);
-          transform-origin: left top;
-        }
-
-        @media (max-height: 720px) {
-          [data-bowling-gesture-block="true"] > div[data-bowling-position-controls="true"] {
-            top: 10px !important;
-          }
-        }
-      `}</style>
-
+    <div className="fixed inset-0 z-[50] flex h-dvh flex-col overflow-hidden bg-[#050a11]">
       <BowlingScreenLock />
 
-      <TopHeader
-        backHref="/games"
-        title="わんこボウリング"
-        subtitle="調整中：プレイはできますが、内容は今後変更されることがあります"
-        action={(
+      <header className="flex shrink-0 items-center gap-3 border-b border-[#26384b] bg-[linear-gradient(180deg,#121e2d,#08111c)] px-3 py-2 text-white shadow-[0_4px_18px_rgba(0,0,0,0.32)]">
+        <Link href="/games" className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-white/15 bg-white/5 text-lg font-black active:scale-95" aria-label="ゲーム一覧へ戻る">‹</Link>
+        <div className="min-w-0 flex-1">
+          <p className="text-[7px] font-black tracking-[0.16em] text-[#71dfff]">おでかけスポーツ</p>
+          <h1 className="truncate text-[15px] font-black tracking-[0.04em]">わんこボウリング</h1>
+        </div>
+          <BowlingPlayGuide />
           <a
             href="#wanko-bowling-ranking"
-            className="pressable shrink-0 rounded-full border border-[#c9b88e] bg-[#fffaf0] px-2.5 py-2 text-[9px] font-black leading-none text-leaf-deep shadow-[0_2px_7px_rgba(85,63,31,0.08)] active:scale-[0.97]"
+            className="pressable flex h-8 shrink-0 items-center rounded-full border border-[#4b6a83] bg-[#102538] px-2.5 text-[9px] font-black leading-none text-[#cbeeff] active:scale-[0.97]"
             aria-label="フレンドのスコアを見る"
           >
-            フレンドのスコアを見る
+            フレンド
           </a>
-        )}
-      />
+      </header>
 
       <main id="wanko-bowling-scroll" className="min-h-0 flex-1 overflow-y-auto overscroll-none scroll-smooth">
         <div
@@ -67,7 +52,7 @@ export default async function WankoBowlingPage() {
           <WankoBowlingGame ownedBalls={ownedBalls} />
         </div>
 
-        <div id="wanko-bowling-ranking" className="scroll-mt-3 px-2 pb-6 pt-3">
+        <div id="wanko-bowling-ranking" className="scroll-mt-3 bg-[#050a11] px-2 pb-6 pt-3">
           <WankoBowlingRanking />
         </div>
       </main>

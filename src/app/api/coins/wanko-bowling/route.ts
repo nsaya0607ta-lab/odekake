@@ -2,9 +2,11 @@ import { NextResponse } from "next/server";
 import {
   BOWLING_FRAME_COUNT,
   calculateBowlingScore,
-  getBonusFrameIndex,
+  countGoldenPinHits,
+  isValidBowlingPinFalls,
   isValidCompletedBowlingFrames,
   type BowlingFrame,
+  type BowlingPinFalls,
 } from "@/lib/games/wanko-bowling-score";
 import { checkRateLimit } from "@/lib/rate-limit";
 import { requireUser } from "@/lib/supabase/server";
@@ -24,6 +26,7 @@ export async function POST(request: Request) {
   const body = (await request.json().catch(() => null)) as {
     roundId?: unknown;
     frames?: unknown;
+    pinFalls?: unknown;
   } | null;
 
   if (
@@ -36,17 +39,19 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "ゲーム結果が正しくありません。" }, { status: 400 });
   }
 
-  // 合計点やSTRIKE/SPARE/GUTTER回数、ボーナスチャンス成功はクライアント値を一切信用しない。
-  // 合法な投球列だけ受け取り、同じ純粋関数でサーバー側から再計算する。
+  // 合計点やストライク等の回数、ゴールデンピン成功数はクライアント値を信用しない。
+  // 合法な投球列とピン番号を検証し、同じ純粋関数でサーバー側から再計算する。
   const frames = body.frames as BowlingFrame[];
+  if (!isValidBowlingPinFalls(frames, body.pinFalls)) {
+    return NextResponse.json({ error: "ゲーム結果が正しくありません。" }, { status: 400 });
+  }
+  const pinFalls = body.pinFalls as BowlingPinFalls;
   const finalState = calculateBowlingScore(frames);
   if (!finalState.isComplete) {
     return NextResponse.json({ error: "ゲーム結果が正しくありません。" }, { status: 400 });
   }
 
-  const bonusFrameIndex = getBonusFrameIndex(body.roundId);
-  const bonusFrame = frames[bonusFrameIndex];
-  const bonusHit = bonusFrame?.rolls[0] === 10;
+  const goldenHits = countGoldenPinHits(body.roundId, pinFalls);
 
   // 1ゲーム数十秒〜数分を想定。直接APIを連打してコインを稼ぐ被害も抑える。
   const limit = checkRateLimit(`wanko-bowling:${user.id}`, 30, 60 * 60_000);
@@ -66,7 +71,7 @@ export async function POST(request: Request) {
       p_spare_count: number;
       p_gutter_count: number;
       p_frame_count: number;
-      p_bonus_hit: boolean;
+      p_golden_hits: number;
     },
   ) => Promise<RpcResponse>;
 
@@ -77,7 +82,7 @@ export async function POST(request: Request) {
     p_spare_count: finalState.spareCount,
     p_gutter_count: finalState.gutterCount,
     p_frame_count: BOWLING_FRAME_COUNT,
-    p_bonus_hit: bonusHit,
+    p_golden_hits: goldenHits,
   });
 
   if (error) {
@@ -91,6 +96,8 @@ export async function POST(request: Request) {
       ok: true,
       applied: result.applied === true,
       score: finalState.total,
+      goldenHits,
+      goldenBonusCoins: goldenHits * 10,
       coins: typeof result.coins === "number" ? result.coins : 0,
       balance: typeof result.balance === "number" ? result.balance : 0,
     },

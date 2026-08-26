@@ -47,7 +47,8 @@ const PIN_COLLISION_RADIUS_M = BALL_RADIUS_M + PIN_RADIUS_M;
 const PIN_PAIR_RADIUS_M = JB_PIN_DIAMETER_M;
 const FALLEN_PIN_EXTRA_REACH_M = Math.max(0, JB_PIN_HEIGHT_M / 2 - PIN_RADIUS_M) * 0.82;
 const BALL_EXIT_DISTANCE_M = JB_HEAD_PIN_DISTANCE_M + 1.15;
-const MAX_LAUNCH_ANGLE_RAD = 16 * Math.PI / 180;
+/** Ji et al. の探索範囲（0〜6°）に合わせた左右の最大投球角度。 */
+const MAX_LAUNCH_ANGLE_RAD = 6 * Math.PI / 180;
 const GUTTER_BALL_DRAG_PER_SEC = 0.035;
 const FOUL_LINE_Y = 97;
 const PIN_ROW_DEPTH_M = JB_PIN_SPACING_M * Math.sqrt(3) / 2;
@@ -59,10 +60,6 @@ const HEAD_PIN_LANE_APPROACH_SLOPE_PCT_PER_M = (20 * 0.68) / JB_HEAD_PIN_DISTANC
 const PIN_DECK_LANE_QUADRATIC_TERM_PCT_PER_M2 =
   (PIN_DECK_LANE_CONVERGENCE_PCT - HEAD_PIN_LANE_APPROACH_SLOPE_PCT_PER_M * PIN_DECK_DEPTH_M)
   / (PIN_DECK_DEPTH_M * PIN_DECK_DEPTH_M);
-const TARGET_BOARDS = [5, 10, 15, 20, 25, 30, 35] as const;
-const GUIDE_DISTANCE_M = 7 * 0.3048;
-const TARGET_DISTANCE_M = 15 * 0.3048;
-
 const CURVE_DEAD_ZONE_RAD = 5 * Math.PI / 180;
 const CURVE_FULL_SCALE_RAD = 20 * Math.PI / 180;
 const CURVE_BOW_DEAD_ZONE_PCT = 0.8;
@@ -121,6 +118,7 @@ export type LaneRollResult = {
 
 type LaneProps = {
   ballVisual: BowlingBallVisual;
+  goldenPinId?: number | null;
   resetSignal: number;
   newGameSignal: number;
   active: boolean;
@@ -230,11 +228,6 @@ function screenXToVirtualWorldX(screenXPct: number, distanceM: number): number {
   const leftLaneEdge = 50 - halfLane;
   const laneT = (screenXPct - leftLaneEdge) / Math.max(0.001, halfLane * 2);
   return JB_GUTTER_WIDTH_M + laneT * JB_LANE_WIDTH_M;
-}
-
-function boardXToPct(board: number, distanceM: number): number {
-  const normalized = (board - 20) / 20;
-  return 50 + normalized * laneHalfWidthPct(distanceM);
 }
 
 function ballVisualWidthPct(distanceM: number): number {
@@ -495,8 +488,6 @@ const NEAR_OUTER_LEFT = NEAR_LANE_LEFT - NEAR_GUTTER;
 const NEAR_OUTER_RIGHT = NEAR_LANE_RIGHT + NEAR_GUTTER;
 const FAR_OUTER_LEFT = FAR_LANE_LEFT - FAR_GUTTER;
 const FAR_OUTER_RIGHT = FAR_LANE_RIGHT + FAR_GUTTER;
-const GUIDE_DOTS_Y = worldYToPct(GUIDE_DISTANCE_M);
-const TARGET_ARROWS_Y = worldYToPct(TARGET_DISTANCE_M);
 const OIL_END_Y = worldYToPct(GAME_OIL_LENGTH_M);
 const OIL_HALF = laneHalfWidthPct(GAME_OIL_LENGTH_M);
 const OIL_LEFT = 50 - OIL_HALF;
@@ -506,7 +497,7 @@ const LEFT_GUTTER_CENTER_M = JB_GUTTER_WIDTH_M / 2;
 const RIGHT_GUTTER_CENTER_M = JB_GUTTER_WIDTH_M + JB_LANE_WIDTH_M + JB_GUTTER_WIDTH_M / 2;
 const MAX_START_OFFSET_M = 0.4249;
 
-export function Lane({ ballVisual, resetSignal, newGameSignal, active, onRoll }: LaneProps) {
+export function Lane({ ballVisual, goldenPinId = null, resetSignal, newGameSignal, active, onRoll }: LaneProps) {
   const boardRef = useRef<HTMLDivElement>(null);
   const ballRef = useRef<HTMLDivElement>(null);
   const throwingRef = useRef(false);
@@ -517,7 +508,6 @@ export function Lane({ ballVisual, resetSignal, newGameSignal, active, onRoll }:
   const ballStartXRef = useRef(DEFAULT_BALL_START_X_M);
   const positionLockedRef = useRef(false);
   const [positionLocked, setPositionLockedState] = useState(false);
-  const [startOffsetM, setStartOffsetM] = useState<number>(0);
   const [isThrowing, setIsThrowing] = useState(false);
   const pinBodiesRef = useRef<Map<number, PinBody>>(
     new Map(PIN_LAYOUT.map((pin) => [pin.id, createPinBody(pin)])),
@@ -615,7 +605,6 @@ export function Lane({ ballVisual, resetSignal, newGameSignal, active, onRoll }:
     );
     const startXM = DEFAULT_BALL_START_X_M + offsetM;
     ballStartXRef.current = startXM;
-    setStartOffsetM(offsetM);
     setBallPosition(startXM, 0, 0);
   }, [setBallPosition]);
 
@@ -667,7 +656,6 @@ export function Lane({ ballVisual, resetSignal, newGameSignal, active, onRoll }:
 
   useEffect(() => {
     ballStartXRef.current = DEFAULT_BALL_START_X_M;
-    setStartOffsetM(0);
     setPositionLocked(false);
     setBallPosition(DEFAULT_BALL_START_X_M, 0, 0);
   }, [newGameSignal, setPositionLocked, setBallPosition]);
@@ -1165,16 +1153,26 @@ export function Lane({ ballVisual, resetSignal, newGameSignal, active, onRoll }:
         touchAction: "none",
         overscrollBehavior: "none",
         borderRadius: "22px 22px 26px 26px",
-        background: "linear-gradient(180deg, #241914 0%, #39251a 45%, #2b1b13 100%)",
-        boxShadow: "inset 0 1px 0 rgba(255,255,255,0.18), inset 0 -20px 32px -24px rgba(0,0,0,0.8)",
+        background: "radial-gradient(ellipse at 50% 5%, rgba(103,152,190,0.22), transparent 25%), linear-gradient(180deg, #050a10 0%, #15171a 24%, #302016 63%, #21140f 100%)",
+        boxShadow: "inset 0 1px 0 rgba(255,255,255,0.18), inset 0 22px 34px -22px rgba(0,0,0,0.95), inset 0 -28px 42px -28px rgba(0,0,0,0.9)",
       }}
     >
+      <div
+        className="pointer-events-none absolute left-1/2 top-0 h-[24%] w-[54%] -translate-x-1/2"
+        style={{
+          background: "linear-gradient(180deg, rgba(4,8,13,0.96), rgba(13,19,25,0.78) 58%, transparent)",
+          clipPath: `polygon(${50 - FAR_OUTER_LEFT}% 0%, ${50 + FAR_OUTER_LEFT}% 0%, ${100 - FAR_OUTER_LEFT}% 100%, ${FAR_OUTER_LEFT}% 100%)`,
+          filter: "drop-shadow(0 12px 18px rgba(0,0,0,0.5))",
+        }}
+        aria-hidden="true"
+      />
+
       <div
         className="pointer-events-none absolute inset-0"
         style={{
           clipPath: `polygon(${FAR_LANE_LEFT}% 0%, ${FAR_LANE_RIGHT}% 0%, ${NEAR_LANE_RIGHT}% 100%, ${NEAR_LANE_LEFT}% 100%)`,
-          background: "linear-gradient(180deg, #e6bd7d 0%, #ddb170 42%, #d29d5b 100%)",
-          boxShadow: "inset 0 0 24px rgba(104,67,34,0.16)",
+          background: "radial-gradient(ellipse at 50% 92%, rgba(255,230,177,0.34), transparent 52%), linear-gradient(180deg, #ba7b43 0%, #dca766 34%, #e6bd7d 72%, #cc9252 100%)",
+          boxShadow: "inset 0 0 28px rgba(63,35,17,0.24), inset 0 -18px 22px rgba(83,42,18,0.14)",
         }}
         aria-hidden="true"
       />
@@ -1183,8 +1181,8 @@ export function Lane({ ballVisual, resetSignal, newGameSignal, active, onRoll }:
         className="pointer-events-none absolute inset-0"
         style={{
           clipPath: `polygon(${FAR_OUTER_LEFT}% 0%, ${FAR_LANE_LEFT}% 0%, ${NEAR_LANE_LEFT}% 100%, ${NEAR_OUTER_LEFT}% 100%)`,
-          background: "linear-gradient(90deg, #3f2a1d, #654329 70%, #775034)",
-          boxShadow: "inset -3px 0 7px rgba(0,0,0,0.4)",
+          background: "linear-gradient(90deg, #17191b, #3b342c 48%, #765236 82%, #a4764b)",
+          boxShadow: "inset -5px 0 9px rgba(0,0,0,0.62), inset 1px 0 rgba(255,255,255,0.08)",
         }}
         aria-hidden="true"
       />
@@ -1192,8 +1190,8 @@ export function Lane({ ballVisual, resetSignal, newGameSignal, active, onRoll }:
         className="pointer-events-none absolute inset-0"
         style={{
           clipPath: `polygon(${FAR_LANE_RIGHT}% 0%, ${FAR_OUTER_RIGHT}% 0%, ${NEAR_OUTER_RIGHT}% 100%, ${NEAR_LANE_RIGHT}% 100%)`,
-          background: "linear-gradient(270deg, #3f2a1d, #654329 70%, #775034)",
-          boxShadow: "inset 3px 0 7px rgba(0,0,0,0.4)",
+          background: "linear-gradient(270deg, #17191b, #3b342c 48%, #765236 82%, #a4764b)",
+          boxShadow: "inset 5px 0 9px rgba(0,0,0,0.62), inset -1px 0 rgba(255,255,255,0.08)",
         }}
         aria-hidden="true"
       />
@@ -1212,52 +1210,11 @@ export function Lane({ ballVisual, resetSignal, newGameSignal, active, onRoll }:
         ))}
         <polygon
           points={`${OIL_LEFT},${OIL_END_Y} ${OIL_RIGHT},${OIL_END_Y} ${NEAR_LANE_RIGHT},100 ${NEAR_LANE_LEFT},100`}
-          fill="rgba(255,255,255,0.035)"
+          fill="rgba(255,255,255,0.055)"
         />
+        <line x1={FAR_LANE_LEFT} y1="0" x2={NEAR_LANE_LEFT} y2="100" stroke="rgba(255,235,200,0.52)" strokeWidth="0.55" vectorEffect="non-scaling-stroke" />
+        <line x1={FAR_LANE_RIGHT} y1="0" x2={NEAR_LANE_RIGHT} y2="100" stroke="rgba(255,235,200,0.52)" strokeWidth="0.55" vectorEffect="non-scaling-stroke" />
       </svg>
-
-      {active && !isThrowing && (
-        <div className="pointer-events-none absolute" style={{ top: `${DOCK_Y}%`, left: 0, right: 0 }} aria-hidden="true">
-          <span
-            className="absolute -translate-x-1/2 -translate-y-1/2 rounded-full"
-            style={{
-              left: `${worldXToPct(DEFAULT_BALL_START_X_M + startOffsetM, 0)}%`,
-              width: positionLocked ? "10px" : "8px",
-              height: positionLocked ? "10px" : "8px",
-              background: "#ffd76a",
-              boxShadow: "0 0 6px 1px rgba(255,215,106,0.7)",
-            }}
-          />
-        </div>
-      )}
-
-      {TARGET_BOARDS.map((board) => (
-        <div
-          key={`guide-${board}`}
-          className="pointer-events-none absolute"
-          style={{ left: `${boardXToPct(board, GUIDE_DISTANCE_M)}%`, top: `${GUIDE_DOTS_Y}%` }}
-          aria-hidden="true"
-        >
-          <span className="block h-[3px] w-[3px] -translate-x-1/2 -translate-y-1/2 rounded-full bg-[#654628]/55" />
-        </div>
-      ))}
-
-      {TARGET_BOARDS.map((board) => (
-        <div
-          key={`arrow-${board}`}
-          className="pointer-events-none absolute -translate-x-1/2 -translate-y-1/2"
-          style={{
-            left: `${boardXToPct(board, TARGET_DISTANCE_M)}%`,
-            top: `${TARGET_ARROWS_Y}%`,
-            width: 0,
-            height: 0,
-            borderLeft: "3.5px solid transparent",
-            borderRight: "3.5px solid transparent",
-            borderBottom: "9px solid rgba(82,55,31,0.6)",
-          }}
-          aria-hidden="true"
-        />
-      ))}
 
       <div
         className="pointer-events-none absolute h-[2px] bg-[#8c4735]/75"
@@ -1265,7 +1222,7 @@ export function Lane({ ballVisual, resetSignal, newGameSignal, active, onRoll }:
         aria-hidden="true"
       />
 
-      <Pins registerNode={registerPinNode} />
+      <Pins registerNode={registerPinNode} goldenPinId={goldenPinId} />
 
       <div
         ref={ballRef}
@@ -1288,35 +1245,20 @@ export function Lane({ ballVisual, resetSignal, newGameSignal, active, onRoll }:
       {active && !isThrowing ? (
         <div
           data-bowling-position-controls="true"
-          className="absolute bottom-2 left-2 z-[1200] flex items-center gap-1.5 rounded-full bg-[#2f2119]/78 p-1 shadow-lg backdrop-blur-sm"
+          className="absolute left-2 top-2 z-[1600] flex items-center rounded-xl border border-white/15 bg-[#08131f]/90 p-1 shadow-[0_6px_18px_rgba(0,0,0,0.38)] backdrop-blur-md"
           onPointerDown={(event) => {
             event.stopPropagation();
           }}
         >
-          <button
-            type="button"
-            onPointerUp={handleConfirmPosition}
-            aria-pressed={positionLocked}
-            className={`min-w-[52px] rounded-full px-3 py-2 text-[11px] font-black transition ${
-              positionLocked
-                ? "bg-[#e8e0d2] text-[#807363]"
-                : "bg-[#6f9b58] text-white shadow-sm"
-            }`}
-          >
-            ✓ OK
-          </button>
-          <button
-            type="button"
-            onPointerUp={handleUnlockPosition}
-            aria-pressed={!positionLocked}
-            className={`h-8 w-8 rounded-full text-[16px] font-black leading-none transition ${
-              positionLocked
-                ? "bg-[#f4eadc] text-[#5b4637] shadow-sm"
-                : "bg-white/15 text-white/45"
-            }`}
-          >
-            ×
-          </button>
+          {positionLocked ? (
+            <button type="button" onPointerUp={handleUnlockPosition} className="min-h-10 rounded-lg border border-[#638099] bg-[#142638] px-3 text-[10px] font-black text-[#cfeeff] active:scale-[0.98]">
+              ↺ 位置を変更
+            </button>
+          ) : (
+            <button type="button" onPointerUp={handleConfirmPosition} className="min-h-10 rounded-lg bg-[linear-gradient(135deg,#1b9bc4,#16749b)] px-4 text-[11px] font-black text-white shadow-[0_0_16px_rgba(45,190,229,0.25)] active:scale-[0.98]">
+              ✓ この位置に決定
+            </button>
+          )}
         </div>
       ) : null}
     </div>

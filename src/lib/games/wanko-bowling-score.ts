@@ -17,6 +17,14 @@ export type BowlingFrame = {
   gutters?: boolean[];
 };
 
+/** フレーム → 投球 → 倒したピン番号の記録。ゴールデンピン判定をAPI側で再検証する。 */
+export type BowlingPinFalls = number[][][];
+
+export type GoldenPinTarget = {
+  frameIndex: number;
+  pinId: number;
+};
+
 export type BowlingFrameResult = {
   /** そのフレームまでの累積スコア。まだ確定していない（ボーナス待ち）なら null。 */
   cumulativeScore: number | null;
@@ -123,6 +131,21 @@ export function isFrameDone(frame: BowlingFrame, frameIndex: number): boolean {
   return frame.rolls.length >= 2;
 }
 
+/** その投球の前に10本が新しくセットされるかを返す。 */
+export function isFreshRackRoll(frameIndex: number, priorRolls: number[]): boolean {
+  if (frameIndex < BOWLING_FRAME_COUNT - 1) return priorRolls.length === 0;
+  if (priorRolls.length === 0) return true;
+
+  const first = priorRolls[0] ?? 0;
+  const second = priorRolls[1] ?? 0;
+  if (priorRolls.length === 1) return first === PINS_PER_FRAME;
+  if (priorRolls.length === 2) {
+    if (first === PINS_PER_FRAME) return second === PINS_PER_FRAME;
+    return first + second === PINS_PER_FRAME;
+  }
+  return false;
+}
+
 /** 次に投げるピンの残り本数（そのフレーム内で）。 */
 export function pinsStandingForNextRoll(frame: BowlingFrame, frameIndex: number): number {
   const isLastFrame = frameIndex === BOWLING_FRAME_COUNT - 1;
@@ -201,6 +224,55 @@ export function isValidCompletedBowlingFrames(value: unknown): value is BowlingF
       return rolls.length === 3 && third !== undefined;
     }
     return rolls.length === 2;
+  });
+}
+
+/**
+ * スコアの本数と、実際に倒したピン番号の並びが一致するかを検証する。
+ * 同じラックのピンを二度倒す記録も拒否する。
+ */
+export function isValidBowlingPinFalls(
+  frames: BowlingFrame[],
+  value: unknown,
+): value is BowlingPinFalls {
+  if (!Array.isArray(value) || value.length !== BOWLING_FRAME_COUNT) return false;
+
+  return value.every((rawFrameFalls, frameIndex) => {
+    const frame = frames[frameIndex];
+    if (!frame || !Array.isArray(rawFrameFalls) || rawFrameFalls.length !== frame.rolls.length) return false;
+
+    let standing = new Set<number>();
+    const priorRolls: number[] = [];
+
+    for (let rollIndex = 0; rollIndex < rawFrameFalls.length; rollIndex += 1) {
+      const rawPinIds = rawFrameFalls[rollIndex];
+      const roll = frame.rolls[rollIndex];
+      if (!Array.isArray(rawPinIds) || rawPinIds.length !== roll) return false;
+
+      if (isFreshRackRoll(frameIndex, priorRolls)) {
+        standing = new Set(Array.from({ length: PINS_PER_FRAME }, (_, index) => index + 1));
+      }
+
+      const uniqueIds = new Set<number>();
+      for (const pinId of rawPinIds) {
+        if (
+          typeof pinId !== "number"
+          || !Number.isInteger(pinId)
+          || pinId < 1
+          || pinId > PINS_PER_FRAME
+          || uniqueIds.has(pinId)
+          || !standing.has(pinId)
+        ) {
+          return false;
+        }
+        uniqueIds.add(pinId);
+      }
+
+      uniqueIds.forEach((pinId) => standing.delete(pinId));
+      priorRolls.push(roll ?? 0);
+    }
+
+    return true;
   });
 }
 
@@ -331,6 +403,48 @@ export function getBonusFrameIndex(roundId: string): number {
     sum = (sum + roundId.charCodeAt(i)) % BOWLING_FRAME_COUNT;
   }
   return sum;
+}
+
+/**
+ * round_idから、10フレーム中ちょうど5フレームと各1本のゴールデンピンを決める。
+ * 同じ関数をブラウザとAPIで使い、クライアントによる対象の差し替えを防ぐ。
+ */
+export function getGoldenPinTargets(roundId: string): GoldenPinTarget[] {
+  let seed = 2166136261;
+  for (let index = 0; index < roundId.length; index += 1) {
+    seed ^= roundId.charCodeAt(index);
+    seed = Math.imul(seed, 16777619) >>> 0;
+  }
+  if (seed === 0) seed = 0x9e3779b9;
+
+  const nextRandom = () => {
+    seed ^= seed << 13;
+    seed ^= seed >>> 17;
+    seed ^= seed << 5;
+    seed >>>= 0;
+    return seed / 0x100000000;
+  };
+
+  const frameIndexes = Array.from({ length: BOWLING_FRAME_COUNT }, (_, index) => index);
+  for (let index = frameIndexes.length - 1; index > 0; index -= 1) {
+    const swapIndex = Math.floor(nextRandom() * (index + 1));
+    [frameIndexes[index], frameIndexes[swapIndex]] = [frameIndexes[swapIndex]!, frameIndexes[index]!];
+  }
+
+  return frameIndexes
+    .slice(0, 5)
+    .sort((a, b) => a - b)
+    .map((frameIndex) => ({
+      frameIndex,
+      pinId: 1 + Math.floor(nextRandom() * PINS_PER_FRAME),
+    }));
+}
+
+export function countGoldenPinHits(roundId: string, pinFalls: BowlingPinFalls): number {
+  return getGoldenPinTargets(roundId).reduce((hits, target) => {
+    const wasKnocked = pinFalls[target.frameIndex]?.some((roll) => roll.includes(target.pinId)) === true;
+    return hits + (wasKnocked ? 1 : 0);
+  }, 0);
 }
 
 export function createEmptyFrames(): BowlingFrame[] {
