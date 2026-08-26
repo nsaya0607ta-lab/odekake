@@ -1,9 +1,13 @@
 -- =============================================================
 -- わんこボウリング：スコア等倍コイン + ゴールデンピン報酬
 --
--- 変更対象は record_wanko_bowling_result() だけ。
+-- 新しい record_wanko_bowling_result(..., p_golden_hits integer) を追加する。
 -- item_catchを含む他ゲームの関数・coin_events・既存履歴は変更しない。
 -- 報酬 = 最終スコア + (ゴールデンピンを倒した本数 × 10)
+--
+-- 本番とプレビューが同じDBを使っていても、旧APIが呼ぶ
+-- record_wanko_bowling_result(..., p_bonus_hit boolean) は削除しない。
+-- JSONの引数名が異なるため、PostgRESTは新旧APIを呼び分けられる。
 -- =============================================================
 
 begin;
@@ -20,9 +24,7 @@ begin
 end;
 $$;
 
--- PostgRESTで旧版と新版が多重定義にならないよう、ボウリング関数だけを置き換える。
-drop function if exists public.record_wanko_bowling_result(text, integer, integer, integer, integer, integer);
-drop function if exists public.record_wanko_bowling_result(text, integer, integer, integer, integer, integer, boolean);
+-- 同じ新シグネチャだけを再作成可能にする。旧boolean版は本番互換用に残す。
 drop function if exists public.record_wanko_bowling_result(text, integer, integer, integer, integer, integer, integer);
 
 create function public.record_wanko_bowling_result(
