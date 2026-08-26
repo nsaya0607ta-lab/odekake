@@ -118,7 +118,8 @@ export function ScoreBoard({
   bonusAchieved?: boolean;
 }) {
   const activeFrameRef = useRef<HTMLDivElement>(null);
-  const currentRoll = Math.min(3, (frames[currentFrameIndex]?.rolls.length ?? 0) + 1);
+  const maxRolls = currentFrameIndex === BOWLING_FRAME_COUNT - 1 ? 3 : 2;
+  const currentRoll = Math.min(maxRolls, (frames[currentFrameIndex]?.rolls.length ?? 0) + 1);
 
   useEffect(() => {
     activeFrameRef.current?.scrollIntoView({ behavior: "smooth", block: "nearest", inline: "center" });
