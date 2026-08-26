@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import type { BowlingFrame, BowlingScoreState } from "@/lib/games/wanko-bowling-score";
 import { BOWLING_FRAME_COUNT } from "@/lib/games/wanko-bowling-score";
 
@@ -117,13 +117,8 @@ export function ScoreBoard({
   bonusFrameIndex?: number;
   bonusAchieved?: boolean;
 }) {
-  const activeFrameRef = useRef<HTMLDivElement>(null);
   const maxRolls = currentFrameIndex === BOWLING_FRAME_COUNT - 1 ? 3 : 2;
   const currentRoll = Math.min(maxRolls, (frames[currentFrameIndex]?.rolls.length ?? 0) + 1);
-
-  useEffect(() => {
-    activeFrameRef.current?.scrollIntoView({ behavior: "smooth", block: "nearest", inline: "center" });
-  }, [currentFrameIndex]);
 
   return (
     <div className="relative overflow-hidden border-b border-[#30435a] bg-[linear-gradient(180deg,#111b29_0%,#07101a_100%)] px-2 pb-2 pt-1.5 shadow-[0_8px_22px_rgba(0,0,0,0.36)]" aria-label="10フレーム ボウリングスコアボード">
@@ -166,8 +161,7 @@ export function ScoreBoard({
         </div>
       </div>
 
-      <div className="overflow-x-auto overscroll-x-contain [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-        <div className="flex min-w-max gap-1">
+      <div className="grid w-full grid-cols-10 gap-px">
         {frames.map((frame, index) => {
           const active = index === currentFrameIndex;
           const marks = frameRollMarks(frame, index);
@@ -176,21 +170,19 @@ export function ScoreBoard({
           return (
             <div
               key={index}
-              ref={active ? activeFrameRef : undefined}
-              className={`relative w-[48px] overflow-hidden rounded-[8px] border text-center transition-all ${active ? "border-[#63d9ff] bg-[#19384b] shadow-[0_0_12px_rgba(78,206,255,0.28)]" : "border-white/10 bg-[#0a141f]"} ${isBonusFrame ? "ring-1 ring-[#ffd66c]/85" : ""}`}
+              className={`relative min-w-0 overflow-hidden rounded-[5px] border text-center transition-all ${active ? "z-10 border-[#63d9ff] bg-[#19384b] shadow-[0_0_10px_rgba(78,206,255,0.32)]" : "border-white/10 bg-[#0a141f]"} ${isBonusFrame ? "ring-1 ring-[#ffd66c]/85" : ""}`}
             >
               {isBonusFrame ? (
                 <span className={`absolute right-0.5 top-0.5 text-[7px] ${bonusAchieved ? "text-[#ffd66c]" : "text-white/55"}`} aria-label={bonusAchieved ? "ボーナスチャンス成功" : "ボーナスチャンス"}>{bonusAchieved ? "★" : "◆"}</span>
               ) : null}
               <p className={`h-[13px] text-[7px] font-black leading-[13px] ${active ? "text-[#8fe8ff]" : "text-[#8292a1]"}`}>{index + 1}</p>
-              <div className="flex h-[16px] items-center justify-center gap-1 border-y border-white/10 bg-black/20">
-                {marks.map((mark, markIndex) => <span key={markIndex} className={`text-[9px] font-black tabular-nums leading-none ${mark === "X" || mark === "/" ? "text-[#ffd66c]" : "text-[#eef7ff]"}`}>{mark || "·"}</span>)}
+              <div className="flex h-[16px] items-center justify-center gap-[clamp(1px,0.7vw,4px)] border-y border-white/10 bg-black/20">
+                {marks.map((mark, markIndex) => <span key={markIndex} className={`text-[clamp(6px,2vw,9px)] font-black tabular-nums leading-none ${mark === "X" || mark === "/" ? "text-[#ffd66c]" : "text-[#eef7ff]"}`}>{mark || "·"}</span>)}
               </div>
               <div className="flex h-[21px] items-center justify-center"><DigitalNumber value={result?.cumulativeScore ?? null} /></div>
             </div>
           );
         })}
-        </div>
       </div>
     </div>
   );
