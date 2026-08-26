@@ -2,7 +2,7 @@
 
 import { forwardRef, useCallback, useEffect, useImperativeHandle, useRef, useState } from "react";
 import type { GachaRarity } from "@/lib/gacha/config";
-import { playGachaCue } from "./audio";
+import { playGachaCue, setGachaAudioPlaybackRate } from "./audio";
 import styles from "./gacha-cinematic.module.css";
 import type { AnimationDraw, DrawResult } from "./types";
 
@@ -11,13 +11,14 @@ type BurstIntensity = "normal" | "large" | "mega";
 type GsapModule = typeof import("gsap");
 type GsapTimeline = ReturnType<GsapModule["gsap"]["timeline"]>;
 type GachaPromotion = NonNullable<AnimationDraw["promotion"]>;
+type PlaybackRate = 1 | 2;
 
 type ParticleHandle = {
   burst: (rarity: GachaRarity, intensity?: BurstIntensity) => void;
 };
 
-const MULTI_DROP_DURATION = 0.62;
-const MULTI_DROP_GAP = 0.045;
+const MULTI_DROP_DURATION = 0.53;
+const MULTI_DROP_GAP = 0.03;
 const MULTI_DROP_INTERVAL = MULTI_DROP_DURATION + MULTI_DROP_GAP;
 const MULTI_REVEAL_TIME_SCALE = 1.4;
 
@@ -200,11 +201,13 @@ const PixiEffects = forwardRef<ParticleHandle, { enabled: boolean }>(function Pi
 type MultiCapsuleIntroProps = {
   results: DrawResult[];
   promotion?: GachaPromotion;
+  playbackRate: PlaybackRate;
+  onTogglePlaybackRate: () => void;
   onComplete: () => void;
   onSkipAll: () => void;
 };
 
-function MultiCapsuleIntro({ results, promotion, onComplete, onSkipAll }: MultiCapsuleIntroProps) {
+function MultiCapsuleIntro({ results, promotion, playbackRate, onTogglePlaybackRate, onComplete, onSkipAll }: MultiCapsuleIntroProps) {
   const [batchPhase, setBatchPhase] = useState("10個のカプセル排出！");
   const rootRef = useRef<HTMLDivElement>(null);
   const machineRef = useRef<HTMLDivElement>(null);
@@ -214,6 +217,7 @@ function MultiCapsuleIntro({ results, promotion, onComplete, onSkipAll }: MultiC
   const promotionCopyRef = useRef<HTMLDivElement>(null);
   const particlesRef = useRef<ParticleHandle>(null);
   const timelineRef = useRef<GsapTimeline | null>(null);
+  const playbackRateRef = useRef<PlaybackRate>(playbackRate);
   const completedRef = useRef(false);
   const completeRef = useRef(onComplete);
   const skipRef = useRef(onSkipAll);
@@ -221,6 +225,11 @@ function MultiCapsuleIntro({ results, promotion, onComplete, onSkipAll }: MultiC
     completeRef.current = onComplete;
     skipRef.current = onSkipAll;
   }, [onComplete, onSkipAll]);
+
+  useEffect(() => {
+    playbackRateRef.current = playbackRate;
+    timelineRef.current?.timeScale(playbackRate);
+  }, [playbackRate]);
 
   const complete = useCallback(() => {
     if (completedRef.current) return;
@@ -264,6 +273,7 @@ function MultiCapsuleIntro({ results, promotion, onComplete, onSkipAll }: MultiC
 
       const tl = gsap.timeline({ defaults: { ease: "power2.out" } });
       timelineRef.current = tl;
+      tl.timeScale(playbackRateRef.current);
       gsap.set(promotionCopyRef.current, { opacity: 0, scale: 0.54 });
 
       tl.fromTo(machineRef.current, { opacity: 0, scale: 0.78, y: 22 }, { opacity: 1, scale: 1, y: 0, duration: 0.4, ease: "back.out(1.4)" })
@@ -345,6 +355,9 @@ function MultiCapsuleIntro({ results, promotion, onComplete, onSkipAll }: MultiC
           <p className={styles.phase} aria-live="polite">{batchPhase}</p>
         </div>
       </div>
+      <button type="button" className={styles.speed} data-active={playbackRate === 2} onClick={onTogglePlaybackRate} aria-label={`演出速度 ${playbackRate}倍`} aria-pressed={playbackRate === 2}>
+        <span>×{playbackRate}</span><small>倍速</small>
+      </button>
       <button type="button" className={styles.skip} onClick={skipAll}>すべてスキップ</button>
 
       <div className={styles.batchStage}>
@@ -394,11 +407,13 @@ type SceneProps = {
   current: number;
   total: number;
   capsuleOnly: boolean;
+  playbackRate: PlaybackRate;
+  onTogglePlaybackRate: () => void;
   onSceneComplete: () => void;
   onSkipAll: () => void;
 };
 
-function GachaCinematicScene({ result, current, total, capsuleOnly, onSceneComplete, onSkipAll }: SceneProps) {
+function GachaCinematicScene({ result, current, total, capsuleOnly, playbackRate, onTogglePlaybackRate, onSceneComplete, onSkipAll }: SceneProps) {
   const rarity = validRarity(result.rarity);
   const [phase, setPhase] = useState<Phase>("準備中");
   const completeRef = useRef(false);
@@ -446,6 +461,13 @@ function GachaCinematicScene({ result, current, total, capsuleOnly, onSceneCompl
   const freezeRef = useRef<HTMLDivElement>(null);
   const particlesRef = useRef<ParticleHandle>(null);
   const timelineRef = useRef<GsapTimeline | null>(null);
+  const playbackRateRef = useRef<PlaybackRate>(playbackRate);
+
+  useEffect(() => {
+    playbackRateRef.current = playbackRate;
+    const sceneBaseRate = capsuleOnly ? MULTI_REVEAL_TIME_SCALE : 1;
+    timelineRef.current?.timeScale(sceneBaseRate * playbackRate);
+  }, [capsuleOnly, playbackRate]);
 
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
@@ -625,7 +647,7 @@ function GachaCinematicScene({ result, current, total, capsuleOnly, onSceneCompl
       }
 
       reveal(tl, ">");
-      if (capsuleOnly) tl.timeScale(MULTI_REVEAL_TIME_SCALE);
+      tl.timeScale((capsuleOnly ? MULTI_REVEAL_TIME_SCALE : 1) * playbackRateRef.current);
     });
 
     return () => {
@@ -649,6 +671,9 @@ function GachaCinematicScene({ result, current, total, capsuleOnly, onSceneCompl
           <p className={styles.phase} aria-live="polite">{phase}</p>
         </div>
       </div>
+      <button type="button" className={styles.speed} data-active={playbackRate === 2} onClick={onTogglePlaybackRate} aria-label={`演出速度 ${playbackRate}倍`} aria-pressed={playbackRate === 2}>
+        <span>×{playbackRate}</span><small>倍速</small>
+      </button>
       <button type="button" className={styles.skip} onClick={skipAll} aria-label="残りのガチャ演出をすべてスキップ">
         {total > 1 ? "すべてスキップ" : "スキップ"}
       </button>
@@ -733,6 +758,7 @@ export function GachaCinematic({ draw, onComplete }: { draw: AnimationDraw; onCo
   const isMulti = draw.plan === "multi" && draw.results.length > 1;
   const [batchIntroComplete, setBatchIntroComplete] = useState(!isMulti);
   const [currentIndex, setCurrentIndex] = useState(0);
+  const [playbackRate, setPlaybackRate] = useState<PlaybackRate>(1);
   const finishedRef = useRef(false);
   const onCompleteRef = useRef(onComplete);
   const drawRef = useRef(draw);
@@ -741,6 +767,15 @@ export function GachaCinematic({ draw, onComplete }: { draw: AnimationDraw; onCo
     onCompleteRef.current = onComplete;
     drawRef.current = draw;
   }, [draw, onComplete]);
+
+  useEffect(() => {
+    setGachaAudioPlaybackRate(playbackRate);
+    return () => setGachaAudioPlaybackRate(1);
+  }, [playbackRate]);
+
+  const togglePlaybackRate = useCallback(() => {
+    setPlaybackRate((currentRate) => currentRate === 1 ? 2 : 1);
+  }, []);
 
   useEffect(() => {
     for (const result of draw.results) {
@@ -776,6 +811,8 @@ export function GachaCinematic({ draw, onComplete }: { draw: AnimationDraw; onCo
       <MultiCapsuleIntro
         results={draw.results}
         promotion={draw.promotion}
+        playbackRate={playbackRate}
+        onTogglePlaybackRate={togglePlaybackRate}
         onComplete={() => setBatchIntroComplete(true)}
         onSkipAll={finishAll}
       />
@@ -789,6 +826,8 @@ export function GachaCinematic({ draw, onComplete }: { draw: AnimationDraw; onCo
       current={currentIndex + 1}
       total={draw.results.length}
       capsuleOnly={isMulti}
+      playbackRate={playbackRate}
+      onTogglePlaybackRate={togglePlaybackRate}
       onSceneComplete={completeCurrentScene}
       onSkipAll={finishAll}
     />
