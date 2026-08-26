@@ -34,27 +34,8 @@ export function BallPicker({
           <p className="text-[9px] font-black tracking-[0.16em] text-[#54d8ff]">プレイヤー装備</p>
           <h2 className="mt-1 text-xl font-black tracking-tight">ボールを選択</h2>
           <p className="mt-1.5 text-[11px] leading-relaxed text-white/55">
-            性能はすべて同じです。お気に入りのボールで挑戦しよう。
+            ゴールドボールだけ少し違う球質。お気に入りのボールで挑戦しよう。
           </p>
-          <ol className="mt-4 grid grid-cols-3 gap-1.5" aria-label="ゲームの流れ">
-            {[
-              ["01", "ボール"],
-              ["02", "位置決め"],
-              ["03", "投球"],
-            ].map(([number, label], index) => (
-              <li
-                key={label}
-                className={`rounded-lg border px-2 py-2 ${
-                  index === 0
-                    ? "border-[#54d8ff]/70 bg-[#54d8ff]/12"
-                    : "border-white/10 bg-white/[0.035]"
-                }`}
-              >
-                <span className="block text-[8px] font-black tracking-[0.12em] text-[#54d8ff]">{number}</span>
-                <span className="mt-0.5 block text-[8px] font-black tracking-[0.08em] text-white/80">{label}</span>
-              </li>
-            ))}
-          </ol>
         </div>
       </div>
 

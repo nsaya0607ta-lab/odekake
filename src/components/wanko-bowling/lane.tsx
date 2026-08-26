@@ -1,14 +1,14 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState, type PointerEvent as ReactPointerEvent } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type PointerEvent as ReactPointerEvent } from "react";
 import Image from "next/image";
 import { PIN_LAYOUT, PIN_VISUAL_WIDTH_PCT, Pins } from "./pins";
 import type { BowlingBallVisual } from "@/lib/games/wanko-bowling-balls";
 import {
   AXIS_ROTATION_INPUT_EXPONENT,
-  BALL_INERTIA_X_KGM2,
-  BALL_INERTIA_Y_KGM2,
-  BALL_INERTIA_Z_KGM2,
+  ballInertiaXKgm2,
+  ballInertiaYKgm2,
+  ballInertiaZKgm2,
   BALL_PIN_RESTITUTION,
   BALL_SPIN_RADIUS_M,
   GAME_BALL_MASS_KG,
@@ -510,6 +510,18 @@ export function Lane({ ballVisual, goldenPinId = null, resetSignal, newGameSigna
   const positionLockedRef = useRef(false);
   const [positionLocked, setPositionLockedState] = useState(false);
   const [isThrowing, setIsThrowing] = useState(false);
+  const [throwMode, setThrowMode] = useState<"straight" | "curve">("curve");
+
+  const ballMassKg = ballVisual.massKg ?? GAME_BALL_MASS_KG;
+  const ballMaxSpeedKmh = ballVisual.maxSpeedKmh ?? GAME_MAX_BALL_SPEED_KMH;
+  const ballInertia = useMemo(
+    () => ({
+      x: ballInertiaXKgm2(ballMassKg),
+      y: ballInertiaYKgm2(ballMassKg),
+      z: ballInertiaZKgm2(ballMassKg),
+    }),
+    [ballMassKg],
+  );
   const pinBodiesRef = useRef<Map<number, PinBody>>(
     new Map(PIN_LAYOUT.map((pin) => [pin.id, createPinBody(pin)])),
   );
@@ -681,7 +693,7 @@ export function Lane({ ballVisual, goldenPinId = null, resetSignal, newGameSigna
 
     const { axisRotationRad, curveSign } = computeAxisRotation(launch.launchAngleRad, launch.curveNorm);
     const axisTiltRad = SPIN_AXIS_TILT_DEG * Math.PI / 180;
-    const spinMagnitudeRadS = spinMagnitudeRadSAtSpeed(launch.speedMps);
+    const spinMagnitudeRadS = spinMagnitudeRadSAtSpeed(launch.speedMps, GAME_MIN_BALL_SPEED_KMH, ballMaxSpeedKmh);
     const horizontalSpinRadS = spinMagnitudeRadS * Math.cos(axisTiltRad);
     let omegaXRadS = -horizontalSpinRadS * Math.cos(axisRotationRad);
     let omegaYRadS = -curveSign * horizontalSpinRadS * Math.sin(axisRotationRad);
@@ -751,7 +763,7 @@ export function Lane({ ballVisual, goldenPinId = null, resetSignal, newGameSigna
       finished = true;
       const speedNorm = clamp(
         ((launch.speedMps * 3.6) - GAME_MIN_BALL_SPEED_KMH)
-          / (GAME_MAX_BALL_SPEED_KMH - GAME_MIN_BALL_SPEED_KMH),
+          / (ballMaxSpeedKmh - GAME_MIN_BALL_SPEED_KMH),
         0,
         1,
       );
@@ -791,18 +803,18 @@ export function Lane({ ballVisual, goldenPinId = null, resetSignal, newGameSigna
           const omegaYPrime = -omegaXRadS * sinPhi + omegaYRadS * cosPhi;
 
           const termA =
-            (GAME_BALL_MASS_KG * BALL_SPIN_RADIUS_M * (dvy * cosPhi + dvx * sinPhi)
-              + (BALL_INERTIA_Y_KGM2 - BALL_INERTIA_Z_KGM2) * omegaYPrime * omegaZRadS)
-            / BALL_INERTIA_X_KGM2;
+            (ballMassKg * BALL_SPIN_RADIUS_M * (dvy * cosPhi + dvx * sinPhi)
+              + (ballInertia.y - ballInertia.z) * omegaYPrime * omegaZRadS)
+            / ballInertia.x;
           const termB =
-            (GAME_BALL_MASS_KG * BALL_SPIN_RADIUS_M * (-dvy * sinPhi - dvx * cosPhi)
-              + (BALL_INERTIA_Z_KGM2 - BALL_INERTIA_X_KGM2) * omegaXPrime * omegaZRadS)
-            / BALL_INERTIA_Y_KGM2;
+            (ballMassKg * BALL_SPIN_RADIUS_M * (-dvy * sinPhi - dvx * cosPhi)
+              + (ballInertia.z - ballInertia.x) * omegaXPrime * omegaZRadS)
+            / ballInertia.y;
 
           const domegaXdt = termA * cosPhi - termB * sinPhi;
           const domegaYdt = termA * sinPhi + termB * cosPhi;
           const domegaZdt =
-            ((BALL_INERTIA_X_KGM2 - BALL_INERTIA_Y_KGM2) / BALL_INERTIA_Z_KGM2)
+            ((ballInertia.x - ballInertia.y) / ballInertia.z)
             * omegaXPrime * omegaYPrime;
           const omegaHorizSq = omegaXRadS * omegaXRadS + omegaYRadS * omegaYRadS;
           const dphiDt = omegaHorizSq > 0
@@ -871,7 +883,7 @@ export function Lane({ ballVisual, goldenPinId = null, resetSignal, newGameSigna
               closest.y,
               bvxMps,
               bvyMps,
-              GAME_BALL_MASS_KG,
+              ballMassKg,
               body.xM,
               body.yM,
               body.vxMps,
@@ -1015,7 +1027,7 @@ export function Lane({ ballVisual, goldenPinId = null, resetSignal, newGameSigna
     };
 
     requestAnimationFrame(step);
-  }, [onRoll, setBallPosition, writePinNode]);
+  }, [ballMassKg, ballMaxSpeedKmh, ballInertia, onRoll, setBallPosition, writePinNode]);
 
   const onPointerDown = useCallback((event: ReactPointerEvent<HTMLDivElement>) => {
     event.preventDefault();
@@ -1111,11 +1123,12 @@ export function Lane({ ballVisual, goldenPinId = null, resetSignal, newGameSigna
     const rawSpeedNorm = clamp((swipeRate - 25) / 430, 0, 1);
     const speedNorm = Math.pow(rawSpeedNorm, 0.72);
     const speedKmh = GAME_MIN_BALL_SPEED_KMH
-      + (GAME_MAX_BALL_SPEED_KMH - GAME_MIN_BALL_SPEED_KMH) * speedNorm;
+      + (ballMaxSpeedKmh - GAME_MIN_BALL_SPEED_KMH) * speedNorm;
     const speedMps = speedKmh / 3.6;
+    const curveNorm = throwMode === "straight" ? 0 : aim.curveNorm;
 
-    runThrow({ speedMps, launchAngleRad: aim.launchAngleRad, curveNorm: aim.curveNorm, startXM });
-  }, [active, runThrow]);
+    runThrow({ speedMps, launchAngleRad: aim.launchAngleRad, curveNorm, startXM });
+  }, [active, ballMaxSpeedKmh, throwMode, runThrow]);
 
   const onPointerCancel = useCallback((event: ReactPointerEvent<HTMLDivElement>) => {
     if (activePointerRef.current !== event.pointerId) return;
@@ -1266,6 +1279,39 @@ export function Lane({ ballVisual, goldenPinId = null, resetSignal, newGameSigna
               ✓ この位置に決定
             </button>
           )}
+        </div>
+      ) : null}
+
+      {active && !isThrowing ? (
+        <div
+          data-bowling-throw-mode-controls="true"
+          className="absolute right-2 top-2 z-[1600] flex flex-col items-stretch gap-1 rounded-xl border border-white/15 bg-[#08131f]/90 p-1 shadow-[0_6px_18px_rgba(0,0,0,0.38)] backdrop-blur-md"
+          onPointerDown={(event) => {
+            event.stopPropagation();
+          }}
+        >
+          <button
+            type="button"
+            onPointerUp={() => setThrowMode("straight")}
+            className={`min-h-9 rounded-lg px-3 text-[10px] font-black active:scale-[0.98] ${
+              throwMode === "straight"
+                ? "bg-[linear-gradient(135deg,#1b9bc4,#16749b)] text-white shadow-[0_0_16px_rgba(45,190,229,0.25)]"
+                : "border border-[#638099] bg-[#142638] text-[#cfeeff]"
+            }`}
+          >
+            ストレート
+          </button>
+          <button
+            type="button"
+            onPointerUp={() => setThrowMode("curve")}
+            className={`min-h-9 rounded-lg px-3 text-[10px] font-black active:scale-[0.98] ${
+              throwMode === "curve"
+                ? "bg-[linear-gradient(135deg,#1b9bc4,#16749b)] text-white shadow-[0_0_16px_rgba(45,190,229,0.25)]"
+                : "border border-[#638099] bg-[#142638] text-[#cfeeff]"
+            }`}
+          >
+            カーブ
+          </button>
         </div>
       ) : null}
     </div>
