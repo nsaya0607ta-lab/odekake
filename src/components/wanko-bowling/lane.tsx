@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState, type PointerEvent as ReactPointerEvent } from "react";
+import Image from "next/image";
 import { PIN_LAYOUT, PIN_VISUAL_WIDTH_PCT, Pins } from "./pins";
 import type { BowlingBallVisual } from "@/lib/games/wanko-bowling-balls";
 import {
@@ -36,7 +37,7 @@ import {
   SPIN_AXIS_TILT_DEG,
 } from "@/lib/games/wanko-bowling-physics";
 
-const DOCK_Y = 94;
+const DOCK_Y = 90;
 const HEAD_PIN_SCREEN_Y = 19.5;
 const MIN_UPWARD_PCT = 8;
 const MAX_THROW_MS = 7000;
@@ -1226,7 +1227,7 @@ export function Lane({ ballVisual, goldenPinId = null, resetSignal, newGameSigna
 
       <div
         ref={ballRef}
-        className="pointer-events-none absolute aspect-square rounded-full shadow-[0_4px_10px_rgba(0,0,0,0.38)]"
+        className="pointer-events-none absolute aspect-square overflow-hidden rounded-full shadow-[0_4px_10px_rgba(0,0,0,0.38)]"
         style={{
           width: `${ballVisualWidthPct(0)}%`,
           left: "50%",
@@ -1237,9 +1238,15 @@ export function Lane({ ballVisual, goldenPinId = null, resetSignal, newGameSigna
         }}
         aria-hidden="true"
       >
-        <span className="absolute left-[34%] top-[28%] h-[10%] w-[10%] rounded-full bg-black/40" />
-        <span className="absolute left-[49%] top-[22%] h-[9%] w-[9%] rounded-full bg-black/40" />
-        <span className="absolute left-[52%] top-[38%] h-[9%] w-[9%] rounded-full bg-black/40" />
+        {ballVisual.image ? (
+          <Image src={ballVisual.image} alt="" fill sizes="60px" className="object-cover" />
+        ) : (
+          <>
+            <span className="absolute left-[34%] top-[28%] h-[10%] w-[10%] rounded-full bg-black/40" />
+            <span className="absolute left-[49%] top-[22%] h-[9%] w-[9%] rounded-full bg-black/40" />
+            <span className="absolute left-[52%] top-[38%] h-[9%] w-[9%] rounded-full bg-black/40" />
+          </>
+        )}
       </div>
 
       {active && !isThrowing ? (

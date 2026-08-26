@@ -7,6 +7,7 @@
  */
 
 import type { GachaRarity } from "@/lib/gacha/config";
+import { COLLECTION_ITEMS } from "@/lib/collection/items";
 
 export type BowlingBallVisual = {
   itemId: string;
@@ -18,7 +19,13 @@ export type BowlingBallVisual = {
   hitColor: string;
   /** ストライク演出を少し豪華にするか */
   premiumEffect: boolean;
+  /** プレイ中に表示するボールの実画像（未設定ならグラデーションのみ） */
+  image: string | null;
 };
+
+function imageForItem(itemId: string): string | null {
+  return COLLECTION_ITEMS.find((item) => item.id === itemId)?.image ?? null;
+}
 
 export const BOWLING_BALL_ITEM_IDS = [
   "toy_colorful_ball",
@@ -40,6 +47,7 @@ const BALL_VISUALS: Record<string, BowlingBallVisual> = {
     bodyGradient: ["#fbeed7", "#c9a06a"],
     hitColor: "#e7c98f",
     premiumEffect: false,
+    image: null,
   },
   toy_colorful_ball: {
     itemId: "toy_colorful_ball",
@@ -47,6 +55,7 @@ const BALL_VISUALS: Record<string, BowlingBallVisual> = {
     bodyGradient: ["#fff2ea", "#e08a9a"],
     hitColor: "#ffb6c6",
     premiumEffect: false,
+    image: imageForItem("toy_colorful_ball"),
   },
   toy_squeaky_ball: {
     itemId: "toy_squeaky_ball",
@@ -54,6 +63,7 @@ const BALL_VISUALS: Record<string, BowlingBallVisual> = {
     bodyGradient: ["#eef6fb", "#7fa8c9"],
     hitColor: "#a8d4f0",
     premiumEffect: false,
+    image: imageForItem("toy_squeaky_ball"),
   },
   toy_tennis_ball: {
     itemId: "toy_tennis_ball",
@@ -61,6 +71,7 @@ const BALL_VISUALS: Record<string, BowlingBallVisual> = {
     bodyGradient: ["#f5fadd", "#a9c94a"],
     hitColor: "#d7ee8a",
     premiumEffect: false,
+    image: imageForItem("toy_tennis_ball"),
   },
   toy_soccer_ball: {
     itemId: "toy_soccer_ball",
@@ -68,6 +79,7 @@ const BALL_VISUALS: Record<string, BowlingBallVisual> = {
     bodyGradient: ["#ffffff", "#c9c9c9"],
     hitColor: "#e5e5e5",
     premiumEffect: false,
+    image: imageForItem("toy_soccer_ball"),
   },
   toy_rainbow_ball: {
     itemId: "toy_rainbow_ball",
@@ -75,6 +87,7 @@ const BALL_VISUALS: Record<string, BowlingBallVisual> = {
     bodyGradient: ["#ffffff", "#a99bcb"],
     hitColor: "#ffe08a",
     premiumEffect: true,
+    image: imageForItem("toy_rainbow_ball"),
   },
   toy_golden_crown_ball: {
     itemId: "toy_golden_crown_ball",
@@ -82,6 +95,7 @@ const BALL_VISUALS: Record<string, BowlingBallVisual> = {
     bodyGradient: ["#fff6d8", "#c99a34"],
     hitColor: "#ffd766",
     premiumEffect: true,
+    image: imageForItem("toy_golden_crown_ball"),
   },
 };
 

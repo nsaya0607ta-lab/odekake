@@ -115,7 +115,7 @@ export function ItemCard({
       className={`relative aspect-[561/701] w-full overflow-hidden rounded-[16px] transition-shadow ${
         isRevealed
           ? "bg-transparent shadow-[0_3px_10px_rgba(94,78,53,0.10)]"
-          : "border border-[#ddd6c7] bg-[linear-gradient(145deg,#faf8f2_0%,#f1eee6_100%)] shadow-[0_2px_7px_rgba(98,88,70,0.07)]"
+          : "border border-[#ddd6c7] bg-transparent shadow-[0_2px_7px_rgba(98,88,70,0.07)]"
       }`}
     >
       {isRevealed ? (
