@@ -357,12 +357,15 @@ function MultiCapsuleIntro({ results, promotion, onComplete, onSkipAll }: MultiC
         <div className={styles.batchTray} aria-label="排出された10個のカプセル">
           {results.map((result, index) => {
             const isPromotionTarget = promotion?.index === index;
+            const capsuleRarity = isPromotionTarget && promotion
+              ? promotion.fromRarity
+              : validRarity(result.rarity);
             return (
               <div
                 key={`${result.id}-${index}`}
                 ref={(node) => { if (node) capsuleRefs.current[index] = node; }}
                 className={styles.batchCapsule}
-                data-rarity="concealed"
+                data-rarity={capsuleRarity}
                 aria-label={`${index + 1}個目のカプセル`}
               >
                 <span className={styles.batchCapsuleGlow} />
