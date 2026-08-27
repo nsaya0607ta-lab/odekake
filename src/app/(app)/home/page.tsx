@@ -38,8 +38,10 @@ export default async function HomePage({
   searchParams: Promise<{ notice?: string }>;
 }) {
   const [{ supabase, user }, { notice }] = await Promise.all([requireUser(), searchParams]);
-  const space = await getRecordSpace(supabase, user.id);
 
+  // 旅行IDの取得と、それを必要としないホーム情報の取得を同時に始める。
+  // 表示内容は変えず、旅行IDを待ってから全通信を開始していた直列待ちだけをなくす。
+  const spacePromise = getRecordSpace(supabase, user.id);
   const [
     areas,
     expDashboard,
@@ -52,12 +54,12 @@ export default async function HomePage({
     noticesFeed,
     unreadNoticeCount,
   ] = await Promise.all([
-    loadAreaIndex(supabase, space.tripIds),
+    spacePromise.then((space) => loadAreaIndex(supabase, space.tripIds)),
     getExpDashboard(supabase, user.id),
     getCoinSummary(supabase, user.id),
     getOwnedItemIds(supabase, user.id),
     getCurrentDogSkin(supabase, user.id),
-    supabase.from("profiles").select("profile_image_url, introduction").eq("user_id", user.id).maybeSingle(),
+    supabase.from("profiles").select("profile_image_url").eq("user_id", user.id).maybeSingle(),
     getFriendsActivityFeed(supabase, 30),
     getFriendsStepsRanking(supabase, 20),
     getNoticesFeed(supabase, 3),
