@@ -1275,7 +1275,7 @@ export function Lane({ ballVisual, goldenPinId = null, resetSignal, newGameSigna
 
       <div
         ref={ballRef}
-        className="pointer-events-none absolute aspect-square overflow-hidden rounded-full shadow-[0_4px_10px_rgba(0,0,0,0.38)]"
+        className="pointer-events-none absolute aspect-square overflow-hidden rounded-full shadow-[0_4px_10px_rgba(0,0,0,0.38)] will-change-transform"
         style={{
           width: `${ballVisualWidthPct(0)}%`,
           left: "50%",
