@@ -1940,7 +1940,7 @@ export function FrenchieCatchGame({ ownedItems }: { ownedItems: FrenchieCatchIte
     const now = performance.now();
     const boxScale = now < boxShrinkUntilRef.current ? BOX_SHRINK_SCALE : now < boxWideUntilRef.current ? boxWideScaleRef.current : 1;
     const dynamicHalf = BOX_HALF * boxScale;
-    const nextX = clamp(pointerX - dragOffsetRef.current, dynamicHalf + 1, 100 - dynamicHalf - 1);
+    const nextX = clamp(pointerX - dragOffsetRef.current, dynamicHalf, 100 - dynamicHalf);
     boxXRef.current = nextX;
     setBoxX(nextX);
   }, []);
