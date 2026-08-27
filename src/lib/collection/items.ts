@@ -177,6 +177,11 @@ const CURATED_ITEMS: readonly CollectionItem[] = [
   { id: "food_summit_cup_ramen", name: "山頂カップラーメン", image: "/collection/items/summit-cup-ramen.webp", category: "food", series: "hiking", rarity: "R" },
   { id: "interior_led_lantern", name: "LEDランタン", image: "/collection/items/led-lantern.webp", category: "interior", series: "hiking", rarity: "N" },
   { id: "interior_campfire_set", name: "焚き火セット", image: "/collection/items/campfire-set.webp", category: "interior", series: "hiking", rarity: "R" },
+  { id: "interior_hut_fireplace", name: "山小屋の暖炉", image: "/collection/items/hut-fireplace.webp", category: "interior", series: "hiking", rarity: "SR" },
+  { id: "interior_stargazing_telescope", name: "星空の天体望遠鏡", image: "/collection/items/stargazing-telescope.webp", category: "interior", series: "hiking", rarity: "SSR" },
+  { id: "accessory_bear_bell", name: "熊よけ鈴", image: "/collection/items/bear-bell.webp", category: "accessory", series: "hiking", rarity: "N" },
+  { id: "accessory_hiking_backpack", name: "リュックサック", image: "/collection/items/hiking-backpack.webp", category: "accessory", series: "hiking", rarity: "N" },
+  { id: "accessory_trekking_poles", name: "トレッキングポール", image: "/collection/items/trekking-poles.webp", category: "accessory", series: "hiking", rarity: "R" },
   // --- 雪国シリーズ ----------------------------------------------------
   { id: "snow_frenchie", name: "雪国のフレブル", image: "/collection/skins/snow-frenchie.webp", category: "other", series: "snow", rarity: "LR", art: "dogSnow" },
   { id: "toy_sled", name: "雪ぞり", image: "/collection/items/sled.webp", category: "toy", series: "snow", rarity: "N" },

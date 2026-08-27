@@ -18,7 +18,8 @@ as $$
       'food_snow_roasted_sweet_potato', 'food_oshiruko',
       'interior_yutanpo', 'accessory_knit_hat', 'accessory_muffler',
       'toy_hiking_stick', 'toy_rock_ball', 'toy_echo_whistle', 'food_ume_onigiri',
-      'food_hut_curry', 'interior_led_lantern'
+      'food_hut_curry', 'interior_led_lantern',
+      'accessory_bear_bell', 'accessory_hiking_backpack'
     ) then 'N'
     when p_item_id in (
       'toy_duck_plush', 'toy_carrot', 'toy_frisbee', 'toy_soccer_ball',
@@ -30,7 +31,8 @@ as $$
       'food_hiyashi_chuka', 'accessory_beach_sandals', 'accessory_shell_bracelet',
       'toy_mini_skis', 'food_oden', 'food_hot_chocolate',
       'interior_fluffy_blanket', 'accessory_mittens', 'other_icicle',
-      'toy_rope_swing', 'food_onsen_tamago', 'food_summit_cup_ramen', 'interior_campfire_set'
+      'toy_rope_swing', 'food_onsen_tamago', 'food_summit_cup_ramen', 'interior_campfire_set',
+      'accessory_trekking_poles'
     ) then 'R'
     when p_item_id in (
       'toy_treasure_puzzle', 'toy_frenchie_plush', 'toy_meat', 'toy_frenchie_cushion',
@@ -40,13 +42,15 @@ as $$
       'food_strawberry_roll_cake', 'food_paw_cupcake',
       'accessory_jinbei', 'other_sparkler',
       'interior_mosquito_coil', 'interior_hammock', 'accessory_yukata_kanzashi',
-      'interior_kerosene_stove', 'other_snowflake_ornament', 'accessory_fluffy_boots'
+      'interior_kerosene_stove', 'other_snowflake_ornament', 'accessory_fluffy_boots',
+      'interior_hut_fireplace'
     ) then 'SR'
     when p_item_id in (
       'toy_rainbow_ball', 'toy_golden_crown_ball',
       'other_nakayoshi_azubee', 'other_kamunayo', 'other_goldfish_scoop',
       'interior_beach_parasol', 'other_lantern', 'other_shooting_gallery',
-      'interior_kotatsu', 'other_snow_lantern'
+      'interior_kotatsu', 'other_snow_lantern',
+      'interior_stargazing_telescope'
     ) then 'SSR'
     when p_item_id in (
       'interior_anball', 'other_azubee', 'other_omojii',

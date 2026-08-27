@@ -130,6 +130,11 @@ export const GACHA_PRIZES: readonly GachaPrize[] = [
   { id: "food_summit_cup_ramen", name: "山頂カップラーメン", rarity: "R", type: "item", image: "/collection/items/summit-cup-ramen.webp" },
   { id: "interior_led_lantern", name: "LEDランタン", rarity: "N", type: "item", image: "/collection/items/led-lantern.webp" },
   { id: "interior_campfire_set", name: "焚き火セット", rarity: "R", type: "item", image: "/collection/items/campfire-set.webp" },
+  { id: "interior_hut_fireplace", name: "山小屋の暖炉", rarity: "SR", type: "item", image: "/collection/items/hut-fireplace.webp" },
+  { id: "interior_stargazing_telescope", name: "星空の天体望遠鏡", rarity: "SSR", type: "item", image: "/collection/items/stargazing-telescope.webp" },
+  { id: "accessory_bear_bell", name: "熊よけ鈴", rarity: "N", type: "item", image: "/collection/items/bear-bell.webp" },
+  { id: "accessory_hiking_backpack", name: "リュックサック", rarity: "N", type: "item", image: "/collection/items/hiking-backpack.webp" },
+  { id: "accessory_trekking_poles", name: "トレッキングポール", rarity: "R", type: "item", image: "/collection/items/trekking-poles.webp" },
 
   // --- 雪国シリーズの小物 -----------------------------------------------
   { id: "toy_sled", name: "雪ぞり", rarity: "N", type: "item", image: "/collection/items/sled.webp" },
