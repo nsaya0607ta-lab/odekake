@@ -187,6 +187,7 @@ const CURATED_ITEMS: readonly CollectionItem[] = [
   { id: "other_cairn", name: "ケルン(積み石)", image: "/collection/items/cairn.webp", category: "other", series: "hiking", rarity: "SR" },
   { id: "other_sunrise_view", name: "ご来光", image: "/collection/items/sunrise-view.webp", category: "other", series: "hiking", rarity: "SSR" },
   { id: "other_sea_of_clouds", name: "雲海", image: "/collection/items/sea-of-clouds.webp", category: "other", series: "hiking", rarity: "UR" },
+  { id: "other_rock_ptarmigan", name: "雷鳥", image: "/collection/items/rock-ptarmigan.webp", category: "other", series: "hiking", rarity: "LR" },
   // --- 雪国シリーズ ----------------------------------------------------
   { id: "snow_frenchie", name: "雪国のフレブル", image: "/collection/skins/snow-frenchie.webp", category: "other", series: "snow", rarity: "LR", art: "dogSnow" },
   { id: "toy_sled", name: "雪ぞり", image: "/collection/items/sled.webp", category: "toy", series: "snow", rarity: "N" },
@@ -209,6 +210,7 @@ const CURATED_ITEMS: readonly CollectionItem[] = [
   { id: "other_snowflake_ornament", name: "雪の結晶オーナメント", image: "/collection/items/snowflake-ornament.webp", category: "other", series: "snow", rarity: "SR" },
   { id: "other_snow_lantern", name: "雪灯篭", image: "/collection/items/snow-lantern.webp", category: "other", series: "snow", rarity: "SSR" },
   { id: "other_kamakura", name: "かまくら", image: "/collection/items/kamakura.webp", category: "other", series: "snow", rarity: "UR" },
+  { id: "other_diamond_dust", name: "ダイヤモンドダスト", image: "/collection/items/diamond-dust.webp", category: "other", series: "snow", rarity: "LR" },
   // --- 夏シリーズ ------------------------------------------------------
   { id: "summer_frenchie", name: "夏のフレブル", image: "/collection/skins/summer-frenchie.webp", category: "other", series: "summer", rarity: "LR", art: "dogSummer" },
   { id: "toy_beach_ball", name: "ビーチボール", image: "/collection/items/beach-ball.webp", category: "toy", series: "summer", rarity: "N" },
@@ -245,6 +247,7 @@ const CURATED_ITEMS: readonly CollectionItem[] = [
   { id: "accessory_yukata_kanzashi", name: "花柄の浴衣かんざし", image: "/collection/items/yukata-kanzashi.webp", category: "accessory", series: "summer", rarity: "SR" },
   { id: "other_lantern", name: "提灯", image: "/collection/items/lantern.webp", category: "other", series: "summer", rarity: "SSR" },
   { id: "other_shooting_gallery", name: "射的セット", image: "/collection/items/shooting-gallery.webp", category: "other", series: "summer", rarity: "SSR" },
+  { id: "other_milky_way", name: "天の川", image: "/collection/items/milky-way.webp", category: "other", series: "summer", rarity: "LR" },
 ];
 
 const CURATED_IDS = new Set(CURATED_ITEMS.map((item) => item.id));

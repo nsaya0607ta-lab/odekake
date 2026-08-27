@@ -140,6 +140,7 @@ export const GACHA_PRIZES: readonly GachaPrize[] = [
   { id: "other_cairn", name: "ケルン(積み石)", rarity: "SR", type: "item", image: "/collection/items/cairn.webp" },
   { id: "other_sunrise_view", name: "ご来光", rarity: "SSR", type: "item", image: "/collection/items/sunrise-view.webp" },
   { id: "other_sea_of_clouds", name: "雲海", rarity: "UR", type: "item", image: "/collection/items/sea-of-clouds.webp" },
+  { id: "other_rock_ptarmigan", name: "雷鳥", rarity: "LR", type: "item", image: "/collection/items/rock-ptarmigan.webp" },
 
   // --- 雪国シリーズの小物 -----------------------------------------------
   { id: "toy_sled", name: "雪ぞり", rarity: "N", type: "item", image: "/collection/items/sled.webp" },
@@ -162,6 +163,7 @@ export const GACHA_PRIZES: readonly GachaPrize[] = [
   { id: "other_snowflake_ornament", name: "雪の結晶オーナメント", rarity: "SR", type: "item", image: "/collection/items/snowflake-ornament.webp" },
   { id: "other_snow_lantern", name: "雪灯篭", rarity: "SSR", type: "item", image: "/collection/items/snow-lantern.webp" },
   { id: "other_kamakura", name: "かまくら", rarity: "UR", type: "item", image: "/collection/items/kamakura.webp" },
+  { id: "other_diamond_dust", name: "ダイヤモンドダスト", rarity: "LR", type: "item", image: "/collection/items/diamond-dust.webp" },
 
   // --- 夏シリーズの小物 -------------------------------------------------
   { id: "toy_beach_ball", name: "ビーチボール", rarity: "N", type: "item", image: "/collection/items/beach-ball.webp" },
@@ -200,6 +202,7 @@ export const GACHA_PRIZES: readonly GachaPrize[] = [
   { id: "accessory_yukata_kanzashi", name: "花柄の浴衣かんざし", rarity: "SR", type: "item", image: "/collection/items/yukata-kanzashi.webp" },
   { id: "other_lantern", name: "提灯", rarity: "SSR", type: "item", image: "/collection/items/lantern.webp" },
   { id: "other_shooting_gallery", name: "射的セット", rarity: "SSR", type: "item", image: "/collection/items/shooting-gallery.webp" },
+  { id: "other_milky_way", name: "天の川", rarity: "LR", type: "item", image: "/collection/items/milky-way.webp" },
 ];
 
 const PRIZE_BY_ID = new Map(GACHA_PRIZES.map((prize) => [prize.id, prize]));
