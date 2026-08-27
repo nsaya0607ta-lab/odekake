@@ -84,16 +84,12 @@ export function useSnsUnreadCount(): number {
     const refreshWhenVisible = () => {
       if (document.visibilityState === "visible") void requestUnreadCount(true);
     };
-    const pollingId = window.setInterval(() => {
-      if (document.visibilityState === "visible") void requestUnreadCount();
-    }, 30_000);
     document.addEventListener("visibilitychange", refreshWhenVisible);
     window.addEventListener("focus", refreshWhenVisible);
 
     return () => {
       if (idleId !== undefined) idleWindow.cancelIdleCallback?.(idleId);
       if (timeoutId !== undefined) window.clearTimeout(timeoutId);
-      window.clearInterval(pollingId);
       document.removeEventListener("visibilitychange", refreshWhenVisible);
       window.removeEventListener("focus", refreshWhenVisible);
     };
