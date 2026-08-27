@@ -1,4 +1,4 @@
--- 登山シリーズの新規景品5点を、DB側の重複返却判定へ追加する。
+-- 登山シリーズの新規景品を、DB側の重複返却判定へ追加する。
 create or replace function public.gacha_rarity_for_item(p_item_id text)
 returns text
 language sql
@@ -17,7 +17,8 @@ as $$
       'toy_sled', 'toy_snowman_kit', 'toy_snowball',
       'food_snow_roasted_sweet_potato', 'food_oshiruko',
       'interior_yutanpo', 'accessory_knit_hat', 'accessory_muffler',
-      'toy_hiking_stick', 'toy_rock_ball', 'toy_echo_whistle', 'food_ume_onigiri'
+      'toy_hiking_stick', 'toy_rock_ball', 'toy_echo_whistle', 'food_ume_onigiri',
+      'food_hut_curry', 'interior_led_lantern'
     ) then 'N'
     when p_item_id in (
       'toy_duck_plush', 'toy_carrot', 'toy_frisbee', 'toy_soccer_ball',
@@ -29,7 +30,7 @@ as $$
       'food_hiyashi_chuka', 'accessory_beach_sandals', 'accessory_shell_bracelet',
       'toy_mini_skis', 'food_oden', 'food_hot_chocolate',
       'interior_fluffy_blanket', 'accessory_mittens', 'other_icicle',
-      'toy_rope_swing'
+      'toy_rope_swing', 'food_onsen_tamago', 'food_summit_cup_ramen', 'interior_campfire_set'
     ) then 'R'
     when p_item_id in (
       'toy_treasure_puzzle', 'toy_frenchie_plush', 'toy_meat', 'toy_frenchie_cushion',
