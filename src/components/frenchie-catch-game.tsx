@@ -25,6 +25,9 @@ type Entity = {
   level: number;
   x: number;
   y: number;
+  /** 生成時のx/y（%）。position:absoluteのleft/topはこの値で固定し、以後の移動はtransformのtranslateだけで表す */
+  spawnX: number;
+  spawnY: number;
   vx: number;
   vy: number;
   size: number;
@@ -441,8 +444,8 @@ const FallingEntity = memo(function FallingEntity({
       ref={registerRef}
       className={`absolute will-change-transform ${entity.rarity ? RARITY_STYLE[entity.rarity] : ""}`}
       style={{
-        left: `${entity.x}%`,
-        top: `${entity.y}%`,
+        left: `${entity.spawnX}%`,
+        top: `${entity.spawnY}%`,
         width: `${entity.size}%`,
         zIndex: entity.enteredOpening && entity.status !== "bounced" ? 40 : 20,
         transform: `translate(-50%, -50%) rotate(${entity.rotation}deg)`,
@@ -461,6 +464,8 @@ export function FrenchieCatchGame({ ownedItems }: { ownedItems: FrenchieCatchIte
   const catcherRef = useRef<HTMLDivElement | null>(null);
   const entitiesRef = useRef<Entity[]>([]);
   const entityNodeRefs = useRef<Map<number, HTMLDivElement>>(new Map());
+  /** ボード実寸(px)。リサイズ時だけ更新し、毎フレームの座標計算はこれを参照する */
+  const boardSizeRef = useRef({ w: 0, h: 0 });
   const mountedEntityIdsRef = useRef<Set<number>>(new Set());
   const draggingRef = useRef(false);
   const dragOffsetRef = useRef(0);
@@ -558,6 +563,18 @@ export function FrenchieCatchGame({ ownedItems }: { ownedItems: FrenchieCatchIte
     itemLevelByIdRef.current = new Map(ownedItems.map((item) => [item.id, item.level]));
   }, [ownedItems]);
 
+  useEffect(() => {
+    const board = boardRef.current;
+    if (!board) return;
+    const measure = () => {
+      boardSizeRef.current = { w: board.clientWidth, h: board.clientHeight };
+    };
+    measure();
+    const observer = new ResizeObserver(measure);
+    observer.observe(board);
+    return () => observer.disconnect();
+  }, []);
+
   /**
    * 落下中に出現するすべての画像を先読みしてブラウザキャッシュに乗せておく。
    * これをしないと、初出現の画像はダウンロード+デコードが落下中に間に合わず
@@ -614,10 +631,14 @@ export function FrenchieCatchGame({ ownedItems }: { ownedItems: FrenchieCatchIte
     const fallSpeedBoost = performance.now() < fallSpeedBoostUntilRef.current ? fallSpeedValueRef.current : 1;
     const slantBoost = performance.now() < slantBoostUntilRef.current ? SLANT_VX_BOOST : 1;
     const rawVy = (17 + Math.random() * 5) * 1.35;
+    const spawnX = 9 + Math.random() * 82;
+    const spawnY = -13 - Math.random() * 5;
     const base = {
       id: nextIdRef.current++,
-      x: 9 + Math.random() * 82,
-      y: -13 - Math.random() * 5,
+      x: spawnX,
+      y: spawnY,
+      spawnX,
+      spawnY,
       vx: (Math.random() - 0.5) * 2.4 * slantBoost,
       vy: rawVy * fallSpeedBoost,
       rotation: (Math.random() - 0.5) * 12,
@@ -1788,12 +1809,17 @@ export function FrenchieCatchGame({ ownedItems }: { ownedItems: FrenchieCatchIte
         : elapsedSincePlayStart > TOP_ZONE_HIDDEN_AFTER_SEC * 1000
           ? TOP_ZONE_HIDDEN_LOCAL_Y
           : 0;
+      const { w: boardW, h: boardH } = boardSizeRef.current;
       for (const entity of next) {
         const el = entityNodeRefs.current.get(entity.id);
         if (!el) continue;
         const zIndex = entity.enteredOpening && entity.status !== "bounced" ? 40 : 20;
         const opacity = entity.y < topZoneHiddenY ? 0 : 1;
-        el.style.cssText = `position:absolute;left:${entity.x}%;top:${entity.y}%;width:${entity.size}%;z-index:${zIndex};opacity:${opacity};transform:translate(-50%,-50%) rotate(${entity.rotation}deg);will-change:transform;`;
+        const px = ((entity.x - entity.spawnX) / 100) * boardW;
+        const py = ((entity.y - entity.spawnY) / 100) * boardH;
+        el.style.zIndex = String(zIndex);
+        el.style.opacity = String(opacity);
+        el.style.transform = `translate(${px}px, ${py}px) translate(-50%, -50%) rotate(${entity.rotation}deg)`;
       }
 
       rafRef.current = requestAnimationFrame(frame);

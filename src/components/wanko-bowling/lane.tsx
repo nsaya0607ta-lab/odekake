@@ -497,10 +497,25 @@ const DEFAULT_BALL_START_X_M = JB_GUTTER_WIDTH_M + JB_LANE_WIDTH_M / 2;
 const LEFT_GUTTER_CENTER_M = JB_GUTTER_WIDTH_M / 2;
 const RIGHT_GUTTER_CENTER_M = JB_GUTTER_WIDTH_M + JB_LANE_WIDTH_M + JB_GUTTER_WIDTH_M / 2;
 const MAX_START_OFFSET_M = 0.4249;
+/** ボールの初期表示幅（%）。以後の幅変化は widthPct/BALL_BASE_WIDTH_PCT の scale() で表現する */
+const BALL_BASE_WIDTH_PCT = ballVisualWidthPct(0);
+const BALL_BASE_LEFT_PCT = 50;
+const BALL_BASE_TOP_PCT = DOCK_Y;
+/**
+ * ピン・ボールの位置更新は毎フレーム left/top/width（レイアウトを再計算させるCSSプロパティ）を
+ * 書き換えていたため、60fpsで動く投球中にリフローが連発して低〜中スペック端末で重くなっていた。
+ * JSXの初期 left/top/width はそのまま（初回描画のアンカー）にして、以後は初期値からの差分を
+ * transform の translate(px)/scale() だけで表現し、レイアウトに触れないようにする。
+ */
+const PIN_ANCHOR: ReadonlyMap<number, { x: number; y: number }> = new Map(
+  PIN_LAYOUT.map((pin) => [pin.id, { x: pin.x, y: pin.y }]),
+);
 
 export function Lane({ ballVisual, goldenPinId = null, resetSignal, newGameSignal, active, onRoll }: LaneProps) {
   const boardRef = useRef<HTMLDivElement>(null);
   const ballRef = useRef<HTMLDivElement>(null);
+  /** ボード実寸(px)。リサイズ時だけ更新し、毎フレームの座標計算はこれを参照する */
+  const boardSizeRef = useRef({ w: 0, h: 0 });
   const throwingRef = useRef(false);
   const dockingRef = useRef(false);
   const pointsRef = useRef<Point[]>([]);
@@ -544,14 +559,19 @@ export function Lane({ ballVisual, goldenPinId = null, resetSignal, newGameSigna
     const el = pinNodesRef.current.get(id);
     if (!el) return;
 
+    const anchor = PIN_ANCHOR.get(id);
+    const { w, h } = boardSizeRef.current;
+    const screenX = worldXToPct(body.xM, body.yM);
     const screenY = worldYToPct(body.yM);
-    el.style.left = `${worldXToPct(body.xM, body.yM)}%`;
-    el.style.top = `${screenY}%`;
-    el.style.width = `${pinVisualWidthPct(body.yM)}%`;
+    const widthPct = pinVisualWidthPct(body.yM);
+    const scale = widthPct / PIN_VISUAL_WIDTH_PCT;
+    const px = anchor ? ((screenX - anchor.x) / 100) * w : 0;
+    const py = anchor ? ((screenY - anchor.y) / 100) * h : 0;
+
     el.style.opacity = body.visible ? "1" : "0";
     el.style.zIndex = String(500 + Math.round(screenY * 10));
     const squashY = 1 - 0.62 * body.fallProgress;
-    el.style.transform = `translate(-50%, -50%) rotate(${body.angle}deg) scale(1, ${squashY})`;
+    el.style.transform = `translate(${px}px, ${py}px) translate(-50%, -50%) rotate(${body.angle}deg) scale(${scale}, ${scale * squashY})`;
   }, []);
 
   const resetPins = useCallback(() => {
@@ -582,10 +602,13 @@ export function Lane({ ballVisual, goldenPinId = null, resetSignal, newGameSigna
   ) => {
     const el = ballRef.current;
     if (!el) return;
+    const { w, h } = boardSizeRef.current;
+    const screenX = worldXToPct(xM, yM);
     const screenY = worldYToPct(yM);
-    el.style.left = `${worldXToPct(xM, yM)}%`;
-    el.style.top = `${screenY}%`;
-    el.style.width = `${ballVisualWidthPct(yM)}%`;
+    const widthPct = ballVisualWidthPct(yM);
+    const scale = widthPct / BALL_BASE_WIDTH_PCT;
+    const px = ((screenX - BALL_BASE_LEFT_PCT) / 100) * w;
+    const py = ((screenY - BALL_BASE_TOP_PCT) / 100) * h;
     el.style.zIndex = String(501 + Math.round(screenY * 10));
 
     const visualRollDeg = rotateDeg * 0.16;
@@ -596,7 +619,7 @@ export function Lane({ ballVisual, goldenPinId = null, resetSignal, newGameSigna
       const highlightY = 28 + Math.sin(phaseRad) * 12;
       const forwardRollDeg = visualRollDeg * 0.18;
       el.style.background = `radial-gradient(circle at 32% ${highlightY}%, ${ballVisual.bodyGradient[0]}, ${ballVisual.bodyGradient[1]})`;
-      el.style.transform = `translate(-50%, -50%) rotate(${forwardRollDeg}deg)`;
+      el.style.transform = `translate(${px}px, ${py}px) translate(-50%, -50%) scale(${scale}) rotate(${forwardRollDeg}deg)`;
       return;
     }
 
@@ -607,7 +630,7 @@ export function Lane({ ballVisual, goldenPinId = null, resetSignal, newGameSigna
     const highlightX = 32 + Math.sin(phaseRad * curveDirection) * 10 * curveStrength * surfaceFactor;
     const highlightY = 28 + Math.cos(phaseRad) * 7 * curveStrength;
     el.style.background = `radial-gradient(circle at ${highlightX}% ${highlightY}%, ${ballVisual.bodyGradient[0]}, ${ballVisual.bodyGradient[1]})`;
-    el.style.transform = `translate(-50%, -50%) rotate(${sideSpinDeg + axisTiltDeg}deg)`;
+    el.style.transform = `translate(${px}px, ${py}px) translate(-50%, -50%) scale(${scale}) rotate(${sideSpinDeg + axisTiltDeg}deg)`;
   }, [ballVisual.bodyGradient]);
 
   const setStartPositionFromScreenX = useCallback((screenXPct: number) => {
@@ -650,6 +673,18 @@ export function Lane({ ballVisual, goldenPinId = null, resetSignal, newGameSigna
       });
     }, 110);
   }, [setBallPosition]);
+
+  useEffect(() => {
+    const board = boardRef.current;
+    if (!board) return;
+    const measure = () => {
+      boardSizeRef.current = { w: board.clientWidth, h: board.clientHeight };
+    };
+    measure();
+    const observer = new ResizeObserver(measure);
+    observer.observe(board);
+    return () => observer.disconnect();
+  }, []);
 
   useEffect(() => {
     resetPins();
