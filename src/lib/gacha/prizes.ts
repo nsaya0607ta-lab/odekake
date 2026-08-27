@@ -119,6 +119,28 @@ export const GACHA_PRIZES: readonly GachaPrize[] = [
   { id: "snow_frenchie", name: "雪国のフレブル", rarity: "LR", type: "dog_skin", image: "/collection/skins/snow-frenchie.webp" },
   { id: "summer_frenchie", name: "夏のフレブル", rarity: "LR", type: "dog_skin", image: "/collection/skins/summer-frenchie.webp" },
 
+  // --- 雪国シリーズの小物 -----------------------------------------------
+  { id: "toy_sled", name: "雪ぞり", rarity: "N", type: "item", image: "/collection/items/sled.webp" },
+  { id: "toy_snowman_kit", name: "雪だるまキット", rarity: "N", type: "item", image: "/collection/items/snowman-kit.webp" },
+  { id: "toy_snowball", name: "雪玉(雪合戦用)", rarity: "N", type: "item", image: "/collection/items/snowball.webp" },
+  { id: "toy_mini_skis", name: "ミニスキー板", rarity: "R", type: "item", image: "/collection/items/mini-skis.webp" },
+  { id: "food_snow_roasted_sweet_potato", name: "焼き芋", rarity: "N", type: "item", image: "/collection/items/snow-roasted-sweet-potato.webp" },
+  { id: "food_oshiruko", name: "おしるこ", rarity: "N", type: "item", image: "/collection/items/oshiruko.webp" },
+  { id: "food_oden", name: "熱々おでん", rarity: "R", type: "item", image: "/collection/items/oden.webp" },
+  { id: "food_hot_chocolate", name: "ホットチョコレート", rarity: "R", type: "item", image: "/collection/items/hot-chocolate.webp" },
+  { id: "interior_yutanpo", name: "湯たんぽ", rarity: "N", type: "item", image: "/collection/items/yutanpo.webp" },
+  { id: "interior_fluffy_blanket", name: "もこもこ毛布", rarity: "R", type: "item", image: "/collection/items/fluffy-blanket.webp" },
+  { id: "interior_kerosene_stove", name: "石油ストーブ", rarity: "SR", type: "item", image: "/collection/items/kerosene-stove.webp" },
+  { id: "interior_kotatsu", name: "こたつ", rarity: "SSR", type: "item", image: "/collection/items/kotatsu.webp" },
+  { id: "accessory_knit_hat", name: "ニット帽", rarity: "N", type: "item", image: "/collection/items/knit-hat.webp" },
+  { id: "accessory_muffler", name: "マフラー", rarity: "N", type: "item", image: "/collection/items/muffler.webp" },
+  { id: "accessory_mittens", name: "ミトン手袋", rarity: "R", type: "item", image: "/collection/items/mittens.webp" },
+  { id: "accessory_fluffy_boots", name: "もこもこブーツ", rarity: "SR", type: "item", image: "/collection/items/fluffy-boots.webp" },
+  { id: "other_icicle", name: "つらら", rarity: "R", type: "item", image: "/collection/items/icicle.webp" },
+  { id: "other_snowflake_ornament", name: "雪の結晶オーナメント", rarity: "SR", type: "item", image: "/collection/items/snowflake-ornament.webp" },
+  { id: "other_snow_lantern", name: "雪灯篭", rarity: "SSR", type: "item", image: "/collection/items/snow-lantern.webp" },
+  { id: "other_kamakura", name: "かまくら", rarity: "UR", type: "item", image: "/collection/items/kamakura.webp" },
+
   // --- 夏シリーズの小物 -------------------------------------------------
   { id: "toy_beach_ball", name: "ビーチボール", rarity: "N", type: "item", image: "/collection/items/beach-ball.webp" },
   { id: "toy_bug_net", name: "虫取り網", rarity: "N", type: "item", image: "/collection/items/bug-net.webp" },
