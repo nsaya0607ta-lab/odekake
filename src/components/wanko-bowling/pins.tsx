@@ -54,7 +54,7 @@ export function Pins({ registerNode, goldenPinId = null }: PinsProps) {
           <div
             key={pin.id}
             ref={(el) => registerNode(pin.id, el)}
-            className="absolute"
+            className="absolute will-change-transform"
             style={{
               left: `${pin.x}%`,
               top: `${pin.y}%`,
