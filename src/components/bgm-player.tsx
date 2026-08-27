@@ -58,7 +58,8 @@ export function BgmPlayer() {
       }
     };
 
-    tryPlay();
+    // 起動直後の自動再生試行ではAudioContextやBGM取得を開始しない。
+    // スプラッシュを閉じる最初のタップが従来どおり再生開始のきっかけになる。
     document.addEventListener("visibilitychange", onVisibilityChange);
     window.addEventListener("pageshow", tryPlay);
     window.addEventListener("focus", tryPlay);
