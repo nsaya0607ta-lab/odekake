@@ -1,17 +1,22 @@
-# デコレーションボード機能 実装依頼
+# マイルーム機能 実装依頼
 
 このドキュメントは、ChatGPT（または他のAIアシスタント）にこの機能の実装を依頼するための仕様書です。
 そのままコピペしてプロンプトとして渡すことを想定しています。
+
+> **v2 での変更点**: 初期案（壁面の棚にアイテムを飾るだけの「デコレーションボード」）から、
+> 部屋の間取りを上から見た**見下ろし視点のマイルーム**に方向転換しました。壁掛け棚の実装が
+> 既にある場合は、それを置き換える形で作り直してください（残す必要はありません）。
 
 ---
 
 ## 依頼したいこと
 
 > 以下は Next.js (App Router) + Supabase の犬のお散歩記録アプリ「おでかけ」のリポジトリです。
-> ガチャで手に入れたコレクションアイテムを、自分専用の「棚」に自由に飾れる
-> **デコレーションボード機能**を追加してください。マイクラのインベントリ画面のように、
-> 「アイテムを選ぶ→空いているマスに置く」というシンプルな操作で配置できるようにしたいです。
-> 下記の仕様・既存コードのパターンに沿って実装してください。
+> ガチャで手に入れたコレクションアイテムを使って、自分だけの部屋を作れる**マイルーム機能**を
+> 追加してください。あつまれどうぶつの森やマイクラのハウジングのように、部屋を上から見た
+> 間取りの中に、床や壁際へ好きなアイテムを配置できるようにしたいです。操作はドラッグではなく、
+> 「アイテムを選ぶ→空いているマスをタップして置く」というマイクラのインベントリ的な
+> シンプルな方式にしてください。下記の仕様・既存コードのパターンに沿って実装してください。
 
 ---
 
@@ -24,31 +29,37 @@
 
 ## 2. 作りたい機能
 
-**デコレーションボード**：マイページに新設する画面。持っているガチャアイテムを、
-壁面の棚（マイクラのインベントリのようなグリッド）に自由に配置して自分だけの棚を作れる。
+**マイルーム**：マイページに新設する画面。持っているガチャアイテムを、見下ろし視点の
+部屋の間取りに自由に配置して、自分だけの部屋を作れる。
 
 ### 見た目・UX
 
-- 木目調などの棚背景の上に、グリッド線を敷く（初期案: **3段 × 横6マス = 18マス**）。
+- 部屋を真上から見た間取り（フロアタイル）を描画する。初期案: **6 × 6 マスの正方形の部屋**。
+- 部屋の中央付近に、自分の犬（`getCurrentDogSkin` で取得できる現在のスキン）を固定表示し、
+  「自分の部屋に自分の犬がいる」生活感を出す（犬自体はマスを専有しない、演出目的の表示）。
 - 画面下部にインベントリ風のアイテム一覧を表示する。図鑑と同じ絵柄・レアリティ枠
   （`src/components/collection/collection-ui.tsx` のカード表現）を流用する。
 - 操作フロー（ドラッグ&ドロップは使わない。タップだけで完結させる）：
   1. 下部のインベントリからアイテムをタップして選択する。
-  2. 棚の空いているマスがハイライトされる。
+  2. 床グリッドの空いているマスがハイライトされる。
   3. 置きたいマスをタップすると設置される。
   4. 既に置いてあるマスをタップすると「どける／別のアイテムに差し替え」の操作ができる。
-- 1つのアイテムにつき棚に置けるのは同時に1個まで（在庫管理はしない。図鑑と同じ
+- カテゴリ（toy / food / interior / accessory / other）による置き場所の制限はしない。
+  すべて同じ床グリッドに置ける（実装をシンプルに保つため）。
+- 1つのアイテムにつき部屋に置けるのは同時に1個まで（在庫管理はしない。図鑑と同じ
   「持っている/持っていない」の状態だけで完結させる）。
 
 ### 発展案（初期実装のスコープ外でよい）
 
-- フレンドの棚を見に行ける（`src/app/(app)/mypage/friends/[friendId]/collection/page.tsx`
+- 床材・壁紙を着せ替えできるようにする。
+- 複数の部屋（間取りのバリエーション）を持てるようにする。
+- フレンドの部屋を見に行ける（`src/app/(app)/mypage/friends/[friendId]/collection/page.tsx`
   と同様のパターンで `.../friends/[friendId]/room` を追加）。
 
 ## 3. 参考にすべき既存実装
 
-似た「所持データを装着/配置する」機能として、そうび機能（`user_equipment`）が
-既にあるので、これと同じ設計パターンを踏襲してください。
+似た「所持データを配置する」機能として、そうび機能（`user_equipment`）が既にあるので、
+これと同じ設計パターンを踏襲してください。
 
 - **DBマイグレーション**: `supabase/migrations/0012_user_equipment.sql`
   - RLS で `select` は本人のみ許可。
@@ -66,13 +77,14 @@
   同様に `getRoomItems(supabase, userId)` を `src/lib/data/room.ts` に作る。
 - **APIルート**: `src/app/api/equipment/route.ts` を参考に `src/app/api/room/route.ts` を作る。
 - **ページ**: `src/app/(app)/mypage/gear/page.tsx`（サーバーコンポーネントでデータ取得し、
-  クライアントコンポーネントに渡す構成）を参考に
-  `src/app/(app)/mypage/room/page.tsx` を追加する。
+  クライアントコンポーネントに渡す構成）を参考に `src/app/(app)/mypage/room/page.tsx` を追加する。
+  犬のスキン表示には `getCurrentDogSkin`（`src/lib/data/dog-skin.ts`）を使う。
 - **UIコンポーネント**: `src/components/gear-board.tsx` の構成・状態管理の仕方を参考に
-  `src/components/room-board.tsx` を作る。
+  `src/components/room-board.tsx` を作る。見下ろし視点の床グリッドは、正方形マスを
+  CSS Grid で並べ、奥のマスほど手前より若干縮小・上寄せする程度の軽い擬似遠近表現に留め、
+  過度な3D表現は避ける（実装コストとメンテ性を優先）。
 - **アイテム定義**: `src/lib/collection/items.ts` の `CollectionItem` 型
   （`id`, `name`, `image`, `category`, `series`, `rarity`）をそのまま利用する。
-  カテゴリは `toy` / `food` / `interior` / `accessory` / `other`。
 - **カードの見た目**: `src/components/collection/collection-ui.tsx`、
   `src/components/collection/item-art.tsx` にレアリティ枠込みのカード表現があるので流用する。
 
@@ -81,7 +93,7 @@
 ```sql
 create table if not exists public.room_items (
   user_id uuid not null references auth.users(id) on delete cascade,
-  slot_index integer not null check (slot_index between 0 and 17), -- 3段×6マス=18マス
+  slot_index integer not null check (slot_index between 0 and 35), -- 6×6マス=36マス
   item_id text not null,
   updated_at timestamptz not null default now(),
   primary key (user_id, slot_index)
@@ -130,6 +142,7 @@ $$;
 - [ ] `src/lib/data/room.ts` で配置状況を取得できる
 - [ ] `src/app/api/room/route.ts` で配置の更新ができる（未所持アイテムは拒否）
 - [ ] `src/app/(app)/mypage/room/page.tsx` + `src/components/room-board.tsx` で
-      タップ操作による配置UIが動作する
-- [ ] マイページ（`src/app/(app)/mypage/page.tsx`）にデコレーションボードへの導線を追加
+      見下ろし視点の間取り上にタップ操作で配置できるUIが動作する
+- [ ] 部屋の中央付近に現在のスキンの犬が表示される
+- [ ] マイページ（`src/app/(app)/mypage/page.tsx`）にマイルームへの導線を追加
 - [ ] 型チェック・lint が通る（`npm run lint` など、リポジトリの既存スクリプトに従う）
