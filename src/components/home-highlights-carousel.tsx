@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import { useEffect, useMemo, useRef, useState, type ReactNode, type TouchEvent } from "react";
 import { IconClock, IconMapPin, IconPaw, IconUser } from "@/components/icons";
 import { MarqueeText } from "@/components/marquee-text";
@@ -201,15 +202,14 @@ export function HomeHighlightsCarousel({
 function FrameCard({ children }: { children: ReactNode }) {
   return (
     <div className="relative w-full" style={{ aspectRatio: CARD_RATIO }}>
-      {/* eslint-disable-next-line @next/next/no-img-element */}
-      <img
+      <Image
         src={FRAME_SRC}
         alt=""
         aria-hidden="true"
-        width={1536}
-        height={1024}
+        fill
+        sizes="(max-width: 480px) 100vw, 480px"
         draggable={false}
-        className="pointer-events-none absolute inset-0 h-full w-full select-none"
+        className="pointer-events-none select-none"
       />
       <div className="absolute inset-0 flex items-center justify-center px-[11%] py-[13%]">{children}</div>
     </div>
