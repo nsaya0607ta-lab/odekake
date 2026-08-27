@@ -1,18 +1,9 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 
 export function StartupSplash({ children }: { children: React.ReactNode }) {
   const [visible, setVisible] = useState(true);
-  const [ready, setReady] = useState(false);
-
-  useEffect(() => {
-    // 少しだけ演出を見せてから「タップしてはじめる」に切り替える。
-    // BGMはブラウザの制約上ユーザー操作なしには鳴らせないため、
-    // ここでの最初のタップを再生開始のきっかけとして使う。
-    const timer = window.setTimeout(() => setReady(true), 900);
-    return () => window.clearTimeout(timer);
-  }, []);
 
   return (
     <>
@@ -20,12 +11,12 @@ export function StartupSplash({ children }: { children: React.ReactNode }) {
       {visible ? (
         <main
           className="app-splash"
-          aria-label={ready ? "タップしてはじめる" : "読み込み中"}
+          aria-label="タップしてはじめる"
           onClick={() => {
             // pointerdown(押した瞬間)で閉じると、指を離した時の click が
             // 下に隠れている画面のボタンまで突き抜けて反応してしまう
             // (いわゆるゴーストクリック)。タップが完了する click まで待つ。
-            if (ready) setVisible(false);
+            setVisible(false);
           }}
         >
           <div className="app-splash-scene" aria-hidden="true">
@@ -43,20 +34,9 @@ export function StartupSplash({ children }: { children: React.ReactNode }) {
           <section className="app-splash-copy">
             <h1>自分の旅</h1>
             <p>おでかけの記録を、<br />一生の思い出に。</p>
-            {ready ? (
-              <button type="button" className="app-splash-start">
-                タップしてはじめる
-              </button>
-            ) : (
-              <>
-                <div className="app-splash-dots" aria-hidden="true">
-                  <span />
-                  <span />
-                  <span />
-                </div>
-                <span className="app-splash-loading">読み込み中...</span>
-              </>
-            )}
+            <button type="button" className="app-splash-start">
+              タップしてはじめる
+            </button>
           </section>
         </main>
       ) : null}

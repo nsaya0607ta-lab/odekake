@@ -1,3 +1,4 @@
+import Image from "next/image";
 import Link from "next/link";
 import { IconChevronRight } from "@/components/icons";
 import { MarqueeText } from "@/components/marquee-text";
@@ -34,15 +35,14 @@ export function HomeNoticeCard({
       aria-label={`お知らせ。${summary}`}
     >
       <div className="relative w-full" style={{ aspectRatio: CARD_RATIO }}>
-        {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img
+        <Image
           src={CARD_SRC}
           alt=""
           aria-hidden="true"
-          width={2172}
-          height={724}
+          fill
+          sizes="(max-width: 480px) 100vw, 480px"
           draggable={false}
-          className="pointer-events-none absolute inset-0 h-full w-full select-none"
+          className="pointer-events-none select-none"
         />
         <div className="absolute inset-0 flex items-center gap-1" style={{ paddingLeft: "37%", paddingRight: "8%" }}>
           <div className="flex min-w-0 flex-1 flex-col gap-1">
