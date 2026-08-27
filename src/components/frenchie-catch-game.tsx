@@ -242,6 +242,7 @@ const LV = {
   CLAWD_BALL_COUNT: [5, 8, 10, 12, 14],
   KAMIKAMI_PT: [10, 15, 25, 35, 45],
   MOCCHURIN_PT: [30, 45, 60, 80, 100],
+  TIME_BONUS_FALL: [6, 5.6, 5.2, 4.8, 4.5],
 } as const;
 /** 出現量アップ系は時間増加系アイテムの取得率まで底上げしてしまうため、控えめな倍率にしている */
 const SPAWN_RATE_BOOST = 1.5;
@@ -254,7 +255,6 @@ const TIME_BONUS_ITEM_IDS = new Set([
   "toy_duck_plush", "toy_carrot", "food_paw_melon_bread",
   "interior_anball", "other_omojii", "other_azuki", "summer_frenchie",
 ]);
-const TIME_BONUS_FALL_SPEED = 6;
 const TREASURE_ITEM_ID = "toy_treasure_puzzle";
 const TREASURE_FALL_SPEED = 4;
 const POOP_FLOOD_FALL_SPEED = 6;
@@ -392,12 +392,23 @@ function overlap(leftA: number, rightA: number, leftB: number, rightB: number) {
 }
 
 /**
- * 時間増加系アイテムは「落下速度アップ」スキルの影響を受けず、常に固定の倍率で落ちる。
+ * 時間増加系アイテムは「落下速度アップ」スキルの影響を受けず、常にスキルレベル別の固定倍率で落ちる
+ * （Lv1〜5でLV.TIME_BONUS_FALLの6→5.6→5.2→4.8→4.5と、レベルが上がるほど遅くなり捕まえやすくなる）。
  * それ以外は通常どおりスキルによる落下速度アップ(boostedVy)を反映したレアリティ倍率になる。
  */
-function resolveFallVy(rawVy: number, boostedVy: number, itemId: string, rarity: FrenchieCatchItem["rarity"]) {
+function resolveFallVy(
+  rawVy: number,
+  boostedVy: number,
+  itemId: string,
+  rarity: FrenchieCatchItem["rarity"],
+  level: number,
+) {
   if (itemId === TREASURE_ITEM_ID) return rawVy * TREASURE_FALL_SPEED;
-  return TIME_BONUS_ITEM_IDS.has(itemId) ? rawVy * TIME_BONUS_FALL_SPEED : boostedVy * RARITY_FALL_SPEED[rarity];
+  if (TIME_BONUS_ITEM_IDS.has(itemId)) {
+    const lv = clamp(level || 1, 1, MAX_SKILL_LEVEL) - 1;
+    return rawVy * LV.TIME_BONUS_FALL[lv]!;
+  }
+  return boostedVy * RARITY_FALL_SPEED[rarity];
 }
 
 function openingBoundsAt(localY: number) {
@@ -643,7 +654,7 @@ export function FrenchieCatchGame({ ownedItems }: { ownedItems: FrenchieCatchIte
         image: character.image ?? "",
         rarity: character.rarity,
         level: itemLevelByIdRef.current.get(character.id) ?? 0,
-        vy: resolveFallVy(rawVy, base.vy, character.id, character.rarity),
+        vy: resolveFallVy(rawVy, base.vy, character.id, character.rarity, itemLevelByIdRef.current.get(character.id) ?? 1),
         size: 12.5 + Math.random() * 3.5,
         spin: (Math.random() - 0.5) * 65,
       };
@@ -661,7 +672,7 @@ export function FrenchieCatchGame({ ownedItems }: { ownedItems: FrenchieCatchIte
         image: ball.image ?? "",
         rarity: ball.rarity,
         level: itemLevelByIdRef.current.get(ball.id) ?? 0,
-        vy: resolveFallVy(rawVy, base.vy, ball.id, ball.rarity),
+        vy: resolveFallVy(rawVy, base.vy, ball.id, ball.rarity, itemLevelByIdRef.current.get(ball.id) ?? 1),
         size: 12.5 + Math.random() * 3.5,
         spin: (Math.random() - 0.5) * 65,
       };
@@ -782,7 +793,7 @@ export function FrenchieCatchGame({ ownedItems }: { ownedItems: FrenchieCatchIte
           image: skin.image,
           rarity: skin.rarity,
           level: skin.level,
-          vy: resolveFallVy(rawVy, base.vy, skin.id, skin.rarity),
+          vy: resolveFallVy(rawVy, base.vy, skin.id, skin.rarity, skin.level || 1),
           size: 15.5 + Math.random() * 3.5,
           spin: (Math.random() - 0.5) * 20,
         };
@@ -818,7 +829,7 @@ export function FrenchieCatchGame({ ownedItems }: { ownedItems: FrenchieCatchIte
       image: item.image,
       rarity: item.rarity,
       level: item.level,
-      vy: resolveFallVy(rawVy, base.vy, item.id, item.rarity),
+      vy: resolveFallVy(rawVy, base.vy, item.id, item.rarity, item.level || 1),
       size: 12.5 + Math.random() * 3.5,
       spin: (Math.random() - 0.5) * 65,
     };
