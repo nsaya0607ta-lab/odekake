@@ -135,6 +135,11 @@ export const GACHA_PRIZES: readonly GachaPrize[] = [
   { id: "accessory_bear_bell", name: "熊よけ鈴", rarity: "N", type: "item", image: "/collection/items/bear-bell.webp" },
   { id: "accessory_hiking_backpack", name: "リュックサック", rarity: "N", type: "item", image: "/collection/items/hiking-backpack.webp" },
   { id: "accessory_trekking_poles", name: "トレッキングポール", rarity: "R", type: "item", image: "/collection/items/trekking-poles.webp" },
+  { id: "accessory_hiking_pin_hat", name: "登山バッジ帽子", rarity: "SR", type: "item", image: "/collection/items/hiking-pin-hat.webp" },
+  { id: "other_trail_map_compass", name: "山の地図とコンパス", rarity: "R", type: "item", image: "/collection/items/trail-map-compass.webp" },
+  { id: "other_cairn", name: "ケルン(積み石)", rarity: "SR", type: "item", image: "/collection/items/cairn.webp" },
+  { id: "other_sunrise_view", name: "ご来光", rarity: "SSR", type: "item", image: "/collection/items/sunrise-view.webp" },
+  { id: "other_sea_of_clouds", name: "雲海", rarity: "UR", type: "item", image: "/collection/items/sea-of-clouds.webp" },
 
   // --- 雪国シリーズの小物 -----------------------------------------------
   { id: "toy_sled", name: "雪ぞり", rarity: "N", type: "item", image: "/collection/items/sled.webp" },

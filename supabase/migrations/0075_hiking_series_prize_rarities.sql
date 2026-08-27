@@ -32,7 +32,7 @@ as $$
       'toy_mini_skis', 'food_oden', 'food_hot_chocolate',
       'interior_fluffy_blanket', 'accessory_mittens', 'other_icicle',
       'toy_rope_swing', 'food_onsen_tamago', 'food_summit_cup_ramen', 'interior_campfire_set',
-      'accessory_trekking_poles'
+      'accessory_trekking_poles', 'other_trail_map_compass'
     ) then 'R'
     when p_item_id in (
       'toy_treasure_puzzle', 'toy_frenchie_plush', 'toy_meat', 'toy_frenchie_cushion',
@@ -43,20 +43,20 @@ as $$
       'accessory_jinbei', 'other_sparkler',
       'interior_mosquito_coil', 'interior_hammock', 'accessory_yukata_kanzashi',
       'interior_kerosene_stove', 'other_snowflake_ornament', 'accessory_fluffy_boots',
-      'interior_hut_fireplace'
+      'interior_hut_fireplace', 'accessory_hiking_pin_hat', 'other_cairn'
     ) then 'SR'
     when p_item_id in (
       'toy_rainbow_ball', 'toy_golden_crown_ball',
       'other_nakayoshi_azubee', 'other_kamunayo', 'other_goldfish_scoop',
       'interior_beach_parasol', 'other_lantern', 'other_shooting_gallery',
       'interior_kotatsu', 'other_snow_lantern',
-      'interior_stargazing_telescope'
+      'interior_stargazing_telescope', 'other_sunrise_view'
     ) then 'SSR'
     when p_item_id in (
       'interior_anball', 'other_azubee', 'other_omojii',
       'interior_kinoko_azubee', 'other_komochi', 'other_azuki', 'other_kobee',
       'toy_fireworks_set',
-      'other_kamakura'
+      'other_kamakura', 'other_sea_of_clouds'
     ) then 'UR'
     when p_item_id in (
       'hiking_frenchie', 'snow_frenchie', 'summer_frenchie',

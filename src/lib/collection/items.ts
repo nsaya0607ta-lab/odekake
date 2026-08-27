@@ -182,6 +182,11 @@ const CURATED_ITEMS: readonly CollectionItem[] = [
   { id: "accessory_bear_bell", name: "熊よけ鈴", image: "/collection/items/bear-bell.webp", category: "accessory", series: "hiking", rarity: "N" },
   { id: "accessory_hiking_backpack", name: "リュックサック", image: "/collection/items/hiking-backpack.webp", category: "accessory", series: "hiking", rarity: "N" },
   { id: "accessory_trekking_poles", name: "トレッキングポール", image: "/collection/items/trekking-poles.webp", category: "accessory", series: "hiking", rarity: "R" },
+  { id: "accessory_hiking_pin_hat", name: "登山バッジ帽子", image: "/collection/items/hiking-pin-hat.webp", category: "accessory", series: "hiking", rarity: "SR" },
+  { id: "other_trail_map_compass", name: "山の地図とコンパス", image: "/collection/items/trail-map-compass.webp", category: "other", series: "hiking", rarity: "R" },
+  { id: "other_cairn", name: "ケルン(積み石)", image: "/collection/items/cairn.webp", category: "other", series: "hiking", rarity: "SR" },
+  { id: "other_sunrise_view", name: "ご来光", image: "/collection/items/sunrise-view.webp", category: "other", series: "hiking", rarity: "SSR" },
+  { id: "other_sea_of_clouds", name: "雲海", image: "/collection/items/sea-of-clouds.webp", category: "other", series: "hiking", rarity: "UR" },
   // --- 雪国シリーズ ----------------------------------------------------
   { id: "snow_frenchie", name: "雪国のフレブル", image: "/collection/skins/snow-frenchie.webp", category: "other", series: "snow", rarity: "LR", art: "dogSnow" },
   { id: "toy_sled", name: "雪ぞり", image: "/collection/items/sled.webp", category: "toy", series: "snow", rarity: "N" },
