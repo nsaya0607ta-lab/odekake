@@ -167,6 +167,11 @@ const CURATED_ITEMS: readonly CollectionItem[] = [
 
   // --- 登山シリーズ ----------------------------------------------------
   { id: "hiking_frenchie", name: "登山のフレブル", image: "/collection/skins/hiking-frenchie.webp", category: "other", series: "hiking", rarity: "LR", art: "dogHiking" },
+  { id: "toy_hiking_stick", name: "木の枝ステッキ", image: "/collection/items/hiking-stick.webp", category: "toy", series: "hiking", rarity: "N" },
+  { id: "toy_rock_ball", name: "ごつごつ岩ボール", image: "/collection/items/rock-ball.webp", category: "toy", series: "hiking", rarity: "N" },
+  { id: "toy_echo_whistle", name: "山びこホイッスル", image: "/collection/items/echo-whistle.webp", category: "toy", series: "hiking", rarity: "N" },
+  { id: "toy_rope_swing", name: "ターザンロープ", image: "/collection/items/rope-swing.webp", category: "toy", series: "hiking", rarity: "R" },
+  { id: "food_ume_onigiri", name: "梅干しおにぎり", image: "/collection/items/ume-onigiri.webp", category: "food", series: "hiking", rarity: "N" },
   // --- 雪国シリーズ ----------------------------------------------------
   { id: "snow_frenchie", name: "雪国のフレブル", image: "/collection/skins/snow-frenchie.webp", category: "other", series: "snow", rarity: "LR", art: "dogSnow" },
   { id: "toy_sled", name: "雪ぞり", image: "/collection/items/sled.webp", category: "toy", series: "snow", rarity: "N" },

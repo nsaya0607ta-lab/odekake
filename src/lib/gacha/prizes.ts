@@ -119,6 +119,13 @@ export const GACHA_PRIZES: readonly GachaPrize[] = [
   { id: "snow_frenchie", name: "雪国のフレブル", rarity: "LR", type: "dog_skin", image: "/collection/skins/snow-frenchie.webp" },
   { id: "summer_frenchie", name: "夏のフレブル", rarity: "LR", type: "dog_skin", image: "/collection/skins/summer-frenchie.webp" },
 
+  // --- 登山シリーズの小物 -----------------------------------------------
+  { id: "toy_hiking_stick", name: "木の枝ステッキ", rarity: "N", type: "item", image: "/collection/items/hiking-stick.webp" },
+  { id: "toy_rock_ball", name: "ごつごつ岩ボール", rarity: "N", type: "item", image: "/collection/items/rock-ball.webp" },
+  { id: "toy_echo_whistle", name: "山びこホイッスル", rarity: "N", type: "item", image: "/collection/items/echo-whistle.webp" },
+  { id: "toy_rope_swing", name: "ターザンロープ", rarity: "R", type: "item", image: "/collection/items/rope-swing.webp" },
+  { id: "food_ume_onigiri", name: "梅干しおにぎり", rarity: "N", type: "item", image: "/collection/items/ume-onigiri.webp" },
+
   // --- 雪国シリーズの小物 -----------------------------------------------
   { id: "toy_sled", name: "雪ぞり", rarity: "N", type: "item", image: "/collection/items/sled.webp" },
   { id: "toy_snowman_kit", name: "雪だるまキット", rarity: "N", type: "item", image: "/collection/items/snowman-kit.webp" },
