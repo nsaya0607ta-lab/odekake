@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { DebugFpsOverlay } from "@/components/debug-fps-overlay";
 import { BallPicker } from "@/components/wanko-bowling/ball-picker";
 import { Lane, type LaneRollResult } from "@/components/wanko-bowling/lane";
 import { ScoreBoard } from "@/components/wanko-bowling/score-board";
@@ -438,6 +439,7 @@ export function WankoBowlingGame({ ownedBalls }: { ownedBalls: OwnedBowlingBall[
 
   return (
     <section className={`relative flex h-full min-h-0 flex-col overflow-hidden ${shake ? "wanko-bowl-shake" : ""}`}>
+      <DebugFpsOverlay />
       <div className="pointer-events-none relative z-30 shrink-0 [&>div]:!mx-0 [&>div]:!mt-0 [&>div]:!w-full [&>div]:!rounded-b-none [&>div]:!shadow-none">
         <ScoreBoard
           frames={frames}
