@@ -1,5 +1,6 @@
 import type { Metadata, Viewport } from "next";
 import { Yusei_Magic } from "next/font/google";
+import { SpeedInsights } from "@vercel/speed-insights/next";
 import { StartupSplash } from "@/components/startup-splash";
 import { BgmPlayer } from "@/components/bgm-player";
 import "./globals.css";
@@ -41,6 +42,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       <body>
         <StartupSplash>{children}</StartupSplash>
         <BgmPlayer />
+        <SpeedInsights />
       </body>
     </html>
   );
