@@ -33,6 +33,7 @@ export default async function MyPage() {
             <MenuItem href="/records?tab=trips" icon={<IconCalendar size={20} />} label="旅行の計画" />
             <MenuItem href="/mypage/exp-history" icon={<IconStar size={20} />} label="おでかけレベル・EXP履歴" />
             <MenuItem href="/mypage/coins" icon={<IconCoin size={20} />} label="おでかけコイン" />
+            <MenuItem href="/mypage/room" icon={<span className="text-lg leading-none">🏠</span>} label="マイルーム" />
             <MenuItem href="/mypage/gear" icon={<span className="text-lg leading-none">🐾</span>} label="おぼえたしぐさ" />
             <MenuItem href="/mypage/dog-skin" icon={<span className="text-lg leading-none">🐕</span>} label="犬のすがたを選ぶ" />
           </ul>

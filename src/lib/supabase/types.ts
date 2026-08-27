@@ -182,6 +182,17 @@ export type UserDogSkinRow = {
   updated_at: string;
 };
 
+export type RoomItemRow = {
+  user_id: string;
+  item_id: string;
+  position_x: number;
+  position_y: number;
+  rotation: 0 | 90 | 180 | 270;
+  scale_value: number;
+  z_index: number;
+  updated_at: string;
+};
+
 /** ガチャで手に入れたもの。item_id は src/lib/gacha/prizes.ts の GachaPrize.id */
 export type UserGachaItemRow = {
   user_id: string;
@@ -601,6 +612,17 @@ export type Database = {
         Update: Partial<UserGachaItemRow>;
         Relationships: [];
       };
+      room_items: {
+        Row: RoomItemRow;
+        Insert: Partial<RoomItemRow> & {
+          user_id: string;
+          item_id: string;
+          position_x: number;
+          position_y: number;
+        };
+        Update: Partial<RoomItemRow>;
+        Relationships: [];
+      };
       friend_codes: {
         Row: FriendCodeRow;
         Insert: Partial<FriendCodeRow> & { user_id: string; code: string };
@@ -722,6 +744,18 @@ export type Database = {
       revoke_steps_sync_token: { Args: Record<string, never>; Returns: undefined };
       set_dog_skin: { Args: { p_skin_id: string }; Returns: undefined };
       set_equipped_item: { Args: { p_slot: string; p_level: number | null }; Returns: undefined };
+      set_room_item: {
+        Args: {
+          p_item_id: string;
+          p_position_x: number;
+          p_position_y: number;
+          p_rotation?: number;
+          p_scale?: number;
+          p_z_index?: number;
+        };
+        Returns: undefined;
+      };
+      clear_room_item: { Args: { p_item_id: string }; Returns: undefined };
       create_friend_photo: {
         Args: { p_storage_path: string; p_caption?: string | null; p_group_id?: string | null };
         Returns: { id: string; photo_date: string; created_at: string }[];
