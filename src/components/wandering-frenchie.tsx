@@ -695,6 +695,7 @@ export function WanderingFrenchie({
                   width={300}
                   height={254}
                   decoding="async"
+                  loading={key === "stand" || key === "walk" ? "eager" : "lazy"}
                   fetchPriority={key === "stand" || key === "walk" ? "high" : "low"}
                   draggable={false}
                   className={`frenchie-pose ${GESTURE_CLASS[key] ? "frenchie-gesture" : ""} ${
