@@ -5,6 +5,7 @@ export const ROOM_SCALE_MIN = 0.7;
 export const ROOM_SCALE_MAX = 1.35;
 export const ROOM_POSITION_MIN = 0.06;
 export const ROOM_POSITION_MAX = 0.94;
+export const ROOM_GRID_SIZE = 7;
 
 type Footprint = { width: number; depth: number };
 
@@ -46,6 +47,14 @@ export function placementsOverlap(
 
 export function clampRoomPosition(value: number): number {
   return Math.min(ROOM_POSITION_MAX, Math.max(ROOM_POSITION_MIN, value));
+}
+
+/** 指を離した位置を、端末サイズに依存しない床グリッドへ吸着させる。 */
+export function snapRoomPosition(value: number): number {
+  const clamped = clampRoomPosition(value);
+  const span = ROOM_POSITION_MAX - ROOM_POSITION_MIN;
+  const step = span / (ROOM_GRID_SIZE - 1);
+  return Math.round((clamped - ROOM_POSITION_MIN) / step) * step + ROOM_POSITION_MIN;
 }
 
 export function clampRoomScale(value: number): number {

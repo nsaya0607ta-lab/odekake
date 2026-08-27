@@ -3,7 +3,9 @@ import { PageHeader } from "@/components/page-header";
 import { RoomPlanner } from "@/components/room-planner";
 import { COLLECTION_ITEMS } from "@/lib/collection/items";
 import { getOwnedItemIds } from "@/lib/data/collection";
+import { getCurrentDogSkin } from "@/lib/data/dog-skin";
 import { getRoomItems } from "@/lib/data/room";
+import { getFrenchieSrc } from "@/lib/dog-skins";
 import { requireUser } from "@/lib/supabase/server";
 
 export const metadata = { title: "マイルーム | おでかけ記録" };
@@ -11,9 +13,10 @@ export const dynamic = "force-dynamic";
 
 export default async function RoomPage() {
   const { supabase, user } = await requireUser();
-  const [ownedIds, placements] = await Promise.all([
+  const [ownedIds, placements, skin] = await Promise.all([
     getOwnedItemIds(supabase, user.id),
     getRoomItems(supabase, user.id),
+    getCurrentDogSkin(supabase, user.id),
   ]);
 
   const items = COLLECTION_ITEMS.filter(
@@ -24,7 +27,11 @@ export default async function RoomPage() {
     <>
       <PageHeader title="マイルーム" backHref="/mypage" subtitle="家具を置いて、じぶんだけの部屋づくり" />
       <PageBody className="max-w-2xl px-3">
-        <RoomPlanner items={items} initialPlacements={placements} />
+        <RoomPlanner
+          items={items}
+          initialPlacements={placements}
+          residentImage={getFrenchieSrc(skin, "sit")}
+        />
       </PageBody>
     </>
   );
