@@ -8,6 +8,7 @@ export const dynamic = "force-dynamic";
 
 const ITEM_CATCH_CARD_SRC = "/games/item-catch/menu-icon-v2.webp";
 const WANKO_BOWLING_CARD_SRC = "/games/wanko-bowling/menu-icon-v2.webp";
+const SNACK_TRAIL_CARD_SRC = "/games/snack-trail/menu-icon.svg";
 
 export default async function GamesPage() {
   await requireUser();
@@ -124,6 +125,55 @@ export default async function GamesPage() {
                 </span>
               </span>
               <span className="ml-2 flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-leaf-deep text-xl font-black leading-none text-white shadow-[0_4px_10px_rgba(93,128,73,0.22)] transition-transform group-active:translate-x-0.5">
+                ›
+              </span>
+            </span>
+          </Link>
+
+          <Link
+            href="/snack-trail-preview"
+            aria-label="わんこのおやつ道で遊ぶ"
+            className="pressable group relative block overflow-hidden rounded-[30px] border border-[#4f8198] bg-gradient-to-br from-[#17384d] via-[#0e293c] to-[#071722] p-5 text-white shadow-[0_12px_30px_rgba(5,25,37,0.28)] transition-transform active:scale-[0.985]"
+          >
+            <span aria-hidden="true" className="absolute -right-8 -top-10 h-32 w-32 rounded-full border border-[#72e3ff]/20 bg-[#72e3ff]/5" />
+            <span aria-hidden="true" className="absolute -bottom-10 left-9 h-28 w-28 rounded-full bg-[#72f4c6]/10 blur-md" />
+
+            <span className="relative z-10 flex items-center gap-2">
+              <span className="rounded-full bg-[#72e3ff] px-2.5 py-1 text-[10px] font-black text-[#082230] shadow-[0_0_12px_rgba(114,227,255,0.25)]">GAME 03</span>
+              <span className="rounded-full border border-white/15 bg-white/10 px-2.5 py-1 text-[10px] font-bold text-[#bdeeff]">プレビュー</span>
+            </span>
+
+            <span className="relative z-10 mt-3 flex items-center gap-3">
+              <span className="min-w-0 flex-1 pb-1">
+                <span className="block text-[10px] font-black tracking-[0.08em] text-[#72e3ff]">おやつを集めて、どこまでも！</span>
+                <span className="mt-1 block text-[21px] font-black tracking-[-0.03em]">わんこのおやつ道</span>
+                <span className="mt-1.5 block text-[11px] font-bold leading-relaxed text-[#a8c9d8]">足あとをのばしてハイスコアを目指そう。</span>
+              </span>
+
+              <span className="relative flex h-[108px] w-[108px] shrink-0 items-center justify-center rounded-full bg-white/5">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img
+                  src={SNACK_TRAIL_CARD_SRC}
+                  alt=""
+                  aria-hidden="true"
+                  className="h-[116px] w-[116px] max-w-none object-contain drop-shadow-[0_9px_14px_rgba(0,0,0,0.28)]"
+                />
+              </span>
+            </span>
+
+            <span className="relative z-10 mt-4 flex items-center justify-between rounded-[18px] border border-white/10 bg-white/[0.07] px-3 py-2.5 shadow-[inset_0_1px_0_rgba(255,255,255,0.08)]">
+              <span className="flex min-w-0 items-center gap-3">
+                <span className="min-w-0">
+                  <span className="block text-[8px] font-black text-[#78a7b9]">プレイ形式</span>
+                  <span className="block text-[11px] font-black text-white">エンドレス</span>
+                </span>
+                <span aria-hidden="true" className="h-7 w-px bg-white/10" />
+                <span className="min-w-0">
+                  <span className="block text-[8px] font-black text-[#78a7b9]">操作</span>
+                  <span className="block truncate text-[11px] font-black text-white">スワイプで方向転換</span>
+                </span>
+              </span>
+              <span className="ml-2 flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-[#72f4c6] text-xl font-black leading-none text-[#09251f] shadow-[0_0_14px_rgba(114,244,198,0.2)] transition-transform group-active:translate-x-0.5">
                 ›
               </span>
             </span>
