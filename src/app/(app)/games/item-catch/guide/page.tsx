@@ -126,7 +126,7 @@ export default async function ItemCatchGuidePage() {
           <div className="grid gap-2">
             {[
               { image: "/collection/items/dog-poop.webp", name: "犬のうんち", rate: "4%", body: "取ると −500pt。ビニール袋があればダメージを打ち消せます。", tone: "bg-gradient-to-br from-[#fff7f0] to-[#f9e7d8] border-[#e7cbb5]" },
-              { image: "/collection/items/mystery-question.webp", name: "？アイテム", rate: "5%", body: "全アイテムからランダムに1つのスキルが発動。未所持ならLv1です。", tone: "bg-gradient-to-br from-[#f8f3fb] to-[#ece4f3] border-[#d8cae5]" },
+              { image: "/collection/items/mystery-question.webp", name: "？アイテム", rate: "5%", body: "所持アイテムの中からランダムに1つのスキルが発動。そのアイテムの現在のLvで発動します。", tone: "bg-gradient-to-br from-[#f8f3fb] to-[#ece4f3] border-[#d8cae5]" },
               { image: "/collection/items/plastic-bag.webp", name: "ビニール袋", rate: "3%", body: "最大3つまで持てる「うんちよけ」。ダメージを1回打ち消します。", tone: "bg-gradient-to-br from-[#f2f8f4] to-[#e3f0e8] border-[#c7dccd]" },
               { image: "/collection/items/hazard-time-minus.webp", name: "時間 -3秒", rate: "1.5%", body: "取ると残り時間が3秒減ります。0秒になるとその場でゲーム終了です。", tone: "bg-gradient-to-br from-[#fdf1f0] to-[#f6dcd9] border-[#e6bdb7]" },
               { image: "/collection/items/hazard-box-shrink.webp", name: "ダンボール縮小", rate: "2%", body: "3秒間、段ボールの当たり判定が0.8倍に縮みます。", tone: "bg-gradient-to-br from-[#f4f1fb] to-[#e6e0f4] border-[#cec4e5]" },

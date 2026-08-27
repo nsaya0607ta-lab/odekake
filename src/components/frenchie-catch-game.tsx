@@ -226,7 +226,7 @@ const LV = {
   RAGBY_SEC: [5, 6, 7, 9, 12],
   OYATSU_PT: [80, 100, 120, 140, 180],
   KETSUNADE_SEC: [4, 5, 6, 8, 10],
-  BUREBUR_SEC: [4, 5, 6, 8, 10],
+  BUREBUR_COUNT: [5, 7, 9, 11, 13],
   XMAS_SEC: [6, 7, 9, 10, 12],
   XMAS_FALL: [1.8, 2, 2.2, 2.4, 2.5],
   XMAS_SCORE: [2, 2.2, 2.5, 2.7, 3],
@@ -511,6 +511,8 @@ export function FrenchieCatchGame({ ownedItems }: { ownedItems: FrenchieCatchIte
   const otherSuppressUntilRef = useRef(0);
   const otherSuppressValueRef = useRef(1);
   const highRarityLockUntilRef = useRef(0);
+  /** ブレブル用。時間ではなく「次に出現するアイテム数」で管理するカウント式のSSR/UR/LR限定ロック */
+  const highRarityLockCountRef = useRef(0);
   const treasureStreakActiveRef = useRef(false);
   const treasureStreakMultRef = useRef(1);
   const omochiUntilRef = useRef(0);
@@ -559,8 +561,13 @@ export function FrenchieCatchGame({ ownedItems }: { ownedItems: FrenchieCatchIte
 
   const itemPool = useMemo(() => ownedItems.filter((item) => item.image.length > 0), [ownedItems]);
   const itemLevelByIdRef = useRef<Map<string, number>>(new Map());
+  /** ❓アイテムが確定させるスキルの抽選プール。持っていないキャラのスキルが出ないよう、所持アイテムだけに絞る */
+  const mysterySkillPoolRef = useRef<string[]>(MYSTERY_SKILL_ITEM_IDS);
   useEffect(() => {
     itemLevelByIdRef.current = new Map(ownedItems.map((item) => [item.id, item.level]));
+    const ownedIds = new Set(ownedItems.map((item) => item.id));
+    const pool = MYSTERY_SKILL_ITEM_IDS.filter((id) => ownedIds.has(id));
+    mysterySkillPoolRef.current = pool.length > 0 ? pool : MYSTERY_SKILL_ITEM_IDS;
   }, [ownedItems]);
 
   useEffect(() => {
@@ -611,6 +618,7 @@ export function FrenchieCatchGame({ ownedItems }: { ownedItems: FrenchieCatchIte
     if (now < spawnRateBoostUntilRef.current) labels.push(`アイテム出現量×${spawnRateBoostValueRef.current}中`);
     if (now < otherSuppressUntilRef.current) labels.push(`その他カテゴリ出現×${otherSuppressValueRef.current}中`);
     if (now < highRarityLockUntilRef.current) labels.push("SSR/UR/LRのみ出現中");
+    if (highRarityLockCountRef.current > 0) labels.push(`SSR/UR/LRのみ出現 あと${highRarityLockCountRef.current}体`);
     if (treasureStreakActiveRef.current) labels.push(`宝箱連続ボーナス 得点+${Math.round((treasureStreakMultRef.current - 1) * 100)}%`);
     if (now < omochiUntilRef.current) labels.push(`うんちがおもちに +${omochiPtValueRef.current}pt`);
     if (now < okaeriUntilRef.current) labels.push(`1個ごとに+${okaeriPerCatchValueRef.current}秒`);
@@ -787,7 +795,7 @@ export function FrenchieCatchGame({ ownedItems }: { ownedItems: FrenchieCatchIte
 
     const urBoostFactor = 1 + Math.min(urBoostRef.current, UR_BOOST_MAX) / 100;
     const otherSuppressActive = performance.now() < otherSuppressUntilRef.current;
-    const highRarityLockActive = performance.now() < highRarityLockUntilRef.current;
+    const highRarityLockActive = performance.now() < highRarityLockUntilRef.current || highRarityLockCountRef.current > 0;
     const weightedItems = itemPool.map((item) => ({
       item,
       weight:
@@ -841,6 +849,8 @@ export function FrenchieCatchGame({ ownedItems }: { ownedItems: FrenchieCatchIte
         break;
       }
     }
+
+    if (highRarityLockCountRef.current > 0) highRarityLockCountRef.current -= 1;
 
     return {
       ...base,
@@ -1220,7 +1230,7 @@ export function FrenchieCatchGame({ ownedItems }: { ownedItems: FrenchieCatchIte
 
             const isMystery = entity.itemId === MYSTERY_ITEM_ID;
             const skillId = isMystery
-              ? MYSTERY_SKILL_ITEM_IDS[Math.floor(Math.random() * MYSTERY_SKILL_ITEM_IDS.length)]!
+              ? mysterySkillPoolRef.current[Math.floor(Math.random() * mysterySkillPoolRef.current.length)]!
               : entity.itemId;
             const skillLevel = isMystery
               ? (itemLevelByIdRef.current.get(skillId ?? "") ?? 1)
@@ -1388,8 +1398,8 @@ export function FrenchieCatchGame({ ownedItems }: { ownedItems: FrenchieCatchIte
                 statusChanged = true;
                 break;
               case BUREBUR_ITEM_ID:
-                highRarityLockUntilRef.current = now + LV.BUREBUR_SEC[lv]! * 1000;
-                effectLabel = `${LV.BUREBUR_SEC[lv]}秒間 SSR/UR/LRのみ出現${lvTag}`;
+                highRarityLockCountRef.current = LV.BUREBUR_COUNT[lv]!;
+                effectLabel = `${LV.BUREBUR_COUNT[lv]}体 SSR/UR/LRのみ出現${lvTag}`;
                 statusChanged = true;
                 break;
               case XMAS_PARTY_ITEM_ID: {
@@ -1915,6 +1925,7 @@ export function FrenchieCatchGame({ ownedItems }: { ownedItems: FrenchieCatchIte
     otherSuppressUntilRef.current = 0;
     otherSuppressValueRef.current = 1;
     highRarityLockUntilRef.current = 0;
+    highRarityLockCountRef.current = 0;
     treasureStreakActiveRef.current = false;
     treasureStreakMultRef.current = 1;
     omochiUntilRef.current = 0;
@@ -2010,7 +2021,11 @@ export function FrenchieCatchGame({ ownedItems }: { ownedItems: FrenchieCatchIte
         <span className="rounded-full bg-leaf-soft px-2.5 py-1 text-[10px] font-bold text-leaf-deep">30秒チャレンジ</span>
       </div>
 
-      <div ref={boardRef} className="relative aspect-[3/4] w-full select-none overflow-hidden bg-[#dff3fa]">
+      <div
+        ref={boardRef}
+        className="relative w-full select-none overflow-hidden bg-[#dff3fa]"
+        style={{ paddingBottom: "calc(400% / 3 + 30px)" }}
+      >
         <div className="absolute inset-0 bg-[linear-gradient(180deg,#caeef9_0%,#eff9f2_70%,#d9ebbd_100%)]" />
         <div className="absolute -left-8 top-[18%] h-20 w-36 rounded-full bg-white/50 blur-xl will-change-transform" />
         <div className="absolute -right-10 top-[34%] h-24 w-40 rounded-full bg-white/50 blur-xl will-change-transform" />
