@@ -3,7 +3,7 @@ import { PageBody } from "@/components/page-body";
 import { TopHeader } from "@/components/page-header";
 import { requireUser } from "@/lib/supabase/server";
 
-export const metadata = { title: "各種ゲーム | おでかけ記録" };
+export const metadata = { title: "ミニゲーム | おでかけ記録" };
 export const dynamic = "force-dynamic";
 
 const ITEM_CATCH_CARD_SRC = "/140352b4-d7ad-4b73-8b9d-4136fc5e27a4.webp";
