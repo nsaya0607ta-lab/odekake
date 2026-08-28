@@ -69,11 +69,12 @@ function isInsideItem(point: Point, item: Point, expanded = false): boolean {
 function spawnOneItem(
   trail: Point[],
   currentItems: ItemPickup[],
+  hazards: Hazard[],
+  walls: WallBlock[],
   recentItemIds: readonly string[],
   forceGolden = false,
 ): ItemPickup {
-  const occupied = new Set(trail.map(pointKey));
-  currentItems.flatMap(itemCells).forEach((point) => occupied.add(pointKey(point)));
+  const occupied = occupiedCells(trail, currentItems, hazards, walls);
   const candidates: Point[] = [];
   for (let y = 1; y <= GRID_ROWS - ITEM_SIZE - 1; y += 1) {
     for (let x = 1; x <= GRID_COLS - ITEM_SIZE - 1; x += 1) {
@@ -96,7 +97,7 @@ function spawnOneItem(
 
 function spawnInitialItems(trail: Point[]): ItemPickup[] {
   const items: ItemPickup[] = [];
-  while (items.length < ITEMS_ON_BOARD) items.push(spawnOneItem(trail, items, []));
+  while (items.length < ITEMS_ON_BOARD) items.push(spawnOneItem(trail, items, [], [], []));
   return items;
 }
 
@@ -461,7 +462,7 @@ export function SnackTrailPreview() {
           while (nextItems.length < ITEMS_ON_BOARD) {
             const forceGolden = goldenBudget > 0;
             if (forceGolden) goldenBudget -= 1;
-            nextItems.push(spawnOneItem(nextTrail, nextItems, recentItemIdsRef.current, forceGolden));
+            nextItems.push(spawnOneItem(nextTrail, nextItems, hazards, walls, recentItemIdsRef.current, forceGolden));
           }
           goldenRemainingRef.current = goldenBudget;
           setGoldenRemaining(goldenBudget);
@@ -508,7 +509,6 @@ export function SnackTrailPreview() {
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, [chooseDirection]);
 
-  const trailByKey = useMemo(() => new Map(trail.map((point, index) => [pointKey(point), index])), [trail]);
   const boardCells = useMemo(
     () => Array.from({ length: GRID_COLS * GRID_ROWS }, (_, index) => ({ x: index % GRID_COLS, y: Math.floor(index / GRID_COLS) })),
     [],
@@ -530,6 +530,13 @@ export function SnackTrailPreview() {
         <div className={styles.titleBlock}><span>おでかけ ミニゲーム 03</span><h1>わんこのおやつ道</h1></div>
         <button type="button" className={styles.soundButton} onClick={() => setSoundOn((value) => !value)} aria-label={soundOn ? "音をオフにする" : "音をオンにする"}>{soundOn ? "♪" : "×"}</button>
       </header>
+
+      {skillToast ? (
+        <div className={`${styles.skillToast} ${skillToast.boosted ? styles.boostedToast : ""}`} role="status">
+          <span><Image src={skillToast.item.image} alt="" fill sizes="42px" unoptimized /></span>
+          <p><small>{skillToast.boosted ? "強化スキル！" : skillToast.item.name}</small><b>{skillToast.skill.title}</b><em>{skillToast.text}</em></p>
+        </div>
+      ) : null}
 
       <main className={styles.main}>
         <section className={styles.scorePanel} aria-label="スコア">
@@ -605,29 +612,28 @@ export function SnackTrailPreview() {
                 <small>{pickup.golden ? "5 PT" : pickup.item.rarity}</small>
               </span>
             ))}
-            {boardCells.map((cell) => {
-              const index = trailByKey.get(pointKey(cell));
-              const hasBurst = burst && cell.x === burst.x && cell.y === burst.y;
-              return (
-                <span key={pointKey(cell)} className={styles.cell}>
-                  {index === 0 ? <DogHead direction={directionRef.current} /> : null}
-                  {index !== undefined && index > 0 ? <PawSegment index={index} /> : null}
-                  {hasBurst ? (
-                    <span className={`${styles.burst} ${burst.golden ? styles.goldenBurst : ""} ${burst.hazard ? styles.hazardBurst : ""}`} aria-hidden="true">
-                      {Array.from({ length: 8 }, (_, particle) => <i key={particle} style={{ "--particle": particle } as React.CSSProperties} />)}
-                    </span>
-                  ) : null}
-                </span>
-              );
-            })}
+            {boardCells.map((cell) => (
+              <span key={pointKey(cell)} className={styles.cell} />
+            ))}
+            {trail.map((point, index) => (
+              <span
+                key={index}
+                className={styles.trailSegment}
+                style={{ left: `${(point.x / GRID_COLS) * 100}%`, top: `${(point.y / GRID_ROWS) * 100}%` }}
+              >
+                {index === 0 ? <DogHead direction={directionRef.current} /> : <PawSegment index={index} />}
+              </span>
+            ))}
+            {burst ? (
+              <span
+                className={`${styles.burst} ${burst.golden ? styles.goldenBurst : ""} ${burst.hazard ? styles.hazardBurst : ""}`}
+                style={{ left: `${((burst.x + 0.5) / GRID_COLS) * 100}%`, top: `${((burst.y + 0.5) / GRID_ROWS) * 100}%` }}
+                aria-hidden="true"
+              >
+                {Array.from({ length: 8 }, (_, particle) => <i key={particle} style={{ "--particle": particle } as React.CSSProperties} />)}
+              </span>
+            ) : null}
           </div>
-
-          {skillToast ? (
-            <div className={`${styles.skillToast} ${skillToast.boosted ? styles.boostedToast : ""}`} role="status">
-              <span><Image src={skillToast.item.image} alt="" fill sizes="42px" unoptimized /></span>
-              <p><small>{skillToast.boosted ? "強化スキル！" : skillToast.item.name}</small><b>{skillToast.skill.title}</b><em>{skillToast.text}</em></p>
-            </div>
-          ) : null}
 
           {phase !== "playing" ? (
             <div className={styles.overlay}>

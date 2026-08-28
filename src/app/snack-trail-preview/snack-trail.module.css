@@ -206,6 +206,8 @@
 @keyframes specialFloat { to { transform: translateY(-8%) scale(1.06) rotate(2deg); } }
 @keyframes specialPulse { to { opacity: .58; transform: scale(1.1) rotate(4deg); } }
 
+.trailSegment { position: absolute; z-index: 7; display: grid; width: 6.25%; height: 5%; place-items: center; }
+
 .dogHead { position: relative; z-index: 5; display: block; width: 158%; height: 158%; transform-origin: center; border-radius: 48%; background: radial-gradient(circle, rgba(255,255,255,.4), rgba(114,227,255,.08) 62%, transparent 68%); filter: drop-shadow(0 3px 5px rgba(0,0,0,.58)); transition: transform 80ms linear; }
 .dogSprite { object-fit: contain; padding: 5%; }
 
@@ -226,18 +228,19 @@
 @keyframes snackBounce { to { transform: translateY(-12%) rotate(5deg) scale(1.04); } }
 @keyframes sparkle { 50% { opacity: .25; transform: scale(.65) rotate(45deg); } }
 
-.burst { position: absolute; z-index: 8; left: 50%; top: 50%; width: 1px; height: 1px; }
+.burst { position: absolute; z-index: 8; width: 1px; height: 1px; transform: translate(-50%, -50%); }
 .burst i { --angle: calc(var(--particle) * 45deg); position: absolute; width: 5px; height: 5px; border-radius: 50%; background: var(--mint); box-shadow: 0 0 7px var(--mint); animation: particle .5s ease-out forwards; }
 .goldenBurst i { background: #ffcf43; box-shadow: 0 0 8px #ffcf43; }
 @keyframes particle { to { opacity: 0; transform: rotate(var(--angle)) translateX(31px) scale(.2); } }
 
 .skillToast {
-  position: absolute;
-  z-index: 19;
-  top: 16px;
+  position: fixed;
+  z-index: 50;
+  top: calc(env(safe-area-inset-top) + 62px);
   left: 50%;
   display: flex;
   min-width: 188px;
+  max-width: min(90vw, 320px);
   align-items: center;
   gap: 9px;
   padding: 7px 11px 7px 8px;
@@ -248,6 +251,7 @@
   box-shadow: 0 8px 23px rgba(0,0,0,.45), 0 0 18px rgba(255,198,61,.2);
   transform: translateX(-50%);
   animation: toastIn 1.9s ease both;
+  pointer-events: none;
 }
 .skillToast > span { position: relative; width: 38px; height: 38px; flex: 0 0 auto; border-radius: 10px; background: rgba(255,255,255,.12); }
 .skillToast > span img { object-fit: contain; padding: 3px; }
