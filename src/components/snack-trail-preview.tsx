@@ -97,7 +97,17 @@ function PawSegment({ index }: { index: number }) {
   );
 }
 
-function ControlButton({ direction, label, onDirection }: { direction: Direction; label: string; onDirection: (direction: Direction) => void }) {
+function ControlButton({
+  direction,
+  label,
+  disabled,
+  onDirection,
+}: {
+  direction: Direction;
+  label: string;
+  disabled: boolean;
+  onDirection: (direction: Direction) => void;
+}) {
   const directionClass: Record<Direction, string> = {
     up: styles.controlUp ?? "",
     down: styles.controlDown ?? "",
@@ -112,6 +122,7 @@ function ControlButton({ direction, label, onDirection }: { direction: Direction
         event.preventDefault();
         onDirection(direction);
       }}
+      disabled={disabled}
       aria-label={`${label}へ進む`}
     >
       <span aria-hidden="true">{direction === "up" ? "↑" : direction === "down" ? "↓" : direction === "left" ? "←" : "→"}</span>
@@ -151,6 +162,7 @@ export function SnackTrailPreview() {
   const [bestScore, setBestScore] = useState(0);
   const [collected, setCollected] = useState(0);
   const [soundOn, setSoundOn] = useState(true);
+  const [activeDirection, setActiveDirection] = useState<Direction>("right");
   const [burst, setBurst] = useState<(Point & { id: number; golden: boolean }) | null>(null);
   const [newBest, setNewBest] = useState(false);
   const directionRef = useRef<Direction>("right");
@@ -194,6 +206,7 @@ export function SnackTrailPreview() {
     const freshTrail = makeInitialTrail();
     directionRef.current = "right";
     queuedDirectionRef.current = "right";
+    setActiveDirection("right");
     scoreRef.current = 0;
     setTrail(freshTrail);
     setSnack(spawnSnack(freshTrail));
@@ -210,6 +223,7 @@ export function SnackTrailPreview() {
     if (phase !== "playing") return;
     const timer = window.setInterval(() => {
       directionRef.current = queuedDirectionRef.current;
+      setActiveDirection(directionRef.current);
       const movement = STEP[directionRef.current];
       setTrail((current) => {
         const head = current[0];
@@ -285,6 +299,12 @@ export function SnackTrailPreview() {
       return next;
     });
   };
+
+  const canTurn = (next: Direction) => (
+    phase === "playing"
+    && next !== activeDirection
+    && next !== OPPOSITE[activeDirection]
+  );
 
   return (
     <div className={styles.shell}>
@@ -400,13 +420,13 @@ export function SnackTrailPreview() {
         </section>
 
         <section className={styles.controlArea} aria-label="方向操作">
-          <div className={styles.hint}><span>指でスワイプ</span><i />または方向ボタン</div>
+          <div className={styles.hint}><span>進行方向に対して直角の2方向へ曲がれます</span></div>
           <div className={styles.controls}>
-            <ControlButton direction="up" label="上" onDirection={chooseDirection} />
-            <ControlButton direction="left" label="左" onDirection={chooseDirection} />
+            <ControlButton direction="up" label="上" disabled={!canTurn("up")} onDirection={chooseDirection} />
+            <ControlButton direction="left" label="左" disabled={!canTurn("left")} onDirection={chooseDirection} />
             <span className={styles.controlCenter}><i /><i /><i /></span>
-            <ControlButton direction="right" label="右" onDirection={chooseDirection} />
-            <ControlButton direction="down" label="下" onDirection={chooseDirection} />
+            <ControlButton direction="right" label="右" disabled={!canTurn("right")} onDirection={chooseDirection} />
+            <ControlButton direction="down" label="下" disabled={!canTurn("down")} onDirection={chooseDirection} />
           </div>
         </section>
 

@@ -190,6 +190,15 @@
 .controlButton small { font-size: 7px; font-weight: 900; }
 .controlButton:active { transform: scale(.91); color: #09231e; background: var(--mint); }
 .controlButton:active span { color: #09231e; }
+.controlButton:disabled {
+  opacity: .24;
+  border-color: rgba(114, 227, 255, .12);
+  color: #76909c;
+  background: rgba(7, 21, 32, .72);
+  box-shadow: none;
+  filter: saturate(.35);
+}
+.controlButton:disabled span { color: #537482; }
 .controlUp { grid-column: 2; grid-row: 1; }
 .controlLeft { grid-column: 1; grid-row: 2; }
 .controlRight { grid-column: 3; grid-row: 2; }
