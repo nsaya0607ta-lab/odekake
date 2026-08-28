@@ -10,8 +10,12 @@ const ITEM_CATCH_CARD_SRC = "/games/item-catch/menu-icon-v2.webp";
 const WANKO_BOWLING_CARD_SRC = "/games/wanko-bowling/menu-icon-v2.webp";
 const SNACK_TRAIL_CARD_SRC = "/games/snack-trail/menu-icon.svg";
 
+// わんこのおやつ道はまだ検証中のため、特定ユーザーにのみ表示する
+const SNACK_TRAIL_PREVIEW_USER = "しゅん";
+
 export default async function GamesPage() {
-  await requireUser();
+  const { user } = await requireUser();
+  const canSeeSnackTrailPreview = user.displayName === SNACK_TRAIL_PREVIEW_USER;
 
   return (
     <>
@@ -130,6 +134,7 @@ export default async function GamesPage() {
             </span>
           </Link>
 
+          {canSeeSnackTrailPreview && (
           <Link
             href="/snack-trail-preview"
             aria-label="わんこのおやつ道で遊ぶ"
@@ -178,6 +183,7 @@ export default async function GamesPage() {
               </span>
             </span>
           </Link>
+          )}
         </section>
 
         <p className="flex items-center justify-center gap-1.5 py-1 text-[10px] font-bold text-ink-faint">
