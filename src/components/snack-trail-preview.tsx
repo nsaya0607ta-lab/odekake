@@ -18,6 +18,10 @@ const GRID_SIZE = 16;
 const ITEM_SIZE = 2;
 const ITEMS_ON_BOARD = 3;
 const BOOST_INTERVAL = 5;
+/** 壁ガードは1ゲームにつき最大2回まで発動できる */
+const MAX_WALL_GUARD_USES = 2;
+/** スワイプの向き変更をタッチ移動中に判定するためのしきい値(px) */
+const SWIPE_THRESHOLD = 16;
 const BEST_SCORE_KEY = "odekake:snack-trail-preview:best-score";
 const PLAYABLE_ITEMS = REGULAR_ITEMS.filter((item): item is PlayableItem => Boolean(item.image));
 
@@ -189,6 +193,7 @@ export function SnackTrailPreview() {
   const doubleRemainingRef = useRef(0);
   const goldenRemainingRef = useRef(0);
   const wallShieldsRef = useRef(0);
+  const wallGuardUsesRef = useRef(0);
   const noGrowRemainingRef = useRef(0);
   const widePickupRemainingRef = useRef(0);
   const recentItemIdsRef = useRef<string[]>([]);
@@ -254,6 +259,7 @@ export function SnackTrailPreview() {
     doubleRemainingRef.current = 0;
     goldenRemainingRef.current = 0;
     wallShieldsRef.current = 0;
+    wallGuardUsesRef.current = 0;
     noGrowRemainingRef.current = 0;
     widePickupRemainingRef.current = 0;
     recentItemIdsRef.current = [];
@@ -290,11 +296,12 @@ export function SnackTrailPreview() {
         let nextHead = { x: head.x + movement.x, y: head.y + movement.y };
         const hitWall = nextHead.x < 0 || nextHead.x >= GRID_SIZE || nextHead.y < 0 || nextHead.y >= GRID_SIZE;
         if (hitWall) {
-          if (wallShieldsRef.current <= 0) {
+          if (wallShieldsRef.current <= 0 || wallGuardUsesRef.current >= MAX_WALL_GUARD_USES) {
             window.setTimeout(() => finishGame(scoreRef.current), 0);
             return currentTrail;
           }
           wallShieldsRef.current -= 1;
+          wallGuardUsesRef.current += 1;
           setWallShields(wallShieldsRef.current);
           nextHead = { x: (nextHead.x + GRID_SIZE) % GRID_SIZE, y: (nextHead.y + GRID_SIZE) % GRID_SIZE };
           playTone(420, 0.12, soundOn);
@@ -358,7 +365,7 @@ export function SnackTrailPreview() {
           goldenRemainingRef.current = Math.max(goldenRemainingRef.current, skillValue);
           setGoldenRemaining(goldenRemainingRef.current);
         } else if (caughtItem.skill.kind === "shield") {
-          wallShieldsRef.current = Math.min(3, wallShieldsRef.current + skillValue);
+          wallShieldsRef.current = Math.min(MAX_WALL_GUARD_USES - wallGuardUsesRef.current, wallShieldsRef.current + skillValue);
           setWallShields(wallShieldsRef.current);
         } else if (caughtItem.skill.kind === "noGrow") {
           noGrowRemainingRef.current = Math.max(noGrowRemainingRef.current, skillValue);
@@ -374,7 +381,7 @@ export function SnackTrailPreview() {
           setDoubleRemaining(doubleRemainingRef.current);
           setGoldenRemaining(goldenRemainingRef.current);
           if (boosted) {
-            wallShieldsRef.current = Math.min(3, wallShieldsRef.current + 2);
+            wallShieldsRef.current = Math.min(MAX_WALL_GUARD_USES - wallGuardUsesRef.current, wallShieldsRef.current + 2);
             setWallShields(wallShieldsRef.current);
           }
         }
@@ -493,21 +500,22 @@ export function SnackTrailPreview() {
         </section>
 
         <section
-          className={styles.boardFrame}
+          className={`${styles.boardFrame} ${wallShields > 0 ? styles.wallGuardActive : ""}`}
           onTouchStart={(event) => {
             const touch = event.changedTouches[0];
             if (touch) touchStartRef.current = { x: touch.clientX, y: touch.clientY };
           }}
-          onTouchEnd={(event) => {
+          onTouchMove={(event) => {
             const start = touchStartRef.current;
             const touch = event.changedTouches[0];
-            touchStartRef.current = null;
             if (!start || !touch) return;
             const dx = touch.clientX - start.x;
             const dy = touch.clientY - start.y;
-            if (Math.max(Math.abs(dx), Math.abs(dy)) < 20) return;
+            if (Math.max(Math.abs(dx), Math.abs(dy)) < SWIPE_THRESHOLD) return;
             chooseDirection(Math.abs(dx) > Math.abs(dy) ? (dx > 0 ? "right" : "left") : (dy > 0 ? "down" : "up"));
+            touchStartRef.current = { x: touch.clientX, y: touch.clientY };
           }}
+          onTouchEnd={() => { touchStartRef.current = null; }}
         >
           <div className={styles.boardGlow} aria-hidden="true" />
           <div className={styles.board} role="img" aria-label="わんこがガチャアイテムを集めるゲーム盤">
