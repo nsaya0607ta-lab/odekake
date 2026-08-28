@@ -24,6 +24,8 @@ const HAZARDS_ON_BOARD = 1;
 const HAZARD_PENALTY = 20;
 /** 経過プレイ時間がこの間隔(ms)を超えるたびに壁を1つ生成する */
 const WALL_SPAWN_INTERVAL_MS = 60_000;
+/** 壁が出現する何ms前から予告点滅を表示するか */
+const WALL_WARNING_LEAD_MS = 3_000;
 const BOOST_INTERVAL = 5;
 /** 壁ガードは1ゲームにつき最大2回まで発動できる */
 const MAX_WALL_GUARD_USES = 2;
@@ -174,6 +176,17 @@ const WallLayer = memo(function WallLayer({ walls }: { walls: WallBlock[] }) {
   );
 });
 
+const WallWarningLayer = memo(function WallWarningLayer({ pendingWall }: { pendingWall: WallBlock | null }) {
+  if (!pendingWall) return null;
+  return (
+    <span
+      className={styles.wallWarning}
+      style={{ left: `${(pendingWall.x / GRID_COLS) * 100}%`, top: `${(pendingWall.y / GRID_ROWS) * 100}%` }}
+      aria-hidden="true"
+    />
+  );
+});
+
 const HazardLayer = memo(function HazardLayer({ hazards }: { hazards: Hazard[] }) {
   return (
     <>
@@ -241,6 +254,7 @@ export function SnackTrailPreview() {
   const [pickups, setPickups] = useState<ItemPickup[]>(() => spawnInitialItems(initialTrail));
   const [hazards, setHazards] = useState<Hazard[]>(() => spawnInitialHazards(initialTrail, pickups));
   const [walls, setWalls] = useState<WallBlock[]>([]);
+  const [pendingWall, setPendingWall] = useState<WallBlock | null>(null);
   const [score, setScore] = useState(0);
   const [bestScore, setBestScore] = useState(0);
   const [collected, setCollected] = useState(0);
@@ -274,6 +288,7 @@ export function SnackTrailPreview() {
   const recentItemIdsRef = useRef<string[]>([]);
   const playElapsedMsRef = useRef(0);
   const wallMinuteMarkRef = useRef(0);
+  const pendingWallRef = useRef<WallBlock | null>(null);
   const slowTimeoutRef = useRef<number | null>(null);
   const toastTimeoutRef = useRef<number | null>(null);
   const toastIdRef = useRef(0);
@@ -342,6 +357,7 @@ export function SnackTrailPreview() {
     recentItemIdsRef.current = [];
     playElapsedMsRef.current = 0;
     wallMinuteMarkRef.current = 0;
+    pendingWallRef.current = null;
     const freshPickups = spawnInitialItems(freshTrail);
     const freshHazards = spawnInitialHazards(freshTrail, freshPickups);
     trailRef.current = freshTrail;
@@ -349,6 +365,7 @@ export function SnackTrailPreview() {
     setPickups(freshPickups);
     setHazards(freshHazards);
     setWalls([]);
+    setPendingWall(null);
     setScore(0);
     setCollected(0);
     setCombo(0);
@@ -373,9 +390,9 @@ export function SnackTrailPreview() {
       const movement = STEP[directionRef.current];
 
       playElapsedMsRef.current += stepMs;
-      const minuteMark = Math.floor(playElapsedMsRef.current / WALL_SPAWN_INTERVAL_MS);
-      const shouldSpawnWall = minuteMark > wallMinuteMarkRef.current;
-      if (shouldSpawnWall) wallMinuteMarkRef.current = minuteMark;
+      const nextWallBoundaryMs = (wallMinuteMarkRef.current + 1) * WALL_SPAWN_INTERVAL_MS;
+      const shouldWarnWall = !pendingWallRef.current && playElapsedMsRef.current >= nextWallBoundaryMs - WALL_WARNING_LEAD_MS;
+      const shouldSpawnWall = playElapsedMsRef.current >= nextWallBoundaryMs;
 
       const currentTrail = trailRef.current;
       const head = currentTrail[0];
@@ -383,6 +400,12 @@ export function SnackTrailPreview() {
         trailRef.current = makeInitialTrail();
         setTrail(trailRef.current);
         return;
+      }
+
+      if (shouldWarnWall) {
+        const preview = spawnOneWall(currentTrail, pickups, hazards, walls);
+        pendingWallRef.current = preview;
+        setPendingWall(preview);
       }
 
       let nextHead = { x: head.x + movement.x, y: head.y + movement.y };
@@ -422,7 +445,11 @@ export function SnackTrailPreview() {
 
       let nextWalls = walls;
       if (shouldSpawnWall) {
-        nextWalls = [...walls, spawnOneWall(nextTrail, pickups, hazards, walls)];
+        wallMinuteMarkRef.current += 1;
+        const newWall = pendingWallRef.current ?? spawnOneWall(nextTrail, pickups, hazards, walls);
+        pendingWallRef.current = null;
+        setPendingWall(null);
+        nextWalls = [...walls, newWall];
         setWalls(nextWalls);
       }
 
@@ -639,6 +666,7 @@ export function SnackTrailPreview() {
         >
           <div className={styles.boardGlow} aria-hidden="true" />
           <div className={styles.board} role="img" aria-label="わんこがガチャアイテムを集めるゲーム盤">
+            <WallWarningLayer pendingWall={pendingWall} />
             <WallLayer walls={walls} />
             <HazardLayer hazards={hazards} />
             <ItemLayer pickups={pickups} />
@@ -691,7 +719,7 @@ export function SnackTrailPreview() {
             <span><b>シリーズ外 全{PLAYABLE_ITEMS.length}種</b><small>常に3個出現・5個目で強化スキル</small></span>
           </div>
           <div><span className={styles.hazardRuleIcon}><i /></span><span><b>罠</b><small>踏むと{HAZARD_PENALTY}ポイント減点</small></span></div>
-          <div><span className={styles.wallRuleIcon}><i /></span><span><b>壁</b><small>1分ごとに1箇所出現・当たるとゲームオーバー</small></span></div>
+          <div><span className={styles.wallRuleIcon}><i /></span><span><b>壁</b><small>1分ごとに1箇所出現・3秒前に点滅で予告・当たるとゲームオーバー</small></span></div>
           <p>プレビューでは全アイテムを所持扱い・コインは付与されません</p>
         </section>
       </main>

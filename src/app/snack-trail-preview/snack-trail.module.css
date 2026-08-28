@@ -194,6 +194,19 @@
   box-shadow: 0 0 0 2px rgba(4, 10, 17, .75), 0 0 14px rgba(114,227,255,.22), inset 0 0 18px rgba(0,0,0,.6);
 }
 
+.wallWarning {
+  position: absolute;
+  z-index: 6;
+  width: 12.5%;
+  height: 10%;
+  border: 2px dashed rgba(255, 205, 60, .85);
+  border-radius: 16px;
+  background: rgba(255, 205, 60, .1);
+  pointer-events: none;
+  animation: wallWarningBlink .5s steps(1, end) infinite;
+}
+@keyframes wallWarningBlink { 50% { opacity: 0; } }
+
 .hazardBurst i { background: #ff5f5f; box-shadow: 0 0 8px #ff5f5f; }
 
 .specialItem {
@@ -354,5 +367,5 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .ambient i, .snack, .goldenSnack::before, .goldenSnack::after, .previewDog, .specialItem, .specialAura, .itemPickup, .itemAura, .skillToast, .wallGuardActive::after, .hazardMarker, .hazardAura { animation: none; }
+  .ambient i, .snack, .goldenSnack::before, .goldenSnack::after, .previewDog, .specialItem, .specialAura, .itemPickup, .itemAura, .skillToast, .wallGuardActive::after, .hazardMarker, .hazardAura, .wallWarning { animation: none; }
 }
