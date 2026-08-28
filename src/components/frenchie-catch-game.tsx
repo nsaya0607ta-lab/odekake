@@ -218,19 +218,23 @@ const LV = {
   ORUSUBAN_SEC: [5, 6, 7, 8, 10],
   ORUSUBAN_FALL: [1.8, 2, 2.2, 2.4, 2.8],
   PONDEOMO_SEC: [4, 5, 6, 8, 10],
+  PONDEOMO_SPAWN: [1.5, 1.625, 1.75, 1.875, 2],
   PONDEAR_SEC: [4, 5, 6, 8, 10],
+  PONDEAR_SPAWN: [1.5, 1.625, 1.75, 1.875, 2],
   JARE_A_SEC: [4, 5, 6, 8, 10],
+  JARE_A_SPAWN: [1.5, 1.625, 1.75, 1.875, 2],
   SHIKKOKU_SEC: [8, 10, 12, 15, 20],
   SHIKKOKU_FALL: [2, 2.2, 2.4, 2.6, 3],
   SHIKKOKU_MULT: [2, 2.2, 2.4, 2.7, 3],
   RAGBY_SEC: [5, 6, 7, 9, 12],
+  RAGBY_SPAWN: [2, 2.25, 2.5, 2.75, 3],
   OYATSU_PT: [80, 100, 120, 140, 180],
   KETSUNADE_SEC: [4, 5, 6, 8, 10],
   BUREBUR_COUNT: [5, 7, 9, 11, 13],
   XMAS_SEC: [6, 7, 9, 10, 12],
   XMAS_FALL: [1.8, 2, 2.2, 2.4, 2.5],
   XMAS_SCORE: [2, 2.2, 2.5, 2.7, 3],
-  XMAS_SPAWN: [1.5, 1.6, 1.7, 1.8, 2],
+  XMAS_SPAWN: [1.5, 1.75, 2, 2.25, 2.5],
   XMAS_DOG_COUNT: [5, 6, 7, 8, 9],
   OMOCHI_SEC: [4, 5, 6, 8, 10],
   OMOCHI_PT: [10, 15, 20, 25, 30],
@@ -247,10 +251,7 @@ const LV = {
   MOCCHURIN_PT: [30, 45, 60, 80, 100],
   TIME_BONUS_FALL: [6, 5.6, 5.2, 4.8, 4.5],
 } as const;
-/** 出現量アップ系は時間増加系アイテムの取得率まで底上げしてしまうため、控えめな倍率にしている */
-const SPAWN_RATE_BOOST = 1.5;
 const SLANT_VX_BOOST = 3.5;
-const RAGBY_SPAWN_RATE_BOOST = 2;
 const POINTS: Record<FrenchieCatchItem["rarity"], number> = { N: 10, R: 20, SR: 40, SSR: 70, UR: 100, LR: 150, MR: 220 };
 const RARITY_FALL_SPEED: Record<FrenchieCatchItem["rarity"], number> = { N: 1, R: 1.08, SR: 1.18, SSR: 1.32, UR: 1.5, LR: 1.75, MR: 2 };
 /** 時間が増えるスキルを持つアイテムだけ、落下速度をレアリティ別倍率で上げる */
@@ -289,13 +290,16 @@ function rollTreasureOutcome(): string {
 }
 const DEFAULT_ITEM_SPAWN_WEIGHT = 100;
 /**
- * 出現量アップ系スキル（宝箱の1/7枠・ぽんでおも・ぽんでアー・じゃれアー・ラグビーアー）は
+ * 出現量アップ系スキル（ぽんでおも・ぽんでアー・じゃれアー・ラグビーアー・Xmas Party）は
  * スポーン間隔そのものを割るため、有効中は時間増加系アイテムの取得率まで一緒に底上げしてしまう。
  * 何もしないとLv5でr(1秒あたりの時間増加率)が1を超え、理論上ゲームが終わらなくなる。
- * そのため出現量アップの倍率を抑えた上（SPAWN_RATE_BOOST/RAGBY_SPAWN_RATE_BOOST参照）、
- * 時間増加系7種＋おもじぃの出現重みをさらに下げて、Lv5でも最終プレイ時間が180秒程度に収まるよう調整している。
- * （出現量アップ側の重み・秒数を下げると、浮いた確率が時間増加系側に再配分されてかえって悪化するため、
- * 　時間増加系側の重みを絞るのが正しいレバーだった）
+ *
+ * 2026-08-28、出現量アップの倍率をレベル別（Lv1〜MAXで1.5→2/2→3/1.5→2.5、LV.xxx_SPAWN参照）に
+ * 強化するのに合わせて、createEntity内のweightedItems計算で「出現量アップ中は時間増加系7種の重みを
+ * 現在有効なブースト倍率で割る」1/n相殺ロジックを追加した。これにより出現量アップ側の倍率をどれだけ
+ * 強くしても時間増加系側のr値には影響しなくなったため、この相殺を前提に時間増加系7種＋おもじぃの
+ * 出現重みを一律×1.2838に引き上げ、Lv5の最終プレイ時間期待値がちょうど180秒になるよう再調整した
+ * （詳細はdocs/minigame-time-balance.md参照）。
  *
  * other_listen_to_the_a（LR、一撃で大量スコアが出やすいため出現重みを半分に調整）は
  * 時間・出現量には無関係だが、重みを下げた分だけプール全体の合計重みが減り、他アイテムの
@@ -326,13 +330,13 @@ const DEFAULT_ITEM_SPAWN_WEIGHT = 100;
  */
 const ITEM_SPAWN_WEIGHTS: Partial<Record<string, number>> = {
   toy_treasure_puzzle: 200,
-  other_omojii: 69.0,
-  toy_duck_plush: 85.9,
-  toy_carrot: 85.9,
-  food_paw_melon_bread: 85.9,
-  interior_anball: 85.9,
-  other_azuki: 85.9,
-  summer_frenchie: 85.9,
+  other_omojii: 88.6,
+  toy_duck_plush: 110.3,
+  toy_carrot: 110.3,
+  food_paw_melon_bread: 110.3,
+  interior_anball: 110.3,
+  other_azuki: 110.3,
+  summer_frenchie: 110.3,
   other_listen_to_the_a: 50,
 };
 const STRETCH_ROD_ITEM_ID = "interior_stretch_rod";
@@ -507,7 +511,7 @@ export function FrenchieCatchGame({ ownedItems }: { ownedItems: FrenchieCatchIte
   const ikeaCountRef = useRef(0);
   const bagStockRef = useRef(0);
   const spawnRateBoostUntilRef = useRef(0);
-  const spawnRateBoostValueRef = useRef(SPAWN_RATE_BOOST);
+  const spawnRateBoostValueRef = useRef(1);
   const otherSuppressUntilRef = useRef(0);
   const otherSuppressValueRef = useRef(1);
   const highRarityLockUntilRef = useRef(0);
@@ -796,6 +800,12 @@ export function FrenchieCatchGame({ ownedItems }: { ownedItems: FrenchieCatchIte
     const urBoostFactor = 1 + Math.min(urBoostRef.current, UR_BOOST_MAX) / 100;
     const otherSuppressActive = performance.now() < otherSuppressUntilRef.current;
     const highRarityLockActive = performance.now() < highRarityLockUntilRef.current || highRarityLockCountRef.current > 0;
+    /**
+     * 出現量アップ中は時間増加系7種の重みをブースト倍率で割り、取得ペースがブーストなしの時と
+     * 変わらないよう相殺する（詳細はdocs/minigame-time-balance.mdの「出現量ブーストの1/n相殺」参照）。
+     * これにより出現量アップ側の倍率をどれだけ強くしても、時間増加系側のr値には影響しなくなる。
+     */
+    const spawnRateBoostActive = performance.now() < spawnRateBoostUntilRef.current;
     const weightedItems = itemPool.map((item) => ({
       item,
       weight:
@@ -804,7 +814,8 @@ export function FrenchieCatchGame({ ownedItems }: { ownedItems: FrenchieCatchIte
         (otherSuppressActive && item.id !== STRETCH_ROD_ITEM_ID && OTHER_CATEGORY_ITEM_IDS.has(item.id)
           ? otherSuppressValueRef.current
           : 1) *
-        (highRarityLockActive && !HIGH_RARITY_LOCK_RARITIES.has(item.rarity) ? 0 : 1),
+        (highRarityLockActive && !HIGH_RARITY_LOCK_RARITIES.has(item.rarity) ? 0 : 1) *
+        (spawnRateBoostActive && TIME_BONUS_ITEM_IDS.has(item.id) ? 1 / spawnRateBoostValueRef.current : 1),
     }));
     const itemWeightTotal = weightedItems.reduce((sum, entry) => sum + entry.weight, 0);
     const dogWeight = itemPool.length * DEFAULT_ITEM_SPAWN_WEIGHT * (DOG_SPAWN_RATIO / (1 - DOG_SPAWN_RATIO));
@@ -1651,26 +1662,29 @@ export function FrenchieCatchGame({ ownedItems }: { ownedItems: FrenchieCatchIte
               }
               case "other_pondeomo": {
                 const pondeomoSec = LV.PONDEOMO_SEC[lv]!;
+                const pondeomoSpawn = LV.PONDEOMO_SPAWN[lv]!;
                 spawnRateBoostUntilRef.current = now + pondeomoSec * 1000;
-                spawnRateBoostValueRef.current = SPAWN_RATE_BOOST;
-                effectLabel = `${pondeomoSec}秒間 アイテム出現量×${SPAWN_RATE_BOOST}${lvTag}`;
+                spawnRateBoostValueRef.current = pondeomoSpawn;
+                effectLabel = `${pondeomoSec}秒間 アイテム出現量×${pondeomoSpawn}${lvTag}`;
                 statusChanged = true;
                 break;
               }
               case "other_pondear": {
                 const pondearSec = LV.PONDEAR_SEC[lv]!;
+                const pondearSpawn = LV.PONDEAR_SPAWN[lv]!;
                 spawnRateBoostUntilRef.current = now + pondearSec * 1000;
-                spawnRateBoostValueRef.current = SPAWN_RATE_BOOST;
-                effectLabel = `${pondearSec}秒間 アイテム出現量×${SPAWN_RATE_BOOST}${lvTag}`;
+                spawnRateBoostValueRef.current = pondearSpawn;
+                effectLabel = `${pondearSec}秒間 アイテム出現量×${pondearSpawn}${lvTag}`;
                 statusChanged = true;
                 break;
               }
               case "other_jare_a": {
                 const jareASec = LV.JARE_A_SEC[lv]!;
+                const jareASpawn = LV.JARE_A_SPAWN[lv]!;
                 spawnRateBoostUntilRef.current = now + jareASec * 1000;
-                spawnRateBoostValueRef.current = SPAWN_RATE_BOOST;
+                spawnRateBoostValueRef.current = jareASpawn;
                 slantBoostUntilRef.current = now + jareASec * 1000;
-                effectLabel = `${jareASec}秒間 アイテム出現量×${SPAWN_RATE_BOOST}+斜め落下${lvTag}`;
+                effectLabel = `${jareASec}秒間 アイテム出現量×${jareASpawn}+斜め落下${lvTag}`;
                 statusChanged = true;
                 break;
               }
@@ -1686,9 +1700,10 @@ export function FrenchieCatchGame({ ownedItems }: { ownedItems: FrenchieCatchIte
               }
               case "interior_ragby_ar": {
                 const ragbySec = LV.RAGBY_SEC[lv]!;
+                const ragbySpawn = LV.RAGBY_SPAWN[lv]!;
                 spawnRateBoostUntilRef.current = now + ragbySec * 1000;
-                spawnRateBoostValueRef.current = RAGBY_SPAWN_RATE_BOOST;
-                effectLabel = `${ragbySec}秒間 アイテム出現量×${RAGBY_SPAWN_RATE_BOOST}${lvTag}`;
+                spawnRateBoostValueRef.current = ragbySpawn;
+                effectLabel = `${ragbySec}秒間 アイテム出現量×${ragbySpawn}${lvTag}`;
                 statusChanged = true;
                 break;
               }
