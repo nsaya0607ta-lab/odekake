@@ -10,11 +10,11 @@ export const metadata: Metadata = {
 export const dynamic = "force-dynamic";
 
 // わんこのおやつ道はまだ検証中のため、特定ユーザーにのみ表示する
-const SNACK_TRAIL_PREVIEW_USER = "しゅん";
+const SNACK_TRAIL_PREVIEW_USERS = ["しゅん", "さやか"];
 
 export default async function SnackTrailPreviewPage() {
   const { user } = await requireUser();
-  if (user.displayName !== SNACK_TRAIL_PREVIEW_USER) redirect("/games");
+  if (!SNACK_TRAIL_PREVIEW_USERS.includes(user.displayName)) redirect("/games");
 
   return <SnackTrailPreview />;
 }
