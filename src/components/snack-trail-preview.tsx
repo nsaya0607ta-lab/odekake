@@ -3,7 +3,9 @@
 import Image from "next/image";
 import Link from "next/link";
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
-import styles from "@/app/snack-trail-preview/snack-trail.module.css";
+import styles from "@/components/games/snack-trail.module.css";
+import { SnackTrailGuide } from "@/components/games/snack-trail-guide";
+import { SNACK_TRAIL_RANKING_REFRESH_EVENT, SnackTrailRanking } from "@/components/games/snack-trail-ranking";
 import { REGULAR_ITEMS, type CollectionItem } from "@/lib/collection/items";
 import { getSnackTrailSkill, type SnackTrailSkill } from "@/lib/games/snack-trail-skills";
 
@@ -22,6 +24,9 @@ const ITEM_SIZE = 2;
 const ITEMS_ON_BOARD = 3;
 const HAZARDS_ON_BOARD = 1;
 const HAZARD_PENALTY = 20;
+/** 通常アイテムと金色アイテムの基礎点 */
+const NORMAL_POINT = 1;
+const GOLDEN_POINT = 5;
 /** 経過プレイ時間がこの間隔(ms)を超えるたびに壁を1つ生成する */
 const WALL_SPAWN_INTERVAL_MS = 60_000;
 /** 壁が出現する何ms前から予告点滅を表示するか */
@@ -32,6 +37,8 @@ const MAX_WALL_GUARD_USES = 2;
 /** スワイプの向き変更をタッチ移動中に判定するためのしきい値(px) */
 const SWIPE_THRESHOLD = 16;
 const BEST_SCORE_KEY = "odekake:snack-trail-preview:best-score";
+/** フレンドスコアの記録先 */
+const SCORE_ENDPOINT = "/api/games/snack-trail/score";
 const PLAYABLE_ITEMS = REGULAR_ITEMS.filter((item): item is PlayableItem => Boolean(item.image));
 
 const OPPOSITE: Record<Direction, Direction> = { up: "down", down: "up", left: "right", right: "left" };
@@ -224,6 +231,43 @@ const ItemLayer = memo(function ItemLayer({ pickups }: { pickups: ItemPickup[] }
   );
 });
 
+/** 1プレイに1つ。同じ結果を二重に記録しないための鍵になる。 */
+function createRoundId(): string {
+  const random = Math.random().toString(36).slice(2, 10);
+  return `snack-trail-${Date.now().toString(36)}-${random}`;
+}
+
+/**
+ * 遊び終わったスコアと最高コンボをフレンドスコアへ送る。
+ * 記録に失敗してもゲームの進行は止めない（プレビュー中でコインも動かないため）。
+ */
+async function recordResult(result: {
+  roundId: string | null;
+  score: number;
+  maxCombo: number;
+  collected: number;
+}): Promise<void> {
+  // 1個も取らずに終わった回は記録しない
+  if (!result.roundId || result.collected <= 0) return;
+
+  try {
+    const response = await fetch(SCORE_ENDPOINT, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        roundId: result.roundId,
+        score: result.score,
+        maxCombo: result.maxCombo,
+        collected: result.collected,
+      }),
+    });
+    if (!response.ok) return;
+    window.dispatchEvent(new Event(SNACK_TRAIL_RANKING_REFRESH_EVENT));
+  } catch {
+    // 通信できないときは、この回の記録をあきらめる
+  }
+}
+
 function playTone(frequency: number, duration: number, soundOn: boolean) {
   if (!soundOn || typeof window === "undefined") return;
   try {
@@ -278,6 +322,8 @@ export function SnackTrailPreview() {
   const scoreRef = useRef(0);
   const collectedRef = useRef(0);
   const comboRef = useRef(0);
+  const maxComboRef = useRef(0);
+  const roundIdRef = useRef<string | null>(null);
   const phaseRef = useRef<Phase>("ready");
   const doubleRemainingRef = useRef(0);
   const goldenRemainingRef = useRef(0);
@@ -331,6 +377,12 @@ export function SnackTrailPreview() {
     setPhase("gameover");
     phaseRef.current = "gameover";
     playTone(130, 0.32, soundOn);
+    void recordResult({
+      roundId: roundIdRef.current,
+      score: finalScore,
+      maxCombo: maxComboRef.current,
+      collected: collectedRef.current,
+    });
     setBestScore((current) => {
       if (finalScore <= current) return current;
       window.localStorage.setItem(BEST_SCORE_KEY, String(finalScore));
@@ -348,6 +400,8 @@ export function SnackTrailPreview() {
     scoreRef.current = 0;
     collectedRef.current = 0;
     comboRef.current = 0;
+    maxComboRef.current = 0;
+    roundIdRef.current = createRoundId();
     doubleRemainingRef.current = 0;
     goldenRemainingRef.current = 0;
     wallShieldsRef.current = 0;
@@ -492,7 +546,7 @@ export function SnackTrailPreview() {
       let nextCombo = comboRef.current + 1;
       const multiplier = nextCombo >= 10 ? 3 : nextCombo >= 5 ? 2 : 1;
       const doubleActive = doubleRemainingRef.current > 0;
-      let earned = (caughtItem.golden ? 5 : 1) * multiplier * (doubleActive ? 2 : 1);
+      let earned = (caughtItem.golden ? GOLDEN_POINT : NORMAL_POINT) * multiplier * (doubleActive ? 2 : 1);
       if (doubleActive) {
         doubleRemainingRef.current -= 1;
         setDoubleRemaining(doubleRemainingRef.current);
@@ -537,6 +591,7 @@ export function SnackTrailPreview() {
       }
 
       comboRef.current = nextCombo;
+      maxComboRef.current = Math.max(maxComboRef.current, nextCombo);
       setCombo(nextCombo);
       const nextScore = scoreRef.current + earned;
       scoreRef.current = nextScore;
@@ -722,6 +777,25 @@ export function SnackTrailPreview() {
           <div><span className={styles.wallRuleIcon}><i /></span><span><b>壁</b><small>1分ごとに1箇所出現・3秒前に点滅で予告・当たるとゲームオーバー</small></span></div>
           <p>プレビューでは全アイテムを所持扱い・コインは付与されません</p>
         </section>
+
+        <nav className={styles.jumpLinks} aria-label="この下の内容">
+          <a href="#snack-trail-guide">↓ 遊びかたの説明書</a>
+          <a href="#snack-trail-friends">↓ フレンドのスコア</a>
+        </nav>
+
+        <SnackTrailGuide
+          hazardPenalty={HAZARD_PENALTY}
+          wallIntervalMinutes={Math.round(WALL_SPAWN_INTERVAL_MS / 60_000)}
+          wallWarningSeconds={Math.round(WALL_WARNING_LEAD_MS / 1_000)}
+          maxWallGuardUses={MAX_WALL_GUARD_USES}
+          boostInterval={BOOST_INTERVAL}
+          itemKindCount={PLAYABLE_ITEMS.length}
+          itemsOnBoard={ITEMS_ON_BOARD}
+          normalPoint={NORMAL_POINT}
+          goldenPoint={GOLDEN_POINT}
+        />
+
+        <SnackTrailRanking />
       </main>
     </div>
   );
