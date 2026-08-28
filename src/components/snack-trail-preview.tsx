@@ -20,7 +20,7 @@ const GRID_SIZE = 16;
 const ITEM_SIZE = 2;
 const ITEMS_ON_BOARD = 3;
 const HAZARDS_ON_BOARD = 1;
-const HAZARD_PENALTY = 3;
+const HAZARD_PENALTY = 20;
 /** 経過プレイ時間がこの間隔(ms)を超えるたびに壁を1つ生成する */
 const WALL_SPAWN_INTERVAL_MS = 60_000;
 const BOOST_INTERVAL = 5;
