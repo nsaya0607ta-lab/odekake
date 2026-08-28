@@ -144,6 +144,22 @@
 .cell { position: relative; display: grid; min-width: 0; min-height: 0; place-items: center; border-right: 1px solid rgba(114,227,255,.035); border-bottom: 1px solid rgba(114,227,255,.035); }
 .cell:nth-child(4n) { background: rgba(114,227,255,.012); }
 
+.itemPickup {
+  position: absolute;
+  z-index: 4;
+  width: 12.5%;
+  height: 12.5%;
+  pointer-events: none;
+  filter: drop-shadow(0 5px 7px rgba(0,0,0,.52));
+  animation: specialFloat .8s ease-in-out infinite alternate;
+}
+.itemAura { position: absolute; inset: -8%; border: 1px solid rgba(114,227,255,.48); border-radius: 27%; background: radial-gradient(circle, rgba(190,245,255,.25), rgba(71,169,206,.08) 60%, transparent 73%); box-shadow: 0 0 12px rgba(114,227,255,.28), inset 0 0 10px rgba(255,255,255,.12); }
+.pickupImage { z-index: 1; object-fit: contain; padding: 7%; }
+.itemPickup small { position: absolute; z-index: 2; right: -8%; bottom: -7%; min-width: 17px; padding: 2px 4px; border: 1px solid rgba(255,255,255,.58); border-radius: 999px; color: #06221e; background: linear-gradient(135deg, #b9ffe9, #67dfbf); box-shadow: 0 2px 5px rgba(0,0,0,.4); font-size: 4px; font-weight: 1000; line-height: 1.2; text-align: center; }
+.goldenItemPickup { filter: drop-shadow(0 0 10px rgba(255,204,67,.95)) drop-shadow(0 5px 7px rgba(0,0,0,.52)); }
+.goldenItemPickup .itemAura { border-color: rgba(255,235,142,.9); background: radial-gradient(circle, rgba(255,243,170,.5), rgba(255,185,42,.13) 60%, transparent 73%); box-shadow: 0 0 18px rgba(255,195,48,.72), inset 0 0 13px rgba(255,255,255,.26); animation: specialPulse .75s ease-in-out infinite alternate; }
+.goldenItemPickup small { color: #2b1a00; background: linear-gradient(135deg, #fff4a9, #ffb51f); }
+
 .specialItem {
   position: absolute;
   z-index: 7;
@@ -207,6 +223,9 @@
 .skillToast p { display: flex; flex-direction: column; margin: 0; }
 .skillToast small { color: #e2c86f; font-size: 7px; font-weight: 900; }
 .skillToast b { margin-top: 2px; color: #fff; font-size: 10px; font-weight: 900; }
+.skillToast em { margin-top: 2px; color: #b9d6df; font-size: 7px; font-style: normal; font-weight: 800; white-space: nowrap; }
+.boostedToast { min-width: 215px; border-color: rgba(255,241,142,.95); background: linear-gradient(145deg, rgba(91,57,10,.98), rgba(20,23,31,.98)); box-shadow: 0 9px 28px rgba(0,0,0,.5), 0 0 24px rgba(255,199,45,.42); }
+.boostedToast small { color: #fff09e; letter-spacing: .1em; }
 @keyframes toastIn { 0% { opacity: 0; transform: translate(-50%, -12px) scale(.9); } 12%, 78% { opacity: 1; transform: translate(-50%, 0) scale(1); } 100% { opacity: 0; transform: translate(-50%, -8px) scale(.96); } }
 
 .overlay {
@@ -263,6 +282,9 @@
 .rules { display: grid; grid-template-columns: 1fr 1fr; gap: 7px; margin-top: 10px; }
 .rules > div { display: flex; min-width: 0; align-items: center; gap: 8px; padding: 8px 10px; border: 1px solid rgba(114,227,255,.12); border-radius: 14px; background: rgba(14,34,49,.66); }
 .rules > div > .snackIcon { width: 32px; height: 32px; flex: 0 0 auto; filter: drop-shadow(0 2px 4px rgba(0,0,0,.45)); }
+.rules > div > .ruleItemIcon { position: relative; display: block; width: 34px; height: 34px; flex: 0 0 auto; border: 1px solid rgba(114,227,255,.22); border-radius: 10px; background: radial-gradient(circle, rgba(114,227,255,.14), rgba(255,255,255,.03)); filter: drop-shadow(0 2px 4px rgba(0,0,0,.45)); }
+.ruleItemIcon img { object-fit: contain; padding: 3px; }
+.rules > div > .ruleGoldenIcon { border-color: rgba(255,222,91,.72); background: radial-gradient(circle, rgba(255,236,139,.45), rgba(255,181,31,.12)); box-shadow: 0 0 9px rgba(255,193,47,.42); }
 .rules span { display: flex; min-width: 0; flex-direction: column; }
 .rules b { overflow: hidden; color: #cde7f1; font-size: 8px; font-weight: 900; text-overflow: ellipsis; white-space: nowrap; }
 .rules small { color: #7899a9; font-size: 7px; font-weight: 800; }
@@ -288,5 +310,5 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .ambient i, .snack, .goldenSnack::before, .goldenSnack::after, .previewDog, .specialItem, .specialAura, .skillToast { animation: none; }
+  .ambient i, .snack, .goldenSnack::before, .goldenSnack::after, .previewDog, .specialItem, .specialAura, .itemPickup, .itemAura, .skillToast { animation: none; }
 }
