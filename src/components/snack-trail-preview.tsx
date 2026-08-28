@@ -12,11 +12,17 @@ type Direction = "up" | "down" | "left" | "right";
 type Phase = "ready" | "playing" | "paused" | "gameover";
 type PlayableItem = CollectionItem & { image: string };
 type ItemPickup = Point & { uid: number; golden: boolean; item: PlayableItem; skill: SnackTrailSkill };
+type Hazard = Point & { uid: number };
+type WallBlock = Point & { uid: number };
 type SkillToast = { id: number; item: PlayableItem; skill: SnackTrailSkill; boosted: boolean; text: string };
 
 const GRID_SIZE = 16;
 const ITEM_SIZE = 2;
 const ITEMS_ON_BOARD = 3;
+const HAZARDS_ON_BOARD = 1;
+const HAZARD_PENALTY = 3;
+/** 経過プレイ時間がこの間隔(ms)を超えるたびに壁を1つ生成する */
+const WALL_SPAWN_INTERVAL_MS = 60_000;
 const BOOST_INTERVAL = 5;
 /** 壁ガードは1ゲームにつき最大2回まで発動できる */
 const MAX_WALL_GUARD_USES = 2;
@@ -50,7 +56,7 @@ function itemCells(item: Pick<ItemPickup, "x" | "y">): Point[] {
   }));
 }
 
-function isInsideItem(point: Point, item: ItemPickup, expanded = false): boolean {
+function isInsideItem(point: Point, item: Point, expanded = false): boolean {
   const padding = expanded ? 1 : 0;
   return point.x >= item.x - padding
     && point.x < item.x + ITEM_SIZE + padding
@@ -92,6 +98,44 @@ function spawnInitialItems(trail: Point[]): ItemPickup[] {
   return items;
 }
 
+function occupiedCells(trail: Point[], pickups: ItemPickup[], hazards: Hazard[], walls: WallBlock[]): Set<string> {
+  const occupied = new Set(trail.map(pointKey));
+  pickups.flatMap(itemCells).forEach((point) => occupied.add(pointKey(point)));
+  walls.flatMap(itemCells).forEach((point) => occupied.add(pointKey(point)));
+  hazards.forEach((hazard) => occupied.add(pointKey(hazard)));
+  return occupied;
+}
+
+function spawnOneHazard(trail: Point[], pickups: ItemPickup[], hazards: Hazard[], walls: WallBlock[]): Hazard {
+  const occupied = occupiedCells(trail, pickups, hazards, walls);
+  const candidates: Point[] = [];
+  for (let y = 1; y <= GRID_SIZE - 2; y += 1) {
+    for (let x = 1; x <= GRID_SIZE - 2; x += 1) {
+      if (!occupied.has(pointKey({ x, y }))) candidates.push({ x, y });
+    }
+  }
+  const point = candidates[Math.floor(Math.random() * candidates.length)] ?? { x: 3, y: 3 };
+  return { ...point, uid: ++pickupIdSeed };
+}
+
+function spawnInitialHazards(trail: Point[], pickups: ItemPickup[]): Hazard[] {
+  const hazards: Hazard[] = [];
+  while (hazards.length < HAZARDS_ON_BOARD) hazards.push(spawnOneHazard(trail, pickups, hazards, []));
+  return hazards;
+}
+
+function spawnOneWall(trail: Point[], pickups: ItemPickup[], hazards: Hazard[], walls: WallBlock[]): WallBlock {
+  const occupied = occupiedCells(trail, pickups, hazards, walls);
+  const candidates: Point[] = [];
+  for (let y = 1; y <= GRID_SIZE - ITEM_SIZE - 1; y += 1) {
+    for (let x = 1; x <= GRID_SIZE - ITEM_SIZE - 1; x += 1) {
+      if (itemCells({ x, y }).every((point) => !occupied.has(pointKey(point)))) candidates.push({ x, y });
+    }
+  }
+  const point = candidates[Math.floor(Math.random() * candidates.length)] ?? { x: 6, y: 6 };
+  return { ...point, uid: ++pickupIdSeed };
+}
+
 function DogHead({ direction }: { direction: Direction }) {
   const rotation = { right: 0, down: 90, left: 180, up: 270 }[direction];
   return (
@@ -109,32 +153,6 @@ function PawSegment({ index }: { index: number }) {
       <i className={`${styles.pawToe} ${styles.pawToeTwo}`} />
       <i className={`${styles.pawToe} ${styles.pawToeThree}`} />
     </span>
-  );
-}
-
-function ControlButton({ direction, label, disabled, onDirection }: {
-  direction: Direction;
-  label: string;
-  disabled: boolean;
-  onDirection: (direction: Direction) => void;
-}) {
-  const directionClass: Record<Direction, string> = {
-    up: styles.controlUp ?? "",
-    down: styles.controlDown ?? "",
-    left: styles.controlLeft ?? "",
-    right: styles.controlRight ?? "",
-  };
-  return (
-    <button
-      type="button"
-      className={`${styles.controlButton} ${directionClass[direction]}`}
-      onPointerDown={(event) => { event.preventDefault(); onDirection(direction); }}
-      disabled={disabled}
-      aria-label={`${label}へ進む`}
-    >
-      <span aria-hidden="true">{direction === "up" ? "↑" : direction === "down" ? "↓" : direction === "left" ? "←" : "→"}</span>
-      <small>{label}</small>
-    </button>
   );
 }
 
@@ -166,12 +184,13 @@ export function SnackTrailPreview() {
   const [phase, setPhase] = useState<Phase>("ready");
   const [trail, setTrail] = useState<Point[]>(initialTrail);
   const [pickups, setPickups] = useState<ItemPickup[]>(() => spawnInitialItems(initialTrail));
+  const [hazards, setHazards] = useState<Hazard[]>(() => spawnInitialHazards(initialTrail, pickups));
+  const [walls, setWalls] = useState<WallBlock[]>([]);
   const [score, setScore] = useState(0);
   const [bestScore, setBestScore] = useState(0);
   const [collected, setCollected] = useState(0);
   const [combo, setCombo] = useState(0);
   const [soundOn, setSoundOn] = useState(true);
-  const [activeDirection, setActiveDirection] = useState<Direction>("right");
   const [skillToast, setSkillToast] = useState<SkillToast | null>(null);
   const [slowActive, setSlowActive] = useState(false);
   const [doubleRemaining, setDoubleRemaining] = useState(0);
@@ -179,7 +198,7 @@ export function SnackTrailPreview() {
   const [wallShields, setWallShields] = useState(0);
   const [noGrowRemaining, setNoGrowRemaining] = useState(0);
   const [widePickupRemaining, setWidePickupRemaining] = useState(0);
-  const [burst, setBurst] = useState<(Point & { id: number; golden: boolean }) | null>(null);
+  const [burst, setBurst] = useState<(Point & { id: number; golden: boolean; hazard?: boolean }) | null>(null);
   const [newBest, setNewBest] = useState(false);
 
   const directionRef = useRef<Direction>("right");
@@ -197,6 +216,8 @@ export function SnackTrailPreview() {
   const noGrowRemainingRef = useRef(0);
   const widePickupRemainingRef = useRef(0);
   const recentItemIdsRef = useRef<string[]>([]);
+  const playElapsedMsRef = useRef(0);
+  const wallMinuteMarkRef = useRef(0);
   const slowTimeoutRef = useRef<number | null>(null);
   const toastTimeoutRef = useRef<number | null>(null);
   const toastIdRef = useRef(0);
@@ -263,9 +284,14 @@ export function SnackTrailPreview() {
     noGrowRemainingRef.current = 0;
     widePickupRemainingRef.current = 0;
     recentItemIdsRef.current = [];
-    setActiveDirection("right");
+    playElapsedMsRef.current = 0;
+    wallMinuteMarkRef.current = 0;
+    const freshPickups = spawnInitialItems(freshTrail);
+    const freshHazards = spawnInitialHazards(freshTrail, freshPickups);
     setTrail(freshTrail);
-    setPickups(spawnInitialItems(freshTrail));
+    setPickups(freshPickups);
+    setHazards(freshHazards);
+    setWalls([]);
     setScore(0);
     setCollected(0);
     setCombo(0);
@@ -287,14 +313,20 @@ export function SnackTrailPreview() {
     if (phase !== "playing") return;
     const timer = window.setInterval(() => {
       directionRef.current = queuedDirectionRef.current;
-      setActiveDirection(directionRef.current);
       const movement = STEP[directionRef.current];
+
+      playElapsedMsRef.current += stepMs;
+      const minuteMark = Math.floor(playElapsedMsRef.current / WALL_SPAWN_INTERVAL_MS);
+      const shouldSpawnWall = minuteMark > wallMinuteMarkRef.current;
+      if (shouldSpawnWall) wallMinuteMarkRef.current = minuteMark;
 
       setTrail((currentTrail) => {
         const head = currentTrail[0];
         if (!head) return makeInitialTrail();
         let nextHead = { x: head.x + movement.x, y: head.y + movement.y };
-        const hitWall = nextHead.x < 0 || nextHead.x >= GRID_SIZE || nextHead.y < 0 || nextHead.y >= GRID_SIZE;
+        const hitBoundary = nextHead.x < 0 || nextHead.x >= GRID_SIZE || nextHead.y < 0 || nextHead.y >= GRID_SIZE;
+        const hitInteriorWall = !hitBoundary && walls.some((wallBlock) => isInsideItem(nextHead, wallBlock));
+        const hitWall = hitBoundary || hitInteriorWall;
         if (hitWall) {
           if (wallShieldsRef.current <= 0 || wallGuardUsesRef.current >= MAX_WALL_GUARD_USES) {
             window.setTimeout(() => finishGame(scoreRef.current), 0);
@@ -303,7 +335,7 @@ export function SnackTrailPreview() {
           wallShieldsRef.current -= 1;
           wallGuardUsesRef.current += 1;
           setWallShields(wallShieldsRef.current);
-          nextHead = { x: (nextHead.x + GRID_SIZE) % GRID_SIZE, y: (nextHead.y + GRID_SIZE) % GRID_SIZE };
+          if (hitBoundary) nextHead = { x: (nextHead.x + GRID_SIZE) % GRID_SIZE, y: (nextHead.y + GRID_SIZE) % GRID_SIZE };
           playTone(420, 0.12, soundOn);
         }
 
@@ -324,6 +356,29 @@ export function SnackTrailPreview() {
           window.setTimeout(() => setBurst((value) => value?.id === collisionBurst.id ? null : value), 520);
           playTone(280, 0.1, soundOn);
         }
+
+        if (shouldSpawnWall) {
+          setWalls((currentWalls) => [...currentWalls, spawnOneWall(nextTrail, pickups, hazards, currentWalls)]);
+        }
+
+        const hazardHit = hazards.find((hazard) => hazard.x === nextHead.x && hazard.y === nextHead.y);
+        if (hazardHit) {
+          comboRef.current = 0;
+          setCombo(0);
+          const nextScore = Math.max(0, scoreRef.current - HAZARD_PENALTY);
+          scoreRef.current = nextScore;
+          setScore(nextScore);
+          const hazardBurst = { ...nextHead, id: ++burstIdRef.current, golden: false, hazard: true };
+          setBurst(hazardBurst);
+          window.setTimeout(() => setBurst((value) => value?.id === hazardBurst.id ? null : value), 520);
+          playTone(160, 0.18, soundOn);
+          setHazards((currentHazards) => {
+            const remaining = currentHazards.filter((hazard) => hazard.uid !== hazardHit.uid);
+            while (remaining.length < HAZARDS_ON_BOARD) remaining.push(spawnOneHazard(nextTrail, pickups, remaining, walls));
+            return remaining;
+          });
+        }
+
         if (!caughtItem) return nextTrail;
 
         if (noGrowRemainingRef.current > 0) {
@@ -432,7 +487,7 @@ export function SnackTrailPreview() {
       });
     }, stepMs);
     return () => window.clearInterval(timer);
-  }, [finishGame, phase, pickups, soundOn, stepMs]);
+  }, [finishGame, phase, pickups, hazards, walls, soundOn, stepMs]);
 
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
@@ -464,8 +519,6 @@ export function SnackTrailPreview() {
       return next;
     });
   };
-
-  const canTurn = (next: Direction) => phase === "playing" && next !== activeDirection && next !== OPPOSITE[activeDirection];
 
   return (
     <div className={styles.shell}>
@@ -519,6 +572,24 @@ export function SnackTrailPreview() {
         >
           <div className={styles.boardGlow} aria-hidden="true" />
           <div className={styles.board} role="img" aria-label="わんこがガチャアイテムを集めるゲーム盤">
+            {walls.map((wallBlock) => (
+              <span
+                key={wallBlock.uid}
+                className={styles.wallBlock}
+                style={{ left: `${(wallBlock.x / GRID_SIZE) * 100}%`, top: `${(wallBlock.y / GRID_SIZE) * 100}%` }}
+                aria-hidden="true"
+              />
+            ))}
+            {hazards.map((hazard) => (
+              <span
+                key={hazard.uid}
+                className={styles.hazardMarker}
+                style={{ left: `${(hazard.x / GRID_SIZE) * 100}%`, top: `${(hazard.y / GRID_SIZE) * 100}%` }}
+                aria-label="踏むと減点する罠"
+              >
+                <i />
+              </span>
+            ))}
             {pickups.map((pickup) => (
               <span
                 key={pickup.uid}
@@ -539,7 +610,7 @@ export function SnackTrailPreview() {
                   {index === 0 ? <DogHead direction={directionRef.current} /> : null}
                   {index !== undefined && index > 0 ? <PawSegment index={index} /> : null}
                   {hasBurst ? (
-                    <span className={`${styles.burst} ${burst.golden ? styles.goldenBurst : ""}`} aria-hidden="true">
+                    <span className={`${styles.burst} ${burst.golden ? styles.goldenBurst : ""} ${burst.hazard ? styles.hazardBurst : ""}`} aria-hidden="true">
                       {Array.from({ length: 8 }, (_, particle) => <i key={particle} style={{ "--particle": particle } as React.CSSProperties} />)}
                     </span>
                   ) : null}
@@ -561,8 +632,8 @@ export function SnackTrailPreview() {
                 <>
                   <span className={styles.overlayBadge}>80 ITEMS</span>
                   <div className={styles.previewDog}><DogHead direction="right" /></div>
-                  <h2>3つのアイテムから<br />進む道を選ぼう！</h2>
-                  <p>5個目で強化スキル。<br />肉球の道に触れるとコンボが0になるよ。</p>
+                  <h2>スワイプで方向を変えて<br />進む道を選ぼう！</h2>
+                  <p>5個目で強化スキル。肉球の道や罠に触れるとコンボが0になるよ。<br />1分ごとにどこかへ壁が出現するので気をつけて。</p>
                   <button type="button" className={styles.startButton} onClick={startGame}>ゲームスタート <span>›</span></button>
                 </>
               ) : null}
@@ -576,17 +647,6 @@ export function SnackTrailPreview() {
           ) : null}
         </section>
 
-        <section className={styles.controlArea} aria-label="方向操作">
-          <div className={styles.hint}><span>進行方向に対して直角の2方向へ曲がれます</span></div>
-          <div className={styles.controls}>
-            <ControlButton direction="up" label="上" disabled={!canTurn("up")} onDirection={chooseDirection} />
-            <ControlButton direction="left" label="左" disabled={!canTurn("left")} onDirection={chooseDirection} />
-            <span className={styles.controlCenter}><i /><i /><i /></span>
-            <ControlButton direction="right" label="右" disabled={!canTurn("right")} onDirection={chooseDirection} />
-            <ControlButton direction="down" label="下" disabled={!canTurn("down")} onDirection={chooseDirection} />
-          </div>
-        </section>
-
         <section className={styles.rules}>
           <div><span className={styles.ruleItemIcon}><Image src={PLAYABLE_ITEMS[0]!.image} alt="" fill sizes="34px" /></span><span><b>通常アイテム</b><small>1ポイント＋ミニスキル</small></span></div>
           <div><span className={`${styles.ruleItemIcon} ${styles.ruleGoldenIcon}`}><Image src={PLAYABLE_ITEMS[1]!.image} alt="" fill sizes="34px" /></span><span><b>金色アイテム</b><small>5ポイント＋ミニスキル</small></span></div>
@@ -594,6 +654,8 @@ export function SnackTrailPreview() {
             <span className={styles.demoItems}>{PLAYABLE_ITEMS.slice(2, 6).map((item) => <i key={item.id}><Image src={item.image} alt="" fill sizes="28px" /></i>)}</span>
             <span><b>シリーズ外 全{PLAYABLE_ITEMS.length}種</b><small>常に3個出現・5個目で強化スキル</small></span>
           </div>
+          <div><span className={styles.hazardRuleIcon}><i /></span><span><b>罠</b><small>踏むと{HAZARD_PENALTY}ポイント減点</small></span></div>
+          <div><span className={styles.wallRuleIcon}><i /></span><span><b>壁</b><small>1分ごとに1箇所出現・当たるとゲームオーバー</small></span></div>
           <p>プレビューでは全アイテムを所持扱い・コインは付与されません</p>
         </section>
       </main>
