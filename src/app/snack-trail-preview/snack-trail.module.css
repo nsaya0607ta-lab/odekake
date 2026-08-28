@@ -328,6 +328,27 @@
   .controlButton { height: 48px; }
 }
 
+@media (max-height: 600px) {
+  .header { padding-top: max(4px, env(safe-area-inset-top)); padding-bottom: 4px; }
+  .backButton, .soundButton { width: 34px; height: 34px; }
+  .titleBlock span { display: none; }
+  .main { padding-top: 4px; }
+  .scorePanel { min-height: 42px; }
+  .skillStrip { min-height: 24px; margin-top: 4px; }
+  .boardFrame {
+    width: min(
+      calc(100vw - 24px),
+      max(210px, calc(100dvh - env(safe-area-inset-top) - env(safe-area-inset-bottom) - 350px))
+    );
+    margin-top: 5px;
+  }
+  .controlArea { margin-top: 6px; padding: 4px 4px 6px; }
+  .hint { display: none; }
+  .controls { grid-template-rows: repeat(3, 44px); gap: 5px; margin-top: 0; }
+  .controlButton { height: 44px; }
+  .controlCenter { width: 40px; height: 40px; }
+}
+
 @media (min-width: 720px) {
   .main { padding-top: 16px; }
   .header { position: relative; max-width: 520px; margin: 0 auto; border-right: 1px solid rgba(114,227,255,.16); border-left: 1px solid rgba(114,227,255,.16); border-radius: 0 0 18px 18px; }
