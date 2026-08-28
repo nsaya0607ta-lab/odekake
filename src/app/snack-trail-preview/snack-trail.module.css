@@ -93,10 +93,31 @@
 .pauseButton { min-width: 58px; height: 34px; padding: 0 8px; border: 1px solid rgba(114, 227, 255, .24); border-radius: 11px; color: #c8f6ff; background: rgba(76, 145, 170, .12); font-size: 8px; font-weight: 900; }
 .pauseButton:disabled { opacity: .35; }
 
+.skillStrip {
+  display: flex;
+  min-height: 30px;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-top: 7px;
+  padding: 5px 10px;
+  border: 1px solid rgba(255, 194, 82, .16);
+  border-radius: 11px;
+  color: #8faebb;
+  background: rgba(7, 21, 32, .66);
+  font-size: 7px;
+  font-weight: 900;
+  letter-spacing: .03em;
+}
+.skillStrip > span { white-space: nowrap; }
+.skillStrip .specialReady { color: #ffe28d; text-shadow: 0 0 10px rgba(255, 193, 63, .45); }
+.skillStrip div { display: flex; min-width: 0; justify-content: flex-end; gap: 4px; overflow: hidden; }
+.skillStrip b { padding: 3px 6px; border: 1px solid rgba(114, 244, 198, .22); border-radius: 999px; color: #a8ffe2; background: rgba(39, 159, 140, .14); font-size: 6px; white-space: nowrap; }
+
 .boardFrame {
   position: relative;
   width: 100%;
-  margin-top: 9px;
+  margin-top: 7px;
   padding: 8px;
   border: 1px solid rgba(114, 227, 255, .36);
   border-radius: 23px;
@@ -122,6 +143,21 @@
 }
 .cell { position: relative; display: grid; min-width: 0; min-height: 0; place-items: center; border-right: 1px solid rgba(114,227,255,.035); border-bottom: 1px solid rgba(114,227,255,.035); }
 .cell:nth-child(4n) { background: rgba(114,227,255,.012); }
+
+.specialItem {
+  position: absolute;
+  z-index: 7;
+  width: 12.5%;
+  height: 12.5%;
+  pointer-events: none;
+  filter: drop-shadow(0 5px 7px rgba(0,0,0,.48));
+  animation: specialFloat .85s ease-in-out infinite alternate;
+}
+.specialAura { position: absolute; inset: -10%; border: 1px solid rgba(255, 220, 105, .8); border-radius: 28%; background: radial-gradient(circle, rgba(255,235,147,.34), rgba(255,193,57,.08) 58%, transparent 72%); box-shadow: 0 0 17px rgba(255,193,62,.5), inset 0 0 12px rgba(255,255,255,.25); animation: specialPulse 1s ease-in-out infinite alternate; }
+.specialImage { z-index: 1; object-fit: contain; padding: 7%; }
+.specialItem small { position: absolute; z-index: 2; right: -8%; bottom: -9%; padding: 2px 4px; border: 1px solid rgba(255,255,255,.7); border-radius: 999px; color: #2c1c00; background: linear-gradient(135deg, #fff2a6, #ffb72e); box-shadow: 0 2px 5px rgba(0,0,0,.35); font-size: 4px; font-weight: 1000; letter-spacing: .08em; }
+@keyframes specialFloat { to { transform: translateY(-8%) scale(1.06) rotate(2deg); } }
+@keyframes specialPulse { to { opacity: .58; transform: scale(1.1) rotate(4deg); } }
 
 .dogHead { position: relative; z-index: 5; display: block; width: 126%; height: 126%; transform-origin: center; filter: drop-shadow(0 3px 4px rgba(0,0,0,.5)); transition: transform 80ms linear; }
 .dogFace { position: absolute; inset: 8%; border: 2px solid #593723; border-radius: 48% 52% 47% 53%; background: linear-gradient(145deg, #d7a275, #9c603b); box-shadow: inset 4px 3px rgba(255,255,255,.18); }
@@ -154,6 +190,31 @@
 .burst i { --angle: calc(var(--particle) * 45deg); position: absolute; width: 5px; height: 5px; border-radius: 50%; background: var(--mint); box-shadow: 0 0 7px var(--mint); animation: particle .5s ease-out forwards; }
 .goldenBurst i { background: #ffcf43; box-shadow: 0 0 8px #ffcf43; }
 @keyframes particle { to { opacity: 0; transform: rotate(var(--angle)) translateX(31px) scale(.2); } }
+
+.skillToast {
+  position: absolute;
+  z-index: 19;
+  top: 16px;
+  left: 50%;
+  display: flex;
+  min-width: 188px;
+  align-items: center;
+  gap: 9px;
+  padding: 7px 11px 7px 8px;
+  border: 1px solid rgba(255, 223, 118, .78);
+  border-radius: 14px;
+  color: #fff8d7;
+  background: linear-gradient(145deg, rgba(56, 44, 19, .96), rgba(12, 27, 35, .97));
+  box-shadow: 0 8px 23px rgba(0,0,0,.45), 0 0 18px rgba(255,198,61,.2);
+  transform: translateX(-50%);
+  animation: toastIn 1.9s ease both;
+}
+.skillToast > span { position: relative; width: 38px; height: 38px; flex: 0 0 auto; border-radius: 10px; background: rgba(255,255,255,.12); }
+.skillToast > span img { object-fit: contain; padding: 3px; }
+.skillToast p { display: flex; flex-direction: column; margin: 0; }
+.skillToast small { color: #e2c86f; font-size: 7px; font-weight: 900; }
+.skillToast b { margin-top: 2px; color: #fff; font-size: 10px; font-weight: 900; }
+@keyframes toastIn { 0% { opacity: 0; transform: translate(-50%, -12px) scale(.9); } 12%, 78% { opacity: 1; transform: translate(-50%, 0) scale(1); } 100% { opacity: 0; transform: translate(-50%, -8px) scale(.96); } }
 
 .overlay {
   position: absolute;
@@ -212,6 +273,10 @@
 .rules span { display: flex; min-width: 0; flex-direction: column; }
 .rules b { overflow: hidden; color: #cde7f1; font-size: 8px; font-weight: 900; text-overflow: ellipsis; white-space: nowrap; }
 .rules small { color: #7899a9; font-size: 7px; font-weight: 800; }
+.rules .specialRule { grid-column: 1 / -1; }
+.demoItems { display: flex !important; flex-direction: row !important; flex: 0 0 auto; gap: 2px; }
+.demoItems i { position: relative; display: block; width: 25px; height: 25px; overflow: hidden; border: 1px solid rgba(255,218,102,.18); border-radius: 7px; background: rgba(255,255,255,.06); }
+.demoItems img { object-fit: contain; padding: 2px; }
 .rules p { grid-column: 1 / -1; text-align: center; color: #607e8e; font-size: 7px; font-weight: 800; }
 
 @media (max-height: 780px) {
@@ -230,5 +295,5 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .ambient i, .snack, .goldenSnack::before, .goldenSnack::after, .previewDog { animation: none; }
+  .ambient i, .snack, .goldenSnack::before, .goldenSnack::after, .previewDog, .specialItem, .specialAura, .skillToast { animation: none; }
 }

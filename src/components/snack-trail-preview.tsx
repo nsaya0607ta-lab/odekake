@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import styles from "@/app/snack-trail-preview/snack-trail.module.css";
@@ -8,9 +9,51 @@ type Point = { x: number; y: number };
 type Direction = "up" | "down" | "left" | "right";
 type Phase = "ready" | "playing" | "paused" | "gameover";
 type Snack = Point & { golden: boolean };
+type SpecialSkill = "slow" | "trim" | "double" | "gold";
+type SpecialItemDefinition = {
+  id: string;
+  name: string;
+  image: string;
+  skill: SpecialSkill;
+  effect: string;
+};
+type SpecialPickup = Point & { item: SpecialItemDefinition };
+type SkillToast = { id: number; item: SpecialItemDefinition };
 
 const GRID_SIZE = 16;
 const BEST_SCORE_KEY = "odekake:snack-trail-preview:best-score";
+const SPECIAL_ITEM_INTERVAL = 5;
+const SPECIAL_ITEM_SIZE = 2;
+const DEMO_GACHA_ITEMS: readonly SpecialItemDefinition[] = [
+  {
+    id: "toy_carrot",
+    name: "にんじんトイ",
+    image: "/collection/items/carrot-toy.webp",
+    skill: "slow",
+    effect: "6秒間ゆっくり",
+  },
+  {
+    id: "toy_frisbee",
+    name: "フリスビー",
+    image: "/collection/items/frisbee.webp",
+    skill: "trim",
+    effect: "足あとを3マス短縮",
+  },
+  {
+    id: "toy_meat",
+    name: "大きな肉のおもちゃ",
+    image: "/collection/items/meat-toy.webp",
+    skill: "double",
+    effect: "次のおやつ3個 ×2",
+  },
+  {
+    id: "toy_rainbow_ball",
+    name: "虹色わんこボール",
+    image: "/collection/items/rainbow-ball.webp",
+    skill: "gold",
+    effect: "次のおやつ3個が金色",
+  },
+];
 const OPPOSITE: Record<Direction, Direction> = {
   up: "down",
   down: "up",
@@ -37,8 +80,17 @@ function pointKey(point: Point): string {
   return `${point.x}:${point.y}`;
 }
 
-function spawnSnack(trail: Point[]): Snack {
+function specialCells(specialItem: SpecialPickup | null): Point[] {
+  if (!specialItem) return [];
+  return Array.from({ length: SPECIAL_ITEM_SIZE * SPECIAL_ITEM_SIZE }, (_, index) => ({
+    x: specialItem.x + (index % SPECIAL_ITEM_SIZE),
+    y: specialItem.y + Math.floor(index / SPECIAL_ITEM_SIZE),
+  }));
+}
+
+function spawnSnack(trail: Point[], specialItem: SpecialPickup | null = null, forceGolden = false): Snack {
   const occupied = new Set(trail.map(pointKey));
+  specialCells(specialItem).forEach((point) => occupied.add(pointKey(point)));
   const candidates: Point[] = [];
   for (let y = 1; y < GRID_SIZE - 1; y += 1) {
     for (let x = 1; x < GRID_SIZE - 1; x += 1) {
@@ -46,7 +98,34 @@ function spawnSnack(trail: Point[]): Snack {
     }
   }
   const point = candidates[Math.floor(Math.random() * candidates.length)] ?? { x: 3, y: 3 };
-  return { ...point, golden: Math.random() < 0.14 };
+  return { ...point, golden: forceGolden || Math.random() < 0.14 };
+}
+
+function spawnSpecialItem(trail: Point[], snack: Snack): SpecialPickup {
+  const occupied = new Set([...trail.map(pointKey), pointKey(snack)]);
+  const candidates: Point[] = [];
+  for (let y = 1; y <= GRID_SIZE - SPECIAL_ITEM_SIZE - 1; y += 1) {
+    for (let x = 1; x <= GRID_SIZE - SPECIAL_ITEM_SIZE - 1; x += 1) {
+      const area = Array.from({ length: SPECIAL_ITEM_SIZE * SPECIAL_ITEM_SIZE }, (_, index) => ({
+        x: x + (index % SPECIAL_ITEM_SIZE),
+        y: y + Math.floor(index / SPECIAL_ITEM_SIZE),
+      }));
+      if (area.every((point) => !occupied.has(pointKey(point)))) candidates.push({ x, y });
+    }
+  }
+  const point = candidates[Math.floor(Math.random() * candidates.length)] ?? { x: 2, y: 2 };
+  const item = DEMO_GACHA_ITEMS[Math.floor(Math.random() * DEMO_GACHA_ITEMS.length)] ?? DEMO_GACHA_ITEMS[0]!;
+  return { ...point, item };
+}
+
+function isInsideSpecialItem(point: Point, specialItem: SpecialPickup | null): boolean {
+  return Boolean(
+    specialItem
+    && point.x >= specialItem.x
+    && point.x < specialItem.x + SPECIAL_ITEM_SIZE
+    && point.y >= specialItem.y
+    && point.y < specialItem.y + SPECIAL_ITEM_SIZE,
+  );
 }
 
 function BoneIcon({ golden = false }: { golden?: boolean }) {
@@ -163,6 +242,11 @@ export function SnackTrailPreview() {
   const [collected, setCollected] = useState(0);
   const [soundOn, setSoundOn] = useState(true);
   const [activeDirection, setActiveDirection] = useState<Direction>("right");
+  const [specialItem, setSpecialItem] = useState<SpecialPickup | null>(null);
+  const [skillToast, setSkillToast] = useState<SkillToast | null>(null);
+  const [slowActive, setSlowActive] = useState(false);
+  const [doubleSnackRemaining, setDoubleSnackRemaining] = useState(0);
+  const [goldenSnackRemaining, setGoldenSnackRemaining] = useState(0);
   const [burst, setBurst] = useState<(Point & { id: number; golden: boolean }) | null>(null);
   const [newBest, setNewBest] = useState(false);
   const directionRef = useRef<Direction>("right");
@@ -171,9 +255,16 @@ export function SnackTrailPreview() {
   const burstIdRef = useRef(0);
   const scoreRef = useRef(0);
   const phaseRef = useRef<Phase>("ready");
+  const doubleSnackRemainingRef = useRef(0);
+  const goldenSnackRemainingRef = useRef(0);
+  const slowTimeoutRef = useRef<number | null>(null);
+  const toastTimeoutRef = useRef<number | null>(null);
+  const toastIdRef = useRef(0);
 
   const level = Math.min(9, 1 + Math.floor(collected / 5));
-  const stepMs = Math.max(78, 184 - (level - 1) * 13);
+  const baseStepMs = Math.max(78, 184 - (level - 1) * 13);
+  const stepMs = slowActive ? Math.round(baseStepMs * 1.45) : baseStepMs;
+  const snacksUntilSpecial = SPECIAL_ITEM_INTERVAL - (collected % SPECIAL_ITEM_INTERVAL);
 
   useEffect(() => {
     const stored = Number(window.localStorage.getItem(BEST_SCORE_KEY));
@@ -183,6 +274,11 @@ export function SnackTrailPreview() {
   useEffect(() => {
     phaseRef.current = phase;
   }, [phase]);
+
+  useEffect(() => () => {
+    if (slowTimeoutRef.current !== null) window.clearTimeout(slowTimeoutRef.current);
+    if (toastTimeoutRef.current !== null) window.clearTimeout(toastTimeoutRef.current);
+  }, []);
 
   const chooseDirection = useCallback((next: Direction) => {
     if (phaseRef.current !== "playing") return;
@@ -204,14 +300,23 @@ export function SnackTrailPreview() {
 
   const startGame = useCallback(() => {
     const freshTrail = makeInitialTrail();
+    if (slowTimeoutRef.current !== null) window.clearTimeout(slowTimeoutRef.current);
+    if (toastTimeoutRef.current !== null) window.clearTimeout(toastTimeoutRef.current);
     directionRef.current = "right";
     queuedDirectionRef.current = "right";
     setActiveDirection("right");
     scoreRef.current = 0;
+    doubleSnackRemainingRef.current = 0;
+    goldenSnackRemainingRef.current = 0;
     setTrail(freshTrail);
     setSnack(spawnSnack(freshTrail));
     setScore(0);
     setCollected(0);
+    setSpecialItem(null);
+    setSkillToast(null);
+    setSlowActive(false);
+    setDoubleSnackRemaining(0);
+    setGoldenSnackRemaining(0);
     setBurst(null);
     setNewBest(false);
     setPhase("playing");
@@ -231,6 +336,7 @@ export function SnackTrailPreview() {
         const nextHead = { x: head.x + movement.x, y: head.y + movement.y };
         const hitWall = nextHead.x < 0 || nextHead.x >= GRID_SIZE || nextHead.y < 0 || nextHead.y >= GRID_SIZE;
         const ateSnack = nextHead.x === snack.x && nextHead.y === snack.y;
+        const caughtSpecialItem = isInsideSpecialItem(nextHead, specialItem);
         const collisionBody = ateSnack ? current : current.slice(0, -1);
         const hitTail = collisionBody.some((part) => part.x === nextHead.x && part.y === nextHead.y);
 
@@ -242,23 +348,61 @@ export function SnackTrailPreview() {
         const nextTrail = [nextHead, ...current];
         if (!ateSnack) nextTrail.pop();
 
+        if (caughtSpecialItem && specialItem) {
+          if (toastTimeoutRef.current !== null) window.clearTimeout(toastTimeoutRef.current);
+          const nextToast = { id: ++toastIdRef.current, item: specialItem.item };
+          setSkillToast(nextToast);
+          toastTimeoutRef.current = window.setTimeout(() => {
+            setSkillToast((currentToast) => currentToast?.id === nextToast.id ? null : currentToast);
+          }, 1900);
+
+          if (specialItem.item.skill === "slow") {
+            if (slowTimeoutRef.current !== null) window.clearTimeout(slowTimeoutRef.current);
+            setSlowActive(true);
+            slowTimeoutRef.current = window.setTimeout(() => setSlowActive(false), 6000);
+          } else if (specialItem.item.skill === "trim") {
+            for (let removed = 0; removed < 3 && nextTrail.length > 3; removed += 1) nextTrail.pop();
+          } else if (specialItem.item.skill === "double") {
+            doubleSnackRemainingRef.current = 3;
+            setDoubleSnackRemaining(3);
+          } else if (specialItem.item.skill === "gold") {
+            goldenSnackRemainingRef.current = 3;
+            setGoldenSnackRemaining(3);
+            setSnack((currentSnack) => ({ ...currentSnack, golden: true }));
+          }
+          setSpecialItem(null);
+          playTone(980, 0.22, soundOn);
+        }
+
         if (ateSnack) {
-          const earned = snack.golden ? 5 : 1;
+          const doubleActive = doubleSnackRemainingRef.current > 0;
+          const earned = (snack.golden ? 5 : 1) * (doubleActive ? 2 : 1);
           const nextScore = scoreRef.current + earned;
           scoreRef.current = nextScore;
           setScore(nextScore);
-          setCollected((value) => value + 1);
+          if (doubleActive) {
+            doubleSnackRemainingRef.current -= 1;
+            setDoubleSnackRemaining(doubleSnackRemainingRef.current);
+          }
+          if (goldenSnackRemainingRef.current > 0) {
+            goldenSnackRemainingRef.current -= 1;
+            setGoldenSnackRemaining(goldenSnackRemainingRef.current);
+          }
+          const nextCollected = collected + 1;
+          setCollected(nextCollected);
           const nextBurst = { ...snack, id: ++burstIdRef.current };
           setBurst(nextBurst);
           window.setTimeout(() => setBurst((currentBurst) => currentBurst?.id === nextBurst.id ? null : currentBurst), 520);
-          setSnack(spawnSnack(nextTrail));
+          const nextSnack = spawnSnack(nextTrail, specialItem, goldenSnackRemainingRef.current > 0);
+          setSnack(nextSnack);
+          if (nextCollected % SPECIAL_ITEM_INTERVAL === 0) setSpecialItem(spawnSpecialItem(nextTrail, nextSnack));
           playTone(snack.golden ? 880 : 620, snack.golden ? 0.2 : 0.1, soundOn);
         }
         return nextTrail;
       });
     }, stepMs);
     return () => window.clearInterval(timer);
-  }, [finishGame, phase, snack, soundOn, stepMs]);
+  }, [collected, finishGame, phase, snack, soundOn, specialItem, stepMs]);
 
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
@@ -344,6 +488,17 @@ export function SnackTrailPreview() {
           </button>
         </section>
 
+        <section className={styles.skillStrip} aria-live="polite">
+          <span className={specialItem ? styles.specialReady : ""}>
+            {specialItem ? "特殊アイテム出現中！" : `あと${snacksUntilSpecial}個で特殊アイテム`}
+          </span>
+          <div>
+            {slowActive ? <b>ゆっくり</b> : null}
+            {doubleSnackRemaining > 0 ? <b>得点×2：残り{doubleSnackRemaining}個</b> : null}
+            {goldenSnackRemaining > 0 ? <b>金色：残り{goldenSnackRemaining}個</b> : null}
+          </div>
+        </section>
+
         <section
           className={styles.boardFrame}
           onTouchStart={(event) => {
@@ -364,6 +519,20 @@ export function SnackTrailPreview() {
         >
           <div className={styles.boardGlow} aria-hidden="true" />
           <div className={styles.board} role="img" aria-label="わんこがおやつを集めるゲーム盤">
+            {specialItem ? (
+              <span
+                className={styles.specialItem}
+                style={{
+                  left: `${(specialItem.x / GRID_SIZE) * 100}%`,
+                  top: `${(specialItem.y / GRID_SIZE) * 100}%`,
+                }}
+                aria-label={`${specialItem.item.name}。${specialItem.item.effect}`}
+              >
+                <i className={styles.specialAura} />
+                <Image src={specialItem.item.image} alt="" fill sizes="64px" className={styles.specialImage} />
+                <small>SKILL</small>
+              </span>
+            ) : null}
             {boardCells.map((cell) => {
               const index = trailByKey.get(pointKey(cell));
               const hasSnack = cell.x === snack.x && cell.y === snack.y;
@@ -386,6 +555,13 @@ export function SnackTrailPreview() {
               );
             })}
           </div>
+
+          {skillToast ? (
+            <div className={styles.skillToast} role="status">
+              <span><Image src={skillToast.item.image} alt="" fill sizes="42px" /></span>
+              <p><small>{skillToast.item.name}</small><b>{skillToast.item.effect}</b></p>
+            </div>
+          ) : null}
 
           {phase !== "playing" ? (
             <div className={styles.overlay}>
@@ -433,6 +609,14 @@ export function SnackTrailPreview() {
         <section className={styles.rules}>
           <div><BoneIcon /><span><b>ふつうのおやつ</b><small>1ポイント</small></span></div>
           <div><BoneIcon golden /><span><b>金のおやつ</b><small>5ポイント</small></span></div>
+          <div className={styles.specialRule}>
+            <span className={styles.demoItems}>
+              {DEMO_GACHA_ITEMS.map((item) => (
+                <i key={item.id}><Image src={item.image} alt="" fill sizes="28px" /></i>
+              ))}
+            </span>
+            <span><b>ガチャアイテム</b><small>5個ごとに出現・2×2マスで取得</small></span>
+          </div>
           <p>プレビュー版のため、コインは付与されません</p>
         </section>
       </main>
