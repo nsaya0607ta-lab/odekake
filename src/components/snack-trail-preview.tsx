@@ -195,6 +195,7 @@ export function SnackTrailPreview() {
   const slowTimeoutRef = useRef<number | null>(null);
   const toastTimeoutRef = useRef<number | null>(null);
   const toastIdRef = useRef(0);
+  const preloadedImagesRef = useRef<HTMLImageElement[]>([]);
 
   const level = Math.min(9, 1 + Math.floor(collected / 5));
   const baseStepMs = Math.max(78, 184 - (level - 1) * 13);
@@ -205,6 +206,16 @@ export function SnackTrailPreview() {
   useEffect(() => {
     const stored = Number(window.localStorage.getItem(BEST_SCORE_KEY));
     if (Number.isFinite(stored) && stored > 0) setBestScore(stored);
+  }, []);
+
+  useEffect(() => {
+    preloadedImagesRef.current = PLAYABLE_ITEMS.map((item) => {
+      const image = new window.Image();
+      image.decoding = "async";
+      image.src = item.image;
+      return image;
+    });
+    return () => { preloadedImagesRef.current = []; };
   }, []);
 
   useEffect(() => { phaseRef.current = phase; }, [phase]);
@@ -508,7 +519,7 @@ export function SnackTrailPreview() {
                 aria-label={`${pickup.item.name}。${pickup.skill.miniText}`}
               >
                 <i className={styles.itemAura} />
-                <Image src={pickup.item.image} alt="" fill sizes="64px" className={styles.pickupImage} />
+                <Image src={pickup.item.image} alt="" fill sizes="64px" className={styles.pickupImage} priority unoptimized />
                 <small>{pickup.golden ? "5 PT" : pickup.item.rarity}</small>
               </span>
             ))}
@@ -531,7 +542,7 @@ export function SnackTrailPreview() {
 
           {skillToast ? (
             <div className={`${styles.skillToast} ${skillToast.boosted ? styles.boostedToast : ""}`} role="status">
-              <span><Image src={skillToast.item.image} alt="" fill sizes="42px" /></span>
+              <span><Image src={skillToast.item.image} alt="" fill sizes="42px" unoptimized /></span>
               <p><small>{skillToast.boosted ? "強化スキル！" : skillToast.item.name}</small><b>{skillToast.skill.title}</b><em>{skillToast.text}</em></p>
             </div>
           ) : null}
