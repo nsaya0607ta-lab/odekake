@@ -159,16 +159,8 @@
 @keyframes specialFloat { to { transform: translateY(-8%) scale(1.06) rotate(2deg); } }
 @keyframes specialPulse { to { opacity: .58; transform: scale(1.1) rotate(4deg); } }
 
-.dogHead { position: relative; z-index: 5; display: block; width: 126%; height: 126%; transform-origin: center; filter: drop-shadow(0 3px 4px rgba(0,0,0,.5)); transition: transform 80ms linear; }
-.dogFace { position: absolute; inset: 8%; border: 2px solid #593723; border-radius: 48% 52% 47% 53%; background: linear-gradient(145deg, #d7a275, #9c603b); box-shadow: inset 4px 3px rgba(255,255,255,.18); }
-.ear { position: absolute; z-index: -1; left: 3%; width: 40%; height: 38%; border: 2px solid #55331f; border-radius: 70% 20% 65% 35%; background: #6c4028; }
-.earTop { top: -3%; transform: rotate(-26deg); }
-.earBottom { bottom: -3%; transform: rotate(26deg); }
-.eyeTop, .eyeBottom { position: absolute; right: 31%; width: 10%; height: 10%; border-radius: 50%; background: #1d1511; box-shadow: 0 0 0 1px rgba(255,255,255,.17); }
-.eyeTop { top: 23%; }
-.eyeBottom { bottom: 23%; }
-.muzzle { position: absolute; right: -5%; top: 31%; width: 43%; height: 40%; border: 1px solid rgba(88,52,29,.8); border-radius: 48%; background: #e8c29d; }
-.nose { position: absolute; right: -10%; top: 43%; width: 20%; height: 20%; border-radius: 46% 52% 48% 45%; background: #211914; }
+.dogHead { position: relative; z-index: 5; display: block; width: 158%; height: 158%; transform-origin: center; border-radius: 48%; background: radial-gradient(circle, rgba(255,255,255,.4), rgba(114,227,255,.08) 62%, transparent 68%); filter: drop-shadow(0 3px 5px rgba(0,0,0,.58)); transition: transform 80ms linear; }
+.dogSprite { object-fit: contain; padding: 5%; }
 
 .pawSegment { position: relative; z-index: 3; display: block; width: 68%; height: 68%; border: 1px solid rgba(103, 255, 205, .7); border-radius: 43% 57% 48% 52%; background: linear-gradient(145deg, #72f4c6, #279f8c); box-shadow: 0 0 9px rgba(114,244,198,.43), inset 2px 2px rgba(255,255,255,.25); }
 .pawPad { position: absolute; left: 31%; top: 38%; width: 39%; height: 38%; border-radius: 52% 48% 58% 42%; background: rgba(5,60,57,.5); transform: rotate(-8deg); }
@@ -177,12 +169,13 @@
 .pawToeTwo { left: 41%; top: 8%; }
 .pawToeThree { right: 17%; top: 20%; }
 
-.snack { position: relative; z-index: 4; display: grid; width: 120%; height: 120%; place-items: center; animation: snackBounce .8s ease-in-out infinite alternate; filter: drop-shadow(0 0 7px rgba(255,214,150,.55)); }
+.snack { position: relative; z-index: 4; display: grid; width: 148%; height: 148%; place-items: center; animation: snackBounce .8s ease-in-out infinite alternate; filter: drop-shadow(0 0 7px rgba(255,214,150,.55)); }
 .goldenSnack { filter: drop-shadow(0 0 9px #ffcc43); }
 .goldenSnack::before, .goldenSnack::after { position: absolute; content: "✦"; color: #fff4a4; font-size: 8px; text-shadow: 0 0 8px #ffb21f; animation: sparkle 1s ease-in-out infinite; }
 .goldenSnack::before { top: -35%; right: -20%; }
 .goldenSnack::after { bottom: -30%; left: -12%; animation-delay: -.5s; }
-.boneSvg { display: block; width: 100%; height: 100%; overflow: visible; }
+.snackIcon { position: relative; display: block; width: 100%; height: 100%; }
+.snackIcon img { object-fit: contain; }
 @keyframes snackBounce { to { transform: translateY(-12%) rotate(5deg) scale(1.04); } }
 @keyframes sparkle { 50% { opacity: .25; transform: scale(.65) rotate(45deg); } }
 
@@ -269,7 +262,7 @@
 
 .rules { display: grid; grid-template-columns: 1fr 1fr; gap: 7px; margin-top: 10px; }
 .rules > div { display: flex; min-width: 0; align-items: center; gap: 8px; padding: 8px 10px; border: 1px solid rgba(114,227,255,.12); border-radius: 14px; background: rgba(14,34,49,.66); }
-.rules > div > svg { width: 30px; height: 30px; flex: 0 0 auto; }
+.rules > div > .snackIcon { width: 32px; height: 32px; flex: 0 0 auto; filter: drop-shadow(0 2px 4px rgba(0,0,0,.45)); }
 .rules span { display: flex; min-width: 0; flex-direction: column; }
 .rules b { overflow: hidden; color: #cde7f1; font-size: 8px; font-weight: 900; text-overflow: ellipsis; white-space: nowrap; }
 .rules small { color: #7899a9; font-size: 7px; font-weight: 800; }

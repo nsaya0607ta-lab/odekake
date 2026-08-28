@@ -128,24 +128,16 @@ function isInsideSpecialItem(point: Point, specialItem: SpecialPickup | null): b
   );
 }
 
-function BoneIcon({ golden = false }: { golden?: boolean }) {
+function SnackIcon({ golden = false }: { golden?: boolean }) {
   return (
-    <svg viewBox="0 0 64 64" aria-hidden="true" className={styles.boneSvg}>
-      <defs>
-        <linearGradient id={golden ? "goldBone" : "creamBone"} x1="0" y1="0" x2="1" y2="1">
-          <stop offset="0" stopColor={golden ? "#fff3a8" : "#fff9e8"} />
-          <stop offset="1" stopColor={golden ? "#ffb11b" : "#eecb94"} />
-        </linearGradient>
-      </defs>
-      <path
-        d="M13.7 20.2a8.3 8.3 0 1 1 7.4-12 8.2 8.2 0 0 1 9.3 5.4l11.3 11.3a8.2 8.2 0 0 1 5.9-.2 8.3 8.3 0 1 1 3.1 15.6 8.3 8.3 0 1 1-12-7.4L27.4 21.6a8.2 8.2 0 0 1-5.4-.5 8.3 8.3 0 0 1-8.3-.9Z"
-        fill={`url(#${golden ? "goldBone" : "creamBone"})`}
-        stroke={golden ? "#ff8a00" : "#c69457"}
-        strokeWidth="3"
-        strokeLinejoin="round"
+    <span className={styles.snackIcon} aria-hidden="true">
+      <Image
+        src={golden ? "/collection/items/paw-pudding.webp" : "/collection/items/paw-melon-bread.webp"}
+        alt=""
+        fill
+        sizes="50px"
       />
-      <path d="M25 18 43 36" stroke="#fff" strokeWidth="3" strokeLinecap="round" opacity=".55" />
-    </svg>
+    </span>
   );
 }
 
@@ -153,14 +145,7 @@ function DogHead({ direction }: { direction: Direction }) {
   const rotation = { right: 0, down: 90, left: 180, up: 270 }[direction];
   return (
     <span className={styles.dogHead} style={{ transform: `rotate(${rotation}deg)` }} aria-hidden="true">
-      <span className={`${styles.ear} ${styles.earTop}`} />
-      <span className={`${styles.ear} ${styles.earBottom}`} />
-      <span className={styles.dogFace}>
-        <span className={styles.eyeTop} />
-        <span className={styles.eyeBottom} />
-        <span className={styles.muzzle} />
-        <span className={styles.nose} />
-      </span>
+      <Image src="/collection/items/frenchie-plush.webp" alt="" fill sizes="64px" className={styles.dogSprite} />
     </span>
   );
 }
@@ -338,15 +323,22 @@ export function SnackTrailPreview() {
         const ateSnack = nextHead.x === snack.x && nextHead.y === snack.y;
         const caughtSpecialItem = isInsideSpecialItem(nextHead, specialItem);
         const collisionBody = ateSnack ? current : current.slice(0, -1);
-        const hitTail = collisionBody.some((part) => part.x === nextHead.x && part.y === nextHead.y);
+        const hitTailIndex = collisionBody.findIndex((part) => part.x === nextHead.x && part.y === nextHead.y);
 
-        if (hitWall || hitTail) {
+        if (hitWall) {
           window.setTimeout(() => finishGame(scoreRef.current), 0);
           return current;
         }
 
         const nextTrail = [nextHead, ...current];
         if (!ateSnack) nextTrail.pop();
+        if (hitTailIndex >= 0) {
+          nextTrail.splice(hitTailIndex + 1);
+          const nextBurst = { ...nextHead, id: ++burstIdRef.current, golden: false };
+          setBurst(nextBurst);
+          window.setTimeout(() => setBurst((currentBurst) => currentBurst?.id === nextBurst.id ? null : currentBurst), 520);
+          playTone(280, 0.1, soundOn);
+        }
 
         if (caughtSpecialItem && specialItem) {
           if (toastTimeoutRef.current !== null) window.clearTimeout(toastTimeoutRef.current);
@@ -543,7 +535,7 @@ export function SnackTrailPreview() {
                   {index !== undefined && index > 0 ? <PawSegment index={index} /> : null}
                   {hasSnack ? (
                     <span className={`${styles.snack} ${snack.golden ? styles.goldenSnack : ""}`}>
-                      <BoneIcon golden={snack.golden} />
+                      <SnackIcon golden={snack.golden} />
                     </span>
                   ) : null}
                   {hasBurst ? (
@@ -570,7 +562,7 @@ export function SnackTrailPreview() {
                   <span className={styles.overlayBadge}>NEW GAME</span>
                   <div className={styles.previewDog}><DogHead direction="right" /></div>
                   <h2>おやつを集めて<br />しっぽをのばそう！</h2>
-                  <p>スワイプで進む方向を変えて、<br />壁と自分の足あとをよけよう。</p>
+                  <p>壁だけはよけよう。<br />足あとに触れるとしっぽが短くなるよ。</p>
                   <button type="button" className={styles.startButton} onClick={startGame}>ゲームスタート <span>›</span></button>
                 </>
               ) : null}
@@ -586,7 +578,7 @@ export function SnackTrailPreview() {
                 <>
                   <span className={styles.overlayBadge}>今回のスコア</span>
                   <strong className={styles.finalScore}>{score}</strong>
-                  <h2>{newBest ? "ベストスコア更新！" : "よくがんばりました！"}</h2>
+                  <h2>{newBest ? "ベストスコア更新！" : "壁にぶつかっちゃった！"}</h2>
                   <p>集めたおやつ {collected}個・到達レベル {level}</p>
                   <button type="button" className={styles.startButton} onClick={startGame}>もう一度あそぶ <span>↻</span></button>
                 </>
@@ -607,8 +599,8 @@ export function SnackTrailPreview() {
         </section>
 
         <section className={styles.rules}>
-          <div><BoneIcon /><span><b>ふつうのおやつ</b><small>1ポイント</small></span></div>
-          <div><BoneIcon golden /><span><b>金のおやつ</b><small>5ポイント</small></span></div>
+          <div><SnackIcon /><span><b>肉球メロンパン</b><small>1ポイント</small></span></div>
+          <div><SnackIcon golden /><span><b>金の肉球プリン</b><small>5ポイント</small></span></div>
           <div className={styles.specialRule}>
             <span className={styles.demoItems}>
               {DEMO_GACHA_ITEMS.map((item) => (
