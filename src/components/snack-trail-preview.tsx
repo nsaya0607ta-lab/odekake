@@ -2,7 +2,7 @@
 
 import Image from "next/image";
 import Link from "next/link";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import styles from "@/app/snack-trail-preview/snack-trail.module.css";
 import { REGULAR_ITEMS, type CollectionItem } from "@/lib/collection/items";
 import { getSnackTrailSkill, type SnackTrailSkill } from "@/lib/games/snack-trail-skills";
@@ -159,6 +159,58 @@ function PawSegment({ index }: { index: number }) {
   );
 }
 
+const WallLayer = memo(function WallLayer({ walls }: { walls: WallBlock[] }) {
+  return (
+    <>
+      {walls.map((wallBlock) => (
+        <span
+          key={wallBlock.uid}
+          className={styles.wallBlock}
+          style={{ left: `${(wallBlock.x / GRID_COLS) * 100}%`, top: `${(wallBlock.y / GRID_ROWS) * 100}%` }}
+          aria-hidden="true"
+        />
+      ))}
+    </>
+  );
+});
+
+const HazardLayer = memo(function HazardLayer({ hazards }: { hazards: Hazard[] }) {
+  return (
+    <>
+      {hazards.map((hazard) => (
+        <span
+          key={hazard.uid}
+          className={styles.hazardMarker}
+          style={{ left: `${(hazard.x / GRID_COLS) * 100}%`, top: `${(hazard.y / GRID_ROWS) * 100}%` }}
+          aria-label="踏むと減点する罠"
+        >
+          <i className={styles.hazardAura} />
+          <i className={styles.hazardIcon} />
+        </span>
+      ))}
+    </>
+  );
+});
+
+const ItemLayer = memo(function ItemLayer({ pickups }: { pickups: ItemPickup[] }) {
+  return (
+    <>
+      {pickups.map((pickup) => (
+        <span
+          key={pickup.uid}
+          className={`${styles.itemPickup} ${pickup.golden ? styles.goldenItemPickup : ""}`}
+          style={{ left: `${(pickup.x / GRID_COLS) * 100}%`, top: `${(pickup.y / GRID_ROWS) * 100}%` }}
+          aria-label={`${pickup.item.name}。${pickup.skill.miniText}`}
+        >
+          <i className={styles.itemAura} />
+          <Image src={pickup.item.image} alt="" fill sizes="64px" className={styles.pickupImage} priority unoptimized />
+          <small>{pickup.golden ? "5 PT" : pickup.item.rarity}</small>
+        </span>
+      ))}
+    </>
+  );
+});
+
 function playTone(frequency: number, duration: number, soundOn: boolean) {
   if (!soundOn || typeof window === "undefined") return;
   try {
@@ -204,6 +256,7 @@ export function SnackTrailPreview() {
   const [burst, setBurst] = useState<(Point & { id: number; golden: boolean; hazard?: boolean }) | null>(null);
   const [newBest, setNewBest] = useState(false);
 
+  const trailRef = useRef<Point[]>(initialTrail);
   const directionRef = useRef<Direction>("right");
   const queuedDirectionRef = useRef<Direction>("right");
   const touchStartRef = useRef<Point | null>(null);
@@ -291,6 +344,7 @@ export function SnackTrailPreview() {
     wallMinuteMarkRef.current = 0;
     const freshPickups = spawnInitialItems(freshTrail);
     const freshHazards = spawnInitialHazards(freshTrail, freshPickups);
+    trailRef.current = freshTrail;
     setTrail(freshTrail);
     setPickups(freshPickups);
     setHazards(freshHazards);
@@ -323,171 +377,180 @@ export function SnackTrailPreview() {
       const shouldSpawnWall = minuteMark > wallMinuteMarkRef.current;
       if (shouldSpawnWall) wallMinuteMarkRef.current = minuteMark;
 
-      setTrail((currentTrail) => {
-        const head = currentTrail[0];
-        if (!head) return makeInitialTrail();
-        let nextHead = { x: head.x + movement.x, y: head.y + movement.y };
-        const hitBoundary = nextHead.x < 0 || nextHead.x >= GRID_COLS || nextHead.y < 0 || nextHead.y >= GRID_ROWS;
-        const hitInteriorWall = !hitBoundary && walls.some((wallBlock) => isInsideItem(nextHead, wallBlock));
-        const hitWall = hitBoundary || hitInteriorWall;
-        if (hitWall) {
-          if (wallShieldsRef.current <= 0 || wallGuardUsesRef.current >= MAX_WALL_GUARD_USES) {
-            window.setTimeout(() => finishGame(scoreRef.current), 0);
-            return currentTrail;
-          }
-          wallShieldsRef.current -= 1;
-          wallGuardUsesRef.current += 1;
+      const currentTrail = trailRef.current;
+      const head = currentTrail[0];
+      if (!head) {
+        trailRef.current = makeInitialTrail();
+        setTrail(trailRef.current);
+        return;
+      }
+
+      let nextHead = { x: head.x + movement.x, y: head.y + movement.y };
+      const hitBoundary = nextHead.x < 0 || nextHead.x >= GRID_COLS || nextHead.y < 0 || nextHead.y >= GRID_ROWS;
+      const wasInsideWall = walls.some((wallBlock) => isInsideItem(head, wallBlock));
+      const hitInteriorWall = !hitBoundary && !wasInsideWall && walls.some((wallBlock) => isInsideItem(nextHead, wallBlock));
+      const hitWall = hitBoundary || hitInteriorWall;
+      if (hitWall) {
+        if (wallShieldsRef.current <= 0 || wallGuardUsesRef.current >= MAX_WALL_GUARD_USES) {
+          finishGame(scoreRef.current);
+          return;
+        }
+        wallShieldsRef.current -= 1;
+        wallGuardUsesRef.current += 1;
+        setWallShields(wallShieldsRef.current);
+        if (hitBoundary) nextHead = { x: (nextHead.x + GRID_COLS) % GRID_COLS, y: (nextHead.y + GRID_ROWS) % GRID_ROWS };
+        playTone(420, 0.12, soundOn);
+      }
+
+      const caughtItem = pickups.find((pickup) => isInsideItem(nextHead, pickup, widePickupRemainingRef.current > 0));
+      const stopsGrowing = Boolean(caughtItem && noGrowRemainingRef.current > 0);
+      const grows = Boolean(caughtItem && !stopsGrowing);
+      const collisionBody = grows ? currentTrail : currentTrail.slice(0, -1);
+      const hitTrailIndex = collisionBody.findIndex((part) => part.x === nextHead.x && part.y === nextHead.y);
+      const nextTrail = [nextHead, ...currentTrail];
+      if (!grows) nextTrail.pop();
+
+      if (hitTrailIndex >= 0) {
+        nextTrail.splice(hitTrailIndex + 1);
+        comboRef.current = 0;
+        setCombo(0);
+        const collisionBurst = { ...nextHead, id: ++burstIdRef.current, golden: false };
+        setBurst(collisionBurst);
+        window.setTimeout(() => setBurst((value) => value?.id === collisionBurst.id ? null : value), 520);
+        playTone(280, 0.1, soundOn);
+      }
+
+      let nextWalls = walls;
+      if (shouldSpawnWall) {
+        nextWalls = [...walls, spawnOneWall(nextTrail, pickups, hazards, walls)];
+        setWalls(nextWalls);
+      }
+
+      let nextHazards = hazards;
+      const hazardHit = hazards.find((hazard) => hazard.x === nextHead.x && hazard.y === nextHead.y);
+      if (hazardHit) {
+        comboRef.current = 0;
+        setCombo(0);
+        const scoreAfterHazard = Math.max(0, scoreRef.current - HAZARD_PENALTY);
+        scoreRef.current = scoreAfterHazard;
+        setScore(scoreAfterHazard);
+        const hazardBurst = { ...nextHead, id: ++burstIdRef.current, golden: false, hazard: true };
+        setBurst(hazardBurst);
+        window.setTimeout(() => setBurst((value) => value?.id === hazardBurst.id ? null : value), 520);
+        playTone(160, 0.18, soundOn);
+        nextHazards = hazards.filter((hazard) => hazard.uid !== hazardHit.uid);
+        while (nextHazards.length < HAZARDS_ON_BOARD) nextHazards.push(spawnOneHazard(nextTrail, pickups, nextHazards, nextWalls));
+        setHazards(nextHazards);
+      }
+
+      if (!caughtItem) {
+        trailRef.current = nextTrail;
+        setTrail(nextTrail);
+        return;
+      }
+
+      if (noGrowRemainingRef.current > 0) {
+        noGrowRemainingRef.current -= 1;
+        setNoGrowRemaining(noGrowRemainingRef.current);
+      }
+      if (widePickupRemainingRef.current > 0) {
+        widePickupRemainingRef.current -= 1;
+        setWidePickupRemaining(widePickupRemainingRef.current);
+      }
+
+      const nextCollected = collectedRef.current + 1;
+      collectedRef.current = nextCollected;
+      setCollected(nextCollected);
+      const boosted = nextCollected % BOOST_INTERVAL === 0;
+      let nextCombo = comboRef.current + 1;
+      const multiplier = nextCombo >= 10 ? 3 : nextCombo >= 5 ? 2 : 1;
+      const doubleActive = doubleRemainingRef.current > 0;
+      let earned = (caughtItem.golden ? 5 : 1) * multiplier * (doubleActive ? 2 : 1);
+      if (doubleActive) {
+        doubleRemainingRef.current -= 1;
+        setDoubleRemaining(doubleRemainingRef.current);
+      }
+
+      const skillValue = boosted ? caughtItem.skill.boostedValue : caughtItem.skill.miniValue;
+      const skillText = boosted ? caughtItem.skill.boostedText : caughtItem.skill.miniText;
+      if (caughtItem.skill.kind === "slow") {
+        if (slowTimeoutRef.current !== null) window.clearTimeout(slowTimeoutRef.current);
+        setSlowActive(true);
+        slowTimeoutRef.current = window.setTimeout(() => setSlowActive(false), skillValue * 1000);
+      } else if (caughtItem.skill.kind === "trim") {
+        for (let removed = 0; removed < skillValue && nextTrail.length > 3; removed += 1) nextTrail.pop();
+      } else if (caughtItem.skill.kind === "score") {
+        earned += skillValue;
+      } else if (caughtItem.skill.kind === "double") {
+        doubleRemainingRef.current = Math.max(doubleRemainingRef.current, skillValue);
+        setDoubleRemaining(doubleRemainingRef.current);
+      } else if (caughtItem.skill.kind === "gold") {
+        goldenRemainingRef.current = Math.max(goldenRemainingRef.current, skillValue);
+        setGoldenRemaining(goldenRemainingRef.current);
+      } else if (caughtItem.skill.kind === "shield") {
+        wallShieldsRef.current = Math.min(MAX_WALL_GUARD_USES - wallGuardUsesRef.current, wallShieldsRef.current + skillValue);
+        setWallShields(wallShieldsRef.current);
+      } else if (caughtItem.skill.kind === "noGrow") {
+        noGrowRemainingRef.current = Math.max(noGrowRemainingRef.current, skillValue);
+        setNoGrowRemaining(noGrowRemainingRef.current);
+      } else if (caughtItem.skill.kind === "wide") {
+        widePickupRemainingRef.current = Math.max(widePickupRemainingRef.current, skillValue);
+        setWidePickupRemaining(widePickupRemainingRef.current);
+      } else if (caughtItem.skill.kind === "combo") {
+        nextCombo += skillValue;
+      } else {
+        doubleRemainingRef.current = Math.max(doubleRemainingRef.current, boosted ? 3 : 1);
+        goldenRemainingRef.current = Math.max(goldenRemainingRef.current, boosted ? 3 : 1);
+        setDoubleRemaining(doubleRemainingRef.current);
+        setGoldenRemaining(goldenRemainingRef.current);
+        if (boosted) {
+          wallShieldsRef.current = Math.min(MAX_WALL_GUARD_USES - wallGuardUsesRef.current, wallShieldsRef.current + 2);
           setWallShields(wallShieldsRef.current);
-          if (hitBoundary) nextHead = { x: (nextHead.x + GRID_COLS) % GRID_COLS, y: (nextHead.y + GRID_ROWS) % GRID_ROWS };
-          playTone(420, 0.12, soundOn);
         }
+      }
 
-        const caughtItem = pickups.find((pickup) => isInsideItem(nextHead, pickup, widePickupRemainingRef.current > 0));
-        const stopsGrowing = Boolean(caughtItem && noGrowRemainingRef.current > 0);
-        const grows = Boolean(caughtItem && !stopsGrowing);
-        const collisionBody = grows ? currentTrail : currentTrail.slice(0, -1);
-        const hitTrailIndex = collisionBody.findIndex((part) => part.x === nextHead.x && part.y === nextHead.y);
-        const nextTrail = [nextHead, ...currentTrail];
-        if (!grows) nextTrail.pop();
+      comboRef.current = nextCombo;
+      setCombo(nextCombo);
+      const nextScore = scoreRef.current + earned;
+      scoreRef.current = nextScore;
+      setScore(nextScore);
 
-        if (hitTrailIndex >= 0) {
-          nextTrail.splice(hitTrailIndex + 1);
-          comboRef.current = 0;
-          setCombo(0);
-          const collisionBurst = { ...nextHead, id: ++burstIdRef.current, golden: false };
-          setBurst(collisionBurst);
-          window.setTimeout(() => setBurst((value) => value?.id === collisionBurst.id ? null : value), 520);
-          playTone(280, 0.1, soundOn);
-        }
-
-        if (shouldSpawnWall) {
-          setWalls((currentWalls) => [...currentWalls, spawnOneWall(nextTrail, pickups, hazards, currentWalls)]);
-        }
-
-        const hazardHit = hazards.find((hazard) => hazard.x === nextHead.x && hazard.y === nextHead.y);
-        if (hazardHit) {
-          comboRef.current = 0;
-          setCombo(0);
-          const nextScore = Math.max(0, scoreRef.current - HAZARD_PENALTY);
-          scoreRef.current = nextScore;
-          setScore(nextScore);
-          const hazardBurst = { ...nextHead, id: ++burstIdRef.current, golden: false, hazard: true };
-          setBurst(hazardBurst);
-          window.setTimeout(() => setBurst((value) => value?.id === hazardBurst.id ? null : value), 520);
-          playTone(160, 0.18, soundOn);
-          setHazards((currentHazards) => {
-            const remaining = currentHazards.filter((hazard) => hazard.uid !== hazardHit.uid);
-            while (remaining.length < HAZARDS_ON_BOARD) remaining.push(spawnOneHazard(nextTrail, pickups, remaining, walls));
-            return remaining;
-          });
-        }
-
-        if (!caughtItem) return nextTrail;
-
-        if (noGrowRemainingRef.current > 0) {
-          noGrowRemainingRef.current -= 1;
-          setNoGrowRemaining(noGrowRemainingRef.current);
-        }
-        if (widePickupRemainingRef.current > 0) {
-          widePickupRemainingRef.current -= 1;
-          setWidePickupRemaining(widePickupRemainingRef.current);
-        }
-
-        const nextCollected = collectedRef.current + 1;
-        collectedRef.current = nextCollected;
-        setCollected(nextCollected);
-        const boosted = nextCollected % BOOST_INTERVAL === 0;
-        let nextCombo = comboRef.current + 1;
-        const multiplier = nextCombo >= 10 ? 3 : nextCombo >= 5 ? 2 : 1;
-        const doubleActive = doubleRemainingRef.current > 0;
-        let earned = (caughtItem.golden ? 5 : 1) * multiplier * (doubleActive ? 2 : 1);
-        if (doubleActive) {
-          doubleRemainingRef.current -= 1;
-          setDoubleRemaining(doubleRemainingRef.current);
-        }
-
-        const skillValue = boosted ? caughtItem.skill.boostedValue : caughtItem.skill.miniValue;
-        const skillText = boosted ? caughtItem.skill.boostedText : caughtItem.skill.miniText;
-        if (caughtItem.skill.kind === "slow") {
-          if (slowTimeoutRef.current !== null) window.clearTimeout(slowTimeoutRef.current);
-          setSlowActive(true);
-          slowTimeoutRef.current = window.setTimeout(() => setSlowActive(false), skillValue * 1000);
-        } else if (caughtItem.skill.kind === "trim") {
-          for (let removed = 0; removed < skillValue && nextTrail.length > 3; removed += 1) nextTrail.pop();
-        } else if (caughtItem.skill.kind === "score") {
-          earned += skillValue;
-        } else if (caughtItem.skill.kind === "double") {
-          doubleRemainingRef.current = Math.max(doubleRemainingRef.current, skillValue);
-          setDoubleRemaining(doubleRemainingRef.current);
-        } else if (caughtItem.skill.kind === "gold") {
-          goldenRemainingRef.current = Math.max(goldenRemainingRef.current, skillValue);
-          setGoldenRemaining(goldenRemainingRef.current);
-        } else if (caughtItem.skill.kind === "shield") {
-          wallShieldsRef.current = Math.min(MAX_WALL_GUARD_USES - wallGuardUsesRef.current, wallShieldsRef.current + skillValue);
-          setWallShields(wallShieldsRef.current);
-        } else if (caughtItem.skill.kind === "noGrow") {
-          noGrowRemainingRef.current = Math.max(noGrowRemainingRef.current, skillValue);
-          setNoGrowRemaining(noGrowRemainingRef.current);
-        } else if (caughtItem.skill.kind === "wide") {
-          widePickupRemainingRef.current = Math.max(widePickupRemainingRef.current, skillValue);
-          setWidePickupRemaining(widePickupRemainingRef.current);
-        } else if (caughtItem.skill.kind === "combo") {
-          nextCombo += skillValue;
-        } else {
-          doubleRemainingRef.current = Math.max(doubleRemainingRef.current, boosted ? 3 : 1);
-          goldenRemainingRef.current = Math.max(goldenRemainingRef.current, boosted ? 3 : 1);
-          setDoubleRemaining(doubleRemainingRef.current);
-          setGoldenRemaining(goldenRemainingRef.current);
-          if (boosted) {
-            wallShieldsRef.current = Math.min(MAX_WALL_GUARD_USES - wallGuardUsesRef.current, wallShieldsRef.current + 2);
-            setWallShields(wallShieldsRef.current);
-          }
-        }
-
-        comboRef.current = nextCombo;
-        setCombo(nextCombo);
-        const nextScore = scoreRef.current + earned;
-        scoreRef.current = nextScore;
-        setScore(nextScore);
-
-        recentItemIdsRef.current = [...recentItemIdsRef.current, caughtItem.item.id].slice(-5);
-        setPickups((currentItems) => {
-          let nextItems = currentItems.filter((pickup) => pickup.uid !== caughtItem.uid);
-          let goldenBudget = goldenRemainingRef.current;
-          nextItems = nextItems.map((pickup) => {
-            if (goldenBudget <= 0 || pickup.golden) return pickup;
-            goldenBudget -= 1;
-            return { ...pickup, golden: true };
-          });
-          while (nextItems.length < ITEMS_ON_BOARD) {
-            const forceGolden = goldenBudget > 0;
-            if (forceGolden) goldenBudget -= 1;
-            nextItems.push(spawnOneItem(nextTrail, nextItems, hazards, walls, recentItemIdsRef.current, forceGolden));
-          }
-          goldenRemainingRef.current = goldenBudget;
-          setGoldenRemaining(goldenBudget);
-          return nextItems;
-        });
-
-        const nextToast: SkillToast = {
-          id: ++toastIdRef.current,
-          item: caughtItem.item,
-          skill: caughtItem.skill,
-          boosted,
-          text: skillText,
-        };
-        if (toastTimeoutRef.current !== null) window.clearTimeout(toastTimeoutRef.current);
-        setSkillToast(nextToast);
-        toastTimeoutRef.current = window.setTimeout(() => {
-          setSkillToast((value) => value?.id === nextToast.id ? null : value);
-        }, boosted ? 2400 : 1600);
-
-        const pickupBurst = { ...nextHead, id: ++burstIdRef.current, golden: caughtItem.golden };
-        setBurst(pickupBurst);
-        window.setTimeout(() => setBurst((value) => value?.id === pickupBurst.id ? null : value), 520);
-        playTone(boosted ? 1080 : caughtItem.golden ? 880 : 620, boosted ? 0.24 : caughtItem.golden ? 0.2 : 0.1, soundOn);
-        return nextTrail;
+      recentItemIdsRef.current = [...recentItemIdsRef.current, caughtItem.item.id].slice(-5);
+      let nextPickups = pickups.filter((pickup) => pickup.uid !== caughtItem.uid);
+      let goldenBudget = goldenRemainingRef.current;
+      nextPickups = nextPickups.map((pickup) => {
+        if (goldenBudget <= 0 || pickup.golden) return pickup;
+        goldenBudget -= 1;
+        return { ...pickup, golden: true };
       });
+      while (nextPickups.length < ITEMS_ON_BOARD) {
+        const forceGolden = goldenBudget > 0;
+        if (forceGolden) goldenBudget -= 1;
+        nextPickups.push(spawnOneItem(nextTrail, nextPickups, nextHazards, nextWalls, recentItemIdsRef.current, forceGolden));
+      }
+      goldenRemainingRef.current = goldenBudget;
+      setGoldenRemaining(goldenBudget);
+      setPickups(nextPickups);
+
+      const nextToast: SkillToast = {
+        id: ++toastIdRef.current,
+        item: caughtItem.item,
+        skill: caughtItem.skill,
+        boosted,
+        text: skillText,
+      };
+      if (toastTimeoutRef.current !== null) window.clearTimeout(toastTimeoutRef.current);
+      setSkillToast(nextToast);
+      toastTimeoutRef.current = window.setTimeout(() => {
+        setSkillToast((value) => value?.id === nextToast.id ? null : value);
+      }, boosted ? 2400 : 1600);
+
+      const pickupBurst = { ...nextHead, id: ++burstIdRef.current, golden: caughtItem.golden };
+      setBurst(pickupBurst);
+      window.setTimeout(() => setBurst((value) => value?.id === pickupBurst.id ? null : value), 520);
+      playTone(boosted ? 1080 : caughtItem.golden ? 880 : 620, boosted ? 0.24 : caughtItem.golden ? 0.2 : 0.1, soundOn);
+      trailRef.current = nextTrail;
+      setTrail(nextTrail);
     }, stepMs);
     return () => window.clearInterval(timer);
   }, [finishGame, phase, pickups, hazards, walls, soundOn, stepMs]);
@@ -508,11 +571,6 @@ export function SnackTrailPreview() {
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, [chooseDirection]);
-
-  const boardCells = useMemo(
-    () => Array.from({ length: GRID_COLS * GRID_ROWS }, (_, index) => ({ x: index % GRID_COLS, y: Math.floor(index / GRID_COLS) })),
-    [],
-  );
 
   const togglePause = () => {
     setPhase((current) => {
@@ -581,40 +639,9 @@ export function SnackTrailPreview() {
         >
           <div className={styles.boardGlow} aria-hidden="true" />
           <div className={styles.board} role="img" aria-label="わんこがガチャアイテムを集めるゲーム盤">
-            {walls.map((wallBlock) => (
-              <span
-                key={wallBlock.uid}
-                className={styles.wallBlock}
-                style={{ left: `${(wallBlock.x / GRID_COLS) * 100}%`, top: `${(wallBlock.y / GRID_ROWS) * 100}%` }}
-                aria-hidden="true"
-              />
-            ))}
-            {hazards.map((hazard) => (
-              <span
-                key={hazard.uid}
-                className={styles.hazardMarker}
-                style={{ left: `${(hazard.x / GRID_COLS) * 100}%`, top: `${(hazard.y / GRID_ROWS) * 100}%` }}
-                aria-label="踏むと減点する罠"
-              >
-                <i className={styles.hazardAura} />
-                <i className={styles.hazardIcon} />
-              </span>
-            ))}
-            {pickups.map((pickup) => (
-              <span
-                key={pickup.uid}
-                className={`${styles.itemPickup} ${pickup.golden ? styles.goldenItemPickup : ""}`}
-                style={{ left: `${(pickup.x / GRID_COLS) * 100}%`, top: `${(pickup.y / GRID_ROWS) * 100}%` }}
-                aria-label={`${pickup.item.name}。${pickup.skill.miniText}`}
-              >
-                <i className={styles.itemAura} />
-                <Image src={pickup.item.image} alt="" fill sizes="64px" className={styles.pickupImage} priority unoptimized />
-                <small>{pickup.golden ? "5 PT" : pickup.item.rarity}</small>
-              </span>
-            ))}
-            {boardCells.map((cell) => (
-              <span key={pointKey(cell)} className={styles.cell} />
-            ))}
+            <WallLayer walls={walls} />
+            <HazardLayer hazards={hazards} />
+            <ItemLayer pickups={pickups} />
             {trail.map((point, index) => (
               <span
                 key={index}
