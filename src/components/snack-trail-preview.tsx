@@ -16,7 +16,8 @@ type Hazard = Point & { uid: number };
 type WallBlock = Point & { uid: number };
 type SkillToast = { id: number; item: PlayableItem; skill: SnackTrailSkill; boosted: boolean; text: string };
 
-const GRID_SIZE = 16;
+const GRID_COLS = 16;
+const GRID_ROWS = 20;
 const ITEM_SIZE = 2;
 const ITEMS_ON_BOARD = 3;
 const HAZARDS_ON_BOARD = 1;
@@ -42,7 +43,8 @@ const STEP: Record<Direction, Point> = {
 let pickupIdSeed = 0;
 
 function makeInitialTrail(): Point[] {
-  return [{ x: 8, y: 8 }, { x: 7, y: 8 }, { x: 6, y: 8 }, { x: 5, y: 8 }];
+  const y = Math.floor(GRID_ROWS / 2);
+  return [{ x: 8, y }, { x: 7, y }, { x: 6, y }, { x: 5, y }];
 }
 
 function pointKey(point: Point): string {
@@ -73,8 +75,8 @@ function spawnOneItem(
   const occupied = new Set(trail.map(pointKey));
   currentItems.flatMap(itemCells).forEach((point) => occupied.add(pointKey(point)));
   const candidates: Point[] = [];
-  for (let y = 1; y <= GRID_SIZE - ITEM_SIZE - 1; y += 1) {
-    for (let x = 1; x <= GRID_SIZE - ITEM_SIZE - 1; x += 1) {
+  for (let y = 1; y <= GRID_ROWS - ITEM_SIZE - 1; y += 1) {
+    for (let x = 1; x <= GRID_COLS - ITEM_SIZE - 1; x += 1) {
       if (itemCells({ x, y }).every((point) => !occupied.has(pointKey(point)))) candidates.push({ x, y });
     }
   }
@@ -109,8 +111,8 @@ function occupiedCells(trail: Point[], pickups: ItemPickup[], hazards: Hazard[],
 function spawnOneHazard(trail: Point[], pickups: ItemPickup[], hazards: Hazard[], walls: WallBlock[]): Hazard {
   const occupied = occupiedCells(trail, pickups, hazards, walls);
   const candidates: Point[] = [];
-  for (let y = 1; y <= GRID_SIZE - 2; y += 1) {
-    for (let x = 1; x <= GRID_SIZE - 2; x += 1) {
+  for (let y = 1; y <= GRID_ROWS - 2; y += 1) {
+    for (let x = 1; x <= GRID_COLS - 2; x += 1) {
       if (!occupied.has(pointKey({ x, y }))) candidates.push({ x, y });
     }
   }
@@ -127,8 +129,8 @@ function spawnInitialHazards(trail: Point[], pickups: ItemPickup[]): Hazard[] {
 function spawnOneWall(trail: Point[], pickups: ItemPickup[], hazards: Hazard[], walls: WallBlock[]): WallBlock {
   const occupied = occupiedCells(trail, pickups, hazards, walls);
   const candidates: Point[] = [];
-  for (let y = 1; y <= GRID_SIZE - ITEM_SIZE - 1; y += 1) {
-    for (let x = 1; x <= GRID_SIZE - ITEM_SIZE - 1; x += 1) {
+  for (let y = 1; y <= GRID_ROWS - ITEM_SIZE - 1; y += 1) {
+    for (let x = 1; x <= GRID_COLS - ITEM_SIZE - 1; x += 1) {
       if (itemCells({ x, y }).every((point) => !occupied.has(pointKey(point)))) candidates.push({ x, y });
     }
   }
@@ -324,7 +326,7 @@ export function SnackTrailPreview() {
         const head = currentTrail[0];
         if (!head) return makeInitialTrail();
         let nextHead = { x: head.x + movement.x, y: head.y + movement.y };
-        const hitBoundary = nextHead.x < 0 || nextHead.x >= GRID_SIZE || nextHead.y < 0 || nextHead.y >= GRID_SIZE;
+        const hitBoundary = nextHead.x < 0 || nextHead.x >= GRID_COLS || nextHead.y < 0 || nextHead.y >= GRID_ROWS;
         const hitInteriorWall = !hitBoundary && walls.some((wallBlock) => isInsideItem(nextHead, wallBlock));
         const hitWall = hitBoundary || hitInteriorWall;
         if (hitWall) {
@@ -335,7 +337,7 @@ export function SnackTrailPreview() {
           wallShieldsRef.current -= 1;
           wallGuardUsesRef.current += 1;
           setWallShields(wallShieldsRef.current);
-          if (hitBoundary) nextHead = { x: (nextHead.x + GRID_SIZE) % GRID_SIZE, y: (nextHead.y + GRID_SIZE) % GRID_SIZE };
+          if (hitBoundary) nextHead = { x: (nextHead.x + GRID_COLS) % GRID_COLS, y: (nextHead.y + GRID_ROWS) % GRID_ROWS };
           playTone(420, 0.12, soundOn);
         }
 
@@ -508,7 +510,7 @@ export function SnackTrailPreview() {
 
   const trailByKey = useMemo(() => new Map(trail.map((point, index) => [pointKey(point), index])), [trail]);
   const boardCells = useMemo(
-    () => Array.from({ length: GRID_SIZE * GRID_SIZE }, (_, index) => ({ x: index % GRID_SIZE, y: Math.floor(index / GRID_SIZE) })),
+    () => Array.from({ length: GRID_COLS * GRID_ROWS }, (_, index) => ({ x: index % GRID_COLS, y: Math.floor(index / GRID_COLS) })),
     [],
   );
 
@@ -576,7 +578,7 @@ export function SnackTrailPreview() {
               <span
                 key={wallBlock.uid}
                 className={styles.wallBlock}
-                style={{ left: `${(wallBlock.x / GRID_SIZE) * 100}%`, top: `${(wallBlock.y / GRID_SIZE) * 100}%` }}
+                style={{ left: `${(wallBlock.x / GRID_COLS) * 100}%`, top: `${(wallBlock.y / GRID_ROWS) * 100}%` }}
                 aria-hidden="true"
               />
             ))}
@@ -584,17 +586,18 @@ export function SnackTrailPreview() {
               <span
                 key={hazard.uid}
                 className={styles.hazardMarker}
-                style={{ left: `${(hazard.x / GRID_SIZE) * 100}%`, top: `${(hazard.y / GRID_SIZE) * 100}%` }}
+                style={{ left: `${(hazard.x / GRID_COLS) * 100}%`, top: `${(hazard.y / GRID_ROWS) * 100}%` }}
                 aria-label="踏むと減点する罠"
               >
-                <i />
+                <i className={styles.hazardAura} />
+                <i className={styles.hazardIcon} />
               </span>
             ))}
             {pickups.map((pickup) => (
               <span
                 key={pickup.uid}
                 className={`${styles.itemPickup} ${pickup.golden ? styles.goldenItemPickup : ""}`}
-                style={{ left: `${(pickup.x / GRID_SIZE) * 100}%`, top: `${(pickup.y / GRID_SIZE) * 100}%` }}
+                style={{ left: `${(pickup.x / GRID_COLS) * 100}%`, top: `${(pickup.y / GRID_ROWS) * 100}%` }}
                 aria-label={`${pickup.item.name}。${pickup.skill.miniText}`}
               >
                 <i className={styles.itemAura} />
