@@ -251,6 +251,7 @@ export function GachaSection({ balance }: { balance: number }) {
           );
         })}
       </div>
+      <p className="mt-1 text-center text-[8px] text-ink-faint">100連だけ、SR以上の排出率がアップします</p>
 
       {balance < GACHA_PLANS.single.cost && !error && (
         <p className="mt-1.5 text-center text-[9px] text-ink-faint">コインが足りません</p>

@@ -33,6 +33,28 @@ export const GACHA_DISPLAY_RARITY_RATES: Record<GachaRarity, number> = {
   MR: 0,
 };
 
+/** 100連だけの排出率（合計100%）。まとめ買いの優待として、上位レアリティを通常より高くしてある。 */
+export const GACHA_HUNDRED_RARITY_RATES: Record<GachaRarity, number> = {
+  N: 48.4,
+  R: 24.9,
+  SR: 16,
+  SSR: 6.6,
+  UR: 3.3,
+  LR: 0.6,
+  MR: 0.2,
+};
+
+/** 100連の排出率表示専用。通常版と同じく、MRだけ伏せてNに合算して見せる。 */
+export const GACHA_HUNDRED_DISPLAY_RARITY_RATES: Record<GachaRarity, number> = {
+  N: 48.6,
+  R: 24.9,
+  SR: 16,
+  SSR: 6.6,
+  UR: 3.3,
+  LR: 0.6,
+  MR: 0,
+};
+
 /** 引き方（1回 / 10連 / 100連）と消費コイン */
 export const GACHA_PLANS = {
   single: { draws: 1, cost: 100, label: "1回まわす" },

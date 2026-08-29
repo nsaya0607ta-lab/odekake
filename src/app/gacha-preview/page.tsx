@@ -77,22 +77,39 @@ const TEN_PULL_RESULTS: DrawResult[] = [
 const PROMOTION_RATE = 0.01;
 const LR_PROMOTION_RATE = 0.7;
 
-const HUNDRED_PULL_POOL: Record<"N" | "R" | "SR" | "SSR" | "UR" | "LR", DrawResult> = {
+const HUNDRED_PULL_POOL: Record<"N" | "R" | "SR" | "SSR" | "UR" | "LR" | "MR", DrawResult> = {
   N: { id: "preview-100-n", name: "カラフルボール", rarity: "N", type: "item", image: "/collection/items/colorful-ball.webp", isNew: false, previousLevel: 1, newLevel: 1 },
   R: { id: "preview-100-r", name: "あひるのぬいぐるみ", rarity: "R", type: "item", image: "/collection/items/duck-plush.webp", isNew: false, previousLevel: 1, newLevel: 1 },
   SR: { id: "preview-100-sr", name: "宝箱おやつパズル", rarity: "SR", type: "item", image: "/collection/items/treasure-puzzle.webp", isNew: false, previousLevel: 1, newLevel: 1 },
   SSR: { ...PREVIEW_RESULTS.SSR, id: "preview-100-ssr", isNew: false },
   UR: { ...PREVIEW_RESULTS.UR, id: "preview-100-ur", isNew: false },
   LR: { ...PREVIEW_RESULTS.LR, id: "preview-100-lr", isNew: false },
+  MR: { ...PREVIEW_RESULTS.MR, id: "preview-100-mr", isNew: false },
 };
+
+// プレビュー用に、本番の100連専用排出率（N48.4/R24.9/SR16/SSR6.6/UR3.3/LR0.6/MR0.2）をなぞる。
+function rollHundredRarity(): keyof typeof HUNDRED_PULL_POOL {
+  const roll = Math.random() * 100;
+  if (roll < 48.4) return "N";
+  if (roll < 73.3) return "R";
+  if (roll < 89.3) return "SR";
+  if (roll < 95.9) return "SSR";
+  if (roll < 99.2) return "UR";
+  if (roll < 99.8) return "LR";
+  return "MR";
+}
 
 function createHundredPull(): AnimationDraw {
   const results: DrawResult[] = Array.from({ length: 100 }, (_, index) => {
-    const roll = Math.random() * 100;
-    const rarity = roll < 49.5 ? "N" : roll < 74.5 ? "R" : roll < 90.5 ? "SR" : roll < 96.5 ? "SSR" : roll < 99.5 ? "UR" : "LR";
+    const rarity = rollHundredRarity();
     const base = HUNDRED_PULL_POOL[rarity];
     return { ...base, id: `${base.id}-${index}`, isNew: index % 7 === 0 };
   });
+  // 予兆演出（LR以上の大揺れ・MRの発光）を毎回確認できるよう、1セット目にMR・2セット目にLRを仕込む。
+  const mrTemplate = HUNDRED_PULL_POOL.MR;
+  const lrTemplate = HUNDRED_PULL_POOL.LR;
+  results[3] = { ...mrTemplate, id: `${mrTemplate.id}-forced`, isNew: true };
+  results[13] = { ...lrTemplate, id: `${lrTemplate.id}-forced`, isNew: true };
   return { plan: "hundred", results };
 }
 
