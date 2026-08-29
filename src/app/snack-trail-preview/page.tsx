@@ -1,20 +1,14 @@
-import type { Metadata } from "next";
 import { redirect } from "next/navigation";
-import { SnackTrailPreview } from "@/components/snack-trail-preview";
-import { requireUser } from "@/lib/supabase/server";
 
-export const metadata: Metadata = {
-  title: "わんこのおやつ道（プレビュー） | おでかけ記録",
-  description: "おでかけアプリの3つ目のミニゲーム候補を遊べるプレビューです。",
-};
 export const dynamic = "force-dynamic";
 
-// わんこのおやつ道はまだ検証中のため、特定ユーザーにのみ表示する
-const SNACK_TRAIL_PREVIEW_USERS = ["しゅん", "さやか"];
-
-export default async function SnackTrailPreviewPage() {
-  const { user } = await requireUser();
-  if (!SNACK_TRAIL_PREVIEW_USERS.includes(user.displayName)) redirect("/games");
-
-  return <SnackTrailPreview />;
+/**
+ * 旧URL。ミニゲームは /games/snack-trail へ移した。
+ *
+ * ここは (app) の外にあるため、遷移中のフォールバックがアプリ起動画面
+ * (app/loading.tsx) になり、ゲームを選ぶたびに起動画面へ戻ったように見えていた。
+ * ブックマークや共有リンクのために、転送だけ残しておく。
+ */
+export default function SnackTrailPreviewRedirect() {
+  redirect("/games/snack-trail");
 }

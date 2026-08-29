@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { PageBody } from "@/components/page-body";
 import { TopHeader } from "@/components/page-header";
+import { canSeeSnackTrail } from "@/lib/games/snack-trail-access";
 import { requireUser } from "@/lib/supabase/server";
 
 export const metadata = { title: "ミニゲーム | おでかけ記録" };
@@ -10,12 +11,9 @@ const ITEM_CATCH_CARD_SRC = "/games/item-catch/menu-icon-v2.webp";
 const WANKO_BOWLING_CARD_SRC = "/games/wanko-bowling/menu-icon-v2.webp";
 const SNACK_TRAIL_CARD_SRC = "/games/snack-trail/menu-icon.svg";
 
-// わんこのおやつ道はまだ検証中のため、特定ユーザーにのみ表示する
-const SNACK_TRAIL_PREVIEW_USERS = ["しゅん", "さやか"];
-
 export default async function GamesPage() {
   const { user } = await requireUser();
-  const canSeeSnackTrailPreview = SNACK_TRAIL_PREVIEW_USERS.includes(user.displayName);
+  const canSeeSnackTrailPreview = canSeeSnackTrail(user.displayName);
 
   return (
     <>
@@ -136,7 +134,7 @@ export default async function GamesPage() {
 
           {canSeeSnackTrailPreview && (
           <Link
-            href="/snack-trail-preview"
+            href="/games/snack-trail"
             aria-label="わんこのおやつ道で遊ぶ"
             className="pressable group relative block overflow-hidden rounded-[30px] border border-[#4f8198] bg-gradient-to-br from-[#17384d] via-[#0e293c] to-[#071722] p-5 text-white shadow-[0_12px_30px_rgba(5,25,37,0.28)] transition-transform active:scale-[0.985]"
           >

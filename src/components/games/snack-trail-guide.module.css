@@ -1,0 +1,154 @@
+/* =============================================================
+   わんこのおやつ道 ルールブック
+   =============================================================
+   SNSの説明書（public/sns-guide.html）と同じ考えかたで、
+   実際のプレイ画面の写真を1項目に1枚ずつ添えて説明する。
+   ゲーム画面の下に置くため、配色はゲーム本体に合わせた暗い色。
+   ============================================================= */
+
+.guide {
+  scroll-margin-top: 10px;
+  margin-top: 14px;
+  overflow: hidden;
+  border: 1px solid rgba(114, 227, 255, 0.18);
+  border-radius: 24px;
+  background: linear-gradient(180deg, rgba(13, 32, 47, 0.95), rgba(5, 15, 24, 0.96));
+  box-shadow: inset 0 1px rgba(255, 255, 255, 0.06), 0 18px 44px rgba(0, 0, 0, 0.4);
+}
+
+.guideHead {
+  position: relative;
+  overflow: hidden;
+  padding: 18px 16px 16px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  background: radial-gradient(circle at 88% 0%, rgba(114, 227, 255, 0.16), transparent 52%);
+}
+.guideHead p { color: #72e3ff; font-size: 9px; font-weight: 900; letter-spacing: 0.14em; }
+.guideHead h2 { margin-top: 3px; color: #f2fbff; font-size: 17px; font-weight: 900; letter-spacing: 0.02em; }
+.guideHead small { display: block; margin-top: 7px; color: rgba(244, 251, 255, 0.5); font-size: 10px; font-weight: 700; line-height: 1.8; }
+
+.tocList {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+  margin-top: 12px;
+}
+.tocList a {
+  padding: 4px 9px;
+  border: 1px solid rgba(114, 227, 255, 0.22);
+  border-radius: 999px;
+  color: #bfeaf8;
+  background: rgba(16, 37, 56, 0.8);
+  font-size: 9px;
+  font-weight: 900;
+  text-decoration: none;
+}
+.tocList a:active { transform: scale(0.96); }
+
+.steps { display: flex; flex-direction: column; }
+
+.step {
+  scroll-margin-top: 12px;
+  padding: 16px;
+  border-top: 1px solid rgba(255, 255, 255, 0.06);
+}
+.step:first-child { border-top: 0; }
+.step:nth-child(even) { background: rgba(255, 255, 255, 0.018); }
+
+.stepNumber {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: rgba(191, 234, 248, 0.62);
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.16em;
+}
+.stepNumber::before {
+  width: 16px;
+  border-top: 1px dashed rgba(114, 227, 255, 0.4);
+  content: "";
+}
+
+.step h3 {
+  margin-top: 8px;
+  color: #f4fbff;
+  font-size: 15px;
+  font-weight: 900;
+  line-height: 1.5;
+  letter-spacing: 0.02em;
+}
+.step > p {
+  margin-top: 8px;
+  color: rgba(226, 242, 249, 0.62);
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 1.95;
+}
+.step > p strong { color: #cdeffb; font-weight: 900; }
+
+.points { margin-top: 11px; display: flex; flex-direction: column; gap: 7px; }
+.points li {
+  display: flex;
+  gap: 8px;
+  padding: 8px 10px;
+  border: 1px solid rgba(114, 227, 255, 0.13);
+  border-radius: 13px;
+  background: rgba(9, 24, 37, 0.72);
+}
+.points li::before {
+  flex: 0 0 auto;
+  margin-top: 6px;
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: #72f4c6;
+  box-shadow: 0 0 8px rgba(114, 244, 198, 0.6);
+  content: "";
+}
+.pointBody { min-width: 0; flex: 1 1 auto; }
+.points b { display: block; color: #e6f6fd; font-size: 10.5px; font-weight: 900; }
+.points span { display: block; margin-top: 2px; color: rgba(200, 224, 235, 0.56); font-size: 10px; font-weight: 600; line-height: 1.7; }
+
+.shots { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 12px; }
+
+.shot { flex: 1 1 150px; min-width: 0; margin: 0; }
+.shot img {
+  display: block;
+  width: 100%;
+  height: auto;
+  border: 1px solid rgba(114, 227, 255, 0.22);
+  border-radius: 14px;
+  background: #05101a;
+  box-shadow: 0 10px 26px rgba(0, 0, 0, 0.42);
+}
+.shot figcaption {
+  margin-top: 6px;
+  color: rgba(178, 206, 219, 0.62);
+  font-size: 9px;
+  font-weight: 800;
+  line-height: 1.6;
+  text-align: center;
+}
+
+/* 画面いっぱいの写真は縦長なので、横に2枚並べず中央に置く */
+.phoneShot { flex: 0 1 210px; margin-inline: auto; }
+/* スコア帯のような細長い切り抜きは、幅いっぱいに使う */
+.stripShot { flex: 1 1 100%; }
+.stripShot img { border-radius: 11px; }
+
+.guideFoot {
+  padding: 13px 16px 16px;
+  border-top: 1px solid rgba(255, 255, 255, 0.06);
+  color: rgba(160, 190, 203, 0.6);
+  font-size: 9.5px;
+  font-weight: 700;
+  line-height: 1.8;
+  text-align: center;
+}
+
+@media (min-width: 560px) {
+  .step { padding: 20px; }
+  .phoneShot { flex: 0 1 240px; }
+}
