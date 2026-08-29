@@ -679,8 +679,8 @@
   display: grid;
   width: min(92vw, 430px);
   max-height: 62vh;
-  grid-template-columns: repeat(var(--batch-columns, 5), minmax(0, 1fr));
-  gap: clamp(4px, 1.6vw, 13px);
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: clamp(7px, 2.4vw, 13px);
   overflow-y: auto;
   overscroll-behavior: contain;
   transform: translateX(-50%);

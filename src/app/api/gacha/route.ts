@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { GACHA_PLANS, isGachaPlanId } from "@/lib/gacha/config";
+import { GACHA_HUNDRED_RARITY_RATES, GACHA_PLANS, isGachaPlanId } from "@/lib/gacha/config";
 import { drawPrizes } from "@/lib/gacha/draw";
 import { getPrize } from "@/lib/gacha/prizes";
 import { getSkillLevel } from "@/lib/gacha/skill-levels";
@@ -51,7 +51,7 @@ export async function POST(request: Request) {
     );
   }
 
-  const drawn = drawPrizes(plan.draws);
+  const drawn = drawPrizes(plan.draws, body.plan === "hundred" ? GACHA_HUNDRED_RARITY_RATES : undefined);
   if (drawn.length !== plan.draws) {
     console.error("Gacha prize pool is empty", { plan: body.plan, drawn: drawn.length });
     return NextResponse.json({ error: "ただいまガチャを準備中です。" }, { status: 503 });
