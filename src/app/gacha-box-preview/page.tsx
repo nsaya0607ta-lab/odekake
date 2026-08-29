@@ -68,15 +68,6 @@ export default function GachaBoxPreviewPage() {
               height={285}
             />
 
-            <div className={styles.resultCover} aria-hidden="true" />
-            <Image
-              className={styles.resultCapsule}
-              src="/gacha/box-preview/capsule-green.png"
-              alt=""
-              width={70}
-              height={70}
-            />
-
             <span className={`${styles.twinkle} ${styles.twinkleOne}`} aria-hidden="true" />
             <span className={`${styles.twinkle} ${styles.twinkleTwo}`} aria-hidden="true" />
             <span className={`${styles.twinkle} ${styles.twinkleThree}`} aria-hidden="true" />
@@ -95,7 +86,7 @@ export default function GachaBoxPreviewPage() {
         </button>
 
         <p className={styles.note}>
-          元動画から背景・カプセル・箱のキラキラを切り出し、カプセル上の文字だけを表示しない構成です。
+          元動画から背景・カプセル・箱のキラキラを切り出し、文字を出さずそのまま箱へ入る構成です。
         </p>
       </section>
     </main>
