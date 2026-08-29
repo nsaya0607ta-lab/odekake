@@ -13,7 +13,6 @@ type GameCard = {
   description: string;
   playStyle: string;
   control: string;
-  badge: string;
   image: string;
   cardClass: string;
   accentClass: string;
@@ -33,7 +32,6 @@ const games: GameCard[] = [
     description: "反射神経でハイスコアを目指そう。",
     playStyle: "約30秒",
     control: "箱を左右に動かす",
-    badge: "すぐ遊べる",
     image: "/games/item-catch/menu-icon-v2.webp",
     cardClass:
       "border-[#efd7a8] bg-gradient-to-br from-[#fffdf8] via-[#fff5df] to-[#fbe7bd] shadow-[0_14px_34px_rgba(184,125,51,0.13)]",
@@ -50,7 +48,6 @@ const games: GameCard[] = [
     description: "お気に入りのボールでピンを倒そう。",
     playStyle: "10フレーム",
     control: "スワイプで投球",
-    badge: "じっくり挑戦",
     image: "/games/wanko-bowling/menu-icon-v2.webp",
     cardClass:
       "border-[#bfd9b6] bg-gradient-to-br from-[#fcfff9] via-[#eef8e9] to-[#dff1d7] shadow-[0_14px_34px_rgba(83,131,69,0.13)]",
@@ -67,7 +64,6 @@ const games: GameCard[] = [
     description: "足あとをのばしてハイスコアを目指そう。",
     playStyle: "エンドレス",
     control: "スワイプで方向転換",
-    badge: "新しくなったよ",
     image: "/games/snack-trail/menu-icon-preview.webp",
     cardClass:
       "border-[#afd9dd] bg-gradient-to-br from-[#fbffff] via-[#eaf9f6] to-[#d8f1ee] shadow-[0_14px_34px_rgba(62,139,140,0.14)]",
@@ -84,7 +80,6 @@ const games: GameCard[] = [
     description: "記憶力でハイスコアを目指そう。",
     playStyle: "初級〜上級",
     control: "タップでめくる",
-    badge: "あたまで勝負",
     image: "/collection/items/duck-plush.webp",
     cardClass:
       "border-[#d9cdee] bg-gradient-to-br from-[#fffdfe] via-[#f5f1fb] to-[#e9e1f7] shadow-[0_14px_34px_rgba(105,86,150,0.13)]",
@@ -120,18 +115,7 @@ export default function MiniGamesPreviewPage() {
       </header>
 
       <main className="mx-auto max-w-lg px-4 pb-6 pt-5">
-        <section className="px-1">
-          <span className="inline-flex items-center gap-1.5 rounded-full border border-[#a9c99a]/35 bg-[#eaf4df] px-3 py-1 text-[10px] font-black text-[#628451]">
-            <span aria-hidden="true">✦</span>
-            今日はどれで遊ぶ？
-          </span>
-          <h1 className="mt-2 text-[24px] font-black tracking-[-0.04em]">好きなゲームを選ぼう</h1>
-          <p className="mt-1 text-xs font-bold leading-relaxed text-[#887e70]">
-            4つのゲームを、明るくやさしい色で揃えました。
-          </p>
-        </section>
-
-        <section className="mt-5 space-y-4" aria-label="ゲーム一覧">
+        <section className="space-y-4" aria-label="ゲーム一覧">
           {games.map((game) => {
             const cardBody = (
               <>
@@ -147,9 +131,6 @@ export default function MiniGamesPreviewPage() {
                 <div className="relative z-10 flex items-center gap-2">
                   <span className={`rounded-full px-2.5 py-1 text-[10px] font-black shadow-sm ${game.accentClass}`}>
                     GAME {game.number}
-                  </span>
-                  <span className={`rounded-full border border-white/90 bg-white/70 px-2.5 py-1 text-[10px] font-black ${game.copyClass}`}>
-                    {game.badge}
                   </span>
                 </div>
 
