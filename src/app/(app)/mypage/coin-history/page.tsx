@@ -16,6 +16,8 @@ const EVENT_LABELS: Record<CoinEventRow["event_type"], string> = {
   gacha: "ガチャ",
   login: "ログインボーナス",
   item_catch: "アイテムキャッチ",
+  wanko_bowling: "わんこボウリング",
+  snack_trail: "わんこのおやつ道",
 };
 
 export default async function CoinHistoryPage() {

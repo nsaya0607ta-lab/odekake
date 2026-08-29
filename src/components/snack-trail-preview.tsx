@@ -235,17 +235,17 @@ function createRoundId(): string {
 }
 
 /**
- * 遊び終わったスコアと最高コンボをフレンドスコアへ送る。
- * 記録に失敗してもゲームの進行は止めない（プレビュー中でコインも動かないため）。
+ * 遊び終わったスコアと最高コンボをフレンドスコアへ送り、獲得コインを受け取る。
+ * 記録に失敗してもゲームの進行は止めない。戻り値は獲得コイン（送信しなかった／失敗した場合は null）。
  */
 async function recordResult(result: {
   roundId: string | null;
   score: number;
   maxCombo: number;
   collected: number;
-}): Promise<void> {
+}): Promise<number | null> {
   // 1個も取らずに終わった回は記録しない
-  if (!result.roundId || result.collected <= 0) return;
+  if (!result.roundId || result.collected <= 0) return null;
 
   try {
     const response = await fetch(SCORE_ENDPOINT, {
@@ -258,10 +258,13 @@ async function recordResult(result: {
         collected: result.collected,
       }),
     });
-    if (!response.ok) return;
+    if (!response.ok) return null;
     window.dispatchEvent(new Event(SNACK_TRAIL_RANKING_REFRESH_EVENT));
+    const payload = (await response.json().catch(() => null)) as { coins?: number } | null;
+    return typeof payload?.coins === "number" ? payload.coins : null;
   } catch {
     // 通信できないときは、この回の記録をあきらめる
+    return null;
   }
 }
 
@@ -310,6 +313,7 @@ export function SnackTrailPreview() {
   const [widePickupRemaining, setWidePickupRemaining] = useState(0);
   const [burst, setBurst] = useState<(Point & { id: number; golden: boolean; hazard?: boolean }) | null>(null);
   const [newBest, setNewBest] = useState(false);
+  const [coinReward, setCoinReward] = useState<number | null>(null);
 
   const trailRef = useRef<Point[]>(initialTrail);
   const directionRef = useRef<Direction>("right");
@@ -379,7 +383,7 @@ export function SnackTrailPreview() {
       score: finalScore,
       maxCombo: maxComboRef.current,
       collected: collectedRef.current,
-    });
+    }).then(setCoinReward);
     setBestScore((current) => {
       if (finalScore <= current) return current;
       window.localStorage.setItem(BEST_SCORE_KEY, String(finalScore));
@@ -429,6 +433,7 @@ export function SnackTrailPreview() {
     setWidePickupRemaining(0);
     setBurst(null);
     setNewBest(false);
+    setCoinReward(null);
     setPhase("playing");
     phaseRef.current = "playing";
     playTone(440, 0.12, soundOn);
@@ -757,7 +762,7 @@ export function SnackTrailPreview() {
                 <><span className={styles.overlayBadge}>ひとやすみ</span><h2>一時停止中</h2><p>準備ができたら、続きをはじめよう。</p><button type="button" className={styles.startButton} onClick={togglePause}>つづける <span>›</span></button></>
               ) : null}
               {phase === "gameover" ? (
-                <><span className={styles.overlayBadge}>今回のスコア</span><strong className={styles.finalScore}>{score}</strong><h2>{newBest ? "ベストスコア更新！" : "壁にぶつかっちゃった！"}</h2><p>集めたアイテム {collected}個・最終コンボ {combo}</p><button type="button" className={styles.startButton} onClick={startGame}>もう一度あそぶ <span>↻</span></button></>
+                <><span className={styles.overlayBadge}>今回のスコア</span><strong className={styles.finalScore}>{score}</strong><h2>{newBest ? "ベストスコア更新！" : "壁にぶつかっちゃった！"}</h2><p>集めたアイテム {collected}個・最終コンボ {combo}</p>{coinReward !== null ? <span className={styles.coinReward}>獲得コイン +{coinReward}</span> : null}<button type="button" className={styles.startButton} onClick={startGame}>もう一度あそぶ <span>↻</span></button></>
               ) : null}
             </div>
           ) : null}
