@@ -766,18 +766,6 @@ export function SnackTrailPreview() {
           ) : null}
         </section>
 
-        <section className={styles.rules}>
-          <div><span className={styles.ruleItemIcon}><Image src={PLAYABLE_ITEMS[0]!.image} alt="" fill sizes="34px" /></span><span><b>通常アイテム</b><small>1ポイント＋ミニスキル</small></span></div>
-          <div><span className={`${styles.ruleItemIcon} ${styles.ruleGoldenIcon}`}><Image src={PLAYABLE_ITEMS[1]!.image} alt="" fill sizes="34px" /></span><span><b>金色アイテム</b><small>5ポイント＋ミニスキル</small></span></div>
-          <div className={styles.specialRule}>
-            <span className={styles.demoItems}>{PLAYABLE_ITEMS.slice(2, 6).map((item) => <i key={item.id}><Image src={item.image} alt="" fill sizes="28px" /></i>)}</span>
-            <span><b>シリーズ外 全{PLAYABLE_ITEMS.length}種</b><small>常に3個出現・5個目で強化スキル</small></span>
-          </div>
-          <div><span className={styles.hazardRuleIcon}><i /></span><span><b>罠</b><small>踏むと{HAZARD_PENALTY}ポイント減点</small></span></div>
-          <div><span className={styles.wallRuleIcon}><i /></span><span><b>壁</b><small>1分ごとに1箇所出現・3秒前に点滅で予告・当たるとゲームオーバー</small></span></div>
-          <p>プレビューでは全アイテムを所持扱い・コインは付与されません</p>
-        </section>
-
         <nav className={styles.jumpLinks} aria-label="この下の内容">
           <a href="#snack-trail-guide">↓ 遊びかたの説明書</a>
           <a href="#snack-trail-friends">↓ フレンドのスコア</a>
