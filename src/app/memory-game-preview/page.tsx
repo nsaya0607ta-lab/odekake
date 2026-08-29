@@ -1,7 +1,7 @@
 "use client";
 
 import Image from "next/image";
-import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import { COLLECTION_ITEMS } from "@/lib/collection/items";
 
@@ -136,6 +136,7 @@ function bestScoreKey(id: DifficultyId): string {
 }
 
 export default function MemoryGamePreviewPage() {
+  const router = useRouter();
   const [phase, setPhase] = useState<Phase>("select");
   const [difficulty, setDifficulty] = useState<DifficultyConfig | null>(null);
   const [cards, setCards] = useState<CardState[]>([]);
@@ -322,13 +323,14 @@ export default function MemoryGamePreviewPage() {
       <div className="mx-auto max-w-[560px]">
         <header className="mb-5 flex items-center justify-between gap-3 px-1">
           <div className="flex min-w-0 items-center gap-2.5">
-            <Link
-              href="/mini-games-preview"
+            <button
+              type="button"
+              onClick={() => router.back()}
               aria-label="ミニゲーム一覧へ戻る"
               className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-card text-2xl font-bold text-ink-soft shadow-[0_3px_12px_rgba(94,75,47,0.08)]"
             >
               ‹
-            </Link>
+            </button>
             <div className="min-w-0">
               <p className="text-[10px] font-black tracking-[0.16em] text-[#6d5c96]">ODEKAKE MEMORY</p>
               <h1 className="truncate text-xl font-black sm:text-2xl">しん犬すいじゃく</h1>
