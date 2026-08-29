@@ -33,10 +33,11 @@ export const GACHA_DISPLAY_RARITY_RATES: Record<GachaRarity, number> = {
   MR: 0,
 };
 
-/** 引き方（1回 / 10連）と消費コイン */
+/** 引き方（1回 / 10連 / 100連）と消費コイン */
 export const GACHA_PLANS = {
   single: { draws: 1, cost: 100, label: "1回まわす" },
   multi: { draws: 10, cost: 900, label: "10回まわす" },
+  hundred: { draws: 100, cost: 9000, label: "100回まわす" },
 } as const;
 
 export type GachaPlanId = keyof typeof GACHA_PLANS;

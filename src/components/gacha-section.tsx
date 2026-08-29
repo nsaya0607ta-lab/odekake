@@ -552,7 +552,7 @@ function GachaResultModal({
           <IconClose size={17} />
         </button>
 
-        {only ? <SingleResult result={only} /> : <MultiResult results={results} />}
+        {only ? <SingleResult result={only} /> : <MultiResult results={results} plan={plan} />}
 
         <div className="mt-4 grid grid-cols-2 gap-2">
           <button
@@ -561,7 +561,7 @@ function GachaResultModal({
             disabled={busy}
             className="rounded-full bg-leaf px-3 py-2.5 text-xs font-bold text-white shadow-sm disabled:opacity-45"
           >
-            {plan === "multi" ? "もう10連まわす" : "もう1回まわす"}
+            {plan === "hundred" ? "もう100連まわす" : plan === "multi" ? "もう10連まわす" : "もう1回まわす"}
           </button>
           <button
             type="button"
@@ -659,11 +659,12 @@ function SingleResult({ result }: { result: DrawResult }) {
   );
 }
 
-function MultiResult({ results }: { results: DrawResult[] }) {
+function MultiResult({ results, plan }: { results: DrawResult[]; plan: GachaPlanId }) {
+  const label = plan === "hundred" ? "100連ガチャ" : "10連ガチャ";
   return (
     <div>
       <div className="pr-9 text-center">
-        <p className="text-[11px] font-bold tracking-[0.18em] text-ink-faint">10連ガチャ</p>
+        <p className="text-[11px] font-bold tracking-[0.18em] text-ink-faint">{label}</p>
         <h2 className="mt-1 text-xl font-black text-[#6e5a3c]">結果発表！</h2>
       </div>
       <ul className="mt-4 grid grid-cols-2 gap-2.5">

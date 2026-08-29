@@ -544,6 +544,32 @@ select pg_temp.expect_count('ガチャ: 本人は自分の所持を見られる'
 select pg_temp.expect_count('ガチャ: 他人の所持は見えない', :'bob',
   format($q$select 1 from public.user_gacha_items where user_id = %L$q$, :'alice'), 0);
 
+-- 100連: 0079で上限を100件に緩和したことを確かめる。まず残高を用意する（'unlock' は
+-- 将来のショップ用に予約された種別で、ここではテスト用の入金として使う）。
+-- ここまでの残高がいくつであっても成り立つよう、絶対値ではなく差分で確かめる。
+create temp table gacha_balance_before (balance integer) on commit drop;
+insert into gacha_balance_before select balance from public.user_coins where user_id = :'alice';
+
+insert into public.coin_events (user_id, event_type, amount, idempotency_key)
+values (:'alice', 'unlock', 9000, 'test-topup-hundred-pull');
+
+-- 既存テストで使われている placeholder_n とはぶつからない、この検証専用の id を使う。
+select pg_temp.gacha_as(:'alice',
+  $q$select public.commit_gacha_draw(9000, 'req-alice-hundred',
+    (select array_agg('placeholder_hundred_test'::text) from generate_series(1, 100)))$q$);
+select pg_temp.record('ガチャ: 100連を1トランザクションで確定できる',
+  (select result ->> 'applied' from gacha_last) = 'true'
+  and (select (result ->> 'balance')::integer from gacha_last)
+      = (select balance from gacha_balance_before)
+  and (select balance from public.user_coins where user_id = :'alice')
+      = (select balance from gacha_balance_before)
+  and (select count from public.user_gacha_items
+        where user_id = :'alice' and item_id = 'placeholder_hundred_test') = 100);
+
+select pg_temp.expect_denied('ガチャ: 101件は一括確定できない（上限は100件のまま）', :'alice',
+  $q$select public.commit_gacha_draw(100, 'req-alice-101',
+    (select array_agg('placeholder_hundred_test'::text) from generate_series(1, 101)))$q$);
+
 -- -------------------------------------------------------------
 -- 犬スキン（重ね着せではなく、犬ごと丸ごと差し替え）
 -- -------------------------------------------------------------
