@@ -10,8 +10,8 @@ export default function GachaBoxPreviewPage() {
 
   useEffect(() => {
     setPlaying(true);
-    const impactTimer = window.setTimeout(() => window.navigator.vibrate?.(24), 3260);
-    const finishTimer = window.setTimeout(() => setPlaying(false), 5400);
+    const impactTimer = window.setTimeout(() => window.navigator.vibrate?.(24), 2700);
+    const finishTimer = window.setTimeout(() => setPlaying(false), 4700);
 
     return () => {
       window.clearTimeout(impactTimer);
