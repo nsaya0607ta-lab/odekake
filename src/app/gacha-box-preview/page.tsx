@@ -20,6 +20,7 @@ type PreviewMode = "single" | "ten";
 type AnimationStyle = CSSProperties & Record<`--${string}`, string>;
 
 const TEN_RESULTS: RarityId[] = ["n", "r", "n", "sr", "r", "n", "ssr", "ur", "lr", "mr"];
+const LUXURY_RARITIES = new Set<RarityId>(["ur", "lr", "mr"]);
 
 function rarityClass(id: RarityId) {
   return styles[`rarity${id.toUpperCase()}` as keyof typeof styles];
@@ -137,13 +138,27 @@ export default function GachaBoxPreviewPage() {
                   <Image
                     className={`${styles.travelCapsule} ${rarityClass(rarity.id)}`}
                     style={animationStyle}
+                    data-rarity={rarity.id}
                     src="/gacha/box-preview/capsule-green.png"
                     alt=""
                     width={70}
                     height={70}
                     priority={index === 0}
                   />
-                  <span className={styles.impactGlow} style={animationStyle} aria-hidden="true" />
+                  {LUXURY_RARITIES.has(rarity.id) && (
+                    <span
+                      className={styles.capsuleLuxury}
+                      style={animationStyle}
+                      data-rarity={rarity.id}
+                      aria-hidden="true"
+                    />
+                  )}
+                  <span
+                    className={styles.impactGlow}
+                    style={animationStyle}
+                    data-rarity={rarity.id}
+                    aria-hidden="true"
+                  />
                 </div>
               );
             })}
