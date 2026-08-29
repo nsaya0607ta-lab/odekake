@@ -5,6 +5,8 @@ import styles from "@/components/games/snack-trail.module.css";
 import { SnackTrailGuide } from "@/components/games/snack-trail-guide";
 import {
   BOOST_INTERVAL,
+  COIN_SCORE_DENOMINATOR,
+  COIN_SCORE_NUMERATOR,
   GOLDEN_POINT,
   HAZARD_PENALTY,
   ITEMS_ON_BOARD,
@@ -48,6 +50,8 @@ export default async function SnackTrailGuidePage() {
           itemsOnBoard={ITEMS_ON_BOARD}
           normalPoint={NORMAL_POINT}
           goldenPoint={GOLDEN_POINT}
+          coinScoreNumerator={COIN_SCORE_NUMERATOR}
+          coinScoreDenominator={COIN_SCORE_DENOMINATOR}
         />
       </main>
     </div>

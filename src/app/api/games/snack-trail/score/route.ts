@@ -7,8 +7,8 @@ type RpcResponse = {
   error: { code?: string; message: string } | null;
 };
 
-/** おやつ道はコインを配らないので、ここは「ありえない値を弾く」だけの上限。 */
-const MAX_SCORE = 100_000;
+/** スコアの2/3をコインとして配るため、偽装スコアで稼がれないよう現実的な範囲に絞っている。 */
+const MAX_SCORE = 5_000;
 const MAX_COMBO = 5_000;
 const MAX_COLLECTED = 100_000;
 
@@ -87,6 +87,8 @@ export async function POST(request: Request) {
       applied: result.applied === true,
       bestScore: typeof result.best_score === "number" ? result.best_score : 0,
       bestCombo: typeof result.best_combo === "number" ? result.best_combo : 0,
+      coins: typeof result.coins === "number" ? result.coins : 0,
+      balance: typeof result.balance === "number" ? result.balance : 0,
     },
     { headers: { "Cache-Control": "no-store" } },
   );

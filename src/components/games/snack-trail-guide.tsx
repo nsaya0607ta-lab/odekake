@@ -30,6 +30,10 @@ export type SnackTrailGuideProps = {
   normalPoint: number;
   /** 金色アイテムの得点 */
   goldenPoint: number;
+  /** コイン還元率の分子（スコア×分子/分母がコインになる） */
+  coinScoreNumerator: number;
+  /** コイン還元率の分母 */
+  coinScoreDenominator: number;
 };
 
 const SHOTS = "/snack-trail-guide-shots";
@@ -71,6 +75,8 @@ export function SnackTrailGuide({
   itemsOnBoard,
   normalPoint,
   goldenPoint,
+  coinScoreNumerator,
+  coinScoreDenominator,
 }: SnackTrailGuideProps) {
   return (
     <section className={styles.guide} id="snack-trail-guide" aria-label="わんこのおやつ道の説明書">
@@ -246,7 +252,7 @@ export function SnackTrailGuide({
           <ul className={styles.points}>
             <li><div className={styles.pointBody}><b>自分の道は終わりではない</b><span>肉球の道にぶつかったときは、そこから先が切れてコンボが0になるだけ。まだ続けられます。</span></div></li>
             <li><div className={styles.pointBody}><b>結果はフレンドと並びます</b><span>スコアと、そのプレイでの最高コンボが、下のフレンドスコアに記録されます。</span></div></li>
-            <li><div className={styles.pointBody}><b>コインはもらえません</b><span>おやつ道はまだ検証中のため、遊んでもコインは増えません。</span></div></li>
+            <li><div className={styles.pointBody}><b>コインはスコアの{coinScoreNumerator}/{coinScoreDenominator}</b><span>ゲームオーバーになると、そのプレイのスコアの{coinScoreNumerator}/{coinScoreDenominator}(端数切り捨て)がコインとして手に入ります。</span></div></li>
           </ul>
           <div className={styles.shots}>
             <PhoneShot
