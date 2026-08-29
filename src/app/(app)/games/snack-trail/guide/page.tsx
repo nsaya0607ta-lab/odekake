@@ -1,6 +1,5 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { redirect } from "next/navigation";
 import styles from "@/components/games/snack-trail.module.css";
 import { SnackTrailGuide } from "@/components/games/snack-trail-guide";
 import {
@@ -16,8 +15,6 @@ import {
   WALL_SPAWN_INTERVAL_MS,
   WALL_WARNING_LEAD_MS,
 } from "@/lib/games/snack-trail-config";
-import { canSeeSnackTrail } from "@/lib/games/snack-trail-access";
-import { requireUser } from "@/lib/supabase/server";
 
 export const metadata: Metadata = {
   title: "わんこのおやつ道の説明書 | おでかけ記録",
@@ -25,10 +22,7 @@ export const metadata: Metadata = {
 };
 export const dynamic = "force-dynamic";
 
-export default async function SnackTrailGuidePage() {
-  const { user } = await requireUser();
-  if (!canSeeSnackTrail(user.displayName)) redirect("/games");
-
+export default function SnackTrailGuidePage() {
   return (
     <div className={styles.shell}>
       <div className={styles.ambient} aria-hidden="true"><i /><i /><i /><i /><i /></div>
