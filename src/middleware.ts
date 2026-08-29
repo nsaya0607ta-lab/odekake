@@ -17,6 +17,7 @@ const PUBLIC_PATHS = [
   "/terms",
   "/manifest.webmanifest",
   "/gacha-preview",
+  "/mini-games-preview",
 ];
 
 function isPublicPath(pathname: string) {
@@ -32,6 +33,7 @@ export async function middleware(request: NextRequest) {
       pathname === "/setup" ||
       pathname === "/manifest.webmanifest" ||
       pathname === "/gacha-preview" ||
+      pathname === "/mini-games-preview" ||
       pathname === "/privacy" ||
       pathname === "/terms"
     ) {
