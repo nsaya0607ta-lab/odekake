@@ -200,16 +200,27 @@
 }
 
 @keyframes capsuleTravel {
-  0% { top: 57%; left: 22.5%; opacity: 0; transform: rotate(0) scale(.7); }
-  5% { top: 62%; left: 25%; opacity: 1; transform: rotate(70deg) scale(.88); }
-  18% { top: 66%; left: 29%; transform: rotate(230deg) scale(1); }
-  38% { top: 72%; left: 36%; transform: rotate(470deg) scale(1); }
-  55% { top: 66%; left: 43%; transform: rotate(680deg) scale(1); }
-  72% { top: 56%; left: 51%; transform: rotate(870deg) scale(1); }
-  82% { top: 56%; left: 57%; transform: rotate(990deg) scale(1); }
-  90% { top: 52%; left: 63%; transform: rotate(1080deg) scale(.98); }
-  97% { top: 62%; left: 69%; opacity: 1; transform: rotate(1180deg) scale(.92); }
-  100% { top: 69%; left: 72%; opacity: 0; transform: rotate(1220deg) scale(.78); }
+  /*
+   * 元画像は 910 x 512px。カプセルの見える下端は画像上端から約65px。
+   * 各 top は「レーン上面のY座標 - 65px」で算出し、球の下側をレーンに接地させる。
+   */
+  0% { top: 58.59%; left: 23.63%; opacity: 0; transform: rotate(0) scale(.82); }
+  7% { top: 57.62%; left: 25.82%; opacity: 1; transform: rotate(72deg) scale(.92); }
+  18% { top: 60.94%; left: 29.12%; transform: rotate(196deg) scale(1); }
+  30% { top: 63.87%; left: 32.42%; transform: rotate(330deg) scale(1); }
+  40% { top: 64.84%; left: 35.71%; transform: rotate(448deg) scale(1); }
+  50% { top: 62.89%; left: 39.01%; transform: rotate(566deg) scale(1); }
+  58% { top: 59.18%; left: 42.31%; transform: rotate(678deg) scale(1); }
+  64% { top: 54.49%; left: 45.60%; transform: rotate(788deg) scale(1); }
+  69% { top: 50.78%; left: 48.90%; transform: rotate(892deg) scale(1); }
+  74% { top: 49.02%; left: 52.20%; transform: rotate(994deg) scale(1); }
+  78% { top: 48.83%; left: 55.49%; transform: rotate(1084deg) scale(1); }
+  81% { top: 49.80%; left: 57.69%; transform: rotate(1144deg) scale(1); }
+  /* ここでレーン先端を離れ、箱へ向かって小さく跳ねる */
+  86% { top: 45.90%; left: 60.99%; transform: rotate(1230deg) scale(1); }
+  91% { top: 42.97%; left: 64.84%; transform: rotate(1322deg) scale(.99); }
+  96% { top: 47.85%; left: 68.68%; opacity: 1; transform: rotate(1414deg) scale(.96); }
+  100% { top: 58.59%; left: 71.98%; opacity: 0; transform: rotate(1490deg) scale(.82); }
 }
 
 @keyframes sourceSparkleBurst {
