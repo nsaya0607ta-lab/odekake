@@ -64,7 +64,7 @@
   top: 57%;
   left: 22.5%;
   opacity: 0;
-  animation: capsuleTravel 2.82s .48s linear both;
+  animation: capsuleTravel 2.35s .38s linear both;
 }
 
 .sourceSparkle {
@@ -78,7 +78,7 @@
   opacity: 0;
   -webkit-mask-image: radial-gradient(circle at 44% 44%, transparent 0 20%, #000 29%, #000 100%);
   mask-image: radial-gradient(circle at 44% 44%, transparent 0 20%, #000 29%, #000 100%);
-  animation: sourceSparkleBurst 1.24s 3.25s ease-out both;
+  animation: sourceSparkleBurst 1.24s 2.7s ease-out both;
 }
 
 .impactGlow {
@@ -92,7 +92,7 @@
   opacity: 0;
   background: radial-gradient(circle, rgba(221,255,191,.98) 0 18%, rgba(62,220,113,.8) 38%, rgba(65,210,111,0) 72%);
   filter: blur(1px);
-  animation: impactGlow 1.2s 3.22s ease-out both;
+  animation: impactGlow 1.2s 2.67s ease-out both;
 }
 
 .twinkle {
@@ -107,10 +107,10 @@
   animation: twinklePop .72s ease-out both;
 }
 
-.twinkleOne { top: 47%; left: 67%; animation-delay: 3.34s; }
-.twinkleTwo { top: 43%; left: 78%; animation-delay: 3.48s; }
-.twinkleThree { top: 63%; left: 82%; animation-delay: 3.58s; }
-.twinkleFour { top: 68%; left: 67%; animation-delay: 3.68s; }
+.twinkleOne { top: 47%; left: 67%; animation-delay: 2.78s; }
+.twinkleTwo { top: 43%; left: 78%; animation-delay: 2.92s; }
+.twinkleThree { top: 63%; left: 82%; animation-delay: 3.02s; }
+.twinkleFour { top: 68%; left: 67%; animation-delay: 3.12s; }
 
 .caption {
   position: relative;
@@ -189,12 +189,12 @@
   30% { top: 61.52%; left: 32.42%; transform: rotate(330deg) scale(1); }
   40% { top: 62.30%; left: 35.71%; transform: rotate(448deg) scale(1); }
   50% { top: 60.74%; left: 39.01%; transform: rotate(566deg) scale(1); }
-  58% { top: 57.62%; left: 42.31%; transform: rotate(678deg) scale(1); }
-  64% { top: 54.49%; left: 45.60%; transform: rotate(788deg) scale(1); }
-  69% { top: 50.78%; left: 48.90%; transform: rotate(892deg) scale(1); }
-  74% { top: 49.02%; left: 52.20%; transform: rotate(994deg) scale(1); }
-  78% { top: 48.83%; left: 55.49%; transform: rotate(1084deg) scale(1); }
-  81% { top: 49.80%; left: 57.69%; transform: rotate(1144deg) scale(1); }
+  58% { top: 55.66%; left: 42.31%; transform: rotate(678deg) scale(1); }
+  64% { top: 52.34%; left: 45.60%; transform: rotate(788deg) scale(1); }
+  69% { top: 48.44%; left: 48.90%; transform: rotate(892deg) scale(1); }
+  74% { top: 46.68%; left: 52.20%; transform: rotate(994deg) scale(1); }
+  78% { top: 46.68%; left: 55.49%; transform: rotate(1084deg) scale(1); }
+  81% { top: 47.85%; left: 57.69%; transform: rotate(1144deg) scale(1); }
   /* ここでレーン先端を離れ、箱へ向かって小さく跳ねる */
   86% { top: 45.90%; left: 60.99%; transform: rotate(1230deg) scale(1); }
   91% { top: 42.97%; left: 64.84%; transform: rotate(1322deg) scale(.99); }
