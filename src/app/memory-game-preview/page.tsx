@@ -331,7 +331,7 @@ export default function MemoryGamePreviewPage() {
             </Link>
             <div className="min-w-0">
               <p className="text-[10px] font-black tracking-[0.16em] text-[#6d5c96]">ODEKAKE MEMORY</p>
-              <h1 className="truncate text-xl font-black sm:text-2xl">おさんぽメモリー</h1>
+              <h1 className="truncate text-xl font-black sm:text-2xl">しん犬すいじゃく</h1>
             </div>
           </div>
           <span className="shrink-0 rounded-full border border-line bg-card px-3 py-1.5 text-[10px] font-black tracking-[0.12em] text-ink-soft">

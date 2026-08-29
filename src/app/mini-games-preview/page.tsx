@@ -45,7 +45,7 @@ const games: GameCard[] = [
   },
   {
     number: "02",
-    title: "わんこボウリング",
+    title: "ごろごろボウリング",
     lead: "狙って、転がして、ストライク！",
     description: "お気に入りのボールでピンを倒そう。",
     playStyle: "10フレーム",
@@ -62,7 +62,7 @@ const games: GameCard[] = [
   },
   {
     number: "03",
-    title: "わんこのおやつ道",
+    title: "おやつロード",
     lead: "おやつを集めて、どこまでも！",
     description: "足あとをのばしてハイスコアを目指そう。",
     playStyle: "エンドレス",
@@ -79,7 +79,7 @@ const games: GameCard[] = [
   },
   {
     number: "04",
-    title: "おさんぽメモリー",
+    title: "しん犬すいじゃく",
     lead: "絵柄をおぼえてペア探し！",
     description: "記憶力でハイスコアを目指そう。",
     playStyle: "初級〜上級",
