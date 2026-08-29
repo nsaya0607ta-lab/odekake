@@ -4,9 +4,18 @@ import Image from "next/image";
 import Link from "next/link";
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import styles from "@/components/games/snack-trail.module.css";
-import { SnackTrailGuide } from "@/components/games/snack-trail-guide";
 import { SNACK_TRAIL_RANKING_REFRESH_EVENT, SnackTrailRanking } from "@/components/games/snack-trail-ranking";
 import { REGULAR_ITEMS, type CollectionItem } from "@/lib/collection/items";
+import {
+  BOOST_INTERVAL,
+  GOLDEN_POINT,
+  HAZARD_PENALTY,
+  ITEMS_ON_BOARD,
+  MAX_WALL_GUARD_USES,
+  NORMAL_POINT,
+  WALL_SPAWN_INTERVAL_MS,
+  WALL_WARNING_LEAD_MS,
+} from "@/lib/games/snack-trail-config";
 import { getSnackTrailSkill, type SnackTrailSkill } from "@/lib/games/snack-trail-skills";
 
 type Point = { x: number; y: number };
@@ -21,19 +30,7 @@ type SkillToast = { id: number; item: PlayableItem; skill: SnackTrailSkill; boos
 const GRID_COLS = 16;
 const GRID_ROWS = 20;
 const ITEM_SIZE = 2;
-const ITEMS_ON_BOARD = 3;
 const HAZARDS_ON_BOARD = 1;
-const HAZARD_PENALTY = 20;
-/** 通常アイテムと金色アイテムの基礎点 */
-const NORMAL_POINT = 1;
-const GOLDEN_POINT = 5;
-/** 経過プレイ時間がこの間隔(ms)を超えるたびに壁を1つ生成する */
-const WALL_SPAWN_INTERVAL_MS = 60_000;
-/** 壁が出現する何ms前から予告点滅を表示するか */
-const WALL_WARNING_LEAD_MS = 3_000;
-const BOOST_INTERVAL = 5;
-/** 壁ガードは1ゲームにつき最大2回まで発動できる */
-const MAX_WALL_GUARD_USES = 2;
 /** スワイプの向き変更をタッチ移動中に判定するためのしきい値(px) */
 const SWIPE_THRESHOLD = 16;
 const BEST_SCORE_KEY = "odekake:snack-trail-preview:best-score";
@@ -766,22 +763,10 @@ export function SnackTrailPreview() {
           ) : null}
         </section>
 
-        <nav className={styles.jumpLinks} aria-label="この下の内容">
-          <a href="#snack-trail-guide">↓ 遊びかたの説明書</a>
+        <nav className={styles.jumpLinks} aria-label="このページのリンク">
+          <Link href="/games/snack-trail/guide">遊びかたの説明書 ›</Link>
           <a href="#snack-trail-friends">↓ フレンドのスコア</a>
         </nav>
-
-        <SnackTrailGuide
-          hazardPenalty={HAZARD_PENALTY}
-          wallIntervalMinutes={Math.round(WALL_SPAWN_INTERVAL_MS / 60_000)}
-          wallWarningSeconds={Math.round(WALL_WARNING_LEAD_MS / 1_000)}
-          maxWallGuardUses={MAX_WALL_GUARD_USES}
-          boostInterval={BOOST_INTERVAL}
-          itemKindCount={PLAYABLE_ITEMS.length}
-          itemsOnBoard={ITEMS_ON_BOARD}
-          normalPoint={NORMAL_POINT}
-          goldenPoint={GOLDEN_POINT}
-        />
 
         <SnackTrailRanking />
       </main>
