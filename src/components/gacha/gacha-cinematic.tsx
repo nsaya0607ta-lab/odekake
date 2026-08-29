@@ -1,6 +1,6 @@
 "use client";
 
-import { forwardRef, useCallback, useEffect, useImperativeHandle, useRef, useState } from "react";
+import { forwardRef, useCallback, useEffect, useImperativeHandle, useMemo, useRef, useState } from "react";
 import type { GachaRarity } from "@/lib/gacha/config";
 import { playGachaCue, setGachaAudioPlaybackRate } from "./audio";
 import styles from "./gacha-cinematic.module.css";
@@ -21,6 +21,12 @@ const MULTI_DROP_DURATION = 0.53;
 const MULTI_DROP_GAP = 0.03;
 const MULTI_DROP_INTERVAL = MULTI_DROP_DURATION + MULTI_DROP_GAP;
 const MULTI_REVEAL_TIME_SCALE = 1.4;
+
+/**
+ * 100連は全件フル演出だと2〜3分かかってしまうため、SR以上だけ1件ずつの
+ * カプセル演出を見せ、N・Rは演出を挟まず結果一覧にまとめて出す。
+ */
+const FULL_CINEMATIC_RARITIES = new Set<GachaRarity>(["SR", "SSR", "UR", "LR", "MR"]);
 
 function validRarity(rarity: string): GachaRarity {
   return (["N", "R", "SR", "SSR", "UR", "LR", "MR"] as const).includes(rarity as GachaRarity)
@@ -407,13 +413,14 @@ type SceneProps = {
   current: number;
   total: number;
   capsuleOnly: boolean;
+  planLabel: string | null;
   playbackRate: PlaybackRate;
   onTogglePlaybackRate: () => void;
   onSceneComplete: () => void;
   onSkipAll: () => void;
 };
 
-function GachaCinematicScene({ result, current, total, capsuleOnly, playbackRate, onTogglePlaybackRate, onSceneComplete, onSkipAll }: SceneProps) {
+function GachaCinematicScene({ result, current, total, capsuleOnly, planLabel, playbackRate, onTogglePlaybackRate, onSceneComplete, onSkipAll }: SceneProps) {
   const rarity = validRarity(result.rarity);
   const [phase, setPhase] = useState<Phase>("準備中");
   const completeRef = useRef(false);
@@ -676,7 +683,7 @@ function GachaCinematicScene({ result, current, total, capsuleOnly, playbackRate
 
       <div className={styles.hud}>
         <div>
-          <p className={styles.eyebrow}>{total > 1 ? `10連ガチャ　${current} / ${total}` : "GACHA CINEMATIC"}</p>
+          <p className={styles.eyebrow}>{total > 1 && planLabel ? `${planLabel}　${current} / ${total}` : "GACHA CINEMATIC"}</p>
           <p className={styles.phase} aria-live="polite">{phase}</p>
         </div>
       </div>
@@ -765,8 +772,19 @@ function GachaCinematicScene({ result, current, total, capsuleOnly, playbackRate
 
 export function GachaCinematic({ draw, onComplete }: { draw: AnimationDraw; onComplete: (draw: AnimationDraw) => void }) {
   useBodyScrollLock();
-  const isMulti = draw.plan === "multi" && draw.results.length > 1;
-  const [batchIntroComplete, setBatchIntroComplete] = useState(!isMulti);
+  const isHundred = draw.plan === "hundred";
+  // 100連はカプセル一括排出の演出を挟まず、そのままレア以上の個別演出へ進む。
+  const showBatchIntro = draw.plan === "multi" && draw.results.length > 1;
+  const isCapsuleOnly = showBatchIntro || isHundred;
+  const planLabel = draw.plan === "hundred" ? "100連ガチャ" : draw.plan === "multi" ? "10連ガチャ" : null;
+
+  // 100連はSR以上だけを1件ずつの演出にかけ、N・Rは結果一覧にまとめて出す。
+  const cinematicResults = useMemo(() => {
+    if (!isHundred) return draw.results;
+    return draw.results.filter((result) => FULL_CINEMATIC_RARITIES.has(validRarity(result.rarity)));
+  }, [draw.results, isHundred]);
+
+  const [batchIntroComplete, setBatchIntroComplete] = useState(!showBatchIntro);
   const [currentIndex, setCurrentIndex] = useState(0);
   const [playbackRate, setPlaybackRate] = useState<PlaybackRate>(1);
   const finishedRef = useRef(false);
@@ -788,12 +806,12 @@ export function GachaCinematic({ draw, onComplete }: { draw: AnimationDraw; onCo
   }, []);
 
   useEffect(() => {
-    for (const result of draw.results) {
+    for (const result of cinematicResults) {
       if (!result.image) continue;
       const image = new Image();
       image.src = result.image;
     }
-  }, [draw.results]);
+  }, [cinematicResults]);
 
   const finishAll = useCallback(() => {
     if (finishedRef.current) return;
@@ -802,18 +820,18 @@ export function GachaCinematic({ draw, onComplete }: { draw: AnimationDraw; onCo
   }, []);
 
   const completeCurrentScene = useCallback(() => {
-    if (currentIndex + 1 >= draw.results.length) {
+    if (currentIndex + 1 >= cinematicResults.length) {
       finishAll();
       return;
     }
     setCurrentIndex(currentIndex + 1);
-  }, [currentIndex, draw.results.length, finishAll]);
+  }, [currentIndex, cinematicResults.length, finishAll]);
 
   useEffect(() => {
-    if (draw.results.length === 0) finishAll();
-  }, [draw.results.length, finishAll]);
+    if (cinematicResults.length === 0) finishAll();
+  }, [cinematicResults.length, finishAll]);
 
-  const result = draw.results[currentIndex];
+  const result = cinematicResults[currentIndex];
   if (!result) return null;
 
   if (!batchIntroComplete) {
@@ -834,8 +852,9 @@ export function GachaCinematic({ draw, onComplete }: { draw: AnimationDraw; onCo
       key={`${currentIndex}-${result.id}`}
       result={result}
       current={currentIndex + 1}
-      total={draw.results.length}
-      capsuleOnly={isMulti}
+      total={cinematicResults.length}
+      capsuleOnly={isCapsuleOnly}
+      planLabel={planLabel}
       playbackRate={playbackRate}
       onTogglePlaybackRate={togglePlaybackRate}
       onSceneComplete={completeCurrentScene}
