@@ -129,6 +129,23 @@
   backdrop-filter: blur(10px);
 }
 
+.skipRound {
+  position: absolute;
+  z-index: 70;
+  top: calc(max(16px, env(safe-area-inset-top)) + 46px);
+  right: 14px;
+  min-width: 58px;
+  min-height: 34px;
+  border: 1px solid rgb(255 210 120 / 46%);
+  border-radius: 999px;
+  background: rgb(64 40 8 / 58%);
+  color: rgb(255 230 180 / 92%);
+  font: inherit;
+  font-size: 10px;
+  font-weight: 800;
+  backdrop-filter: blur(10px);
+}
+
 .speed {
   position: absolute;
   z-index: 70;

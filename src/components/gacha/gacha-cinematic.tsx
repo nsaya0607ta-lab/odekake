@@ -220,12 +220,13 @@ type MultiCapsuleIntroProps = {
   onTogglePlaybackRate: () => void;
   onComplete: () => void;
   onSkipAll: () => void;
+  onSkipRound?: () => void;
 };
 
 /** LR以上が混じっているときに、ガチャを回す瞬間だけ強めに揺らして予兆にする */
 const SHAKE_TELL_RARITIES: readonly GachaRarity[] = ["LR", "MR"];
 
-function MultiCapsuleIntro({ results, promotion, planLabel, roundLabel, playbackRate, onTogglePlaybackRate, onComplete, onSkipAll }: MultiCapsuleIntroProps) {
+function MultiCapsuleIntro({ results, promotion, planLabel, roundLabel, playbackRate, onTogglePlaybackRate, onComplete, onSkipAll, onSkipRound }: MultiCapsuleIntroProps) {
   const eyebrowLabel = roundLabel ? `${planLabel}　${roundLabel}` : planLabel;
   const columns = 5;
   const hasShakeTell = useMemo(() => hasTellRarity(results, SHAKE_TELL_RARITIES), [results]);
@@ -243,10 +244,12 @@ function MultiCapsuleIntro({ results, promotion, planLabel, roundLabel, playback
   const completedRef = useRef(false);
   const completeRef = useRef(onComplete);
   const skipRef = useRef(onSkipAll);
+  const skipRoundRef = useRef(onSkipRound);
   useEffect(() => {
     completeRef.current = onComplete;
     skipRef.current = onSkipAll;
-  }, [onComplete, onSkipAll]);
+    skipRoundRef.current = onSkipRound;
+  }, [onComplete, onSkipAll, onSkipRound]);
 
   useEffect(() => {
     playbackRateRef.current = playbackRate;
@@ -265,6 +268,13 @@ function MultiCapsuleIntro({ results, promotion, planLabel, roundLabel, playback
     completedRef.current = true;
     timelineRef.current?.kill();
     skipRef.current();
+  }, []);
+
+  const skipRound = useCallback(() => {
+    if (completedRef.current) return;
+    completedRef.current = true;
+    timelineRef.current?.kill();
+    skipRoundRef.current?.();
   }, []);
 
   useEffect(() => {
@@ -400,6 +410,9 @@ function MultiCapsuleIntro({ results, promotion, planLabel, roundLabel, playback
         <span>×{playbackRate}</span><small>倍速</small>
       </button>
       <button type="button" className={styles.skip} onClick={skipAll}>すべてスキップ</button>
+      {onSkipRound && (
+        <button type="button" className={styles.skipRound} onClick={skipRound}>次の10連へ</button>
+      )}
 
       <div className={styles.batchStage}>
         <div ref={machineRef} className={styles.batchMachineWrap}>
@@ -454,9 +467,10 @@ type SceneProps = {
   onTogglePlaybackRate: () => void;
   onSceneComplete: () => void;
   onSkipAll: () => void;
+  onSkipRound?: () => void;
 };
 
-function GachaCinematicScene({ result, current, total, capsuleOnly, planLabel, roundLabel, playbackRate, onTogglePlaybackRate, onSceneComplete, onSkipAll }: SceneProps) {
+function GachaCinematicScene({ result, current, total, capsuleOnly, planLabel, roundLabel, playbackRate, onTogglePlaybackRate, onSceneComplete, onSkipAll, onSkipRound }: SceneProps) {
   const rarity = validRarity(result.rarity);
   const hasShakeTell = rarity === "LR" || rarity === "MR";
   const hasMrTell = rarity === "MR";
@@ -464,11 +478,13 @@ function GachaCinematicScene({ result, current, total, capsuleOnly, planLabel, r
   const completeRef = useRef(false);
   const sceneCompleteRef = useRef(onSceneComplete);
   const skipAllRef = useRef(onSkipAll);
+  const skipRoundRef = useRef(onSkipRound);
 
   useEffect(() => {
     sceneCompleteRef.current = onSceneComplete;
     skipAllRef.current = onSkipAll;
-  }, [onSceneComplete, onSkipAll]);
+    skipRoundRef.current = onSkipRound;
+  }, [onSceneComplete, onSkipAll, onSkipRound]);
 
   const completeScene = useCallback(() => {
     if (completeRef.current) return;
@@ -482,6 +498,13 @@ function GachaCinematicScene({ result, current, total, capsuleOnly, planLabel, r
     completeRef.current = true;
     timelineRef.current?.kill();
     skipAllRef.current();
+  }, []);
+
+  const skipRound = useCallback(() => {
+    if (completeRef.current) return;
+    completeRef.current = true;
+    timelineRef.current?.kill();
+    skipRoundRef.current?.();
   }, []);
 
   const rootRef = useRef<HTMLDivElement>(null);
@@ -751,6 +774,9 @@ function GachaCinematicScene({ result, current, total, capsuleOnly, planLabel, r
       <button type="button" className={styles.skip} onClick={skipAll} aria-label="残りのガチャ演出をすべてスキップ">
         {total > 1 ? "すべてスキップ" : "スキップ"}
       </button>
+      {onSkipRound && (
+        <button type="button" className={styles.skipRound} onClick={skipRound}>次の10連へ</button>
+      )}
 
       <div className={styles.stage}>
         <div className={styles.floor} />
@@ -899,19 +925,29 @@ export function GachaCinematic({ draw, onComplete }: { draw: AnimationDraw; onCo
     setState((previous) => ({ ...previous, phase: "scene" }));
   }, []);
 
+  const advanceToRound = useCallback((nextRoundIndex: number) => {
+    if (nextRoundIndex >= rounds.length) {
+      finishAll();
+      return;
+    }
+    setState({ roundIndex: nextRoundIndex, phase: phaseFor(draw.plan, rounds[nextRoundIndex]), itemIndex: 0 });
+  }, [draw.plan, finishAll, rounds]);
+
   const completeCurrentScene = useCallback(() => {
     const round = rounds[state.roundIndex] ?? [];
     if (state.itemIndex + 1 < round.length) {
       setState((previous) => ({ ...previous, itemIndex: previous.itemIndex + 1 }));
       return;
     }
-    const nextRoundIndex = state.roundIndex + 1;
-    if (nextRoundIndex >= rounds.length) {
-      finishAll();
-      return;
-    }
-    setState({ roundIndex: nextRoundIndex, phase: phaseFor(draw.plan, rounds[nextRoundIndex]), itemIndex: 0 });
-  }, [draw.plan, finishAll, rounds, state.itemIndex, state.roundIndex]);
+    advanceToRound(state.roundIndex + 1);
+  }, [advanceToRound, rounds, state.itemIndex, state.roundIndex]);
+
+  // 100連だけ「次の10連へ」で、いま演出中のセットを丸ごと飛ばして次のセットの
+  // カプセル排出から見せる（すべてスキップ＝全部終了、とは別の一段階だけの早送り）。
+  const skipToNextRound = useCallback(() => {
+    advanceToRound(state.roundIndex + 1);
+  }, [advanceToRound, state.roundIndex]);
+  const hasNextRound = isHundred && state.roundIndex + 1 < rounds.length;
 
   const round = rounds[state.roundIndex] ?? [];
   const roundLabel = rounds.length > 1 ? `${state.roundIndex + 1}/${rounds.length}セット目` : null;
@@ -919,6 +955,7 @@ export function GachaCinematic({ draw, onComplete }: { draw: AnimationDraw; onCo
   if (state.phase === "batch") {
     return (
       <MultiCapsuleIntro
+        key={state.roundIndex}
         results={round}
         promotion={rounds.length === 1 ? draw.promotion : undefined}
         planLabel={planLabel ?? ""}
@@ -927,6 +964,7 @@ export function GachaCinematic({ draw, onComplete }: { draw: AnimationDraw; onCo
         onTogglePlaybackRate={togglePlaybackRate}
         onComplete={completeBatchIntro}
         onSkipAll={finishAll}
+        onSkipRound={hasNextRound ? skipToNextRound : undefined}
       />
     );
   }
@@ -949,6 +987,7 @@ export function GachaCinematic({ draw, onComplete }: { draw: AnimationDraw; onCo
       onTogglePlaybackRate={togglePlaybackRate}
       onSceneComplete={completeCurrentScene}
       onSkipAll={finishAll}
+      onSkipRound={hasNextRound ? skipToNextRound : undefined}
     />
   );
 }
