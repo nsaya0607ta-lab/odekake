@@ -12,7 +12,7 @@
   align-items: flex-end;
   justify-content: space-between;
   gap: 14px;
-  padding: 4px 4px 17px;
+  padding: 4px 4px 14px;
 }
 
 .heading h1 { margin: 4px 0 0; font-size: clamp(23px, 7vw, 31px); font-weight: 900; letter-spacing: -.035em; }
@@ -28,6 +28,77 @@
   background: rgba(225, 246, 218, .72);
   font-size: 10px;
   font-weight: 900;
+}
+
+.previewControls {
+  display: grid;
+  gap: 9px;
+  margin-bottom: 12px;
+  padding: 10px;
+  border: 1px solid rgba(157, 112, 49, .13);
+  border-radius: 20px;
+  background: rgba(255, 253, 241, .76);
+  box-shadow: 0 8px 22px rgba(107, 73, 27, .07);
+}
+
+.modeSwitch {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 4px;
+  padding: 3px;
+  border-radius: 14px;
+  background: rgba(104, 80, 49, .08);
+}
+
+.modeSwitch button {
+  min-height: 35px;
+  border: 0;
+  border-radius: 11px;
+  color: #89765d;
+  background: transparent;
+  font: inherit;
+  font-size: 12px;
+  font-weight: 900;
+}
+
+.modeSwitch .activeMode {
+  color: #3c6e48;
+  background: #fffef6;
+  box-shadow: 0 3px 10px rgba(83, 62, 35, .12);
+}
+
+.rarityPicker {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 5px;
+}
+
+.rarityButton {
+  position: relative;
+  min-width: 0;
+  min-height: 34px;
+  padding: 0;
+  border: 2px solid transparent;
+  border-radius: 10px;
+  color: #fff;
+  background: #35ae68;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.28), 0 3px 8px rgba(79, 63, 40, .12);
+  font: inherit;
+  font-size: 10px;
+  font-weight: 950;
+}
+
+.rarityButton[data-rarity="r"] { background: #358edc; }
+.rarityButton[data-rarity="sr"] { color: #5e4210; background: linear-gradient(135deg, #fff0a2, #e7a91b); }
+.rarityButton[data-rarity="ssr"] { background: linear-gradient(135deg, #55d6ff, #8c70ed 38%, #ed71bf 68%, #ffd75c); }
+.rarityButton[data-rarity="ur"] { background: linear-gradient(135deg, #ff786c, #c62c37); }
+.rarityButton[data-rarity="lr"] { background: linear-gradient(135deg, #5f586c, #17141e); }
+.rarityButton[data-rarity="mr"] { background: linear-gradient(135deg, #3b7bda, #6638c2 55%, #b23fce); }
+
+.rarityButton.activeRarity {
+  border-color: #fff;
+  outline: 2px solid #5f513d;
+  transform: translateY(-1px);
 }
 
 .stageWrap {
@@ -51,20 +122,35 @@
 .sceneImage { z-index: 0; object-fit: cover; }
 
 .travelCapsule {
+  --rarity-filter: saturate(1.08);
   position: absolute;
   z-index: 3;
+  top: 57%;
+  left: 22.5%;
   width: 7.7%;
   height: auto;
   object-fit: contain;
+  opacity: 0;
   clip-path: circle(43% at 49% 50%);
-  filter: drop-shadow(0 4px 4px rgba(66, 83, 49, .28));
+  filter: var(--rarity-filter) drop-shadow(0 4px 4px rgba(66, 83, 49, .28));
+  animation: capsuleTravel 2.35s var(--travel-delay) linear both;
 }
 
-.travelCapsule {
-  top: 57%;
-  left: 22.5%;
-  opacity: 0;
-  animation: capsuleTravel 2.35s .38s linear both;
+.rarityN { --rarity-filter: saturate(1.08); }
+.rarityR { --rarity-filter: hue-rotate(103deg) saturate(1.18) brightness(1.02); }
+.raritySR { --rarity-filter: hue-rotate(282deg) saturate(1.45) brightness(1.16); }
+.raritySSR { --rarity-filter: hue-rotate(128deg) saturate(1.55) brightness(1.12); }
+.rarityUR { --rarity-filter: hue-rotate(235deg) saturate(1.42) brightness(1.02); }
+.rarityLR { --rarity-filter: grayscale(1) brightness(.38) contrast(1.28); }
+.rarityMR { --rarity-filter: hue-rotate(145deg) saturate(1.62) brightness(.92); }
+
+.travelCapsule.raritySSR {
+  animation-name: capsuleTravel, rainbowFilter;
+  animation-duration: 2.35s, .64s;
+  animation-delay: var(--travel-delay), var(--travel-delay);
+  animation-timing-function: linear, linear;
+  animation-iteration-count: 1, infinite;
+  animation-fill-mode: both, both;
 }
 
 .sourceSparkle {
@@ -76,9 +162,19 @@
   height: 55.7%;
   object-fit: contain;
   opacity: 0;
+  filter: var(--rarity-filter) brightness(1.12) saturate(1.18);
   -webkit-mask-image: radial-gradient(circle at 44% 44%, transparent 0 20%, #000 29%, #000 100%);
   mask-image: radial-gradient(circle at 44% 44%, transparent 0 20%, #000 29%, #000 100%);
-  animation: sourceSparkleBurst 1.24s 2.7s ease-out both;
+  animation: sourceSparkleBurst 1.24s var(--sparkle-delay) ease-out both;
+}
+
+.sourceSparkle.raritySSR {
+  animation-name: sourceSparkleBurst, rainbowSparkle;
+  animation-duration: 1.24s, .52s;
+  animation-delay: var(--sparkle-delay), var(--sparkle-delay);
+  animation-timing-function: ease-out, linear;
+  animation-iteration-count: 1, infinite;
+  animation-fill-mode: both, both;
 }
 
 .impactGlow {
@@ -90,9 +186,9 @@
   aspect-ratio: 1;
   border-radius: 50%;
   opacity: 0;
-  background: radial-gradient(circle, rgba(221,255,191,.98) 0 18%, rgba(62,220,113,.8) 38%, rgba(65,210,111,0) 72%);
+  background: radial-gradient(circle, rgba(255,255,238,.98) 0 14%, rgba(var(--glow-rgb),.88) 38%, rgba(var(--glow-rgb),0) 72%);
   filter: blur(1px);
-  animation: impactGlow 1.2s 2.67s ease-out both;
+  animation: impactGlow .92s var(--impact-delay) ease-out both;
 }
 
 .twinkle {
@@ -101,16 +197,16 @@
   width: 2.2%;
   aspect-ratio: 1;
   opacity: 0;
-  background: rgba(240,255,218,.95);
+  background: rgba(250,255,240,.98);
   clip-path: polygon(50% 0, 60% 39%, 100% 50%, 60% 61%, 50% 100%, 40% 61%, 0 50%, 40% 39%);
-  filter: drop-shadow(0 0 5px #5ce891);
-  animation: twinklePop .72s ease-out both;
+  filter: drop-shadow(0 0 5px rgb(var(--glow-rgb)));
+  animation: twinklePop .72s var(--twinkle-delay) ease-out both;
 }
 
-.twinkleOne { top: 47%; left: 67%; animation-delay: 2.78s; }
-.twinkleTwo { top: 43%; left: 78%; animation-delay: 2.92s; }
-.twinkleThree { top: 63%; left: 82%; animation-delay: 3.02s; }
-.twinkleFour { top: 68%; left: 67%; animation-delay: 3.12s; }
+.twinkle1 { top: 47%; left: 67%; }
+.twinkle2 { top: 43%; left: 78%; }
+.twinkle3 { top: 63%; left: 82%; }
+.twinkle4 { top: 68%; left: 67%; }
 
 .caption {
   position: relative;
@@ -179,10 +275,7 @@
 }
 
 @keyframes capsuleTravel {
-  /*
-   * 元画像は 910 x 512px。カプセルの見える下端は画像上端から約65px。
-   * 各 top は「レーン上面のY座標 - 65px」で算出し、球の下側をレーンに接地させる。
-   */
+  /* 元画像 910 x 512px。カプセル下端をレーン上面へ接地させた座標。 */
   0% { top: 58.59%; left: 23.63%; opacity: 0; transform: rotate(0) scale(.82); }
   7% { top: 56.05%; left: 25.82%; opacity: 1; transform: rotate(72deg) scale(.92); }
   18% { top: 59.18%; left: 29.12%; transform: rotate(196deg) scale(1); }
@@ -195,7 +288,6 @@
   74% { top: 46.68%; left: 52.20%; transform: rotate(994deg) scale(1); }
   78% { top: 46.68%; left: 55.49%; transform: rotate(1084deg) scale(1); }
   81% { top: 47.85%; left: 57.69%; transform: rotate(1144deg) scale(1); }
-  /* ここでレーン先端を離れ、箱へ向かって小さく跳ねる */
   86% { top: 45.90%; left: 60.99%; transform: rotate(1230deg) scale(1); }
   91% { top: 42.97%; left: 64.84%; transform: rotate(1322deg) scale(.99); }
   96% { top: 47.85%; left: 68.68%; opacity: 1; transform: rotate(1414deg) scale(.96); }
@@ -203,10 +295,10 @@
 }
 
 @keyframes sourceSparkleBurst {
-  0% { opacity: 0; transform: scale(.58); filter: brightness(1.1) saturate(1.18); }
+  0% { opacity: 0; transform: scale(.58); }
   20% { opacity: .96; }
-  72% { opacity: .86; transform: scale(1.05); filter: brightness(1.12) saturate(1.25); }
-  100% { opacity: 0; transform: scale(1.12); filter: brightness(1.05) saturate(1.1); }
+  72% { opacity: .88; transform: scale(1.05); }
+  100% { opacity: 0; transform: scale(1.12); }
 }
 
 @keyframes impactGlow {
@@ -221,11 +313,26 @@
   100% { opacity: 0; transform: scale(1.65) rotate(55deg); }
 }
 
+@keyframes rainbowFilter {
+  0% { filter: hue-rotate(0deg) saturate(1.7) brightness(1.08) drop-shadow(0 4px 4px rgba(66, 83, 49, .28)); }
+  33% { filter: hue-rotate(115deg) saturate(1.7) brightness(1.12) drop-shadow(0 4px 4px rgba(66, 83, 49, .28)); }
+  66% { filter: hue-rotate(235deg) saturate(1.7) brightness(1.12) drop-shadow(0 4px 4px rgba(66, 83, 49, .28)); }
+  100% { filter: hue-rotate(360deg) saturate(1.7) brightness(1.08) drop-shadow(0 4px 4px rgba(66, 83, 49, .28)); }
+}
+
+@keyframes rainbowSparkle {
+  0% { filter: hue-rotate(0deg) saturate(1.8) brightness(1.14); }
+  50% { filter: hue-rotate(180deg) saturate(1.8) brightness(1.2); }
+  100% { filter: hue-rotate(360deg) saturate(1.8) brightness(1.14); }
+}
+
 @media (max-width: 370px) {
   .page { padding-inline: 10px; }
   .heading { align-items: flex-start; }
   .safeBadge { padding-inline: 8px; font-size: 9px; }
   .stageWrap { border-radius: 25px; }
+  .rarityPicker { gap: 3px; }
+  .rarityButton { min-height: 31px; font-size: 9px; }
 }
 
 @media (prefers-reduced-motion: reduce) {
