@@ -1,6 +1,7 @@
 "use client";
 
 import { forwardRef, useCallback, useEffect, useImperativeHandle, useMemo, useRef, useState } from "react";
+import type { CSSProperties } from "react";
 import type { GachaRarity } from "@/lib/gacha/config";
 import { playGachaCue, setGachaAudioPlaybackRate } from "./audio";
 import styles from "./gacha-cinematic.module.css";
@@ -214,7 +215,11 @@ type MultiCapsuleIntroProps = {
 };
 
 function MultiCapsuleIntro({ results, promotion, playbackRate, onTogglePlaybackRate, onComplete, onSkipAll }: MultiCapsuleIntroProps) {
-  const [batchPhase, setBatchPhase] = useState("10個のカプセル排出！");
+  const drawLabel = `${results.length}連ガチャ`;
+  // 10連は5列のまま。100連は10列にして、各列の粒を小さくすることで
+  // 全部を1画面（+縦スクロール）で見られるようにする。
+  const columns = results.length > 20 ? 10 : 5;
+  const [batchPhase, setBatchPhase] = useState(`${results.length}個のカプセル排出！`);
   const rootRef = useRef<HTMLDivElement>(null);
   const machineRef = useRef<HTMLDivElement>(null);
   const knobRef = useRef<HTMLSpanElement>(null);
@@ -288,19 +293,29 @@ function MultiCapsuleIntro({ results, promotion, playbackRate, onTogglePlaybackR
         .to(knobRef.current, { rotation: 720, duration: 1.1, ease: "power3.inOut" }, "<")
         .addLabel("capsuleDrop", ">-0.12");
 
+      // 件数が多いほど間隔を詰めて、100個でも数秒でひとまとまりに落ちきるようにする。
+      const dropInterval = capsules.length > 20
+        ? Math.max(0.018, 2.4 / capsules.length)
+        : MULTI_DROP_INTERVAL;
+      const offsetUnit = (48 * 5) / columns;
+      // ドロップ音が100連で鳴りっぱなしにならないよう、間引いて再生する。
+      const soundStep = Math.max(1, Math.round(capsules.length / 24));
+
       capsules.forEach((capsule, index) => {
-        const column = index % 5;
-        const at = `capsuleDrop+=${(index * MULTI_DROP_INTERVAL).toFixed(3)}`;
-        tl.call(() => playGachaCue("drop"), undefined, at)
+        const column = index % columns;
+        const at = `capsuleDrop+=${(index * dropInterval).toFixed(3)}`;
+        tl.call(() => {
+          if (index % soundStep === 0) playGachaCue("drop");
+        }, undefined, at)
           .fromTo(
             capsule,
-            { opacity: 0, x: (2 - column) * 48, y: -210 - (index % 2) * 22, scale: 0.34, rotation: -150 + index * 19 },
+            { opacity: 0, x: (Math.floor(columns / 2) - column) * offsetUnit, y: -210 - (index % 2) * 22, scale: 0.34, rotation: -150 + index * 19 },
             { opacity: 1, x: 0, y: 0, scale: 1, rotation: 0, duration: MULTI_DROP_DURATION, ease: "bounce.out" },
             at,
           );
       });
 
-      const dropSequenceDuration = Math.max(0, capsules.length - 1) * MULTI_DROP_INTERVAL + MULTI_DROP_DURATION;
+      const dropSequenceDuration = Math.max(0, capsules.length - 1) * dropInterval + MULTI_DROP_DURATION;
       tl.to(machineRef.current, { opacity: 0.68, scale: 0.94, duration: 0.3 }, `capsuleDrop+=${dropSequenceDuration.toFixed(3)}`);
 
       const promotionTarget = promotion ? capsules[promotion.index] : undefined;
@@ -348,16 +363,16 @@ function MultiCapsuleIntro({ results, promotion, playbackRate, onTogglePlaybackR
       timelineRef.current?.kill();
       timelineRef.current = null;
     };
-  }, [complete, promotion, results]);
+  }, [columns, complete, promotion, results]);
 
   return (
-    <div ref={rootRef} className={`${styles.root} ${styles.batchRoot}`} role="dialog" aria-modal="true" aria-label="10連ガチャのカプセル排出演出">
+    <div ref={rootRef} className={`${styles.root} ${styles.batchRoot}`} role="dialog" aria-modal="true" aria-label={`${drawLabel}のカプセル排出演出`}>
       <div className={styles.backdrop} />
       <div className={styles.ambient} />
       <div className={styles.vignette} />
       <div className={styles.hud}>
         <div>
-          <p className={styles.eyebrow}>10連ガチャ</p>
+          <p className={styles.eyebrow}>{drawLabel}</p>
           <p className={styles.phase} aria-live="polite">{batchPhase}</p>
         </div>
       </div>
@@ -373,7 +388,11 @@ function MultiCapsuleIntro({ results, promotion, playbackRate, onTogglePlaybackR
           <span ref={knobRef} className={styles.knob} aria-hidden="true" />
         </div>
 
-        <div className={styles.batchTray} aria-label="排出された10個のカプセル">
+        <div
+          className={styles.batchTray}
+          aria-label={`排出された${results.length}個のカプセル`}
+          style={{ "--batch-columns": columns } as CSSProperties}
+        >
           {results.map((result, index) => {
             const isPromotionTarget = promotion?.index === index;
             const capsuleRarity = isPromotionTarget && promotion
@@ -773,9 +792,9 @@ function GachaCinematicScene({ result, current, total, capsuleOnly, planLabel, p
 export function GachaCinematic({ draw, onComplete }: { draw: AnimationDraw; onComplete: (draw: AnimationDraw) => void }) {
   useBodyScrollLock();
   const isHundred = draw.plan === "hundred";
-  // 100連はカプセル一括排出の演出を挟まず、そのままレア以上の個別演出へ進む。
-  const showBatchIntro = draw.plan === "multi" && draw.results.length > 1;
-  const isCapsuleOnly = showBatchIntro || isHundred;
+  // 100連も10連と同じく、まず全個数ぶんのカプセルが一括で排出される演出を見せる。
+  const showBatchIntro = (draw.plan === "multi" || isHundred) && draw.results.length > 1;
+  const isCapsuleOnly = showBatchIntro;
   const planLabel = draw.plan === "hundred" ? "100連ガチャ" : draw.plan === "multi" ? "10連ガチャ" : null;
 
   // 100連はSR以上だけを1件ずつの演出にかけ、N・Rは結果一覧にまとめて出す。
@@ -828,11 +847,10 @@ export function GachaCinematic({ draw, onComplete }: { draw: AnimationDraw; onCo
   }, [currentIndex, cinematicResults.length, finishAll]);
 
   useEffect(() => {
+    // カプセル一括排出の演出中は、その演出自身の onComplete / onSkipAll に任せる。
+    if (!batchIntroComplete) return;
     if (cinematicResults.length === 0) finishAll();
-  }, [cinematicResults.length, finishAll]);
-
-  const result = cinematicResults[currentIndex];
-  if (!result) return null;
+  }, [batchIntroComplete, cinematicResults.length, finishAll]);
 
   if (!batchIntroComplete) {
     return (
@@ -846,6 +864,9 @@ export function GachaCinematic({ draw, onComplete }: { draw: AnimationDraw; onCo
       />
     );
   }
+
+  const result = cinematicResults[currentIndex];
+  if (!result) return null;
 
   return (
     <GachaCinematicScene

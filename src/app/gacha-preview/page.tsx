@@ -77,6 +77,25 @@ const TEN_PULL_RESULTS: DrawResult[] = [
 const PROMOTION_RATE = 0.01;
 const LR_PROMOTION_RATE = 0.7;
 
+const HUNDRED_PULL_POOL: Record<"N" | "R" | "SR" | "SSR" | "UR" | "LR", DrawResult> = {
+  N: { id: "preview-100-n", name: "カラフルボール", rarity: "N", type: "item", image: "/collection/items/colorful-ball.webp", isNew: false, previousLevel: 1, newLevel: 1 },
+  R: { id: "preview-100-r", name: "あひるのぬいぐるみ", rarity: "R", type: "item", image: "/collection/items/duck-plush.webp", isNew: false, previousLevel: 1, newLevel: 1 },
+  SR: { id: "preview-100-sr", name: "宝箱おやつパズル", rarity: "SR", type: "item", image: "/collection/items/treasure-puzzle.webp", isNew: false, previousLevel: 1, newLevel: 1 },
+  SSR: { ...PREVIEW_RESULTS.SSR, id: "preview-100-ssr", isNew: false },
+  UR: { ...PREVIEW_RESULTS.UR, id: "preview-100-ur", isNew: false },
+  LR: { ...PREVIEW_RESULTS.LR, id: "preview-100-lr", isNew: false },
+};
+
+function createHundredPull(): AnimationDraw {
+  const results: DrawResult[] = Array.from({ length: 100 }, (_, index) => {
+    const roll = Math.random() * 100;
+    const rarity = roll < 49.5 ? "N" : roll < 74.5 ? "R" : roll < 90.5 ? "SR" : roll < 96.5 ? "SSR" : roll < 99.5 ? "UR" : "LR";
+    const base = HUNDRED_PULL_POOL[rarity];
+    return { ...base, id: `${base.id}-${index}`, isNew: index % 7 === 0 };
+  });
+  return { plan: "hundred", results };
+}
+
 function createTenPull(forcePromotion: boolean): AnimationDraw {
   const results = TEN_PULL_RESULTS.map((result) => ({ ...result }));
   if (!forcePromotion && Math.random() >= PROMOTION_RATE) return { plan: "multi", results };
@@ -111,6 +130,11 @@ export default function GachaPreviewPage() {
   const playTen = (forcePromotion = false) => {
     primeGachaAudio();
     setActive(createTenPull(forcePromotion));
+  };
+
+  const playHundred = () => {
+    primeGachaAudio();
+    setActive(createHundredPull());
   };
 
   return (
@@ -154,6 +178,15 @@ export default function GachaPreviewPage() {
         >
           <span className="block text-lg font-black">確変を強制再生</span>
           <span className="mt-1 block text-[10px] font-bold text-white/75">プレビュー確認用：N/Rの1個がLR 70%・MR 30%で昇格</span>
+        </button>
+
+        <button
+          type="button"
+          onClick={playHundred}
+          className="mt-3 min-h-24 w-full rounded-[28px] bg-gradient-to-r from-[#0f4d2e] via-[#1c8f52] to-[#e3b74e] p-5 text-left text-white shadow-[0_14px_28px_rgba(73,59,43,.2)] active:scale-[.98]"
+        >
+          <span className="block text-2xl font-black tracking-[0.08em]">100連を再生</span>
+          <span className="mt-2 block text-[11px] font-black text-white/80">100個のカプセル排出 → SR以上だけ個別演出</span>
         </button>
 
         <div className="mt-7 rounded-[24px] border border-[#dfd1b9] bg-white/70 p-4 text-xs font-semibold leading-6 text-[#7d6d58]">
