@@ -11,10 +11,13 @@
  * 正規表現+evalでLVテーブル・出現重み・？アイテムの抽選プール・ROUND_SECONDS等を抽出するため、
  * 実装側の数値を変更すればこのスクリプトも自動的に追従する（値を二重管理しない）。
  *
- * 使い方: node scripts/simulate-item-catch.mjs [試行回数(デフォルト300)] [avoid|all]
+ * 使い方: node scripts/simulate-item-catch.mjs [試行回数(デフォルト300)] [avoid|all] [時間増加系7種の実キャッチ率(デフォルト1)]
  *   第2引数 "avoid"（デフォルト）: 時間減少ハザードとチョコレートは回避する（キャッチしない）前提
  *   第2引数 "all": ハザードも含めて全てのスポーンを100%キャッチする前提
  *     （時間減少は-3秒、チョコレートは即座にラウンド終了）
+ *   第3引数: 時間増加系7種(あひる/にんじん/肉球メロンパン/アンボール/小豆/おもじぃ/夏のフレブル)が
+ *     出現した際に実際にキャッチできる確率。例: 0.9 を渡すと「時間増加系を9割しか取れない」プレイを再現する
+ *     （見送った分は何も起きない＝ハズレでも他のアイテムでもなく、ただ落下していくだけとして扱う）
  *
  * 既知の簡略化（完全な再現ではない点に注意）:
  * - もっちゅりんの「エコー」（直前に捕まえたアイテムのスキルを再発動）は未実装
@@ -134,7 +137,7 @@ function uniform(min, max) { return min + Math.random() * (max - min); }
 function weightOf(id) { return ITEM_SPAWN_WEIGHTS[id] ?? DEFAULT_WEIGHT; }
 function clamp1to5(x) { return Math.min(5, Math.max(1, x)); }
 
-function simulateOneRound(lv, catchAll) {
+function simulateOneRound(lv, catchAll, timeBonusCatchRate = 1) {
   let t = 0;
   let endAt = ROUND_SECONDS * 1000;
   let score = 0;
@@ -371,8 +374,11 @@ function simulateOneRound(lv, catchAll) {
       if (Math.random() < FRENCHIE_SKIN_SPAWN_CHANCE) {
         const skinIds = ["hiking_frenchie", "snow_frenchie", "summer_frenchie"];
         const sid = skinIds[Math.floor(Math.random() * skinIds.length)];
-        const item = byId.get(sid);
-        resolveCatch("item", sid, item.rarity, lv + 1);
+        // 時間増加系(夏のフレブル)はtimeBonusCatchRateの確率でしか実際にはキャッチできない前提
+        if (!TIME_BONUS_IDS.has(sid) || Math.random() < timeBonusCatchRate) {
+          const item = byId.get(sid);
+          resolveCatch("item", sid, item.rarity, lv + 1);
+        }
       } else {
         const dogGoldenActive = t < dogGoldenUntil;
         resolveCatch("dog", dogGoldenActive ? "toorematen_golden_dog" : null, null, 0);
@@ -383,8 +389,11 @@ function simulateOneRound(lv, catchAll) {
     let pickedId = pool[pool.length - 1].id;
     for (let i = 0; i < pool.length; i++) { roll -= weights[i]; if (roll <= 0) { pickedId = pool[i].id; break; } }
     if (highRarityLockCount > 0) highRarityLockCount -= 1;
-    const item = byId.get(pickedId);
-    resolveCatch("item", pickedId, item.rarity, lv + 1);
+    // 時間増加系7種はtimeBonusCatchRateの確率でしか実際にはキャッチできない前提（見送ると何も起きない）
+    if (!TIME_BONUS_IDS.has(pickedId) || Math.random() < timeBonusCatchRate) {
+      const item = byId.get(pickedId);
+      resolveCatch("item", pickedId, item.rarity, lv + 1);
+    }
   }
 
   const playSeconds = endAt / 1000;
@@ -401,11 +410,12 @@ function main() {
   const mode = process.argv[3] ?? "avoid";
   if (mode !== "avoid" && mode !== "all") throw new Error(`unknown mode: ${mode} (use "avoid" or "all")`);
   const catchAll = mode === "all";
-  console.log(`itemPool N=${POOL_SIZE} / ROUND_SECONDS=${ROUND_SECONDS} / 試行回数=${trials} / モード=${mode}${catchAll ? "（時間減少・チョコレートも100%キャッチ）" : "（時間減少・チョコレートは回避）"}\n`);
+  const timeBonusCatchRate = process.argv[4] !== undefined ? Number(process.argv[4]) : 1;
+  console.log(`itemPool N=${POOL_SIZE} / ROUND_SECONDS=${ROUND_SECONDS} / 試行回数=${trials} / モード=${mode}${catchAll ? "（時間減少・チョコレートも100%キャッチ）" : "（時間減少・チョコレートは回避）"} / 時間増加系7種の実キャッチ率=${timeBonusCatchRate}\n`);
   for (let lvIdx = 0; lvIdx < 5; lvIdx++) {
     const scores = [], secs = [];
     for (let i = 0; i < trials; i++) {
-      const r = simulateOneRound(lvIdx, catchAll);
+      const r = simulateOneRound(lvIdx, catchAll, timeBonusCatchRate);
       scores.push(r.score);
       secs.push(r.playSeconds);
     }
