@@ -161,7 +161,7 @@ const MYSTERY_SKILL_ITEM_IDS = [
 /** アイテムごとのLv1〜5パラメータ（item_skill_levels_colored.xlsxの「スキル一覧」シート通り） */
 const LV = {
   DUCK_SEC: [1, 3, 4, 5, 6],
-  CARROT_SEC: [1, 3, 4, 5, 7],
+  CARROT_SEC: [1, 3, 4, 5, 6],
   FRISBEE_MULT: [2, 2.2, 2.4, 2.7, 3],
   SOCCER_PT: [10, 15, 20, 30, 40],
   TAIYAKI_PT: [5, 7, 10, 13, 15],
@@ -235,7 +235,7 @@ const LV = {
   RAGBY_SPAWN: [2, 2.25, 2.5, 2.75, 3],
   OYATSU_PT: [180, 200, 220, 240, 280],
   KETSUNADE_SEC: [4, 5, 6, 8, 10],
-  BUREBUR_COUNT: [6, 8, 10, 12, 14],
+  BUREBUR_COUNT: [6, 8, 10, 12, 7],
   XMAS_SEC: [6, 7, 9, 10, 12],
   XMAS_FALL: [1.8, 2, 2.2, 2.4, 2.5],
   XMAS_SCORE: [2, 2.2, 2.5, 2.7, 3],
