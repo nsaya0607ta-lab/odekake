@@ -153,7 +153,7 @@ const MYSTERY_SKILL_ITEM_IDS = [
   "other_komochi", "other_azuki", "other_kobee", "other_hamigaki", "other_ikea", "other_orusuban",
   "other_pondeomo", "other_pondear", "other_kurumari_a", "other_jare_a", "other_ketsunade_a", "other_omochi_janai", "other_oyasumi", "other_nisoku_a",
   "interior_shikkoku_no_ar", "interior_ragby_ar", "other_oyatsu_no_jikan", "other_listen_to_the_a", "other_okaeri",
-  "food_fruit_basket", "interior_gold_ball", "other_clawd", "food_kamikami", "food_mocchurin",
+  "food_fruit_basket", "interior_gold_ball", "other_clawd", "food_kamikami", "food_mocchurin", "other_mah",
 ];
 
 /** アイテムごとのLv1〜5パラメータ（item_skill_levels_colored.xlsxの「スキル一覧」シート通り） */
@@ -253,6 +253,7 @@ const LV = {
   KAMIKAMI_PT: [10, 15, 25, 35, 45],
   MOCCHURIN_PT: [30, 45, 60, 80, 100],
   TIME_BONUS_FALL: [6, 5.6, 5.2, 4.8, 4.5],
+  MAH_PT: [45, 60, 80, 100, 130],
 } as const;
 const SLANT_VX_BOOST = 3.5;
 const POINTS: Record<FrenchieCatchItem["rarity"], number> = { N: 10, R: 20, SR: 40, SSR: 70, UR: 100, LR: 150, MR: 220 };
@@ -1562,6 +1563,13 @@ export function FrenchieCatchGame({ ownedItems }: { ownedItems: FrenchieCatchIte
                 points += LV.NAKAYOSHI_PT[lv]!;
                 const guard = grantRandomHazardGuard();
                 effectLabel = `+${LV.NAKAYOSHI_PT[lv]}pt / ${guard ? HAZARD_GUARD_LABELS[guard] : "防止アイテムは満タン"}${lvTag}`;
+                statusChanged = true;
+                break;
+              }
+              case "other_mah": {
+                points += LV.MAH_PT[lv]!;
+                const guard = grantRandomHazardGuard();
+                effectLabel = `+${LV.MAH_PT[lv]}pt / ${guard ? HAZARD_GUARD_LABELS[guard] : "防止アイテムは満タン"}${lvTag}`;
                 statusChanged = true;
                 break;
               }

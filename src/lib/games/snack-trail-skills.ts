@@ -94,6 +94,7 @@ const RECIPES: Record<string, SkillRecipe> = {
   other_burebur: { title: "ブレブル覚醒", kind: "ultimate" },
   other_xmas_party: { title: "プレゼントラッシュ", kind: "ultimate" },
   other_clawd: { title: "未来予測", kind: "combo" },
+  other_mah: { title: "だっこシールド", kind: "shield" },
   other_yellow_rain_boots: { title: "水たまりジャンプ", kind: "noGrow" },
   accessory_red_bandana: { title: "赤い応援", kind: "combo" },
   other_acorns: { title: "どんぐりころころ", kind: "wide" },
