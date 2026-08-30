@@ -104,6 +104,7 @@ const POOP_FLOOD_SPAWN_RATE = Number(GAME_TSX.match(/const POOP_FLOOD_SPAWN_RATE
 
 const POINTS = evalLiteral(extractBlock(GAME_TSX, 'const POINTS: Record<FrenchieCatchItem["rarity"], number> = {', "{", "}"));
 const MYSTERY_BASE_POINTS = Number(GAME_TSX.match(/const MYSTERY_BASE_POINTS = (\d+);/)[1]);
+const IKEA_PT_PER_ITEM = Number(GAME_TSX.match(/const IKEA_PT_PER_ITEM = (\d+);/)[1]);
 const POOP_PENALTY = Number(GAME_TSX.match(/const POOP_PENALTY = (\d+);/)[1]);
 
 const pool = buildItemPool();
@@ -162,7 +163,7 @@ function simulateOneRound(lv, catchAll) {
   function finishIkeaIfDone() {
     if (ikeaUntil > 0 && t >= ikeaUntil) {
       ikeaUntil = 0;
-      if (ikeaCount > 0) { score += ikeaCount * 10; ikeaCount = 0; }
+      if (ikeaCount > 0) { score += ikeaCount * IKEA_PT_PER_ITEM; ikeaCount = 0; }
     }
   }
 
@@ -308,15 +309,16 @@ function simulateOneRound(lv, catchAll) {
       resolveCatch("item", pid, item.rarity, lv + 1);
       continue;
     }
+    if (poopFloodRemaining > 0) { poopFloodRemaining -= 1; catchPoop(); continue; }
+    // Clawdのボールは通常アイテムの抽選をブロックせず並行して降る(独立タイマーの近似として、
+    // このtickの通常ロールを妨げずに追加の1catchとして処理する)
     if (clawdFloodRemaining > 0) {
       clawdFloodRemaining -= 1;
       const isGold = Math.random() < 0.2;
       const pid = isGold ? "interior_gold_ball" : "toy_soccer_ball";
       const item = byId.get(pid);
       resolveCatch("item", pid, item.rarity, lv + 1);
-      continue;
     }
-    if (poopFloodRemaining > 0) { poopFloodRemaining -= 1; catchPoop(); continue; }
 
     const elapsedSec = t / 1000;
     const timeMinusChance = elapsedSec > TIME_MINUS_BOOST_AFTER_SEC

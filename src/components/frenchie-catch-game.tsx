@@ -83,6 +83,7 @@ const MYSTERY_ITEM_ID = "mystery_item";
 const MYSTERY_IMAGE = "/collection/items/mystery-question.webp";
 const MYSTERY_SPAWN_CHANCE = 0.05;
 const MYSTERY_BASE_POINTS = 10;
+const IKEA_PT_PER_ITEM = 60;
 const BAG_ITEM_ID = "hazard_bag";
 const BAG_IMAGE = "/collection/items/plastic-bag.webp";
 const BAG_SPAWN_CHANCE = 0.03;
@@ -232,7 +233,7 @@ const LV = {
   SHIKKOKU_MULT: [2, 2.2, 2.4, 2.7, 3],
   RAGBY_SEC: [5, 6, 7, 9, 12],
   RAGBY_SPAWN: [2, 2.25, 2.5, 2.75, 3],
-  OYATSU_PT: [80, 100, 120, 140, 180],
+  OYATSU_PT: [180, 200, 220, 240, 280],
   KETSUNADE_SEC: [4, 5, 6, 8, 10],
   BUREBUR_COUNT: [6, 8, 10, 12, 14],
   XMAS_SEC: [6, 7, 9, 10, 12],
@@ -241,7 +242,7 @@ const LV = {
   XMAS_SPAWN: [1.5, 1.75, 2, 2.25, 2.5],
   XMAS_DOG_COUNT: [5, 6, 7, 8, 9],
   OMOCHI_SEC: [4, 5, 6, 8, 10],
-  OMOCHI_PT: [10, 15, 20, 25, 30],
+  OMOCHI_PT: [500, 500, 500, 500, 500],
   OKAERI_SEC: 3,
   OKAERI_PER_CATCH: [3, 4, 5, 6, 7],
   OMOI_BASHIRA_SEC: [4, 5, 6, 8, 10],
@@ -343,6 +344,8 @@ const OKAERI_ITEM_ID = "other_okaeri";
 const OMOI_BASHIRA_ITEM_ID = "other_omoi_bashira";
 const OYASUMI_ITEM_ID = "other_oyasumi";
 const OYASUMI_SECONDS = 5;
+/** 50%の確率でブラックアウト演出だけ発生せず、得点倍率だけがかかる */
+const OYASUMI_NO_BLACKOUT_CHANCE = 0.5;
 const NISOKU_A_ITEM_ID = "other_nisoku_a";
 const FRUIT_BASKET_ITEM_ID = "food_fruit_basket";
 const GOLD_BALL_ITEM_ID = "interior_gold_ball";
@@ -477,6 +480,8 @@ export function FrenchieCatchGame({ ownedItems }: { ownedItems: FrenchieCatchIte
   const startAtRef = useRef(0);
   const endAtRef = useRef(0);
   const nextSpawnRef = useRef(0);
+  /** Clawdのボールは通常アイテムの抽選を妨げず、独立したタイマーで並行して降らせる */
+  const nextClawdSpawnRef = useRef(0);
   const rafRef = useRef<number | null>(null);
   const scoreRef = useRef(0);
   const dogCaughtRef = useRef(0);
@@ -711,24 +716,6 @@ export function FrenchieCatchGame({ ownedItems }: { ownedItems: FrenchieCatchIte
       };
     }
 
-    if (clawdBallFloodRemainingRef.current > 0 && (CLAWD_SOCCER_BALL_ITEM || CLAWD_GOLD_BALL_ITEM)) {
-      clawdBallFloodRemainingRef.current -= 1;
-      const rollGold = Math.random() < CLAWD_GOLD_BALL_CHANCE;
-      const ball = (rollGold ? CLAWD_GOLD_BALL_ITEM : CLAWD_SOCCER_BALL_ITEM) ?? CLAWD_SOCCER_BALL_ITEM ?? CLAWD_GOLD_BALL_ITEM!;
-      return {
-        ...base,
-        itemId: ball.id,
-        kind: "item",
-        name: ball.name,
-        image: ball.image ?? "",
-        rarity: ball.rarity,
-        level: itemLevelByIdRef.current.get(ball.id) ?? 0,
-        vy: resolveFallVy(rawVy, base.vy, ball.id, ball.rarity, itemLevelByIdRef.current.get(ball.id) ?? 1),
-        size: 12.5 + Math.random() * 3.5,
-        spin: (Math.random() - 0.5) * 65,
-      };
-    }
-
     if (poopFloodRemainingRef.current > 0) {
       poopFloodRemainingRef.current -= 1;
       return {
@@ -913,6 +900,47 @@ export function FrenchieCatchGame({ ownedItems }: { ownedItems: FrenchieCatchIte
     };
   }, [itemPool]);
 
+  /**
+   * Clawdのボールは通常アイテムの抽選を妨げないよう、createEntityとは独立したタイマーで
+   * 並行して降らせる（他のアイテムと一緒に降ってくる。normal spawnをブロックしない）。
+   */
+  const createClawdBallEntity = useCallback((): Entity | null => {
+    if (!CLAWD_SOCCER_BALL_ITEM && !CLAWD_GOLD_BALL_ITEM) return null;
+    const fallSpeedBoost = performance.now() < fallSpeedBoostUntilRef.current ? fallSpeedValueRef.current : 1;
+    const slantBoost = performance.now() < slantBoostUntilRef.current ? SLANT_VX_BOOST : 1;
+    const rawVy = (17 + Math.random() * 5) * 1.35;
+    const spawnX = 9 + Math.random() * 82;
+    const spawnY = -13 - Math.random() * 5;
+    const base = {
+      id: nextIdRef.current++,
+      x: spawnX,
+      y: spawnY,
+      spawnX,
+      spawnY,
+      vx: (Math.random() - 0.5) * 2.4 * slantBoost,
+      vy: rawVy * fallSpeedBoost,
+      rotation: (Math.random() - 0.5) * 12,
+      status: "falling" as const,
+      rimChecked: false,
+      enteredOpening: false,
+      ttl: 0,
+    };
+    const rollGold = Math.random() < CLAWD_GOLD_BALL_CHANCE;
+    const ball = (rollGold ? CLAWD_GOLD_BALL_ITEM : CLAWD_SOCCER_BALL_ITEM) ?? CLAWD_SOCCER_BALL_ITEM ?? CLAWD_GOLD_BALL_ITEM!;
+    return {
+      ...base,
+      itemId: ball.id,
+      kind: "item",
+      name: ball.name,
+      image: ball.image ?? "",
+      rarity: ball.rarity,
+      level: itemLevelByIdRef.current.get(ball.id) ?? 0,
+      vy: resolveFallVy(rawVy, base.vy, ball.id, ball.rarity, itemLevelByIdRef.current.get(ball.id) ?? 1),
+      size: 12.5 + Math.random() * 3.5,
+      spin: (Math.random() - 0.5) * 65,
+    };
+  }, []);
+
   const pushRecentSkillEffect = useCallback((text: string) => {
     const id = ++recentSkillEffectIdRef.current;
     setRecentSkillEffects((prev) => [{ id, text }, ...prev].slice(0, 2));
@@ -1004,7 +1032,7 @@ export function FrenchieCatchGame({ ownedItems }: { ownedItems: FrenchieCatchIte
         const ikeaCount = ikeaCountRef.current;
         ikeaCountRef.current = 0;
         if (ikeaCount > 0) {
-          const ikeaBonus = ikeaCount * 10;
+          const ikeaBonus = ikeaCount * IKEA_PT_PER_ITEM;
           scoreRef.current += ikeaBonus;
           setScore(scoreRef.current);
           setFeedback({ name: "くみたてボーナス", points: ikeaBonus, effect: `くみたて完成！+${ikeaBonus}pt` });
@@ -1043,6 +1071,14 @@ export function FrenchieCatchGame({ ownedItems }: { ownedItems: FrenchieCatchIte
       if (now >= nextSpawnRef.current && entitiesRef.current.length < entityCap) {
         entitiesRef.current.push(createEntity());
         nextSpawnRef.current = now + (SPAWN_INTERVAL_MIN_MS + Math.random() * (SPAWN_INTERVAL_MAX_MS - SPAWN_INTERVAL_MIN_MS)) / spawnRate;
+      }
+      if (clawdBallFloodRemainingRef.current > 0 && now >= nextClawdSpawnRef.current && entitiesRef.current.length < entityCap) {
+        const ball = createClawdBallEntity();
+        if (ball) {
+          clawdBallFloodRemainingRef.current -= 1;
+          entitiesRef.current.push(ball);
+        }
+        nextClawdSpawnRef.current = now + SPAWN_INTERVAL_MIN_MS + Math.random() * (SPAWN_INTERVAL_MAX_MS - SPAWN_INTERVAL_MIN_MS);
       }
 
       const boxWide = now < boxWideUntilRef.current;
@@ -1602,11 +1638,16 @@ export function FrenchieCatchGame({ ownedItems }: { ownedItems: FrenchieCatchIte
                 break;
               }
               case OYASUMI_ITEM_ID: {
-                blackoutUntilRef.current = now + OYASUMI_SECONDS * 1000;
-                setBlackoutActive(true);
+                const skipBlackout = Math.random() < OYASUMI_NO_BLACKOUT_CHANCE;
+                if (!skipBlackout) {
+                  blackoutUntilRef.current = now + OYASUMI_SECONDS * 1000;
+                  setBlackoutActive(true);
+                }
                 multiplier15UntilRef.current = now + OYASUMI_SECONDS * 1000;
                 multiplier15ValueRef.current = LV.OYASUMI_MULT[lv]!;
-                effectLabel = `${OYASUMI_SECONDS}秒間 上半分ブラックアウト 得点×${LV.OYASUMI_MULT[lv]}${lvTag}`;
+                effectLabel = skipBlackout
+                  ? `${OYASUMI_SECONDS}秒間 得点×${LV.OYASUMI_MULT[lv]}（ブラックアウトなし）${lvTag}`
+                  : `${OYASUMI_SECONDS}秒間 上半分ブラックアウト 得点×${LV.OYASUMI_MULT[lv]}${lvTag}`;
                 statusChanged = true;
                 break;
               }
@@ -2069,6 +2110,7 @@ export function FrenchieCatchGame({ ownedItems }: { ownedItems: FrenchieCatchIte
     startAtRef.current = now;
     endAtRef.current = now + ROUND_SECONDS * 1000;
     nextSpawnRef.current = now;
+    nextClawdSpawnRef.current = now;
     setPhase("playing");
   }, []);
 
