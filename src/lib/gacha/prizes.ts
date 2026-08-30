@@ -102,6 +102,7 @@ export const GACHA_PRIZES: readonly GachaPrize[] = [
   // --- 通常ガチャ：その他 追加分 --------------------------------------
   { id: "other_clawd", name: "Clawd", rarity: "SSR", type: "item", image: "/collection/items/clawd.webp" },
   { id: "other_mah", name: "mah-", rarity: "UR", type: "item", image: "/collection/items/mah.webp" },
+  { id: "other_mirror_omochi", name: "ミラーおもち", rarity: "UR", type: "item", image: "/collection/items/mirror-omochi.webp" },
 
   // --- 通常ガチャ：おでかけ小物 ----------------------------------------
   { id: "other_yellow_rain_boots", name: "きいろのながぐつ", rarity: "N", type: "item", image: "/collection/items/yellow-rain-boots.webp" },

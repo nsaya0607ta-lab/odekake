@@ -629,3 +629,32 @@ r値を1から十分離さない限り（＝時間増加効果自体をもっと
 現在の`ITEM_SPAWN_WEIGHTS`はこの節の数値が最新（宝箱=149、`other_omojii`=71、`other_azuki`=71、
 他5種(`toy_duck_plush`/`toy_carrot`/`food_paw_melon_bread`/`interior_anball`/`summer_frenchie`)=103、
 `other_listen_to_the_a`=50、N=84）。
+
+## ミラーおもち（UR・その他）追加による重み再調整（2026-08-30）
+
+新規URアイテム「ミラーおもち」(`other_mirror_omochi`)を追加した。効果は「Lv1〜5で5/6/8/10/13秒間、
+しびれ/ダンボール縮小/時間減少のマイナス効果を反転させる」（`hazardInvertUntilRef`で管理）。効果中に
+これら3種のハザードをキャッチすると、本来のマイナスではなく次のプラス効果に変わる：
+- 時間減少 → 残り時間 +3秒（本来の-3秒がそのまま符号反転）
+- ダンボール縮小 → 3秒間ダンボール拡大（`boxWideUntilRef`/`BOX_WIDE_SCALE_DEFAULT`を流用）
+- しびれ → しびれなしでLv別+15/20/25/30/40pt（`mirrorStunPtValueRef`にスキル発動時のLv別値を保持）
+
+反転判定はガード（防止付与）より先に評価するため、反転中はガードを消費しない。呪いのチョコレート・
+イカスミは反転対象外（既存のガード系と同じ3種のみ）。時間増加系・出現量アップ系のどちらでもない
+（反転で得られる時間・出現量への寄与は、既存の防止付与系アイテムと同様に本メモの確率モデルでは
+無視できるものとして扱う）。
+
+この追加により図鑑プールが84→**85**種に増え、既存アイテムの取得確率が薄まる。同じ「時間増加系7種の
+重みをプール総数の増加率（Total(85)/Total(84) ≈ **1.0120**）だけ底上げする」方針で、
+`toy_duck_plush` / `toy_carrot` / `food_paw_melon_bread` / `interior_anball` / `summer_frenchie`を
+103→**104**、`other_omojii` / `other_azuki`を71→**72**に変更して相殺した（宝箱=149、
+`other_listen_to_the_a`=50は変更なし）。
+
+この倍率はN=84時点の重みをN=85のTotalで割った場合に生じる希釈率の逆数にあたるため、調整後の時間増加系
+7種の取得確率(P_i)はN=84時点とほぼ完全に一致する（ミラーおもち自身の重みがデフォルト100でTotalに
+わずかに混ざる分だけ、二次的な誤差が残る）。したがってLv1〜5の最終プレイ時間期待値は、直前の節
+（mah-追加後）からほぼ変化していない想定。
+
+現在の`ITEM_SPAWN_WEIGHTS`はこの節の数値が最新（宝箱=149、`other_omojii`=72、`other_azuki`=72、
+他5種(`toy_duck_plush`/`toy_carrot`/`food_paw_melon_bread`/`interior_anball`/`summer_frenchie`)=104、
+`other_listen_to_the_a`=50、N=85）。

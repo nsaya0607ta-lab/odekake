@@ -154,6 +154,7 @@ const MYSTERY_SKILL_ITEM_IDS = [
   "other_pondeomo", "other_pondear", "other_kurumari_a", "other_jare_a", "other_ketsunade_a", "other_omochi_janai", "other_oyasumi", "other_nisoku_a",
   "interior_shikkoku_no_ar", "interior_ragby_ar", "other_oyatsu_no_jikan", "other_listen_to_the_a", "other_okaeri",
   "food_fruit_basket", "interior_gold_ball", "other_clawd", "food_kamikami", "food_mocchurin", "other_mah",
+  "other_mirror_omochi",
 ];
 
 /** アイテムごとのLv1〜5パラメータ（item_skill_levels_colored.xlsxの「スキル一覧」シート通り） */
@@ -254,6 +255,8 @@ const LV = {
   MOCCHURIN_PT: [30, 45, 60, 80, 100],
   TIME_BONUS_FALL: [6, 5.6, 5.2, 4.8, 4.5],
   MAH_PT: [60, 80, 100, 130, 170],
+  MIRROR_SEC: [5, 6, 8, 10, 13],
+  MIRROR_STUN_PT: [15, 20, 25, 30, 40],
 } as const;
 const SLANT_VX_BOOST = 3.5;
 const POINTS: Record<FrenchieCatchItem["rarity"], number> = { N: 10, R: 20, SR: 40, SSR: 70, UR: 100, LR: 150, MR: 220 };
@@ -319,13 +322,13 @@ const DEFAULT_ITEM_SPAWN_WEIGHT = 100;
  */
 const ITEM_SPAWN_WEIGHTS: Partial<Record<string, number>> = {
   toy_treasure_puzzle: 149,
-  other_omojii: 71,
-  toy_duck_plush: 103,
-  toy_carrot: 103,
-  food_paw_melon_bread: 103,
-  interior_anball: 103,
-  other_azuki: 71,
-  summer_frenchie: 103,
+  other_omojii: 72,
+  toy_duck_plush: 104,
+  toy_carrot: 104,
+  food_paw_melon_bread: 104,
+  interior_anball: 104,
+  other_azuki: 72,
+  summer_frenchie: 104,
   other_listen_to_the_a: 50,
 };
 const STRETCH_ROD_ITEM_ID = "interior_stretch_rod";
@@ -526,6 +529,9 @@ export function FrenchieCatchGame({ ownedItems }: { ownedItems: FrenchieCatchIte
   const boxShrinkUntilRef = useRef(0);
   const blackoutUntilRef = useRef(0);
   const stunUntilRef = useRef(0);
+  /** ミラーおもち：有効中はしびれ/ダンボール縮小/時間減少のマイナス効果が反転してプラスになる */
+  const hazardInvertUntilRef = useRef(0);
+  const mirrorStunPtValueRef = useRef(0);
   const feedbackTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const impactTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const recentSkillEffectIdRef = useRef(0);
@@ -625,6 +631,7 @@ export function FrenchieCatchGame({ ownedItems }: { ownedItems: FrenchieCatchIte
     if (now - startAtRef.current > TOP_ZONE_HIDDEN_AFTER_SEC_2 * 1000) labels.push("画面上部1/4が見えない");
     else if (now - startAtRef.current > TOP_ZONE_HIDDEN_AFTER_SEC * 1000) labels.push("画面上部が見えない");
     if (now < stunUntilRef.current) labels.push("しびれ中");
+    if (now < hazardInvertUntilRef.current) labels.push("ミラータイム中（ハザード反転）");
     if (urBoostRef.current > 0) labels.push(`UR出現率+${Math.min(urBoostRef.current, UR_BOOST_MAX)}`);
     setActiveEffects(labels);
   }, []);
@@ -1137,8 +1144,14 @@ export function FrenchieCatchGame({ ownedItems }: { ownedItems: FrenchieCatchIte
             if (NEGATIVE_HAZARD_IDS.has(entity.itemId ?? "")) {
               caughtRef.current += 1;
               setCaught(caughtRef.current);
+              const hazardInverted = now < hazardInvertUntilRef.current
+                && (entity.itemId === TIME_MINUS_ITEM_ID || entity.itemId === BOX_SHRINK_ITEM_ID || entity.itemId === STUN_ITEM_ID);
               if (entity.itemId === TIME_MINUS_ITEM_ID) {
-                if (timeMinusGuardRef.current > 0) {
+                if (hazardInverted) {
+                  endAtRef.current += TIME_MINUS_SECONDS * 1000;
+                  setTimeLeft(Math.ceil(Math.max(0, (endAtRef.current - now) / 1000)));
+                  showCatch(entity, 0, `ミラー反転！残り時間 +${TIME_MINUS_SECONDS}秒`);
+                } else if (timeMinusGuardRef.current > 0) {
                   timeMinusGuardRef.current = 0;
                   setTimeMinusGuard(0);
                   showCatch(entity, 0, `${HAZARD_GUARD_LABELS.timeMinus}で無効化！`);
@@ -1150,7 +1163,11 @@ export function FrenchieCatchGame({ ownedItems }: { ownedItems: FrenchieCatchIte
                   if (endAtRef.current <= now) { endAtRef.current = now; setTimeLeft(0); finishRound(now); }
                 }
               } else if (entity.itemId === BOX_SHRINK_ITEM_ID) {
-                if (boxShrinkGuardRef.current > 0) {
+                if (hazardInverted) {
+                  boxWideUntilRef.current = now + BOX_SHRINK_SECONDS * 1000;
+                  boxWideScaleRef.current = BOX_WIDE_SCALE_DEFAULT;
+                  showCatch(entity, 0, `ミラー反転！${BOX_SHRINK_SECONDS}秒間 ダンボール拡大`);
+                } else if (boxShrinkGuardRef.current > 0) {
                   boxShrinkGuardRef.current = 0;
                   setBoxShrinkGuard(0);
                   showCatch(entity, 0, `${HAZARD_GUARD_LABELS.boxShrink}で無効化！`);
@@ -1163,7 +1180,12 @@ export function FrenchieCatchGame({ ownedItems }: { ownedItems: FrenchieCatchIte
                 setBlackoutActive(true);
                 showCatch(entity, 0, BLACKOUT_SECONDS + "秒間 上半分が見えない！");
               } else if (entity.itemId === STUN_ITEM_ID) {
-                if (stunGuardRef.current > 0) {
+                if (hazardInverted) {
+                  const bonusPt = mirrorStunPtValueRef.current;
+                  scoreRef.current += bonusPt;
+                  setScore(scoreRef.current);
+                  showCatch(entity, bonusPt, `ミラー反転！+${bonusPt}pt`);
+                } else if (stunGuardRef.current > 0) {
                   stunGuardRef.current = 0;
                   setStunGuard(0);
                   showCatch(entity, 0, `${HAZARD_GUARD_LABELS.stun}で無効化！`);
@@ -1570,6 +1592,14 @@ export function FrenchieCatchGame({ ownedItems }: { ownedItems: FrenchieCatchIte
                 points += LV.MAH_PT[lv]!;
                 const guard = grantRandomHazardGuard();
                 effectLabel = `+${LV.MAH_PT[lv]}pt / ${guard ? HAZARD_GUARD_LABELS[guard] : "防止アイテムは満タン"}${lvTag}`;
+                statusChanged = true;
+                break;
+              }
+              case "other_mirror_omochi": {
+                const mirrorSec = LV.MIRROR_SEC[lv]!;
+                hazardInvertUntilRef.current = now + mirrorSec * 1000;
+                mirrorStunPtValueRef.current = LV.MIRROR_STUN_PT[lv]!;
+                effectLabel = `${mirrorSec}秒間 ハザード反転${lvTag}`;
                 statusChanged = true;
                 break;
               }
