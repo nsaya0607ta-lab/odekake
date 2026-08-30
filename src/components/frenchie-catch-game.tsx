@@ -234,7 +234,7 @@ const LV = {
   RAGBY_SPAWN: [2, 2.25, 2.5, 2.75, 3],
   OYATSU_PT: [80, 100, 120, 140, 180],
   KETSUNADE_SEC: [4, 5, 6, 8, 10],
-  BUREBUR_COUNT: [2, 3, 3, 4, 5],
+  BUREBUR_COUNT: [6, 8, 10, 12, 14],
   XMAS_SEC: [6, 7, 9, 10, 12],
   XMAS_FALL: [1.8, 2, 2.2, 2.4, 2.5],
   XMAS_SCORE: [2, 2.2, 2.5, 2.7, 3],
@@ -362,6 +362,8 @@ const MOCCHURIN_ITEM_ID = "food_mocchurin";
 const MOCCHURIN_DOUBLE_ECHO_MIN_LV = 3;
 /** ブレブルの効果中、このレアリティ以外のアイテムは出現しなくなる */
 const HIGH_RARITY_LOCK_RARITIES = new Set<FrenchieCatchItem["rarity"]>(["SSR", "UR", "LR"]);
+/** ブレブルは他の「レア枠確定」より対象を絞り、UR・LRランクのみに限定する */
+const BUREBUR_LOCK_RARITIES = new Set<FrenchieCatchItem["rarity"]>(["UR", "LR"]);
 const OTHER_CATEGORY_ITEM_IDS = new Set(
   COLLECTION_ITEMS.filter((entry) => entry.category === "other").map((entry) => entry.id),
 );
@@ -634,7 +636,7 @@ export function FrenchieCatchGame({ ownedItems }: { ownedItems: FrenchieCatchIte
     if (now < spawnRateBoostUntilRef.current) labels.push(`アイテム出現量×${spawnRateBoostValueRef.current}中`);
     if (now < otherSuppressUntilRef.current) labels.push(`その他カテゴリ出現×${otherSuppressValueRef.current}中`);
     if (now < highRarityLockUntilRef.current) labels.push("SSR/UR/LRのみ出現中");
-    if (highRarityLockCountRef.current > 0) labels.push(`SSR/UR/LRのみ出現 あと${highRarityLockCountRef.current}体`);
+    if (highRarityLockCountRef.current > 0) labels.push(`UR/LRのみ出現 あと${highRarityLockCountRef.current}体`);
     if (treasureStreakActiveRef.current) labels.push(`宝箱連続ボーナス 得点+${Math.round((treasureStreakMultRef.current - 1) * 100)}%`);
     if (now < omochiUntilRef.current) labels.push(`うんちがおもちに +${omochiPtValueRef.current}pt`);
     if (now < okaeriUntilRef.current) labels.push(`1個ごとに+${okaeriPerCatchValueRef.current}秒`);
@@ -813,7 +815,11 @@ export function FrenchieCatchGame({ ownedItems }: { ownedItems: FrenchieCatchIte
 
     const urBoostFactor = 1 + Math.min(urBoostRef.current, UR_BOOST_MAX) / 100;
     const otherSuppressActive = performance.now() < otherSuppressUntilRef.current;
-    const highRarityLockActive = performance.now() < highRarityLockUntilRef.current || highRarityLockCountRef.current > 0;
+    const treasureRareLockActive = performance.now() < highRarityLockUntilRef.current;
+    const bureburLockActive = highRarityLockCountRef.current > 0;
+    const highRarityLockActive = treasureRareLockActive || bureburLockActive;
+    /** 両方同時に有効な場合は宝箱側(SSR/UR/LR)の対象を優先する（ブレブル単体ならUR/LRのみに絞る） */
+    const allowedHighRarities = treasureRareLockActive ? HIGH_RARITY_LOCK_RARITIES : BUREBUR_LOCK_RARITIES;
     /**
      * 出現量アップ中は時間増加系7種の重みをブースト倍率で割り、取得ペースがブーストなしの時と
      * 変わらないよう相殺する（詳細はdocs/minigame-time-balance.mdの「出現量ブーストの1/n相殺」参照）。
@@ -828,7 +834,7 @@ export function FrenchieCatchGame({ ownedItems }: { ownedItems: FrenchieCatchIte
         (otherSuppressActive && item.id !== STRETCH_ROD_ITEM_ID && OTHER_CATEGORY_ITEM_IDS.has(item.id)
           ? otherSuppressValueRef.current
           : 1) *
-        (highRarityLockActive && !HIGH_RARITY_LOCK_RARITIES.has(item.rarity) ? 0 : 1) *
+        (highRarityLockActive && !allowedHighRarities.has(item.rarity) ? 0 : 1) *
         (spawnRateBoostActive && TIME_BONUS_ITEM_IDS.has(item.id) ? 1 / spawnRateBoostValueRef.current : 1),
     }));
     const itemWeightTotal = weightedItems.reduce((sum, entry) => sum + entry.weight, 0);
@@ -1460,7 +1466,7 @@ export function FrenchieCatchGame({ ownedItems }: { ownedItems: FrenchieCatchIte
                 break;
               case BUREBUR_ITEM_ID:
                 highRarityLockCountRef.current = LV.BUREBUR_COUNT[lv]!;
-                effectLabel = `${LV.BUREBUR_COUNT[lv]}体 SSR/UR/LRのみ出現${lvTag}`;
+                effectLabel = `${LV.BUREBUR_COUNT[lv]}体 UR/LRのみ出現${lvTag}`;
                 statusChanged = true;
                 break;
               case XMAS_PARTY_ITEM_ID: {

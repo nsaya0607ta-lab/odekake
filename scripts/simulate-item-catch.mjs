@@ -116,7 +116,8 @@ const DOG_POINTS = 15;
 const DOG_FLOOD_RATE = DOG_FLOOD_SPAWN_RATE;
 const POOP_FLOOD_RATE = POOP_FLOOD_SPAWN_RATE;
 
-const HIGH_RARITY = new Set(["SSR", "UR", "LR"]);
+const HIGH_RARITY = new Set(["SSR", "UR", "LR"]); // 宝箱の「レア枠確定出現」対象
+const BUREBUR_RARITY = new Set(["UR", "LR"]); // ブレブルの限定対象（宝箱より絞り込み）
 const OTHER_CATEGORY_IDS = new Set(pool.filter((x) => x.category === "other").map((x) => x.id));
 const FOOD_CATEGORY_IDS = new Set(pool.filter((x) => x.category === "food").map((x) => x.id));
 const PERSON_IDS = ["other_omochi_janai", "other_listen_to_the_a", "other_omoi_bashira", "other_xmas_party"];
@@ -342,7 +343,11 @@ function simulateOneRound(lv, catchAll) {
     }
 
     const otherSuppressActive = t < otherSuppressUntil;
-    const highRarityLockActive = t < highRarityLockUntil || highRarityLockCount > 0;
+    const treasureRareLockActive = t < highRarityLockUntil;
+    const bureburLockActive = highRarityLockCount > 0;
+    const highRarityLockActive = treasureRareLockActive || bureburLockActive;
+    // 両方同時に有効なら宝箱側(SSR/UR/LR)を優先。ブレブル単体ならUR/LRのみに絞る
+    const allowedHighRarities = treasureRareLockActive ? HIGH_RARITY : BUREBUR_RARITY;
     const urBoostFactor = 1 + Math.min(urBoost, UR_BOOST_MAX) / 100;
     const spawnRateBoostActive = t < spawnRateBoostUntil;
 
@@ -353,7 +358,7 @@ function simulateOneRound(lv, catchAll) {
       let w = weightOf(item.id);
       if (item.rarity === "UR") w *= urBoostFactor;
       if (otherSuppressActive && item.id !== "interior_stretch_rod" && OTHER_CATEGORY_IDS.has(item.id)) w *= otherSuppressValue;
-      if (highRarityLockActive && !HIGH_RARITY.has(item.rarity)) w = 0;
+      if (highRarityLockActive && !allowedHighRarities.has(item.rarity)) w = 0;
       if (spawnRateBoostActive && TIME_BONUS_IDS.has(item.id)) w /= spawnRateBoostValue;
       weights[i] = w;
       itemWeightTotal += w;
