@@ -71,7 +71,10 @@ const MAGNET_MEDIUM_PULL = 30;
 const MAGNET_STRONG_RANGE = 28;
 const MAGNET_STRONG_PULL = 48;
 const FALL_SPEED_BOOST = 1.7;
-const UR_BOOST_MAX = 30;
+const UR_BOOST_MAX = 10;
+/** 虹色わんこボールのUR加算は永続だと時間増加系との複利で発散しやすいため、時間経過で自然に減衰させる */
+const UR_BOOST_DECAY_STEP = 1;
+const UR_BOOST_DECAY_INTERVAL_MS = 650;
 const POOP_ITEM_ID = "hazard_poop";
 const POOP_IMAGE = "/collection/items/dog-poop.webp";
 const POOP_SPAWN_CHANCE = 0.04;
@@ -167,7 +170,7 @@ const LV = {
   MELON_PT: [5, 10, 15, 20, 30],
   TREASURE_LOW: [25, 30, 40, 50, 60],
   TREASURE_HIGH: [50, 65, 80, 100, 130],
-  TREASURE_SEC: [3, 4, 5, 6, 8],
+  TREASURE_SEC: [2, 3, 4, 5, 6],
   TREASURE_STREAK_PCT: [20, 25, 30, 35, 40],
   FRENCHIE_PLUSH_COUNT: [3, 3, 4, 4, 5],
   FRENCHIE_PLUSH_PT: [10, 13, 15, 20, 25],
@@ -183,7 +186,7 @@ const LV = {
   SPRING_MULT: [1.2, 1.2, 1.25, 1.3, 1.4],
   SPARKLE_SEC: [4, 5, 6, 8, 10],
   SPARKLE_STRENGTH: ["weak", "weak", "weak", "weak", "medium"] as const,
-  RAINBOW_STEP: [10, 12, 15, 20, 25],
+  RAINBOW_STEP: [3, 4, 5, 6, 8],
   GOLDEN_COUNT: [2, 2, 3, 3, 4],
   GOLDEN_MULT: [2, 2.2, 2.2, 2.5, 2.5],
   NAKAYOSHI_PT: [30, 40, 50, 65, 80],
@@ -191,23 +194,23 @@ const LV = {
   KAMUNAYO_MULT: [1.3, 1.35, 1.4, 1.5, 1.6],
   HIKING_SEC: [5, 6, 7, 9, 12],
   SNOW_SEC: [5, 6, 7, 9, 12],
-  SUMMER_ADD: [6, 7, 8, 9, 10],
+  SUMMER_ADD: [3, 4, 5, 6, 7],
   SUMMER_MULTSEC: [5, 6, 7, 8, 10],
   SUMMER_MULT: [1.5, 1.5, 1.6, 1.7, 1.8],
   ANBALL_PT: [100, 125, 150, 180, 220],
-  ANBALL_SEC: [3, 4, 5, 6, 8],
+  ANBALL_SEC: [2, 3, 4, 5, 6],
   STRETCH_ROD_MULT: [0.5, 0.4, 0.3, 0.2, 0.1],
   LISTEN_DOG_COUNT: [10, 15, 20, 25, 30],
   AZUBEE_SEC: [6, 7, 8, 10, 12],
   AZUBEE_MULT: [2, 2, 2.1, 2.2, 2.5],
-  OMOJII_SEC: [7, 13, 16, 17, 19],
+  OMOJII_SEC: [4, 7, 9, 10, 11],
   OMOJII_PT: [30, 45, 60, 80, 100],
   KINOKO_SEC: [6, 7, 8, 10, 12],
   KINOKO_FALL: [1.7, 1.8, 1.9, 2, 2.2],
   KINOKO_SCORE: [1.5, 1.5, 1.6, 1.7, 2],
   KOMOCHI_COUNT: [5, 5, 6, 7, 8],
   KOMOCHI_MULT: [2, 2.1, 2.2, 2.3, 2.5],
-  AZUKI_SEC: [5, 8, 10, 11, 12],
+  AZUKI_SEC: [3, 5, 6, 7, 8],
   AZUKI_PT: [50, 65, 80, 100, 130],
   KOBEE_PT: [50, 65, 80, 100, 130],
   KOBEE_SEC: [8, 9, 11, 13, 16],
@@ -230,7 +233,7 @@ const LV = {
   RAGBY_SPAWN: [2, 2.25, 2.5, 2.75, 3],
   OYATSU_PT: [80, 100, 120, 140, 180],
   KETSUNADE_SEC: [4, 5, 6, 8, 10],
-  BUREBUR_COUNT: [5, 7, 9, 11, 13],
+  BUREBUR_COUNT: [2, 3, 3, 4, 5],
   XMAS_SEC: [6, 7, 9, 10, 12],
   XMAS_FALL: [1.8, 2, 2.2, 2.4, 2.5],
   XMAS_SCORE: [2, 2.2, 2.5, 2.7, 3],
@@ -268,15 +271,19 @@ const DOG_FLOOD_SPAWN_RATE = 4;
 const DOG_FLOOD_FALL_SPEED = 2.5;
 const TREASURE_MINUS5_SEC = 5;
 const TREASURE_DOUBLE_MULT = 2;
-/** 宝箱の中身抽選（8択）。合計100、ハズレ(うんち祭り+マイナス秒)は合計20 */
+/**
+ * 宝箱の中身抽選（8択）。合計100、ハズレ(うんち祭り+マイナス秒)は合計20。
+ * rare_lockはSSR/UR/LR以外の出現重みをゼロにするため、時間増加系のUR勢を一時的に
+ * 集中優遇してしまい複利的に伸びやすい。頻度を下げてitem_doubleに振り替えた。
+ */
 const TREASURE_OUTCOME_WEIGHTS: { outcome: string; weight: number }[] = [
   { outcome: "low_pt", weight: 17 },
   { outcome: "high_pt", weight: 10 },
   { outcome: "time_plus", weight: 15 },
   { outcome: "poop_flood", weight: 10 },
   { outcome: "time_minus5", weight: 10 },
-  { outcome: "item_double", weight: 15 },
-  { outcome: "rare_lock", weight: 15 },
+  { outcome: "item_double", weight: 26 },
+  { outcome: "rare_lock", weight: 4 },
   { outcome: "streak_bonus", weight: 8 },
 ];
 function rollTreasureOutcome(): string {
@@ -292,51 +299,32 @@ const DEFAULT_ITEM_SPAWN_WEIGHT = 100;
 /**
  * 出現量アップ系スキル（ぽんでおも・ぽんでアー・じゃれアー・ラグビーアー・Xmas Party）は
  * スポーン間隔そのものを割るため、有効中は時間増加系アイテムの取得率まで一緒に底上げしてしまう。
- * 何もしないとLv5でr(1秒あたりの時間増加率)が1を超え、理論上ゲームが終わらなくなる。
+ * createEntity内のweightedItems計算で「出現量アップ中は時間増加系7種の重みを現在有効な
+ * ブースト倍率で割る」1/n相殺ロジックを入れてあるため、出現量アップ側の倍率は時間増加系のr値に
+ * 影響しない（詳細はdocs/minigame-time-balance.md参照）。
  *
- * 2026-08-28、出現量アップの倍率をレベル別（Lv1〜MAXで1.5→2/2→3/1.5→2.5、LV.xxx_SPAWN参照）に
- * 強化するのに合わせて、createEntity内のweightedItems計算で「出現量アップ中は時間増加系7種の重みを
- * 現在有効なブースト倍率で割る」1/n相殺ロジックを追加した。これにより出現量アップ側の倍率をどれだけ
- * 強くしても時間増加系側のr値には影響しなくなったため、この相殺を前提に時間増加系7種＋おもじぃの
- * 出現重みを一律×1.2838に引き上げ、Lv5の最終プレイ時間期待値がちょうど180秒になるよう再調整した
- * （詳細はdocs/minigame-time-balance.md参照）。
- *
- * other_listen_to_the_a（LR、一撃で大量スコアが出やすいため出現重みを半分に調整）は
- * 時間・出現量には無関係だが、重みを下げた分だけプール全体の合計重みが減り、他アイテムの
- * 取得確率が僅かに底上げされてLv5の最終プレイ時間が180秒を超えてしまう。
- * そのため上と同じ「時間増加系7種＋宝箱」の重みを底上げ分だけ相殺し、Lv5の時間増加を打ち消している。
- *
- * food_fruit_basket（SR、時間・出現量のどちらにも無関係）を追加した際も、プール総数(N)が
- * 78→79に増えたことで既存アイテムの取得確率が薄まり、Lv5の最終プレイ時間期待値が175秒→約166秒に
- * 短縮されてしまっていた。docs/minigame-time-balance.md の手順どおり「時間増加系7種の重みを
- * プール総数の増加率だけ底上げする」方針で、64.4→65.5・80.3→81.6（6種）に変更して相殺済み。
- *
- * interior_gold_ball（SSR、時間・出現量のどちらにも無関係）を追加した際も同様に、
- * プール総数(N)が79→80に増えたことでLv5の最終プレイ時間期待値が175秒→約166秒に短縮されて
- * いたため、時間増加系7種の重みを65.5→66.6・81.6→82.9（6種）に変更して相殺済み。
- *
- * other_clawd（SSR、時間・出現量のどちらにも無関係）を追加した際も同様に、プール総数(N)が
- * 80→81に増えたため、時間増加系7種の重みをプール総数の増加率（Total(81)/Total(80)≈1.0126）
- * だけ底上げして相殺し、66.6→67.4・82.9→83.9（6種）に変更した。
- *
- * food_kamikami（R、時間・出現量のどちらにも無関係）を追加した際も同様に、プール総数(N)が
- * 81→82に増えたため、時間増加系7種の重みをプール総数の増加率（Total(82)/Total(81)≈1.0124）
- * だけ底上げして相殺し、67.4→68.2・83.9→84.9（6種）に変更した。
- *
- * food_mocchurin（SSR、時間・出現量のどちらにも無関係。直前に捕まえたアイテムのスキルを
- * 確率でもう一度発動する「エコー」系）を追加した際も同様に、プール総数(N)が82→83に増えたため、
- * 時間増加系7種の重みをプール総数の増加率（Total(83)/Total(82)≈1.0123）だけ底上げして相殺し、
- * 68.2→69.0・84.9→85.9（6種）に変更した。
+ * 2026-08-30、「時間減少ハザードとチョコレートは避けられる（回避されうる）」という、より現実的な
+ * 前提でバランスを取り直した。この前提だと、それまで理論値計算の"歯止め"になっていた
+ * チョコレート即終了がなくなり、r値が1未満でも虹色わんこボールのUR加算(永続)や宝箱のレア枠確定
+ * （SSR/UR/LR以外の出現を一時的にゼロにする）が作る自己強化ループのせいでLv5が発散気味になる
+ * ことが判明した。そのため今回は重みだけでなく次の3点もあわせて調整した:
+ * 1. 虹色わんこボールのUR加算を永続→時間経過で減衰（UR_BOOST_DECAY_STEP/INTERVAL_MS）に変更し、
+ *    上限もUR_BOOST_MAX 30→10に縮小
+ * 2. 宝箱の「レア枠確定出現」の出現率を15%→4%に削減（浮いた11%はitem_double(得点倍率)に付け替え）
+ * 3. ブレブルのSSR/UR/LR限定カウントをBUREBUR_COUNT [5,7,9,11,13]→[2,3,3,4,5]に短縮
+ * さらに時間増加系7種＋宝箱の重みも下げて、「時間減少・チョコレートを一切キャッチしない」前提で
+ * Lv5の最終プレイ時間期待値の平均が概ね180秒になるよう再調整した（同条件でのシミュレーションで
+ * 平均185.7秒・中央値111秒・p99が1112秒程度、暴走はしない）。
  */
 const ITEM_SPAWN_WEIGHTS: Partial<Record<string, number>> = {
-  toy_treasure_puzzle: 200,
-  other_omojii: 88.6,
-  toy_duck_plush: 110.3,
-  toy_carrot: 110.3,
-  food_paw_melon_bread: 110.3,
-  interior_anball: 110.3,
-  other_azuki: 110.3,
-  summer_frenchie: 110.3,
+  toy_treasure_puzzle: 149,
+  other_omojii: 70,
+  toy_duck_plush: 102,
+  toy_carrot: 102,
+  food_paw_melon_bread: 102,
+  interior_anball: 102,
+  other_azuki: 70,
+  summer_frenchie: 102,
   other_listen_to_the_a: 50,
 };
 const STRETCH_ROD_ITEM_ID = "interior_stretch_rod";
@@ -503,6 +491,7 @@ export function FrenchieCatchGame({ ownedItems }: { ownedItems: FrenchieCatchIte
   const magnetUntilRef = useRef(0);
   const magnetStrengthRef = useRef<"weak" | "medium" | "strong">("weak");
   const urBoostRef = useRef(0);
+  const urBoostDecayNextRef = useRef(0);
   const fallSpeedBoostUntilRef = useRef(0);
   const fallSpeedValueRef = useRef(FALL_SPEED_BOOST);
   const poopSuppressUntilRef = useRef(0);
@@ -986,6 +975,11 @@ export function FrenchieCatchGame({ ownedItems }: { ownedItems: FrenchieCatchIte
         spawnRateBoostUntilRef.current = 0;
         timedEffectChanged = true;
       }
+      if (urBoostRef.current > 0 && now >= urBoostDecayNextRef.current) {
+        urBoostRef.current = Math.max(0, urBoostRef.current - UR_BOOST_DECAY_STEP);
+        urBoostDecayNextRef.current = now + UR_BOOST_DECAY_INTERVAL_MS;
+        timedEffectChanged = true;
+      }
       if (boxShrinkUntilRef.current > 0 && now >= boxShrinkUntilRef.current) { boxShrinkUntilRef.current = 0; timedEffectChanged = true; }
       if (blackoutUntilRef.current > 0 && now >= blackoutUntilRef.current) { blackoutUntilRef.current = 0; setBlackoutActive(false); timedEffectChanged = true; }
       if (stunUntilRef.current > 0 && now >= stunUntilRef.current) { stunUntilRef.current = 0; setStunned(false); timedEffectChanged = true; }
@@ -1387,7 +1381,8 @@ export function FrenchieCatchGame({ ownedItems }: { ownedItems: FrenchieCatchIte
                 break;
               case "toy_rainbow_ball":
                 urBoostRef.current = Math.min(UR_BOOST_MAX, urBoostRef.current + LV.RAINBOW_STEP[lv]!);
-                effectLabel = `UR出現率 +${LV.RAINBOW_STEP[lv]}（ゲーム終了まで）${lvTag}`;
+                urBoostDecayNextRef.current = now + UR_BOOST_DECAY_INTERVAL_MS;
+                effectLabel = `UR出現率 +${LV.RAINBOW_STEP[lv]}（少しずつ減衰）${lvTag}`;
                 statusChanged = true;
                 break;
               case "toy_golden_crown_ball":
@@ -1930,6 +1925,7 @@ export function FrenchieCatchGame({ ownedItems }: { ownedItems: FrenchieCatchIte
     magnetUntilRef.current = 0;
     magnetStrengthRef.current = "weak";
     urBoostRef.current = 0;
+    urBoostDecayNextRef.current = 0;
     fallSpeedBoostUntilRef.current = 0;
     fallSpeedValueRef.current = FALL_SPEED_BOOST;
     poopSuppressUntilRef.current = 0;
