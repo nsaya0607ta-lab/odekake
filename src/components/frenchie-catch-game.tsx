@@ -235,7 +235,7 @@ const LV = {
   RAGBY_SPAWN: [2, 2.25, 2.5, 2.75, 3],
   OYATSU_PT: [180, 200, 220, 240, 280],
   KETSUNADE_SEC: [4, 5, 6, 8, 10],
-  BUREBUR_COUNT: [6, 8, 10, 12, 7],
+  BUREBUR_COUNT: [6, 8, 10, 12, 13],
   XMAS_SEC: [6, 7, 9, 10, 12],
   XMAS_FALL: [1.8, 2, 2.2, 2.4, 2.5],
   XMAS_SCORE: [2, 2.2, 2.5, 2.7, 3],
