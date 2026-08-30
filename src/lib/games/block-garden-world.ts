@@ -42,10 +42,24 @@ function terrainHeight(x: number, z: number): number {
   return Math.max(2, Math.min(4, Math.round(2.7 + wave * 0.55 + coordinateNoise(x, z) * 0.28)));
 }
 
-function isPondCell(x: number, z: number): boolean {
+function pondDistance(x: number, z: number): number {
   const dx = (x + 3.5) / 3.7;
   const dz = (z - 1.5) / 3;
-  return dx * dx + dz * dz < 1;
+  return Math.hypot(dx, dz);
+}
+
+function isPondCell(x: number, z: number): boolean {
+  return pondDistance(x, z) < 1;
+}
+
+function terrainSurfaceHeight(x: number, z: number): number {
+  const distance = pondDistance(x, z);
+  if (distance < 1) return 1;
+
+  const naturalHeight = terrainHeight(x, z);
+  if (distance < 1.4) return 2;
+  if (distance < 1.8) return Math.min(naturalHeight, 3);
+  return naturalHeight;
 }
 
 function topSolidBlockY(world: BlockWorld, x: number, z: number): number | null {
@@ -94,7 +108,7 @@ export function createBlockGardenWorld(): BlockWorld {
   for (let x = BLOCK_GARDEN_WORLD.min; x <= BLOCK_GARDEN_WORLD.max; x += 1) {
     for (let z = BLOCK_GARDEN_WORLD.min; z <= BLOCK_GARDEN_WORLD.max; z += 1) {
       const pond = isPondCell(x, z);
-      const topY = pond ? 1 : terrainHeight(x, z);
+      const topY = terrainSurfaceHeight(x, z);
 
       for (let y = BLOCK_GARDEN_WORLD.minY; y <= topY; y += 1) {
         const depth = topY - y;

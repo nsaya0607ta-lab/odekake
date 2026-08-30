@@ -47,9 +47,179 @@ const PLAYER_SPEED = 3.65;
 const PLAYER_JUMP_VELOCITY = 5.8;
 const PLAYER_GRAVITY = 15;
 const TARGET_UPDATE_INTERVAL = 80;
+const BLOCK_TEXTURE_SIZE = 64;
 
 function blockIds(): BlockId[] {
   return Object.keys(BLOCK_DEFINITIONS) as BlockId[];
+}
+
+function seededRandom(seed: number): () => number {
+  let value = seed >>> 0;
+  return () => {
+    value = (Math.imul(value, 1664525) + 1013904223) >>> 0;
+    return value / 4294967296;
+  };
+}
+
+function blockSeed(blockId: BlockId): number {
+  let seed = 2166136261;
+  for (const character of blockId) {
+    seed ^= character.charCodeAt(0);
+    seed = Math.imul(seed, 16777619);
+  }
+  return seed >>> 0;
+}
+
+function paintMottles(
+  context: CanvasRenderingContext2D,
+  random: () => number,
+  count: number,
+  darkColor: string,
+  lightColor: string,
+  minimumRadius: number,
+  maximumRadius: number,
+): void {
+  for (let index = 0; index < count; index += 1) {
+    const radius = minimumRadius + random() * (maximumRadius - minimumRadius);
+    context.fillStyle = random() > 0.48 ? darkColor : lightColor;
+    context.beginPath();
+    context.ellipse(
+      random() * BLOCK_TEXTURE_SIZE,
+      random() * BLOCK_TEXTURE_SIZE,
+      radius,
+      radius * (0.55 + random() * 0.6),
+      random() * Math.PI,
+      0,
+      Math.PI * 2,
+    );
+    context.fill();
+  }
+}
+
+function createBlockSurfaceTexture(blockId: BlockId, baseColor: string, maxAnisotropy: number): THREE.CanvasTexture {
+  const canvas = document.createElement("canvas");
+  canvas.width = BLOCK_TEXTURE_SIZE;
+  canvas.height = BLOCK_TEXTURE_SIZE;
+  const context = canvas.getContext("2d");
+
+  if (context) {
+    const random = seededRandom(blockSeed(blockId));
+    context.fillStyle = baseColor;
+    context.fillRect(0, 0, BLOCK_TEXTURE_SIZE, BLOCK_TEXTURE_SIZE);
+    context.lineCap = "round";
+    context.lineJoin = "round";
+
+    if (blockId === "grass") {
+      const light = context.createLinearGradient(0, 0, 0, BLOCK_TEXTURE_SIZE);
+      light.addColorStop(0, "rgba(255, 255, 225, 0.25)");
+      light.addColorStop(0.5, "rgba(255, 255, 255, 0.03)");
+      light.addColorStop(1, "rgba(40, 80, 34, 0.16)");
+      context.fillStyle = light;
+      context.fillRect(0, 0, BLOCK_TEXTURE_SIZE, BLOCK_TEXTURE_SIZE);
+      paintMottles(context, random, 18, "rgba(32, 91, 43, 0.2)", "rgba(244, 255, 206, 0.2)", 1.2, 3.7);
+
+      for (let index = 0; index < 46; index += 1) {
+        const x = random() * BLOCK_TEXTURE_SIZE;
+        const y = random() * BLOCK_TEXTURE_SIZE;
+        const height = 2 + random() * 5;
+        context.strokeStyle = random() > 0.42 ? "rgba(27, 78, 34, 0.32)" : "rgba(255, 255, 214, 0.28)";
+        context.lineWidth = 0.7 + random() * 0.8;
+        context.beginPath();
+        context.moveTo(x, y + height * 0.45);
+        context.quadraticCurveTo(x + random() * 2 - 1, y, x + random() * 3 - 1.5, y - height * 0.55);
+        context.stroke();
+      }
+    } else if (blockId === "dirt") {
+      paintMottles(context, random, 34, "rgba(77, 43, 26, 0.19)", "rgba(255, 226, 183, 0.2)", 1.4, 5.2);
+    } else if (blockId === "stone") {
+      paintMottles(context, random, 27, "rgba(55, 63, 65, 0.18)", "rgba(255, 255, 246, 0.21)", 1.7, 5.8);
+      for (let index = 0; index < 9; index += 1) {
+        const x = random() * BLOCK_TEXTURE_SIZE;
+        const y = random() * BLOCK_TEXTURE_SIZE;
+        context.strokeStyle = "rgba(48, 55, 57, 0.27)";
+        context.lineWidth = 0.65;
+        context.beginPath();
+        context.moveTo(x, y);
+        context.lineTo(x + random() * 6 - 3, y + 2 + random() * 4);
+        context.lineTo(x + random() * 8 - 4, y + 5 + random() * 5);
+        context.stroke();
+      }
+    } else if (blockId === "wood") {
+      const shade = context.createLinearGradient(0, 0, BLOCK_TEXTURE_SIZE, 0);
+      shade.addColorStop(0, "rgba(66, 36, 18, 0.15)");
+      shade.addColorStop(0.5, "rgba(255, 229, 178, 0.13)");
+      shade.addColorStop(1, "rgba(66, 36, 18, 0.16)");
+      context.fillStyle = shade;
+      context.fillRect(0, 0, BLOCK_TEXTURE_SIZE, BLOCK_TEXTURE_SIZE);
+
+      for (let index = 0; index < 10; index += 1) {
+        const x = 3 + index * 6.3 + random() * 2;
+        context.strokeStyle = index % 2 === 0 ? "rgba(70, 36, 18, 0.25)" : "rgba(255, 226, 173, 0.2)";
+        context.lineWidth = 0.9 + random() * 0.75;
+        context.beginPath();
+        context.moveTo(x, -2);
+        context.bezierCurveTo(x - 3, 18, x + 4, 42, x + random() * 4 - 2, 66);
+        context.stroke();
+      }
+      for (let index = 0; index < 4; index += 1) {
+        context.strokeStyle = "rgba(65, 32, 16, 0.32)";
+        context.lineWidth = 1.1;
+        context.beginPath();
+        context.ellipse(8 + random() * 48, 8 + random() * 48, 2.5 + random() * 2.6, 1.5 + random() * 1.7, random() * 0.4, 0, Math.PI * 2);
+        context.stroke();
+      }
+    } else if (blockId === "leaves") {
+      paintMottles(context, random, 46, "rgba(24, 83, 51, 0.25)", "rgba(229, 255, 207, 0.24)", 1.2, 4.4);
+    } else if (blockId === "water") {
+      const waterLight = context.createLinearGradient(0, 0, 0, BLOCK_TEXTURE_SIZE);
+      waterLight.addColorStop(0, "rgba(238, 255, 255, 0.36)");
+      waterLight.addColorStop(0.55, "rgba(255, 255, 255, 0.04)");
+      waterLight.addColorStop(1, "rgba(20, 91, 141, 0.2)");
+      context.fillStyle = waterLight;
+      context.fillRect(0, 0, BLOCK_TEXTURE_SIZE, BLOCK_TEXTURE_SIZE);
+
+      for (let index = 0; index < 9; index += 1) {
+        const y = 4 + index * 7 + random() * 2;
+        context.strokeStyle = index % 2 === 0 ? "rgba(235, 255, 255, 0.44)" : "rgba(24, 96, 148, 0.24)";
+        context.lineWidth = 0.8 + random() * 0.6;
+        context.beginPath();
+        context.moveTo(-4, y);
+        context.bezierCurveTo(12, y - 3, 21, y + 3, 34, y);
+        context.bezierCurveTo(46, y - 3, 53, y + 2, 68, y - 1);
+        context.stroke();
+      }
+    } else if (blockId === "flower") {
+      paintMottles(context, random, 24, "rgba(132, 43, 83, 0.2)", "rgba(255, 238, 247, 0.36)", 1.5, 4.5);
+    }
+
+    for (let index = 0; index < 34; index += 1) {
+      context.fillStyle = random() > 0.5 ? "rgba(255, 255, 255, 0.16)" : "rgba(35, 42, 32, 0.13)";
+      context.fillRect(
+        random() * BLOCK_TEXTURE_SIZE,
+        random() * BLOCK_TEXTURE_SIZE,
+        0.7 + random() * 1.3,
+        0.7 + random() * 1.3,
+      );
+    }
+  }
+
+  const texture = new THREE.CanvasTexture(canvas);
+  texture.name = "block-garden-" + blockId + "-surface";
+  texture.colorSpace = THREE.SRGBColorSpace;
+  texture.anisotropy = Math.min(4, maxAnisotropy);
+  texture.magFilter = THREE.LinearFilter;
+  texture.minFilter = THREE.LinearMipmapLinearFilter;
+  return texture;
+}
+
+function setInstanceTint(color: THREE.Color, position: BlockPosition): void {
+  const hash = (
+    Math.imul(position.x + 37, 73856093)
+    ^ Math.imul(position.y + 17, 19349663)
+    ^ Math.imul(position.z + 53, 83492791)
+  ) >>> 0;
+  const variation = (hash % 1000) / 999 - 0.5;
+  color.setRGB(0.98 + variation * 0.08, 0.98 + variation * 0.1, 0.98 + variation * 0.06);
 }
 
 function dominantAxisNormal(normal: THREE.Vector3): BlockPosition {
@@ -76,6 +246,7 @@ export class BlockGardenEngine {
   private readonly centerPoint = new THREE.Vector2(0, 0);
   private readonly callbacks: EngineCallbacks;
   private readonly materials = new Map<BlockId, THREE.MeshStandardMaterial>();
+  private readonly surfaceTextures = new Map<BlockId, THREE.CanvasTexture>();
   private readonly geometries: Record<BlockGeometryKind, THREE.BufferGeometry>;
   private readonly positionsByMesh = new Map<THREE.InstancedMesh, BlockPosition[]>();
   private readonly pressedKeys = new Set<string>();
@@ -129,17 +300,33 @@ export class BlockGardenEngine {
       water: new RoundedBoxGeometry(0.97, 0.7, 0.97, 1, 0.045).translate(0, -0.14, 0),
     };
 
+    const maxAnisotropy = this.renderer.capabilities.getMaxAnisotropy();
     for (const blockId of blockIds()) {
       const definition = BLOCK_DEFINITIONS[blockId];
       const transparent = definition.opacity !== undefined && definition.opacity < 1;
-      const material = new THREE.MeshStandardMaterial({
-        color: definition.color,
-        roughness: blockId === "water" ? 0.34 : 0.84,
+      const surfaceTexture = createBlockSurfaceTexture(blockId, definition.color, maxAnisotropy);
+      this.surfaceTextures.set(blockId, surfaceTexture);
+      const commonMaterial = {
+        color: 0xffffff,
+        map: surfaceTexture,
+        bumpMap: blockId === "water" ? undefined : surfaceTexture,
+        bumpScale: blockId === "stone" ? 0.055 : blockId === "wood" ? 0.04 : 0.026,
         metalness: 0,
         transparent,
         opacity: definition.opacity ?? 1,
         depthWrite: !transparent,
-      });
+      };
+      const material = blockId === "water"
+        ? new THREE.MeshPhysicalMaterial({
+            ...commonMaterial,
+            roughness: 0.18,
+            clearcoat: 0.72,
+            clearcoatRoughness: 0.23,
+          })
+        : new THREE.MeshStandardMaterial({
+            ...commonMaterial,
+            roughness: blockId === "stone" ? 0.94 : blockId === "wood" ? 0.76 : 0.84,
+          });
       this.materials.set(blockId, material);
     }
 
@@ -277,6 +464,7 @@ export class BlockGardenEngine {
 
     for (const geometry of new Set(Object.values(this.geometries))) geometry.dispose();
     for (const material of this.materials.values()) material.dispose();
+    for (const texture of this.surfaceTextures.values()) texture.dispose();
 
     this.horizon.geometry.dispose();
     const horizonMaterial = this.horizon.material;
@@ -339,13 +527,22 @@ export class BlockGardenEngine {
     if (movement.lengthSq() > 1) movement.normalize();
     movement.multiplyScalar(PLAYER_SPEED * delta);
 
+    let moved = false;
     const nextX = this.player.x + movement.x;
-    const nextZ = this.player.z + movement.z;
-    const nextGround = getPlayerGroundHeight(this.world, nextX, nextZ);
-    if (nextGround === null || nextGround > this.player.feetY + PLAYER_STEP_HEIGHT) return;
+    if (Math.abs(movement.x) > 0.0001 && this.canMoveTo(nextX, this.player.z)) {
+      this.player.x = nextX;
+      moved = true;
+    }
 
-    this.player.x = nextX;
-    this.player.z = nextZ;
+    const nextZ = this.player.z + movement.z;
+    if (Math.abs(movement.z) > 0.0001 && this.canMoveTo(this.player.x, nextZ)) {
+      this.player.z = nextZ;
+      moved = true;
+    }
+
+    if (!moved) return;
+    const nextGround = getPlayerGroundHeight(this.world, this.player.x, this.player.z);
+    if (nextGround === null) return;
     if (this.grounded) {
       if (nextGround < this.player.feetY - 0.08) {
         this.grounded = false;
@@ -354,6 +551,11 @@ export class BlockGardenEngine {
         this.player.feetY = THREE.MathUtils.lerp(this.player.feetY, nextGround, smoothing);
       }
     }
+  }
+
+  private canMoveTo(x: number, z: number): boolean {
+    const ground = getPlayerGroundHeight(this.world, x, z);
+    return ground !== null && ground <= this.player.feetY + PLAYER_STEP_HEIGHT;
   }
 
   private updateVerticalMovement(delta: number): void {
@@ -442,6 +644,7 @@ export class BlockGardenEngine {
     this.disposeWorldMeshes();
     const visibleByType = getVisibleBlocks(this.world);
     const transform = new THREE.Matrix4();
+    const instanceTint = new THREE.Color();
 
     for (const blockId of blockIds()) {
       const positions = visibleByType.get(blockId);
@@ -458,8 +661,11 @@ export class BlockGardenEngine {
       positions.forEach((position, index) => {
         transform.makeTranslation(position.x, position.y, position.z);
         mesh.setMatrixAt(index, transform);
+        setInstanceTint(instanceTint, position);
+        mesh.setColorAt(index, instanceTint);
       });
       mesh.instanceMatrix.needsUpdate = true;
+      if (mesh.instanceColor) mesh.instanceColor.needsUpdate = true;
       mesh.computeBoundingSphere();
       this.positionsByMesh.set(mesh, positions);
       this.pickableMeshes.push(mesh);
