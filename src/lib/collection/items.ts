@@ -154,6 +154,7 @@ const CURATED_ITEMS: readonly CollectionItem[] = [
   { id: "other_clawd", name: "Clawd", image: "/collection/items/clawd.webp", category: "other", series: null, rarity: "SSR" },
   { id: "other_mah", name: "mah-", image: "/collection/items/mah.webp", category: "other", series: null, rarity: "UR" },
   { id: "other_mirror_omochi", name: "ミラーおもち", image: "/collection/items/mirror-omochi.webp", category: "other", series: null, rarity: "UR" },
+  { id: "other_toorematen", name: "通れまてん", image: "/collection/items/toorematen.webp", category: "other", series: null, rarity: "UR" },
 
   // --- 通常図鑑：おでかけ小物 ------------------------------------------
   { id: "other_yellow_rain_boots", name: "きいろのながぐつ", image: "/collection/items/yellow-rain-boots.webp", category: "other", series: null, rarity: "N" },

@@ -154,7 +154,7 @@ const MYSTERY_SKILL_ITEM_IDS = [
   "other_pondeomo", "other_pondear", "other_kurumari_a", "other_jare_a", "other_ketsunade_a", "other_omochi_janai", "other_oyasumi", "other_nisoku_a",
   "interior_shikkoku_no_ar", "interior_ragby_ar", "other_oyatsu_no_jikan", "other_listen_to_the_a", "other_okaeri",
   "food_fruit_basket", "interior_gold_ball", "other_clawd", "food_kamikami", "food_mocchurin", "other_mah",
-  "other_mirror_omochi",
+  "other_mirror_omochi", "other_toorematen",
 ];
 
 /** アイテムごとのLv1〜5パラメータ（item_skill_levels_colored.xlsxの「スキル一覧」シート通り） */
@@ -257,6 +257,7 @@ const LV = {
   MAH_PT: [60, 80, 100, 130, 170],
   MIRROR_SEC: [5, 6, 8, 10, 13],
   MIRROR_INVERT_PT: [15, 20, 25, 30, 40],
+  TOOREMATEN_SEC: [4, 5, 6, 8, 10],
 } as const;
 const SLANT_VX_BOOST = 3.5;
 const POINTS: Record<FrenchieCatchItem["rarity"], number> = { N: 10, R: 20, SR: 40, SSR: 70, UR: 100, LR: 150, MR: 220 };
@@ -322,13 +323,13 @@ const DEFAULT_ITEM_SPAWN_WEIGHT = 100;
  */
 const ITEM_SPAWN_WEIGHTS: Partial<Record<string, number>> = {
   toy_treasure_puzzle: 149,
-  other_omojii: 72,
-  toy_duck_plush: 104,
-  toy_carrot: 104,
-  food_paw_melon_bread: 104,
-  interior_anball: 104,
-  other_azuki: 72,
-  summer_frenchie: 104,
+  other_omojii: 73,
+  toy_duck_plush: 105,
+  toy_carrot: 105,
+  food_paw_melon_bread: 105,
+  interior_anball: 105,
+  other_azuki: 73,
+  summer_frenchie: 105,
   other_listen_to_the_a: 50,
 };
 const STRETCH_ROD_ITEM_ID = "interior_stretch_rod";
@@ -366,6 +367,13 @@ const FOOD_CATEGORY_ITEM_IDS = new Set(
   COLLECTION_ITEMS.filter((entry) => entry.category === "food").map((entry) => entry.id),
 );
 const DOG_SPAWN_RATIO = 0.28;
+/**
+ * 通れまてん有効中は「はずれ」フレブルの出現重みを0にする代わり、通常はフレブルが持つ
+ * 出現シェア(DOG_SPAWN_RATIO=28%)がすべてアイテム側に回るため、そのままだと時間増加系7種の
+ * 取得率まで一律 1/(1-DOG_SPAWN_RATIO) 倍に底上げしてしまう。出現量アップ系と同じ「1/n相殺」を
+ * 時間増加系7種にだけかけ、時間増加系のr値には影響しないようにする（詳細はdocs/minigame-time-balance.md）。
+ */
+const DOG_BLOCK_TIME_BONUS_RELIEF = 1 / (1 - DOG_SPAWN_RATIO);
 const FRENCHIE_SKIN_IDS = ["hiking_frenchie", "snow_frenchie", "summer_frenchie"];
 const FRENCHIE_SKIN_SPAWN_CHANCE = 0.18;
 /**
@@ -536,6 +544,8 @@ export function FrenchieCatchGame({ ownedItems }: { ownedItems: FrenchieCatchIte
    */
   const hazardInvertUntilRef = useRef(0);
   const mirrorInvertPtValueRef = useRef(0);
+  /** 通れまてん：有効中は「はずれ」の初期フレブルが出現せず、その分すべてアイテム抽選に回る */
+  const dogBlockUntilRef = useRef(0);
   const feedbackTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const impactTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const recentSkillEffectIdRef = useRef(0);
@@ -636,6 +646,7 @@ export function FrenchieCatchGame({ ownedItems }: { ownedItems: FrenchieCatchIte
     else if (now - startAtRef.current > TOP_ZONE_HIDDEN_AFTER_SEC * 1000) labels.push("画面上部が見えない");
     if (now < stunUntilRef.current) labels.push("しびれ中");
     if (now < hazardInvertUntilRef.current) labels.push("ミラータイム中（ハザード反転）");
+    if (now < dogBlockUntilRef.current) labels.push("通れまてん発動中（フレブル出現なし）");
     if (urBoostRef.current > 0) labels.push(`UR出現率+${Math.min(urBoostRef.current, UR_BOOST_MAX)}`);
     setActiveEffects(labels);
   }, []);
@@ -807,6 +818,7 @@ export function FrenchieCatchGame({ ownedItems }: { ownedItems: FrenchieCatchIte
      * これにより出現量アップ側の倍率をどれだけ強くしても、時間増加系側のr値には影響しなくなる。
      */
     const spawnRateBoostActive = performance.now() < spawnRateBoostUntilRef.current;
+    const dogBlockActive = performance.now() < dogBlockUntilRef.current;
     const weightedItems = itemPool.map((item) => ({
       item,
       weight:
@@ -816,10 +828,13 @@ export function FrenchieCatchGame({ ownedItems }: { ownedItems: FrenchieCatchIte
           ? otherSuppressValueRef.current
           : 1) *
         (highRarityLockActive && !HIGH_RARITY_LOCK_RARITIES.has(item.rarity) ? 0 : 1) *
-        (spawnRateBoostActive && TIME_BONUS_ITEM_IDS.has(item.id) ? 1 / spawnRateBoostValueRef.current : 1),
+        (spawnRateBoostActive && TIME_BONUS_ITEM_IDS.has(item.id) ? 1 / spawnRateBoostValueRef.current : 1) *
+        (dogBlockActive && TIME_BONUS_ITEM_IDS.has(item.id) ? 1 / DOG_BLOCK_TIME_BONUS_RELIEF : 1),
     }));
     const itemWeightTotal = weightedItems.reduce((sum, entry) => sum + entry.weight, 0);
-    const dogWeight = itemPool.length * DEFAULT_ITEM_SPAWN_WEIGHT * (DOG_SPAWN_RATIO / (1 - DOG_SPAWN_RATIO));
+    const dogWeight = dogBlockActive
+      ? 0
+      : itemPool.length * DEFAULT_ITEM_SPAWN_WEIGHT * (DOG_SPAWN_RATIO / (1 - DOG_SPAWN_RATIO));
     let roll = Math.random() * (dogWeight + itemWeightTotal);
 
     if (roll < dogWeight) {
@@ -1608,6 +1623,13 @@ export function FrenchieCatchGame({ ownedItems }: { ownedItems: FrenchieCatchIte
                 statusChanged = true;
                 break;
               }
+              case "other_toorematen": {
+                const toorematenSec = LV.TOOREMATEN_SEC[lv]!;
+                dogBlockUntilRef.current = now + toorematenSec * 1000;
+                effectLabel = `${toorematenSec}秒間 フレブル出現なし${lvTag}`;
+                statusChanged = true;
+                break;
+              }
               case "other_kamunayo":
                 multiplier15UntilRef.current = now + LV.KAMUNAYO_SEC[lv]! * 1000;
                 multiplier15ValueRef.current = LV.KAMUNAYO_MULT[lv]!;
@@ -1998,6 +2020,9 @@ export function FrenchieCatchGame({ ownedItems }: { ownedItems: FrenchieCatchIte
     boxShrinkUntilRef.current = 0;
     blackoutUntilRef.current = 0;
     stunUntilRef.current = 0;
+    hazardInvertUntilRef.current = 0;
+    mirrorInvertPtValueRef.current = 0;
+    dogBlockUntilRef.current = 0;
     setBlackoutActive(false);
     setStunned(false);
     bagStockRef.current = 0;

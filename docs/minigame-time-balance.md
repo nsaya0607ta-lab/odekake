@@ -670,3 +670,28 @@ r値を1から十分離さない限り（＝時間増加効果自体をもっと
 現在の`ITEM_SPAWN_WEIGHTS`はこの節の数値が最新（宝箱=149、`other_omojii`=72、`other_azuki`=72、
 他5種(`toy_duck_plush`/`toy_carrot`/`food_paw_melon_bread`/`interior_anball`/`summer_frenchie`)=104、
 `other_listen_to_the_a`=50、N=85）。
+
+## 通れまてん（UR・その他）追加による重み再調整（2026-08-30）
+
+新規URアイテム「通れまてん」(`other_toorematen`)を追加した。効果は「Lv1〜5で4/5/6/8/10秒間、
+『はずれ』の初期フレブルが一切出現しなくなり、その分すべてアイテム抽選に回る」（`dogBlockUntilRef`で
+管理）。実装は`createEntity`内で、`dogBlockActive`のときだけ`dogWeight`を0にする（通常は
+`itemPool.length × 100 × (DOG_SPAWN_RATIO/(1-DOG_SPAWN_RATIO))`で、フレブルの出現シェアが常に
+全体のDOG_SPAWN_RATIO=28%になるよう計算されている値）。
+
+フレブル28%ぶんの出現シェアがまるごとアイテム側に回るため、何もしなければ全アイテムの出現率が
+一律 `1/(1-0.28) ≈ 1.389倍`になる。これは出現量アップ系のスポーン間隔短縮と同じ構造の問題（時間増加系
+7種の取得率まで一緒に底上げしてしまう）のため、**同じ「1/n相殺」を時間増加系7種にだけ適用**した
+（`DOG_BLOCK_TIME_BONUS_RELIEF = 1/(1-DOG_SPAWN_RATIO)`で重みを割る）。これにより通れまてん発動中も
+時間増加系7種の取得率は据え置きのまま、それ以外のアイテム（N/R/SR含む実際の景品）だけが1.389倍
+出現しやすくなる。時間増加系・出現量アップ系のどちらでもない（時間そのものに触れるコードパスは無い）。
+
+この追加により図鑑プールが85→**86**種に増え、既存アイテムの取得確率が薄まる。同じ「時間増加系7種の
+重みをプール総数の増加率（Total(86)/Total(85) ≈ **1.0118**）だけ底上げする」方針で、
+`toy_duck_plush` / `toy_carrot` / `food_paw_melon_bread` / `interior_anball` / `summer_frenchie`を
+104→**105**、`other_omojii` / `other_azuki`を72→**73**に変更して相殺した（宝箱=149、
+`other_listen_to_the_a`=50は変更なし）。
+
+現在の`ITEM_SPAWN_WEIGHTS`はこの節の数値が最新（宝箱=149、`other_omojii`=73、`other_azuki`=73、
+他5種(`toy_duck_plush`/`toy_carrot`/`food_paw_melon_bread`/`interior_anball`/`summer_frenchie`)=105、
+`other_listen_to_the_a`=50、N=86）。
