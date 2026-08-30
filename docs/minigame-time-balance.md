@@ -698,6 +698,29 @@ r値を1から十分離さない限り（＝時間増加効果自体をもっと
 他5種(`toy_duck_plush`/`toy_carrot`/`food_paw_melon_bread`/`interior_anball`/`summer_frenchie`)=105、
 `other_listen_to_the_a`=50、N=86）。
 
+## hiA（UR・その他）追加による重み再調整（2026-08-30）
+
+新規URアイテム「hiA」(`other_hia`)を追加した。効果は「捕まえた瞬間の残り秒数×倍率がそのままptになる」
+（`toy_star_wan_wand`と全く同じ構造。倍率のみLv1〜5で`STARWAND_MULT`の[2, 2.3, 2.6, 3, 3.5]ではなく
+`HIA_MULT` [6, 7, 8, 9, 10]という、1レベルごとに+1ずつ上がる単純な直線設計にした）。UR相応にスターわん
+ステッキ（SR）より高い倍率にしてある。時間増加系・出現量アップ系のどちらでもない（プレイ時間そのものを
+変更するコードパスは無く、取得時点の残り時間を得点へ変換するだけ）。
+
+この追加により図鑑プールが86→**87**種に増え、既存アイテムの取得確率が薄まる。同じ「時間増加系7種の
+重みをプール総数の増加率（Total(87)/Total(86) = 12053.333/11914.444 ≈ **1.0117**）だけ底上げする」方針で、
+`toy_duck_plush` / `toy_carrot` / `food_paw_melon_bread` / `interior_anball` / `summer_frenchie`を
+105→**106**、`other_omojii` / `other_azuki`を73→**74**に変更して相殺した（宝箱=149、
+`other_listen_to_the_a`=50は変更なし）。
+
+この倍率はN=86時点の重みをN=87のTotalで割った場合に生じる希釈率の逆数にあたるため、調整後の時間増加系
+7種の取得確率(P_i)はN=86時点とほぼ完全に一致する（hiA自身の重みがデフォルト100でTotalにわずかに
+混ざる分だけ、二次的な誤差が残る）。したがってLv1〜5の最終プレイ時間期待値は、直前の節（通れまてん追加後）
+からほぼ変化していない想定。
+
+現在の`ITEM_SPAWN_WEIGHTS`はこの節の数値が最新（宝箱=149、`other_omojii`=74、`other_azuki`=74、
+他5種(`toy_duck_plush`/`toy_carrot`/`food_paw_melon_bread`/`interior_anball`/`summer_frenchie`)=106、
+`other_listen_to_the_a`=50、N=87）。
+
 ## 初期プレイ時間を30秒→50秒に変更（2026-08-30）
 
 `ROUND_SECONDS`を30から50に変更した（`frenchie-catch-game.tsx`のUI表記「30秒チャレンジ」等、

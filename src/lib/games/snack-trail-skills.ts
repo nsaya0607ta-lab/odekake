@@ -97,6 +97,7 @@ const RECIPES: Record<string, SkillRecipe> = {
   other_mah: { title: "だっこシールド", kind: "shield" },
   other_mirror_omochi: { title: "ミラーおもち反転", kind: "shield" },
   other_toorematen: { title: "通行止め", kind: "gold" },
+  other_hia: { title: "タイムチャージ", kind: "gold" },
   other_yellow_rain_boots: { title: "水たまりジャンプ", kind: "noGrow" },
   accessory_red_bandana: { title: "赤い応援", kind: "combo" },
   other_acorns: { title: "どんぐりころころ", kind: "wide" },

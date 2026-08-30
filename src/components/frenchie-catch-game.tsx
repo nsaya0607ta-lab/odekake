@@ -154,7 +154,7 @@ const MYSTERY_SKILL_ITEM_IDS = [
   "other_pondeomo", "other_pondear", "other_kurumari_a", "other_jare_a", "other_ketsunade_a", "other_omochi_janai", "other_oyasumi", "other_nisoku_a",
   "interior_shikkoku_no_ar", "interior_ragby_ar", "other_oyatsu_no_jikan", "other_listen_to_the_a", "other_okaeri",
   "food_fruit_basket", "interior_gold_ball", "other_clawd", "food_kamikami", "food_mocchurin", "other_mah",
-  "other_mirror_omochi", "other_toorematen",
+  "other_mirror_omochi", "other_toorematen", "other_hia",
 ];
 
 /** アイテムごとのLv1〜5パラメータ（item_skill_levels_colored.xlsxの「スキル一覧」シート通り） */
@@ -259,6 +259,7 @@ const LV = {
   MIRROR_INVERT_PT: [15, 20, 25, 30, 40],
   TOOREMATEN_SEC: [4, 5, 6, 8, 10],
   TOOREMATEN_PT: [45, 60, 80, 100, 130],
+  HIA_MULT: [6, 7, 8, 9, 10],
 } as const;
 const SLANT_VX_BOOST = 3.5;
 const POINTS: Record<FrenchieCatchItem["rarity"], number> = { N: 10, R: 20, SR: 40, SSR: 70, UR: 100, LR: 150, MR: 220 };
@@ -324,13 +325,13 @@ const DEFAULT_ITEM_SPAWN_WEIGHT = 100;
  */
 const ITEM_SPAWN_WEIGHTS: Partial<Record<string, number>> = {
   toy_treasure_puzzle: 149,
-  other_omojii: 73,
-  toy_duck_plush: 105,
-  toy_carrot: 105,
-  food_paw_melon_bread: 105,
-  interior_anball: 105,
-  other_azuki: 73,
-  summer_frenchie: 105,
+  other_omojii: 74,
+  toy_duck_plush: 106,
+  toy_carrot: 106,
+  food_paw_melon_bread: 106,
+  interior_anball: 106,
+  other_azuki: 74,
+  summer_frenchie: 106,
   other_listen_to_the_a: 50,
 };
 const STRETCH_ROD_ITEM_ID = "interior_stretch_rod";
@@ -1531,6 +1532,13 @@ export function FrenchieCatchGame({ ownedItems }: { ownedItems: FrenchieCatchIte
               case "toy_star_wan_wand": {
                 const remainingSec = Math.round(Math.max(0, (endAtRef.current - now) / 1000));
                 const timeBonus = Math.round(remainingSec * LV.STARWAND_MULT[lv]!);
+                points += timeBonus;
+                effectLabel = `残り時間ボーナス +${timeBonus}pt${lvTag}`;
+                break;
+              }
+              case "other_hia": {
+                const remainingSec = Math.round(Math.max(0, (endAtRef.current - now) / 1000));
+                const timeBonus = Math.round(remainingSec * LV.HIA_MULT[lv]!);
                 points += timeBonus;
                 effectLabel = `残り時間ボーナス +${timeBonus}pt${lvTag}`;
                 break;
