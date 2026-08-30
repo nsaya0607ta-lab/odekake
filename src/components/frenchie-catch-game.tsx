@@ -50,7 +50,7 @@ type RecentSkillEffect = {
   text: string;
 };
 
-const ROUND_SECONDS = 30;
+const ROUND_SECONDS = 50;
 const BOX_IMAGE = "/4EA485D9-BB37-47F3-97F0-111CF0E4AF7E.webp";
 const BOX_WIDTH = 37.8 * 0.9;
 const BOX_HALF = BOX_WIDTH / 2;
@@ -2110,7 +2110,7 @@ export function FrenchieCatchGame({ ownedItems }: { ownedItems: FrenchieCatchIte
           <p className="text-[10px] font-bold tracking-[0.16em] text-ink-faint">MINI GAME</p>
           <h2 className="mt-0.5 text-base font-black text-ink">アイテムキャッチ</h2>
         </div>
-        <span className="rounded-full bg-leaf-soft px-2.5 py-1 text-[10px] font-bold text-leaf-deep">30秒チャレンジ</span>
+        <span className="rounded-full bg-leaf-soft px-2.5 py-1 text-[10px] font-bold text-leaf-deep">50秒チャレンジ</span>
       </div>
 
       <div

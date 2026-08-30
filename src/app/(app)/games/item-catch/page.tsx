@@ -35,7 +35,7 @@ export default async function ItemCatchPage() {
       <TopHeader
         backHref="/games"
         title="アイテムキャッチ"
-        subtitle="30秒でどこまでキャッチできる？"
+        subtitle="50秒でどこまでキャッチできる？"
       />
 
       <PageBody className="!space-y-3 !py-3">

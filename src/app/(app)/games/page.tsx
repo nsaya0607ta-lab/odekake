@@ -73,7 +73,7 @@ export default async function GamesPage() {
               <span className="flex min-w-0 items-center gap-3">
                 <span className="min-w-0">
                   <span className="block text-[8px] font-black text-[#a46624]">プレイ形式</span>
-                  <span className="block text-[11px] font-black text-ink">約30秒</span>
+                  <span className="block text-[11px] font-black text-ink">約50秒</span>
                 </span>
                 <span aria-hidden="true" className="h-7 w-px bg-[#d4b87d]/55" />
                 <span className="min-w-0">

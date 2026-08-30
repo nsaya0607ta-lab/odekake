@@ -63,7 +63,7 @@ export async function POST(request: Request) {
   const bonusCoins = body.bonusCoins ?? 0;
 
   if (
-    body.durationSeconds !== 30
+    body.durationSeconds !== 50
     || body.score < 0
     || body.caughtCount < 0
     || body.caughtCount > MAX_CAUGHT_COUNT

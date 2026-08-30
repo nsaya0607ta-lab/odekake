@@ -68,14 +68,14 @@ export default async function ItemCatchGuidePage() {
             <span className="inline-flex rounded-full border border-[#cbb477] bg-[#fffaf0]/90 px-3 py-1 text-[9px] font-black tracking-[0.2em] text-[#7a6533] shadow-[0_3px_10px_rgba(120,95,40,0.08)]">
               ITEM CATCH · RULE BOOK
             </span>
-            <h1 className="mt-3 text-[21px] font-black tracking-tight text-[#30291f]">30秒で、どこまで伸ばせる？</h1>
+            <h1 className="mt-3 text-[21px] font-black tracking-tight text-[#30291f]">50秒で、どこまで伸ばせる？</h1>
             <p className="mt-1.5 max-w-[92%] text-xs leading-relaxed text-[#6f6251]">
               落ちてくるアイテムを段ボールでキャッチ。レア度・JUST・スキルを重ねてハイスコアを狙います。
             </p>
 
             <div className="mt-4 grid grid-cols-2 gap-2">
               {[
-                ["TIME", "30秒", "1プレイ"],
+                ["TIME", "50秒", "1プレイ"],
                 ["REWARD", "÷25", "コイン換算"],
               ].map(([label, value, note]) => (
                 <div key={label} className="rounded-2xl border border-[#dbcda6] bg-gradient-to-b from-white/95 to-[#fffaf0]/85 px-2 py-2.5 text-center shadow-[0_6px_16px_rgba(90,72,38,0.09)] backdrop-blur-sm">
