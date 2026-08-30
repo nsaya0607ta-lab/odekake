@@ -30,7 +30,7 @@ const games: GameCard[] = [
     title: "アイテムキャッチ",
     lead: "落ちてくるお宝をキャッチ！",
     description: "反射神経でハイスコアを目指そう。",
-    playStyle: "約30秒",
+    playStyle: "約50秒",
     control: "箱を左右に動かす",
     image: "/games/item-catch/menu-icon-v2.webp",
     cardClass:

@@ -86,7 +86,7 @@ export function CoinEarnMethods() {
             </span>
           </div>
           <p className="mt-2 text-[10px] leading-relaxed text-ink-faint">
-            30秒遊びきるたびに獲得できます。回数・獲得上限はなく、完走すれば最低1コインです。
+            50秒遊びきるたびに獲得できます。回数・獲得上限はなく、完走すれば最低1コインです。
           </p>
         </div>
 

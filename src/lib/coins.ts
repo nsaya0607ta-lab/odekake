@@ -49,7 +49,7 @@ export const MAX_DAILY_STEP_COINS =
   (200000 / STEP_COIN_INTERVAL) * STEP_COIN_AMOUNT
   + STEP_COIN_MILESTONES.reduce((sum, milestone) => sum + milestone.coins, 0);
 
-/** アイテムキャッチ：30秒遊びきると25スコアごとに1コイン、最低1コイン。 */
+/** アイテムキャッチ：50秒遊びきると25スコアごとに1コイン、最低1コイン。 */
 export const ITEM_CATCH_SCORE_PER_COIN = 25;
 export const ITEM_CATCH_MIN_COINS = 1;
 
@@ -95,7 +95,7 @@ export function getStepCoins(steps: number | null | undefined): number {
   return base + milestone;
 }
 
-/** 30秒のアイテムキャッチを完走したときの報酬。 */
+/** 50秒のアイテムキャッチを完走したときの報酬。 */
 export function getItemCatchCoins(score: number): number {
   if (!Number.isFinite(score)) return ITEM_CATCH_MIN_COINS;
   const safeScore = Math.max(0, Math.floor(score));
