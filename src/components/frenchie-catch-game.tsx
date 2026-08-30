@@ -254,7 +254,7 @@ const LV = {
   KAMIKAMI_PT: [10, 15, 25, 35, 45],
   MOCCHURIN_PT: [30, 45, 60, 80, 100],
   TIME_BONUS_FALL: [6, 5.6, 5.2, 4.8, 4.5],
-  MAH_PT: [60, 80, 100, 130, 170],
+  MAH_PT: [260, 280, 300, 330, 370],
   MIRROR_SEC: [5, 6, 8, 10, 13],
   MIRROR_INVERT_PT: [15, 20, 25, 30, 40],
   TOOREMATEN_SEC: [4, 5, 6, 8, 10],
@@ -530,7 +530,8 @@ export function FrenchieCatchGame({ ownedItems }: { ownedItems: FrenchieCatchIte
   const personFloodRemainingRef = useRef(0);
   const clawdBallFloodRemainingRef = useRef(0);
   /** もっちゅりんのエコー用に、直前に捕まえたアイテムを新しい順に最大2件保持する */
-  const lastSkillCatchesRef = useRef<{ itemId: string; level: number }[]>([]);
+  /** もっちゅりんを取った直後に捕まえるアイテムのスキルをもう一度発動する残り回数 */
+  const mocchurinPendingEchoCountRef = useRef(0);
   const goldBonusCoinsRef = useRef(0);
   const slantBoostUntilRef = useRef(0);
   const boxShrinkUntilRef = useRef(0);
@@ -622,6 +623,7 @@ export function FrenchieCatchGame({ ownedItems }: { ownedItems: FrenchieCatchIte
     if (nextBonus10Ref.current > 0) labels.push(`あと${nextBonus10Ref.current}個 +10pt`);
     if (rewardTimeCountRef.current > 0) labels.push(`次の1個 ${rewardTimeValueRef.current}pt確定`);
     if (nextBonus5Ref.current > 0) labels.push(`あと${nextBonus5Ref.current}個 +5pt`);
+    if (mocchurinPendingEchoCountRef.current > 0) labels.push(`次の${mocchurinPendingEchoCountRef.current}個をエコー`);
     if (stunGuardRef.current > 0) labels.push(HAZARD_GUARD_LABELS.stun);
     if (boxShrinkGuardRef.current > 0) labels.push(HAZARD_GUARD_LABELS.boxShrink);
     if (timeMinusGuardRef.current > 0) labels.push(HAZARD_GUARD_LABELS.timeMinus);
@@ -1507,10 +1509,14 @@ export function FrenchieCatchGame({ ownedItems }: { ownedItems: FrenchieCatchIte
                 points += LV.KAMIKAMI_PT[lv]!;
                 effectLabel = `+${LV.KAMIKAMI_PT[lv]}ptボーナス${lvTag}`;
                 break;
-              case MOCCHURIN_ITEM_ID:
+              case MOCCHURIN_ITEM_ID: {
                 points += LV.MOCCHURIN_PT[lv]!;
-                effectLabel = `+${LV.MOCCHURIN_PT[lv]}ptボーナス${lvTag}`;
+                const echoCount = lv >= MOCCHURIN_DOUBLE_ECHO_MIN_LV ? 2 : 1;
+                mocchurinPendingEchoCountRef.current += echoCount;
+                effectLabel = `+${LV.MOCCHURIN_PT[lv]}ptボーナス / 次の${echoCount}個をエコー${lvTag}`;
+                statusChanged = true;
                 break;
+              }
               case "food_paw_melon_bread": {
                 const applied = addBonusTime(LV.MELON_SEC[lv]!);
                 points += LV.MELON_PT[lv]!;
@@ -1821,23 +1827,14 @@ export function FrenchieCatchGame({ ownedItems }: { ownedItems: FrenchieCatchIte
             if (mainSkillResult.effectLabel) effectLabel = mainSkillResult.effectLabel;
             if (mainSkillResult.statusChanged) statusChanged = true;
 
-            if (skillId === MOCCHURIN_ITEM_ID) {
-              const echoCount = lv >= MOCCHURIN_DOUBLE_ECHO_MIN_LV ? 2 : 1;
-              const echoTargets = lastSkillCatchesRef.current.slice(0, echoCount);
-              for (const lastSkill of echoTargets) {
-                const echoLv = clamp(lastSkill.level, 1, MAX_SKILL_LEVEL) - 1;
-                const echoLvTag = lastSkill.level >= MAX_SKILL_LEVEL ? " [Lv.MAX]" : lastSkill.level > 1 ? ` [Lv${lastSkill.level}]` : "";
-                const echoResult = runItemSkillEffect(lastSkill.itemId, echoLv, echoLvTag);
-                points += echoResult.points;
-                if (echoResult.effectLabel) {
-                  effectLabel = effectLabel ? `${effectLabel} / エコー: ${echoResult.effectLabel}` : `エコー: ${echoResult.effectLabel}`;
-                }
-                if (echoResult.statusChanged) statusChanged = true;
+            if (skillId && skillId !== MOCCHURIN_ITEM_ID && mocchurinPendingEchoCountRef.current > 0) {
+              mocchurinPendingEchoCountRef.current -= 1;
+              const echoResult = runItemSkillEffect(skillId, lv, lvTag);
+              points += echoResult.points;
+              if (echoResult.effectLabel) {
+                effectLabel = effectLabel ? `${effectLabel} / エコー: ${echoResult.effectLabel}` : `エコー: ${echoResult.effectLabel}`;
               }
-            }
-
-            if (skillId && skillId !== MOCCHURIN_ITEM_ID) {
-              lastSkillCatchesRef.current = [{ itemId: skillId, level: skillLevel }, ...lastSkillCatchesRef.current].slice(0, 2);
+              if (echoResult.statusChanged) statusChanged = true;
             }
 
             if (isMystery && effectLabel) effectLabel = `？発動 / ${effectLabel}`;
@@ -2040,7 +2037,7 @@ export function FrenchieCatchGame({ ownedItems }: { ownedItems: FrenchieCatchIte
     dogFloodRemainingRef.current = 0;
     personFloodRemainingRef.current = 0;
     clawdBallFloodRemainingRef.current = 0;
-    lastSkillCatchesRef.current = [];
+    mocchurinPendingEchoCountRef.current = 0;
     goldBonusCoinsRef.current = 0;
     slantBoostUntilRef.current = 0;
     boxShrinkUntilRef.current = 0;
