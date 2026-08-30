@@ -154,24 +154,24 @@ const MYSTERY_SKILL_ITEM_IDS = [
   "other_pondeomo", "other_pondear", "other_kurumari_a", "other_jare_a", "other_ketsunade_a", "other_omochi_janai", "other_oyasumi", "other_nisoku_a",
   "interior_shikkoku_no_ar", "interior_ragby_ar", "other_oyatsu_no_jikan", "other_listen_to_the_a", "other_okaeri",
   "food_fruit_basket", "interior_gold_ball", "other_clawd", "food_kamikami", "food_mocchurin", "other_mah",
-  "other_mirror_omochi", "other_toorematen",
+  "other_mirror_omochi", "other_toorematen", "other_hia",
 ];
 
 /** アイテムごとのLv1〜5パラメータ（item_skill_levels_colored.xlsxの「スキル一覧」シート通り） */
 const LV = {
-  DUCK_SEC: [2, 3, 4, 5, 6],
-  CARROT_SEC: [2, 3, 4, 5, 7],
+  DUCK_SEC: [2, 3, 4, 5, 7],
+  CARROT_SEC: [2, 3, 4, 5, 8],
   FRISBEE_MULT: [2, 2.2, 2.4, 2.7, 3],
   SOCCER_PT: [10, 15, 20, 30, 40],
   TAIYAKI_PT: [5, 7, 10, 13, 15],
   BEAR_PT: [0, 10, 0, 20, 0],
   BOWL_PT: [5, 7, 10, 13, 15],
   PUDDING_PT: [15, 20, 30, 40, 50],
-  MELON_SEC: [2, 3, 4, 5, 6],
+  MELON_SEC: [2, 3, 4, 5, 7],
   MELON_PT: [5, 10, 15, 20, 30],
   TREASURE_LOW: [25, 30, 40, 50, 60],
   TREASURE_HIGH: [50, 65, 80, 100, 130],
-  TREASURE_SEC: [2, 3, 4, 5, 6],
+  TREASURE_SEC: [2, 4, 5, 6, 8],
   TREASURE_STREAK_PCT: [20, 25, 30, 35, 40],
   FRENCHIE_PLUSH_COUNT: [3, 3, 4, 4, 5],
   FRENCHIE_PLUSH_PT: [10, 13, 15, 20, 25],
@@ -187,7 +187,7 @@ const LV = {
   SPRING_MULT: [1.2, 1.2, 1.25, 1.3, 1.4],
   SPARKLE_SEC: [4, 5, 6, 8, 10],
   SPARKLE_STRENGTH: ["weak", "weak", "weak", "weak", "medium"] as const,
-  RAINBOW_STEP: [3, 4, 5, 6, 8],
+  RAINBOW_STEP: [3, 4, 6, 8, 10],
   GOLDEN_COUNT: [2, 2, 3, 3, 4],
   GOLDEN_MULT: [2, 2.2, 2.2, 2.5, 2.5],
   NAKAYOSHI_PT: [30, 40, 50, 65, 80],
@@ -195,23 +195,23 @@ const LV = {
   KAMUNAYO_MULT: [1.3, 1.35, 1.4, 1.5, 1.6],
   HIKING_SEC: [5, 6, 7, 9, 12],
   SNOW_SEC: [5, 6, 7, 9, 12],
-  SUMMER_ADD: [3, 4, 5, 6, 7],
+  SUMMER_ADD: [3, 4, 6, 7, 9],
   SUMMER_MULTSEC: [5, 6, 7, 8, 10],
   SUMMER_MULT: [1.5, 1.5, 1.6, 1.7, 1.8],
   ANBALL_PT: [100, 125, 150, 180, 220],
-  ANBALL_SEC: [2, 3, 4, 5, 6],
+  ANBALL_SEC: [3, 4, 6, 8, 10],
   STRETCH_ROD_MULT: [0.5, 0.4, 0.3, 0.2, 0.1],
   LISTEN_DOG_COUNT: [10, 15, 20, 25, 30],
   AZUBEE_SEC: [6, 7, 8, 10, 12],
   AZUBEE_MULT: [2, 2, 2.1, 2.2, 2.5],
-  OMOJII_SEC: [4, 7, 9, 10, 11],
+  OMOJII_SEC: [4, 9, 10, 13, 14],
   OMOJII_PT: [30, 45, 60, 80, 100],
   KINOKO_SEC: [6, 7, 8, 10, 12],
   KINOKO_FALL: [1.7, 1.8, 1.9, 2, 2.2],
   KINOKO_SCORE: [1.5, 1.5, 1.6, 1.7, 2],
   KOMOCHI_COUNT: [5, 5, 6, 7, 8],
   KOMOCHI_MULT: [2, 2.1, 2.2, 2.3, 2.5],
-  AZUKI_SEC: [3, 5, 6, 7, 8],
+  AZUKI_SEC: [3, 7, 8, 9, 10],
   AZUKI_PT: [50, 65, 80, 100, 130],
   KOBEE_PT: [50, 65, 80, 100, 130],
   KOBEE_SEC: [8, 9, 11, 13, 16],
@@ -259,6 +259,7 @@ const LV = {
   MIRROR_INVERT_PT: [15, 20, 25, 30, 40],
   TOOREMATEN_SEC: [4, 5, 6, 8, 10],
   TOOREMATEN_PT: [45, 60, 80, 100, 130],
+  HIA_MULT: [6, 7, 8, 9, 10],
 } as const;
 const SLANT_VX_BOOST = 3.5;
 const POINTS: Record<FrenchieCatchItem["rarity"], number> = { N: 10, R: 20, SR: 40, SSR: 70, UR: 100, LR: 150, MR: 220 };
@@ -324,13 +325,13 @@ const DEFAULT_ITEM_SPAWN_WEIGHT = 100;
  */
 const ITEM_SPAWN_WEIGHTS: Partial<Record<string, number>> = {
   toy_treasure_puzzle: 149,
-  other_omojii: 73,
-  toy_duck_plush: 105,
-  toy_carrot: 105,
-  food_paw_melon_bread: 105,
-  interior_anball: 105,
-  other_azuki: 73,
-  summer_frenchie: 105,
+  other_omojii: 74,
+  toy_duck_plush: 106,
+  toy_carrot: 106,
+  food_paw_melon_bread: 106,
+  interior_anball: 106,
+  other_azuki: 74,
+  summer_frenchie: 106,
   other_listen_to_the_a: 50,
 };
 const STRETCH_ROD_ITEM_ID = "interior_stretch_rod";
@@ -1531,6 +1532,13 @@ export function FrenchieCatchGame({ ownedItems }: { ownedItems: FrenchieCatchIte
               case "toy_star_wan_wand": {
                 const remainingSec = Math.round(Math.max(0, (endAtRef.current - now) / 1000));
                 const timeBonus = Math.round(remainingSec * LV.STARWAND_MULT[lv]!);
+                points += timeBonus;
+                effectLabel = `残り時間ボーナス +${timeBonus}pt${lvTag}`;
+                break;
+              }
+              case "other_hia": {
+                const remainingSec = Math.round(Math.max(0, (endAtRef.current - now) / 1000));
+                const timeBonus = Math.round(remainingSec * LV.HIA_MULT[lv]!);
                 points += timeBonus;
                 effectLabel = `残り時間ボーナス +${timeBonus}pt${lvTag}`;
                 break;
