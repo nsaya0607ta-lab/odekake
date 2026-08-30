@@ -3,8 +3,9 @@
 import { useActionState } from "react";
 import { postAdminNoticeAction } from "./actions";
 import { emptyActionState, Field, FormMessage, SubmitButton } from "@/components/form";
+import { PhotoUploader } from "@/components/photo-uploader";
 
-export function AdminNoticeForm() {
+export function AdminNoticeForm({ userId }: { userId: string }) {
   const [state, formAction] = useActionState(postAdminNoticeAction, emptyActionState);
 
   return (
@@ -36,6 +37,15 @@ export function AdminNoticeForm() {
           required
         />
       </Field>
+
+      <PhotoUploader
+        name="imagePaths"
+        userId={userId}
+        draftKey="admin-notice-new"
+        max={1}
+        label="画像（任意）"
+        persistDraft
+      />
 
       <SubmitButton pendingLabel="配信中…">全ユーザーに配信する</SubmitButton>
     </form>

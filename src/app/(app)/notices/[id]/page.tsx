@@ -2,6 +2,7 @@ import { notFound } from "next/navigation";
 import { PageBody } from "@/components/page-body";
 import { PageHeader } from "@/components/page-header";
 import { getNoticeDetail } from "@/lib/data/notices";
+import { signPhotoPath } from "@/lib/data/photos";
 import { requireUser } from "@/lib/supabase/server";
 import { MarkNoticeRead } from "./mark-notice-read";
 
@@ -32,6 +33,7 @@ export default async function NoticeDetailPage({ params }: { params: Promise<{ i
   const { supabase } = await requireUser();
   const notice = await getNoticeDetail(supabase, id);
   if (!notice) notFound();
+  const imageUrl = await signPhotoPath(supabase, notice.image_path);
 
   return (
     <>
@@ -46,6 +48,10 @@ export default async function NoticeDetailPage({ params }: { params: Promise<{ i
             <span>{formatDateTime(notice.created_at)}</span>
           </div>
           <h1 className="mt-2 text-lg font-bold text-ink">{notice.title}</h1>
+          {imageUrl ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img src={imageUrl} alt="" className="mt-3 w-full rounded-xl" />
+          ) : null}
           {notice.content ? (
             <p className="mt-3 whitespace-pre-wrap text-sm leading-relaxed text-ink-soft">{notice.content}</p>
           ) : null}

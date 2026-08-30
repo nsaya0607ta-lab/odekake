@@ -4,6 +4,7 @@ import { AdminNoticeEditForm } from "./admin-notice-edit-form";
 import { AdminNoticeForm } from "./admin-notice-form";
 import { ConfirmSubmitButton } from "@/components/confirm-submit-button";
 import { getNoticesFeed, isNoticeAdmin } from "@/lib/data/notices";
+import { signPhotoPath } from "@/lib/data/photos";
 import { PageBody } from "@/components/page-body";
 import { PageHeader } from "@/components/page-header";
 import { requireUser } from "@/lib/supabase/server";
@@ -23,12 +24,17 @@ function formatDateTime(iso: string): string {
 }
 
 export default async function AdminNoticePage() {
-  const { supabase } = await requireUser();
+  const { supabase, user } = await requireUser();
   const isAdmin = await isNoticeAdmin(supabase);
   if (!isAdmin) notFound();
 
   const notices = await getNoticesFeed(supabase, 50);
   const adminNotices = notices.filter((notice) => notice.type === "admin");
+  const adminNoticeImageUrls = new Map(
+    await Promise.all(
+      adminNotices.map(async (notice) => [notice.id, await signPhotoPath(supabase, notice.image_path)] as const),
+    ),
+  );
 
   return (
     <>
@@ -37,7 +43,7 @@ export default async function AdminNoticePage() {
         <p className="px-1 text-sm text-ink-soft">
           ここで送信した内容は、全ユーザーの「お知らせ」に配信されます。
         </p>
-        <AdminNoticeForm />
+        <AdminNoticeForm userId={user.id} />
 
         {adminNotices.length > 0 ? (
           <section className="space-y-2">
@@ -50,8 +56,11 @@ export default async function AdminNoticePage() {
                     <summary className="cursor-pointer font-semibold">{notice.title}</summary>
                     <AdminNoticeEditForm
                       noticeId={notice.id}
+                      userId={user.id}
                       initialTitle={notice.title}
                       initialMessage={notice.content ?? notice.title}
+                      initialImagePath={notice.image_path}
+                      initialImageUrl={adminNoticeImageUrls.get(notice.id) ?? null}
                     />
                     <form action={deleteAdminNoticeAction} className="mt-2">
                       <input type="hidden" name="noticeId" value={notice.id} />
