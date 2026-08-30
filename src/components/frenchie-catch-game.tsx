@@ -256,7 +256,7 @@ const LV = {
   TIME_BONUS_FALL: [6, 5.6, 5.2, 4.8, 4.5],
   MAH_PT: [60, 80, 100, 130, 170],
   MIRROR_SEC: [5, 6, 8, 10, 13],
-  MIRROR_STUN_PT: [15, 20, 25, 30, 40],
+  MIRROR_INVERT_PT: [15, 20, 25, 30, 40],
 } as const;
 const SLANT_VX_BOOST = 3.5;
 const POINTS: Record<FrenchieCatchItem["rarity"], number> = { N: 10, R: 20, SR: 40, SSR: 70, UR: 100, LR: 150, MR: 220 };
@@ -529,9 +529,13 @@ export function FrenchieCatchGame({ ownedItems }: { ownedItems: FrenchieCatchIte
   const boxShrinkUntilRef = useRef(0);
   const blackoutUntilRef = useRef(0);
   const stunUntilRef = useRef(0);
-  /** ミラーおもち：有効中はしびれ/ダンボール縮小/時間減少のマイナス効果が反転してプラスになる */
+  /**
+   * ミラーおもち：有効中はしびれ/ダンボール縮小/時間減少のマイナス効果が反転してプラスになる。
+   * 時間減少の反転先も「+秒」ではなく「+pt」にしてある（プレイ時間そのものを伸ばすと
+   * docs/minigame-time-balance.mdの時間バランス計算に影響するため、あえて時間には触れない設計）。
+   */
   const hazardInvertUntilRef = useRef(0);
-  const mirrorStunPtValueRef = useRef(0);
+  const mirrorInvertPtValueRef = useRef(0);
   const feedbackTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const impactTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const recentSkillEffectIdRef = useRef(0);
@@ -1148,9 +1152,10 @@ export function FrenchieCatchGame({ ownedItems }: { ownedItems: FrenchieCatchIte
                 && (entity.itemId === TIME_MINUS_ITEM_ID || entity.itemId === BOX_SHRINK_ITEM_ID || entity.itemId === STUN_ITEM_ID);
               if (entity.itemId === TIME_MINUS_ITEM_ID) {
                 if (hazardInverted) {
-                  endAtRef.current += TIME_MINUS_SECONDS * 1000;
-                  setTimeLeft(Math.ceil(Math.max(0, (endAtRef.current - now) / 1000)));
-                  showCatch(entity, 0, `ミラー反転！残り時間 +${TIME_MINUS_SECONDS}秒`);
+                  const bonusPt = mirrorInvertPtValueRef.current;
+                  scoreRef.current += bonusPt;
+                  setScore(scoreRef.current);
+                  showCatch(entity, bonusPt, `ミラー反転！+${bonusPt}pt`);
                 } else if (timeMinusGuardRef.current > 0) {
                   timeMinusGuardRef.current = 0;
                   setTimeMinusGuard(0);
@@ -1181,7 +1186,7 @@ export function FrenchieCatchGame({ ownedItems }: { ownedItems: FrenchieCatchIte
                 showCatch(entity, 0, BLACKOUT_SECONDS + "秒間 上半分が見えない！");
               } else if (entity.itemId === STUN_ITEM_ID) {
                 if (hazardInverted) {
-                  const bonusPt = mirrorStunPtValueRef.current;
+                  const bonusPt = mirrorInvertPtValueRef.current;
                   scoreRef.current += bonusPt;
                   setScore(scoreRef.current);
                   showCatch(entity, bonusPt, `ミラー反転！+${bonusPt}pt`);
@@ -1598,7 +1603,7 @@ export function FrenchieCatchGame({ ownedItems }: { ownedItems: FrenchieCatchIte
               case "other_mirror_omochi": {
                 const mirrorSec = LV.MIRROR_SEC[lv]!;
                 hazardInvertUntilRef.current = now + mirrorSec * 1000;
-                mirrorStunPtValueRef.current = LV.MIRROR_STUN_PT[lv]!;
+                mirrorInvertPtValueRef.current = LV.MIRROR_INVERT_PT[lv]!;
                 effectLabel = `${mirrorSec}秒間 ハザード反転${lvTag}`;
                 statusChanged = true;
                 break;
