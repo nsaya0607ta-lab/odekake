@@ -46,6 +46,7 @@ export default function BlockGardenGame() {
   const [inventory, setInventory] = useState({ ...INITIAL_BLOCK_INVENTORY });
   const [target, setTarget] = useState<BlockGardenTarget>(null);
   const [guideOpen, setGuideOpen] = useState(true);
+  const [lookHintVisible, setLookHintVisible] = useState(true);
   const [holding, setHolding] = useState(false);
   const [toast, setToast] = useState<string | null>(null);
   const [renderError, setRenderError] = useState<string | null>(null);
@@ -102,6 +103,10 @@ export default function BlockGardenGame() {
   const chooseBlock = useCallback((blockId: PlaceableBlockId) => {
     selectedRef.current = blockId;
     setSelected(blockId);
+  }, []);
+
+  const jumpPlayer = useCallback(() => {
+    engineRef.current?.jump();
   }, []);
 
   useEffect(() => {
@@ -178,6 +183,11 @@ export default function BlockGardenGame() {
         engineRef.current?.setKey(event.code, true);
         return;
       }
+      if (event.code === "Space") {
+        event.preventDefault();
+        if (!event.repeat) jumpPlayer();
+        return;
+      }
       if (/^Digit[1-5]$/.test(event.code)) {
         const index = Number(event.code.slice(-1)) - 1;
         const blockId = HOTBAR_BLOCK_IDS[index];
@@ -207,7 +217,7 @@ export default function BlockGardenGame() {
       window.removeEventListener("blur", releaseKeys);
       document.removeEventListener("mousemove", handleMouseMove);
     };
-  }, [chooseBlock]);
+  }, [chooseBlock, jumpPlayer]);
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -266,14 +276,15 @@ export default function BlockGardenGame() {
     if (!gesture || gesture.pointerId !== event.pointerId) return;
 
     const totalDistance = Math.hypot(event.clientX - gesture.startX, event.clientY - gesture.startY);
-    if (totalDistance > 7 && !gesture.moved) {
+    if (totalDistance > 4 && !gesture.moved) {
       gesture.moved = true;
       clearLongPress();
+      setLookHintVisible(false);
     }
     if (gesture.moved) {
       const deltaX = event.clientX - gesture.lastX;
       const deltaY = event.clientY - gesture.lastY;
-      engineRef.current?.addLookDelta(deltaX, deltaY, 0.0041);
+      engineRef.current?.addLookDelta(deltaX, deltaY, 0.0031);
     }
     gesture.lastX = event.clientX;
     gesture.lastY = event.clientY;
@@ -379,13 +390,26 @@ export default function BlockGardenGame() {
         onPointerUp={finishJoystick}
         onPointerCancel={finishJoystick}
       >
+        <span className={styles.joystickLabel} aria-hidden="true">移動</span>
         <span ref={joystickKnobRef} className={styles.joystickKnob} aria-hidden="true">
           🐾
         </span>
       </div>
 
-      <div className={styles.actionButtons} aria-label="ブロック操作">
-        <button type="button" className={styles.actionButton} onClick={breakBlock}>
+      {lookHintVisible && !guideOpen ? (
+        <div className={styles.lookHint} aria-hidden="true">
+          <span>↔</span>
+          <strong>右画面をスワイプ</strong>
+          <small>見回す</small>
+        </div>
+      ) : null}
+
+      <div className={styles.actionButtons} aria-label="ゲーム操作" role="group">
+        <button type="button" className={`${styles.actionButton} ${styles.actionJump}`} onClick={jumpPlayer}>
+          <span className={styles.actionIcon} aria-hidden="true">⬆️</span>
+          <span className={styles.actionLabel}>ジャンプ</span>
+        </button>
+        <button type="button" className={`${styles.actionButton} ${styles.actionBreak}`} onClick={breakBlock}>
           <span className={styles.actionIcon} aria-hidden="true">⛏️</span>
           <span className={styles.actionLabel}>こわす</span>
         </button>
@@ -418,7 +442,7 @@ export default function BlockGardenGame() {
         })}
       </ol>
 
-      <p className={styles.desktopHint}>WASDで移動 ・ クリックで視点 ・ 左クリックで壊す ・ 右クリックで置く</p>
+      <p className={styles.desktopHint}>WASDで移動 ・ Spaceでジャンプ ・ クリックで視点 ・ 左クリックで壊す ・ 右クリックで置く</p>
 
       {toast ? <div className={styles.toast} role="status">{toast}</div> : null}
 
@@ -433,11 +457,19 @@ export default function BlockGardenGame() {
           >
             <div className={styles.guideIcon} aria-hidden="true">🌱</div>
             <h2 id="block-garden-guide-title" className={styles.guideTitle}>小さな庭をつくろう</h2>
-            <p className={styles.guideLead}>歩いて、集めて、好きな場所にブロックを置けます。</p>
+            <p className={styles.guideLead}>画面のボタンだけで遊べます。まずは移動とジャンプを試してみよう。</p>
             <ul className={styles.guideList}>
               <li className={styles.guideItem}>
                 <span className={styles.guideItemIcon} aria-hidden="true">🐾</span>
-                <span><strong>移動と見回し</strong><span>左の肉球で移動、右側をスワイプして視点を動かします。</span></span>
+                <span><strong>移動</strong><span>左下の肉球を、進みたい方向へ動かします。</span></span>
+              </li>
+              <li className={styles.guideItem}>
+                <span className={styles.guideItemIcon} aria-hidden="true">👀</span>
+                <span><strong>見回す</strong><span>ボタン以外の右画面を、見たい方向へスワイプします。</span></span>
+              </li>
+              <li className={styles.guideItem}>
+                <span className={styles.guideItemIcon} aria-hidden="true">⬆️</span>
+                <span><strong>ジャンプ</strong><span>右下の「ジャンプ」を押します。PCはSpaceキーです。</span></span>
               </li>
               <li className={styles.guideItem}>
                 <span className={styles.guideItemIcon} aria-hidden="true">⛏️</span>

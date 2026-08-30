@@ -44,6 +44,8 @@ type InternalTarget = Exclude<BlockGardenTarget, null> & { normal: BlockPosition
 const PLAYER_EYE_HEIGHT = 1.48;
 const PLAYER_STEP_HEIGHT = 1.05;
 const PLAYER_SPEED = 3.65;
+const PLAYER_JUMP_VELOCITY = 5.8;
+const PLAYER_GRAVITY = 15;
 const TARGET_UPDATE_INTERVAL = 80;
 
 function blockIds(): BlockId[] {
@@ -89,6 +91,8 @@ export class BlockGardenEngine {
   private targetSignature = "";
   private touchStrafe = 0;
   private touchForward = 0;
+  private verticalVelocity = 0;
+  private grounded = true;
   private yaw = -Math.PI / 4;
   private pitch = -0.12;
   private animationFrame = 0;
@@ -197,6 +201,16 @@ export class BlockGardenEngine {
     this.updateCamera();
   }
 
+  jump(): boolean {
+    if (!this.grounded) return false;
+
+    const ground = getPlayerGroundHeight(this.world, this.player.x, this.player.z);
+    if (ground !== null) this.player.feetY = Math.max(this.player.feetY, ground);
+    this.grounded = false;
+    this.verticalVelocity = PLAYER_JUMP_VELOCITY;
+    return true;
+  }
+
   breakTarget(): BlockGardenInteractionResult {
     if (!this.target) return { ok: false, message: "照準をブロックに合わせてね" };
 
@@ -288,6 +302,7 @@ export class BlockGardenEngine {
     const delta = Math.min(this.clock.getDelta(), 0.05);
     if (!document.hidden) {
       this.updateMovement(delta);
+      this.updateVerticalMovement(delta);
       this.updateCamera();
 
       const now = performance.now();
@@ -331,8 +346,39 @@ export class BlockGardenEngine {
 
     this.player.x = nextX;
     this.player.z = nextZ;
-    const smoothing = 1 - Math.exp(-delta * 14);
-    this.player.feetY = THREE.MathUtils.lerp(this.player.feetY, nextGround, smoothing);
+    if (this.grounded) {
+      if (nextGround < this.player.feetY - 0.08) {
+        this.grounded = false;
+      } else {
+        const smoothing = 1 - Math.exp(-delta * 14);
+        this.player.feetY = THREE.MathUtils.lerp(this.player.feetY, nextGround, smoothing);
+      }
+    }
+  }
+
+  private updateVerticalMovement(delta: number): void {
+    const ground = getPlayerGroundHeight(this.world, this.player.x, this.player.z);
+    if (ground === null) return;
+
+    if (this.grounded) {
+      if (this.player.feetY > ground + 0.08) {
+        this.grounded = false;
+      } else {
+        const smoothing = 1 - Math.exp(-delta * 14);
+        this.player.feetY = THREE.MathUtils.lerp(this.player.feetY, ground, smoothing);
+        this.verticalVelocity = 0;
+        return;
+      }
+    }
+
+    this.verticalVelocity -= PLAYER_GRAVITY * delta;
+    this.player.feetY += this.verticalVelocity * delta;
+
+    if (this.verticalVelocity <= 0 && this.player.feetY <= ground) {
+      this.player.feetY = ground;
+      this.verticalVelocity = 0;
+      this.grounded = true;
+    }
   }
 
   private updateCamera(): void {
