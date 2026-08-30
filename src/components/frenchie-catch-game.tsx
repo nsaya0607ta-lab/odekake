@@ -159,15 +159,15 @@ const MYSTERY_SKILL_ITEM_IDS = [
 
 /** アイテムごとのLv1〜5パラメータ（item_skill_levels_colored.xlsxの「スキル一覧」シート通り） */
 const LV = {
-  DUCK_SEC: [2, 3, 5, 6, 8],
-  CARROT_SEC: [2, 3, 5, 6, 9],
+  DUCK_SEC: [2, 3, 4, 5, 7],
+  CARROT_SEC: [2, 3, 4, 5, 8],
   FRISBEE_MULT: [2, 2.2, 2.4, 2.7, 3],
   SOCCER_PT: [10, 15, 20, 30, 40],
   TAIYAKI_PT: [5, 7, 10, 13, 15],
   BEAR_PT: [0, 10, 0, 20, 0],
   BOWL_PT: [5, 7, 10, 13, 15],
   PUDDING_PT: [15, 20, 30, 40, 50],
-  MELON_SEC: [2, 3, 5, 6, 8],
+  MELON_SEC: [2, 3, 4, 5, 7],
   MELON_PT: [5, 10, 15, 20, 30],
   TREASURE_LOW: [25, 30, 40, 50, 60],
   TREASURE_HIGH: [50, 65, 80, 100, 130],
@@ -199,7 +199,7 @@ const LV = {
   SUMMER_MULTSEC: [5, 6, 7, 8, 10],
   SUMMER_MULT: [1.5, 1.5, 1.6, 1.7, 1.8],
   ANBALL_PT: [100, 125, 150, 180, 220],
-  ANBALL_SEC: [2, 3, 5, 6, 8],
+  ANBALL_SEC: [3, 4, 6, 8, 10],
   STRETCH_ROD_MULT: [0.5, 0.4, 0.3, 0.2, 0.1],
   LISTEN_DOG_COUNT: [10, 15, 20, 25, 30],
   AZUBEE_SEC: [6, 7, 8, 10, 12],
