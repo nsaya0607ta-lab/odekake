@@ -253,7 +253,7 @@ const LV = {
   KAMIKAMI_PT: [10, 15, 25, 35, 45],
   MOCCHURIN_PT: [30, 45, 60, 80, 100],
   TIME_BONUS_FALL: [6, 5.6, 5.2, 4.8, 4.5],
-  MAH_PT: [45, 60, 80, 100, 130],
+  MAH_PT: [60, 80, 100, 130, 170],
 } as const;
 const SLANT_VX_BOOST = 3.5;
 const POINTS: Record<FrenchieCatchItem["rarity"], number> = { N: 10, R: 20, SR: 40, SSR: 70, UR: 100, LR: 150, MR: 220 };
@@ -319,13 +319,13 @@ const DEFAULT_ITEM_SPAWN_WEIGHT = 100;
  */
 const ITEM_SPAWN_WEIGHTS: Partial<Record<string, number>> = {
   toy_treasure_puzzle: 149,
-  other_omojii: 70,
-  toy_duck_plush: 102,
-  toy_carrot: 102,
-  food_paw_melon_bread: 102,
-  interior_anball: 102,
-  other_azuki: 70,
-  summer_frenchie: 102,
+  other_omojii: 71,
+  toy_duck_plush: 103,
+  toy_carrot: 103,
+  food_paw_melon_bread: 103,
+  interior_anball: 103,
+  other_azuki: 71,
+  summer_frenchie: 103,
   other_listen_to_the_a: 50,
 };
 const STRETCH_ROD_ITEM_ID = "interior_stretch_rod";
