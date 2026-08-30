@@ -258,6 +258,7 @@ const LV = {
   MIRROR_SEC: [5, 6, 8, 10, 13],
   MIRROR_INVERT_PT: [15, 20, 25, 30, 40],
   TOOREMATEN_SEC: [4, 5, 6, 8, 10],
+  TOOREMATEN_PT: [45, 60, 80, 100, 130],
 } as const;
 const SLANT_VX_BOOST = 3.5;
 const POINTS: Record<FrenchieCatchItem["rarity"], number> = { N: 10, R: 20, SR: 40, SSR: 70, UR: 100, LR: 150, MR: 220 };
@@ -367,13 +368,8 @@ const FOOD_CATEGORY_ITEM_IDS = new Set(
   COLLECTION_ITEMS.filter((entry) => entry.category === "food").map((entry) => entry.id),
 );
 const DOG_SPAWN_RATIO = 0.28;
-/**
- * 通れまてん有効中は「はずれ」フレブルの出現重みを0にする代わり、通常はフレブルが持つ
- * 出現シェア(DOG_SPAWN_RATIO=28%)がすべてアイテム側に回るため、そのままだと時間増加系7種の
- * 取得率まで一律 1/(1-DOG_SPAWN_RATIO) 倍に底上げしてしまう。出現量アップ系と同じ「1/n相殺」を
- * 時間増加系7種にだけかけ、時間増加系のr値には影響しないようにする（詳細はdocs/minigame-time-balance.md）。
- */
-const DOG_BLOCK_TIME_BONUS_RELIEF = 1 / (1 - DOG_SPAWN_RATIO);
+/** 通れまてん有効中に「はずれ」フレブルの代わりに出現する金色フレブルの目印用id（kindは通常のdogのまま） */
+const TOOREMATEN_GOLDEN_DOG_ID = "toorematen_golden_dog";
 const FRENCHIE_SKIN_IDS = ["hiking_frenchie", "snow_frenchie", "summer_frenchie"];
 const FRENCHIE_SKIN_SPAWN_CHANCE = 0.18;
 /**
@@ -544,8 +540,13 @@ export function FrenchieCatchGame({ ownedItems }: { ownedItems: FrenchieCatchIte
    */
   const hazardInvertUntilRef = useRef(0);
   const mirrorInvertPtValueRef = useRef(0);
-  /** 通れまてん：有効中は「はずれ」の初期フレブルが出現せず、その分すべてアイテム抽選に回る */
-  const dogBlockUntilRef = useRef(0);
+  /**
+   * 通れまてん：有効中は「はずれ」の初期フレブル(15pt)の代わりに、より高得点な金色フレブルが
+   * 同じ出現枠（dogWeight）でそのまま出現する。フレブルの出現シェア自体は変えないので、
+   * 時間増加系7種の取得率やdogCaughtRef（ラウンド終了時のフレブル数ボーナス算定）には影響しない。
+   */
+  const dogGoldenUntilRef = useRef(0);
+  const dogGoldenPtValueRef = useRef(0);
   const feedbackTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const impactTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const recentSkillEffectIdRef = useRef(0);
@@ -646,7 +647,7 @@ export function FrenchieCatchGame({ ownedItems }: { ownedItems: FrenchieCatchIte
     else if (now - startAtRef.current > TOP_ZONE_HIDDEN_AFTER_SEC * 1000) labels.push("画面上部が見えない");
     if (now < stunUntilRef.current) labels.push("しびれ中");
     if (now < hazardInvertUntilRef.current) labels.push("ミラータイム中（ハザード反転）");
-    if (now < dogBlockUntilRef.current) labels.push("通れまてん発動中（フレブル出現なし）");
+    if (now < dogGoldenUntilRef.current) labels.push(`通れまてん発動中（フレブルが金色に、+${dogGoldenPtValueRef.current}pt）`);
     if (urBoostRef.current > 0) labels.push(`UR出現率+${Math.min(urBoostRef.current, UR_BOOST_MAX)}`);
     setActiveEffects(labels);
   }, []);
@@ -818,7 +819,6 @@ export function FrenchieCatchGame({ ownedItems }: { ownedItems: FrenchieCatchIte
      * これにより出現量アップ側の倍率をどれだけ強くしても、時間増加系側のr値には影響しなくなる。
      */
     const spawnRateBoostActive = performance.now() < spawnRateBoostUntilRef.current;
-    const dogBlockActive = performance.now() < dogBlockUntilRef.current;
     const weightedItems = itemPool.map((item) => ({
       item,
       weight:
@@ -828,16 +828,27 @@ export function FrenchieCatchGame({ ownedItems }: { ownedItems: FrenchieCatchIte
           ? otherSuppressValueRef.current
           : 1) *
         (highRarityLockActive && !HIGH_RARITY_LOCK_RARITIES.has(item.rarity) ? 0 : 1) *
-        (spawnRateBoostActive && TIME_BONUS_ITEM_IDS.has(item.id) ? 1 / spawnRateBoostValueRef.current : 1) *
-        (dogBlockActive && TIME_BONUS_ITEM_IDS.has(item.id) ? 1 / DOG_BLOCK_TIME_BONUS_RELIEF : 1),
+        (spawnRateBoostActive && TIME_BONUS_ITEM_IDS.has(item.id) ? 1 / spawnRateBoostValueRef.current : 1),
     }));
     const itemWeightTotal = weightedItems.reduce((sum, entry) => sum + entry.weight, 0);
-    const dogWeight = dogBlockActive
-      ? 0
-      : itemPool.length * DEFAULT_ITEM_SPAWN_WEIGHT * (DOG_SPAWN_RATIO / (1 - DOG_SPAWN_RATIO));
+    const dogWeight = itemPool.length * DEFAULT_ITEM_SPAWN_WEIGHT * (DOG_SPAWN_RATIO / (1 - DOG_SPAWN_RATIO));
     let roll = Math.random() * (dogWeight + itemWeightTotal);
 
     if (roll < dogWeight) {
+      const dogGoldenActive = performance.now() < dogGoldenUntilRef.current;
+      if (dogGoldenActive) {
+        return {
+          ...base,
+          itemId: TOOREMATEN_GOLDEN_DOG_ID,
+          kind: "dog",
+          name: "金色フレブル",
+          image: "/characters/default/front.webp",
+          rarity: null,
+          level: 0,
+          size: 21,
+          spin: (Math.random() - 0.5) * 20,
+        };
+      }
       const skinPool = itemPool.filter((item) => FRENCHIE_SKIN_IDS.includes(item.id));
       if (skinPool.length > 0 && Math.random() < FRENCHIE_SKIN_SPAWN_CHANCE) {
         const skin = skinPool[Math.floor(Math.random() * skinPool.length)]!;
@@ -1227,7 +1238,7 @@ export function FrenchieCatchGame({ ownedItems }: { ownedItems: FrenchieCatchIte
             }
 
             let basePoints = entity.kind === "dog"
-              ? 15
+              ? (entity.itemId === TOOREMATEN_GOLDEN_DOG_ID ? dogGoldenPtValueRef.current : 15)
               : entity.itemId === MYSTERY_ITEM_ID
                 ? MYSTERY_BASE_POINTS
                 : POINTS[entity.rarity!];
@@ -1625,8 +1636,9 @@ export function FrenchieCatchGame({ ownedItems }: { ownedItems: FrenchieCatchIte
               }
               case "other_toorematen": {
                 const toorematenSec = LV.TOOREMATEN_SEC[lv]!;
-                dogBlockUntilRef.current = now + toorematenSec * 1000;
-                effectLabel = `${toorematenSec}秒間 フレブル出現なし${lvTag}`;
+                dogGoldenUntilRef.current = now + toorematenSec * 1000;
+                dogGoldenPtValueRef.current = LV.TOOREMATEN_PT[lv]!;
+                effectLabel = `${toorematenSec}秒間 フレブルが金色に(+${LV.TOOREMATEN_PT[lv]}pt)${lvTag}`;
                 statusChanged = true;
                 break;
               }
@@ -2022,7 +2034,8 @@ export function FrenchieCatchGame({ ownedItems }: { ownedItems: FrenchieCatchIte
     stunUntilRef.current = 0;
     hazardInvertUntilRef.current = 0;
     mirrorInvertPtValueRef.current = 0;
-    dogBlockUntilRef.current = 0;
+    dogGoldenUntilRef.current = 0;
+    dogGoldenPtValueRef.current = 0;
     setBlackoutActive(false);
     setStunned(false);
     bagStockRef.current = 0;
