@@ -11,7 +11,10 @@
  * 正規表現+evalでLVテーブル・出現重み・？アイテムの抽選プール・ROUND_SECONDS等を抽出するため、
  * 実装側の数値を変更すればこのスクリプトも自動的に追従する（値を二重管理しない）。
  *
- * 使い方: node scripts/simulate-item-catch.mjs [試行回数(デフォルト300)]
+ * 使い方: node scripts/simulate-item-catch.mjs [試行回数(デフォルト300)] [avoid|all]
+ *   第2引数 "avoid"（デフォルト）: 時間減少ハザードとチョコレートは回避する（キャッチしない）前提
+ *   第2引数 "all": ハザードも含めて全てのスポーンを100%キャッチする前提
+ *     （時間減少は-3秒、チョコレートは即座にラウンド終了）
  *
  * 既知の簡略化（完全な再現ではない点に注意）:
  * - もっちゅりんの「エコー」（直前に捕まえたアイテムのスキルを再発動）は未実装
@@ -90,6 +93,7 @@ const BOX_SHRINK_SPAWN_CHANCE = Number(GAME_TSX.match(/const BOX_SHRINK_SPAWN_CH
 const BLACKOUT_SPAWN_CHANCE = Number(GAME_TSX.match(/const BLACKOUT_SPAWN_CHANCE = ([\d.]+);/)[1]);
 const STUN_SPAWN_CHANCE = Number(GAME_TSX.match(/const STUN_SPAWN_CHANCE = ([\d.]+);/)[1]);
 const CHOCOLATE_SPAWN_CHANCE = Number(GAME_TSX.match(/const CHOCOLATE_SPAWN_CHANCE = ([\d.]+);/)[1]);
+const TIME_MINUS_SECONDS = Number(GAME_TSX.match(/const TIME_MINUS_SECONDS = (\d+);/)[1]);
 const TREASURE_POOP_FLOOD_COUNT = Number(GAME_TSX.match(/const TREASURE_POOP_FLOOD_COUNT = (\d+);/)[1]);
 const TREASURE_MINUS5_SEC = Number(GAME_TSX.match(/const TREASURE_MINUS5_SEC = (\d+);/)[1]);
 const TREASURE_DOUBLE_MULT = Number(GAME_TSX.match(/const TREASURE_DOUBLE_MULT = (\d+);/)[1]);
@@ -128,7 +132,7 @@ function uniform(min, max) { return min + Math.random() * (max - min); }
 function weightOf(id) { return ITEM_SPAWN_WEIGHTS[id] ?? DEFAULT_WEIGHT; }
 function clamp1to5(x) { return Math.min(5, Math.max(1, x)); }
 
-function simulateOneRound(lv) {
+function simulateOneRound(lv, catchAll) {
   let t = 0;
   let endAt = ROUND_SECONDS * 1000;
   let score = 0;
@@ -323,11 +327,19 @@ function simulateOneRound(lv) {
     cum += MYSTERY_SPAWN_CHANCE; if (u < cum) { resolveCatch("item", "mystery_item", null, 0); continue; }
     cum += BAG_SPAWN_CHANCE;
     if (u < cum) { if (bagStock < BAG_MAX_STOCK) bagStock += 1; continue; }
-    cum += timeMinusChance; if (u < cum) continue; // 時間減少：回避する前提のため未キャッチ
+    cum += timeMinusChance;
+    if (u < cum) {
+      if (catchAll) endAt -= TIME_MINUS_SECONDS * 1000;
+      continue; // avoidモードでは回避する前提のため未キャッチ
+    }
     cum += BOX_SHRINK_SPAWN_CHANCE; if (u < cum) continue;
     cum += BLACKOUT_SPAWN_CHANCE; if (u < cum) continue;
     cum += STUN_SPAWN_CHANCE; if (u < cum) continue;
-    cum += CHOCOLATE_SPAWN_CHANCE; if (u < cum) continue; // チョコレート：回避する前提のため未キャッチ
+    cum += CHOCOLATE_SPAWN_CHANCE;
+    if (u < cum) {
+      if (catchAll) endAt = t; // 呪いのチョコレート：キャッチした瞬間ラウンド終了
+      continue; // avoidモードでは回避する前提のため未キャッチ
+    }
 
     const otherSuppressActive = t < otherSuppressUntil;
     const highRarityLockActive = t < highRarityLockUntil || highRarityLockCount > 0;
@@ -379,11 +391,14 @@ function percentile(sortedArr, p) {
 
 function main() {
   const trials = Number(process.argv[2] ?? 300);
-  console.log(`itemPool N=${POOL_SIZE} / ROUND_SECONDS=${ROUND_SECONDS} / 試行回数=${trials}\n`);
+  const mode = process.argv[3] ?? "avoid";
+  if (mode !== "avoid" && mode !== "all") throw new Error(`unknown mode: ${mode} (use "avoid" or "all")`);
+  const catchAll = mode === "all";
+  console.log(`itemPool N=${POOL_SIZE} / ROUND_SECONDS=${ROUND_SECONDS} / 試行回数=${trials} / モード=${mode}${catchAll ? "（時間減少・チョコレートも100%キャッチ）" : "（時間減少・チョコレートは回避）"}\n`);
   for (let lvIdx = 0; lvIdx < 5; lvIdx++) {
     const scores = [], secs = [];
     for (let i = 0; i < trials; i++) {
-      const r = simulateOneRound(lvIdx);
+      const r = simulateOneRound(lvIdx, catchAll);
       scores.push(r.score);
       secs.push(r.playSeconds);
     }
