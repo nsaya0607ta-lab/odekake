@@ -83,6 +83,7 @@ const MYSTERY_ITEM_ID = "mystery_item";
 const MYSTERY_IMAGE = "/collection/items/mystery-question.webp";
 const MYSTERY_SPAWN_CHANCE = 0.05;
 const MYSTERY_BASE_POINTS = 10;
+const IKEA_PT_PER_ITEM = 60;
 const BAG_ITEM_ID = "hazard_bag";
 const BAG_IMAGE = "/collection/items/plastic-bag.webp";
 const BAG_SPAWN_CHANCE = 0.03;
@@ -159,19 +160,19 @@ const MYSTERY_SKILL_ITEM_IDS = [
 
 /** アイテムごとのLv1〜5パラメータ（item_skill_levels_colored.xlsxの「スキル一覧」シート通り） */
 const LV = {
-  DUCK_SEC: [2, 3, 4, 5, 7],
-  CARROT_SEC: [2, 3, 4, 5, 8],
+  DUCK_SEC: [1, 3, 4, 5, 6],
+  CARROT_SEC: [1, 3, 4, 5, 6],
   FRISBEE_MULT: [2, 2.2, 2.4, 2.7, 3],
   SOCCER_PT: [10, 15, 20, 30, 40],
   TAIYAKI_PT: [5, 7, 10, 13, 15],
   BEAR_PT: [0, 10, 0, 20, 0],
   BOWL_PT: [5, 7, 10, 13, 15],
   PUDDING_PT: [15, 20, 30, 40, 50],
-  MELON_SEC: [2, 3, 4, 5, 7],
+  MELON_SEC: [1, 3, 4, 5, 6],
   MELON_PT: [5, 10, 15, 20, 30],
   TREASURE_LOW: [25, 30, 40, 50, 60],
   TREASURE_HIGH: [50, 65, 80, 100, 130],
-  TREASURE_SEC: [2, 4, 5, 6, 8],
+  TREASURE_SEC: [1, 5, 6, 7, 8],
   TREASURE_STREAK_PCT: [20, 25, 30, 35, 40],
   FRENCHIE_PLUSH_COUNT: [3, 3, 4, 4, 5],
   FRENCHIE_PLUSH_PT: [10, 13, 15, 20, 25],
@@ -187,7 +188,7 @@ const LV = {
   SPRING_MULT: [1.2, 1.2, 1.25, 1.3, 1.4],
   SPARKLE_SEC: [4, 5, 6, 8, 10],
   SPARKLE_STRENGTH: ["weak", "weak", "weak", "weak", "medium"] as const,
-  RAINBOW_STEP: [3, 4, 6, 8, 10],
+  RAINBOW_STEP: [2, 5, 7, 8, 9],
   GOLDEN_COUNT: [2, 2, 3, 3, 4],
   GOLDEN_MULT: [2, 2.2, 2.2, 2.5, 2.5],
   NAKAYOSHI_PT: [30, 40, 50, 65, 80],
@@ -195,23 +196,23 @@ const LV = {
   KAMUNAYO_MULT: [1.3, 1.35, 1.4, 1.5, 1.6],
   HIKING_SEC: [5, 6, 7, 9, 12],
   SNOW_SEC: [5, 6, 7, 9, 12],
-  SUMMER_ADD: [3, 4, 6, 7, 9],
+  SUMMER_ADD: [2, 5, 7, 8, 9],
   SUMMER_MULTSEC: [5, 6, 7, 8, 10],
   SUMMER_MULT: [1.5, 1.5, 1.6, 1.7, 1.8],
   ANBALL_PT: [100, 125, 150, 180, 220],
-  ANBALL_SEC: [3, 4, 6, 8, 10],
+  ANBALL_SEC: [2, 5, 7, 8, 9],
   STRETCH_ROD_MULT: [0.5, 0.4, 0.3, 0.2, 0.1],
   LISTEN_DOG_COUNT: [10, 15, 20, 25, 30],
   AZUBEE_SEC: [6, 7, 8, 10, 12],
   AZUBEE_MULT: [2, 2, 2.1, 2.2, 2.5],
-  OMOJII_SEC: [4, 9, 10, 13, 14],
+  OMOJII_SEC: [3, 10, 11, 13, 14],
   OMOJII_PT: [30, 45, 60, 80, 100],
   KINOKO_SEC: [6, 7, 8, 10, 12],
   KINOKO_FALL: [1.7, 1.8, 1.9, 2, 2.2],
   KINOKO_SCORE: [1.5, 1.5, 1.6, 1.7, 2],
   KOMOCHI_COUNT: [5, 5, 6, 7, 8],
   KOMOCHI_MULT: [2, 2.1, 2.2, 2.3, 2.5],
-  AZUKI_SEC: [3, 7, 8, 9, 10],
+  AZUKI_SEC: [2, 8, 9, 10, 11],
   AZUKI_PT: [50, 65, 80, 100, 130],
   KOBEE_PT: [50, 65, 80, 100, 130],
   KOBEE_SEC: [8, 9, 11, 13, 16],
@@ -232,16 +233,16 @@ const LV = {
   SHIKKOKU_MULT: [2, 2.2, 2.4, 2.7, 3],
   RAGBY_SEC: [5, 6, 7, 9, 12],
   RAGBY_SPAWN: [2, 2.25, 2.5, 2.75, 3],
-  OYATSU_PT: [80, 100, 120, 140, 180],
+  OYATSU_PT: [180, 200, 220, 240, 280],
   KETSUNADE_SEC: [4, 5, 6, 8, 10],
-  BUREBUR_COUNT: [2, 3, 3, 4, 5],
+  BUREBUR_COUNT: [6, 8, 10, 12, 13],
   XMAS_SEC: [6, 7, 9, 10, 12],
   XMAS_FALL: [1.8, 2, 2.2, 2.4, 2.5],
   XMAS_SCORE: [2, 2.2, 2.5, 2.7, 3],
   XMAS_SPAWN: [1.5, 1.75, 2, 2.25, 2.5],
   XMAS_DOG_COUNT: [5, 6, 7, 8, 9],
   OMOCHI_SEC: [4, 5, 6, 8, 10],
-  OMOCHI_PT: [10, 15, 20, 25, 30],
+  OMOCHI_PT: [500, 500, 500, 500, 500],
   OKAERI_SEC: 3,
   OKAERI_PER_CATCH: [3, 4, 5, 6, 7],
   OMOI_BASHIRA_SEC: [4, 5, 6, 8, 10],
@@ -254,7 +255,7 @@ const LV = {
   KAMIKAMI_PT: [10, 15, 25, 35, 45],
   MOCCHURIN_PT: [30, 45, 60, 80, 100],
   TIME_BONUS_FALL: [6, 5.6, 5.2, 4.8, 4.5],
-  MAH_PT: [60, 80, 100, 130, 170],
+  MAH_PT: [260, 280, 300, 330, 370],
   MIRROR_SEC: [5, 6, 8, 10, 13],
   MIRROR_INVERT_PT: [15, 20, 25, 30, 40],
   TOOREMATEN_SEC: [4, 5, 6, 8, 10],
@@ -343,6 +344,8 @@ const OKAERI_ITEM_ID = "other_okaeri";
 const OMOI_BASHIRA_ITEM_ID = "other_omoi_bashira";
 const OYASUMI_ITEM_ID = "other_oyasumi";
 const OYASUMI_SECONDS = 5;
+/** 50%の確率でブラックアウト演出だけ発生せず、得点倍率だけがかかる */
+const OYASUMI_NO_BLACKOUT_CHANCE = 0.5;
 const NISOKU_A_ITEM_ID = "other_nisoku_a";
 const FRUIT_BASKET_ITEM_ID = "food_fruit_basket";
 const GOLD_BALL_ITEM_ID = "interior_gold_ball";
@@ -362,6 +365,8 @@ const MOCCHURIN_ITEM_ID = "food_mocchurin";
 const MOCCHURIN_DOUBLE_ECHO_MIN_LV = 3;
 /** ブレブルの効果中、このレアリティ以外のアイテムは出現しなくなる */
 const HIGH_RARITY_LOCK_RARITIES = new Set<FrenchieCatchItem["rarity"]>(["SSR", "UR", "LR"]);
+/** ブレブルは他の「レア枠確定」より対象を絞り、UR・LRランクのみに限定する */
+const BUREBUR_LOCK_RARITIES = new Set<FrenchieCatchItem["rarity"]>(["UR", "LR"]);
 const OTHER_CATEGORY_ITEM_IDS = new Set(
   COLLECTION_ITEMS.filter((entry) => entry.category === "other").map((entry) => entry.id),
 );
@@ -475,6 +480,8 @@ export function FrenchieCatchGame({ ownedItems }: { ownedItems: FrenchieCatchIte
   const startAtRef = useRef(0);
   const endAtRef = useRef(0);
   const nextSpawnRef = useRef(0);
+  /** Clawdのボールは通常アイテムの抽選を妨げず、独立したタイマーで並行して降らせる */
+  const nextClawdSpawnRef = useRef(0);
   const rafRef = useRef<number | null>(null);
   const scoreRef = useRef(0);
   const dogCaughtRef = useRef(0);
@@ -528,7 +535,8 @@ export function FrenchieCatchGame({ ownedItems }: { ownedItems: FrenchieCatchIte
   const personFloodRemainingRef = useRef(0);
   const clawdBallFloodRemainingRef = useRef(0);
   /** もっちゅりんのエコー用に、直前に捕まえたアイテムを新しい順に最大2件保持する */
-  const lastSkillCatchesRef = useRef<{ itemId: string; level: number }[]>([]);
+  /** もっちゅりんを取った直後に捕まえるアイテムのスキルをもう一度発動する残り回数 */
+  const mocchurinPendingEchoCountRef = useRef(0);
   const goldBonusCoinsRef = useRef(0);
   const slantBoostUntilRef = useRef(0);
   const boxShrinkUntilRef = useRef(0);
@@ -620,6 +628,7 @@ export function FrenchieCatchGame({ ownedItems }: { ownedItems: FrenchieCatchIte
     if (nextBonus10Ref.current > 0) labels.push(`あと${nextBonus10Ref.current}個 +10pt`);
     if (rewardTimeCountRef.current > 0) labels.push(`次の1個 ${rewardTimeValueRef.current}pt確定`);
     if (nextBonus5Ref.current > 0) labels.push(`あと${nextBonus5Ref.current}個 +5pt`);
+    if (mocchurinPendingEchoCountRef.current > 0) labels.push(`次の${mocchurinPendingEchoCountRef.current}個をエコー`);
     if (stunGuardRef.current > 0) labels.push(HAZARD_GUARD_LABELS.stun);
     if (boxShrinkGuardRef.current > 0) labels.push(HAZARD_GUARD_LABELS.boxShrink);
     if (timeMinusGuardRef.current > 0) labels.push(HAZARD_GUARD_LABELS.timeMinus);
@@ -634,7 +643,7 @@ export function FrenchieCatchGame({ ownedItems }: { ownedItems: FrenchieCatchIte
     if (now < spawnRateBoostUntilRef.current) labels.push(`アイテム出現量×${spawnRateBoostValueRef.current}中`);
     if (now < otherSuppressUntilRef.current) labels.push(`その他カテゴリ出現×${otherSuppressValueRef.current}中`);
     if (now < highRarityLockUntilRef.current) labels.push("SSR/UR/LRのみ出現中");
-    if (highRarityLockCountRef.current > 0) labels.push(`SSR/UR/LRのみ出現 あと${highRarityLockCountRef.current}体`);
+    if (highRarityLockCountRef.current > 0) labels.push(`UR/LRのみ出現 あと${highRarityLockCountRef.current}体`);
     if (treasureStreakActiveRef.current) labels.push(`宝箱連続ボーナス 得点+${Math.round((treasureStreakMultRef.current - 1) * 100)}%`);
     if (now < omochiUntilRef.current) labels.push(`うんちがおもちに +${omochiPtValueRef.current}pt`);
     if (now < okaeriUntilRef.current) labels.push(`1個ごとに+${okaeriPerCatchValueRef.current}秒`);
@@ -702,24 +711,6 @@ export function FrenchieCatchGame({ ownedItems }: { ownedItems: FrenchieCatchIte
         rarity: character.rarity,
         level: itemLevelByIdRef.current.get(character.id) ?? 0,
         vy: resolveFallVy(rawVy, base.vy, character.id, character.rarity, itemLevelByIdRef.current.get(character.id) ?? 1),
-        size: 12.5 + Math.random() * 3.5,
-        spin: (Math.random() - 0.5) * 65,
-      };
-    }
-
-    if (clawdBallFloodRemainingRef.current > 0 && (CLAWD_SOCCER_BALL_ITEM || CLAWD_GOLD_BALL_ITEM)) {
-      clawdBallFloodRemainingRef.current -= 1;
-      const rollGold = Math.random() < CLAWD_GOLD_BALL_CHANCE;
-      const ball = (rollGold ? CLAWD_GOLD_BALL_ITEM : CLAWD_SOCCER_BALL_ITEM) ?? CLAWD_SOCCER_BALL_ITEM ?? CLAWD_GOLD_BALL_ITEM!;
-      return {
-        ...base,
-        itemId: ball.id,
-        kind: "item",
-        name: ball.name,
-        image: ball.image ?? "",
-        rarity: ball.rarity,
-        level: itemLevelByIdRef.current.get(ball.id) ?? 0,
-        vy: resolveFallVy(rawVy, base.vy, ball.id, ball.rarity, itemLevelByIdRef.current.get(ball.id) ?? 1),
         size: 12.5 + Math.random() * 3.5,
         spin: (Math.random() - 0.5) * 65,
       };
@@ -813,7 +804,11 @@ export function FrenchieCatchGame({ ownedItems }: { ownedItems: FrenchieCatchIte
 
     const urBoostFactor = 1 + Math.min(urBoostRef.current, UR_BOOST_MAX) / 100;
     const otherSuppressActive = performance.now() < otherSuppressUntilRef.current;
-    const highRarityLockActive = performance.now() < highRarityLockUntilRef.current || highRarityLockCountRef.current > 0;
+    const treasureRareLockActive = performance.now() < highRarityLockUntilRef.current;
+    const bureburLockActive = highRarityLockCountRef.current > 0;
+    const highRarityLockActive = treasureRareLockActive || bureburLockActive;
+    /** 両方同時に有効な場合は宝箱側(SSR/UR/LR)の対象を優先する（ブレブル単体ならUR/LRのみに絞る） */
+    const allowedHighRarities = treasureRareLockActive ? HIGH_RARITY_LOCK_RARITIES : BUREBUR_LOCK_RARITIES;
     /**
      * 出現量アップ中は時間増加系7種の重みをブースト倍率で割り、取得ペースがブーストなしの時と
      * 変わらないよう相殺する（詳細はdocs/minigame-time-balance.mdの「出現量ブーストの1/n相殺」参照）。
@@ -828,7 +823,7 @@ export function FrenchieCatchGame({ ownedItems }: { ownedItems: FrenchieCatchIte
         (otherSuppressActive && item.id !== STRETCH_ROD_ITEM_ID && OTHER_CATEGORY_ITEM_IDS.has(item.id)
           ? otherSuppressValueRef.current
           : 1) *
-        (highRarityLockActive && !HIGH_RARITY_LOCK_RARITIES.has(item.rarity) ? 0 : 1) *
+        (highRarityLockActive && !allowedHighRarities.has(item.rarity) ? 0 : 1) *
         (spawnRateBoostActive && TIME_BONUS_ITEM_IDS.has(item.id) ? 1 / spawnRateBoostValueRef.current : 1),
     }));
     const itemWeightTotal = weightedItems.reduce((sum, entry) => sum + entry.weight, 0);
@@ -904,6 +899,47 @@ export function FrenchieCatchGame({ ownedItems }: { ownedItems: FrenchieCatchIte
       spin: (Math.random() - 0.5) * 65,
     };
   }, [itemPool]);
+
+  /**
+   * Clawdのボールは通常アイテムの抽選を妨げないよう、createEntityとは独立したタイマーで
+   * 並行して降らせる（他のアイテムと一緒に降ってくる。normal spawnをブロックしない）。
+   */
+  const createClawdBallEntity = useCallback((): Entity | null => {
+    if (!CLAWD_SOCCER_BALL_ITEM && !CLAWD_GOLD_BALL_ITEM) return null;
+    const fallSpeedBoost = performance.now() < fallSpeedBoostUntilRef.current ? fallSpeedValueRef.current : 1;
+    const slantBoost = performance.now() < slantBoostUntilRef.current ? SLANT_VX_BOOST : 1;
+    const rawVy = (17 + Math.random() * 5) * 1.35;
+    const spawnX = 9 + Math.random() * 82;
+    const spawnY = -13 - Math.random() * 5;
+    const base = {
+      id: nextIdRef.current++,
+      x: spawnX,
+      y: spawnY,
+      spawnX,
+      spawnY,
+      vx: (Math.random() - 0.5) * 2.4 * slantBoost,
+      vy: rawVy * fallSpeedBoost,
+      rotation: (Math.random() - 0.5) * 12,
+      status: "falling" as const,
+      rimChecked: false,
+      enteredOpening: false,
+      ttl: 0,
+    };
+    const rollGold = Math.random() < CLAWD_GOLD_BALL_CHANCE;
+    const ball = (rollGold ? CLAWD_GOLD_BALL_ITEM : CLAWD_SOCCER_BALL_ITEM) ?? CLAWD_SOCCER_BALL_ITEM ?? CLAWD_GOLD_BALL_ITEM!;
+    return {
+      ...base,
+      itemId: ball.id,
+      kind: "item",
+      name: ball.name,
+      image: ball.image ?? "",
+      rarity: ball.rarity,
+      level: itemLevelByIdRef.current.get(ball.id) ?? 0,
+      vy: resolveFallVy(rawVy, base.vy, ball.id, ball.rarity, itemLevelByIdRef.current.get(ball.id) ?? 1),
+      size: 12.5 + Math.random() * 3.5,
+      spin: (Math.random() - 0.5) * 65,
+    };
+  }, []);
 
   const pushRecentSkillEffect = useCallback((text: string) => {
     const id = ++recentSkillEffectIdRef.current;
@@ -996,7 +1032,7 @@ export function FrenchieCatchGame({ ownedItems }: { ownedItems: FrenchieCatchIte
         const ikeaCount = ikeaCountRef.current;
         ikeaCountRef.current = 0;
         if (ikeaCount > 0) {
-          const ikeaBonus = ikeaCount * 10;
+          const ikeaBonus = ikeaCount * IKEA_PT_PER_ITEM;
           scoreRef.current += ikeaBonus;
           setScore(scoreRef.current);
           setFeedback({ name: "くみたてボーナス", points: ikeaBonus, effect: `くみたて完成！+${ikeaBonus}pt` });
@@ -1035,6 +1071,14 @@ export function FrenchieCatchGame({ ownedItems }: { ownedItems: FrenchieCatchIte
       if (now >= nextSpawnRef.current && entitiesRef.current.length < entityCap) {
         entitiesRef.current.push(createEntity());
         nextSpawnRef.current = now + (SPAWN_INTERVAL_MIN_MS + Math.random() * (SPAWN_INTERVAL_MAX_MS - SPAWN_INTERVAL_MIN_MS)) / spawnRate;
+      }
+      if (clawdBallFloodRemainingRef.current > 0 && now >= nextClawdSpawnRef.current && entitiesRef.current.length < entityCap) {
+        const ball = createClawdBallEntity();
+        if (ball) {
+          clawdBallFloodRemainingRef.current -= 1;
+          entitiesRef.current.push(ball);
+        }
+        nextClawdSpawnRef.current = now + SPAWN_INTERVAL_MIN_MS + Math.random() * (SPAWN_INTERVAL_MAX_MS - SPAWN_INTERVAL_MIN_MS);
       }
 
       const boxWide = now < boxWideUntilRef.current;
@@ -1460,7 +1504,7 @@ export function FrenchieCatchGame({ ownedItems }: { ownedItems: FrenchieCatchIte
                 break;
               case BUREBUR_ITEM_ID:
                 highRarityLockCountRef.current = LV.BUREBUR_COUNT[lv]!;
-                effectLabel = `${LV.BUREBUR_COUNT[lv]}体 SSR/UR/LRのみ出現${lvTag}`;
+                effectLabel = `${LV.BUREBUR_COUNT[lv]}体 UR/LRのみ出現${lvTag}`;
                 statusChanged = true;
                 break;
               case XMAS_PARTY_ITEM_ID: {
@@ -1501,10 +1545,14 @@ export function FrenchieCatchGame({ ownedItems }: { ownedItems: FrenchieCatchIte
                 points += LV.KAMIKAMI_PT[lv]!;
                 effectLabel = `+${LV.KAMIKAMI_PT[lv]}ptボーナス${lvTag}`;
                 break;
-              case MOCCHURIN_ITEM_ID:
+              case MOCCHURIN_ITEM_ID: {
                 points += LV.MOCCHURIN_PT[lv]!;
-                effectLabel = `+${LV.MOCCHURIN_PT[lv]}ptボーナス${lvTag}`;
+                const echoCount = lv >= MOCCHURIN_DOUBLE_ECHO_MIN_LV ? 2 : 1;
+                mocchurinPendingEchoCountRef.current += echoCount;
+                effectLabel = `+${LV.MOCCHURIN_PT[lv]}ptボーナス / 次の${echoCount}個をエコー${lvTag}`;
+                statusChanged = true;
                 break;
+              }
               case "food_paw_melon_bread": {
                 const applied = addBonusTime(LV.MELON_SEC[lv]!);
                 points += LV.MELON_PT[lv]!;
@@ -1590,11 +1638,16 @@ export function FrenchieCatchGame({ ownedItems }: { ownedItems: FrenchieCatchIte
                 break;
               }
               case OYASUMI_ITEM_ID: {
-                blackoutUntilRef.current = now + OYASUMI_SECONDS * 1000;
-                setBlackoutActive(true);
+                const skipBlackout = Math.random() < OYASUMI_NO_BLACKOUT_CHANCE;
+                if (!skipBlackout) {
+                  blackoutUntilRef.current = now + OYASUMI_SECONDS * 1000;
+                  setBlackoutActive(true);
+                }
                 multiplier15UntilRef.current = now + OYASUMI_SECONDS * 1000;
                 multiplier15ValueRef.current = LV.OYASUMI_MULT[lv]!;
-                effectLabel = `${OYASUMI_SECONDS}秒間 上半分ブラックアウト 得点×${LV.OYASUMI_MULT[lv]}${lvTag}`;
+                effectLabel = skipBlackout
+                  ? `${OYASUMI_SECONDS}秒間 得点×${LV.OYASUMI_MULT[lv]}（ブラックアウトなし）${lvTag}`
+                  : `${OYASUMI_SECONDS}秒間 上半分ブラックアウト 得点×${LV.OYASUMI_MULT[lv]}${lvTag}`;
                 statusChanged = true;
                 break;
               }
@@ -1815,23 +1868,14 @@ export function FrenchieCatchGame({ ownedItems }: { ownedItems: FrenchieCatchIte
             if (mainSkillResult.effectLabel) effectLabel = mainSkillResult.effectLabel;
             if (mainSkillResult.statusChanged) statusChanged = true;
 
-            if (skillId === MOCCHURIN_ITEM_ID) {
-              const echoCount = lv >= MOCCHURIN_DOUBLE_ECHO_MIN_LV ? 2 : 1;
-              const echoTargets = lastSkillCatchesRef.current.slice(0, echoCount);
-              for (const lastSkill of echoTargets) {
-                const echoLv = clamp(lastSkill.level, 1, MAX_SKILL_LEVEL) - 1;
-                const echoLvTag = lastSkill.level >= MAX_SKILL_LEVEL ? " [Lv.MAX]" : lastSkill.level > 1 ? ` [Lv${lastSkill.level}]` : "";
-                const echoResult = runItemSkillEffect(lastSkill.itemId, echoLv, echoLvTag);
-                points += echoResult.points;
-                if (echoResult.effectLabel) {
-                  effectLabel = effectLabel ? `${effectLabel} / エコー: ${echoResult.effectLabel}` : `エコー: ${echoResult.effectLabel}`;
-                }
-                if (echoResult.statusChanged) statusChanged = true;
+            if (skillId && skillId !== MOCCHURIN_ITEM_ID && mocchurinPendingEchoCountRef.current > 0) {
+              mocchurinPendingEchoCountRef.current -= 1;
+              const echoResult = runItemSkillEffect(skillId, lv, lvTag);
+              points += echoResult.points;
+              if (echoResult.effectLabel) {
+                effectLabel = effectLabel ? `${effectLabel} / エコー: ${echoResult.effectLabel}` : `エコー: ${echoResult.effectLabel}`;
               }
-            }
-
-            if (skillId && skillId !== MOCCHURIN_ITEM_ID) {
-              lastSkillCatchesRef.current = [{ itemId: skillId, level: skillLevel }, ...lastSkillCatchesRef.current].slice(0, 2);
+              if (echoResult.statusChanged) statusChanged = true;
             }
 
             if (isMystery && effectLabel) effectLabel = `？発動 / ${effectLabel}`;
@@ -2034,7 +2078,7 @@ export function FrenchieCatchGame({ ownedItems }: { ownedItems: FrenchieCatchIte
     dogFloodRemainingRef.current = 0;
     personFloodRemainingRef.current = 0;
     clawdBallFloodRemainingRef.current = 0;
-    lastSkillCatchesRef.current = [];
+    mocchurinPendingEchoCountRef.current = 0;
     goldBonusCoinsRef.current = 0;
     slantBoostUntilRef.current = 0;
     boxShrinkUntilRef.current = 0;
@@ -2066,6 +2110,7 @@ export function FrenchieCatchGame({ ownedItems }: { ownedItems: FrenchieCatchIte
     startAtRef.current = now;
     endAtRef.current = now + ROUND_SECONDS * 1000;
     nextSpawnRef.current = now;
+    nextClawdSpawnRef.current = now;
     setPhase("playing");
   }, []);
 
