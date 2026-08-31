@@ -15,6 +15,11 @@
   cursor: grabbing;
 }
 
+.viewportPlacement,
+.viewportPlacement:active {
+  cursor: crosshair;
+}
+
 .world {
   position: absolute;
   left: 0;
