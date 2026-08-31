@@ -63,8 +63,10 @@
 
 .entity {
   position: absolute;
-  width: 148px;
-  height: 132px;
+  display: grid;
+  width: 224px;
+  height: 184px;
+  place-items: end center;
   padding: 0;
   border: 0;
   background: transparent;
