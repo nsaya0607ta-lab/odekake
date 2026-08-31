@@ -71,39 +71,37 @@
 .pathLeft,
 .pathRight {
   position: absolute;
-  border: 2px solid rgb(121 98 64 / 18%);
   border-radius: 999px;
+  opacity: 0.44;
   background:
-    radial-gradient(ellipse at 20% 48%, rgb(255 255 255 / 36%) 0 5px, transparent 6px),
-    radial-gradient(ellipse at 68% 38%, rgb(139 113 73 / 16%) 0 5px, transparent 6px),
-    linear-gradient(145deg, #ead5a4, #d9bd87);
+    radial-gradient(ellipse at 24% 48%, rgb(255 248 218 / 42%) 0 4px, transparent 5px),
+    radial-gradient(ellipse at 70% 42%, rgb(139 113 73 / 13%) 0 4px, transparent 5px),
+    rgb(218 194 145 / 68%);
   background-size: 31px 23px, 37px 27px, auto;
-  box-shadow:
-    inset 0 2px 4px rgb(255 255 255 / 38%),
-    0 3px 5px rgb(73 99 57 / 16%);
+  mix-blend-mode: multiply;
 }
 
 .pathMain {
-  left: 471px;
-  top: 248px;
-  width: 58px;
-  height: 205px;
+  left: 478px;
+  top: 254px;
+  width: 44px;
+  height: 198px;
 }
 
 .pathLeft {
-  left: 326px;
-  top: 257px;
-  width: 186px;
-  height: 46px;
+  left: 334px;
+  top: 263px;
+  width: 174px;
+  height: 34px;
   transform: rotate(-26.5deg);
   transform-origin: right center;
 }
 
 .pathRight {
-  left: 489px;
-  top: 257px;
-  width: 186px;
-  height: 46px;
+  left: 492px;
+  top: 263px;
+  width: 174px;
+  height: 34px;
   transform: rotate(26.5deg);
   transform-origin: left center;
 }
@@ -206,71 +204,14 @@
 
 .scenery {
   position: absolute;
-  display: block;
+  display: grid;
+  width: 112px;
+  height: 116px;
+  place-items: end center;
   transform: translate(-50%, -88%);
   transform-origin: 50% 100%;
   pointer-events: none;
-  filter: drop-shadow(0 7px 5px rgb(48 70 42 / 24%));
-}
-
-.sceneryTree {
-  width: 74px;
-  height: 92px;
-}
-
-.sceneryTree::before {
-  content: "";
-  position: absolute;
-  left: 5px;
-  top: 0;
-  width: 64px;
-  height: 68px;
-  border: 2px solid rgb(62 102 54 / 30%);
-  border-radius: 48% 52% 45% 55%;
-  background:
-    radial-gradient(circle at 30% 28%, #d2e989 0 17%, transparent 18%),
-    radial-gradient(circle at 68% 31%, #9fce70 0 26%, transparent 27%),
-    radial-gradient(circle at 42% 69%, #76b45f 0 34%, transparent 35%),
-    radial-gradient(circle at 61% 72%, #5f9b52 0 31%, transparent 32%),
-    #86bd63;
-  box-shadow: inset -10px -12px 14px rgb(48 103 47 / 20%);
-}
-
-.sceneryTree::after {
-  content: "";
-  position: absolute;
-  left: 31px;
-  bottom: 2px;
-  width: 14px;
-  height: 40px;
-  border: 2px solid #78563b;
-  border-radius: 8px 8px 5px 5px;
-  background: linear-gradient(90deg, #a8784c, #765036);
-}
-
-.sceneryBush {
-  width: 62px;
-  height: 42px;
-  border: 2px solid rgb(62 107 54 / 24%);
-  border-radius: 48% 55% 42% 58%;
-  background:
-    radial-gradient(circle at 26% 38%, #c9e783 0 20%, transparent 21%),
-    radial-gradient(circle at 58% 27%, #9bce6a 0 29%, transparent 30%),
-    radial-gradient(circle at 72% 68%, #67a654 0 33%, transparent 34%),
-    #7db75d;
-  box-shadow: inset -8px -7px 8px rgb(49 91 44 / 18%);
-}
-
-.sceneryFlowers {
-  width: 62px;
-  height: 34px;
-  border-radius: 50%;
-  background:
-    radial-gradient(circle at 18% 42%, #fff9dc 0 3px, #efb857 3.5px 5px, transparent 5.5px),
-    radial-gradient(circle at 39% 23%, #f8b5c1 0 3px, #f7df67 3.5px 5px, transparent 5.5px),
-    radial-gradient(circle at 59% 51%, #fff 0 3px, #efbd54 3.5px 5px, transparent 5.5px),
-    radial-gradient(circle at 80% 28%, #b9d7f0 0 3px, #f5d45e 3.5px 5px, transparent 5.5px),
-    radial-gradient(ellipse at center bottom, #69a852 0 56%, transparent 58%);
+  filter: drop-shadow(0 6px 5px rgb(48 70 42 / 20%));
 }
 
 .hint {
