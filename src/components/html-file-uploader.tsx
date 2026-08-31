@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { IconClose, IconPlus, IconSpinner } from "./icons";
+import { NOTICE_HTML_BUCKET } from "@/lib/data/client";
 import { toJapaneseStorageError } from "@/lib/errors";
 import { isTemporaryPath, tmpPrefixFor, userTmpPrefixFor } from "@/lib/photos";
 import { createClient } from "@/lib/supabase/client";
@@ -86,7 +87,7 @@ export function HtmlFileUploader({
 
         const sendTo = (prefix: string) =>
           supabase.storage
-            .from("photos")
+            .from(NOTICE_HTML_BUCKET)
             .upload(`${prefix}/${fileName}`, item.file, {
               contentType: "text/html",
               upsert: false,
@@ -139,7 +140,7 @@ export function HtmlFileUploader({
     if (!isTemporaryPath(path)) return;
     try {
       const supabase = createClient();
-      await supabase.storage.from("photos").remove([path]);
+      await supabase.storage.from(NOTICE_HTML_BUCKET).remove([path]);
     } catch {
       // 表示からは消えているので、実ファイルの削除失敗は無視する
     }

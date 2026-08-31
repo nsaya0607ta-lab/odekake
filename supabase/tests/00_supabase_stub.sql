@@ -62,6 +62,14 @@ as $$
   select coalesce(auth.jwt() ->> 'role', current_setting('role', true));
 $$;
 
+create or replace function auth.email()
+returns text
+language sql
+stable
+as $$
+  select nullif(auth.jwt() ->> 'email', '');
+$$;
+
 -- ---------------- storage ----------------
 create table if not exists storage.buckets (
   id text primary key,

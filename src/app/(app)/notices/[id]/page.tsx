@@ -2,7 +2,7 @@ import { notFound } from "next/navigation";
 import { PageBody } from "@/components/page-body";
 import { PageHeader } from "@/components/page-header";
 import { getNoticeDetail } from "@/lib/data/notices";
-import { signPhotoPath } from "@/lib/data/photos";
+import { signHtmlPath, signPhotoPath } from "@/lib/data/photos";
 import { requireUser } from "@/lib/supabase/server";
 import { MarkNoticeRead } from "./mark-notice-read";
 
@@ -34,7 +34,7 @@ export default async function NoticeDetailPage({ params }: { params: Promise<{ i
   const notice = await getNoticeDetail(supabase, id);
   if (!notice) notFound();
   const imageUrl = await signPhotoPath(supabase, notice.image_path);
-  const htmlUrl = await signPhotoPath(supabase, notice.html_path);
+  const htmlUrl = await signHtmlPath(supabase, notice.html_path);
 
   return (
     <>

@@ -4,7 +4,7 @@ import { randomUUID } from "node:crypto";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import type { ActionState } from "@/components/form";
-import { PHOTO_BUCKET } from "@/lib/data/client";
+import { NOTICE_HTML_BUCKET, PHOTO_BUCKET } from "@/lib/data/client";
 import { deleteAdminNotice, postAdminNotice, updateAdminNotice } from "@/lib/data/notices";
 import { finalizePhotoPaths } from "@/lib/photos";
 import { requireUser } from "@/lib/supabase/server";
@@ -71,7 +71,7 @@ export async function postAdminNoticeAction(_previous: ActionState, formData: Fo
 
   let htmlPath: string | null = null;
   if (htmlPaths[0]) {
-    const [moved] = await finalizePhotoPaths(supabase, [htmlPaths[0]], `notices/${randomUUID()}`);
+    const [moved] = await finalizePhotoPaths(supabase, [htmlPaths[0]], `notices/${randomUUID()}`, NOTICE_HTML_BUCKET);
     if (!moved) {
       if (imagePath) await supabase.storage.from(PHOTO_BUCKET).remove([imagePath]);
       return {
@@ -85,8 +85,8 @@ export async function postAdminNoticeAction(_previous: ActionState, formData: Fo
   try {
     await postAdminNotice(supabase, title.data, message.data, imagePath, linkUrl.value, htmlPath);
   } catch {
-    const cleanup = [imagePath, htmlPath].filter((p): p is string => !!p);
-    if (cleanup.length > 0) await supabase.storage.from(PHOTO_BUCKET).remove(cleanup);
+    if (imagePath) await supabase.storage.from(PHOTO_BUCKET).remove([imagePath]);
+    if (htmlPath) await supabase.storage.from(NOTICE_HTML_BUCKET).remove([htmlPath]);
     return {
       error: "お知らせを投稿できませんでした。もう一度お試しください",
       values: { title: title.data, message: message.data },
@@ -141,7 +141,12 @@ export async function updateAdminNoticeAction(_previous: ActionState, formData: 
 
   let htmlPath: string | null = null;
   if (htmlPaths[0]) {
-    const [moved] = await finalizePhotoPaths(supabase, [htmlPaths[0]], `notices/${noticeId.data}`);
+    const [moved] = await finalizePhotoPaths(
+      supabase,
+      [htmlPaths[0]],
+      `notices/${noticeId.data}`,
+      NOTICE_HTML_BUCKET,
+    );
     if (!moved) {
       return {
         error: "添付ファイルを保存できませんでした。もう一度お試しください",
@@ -160,12 +165,11 @@ export async function updateAdminNoticeAction(_previous: ActionState, formData: 
     };
   }
 
-  const staleRemovals = [
-    previousImagePath && previousImagePath !== imagePath ? previousImagePath : null,
-    previousHtmlPath && previousHtmlPath !== htmlPath ? previousHtmlPath : null,
-  ].filter((p): p is string => !!p);
-  if (staleRemovals.length > 0) {
-    await supabase.storage.from(PHOTO_BUCKET).remove(staleRemovals);
+  if (previousImagePath && previousImagePath !== imagePath) {
+    await supabase.storage.from(PHOTO_BUCKET).remove([previousImagePath]);
+  }
+  if (previousHtmlPath && previousHtmlPath !== htmlPath) {
+    await supabase.storage.from(NOTICE_HTML_BUCKET).remove([previousHtmlPath]);
   }
 
   revalidatePath("/notices");
@@ -179,8 +183,9 @@ export async function deleteAdminNoticeAction(formData: FormData): Promise<void>
   if (!noticeId.success) return;
 
   const { supabase } = await requireUser();
-  const removedPaths = await deleteAdminNotice(supabase, noticeId.data);
-  if (removedPaths.length > 0) await supabase.storage.from(PHOTO_BUCKET).remove(removedPaths);
+  const removed = await deleteAdminNotice(supabase, noticeId.data);
+  if (removed.imagePath) await supabase.storage.from(PHOTO_BUCKET).remove([removed.imagePath]);
+  if (removed.htmlPath) await supabase.storage.from(NOTICE_HTML_BUCKET).remove([removed.htmlPath]);
 
   revalidatePath("/notices");
   revalidatePath("/notices/admin");
