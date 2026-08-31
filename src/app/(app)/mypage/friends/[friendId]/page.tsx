@@ -4,6 +4,7 @@ import { ConfirmSubmitButton } from "@/components/confirm-submit-button";
 import { IconChevronRight, IconLock, IconMapPin, IconUser } from "@/components/icons";
 import { PageBody } from "@/components/page-body";
 import { PageHeader } from "@/components/page-header";
+import { TappablePhoto } from "@/components/photo-lightbox";
 import { removeFriendAction } from "@/app/(app)/mypage/friends/actions";
 import { COLLECTION_ITEMS } from "@/lib/collection/items";
 import {
@@ -269,12 +270,9 @@ function RecentVisitsSection({
                   </span>
                 </span>
                 {photoUrl ? (
-                  // eslint-disable-next-line @next/next/no-img-element
-                  <img
-                    src={photoUrl}
-                    alt=""
-                    className="h-16 w-16 shrink-0 rounded-2xl border border-line object-cover"
-                    loading="lazy"
+                  <TappablePhoto
+                    url={photoUrl}
+                    className="h-16 w-16 shrink-0 cursor-zoom-in rounded-2xl border border-line object-cover"
                   />
                 ) : null}
               </li>

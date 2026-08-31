@@ -18,6 +18,7 @@ import { PageBody } from "@/components/page-body";
 import { PageHeader } from "@/components/page-header";
 import { PhotoGallery } from "@/components/photo-gallery";
 import { StarRating, TripBadge, formatDate } from "@/components/ui";
+import { VisitPhotoStrip } from "@/components/visit-photo-strip";
 import { getSpotDetail } from "@/lib/data/spots";
 import { getMapScope, mapScopeHref } from "@/lib/data/map-scope";
 import { getMunicipality, getPrefecture, municipalityFromAddress } from "@/lib/geo";
@@ -254,20 +255,11 @@ export default async function SpotDetailPage({
                   {record.rating ? <StarRating value={record.rating} /> : null}
 
                   {photos.length > 0 ? (
-                    <ul className="-mx-1 flex gap-2 overflow-x-auto px-1 pb-1">
-                      {photos.map((photo) =>
-                        photo.url ? (
-                          <li key={photo.id} className="shrink-0">
-                            {/* eslint-disable-next-line @next/next/no-img-element */}
-                            <img
-                              src={photo.url}
-                              alt={photo.caption ?? ""}
-                              className="h-24 w-24 rounded-2xl object-cover"
-                            />
-                          </li>
-                        ) : null,
-                      )}
-                    </ul>
+                    <VisitPhotoStrip
+                      photos={photos
+                        .filter((photo): photo is typeof photo & { url: string } => Boolean(photo.url))
+                        .map((photo) => ({ id: photo.id, url: photo.url, caption: photo.caption }))}
+                    />
                   ) : null}
 
                   {record.comment ? (
