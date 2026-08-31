@@ -62,12 +62,14 @@ export async function postAdminNotice(
   message: string,
   imagePath: string | null = null,
   linkUrl: string | null = null,
+  htmlPath: string | null = null,
 ): Promise<string> {
   const { data, error } = await supabase.rpc("post_admin_notice", {
     p_title: title,
     p_message: message,
     p_image_path: imagePath,
     p_link_url: linkUrl,
+    p_html_path: htmlPath,
   });
   if (error) throw new Error(error.message || "お知らせの投稿に失敗しました");
   return data;
@@ -80,6 +82,7 @@ export async function updateAdminNotice(
   message: string,
   imagePath: string | null = null,
   linkUrl: string | null = null,
+  htmlPath: string | null = null,
 ): Promise<void> {
   const { error } = await supabase.rpc("update_admin_notice", {
     p_notice_id: noticeId,
@@ -87,13 +90,14 @@ export async function updateAdminNotice(
     p_message: message,
     p_image_path: imagePath,
     p_link_url: linkUrl,
+    p_html_path: htmlPath,
   });
   if (error) throw new Error(error.message || "お知らせを更新できませんでした");
 }
 
-/** 削除したお知らせに添付されていた画像のパスを返す（Storageの後片付け用、無ければnull） */
-export async function deleteAdminNotice(supabase: DB, noticeId: string): Promise<string | null> {
+/** 削除したお知らせに添付されていた画像・HTMLファイルのパスを返す（Storageの後片付け用） */
+export async function deleteAdminNotice(supabase: DB, noticeId: string): Promise<string[]> {
   const { data, error } = await supabase.rpc("delete_admin_notice", { p_notice_id: noticeId });
   if (error) throw new Error(error.message || "お知らせを削除できませんでした");
-  return data ?? null;
+  return data ?? [];
 }

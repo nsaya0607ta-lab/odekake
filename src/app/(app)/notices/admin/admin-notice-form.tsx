@@ -3,6 +3,7 @@
 import { useActionState } from "react";
 import { postAdminNoticeAction } from "./actions";
 import { emptyActionState, Field, FormMessage, SubmitButton } from "@/components/form";
+import { HtmlFileUploader } from "@/components/html-file-uploader";
 import { PhotoUploader } from "@/components/photo-uploader";
 
 export function AdminNoticeForm({ userId }: { userId: string }) {
@@ -57,6 +58,8 @@ export function AdminNoticeForm({ userId }: { userId: string }) {
           placeholder="https://example.com"
         />
       </Field>
+
+      <HtmlFileUploader name="htmlPaths" userId={userId} draftKey="admin-notice-new-html" />
 
       <SubmitButton pendingLabel="配信中…">全ユーザーに配信する</SubmitButton>
     </form>
