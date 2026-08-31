@@ -66,6 +66,14 @@ export function getSeries(id: CollectionSeriesId): CollectionSeries | null {
   return SERIES_BY_ID.get(id) ?? null;
 }
 
+/**
+ * シリーズの小物アイテムはミニゲーム用スキルが未整備なので、犬スキン(art持ち)以外は
+ * ミニゲームに出現せず、スキルレベルの概念も持たない。
+ */
+export function hasMinigameSkillLevel(item: Pick<CollectionItem, "series" | "art">): boolean {
+  return item.series === null || item.art !== undefined;
+}
+
 const CURATED_ITEMS: readonly CollectionItem[] = [
   // --- 通常図鑑：おもちゃ 第1弾 --------------------------------------
   { id: "toy_colorful_ball", name: "カラフルボール", image: "/collection/items/colorful-ball.webp", category: "toy", series: null, rarity: "N" },

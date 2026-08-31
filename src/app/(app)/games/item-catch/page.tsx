@@ -4,7 +4,7 @@ import { IconChevronRight, IconNotebook } from "@/components/icons";
 import { ItemCatchRanking } from "@/components/item-catch-ranking";
 import { PageBody } from "@/components/page-body";
 import { TopHeader } from "@/components/page-header";
-import { COLLECTION_ITEMS } from "@/lib/collection/items";
+import { COLLECTION_ITEMS, hasMinigameSkillLevel } from "@/lib/collection/items";
 import { getOwnedItemCounts } from "@/lib/data/collection";
 import { getSkillLevel } from "@/lib/gacha/skill-levels";
 import { requireUser } from "@/lib/supabase/server";
@@ -19,8 +19,7 @@ export default async function ItemCatchPage() {
   const catchItems = COLLECTION_ITEMS.flatMap((item) => {
     const count = ownedItemCounts.get(item.id) ?? 0;
     if (count <= 0 || !item.image) return [];
-    // シリーズの小物アイテムはミニゲーム用スキルが未整備なので、犬スキン(art持ち)以外は出現させない
-    if (item.series !== null && item.art === undefined) return [];
+    if (!hasMinigameSkillLevel(item)) return [];
     return [{
       id: item.id,
       name: item.name,
