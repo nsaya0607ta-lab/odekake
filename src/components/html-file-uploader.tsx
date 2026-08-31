@@ -85,10 +85,17 @@ export function HtmlFileUploader({
         const fileName = `${crypto.randomUUID()}.html`;
         const token = draftToken || item.localId;
 
+        // @supabase/supabase-jsは、アップロードするBodyがFile/Blobの場合、
+        // 明示的な contentType オプションを無視してファイル自身の type をそのまま使う。
+        // ブラウザ・OSによってはHTMLファイルの type が "text/html" にならない
+        // （空文字や text/plain になる）ことがあるため、type を確実に上書きした
+        // 新しいBlobを作ってからアップロードする。
+        const htmlBlob = new Blob([await item.file.arrayBuffer()], { type: "text/html" });
+
         const sendTo = (prefix: string) =>
           supabase.storage
             .from(NOTICE_HTML_BUCKET)
-            .upload(`${prefix}/${fileName}`, item.file, {
+            .upload(`${prefix}/${fileName}`, htmlBlob, {
               contentType: "text/html",
               upsert: false,
               cacheControl: "31536000",
