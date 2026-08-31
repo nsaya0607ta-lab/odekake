@@ -1,8 +1,8 @@
 name: Town fallback typecheck
 on:
-  push:
+  pull_request:
     branches:
-      - feature/wanko-town-phase1
+      - main
   workflow_dispatch:
 jobs:
   typecheck:
