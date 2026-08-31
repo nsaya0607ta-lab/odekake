@@ -27,21 +27,26 @@ export function useTown(initialSnapshot: TownSnapshot) {
 
   const applyMutation = useCallback(
     async (
-      mutation: ReturnType<ReturnType<typeof createClient>["rpc"]>,
+      execute: () => Promise<{
+        data: Json | null;
+        error: { message: string } | null;
+      }>,
     ): Promise<boolean> => {
       if (pending) return false;
       setPending(true);
       setError(null);
-      const { data, error: mutationError } = await mutation;
-      setPending(false);
 
-      if (mutationError) {
-        setError(friendlyTownError(mutationError.message));
-        return false;
+      try {
+        const { data, error: mutationError } = await execute();
+        if (mutationError) {
+          setError(friendlyTownError(mutationError.message));
+          return false;
+        }
+        setSnapshot(parseTownSnapshot(data));
+        return true;
+      } finally {
+        setPending(false);
       }
-
-      setSnapshot(parseTownSnapshot(data as Json));
-      return true;
     },
     [pending],
   );
@@ -49,14 +54,15 @@ export function useTown(initialSnapshot: TownSnapshot) {
   const buildItem = useCallback(
     async (candidate: TownPlacementCandidate) => {
       const supabase = createClient();
-      return applyMutation(
-        supabase.rpc("build_town_item", {
+      return applyMutation(async () => {
+        const { data, error } = await supabase.rpc("build_town_item", {
           p_item_id: candidate.itemId,
           p_grid_x: candidate.gridX,
           p_grid_y: candidate.gridY,
           p_rotation: candidate.rotation,
-        }),
-      );
+        });
+        return { data, error };
+      });
     },
     [applyMutation],
   );
@@ -65,15 +71,16 @@ export function useTown(initialSnapshot: TownSnapshot) {
     async (candidate: TownPlacementCandidate, isPlaced = true) => {
       if (!candidate.instanceId) return false;
       const supabase = createClient();
-      return applyMutation(
-        supabase.rpc("move_town_item", {
-          p_instance_id: candidate.instanceId,
+      return applyMutation(async () => {
+        const { data, error } = await supabase.rpc("move_town_item", {
+          p_instance_id: candidate.instanceId!,
           p_grid_x: candidate.gridX,
           p_grid_y: candidate.gridY,
           p_rotation: candidate.rotation,
           p_is_placed: isPlaced,
-        }),
-      );
+        });
+        return { data, error };
+      });
     },
     [applyMutation],
   );
