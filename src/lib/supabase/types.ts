@@ -308,6 +308,8 @@ export type NoticeFeedRow = {
   title: string;
   content: string | null;
   is_read: boolean;
+  /** Storageのパス（未解決）。運営お知らせ以外は常にnull */
+  image_path: string | null;
 };
 
 export type NoticeDetailRow = {
@@ -319,6 +321,8 @@ export type NoticeDetailRow = {
   title: string;
   content: string | null;
   is_read: boolean;
+  /** Storageのパス（未解決）。運営お知らせ以外は常にnull */
+  image_path: string | null;
 };
 
 export type DailyStepsRow = {
@@ -682,12 +686,15 @@ export type Database = {
       get_notice_detail: { Args: { p_notice_id: string }; Returns: NoticeDetailRow[] };
       get_unread_notice_count: { Args: Record<string, never>; Returns: number };
       mark_notices_read: { Args: { p_notice_ids: string[] }; Returns: undefined };
-      post_admin_notice: { Args: { p_title: string; p_message: string }; Returns: string };
+      post_admin_notice: {
+        Args: { p_title: string; p_message: string; p_image_path?: string | null };
+        Returns: string;
+      };
       update_admin_notice: {
-        Args: { p_notice_id: string; p_title: string; p_message: string };
+        Args: { p_notice_id: string; p_title: string; p_message: string; p_image_path?: string | null };
         Returns: undefined;
       };
-      delete_admin_notice: { Args: { p_notice_id: string }; Returns: undefined };
+      delete_admin_notice: { Args: { p_notice_id: string }; Returns: string | null };
       is_notice_admin: { Args: Record<string, never>; Returns: boolean };
       get_shared_trips_health: { Args: Record<string, never>; Returns: Json };
       get_shared_trip_list: { Args: Record<string, never>; Returns: SharedTripListRow[] };
