@@ -385,7 +385,7 @@ export const TownCanvas = memo(function TownCanvas({
               zIndex: 100 + Math.round((placed.gridX + placed.gridY) * 10),
             }}
           >
-            <BuildingArtwork itemId={item.id} />
+            <BuildingArtwork itemId={item.id} rotation={placed.rotation} />
           </button>
         ))}
 
@@ -413,7 +413,7 @@ export const TownCanvas = memo(function TownCanvas({
               zIndex: 400,
             }}
           >
-            <BuildingArtwork itemId={candidateItem.id} />
+            <BuildingArtwork itemId={candidateItem.id} rotation={candidate.rotation} />
           </button>
         ) : null}
       </div>
