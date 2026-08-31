@@ -587,11 +587,23 @@ export function FrenchieCatchGame({ ownedItems }: { ownedItems: FrenchieCatchIte
   const itemLevelByIdRef = useRef<Map<string, number>>(new Map());
   /** ❓アイテムが確定させるスキルの抽選プール。持っていないキャラのスキルが出ないよう、所持アイテムだけに絞る */
   const mysterySkillPoolRef = useRef<string[]>(MYSTERY_SKILL_ITEM_IDS);
+  /** フルーツバスケット中に降ってくる「人物の入ったキャラ」。未所持のものは出さないよう所持アイテムだけに絞る */
+  const personCharacterPoolRef = useRef<CollectionItem[]>([]);
+  /** Clawd中に降ってくるサッカーボール／ゴールドボール。未所持のものは出さないよう所持アイテムだけに絞る */
+  const clawdBallItemsRef = useRef<{ soccer: CollectionItem | null; gold: CollectionItem | null }>({
+    soccer: null,
+    gold: null,
+  });
   useEffect(() => {
     itemLevelByIdRef.current = new Map(ownedItems.map((item) => [item.id, item.level]));
     const ownedIds = new Set(ownedItems.map((item) => item.id));
     const pool = MYSTERY_SKILL_ITEM_IDS.filter((id) => ownedIds.has(id));
     mysterySkillPoolRef.current = pool.length > 0 ? pool : MYSTERY_SKILL_ITEM_IDS;
+    personCharacterPoolRef.current = PERSON_CHARACTER_ITEMS.filter((item) => ownedIds.has(item.id));
+    clawdBallItemsRef.current = {
+      soccer: ownedIds.has(CLAWD_SOCCER_BALL_ITEM?.id ?? "") ? CLAWD_SOCCER_BALL_ITEM : null,
+      gold: ownedIds.has(CLAWD_GOLD_BALL_ITEM?.id ?? "") ? CLAWD_GOLD_BALL_ITEM : null,
+    };
   }, [ownedItems]);
 
   useEffect(() => {
@@ -699,9 +711,13 @@ export function FrenchieCatchGame({ ownedItems }: { ownedItems: FrenchieCatchIte
       };
     }
 
-    if (personFloodRemainingRef.current > 0 && PERSON_CHARACTER_ITEMS.length > 0) {
+    if (personFloodRemainingRef.current > 0 && personCharacterPoolRef.current.length === 0) {
+      personFloodRemainingRef.current = 0;
+    }
+    if (personFloodRemainingRef.current > 0) {
       personFloodRemainingRef.current -= 1;
-      const character = PERSON_CHARACTER_ITEMS[Math.floor(Math.random() * PERSON_CHARACTER_ITEMS.length)]!;
+      const pool = personCharacterPoolRef.current;
+      const character = pool[Math.floor(Math.random() * pool.length)]!;
       return {
         ...base,
         itemId: character.id,
@@ -905,7 +921,8 @@ export function FrenchieCatchGame({ ownedItems }: { ownedItems: FrenchieCatchIte
    * 並行して降らせる（他のアイテムと一緒に降ってくる。normal spawnをブロックしない）。
    */
   const createClawdBallEntity = useCallback((): Entity | null => {
-    if (!CLAWD_SOCCER_BALL_ITEM && !CLAWD_GOLD_BALL_ITEM) return null;
+    const { soccer, gold } = clawdBallItemsRef.current;
+    if (!soccer && !gold) return null;
     const fallSpeedBoost = performance.now() < fallSpeedBoostUntilRef.current ? fallSpeedValueRef.current : 1;
     const slantBoost = performance.now() < slantBoostUntilRef.current ? SLANT_VX_BOOST : 1;
     const rawVy = (17 + Math.random() * 5) * 1.35;
@@ -926,7 +943,7 @@ export function FrenchieCatchGame({ ownedItems }: { ownedItems: FrenchieCatchIte
       ttl: 0,
     };
     const rollGold = Math.random() < CLAWD_GOLD_BALL_CHANCE;
-    const ball = (rollGold ? CLAWD_GOLD_BALL_ITEM : CLAWD_SOCCER_BALL_ITEM) ?? CLAWD_SOCCER_BALL_ITEM ?? CLAWD_GOLD_BALL_ITEM!;
+    const ball = (rollGold ? gold : soccer) ?? soccer ?? gold!;
     return {
       ...base,
       itemId: ball.id,
