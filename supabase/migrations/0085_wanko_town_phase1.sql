@@ -27,7 +27,7 @@ create table if not exists public.user_towns (
   town_level integer not null default 1 check (town_level between 1 and 100),
   town_exp integer not null default 0 check (town_exp >= 0),
   unlocked_areas text[] not null default array['core']::text[],
-  materials jsonb not null default '{"wood":500,"stone":360,"flower":180,"shell":120,"iron":80}'::jsonb
+  materials jsonb not null default '{"wood":700,"stone":360,"flower":180,"shell":120,"iron":80}'::jsonb
     check (jsonb_typeof(materials) = 'object'),
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
