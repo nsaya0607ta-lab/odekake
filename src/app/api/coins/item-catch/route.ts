@@ -96,11 +96,12 @@ export async function POST(request: Request) {
   for (let index = 0; index < scoreChunks.length; index += 1) {
     const scoreChunk = scoreChunks[index]!;
     const rpcRoundId = scoreChunks.length === 1 ? body.roundId : `${body.roundId}:${index + 1}`;
-    const legacyCaughtCount = scoreChunk === 0
-      ? 0
-      : scoreChunks.length === 1
-        ? Math.max(body.caughtCount, Math.ceil(scoreChunk / 100))
-        : Math.ceil(scoreChunk / 100);
+    // record_item_catch_result() 側は p_caught_count を「ラウンド全体の合計」ではなく
+    // 「このチャンクの推定値」として扱い、上限80で弾く（0069参照）。1チャンクのみの場合に
+    // 実際の合計キャッチ数(body.caughtCount)をそのまま渡すと、80個を超えて拾った低〜中スコアの
+    // ラウンド（例: score=3000, caughtCount=200）が毎回「Invalid caught count」で弾かれ、
+    // コインを一切受け取れなくなってしまうため、チャンク数によらず常にスコアからの推定値を使う。
+    const legacyCaughtCount = scoreChunk === 0 ? 0 : Math.ceil(scoreChunk / 100);
     // ボーナスコインはスコアが複数チャンクに分割された場合でも二重加算されないよう、最初の1回だけ渡す。
     const bonusCoinsForChunk = index === 0 ? bonusCoins : 0;
 
