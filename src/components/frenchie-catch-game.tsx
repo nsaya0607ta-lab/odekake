@@ -1981,12 +1981,14 @@ export function FrenchieCatchGame({ ownedItems }: { ownedItems: FrenchieCatchIte
     };
   }, [createEntity, phase, refreshEffectStatus, showCatch, showImpact]);
 
+  const [rewardRetryCount, setRewardRetryCount] = useState(0);
+
   useEffect(() => {
     if (phase !== "finished" || !roundIdRef.current) return;
     const roundId = roundIdRef.current;
     let cancelled = false;
 
-    const grantReward = async () => {
+    const grantReward = async (isRetry: boolean): Promise<void> => {
       setRewardPending(true);
       setRewardError(null);
       try {
@@ -2007,17 +2009,26 @@ export function FrenchieCatchGame({ ownedItems }: { ownedItems: FrenchieCatchIte
         setCoinReward(payload?.coins ?? 0);
       } catch (error) {
         if (cancelled) return;
-        setRewardError(error instanceof Error ? error.message : "コインを受け取れませんでした。");
+        if (!isRetry) {
+          // fetch自体が失敗するのは電波状況などによる一時的な通信断のことが多いため、
+          // ユーザーに見せる前に一度だけ自動で再試行する。
+          await grantReward(true);
+          return;
+        }
+        // ここまで来て失敗する場合、fetchが投げるエラーはブラウザ由来の英語メッセージ（"Load failed" 等）で
+        // ユーザーには分かりづらいため、サーバーが返した日本語メッセージ以外は通信エラー向けの文言に差し替える。
+        const isServerMessage = error instanceof Error && !/failed to fetch|load failed|network/i.test(error.message);
+        setRewardError(isServerMessage ? (error as Error).message : "通信に失敗しました。電波状況を確認してもう一度お試しください。");
       } finally {
         if (!cancelled) setRewardPending(false);
       }
     };
 
-    void grantReward();
+    void grantReward(false);
     return () => {
       cancelled = true;
     };
-  }, [phase]);
+  }, [phase, rewardRetryCount]);
 
   const startGame = useCallback(() => {
     const now = performance.now();
@@ -2294,7 +2305,16 @@ export function FrenchieCatchGame({ ownedItems }: { ownedItems: FrenchieCatchIte
                     {rewardPending ? (
                       <p className="text-[11px] font-bold text-[#8d6231]">コインを受け取り中…</p>
                     ) : rewardError ? (
-                      <p className="text-[10px] font-bold text-red-600">{rewardError}</p>
+                      <div className="flex flex-col items-center gap-1.5">
+                        <p className="text-[10px] font-bold text-red-600">{rewardError}</p>
+                        <button
+                          type="button"
+                          onClick={() => setRewardRetryCount((count) => count + 1)}
+                          className="rounded-full border border-[#8d6231]/40 bg-white px-3 py-1 text-[10px] font-black text-[#8d6231] active:translate-y-px"
+                        >
+                          もう一度受け取る
+                        </button>
+                      </div>
                     ) : (
                       <p className="flex items-center justify-center gap-1 text-sm font-black text-[#8d6231]">獲得コイン <span className="tabular-nums">+{coinReward ?? 0}</span></p>
                     )}
