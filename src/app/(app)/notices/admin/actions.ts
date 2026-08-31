@@ -12,6 +12,20 @@ import { requireUser } from "@/lib/supabase/server";
 const titleSchema = z.string().trim().min(1, "タイトルを入力してください").max(100, "100文字以内で入力してください");
 const messageSchema = z.string().trim().min(1, "本文を入力してください").max(2000, "2000文字以内で入力してください");
 const noticeIdSchema = z.string().uuid();
+const linkUrlSchema = z
+  .string()
+  .trim()
+  .max(2000, "URLが長すぎます")
+  .regex(/^https?:\/\//i, "http(s)から始まるURLを入力してください")
+  .or(z.literal(""));
+
+function parseLinkUrl(raw: FormDataEntryValue | null): { ok: true; value: string | null } | { ok: false; error: string } {
+  const result = linkUrlSchema.safeParse(typeof raw === "string" ? raw : "");
+  if (!result.success) {
+    return { ok: false, error: result.error.issues[0]?.message ?? "URLを確認してください" };
+  }
+  return { ok: true, value: result.data.length > 0 ? result.data : null };
+}
 
 /** PhotoUploaderのhidden inputはアップロード済みパスのJSON配列文字列 */
 function parseImagePaths(raw: FormDataEntryValue | null): string[] {
@@ -27,9 +41,14 @@ function parseImagePaths(raw: FormDataEntryValue | null): string[] {
 export async function postAdminNoticeAction(_previous: ActionState, formData: FormData): Promise<ActionState> {
   const title = titleSchema.safeParse(formData.get("title"));
   const message = messageSchema.safeParse(formData.get("message"));
-  if (!title.success || !message.success) {
+  const linkUrl = parseLinkUrl(formData.get("linkUrl"));
+  if (!title.success || !message.success || !linkUrl.ok) {
     return {
-      error: title.error?.issues[0]?.message ?? message.error?.issues[0]?.message ?? "入力内容を確認してください",
+      error:
+        title.error?.issues[0]?.message
+        ?? message.error?.issues[0]?.message
+        ?? (!linkUrl.ok ? linkUrl.error : undefined)
+        ?? "入力内容を確認してください",
       values: { title: String(formData.get("title") ?? ""), message: String(formData.get("message") ?? "") },
     };
   }
@@ -50,7 +69,7 @@ export async function postAdminNoticeAction(_previous: ActionState, formData: Fo
   }
 
   try {
-    await postAdminNotice(supabase, title.data, message.data, imagePath);
+    await postAdminNotice(supabase, title.data, message.data, imagePath, linkUrl.value);
   } catch {
     if (imagePath) await supabase.storage.from(PHOTO_BUCKET).remove([imagePath]);
     return {
@@ -69,9 +88,14 @@ export async function updateAdminNoticeAction(_previous: ActionState, formData: 
   const noticeId = noticeIdSchema.safeParse(formData.get("noticeId"));
   const title = titleSchema.safeParse(formData.get("title"));
   const message = messageSchema.safeParse(formData.get("message"));
-  if (!noticeId.success || !title.success || !message.success) {
+  const linkUrl = parseLinkUrl(formData.get("linkUrl"));
+  if (!noticeId.success || !title.success || !message.success || !linkUrl.ok) {
     return {
-      error: title.error?.issues[0]?.message ?? message.error?.issues[0]?.message ?? "入力内容を確認してください",
+      error:
+        title.error?.issues[0]?.message
+        ?? message.error?.issues[0]?.message
+        ?? (!linkUrl.ok ? linkUrl.error : undefined)
+        ?? "入力内容を確認してください",
       values: { title: String(formData.get("title") ?? ""), message: String(formData.get("message") ?? "") },
     };
   }
@@ -96,7 +120,7 @@ export async function updateAdminNoticeAction(_previous: ActionState, formData: 
   }
 
   try {
-    await updateAdminNotice(supabase, noticeId.data, title.data, message.data, imagePath);
+    await updateAdminNotice(supabase, noticeId.data, title.data, message.data, imagePath, linkUrl.value);
   } catch {
     return {
       error: "お知らせを更新できませんでした。もう一度お試しください",

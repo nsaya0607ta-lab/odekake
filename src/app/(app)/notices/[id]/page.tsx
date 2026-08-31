@@ -55,6 +55,16 @@ export default async function NoticeDetailPage({ params }: { params: Promise<{ i
           {notice.content ? (
             <p className="mt-3 whitespace-pre-wrap text-sm leading-relaxed text-ink-soft">{notice.content}</p>
           ) : null}
+          {notice.link_url ? (
+            <a
+              href={notice.link_url}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="btn btn-quiet mt-3 inline-block"
+            >
+              関連リンクを開く
+            </a>
+          ) : null}
         </div>
       </PageBody>
     </>

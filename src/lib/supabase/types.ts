@@ -310,6 +310,8 @@ export type NoticeFeedRow = {
   is_read: boolean;
   /** Storageのパス（未解決）。運営お知らせ以外は常にnull */
   image_path: string | null;
+  /** 外部リンクURL。運営お知らせ以外は常にnull */
+  link_url: string | null;
 };
 
 export type NoticeDetailRow = {
@@ -323,6 +325,8 @@ export type NoticeDetailRow = {
   is_read: boolean;
   /** Storageのパス（未解決）。運営お知らせ以外は常にnull */
   image_path: string | null;
+  /** 外部リンクURL。運営お知らせ以外は常にnull */
+  link_url: string | null;
 };
 
 export type DailyStepsRow = {
@@ -687,11 +691,22 @@ export type Database = {
       get_unread_notice_count: { Args: Record<string, never>; Returns: number };
       mark_notices_read: { Args: { p_notice_ids: string[] }; Returns: undefined };
       post_admin_notice: {
-        Args: { p_title: string; p_message: string; p_image_path?: string | null };
+        Args: {
+          p_title: string;
+          p_message: string;
+          p_image_path?: string | null;
+          p_link_url?: string | null;
+        };
         Returns: string;
       };
       update_admin_notice: {
-        Args: { p_notice_id: string; p_title: string; p_message: string; p_image_path?: string | null };
+        Args: {
+          p_notice_id: string;
+          p_title: string;
+          p_message: string;
+          p_image_path?: string | null;
+          p_link_url?: string | null;
+        };
         Returns: undefined;
       };
       delete_admin_notice: { Args: { p_notice_id: string }; Returns: string | null };
