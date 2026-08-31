@@ -715,7 +715,10 @@ export type Database = {
         };
         Returns: undefined;
       };
-      delete_admin_notice: { Args: { p_notice_id: string }; Returns: string[] };
+      delete_admin_notice: {
+        Args: { p_notice_id: string };
+        Returns: { image_path: string | null; html_path: string | null }[];
+      };
       is_notice_admin: { Args: Record<string, never>; Returns: boolean };
       get_shared_trips_health: { Args: Record<string, never>; Returns: Json };
       get_shared_trip_list: { Args: Record<string, never>; Returns: SharedTripListRow[] };

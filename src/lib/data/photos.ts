@@ -1,4 +1,4 @@
-import type { DB } from "./client";
+import { NOTICE_HTML_BUCKET, PHOTO_BUCKET, type DB } from "./client";
 
 /**
  * ストレージパスを、/api/photo プロキシ経由の配信URLに変換する。
@@ -9,12 +9,16 @@ import type { DB } from "./client";
  * ここではパスから決まる安定した URL だけを返し、実際の署名・配信は
  * リクエストの都度 /api/photo/[...path] ルートが行う（認可チェックもそちら）。
  */
-function photoProxyUrl(path: string, opts?: { thumb?: boolean }): string {
+function photoProxyUrl(path: string, opts?: { thumb?: boolean; bucket?: string }): string {
   const encodedPath = path
     .split("/")
     .map((segment) => encodeURIComponent(segment))
     .join("/");
-  return opts?.thumb ? `/api/photo/${encodedPath}?thumb=1` : `/api/photo/${encodedPath}`;
+  const params = new URLSearchParams();
+  if (opts?.thumb) params.set("thumb", "1");
+  if (opts?.bucket && opts.bucket !== PHOTO_BUCKET) params.set("bucket", opts.bucket);
+  const query = params.toString();
+  return query ? `/api/photo/${encodedPath}?${query}` : `/api/photo/${encodedPath}`;
 }
 
 export async function signPhotoPaths(_supabase: DB, paths: string[]): Promise<Map<string, string>> {
@@ -28,6 +32,12 @@ export async function signPhotoPaths(_supabase: DB, paths: string[]): Promise<Ma
 export async function signPhotoPath(_supabase: DB, path: string | null | undefined): Promise<string | null> {
   if (!path) return null;
   return photoProxyUrl(path);
+}
+
+/** 運営お知らせに添付されたHTMLファイル（notice_filesバケット）用の配信URLを返す */
+export async function signHtmlPath(_supabase: DB, path: string | null | undefined): Promise<string | null> {
+  if (!path) return null;
+  return photoProxyUrl(path, { bucket: NOTICE_HTML_BUCKET });
 }
 
 /**

@@ -1,5 +1,5 @@
 import { type NextRequest, NextResponse } from "next/server";
-import { PHOTO_BUCKET, type DB } from "@/lib/data/client";
+import { NOTICE_HTML_BUCKET, PHOTO_BUCKET, type DB } from "@/lib/data/client";
 import { toThumbPath } from "@/lib/image";
 import { requireUser } from "@/lib/supabase/server";
 
@@ -12,8 +12,11 @@ const SIGNED_URL_TTL_SECONDS = 60;
 // その場でのチェックを迂回されてしまう）
 const PROXY_CACHE_CONTROL = "private, max-age=2592000, immutable";
 
-async function fetchStoragePhoto(supabase: DB, path: string): Promise<Response | null> {
-  const { data, error } = await supabase.storage.from(PHOTO_BUCKET).createSignedUrl(path, SIGNED_URL_TTL_SECONDS);
+// クエリで指定できるバケットは既知の2つだけに絞る（任意のバケット名を渡せないようにする）
+const ALLOWED_BUCKETS = new Set([PHOTO_BUCKET, NOTICE_HTML_BUCKET]);
+
+async function fetchStoragePhoto(supabase: DB, bucket: string, path: string): Promise<Response | null> {
+  const { data, error } = await supabase.storage.from(bucket).createSignedUrl(path, SIGNED_URL_TTL_SECONDS);
   if (error || !data?.signedUrl) return null;
 
   const response = await fetch(data.signedUrl);
@@ -27,10 +30,13 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
   const path = segments.join("/");
   if (!path) return new NextResponse(null, { status: 404 });
 
-  const wantThumb = request.nextUrl.searchParams.get("thumb") === "1";
+  const bucketParam = request.nextUrl.searchParams.get("bucket");
+  const bucket = bucketParam && ALLOWED_BUCKETS.has(bucketParam) ? bucketParam : PHOTO_BUCKET;
+
+  const wantThumb = bucket === PHOTO_BUCKET && request.nextUrl.searchParams.get("thumb") === "1";
   const response =
-    (wantThumb ? await fetchStoragePhoto(supabase, toThumbPath(path)) : null) ??
-    (await fetchStoragePhoto(supabase, path));
+    (wantThumb ? await fetchStoragePhoto(supabase, bucket, toThumbPath(path)) : null) ??
+    (await fetchStoragePhoto(supabase, bucket, path));
 
   if (!response?.body) return new NextResponse(null, { status: 404 });
 

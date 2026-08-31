@@ -56,11 +56,15 @@ function basenameOf(path: string): string {
  * 一時領域の写真を本来の場所へ移す。
  * すでに本来の場所にあるものはそのまま返す。移動に失敗したものは取り除く
  * （参照できないパスを記録に残さないため）。
+ *
+ * bucket を省略すると既定の photos バケットを使う。サムネイルの移動も
+ * photos バケット内の写真を前提にしているため、他バケットでは行わない。
  */
 export async function finalizePhotoPaths(
   supabase: DB,
   paths: string[],
   destinationPrefix: string,
+  bucket: string = PHOTO_BUCKET,
 ): Promise<string[]> {
   const result: string[] = [];
 
@@ -71,17 +75,19 @@ export async function finalizePhotoPaths(
     }
 
     const destination = `${destinationPrefix}/${basenameOf(path)}`;
-    const { error } = await supabase.storage.from(PHOTO_BUCKET).move(path, destination);
+    const { error } = await supabase.storage.from(bucket).move(path, destination);
 
     if (!error) {
       result.push(destination);
       // サムネイルも一緒に移す。無ければ失敗するだけなので結果は見ない
-      void supabase.storage.from(PHOTO_BUCKET).move(toThumbPath(path), toThumbPath(destination));
+      if (bucket === PHOTO_BUCKET) {
+        void supabase.storage.from(bucket).move(toThumbPath(path), toThumbPath(destination));
+      }
       continue;
     }
 
     // すでに移動済みなら、移動先にファイルがあるはず
-    const { data } = await supabase.storage.from(PHOTO_BUCKET).list(destinationPrefix, {
+    const { data } = await supabase.storage.from(bucket).list(destinationPrefix, {
       search: basenameOf(path),
       limit: 1,
     });

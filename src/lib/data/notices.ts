@@ -96,8 +96,12 @@ export async function updateAdminNotice(
 }
 
 /** 削除したお知らせに添付されていた画像・HTMLファイルのパスを返す（Storageの後片付け用） */
-export async function deleteAdminNotice(supabase: DB, noticeId: string): Promise<string[]> {
+export async function deleteAdminNotice(
+  supabase: DB,
+  noticeId: string,
+): Promise<{ imagePath: string | null; htmlPath: string | null }> {
   const { data, error } = await supabase.rpc("delete_admin_notice", { p_notice_id: noticeId });
   if (error) throw new Error(error.message || "お知らせを削除できませんでした");
-  return data ?? [];
+  const row = data?.[0];
+  return { imagePath: row?.image_path ?? null, htmlPath: row?.html_path ?? null };
 }
