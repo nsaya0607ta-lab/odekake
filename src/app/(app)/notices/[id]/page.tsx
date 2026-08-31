@@ -34,6 +34,7 @@ export default async function NoticeDetailPage({ params }: { params: Promise<{ i
   const notice = await getNoticeDetail(supabase, id);
   if (!notice) notFound();
   const imageUrl = await signPhotoPath(supabase, notice.image_path);
+  const htmlUrl = await signPhotoPath(supabase, notice.html_path);
 
   return (
     <>
@@ -64,6 +65,16 @@ export default async function NoticeDetailPage({ params }: { params: Promise<{ i
             >
               関連リンクを開く
             </a>
+          ) : null}
+          {htmlUrl ? (
+            // スクリプト・same-originを許可しないsandboxで埋め込み、添付HTML内のコードが
+            // アプリと同一オリジンで実行されないようにする（管理者アカウントが侵害された場合の対策）。
+            <iframe
+              src={htmlUrl}
+              sandbox="allow-popups"
+              title="添付ページ"
+              className="mt-3 h-[70vh] w-full rounded-xl border border-line bg-paper"
+            />
           ) : null}
         </div>
       </PageBody>

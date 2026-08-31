@@ -312,6 +312,8 @@ export type NoticeFeedRow = {
   image_path: string | null;
   /** 外部リンクURL。運営お知らせ以外は常にnull */
   link_url: string | null;
+  /** 添付HTMLファイルのStorageパス（未解決）。運営お知らせ以外は常にnull */
+  html_path: string | null;
 };
 
 export type NoticeDetailRow = {
@@ -327,6 +329,8 @@ export type NoticeDetailRow = {
   image_path: string | null;
   /** 外部リンクURL。運営お知らせ以外は常にnull */
   link_url: string | null;
+  /** 添付HTMLファイルのStorageパス（未解決）。運営お知らせ以外は常にnull */
+  html_path: string | null;
 };
 
 export type DailyStepsRow = {
@@ -696,6 +700,7 @@ export type Database = {
           p_message: string;
           p_image_path?: string | null;
           p_link_url?: string | null;
+          p_html_path?: string | null;
         };
         Returns: string;
       };
@@ -706,10 +711,11 @@ export type Database = {
           p_message: string;
           p_image_path?: string | null;
           p_link_url?: string | null;
+          p_html_path?: string | null;
         };
         Returns: undefined;
       };
-      delete_admin_notice: { Args: { p_notice_id: string }; Returns: string | null };
+      delete_admin_notice: { Args: { p_notice_id: string }; Returns: string[] };
       is_notice_admin: { Args: Record<string, never>; Returns: boolean };
       get_shared_trips_health: { Args: Record<string, never>; Returns: Json };
       get_shared_trip_list: { Args: Record<string, never>; Returns: SharedTripListRow[] };
