@@ -61,6 +61,7 @@ export default async function AdminNoticePage() {
                       initialMessage={notice.content ?? notice.title}
                       initialImagePath={notice.image_path}
                       initialImageUrl={adminNoticeImageUrls.get(notice.id) ?? null}
+                      initialLinkUrl={notice.link_url}
                     />
                     <form action={deleteAdminNoticeAction} className="mt-2">
                       <input type="hidden" name="noticeId" value={notice.id} />

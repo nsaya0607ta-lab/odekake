@@ -61,11 +61,13 @@ export async function postAdminNotice(
   title: string,
   message: string,
   imagePath: string | null = null,
+  linkUrl: string | null = null,
 ): Promise<string> {
   const { data, error } = await supabase.rpc("post_admin_notice", {
     p_title: title,
     p_message: message,
     p_image_path: imagePath,
+    p_link_url: linkUrl,
   });
   if (error) throw new Error(error.message || "お知らせの投稿に失敗しました");
   return data;
@@ -77,12 +79,14 @@ export async function updateAdminNotice(
   title: string,
   message: string,
   imagePath: string | null = null,
+  linkUrl: string | null = null,
 ): Promise<void> {
   const { error } = await supabase.rpc("update_admin_notice", {
     p_notice_id: noticeId,
     p_title: title,
     p_message: message,
     p_image_path: imagePath,
+    p_link_url: linkUrl,
   });
   if (error) throw new Error(error.message || "お知らせを更新できませんでした");
 }

@@ -12,6 +12,7 @@ export function AdminNoticeEditForm({
   initialMessage,
   initialImagePath,
   initialImageUrl,
+  initialLinkUrl,
 }: {
   noticeId: string;
   userId: string;
@@ -19,6 +20,7 @@ export function AdminNoticeEditForm({
   initialMessage: string;
   initialImagePath: string | null;
   initialImageUrl: string | null;
+  initialLinkUrl: string | null;
 }) {
   const [state, formAction] = useActionState(updateAdminNoticeAction, emptyActionState);
 
@@ -57,6 +59,17 @@ export function AdminNoticeEditForm({
         label="画像（任意）"
         initial={initialImagePath && initialImageUrl ? [{ path: initialImagePath, url: initialImageUrl }] : []}
       />
+      <Field label="リンクURL" htmlFor={`linkUrl-${noticeId}`} hint="任意。httpまたはhttpsから始まるURL。">
+        <input
+          id={`linkUrl-${noticeId}`}
+          name="linkUrl"
+          type="url"
+          className="field"
+          maxLength={2000}
+          defaultValue={initialLinkUrl ?? ""}
+          placeholder="https://example.com"
+        />
+      </Field>
       <SubmitButton className="btn btn-quiet" pendingLabel="更新中…">
         更新する
       </SubmitButton>

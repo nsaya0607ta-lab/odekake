@@ -47,6 +47,17 @@ export function AdminNoticeForm({ userId }: { userId: string }) {
         persistDraft
       />
 
+      <Field label="リンクURL" htmlFor="linkUrl" hint="任意。httpまたはhttpsから始まるURL。詳細画面にリンクとして表示されます。">
+        <input
+          id="linkUrl"
+          name="linkUrl"
+          type="url"
+          className="field"
+          maxLength={2000}
+          placeholder="https://example.com"
+        />
+      </Field>
+
       <SubmitButton pendingLabel="配信中…">全ユーザーに配信する</SubmitButton>
     </form>
   );
