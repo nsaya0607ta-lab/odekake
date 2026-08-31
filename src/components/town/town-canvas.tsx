@@ -61,14 +61,23 @@ function clampView(view: ViewState, width: number, height: number): ViewState {
   };
 }
 
-const LOCKED_DECOR = [
-  { x: 2, y: 2, icon: "🌳" },
-  { x: 10.8, y: 2.2, icon: "🌲" },
-  { x: 12.3, y: 7.2, icon: "🌳" },
-  { x: 2, y: 9.7, icon: "🌲" },
-  { x: 5, y: 12.3, icon: "🌳" },
-  { x: 9.7, y: 12.2, icon: "🌲" },
+const SCENERY_DECOR = [
+  { x: 2.1, y: 2.2, kind: "tree" },
+  { x: 10.8, y: 2.3, kind: "tree" },
+  { x: 12.2, y: 5.3, kind: "bush" },
+  { x: 12.1, y: 8.7, kind: "tree" },
+  { x: 10.8, y: 11.8, kind: "flowers" },
+  { x: 7.9, y: 12.5, kind: "bush" },
+  { x: 4.5, y: 12.2, kind: "tree" },
+  { x: 1.8, y: 9.4, kind: "flowers" },
+  { x: 1.8, y: 6.2, kind: "bush" },
 ] as const;
+
+const SCENERY_CLASS = {
+  tree: styles.sceneryTree,
+  bush: styles.sceneryBush,
+  flowers: styles.sceneryFlowers,
+} as const;
 
 export const TownCanvas = memo(function TownCanvas({
   catalog,
@@ -332,7 +341,15 @@ export const TownCanvas = memo(function TownCanvas({
         className={styles.world}
         style={{ transform: "translate3d(" + view.x + "px," + view.y + "px,0) scale(" + view.scale + ")" }}
       >
+        <div className={styles.groundEdge} style={{ clipPath: wholeGround }} />
         <div className={styles.ground} style={{ clipPath: wholeGround }} />
+        <div className={styles.landscape} style={{ clipPath: wholeGround }}>
+          <span className={styles.pathMain} />
+          <span className={styles.pathLeft} />
+          <span className={styles.pathRight} />
+          <span className={styles.grassPatchOne} />
+          <span className={styles.grassPatchTwo} />
+        </div>
 
         {TOWN_AREAS.filter((area) => !unlockedAreas.includes(area.id)).map((area) => {
           const center = projectTownPoint(area.x + area.width / 2, area.y + area.height / 2);
@@ -346,16 +363,15 @@ export const TownCanvas = memo(function TownCanvas({
           );
         })}
 
-        {LOCKED_DECOR.map((decor, index) => {
+        {SCENERY_DECOR.map((decor, index) => {
           const point = projectTownPoint(decor.x, decor.y);
           return (
             <span
               key={index}
-              className={styles.tree}
+              aria-hidden="true"
+              className={styles.scenery + " " + SCENERY_CLASS[decor.kind]}
               style={{ left: point.x, top: point.y, zIndex: Math.round((decor.x + decor.y) * 10) }}
-            >
-              {decor.icon}
-            </span>
+            />
           );
         })}
 
