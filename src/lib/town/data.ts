@@ -103,3 +103,24 @@ export async function getTownCatalog(supabase: DB): Promise<TownCatalogItem[]> {
     sortOrder: row.sort_order,
   }));
 }
+
+
+export const FALLBACK_TOWN_CATALOG: TownCatalogItem[] = [
+  { id: "town-hall", name: "タウンホール", category: "building", gridWidth: 3, gridHeight: 3, unlockLevel: 1, cost: { wood: 80, stone: 60, flower: 0, shell: 0, iron: 20 }, expReward: 80, sortOrder: 10 },
+  { id: "dog-cafe", name: "ドッグカフェ", category: "building", gridWidth: 2, gridHeight: 2, unlockLevel: 1, cost: { wood: 120, stone: 80, flower: 40, shell: 0, iron: 0 }, expReward: 65, sortOrder: 20 },
+  { id: "bakery", name: "ベーカリー", category: "building", gridWidth: 2, gridHeight: 2, unlockLevel: 1, cost: { wood: 100, stone: 60, flower: 50, shell: 0, iron: 0 }, expReward: 60, sortOrder: 30 },
+  { id: "dog-run", name: "ドッグラン", category: "facility", gridWidth: 3, gridHeight: 2, unlockLevel: 2, cost: { wood: 90, stone: 0, flower: 30, shell: 0, iron: 10 }, expReward: 75, sortOrder: 40 },
+  { id: "hot-spring", name: "温泉", category: "facility", gridWidth: 3, gridHeight: 3, unlockLevel: 3, cost: { wood: 150, stone: 100, flower: 0, shell: 30, iron: 20 }, expReward: 110, sortOrder: 50 },
+];
+
+export const FALLBACK_TOWN_SNAPSHOT: TownSnapshot = {
+  town: {
+    townName: "わんこタウン",
+    townLevel: 1,
+    townExp: 0,
+    unlockedAreas: ["core"],
+    materials: { wood: 700, stone: 360, flower: 180, shell: 120, iron: 80 },
+    updatedAt: "",
+  },
+  items: [],
+};
