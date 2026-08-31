@@ -1,0 +1,184 @@
+.viewport {
+  position: relative;
+  height: clamp(390px, 57dvh, 570px);
+  overflow: hidden;
+  touch-action: none;
+  overscroll-behavior: contain;
+  border-block: 1px solid color-mix(in srgb, var(--color-leaf) 22%, var(--color-line));
+  background:
+    radial-gradient(circle at 18% 18%, rgb(255 255 255 / 70%) 0 2px, transparent 3px),
+    linear-gradient(#dff0e5, #d5e9db 58%, #cae0d2);
+  cursor: grab;
+}
+
+.viewport:active {
+  cursor: grabbing;
+}
+
+.world {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 1000px;
+  height: 560px;
+  transform-origin: 0 0;
+  will-change: transform;
+  contain: layout style;
+}
+
+.ground,
+.lockedArea,
+.placementMask {
+  position: absolute;
+  inset: 0;
+}
+
+.ground {
+  background:
+    repeating-linear-gradient(26.565deg, transparent 0 31px, rgb(75 111 65 / 8%) 32px 33px),
+    repeating-linear-gradient(-26.565deg, transparent 0 31px, rgb(75 111 65 / 8%) 32px 33px),
+    linear-gradient(145deg, #b9d997, #9fcb82);
+  filter: drop-shadow(0 17px 12px rgb(66 82 55 / 22%));
+}
+
+.ground::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background:
+    radial-gradient(circle at 30% 40%, rgb(255 255 255 / 24%) 0 1px, transparent 2px),
+    radial-gradient(circle at 72% 66%, rgb(67 112 58 / 13%) 0 1px, transparent 2px);
+  background-size: 31px 27px, 37px 33px;
+}
+
+.lockedArea {
+  background:
+    radial-gradient(circle at 28% 34%, #6a9659 0 7px, transparent 8px),
+    radial-gradient(circle at 68% 62%, #79a362 0 9px, transparent 10px),
+    rgb(72 103 61 / 34%);
+  background-size: 68px 55px, 82px 71px, auto;
+  border: 1px dashed rgb(69 91 57 / 35%);
+  backdrop-filter: blur(1px);
+}
+
+.entity {
+  position: absolute;
+  width: 148px;
+  height: 132px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  transform: translate(-50%, -100%);
+  transform-origin: 50% 100%;
+  touch-action: none;
+  -webkit-user-drag: none;
+  user-select: none;
+}
+
+.entitySelected {
+  filter: drop-shadow(0 0 5px rgb(255 255 255 / 95%)) drop-shadow(0 0 9px rgb(93 128 73 / 85%));
+}
+
+.entityCandidate {
+  opacity: 0.8;
+  filter: drop-shadow(0 0 7px rgb(255 255 255 / 95%));
+}
+
+.placementMask {
+  pointer-events: none;
+  opacity: 0.42;
+  background: #6abf69;
+  filter: drop-shadow(0 0 5px rgb(72 143 72 / 70%));
+}
+
+.placementMaskInvalid {
+  background: #dd6877;
+  filter: drop-shadow(0 0 5px rgb(190 66 82 / 75%));
+}
+
+.dog {
+  position: absolute;
+  width: 82px;
+  height: auto;
+  transform: translate(-50%, -90%);
+  transform-origin: 50% 100%;
+  filter: drop-shadow(0 5px 4px rgb(55 51 43 / 24%));
+  pointer-events: none;
+  user-select: none;
+}
+
+.lockedLabel {
+  position: absolute;
+  transform: translate(-50%, -50%);
+  border: 1px solid rgb(255 255 255 / 70%);
+  border-radius: 999px;
+  padding: 5px 9px;
+  color: #4f6647;
+  background: rgb(255 253 248 / 72%);
+  font-size: 9px;
+  font-weight: 900;
+  box-shadow: 0 3px 8px rgb(61 78 52 / 12%);
+  pointer-events: none;
+}
+
+.tree {
+  position: absolute;
+  transform: translate(-50%, -100%);
+  font-size: 33px;
+  filter: drop-shadow(0 4px 3px rgb(53 70 45 / 22%));
+  pointer-events: none;
+}
+
+.hint {
+  position: absolute;
+  left: 50%;
+  top: 10px;
+  z-index: 20;
+  transform: translateX(-50%);
+  white-space: nowrap;
+  border: 1px solid rgb(255 255 255 / 80%);
+  border-radius: 999px;
+  padding: 6px 11px;
+  color: #526c4b;
+  background: rgb(255 253 248 / 86%);
+  font-size: 10px;
+  font-weight: 800;
+  box-shadow: 0 4px 12px rgb(65 78 58 / 12%);
+  pointer-events: none;
+}
+
+.zoomControls {
+  position: absolute;
+  right: 10px;
+  bottom: 12px;
+  z-index: 25;
+  display: flex;
+  gap: 6px;
+}
+
+.zoomButton {
+  display: grid;
+  width: 38px;
+  height: 38px;
+  place-items: center;
+  border: 1px solid rgb(255 255 255 / 82%);
+  border-radius: 999px;
+  color: var(--color-ink-soft);
+  background: rgb(255 253 248 / 88%);
+  font-size: 19px;
+  font-weight: 900;
+  box-shadow: 0 5px 12px rgb(63 58 51 / 12%);
+  touch-action: manipulation;
+}
+
+@media (max-height: 700px) {
+  .viewport {
+    height: 390px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .world {
+    will-change: auto;
+  }
+}

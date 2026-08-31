@@ -191,6 +191,44 @@ export type UserGachaItemRow = {
   updated_at: string;
 };
 
+export type TownCatalogItemRow = {
+  id: string;
+  name: string;
+  category: "building" | "facility" | "decor" | "road" | "nature";
+  grid_width: number;
+  grid_height: number;
+  unlock_level: number;
+  cost: Json;
+  exp_reward: number;
+  sort_order: number;
+  active: boolean;
+  created_at: string;
+  updated_at: string;
+};
+
+export type UserTownRow = {
+  user_id: string;
+  town_name: string;
+  town_level: number;
+  town_exp: number;
+  unlocked_areas: string[];
+  materials: Json;
+  created_at: string;
+  updated_at: string;
+};
+
+export type UserTownItemRow = {
+  instance_id: string;
+  user_id: string;
+  item_id: string;
+  grid_x: number;
+  grid_y: number;
+  rotation: 0 | 90 | 180 | 270;
+  is_placed: boolean;
+  created_at: string;
+  updated_at: string;
+};
+
 export type FriendCodeRow = {
   user_id: string;
   code: string;
@@ -613,6 +651,35 @@ export type Database = {
         Update: Partial<UserGachaItemRow>;
         Relationships: [];
       };
+      town_catalog_items: {
+        Row: TownCatalogItemRow;
+        Insert: Partial<TownCatalogItemRow> & {
+          id: string;
+          name: string;
+          category: TownCatalogItemRow["category"];
+          grid_width: number;
+          grid_height: number;
+        };
+        Update: Partial<TownCatalogItemRow>;
+        Relationships: [];
+      };
+      user_towns: {
+        Row: UserTownRow;
+        Insert: Partial<UserTownRow> & { user_id: string };
+        Update: Partial<UserTownRow>;
+        Relationships: [];
+      };
+      user_town_items: {
+        Row: UserTownItemRow;
+        Insert: Partial<UserTownItemRow> & {
+          user_id: string;
+          item_id: string;
+          grid_x: number;
+          grid_y: number;
+        };
+        Update: Partial<UserTownItemRow>;
+        Relationships: [];
+      };
       friend_codes: {
         Row: FriendCodeRow;
         Insert: Partial<FriendCodeRow> & { user_id: string; code: string };
@@ -659,6 +726,21 @@ export type Database = {
     };
     Views: Record<string, never>;
     Functions: {
+      get_or_create_town: { Args: Record<string, never>; Returns: Json };
+      build_town_item: {
+        Args: { p_item_id: string; p_grid_x: number; p_grid_y: number; p_rotation?: number };
+        Returns: Json;
+      };
+      move_town_item: {
+        Args: {
+          p_instance_id: string;
+          p_grid_x: number;
+          p_grid_y: number;
+          p_rotation: number;
+          p_is_placed?: boolean;
+        };
+        Returns: Json;
+      };
       area_stats: { Args: { p_trip_ids?: string[] }; Returns: AreaStatsRow[] };
       claim_login_bonus: { Args: Record<string, never>; Returns: Json };
       commit_gacha_draw: {

@@ -198,6 +198,15 @@ export default async function HomePage({
                     style={{ background: "transparent" }}
                   />
                 </Link>
+
+                <Link
+                  href="/town"
+                  aria-label="わんこタウンを開く"
+                  className="mt-[-8px] flex min-h-[36px] w-full items-center justify-center gap-1.5 rounded-full border border-leaf/25 bg-card/90 px-3 text-[11px] font-black text-leaf-deep shadow-[0_4px_12px_rgba(93,128,73,0.15)] active:scale-[0.97]"
+                >
+                  <span aria-hidden="true" className="text-base">🏡</span>
+                  わんこタウン
+                </Link>
               </div>
             </div>
           </section>
