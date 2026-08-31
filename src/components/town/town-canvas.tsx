@@ -26,6 +26,7 @@ import type {
   TownPlacementCandidate,
 } from "@/lib/town/types";
 import { BuildingArtwork } from "./building-artwork";
+import { TownScenery } from "./town-scenery";
 import styles from "./town-canvas.module.css";
 
 type ViewState = { x: number; y: number; scale: number };
@@ -64,20 +65,14 @@ function clampView(view: ViewState, width: number, height: number): ViewState {
 const SCENERY_DECOR = [
   { x: 2.1, y: 2.2, kind: "tree" },
   { x: 10.8, y: 2.3, kind: "tree" },
-  { x: 12.2, y: 5.3, kind: "bush" },
+  { x: 12.2, y: 5.3, kind: "shrub" },
   { x: 12.1, y: 8.7, kind: "tree" },
   { x: 10.8, y: 11.8, kind: "flowers" },
-  { x: 7.9, y: 12.5, kind: "bush" },
+  { x: 7.9, y: 12.5, kind: "shrub" },
   { x: 4.5, y: 12.2, kind: "tree" },
   { x: 1.8, y: 9.4, kind: "flowers" },
-  { x: 1.8, y: 6.2, kind: "bush" },
+  { x: 1.8, y: 6.2, kind: "shrub" },
 ] as const;
-
-const SCENERY_CLASS = {
-  tree: styles.sceneryTree,
-  bush: styles.sceneryBush,
-  flowers: styles.sceneryFlowers,
-} as const;
 
 export const TownCanvas = memo(function TownCanvas({
   catalog,
@@ -369,9 +364,11 @@ export const TownCanvas = memo(function TownCanvas({
             <span
               key={index}
               aria-hidden="true"
-              className={styles.scenery + " " + SCENERY_CLASS[decor.kind]}
+              className={styles.scenery}
               style={{ left: point.x, top: point.y, zIndex: Math.round((decor.x + decor.y) * 10) }}
-            />
+            >
+              <TownScenery kind={decor.kind} />
+            </span>
           );
         })}
 
