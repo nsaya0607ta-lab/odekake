@@ -29,13 +29,19 @@ export function TownScreen({
   catalog,
   initialCoinBalance,
   dogSkin,
+  persistenceMode,
 }: {
   initialSnapshot: TownSnapshot;
   catalog: TownCatalogItem[];
   initialCoinBalance: number;
   dogSkin: DogSkinId;
+  persistenceMode: "supabase" | "local";
 }) {
-  const { snapshot, pending, error, clearError, buildItem, moveItem } = useTown(initialSnapshot);
+  const { snapshot, pending, error, clearError, buildItem, moveItem } = useTown(
+    initialSnapshot,
+    catalog,
+    persistenceMode,
+  );
   const [menuOpen, setMenuOpen] = useState(false);
   const [editMode, setEditMode] = useState(false);
   const [selectedId, setSelectedId] = useState<string | null>(null);
@@ -215,6 +221,12 @@ export function TownScreen({
           </div>
         </div>
       </section>
+
+      {persistenceMode === "local" ? (
+        <p className="mx-3 mb-2 rounded-2xl border border-sun/40 bg-sun-soft px-3 py-2 text-[11px] font-bold leading-relaxed text-[#7c622f]">
+          現在は端末への一時保存モードです。この画面で建築・移動・収納を試せます。
+        </p>
+      ) : null}
 
       <TownCanvas
         catalog={catalog}
