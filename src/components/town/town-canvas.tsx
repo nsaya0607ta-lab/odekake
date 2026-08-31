@@ -153,6 +153,16 @@ export const TownCanvas = memo(function TownCanvas({
 
   function beginViewGesture(event: ReactPointerEvent<HTMLDivElement>) {
     if (dragPointerRef.current !== null) return;
+
+    if (candidate) {
+      if ((event.target as HTMLElement).closest('[data-town-control="true"]')) return;
+      event.preventDefault();
+      event.stopPropagation();
+      moveCandidateToPoint(localPoint(event));
+      gestureRef.current = { kind: "none" };
+      return;
+    }
+
     event.preventDefault();
     event.currentTarget.setPointerCapture(event.pointerId);
     const point = localPoint(event);
@@ -256,12 +266,10 @@ export const TownCanvas = memo(function TownCanvas({
     });
   }
 
-  function updateCandidateFromPointer(event: ReactPointerEvent<HTMLButtonElement>) {
-    if (!candidate || dragPointerRef.current !== event.pointerId) return;
-    const node = viewportRef.current;
+  function moveCandidateToPoint(point: LocalPoint) {
+    if (!candidate) return;
     const item = catalogById.get(candidate.itemId);
-    if (!node || !item) return;
-    const point = localPoint(event);
+    if (!item) return;
     const position = screenPointToGrid({
       worldX: (point.x - view.x) / view.scale,
       worldY: (point.y - view.y) / view.scale,
@@ -270,6 +278,13 @@ export const TownCanvas = memo(function TownCanvas({
     });
     if (position.gridX === candidate.gridX && position.gridY === candidate.gridY) return;
     queueCandidate({ ...candidate, ...position });
+  }
+
+  function updateCandidateFromPointer(event: ReactPointerEvent<HTMLButtonElement>) {
+    if (!candidate || dragPointerRef.current !== event.pointerId) return;
+    event.preventDefault();
+    event.stopPropagation();
+    moveCandidateToPoint(localPoint(event));
   }
 
   function startCandidateDrag(event: ReactPointerEvent<HTMLButtonElement>) {
@@ -325,7 +340,7 @@ export const TownCanvas = memo(function TownCanvas({
   return (
     <div
       ref={viewportRef}
-      className={styles.viewport}
+      className={styles.viewport + (candidate ? " " + styles.viewportPlacement : "")}
       onPointerDown={beginViewGesture}
       onPointerMove={moveViewGesture}
       onPointerUp={endViewGesture}
@@ -432,12 +447,12 @@ export const TownCanvas = memo(function TownCanvas({
       </div>
 
       <p className={styles.hint}>
-        {candidate ? "建物をドラッグして場所を決めます" : editMode ? "建物をタップして編集できます" : "指でドラッグ・ピンチできます"}
+        {candidate ? "置きたい場所をタップ、または建物をドラッグ" : editMode ? "建物をタップして編集できます" : "指でドラッグ・ピンチできます"}
       </p>
 
       <div className={styles.zoomControls} aria-label="ズーム操作">
-        <button type="button" className={styles.zoomButton} onClick={() => zoomBy(-0.12)} aria-label="縮小">−</button>
-        <button type="button" className={styles.zoomButton} onClick={() => zoomBy(0.12)} aria-label="拡大">＋</button>
+        <button type="button" data-town-control="true" className={styles.zoomButton} onClick={() => zoomBy(-0.12)} aria-label="縮小">−</button>
+        <button type="button" data-town-control="true" className={styles.zoomButton} onClick={() => zoomBy(0.12)} aria-label="拡大">＋</button>
       </div>
     </div>
   );
