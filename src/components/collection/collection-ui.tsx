@@ -7,7 +7,7 @@
 import { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
 import type { GachaRarity } from "@/lib/gacha/config";
-import type { CollectionItem } from "@/lib/collection/items";
+import { hasMinigameSkillLevel, type CollectionItem } from "@/lib/collection/items";
 import { formatSkillLevel, getNextLevelRemaining } from "@/lib/gacha/skill-levels";
 import { ExactSilhouette, hasExactSilhouette } from "./exact-silhouette";
 import { ItemArt } from "./item-art";
@@ -162,8 +162,8 @@ export function ItemCard({
 
 function ItemPreviewModal({ item, count, onClose }: { item: CollectionItem; count: number; onClose: () => void }) {
   const drawCount = Math.max(1, count);
-  const skillLevelLabel = formatSkillLevel(item.rarity, drawCount);
-  const nextLevelRemaining = getNextLevelRemaining(item.rarity, drawCount);
+  const skillLevelLabel = hasMinigameSkillLevel(item) ? formatSkillLevel(item.rarity, drawCount) : null;
+  const nextLevelRemaining = hasMinigameSkillLevel(item) ? getNextLevelRemaining(item.rarity, drawCount) : null;
 
   useEffect(() => {
     const previousBodyOverflow = document.body.style.overflow;
