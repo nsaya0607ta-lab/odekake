@@ -28,7 +28,19 @@ const nextConfig: NextConfig = {
     dangerouslyAllowSVG: true,
   },
   async headers() {
-    return [{ source: "/:path*", headers: securityHeaders }];
+    return [
+      { source: "/:path*", headers: securityHeaders },
+      // 運営お知らせのHTML添付は、自ページ内のsandbox付きiframeに埋め込んで表示する。
+      // /api/photo だけは「他サイトからの埋め込みは禁止・自分自身からの埋め込みだけ許可」に緩める
+      // （後に定義した方が同じキーを上書きするため、対象パスにはこちらが適用される）
+      {
+        source: "/api/photo/:path*",
+        headers: [
+          { key: "X-Frame-Options", value: "SAMEORIGIN" },
+          { key: "Content-Security-Policy", value: "frame-ancestors 'self'" },
+        ],
+      },
+    ];
   },
 };
 
