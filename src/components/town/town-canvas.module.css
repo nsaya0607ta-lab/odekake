@@ -26,39 +26,120 @@
   contain: layout style;
 }
 
+.groundEdge,
 .ground,
+.landscape,
 .lockedArea,
 .placementMask {
   position: absolute;
   inset: 0;
 }
 
+.groundEdge {
+  transform: translateY(13px);
+  background: linear-gradient(155deg, #739758, #4f7244 64%, #3f6038);
+  filter: drop-shadow(0 19px 15px rgb(48 67 42 / 28%));
+}
+
 .ground {
   background:
-    repeating-linear-gradient(26.565deg, transparent 0 31px, rgb(75 111 65 / 8%) 32px 33px),
-    repeating-linear-gradient(-26.565deg, transparent 0 31px, rgb(75 111 65 / 8%) 32px 33px),
-    linear-gradient(145deg, #b9d997, #9fcb82);
-  filter: drop-shadow(0 17px 12px rgb(66 82 55 / 22%));
+    radial-gradient(ellipse at 28% 34%, rgb(229 244 192 / 46%) 0 5%, transparent 18%),
+    radial-gradient(ellipse at 71% 62%, rgb(92 143 71 / 24%) 0 7%, transparent 22%),
+    radial-gradient(ellipse at 52% 48%, transparent 0 36%, rgb(63 104 54 / 11%) 78%),
+    linear-gradient(145deg, #c4e49b 0%, #a8d283 48%, #92c474 100%);
+  filter: drop-shadow(0 3px 0 rgb(224 241 189 / 80%));
 }
 
 .ground::after {
   content: "";
   position: absolute;
   inset: 0;
+  opacity: 0.68;
   background:
-    radial-gradient(circle at 30% 40%, rgb(255 255 255 / 24%) 0 1px, transparent 2px),
-    radial-gradient(circle at 72% 66%, rgb(67 112 58 / 13%) 0 1px, transparent 2px);
-  background-size: 31px 27px, 37px 33px;
+    radial-gradient(circle at 20% 30%, rgb(255 255 255 / 34%) 0 1px, transparent 2px),
+    radial-gradient(circle at 78% 68%, rgb(50 102 48 / 20%) 0 1.4px, transparent 2.5px),
+    radial-gradient(ellipse at 48% 52%, rgb(255 238 165 / 22%) 0 1px, transparent 3px);
+  background-size: 29px 25px, 37px 33px, 43px 39px;
+  mix-blend-mode: soft-light;
+}
+
+.landscape {
+  pointer-events: none;
+}
+
+.pathMain,
+.pathLeft,
+.pathRight {
+  position: absolute;
+  border: 2px solid rgb(121 98 64 / 18%);
+  border-radius: 999px;
+  background:
+    radial-gradient(ellipse at 20% 48%, rgb(255 255 255 / 36%) 0 5px, transparent 6px),
+    radial-gradient(ellipse at 68% 38%, rgb(139 113 73 / 16%) 0 5px, transparent 6px),
+    linear-gradient(145deg, #ead5a4, #d9bd87);
+  background-size: 31px 23px, 37px 27px, auto;
+  box-shadow:
+    inset 0 2px 4px rgb(255 255 255 / 38%),
+    0 3px 5px rgb(73 99 57 / 16%);
+}
+
+.pathMain {
+  left: 471px;
+  top: 248px;
+  width: 58px;
+  height: 205px;
+}
+
+.pathLeft {
+  left: 326px;
+  top: 257px;
+  width: 186px;
+  height: 46px;
+  transform: rotate(-26.5deg);
+  transform-origin: right center;
+}
+
+.pathRight {
+  left: 489px;
+  top: 257px;
+  width: 186px;
+  height: 46px;
+  transform: rotate(26.5deg);
+  transform-origin: left center;
+}
+
+.grassPatchOne,
+.grassPatchTwo {
+  position: absolute;
+  width: 126px;
+  height: 58px;
+  border-radius: 50%;
+  opacity: 0.34;
+  background: radial-gradient(ellipse, #6ead62 0 35%, transparent 72%);
+  filter: blur(2px);
+}
+
+.grassPatchOne {
+  left: 282px;
+  top: 294px;
+  transform: rotate(-13deg);
+}
+
+.grassPatchTwo {
+  left: 592px;
+  top: 318px;
+  transform: rotate(17deg);
 }
 
 .lockedArea {
   background:
-    radial-gradient(circle at 28% 34%, #6a9659 0 7px, transparent 8px),
-    radial-gradient(circle at 68% 62%, #79a362 0 9px, transparent 10px),
-    rgb(72 103 61 / 34%);
-  background-size: 68px 55px, 82px 71px, auto;
-  border: 1px dashed rgb(69 91 57 / 35%);
-  backdrop-filter: blur(1px);
+    radial-gradient(circle at 24% 30%, rgb(69 115 59 / 48%) 0 8px, transparent 9px),
+    radial-gradient(circle at 72% 66%, rgb(91 139 73 / 44%) 0 11px, transparent 12px),
+    radial-gradient(circle at 50% 48%, rgb(48 83 44 / 13%) 0 2px, transparent 3px),
+    rgb(58 91 51 / 29%);
+  background-size: 68px 55px, 84px 72px, 31px 27px, auto;
+  border: 1px dashed rgb(62 91 51 / 28%);
+  backdrop-filter: saturate(0.88);
 }
 
 .entity {
@@ -123,12 +204,73 @@
   pointer-events: none;
 }
 
-.tree {
+.scenery {
   position: absolute;
-  transform: translate(-50%, -100%);
-  font-size: 33px;
-  filter: drop-shadow(0 4px 3px rgb(53 70 45 / 22%));
+  display: block;
+  transform: translate(-50%, -88%);
+  transform-origin: 50% 100%;
   pointer-events: none;
+  filter: drop-shadow(0 7px 5px rgb(48 70 42 / 24%));
+}
+
+.sceneryTree {
+  width: 74px;
+  height: 92px;
+}
+
+.sceneryTree::before {
+  content: "";
+  position: absolute;
+  left: 5px;
+  top: 0;
+  width: 64px;
+  height: 68px;
+  border: 2px solid rgb(62 102 54 / 30%);
+  border-radius: 48% 52% 45% 55%;
+  background:
+    radial-gradient(circle at 30% 28%, #d2e989 0 17%, transparent 18%),
+    radial-gradient(circle at 68% 31%, #9fce70 0 26%, transparent 27%),
+    radial-gradient(circle at 42% 69%, #76b45f 0 34%, transparent 35%),
+    radial-gradient(circle at 61% 72%, #5f9b52 0 31%, transparent 32%),
+    #86bd63;
+  box-shadow: inset -10px -12px 14px rgb(48 103 47 / 20%);
+}
+
+.sceneryTree::after {
+  content: "";
+  position: absolute;
+  left: 31px;
+  bottom: 2px;
+  width: 14px;
+  height: 40px;
+  border: 2px solid #78563b;
+  border-radius: 8px 8px 5px 5px;
+  background: linear-gradient(90deg, #a8784c, #765036);
+}
+
+.sceneryBush {
+  width: 62px;
+  height: 42px;
+  border: 2px solid rgb(62 107 54 / 24%);
+  border-radius: 48% 55% 42% 58%;
+  background:
+    radial-gradient(circle at 26% 38%, #c9e783 0 20%, transparent 21%),
+    radial-gradient(circle at 58% 27%, #9bce6a 0 29%, transparent 30%),
+    radial-gradient(circle at 72% 68%, #67a654 0 33%, transparent 34%),
+    #7db75d;
+  box-shadow: inset -8px -7px 8px rgb(49 91 44 / 18%);
+}
+
+.sceneryFlowers {
+  width: 62px;
+  height: 34px;
+  border-radius: 50%;
+  background:
+    radial-gradient(circle at 18% 42%, #fff9dc 0 3px, #efb857 3.5px 5px, transparent 5.5px),
+    radial-gradient(circle at 39% 23%, #f8b5c1 0 3px, #f7df67 3.5px 5px, transparent 5.5px),
+    radial-gradient(circle at 59% 51%, #fff 0 3px, #efbd54 3.5px 5px, transparent 5.5px),
+    radial-gradient(circle at 80% 28%, #b9d7f0 0 3px, #f5d45e 3.5px 5px, transparent 5.5px),
+    radial-gradient(ellipse at center bottom, #69a852 0 56%, transparent 58%);
 }
 
 .hint {
