@@ -41,8 +41,16 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
   if (!response?.body) return new NextResponse(null, { status: 404 });
 
   const headers = new Headers();
-  const contentType = response.headers.get("content-type");
-  if (contentType) headers.set("content-type", contentType);
+  // notice_files バケットは allowed_mime_types が text/html のみなので、
+  // 保存されている実体は必ずHTMLだと分かる。アップロード時のクライアント側の型判定や
+  // Storage側の配信時のContent-Type付与に左右されず、ここで確実にtext/htmlとして
+  // 配信する（ブラウザがソースコードのままテキスト表示してしまう問題を避けるため）。
+  if (bucket === NOTICE_HTML_BUCKET) {
+    headers.set("content-type", "text/html; charset=utf-8");
+  } else {
+    const contentType = response.headers.get("content-type");
+    if (contentType) headers.set("content-type", contentType);
+  }
   headers.set("cache-control", PROXY_CACHE_CONTROL);
 
   return new NextResponse(response.body, { headers });
