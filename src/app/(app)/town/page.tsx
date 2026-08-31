@@ -5,16 +5,33 @@ import { TownScreen } from "@/components/town/town-screen";
 import { getCoinSummary } from "@/lib/data/coins";
 import { getCurrentDogSkin } from "@/lib/data/dog-skin";
 import { requireUser } from "@/lib/supabase/server";
-import { getTownCatalog, getTownSnapshot } from "@/lib/town/data";
+import {
+  FALLBACK_TOWN_CATALOG,
+  FALLBACK_TOWN_SNAPSHOT,
+  getTownCatalog,
+  getTownSnapshot,
+} from "@/lib/town/data";
 
 export const metadata = { title: "わんこタウン | おでかけ記録" };
 export const dynamic = "force-dynamic";
 
 export default async function TownPage() {
   const { supabase, user } = await requireUser();
-  const [snapshot, catalog, coins, dogSkin] = await Promise.all([
-    getTownSnapshot(supabase),
-    getTownCatalog(supabase),
+  const [townData, coins, dogSkin] = await Promise.all([
+    Promise.all([getTownSnapshot(supabase), getTownCatalog(supabase)])
+      .then(([snapshot, catalog]) => ({
+        snapshot,
+        catalog,
+        persistenceMode: "supabase" as const,
+      }))
+      .catch((error: unknown) => {
+        console.error("Town database is not ready; using local fallback", { error });
+        return {
+          snapshot: FALLBACK_TOWN_SNAPSHOT,
+          catalog: FALLBACK_TOWN_CATALOG,
+          persistenceMode: "local" as const,
+        };
+      }),
     getCoinSummary(supabase, user.id),
     getCurrentDogSkin(supabase, user.id),
   ]);
@@ -29,10 +46,11 @@ export default async function TownPage() {
       />
       <PageBody className="!max-w-lg !space-y-0 !px-0 !py-0">
         <TownScreen
-          initialSnapshot={snapshot}
-          catalog={catalog}
+          initialSnapshot={townData.snapshot}
+          catalog={townData.catalog}
           initialCoinBalance={coins.balance}
           dogSkin={dogSkin}
+          persistenceMode={townData.persistenceMode}
         />
       </PageBody>
     </>
