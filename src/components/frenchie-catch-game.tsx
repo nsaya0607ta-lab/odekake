@@ -1431,7 +1431,7 @@ export function FrenchieCatchGame({ ownedItems }: { ownedItems: FrenchieCatchIte
               }
               case "toy_frisbee":
                 nextMultiplierRef.current = LV.FRISBEE_MULT[lv]!;
-                nextMultiplierCountRef.current = 1;
+                nextMultiplierCountRef.current += 1;
                 effectLabel = `次の1個 ×${LV.FRISBEE_MULT[lv]}${lvTag}`;
                 statusChanged = true;
                 break;
@@ -1503,7 +1503,7 @@ export function FrenchieCatchGame({ ownedItems }: { ownedItems: FrenchieCatchIte
                 break;
               case "toy_golden_crown_ball":
                 nextMultiplierRef.current = LV.GOLDEN_MULT[lv]!;
-                nextMultiplierCountRef.current = LV.GOLDEN_COUNT[lv]!;
+                nextMultiplierCountRef.current += LV.GOLDEN_COUNT[lv]!;
                 effectLabel = `次の${LV.GOLDEN_COUNT[lv]}個 ×${LV.GOLDEN_MULT[lv]}${lvTag}`;
                 statusChanged = true;
                 break;
@@ -1590,7 +1590,7 @@ export function FrenchieCatchGame({ ownedItems }: { ownedItems: FrenchieCatchIte
                 break;
               case "food_strawberry_roll_cake":
                 nextMultiplierRef.current = LV.STRAWBERRY_MULT[lv]!;
-                nextMultiplierCountRef.current = LV.STRAWBERRY_COUNT[lv]!;
+                nextMultiplierCountRef.current += LV.STRAWBERRY_COUNT[lv]!;
                 effectLabel = `次の${LV.STRAWBERRY_COUNT[lv]}個 ×${LV.STRAWBERRY_MULT[lv]}${lvTag}`;
                 statusChanged = true;
                 break;
@@ -1756,7 +1756,7 @@ export function FrenchieCatchGame({ ownedItems }: { ownedItems: FrenchieCatchIte
                 break;
               case "other_komochi": {
                 nextMultiplierRef.current = LV.KOMOCHI_MULT[lv]!;
-                nextMultiplierCountRef.current = LV.KOMOCHI_COUNT[lv]!;
+                nextMultiplierCountRef.current += LV.KOMOCHI_COUNT[lv]!;
                 const guard = grantRandomHazardGuard();
                 effectLabel = `次の${LV.KOMOCHI_COUNT[lv]}個 ×${LV.KOMOCHI_MULT[lv]} / ${guard ? HAZARD_GUARD_LABELS[guard] : "防止アイテムは満タン"}${lvTag}`;
                 statusChanged = true;
@@ -1868,7 +1868,7 @@ export function FrenchieCatchGame({ ownedItems }: { ownedItems: FrenchieCatchIte
               }
               case "other_oyatsu_no_jikan": {
                 const rewardPt = LV.OYATSU_PT[lv]!;
-                rewardTimeCountRef.current = 1;
+                rewardTimeCountRef.current += 1;
                 rewardTimeValueRef.current = rewardPt;
                 effectLabel = `次の1個 ${rewardPt}pt確定${lvTag}`;
                 statusChanged = true;
