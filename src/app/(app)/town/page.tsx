@@ -3,7 +3,6 @@ import { PageBody } from "@/components/page-body";
 import { TopHeader } from "@/components/page-header";
 import { TownScreen } from "@/components/town/town-screen";
 import { getCoinSummary } from "@/lib/data/coins";
-import { getCurrentDogSkin } from "@/lib/data/dog-skin";
 import { requireUser } from "@/lib/supabase/server";
 import {
   FALLBACK_TOWN_CATALOG,
@@ -17,7 +16,7 @@ export const dynamic = "force-dynamic";
 
 export default async function TownPage() {
   const { supabase, user } = await requireUser();
-  const [townData, coins, dogSkin] = await Promise.all([
+  const [townData, coins] = await Promise.all([
     Promise.all([getTownSnapshot(supabase), getTownCatalog(supabase)])
       .then(([snapshot, catalog]) => ({
         snapshot,
@@ -33,7 +32,6 @@ export default async function TownPage() {
         };
       }),
     getCoinSummary(supabase, user.id),
-    getCurrentDogSkin(supabase, user.id),
   ]);
 
   return (
@@ -49,7 +47,6 @@ export default async function TownPage() {
           initialSnapshot={townData.snapshot}
           catalog={townData.catalog}
           initialCoinBalance={coins.balance}
-          dogSkin={dogSkin}
           persistenceMode={townData.persistenceMode}
         />
       </PageBody>
