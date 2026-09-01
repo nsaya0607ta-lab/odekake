@@ -33,6 +33,9 @@ type LocalPoint = { x: number; y: number };
 
 const MIN_ZOOM = 0.48;
 const MAX_ZOOM = 1.2;
+const INITIAL_MIN_ZOOM = 0.58;
+const INITIAL_MAX_ZOOM = 0.8;
+const CANDIDATE_UPDATE_INTERVAL = 32;
 
 function clamp(value: number, minimum: number, maximum: number): number {
   return Math.min(maximum, Math.max(minimum, value));
@@ -101,12 +104,13 @@ export const TownCanvas = memo(function TownCanvas({
   const initializedRef = useRef(false);
   const frameRef = useRef<number | null>(null);
   const queuedCandidateRef = useRef<TownPlacementCandidate | null>(null);
+  const lastCandidateUpdateRef = useRef(0);
   const gestureRef = useRef<
     | { kind: "none" }
     | { kind: "pan"; pointerId: number; start: LocalPoint; view: ViewState }
     | { kind: "pinch"; distance: number; anchorWorld: LocalPoint }
   >({ kind: "none" });
-  const [view, setView] = useState<ViewState>({ x: -20, y: 8, scale: 0.58 });
+  const [view, setView] = useState<ViewState>({ x: -80, y: 8, scale: INITIAL_MIN_ZOOM });
   const viewRef = useRef(view);
 
   const catalogById = useMemo(
@@ -120,7 +124,11 @@ export const TownCanvas = memo(function TownCanvas({
     const updateInitialView = () => {
       if (initializedRef.current) return;
       const width = node.clientWidth;
-      const scale = clamp((width - 18) / TOWN_WORLD_WIDTH, MIN_ZOOM, 0.7);
+      const scale = clamp(
+        ((width - 18) / TOWN_WORLD_WIDTH) * 1.2,
+        INITIAL_MIN_ZOOM,
+        INITIAL_MAX_ZOOM,
+      );
       const next = clampView(
         { x: (width - TOWN_WORLD_WIDTH * scale) / 2, y: 12, scale },
         width,
@@ -274,10 +282,21 @@ export const TownCanvas = memo(function TownCanvas({
   function queueCandidate(next: TownPlacementCandidate) {
     queuedCandidateRef.current = next;
     if (frameRef.current !== null) return;
-    frameRef.current = requestAnimationFrame(() => {
+
+    const flushCandidate = (timestamp: number) => {
+      if (timestamp - lastCandidateUpdateRef.current < CANDIDATE_UPDATE_INTERVAL) {
+        frameRef.current = requestAnimationFrame(flushCandidate);
+        return;
+      }
+
       frameRef.current = null;
-      if (queuedCandidateRef.current) onCandidateChange(queuedCandidateRef.current);
-    });
+      lastCandidateUpdateRef.current = timestamp;
+      const queued = queuedCandidateRef.current;
+      queuedCandidateRef.current = null;
+      if (queued) onCandidateChange(queued);
+    };
+
+    frameRef.current = requestAnimationFrame(flushCandidate);
   }
 
   function moveCandidateToPoint(point: LocalPoint) {
