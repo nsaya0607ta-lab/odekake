@@ -13,11 +13,11 @@ const ART: Record<
     intrinsicHeight: number;
   }
 > = {
-  "town-hall": { src: "/town/town-hall.webp", width: 224, compactWidth: 138, intrinsicWidth: 640, intrinsicHeight: 585 },
-  "dog-cafe": { src: "/town/dog-cafe.webp", width: 184, compactWidth: 126, intrinsicWidth: 640, intrinsicHeight: 585 },
-  bakery: { src: "/town/bakery.webp", width: 180, compactWidth: 124, intrinsicWidth: 640, intrinsicHeight: 592 },
-  "dog-run": { src: "/town/dog-run.webp", width: 218, compactWidth: 142, intrinsicWidth: 720, intrinsicHeight: 480 },
-  "hot-spring": { src: "/town/hot-spring.webp", width: 216, compactWidth: 138, intrinsicWidth: 640, intrinsicHeight: 585 },
+  "town-hall": { src: "/town/town-hall.webp", width: 224, compactWidth: 138, intrinsicWidth: 512, intrinsicHeight: 468 },
+  "dog-cafe": { src: "/town/dog-cafe.webp", width: 184, compactWidth: 126, intrinsicWidth: 512, intrinsicHeight: 468 },
+  bakery: { src: "/town/bakery.webp", width: 180, compactWidth: 124, intrinsicWidth: 512, intrinsicHeight: 474 },
+  "dog-run": { src: "/town/dog-run.webp", width: 218, compactWidth: 142, intrinsicWidth: 576, intrinsicHeight: 384 },
+  "hot-spring": { src: "/town/hot-spring.webp", width: 216, compactWidth: 138, intrinsicWidth: 512, intrinsicHeight: 468 },
 };
 
 export const BuildingArtwork = memo(function BuildingArtwork({
