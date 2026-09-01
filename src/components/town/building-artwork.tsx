@@ -47,7 +47,7 @@ export const BuildingArtwork = memo(function BuildingArtwork({
         height={art.intrinsicHeight}
         draggable={false}
         unoptimized
-        className="block h-auto max-w-none origin-bottom object-contain drop-shadow-[0_7px_5px_rgba(55,51,43,0.22)]"
+        className="block h-auto max-w-none origin-bottom object-contain"
         style={{
           width: compact ? art.compactWidth : art.width,
           transform: mirrored ? "scaleX(-1)" : undefined,
