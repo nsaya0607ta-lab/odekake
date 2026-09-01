@@ -21,11 +21,11 @@ export type TownArea = {
 };
 
 export const TOWN_AREAS: readonly TownArea[] = [
-  { id: "core", x: 3, y: 3, width: 8, height: 8 },
-  { id: "north", x: 3, y: 0, width: 8, height: 3 },
-  { id: "east", x: 11, y: 3, width: 3, height: 8 },
-  { id: "south", x: 3, y: 11, width: 8, height: 3 },
-  { id: "west", x: 0, y: 3, width: 3, height: 8 },
+  { id: "core", x: 2, y: 2, width: 10, height: 10 },
+  { id: "north", x: 2, y: 0, width: 10, height: 2 },
+  { id: "east", x: 12, y: 2, width: 2, height: 10 },
+  { id: "south", x: 2, y: 12, width: 10, height: 2 },
+  { id: "west", x: 0, y: 2, width: 2, height: 10 },
 ] as const;
 
 export type Point = { x: number; y: number };
