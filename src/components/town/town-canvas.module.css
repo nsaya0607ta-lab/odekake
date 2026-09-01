@@ -1,6 +1,6 @@
 .viewport {
   position: relative;
-  height: clamp(390px, 57dvh, 570px);
+  height: clamp(520px, calc(100dvh - var(--nav-height) - var(--safe-bottom)), 760px);
   overflow: hidden;
   touch-action: none;
   overscroll-behavior: contain;
@@ -220,7 +220,7 @@
 .hint {
   position: absolute;
   left: 50%;
-  top: 10px;
+  top: 148px;
   z-index: 20;
   transform: translateX(-50%);
   white-space: nowrap;
@@ -257,12 +257,6 @@
   font-weight: 900;
   box-shadow: 0 5px 12px rgb(63 58 51 / 12%);
   touch-action: manipulation;
-}
-
-@media (max-height: 700px) {
-  .viewport {
-    height: 390px;
-  }
 }
 
 @media (prefers-reduced-motion: reduce) {
