@@ -126,6 +126,10 @@ const OTHER_CATEGORY_IDS = new Set(pool.filter((x) => x.category === "other").ma
 const FOOD_CATEGORY_IDS = new Set(pool.filter((x) => x.category === "food").map((x) => x.id));
 const PERSON_IDS = ["other_omochi_janai", "other_listen_to_the_a", "other_omoi_bashira", "other_xmas_party"];
 const TIME_BONUS_IDS = new Set(["toy_duck_plush", "toy_carrot", "food_paw_melon_bread", "interior_anball", "other_azuki", "other_omojii", "summer_frenchie"]);
+// UR出現率アップ・その他抑制・SSR/UR/LR限定出現・出現量アップなど出現重みの計算式自体を書き換える
+// アイテム。ボーナス出現タイマー側で発動頻度が実質的に上がると時間増加系の取得ペースが間接的に
+// 揺らぐため、TIME_BONUS_IDSと合わせてボーナス側では除外する（frenchie-catch-game.tsxのSPAWN_DYNAMICS_ITEM_IDSと同一）
+const SPAWN_DYNAMICS_IDS = new Set(["toy_rainbow_ball", "interior_stretch_rod", "toy_treasure_puzzle", "other_burebur", "other_xmas_party", "other_pondeomo", "other_pondear", "other_jare_a", "interior_ragby_ar"]);
 
 function rollTreasureOutcome() {
   const total = TREASURE_OUTCOME_WEIGHTS.reduce((s, e) => s + e.weight, 0);
@@ -294,6 +298,11 @@ function simulateOneRound(lv, catchAll, timeBonusCatchRate = 1) {
   // ハングしないための安全弁。到達したら打ち切ってフラグを立てる（実プレイでは起き得ない前提）。
   const MAX_PLAY_SECONDS = 3600;
   let cappedOut = false;
+  // frenchie-catch-game.tsxのnextSpawnRef(通常)/extraSpawnRef(ボーナス、時間増加系除外)と
+  // 同じく、完全に独立した2本のタイマーとしてスケジュールする。「同一レートの1本を50%で
+  // 間引く」近似は、一様分布の間隔をベルヌーイ間引きすると分散が実際より大幅に大きくなり
+  // （待ち時間が幾何分布的に伸びるため）、暴走判定に偽陽性を生むことが判明したため採用しない。
+  let nextT = 0, nextExtraT = 0;
   while (t < endAt) {
     if (t > MAX_PLAY_SECONDS * 1000) { cappedOut = true; break; }
     while (urBoost > 0 && t >= urBoostDecayNextAt) { urBoost = Math.max(0, urBoost - UR_BOOST_DECAY_STEP); urBoostDecayNextAt += UR_BOOST_DECAY_INTERVAL_MS; }
@@ -302,17 +311,15 @@ function simulateOneRound(lv, catchAll, timeBonusCatchRate = 1) {
     if (multiplier2Until > 0 && t >= multiplier2Until) multiplier2Until = 0;
     if (multiplier15Until > 0 && t >= multiplier15Until) multiplier15Until = 0;
 
+    t = Math.min(nextT, nextExtraT);
+    if (t >= endAt) break;
+    const excludeTimeBonus = nextExtraT <= nextT;
+
     const spawnRateMult = dogFloodRemaining > 0 ? DOG_FLOOD_RATE
       : poopFloodRemaining > 0 ? POOP_FLOOD_RATE
       : (t < spawnRateBoostUntil ? spawnRateBoostValue : 1);
-    // 通常の出現タイマーと、時間増加系を一切対象にしないボーナス出現タイマーが同じ間隔で
-    // 並走する構成（frenchie-catch-game.tsxのnextSpawnRef/extraSpawnRef）を、同一レートの
-    // 独立した2系統がマージされた単一ストリーム（レート2倍、各イベントは50%の確率でどちらか）
-    // として近似する。
-    const dt = uniform(SPAWN_MIN_MS, SPAWN_MAX_MS) / spawnRateMult / 2;
-    const excludeTimeBonus = Math.random() < 0.5;
-    t += dt;
-    if (t >= endAt) break;
+    const dt = uniform(SPAWN_MIN_MS, SPAWN_MAX_MS) / spawnRateMult;
+    if (excludeTimeBonus) nextExtraT = t + dt; else nextT = t + dt;
 
     if (dogFloodRemaining > 0) { dogFloodRemaining -= 1; resolveCatch("dog", null, null, 0); continue; }
     if (personFloodRemaining > 0) {
@@ -376,7 +383,7 @@ function simulateOneRound(lv, catchAll, timeBonusCatchRate = 1) {
       if (item.rarity === "UR") w *= urBoostFactor;
       if (otherSuppressActive && item.id !== "interior_stretch_rod" && OTHER_CATEGORY_IDS.has(item.id)) w *= otherSuppressValue;
       if (highRarityLockActive && !allowedHighRarities.has(item.rarity)) w = 0;
-      if (excludeTimeBonus && TIME_BONUS_IDS.has(item.id)) w = 0;
+      if (excludeTimeBonus && (TIME_BONUS_IDS.has(item.id) || SPAWN_DYNAMICS_IDS.has(item.id))) w = 0;
       if (spawnRateBoostActive && TIME_BONUS_IDS.has(item.id)) w /= spawnRateBoostValue;
       weights[i] = w;
       itemWeightTotal += w;

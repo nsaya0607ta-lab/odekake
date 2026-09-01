@@ -284,6 +284,20 @@ const TIME_BONUS_ITEM_IDS = new Set([
   "toy_duck_plush", "toy_carrot", "food_paw_melon_bread",
   "interior_anball", "other_omojii", "other_azuki", "summer_frenchie",
 ]);
+/**
+ * UR出現率アップ・その他カテゴリ抑制・SSR/UR/LR限定出現・出現量アップを付与するアイテム。
+ * いずれも「出現重みの計算式そのもの」を一時的に書き換える効果を持ち、時間増加系7種の
+ * 一部はUR/otherカテゴリに属するため、これらの発動頻度が変わると時間増加系の取得ペースが
+ * 間接的に揺らいでしまう（宝箱のrare_lockが時間増加系のUR勢を集中優遇して伸びやすくなる、
+ * という既知の現象がTREASURE_OUTCOME_WEIGHTSのコメントにもある）。
+ * ボーナス出現タイマーがこれらを引いて発動頻度を実質的に底上げしてしまうと、時間増加系の
+ * 取得ペースがわずかに変わり得るため、ボーナス出現タイマーでは時間増加系7種と合わせて
+ * こちらも対象外にする。
+ */
+const SPAWN_DYNAMICS_ITEM_IDS = new Set([
+  "toy_rainbow_ball", "interior_stretch_rod", "toy_treasure_puzzle", "other_burebur",
+  "other_xmas_party", "other_pondeomo", "other_pondear", "other_jare_a", "interior_ragby_ar",
+]);
 const TREASURE_ITEM_ID = "toy_treasure_puzzle";
 const TREASURE_FALL_SPEED = 4;
 const POOP_FLOOD_FALL_SPEED = 6;
@@ -773,8 +787,9 @@ export function FrenchieCatchGame({ ownedItems }: { ownedItems: FrenchieCatchIte
 
   /**
    * excludeTimeBonus: ボーナス出現タイマー（アイテム量2倍化用）からの呼び出し専用。
-   * 時間増加系7種・そのスキンである夏のフレブル・？アイテム（時間増加系を引く可能性があるため）を
-   * 一切対象にせず、既存のスポーンタイマー側の時間増加系取得ペースを完全に不変に保つ。
+   * 時間増加系7種・そのスキンである夏のフレブル・？アイテム（時間増加系を引く可能性があるため）、
+   * および出現重みの計算式自体を書き換えるSPAWN_DYNAMICS_ITEM_IDSを一切対象にせず、
+   * 既存のスポーンタイマー側の時間増加系取得ペースを完全に不変に保つ。
    */
   const createEntity = useCallback((excludeTimeBonus = false): Entity => {
     const fallSpeedBoost = performance.now() < fallSpeedBoostUntilRef.current ? fallSpeedValueRef.current : 1;
@@ -944,7 +959,7 @@ export function FrenchieCatchGame({ ownedItems }: { ownedItems: FrenchieCatchIte
           ? otherSuppressValueRef.current
           : 1) *
         (highRarityLockActive && !allowedHighRarities.has(item.rarity) ? 0 : 1) *
-        (excludeTimeBonus && TIME_BONUS_ITEM_IDS.has(item.id) ? 0 : 1) *
+        (excludeTimeBonus && (TIME_BONUS_ITEM_IDS.has(item.id) || SPAWN_DYNAMICS_ITEM_IDS.has(item.id)) ? 0 : 1) *
         (spawnRateBoostActive && TIME_BONUS_ITEM_IDS.has(item.id) ? 1 / spawnRateBoostValueRef.current : 1),
     }));
     const itemWeightTotal = weightedItems.reduce((sum, entry) => sum + entry.weight, 0);
