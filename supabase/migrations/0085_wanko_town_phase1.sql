@@ -303,10 +303,34 @@ begin
     where i.user_id = p_user_id
       and i.is_placed
       and (p_exclude_instance is null or i.instance_id <> p_exclude_instance)
-      and p_grid_x < i.grid_x + (case when i.rotation in (90, 270) then c.grid_height else c.grid_width end)
-      and p_grid_x + v_width > i.grid_x
-      and p_grid_y < i.grid_y + (case when i.rotation in (90, 270) then c.grid_width else c.grid_height end)
-      and p_grid_y + v_height > i.grid_y
+      and p_grid_x
+        - case
+            when p_category in ('building', 'facility')
+              and c.category in ('building', 'facility') then 1
+            else 0
+          end
+        < i.grid_x + (case when i.rotation in (90, 270) then c.grid_height else c.grid_width end)
+      and p_grid_x + v_width
+        + case
+            when p_category in ('building', 'facility')
+              and c.category in ('building', 'facility') then 1
+            else 0
+          end
+        > i.grid_x
+      and p_grid_y
+        - case
+            when p_category in ('building', 'facility')
+              and c.category in ('building', 'facility') then 1
+            else 0
+          end
+        < i.grid_y + (case when i.rotation in (90, 270) then c.grid_width else c.grid_height end)
+      and p_grid_y + v_height
+        + case
+            when p_category in ('building', 'facility')
+              and c.category in ('building', 'facility') then 1
+            else 0
+          end
+        > i.grid_y
   ) into v_collision;
 
   return not coalesce(v_collision, false);
