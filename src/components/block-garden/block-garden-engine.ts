@@ -388,6 +388,12 @@ export class BlockGardenEngine {
     this.updateCamera();
   }
 
+  resetLook(): void {
+    this.yaw = -Math.PI / 4;
+    this.pitch = -0.12;
+    this.updateCamera();
+  }
+
   jump(): boolean {
     if (!this.grounded) return false;
 
