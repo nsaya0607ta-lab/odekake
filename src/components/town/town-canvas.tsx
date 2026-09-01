@@ -144,7 +144,7 @@ export const TownCanvas = memo(function TownCanvas({
         renderer.outputColorSpace = THREE.SRGBColorSpace;
         renderer.shadowMap.enabled = true;
         renderer.shadowMap.type = THREE.PCFSoftShadowMap;
-        renderer.domElement.className = styles.canvas;
+        renderer.domElement.className = styles.canvas ?? "";
         renderer.domElement.setAttribute("aria-label", "3Dわんこタウン");
         mountRef.current.replaceChildren(renderer.domElement);
 
