@@ -11,6 +11,21 @@
   cursor: grab;
 }
 
+.viewport::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background:
+    radial-gradient(ellipse at 12% 66%, rgb(66 112 61 / 18%) 0 5%, transparent 17%),
+    radial-gradient(ellipse at 88% 42%, rgb(63 105 57 / 16%) 0 6%, transparent 19%),
+    radial-gradient(ellipse at 54% 88%, rgb(55 99 53 / 13%) 0 7%, transparent 22%),
+    linear-gradient(30deg, transparent 0 49.5%, rgb(76 119 67 / 7%) 50%, transparent 50.5%) 0 0 / 118px 68px,
+    linear-gradient(-30deg, transparent 0 49.5%, rgb(255 255 255 / 9%) 50%, transparent 50.5%) 0 0 / 118px 68px,
+    linear-gradient(180deg, #c8e2b5 0%, #afd39a 42%, #91bd7f 100%);
+  opacity: 0.72;
+}
+
 .viewport:active {
   cursor: grabbing;
 }
@@ -22,6 +37,7 @@
 
 .world {
   position: absolute;
+  z-index: 1;
   left: 0;
   top: 0;
   width: 1000px;
