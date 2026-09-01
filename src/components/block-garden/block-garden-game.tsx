@@ -117,6 +117,12 @@ export default function BlockGardenGame({
     engineRef.current?.jump();
   }, []);
 
+  const resetLook = useCallback(() => {
+    engineRef.current?.resetLook();
+    setLookHintVisible(false);
+    showToast("視点を正面に戻しました");
+  }, [showToast]);
+
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
@@ -284,7 +290,7 @@ export default function BlockGardenGame({
     if (!gesture || gesture.pointerId !== event.pointerId) return;
 
     const totalDistance = Math.hypot(event.clientX - gesture.startX, event.clientY - gesture.startY);
-    if (totalDistance > 4 && !gesture.moved) {
+    if (totalDistance > 9 && !gesture.moved) {
       gesture.moved = true;
       clearLongPress();
       setLookHintVisible(false);
@@ -292,7 +298,7 @@ export default function BlockGardenGame({
     if (gesture.moved) {
       const deltaX = event.clientX - gesture.lastX;
       const deltaY = event.clientY - gesture.lastY;
-      engineRef.current?.addLookDelta(deltaX, deltaY, 0.0031);
+      engineRef.current?.addLookDelta(deltaX, deltaY, 0.00235);
     }
     gesture.lastX = event.clientX;
     gesture.lastY = event.clientY;
@@ -302,7 +308,6 @@ export default function BlockGardenGame({
     const gesture = lookGestureRef.current;
     if (!gesture || gesture.pointerId !== event.pointerId) return;
     clearLongPress();
-    if (!gesture.moved && !gesture.longPressed && performance.now() - gesture.startedAt < 520) breakBlock();
     lookGestureRef.current = null;
     if (event.currentTarget.hasPointerCapture(event.pointerId)) event.currentTarget.releasePointerCapture(event.pointerId);
   };
@@ -320,7 +325,7 @@ export default function BlockGardenGame({
     const rect = event.currentTarget.getBoundingClientRect();
     const deltaX = event.clientX - (rect.left + rect.width / 2);
     const deltaY = event.clientY - (rect.top + rect.height / 2);
-    const maxDistance = rect.width * 0.34;
+    const maxDistance = rect.width * 0.37;
     const distance = Math.hypot(deltaX, deltaY);
     const scale = distance > maxDistance ? maxDistance / distance : 1;
     const visualX = deltaX * scale;
@@ -328,7 +333,15 @@ export default function BlockGardenGame({
     if (joystickKnobRef.current) {
       joystickKnobRef.current.style.transform = `translate3d(${visualX}px, ${visualY}px, 0)`;
     }
-    engineRef.current?.setTouchMovement(visualX / maxDistance, -visualY / maxDistance);
+    const normalizedDistance = Math.min(1, Math.hypot(visualX, visualY) / maxDistance);
+    const response = normalizedDistance < 0.06
+      ? 0
+      : 0.3 + ((normalizedDistance - 0.06) / 0.94) * 0.7;
+    const directionLength = Math.max(1, Math.hypot(visualX, visualY));
+    engineRef.current?.setTouchMovement(
+      (visualX / directionLength) * response,
+      (-visualY / directionLength) * response,
+    );
   };
 
   const handleJoystickDown = (event: ReactPointerEvent<HTMLDivElement>) => {
@@ -385,6 +398,16 @@ export default function BlockGardenGame({
         {targetDefinition ? `${targetDefinition.icon} ${targetDefinition.label}` : "照準をブロックに合わせよう"}
       </div>
 
+      <button
+        type="button"
+        className={styles.resetViewButton}
+        onClick={resetLook}
+        aria-label="視点を正面に戻す"
+      >
+        <span aria-hidden="true">↻</span>
+        視点を戻す
+      </button>
+
       <div className={`${styles.crosshair} ${holding ? styles.holding : ""}`} aria-hidden="true">
         <span className={styles.holdRing} />
       </div>
@@ -413,7 +436,14 @@ export default function BlockGardenGame({
       ) : null}
 
       <div className={styles.actionButtons} aria-label="ゲーム操作" role="group">
-        <button type="button" className={`${styles.actionButton} ${styles.actionJump}`} onClick={jumpPlayer}>
+        <button
+          type="button"
+          className={`${styles.actionButton} ${styles.actionJump}`}
+          onPointerDown={(event) => {
+            event.preventDefault();
+            jumpPlayer();
+          }}
+        >
           <span className={styles.actionIcon} aria-hidden="true">⬆️</span>
           <span className={styles.actionLabel}>ジャンプ</span>
         </button>
@@ -481,7 +511,7 @@ export default function BlockGardenGame({
               </li>
               <li className={styles.guideItem}>
                 <span className={styles.guideItemIcon} aria-hidden="true">⛏️</span>
-                <span><strong>ブロックを壊す</strong><span>照準を合わせてタップ、長押し、または「こわす」を押します。</span></span>
+                <span><strong>ブロックを壊す</strong><span>中央の照準を合わせて「こわす」を押します。画面の長押しでも壊せます。</span></span>
               </li>
               <li className={styles.guideItem}>
                 <span className={styles.guideItemIcon} aria-hidden="true">🌸</span>
