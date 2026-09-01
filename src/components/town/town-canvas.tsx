@@ -8,7 +8,6 @@ import {
   useState,
   type PointerEvent as ReactPointerEvent,
 } from "react";
-import { getFrenchieSrc, type DogSkinId } from "@/lib/dog-skins";
 import {
   TOWN_AREAS,
   TOWN_GRID_SIZE,
@@ -78,7 +77,6 @@ export const TownCanvas = memo(function TownCanvas({
   catalog,
   items,
   unlockedAreas,
-  dogSkin,
   selectedId,
   candidate,
   candidateCanPlace,
@@ -89,7 +87,6 @@ export const TownCanvas = memo(function TownCanvas({
   catalog: TownCatalogItem[];
   items: TownPlacedItem[];
   unlockedAreas: string[];
-  dogSkin: DogSkinId;
   selectedId: string | null;
   candidate: TownPlacementCandidate | null;
   candidateCanPlace: boolean;
@@ -98,6 +95,7 @@ export const TownCanvas = memo(function TownCanvas({
   onCandidateChange: (candidate: TownPlacementCandidate) => void;
 }) {
   const viewportRef = useRef<HTMLDivElement>(null);
+  const worldRef = useRef<HTMLDivElement>(null);
   const pointersRef = useRef(new Map<number, LocalPoint>());
   const dragPointerRef = useRef<number | null>(null);
   const initializedRef = useRef(false);
@@ -109,6 +107,7 @@ export const TownCanvas = memo(function TownCanvas({
     | { kind: "pinch"; distance: number; anchorWorld: LocalPoint }
   >({ kind: "none" });
   const [view, setView] = useState<ViewState>({ x: -20, y: 8, scale: 0.58 });
+  const viewRef = useRef(view);
 
   const catalogById = useMemo(
     () => new Map(catalog.map((item) => [item.id, item])),
@@ -128,6 +127,7 @@ export const TownCanvas = memo(function TownCanvas({
         node.clientHeight,
       );
       initializedRef.current = true;
+      viewRef.current = next;
       setView(next);
     };
     updateInitialView();
@@ -142,6 +142,14 @@ export const TownCanvas = memo(function TownCanvas({
     },
     [],
   );
+
+  function applyTransientView(next: ViewState) {
+    viewRef.current = next;
+    if (worldRef.current) {
+      worldRef.current.style.transform =
+        "translate3d(" + next.x + "px," + next.y + "px,0) scale(" + next.scale + ")";
+    }
+  }
 
   function localPoint(event: ReactPointerEvent): LocalPoint {
     const rect = viewportRef.current?.getBoundingClientRect();
@@ -166,6 +174,7 @@ export const TownCanvas = memo(function TownCanvas({
     event.preventDefault();
     event.currentTarget.setPointerCapture(event.pointerId);
     const point = localPoint(event);
+    const currentView = viewRef.current;
     pointersRef.current.set(event.pointerId, point);
     const points = [...pointersRef.current.values()];
 
@@ -174,7 +183,7 @@ export const TownCanvas = memo(function TownCanvas({
         kind: "pan",
         pointerId: event.pointerId,
         start: point,
-        view,
+        view: currentView,
       };
     } else if (points.length >= 2) {
       const center = pointCenter(points[0]!, points[1]!);
@@ -182,8 +191,8 @@ export const TownCanvas = memo(function TownCanvas({
         kind: "pinch",
         distance: Math.max(1, pointDistance(points[0]!, points[1]!)),
         anchorWorld: {
-          x: (center.x - view.x) / view.scale,
-          y: (center.y - view.y) / view.scale,
+          x: (center.x - currentView.x) / currentView.scale,
+          y: (center.y - currentView.y) / currentView.scale,
         },
       };
     }
@@ -201,7 +210,11 @@ export const TownCanvas = memo(function TownCanvas({
     if (points.length >= 2 && gesture.kind === "pinch") {
       const center = pointCenter(points[0]!, points[1]!);
       const distance = Math.max(1, pointDistance(points[0]!, points[1]!));
-      const nextScale = clamp(view.scale * (distance / gesture.distance), MIN_ZOOM, MAX_ZOOM);
+      const nextScale = clamp(
+        viewRef.current.scale * (distance / gesture.distance),
+        MIN_ZOOM,
+        MAX_ZOOM,
+      );
       const next = clampView(
         {
           scale: nextScale,
@@ -219,13 +232,13 @@ export const TownCanvas = memo(function TownCanvas({
           y: (center.y - next.y) / next.scale,
         },
       };
-      setView(next);
+      applyTransientView(next);
       return;
     }
 
     if (points.length === 1 && gesture.kind === "pan" && gesture.pointerId === event.pointerId) {
       const point = points[0]!;
-      setView(
+      applyTransientView(
         clampView(
           {
             ...gesture.view,
@@ -255,6 +268,7 @@ export const TownCanvas = memo(function TownCanvas({
     } else {
       gestureRef.current = { kind: "none" };
     }
+    setView(viewRef.current);
   }
 
   function queueCandidate(next: TownPlacementCandidate) {
@@ -270,9 +284,10 @@ export const TownCanvas = memo(function TownCanvas({
     if (!candidate) return;
     const item = catalogById.get(candidate.itemId);
     if (!item) return;
+    const currentView = viewRef.current;
     const position = screenPointToGrid({
-      worldX: (point.x - view.x) / view.scale,
-      worldY: (point.y - view.y) / view.scale,
+      worldX: (point.x - currentView.x) / currentView.scale,
+      worldY: (point.y - currentView.y) / currentView.scale,
       item,
       rotation: candidate.rotation,
     });
@@ -310,31 +325,35 @@ export const TownCanvas = memo(function TownCanvas({
     const node = viewportRef.current;
     if (!node) return;
     const center = { x: node.clientWidth / 2, y: node.clientHeight / 2 };
-    const nextScale = clamp(view.scale + amount, MIN_ZOOM, MAX_ZOOM);
-    setView(
-      clampView(
-        {
-          scale: nextScale,
-          x: center.x - ((center.x - view.x) / view.scale) * nextScale,
-          y: center.y - ((center.y - view.y) / view.scale) * nextScale,
-        },
-        node.clientWidth,
-        node.clientHeight,
-      ),
+    const currentView = viewRef.current;
+    const nextScale = clamp(currentView.scale + amount, MIN_ZOOM, MAX_ZOOM);
+    const next = clampView(
+      {
+        scale: nextScale,
+        x: center.x - ((center.x - currentView.x) / currentView.scale) * nextScale,
+        y: center.y - ((center.y - currentView.y) / currentView.scale) * nextScale,
+      },
+      node.clientWidth,
+      node.clientHeight,
     );
+    viewRef.current = next;
+    setView(next);
   }
 
-  const visibleItems = items
-    .filter((item) => item.isPlaced && item.instanceId !== candidate?.instanceId)
-    .flatMap((placed) => {
-      const item = catalogById.get(placed.itemId);
-      return item ? [{ placed, item, anchor: placementAnchor(placed, item) }] : [];
-    })
-    .sort((a, b) => a.placed.gridX + a.placed.gridY - (b.placed.gridX + b.placed.gridY));
+  const visibleItems = useMemo(
+    () =>
+      items
+        .filter((item) => item.isPlaced && item.instanceId !== candidate?.instanceId)
+        .flatMap((placed) => {
+          const item = catalogById.get(placed.itemId);
+          return item ? [{ placed, item, anchor: placementAnchor(placed, item) }] : [];
+        })
+        .sort((a, b) => a.placed.gridX + a.placed.gridY - (b.placed.gridX + b.placed.gridY)),
+    [candidate?.instanceId, catalogById, items],
+  );
 
   const candidateItem = candidate ? catalogById.get(candidate.itemId) ?? null : null;
   const candidateAnchor = candidate && candidateItem ? placementAnchor(candidate, candidateItem) : null;
-  const dogAnchor = projectTownPoint(7, 11.35);
   const wholeGround = areaPolygon({ id: "all", x: 0, y: 0, width: TOWN_GRID_SIZE, height: TOWN_GRID_SIZE });
 
   return (
@@ -348,6 +367,7 @@ export const TownCanvas = memo(function TownCanvas({
       aria-label="わんこタウン。ドラッグで見渡せます"
     >
       <div
+        ref={worldRef}
         className={styles.world}
         style={{ transform: "translate3d(" + view.x + "px," + view.y + "px,0) scale(" + view.scale + ")" }}
       >
@@ -416,14 +436,6 @@ export const TownCanvas = memo(function TownCanvas({
             <BuildingArtwork itemId={item.id} rotation={placed.rotation} />
           </button>
         ))}
-
-        <img
-          src={getFrenchieSrc(dogSkin, "stand-happy")}
-          alt=""
-          draggable={false}
-          className={styles.dog}
-          style={{ left: dogAnchor.x, top: dogAnchor.y, zIndex: 245 }}
-        />
 
         {candidate && candidateItem && candidateAnchor ? (
           <button
