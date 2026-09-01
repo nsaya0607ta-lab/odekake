@@ -54,17 +54,35 @@ alter table public.town_catalog_items enable row level security;
 alter table public.user_towns enable row level security;
 alter table public.user_town_items enable row level security;
 
+create or replace function public.town_access_allowed()
+returns boolean
+language sql
+stable
+security definer
+set search_path = public
+as $
+  select exists (
+    select 1
+    from public.profiles p
+    where p.user_id = auth.uid()
+      and btrim(coalesce(p.display_name, '')) = 'しゅん'
+  );
+$;
+
 drop policy if exists town_catalog_items_select on public.town_catalog_items;
 create policy town_catalog_items_select on public.town_catalog_items
-  for select to authenticated using (active = true);
+  for select to authenticated
+  using (active = true and public.town_access_allowed());
 
 drop policy if exists user_towns_select_own on public.user_towns;
 create policy user_towns_select_own on public.user_towns
-  for select to authenticated using (user_id = auth.uid());
+  for select to authenticated
+  using (user_id = auth.uid() and public.town_access_allowed());
 
 drop policy if exists user_town_items_select_own on public.user_town_items;
 create policy user_town_items_select_own on public.user_town_items
-  for select to authenticated using (user_id = auth.uid());
+  for select to authenticated
+  using (user_id = auth.uid() and public.town_access_allowed());
 
 -- クライアントは参照のみ。書き込みは下のSECURITY DEFINER RPCだけに限定する。
 grant select on public.town_catalog_items, public.user_towns, public.user_town_items to authenticated;
@@ -208,6 +226,9 @@ begin
   if v_user_id is null then
     raise exception using errcode = 'P0001', message = 'AUTH_REQUIRED';
   end if;
+  if not public.town_access_allowed() then
+    raise exception using errcode = 'P0002', message = 'TOWN_NOT_FOUND';
+  end if;
 
   insert into public.user_towns (user_id)
   values (v_user_id)
@@ -322,6 +343,9 @@ begin
   if v_user_id is null then
     raise exception using errcode = 'P0001', message = 'AUTH_REQUIRED';
   end if;
+  if not public.town_access_allowed() then
+    raise exception using errcode = 'P0002', message = 'TOWN_NOT_FOUND';
+  end if;
   if p_rotation not in (0, 90, 180, 270) then
     raise exception using errcode = 'P0001', message = 'INVALID_TOWN_PLACEMENT';
   end if;
@@ -418,6 +442,9 @@ begin
   if v_user_id is null then
     raise exception using errcode = 'P0001', message = 'AUTH_REQUIRED';
   end if;
+  if not public.town_access_allowed() then
+    raise exception using errcode = 'P0002', message = 'TOWN_NOT_FOUND';
+  end if;
   if p_rotation not in (0, 90, 180, 270) then
     raise exception using errcode = 'P0001', message = 'INVALID_TOWN_PLACEMENT';
   end if;
@@ -457,6 +484,7 @@ begin
 end;
 $$;
 
+revoke all on function public.town_access_allowed() from public, anon, authenticated;
 revoke all on function public.town_level_of(integer) from public, anon, authenticated;
 revoke all on function public.town_cell_is_unlocked(text[], integer, integer) from public, anon, authenticated;
 revoke all on function public.town_snapshot(uuid) from public, anon, authenticated;
