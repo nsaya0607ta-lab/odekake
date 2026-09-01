@@ -81,6 +81,7 @@ const DOG_SPAWN_RATIO = Number(GAME_TSX.match(/const DOG_SPAWN_RATIO = ([\d.]+);
 const FRENCHIE_SKIN_SPAWN_CHANCE = Number(GAME_TSX.match(/const FRENCHIE_SKIN_SPAWN_CHANCE = ([\d.]+);/)[1]);
 const SPAWN_MIN_MS = Number(GAME_TSX.match(/const SPAWN_INTERVAL_MIN_MS = (\d+);/)[1]);
 const SPAWN_MAX_MS = Number(GAME_TSX.match(/const SPAWN_INTERVAL_MAX_MS = (\d+);/)[1]);
+const BASE_SPAWN_RATE_MULTIPLIER = Number(GAME_TSX.match(/const BASE_SPAWN_RATE_MULTIPLIER = (\d+);/)[1]);
 const UR_BOOST_MAX = Number(GAME_TSX.match(/const UR_BOOST_MAX = (\d+);/)[1]);
 const UR_BOOST_DECAY_STEP = Number(GAME_TSX.match(/const UR_BOOST_DECAY_STEP = (\d+);/)[1]);
 const UR_BOOST_DECAY_INTERVAL_MS = Number(GAME_TSX.match(/const UR_BOOST_DECAY_INTERVAL_MS = (\d+);/)[1]);
@@ -297,9 +298,9 @@ function simulateOneRound(lv, catchAll, timeBonusCatchRate = 1) {
     if (multiplier2Until > 0 && t >= multiplier2Until) multiplier2Until = 0;
     if (multiplier15Until > 0 && t >= multiplier15Until) multiplier15Until = 0;
 
-    const spawnRateMult = dogFloodRemaining > 0 ? DOG_FLOOD_RATE
+    const spawnRateMult = (dogFloodRemaining > 0 ? DOG_FLOOD_RATE
       : poopFloodRemaining > 0 ? POOP_FLOOD_RATE
-      : (t < spawnRateBoostUntil ? spawnRateBoostValue : 1);
+      : (t < spawnRateBoostUntil ? spawnRateBoostValue : 1)) * BASE_SPAWN_RATE_MULTIPLIER;
     const dt = uniform(SPAWN_MIN_MS, SPAWN_MAX_MS) / spawnRateMult;
     t += dt;
     if (t >= endAt) break;
@@ -364,6 +365,7 @@ function simulateOneRound(lv, catchAll, timeBonusCatchRate = 1) {
       if (item.rarity === "UR") w *= urBoostFactor;
       if (otherSuppressActive && item.id !== "interior_stretch_rod" && OTHER_CATEGORY_IDS.has(item.id)) w *= otherSuppressValue;
       if (highRarityLockActive && !allowedHighRarities.has(item.rarity)) w = 0;
+      if (TIME_BONUS_IDS.has(item.id)) w /= BASE_SPAWN_RATE_MULTIPLIER;
       if (spawnRateBoostActive && TIME_BONUS_IDS.has(item.id)) w /= spawnRateBoostValue;
       weights[i] = w;
       itemWeightTotal += w;

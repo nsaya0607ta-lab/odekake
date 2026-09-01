@@ -918,6 +918,10 @@ export function FrenchieCatchGame({ ownedItems }: { ownedItems: FrenchieCatchIte
      * 出現量アップ中は時間増加系7種の重みをブースト倍率で割り、取得ペースがブーストなしの時と
      * 変わらないよう相殺する（詳細はdocs/minigame-time-balance.mdの「出現量ブーストの1/n相殺」参照）。
      * これにより出現量アップ側の倍率をどれだけ強くしても、時間増加系側のr値には影響しなくなる。
+     *
+     * BASE_SPAWN_RATE_MULTIPLIERで出現ペース自体を常時底上げしているため、この相殺も
+     * ブースト中だけでなく常時BASE_SPAWN_RATE_MULTIPLIER分を織り込む。これを忘れると、
+     * 時間増加系アイテムの取得ペースまで一律で速くなり、プレイ時間バランスが崩れてしまう。
      */
     const spawnRateBoostActive = performance.now() < spawnRateBoostUntilRef.current;
     const weightedItems = itemPool.map((item) => ({
@@ -929,6 +933,7 @@ export function FrenchieCatchGame({ ownedItems }: { ownedItems: FrenchieCatchIte
           ? otherSuppressValueRef.current
           : 1) *
         (highRarityLockActive && !allowedHighRarities.has(item.rarity) ? 0 : 1) *
+        (TIME_BONUS_ITEM_IDS.has(item.id) ? 1 / BASE_SPAWN_RATE_MULTIPLIER : 1) *
         (spawnRateBoostActive && TIME_BONUS_ITEM_IDS.has(item.id) ? 1 / spawnRateBoostValueRef.current : 1),
     }));
     const itemWeightTotal = weightedItems.reduce((sum, entry) => sum + entry.weight, 0);
