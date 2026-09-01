@@ -132,9 +132,10 @@ const SPAWN_INTERVAL_MAX_MS = 780;
 const BASE_SPAWN_RATE_MULTIPLIER = 2;
 /** うんち祭り中の出現レート倍率（通常の4倍の頻度で降ってくる） */
 const POOP_FLOOD_SPAWN_RATE = 4;
-const NORMAL_ENTITY_CAP = 10;
-const DOUBLE_ENTITY_CAP = 15;
-const TRIPLE_ENTITY_CAP = 18;
+/** BASE_SPAWN_RATE_MULTIPLIERで出現ペースを底上げした分、同時出現数の上限も合わせて緩めている */
+const NORMAL_ENTITY_CAP = 20;
+const DOUBLE_ENTITY_CAP = 30;
+const TRIPLE_ENTITY_CAP = 36;
 type HazardGuardKind = "stun" | "boxShrink" | "timeMinus";
 const HAZARD_GUARD_KINDS: readonly HazardGuardKind[] = ["stun", "boxShrink", "timeMinus"];
 const HAZARD_GUARD_LABELS: Record<HazardGuardKind, string> = {
