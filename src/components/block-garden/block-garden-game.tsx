@@ -31,7 +31,15 @@ type TouchLookGesture = {
   longPressed: boolean;
 };
 
-export default function BlockGardenGame() {
+export default function BlockGardenGame({
+  returnHref = "/games",
+  title = "わんこのブロックガーデン",
+  eyebrow = "おでかけクラフト",
+}: {
+  returnHref?: string;
+  title?: string;
+  eyebrow?: string;
+}) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const engineRef = useRef<BlockGardenEngine | null>(null);
   const joystickKnobRef = useRef<HTMLSpanElement>(null);
@@ -117,7 +125,7 @@ export default function BlockGardenGame() {
     try {
       engine = new BlockGardenEngine(canvas, {
         onTargetChange: setTarget,
-        onContextLost: () => setRenderError("3D画面が一時停止しました。ゲーム一覧から開き直してください。"),
+        onContextLost: () => setRenderError("3D画面が一時停止しました。画面を閉じてから開き直してください。"),
       });
       engineRef.current = engine;
       engine.start();
@@ -356,16 +364,16 @@ export default function BlockGardenGame() {
       </div>
 
       <header className={styles.header}>
-        <Link href="/games" className={styles.backButton} aria-label="ミニゲーム一覧へ戻る">
+        <Link href={returnHref} className={styles.backButton} aria-label="ミニゲーム一覧へ戻る">
           ‹
         </Link>
         <div className={styles.titleWrap}>
           <div className={styles.eyebrow}>
             <span aria-hidden="true">🐾</span>
-            おでかけクラフト
+            {eyebrow}
             <span className={styles.prototypeBadge}>PROTOTYPE</span>
           </div>
-          <h1 className={styles.title}>わんこのブロックガーデン</h1>
+          <h1 className={styles.title}>{title}</h1>
         </div>
         <button type="button" className={styles.helpButton} onClick={() => setGuideOpen(true)} aria-label="遊び方を見る">
           ?
@@ -491,7 +499,7 @@ export default function BlockGardenGame() {
             <div className={styles.errorIcon} aria-hidden="true">🌿</div>
             <h2 className={styles.errorTitle}>3D画面を開けませんでした</h2>
             <p className={styles.errorText}>{renderError}</p>
-            <Link href="/games" className={styles.errorButton}>ゲーム一覧へ戻る</Link>
+            <Link href={returnHref} className={styles.errorButton}>戻る</Link>
           </section>
         </div>
       ) : null}
