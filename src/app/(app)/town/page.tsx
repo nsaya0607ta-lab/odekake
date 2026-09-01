@@ -1,7 +1,4 @@
 import { notFound } from "next/navigation";
-import { CoinBadge } from "@/components/coin-badge";
-import { PageBody } from "@/components/page-body";
-import { TopHeader } from "@/components/page-header";
 import { TownScreen } from "@/components/town/town-screen";
 import { getCoinSummary } from "@/lib/data/coins";
 import { requireUser } from "@/lib/supabase/server";
@@ -45,21 +42,11 @@ export default async function TownPage() {
   ]);
 
   return (
-    <>
-      <TopHeader
-        backHref="/home"
-        title="わんこタウン"
-        subtitle="素材を集めて、ちいさな街づくり"
-        action={<CoinBadge balance={coins.balance} />}
-      />
-      <PageBody className="!max-w-lg !space-y-0 !px-0 !py-0">
-        <TownScreen
-          initialSnapshot={townData.snapshot}
-          catalog={townData.catalog}
-          initialCoinBalance={coins.balance}
-          persistenceMode={townData.persistenceMode}
-        />
-      </PageBody>
-    </>
+    <TownScreen
+      initialSnapshot={townData.snapshot}
+      catalog={townData.catalog}
+      initialCoinBalance={coins.balance}
+      persistenceMode={townData.persistenceMode}
+    />
   );
 }
