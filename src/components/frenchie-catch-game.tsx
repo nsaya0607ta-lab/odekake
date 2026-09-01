@@ -365,12 +365,14 @@ const ITEM_SPAWN_WEIGHTS: Partial<Record<string, number>> = {
   summer_frenchie: 106,
   other_listen_to_the_a: 50,
   /**
-   * ナルシストアー：捕まえた全アイテムのスキルがLv.MAXとして発動するため、発動中に得点倍率系
-   * （肉/宝箱/Xmas Party/こびー等の「○秒間×n」スキル）を複数拾うと掛け算が重なり大きく
-   * 跳ねる（シミュレーションで確認済み）。効果自体は文字通り全アイテムに適用したまま、
-   * 出現頻度をデフォルトの1/10に抑えて「稀に大当たりする」MRらしい枠にしてある。
+   * MR3種（ブレブル・ナルシストアー・マフィアー）はいずれも効果が強く出現頻度を抑えたいため、
+   * 出現重みを一律20（デフォルト100の1/5）にしてある（2026-09-01、ユーザー指定）。
+   * ナルシストアーは特に、発動中に得点倍率系（肉/宝箱/Xmas Party/こびー等の「○秒間×n」スキル）を
+   * 複数拾うと掛け算が重なり大きく跳ねることがシミュレーションで確認済み（詳細はdocs参照）。
    */
-  other_narcissist_a: 10,
+  other_burebur: 20,
+  other_narcissist_a: 20,
+  other_mafia_a: 20,
 };
 const STRETCH_ROD_ITEM_ID = "interior_stretch_rod";
 const STRETCH_ROD_SECONDS = 3;
