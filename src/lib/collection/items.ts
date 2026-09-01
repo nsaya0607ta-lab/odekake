@@ -157,8 +157,8 @@ const CURATED_ITEMS: readonly CollectionItem[] = [
   // --- 通常図鑑：MR ----------------------------------------------------
   { id: "other_burebur", name: "ブレブル", image: "/collection/items/burebur.webp", category: "other", series: null, rarity: "MR" },
   { id: "other_xmas_party", name: "Xmas Party", image: "/collection/items/xmas-party.webp", category: "other", series: null, rarity: "MR" },
-  { id: "other_narcissist_a", name: "ナルシストアー", image: null, category: "other", series: null, rarity: "MR" },
-  { id: "other_mafia_a", name: "マフィアー", image: null, category: "other", series: null, rarity: "MR" },
+  { id: "other_narcissist_a", name: "ナルシストアー", image: "/collection/items/narcissist-a.webp", category: "other", series: null, rarity: "MR" },
+  { id: "other_mafia_a", name: "マフィアー", image: "/collection/items/mafia-a.webp", category: "other", series: null, rarity: "MR" },
 
   // --- 通常図鑑：その他 追加分 ------------------------------------------
   { id: "other_clawd", name: "Clawd", image: "/collection/items/clawd.webp", category: "other", series: null, rarity: "SSR" },
