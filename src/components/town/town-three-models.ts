@@ -1,4 +1,3 @@
-// @ts-nocheck -- Procedural Three.js models use the runtime module shape.
 const PALETTE = {
   cream: 0xfff4d8,
   warmWhite: 0xfffbef,
