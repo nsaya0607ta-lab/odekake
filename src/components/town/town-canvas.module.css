@@ -42,7 +42,7 @@
   left: 0;
   top: 0;
   width: 1000px;
-  height: 560px;
+  height: 640px;
   transform-origin: 0 0;
   will-change: transform;
   contain: layout style paint;
@@ -59,9 +59,11 @@
 }
 
 .groundEdge {
-  transform: translateY(13px);
-  background: linear-gradient(155deg, #739758, #4f7244 64%, #3f6038);
-  box-shadow: 0 19px 15px rgb(48 67 42 / 20%);
+  transform: translateY(20px);
+  background:
+    linear-gradient(180deg, rgb(151 183 111 / 72%) 0 3px, transparent 4px),
+    linear-gradient(155deg, #739758, #4f7244 62%, #365732);
+  box-shadow: 0 24px 18px rgb(40 61 37 / 25%);
 }
 
 .ground {
@@ -103,26 +105,26 @@
 
 .pathMain {
   left: 478px;
-  top: 254px;
+  top: 296px;
   width: 44px;
-  height: 198px;
+  height: 233px;
 }
 
 .pathLeft {
   left: 334px;
-  top: 263px;
+  top: 305px;
   width: 174px;
-  height: 34px;
-  transform: rotate(-26.5deg);
+  height: 40px;
+  transform: rotate(-30.5deg);
   transform-origin: right center;
 }
 
 .pathRight {
   left: 492px;
-  top: 263px;
+  top: 305px;
   width: 174px;
-  height: 34px;
-  transform: rotate(26.5deg);
+  height: 40px;
+  transform: rotate(30.5deg);
   transform-origin: left center;
 }
 
@@ -138,14 +140,14 @@
 
 .grassPatchOne {
   left: 282px;
-  top: 294px;
-  transform: rotate(-13deg);
+  top: 346px;
+  transform: rotate(-15deg);
 }
 
 .grassPatchTwo {
   left: 592px;
-  top: 318px;
-  transform: rotate(17deg);
+  top: 374px;
+  transform: rotate(19deg);
 }
 
 .lockedArea {
@@ -166,7 +168,13 @@
   place-items: end center;
   padding: 0;
   border: 0;
-  background: transparent;
+  background:
+    radial-gradient(
+      ellipse at center,
+      rgb(42 68 37 / 30%) 0 24%,
+      rgb(48 75 42 / 14%) 49%,
+      transparent 72%
+    ) 50% 100% / 138px 34px no-repeat;
   transform: translate(-50%, -100%);
   transform-origin: 50% 100%;
   touch-action: none;
