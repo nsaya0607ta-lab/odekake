@@ -24,13 +24,13 @@ type Point = { x: number; y: number };
 type ThreeObject = any;
 type Runtime = {
   THREE: typeof import("three");
-  renderer: ReturnType<typeof import("three")["WebGLRenderer"]>;
-  scene: ReturnType<typeof import("three")["Scene"]>;
-  camera: ReturnType<typeof import("three")["OrthographicCamera"]>;
-  root: ReturnType<typeof import("three")["Group"]>;
-  raycaster: ReturnType<typeof import("three")["Raycaster"]>;
-  groundPlane: ReturnType<typeof import("three")["Plane"]>;
-  target: ReturnType<typeof import("three")["Vector3"]>;
+  renderer: InstanceType<typeof import("three")["WebGLRenderer"]>;
+  scene: InstanceType<typeof import("three")["Scene"]>;
+  camera: InstanceType<typeof import("three")["OrthographicCamera"]>;
+  root: InstanceType<typeof import("three")["Group"]>;
+  raycaster: InstanceType<typeof import("three")["Raycaster"]>;
+  groundPlane: InstanceType<typeof import("three")["Plane"]>;
+  target: InstanceType<typeof import("three")["Vector3"]>;
 };
 
 const WORLD_HALF = 7;
