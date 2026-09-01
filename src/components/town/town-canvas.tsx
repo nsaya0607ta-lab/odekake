@@ -263,7 +263,7 @@ export const TownCanvas = memo(function TownCanvas({
         kind: "pan",
         pointerId: remaining[0]![0],
         start: remaining[0]![1],
-        view,
+        view: viewRef.current,
       };
     } else {
       gestureRef.current = { kind: "none" };
