@@ -52,7 +52,7 @@ export function BottomNav({
   const current = activeHref(pathname);
 
   // ミニゲーム中はアプリ本体のナビを完全に外し、誤タップ・背面反応を防ぐ。
-  if (pathname.startsWith("/games/wanko-bowling")) return null;
+  if (pathname.startsWith("/games/wanko-bowling") || pathname.startsWith("/town")) return null;
 
   return (
     <nav

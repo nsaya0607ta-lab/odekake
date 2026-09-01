@@ -19,6 +19,7 @@
     "pixi.js": "^7.4.3",
     "react": "^19.1.1",
     "react-dom": "^19.1.1",
+    "three": "^0.185.1",
     "zod": "^4.1.11"
   },
   "devDependencies": {
@@ -30,6 +31,7 @@
     "eslint": "^9.36.0",
     "eslint-config-next": "^15.5.4",
     "tailwindcss": "^4.1.13",
-    "typescript": "^5.9.2"
+    "typescript": "^5.9.2",
+    "@types/three": "^0.185.4"
   }
 }

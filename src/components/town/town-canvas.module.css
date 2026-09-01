@@ -1,0 +1,118 @@
+.viewport {
+  position: relative;
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: hidden;
+  touch-action: none;
+  overscroll-behavior: contain;
+  border-block: 1px solid color-mix(in srgb, var(--color-leaf) 22%, var(--color-line));
+  background: linear-gradient(180deg, #dff1e6 0%, #d1e8d8 58%, #bdd8c8 100%);
+  cursor: grab;
+}
+
+.viewport:active {
+  cursor: grabbing;
+}
+
+.viewportPlacement,
+.viewportPlacement:active {
+  cursor: crosshair;
+}
+
+.threeMount,
+.canvas {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+}
+
+.canvas {
+  display: block;
+  outline: none;
+  touch-action: none;
+}
+
+.loading {
+  position: absolute;
+  left: 50%;
+  top: 48%;
+  z-index: 10;
+  transform: translate(-50%, -50%);
+  border: 1px solid rgb(255 255 255 / 78%);
+  border-radius: 999px;
+  padding: 8px 13px;
+  color: #526c4b;
+  background: rgb(255 253 248 / 88%);
+  font-size: 10px;
+  font-weight: 800;
+  box-shadow: 0 5px 16px rgb(61 78 52 / 14%);
+}
+
+.hint {
+  position: absolute;
+  left: 50%;
+  top: 10px;
+  z-index: 20;
+  transform: translateX(-50%);
+  white-space: nowrap;
+  border: 1px solid rgb(255 255 255 / 82%);
+  border-radius: 999px;
+  padding: 6px 11px;
+  color: #526c4b;
+  background: rgb(255 253 248 / 87%);
+  font-size: 10px;
+  font-weight: 800;
+  box-shadow: 0 4px 12px rgb(65 78 58 / 12%);
+  pointer-events: none;
+}
+
+.threeBadge {
+  position: absolute;
+  left: 10px;
+  bottom: 12px;
+  z-index: 20;
+  display: grid;
+  min-width: 37px;
+  height: 27px;
+  place-items: center;
+  border: 1px solid rgb(255 255 255 / 75%);
+  border-radius: 999px;
+  color: white;
+  background: rgb(65 105 61 / 76%);
+  font-size: 9px;
+  font-weight: 900;
+  letter-spacing: 0.08em;
+  box-shadow: 0 4px 10px rgb(47 72 43 / 18%);
+  pointer-events: none;
+}
+
+.zoomControls {
+  position: absolute;
+  right: 10px;
+  bottom: 12px;
+  z-index: 25;
+  display: flex;
+  gap: 6px;
+}
+
+.zoomButton {
+  display: grid;
+  width: 38px;
+  height: 38px;
+  place-items: center;
+  border: 1px solid rgb(255 255 255 / 82%);
+  border-radius: 999px;
+  color: var(--color-ink-soft);
+  background: rgb(255 253 248 / 90%);
+  font-size: 19px;
+  font-weight: 900;
+  box-shadow: 0 5px 12px rgb(63 58 51 / 12%);
+  touch-action: manipulation;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .canvas {
+    image-rendering: auto;
+  }
+}
