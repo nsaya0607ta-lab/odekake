@@ -379,6 +379,24 @@ const ITEM_SPAWN_WEIGHTS: Partial<Record<string, number>> = {
   other_burebur: 20,
   other_narcissist_a: 20,
   other_mafia_a: 20,
+  /**
+   * 得点倍率系スキル（本メモに何度も登場している重複掛け算の暴走要因）は、Lv5フルコンプで
+   * ×100以上が95%・×1000以上が62.5%発生することが確認されたため、出現頻度自体を
+   * レアリティ別に下げてほしいというユーザー指定（デフォルト100→R:80/SR:70/SSR:60/UR:50/LR:40）。
+   * ただし宝箱(toy_treasure_puzzle)と夏のフレブル(summer_frenchie)は既に時間バランス調整用の
+   * 重み(149/106)が入っており、得点倍率(item_double/SUMMER_MULT)はそのアイテムが持つ効果の
+   * 一部でしかないため、この指定では変更していない（変更すると宝箱の出現率チューニングと
+   * 時間増加系7種のプール希釈相殺が崩れる）。Xmas Party(MR)はランク表に含まれていないため
+   * 未変更（デフォルト100のまま）。
+   */
+  toy_meat: 70,
+  interior_spring_flower_wreath: 70,
+  other_kamunayo: 60,
+  other_nisoku_a: 60,
+  other_azubee: 50,
+  interior_kinoko_azubee: 50,
+  other_kobee: 50,
+  interior_shikkoku_no_ar: 40,
 };
 const STRETCH_ROD_ITEM_ID = "interior_stretch_rod";
 const STRETCH_ROD_SECONDS = 3;
