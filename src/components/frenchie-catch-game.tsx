@@ -586,8 +586,8 @@ export function FrenchieCatchGame({ ownedItems }: { ownedItems: FrenchieCatchIte
   const okaeriUntilRef = useRef(0);
   const okaeriPerCatchValueRef = useRef(3);
   const hazardShieldUntilRef = useRef(0);
-  const nisokuUntilRef = useRef(0);
-  const nisokuMultValueRef = useRef(3);
+  /** 食べ物カテゴリ限定倍率（二足A）の有効中エントリ一覧。重複取得時は掛け合わされる */
+  const foodScoreMultipliersRef = useRef<TimedMultiplierEntry[]>([]);
   const dogFloodRemainingRef = useRef(0);
   const personFloodRemainingRef = useRef(0);
   const clawdBallFloodRemainingRef = useRef(0);
@@ -733,7 +733,15 @@ export function FrenchieCatchGame({ ownedItems }: { ownedItems: FrenchieCatchIte
     if (now < omochiUntilRef.current) labels.push(`うんちがおもちに +${omochiPtValueRef.current}pt`);
     if (now < okaeriUntilRef.current) labels.push(`1個ごとに+${okaeriPerCatchValueRef.current}秒`);
     if (now < hazardShieldUntilRef.current) labels.push("ハザード出現なし");
-    if (now < nisokuUntilRef.current) labels.push(`食べ物カテゴリ得点×${nisokuMultValueRef.current}中`);
+    const activeFoodMultipliers = foodScoreMultipliersRef.current.filter((entry) => entry.until > now);
+    if (activeFoodMultipliers.length > 0) {
+      const product = activeFoodMultipliers.reduce((acc, entry) => acc * entry.value, 1);
+      labels.push(
+        activeFoodMultipliers.length > 1
+          ? `食べ物カテゴリ得点×${activeFoodMultipliers.map((entry) => entry.value).join("×")}=${product}中`
+          : `食べ物カテゴリ得点×${product}中`,
+      );
+    }
     if (now < slantBoostUntilRef.current) labels.push("斜め落下中");
     if (now < boxShrinkUntilRef.current) labels.push("ダンボール0.8倍");
     else if (now < boxWideUntilRef.current) labels.push(`ダンボール×${boxWideScaleRef.current}拡大中`);
@@ -1096,6 +1104,9 @@ export function FrenchieCatchGame({ ownedItems }: { ownedItems: FrenchieCatchIte
       if (pruneScoreMultipliers(scoreMultipliersRef, now)) {
         timedEffectChanged = true;
       }
+      if (pruneScoreMultipliers(foodScoreMultipliersRef, now)) {
+        timedEffectChanged = true;
+      }
       if (boxWideUntilRef.current > 0 && now >= boxWideUntilRef.current) {
         boxWideUntilRef.current = 0;
         timedEffectChanged = true;
@@ -1396,8 +1407,8 @@ export function FrenchieCatchGame({ ownedItems }: { ownedItems: FrenchieCatchIte
             const hadActiveNextMultiplier = nextMultipliersRef.current.some((entry) => entry.remaining > 0);
             const nextMultiplier = consumeCountMultiplierProduct(nextMultipliersRef);
             if (hadActiveNextMultiplier) statusChanged = true;
-            const foodMultiplier = now < nisokuUntilRef.current && FOOD_CATEGORY_ITEM_IDS.has(entity.itemId ?? "")
-              ? nisokuMultValueRef.current
+            const foodMultiplier = FOOD_CATEGORY_ITEM_IDS.has(entity.itemId ?? "")
+              ? getScoreMultiplierProduct(foodScoreMultipliersRef, now)
               : 1;
             const streakMultiplier = treasureStreakActiveRef.current ? treasureStreakMultRef.current : 1;
             // 種類の異なる得点倍率（時間経過系/次のN個系/食べ物限定系/宝箱連続ボーナス系）は重複中すべて掛け合わされる
@@ -1681,8 +1692,7 @@ export function FrenchieCatchGame({ ownedItems }: { ownedItems: FrenchieCatchIte
                 break;
               case NISOKU_A_ITEM_ID: {
                 const nisokuSec = LV.NISOKU_A_SEC[lv]!;
-                nisokuUntilRef.current = Math.max(now, nisokuUntilRef.current) + nisokuSec * 1000;
-                nisokuMultValueRef.current = LV.NISOKU_A_MULT[lv]!;
+                addScoreMultiplier(foodScoreMultipliersRef, now, LV.NISOKU_A_MULT[lv]!, nisokuSec * 1000);
                 effectLabel = `${nisokuSec}秒間 食べ物カテゴリ得点×${LV.NISOKU_A_MULT[lv]}${lvTag}`;
                 statusChanged = true;
                 break;
@@ -2132,8 +2142,7 @@ export function FrenchieCatchGame({ ownedItems }: { ownedItems: FrenchieCatchIte
     okaeriUntilRef.current = 0;
     okaeriPerCatchValueRef.current = 3;
     hazardShieldUntilRef.current = 0;
-    nisokuUntilRef.current = 0;
-    nisokuMultValueRef.current = 3;
+    foodScoreMultipliersRef.current = [];
     dogFloodRemainingRef.current = 0;
     personFloodRemainingRef.current = 0;
     clawdBallFloodRemainingRef.current = 0;
