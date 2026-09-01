@@ -1,6 +1,7 @@
 .viewport {
   position: relative;
-  height: clamp(520px, calc(100dvh - var(--nav-height) - var(--safe-bottom)), 760px);
+  flex: 1 1 auto;
+  min-height: 0;
   overflow: hidden;
   touch-action: none;
   overscroll-behavior: contain;
@@ -220,7 +221,7 @@
 .hint {
   position: absolute;
   left: 50%;
-  top: 148px;
+  top: 10px;
   z-index: 20;
   transform: translateX(-50%);
   white-space: nowrap;
