@@ -367,7 +367,7 @@ export const TownCanvas = memo(function TownCanvas({
           const item = catalogById.get(placed.itemId);
           return item ? [{ placed, item, anchor: placementAnchor(placed, item) }] : [];
         })
-        .sort((a, b) => a.placed.gridX + a.placed.gridY - (b.placed.gridX + b.placed.gridY)),
+        .sort((a, b) => a.anchor.y - b.anchor.y || a.anchor.x - b.anchor.x),
     [candidate?.instanceId, catalogById, items],
   );
 
@@ -419,7 +419,7 @@ export const TownCanvas = memo(function TownCanvas({
               key={index}
               aria-hidden="true"
               className={styles.scenery}
-              style={{ left: point.x, top: point.y, zIndex: Math.round((decor.x + decor.y) * 10) }}
+              style={{ left: point.x, top: point.y, zIndex: Math.round(point.y * 10) }}
             >
               <TownScenery kind={decor.kind} />
             </span>
@@ -449,7 +449,7 @@ export const TownCanvas = memo(function TownCanvas({
             style={{
               left: anchor.x,
               top: anchor.y,
-              zIndex: 100 + Math.round((placed.gridX + placed.gridY) * 10),
+              zIndex: Math.round(anchor.y * 10),
             }}
           >
             <BuildingArtwork itemId={item.id} rotation={placed.rotation} />
@@ -469,7 +469,7 @@ export const TownCanvas = memo(function TownCanvas({
             style={{
               left: candidateAnchor.x,
               top: candidateAnchor.y,
-              zIndex: 400,
+              zIndex: 10000,
             }}
           >
             <BuildingArtwork itemId={candidateItem.id} rotation={candidate.rotation} />
