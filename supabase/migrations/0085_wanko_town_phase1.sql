@@ -224,6 +224,7 @@ create or replace function public.town_can_place(
   p_grid_width integer,
   p_grid_height integer,
   p_rotation integer,
+  p_category text,
   p_exclude_instance uuid default null
 )
 returns boolean
@@ -235,6 +236,7 @@ as $$
 declare
   v_width integer;
   v_height integer;
+  v_padding integer;
   v_areas text[];
   v_collision boolean;
 begin
@@ -248,7 +250,13 @@ begin
     v_height := p_grid_height;
   end if;
 
-  if p_grid_x < 0 or p_grid_y < 0 or p_grid_x + v_width > 14 or p_grid_y + v_height > 14 then
+  v_padding := case when p_category in ('building', 'facility') then 1 else 0 end;
+
+  if p_grid_x - v_padding < 0
+    or p_grid_y - v_padding < 0
+    or p_grid_x + v_width + v_padding > 14
+    or p_grid_y + v_height + v_padding > 14
+  then
     return false;
   end if;
 
@@ -260,8 +268,8 @@ begin
 
   if exists (
     select 1
-    from generate_series(p_grid_x, p_grid_x + v_width - 1) as gx
-    cross join generate_series(p_grid_y, p_grid_y + v_height - 1) as gy
+    from generate_series(p_grid_x - v_padding, p_grid_x + v_width + v_padding - 1) as gx
+    cross join generate_series(p_grid_y - v_padding, p_grid_y + v_height + v_padding - 1) as gy
     where not public.town_cell_is_unlocked(v_areas, gx, gy)
   ) then
     return false;
@@ -339,7 +347,8 @@ begin
   end if;
 
   if not public.town_can_place(
-    v_user_id, p_grid_x, p_grid_y, v_item.grid_width, v_item.grid_height, p_rotation, null
+    v_user_id, p_grid_x, p_grid_y, v_item.grid_width, v_item.grid_height,
+    p_rotation, v_item.category, null
   ) then
     raise exception using errcode = 'P0001', message = 'INVALID_TOWN_PLACEMENT';
   end if;
@@ -430,7 +439,8 @@ begin
   where id = v_owned.item_id;
 
   if p_is_placed and not public.town_can_place(
-    v_user_id, p_grid_x, p_grid_y, v_item.grid_width, v_item.grid_height, p_rotation, p_instance_id
+    v_user_id, p_grid_x, p_grid_y, v_item.grid_width, v_item.grid_height,
+    p_rotation, v_item.category, p_instance_id
   ) then
     raise exception using errcode = 'P0001', message = 'INVALID_TOWN_PLACEMENT';
   end if;
@@ -450,7 +460,7 @@ $$;
 revoke all on function public.town_level_of(integer) from public, anon, authenticated;
 revoke all on function public.town_cell_is_unlocked(text[], integer, integer) from public, anon, authenticated;
 revoke all on function public.town_snapshot(uuid) from public, anon, authenticated;
-revoke all on function public.town_can_place(uuid, integer, integer, integer, integer, integer, uuid)
+revoke all on function public.town_can_place(uuid, integer, integer, integer, integer, integer, text, uuid)
   from public, anon, authenticated;
 
 revoke all on function public.get_or_create_town() from public, anon;
