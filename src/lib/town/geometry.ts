@@ -6,9 +6,9 @@ import type {
 
 export const TOWN_GRID_SIZE = 14;
 export const TOWN_TILE_WIDTH = 68;
-export const TOWN_TILE_HEIGHT = 34;
+export const TOWN_TILE_HEIGHT = 40;
 export const TOWN_WORLD_WIDTH = 1000;
-export const TOWN_WORLD_HEIGHT = 560;
+export const TOWN_WORLD_HEIGHT = 640;
 export const TOWN_ORIGIN_X = 500;
 export const TOWN_ORIGIN_Y = 38;
 
