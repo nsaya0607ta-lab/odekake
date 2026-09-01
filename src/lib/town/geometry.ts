@@ -52,8 +52,8 @@ export function placementAnchor(
 ): Point {
   const footprint = townFootprint(item, placement.rotation);
   return projectTownPoint(
-    placement.gridX + footprint.width / 2,
-    placement.gridY + footprint.height / 2,
+    placement.gridX + footprint.width,
+    placement.gridY + footprint.height,
   );
 }
 
@@ -144,17 +144,12 @@ export function canPlaceTownItem({
     const placedItem = catalog.find((entry) => entry.id === placed.itemId);
     if (!placedItem) return false;
     const placedFootprint = townFootprint(placedItem, placed.rotation);
-    const structureSpacing =
-      (item.category === "building" || item.category === "facility") &&
-      (placedItem.category === "building" || placedItem.category === "facility")
-        ? 1
-        : 0;
     return overlaps(
       {
-        x: candidate.gridX - structureSpacing,
-        y: candidate.gridY - structureSpacing,
-        width: footprint.width + structureSpacing * 2,
-        height: footprint.height + structureSpacing * 2,
+        x: candidate.gridX,
+        y: candidate.gridY,
+        width: footprint.width,
+        height: footprint.height,
       },
       {
         x: placed.gridX,
@@ -209,12 +204,12 @@ export function screenPointToGrid({
 }): { gridX: number; gridY: number } {
   const isoX = (worldX - TOWN_ORIGIN_X) / (TOWN_TILE_WIDTH / 2);
   const isoY = (worldY - TOWN_ORIGIN_Y) / (TOWN_TILE_HEIGHT / 2);
-  const centerX = (isoX + isoY) / 2;
-  const centerY = (isoY - isoX) / 2;
+  const anchorX = (isoX + isoY) / 2;
+  const anchorY = (isoY - isoX) / 2;
   const footprint = townFootprint(item, rotation);
 
   return {
-    gridX: Math.max(0, Math.min(TOWN_GRID_SIZE - footprint.width, Math.round(centerX - footprint.width / 2))),
-    gridY: Math.max(0, Math.min(TOWN_GRID_SIZE - footprint.height, Math.round(centerY - footprint.height / 2))),
+    gridX: Math.max(0, Math.min(TOWN_GRID_SIZE - footprint.width, Math.round(anchorX - footprint.width))),
+    gridY: Math.max(0, Math.min(TOWN_GRID_SIZE - footprint.height, Math.round(anchorY - footprint.height))),
   };
 }
