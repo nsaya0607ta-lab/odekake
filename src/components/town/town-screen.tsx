@@ -155,7 +155,10 @@ export function TownScreen({
   const controlsItemName = candidateCatalog?.name ?? selectedCatalog?.name ?? "";
 
   return (
-    <div className="relative mx-auto max-w-lg overflow-hidden bg-paper">
+    <div
+      className="relative mx-auto flex max-w-lg flex-col overflow-hidden bg-paper"
+      style={{ height: "calc(100dvh - var(--nav-height) - var(--safe-bottom))" }}
+    >
       <TownCanvas
         catalog={catalog}
         items={snapshot.items}
@@ -170,7 +173,7 @@ export function TownScreen({
 
       <section
         aria-label="タウン情報と操作"
-        className="pointer-events-none absolute inset-x-0 top-0 z-[30] mx-auto max-w-lg px-2 pt-[max(8px,env(safe-area-inset-top))]"
+        className="pointer-events-none order-first relative z-[30] w-full shrink-0 border-b border-line/60 bg-paper/95 px-2 pb-2 pt-[max(8px,env(safe-area-inset-top))]"
       >
         <div className="pointer-events-auto rounded-[22px] border border-white/70 bg-card/90 p-2.5 shadow-[0_8px_24px_rgba(57,73,49,0.16)] backdrop-blur-md">
           <div className="flex items-center gap-2">
