@@ -110,7 +110,7 @@ export const TownCanvas = memo(function TownCanvas({
     | { kind: "pan"; pointerId: number; start: LocalPoint; view: ViewState }
     | { kind: "pinch"; distance: number; anchorWorld: LocalPoint }
   >({ kind: "none" });
-  const [view, setView] = useState<ViewState>({ x: -80, y: 124, scale: INITIAL_MIN_ZOOM });
+  const [view, setView] = useState<ViewState>({ x: -80, y: 12, scale: INITIAL_MIN_ZOOM });
   const viewRef = useRef(view);
 
   const catalogById = useMemo(
@@ -130,7 +130,7 @@ export const TownCanvas = memo(function TownCanvas({
         INITIAL_MAX_ZOOM,
       );
       const next = clampView(
-        { x: (width - TOWN_WORLD_WIDTH * scale) / 2, y: 124, scale },
+        { x: (width - TOWN_WORLD_WIDTH * scale) / 2, y: 12, scale },
         width,
         node.clientHeight,
       );
