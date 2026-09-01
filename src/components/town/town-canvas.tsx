@@ -1,5 +1,6 @@
-// @ts-nocheck -- Three.js is loaded dynamically and isolated to this client-only renderer.
 "use client";
+
+/* eslint-disable @typescript-eslint/no-explicit-any */
 
 import {
   memo,
@@ -20,6 +21,7 @@ import { createTownItemModel, createTownTree } from "./town-three-models";
 import styles from "./town-canvas.module.css";
 
 type Point = { x: number; y: number };
+type ThreeObject = any;
 type Runtime = {
   THREE: typeof import("three");
   renderer: ReturnType<typeof import("three")["WebGLRenderer"]>;
@@ -48,12 +50,12 @@ function clamp(value: number, minimum: number, maximum: number) {
   return Math.min(maximum, Math.max(minimum, value));
 }
 
-function disposeObject(object: ReturnType<typeof import("three")["Object3D"]>) {
-  object.traverse((child) => {
+function disposeObject(object: ThreeObject) {
+  object.traverse((child: ThreeObject) => {
     if (!("isMesh" in child) || !child.isMesh) return;
     child.geometry?.dispose?.();
     if (Array.isArray(child.material)) {
-      child.material.forEach((entry) => entry.dispose?.());
+      child.material.forEach((entry: ThreeObject) => entry.dispose?.());
     } else {
       child.material?.dispose?.();
     }
@@ -291,7 +293,7 @@ export const TownCanvas = memo(function TownCanvas({
       );
       model.rotation.y = (-placed.rotation * Math.PI) / 180;
       model.userData.instanceId = placed.instanceId;
-      model.traverse((child) => {
+      model.traverse((child: ThreeObject) => {
         child.userData.instanceId = placed.instanceId;
         if (selectedId === placed.instanceId && "material" in child && child.material?.emissive) {
           child.material.emissive.setHex(0x294d1f);
@@ -313,7 +315,7 @@ export const TownCanvas = memo(function TownCanvas({
         );
         model.rotation.y = (-candidate.rotation * Math.PI) / 180;
         model.userData.isCandidate = true;
-        model.traverse((child) => {
+        model.traverse((child: ThreeObject) => {
           if (!("material" in child) || !child.material) return;
           child.material = child.material.clone();
           child.material.transparent = true;
@@ -390,7 +392,7 @@ export const TownCanvas = memo(function TownCanvas({
     );
     runtime.raycaster.setFromCamera(pointer, runtime.camera);
     const hit = runtime.raycaster.intersectObjects(runtime.root.children, true)
-      .find((entry) => typeof entry.object.userData.instanceId === "string");
+      .find((entry: ThreeObject) => typeof entry.object.userData.instanceId === "string");
     if (hit) onSelect(hit.object.userData.instanceId);
   }
 
