@@ -63,6 +63,7 @@
 
 .backButton:active,
 .helpButton:active,
+.resetViewButton:active,
 .actionButton:active,
 .hotbarButton:active {
   transform: scale(0.95);
@@ -136,6 +137,31 @@
   box-shadow: 0 0 0 3px rgba(120, 174, 102, 0.18);
 }
 
+.resetViewButton {
+  position: absolute;
+  top: calc(112px + env(safe-area-inset-top, 0px));
+  right: max(12px, env(safe-area-inset-right, 0px));
+  z-index: 8;
+  display: flex;
+  min-height: 38px;
+  align-items: center;
+  gap: 5px;
+  padding: 7px 11px;
+  border: 1px solid rgba(255, 255, 255, 0.78);
+  border-radius: 999px;
+  color: #4e6849;
+  background: rgba(255, 253, 245, 0.88);
+  box-shadow: 0 7px 18px rgba(55, 75, 51, 0.13);
+  font-size: 10px;
+  font-weight: 900;
+  touch-action: manipulation;
+}
+
+.resetViewButton > span {
+  font-size: 18px;
+  line-height: 1;
+}
+
 .crosshair {
   position: absolute;
   top: 50%;
@@ -195,17 +221,17 @@
 
 .joystick {
   position: absolute;
-  bottom: calc(104px + env(safe-area-inset-bottom, 0px));
-  left: max(16px, env(safe-area-inset-left, 0px));
+  bottom: calc(108px + env(safe-area-inset-bottom, 0px));
+  left: max(12px, env(safe-area-inset-left, 0px));
   z-index: 9;
   display: grid;
-  width: 104px;
-  height: 104px;
+  width: 124px;
+  height: 124px;
   place-items: center;
   border: 2px solid rgba(255, 255, 255, 0.62);
   border-radius: 999px;
   background: rgba(247, 252, 235, 0.42);
-  box-shadow: inset 0 0 0 9px rgba(94, 139, 81, 0.08), 0 9px 24px rgba(48, 75, 48, 0.12);
+  box-shadow: inset 0 0 0 11px rgba(94, 139, 81, 0.1), 0 9px 24px rgba(48, 75, 48, 0.15);
   backdrop-filter: blur(5px);
   -webkit-backdrop-filter: blur(5px);
   touch-action: none;
@@ -232,44 +258,44 @@
 
 .joystickKnob {
   display: grid;
-  width: 51px;
-  height: 51px;
+  width: 60px;
+  height: 60px;
   place-items: center;
   border: 2px solid rgba(255, 255, 255, 0.8);
   border-radius: 999px;
   color: white;
   background: linear-gradient(145deg, #8ec779, #6da75e);
   box-shadow: 0 7px 16px rgba(66, 107, 58, 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.45);
-  font-size: 20px;
+  font-size: 23px;
   will-change: transform;
 }
 
 .actionButtons {
   position: absolute;
-  right: max(16px, env(safe-area-inset-right, 0px));
-  bottom: calc(106px + env(safe-area-inset-bottom, 0px));
+  right: max(12px, env(safe-area-inset-right, 0px));
+  bottom: calc(110px + env(safe-area-inset-bottom, 0px));
   z-index: 9;
   display: grid;
-  width: 136px;
-  height: 136px;
+  width: 162px;
+  height: 162px;
   grid-template-areas:
     ". jump"
     "break place";
-  grid-template-columns: repeat(2, 64px);
-  grid-template-rows: repeat(2, 64px);
-  gap: 8px;
+  grid-template-columns: repeat(2, 76px);
+  grid-template-rows: repeat(2, 76px);
+  gap: 10px;
 }
 
 .actionButton {
   display: flex;
-  width: 64px;
-  height: 64px;
+  width: 76px;
+  height: 76px;
   flex-direction: column;
   align-items: center;
   justify-content: center;
   gap: 1px;
   border: 2px solid rgba(255, 255, 255, 0.76);
-  border-radius: 23px;
+  border-radius: 26px;
   color: #526047;
   background: rgba(255, 251, 238, 0.84);
   box-shadow: 0 10px 23px rgba(59, 77, 52, 0.16);
@@ -348,12 +374,12 @@
 }
 
 .actionIcon {
-  font-size: 23px;
+  font-size: 27px;
   line-height: 1;
 }
 
 .actionLabel {
-  font-size: 10px;
+  font-size: 11px;
   line-height: 1.1;
 }
 
@@ -657,13 +683,13 @@
 @media (max-height: 680px) {
   .joystick {
     bottom: calc(91px + env(safe-area-inset-bottom, 0px));
-    width: 88px;
-    height: 88px;
+    width: 104px;
+    height: 104px;
   }
 
   .joystickKnob {
-    width: 45px;
-    height: 45px;
+    width: 50px;
+    height: 50px;
   }
 
   .actionButtons {
@@ -671,15 +697,16 @@
   }
 
   .actionButton {
-    width: 56px;
-    height: 56px;
+    width: 64px;
+    height: 64px;
   }
 
   .actionButtons {
-    width: 120px;
-    height: 120px;
-    grid-template-columns: repeat(2, 56px);
-    grid-template-rows: repeat(2, 56px);
+    width: 136px;
+    height: 136px;
+    grid-template-columns: repeat(2, 64px);
+    grid-template-rows: repeat(2, 64px);
+    gap: 8px;
   }
 
   .hotbar {
@@ -706,6 +733,10 @@
 
   .targetBadge {
     top: calc(12px + env(safe-area-inset-top, 0px));
+  }
+
+  .resetViewButton {
+    top: calc(62px + env(safe-area-inset-top, 0px));
   }
 
   .joystick {
