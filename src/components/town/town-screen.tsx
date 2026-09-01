@@ -155,7 +155,7 @@ export function TownScreen({
   const controlsItemName = candidateCatalog?.name ?? selectedCatalog?.name ?? "";
 
   return (
-    <div className="relative overflow-hidden bg-paper">
+    <div className="relative mx-auto max-w-lg overflow-hidden bg-paper">
       <TownCanvas
         catalog={catalog}
         items={snapshot.items}
