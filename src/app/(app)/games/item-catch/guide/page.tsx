@@ -76,7 +76,7 @@ export default async function ItemCatchGuidePage() {
             <div className="mt-4 grid grid-cols-2 gap-2">
               {[
                 ["TIME", "50秒", "1プレイ"],
-                ["REWARD", "÷25", "コイン換算"],
+                ["REWARD", "÷200", "コイン換算"],
               ].map(([label, value, note]) => (
                 <div key={label} className="rounded-2xl border border-[#dbcda6] bg-gradient-to-b from-white/95 to-[#fffaf0]/85 px-2 py-2.5 text-center shadow-[0_6px_16px_rgba(90,72,38,0.09)] backdrop-blur-sm">
                   <span className="block text-[8px] font-black tracking-[0.14em] text-[#927b48]">{label}</span>
@@ -182,7 +182,7 @@ export default async function ItemCatchGuidePage() {
             <div className="relative bg-gradient-to-br from-[#dce9cf] via-[#f2f3df] to-[#f7df9d] px-4 py-5 text-center">
               <div className="pointer-events-none absolute inset-x-8 top-0 h-px bg-gradient-to-r from-transparent via-[#b9933e] to-transparent" />
               <p className="text-[9px] font-black tracking-[0.18em] text-[#7e692e]">COIN REWARD</p>
-              <p className="mt-1 text-lg font-black tabular-nums text-[#405f36]">スコア ÷ 25 = 獲得コイン</p>
+              <p className="mt-1 text-lg font-black tabular-nums text-[#405f36]">スコア ÷ 200 = 獲得コイン</p>
               <p className="mt-1 text-[10px] text-[#6d7252]">小数点以下は切り捨て · 最低1コイン</p>
             </div>
             <ul className="space-y-2 border-t border-[#dfcfaa] bg-gradient-to-b from-[#fffefa] to-[#fbf6eb] p-3.5 text-[11px] leading-relaxed text-[#756854]">
