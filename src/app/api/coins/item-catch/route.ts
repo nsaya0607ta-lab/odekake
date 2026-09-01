@@ -18,6 +18,9 @@ function toRecord(value: unknown): Record<string, unknown> {
   return value && typeof value === "object" ? (value as Record<string, unknown>) : {};
 }
 
+/** record_item_catch_result() のコイン換算レート（1コイン=200pt）と揃える */
+const COIN_CONVERSION_POINTS = 200;
+
 function splitScoreForLegacyValidation(score: number): number[] {
   if (score <= MAX_SCORE_PER_RPC) return [score];
 
@@ -26,7 +29,7 @@ function splitScoreForLegacyValidation(score: number): number[] {
   while (remaining > MAX_SCORE_PER_RPC) {
     let chunk = MAX_SCORE_PER_RPC;
     const remainder = remaining - chunk;
-    if (remainder > 0 && remainder < 25) chunk -= 25 - remainder;
+    if (remainder > 0 && remainder < COIN_CONVERSION_POINTS) chunk -= COIN_CONVERSION_POINTS - remainder;
     chunks.push(chunk);
     remaining -= chunk;
   }
