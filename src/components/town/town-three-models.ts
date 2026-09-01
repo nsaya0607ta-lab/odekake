@@ -17,7 +17,7 @@ function material(THREE: typeof import("three"), color: number, roughness = 0.78
 
 function mesh(
   THREE: typeof import("three"),
-  geometry: unknown,
+  geometry: import("three").BufferGeometry,
   color: number,
   roughness?: number,
 ) {
