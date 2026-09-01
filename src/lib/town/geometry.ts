@@ -144,12 +144,17 @@ export function canPlaceTownItem({
     const placedItem = catalog.find((entry) => entry.id === placed.itemId);
     if (!placedItem) return false;
     const placedFootprint = townFootprint(placedItem, placed.rotation);
+    const structureSpacing =
+      (item.category === "building" || item.category === "facility") &&
+      (placedItem.category === "building" || placedItem.category === "facility")
+        ? 1
+        : 0;
     return overlaps(
       {
-        x: candidate.gridX,
-        y: candidate.gridY,
-        width: footprint.width,
-        height: footprint.height,
+        x: candidate.gridX - structureSpacing,
+        y: candidate.gridY - structureSpacing,
+        width: footprint.width + structureSpacing * 2,
+        height: footprint.height + structureSpacing * 2,
       },
       {
         x: placed.gridX,
