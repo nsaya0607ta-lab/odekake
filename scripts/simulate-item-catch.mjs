@@ -81,7 +81,6 @@ const DOG_SPAWN_RATIO = Number(GAME_TSX.match(/const DOG_SPAWN_RATIO = ([\d.]+);
 const FRENCHIE_SKIN_SPAWN_CHANCE = Number(GAME_TSX.match(/const FRENCHIE_SKIN_SPAWN_CHANCE = ([\d.]+);/)[1]);
 const SPAWN_MIN_MS = Number(GAME_TSX.match(/const SPAWN_INTERVAL_MIN_MS = (\d+);/)[1]);
 const SPAWN_MAX_MS = Number(GAME_TSX.match(/const SPAWN_INTERVAL_MAX_MS = (\d+);/)[1]);
-const BASE_SPAWN_RATE_MULTIPLIER = Number(GAME_TSX.match(/const BASE_SPAWN_RATE_MULTIPLIER = (\d+);/)[1]);
 const UR_BOOST_MAX = Number(GAME_TSX.match(/const UR_BOOST_MAX = (\d+);/)[1]);
 const UR_BOOST_DECAY_STEP = Number(GAME_TSX.match(/const UR_BOOST_DECAY_STEP = (\d+);/)[1]);
 const UR_BOOST_DECAY_INTERVAL_MS = Number(GAME_TSX.match(/const UR_BOOST_DECAY_INTERVAL_MS = (\d+);/)[1]);
@@ -291,17 +290,27 @@ function simulateOneRound(lv, catchAll, timeBonusCatchRate = 1) {
     else { score = Math.max(0, score - POOP_PENALTY); }
   }
 
+  // 稀に発生しうる暴走（時間増加の連鎖でendAtが際限なく伸びる）でシミュレータ自体が
+  // ハングしないための安全弁。到達したら打ち切ってフラグを立てる（実プレイでは起き得ない前提）。
+  const MAX_PLAY_SECONDS = 3600;
+  let cappedOut = false;
   while (t < endAt) {
+    if (t > MAX_PLAY_SECONDS * 1000) { cappedOut = true; break; }
     while (urBoost > 0 && t >= urBoostDecayNextAt) { urBoost = Math.max(0, urBoost - UR_BOOST_DECAY_STEP); urBoostDecayNextAt += UR_BOOST_DECAY_INTERVAL_MS; }
     finishIkeaIfDone();
     if (spawnRateBoostUntil > 0 && t >= spawnRateBoostUntil) spawnRateBoostUntil = 0;
     if (multiplier2Until > 0 && t >= multiplier2Until) multiplier2Until = 0;
     if (multiplier15Until > 0 && t >= multiplier15Until) multiplier15Until = 0;
 
-    const spawnRateMult = (dogFloodRemaining > 0 ? DOG_FLOOD_RATE
+    const spawnRateMult = dogFloodRemaining > 0 ? DOG_FLOOD_RATE
       : poopFloodRemaining > 0 ? POOP_FLOOD_RATE
-      : (t < spawnRateBoostUntil ? spawnRateBoostValue : 1)) * BASE_SPAWN_RATE_MULTIPLIER;
-    const dt = uniform(SPAWN_MIN_MS, SPAWN_MAX_MS) / spawnRateMult;
+      : (t < spawnRateBoostUntil ? spawnRateBoostValue : 1);
+    // 通常の出現タイマーと、時間増加系を一切対象にしないボーナス出現タイマーが同じ間隔で
+    // 並走する構成（frenchie-catch-game.tsxのnextSpawnRef/extraSpawnRef）を、同一レートの
+    // 独立した2系統がマージされた単一ストリーム（レート2倍、各イベントは50%の確率でどちらか）
+    // として近似する。
+    const dt = uniform(SPAWN_MIN_MS, SPAWN_MAX_MS) / spawnRateMult / 2;
+    const excludeTimeBonus = Math.random() < 0.5;
     t += dt;
     if (t >= endAt) break;
 
@@ -330,8 +339,10 @@ function simulateOneRound(lv, catchAll, timeBonusCatchRate = 1) {
       : TIME_MINUS_SPAWN_CHANCE;
     let cum = 0;
     const u = Math.random();
+    // ？アイテムは所持スキルからランダムに時間増加系を引く可能性があるため、ボーナス出現タイマー分は除外する
+    const mysteryChance = excludeTimeBonus ? 0 : MYSTERY_SPAWN_CHANCE;
     cum += POOP_SPAWN_CHANCE; if (u < cum) { catchPoop(); continue; }
-    cum += MYSTERY_SPAWN_CHANCE; if (u < cum) { resolveCatch("item", "mystery_item", null, 0); continue; }
+    cum += mysteryChance; if (u < cum) { resolveCatch("item", "mystery_item", null, 0); continue; }
     cum += BAG_SPAWN_CHANCE;
     if (u < cum) { if (bagStock < BAG_MAX_STOCK) bagStock += 1; continue; }
     cum += timeMinusChance;
@@ -365,7 +376,7 @@ function simulateOneRound(lv, catchAll, timeBonusCatchRate = 1) {
       if (item.rarity === "UR") w *= urBoostFactor;
       if (otherSuppressActive && item.id !== "interior_stretch_rod" && OTHER_CATEGORY_IDS.has(item.id)) w *= otherSuppressValue;
       if (highRarityLockActive && !allowedHighRarities.has(item.rarity)) w = 0;
-      if (TIME_BONUS_IDS.has(item.id)) w /= BASE_SPAWN_RATE_MULTIPLIER;
+      if (excludeTimeBonus && TIME_BONUS_IDS.has(item.id)) w = 0;
       if (spawnRateBoostActive && TIME_BONUS_IDS.has(item.id)) w /= spawnRateBoostValue;
       weights[i] = w;
       itemWeightTotal += w;
@@ -374,7 +385,7 @@ function simulateOneRound(lv, catchAll, timeBonusCatchRate = 1) {
     let roll = Math.random() * (dogWeight + itemWeightTotal);
     if (roll < dogWeight) {
       if (Math.random() < FRENCHIE_SKIN_SPAWN_CHANCE) {
-        const skinIds = ["hiking_frenchie", "snow_frenchie", "summer_frenchie"];
+        const skinIds = ["hiking_frenchie", "snow_frenchie", "summer_frenchie"].filter((id) => !(excludeTimeBonus && TIME_BONUS_IDS.has(id)));
         const sid = skinIds[Math.floor(Math.random() * skinIds.length)];
         // 時間増加系(夏のフレブル)はtimeBonusCatchRateの確率でしか実際にはキャッチできない前提
         if (!TIME_BONUS_IDS.has(sid) || Math.random() < timeBonusCatchRate) {
@@ -398,9 +409,9 @@ function simulateOneRound(lv, catchAll, timeBonusCatchRate = 1) {
     }
   }
 
-  const playSeconds = endAt / 1000;
+  const playSeconds = cappedOut ? MAX_PLAY_SECONDS : endAt / 1000;
   score += Math.floor(dogCaught * playSeconds);
-  return { score, playSeconds };
+  return { score, playSeconds, cappedOut };
 }
 
 function percentile(sortedArr, p) {
@@ -416,10 +427,12 @@ function main() {
   console.log(`itemPool N=${POOL_SIZE} / ROUND_SECONDS=${ROUND_SECONDS} / 試行回数=${trials} / モード=${mode}${catchAll ? "（時間減少・チョコレートも100%キャッチ）" : "（時間減少・チョコレートは回避）"} / 時間増加系7種の実キャッチ率=${timeBonusCatchRate}\n`);
   for (let lvIdx = 0; lvIdx < 5; lvIdx++) {
     const scores = [], secs = [];
+    let cappedCount = 0;
     for (let i = 0; i < trials; i++) {
       const r = simulateOneRound(lvIdx, catchAll, timeBonusCatchRate);
       scores.push(r.score);
       secs.push(r.playSeconds);
+      if (r.cappedOut) cappedCount += 1;
     }
     scores.sort((a, b) => a - b);
     secs.sort((a, b) => a - b);
@@ -427,7 +440,8 @@ function main() {
     console.log(
       `Lv${lvIdx + 1}: ` +
       `秒数 平均=${mean(secs).toFixed(1)} 中央値=${percentile(secs, 0.5).toFixed(1)} p90=${percentile(secs, 0.9).toFixed(1)} p99=${percentile(secs, 0.99).toFixed(1)} 最大=${secs[secs.length - 1].toFixed(1)} | ` +
-      `スコア 平均=${Math.round(mean(scores))} 中央値=${Math.round(percentile(scores, 0.5))} 最小=${Math.round(scores[0])} 最大=${Math.round(scores[scores.length - 1])}`
+      `スコア 平均=${Math.round(mean(scores))} 中央値=${Math.round(percentile(scores, 0.5))} 最小=${Math.round(scores[0])} 最大=${Math.round(scores[scores.length - 1])}` +
+      (cappedCount > 0 ? ` | ⚠️安全弁到達=${cappedCount}/${trials}試行` : "")
     );
   }
 }
