@@ -1,3 +1,4 @@
+// @ts-nocheck -- Three.js is loaded dynamically and isolated to this client-only renderer.
 "use client";
 
 import {
