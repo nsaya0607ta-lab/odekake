@@ -123,6 +123,13 @@ const CHOCOLATE_SPAWN_CHANCE = 0.002;
 const NEGATIVE_HAZARD_IDS = new Set([TIME_MINUS_ITEM_ID, BOX_SHRINK_ITEM_ID, BLACKOUT_ITEM_ID, STUN_ITEM_ID, CHOCOLATE_ITEM_ID]);
 const SPAWN_INTERVAL_MIN_MS = 650;
 const SPAWN_INTERVAL_MAX_MS = 780;
+/**
+ * アイテムの降ってくる量（出現ペース）を全状態一律でデフォルトの2倍にする。
+ * うんち祭り・フレブル大量発生・出現量アップ系スキルの倍率もこれを基準に
+ * 相対的にかかるようにするため、個々の倍率定数ではなくspawnRate計算の
+ * 最後に一括で掛ける（各系統の「通常の何倍」という表記が変わらないようにするため）。
+ */
+const BASE_SPAWN_RATE_MULTIPLIER = 2;
 /** うんち祭り中の出現レート倍率（通常の4倍の頻度で降ってくる） */
 const POOP_FLOOD_SPAWN_RATE = 4;
 const NORMAL_ENTITY_CAP = 10;
@@ -1158,11 +1165,11 @@ export function FrenchieCatchGame({ ownedItems }: { ownedItems: FrenchieCatchIte
 
       const dt = Math.min(0.035, Math.max(0, (now - last) / 1000));
       last = now;
-      const spawnRate = dogFloodRemainingRef.current > 0
+      const spawnRate = (dogFloodRemainingRef.current > 0
         ? DOG_FLOOD_SPAWN_RATE
         : poopFloodRemainingRef.current > 0
         ? POOP_FLOOD_SPAWN_RATE
-        : now < spawnRateBoostUntilRef.current ? spawnRateBoostValueRef.current : 1;
+        : now < spawnRateBoostUntilRef.current ? spawnRateBoostValueRef.current : 1) * BASE_SPAWN_RATE_MULTIPLIER;
       const entityCap = spawnRate >= 3 ? TRIPLE_ENTITY_CAP : spawnRate >= 2 ? DOUBLE_ENTITY_CAP : NORMAL_ENTITY_CAP;
       if (now >= nextSpawnRef.current && entitiesRef.current.length < entityCap) {
         entitiesRef.current.push(createEntity());
