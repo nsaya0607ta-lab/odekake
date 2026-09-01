@@ -149,11 +149,11 @@ strict
 set search_path = public
 as $$
   select
-    (p_x between 3 and 10 and p_y between 3 and 10 and 'core' = any(p_areas))
-    or (p_x between 3 and 10 and p_y between 0 and 2 and 'north' = any(p_areas))
-    or (p_x between 11 and 13 and p_y between 3 and 10 and 'east' = any(p_areas))
-    or (p_x between 3 and 10 and p_y between 11 and 13 and 'south' = any(p_areas))
-    or (p_x between 0 and 2 and p_y between 3 and 10 and 'west' = any(p_areas));
+    (p_x between 2 and 11 and p_y between 2 and 11 and 'core' = any(p_areas))
+    or (p_x between 2 and 11 and p_y between 0 and 1 and 'north' = any(p_areas))
+    or (p_x between 12 and 13 and p_y between 2 and 11 and 'east' = any(p_areas))
+    or (p_x between 2 and 11 and p_y between 12 and 13 and 'south' = any(p_areas))
+    or (p_x between 0 and 1 and p_y between 2 and 11 and 'west' = any(p_areas));
 $$;
 
 create or replace function public.town_snapshot(p_user_id uuid)
