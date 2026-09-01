@@ -114,17 +114,27 @@ export function canPlaceTownItem({
   if (!item) return false;
 
   const footprint = townFootprint(item, candidate.rotation);
+  const boundaryPadding =
+    item.category === "building" || item.category === "facility" ? 1 : 0;
   if (
-    candidate.gridX < 0 ||
-    candidate.gridY < 0 ||
-    candidate.gridX + footprint.width > TOWN_GRID_SIZE ||
-    candidate.gridY + footprint.height > TOWN_GRID_SIZE
+    candidate.gridX - boundaryPadding < 0 ||
+    candidate.gridY - boundaryPadding < 0 ||
+    candidate.gridX + footprint.width + boundaryPadding > TOWN_GRID_SIZE ||
+    candidate.gridY + footprint.height + boundaryPadding > TOWN_GRID_SIZE
   ) {
     return false;
   }
 
-  for (let x = candidate.gridX; x < candidate.gridX + footprint.width; x += 1) {
-    for (let y = candidate.gridY; y < candidate.gridY + footprint.height; y += 1) {
+  for (
+    let x = candidate.gridX - boundaryPadding;
+    x < candidate.gridX + footprint.width + boundaryPadding;
+    x += 1
+  ) {
+    for (
+      let y = candidate.gridY - boundaryPadding;
+      y < candidate.gridY + footprint.height + boundaryPadding;
+      y += 1
+    ) {
       if (!isCellUnlocked(unlockedAreas, x, y)) return false;
     }
   }
