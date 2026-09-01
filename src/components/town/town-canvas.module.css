@@ -28,7 +28,8 @@
   height: 560px;
   transform-origin: 0 0;
   will-change: transform;
-  contain: layout style;
+  contain: layout style paint;
+  backface-visibility: hidden;
 }
 
 .groundEdge,
@@ -43,7 +44,7 @@
 .groundEdge {
   transform: translateY(13px);
   background: linear-gradient(155deg, #739758, #4f7244 64%, #3f6038);
-  filter: drop-shadow(0 19px 15px rgb(48 67 42 / 28%));
+  box-shadow: 0 19px 15px rgb(48 67 42 / 20%);
 }
 
 .ground {
@@ -52,7 +53,6 @@
     radial-gradient(ellipse at 71% 62%, rgb(92 143 71 / 24%) 0 7%, transparent 22%),
     radial-gradient(ellipse at 52% 48%, transparent 0 36%, rgb(63 104 54 / 11%) 78%),
     linear-gradient(145deg, #c4e49b 0%, #a8d283 48%, #92c474 100%);
-  filter: drop-shadow(0 3px 0 rgb(224 241 189 / 80%));
 }
 
 .ground::after {
@@ -65,7 +65,6 @@
     radial-gradient(circle at 78% 68%, rgb(50 102 48 / 20%) 0 1.4px, transparent 2.5px),
     radial-gradient(ellipse at 48% 52%, rgb(255 238 165 / 22%) 0 1px, transparent 3px);
   background-size: 29px 25px, 37px 33px, 43px 39px;
-  mix-blend-mode: soft-light;
 }
 
 .landscape {
@@ -83,7 +82,6 @@
     radial-gradient(ellipse at 70% 42%, rgb(139 113 73 / 13%) 0 4px, transparent 5px),
     rgb(218 194 145 / 68%);
   background-size: 31px 23px, 37px 27px, auto;
-  mix-blend-mode: multiply;
 }
 
 .pathMain {
@@ -119,7 +117,6 @@
   border-radius: 50%;
   opacity: 0.34;
   background: radial-gradient(ellipse, #6ead62 0 35%, transparent 72%);
-  filter: blur(2px);
 }
 
 .grassPatchOne {
@@ -142,7 +139,6 @@
     rgb(58 91 51 / 29%);
   background-size: 68px 55px, 84px 72px, 31px 27px, auto;
   border: 1px dashed rgb(62 91 51 / 28%);
-  backdrop-filter: saturate(0.88);
 }
 
 .entity {
@@ -174,23 +170,10 @@
   pointer-events: none;
   opacity: 0.42;
   background: #6abf69;
-  filter: drop-shadow(0 0 5px rgb(72 143 72 / 70%));
 }
 
 .placementMaskInvalid {
   background: #dd6877;
-  filter: drop-shadow(0 0 5px rgb(190 66 82 / 75%));
-}
-
-.dog {
-  position: absolute;
-  width: 82px;
-  height: auto;
-  transform: translate(-50%, -90%);
-  transform-origin: 50% 100%;
-  filter: drop-shadow(0 5px 4px rgb(55 51 43 / 24%));
-  pointer-events: none;
-  user-select: none;
 }
 
 .lockedLabel {
@@ -216,7 +199,6 @@
   transform: translate(-50%, -88%);
   transform-origin: 50% 100%;
   pointer-events: none;
-  filter: drop-shadow(0 6px 5px rgb(48 70 42 / 20%));
 }
 
 .hint {
