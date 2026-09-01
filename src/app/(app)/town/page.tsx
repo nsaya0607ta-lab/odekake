@@ -1,3 +1,4 @@
+import { notFound } from "next/navigation";
 import { CoinBadge } from "@/components/coin-badge";
 import { PageBody } from "@/components/page-body";
 import { TopHeader } from "@/components/page-header";
@@ -11,11 +12,20 @@ import {
   getTownSnapshot,
 } from "@/lib/town/data";
 
-export const metadata = { title: "わんこタウン | おでかけ記録" };
 export const dynamic = "force-dynamic";
 
 export default async function TownPage() {
   const { supabase, user } = await requireUser();
+  const { data: profile, error: profileError } = await supabase
+    .from("profiles")
+    .select("display_name")
+    .eq("user_id", user.id)
+    .maybeSingle();
+
+  if (profileError || profile?.display_name?.trim() !== "しゅん") {
+    notFound();
+  }
+
   const [townData, coins] = await Promise.all([
     Promise.all([getTownSnapshot(supabase), getTownCatalog(supabase)])
       .then(([snapshot, catalog]) => ({
