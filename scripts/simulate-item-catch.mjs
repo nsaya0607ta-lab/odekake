@@ -62,7 +62,7 @@ function extractBlock(src, startMarker, openChar, closeChar) {
 
 // --- itemPool（ミニゲームで実際に出現する全アイテム。図鑑本体から復元） ---------------
 function buildItemPool() {
-  const re = /\{ id: "([^"]+)", name: "[^"]*", image: "[^"]*", category: "([^"]+)", series: (null|"[^"]+"), rarity: "([^"]+)"(?:, art: "([^"]+)")? \}/g;
+  const re = /\{ id: "([^"]+)", name: "[^"]*", image: (?:null|"[^"]*"), category: "([^"]+)", series: (null|"[^"]+"), rarity: "([^"]+)"(?:, art: "([^"]+)")? \}/g;
   const all = [];
   let m;
   while ((m = re.exec(ITEMS_TS))) {
@@ -99,9 +99,10 @@ const CHOCOLATE_SPAWN_CHANCE = Number(GAME_TSX.match(/const CHOCOLATE_SPAWN_CHAN
 const TIME_MINUS_SECONDS = Number(GAME_TSX.match(/const TIME_MINUS_SECONDS = (\d+);/)[1]);
 const TREASURE_POOP_FLOOD_COUNT = Number(GAME_TSX.match(/const TREASURE_POOP_FLOOD_COUNT = (\d+);/)[1]);
 const TREASURE_MINUS5_SEC = Number(GAME_TSX.match(/const TREASURE_MINUS5_SEC = (\d+);/)[1]);
-const TREASURE_DOUBLE_MULT = Number(GAME_TSX.match(/const TREASURE_DOUBLE_MULT = (\d+);/)[1]);
 const STRETCH_ROD_SECONDS = Number(GAME_TSX.match(/const STRETCH_ROD_SECONDS = (\d+);/)[1]);
-const OYASUMI_SECONDS = Number(GAME_TSX.match(/const OYASUMI_SECONDS = (\d+);/)[1]);
+const SCORE_MULT_DURATION_SEC = Number(GAME_TSX.match(/const SCORE_MULT_DURATION_SEC = (\d+);/)[1]);
+const OYASUMI_SECONDS = SCORE_MULT_DURATION_SEC;
+const OYASUMI_NO_BLACKOUT_CHANCE = Number(GAME_TSX.match(/const OYASUMI_NO_BLACKOUT_CHANCE = ([\d.]+);/)[1]);
 const DOG_FLOOD_SPAWN_RATE = Number(GAME_TSX.match(/const DOG_FLOOD_SPAWN_RATE = ([\d.]+);/)[1]);
 const POOP_FLOOD_SPAWN_RATE = Number(GAME_TSX.match(/const POOP_FLOOD_SPAWN_RATE = ([\d.]+);/)[1]);
 
@@ -164,6 +165,8 @@ function simulateOneRound(lv, catchAll, timeBonusCatchRate = 1) {
   let ikeaUntil = 0, ikeaCount = 0;
   let bagStock = 0;
   let spawnRateBoostUntil = 0, spawnRateBoostValue = 1;
+  let narcissistUntil = 0;
+  let mafiaDogBonusMult = 1;
 
   function addBonusTime(sec) { endAt += sec * 1000; }
 
@@ -184,7 +187,7 @@ function simulateOneRound(lv, catchAll, timeBonusCatchRate = 1) {
       case "toy_carrot": addBonusTime(LV.CARROT_SEC[lvIdx]); break;
       case "toy_frisbee": nextMultValue = LV.FRISBEE_MULT[lvIdx]; nextMultCount = 1; break;
       case "food_paw_bowl": nextBonus5 += 3; nextBonus5Value = LV.BOWL_PT[lvIdx]; break;
-      case "toy_meat": multiplier15Until = t + LV.MEAT_SEC[lvIdx] * 1000; multiplier15Value = LV.MEAT_MULT[lvIdx]; break;
+      case "toy_meat": multiplier15Until = t + SCORE_MULT_DURATION_SEC * 1000; multiplier15Value = LV.MEAT_MULT[lvIdx]; break;
       case "toy_frenchie_cushion": points += LV.CUSHION_PT[lvIdx]; break;
       case "toy_treasure_puzzle": {
         treasureStreakActive = false;
@@ -194,7 +197,7 @@ function simulateOneRound(lv, catchAll, timeBonusCatchRate = 1) {
         else if (outcome === "time_plus") addBonusTime(LV.TREASURE_SEC[lvIdx]);
         else if (outcome === "poop_flood") poopFloodRemaining += TREASURE_POOP_FLOOD_COUNT;
         else if (outcome === "time_minus5") addBonusTime(-TREASURE_MINUS5_SEC);
-        else if (outcome === "item_double") { multiplier15Until = t + LV.TREASURE_SEC[lvIdx] * 1000; multiplier15Value = TREASURE_DOUBLE_MULT; }
+        else if (outcome === "item_double") { multiplier15Until = t + SCORE_MULT_DURATION_SEC * 1000; multiplier15Value = LV.TREASURE_DOUBLE_MULT[lvIdx]; }
         else if (outcome === "rare_lock") highRarityLockUntil = t + LV.TREASURE_SEC[lvIdx] * 1000;
         else { treasureStreakActive = true; treasureStreakMult = 1 + LV.TREASURE_STREAK_PCT[lvIdx] / 100; }
         break;
@@ -206,12 +209,12 @@ function simulateOneRound(lv, catchAll, timeBonusCatchRate = 1) {
       case "interior_stretch_rod": otherSuppressUntil = t + STRETCH_ROD_SECONDS * 1000; otherSuppressValue = LV.STRETCH_ROD_MULT[lvIdx]; break;
       case "other_burebur": highRarityLockCount = LV.BUREBUR_COUNT[lvIdx]; break;
       case "other_xmas_party":
-        multiplier15Until = t + LV.XMAS_SEC[lvIdx] * 1000; multiplier15Value = LV.XMAS_SCORE[lvIdx];
+        multiplier15Until = t + SCORE_MULT_DURATION_SEC * 1000; multiplier15Value = LV.XMAS_SCORE[lvIdx];
         spawnRateBoostUntil = t + LV.XMAS_SEC[lvIdx] * 1000; spawnRateBoostValue = LV.XMAS_SPAWN[lvIdx];
         dogFloodRemaining += LV.XMAS_DOG_COUNT[lvIdx];
         break;
       case "other_listen_to_the_a": dogFloodRemaining += LV.LISTEN_DOG_COUNT[lvIdx]; break;
-      case "other_azubee": multiplier2Until = t + LV.AZUBEE_SEC[lvIdx] * 1000; multiplier2Value = LV.AZUBEE_MULT[lvIdx]; break;
+      case "other_azubee": multiplier2Until = t + SCORE_MULT_DURATION_SEC * 1000; multiplier2Value = LV.AZUBEE_MULT[lvIdx]; break;
       case "other_omojii": addBonusTime(LV.OMOJII_SEC[lvIdx]); points += LV.OMOJII_PT[lvIdx]; break;
       case "food_paw_pudding": points += LV.PUDDING_PT[lvIdx]; break;
       case "food_kamikami": points += LV.KAMIKAMI_PT[lvIdx]; break;
@@ -220,30 +223,37 @@ function simulateOneRound(lv, catchAll, timeBonusCatchRate = 1) {
       case "food_strawberry_roll_cake": nextMultValue = LV.STRAWBERRY_MULT[lvIdx]; nextMultCount = LV.STRAWBERRY_COUNT[lvIdx]; break;
       case "toy_star_wan_wand": { const rem = Math.round(Math.max(0, (endAt - t) / 1000)); points += Math.round(rem * LV.STARWAND_MULT[lvIdx]); break; }
       case "other_hia": { const rem = Math.round(Math.max(0, (endAt - t) / 1000)); points += Math.round(rem * LV.HIA_MULT[lvIdx]); break; }
-      case "interior_spring_flower_wreath": multiplier15Until = t + LV.SPRING_SEC[lvIdx] * 1000; multiplier15Value = LV.SPRING_MULT[lvIdx]; break;
-      case "other_nisoku_a": nisokuUntil = t + LV.NISOKU_A_SEC[lvIdx] * 1000; nisokuMultValue = LV.NISOKU_A_MULT[lvIdx]; break;
+      case "interior_spring_flower_wreath": multiplier15Until = t + SCORE_MULT_DURATION_SEC * 1000; multiplier15Value = LV.SPRING_MULT[lvIdx]; break;
+      case "other_nisoku_a": nisokuUntil = t + SCORE_MULT_DURATION_SEC * 1000; nisokuMultValue = LV.NISOKU_A_MULT[lvIdx]; break;
       case "food_fruit_basket": personFloodRemaining += LV.FRUIT_BASKET_COUNT[lvIdx]; break;
       case "other_clawd": clawdFloodRemaining += LV.CLAWD_BALL_COUNT[lvIdx]; break;
-      case "other_oyasumi": multiplier15Until = t + OYASUMI_SECONDS * 1000; multiplier15Value = LV.OYASUMI_MULT[lvIdx]; break;
+      case "other_oyasumi": {
+        const skipBlackout = Math.random() < OYASUMI_NO_BLACKOUT_CHANCE;
+        multiplier15Until = t + OYASUMI_SECONDS * 1000;
+        multiplier15Value = skipBlackout ? LV.OYASUMI_MULT_NORMAL[lvIdx] : LV.OYASUMI_MULT_BLACKOUT[lvIdx];
+        break;
+      }
       case "other_omochi_janai": omochiUntil = t + LV.OMOCHI_SEC[lvIdx] * 1000; omochiPtValue = LV.OMOCHI_PT[lvIdx]; break;
       case "other_nakayoshi_azubee": points += LV.NAKAYOSHI_PT[lvIdx]; break;
       case "other_mah": points += LV.MAH_PT[lvIdx]; break;
       case "other_toorematen": dogGoldenUntil = t + LV.TOOREMATEN_SEC[lvIdx] * 1000; dogGoldenPtValue = LV.TOOREMATEN_PT[lvIdx]; break;
-      case "other_kamunayo": multiplier15Until = t + LV.KAMUNAYO_SEC[lvIdx] * 1000; multiplier15Value = LV.KAMUNAYO_MULT[lvIdx]; break;
-      case "summer_frenchie": addBonusTime(LV.SUMMER_ADD[lvIdx]); multiplier15Until = t + LV.SUMMER_MULTSEC[lvIdx] * 1000; multiplier15Value = LV.SUMMER_MULT[lvIdx]; break;
-      case "interior_kinoko_azubee": multiplier15Until = t + LV.KINOKO_SEC[lvIdx] * 1000; multiplier15Value = LV.KINOKO_SCORE[lvIdx]; break;
+      case "other_kamunayo": multiplier15Until = t + SCORE_MULT_DURATION_SEC * 1000; multiplier15Value = LV.KAMUNAYO_MULT[lvIdx]; break;
+      case "summer_frenchie": addBonusTime(LV.SUMMER_ADD[lvIdx]); multiplier15Until = t + SCORE_MULT_DURATION_SEC * 1000; multiplier15Value = LV.SUMMER_MULT[lvIdx]; break;
+      case "interior_kinoko_azubee": multiplier15Until = t + SCORE_MULT_DURATION_SEC * 1000; multiplier15Value = LV.KINOKO_SCORE[lvIdx]; break;
       case "other_komochi": nextMultValue = LV.KOMOCHI_MULT[lvIdx]; nextMultCount = LV.KOMOCHI_COUNT[lvIdx]; break;
       case "other_azuki": addBonusTime(LV.AZUKI_SEC[lvIdx]); points += LV.AZUKI_PT[lvIdx]; break;
-      case "other_kobee": points += LV.KOBEE_PT[lvIdx]; multiplier15Until = t + LV.KOBEE_SEC[lvIdx] * 1000; multiplier15Value = LV.KOBEE_MULT[lvIdx]; break;
+      case "other_kobee": points += LV.KOBEE_PT[lvIdx]; multiplier15Until = t + SCORE_MULT_DURATION_SEC * 1000; multiplier15Value = LV.KOBEE_MULT[lvIdx]; break;
       case "other_hamigaki": points += LV.HAMIGAKI_PT[lvIdx]; break;
       case "other_ikea": { const addSec = LV.IKEA_SEC[lvIdx]; const base = t < ikeaUntil ? ikeaUntil : t; ikeaUntil = base + addSec * 1000; break; }
       case "other_pondeomo": spawnRateBoostUntil = t + LV.PONDEOMO_SEC[lvIdx] * 1000; spawnRateBoostValue = LV.PONDEOMO_SPAWN[lvIdx]; break;
       case "other_pondear": spawnRateBoostUntil = t + LV.PONDEAR_SEC[lvIdx] * 1000; spawnRateBoostValue = LV.PONDEAR_SPAWN[lvIdx]; break;
       case "other_jare_a": spawnRateBoostUntil = t + LV.JARE_A_SEC[lvIdx] * 1000; spawnRateBoostValue = LV.JARE_A_SPAWN[lvIdx]; break;
       case "interior_ragby_ar": spawnRateBoostUntil = t + LV.RAGBY_SEC[lvIdx] * 1000; spawnRateBoostValue = LV.RAGBY_SPAWN[lvIdx]; break;
-      case "interior_shikkoku_no_ar": multiplier15Until = t + LV.SHIKKOKU_SEC[lvIdx] * 1000; multiplier15Value = LV.SHIKKOKU_MULT[lvIdx]; break;
+      case "interior_shikkoku_no_ar": multiplier15Until = t + SCORE_MULT_DURATION_SEC * 1000; multiplier15Value = LV.SHIKKOKU_MULT[lvIdx]; break;
       case "other_oyatsu_no_jikan": rewardTimeCount = 1; rewardTimeValue = LV.OYATSU_PT[lvIdx]; break;
       case "interior_gold_ball": break; // コイン加算のみ。スコアには含めない
+      case "other_narcissist_a": narcissistUntil = Math.max(t, narcissistUntil) + LV.NARCISSIST_SEC[lvIdx] * 1000; break;
+      case "other_mafia_a": mafiaDogBonusMult *= LV.MAFIA_MULT[lvIdx]; break;
       default: break; // その他の効果はスコア・秒数に影響しない（磁石・ダンボール拡大・ガード付与・ハザード反転など）
     }
     return points;
@@ -280,6 +290,8 @@ function simulateOneRound(lv, catchAll, timeBonusCatchRate = 1) {
       skillId = MYSTERY_SKILL_ITEM_IDS[Math.floor(Math.random() * MYSTERY_SKILL_ITEM_IDS.length)];
       skillLvIdx = lv; // フルコンプ想定なので？が選んだアイテムも同じLv扱い
     }
+    // ナルシストアー有効中は、捕まえた全アイテムのスキルがレベル5(MAX)として発動する
+    if (t < narcissistUntil) skillLvIdx = 4;
     if (skillId) points += runItemSkillEffect(skillId, skillLvIdx);
 
     if (Math.random() < JUST_CHANCE) points = Math.round(points * JUST_MULTIPLIER);
@@ -417,7 +429,7 @@ function simulateOneRound(lv, catchAll, timeBonusCatchRate = 1) {
   }
 
   const playSeconds = cappedOut ? MAX_PLAY_SECONDS : endAt / 1000;
-  score += Math.floor(dogCaught * playSeconds);
+  score += Math.floor(dogCaught * playSeconds * mafiaDogBonusMult);
   return { score, playSeconds, cappedOut };
 }
 
