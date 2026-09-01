@@ -124,15 +124,21 @@ const NEGATIVE_HAZARD_IDS = new Set([TIME_MINUS_ITEM_ID, BOX_SHRINK_ITEM_ID, BLA
 const SPAWN_INTERVAL_MIN_MS = 650;
 const SPAWN_INTERVAL_MAX_MS = 780;
 /**
- * アイテムの降ってくる量（出現ペース）を全状態一律でデフォルトの2倍にする。
- * うんち祭り・フレブル大量発生・出現量アップ系スキルの倍率もこれを基準に
- * 相対的にかかるようにするため、個々の倍率定数ではなくspawnRate計算の
- * 最後に一括で掛ける（各系統の「通常の何倍」という表記が変わらないようにするため）。
+ * アイテムの降ってくる量を2倍にするため、通常のスポーンタイマーと全く同じ間隔で
+ * もう1系統「ボーナス出現」タイマーを並走させる（Clawdのボールと同じ独立タイマー方式）。
+ *
+ * 単純にspawnRate計算へ一律の倍率を掛ける方式も試したが、時間増加系7種の重みを
+ * 「1/倍率」で相殺する近似では誤差を完全には消せず、プレイ時間の期待値がLv3以降
+ * わずかに水増しされ続けて指数的に膨らみ、ラウンドが実質終了しなくなる不具合が
+ * 発生した（元々r値が1に近い際どいバランスだったため、小さな誤差でも致命的だった）。
+ * ボーナス出現タイマーは時間増加系7種（TIME_BONUS_ITEM_IDS）と、時間増加系を含む
+ * 夏のフレブルスキン・？アイテムを一切対象にしないことで、既存のスポーンタイマーの
+ * 挙動（＝時間増加系の取得ペース）を寸分変えずに、それ以外のアイテム量だけを厳密に
+ * 2倍にする。
  */
-const BASE_SPAWN_RATE_MULTIPLIER = 2;
 /** うんち祭り中の出現レート倍率（通常の4倍の頻度で降ってくる） */
 const POOP_FLOOD_SPAWN_RATE = 4;
-/** BASE_SPAWN_RATE_MULTIPLIERで出現ペースを底上げした分、同時出現数の上限も合わせて緩めている */
+/** ボーナス出現タイマーを並走させて出現量を底上げした分、同時出現数の上限も合わせて緩めている */
 const NORMAL_ENTITY_CAP = 20;
 const DOUBLE_ENTITY_CAP = 30;
 const TRIPLE_ENTITY_CAP = 36;
@@ -277,6 +283,20 @@ const RARITY_FALL_SPEED: Record<FrenchieCatchItem["rarity"], number> = { N: 1, R
 const TIME_BONUS_ITEM_IDS = new Set([
   "toy_duck_plush", "toy_carrot", "food_paw_melon_bread",
   "interior_anball", "other_omojii", "other_azuki", "summer_frenchie",
+]);
+/**
+ * UR出現率アップ・その他カテゴリ抑制・SSR/UR/LR限定出現・出現量アップを付与するアイテム。
+ * いずれも「出現重みの計算式そのもの」を一時的に書き換える効果を持ち、時間増加系7種の
+ * 一部はUR/otherカテゴリに属するため、これらの発動頻度が変わると時間増加系の取得ペースが
+ * 間接的に揺らいでしまう（宝箱のrare_lockが時間増加系のUR勢を集中優遇して伸びやすくなる、
+ * という既知の現象がTREASURE_OUTCOME_WEIGHTSのコメントにもある）。
+ * ボーナス出現タイマーがこれらを引いて発動頻度を実質的に底上げしてしまうと、時間増加系の
+ * 取得ペースがわずかに変わり得るため、ボーナス出現タイマーでは時間増加系7種と合わせて
+ * こちらも対象外にする。
+ */
+const SPAWN_DYNAMICS_ITEM_IDS = new Set([
+  "toy_rainbow_ball", "interior_stretch_rod", "toy_treasure_puzzle", "other_burebur",
+  "other_xmas_party", "other_pondeomo", "other_pondear", "other_jare_a", "interior_ragby_ar",
 ]);
 const TREASURE_ITEM_ID = "toy_treasure_puzzle";
 const TREASURE_FALL_SPEED = 4;
@@ -547,6 +567,8 @@ export function FrenchieCatchGame({ ownedItems }: { ownedItems: FrenchieCatchIte
   const startAtRef = useRef(0);
   const endAtRef = useRef(0);
   const nextSpawnRef = useRef(0);
+  /** アイテム量2倍化用のボーナス出現タイマー（時間増加系を除く独立系統） */
+  const extraSpawnRef = useRef(0);
   /** Clawdのボールは通常アイテムの抽選を妨げず、独立したタイマーで並行して降らせる */
   const nextClawdSpawnRef = useRef(0);
   const rafRef = useRef<number | null>(null);
@@ -763,7 +785,13 @@ export function FrenchieCatchGame({ ownedItems }: { ownedItems: FrenchieCatchIte
     setActiveEffects(labels);
   }, []);
 
-  const createEntity = useCallback((): Entity => {
+  /**
+   * excludeTimeBonus: ボーナス出現タイマー（アイテム量2倍化用）からの呼び出し専用。
+   * 時間増加系7種・そのスキンである夏のフレブル・？アイテム（時間増加系を引く可能性があるため）、
+   * および出現重みの計算式自体を書き換えるSPAWN_DYNAMICS_ITEM_IDSを一切対象にせず、
+   * 既存のスポーンタイマー側の時間増加系取得ペースを完全に不変に保つ。
+   */
+  const createEntity = useCallback((excludeTimeBonus = false): Entity => {
     const fallSpeedBoost = performance.now() < fallSpeedBoostUntilRef.current ? fallSpeedValueRef.current : 1;
     const slantBoost = performance.now() < slantBoostUntilRef.current ? SLANT_VX_BOOST : 1;
     const rawVy = (17 + Math.random() * 5) * 1.35;
@@ -851,7 +879,9 @@ export function FrenchieCatchGame({ ownedItems }: { ownedItems: FrenchieCatchIte
         spin: (Math.random() - 0.5) * 40,
       };
     }
-    if (hazardRoll < POOP_SPAWN_CHANCE + MYSTERY_SPAWN_CHANCE) {
+    /** ？アイテムは所持スキルからランダムに1つ発動するため、時間増加系を引く可能性がありボーナス出現タイマーでは除外する */
+    const mysteryChance = excludeTimeBonus ? 0 : MYSTERY_SPAWN_CHANCE;
+    if (hazardRoll < POOP_SPAWN_CHANCE + mysteryChance) {
       return {
         ...base,
         itemId: MYSTERY_ITEM_ID,
@@ -864,7 +894,7 @@ export function FrenchieCatchGame({ ownedItems }: { ownedItems: FrenchieCatchIte
         spin: (Math.random() - 0.5) * 50,
       };
     }
-    if (hazardRoll < POOP_SPAWN_CHANCE + MYSTERY_SPAWN_CHANCE + BAG_SPAWN_CHANCE && bagStockRef.current < BAG_MAX_STOCK) {
+    if (hazardRoll < POOP_SPAWN_CHANCE + mysteryChance + BAG_SPAWN_CHANCE && bagStockRef.current < BAG_MAX_STOCK) {
       return {
         ...base,
         itemId: BAG_ITEM_ID,
@@ -882,7 +912,7 @@ export function FrenchieCatchGame({ ownedItems }: { ownedItems: FrenchieCatchIte
     const elapsedSec = (performance.now() - startAtRef.current) / 1000;
     const timeMinusWeightFactor = elapsedSec > TIME_MINUS_BOOST_AFTER_SEC ? TIME_MINUS_BOOSTED_WEIGHT / TIME_MINUS_BASE_WEIGHT : 1;
     const timeMinusChance = TIME_MINUS_SPAWN_CHANCE * timeMinusWeightFactor;
-    const timeMinusThreshold = POOP_SPAWN_CHANCE + MYSTERY_SPAWN_CHANCE + BAG_SPAWN_CHANCE + timeMinusChance;
+    const timeMinusThreshold = POOP_SPAWN_CHANCE + mysteryChance + BAG_SPAWN_CHANCE + timeMinusChance;
     const shrinkThreshold = timeMinusThreshold + BOX_SHRINK_SPAWN_CHANCE;
     const blackoutThreshold = shrinkThreshold + BLACKOUT_SPAWN_CHANCE;
     const stunThreshold = blackoutThreshold + STUN_SPAWN_CHANCE;
@@ -929,6 +959,7 @@ export function FrenchieCatchGame({ ownedItems }: { ownedItems: FrenchieCatchIte
           ? otherSuppressValueRef.current
           : 1) *
         (highRarityLockActive && !allowedHighRarities.has(item.rarity) ? 0 : 1) *
+        (excludeTimeBonus && (TIME_BONUS_ITEM_IDS.has(item.id) || SPAWN_DYNAMICS_ITEM_IDS.has(item.id)) ? 0 : 1) *
         (spawnRateBoostActive && TIME_BONUS_ITEM_IDS.has(item.id) ? 1 / spawnRateBoostValueRef.current : 1),
     }));
     const itemWeightTotal = weightedItems.reduce((sum, entry) => sum + entry.weight, 0);
@@ -950,7 +981,7 @@ export function FrenchieCatchGame({ ownedItems }: { ownedItems: FrenchieCatchIte
           spin: (Math.random() - 0.5) * 20,
         };
       }
-      const skinPool = itemPool.filter((item) => FRENCHIE_SKIN_IDS.includes(item.id));
+      const skinPool = itemPool.filter((item) => FRENCHIE_SKIN_IDS.includes(item.id) && !(excludeTimeBonus && TIME_BONUS_ITEM_IDS.has(item.id)));
       if (skinPool.length > 0 && Math.random() < FRENCHIE_SKIN_SPAWN_CHANCE) {
         const skin = skinPool[Math.floor(Math.random() * skinPool.length)]!;
         return {
@@ -1166,15 +1197,20 @@ export function FrenchieCatchGame({ ownedItems }: { ownedItems: FrenchieCatchIte
 
       const dt = Math.min(0.035, Math.max(0, (now - last) / 1000));
       last = now;
-      const spawnRate = (dogFloodRemainingRef.current > 0
+      const spawnRate = dogFloodRemainingRef.current > 0
         ? DOG_FLOOD_SPAWN_RATE
         : poopFloodRemainingRef.current > 0
         ? POOP_FLOOD_SPAWN_RATE
-        : now < spawnRateBoostUntilRef.current ? spawnRateBoostValueRef.current : 1) * BASE_SPAWN_RATE_MULTIPLIER;
+        : now < spawnRateBoostUntilRef.current ? spawnRateBoostValueRef.current : 1;
       const entityCap = spawnRate >= 3 ? TRIPLE_ENTITY_CAP : spawnRate >= 2 ? DOUBLE_ENTITY_CAP : NORMAL_ENTITY_CAP;
       if (now >= nextSpawnRef.current && entitiesRef.current.length < entityCap) {
         entitiesRef.current.push(createEntity());
         nextSpawnRef.current = now + (SPAWN_INTERVAL_MIN_MS + Math.random() * (SPAWN_INTERVAL_MAX_MS - SPAWN_INTERVAL_MIN_MS)) / spawnRate;
+      }
+      /** アイテム量2倍化用のボーナス出現タイマー。時間増加系は一切対象にせず(createEntityにexcludeTimeBonus=trueを渡す)、通常タイマーと全く同じ間隔で並走させる */
+      if (now >= extraSpawnRef.current && entitiesRef.current.length < entityCap) {
+        entitiesRef.current.push(createEntity(true));
+        extraSpawnRef.current = now + (SPAWN_INTERVAL_MIN_MS + Math.random() * (SPAWN_INTERVAL_MAX_MS - SPAWN_INTERVAL_MIN_MS)) / spawnRate;
       }
       if (clawdBallFloodRemainingRef.current > 0 && now >= nextClawdSpawnRef.current && entitiesRef.current.length < entityCap) {
         const ball = createClawdBallEntity();
@@ -2186,6 +2222,7 @@ export function FrenchieCatchGame({ ownedItems }: { ownedItems: FrenchieCatchIte
     startAtRef.current = now;
     endAtRef.current = now + ROUND_SECONDS * 1000;
     nextSpawnRef.current = now;
+    extraSpawnRef.current = now;
     nextClawdSpawnRef.current = now;
     setPhase("playing");
   }, []);

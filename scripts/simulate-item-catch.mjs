@@ -126,6 +126,10 @@ const OTHER_CATEGORY_IDS = new Set(pool.filter((x) => x.category === "other").ma
 const FOOD_CATEGORY_IDS = new Set(pool.filter((x) => x.category === "food").map((x) => x.id));
 const PERSON_IDS = ["other_omochi_janai", "other_listen_to_the_a", "other_omoi_bashira", "other_xmas_party"];
 const TIME_BONUS_IDS = new Set(["toy_duck_plush", "toy_carrot", "food_paw_melon_bread", "interior_anball", "other_azuki", "other_omojii", "summer_frenchie"]);
+// UR出現率アップ・その他抑制・SSR/UR/LR限定出現・出現量アップなど出現重みの計算式自体を書き換える
+// アイテム。ボーナス出現タイマー側で発動頻度が実質的に上がると時間増加系の取得ペースが間接的に
+// 揺らぐため、TIME_BONUS_IDSと合わせてボーナス側では除外する（frenchie-catch-game.tsxのSPAWN_DYNAMICS_ITEM_IDSと同一）
+const SPAWN_DYNAMICS_IDS = new Set(["toy_rainbow_ball", "interior_stretch_rod", "toy_treasure_puzzle", "other_burebur", "other_xmas_party", "other_pondeomo", "other_pondear", "other_jare_a", "interior_ragby_ar"]);
 
 function rollTreasureOutcome() {
   const total = TREASURE_OUTCOME_WEIGHTS.reduce((s, e) => s + e.weight, 0);
@@ -290,19 +294,32 @@ function simulateOneRound(lv, catchAll, timeBonusCatchRate = 1) {
     else { score = Math.max(0, score - POOP_PENALTY); }
   }
 
+  // 稀に発生しうる暴走（時間増加の連鎖でendAtが際限なく伸びる）でシミュレータ自体が
+  // ハングしないための安全弁。到達したら打ち切ってフラグを立てる（実プレイでは起き得ない前提）。
+  const MAX_PLAY_SECONDS = 3600;
+  let cappedOut = false;
+  // frenchie-catch-game.tsxのnextSpawnRef(通常)/extraSpawnRef(ボーナス、時間増加系除外)と
+  // 同じく、完全に独立した2本のタイマーとしてスケジュールする。「同一レートの1本を50%で
+  // 間引く」近似は、一様分布の間隔をベルヌーイ間引きすると分散が実際より大幅に大きくなり
+  // （待ち時間が幾何分布的に伸びるため）、暴走判定に偽陽性を生むことが判明したため採用しない。
+  let nextT = 0, nextExtraT = 0;
   while (t < endAt) {
+    if (t > MAX_PLAY_SECONDS * 1000) { cappedOut = true; break; }
     while (urBoost > 0 && t >= urBoostDecayNextAt) { urBoost = Math.max(0, urBoost - UR_BOOST_DECAY_STEP); urBoostDecayNextAt += UR_BOOST_DECAY_INTERVAL_MS; }
     finishIkeaIfDone();
     if (spawnRateBoostUntil > 0 && t >= spawnRateBoostUntil) spawnRateBoostUntil = 0;
     if (multiplier2Until > 0 && t >= multiplier2Until) multiplier2Until = 0;
     if (multiplier15Until > 0 && t >= multiplier15Until) multiplier15Until = 0;
 
+    t = Math.min(nextT, nextExtraT);
+    if (t >= endAt) break;
+    const excludeTimeBonus = nextExtraT <= nextT;
+
     const spawnRateMult = dogFloodRemaining > 0 ? DOG_FLOOD_RATE
       : poopFloodRemaining > 0 ? POOP_FLOOD_RATE
       : (t < spawnRateBoostUntil ? spawnRateBoostValue : 1);
     const dt = uniform(SPAWN_MIN_MS, SPAWN_MAX_MS) / spawnRateMult;
-    t += dt;
-    if (t >= endAt) break;
+    if (excludeTimeBonus) nextExtraT = t + dt; else nextT = t + dt;
 
     if (dogFloodRemaining > 0) { dogFloodRemaining -= 1; resolveCatch("dog", null, null, 0); continue; }
     if (personFloodRemaining > 0) {
@@ -329,8 +346,10 @@ function simulateOneRound(lv, catchAll, timeBonusCatchRate = 1) {
       : TIME_MINUS_SPAWN_CHANCE;
     let cum = 0;
     const u = Math.random();
+    // ？アイテムは所持スキルからランダムに時間増加系を引く可能性があるため、ボーナス出現タイマー分は除外する
+    const mysteryChance = excludeTimeBonus ? 0 : MYSTERY_SPAWN_CHANCE;
     cum += POOP_SPAWN_CHANCE; if (u < cum) { catchPoop(); continue; }
-    cum += MYSTERY_SPAWN_CHANCE; if (u < cum) { resolveCatch("item", "mystery_item", null, 0); continue; }
+    cum += mysteryChance; if (u < cum) { resolveCatch("item", "mystery_item", null, 0); continue; }
     cum += BAG_SPAWN_CHANCE;
     if (u < cum) { if (bagStock < BAG_MAX_STOCK) bagStock += 1; continue; }
     cum += timeMinusChance;
@@ -364,6 +383,7 @@ function simulateOneRound(lv, catchAll, timeBonusCatchRate = 1) {
       if (item.rarity === "UR") w *= urBoostFactor;
       if (otherSuppressActive && item.id !== "interior_stretch_rod" && OTHER_CATEGORY_IDS.has(item.id)) w *= otherSuppressValue;
       if (highRarityLockActive && !allowedHighRarities.has(item.rarity)) w = 0;
+      if (excludeTimeBonus && (TIME_BONUS_IDS.has(item.id) || SPAWN_DYNAMICS_IDS.has(item.id))) w = 0;
       if (spawnRateBoostActive && TIME_BONUS_IDS.has(item.id)) w /= spawnRateBoostValue;
       weights[i] = w;
       itemWeightTotal += w;
@@ -372,7 +392,7 @@ function simulateOneRound(lv, catchAll, timeBonusCatchRate = 1) {
     let roll = Math.random() * (dogWeight + itemWeightTotal);
     if (roll < dogWeight) {
       if (Math.random() < FRENCHIE_SKIN_SPAWN_CHANCE) {
-        const skinIds = ["hiking_frenchie", "snow_frenchie", "summer_frenchie"];
+        const skinIds = ["hiking_frenchie", "snow_frenchie", "summer_frenchie"].filter((id) => !(excludeTimeBonus && TIME_BONUS_IDS.has(id)));
         const sid = skinIds[Math.floor(Math.random() * skinIds.length)];
         // 時間増加系(夏のフレブル)はtimeBonusCatchRateの確率でしか実際にはキャッチできない前提
         if (!TIME_BONUS_IDS.has(sid) || Math.random() < timeBonusCatchRate) {
@@ -396,9 +416,9 @@ function simulateOneRound(lv, catchAll, timeBonusCatchRate = 1) {
     }
   }
 
-  const playSeconds = endAt / 1000;
+  const playSeconds = cappedOut ? MAX_PLAY_SECONDS : endAt / 1000;
   score += Math.floor(dogCaught * playSeconds);
-  return { score, playSeconds };
+  return { score, playSeconds, cappedOut };
 }
 
 function percentile(sortedArr, p) {
@@ -414,10 +434,12 @@ function main() {
   console.log(`itemPool N=${POOL_SIZE} / ROUND_SECONDS=${ROUND_SECONDS} / 試行回数=${trials} / モード=${mode}${catchAll ? "（時間減少・チョコレートも100%キャッチ）" : "（時間減少・チョコレートは回避）"} / 時間増加系7種の実キャッチ率=${timeBonusCatchRate}\n`);
   for (let lvIdx = 0; lvIdx < 5; lvIdx++) {
     const scores = [], secs = [];
+    let cappedCount = 0;
     for (let i = 0; i < trials; i++) {
       const r = simulateOneRound(lvIdx, catchAll, timeBonusCatchRate);
       scores.push(r.score);
       secs.push(r.playSeconds);
+      if (r.cappedOut) cappedCount += 1;
     }
     scores.sort((a, b) => a - b);
     secs.sort((a, b) => a - b);
@@ -425,7 +447,8 @@ function main() {
     console.log(
       `Lv${lvIdx + 1}: ` +
       `秒数 平均=${mean(secs).toFixed(1)} 中央値=${percentile(secs, 0.5).toFixed(1)} p90=${percentile(secs, 0.9).toFixed(1)} p99=${percentile(secs, 0.99).toFixed(1)} 最大=${secs[secs.length - 1].toFixed(1)} | ` +
-      `スコア 平均=${Math.round(mean(scores))} 中央値=${Math.round(percentile(scores, 0.5))} 最小=${Math.round(scores[0])} 最大=${Math.round(scores[scores.length - 1])}`
+      `スコア 平均=${Math.round(mean(scores))} 中央値=${Math.round(percentile(scores, 0.5))} 最小=${Math.round(scores[0])} 最大=${Math.round(scores[scores.length - 1])}` +
+      (cappedCount > 0 ? ` | ⚠️安全弁到達=${cappedCount}/${trials}試行` : "")
     );
   }
 }
