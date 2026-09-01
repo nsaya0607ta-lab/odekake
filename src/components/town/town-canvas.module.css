@@ -6,25 +6,8 @@
   touch-action: none;
   overscroll-behavior: contain;
   border-block: 1px solid color-mix(in srgb, var(--color-leaf) 22%, var(--color-line));
-  background:
-    radial-gradient(circle at 18% 18%, rgb(255 255 255 / 70%) 0 2px, transparent 3px),
-    linear-gradient(#dff0e5, #d5e9db 58%, #cae0d2);
+  background: linear-gradient(180deg, #dff1e6 0%, #d1e8d8 58%, #bdd8c8 100%);
   cursor: grab;
-}
-
-.viewport::before {
-  content: "";
-  position: absolute;
-  inset: 0;
-  pointer-events: none;
-  background:
-    radial-gradient(ellipse at 12% 66%, rgb(66 112 61 / 18%) 0 5%, transparent 17%),
-    radial-gradient(ellipse at 88% 42%, rgb(63 105 57 / 16%) 0 6%, transparent 19%),
-    radial-gradient(ellipse at 54% 88%, rgb(55 99 53 / 13%) 0 7%, transparent 22%),
-    linear-gradient(30deg, transparent 0 49.5%, rgb(76 119 67 / 7%) 50%, transparent 50.5%) 0 0 / 118px 68px,
-    linear-gradient(-30deg, transparent 0 49.5%, rgb(255 255 255 / 9%) 50%, transparent 50.5%) 0 0 / 118px 68px,
-    linear-gradient(180deg, #c8e2b5 0%, #afd39a 42%, #91bd7f 100%);
-  opacity: 0.72;
 }
 
 .viewport:active {
@@ -36,194 +19,34 @@
   cursor: crosshair;
 }
 
-.world {
-  position: absolute;
-  z-index: 1;
-  left: 0;
-  top: 0;
-  width: 1000px;
-  height: 640px;
-  transform-origin: 0 0;
-  will-change: transform;
-  contain: layout style paint;
-  backface-visibility: hidden;
-}
-
-.groundEdge,
-.ground,
-.landscape,
-.lockedArea,
-.placementMask {
+.threeMount,
+.canvas {
   position: absolute;
   inset: 0;
+  width: 100%;
+  height: 100%;
 }
 
-.groundEdge {
-  transform: translateY(20px);
-  background:
-    linear-gradient(180deg, rgb(151 183 111 / 72%) 0 3px, transparent 4px),
-    linear-gradient(155deg, #739758, #4f7244 62%, #365732);
-  box-shadow: 0 24px 18px rgb(40 61 37 / 25%);
-}
-
-.ground {
-  background:
-    radial-gradient(ellipse at 28% 34%, rgb(229 244 192 / 46%) 0 5%, transparent 18%),
-    radial-gradient(ellipse at 71% 62%, rgb(92 143 71 / 24%) 0 7%, transparent 22%),
-    radial-gradient(ellipse at 52% 48%, transparent 0 36%, rgb(63 104 54 / 11%) 78%),
-    linear-gradient(145deg, #c4e49b 0%, #a8d283 48%, #92c474 100%);
-}
-
-.ground::after {
-  content: "";
-  position: absolute;
-  inset: 0;
-  opacity: 0.68;
-  background:
-    radial-gradient(circle at 20% 30%, rgb(255 255 255 / 34%) 0 1px, transparent 2px),
-    radial-gradient(circle at 78% 68%, rgb(50 102 48 / 20%) 0 1.4px, transparent 2.5px),
-    radial-gradient(ellipse at 48% 52%, rgb(255 238 165 / 22%) 0 1px, transparent 3px);
-  background-size: 29px 25px, 37px 33px, 43px 39px;
-}
-
-.landscape {
-  pointer-events: none;
-}
-
-.pathMain,
-.pathLeft,
-.pathRight {
-  position: absolute;
-  border-radius: 999px;
-  opacity: 0.44;
-  background:
-    radial-gradient(ellipse at 24% 48%, rgb(255 248 218 / 42%) 0 4px, transparent 5px),
-    radial-gradient(ellipse at 70% 42%, rgb(139 113 73 / 13%) 0 4px, transparent 5px),
-    rgb(218 194 145 / 68%);
-  background-size: 31px 23px, 37px 27px, auto;
-}
-
-.pathMain {
-  left: 478px;
-  top: 296px;
-  width: 44px;
-  height: 233px;
-}
-
-.pathLeft {
-  left: 334px;
-  top: 305px;
-  width: 174px;
-  height: 40px;
-  transform: rotate(-30.5deg);
-  transform-origin: right center;
-}
-
-.pathRight {
-  left: 492px;
-  top: 305px;
-  width: 174px;
-  height: 40px;
-  transform: rotate(30.5deg);
-  transform-origin: left center;
-}
-
-.grassPatchOne,
-.grassPatchTwo {
-  position: absolute;
-  width: 126px;
-  height: 58px;
-  border-radius: 50%;
-  opacity: 0.34;
-  background: radial-gradient(ellipse, #6ead62 0 35%, transparent 72%);
-}
-
-.grassPatchOne {
-  left: 282px;
-  top: 346px;
-  transform: rotate(-15deg);
-}
-
-.grassPatchTwo {
-  left: 592px;
-  top: 374px;
-  transform: rotate(19deg);
-}
-
-.lockedArea {
-  background:
-    radial-gradient(circle at 24% 30%, rgb(69 115 59 / 48%) 0 8px, transparent 9px),
-    radial-gradient(circle at 72% 66%, rgb(91 139 73 / 44%) 0 11px, transparent 12px),
-    radial-gradient(circle at 50% 48%, rgb(48 83 44 / 13%) 0 2px, transparent 3px),
-    rgb(58 91 51 / 29%);
-  background-size: 68px 55px, 84px 72px, 31px 27px, auto;
-  border: 1px dashed rgb(62 91 51 / 28%);
-}
-
-.entity {
-  position: absolute;
-  display: grid;
-  width: 224px;
-  height: 184px;
-  place-items: end center;
-  padding: 0;
-  border: 0;
-  background:
-    radial-gradient(
-      ellipse at center,
-      rgb(42 68 37 / 30%) 0 24%,
-      rgb(48 75 42 / 14%) 49%,
-      transparent 72%
-    ) 50% 100% / 138px 34px no-repeat;
-  transform: translate(-50%, -100%);
-  transform-origin: 50% 100%;
+.canvas {
+  display: block;
+  outline: none;
   touch-action: none;
-  -webkit-user-drag: none;
-  user-select: none;
 }
 
-.entitySelected {
-  filter: drop-shadow(0 0 5px rgb(255 255 255 / 95%)) drop-shadow(0 0 9px rgb(93 128 73 / 85%));
-}
-
-.entityCandidate {
-  opacity: 0.8;
-  filter: drop-shadow(0 0 7px rgb(255 255 255 / 95%));
-}
-
-.placementMask {
-  pointer-events: none;
-  opacity: 0.42;
-  background: #6abf69;
-}
-
-.placementMaskInvalid {
-  background: #dd6877;
-}
-
-.lockedLabel {
+.loading {
   position: absolute;
+  left: 50%;
+  top: 48%;
+  z-index: 10;
   transform: translate(-50%, -50%);
-  border: 1px solid rgb(255 255 255 / 70%);
+  border: 1px solid rgb(255 255 255 / 78%);
   border-radius: 999px;
-  padding: 5px 9px;
-  color: #4f6647;
-  background: rgb(255 253 248 / 72%);
-  font-size: 9px;
-  font-weight: 900;
-  box-shadow: 0 3px 8px rgb(61 78 52 / 12%);
-  pointer-events: none;
-}
-
-.scenery {
-  position: absolute;
-  display: grid;
-  width: 112px;
-  height: 116px;
-  place-items: end center;
-  transform: translate(-50%, -88%);
-  transform-origin: 50% 100%;
-  pointer-events: none;
+  padding: 8px 13px;
+  color: #526c4b;
+  background: rgb(255 253 248 / 88%);
+  font-size: 10px;
+  font-weight: 800;
+  box-shadow: 0 5px 16px rgb(61 78 52 / 14%);
 }
 
 .hint {
@@ -233,14 +56,34 @@
   z-index: 20;
   transform: translateX(-50%);
   white-space: nowrap;
-  border: 1px solid rgb(255 255 255 / 80%);
+  border: 1px solid rgb(255 255 255 / 82%);
   border-radius: 999px;
   padding: 6px 11px;
   color: #526c4b;
-  background: rgb(255 253 248 / 86%);
+  background: rgb(255 253 248 / 87%);
   font-size: 10px;
   font-weight: 800;
   box-shadow: 0 4px 12px rgb(65 78 58 / 12%);
+  pointer-events: none;
+}
+
+.threeBadge {
+  position: absolute;
+  left: 10px;
+  bottom: 12px;
+  z-index: 20;
+  display: grid;
+  min-width: 37px;
+  height: 27px;
+  place-items: center;
+  border: 1px solid rgb(255 255 255 / 75%);
+  border-radius: 999px;
+  color: white;
+  background: rgb(65 105 61 / 76%);
+  font-size: 9px;
+  font-weight: 900;
+  letter-spacing: 0.08em;
+  box-shadow: 0 4px 10px rgb(47 72 43 / 18%);
   pointer-events: none;
 }
 
@@ -261,7 +104,7 @@
   border: 1px solid rgb(255 255 255 / 82%);
   border-radius: 999px;
   color: var(--color-ink-soft);
-  background: rgb(255 253 248 / 88%);
+  background: rgb(255 253 248 / 90%);
   font-size: 19px;
   font-weight: 900;
   box-shadow: 0 5px 12px rgb(63 58 51 / 12%);
@@ -269,7 +112,7 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .world {
-    will-change: auto;
+  .canvas {
+    image-rendering: auto;
   }
 }
