@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import type { DogSkinId } from "@/lib/dog-skins";
 import {
   canPlaceTownItem,
   findFirstTownPlacement,
@@ -28,13 +27,11 @@ export function TownScreen({
   initialSnapshot,
   catalog,
   initialCoinBalance,
-  dogSkin,
   persistenceMode,
 }: {
   initialSnapshot: TownSnapshot;
   catalog: TownCatalogItem[];
   initialCoinBalance: number;
-  dogSkin: DogSkinId;
   persistenceMode: "supabase" | "local";
 }) {
   const { snapshot, pending, error, clearError, buildItem, moveItem } = useTown(
@@ -232,7 +229,6 @@ export function TownScreen({
         catalog={catalog}
         items={snapshot.items}
         unlockedAreas={snapshot.town.unlockedAreas}
-        dogSkin={dogSkin}
         selectedId={selectedId}
         candidate={candidate}
         candidateCanPlace={candidateCanPlace}
