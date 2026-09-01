@@ -101,6 +101,7 @@ export const TownCanvas = memo(function TownCanvas({
   const worldRef = useRef<HTMLDivElement>(null);
   const pointersRef = useRef(new Map<number, LocalPoint>());
   const dragPointerRef = useRef<number | null>(null);
+  const dragOffsetRef = useRef<LocalPoint>({ x: 0, y: 0 });
   const initializedRef = useRef(false);
   const frameRef = useRef<number | null>(null);
   const queuedCandidateRef = useRef<TownPlacementCandidate | null>(null);
@@ -299,14 +300,14 @@ export const TownCanvas = memo(function TownCanvas({
     frameRef.current = requestAnimationFrame(flushCandidate);
   }
 
-  function moveCandidateToPoint(point: LocalPoint) {
+  function moveCandidateToPoint(point: LocalPoint, offset: LocalPoint = { x: 0, y: 0 }) {
     if (!candidate) return;
     const item = catalogById.get(candidate.itemId);
     if (!item) return;
     const currentView = viewRef.current;
     const position = screenPointToGrid({
-      worldX: (point.x - currentView.x) / currentView.scale,
-      worldY: (point.y - currentView.y) / currentView.scale,
+      worldX: (point.x - offset.x - currentView.x) / currentView.scale,
+      worldY: (point.y - offset.y - currentView.y) / currentView.scale,
       item,
       rotation: candidate.rotation,
     });
@@ -318,16 +319,25 @@ export const TownCanvas = memo(function TownCanvas({
     if (!candidate || dragPointerRef.current !== event.pointerId) return;
     event.preventDefault();
     event.stopPropagation();
-    moveCandidateToPoint(localPoint(event));
+    moveCandidateToPoint(localPoint(event), dragOffsetRef.current);
   }
 
   function startCandidateDrag(event: ReactPointerEvent<HTMLButtonElement>) {
     if (!candidate) return;
     event.preventDefault();
     event.stopPropagation();
+    const point = localPoint(event);
+    const item = catalogById.get(candidate.itemId);
+    const anchor = item ? placementAnchor(candidate, item) : null;
+    const currentView = viewRef.current;
+    dragOffsetRef.current = anchor
+      ? {
+          x: point.x - (currentView.x + anchor.x * currentView.scale),
+          y: point.y - (currentView.y + anchor.y * currentView.scale),
+        }
+      : { x: 0, y: 0 };
     dragPointerRef.current = event.pointerId;
     event.currentTarget.setPointerCapture(event.pointerId);
-    updateCandidateFromPointer(event);
   }
 
   function endCandidateDrag(event: ReactPointerEvent<HTMLButtonElement>) {
@@ -338,6 +348,7 @@ export const TownCanvas = memo(function TownCanvas({
       event.currentTarget.releasePointerCapture(event.pointerId);
     }
     dragPointerRef.current = null;
+    dragOffsetRef.current = { x: 0, y: 0 };
   }
 
   function zoomBy(amount: number) {
