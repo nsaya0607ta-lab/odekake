@@ -29,7 +29,7 @@ function mesh(
 
 function addWindow(
   THREE: typeof import("three"),
-  group: ReturnType<typeof THREE.Group>,
+  group: InstanceType<typeof THREE.Group>,
   x: number,
   y: number,
   z: number,
@@ -45,7 +45,7 @@ function addWindow(
 
 function addHouse(
   THREE: typeof import("three"),
-  group: ReturnType<typeof THREE.Group>,
+  group: InstanceType<typeof THREE.Group>,
   width: number,
   depth: number,
   wallColor: number,
@@ -108,7 +108,7 @@ function addHouse(
 
 function addDogRun(
   THREE: typeof import("three"),
-  group: ReturnType<typeof THREE.Group>,
+  group: InstanceType<typeof THREE.Group>,
   width: number,
   depth: number,
 ) {
@@ -141,7 +141,7 @@ function addDogRun(
 
 function addHotSpring(
   THREE: typeof import("three"),
-  group: ReturnType<typeof THREE.Group>,
+  group: InstanceType<typeof THREE.Group>,
   width: number,
   depth: number,
 ) {
