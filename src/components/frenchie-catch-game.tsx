@@ -379,6 +379,32 @@ function getScoreMultiplierProduct(ref: MutableRefObject<TimedMultiplierEntry[]>
   return product;
 }
 
+/**
+ * 「次のN個 ×n」系（フリスビー/金の冠ボール/いちごロールケーキ/こもち）も、
+ * 効果中に重ねて取ると上書きせず独立したカウントを追加する。
+ * キャッチのたびに、その時点で残数が残っている全エントリの倍率を掛け合わせてから、
+ * それぞれの残数を1減らす（0になったエントリは消える）。
+ * これにより「次の2個×2」中にもう一度取ると、重なる区間だけ×2×2=×4になり、
+ * 後続の区間は残った方の×2だけになる。
+ */
+type CountMultiplierEntry = { value: number; remaining: number };
+
+function addCountMultiplier(ref: MutableRefObject<CountMultiplierEntry[]>, value: number, count: number) {
+  ref.current.push({ value, remaining: count });
+}
+
+/** 現在有効なエントリの倍率を掛け合わせて返し、全エントリの残数を1減らす（このキャッチ分を消費する） */
+function consumeCountMultiplierProduct(ref: MutableRefObject<CountMultiplierEntry[]>): number {
+  const active = ref.current.filter((entry) => entry.remaining > 0);
+  const product = active.reduce((acc, entry) => acc * entry.value, 1);
+  if (active.length > 0) {
+    ref.current = ref.current
+      .map((entry) => (entry.remaining > 0 ? { ...entry, remaining: entry.remaining - 1 } : entry))
+      .filter((entry) => entry.remaining > 0);
+  }
+  return product;
+}
+
 const NISOKU_A_ITEM_ID = "other_nisoku_a";
 const FRUIT_BASKET_ITEM_ID = "food_fruit_basket";
 const GOLD_BALL_ITEM_ID = "interior_gold_ball";
@@ -520,8 +546,8 @@ export function FrenchieCatchGame({ ownedItems }: { ownedItems: FrenchieCatchIte
   const dogCaughtRef = useRef(0);
   const caughtRef = useRef(0);
   const roundIdRef = useRef<string | null>(null);
-  const nextMultiplierRef = useRef(1);
-  const nextMultiplierCountRef = useRef(0);
+  /** 「次のN個 ×n」アイテムの有効中エントリ一覧。重複取得時は掛け合わされる */
+  const nextMultipliersRef = useRef<CountMultiplierEntry[]>([]);
   const nextBonus5Ref = useRef(0);
   const nextBonus5ValueRef = useRef(5);
   const nextBonus10Ref = useRef(0);
@@ -674,7 +700,16 @@ export function FrenchieCatchGame({ ownedItems }: { ownedItems: FrenchieCatchIte
           : `得点 ×${product}`,
       );
     }
-    if (nextMultiplierCountRef.current > 0) labels.push(`次の${nextMultiplierCountRef.current}個 ×${nextMultiplierRef.current}`);
+    const activeNextMultipliers = nextMultipliersRef.current.filter((entry) => entry.remaining > 0);
+    if (activeNextMultipliers.length > 0) {
+      const maxRemaining = Math.max(...activeNextMultipliers.map((entry) => entry.remaining));
+      const product = activeNextMultipliers.reduce((acc, entry) => acc * entry.value, 1);
+      labels.push(
+        activeNextMultipliers.length > 1
+          ? `次の${maxRemaining}個 ×${activeNextMultipliers.map((entry) => entry.value).join("×")}=${product}`
+          : `次の${maxRemaining}個 ×${product}`,
+      );
+    }
     if (nextBonus10Ref.current > 0) labels.push(`あと${nextBonus10Ref.current}個 +10pt`);
     if (rewardTimeCountRef.current > 0) labels.push(`次の1個 ${rewardTimeValueRef.current}pt確定`);
     if (nextBonus5Ref.current > 0) labels.push(`あと${nextBonus5Ref.current}個 +5pt`);
@@ -1358,13 +1393,9 @@ export function FrenchieCatchGame({ ownedItems }: { ownedItems: FrenchieCatchIte
             }
 
             const timedMultiplier = getScoreMultiplierProduct(scoreMultipliersRef, now);
-            let nextMultiplier = 1;
-            if (nextMultiplierCountRef.current > 0) {
-              nextMultiplier = nextMultiplierRef.current;
-              nextMultiplierCountRef.current -= 1;
-              if (nextMultiplierCountRef.current === 0) nextMultiplierRef.current = 1;
-              statusChanged = true;
-            }
+            const hadActiveNextMultiplier = nextMultipliersRef.current.some((entry) => entry.remaining > 0);
+            const nextMultiplier = consumeCountMultiplierProduct(nextMultipliersRef);
+            if (hadActiveNextMultiplier) statusChanged = true;
             const foodMultiplier = now < nisokuUntilRef.current && FOOD_CATEGORY_ITEM_IDS.has(entity.itemId ?? "")
               ? nisokuMultValueRef.current
               : 1;
@@ -1460,8 +1491,7 @@ export function FrenchieCatchGame({ ownedItems }: { ownedItems: FrenchieCatchIte
                 break;
               }
               case "toy_frisbee":
-                nextMultiplierRef.current = LV.FRISBEE_MULT[lv]!;
-                nextMultiplierCountRef.current += 1;
+                addCountMultiplier(nextMultipliersRef, LV.FRISBEE_MULT[lv]!, 1);
                 effectLabel = `次の1個 ×${LV.FRISBEE_MULT[lv]}${lvTag}`;
                 statusChanged = true;
                 break;
@@ -1530,8 +1560,7 @@ export function FrenchieCatchGame({ ownedItems }: { ownedItems: FrenchieCatchIte
                 statusChanged = true;
                 break;
               case "toy_golden_crown_ball":
-                nextMultiplierRef.current = LV.GOLDEN_MULT[lv]!;
-                nextMultiplierCountRef.current += LV.GOLDEN_COUNT[lv]!;
+                addCountMultiplier(nextMultipliersRef, LV.GOLDEN_MULT[lv]!, LV.GOLDEN_COUNT[lv]!);
                 effectLabel = `次の${LV.GOLDEN_COUNT[lv]}個 ×${LV.GOLDEN_MULT[lv]}${lvTag}`;
                 statusChanged = true;
                 break;
@@ -1615,8 +1644,7 @@ export function FrenchieCatchGame({ ownedItems }: { ownedItems: FrenchieCatchIte
                 statusChanged = true;
                 break;
               case "food_strawberry_roll_cake":
-                nextMultiplierRef.current = LV.STRAWBERRY_MULT[lv]!;
-                nextMultiplierCountRef.current += LV.STRAWBERRY_COUNT[lv]!;
+                addCountMultiplier(nextMultipliersRef, LV.STRAWBERRY_MULT[lv]!, LV.STRAWBERRY_COUNT[lv]!);
                 effectLabel = `次の${LV.STRAWBERRY_COUNT[lv]}個 ×${LV.STRAWBERRY_MULT[lv]}${lvTag}`;
                 statusChanged = true;
                 break;
@@ -1776,8 +1804,7 @@ export function FrenchieCatchGame({ ownedItems }: { ownedItems: FrenchieCatchIte
                 statusChanged = true;
                 break;
               case "other_komochi": {
-                nextMultiplierRef.current = LV.KOMOCHI_MULT[lv]!;
-                nextMultiplierCountRef.current += LV.KOMOCHI_COUNT[lv]!;
+                addCountMultiplier(nextMultipliersRef, LV.KOMOCHI_MULT[lv]!, LV.KOMOCHI_COUNT[lv]!);
                 const guard = grantRandomHazardGuard();
                 effectLabel = `次の${LV.KOMOCHI_COUNT[lv]}個 ×${LV.KOMOCHI_MULT[lv]} / ${guard ? HAZARD_GUARD_LABELS[guard] : "防止アイテムは満タン"}${lvTag}`;
                 statusChanged = true;
@@ -2068,8 +2095,7 @@ export function FrenchieCatchGame({ ownedItems }: { ownedItems: FrenchieCatchIte
     draggingRef.current = false;
     dragOffsetRef.current = 0;
     roundIdRef.current = crypto.randomUUID();
-    nextMultiplierRef.current = 1;
-    nextMultiplierCountRef.current = 0;
+    nextMultipliersRef.current = [];
     nextBonus5Ref.current = 0;
     nextBonus5ValueRef.current = 5;
     nextBonus10Ref.current = 0;
