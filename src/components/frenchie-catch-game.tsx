@@ -275,6 +275,8 @@ const LV = {
   TOOREMATEN_SEC: [4, 5, 6, 8, 10],
   TOOREMATEN_PT: [45, 60, 80, 100, 130],
   HIA_MULT: [6, 7, 8, 9, 10],
+  NARCISSIST_SEC: [20, 25, 30, 35, 40],
+  MAFIA_MULT: [1.1, 1.12, 1.14, 1.16, 1.18],
 } as const;
 const SLANT_VX_BOOST = 3.5;
 const POINTS: Record<FrenchieCatchItem["rarity"], number> = { N: 10, R: 20, SR: 40, SSR: 70, UR: 100, LR: 150, MR: 220 };
@@ -362,6 +364,13 @@ const ITEM_SPAWN_WEIGHTS: Partial<Record<string, number>> = {
   other_azuki: 74,
   summer_frenchie: 106,
   other_listen_to_the_a: 50,
+  /**
+   * ナルシストアー：捕まえた全アイテムのスキルがLv.MAXとして発動するため、発動中に得点倍率系
+   * （肉/宝箱/Xmas Party/こびー等の「○秒間×n」スキル）を複数拾うと掛け算が重なり大きく
+   * 跳ねる（シミュレーションで確認済み）。効果自体は文字通り全アイテムに適用したまま、
+   * 出現頻度をデフォルトの1/10に抑えて「稀に大当たりする」MRらしい枠にしてある。
+   */
+  other_narcissist_a: 10,
 };
 const STRETCH_ROD_ITEM_ID = "interior_stretch_rod";
 const STRETCH_ROD_SECONDS = 3;
@@ -636,6 +645,13 @@ export function FrenchieCatchGame({ ownedItems }: { ownedItems: FrenchieCatchIte
    */
   const hazardInvertUntilRef = useRef(0);
   const mirrorInvertPtValueRef = useRef(0);
+  /** ナルシストアー：有効中は捕まえた全アイテムのスキルがレベル5(MAX)として発動する */
+  const narcissistUntilRef = useRef(0);
+  /**
+   * マフィアー：ラウンド終了時のフレブル数ボーナス（dogCaughtRef × プレイ秒数）にかかる
+   * 累計倍率。捕まえるたびに掛け合わされ、ラウンド中重複していく（3体で×1.1×1.1×1.1など）。
+   */
+  const mafiaDogBonusMultRef = useRef(1);
   /**
    * 通れまてん：有効中は「はずれ」の初期フレブル(15pt)の代わりに、より高得点な金色フレブルが
    * 同じ出現枠（dogWeight）でそのまま出現する。フレブルの出現シェア自体は変えないので、
@@ -782,6 +798,8 @@ export function FrenchieCatchGame({ ownedItems }: { ownedItems: FrenchieCatchIte
     if (now < hazardInvertUntilRef.current) labels.push("ミラータイム中（ハザード反転）");
     if (now < dogGoldenUntilRef.current) labels.push(`通れまてん発動中（フレブルが金色に、+${dogGoldenPtValueRef.current}pt）`);
     if (urBoostRef.current > 0) labels.push(`UR出現率+${Math.min(urBoostRef.current, UR_BOOST_MAX)}`);
+    if (now < narcissistUntilRef.current) labels.push("ナルシストアー発動中（全アイテムのスキルがLv.MAX）");
+    if (mafiaDogBonusMultRef.current > 1) labels.push(`フレブル数ボーナス×${mafiaDogBonusMultRef.current.toFixed(2)}`);
     setActiveEffects(labels);
   }, []);
 
@@ -1122,7 +1140,7 @@ export function FrenchieCatchGame({ ownedItems }: { ownedItems: FrenchieCatchIte
     const finishRound = (now: number) => {
       const playSeconds = Math.max(0, (now - startAtRef.current) / 1000);
       const dogCount = dogCaughtRef.current;
-      const dogBonusPoints = Math.floor(dogCount * playSeconds);
+      const dogBonusPoints = Math.floor(dogCount * playSeconds * mafiaDogBonusMultRef.current);
       if (dogBonusPoints > 0) {
         scoreRef.current += dogBonusPoints;
         setScore(scoreRef.current);
@@ -1183,6 +1201,10 @@ export function FrenchieCatchGame({ ownedItems }: { ownedItems: FrenchieCatchIte
       }
       if (spawnRateBoostUntilRef.current > 0 && now >= spawnRateBoostUntilRef.current) {
         spawnRateBoostUntilRef.current = 0;
+        timedEffectChanged = true;
+      }
+      if (narcissistUntilRef.current > 0 && now >= narcissistUntilRef.current) {
+        narcissistUntilRef.current = 0;
         timedEffectChanged = true;
       }
       if (urBoostRef.current > 0 && now >= urBoostDecayNextRef.current) {
@@ -1472,7 +1494,10 @@ export function FrenchieCatchGame({ ownedItems }: { ownedItems: FrenchieCatchIte
             const skillLevel = isMystery
               ? (itemLevelByIdRef.current.get(skillId ?? "") ?? 1)
               : (entity.level || 1);
-            const lv = clamp(skillLevel, 1, MAX_SKILL_LEVEL) - 1;
+            /** ナルシストアー有効中は、捕まえた全アイテムのスキルがレベル5(MAX)として発動する */
+            const narcissistActive = now < narcissistUntilRef.current;
+            const effectiveSkillLevel = narcissistActive ? MAX_SKILL_LEVEL : skillLevel;
+            const lv = clamp(effectiveSkillLevel, 1, MAX_SKILL_LEVEL) - 1;
 
             const addBonusTime = (seconds: number) => {
               endAtRef.current += seconds * 1000;
@@ -1500,7 +1525,9 @@ export function FrenchieCatchGame({ ownedItems }: { ownedItems: FrenchieCatchIte
               return kind;
             };
 
-            const lvTag = skillLevel >= MAX_SKILL_LEVEL ? " [Lv.MAX]" : skillLevel > 1 ? ` [Lv${skillLevel}]` : "";
+            const lvTag = narcissistActive
+              ? " [ナルシストアー Lv.MAX]"
+              : skillLevel >= MAX_SKILL_LEVEL ? " [Lv.MAX]" : skillLevel > 1 ? ` [Lv${skillLevel}]` : "";
 
             /**
              * もっちゅりんの「エコー」で任意のアイテムのスキルを再発動できるよう、
@@ -1974,6 +2001,20 @@ export function FrenchieCatchGame({ ownedItems }: { ownedItems: FrenchieCatchIte
                 statusChanged = true;
                 break;
               }
+              case "other_narcissist_a": {
+                const narcissistSec = LV.NARCISSIST_SEC[lv]!;
+                narcissistUntilRef.current = Math.max(now, narcissistUntilRef.current) + narcissistSec * 1000;
+                effectLabel = `${narcissistSec}秒間 全アイテムのスキルがLv.MAXに${lvTag}`;
+                statusChanged = true;
+                break;
+              }
+              case "other_mafia_a": {
+                const mafiaMult = LV.MAFIA_MULT[lv]!;
+                mafiaDogBonusMultRef.current *= mafiaMult;
+                effectLabel = `フレブル数ボーナス×${mafiaMult}（累計×${mafiaDogBonusMultRef.current.toFixed(2)}）${lvTag}`;
+                statusChanged = true;
+                break;
+              }
               default:
                 break;
               }
@@ -2200,6 +2241,8 @@ export function FrenchieCatchGame({ ownedItems }: { ownedItems: FrenchieCatchIte
     mirrorInvertPtValueRef.current = 0;
     dogGoldenUntilRef.current = 0;
     dogGoldenPtValueRef.current = 0;
+    narcissistUntilRef.current = 0;
+    mafiaDogBonusMultRef.current = 1;
     setBlackoutActive(false);
     setStunned(false);
     bagStockRef.current = 0;

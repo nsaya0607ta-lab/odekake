@@ -98,6 +98,8 @@ export const GACHA_PRIZES: readonly GachaPrize[] = [
   // --- 通常ガチャ：MR --------------------------------------------------
   { id: "other_burebur", name: "ブレブル", rarity: "MR", type: "item", image: "/collection/items/burebur.webp" },
   { id: "other_xmas_party", name: "Xmas Party", rarity: "MR", type: "item", image: "/collection/items/xmas-party.webp" },
+  { id: "other_narcissist_a", name: "ナルシストアー", rarity: "MR", type: "item", image: null },
+  { id: "other_mafia_a", name: "マフィアー", rarity: "MR", type: "item", image: null },
 
   // --- 通常ガチャ：その他 追加分 --------------------------------------
   { id: "other_clawd", name: "Clawd", rarity: "SSR", type: "item", image: "/collection/items/clawd.webp" },

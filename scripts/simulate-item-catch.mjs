@@ -62,7 +62,7 @@ function extractBlock(src, startMarker, openChar, closeChar) {
 
 // --- itemPool（ミニゲームで実際に出現する全アイテム。図鑑本体から復元） ---------------
 function buildItemPool() {
-  const re = /\{ id: "([^"]+)", name: "[^"]*", image: "[^"]*", category: "([^"]+)", series: (null|"[^"]+"), rarity: "([^"]+)"(?:, art: "([^"]+)")? \}/g;
+  const re = /\{ id: "([^"]+)", name: "[^"]*", image: (?:null|"[^"]*"), category: "([^"]+)", series: (null|"[^"]+"), rarity: "([^"]+)"(?:, art: "([^"]+)")? \}/g;
   const all = [];
   let m;
   while ((m = re.exec(ITEMS_TS))) {
@@ -164,6 +164,8 @@ function simulateOneRound(lv, catchAll, timeBonusCatchRate = 1) {
   let ikeaUntil = 0, ikeaCount = 0;
   let bagStock = 0;
   let spawnRateBoostUntil = 0, spawnRateBoostValue = 1;
+  let narcissistUntil = 0;
+  let mafiaDogBonusMult = 1;
 
   function addBonusTime(sec) { endAt += sec * 1000; }
 
@@ -244,6 +246,8 @@ function simulateOneRound(lv, catchAll, timeBonusCatchRate = 1) {
       case "interior_shikkoku_no_ar": multiplier15Until = t + LV.SHIKKOKU_SEC[lvIdx] * 1000; multiplier15Value = LV.SHIKKOKU_MULT[lvIdx]; break;
       case "other_oyatsu_no_jikan": rewardTimeCount = 1; rewardTimeValue = LV.OYATSU_PT[lvIdx]; break;
       case "interior_gold_ball": break; // コイン加算のみ。スコアには含めない
+      case "other_narcissist_a": narcissistUntil = Math.max(t, narcissistUntil) + LV.NARCISSIST_SEC[lvIdx] * 1000; break;
+      case "other_mafia_a": mafiaDogBonusMult *= LV.MAFIA_MULT[lvIdx]; break;
       default: break; // その他の効果はスコア・秒数に影響しない（磁石・ダンボール拡大・ガード付与・ハザード反転など）
     }
     return points;
@@ -280,6 +284,8 @@ function simulateOneRound(lv, catchAll, timeBonusCatchRate = 1) {
       skillId = MYSTERY_SKILL_ITEM_IDS[Math.floor(Math.random() * MYSTERY_SKILL_ITEM_IDS.length)];
       skillLvIdx = lv; // フルコンプ想定なので？が選んだアイテムも同じLv扱い
     }
+    // ナルシストアー有効中は、捕まえた全アイテムのスキルがレベル5(MAX)として発動する
+    if (t < narcissistUntil) skillLvIdx = 4;
     if (skillId) points += runItemSkillEffect(skillId, skillLvIdx);
 
     if (Math.random() < JUST_CHANCE) points = Math.round(points * JUST_MULTIPLIER);
@@ -417,7 +423,7 @@ function simulateOneRound(lv, catchAll, timeBonusCatchRate = 1) {
   }
 
   const playSeconds = cappedOut ? MAX_PLAY_SECONDS : endAt / 1000;
-  score += Math.floor(dogCaught * playSeconds);
+  score += Math.floor(dogCaught * playSeconds * mafiaDogBonusMult);
   return { score, playSeconds, cappedOut };
 }
 
