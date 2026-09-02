@@ -49,8 +49,8 @@ export const MAX_DAILY_STEP_COINS =
   (200000 / STEP_COIN_INTERVAL) * STEP_COIN_AMOUNT
   + STEP_COIN_MILESTONES.reduce((sum, milestone) => sum + milestone.coins, 0);
 
-/** アイテムキャッチ：50秒遊びきると25スコアごとに1コイン、最低1コイン。 */
-export const ITEM_CATCH_SCORE_PER_COIN = 25;
+/** アイテムキャッチ：50秒遊びきると100スコアごとに1コイン、最低1コイン。 */
+export const ITEM_CATCH_SCORE_PER_COIN = 100;
 export const ITEM_CATCH_MIN_COINS = 1;
 
 /** わんこボウリング：5フレーム完走で、倒したピン合計スコア5点ごとに1コイン、最低1コイン。 */

@@ -18,8 +18,8 @@ function toRecord(value: unknown): Record<string, unknown> {
   return value && typeof value === "object" ? (value as Record<string, unknown>) : {};
 }
 
-/** record_item_catch_result() のコイン換算レート（1コイン=200pt）と揃える */
-const COIN_CONVERSION_POINTS = 200;
+/** record_item_catch_result() のコイン換算レート（1コイン=100pt）と揃える */
+const COIN_CONVERSION_POINTS = 100;
 
 function splitScoreForLegacyValidation(score: number): number[] {
   if (score <= MAX_SCORE_PER_RPC) return [score];
