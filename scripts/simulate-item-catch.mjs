@@ -117,7 +117,7 @@ const byId = new Map(pool.map((x) => [x.id, x]));
 const DEFAULT_WEIGHT = 100;
 const JUST_CHANCE = 0.3; // JUST_RADIUS_RATIO=0.3の近似（正確な着地位置は未実装）
 const JUST_MULTIPLIER = Number(GAME_TSX.match(/const JUST_MULTIPLIER = ([\d.]+);/)[1]);
-const DOG_POINTS = 15;
+const DOG_POINTS = 30;
 const DOG_FLOOD_RATE = DOG_FLOOD_SPAWN_RATE;
 const POOP_FLOOD_RATE = POOP_FLOOD_SPAWN_RATE;
 

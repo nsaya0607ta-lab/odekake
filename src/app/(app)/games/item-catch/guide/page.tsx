@@ -13,15 +13,15 @@ export const dynamic = "force-dynamic";
 const ITEM_BY_ID = new Map(COLLECTION_ITEMS.map((item) => [item.id, item]));
 
 const SCORE_CARDS = [
-  ["N", "10pt", "bg-gradient-to-br from-[#eef8ec] to-[#dff0dc] border-[#bdd8b7] text-[#3f6d43] shadow-[inset_0_1px_0_rgba(255,255,255,0.85)]"],
-  ["R", "20pt", "bg-gradient-to-br from-[#edf7ff] to-[#dceefd] border-[#b9d5ed] text-[#326b96] shadow-[inset_0_1px_0_rgba(255,255,255,0.85)]"],
-  ["SR", "40pt", "bg-gradient-to-br from-[#fff9dc] via-[#fff0b8] to-[#f4d67c] border-[#d8b95e] text-[#7c5a08] shadow-[0_5px_14px_rgba(185,145,35,0.12)]"],
-  ["SSR", "70pt", "bg-gradient-to-br from-[#f4ddff] via-[#dff4ff] to-[#fff0c9] border-[#d9c4e8] text-[#6b568a] shadow-[0_5px_14px_rgba(120,95,170,0.10)]"],
-  ["UR", "100pt", "bg-gradient-to-br from-[#ffebe8] via-[#f7b5ab] to-[#c9362e] border-[#b72b24] text-[#7f1713] shadow-[0_6px_16px_rgba(182,45,38,0.22)]"],
-  ["LR", "150pt", "bg-gradient-to-br from-[#2c2924] via-[#12110f] to-[#050505] border-[#c8a34b] text-[#f0cf72] shadow-[0_7px_18px_rgba(0,0,0,0.28),inset_0_0_0_1px_rgba(240,207,114,0.16)]"],
-  ["MR", "220pt", "bg-gradient-to-br from-[#151a4d] via-[#1f2470] to-[#3a2f7a] border-[#c9a53f] text-[#ffe9a8] shadow-[0_7px_18px_rgba(20,20,70,0.35),inset_0_0_0_1px_rgba(255,233,168,0.18)]"],
-  ["わんこ", "15pt", "bg-gradient-to-br from-[#fbf4e9] to-[#efe1cc] border-[#ddc9aa] text-[#735b3d]"],
-  ["？", "10pt〜", "bg-gradient-to-br from-[#f5f2ec] to-[#e7e1d8] border-[#d2c8ba] text-[#625b52]"],
+  ["N", "20pt", "bg-gradient-to-br from-[#eef8ec] to-[#dff0dc] border-[#bdd8b7] text-[#3f6d43] shadow-[inset_0_1px_0_rgba(255,255,255,0.85)]"],
+  ["R", "40pt", "bg-gradient-to-br from-[#edf7ff] to-[#dceefd] border-[#b9d5ed] text-[#326b96] shadow-[inset_0_1px_0_rgba(255,255,255,0.85)]"],
+  ["SR", "80pt", "bg-gradient-to-br from-[#fff9dc] via-[#fff0b8] to-[#f4d67c] border-[#d8b95e] text-[#7c5a08] shadow-[0_5px_14px_rgba(185,145,35,0.12)]"],
+  ["SSR", "140pt", "bg-gradient-to-br from-[#f4ddff] via-[#dff4ff] to-[#fff0c9] border-[#d9c4e8] text-[#6b568a] shadow-[0_5px_14px_rgba(120,95,170,0.10)]"],
+  ["UR", "200pt", "bg-gradient-to-br from-[#ffebe8] via-[#f7b5ab] to-[#c9362e] border-[#b72b24] text-[#7f1713] shadow-[0_6px_16px_rgba(182,45,38,0.22)]"],
+  ["LR", "300pt", "bg-gradient-to-br from-[#2c2924] via-[#12110f] to-[#050505] border-[#c8a34b] text-[#f0cf72] shadow-[0_7px_18px_rgba(0,0,0,0.28),inset_0_0_0_1px_rgba(240,207,114,0.16)]"],
+  ["MR", "440pt", "bg-gradient-to-br from-[#151a4d] via-[#1f2470] to-[#3a2f7a] border-[#c9a53f] text-[#ffe9a8] shadow-[0_7px_18px_rgba(20,20,70,0.35),inset_0_0_0_1px_rgba(255,233,168,0.18)]"],
+  ["わんこ", "30pt", "bg-gradient-to-br from-[#fbf4e9] to-[#efe1cc] border-[#ddc9aa] text-[#735b3d]"],
+  ["？", "20pt〜", "bg-gradient-to-br from-[#f5f2ec] to-[#e7e1d8] border-[#d2c8ba] text-[#625b52]"],
 ] as const;
 
 export default async function ItemCatchGuidePage() {

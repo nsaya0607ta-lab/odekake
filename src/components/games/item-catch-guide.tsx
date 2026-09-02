@@ -31,7 +31,7 @@ export type GuideSkill = {
 // ---------------------------------------------------------------
 // 得点の試算
 // ---------------------------------------------------------------
-const BASE_POINTS: Record<GachaRarity, number> = { N: 10, R: 20, SR: 40, SSR: 70, UR: 100, LR: 150, MR: 220 };
+const BASE_POINTS: Record<GachaRarity, number> = { N: 20, R: 40, SR: 80, SSR: 140, UR: 200, LR: 300, MR: 440 };
 const SIM_RARITIES: GachaRarity[] = ["N", "R", "SR", "SSR", "UR", "LR", "MR"];
 const SIM_MULTIPLIERS = [1, 1.5, 2, 2.5, 3];
 const JUST_MULTIPLIER = 1.25;
