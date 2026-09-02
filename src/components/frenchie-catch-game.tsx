@@ -51,6 +51,8 @@ type RecentSkillEffect = {
 };
 
 const ROUND_SECONDS = 50;
+/** 時間増加系スキルの複利的な伸びが稀に極端化した場合の安全弁。この秒数を超えては延長しない */
+const MAX_ROUND_SECONDS = 1800;
 const BOX_IMAGE = "/4EA485D9-BB37-47F3-97F0-111CF0E4AF7E.webp";
 const BOX_WIDTH = 37.8 * 0.9;
 const BOX_HALF = BOX_WIDTH / 2;
@@ -82,8 +84,8 @@ const POOP_PENALTY = 500;
 const MYSTERY_ITEM_ID = "mystery_item";
 const MYSTERY_IMAGE = "/collection/items/mystery-question.webp";
 const MYSTERY_SPAWN_CHANCE = 0.05;
-const MYSTERY_BASE_POINTS = 10;
-const IKEA_PT_PER_ITEM = 60;
+const MYSTERY_BASE_POINTS = 20;
+const IKEA_PT_PER_ITEM = 90;
 const BAG_ITEM_ID = "hazard_bag";
 const BAG_IMAGE = "/collection/items/plastic-bag.webp";
 const BAG_SPAWN_CHANCE = 0.03;
@@ -177,21 +179,21 @@ const LV = {
   DUCK_SEC: [1, 3, 4, 5, 6],
   CARROT_SEC: [1, 3, 4, 5, 6],
   FRISBEE_MULT: [2, 2.2, 2.4, 2.7, 3],
-  SOCCER_PT: [10, 15, 20, 30, 40],
-  TAIYAKI_PT: [5, 7, 10, 13, 15],
-  BEAR_PT: [0, 10, 0, 20, 0],
-  BOWL_PT: [5, 7, 10, 13, 15],
-  PUDDING_PT: [15, 20, 30, 40, 50],
+  SOCCER_PT: [15, 23, 30, 45, 60],
+  TAIYAKI_PT: [8, 11, 15, 20, 23],
+  BEAR_PT: [0, 15, 0, 30, 0],
+  BOWL_PT: [8, 11, 15, 20, 23],
+  PUDDING_PT: [23, 30, 45, 60, 75],
   MELON_SEC: [1, 3, 4, 5, 6],
-  MELON_PT: [5, 10, 15, 20, 30],
-  TREASURE_LOW: [25, 30, 40, 50, 60],
-  TREASURE_HIGH: [50, 65, 80, 100, 130],
+  MELON_PT: [8, 15, 23, 30, 45],
+  TREASURE_LOW: [38, 45, 60, 75, 90],
+  TREASURE_HIGH: [75, 98, 120, 150, 195],
   TREASURE_SEC: [1, 5, 6, 7, 8],
   TREASURE_STREAK_PCT: [20, 25, 30, 35, 40],
   FRENCHIE_PLUSH_COUNT: [3, 3, 4, 4, 5],
-  FRENCHIE_PLUSH_PT: [10, 13, 15, 20, 25],
+  FRENCHIE_PLUSH_PT: [15, 20, 23, 30, 38],
   MEAT_MULT: [1.1, 1.3, 1.5, 1.7, 1.9],
-  CUSHION_PT: [30, 40, 50, 65, 80],
+  CUSHION_PT: [45, 60, 75, 98, 120],
   MACARON_SEC: [3, 4, 5, 6, 8],
   STARWAND_MULT: [2, 2.3, 2.6, 3, 3.5],
   STRAWBERRY_COUNT: [1, 1, 1, 2, 2],
@@ -203,31 +205,31 @@ const LV = {
   RAINBOW_STEP: [2, 5, 7, 8, 9],
   GOLDEN_COUNT: [2, 2, 3, 3, 4],
   GOLDEN_MULT: [2, 2.2, 2.2, 2.5, 2.5],
-  NAKAYOSHI_PT: [30, 40, 50, 65, 80],
+  NAKAYOSHI_PT: [45, 60, 75, 98, 120],
   KAMUNAYO_SEC: [5, 6, 8, 10, 13],
   KAMUNAYO_MULT: [1.2, 1.4, 1.6, 1.8, 2.0],
   HIKING_SEC: [5, 6, 7, 9, 12],
   SNOW_SEC: [5, 6, 7, 9, 12],
   SUMMER_ADD: [2, 5, 7, 8, 9],
   SUMMER_MULT: [1.3, 1.6, 1.9, 2.2, 2.5],
-  ANBALL_PT: [100, 125, 150, 180, 220],
+  ANBALL_PT: [150, 188, 225, 270, 330],
   ANBALL_SEC: [2, 5, 7, 8, 9],
   STRETCH_ROD_MULT: [0.5, 0.4, 0.3, 0.2, 0.1],
   LISTEN_DOG_COUNT: [10, 15, 20, 25, 30],
   AZUBEE_MULT: [1.2, 1.5, 1.8, 2.1, 2.4],
   OMOJII_SEC: [3, 10, 11, 13, 14],
-  OMOJII_PT: [30, 45, 60, 80, 100],
+  OMOJII_PT: [45, 68, 90, 120, 150],
   KINOKO_SEC: [6, 7, 8, 10, 12],
   KINOKO_FALL: [1.7, 1.8, 1.9, 2, 2.2],
   KINOKO_SCORE: [1.2, 1.5, 1.8, 2.1, 2.4],
   KOMOCHI_COUNT: [5, 5, 6, 7, 8],
   KOMOCHI_MULT: [2, 2.1, 2.2, 2.3, 2.5],
   AZUKI_SEC: [2, 8, 9, 10, 11],
-  AZUKI_PT: [50, 65, 80, 100, 130],
-  KOBEE_PT: [50, 65, 80, 100, 130],
+  AZUKI_PT: [75, 98, 120, 150, 195],
+  KOBEE_PT: [75, 98, 120, 150, 195],
   KOBEE_MULT: [1.2, 1.5, 1.8, 2.1, 2.4],
   HAMIGAKI_SEC: [0, 2, 3, 4, 5],
-  HAMIGAKI_PT: [0, 0, 10, 15, 20],
+  HAMIGAKI_PT: [0, 0, 15, 23, 30],
   IKEA_SEC: [4, 5, 6, 7, 8],
   ORUSUBAN_SEC: [5, 6, 7, 8, 10],
   ORUSUBAN_FALL: [1.8, 2, 2.2, 2.4, 2.8],
@@ -242,7 +244,7 @@ const LV = {
   SHIKKOKU_MULT: [1.3, 1.6, 1.9, 2.2, 2.5],
   RAGBY_SEC: [5, 6, 7, 9, 12],
   RAGBY_SPAWN: [2, 2.25, 2.5, 2.75, 3],
-  OYATSU_PT: [180, 200, 220, 240, 280],
+  OYATSU_PT: [270, 300, 330, 360, 420],
   KETSUNADE_SEC: [4, 5, 6, 8, 10],
   BUREBUR_COUNT: [6, 8, 10, 12, 13],
   XMAS_SEC: [6, 7, 9, 10, 12],
@@ -251,9 +253,9 @@ const LV = {
   XMAS_SPAWN: [1.5, 1.75, 2, 2.25, 2.5],
   XMAS_DOG_COUNT: [5, 6, 7, 8, 9],
   OMOCHI_SEC: [4, 5, 6, 8, 10],
-  OMOCHI_PT: [500, 500, 500, 500, 500],
+  OMOCHI_PT: [750, 750, 750, 750, 750],
   OKAERI_SEC: 3,
-  OKAERI_PER_CATCH: [3, 4, 5, 6, 7],
+  OKAERI_PER_CATCH: [1, 1, 1, 1, 1],
   OMOI_BASHIRA_SEC: [4, 5, 6, 8, 10],
   /** おやすみ：ブラックアウト発生時はLR、発生しなかった時はSSRのランク別倍率カーブを使う */
   OYASUMI_MULT_BLACKOUT: [1.3, 1.6, 1.9, 2.2, 2.5],
@@ -263,20 +265,20 @@ const LV = {
   FRUIT_BASKET_COUNT: [2, 3, 4, 5, 6],
   GOLD_BALL_COINS: [10, 15, 20, 30, 50],
   CLAWD_BALL_COUNT: [5, 8, 10, 12, 14],
-  KAMIKAMI_PT: [10, 15, 25, 35, 45],
-  MOCCHURIN_PT: [30, 45, 60, 80, 100],
+  KAMIKAMI_PT: [15, 23, 38, 53, 68],
+  MOCCHURIN_PT: [45, 68, 90, 120, 150],
   TIME_BONUS_FALL: [6, 5.6, 5.2, 4.8, 4.5],
-  MAH_PT: [260, 280, 300, 330, 370],
+  MAH_PT: [390, 420, 450, 495, 555],
   MIRROR_SEC: [5, 6, 8, 10, 13],
-  MIRROR_INVERT_PT: [15, 20, 25, 30, 40],
+  MIRROR_INVERT_PT: [23, 30, 38, 45, 60],
   TOOREMATEN_SEC: [4, 5, 6, 8, 10],
-  TOOREMATEN_PT: [45, 60, 80, 100, 130],
+  TOOREMATEN_PT: [68, 90, 120, 150, 195],
   HIA_MULT: [6, 7, 8, 9, 10],
   NARCISSIST_SEC: [20, 25, 30, 35, 40],
   MAFIA_MULT: [1.1, 1.12, 1.14, 1.16, 1.18],
 } as const;
 const SLANT_VX_BOOST = 3.5;
-const POINTS: Record<FrenchieCatchItem["rarity"], number> = { N: 10, R: 20, SR: 40, SSR: 70, UR: 100, LR: 150, MR: 220 };
+const POINTS: Record<FrenchieCatchItem["rarity"], number> = { N: 20, R: 40, SR: 80, SSR: 140, UR: 200, LR: 300, MR: 440 };
 const RARITY_FALL_SPEED: Record<FrenchieCatchItem["rarity"], number> = { N: 1, R: 1.08, SR: 1.18, SSR: 1.32, UR: 1.5, LR: 1.75, MR: 2 };
 /** 時間が増えるスキルを持つアイテムだけ、落下速度をレアリティ別倍率で上げる */
 const TIME_BONUS_ITEM_IDS = new Set([
@@ -362,13 +364,14 @@ const DEFAULT_ITEM_SPAWN_WEIGHT = 100;
  */
 const ITEM_SPAWN_WEIGHTS: Partial<Record<string, number>> = {
   toy_treasure_puzzle: 149,
-  other_omojii: 74,
-  toy_duck_plush: 106,
-  toy_carrot: 106,
-  food_paw_melon_bread: 106,
-  interior_anball: 106,
-  other_azuki: 74,
-  summer_frenchie: 106,
+  other_omojii: 63,
+  toy_duck_plush: 90,
+  toy_carrot: 90,
+  food_paw_melon_bread: 90,
+  interior_anball: 90,
+  other_azuki: 63,
+  summer_frenchie: 90,
+  other_okaeri: 14,
   other_listen_to_the_a: 50,
   /**
    * MR3種（ブレブル・ナルシストアー・マフィアー）はいずれも効果が強く出現頻度を抑えたいため、
@@ -1473,7 +1476,7 @@ export function FrenchieCatchGame({ ownedItems }: { ownedItems: FrenchieCatchIte
             }
 
             let basePoints = entity.kind === "dog"
-              ? (entity.itemId === TOOREMATEN_GOLDEN_DOG_ID ? dogGoldenPtValueRef.current : 15)
+              ? (entity.itemId === TOOREMATEN_GOLDEN_DOG_ID ? dogGoldenPtValueRef.current : 30)
               : entity.itemId === MYSTERY_ITEM_ID
                 ? MYSTERY_BASE_POINTS
                 : POINTS[entity.rarity!];
@@ -1528,7 +1531,8 @@ export function FrenchieCatchGame({ ownedItems }: { ownedItems: FrenchieCatchIte
             const lv = clamp(effectiveSkillLevel, 1, MAX_SKILL_LEVEL) - 1;
 
             const addBonusTime = (seconds: number) => {
-              endAtRef.current += seconds * 1000;
+              const maxEndAt = startAtRef.current + MAX_ROUND_SECONDS * 1000;
+              endAtRef.current = Math.min(maxEndAt, endAtRef.current + seconds * 1000);
               setTimeLeft(Math.ceil(Math.max(0, (endAtRef.current - now) / 1000)));
               return seconds;
             };
