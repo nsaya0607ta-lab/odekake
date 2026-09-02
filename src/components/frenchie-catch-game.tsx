@@ -461,6 +461,11 @@ function getScoreMultiplierProduct(ref: MutableRefObject<TimedMultiplierEntry[]>
   return product;
 }
 
+/** UI表示用：小数点第一位まで切り上げ（例: 1.21→1.3, 2→2.0） */
+function formatMultiplierCeil(value: number): string {
+  return (Math.ceil(value * 10) / 10).toFixed(1);
+}
+
 /**
  * 「次のN個 ×n」系（フリスビー/金の冠ボール/いちごロールケーキ/こもち）も、
  * 効果中に重ねて取ると上書きせず独立したカウントを追加する。
@@ -721,6 +726,7 @@ export function FrenchieCatchGame({ ownedItems }: { ownedItems: FrenchieCatchIte
   const [timeMinusGuard, setTimeMinusGuard] = useState(0);
   const [feedback, setFeedback] = useState<CatchFeedback | null>(null);
   const [activeEffects, setActiveEffects] = useState<string[]>([]);
+  const [scoreMultiplierParts, setScoreMultiplierParts] = useState<{ label: string; value: number }[]>([]);
   const [recentSkillEffects, setRecentSkillEffects] = useState<RecentSkillEffect[]>([]);
   const [impactX, setImpactX] = useState<number | null>(null);
   const [boxBounce, setBoxBounce] = useState(false);
@@ -791,6 +797,7 @@ export function FrenchieCatchGame({ ownedItems }: { ownedItems: FrenchieCatchIte
 
   const refreshEffectStatus = useCallback((now: number) => {
     const labels: string[] = [];
+    const multiplierParts: { label: string; value: number }[] = [];
     const activeScoreMultipliers = scoreMultipliersRef.current.filter((entry) => entry.until > now);
     if (activeScoreMultipliers.length > 0) {
       const product = activeScoreMultipliers.reduce((acc, entry) => acc * entry.value, 1);
@@ -799,6 +806,7 @@ export function FrenchieCatchGame({ ownedItems }: { ownedItems: FrenchieCatchIte
           ? `得点 ×${activeScoreMultipliers.map((entry) => entry.value).join("×")}=${product}`
           : `得点 ×${product}`,
       );
+      multiplierParts.push({ label: "得点", value: product });
     }
     const activeNextMultipliers = nextMultipliersRef.current.filter((entry) => entry.remaining > 0);
     if (activeNextMultipliers.length > 0) {
@@ -809,6 +817,7 @@ export function FrenchieCatchGame({ ownedItems }: { ownedItems: FrenchieCatchIte
           ? `次の${maxRemaining}個 ×${activeNextMultipliers.map((entry) => entry.value).join("×")}=${product}`
           : `次の${maxRemaining}個 ×${product}`,
       );
+      multiplierParts.push({ label: `次の${maxRemaining}個`, value: product });
     }
     if (nextBonus10Ref.current > 0) labels.push(`あと${nextBonus10Ref.current}個 +10pt`);
     if (rewardTimeCountRef.current > 0) labels.push(`次の1個 ${rewardTimeValueRef.current}pt確定`);
@@ -829,7 +838,10 @@ export function FrenchieCatchGame({ ownedItems }: { ownedItems: FrenchieCatchIte
     if (now < otherSuppressUntilRef.current) labels.push(`その他カテゴリ出現×${otherSuppressValueRef.current}中`);
     if (now < highRarityLockUntilRef.current) labels.push("SSR/UR/LRのみ出現中");
     if (highRarityLockCountRef.current > 0) labels.push(`UR/LRのみ出現 あと${highRarityLockCountRef.current}体`);
-    if (treasureStreakActiveRef.current) labels.push(`宝箱連続ボーナス 得点+${Math.round((treasureStreakMultRef.current - 1) * 100)}%`);
+    if (treasureStreakActiveRef.current) {
+      labels.push(`宝箱連続ボーナス 得点+${Math.round((treasureStreakMultRef.current - 1) * 100)}%`);
+      multiplierParts.push({ label: "宝箱連続", value: treasureStreakMultRef.current });
+    }
     if (now < omochiUntilRef.current) labels.push(`うんちがおもちに +${omochiPtValueRef.current}pt`);
     if (now < okaeriUntilRef.current) labels.push(`1個ごとに+${okaeriPerCatchValueRef.current}秒`);
     if (now < hazardShieldUntilRef.current) labels.push("ハザード出現なし");
@@ -841,6 +853,7 @@ export function FrenchieCatchGame({ ownedItems }: { ownedItems: FrenchieCatchIte
           ? `食べ物カテゴリ得点×${activeFoodMultipliers.map((entry) => entry.value).join("×")}=${product}中`
           : `食べ物カテゴリ得点×${product}中`,
       );
+      multiplierParts.push({ label: "食べ物", value: product });
     }
     if (now < slantBoostUntilRef.current) labels.push("斜め落下中");
     if (now < boxShrinkUntilRef.current) labels.push("ダンボール0.8倍");
@@ -855,6 +868,7 @@ export function FrenchieCatchGame({ ownedItems }: { ownedItems: FrenchieCatchIte
     if (now < narcissistUntilRef.current) labels.push("ナルシストアー発動中（全アイテムのスキルがLv.MAX）");
     if (mafiaDogBonusMultRef.current > 1) labels.push(`フレブル数ボーナス×${mafiaDogBonusMultRef.current.toFixed(2)}`);
     setActiveEffects(labels);
+    setScoreMultiplierParts(multiplierParts);
   }, []);
 
   /**
@@ -2316,6 +2330,7 @@ export function FrenchieCatchGame({ ownedItems }: { ownedItems: FrenchieCatchIte
     setTimeLeft(ROUND_SECONDS);
     setFeedback(null);
     setActiveEffects([]);
+    setScoreMultiplierParts([]);
     recentSkillEffectTimersRef.current.forEach((timer) => clearTimeout(timer));
     recentSkillEffectTimersRef.current.clear();
     setRecentSkillEffects([]);
@@ -2401,6 +2416,15 @@ export function FrenchieCatchGame({ ownedItems }: { ownedItems: FrenchieCatchIte
               <p className="text-xl font-black tabular-nums text-ink">{score.toLocaleString("ja-JP")}</p>
               {feedback ? <span className="pointer-events-none absolute -right-2 -top-2 rounded-full bg-[#fff6cc]/95 px-2 py-0.5 text-[10px] font-black text-[#c87527] shadow-sm">+{feedback.points}</span> : null}
             </div>
+            {scoreMultiplierParts.length > 0 ? (
+              <div className="flex flex-row flex-wrap items-center gap-1">
+                {scoreMultiplierParts.map((part) => (
+                  <span key={part.label} className="rounded-xl border border-[#f4d98f] bg-[#fff6cc]/95 px-2 py-1 text-sm font-black leading-none text-[#c87527] shadow-sm">
+                    {part.label}×{formatMultiplierCeil(part.value)}
+                  </span>
+                ))}
+              </div>
+            ) : null}
             {bagStock > 0 || stunGuard > 0 || boxShrinkGuard > 0 || timeMinusGuard > 0 ? (
               <div className="flex flex-row items-start gap-1.5">
                 {bagStock > 0 ? (
