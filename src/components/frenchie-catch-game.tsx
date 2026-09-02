@@ -371,7 +371,7 @@ const ITEM_SPAWN_WEIGHTS: Partial<Record<string, number>> = {
   interior_anball: 90,
   other_azuki: 63,
   summer_frenchie: 90,
-  other_okaeri: 14,
+  other_okaeri: 300,
   other_listen_to_the_a: 50,
   /**
    * MR3種（ブレブル・ナルシストアー・マフィアー）はいずれも効果が強く出現頻度を抑えたいため、

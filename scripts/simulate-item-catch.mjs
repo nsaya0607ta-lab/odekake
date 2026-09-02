@@ -11,20 +11,28 @@
  * 正規表現+evalでLVテーブル・出現重み・？アイテムの抽選プール・ROUND_SECONDS等を抽出するため、
  * 実装側の数値を変更すればこのスクリプトも自動的に追従する（値を二重管理しない）。
  *
- * 使い方: node scripts/simulate-item-catch.mjs [試行回数(デフォルト300)] [avoid|all] [時間増加系7種の実キャッチ率(デフォルト1)]
+ * 使い方: node scripts/simulate-item-catch.mjs [試行回数(デフォルト300)] [avoid|all] [時間増加系7種の実キャッチ率(デフォルト0.8)] [通常時キャッチ率(デフォルト0.85)] [密集時キャッチ率(デフォルト0.5)]
  *   第2引数 "avoid"（デフォルト）: 時間減少ハザードとチョコレートは回避する（キャッチしない）前提
  *   第2引数 "all": ハザードも含めて全てのスポーンを100%キャッチする前提
  *     （時間減少は-3秒、チョコレートは即座にラウンド終了）
- *   第3引数: 時間増加系7種(あひる/にんじん/肉球メロンパン/アンボール/小豆/おもじぃ/夏のフレブル)が
- *     出現した際に実際にキャッチできる確率。例: 0.9 を渡すと「時間増加系を9割しか取れない」プレイを再現する
+ *   第3引数: 時間増加系7種(あひる/にんじん/肉球メロンパン/アンボール/小豆/おもじぃ/夏のフレブル)+おかえりが
+ *     出現した際に実際にキャッチできる確率（第5・第6引数の一般キャッチ率とは別枠で、さらにこの確率を掛け合わせる）。
+ *     例: 0.8 を渡すと「時間増加系を8割しか取れない」プレイを再現する
  *     （見送った分は何も起きない＝ハズレでも他のアイテムでもなく、ただ落下していくだけとして扱う）
+ *   第4引数: それ以外の全キャッチ（わんこ・フラッド中のキャラ含む）に一律で適用される「通常時」キャッチ率。
+ *     反応の遅れ等による平常時の取りこぼしを表す（2026-09-02〜、現実的プレイの標準前提。詳細はdocs/minigame-time-balance.md）。
+ *   第5引数: フレブル大量出現(dogFlood)・うんち祭り(poopFlood)・フルーツバスケット/Clawd(personFlood/clawdFlood)・
+ *     出現量アップ中など、複数アイテムがほぼ同時に降ってくる「密集時」に適用されるキャッチ率。段ボールは1つしかなく
+ *     同時に複数はキャッチできないため、通常時より大幅に低い値を想定する。
  *
  * 既知の簡略化（完全な再現ではない点に注意）:
  * - もっちゅりんの「エコー」（直前に捕まえたアイテムのスキルを再発動）は未実装
  * - JUSTボーナス（着地位置がド真ん中に近いと+25%）は正確な位置判定の代わりに一律30%確率で近似
  * - ミラーおもちの「しびれ/ダンボール縮小への反転加点」は未実装（時間減少の反転pt加算のみ実装）
  * - エンティティ同時出現数の上限(NORMAL/DOUBLE/TRIPLE_ENTITY_CAP)による出現抑制は未実装
- * - 「100%キャッチできる」という理想化前提（実プレイの体感時間・スコアはこれより下振れするのが通常）
+ *   （代わりに第5引数の「密集時キャッチ率」で、同時多発時の取りこぼしを近似している）
+ * - 「スポーンした物を必ずしも100%キャッチできるわけではない」現実的なプレイを、通常時/密集時/時間増加系の
+ *   3段階キャッチ率で近似している（完全な位置判定・反応時間シミュレーションではない）
  */
 import fs from "node:fs";
 import path from "node:path";
@@ -147,11 +155,18 @@ function uniform(min, max) { return min + Math.random() * (max - min); }
 function weightOf(id) { return ITEM_SPAWN_WEIGHTS[id] ?? DEFAULT_WEIGHT; }
 function clamp1to5(x) { return Math.min(5, Math.max(1, x)); }
 
-function simulateOneRound(lv, catchAll, timeBonusCatchRate = 1) {
+function simulateOneRound(lv, catchAll, timeBonusCatchRate = 0.8, normalCatchRate = 0.85, denseCatchRate = 0.5) {
   let t = 0;
   let endAt = ROUND_SECONDS * 1000;
   let score = 0;
   let dogCaught = 0;
+
+  function isDense() {
+    return dogFloodRemaining > 0 || poopFloodRemaining > 0 || personFloodRemaining > 0 || clawdFloodRemaining > 0 || t < spawnRateBoostUntil;
+  }
+  function attemptCatch() {
+    return Math.random() < (isDense() ? denseCatchRate : normalCatchRate);
+  }
 
   let urBoost = 0, urBoostDecayNextAt = 0;
   let otherSuppressUntil = 0, otherSuppressValue = 1;
@@ -336,12 +351,12 @@ function simulateOneRound(lv, catchAll, timeBonusCatchRate = 1) {
     const dt = uniform(SPAWN_MIN_MS, SPAWN_MAX_MS) / spawnRateMult;
     if (excludeTimeBonus) nextExtraT = t + dt; else nextT = t + dt;
 
-    if (dogFloodRemaining > 0) { dogFloodRemaining -= 1; resolveCatch("dog", null, null, 0); continue; }
+    if (dogFloodRemaining > 0) { dogFloodRemaining -= 1; if (attemptCatch()) resolveCatch("dog", null, null, 0); continue; }
     if (personFloodRemaining > 0) {
       personFloodRemaining -= 1;
       const pid = PERSON_IDS[Math.floor(Math.random() * PERSON_IDS.length)];
       const item = byId.get(pid);
-      resolveCatch("item", pid, item.rarity, lv + 1);
+      if (attemptCatch()) resolveCatch("item", pid, item.rarity, lv + 1);
       continue;
     }
     if (poopFloodRemaining > 0) { poopFloodRemaining -= 1; catchPoop(); continue; }
@@ -352,7 +367,7 @@ function simulateOneRound(lv, catchAll, timeBonusCatchRate = 1) {
       const isGold = Math.random() < 0.2;
       const pid = isGold ? "interior_gold_ball" : "toy_soccer_ball";
       const item = byId.get(pid);
-      resolveCatch("item", pid, item.rarity, lv + 1);
+      if (attemptCatch()) resolveCatch("item", pid, item.rarity, lv + 1);
     }
 
     const elapsedSec = t / 1000;
@@ -410,13 +425,13 @@ function simulateOneRound(lv, catchAll, timeBonusCatchRate = 1) {
         const skinIds = ["hiking_frenchie", "snow_frenchie", "summer_frenchie"].filter((id) => !(excludeTimeBonus && TIME_BONUS_IDS.has(id)));
         const sid = skinIds[Math.floor(Math.random() * skinIds.length)];
         // 時間増加系(夏のフレブル)はtimeBonusCatchRateの確率でしか実際にはキャッチできない前提
-        if (!TIME_BONUS_IDS.has(sid) || Math.random() < timeBonusCatchRate) {
+        if (attemptCatch() && (!TIME_BONUS_IDS.has(sid) || Math.random() < timeBonusCatchRate)) {
           const item = byId.get(sid);
           resolveCatch("item", sid, item.rarity, lv + 1);
         }
       } else {
         const dogGoldenActive = t < dogGoldenUntil;
-        resolveCatch("dog", dogGoldenActive ? "toorematen_golden_dog" : null, null, 0);
+        if (attemptCatch()) resolveCatch("dog", dogGoldenActive ? "toorematen_golden_dog" : null, null, 0);
       }
       continue;
     }
@@ -425,7 +440,7 @@ function simulateOneRound(lv, catchAll, timeBonusCatchRate = 1) {
     for (let i = 0; i < pool.length; i++) { roll -= weights[i]; if (roll <= 0) { pickedId = pool[i].id; break; } }
     if (highRarityLockCount > 0) highRarityLockCount -= 1;
     // 時間増加系7種＋おかえりはtimeBonusCatchRateの確率でしか実際にはキャッチできない前提（見送ると何も起きない）
-    if (!REDUCED_CATCH_IDS.has(pickedId) || Math.random() < timeBonusCatchRate) {
+    if (attemptCatch() && (!REDUCED_CATCH_IDS.has(pickedId) || Math.random() < timeBonusCatchRate)) {
       const item = byId.get(pickedId);
       resolveCatch("item", pickedId, item.rarity, lv + 1);
     }
@@ -446,13 +461,15 @@ function main() {
   const mode = process.argv[3] ?? "avoid";
   if (mode !== "avoid" && mode !== "all") throw new Error(`unknown mode: ${mode} (use "avoid" or "all")`);
   const catchAll = mode === "all";
-  const timeBonusCatchRate = process.argv[4] !== undefined ? Number(process.argv[4]) : 1;
-  console.log(`itemPool N=${POOL_SIZE} / ROUND_SECONDS=${ROUND_SECONDS} / MAX_ROUND_SECONDS=${MAX_PLAY_SECONDS} / 試行回数=${trials} / モード=${mode}${catchAll ? "（時間減少・チョコレートも100%キャッチ）" : "（時間減少・チョコレートは回避）"} / 時間増加系7種の実キャッチ率=${timeBonusCatchRate}\n`);
+  const timeBonusCatchRate = process.argv[4] !== undefined ? Number(process.argv[4]) : 0.8;
+  const normalCatchRate = process.argv[5] !== undefined ? Number(process.argv[5]) : 0.85;
+  const denseCatchRate = process.argv[6] !== undefined ? Number(process.argv[6]) : 0.5;
+  console.log(`itemPool N=${POOL_SIZE} / ROUND_SECONDS=${ROUND_SECONDS} / MAX_ROUND_SECONDS=${MAX_PLAY_SECONDS} / 試行回数=${trials} / モード=${mode}${catchAll ? "（時間減少・チョコレートも100%キャッチ）" : "（時間減少・チョコレートは回避）"} / 時間増加系7種の実キャッチ率=${timeBonusCatchRate} / 通常時キャッチ率=${normalCatchRate} / 密集時キャッチ率=${denseCatchRate}\n`);
   for (let lvIdx = 0; lvIdx < 5; lvIdx++) {
     const scores = [], secs = [];
     let cappedCount = 0;
     for (let i = 0; i < trials; i++) {
-      const r = simulateOneRound(lvIdx, catchAll, timeBonusCatchRate);
+      const r = simulateOneRound(lvIdx, catchAll, timeBonusCatchRate, normalCatchRate, denseCatchRate);
       scores.push(r.score);
       secs.push(r.playSeconds);
       if (r.cappedOut) cappedCount += 1;
