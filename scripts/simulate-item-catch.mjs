@@ -463,9 +463,11 @@ function main() {
     scores.sort((a, b) => a - b);
     secs.sort((a, b) => a - b);
     const mean = (arr) => arr.reduce((s, v) => s + v, 0) / arr.length;
+    const exceed = (th) => (secs.filter((s) => s > th).length / secs.length * 100).toFixed(2);
     console.log(
       `Lv${lvIdx + 1}: ` +
       `秒数 平均=${mean(secs).toFixed(1)} 中央値=${percentile(secs, 0.5).toFixed(1)} p90=${percentile(secs, 0.9).toFixed(1)} p99=${percentile(secs, 0.99).toFixed(1)} 最大=${secs[secs.length - 1].toFixed(1)} | ` +
+      `>500s=${exceed(500)}% >700s=${exceed(700)}% >1000s=${exceed(1000)}% | ` +
       `スコア 平均=${Math.round(mean(scores))} 中央値=${Math.round(percentile(scores, 0.5))} 最小=${Math.round(scores[0])} 最大=${Math.round(scores[scores.length - 1])}` +
       (cappedCount > 0 ? ` | ⚠️安全弁到達=${cappedCount}/${trials}試行` : "")
     );
