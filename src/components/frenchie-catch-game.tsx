@@ -311,12 +311,17 @@ const TREASURE_MINUS5_SEC = 5;
  * 得点倍率スキル（肉/宝箱item_double/Xmas Party/あずびー/はるいろフラワーリース/おやすみ/
  * かむなよ/夏のフレブル/きのこあずびー/こびー/漆黒のアー/二足アー）は、2026-09-01に
  * レアリティ別の統一カーブ（R:1.1〜0.1刻み、SR:1.1〜0.2、SSR:1.2〜0.2、UR:1.2〜0.3、
- * LR:1.3〜0.3、MR:1.5〜0.4）に揃え、発動秒数も一律10秒固定にした（ユーザー指定）。
+ * LR:1.3〜0.3、MR:1.5〜0.4）に揃えた。発動秒数は2026-09-02にレアリティ別
+ * （SR:3秒/SSR:5秒/UR:6秒/LR:8秒/MR:15秒）に変更（ユーザー指定）。
  * 落下速度アップ等、別の効果と秒数を共有していたアイテム（Xmas Party/きのこあずびー/
  * 漆黒のアー）は、得点倍率の発動時間だけこの定数を使い、落下速度側は既存のLV.xxx_SECを
  * そのまま使う（両者が別々の秒数で動くようになる）。
  */
-const SCORE_MULT_DURATION_SEC = 10;
+const SCORE_MULT_DURATION_SR_SEC = 3;
+const SCORE_MULT_DURATION_SSR_SEC = 5;
+const SCORE_MULT_DURATION_UR_SEC = 6;
+const SCORE_MULT_DURATION_LR_SEC = 8;
+const SCORE_MULT_DURATION_MR_SEC = 15;
 /**
  * 宝箱の中身抽選（8択）。合計100、ハズレ(うんち祭り+マイナス秒)は合計20。
  * rare_lockはSSR/UR/LR以外の出現重みをゼロにするため、時間増加系のUR勢を一時的に
@@ -420,7 +425,7 @@ const TIME_BONUS_CUTOFF_BASE_SEC = 60;
 const TIME_BONUS_CUTOFF_STEP_SEC_PER_LEVEL = 20;
 const OMOI_BASHIRA_ITEM_ID = "other_omoi_bashira";
 const OYASUMI_ITEM_ID = "other_oyasumi";
-const OYASUMI_SECONDS = SCORE_MULT_DURATION_SEC;
+const OYASUMI_SECONDS = SCORE_MULT_DURATION_SSR_SEC;
 /** 50%の確率でブラックアウト演出だけ発生せず、得点倍率だけがかかる */
 const OYASUMI_NO_BLACKOUT_CHANCE = 0.5;
 /**
@@ -1641,8 +1646,8 @@ export function FrenchieCatchGame({ ownedItems }: { ownedItems: FrenchieCatchIte
                 statusChanged = true;
                 break;
               case "toy_meat":
-                addScoreMultiplier(scoreMultipliersRef, now, LV.MEAT_MULT[lv]!, SCORE_MULT_DURATION_SEC * 1000);
-                effectLabel = `${SCORE_MULT_DURATION_SEC}秒間 ×${LV.MEAT_MULT[lv]}${lvTag}`;
+                addScoreMultiplier(scoreMultipliersRef, now, LV.MEAT_MULT[lv]!, SCORE_MULT_DURATION_SR_SEC * 1000);
+                effectLabel = `${SCORE_MULT_DURATION_SR_SEC}秒間 ×${LV.MEAT_MULT[lv]}${lvTag}`;
                 statusChanged = true;
                 break;
               case "toy_frenchie_cushion":
@@ -1670,8 +1675,8 @@ export function FrenchieCatchGame({ ownedItems }: { ownedItems: FrenchieCatchIte
                   const applied = addBonusTime(-TREASURE_MINUS5_SEC);
                   effectLabel = `宝箱 ${applied}秒${lvTag}`;
                 } else if (outcome === "item_double") {
-                  addScoreMultiplier(scoreMultipliersRef, now, LV.TREASURE_DOUBLE_MULT[lv]!, SCORE_MULT_DURATION_SEC * 1000);
-                  effectLabel = `宝箱 ${SCORE_MULT_DURATION_SEC}秒間 得点×${LV.TREASURE_DOUBLE_MULT[lv]}${lvTag}`;
+                  addScoreMultiplier(scoreMultipliersRef, now, LV.TREASURE_DOUBLE_MULT[lv]!, SCORE_MULT_DURATION_SR_SEC * 1000);
+                  effectLabel = `宝箱 ${SCORE_MULT_DURATION_SR_SEC}秒間 得点×${LV.TREASURE_DOUBLE_MULT[lv]}${lvTag}`;
                   statusChanged = true;
                 } else if (outcome === "rare_lock") {
                   highRarityLockUntilRef.current = Math.max(now, highRarityLockUntilRef.current) + LV.TREASURE_SEC[lv]! * 1000;
@@ -1724,11 +1729,11 @@ export function FrenchieCatchGame({ ownedItems }: { ownedItems: FrenchieCatchIte
                 const xmasSec = LV.XMAS_SEC[lv]!;
                 fallSpeedBoostUntilRef.current = Math.max(now, fallSpeedBoostUntilRef.current) + xmasSec * 1000;
                 fallSpeedValueRef.current = LV.XMAS_FALL[lv]!;
-                addScoreMultiplier(scoreMultipliersRef, now, LV.XMAS_SCORE[lv]!, SCORE_MULT_DURATION_SEC * 1000);
+                addScoreMultiplier(scoreMultipliersRef, now, LV.XMAS_SCORE[lv]!, SCORE_MULT_DURATION_MR_SEC * 1000);
                 spawnRateBoostUntilRef.current = Math.max(now, spawnRateBoostUntilRef.current) + xmasSec * 1000;
                 spawnRateBoostValueRef.current = LV.XMAS_SPAWN[lv]!;
                 dogFloodRemainingRef.current += LV.XMAS_DOG_COUNT[lv]!;
-                effectLabel = `${xmasSec}秒間 落下×${LV.XMAS_FALL[lv]}+出現量×${LV.XMAS_SPAWN[lv]} / ${SCORE_MULT_DURATION_SEC}秒間 得点×${LV.XMAS_SCORE[lv]} / フレブル${LV.XMAS_DOG_COUNT[lv]}体${lvTag}`;
+                effectLabel = `${xmasSec}秒間 落下×${LV.XMAS_FALL[lv]}+出現量×${LV.XMAS_SPAWN[lv]} / ${SCORE_MULT_DURATION_MR_SEC}秒間 得点×${LV.XMAS_SCORE[lv]} / フレブル${LV.XMAS_DOG_COUNT[lv]}体${lvTag}`;
                 statusChanged = true;
                 break;
               }
@@ -1738,8 +1743,8 @@ export function FrenchieCatchGame({ ownedItems }: { ownedItems: FrenchieCatchIte
                 statusChanged = true;
                 break;
               case "other_azubee":
-                addScoreMultiplier(scoreMultipliersRef, now, LV.AZUBEE_MULT[lv]!, SCORE_MULT_DURATION_SEC * 1000);
-                effectLabel = `${SCORE_MULT_DURATION_SEC}秒間 ×${LV.AZUBEE_MULT[lv]}${lvTag}`;
+                addScoreMultiplier(scoreMultipliersRef, now, LV.AZUBEE_MULT[lv]!, SCORE_MULT_DURATION_UR_SEC * 1000);
+                effectLabel = `${SCORE_MULT_DURATION_UR_SEC}秒間 ×${LV.AZUBEE_MULT[lv]}${lvTag}`;
                 statusChanged = true;
                 break;
               case "other_omojii": {
@@ -1808,8 +1813,8 @@ export function FrenchieCatchGame({ ownedItems }: { ownedItems: FrenchieCatchIte
                 break;
               }
               case "interior_spring_flower_wreath":
-                addScoreMultiplier(scoreMultipliersRef, now, LV.SPRING_MULT[lv]!, SCORE_MULT_DURATION_SEC * 1000);
-                effectLabel = `${SCORE_MULT_DURATION_SEC}秒間 ×${LV.SPRING_MULT[lv]}${lvTag}`;
+                addScoreMultiplier(scoreMultipliersRef, now, LV.SPRING_MULT[lv]!, SCORE_MULT_DURATION_SR_SEC * 1000);
+                effectLabel = `${SCORE_MULT_DURATION_SR_SEC}秒間 ×${LV.SPRING_MULT[lv]}${lvTag}`;
                 statusChanged = true;
                 break;
               case "other_sparkle_rope_crown":
@@ -1819,8 +1824,8 @@ export function FrenchieCatchGame({ ownedItems }: { ownedItems: FrenchieCatchIte
                 statusChanged = true;
                 break;
               case NISOKU_A_ITEM_ID: {
-                addScoreMultiplier(foodScoreMultipliersRef, now, LV.NISOKU_A_MULT[lv]!, SCORE_MULT_DURATION_SEC * 1000);
-                effectLabel = `${SCORE_MULT_DURATION_SEC}秒間 食べ物カテゴリ得点×${LV.NISOKU_A_MULT[lv]}${lvTag}`;
+                addScoreMultiplier(foodScoreMultipliersRef, now, LV.NISOKU_A_MULT[lv]!, SCORE_MULT_DURATION_SSR_SEC * 1000);
+                effectLabel = `${SCORE_MULT_DURATION_SSR_SEC}秒間 食べ物カテゴリ得点×${LV.NISOKU_A_MULT[lv]}${lvTag}`;
                 statusChanged = true;
                 break;
               }
@@ -1911,8 +1916,8 @@ export function FrenchieCatchGame({ ownedItems }: { ownedItems: FrenchieCatchIte
                 break;
               }
               case "other_kamunayo":
-                addScoreMultiplier(scoreMultipliersRef, now, LV.KAMUNAYO_MULT[lv]!, SCORE_MULT_DURATION_SEC * 1000);
-                effectLabel = `${SCORE_MULT_DURATION_SEC}秒間 ×${LV.KAMUNAYO_MULT[lv]}${lvTag}`;
+                addScoreMultiplier(scoreMultipliersRef, now, LV.KAMUNAYO_MULT[lv]!, SCORE_MULT_DURATION_SSR_SEC * 1000);
+                effectLabel = `${SCORE_MULT_DURATION_SSR_SEC}秒間 ×${LV.KAMUNAYO_MULT[lv]}${lvTag}`;
                 statusChanged = true;
                 break;
               case "hiking_frenchie":
@@ -1929,16 +1934,16 @@ export function FrenchieCatchGame({ ownedItems }: { ownedItems: FrenchieCatchIte
                 break;
               case "summer_frenchie": {
                 const applied = addBonusTime(LV.SUMMER_ADD[lv]!);
-                addScoreMultiplier(scoreMultipliersRef, now, LV.SUMMER_MULT[lv]!, SCORE_MULT_DURATION_SEC * 1000);
-                effectLabel = `+${applied}秒 / ${SCORE_MULT_DURATION_SEC}秒間×${LV.SUMMER_MULT[lv]}${lvTag}`;
+                addScoreMultiplier(scoreMultipliersRef, now, LV.SUMMER_MULT[lv]!, SCORE_MULT_DURATION_LR_SEC * 1000);
+                effectLabel = `+${applied}秒 / ${SCORE_MULT_DURATION_LR_SEC}秒間×${LV.SUMMER_MULT[lv]}${lvTag}`;
                 statusChanged = true;
                 break;
               }
               case "interior_kinoko_azubee":
                 fallSpeedBoostUntilRef.current = Math.max(now, fallSpeedBoostUntilRef.current) + LV.KINOKO_SEC[lv]! * 1000;
                 fallSpeedValueRef.current = LV.KINOKO_FALL[lv]!;
-                addScoreMultiplier(scoreMultipliersRef, now, LV.KINOKO_SCORE[lv]!, SCORE_MULT_DURATION_SEC * 1000);
-                effectLabel = `${LV.KINOKO_SEC[lv]}秒間 落下×${LV.KINOKO_FALL[lv]} / ${SCORE_MULT_DURATION_SEC}秒間 得点×${LV.KINOKO_SCORE[lv]}${lvTag}`;
+                addScoreMultiplier(scoreMultipliersRef, now, LV.KINOKO_SCORE[lv]!, SCORE_MULT_DURATION_UR_SEC * 1000);
+                effectLabel = `${LV.KINOKO_SEC[lv]}秒間 落下×${LV.KINOKO_FALL[lv]} / ${SCORE_MULT_DURATION_UR_SEC}秒間 得点×${LV.KINOKO_SCORE[lv]}${lvTag}`;
                 statusChanged = true;
                 break;
               case "other_komochi": {
@@ -1956,8 +1961,8 @@ export function FrenchieCatchGame({ ownedItems }: { ownedItems: FrenchieCatchIte
               }
               case "other_kobee":
                 points += LV.KOBEE_PT[lv]!;
-                addScoreMultiplier(scoreMultipliersRef, now, LV.KOBEE_MULT[lv]!, SCORE_MULT_DURATION_SEC * 1000);
-                effectLabel = `+${LV.KOBEE_PT[lv]}pt / ${SCORE_MULT_DURATION_SEC}秒間 ×${LV.KOBEE_MULT[lv]}${lvTag}`;
+                addScoreMultiplier(scoreMultipliersRef, now, LV.KOBEE_MULT[lv]!, SCORE_MULT_DURATION_UR_SEC * 1000);
+                effectLabel = `+${LV.KOBEE_PT[lv]}pt / ${SCORE_MULT_DURATION_UR_SEC}秒間 ×${LV.KOBEE_MULT[lv]}${lvTag}`;
                 statusChanged = true;
                 break;
               case "other_hamigaki": {
@@ -2027,8 +2032,8 @@ export function FrenchieCatchGame({ ownedItems }: { ownedItems: FrenchieCatchIte
                 const shikkokuSec = LV.SHIKKOKU_SEC[lv]!;
                 fallSpeedBoostUntilRef.current = Math.max(now, fallSpeedBoostUntilRef.current) + shikkokuSec * 1000;
                 fallSpeedValueRef.current = LV.SHIKKOKU_FALL[lv]!;
-                addScoreMultiplier(scoreMultipliersRef, now, LV.SHIKKOKU_MULT[lv]!, SCORE_MULT_DURATION_SEC * 1000);
-                effectLabel = `${shikkokuSec}秒間 落下×${LV.SHIKKOKU_FALL[lv]} / ${SCORE_MULT_DURATION_SEC}秒間 得点×${LV.SHIKKOKU_MULT[lv]}${lvTag}`;
+                addScoreMultiplier(scoreMultipliersRef, now, LV.SHIKKOKU_MULT[lv]!, SCORE_MULT_DURATION_LR_SEC * 1000);
+                effectLabel = `${shikkokuSec}秒間 落下×${LV.SHIKKOKU_FALL[lv]} / ${SCORE_MULT_DURATION_LR_SEC}秒間 得点×${LV.SHIKKOKU_MULT[lv]}${lvTag}`;
                 statusChanged = true;
                 break;
               }
