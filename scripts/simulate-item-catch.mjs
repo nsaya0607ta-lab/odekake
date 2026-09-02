@@ -77,6 +77,7 @@ const ITEM_SPAWN_WEIGHTS = evalLiteral(extractBlock(GAME_TSX, "const ITEM_SPAWN_
 const MYSTERY_SKILL_ITEM_IDS = evalLiteral(extractBlock(GAME_TSX, "const MYSTERY_SKILL_ITEM_IDS = [", "[", "]"));
 const TREASURE_OUTCOME_WEIGHTS = evalLiteral(extractBlock(GAME_TSX, "const TREASURE_OUTCOME_WEIGHTS: { outcome: string; weight: number }[] = [", "[", "]"));
 const ROUND_SECONDS = Number(GAME_TSX.match(/const ROUND_SECONDS = (\d+);/)[1]);
+const MAX_PLAY_SECONDS = Number(GAME_TSX.match(/const MAX_ROUND_SECONDS = (\d+);/)[1]);
 const DOG_SPAWN_RATIO = Number(GAME_TSX.match(/const DOG_SPAWN_RATIO = ([\d.]+);/)[1]);
 const FRENCHIE_SKIN_SPAWN_CHANCE = Number(GAME_TSX.match(/const FRENCHIE_SKIN_SPAWN_CHANCE = ([\d.]+);/)[1]);
 const SPAWN_MIN_MS = Number(GAME_TSX.match(/const SPAWN_INTERVAL_MIN_MS = (\d+);/)[1]);
@@ -173,7 +174,7 @@ function simulateOneRound(lv, catchAll, timeBonusCatchRate = 1) {
   let mafiaDogBonusMult = 1;
   let okaeriUntil = 0, okaeriPerCatchValue = 0;
 
-  function addBonusTime(sec) { endAt += sec * 1000; }
+  function addBonusTime(sec) { endAt = Math.min(MAX_PLAY_SECONDS * 1000, endAt + sec * 1000); }
 
   function finishIkeaIfDone() {
     if (ikeaUntil > 0 && t >= ikeaUntil) {
@@ -313,17 +314,12 @@ function simulateOneRound(lv, catchAll, timeBonusCatchRate = 1) {
     else { score = Math.max(0, score - POOP_PENALTY); }
   }
 
-  // 稀に発生しうる暴走（時間増加の連鎖でendAtが際限なく伸びる）でシミュレータ自体が
-  // ハングしないための安全弁。到達したら打ち切ってフラグを立てる（実プレイでは起き得ない前提）。
-  const MAX_PLAY_SECONDS = 3600;
-  let cappedOut = false;
   // frenchie-catch-game.tsxのnextSpawnRef(通常)/extraSpawnRef(ボーナス、時間増加系除外)と
   // 同じく、完全に独立した2本のタイマーとしてスケジュールする。「同一レートの1本を50%で
   // 間引く」近似は、一様分布の間隔をベルヌーイ間引きすると分散が実際より大幅に大きくなり
   // （待ち時間が幾何分布的に伸びるため）、暴走判定に偽陽性を生むことが判明したため採用しない。
   let nextT = 0, nextExtraT = 0;
   while (t < endAt) {
-    if (t > MAX_PLAY_SECONDS * 1000) { cappedOut = true; break; }
     while (urBoost > 0 && t >= urBoostDecayNextAt) { urBoost = Math.max(0, urBoost - UR_BOOST_DECAY_STEP); urBoostDecayNextAt += UR_BOOST_DECAY_INTERVAL_MS; }
     finishIkeaIfDone();
     if (spawnRateBoostUntil > 0 && t >= spawnRateBoostUntil) spawnRateBoostUntil = 0;
@@ -435,7 +431,8 @@ function simulateOneRound(lv, catchAll, timeBonusCatchRate = 1) {
     }
   }
 
-  const playSeconds = cappedOut ? MAX_PLAY_SECONDS : endAt / 1000;
+  const playSeconds = endAt / 1000;
+  const cappedOut = playSeconds >= MAX_PLAY_SECONDS;
   score += Math.floor(dogCaught * playSeconds * mafiaDogBonusMult);
   return { score, playSeconds, cappedOut };
 }
@@ -450,7 +447,7 @@ function main() {
   if (mode !== "avoid" && mode !== "all") throw new Error(`unknown mode: ${mode} (use "avoid" or "all")`);
   const catchAll = mode === "all";
   const timeBonusCatchRate = process.argv[4] !== undefined ? Number(process.argv[4]) : 1;
-  console.log(`itemPool N=${POOL_SIZE} / ROUND_SECONDS=${ROUND_SECONDS} / 試行回数=${trials} / モード=${mode}${catchAll ? "（時間減少・チョコレートも100%キャッチ）" : "（時間減少・チョコレートは回避）"} / 時間増加系7種の実キャッチ率=${timeBonusCatchRate}\n`);
+  console.log(`itemPool N=${POOL_SIZE} / ROUND_SECONDS=${ROUND_SECONDS} / MAX_ROUND_SECONDS=${MAX_PLAY_SECONDS} / 試行回数=${trials} / モード=${mode}${catchAll ? "（時間減少・チョコレートも100%キャッチ）" : "（時間減少・チョコレートは回避）"} / 時間増加系7種の実キャッチ率=${timeBonusCatchRate}\n`);
   for (let lvIdx = 0; lvIdx < 5; lvIdx++) {
     const scores = [], secs = [];
     let cappedCount = 0;
@@ -469,7 +466,7 @@ function main() {
       `秒数 平均=${mean(secs).toFixed(1)} 中央値=${percentile(secs, 0.5).toFixed(1)} p90=${percentile(secs, 0.9).toFixed(1)} p99=${percentile(secs, 0.99).toFixed(1)} 最大=${secs[secs.length - 1].toFixed(1)} | ` +
       `>500s=${exceed(500)}% >700s=${exceed(700)}% >1000s=${exceed(1000)}% | ` +
       `スコア 平均=${Math.round(mean(scores))} 中央値=${Math.round(percentile(scores, 0.5))} 最小=${Math.round(scores[0])} 最大=${Math.round(scores[scores.length - 1])}` +
-      (cappedCount > 0 ? ` | ⚠️安全弁到達=${cappedCount}/${trials}試行` : "")
+      (cappedCount > 0 ? ` | ⚠️強制終了(${MAX_PLAY_SECONDS}秒)到達=${cappedCount}/${trials}試行` : "")
     );
   }
 }

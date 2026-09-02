@@ -51,6 +51,8 @@ type RecentSkillEffect = {
 };
 
 const ROUND_SECONDS = 50;
+/** 時間増加系スキルの複利的な伸びが稀に極端化した場合の安全弁。この秒数を超えては延長しない */
+const MAX_ROUND_SECONDS = 1800;
 const BOX_IMAGE = "/4EA485D9-BB37-47F3-97F0-111CF0E4AF7E.webp";
 const BOX_WIDTH = 37.8 * 0.9;
 const BOX_HALF = BOX_WIDTH / 2;
@@ -1529,7 +1531,8 @@ export function FrenchieCatchGame({ ownedItems }: { ownedItems: FrenchieCatchIte
             const lv = clamp(effectiveSkillLevel, 1, MAX_SKILL_LEVEL) - 1;
 
             const addBonusTime = (seconds: number) => {
-              endAtRef.current += seconds * 1000;
+              const maxEndAt = startAtRef.current + MAX_ROUND_SECONDS * 1000;
+              endAtRef.current = Math.min(maxEndAt, endAtRef.current + seconds * 1000);
               setTimeLeft(Math.ceil(Math.max(0, (endAtRef.current - now) / 1000)));
               return seconds;
             };
