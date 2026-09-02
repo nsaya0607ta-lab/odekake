@@ -253,7 +253,7 @@ const LV = {
   OMOCHI_SEC: [4, 5, 6, 8, 10],
   OMOCHI_PT: [500, 500, 500, 500, 500],
   OKAERI_SEC: 3,
-  OKAERI_PER_CATCH: [3, 4, 5, 6, 7],
+  OKAERI_PER_CATCH: [1, 1, 1, 1, 1],
   OMOI_BASHIRA_SEC: [4, 5, 6, 8, 10],
   /** おやすみ：ブラックアウト発生時はLR、発生しなかった時はSSRのランク別倍率カーブを使う */
   OYASUMI_MULT_BLACKOUT: [1.3, 1.6, 1.9, 2.2, 2.5],

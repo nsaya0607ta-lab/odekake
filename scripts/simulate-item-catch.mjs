@@ -167,6 +167,7 @@ function simulateOneRound(lv, catchAll, timeBonusCatchRate = 1) {
   let spawnRateBoostUntil = 0, spawnRateBoostValue = 1;
   let narcissistUntil = 0;
   let mafiaDogBonusMult = 1;
+  let okaeriUntil = 0, okaeriPerCatchValue = 0;
 
   function addBonusTime(sec) { endAt += sec * 1000; }
 
@@ -254,6 +255,7 @@ function simulateOneRound(lv, catchAll, timeBonusCatchRate = 1) {
       case "interior_gold_ball": break; // コイン加算のみ。スコアには含めない
       case "other_narcissist_a": narcissistUntil = Math.max(t, narcissistUntil) + LV.NARCISSIST_SEC[lvIdx] * 1000; break;
       case "other_mafia_a": mafiaDogBonusMult *= LV.MAFIA_MULT[lvIdx]; break;
+      case "other_okaeri": okaeriUntil = Math.max(t, okaeriUntil) + LV.OKAERI_SEC * 1000; okaeriPerCatchValue = LV.OKAERI_PER_CATCH[lvIdx]; break;
       default: break; // その他の効果はスコア・秒数に影響しない（磁石・ダンボール拡大・ガード付与・ハザード反転など）
     }
     return points;
@@ -283,6 +285,7 @@ function simulateOneRound(lv, catchAll, timeBonusCatchRate = 1) {
     let points = Math.round((basePoints + pendingBonus) * multiplier);
 
     if (t < ikeaUntil) ikeaCount += 1;
+    if (t < okaeriUntil) addBonusTime(okaeriPerCatchValue);
 
     let skillId = itemId;
     let skillLvIdx = clamp1to5(itemLevel) - 1;
