@@ -144,6 +144,11 @@ const REDUCED_CATCH_IDS = new Set([...TIME_BONUS_IDS, "other_okaeri"]);
 // アイテム。ボーナス出現タイマー側で発動頻度が実質的に上がると時間増加系の取得ペースが間接的に
 // 揺らぐため、TIME_BONUS_IDSと合わせてボーナス側では除外する（frenchie-catch-game.tsxのSPAWN_DYNAMICS_ITEM_IDSと同一）
 const SPAWN_DYNAMICS_IDS = new Set(["toy_rainbow_ball", "interior_stretch_rod", "toy_treasure_puzzle", "other_burebur", "other_xmas_party", "other_pondeomo", "other_pondear", "other_jare_a", "interior_ragby_ar"]);
+// 時間増加系7種＋おかえりは、プレイ時間がTIME_BONUS_CUTOFF_BASE_SEC + Lv*TIME_BONUS_CUTOFF_STEP_SEC_PER_LEVEL
+// (Lv0始まりなので実質「平均スキルLv」×20秒)を超えると出現しなくなる。シミュレータは全アイテムの
+// スキルLvをラウンドのLv(0〜4)+1に統一する既存の簡略化にそのまま乗せ、平均スキルLv=lv+1として扱う。
+const TIME_BONUS_CUTOFF_BASE_SEC = Number(GAME_TSX.match(/const TIME_BONUS_CUTOFF_BASE_SEC = (\d+);/)[1]);
+const TIME_BONUS_CUTOFF_STEP_SEC_PER_LEVEL = Number(GAME_TSX.match(/const TIME_BONUS_CUTOFF_STEP_SEC_PER_LEVEL = (\d+);/)[1]);
 
 function rollTreasureOutcome() {
   const total = TREASURE_OUTCOME_WEIGHTS.reduce((s, e) => s + e.weight, 0);
@@ -156,6 +161,7 @@ function weightOf(id) { return ITEM_SPAWN_WEIGHTS[id] ?? DEFAULT_WEIGHT; }
 function clamp1to5(x) { return Math.min(5, Math.max(1, x)); }
 
 function simulateOneRound(lv, catchAll, timeBonusCatchRate = 0.8, normalCatchRate = 0.85, denseCatchRate = 0.5) {
+  const timeBonusCutoffMs = (TIME_BONUS_CUTOFF_BASE_SEC + lv * TIME_BONUS_CUTOFF_STEP_SEC_PER_LEVEL) * 1000;
   let t = 0;
   let endAt = ROUND_SECONDS * 1000;
   let score = 0;
@@ -310,7 +316,8 @@ function simulateOneRound(lv, catchAll, timeBonusCatchRate = 0.8, normalCatchRat
     let skillId = itemId;
     let skillLvIdx = clamp1to5(itemLevel) - 1;
     if (itemId === "mystery_item") {
-      skillId = MYSTERY_SKILL_ITEM_IDS[Math.floor(Math.random() * MYSTERY_SKILL_ITEM_IDS.length)];
+      const mysteryPool = t >= timeBonusCutoffMs ? MYSTERY_SKILL_ITEM_IDS.filter((id) => !REDUCED_CATCH_IDS.has(id)) : MYSTERY_SKILL_ITEM_IDS;
+      skillId = mysteryPool[Math.floor(Math.random() * mysteryPool.length)];
       skillLvIdx = lv; // フルコンプ想定なので？が選んだアイテムも同じLv扱い
     }
     // ナルシストアー有効中は、捕まえた全アイテムのスキルがレベル5(MAX)として発動する
@@ -404,6 +411,7 @@ function simulateOneRound(lv, catchAll, timeBonusCatchRate = 0.8, normalCatchRat
     const allowedHighRarities = treasureRareLockActive ? HIGH_RARITY : BUREBUR_RARITY;
     const urBoostFactor = 1 + Math.min(urBoost, UR_BOOST_MAX) / 100;
     const spawnRateBoostActive = t < spawnRateBoostUntil;
+    const timeBonusCutoffActive = t >= timeBonusCutoffMs;
 
     let itemWeightTotal = 0;
     const weights = new Array(pool.length);
@@ -414,6 +422,7 @@ function simulateOneRound(lv, catchAll, timeBonusCatchRate = 0.8, normalCatchRat
       if (otherSuppressActive && item.id !== "interior_stretch_rod" && OTHER_CATEGORY_IDS.has(item.id)) w *= otherSuppressValue;
       if (highRarityLockActive && !allowedHighRarities.has(item.rarity)) w = 0;
       if (excludeTimeBonus && (TIME_BONUS_IDS.has(item.id) || SPAWN_DYNAMICS_IDS.has(item.id))) w = 0;
+      if (timeBonusCutoffActive && REDUCED_CATCH_IDS.has(item.id)) w = 0;
       if (spawnRateBoostActive && TIME_BONUS_IDS.has(item.id)) w /= spawnRateBoostValue;
       weights[i] = w;
       itemWeightTotal += w;
@@ -422,7 +431,7 @@ function simulateOneRound(lv, catchAll, timeBonusCatchRate = 0.8, normalCatchRat
     let roll = Math.random() * (dogWeight + itemWeightTotal);
     if (roll < dogWeight) {
       if (Math.random() < FRENCHIE_SKIN_SPAWN_CHANCE) {
-        const skinIds = ["hiking_frenchie", "snow_frenchie", "summer_frenchie"].filter((id) => !(excludeTimeBonus && TIME_BONUS_IDS.has(id)));
+        const skinIds = ["hiking_frenchie", "snow_frenchie", "summer_frenchie"].filter((id) => !((excludeTimeBonus || timeBonusCutoffActive) && TIME_BONUS_IDS.has(id)));
         const sid = skinIds[Math.floor(Math.random() * skinIds.length)];
         // 時間増加系(夏のフレブル)はtimeBonusCatchRateの確率でしか実際にはキャッチできない前提
         if (attemptCatch() && (!TIME_BONUS_IDS.has(sid) || Math.random() < timeBonusCatchRate)) {
