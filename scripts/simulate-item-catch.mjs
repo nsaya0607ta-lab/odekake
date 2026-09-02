@@ -127,6 +127,10 @@ const OTHER_CATEGORY_IDS = new Set(pool.filter((x) => x.category === "other").ma
 const FOOD_CATEGORY_IDS = new Set(pool.filter((x) => x.category === "food").map((x) => x.id));
 const PERSON_IDS = ["other_omochi_janai", "other_listen_to_the_a", "other_omoi_bashira", "other_xmas_party"];
 const TIME_BONUS_IDS = new Set(["toy_duck_plush", "toy_carrot", "food_paw_melon_bread", "interior_anball", "other_azuki", "other_omojii", "summer_frenchie"]);
+// おかえり(other_okaeri)は時間増加系7種そのものではないが、時間バランス調整の対象として
+// timeBonusCatchRate(見送り確率)の適用対象に加える（ボーナス出現タイマーの除外対象ではないため
+// TIME_BONUS_IDS自体には加えず、キャッチ判定にのみ加算する）
+const REDUCED_CATCH_IDS = new Set([...TIME_BONUS_IDS, "other_okaeri"]);
 // UR出現率アップ・その他抑制・SSR/UR/LR限定出現・出現量アップなど出現重みの計算式自体を書き換える
 // アイテム。ボーナス出現タイマー側で発動頻度が実質的に上がると時間増加系の取得ペースが間接的に
 // 揺らぐため、TIME_BONUS_IDSと合わせてボーナス側では除外する（frenchie-catch-game.tsxのSPAWN_DYNAMICS_ITEM_IDSと同一）
@@ -424,8 +428,8 @@ function simulateOneRound(lv, catchAll, timeBonusCatchRate = 1) {
     let pickedId = pool[pool.length - 1].id;
     for (let i = 0; i < pool.length; i++) { roll -= weights[i]; if (roll <= 0) { pickedId = pool[i].id; break; } }
     if (highRarityLockCount > 0) highRarityLockCount -= 1;
-    // 時間増加系7種はtimeBonusCatchRateの確率でしか実際にはキャッチできない前提（見送ると何も起きない）
-    if (!TIME_BONUS_IDS.has(pickedId) || Math.random() < timeBonusCatchRate) {
+    // 時間増加系7種＋おかえりはtimeBonusCatchRateの確率でしか実際にはキャッチできない前提（見送ると何も起きない）
+    if (!REDUCED_CATCH_IDS.has(pickedId) || Math.random() < timeBonusCatchRate) {
       const item = byId.get(pickedId);
       resolveCatch("item", pickedId, item.rarity, lv + 1);
     }

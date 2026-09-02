@@ -362,13 +362,14 @@ const DEFAULT_ITEM_SPAWN_WEIGHT = 100;
  */
 const ITEM_SPAWN_WEIGHTS: Partial<Record<string, number>> = {
   toy_treasure_puzzle: 149,
-  other_omojii: 74,
-  toy_duck_plush: 106,
-  toy_carrot: 106,
-  food_paw_melon_bread: 106,
-  interior_anball: 106,
-  other_azuki: 74,
-  summer_frenchie: 106,
+  other_omojii: 63,
+  toy_duck_plush: 90,
+  toy_carrot: 90,
+  food_paw_melon_bread: 90,
+  interior_anball: 90,
+  other_azuki: 63,
+  summer_frenchie: 90,
+  other_okaeri: 3,
   other_listen_to_the_a: 50,
   /**
    * MR3種（ブレブル・ナルシストアー・マフィアー）はいずれも効果が強く出現頻度を抑えたいため、
