@@ -409,6 +409,15 @@ const BUREBUR_ITEM_ID = "other_burebur";
 const XMAS_PARTY_ITEM_ID = "other_xmas_party";
 const OMOCHI_ITEM_ID = "other_omochi_janai";
 const OKAERI_ITEM_ID = "other_okaeri";
+/**
+ * 時間増加系7種＋おかえりは、プレイヤーの図鑑育成度（R以上アイテムのスキルLv平均）に応じた
+ * 秒数を超えると出現しなくなる（？アイテムのスキル抽選からも除外される）。宝箱は対象外。
+ * 平均Lv1→60秒、2→80、3→100、4→120、5→140の線形（+20秒/Lv、小数点も比例配分）。
+ * 詳細はdocs/minigame-time-balance.mdの「時間増加系の出現カットオフ」節を参照。
+ */
+const TIME_BONUS_CUTOFF_ITEM_IDS = new Set([...TIME_BONUS_ITEM_IDS, OKAERI_ITEM_ID]);
+const TIME_BONUS_CUTOFF_BASE_SEC = 60;
+const TIME_BONUS_CUTOFF_STEP_SEC_PER_LEVEL = 20;
 const OMOI_BASHIRA_ITEM_ID = "other_omoi_bashira";
 const OYASUMI_ITEM_ID = "other_oyasumi";
 const OYASUMI_SECONDS = SCORE_MULT_DURATION_SEC;
@@ -719,6 +728,8 @@ export function FrenchieCatchGame({ ownedItems }: { ownedItems: FrenchieCatchIte
 
   const itemPool = useMemo(() => ownedItems.filter((item) => item.image.length > 0), [ownedItems]);
   const itemLevelByIdRef = useRef<Map<string, number>>(new Map());
+  /** 時間増加系7種＋おかえりが出現しなくなるまでの秒数。ownedItems（R以上）のスキルLv平均から算出する */
+  const timeBonusCutoffSecRef = useRef(TIME_BONUS_CUTOFF_BASE_SEC);
   /** ❓アイテムが確定させるスキルの抽選プール。持っていないキャラのスキルが出ないよう、所持アイテムだけに絞る */
   const mysterySkillPoolRef = useRef<string[]>(MYSTERY_SKILL_ITEM_IDS);
   /** フルーツバスケット中に降ってくる「人物の入ったキャラ」。未所持のものは出さないよう所持アイテムだけに絞る */
@@ -730,6 +741,13 @@ export function FrenchieCatchGame({ ownedItems }: { ownedItems: FrenchieCatchIte
   });
   useEffect(() => {
     itemLevelByIdRef.current = new Map(ownedItems.map((item) => [item.id, item.level]));
+    const rPlusItems = ownedItems.filter((item) => item.rarity !== "N");
+    const totalLevel = rPlusItems.reduce((sum, item) => sum + item.level, 0);
+    const avgLevelRaw = rPlusItems.length > 0 ? totalLevel / rPlusItems.length : 0;
+    const avgLevel = Math.round(avgLevelRaw * 100) / 100;
+    timeBonusCutoffSecRef.current = avgLevel < 1
+      ? TIME_BONUS_CUTOFF_BASE_SEC
+      : TIME_BONUS_CUTOFF_BASE_SEC + (Math.min(avgLevel, MAX_SKILL_LEVEL) - 1) * TIME_BONUS_CUTOFF_STEP_SEC_PER_LEVEL;
     const ownedIds = new Set(ownedItems.map((item) => item.id));
     const pool = MYSTERY_SKILL_ITEM_IDS.filter((id) => ownedIds.has(id));
     mysterySkillPoolRef.current = pool.length > 0 ? pool : MYSTERY_SKILL_ITEM_IDS;
@@ -999,6 +1017,7 @@ export function FrenchieCatchGame({ ownedItems }: { ownedItems: FrenchieCatchIte
      * これにより出現量アップ側の倍率をどれだけ強くしても、時間増加系側のr値には影響しなくなる。
      */
     const spawnRateBoostActive = performance.now() < spawnRateBoostUntilRef.current;
+    const timeBonusCutoffActive = elapsedSec >= timeBonusCutoffSecRef.current;
     const weightedItems = itemPool.map((item) => ({
       item,
       weight:
@@ -1009,6 +1028,7 @@ export function FrenchieCatchGame({ ownedItems }: { ownedItems: FrenchieCatchIte
           : 1) *
         (highRarityLockActive && !allowedHighRarities.has(item.rarity) ? 0 : 1) *
         (excludeTimeBonus && (TIME_BONUS_ITEM_IDS.has(item.id) || SPAWN_DYNAMICS_ITEM_IDS.has(item.id)) ? 0 : 1) *
+        (timeBonusCutoffActive && TIME_BONUS_CUTOFF_ITEM_IDS.has(item.id) ? 0 : 1) *
         (spawnRateBoostActive && TIME_BONUS_ITEM_IDS.has(item.id) ? 1 / spawnRateBoostValueRef.current : 1),
     }));
     const itemWeightTotal = weightedItems.reduce((sum, entry) => sum + entry.weight, 0);
@@ -1030,7 +1050,7 @@ export function FrenchieCatchGame({ ownedItems }: { ownedItems: FrenchieCatchIte
           spin: (Math.random() - 0.5) * 20,
         };
       }
-      const skinPool = itemPool.filter((item) => FRENCHIE_SKIN_IDS.includes(item.id) && !(excludeTimeBonus && TIME_BONUS_ITEM_IDS.has(item.id)));
+      const skinPool = itemPool.filter((item) => FRENCHIE_SKIN_IDS.includes(item.id) && !((excludeTimeBonus || timeBonusCutoffActive) && TIME_BONUS_ITEM_IDS.has(item.id)));
       if (skinPool.length > 0 && Math.random() < FRENCHIE_SKIN_SPAWN_CHANCE) {
         const skin = skinPool[Math.floor(Math.random() * skinPool.length)]!;
         return {
@@ -1519,8 +1539,13 @@ export function FrenchieCatchGame({ ownedItems }: { ownedItems: FrenchieCatchIte
             }
 
             const isMystery = entity.itemId === MYSTERY_ITEM_ID;
+            const timeBonusCutoffActiveAtCatch = (now - startAtRef.current) / 1000 >= timeBonusCutoffSecRef.current;
+            const mysterySkillPool = timeBonusCutoffActiveAtCatch
+              ? mysterySkillPoolRef.current.filter((id) => !TIME_BONUS_CUTOFF_ITEM_IDS.has(id))
+              : mysterySkillPoolRef.current;
+            const effectiveMysterySkillPool = mysterySkillPool.length > 0 ? mysterySkillPool : mysterySkillPoolRef.current;
             const skillId = isMystery
-              ? mysterySkillPoolRef.current[Math.floor(Math.random() * mysterySkillPoolRef.current.length)]!
+              ? effectiveMysterySkillPool[Math.floor(Math.random() * effectiveMysterySkillPool.length)]!
               : entity.itemId;
             const skillLevel = isMystery
               ? (itemLevelByIdRef.current.get(skillId ?? "") ?? 1)
