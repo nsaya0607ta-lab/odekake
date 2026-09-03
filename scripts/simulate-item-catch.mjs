@@ -11,11 +11,11 @@
  * 正規表現+evalでLVテーブル・出現重み・？アイテムの抽選プール・ROUND_SECONDS等を抽出するため、
  * 実装側の数値を変更すればこのスクリプトも自動的に追従する（値を二重管理しない）。
  *
- * 使い方: node scripts/simulate-item-catch.mjs [試行回数(デフォルト300)] [avoid|all] [時間増加系7種の実キャッチ率(デフォルト0.8)] [通常時キャッチ率(デフォルト0.85)] [密集時キャッチ率(デフォルト0.5)]
+ * 使い方: node scripts/simulate-item-catch.mjs [試行回数(デフォルト300)] [avoid|all] [時間増加系8種の実キャッチ率(デフォルト0.8)] [通常時キャッチ率(デフォルト0.85)] [密集時キャッチ率(デフォルト0.5)]
  *   第2引数 "avoid"（デフォルト）: 時間減少ハザードとチョコレートは回避する（キャッチしない）前提
  *   第2引数 "all": ハザードも含めて全てのスポーンを100%キャッチする前提
  *     （時間減少は-3秒、チョコレートは即座にラウンド終了）
- *   第3引数: 時間増加系7種(あひる/にんじん/肉球メロンパン/アンボール/小豆/おもじぃ/夏のフレブル)+おかえりが
+ *   第3引数: 時間増加系8種(あひる/にんじん/肉球メロンパン/アンボール/小豆/おもじぃ/夏のフレブル/ブレブル)+おかえりが
  *     出現した際に実際にキャッチできる確率（第5・第6引数の一般キャッチ率とは別枠で、さらにこの確率を掛け合わせる）。
  *     例: 0.8 を渡すと「時間増加系を8割しか取れない」プレイを再現する
  *     （見送った分は何も起きない＝ハズレでも他のアイテムでもなく、ただ落下していくだけとして扱う）
@@ -135,7 +135,6 @@ const DOG_FLOOD_RATE = DOG_FLOOD_SPAWN_RATE;
 const POOP_FLOOD_RATE = POOP_FLOOD_SPAWN_RATE;
 
 const HIGH_RARITY = new Set(["SSR", "UR", "LR"]); // 宝箱の「レア枠確定出現」対象
-const BUREBUR_RARITY = new Set(["UR", "LR"]); // ブレブルの限定対象（宝箱より絞り込み）
 const OTHER_CATEGORY_IDS = new Set(pool.filter((x) => x.category === "other").map((x) => x.id));
 const FOOD_CATEGORY_IDS = new Set(pool.filter((x) => x.category === "food").map((x) => x.id));
 const PERSON_IDS = ["other_omochi_janai", "other_listen_to_the_a", "other_omoi_bashira", "other_xmas_party"];
@@ -152,15 +151,15 @@ function pickPersonId() {
   }
   return weighted[weighted.length - 1].pid;
 }
-const TIME_BONUS_IDS = new Set(["toy_duck_plush", "toy_carrot", "food_paw_melon_bread", "interior_anball", "other_azuki", "other_omojii", "summer_frenchie"]);
-// おかえり(other_okaeri)は時間増加系7種そのものではないが、時間バランス調整の対象として
+const TIME_BONUS_IDS = new Set(["toy_duck_plush", "toy_carrot", "food_paw_melon_bread", "interior_anball", "other_azuki", "other_omojii", "summer_frenchie", "other_burebur"]);
+// おかえり(other_okaeri)は時間増加系8種そのものではないが、時間バランス調整の対象として
 // timeBonusCatchRate(見送り確率)の適用対象に加える（ボーナス出現タイマーの除外対象ではないため
 // TIME_BONUS_IDS自体には加えず、キャッチ判定にのみ加算する）
 const REDUCED_CATCH_IDS = new Set([...TIME_BONUS_IDS, "other_okaeri"]);
 // UR出現率アップ・その他抑制・SSR/UR/LR限定出現・出現量アップなど出現重みの計算式自体を書き換える
 // アイテム。ボーナス出現タイマー側で発動頻度が実質的に上がると時間増加系の取得ペースが間接的に
 // 揺らぐため、TIME_BONUS_IDSと合わせてボーナス側では除外する（frenchie-catch-game.tsxのSPAWN_DYNAMICS_ITEM_IDSと同一）
-const SPAWN_DYNAMICS_IDS = new Set(["toy_rainbow_ball", "interior_stretch_rod", "toy_treasure_puzzle", "other_burebur", "other_xmas_party", "other_pondeomo", "other_pondear", "other_jare_a", "interior_ragby_ar"]);
+const SPAWN_DYNAMICS_IDS = new Set(["toy_rainbow_ball", "interior_stretch_rod", "toy_treasure_puzzle", "other_xmas_party", "other_pondeomo", "other_pondear", "other_jare_a", "interior_ragby_ar"]);
 // 得点倍率プール（"○秒間×n"の得点倍率スキルを主効果として持つアイテム）。ITEM_SPAWN_WEIGHTSで
 // レアリティ別に重みを下げてある8種（frenchie-catch-game.tsxの同名コメント参照）。宝箱・夏のフレブル・
 // Xmas Partyは得点倍率効果も持つが、重みが時間バランス/出現量アップ側のチューニングで別途固定されている
@@ -197,10 +196,10 @@ function poolWeightTotal(ids) {
 // 変更（frenchie-catch-game.tsx ITEM_SPAWN_WEIGHTS直上のコメント参照）。該当アイテムが無いランクの
 // 予算はプールの合計から減らさず、dogの出現重みに上乗せして消化する
 // （frenchie-catch-game.tsxのXXX_UNFILLED_RANK_DOG_WEIGHTと同一値を手動同期）。
-const TIME_BONUS_UNFILLED_RANK_DOG_WEIGHT = 960;
+const TIME_BONUS_UNFILLED_RANK_DOG_WEIGHT = 748;
 const SCORE_MULT_UNFILLED_RANK_DOG_WEIGHT = 150;
 const SPAWN_DYNAMICS_UNFILLED_RANK_DOG_WEIGHT = 110;
-// 時間増加系7種＋おかえりは、プレイ時間がTIME_BONUS_CUTOFF_BASE_SEC + Lv*TIME_BONUS_CUTOFF_STEP_SEC_PER_LEVEL
+// 時間増加系8種＋おかえりは、プレイ時間がTIME_BONUS_CUTOFF_BASE_SEC + Lv*TIME_BONUS_CUTOFF_STEP_SEC_PER_LEVEL
 // (Lv0始まりなので実質「平均スキルLv」×20秒)を超えると出現しなくなる。シミュレータは全アイテムの
 // スキルLvをラウンドのLv(0〜4)+1に統一する既存の簡略化にそのまま乗せ、平均スキルLv=lv+1として扱う。
 const TIME_BONUS_CUTOFF_BASE_SEC = Number(GAME_TSX.match(/const TIME_BONUS_CUTOFF_BASE_SEC = (\d+);/)[1]);
@@ -232,7 +231,7 @@ function simulateOneRound(lv, catchAll, timeBonusCatchRate = 0.8, normalCatchRat
 
   let urBoost = 0, urBoostDecayNextAt = 0;
   let otherSuppressUntil = 0, otherSuppressValue = 1;
-  let highRarityLockUntil = 0, highRarityLockCount = 0;
+  let highRarityLockUntil = 0;
   let dogFloodRemaining = 0, poopFloodRemaining = 0, personFloodRemaining = 0, clawdFloodRemaining = 0;
   let nextBonus5 = 0, nextBonus5Value = 0;
   let nextBonus10 = 0, nextBonus10Value = 0;
@@ -290,7 +289,7 @@ function simulateOneRound(lv, catchAll, timeBonusCatchRate = 0.8, normalCatchRat
       case "toy_golden_crown_ball": nextMultValue = LV.GOLDEN_MULT[lvIdx]; nextMultCount = LV.GOLDEN_COUNT[lvIdx]; break;
       case "interior_anball": points += LV.ANBALL_PT[lvIdx]; addBonusTime(LV.ANBALL_SEC[lvIdx]); break;
       case "interior_stretch_rod": otherSuppressUntil = t + STRETCH_ROD_SECONDS * 1000; otherSuppressValue = LV.STRETCH_ROD_MULT[lvIdx]; break;
-      case "other_burebur": highRarityLockCount = LV.BUREBUR_COUNT[lvIdx]; break;
+      case "other_burebur": addBonusTime(LV.BUREBUR_SEC[lvIdx]); break;
       case "other_xmas_party":
         multiplier15Until = t + SCORE_MULT_DURATION_MR_SEC * 1000; multiplier15Value = LV.XMAS_SCORE[lvIdx];
         spawnRateBoostUntil = t + LV.XMAS_SEC[lvIdx] * 1000; spawnRateBoostValue = LV.XMAS_SPAWN[lvIdx];
@@ -461,10 +460,6 @@ function simulateOneRound(lv, catchAll, timeBonusCatchRate = 0.8, normalCatchRat
 
     const otherSuppressActive = t < otherSuppressUntil;
     const treasureRareLockActive = t < highRarityLockUntil;
-    const bureburLockActive = highRarityLockCount > 0;
-    const highRarityLockActive = treasureRareLockActive || bureburLockActive;
-    // 両方同時に有効なら宝箱側(SSR/UR/LR)を優先。ブレブル単体ならUR/LRのみに絞る
-    const allowedHighRarities = treasureRareLockActive ? HIGH_RARITY : BUREBUR_RARITY;
     const urBoostFactor = 1 + Math.min(urBoost, UR_BOOST_MAX) / 100;
     const spawnRateBoostActive = t < spawnRateBoostUntil;
     const timeBonusCutoffActive = t >= timeBonusCutoffMs;
@@ -476,7 +471,7 @@ function simulateOneRound(lv, catchAll, timeBonusCatchRate = 0.8, normalCatchRat
       let w = weightOf(item.id);
       if (item.rarity === "UR") w *= urBoostFactor;
       if (otherSuppressActive && item.id !== "interior_stretch_rod" && OTHER_CATEGORY_IDS.has(item.id)) w *= otherSuppressValue;
-      if (highRarityLockActive && !allowedHighRarities.has(item.rarity)) w = 0;
+      if (treasureRareLockActive && !HIGH_RARITY.has(item.rarity)) w = 0;
       if (excludeTimeBonus && (TIME_BONUS_IDS.has(item.id) || SPAWN_DYNAMICS_IDS.has(item.id))) w = 0;
       if (timeBonusCutoffActive && REDUCED_CATCH_IDS.has(item.id)) w = 0;
       if (spawnRateBoostActive && TIME_BONUS_IDS.has(item.id)) w /= spawnRateBoostValue;
@@ -507,8 +502,7 @@ function simulateOneRound(lv, catchAll, timeBonusCatchRate = 0.8, normalCatchRat
     roll -= dogWeight;
     let pickedId = pool[pool.length - 1].id;
     for (let i = 0; i < pool.length; i++) { roll -= weights[i]; if (roll <= 0) { pickedId = pool[i].id; break; } }
-    if (highRarityLockCount > 0) highRarityLockCount -= 1;
-    // 時間増加系7種＋おかえりはtimeBonusCatchRateの確率でしか実際にはキャッチできない前提（見送ると何も起きない）
+    // 時間増加系8種＋おかえりはtimeBonusCatchRateの確率でしか実際にはキャッチできない前提（見送ると何も起きない）
     if (attemptCatch() && (!REDUCED_CATCH_IDS.has(pickedId) || Math.random() < timeBonusCatchRate)) {
       const item = byId.get(pickedId);
       resolveCatch("item", pickedId, item.rarity, lv + 1);
@@ -533,10 +527,10 @@ function main() {
   const timeBonusCatchRate = process.argv[4] !== undefined ? Number(process.argv[4]) : 0.8;
   const normalCatchRate = process.argv[5] !== undefined ? Number(process.argv[5]) : 0.85;
   const denseCatchRate = process.argv[6] !== undefined ? Number(process.argv[6]) : 0.5;
-  console.log(`itemPool N=${POOL_SIZE} / ROUND_SECONDS=${ROUND_SECONDS} / MAX_ROUND_SECONDS=${MAX_PLAY_SECONDS} / 試行回数=${trials} / モード=${mode}${catchAll ? "（時間減少・チョコレートも100%キャッチ）" : "（時間減少・チョコレートは回避）"} / 時間増加系7種の実キャッチ率=${timeBonusCatchRate} / 通常時キャッチ率=${normalCatchRate} / 密集時キャッチ率=${denseCatchRate}`);
+  console.log(`itemPool N=${POOL_SIZE} / ROUND_SECONDS=${ROUND_SECONDS} / MAX_ROUND_SECONDS=${MAX_PLAY_SECONDS} / 試行回数=${trials} / モード=${mode}${catchAll ? "（時間減少・チョコレートも100%キャッチ）" : "（時間減少・チョコレートは回避）"} / 時間増加系8種の実キャッチ率=${timeBonusCatchRate} / 通常時キャッチ率=${normalCatchRate} / 密集時キャッチ率=${denseCatchRate}`);
   console.log(
     `プール重み予算（未充填ランク分はdogへ上乗せして消化）: ` +
-    `時間増加系7種=${poolWeightTotal(TIME_BONUS_IDS)}（+未充填${TIME_BONUS_UNFILLED_RANK_DOG_WEIGHT}→dogへ、合計${poolWeightTotal(TIME_BONUS_IDS) + TIME_BONUS_UNFILLED_RANK_DOG_WEIGHT}） / ` +
+    `時間増加系8種=${poolWeightTotal(TIME_BONUS_IDS)}（+未充填${TIME_BONUS_UNFILLED_RANK_DOG_WEIGHT}→dogへ、合計${poolWeightTotal(TIME_BONUS_IDS) + TIME_BONUS_UNFILLED_RANK_DOG_WEIGHT}） / ` +
     `得点倍率系8種=${poolWeightTotal(SCORE_MULT_IDS)}（+未充填${SCORE_MULT_UNFILLED_RANK_DOG_WEIGHT}→dogへ、合計${poolWeightTotal(SCORE_MULT_IDS) + SCORE_MULT_UNFILLED_RANK_DOG_WEIGHT}） / ` +
     `出現量アップ・制御系=${poolWeightTotal(SPAWN_DYNAMICS_IDS)}（+未充填${SPAWN_DYNAMICS_UNFILLED_RANK_DOG_WEIGHT}→dogへ、合計${poolWeightTotal(SPAWN_DYNAMICS_IDS) + SPAWN_DYNAMICS_UNFILLED_RANK_DOG_WEIGHT}） / ` +
     `通常アイテム系=${poolWeightTotal(NORMAL_ITEM_IDS)}（未充填ランクなし）\n`
