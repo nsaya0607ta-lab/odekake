@@ -72,6 +72,8 @@ const MAGNET_MEDIUM_RANGE = 20;
 const MAGNET_MEDIUM_PULL = 30;
 const MAGNET_STRONG_RANGE = 28;
 const MAGNET_STRONG_PULL = 48;
+/** ピンクオモ：既存のマグネットと違い範囲制限なしで全アイテムを段ボールの中心軸へ引き寄せる */
+const PINK_OMO_PULL = 60;
 const FALL_SPEED_BOOST = 1.7;
 const UR_BOOST_MAX = 10;
 /** 虹色わんこボールのUR加算は永続だと時間増加系との複利で発散しやすいため、時間経過で自然に減衰させる */
@@ -165,7 +167,7 @@ const MYSTERY_SKILL_ITEM_IDS = [
   "other_pondeomo", "other_pondear", "other_kurumari_a", "other_jare_a", "other_ketsunade_a", "other_omochi_janai", "other_oyasumi", "other_nisoku_a",
   "interior_shikkoku_no_ar", "interior_ragby_ar", "other_oyatsu_no_jikan", "other_listen_to_the_a", "other_okaeri",
   "food_fruit_basket", "interior_gold_ball", "other_clawd", "food_kamikami", "food_mocchurin", "other_mah",
-  "other_mirror_omochi", "other_toorematen", "other_hia",
+  "other_mirror_omochi", "other_toorematen", "other_hia", "other_pink_omo",
 ];
 
 /** アイテムごとのLv1〜5パラメータ（item_skill_levels_colored.xlsxの「スキル一覧」シート通り） */
@@ -270,6 +272,7 @@ const LV = {
   HIA_MULT: [6, 7, 8, 9, 10],
   NARCISSIST_SEC: [20, 25, 30, 35, 40],
   MAFIA_MULT: [1.1, 1.12, 1.14, 1.16, 1.18],
+  PINK_OMO_SEC: [3, 5, 7, 9, 10],
 } as const;
 const SLANT_VX_BOOST = 3.5;
 const POINTS: Record<FrenchieCatchItem["rarity"], number> = { N: 20, R: 40, SR: 80, SSR: 140, UR: 200, LR: 300, MR: 440 };
@@ -373,68 +376,61 @@ const DEFAULT_ITEM_SPAWN_WEIGHT = 100;
  */
 const ITEM_SPAWN_WEIGHTS: Partial<Record<string, number>> = {
   /**
-   * 2026-09-03、3プール共通のレアリティ別「固定比率」制に変更（ユーザー指定）。各プールの
-   * 合計予算 × ランク比率(R:30% / SR:18% / SSR:16% / UR:14% / LR:12% / MR:10%、合計100%)が
-   * そのランクの予算で、そのランクに属するアイテムの人数で均等に割った値をここに書く
-   * （10の倍数に丸め）。該当アイテムが無いランクの予算はプールの合計から減らさず、
-   * 「普通のフレブル」(dog)の出現重みに上乗せして消化する
-   * （TIME_BONUS_UNFILLED_RANK_DOG_WEIGHT等、DOG_SPAWN_RATIO直下のコメント参照）。
+   * 2026-09-03、ユーザー指定で「固定重み」を全廃し、4プール共通で以下の1ルールのみに統一：
+   * 各プールの合計予算 × レアリティ別ランク比率(R:30% / SR:18% / SSR:16% / UR:14% / LR:12% /
+   * MR:10%、合計100%)がそのランクの予算。**そのランクに属するアイテムの人数で均等に割った値を
+   * 一切丸めずそのまま書く**（個別チューニング・10の倍数丸めのどちらも行わない。ランク予算自体が
+   * 割り切れない場合は小数のまま、式`予算/人数`をそのままコードに書いて計算させる）。該当アイテムが
+   * 無いランクの予算はプールの合計から減らさず、「普通のフレブル」(dog)の出現重みに上乗せして
+   * 消化する（TIME_BONUS_UNFILLED_RANK_DOG_WEIGHT等、DOG_SPAWN_RATIO直下のコメント参照）。
    *
-   * 時間増加系プール（予算2120、おかえりを含む）：R:636→230ずつ(3種) / SR:381.6(未充填→dog) /
-   * SSR:339.2(未充填→dog) / UR:296.8→110ずつ(3種) / LR:254.4→140ずつ(2種:夏のフレブル/おかえり) /
-   * MR:212(未充填→dog)。在籍分の実際の合計は1160（残り960は`TIME_BONUS_UNFILLED_RANK_DOG_WEIGHT`で
-   * dogへ）。2026-09-03、おかえりの個別チューニング値(300)を廃止しランク比率に統合（ユーザー指定）。
-   * ただし統合直後の素の予算600だとLv5平均プレイ時間が181秒→95秒まで落ち込んだため、目標値
-   * （docs/item-catch-new-item-checklist.md）に戻すためプール予算自体を600→2120に約3.5倍
-   * 引き上げて再チューニング済み（`node scripts/simulate-item-catch.mjs 20000 avoid`でLv5平均
-   * 174.7秒・500秒超え0%を確認）。
+   * 時間増加系プール（予算2120、おかえりを含む）：R:636÷3=212ずつ / SR:381.6(未充填→dog) /
+   * SSR:339.2(未充填→dog) / UR:296.8÷3 / LR:254.4÷2=127.2ずつ(夏のフレブル/おかえり) /
+   * MR:212(未充填→dog)。在籍分の実際の合計は1187.2（残り932.8は
+   * `TIME_BONUS_UNFILLED_RANK_DOG_WEIGHT`でdogへ）。
    */
-  other_omojii: 110,
-  toy_duck_plush: 230,
-  toy_carrot: 230,
-  food_paw_melon_bread: 230,
-  interior_anball: 110,
-  other_azuki: 110,
-  summer_frenchie: 140,
-  other_okaeri: 140,
-  other_listen_to_the_a: 50,
+  other_omojii: 296.8 / 3,
+  toy_duck_plush: 636 / 3,
+  toy_carrot: 636 / 3,
+  food_paw_melon_bread: 636 / 3,
+  interior_anball: 296.8 / 3,
+  other_azuki: 296.8 / 3,
+  summer_frenchie: 254.4 / 2,
+  other_okaeri: 254.4 / 2,
   /**
-   * 出現量アップ・出現制御系プール（予算900）：R:270→270(1種) / SR:162→160(1種) /
-   * SSR:144→40ずつ(4種) / UR:126(未充填→dog) / LR:108→110(1種) / MR:90→50/40
-   * （Xmas Party/ブレブル）。在籍分の実際の合計は790（残り110は
-   * `SPAWN_DYNAMICS_UNFILLED_RANK_DOG_WEIGHT`でdogへ）。2026-09-03、ブレブルの固定値(20)を
-   * 廃止しMRランク比率に統合（ユーザー指定）。
+   * 出現量アップ・出現制御系プール（予算900）：R:270÷1=270 / SR:162÷1=162 / SSR:144÷4=36ずつ /
+   * UR:126(未充填→dog) / LR:108÷2=54ずつ / MR:90÷2=45ずつ。在籍分の実際の合計は774
+   * （残り126は`SPAWN_DYNAMICS_UNFILLED_RANK_DOG_WEIGHT`でdogへ）。宝箱おやつパズル・ブレブル・
+   * Xmas Partyもここでは個別チューニング値ではなく「ランク予算÷在籍数」のみで計算する
+   * （ユーザー指定、2026-09-03〜）。
    */
-  toy_rainbow_ball: 40,
-  interior_stretch_rod: 270,
-  toy_treasure_puzzle: 160,
-  other_xmas_party: 50,
-  other_pondeomo: 40,
-  other_pondear: 40,
-  other_jare_a: 40,
-  interior_ragby_ar: 110,
-  other_burebur: 40,
+  toy_rainbow_ball: 144 / 4,
+  interior_stretch_rod: 270 / 1,
+  toy_treasure_puzzle: 162 / 1,
+  other_xmas_party: 90 / 2,
+  other_pondeomo: 144 / 4,
+  other_pondear: 144 / 4,
+  other_jare_a: 144 / 4,
+  interior_ragby_ar: 108 / 2,
+  other_listen_to_the_a: 108 / 2,
+  other_burebur: 90 / 2,
   /**
-   * ナルシストアー・マフィアーは上記3プールのいずれにも属さない単独チューニング枠のため、
-   * 引き続き重み20のまま据え置き（発動中に得点倍率系を複数拾うと掛け算が重なり大きく跳ねることが
-   * シミュレーションで確認済み。詳細はdocs参照）。
+   * 得点倍率系プール（予算400）：R:120(未充填→dog) / SR:72÷2=36ずつ / SSR:64÷2=32ずつ /
+   * UR:56÷3 / LR:48÷2=24ずつ / MR:40÷2=20ずつ。在籍分の実際の合計は280
+   * （残り120は`SCORE_MULT_UNFILLED_RANK_DOG_WEIGHT`でdogへ）。ピンクオモ・ナルシストアー・
+   * マフィアーも含め、全アイテム「ランク予算÷在籍数」のみで計算する（ユーザー指定、2026-09-03〜）。
    */
-  other_narcissist_a: 20,
-  other_mafia_a: 20,
-  /**
-   * 得点倍率系プール（予算400）：R:120(未充填→dog) / SR:72→40ずつ(2種) / SSR:64→30ずつ(2種) /
-   * UR:56→20ずつ(3種) / LR:48→50(1種) / MR:40(未充填→dog)。在籍分の実際の合計は250
-   * （残り150は`SCORE_MULT_UNFILLED_RANK_DOG_WEIGHT`でdogへ）。他プールと同じ
-   * R:30%/SR:18%/SSR:16%/UR:14%/LR:12%/MR:10%比率（ユーザー指定、2026-09-03〜）。
-   */
-  toy_meat: 40,
-  interior_spring_flower_wreath: 40,
-  other_kamunayo: 30,
-  other_nisoku_a: 30,
-  other_azubee: 20,
-  interior_kinoko_azubee: 20,
-  other_kobee: 20,
-  interior_shikkoku_no_ar: 50,
+  toy_meat: 72 / 2,
+  interior_spring_flower_wreath: 72 / 2,
+  other_kamunayo: 64 / 2,
+  other_nisoku_a: 64 / 2,
+  other_azubee: 56 / 3,
+  interior_kinoko_azubee: 56 / 3,
+  other_kobee: 56 / 3,
+  interior_shikkoku_no_ar: 48 / 2,
+  other_pink_omo: 48 / 2,
+  other_narcissist_a: 40 / 2,
+  other_mafia_a: 40 / 2,
   /**
    * 通常アイテム系プール（予算6100、在籍61種すべて等分100ずつ）：N:2400(24種) / R:700(7種) /
    * SR:900(9種) / SSR:1200(12種) / UR:700(7種) / LR:200(2種) / MR:0(未在籍)。全ランクとも
@@ -657,15 +653,16 @@ const DOG_SPAWN_RATIO = 0.28;
  * （R:30%/SR:18%/SSR:16%/UR:14%/LR:12%/MR:10%）でランク予算を割り当てているが、該当アイテムが
  * まだ存在しないランクの予算は消化されず余る。プールの予算を減らさないため、この余りを
  * 「普通のフレブル」(dog)の出現重みに上乗せして消化する（ITEM_SPAWN_WEIGHTS直上のコメント参照）。
- * 各値は「プール予算 − 在籍ランクの実際の重み合計」。時間増加系: 2120−1160=960 /
- * 得点倍率系: 400−250=150 / 出現量アップ制御系: 900−790=110（2026-09-03時点、おかえり・ブレブルの
- * 個別チューニング値を廃止してランク比率のみに統合し、時間増加系プールの予算を600→2120に
- * 引き上げて目標プレイ時間を再現した後の値）。新しく未充填ランクにアイテムを追加したら、
- * 対応する定数からそのランクの予算分を差し引くこと。
+ * 各値は「プール予算 − 在籍ランクの実際の重み合計」。2026-09-03、ユーザー指定で固定重みを
+ * 全廃し「ランク予算÷在籍数」のみに統一したため、以下の3値も端数を丸めず正確な値にした：
+ * 時間増加系: 2120−1187.2=932.8 / 得点倍率系: 400−280=120 / 出現量アップ制御系: 900−774=126。
+ * 新しく未充填ランクにアイテムを追加したら、対応する定数からそのランクの予算分を差し引くこと。
  */
-const TIME_BONUS_UNFILLED_RANK_DOG_WEIGHT = 960;
-const SCORE_MULT_UNFILLED_RANK_DOG_WEIGHT = 150;
-const SPAWN_DYNAMICS_UNFILLED_RANK_DOG_WEIGHT = 110;
+const TIME_BONUS_UNFILLED_RANK_DOG_WEIGHT = 2120 - 1187.2;
+/** 2026-09-03、固定重み全廃・ランク予算÷在籍数のみに統一（ユーザー指定）。ITEM_SPAWN_WEIGHTS直上のコメント参照。 */
+const SCORE_MULT_UNFILLED_RANK_DOG_WEIGHT = 120;
+/** 2026-09-03、固定重み全廃・ランク予算÷在籍数のみに統一（ユーザー指定）。ITEM_SPAWN_WEIGHTS直上のコメント参照。 */
+const SPAWN_DYNAMICS_UNFILLED_RANK_DOG_WEIGHT = 126;
 /** 通れまてん有効中に「はずれ」フレブルの代わりに出現する金色フレブルの目印用id（kindは通常のdogのまま） */
 const TOOREMATEN_GOLDEN_DOG_ID = "toorematen_golden_dog";
 const FRENCHIE_SKIN_IDS = ["hiking_frenchie", "snow_frenchie", "summer_frenchie"];
@@ -798,6 +795,8 @@ export function FrenchieCatchGame({ ownedItems }: { ownedItems: FrenchieCatchIte
   const boxWideScaleRef = useRef(BOX_WIDE_SCALE_DEFAULT);
   const magnetUntilRef = useRef(0);
   const magnetStrengthRef = useRef<"weak" | "medium" | "strong">("weak");
+  /** ピンクオモ：有効中は画面にピンクフィルターがかかり、マイナスアイテム以外の全アイテムが段ボールの中心軸へ引き寄せられる */
+  const pinkOmoUntilRef = useRef(0);
   const urBoostRef = useRef(0);
   const urBoostDecayNextRef = useRef(0);
   const fallSpeedBoostUntilRef = useRef(0);
@@ -877,6 +876,7 @@ export function FrenchieCatchGame({ ownedItems }: { ownedItems: FrenchieCatchIte
   const [impactX, setImpactX] = useState<number | null>(null);
   const [boxBounce, setBoxBounce] = useState(false);
   const [blackoutActive, setBlackoutActive] = useState(false);
+  const [pinkOmoActive, setPinkOmoActive] = useState(false);
   const [stunned, setStunned] = useState(false);
   const [dogBonus, setDogBonus] = useState<{ count: number; bonus: number } | null>(null);
   const [coinReward, setCoinReward] = useState<number | null>(null);
@@ -972,6 +972,7 @@ export function FrenchieCatchGame({ ownedItems }: { ownedItems: FrenchieCatchIte
     if (boxShrinkGuardRef.current > 0) labels.push(HAZARD_GUARD_LABELS.boxShrink);
     if (timeMinusGuardRef.current > 0) labels.push(HAZARD_GUARD_LABELS.timeMinus);
     if (now < magnetUntilRef.current) labels.push(magnetStrengthRef.current === "weak" ? "ミニマグネット発動中" : "マグネット発動中");
+    if (now < pinkOmoUntilRef.current) labels.push("ピンクオモ発動中（アイテムが中心へ）");
     if (now < fallSpeedBoostUntilRef.current) labels.push("落下速度アップ中");
     if (now < poopSuppressUntilRef.current) labels.push("うんち出現なし");
     if (poopFloodRemainingRef.current > 0) labels.push(`うんち祭り あと${poopFloodRemainingRef.current}個`);
@@ -1427,6 +1428,7 @@ export function FrenchieCatchGame({ ownedItems }: { ownedItems: FrenchieCatchIte
         urBoostDecayNextRef.current = now + UR_BOOST_DECAY_INTERVAL_MS;
         timedEffectChanged = true;
       }
+      if (pinkOmoUntilRef.current > 0 && now >= pinkOmoUntilRef.current) { pinkOmoUntilRef.current = 0; setPinkOmoActive(false); timedEffectChanged = true; }
       if (boxShrinkUntilRef.current > 0 && now >= boxShrinkUntilRef.current) { boxShrinkUntilRef.current = 0; timedEffectChanged = true; }
       if (blackoutUntilRef.current > 0 && now >= blackoutUntilRef.current) { blackoutUntilRef.current = 0; setBlackoutActive(false); timedEffectChanged = true; }
       if (stunUntilRef.current > 0 && now >= stunUntilRef.current) { stunUntilRef.current = 0; setStunned(false); timedEffectChanged = true; }
@@ -1464,6 +1466,7 @@ export function FrenchieCatchGame({ ownedItems }: { ownedItems: FrenchieCatchIte
       const effBoxHalf = BOX_HALF * effectiveBoxScale;
       const effBoxWidth = BOX_WIDTH * effectiveBoxScale;
       const magnetActive = now < magnetUntilRef.current;
+      const pinkOmoPullActive = now < pinkOmoUntilRef.current;
       const magnetRange = magnetStrengthRef.current === "strong"
         ? MAGNET_STRONG_RANGE
         : magnetStrengthRef.current === "medium"
@@ -1490,6 +1493,16 @@ export function FrenchieCatchGame({ ownedItems }: { ownedItems: FrenchieCatchIte
         if (magnetActive && entity.status === "falling" && entity.y > 20 && entity.itemId !== POOP_ITEM_ID && !NEGATIVE_HAZARD_IDS.has(entity.itemId ?? "")) {
           const dx = boxXRef.current - entity.x;
           if (Math.abs(dx) < magnetRange) entity.vx += Math.sign(dx) * magnetPull * dt;
+        }
+
+        if (
+          pinkOmoPullActive &&
+          (entity.status === "falling" || entity.status === "bounced") &&
+          entity.itemId !== POOP_ITEM_ID &&
+          !NEGATIVE_HAZARD_IDS.has(entity.itemId ?? "")
+        ) {
+          const dx = boxXRef.current - entity.x;
+          entity.vx += Math.sign(dx) * PINK_OMO_PULL * dt;
         }
 
         const previousY = entity.y;
@@ -2201,6 +2214,14 @@ export function FrenchieCatchGame({ ownedItems }: { ownedItems: FrenchieCatchIte
                 statusChanged = true;
                 break;
               }
+              case "other_pink_omo": {
+                const pinkOmoSec = LV.PINK_OMO_SEC[lv]!;
+                pinkOmoUntilRef.current = Math.max(now, pinkOmoUntilRef.current) + pinkOmoSec * 1000;
+                setPinkOmoActive(true);
+                effectLabel = `${pinkOmoSec}秒間 ピンクフィルター発動！アイテムが中心へ${lvTag}`;
+                statusChanged = true;
+                break;
+              }
               case "interior_ragby_ar": {
                 const ragbySec = LV.RAGBY_SEC[lv]!;
                 const ragbySpawn = LV.RAGBY_SPAWN[lv]!;
@@ -2425,6 +2446,8 @@ export function FrenchieCatchGame({ ownedItems }: { ownedItems: FrenchieCatchIte
     boxWideScaleRef.current = BOX_WIDE_SCALE_DEFAULT;
     magnetUntilRef.current = 0;
     magnetStrengthRef.current = "weak";
+    pinkOmoUntilRef.current = 0;
+    setPinkOmoActive(false);
     urBoostRef.current = 0;
     urBoostDecayNextRef.current = 0;
     fallSpeedBoostUntilRef.current = 0;
@@ -2603,6 +2626,7 @@ export function FrenchieCatchGame({ ownedItems }: { ownedItems: FrenchieCatchIte
         </div>
 
         {blackoutActive ? <div className="pointer-events-none absolute inset-x-0 top-0 z-[25] h-1/2 bg-black/95" aria-label="上半分ブラックアウト" /> : null}
+        {pinkOmoActive ? <div className="pointer-events-none absolute inset-0 z-[26] bg-pink-300/25" aria-label="ピンクオモ発動中（ピンクフィルター）" /> : null}
 
         {activeEffects.length > 0 ? (
           <div className="pointer-events-none absolute right-3 top-24 z-50 flex flex-col items-end gap-0.5">

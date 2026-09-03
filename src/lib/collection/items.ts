@@ -153,6 +153,7 @@ const CURATED_ITEMS: readonly CollectionItem[] = [
   { id: "other_listen_to_the_a", name: "Listen to the a-", image: "/collection/items/listen-to-the-a.webp", category: "other", series: null, rarity: "LR" },
   { id: "other_okaeri", name: "おかえり", image: "/collection/items/okaeri.webp", category: "other", series: null, rarity: "LR" },
   { id: "other_omoi_bashira", name: "一家の大オモ柱", image: "/collection/items/omoi-bashira.webp", category: "other", series: null, rarity: "UR" },
+  { id: "other_pink_omo", name: "ピンクオモ", image: "/collection/items/pink-omo.webp", category: "other", series: null, rarity: "LR" },
 
   // --- 通常図鑑：MR ----------------------------------------------------
   { id: "other_burebur", name: "ブレブル", image: "/collection/items/burebur.webp", category: "other", series: null, rarity: "MR" },
