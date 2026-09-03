@@ -160,12 +160,21 @@ const REDUCED_CATCH_IDS = new Set([...TIME_BONUS_IDS, "other_okaeri"]);
 // UR出現率アップ・その他抑制・SSR/UR/LR限定出現・出現量アップなど出現重みの計算式自体を書き換える
 // アイテム。ボーナス出現タイマー側で発動頻度が実質的に上がると時間増加系の取得ペースが間接的に
 // 揺らぐため、TIME_BONUS_IDSと合わせてボーナス側では除外する（frenchie-catch-game.tsxのSPAWN_DYNAMICS_ITEM_IDSと同一）
-const SPAWN_DYNAMICS_IDS = new Set(["toy_rainbow_ball", "interior_stretch_rod", "toy_treasure_puzzle", "other_burebur", "other_xmas_party", "other_pondeomo", "other_pondear", "other_jare_a", "interior_ragby_ar"]);
+// other_listen_to_the_a（フレブル大量発生。厳密には出現重みの計算式ではなくdogFloodそのものを起こす
+// 効果だが）は、2026-09-03、単独チューニング枠からこのプールのLR枠に移動（ユーザー指定）。
+const SPAWN_DYNAMICS_IDS = new Set(["toy_rainbow_ball", "interior_stretch_rod", "toy_treasure_puzzle", "other_burebur", "other_xmas_party", "other_pondeomo", "other_pondear", "other_jare_a", "interior_ragby_ar", "other_listen_to_the_a"]);
 // 得点倍率プール（"○秒間×n"の得点倍率スキルを主効果として持つアイテム）。ITEM_SPAWN_WEIGHTSで
 // レアリティ別に重みを下げてある8種（frenchie-catch-game.tsxの同名コメント参照）。宝箱・夏のフレブル・
 // Xmas Partyは得点倍率効果も持つが、重みが時間バランス/出現量アップ側のチューニングで別途固定されている
 // 「兼用アイテム」のため、意図的にこのプールには含めない。
-const SCORE_MULT_IDS = new Set(["toy_meat", "interior_spring_flower_wreath", "other_kamunayo", "other_nisoku_a", "other_azubee", "interior_kinoko_azubee", "other_kobee", "interior_shikkoku_no_ar"]);
+// ピンクオモ（other_pink_omo）は主効果が得点倍率ではない（画面ピンクフィルター＋アイテムを段ボール
+// 中心へ引き寄せる演出、スコア・時間には影響しない）が、出現重みの管理上はユーザー指定でこのプールの
+// LR枠に含める（frenchie-catch-game.tsx ITEM_SPAWN_WEIGHTS直上のコメント参照）。スコア・時間への
+// 効果が無いため、runItemSkillEffectにケースは追加していない（未知IDはdefaultでpoints=0のまま）。
+// ナルシストアー・マフィアーも同様に2026-09-03、単独チューニング枠からこのプールのMR枠に移動
+// （ユーザー指定。主効果はそれぞれ「全アイテムのスキルがLv.MAXで発動」「フレブル数ボーナス倍率」で
+// 得点倍率そのものではないが、重み管理上の扱いとして含める）。
+const SCORE_MULT_IDS = new Set(["toy_meat", "interior_spring_flower_wreath", "other_kamunayo", "other_nisoku_a", "other_azubee", "interior_kinoko_azubee", "other_kobee", "interior_shikkoku_no_ar", "other_pink_omo", "other_narcissist_a", "other_mafia_a"]);
 // 通常アイテム系プール（特殊効果を持たない全61種。frenchie-catch-game.tsxのNORMAL_ITEM_IDSと同一、手動同期）。
 const NORMAL_ITEM_IDS = new Set([
   "toy_colorful_ball", "toy_rope", "toy_bone", "toy_squeaky_ball", "toy_tennis_ball",
@@ -197,9 +206,9 @@ function poolWeightTotal(ids) {
 // 変更（frenchie-catch-game.tsx ITEM_SPAWN_WEIGHTS直上のコメント参照）。該当アイテムが無いランクの
 // 予算はプールの合計から減らさず、dogの出現重みに上乗せして消化する
 // （frenchie-catch-game.tsxのXXX_UNFILLED_RANK_DOG_WEIGHTと同一値を手動同期）。
-const TIME_BONUS_UNFILLED_RANK_DOG_WEIGHT = 960;
-const SCORE_MULT_UNFILLED_RANK_DOG_WEIGHT = 150;
-const SPAWN_DYNAMICS_UNFILLED_RANK_DOG_WEIGHT = 110;
+const TIME_BONUS_UNFILLED_RANK_DOG_WEIGHT = 2120 - 1187.2;
+const SCORE_MULT_UNFILLED_RANK_DOG_WEIGHT = 120;
+const SPAWN_DYNAMICS_UNFILLED_RANK_DOG_WEIGHT = 126;
 // 時間増加系7種＋おかえりは、プレイ時間がTIME_BONUS_CUTOFF_BASE_SEC + Lv*TIME_BONUS_CUTOFF_STEP_SEC_PER_LEVEL
 // (Lv0始まりなので実質「平均スキルLv」×20秒)を超えると出現しなくなる。シミュレータは全アイテムの
 // スキルLvをラウンドのLv(0〜4)+1に統一する既存の簡略化にそのまま乗せ、平均スキルLv=lv+1として扱う。
