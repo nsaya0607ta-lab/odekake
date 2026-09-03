@@ -1568,9 +1568,14 @@ export function FrenchieCatchGame({ ownedItems }: { ownedItems: FrenchieCatchIte
                 setBagStock(bagStockRef.current);
                 showCatch(entity, 0, "ビニール袋でノーダメージ！");
               } else {
-                scoreRef.current = Math.max(0, scoreRef.current - POOP_PENALTY);
+                // マイナス点も画面上部の「スコア倍率 ×X」と同じ倍率（時間経過系×宝箱連続ボーナス系×食べ物限定系）を反映する
+                const poopPenaltyMultiplier = getScoreMultiplierProduct(scoreMultipliersRef, now)
+                  * (treasureStreakActiveRef.current ? treasureStreakMultRef.current : 1)
+                  * getScoreMultiplierProduct(foodScoreMultipliersRef, now);
+                const poopPenalty = Math.round(POOP_PENALTY * poopPenaltyMultiplier);
+                scoreRef.current = Math.max(0, scoreRef.current - poopPenalty);
                 setScore(scoreRef.current);
-                showCatch(entity, -POOP_PENALTY, "うんちを踏んじゃった…");
+                showCatch(entity, -poopPenalty, "うんちを踏んじゃった…");
               }
               next.push(entity);
               continue;
