@@ -368,16 +368,29 @@ const DEFAULT_ITEM_SPAWN_WEIGHT = 100;
  * 平均185.7秒・中央値111秒・p99が1112秒程度、暴走はしない）。
  */
 const ITEM_SPAWN_WEIGHTS: Partial<Record<string, number>> = {
-  toy_treasure_puzzle: 149,
-  other_omojii: 63,
-  toy_duck_plush: 90,
-  toy_carrot: 90,
-  food_paw_melon_bread: 90,
-  interior_anball: 90,
-  other_azuki: 63,
-  summer_frenchie: 90,
+  /**
+   * 2026-09-03、出現重みプールの予算をユーザー指定で底上げ（時間増加系7種 576→600 /
+   * 得点倍率系8種 370→400 / 出現量アップ・制御系 869→900）。各プール内は元のレアリティ比を
+   * 保ったまま比例配分してある（MR3種の重み20は「触ってはいけない」対象のため据え置き）。
+   * 検算はdocs/item-catch-new-item-checklist.mdの基準値表を参照。
+   */
+  toy_treasure_puzzle: 152,
+  other_omojii: 65,
+  toy_duck_plush: 94,
+  toy_carrot: 94,
+  food_paw_melon_bread: 94,
+  interior_anball: 94,
+  other_azuki: 65,
+  summer_frenchie: 94,
   other_okaeri: 300,
   other_listen_to_the_a: 50,
+  toy_rainbow_ball: 104,
+  interior_stretch_rod: 104,
+  other_xmas_party: 104,
+  other_pondeomo: 104,
+  other_pondear: 104,
+  other_jare_a: 104,
+  interior_ragby_ar: 104,
   /**
    * MR3種（ブレブル・ナルシストアー・マフィアー）はいずれも効果が強く出現頻度を抑えたいため、
    * 出現重みを一律20（デフォルト100の1/5）にしてある（2026-09-01、ユーザー指定）。
@@ -399,14 +412,14 @@ const ITEM_SPAWN_WEIGHTS: Partial<Record<string, number>> = {
    * 時間増加系7種のプール希釈相殺が崩れる）。Xmas Party(MR)はランク表に含まれていないため
    * 未変更（デフォルト100のまま）。
    */
-  toy_meat: 60,
-  interior_spring_flower_wreath: 60,
-  other_kamunayo: 50,
-  other_nisoku_a: 50,
-  other_azubee: 40,
-  interior_kinoko_azubee: 40,
-  other_kobee: 40,
-  interior_shikkoku_no_ar: 30,
+  toy_meat: 65,
+  interior_spring_flower_wreath: 65,
+  other_kamunayo: 54,
+  other_nisoku_a: 54,
+  other_azubee: 43,
+  interior_kinoko_azubee: 43,
+  other_kobee: 43,
+  interior_shikkoku_no_ar: 33,
 };
 const STRETCH_ROD_ITEM_ID = "interior_stretch_rod";
 const STRETCH_ROD_SECONDS = 3;
