@@ -946,12 +946,8 @@ export function FrenchieCatchGame({ ownedItems }: { ownedItems: FrenchieCatchIte
     let scoreMultiplierTotalValue = 1;
     const activeScoreMultipliers = scoreMultipliersRef.current.filter((entry) => entry.until > now);
     if (activeScoreMultipliers.length > 0) {
+      // この倍率はSCORE表示の下の「スコア倍率 ×X」に表示済みのため、右側のスキルログには出さない
       const product = activeScoreMultipliers.reduce((acc, entry) => acc * entry.value, 1);
-      labels.push(
-        activeScoreMultipliers.length > 1
-          ? `得点 ×${activeScoreMultipliers.map((entry) => entry.value).join("×")}=${product}`
-          : `得点 ×${product}`,
-      );
       scoreMultiplierTotalValue *= product;
     }
     const activeNextMultipliers = nextMultipliersRef.current.filter((entry) => entry.remaining > 0);
@@ -984,7 +980,7 @@ export function FrenchieCatchGame({ ownedItems }: { ownedItems: FrenchieCatchIte
     if (now < highRarityLockUntilRef.current) labels.push("SSR/UR/LRのみ出現中");
     if (highRarityLockCountRef.current > 0) labels.push(`UR/LRのみ出現 あと${highRarityLockCountRef.current}体`);
     if (treasureStreakActiveRef.current) {
-      labels.push(`宝箱連続ボーナス 得点+${Math.round((treasureStreakMultRef.current - 1) * 100)}%`);
+      // この倍率もSCORE表示の下の「スコア倍率 ×X」に含まれているため、右側のスキルログには出さない
       scoreMultiplierTotalValue *= treasureStreakMultRef.current;
     }
     if (now < omochiUntilRef.current) labels.push(`うんちがおもちに +${omochiPtValueRef.current}pt`);
@@ -992,12 +988,8 @@ export function FrenchieCatchGame({ ownedItems }: { ownedItems: FrenchieCatchIte
     if (now < hazardShieldUntilRef.current) labels.push("ハザード出現なし");
     const activeFoodMultipliers = foodScoreMultipliersRef.current.filter((entry) => entry.until > now);
     if (activeFoodMultipliers.length > 0) {
+      // この倍率もSCORE表示の下の「スコア倍率 ×X」に含まれているため、右側のスキルログには出さない
       const product = activeFoodMultipliers.reduce((acc, entry) => acc * entry.value, 1);
-      labels.push(
-        activeFoodMultipliers.length > 1
-          ? `食べ物カテゴリ得点×${activeFoodMultipliers.map((entry) => entry.value).join("×")}=${product}中`
-          : `食べ物カテゴリ得点×${product}中`,
-      );
       scoreMultiplierTotalValue *= product;
     }
     if (now < slantBoostUntilRef.current) labels.push("斜め落下中");
