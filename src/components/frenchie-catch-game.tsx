@@ -369,28 +369,41 @@ const DEFAULT_ITEM_SPAWN_WEIGHT = 100;
  */
 const ITEM_SPAWN_WEIGHTS: Partial<Record<string, number>> = {
   /**
-   * 2026-09-03、出現重みプールの予算をユーザー指定で底上げ（時間増加系7種 576→600 /
-   * 得点倍率系8種 370→400 / 出現量アップ・制御系 869→900）。各プール内は元のレアリティ比を
-   * 保ったまま比例配分してある（MR3種の重み20は「触ってはいけない」対象のため据え置き）。
-   * 検算はdocs/item-catch-new-item-checklist.mdの基準値表を参照。
+   * 時間増加系プール（合計600、2026-09-03〜レアリティ別「固定予算」制、ユーザー指定）：
+   * R:270 / SR:10 / SSR:10 / UR:210 / LR:90 / MR:10。各ランクの予算は、そのランクに属する
+   * 時間増加系アイテムの人数で均等に割った値をここに書く（1個あたりの重みは必ず10の倍数）。
+   * SR・SSR・MRには該当アイテムが無いため、その予算(10+10+10=30)は「普通のフレブル」(dog)の
+   * 出現重みに上乗せして消化している（TIME_BONUS_UNFILLED_RANK_DOG_WEIGHT参照）。
+   * SR・SSR・MRの時間増加系アイテムを新規追加する時は、TIME_BONUS_UNFILLED_RANK_DOG_WEIGHT側の
+   * 該当ランク予算を差し引き、そのランクの予算（10の倍数を維持）をここに追加すること。
    */
-  toy_treasure_puzzle: 152,
-  other_omojii: 65,
-  toy_duck_plush: 94,
-  toy_carrot: 94,
-  food_paw_melon_bread: 94,
-  interior_anball: 94,
-  other_azuki: 65,
-  summer_frenchie: 94,
+  other_omojii: 70,
+  toy_duck_plush: 90,
+  toy_carrot: 90,
+  food_paw_melon_bread: 90,
+  interior_anball: 70,
+  other_azuki: 70,
+  summer_frenchie: 90,
   other_okaeri: 300,
   other_listen_to_the_a: 50,
-  toy_rainbow_ball: 104,
-  interior_stretch_rod: 104,
-  other_xmas_party: 104,
-  other_pondeomo: 104,
-  other_pondear: 104,
-  other_jare_a: 104,
-  interior_ragby_ar: 104,
+  /**
+   * 出現量アップ・出現制御系プール（合計900、2026-09-03〜レアリティ別「固定予算」制、ユーザー指定）：
+   * R:100 / SR:150 / SSR:400 / UR:30 / LR:100 / MR:120。各ランクの予算は、そのランクに属する
+   * アイテムの人数で均等に割った値をここに書く（1個あたりの重みは必ず10の倍数）。ブレブルの重み20は
+   * 「触ってはいけない」対象のため据え置き、MRランク予算120のうち残り100をXmas Partyに割り当てる。
+   * URランクには該当アイテムが無いため、その予算30は「普通のフレブル」(dog)の出現重みに上乗せして
+   * 消化している（SPAWN_DYNAMICS_UNFILLED_RANK_DOG_WEIGHT参照）。URの出現量アップアイテムを
+   * 新規追加する時は、SPAWN_DYNAMICS_UNFILLED_RANK_DOG_WEIGHT側の予算を差し引き、
+   * そのランクの予算（10の倍数を維持）をここに追加すること。
+   */
+  toy_rainbow_ball: 100,
+  interior_stretch_rod: 100,
+  toy_treasure_puzzle: 150,
+  other_xmas_party: 100,
+  other_pondeomo: 100,
+  other_pondear: 100,
+  other_jare_a: 100,
+  interior_ragby_ar: 100,
   /**
    * MR3種（ブレブル・ナルシストアー・マフィアー）はいずれも効果が強く出現頻度を抑えたいため、
    * 出現重みを一律20（デフォルト100の1/5）にしてある（2026-09-01、ユーザー指定）。
@@ -540,6 +553,19 @@ const DOG_SPAWN_RATIO = 0.28;
  * R・MRの得点倍率アイテムを追加したら、そのランクの予算分をここから引くこと。
  */
 const SCORE_MULT_UNFILLED_RANK_DOG_WEIGHT = 130;
+/**
+ * 時間増加系プールのランク別固定予算（ITEM_SPAWN_WEIGHTS直上のコメント参照）のうち、
+ * 該当する時間増加系アイテムがまだ存在しないランク(SR/SSR/MR)の予算を合算した値。
+ * SR(10) + SSR(10) + MR(10) = 30（2026-09-03時点）。SR・SSR・MRの時間増加系アイテムを
+ * 追加したら、そのランクの予算分をここから引くこと。
+ */
+const TIME_BONUS_UNFILLED_RANK_DOG_WEIGHT = 30;
+/**
+ * 出現量アップ・出現制御系プールのランク別固定予算（ITEM_SPAWN_WEIGHTS直上のコメント参照）のうち、
+ * 該当するアイテムがまだ存在しないランク(UR)の予算。UR(30) = 30（2026-09-03時点）。
+ * URの出現量アップアイテムを追加したら、その予算分をここから引くこと。
+ */
+const SPAWN_DYNAMICS_UNFILLED_RANK_DOG_WEIGHT = 30;
 /** 通れまてん有効中に「はずれ」フレブルの代わりに出現する金色フレブルの目印用id（kindは通常のdogのまま） */
 const TOOREMATEN_GOLDEN_DOG_ID = "toorematen_golden_dog";
 const FRENCHIE_SKIN_IDS = ["hiking_frenchie", "snow_frenchie", "summer_frenchie"];
@@ -1072,7 +1098,9 @@ export function FrenchieCatchGame({ ownedItems }: { ownedItems: FrenchieCatchIte
     const itemWeightTotal = weightedItems.reduce((sum, entry) => sum + entry.weight, 0);
     const dogWeight =
       itemPool.length * DEFAULT_ITEM_SPAWN_WEIGHT * (DOG_SPAWN_RATIO / (1 - DOG_SPAWN_RATIO)) +
-      SCORE_MULT_UNFILLED_RANK_DOG_WEIGHT;
+      SCORE_MULT_UNFILLED_RANK_DOG_WEIGHT +
+      TIME_BONUS_UNFILLED_RANK_DOG_WEIGHT +
+      SPAWN_DYNAMICS_UNFILLED_RANK_DOG_WEIGHT;
     let roll = Math.random() * (dogWeight + itemWeightTotal);
 
     if (roll < dogWeight) {
