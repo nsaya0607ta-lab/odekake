@@ -369,14 +369,16 @@ const DEFAULT_ITEM_SPAWN_WEIGHT = 100;
  */
 const ITEM_SPAWN_WEIGHTS: Partial<Record<string, number>> = {
   /**
-   * 2026-09-03、3プール共通のレアリティ別「固定比率」制に変更（ユーザー指定）。dog（普通のフレブル）
-   * の出現重みは一切変更しない。各プールの合計予算 × ランク比率(R:30% / SR:18% / SSR:16% /
-   * UR:14% / LR:12% / MR:10%、合計100%)がそのランクの予算で、そのランクに属するアイテムの
-   * 人数で均等に割った値をここに書く（10の倍数に丸め）。該当アイテムが無いランクの予算は
-   * dogへ回さず単純に不使用（このプールの実効合計は、埋まっているランクの予算の合計になる）。
+   * 2026-09-03、3プール共通のレアリティ別「固定比率」制に変更（ユーザー指定）。各プールの
+   * 合計予算 × ランク比率(R:30% / SR:18% / SSR:16% / UR:14% / LR:12% / MR:10%、合計100%)が
+   * そのランクの予算で、そのランクに属するアイテムの人数で均等に割った値をここに書く
+   * （10の倍数に丸め）。該当アイテムが無いランクの予算はプールの合計から減らさず、
+   * 「普通のフレブル」(dog)の出現重みに上乗せして消化する
+   * （TIME_BONUS_UNFILLED_RANK_DOG_WEIGHT等、DOG_SPAWN_RATIO直下のコメント参照）。
    *
-   * 時間増加系プール（予算600）：R:180(3種60ずつ) / SR:108(未使用) / SSR:96(未使用) /
-   * UR:84→30ずつ(3種) / LR:72→70(1種) / MR:60(未使用)。実効合計340。
+   * 時間増加系プール（予算600）：R:180(3種60ずつ) / SR:108(未充填→dog) / SSR:96(未充填→dog) /
+   * UR:84→30ずつ(3種) / LR:72→70(1種) / MR:60(未充填→dog)。在籍分の実際の合計は340
+   * （残り260は`TIME_BONUS_UNFILLED_RANK_DOG_WEIGHT`でdogへ）。
    */
   other_omojii: 30,
   toy_duck_plush: 60,
@@ -389,8 +391,9 @@ const ITEM_SPAWN_WEIGHTS: Partial<Record<string, number>> = {
   other_listen_to_the_a: 50,
   /**
    * 出現量アップ・出現制御系プール（予算900）：R:270→270(1種) / SR:162→160(1種) /
-   * SSR:144→40ずつ(4種) / UR:126(未使用) / LR:108→110(1種) / MR:90（ブレブル20固定+
-   * Xmas Party70）。実効合計790。ブレブルの重み20は「触ってはいけない」対象のため据え置き、
+   * SSR:144→40ずつ(4種) / UR:126(未充填→dog) / LR:108→110(1種) / MR:90（ブレブル20固定+
+   * Xmas Party70）。在籍分の実際の合計は790（残り110は`SPAWN_DYNAMICS_UNFILLED_RANK_DOG_WEIGHT`で
+   * dogへ）。ブレブルの重み20は「触ってはいけない」対象のため据え置き、
    * MRランク予算からブレブル分20を引いた残りをXmas Partyに割り当てる。
    */
   toy_rainbow_ball: 40,
@@ -411,8 +414,9 @@ const ITEM_SPAWN_WEIGHTS: Partial<Record<string, number>> = {
   other_narcissist_a: 20,
   other_mafia_a: 20,
   /**
-   * 得点倍率系プール（予算400）：R:120(未使用) / SR:72→40ずつ(2種) / SSR:64→30ずつ(2種) /
-   * UR:56→20ずつ(3種) / LR:48→50(1種) / MR:40(未使用)。実効合計250。他プールと同じ
+   * 得点倍率系プール（予算400）：R:120(未充填→dog) / SR:72→40ずつ(2種) / SSR:64→30ずつ(2種) /
+   * UR:56→20ずつ(3種) / LR:48→50(1種) / MR:40(未充填→dog)。在籍分の実際の合計は250
+   * （残り150は`SCORE_MULT_UNFILLED_RANK_DOG_WEIGHT`でdogへ）。他プールと同じ
    * R:30%/SR:18%/SSR:16%/UR:14%/LR:12%/MR:10%比率（ユーザー指定、2026-09-03〜）。
    */
   toy_meat: 40,
@@ -536,6 +540,18 @@ const FOOD_CATEGORY_ITEM_IDS = new Set(
   COLLECTION_ITEMS.filter((entry) => entry.category === "food").map((entry) => entry.id),
 );
 const DOG_SPAWN_RATIO = 0.28;
+/**
+ * 3プール（時間増加系600・得点倍率系400・出現量アップ制御系900）はレアリティ別の固定比率
+ * （R:30%/SR:18%/SSR:16%/UR:14%/LR:12%/MR:10%）でランク予算を割り当てているが、該当アイテムが
+ * まだ存在しないランクの予算は消化されず余る。プールの予算を減らさないため、この余りを
+ * 「普通のフレブル」(dog)の出現重みに上乗せして消化する（ITEM_SPAWN_WEIGHTS直上のコメント参照）。
+ * 各値は「プール予算 − 在籍ランクの実際の重み合計」。時間増加系: 600−340=260 /
+ * 得点倍率系: 400−250=150 / 出現量アップ制御系: 900−790=110（2026-09-03時点）。
+ * 新しく未充填ランクにアイテムを追加したら、対応する定数からそのランクの予算分を差し引くこと。
+ */
+const TIME_BONUS_UNFILLED_RANK_DOG_WEIGHT = 260;
+const SCORE_MULT_UNFILLED_RANK_DOG_WEIGHT = 150;
+const SPAWN_DYNAMICS_UNFILLED_RANK_DOG_WEIGHT = 110;
 /** 通れまてん有効中に「はずれ」フレブルの代わりに出現する金色フレブルの目印用id（kindは通常のdogのまま） */
 const TOOREMATEN_GOLDEN_DOG_ID = "toorematen_golden_dog";
 const FRENCHIE_SKIN_IDS = ["hiking_frenchie", "snow_frenchie", "summer_frenchie"];
@@ -1066,7 +1082,11 @@ export function FrenchieCatchGame({ ownedItems }: { ownedItems: FrenchieCatchIte
         (spawnRateBoostActive && TIME_BONUS_ITEM_IDS.has(item.id) ? 1 / spawnRateBoostValueRef.current : 1),
     }));
     const itemWeightTotal = weightedItems.reduce((sum, entry) => sum + entry.weight, 0);
-    const dogWeight = itemPool.length * DEFAULT_ITEM_SPAWN_WEIGHT * (DOG_SPAWN_RATIO / (1 - DOG_SPAWN_RATIO));
+    const dogWeight =
+      itemPool.length * DEFAULT_ITEM_SPAWN_WEIGHT * (DOG_SPAWN_RATIO / (1 - DOG_SPAWN_RATIO)) +
+      TIME_BONUS_UNFILLED_RANK_DOG_WEIGHT +
+      SCORE_MULT_UNFILLED_RANK_DOG_WEIGHT +
+      SPAWN_DYNAMICS_UNFILLED_RANK_DOG_WEIGHT;
     let roll = Math.random() * (dogWeight + itemWeightTotal);
 
     if (roll < dogWeight) {
