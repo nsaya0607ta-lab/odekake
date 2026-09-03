@@ -305,7 +305,7 @@ const SPAWN_DYNAMICS_ITEM_IDS = new Set([
  */
 const TREASURE_ITEM_ID = "toy_treasure_puzzle";
 const TREASURE_FALL_SPEED = 4;
-const POOP_FLOOD_FALL_SPEED = 6;
+const POOP_FLOOD_FALL_SPEED = 2;
 const TREASURE_POOP_FLOOD_COUNT = 10;
 const DOG_FLOOD_ITEM_ID = "other_listen_to_the_a";
 const DOG_FLOOD_SPAWN_RATE = 4;
@@ -1099,6 +1099,8 @@ export function FrenchieCatchGame({ ownedItems }: { ownedItems: FrenchieCatchIte
         image: POOP_IMAGE,
         rarity: null,
         level: 0,
+        // マイナス要素のアイテムは落下速度アップ系スキルの影響を受けない
+        vy: rawVy,
         size: 12 + Math.random() * 3,
         spin: (Math.random() - 0.5) * 40,
       };
@@ -1141,11 +1143,12 @@ export function FrenchieCatchGame({ ownedItems }: { ownedItems: FrenchieCatchIte
     const blackoutThreshold = shrinkThreshold + BLACKOUT_SPAWN_CHANCE;
     const stunThreshold = blackoutThreshold + STUN_SPAWN_CHANCE;
     const chocolateThreshold = stunThreshold + CHOCOLATE_SPAWN_CHANCE;
-    if (!hazardShieldActive && hazardRoll < timeMinusThreshold) return { ...base, itemId: TIME_MINUS_ITEM_ID, kind: "item", name: "時間 -3秒", image: TIME_MINUS_IMAGE, rarity: null, level: 0, vy: base.vy * TIME_MINUS_FALL_SPEED, size: 13 + Math.random() * 3, spin: (Math.random() - 0.5) * 28 };
-    if (!hazardShieldActive && hazardRoll < shrinkThreshold) return { ...base, itemId: BOX_SHRINK_ITEM_ID, kind: "item", name: "ダンボール縮小", image: BOX_SHRINK_IMAGE, rarity: null, level: 0, size: 13 + Math.random() * 3, spin: (Math.random() - 0.5) * 28 };
-    if (!hazardShieldActive && hazardRoll < blackoutThreshold) return { ...base, itemId: BLACKOUT_ITEM_ID, kind: "item", name: "イカスミ", image: BLACKOUT_IMAGE, rarity: null, level: 0, size: 14 + Math.random() * 3, spin: (Math.random() - 0.5) * 22 };
-    if (!hazardShieldActive && hazardRoll < stunThreshold) return { ...base, itemId: STUN_ITEM_ID, kind: "item", name: "しびれバッテリー", image: STUN_IMAGE, rarity: null, level: 0, size: 12.5 + Math.random() * 3, spin: (Math.random() - 0.5) * 30 };
-    if (!hazardShieldActive && hazardRoll < chocolateThreshold) return { ...base, itemId: CHOCOLATE_ITEM_ID, kind: "item", name: "呪いのチョコレート", image: CHOCOLATE_IMAGE, rarity: null, level: 0, size: 13.5 + Math.random() * 3, spin: (Math.random() - 0.5) * 26 };
+    // マイナス要素のアイテム（うんち以外）も落下速度アップ系スキルの影響を受けないよう、vyはrawVy基準にする
+    if (!hazardShieldActive && hazardRoll < timeMinusThreshold) return { ...base, itemId: TIME_MINUS_ITEM_ID, kind: "item", name: "時間 -3秒", image: TIME_MINUS_IMAGE, rarity: null, level: 0, vy: rawVy * TIME_MINUS_FALL_SPEED, size: 13 + Math.random() * 3, spin: (Math.random() - 0.5) * 28 };
+    if (!hazardShieldActive && hazardRoll < shrinkThreshold) return { ...base, itemId: BOX_SHRINK_ITEM_ID, kind: "item", name: "ダンボール縮小", image: BOX_SHRINK_IMAGE, rarity: null, level: 0, vy: rawVy, size: 13 + Math.random() * 3, spin: (Math.random() - 0.5) * 28 };
+    if (!hazardShieldActive && hazardRoll < blackoutThreshold) return { ...base, itemId: BLACKOUT_ITEM_ID, kind: "item", name: "イカスミ", image: BLACKOUT_IMAGE, rarity: null, level: 0, vy: rawVy, size: 14 + Math.random() * 3, spin: (Math.random() - 0.5) * 22 };
+    if (!hazardShieldActive && hazardRoll < stunThreshold) return { ...base, itemId: STUN_ITEM_ID, kind: "item", name: "しびれバッテリー", image: STUN_IMAGE, rarity: null, level: 0, vy: rawVy, size: 12.5 + Math.random() * 3, spin: (Math.random() - 0.5) * 30 };
+    if (!hazardShieldActive && hazardRoll < chocolateThreshold) return { ...base, itemId: CHOCOLATE_ITEM_ID, kind: "item", name: "呪いのチョコレート", image: CHOCOLATE_IMAGE, rarity: null, level: 0, vy: rawVy, size: 13.5 + Math.random() * 3, spin: (Math.random() - 0.5) * 26 };
 
     if (itemPool.length === 0) {
       return {
