@@ -72,8 +72,15 @@ const MAGNET_MEDIUM_RANGE = 20;
 const MAGNET_MEDIUM_PULL = 30;
 const MAGNET_STRONG_RANGE = 28;
 const MAGNET_STRONG_PULL = 48;
-/** ピンクオモ：既存のマグネットと違い範囲制限なしで全アイテムを段ボールの中心軸へ引き寄せる */
-const PINK_OMO_PULL = 60;
+/**
+ * ピンクオモ：既存のマグネットと違い範囲制限なしで全アイテムを段ボールの中心軸へ引き寄せる。
+ * 速度に力を加算する方式（マグネットと同じ）だと中心を通り過ぎては戻りを繰り返す「うにょうにょ」
+ * した往復振動になるため、ピンクオモは指数減衰イージングでx座標を直接中心へ寄せ、
+ * 十分近づいたらピタッと止めて中心軸に固定する（vxは使わない）。値は1秒あたりの収束の速さ。
+ */
+const PINK_OMO_SNAP_RATE = 8;
+/** この距離未満まで中心へ寄ったら、以後は中心軸ぴったりに固定する（%幅基準） */
+const PINK_OMO_SNAP_EPSILON = 0.15;
 const FALL_SPEED_BOOST = 1.7;
 const UR_BOOST_MAX = 10;
 /** 虹色わんこボールのUR加算は永続だと時間増加系との複利で発散しやすいため、時間経過で自然に減衰させる */
@@ -1502,7 +1509,12 @@ export function FrenchieCatchGame({ ownedItems }: { ownedItems: FrenchieCatchIte
           !NEGATIVE_HAZARD_IDS.has(entity.itemId ?? "")
         ) {
           const dx = boxXRef.current - entity.x;
-          entity.vx += Math.sign(dx) * PINK_OMO_PULL * dt;
+          if (Math.abs(dx) < PINK_OMO_SNAP_EPSILON) {
+            entity.x = boxXRef.current;
+          } else {
+            entity.x += dx * (1 - Math.exp(-PINK_OMO_SNAP_RATE * dt));
+          }
+          entity.vx = 0;
         }
 
         const previousY = entity.y;
