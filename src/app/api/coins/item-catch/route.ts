@@ -7,7 +7,7 @@ type RpcResponse = {
   error: { code?: string; message: string } | null;
 };
 
-const MAX_CAUGHT_COUNT = 2000;
+const MAX_CAUGHT_COUNT = 10000;
 const MAX_SCORE_PER_RPC = 8000;
 /** ゲームを介さずAPIを直接叩いて無限にコインを増やせてしまわないための固定上限。
  *  record_item_catch_result() 側の上限(2000)と揃えている。 */
