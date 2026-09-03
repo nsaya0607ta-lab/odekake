@@ -98,12 +98,6 @@ const TIME_MINUS_BOOSTED_WEIGHT = 300;
 const TIME_MINUS_BOOST_AFTER_SEC = 60;
 const TIME_MINUS_SPAWN_CHANCE = 0.015;
 const TIME_MINUS_SECONDS = 3;
-/** プレイ60秒経過後、画面上部1/5のアイテムを透明にする */
-const TOP_ZONE_HIDDEN_AFTER_SEC = 60;
-const TOP_ZONE_HIDDEN_LOCAL_Y = 20;
-/** プレイ120秒経過後、画面上部1/4のアイテムを透明にする */
-const TOP_ZONE_HIDDEN_AFTER_SEC_2 = 120;
-const TOP_ZONE_HIDDEN_LOCAL_Y_2 = 25;
 const TIME_MINUS_FALL_SPEED = 3.5;
 const BOX_SHRINK_ITEM_ID = "hazard_box_shrink";
 const BOX_SHRINK_IMAGE = "/collection/items/hazard-box-shrink.webp";
@@ -890,8 +884,6 @@ export function FrenchieCatchGame({ ownedItems }: { ownedItems: FrenchieCatchIte
     if (now < boxShrinkUntilRef.current) labels.push("ダンボール0.8倍");
     else if (now < boxWideUntilRef.current) labels.push(`ダンボール×${boxWideScaleRef.current}拡大中`);
     if (now < blackoutUntilRef.current) labels.push("上半分ブラックアウト中");
-    if (now - startAtRef.current > TOP_ZONE_HIDDEN_AFTER_SEC_2 * 1000) labels.push("画面上部1/4が見えない");
-    else if (now - startAtRef.current > TOP_ZONE_HIDDEN_AFTER_SEC * 1000) labels.push("画面上部が見えない");
     if (now < stunUntilRef.current) labels.push("しびれ中");
     if (now < hazardInvertUntilRef.current) labels.push("ミラータイム中（ハザード反転）");
     if (now < dogGoldenUntilRef.current) labels.push(`通れまてん発動中（フレブルが金色に、+${dogGoldenPtValueRef.current}pt）`);
@@ -2221,22 +2213,14 @@ export function FrenchieCatchGame({ ownedItems }: { ownedItems: FrenchieCatchIte
         setEntities(next);
       }
 
-      const elapsedSincePlayStart = now - startAtRef.current;
-      const topZoneHiddenY = elapsedSincePlayStart > TOP_ZONE_HIDDEN_AFTER_SEC_2 * 1000
-        ? TOP_ZONE_HIDDEN_LOCAL_Y_2
-        : elapsedSincePlayStart > TOP_ZONE_HIDDEN_AFTER_SEC * 1000
-          ? TOP_ZONE_HIDDEN_LOCAL_Y
-          : 0;
       const { w: boardW, h: boardH } = boardSizeRef.current;
       for (const entity of next) {
         const el = entityNodeRefs.current.get(entity.id);
         if (!el) continue;
         const zIndex = entity.enteredOpening && entity.status !== "bounced" ? 40 : 20;
-        const opacity = entity.y < topZoneHiddenY ? 0 : 1;
         const px = ((entity.x - entity.spawnX) / 100) * boardW;
         const py = ((entity.y - entity.spawnY) / 100) * boardH;
         el.style.zIndex = String(zIndex);
-        el.style.opacity = String(opacity);
         el.style.transform = `translate(${px}px, ${py}px) translate(-50%, -50%) rotate(${entity.rotation}deg)`;
       }
 
