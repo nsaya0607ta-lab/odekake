@@ -318,6 +318,33 @@ export type FriendRecentVisitRow = {
   photo_path: string | null;
 };
 
+export type FriendSpotVisitRow = {
+  spot_id: string;
+  spot_name: string;
+  category_id: number | null;
+  category_name: string | null;
+  prefecture_code: string;
+  municipality_code: string;
+  address: string | null;
+  latitude: number | null;
+  longitude: number | null;
+  visit_id: string;
+  visited_at: string;
+  rating: number | null;
+  comment: string | null;
+  note: string | null;
+  companions: string | null;
+  amount: number | null;
+  stay_minutes: number | null;
+  congestion_level: number | null;
+  revisit_wanted: boolean;
+  trip_title: string | null;
+  photo_id: string | null;
+  photo_storage_path: string | null;
+  photo_caption: string | null;
+  photo_display_order: number | null;
+};
+
 export type FriendActivityRow = {
   friend_user_id: string;
   display_name: string;
@@ -769,6 +796,10 @@ export type Database = {
       get_friend_recent_visits: {
         Args: { p_friend_user_id: string; p_limit?: number };
         Returns: FriendRecentVisitRow[];
+      };
+      get_friend_spot_visits: {
+        Args: { p_friend_user_id: string; p_spot_id: string };
+        Returns: FriendSpotVisitRow[];
       };
       get_friends_activity_feed: { Args: { p_limit?: number }; Returns: FriendActivityRow[] };
       get_friends_steps_ranking: { Args: { p_limit?: number }; Returns: FriendStepsRankingRow[] };

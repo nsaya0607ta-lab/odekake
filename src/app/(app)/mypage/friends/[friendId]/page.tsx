@@ -4,7 +4,6 @@ import { ConfirmSubmitButton } from "@/components/confirm-submit-button";
 import { IconChevronRight, IconLock, IconMapPin, IconUser } from "@/components/icons";
 import { PageBody } from "@/components/page-body";
 import { PageHeader } from "@/components/page-header";
-import { TappablePhoto } from "@/components/photo-lightbox";
 import { removeFriendAction } from "@/app/(app)/mypage/friends/actions";
 import { COLLECTION_ITEMS } from "@/lib/collection/items";
 import {
@@ -103,6 +102,7 @@ export default async function FriendDetailPage({
           <PrefectureSection visible={overview.show_prefectures} prefectures={prefectures} />
           <CollectionSection visible={overview.show_collection} collection={collection} friendId={friendId} />
           <RecentVisitsSection
+            friendId={friendId}
             visible={overview.show_recent_visits}
             visits={recentVisits}
             photoUrls={visitPhotoUrls}
@@ -236,10 +236,12 @@ function CollectionSection({
 }
 
 function RecentVisitsSection({
+  friendId,
   visible,
   visits,
   photoUrls,
 }: {
+  friendId: string;
   visible: boolean;
   visits: FriendRecentVisitRow[];
   photoUrls: Map<string, string>;
@@ -258,23 +260,32 @@ function RecentVisitsSection({
             const municipality = getMunicipality(visit.municipality_code)?.name ?? visit.municipality_code;
             const photoUrl = visit.photo_path ? photoUrls.get(visit.photo_path) ?? null : null;
             return (
-              <li key={`${visit.spot_id}-${visit.visited_at}-${index}`} className="flex gap-3 px-4 py-4">
-                <span className="w-11 shrink-0 text-sm font-bold text-leaf-deep tabular-nums">
-                  {formatVisitDate(visit.visited_at)}
-                </span>
-                <span className="min-w-0 flex-1">
-                  <span className="block truncate font-semibold">{visit.spot_name}</span>
-                  <span className="mt-1 flex items-center gap-1 truncate text-xs text-ink-faint">
-                    <IconMapPin size={13} className="shrink-0" />
-                    {prefecture} {municipality}
+              <li key={`${visit.spot_id}-${visit.visited_at}-${index}`}>
+                <Link
+                  href={`/mypage/friends/${friendId}/spots/${visit.spot_id}`}
+                  className="flex items-center gap-3 px-4 py-4 active:bg-paper-deep"
+                >
+                  <span className="w-11 shrink-0 text-sm font-bold text-leaf-deep tabular-nums">
+                    {formatVisitDate(visit.visited_at)}
                   </span>
-                </span>
-                {photoUrl ? (
-                  <TappablePhoto
-                    url={photoUrl}
-                    className="h-16 w-16 shrink-0 cursor-zoom-in rounded-2xl border border-line object-cover"
-                  />
-                ) : null}
+                  <span className="min-w-0 flex-1">
+                    <span className="block truncate font-semibold">{visit.spot_name}</span>
+                    <span className="mt-1 flex items-center gap-1 truncate text-xs text-ink-faint">
+                      <IconMapPin size={13} className="shrink-0" />
+                      {prefecture} {municipality}
+                    </span>
+                  </span>
+                  {photoUrl ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img
+                      src={photoUrl}
+                      alt=""
+                      className="h-16 w-16 shrink-0 rounded-2xl border border-line object-cover"
+                      loading="lazy"
+                    />
+                  ) : null}
+                  <IconChevronRight size={17} className="shrink-0 text-ink-faint" />
+                </Link>
               </li>
             );
           })}

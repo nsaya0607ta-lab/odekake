@@ -7,8 +7,10 @@ import type {
   FriendPrefectureRow,
   FriendPrivacySettingsRow,
   FriendRecentVisitRow,
+  FriendSpotVisitRow,
   FriendStepsRankingRow,
 } from "@/lib/supabase/types";
+import { signPhotoPaths } from "./photos";
 
 type DataError = { code?: string; message?: string };
 
@@ -127,6 +129,114 @@ export async function getFriendRecentVisits(
   });
   if (error) throwDataError(error, "Friend visits are unavailable");
   return data ?? [];
+}
+
+async function getFriendSpotVisits(
+  supabase: DB,
+  friendUserId: string,
+  spotId: string,
+): Promise<FriendSpotVisitRow[]> {
+  const { data, error } = await supabase.rpc("get_friend_spot_visits", {
+    p_friend_user_id: friendUserId,
+    p_spot_id: spotId,
+  });
+  if (error) throwDataError(error, "Friend spot visits are unavailable");
+  return data ?? [];
+}
+
+export type FriendSpotDetail = {
+  spotName: string;
+  categoryName: string | null;
+  prefectureCode: string;
+  municipalityCode: string;
+  address: string | null;
+  latitude: number | null;
+  longitude: number | null;
+  summary: { visitCount: number; averageRating: number | null; lastVisitedAt: string | null };
+  visits: Array<{
+    id: string;
+    visitedAt: string;
+    rating: number | null;
+    comment: string | null;
+    note: string | null;
+    companions: string | null;
+    amount: number | null;
+    stayMinutes: number | null;
+    congestionLevel: number | null;
+    revisitWanted: boolean;
+    tripTitle: string | null;
+    photos: Array<{ id: string; url: string | null; caption: string | null }>;
+  }>;
+  galleryUrls: string[];
+};
+
+/** フレンドの訪問先スポットの詳細（閲覧専用）。フレンド自身の訪問履歴・写真だけを返す */
+export async function getFriendSpotDetail(
+  supabase: DB,
+  friendUserId: string,
+  spotId: string,
+): Promise<FriendSpotDetail | null> {
+  const rows = await getFriendSpotVisits(supabase, friendUserId, spotId);
+  if (rows.length === 0) return null;
+
+  const photoPaths = rows.flatMap((row) => (row.photo_storage_path ? [row.photo_storage_path] : []));
+  const signed = await signPhotoPaths(supabase, photoPaths);
+
+  const visitsById = new Map<string, FriendSpotDetail["visits"][number]>();
+  for (const row of rows) {
+    let visit = visitsById.get(row.visit_id);
+    if (!visit) {
+      visit = {
+        id: row.visit_id,
+        visitedAt: row.visited_at,
+        rating: row.rating,
+        comment: row.comment,
+        note: row.note,
+        companions: row.companions,
+        amount: row.amount,
+        stayMinutes: row.stay_minutes,
+        congestionLevel: row.congestion_level,
+        revisitWanted: row.revisit_wanted,
+        tripTitle: row.trip_title,
+        photos: [],
+      };
+      visitsById.set(row.visit_id, visit);
+    }
+    if (row.photo_id && row.photo_storage_path) {
+      visit.photos.push({
+        id: row.photo_id,
+        url: signed.get(row.photo_storage_path) ?? null,
+        caption: row.photo_caption,
+      });
+    }
+  }
+
+  const visits = [...visitsById.values()];
+  const ratings = visits.filter((v): v is typeof v & { rating: number } => typeof v.rating === "number");
+  const first = rows[0]!;
+
+  return {
+    spotName: first.spot_name,
+    categoryName: first.category_name,
+    prefectureCode: first.prefecture_code,
+    municipalityCode: first.municipality_code,
+    address: first.address,
+    latitude: first.latitude,
+    longitude: first.longitude,
+    summary: {
+      visitCount: visits.length,
+      averageRating:
+        ratings.length > 0
+          ? Math.round((ratings.reduce((sum, v) => sum + v.rating, 0) / ratings.length) * 10) / 10
+          : null,
+      lastVisitedAt: visits.reduce<string | null>(
+        (latest, v) => (!latest || v.visitedAt > latest ? v.visitedAt : latest),
+        null,
+      ),
+    },
+    visits,
+    galleryUrls: visits.flatMap((v) => v.photos.map((p) => p.url).filter((u): u is string => Boolean(u))),
+  };
 }
 
 /**
