@@ -600,6 +600,27 @@ const PERSON_CHARACTER_ITEM_IDS = ["other_omochi_janai", "other_listen_to_the_a"
 const PERSON_CHARACTER_ITEMS: CollectionItem[] = PERSON_CHARACTER_ITEM_IDS
   .map((id) => COLLECTION_ITEMS.find((entry) => entry.id === id))
   .filter((entry): entry is CollectionItem => entry != null);
+/**
+ * フルーツバスケットで降ってくる人物入りキャラの抽選重み。他プールと同じ
+ * R:30%/SR:18%/SSR:16%/UR:14%/LR:12%/MR:10%比率（ITEM_SPAWN_WEIGHTS直上コメント参照）を流用する。
+ * これまでは所持している人物入りキャラ4種（SSR/UR/LR/MR）から均等抽選していたため、
+ * 最も効果の強いMR（Xmas Party：得点倍率×最大3.1＋出現量・落下速度アップ＋フレブル大量発生が同時発動）が
+ * 他と同確率(25%)で頻発し、複数体連続で引くとスコアが際限なく伸びる原因になっていた。
+ * ランクが上がるほど出現しにくくする比率に変更し、爆発力の強いキャラほど頻度を下げる。
+ */
+const PERSON_CHARACTER_RANK_WEIGHT: Partial<Record<FrenchieCatchItem["rarity"], number>> = {
+  N: 30, R: 30, SR: 18, SSR: 16, UR: 14, LR: 12, MR: 10,
+};
+function pickPersonCharacter(pool: CollectionItem[]): CollectionItem {
+  const weighted = pool.map((item) => ({ item, weight: PERSON_CHARACTER_RANK_WEIGHT[item.rarity] ?? 1 }));
+  const total = weighted.reduce((sum, entry) => sum + entry.weight, 0);
+  let roll = Math.random() * total;
+  for (const entry of weighted) {
+    roll -= entry.weight;
+    if (roll < 0) return entry.item;
+  }
+  return weighted[weighted.length - 1]!.item;
+}
 const CLAWD_ITEM_ID = "other_clawd";
 /** Clawdの効果中に降ってくる「サッカーボール／ゴールドボール」。本来のレアリティ・スキルのまま出現する */
 const CLAWD_SOCCER_BALL_ITEM = COLLECTION_ITEMS.find((entry) => entry.id === "toy_soccer_ball") ?? null;
@@ -1041,8 +1062,7 @@ export function FrenchieCatchGame({ ownedItems }: { ownedItems: FrenchieCatchIte
     }
     if (personFloodRemainingRef.current > 0) {
       personFloodRemainingRef.current -= 1;
-      const pool = personCharacterPoolRef.current;
-      const character = pool[Math.floor(Math.random() * pool.length)]!;
+      const character = pickPersonCharacter(personCharacterPoolRef.current);
       return {
         ...base,
         itemId: character.id,

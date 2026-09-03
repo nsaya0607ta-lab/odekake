@@ -139,6 +139,19 @@ const BUREBUR_RARITY = new Set(["UR", "LR"]); // ブレブルの限定対象（�
 const OTHER_CATEGORY_IDS = new Set(pool.filter((x) => x.category === "other").map((x) => x.id));
 const FOOD_CATEGORY_IDS = new Set(pool.filter((x) => x.category === "food").map((x) => x.id));
 const PERSON_IDS = ["other_omochi_janai", "other_listen_to_the_a", "other_omoi_bashira", "other_xmas_party"];
+// フルーツバスケットの人物入りキャラ抽選重み（frenchie-catch-game.tsxのPERSON_CHARACTER_RANK_WEIGHTと同一値を手動同期）。
+// 他プールと同じR:30%/SR:18%/SSR:16%/UR:14%/LR:12%/MR:10%比率を流用し、爆発力の強いMR等ほど出現しにくくする。
+const PERSON_RANK_WEIGHT = { N: 30, R: 30, SR: 18, SSR: 16, UR: 14, LR: 12, MR: 10 };
+function pickPersonId() {
+  const weighted = PERSON_IDS.map((pid) => ({ pid, weight: PERSON_RANK_WEIGHT[byId.get(pid).rarity] ?? 1 }));
+  const total = weighted.reduce((sum, e) => sum + e.weight, 0);
+  let roll = Math.random() * total;
+  for (const e of weighted) {
+    roll -= e.weight;
+    if (roll < 0) return e.pid;
+  }
+  return weighted[weighted.length - 1].pid;
+}
 const TIME_BONUS_IDS = new Set(["toy_duck_plush", "toy_carrot", "food_paw_melon_bread", "interior_anball", "other_azuki", "other_omojii", "summer_frenchie"]);
 // おかえり(other_okaeri)は時間増加系7種そのものではないが、時間バランス調整の対象として
 // timeBonusCatchRate(見送り確率)の適用対象に加える（ボーナス出現タイマーの除外対象ではないため
@@ -404,7 +417,7 @@ function simulateOneRound(lv, catchAll, timeBonusCatchRate = 0.8, normalCatchRat
     if (dogFloodRemaining > 0) { dogFloodRemaining -= 1; if (attemptCatch()) resolveCatch("dog", null, null, 0); continue; }
     if (personFloodRemaining > 0) {
       personFloodRemaining -= 1;
-      const pid = PERSON_IDS[Math.floor(Math.random() * PERSON_IDS.length)];
+      const pid = pickPersonId();
       const item = byId.get(pid);
       if (attemptCatch()) resolveCatch("item", pid, item.rarity, lv + 1);
       continue;
