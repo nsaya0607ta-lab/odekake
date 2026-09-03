@@ -293,6 +293,32 @@ const SPAWN_DYNAMICS_ITEM_IDS = new Set([
   "toy_rainbow_ball", "interior_stretch_rod", "toy_treasure_puzzle", "other_burebur",
   "other_xmas_party", "other_pondeomo", "other_pondear", "other_jare_a", "interior_ragby_ar",
 ]);
+/**
+ * 2026-09-03、ユーザー指定で新設した4つ目のプール。上記3プール・Listen to the a-/ナルシストアー/
+ * マフィアー（単独チューニング枠）以外の、特殊効果を持たない「通常アイテム」全61種
+ * （得点のみ・演出のみ含む）が対象。新設時点ではいずれも`DEFAULT_ITEM_SPAWN_WEIGHT`と同値の
+ * 100のままなので、導入によるプレイ時間・スコアへの影響はゼロ。
+ * 重みの決め方・新アイテム追加時の手順は`ITEM_SPAWN_WEIGHTS`直上のコメント参照。
+ */
+const NORMAL_ITEM_IDS = new Set([
+  "toy_colorful_ball", "toy_rope", "toy_bone", "toy_squeaky_ball", "toy_tennis_ball",
+  "toy_red_slipper", "toy_wood_stick", "toy_donut_rope", "food_smile_onigiri", "food_paw_taiyaki",
+  "food_dog_milk", "food_cheese_cubes", "food_roasted_sweet_potato", "food_honey_butter_toast",
+  "other_yellow_rain_boots", "accessory_red_bandana", "other_acorns", "toy_paper_airplane",
+  "other_walk_water_bottle", "other_shiny_pinecone", "accessory_blue_handkerchief",
+  "toy_red_balloon", "toy_sand_bucket", "accessory_walk_pouch",
+  "toy_frisbee", "toy_soccer_ball", "toy_taiyaki_plush", "toy_bear_plush", "food_paw_bowl",
+  "food_paw_pudding", "food_kamikami",
+  "toy_frenchie_plush", "toy_frenchie_cushion", "toy_paw_macaron", "toy_star_wan_wand",
+  "food_strawberry_roll_cake", "food_paw_cupcake", "food_fruit_basket", "interior_sleepy_moon",
+  "other_sparkle_rope_crown",
+  "toy_golden_crown_ball", "interior_gold_ball", "other_nakayoshi_azubee", "other_hamigaki",
+  "other_ikea", "other_orusuban", "other_kurumari_a", "other_oyatsu_no_jikan", "other_ketsunade_a",
+  "other_omochi_janai", "other_oyasumi", "other_clawd",
+  "food_mocchurin", "other_komochi", "other_omoi_bashira", "other_mah", "other_mirror_omochi",
+  "other_toorematen", "other_hia",
+  "hiking_frenchie", "snow_frenchie",
+]);
 const TREASURE_ITEM_ID = "toy_treasure_puzzle";
 const TREASURE_FALL_SPEED = 4;
 const POOP_FLOOD_FALL_SPEED = 6;
@@ -425,6 +451,78 @@ const ITEM_SPAWN_WEIGHTS: Partial<Record<string, number>> = {
   interior_kinoko_azubee: 20,
   other_kobee: 20,
   interior_shikkoku_no_ar: 50,
+  /**
+   * 通常アイテム系プール（予算6100、在籍61種すべて等分100ずつ）：N:2400(24種) / R:700(7種) /
+   * SR:900(9種) / SSR:1200(12種) / UR:700(7種) / LR:200(2種) / MR:0(未在籍)。全ランクとも
+   * 予算÷在籍数=100ちょうどで割り切れるため、現状は`DEFAULT_ITEM_SPAWN_WEIGHT`と同じ値。
+   * 今後このプールに新アイテムを追加する場合は、他の3プールと同じ「同ランク内で均等に重みを
+   * 割り振る計算方法」（docs/item-catch-new-item-checklist.md参照）でそのランクの予算を
+   * 新しい在籍数で割り直し、対象ランクの全メンバーを書き直すこと（ランク予算・プール総予算
+   * 6100自体は変更しない）。これにより、このプールにどれだけアイテムを追加しても他の3プール・
+   * 「普通のフレブル」(dog)の相対確率は薄まらない。MRランクに初めて追加する場合のみ、
+   * 新たにMRランク予算を設定してプール総予算に加算すること（他ランクの予算はいじらない）。
+   */
+  toy_colorful_ball: 100,
+  toy_rope: 100,
+  toy_bone: 100,
+  toy_squeaky_ball: 100,
+  toy_tennis_ball: 100,
+  toy_red_slipper: 100,
+  toy_wood_stick: 100,
+  toy_donut_rope: 100,
+  food_smile_onigiri: 100,
+  food_paw_taiyaki: 100,
+  food_dog_milk: 100,
+  food_cheese_cubes: 100,
+  food_roasted_sweet_potato: 100,
+  food_honey_butter_toast: 100,
+  other_yellow_rain_boots: 100,
+  accessory_red_bandana: 100,
+  other_acorns: 100,
+  toy_paper_airplane: 100,
+  other_walk_water_bottle: 100,
+  other_shiny_pinecone: 100,
+  accessory_blue_handkerchief: 100,
+  toy_red_balloon: 100,
+  toy_sand_bucket: 100,
+  accessory_walk_pouch: 100,
+  toy_frisbee: 100,
+  toy_soccer_ball: 100,
+  toy_taiyaki_plush: 100,
+  toy_bear_plush: 100,
+  food_paw_bowl: 100,
+  food_paw_pudding: 100,
+  food_kamikami: 100,
+  toy_frenchie_plush: 100,
+  toy_frenchie_cushion: 100,
+  toy_paw_macaron: 100,
+  toy_star_wan_wand: 100,
+  food_strawberry_roll_cake: 100,
+  food_paw_cupcake: 100,
+  food_fruit_basket: 100,
+  interior_sleepy_moon: 100,
+  other_sparkle_rope_crown: 100,
+  toy_golden_crown_ball: 100,
+  interior_gold_ball: 100,
+  other_nakayoshi_azubee: 100,
+  other_hamigaki: 100,
+  other_ikea: 100,
+  other_orusuban: 100,
+  other_kurumari_a: 100,
+  other_oyatsu_no_jikan: 100,
+  other_ketsunade_a: 100,
+  other_omochi_janai: 100,
+  other_oyasumi: 100,
+  other_clawd: 100,
+  food_mocchurin: 100,
+  other_komochi: 100,
+  other_omoi_bashira: 100,
+  other_mah: 100,
+  other_mirror_omochi: 100,
+  other_toorematen: 100,
+  other_hia: 100,
+  hiking_frenchie: 100,
+  snow_frenchie: 100,
 };
 const STRETCH_ROD_ITEM_ID = "interior_stretch_rod";
 const STRETCH_ROD_SECONDS = 3;

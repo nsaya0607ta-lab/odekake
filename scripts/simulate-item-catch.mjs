@@ -153,6 +153,26 @@ const SPAWN_DYNAMICS_IDS = new Set(["toy_rainbow_ball", "interior_stretch_rod", 
 // Xmas Partyは得点倍率効果も持つが、重みが時間バランス/出現量アップ側のチューニングで別途固定されている
 // 「兼用アイテム」のため、意図的にこのプールには含めない。
 const SCORE_MULT_IDS = new Set(["toy_meat", "interior_spring_flower_wreath", "other_kamunayo", "other_nisoku_a", "other_azubee", "interior_kinoko_azubee", "other_kobee", "interior_shikkoku_no_ar"]);
+// 通常アイテム系プール（特殊効果を持たない全61種。frenchie-catch-game.tsxのNORMAL_ITEM_IDSと同一、手動同期）。
+const NORMAL_ITEM_IDS = new Set([
+  "toy_colorful_ball", "toy_rope", "toy_bone", "toy_squeaky_ball", "toy_tennis_ball",
+  "toy_red_slipper", "toy_wood_stick", "toy_donut_rope", "food_smile_onigiri", "food_paw_taiyaki",
+  "food_dog_milk", "food_cheese_cubes", "food_roasted_sweet_potato", "food_honey_butter_toast",
+  "other_yellow_rain_boots", "accessory_red_bandana", "other_acorns", "toy_paper_airplane",
+  "other_walk_water_bottle", "other_shiny_pinecone", "accessory_blue_handkerchief",
+  "toy_red_balloon", "toy_sand_bucket", "accessory_walk_pouch",
+  "toy_frisbee", "toy_soccer_ball", "toy_taiyaki_plush", "toy_bear_plush", "food_paw_bowl",
+  "food_paw_pudding", "food_kamikami",
+  "toy_frenchie_plush", "toy_frenchie_cushion", "toy_paw_macaron", "toy_star_wan_wand",
+  "food_strawberry_roll_cake", "food_paw_cupcake", "food_fruit_basket", "interior_sleepy_moon",
+  "other_sparkle_rope_crown",
+  "toy_golden_crown_ball", "interior_gold_ball", "other_nakayoshi_azubee", "other_hamigaki",
+  "other_ikea", "other_orusuban", "other_kurumari_a", "other_oyatsu_no_jikan", "other_ketsunade_a",
+  "other_omochi_janai", "other_oyasumi", "other_clawd",
+  "food_mocchurin", "other_komochi", "other_omoi_bashira", "other_mah", "other_mirror_omochi",
+  "other_toorematen", "other_hia",
+  "hiking_frenchie", "snow_frenchie",
+]);
 // 出現重みプールの合計値（＝プールの「予算」）。新アイテムをどれかのプールに追加してプレイ時間・
 // スコアへの影響度を変えたくない場合は、追加前後でこの値が変わらないよう、プール内の既存メンバーの
 // 重みを再配分すること（他プールの重みは触らなくてよい）。プール定義はfrenchie-catch-game.tsx側の
@@ -505,7 +525,8 @@ function main() {
     `プール重み予算（未充填ランク分はdogへ上乗せして消化）: ` +
     `時間増加系7種=${poolWeightTotal(TIME_BONUS_IDS)}（+未充填${TIME_BONUS_UNFILLED_RANK_DOG_WEIGHT}→dogへ、合計${poolWeightTotal(TIME_BONUS_IDS) + TIME_BONUS_UNFILLED_RANK_DOG_WEIGHT}） / ` +
     `得点倍率系8種=${poolWeightTotal(SCORE_MULT_IDS)}（+未充填${SCORE_MULT_UNFILLED_RANK_DOG_WEIGHT}→dogへ、合計${poolWeightTotal(SCORE_MULT_IDS) + SCORE_MULT_UNFILLED_RANK_DOG_WEIGHT}） / ` +
-    `出現量アップ・制御系=${poolWeightTotal(SPAWN_DYNAMICS_IDS)}（+未充填${SPAWN_DYNAMICS_UNFILLED_RANK_DOG_WEIGHT}→dogへ、合計${poolWeightTotal(SPAWN_DYNAMICS_IDS) + SPAWN_DYNAMICS_UNFILLED_RANK_DOG_WEIGHT}）\n`
+    `出現量アップ・制御系=${poolWeightTotal(SPAWN_DYNAMICS_IDS)}（+未充填${SPAWN_DYNAMICS_UNFILLED_RANK_DOG_WEIGHT}→dogへ、合計${poolWeightTotal(SPAWN_DYNAMICS_IDS) + SPAWN_DYNAMICS_UNFILLED_RANK_DOG_WEIGHT}） / ` +
+    `通常アイテム系=${poolWeightTotal(NORMAL_ITEM_IDS)}（未充填ランクなし）\n`
   );
   for (let lvIdx = 0; lvIdx < 5; lvIdx++) {
     const scores = [], secs = [];
