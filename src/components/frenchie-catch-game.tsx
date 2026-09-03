@@ -896,15 +896,19 @@ export function FrenchieCatchGame({ ownedItems }: { ownedItems: FrenchieCatchIte
     soccer: null,
     gold: null,
   });
-  useEffect(() => {
-    itemLevelByIdRef.current = new Map(ownedItems.map((item) => [item.id, item.level]));
+  /** 時間増加系7種＋おかえりが出現しなくなるまでの秒数（スタート画面表示用）。timeBonusCutoffSecRefと同じ計算式 */
+  const timeBonusCutoffSecDisplay = useMemo(() => {
     const rPlusItems = ownedItems.filter((item) => item.rarity !== "N");
     const totalLevel = rPlusItems.reduce((sum, item) => sum + item.level, 0);
     const avgLevelRaw = rPlusItems.length > 0 ? totalLevel / rPlusItems.length : 0;
     const avgLevel = Math.round(avgLevelRaw * 100) / 100;
-    timeBonusCutoffSecRef.current = avgLevel < 1
+    return avgLevel < 1
       ? TIME_BONUS_CUTOFF_BASE_SEC
       : TIME_BONUS_CUTOFF_BASE_SEC + (Math.min(avgLevel, MAX_SKILL_LEVEL) - 1) * TIME_BONUS_CUTOFF_STEP_SEC_PER_LEVEL;
+  }, [ownedItems]);
+  useEffect(() => {
+    itemLevelByIdRef.current = new Map(ownedItems.map((item) => [item.id, item.level]));
+    timeBonusCutoffSecRef.current = timeBonusCutoffSecDisplay;
     const ownedIds = new Set(ownedItems.map((item) => item.id));
     const pool = MYSTERY_SKILL_ITEM_IDS.filter((id) => ownedIds.has(id));
     mysterySkillPoolRef.current = pool.length > 0 ? pool : MYSTERY_SKILL_ITEM_IDS;
@@ -913,7 +917,7 @@ export function FrenchieCatchGame({ ownedItems }: { ownedItems: FrenchieCatchIte
       soccer: ownedIds.has(CLAWD_SOCCER_BALL_ITEM?.id ?? "") ? CLAWD_SOCCER_BALL_ITEM : null,
       gold: ownedIds.has(CLAWD_GOLD_BALL_ITEM?.id ?? "") ? CLAWD_GOLD_BALL_ITEM : null,
     };
-  }, [ownedItems]);
+  }, [ownedItems, timeBonusCutoffSecDisplay]);
 
   useEffect(() => {
     const board = boardRef.current;
@@ -2676,7 +2680,8 @@ export function FrenchieCatchGame({ ownedItems }: { ownedItems: FrenchieCatchIte
                 <>
                   <p className="text-[10px] font-black tracking-[0.18em] text-leaf-deep">ITEM CATCH</p>
                   <p className="mt-1 text-xl font-black text-ink">箱でキャッチしよう！</p>
-                  <button type="button" onClick={startGame} className="mt-4 w-full rounded-full bg-leaf px-4 py-3 text-sm font-black text-white shadow-md active:translate-y-px">START</button>
+                  <p className="mt-3 text-[9px] text-ink-faint">時間増加系アイテムは{Math.round(timeBonusCutoffSecDisplay)}秒まで出現</p>
+                  <button type="button" onClick={startGame} className="mt-1.5 w-full rounded-full bg-leaf px-4 py-3 text-sm font-black text-white shadow-md active:translate-y-px">START</button>
                 </>
               )}
               <p className="mt-2 text-[9px] text-ink-faint">所持アイテム {itemPool.length}種類 + 初期フレブル</p>
