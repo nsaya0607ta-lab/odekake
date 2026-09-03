@@ -370,41 +370,45 @@ const ITEM_SPAWN_WEIGHTS: Partial<Record<string, number>> = {
    * 「普通のフレブル」(dog)の出現重みに上乗せして消化する
    * （TIME_BONUS_UNFILLED_RANK_DOG_WEIGHT等、DOG_SPAWN_RATIO直下のコメント参照）。
    *
-   * 時間増加系プール（予算600）：R:180(3種60ずつ) / SR:108(未充填→dog) / SSR:96(未充填→dog) /
-   * UR:84→30ずつ(3種) / LR:72→70(1種) / MR:60(未充填→dog)。在籍分の実際の合計は340
-   * （残り260は`TIME_BONUS_UNFILLED_RANK_DOG_WEIGHT`でdogへ）。
+   * 時間増加系プール（予算2120、おかえりを含む）：R:636→230ずつ(3種) / SR:381.6(未充填→dog) /
+   * SSR:339.2(未充填→dog) / UR:296.8→110ずつ(3種) / LR:254.4→140ずつ(2種:夏のフレブル/おかえり) /
+   * MR:212(未充填→dog)。在籍分の実際の合計は1160（残り960は`TIME_BONUS_UNFILLED_RANK_DOG_WEIGHT`で
+   * dogへ）。2026-09-03、おかえりの個別チューニング値(300)を廃止しランク比率に統合（ユーザー指定）。
+   * ただし統合直後の素の予算600だとLv5平均プレイ時間が181秒→95秒まで落ち込んだため、目標値
+   * （docs/item-catch-new-item-checklist.md）に戻すためプール予算自体を600→2120に約3.5倍
+   * 引き上げて再チューニング済み（`node scripts/simulate-item-catch.mjs 20000 avoid`でLv5平均
+   * 174.7秒・500秒超え0%を確認）。
    */
-  other_omojii: 30,
-  toy_duck_plush: 60,
-  toy_carrot: 60,
-  food_paw_melon_bread: 60,
-  interior_anball: 30,
-  other_azuki: 30,
-  summer_frenchie: 70,
-  other_okaeri: 300,
+  other_omojii: 110,
+  toy_duck_plush: 230,
+  toy_carrot: 230,
+  food_paw_melon_bread: 230,
+  interior_anball: 110,
+  other_azuki: 110,
+  summer_frenchie: 140,
+  other_okaeri: 140,
   other_listen_to_the_a: 50,
   /**
    * 出現量アップ・出現制御系プール（予算900）：R:270→270(1種) / SR:162→160(1種) /
-   * SSR:144→40ずつ(4種) / UR:126(未充填→dog) / LR:108→110(1種) / MR:90（ブレブル20固定+
-   * Xmas Party70）。在籍分の実際の合計は790（残り110は`SPAWN_DYNAMICS_UNFILLED_RANK_DOG_WEIGHT`で
-   * dogへ）。ブレブルの重み20は「触ってはいけない」対象のため据え置き、
-   * MRランク予算からブレブル分20を引いた残りをXmas Partyに割り当てる。
+   * SSR:144→40ずつ(4種) / UR:126(未充填→dog) / LR:108→110(1種) / MR:90→50/40
+   * （Xmas Party/ブレブル）。在籍分の実際の合計は790（残り110は
+   * `SPAWN_DYNAMICS_UNFILLED_RANK_DOG_WEIGHT`でdogへ）。2026-09-03、ブレブルの固定値(20)を
+   * 廃止しMRランク比率に統合（ユーザー指定）。
    */
   toy_rainbow_ball: 40,
   interior_stretch_rod: 270,
   toy_treasure_puzzle: 160,
-  other_xmas_party: 70,
+  other_xmas_party: 50,
   other_pondeomo: 40,
   other_pondear: 40,
   other_jare_a: 40,
   interior_ragby_ar: 110,
+  other_burebur: 40,
   /**
-   * MR3種（ブレブル・ナルシストアー・マフィアー）はいずれも効果が強く出現頻度を抑えたいため、
-   * 出現重みを一律20（デフォルト100の1/5）にしてある（2026-09-01、ユーザー指定）。
-   * ナルシストアーは特に、発動中に得点倍率系（肉/宝箱/Xmas Party/こびー等の「○秒間×n」スキル）を
-   * 複数拾うと掛け算が重なり大きく跳ねることがシミュレーションで確認済み（詳細はdocs参照）。
+   * ナルシストアー・マフィアーは上記3プールのいずれにも属さない単独チューニング枠のため、
+   * 引き続き重み20のまま据え置き（発動中に得点倍率系を複数拾うと掛け算が重なり大きく跳ねることが
+   * シミュレーションで確認済み。詳細はdocs参照）。
    */
-  other_burebur: 20,
   other_narcissist_a: 20,
   other_mafia_a: 20,
   /**
@@ -535,15 +539,17 @@ const FOOD_CATEGORY_ITEM_IDS = new Set(
 );
 const DOG_SPAWN_RATIO = 0.28;
 /**
- * 3プール（時間増加系600・得点倍率系400・出現量アップ制御系900）はレアリティ別の固定比率
+ * 3プール（時間増加系2120・得点倍率系400・出現量アップ制御系900）はレアリティ別の固定比率
  * （R:30%/SR:18%/SSR:16%/UR:14%/LR:12%/MR:10%）でランク予算を割り当てているが、該当アイテムが
  * まだ存在しないランクの予算は消化されず余る。プールの予算を減らさないため、この余りを
  * 「普通のフレブル」(dog)の出現重みに上乗せして消化する（ITEM_SPAWN_WEIGHTS直上のコメント参照）。
- * 各値は「プール予算 − 在籍ランクの実際の重み合計」。時間増加系: 600−340=260 /
- * 得点倍率系: 400−250=150 / 出現量アップ制御系: 900−790=110（2026-09-03時点）。
- * 新しく未充填ランクにアイテムを追加したら、対応する定数からそのランクの予算分を差し引くこと。
+ * 各値は「プール予算 − 在籍ランクの実際の重み合計」。時間増加系: 2120−1160=960 /
+ * 得点倍率系: 400−250=150 / 出現量アップ制御系: 900−790=110（2026-09-03時点、おかえり・ブレブルの
+ * 個別チューニング値を廃止してランク比率のみに統合し、時間増加系プールの予算を600→2120に
+ * 引き上げて目標プレイ時間を再現した後の値）。新しく未充填ランクにアイテムを追加したら、
+ * 対応する定数からそのランクの予算分を差し引くこと。
  */
-const TIME_BONUS_UNFILLED_RANK_DOG_WEIGHT = 260;
+const TIME_BONUS_UNFILLED_RANK_DOG_WEIGHT = 960;
 const SCORE_MULT_UNFILLED_RANK_DOG_WEIGHT = 150;
 const SPAWN_DYNAMICS_UNFILLED_RANK_DOG_WEIGHT = 110;
 /** 通れまてん有効中に「はずれ」フレブルの代わりに出現する金色フレブルの目印用id（kindは通常のdogのまま） */
