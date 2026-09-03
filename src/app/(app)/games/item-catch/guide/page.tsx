@@ -76,7 +76,7 @@ export default async function ItemCatchGuidePage() {
             <div className="mt-4 grid grid-cols-2 gap-2">
               {[
                 ["TIME", "50秒", "1プレイ"],
-                ["REWARD", "÷200", "コイン換算"],
+                ["REWARD", "÷100", "コイン換算"],
               ].map(([label, value, note]) => (
                 <div key={label} className="rounded-2xl border border-[#dbcda6] bg-gradient-to-b from-white/95 to-[#fffaf0]/85 px-2 py-2.5 text-center shadow-[0_6px_16px_rgba(90,72,38,0.09)] backdrop-blur-sm">
                   <span className="block text-[8px] font-black tracking-[0.14em] text-[#927b48]">{label}</span>
@@ -154,7 +154,79 @@ export default async function ItemCatchGuidePage() {
         </section>
 
         <section className="space-y-2">
-          <SectionTitle number="04" eyebrow="SKILL LEVEL" title="重ねてスキルを育てる" />
+          <SectionTitle number="04" eyebrow="TIME LIMIT" title="時間を伸ばすアイテムには上限がある" />
+          <p className="text-[11px] leading-relaxed text-[#756854]">
+            図鑑の<b className="text-[#40362a]">R以上アイテムのスキルLv平均</b>が高いほど、時間を伸ばすアイテム
+            （+秒系スキルとおかえり、あわせて8種）の出現が早く止まります。無限に伸び続けないための仕組みです。
+          </p>
+          <div className="rounded-[22px] border border-[#d2c4a2] bg-gradient-to-br from-[#fffefa] to-[#f8f2e7] p-3.5 shadow-[0_7px_20px_rgba(80,66,40,0.07)]">
+            <table className="w-full border-collapse text-[11px]">
+              <thead>
+                <tr>
+                  {["図鑑Lv平均", "1", "2", "3", "4", "5"].map((head) => (
+                    <th key={head} className="border-b border-[#d9cba9] px-1 py-1.5 text-center text-[9px] font-black text-[#88754d] first:text-left">
+                      {head}
+                    </th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td className="border-b border-[#ebe3d2] px-1 py-1.5 text-left font-black text-[#443a2e]">出現停止</td>
+                  {["60秒〜", "80秒〜", "100秒〜", "120秒〜", "140秒〜"].map((cell) => (
+                    <td key={cell} className="border-b border-[#ebe3d2] px-1 py-1.5 text-center font-bold tabular-nums text-[#443a2e]">
+                      {cell}
+                    </td>
+                  ))}
+                </tr>
+              </tbody>
+            </table>
+            <p className="mt-2 text-[10px] leading-relaxed text-[#8f816b]">
+              計算式は<b className="text-[#40362a]">60秒 + (図鑑Lv平均 − 1) × 20秒</b>（Lv1未満は60秒扱い、Lv5で頭打ち）。
+              この秒数を過ぎると時間を伸ばすアイテムは一切出現しなくなり、その分他のアイテムの出現率が上がります。
+            </p>
+          </div>
+          <div className="rounded-[22px] border border-[#d6c8a9] bg-gradient-to-r from-[#f5f0e4] to-[#fffaf0] p-3.5 shadow-[0_4px_12px_rgba(80,66,40,0.04)]">
+            <p className="mb-2 text-[10px] font-black tracking-[0.1em] text-[#7a6533]">図鑑Lv平均ごとの目安（1プレイあたり・実測平均値）</p>
+            <table className="w-full border-collapse text-[11px]">
+              <thead>
+                <tr>
+                  {["図鑑Lv平均", "秒数", "スコア"].map((head) => (
+                    <th key={head} className="border-b border-[#d9cba9] px-1 py-1.5 text-center text-[9px] font-black text-[#88754d] first:text-left">
+                      {head}
+                    </th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {[
+                  ["1", "約75秒", "約24,000pt"],
+                  ["2", "約103秒", "約42,000pt"],
+                  ["3", "約126秒", "約63,000pt"],
+                  ["4", "約151秒", "約95,000pt"],
+                  ["5", "約179秒", "約144,000pt"],
+                ].map((row) => (
+                  <tr key={row[0]}>
+                    {row.map((cell, index) => (
+                      <td
+                        key={index}
+                        className="border-b border-[#ebe3d2] px-1 py-1.5 text-center font-bold tabular-nums text-[#443a2e] last:border-b-0 first:text-left first:font-black"
+                      >
+                        {cell}
+                      </td>
+                    ))}
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+            <p className="mt-2 text-[10px] leading-relaxed text-[#8f816b]">
+              腕前や運で±10〜15%ほど前後します。あくまで目安の平均値です。
+            </p>
+          </div>
+        </section>
+
+        <section className="space-y-2">
+          <SectionTitle number="05" eyebrow="SKILL LEVEL" title="重ねてスキルを育てる" />
           <p className="text-[11px] leading-relaxed text-[#756854]">同じアイテムを引くほど5段階で強化。Nと特殊アイテムはレベル対象外です。</p>
           <div className="rounded-[22px] border border-[#d2c4a2] bg-gradient-to-br from-[#fffefa] to-[#f8f2e7] p-3.5 shadow-[0_7px_20px_rgba(80,66,40,0.07)]">
             <table className="w-full border-collapse text-[11px]">
@@ -170,14 +242,14 @@ export default async function ItemCatchGuidePage() {
         </section>
 
         <section className="space-y-2">
-          <SectionTitle number="05" eyebrow="MY SKILLS" title="持っているスキル" />
+          <SectionTitle number="06" eyebrow="MY SKILLS" title="持っているスキル" />
           <div className="rounded-[24px] border border-[#d0c09a] bg-gradient-to-br from-[#fffefa] to-[#f7f1e5] p-1 shadow-[0_8px_22px_rgba(80,66,40,0.07)]">
             <SkillCatalog skills={skills} total={ITEM_CATCH_SKILLS.length} />
           </div>
         </section>
 
         <section className="space-y-2">
-          <SectionTitle number="06" eyebrow="REWARD" title="コインのもらい方" />
+          <SectionTitle number="07" eyebrow="REWARD" title="コインのもらい方" />
           <div className="overflow-hidden rounded-[26px] border border-[#b99a4f] bg-[#fffdf8] shadow-[0_10px_28px_rgba(98,72,24,0.12)]">
             <div className="relative bg-gradient-to-br from-[#dce9cf] via-[#f2f3df] to-[#f7df9d] px-4 py-5 text-center">
               <div className="pointer-events-none absolute inset-x-8 top-0 h-px bg-gradient-to-r from-transparent via-[#b9933e] to-transparent" />
