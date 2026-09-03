@@ -20,6 +20,35 @@
 「時間増加系の出現カットオフ」（後述）が効いている限り基本的に0%のまま動かないはずなので、
 0%以外の値が出たらカットオフ側の実装ミスを疑うこと。
 
+## 出現重みプール（追加時にどこを触るか迷ったらここを見る）
+
+`frenchie-catch-game.tsx` の `ITEM_SPAWN_WEIGHTS` はフラットな1回抽選（全アイテムを1つの乱数で選ぶ）だが、
+運用上は3つの「プール」に分けて考える。各プールは「合計重み（予算）」を意識し、新アイテムを
+そのプールに追加するときは**プールの合計重みを変えない**ように、既存メンバーの重みをプール内で
+再配分する（他プール・プール外の重みは触らなくてよい）。プールの合計重みは
+`node scripts/simulate-item-catch.mjs` 実行時に毎回「プール重み予算: ...」として表示されるので、
+追加前後で比較すること。
+
+| プール | 定義（Set） | 現在の合計重み | 備考 |
+|---|---|---|---|
+| 時間増加系7種 | `TIME_BONUS_ITEM_IDS`（`frenchie-catch-game.tsx`）/ `TIME_BONUS_IDS`（`simulate-item-catch.mjs`） | 576 | おかえり(`other_okaeri`)は時間バランス調整用に重み300で個別チューニング済みのため、このプールには含めない |
+| 得点倍率系8種 | `SCORE_MULT_IDS`（`simulate-item-catch.mjs`のみ。得点倍率スキルを主効果とする8種） | 370 | 宝箱・夏のフレブル・Xmas Partyは得点倍率効果も持つが、重みが別枠でチューニング済みの「兼用アイテム」なので**このプールには含めない**（`ITEM_SPAWN_WEIGHTS`直上のコメント参照） |
+| 出現量アップ・出現制御系 | `SPAWN_DYNAMICS_ITEM_IDS`（`frenchie-catch-game.tsx`）/ `SPAWN_DYNAMICS_IDS`（`simulate-item-catch.mjs`） | 869 | 出現重みの計算式自体を書き換える系（UR確率アップ・レア限定・出現量アップ等） |
+
+新アイテムをプールに追加する手順：
+1. 性質に応じてどのプールに属するか判断する（得点倍率系なら`simulate-item-catch.mjs`の`SCORE_MULT_IDS`に追加。
+   時間増加系・出現量アップ系は既存の`TIME_BONUS_ITEM_IDS`/`SPAWN_DYNAMICS_ITEM_IDS`の追加手順（下記）と同じ）。
+2. `ITEM_SPAWN_WEIGHTS`（`frenchie-catch-game.tsx`）に新アイテムの重みを追加しつつ、同じプールの既存メンバーの
+   重みを、プール合計が追加前と変わらないよう再配分する（レアリティのバランスは崩さない）。
+3. `simulate-item-catch.mjs`側のプールSet（該当する場合）にも同じIDを追加し、
+   `node scripts/simulate-item-catch.mjs 8000 avoid` を実行して「プール重み予算」行の値が想定通りか確認する。
+4. 得点倍率系プールに追加する場合は、重みだけでなく`SCORE_MULT_DURATION_*`（発動秒数）・倍率値も
+   既存のレアリティ別カーブに揃えること（プールの重み予算を守っても、倍率値や持続時間が既存と
+   ズレると得点倍率の重複掛け算リスクが変わってしまう）。
+
+**プールに属さないアイテム**（得点系単発・演出系など）は`DEFAULT_ITEM_SPAWN_WEIGHT`（100）のままでよく、
+プールの合計重みには影響しない。
+
 ## 追加手順（毎回これをやる）
 
 1. **`src/lib/collection/items.ts`（図鑑本体）に追加する。** ここに無いとミニゲームの`itemPool`に
