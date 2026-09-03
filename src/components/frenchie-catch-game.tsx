@@ -294,31 +294,15 @@ const SPAWN_DYNAMICS_ITEM_IDS = new Set([
   "other_xmas_party", "other_pondeomo", "other_pondear", "other_jare_a", "interior_ragby_ar",
 ]);
 /**
- * 2026-09-03、ユーザー指定で新設した4つ目のプール。上記3プール・Listen to the a-/ナルシストアー/
- * マフィアー（単独チューニング枠）以外の、特殊効果を持たない「通常アイテム」全61種
- * （得点のみ・演出のみ含む）が対象。新設時点ではいずれも`DEFAULT_ITEM_SPAWN_WEIGHT`と同値の
- * 100のままなので、導入によるプレイ時間・スコアへの影響はゼロ。
- * 重みの決め方・新アイテム追加時の手順は`ITEM_SPAWN_WEIGHTS`直上のコメント参照。
+ * 2026-09-03、ユーザー指定で新設した4つ目のプール（通常アイテム系プール）。上記3プール・
+ * Listen to the a-/ナルシストアー/マフィアー（単独チューニング枠）以外の、特殊効果を持たない
+ * 「通常アイテム」全61種（得点のみ・演出のみ含む）が対象。新設時点ではいずれも
+ * `DEFAULT_ITEM_SPAWN_WEIGHT`と同値の100のままなので、導入によるプレイ時間・スコアへの
+ * 影響はゼロ。重みの決め方・新アイテム追加時の手順、対象アイテムのID一覧は
+ * `ITEM_SPAWN_WEIGHTS`直上のコメント・実体、および`scripts/simulate-item-catch.mjs`の
+ * `NORMAL_ITEM_IDS`（手動同期）を参照（ゲームロジック側でこの分類を参照する処理は無いため、
+ * この定義自体はここには置かない）。
  */
-const NORMAL_ITEM_IDS = new Set([
-  "toy_colorful_ball", "toy_rope", "toy_bone", "toy_squeaky_ball", "toy_tennis_ball",
-  "toy_red_slipper", "toy_wood_stick", "toy_donut_rope", "food_smile_onigiri", "food_paw_taiyaki",
-  "food_dog_milk", "food_cheese_cubes", "food_roasted_sweet_potato", "food_honey_butter_toast",
-  "other_yellow_rain_boots", "accessory_red_bandana", "other_acorns", "toy_paper_airplane",
-  "other_walk_water_bottle", "other_shiny_pinecone", "accessory_blue_handkerchief",
-  "toy_red_balloon", "toy_sand_bucket", "accessory_walk_pouch",
-  "toy_frisbee", "toy_soccer_ball", "toy_taiyaki_plush", "toy_bear_plush", "food_paw_bowl",
-  "food_paw_pudding", "food_kamikami",
-  "toy_frenchie_plush", "toy_frenchie_cushion", "toy_paw_macaron", "toy_star_wan_wand",
-  "food_strawberry_roll_cake", "food_paw_cupcake", "food_fruit_basket", "interior_sleepy_moon",
-  "other_sparkle_rope_crown",
-  "toy_golden_crown_ball", "interior_gold_ball", "other_nakayoshi_azubee", "other_hamigaki",
-  "other_ikea", "other_orusuban", "other_kurumari_a", "other_oyatsu_no_jikan", "other_ketsunade_a",
-  "other_omochi_janai", "other_oyasumi", "other_clawd",
-  "food_mocchurin", "other_komochi", "other_omoi_bashira", "other_mah", "other_mirror_omochi",
-  "other_toorematen", "other_hia",
-  "hiking_frenchie", "snow_frenchie",
-]);
 const TREASURE_ITEM_ID = "toy_treasure_puzzle";
 const TREASURE_FALL_SPEED = 4;
 const POOP_FLOOD_FALL_SPEED = 6;
