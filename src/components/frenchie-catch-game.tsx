@@ -305,7 +305,7 @@ const SPAWN_DYNAMICS_ITEM_IDS = new Set([
  */
 const TREASURE_ITEM_ID = "toy_treasure_puzzle";
 const TREASURE_FALL_SPEED = 4;
-const POOP_FLOOD_FALL_SPEED = 6;
+const POOP_FLOOD_FALL_SPEED = 2;
 const TREASURE_POOP_FLOOD_COUNT = 10;
 const DOG_FLOOD_ITEM_ID = "other_listen_to_the_a";
 const DOG_FLOOD_SPAWN_RATE = 4;
