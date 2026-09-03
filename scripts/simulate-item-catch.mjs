@@ -196,7 +196,7 @@ function poolWeightTotal(ids) {
 // 変更（frenchie-catch-game.tsx ITEM_SPAWN_WEIGHTS直上のコメント参照）。該当アイテムが無いランクの
 // 予算はプールの合計から減らさず、dogの出現重みに上乗せして消化する
 // （frenchie-catch-game.tsxのXXX_UNFILLED_RANK_DOG_WEIGHTと同一値を手動同期）。
-const TIME_BONUS_UNFILLED_RANK_DOG_WEIGHT = 910;
+const TIME_BONUS_UNFILLED_RANK_DOG_WEIGHT = 748;
 const SCORE_MULT_UNFILLED_RANK_DOG_WEIGHT = 150;
 const SPAWN_DYNAMICS_UNFILLED_RANK_DOG_WEIGHT = 110;
 // 時間増加系8種＋おかえりは、プレイ時間がTIME_BONUS_CUTOFF_BASE_SEC + Lv*TIME_BONUS_CUTOFF_STEP_SEC_PER_LEVEL
