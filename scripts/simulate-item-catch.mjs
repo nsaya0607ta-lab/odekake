@@ -160,6 +160,10 @@ const SCORE_MULT_IDS = new Set(["toy_meat", "interior_spring_flower_wreath", "ot
 function poolWeightTotal(ids) {
   return [...ids].reduce((sum, id) => sum + weightOf(id), 0);
 }
+// 得点倍率系プールはランク別に固定予算(R:100/SR:90/SSR:80/UR:60/LR:40/MR:30=合計400)を割り当てており、
+// 該当アイテムがまだ存在しないランク(現状R・MR=130)の予算は「普通のフレブル」(dog)の出現重みに
+// 上乗せして消化する（frenchie-catch-game.tsxのSCORE_MULT_UNFILLED_RANK_DOG_WEIGHTと同一値を手動同期）。
+const SCORE_MULT_UNFILLED_RANK_DOG_WEIGHT = 130;
 // 時間増加系7種＋おかえりは、プレイ時間がTIME_BONUS_CUTOFF_BASE_SEC + Lv*TIME_BONUS_CUTOFF_STEP_SEC_PER_LEVEL
 // (Lv0始まりなので実質「平均スキルLv」×20秒)を超えると出現しなくなる。シミュレータは全アイテムの
 // スキルLvをラウンドのLv(0〜4)+1に統一する既存の簡略化にそのまま乗せ、平均スキルLv=lv+1として扱う。
@@ -443,7 +447,7 @@ function simulateOneRound(lv, catchAll, timeBonusCatchRate = 0.8, normalCatchRat
       weights[i] = w;
       itemWeightTotal += w;
     }
-    const dogWeight = POOL_SIZE * DEFAULT_WEIGHT * (DOG_SPAWN_RATIO / (1 - DOG_SPAWN_RATIO));
+    const dogWeight = POOL_SIZE * DEFAULT_WEIGHT * (DOG_SPAWN_RATIO / (1 - DOG_SPAWN_RATIO)) + SCORE_MULT_UNFILLED_RANK_DOG_WEIGHT;
     let roll = Math.random() * (dogWeight + itemWeightTotal);
     if (roll < dogWeight) {
       if (Math.random() < FRENCHIE_SKIN_SPAWN_CHANCE) {
@@ -490,7 +494,7 @@ function main() {
   const normalCatchRate = process.argv[5] !== undefined ? Number(process.argv[5]) : 0.85;
   const denseCatchRate = process.argv[6] !== undefined ? Number(process.argv[6]) : 0.5;
   console.log(`itemPool N=${POOL_SIZE} / ROUND_SECONDS=${ROUND_SECONDS} / MAX_ROUND_SECONDS=${MAX_PLAY_SECONDS} / 試行回数=${trials} / モード=${mode}${catchAll ? "（時間減少・チョコレートも100%キャッチ）" : "（時間減少・チョコレートは回避）"} / 時間増加系7種の実キャッチ率=${timeBonusCatchRate} / 通常時キャッチ率=${normalCatchRate} / 密集時キャッチ率=${denseCatchRate}`);
-  console.log(`プール重み予算: 時間増加系7種=${poolWeightTotal(TIME_BONUS_IDS)} / 得点倍率系8種=${poolWeightTotal(SCORE_MULT_IDS)} / 出現量アップ・制御系=${poolWeightTotal(SPAWN_DYNAMICS_IDS)}\n`);
+  console.log(`プール重み予算: 時間増加系7種=${poolWeightTotal(TIME_BONUS_IDS)} / 得点倍率系8種=${poolWeightTotal(SCORE_MULT_IDS)}（+ランク未充填分${SCORE_MULT_UNFILLED_RANK_DOG_WEIGHT}→dogへ、合計${poolWeightTotal(SCORE_MULT_IDS) + SCORE_MULT_UNFILLED_RANK_DOG_WEIGHT}） / 出現量アップ・制御系=${poolWeightTotal(SPAWN_DYNAMICS_IDS)}\n`);
   for (let lvIdx = 0; lvIdx < 5; lvIdx++) {
     const scores = [], secs = [];
     let cappedCount = 0;

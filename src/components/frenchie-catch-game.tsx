@@ -401,25 +401,24 @@ const ITEM_SPAWN_WEIGHTS: Partial<Record<string, number>> = {
   other_narcissist_a: 20,
   other_mafia_a: 20,
   /**
-   * 得点倍率系スキル（本メモに何度も登場している重複掛け算の暴走要因）は、Lv5フルコンプで
-   * ×100以上が95%・×1000以上が62.5%発生することが確認されたため、出現頻度自体を
-   * レアリティ別に下げてほしいというユーザー指定。2026-09-01に一度
-   * デフォルト100→R:80/SR:70/SSR:60/UR:50/LR:40へ変更した後、さらに一段階
-   * R:70/SR:60/SSR:50/UR:40/LR:30へ引き下げた（ユーザー指定）。
-   * ただし宝箱(toy_treasure_puzzle)と夏のフレブル(summer_frenchie)は既に時間バランス調整用の
-   * 重み(149/106)が入っており、得点倍率(item_double/SUMMER_MULT)はそのアイテムが持つ効果の
-   * 一部でしかないため、この指定では変更していない（変更すると宝箱の出現率チューニングと
-   * 時間増加系7種のプール希釈相殺が崩れる）。Xmas Party(MR)はランク表に含まれていないため
-   * 未変更（デフォルト100のまま）。
+   * 得点倍率系プール（合計400、2026-09-03〜レアリティ別「固定予算」制）：
+   * R:100 / SR:90 / SSR:80 / UR:60 / LR:40 / MR:30（ユーザー指定）。各ランクの予算は、
+   * そのランクに属する得点倍率アイテムの人数で均等に割った値をここに書く。
+   * 現時点でR・MRランクの得点倍率アイテムは存在しないため、その2ランク分の予算
+   * (100+30=130)は消化されずに余る。余らせず「普通のフレブル」(dog)の出現重みに
+   * 上乗せして消化している（SCORE_MULT_UNFILLED_RANK_DOG_WEIGHT参照）。
+   * R・MRの得点倍率アイテムを新規追加する時は、SCORE_MULT_UNFILLED_RANK_DOG_WEIGHT側の
+   * 該当ランク予算を差し引き、そのランクの予算をここに追加すること
+   * （他ランク・他プールの重みは触らなくてよい）。
    */
-  toy_meat: 65,
-  interior_spring_flower_wreath: 65,
-  other_kamunayo: 54,
-  other_nisoku_a: 54,
-  other_azubee: 43,
-  interior_kinoko_azubee: 43,
-  other_kobee: 43,
-  interior_shikkoku_no_ar: 33,
+  toy_meat: 45,
+  interior_spring_flower_wreath: 45,
+  other_kamunayo: 40,
+  other_nisoku_a: 40,
+  other_azubee: 20,
+  interior_kinoko_azubee: 20,
+  other_kobee: 20,
+  interior_shikkoku_no_ar: 40,
 };
 const STRETCH_ROD_ITEM_ID = "interior_stretch_rod";
 const STRETCH_ROD_SECONDS = 3;
@@ -533,6 +532,14 @@ const FOOD_CATEGORY_ITEM_IDS = new Set(
   COLLECTION_ITEMS.filter((entry) => entry.category === "food").map((entry) => entry.id),
 );
 const DOG_SPAWN_RATIO = 0.28;
+/**
+ * 得点倍率系プールのランク別固定予算（ITEM_SPAWN_WEIGHTS直上のコメント参照）のうち、
+ * 該当する得点倍率アイテムがまだ存在しないランクの予算を合算した値。「普通のフレブル」
+ * (dog)の出現重みに上乗せすることで、そのランクにアイテムが無い間も出現重みプールの
+ * 合計400を空費させずに消化する。R(100) + MR(30) = 130（2026-09-03時点）。
+ * R・MRの得点倍率アイテムを追加したら、そのランクの予算分をここから引くこと。
+ */
+const SCORE_MULT_UNFILLED_RANK_DOG_WEIGHT = 130;
 /** 通れまてん有効中に「はずれ」フレブルの代わりに出現する金色フレブルの目印用id（kindは通常のdogのまま） */
 const TOOREMATEN_GOLDEN_DOG_ID = "toorematen_golden_dog";
 const FRENCHIE_SKIN_IDS = ["hiking_frenchie", "snow_frenchie", "summer_frenchie"];
@@ -1063,7 +1070,9 @@ export function FrenchieCatchGame({ ownedItems }: { ownedItems: FrenchieCatchIte
         (spawnRateBoostActive && TIME_BONUS_ITEM_IDS.has(item.id) ? 1 / spawnRateBoostValueRef.current : 1),
     }));
     const itemWeightTotal = weightedItems.reduce((sum, entry) => sum + entry.weight, 0);
-    const dogWeight = itemPool.length * DEFAULT_ITEM_SPAWN_WEIGHT * (DOG_SPAWN_RATIO / (1 - DOG_SPAWN_RATIO));
+    const dogWeight =
+      itemPool.length * DEFAULT_ITEM_SPAWN_WEIGHT * (DOG_SPAWN_RATIO / (1 - DOG_SPAWN_RATIO)) +
+      SCORE_MULT_UNFILLED_RANK_DOG_WEIGHT;
     let roll = Math.random() * (dogWeight + itemWeightTotal);
 
     if (roll < dogWeight) {
