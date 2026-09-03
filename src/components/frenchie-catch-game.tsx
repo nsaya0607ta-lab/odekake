@@ -600,6 +600,27 @@ const PERSON_CHARACTER_ITEM_IDS = ["other_omochi_janai", "other_listen_to_the_a"
 const PERSON_CHARACTER_ITEMS: CollectionItem[] = PERSON_CHARACTER_ITEM_IDS
   .map((id) => COLLECTION_ITEMS.find((entry) => entry.id === id))
   .filter((entry): entry is CollectionItem => entry != null);
+/**
+ * フルーツバスケットで降ってくる人物入りキャラの抽選重み。他プールと同じ
+ * R:30%/SR:18%/SSR:16%/UR:14%/LR:12%/MR:10%比率（ITEM_SPAWN_WEIGHTS直上コメント参照）を流用する。
+ * これまでは所持している人物入りキャラ4種（SSR/UR/LR/MR）から均等抽選していたため、
+ * 最も効果の強いMR（Xmas Party：得点倍率×最大3.1＋出現量・落下速度アップ＋フレブル大量発生が同時発動）が
+ * 他と同確率(25%)で頻発し、複数体連続で引くとスコアが際限なく伸びる原因になっていた。
+ * ランクが上がるほど出現しにくくする比率に変更し、爆発力の強いキャラほど頻度を下げる。
+ */
+const PERSON_CHARACTER_RANK_WEIGHT: Partial<Record<FrenchieCatchItem["rarity"], number>> = {
+  N: 30, R: 30, SR: 18, SSR: 16, UR: 14, LR: 12, MR: 10,
+};
+function pickPersonCharacter(pool: CollectionItem[]): CollectionItem {
+  const weighted = pool.map((item) => ({ item, weight: PERSON_CHARACTER_RANK_WEIGHT[item.rarity] ?? 1 }));
+  const total = weighted.reduce((sum, entry) => sum + entry.weight, 0);
+  let roll = Math.random() * total;
+  for (const entry of weighted) {
+    roll -= entry.weight;
+    if (roll < 0) return entry.item;
+  }
+  return weighted[weighted.length - 1]!.item;
+}
 const CLAWD_ITEM_ID = "other_clawd";
 /** Clawdの効果中に降ってくる「サッカーボール／ゴールドボール」。本来のレアリティ・スキルのまま出現する */
 const CLAWD_SOCCER_BALL_ITEM = COLLECTION_ITEMS.find((entry) => entry.id === "toy_soccer_ball") ?? null;
@@ -875,15 +896,19 @@ export function FrenchieCatchGame({ ownedItems }: { ownedItems: FrenchieCatchIte
     soccer: null,
     gold: null,
   });
-  useEffect(() => {
-    itemLevelByIdRef.current = new Map(ownedItems.map((item) => [item.id, item.level]));
+  /** 時間増加系7種＋おかえりが出現しなくなるまでの秒数（スタート画面表示用）。timeBonusCutoffSecRefと同じ計算式 */
+  const timeBonusCutoffSecDisplay = useMemo(() => {
     const rPlusItems = ownedItems.filter((item) => item.rarity !== "N");
     const totalLevel = rPlusItems.reduce((sum, item) => sum + item.level, 0);
     const avgLevelRaw = rPlusItems.length > 0 ? totalLevel / rPlusItems.length : 0;
     const avgLevel = Math.round(avgLevelRaw * 100) / 100;
-    timeBonusCutoffSecRef.current = avgLevel < 1
+    return avgLevel < 1
       ? TIME_BONUS_CUTOFF_BASE_SEC
       : TIME_BONUS_CUTOFF_BASE_SEC + (Math.min(avgLevel, MAX_SKILL_LEVEL) - 1) * TIME_BONUS_CUTOFF_STEP_SEC_PER_LEVEL;
+  }, [ownedItems]);
+  useEffect(() => {
+    itemLevelByIdRef.current = new Map(ownedItems.map((item) => [item.id, item.level]));
+    timeBonusCutoffSecRef.current = timeBonusCutoffSecDisplay;
     const ownedIds = new Set(ownedItems.map((item) => item.id));
     const pool = MYSTERY_SKILL_ITEM_IDS.filter((id) => ownedIds.has(id));
     mysterySkillPoolRef.current = pool.length > 0 ? pool : MYSTERY_SKILL_ITEM_IDS;
@@ -892,7 +917,7 @@ export function FrenchieCatchGame({ ownedItems }: { ownedItems: FrenchieCatchIte
       soccer: ownedIds.has(CLAWD_SOCCER_BALL_ITEM?.id ?? "") ? CLAWD_SOCCER_BALL_ITEM : null,
       gold: ownedIds.has(CLAWD_GOLD_BALL_ITEM?.id ?? "") ? CLAWD_GOLD_BALL_ITEM : null,
     };
-  }, [ownedItems]);
+  }, [ownedItems, timeBonusCutoffSecDisplay]);
 
   useEffect(() => {
     const board = boardRef.current;
@@ -925,12 +950,8 @@ export function FrenchieCatchGame({ ownedItems }: { ownedItems: FrenchieCatchIte
     let scoreMultiplierTotalValue = 1;
     const activeScoreMultipliers = scoreMultipliersRef.current.filter((entry) => entry.until > now);
     if (activeScoreMultipliers.length > 0) {
+      // この倍率はSCORE表示の下の「スコア倍率 ×X」に表示済みのため、右側のスキルログには出さない
       const product = activeScoreMultipliers.reduce((acc, entry) => acc * entry.value, 1);
-      labels.push(
-        activeScoreMultipliers.length > 1
-          ? `得点 ×${activeScoreMultipliers.map((entry) => entry.value).join("×")}=${product}`
-          : `得点 ×${product}`,
-      );
       scoreMultiplierTotalValue *= product;
     }
     const activeNextMultipliers = nextMultipliersRef.current.filter((entry) => entry.remaining > 0);
@@ -963,7 +984,7 @@ export function FrenchieCatchGame({ ownedItems }: { ownedItems: FrenchieCatchIte
     if (now < highRarityLockUntilRef.current) labels.push("SSR/UR/LRのみ出現中");
     if (highRarityLockCountRef.current > 0) labels.push(`UR/LRのみ出現 あと${highRarityLockCountRef.current}体`);
     if (treasureStreakActiveRef.current) {
-      labels.push(`宝箱連続ボーナス 得点+${Math.round((treasureStreakMultRef.current - 1) * 100)}%`);
+      // この倍率もSCORE表示の下の「スコア倍率 ×X」に含まれているため、右側のスキルログには出さない
       scoreMultiplierTotalValue *= treasureStreakMultRef.current;
     }
     if (now < omochiUntilRef.current) labels.push(`うんちがおもちに +${omochiPtValueRef.current}pt`);
@@ -971,12 +992,8 @@ export function FrenchieCatchGame({ ownedItems }: { ownedItems: FrenchieCatchIte
     if (now < hazardShieldUntilRef.current) labels.push("ハザード出現なし");
     const activeFoodMultipliers = foodScoreMultipliersRef.current.filter((entry) => entry.until > now);
     if (activeFoodMultipliers.length > 0) {
+      // この倍率もSCORE表示の下の「スコア倍率 ×X」に含まれているため、右側のスキルログには出さない
       const product = activeFoodMultipliers.reduce((acc, entry) => acc * entry.value, 1);
-      labels.push(
-        activeFoodMultipliers.length > 1
-          ? `食べ物カテゴリ得点×${activeFoodMultipliers.map((entry) => entry.value).join("×")}=${product}中`
-          : `食べ物カテゴリ得点×${product}中`,
-      );
       scoreMultiplierTotalValue *= product;
     }
     if (now < slantBoostUntilRef.current) labels.push("斜め落下中");
@@ -1041,8 +1058,7 @@ export function FrenchieCatchGame({ ownedItems }: { ownedItems: FrenchieCatchIte
     }
     if (personFloodRemainingRef.current > 0) {
       personFloodRemainingRef.current -= 1;
-      const pool = personCharacterPoolRef.current;
-      const character = pool[Math.floor(Math.random() * pool.length)]!;
+      const character = pickPersonCharacter(personCharacterPoolRef.current);
       return {
         ...base,
         itemId: character.id,
@@ -2664,7 +2680,8 @@ export function FrenchieCatchGame({ ownedItems }: { ownedItems: FrenchieCatchIte
                 <>
                   <p className="text-[10px] font-black tracking-[0.18em] text-leaf-deep">ITEM CATCH</p>
                   <p className="mt-1 text-xl font-black text-ink">箱でキャッチしよう！</p>
-                  <button type="button" onClick={startGame} className="mt-4 w-full rounded-full bg-leaf px-4 py-3 text-sm font-black text-white shadow-md active:translate-y-px">START</button>
+                  <p className="mt-3 text-[9px] text-ink-faint">時間増加系アイテムは{Math.round(timeBonusCutoffSecDisplay)}秒まで出現</p>
+                  <button type="button" onClick={startGame} className="mt-1.5 w-full rounded-full bg-leaf px-4 py-3 text-sm font-black text-white shadow-md active:translate-y-px">START</button>
                 </>
               )}
               <p className="mt-2 text-[9px] text-ink-faint">所持アイテム {itemPool.length}種類 + 初期フレブル</p>

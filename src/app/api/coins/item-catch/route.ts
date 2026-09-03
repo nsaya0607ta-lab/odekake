@@ -7,8 +7,7 @@ type RpcResponse = {
   error: { code?: string; message: string } | null;
 };
 
-const MAX_CAUGHT_COUNT = 2000;
-const MAX_SCORE_PER_CATCH = 1500;
+const MAX_CAUGHT_COUNT = 10000;
 const MAX_SCORE_PER_RPC = 8000;
 /** ゲームを介さずAPIを直接叩いて無限にコインを増やせてしまわないための固定上限。
  *  record_item_catch_result() 側の上限(2000)と揃えている。 */
@@ -65,13 +64,15 @@ export async function POST(request: Request) {
 
   const bonusCoins = body.bonusCoins ?? 0;
 
+  // ゲーム内の得点倍率スキルはスタック上限を設けない仕様（docs/minigame-time-balance.md参照）で、
+  // 1回のキャッチで数十万倍以上の倍率がかかることもあるため、キャッチ数に対するスコア上限（1回あたり
+  // 固定pt）でのチェックは行わない。
   if (
     body.durationSeconds !== 50
     || body.score < 0
     || body.caughtCount < 0
     || body.caughtCount > MAX_CAUGHT_COUNT
     || (body.caughtCount === 0 && body.score !== 0)
-    || (body.caughtCount > 0 && body.score > body.caughtCount * MAX_SCORE_PER_CATCH)
     || bonusCoins < 0
     || bonusCoins > MAX_BONUS_COINS
   ) {
