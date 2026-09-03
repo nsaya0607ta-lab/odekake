@@ -148,6 +148,25 @@ const REDUCED_CATCH_IDS = new Set([...TIME_BONUS_IDS, "other_okaeri"]);
 // アイテム。ボーナス出現タイマー側で発動頻度が実質的に上がると時間増加系の取得ペースが間接的に
 // 揺らぐため、TIME_BONUS_IDSと合わせてボーナス側では除外する（frenchie-catch-game.tsxのSPAWN_DYNAMICS_ITEM_IDSと同一）
 const SPAWN_DYNAMICS_IDS = new Set(["toy_rainbow_ball", "interior_stretch_rod", "toy_treasure_puzzle", "other_burebur", "other_xmas_party", "other_pondeomo", "other_pondear", "other_jare_a", "interior_ragby_ar"]);
+// 得点倍率プール（"○秒間×n"の得点倍率スキルを主効果として持つアイテム）。ITEM_SPAWN_WEIGHTSで
+// レアリティ別に重みを下げてある8種（frenchie-catch-game.tsxの同名コメント参照）。宝箱・夏のフレブル・
+// Xmas Partyは得点倍率効果も持つが、重みが時間バランス/出現量アップ側のチューニングで別途固定されている
+// 「兼用アイテム」のため、意図的にこのプールには含めない。
+const SCORE_MULT_IDS = new Set(["toy_meat", "interior_spring_flower_wreath", "other_kamunayo", "other_nisoku_a", "other_azubee", "interior_kinoko_azubee", "other_kobee", "interior_shikkoku_no_ar"]);
+// 出現重みプールの合計値（＝プールの「予算」）。新アイテムをどれかのプールに追加してプレイ時間・
+// スコアへの影響度を変えたくない場合は、追加前後でこの値が変わらないよう、プール内の既存メンバーの
+// 重みを再配分すること（他プールの重みは触らなくてよい）。プール定義はfrenchie-catch-game.tsx側の
+// TIME_BONUS_ITEM_IDS/SPAWN_DYNAMICS_ITEM_IDSおよびこのファイルのSCORE_MULT_IDSと手動で同期させる。
+function poolWeightTotal(ids) {
+  return [...ids].reduce((sum, id) => sum + weightOf(id), 0);
+}
+// 2026-09-03、3プール共通のレアリティ別「固定比率」制(R:30%/SR:18%/SSR:16%/UR:14%/LR:12%/MR:10%)に
+// 変更（frenchie-catch-game.tsx ITEM_SPAWN_WEIGHTS直上のコメント参照）。該当アイテムが無いランクの
+// 予算はプールの合計から減らさず、dogの出現重みに上乗せして消化する
+// （frenchie-catch-game.tsxのXXX_UNFILLED_RANK_DOG_WEIGHTと同一値を手動同期）。
+const TIME_BONUS_UNFILLED_RANK_DOG_WEIGHT = 260;
+const SCORE_MULT_UNFILLED_RANK_DOG_WEIGHT = 150;
+const SPAWN_DYNAMICS_UNFILLED_RANK_DOG_WEIGHT = 110;
 // 時間増加系7種＋おかえりは、プレイ時間がTIME_BONUS_CUTOFF_BASE_SEC + Lv*TIME_BONUS_CUTOFF_STEP_SEC_PER_LEVEL
 // (Lv0始まりなので実質「平均スキルLv」×20秒)を超えると出現しなくなる。シミュレータは全アイテムの
 // スキルLvをラウンドのLv(0〜4)+1に統一する既存の簡略化にそのまま乗せ、平均スキルLv=lv+1として扱う。
@@ -431,7 +450,11 @@ function simulateOneRound(lv, catchAll, timeBonusCatchRate = 0.8, normalCatchRat
       weights[i] = w;
       itemWeightTotal += w;
     }
-    const dogWeight = POOL_SIZE * DEFAULT_WEIGHT * (DOG_SPAWN_RATIO / (1 - DOG_SPAWN_RATIO));
+    const dogWeight =
+      POOL_SIZE * DEFAULT_WEIGHT * (DOG_SPAWN_RATIO / (1 - DOG_SPAWN_RATIO)) +
+      TIME_BONUS_UNFILLED_RANK_DOG_WEIGHT +
+      SCORE_MULT_UNFILLED_RANK_DOG_WEIGHT +
+      SPAWN_DYNAMICS_UNFILLED_RANK_DOG_WEIGHT;
     let roll = Math.random() * (dogWeight + itemWeightTotal);
     if (roll < dogWeight) {
       if (Math.random() < FRENCHIE_SKIN_SPAWN_CHANCE) {
@@ -477,7 +500,13 @@ function main() {
   const timeBonusCatchRate = process.argv[4] !== undefined ? Number(process.argv[4]) : 0.8;
   const normalCatchRate = process.argv[5] !== undefined ? Number(process.argv[5]) : 0.85;
   const denseCatchRate = process.argv[6] !== undefined ? Number(process.argv[6]) : 0.5;
-  console.log(`itemPool N=${POOL_SIZE} / ROUND_SECONDS=${ROUND_SECONDS} / MAX_ROUND_SECONDS=${MAX_PLAY_SECONDS} / 試行回数=${trials} / モード=${mode}${catchAll ? "（時間減少・チョコレートも100%キャッチ）" : "（時間減少・チョコレートは回避）"} / 時間増加系7種の実キャッチ率=${timeBonusCatchRate} / 通常時キャッチ率=${normalCatchRate} / 密集時キャッチ率=${denseCatchRate}\n`);
+  console.log(`itemPool N=${POOL_SIZE} / ROUND_SECONDS=${ROUND_SECONDS} / MAX_ROUND_SECONDS=${MAX_PLAY_SECONDS} / 試行回数=${trials} / モード=${mode}${catchAll ? "（時間減少・チョコレートも100%キャッチ）" : "（時間減少・チョコレートは回避）"} / 時間増加系7種の実キャッチ率=${timeBonusCatchRate} / 通常時キャッチ率=${normalCatchRate} / 密集時キャッチ率=${denseCatchRate}`);
+  console.log(
+    `プール重み予算（未充填ランク分はdogへ上乗せして消化）: ` +
+    `時間増加系7種=${poolWeightTotal(TIME_BONUS_IDS)}（+未充填${TIME_BONUS_UNFILLED_RANK_DOG_WEIGHT}→dogへ、合計${poolWeightTotal(TIME_BONUS_IDS) + TIME_BONUS_UNFILLED_RANK_DOG_WEIGHT}） / ` +
+    `得点倍率系8種=${poolWeightTotal(SCORE_MULT_IDS)}（+未充填${SCORE_MULT_UNFILLED_RANK_DOG_WEIGHT}→dogへ、合計${poolWeightTotal(SCORE_MULT_IDS) + SCORE_MULT_UNFILLED_RANK_DOG_WEIGHT}） / ` +
+    `出現量アップ・制御系=${poolWeightTotal(SPAWN_DYNAMICS_IDS)}（+未充填${SPAWN_DYNAMICS_UNFILLED_RANK_DOG_WEIGHT}→dogへ、合計${poolWeightTotal(SPAWN_DYNAMICS_IDS) + SPAWN_DYNAMICS_UNFILLED_RANK_DOG_WEIGHT}）\n`
+  );
   for (let lvIdx = 0; lvIdx < 5; lvIdx++) {
     const scores = [], secs = [];
     let cappedCount = 0;
