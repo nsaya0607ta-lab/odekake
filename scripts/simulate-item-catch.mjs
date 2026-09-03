@@ -471,7 +471,7 @@ function simulateOneRound(lv, catchAll, timeBonusCatchRate = 0.8, normalCatchRat
       itemWeightTotal += w;
     }
     const dogWeight =
-      POOL_SIZE * DEFAULT_WEIGHT * (DOG_SPAWN_RATIO / (1 - DOG_SPAWN_RATIO)) +
+      itemWeightTotal * (DOG_SPAWN_RATIO / (1 - DOG_SPAWN_RATIO)) +
       TIME_BONUS_UNFILLED_RANK_DOG_WEIGHT +
       SCORE_MULT_UNFILLED_RANK_DOG_WEIGHT +
       SPAWN_DYNAMICS_UNFILLED_RANK_DOG_WEIGHT;

@@ -637,6 +637,17 @@ const FOOD_CATEGORY_ITEM_IDS = new Set(
 );
 const DOG_SPAWN_RATIO = 0.28;
 /**
+ * 2026-09-03、`dogWeight`（「普通のフレブル」(dog)の出現重み）の算出式を
+ * `itemPool.length（所持アイテム数）× DEFAULT_ITEM_SPAWN_WEIGHT`という近似から、
+ * 実際の`itemWeightTotal`（所持アイテムの実重み合計）を使う式に変更した（ユーザー指定）。
+ * 旧式は「全アイテムがDEFAULT_ITEM_SPAWN_WEIGHT(100)である」前提の近似だったため、4プール制で
+ * ランク予算が固定化された後も所持アイテム数が増えるたびにdogWeightだけ増え続け、時間増加系を
+ * 含む全アイテムの相対確率がわずかに薄まり続けていた（Nランクへの大量追加の検証でLv5平均-5%程度）。
+ * `dogWeight = itemWeightTotal × (DOG_SPAWN_RATIO/(1-DOG_SPAWN_RATIO))`にすると、
+ * `dogWeight / (dogWeight + itemWeightTotal) = DOG_SPAWN_RATIO`が常に厳密に成り立つため、
+ * 未充填ランク分（下記3定数）を除けば、プール予算が変わらない限りdogの出現割合は所持アイテム数に
+ * 依存せず常にDOG_SPAWN_RATIO(28%)ちょうどになる。
+ *
  * 3プール（時間増加系2120・得点倍率系400・出現量アップ制御系900）はレアリティ別の固定比率
  * （R:30%/SR:18%/SSR:16%/UR:14%/LR:12%/MR:10%）でランク予算を割り当てているが、該当アイテムが
  * まだ存在しないランクの予算は消化されず余る。プールの予算を減らさないため、この余りを
@@ -1179,7 +1190,7 @@ export function FrenchieCatchGame({ ownedItems }: { ownedItems: FrenchieCatchIte
     }));
     const itemWeightTotal = weightedItems.reduce((sum, entry) => sum + entry.weight, 0);
     const dogWeight =
-      itemPool.length * DEFAULT_ITEM_SPAWN_WEIGHT * (DOG_SPAWN_RATIO / (1 - DOG_SPAWN_RATIO)) +
+      itemWeightTotal * (DOG_SPAWN_RATIO / (1 - DOG_SPAWN_RATIO)) +
       TIME_BONUS_UNFILLED_RANK_DOG_WEIGHT +
       SCORE_MULT_UNFILLED_RANK_DOG_WEIGHT +
       SPAWN_DYNAMICS_UNFILLED_RANK_DOG_WEIGHT;
