@@ -5,7 +5,10 @@
 -- src/lib/gacha/skill-levels.ts の SKILL_LEVEL_THRESHOLDS で判定される。
 -- Lv5に必要なcountはレアリティごとに固定（R:90 / SR:40 / SSR:26 / UR:15 / LR:8 / MR:6）。
 -- N（ノーマル）はスキルレベルの対象外なので触らない。
--- アイテム一覧（id・レアリティ）は src/lib/gacha/prizes.ts の GACHA_PRIZES と一致させている。
+-- アイテム一覧（id・レアリティ）は src/lib/collection/items.ts の COLLECTION_ITEMS
+-- （通常図鑑 + 3シリーズの犬スキン）と一致させている。
+-- ※ other_pink_omo（ピンクオモ, LR）は items.ts には登録されているが
+--   src/lib/gacha/prizes.ts の GACHA_PRIZES には無いため、そちらだけでは漏れる。
 --
 -- 実行方法: Supabase SQL Editor か `psql` で、対象DBに対してこのファイルをそのまま実行する。
 -- 一回限りのデータ修正用スクリプトであり、schema migrationではないので
@@ -92,6 +95,7 @@ begin
     ('other_nisoku_a', 'SSR'),
     ('other_listen_to_the_a', 'LR'),
     ('other_okaeri', 'LR'),
+    ('other_pink_omo', 'LR'),
     ('other_sparkle_rope_crown', 'SR'),
     ('other_burebur', 'MR'),
     ('other_xmas_party', 'MR'),
