@@ -132,11 +132,11 @@ const SPAWN_INTERVAL_MAX_MS = 780;
  * アイテムの降ってくる量を2倍にするため、通常のスポーンタイマーと全く同じ間隔で
  * もう1系統「ボーナス出現」タイマーを並走させる（Clawdのボールと同じ独立タイマー方式）。
  *
- * 単純にspawnRate計算へ一律の倍率を掛ける方式も試したが、時間増加系7種の重みを
+ * 単純にspawnRate計算へ一律の倍率を掛ける方式も試したが、時間増加系8種の重みを
  * 「1/倍率」で相殺する近似では誤差を完全には消せず、プレイ時間の期待値がLv3以降
  * わずかに水増しされ続けて指数的に膨らみ、ラウンドが実質終了しなくなる不具合が
  * 発生した（元々r値が1に近い際どいバランスだったため、小さな誤差でも致命的だった）。
- * ボーナス出現タイマーは時間増加系7種（TIME_BONUS_ITEM_IDS）と、時間増加系を含む
+ * ボーナス出現タイマーは時間増加系8種（TIME_BONUS_ITEM_IDS）と、時間増加系を含む
  * 夏のフレブルスキン・？アイテムを一切対象にしないことで、既存のスポーンタイマーの
  * 挙動（＝時間増加系の取得ペース）を寸分変えずに、それ以外のアイテム量だけを厳密に
  * 2倍にする。
@@ -249,7 +249,7 @@ const LV = {
   RAGBY_SPAWN: [2, 2.25, 2.5, 2.75, 3],
   OYATSU_PT: [270, 300, 330, 360, 420],
   KETSUNADE_SEC: [4, 5, 6, 8, 10],
-  BUREBUR_COUNT: [6, 8, 10, 12, 13],
+  BUREBUR_SEC: [20, 23, 26, 29, 32],
   XMAS_SEC: [6, 7, 9, 10, 12],
   XMAS_FALL: [1.8, 2, 2.2, 2.4, 2.5],
   XMAS_SCORE: [1.5, 1.9, 2.3, 2.7, 3.1],
@@ -287,20 +287,20 @@ const RARITY_FALL_SPEED: Record<FrenchieCatchItem["rarity"], number> = { N: 1, R
 /** 時間が増えるスキルを持つアイテムだけ、落下速度をレアリティ別倍率で上げる */
 const TIME_BONUS_ITEM_IDS = new Set([
   "toy_duck_plush", "toy_carrot", "food_paw_melon_bread",
-  "interior_anball", "other_omojii", "other_azuki", "summer_frenchie",
+  "interior_anball", "other_omojii", "other_azuki", "summer_frenchie", "other_burebur",
 ]);
 /**
  * UR出現率アップ・その他カテゴリ抑制・SSR/UR/LR限定出現・出現量アップを付与するアイテム。
- * いずれも「出現重みの計算式そのもの」を一時的に書き換える効果を持ち、時間増加系7種の
+ * いずれも「出現重みの計算式そのもの」を一時的に書き換える効果を持ち、時間増加系8種の
  * 一部はUR/otherカテゴリに属するため、これらの発動頻度が変わると時間増加系の取得ペースが
  * 間接的に揺らいでしまう（宝箱のrare_lockが時間増加系のUR勢を集中優遇して伸びやすくなる、
  * という既知の現象がTREASURE_OUTCOME_WEIGHTSのコメントにもある）。
  * ボーナス出現タイマーがこれらを引いて発動頻度を実質的に底上げしてしまうと、時間増加系の
- * 取得ペースがわずかに変わり得るため、ボーナス出現タイマーでは時間増加系7種と合わせて
+ * 取得ペースがわずかに変わり得るため、ボーナス出現タイマーでは時間増加系8種と合わせて
  * こちらも対象外にする。
  */
 const SPAWN_DYNAMICS_ITEM_IDS = new Set([
-  "toy_rainbow_ball", "interior_stretch_rod", "toy_treasure_puzzle", "other_burebur",
+  "toy_rainbow_ball", "interior_stretch_rod", "toy_treasure_puzzle",
   "other_xmas_party", "other_pondeomo", "other_pondear", "other_jare_a", "interior_ragby_ar",
 ]);
 /**
@@ -364,7 +364,7 @@ const DEFAULT_ITEM_SPAWN_WEIGHT = 100;
 /**
  * 出現量アップ系スキル（ぽんでおも・ぽんでアー・じゃれアー・ラグビーアー・Xmas Party）は
  * スポーン間隔そのものを割るため、有効中は時間増加系アイテムの取得率まで一緒に底上げしてしまう。
- * createEntity内のweightedItems計算で「出現量アップ中は時間増加系7種の重みを現在有効な
+ * createEntity内のweightedItems計算で「出現量アップ中は時間増加系8種の重みを現在有効な
  * ブースト倍率で割る」1/n相殺ロジックを入れてあるため、出現量アップ側の倍率は時間増加系のr値に
  * 影響しない（詳細はdocs/minigame-time-balance.md参照）。
  *
@@ -393,7 +393,7 @@ const ITEM_SPAWN_WEIGHTS: Partial<Record<string, number>> = {
    *
    * 時間増加系プール（予算2120、おかえりを含む）：R:636÷3=212ずつ / SR:381.6(未充填→dog) /
    * SSR:339.2(未充填→dog) / UR:296.8÷3 / LR:254.4÷2=127.2ずつ(夏のフレブル/おかえり) /
-   * MR:212(未充填→dog)。在籍分の実際の合計は1187.2（残り932.8は
+   * MR:212÷1=212(ブレブル)。在籍分の実際の合計は1399.2（残り720.8は
    * `TIME_BONUS_UNFILLED_RANK_DOG_WEIGHT`でdogへ）。
    */
   other_omojii: 296.8 / 3,
@@ -404,23 +404,24 @@ const ITEM_SPAWN_WEIGHTS: Partial<Record<string, number>> = {
   other_azuki: 296.8 / 3,
   summer_frenchie: 254.4 / 2,
   other_okaeri: 254.4 / 2,
+  other_burebur: 212 / 1,
   /**
    * 出現量アップ・出現制御系プール（予算900）：R:270÷1=270 / SR:162÷1=162 / SSR:144÷4=36ずつ /
-   * UR:126(未充填→dog) / LR:108÷2=54ずつ / MR:90÷2=45ずつ。在籍分の実際の合計は774
-   * （残り126は`SPAWN_DYNAMICS_UNFILLED_RANK_DOG_WEIGHT`でdogへ）。宝箱おやつパズル・ブレブル・
+   * UR:126(未充填→dog) / LR:108÷2=54ずつ / MR:90÷1=90(Xmas Party)。在籍分の実際の合計は774
+   * （残り126は`SPAWN_DYNAMICS_UNFILLED_RANK_DOG_WEIGHT`でdogへ）。宝箱おやつパズル・
    * Xmas Partyもここでは個別チューニング値ではなく「ランク予算÷在籍数」のみで計算する
-   * （ユーザー指定、2026-09-03〜）。
+   * （ユーザー指定、2026-09-03〜）。ブレブルは2026-09-04に効果を秒数プラス系へ変更し、
+   * 時間増加系プールへ移動した（このプールからは離籍）。
    */
   toy_rainbow_ball: 144 / 4,
   interior_stretch_rod: 270 / 1,
   toy_treasure_puzzle: 162 / 1,
-  other_xmas_party: 90 / 2,
+  other_xmas_party: 90 / 1,
   other_pondeomo: 144 / 4,
   other_pondear: 144 / 4,
   other_jare_a: 144 / 4,
   interior_ragby_ar: 108 / 2,
   other_listen_to_the_a: 108 / 2,
-  other_burebur: 90 / 2,
   /**
    * 得点倍率系プール（予算400）：R:120(未充填→dog) / SR:72÷2=36ずつ / SSR:64÷2=32ずつ /
    * UR:56÷3 / LR:48÷2=24ずつ / MR:40÷2=20ずつ。在籍分の実際の合計は280
@@ -518,7 +519,7 @@ const XMAS_PARTY_ITEM_ID = "other_xmas_party";
 const OMOCHI_ITEM_ID = "other_omochi_janai";
 const OKAERI_ITEM_ID = "other_okaeri";
 /**
- * 時間増加系7種＋おかえりは、プレイヤーの図鑑育成度（R以上アイテムのスキルLv平均）に応じた
+ * 時間増加系8種＋おかえりは、プレイヤーの図鑑育成度（R以上アイテムのスキルLv平均）に応じた
  * 秒数を超えると出現しなくなる（？アイテムのスキル抽選からも除外される）。宝箱は対象外。
  * 平均Lv1→60秒、2→80、3→100、4→120、5→140の線形（+20秒/Lv、小数点も比例配分）。
  * 詳細はdocs/minigame-time-balance.mdの「時間増加系の出現カットオフ」節を参照。
@@ -633,10 +634,8 @@ const CLAWD_GOLD_BALL_CHANCE = 0.2;
 const MOCCHURIN_ITEM_ID = "food_mocchurin";
 /** Lv4(lv index=3)以降は直前に捕まえた2つ分のスキルをエコーする */
 const MOCCHURIN_DOUBLE_ECHO_MIN_LV = 3;
-/** ブレブルの効果中、このレアリティ以外のアイテムは出現しなくなる */
+/** 宝箱の「レア枠確定出現」効果中、このレアリティ以外のアイテムは出現しなくなる */
 const HIGH_RARITY_LOCK_RARITIES = new Set<FrenchieCatchItem["rarity"]>(["SSR", "UR", "LR"]);
-/** ブレブルは他の「レア枠確定」より対象を絞り、UR・LRランクのみに限定する */
-const BUREBUR_LOCK_RARITIES = new Set<FrenchieCatchItem["rarity"]>(["UR", "LR"]);
 const OTHER_CATEGORY_ITEM_IDS = new Set(
   COLLECTION_ITEMS.filter((entry) => entry.category === "other").map((entry) => entry.id),
 );
@@ -662,10 +661,12 @@ const DOG_SPAWN_RATIO = 0.28;
  * 「普通のフレブル」(dog)の出現重みに上乗せして消化する（ITEM_SPAWN_WEIGHTS直上のコメント参照）。
  * 各値は「プール予算 − 在籍ランクの実際の重み合計」。2026-09-03、ユーザー指定で固定重みを
  * 全廃し「ランク予算÷在籍数」のみに統一したため、以下の3値も端数を丸めず正確な値にした：
- * 時間増加系: 2120−1187.2=932.8 / 得点倍率系: 400−280=120 / 出現量アップ制御系: 900−774=126。
+ * 時間増加系: 2120−1399.2=720.8 / 得点倍率系: 400−280=120 / 出現量アップ制御系: 900−774=126。
  * 新しく未充填ランクにアイテムを追加したら、対応する定数からそのランクの予算分を差し引くこと。
+ * （時間増加系のMR枠は、2026-09-04にブレブルの効果を秒数プラス系へ変更したことで新たに
+ * 充填された。従来のR:636+UR:296.8+LR:254.4=1187.2に、MR:212を加えて1399.2）
  */
-const TIME_BONUS_UNFILLED_RANK_DOG_WEIGHT = 2120 - 1187.2;
+const TIME_BONUS_UNFILLED_RANK_DOG_WEIGHT = 2120 - 1399.2;
 /** 2026-09-03、固定重み全廃・ランク予算÷在籍数のみに統一（ユーザー指定）。ITEM_SPAWN_WEIGHTS直上のコメント参照。 */
 const SCORE_MULT_UNFILLED_RANK_DOG_WEIGHT = 120;
 /** 2026-09-03、固定重み全廃・ランク予算÷在籍数のみに統一（ユーザー指定）。ITEM_SPAWN_WEIGHTS直上のコメント参照。 */
@@ -818,8 +819,6 @@ export function FrenchieCatchGame({ ownedItems }: { ownedItems: FrenchieCatchIte
   const otherSuppressUntilRef = useRef(0);
   const otherSuppressValueRef = useRef(1);
   const highRarityLockUntilRef = useRef(0);
-  /** ブレブル用。時間ではなく「次に出現するアイテム数」で管理するカウント式のSSR/UR/LR限定ロック */
-  const highRarityLockCountRef = useRef(0);
   const treasureStreakActiveRef = useRef(false);
   const treasureStreakMultRef = useRef(1);
   const omochiUntilRef = useRef(0);
@@ -857,7 +856,7 @@ export function FrenchieCatchGame({ ownedItems }: { ownedItems: FrenchieCatchIte
   /**
    * 通れまてん：有効中は「はずれ」の初期フレブル(15pt)の代わりに、より高得点な金色フレブルが
    * 同じ出現枠（dogWeight）でそのまま出現する。フレブルの出現シェア自体は変えないので、
-   * 時間増加系7種の取得率やdogCaughtRef（ラウンド終了時のフレブル数ボーナス算定）には影響しない。
+   * 時間増加系8種の取得率やdogCaughtRef（ラウンド終了時のフレブル数ボーナス算定）には影響しない。
    */
   const dogGoldenUntilRef = useRef(0);
   const dogGoldenPtValueRef = useRef(0);
@@ -892,7 +891,7 @@ export function FrenchieCatchGame({ ownedItems }: { ownedItems: FrenchieCatchIte
 
   const itemPool = useMemo(() => ownedItems.filter((item) => item.image.length > 0), [ownedItems]);
   const itemLevelByIdRef = useRef<Map<string, number>>(new Map());
-  /** 時間増加系7種＋おかえりが出現しなくなるまでの秒数。ownedItems（R以上）のスキルLv平均から算出する */
+  /** 時間増加系8種＋おかえりが出現しなくなるまでの秒数。ownedItems（R以上）のスキルLv平均から算出する */
   const timeBonusCutoffSecRef = useRef(TIME_BONUS_CUTOFF_BASE_SEC);
   /** ❓アイテムが確定させるスキルの抽選プール。持っていないキャラのスキルが出ないよう、所持アイテムだけに絞る */
   const mysterySkillPoolRef = useRef<string[]>(MYSTERY_SKILL_ITEM_IDS);
@@ -903,7 +902,7 @@ export function FrenchieCatchGame({ ownedItems }: { ownedItems: FrenchieCatchIte
     soccer: null,
     gold: null,
   });
-  /** 時間増加系7種＋おかえりが出現しなくなるまでの秒数（スタート画面表示用）。timeBonusCutoffSecRefと同じ計算式 */
+  /** 時間増加系8種＋おかえりが出現しなくなるまでの秒数（スタート画面表示用）。timeBonusCutoffSecRefと同じ計算式 */
   const timeBonusCutoffSecDisplay = useMemo(() => {
     const rPlusItems = ownedItems.filter((item) => item.rarity !== "N");
     const totalLevel = rPlusItems.reduce((sum, item) => sum + item.level, 0);
@@ -990,7 +989,6 @@ export function FrenchieCatchGame({ ownedItems }: { ownedItems: FrenchieCatchIte
     if (now < spawnRateBoostUntilRef.current) labels.push(`アイテム出現量×${spawnRateBoostValueRef.current}中`);
     if (now < otherSuppressUntilRef.current) labels.push(`その他カテゴリ出現×${otherSuppressValueRef.current}中`);
     if (now < highRarityLockUntilRef.current) labels.push("SSR/UR/LRのみ出現中");
-    if (highRarityLockCountRef.current > 0) labels.push(`UR/LRのみ出現 あと${highRarityLockCountRef.current}体`);
     if (treasureStreakActiveRef.current) {
       // この倍率もSCORE表示の下の「スコア倍率 ×X」に含まれているため、右側のスキルログには出さない
       scoreMultiplierTotalValue *= treasureStreakMultRef.current;
@@ -1020,7 +1018,7 @@ export function FrenchieCatchGame({ ownedItems }: { ownedItems: FrenchieCatchIte
 
   /**
    * excludeTimeBonus: ボーナス出現タイマー（アイテム量2倍化用）からの呼び出し専用。
-   * 時間増加系7種・そのスキンである夏のフレブル・？アイテム（時間増加系を引く可能性があるため）、
+   * 時間増加系8種・そのスキンである夏のフレブル・？アイテム（時間増加系を引く可能性があるため）、
    * および出現重みの計算式自体を書き換えるSPAWN_DYNAMICS_ITEM_IDSを一切対象にせず、
    * 既存のスポーンタイマー側の時間増加系取得ペースを完全に不変に保つ。
    */
@@ -1174,13 +1172,9 @@ export function FrenchieCatchGame({ ownedItems }: { ownedItems: FrenchieCatchIte
 
     const urBoostFactor = 1 + Math.min(urBoostRef.current, UR_BOOST_MAX) / 100;
     const otherSuppressActive = performance.now() < otherSuppressUntilRef.current;
-    const treasureRareLockActive = performance.now() < highRarityLockUntilRef.current;
-    const bureburLockActive = highRarityLockCountRef.current > 0;
-    const highRarityLockActive = treasureRareLockActive || bureburLockActive;
-    /** 両方同時に有効な場合は宝箱側(SSR/UR/LR)の対象を優先する（ブレブル単体ならUR/LRのみに絞る） */
-    const allowedHighRarities = treasureRareLockActive ? HIGH_RARITY_LOCK_RARITIES : BUREBUR_LOCK_RARITIES;
+    const highRarityLockActive = performance.now() < highRarityLockUntilRef.current;
     /**
-     * 出現量アップ中は時間増加系7種の重みをブースト倍率で割り、取得ペースがブーストなしの時と
+     * 出現量アップ中は時間増加系8種の重みをブースト倍率で割り、取得ペースがブーストなしの時と
      * 変わらないよう相殺する（詳細はdocs/minigame-time-balance.mdの「出現量ブーストの1/n相殺」参照）。
      * これにより出現量アップ側の倍率をどれだけ強くしても、時間増加系側のr値には影響しなくなる。
      */
@@ -1194,7 +1188,7 @@ export function FrenchieCatchGame({ ownedItems }: { ownedItems: FrenchieCatchIte
         (otherSuppressActive && item.id !== STRETCH_ROD_ITEM_ID && OTHER_CATEGORY_ITEM_IDS.has(item.id)
           ? otherSuppressValueRef.current
           : 1) *
-        (highRarityLockActive && !allowedHighRarities.has(item.rarity) ? 0 : 1) *
+        (highRarityLockActive && !HIGH_RARITY_LOCK_RARITIES.has(item.rarity) ? 0 : 1) *
         (excludeTimeBonus && (TIME_BONUS_ITEM_IDS.has(item.id) || SPAWN_DYNAMICS_ITEM_IDS.has(item.id)) ? 0 : 1) *
         (timeBonusCutoffActive && TIME_BONUS_CUTOFF_ITEM_IDS.has(item.id) ? 0 : 1) *
         (spawnRateBoostActive && TIME_BONUS_ITEM_IDS.has(item.id) ? 1 / spawnRateBoostValueRef.current : 1),
@@ -1260,8 +1254,6 @@ export function FrenchieCatchGame({ ownedItems }: { ownedItems: FrenchieCatchIte
         break;
       }
     }
-
-    if (highRarityLockCountRef.current > 0) highRarityLockCountRef.current -= 1;
 
     return {
       ...base,
@@ -1909,11 +1901,11 @@ export function FrenchieCatchGame({ ownedItems }: { ownedItems: FrenchieCatchIte
                 effectLabel = `${STRETCH_ROD_SECONDS}秒間 その他×${LV.STRETCH_ROD_MULT[lv]}${lvTag}`;
                 statusChanged = true;
                 break;
-              case BUREBUR_ITEM_ID:
-                highRarityLockCountRef.current = LV.BUREBUR_COUNT[lv]!;
-                effectLabel = `${LV.BUREBUR_COUNT[lv]}体 UR/LRのみ出現${lvTag}`;
-                statusChanged = true;
+              case BUREBUR_ITEM_ID: {
+                const applied = addBonusTime(LV.BUREBUR_SEC[lv]!);
+                effectLabel = `+${applied}秒${lvTag}`;
                 break;
+              }
               case XMAS_PARTY_ITEM_ID: {
                 const xmasSec = LV.XMAS_SEC[lv]!;
                 fallSpeedBoostUntilRef.current = Math.max(now, fallSpeedBoostUntilRef.current) + xmasSec * 1000;
@@ -2472,7 +2464,6 @@ export function FrenchieCatchGame({ ownedItems }: { ownedItems: FrenchieCatchIte
     otherSuppressUntilRef.current = 0;
     otherSuppressValueRef.current = 1;
     highRarityLockUntilRef.current = 0;
-    highRarityLockCountRef.current = 0;
     treasureStreakActiveRef.current = false;
     treasureStreakMultRef.current = 1;
     omochiUntilRef.current = 0;
