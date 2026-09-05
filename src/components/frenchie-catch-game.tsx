@@ -742,25 +742,6 @@ function dambourleEffectPercent(effectKey: DambourleEffectKey, level: number): n
 type ResolvedDambourleEffect = { key: DambourleEffectKey; percent: number };
 
 /**
- * 右側のスキルログ・状態表示に出す短いラベル。No.11「全アイテムのスキルLv上昇」は別プロップで
- * 処理するため含めない。No.12「効果ルーレット」はresolveDambourleEffectで必ず対象9種いずれかの
- * キーに解決されるため、実際にはここでは引かれない（型を素直に保つためPartialにしている）。
- */
-const DAMBOURLE_EFFECT_LABELS: Partial<Record<DambourleEffectKey, string>> = {
-  item_spawn_up: "アイテム出現量アップ",
-  score_mult_up: "スコア倍率アップ",
-  time_bonus_cutoff_up: "時間増加アップ",
-  box_size_up: "ダンボール拡大",
-  end_coin_bonus: "終了時コイン増加",
-  dog_bonus_mult_up: "フレブルボーナス倍率アップ",
-  negative_spawn_down: "マイナスアイテム出現ダウン",
-  time_pool_rate_up: "時間増加系の出現率アップ",
-  spawn_dynamics_effect_up: "出現量アップ系の効果アップ",
-  score_mult_pool_effect_up: "得点倍率系の効果アップ",
-  item_base_score_up: "基礎スコアアップ",
-};
-
-/**
  * No.12「効果ルーレット」は対象9種から毎ラウンド開始時に1つ抽選し、そのラウンドの間だけ固定する。
  * No.11「全アイテムのスキルLv上昇」はここでは扱わない（dambourleSkillBoostプロップで別処理）。
  */
@@ -984,7 +965,6 @@ export function FrenchieCatchGame({
   const [boxShrinkGuard, setBoxShrinkGuard] = useState(0);
   const [timeMinusGuard, setTimeMinusGuard] = useState(0);
   const [feedback, setFeedback] = useState<CatchFeedback | null>(null);
-  const [activeEffects, setActiveEffects] = useState<string[]>([]);
   const [scoreMultiplierTotal, setScoreMultiplierTotal] = useState(1);
   const [recentSkillEffects, setRecentSkillEffects] = useState<RecentSkillEffect[]>([]);
   const [impactX, setImpactX] = useState<number | null>(null);
@@ -1071,75 +1051,22 @@ export function FrenchieCatchGame({
   }, [itemPool]);
 
   const refreshEffectStatus = useCallback((now: number) => {
-    const labels: string[] = [];
     let scoreMultiplierTotalValue = 1;
     // ダンボールNo.2「スコア倍率アップ」：ラウンド中ずっと有効な固定倍率。上部「スコア倍率 ×X」に含める
     scoreMultiplierTotalValue *= dambourleUpMultiplier("score_mult_up");
     const activeScoreMultipliers = scoreMultipliersRef.current.filter((entry) => entry.until > now);
     if (activeScoreMultipliers.length > 0) {
-      // この倍率はSCORE表示の下の「スコア倍率 ×X」に表示済みのため、右側のスキルログには出さない
       const product = activeScoreMultipliers.reduce((acc, entry) => acc * entry.value, 1);
       scoreMultiplierTotalValue *= product;
     }
-    const activeNextMultipliers = nextMultipliersRef.current.filter((entry) => entry.remaining > 0);
-    if (activeNextMultipliers.length > 0) {
-      const maxRemaining = Math.max(...activeNextMultipliers.map((entry) => entry.remaining));
-      const product = activeNextMultipliers.reduce((acc, entry) => acc * entry.value, 1);
-      labels.push(
-        activeNextMultipliers.length > 1
-          ? `次の${maxRemaining}個 ×${activeNextMultipliers.map((entry) => entry.value).join("×")}=${product}`
-          : `次の${maxRemaining}個 ×${product}`,
-      );
-    }
-    if (nextBonus10Ref.current > 0) labels.push(`あと${nextBonus10Ref.current}個 +10pt`);
-    if (rewardTimeCountRef.current > 0) labels.push(`次の1個 ${rewardTimeValueRef.current}pt確定`);
-    if (nextBonus5Ref.current > 0) labels.push(`あと${nextBonus5Ref.current}個 +5pt`);
-    if (mocchurinPendingEchoCountRef.current > 0) labels.push(`次の${mocchurinPendingEchoCountRef.current}個をエコー`);
-    if (stunGuardRef.current > 0) labels.push(HAZARD_GUARD_LABELS.stun);
-    if (boxShrinkGuardRef.current > 0) labels.push(HAZARD_GUARD_LABELS.boxShrink);
-    if (timeMinusGuardRef.current > 0) labels.push(HAZARD_GUARD_LABELS.timeMinus);
-    if (now < magnetUntilRef.current) labels.push(magnetStrengthRef.current === "weak" ? "ミニマグネット発動中" : "マグネット発動中");
-    if (now < pinkOmoUntilRef.current) labels.push("ピンクオモ発動中（アイテムが中心へ）");
-    if (now < fallSpeedBoostUntilRef.current) labels.push("落下速度アップ中");
-    if (now < poopSuppressUntilRef.current) labels.push("うんち出現なし");
-    if (poopFloodRemainingRef.current > 0) labels.push(`うんち祭り あと${poopFloodRemainingRef.current}個`);
-    if (dogFloodRemainingRef.current > 0) labels.push(`フレブル大量発生 あと${dogFloodRemainingRef.current}体`);
-    if (personFloodRemainingRef.current > 0) labels.push(`人物入りキャラ大量発生 あと${personFloodRemainingRef.current}体`);
-    if (clawdBallFloodRemainingRef.current > 0) labels.push(`サッカーボール/ゴールドボール大量発生 あと${clawdBallFloodRemainingRef.current}個`);
-    if (now < ikeaUntilRef.current) labels.push(`くみたて中 ${ikeaCountRef.current}個`);
-    if (now < spawnRateBoostUntilRef.current) labels.push(`アイテム出現量×${spawnRateBoostValueRef.current}中`);
-    if (now < otherSuppressUntilRef.current) labels.push(`その他カテゴリ出現×${otherSuppressValueRef.current}中`);
-    if (now < highRarityLockUntilRef.current) labels.push("SSR/UR/LRのみ出現中");
     if (treasureStreakActiveRef.current) {
-      // この倍率もSCORE表示の下の「スコア倍率 ×X」に含まれているため、右側のスキルログには出さない
       scoreMultiplierTotalValue *= treasureStreakMultRef.current;
     }
-    if (now < omochiUntilRef.current) labels.push(`うんちがおもちに +${omochiPtValueRef.current}pt`);
-    if (now < okaeriUntilRef.current) labels.push(`1個ごとに+${okaeriPerCatchValueRef.current}秒`);
-    if (now < hazardShieldUntilRef.current) labels.push("ハザード出現なし");
     const activeFoodMultipliers = foodScoreMultipliersRef.current.filter((entry) => entry.until > now);
     if (activeFoodMultipliers.length > 0) {
-      // この倍率もSCORE表示の下の「スコア倍率 ×X」に含まれているため、右側のスキルログには出さない
       const product = activeFoodMultipliers.reduce((acc, entry) => acc * entry.value, 1);
       scoreMultiplierTotalValue *= product;
     }
-    if (now < slantBoostUntilRef.current) labels.push("斜め落下中");
-    if (now < boxShrinkUntilRef.current) labels.push("ダンボール0.8倍");
-    else if (now < boxWideUntilRef.current) labels.push(`ダンボール×${boxWideScaleRef.current}拡大中`);
-    if (now < blackoutUntilRef.current) labels.push("上半分ブラックアウト中");
-    if (now < stunUntilRef.current) labels.push("しびれ中");
-    if (now < hazardInvertUntilRef.current) labels.push("ミラータイム中（ハザード反転）");
-    if (now < dogGoldenUntilRef.current) labels.push(`通れまてん発動中（フレブルが金色に、+${dogGoldenPtValueRef.current}pt）`);
-    if (urBoostRef.current > 0) labels.push(`UR出現率+${Math.min(urBoostRef.current, UR_BOOST_MAX)}`);
-    if (now < narcissistUntilRef.current) labels.push("ナルシストアー発動中（全アイテムのスキルがLv.MAX）");
-    if (mafiaDogBonusMultRef.current > 1) labels.push(`フレブル数ボーナス×${mafiaDogBonusMultRef.current.toFixed(2)}`);
-    if (dambourleEffectRef.current) {
-      const { key, percent } = dambourleEffectRef.current;
-      const label = DAMBOURLE_EFFECT_LABELS[key] ?? key;
-      const sign = key === "negative_spawn_down" ? "-" : "+";
-      labels.push(`${label} ${sign}${Math.round(percent)}%（装備中のダンボール）`);
-    }
-    setActiveEffects(labels);
     setScoreMultiplierTotal(scoreMultiplierTotalValue);
   }, []);
 
@@ -2440,6 +2367,10 @@ export function FrenchieCatchGame({
 
             if (isMystery && effectLabel) effectLabel = `？発動 / ${effectLabel}`;
 
+            // スキルLv6以降のLV.*_PTは0.02刻み成長の計算上、小数点を含む値になっているため
+            // （例: LV.ANBALL_PTのLv6以降）、加算した時点で必ず切り上げて整数にする
+            points = Math.ceil(points);
+
             const isJust = Math.abs(entity.x - center) <= effBoxHalf * JUST_RADIUS_RATIO;
             if (isJust) {
               points = Math.round(points * JUST_MULTIPLIER);
@@ -2796,14 +2727,6 @@ export function FrenchieCatchGame({
 
         {blackoutActive ? <div className="pointer-events-none absolute inset-x-0 top-0 z-[25] h-1/2 bg-black/95" aria-label="上半分ブラックアウト" /> : null}
         {pinkOmoActive ? <div className="pointer-events-none absolute inset-0 z-[26] bg-pink-300/25" aria-label="ピンクオモ発動中（ピンクフィルター）" /> : null}
-
-        {activeEffects.length > 0 ? (
-          <div className="pointer-events-none absolute right-3 top-24 z-50 flex flex-col items-end gap-0.5">
-            {activeEffects.map((effect) => (
-              <span key={effect} className="rounded-full bg-white/90 px-2 py-0.5 text-[8px] font-bold text-ink-soft shadow-sm">{effect}</span>
-            ))}
-          </div>
-        ) : null}
 
         {entities.map((entity) => (
           <FallingEntity
