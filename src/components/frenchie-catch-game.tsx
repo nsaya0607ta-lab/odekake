@@ -6,6 +6,7 @@ import { memo, useCallback, useEffect, useMemo, useRef, useState, type MutableRe
 import { MAX_SKILL_LEVEL } from "@/lib/gacha/skill-levels";
 import { COLLECTION_ITEMS, type CollectionItem } from "@/lib/collection/items";
 import { DAMBOURLE_PRIZES, EFFECT_ROULETTE_ELIGIBLE_EFFECT_KEYS, type DambourleEffectKey } from "@/lib/dambourle/prizes";
+import { getDambourleEffectLevel } from "@/lib/dambourle/skill-levels";
 
 export type FrenchieCatchItem = {
   id: string;
@@ -722,10 +723,11 @@ function resolveFallVy(
 
 /**
  * ダンボールガチャの効果（No.11「全アイテムのスキルLv上昇」を除く）を、そのダンボール自身の
- * Lv(1〜70)で拡大した実効値(%)に変換する。倍率式は
+ * Lv(1〜5)で拡大した実効値(%)に変換する。倍率式は
  * `src/lib/dambourle/prizes.ts`のDambourleItem.baseValuePercentコメントの通り
- * 「基礎値(%) × (1 + 0.02×(Lv-1))」で統一する（No.12「効果ルーレット」が引いた
- * 効果にも、その基礎値にNo.12自身のLvでこの式を適用する）。
+ * 「基礎値(%) × (1 + 0.02×(換算Lv-1))」で統一する（No.12「効果ルーレット」が引いた
+ * 効果にも、その基礎値にNo.12自身のLvでこの式を適用する）。換算Lvは
+ * `getDambourleEffectLevel`（新Lv1〜5→旧70段階システムのLv1/14/28/42/56）を参照。
  */
 const DAMBOURLE_EFFECT_BASE_VALUE_PERCENT = new Map(
   DAMBOURLE_PRIZES.filter((prize) => prize.baseValuePercent !== null).map((prize) => [prize.effectKey, prize.baseValuePercent!]),
@@ -734,7 +736,7 @@ const DAMBOURLE_EFFECT_BASE_VALUE_PERCENT = new Map(
 function dambourleEffectPercent(effectKey: DambourleEffectKey, level: number): number {
   const base = DAMBOURLE_EFFECT_BASE_VALUE_PERCENT.get(effectKey);
   if (base == null) return 0;
-  return base * (1 + 0.02 * (level - 1));
+  return base * (1 + 0.02 * (getDambourleEffectLevel(level) - 1));
 }
 
 type ResolvedDambourleEffect = { key: DambourleEffectKey; percent: number };
@@ -845,7 +847,7 @@ export function FrenchieCatchGame({
    * カットオフ秒数の計算(timeBonusCutoffSecRef)には反映しない。
    */
   dambourleSkillBoost?: number;
-  /** No.11以外の装備中ダンボール効果（effectKey + そのダンボール自身のLv1〜70）。未装備・No.11装備時はnull */
+  /** No.11以外の装備中ダンボール効果（effectKey + そのダンボール自身のLv1〜5）。未装備・No.11装備時はnull */
   dambourleEffect?: { key: DambourleEffectKey; level: number } | null;
   /** ダンボールガチャは実験公開中のため、限定ユーザーにのみ選択導線を出す */
   showDambourlePicker?: boolean;

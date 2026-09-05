@@ -4,7 +4,12 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { createPortal } from "react-dom";
 import { DAMBOURLE_PRIZES } from "@/lib/dambourle/prizes";
 import { DEFAULT_BOX_ALT, DEFAULT_BOX_IMAGE, getDambourleBoxImage } from "@/lib/dambourle/box-image";
-import { getDambourleLevel, getDambourleMinSkinIndex, getDambourleUnlockedSkinTier } from "@/lib/dambourle/skill-levels";
+import {
+  getDambourleLevel,
+  getDambourleMinSkinIndex,
+  getDambourleUnlockedSkinIndices,
+  getDambourleUnlockedSkinTier,
+} from "@/lib/dambourle/skill-levels";
 import { IconCheck, IconLock } from "./icons";
 
 const DEFAULT_ITEM_ID = "default";
@@ -34,15 +39,14 @@ export function DambourlePicker({ equippedItemId, equippedSkinIndex, ownedCounts
     setNavSlot(document.getElementById("bottom-nav-extra-slot"));
   }, []);
 
-  const activeMaxTier = useMemo(() => {
-    if (activeItemId === DEFAULT_ITEM_ID) return 0;
+  const activeSkinIndices = useMemo(() => {
+    if (activeItemId === DEFAULT_ITEM_ID) return [];
     const prize = DAMBOURLE_PRIZES.find((p) => p.id === activeItemId);
     const count = ownedCounts[activeItemId] ?? 0;
-    if (!prize || count <= 0) return 0;
+    if (!prize || count <= 0) return [];
     const level = getDambourleLevel(prize.rarity, count);
-    return getDambourleUnlockedSkinTier(activeItemId, level);
+    return getDambourleUnlockedSkinIndices(activeItemId, level);
   }, [activeItemId, ownedCounts]);
-  const activeMinSkinIndex = getDambourleMinSkinIndex(activeItemId);
 
   const activeName = activeItemId === DEFAULT_ITEM_ID ? "初期のダンボール" : DAMBOURLE_PRIZES.find((p) => p.id === activeItemId)?.name ?? activeItemId;
 
@@ -136,9 +140,9 @@ export function DambourlePicker({ equippedItemId, equippedSkinIndex, ownedCounts
 
       {activeItemId !== DEFAULT_ITEM_ID ? (
         <div className="rough-card p-3">
-          <p className="text-[11px] font-bold text-ink-soft">スキンを選ぶ（解放済み：{activeMaxTier - activeMinSkinIndex + 1}種）</p>
+          <p className="text-[11px] font-bold text-ink-soft">スキンを選ぶ（解放済み：{activeSkinIndices.length}種）</p>
           <div className="mt-2 flex gap-2 overflow-x-auto pb-1">
-            {Array.from({ length: activeMaxTier - activeMinSkinIndex + 1 }, (_, i) => i + activeMinSkinIndex).map((skinIndex) => (
+            {activeSkinIndices.map((skinIndex) => (
               <button
                 key={skinIndex}
                 type="button"

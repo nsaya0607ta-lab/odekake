@@ -30,7 +30,8 @@ export type DambourleItem = {
   name: string;
   rarity: DambourleRarity;
   effectKey: DambourleEffectKey;
-  /** 基礎値（%）。倍率式 1 + 0.02×(Lv-1) を掛けた値が実際の効果値になる。No.11は対象外(null)。 */
+  /** 基礎値（%）。倍率式 1 + 0.02×(換算Lv-1) を掛けた値が実際の効果値になる
+   * （換算Lvは skill-levels.ts の getDambourleEffectLevel を参照）。No.11は対象外(null)。 */
   baseValuePercent: number | null;
 };
 

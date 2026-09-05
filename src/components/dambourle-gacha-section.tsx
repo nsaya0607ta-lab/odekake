@@ -24,8 +24,8 @@ const GachaCinematic = dynamic(
   },
 );
 
-/** ダンボール自身のスキルLv上限（No.11だけ5、それ以外は70）。結果画面の「Lv.MAX」判定に使う */
-const DAMBOURLE_RESULT_MAX_LEVEL = 70;
+/** ダンボール自身のスキルLv上限（全ランク共通で5）。結果画面の「Lv.MAX」判定に使う */
+const DAMBOURLE_RESULT_MAX_LEVEL = 5;
 
 type ResultState = {
   plan: DambourlePlanId;
