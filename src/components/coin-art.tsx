@@ -55,6 +55,14 @@ export function GachaMachineArt({ className }: ArtProps) {
   );
 }
 
+/** ダンボールガチャの飾り絵。ユーザー提供の画像に差し替え済み（public/dambourle/reference/） */
+export function DambourleMachineArt({ className }: ArtProps) {
+  return (
+    // eslint-disable-next-line @next/next/no-img-element
+    <img src="/dambourle/reference/dambourle-machine.webp" className={className} alt="" aria-hidden="true" draggable={false} />
+  );
+}
+
 /** ショップのかご。かわいい小物が入っている */
 export function ShopBasketArt({ className }: ArtProps) {
   return (

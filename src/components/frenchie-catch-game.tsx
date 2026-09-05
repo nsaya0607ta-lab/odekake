@@ -6,6 +6,7 @@ import { memo, useCallback, useEffect, useMemo, useRef, useState, type MutableRe
 import { MAX_SKILL_LEVEL } from "@/lib/gacha/skill-levels";
 import { COLLECTION_ITEMS, type CollectionItem } from "@/lib/collection/items";
 import { DAMBOURLE_PRIZES, EFFECT_ROULETTE_ELIGIBLE_EFFECT_KEYS, type DambourleEffectKey } from "@/lib/dambourle/prizes";
+import { getDambourleEffectLevel } from "@/lib/dambourle/skill-levels";
 
 export type FrenchieCatchItem = {
   id: string;
@@ -722,10 +723,11 @@ function resolveFallVy(
 
 /**
  * ダンボールガチャの効果（No.11「全アイテムのスキルLv上昇」を除く）を、そのダンボール自身の
- * Lv(1〜70)で拡大した実効値(%)に変換する。倍率式は
+ * Lv(1〜5)で拡大した実効値(%)に変換する。倍率式は
  * `src/lib/dambourle/prizes.ts`のDambourleItem.baseValuePercentコメントの通り
- * 「基礎値(%) × (1 + 0.02×(Lv-1))」で統一する（No.12「効果ルーレット」が引いた
- * 効果にも、その基礎値にNo.12自身のLvでこの式を適用する）。
+ * 「基礎値(%) × (1 + 0.02×(換算Lv-1))」で統一する（No.12「効果ルーレット」が引いた
+ * 効果にも、その基礎値にNo.12自身のLvでこの式を適用する）。換算Lvは
+ * `getDambourleEffectLevel`（新Lv1〜5→旧70段階システムのLv1/14/28/42/56）を参照。
  */
 const DAMBOURLE_EFFECT_BASE_VALUE_PERCENT = new Map(
   DAMBOURLE_PRIZES.filter((prize) => prize.baseValuePercent !== null).map((prize) => [prize.effectKey, prize.baseValuePercent!]),
@@ -734,7 +736,7 @@ const DAMBOURLE_EFFECT_BASE_VALUE_PERCENT = new Map(
 function dambourleEffectPercent(effectKey: DambourleEffectKey, level: number): number {
   const base = DAMBOURLE_EFFECT_BASE_VALUE_PERCENT.get(effectKey);
   if (base == null) return 0;
-  return base * (1 + 0.02 * (level - 1));
+  return base * (1 + 0.02 * (getDambourleEffectLevel(level) - 1));
 }
 
 type ResolvedDambourleEffect = { key: DambourleEffectKey; percent: number };
@@ -845,7 +847,7 @@ export function FrenchieCatchGame({
    * カットオフ秒数の計算(timeBonusCutoffSecRef)には反映しない。
    */
   dambourleSkillBoost?: number;
-  /** No.11以外の装備中ダンボール効果（effectKey + そのダンボール自身のLv1〜70）。未装備・No.11装備時はnull */
+  /** No.11以外の装備中ダンボール効果（effectKey + そのダンボール自身のLv1〜5）。未装備・No.11装備時はnull */
   dambourleEffect?: { key: DambourleEffectKey; level: number } | null;
   /** ダンボールガチャは実験公開中のため、限定ユーザーにのみ選択導線を出す */
   showDambourlePicker?: boolean;
@@ -1492,7 +1494,9 @@ export function FrenchieCatchGame({
       const playSeconds = Math.max(0, (now - startAtRef.current) / 1000);
       const dogCount = dogCaughtRef.current;
       // ダンボールNo.6「フレブルボーナスの倍率アップ」：マフィアーの累積倍率とは別枠でさらに掛け合わせる
-      const dogBonusPoints = Math.floor(dogCount * playSeconds * mafiaDogBonusMultRef.current * dambourleUpMultiplier("dog_bonus_mult_up"));
+      // （ダンボール効果が絡むスコア換算は必ず切り上げにする。/api/coins/item-catchはInteger必須のため
+      //  端数が残るとリクエスト自体が失敗する）
+      const dogBonusPoints = Math.ceil(dogCount * playSeconds * mafiaDogBonusMultRef.current * dambourleUpMultiplier("dog_bonus_mult_up"));
       if (dogBonusPoints > 0) {
         scoreRef.current += dogBonusPoints;
         setScore(scoreRef.current);
@@ -1846,7 +1850,8 @@ export function FrenchieCatchGame({
             }
 
             // ダンボールNo.13「全アイテムの基礎スコアプラス」：基礎点を底上げする（固定pt系オーバーライドの後に適用）
-            basePoints = Math.round(basePoints * dambourleUpMultiplier("item_base_score_up"));
+            // ダンボール効果が絡むスコア換算は必ず切り上げにする（端数が出るとAPI側の整数チェックで弾かれるため）
+            basePoints = Math.ceil(basePoints * dambourleUpMultiplier("item_base_score_up"));
 
             const timedMultiplier = getScoreMultiplierProduct(scoreMultipliersRef, now);
             const hadActiveNextMultiplier = nextMultipliersRef.current.some((entry) => entry.remaining > 0);
@@ -1860,7 +1865,9 @@ export function FrenchieCatchGame({
             const dambourleScoreMultiplier = dambourleUpMultiplier("score_mult_up");
             // 種類の異なる得点倍率（時間経過系/次のN個系/食べ物限定系/宝箱連続ボーナス系/ダンボール効果）は重複中すべて掛け合わされる
             const multiplier = timedMultiplier * nextMultiplier * foodMultiplier * streakMultiplier * dambourleScoreMultiplier;
-            let points = Math.round((basePoints + pendingBonus) * multiplier);
+            // ダンボール効果（No.2やNo.12の抽選結果）が絡むと端数が出うるため、必ず切り上げにする
+            // （端数のままだと/api/coins/item-catchのInteger必須チェックでリクエスト自体が失敗する）
+            let points = Math.ceil((basePoints + pendingBonus) * multiplier);
             let effectLabel: string | undefined;
 
             if (now < ikeaUntilRef.current) {
@@ -2548,7 +2555,9 @@ export function FrenchieCatchGame({
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
             roundId,
-            score: scoreRef.current,
+            // ダンボール効果の倍率計算で万一端数が残っていても、送信直前に必ず整数へ切り上げる
+            // （/api/coins/item-catchはInteger必須のため、端数のままだとリクエスト自体が失敗する）
+            score: Math.ceil(scoreRef.current),
             caughtCount: caughtRef.current,
             durationSeconds: ROUND_SECONDS,
             bonusCoins,

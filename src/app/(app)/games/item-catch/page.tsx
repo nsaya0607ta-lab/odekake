@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { FrenchieCatchGame } from "@/components/frenchie-catch-game";
 import { IconChevronRight, IconNotebook } from "@/components/icons";
+import { ItemCatchLiveRefresh } from "@/components/item-catch-live-refresh";
 import { ItemCatchRanking } from "@/components/item-catch-ranking";
 import { PageBody } from "@/components/page-body";
 import { TopHeader } from "@/components/page-header";
@@ -61,6 +62,7 @@ export default async function ItemCatchPage() {
 
   return (
     <>
+      <ItemCatchLiveRefresh />
       <TopHeader
         backHref="/games"
         title="アイテムキャッチ"

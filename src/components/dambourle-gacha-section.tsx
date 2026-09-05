@@ -6,6 +6,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { formatCoins } from "@/lib/coins";
 import { DAMBOURLE_PLANS, type DambourlePlanId } from "@/lib/dambourle/config";
+import { DambourleMachineArt, SparkleArt } from "./coin-art";
 import { GachaResultModal } from "./gacha-section";
 import { primeGachaAudio } from "./gacha/audio";
 import type { AnimationDraw, DrawResult } from "./gacha/types";
@@ -23,8 +24,8 @@ const GachaCinematic = dynamic(
   },
 );
 
-/** ダンボール自身のスキルLv上限（No.11だけ5、それ以外は70）。結果画面の「Lv.MAX」判定に使う */
-const DAMBOURLE_RESULT_MAX_LEVEL = 70;
+/** ダンボール自身のスキルLv上限（全ランク共通で5）。結果画面の「Lv.MAX」判定に使う */
+const DAMBOURLE_RESULT_MAX_LEVEL = 5;
 
 type ResultState = {
   plan: DambourlePlanId;
@@ -103,35 +104,52 @@ export function DambourleGachaSection({ balance }: { balance: number }) {
 
   return (
     <div className="space-y-3">
-      <div className="rough-card flex items-center justify-between p-3">
-        <span className="text-xs font-bold text-ink-soft">所持コイン</span>
-        <span className="flex items-center gap-1 text-sm font-black text-ink">
-          <IconCoin size={16} />
-          {formatCoins(balance)}
-        </span>
-      </div>
+      <section className="rough-card flex min-w-0 flex-col overflow-hidden p-3.5">
+        <h2 className="flex items-center gap-1 text-[15px] font-bold">
+          <SparkleArt className="w-3.5 shrink-0 text-sun" />
+          <span className="min-w-0 truncate">ダンボールガチャ</span>
+        </h2>
 
-      <div className="space-y-2">
-        {(Object.keys(DAMBOURLE_PLANS) as DambourlePlanId[]).map((planId) => {
-          const plan = DAMBOURLE_PLANS[planId];
-          const short = balance < plan.cost;
-          return (
-            <button
-              key={planId}
-              type="button"
-              onClick={() => void draw(planId)}
-              disabled={pending !== null || short}
-              className="flex w-full items-center justify-between rounded-full bg-leaf px-4 py-3 text-sm font-black text-white shadow-md active:translate-y-px disabled:opacity-45"
-            >
-              <span>{pending === planId ? "まわしています…" : plan.label}</span>
-              <span className="flex items-center gap-1">
-                <IconCoin size={13} />
-                {formatCoins(plan.cost)}
-              </span>
-            </button>
-          );
-        })}
-      </div>
+        <div className="mt-2 flex min-h-0 flex-1 items-start gap-0.5">
+          <div className="min-w-0 flex-1">
+            <p className="text-[10px] leading-[1.65] text-ink-soft">
+              <span className="block whitespace-nowrap">コインをつかって</span>
+              <span className="block whitespace-nowrap">アイテムキャッチのダンボールをゲット！</span>
+            </p>
+            <p className="mt-1.5 flex items-center gap-1 text-[9px] font-bold text-ink-faint">
+              <IconCoin size={11} />
+              所持 {formatCoins(balance)}
+            </p>
+          </div>
+          <span className="flex h-[88px] w-[44%] shrink-0 items-end justify-center">
+            <DambourleMachineArt className="h-full w-auto" />
+          </span>
+        </div>
+
+        <div className="mt-3 space-y-1.5">
+          {(Object.keys(DAMBOURLE_PLANS) as DambourlePlanId[]).map((planId) => {
+            const plan = DAMBOURLE_PLANS[planId];
+            const short = balance < plan.cost;
+            return (
+              <button
+                key={planId}
+                type="button"
+                onClick={() => void draw(planId)}
+                disabled={pending !== null || short}
+                className="flex w-full items-center justify-between rounded-full bg-leaf px-3 py-2 text-white shadow-sm transition active:translate-y-px disabled:opacity-45"
+              >
+                <span className="text-[11px] font-bold">
+                  {pending === planId ? "まわしています…" : plan.label}
+                </span>
+                <span className="flex items-center gap-1 text-[10px] font-bold tabular-nums">
+                  <IconCoin size={12} />
+                  {formatCoins(plan.cost)}
+                </span>
+              </button>
+            );
+          })}
+        </div>
+      </section>
 
       {error ? <p role="status" className="text-center text-[11px] text-blossom">{error}</p> : null}
 

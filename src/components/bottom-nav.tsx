@@ -60,6 +60,9 @@ export function BottomNav({
       className="app-bottom-nav fixed inset-x-0 bottom-0 z-40 border-t border-line bg-card/95 backdrop-blur-sm"
       style={{ paddingBottom: "var(--safe-bottom)" }}
     >
+      {/* ナビの上に追加バーを重ねたいページ用の差し込み口（例: dambourle-picker.tsx）。
+          同じ固定ボックス内に置くことで、隙間なくぴったりナビの上に表示できる。 */}
+      <div id="bottom-nav-extra-slot" />
       <ul className="mx-auto flex max-w-lg items-stretch justify-between px-2">
         {ITEMS.map(({ href, label, icon, ...rest }) => {
           const center = "center" in rest && rest.center;

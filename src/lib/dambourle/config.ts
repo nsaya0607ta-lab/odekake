@@ -29,11 +29,11 @@ export const DAMBOURLE_DUPLICATE_COIN: Record<DambourleRarity, number> = {
   MR: 1000,
 };
 
-/** ダンボール自身のスキルLv上限。No.11(MR)だけ特殊で、それ以外は70。
+/** ダンボール自身のスキルLv上限。全ランク共通で5（2026-09〜）。
  * supabase/migrations/0088_dambourle_gacha.sql の dambourle_level_cap_for_item と一致させること。 */
 export const DAMBOURLE_LEVEL_CAP: Record<DambourleRarity, number> = {
-  SSR: 70,
-  UR: 70,
-  LR: 70,
+  SSR: 5,
+  UR: 5,
+  LR: 5,
   MR: 5,
 };

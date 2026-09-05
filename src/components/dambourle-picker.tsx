@@ -1,9 +1,16 @@
 "use client";
 
-import { useCallback, useMemo, useState } from "react";
+import { useRouter } from "next/navigation";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { createPortal } from "react-dom";
 import { DAMBOURLE_PRIZES } from "@/lib/dambourle/prizes";
 import { DEFAULT_BOX_ALT, DEFAULT_BOX_IMAGE, getDambourleBoxImage } from "@/lib/dambourle/box-image";
-import { getDambourleLevel, getDambourleMinSkinIndex, getDambourleUnlockedSkinTier } from "@/lib/dambourle/skill-levels";
+import {
+  getDambourleLevel,
+  getDambourleMinSkinIndex,
+  getDambourleUnlockedSkinIndices,
+  getDambourleUnlockedSkinTier,
+} from "@/lib/dambourle/skill-levels";
 import { IconCheck, IconLock } from "./icons";
 
 const DEFAULT_ITEM_ID = "default";
@@ -16,48 +23,90 @@ type Props = {
 };
 
 export function DambourlePicker({ equippedItemId, equippedSkinIndex, ownedCounts }: Props) {
-  const [activeItemId, setActiveItemId] = useState(equippedItemId ?? DEFAULT_ITEM_ID);
-  const [equipped, setEquipped] = useState({ itemId: equippedItemId ?? DEFAULT_ITEM_ID, skinIndex: equippedSkinIndex });
+  const router = useRouter();
+  const initialItemId = equippedItemId ?? DEFAULT_ITEM_ID;
+  const [equipped, setEquipped] = useState({ itemId: initialItemId, skinIndex: equippedSkinIndex });
+  // active = プレビュー中のダンボール、previewSkinIndex = プレビュー中のスキン段階。
+  // OKボタンを押すまでは equipped（実際に装備されている状態）を変えない。
+  const [activeItemId, setActiveItemId] = useState(initialItemId);
+  const [previewSkinIndex, setPreviewSkinIndex] = useState(equippedSkinIndex);
   const [pending, setPending] = useState(false);
   const [error, setError] = useState(false);
+  const [saved, setSaved] = useState(false);
+  // BottomNav（bottom-nav.tsx）の固定ボックス内にある差し込み口に確定バーをポータルする。
+  // 座標計算で高さを合わせるのではなく同じ固定ボックスに入れることで、隙間なくぴったり重ねる。
+  const [navSlot, setNavSlot] = useState<HTMLElement | null>(null);
 
-  const activeMaxTier = useMemo(() => {
-    if (activeItemId === DEFAULT_ITEM_ID) return 0;
+  useEffect(() => {
+    setNavSlot(document.getElementById("bottom-nav-extra-slot"));
+  }, []);
+
+  const activeSkinIndices = useMemo(() => {
+    if (activeItemId === DEFAULT_ITEM_ID) return [];
     const prize = DAMBOURLE_PRIZES.find((p) => p.id === activeItemId);
     const count = ownedCounts[activeItemId] ?? 0;
-    if (!prize || count <= 0) return 0;
+    if (!prize || count <= 0) return [];
     const level = getDambourleLevel(prize.rarity, count);
-    return getDambourleUnlockedSkinTier(activeItemId, level);
+    return getDambourleUnlockedSkinIndices(activeItemId, level);
   }, [activeItemId, ownedCounts]);
-  const activeMinSkinIndex = getDambourleMinSkinIndex(activeItemId);
 
-  const equip = useCallback(
-    async (itemId: string, skinIndex: number) => {
-      if (pending || (itemId === equipped.itemId && skinIndex === equipped.skinIndex)) return;
-      const previous = equipped;
-      setEquipped({ itemId, skinIndex });
-      setPending(true);
+  const activeName = activeItemId === DEFAULT_ITEM_ID ? "初期のダンボール" : DAMBOURLE_PRIZES.find((p) => p.id === activeItemId)?.name ?? activeItemId;
+
+  const selectItem = useCallback(
+    (itemId: string) => {
+      setActiveItemId(itemId);
+      setSaved(false);
       setError(false);
-
-      try {
-        const response = await fetch("/api/dambourle-equipped", {
-          method: "PATCH",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ itemId, skinIndex }),
-        });
-        if (!response.ok) throw new Error();
-      } catch {
-        setEquipped(previous);
-        setError(true);
-      } finally {
-        setPending(false);
+      if (itemId === DEFAULT_ITEM_ID) {
+        setPreviewSkinIndex(0);
+        return;
       }
+      const prize = DAMBOURLE_PRIZES.find((p) => p.id === itemId);
+      const count = ownedCounts[itemId] ?? 0;
+      const level = prize && count > 0 ? getDambourleLevel(prize.rarity, count) : 0;
+      const maxTier = getDambourleUnlockedSkinTier(itemId, level);
+      const minSkinIndex = getDambourleMinSkinIndex(itemId);
+      const seed = equipped.itemId === itemId ? equipped.skinIndex : maxTier;
+      setPreviewSkinIndex(Math.max(minSkinIndex, Math.min(seed, maxTier)));
     },
-    [equipped, pending],
+    [equipped, ownedCounts],
   );
 
+  const selectSkin = useCallback((skinIndex: number) => {
+    setPreviewSkinIndex(skinIndex);
+    setSaved(false);
+    setError(false);
+  }, []);
+
+  const isPreviewEquipped = equipped.itemId === activeItemId && equipped.skinIndex === previewSkinIndex;
+
+  const confirm = useCallback(async () => {
+    if (pending || isPreviewEquipped) return;
+    setPending(true);
+    setError(false);
+    setSaved(false);
+
+    try {
+      const response = await fetch("/api/dambourle-equipped", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ itemId: activeItemId, skinIndex: previewSkinIndex }),
+      });
+      if (!response.ok) throw new Error();
+      setEquipped({ itemId: activeItemId, skinIndex: previewSkinIndex });
+      setSaved(true);
+      // アイテムキャッチ画面など他ページのキャッシュされたRSCが装備変更前のまま
+      // 表示され続けないよう、サーバーコンポーネントを再取得させる。
+      router.refresh();
+    } catch {
+      setError(true);
+    } finally {
+      setPending(false);
+    }
+  }, [activeItemId, isPreviewEquipped, pending, previewSkinIndex, router]);
+
   return (
-    <div className="space-y-4">
+    <div className="space-y-4 pb-20">
       <div className="grid grid-cols-2 gap-3">
         <DambourleCard
           name="初期のダンボール"
@@ -67,10 +116,7 @@ export function DambourlePicker({ equippedItemId, equippedSkinIndex, ownedCounts
           active={activeItemId === DEFAULT_ITEM_ID}
           equipped={equipped.itemId === DEFAULT_ITEM_ID}
           sublabel="効果なし"
-          onSelect={() => {
-            setActiveItemId(DEFAULT_ITEM_ID);
-            void equip(DEFAULT_ITEM_ID, 0);
-          }}
+          onSelect={() => selectItem(DEFAULT_ITEM_ID)}
         />
         {DAMBOURLE_PRIZES.map((prize) => {
           const count = ownedCounts[prize.id] ?? 0;
@@ -90,8 +136,7 @@ export function DambourlePicker({ equippedItemId, equippedSkinIndex, ownedCounts
               sublabel={unlocked ? `${prize.rarity} / Lv${level}` : prize.rarity}
               onSelect={() => {
                 if (!unlocked) return;
-                setActiveItemId(prize.id);
-                if (equipped.itemId !== prize.id) void equip(prize.id, displaySkinIndex);
+                selectItem(prize.id);
               }}
             />
           );
@@ -100,19 +145,16 @@ export function DambourlePicker({ equippedItemId, equippedSkinIndex, ownedCounts
 
       {activeItemId !== DEFAULT_ITEM_ID ? (
         <div className="rough-card p-3">
-          <p className="text-[11px] font-bold text-ink-soft">スキンを選ぶ（解放済み：{activeMaxTier - activeMinSkinIndex + 1}種）</p>
+          <p className="text-[11px] font-bold text-ink-soft">スキンを選ぶ（解放済み：{activeSkinIndices.length}種）</p>
           <div className="mt-2 flex gap-2 overflow-x-auto pb-1">
-            {Array.from({ length: activeMaxTier - activeMinSkinIndex + 1 }, (_, i) => i + activeMinSkinIndex).map((skinIndex) => (
+            {activeSkinIndices.map((skinIndex) => (
               <button
                 key={skinIndex}
                 type="button"
-                disabled={pending}
-                onClick={() => equip(activeItemId, skinIndex)}
-                aria-pressed={equipped.itemId === activeItemId && equipped.skinIndex === skinIndex}
+                onClick={() => selectSkin(skinIndex)}
+                aria-pressed={previewSkinIndex === skinIndex}
                 className={`relative h-16 w-16 shrink-0 overflow-hidden rounded-xl border ${
-                  equipped.itemId === activeItemId && equipped.skinIndex === skinIndex
-                    ? "border-leaf ring-2 ring-leaf/40"
-                    : "border-line"
+                  previewSkinIndex === skinIndex ? "border-leaf ring-2 ring-leaf/40" : "border-line"
                 }`}
               >
                 {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -128,7 +170,34 @@ export function DambourlePicker({ equippedItemId, equippedSkinIndex, ownedCounts
         </div>
       ) : null}
 
-      {error ? <p className="text-center text-[11px] text-blossom">変更できませんでした。もう一度お試しください。</p> : null}
+      {navSlot &&
+        createPortal(
+          <div className="border-b border-line bg-card/95 px-4 py-3 backdrop-blur">
+            <div className="mx-auto flex max-w-md items-center gap-3">
+              <div className="min-w-0 flex-1">
+                <p className="truncate text-[11px] font-bold text-ink-soft">選択中：{activeName}</p>
+                {error ? (
+                  <p className="text-[10px] font-bold text-blossom">変更できませんでした。もう一度お試しください。</p>
+                ) : saved ? (
+                  <p className="text-[10px] font-bold text-leaf-deep">この見た目に変更しました！</p>
+                ) : isPreviewEquipped ? (
+                  <p className="text-[10px] text-ink-faint">現在装備中です</p>
+                ) : (
+                  <p className="text-[10px] text-ink-faint">まだ反映されていません</p>
+                )}
+              </div>
+              <button
+                type="button"
+                onClick={() => void confirm()}
+                disabled={pending || isPreviewEquipped}
+                className="shrink-0 rounded-full bg-leaf px-5 py-2.5 text-xs font-bold text-white shadow-sm active:translate-y-px disabled:opacity-45"
+              >
+                {pending ? "反映中…" : isPreviewEquipped ? "反映済み" : "この見た目にする"}
+              </button>
+            </div>
+          </div>,
+          navSlot,
+        )}
     </div>
   );
 }
