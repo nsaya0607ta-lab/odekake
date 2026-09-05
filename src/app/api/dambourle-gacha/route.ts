@@ -1,9 +1,10 @@
 import { NextResponse } from "next/server";
-import { DAMBOURLE_PLANS, isDambourlePlanId } from "@/lib/dambourle/config";
+import { revalidatePath } from "next/cache";
+import { DAMBOURLE_LEVEL_CAP, DAMBOURLE_PLANS, isDambourlePlanId } from "@/lib/dambourle/config";
 import { getDambourleBoxImage } from "@/lib/dambourle/box-image";
 import { drawDambourlePrizes } from "@/lib/dambourle/draw";
-import { getDambourlePrize } from "@/lib/dambourle/prizes";
-import { getDambourleLevel, getDambourleMinSkinIndex } from "@/lib/dambourle/skill-levels";
+import { getDambourleEffectSummary, getDambourlePrize } from "@/lib/dambourle/prizes";
+import { getDambourleLevel, getDambourleMinSkinIndex, getDambourleUnlockedSkinTier } from "@/lib/dambourle/skill-levels";
 import { getOwnedDambourleCounts } from "@/lib/data/dambourle";
 import { isDambourleGachaEnabled } from "@/lib/dambourle/feature-flag";
 import { checkRateLimit } from "@/lib/rate-limit";
@@ -18,6 +19,8 @@ type DrawResult = {
   isNew: boolean;
   previousLevel: number;
   newLevel: number;
+  maxLevel: number;
+  detail: string;
 };
 
 function toRecord(value: unknown): Record<string, unknown> {
@@ -96,17 +99,27 @@ export async function POST(request: Request) {
     const previousCount = runningCounts.get(id) ?? 0;
     const newCount = previousCount + 1;
     runningCounts.set(id, newCount);
+    const previousLevel = previousCount > 0 ? getDambourleLevel(rarity, previousCount) : 0;
+    const newLevel = getDambourleLevel(rarity, newCount);
+    const minSkinIndex = getDambourleMinSkinIndex(id);
+    const unlockedSkinIndex = prize ? getDambourleUnlockedSkinTier(id, newLevel) : minSkinIndex;
     return {
       id,
       name: prize?.name ?? id,
       rarity,
       type: "dambourle",
-      image: getDambourleBoxImage(id, getDambourleMinSkinIndex(id)),
+      image: getDambourleBoxImage(id, Math.max(minSkinIndex, unlockedSkinIndex)),
       isNew: newIds.has(id),
-      previousLevel: previousCount > 0 ? getDambourleLevel(rarity, previousCount) : 0,
-      newLevel: getDambourleLevel(rarity, newCount),
+      previousLevel,
+      newLevel,
+      maxLevel: DAMBOURLE_LEVEL_CAP[rarity],
+      detail: prize ? getDambourleEffectSummary(prize, newLevel) : "",
     };
   });
+
+  revalidatePath("/games/item-catch/dambourle");
+  revalidatePath("/games/item-catch/dambourle/gacha");
+  revalidatePath("/mypage/coins");
 
   return NextResponse.json(
     { results, balance: Number(result.balance ?? 0), duplicateCoins: Number(result.duplicate_coins ?? 0) },

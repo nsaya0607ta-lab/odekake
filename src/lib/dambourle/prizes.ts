@@ -58,6 +58,23 @@ export const DAMBOURLE_PRIZES: readonly DambourleItem[] = [
 ];
 
 const DAMBOURLE_PRIZE_BY_ID = new Map(DAMBOURLE_PRIZES.map((prize) => [prize.id, prize]));
+const DAMBOURLE_EFFECT_BASE_VALUE_PERCENT = new Map(
+  DAMBOURLE_PRIZES.filter((prize) => prize.baseValuePercent !== null).map((prize) => [prize.effectKey, prize.baseValuePercent!]),
+);
+
+export const DAMBOURLE_EFFECT_LABELS: Readonly<Partial<Record<DambourleEffectKey, string>>> = {
+  item_spawn_up: "アイテム出現量",
+  score_mult_up: "スコア倍率",
+  time_bonus_cutoff_up: "時間増加アイテムの出現期限",
+  box_size_up: "ダンボールサイズ",
+  end_coin_bonus: "ゲーム終了時の獲得コイン",
+  dog_bonus_mult_up: "フレブルボーナス倍率",
+  negative_spawn_down: "マイナスアイテム出現率",
+  time_pool_rate_up: "時間増加系の出現率",
+  spawn_dynamics_effect_up: "出現量アップ系の効果",
+  score_mult_pool_effect_up: "得点倍率系の効果",
+  item_base_score_up: "全アイテムの基礎スコア",
+};
 
 export function getDambourlePrize(id: string): DambourleItem | null {
   return DAMBOURLE_PRIZE_BY_ID.get(id) ?? null;
@@ -65,6 +82,22 @@ export function getDambourlePrize(id: string): DambourleItem | null {
 
 export function getDambourlePrizesByRarity(rarity: DambourleRarity): DambourleItem[] {
   return DAMBOURLE_PRIZES.filter((prize) => prize.rarity === rarity);
+}
+
+/** ダンボール自身のLvを反映した実効値（%）。No.11とNo.12は0を返す。 */
+export function getDambourleEffectPercent(effectKey: DambourleEffectKey, level: number): number {
+  const base = DAMBOURLE_EFFECT_BASE_VALUE_PERCENT.get(effectKey);
+  if (base == null) return 0;
+  return base * (1 + 0.02 * (Math.max(1, level) - 1));
+}
+
+/** 選択画面・開始画面・ガチャ結果で共通利用する、現在Lv時点の短い効果説明。 */
+export function getDambourleEffectSummary(prize: DambourleItem, level: number): string {
+  if (prize.effectKey === "item_skill_level_up") return `全アイテムのスキルLv +${Math.max(1, level)}`;
+  if (prize.effectKey === "effect_roulette") return "ラウンド開始時に9種類から1つの効果を抽選";
+  const percent = getDambourleEffectPercent(prize.effectKey, level);
+  const sign = prize.effectKey === "negative_spawn_down" ? "−" : "+";
+  return `${DAMBOURLE_EFFECT_LABELS[prize.effectKey] ?? prize.effectKey} ${sign}${Number(percent.toFixed(1))}%`;
 }
 
 /** 効果ルーレット(No.12)の抽選対象。終了時精算系(No.5,6)と永続メタ系(No.11)、

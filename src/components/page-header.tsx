@@ -9,6 +9,8 @@ type Props = {
   title: string;
   /** 指定するとその URL へ戻る。省略時はブラウザ履歴を1つ戻る */
   backHref?: string;
+  /** 保存直後など、戻り先のServer Componentを必ず最新状態で読み直したい場合に使う */
+  backReload?: boolean;
   /** false にすると戻るボタン自体を出さない（下部ナビの主要画面向け） */
   showBack?: boolean;
   subtitle?: string;
@@ -19,7 +21,7 @@ type Props = {
   avatarUrl?: string;
 };
 
-export function PageHeader({ title, backHref, showBack = true, subtitle, action, leftAction, avatarUrl }: Props) {
+export function PageHeader({ title, backHref, backReload = false, showBack = true, subtitle, action, leftAction, avatarUrl }: Props) {
   const router = useRouter();
 
   const backButtonClass =
@@ -30,6 +32,10 @@ export function PageHeader({ title, backHref, showBack = true, subtitle, action,
       <div className="mx-auto flex max-w-lg items-center gap-1 px-2 py-2">
         {!showBack ? (
           leftAction ?? <span aria-hidden className="h-11 w-11 shrink-0" />
+        ) : backHref && backReload ? (
+          <a href={backHref} aria-label="戻る" className={backButtonClass}>
+            <IconChevronLeft />
+          </a>
         ) : backHref ? (
           <Link href={backHref} aria-label="戻る" className={backButtonClass}>
             <IconChevronLeft />

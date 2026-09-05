@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { memo, useCallback, useEffect, useMemo, useRef, useState, type MutableRefObject, type PointerEvent as ReactPointerEvent } from "react";
 import { MAX_SKILL_LEVEL } from "@/lib/gacha/skill-levels";
 import { COLLECTION_ITEMS, type CollectionItem } from "@/lib/collection/items";
-import { DAMBOURLE_PRIZES, EFFECT_ROULETTE_ELIGIBLE_EFFECT_KEYS, type DambourleEffectKey } from "@/lib/dambourle/prizes";
+import { DAMBOURLE_EFFECT_LABELS, EFFECT_ROULETTE_ELIGIBLE_EFFECT_KEYS, getDambourleEffectPercent, type DambourleEffectKey } from "@/lib/dambourle/prizes";
 
 export type FrenchieCatchItem = {
   id: string;
@@ -14,6 +14,14 @@ export type FrenchieCatchItem = {
   rarity: "N" | "R" | "SR" | "SSR" | "UR" | "LR" | "MR";
   /** スキルレベル(1〜5)。Nや未所持は0。user_gacha_items.countから判定済みの値を渡す。 */
   level: number;
+};
+
+export type EquippedDambourleInfo = {
+  name: string;
+  rarity: string | null;
+  level: number;
+  maxLevel: number;
+  effect: string;
 };
 
 type Entity = {
@@ -720,43 +728,7 @@ function resolveFallVy(
   return boostedVy * RARITY_FALL_SPEED[rarity];
 }
 
-/**
- * ダンボールガチャの効果（No.11「全アイテムのスキルLv上昇」を除く）を、そのダンボール自身の
- * Lv(1〜70)で拡大した実効値(%)に変換する。倍率式は
- * `src/lib/dambourle/prizes.ts`のDambourleItem.baseValuePercentコメントの通り
- * 「基礎値(%) × (1 + 0.02×(Lv-1))」で統一する（No.12「効果ルーレット」が引いた
- * 効果にも、その基礎値にNo.12自身のLvでこの式を適用する）。
- */
-const DAMBOURLE_EFFECT_BASE_VALUE_PERCENT = new Map(
-  DAMBOURLE_PRIZES.filter((prize) => prize.baseValuePercent !== null).map((prize) => [prize.effectKey, prize.baseValuePercent!]),
-);
-
-function dambourleEffectPercent(effectKey: DambourleEffectKey, level: number): number {
-  const base = DAMBOURLE_EFFECT_BASE_VALUE_PERCENT.get(effectKey);
-  if (base == null) return 0;
-  return base * (1 + 0.02 * (level - 1));
-}
-
 type ResolvedDambourleEffect = { key: DambourleEffectKey; percent: number };
-
-/**
- * 右側のスキルログ・状態表示に出す短いラベル。No.11「全アイテムのスキルLv上昇」は別プロップで
- * 処理するため含めない。No.12「効果ルーレット」はresolveDambourleEffectで必ず対象9種いずれかの
- * キーに解決されるため、実際にはここでは引かれない（型を素直に保つためPartialにしている）。
- */
-const DAMBOURLE_EFFECT_LABELS: Partial<Record<DambourleEffectKey, string>> = {
-  item_spawn_up: "アイテム出現量アップ",
-  score_mult_up: "スコア倍率アップ",
-  time_bonus_cutoff_up: "時間増加アップ",
-  box_size_up: "ダンボール拡大",
-  end_coin_bonus: "終了時コイン増加",
-  dog_bonus_mult_up: "フレブルボーナス倍率アップ",
-  negative_spawn_down: "マイナスアイテム出現ダウン",
-  time_pool_rate_up: "時間増加系の出現率アップ",
-  spawn_dynamics_effect_up: "出現量アップ系の効果アップ",
-  score_mult_pool_effect_up: "得点倍率系の効果アップ",
-  item_base_score_up: "基礎スコアアップ",
-};
 
 /**
  * No.12「効果ルーレット」は対象9種から毎ラウンド開始時に1つ抽選し、そのラウンドの間だけ固定する。
@@ -769,9 +741,9 @@ function resolveDambourleEffect(
   if (effect.key === "effect_roulette") {
     const pool = EFFECT_ROULETTE_ELIGIBLE_EFFECT_KEYS;
     const key = pool[Math.floor(Math.random() * pool.length)]!;
-    return { key, percent: dambourleEffectPercent(key, effect.level) };
+    return { key, percent: getDambourleEffectPercent(key, effect.level) };
   }
-  return { key: effect.key, percent: dambourleEffectPercent(effect.key, effect.level) };
+  return { key: effect.key, percent: getDambourleEffectPercent(effect.key, effect.level) };
 }
 
 /**
@@ -831,6 +803,7 @@ export function FrenchieCatchGame({
   ownedItems,
   equippedBoxImage = BOX_IMAGE,
   equippedBoxAlt = "拾ってくだブーと書かれた段ボール",
+  equippedDambourleInfo = { name: "初期のダンボール", rarity: null, level: 0, maxLevel: 0, effect: "効果なし" },
   dambourleSkillBoost = 0,
   dambourleEffect = null,
   showDambourlePicker = false,
@@ -839,6 +812,8 @@ export function FrenchieCatchGame({
   /** プレイ前に選んだダンボールの画像。未指定なら初期無料ダンボール */
   equippedBoxImage?: string;
   equippedBoxAlt?: string;
+  /** START前に表示する装備中ダンボールの名称・Lv・効果 */
+  equippedDambourleInfo?: EquippedDambourleInfo;
   /**
    * ダンボールNo.11「全アイテムのスキルLv上昇」を装備しているときの、そのダンボール自身のLv(1〜5)。
    * 図鑑アイテムのスキルLv上限をこの分だけ底上げする（Lv5→最大Lv10）。未装備なら0。
@@ -953,6 +928,10 @@ export function FrenchieCatchGame({
   const impactTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const recentSkillEffectIdRef = useRef(0);
   const recentSkillEffectTimersRef = useRef<Map<number, ReturnType<typeof setTimeout>>>(new Map());
+  const dambourleSkillBoostRef = useRef(dambourleSkillBoost);
+  useEffect(() => {
+    dambourleSkillBoostRef.current = dambourleSkillBoost;
+  }, [dambourleSkillBoost]);
   /** 装備中ダンボール効果のプロップの最新値。startGame(deps:[])内から常に最新値を読むための橋渡し */
   const dambourleEffectPropRef = useRef(dambourleEffect);
   useEffect(() => {
@@ -992,6 +971,7 @@ export function FrenchieCatchGame({
   const [stunned, setStunned] = useState(false);
   const [dogBonus, setDogBonus] = useState<{ count: number; bonus: number } | null>(null);
   const [coinReward, setCoinReward] = useState<number | null>(null);
+  const [coinBreakdown, setCoinBreakdown] = useState<{ base: number; gold: number; dambourle: number } | null>(null);
   const [rewardPending, setRewardPending] = useState(false);
   const [rewardError, setRewardError] = useState<string | null>(null);
 
@@ -1025,7 +1005,7 @@ export function FrenchieCatchGame({
    */
   const timeBonusCutoffSecDisplayWithDambourle = useMemo(() => {
     const directPercent = dambourleEffect?.key === "time_bonus_cutoff_up"
-      ? dambourleEffectPercent("time_bonus_cutoff_up", dambourleEffect.level)
+      ? getDambourleEffectPercent("time_bonus_cutoff_up", dambourleEffect.level)
       : 0;
     return timeBonusCutoffSecDisplay * (1 + directPercent / 100);
   }, [timeBonusCutoffSecDisplay, dambourleEffect]);
@@ -1136,6 +1116,9 @@ export function FrenchieCatchGame({
       const label = DAMBOURLE_EFFECT_LABELS[key] ?? key;
       const sign = key === "negative_spawn_down" ? "-" : "+";
       labels.push(`${label} ${sign}${Math.round(percent)}%（装備中のダンボール）`);
+    }
+    if (dambourleSkillBoostRef.current > 0) {
+      labels.push(`全アイテムのスキルLv +${dambourleSkillBoostRef.current}（装備中のダンボール）`);
     }
     setActiveEffects(labels);
     setScoreMultiplierTotal(scoreMultiplierTotalValue);
@@ -2542,7 +2525,8 @@ export function FrenchieCatchGame({
         const dambourleEndCoinBonus = dambourleEffectRef.current?.key === "end_coin_bonus"
           ? Math.floor((scoreRef.current / 100) * (dambourleEffectRef.current.percent / 100))
           : 0;
-        const bonusCoins = Math.min(MAX_BONUS_COINS_CLIENT, goldBonusCoinsRef.current + dambourleEndCoinBonus);
+        const goldBonusCoins = Math.floor(goldBonusCoinsRef.current);
+        const bonusCoins = Math.min(MAX_BONUS_COINS_CLIENT, goldBonusCoins + dambourleEndCoinBonus);
         const response = await fetch("/api/coins/item-catch", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -2557,7 +2541,14 @@ export function FrenchieCatchGame({
         const payload = (await response.json().catch(() => null)) as { coins?: number; error?: string } | null;
         if (!response.ok) throw new Error(payload?.error ?? "コインを受け取れませんでした。");
         if (cancelled) return;
-        setCoinReward(payload?.coins ?? 0);
+        const receivedCoins = payload?.coins ?? 0;
+        const appliedGoldBonus = Math.min(goldBonusCoins, bonusCoins);
+        setCoinReward(receivedCoins);
+        setCoinBreakdown({
+          base: Math.max(0, receivedCoins - bonusCoins),
+          gold: appliedGoldBonus,
+          dambourle: Math.max(0, bonusCoins - appliedGoldBonus),
+        });
       } catch (error) {
         if (cancelled) return;
         setRewardError(error instanceof Error ? error.message : "コインを受け取れませんでした。");
@@ -2660,6 +2651,7 @@ export function FrenchieCatchGame({
     setImpactX(null);
     setDogBonus(null);
     setCoinReward(null);
+    setCoinBreakdown(null);
     setRewardPending(false);
     setRewardError(null);
     startAtRef.current = now;
@@ -2669,8 +2661,12 @@ export function FrenchieCatchGame({
     nextClawdSpawnRef.current = now;
     // 装備中ダンボール効果はラウンド開始時から有効なので、最初のcatchを待たず状態表示に反映する
     refreshEffectStatus(now);
+    if (dambourleEffectPropRef.current?.key === "effect_roulette" && dambourleEffectRef.current) {
+      const resolved = dambourleEffectRef.current;
+      pushRecentSkillEffect(`No.12抽選：${DAMBOURLE_EFFECT_LABELS[resolved.key] ?? resolved.key} ${Math.round(resolved.percent)}%`);
+    }
     setPhase("playing");
-  }, [timeBonusCutoffSecDisplay, refreshEffectStatus]);
+  }, [timeBonusCutoffSecDisplay, pushRecentSkillEffect, refreshEffectStatus]);
 
   const moveBox = useCallback((clientX: number) => {
     if (performance.now() < stunUntilRef.current) return;
@@ -2860,7 +2856,16 @@ export function FrenchieCatchGame({
                     ) : rewardError ? (
                       <p className="text-[10px] font-bold text-red-600">{rewardError}</p>
                     ) : (
-                      <p className="flex items-center justify-center gap-1 text-sm font-black text-[#8d6231]">獲得コイン <span className="tabular-nums">+{coinReward ?? 0}</span></p>
+                      <>
+                        <p className="flex items-center justify-center gap-1 text-sm font-black text-[#8d6231]">獲得コイン <span className="tabular-nums">+{coinReward ?? 0}</span></p>
+                        {coinBreakdown ? (
+                          <div className="mt-1.5 flex flex-wrap justify-center gap-x-2 text-[9px] font-bold text-[#a17b47]">
+                            <span>スコア分 +{coinBreakdown.base}</span>
+                            {coinBreakdown.gold > 0 ? <span>金ボール +{coinBreakdown.gold}</span> : null}
+                            {coinBreakdown.dambourle > 0 ? <span>ダンボール効果 +{coinBreakdown.dambourle}</span> : null}
+                          </div>
+                        ) : null}
+                      </>
                     )}
                   </div>
                   <div className="mt-4 grid grid-cols-2 gap-2">
@@ -2872,6 +2877,20 @@ export function FrenchieCatchGame({
                 <>
                   <p className="text-[10px] font-black tracking-[0.18em] text-leaf-deep">ITEM CATCH</p>
                   <p className="mt-1 text-xl font-black text-ink">箱でキャッチしよう！</p>
+                  <div className="mt-3 flex items-center gap-3 rounded-2xl border border-line bg-paper-deep/70 p-2.5 text-left">
+                    <span className="flex h-14 w-14 shrink-0 items-center justify-center overflow-hidden rounded-xl bg-white/70 p-1">
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img src={equippedBoxImage} alt="" draggable={false} className="h-full w-full object-contain" />
+                    </span>
+                    <span className="min-w-0 flex-1">
+                      <span className="flex flex-wrap items-center gap-1">
+                        <span className="truncate text-xs font-black text-ink">{equippedDambourleInfo.name}</span>
+                        {equippedDambourleInfo.rarity ? <span className="rounded-full bg-ink px-1.5 py-0.5 text-[8px] font-black text-white">{equippedDambourleInfo.rarity}</span> : null}
+                        {equippedDambourleInfo.level > 0 ? <span className="text-[9px] font-bold text-leaf-deep">{equippedDambourleInfo.level >= equippedDambourleInfo.maxLevel ? "Lv.MAX" : `Lv${equippedDambourleInfo.level}`}</span> : null}
+                      </span>
+                      <span className="mt-1 block text-[9px] font-bold leading-relaxed text-ink-soft">{equippedDambourleInfo.effect}</span>
+                    </span>
+                  </div>
                   <p className="mt-3 text-[9px] text-ink-faint">時間増加系アイテムは{Math.round(timeBonusCutoffSecDisplayWithDambourle)}秒まで出現</p>
                   <button type="button" onClick={startGame} className="mt-1.5 w-full rounded-full bg-leaf px-4 py-3 text-sm font-black text-white shadow-md active:translate-y-px">START</button>
                   {showDambourlePicker ? (

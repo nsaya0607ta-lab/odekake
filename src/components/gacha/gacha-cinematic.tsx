@@ -870,7 +870,10 @@ function phaseFor(plan: AnimationDraw["plan"], round: DrawResult[] | undefined):
 export function GachaCinematic({ draw, onComplete }: { draw: AnimationDraw; onComplete: (draw: AnimationDraw) => void }) {
   useBodyScrollLock();
   const isHundred = draw.plan === "hundred";
-  const planLabel = draw.plan === "hundred" ? "100連ガチャ" : draw.plan === "multi" ? "10連ガチャ" : null;
+  const isDambourle = draw.results.some((result) => result.type === "dambourle");
+  const planLabel = isDambourle
+    ? draw.plan === "multi" ? "ダンボール10連ガチャ" : "ダンボールガチャ"
+    : draw.plan === "hundred" ? "100連ガチャ" : draw.plan === "multi" ? "10連ガチャ" : null;
 
   // 100連は「10連を10回」と同じ体験になるよう、10個ずつのセットに分けて
   // セットごとにカプセル一括排出→1件ずつの本演出を繰り返す。

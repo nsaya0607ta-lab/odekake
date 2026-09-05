@@ -9,6 +9,10 @@ export type DrawResult = {
   isNew: boolean;
   previousLevel: number;
   newLevel: number;
+  /** 景品ごとにLv上限が異なる場合の表示用。通常ガチャは未指定で5。 */
+  maxLevel?: number;
+  /** 結果カードに添える短い効果説明。 */
+  detail?: string;
 };
 
 export type AnimationDraw = {
