@@ -1,4 +1,5 @@
 import type { DambourleRarity } from "./config";
+import { getDambourleEffectLevel } from "./skill-levels";
 
 /**
  * ダンボールガチャの景品一覧。
@@ -57,6 +58,36 @@ export const DAMBOURLE_PRIZES: readonly DambourleItem[] = [
   // --- MR（排出率0.5%、1種） ---
   { id: "dambourle_no11", name: "No.11", rarity: "MR", effectKey: "item_skill_level_up", baseValuePercent: null },
 ];
+
+/** ダンボール選択画面・図鑑等で表示するスキル名。 */
+export const DAMBOURLE_EFFECT_NAMES: Record<DambourleEffectKey, string> = {
+  item_spawn_up: "アイテム出現量アップ",
+  score_mult_up: "スコア倍率アップ",
+  time_bonus_cutoff_up: "時間増加アップ（カットオフ延長）",
+  box_size_up: "ダンボール自体の大きさアップ",
+  end_coin_bonus: "ゲーム終了時コイン増加",
+  dog_bonus_mult_up: "フレブルボーナスの倍率アップ",
+  negative_spawn_down: "マイナスアイテムの出現率ダウン",
+  time_pool_rate_up: "時間増加系の出現率アップ",
+  spawn_dynamics_effect_up: "出現量倍増プールの効果アップ",
+  score_mult_pool_effect_up: "得点倍率系プールの効果アップ",
+  effect_roulette: "効果ルーレット（毎ラウンド他9種から1つ抽選）",
+  item_base_score_up: "全アイテムの基礎スコアプラス",
+  item_skill_level_up: "全アイテムのスキルLv上昇",
+};
+
+/**
+ * そのダンボールの現在のLvにおける効果値の表示テキスト（例:「+12%」）。
+ * item_skill_level_up・effect_roulette は%換算ではないため専用の文言を返す。
+ */
+export function getDambourleEffectValueText(prize: DambourleItem, level: number): string {
+  if (prize.effectKey === "item_skill_level_up") return `全アイテムのスキルLv +${level}`;
+  if (prize.effectKey === "effect_roulette") return "他9種の効果からランダムで1つ発動";
+  if (prize.baseValuePercent == null) return "";
+  const percent = prize.baseValuePercent * (1 + 0.02 * (getDambourleEffectLevel(level) - 1));
+  const sign = prize.effectKey === "negative_spawn_down" ? "-" : "+";
+  return `${sign}${Math.round(percent)}%`;
+}
 
 const DAMBOURLE_PRIZE_BY_ID = new Map(DAMBOURLE_PRIZES.map((prize) => [prize.id, prize]));
 
