@@ -2367,6 +2367,10 @@ export function FrenchieCatchGame({
 
             if (isMystery && effectLabel) effectLabel = `？発動 / ${effectLabel}`;
 
+            // スキルLv6以降のLV.*_PTは0.02刻み成長の計算上、小数点を含む値になっているため
+            // （例: LV.ANBALL_PTのLv6以降）、加算した時点で必ず切り上げて整数にする
+            points = Math.ceil(points);
+
             const isJust = Math.abs(entity.x - center) <= effBoxHalf * JUST_RADIUS_RATIO;
             if (isJust) {
               points = Math.round(points * JUST_MULTIPLIER);
