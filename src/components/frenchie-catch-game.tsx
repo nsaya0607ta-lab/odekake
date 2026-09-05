@@ -96,8 +96,8 @@ const MYSTERY_IMAGE = "/collection/items/mystery-question.webp";
 const MYSTERY_SPAWN_CHANCE = 0.05;
 const MYSTERY_BASE_POINTS = 20;
 const IKEA_PT_PER_ITEM = 90;
-/** /api/coins/item-catch のMAX_BONUS_COINS(2000)と一致させる。超えるとリクエスト自体が400で失敗するため必ず送信前にクランプする */
-const MAX_BONUS_COINS_CLIENT = 2000;
+/** /api/coins/item-catch のMAX_BONUS_COINS(10000)と一致させる。超えるとリクエスト自体が400で失敗するため必ず送信前にクランプする */
+const MAX_BONUS_COINS_CLIENT = 10000;
 const BAG_ITEM_ID = "hazard_bag";
 const BAG_IMAGE = "/collection/items/plastic-bag.webp";
 const BAG_SPAWN_CHANCE = 0.03;
