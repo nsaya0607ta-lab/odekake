@@ -123,7 +123,14 @@ export function DambourlePicker({ equippedItemId, equippedSkinIndex, ownedCounts
           const unlocked = count > 0;
           const level = unlocked ? getDambourleLevel(prize.rarity, count) : 0;
           const minSkinIndex = getDambourleMinSkinIndex(prize.id);
-          const displaySkinIndex = Math.max(minSkinIndex, Math.min(equipped.skinIndex, getDambourleUnlockedSkinTier(prize.id, level)));
+          const maxTier = getDambourleUnlockedSkinTier(prize.id, level);
+          // equipped.skinIndexは「今装備中のアイテム」のスキン段階であり、他のアイテムには無関係。
+          // ここで使い回すと、装備中のスキンを変えただけで無関係な他アイテムの見た目まで
+          // 変わって見えるバグになるため、装備中のカードだけそれを反映し、それ以外は
+          // 自分自身の解放済み最大スキン段階を表示する。
+          const displaySkinIndex = equipped.itemId === prize.id
+            ? Math.max(minSkinIndex, Math.min(equipped.skinIndex, maxTier))
+            : maxTier;
           return (
             <DambourleCard
               key={prize.id}
