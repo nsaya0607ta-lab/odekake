@@ -5,7 +5,6 @@ import { drawDambourlePrizes } from "@/lib/dambourle/draw";
 import { getDambourlePrize } from "@/lib/dambourle/prizes";
 import { getDambourleLevel, getDambourleMinSkinIndex } from "@/lib/dambourle/skill-levels";
 import { getOwnedDambourleCounts } from "@/lib/data/dambourle";
-import { isDambourleGachaEnabled } from "@/lib/dambourle/feature-flag";
 import { checkRateLimit } from "@/lib/rate-limit";
 import { requireUser } from "@/lib/supabase/server";
 
@@ -30,9 +29,6 @@ function toStringArray(value: unknown): string[] {
 
 export async function POST(request: Request) {
   const { supabase, user } = await requireUser();
-  if (!isDambourleGachaEnabled(user.email)) {
-    return NextResponse.json({ error: "この機能はまだ利用できません。" }, { status: 403 });
-  }
 
   const body = (await request.json().catch(() => null)) as {
     plan?: unknown;
