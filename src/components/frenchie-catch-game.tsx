@@ -47,11 +47,6 @@ type CatchFeedback = {
   effect?: string;
 };
 
-type RecentSkillEffect = {
-  id: number;
-  text: string;
-};
-
 const ROUND_SECONDS = 50;
 /** 時間増加系スキルの複利的な伸びが稀に極端化した場合の安全弁。この秒数を超えては延長しない */
 const MAX_ROUND_SECONDS = 1800;
@@ -854,6 +849,8 @@ export function FrenchieCatchGame({
   /** Clawdのボールは通常アイテムの抽選を妨げず、独立したタイマーで並行して降らせる */
   const nextClawdSpawnRef = useRef(0);
   const rafRef = useRef<number | null>(null);
+  /** setScoreで画面表示する直前に必ずMath.ceilで整数化する（各加算箇所は既に整数のはずだが、
+   * 表示側でも保険をかけて小数点表示が絶対に出ないようにする）。 */
   const scoreRef = useRef(0);
   const dogCaughtRef = useRef(0);
   const caughtRef = useRef(0);
@@ -934,8 +931,6 @@ export function FrenchieCatchGame({
   const dogGoldenPtValueRef = useRef(0);
   const feedbackTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const impactTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const recentSkillEffectIdRef = useRef(0);
-  const recentSkillEffectTimersRef = useRef<Map<number, ReturnType<typeof setTimeout>>>(new Map());
   /** 装備中ダンボール効果のプロップの最新値。startGame(deps:[])内から常に最新値を読むための橋渡し */
   const dambourleEffectPropRef = useRef(dambourleEffect);
   useEffect(() => {
@@ -966,7 +961,6 @@ export function FrenchieCatchGame({
   const [timeMinusGuard, setTimeMinusGuard] = useState(0);
   const [feedback, setFeedback] = useState<CatchFeedback | null>(null);
   const [scoreMultiplierTotal, setScoreMultiplierTotal] = useState(1);
-  const [recentSkillEffects, setRecentSkillEffects] = useState<RecentSkillEffect[]>([]);
   const [impactX, setImpactX] = useState<number | null>(null);
   const [boxBounce, setBoxBounce] = useState(false);
   const [blackoutActive, setBlackoutActive] = useState(false);
@@ -1376,16 +1370,6 @@ export function FrenchieCatchGame({
     };
   }, []);
 
-  const pushRecentSkillEffect = useCallback((text: string) => {
-    const id = ++recentSkillEffectIdRef.current;
-    setRecentSkillEffects((prev) => [{ id, text }, ...prev].slice(0, 2));
-    const timer = setTimeout(() => {
-      setRecentSkillEffects((prev) => prev.filter((entry) => entry.id !== id));
-      recentSkillEffectTimersRef.current.delete(id);
-    }, 2400);
-    recentSkillEffectTimersRef.current.set(id, timer);
-  }, []);
-
   const showCatch = useCallback((entity: Entity, points: number, effect?: string) => {
     setFeedback({ name: entity.name, points, effect });
     setBoxBounce(true);
@@ -1394,9 +1378,8 @@ export function FrenchieCatchGame({
       setFeedback(null);
       setBoxBounce(false);
     }, 900);
-    if (effect) pushRecentSkillEffect(effect);
     if (typeof navigator !== "undefined" && "vibrate" in navigator) navigator.vibrate?.(18);
-  }, [pushRecentSkillEffect]);
+  }, []);
 
   const showImpact = useCallback((x: number) => {
     setImpactX(x);
@@ -1408,8 +1391,6 @@ export function FrenchieCatchGame({
     if (rafRef.current !== null) cancelAnimationFrame(rafRef.current);
     if (feedbackTimerRef.current) clearTimeout(feedbackTimerRef.current);
     if (impactTimerRef.current) clearTimeout(impactTimerRef.current);
-    recentSkillEffectTimersRef.current.forEach((timer) => clearTimeout(timer));
-    recentSkillEffectTimersRef.current.clear();
   }, []);
 
   useEffect(() => {
@@ -1426,7 +1407,7 @@ export function FrenchieCatchGame({
       const dogBonusPoints = Math.ceil(dogCount * playSeconds * mafiaDogBonusMultRef.current * dambourleUpMultiplier("dog_bonus_mult_up"));
       if (dogBonusPoints > 0) {
         scoreRef.current += dogBonusPoints;
-        setScore(scoreRef.current);
+        scoreRef.current = Math.ceil(scoreRef.current); setScore(scoreRef.current);
       }
       setDogBonus(dogCount > 0 ? { count: dogCount, bonus: dogBonusPoints } : null);
       setPhase("finished");
@@ -1470,7 +1451,7 @@ export function FrenchieCatchGame({
         if (ikeaCount > 0) {
           const ikeaBonus = ikeaCount * IKEA_PT_PER_ITEM;
           scoreRef.current += ikeaBonus;
-          setScore(scoreRef.current);
+          scoreRef.current = Math.ceil(scoreRef.current); setScore(scoreRef.current);
           setFeedback({ name: "くみたてボーナス", points: ikeaBonus, effect: `くみたて完成！+${ikeaBonus}pt` });
           setBoxBounce(true);
           if (feedbackTimerRef.current) clearTimeout(feedbackTimerRef.current);
@@ -1478,7 +1459,6 @@ export function FrenchieCatchGame({
             setFeedback(null);
             setBoxBounce(false);
           }, 900);
-          pushRecentSkillEffect(`くみたて完成！+${ikeaBonus}pt`);
         }
         timedEffectChanged = true;
       }
@@ -1650,7 +1630,7 @@ export function FrenchieCatchGame({
               if (now < omochiUntilRef.current) {
                 const omochiPt = omochiPtValueRef.current;
                 scoreRef.current += omochiPt;
-                setScore(scoreRef.current);
+                scoreRef.current = Math.ceil(scoreRef.current); setScore(scoreRef.current);
                 showCatch(entity, omochiPt, `こんどうが守ってくれた！ +${omochiPt}pt`);
               } else if (bagStockRef.current > 0) {
                 bagStockRef.current -= 1;
@@ -1664,7 +1644,7 @@ export function FrenchieCatchGame({
                   * dambourleUpMultiplier("score_mult_up");
                 const poopPenalty = Math.round(POOP_PENALTY * poopPenaltyMultiplier);
                 scoreRef.current = Math.max(0, scoreRef.current - poopPenalty);
-                setScore(scoreRef.current);
+                scoreRef.current = Math.ceil(scoreRef.current); setScore(scoreRef.current);
                 showCatch(entity, -poopPenalty, "うんちを踏んじゃった…");
               }
               next.push(entity);
@@ -1694,7 +1674,7 @@ export function FrenchieCatchGame({
                 if (hazardInverted) {
                   const bonusPt = Math.round(mirrorInvertPtValueRef.current);
                   scoreRef.current += bonusPt;
-                  setScore(scoreRef.current);
+                  scoreRef.current = Math.ceil(scoreRef.current); setScore(scoreRef.current);
                   showCatch(entity, bonusPt, `ミラー反転！+${bonusPt}pt`);
                 } else if (timeMinusGuardRef.current > 0) {
                   timeMinusGuardRef.current = 0;
@@ -1728,7 +1708,7 @@ export function FrenchieCatchGame({
                 if (hazardInverted) {
                   const bonusPt = Math.round(mirrorInvertPtValueRef.current);
                   scoreRef.current += bonusPt;
-                  setScore(scoreRef.current);
+                  scoreRef.current = Math.ceil(scoreRef.current); setScore(scoreRef.current);
                   showCatch(entity, bonusPt, `ミラー反転！+${bonusPt}pt`);
                 } else if (stunGuardRef.current > 0) {
                   stunGuardRef.current = 0;
@@ -2380,7 +2360,7 @@ export function FrenchieCatchGame({
             scoreRef.current += points;
             if (entity.kind === "dog") dogCaughtRef.current += 1;
             caughtRef.current += 1;
-            setScore(scoreRef.current);
+            scoreRef.current = Math.ceil(scoreRef.current); setScore(scoreRef.current);
             setCaught(caughtRef.current);
             if (statusChanged) refreshEffectStatus(now);
             showCatch(entity, points, effectLabel);
@@ -2594,9 +2574,6 @@ export function FrenchieCatchGame({
     setTimeLeft(ROUND_SECONDS);
     setFeedback(null);
     setScoreMultiplierTotal(1);
-    recentSkillEffectTimersRef.current.forEach((timer) => clearTimeout(timer));
-    recentSkillEffectTimersRef.current.clear();
-    setRecentSkillEffects([]);
     setImpactX(null);
     setDogBonus(null);
     setCoinReward(null);
@@ -2711,17 +2688,7 @@ export function FrenchieCatchGame({
               </div>
             ) : null}
           </div>
-          {recentSkillEffects.length > 0 ? (
-            <div className="pointer-events-none flex flex-1 flex-col items-center gap-1 pt-1">
-              {recentSkillEffects.map((entry) => (
-                <span key={entry.id} className="animate-in fade-in zoom-in-95 rounded-full border border-[#f4d98f] bg-[#fff6cc]/95 px-3 py-1 text-center text-[12px] font-black leading-tight text-[#9a6322] shadow-md">
-                  {entry.text}
-                </span>
-              ))}
-            </div>
-          ) : (
-            <span className="flex-1" />
-          )}
+          <span className="flex-1" />
           <div className="rounded-2xl border border-white/80 bg-white/90 px-3 py-2 text-right shadow-sm"><p className="text-[9px] font-bold tracking-widest text-ink-faint">TIME</p><p className="text-xl font-black tabular-nums text-ink">{timeLeft}</p></div>
         </div>
 
