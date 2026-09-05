@@ -3,6 +3,7 @@
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { createPortal } from "react-dom";
+import { DAMBOURLE_RARITIES } from "@/lib/dambourle/config";
 import { DAMBOURLE_EFFECT_NAMES, DAMBOURLE_PRIZES, getDambourleEffectValueText } from "@/lib/dambourle/prizes";
 import { DEFAULT_BOX_ALT, DEFAULT_BOX_IMAGE, getDambourleBoxImage } from "@/lib/dambourle/box-image";
 import {
@@ -14,6 +15,10 @@ import {
 import { IconCheck, IconLock } from "./icons";
 
 const DEFAULT_ITEM_ID = "default";
+
+/** N・Rは将来的に追加予定のためタブだけ先に用意しておく（現状は在籍アイテムなし）。 */
+const RARITY_TABS = ["N", ...DAMBOURLE_RARITIES] as const;
+type RarityTab = (typeof RARITY_TABS)[number];
 
 type Props = {
   equippedItemId: string | null;
@@ -36,6 +41,11 @@ export function DambourlePicker({ equippedItemId, equippedSkinIndex, ownedCounts
   // BottomNav（bottom-nav.tsx）の固定ボックス内にある差し込み口に確定バーをポータルする。
   // 座標計算で高さを合わせるのではなく同じ固定ボックスに入れることで、隙間なくぴったり重ねる。
   const [navSlot, setNavSlot] = useState<HTMLElement | null>(null);
+  // 初期表示は、今装備中のダンボールのランクタブを開いておく（未装備・初期ダンボールならSSR）。
+  const [rarityTab, setRarityTab] = useState<RarityTab>(() => {
+    if (initialItemId === DEFAULT_ITEM_ID) return "SSR";
+    return DAMBOURLE_PRIZES.find((p) => p.id === initialItemId)?.rarity ?? "SSR";
+  });
 
   useEffect(() => {
     setNavSlot(document.getElementById("bottom-nav-extra-slot"));
@@ -105,9 +115,11 @@ export function DambourlePicker({ equippedItemId, equippedSkinIndex, ownedCounts
     }
   }, [activeItemId, isPreviewEquipped, pending, previewSkinIndex, router]);
 
+  const visiblePrizes = DAMBOURLE_PRIZES.filter((prize) => prize.rarity === rarityTab);
+
   return (
     <div className="space-y-4 pb-20">
-      <div className="grid grid-cols-2 gap-3">
+      <div className="w-[calc(50%-0.375rem)]">
         <DambourleCard
           name="初期のダンボール"
           image={DEFAULT_BOX_IMAGE}
@@ -119,7 +131,33 @@ export function DambourlePicker({ equippedItemId, equippedSkinIndex, ownedCounts
           skillText={null}
           onSelect={() => selectItem(DEFAULT_ITEM_ID)}
         />
-        {DAMBOURLE_PRIZES.map((prize) => {
+      </div>
+
+      <div role="tablist" aria-label="ランクで絞り込み" className="rough-pill flex gap-1 bg-paper-deep p-1">
+        {RARITY_TABS.map((tab) => (
+          <button
+            key={tab}
+            type="button"
+            role="tab"
+            aria-selected={rarityTab === tab}
+            onClick={() => setRarityTab(tab)}
+            className={`rough-pill flex-1 py-2 text-center text-xs font-bold transition-colors ${
+              rarityTab === tab ? "bg-leaf-soft text-leaf-deep shadow-sm" : "text-ink-soft"
+            }`}
+          >
+            {tab}
+          </button>
+        ))}
+      </div>
+
+      {visiblePrizes.length === 0 ? (
+        <div className="rough-card px-6 py-8 text-center">
+          <p className="text-sm font-semibold text-ink-soft">まだアイテムがありません</p>
+          <p className="mt-1.5 text-xs leading-relaxed text-ink-faint">アイテムが増えるとここに並びます。</p>
+        </div>
+      ) : (
+        <div className="grid grid-cols-2 gap-3">
+        {visiblePrizes.map((prize) => {
           const count = ownedCounts[prize.id] ?? 0;
           const unlocked = count > 0;
           const level = unlocked ? getDambourleLevel(prize.rarity, count) : 0;
@@ -150,7 +188,8 @@ export function DambourlePicker({ equippedItemId, equippedSkinIndex, ownedCounts
             />
           );
         })}
-      </div>
+        </div>
+      )}
 
       {activeItemId !== DEFAULT_ITEM_ID ? (
         <div className="rough-card p-3">
