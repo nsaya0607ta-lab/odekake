@@ -23,6 +23,14 @@ export function getDambourleUnlockedSkinTier(itemId: string, level: number): num
   return Math.min(Math.floor(level / 14), 5);
 }
 
+/**
+ * No.11は基本スキン(skin-0)を持たず、count=1で確定するLv1からスキン1が最初の見た目になる
+ * （public/collection/dambourle/dambourle_no11/にskin-0.webpは存在しない）。それ以外は0が基本デザイン。
+ */
+export function getDambourleMinSkinIndex(itemId: string): number {
+  return itemId === MR_ITEM_ID ? 1 : 0;
+}
+
 /** 次のLvまでに必要な追加重複数。Lv上限のときはnull。 */
 export function getDambourleNextLevelRemaining(rarity: DambourleRarity, count: number): number | null {
   const cap = DAMBOURLE_LEVEL_CAP[rarity];

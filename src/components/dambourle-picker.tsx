@@ -3,7 +3,7 @@
 import { useCallback, useMemo, useState } from "react";
 import { DAMBOURLE_PRIZES } from "@/lib/dambourle/prizes";
 import { DEFAULT_BOX_ALT, DEFAULT_BOX_IMAGE, getDambourleBoxImage } from "@/lib/dambourle/box-image";
-import { getDambourleLevel, getDambourleUnlockedSkinTier } from "@/lib/dambourle/skill-levels";
+import { getDambourleLevel, getDambourleMinSkinIndex, getDambourleUnlockedSkinTier } from "@/lib/dambourle/skill-levels";
 import { IconCheck, IconLock } from "./icons";
 
 const DEFAULT_ITEM_ID = "default";
@@ -29,6 +29,7 @@ export function DambourlePicker({ equippedItemId, equippedSkinIndex, ownedCounts
     const level = getDambourleLevel(prize.rarity, count);
     return getDambourleUnlockedSkinTier(activeItemId, level);
   }, [activeItemId, ownedCounts]);
+  const activeMinSkinIndex = getDambourleMinSkinIndex(activeItemId);
 
   const equip = useCallback(
     async (itemId: string, skinIndex: number) => {
@@ -75,11 +76,13 @@ export function DambourlePicker({ equippedItemId, equippedSkinIndex, ownedCounts
           const count = ownedCounts[prize.id] ?? 0;
           const unlocked = count > 0;
           const level = unlocked ? getDambourleLevel(prize.rarity, count) : 0;
+          const minSkinIndex = getDambourleMinSkinIndex(prize.id);
+          const displaySkinIndex = Math.max(minSkinIndex, Math.min(equipped.skinIndex, getDambourleUnlockedSkinTier(prize.id, level)));
           return (
             <DambourleCard
               key={prize.id}
               name={prize.name}
-              image={getDambourleBoxImage(prize.id, unlocked ? Math.min(equipped.skinIndex, getDambourleUnlockedSkinTier(prize.id, level)) : 0)}
+              image={getDambourleBoxImage(prize.id, unlocked ? displaySkinIndex : minSkinIndex)}
               alt={prize.name}
               unlocked={unlocked}
               active={activeItemId === prize.id}
@@ -88,7 +91,7 @@ export function DambourlePicker({ equippedItemId, equippedSkinIndex, ownedCounts
               onSelect={() => {
                 if (!unlocked) return;
                 setActiveItemId(prize.id);
-                if (equipped.itemId !== prize.id) void equip(prize.id, Math.min(equipped.skinIndex, getDambourleUnlockedSkinTier(prize.id, level)));
+                if (equipped.itemId !== prize.id) void equip(prize.id, displaySkinIndex);
               }}
             />
           );
@@ -97,9 +100,9 @@ export function DambourlePicker({ equippedItemId, equippedSkinIndex, ownedCounts
 
       {activeItemId !== DEFAULT_ITEM_ID ? (
         <div className="rough-card p-3">
-          <p className="text-[11px] font-bold text-ink-soft">スキンを選ぶ（解放済み：{activeMaxTier + 1}種）</p>
+          <p className="text-[11px] font-bold text-ink-soft">スキンを選ぶ（解放済み：{activeMaxTier - activeMinSkinIndex + 1}種）</p>
           <div className="mt-2 flex gap-2 overflow-x-auto pb-1">
-            {Array.from({ length: activeMaxTier + 1 }, (_, skinIndex) => (
+            {Array.from({ length: activeMaxTier - activeMinSkinIndex + 1 }, (_, i) => i + activeMinSkinIndex).map((skinIndex) => (
               <button
                 key={skinIndex}
                 type="button"
@@ -166,7 +169,9 @@ function DambourleCard({
           src={image}
           alt={alt}
           draggable={false}
-          className={`h-full w-full object-contain p-3 ${unlocked ? "" : "grayscale brightness-75 contrast-125 opacity-80"}`}
+          onContextMenu={!unlocked ? (event) => event.preventDefault() : undefined}
+          style={!unlocked ? { WebkitTouchCallout: "none", WebkitUserSelect: "none", userSelect: "none" } : undefined}
+          className={`h-full w-full object-contain p-3 ${unlocked ? "" : "[filter:brightness(0)] opacity-100"}`}
         />
         {!unlocked ? (
           <span className="absolute inset-0 flex flex-col items-center justify-center gap-1 bg-gradient-to-b from-transparent via-paper/10 to-ink/15">
