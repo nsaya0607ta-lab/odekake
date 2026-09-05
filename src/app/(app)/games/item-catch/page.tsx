@@ -26,6 +26,7 @@ export default async function ItemCatchPage() {
 
   let equippedBoxImage = DEFAULT_BOX_IMAGE;
   let equippedBoxAlt = DEFAULT_BOX_ALT;
+  let dambourleSkillBoost = 0;
   if (equippedDambourle) {
     const prize = getDambourlePrize(equippedDambourle.itemId);
     const count = ownedDambourleCounts.get(equippedDambourle.itemId) ?? 0;
@@ -35,6 +36,8 @@ export default async function ItemCatchPage() {
       const skinIndex = Math.min(equippedDambourle.skinIndex, maxTier);
       equippedBoxImage = getDambourleBoxImage(equippedDambourle.itemId, skinIndex);
       equippedBoxAlt = `装備中のダンボール（${prize.name}）`;
+      // No.11「全アイテムのスキルLv上昇」装備時は、そのダンボール自身のLv(1〜5)ぶん底上げする
+      if (equippedDambourle.itemId === "dambourle_no11") dambourleSkillBoost = level;
     }
   }
 
@@ -60,7 +63,12 @@ export default async function ItemCatchPage() {
       />
 
       <PageBody className="!space-y-3 !py-3">
-        <FrenchieCatchGame ownedItems={catchItems} equippedBoxImage={equippedBoxImage} equippedBoxAlt={equippedBoxAlt} />
+        <FrenchieCatchGame
+          ownedItems={catchItems}
+          equippedBoxImage={equippedBoxImage}
+          equippedBoxAlt={equippedBoxAlt}
+          dambourleSkillBoost={dambourleSkillBoost}
+        />
 
         <Link
           href="/games/item-catch/guide"
