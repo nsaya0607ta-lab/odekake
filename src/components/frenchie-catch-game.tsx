@@ -761,7 +761,16 @@ const FallingEntity = memo(function FallingEntity({
   );
 }, (prev, next) => prev.entity.id === next.entity.id);
 
-export function FrenchieCatchGame({ ownedItems }: { ownedItems: FrenchieCatchItem[] }) {
+export function FrenchieCatchGame({
+  ownedItems,
+  equippedBoxImage = BOX_IMAGE,
+  equippedBoxAlt = "拾ってくだブーと書かれた段ボール",
+}: {
+  ownedItems: FrenchieCatchItem[];
+  /** プレイ前に選んだダンボールの画像。未指定なら初期無料ダンボール */
+  equippedBoxImage?: string;
+  equippedBoxAlt?: string;
+}) {
   const router = useRouter();
   const boardRef = useRef<HTMLDivElement | null>(null);
   const catcherRef = useRef<HTMLDivElement | null>(null);
@@ -2675,7 +2684,7 @@ export function FrenchieCatchGame({ ownedItems }: { ownedItems: FrenchieCatchIte
           onPointerCancel={pointerEnd}
         >
           {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src={BOX_IMAGE} alt="拾ってくだブーと書かれた段ボール" draggable={false} className={`pointer-events-none absolute inset-0 h-full w-full ${performance.now() < boxWideUntilRef.current && performance.now() >= boxShrinkUntilRef.current ? "object-fill" : "object-contain"}`} />
+          <img src={equippedBoxImage} alt={equippedBoxAlt} draggable={false} className={`pointer-events-none absolute inset-0 h-full w-full ${performance.now() < boxWideUntilRef.current && performance.now() >= boxShrinkUntilRef.current ? "object-fill" : "object-contain"}`} />
           {stunned ? <span className="pointer-events-none absolute -right-4 top-1/2 -translate-y-1/2 text-2xl" aria-label="しびれ中">⚡</span> : null}
         </div>
 
@@ -2717,6 +2726,13 @@ export function FrenchieCatchGame({ ownedItems }: { ownedItems: FrenchieCatchIte
                   <p className="mt-1 text-xl font-black text-ink">箱でキャッチしよう！</p>
                   <p className="mt-3 text-[9px] text-ink-faint">時間増加系アイテムは{Math.round(timeBonusCutoffSecDisplay)}秒まで出現</p>
                   <button type="button" onClick={startGame} className="mt-1.5 w-full rounded-full bg-leaf px-4 py-3 text-sm font-black text-white shadow-md active:translate-y-px">START</button>
+                  <button
+                    type="button"
+                    onClick={() => router.push("/games/item-catch/dambourle")}
+                    className="mt-2 w-full rounded-full border border-line bg-card px-4 py-2 text-xs font-black text-ink-soft shadow-sm active:translate-y-px"
+                  >
+                    ダンボールを選ぶ
+                  </button>
                 </>
               )}
               <p className="mt-2 text-[9px] text-ink-faint">所持アイテム {itemPool.length}種類 + 初期フレブル</p>

@@ -5,7 +5,11 @@ import { ItemCatchRanking } from "@/components/item-catch-ranking";
 import { PageBody } from "@/components/page-body";
 import { TopHeader } from "@/components/page-header";
 import { COLLECTION_ITEMS, hasMinigameSkillLevel } from "@/lib/collection/items";
+import { DEFAULT_BOX_ALT, DEFAULT_BOX_IMAGE, getDambourleBoxImage } from "@/lib/dambourle/box-image";
+import { getDambourlePrize } from "@/lib/dambourle/prizes";
+import { getDambourleLevel, getDambourleUnlockedSkinTier } from "@/lib/dambourle/skill-levels";
 import { getOwnedItemCounts } from "@/lib/data/collection";
+import { getEquippedDambourle, getOwnedDambourleCounts } from "@/lib/data/dambourle";
 import { getSkillLevel } from "@/lib/gacha/skill-levels";
 import { requireUser } from "@/lib/supabase/server";
 
@@ -14,7 +18,25 @@ export const dynamic = "force-dynamic";
 
 export default async function ItemCatchPage() {
   const { supabase, user } = await requireUser();
-  const ownedItemCounts = await getOwnedItemCounts(supabase, user.id);
+  const [ownedItemCounts, ownedDambourleCounts, equippedDambourle] = await Promise.all([
+    getOwnedItemCounts(supabase, user.id),
+    getOwnedDambourleCounts(supabase, user.id),
+    getEquippedDambourle(supabase, user.id),
+  ]);
+
+  let equippedBoxImage = DEFAULT_BOX_IMAGE;
+  let equippedBoxAlt = DEFAULT_BOX_ALT;
+  if (equippedDambourle) {
+    const prize = getDambourlePrize(equippedDambourle.itemId);
+    const count = ownedDambourleCounts.get(equippedDambourle.itemId) ?? 0;
+    if (prize && count > 0) {
+      const level = getDambourleLevel(prize.rarity, count);
+      const maxTier = getDambourleUnlockedSkinTier(equippedDambourle.itemId, level);
+      const skinIndex = Math.min(equippedDambourle.skinIndex, maxTier);
+      equippedBoxImage = getDambourleBoxImage(equippedDambourle.itemId, skinIndex);
+      equippedBoxAlt = `装備中のダンボール（${prize.name}）`;
+    }
+  }
 
   const catchItems = COLLECTION_ITEMS.flatMap((item) => {
     const count = ownedItemCounts.get(item.id) ?? 0;
@@ -38,7 +60,7 @@ export default async function ItemCatchPage() {
       />
 
       <PageBody className="!space-y-3 !py-3">
-        <FrenchieCatchGame ownedItems={catchItems} />
+        <FrenchieCatchGame ownedItems={catchItems} equippedBoxImage={equippedBoxImage} equippedBoxAlt={equippedBoxAlt} />
 
         <Link
           href="/games/item-catch/guide"
