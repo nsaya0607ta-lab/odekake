@@ -1,46 +1,52 @@
 "use client";
 
-import { useCallback, useRef, useState } from "react";
+import dynamic from "next/dynamic";
 import { useRouter } from "next/navigation";
-import { DAMBOURLE_PLANS, type DambourlePlanId } from "@/lib/dambourle/config";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { formatCoins } from "@/lib/coins";
+import { DAMBOURLE_PLANS, type DambourlePlanId } from "@/lib/dambourle/config";
+import { GachaResultModal } from "./gacha-section";
+import { primeGachaAudio } from "./gacha/audio";
+import type { AnimationDraw, DrawResult } from "./gacha/types";
 import { IconCoin } from "./icons";
 
-type DrawResult = {
-  id: string;
-  name: string;
-  rarity: string;
-  isNew: boolean;
-  previousLevel: number;
-  newLevel: number;
-};
+const GachaCinematic = dynamic(
+  () => import("./gacha/gacha-cinematic").then((module) => module.GachaCinematic),
+  {
+    ssr: false,
+    loading: () => (
+      <div className="fixed inset-0 z-[140] grid place-items-center bg-[#070807] text-sm font-black tracking-[0.12em] text-white">
+        演出準備中…
+      </div>
+    ),
+  },
+);
 
-const RARITY_TEXT_CLASS: Record<string, string> = {
-  SSR: "text-ink-soft",
-  UR: "text-sky",
-  LR: "text-sun",
-  MR: "text-blossom",
-};
+/** ダンボール自身のスキルLv上限（No.11だけ5、それ以外は70）。結果画面の「Lv.MAX」判定に使う */
+const DAMBOURLE_RESULT_MAX_LEVEL = 70;
 
-function formatLevelTag(level: number): string {
-  return `Lv${level}`;
-}
+type ResultState = {
+  plan: DambourlePlanId;
+  results: DrawResult[];
+};
 
 export function DambourleGachaSection({ balance }: { balance: number }) {
   const router = useRouter();
   const [pending, setPending] = useState<DambourlePlanId | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [results, setResults] = useState<DrawResult[] | null>(null);
+  const [results, setResults] = useState<ResultState | null>(null);
+  const [animation, setAnimation] = useState<AnimationDraw | null>(null);
   const [duplicateCoins, setDuplicateCoins] = useState(0);
   const inFlight = useRef(false);
 
   const draw = useCallback(
     async (planId: DambourlePlanId) => {
       if (inFlight.current) return;
+      primeGachaAudio();
       inFlight.current = true;
       setPending(planId);
       setError(null);
-      setResults(null);
 
       try {
         const response = await fetch("/api/dambourle-gacha", {
@@ -55,18 +61,45 @@ export function DambourleGachaSection({ balance }: { balance: number }) {
           setError(payload?.error ?? "ガチャをまわせませんでした。");
           return;
         }
-        setResults(payload?.results ?? []);
+
+        const confirmedResults = payload?.results ?? [];
         setDuplicateCoins(payload?.duplicateCoins ?? 0);
+        setAnimation({ plan: planId, results: confirmedResults });
         router.refresh();
       } catch {
         setError("通信に失敗しました。");
-      } finally {
-        setPending(null);
-        inFlight.current = false;
       }
     },
     [router],
   );
+
+  const finishAnimation = useCallback((draw: AnimationDraw) => {
+    setAnimation(null);
+    setResults({ plan: draw.plan as DambourlePlanId, results: draw.results });
+    inFlight.current = false;
+    setPending(null);
+  }, []);
+
+  const failAndUnlock = useCallback(() => {
+    inFlight.current = false;
+    setPending(null);
+  }, []);
+
+  useEffect(() => {
+    if (!error || animation) return;
+    failAndUnlock();
+  }, [animation, error, failAndUnlock]);
+
+  const closeResults = useCallback(() => {
+    setResults(null);
+  }, []);
+
+  const retry = useCallback(() => {
+    if (!results) return;
+    const { plan } = results;
+    setResults(null);
+    void draw(plan);
+  }, [draw, results]);
 
   return (
     <div className="space-y-3">
@@ -102,38 +135,20 @@ export function DambourleGachaSection({ balance }: { balance: number }) {
 
       {error ? <p role="status" className="text-center text-[11px] text-blossom">{error}</p> : null}
 
-      {results ? (
-        <div className="rough-card space-y-2 p-3">
-          <p className="text-xs font-bold text-ink-soft">結果</p>
-          <div className="grid grid-cols-2 gap-2">
-            {results.map((result, index) => (
-              <div key={`${result.id}-${index}`} className="rough-card-alt flex items-center justify-between gap-2 p-2">
-                <span className="min-w-0">
-                  <span className={`block truncate text-xs font-black ${RARITY_TEXT_CLASS[result.rarity] ?? "text-ink"}`}>
-                    {result.name}
-                  </span>
-                  <span className="block text-[9px] text-ink-faint">{result.rarity}</span>
-                </span>
-                <span className="flex shrink-0 flex-col items-end gap-0.5">
-                  {result.isNew ? (
-                    <span className="rounded-full bg-[#ee7470] px-1.5 py-0.5 text-[8px] font-black text-white">NEW</span>
-                  ) : null}
-                  {result.newLevel > result.previousLevel ? (
-                    <span className="rounded-full bg-[#f1c969] px-1.5 py-0.5 text-[8px] font-black text-ink">
-                      {result.previousLevel > 0
-                        ? `${formatLevelTag(result.previousLevel)}→${formatLevelTag(result.newLevel)}`
-                        : formatLevelTag(result.newLevel)}
-                    </span>
-                  ) : null}
-                </span>
-              </div>
-            ))}
-          </div>
-          {duplicateCoins > 0 ? (
-            <p className="text-center text-[10px] text-ink-faint">重複還元 +{formatCoins(duplicateCoins)}コイン</p>
-          ) : null}
-        </div>
-      ) : null}
+      {results &&
+        createPortal(
+          <GachaResultModal
+            results={results.results}
+            plan={results.plan}
+            busy={pending !== null}
+            onRetry={retry}
+            onClose={closeResults}
+            maxLevel={DAMBOURLE_RESULT_MAX_LEVEL}
+            footerNote={duplicateCoins > 0 ? `重複還元 +${formatCoins(duplicateCoins)}コイン` : undefined}
+          />,
+          document.body,
+        )}
+      {animation && createPortal(<GachaCinematic draw={animation} onComplete={finishAnimation} />, document.body)}
     </div>
   );
 }

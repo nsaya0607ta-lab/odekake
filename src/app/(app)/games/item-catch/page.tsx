@@ -8,7 +8,7 @@ import { COLLECTION_ITEMS, hasMinigameSkillLevel } from "@/lib/collection/items"
 import { DEFAULT_BOX_ALT, DEFAULT_BOX_IMAGE, getDambourleBoxImage } from "@/lib/dambourle/box-image";
 import { isDambourleGachaEnabled } from "@/lib/dambourle/feature-flag";
 import { getDambourlePrize, type DambourleEffectKey } from "@/lib/dambourle/prizes";
-import { getDambourleLevel, getDambourleUnlockedSkinTier } from "@/lib/dambourle/skill-levels";
+import { getDambourleLevel, getDambourleMinSkinIndex, getDambourleUnlockedSkinTier } from "@/lib/dambourle/skill-levels";
 import { getOwnedItemCounts } from "@/lib/data/collection";
 import { getEquippedDambourle, getOwnedDambourleCounts } from "@/lib/data/dambourle";
 import { getSkillLevel } from "@/lib/gacha/skill-levels";
@@ -35,7 +35,8 @@ export default async function ItemCatchPage() {
     if (prize && count > 0) {
       const level = getDambourleLevel(prize.rarity, count);
       const maxTier = getDambourleUnlockedSkinTier(equippedDambourle.itemId, level);
-      const skinIndex = Math.min(equippedDambourle.skinIndex, maxTier);
+      const minSkinIndex = getDambourleMinSkinIndex(equippedDambourle.itemId);
+      const skinIndex = Math.max(minSkinIndex, Math.min(equippedDambourle.skinIndex, maxTier));
       equippedBoxImage = getDambourleBoxImage(equippedDambourle.itemId, skinIndex);
       equippedBoxAlt = `装備中のダンボール（${prize.name}）`;
       // No.11「全アイテムのスキルLv上昇」装備時は、そのダンボール自身のLv(1〜5)ぶん底上げする

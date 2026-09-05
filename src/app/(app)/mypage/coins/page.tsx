@@ -4,12 +4,14 @@ import { CoinEarnMethods } from "@/components/coin-earn-methods";
 import { CoinHero } from "@/components/coin-hero";
 import { CoinLiveRefresh } from "@/components/coin-live-refresh";
 import { CoinUseCards } from "@/components/coin-use-cards";
+import { DambourleGachaSection } from "@/components/dambourle-gacha-section";
 import { IconChevronRight, IconPaw } from "@/components/icons";
 import { PageBody } from "@/components/page-body";
 import { TopHeader } from "@/components/page-header";
 import { getCoinSummary } from "@/lib/data/coins";
 import { getCurrentDogSkin } from "@/lib/data/dog-skin";
 import { getRecordSpace } from "@/lib/data/space";
+import { isDambourleGachaEnabled } from "@/lib/dambourle/feature-flag";
 import { requireUser } from "@/lib/supabase/server";
 
 export const metadata = { title: "おでかけコイン | おでかけ記録" };
@@ -53,6 +55,7 @@ export default async function CoinsPage() {
             <IconChevronRight size={18} className="shrink-0 text-ink-faint" />
           </Link>
           <CoinUseCards balance={summary.balance} />
+          {isDambourleGachaEnabled(user.email) ? <DambourleGachaSection balance={summary.balance} /> : null}
           <CoinEarnMethods />
         </div>
       </PageBody>

@@ -1,8 +1,9 @@
 import { NextResponse } from "next/server";
 import { DAMBOURLE_PLANS, isDambourlePlanId } from "@/lib/dambourle/config";
+import { getDambourleBoxImage } from "@/lib/dambourle/box-image";
 import { drawDambourlePrizes } from "@/lib/dambourle/draw";
 import { getDambourlePrize } from "@/lib/dambourle/prizes";
-import { getDambourleLevel } from "@/lib/dambourle/skill-levels";
+import { getDambourleLevel, getDambourleMinSkinIndex } from "@/lib/dambourle/skill-levels";
 import { getOwnedDambourleCounts } from "@/lib/data/dambourle";
 import { isDambourleGachaEnabled } from "@/lib/dambourle/feature-flag";
 import { checkRateLimit } from "@/lib/rate-limit";
@@ -12,6 +13,8 @@ type DrawResult = {
   id: string;
   name: string;
   rarity: string;
+  type: string;
+  image: string;
   isNew: boolean;
   previousLevel: number;
   newLevel: number;
@@ -97,6 +100,8 @@ export async function POST(request: Request) {
       id,
       name: prize?.name ?? id,
       rarity,
+      type: "dambourle",
+      image: getDambourleBoxImage(id, getDambourleMinSkinIndex(id)),
       isNew: newIds.has(id),
       previousLevel: previousCount > 0 ? getDambourleLevel(rarity, previousCount) : 0,
       newLevel: getDambourleLevel(rarity, newCount),

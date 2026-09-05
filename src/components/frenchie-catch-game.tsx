@@ -1761,7 +1761,7 @@ export function FrenchieCatchGame({
                 && (entity.itemId === TIME_MINUS_ITEM_ID || entity.itemId === BOX_SHRINK_ITEM_ID || entity.itemId === STUN_ITEM_ID);
               if (entity.itemId === TIME_MINUS_ITEM_ID) {
                 if (hazardInverted) {
-                  const bonusPt = mirrorInvertPtValueRef.current;
+                  const bonusPt = Math.round(mirrorInvertPtValueRef.current);
                   scoreRef.current += bonusPt;
                   setScore(scoreRef.current);
                   showCatch(entity, bonusPt, `ミラー反転！+${bonusPt}pt`);
@@ -1795,7 +1795,7 @@ export function FrenchieCatchGame({
                 showCatch(entity, 0, BLACKOUT_SECONDS + "秒間 上半分が見えない！");
               } else if (entity.itemId === STUN_ITEM_ID) {
                 if (hazardInverted) {
-                  const bonusPt = mirrorInvertPtValueRef.current;
+                  const bonusPt = Math.round(mirrorInvertPtValueRef.current);
                   scoreRef.current += bonusPt;
                   setScore(scoreRef.current);
                   showCatch(entity, bonusPt, `ミラー反転！+${bonusPt}pt`);
