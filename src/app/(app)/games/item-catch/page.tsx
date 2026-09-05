@@ -6,6 +6,7 @@ import { PageBody } from "@/components/page-body";
 import { TopHeader } from "@/components/page-header";
 import { COLLECTION_ITEMS, hasMinigameSkillLevel } from "@/lib/collection/items";
 import { DEFAULT_BOX_ALT, DEFAULT_BOX_IMAGE, getDambourleBoxImage } from "@/lib/dambourle/box-image";
+import { isDambourleGachaEnabled } from "@/lib/dambourle/feature-flag";
 import { getDambourlePrize } from "@/lib/dambourle/prizes";
 import { getDambourleLevel, getDambourleUnlockedSkinTier } from "@/lib/dambourle/skill-levels";
 import { getOwnedItemCounts } from "@/lib/data/collection";
@@ -68,6 +69,7 @@ export default async function ItemCatchPage() {
           equippedBoxImage={equippedBoxImage}
           equippedBoxAlt={equippedBoxAlt}
           dambourleSkillBoost={dambourleSkillBoost}
+          showDambourlePicker={isDambourleGachaEnabled(user.email)}
         />
 
         <Link

@@ -766,6 +766,7 @@ export function FrenchieCatchGame({
   equippedBoxImage = BOX_IMAGE,
   equippedBoxAlt = "拾ってくだブーと書かれた段ボール",
   dambourleSkillBoost = 0,
+  showDambourlePicker = false,
 }: {
   ownedItems: FrenchieCatchItem[];
   /** プレイ前に選んだダンボールの画像。未指定なら初期無料ダンボール */
@@ -777,6 +778,8 @@ export function FrenchieCatchGame({
    * カットオフ秒数の計算(timeBonusCutoffSecRef)には反映しない。
    */
   dambourleSkillBoost?: number;
+  /** ダンボールガチャは実験公開中のため、限定ユーザーにのみ選択導線を出す */
+  showDambourlePicker?: boolean;
 }) {
   const router = useRouter();
   const skillLevelCap = MAX_SKILL_LEVEL + dambourleSkillBoost;
@@ -2734,13 +2737,15 @@ export function FrenchieCatchGame({
                   <p className="mt-1 text-xl font-black text-ink">箱でキャッチしよう！</p>
                   <p className="mt-3 text-[9px] text-ink-faint">時間増加系アイテムは{Math.round(timeBonusCutoffSecDisplay)}秒まで出現</p>
                   <button type="button" onClick={startGame} className="mt-1.5 w-full rounded-full bg-leaf px-4 py-3 text-sm font-black text-white shadow-md active:translate-y-px">START</button>
-                  <button
-                    type="button"
-                    onClick={() => router.push("/games/item-catch/dambourle")}
-                    className="mt-2 w-full rounded-full border border-line bg-card px-4 py-2 text-xs font-black text-ink-soft shadow-sm active:translate-y-px"
-                  >
-                    ダンボールを選ぶ
-                  </button>
+                  {showDambourlePicker ? (
+                    <button
+                      type="button"
+                      onClick={() => router.push("/games/item-catch/dambourle")}
+                      className="mt-2 w-full rounded-full border border-line bg-card px-4 py-2 text-xs font-black text-ink-soft shadow-sm active:translate-y-px"
+                    >
+                      ダンボールを選ぶ
+                    </button>
+                  ) : null}
                 </>
               )}
               <p className="mt-2 text-[9px] text-ink-faint">所持アイテム {itemPool.length}種類 + 初期フレブル</p>
