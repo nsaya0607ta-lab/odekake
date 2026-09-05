@@ -7,7 +7,7 @@ import { TopHeader } from "@/components/page-header";
 import { COLLECTION_ITEMS, hasMinigameSkillLevel } from "@/lib/collection/items";
 import { DEFAULT_BOX_ALT, DEFAULT_BOX_IMAGE, getDambourleBoxImage } from "@/lib/dambourle/box-image";
 import { isDambourleGachaEnabled } from "@/lib/dambourle/feature-flag";
-import { getDambourlePrize } from "@/lib/dambourle/prizes";
+import { getDambourlePrize, type DambourleEffectKey } from "@/lib/dambourle/prizes";
 import { getDambourleLevel, getDambourleUnlockedSkinTier } from "@/lib/dambourle/skill-levels";
 import { getOwnedItemCounts } from "@/lib/data/collection";
 import { getEquippedDambourle, getOwnedDambourleCounts } from "@/lib/data/dambourle";
@@ -28,6 +28,7 @@ export default async function ItemCatchPage() {
   let equippedBoxImage = DEFAULT_BOX_IMAGE;
   let equippedBoxAlt = DEFAULT_BOX_ALT;
   let dambourleSkillBoost = 0;
+  let dambourleEffect: { key: DambourleEffectKey; level: number } | null = null;
   if (equippedDambourle) {
     const prize = getDambourlePrize(equippedDambourle.itemId);
     const count = ownedDambourleCounts.get(equippedDambourle.itemId) ?? 0;
@@ -39,6 +40,8 @@ export default async function ItemCatchPage() {
       equippedBoxAlt = `装備中のダンボール（${prize.name}）`;
       // No.11「全アイテムのスキルLv上昇」装備時は、そのダンボール自身のLv(1〜5)ぶん底上げする
       if (equippedDambourle.itemId === "dambourle_no11") dambourleSkillBoost = level;
+      // それ以外の効果はミニゲーム側でまとめて解決する（effectKey + そのダンボール自身のLv）
+      else dambourleEffect = { key: prize.effectKey, level };
     }
   }
 
@@ -69,6 +72,7 @@ export default async function ItemCatchPage() {
           equippedBoxImage={equippedBoxImage}
           equippedBoxAlt={equippedBoxAlt}
           dambourleSkillBoost={dambourleSkillBoost}
+          dambourleEffect={dambourleEffect}
           showDambourlePicker={isDambourleGachaEnabled(user.email)}
         />
 
