@@ -3,7 +3,7 @@
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { createPortal } from "react-dom";
-import { DAMBOURLE_PRIZES } from "@/lib/dambourle/prizes";
+import { DAMBOURLE_EFFECT_NAMES, DAMBOURLE_PRIZES, getDambourleEffectValueText } from "@/lib/dambourle/prizes";
 import { DEFAULT_BOX_ALT, DEFAULT_BOX_IMAGE, getDambourleBoxImage } from "@/lib/dambourle/box-image";
 import {
   getDambourleLevel,
@@ -116,6 +116,7 @@ export function DambourlePicker({ equippedItemId, equippedSkinIndex, ownedCounts
           active={activeItemId === DEFAULT_ITEM_ID}
           equipped={equipped.itemId === DEFAULT_ITEM_ID}
           sublabel="効果なし"
+          skillText={null}
           onSelect={() => selectItem(DEFAULT_ITEM_ID)}
         />
         {DAMBOURLE_PRIZES.map((prize) => {
@@ -141,6 +142,7 @@ export function DambourlePicker({ equippedItemId, equippedSkinIndex, ownedCounts
               active={activeItemId === prize.id}
               equipped={equipped.itemId === prize.id}
               sublabel={unlocked ? `${prize.rarity} / Lv${level}` : prize.rarity}
+              skillText={unlocked ? `${DAMBOURLE_EFFECT_NAMES[prize.effectKey]} ${getDambourleEffectValueText(prize, level)}` : null}
               onSelect={() => {
                 if (!unlocked) return;
                 selectItem(prize.id);
@@ -217,6 +219,7 @@ function DambourleCard({
   active,
   equipped,
   sublabel,
+  skillText,
   onSelect,
 }: {
   name: string;
@@ -226,6 +229,7 @@ function DambourleCard({
   active: boolean;
   equipped: boolean;
   sublabel: string;
+  skillText: string | null;
   onSelect: () => void;
 }) {
   return (
@@ -266,6 +270,7 @@ function DambourleCard({
 
       <p className={`mt-2 truncate text-sm font-bold ${unlocked ? "text-ink" : "text-ink-faint"}`}>{unlocked ? name : "？？？"}</p>
       <p className="mt-0.5 truncate text-[10px] text-ink-faint">{unlocked ? sublabel : "ガチャで手に入れると解放"}</p>
+      {skillText ? <p className="mt-0.5 truncate text-[9px] font-bold text-leaf-deep">{skillText}</p> : null}
     </button>
   );
 }
