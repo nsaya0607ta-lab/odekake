@@ -35,22 +35,22 @@ export type DambourleItem = {
 };
 
 export const DAMBOURLE_PRIZES: readonly DambourleItem[] = [
-  // --- SSR（排出率60%、3種・各20%） ---
+  // --- SSR（排出率60%、6種・各10%） ---
+  { id: "dambourle_no6", name: "No.6", rarity: "SSR", effectKey: "dog_bonus_mult_up", baseValuePercent: 10 },
   { id: "dambourle_no7", name: "No.7", rarity: "SSR", effectKey: "negative_spawn_down", baseValuePercent: 10 },
+  { id: "dambourle_no8", name: "No.8", rarity: "SSR", effectKey: "time_pool_rate_up", baseValuePercent: 10 },
+  { id: "dambourle_no9", name: "No.9", rarity: "SSR", effectKey: "spawn_dynamics_effect_up", baseValuePercent: 10 },
   { id: "dambourle_no13", name: "No.13", rarity: "SSR", effectKey: "item_base_score_up", baseValuePercent: 10 },
-  { id: "dambourle_no10", name: "No.10", rarity: "SSR", effectKey: "score_mult_pool_effect_up", baseValuePercent: 10 },
+  { id: "dambourle_no5", name: "No.5", rarity: "SSR", effectKey: "end_coin_bonus", baseValuePercent: 50 },
 
   // --- UR（排出率30%、4種・各7.5%） ---
-  { id: "dambourle_no6", name: "No.6", rarity: "UR", effectKey: "dog_bonus_mult_up", baseValuePercent: 10 },
-  { id: "dambourle_no8", name: "No.8", rarity: "UR", effectKey: "time_pool_rate_up", baseValuePercent: 10 },
-  { id: "dambourle_no9", name: "No.9", rarity: "UR", effectKey: "spawn_dynamics_effect_up", baseValuePercent: 10 },
+  { id: "dambourle_no2", name: "No.2", rarity: "UR", effectKey: "score_mult_up", baseValuePercent: 20 },
   { id: "dambourle_no3", name: "No.3", rarity: "UR", effectKey: "time_bonus_cutoff_up", baseValuePercent: 20 },
+  { id: "dambourle_no10", name: "No.10", rarity: "UR", effectKey: "score_mult_pool_effect_up", baseValuePercent: 10 },
+  { id: "dambourle_no12", name: "No.12", rarity: "UR", effectKey: "effect_roulette", baseValuePercent: null },
 
-  // --- LR（排出率9.5%、5種・各1.9%） ---
+  // --- LR（排出率9.5%、2種・各4.75%） ---
   { id: "dambourle_no1", name: "No.1", rarity: "LR", effectKey: "item_spawn_up", baseValuePercent: 10 },
-  { id: "dambourle_no2", name: "No.2", rarity: "LR", effectKey: "score_mult_up", baseValuePercent: 20 },
-  { id: "dambourle_no5", name: "No.5", rarity: "LR", effectKey: "end_coin_bonus", baseValuePercent: 25 },
-  { id: "dambourle_no12", name: "No.12", rarity: "LR", effectKey: "effect_roulette", baseValuePercent: null },
   { id: "dambourle_no4", name: "No.4", rarity: "LR", effectKey: "box_size_up", baseValuePercent: 10 },
 
   // --- MR（排出率0.5%、1種） ---
