@@ -22,10 +22,10 @@ export default async function DambourlePickerPage() {
 
   return (
     <>
-      <PageHeader title="ダンボールを選ぶ" backHref="/games/item-catch" subtitle="ガチャで手に入れたダンボール・スキンに変えられます" />
+      <PageHeader title="ダンボールを選ぶ" backHref="/games/item-catch" backReload subtitle="効果とスキンを確認してから装備できます" />
       <PageBody>
         <Link
-          href="/mypage/coins"
+          href="/games/item-catch/dambourle/gacha"
           className="rough-card flex items-center gap-3 p-4 active:scale-[0.99]"
         >
           <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-leaf-soft text-leaf-deep">
@@ -33,7 +33,7 @@ export default async function DambourlePickerPage() {
           </span>
           <span className="min-w-0 flex-1">
             <span className="block text-sm font-bold">ダンボールガチャを引く</span>
-            <span className="mt-0.5 block text-[11px] text-ink-soft">コインを使う画面から引けます</span>
+            <span className="mt-0.5 block text-[11px] text-ink-soft">排出率・効果・所持状況を確認できます</span>
           </span>
           <IconChevronRight size={18} className="shrink-0 text-ink-faint" />
         </Link>

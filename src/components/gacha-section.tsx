@@ -528,6 +528,8 @@ export function GachaResultModal({
   onClose,
   maxLevel = 5,
   footerNote,
+  extraActionLabel,
+  onExtraAction,
 }: {
   results: DrawResult[];
   plan: GachaPlanId;
@@ -538,6 +540,9 @@ export function GachaResultModal({
   maxLevel?: number;
   /** ボタン下に添える補足（重複還元額など）。呼び出し元固有の情報用 */
   footerNote?: string;
+  /** 呼び出し元固有の次アクション（例：引いたダンボールを装備する）。 */
+  extraActionLabel?: string;
+  onExtraAction?: () => void;
 }) {
   useBodyScrollLock();
   const only = plan === "single" && results.length === 1 ? results[0] : null;
@@ -578,6 +583,11 @@ export function GachaResultModal({
             とじる
           </button>
         </div>
+        {extraActionLabel && onExtraAction ? (
+          <button type="button" onClick={onExtraAction} className="mt-2 w-full rounded-full border border-leaf bg-leaf-soft px-3 py-2.5 text-xs font-black text-leaf-deep">
+            {extraActionLabel}
+          </button>
+        ) : null}
         {footerNote ? <p className="mt-2 text-center text-[10px] text-ink-faint">{footerNote}</p> : null}
       </div>
     </div>
@@ -586,6 +596,7 @@ export function GachaResultModal({
 
 function RarityResultCard({ result, large = false, maxLevel = 5 }: { result: DrawResult; large?: boolean; maxLevel?: number }) {
   const rarity = validRarity(result.rarity);
+  const effectiveMaxLevel = result.maxLevel ?? maxLevel;
 
   return (
     <div
@@ -625,7 +636,7 @@ function RarityResultCard({ result, large = false, maxLevel = 5 }: { result: Dra
                 large ? "px-3 py-0.5 text-[11px]" : "px-2 py-0.5 text-[8px]"
               }`}
             >
-              {result.previousLevel > 0 ? `${formatLevelTag(result.previousLevel, maxLevel)}→${formatLevelTag(result.newLevel, maxLevel)}` : formatLevelTag(result.newLevel, maxLevel)}
+              {result.previousLevel > 0 ? `${formatLevelTag(result.previousLevel, effectiveMaxLevel)}→${formatLevelTag(result.newLevel, effectiveMaxLevel)}` : formatLevelTag(result.newLevel, effectiveMaxLevel)}
             </span>
           )}
         </span>
@@ -637,6 +648,7 @@ function RarityResultCard({ result, large = false, maxLevel = 5 }: { result: Dra
         >
           {result.name}
         </p>
+        {result.detail ? <p className={`line-clamp-2 w-full font-bold leading-tight opacity-90 ${large ? "text-[10px]" : "text-[7px]"}`}>{result.detail}</p> : null}
       </div>
     </div>
   );
@@ -644,10 +656,11 @@ function RarityResultCard({ result, large = false, maxLevel = 5 }: { result: Dra
 
 function SingleResult({ result, maxLevel = 5 }: { result: DrawResult; maxLevel?: number }) {
   const acquisitionLabel = result.type === "dog_skin" ? "わんこスキンをゲット！" : result.type === "dambourle" ? "ダンボールをゲット！" : "おもちゃをゲット！";
+  const effectiveMaxLevel = result.maxLevel ?? maxLevel;
 
   return (
     <div className="pt-1 text-center">
-      <p className="pr-9 text-[11px] font-bold tracking-[0.18em] text-ink-faint">1回ガチャ</p>
+      <p className="pr-9 text-[11px] font-bold tracking-[0.18em] text-ink-faint">{result.type === "dambourle" ? "ダンボールガチャ" : "1回ガチャ"}</p>
       <h2 className="mt-1 pr-9 text-xl font-black text-[#6e5a3c]">おめでとう！</h2>
 
       <div className="mx-auto mt-4 w-[76%]">
@@ -660,7 +673,7 @@ function SingleResult({ result, maxLevel = 5 }: { result: DrawResult; maxLevel?:
       </p>
       {result.newLevel > result.previousLevel && (
         <p className="mx-auto mt-2 w-fit rounded-full bg-[#fff1cf] px-3 py-1 text-[10px] font-bold text-[#a67c2d]">
-          スキルレベルアップ！{result.previousLevel > 0 ? `${formatLevelTag(result.previousLevel, maxLevel)} → ${formatLevelTag(result.newLevel, maxLevel)}` : formatLevelTag(result.newLevel, maxLevel)}
+          スキルレベルアップ！{result.previousLevel > 0 ? `${formatLevelTag(result.previousLevel, effectiveMaxLevel)} → ${formatLevelTag(result.newLevel, effectiveMaxLevel)}` : formatLevelTag(result.newLevel, effectiveMaxLevel)}
         </p>
       )}
     </div>
@@ -668,7 +681,8 @@ function SingleResult({ result, maxLevel = 5 }: { result: DrawResult; maxLevel?:
 }
 
 function MultiResult({ results, plan, maxLevel = 5 }: { results: DrawResult[]; plan: GachaPlanId; maxLevel?: number }) {
-  const label = plan === "hundred" ? "100連ガチャ" : "10連ガチャ";
+  const isDambourle = results.some((result) => result.type === "dambourle");
+  const label = isDambourle ? "ダンボール10連ガチャ" : plan === "hundred" ? "100連ガチャ" : "10連ガチャ";
   return (
     <div>
       <div className="pr-9 text-center">
