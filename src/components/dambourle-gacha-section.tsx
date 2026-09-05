@@ -125,29 +125,31 @@ export function DambourleGachaSection({ balance }: { balance: number }) {
             <DambourleMachineArt className="h-full w-auto" />
           </span>
         </div>
-      </section>
 
-      <div className="space-y-2">
-        {(Object.keys(DAMBOURLE_PLANS) as DambourlePlanId[]).map((planId) => {
-          const plan = DAMBOURLE_PLANS[planId];
-          const short = balance < plan.cost;
-          return (
-            <button
-              key={planId}
-              type="button"
-              onClick={() => void draw(planId)}
-              disabled={pending !== null || short}
-              className="flex w-full items-center justify-between rounded-full bg-leaf px-4 py-3 text-sm font-black text-white shadow-md active:translate-y-px disabled:opacity-45"
-            >
-              <span>{pending === planId ? "まわしています…" : plan.label}</span>
-              <span className="flex items-center gap-1">
-                <IconCoin size={13} />
-                {formatCoins(plan.cost)}
-              </span>
-            </button>
-          );
-        })}
-      </div>
+        <div className="mt-3 space-y-1.5">
+          {(Object.keys(DAMBOURLE_PLANS) as DambourlePlanId[]).map((planId) => {
+            const plan = DAMBOURLE_PLANS[planId];
+            const short = balance < plan.cost;
+            return (
+              <button
+                key={planId}
+                type="button"
+                onClick={() => void draw(planId)}
+                disabled={pending !== null || short}
+                className="flex w-full items-center justify-between rounded-full bg-leaf px-3 py-2 text-white shadow-sm transition active:translate-y-px disabled:opacity-45"
+              >
+                <span className="text-[11px] font-bold">
+                  {pending === planId ? "まわしています…" : plan.label}
+                </span>
+                <span className="flex items-center gap-1 text-[10px] font-bold tabular-nums">
+                  <IconCoin size={12} />
+                  {formatCoins(plan.cost)}
+                </span>
+              </button>
+            );
+          })}
+        </div>
+      </section>
 
       {error ? <p role="status" className="text-center text-[11px] text-blossom">{error}</p> : null}
 
