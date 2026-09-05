@@ -82,7 +82,11 @@ export default async function CollectionPage({
   const [{ supabase, user }, params] = await Promise.all([requireUser(), searchParams]);
   const [counts, dambourleCounts] = await Promise.all([
     getOwnedItemCounts(supabase, user.id),
-    getOwnedDambourleCounts(supabase, user.id),
+    // ダンボールの取得に失敗しても図鑑ページ全体を落とさない
+    getOwnedDambourleCounts(supabase, user.id).catch((error) => {
+      console.warn("Failed to load dambourle counts for collection page", error);
+      return new Map<string, number>();
+    }),
   ]);
   const owned = new Set(counts.keys());
 
