@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { CollectionProgress, ItemGrid } from "@/components/collection/collection-ui";
+import { DambourleSeriesGrid } from "@/components/collection/dambourle-series-grid";
 import { IconChevronRight } from "@/components/icons";
 import { PageBody } from "@/components/page-body";
 import { PageHeader } from "@/components/page-header";
@@ -15,7 +16,9 @@ import {
   type CollectionCategory,
   type CollectionItem,
 } from "@/lib/collection/items";
+import { DAMBOURLE_PRIZES } from "@/lib/dambourle/prizes";
 import { getOwnedItemCounts } from "@/lib/data/collection";
+import { getOwnedDambourleCounts } from "@/lib/data/dambourle";
 import { requireUser } from "@/lib/supabase/server";
 
 export const metadata = { title: "図鑑 | おでかけ記録" };
@@ -77,7 +80,10 @@ export default async function CollectionPage({
   searchParams: Promise<{ tab?: string; category?: string; sort?: string }>;
 }) {
   const [{ supabase, user }, params] = await Promise.all([requireUser(), searchParams]);
-  const counts = await getOwnedItemCounts(supabase, user.id);
+  const [counts, dambourleCounts] = await Promise.all([
+    getOwnedItemCounts(supabase, user.id),
+    getOwnedDambourleCounts(supabase, user.id),
+  ]);
   const owned = new Set(counts.keys());
 
   const tab: Tab = params.tab === "series" ? "series" : "regular";
@@ -98,7 +104,7 @@ export default async function CollectionPage({
           {tab === "regular" ? (
             <RegularTab owned={owned} counts={counts} category={category} sort={sort} />
           ) : (
-            <SeriesTab owned={owned} counts={counts} />
+            <SeriesTab owned={owned} counts={counts} dambourleCounts={dambourleCounts} />
           )}
           <p className="pb-2 text-center text-xs text-ink-faint">
             持っていないアイテムはシルエットで表示されます
@@ -219,8 +225,17 @@ function RegularTab({
 }
 
 /** シリーズ図鑑。シリーズごとにまとめて並べ、見出しから詳細へ行ける */
-function SeriesTab({ owned, counts }: { owned: ReadonlySet<string>; counts: ReadonlyMap<string, number> }) {
+function SeriesTab({
+  owned,
+  counts,
+  dambourleCounts,
+}: {
+  owned: ReadonlySet<string>;
+  counts: ReadonlyMap<string, number>;
+  dambourleCounts: ReadonlyMap<string, number>;
+}) {
   const allSeriesItems = COLLECTION_SERIES.flatMap((series) => getSeriesItems(series.id));
+  const dambourleOwnedCount = DAMBOURLE_PRIZES.filter((prize) => (dambourleCounts.get(prize.id) ?? 0) > 0).length;
 
   return (
     <div className="space-y-4">
@@ -253,6 +268,20 @@ function SeriesTab({ owned, counts }: { owned: ReadonlySet<string>; counts: Read
           </section>
         );
       })}
+
+      <section className="space-y-2.5">
+        <Link
+          href="/games/item-catch/dambourle"
+          className="rough-pill pressable flex items-center gap-2 border border-[#d8c79a] bg-[#fff6e0] px-3.5 py-2 text-[#7a5c1e]"
+        >
+          <span className="min-w-0 flex-1 truncate text-sm font-bold">ダンボール</span>
+          <span className="shrink-0 text-xs font-semibold tabular-nums">
+            {dambourleOwnedCount} / {DAMBOURLE_PRIZES.length}
+          </span>
+          <IconChevronRight size={16} className="shrink-0" />
+        </Link>
+        <DambourleSeriesGrid ownedCounts={dambourleCounts} />
+      </section>
     </div>
   );
 }
