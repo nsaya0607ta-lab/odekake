@@ -1,11 +1,9 @@
 import Link from "next/link";
-import { notFound } from "next/navigation";
 import { DambourlePicker } from "@/components/dambourle-picker";
 import { IconChevronRight, IconCoin } from "@/components/icons";
 import { PageBody } from "@/components/page-body";
 import { PageHeader } from "@/components/page-header";
 import { getEquippedDambourle, getOwnedDambourleCounts } from "@/lib/data/dambourle";
-import { isDambourleGachaEnabled } from "@/lib/dambourle/feature-flag";
 import { requireUser } from "@/lib/supabase/server";
 
 export const metadata = { title: "ダンボールを選ぶ | おでかけ記録" };
@@ -13,7 +11,6 @@ export const dynamic = "force-dynamic";
 
 export default async function DambourlePickerPage() {
   const { supabase, user } = await requireUser();
-  if (!isDambourleGachaEnabled(user.email)) notFound();
 
   const [ownedCounts, equipped] = await Promise.all([
     getOwnedDambourleCounts(supabase, user.id),
