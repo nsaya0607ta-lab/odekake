@@ -1494,7 +1494,9 @@ export function FrenchieCatchGame({
       const playSeconds = Math.max(0, (now - startAtRef.current) / 1000);
       const dogCount = dogCaughtRef.current;
       // ダンボールNo.6「フレブルボーナスの倍率アップ」：マフィアーの累積倍率とは別枠でさらに掛け合わせる
-      const dogBonusPoints = Math.floor(dogCount * playSeconds * mafiaDogBonusMultRef.current * dambourleUpMultiplier("dog_bonus_mult_up"));
+      // （ダンボール効果が絡むスコア換算は必ず切り上げにする。/api/coins/item-catchはInteger必須のため
+      //  端数が残るとリクエスト自体が失敗する）
+      const dogBonusPoints = Math.ceil(dogCount * playSeconds * mafiaDogBonusMultRef.current * dambourleUpMultiplier("dog_bonus_mult_up"));
       if (dogBonusPoints > 0) {
         scoreRef.current += dogBonusPoints;
         setScore(scoreRef.current);
@@ -1848,7 +1850,8 @@ export function FrenchieCatchGame({
             }
 
             // ダンボールNo.13「全アイテムの基礎スコアプラス」：基礎点を底上げする（固定pt系オーバーライドの後に適用）
-            basePoints = Math.round(basePoints * dambourleUpMultiplier("item_base_score_up"));
+            // ダンボール効果が絡むスコア換算は必ず切り上げにする（端数が出るとAPI側の整数チェックで弾かれるため）
+            basePoints = Math.ceil(basePoints * dambourleUpMultiplier("item_base_score_up"));
 
             const timedMultiplier = getScoreMultiplierProduct(scoreMultipliersRef, now);
             const hadActiveNextMultiplier = nextMultipliersRef.current.some((entry) => entry.remaining > 0);
@@ -1862,7 +1865,9 @@ export function FrenchieCatchGame({
             const dambourleScoreMultiplier = dambourleUpMultiplier("score_mult_up");
             // 種類の異なる得点倍率（時間経過系/次のN個系/食べ物限定系/宝箱連続ボーナス系/ダンボール効果）は重複中すべて掛け合わされる
             const multiplier = timedMultiplier * nextMultiplier * foodMultiplier * streakMultiplier * dambourleScoreMultiplier;
-            let points = Math.round((basePoints + pendingBonus) * multiplier);
+            // ダンボール効果（No.2やNo.12の抽選結果）が絡むと端数が出うるため、必ず切り上げにする
+            // （端数のままだと/api/coins/item-catchのInteger必須チェックでリクエスト自体が失敗する）
+            let points = Math.ceil((basePoints + pendingBonus) * multiplier);
             let effectLabel: string | undefined;
 
             if (now < ikeaUntilRef.current) {
@@ -2550,7 +2555,9 @@ export function FrenchieCatchGame({
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
             roundId,
-            score: scoreRef.current,
+            // ダンボール効果の倍率計算で万一端数が残っていても、送信直前に必ず整数へ切り上げる
+            // （/api/coins/item-catchはInteger必須のため、端数のままだとリクエスト自体が失敗する）
+            score: Math.ceil(scoreRef.current),
             caughtCount: caughtRef.current,
             durationSeconds: ROUND_SECONDS,
             bonusCoins,
