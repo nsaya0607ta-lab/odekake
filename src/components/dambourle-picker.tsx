@@ -1,5 +1,6 @@
 "use client";
 
+import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { createPortal } from "react-dom";
 import { DAMBOURLE_PRIZES } from "@/lib/dambourle/prizes";
@@ -22,6 +23,7 @@ type Props = {
 };
 
 export function DambourlePicker({ equippedItemId, equippedSkinIndex, ownedCounts }: Props) {
+  const router = useRouter();
   const initialItemId = equippedItemId ?? DEFAULT_ITEM_ID;
   const [equipped, setEquipped] = useState({ itemId: initialItemId, skinIndex: equippedSkinIndex });
   // active = プレビュー中のダンボール、previewSkinIndex = プレビュー中のスキン段階。
@@ -93,12 +95,15 @@ export function DambourlePicker({ equippedItemId, equippedSkinIndex, ownedCounts
       if (!response.ok) throw new Error();
       setEquipped({ itemId: activeItemId, skinIndex: previewSkinIndex });
       setSaved(true);
+      // アイテムキャッチ画面など他ページのキャッシュされたRSCが装備変更前のまま
+      // 表示され続けないよう、サーバーコンポーネントを再取得させる。
+      router.refresh();
     } catch {
       setError(true);
     } finally {
       setPending(false);
     }
-  }, [activeItemId, isPreviewEquipped, pending, previewSkinIndex]);
+  }, [activeItemId, isPreviewEquipped, pending, previewSkinIndex, router]);
 
   return (
     <div className="space-y-4 pb-20">
