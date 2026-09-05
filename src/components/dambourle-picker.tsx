@@ -154,7 +154,7 @@ export function DambourlePicker({ equippedItemId, equippedSkinIndex, ownedCounts
       ) : null}
 
       <div
-        className="fixed inset-x-0 z-30 border-t border-line bg-card/95 px-4 py-3 backdrop-blur"
+        className="fixed inset-x-0 z-30 border-t border-b border-line bg-card/95 px-4 py-3 backdrop-blur"
         style={{ bottom: "calc(var(--nav-height) + var(--safe-bottom))" }}
       >
         {/* z-40のBottomNav(bottom-nav.tsx)より下・かぶらない位置に固定する */}
