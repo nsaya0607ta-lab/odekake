@@ -191,6 +191,23 @@ export type UserGachaItemRow = {
   updated_at: string;
 };
 
+/** ダンボールガチャで手に入れたもの。item_id は src/lib/dambourle/prizes.ts の DambourleItem.id */
+export type UserDambourleItemRow = {
+  user_id: string;
+  item_id: string;
+  count: number;
+  first_obtained_at: string;
+  updated_at: string;
+};
+
+/** プレイ前に選んだ装備中のダンボール・スキン段階 */
+export type UserDambourleEquippedRow = {
+  user_id: string;
+  item_id: string;
+  skin_index: number;
+  updated_at: string;
+};
+
 export type TownCatalogItemRow = {
   id: string;
   name: string;
@@ -651,6 +668,18 @@ export type Database = {
         Update: Partial<UserGachaItemRow>;
         Relationships: [];
       };
+      user_dambourle_items: {
+        Row: UserDambourleItemRow;
+        Insert: Partial<UserDambourleItemRow> & { user_id: string; item_id: string };
+        Update: Partial<UserDambourleItemRow>;
+        Relationships: [];
+      };
+      user_dambourle_equipped: {
+        Row: UserDambourleEquippedRow;
+        Insert: Partial<UserDambourleEquippedRow> & { user_id: string };
+        Update: Partial<UserDambourleEquippedRow>;
+        Relationships: [];
+      };
       town_catalog_items: {
         Row: TownCatalogItemRow;
         Insert: Partial<TownCatalogItemRow> & {
@@ -746,6 +775,14 @@ export type Database = {
       commit_gacha_draw: {
         Args: { p_cost: number; p_request_id: string; p_item_ids: string[] };
         Returns: Json;
+      };
+      commit_dambourle_draw: {
+        Args: { p_cost: number; p_request_id: string; p_item_ids: string[] };
+        Returns: Json;
+      };
+      set_dambourle_equipped: {
+        Args: { p_item_id: string; p_skin_index: number };
+        Returns: undefined;
       };
       create_steps_sync_token: { Args: Record<string, never>; Returns: string };
       get_or_create_friend_code: { Args: Record<string, never>; Returns: string };
