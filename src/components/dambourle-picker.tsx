@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { DAMBOURLE_PRIZES } from "@/lib/dambourle/prizes";
 import { DEFAULT_BOX_ALT, DEFAULT_BOX_IMAGE, getDambourleBoxImage } from "@/lib/dambourle/box-image";
 import { getDambourleLevel, getDambourleMinSkinIndex, getDambourleUnlockedSkinTier } from "@/lib/dambourle/skill-levels";
@@ -25,6 +25,19 @@ export function DambourlePicker({ equippedItemId, equippedSkinIndex, ownedCounts
   const [pending, setPending] = useState(false);
   const [error, setError] = useState(false);
   const [saved, setSaved] = useState(false);
+  // BottomNav（bottom-nav.tsx）の実際の高さをそのつど測る。--nav-heightの決め打ちだと
+  // 実際のナビ高さとズレて確定バーとの間に隙間ができるため、隙間なくぴったり重ねる。
+  const [navHeight, setNavHeight] = useState(0);
+
+  useEffect(() => {
+    const nav = document.querySelector(".app-bottom-nav");
+    if (!nav) return;
+    const update = () => setNavHeight(nav.getBoundingClientRect().height);
+    update();
+    const observer = new ResizeObserver(update);
+    observer.observe(nav);
+    return () => observer.disconnect();
+  }, []);
 
   const activeMaxTier = useMemo(() => {
     if (activeItemId === DEFAULT_ITEM_ID) return 0;
@@ -155,7 +168,7 @@ export function DambourlePicker({ equippedItemId, equippedSkinIndex, ownedCounts
 
       <div
         className="fixed inset-x-0 z-30 border-t border-b border-line bg-card/95 px-4 py-3 backdrop-blur"
-        style={{ bottom: "calc(var(--nav-height) + var(--safe-bottom))" }}
+        style={{ bottom: navHeight > 0 ? `${navHeight}px` : "calc(var(--nav-height) + var(--safe-bottom))" }}
       >
         {/* z-40のBottomNav(bottom-nav.tsx)より下・かぶらない位置に固定する */}
         <div className="mx-auto flex max-w-md items-center gap-3">
