@@ -10,6 +10,49 @@
   （ガイド画面の基礎ポイント表示・スコアシミュレーター。`frenchie-catch-game.tsx`の`POINTS`と
   値を二重管理しているため、基礎ポイントを変更したら必ずこちらも合わせて直すこと）
 
+## 【2026-09-04 最新確定10】ブレブルの効果を「UR/LR限定出現」→「秒数プラス」へ変更、時間増加系プールへ移動
+
+ユーザー指定で、ブレブル(`other_burebur`, MR)の効果を「指定数のアイテムが出現するまでUR・LR
+ランクのアイテムしか出現しなくなる」から「秒数プラス」（Lv1=+20秒、レベルが1上がるごとに+3秒。
+Lv1〜5=20/23/26/29/32秒）へ変更した。これに伴い、出現量アップ・出現制御系プール（`SPAWN_DYNAMICS_ITEM_IDS`）
+から時間増加系プール（`TIME_BONUS_ITEM_IDS`）へ移籍し、「時間増加系7種＋おかえり」は
+「時間増加系8種＋おかえり」になった。
+
+**変更内容**
+- `item-catch-skills.ts`：`other_burebur`のlevelsを`["+20秒","+23秒","+26秒","+29秒","+32秒"]`に変更（noteは削除）。
+- `frenchie-catch-game.tsx`：
+  - `LV.BUREBUR_COUNT`（体数配列）→`LV.BUREBUR_SEC: [20, 23, 26, 29, 32]`に変更。
+  - `TIME_BONUS_ITEM_IDS`に`other_burebur`を追加、`SPAWN_DYNAMICS_ITEM_IDS`から削除。
+  - `case BUREBUR_ITEM_ID`の処理を`addBonusTime(LV.BUREBUR_SEC[lv])`に変更（他の秒数プラス系アイテムと同じ形）。
+  - ブレブル専用だった「体数管理式のUR/LR限定ロック」関連コード（`BUREBUR_LOCK_RARITIES`、
+    `highRarityLockCountRef`、`bureburLockActive`、`allowedHighRarities`の分岐）を全て削除。
+    宝箱(`toy_treasure_puzzle`)の「レア枠確定出現」（`highRarityLockUntilRef` / `HIGH_RARITY_LOCK_RARITIES`）は
+    ブレブルと無関係な別ロジックのためそのまま維持。
+  - `ITEM_SPAWN_WEIGHTS`：`other_burebur`を時間増加系プールMR枠（212÷1=212）に追加、
+    出現量アップ・出現制御系プールMR枠は`other_xmas_party`のみになったため90÷2=45→90÷1=90に更新。
+  - `TIME_BONUS_UNFILLED_RANK_DOG_WEIGHT`：MR枠が新たに充填されたため`2120-1187.2`→`2120-1399.2`に更新。
+    `SPAWN_DYNAMICS_UNFILLED_RANK_DOG_WEIGHT`（126、UR枠未充填分）は変更なし（MR枠の予算90自体は
+    変わらずXmas Party1種で消化するだけのため）。
+- `scripts/simulate-item-catch.mjs`：上記と同じ内容を`TIME_BONUS_IDS`/`SPAWN_DYNAMICS_IDS`・
+  switch-case・`highRarityLockCount`関連コード・`TIME_BONUS_UNFILLED_RANK_DOG_WEIGHT`に手動同期。
+
+**検算結果**（`node scripts/simulate-item-catch.mjs 1000 avoid`、変更後）
+
+| Lv | 秒数平均 | 秒数中央値 | スコア平均 | 500秒超え |
+|---|---|---|---|---|
+| 1 | 87.3秒 | 84.0秒 | 29,017 | 0% |
+| 2 | 118.7秒 | 116.0秒 | 49,164 | 0% |
+| 3 | 146.7秒 | 147.0秒 | 74,456 | 0% |
+| 4 | 177.5秒 | 176.0秒 | 111,978 | 0% |
+| 5 | 210.0秒 | 213.0秒 | 167,591 | 0% |
+
+プール重み予算：時間増加系8種=1272.0（+未充填720.8→dogへ、合計1992.8。表示は`TIME_BONUS_IDS`が
+おかえりを含まないSetのため実際より少なく出る仕様、実害なし） / 得点倍率系8種=280（+未充填120→dogへ、
+合計400、変更なし） / 出現量アップ・制御系=774（+未充填126→dogへ、合計900、変更なし） /
+通常アイテム系=6100（変更なし）。500秒超えは引き続き0%を維持しており、カットオフは壊れていない。
+2026-09-03以降のユーザー指定によりプレイ時間を目標値表へ厳密に合わせる調整は不要のため、
+本節の実測値はそのまま基準値として扱う。
+
 ## 【2026-09-03 最新確定9】固定重み・個別チューニング値を全廃し「ランク予算÷在籍数」の1ルールに統一
 
 ユーザー指定で「固定重みとかいらないから全部のプールで全アイテム、同じルールで等分して」との

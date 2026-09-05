@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { memo, useCallback, useEffect, useMemo, useRef, useState, type MutableRefObject, type PointerEvent as ReactPointerEvent } from "react";
 import { MAX_SKILL_LEVEL } from "@/lib/gacha/skill-levels";
 import { COLLECTION_ITEMS, type CollectionItem } from "@/lib/collection/items";
+import { DAMBOURLE_PRIZES, EFFECT_ROULETTE_ELIGIBLE_EFFECT_KEYS, type DambourleEffectKey } from "@/lib/dambourle/prizes";
 
 export type FrenchieCatchItem = {
   id: string;
@@ -95,6 +96,8 @@ const MYSTERY_IMAGE = "/collection/items/mystery-question.webp";
 const MYSTERY_SPAWN_CHANCE = 0.05;
 const MYSTERY_BASE_POINTS = 20;
 const IKEA_PT_PER_ITEM = 90;
+/** /api/coins/item-catch のMAX_BONUS_COINS(2000)と一致させる。超えるとリクエスト自体が400で失敗するため必ず送信前にクランプする */
+const MAX_BONUS_COINS_CLIENT = 2000;
 const BAG_ITEM_ID = "hazard_bag";
 const BAG_IMAGE = "/collection/items/plastic-bag.webp";
 const BAG_SPAWN_CHANCE = 0.03;
@@ -132,11 +135,11 @@ const SPAWN_INTERVAL_MAX_MS = 780;
  * アイテムの降ってくる量を2倍にするため、通常のスポーンタイマーと全く同じ間隔で
  * もう1系統「ボーナス出現」タイマーを並走させる（Clawdのボールと同じ独立タイマー方式）。
  *
- * 単純にspawnRate計算へ一律の倍率を掛ける方式も試したが、時間増加系7種の重みを
+ * 単純にspawnRate計算へ一律の倍率を掛ける方式も試したが、時間増加系8種の重みを
  * 「1/倍率」で相殺する近似では誤差を完全には消せず、プレイ時間の期待値がLv3以降
  * わずかに水増しされ続けて指数的に膨らみ、ラウンドが実質終了しなくなる不具合が
  * 発生した（元々r値が1に近い際どいバランスだったため、小さな誤差でも致命的だった）。
- * ボーナス出現タイマーは時間増加系7種（TIME_BONUS_ITEM_IDS）と、時間増加系を含む
+ * ボーナス出現タイマーは時間増加系8種（TIME_BONUS_ITEM_IDS）と、時間増加系を含む
  * 夏のフレブルスキン・？アイテムを一切対象にしないことで、既存のスポーンタイマーの
  * 挙動（＝時間増加系の取得ペース）を寸分変えずに、それ以外のアイテム量だけを厳密に
  * 2倍にする。
@@ -179,107 +182,107 @@ const MYSTERY_SKILL_ITEM_IDS = [
 
 /** アイテムごとのLv1〜5パラメータ（item_skill_levels_colored.xlsxの「スキル一覧」シート通り） */
 const LV = {
-  DUCK_SEC: [1, 3, 4, 5, 6],
-  CARROT_SEC: [1, 3, 4, 5, 6],
-  FRISBEE_MULT: [2, 2.2, 2.4, 2.7, 3],
-  SOCCER_PT: [15, 23, 30, 45, 60],
-  TAIYAKI_PT: [8, 11, 15, 20, 23],
-  BEAR_PT: [0, 15, 0, 30, 0],
-  BOWL_PT: [8, 11, 15, 20, 23],
-  PUDDING_PT: [23, 30, 45, 60, 75],
-  MELON_SEC: [1, 3, 4, 5, 6],
-  MELON_PT: [8, 15, 23, 30, 45],
-  TREASURE_LOW: [38, 45, 60, 75, 90],
-  TREASURE_HIGH: [75, 98, 120, 150, 195],
-  TREASURE_SEC: [1, 5, 6, 7, 8],
-  TREASURE_STREAK_PCT: [20, 25, 30, 35, 40],
-  FRENCHIE_PLUSH_COUNT: [3, 3, 4, 4, 5],
-  FRENCHIE_PLUSH_PT: [15, 20, 23, 30, 38],
-  MEAT_MULT: [1.1, 1.3, 1.5, 1.7, 1.9],
-  CUSHION_PT: [45, 60, 75, 98, 120],
-  MACARON_SEC: [3, 4, 5, 6, 8],
-  STARWAND_MULT: [2, 2.3, 2.6, 3, 3.5],
-  STRAWBERRY_COUNT: [1, 1, 1, 2, 2],
-  STRAWBERRY_MULT: [1.5, 1.7, 2, 2, 2.5],
-  CUPCAKE_SEC: [4, 5, 6, 7, 10],
-  SPRING_MULT: [1.1, 1.3, 1.5, 1.7, 1.9],
-  SPARKLE_SEC: [4, 5, 6, 8, 10],
+  DUCK_SEC: [1, 3, 4, 5, 6, 6.94, 7.88, 8.81, 9.75, 10.69],
+  CARROT_SEC: [1, 3, 4, 5, 6, 6.94, 7.88, 8.81, 9.75, 10.69],
+  FRISBEE_MULT: [2, 2.2, 2.4, 2.7, 3, 3.19, 3.38, 3.56, 3.75, 3.94],
+  SOCCER_PT: [15, 23, 30, 45, 60, 68.44, 76.88, 85.31, 93.75, 102.19],
+  TAIYAKI_PT: [8, 11, 15, 20, 23, 25.81, 28.63, 31.44, 34.25, 37.06],
+  BEAR_PT: [0, 15, 0, 30, 0, 0, 0, 0, 0, 0],
+  BOWL_PT: [8, 11, 15, 20, 23, 25.81, 28.63, 31.44, 34.25, 37.06],
+  PUDDING_PT: [23, 30, 45, 60, 75, 84.75, 94.5, 104.25, 114, 123.75],
+  MELON_SEC: [1, 3, 4, 5, 6, 6.94, 7.88, 8.81, 9.75, 10.69],
+  MELON_PT: [8, 15, 23, 30, 45, 51.94, 58.88, 65.81, 72.75, 79.69],
+  TREASURE_LOW: [38, 45, 60, 75, 90, 99.75, 109.5, 119.25, 129, 138.75],
+  TREASURE_HIGH: [75, 98, 120, 150, 195, 217.5, 240, 262.5, 285, 307.5],
+  TREASURE_SEC: [1, 5, 6, 7, 8, 9.31, 10.63, 11.94, 13.25, 14.56],
+  TREASURE_STREAK_PCT: [20, 25, 30, 35, 40, 43.75, 47.5, 51.25, 55, 58.75],
+  FRENCHIE_PLUSH_COUNT: [3, 3, 4, 4, 5, 6, 6, 7, 7, 7],
+  FRENCHIE_PLUSH_PT: [15, 20, 23, 30, 38, 42.31, 46.63, 50.94, 55.25, 59.56],
+  MEAT_MULT: [1.1, 1.3, 1.5, 1.7, 1.9, 2.05, 2.2, 2.35, 2.5, 2.65],
+  CUSHION_PT: [45, 60, 75, 98, 120, 134.06, 148.13, 162.19, 176.25, 190.31],
+  MACARON_SEC: [3, 4, 5, 6, 8, 8.94, 9.88, 10.81, 11.75, 12.69],
+  STARWAND_MULT: [2, 2.3, 2.6, 3, 3.5, 3.78, 4.06, 4.34, 4.63, 4.91],
+  STRAWBERRY_COUNT: [1, 1, 1, 2, 2, 3, 3, 3, 3, 3],
+  STRAWBERRY_MULT: [1.5, 1.7, 2, 2, 2.5, 2.69, 2.88, 3.06, 3.25, 3.44],
+  CUPCAKE_SEC: [4, 5, 6, 7, 10, 11.13, 12.25, 13.38, 14.5, 15.63],
+  SPRING_MULT: [1.1, 1.3, 1.5, 1.7, 1.9, 2.05, 2.2, 2.35, 2.5, 2.65],
+  SPARKLE_SEC: [4, 5, 6, 8, 10, 11.13, 12.25, 13.38, 14.5, 15.63],
   SPARKLE_STRENGTH: ["weak", "weak", "weak", "weak", "medium"] as const,
-  RAINBOW_STEP: [2, 5, 7, 8, 9],
-  GOLDEN_COUNT: [2, 2, 3, 3, 4],
-  GOLDEN_MULT: [2, 2.2, 2.2, 2.5, 2.5],
-  NAKAYOSHI_PT: [45, 60, 75, 98, 120],
-  KAMUNAYO_SEC: [5, 6, 8, 10, 13],
-  KAMUNAYO_MULT: [1.2, 1.4, 1.6, 1.8, 2.0],
-  HIKING_SEC: [5, 6, 7, 9, 12],
-  SNOW_SEC: [5, 6, 7, 9, 12],
-  SUMMER_ADD: [2, 5, 7, 8, 9],
-  SUMMER_MULT: [1.3, 1.6, 1.9, 2.2, 2.5],
-  ANBALL_PT: [150, 188, 225, 270, 330],
-  ANBALL_SEC: [2, 5, 7, 8, 9],
-  STRETCH_ROD_MULT: [0.5, 0.4, 0.3, 0.2, 0.1],
-  LISTEN_DOG_COUNT: [10, 15, 20, 25, 30],
-  AZUBEE_MULT: [1.2, 1.5, 1.8, 2.1, 2.4],
-  OMOJII_SEC: [3, 10, 11, 13, 14],
-  OMOJII_PT: [45, 68, 90, 120, 150],
-  KINOKO_SEC: [6, 7, 8, 10, 12],
-  KINOKO_FALL: [1.7, 1.8, 1.9, 2, 2.2],
-  KINOKO_SCORE: [1.2, 1.5, 1.8, 2.1, 2.4],
-  KOMOCHI_COUNT: [5, 5, 6, 7, 8],
-  KOMOCHI_MULT: [2, 2.1, 2.2, 2.3, 2.5],
-  AZUKI_SEC: [2, 8, 9, 10, 11],
-  AZUKI_PT: [75, 98, 120, 150, 195],
-  KOBEE_PT: [75, 98, 120, 150, 195],
-  KOBEE_MULT: [1.2, 1.5, 1.8, 2.1, 2.4],
-  HAMIGAKI_SEC: [0, 2, 3, 4, 5],
-  HAMIGAKI_PT: [0, 0, 15, 23, 30],
-  IKEA_SEC: [4, 5, 6, 7, 8],
-  ORUSUBAN_SEC: [5, 6, 7, 8, 10],
-  ORUSUBAN_FALL: [1.8, 2, 2.2, 2.4, 2.8],
-  PONDEOMO_SEC: [4, 5, 6, 8, 10],
-  PONDEOMO_SPAWN: [1.5, 1.625, 1.75, 1.875, 2],
-  PONDEAR_SEC: [4, 5, 6, 8, 10],
-  PONDEAR_SPAWN: [1.5, 1.625, 1.75, 1.875, 2],
-  JARE_A_SEC: [4, 5, 6, 8, 10],
-  JARE_A_SPAWN: [1.5, 1.625, 1.75, 1.875, 2],
-  SHIKKOKU_SEC: [8, 10, 12, 15, 20],
-  SHIKKOKU_FALL: [2, 2.2, 2.4, 2.6, 3],
-  SHIKKOKU_MULT: [1.3, 1.6, 1.9, 2.2, 2.5],
-  RAGBY_SEC: [5, 6, 7, 9, 12],
-  RAGBY_SPAWN: [2, 2.25, 2.5, 2.75, 3],
-  OYATSU_PT: [270, 300, 330, 360, 420],
-  KETSUNADE_SEC: [4, 5, 6, 8, 10],
-  BUREBUR_COUNT: [6, 8, 10, 12, 13],
-  XMAS_SEC: [6, 7, 9, 10, 12],
-  XMAS_FALL: [1.8, 2, 2.2, 2.4, 2.5],
-  XMAS_SCORE: [1.5, 1.9, 2.3, 2.7, 3.1],
-  XMAS_SPAWN: [1.5, 1.75, 2, 2.25, 2.5],
-  XMAS_DOG_COUNT: [5, 6, 7, 8, 9],
-  OMOCHI_SEC: [4, 5, 6, 8, 10],
-  OMOCHI_PT: [750, 750, 750, 750, 750],
+  RAINBOW_STEP: [2, 5, 7, 8, 9, 10.31, 11.63, 12.94, 14.25, 15.56],
+  GOLDEN_COUNT: [2, 2, 3, 3, 4, 5, 5, 6, 6, 6],
+  GOLDEN_MULT: [2, 2.2, 2.2, 2.5, 2.5, 2.59, 2.69, 2.78, 2.88, 2.97],
+  NAKAYOSHI_PT: [45, 60, 75, 98, 120, 134.06, 148.13, 162.19, 176.25, 190.31],
+  KAMUNAYO_SEC: [5, 6, 8, 10, 13, 14.5, 16, 17.5, 19, 20.5],
+  KAMUNAYO_MULT: [1.2, 1.4, 1.6, 1.8, 2.0, 2.15, 2.3, 2.45, 2.6, 2.75],
+  HIKING_SEC: [5, 6, 7, 9, 12, 13.31, 14.63, 15.94, 17.25, 18.56],
+  SNOW_SEC: [5, 6, 7, 9, 12, 13.31, 14.63, 15.94, 17.25, 18.56],
+  SUMMER_ADD: [2, 5, 7, 8, 9, 10.31, 11.63, 12.94, 14.25, 15.56],
+  SUMMER_MULT: [1.3, 1.6, 1.9, 2.2, 2.5, 2.73, 2.95, 3.18, 3.4, 3.63],
+  ANBALL_PT: [150, 188, 225, 270, 330, 363.75, 397.5, 431.25, 465, 498.75],
+  ANBALL_SEC: [2, 5, 7, 8, 9, 10.31, 11.63, 12.94, 14.25, 15.56],
+  STRETCH_ROD_MULT: [0.5, 0.4, 0.3, 0.2, 0.1, 0.05, 0.05, 0.05, 0.05, 0.05],
+  LISTEN_DOG_COUNT: [10, 15, 20, 25, 30, 34, 38, 42, 45, 49],
+  AZUBEE_MULT: [1.2, 1.5, 1.8, 2.1, 2.4, 2.63, 2.85, 3.08, 3.3, 3.53],
+  OMOJII_SEC: [3, 10, 11, 13, 14, 16.06, 18.13, 20.19, 22.25, 24.31],
+  OMOJII_PT: [45, 68, 90, 120, 150, 169.69, 189.38, 209.06, 228.75, 248.44],
+  KINOKO_SEC: [6, 7, 8, 10, 12, 13.13, 14.25, 15.38, 16.5, 17.63],
+  KINOKO_FALL: [1.7, 1.8, 1.9, 2, 2.2, 2.29, 2.39, 2.48, 2.58, 2.67],
+  KINOKO_SCORE: [1.2, 1.5, 1.8, 2.1, 2.4, 2.63, 2.85, 3.08, 3.3, 3.53],
+  KOMOCHI_COUNT: [5, 5, 6, 7, 8, 9, 10, 10, 11, 11],
+  KOMOCHI_MULT: [2, 2.1, 2.2, 2.3, 2.5, 2.59, 2.69, 2.78, 2.88, 2.97],
+  AZUKI_SEC: [2, 8, 9, 10, 11, 12.69, 14.38, 16.06, 17.75, 19.44],
+  AZUKI_PT: [75, 98, 120, 150, 195, 217.5, 240, 262.5, 285, 307.5],
+  KOBEE_PT: [75, 98, 120, 150, 195, 217.5, 240, 262.5, 285, 307.5],
+  KOBEE_MULT: [1.2, 1.5, 1.8, 2.1, 2.4, 2.63, 2.85, 3.08, 3.3, 3.53],
+  HAMIGAKI_SEC: [0, 2, 3, 4, 5, 5.94, 6.88, 7.81, 8.75, 9.69],
+  HAMIGAKI_PT: [0, 0, 15, 23, 30, 35.63, 41.25, 46.88, 52.5, 58.13],
+  IKEA_SEC: [4, 5, 6, 7, 8, 8.75, 9.5, 10.25, 11, 11.75],
+  ORUSUBAN_SEC: [5, 6, 7, 8, 10, 10.94, 11.88, 12.81, 13.75, 14.69],
+  ORUSUBAN_FALL: [1.8, 2, 2.2, 2.4, 2.8, 2.99, 3.18, 3.36, 3.55, 3.74],
+  PONDEOMO_SEC: [4, 5, 6, 8, 10, 11.13, 12.25, 13.38, 14.5, 15.63],
+  PONDEOMO_SPAWN: [1.5, 1.625, 1.75, 1.875, 2, 2.09, 2.19, 2.28, 2.38, 2.47],
+  PONDEAR_SEC: [4, 5, 6, 8, 10, 11.13, 12.25, 13.38, 14.5, 15.63],
+  PONDEAR_SPAWN: [1.5, 1.625, 1.75, 1.875, 2, 2.09, 2.19, 2.28, 2.38, 2.47],
+  JARE_A_SEC: [4, 5, 6, 8, 10, 11.13, 12.25, 13.38, 14.5, 15.63],
+  JARE_A_SPAWN: [1.5, 1.625, 1.75, 1.875, 2, 2.09, 2.19, 2.28, 2.38, 2.47],
+  SHIKKOKU_SEC: [8, 10, 12, 15, 20, 22.25, 24.5, 26.75, 29, 31.25],
+  SHIKKOKU_FALL: [2, 2.2, 2.4, 2.6, 3, 3.19, 3.38, 3.56, 3.75, 3.94],
+  SHIKKOKU_MULT: [1.3, 1.6, 1.9, 2.2, 2.5, 2.73, 2.95, 3.18, 3.4, 3.63],
+  RAGBY_SEC: [5, 6, 7, 9, 12, 13.31, 14.63, 15.94, 17.25, 18.56],
+  RAGBY_SPAWN: [2, 2.25, 2.5, 2.75, 3, 3.19, 3.38, 3.56, 3.75, 3.94],
+  OYATSU_PT: [270, 300, 330, 360, 420, 448.13, 476.25, 504.38, 532.5, 560.63],
+  KETSUNADE_SEC: [4, 5, 6, 8, 10, 11.13, 12.25, 13.38, 14.5, 15.63],
+  BUREBUR_SEC: [20, 23, 26, 29, 32, 34.25, 36.5, 38.75, 41, 43.25],
+  XMAS_SEC: [6, 7, 9, 10, 12, 13.13, 14.25, 15.38, 16.5, 17.63],
+  XMAS_FALL: [1.8, 2, 2.2, 2.4, 2.5, 2.63, 2.76, 2.89, 3.03, 3.16],
+  XMAS_SCORE: [1.5, 1.9, 2.3, 2.7, 3.1, 3.4, 3.7, 4, 4.3, 4.6],
+  XMAS_SPAWN: [1.5, 1.75, 2, 2.25, 2.5, 2.69, 2.88, 3.06, 3.25, 3.44],
+  XMAS_DOG_COUNT: [5, 6, 7, 8, 9, 10, 11, 12, 12, 13],
+  OMOCHI_SEC: [4, 5, 6, 8, 10, 11.13, 12.25, 13.38, 14.5, 15.63],
+  OMOCHI_PT: [750, 750, 750, 750, 750, 750, 750, 750, 750, 750],
   OKAERI_SEC: 3,
-  OKAERI_PER_CATCH: [2, 2, 2, 2, 2],
-  OMOI_BASHIRA_SEC: [4, 5, 6, 8, 10],
+  OKAERI_PER_CATCH: [2, 2, 2, 2, 2, 2, 2, 2, 2, 2],
+  OMOI_BASHIRA_SEC: [4, 5, 6, 8, 10, 11.13, 12.25, 13.38, 14.5, 15.63],
   /** おやすみ：ブラックアウト発生時はLR、発生しなかった時はSSRのランク別倍率カーブを使う */
-  OYASUMI_MULT_BLACKOUT: [1.3, 1.6, 1.9, 2.2, 2.5],
-  OYASUMI_MULT_NORMAL: [1.2, 1.4, 1.6, 1.8, 2.0],
-  NISOKU_A_MULT: [1.2, 1.4, 1.6, 1.8, 2.0],
-  TREASURE_DOUBLE_MULT: [1.1, 1.3, 1.5, 1.7, 1.9],
-  FRUIT_BASKET_COUNT: [2, 3, 4, 5, 6],
-  GOLD_BALL_COINS: [10, 15, 20, 30, 50],
-  CLAWD_BALL_COUNT: [5, 8, 10, 12, 14],
-  KAMIKAMI_PT: [15, 23, 38, 53, 68],
-  MOCCHURIN_PT: [45, 68, 90, 120, 150],
-  TIME_BONUS_FALL: [6, 5.6, 5.2, 4.8, 4.5],
-  MAH_PT: [390, 420, 450, 495, 555],
-  MIRROR_SEC: [5, 6, 8, 10, 13],
-  MIRROR_INVERT_PT: [23, 30, 38, 45, 60],
-  TOOREMATEN_SEC: [4, 5, 6, 8, 10],
-  TOOREMATEN_PT: [68, 90, 120, 150, 195],
-  HIA_MULT: [6, 7, 8, 9, 10],
-  NARCISSIST_SEC: [20, 25, 30, 35, 40],
-  MAFIA_MULT: [1.1, 1.12, 1.14, 1.16, 1.18],
-  PINK_OMO_SEC: [3, 5, 7, 9, 10],
+  OYASUMI_MULT_BLACKOUT: [1.3, 1.6, 1.9, 2.2, 2.5, 2.73, 2.95, 3.18, 3.4, 3.63],
+  OYASUMI_MULT_NORMAL: [1.2, 1.4, 1.6, 1.8, 2.0, 2.15, 2.3, 2.45, 2.6, 2.75],
+  NISOKU_A_MULT: [1.2, 1.4, 1.6, 1.8, 2.0, 2.15, 2.3, 2.45, 2.6, 2.75],
+  TREASURE_DOUBLE_MULT: [1.1, 1.3, 1.5, 1.7, 1.9, 2.05, 2.2, 2.35, 2.5, 2.65],
+  FRUIT_BASKET_COUNT: [2, 3, 4, 5, 6, 7, 8, 9, 9, 10],
+  GOLD_BALL_COINS: [10, 15, 20, 30, 50, 57.5, 65, 72.5, 80, 87.5],
+  CLAWD_BALL_COUNT: [5, 8, 10, 12, 14, 16, 18, 20, 21, 23],
+  KAMIKAMI_PT: [15, 23, 38, 53, 68, 77.94, 87.88, 97.81, 107.75, 117.69],
+  MOCCHURIN_PT: [45, 68, 90, 120, 150, 169.69, 189.38, 209.06, 228.75, 248.44],
+  TIME_BONUS_FALL: [6, 5.6, 5.2, 4.8, 4.5, 4.22, 3.94, 3.66, 3.38, 3.09],
+  MAH_PT: [390, 420, 450, 495, 555, 585.94, 616.88, 647.81, 678.75, 709.69],
+  MIRROR_SEC: [5, 6, 8, 10, 13, 14.5, 16, 17.5, 19, 20.5],
+  MIRROR_INVERT_PT: [23, 30, 38, 45, 60, 66.94, 73.88, 80.81, 87.75, 94.69],
+  TOOREMATEN_SEC: [4, 5, 6, 8, 10, 11.13, 12.25, 13.38, 14.5, 15.63],
+  TOOREMATEN_PT: [68, 90, 120, 150, 195, 218.81, 242.63, 266.44, 290.25, 314.06],
+  HIA_MULT: [6, 7, 8, 9, 10, 10.75, 11.5, 12.25, 13, 13.75],
+  NARCISSIST_SEC: [20, 25, 30, 35, 40, 43.75, 47.5, 51.25, 55, 58.75],
+  MAFIA_MULT: [1.1, 1.12, 1.14, 1.16, 1.18, 1.19, 1.21, 1.22, 1.24, 1.25],
+  PINK_OMO_SEC: [3, 5, 7, 9, 10, 11.31, 12.63, 13.94, 15.25, 16.56],
 } as const;
 const SLANT_VX_BOOST = 3.5;
 const POINTS: Record<FrenchieCatchItem["rarity"], number> = { N: 20, R: 40, SR: 80, SSR: 140, UR: 200, LR: 300, MR: 440 };
@@ -287,20 +290,20 @@ const RARITY_FALL_SPEED: Record<FrenchieCatchItem["rarity"], number> = { N: 1, R
 /** 時間が増えるスキルを持つアイテムだけ、落下速度をレアリティ別倍率で上げる */
 const TIME_BONUS_ITEM_IDS = new Set([
   "toy_duck_plush", "toy_carrot", "food_paw_melon_bread",
-  "interior_anball", "other_omojii", "other_azuki", "summer_frenchie",
+  "interior_anball", "other_omojii", "other_azuki", "summer_frenchie", "other_burebur",
 ]);
 /**
  * UR出現率アップ・その他カテゴリ抑制・SSR/UR/LR限定出現・出現量アップを付与するアイテム。
- * いずれも「出現重みの計算式そのもの」を一時的に書き換える効果を持ち、時間増加系7種の
+ * いずれも「出現重みの計算式そのもの」を一時的に書き換える効果を持ち、時間増加系8種の
  * 一部はUR/otherカテゴリに属するため、これらの発動頻度が変わると時間増加系の取得ペースが
  * 間接的に揺らいでしまう（宝箱のrare_lockが時間増加系のUR勢を集中優遇して伸びやすくなる、
  * という既知の現象がTREASURE_OUTCOME_WEIGHTSのコメントにもある）。
  * ボーナス出現タイマーがこれらを引いて発動頻度を実質的に底上げしてしまうと、時間増加系の
- * 取得ペースがわずかに変わり得るため、ボーナス出現タイマーでは時間増加系7種と合わせて
+ * 取得ペースがわずかに変わり得るため、ボーナス出現タイマーでは時間増加系8種と合わせて
  * こちらも対象外にする。
  */
 const SPAWN_DYNAMICS_ITEM_IDS = new Set([
-  "toy_rainbow_ball", "interior_stretch_rod", "toy_treasure_puzzle", "other_burebur",
+  "toy_rainbow_ball", "interior_stretch_rod", "toy_treasure_puzzle",
   "other_xmas_party", "other_pondeomo", "other_pondear", "other_jare_a", "interior_ragby_ar",
 ]);
 /**
@@ -364,7 +367,7 @@ const DEFAULT_ITEM_SPAWN_WEIGHT = 100;
 /**
  * 出現量アップ系スキル（ぽんでおも・ぽんでアー・じゃれアー・ラグビーアー・Xmas Party）は
  * スポーン間隔そのものを割るため、有効中は時間増加系アイテムの取得率まで一緒に底上げしてしまう。
- * createEntity内のweightedItems計算で「出現量アップ中は時間増加系7種の重みを現在有効な
+ * createEntity内のweightedItems計算で「出現量アップ中は時間増加系8種の重みを現在有効な
  * ブースト倍率で割る」1/n相殺ロジックを入れてあるため、出現量アップ側の倍率は時間増加系のr値に
  * 影響しない（詳細はdocs/minigame-time-balance.md参照）。
  *
@@ -393,7 +396,7 @@ const ITEM_SPAWN_WEIGHTS: Partial<Record<string, number>> = {
    *
    * 時間増加系プール（予算2120、おかえりを含む）：R:636÷3=212ずつ / SR:381.6(未充填→dog) /
    * SSR:339.2(未充填→dog) / UR:296.8÷3 / LR:254.4÷2=127.2ずつ(夏のフレブル/おかえり) /
-   * MR:212(未充填→dog)。在籍分の実際の合計は1187.2（残り932.8は
+   * MR:212÷1=212(ブレブル)。在籍分の実際の合計は1399.2（残り720.8は
    * `TIME_BONUS_UNFILLED_RANK_DOG_WEIGHT`でdogへ）。
    */
   other_omojii: 296.8 / 3,
@@ -404,23 +407,24 @@ const ITEM_SPAWN_WEIGHTS: Partial<Record<string, number>> = {
   other_azuki: 296.8 / 3,
   summer_frenchie: 254.4 / 2,
   other_okaeri: 254.4 / 2,
+  other_burebur: 212 / 1,
   /**
    * 出現量アップ・出現制御系プール（予算900）：R:270÷1=270 / SR:162÷1=162 / SSR:144÷4=36ずつ /
-   * UR:126(未充填→dog) / LR:108÷2=54ずつ / MR:90÷2=45ずつ。在籍分の実際の合計は774
-   * （残り126は`SPAWN_DYNAMICS_UNFILLED_RANK_DOG_WEIGHT`でdogへ）。宝箱おやつパズル・ブレブル・
+   * UR:126(未充填→dog) / LR:108÷2=54ずつ / MR:90÷1=90(Xmas Party)。在籍分の実際の合計は774
+   * （残り126は`SPAWN_DYNAMICS_UNFILLED_RANK_DOG_WEIGHT`でdogへ）。宝箱おやつパズル・
    * Xmas Partyもここでは個別チューニング値ではなく「ランク予算÷在籍数」のみで計算する
-   * （ユーザー指定、2026-09-03〜）。
+   * （ユーザー指定、2026-09-03〜）。ブレブルは2026-09-04に効果を秒数プラス系へ変更し、
+   * 時間増加系プールへ移動した（このプールからは離籍）。
    */
   toy_rainbow_ball: 144 / 4,
   interior_stretch_rod: 270 / 1,
   toy_treasure_puzzle: 162 / 1,
-  other_xmas_party: 90 / 2,
+  other_xmas_party: 90 / 1,
   other_pondeomo: 144 / 4,
   other_pondear: 144 / 4,
   other_jare_a: 144 / 4,
   interior_ragby_ar: 108 / 2,
   other_listen_to_the_a: 108 / 2,
-  other_burebur: 90 / 2,
   /**
    * 得点倍率系プール（予算400）：R:120(未充填→dog) / SR:72÷2=36ずつ / SSR:64÷2=32ずつ /
    * UR:56÷3 / LR:48÷2=24ずつ / MR:40÷2=20ずつ。在籍分の実際の合計は280
@@ -518,7 +522,7 @@ const XMAS_PARTY_ITEM_ID = "other_xmas_party";
 const OMOCHI_ITEM_ID = "other_omochi_janai";
 const OKAERI_ITEM_ID = "other_okaeri";
 /**
- * 時間増加系7種＋おかえりは、プレイヤーの図鑑育成度（R以上アイテムのスキルLv平均）に応じた
+ * 時間増加系8種＋おかえりは、プレイヤーの図鑑育成度（R以上アイテムのスキルLv平均）に応じた
  * 秒数を超えると出現しなくなる（？アイテムのスキル抽選からも除外される）。宝箱は対象外。
  * 平均Lv1→60秒、2→80、3→100、4→120、5→140の線形（+20秒/Lv、小数点も比例配分）。
  * 詳細はdocs/minigame-time-balance.mdの「時間増加系の出現カットオフ」節を参照。
@@ -633,10 +637,8 @@ const CLAWD_GOLD_BALL_CHANCE = 0.2;
 const MOCCHURIN_ITEM_ID = "food_mocchurin";
 /** Lv4(lv index=3)以降は直前に捕まえた2つ分のスキルをエコーする */
 const MOCCHURIN_DOUBLE_ECHO_MIN_LV = 3;
-/** ブレブルの効果中、このレアリティ以外のアイテムは出現しなくなる */
+/** 宝箱の「レア枠確定出現」効果中、このレアリティ以外のアイテムは出現しなくなる */
 const HIGH_RARITY_LOCK_RARITIES = new Set<FrenchieCatchItem["rarity"]>(["SSR", "UR", "LR"]);
-/** ブレブルは他の「レア枠確定」より対象を絞り、UR・LRランクのみに限定する */
-const BUREBUR_LOCK_RARITIES = new Set<FrenchieCatchItem["rarity"]>(["UR", "LR"]);
 const OTHER_CATEGORY_ITEM_IDS = new Set(
   COLLECTION_ITEMS.filter((entry) => entry.category === "other").map((entry) => entry.id),
 );
@@ -662,10 +664,12 @@ const DOG_SPAWN_RATIO = 0.28;
  * 「普通のフレブル」(dog)の出現重みに上乗せして消化する（ITEM_SPAWN_WEIGHTS直上のコメント参照）。
  * 各値は「プール予算 − 在籍ランクの実際の重み合計」。2026-09-03、ユーザー指定で固定重みを
  * 全廃し「ランク予算÷在籍数」のみに統一したため、以下の3値も端数を丸めず正確な値にした：
- * 時間増加系: 2120−1187.2=932.8 / 得点倍率系: 400−280=120 / 出現量アップ制御系: 900−774=126。
+ * 時間増加系: 2120−1399.2=720.8 / 得点倍率系: 400−280=120 / 出現量アップ制御系: 900−774=126。
  * 新しく未充填ランクにアイテムを追加したら、対応する定数からそのランクの予算分を差し引くこと。
+ * （時間増加系のMR枠は、2026-09-04にブレブルの効果を秒数プラス系へ変更したことで新たに
+ * 充填された。従来のR:636+UR:296.8+LR:254.4=1187.2に、MR:212を加えて1399.2）
  */
-const TIME_BONUS_UNFILLED_RANK_DOG_WEIGHT = 2120 - 1187.2;
+const TIME_BONUS_UNFILLED_RANK_DOG_WEIGHT = 2120 - 1399.2;
 /** 2026-09-03、固定重み全廃・ランク予算÷在籍数のみに統一（ユーザー指定）。ITEM_SPAWN_WEIGHTS直上のコメント参照。 */
 const SCORE_MULT_UNFILLED_RANK_DOG_WEIGHT = 120;
 /** 2026-09-03、固定重み全廃・ランク予算÷在籍数のみに統一（ユーザー指定）。ITEM_SPAWN_WEIGHTS直上のコメント参照。 */
@@ -716,6 +720,69 @@ function resolveFallVy(
   return boostedVy * RARITY_FALL_SPEED[rarity];
 }
 
+/**
+ * ダンボールガチャの効果（No.11「全アイテムのスキルLv上昇」を除く）を、そのダンボール自身の
+ * Lv(1〜70)で拡大した実効値(%)に変換する。倍率式は
+ * `src/lib/dambourle/prizes.ts`のDambourleItem.baseValuePercentコメントの通り
+ * 「基礎値(%) × (1 + 0.02×(Lv-1))」で統一する（No.12「効果ルーレット」が引いた
+ * 効果にも、その基礎値にNo.12自身のLvでこの式を適用する）。
+ */
+const DAMBOURLE_EFFECT_BASE_VALUE_PERCENT = new Map(
+  DAMBOURLE_PRIZES.filter((prize) => prize.baseValuePercent !== null).map((prize) => [prize.effectKey, prize.baseValuePercent!]),
+);
+
+function dambourleEffectPercent(effectKey: DambourleEffectKey, level: number): number {
+  const base = DAMBOURLE_EFFECT_BASE_VALUE_PERCENT.get(effectKey);
+  if (base == null) return 0;
+  return base * (1 + 0.02 * (level - 1));
+}
+
+type ResolvedDambourleEffect = { key: DambourleEffectKey; percent: number };
+
+/**
+ * 右側のスキルログ・状態表示に出す短いラベル。No.11「全アイテムのスキルLv上昇」は別プロップで
+ * 処理するため含めない。No.12「効果ルーレット」はresolveDambourleEffectで必ず対象9種いずれかの
+ * キーに解決されるため、実際にはここでは引かれない（型を素直に保つためPartialにしている）。
+ */
+const DAMBOURLE_EFFECT_LABELS: Partial<Record<DambourleEffectKey, string>> = {
+  item_spawn_up: "アイテム出現量アップ",
+  score_mult_up: "スコア倍率アップ",
+  time_bonus_cutoff_up: "時間増加アップ",
+  box_size_up: "ダンボール拡大",
+  end_coin_bonus: "終了時コイン増加",
+  dog_bonus_mult_up: "フレブルボーナス倍率アップ",
+  negative_spawn_down: "マイナスアイテム出現ダウン",
+  time_pool_rate_up: "時間増加系の出現率アップ",
+  spawn_dynamics_effect_up: "出現量アップ系の効果アップ",
+  score_mult_pool_effect_up: "得点倍率系の効果アップ",
+  item_base_score_up: "基礎スコアアップ",
+};
+
+/**
+ * No.12「効果ルーレット」は対象9種から毎ラウンド開始時に1つ抽選し、そのラウンドの間だけ固定する。
+ * No.11「全アイテムのスキルLv上昇」はここでは扱わない（dambourleSkillBoostプロップで別処理）。
+ */
+function resolveDambourleEffect(
+  effect: { key: DambourleEffectKey; level: number } | null,
+): ResolvedDambourleEffect | null {
+  if (!effect || effect.key === "item_skill_level_up") return null;
+  if (effect.key === "effect_roulette") {
+    const pool = EFFECT_ROULETTE_ELIGIBLE_EFFECT_KEYS;
+    const key = pool[Math.floor(Math.random() * pool.length)]!;
+    return { key, percent: dambourleEffectPercent(key, effect.level) };
+  }
+  return { key: effect.key, percent: dambourleEffectPercent(effect.key, effect.level) };
+}
+
+/**
+ * 「出現量×N」「得点×N」のような"ボーナス倍率"は、基礎値そのものではなく1を超えた
+ * ボーナス分だけをupFactor(1+効果%/100)で拡大する（例: ×1.5にダンボール効果+20%なら
+ * 1+0.5×1.2=×1.6。基礎値ごと1.5倍にする(×1.8)方式だと高Lvで暴走しやすいため採らない）。
+ */
+function scaleDambourleBonusMultiplier(rawMultiplier: number, upFactor: number): number {
+  return 1 + (rawMultiplier - 1) * upFactor;
+}
+
 function openingBoundsAt(localY: number) {
   const t = clamp((localY - OPEN_TOP_LOCAL_Y) / (OPEN_BOTTOM_LOCAL_Y - OPEN_TOP_LOCAL_Y), 0, 1);
   const left = 0.145 - t * 0.055;
@@ -760,8 +827,31 @@ const FallingEntity = memo(function FallingEntity({
   );
 }, (prev, next) => prev.entity.id === next.entity.id);
 
-export function FrenchieCatchGame({ ownedItems }: { ownedItems: FrenchieCatchItem[] }) {
+export function FrenchieCatchGame({
+  ownedItems,
+  equippedBoxImage = BOX_IMAGE,
+  equippedBoxAlt = "拾ってくだブーと書かれた段ボール",
+  dambourleSkillBoost = 0,
+  dambourleEffect = null,
+  showDambourlePicker = false,
+}: {
+  ownedItems: FrenchieCatchItem[];
+  /** プレイ前に選んだダンボールの画像。未指定なら初期無料ダンボール */
+  equippedBoxImage?: string;
+  equippedBoxAlt?: string;
+  /**
+   * ダンボールNo.11「全アイテムのスキルLv上昇」を装備しているときの、そのダンボール自身のLv(1〜5)。
+   * 図鑑アイテムのスキルLv上限をこの分だけ底上げする（Lv5→最大Lv10）。未装備なら0。
+   * カットオフ秒数の計算(timeBonusCutoffSecRef)には反映しない。
+   */
+  dambourleSkillBoost?: number;
+  /** No.11以外の装備中ダンボール効果（effectKey + そのダンボール自身のLv1〜70）。未装備・No.11装備時はnull */
+  dambourleEffect?: { key: DambourleEffectKey; level: number } | null;
+  /** ダンボールガチャは実験公開中のため、限定ユーザーにのみ選択導線を出す */
+  showDambourlePicker?: boolean;
+}) {
   const router = useRouter();
+  const skillLevelCap = MAX_SKILL_LEVEL + dambourleSkillBoost;
   const boardRef = useRef<HTMLDivElement | null>(null);
   const catcherRef = useRef<HTMLDivElement | null>(null);
   const entitiesRef = useRef<Entity[]>([]);
@@ -818,8 +908,6 @@ export function FrenchieCatchGame({ ownedItems }: { ownedItems: FrenchieCatchIte
   const otherSuppressUntilRef = useRef(0);
   const otherSuppressValueRef = useRef(1);
   const highRarityLockUntilRef = useRef(0);
-  /** ブレブル用。時間ではなく「次に出現するアイテム数」で管理するカウント式のSSR/UR/LR限定ロック */
-  const highRarityLockCountRef = useRef(0);
   const treasureStreakActiveRef = useRef(false);
   const treasureStreakMultRef = useRef(1);
   const omochiUntilRef = useRef(0);
@@ -857,7 +945,7 @@ export function FrenchieCatchGame({ ownedItems }: { ownedItems: FrenchieCatchIte
   /**
    * 通れまてん：有効中は「はずれ」の初期フレブル(15pt)の代わりに、より高得点な金色フレブルが
    * 同じ出現枠（dogWeight）でそのまま出現する。フレブルの出現シェア自体は変えないので、
-   * 時間増加系7種の取得率やdogCaughtRef（ラウンド終了時のフレブル数ボーナス算定）には影響しない。
+   * 時間増加系8種の取得率やdogCaughtRef（ラウンド終了時のフレブル数ボーナス算定）には影響しない。
    */
   const dogGoldenUntilRef = useRef(0);
   const dogGoldenPtValueRef = useRef(0);
@@ -865,6 +953,23 @@ export function FrenchieCatchGame({ ownedItems }: { ownedItems: FrenchieCatchIte
   const impactTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const recentSkillEffectIdRef = useRef(0);
   const recentSkillEffectTimersRef = useRef<Map<number, ReturnType<typeof setTimeout>>>(new Map());
+  /** 装備中ダンボール効果のプロップの最新値。startGame(deps:[])内から常に最新値を読むための橋渡し */
+  const dambourleEffectPropRef = useRef(dambourleEffect);
+  useEffect(() => {
+    dambourleEffectPropRef.current = dambourleEffect;
+  }, [dambourleEffect]);
+  /** ラウンド開始時に確定した、そのラウンド中ずっと使う実効ダンボール効果（No.12はここで抽選確定） */
+  const dambourleEffectRef = useRef<ResolvedDambourleEffect | null>(null);
+  /** keyが一致する時だけ (1+効果%/100) を返す。一致しなければ1（無効） */
+  const dambourleUpMultiplier = useCallback((key: DambourleEffectKey) => {
+    const eff = dambourleEffectRef.current;
+    return eff && eff.key === key ? 1 + eff.percent / 100 : 1;
+  }, []);
+  /** keyが一致する時だけ (1-効果%/100) を返す（マイナス方向の効果用）。0未満にはしない */
+  const dambourleDownMultiplier = useCallback((key: DambourleEffectKey) => {
+    const eff = dambourleEffectRef.current;
+    return eff && eff.key === key ? Math.max(0, 1 - eff.percent / 100) : 1;
+  }, []);
 
   const [phase, setPhase] = useState<"idle" | "playing" | "finished">("idle");
   const [entities, setEntities] = useState<Entity[]>([]);
@@ -892,7 +997,7 @@ export function FrenchieCatchGame({ ownedItems }: { ownedItems: FrenchieCatchIte
 
   const itemPool = useMemo(() => ownedItems.filter((item) => item.image.length > 0), [ownedItems]);
   const itemLevelByIdRef = useRef<Map<string, number>>(new Map());
-  /** 時間増加系7種＋おかえりが出現しなくなるまでの秒数。ownedItems（R以上）のスキルLv平均から算出する */
+  /** 時間増加系8種＋おかえりが出現しなくなるまでの秒数。ownedItems（R以上）のスキルLv平均から算出する */
   const timeBonusCutoffSecRef = useRef(TIME_BONUS_CUTOFF_BASE_SEC);
   /** ❓アイテムが確定させるスキルの抽選プール。持っていないキャラのスキルが出ないよう、所持アイテムだけに絞る */
   const mysterySkillPoolRef = useRef<string[]>(MYSTERY_SKILL_ITEM_IDS);
@@ -903,7 +1008,7 @@ export function FrenchieCatchGame({ ownedItems }: { ownedItems: FrenchieCatchIte
     soccer: null,
     gold: null,
   });
-  /** 時間増加系7種＋おかえりが出現しなくなるまでの秒数（スタート画面表示用）。timeBonusCutoffSecRefと同じ計算式 */
+  /** 時間増加系8種＋おかえりが出現しなくなるまでの秒数（スタート画面表示用）。timeBonusCutoffSecRefと同じ計算式 */
   const timeBonusCutoffSecDisplay = useMemo(() => {
     const rPlusItems = ownedItems.filter((item) => item.rarity !== "N");
     const totalLevel = rPlusItems.reduce((sum, item) => sum + item.level, 0);
@@ -913,6 +1018,17 @@ export function FrenchieCatchGame({ ownedItems }: { ownedItems: FrenchieCatchIte
       ? TIME_BONUS_CUTOFF_BASE_SEC
       : TIME_BONUS_CUTOFF_BASE_SEC + (Math.min(avgLevel, MAX_SKILL_LEVEL) - 1) * TIME_BONUS_CUTOFF_STEP_SEC_PER_LEVEL;
   }, [ownedItems]);
+  /**
+   * スタート画面表示用のカットオフ秒数。ダンボールNo.3「時間増加アップ」を直接装備している場合のみ
+   * 反映する（No.12「効果ルーレット」はラウンド開始まで抽選結果が定まらないため、ここでは加味しない。
+   * 実プレイ時の実効値はstartGame内でdambourleEffectRef確定後にtimeBonusCutoffSecRefへ反映する）。
+   */
+  const timeBonusCutoffSecDisplayWithDambourle = useMemo(() => {
+    const directPercent = dambourleEffect?.key === "time_bonus_cutoff_up"
+      ? dambourleEffectPercent("time_bonus_cutoff_up", dambourleEffect.level)
+      : 0;
+    return timeBonusCutoffSecDisplay * (1 + directPercent / 100);
+  }, [timeBonusCutoffSecDisplay, dambourleEffect]);
   useEffect(() => {
     itemLevelByIdRef.current = new Map(ownedItems.map((item) => [item.id, item.level]));
     timeBonusCutoffSecRef.current = timeBonusCutoffSecDisplay;
@@ -955,6 +1071,8 @@ export function FrenchieCatchGame({ ownedItems }: { ownedItems: FrenchieCatchIte
   const refreshEffectStatus = useCallback((now: number) => {
     const labels: string[] = [];
     let scoreMultiplierTotalValue = 1;
+    // ダンボールNo.2「スコア倍率アップ」：ラウンド中ずっと有効な固定倍率。上部「スコア倍率 ×X」に含める
+    scoreMultiplierTotalValue *= dambourleUpMultiplier("score_mult_up");
     const activeScoreMultipliers = scoreMultipliersRef.current.filter((entry) => entry.until > now);
     if (activeScoreMultipliers.length > 0) {
       // この倍率はSCORE表示の下の「スコア倍率 ×X」に表示済みのため、右側のスキルログには出さない
@@ -990,7 +1108,6 @@ export function FrenchieCatchGame({ ownedItems }: { ownedItems: FrenchieCatchIte
     if (now < spawnRateBoostUntilRef.current) labels.push(`アイテム出現量×${spawnRateBoostValueRef.current}中`);
     if (now < otherSuppressUntilRef.current) labels.push(`その他カテゴリ出現×${otherSuppressValueRef.current}中`);
     if (now < highRarityLockUntilRef.current) labels.push("SSR/UR/LRのみ出現中");
-    if (highRarityLockCountRef.current > 0) labels.push(`UR/LRのみ出現 あと${highRarityLockCountRef.current}体`);
     if (treasureStreakActiveRef.current) {
       // この倍率もSCORE表示の下の「スコア倍率 ×X」に含まれているため、右側のスキルログには出さない
       scoreMultiplierTotalValue *= treasureStreakMultRef.current;
@@ -1014,13 +1131,19 @@ export function FrenchieCatchGame({ ownedItems }: { ownedItems: FrenchieCatchIte
     if (urBoostRef.current > 0) labels.push(`UR出現率+${Math.min(urBoostRef.current, UR_BOOST_MAX)}`);
     if (now < narcissistUntilRef.current) labels.push("ナルシストアー発動中（全アイテムのスキルがLv.MAX）");
     if (mafiaDogBonusMultRef.current > 1) labels.push(`フレブル数ボーナス×${mafiaDogBonusMultRef.current.toFixed(2)}`);
+    if (dambourleEffectRef.current) {
+      const { key, percent } = dambourleEffectRef.current;
+      const label = DAMBOURLE_EFFECT_LABELS[key] ?? key;
+      const sign = key === "negative_spawn_down" ? "-" : "+";
+      labels.push(`${label} ${sign}${Math.round(percent)}%（装備中のダンボール）`);
+    }
     setActiveEffects(labels);
     setScoreMultiplierTotal(scoreMultiplierTotalValue);
   }, []);
 
   /**
    * excludeTimeBonus: ボーナス出現タイマー（アイテム量2倍化用）からの呼び出し専用。
-   * 時間増加系7種・そのスキンである夏のフレブル・？アイテム（時間増加系を引く可能性があるため）、
+   * 時間増加系8種・そのスキンである夏のフレブル・？アイテム（時間増加系を引く可能性があるため）、
    * および出現重みの計算式自体を書き換えるSPAWN_DYNAMICS_ITEM_IDSを一切対象にせず、
    * 既存のスポーンタイマー側の時間増加系取得ペースを完全に不変に保つ。
    */
@@ -1145,12 +1268,14 @@ export function FrenchieCatchGame({ ownedItems }: { ownedItems: FrenchieCatchIte
     const hazardShieldActive = performance.now() < hazardShieldUntilRef.current;
     const elapsedSec = (performance.now() - startAtRef.current) / 1000;
     const timeMinusWeightFactor = elapsedSec > TIME_MINUS_BOOST_AFTER_SEC ? TIME_MINUS_BOOSTED_WEIGHT / TIME_MINUS_BASE_WEIGHT : 1;
-    const timeMinusChance = TIME_MINUS_SPAWN_CHANCE * timeMinusWeightFactor;
+    /** ダンボールNo.7「マイナスアイテムの出現率ダウン」：時間減少/ダンボール縮小/イカスミ/しびれ/呪いのチョコレートの5種の出現率を一律で下げる */
+    const negativeSpawnDownFactor = dambourleDownMultiplier("negative_spawn_down");
+    const timeMinusChance = TIME_MINUS_SPAWN_CHANCE * timeMinusWeightFactor * negativeSpawnDownFactor;
     const timeMinusThreshold = POOP_SPAWN_CHANCE + mysteryChance + BAG_SPAWN_CHANCE + timeMinusChance;
-    const shrinkThreshold = timeMinusThreshold + BOX_SHRINK_SPAWN_CHANCE;
-    const blackoutThreshold = shrinkThreshold + BLACKOUT_SPAWN_CHANCE;
-    const stunThreshold = blackoutThreshold + STUN_SPAWN_CHANCE;
-    const chocolateThreshold = stunThreshold + CHOCOLATE_SPAWN_CHANCE;
+    const shrinkThreshold = timeMinusThreshold + BOX_SHRINK_SPAWN_CHANCE * negativeSpawnDownFactor;
+    const blackoutThreshold = shrinkThreshold + BLACKOUT_SPAWN_CHANCE * negativeSpawnDownFactor;
+    const stunThreshold = blackoutThreshold + STUN_SPAWN_CHANCE * negativeSpawnDownFactor;
+    const chocolateThreshold = stunThreshold + CHOCOLATE_SPAWN_CHANCE * negativeSpawnDownFactor;
     // マイナス要素のアイテム（うんち以外）も落下速度アップ系スキルの影響を受けないよう、vyはrawVy基準にする
     if (!hazardShieldActive && hazardRoll < timeMinusThreshold) return { ...base, itemId: TIME_MINUS_ITEM_ID, kind: "item", name: "時間 -3秒", image: TIME_MINUS_IMAGE, rarity: null, level: 0, vy: rawVy * TIME_MINUS_FALL_SPEED, size: 13 + Math.random() * 3, spin: (Math.random() - 0.5) * 28 };
     if (!hazardShieldActive && hazardRoll < shrinkThreshold) return { ...base, itemId: BOX_SHRINK_ITEM_ID, kind: "item", name: "ダンボール縮小", image: BOX_SHRINK_IMAGE, rarity: null, level: 0, vy: rawVy, size: 13 + Math.random() * 3, spin: (Math.random() - 0.5) * 28 };
@@ -1174,18 +1299,23 @@ export function FrenchieCatchGame({ ownedItems }: { ownedItems: FrenchieCatchIte
 
     const urBoostFactor = 1 + Math.min(urBoostRef.current, UR_BOOST_MAX) / 100;
     const otherSuppressActive = performance.now() < otherSuppressUntilRef.current;
-    const treasureRareLockActive = performance.now() < highRarityLockUntilRef.current;
-    const bureburLockActive = highRarityLockCountRef.current > 0;
-    const highRarityLockActive = treasureRareLockActive || bureburLockActive;
-    /** 両方同時に有効な場合は宝箱側(SSR/UR/LR)の対象を優先する（ブレブル単体ならUR/LRのみに絞る） */
-    const allowedHighRarities = treasureRareLockActive ? HIGH_RARITY_LOCK_RARITIES : BUREBUR_LOCK_RARITIES;
+    const highRarityLockActive = performance.now() < highRarityLockUntilRef.current;
     /**
-     * 出現量アップ中は時間増加系7種の重みをブースト倍率で割り、取得ペースがブーストなしの時と
+     * 出現量アップ中は時間増加系8種の重みをブースト倍率で割り、取得ペースがブーストなしの時と
      * 変わらないよう相殺する（詳細はdocs/minigame-time-balance.mdの「出現量ブーストの1/n相殺」参照）。
      * これにより出現量アップ側の倍率をどれだけ強くしても、時間増加系側のr値には影響しなくなる。
      */
     const spawnRateBoostActive = performance.now() < spawnRateBoostUntilRef.current;
     const timeBonusCutoffActive = elapsedSec >= timeBonusCutoffSecRef.current;
+    /**
+     * ダンボールNo.1「アイテム出現量アップ」：既存の出現量アップ系スキルと同じ「出現間隔そのものを
+     * 割る」方式（spawnRateへ反映、下のメインループ側）で、時間増加系8種の重みをこの倍率で
+     * 割って相殺する（上のコメント「出現量ブーストの1/n相殺」と同じ考え方をこちらにも適用する）。
+     */
+    const dambourlePermanentSpawnBoost = dambourleUpMultiplier("item_spawn_up");
+    const totalSpawnRateBoost = (spawnRateBoostActive ? spawnRateBoostValueRef.current : 1) * dambourlePermanentSpawnBoost;
+    /** ダンボールNo.8「時間系プールの出現率アップ」：時間増加系8種の重みだけを直接底上げする */
+    const timePoolRateUpFactor = dambourleUpMultiplier("time_pool_rate_up");
     const weightedItems = itemPool.map((item) => ({
       item,
       weight:
@@ -1194,10 +1324,10 @@ export function FrenchieCatchGame({ ownedItems }: { ownedItems: FrenchieCatchIte
         (otherSuppressActive && item.id !== STRETCH_ROD_ITEM_ID && OTHER_CATEGORY_ITEM_IDS.has(item.id)
           ? otherSuppressValueRef.current
           : 1) *
-        (highRarityLockActive && !allowedHighRarities.has(item.rarity) ? 0 : 1) *
+        (highRarityLockActive && !HIGH_RARITY_LOCK_RARITIES.has(item.rarity) ? 0 : 1) *
         (excludeTimeBonus && (TIME_BONUS_ITEM_IDS.has(item.id) || SPAWN_DYNAMICS_ITEM_IDS.has(item.id)) ? 0 : 1) *
         (timeBonusCutoffActive && TIME_BONUS_CUTOFF_ITEM_IDS.has(item.id) ? 0 : 1) *
-        (spawnRateBoostActive && TIME_BONUS_ITEM_IDS.has(item.id) ? 1 / spawnRateBoostValueRef.current : 1),
+        (TIME_BONUS_ITEM_IDS.has(item.id) ? timePoolRateUpFactor / totalSpawnRateBoost : 1),
     }));
     const itemWeightTotal = weightedItems.reduce((sum, entry) => sum + entry.weight, 0);
     const dogWeight =
@@ -1260,8 +1390,6 @@ export function FrenchieCatchGame({ ownedItems }: { ownedItems: FrenchieCatchIte
         break;
       }
     }
-
-    if (highRarityLockCountRef.current > 0) highRarityLockCountRef.current -= 1;
 
     return {
       ...base,
@@ -1363,7 +1491,8 @@ export function FrenchieCatchGame({ ownedItems }: { ownedItems: FrenchieCatchIte
     const finishRound = (now: number) => {
       const playSeconds = Math.max(0, (now - startAtRef.current) / 1000);
       const dogCount = dogCaughtRef.current;
-      const dogBonusPoints = Math.floor(dogCount * playSeconds * mafiaDogBonusMultRef.current);
+      // ダンボールNo.6「フレブルボーナスの倍率アップ」：マフィアーの累積倍率とは別枠でさらに掛け合わせる
+      const dogBonusPoints = Math.floor(dogCount * playSeconds * mafiaDogBonusMultRef.current * dambourleUpMultiplier("dog_bonus_mult_up"));
       if (dogBonusPoints > 0) {
         scoreRef.current += dogBonusPoints;
         setScore(scoreRef.current);
@@ -1447,7 +1576,8 @@ export function FrenchieCatchGame({ ownedItems }: { ownedItems: FrenchieCatchIte
         ? DOG_FLOOD_SPAWN_RATE
         : poopFloodRemainingRef.current > 0
         ? POOP_FLOOD_SPAWN_RATE
-        : now < spawnRateBoostUntilRef.current ? spawnRateBoostValueRef.current : 1;
+        // ダンボールNo.1「アイテム出現量アップ」ぶんを常時掛け合わせる（時間増加系の重み側で1/nを相殺済み）
+        : (now < spawnRateBoostUntilRef.current ? spawnRateBoostValueRef.current : 1) * dambourleUpMultiplier("item_spawn_up");
       const entityCap = spawnRate >= 3 ? TRIPLE_ENTITY_CAP : spawnRate >= 2 ? DOUBLE_ENTITY_CAP : NORMAL_ENTITY_CAP;
       if (now >= nextSpawnRef.current && entitiesRef.current.length < entityCap) {
         entitiesRef.current.push(createEntity());
@@ -1469,7 +1599,7 @@ export function FrenchieCatchGame({ ownedItems }: { ownedItems: FrenchieCatchIte
 
       const boxWide = now < boxWideUntilRef.current;
       const boxShrink = now < boxShrinkUntilRef.current;
-      const effectiveBoxScale = boxShrink ? BOX_SHRINK_SCALE : boxWide ? boxWideScaleRef.current : 1;
+      const effectiveBoxScale = (boxShrink ? BOX_SHRINK_SCALE : boxWide ? boxWideScaleRef.current : 1) * dambourleUpMultiplier("box_size_up");
       const effBoxHalf = BOX_HALF * effectiveBoxScale;
       const effBoxWidth = BOX_WIDTH * effectiveBoxScale;
       const magnetActive = now < magnetUntilRef.current;
@@ -1596,10 +1726,11 @@ export function FrenchieCatchGame({ ownedItems }: { ownedItems: FrenchieCatchIte
                 setBagStock(bagStockRef.current);
                 showCatch(entity, 0, "ビニール袋でノーダメージ！");
               } else {
-                // マイナス点も画面上部の「スコア倍率 ×X」と同じ倍率（時間経過系×宝箱連続ボーナス系×食べ物限定系）を反映する
+                // マイナス点も画面上部の「スコア倍率 ×X」と同じ倍率（時間経過系×宝箱連続ボーナス系×食べ物限定系×ダンボールNo.2）を反映する
                 const poopPenaltyMultiplier = getScoreMultiplierProduct(scoreMultipliersRef, now)
                   * (treasureStreakActiveRef.current ? treasureStreakMultRef.current : 1)
-                  * getScoreMultiplierProduct(foodScoreMultipliersRef, now);
+                  * getScoreMultiplierProduct(foodScoreMultipliersRef, now)
+                  * dambourleUpMultiplier("score_mult_up");
                 const poopPenalty = Math.round(POOP_PENALTY * poopPenaltyMultiplier);
                 scoreRef.current = Math.max(0, scoreRef.current - poopPenalty);
                 setScore(scoreRef.current);
@@ -1714,6 +1845,9 @@ export function FrenchieCatchGame({ ownedItems }: { ownedItems: FrenchieCatchIte
               statusChanged = true;
             }
 
+            // ダンボールNo.13「全アイテムの基礎スコアプラス」：基礎点を底上げする（固定pt系オーバーライドの後に適用）
+            basePoints = Math.round(basePoints * dambourleUpMultiplier("item_base_score_up"));
+
             const timedMultiplier = getScoreMultiplierProduct(scoreMultipliersRef, now);
             const hadActiveNextMultiplier = nextMultipliersRef.current.some((entry) => entry.remaining > 0);
             const nextMultiplier = consumeCountMultiplierProduct(nextMultipliersRef);
@@ -1722,8 +1856,10 @@ export function FrenchieCatchGame({ ownedItems }: { ownedItems: FrenchieCatchIte
               ? getScoreMultiplierProduct(foodScoreMultipliersRef, now)
               : 1;
             const streakMultiplier = treasureStreakActiveRef.current ? treasureStreakMultRef.current : 1;
-            // 種類の異なる得点倍率（時間経過系/次のN個系/食べ物限定系/宝箱連続ボーナス系）は重複中すべて掛け合わされる
-            const multiplier = timedMultiplier * nextMultiplier * foodMultiplier * streakMultiplier;
+            // ダンボールNo.2「スコア倍率アップ」：他系統の得点倍率と同様、重複中もすべて掛け合わされる
+            const dambourleScoreMultiplier = dambourleUpMultiplier("score_mult_up");
+            // 種類の異なる得点倍率（時間経過系/次のN個系/食べ物限定系/宝箱連続ボーナス系/ダンボール効果）は重複中すべて掛け合わされる
+            const multiplier = timedMultiplier * nextMultiplier * foodMultiplier * streakMultiplier * dambourleScoreMultiplier;
             let points = Math.round((basePoints + pendingBonus) * multiplier);
             let effectLabel: string | undefined;
 
@@ -1744,10 +1880,10 @@ export function FrenchieCatchGame({ ownedItems }: { ownedItems: FrenchieCatchIte
             const skillLevel = isMystery
               ? (itemLevelByIdRef.current.get(skillId ?? "") ?? 1)
               : (entity.level || 1);
-            /** ナルシストアー有効中は、捕まえた全アイテムのスキルがレベル5(MAX)として発動する */
+            /** ナルシストアー有効中は、捕まえた全アイテムのスキルが上限(No.11装備時はそのぶん底上げされた上限)として発動する */
             const narcissistActive = now < narcissistUntilRef.current;
-            const effectiveSkillLevel = narcissistActive ? MAX_SKILL_LEVEL : skillLevel;
-            const lv = clamp(effectiveSkillLevel, 1, MAX_SKILL_LEVEL) - 1;
+            const effectiveSkillLevel = narcissistActive ? skillLevelCap : skillLevel + dambourleSkillBoost;
+            const lv = clamp(effectiveSkillLevel, 1, skillLevelCap) - 1;
 
             const addBonusTime = (seconds: number) => {
               const maxEndAt = startAtRef.current + MAX_ROUND_SECONDS * 1000;
@@ -1835,7 +1971,7 @@ export function FrenchieCatchGame({ ownedItems }: { ownedItems: FrenchieCatchIte
                 statusChanged = true;
                 break;
               case "toy_meat":
-                addScoreMultiplier(scoreMultipliersRef, now, LV.MEAT_MULT[lv]!, SCORE_MULT_DURATION_SR_SEC * 1000);
+                addScoreMultiplier(scoreMultipliersRef, now, scaleDambourleBonusMultiplier(LV.MEAT_MULT[lv]!, dambourleUpMultiplier("score_mult_pool_effect_up")), SCORE_MULT_DURATION_SR_SEC * 1000);
                 effectLabel = `${SCORE_MULT_DURATION_SR_SEC}秒間 ×${LV.MEAT_MULT[lv]}${lvTag}`;
                 statusChanged = true;
                 break;
@@ -1864,7 +2000,7 @@ export function FrenchieCatchGame({ ownedItems }: { ownedItems: FrenchieCatchIte
                   const applied = addBonusTime(-TREASURE_MINUS5_SEC);
                   effectLabel = `宝箱 ${applied}秒${lvTag}`;
                 } else if (outcome === "item_double") {
-                  addScoreMultiplier(scoreMultipliersRef, now, LV.TREASURE_DOUBLE_MULT[lv]!, SCORE_MULT_DURATION_SR_SEC * 1000);
+                  addScoreMultiplier(scoreMultipliersRef, now, scaleDambourleBonusMultiplier(LV.TREASURE_DOUBLE_MULT[lv]!, dambourleUpMultiplier("score_mult_pool_effect_up")), SCORE_MULT_DURATION_SR_SEC * 1000);
                   effectLabel = `宝箱 ${SCORE_MULT_DURATION_SR_SEC}秒間 得点×${LV.TREASURE_DOUBLE_MULT[lv]}${lvTag}`;
                   statusChanged = true;
                 } else if (outcome === "rare_lock") {
@@ -1909,18 +2045,18 @@ export function FrenchieCatchGame({ ownedItems }: { ownedItems: FrenchieCatchIte
                 effectLabel = `${STRETCH_ROD_SECONDS}秒間 その他×${LV.STRETCH_ROD_MULT[lv]}${lvTag}`;
                 statusChanged = true;
                 break;
-              case BUREBUR_ITEM_ID:
-                highRarityLockCountRef.current = LV.BUREBUR_COUNT[lv]!;
-                effectLabel = `${LV.BUREBUR_COUNT[lv]}体 UR/LRのみ出現${lvTag}`;
-                statusChanged = true;
+              case BUREBUR_ITEM_ID: {
+                const applied = addBonusTime(LV.BUREBUR_SEC[lv]!);
+                effectLabel = `+${applied}秒${lvTag}`;
                 break;
+              }
               case XMAS_PARTY_ITEM_ID: {
                 const xmasSec = LV.XMAS_SEC[lv]!;
                 fallSpeedBoostUntilRef.current = Math.max(now, fallSpeedBoostUntilRef.current) + xmasSec * 1000;
                 fallSpeedValueRef.current = LV.XMAS_FALL[lv]!;
-                addScoreMultiplier(scoreMultipliersRef, now, LV.XMAS_SCORE[lv]!, SCORE_MULT_DURATION_MR_SEC * 1000);
+                addScoreMultiplier(scoreMultipliersRef, now, scaleDambourleBonusMultiplier(LV.XMAS_SCORE[lv]!, dambourleUpMultiplier("score_mult_pool_effect_up")), SCORE_MULT_DURATION_MR_SEC * 1000);
                 spawnRateBoostUntilRef.current = Math.max(now, spawnRateBoostUntilRef.current) + xmasSec * 1000;
-                spawnRateBoostValueRef.current = LV.XMAS_SPAWN[lv]!;
+                spawnRateBoostValueRef.current = scaleDambourleBonusMultiplier(LV.XMAS_SPAWN[lv]!, dambourleUpMultiplier("spawn_dynamics_effect_up"));
                 dogFloodRemainingRef.current += LV.XMAS_DOG_COUNT[lv]!;
                 effectLabel = `${xmasSec}秒間 落下×${LV.XMAS_FALL[lv]}+出現量×${LV.XMAS_SPAWN[lv]} / ${SCORE_MULT_DURATION_MR_SEC}秒間 得点×${LV.XMAS_SCORE[lv]} / フレブル${LV.XMAS_DOG_COUNT[lv]}体${lvTag}`;
                 statusChanged = true;
@@ -1932,7 +2068,7 @@ export function FrenchieCatchGame({ ownedItems }: { ownedItems: FrenchieCatchIte
                 statusChanged = true;
                 break;
               case "other_azubee":
-                addScoreMultiplier(scoreMultipliersRef, now, LV.AZUBEE_MULT[lv]!, SCORE_MULT_DURATION_UR_SEC * 1000);
+                addScoreMultiplier(scoreMultipliersRef, now, scaleDambourleBonusMultiplier(LV.AZUBEE_MULT[lv]!, dambourleUpMultiplier("score_mult_pool_effect_up")), SCORE_MULT_DURATION_UR_SEC * 1000);
                 effectLabel = `${SCORE_MULT_DURATION_UR_SEC}秒間 ×${LV.AZUBEE_MULT[lv]}${lvTag}`;
                 statusChanged = true;
                 break;
@@ -2002,7 +2138,7 @@ export function FrenchieCatchGame({ ownedItems }: { ownedItems: FrenchieCatchIte
                 break;
               }
               case "interior_spring_flower_wreath":
-                addScoreMultiplier(scoreMultipliersRef, now, LV.SPRING_MULT[lv]!, SCORE_MULT_DURATION_SR_SEC * 1000);
+                addScoreMultiplier(scoreMultipliersRef, now, scaleDambourleBonusMultiplier(LV.SPRING_MULT[lv]!, dambourleUpMultiplier("score_mult_pool_effect_up")), SCORE_MULT_DURATION_SR_SEC * 1000);
                 effectLabel = `${SCORE_MULT_DURATION_SR_SEC}秒間 ×${LV.SPRING_MULT[lv]}${lvTag}`;
                 statusChanged = true;
                 break;
@@ -2045,7 +2181,7 @@ export function FrenchieCatchGame({ ownedItems }: { ownedItems: FrenchieCatchIte
                   blackoutUntilRef.current = Math.max(now, blackoutUntilRef.current) + OYASUMI_SECONDS * 1000;
                   setBlackoutActive(true);
                 }
-                addScoreMultiplier(scoreMultipliersRef, now, oyasumiMult, OYASUMI_SECONDS * 1000);
+                addScoreMultiplier(scoreMultipliersRef, now, scaleDambourleBonusMultiplier(oyasumiMult, dambourleUpMultiplier("score_mult_pool_effect_up")), OYASUMI_SECONDS * 1000);
                 effectLabel = skipBlackout
                   ? `${OYASUMI_SECONDS}秒間 得点×${oyasumiMult}（ブラックアウトなし）${lvTag}`
                   : `${OYASUMI_SECONDS}秒間 上半分ブラックアウト 得点×${oyasumiMult}${lvTag}`;
@@ -2105,7 +2241,7 @@ export function FrenchieCatchGame({ ownedItems }: { ownedItems: FrenchieCatchIte
                 break;
               }
               case "other_kamunayo":
-                addScoreMultiplier(scoreMultipliersRef, now, LV.KAMUNAYO_MULT[lv]!, SCORE_MULT_DURATION_SSR_SEC * 1000);
+                addScoreMultiplier(scoreMultipliersRef, now, scaleDambourleBonusMultiplier(LV.KAMUNAYO_MULT[lv]!, dambourleUpMultiplier("score_mult_pool_effect_up")), SCORE_MULT_DURATION_SSR_SEC * 1000);
                 effectLabel = `${SCORE_MULT_DURATION_SSR_SEC}秒間 ×${LV.KAMUNAYO_MULT[lv]}${lvTag}`;
                 statusChanged = true;
                 break;
@@ -2123,7 +2259,7 @@ export function FrenchieCatchGame({ ownedItems }: { ownedItems: FrenchieCatchIte
                 break;
               case "summer_frenchie": {
                 const applied = addBonusTime(LV.SUMMER_ADD[lv]!);
-                addScoreMultiplier(scoreMultipliersRef, now, LV.SUMMER_MULT[lv]!, SCORE_MULT_DURATION_LR_SEC * 1000);
+                addScoreMultiplier(scoreMultipliersRef, now, scaleDambourleBonusMultiplier(LV.SUMMER_MULT[lv]!, dambourleUpMultiplier("score_mult_pool_effect_up")), SCORE_MULT_DURATION_LR_SEC * 1000);
                 effectLabel = `+${applied}秒 / ${SCORE_MULT_DURATION_LR_SEC}秒間×${LV.SUMMER_MULT[lv]}${lvTag}`;
                 statusChanged = true;
                 break;
@@ -2131,7 +2267,7 @@ export function FrenchieCatchGame({ ownedItems }: { ownedItems: FrenchieCatchIte
               case "interior_kinoko_azubee":
                 fallSpeedBoostUntilRef.current = Math.max(now, fallSpeedBoostUntilRef.current) + LV.KINOKO_SEC[lv]! * 1000;
                 fallSpeedValueRef.current = LV.KINOKO_FALL[lv]!;
-                addScoreMultiplier(scoreMultipliersRef, now, LV.KINOKO_SCORE[lv]!, SCORE_MULT_DURATION_UR_SEC * 1000);
+                addScoreMultiplier(scoreMultipliersRef, now, scaleDambourleBonusMultiplier(LV.KINOKO_SCORE[lv]!, dambourleUpMultiplier("score_mult_pool_effect_up")), SCORE_MULT_DURATION_UR_SEC * 1000);
                 effectLabel = `${LV.KINOKO_SEC[lv]}秒間 落下×${LV.KINOKO_FALL[lv]} / ${SCORE_MULT_DURATION_UR_SEC}秒間 得点×${LV.KINOKO_SCORE[lv]}${lvTag}`;
                 statusChanged = true;
                 break;
@@ -2150,7 +2286,7 @@ export function FrenchieCatchGame({ ownedItems }: { ownedItems: FrenchieCatchIte
               }
               case "other_kobee":
                 points += LV.KOBEE_PT[lv]!;
-                addScoreMultiplier(scoreMultipliersRef, now, LV.KOBEE_MULT[lv]!, SCORE_MULT_DURATION_UR_SEC * 1000);
+                addScoreMultiplier(scoreMultipliersRef, now, scaleDambourleBonusMultiplier(LV.KOBEE_MULT[lv]!, dambourleUpMultiplier("score_mult_pool_effect_up")), SCORE_MULT_DURATION_UR_SEC * 1000);
                 effectLabel = `+${LV.KOBEE_PT[lv]}pt / ${SCORE_MULT_DURATION_UR_SEC}秒間 ×${LV.KOBEE_MULT[lv]}${lvTag}`;
                 statusChanged = true;
                 break;
@@ -2193,7 +2329,7 @@ export function FrenchieCatchGame({ ownedItems }: { ownedItems: FrenchieCatchIte
                 const pondeomoSec = LV.PONDEOMO_SEC[lv]!;
                 const pondeomoSpawn = LV.PONDEOMO_SPAWN[lv]!;
                 spawnRateBoostUntilRef.current = Math.max(now, spawnRateBoostUntilRef.current) + pondeomoSec * 1000;
-                spawnRateBoostValueRef.current = pondeomoSpawn;
+                spawnRateBoostValueRef.current = scaleDambourleBonusMultiplier(pondeomoSpawn, dambourleUpMultiplier("spawn_dynamics_effect_up"));
                 effectLabel = `${pondeomoSec}秒間 アイテム出現量×${pondeomoSpawn}${lvTag}`;
                 statusChanged = true;
                 break;
@@ -2202,7 +2338,7 @@ export function FrenchieCatchGame({ ownedItems }: { ownedItems: FrenchieCatchIte
                 const pondearSec = LV.PONDEAR_SEC[lv]!;
                 const pondearSpawn = LV.PONDEAR_SPAWN[lv]!;
                 spawnRateBoostUntilRef.current = Math.max(now, spawnRateBoostUntilRef.current) + pondearSec * 1000;
-                spawnRateBoostValueRef.current = pondearSpawn;
+                spawnRateBoostValueRef.current = scaleDambourleBonusMultiplier(pondearSpawn, dambourleUpMultiplier("spawn_dynamics_effect_up"));
                 effectLabel = `${pondearSec}秒間 アイテム出現量×${pondearSpawn}${lvTag}`;
                 statusChanged = true;
                 break;
@@ -2211,7 +2347,7 @@ export function FrenchieCatchGame({ ownedItems }: { ownedItems: FrenchieCatchIte
                 const jareASec = LV.JARE_A_SEC[lv]!;
                 const jareASpawn = LV.JARE_A_SPAWN[lv]!;
                 spawnRateBoostUntilRef.current = Math.max(now, spawnRateBoostUntilRef.current) + jareASec * 1000;
-                spawnRateBoostValueRef.current = jareASpawn;
+                spawnRateBoostValueRef.current = scaleDambourleBonusMultiplier(jareASpawn, dambourleUpMultiplier("spawn_dynamics_effect_up"));
                 slantBoostUntilRef.current = Math.max(now, slantBoostUntilRef.current) + jareASec * 1000;
                 effectLabel = `${jareASec}秒間 アイテム出現量×${jareASpawn}+斜め落下${lvTag}`;
                 statusChanged = true;
@@ -2221,7 +2357,7 @@ export function FrenchieCatchGame({ ownedItems }: { ownedItems: FrenchieCatchIte
                 const shikkokuSec = LV.SHIKKOKU_SEC[lv]!;
                 fallSpeedBoostUntilRef.current = Math.max(now, fallSpeedBoostUntilRef.current) + shikkokuSec * 1000;
                 fallSpeedValueRef.current = LV.SHIKKOKU_FALL[lv]!;
-                addScoreMultiplier(scoreMultipliersRef, now, LV.SHIKKOKU_MULT[lv]!, SCORE_MULT_DURATION_LR_SEC * 1000);
+                addScoreMultiplier(scoreMultipliersRef, now, scaleDambourleBonusMultiplier(LV.SHIKKOKU_MULT[lv]!, dambourleUpMultiplier("score_mult_pool_effect_up")), SCORE_MULT_DURATION_LR_SEC * 1000);
                 effectLabel = `${shikkokuSec}秒間 落下×${LV.SHIKKOKU_FALL[lv]} / ${SCORE_MULT_DURATION_LR_SEC}秒間 得点×${LV.SHIKKOKU_MULT[lv]}${lvTag}`;
                 statusChanged = true;
                 break;
@@ -2238,7 +2374,7 @@ export function FrenchieCatchGame({ ownedItems }: { ownedItems: FrenchieCatchIte
                 const ragbySec = LV.RAGBY_SEC[lv]!;
                 const ragbySpawn = LV.RAGBY_SPAWN[lv]!;
                 spawnRateBoostUntilRef.current = Math.max(now, spawnRateBoostUntilRef.current) + ragbySec * 1000;
-                spawnRateBoostValueRef.current = ragbySpawn;
+                spawnRateBoostValueRef.current = scaleDambourleBonusMultiplier(ragbySpawn, dambourleUpMultiplier("spawn_dynamics_effect_up"));
                 effectLabel = `${ragbySec}秒間 アイテム出現量×${ragbySpawn}${lvTag}`;
                 statusChanged = true;
                 break;
@@ -2399,6 +2535,14 @@ export function FrenchieCatchGame({ ownedItems }: { ownedItems: FrenchieCatchIte
       setRewardPending(true);
       setRewardError(null);
       try {
+        // ダンボールNo.5「ゲーム終了時コイン増加」：スコアから見込まれるコイン数(100pt=1コイン、
+        // /api/coins/item-catchのCOIN_CONVERSION_POINTSと一致させる)の増加分を、既存のbonusCoins
+        // 経路（金のボール等と同じ枠）にまとめて上乗せする。MAX_BONUS_COINS_CLIENTを超えると
+        // リクエスト自体が失敗する（サーバー側の上限）ため、送信前に必ずクランプする。
+        const dambourleEndCoinBonus = dambourleEffectRef.current?.key === "end_coin_bonus"
+          ? Math.floor((scoreRef.current / 100) * (dambourleEffectRef.current.percent / 100))
+          : 0;
+        const bonusCoins = Math.min(MAX_BONUS_COINS_CLIENT, goldBonusCoinsRef.current + dambourleEndCoinBonus);
         const response = await fetch("/api/coins/item-catch", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -2407,7 +2551,7 @@ export function FrenchieCatchGame({ ownedItems }: { ownedItems: FrenchieCatchIte
             score: scoreRef.current,
             caughtCount: caughtRef.current,
             durationSeconds: ROUND_SECONDS,
-            bonusCoins: goldBonusCoinsRef.current,
+            bonusCoins,
           }),
         });
         const payload = (await response.json().catch(() => null)) as { coins?: number; error?: string } | null;
@@ -2430,6 +2574,10 @@ export function FrenchieCatchGame({ ownedItems }: { ownedItems: FrenchieCatchIte
 
   const startGame = useCallback(() => {
     const now = performance.now();
+    // No.12「効果ルーレット」はここで対象9種から抽選し、以後このラウンド中は固定する
+    dambourleEffectRef.current = resolveDambourleEffect(dambourleEffectPropRef.current);
+    timeBonusCutoffSecRef.current = timeBonusCutoffSecDisplay
+      * (1 + (dambourleEffectRef.current?.key === "time_bonus_cutoff_up" ? dambourleEffectRef.current.percent : 0) / 100);
     entitiesRef.current = [];
     entityNodeRefs.current.clear();
     mountedEntityIdsRef.current = new Set();
@@ -2472,7 +2620,6 @@ export function FrenchieCatchGame({ ownedItems }: { ownedItems: FrenchieCatchIte
     otherSuppressUntilRef.current = 0;
     otherSuppressValueRef.current = 1;
     highRarityLockUntilRef.current = 0;
-    highRarityLockCountRef.current = 0;
     treasureStreakActiveRef.current = false;
     treasureStreakMultRef.current = 1;
     omochiUntilRef.current = 0;
@@ -2506,7 +2653,6 @@ export function FrenchieCatchGame({ ownedItems }: { ownedItems: FrenchieCatchIte
     setCaught(0);
     setTimeLeft(ROUND_SECONDS);
     setFeedback(null);
-    setActiveEffects([]);
     setScoreMultiplierTotal(1);
     recentSkillEffectTimersRef.current.forEach((timer) => clearTimeout(timer));
     recentSkillEffectTimersRef.current.clear();
@@ -2521,8 +2667,10 @@ export function FrenchieCatchGame({ ownedItems }: { ownedItems: FrenchieCatchIte
     nextSpawnRef.current = now;
     extraSpawnRef.current = now;
     nextClawdSpawnRef.current = now;
+    // 装備中ダンボール効果はラウンド開始時から有効なので、最初のcatchを待たず状態表示に反映する
+    refreshEffectStatus(now);
     setPhase("playing");
-  }, []);
+  }, [timeBonusCutoffSecDisplay, refreshEffectStatus]);
 
   const moveBox = useCallback((clientX: number) => {
     if (performance.now() < stunUntilRef.current) return;
@@ -2530,7 +2678,7 @@ export function FrenchieCatchGame({ ownedItems }: { ownedItems: FrenchieCatchIte
     if (!rect || rect.width <= 0) return;
     const pointerX = ((clientX - rect.left) / rect.width) * 100;
     const now = performance.now();
-    const boxScale = now < boxShrinkUntilRef.current ? BOX_SHRINK_SCALE : now < boxWideUntilRef.current ? boxWideScaleRef.current : 1;
+    const boxScale = (now < boxShrinkUntilRef.current ? BOX_SHRINK_SCALE : now < boxWideUntilRef.current ? boxWideScaleRef.current : 1) * dambourleUpMultiplier("box_size_up");
     const dynamicHalf = BOX_HALF * boxScale;
     const nextX = clamp(pointerX - dragOffsetRef.current, dynamicHalf, 100 - dynamicHalf);
     boxXRef.current = nextX;
@@ -2674,7 +2822,7 @@ export function FrenchieCatchGame({ ownedItems }: { ownedItems: FrenchieCatchIte
           className={`absolute bottom-[0.5%] z-30 touch-none select-none rounded-3xl transition-[width,transform] duration-200 ${performance.now() < magnetUntilRef.current ? "shadow-[0_0_20px_6px_rgba(120,170,240,0.55)] ring-4 ring-sky-300/70" : ""}`}
           style={{
             left: `${boxX}%`,
-            width: `${BOX_WIDTH * (performance.now() < boxShrinkUntilRef.current ? BOX_SHRINK_SCALE : performance.now() < boxWideUntilRef.current ? boxWideScaleRef.current : 1)}%`,
+            width: `${BOX_WIDTH * (performance.now() < boxShrinkUntilRef.current ? BOX_SHRINK_SCALE : performance.now() < boxWideUntilRef.current ? boxWideScaleRef.current : 1) * dambourleUpMultiplier("box_size_up")}%`,
             height: `${BOX_HEIGHT}%`,
             transform: `translateX(-50%) scaleY(${boxBounce ? 1.015 : 1})`,
           }}
@@ -2684,7 +2832,7 @@ export function FrenchieCatchGame({ ownedItems }: { ownedItems: FrenchieCatchIte
           onPointerCancel={pointerEnd}
         >
           {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src={BOX_IMAGE} alt="拾ってくだブーと書かれた段ボール" draggable={false} className={`pointer-events-none absolute inset-0 h-full w-full ${performance.now() < boxWideUntilRef.current && performance.now() >= boxShrinkUntilRef.current ? "object-fill" : "object-contain"}`} />
+          <img src={equippedBoxImage} alt={equippedBoxAlt} draggable={false} className={`pointer-events-none absolute inset-0 h-full w-full ${performance.now() < boxWideUntilRef.current && performance.now() >= boxShrinkUntilRef.current ? "object-fill" : "object-contain"}`} />
           {stunned ? <span className="pointer-events-none absolute -right-4 top-1/2 -translate-y-1/2 text-2xl" aria-label="しびれ中">⚡</span> : null}
         </div>
 
@@ -2724,8 +2872,17 @@ export function FrenchieCatchGame({ ownedItems }: { ownedItems: FrenchieCatchIte
                 <>
                   <p className="text-[10px] font-black tracking-[0.18em] text-leaf-deep">ITEM CATCH</p>
                   <p className="mt-1 text-xl font-black text-ink">箱でキャッチしよう！</p>
-                  <p className="mt-3 text-[9px] text-ink-faint">時間増加系アイテムは{Math.round(timeBonusCutoffSecDisplay)}秒まで出現</p>
+                  <p className="mt-3 text-[9px] text-ink-faint">時間増加系アイテムは{Math.round(timeBonusCutoffSecDisplayWithDambourle)}秒まで出現</p>
                   <button type="button" onClick={startGame} className="mt-1.5 w-full rounded-full bg-leaf px-4 py-3 text-sm font-black text-white shadow-md active:translate-y-px">START</button>
+                  {showDambourlePicker ? (
+                    <button
+                      type="button"
+                      onClick={() => router.push("/games/item-catch/dambourle")}
+                      className="mt-2 w-full rounded-full border border-line bg-card px-4 py-2 text-xs font-black text-ink-soft shadow-sm active:translate-y-px"
+                    >
+                      ダンボールを選ぶ
+                    </button>
+                  ) : null}
                 </>
               )}
               <p className="mt-2 text-[9px] text-ink-faint">所持アイテム {itemPool.length}種類 + 初期フレブル</p>
