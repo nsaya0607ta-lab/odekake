@@ -3,6 +3,9 @@ import { isDambourleGachaEnabled } from "@/lib/dambourle/feature-flag";
 import { getDambourlePrize } from "@/lib/dambourle/prizes";
 import { requireUser } from "@/lib/supabase/server";
 
+/** 効果なしの初期ダンボール。ガチャの景品ではないため DAMBOURLE_PRIZES には無い特別なID。 */
+const DEFAULT_ITEM_ID = "default";
+
 /**
  * プレイ前の「装備中のダンボール＋スキン段階」の切り替え。
  * 所持・解放済みスキン段階のチェックはRPC(set_dambourle_equipped, SECURITY DEFINER)側で行う。
@@ -14,7 +17,11 @@ export async function PATCH(request: Request) {
   }
 
   const body = (await request.json().catch(() => null)) as { itemId?: unknown; skinIndex?: unknown } | null;
-  if (!body || typeof body.itemId !== "string" || !getDambourlePrize(body.itemId)) {
+  if (
+    !body ||
+    typeof body.itemId !== "string" ||
+    (body.itemId !== DEFAULT_ITEM_ID && !getDambourlePrize(body.itemId))
+  ) {
     return NextResponse.json({ error: "ダンボールが正しくありません。" }, { status: 400 });
   }
   if (typeof body.skinIndex !== "number" || !Number.isInteger(body.skinIndex) || body.skinIndex < 0 || body.skinIndex > 5) {
