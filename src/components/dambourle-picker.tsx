@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { createPortal } from "react-dom";
 import { DAMBOURLE_PRIZES } from "@/lib/dambourle/prizes";
 import { DEFAULT_BOX_ALT, DEFAULT_BOX_IMAGE, getDambourleBoxImage } from "@/lib/dambourle/box-image";
 import { getDambourleLevel, getDambourleMinSkinIndex, getDambourleUnlockedSkinTier } from "@/lib/dambourle/skill-levels";
@@ -25,18 +26,12 @@ export function DambourlePicker({ equippedItemId, equippedSkinIndex, ownedCounts
   const [pending, setPending] = useState(false);
   const [error, setError] = useState(false);
   const [saved, setSaved] = useState(false);
-  // BottomNav（bottom-nav.tsx）の実際の高さをそのつど測る。--nav-heightの決め打ちだと
-  // 実際のナビ高さとズレて確定バーとの間に隙間ができるため、隙間なくぴったり重ねる。
-  const [navHeight, setNavHeight] = useState(0);
+  // BottomNav（bottom-nav.tsx）の固定ボックス内にある差し込み口に確定バーをポータルする。
+  // 座標計算で高さを合わせるのではなく同じ固定ボックスに入れることで、隙間なくぴったり重ねる。
+  const [navSlot, setNavSlot] = useState<HTMLElement | null>(null);
 
   useEffect(() => {
-    const nav = document.querySelector(".app-bottom-nav");
-    if (!nav) return;
-    const update = () => setNavHeight(nav.getBoundingClientRect().height);
-    update();
-    const observer = new ResizeObserver(update);
-    observer.observe(nav);
-    return () => observer.disconnect();
+    setNavSlot(document.getElementById("bottom-nav-extra-slot"));
   }, []);
 
   const activeMaxTier = useMemo(() => {
@@ -166,34 +161,34 @@ export function DambourlePicker({ equippedItemId, equippedSkinIndex, ownedCounts
         </div>
       ) : null}
 
-      <div
-        className="fixed inset-x-0 z-30 border-t border-b border-line bg-card/95 px-4 py-3 backdrop-blur"
-        style={{ bottom: navHeight > 0 ? `${navHeight}px` : "calc(var(--nav-height) + var(--safe-bottom))" }}
-      >
-        {/* z-40のBottomNav(bottom-nav.tsx)より下・かぶらない位置に固定する */}
-        <div className="mx-auto flex max-w-md items-center gap-3">
-          <div className="min-w-0 flex-1">
-            <p className="truncate text-[11px] font-bold text-ink-soft">選択中：{activeName}</p>
-            {error ? (
-              <p className="text-[10px] font-bold text-blossom">変更できませんでした。もう一度お試しください。</p>
-            ) : saved ? (
-              <p className="text-[10px] font-bold text-leaf-deep">この見た目に変更しました！</p>
-            ) : isPreviewEquipped ? (
-              <p className="text-[10px] text-ink-faint">現在装備中です</p>
-            ) : (
-              <p className="text-[10px] text-ink-faint">まだ反映されていません</p>
-            )}
-          </div>
-          <button
-            type="button"
-            onClick={() => void confirm()}
-            disabled={pending || isPreviewEquipped}
-            className="shrink-0 rounded-full bg-leaf px-5 py-2.5 text-xs font-bold text-white shadow-sm active:translate-y-px disabled:opacity-45"
-          >
-            {pending ? "反映中…" : isPreviewEquipped ? "反映済み" : "この見た目にする"}
-          </button>
-        </div>
-      </div>
+      {navSlot &&
+        createPortal(
+          <div className="border-b border-line bg-card/95 px-4 py-3 backdrop-blur">
+            <div className="mx-auto flex max-w-md items-center gap-3">
+              <div className="min-w-0 flex-1">
+                <p className="truncate text-[11px] font-bold text-ink-soft">選択中：{activeName}</p>
+                {error ? (
+                  <p className="text-[10px] font-bold text-blossom">変更できませんでした。もう一度お試しください。</p>
+                ) : saved ? (
+                  <p className="text-[10px] font-bold text-leaf-deep">この見た目に変更しました！</p>
+                ) : isPreviewEquipped ? (
+                  <p className="text-[10px] text-ink-faint">現在装備中です</p>
+                ) : (
+                  <p className="text-[10px] text-ink-faint">まだ反映されていません</p>
+                )}
+              </div>
+              <button
+                type="button"
+                onClick={() => void confirm()}
+                disabled={pending || isPreviewEquipped}
+                className="shrink-0 rounded-full bg-leaf px-5 py-2.5 text-xs font-bold text-white shadow-sm active:translate-y-px disabled:opacity-45"
+              >
+                {pending ? "反映中…" : isPreviewEquipped ? "反映済み" : "この見た目にする"}
+              </button>
+            </div>
+          </div>,
+          navSlot,
+        )}
     </div>
   );
 }
