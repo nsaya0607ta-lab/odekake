@@ -10,6 +10,47 @@
   （ガイド画面の基礎ポイント表示・スコアシミュレーター。`frenchie-catch-game.tsx`の`POINTS`と
   値を二重管理しているため、基礎ポイントを変更したら必ずこちらも合わせて直すこと）
 
+## 【2026-09-06 最新確定14】Listen to the a-も緑りんごと同じ「並行スポーン」方式へ変更
+
+ユーザー指定で、緑りんご（最新確定13）と同じ理由でListen to the a-（`other_listen_to_the_a`）の
+初期フレブル大量発生も「他のアイテムの出現を止めない」方式に変更した。
+
+**変更前**：Listen to the a-はXmas Partyの初期フレブル大量発生と同じ`dogFloodRemainingRef`を
+共有しており、`createEntity`の優先分岐で通常の重み付き抽選を一時的に乗っ取っていた（指定体数の
+初期フレブルが出きるまで、他の通常アイテムが一切出現しなくなっていた）。
+
+**変更後**：`dogFloodRemainingRef`から分離し、緑りんご・Clawdと同じ「並行スポーン方式」の専用の
+`listenFloodRemainingRef` / `createListenDogEntity` / `nextListenSpawnRef`を新設した。
+**Xmas Partyの初期フレブル大量発生は`dogFloodRemainingRef`のまま変更していない**（落下速度アップ・
+出現量アップ・得点倍率と同時発動する演出の一部であり、今回のユーザー指定はListen to the a-のみ
+のため）。
+
+**変更内容**
+- `frenchie-catch-game.tsx`：
+  - `listenFloodRemainingRef` / `nextListenSpawnRef`を新設。
+  - `createListenDogEntity`（`createGreenAppleEntity`と同型のuseCallback、`DOG_FLOOD_FALL_SPEED`
+    だけ元のdogFlood分岐と同じ値を維持）を新設。
+  - `case DOG_FLOOD_ITEM_ID`（`other_listen_to_the_a`）の加算先を`dogFloodRemainingRef`から
+    `listenFloodRemainingRef`に変更（Xmas Party側の`case "other_xmas_party"`は
+    `dogFloodRemainingRef`のまま）。
+  - `frame`内、緑りんごの並行スポーン処理のすぐ下に同じ形の処理を追加。
+  - ラウンド開始時のリセットに`nextListenSpawnRef.current = now`、終了時のリセットに
+    `listenFloodRemainingRef.current = 0`を追加。
+- `scripts/simulate-item-catch.mjs`：`listenFloodRemaining`を`dogFloodRemaining`から分離し、
+  `continue`せず通常抽選と並行して処理するよう変更（Xmas Party分の`dogFloodRemaining`はそのまま）。
+
+**検算結果**（`node scripts/simulate-item-catch.mjs 3000 avoid`、変更後、N=92）
+
+| Lv | 秒数平均 | 秒数中央値 | スコア平均 | 500秒超え |
+|---|---|---|---|---|
+| 1 | 86.0秒 | 83.0秒 | 28,768 | 0% |
+| 2 | 120.5秒 | 118.0秒 | 50,720 | 0% |
+| 3 | 151.8秒 | 152.0秒 | 81,696 | 0% |
+| 4 | 187.2秒 | 187.0秒 | 130,615 | 0% |
+| 5 | 228.0秒 | 228.0秒 | 216,763 | 0% |
+
+3000試行、全Lvで500秒超え0%を確認。
+
 ## 【2026-09-06 最新確定13】緑りんごを「他のアイテムの出現を止める」フラッド方式から「並行スポーン」方式へ変更
 
 ユーザー指定で、「緑りんごは他のアイテムが出なくなるようにはしない（他のアイテムと共存して降ってくる）」

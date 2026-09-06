@@ -935,6 +935,7 @@ export function FrenchieCatchGame({
   /** Clawdのボールは通常アイテムの抽選を妨げず、独立したタイマーで並行して降らせる */
   const nextClawdSpawnRef = useRef(0);
   const nextGreenAppleSpawnRef = useRef(0);
+  const nextListenSpawnRef = useRef(0);
   const rafRef = useRef<number | null>(null);
   /** setScoreで画面表示する直前に必ずMath.ceilで整数化する（各加算箇所は既に整数のはずだが、
    * 表示側でも保険をかけて小数点表示が絶対に出ないようにする）。 */
@@ -985,6 +986,8 @@ export function FrenchieCatchGame({
   /** 食べ物カテゴリ限定倍率（二足A）の有効中エントリ一覧。重複取得時は掛け合わされる */
   const foodScoreMultipliersRef = useRef<TimedMultiplierEntry[]>([]);
   const dogFloodRemainingRef = useRef(0);
+  /** Listen to the a-：他のアイテムの出現を止めない並行スポーン方式（緑りんごと同じ扱い）。Xmas Partyのdog大量発生はdogFloodRemainingRefのまま */
+  const listenFloodRemainingRef = useRef(0);
   const personFloodRemainingRef = useRef(0);
   const clawdBallFloodRemainingRef = useRef(0);
   /** Mrs. GREEN アーPPLE成功時に降ってくる「MR」の残数。未所持のものは出さないよう所持アイテムだけに絞る */
@@ -1535,6 +1538,41 @@ export function FrenchieCatchGame({
   }, []);
 
   /**
+   * Listen to the a-：他のアイテムの出現を止めず、通常のスポーンと並行して初期フレブルが追加で
+   * 降ってくる（緑りんご・Clawdと同じ「並行スポーン」方式）。Xmas Partyのdog大量発生は
+   * 従来通りdogFloodRemainingRefのフラッド方式のまま（落下速度アップ等と同時発動する演出のため）。
+   */
+  const createListenDogEntity = useCallback((): Entity => {
+    const fallSpeedBoost = performance.now() < fallSpeedBoostUntilRef.current ? fallSpeedValueRef.current : 1;
+    const slantBoost = performance.now() < slantBoostUntilRef.current ? SLANT_VX_BOOST : 1;
+    const rawVy = (17 + Math.random() * 5) * 1.35;
+    const spawnX = 9 + Math.random() * 82;
+    const spawnY = -13 - Math.random() * 5;
+    return {
+      id: nextIdRef.current++,
+      x: spawnX,
+      y: spawnY,
+      spawnX,
+      spawnY,
+      vx: (Math.random() - 0.5) * 2.4 * slantBoost,
+      vy: rawVy * fallSpeedBoost * DOG_FLOOD_FALL_SPEED,
+      rotation: (Math.random() - 0.5) * 12,
+      status: "falling" as const,
+      rimChecked: false,
+      enteredOpening: false,
+      ttl: 0,
+      itemId: null,
+      kind: "dog",
+      name: "初期フレブル",
+      image: "/characters/default/front.webp",
+      rarity: null,
+      level: 0,
+      size: 19,
+      spin: (Math.random() - 0.5) * 20,
+    };
+  }, []);
+
+  /**
    * スキル発動ログを画面上部の細い帯にトースト表示する。
    * 常時表示のログ欄にするとプレイ画面が覆われるため、直近3件までをキューに積んで
    * 一定時間後に自動で消す方式にしている（見た目上はゲーム画面を邪魔しない）。
@@ -1718,6 +1756,12 @@ export function FrenchieCatchGame({
         mrsGreenAppleSpawnRemainingRef.current -= 1;
         entitiesRef.current.push(createGreenAppleEntity());
         nextGreenAppleSpawnRef.current = now + SPAWN_INTERVAL_MIN_MS + Math.random() * (SPAWN_INTERVAL_MAX_MS - SPAWN_INTERVAL_MIN_MS);
+      }
+      // Listen to the a-も他のアイテムのスポーンを止めず、並行スポーンで初期フレブルを追加投入する
+      if (listenFloodRemainingRef.current > 0 && now >= nextListenSpawnRef.current && entitiesRef.current.length < entityCap) {
+        listenFloodRemainingRef.current -= 1;
+        entitiesRef.current.push(createListenDogEntity());
+        nextListenSpawnRef.current = now + SPAWN_INTERVAL_MIN_MS + Math.random() * (SPAWN_INTERVAL_MAX_MS - SPAWN_INTERVAL_MIN_MS);
       }
 
       const boxWide = now < boxWideUntilRef.current;
@@ -2202,7 +2246,7 @@ export function FrenchieCatchGame({
                 break;
               }
               case DOG_FLOOD_ITEM_ID:
-                dogFloodRemainingRef.current += LV.LISTEN_DOG_COUNT[lv]!;
+                listenFloodRemainingRef.current += LV.LISTEN_DOG_COUNT[lv]!;
                 effectLabel = `フレブル${LV.LISTEN_DOG_COUNT[lv]}体 大量発生${lvTag}`;
                 statusChanged = true;
                 break;
@@ -2792,6 +2836,7 @@ export function FrenchieCatchGame({
     hazardShieldUntilRef.current = 0;
     foodScoreMultipliersRef.current = [];
     dogFloodRemainingRef.current = 0;
+    listenFloodRemainingRef.current = 0;
     personFloodRemainingRef.current = 0;
     clawdBallFloodRemainingRef.current = 0;
     mrFloodRemainingRef.current = 0;
@@ -2838,6 +2883,7 @@ export function FrenchieCatchGame({
     extraSpawnRef.current = now;
     nextClawdSpawnRef.current = now;
     nextGreenAppleSpawnRef.current = now;
+    nextListenSpawnRef.current = now;
     // 装備中ダンボール効果はラウンド開始時から有効なので、最初のcatchを待たず状態表示に反映する
     refreshEffectStatus(now);
     setPhase("playing");

@@ -250,7 +250,7 @@ function simulateOneRound(lv, catchAll, timeBonusCatchRate = 0.8, normalCatchRat
 
   function isDense() {
     return dogFloodRemaining > 0 || poopFloodRemaining > 0 || personFloodRemaining > 0 || clawdFloodRemaining > 0
-      || greenAppleRemaining > 0 || mrFloodRemaining > 0 || t < spawnRateBoostUntil;
+      || greenAppleRemaining > 0 || mrFloodRemaining > 0 || listenFloodRemaining > 0 || t < spawnRateBoostUntil;
   }
   function attemptCatch() {
     return Math.random() < (isDense() ? denseCatchRate : normalCatchRate);
@@ -260,6 +260,7 @@ function simulateOneRound(lv, catchAll, timeBonusCatchRate = 0.8, normalCatchRat
   let otherSuppressUntil = 0, otherSuppressValue = 1;
   let highRarityLockUntil = 0;
   let dogFloodRemaining = 0, poopFloodRemaining = 0, personFloodRemaining = 0, clawdFloodRemaining = 0;
+  let listenFloodRemaining = 0;
   let greenAppleRemaining = 0, greenAppleCaught = 0, greenAppleNeed = 0, greenAppleMrCount = 0, mrFloodRemaining = 0;
   let nextBonus5 = 0, nextBonus5Value = 0;
   let nextBonus10 = 0, nextBonus10Value = 0;
@@ -323,7 +324,8 @@ function simulateOneRound(lv, catchAll, timeBonusCatchRate = 0.8, normalCatchRat
         spawnRateBoostUntil = t + LV.XMAS_SEC[lvIdx] * 1000; spawnRateBoostValue = LV.XMAS_SPAWN[lvIdx];
         dogFloodRemaining += LV.XMAS_DOG_COUNT[lvIdx];
         break;
-      case "other_listen_to_the_a": dogFloodRemaining += LV.LISTEN_DOG_COUNT[lvIdx]; break;
+      // Listen to the a-は他のアイテムの出現を止めない並行スポーン方式（continueせずに通常抽選も続行）
+      case "other_listen_to_the_a": listenFloodRemaining += LV.LISTEN_DOG_COUNT[lvIdx]; break;
       case "other_azubee": multiplier2Until = t + SCORE_MULT_DURATION_UR_SEC * 1000; multiplier2Value = LV.AZUBEE_MULT[lvIdx]; break;
       case "other_omojii": addBonusTime(LV.OMOJII_SEC[lvIdx]); points += LV.OMOJII_PT[lvIdx]; break;
       case "food_paw_pudding": points += LV.PUDDING_PT[lvIdx]; break;
@@ -448,6 +450,8 @@ function simulateOneRound(lv, catchAll, timeBonusCatchRate = 0.8, normalCatchRat
     if (excludeTimeBonus) nextExtraT = t + dt; else nextT = t + dt;
 
     if (dogFloodRemaining > 0) { dogFloodRemaining -= 1; if (attemptCatch()) resolveCatch("dog", null, null, 0); continue; }
+    // Listen to the a-は並行スポーンのためcontinueせず、同じtickで通常抽選も続行する
+    if (listenFloodRemaining > 0) { listenFloodRemaining -= 1; if (attemptCatch()) resolveCatch("dog", null, null, 0); }
     if (mrFloodRemaining > 0) {
       mrFloodRemaining -= 1;
       // ブレブルは時間増加系カットオフの対象なので、カットオフ発動中はMRフラッドの抽選からも除外する
