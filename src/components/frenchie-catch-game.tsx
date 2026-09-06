@@ -934,6 +934,7 @@ export function FrenchieCatchGame({
   const extraSpawnRef = useRef(0);
   /** Clawdのボールは通常アイテムの抽選を妨げず、独立したタイマーで並行して降らせる */
   const nextClawdSpawnRef = useRef(0);
+  const nextGreenAppleSpawnRef = useRef(0);
   const rafRef = useRef<number | null>(null);
   /** setScoreで画面表示する直前に必ずMath.ceilで整数化する（各加算箇所は既に整数のはずだが、
    * 表示側でも保険をかけて小数点表示が絶対に出ないようにする）。 */
@@ -1256,21 +1257,6 @@ export function FrenchieCatchGame({
       };
     }
 
-    if (mrsGreenAppleSpawnRemainingRef.current > 0) {
-      mrsGreenAppleSpawnRemainingRef.current -= 1;
-      return {
-        ...base,
-        itemId: GREEN_APPLE_ITEM_ID,
-        kind: "item",
-        name: "緑りんご",
-        image: GREEN_APPLE_IMAGE,
-        rarity: null,
-        level: 0,
-        size: 13 + Math.random() * 3,
-        spin: (Math.random() - 0.5) * 30,
-      };
-    }
-
     if (poopFloodRemainingRef.current > 0) {
       poopFloodRemainingRef.current -= 1;
       return {
@@ -1515,6 +1501,40 @@ export function FrenchieCatchGame({
   }, []);
 
   /**
+   * Mrs. GREEN アーPPLEの緑りんご：他のアイテムの出現を止めず、通常のスポーンと並行して
+   * 追加で降ってくる（Clawdのサッカーボール／ゴールドボールと同じ「並行スポーン」方式）。
+   */
+  const createGreenAppleEntity = useCallback((): Entity => {
+    const fallSpeedBoost = performance.now() < fallSpeedBoostUntilRef.current ? fallSpeedValueRef.current : 1;
+    const slantBoost = performance.now() < slantBoostUntilRef.current ? SLANT_VX_BOOST : 1;
+    const rawVy = (17 + Math.random() * 5) * 1.35;
+    const spawnX = 9 + Math.random() * 82;
+    const spawnY = -13 - Math.random() * 5;
+    return {
+      id: nextIdRef.current++,
+      x: spawnX,
+      y: spawnY,
+      spawnX,
+      spawnY,
+      vx: (Math.random() - 0.5) * 2.4 * slantBoost,
+      vy: rawVy * fallSpeedBoost,
+      rotation: (Math.random() - 0.5) * 12,
+      status: "falling" as const,
+      rimChecked: false,
+      enteredOpening: false,
+      ttl: 0,
+      itemId: GREEN_APPLE_ITEM_ID,
+      kind: "item",
+      name: "緑りんご",
+      image: GREEN_APPLE_IMAGE,
+      rarity: null,
+      level: 0,
+      size: 13 + Math.random() * 3,
+      spin: (Math.random() - 0.5) * 30,
+    };
+  }, []);
+
+  /**
    * スキル発動ログを画面上部の細い帯にトースト表示する。
    * 常時表示のログ欄にするとプレイ画面が覆われるため、直近3件までをキューに積んで
    * 一定時間後に自動で消す方式にしている（見た目上はゲーム画面を邪魔しない）。
@@ -1692,6 +1712,12 @@ export function FrenchieCatchGame({
           entitiesRef.current.push(ball);
         }
         nextClawdSpawnRef.current = now + SPAWN_INTERVAL_MIN_MS + Math.random() * (SPAWN_INTERVAL_MAX_MS - SPAWN_INTERVAL_MIN_MS);
+      }
+      // 緑りんごも他のアイテムのスポーンを止めず、並行スポーンで追加投入する
+      if (mrsGreenAppleSpawnRemainingRef.current > 0 && now >= nextGreenAppleSpawnRef.current && entitiesRef.current.length < entityCap) {
+        mrsGreenAppleSpawnRemainingRef.current -= 1;
+        entitiesRef.current.push(createGreenAppleEntity());
+        nextGreenAppleSpawnRef.current = now + SPAWN_INTERVAL_MIN_MS + Math.random() * (SPAWN_INTERVAL_MAX_MS - SPAWN_INTERVAL_MIN_MS);
       }
 
       const boxWide = now < boxWideUntilRef.current;
@@ -2811,6 +2837,7 @@ export function FrenchieCatchGame({
     nextSpawnRef.current = now;
     extraSpawnRef.current = now;
     nextClawdSpawnRef.current = now;
+    nextGreenAppleSpawnRef.current = now;
     // 装備中ダンボール効果はラウンド開始時から有効なので、最初のcatchを待たず状態表示に反映する
     refreshEffectStatus(now);
     setPhase("playing");

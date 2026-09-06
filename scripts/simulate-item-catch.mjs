@@ -456,6 +456,7 @@ function simulateOneRound(lv, catchAll, timeBonusCatchRate = 0.8, normalCatchRat
       if (attemptCatch()) resolveCatch("item", pid, item.rarity, lv + 1);
       continue;
     }
+    // 緑りんごは他のアイテムの出現を止めない（並行スポーン）ため、continueせず通常抽選も同じtickで続行する
     if (greenAppleRemaining > 0) {
       greenAppleRemaining -= 1;
       if (attemptCatch()) { greenAppleCaught += 1; score += GREEN_APPLE_POINTS; }
@@ -463,7 +464,6 @@ function simulateOneRound(lv, catchAll, timeBonusCatchRate = 0.8, normalCatchRat
         if (greenAppleCaught >= greenAppleNeed) mrFloodRemaining += greenAppleMrCount;
         greenAppleCaught = 0; greenAppleNeed = 0; greenAppleMrCount = 0;
       }
-      continue;
     }
     if (personFloodRemaining > 0) {
       personFloodRemaining -= 1;

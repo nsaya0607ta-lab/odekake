@@ -10,6 +10,47 @@
   （ガイド画面の基礎ポイント表示・スコアシミュレーター。`frenchie-catch-game.tsx`の`POINTS`と
   値を二重管理しているため、基礎ポイントを変更したら必ずこちらも合わせて直すこと）
 
+## 【2026-09-06 最新確定13】緑りんごを「他のアイテムの出現を止める」フラッド方式から「並行スポーン」方式へ変更
+
+ユーザー指定で、「緑りんごは他のアイテムが出なくなるようにはしない（他のアイテムと共存して降ってくる）」
+という仕様に修正した。
+
+**変更前の問題**：緑りんご（`GREEN_APPLE_ITEM_ID`）は`mrsGreenAppleSpawnRemainingRef`を使い、
+うんち祭り(poopFlood)やフレブル大量発生(dogFlood)と同じ「フラッド方式」で実装していた。この方式は
+`createEntity`内の優先分岐で通常の重み付き抽選そのものを一時的に乗っ取るため、緑りんご10個が
+出きるまでの間、通常アイテム・普通のフレブルが一切出現しなくなっていた（宝箱のうんち祭り等と
+同じ仕様だが、緑りんごについてはユーザーの意図と異なっていた）。
+
+**変更後**：Clawdのサッカーボール／ゴールドボール（`clawdBallFloodRemainingRef` /
+`createClawdBallEntity` / `nextClawdSpawnRef`。「通常の出現とは別の抽選枠で並行して降ってくる」
+実装）と全く同じ「並行スポーン方式」に変更した。
+
+**変更内容**
+- `frenchie-catch-game.tsx`：
+  - `createEntity`内の緑りんご専用分岐（優先的にcreateEntityの戻り値を乗っ取る方式）を削除。
+  - `createGreenAppleEntity`（`createClawdBallEntity`と同型のuseCallback）を新設。
+  - `nextGreenAppleSpawnRef`を新設し、`frame`内のClawdボール処理のすぐ下に、同じ形の
+    「`mrsGreenAppleSpawnRemainingRef > 0` かつ `now >= nextGreenAppleSpawnRef.current` なら
+    `entitiesRef.current`へ直接push」処理を追加（通常スポーン・ボーナススポーンとは独立したタイマー）。
+  - ラウンド開始時のリセット処理に`nextGreenAppleSpawnRef.current = now`を追加。
+  - `mrsGreenAppleUnresolvedRef`（何個決着したかのカウント）や捕まえた際の処理・見送り(画面外)判定は
+    変更なし（スポーン方式が変わっただけで、ラウンドの成功／失敗判定ロジック自体は影響を受けない）。
+- `scripts/simulate-item-catch.mjs`：`greenAppleRemaining`処理から`continue`を削除し、同じtickで
+  通常の重み付き抽選も続けて行われるようにした（Clawdの`clawdFloodRemaining`処理と同じ形。
+  元々`continue`が無かった）。
+
+**検算結果**（`node scripts/simulate-item-catch.mjs 3000 avoid`、変更後、N=92）
+
+| Lv | 秒数平均 | 秒数中央値 | スコア平均 | 500秒超え |
+|---|---|---|---|---|
+| 1 | 87.0秒 | 85.0秒 | 28,833 | 0% |
+| 2 | 119.9秒 | 118.0秒 | 49,954 | 0% |
+| 3 | 150.4秒 | 149.0秒 | 79,397 | 0% |
+| 4 | 180.8秒 | 182.0秒 | 122,026 | 0% |
+| 5 | 220.1秒 | 224.0秒 | 196,964 | 0% |
+
+3000試行、全Lvで500秒超え0%を確認。
+
 ## 【2026-09-06 最新確定12】Mrs. GREEN アーPPLEの緑りんご必要数をLvごとに1個ずつ減る形へ変更
 
 ユーザー指定で、最新確定11で入れた緑りんご必要数（8/7/7/6/6、Lv2・Lv3とLv4・Lv5がそれぞれ同値だった）
