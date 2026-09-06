@@ -2,7 +2,7 @@ plugins { id("com.android.application"); id("org.jetbrains.kotlin.android") }
 
 android {
     namespace = "com.odekake.stepsync"
-    compileSdk = 35
+    compileSdk = 36
     defaultConfig {
         applicationId = "com.odekake.stepsync"
         minSdk = 28
