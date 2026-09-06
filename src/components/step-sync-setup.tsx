@@ -5,10 +5,12 @@ import { useState } from "react";
 type Status = "idle" | "loading" | "ready" | "revoked" | "error";
 
 export function StepSyncSetup({ endpoint }: { endpoint: string }) {
+  const [platform, setPlatform] = useState<"iphone" | "android">("iphone");
   const [status, setStatus] = useState<Status>("idle");
   const [token, setToken] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
+  const [endpointCopied, setEndpointCopied] = useState(false);
 
   async function issueToken() {
     setStatus("loading");
@@ -51,12 +53,39 @@ export function StepSyncSetup({ endpoint }: { endpoint: string }) {
     window.setTimeout(() => setCopied(false), 1800);
   }
 
+  async function copyEndpoint() {
+    await navigator.clipboard.writeText(endpoint);
+    setEndpointCopied(true);
+    window.setTimeout(() => setEndpointCopied(false), 1800);
+  }
+
   return (
     <div className="space-y-4">
+      <div className="grid grid-cols-2 gap-2 rounded-2xl bg-paper-deep p-1.5">
+        <button
+          type="button"
+          className={`rounded-xl px-3 py-2.5 text-sm font-bold ${platform === "iphone" ? "bg-card text-ink shadow-sm" : "text-ink-soft"}`}
+          onClick={() => setPlatform("iphone")}
+        >
+          iPhone
+        </button>
+        <button
+          type="button"
+          className={`rounded-xl px-3 py-2.5 text-sm font-bold ${platform === "android" ? "bg-card text-ink shadow-sm" : "text-ink-soft"}`}
+          onClick={() => setPlatform("android")}
+        >
+          Android
+        </button>
+      </div>
+
       <section className="rough-card p-5">
-        <p className="text-sm font-bold">iPhoneヘルスケア → おでかけ記録</p>
+        <p className="text-sm font-bold">
+          {platform === "iphone" ? "iPhoneヘルスケア → おでかけ記録" : "Android Health Connect → おでかけ記録"}
+        </p>
         <p className="mt-2 text-xs leading-6 text-ink-soft">
-          iPhoneの「ショートカット」を橋渡しにして、ヘルスケアの歩数をこのアプリへ送ります。
+          {platform === "iphone"
+            ? "iPhoneの「ショートカット」を橋渡しにして、ヘルスケアの歩数をこのアプリへ送ります。"
+            : "Android用の歩数連携アプリが、Health Connectの今日の歩数をこのアプリへ送ります。"}
           同じ日の歩数は上書き同期されるため、何度実行しても歩数EXPが重複することはありません。
         </p>
       </section>
@@ -90,7 +119,7 @@ export function StepSyncSetup({ endpoint }: { endpoint: string }) {
         </p>
       </section>
 
-      <section className="rough-card p-5">
+      {platform === "iphone" ? <section className="rough-card p-5">
         <p className="font-bold">2. iPhoneのショートカットを作成</p>
         <ol className="mt-3 space-y-3 text-xs leading-6 text-ink-soft">
           <li><span className="font-bold text-ink">①</span> ヘルスケアから「今日の歩数」の合計を取得します。</li>
@@ -105,12 +134,31 @@ export function StepSyncSetup({ endpoint }: { endpoint: string }) {
           <p className="mt-3 text-[10px] font-semibold text-ink-faint">JSON</p>
           <pre className="mt-1 overflow-x-auto rounded-xl bg-card p-2 font-mono text-[11px] text-ink">{`{\n  "steps": 今日の歩数合計\n}`}</pre>
         </div>
-      </section>
+      </section> : (
+        <section className="rough-card p-5">
+          <p className="font-bold">2. Android連携アプリを設定</p>
+          <ol className="mt-3 space-y-3 text-xs leading-6 text-ink-soft">
+            <li><span className="font-bold text-ink">①</span> Android Studioから「おでかけ歩数連携」を端末へインストールします。</li>
+            <li><span className="font-bold text-ink">②</span> 下の送信先URLと、上で発行した連携キーをアプリに入力します。</li>
+            <li><span className="font-bold text-ink">③</span> Health Connectの「歩数」と「バックグラウンド読み取り」を許可します。</li>
+            <li><span className="font-bold text-ink">④</span> 「今すぐ同期」を押して、歩数が反映されることを確認します。</li>
+          </ol>
+          <div className="mt-4 rounded-2xl border border-line bg-paper-deep/60 p-3 text-xs">
+            <p className="text-[10px] font-semibold text-ink-faint">送信先URL</p>
+            <p className="mt-1 break-all font-mono text-[11px] text-ink">{endpoint}</p>
+            <button type="button" className="btn btn-quiet mt-3 w-full" onClick={copyEndpoint}>
+              {endpointCopied ? "コピーしました" : "送信先URLをコピー"}
+            </button>
+          </div>
+        </section>
+      )}
 
       <section className="rough-card p-5">
-        <p className="font-bold">3. 自動化</p>
+        <p className="font-bold">3. {platform === "iphone" ? "自動化" : "自動同期"}</p>
         <p className="mt-2 text-xs leading-6 text-ink-soft">
-          ショートカットの「オートメーション」で時刻を指定して実行します。1日1回でも使えますが、昼・夕方・夜に複数回実行しても同じ日の歩数を更新するだけなので安全です。
+          {platform === "iphone"
+            ? "ショートカットの「オートメーション」で時刻を指定して実行します。1日1回でも使えますが、昼・夕方・夜に複数回実行しても同じ日の歩数を更新するだけなので安全です。"
+            : "Android連携アプリが約6時間ごとに同期します。Androidの省電力設定で遅れる場合は、アプリの「今すぐ同期」を使用してください。"}
         </p>
       </section>
 

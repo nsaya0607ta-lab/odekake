@@ -4,7 +4,7 @@ import { StepSyncSetup } from "@/components/step-sync-setup";
 import { getSiteUrl } from "@/lib/supabase/env";
 import { requireUser } from "@/lib/supabase/server";
 
-export const metadata = { title: "iPhone歩数連携 | おでかけ記録" };
+export const metadata = { title: "歩数連携 | おでかけ記録" };
 export const dynamic = "force-dynamic";
 
 export default async function StepSyncPage() {
@@ -13,7 +13,7 @@ export default async function StepSyncPage() {
 
   return (
     <>
-      <PageHeader title="iPhone歩数連携" backHref="/mypage" />
+      <PageHeader title="歩数連携" backHref="/mypage" />
       <PageBody>
         <StepSyncSetup endpoint={endpoint} />
       </PageBody>
