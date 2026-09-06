@@ -2780,13 +2780,13 @@ export function FrenchieCatchGame({
         </div>
 
         {skillLogEntries.length > 0 ? (
-          <div className="pointer-events-none absolute left-1/2 top-16 z-40 flex w-[92%] -translate-x-1/2 flex-col items-center gap-1">
+          <div className="pointer-events-none absolute right-3 top-16 z-40 flex w-[62%] flex-col items-end gap-1">
             {skillLogEntries.map((entry) => {
               const style = getSkillLogStyle(entry.rarity);
               return (
                 <span
                   key={entry.id}
-                  className="skill-log-toast max-w-full whitespace-normal break-words rounded-2xl px-2.5 py-1 text-center text-[10px] font-bold leading-tight shadow-sm"
+                  className="skill-log-toast max-w-full whitespace-normal break-words rounded-2xl px-2.5 py-1 text-right text-[10px] font-bold leading-tight shadow-sm"
                   style={{
                     background: style.background,
                     color: style.color,
