@@ -48,6 +48,7 @@ const stepsSchema = z.preprocess(
 const bodySchema = z.object({
   steps: stepsSchema,
   date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
+  source: z.enum(["iphone-shortcuts", "android-health-connect"]).default("iphone-shortcuts"),
 });
 
 const tokenPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
@@ -125,6 +126,9 @@ export async function POST(request: Request) {
   const { url, anonKey } = requireSupabaseEnv();
   const stepDate = input.date ?? todayInJapan();
   const rpcUrl = `${url.replace(/\/$/, "")}/rest/v1/rpc/record_daily_steps_with_token`;
+  const rpcArguments = input.source === "android-health-connect"
+    ? { p_token: token, p_step_date: stepDate, p_steps: input.steps, p_source: input.source }
+    : { p_token: token, p_step_date: stepDate, p_steps: input.steps };
 
   let rpcResponse: Response;
   try {
@@ -137,13 +141,9 @@ export async function POST(request: Request) {
         Authorization: `Bearer ${anonKey}`,
         "Content-Type": "application/json",
         Accept: "application/json",
-        "X-Client-Info": "odekake-shortcuts-step-sync/1.0",
+        "X-Client-Info": "odekake-step-sync/2.0",
       },
-      body: JSON.stringify({
-        p_token: token,
-        p_step_date: stepDate,
-        p_steps: input.steps,
-      }),
+      body: JSON.stringify(rpcArguments),
       cache: "no-store",
     });
   } catch (error) {
@@ -215,6 +215,7 @@ export async function POST(request: Request) {
     requestId,
     stepDate,
     steps: input.steps,
+    source: input.source,
     earnedExp,
   });
 
