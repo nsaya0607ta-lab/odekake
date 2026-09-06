@@ -835,10 +835,11 @@ const FallingEntity = memo(function FallingEntity({
   entity: Entity;
   registerRef: (el: HTMLDivElement | null) => void;
 }) {
+  const isGoldenDog = entity.itemId === TOOREMATEN_GOLDEN_DOG_ID;
   return (
     <div
       ref={registerRef}
-      className={`absolute will-change-transform ${entity.rarity ? RARITY_STYLE[entity.rarity] : ""}`}
+      className={`absolute will-change-transform ${entity.rarity ? RARITY_STYLE[entity.rarity] : ""} ${isGoldenDog ? "drop-shadow-[0_0_10px_rgba(255,200,60,0.85)]" : ""}`}
       style={{
         left: `${entity.spawnX}%`,
         top: `${entity.spawnY}%`,
@@ -847,7 +848,17 @@ const FallingEntity = memo(function FallingEntity({
         transform: `translate(-50%, -50%) rotate(${entity.rotation}deg)`,
       }}
     >
-      <Image src={entity.image} alt="" width={96} height={96} quality={65} draggable={false} loading="eager" className="h-auto w-full object-contain" />
+      <Image
+        src={entity.image}
+        alt=""
+        width={96}
+        height={96}
+        quality={65}
+        draggable={false}
+        loading="eager"
+        className="h-auto w-full object-contain"
+        style={isGoldenDog ? { filter: "sepia(1) saturate(6) hue-rotate(-13deg) brightness(1.15)" } : undefined}
+      />
       {entity.rarity === "UR" ? <span className="absolute -inset-2 -z-10 animate-pulse rounded-full bg-[#e95c4d]/15 blur-sm" /> : null}
       {entity.rarity === "LR" ? <span className="absolute -inset-3 -z-10 animate-pulse rounded-full bg-[#e6b43c]/25 blur" /> : null}
     </div>
