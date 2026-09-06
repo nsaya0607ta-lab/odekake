@@ -931,6 +931,9 @@ export function FrenchieCatchGame({
   const dogGoldenPtValueRef = useRef(0);
   const feedbackTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const impactTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  /** スキル発動ログ（画面を覆わないトースト表示）用の連番とタイマー */
+  const skillLogIdRef = useRef(0);
+  const skillLogTimersRef = useRef<Set<ReturnType<typeof setTimeout>>>(new Set());
   /** 装備中ダンボール効果のプロップの最新値。startGame(deps:[])内から常に最新値を読むための橋渡し */
   const dambourleEffectPropRef = useRef(dambourleEffect);
   useEffect(() => {
@@ -960,6 +963,7 @@ export function FrenchieCatchGame({
   const [boxShrinkGuard, setBoxShrinkGuard] = useState(0);
   const [timeMinusGuard, setTimeMinusGuard] = useState(0);
   const [feedback, setFeedback] = useState<CatchFeedback | null>(null);
+  const [skillLogEntries, setSkillLogEntries] = useState<{ id: number; text: string }[]>([]);
   const [scoreMultiplierTotal, setScoreMultiplierTotal] = useState(1);
   const [impactX, setImpactX] = useState<number | null>(null);
   const [boxBounce, setBoxBounce] = useState(false);
@@ -1370,6 +1374,21 @@ export function FrenchieCatchGame({
     };
   }, []);
 
+  /**
+   * スキル発動ログを画面上部の細い帯にトースト表示する。
+   * 常時表示のログ欄にするとプレイ画面が覆われるため、直近3件までをキューに積んで
+   * 一定時間後に自動で消す方式にしている（見た目上はゲーム画面を邪魔しない）。
+   */
+  const pushSkillLog = useCallback((text: string) => {
+    const id = ++skillLogIdRef.current;
+    setSkillLogEntries((prev) => [...prev.slice(-2), { id, text }]);
+    const timer = setTimeout(() => {
+      skillLogTimersRef.current.delete(timer);
+      setSkillLogEntries((prev) => prev.filter((entry) => entry.id !== id));
+    }, 2200);
+    skillLogTimersRef.current.add(timer);
+  }, []);
+
   const showCatch = useCallback((entity: Entity, points: number, effect?: string) => {
     setFeedback({ name: entity.name, points, effect });
     setBoxBounce(true);
@@ -1378,8 +1397,9 @@ export function FrenchieCatchGame({
       setFeedback(null);
       setBoxBounce(false);
     }, 900);
+    if (effect) pushSkillLog(effect);
     if (typeof navigator !== "undefined" && "vibrate" in navigator) navigator.vibrate?.(18);
-  }, []);
+  }, [pushSkillLog]);
 
   const showImpact = useCallback((x: number) => {
     setImpactX(x);
@@ -1391,6 +1411,8 @@ export function FrenchieCatchGame({
     if (rafRef.current !== null) cancelAnimationFrame(rafRef.current);
     if (feedbackTimerRef.current) clearTimeout(feedbackTimerRef.current);
     if (impactTimerRef.current) clearTimeout(impactTimerRef.current);
+    skillLogTimersRef.current.forEach((timer) => clearTimeout(timer));
+    skillLogTimersRef.current.clear();
   }, []);
 
   useEffect(() => {
@@ -1459,6 +1481,7 @@ export function FrenchieCatchGame({
             setFeedback(null);
             setBoxBounce(false);
           }, 900);
+          pushSkillLog(`くみたて完成！+${ikeaBonus}pt`);
         }
         timedEffectChanged = true;
       }
@@ -2442,7 +2465,7 @@ export function FrenchieCatchGame({
       if (rafRef.current !== null) cancelAnimationFrame(rafRef.current);
       rafRef.current = null;
     };
-  }, [createEntity, phase, refreshEffectStatus, showCatch, showImpact]);
+  }, [createEntity, phase, pushSkillLog, refreshEffectStatus, showCatch, showImpact]);
 
   useEffect(() => {
     if (phase !== "finished" || !roundIdRef.current) return;
@@ -2573,6 +2596,9 @@ export function FrenchieCatchGame({
     setCaught(0);
     setTimeLeft(ROUND_SECONDS);
     setFeedback(null);
+    skillLogTimersRef.current.forEach((timer) => clearTimeout(timer));
+    skillLogTimersRef.current.clear();
+    setSkillLogEntries([]);
     setScoreMultiplierTotal(1);
     setImpactX(null);
     setDogBonus(null);
@@ -2691,6 +2717,16 @@ export function FrenchieCatchGame({
           <span className="flex-1" />
           <div className="rounded-2xl border border-white/80 bg-white/90 px-3 py-2 text-right shadow-sm"><p className="text-[9px] font-bold tracking-widest text-ink-faint">TIME</p><p className="text-xl font-black tabular-nums text-ink">{timeLeft}</p></div>
         </div>
+
+        {skillLogEntries.length > 0 ? (
+          <div className="pointer-events-none absolute left-1/2 top-16 z-40 flex -translate-x-1/2 flex-col items-center gap-1">
+            {skillLogEntries.map((entry) => (
+              <span key={entry.id} className="skill-log-toast max-w-[80vw] truncate rounded-full bg-black/55 px-2.5 py-1 text-[10px] font-bold text-white shadow-sm">
+                {entry.text}
+              </span>
+            ))}
+          </div>
+        ) : null}
 
         {blackoutActive ? <div className="pointer-events-none absolute inset-x-0 top-0 z-[25] h-1/2 bg-black/95" aria-label="上半分ブラックアウト" /> : null}
         {pinkOmoActive ? <div className="pointer-events-none absolute inset-0 z-[26] bg-pink-300/25" aria-label="ピンクオモ発動中（ピンクフィルター）" /> : null}
