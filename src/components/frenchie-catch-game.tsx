@@ -49,10 +49,14 @@ type CatchFeedback = {
 
 /**
  * スキル発動ログ（トースト）のランク別配色。
- * 虹色・青金虹色はグラデーションのため、どの色の上でも読める白文字+輪郭シャドウにしている。
+ * 虹色・青金虹色系はグラデーションのため、どの色の上でも読める白文字+輪郭シャドウにしている。
  * それ以外は背景の明暗に合わせて文字色を選び、視認性を確保する。
+ * UR/LR/MRは金縁+グロー(boxShadow)を付けて、それらしい豪華さを出している。
  */
-const SKILL_LOG_STYLES: Record<"default" | FrenchieCatchItem["rarity"], { background: string; color: string; textShadow?: string }> = {
+const SKILL_LOG_STYLES: Record<
+  "default" | FrenchieCatchItem["rarity"],
+  { background: string; color: string; textShadow?: string; border?: string; boxShadow?: string }
+> = {
   default: { background: "rgba(0,0,0,0.62)", color: "#ffffff" },
   N: { background: "rgba(0,0,0,0.62)", color: "#ffffff" },
   R: { background: "#7dd3fc", color: "#0c4a6e" },
@@ -62,12 +66,29 @@ const SKILL_LOG_STYLES: Record<"default" | FrenchieCatchItem["rarity"], { backgr
     color: "#ffffff",
     textShadow: "0 0 3px rgba(0,0,0,0.9), 0 0 6px rgba(0,0,0,0.55)",
   },
-  UR: { background: "#9f1239", color: "#ffffff" },
-  LR: { background: "#0a0a0a", color: "#ffffff" },
-  MR: {
-    background: "linear-gradient(90deg,#132a6b,#d4af37,#7c3aed,#132a6b)",
+  // くれない色をベースに、光沢のある赤黒グラデーション+金縁で高級感を出す
+  UR: {
+    background: "linear-gradient(135deg,#3d0a12 0%,#9f1239 30%,#ff2d55 50%,#9f1239 70%,#3d0a12 100%)",
+    color: "#fff3d6",
+    textShadow: "0 0 4px rgba(0,0,0,0.85)",
+    border: "1px solid #f3c96b",
+    boxShadow: "0 0 8px rgba(255,45,85,0.55), 0 0 3px rgba(243,201,107,0.8)",
+  },
+  // 黒地に金の輝きを走らせて、漆黒×金箔のような豪華さを出す
+  LR: {
+    background: "linear-gradient(135deg,#050505 0%,#1c1c1c 38%,#d9a72f 50%,#1c1c1c 62%,#050505 100%)",
     color: "#ffffff",
-    textShadow: "0 0 3px rgba(0,0,0,0.9), 0 0 6px rgba(0,0,0,0.55)",
+    textShadow: "0 0 5px rgba(217,167,47,0.9), 0 0 2px rgba(0,0,0,0.9)",
+    border: "1px solid #d9a72f",
+    boxShadow: "0 0 10px rgba(217,167,47,0.6)",
+  },
+  // 青×金×虹をまとめたホログラム調グラデーションで別格感を出す
+  MR: {
+    background: "linear-gradient(90deg,#0a1a4d,#d9a72f,#6f52ff,#4dd7ff,#ec6cff,#d9a72f,#0a1a4d)",
+    color: "#ffffff",
+    textShadow: "0 0 4px rgba(0,0,0,0.9), 0 0 7px rgba(0,0,0,0.6)",
+    border: "1px solid #fff0a0",
+    boxShadow: "0 0 12px rgba(212,175,55,0.65)",
   },
 };
 
@@ -2747,14 +2768,20 @@ export function FrenchieCatchGame({
         </div>
 
         {skillLogEntries.length > 0 ? (
-          <div className="pointer-events-none absolute left-1/2 top-16 z-40 flex -translate-x-1/2 flex-col items-center gap-1">
+          <div className="pointer-events-none absolute left-1/2 top-16 z-40 flex w-[92%] -translate-x-1/2 flex-col items-center gap-1">
             {skillLogEntries.map((entry) => {
               const style = getSkillLogStyle(entry.rarity);
               return (
                 <span
                   key={entry.id}
-                  className="skill-log-toast max-w-[80vw] truncate rounded-full px-2.5 py-1 text-[10px] font-bold shadow-sm"
-                  style={{ background: style.background, color: style.color, textShadow: style.textShadow }}
+                  className="skill-log-toast max-w-full whitespace-normal break-words rounded-2xl px-2.5 py-1 text-center text-[10px] font-bold leading-tight shadow-sm"
+                  style={{
+                    background: style.background,
+                    color: style.color,
+                    textShadow: style.textShadow,
+                    border: style.border,
+                    boxShadow: style.boxShadow,
+                  }}
                 >
                   {entry.text}
                 </span>
