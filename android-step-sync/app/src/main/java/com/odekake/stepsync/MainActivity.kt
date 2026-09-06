@@ -112,7 +112,7 @@ class MainActivity : ComponentActivity() {
         when (health.status()) {
             HealthConnectClient.SDK_AVAILABLE -> permissions.launch(setOf(health.readPermission, health.backgroundPermission))
             HealthConnectClient.SDK_UNAVAILABLE_PROVIDER_UPDATE_REQUIRED -> {
-                val provider = HealthConnectClient.DEFAULT_PROVIDER_PACKAGE_NAME
+                val provider = "com.google.android.apps.healthdata"
                 startActivity(Intent(Intent.ACTION_VIEW, Uri.parse("market://details?id=$provider")))
             }
             else -> status.text = "この端末ではHealth Connectを利用できません。"
