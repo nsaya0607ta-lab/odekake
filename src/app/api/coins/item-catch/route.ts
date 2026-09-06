@@ -11,9 +11,8 @@ const MAX_CAUGHT_COUNT = 10000;
 /** 1ラウンドで申告できるスコアの上限（100億）。ゲームを介さずAPIを直接叩いて
  *  荒唐無稽なスコアを送るのを防ぐ。record_item_catch_result()側の上限と揃えている。 */
 const MAX_TOTAL_SCORE = 10_000_000_000;
-/** ゲームを介さずAPIを直接叩いて無限にコインを増やせてしまわないための固定上限。
- *  record_item_catch_result() 側の上限(10000)と揃えている。 */
-const MAX_BONUS_COINS = 10000;
+// ボーナスコイン（金のボール・ダンボール効果由来）は上限を設けない仕様。コイン付与額の上限は
+// スコア換算分（p_score/100）の側にだけ record_item_catch_result() 内で設けている。
 
 function toRecord(value: unknown): Record<string, unknown> {
   return value && typeof value === "object" ? (value as Record<string, unknown>) : {};
@@ -58,7 +57,6 @@ export async function POST(request: Request) {
     || body.caughtCount > MAX_CAUGHT_COUNT
     || (body.caughtCount === 0 && body.score !== 0)
     || bonusCoins < 0
-    || bonusCoins > MAX_BONUS_COINS
   ) {
     return NextResponse.json({ error: "ゲーム結果が正しくありません。" }, { status: 400 });
   }
