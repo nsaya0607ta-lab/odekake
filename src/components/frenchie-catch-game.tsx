@@ -2423,10 +2423,11 @@ export function FrenchieCatchGame({
             // （例: LV.ANBALL_PTのLv6以降）、加算した時点で必ず切り上げて整数にする
             points = Math.ceil(points);
 
+            // JUSTは中央キャッチのボーナス演出であってスキルではないため、
+            // 得点だけ上乗せしてスキルログには出さない（テキストは付与しない）
             const isJust = Math.abs(entity.x - center) <= effBoxHalf * JUST_RADIUS_RATIO;
             if (isJust) {
               points = Math.round(points * JUST_MULTIPLIER);
-              effectLabel = effectLabel ? `${effectLabel} / JUST!×${JUST_MULTIPLIER}` : `JUST!×${JUST_MULTIPLIER}`;
             }
 
             scoreRef.current += points;
