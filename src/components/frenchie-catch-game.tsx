@@ -47,6 +47,34 @@ type CatchFeedback = {
   effect?: string;
 };
 
+/**
+ * スキル発動ログ（トースト）のランク別配色。
+ * 虹色・青金虹色はグラデーションのため、どの色の上でも読める白文字+輪郭シャドウにしている。
+ * それ以外は背景の明暗に合わせて文字色を選び、視認性を確保する。
+ */
+const SKILL_LOG_STYLES: Record<"default" | FrenchieCatchItem["rarity"], { background: string; color: string; textShadow?: string }> = {
+  default: { background: "rgba(0,0,0,0.62)", color: "#ffffff" },
+  N: { background: "rgba(0,0,0,0.62)", color: "#ffffff" },
+  R: { background: "#7dd3fc", color: "#0c4a6e" },
+  SR: { background: "#facc15", color: "#78350f" },
+  SSR: {
+    background: "linear-gradient(90deg,#ff5f6d,#ffc371,#f9f871,#47e08a,#4fc3f7,#b388ff,#ff5f6d)",
+    color: "#ffffff",
+    textShadow: "0 0 3px rgba(0,0,0,0.9), 0 0 6px rgba(0,0,0,0.55)",
+  },
+  UR: { background: "#9f1239", color: "#ffffff" },
+  LR: { background: "#0a0a0a", color: "#ffffff" },
+  MR: {
+    background: "linear-gradient(90deg,#132a6b,#d4af37,#7c3aed,#132a6b)",
+    color: "#ffffff",
+    textShadow: "0 0 3px rgba(0,0,0,0.9), 0 0 6px rgba(0,0,0,0.55)",
+  },
+};
+
+function getSkillLogStyle(rarity: FrenchieCatchItem["rarity"] | null) {
+  return SKILL_LOG_STYLES[rarity ?? "default"];
+}
+
 const ROUND_SECONDS = 50;
 /** 時間増加系スキルの複利的な伸びが稀に極端化した場合の安全弁。この秒数を超えては延長しない */
 const MAX_ROUND_SECONDS = 1800;
@@ -963,7 +991,7 @@ export function FrenchieCatchGame({
   const [boxShrinkGuard, setBoxShrinkGuard] = useState(0);
   const [timeMinusGuard, setTimeMinusGuard] = useState(0);
   const [feedback, setFeedback] = useState<CatchFeedback | null>(null);
-  const [skillLogEntries, setSkillLogEntries] = useState<{ id: number; text: string }[]>([]);
+  const [skillLogEntries, setSkillLogEntries] = useState<{ id: number; text: string; rarity: FrenchieCatchItem["rarity"] | null }[]>([]);
   const [scoreMultiplierTotal, setScoreMultiplierTotal] = useState(1);
   const [impactX, setImpactX] = useState<number | null>(null);
   const [boxBounce, setBoxBounce] = useState(false);
@@ -1379,9 +1407,9 @@ export function FrenchieCatchGame({
    * 常時表示のログ欄にするとプレイ画面が覆われるため、直近3件までをキューに積んで
    * 一定時間後に自動で消す方式にしている（見た目上はゲーム画面を邪魔しない）。
    */
-  const pushSkillLog = useCallback((text: string) => {
+  const pushSkillLog = useCallback((text: string, rarity: FrenchieCatchItem["rarity"] | null = null) => {
     const id = ++skillLogIdRef.current;
-    setSkillLogEntries((prev) => [...prev.slice(-2), { id, text }]);
+    setSkillLogEntries((prev) => [...prev.slice(-2), { id, text, rarity }]);
     const timer = setTimeout(() => {
       skillLogTimersRef.current.delete(timer);
       setSkillLogEntries((prev) => prev.filter((entry) => entry.id !== id));
@@ -1397,7 +1425,7 @@ export function FrenchieCatchGame({
       setFeedback(null);
       setBoxBounce(false);
     }, 900);
-    if (effect) pushSkillLog(effect);
+    if (effect) pushSkillLog(effect, entity.rarity);
     if (typeof navigator !== "undefined" && "vibrate" in navigator) navigator.vibrate?.(18);
   }, [pushSkillLog]);
 
@@ -1481,7 +1509,7 @@ export function FrenchieCatchGame({
             setFeedback(null);
             setBoxBounce(false);
           }, 900);
-          pushSkillLog(`くみたて完成！+${ikeaBonus}pt`);
+          pushSkillLog(`くみたて完成！+${ikeaBonus}pt`, "SSR");
         }
         timedEffectChanged = true;
       }
@@ -2685,8 +2713,8 @@ export function FrenchieCatchGame({
               {feedback ? <span className="pointer-events-none absolute -right-2 -top-2 rounded-full bg-[#fff6cc]/95 px-2 py-0.5 text-[10px] font-black text-[#c87527] shadow-sm">+{feedback.points}</span> : null}
             </div>
             {scoreMultiplierTotal > 1 ? (
-              <span className="rounded-xl border border-[#f4d98f] bg-[#fff6cc]/95 px-2.5 py-1 text-base font-black leading-none text-[#c87527] shadow-sm">
-                スコア倍率 ×{formatMultiplierCeil(scoreMultiplierTotal)}
+              <span className="rounded-full border border-[#f4d98f] bg-[#fff6cc]/95 px-2 py-0.5 text-[11px] font-black leading-none text-[#c87527] shadow-sm">
+                倍率×{formatMultiplierCeil(scoreMultiplierTotal)}
               </span>
             ) : null}
             {bagStock > 0 || stunGuard > 0 || boxShrinkGuard > 0 || timeMinusGuard > 0 ? (
@@ -2720,11 +2748,18 @@ export function FrenchieCatchGame({
 
         {skillLogEntries.length > 0 ? (
           <div className="pointer-events-none absolute left-1/2 top-16 z-40 flex -translate-x-1/2 flex-col items-center gap-1">
-            {skillLogEntries.map((entry) => (
-              <span key={entry.id} className="skill-log-toast max-w-[80vw] truncate rounded-full bg-black/55 px-2.5 py-1 text-[10px] font-bold text-white shadow-sm">
-                {entry.text}
-              </span>
-            ))}
+            {skillLogEntries.map((entry) => {
+              const style = getSkillLogStyle(entry.rarity);
+              return (
+                <span
+                  key={entry.id}
+                  className="skill-log-toast max-w-[80vw] truncate rounded-full px-2.5 py-1 text-[10px] font-bold shadow-sm"
+                  style={{ background: style.background, color: style.color, textShadow: style.textShadow }}
+                >
+                  {entry.text}
+                </span>
+              );
+            })}
           </div>
         ) : null}
 
