@@ -10,6 +10,207 @@
   （ガイド画面の基礎ポイント表示・スコアシミュレーター。`frenchie-catch-game.tsx`の`POINTS`と
   値を二重管理しているため、基礎ポイントを変更したら必ずこちらも合わせて直すこと）
 
+## 【2026-09-06 最新確定14】Listen to the a-も緑りんごと同じ「並行スポーン」方式へ変更
+
+ユーザー指定で、緑りんご（最新確定13）と同じ理由でListen to the a-（`other_listen_to_the_a`）の
+初期フレブル大量発生も「他のアイテムの出現を止めない」方式に変更した。
+
+**変更前**：Listen to the a-はXmas Partyの初期フレブル大量発生と同じ`dogFloodRemainingRef`を
+共有しており、`createEntity`の優先分岐で通常の重み付き抽選を一時的に乗っ取っていた（指定体数の
+初期フレブルが出きるまで、他の通常アイテムが一切出現しなくなっていた）。
+
+**変更後**：`dogFloodRemainingRef`から分離し、緑りんご・Clawdと同じ「並行スポーン方式」の専用の
+`listenFloodRemainingRef` / `createListenDogEntity` / `nextListenSpawnRef`を新設した。
+**Xmas Partyの初期フレブル大量発生は`dogFloodRemainingRef`のまま変更していない**（落下速度アップ・
+出現量アップ・得点倍率と同時発動する演出の一部であり、今回のユーザー指定はListen to the a-のみ
+のため）。
+
+**変更内容**
+- `frenchie-catch-game.tsx`：
+  - `listenFloodRemainingRef` / `nextListenSpawnRef`を新設。
+  - `createListenDogEntity`（`createGreenAppleEntity`と同型のuseCallback、`DOG_FLOOD_FALL_SPEED`
+    だけ元のdogFlood分岐と同じ値を維持）を新設。
+  - `case DOG_FLOOD_ITEM_ID`（`other_listen_to_the_a`）の加算先を`dogFloodRemainingRef`から
+    `listenFloodRemainingRef`に変更（Xmas Party側の`case "other_xmas_party"`は
+    `dogFloodRemainingRef`のまま）。
+  - `frame`内、緑りんごの並行スポーン処理のすぐ下に同じ形の処理を追加。
+  - ラウンド開始時のリセットに`nextListenSpawnRef.current = now`、終了時のリセットに
+    `listenFloodRemainingRef.current = 0`を追加。
+- `scripts/simulate-item-catch.mjs`：`listenFloodRemaining`を`dogFloodRemaining`から分離し、
+  `continue`せず通常抽選と並行して処理するよう変更（Xmas Party分の`dogFloodRemaining`はそのまま）。
+
+**検算結果**（`node scripts/simulate-item-catch.mjs 3000 avoid`、変更後、N=92）
+
+| Lv | 秒数平均 | 秒数中央値 | スコア平均 | 500秒超え |
+|---|---|---|---|---|
+| 1 | 86.0秒 | 83.0秒 | 28,768 | 0% |
+| 2 | 120.5秒 | 118.0秒 | 50,720 | 0% |
+| 3 | 151.8秒 | 152.0秒 | 81,696 | 0% |
+| 4 | 187.2秒 | 187.0秒 | 130,615 | 0% |
+| 5 | 228.0秒 | 228.0秒 | 216,763 | 0% |
+
+3000試行、全Lvで500秒超え0%を確認。
+
+## 【2026-09-06 最新確定13】緑りんごを「他のアイテムの出現を止める」フラッド方式から「並行スポーン」方式へ変更
+
+ユーザー指定で、「緑りんごは他のアイテムが出なくなるようにはしない（他のアイテムと共存して降ってくる）」
+という仕様に修正した。
+
+**変更前の問題**：緑りんご（`GREEN_APPLE_ITEM_ID`）は`mrsGreenAppleSpawnRemainingRef`を使い、
+うんち祭り(poopFlood)やフレブル大量発生(dogFlood)と同じ「フラッド方式」で実装していた。この方式は
+`createEntity`内の優先分岐で通常の重み付き抽選そのものを一時的に乗っ取るため、緑りんご10個が
+出きるまでの間、通常アイテム・普通のフレブルが一切出現しなくなっていた（宝箱のうんち祭り等と
+同じ仕様だが、緑りんごについてはユーザーの意図と異なっていた）。
+
+**変更後**：Clawdのサッカーボール／ゴールドボール（`clawdBallFloodRemainingRef` /
+`createClawdBallEntity` / `nextClawdSpawnRef`。「通常の出現とは別の抽選枠で並行して降ってくる」
+実装）と全く同じ「並行スポーン方式」に変更した。
+
+**変更内容**
+- `frenchie-catch-game.tsx`：
+  - `createEntity`内の緑りんご専用分岐（優先的にcreateEntityの戻り値を乗っ取る方式）を削除。
+  - `createGreenAppleEntity`（`createClawdBallEntity`と同型のuseCallback）を新設。
+  - `nextGreenAppleSpawnRef`を新設し、`frame`内のClawdボール処理のすぐ下に、同じ形の
+    「`mrsGreenAppleSpawnRemainingRef > 0` かつ `now >= nextGreenAppleSpawnRef.current` なら
+    `entitiesRef.current`へ直接push」処理を追加（通常スポーン・ボーナススポーンとは独立したタイマー）。
+  - ラウンド開始時のリセット処理に`nextGreenAppleSpawnRef.current = now`を追加。
+  - `mrsGreenAppleUnresolvedRef`（何個決着したかのカウント）や捕まえた際の処理・見送り(画面外)判定は
+    変更なし（スポーン方式が変わっただけで、ラウンドの成功／失敗判定ロジック自体は影響を受けない）。
+- `scripts/simulate-item-catch.mjs`：`greenAppleRemaining`処理から`continue`を削除し、同じtickで
+  通常の重み付き抽選も続けて行われるようにした（Clawdの`clawdFloodRemaining`処理と同じ形。
+  元々`continue`が無かった）。
+
+**検算結果**（`node scripts/simulate-item-catch.mjs 3000 avoid`、変更後、N=92）
+
+| Lv | 秒数平均 | 秒数中央値 | スコア平均 | 500秒超え |
+|---|---|---|---|---|
+| 1 | 87.0秒 | 85.0秒 | 28,833 | 0% |
+| 2 | 119.9秒 | 118.0秒 | 49,954 | 0% |
+| 3 | 150.4秒 | 149.0秒 | 79,397 | 0% |
+| 4 | 180.8秒 | 182.0秒 | 122,026 | 0% |
+| 5 | 220.1秒 | 224.0秒 | 196,964 | 0% |
+
+3000試行、全Lvで500秒超え0%を確認。
+
+## 【2026-09-06 最新確定12】Mrs. GREEN アーPPLEの緑りんご必要数をLvごとに1個ずつ減る形へ変更
+
+ユーザー指定で、最新確定11で入れた緑りんご必要数（8/7/7/6/6、Lv2・Lv3とLv4・Lv5がそれぞれ同値だった）
+を、Lvが1上がるごとに必ず1個ずつ減る単調な形へ変更した。MR体数（`LV.MRS_GREEN_APPLE_MR_COUNT`）は
+変更なし。
+
+| Lv | 緑りんご必要数(`LV.MRS_GREEN_APPLE_NEED`) | MR体数(`LV.MRS_GREEN_APPLE_MR_COUNT`) |
+|---|---|---|
+| 1 | 8/10 | 1体 |
+| 2 | 7/10 | 1体 |
+| 3 | 6/10 | 2体 |
+| 4 | 5/10 | 2体 |
+| 5 | 4/10 | 3体 |
+
+（Lv6〜10はダンボールNo.11のスキルLv上限ブーストで到達しうるため、Lv5以降も1ずつ減らし続けて
+最低1個で下げ止まる形にした：`MRS_GREEN_APPLE_NEED: [8, 7, 6, 5, 4, 3, 2, 1, 1, 1]`。MR体数側は
+最新確定11のまま`ceil((lv+1)/2)`＝[1,1,2,2,3,3,4,4,5,5]で変更なし）
+
+**変更内容**
+- `frenchie-catch-game.tsx`：`LV.MRS_GREEN_APPLE_NEED`を`[8, 7, 7, 6, 6, 5, 5, 4, 4, 3]`から
+  `[8, 7, 6, 5, 4, 3, 2, 1, 1, 1]`に変更。
+- `item-catch-skills.ts`：`other_mrs_green_apple`のlevelsを新しい必要数（8/7/6/5/4）に合わせて更新。
+- `scripts/simulate-item-catch.mjs`：`LV`はGAME_TSXから直接抽出するため個別追加不要（自動追従）。
+
+**検算で発覚したバグとその修正**：必要数を下げてMRフラッド成功率が上がったところ、
+`node scripts/simulate-item-catch.mjs 1000 avoid`のLv5で`>500s=0.10%`（1000回中1回）が出た。
+原因は、MRフラッド(`mrFloodRemainingRef`)が`createEntity`内で通常の重み付き抽選（カットオフで
+時間増加系の重みを0にする分岐）を経由せず所持MR4種から直接抽選するため、時間増加系カットオフ対象の
+ブレブル(`other_burebur`)がカットオフ発動後も出現し続けられてしまうこと（`TIME_BONUS_CUTOFF_ITEM_IDS`
+に入っていても、この抽選ルート自体がカットオフを一切見ていなかった）。`frenchie-catch-game.tsx`の
+`createEntity`と`scripts/simulate-item-catch.mjs`の`pickMrId`の両方に、カットオフ発動中は
+ブレブルを候補から除外する処理を追加して修正（候補が空になる場合のみ全MRへフォールバック）。
+
+**検算結果**（`node scripts/simulate-item-catch.mjs 3000 avoid`、修正後、N=92）
+
+| Lv | 秒数平均 | 秒数中央値 | スコア平均 | 500秒超え |
+|---|---|---|---|---|
+| 1 | 86.0秒 | 82.0秒 | 28,131 | 0% |
+| 2 | 118.2秒 | 116.0秒 | 47,899 | 0% |
+| 3 | 147.8秒 | 146.0秒 | 76,129 | 0% |
+| 4 | 178.2秒 | 179.0秒 | 116,604 | 0% |
+| 5 | 219.1秒 | 222.0秒 | 191,908 | 0% |
+
+3000試行全Lvで500秒超え0%を確認（修正前に1000試行中1回出ていた事象は再発せず）。
+
+## 【2026-09-06 最新確定11】新アイテム「Mrs. GREEN アーPPLE」（UR）・「赤りんご」（N）を追加
+
+ユーザー指定で、UR「Mrs. GREEN アーPPLE」(`other_mrs_green_apple`)と通常アイテムN「赤りんご」
+(`other_red_apple`)を追加した。
+
+**Mrs. GREEN アーPPLEのスキル**：捕まえると、このアイテムが出現している時にしか出現しない特別な
+「緑りんご」(`other_mrs_green_apple_fruit`、`GREEN_APPLE_ITEM_ID`)が10個
+(`MRS_GREEN_APPLE_SPAWN_COUNT`)、通常の出現枠とは別に降ってくる。緑りんごはうんち等のハザード系
+アイテムと同じ扱いで、`ITEM_SPAWN_WEIGHTS`のどのプールにも属さない（キャッチするとNランクと同じ
+20pt=`GREEN_APPLE_POINTS`が入るのみ）。10個のうち規定数以上キャッチできれば、所持している
+「MR」（ブレブル/Xmas Party/ナルシストアー/マフィアーの4種、`MR_CHARACTER_ITEM_IDS`）の中から
+ランダムで規定体数、通常の出現枠とは別の抽選枠(`mrFloodRemainingRef`)で降ってくる（それぞれ本来の
+レアリティ得点とスキル効果もそのまま発動する。フルーツバスケットの`PERSON_CHARACTER_ITEM_IDS`/
+`personFloodRemainingRef`と全く同じ実装パターン）。
+
+| Lv | 緑りんご必要数(`LV.MRS_GREEN_APPLE_NEED`) | MR体数(`LV.MRS_GREEN_APPLE_MR_COUNT`) |
+|---|---|---|
+| 1 | 8/10 | 1体 |
+| 2 | 7/10 | 1体 |
+| 3 | 7/10 | 2体 |
+| 4 | 6/10 | 2体 |
+| 5 | 6/10 | 3体 |
+
+（Lv6〜10はダンボールNo.11のスキルLv上限ブーストで到達しうるため、`需要数=8-floor(lv/2)`
+`MR体数=ceil((lv+1)/2)`の式で単調に延長：[5,5,4,4,3] / [3,4,4,5,5]）
+
+**変更内容**
+- `src/lib/collection/items.ts`：`other_mrs_green_apple`（UR、その他）と`other_red_apple`（N、食べもの）を追加。
+- `src/lib/games/item-catch-skills.ts`：`other_mrs_green_apple`のルールブック説明文を追加（UR節）。
+  `other_red_apple`は特殊効果を持たないためエントリー不要。
+- `frenchie-catch-game.tsx`：
+  - `LV.MRS_GREEN_APPLE_NEED` / `LV.MRS_GREEN_APPLE_MR_COUNT`を追加。
+  - `MRS_GREEN_APPLE_ITEM_ID` / `GREEN_APPLE_ITEM_ID` / `GREEN_APPLE_IMAGE` / `GREEN_APPLE_POINTS` /
+    `MRS_GREEN_APPLE_SPAWN_COUNT` / `MR_CHARACTER_ITEM_IDS` / `MR_CHARACTER_ITEMS`を新設。
+  - `SPAWN_DYNAMICS_ITEM_IDS`に`other_mrs_green_apple`を追加（出現重みの計算式自体を書き換える効果に
+    準じる分類。ボーナス出現タイマー側でも除外される）。
+  - `mrFloodRemainingRef` / `mrCharacterPoolRef`（MRフラッド、`personFloodRemainingRef`と同型）、
+    `mrsGreenAppleActiveRef` / `mrsGreenAppleSpawnRemainingRef` / `mrsGreenAppleUnresolvedRef` /
+    `mrsGreenAppleCaughtRef` / `mrsGreenAppleNeedRef` / `mrsGreenAppleMrCountRef`（緑りんごラウンド管理）を追加。
+  - `createEntity`にMRフラッド・緑りんごフラッドの分岐を追加（`personFloodRemainingRef`と同じ、
+    出現量アップ・出現制御系プールと違い専用のスポーンレートブーストは持たない＝通常のスポーン間隔のまま）。
+  - キャッチ判定に緑りんご専用ブロック（うんち/ビニール袋と同じ位置、rarity=null扱い）を追加し、
+    キャッチ・見送り（画面外に落ちた）の両方から`resolveMrsGreenAppleRoundIfDone`を呼んでラウンド完了を判定。
+  - `runItemSkillEffect`に`case MRS_GREEN_APPLE_ITEM_ID`を追加（緑りんごラウンドの開始）。
+  - `ITEM_SPAWN_WEIGHTS`：出現量アップ・出現制御系プールUR枠に`other_mrs_green_apple: 126 / 1`を追加
+    （UR枠は元々未充填だったため、この追加で該当プールが774→900＝予算満額になった）。
+    通常アイテム系プールN枠は25種になったため、既存24種＋赤りんご全てを`2400 / 25`に書き直し。
+  - `SPAWN_DYNAMICS_UNFILLED_RANK_DOG_WEIGHT`：126→0に更新（UR枠が埋まったため）。
+- `scripts/simulate-item-catch.mjs`：`SPAWN_DYNAMICS_IDS`・`SPAWN_DYNAMICS_UNFILLED_RANK_DOG_WEIGHT`・
+  `NORMAL_ITEM_IDS`（赤りんご追加）に同期。`MR_CHARACTER_IDS`/`pickMrId`（`PERSON_IDS`/`pickPersonId`と同型）、
+  `greenAppleRemaining`等の状態変数、メインループでのMRフラッド・緑りんごフラッド分岐、
+  `case "other_mrs_green_apple"`を追加。`LV`テーブルはGAME_TSXから直接抽出するため個別追加不要。
+- `public/collection/items/`：`mrs-green-apple.webp`（図鑑用、犬の写真）・`red-apple.webp`・
+  `green-apple.webp`を追加。
+
+**検算結果**（`node scripts/simulate-item-catch.mjs 1000 avoid`、変更後、N=92）
+
+プール重み予算：時間増加系8種=1272.0（+未充填720.8→dogへ、合計1992.8、変更前と同一）／
+得点倍率系8種=280（+未充填120→dogへ、合計400、変更前と同一）／
+出現量アップ・制御系=900（+未充填0→dogへ、合計900、774→900に増加＝UR枠が埋まった分）／
+通常アイテム系=6100（未充填ランクなし、変更前と同一）。
+
+| Lv | 秒数平均 | 秒数中央値 | スコア平均 | 500秒超え |
+|---|---|---|---|---|
+| 1 | 85.6秒 | 83.0秒 | 27,758 | 0% |
+| 2 | 118.8秒 | 116.0秒 | 48,313 | 0% |
+| 3 | 147.4秒 | 146.0秒 | 73,322 | 0% |
+| 4 | 179.9秒 | 182.0秒 | 115,046 | 0% |
+| 5 | 217.6秒 | 218.0秒 | 178,098 | 0% |
+
+500秒超えは全Lvで0%のまま（カットオフは正常動作）。プール予算のうち出現量アップ・制御系のみ
+774→900に増加した（UR枠が新たに埋まった差分）ので、この変更単体でのプレイ時間・スコアへの
+影響は小さいがゼロではない（目標値への厳密一致は2026-09-03〜不要のため許容）。
+
 ## 【2026-09-04 最新確定10】ブレブルの効果を「UR/LR限定出現」→「秒数プラス」へ変更、時間増加系プールへ移動
 
 ユーザー指定で、ブレブル(`other_burebur`, MR)の効果を「指定数のアイテムが出現するまでUR・LR

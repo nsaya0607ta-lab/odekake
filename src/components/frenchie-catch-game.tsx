@@ -328,6 +328,10 @@ const LV = {
   NARCISSIST_SEC: [20, 25, 30, 35, 40, 43.75, 47.5, 51.25, 55, 58.75],
   MAFIA_MULT: [1.1, 1.12, 1.14, 1.16, 1.18, 1.19, 1.21, 1.22, 1.24, 1.25],
   PINK_OMO_SEC: [3, 5, 7, 9, 10, 11.31, 12.63, 13.94, 15.25, 16.56],
+  /** Mrs. GREEN アーPPLE：緑りんご10個中これだけキャッチできればMR成功（Lvごとに1個ずつ必要数が減る、最低1個） */
+  MRS_GREEN_APPLE_NEED: [8, 7, 6, 5, 4, 3, 2, 1, 1, 1],
+  /** Mrs. GREEN アーPPLE：成功時に降ってくるMRの体数 */
+  MRS_GREEN_APPLE_MR_COUNT: [1, 1, 2, 2, 3, 3, 4, 4, 5, 5],
 } as const;
 const SLANT_VX_BOOST = 3.5;
 const POINTS: Record<FrenchieCatchItem["rarity"], number> = { N: 20, R: 40, SR: 80, SSR: 140, UR: 200, LR: 300, MR: 440 };
@@ -350,6 +354,7 @@ const TIME_BONUS_ITEM_IDS = new Set([
 const SPAWN_DYNAMICS_ITEM_IDS = new Set([
   "toy_rainbow_ball", "interior_stretch_rod", "toy_treasure_puzzle",
   "other_xmas_party", "other_pondeomo", "other_pondear", "other_jare_a", "interior_ragby_ar",
+  "other_mrs_green_apple",
 ]);
 /**
  * 2026-09-03、ユーザー指定で新設した4つ目のプール（通常アイテム系プール）。上記3プール・
@@ -455,11 +460,11 @@ const ITEM_SPAWN_WEIGHTS: Partial<Record<string, number>> = {
   other_burebur: 212 / 1,
   /**
    * 出現量アップ・出現制御系プール（予算900）：R:270÷1=270 / SR:162÷1=162 / SSR:144÷4=36ずつ /
-   * UR:126(未充填→dog) / LR:108÷2=54ずつ / MR:90÷1=90(Xmas Party)。在籍分の実際の合計は774
-   * （残り126は`SPAWN_DYNAMICS_UNFILLED_RANK_DOG_WEIGHT`でdogへ）。宝箱おやつパズル・
-   * Xmas Partyもここでは個別チューニング値ではなく「ランク予算÷在籍数」のみで計算する
+   * UR:126÷1=126(Mrs. GREEN アーPPLE) / LR:108÷2=54ずつ / MR:90÷1=90(Xmas Party)。在籍分の実際の
+   * 合計は900（残りなし。旧・残り126はUR枠が埋まったため`SPAWN_DYNAMICS_UNFILLED_RANK_DOG_WEIGHT`が0になった）。
+   * 宝箱おやつパズル・Xmas Partyもここでは個別チューニング値ではなく「ランク予算÷在籍数」のみで計算する
    * （ユーザー指定、2026-09-03〜）。ブレブルは2026-09-04に効果を秒数プラス系へ変更し、
-   * 時間増加系プールへ移動した（このプールからは離籍）。
+   * 時間増加系プールへ移動した（このプールからは離籍）。Mrs. GREEN アーPPLEは2026-09-06にUR枠へ追加。
    */
   toy_rainbow_ball: 144 / 4,
   interior_stretch_rod: 270 / 1,
@@ -470,6 +475,7 @@ const ITEM_SPAWN_WEIGHTS: Partial<Record<string, number>> = {
   other_jare_a: 144 / 4,
   interior_ragby_ar: 108 / 2,
   other_listen_to_the_a: 108 / 2,
+  other_mrs_green_apple: 126 / 1,
   /**
    * 得点倍率系プール（予算400）：R:120(未充填→dog) / SR:72÷2=36ずつ / SSR:64÷2=32ずつ /
    * UR:56÷3 / LR:48÷2=24ずつ / MR:40÷2=20ずつ。在籍分の実際の合計は280
@@ -488,9 +494,9 @@ const ITEM_SPAWN_WEIGHTS: Partial<Record<string, number>> = {
   other_narcissist_a: 40 / 2,
   other_mafia_a: 40 / 2,
   /**
-   * 通常アイテム系プール（予算6100、在籍61種すべて等分100ずつ）：N:2400(24種) / R:700(7種) /
-   * SR:900(9種) / SSR:1200(12種) / UR:700(7種) / LR:200(2種) / MR:0(未在籍)。全ランクとも
-   * 予算÷在籍数=100ちょうどで割り切れるため、現状は`DEFAULT_ITEM_SPAWN_WEIGHT`と同じ値。
+   * 通常アイテム系プール（予算6100、在籍62種）：N:2400÷25=96ずつ(25種、2026-09-06に赤りんごを追加) /
+   * R:700(7種) / SR:900(9種) / SSR:1200(12種) / UR:700(7種) / LR:200(2種) / MR:0(未在籍)。
+   * N以外のランクは予算÷在籍数=100ちょうどで割り切れるため、`DEFAULT_ITEM_SPAWN_WEIGHT`と同じ値のまま。
    * 今後このプールに新アイテムを追加する場合は、他の3プールと同じ「同ランク内で均等に重みを
    * 割り振る計算方法」（docs/item-catch-new-item-checklist.md参照）でそのランクの予算を
    * 新しい在籍数で割り直し、対象ランクの全メンバーを書き直すこと（ランク予算・プール総予算
@@ -498,30 +504,31 @@ const ITEM_SPAWN_WEIGHTS: Partial<Record<string, number>> = {
    * 「普通のフレブル」(dog)の相対確率は薄まらない。MRランクに初めて追加する場合のみ、
    * 新たにMRランク予算を設定してプール総予算に加算すること（他ランクの予算はいじらない）。
    */
-  toy_colorful_ball: 100,
-  toy_rope: 100,
-  toy_bone: 100,
-  toy_squeaky_ball: 100,
-  toy_tennis_ball: 100,
-  toy_red_slipper: 100,
-  toy_wood_stick: 100,
-  toy_donut_rope: 100,
-  food_smile_onigiri: 100,
-  food_paw_taiyaki: 100,
-  food_dog_milk: 100,
-  food_cheese_cubes: 100,
-  food_roasted_sweet_potato: 100,
-  food_honey_butter_toast: 100,
-  other_yellow_rain_boots: 100,
-  accessory_red_bandana: 100,
-  other_acorns: 100,
-  toy_paper_airplane: 100,
-  other_walk_water_bottle: 100,
-  other_shiny_pinecone: 100,
-  accessory_blue_handkerchief: 100,
-  toy_red_balloon: 100,
-  toy_sand_bucket: 100,
-  accessory_walk_pouch: 100,
+  toy_colorful_ball: 2400 / 25,
+  toy_rope: 2400 / 25,
+  toy_bone: 2400 / 25,
+  toy_squeaky_ball: 2400 / 25,
+  toy_tennis_ball: 2400 / 25,
+  toy_red_slipper: 2400 / 25,
+  toy_wood_stick: 2400 / 25,
+  toy_donut_rope: 2400 / 25,
+  food_smile_onigiri: 2400 / 25,
+  food_paw_taiyaki: 2400 / 25,
+  food_dog_milk: 2400 / 25,
+  food_cheese_cubes: 2400 / 25,
+  food_roasted_sweet_potato: 2400 / 25,
+  food_honey_butter_toast: 2400 / 25,
+  other_yellow_rain_boots: 2400 / 25,
+  accessory_red_bandana: 2400 / 25,
+  other_acorns: 2400 / 25,
+  toy_paper_airplane: 2400 / 25,
+  other_walk_water_bottle: 2400 / 25,
+  other_shiny_pinecone: 2400 / 25,
+  accessory_blue_handkerchief: 2400 / 25,
+  toy_red_balloon: 2400 / 25,
+  toy_sand_bucket: 2400 / 25,
+  accessory_walk_pouch: 2400 / 25,
+  other_red_apple: 2400 / 25,
   toy_frisbee: 100,
   toy_soccer_ball: 100,
   toy_taiyaki_plush: 100,
@@ -673,6 +680,20 @@ function pickPersonCharacter(pool: CollectionItem[]): CollectionItem {
   }
   return weighted[weighted.length - 1]!.item;
 }
+/**
+ * Mrs. GREEN アーPPLEを取ると降ってくる「緑りんご」。このアイテムが発動した時にしか出現せず、
+ * ITEM_SPAWN_WEIGHTSのどのプールにも属さない特別なアイテム（うんち等のハザード系と同じ扱い）。
+ */
+const MRS_GREEN_APPLE_ITEM_ID = "other_mrs_green_apple";
+const GREEN_APPLE_ITEM_ID = "other_mrs_green_apple_fruit";
+const GREEN_APPLE_IMAGE = "/collection/items/green-apple.webp";
+const GREEN_APPLE_POINTS = 20; // Nランクと同じ
+const MRS_GREEN_APPLE_SPAWN_COUNT = 10;
+/** Mrs. GREEN アーPPLE成功時に降ってくる「MR」。本来のレアリティ・スキルのまま出現する */
+const MR_CHARACTER_ITEM_IDS = ["other_burebur", "other_xmas_party", "other_narcissist_a", "other_mafia_a"];
+const MR_CHARACTER_ITEMS: CollectionItem[] = MR_CHARACTER_ITEM_IDS
+  .map((id) => COLLECTION_ITEMS.find((entry) => entry.id === id))
+  .filter((entry): entry is CollectionItem => entry != null);
 const CLAWD_ITEM_ID = "other_clawd";
 /** Clawdの効果中に降ってくる「サッカーボール／ゴールドボール」。本来のレアリティ・スキルのまま出現する */
 const CLAWD_SOCCER_BALL_ITEM = COLLECTION_ITEMS.find((entry) => entry.id === "toy_soccer_ball") ?? null;
@@ -709,16 +730,21 @@ const DOG_SPAWN_RATIO = 0.28;
  * 「普通のフレブル」(dog)の出現重みに上乗せして消化する（ITEM_SPAWN_WEIGHTS直上のコメント参照）。
  * 各値は「プール予算 − 在籍ランクの実際の重み合計」。2026-09-03、ユーザー指定で固定重みを
  * 全廃し「ランク予算÷在籍数」のみに統一したため、以下の3値も端数を丸めず正確な値にした：
- * 時間増加系: 2120−1399.2=720.8 / 得点倍率系: 400−280=120 / 出現量アップ制御系: 900−774=126。
+ * 時間増加系: 2120−1399.2=720.8 / 得点倍率系: 400−280=120 / 出現量アップ制御系: 900−900=0。
  * 新しく未充填ランクにアイテムを追加したら、対応する定数からそのランクの予算分を差し引くこと。
  * （時間増加系のMR枠は、2026-09-04にブレブルの効果を秒数プラス系へ変更したことで新たに
- * 充填された。従来のR:636+UR:296.8+LR:254.4=1187.2に、MR:212を加えて1399.2）
+ * 充填された。従来のR:636+UR:296.8+LR:254.4=1187.2に、MR:212を加えて1399.2。
+ * 出現量アップ制御系のUR枠は、2026-09-06にMrs. GREEN アーPPLEを追加したことで新たに充填され、
+ * 従来のR:270+SR:162+SSR:144+LR:108+MR:90=774に、UR:126を加えて900＝プール予算満額になった）
  */
 const TIME_BONUS_UNFILLED_RANK_DOG_WEIGHT = 2120 - 1399.2;
 /** 2026-09-03、固定重み全廃・ランク予算÷在籍数のみに統一（ユーザー指定）。ITEM_SPAWN_WEIGHTS直上のコメント参照。 */
 const SCORE_MULT_UNFILLED_RANK_DOG_WEIGHT = 120;
-/** 2026-09-03、固定重み全廃・ランク予算÷在籍数のみに統一（ユーザー指定）。ITEM_SPAWN_WEIGHTS直上のコメント参照。 */
-const SPAWN_DYNAMICS_UNFILLED_RANK_DOG_WEIGHT = 126;
+/**
+ * 2026-09-03、固定重み全廃・ランク予算÷在籍数のみに統一（ユーザー指定）。ITEM_SPAWN_WEIGHTS直上のコメント参照。
+ * 2026-09-06、UR枠にMrs. GREEN アーPPLEを追加してUR予算126を全消化したため0になった。
+ */
+const SPAWN_DYNAMICS_UNFILLED_RANK_DOG_WEIGHT = 0;
 /** 通れまてん有効中に「はずれ」フレブルの代わりに出現する金色フレブルの目印用id（kindは通常のdogのまま） */
 const TOOREMATEN_GOLDEN_DOG_ID = "toorematen_golden_dog";
 const FRENCHIE_SKIN_IDS = ["hiking_frenchie", "snow_frenchie", "summer_frenchie"];
@@ -908,6 +934,8 @@ export function FrenchieCatchGame({
   const extraSpawnRef = useRef(0);
   /** Clawdのボールは通常アイテムの抽選を妨げず、独立したタイマーで並行して降らせる */
   const nextClawdSpawnRef = useRef(0);
+  const nextGreenAppleSpawnRef = useRef(0);
+  const nextListenSpawnRef = useRef(0);
   const rafRef = useRef<number | null>(null);
   /** setScoreで画面表示する直前に必ずMath.ceilで整数化する（各加算箇所は既に整数のはずだが、
    * 表示側でも保険をかけて小数点表示が絶対に出ないようにする）。 */
@@ -958,8 +986,20 @@ export function FrenchieCatchGame({
   /** 食べ物カテゴリ限定倍率（二足A）の有効中エントリ一覧。重複取得時は掛け合わされる */
   const foodScoreMultipliersRef = useRef<TimedMultiplierEntry[]>([]);
   const dogFloodRemainingRef = useRef(0);
+  /** Listen to the a-：他のアイテムの出現を止めない並行スポーン方式（緑りんごと同じ扱い）。Xmas Partyのdog大量発生はdogFloodRemainingRefのまま */
+  const listenFloodRemainingRef = useRef(0);
   const personFloodRemainingRef = useRef(0);
   const clawdBallFloodRemainingRef = useRef(0);
+  /** Mrs. GREEN アーPPLE成功時に降ってくる「MR」の残数。未所持のものは出さないよう所持アイテムだけに絞る */
+  const mrFloodRemainingRef = useRef(0);
+  const mrCharacterPoolRef = useRef<CollectionItem[]>([]);
+  /** Mrs. GREEN アーPPLE：緑りんごラウンドの進行管理（active中は緑りんごを降らせる） */
+  const mrsGreenAppleActiveRef = useRef(false);
+  const mrsGreenAppleSpawnRemainingRef = useRef(0);
+  const mrsGreenAppleUnresolvedRef = useRef(0);
+  const mrsGreenAppleCaughtRef = useRef(0);
+  const mrsGreenAppleNeedRef = useRef(0);
+  const mrsGreenAppleMrCountRef = useRef(0);
   /** もっちゅりんのエコー用に、直前に捕まえたアイテムを新しい順に最大2件保持する */
   /** もっちゅりんを取った直後に捕まえるアイテムのスキルをもう一度発動する残り回数 */
   const mocchurinPendingEchoCountRef = useRef(0);
@@ -1076,6 +1116,7 @@ export function FrenchieCatchGame({
     const pool = MYSTERY_SKILL_ITEM_IDS.filter((id) => ownedIds.has(id));
     mysterySkillPoolRef.current = pool.length > 0 ? pool : MYSTERY_SKILL_ITEM_IDS;
     personCharacterPoolRef.current = PERSON_CHARACTER_ITEMS.filter((item) => ownedIds.has(item.id));
+    mrCharacterPoolRef.current = MR_CHARACTER_ITEMS.filter((item) => ownedIds.has(item.id));
     clawdBallItemsRef.current = {
       soccer: ownedIds.has(CLAWD_SOCCER_BALL_ITEM?.id ?? "") ? CLAWD_SOCCER_BALL_ITEM : null,
       gold: ownedIds.has(CLAWD_GOLD_BALL_ITEM?.id ?? "") ? CLAWD_GOLD_BALL_ITEM : null,
@@ -1103,6 +1144,7 @@ export function FrenchieCatchGame({
     const fixed = [
       POOP_IMAGE, MYSTERY_IMAGE, BAG_IMAGE, TIME_MINUS_IMAGE,
       BOX_SHRINK_IMAGE, BLACKOUT_IMAGE, STUN_IMAGE, CHOCOLATE_IMAGE, "/characters/default/front.webp",
+      GREEN_APPLE_IMAGE,
     ];
     const dynamic = itemPool.map((item) => item.image);
     return Array.from(new Set([...fixed, ...dynamic]));
@@ -1177,6 +1219,33 @@ export function FrenchieCatchGame({
     if (personFloodRemainingRef.current > 0) {
       personFloodRemainingRef.current -= 1;
       const character = pickPersonCharacter(personCharacterPoolRef.current);
+      return {
+        ...base,
+        itemId: character.id,
+        kind: "item",
+        name: character.name,
+        image: character.image ?? "",
+        rarity: character.rarity,
+        level: itemLevelByIdRef.current.get(character.id) ?? 0,
+        vy: resolveFallVy(rawVy, base.vy, character.id, character.rarity, itemLevelByIdRef.current.get(character.id) ?? 1),
+        size: 12.5 + Math.random() * 3.5,
+        spin: (Math.random() - 0.5) * 65,
+      };
+    }
+
+    if (mrFloodRemainingRef.current > 0 && mrCharacterPoolRef.current.length === 0) {
+      mrFloodRemainingRef.current = 0;
+    }
+    if (mrFloodRemainingRef.current > 0) {
+      mrFloodRemainingRef.current -= 1;
+      // ブレブルは時間増加系カットオフの対象なので、カットオフ発動中はMRフラッドの抽選からも除外する
+      // （除外すると空になる場合のみ、フラッド自体が止まらないよう全MRへフォールバックする）
+      const cutoffActive = (performance.now() - startAtRef.current) / 1000 >= timeBonusCutoffSecRef.current;
+      const filteredMrPool = cutoffActive
+        ? mrCharacterPoolRef.current.filter((item) => !TIME_BONUS_CUTOFF_ITEM_IDS.has(item.id))
+        : mrCharacterPoolRef.current;
+      const effectiveMrPool = filteredMrPool.length > 0 ? filteredMrPool : mrCharacterPoolRef.current;
+      const character = pickPersonCharacter(effectiveMrPool);
       return {
         ...base,
         itemId: character.id,
@@ -1435,6 +1504,75 @@ export function FrenchieCatchGame({
   }, []);
 
   /**
+   * Mrs. GREEN アーPPLEの緑りんご：他のアイテムの出現を止めず、通常のスポーンと並行して
+   * 追加で降ってくる（Clawdのサッカーボール／ゴールドボールと同じ「並行スポーン」方式）。
+   */
+  const createGreenAppleEntity = useCallback((): Entity => {
+    const fallSpeedBoost = performance.now() < fallSpeedBoostUntilRef.current ? fallSpeedValueRef.current : 1;
+    const slantBoost = performance.now() < slantBoostUntilRef.current ? SLANT_VX_BOOST : 1;
+    const rawVy = (17 + Math.random() * 5) * 1.35;
+    const spawnX = 9 + Math.random() * 82;
+    const spawnY = -13 - Math.random() * 5;
+    return {
+      id: nextIdRef.current++,
+      x: spawnX,
+      y: spawnY,
+      spawnX,
+      spawnY,
+      vx: (Math.random() - 0.5) * 2.4 * slantBoost,
+      vy: rawVy * fallSpeedBoost,
+      rotation: (Math.random() - 0.5) * 12,
+      status: "falling" as const,
+      rimChecked: false,
+      enteredOpening: false,
+      ttl: 0,
+      itemId: GREEN_APPLE_ITEM_ID,
+      kind: "item",
+      name: "緑りんご",
+      image: GREEN_APPLE_IMAGE,
+      rarity: null,
+      level: 0,
+      size: 13 + Math.random() * 3,
+      spin: (Math.random() - 0.5) * 30,
+    };
+  }, []);
+
+  /**
+   * Listen to the a-：他のアイテムの出現を止めず、通常のスポーンと並行して初期フレブルが追加で
+   * 降ってくる（緑りんご・Clawdと同じ「並行スポーン」方式）。Xmas Partyのdog大量発生は
+   * 従来通りdogFloodRemainingRefのフラッド方式のまま（落下速度アップ等と同時発動する演出のため）。
+   */
+  const createListenDogEntity = useCallback((): Entity => {
+    const fallSpeedBoost = performance.now() < fallSpeedBoostUntilRef.current ? fallSpeedValueRef.current : 1;
+    const slantBoost = performance.now() < slantBoostUntilRef.current ? SLANT_VX_BOOST : 1;
+    const rawVy = (17 + Math.random() * 5) * 1.35;
+    const spawnX = 9 + Math.random() * 82;
+    const spawnY = -13 - Math.random() * 5;
+    return {
+      id: nextIdRef.current++,
+      x: spawnX,
+      y: spawnY,
+      spawnX,
+      spawnY,
+      vx: (Math.random() - 0.5) * 2.4 * slantBoost,
+      vy: rawVy * fallSpeedBoost * DOG_FLOOD_FALL_SPEED,
+      rotation: (Math.random() - 0.5) * 12,
+      status: "falling" as const,
+      rimChecked: false,
+      enteredOpening: false,
+      ttl: 0,
+      itemId: null,
+      kind: "dog",
+      name: "初期フレブル",
+      image: "/characters/default/front.webp",
+      rarity: null,
+      level: 0,
+      size: 19,
+      spin: (Math.random() - 0.5) * 20,
+    };
+  }, []);
+
+  /**
    * スキル発動ログを画面上部の細い帯にトースト表示する。
    * 常時表示のログ欄にするとプレイ画面が覆われるため、直近3件までをキューに積んで
    * 一定時間後に自動で消す方式にしている（見た目上はゲーム画面を邪魔しない）。
@@ -1566,6 +1704,29 @@ export function FrenchieCatchGame({
 
       const dt = Math.min(0.035, Math.max(0, (now - last) / 1000));
       last = now;
+
+      /**
+       * Mrs. GREEN アーPPLEの緑りんごラウンドが完了（10個すべて決着）したかを確認し、
+       * 完了していれば成功判定してMRの残数(mrFloodRemainingRef)へ積む。
+       * 緑りんごを1個キャッチした直後と、1個キャッチできずに画面外へ落ちた直後の両方から呼ぶ。
+       */
+      const resolveMrsGreenAppleRoundIfDone = () => {
+        if (!mrsGreenAppleActiveRef.current) return;
+        if (mrsGreenAppleUnresolvedRef.current > 0) return;
+        const success = mrsGreenAppleCaughtRef.current >= mrsGreenAppleNeedRef.current;
+        if (success) {
+          const mrCount = mrsGreenAppleMrCountRef.current;
+          mrFloodRemainingRef.current += mrCount;
+          pushSkillLog(`緑りんご ${mrsGreenAppleCaughtRef.current}/${MRS_GREEN_APPLE_SPAWN_COUNT}個成功！MR${mrCount}体`, "UR");
+        } else {
+          pushSkillLog(`緑りんご ${mrsGreenAppleCaughtRef.current}/${MRS_GREEN_APPLE_SPAWN_COUNT}個…届かなかった`, "UR");
+        }
+        mrsGreenAppleActiveRef.current = false;
+        mrsGreenAppleCaughtRef.current = 0;
+        mrsGreenAppleNeedRef.current = 0;
+        mrsGreenAppleMrCountRef.current = 0;
+      };
+
       const spawnRate = dogFloodRemainingRef.current > 0
         ? DOG_FLOOD_SPAWN_RATE
         : poopFloodRemainingRef.current > 0
@@ -1589,6 +1750,18 @@ export function FrenchieCatchGame({
           entitiesRef.current.push(ball);
         }
         nextClawdSpawnRef.current = now + SPAWN_INTERVAL_MIN_MS + Math.random() * (SPAWN_INTERVAL_MAX_MS - SPAWN_INTERVAL_MIN_MS);
+      }
+      // 緑りんごも他のアイテムのスポーンを止めず、並行スポーンで追加投入する
+      if (mrsGreenAppleSpawnRemainingRef.current > 0 && now >= nextGreenAppleSpawnRef.current && entitiesRef.current.length < entityCap) {
+        mrsGreenAppleSpawnRemainingRef.current -= 1;
+        entitiesRef.current.push(createGreenAppleEntity());
+        nextGreenAppleSpawnRef.current = now + SPAWN_INTERVAL_MIN_MS + Math.random() * (SPAWN_INTERVAL_MAX_MS - SPAWN_INTERVAL_MIN_MS);
+      }
+      // Listen to the a-も他のアイテムのスポーンを止めず、並行スポーンで初期フレブルを追加投入する
+      if (listenFloodRemainingRef.current > 0 && now >= nextListenSpawnRef.current && entitiesRef.current.length < entityCap) {
+        listenFloodRemainingRef.current -= 1;
+        entitiesRef.current.push(createListenDogEntity());
+        nextListenSpawnRef.current = now + SPAWN_INTERVAL_MIN_MS + Math.random() * (SPAWN_INTERVAL_MAX_MS - SPAWN_INTERVAL_MIN_MS);
       }
 
       const boxWide = now < boxWideUntilRef.current;
@@ -1744,6 +1917,19 @@ export function FrenchieCatchGame({
               } else {
                 showCatch(entity, 0, "ビニール袋は満タン");
               }
+              next.push(entity);
+              continue;
+            }
+
+            if (entity.itemId === GREEN_APPLE_ITEM_ID) {
+              caughtRef.current += 1;
+              setCaught(caughtRef.current);
+              mrsGreenAppleCaughtRef.current += 1;
+              mrsGreenAppleUnresolvedRef.current = Math.max(0, mrsGreenAppleUnresolvedRef.current - 1);
+              scoreRef.current += GREEN_APPLE_POINTS;
+              scoreRef.current = Math.ceil(scoreRef.current); setScore(scoreRef.current);
+              showCatch(entity, GREEN_APPLE_POINTS, "緑りんご");
+              resolveMrsGreenAppleRoundIfDone();
               next.push(entity);
               continue;
             }
@@ -2060,7 +2246,7 @@ export function FrenchieCatchGame({
                 break;
               }
               case DOG_FLOOD_ITEM_ID:
-                dogFloodRemainingRef.current += LV.LISTEN_DOG_COUNT[lv]!;
+                listenFloodRemainingRef.current += LV.LISTEN_DOG_COUNT[lv]!;
                 effectLabel = `フレブル${LV.LISTEN_DOG_COUNT[lv]}体 大量発生${lvTag}`;
                 statusChanged = true;
                 break;
@@ -2126,6 +2312,19 @@ export function FrenchieCatchGame({
                 const timeBonus = Math.round(remainingSec * LV.HIA_MULT[lv]!);
                 points += timeBonus;
                 effectLabel = `残り時間ボーナス +${timeBonus}pt${lvTag}`;
+                break;
+              }
+              case MRS_GREEN_APPLE_ITEM_ID: {
+                const need = LV.MRS_GREEN_APPLE_NEED[lv]!;
+                const mrCount = LV.MRS_GREEN_APPLE_MR_COUNT[lv]!;
+                mrsGreenAppleActiveRef.current = true;
+                mrsGreenAppleSpawnRemainingRef.current += MRS_GREEN_APPLE_SPAWN_COUNT;
+                mrsGreenAppleUnresolvedRef.current += MRS_GREEN_APPLE_SPAWN_COUNT;
+                mrsGreenAppleCaughtRef.current = 0;
+                mrsGreenAppleNeedRef.current = need;
+                mrsGreenAppleMrCountRef.current = mrCount;
+                effectLabel = `緑りんご${MRS_GREEN_APPLE_SPAWN_COUNT}個(${need}個でMR${mrCount}体)${lvTag}`;
+                statusChanged = true;
                 break;
               }
               case "interior_sleepy_moon": {
@@ -2485,6 +2684,10 @@ export function FrenchieCatchGame({
         }
 
         if (entity.y > 110 || entity.x < -18 || entity.x > 118) {
+          if (entity.itemId === GREEN_APPLE_ITEM_ID && entity.status !== "caught") {
+            mrsGreenAppleUnresolvedRef.current = Math.max(0, mrsGreenAppleUnresolvedRef.current - 1);
+            resolveMrsGreenAppleRoundIfDone();
+          }
           continue;
         }
         next.push(entity);
@@ -2633,8 +2836,16 @@ export function FrenchieCatchGame({
     hazardShieldUntilRef.current = 0;
     foodScoreMultipliersRef.current = [];
     dogFloodRemainingRef.current = 0;
+    listenFloodRemainingRef.current = 0;
     personFloodRemainingRef.current = 0;
     clawdBallFloodRemainingRef.current = 0;
+    mrFloodRemainingRef.current = 0;
+    mrsGreenAppleActiveRef.current = false;
+    mrsGreenAppleSpawnRemainingRef.current = 0;
+    mrsGreenAppleUnresolvedRef.current = 0;
+    mrsGreenAppleCaughtRef.current = 0;
+    mrsGreenAppleNeedRef.current = 0;
+    mrsGreenAppleMrCountRef.current = 0;
     mocchurinPendingEchoCountRef.current = 0;
     goldBonusCoinsRef.current = 0;
     slantBoostUntilRef.current = 0;
@@ -2671,6 +2882,8 @@ export function FrenchieCatchGame({
     nextSpawnRef.current = now;
     extraSpawnRef.current = now;
     nextClawdSpawnRef.current = now;
+    nextGreenAppleSpawnRef.current = now;
+    nextListenSpawnRef.current = now;
     // 装備中ダンボール効果はラウンド開始時から有効なので、最初のcatchを待たず状態表示に反映する
     refreshEffectStatus(now);
     setPhase("playing");
