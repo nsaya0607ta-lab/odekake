@@ -16,6 +16,8 @@ import { COLLECTION_ITEMS, countOwned } from "@/lib/collection/items";
 import { loadAreaIndex } from "@/lib/data/areas";
 import { getCoinSummary } from "@/lib/data/coins";
 import { getOwnedItemIds } from "@/lib/data/collection";
+import { getOwnedDambourleCounts } from "@/lib/data/dambourle";
+import { DAMBOURLE_PRIZES } from "@/lib/dambourle/prizes";
 import { getCurrentDogSkin } from "@/lib/data/dog-skin";
 import { getExpDashboard } from "@/lib/data/exp";
 import { getFriendsActivityFeed, getFriendsStepsRanking } from "@/lib/data/friends";
@@ -48,6 +50,7 @@ export default async function HomePage({
     coins,
     ownedItemIds,
     dogSkin,
+    dambourleCounts,
     profileResult,
     friendActivity,
     friendSteps,
@@ -59,6 +62,7 @@ export default async function HomePage({
     getCoinSummary(supabase, user.id),
     getOwnedItemIds(supabase, user.id),
     getCurrentDogSkin(supabase, user.id),
+    getOwnedDambourleCounts(supabase, user.id).catch(() => new Map<string, number>()),
     supabase.from("profiles").select("profile_image_url").eq("user_id", user.id).maybeSingle(),
     getFriendsActivityFeed(supabase, 30),
     getFriendsStepsRanking(supabase, 20),
@@ -79,6 +83,10 @@ export default async function HomePage({
 
   const expProgress = getExpProgress(expDashboard.totalExp);
   const collectedItems = countOwned(COLLECTION_ITEMS, ownedItemIds);
+  // 図鑑の母数・所持数に、通常図鑑とは別モデルのダンボールぶんも合算する
+  const collectedDambourle = DAMBOURLE_PRIZES.filter((prize) => (dambourleCounts.get(prize.id) ?? 0) > 0).length;
+  const totalCollectionCount = COLLECTION_ITEMS.length + DAMBOURLE_PRIZES.length;
+  const totalCollectedCount = collectedItems + collectedDambourle;
 
   // 登録者（自分・フレンド・共有旅の参加者）ごとに最新1件だけ残し、
   // 24時間より前の登録は「みんなのおでかけ」に出さない。
@@ -225,7 +233,7 @@ export default async function HomePage({
             stepsRanking={friendStepsRanking}
           />
 
-          <HomeCollectionCard collected={collectedItems} total={COLLECTION_ITEMS.length} />
+          <HomeCollectionCard collected={totalCollectedCount} total={totalCollectionCount} />
         </div>
       </PageBody>
     </>
