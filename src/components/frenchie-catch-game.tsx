@@ -2780,7 +2780,7 @@ export function FrenchieCatchGame({
         </div>
 
         {skillLogEntries.length > 0 ? (
-          <div className="pointer-events-none absolute right-3 top-16 z-40 flex w-[62%] flex-col items-end gap-1">
+          <div className="pointer-events-none absolute right-3 top-[4.75rem] z-[45] flex w-[62%] flex-col items-end gap-1">
             {skillLogEntries.map((entry) => {
               const style = getSkillLogStyle(entry.rarity);
               return (
