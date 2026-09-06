@@ -47,6 +47,55 @@ type CatchFeedback = {
   effect?: string;
 };
 
+/**
+ * スキル発動ログ（トースト）のランク別配色。
+ * 虹色・青金虹色系はグラデーションのため、どの色の上でも読める白文字+輪郭シャドウにしている。
+ * それ以外は背景の明暗に合わせて文字色を選び、視認性を確保する。
+ * UR/LR/MRは金縁+グロー(boxShadow)を付けて、それらしい豪華さを出している。
+ */
+const SKILL_LOG_STYLES: Record<
+  "default" | FrenchieCatchItem["rarity"],
+  { background: string; color: string; textShadow?: string; border?: string; boxShadow?: string }
+> = {
+  default: { background: "rgba(0,0,0,0.62)", color: "#ffffff" },
+  N: { background: "rgba(0,0,0,0.62)", color: "#ffffff" },
+  R: { background: "#7dd3fc", color: "#0c4a6e" },
+  SR: { background: "#facc15", color: "#78350f" },
+  SSR: {
+    background: "linear-gradient(90deg,#ff5f6d,#ffc371,#f9f871,#47e08a,#4fc3f7,#b388ff,#ff5f6d)",
+    color: "#ffffff",
+    textShadow: "0 0 3px rgba(0,0,0,0.9), 0 0 6px rgba(0,0,0,0.55)",
+  },
+  // くれない色をベースに、光沢のある赤黒グラデーション+金縁で高級感を出す
+  UR: {
+    background: "linear-gradient(135deg,#3d0a12 0%,#9f1239 30%,#ff2d55 50%,#9f1239 70%,#3d0a12 100%)",
+    color: "#fff3d6",
+    textShadow: "0 0 4px rgba(0,0,0,0.85)",
+    border: "1px solid #f3c96b",
+    boxShadow: "0 0 8px rgba(255,45,85,0.55), 0 0 3px rgba(243,201,107,0.8)",
+  },
+  // 黒地に金の輝きを走らせて、漆黒×金箔のような豪華さを出す
+  LR: {
+    background: "linear-gradient(135deg,#050505 0%,#1c1c1c 38%,#d9a72f 50%,#1c1c1c 62%,#050505 100%)",
+    color: "#ffffff",
+    textShadow: "0 0 5px rgba(217,167,47,0.9), 0 0 2px rgba(0,0,0,0.9)",
+    border: "1px solid #d9a72f",
+    boxShadow: "0 0 10px rgba(217,167,47,0.6)",
+  },
+  // 青×金×虹をまとめたホログラム調グラデーションで別格感を出す
+  MR: {
+    background: "linear-gradient(90deg,#0a1a4d,#d9a72f,#6f52ff,#4dd7ff,#ec6cff,#d9a72f,#0a1a4d)",
+    color: "#ffffff",
+    textShadow: "0 0 4px rgba(0,0,0,0.9), 0 0 7px rgba(0,0,0,0.6)",
+    border: "1px solid #fff0a0",
+    boxShadow: "0 0 12px rgba(212,175,55,0.65)",
+  },
+};
+
+function getSkillLogStyle(rarity: FrenchieCatchItem["rarity"] | null) {
+  return SKILL_LOG_STYLES[rarity ?? "default"];
+}
+
 const ROUND_SECONDS = 50;
 /** 時間増加系スキルの複利的な伸びが稀に極端化した場合の安全弁。この秒数を超えては延長しない */
 const MAX_ROUND_SECONDS = 1800;
@@ -931,6 +980,9 @@ export function FrenchieCatchGame({
   const dogGoldenPtValueRef = useRef(0);
   const feedbackTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const impactTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  /** スキル発動ログ（画面を覆わないトースト表示）用の連番とタイマー */
+  const skillLogIdRef = useRef(0);
+  const skillLogTimersRef = useRef<Set<ReturnType<typeof setTimeout>>>(new Set());
   /** 装備中ダンボール効果のプロップの最新値。startGame(deps:[])内から常に最新値を読むための橋渡し */
   const dambourleEffectPropRef = useRef(dambourleEffect);
   useEffect(() => {
@@ -960,6 +1012,7 @@ export function FrenchieCatchGame({
   const [boxShrinkGuard, setBoxShrinkGuard] = useState(0);
   const [timeMinusGuard, setTimeMinusGuard] = useState(0);
   const [feedback, setFeedback] = useState<CatchFeedback | null>(null);
+  const [skillLogEntries, setSkillLogEntries] = useState<{ id: number; text: string; rarity: FrenchieCatchItem["rarity"] | null }[]>([]);
   const [scoreMultiplierTotal, setScoreMultiplierTotal] = useState(1);
   const [impactX, setImpactX] = useState<number | null>(null);
   const [boxBounce, setBoxBounce] = useState(false);
@@ -1370,6 +1423,21 @@ export function FrenchieCatchGame({
     };
   }, []);
 
+  /**
+   * スキル発動ログを画面上部の細い帯にトースト表示する。
+   * 常時表示のログ欄にするとプレイ画面が覆われるため、直近3件までをキューに積んで
+   * 一定時間後に自動で消す方式にしている（見た目上はゲーム画面を邪魔しない）。
+   */
+  const pushSkillLog = useCallback((text: string, rarity: FrenchieCatchItem["rarity"] | null = null) => {
+    const id = ++skillLogIdRef.current;
+    setSkillLogEntries((prev) => [...prev.slice(-2), { id, text, rarity }]);
+    const timer = setTimeout(() => {
+      skillLogTimersRef.current.delete(timer);
+      setSkillLogEntries((prev) => prev.filter((entry) => entry.id !== id));
+    }, 2200);
+    skillLogTimersRef.current.add(timer);
+  }, []);
+
   const showCatch = useCallback((entity: Entity, points: number, effect?: string) => {
     setFeedback({ name: entity.name, points, effect });
     setBoxBounce(true);
@@ -1378,8 +1446,9 @@ export function FrenchieCatchGame({
       setFeedback(null);
       setBoxBounce(false);
     }, 900);
+    if (effect) pushSkillLog(effect, entity.rarity);
     if (typeof navigator !== "undefined" && "vibrate" in navigator) navigator.vibrate?.(18);
-  }, []);
+  }, [pushSkillLog]);
 
   const showImpact = useCallback((x: number) => {
     setImpactX(x);
@@ -1391,6 +1460,8 @@ export function FrenchieCatchGame({
     if (rafRef.current !== null) cancelAnimationFrame(rafRef.current);
     if (feedbackTimerRef.current) clearTimeout(feedbackTimerRef.current);
     if (impactTimerRef.current) clearTimeout(impactTimerRef.current);
+    skillLogTimersRef.current.forEach((timer) => clearTimeout(timer));
+    skillLogTimersRef.current.clear();
   }, []);
 
   useEffect(() => {
@@ -1459,6 +1530,7 @@ export function FrenchieCatchGame({
             setFeedback(null);
             setBoxBounce(false);
           }, 900);
+          pushSkillLog(`くみたて完成！+${ikeaBonus}pt`, "SSR");
         }
         timedEffectChanged = true;
       }
@@ -2351,10 +2423,11 @@ export function FrenchieCatchGame({
             // （例: LV.ANBALL_PTのLv6以降）、加算した時点で必ず切り上げて整数にする
             points = Math.ceil(points);
 
+            // JUSTは中央キャッチのボーナス演出であってスキルではないため、
+            // 得点だけ上乗せしてスキルログには出さない（テキストは付与しない）
             const isJust = Math.abs(entity.x - center) <= effBoxHalf * JUST_RADIUS_RATIO;
             if (isJust) {
               points = Math.round(points * JUST_MULTIPLIER);
-              effectLabel = effectLabel ? `${effectLabel} / JUST!×${JUST_MULTIPLIER}` : `JUST!×${JUST_MULTIPLIER}`;
             }
 
             scoreRef.current += points;
@@ -2442,7 +2515,7 @@ export function FrenchieCatchGame({
       if (rafRef.current !== null) cancelAnimationFrame(rafRef.current);
       rafRef.current = null;
     };
-  }, [createEntity, phase, refreshEffectStatus, showCatch, showImpact]);
+  }, [createEntity, phase, pushSkillLog, refreshEffectStatus, showCatch, showImpact]);
 
   useEffect(() => {
     if (phase !== "finished" || !roundIdRef.current) return;
@@ -2573,6 +2646,9 @@ export function FrenchieCatchGame({
     setCaught(0);
     setTimeLeft(ROUND_SECONDS);
     setFeedback(null);
+    skillLogTimersRef.current.forEach((timer) => clearTimeout(timer));
+    skillLogTimersRef.current.clear();
+    setSkillLogEntries([]);
     setScoreMultiplierTotal(1);
     setImpactX(null);
     setDogBonus(null);
@@ -2659,8 +2735,8 @@ export function FrenchieCatchGame({
               {feedback ? <span className="pointer-events-none absolute -right-2 -top-2 rounded-full bg-[#fff6cc]/95 px-2 py-0.5 text-[10px] font-black text-[#c87527] shadow-sm">+{feedback.points}</span> : null}
             </div>
             {scoreMultiplierTotal > 1 ? (
-              <span className="rounded-xl border border-[#f4d98f] bg-[#fff6cc]/95 px-2.5 py-1 text-base font-black leading-none text-[#c87527] shadow-sm">
-                スコア倍率 ×{formatMultiplierCeil(scoreMultiplierTotal)}
+              <span className="rounded-full border border-[#f4d98f] bg-[#fff6cc]/95 px-2 py-0.5 text-[11px] font-black leading-none text-[#c87527] shadow-sm">
+                倍率×{formatMultiplierCeil(scoreMultiplierTotal)}
               </span>
             ) : null}
             {bagStock > 0 || stunGuard > 0 || boxShrinkGuard > 0 || timeMinusGuard > 0 ? (
@@ -2691,6 +2767,29 @@ export function FrenchieCatchGame({
           <span className="flex-1" />
           <div className="rounded-2xl border border-white/80 bg-white/90 px-3 py-2 text-right shadow-sm"><p className="text-[9px] font-bold tracking-widest text-ink-faint">TIME</p><p className="text-xl font-black tabular-nums text-ink">{timeLeft}</p></div>
         </div>
+
+        {skillLogEntries.length > 0 ? (
+          <div className="pointer-events-none absolute left-1/2 top-16 z-40 flex w-[92%] -translate-x-1/2 flex-col items-center gap-1">
+            {skillLogEntries.map((entry) => {
+              const style = getSkillLogStyle(entry.rarity);
+              return (
+                <span
+                  key={entry.id}
+                  className="skill-log-toast max-w-full whitespace-normal break-words rounded-2xl px-2.5 py-1 text-center text-[10px] font-bold leading-tight shadow-sm"
+                  style={{
+                    background: style.background,
+                    color: style.color,
+                    textShadow: style.textShadow,
+                    border: style.border,
+                    boxShadow: style.boxShadow,
+                  }}
+                >
+                  {entry.text}
+                </span>
+              );
+            })}
+          </div>
+        ) : null}
 
         {blackoutActive ? <div className="pointer-events-none absolute inset-x-0 top-0 z-[25] h-1/2 bg-black/95" aria-label="上半分ブラックアウト" /> : null}
         {pinkOmoActive ? <div className="pointer-events-none absolute inset-0 z-[26] bg-pink-300/25" aria-label="ピンクオモ発動中（ピンクフィルター）" /> : null}

@@ -3589,6 +3589,10 @@
     animation: fade-in 180ms ease-out both;
   }
 
+  .skill-log-toast {
+    animation: skill-log-toast 2200ms ease-out both;
+  }
+
   .route-progress {
     animation: route-progress 950ms ease-in-out infinite;
     transform-origin: left center;
@@ -4008,6 +4012,22 @@
   to {
     opacity: 1;
     transform: none;
+  }
+}
+
+@keyframes skill-log-toast {
+  0% {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
+  10%,
+  75% {
+    opacity: 1;
+    transform: none;
+  }
+  100% {
+    opacity: 0;
+    transform: translateY(-4px);
   }
 }
 
