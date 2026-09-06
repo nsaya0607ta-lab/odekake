@@ -328,8 +328,8 @@ const LV = {
   NARCISSIST_SEC: [20, 25, 30, 35, 40, 43.75, 47.5, 51.25, 55, 58.75],
   MAFIA_MULT: [1.1, 1.12, 1.14, 1.16, 1.18, 1.19, 1.21, 1.22, 1.24, 1.25],
   PINK_OMO_SEC: [3, 5, 7, 9, 10, 11.31, 12.63, 13.94, 15.25, 16.56],
-  /** Mrs. GREEN アーPPLE：緑りんご10個中これだけキャッチできればMR成功（Lvが上がるほど必要数が減る） */
-  MRS_GREEN_APPLE_NEED: [8, 7, 7, 6, 6, 5, 5, 4, 4, 3],
+  /** Mrs. GREEN アーPPLE：緑りんご10個中これだけキャッチできればMR成功（Lvごとに1個ずつ必要数が減る、最低1個） */
+  MRS_GREEN_APPLE_NEED: [8, 7, 6, 5, 4, 3, 2, 1, 1, 1],
   /** Mrs. GREEN アーPPLE：成功時に降ってくるMRの体数 */
   MRS_GREEN_APPLE_MR_COUNT: [1, 1, 2, 2, 3, 3, 4, 4, 5, 5],
 } as const;
@@ -1234,7 +1234,14 @@ export function FrenchieCatchGame({
     }
     if (mrFloodRemainingRef.current > 0) {
       mrFloodRemainingRef.current -= 1;
-      const character = pickPersonCharacter(mrCharacterPoolRef.current);
+      // ブレブルは時間増加系カットオフの対象なので、カットオフ発動中はMRフラッドの抽選からも除外する
+      // （除外すると空になる場合のみ、フラッド自体が止まらないよう全MRへフォールバックする）
+      const cutoffActive = (performance.now() - startAtRef.current) / 1000 >= timeBonusCutoffSecRef.current;
+      const filteredMrPool = cutoffActive
+        ? mrCharacterPoolRef.current.filter((item) => !TIME_BONUS_CUTOFF_ITEM_IDS.has(item.id))
+        : mrCharacterPoolRef.current;
+      const effectiveMrPool = filteredMrPool.length > 0 ? filteredMrPool : mrCharacterPoolRef.current;
+      const character = pickPersonCharacter(effectiveMrPool);
       return {
         ...base,
         itemId: character.id,

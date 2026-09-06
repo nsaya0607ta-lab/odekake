@@ -155,8 +155,11 @@ function pickPersonId() {
 }
 // Mrs. GREEN アーPPLE成功時に降ってくる「MR」（frenchie-catch-game.tsxのMR_CHARACTER_ITEM_IDSと同一、手動同期）。全てMRランクなので実質均等抽選。
 const MR_CHARACTER_IDS = ["other_burebur", "other_xmas_party", "other_narcissist_a", "other_mafia_a"];
-function pickMrId() {
-  const weighted = MR_CHARACTER_IDS.map((pid) => ({ pid, weight: PERSON_RANK_WEIGHT[byId.get(pid).rarity] ?? 1 }));
+function pickMrId(excludeCutoff = false) {
+  // 除外すると空になる場合のみ、フラッド自体が止まらないよう全MRへフォールバックする
+  const filtered = excludeCutoff ? MR_CHARACTER_IDS.filter((id) => !TIME_BONUS_IDS.has(id)) : MR_CHARACTER_IDS;
+  const pool = filtered.length > 0 ? filtered : MR_CHARACTER_IDS;
+  const weighted = pool.map((pid) => ({ pid, weight: PERSON_RANK_WEIGHT[byId.get(pid).rarity] ?? 1 }));
   const total = weighted.reduce((sum, e) => sum + e.weight, 0);
   let roll = Math.random() * total;
   for (const e of weighted) {
@@ -447,7 +450,8 @@ function simulateOneRound(lv, catchAll, timeBonusCatchRate = 0.8, normalCatchRat
     if (dogFloodRemaining > 0) { dogFloodRemaining -= 1; if (attemptCatch()) resolveCatch("dog", null, null, 0); continue; }
     if (mrFloodRemaining > 0) {
       mrFloodRemaining -= 1;
-      const pid = pickMrId();
+      // ブレブルは時間増加系カットオフの対象なので、カットオフ発動中はMRフラッドの抽選からも除外する
+      const pid = t >= timeBonusCutoffMs ? pickMrId(true) : pickMrId(false);
       const item = byId.get(pid);
       if (attemptCatch()) resolveCatch("item", pid, item.rarity, lv + 1);
       continue;
