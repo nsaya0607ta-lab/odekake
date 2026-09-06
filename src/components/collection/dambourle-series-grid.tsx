@@ -1,8 +1,12 @@
+"use client";
+
 /**
  * シリーズ図鑑内の「ダンボール」セクション用グリッド。
  * ダンボールガチャ(DambourleItem)は通常図鑑のCollectionItemとは別のデータモデル
  * （所持数はuser_dambourle_items、Lv計算式も別）のため、ItemGrid/ItemCardは使わず
  * 専用の閲覧専用カードを用意する（装備切り替えはダンボール選択画面で行う）。
+ * imgにonContextMenuハンドラを渡すため、サーバーコンポーネントのままにはできない
+ * （"Event handlers cannot be passed to Client Component props"エラーの原因になる）。
  */
 import { DEFAULT_BOX_ALT, DEFAULT_BOX_IMAGE, getDambourleBoxImage } from "@/lib/dambourle/box-image";
 import { DAMBOURLE_EFFECT_NAMES, DAMBOURLE_PRIZES, getDambourleEffectValueText } from "@/lib/dambourle/prizes";
