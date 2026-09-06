@@ -2747,7 +2747,10 @@ export function FrenchieCatchGame({
         const dambourleEndCoinBonus = dambourleEffectRef.current?.key === "end_coin_bonus"
           ? Math.floor((scoreRef.current / 100) * (dambourleEffectRef.current.percent / 100))
           : 0;
-        const bonusCoins = Math.min(MAX_BONUS_COINS_CLIENT, goldBonusCoinsRef.current + dambourleEndCoinBonus);
+        // GOLD_BALL_COINSはNo.11「全アイテムのスキルLv上昇」でLv6以降まで届くと57.5等の端数を含むため、
+        // 積算値(goldBonusCoinsRef)が端数になりうる。/api/coins/item-catchはInteger必須のため、
+        // 端数のまま送るとリクエスト自体が失敗する（正当なプレイが「ゲーム結果が正しくありません」で弾かれる不具合の原因だった）
+        const bonusCoins = Math.min(MAX_BONUS_COINS_CLIENT, Math.floor(goldBonusCoinsRef.current + dambourleEndCoinBonus));
         const response = await fetch("/api/coins/item-catch", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
