@@ -167,6 +167,7 @@ const CURATED_ITEMS: readonly CollectionItem[] = [
   { id: "other_mirror_omochi", name: "ミラーおもち", image: "/collection/items/mirror-omochi.webp", category: "other", series: null, rarity: "UR" },
   { id: "other_toorematen", name: "通れまてん", image: "/collection/items/toorematen.webp", category: "other", series: null, rarity: "UR" },
   { id: "other_hia", name: "hiA", image: "/collection/items/hia.webp", category: "other", series: null, rarity: "UR" },
+  { id: "other_mrs_green_apple", name: "Mrs. GREEN アーPPLE", image: "/collection/items/mrs-green-apple.webp", category: "other", series: null, rarity: "UR" },
 
   // --- 通常図鑑：おでかけ小物 ------------------------------------------
   { id: "other_yellow_rain_boots", name: "きいろのながぐつ", image: "/collection/items/yellow-rain-boots.webp", category: "other", series: null, rarity: "N" },
@@ -179,6 +180,7 @@ const CURATED_ITEMS: readonly CollectionItem[] = [
   { id: "toy_red_balloon", name: "あかい風船", image: "/collection/items/red-balloon.webp", category: "toy", series: null, rarity: "N" },
   { id: "toy_sand_bucket", name: "おすなばバケツ", image: "/collection/items/flower-sand-bucket.webp", category: "toy", series: null, rarity: "N" },
   { id: "accessory_walk_pouch", name: "おさんぽポーチ", image: "/collection/items/pet-outing-bag.webp", category: "accessory", series: null, rarity: "N" },
+  { id: "other_red_apple", name: "赤りんご", image: "/collection/items/red-apple.webp", category: "food", series: null, rarity: "N" },
 
   // --- 登山シリーズ ----------------------------------------------------
   { id: "hiking_frenchie", name: "登山のフレブル", image: "/collection/skins/hiking-frenchie.webp", category: "other", series: "hiking", rarity: "LR", art: "dogHiking" },

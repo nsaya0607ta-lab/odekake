@@ -118,6 +118,8 @@ const OYASUMI_SECONDS = SCORE_MULT_DURATION_SSR_SEC;
 const OYASUMI_NO_BLACKOUT_CHANCE = Number(GAME_TSX.match(/const OYASUMI_NO_BLACKOUT_CHANCE = ([\d.]+);/)[1]);
 const DOG_FLOOD_SPAWN_RATE = Number(GAME_TSX.match(/const DOG_FLOOD_SPAWN_RATE = ([\d.]+);/)[1]);
 const POOP_FLOOD_SPAWN_RATE = Number(GAME_TSX.match(/const POOP_FLOOD_SPAWN_RATE = ([\d.]+);/)[1]);
+const MRS_GREEN_APPLE_SPAWN_COUNT = Number(GAME_TSX.match(/const MRS_GREEN_APPLE_SPAWN_COUNT = (\d+);/)[1]);
+const GREEN_APPLE_POINTS = Number(GAME_TSX.match(/const GREEN_APPLE_POINTS = (\d+);/)[1]);
 
 const POINTS = evalLiteral(extractBlock(GAME_TSX, 'const POINTS: Record<FrenchieCatchItem["rarity"], number> = {', "{", "}"));
 const MYSTERY_BASE_POINTS = Number(GAME_TSX.match(/const MYSTERY_BASE_POINTS = (\d+);/)[1]);
@@ -151,6 +153,18 @@ function pickPersonId() {
   }
   return weighted[weighted.length - 1].pid;
 }
+// Mrs. GREEN アーPPLE成功時に降ってくる「MR」（frenchie-catch-game.tsxのMR_CHARACTER_ITEM_IDSと同一、手動同期）。全てMRランクなので実質均等抽選。
+const MR_CHARACTER_IDS = ["other_burebur", "other_xmas_party", "other_narcissist_a", "other_mafia_a"];
+function pickMrId() {
+  const weighted = MR_CHARACTER_IDS.map((pid) => ({ pid, weight: PERSON_RANK_WEIGHT[byId.get(pid).rarity] ?? 1 }));
+  const total = weighted.reduce((sum, e) => sum + e.weight, 0);
+  let roll = Math.random() * total;
+  for (const e of weighted) {
+    roll -= e.weight;
+    if (roll < 0) return e.pid;
+  }
+  return weighted[weighted.length - 1].pid;
+}
 const TIME_BONUS_IDS = new Set(["toy_duck_plush", "toy_carrot", "food_paw_melon_bread", "interior_anball", "other_azuki", "other_omojii", "summer_frenchie", "other_burebur"]);
 // おかえり(other_okaeri)は時間増加系8種そのものではないが、時間バランス調整の対象として
 // timeBonusCatchRate(見送り確率)の適用対象に加える（ボーナス出現タイマーの除外対象ではないため
@@ -161,7 +175,7 @@ const REDUCED_CATCH_IDS = new Set([...TIME_BONUS_IDS, "other_okaeri"]);
 // 揺らぐため、TIME_BONUS_IDSと合わせてボーナス側では除外する（frenchie-catch-game.tsxのSPAWN_DYNAMICS_ITEM_IDSと同一）
 // other_listen_to_the_a（フレブル大量発生。厳密には出現重みの計算式ではなくdogFloodそのものを起こす
 // 効果だが）は、2026-09-03、単独チューニング枠からこのプールのLR枠に移動（ユーザー指定）。
-const SPAWN_DYNAMICS_IDS = new Set(["toy_rainbow_ball", "interior_stretch_rod", "toy_treasure_puzzle", "other_xmas_party", "other_pondeomo", "other_pondear", "other_jare_a", "interior_ragby_ar", "other_listen_to_the_a"]);
+const SPAWN_DYNAMICS_IDS = new Set(["toy_rainbow_ball", "interior_stretch_rod", "toy_treasure_puzzle", "other_xmas_party", "other_pondeomo", "other_pondear", "other_jare_a", "interior_ragby_ar", "other_listen_to_the_a", "other_mrs_green_apple"]);
 // 得点倍率プール（"○秒間×n"の得点倍率スキルを主効果として持つアイテム）。ITEM_SPAWN_WEIGHTSで
 // レアリティ別に重みを下げてある8種（frenchie-catch-game.tsxの同名コメント参照）。宝箱・夏のフレブル・
 // Xmas Partyは得点倍率効果も持つが、重みが時間バランス/出現量アップ側のチューニングで別途固定されている
@@ -181,7 +195,7 @@ const NORMAL_ITEM_IDS = new Set([
   "food_dog_milk", "food_cheese_cubes", "food_roasted_sweet_potato", "food_honey_butter_toast",
   "other_yellow_rain_boots", "accessory_red_bandana", "other_acorns", "toy_paper_airplane",
   "other_walk_water_bottle", "other_shiny_pinecone", "accessory_blue_handkerchief",
-  "toy_red_balloon", "toy_sand_bucket", "accessory_walk_pouch",
+  "toy_red_balloon", "toy_sand_bucket", "accessory_walk_pouch", "other_red_apple",
   "toy_frisbee", "toy_soccer_ball", "toy_taiyaki_plush", "toy_bear_plush", "food_paw_bowl",
   "food_paw_pudding", "food_kamikami",
   "toy_frenchie_plush", "toy_frenchie_cushion", "toy_paw_macaron", "toy_star_wan_wand",
@@ -207,7 +221,7 @@ function poolWeightTotal(ids) {
 // （frenchie-catch-game.tsxのXXX_UNFILLED_RANK_DOG_WEIGHTと同一値を手動同期）。
 const TIME_BONUS_UNFILLED_RANK_DOG_WEIGHT = 2120 - 1399.2;
 const SCORE_MULT_UNFILLED_RANK_DOG_WEIGHT = 120;
-const SPAWN_DYNAMICS_UNFILLED_RANK_DOG_WEIGHT = 126;
+const SPAWN_DYNAMICS_UNFILLED_RANK_DOG_WEIGHT = 0;
 // 時間増加系8種＋おかえりは、プレイ時間がTIME_BONUS_CUTOFF_BASE_SEC + Lv*TIME_BONUS_CUTOFF_STEP_SEC_PER_LEVEL
 // (Lv0始まりなので実質「平均スキルLv」×20秒)を超えると出現しなくなる。シミュレータは全アイテムの
 // スキルLvをラウンドのLv(0〜4)+1に統一する既存の簡略化にそのまま乗せ、平均スキルLv=lv+1として扱う。
@@ -232,7 +246,8 @@ function simulateOneRound(lv, catchAll, timeBonusCatchRate = 0.8, normalCatchRat
   let dogCaught = 0;
 
   function isDense() {
-    return dogFloodRemaining > 0 || poopFloodRemaining > 0 || personFloodRemaining > 0 || clawdFloodRemaining > 0 || t < spawnRateBoostUntil;
+    return dogFloodRemaining > 0 || poopFloodRemaining > 0 || personFloodRemaining > 0 || clawdFloodRemaining > 0
+      || greenAppleRemaining > 0 || mrFloodRemaining > 0 || t < spawnRateBoostUntil;
   }
   function attemptCatch() {
     return Math.random() < (isDense() ? denseCatchRate : normalCatchRate);
@@ -242,6 +257,7 @@ function simulateOneRound(lv, catchAll, timeBonusCatchRate = 0.8, normalCatchRat
   let otherSuppressUntil = 0, otherSuppressValue = 1;
   let highRarityLockUntil = 0;
   let dogFloodRemaining = 0, poopFloodRemaining = 0, personFloodRemaining = 0, clawdFloodRemaining = 0;
+  let greenAppleRemaining = 0, greenAppleCaught = 0, greenAppleNeed = 0, greenAppleMrCount = 0, mrFloodRemaining = 0;
   let nextBonus5 = 0, nextBonus5Value = 0;
   let nextBonus10 = 0, nextBonus10Value = 0;
   let nextMultCount = 0, nextMultValue = 1;
@@ -346,6 +362,12 @@ function simulateOneRound(lv, catchAll, timeBonusCatchRate = 0.8, normalCatchRat
       case "other_narcissist_a": narcissistUntil = Math.max(t, narcissistUntil) + LV.NARCISSIST_SEC[lvIdx] * 1000; break;
       case "other_mafia_a": mafiaDogBonusMult *= LV.MAFIA_MULT[lvIdx]; break;
       case "other_okaeri": okaeriUntil = Math.max(t, okaeriUntil) + LV.OKAERI_SEC * 1000; okaeriPerCatchValue = LV.OKAERI_PER_CATCH[lvIdx]; break;
+      case "other_mrs_green_apple":
+        greenAppleRemaining += MRS_GREEN_APPLE_SPAWN_COUNT;
+        greenAppleCaught = 0;
+        greenAppleNeed = LV.MRS_GREEN_APPLE_NEED[lvIdx];
+        greenAppleMrCount = LV.MRS_GREEN_APPLE_MR_COUNT[lvIdx];
+        break;
       default: break; // その他の効果はスコア・秒数に影響しない（磁石・ダンボール拡大・ガード付与・ハザード反転など）
     }
     return points;
@@ -423,6 +445,22 @@ function simulateOneRound(lv, catchAll, timeBonusCatchRate = 0.8, normalCatchRat
     if (excludeTimeBonus) nextExtraT = t + dt; else nextT = t + dt;
 
     if (dogFloodRemaining > 0) { dogFloodRemaining -= 1; if (attemptCatch()) resolveCatch("dog", null, null, 0); continue; }
+    if (mrFloodRemaining > 0) {
+      mrFloodRemaining -= 1;
+      const pid = pickMrId();
+      const item = byId.get(pid);
+      if (attemptCatch()) resolveCatch("item", pid, item.rarity, lv + 1);
+      continue;
+    }
+    if (greenAppleRemaining > 0) {
+      greenAppleRemaining -= 1;
+      if (attemptCatch()) { greenAppleCaught += 1; score += GREEN_APPLE_POINTS; }
+      if (greenAppleRemaining === 0) {
+        if (greenAppleCaught >= greenAppleNeed) mrFloodRemaining += greenAppleMrCount;
+        greenAppleCaught = 0; greenAppleNeed = 0; greenAppleMrCount = 0;
+      }
+      continue;
+    }
     if (personFloodRemaining > 0) {
       personFloodRemaining -= 1;
       const pid = pickPersonId();
