@@ -141,8 +141,6 @@ const MYSTERY_IMAGE = "/collection/items/mystery-question.webp";
 const MYSTERY_SPAWN_CHANCE = 0.05;
 const MYSTERY_BASE_POINTS = 20;
 const IKEA_PT_PER_ITEM = 90;
-/** /api/coins/item-catch のMAX_BONUS_COINS(10000)と一致させる。超えるとリクエスト自体が400で失敗するため必ず送信前にクランプする */
-const MAX_BONUS_COINS_CLIENT = 10000;
 const BAG_ITEM_ID = "hazard_bag";
 const BAG_IMAGE = "/collection/items/plastic-bag.webp";
 const BAG_SPAWN_CHANCE = 0.03;
@@ -2742,15 +2740,15 @@ export function FrenchieCatchGame({
       try {
         // ダンボールNo.5「ゲーム終了時コイン増加」：スコアから見込まれるコイン数(100pt=1コイン、
         // /api/coins/item-catchのCOIN_CONVERSION_POINTSと一致させる)の増加分を、既存のbonusCoins
-        // 経路（金のボール等と同じ枠）にまとめて上乗せする。MAX_BONUS_COINS_CLIENTを超えると
-        // リクエスト自体が失敗する（サーバー側の上限）ため、送信前に必ずクランプする。
+        // 経路（金のボール等と同じ枠）にまとめて上乗せする。ボーナスコイン経路には上限を設けない仕様
+        // （上限があるのはスコア換算コインの方。record_item_catch_result()参照）。
         const dambourleEndCoinBonus = dambourleEffectRef.current?.key === "end_coin_bonus"
           ? Math.floor((scoreRef.current / 100) * (dambourleEffectRef.current.percent / 100))
           : 0;
         // GOLD_BALL_COINSはNo.11「全アイテムのスキルLv上昇」でLv6以降まで届くと57.5等の端数を含むため、
         // 積算値(goldBonusCoinsRef)が端数になりうる。/api/coins/item-catchはInteger必須のため、
         // 端数のまま送るとリクエスト自体が失敗する（正当なプレイが「ゲーム結果が正しくありません」で弾かれる不具合の原因だった）
-        const bonusCoins = Math.min(MAX_BONUS_COINS_CLIENT, Math.floor(goldBonusCoinsRef.current + dambourleEndCoinBonus));
+        const bonusCoins = Math.floor(goldBonusCoinsRef.current + dambourleEndCoinBonus);
         const response = await fetch("/api/coins/item-catch", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
