@@ -93,20 +93,6 @@ const SKILL_LOG_STYLES: Record<
   },
 };
 
-/** 背景はゲーム進行中も変化しないため、再描画のたびにJSXを作り直さない。 */
-const PARK_SCENE = (
-  <div aria-hidden className={styles.scene}>
-    <span className={styles.sun} />
-    <span className={`${styles.cloud} ${styles.cloudOne}`} />
-    <span className={`${styles.cloud} ${styles.cloudTwo}`} />
-    <span className={styles.hillBack} />
-    <span className={styles.hillFront} />
-    <span className={`${styles.tree} ${styles.treeLeft}`} />
-    <span className={`${styles.tree} ${styles.treeRight}`} />
-    <span className={styles.fence} />
-  </div>
-);
-
 function getSkillLogStyle(rarity: FrenchieCatchItem["rarity"] | null) {
   return SKILL_LOG_STYLES[rarity ?? "default"];
 }
@@ -2959,10 +2945,13 @@ export function FrenchieCatchGame({
 
       <div
         ref={boardRef}
-        className={`${styles.board} relative w-full select-none overflow-hidden`}
+        className="relative w-full select-none overflow-hidden bg-[#dff3fa]"
         style={{ paddingBottom: "calc(400% / 3 + 30px)" }}
       >
-        {PARK_SCENE}
+        <div className="absolute inset-0 bg-[linear-gradient(180deg,#caeef9_0%,#eff9f2_70%,#d9ebbd_100%)]" />
+        <div className="absolute -left-8 top-[18%] h-20 w-36 rounded-full bg-white/50 blur-xl will-change-transform" />
+        <div className="absolute -right-10 top-[34%] h-24 w-40 rounded-full bg-white/50 blur-xl will-change-transform" />
+        <div className="absolute inset-x-0 bottom-0 h-[18%] bg-[linear-gradient(180deg,rgba(208,232,171,0)_0%,#c9e29e_72%,#efdcb8_73%,#e9cfa5_73%,#e9cfa5_100%)]" />
 
         <div className={styles.hud}>
           <div className="flex flex-col items-start gap-1">
