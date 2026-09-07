@@ -1,10 +1,11 @@
 import Link from "next/link";
+import Image from "next/image";
 import { FrenchieCatchGame } from "@/components/frenchie-catch-game";
-import { IconChevronRight, IconNotebook } from "@/components/icons";
+import { IconChevronLeft, IconChevronRight, IconNotebook } from "@/components/icons";
 import { ItemCatchLiveRefresh } from "@/components/item-catch-live-refresh";
 import { ItemCatchRanking } from "@/components/item-catch-ranking";
+import styles from "@/components/item-catch-visual.module.css";
 import { PageBody } from "@/components/page-body";
-import { TopHeader } from "@/components/page-header";
 import { COLLECTION_ITEMS, hasMinigameSkillLevel } from "@/lib/collection/items";
 import { DEFAULT_BOX_ALT, DEFAULT_BOX_IMAGE, getDambourleBoxImage } from "@/lib/dambourle/box-image";
 import { getDambourlePrize, type DambourleEffectKey } from "@/lib/dambourle/prizes";
@@ -60,15 +61,27 @@ export default async function ItemCatchPage() {
   });
 
   return (
-    <>
+    <div className={styles.pageShell}>
       <ItemCatchLiveRefresh />
-      <TopHeader
-        backHref="/games"
-        title="アイテムキャッチ"
-        subtitle="50秒でどこまでキャッチできる？"
-      />
 
-      <PageBody className="!space-y-3 !py-3">
+      <header className={styles.pageHeader}>
+        <div className={styles.headerInner}>
+          <Link href="/games" aria-label="ゲーム一覧へ戻る" className={styles.headerBack}>
+            <IconChevronLeft size={22} />
+          </Link>
+          <div className={styles.headerCopy}>
+            <p className={styles.eyebrow}>ODEKAKE MINI GAME 01</p>
+            <h1 className={styles.headerTitle}>アイテムキャッチ</h1>
+            <p className={styles.headerSubtitle}>お気に入りの箱で、空からのごほうびをキャッチ！</p>
+          </div>
+          <span className={styles.headerBadge}>
+            <Image src="/games/item-catch/menu-icon-v2.webp" alt="" width={24} height={24} />
+            50秒
+          </span>
+        </div>
+      </header>
+
+      <PageBody className={`!space-y-3 !py-3 ${styles.pageBody}`}>
         <FrenchieCatchGame
           ownedItems={catchItems}
           equippedBoxImage={equippedBoxImage}
@@ -80,9 +93,9 @@ export default async function ItemCatchPage() {
 
         <Link
           href="/games/item-catch/guide"
-          className="rough-card flex items-center gap-3 p-4 active:scale-[0.99]"
+          className={`${styles.guideCard} flex items-center gap-3 p-4 active:scale-[0.99]`}
         >
-          <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-leaf-soft text-leaf-deep">
+          <span className={`${styles.guideIcon} flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl`}>
             <IconNotebook size={21} />
           </span>
           <span className="min-w-0 flex-1">
@@ -92,8 +105,10 @@ export default async function ItemCatchPage() {
           <IconChevronRight size={18} className="shrink-0 text-ink-faint" />
         </Link>
 
-        <ItemCatchRanking />
+        <div className={styles.rankingShell}>
+          <ItemCatchRanking />
+        </div>
       </PageBody>
-    </>
+    </div>
   );
 }

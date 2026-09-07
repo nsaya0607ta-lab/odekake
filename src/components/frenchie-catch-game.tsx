@@ -7,6 +7,7 @@ import { MAX_SKILL_LEVEL } from "@/lib/gacha/skill-levels";
 import { COLLECTION_ITEMS, type CollectionItem } from "@/lib/collection/items";
 import { DAMBOURLE_PRIZES, EFFECT_ROULETTE_ELIGIBLE_EFFECT_KEYS, type DambourleEffectKey } from "@/lib/dambourle/prizes";
 import { getDambourleEffectLevel } from "@/lib/dambourle/skill-levels";
+import styles from "@/components/item-catch-visual.module.css";
 
 export type FrenchieCatchItem = {
   id: string;
@@ -91,6 +92,20 @@ const SKILL_LOG_STYLES: Record<
     boxShadow: "0 0 12px rgba(212,175,55,0.65)",
   },
 };
+
+/** 背景はゲーム進行中も変化しないため、再描画のたびにJSXを作り直さない。 */
+const PARK_SCENE = (
+  <div aria-hidden className={styles.scene}>
+    <span className={styles.sun} />
+    <span className={`${styles.cloud} ${styles.cloudOne}`} />
+    <span className={`${styles.cloud} ${styles.cloudTwo}`} />
+    <span className={styles.hillBack} />
+    <span className={styles.hillFront} />
+    <span className={`${styles.tree} ${styles.treeLeft}`} />
+    <span className={`${styles.tree} ${styles.treeRight}`} />
+    <span className={styles.fence} />
+  </div>
+);
 
 function getSkillLogStyle(rarity: FrenchieCatchItem["rarity"] | null) {
   return SKILL_LOG_STYLES[rarity ?? "default"];
@@ -863,7 +878,7 @@ const FallingEntity = memo(function FallingEntity({
   return (
     <div
       ref={registerRef}
-      className={`absolute will-change-transform ${entity.rarity ? RARITY_STYLE[entity.rarity] : ""} ${isGoldenDog ? "drop-shadow-[0_0_10px_rgba(255,200,60,0.85)]" : ""}`}
+      className={`${styles.fallingEntity} absolute will-change-transform ${entity.rarity ? RARITY_STYLE[entity.rarity] : ""} ${isGoldenDog ? "drop-shadow-[0_0_10px_rgba(255,200,60,0.85)]" : ""}`}
       style={{
         left: `${entity.spawnX}%`,
         top: `${entity.spawnY}%`,
@@ -2927,36 +2942,33 @@ export function FrenchieCatchGame({
   };
 
   return (
-    <section className="rough-card overflow-hidden p-0">
+    <section className={styles.gameCard}>
       <div aria-hidden className="hidden">
         {preloadImages.map((src) => (
           <Image key={src} src={src} alt="" width={96} height={96} quality={65} loading="eager" />
         ))}
       </div>
 
-      <div className="flex items-center justify-between border-b border-line bg-card px-4 py-3">
-        <div>
-          <p className="text-[10px] font-bold tracking-[0.16em] text-ink-faint">MINI GAME</p>
-          <h2 className="mt-0.5 text-base font-black text-ink">アイテムキャッチ</h2>
+      <div className={styles.gameBanner}>
+        <div className={styles.bannerCopy}>
+          <p className={styles.bannerKicker}>TODAY&apos;S CHALLENGE</p>
+          <h2 className={styles.bannerTitle}>空からのごほうびを集めよう</h2>
         </div>
-        <span className="rounded-full bg-leaf-soft px-2.5 py-1 text-[10px] font-bold text-leaf-deep">50秒チャレンジ</span>
+        <span className={styles.challengeBadge}>50 SEC</span>
       </div>
 
       <div
         ref={boardRef}
-        className="relative w-full select-none overflow-hidden bg-[#dff3fa]"
+        className={`${styles.board} relative w-full select-none overflow-hidden`}
         style={{ paddingBottom: "calc(400% / 3 + 30px)" }}
       >
-        <div className="absolute inset-0 bg-[linear-gradient(180deg,#caeef9_0%,#eff9f2_70%,#d9ebbd_100%)]" />
-        <div className="absolute -left-8 top-[18%] h-20 w-36 rounded-full bg-white/50 blur-xl will-change-transform" />
-        <div className="absolute -right-10 top-[34%] h-24 w-40 rounded-full bg-white/50 blur-xl will-change-transform" />
-        <div className="absolute inset-x-0 bottom-0 h-[18%] bg-[linear-gradient(180deg,rgba(208,232,171,0)_0%,#c9e29e_72%,#efdcb8_73%,#e9cfa5_73%,#e9cfa5_100%)]" />
+        {PARK_SCENE}
 
-        <div className="absolute left-3 right-3 top-3 z-50 flex items-start justify-between gap-2">
+        <div className={styles.hud}>
           <div className="flex flex-col items-start gap-1">
-            <div className="relative rounded-2xl border border-white/80 bg-white/90 px-3 py-2 shadow-sm">
-              <p className="text-[9px] font-bold tracking-widest text-ink-faint">SCORE</p>
-              <p className="text-xl font-black tabular-nums text-ink">{score.toLocaleString("ja-JP")}</p>
+            <div className={`${styles.scorePanel} relative`}>
+              <p className={styles.hudLabel}>SCORE</p>
+              <p className={`${styles.hudValue} tabular-nums`}>{score.toLocaleString("ja-JP")}</p>
               {feedback ? <span className="pointer-events-none absolute -right-2 -top-2 rounded-full bg-[#fff6cc]/95 px-2 py-0.5 text-[10px] font-black text-[#c87527] shadow-sm">+{feedback.points}</span> : null}
             </div>
             {scoreMultiplierTotal > 1 ? (
@@ -2990,17 +3002,20 @@ export function FrenchieCatchGame({
             ) : null}
           </div>
           <span className="flex-1" />
-          <div className="rounded-2xl border border-white/80 bg-white/90 px-3 py-2 text-right shadow-sm"><p className="text-[9px] font-bold tracking-widest text-ink-faint">TIME</p><p className="text-xl font-black tabular-nums text-ink">{timeLeft}</p></div>
+          <div className={`${styles.timePanel} ${phase === "playing" && timeLeft <= 10 ? styles.timeUrgent : ""}`}>
+            <p className={styles.hudLabel}>TIME</p>
+            <p className={`${styles.hudValue} tabular-nums`}>{timeLeft}</p>
+          </div>
         </div>
 
         {skillLogEntries.length > 0 ? (
-          <div className="pointer-events-none absolute right-3 top-[4.75rem] z-[45] flex w-[62%] flex-col items-end gap-1">
+          <div className={`${styles.skillLogs} pointer-events-none absolute z-[45] flex w-[62%] flex-col items-end gap-1`}>
             {skillLogEntries.map((entry) => {
               const style = getSkillLogStyle(entry.rarity);
               return (
                 <span
                   key={entry.id}
-                  className="skill-log-toast max-w-full whitespace-normal break-words rounded-2xl px-2.5 py-1 text-right text-[10px] font-bold leading-tight shadow-sm"
+                  className={`${styles.skillToast} skill-log-toast max-w-full whitespace-normal break-words px-2.5 py-1 text-right text-[10px] font-bold leading-tight shadow-sm`}
                   style={{
                     background: style.background,
                     color: style.color,
@@ -3033,7 +3048,7 @@ export function FrenchieCatchGame({
         {impactX !== null ? <div className="pointer-events-none absolute z-40 -translate-x-1/2 -translate-y-1/2 animate-ping text-xl font-black text-[#d7684f]" style={{ left: `${impactX}%`, top: `${BOX_LIP_Y}%` }}>✦</div> : null}
         {feedback ? (
           <div className="pointer-events-none absolute left-1/2 top-[67%] z-40 -translate-x-1/2 text-center">
-            <p className="text-lg font-black text-[#c87527]">CATCH!</p>
+            <p className={`${styles.catchFeedback} text-lg font-black`}>CATCH!</p>
             <p className="mt-0.5 max-w-40 truncate rounded-full bg-white/80 px-2 py-0.5 text-[9px] font-bold text-ink-soft">{feedback.name}</p>
           </div>
         ) : null}
@@ -3042,7 +3057,7 @@ export function FrenchieCatchGame({
           ref={catcherRef}
           role="button"
           aria-label="拾ってくだブーの段ボールを左右に動かす"
-          className={`absolute bottom-[0.5%] z-30 touch-none select-none rounded-3xl transition-[width,transform] duration-200 ${performance.now() < magnetUntilRef.current ? "shadow-[0_0_20px_6px_rgba(120,170,240,0.55)] ring-4 ring-sky-300/70" : ""}`}
+          className={`${styles.catcher} absolute bottom-[0.5%] z-30 touch-none select-none rounded-3xl transition-[width,transform] duration-200 ${performance.now() < magnetUntilRef.current ? "shadow-[0_0_20px_6px_rgba(120,170,240,0.55)] ring-4 ring-sky-300/70" : ""}`}
           style={{
             left: `${boxX}%`,
             width: `${BOX_WIDTH * (performance.now() < boxShrinkUntilRef.current ? BOX_SHRINK_SCALE : performance.now() < boxWideUntilRef.current ? boxWideScaleRef.current : 1) * dambourleUpMultiplier("box_size_up")}%`,
@@ -3059,15 +3074,15 @@ export function FrenchieCatchGame({
           {stunned ? <span className="pointer-events-none absolute -right-4 top-1/2 -translate-y-1/2 text-2xl" aria-label="しびれ中">⚡</span> : null}
         </div>
 
-        {phase === "playing" ? <div className="pointer-events-none absolute bottom-[0.5%] left-1/2 z-40 -translate-x-1/2 rounded-full bg-white/70 px-2 py-0.5 text-[9px] font-bold text-ink-faint">箱を押さえて左右にドラッグ</div> : null}
+        {phase === "playing" ? <div className={`${styles.dragHint} pointer-events-none absolute left-1/2 z-40 -translate-x-1/2 rounded-full px-2.5 py-1 text-[9px] font-bold`}>箱を押さえて左右にドラッグ</div> : null}
 
         {phase !== "playing" ? (
-          <div className="absolute inset-0 z-50 flex items-center justify-center bg-[#f9f3e7]/70 px-6 backdrop-blur-[2px]">
-            <div className="w-full max-w-xs rounded-[28px] border border-white/90 bg-card/95 p-5 text-center shadow-xl">
+          <div className={`${styles.phaseOverlay} absolute inset-0 z-50 flex justify-center px-6`}>
+            <div className={`${styles.phaseCard} w-full max-w-xs text-center`}>
               {phase === "finished" ? (
                 <>
-                  <p className="text-[10px] font-black tracking-[0.18em] text-ink-faint">RESULT</p>
-                  <p className="mt-1 text-4xl font-black tabular-nums text-ink">{score.toLocaleString("ja-JP")}</p>
+                  <p className={styles.readyKicker}>TODAY&apos;S RESULT</p>
+                  <p className={`${styles.resultScore} mt-1 text-4xl font-black tabular-nums`}>{score.toLocaleString("ja-JP")}</p>
                   <div className="mt-3 grid grid-cols-1 gap-2 text-xs">
                     <div className="rounded-xl bg-paper-deep px-2 py-2"><p className="text-[9px] text-ink-faint">キャッチ</p><p className="font-black text-ink">{caught}個</p></div>
                   </div>
@@ -3087,21 +3102,25 @@ export function FrenchieCatchGame({
                     )}
                   </div>
                   <div className="mt-4 grid grid-cols-2 gap-2">
-                    <button type="button" onClick={startGame} disabled={rewardPending} className="rounded-full bg-leaf px-3 py-3 text-xs font-black text-white shadow-md active:translate-y-px disabled:opacity-45">もう一度あそぶ</button>
-                    <button type="button" onClick={() => router.push("/games")} disabled={rewardPending} className="rounded-full border border-line bg-card px-3 py-3 text-xs font-black text-ink-soft shadow-sm active:translate-y-px disabled:opacity-45">終了する</button>
+                    <button type="button" onClick={startGame} disabled={rewardPending} className={`${styles.replayButton} rounded-full px-3 py-3 text-xs font-black active:translate-y-px disabled:opacity-45`}>もう一度あそぶ</button>
+                    <button type="button" onClick={() => router.push("/games")} disabled={rewardPending} className={`${styles.exitButton} rounded-full border px-3 py-3 text-xs font-black active:translate-y-px disabled:opacity-45`}>終了する</button>
                   </div>
                 </>
               ) : (
                 <>
-                  <p className="text-[10px] font-black tracking-[0.18em] text-leaf-deep">ITEM CATCH</p>
-                  <p className="mt-1 text-xl font-black text-ink">箱でキャッチしよう！</p>
+                  <p className={styles.readyKicker}>READY TO CATCH?</p>
+                  <p className={styles.readyTitle}>箱でキャッチしよう！</p>
+                  <div className={styles.readyChips} aria-hidden>
+                    <span>50 SEC</span>
+                    <span>DRAG &amp; CATCH</span>
+                  </div>
                   <p className="mt-3 text-[9px] text-ink-faint">時間増加系アイテムは{Math.round(timeBonusCutoffSecDisplayWithDambourle)}秒まで出現</p>
-                  <button type="button" onClick={startGame} className="mt-1.5 w-full rounded-full bg-leaf px-4 py-3 text-sm font-black text-white shadow-md active:translate-y-px">START</button>
+                  <button type="button" onClick={startGame} className={`${styles.startButton} mt-2 w-full rounded-full px-4 py-3 text-sm font-black active:translate-y-px`}>START</button>
                   {showDambourlePicker ? (
                     <button
                       type="button"
                       onClick={() => router.push("/games/item-catch/dambourle")}
-                      className="mt-2 w-full rounded-full border border-line bg-card px-4 py-2 text-xs font-black text-ink-soft shadow-sm active:translate-y-px"
+                      className={`${styles.pickerButton} mt-2 w-full rounded-full border px-4 py-2 text-xs font-black active:translate-y-px`}
                     >
                       ダンボールを選ぶ
                     </button>
