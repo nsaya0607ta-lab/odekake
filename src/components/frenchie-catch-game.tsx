@@ -39,6 +39,8 @@ type Entity = {
   rimChecked: boolean;
   enteredOpening: boolean;
   ttl: number;
+  /** TEST: 実プレイでの体感キャッチ率計測用（検証が終わったら削除する） */
+  catchCategory?: "timeBonus" | "dense" | "normal";
 };
 
 type CatchFeedback = {
@@ -580,6 +582,18 @@ const OKAERI_ITEM_ID = "other_okaeri";
 const TIME_BONUS_CUTOFF_ITEM_IDS = new Set([...TIME_BONUS_ITEM_IDS, OKAERI_ITEM_ID]);
 const TIME_BONUS_CUTOFF_BASE_SEC = 60;
 const TIME_BONUS_CUTOFF_STEP_SEC_PER_LEVEL = 20;
+
+// TEST: 実プレイでの体感キャッチ率計測用（検証が終わったら削除する）。
+// scripts/simulate-item-catch.mjsの「時間増加系8種の実キャッチ率/通常時キャッチ率/密集時キャッチ率」の
+// 3区分に合わせて、出現した物のうちどれだけ実際にキャッチできたかを区分ごとに集計する。
+type CatchStatsCategory = "timeBonus" | "dense" | "normal";
+function classifyCatchCategory(itemId: string | null, dense: boolean): CatchStatsCategory {
+  if (itemId && (TIME_BONUS_ITEM_IDS.has(itemId) || itemId === OKAERI_ITEM_ID)) return "timeBonus";
+  return dense ? "dense" : "normal";
+}
+function createEmptyCatchStats(): Record<CatchStatsCategory, { spawn: number; caught: number }> {
+  return { timeBonus: { spawn: 0, caught: 0 }, dense: { spawn: 0, caught: 0 }, normal: { spawn: 0, caught: 0 } };
+}
 const OMOI_BASHIRA_ITEM_ID = "other_omoi_bashira";
 const OYASUMI_ITEM_ID = "other_oyasumi";
 const OYASUMI_SECONDS = SCORE_MULT_DURATION_SSR_SEC;
@@ -941,6 +955,8 @@ export function FrenchieCatchGame({
   const dogCaughtRef = useRef(0);
   const caughtRef = useRef(0);
   const roundIdRef = useRef<string | null>(null);
+  /** TEST: 実プレイでの体感キャッチ率計測用（検証が終わったら削除する） */
+  const catchStatsRef = useRef(createEmptyCatchStats());
   /** 「次のN個 ×n」アイテムの有効中エントリ一覧。重複取得時は掛け合わされる */
   const nextMultipliersRef = useRef<CountMultiplierEntry[]>([]);
   const nextBonus5Ref = useRef(0);
@@ -1051,6 +1067,8 @@ export function FrenchieCatchGame({
   }, []);
 
   const [phase, setPhase] = useState<"idle" | "playing" | "finished">("idle");
+  /** TEST: 実プレイでの体感キャッチ率計測用（検証が終わったら削除する） */
+  const [debugCatchStats, setDebugCatchStats] = useState(createEmptyCatchStats());
   const [entities, setEntities] = useState<Entity[]>([]);
   const [boxX, setBoxX] = useState(50);
   const [timeLeft, setTimeLeft] = useState(ROUND_SECONDS);
@@ -1628,6 +1646,8 @@ export function FrenchieCatchGame({
         scoreRef.current = Math.ceil(scoreRef.current); setScore(scoreRef.current);
       }
       setDogBonus(dogCount > 0 ? { count: dogCount, bonus: dogBonusPoints } : null);
+      // TEST: 実プレイでの体感キャッチ率計測用（検証が終わったら削除する）
+      setDebugCatchStats({ ...catchStatsRef.current });
       setPhase("finished");
     };
 
@@ -1732,33 +1752,49 @@ export function FrenchieCatchGame({
         // ダンボールNo.1「アイテム出現量アップ」ぶんを常時掛け合わせる（時間増加系の重み側で1/nを相殺済み）
         : (now < spawnRateBoostUntilRef.current ? spawnRateBoostValueRef.current : 1) * dambourleUpMultiplier("item_spawn_up");
       const entityCap = spawnRate >= 3 ? TRIPLE_ENTITY_CAP : spawnRate >= 2 ? DOUBLE_ENTITY_CAP : NORMAL_ENTITY_CAP;
+      // TEST: 実プレイでの体感キャッチ率計測用（検証が終わったら削除する）。
+      // scripts/simulate-item-catch.mjsのisDense()と同じ条件で「密集時」を判定する
+      const isDenseSpawnNow = () =>
+        dogFloodRemainingRef.current > 0
+        || poopFloodRemainingRef.current > 0
+        || personFloodRemainingRef.current > 0
+        || clawdBallFloodRemainingRef.current > 0
+        || mrsGreenAppleActiveRef.current
+        || mrFloodRemainingRef.current > 0
+        || listenFloodRemainingRef.current > 0
+        || now < spawnRateBoostUntilRef.current;
+      const tagAndCountSpawn = (entity: Entity) => {
+        entity.catchCategory = classifyCatchCategory(entity.itemId, isDenseSpawnNow());
+        catchStatsRef.current[entity.catchCategory].spawn += 1;
+        return entity;
+      };
       if (now >= nextSpawnRef.current && entitiesRef.current.length < entityCap) {
-        entitiesRef.current.push(createEntity());
+        entitiesRef.current.push(tagAndCountSpawn(createEntity()));
         nextSpawnRef.current = now + (SPAWN_INTERVAL_MIN_MS + Math.random() * (SPAWN_INTERVAL_MAX_MS - SPAWN_INTERVAL_MIN_MS)) / spawnRate;
       }
       /** アイテム量2倍化用のボーナス出現タイマー。時間増加系は一切対象にせず(createEntityにexcludeTimeBonus=trueを渡す)、通常タイマーと全く同じ間隔で並走させる */
       if (now >= extraSpawnRef.current && entitiesRef.current.length < entityCap) {
-        entitiesRef.current.push(createEntity(true));
+        entitiesRef.current.push(tagAndCountSpawn(createEntity(true)));
         extraSpawnRef.current = now + (SPAWN_INTERVAL_MIN_MS + Math.random() * (SPAWN_INTERVAL_MAX_MS - SPAWN_INTERVAL_MIN_MS)) / spawnRate;
       }
       if (clawdBallFloodRemainingRef.current > 0 && now >= nextClawdSpawnRef.current && entitiesRef.current.length < entityCap) {
         const ball = createClawdBallEntity();
         if (ball) {
           clawdBallFloodRemainingRef.current -= 1;
-          entitiesRef.current.push(ball);
+          entitiesRef.current.push(tagAndCountSpawn(ball));
         }
         nextClawdSpawnRef.current = now + SPAWN_INTERVAL_MIN_MS + Math.random() * (SPAWN_INTERVAL_MAX_MS - SPAWN_INTERVAL_MIN_MS);
       }
       // 緑りんごも他のアイテムのスポーンを止めず、並行スポーンで追加投入する
       if (mrsGreenAppleSpawnRemainingRef.current > 0 && now >= nextGreenAppleSpawnRef.current && entitiesRef.current.length < entityCap) {
         mrsGreenAppleSpawnRemainingRef.current -= 1;
-        entitiesRef.current.push(createGreenAppleEntity());
+        entitiesRef.current.push(tagAndCountSpawn(createGreenAppleEntity()));
         nextGreenAppleSpawnRef.current = now + SPAWN_INTERVAL_MIN_MS + Math.random() * (SPAWN_INTERVAL_MAX_MS - SPAWN_INTERVAL_MIN_MS);
       }
       // Listen to the a-も他のアイテムのスポーンを止めず、並行スポーンで初期フレブルを追加投入する
       if (listenFloodRemainingRef.current > 0 && now >= nextListenSpawnRef.current && entitiesRef.current.length < entityCap) {
         listenFloodRemainingRef.current -= 1;
-        entitiesRef.current.push(createListenDogEntity());
+        entitiesRef.current.push(tagAndCountSpawn(createListenDogEntity()));
         nextListenSpawnRef.current = now + SPAWN_INTERVAL_MIN_MS + Math.random() * (SPAWN_INTERVAL_MAX_MS - SPAWN_INTERVAL_MIN_MS);
       }
 
@@ -1877,6 +1913,8 @@ export function FrenchieCatchGame({
             entity.vx *= 0.35;
             entity.vy = Math.max(entity.vy, 32);
             entity.spin *= 0.45;
+            // TEST: 実プレイでの体感キャッチ率計測用（検証が終わったら削除する）
+            if (entity.catchCategory) catchStatsRef.current[entity.catchCategory].caught += 1;
 
             if (entity.itemId === POOP_ITEM_ID) {
               caughtRef.current += 1;
@@ -2793,6 +2831,8 @@ export function FrenchieCatchGame({
     scoreRef.current = 0;
     dogCaughtRef.current = 0;
     caughtRef.current = 0;
+    catchStatsRef.current = createEmptyCatchStats();
+    setDebugCatchStats(createEmptyCatchStats());
     boxXRef.current = 50;
     draggingRef.current = false;
     dragOffsetRef.current = 0;
@@ -3077,6 +3117,21 @@ export function FrenchieCatchGame({
                       <p className="mt-0.5 font-black text-ink">{dogBonus.count}匹 × プレイ時間 = <span className="text-leaf-deep">+{dogBonus.bonus.toLocaleString("ja-JP")}pt</span></p>
                     </div>
                   ) : null}
+                  {/* TEST: 実プレイでの体感キャッチ率計測用（検証が終わったら削除する） */}
+                  <div className="mt-2 rounded-xl bg-paper-deep px-3 py-2 text-left text-[10px]">
+                    <p className="mb-1 text-[9px] font-black text-ink-faint">【検証用】区分別キャッチ率</p>
+                    {(["timeBonus", "dense", "normal"] as const).map((key) => {
+                      const s = debugCatchStats[key];
+                      const label = key === "timeBonus" ? "時間増加系8種+おかえり" : key === "dense" ? "密集時（フラッド等）" : "通常時";
+                      const pct = s.spawn > 0 ? ((s.caught / s.spawn) * 100).toFixed(1) : "-";
+                      return (
+                        <p key={key} className="flex justify-between font-bold text-ink">
+                          <span>{label}</span>
+                          <span className="tabular-nums">{pct}%（{s.caught}/{s.spawn}）</span>
+                        </p>
+                      );
+                    })}
+                  </div>
                   <div className="mt-3 rounded-xl bg-[#fff5df] px-3 py-2">
                     {rewardPending ? (
                       <p className="text-[11px] font-bold text-[#8d6231]">コインを受け取り中…</p>
