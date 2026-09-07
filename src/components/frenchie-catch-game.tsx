@@ -849,6 +849,59 @@ function isCardboardTap(localX: number, localY: number) {
   return front || leftSide || rightSide;
 }
 
+type SevenSegmentKey = "a" | "b" | "c" | "d" | "e" | "f" | "g";
+
+const SEVEN_SEGMENT_KEYS: readonly SevenSegmentKey[] = ["a", "b", "c", "d", "e", "f", "g"];
+const SEVEN_SEGMENT_DIGITS: Record<string, string> = {
+  "0": "abcdef",
+  "1": "bc",
+  "2": "abdeg",
+  "3": "abcdg",
+  "4": "bcfg",
+  "5": "acdfg",
+  "6": "acdefg",
+  "7": "abc",
+  "8": "abcdefg",
+  "9": "abcdfg",
+};
+const SEVEN_SEGMENT_CLASSES: Record<SevenSegmentKey, string> = {
+  a: styles.segmentA!,
+  b: styles.segmentB!,
+  c: styles.segmentC!,
+  d: styles.segmentD!,
+  e: styles.segmentE!,
+  f: styles.segmentF!,
+  g: styles.segmentG!,
+};
+
+const SevenSegmentDigit = memo(function SevenSegmentDigit({ digit }: { digit: string }) {
+  const activeSegments = SEVEN_SEGMENT_DIGITS[digit] ?? "";
+  return (
+    <span className={styles.sevenDigit}>
+      {SEVEN_SEGMENT_KEYS.map((segment) => (
+        <span
+          key={segment}
+          className={`${styles.sevenSegment} ${SEVEN_SEGMENT_CLASSES[segment]} ${activeSegments.includes(segment) ? styles.segmentOn : ""}`}
+        />
+      ))}
+    </span>
+  );
+});
+
+const SevenSegmentNumber = memo(function SevenSegmentNumber({ value, label }: { value: string; label: string }) {
+  return (
+    <span className={styles.sevenNumber} role="img" aria-label={label}>
+      <span aria-hidden className={styles.sevenNumberDigits}>
+        {Array.from(value).map((character, index) => (
+          character === ","
+            ? <span key={`comma-${index}`} className={styles.sevenComma} />
+            : <SevenSegmentDigit key={`${character}-${index}`} digit={character} />
+        ))}
+      </span>
+    </span>
+  );
+});
+
 /**
  * 位置・回転・不透明度・z-indexはマウント後、rAFループがrefのDOM要素へ直接書き込む。
  * entity.idさえ変わらなければ再レンダリングしない（増減時のReact側の処理対象を最小化するため）。
@@ -925,6 +978,7 @@ export function FrenchieCatchGame({
   const draggingRef = useRef(false);
   const dragOffsetRef = useRef(0);
   const boxXRef = useRef(50);
+  const displayedTimeLeftRef = useRef(ROUND_SECONDS);
   const nextIdRef = useRef(1);
   const startAtRef = useRef(0);
   const endAtRef = useRef(0);
@@ -1053,7 +1107,6 @@ export function FrenchieCatchGame({
 
   const [phase, setPhase] = useState<"idle" | "playing" | "finished">("idle");
   const [entities, setEntities] = useState<Entity[]>([]);
-  const [boxX, setBoxX] = useState(50);
   const [timeLeft, setTimeLeft] = useState(ROUND_SECONDS);
   const [score, setScore] = useState(0);
   const [caught, setCaught] = useState(0);
@@ -1604,6 +1657,14 @@ export function FrenchieCatchGame({
     impactTimerRef.current = setTimeout(() => setImpactX(null), 280);
   }, []);
 
+  /** rAF中は同じ整数秒が続くため、表示値が変わった時だけReactを更新する。 */
+  const updateDisplayedTimeLeft = useCallback((seconds: number) => {
+    const nextValue = Math.max(0, Math.ceil(seconds));
+    if (displayedTimeLeftRef.current === nextValue) return;
+    displayedTimeLeftRef.current = nextValue;
+    setTimeLeft(nextValue);
+  }, []);
+
   useEffect(() => () => {
     if (rafRef.current !== null) cancelAnimationFrame(rafRef.current);
     if (feedbackTimerRef.current) clearTimeout(feedbackTimerRef.current);
@@ -1634,7 +1695,7 @@ export function FrenchieCatchGame({
 
     const frame = (now: number) => {
       const remaining = Math.max(0, (endAtRef.current - now) / 1000);
-      setTimeLeft(Math.ceil(remaining));
+      updateDisplayedTimeLeft(remaining);
       if (remaining <= 0) {
         finishRound(now);
         return;
@@ -1951,9 +2012,9 @@ export function FrenchieCatchGame({
                 } else {
                   endAtRef.current -= TIME_MINUS_SECONDS * 1000;
                   const nextRemaining = Math.max(0, (endAtRef.current - now) / 1000);
-                  setTimeLeft(Math.ceil(nextRemaining));
+                  updateDisplayedTimeLeft(nextRemaining);
                   showCatch(entity, 0, "残り時間 -" + TIME_MINUS_SECONDS + "秒");
-                  if (endAtRef.current <= now) { endAtRef.current = now; setTimeLeft(0); finishRound(now); }
+                  if (endAtRef.current <= now) { endAtRef.current = now; updateDisplayedTimeLeft(0); finishRound(now); }
                 }
               } else if (entity.itemId === BOX_SHRINK_ITEM_ID) {
                 if (hazardInverted) {
@@ -1990,7 +2051,7 @@ export function FrenchieCatchGame({
                 }
               } else if (entity.itemId === CHOCOLATE_ITEM_ID) {
                 endAtRef.current = now;
-                setTimeLeft(0);
+                updateDisplayedTimeLeft(0);
                 finishRound(now);
                 showCatch(entity, 0, "呪いのチョコレート…ゲーム終了！");
               }
@@ -2070,7 +2131,7 @@ export function FrenchieCatchGame({
             const addBonusTime = (seconds: number) => {
               const maxEndAt = startAtRef.current + MAX_ROUND_SECONDS * 1000;
               endAtRef.current = Math.min(maxEndAt, endAtRef.current + seconds * 1000);
-              setTimeLeft(Math.ceil(Math.max(0, (endAtRef.current - now) / 1000)));
+              updateDisplayedTimeLeft(Math.max(0, (endAtRef.current - now) / 1000));
               return seconds;
             };
 
@@ -2728,7 +2789,7 @@ export function FrenchieCatchGame({
       if (rafRef.current !== null) cancelAnimationFrame(rafRef.current);
       rafRef.current = null;
     };
-  }, [createEntity, phase, pushSkillLog, refreshEffectStatus, showCatch, showImpact]);
+  }, [createEntity, phase, pushSkillLog, refreshEffectStatus, showCatch, showImpact, updateDisplayedTimeLeft]);
 
   useEffect(() => {
     if (phase !== "finished" || !roundIdRef.current) return;
@@ -2795,6 +2856,7 @@ export function FrenchieCatchGame({
     dogCaughtRef.current = 0;
     caughtRef.current = 0;
     boxXRef.current = 50;
+    if (catcherRef.current) catcherRef.current.style.left = "50%";
     draggingRef.current = false;
     dragOffsetRef.current = 0;
     roundIdRef.current = crypto.randomUUID();
@@ -2865,10 +2927,9 @@ export function FrenchieCatchGame({
     bagStockRef.current = 0;
     setBagStock(0);
     setEntities([]);
-    setBoxX(50);
     setScore(0);
     setCaught(0);
-    setTimeLeft(ROUND_SECONDS);
+    updateDisplayedTimeLeft(ROUND_SECONDS);
     setFeedback(null);
     skillLogTimersRef.current.forEach((timer) => clearTimeout(timer));
     skillLogTimersRef.current.clear();
@@ -2889,7 +2950,7 @@ export function FrenchieCatchGame({
     // 装備中ダンボール効果はラウンド開始時から有効なので、最初のcatchを待たず状態表示に反映する
     refreshEffectStatus(now);
     setPhase("playing");
-  }, [timeBonusCutoffSecDisplay, refreshEffectStatus]);
+  }, [timeBonusCutoffSecDisplay, refreshEffectStatus, updateDisplayedTimeLeft]);
 
   const moveBox = useCallback((clientX: number) => {
     if (performance.now() < stunUntilRef.current) return;
@@ -2901,8 +2962,8 @@ export function FrenchieCatchGame({
     const dynamicHalf = BOX_HALF * boxScale;
     const nextX = clamp(pointerX - dragOffsetRef.current, dynamicHalf, 100 - dynamicHalf);
     boxXRef.current = nextX;
-    setBoxX(nextX);
-  }, []);
+    if (catcherRef.current) catcherRef.current.style.left = `${nextX}%`;
+  }, [dambourleUpMultiplier]);
 
   const pointerDown = (event: ReactPointerEvent<HTMLDivElement>) => {
     if (phase !== "playing") return;
@@ -2949,15 +3010,15 @@ export function FrenchieCatchGame({
         style={{ paddingBottom: "calc(400% / 3 + 30px)" }}
       >
         <div className="absolute inset-0 bg-[linear-gradient(180deg,#caeef9_0%,#eff9f2_70%,#d9ebbd_100%)]" />
-        <div className="absolute -left-8 top-[18%] h-20 w-36 rounded-full bg-white/50 blur-xl will-change-transform" />
-        <div className="absolute -right-10 top-[34%] h-24 w-40 rounded-full bg-white/50 blur-xl will-change-transform" />
+        <div className="absolute -left-8 top-[18%] h-20 w-36 rounded-full bg-white/50 blur-xl" />
+        <div className="absolute -right-10 top-[34%] h-24 w-40 rounded-full bg-white/50 blur-xl" />
         <div className="absolute inset-x-0 bottom-0 h-[18%] bg-[linear-gradient(180deg,rgba(208,232,171,0)_0%,#c9e29e_72%,#efdcb8_73%,#e9cfa5_73%,#e9cfa5_100%)]" />
 
         <div className={styles.hud}>
           <div className="flex flex-col items-start gap-1">
             <div className={`${styles.scorePanel} relative`}>
               <p className={styles.hudLabel}>SCORE</p>
-              <p className={`${styles.hudValue} tabular-nums`}>{score.toLocaleString("ja-JP")}</p>
+              <SevenSegmentNumber value={score.toLocaleString("ja-JP")} label={`スコア ${score.toLocaleString("ja-JP")}`} />
               {feedback ? <span className="pointer-events-none absolute -right-2 -top-2 rounded-full bg-[#fff6cc]/95 px-2 py-0.5 text-[10px] font-black text-[#c87527] shadow-sm">+{feedback.points}</span> : null}
             </div>
             {scoreMultiplierTotal > 1 ? (
@@ -2993,7 +3054,7 @@ export function FrenchieCatchGame({
           <span className="flex-1" />
           <div className={`${styles.timePanel} ${phase === "playing" && timeLeft <= 10 ? styles.timeUrgent : ""}`}>
             <p className={styles.hudLabel}>TIME</p>
-            <p className={`${styles.hudValue} tabular-nums`}>{timeLeft}</p>
+            <SevenSegmentNumber value={String(timeLeft).padStart(2, "0")} label={`残り ${timeLeft}秒`} />
           </div>
         </div>
 
@@ -3048,7 +3109,7 @@ export function FrenchieCatchGame({
           aria-label="拾ってくだブーの段ボールを左右に動かす"
           className={`${styles.catcher} absolute bottom-[0.5%] z-30 touch-none select-none rounded-3xl transition-[width,transform] duration-200 ${performance.now() < magnetUntilRef.current ? "shadow-[0_0_20px_6px_rgba(120,170,240,0.55)] ring-4 ring-sky-300/70" : ""}`}
           style={{
-            left: `${boxX}%`,
+            left: `${boxXRef.current}%`,
             width: `${BOX_WIDTH * (performance.now() < boxShrinkUntilRef.current ? BOX_SHRINK_SCALE : performance.now() < boxWideUntilRef.current ? boxWideScaleRef.current : 1) * dambourleUpMultiplier("box_size_up")}%`,
             height: `${BOX_HEIGHT}%`,
             transform: `translateX(-50%) scaleY(${boxBounce ? 1.015 : 1})`,
