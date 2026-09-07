@@ -917,7 +917,7 @@ const FallingEntity = memo(function FallingEntity({
   return (
     <div
       ref={registerRef}
-      className={`${styles.fallingEntity} absolute will-change-transform ${entity.rarity ? RARITY_STYLE[entity.rarity] : ""} ${isGoldenDog ? "drop-shadow-[0_0_10px_rgba(255,200,60,0.85)]" : ""}`}
+      className={`absolute will-change-transform ${entity.rarity ? RARITY_STYLE[entity.rarity] : ""} ${isGoldenDog ? "drop-shadow-[0_0_10px_rgba(255,200,60,0.85)]" : ""}`}
       style={{
         left: `${entity.spawnX}%`,
         top: `${entity.spawnY}%`,
