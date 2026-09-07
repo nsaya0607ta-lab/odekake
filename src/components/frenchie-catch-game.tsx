@@ -223,6 +223,7 @@ const MYSTERY_SKILL_ITEM_IDS = [
   "other_mirror_omochi", "other_toorematen", "other_hia", "other_pink_omo",
   "sushi_salmon", "sushi_maguro_akami", "sushi_ika", "sushi_tako", "sushi_hotate",
   "sushi_chutoro", "sushi_buri", "sushi_kanpachi", "sushi_ebi", "sushi_aburi_saba",
+  "sushi_otoro", "sushi_uni", "sushi_shirasu", "sushi_anago", "sushi_nama_ebi",
 ];
 
 /** アイテムごとのLv1〜5パラメータ（item_skill_levels_colored.xlsxの「スキル一覧」シート通り） */
@@ -345,6 +346,12 @@ const LV = {
   EBI_SEC: [3, 4, 5, 6, 8, 8.94, 9.88, 10.81, 11.75, 12.69],
   ABURI_SABA_SEC: [4, 5, 6, 7, 8, 8.75, 9.5, 10.25, 11, 11.75],
   ABURI_SABA_FALL: [1.5, 1.6, 1.7, 1.9, 2.1, 2.21, 2.33, 2.44, 2.55, 2.66],
+  OTORO_SEC: [2, 7, 9, 11, 13, 15.06, 17.13, 19.19, 21.25, 23.31],
+  OTORO_PT: [100, 125, 150, 175, 200, 218.75, 237.5, 256.25, 275, 293.75],
+  UNI_MULT: [1.2, 1.5, 1.8, 2.1, 2.4, 2.63, 2.85, 3.08, 3.3, 3.53],
+  SHIRASU_SEC: [4, 5, 6, 8, 10, 11.13, 12.25, 13.38, 14.5, 15.63],
+  SHIRASU_SPAWN: [1.7, 1.8, 1.9, 2.1, 2.3, 2.41, 2.53, 2.64, 2.75, 2.86],
+  ANAGO_SEC: [4, 5, 6, 7, 9, 9.94, 10.88, 11.81, 12.75, 13.69],
 } as const;
 const SLANT_VX_BOOST = 3.5;
 const POINTS: Record<FrenchieCatchItem["rarity"], number> = { N: 20, R: 40, SR: 80, SSR: 140, UR: 200, LR: 300, MR: 440 };
@@ -352,7 +359,7 @@ const RARITY_FALL_SPEED: Record<FrenchieCatchItem["rarity"], number> = { N: 1, R
 /** 時間が増えるスキルを持つアイテムだけ、落下速度をレアリティ別倍率で上げる */
 const TIME_BONUS_ITEM_IDS = new Set([
   "toy_duck_plush", "toy_carrot", "food_paw_melon_bread", "sushi_salmon", "sushi_buri",
-  "interior_anball", "other_omojii", "other_azuki", "summer_frenchie", "other_burebur",
+  "interior_anball", "other_omojii", "other_azuki", "sushi_otoro", "summer_frenchie", "other_burebur",
 ]);
 /**
  * UR出現率アップ・その他カテゴリ抑制・SSR/UR/LR限定出現・出現量アップを付与するアイテム。
@@ -367,7 +374,7 @@ const TIME_BONUS_ITEM_IDS = new Set([
 const SPAWN_DYNAMICS_ITEM_IDS = new Set([
   "toy_rainbow_ball", "interior_stretch_rod", "toy_treasure_puzzle",
   "other_xmas_party", "other_pondeomo", "other_pondear", "other_jare_a", "interior_ragby_ar",
-  "other_mrs_green_apple",
+  "other_mrs_green_apple", "sushi_shirasu",
 ]);
 /**
  * 2026-09-03、ユーザー指定で新設した4つ目のプール（通常アイテム系プール）。上記3プール・
@@ -473,25 +480,27 @@ const ITEM_SPAWN_WEIGHTS: Partial<Record<string, number>> = {
    * 時間増加系プール（予算2120、おかえりを含む）：R:636÷4=159ずつ(2026-09-07にサーモン握りを追加、
    * 既存3種+1種の4種。Rランクの予算636自体は元々満額だったため総額は変わらず、1体あたりが
    * 212→159に下がるだけ) / SR:381.6÷1=381.6(ぶり握り、2026-09-07に追加してSR枠を新規充填) /
-   * SSR:339.2(未充填→dog) / UR:296.8÷3 / LR:254.4÷2=127.2ずつ(夏のフレブル/おかえり) /
-   * MR:212÷1=212(ブレブル)。在籍分の実際の合計は1399.2+381.6=1780.8（残り339.2は
-   * `TIME_BONUS_UNFILLED_RANK_DOG_WEIGHT`でdogへ）。
+   * SSR:339.2(未充填→dog) / UR:296.8÷4=74.2ずつ(2026-09-07に大トロ握りを追加、既存3種+1種の4種) /
+   * LR:254.4÷2=127.2ずつ(夏のフレブル/おかえり) / MR:212÷1=212(ブレブル)。在籍分の実際の合計は
+   * 1399.2+381.6=1780.8（残り339.2は`TIME_BONUS_UNFILLED_RANK_DOG_WEIGHT`でdogへ）。
    */
-  other_omojii: 296.8 / 3,
+  other_omojii: 296.8 / 4,
   toy_duck_plush: 636 / 4,
   toy_carrot: 636 / 4,
   food_paw_melon_bread: 636 / 4,
   sushi_salmon: 636 / 4,
   sushi_buri: 381.6 / 1,
-  interior_anball: 296.8 / 3,
-  other_azuki: 296.8 / 3,
+  interior_anball: 296.8 / 4,
+  other_azuki: 296.8 / 4,
+  sushi_otoro: 296.8 / 4,
   summer_frenchie: 254.4 / 2,
   other_okaeri: 254.4 / 2,
   other_burebur: 212 / 1,
   /**
    * 出現量アップ・出現制御系プール（予算900）：R:270÷1=270 / SR:162÷1=162 / SSR:144÷4=36ずつ /
-   * UR:126÷1=126(Mrs. GREEN アーPPLE) / LR:108÷2=54ずつ / MR:90÷1=90(Xmas Party)。在籍分の実際の
-   * 合計は900（残りなし。旧・残り126はUR枠が埋まったため`SPAWN_DYNAMICS_UNFILLED_RANK_DOG_WEIGHT`が0になった）。
+   * UR:126÷2=63ずつ(Mrs. GREEN アーPPLE / 生しらす握り、2026-09-07に生しらす握りを追加) /
+   * LR:108÷2=54ずつ / MR:90÷1=90(Xmas Party)。在籍分の実際の合計は900（残りなし。旧・残り126は
+   * UR枠が埋まったため`SPAWN_DYNAMICS_UNFILLED_RANK_DOG_WEIGHT`が0になった）。
    * 宝箱おやつパズル・Xmas Partyもここでは個別チューニング値ではなく「ランク予算÷在籍数」のみで計算する
    * （ユーザー指定、2026-09-03〜）。ブレブルは2026-09-04に効果を秒数プラス系へ変更し、
    * 時間増加系プールへ移動した（このプールからは離籍）。Mrs. GREEN アーPPLEは2026-09-06にUR枠へ追加。
@@ -505,36 +514,42 @@ const ITEM_SPAWN_WEIGHTS: Partial<Record<string, number>> = {
   other_jare_a: 144 / 4,
   interior_ragby_ar: 108 / 2,
   other_listen_to_the_a: 108 / 2,
-  other_mrs_green_apple: 126 / 1,
+  other_mrs_green_apple: 126 / 2,
+  sushi_shirasu: 126 / 2,
   /**
    * 得点倍率系プール（予算400）：R:120÷1=120(まぐろ(赤身)握り、2026-09-07に追加してR枠を新規充填) /
-   * SR:72÷3=24ずつ(2026-09-07に中トロ握りを追加、既存2種+1種の3種) / SSR:64÷2=32ずつ /
-   * UR:56÷3 / LR:48÷2=24ずつ / MR:40÷2=20ずつ。在籍分の実際の合計は400（残りなし。旧・残り120は
-   * `SCORE_MULT_UNFILLED_RANK_DOG_WEIGHT`でdogへ流していたがR枠が埋まったため0になった）。
-   * ピンクオモ・ナルシストアー・マフィアーも含め、全アイテム「ランク予算÷在籍数」のみで計算する
-   * （ユーザー指定、2026-09-03〜）。
+   * SR:72÷3=24ずつ(2026-09-07に中トロ握りを追加、既存2種+1種の3種) /
+   * SSR:64÷3(2026-09-07に生えび握りを追加、既存2種+1種の3種。生えび握りはピンクオモと同じ
+   * スキル＝主効果が得点倍率ではないが、ピンクオモと同様このプールに含める運用) /
+   * UR:56÷4(2026-09-07にうに握りを追加、既存3種+1種の4種) / LR:48÷2=24ずつ / MR:40÷2=20ずつ。
+   * 在籍分の実際の合計は400（残りなし。旧・残り120は`SCORE_MULT_UNFILLED_RANK_DOG_WEIGHT`でdogへ
+   * 流していたがR枠が埋まったため0になった）。ピンクオモ・ナルシストアー・マフィアーも含め、
+   * 全アイテム「ランク予算÷在籍数」のみで計算する（ユーザー指定、2026-09-03〜）。
    */
   sushi_maguro_akami: 120 / 1,
   toy_meat: 72 / 3,
   interior_spring_flower_wreath: 72 / 3,
   sushi_chutoro: 72 / 3,
-  other_kamunayo: 64 / 2,
-  other_nisoku_a: 64 / 2,
-  other_azubee: 56 / 3,
-  interior_kinoko_azubee: 56 / 3,
-  other_kobee: 56 / 3,
+  other_kamunayo: 64 / 3,
+  other_nisoku_a: 64 / 3,
+  sushi_nama_ebi: 64 / 3,
+  other_azubee: 56 / 4,
+  interior_kinoko_azubee: 56 / 4,
+  other_kobee: 56 / 4,
+  sushi_uni: 56 / 4,
   interior_shikkoku_no_ar: 48 / 2,
   other_pink_omo: 48 / 2,
   other_narcissist_a: 40 / 2,
   other_mafia_a: 40 / 2,
   /**
-   * 通常アイテム系プール（予算6100、在籍68種）：N:2400÷25=96ずつ(25種、2026-09-06に赤りんごを追加) /
+   * 通常アイテム系プール（予算6100、在籍69種）：N:2400÷25=96ずつ(25種、2026-09-06に赤りんごを追加) /
    * R:700÷10=70ずつ(10種、2026-09-07に寿司シリーズのいか握り・たこ握り・ほたて握りを追加。
    * サーモン握り・まぐろ(赤身)握りは時間増加系・得点倍率系プールへ移動したためこちらには残らない) /
    * SR:900÷12=75ずつ(12種、2026-09-07に寿司シリーズのかんぱち握り・えび握り・炙りサバ握りを追加。
    * ぶり握り・中トロ握りは時間増加系・得点倍率系プールへ移動したためこちらには残らない) /
-   * SSR:1200(12種) / UR:700(7種) / LR:200(2種) / MR:0(未在籍)。
-   * N・R・SR以外のランクは予算÷在籍数=100ちょうどで割り切れるため、`DEFAULT_ITEM_SPAWN_WEIGHT`と同じ値のまま。
+   * SSR:1200÷13(13種、2026-09-07に穴子握り＝落下速度アップ+防止付与を追加) /
+   * UR:700(7種) / LR:200(2種) / MR:0(未在籍)。
+   * N・R・SR・SSR以外のランクは予算÷在籍数=100ちょうどで割り切れるため、`DEFAULT_ITEM_SPAWN_WEIGHT`と同じ値のまま。
    * 今後このプールに新アイテムを追加する場合は、他の3プールと同じ「同ランク内で均等に重みを
    * 割り振る計算方法」（docs/item-catch-new-item-checklist.md参照）でそのランクの予算を
    * 新しい在籍数で割り直し、対象ランクの全メンバーを書き直すこと（ランク予算・プール総予算
@@ -589,18 +604,19 @@ const ITEM_SPAWN_WEIGHTS: Partial<Record<string, number>> = {
   sushi_kanpachi: 900 / 12,
   sushi_ebi: 900 / 12,
   sushi_aburi_saba: 900 / 12,
-  toy_golden_crown_ball: 100,
-  interior_gold_ball: 100,
-  other_nakayoshi_azubee: 100,
-  other_hamigaki: 100,
-  other_ikea: 100,
-  other_orusuban: 100,
-  other_kurumari_a: 100,
-  other_oyatsu_no_jikan: 100,
-  other_ketsunade_a: 100,
-  other_omochi_janai: 100,
-  other_oyasumi: 100,
-  other_clawd: 100,
+  toy_golden_crown_ball: 1200 / 13,
+  interior_gold_ball: 1200 / 13,
+  other_nakayoshi_azubee: 1200 / 13,
+  other_hamigaki: 1200 / 13,
+  other_ikea: 1200 / 13,
+  other_orusuban: 1200 / 13,
+  other_kurumari_a: 1200 / 13,
+  other_oyatsu_no_jikan: 1200 / 13,
+  other_ketsunade_a: 1200 / 13,
+  other_omochi_janai: 1200 / 13,
+  other_oyasumi: 1200 / 13,
+  other_clawd: 1200 / 13,
+  sushi_anago: 1200 / 13,
   food_mocchurin: 100,
   other_komochi: 100,
   other_omoi_bashira: 100,
@@ -1024,6 +1040,8 @@ export function FrenchieCatchGame({
   const spawnRateBoostValueRef = useRef(1);
   const otherSuppressUntilRef = useRef(0);
   const otherSuppressValueRef = useRef(1);
+  /** 穴子握り：発動中はダンボールに触れただけ（開口部の外側含む）でキャッチ判定になる */
+  const anagoAutoCatchUntilRef = useRef(0);
   const highRarityLockUntilRef = useRef(0);
   const treasureStreakActiveRef = useRef(false);
   const treasureStreakMultRef = useRef(1);
@@ -1921,10 +1939,11 @@ export function FrenchieCatchGame({
           }
 
           const widthFullyInsideOpening = localHitLeft >= opening.left && localHitRight <= opening.right;
-          const canCatch = entity.enteredOpening
-            && localY >= CATCH_START_LOCAL_Y
-            && localY <= OPEN_BOTTOM_LOCAL_Y + 0.10
-            && widthFullyInsideOpening;
+          const anagoAutoCatchActive = now < anagoAutoCatchUntilRef.current;
+          const touchesBoxWidth = overlap(localHitLeft, localHitRight, 0, 1) > 0;
+          const withinCatchHeight = localY >= CATCH_START_LOCAL_Y && localY <= OPEN_BOTTOM_LOCAL_Y + 0.10;
+          const canCatch = (entity.enteredOpening && withinCatchHeight && widthFullyInsideOpening)
+            || (anagoAutoCatchActive && withinCatchHeight && touchesBoxWidth);
 
           if (canCatch) {
             entity.rimChecked = true;
@@ -2335,10 +2354,21 @@ export function FrenchieCatchGame({
                 effectLabel = `${SCORE_MULT_DURATION_UR_SEC}秒間 ×${LV.AZUBEE_MULT[lv]}${lvTag}`;
                 statusChanged = true;
                 break;
+              case "sushi_uni":
+                addScoreMultiplier(scoreMultipliersRef, now, scaleDambourleBonusMultiplier(LV.UNI_MULT[lv]!, dambourleUpMultiplier("score_mult_pool_effect_up")), SCORE_MULT_DURATION_UR_SEC * 1000);
+                effectLabel = `${SCORE_MULT_DURATION_UR_SEC}秒間 ×${LV.UNI_MULT[lv]}${lvTag}`;
+                statusChanged = true;
+                break;
               case "other_omojii": {
                 const applied = addBonusTime(LV.OMOJII_SEC[lv]!);
                 points += LV.OMOJII_PT[lv]!;
                 effectLabel = `+${applied}秒 / +${LV.OMOJII_PT[lv]}pt${lvTag}`;
+                break;
+              }
+              case "sushi_otoro": {
+                const applied = addBonusTime(LV.OTORO_SEC[lv]!);
+                points += LV.OTORO_PT[lv]!;
+                effectLabel = `+${applied}秒 / +${LV.OTORO_PT[lv]}pt${lvTag}`;
                 break;
               }
               case "food_paw_pudding":
@@ -2615,6 +2645,13 @@ export function FrenchieCatchGame({
                 statusChanged = true;
                 break;
               }
+              case "sushi_anago": {
+                const anagoSec = LV.ANAGO_SEC[lv]!;
+                anagoAutoCatchUntilRef.current = Math.max(now, anagoAutoCatchUntilRef.current) + anagoSec * 1000;
+                effectLabel = `${anagoSec}秒間 ダンボールに触れるだけでキャッチ${lvTag}`;
+                statusChanged = true;
+                break;
+              }
               case "sushi_tako": {
                 const takoSec = LV.TAKO_SEC[lv]!;
                 fallSpeedBoostUntilRef.current = Math.max(now, fallSpeedBoostUntilRef.current) + takoSec * 1000;
@@ -2668,11 +2705,21 @@ export function FrenchieCatchGame({
                 statusChanged = true;
                 break;
               }
-              case "other_pink_omo": {
+              case "other_pink_omo":
+              case "sushi_nama_ebi": {
                 const pinkOmoSec = LV.PINK_OMO_SEC[lv]!;
                 pinkOmoUntilRef.current = Math.max(now, pinkOmoUntilRef.current) + pinkOmoSec * 1000;
                 setPinkOmoActive(true);
                 effectLabel = `${pinkOmoSec}秒間 ピンクフィルター発動！アイテムが中心へ${lvTag}`;
+                statusChanged = true;
+                break;
+              }
+              case "sushi_shirasu": {
+                const shirasuSec = LV.SHIRASU_SEC[lv]!;
+                const shirasuSpawn = LV.SHIRASU_SPAWN[lv]!;
+                spawnRateBoostUntilRef.current = Math.max(now, spawnRateBoostUntilRef.current) + shirasuSec * 1000;
+                spawnRateBoostValueRef.current = scaleDambourleBonusMultiplier(shirasuSpawn, dambourleUpMultiplier("spawn_dynamics_effect_up"));
+                effectLabel = `${shirasuSec}秒間 アイテム出現量×${shirasuSpawn}${lvTag}`;
                 statusChanged = true;
                 break;
               }
@@ -2940,6 +2987,7 @@ export function FrenchieCatchGame({
     spawnRateBoostUntilRef.current = 0;
     otherSuppressUntilRef.current = 0;
     otherSuppressValueRef.current = 1;
+    anagoAutoCatchUntilRef.current = 0;
     highRarityLockUntilRef.current = 0;
     treasureStreakActiveRef.current = false;
     treasureStreakMultRef.current = 1;
