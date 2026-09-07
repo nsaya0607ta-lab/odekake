@@ -1020,6 +1020,8 @@ export function FrenchieCatchGame({
    * 累計倍率。捕まえるたびに掛け合わされ、ラウンド中重複していく（3体で×1.1×1.1×1.1など）。
    */
   const mafiaDogBonusMultRef = useRef(1);
+  /** ラウンド中に捕まえたマフィアーの個数（結果画面に表示） */
+  const mafiaCaughtCountRef = useRef(0);
   /**
    * 通れまてん：有効中は「はずれ」の初期フレブル(15pt)の代わりに、より高得点な金色フレブルが
    * 同じ出現枠（dogWeight）でそのまま出現する。フレブルの出現シェア自体は変えないので、
@@ -1051,6 +1053,8 @@ export function FrenchieCatchGame({
   }, []);
 
   const [phase, setPhase] = useState<"idle" | "playing" | "finished">("idle");
+  /** ラウンド中に捕まえたマフィアーの個数（結果画面表示用） */
+  const [mafiaCaughtCount, setMafiaCaughtCount] = useState(0);
   const [entities, setEntities] = useState<Entity[]>([]);
   const [boxX, setBoxX] = useState(50);
   const [timeLeft, setTimeLeft] = useState(ROUND_SECONDS);
@@ -1628,6 +1632,7 @@ export function FrenchieCatchGame({
         scoreRef.current = Math.ceil(scoreRef.current); setScore(scoreRef.current);
       }
       setDogBonus(dogCount > 0 ? { count: dogCount, bonus: dogBonusPoints } : null);
+      setMafiaCaughtCount(mafiaCaughtCountRef.current);
       setPhase("finished");
     };
 
@@ -2600,6 +2605,7 @@ export function FrenchieCatchGame({
               case "other_mafia_a": {
                 const mafiaMult = LV.MAFIA_MULT[lv]!;
                 mafiaDogBonusMultRef.current *= mafiaMult;
+                mafiaCaughtCountRef.current += 1;
                 effectLabel = `フレブル数ボーナス×${mafiaMult}（累計×${mafiaDogBonusMultRef.current.toFixed(2)}）${lvTag}`;
                 statusChanged = true;
                 break;
@@ -2859,6 +2865,8 @@ export function FrenchieCatchGame({
     dogGoldenPtValueRef.current = 0;
     narcissistUntilRef.current = 0;
     mafiaDogBonusMultRef.current = 1;
+    mafiaCaughtCountRef.current = 0;
+    setMafiaCaughtCount(0);
     setBlackoutActive(false);
     setStunned(false);
     bagStockRef.current = 0;
@@ -3075,6 +3083,12 @@ export function FrenchieCatchGame({
                     <div className="mt-2 rounded-xl bg-paper-deep px-3 py-2 text-xs">
                       <p className="text-[9px] text-ink-faint">いつものフレブル ボーナス</p>
                       <p className="mt-0.5 font-black text-ink">{dogBonus.count}匹 × プレイ時間 = <span className="text-leaf-deep">+{dogBonus.bonus.toLocaleString("ja-JP")}pt</span></p>
+                    </div>
+                  ) : null}
+                  {mafiaCaughtCount > 0 ? (
+                    <div className="mt-2 rounded-xl bg-paper-deep px-3 py-2 text-xs">
+                      <p className="text-[9px] text-ink-faint">マフィアー 捕獲数</p>
+                      <p className="mt-0.5 font-black text-ink">{mafiaCaughtCount}匹</p>
                     </div>
                   ) : null}
                   <div className="mt-3 rounded-xl bg-[#fff5df] px-3 py-2">
