@@ -191,7 +191,7 @@ const SPAWN_DYNAMICS_IDS = new Set(["toy_rainbow_ball", "interior_stretch_rod", 
 // （ユーザー指定。主効果はそれぞれ「全アイテムのスキルがLv.MAXで発動」「フレブル数ボーナス倍率」で
 // 得点倍率そのものではないが、重み管理上の扱いとして含める）。
 const SCORE_MULT_IDS = new Set(["toy_meat", "interior_spring_flower_wreath", "other_kamunayo", "other_nisoku_a", "other_azubee", "interior_kinoko_azubee", "other_kobee", "interior_shikkoku_no_ar", "other_pink_omo", "other_narcissist_a", "other_mafia_a"]);
-// 通常アイテム系プール（特殊効果を持たない全61種。frenchie-catch-game.tsxのNORMAL_ITEM_IDSと同一、手動同期）。
+// 通常アイテム系プール（特殊効果を持たない全67種。frenchie-catch-game.tsxのNORMAL_ITEM_IDSと同一、手動同期）。
 const NORMAL_ITEM_IDS = new Set([
   "toy_colorful_ball", "toy_rope", "toy_bone", "toy_squeaky_ball", "toy_tennis_ball",
   "toy_red_slipper", "toy_wood_stick", "toy_donut_rope", "food_smile_onigiri", "food_paw_taiyaki",
@@ -201,6 +201,7 @@ const NORMAL_ITEM_IDS = new Set([
   "toy_red_balloon", "toy_sand_bucket", "accessory_walk_pouch", "other_red_apple",
   "toy_frisbee", "toy_soccer_ball", "toy_taiyaki_plush", "toy_bear_plush", "food_paw_bowl",
   "food_paw_pudding", "food_kamikami",
+  "sushi_salmon", "sushi_maguro_akami", "sushi_ika", "sushi_tako", "sushi_hotate",
   "toy_frenchie_plush", "toy_frenchie_cushion", "toy_paw_macaron", "toy_star_wan_wand",
   "food_strawberry_roll_cake", "food_paw_cupcake", "food_fruit_basket", "interior_sleepy_moon",
   "other_sparkle_rope_crown",

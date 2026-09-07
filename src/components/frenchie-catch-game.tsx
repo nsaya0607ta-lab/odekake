@@ -500,9 +500,10 @@ const ITEM_SPAWN_WEIGHTS: Partial<Record<string, number>> = {
   other_narcissist_a: 40 / 2,
   other_mafia_a: 40 / 2,
   /**
-   * 通常アイテム系プール（予算6100、在籍62種）：N:2400÷25=96ずつ(25種、2026-09-06に赤りんごを追加) /
-   * R:700(7種) / SR:900(9種) / SSR:1200(12種) / UR:700(7種) / LR:200(2種) / MR:0(未在籍)。
-   * N以外のランクは予算÷在籍数=100ちょうどで割り切れるため、`DEFAULT_ITEM_SPAWN_WEIGHT`と同じ値のまま。
+   * 通常アイテム系プール（予算6100、在籍67種）：N:2400÷25=96ずつ(25種、2026-09-06に赤りんごを追加) /
+   * R:700÷12(12種、2026-09-07に寿司シリーズR5種を追加) / SR:900(9種) / SSR:1200(12種) / UR:700(7種) /
+   * LR:200(2種) / MR:0(未在籍)。
+   * N・R以外のランクは予算÷在籍数=100ちょうどで割り切れるため、`DEFAULT_ITEM_SPAWN_WEIGHT`と同じ値のまま。
    * 今後このプールに新アイテムを追加する場合は、他の3プールと同じ「同ランク内で均等に重みを
    * 割り振る計算方法」（docs/item-catch-new-item-checklist.md参照）でそのランクの予算を
    * 新しい在籍数で割り直し、対象ランクの全メンバーを書き直すこと（ランク予算・プール総予算
@@ -535,13 +536,18 @@ const ITEM_SPAWN_WEIGHTS: Partial<Record<string, number>> = {
   toy_sand_bucket: 2400 / 25,
   accessory_walk_pouch: 2400 / 25,
   other_red_apple: 2400 / 25,
-  toy_frisbee: 100,
-  toy_soccer_ball: 100,
-  toy_taiyaki_plush: 100,
-  toy_bear_plush: 100,
-  food_paw_bowl: 100,
-  food_paw_pudding: 100,
-  food_kamikami: 100,
+  toy_frisbee: 700 / 12,
+  toy_soccer_ball: 700 / 12,
+  toy_taiyaki_plush: 700 / 12,
+  toy_bear_plush: 700 / 12,
+  food_paw_bowl: 700 / 12,
+  food_paw_pudding: 700 / 12,
+  food_kamikami: 700 / 12,
+  sushi_salmon: 700 / 12,
+  sushi_maguro_akami: 700 / 12,
+  sushi_ika: 700 / 12,
+  sushi_tako: 700 / 12,
+  sushi_hotate: 700 / 12,
   toy_frenchie_plush: 100,
   toy_frenchie_cushion: 100,
   toy_paw_macaron: 100,
