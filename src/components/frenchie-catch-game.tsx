@@ -388,6 +388,14 @@ const SCORE_MULT_DURATION_UR_SEC = 6;
 const SCORE_MULT_DURATION_LR_SEC = 8;
 const SCORE_MULT_DURATION_MR_SEC = 15;
 /**
+ * 得点倍率アイテム（時間経過系/次のN個系/食べ物限定系/宝箱連続ボーナス系/ダンボールNo.2）は
+ * 重複中すべて掛け合わされるため、高スキルLv・長時間ラウンドでは理論上倍率が青天井に積み上がる
+ * （検証: node scripts/simulate-item-catch.mjsベースのシミュレーションで、図鑑実効Lv10クラスだと
+ * 数百万倍〜1000万倍超えが発生することを確認）。プレイ1回あたりのスコアが現実的な範囲に収まるよう、
+ * 最終的な倍率にこの上限をかける（2026-09、ユーザー指定）。
+ */
+const SCORE_MULTIPLIER_CAP = 65536;
+/**
  * 宝箱の中身抽選（8択）。合計100、ハズレ(うんち祭り+マイナス秒)は合計20。
  * rare_lockはSSR/UR/LR以外の出現重みをゼロにするため、時間増加系のUR勢を一時的に
  * 集中優遇してしまい複利的に伸びやすい。頻度を下げてitem_doubleに振り替えた。
@@ -1020,6 +1028,8 @@ export function FrenchieCatchGame({
    * 累計倍率。捕まえるたびに掛け合わされ、ラウンド中重複していく（3体で×1.1×1.1×1.1など）。
    */
   const mafiaDogBonusMultRef = useRef(1);
+  /** ラウンド中に捕まえたマフィアーの個数（結果画面に表示） */
+  const mafiaCaughtCountRef = useRef(0);
   /**
    * 通れまてん：有効中は「はずれ」の初期フレブル(15pt)の代わりに、より高得点な金色フレブルが
    * 同じ出現枠（dogWeight）でそのまま出現する。フレブルの出現シェア自体は変えないので、
@@ -1051,6 +1061,8 @@ export function FrenchieCatchGame({
   }, []);
 
   const [phase, setPhase] = useState<"idle" | "playing" | "finished">("idle");
+  /** ラウンド中に捕まえたマフィアーの個数（結果画面表示用） */
+  const [mafiaCaughtCount, setMafiaCaughtCount] = useState(0);
   const [entities, setEntities] = useState<Entity[]>([]);
   const [boxX, setBoxX] = useState(50);
   const [timeLeft, setTimeLeft] = useState(ROUND_SECONDS);
@@ -1165,7 +1177,7 @@ export function FrenchieCatchGame({
       const product = activeFoodMultipliers.reduce((acc, entry) => acc * entry.value, 1);
       scoreMultiplierTotalValue *= product;
     }
-    setScoreMultiplierTotal(scoreMultiplierTotalValue);
+    setScoreMultiplierTotal(Math.min(SCORE_MULTIPLIER_CAP, scoreMultiplierTotalValue));
   }, []);
 
   /**
@@ -1628,6 +1640,7 @@ export function FrenchieCatchGame({
         scoreRef.current = Math.ceil(scoreRef.current); setScore(scoreRef.current);
       }
       setDogBonus(dogCount > 0 ? { count: dogCount, bonus: dogBonusPoints } : null);
+      setMafiaCaughtCount(mafiaCaughtCountRef.current);
       setPhase("finished");
     };
 
@@ -2038,7 +2051,8 @@ export function FrenchieCatchGame({
             // ダンボールNo.2「スコア倍率アップ」：他系統の得点倍率と同様、重複中もすべて掛け合わされる
             const dambourleScoreMultiplier = dambourleUpMultiplier("score_mult_up");
             // 種類の異なる得点倍率（時間経過系/次のN個系/食べ物限定系/宝箱連続ボーナス系/ダンボール効果）は重複中すべて掛け合わされる
-            const multiplier = timedMultiplier * nextMultiplier * foodMultiplier * streakMultiplier * dambourleScoreMultiplier;
+            // （ただしSCORE_MULTIPLIER_CAPを上限とする）
+            const multiplier = Math.min(SCORE_MULTIPLIER_CAP, timedMultiplier * nextMultiplier * foodMultiplier * streakMultiplier * dambourleScoreMultiplier);
             // ダンボール効果（No.2やNo.12の抽選結果）が絡むと端数が出うるため、必ず切り上げにする
             // （端数のままだと/api/coins/item-catchのInteger必須チェックでリクエスト自体が失敗する）
             let points = Math.ceil((basePoints + pendingBonus) * multiplier);
@@ -2600,6 +2614,7 @@ export function FrenchieCatchGame({
               case "other_mafia_a": {
                 const mafiaMult = LV.MAFIA_MULT[lv]!;
                 mafiaDogBonusMultRef.current *= mafiaMult;
+                mafiaCaughtCountRef.current += 1;
                 effectLabel = `フレブル数ボーナス×${mafiaMult}（累計×${mafiaDogBonusMultRef.current.toFixed(2)}）${lvTag}`;
                 statusChanged = true;
                 break;
@@ -2859,6 +2874,8 @@ export function FrenchieCatchGame({
     dogGoldenPtValueRef.current = 0;
     narcissistUntilRef.current = 0;
     mafiaDogBonusMultRef.current = 1;
+    mafiaCaughtCountRef.current = 0;
+    setMafiaCaughtCount(0);
     setBlackoutActive(false);
     setStunned(false);
     bagStockRef.current = 0;
@@ -3075,6 +3092,12 @@ export function FrenchieCatchGame({
                     <div className="mt-2 rounded-xl bg-paper-deep px-3 py-2 text-xs">
                       <p className="text-[9px] text-ink-faint">いつものフレブル ボーナス</p>
                       <p className="mt-0.5 font-black text-ink">{dogBonus.count}匹 × プレイ時間 = <span className="text-leaf-deep">+{dogBonus.bonus.toLocaleString("ja-JP")}pt</span></p>
+                    </div>
+                  ) : null}
+                  {mafiaCaughtCount > 0 ? (
+                    <div className="mt-2 rounded-xl bg-paper-deep px-3 py-2 text-xs">
+                      <p className="text-[9px] text-ink-faint">マフィアー 捕獲数</p>
+                      <p className="mt-0.5 font-black text-ink">{mafiaCaughtCount}匹</p>
                     </div>
                   ) : null}
                   <div className="mt-3 rounded-xl bg-[#fff5df] px-3 py-2">
