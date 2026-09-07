@@ -267,11 +267,11 @@ const CURATED_ITEMS: readonly CollectionItem[] = [
   { id: "other_milky_way", name: "天の川", image: "/collection/items/milky-way.webp", category: "other", series: "summer", rarity: "LR" },
 
   // --- シリーズ図鑑：寿司シリーズ --------------------------------------
-  { id: "sushi_iwashi", name: "いわし握り", image: null, category: "food", series: "sushi", rarity: "N" },
-  { id: "sushi_aji", name: "あじ握り", image: null, category: "food", series: "sushi", rarity: "N" },
-  { id: "sushi_saba", name: "サバ握り", image: null, category: "food", series: "sushi", rarity: "N" },
-  { id: "sushi_maguro", name: "まぐろ握り", image: null, category: "food", series: "sushi", rarity: "N" },
-  { id: "sushi_tamago", name: "たまご握り", image: null, category: "food", series: "sushi", rarity: "N" },
+  { id: "sushi_iwashi", name: "いわし握り", image: "/collection/items/sushi-iwashi.webp", category: "food", series: "sushi", rarity: "N" },
+  { id: "sushi_aji", name: "あじ握り", image: "/collection/items/sushi-aji.webp", category: "food", series: "sushi", rarity: "N" },
+  { id: "sushi_saba", name: "サバ握り", image: "/collection/items/sushi-saba.webp", category: "food", series: "sushi", rarity: "N" },
+  { id: "sushi_maguro", name: "まぐろ握り", image: "/collection/items/sushi-maguro.webp", category: "food", series: "sushi", rarity: "N" },
+  { id: "sushi_tamago", name: "たまご握り", image: "/collection/items/sushi-tamago.webp", category: "food", series: "sushi", rarity: "N" },
 ];
 
 const CURATED_IDS = new Set(CURATED_ITEMS.map((item) => item.id));
