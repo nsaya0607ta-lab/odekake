@@ -216,6 +216,11 @@ export const GACHA_PRIZES: readonly GachaPrize[] = [
   { id: "sushi_saba", name: "サバ握り", rarity: "N", type: "item", image: "/collection/items/sushi-saba.webp" },
   { id: "sushi_maguro", name: "まぐろ握り", rarity: "N", type: "item", image: "/collection/items/sushi-maguro.webp" },
   { id: "sushi_tamago", name: "たまご握り", rarity: "N", type: "item", image: "/collection/items/sushi-tamago.webp" },
+  { id: "sushi_salmon", name: "サーモン握り", rarity: "R", type: "item", image: "/collection/items/sushi-salmon.webp" },
+  { id: "sushi_maguro_akami", name: "まぐろ(赤身)握り", rarity: "R", type: "item", image: "/collection/items/sushi-maguro-akami.webp" },
+  { id: "sushi_ika", name: "いか握り", rarity: "R", type: "item", image: "/collection/items/sushi-ika.webp" },
+  { id: "sushi_tako", name: "たこ握り", rarity: "R", type: "item", image: "/collection/items/sushi-tako.webp" },
+  { id: "sushi_hotate", name: "ほたて握り", rarity: "R", type: "item", image: "/collection/items/sushi-hotate.webp" },
 ];
 
 const PRIZE_BY_ID = new Map(GACHA_PRIZES.map((prize) => [prize.id, prize]));

@@ -109,6 +109,7 @@ const TIME_MINUS_SECONDS = Number(GAME_TSX.match(/const TIME_MINUS_SECONDS = (\d
 const TREASURE_POOP_FLOOD_COUNT = Number(GAME_TSX.match(/const TREASURE_POOP_FLOOD_COUNT = (\d+);/)[1]);
 const TREASURE_MINUS5_SEC = Number(GAME_TSX.match(/const TREASURE_MINUS5_SEC = (\d+);/)[1]);
 const STRETCH_ROD_SECONDS = Number(GAME_TSX.match(/const STRETCH_ROD_SECONDS = (\d+);/)[1]);
+const SCORE_MULT_DURATION_R_SEC = Number(GAME_TSX.match(/const SCORE_MULT_DURATION_R_SEC = (\d+);/)[1]);
 const SCORE_MULT_DURATION_SR_SEC = Number(GAME_TSX.match(/const SCORE_MULT_DURATION_SR_SEC = (\d+);/)[1]);
 const SCORE_MULT_DURATION_SSR_SEC = Number(GAME_TSX.match(/const SCORE_MULT_DURATION_SSR_SEC = (\d+);/)[1]);
 const SCORE_MULT_DURATION_UR_SEC = Number(GAME_TSX.match(/const SCORE_MULT_DURATION_UR_SEC = (\d+);/)[1]);
@@ -168,7 +169,7 @@ function pickMrId(excludeCutoff = false) {
   }
   return weighted[weighted.length - 1].pid;
 }
-const TIME_BONUS_IDS = new Set(["toy_duck_plush", "toy_carrot", "food_paw_melon_bread", "interior_anball", "other_azuki", "other_omojii", "summer_frenchie", "other_burebur"]);
+const TIME_BONUS_IDS = new Set(["toy_duck_plush", "toy_carrot", "food_paw_melon_bread", "sushi_salmon", "interior_anball", "other_azuki", "other_omojii", "summer_frenchie", "other_burebur"]);
 // おかえり(other_okaeri)は時間増加系8種そのものではないが、時間バランス調整の対象として
 // timeBonusCatchRate(見送り確率)の適用対象に加える（ボーナス出現タイマーの除外対象ではないため
 // TIME_BONUS_IDS自体には加えず、キャッチ判定にのみ加算する）
@@ -190,8 +191,8 @@ const SPAWN_DYNAMICS_IDS = new Set(["toy_rainbow_ball", "interior_stretch_rod", 
 // ナルシストアー・マフィアーも同様に2026-09-03、単独チューニング枠からこのプールのMR枠に移動
 // （ユーザー指定。主効果はそれぞれ「全アイテムのスキルがLv.MAXで発動」「フレブル数ボーナス倍率」で
 // 得点倍率そのものではないが、重み管理上の扱いとして含める）。
-const SCORE_MULT_IDS = new Set(["toy_meat", "interior_spring_flower_wreath", "other_kamunayo", "other_nisoku_a", "other_azubee", "interior_kinoko_azubee", "other_kobee", "interior_shikkoku_no_ar", "other_pink_omo", "other_narcissist_a", "other_mafia_a"]);
-// 通常アイテム系プール（特殊効果を持たない全61種。frenchie-catch-game.tsxのNORMAL_ITEM_IDSと同一、手動同期）。
+const SCORE_MULT_IDS = new Set(["toy_meat", "interior_spring_flower_wreath", "other_kamunayo", "other_nisoku_a", "other_azubee", "interior_kinoko_azubee", "other_kobee", "interior_shikkoku_no_ar", "other_pink_omo", "other_narcissist_a", "other_mafia_a", "sushi_maguro_akami"]);
+// 通常アイテム系プール（特殊効果を持たない全67種。frenchie-catch-game.tsxのNORMAL_ITEM_IDSと同一、手動同期）。
 const NORMAL_ITEM_IDS = new Set([
   "toy_colorful_ball", "toy_rope", "toy_bone", "toy_squeaky_ball", "toy_tennis_ball",
   "toy_red_slipper", "toy_wood_stick", "toy_donut_rope", "food_smile_onigiri", "food_paw_taiyaki",
@@ -201,6 +202,7 @@ const NORMAL_ITEM_IDS = new Set([
   "toy_red_balloon", "toy_sand_bucket", "accessory_walk_pouch", "other_red_apple",
   "toy_frisbee", "toy_soccer_ball", "toy_taiyaki_plush", "toy_bear_plush", "food_paw_bowl",
   "food_paw_pudding", "food_kamikami",
+  "sushi_ika", "sushi_tako", "sushi_hotate",
   "toy_frenchie_plush", "toy_frenchie_cushion", "toy_paw_macaron", "toy_star_wan_wand",
   "food_strawberry_roll_cake", "food_paw_cupcake", "food_fruit_basket", "interior_sleepy_moon",
   "other_sparkle_rope_crown",
@@ -223,7 +225,7 @@ function poolWeightTotal(ids) {
 // 予算はプールの合計から減らさず、dogの出現重みに上乗せして消化する
 // （frenchie-catch-game.tsxのXXX_UNFILLED_RANK_DOG_WEIGHTと同一値を手動同期）。
 const TIME_BONUS_UNFILLED_RANK_DOG_WEIGHT = 2120 - 1399.2;
-const SCORE_MULT_UNFILLED_RANK_DOG_WEIGHT = 120;
+const SCORE_MULT_UNFILLED_RANK_DOG_WEIGHT = 0;
 const SPAWN_DYNAMICS_UNFILLED_RANK_DOG_WEIGHT = 0;
 // 時間増加系8種＋おかえりは、プレイ時間がTIME_BONUS_CUTOFF_BASE_SEC + Lv*TIME_BONUS_CUTOFF_STEP_SEC_PER_LEVEL
 // (Lv0始まりなので実質「平均スキルLv」×20秒)を超えると出現しなくなる。シミュレータは全アイテムの
@@ -296,6 +298,10 @@ function simulateOneRound(lv, catchAll, timeBonusCatchRate = 0.8, normalCatchRat
       case "toy_bear_plush": points += LV.BEAR_PT[lvIdx]; break;
       case "toy_duck_plush": addBonusTime(LV.DUCK_SEC[lvIdx]); break;
       case "toy_carrot": addBonusTime(LV.CARROT_SEC[lvIdx]); break;
+      case "sushi_salmon": addBonusTime(LV.SALMON_SEC[lvIdx]); break;
+      case "sushi_maguro_akami": multiplier15Until = t + SCORE_MULT_DURATION_R_SEC * 1000; multiplier15Value = LV.MAGURO_AKAMI_MULT[lvIdx]; break;
+      case "sushi_ika": points += LV.IKA_PT[lvIdx]; break;
+      case "sushi_hotate": points += LV.HOTATE_PT[lvIdx]; break;
       case "toy_frisbee": nextMultValue = LV.FRISBEE_MULT[lvIdx]; nextMultCount = 1; break;
       case "food_paw_bowl": nextBonus5 += 3; nextBonus5Value = LV.BOWL_PT[lvIdx]; break;
       case "toy_meat": multiplier15Until = t + SCORE_MULT_DURATION_SR_SEC * 1000; multiplier15Value = LV.MEAT_MULT[lvIdx]; break;
@@ -581,7 +587,7 @@ function main() {
   const catchAll = mode === "all";
   const timeBonusCatchRate = process.argv[4] !== undefined ? Number(process.argv[4]) : 0.8;
   const normalCatchRate = process.argv[5] !== undefined ? Number(process.argv[5]) : 0.85;
-  const denseCatchRate = process.argv[6] !== undefined ? Number(process.argv[6]) : 0.5;
+  const denseCatchRate = process.argv[6] !== undefined ? Number(process.argv[6]) : 0.7;
   console.log(`itemPool N=${POOL_SIZE} / ROUND_SECONDS=${ROUND_SECONDS} / MAX_ROUND_SECONDS=${MAX_PLAY_SECONDS} / 試行回数=${trials} / モード=${mode}${catchAll ? "（時間減少・チョコレートも100%キャッチ）" : "（時間減少・チョコレートは回避）"} / 時間増加系8種の実キャッチ率=${timeBonusCatchRate} / 通常時キャッチ率=${normalCatchRate} / 密集時キャッチ率=${denseCatchRate}`);
   console.log(
     `プール重み予算（未充填ランク分はdogへ上乗せして消化）: ` +
