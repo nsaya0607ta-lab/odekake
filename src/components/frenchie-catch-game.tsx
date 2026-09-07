@@ -388,6 +388,14 @@ const SCORE_MULT_DURATION_UR_SEC = 6;
 const SCORE_MULT_DURATION_LR_SEC = 8;
 const SCORE_MULT_DURATION_MR_SEC = 15;
 /**
+ * 得点倍率アイテム（時間経過系/次のN個系/食べ物限定系/宝箱連続ボーナス系/ダンボールNo.2）は
+ * 重複中すべて掛け合わされるため、高スキルLv・長時間ラウンドでは理論上倍率が青天井に積み上がる
+ * （検証: node scripts/simulate-item-catch.mjsベースのシミュレーションで、図鑑実効Lv10クラスだと
+ * 数百万倍〜1000万倍超えが発生することを確認）。プレイ1回あたりのスコアが現実的な範囲に収まるよう、
+ * 最終的な倍率にこの上限をかける（2026-09、ユーザー指定）。
+ */
+const SCORE_MULTIPLIER_CAP = 65536;
+/**
  * 宝箱の中身抽選（8択）。合計100、ハズレ(うんち祭り+マイナス秒)は合計20。
  * rare_lockはSSR/UR/LR以外の出現重みをゼロにするため、時間増加系のUR勢を一時的に
  * 集中優遇してしまい複利的に伸びやすい。頻度を下げてitem_doubleに振り替えた。
@@ -1169,7 +1177,7 @@ export function FrenchieCatchGame({
       const product = activeFoodMultipliers.reduce((acc, entry) => acc * entry.value, 1);
       scoreMultiplierTotalValue *= product;
     }
-    setScoreMultiplierTotal(scoreMultiplierTotalValue);
+    setScoreMultiplierTotal(Math.min(SCORE_MULTIPLIER_CAP, scoreMultiplierTotalValue));
   }, []);
 
   /**
@@ -2043,7 +2051,8 @@ export function FrenchieCatchGame({
             // ダンボールNo.2「スコア倍率アップ」：他系統の得点倍率と同様、重複中もすべて掛け合わされる
             const dambourleScoreMultiplier = dambourleUpMultiplier("score_mult_up");
             // 種類の異なる得点倍率（時間経過系/次のN個系/食べ物限定系/宝箱連続ボーナス系/ダンボール効果）は重複中すべて掛け合わされる
-            const multiplier = timedMultiplier * nextMultiplier * foodMultiplier * streakMultiplier * dambourleScoreMultiplier;
+            // （ただしSCORE_MULTIPLIER_CAPを上限とする）
+            const multiplier = Math.min(SCORE_MULTIPLIER_CAP, timedMultiplier * nextMultiplier * foodMultiplier * streakMultiplier * dambourleScoreMultiplier);
             // ダンボール効果（No.2やNo.12の抽選結果）が絡むと端数が出うるため、必ず切り上げにする
             // （端数のままだと/api/coins/item-catchのInteger必須チェックでリクエスト自体が失敗する）
             let points = Math.ceil((basePoints + pendingBonus) * multiplier);
