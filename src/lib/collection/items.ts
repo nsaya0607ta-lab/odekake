@@ -283,10 +283,10 @@ const CURATED_ITEMS: readonly CollectionItem[] = [
   { id: "sushi_ebi", name: "えび握り", image: "/collection/items/sushi-ebi.webp", category: "food", series: "sushi", rarity: "SR" },
   { id: "sushi_aburi_saba", name: "炙りサバ握り", image: "/collection/items/sushi-aburi-saba.webp", category: "food", series: "sushi", rarity: "SR" },
   { id: "sushi_otoro", name: "大トロ握り", image: "/collection/items/sushi-otoro.webp", category: "food", series: "sushi", rarity: "UR" },
-  { id: "sushi_anago", name: "穴子握り", image: "/collection/items/sushi-anago.webp", category: "food", series: "sushi", rarity: "UR" },
+  { id: "sushi_anago", name: "穴子握り", image: "/collection/items/sushi-anago.webp", category: "food", series: "sushi", rarity: "SSR" },
   { id: "sushi_uni", name: "うに握り", image: "/collection/items/sushi-uni.webp", category: "food", series: "sushi", rarity: "UR" },
   { id: "sushi_shirasu", name: "生しらす握り", image: "/collection/items/sushi-shirasu.webp", category: "food", series: "sushi", rarity: "UR" },
-  { id: "sushi_nama_ebi", name: "生えび握り", image: "/collection/items/sushi-nama-ebi.webp", category: "food", series: "sushi", rarity: "UR" },
+  { id: "sushi_nama_ebi", name: "生えび握り", image: "/collection/items/sushi-nama-ebi.webp", category: "food", series: "sushi", rarity: "SSR" },
 ];
 
 const CURATED_IDS = new Set(CURATED_ITEMS.map((item) => item.id));
