@@ -10,6 +10,68 @@
   （ガイド画面の基礎ポイント表示・スコアシミュレーター。`frenchie-catch-game.tsx`の`POINTS`と
   値を二重管理しているため、基礎ポイントを変更したら必ずこちらも合わせて直すこと）
 
+## 【2026-09-07 最新確定20】寿司シリーズUR3種・SSR2種を追加（大トロ握り=時間増加系/うに握り=スコア倍率系/生しらす握り=出現量アップ系/穴子握り=落下速度アップ+防止付与/生えび握り=ピンクオモと同一スキル）
+
+寿司シリーズに新規景品5種を追加した。当初は5種ともURで提案していたが、ユーザー指定で穴子握り・
+生えび握りをSSRに変更した。生えび握りは「ピンクオモと同じスキルにして」というユーザー指定により、
+新規カーブを作らず`other_pink_omo`の`PINK_OMO_SEC`をそのまま流用し、同じcaseブロックで処理する
+（`other_orusuban`/`other_kurumari_a`が同一caseブロックを共有しているのと同じパターン）。
+
+**カーブの決め方**
+- 大トロ握り（時間増加系・UR）：`interior_anball`/`other_omojii`/`other_azuki`（いずれも秒数+pt
+  複合）を参考に新規カーブ「+2秒+100pt→+13秒+200pt」。
+- うに握り（スコア倍率系・UR）：得点倍率のURカーブは固定（`other_azubee`と同じ「1.2〜0.3刻み・
+  6秒間」）なのでそのまま流用。
+- 生しらす握り（出現量アップ系・UR）：SSRの`other_pondeomo`とLRの`interior_ragby_ar`の中間として
+  新規カーブ「4秒間×1.7→10秒間×2.3」。
+- 穴子握り（落下速度アップ+防止付与・SSR）：`other_orusuban`/`other_kurumari_a`「5〜10秒間
+  落下×1.8〜2.8+防止付与」よりやや控えめな新規カーブ「4秒間×1.6→9秒間×2.2」。
+- 生えび握り（SSR）：ユーザー指定で`other_pink_omo`と完全に同一のスキル・数値（新規LV配列なし、
+  `LV.PINK_OMO_SEC`をそのまま参照）。
+
+Lv6〜10は他の項目と同じ規則`値(5+n) = 値(Lv5) + n × (値(Lv5)−値(Lv1)) × 0.1875`で機械的に算出。
+
+**プールの再配分**
+- 大トロ握りは時間増加系プールURランクへ追加（既存3種→4種、296.8÷4=74.2）。
+- うに握りは得点倍率系プールURランクへ追加（既存3種→4種、56÷4=14）。
+- 生しらす握りは出現量アップ・制御系プールURランクへ追加（既存1種＝Mrs. GREENアーPPLE→2種、
+  126÷2=63）。
+- 穴子握りは通常アイテム系プールSSRランクへ追加（既存12種→13種、1200÷13≒92.31）。
+- 生えび握りは得点倍率系プールSSRランクへ追加（既存2種→3種、64÷3≒21.33）。主効果は得点倍率
+  そのものではないが、ピンクオモと同様の運用上の例外としてこのプールに含める。
+
+**検算結果**（`node scripts/simulate-item-catch.mjs 1000 avoid`、密集時70%・itemPool N=92）
+
+| Lv | 秒数平均 | 秒数中央値 | p99 | 最大 | 500秒超え | スコア平均 |
+|---|---|---|---|---|---|---|
+| 1 | 96.3秒 | 92.0秒 | 193秒 | 271秒 | 0.00% | 40,648 |
+| 2 | 138.2秒 | 133.0秒 | 254秒 | 403秒 | 0.00% | 79,720 |
+| 3 | 179.5秒 | 176.0秒 | 336秒 | 412秒 | 0.00% | 145,167 |
+| 4 | 226.5秒 | 224.0秒 | 403秒 | 506秒 | 0.10% | 253,496 |
+| 5 | 291.2秒 | 285.0秒 | 529秒 | 621秒 | 1.60% | 504,771 |
+
+プール重み予算：時間増加系8種=1653.6（+未充填339.2→dog、合計1992.8）/ 得点倍率系8種=400
+（未充填0）/ 出現量アップ・制御系=900（未充填0）/ 通常アイテム系=6100（未充填ランクなし）。
+いずれも追加前後で総予算は変化なし（想定通り）。500秒超えは既定通り気にしない運用のため許容。
+
+**変更内容**
+- `src/lib/collection/items.ts` / `src/lib/gacha/prizes.ts`：`sushi_otoro`/`sushi_uni`（UR）、
+  `sushi_shirasu`（UR）、`sushi_anago`/`sushi_nama_ebi`（SSR）を追加。
+- `supabase/migrations/0098_sushi_series_ur_items.sql`：UR5種を一旦追加。
+- `supabase/migrations/0099_sushi_series_anago_ebi_to_ssr.sql`：ユーザー指定で穴子握り・生えび握りを
+  UR→SSRへ変更。
+- `frenchie-catch-game.tsx`：`LV`に`OTORO_SEC`/`OTORO_PT`/`UNI_MULT`/`SHIRASU_SEC`/`SHIRASU_SPAWN`/
+  `ANAGO_SEC`/`ANAGO_FALL`を追加（生えび握りは`PINK_OMO_SEC`を再利用、新規配列なし）。
+  `TIME_BONUS_ITEM_IDS`に`sushi_otoro`、`SPAWN_DYNAMICS_ITEM_IDS`に`sushi_shirasu`を追加。
+  `runItemSkillEffect`のswitch文に4つのcaseを追加＋`sushi_nama_ebi`を`other_pink_omo`と同じ
+  caseブロックに追加。`ITEM_SPAWN_WEIGHTS`を上記の通り再配分。`MYSTERY_SKILL_ITEM_IDS`に5種を追加。
+- `src/lib/games/item-catch-skills.ts`：SSR/URセクションに5種のルールブック説明文を追加。
+- `scripts/simulate-item-catch.mjs`：`TIME_BONUS_IDS`に`sushi_otoro`、`SCORE_MULT_IDS`に
+  `sushi_uni`/`sushi_nama_ebi`、`SPAWN_DYNAMICS_IDS`に`sushi_shirasu`、`NORMAL_ITEM_IDS`に
+  `sushi_anago`を追加。switch文に`sushi_otoro`/`sushi_uni`/`sushi_shirasu`のcase追加（穴子握り・
+  生えび握りは実効果がこのシミュレータのスコア/時間モデルに影響しないため、`other_orusuban`/
+  `other_pink_omo`と同様case追加なしのdefault扱いで正しい）。
+
 ## 【2026-09-07 最新確定19】寿司シリーズSR5種を追加（中トロ握り=スコア倍率系/ぶり握り=時間増加系/かんぱち握り=次のN個×倍率系/えび握り=ダンボール拡大系/炙りサバ握り=落下速度アップ系）
 
 寿司シリーズにSRレアリティの新規景品5種を追加し、ユーザー指定でスキルを付与した。ぶり握りは
