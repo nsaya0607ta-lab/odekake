@@ -16,9 +16,8 @@
   z-index: 60;
   overflow: hidden;
   border-bottom: 1px solid rgba(104, 87, 55, 0.13);
-  background: rgba(255, 250, 238, 0.9);
-  box-shadow: 0 8px 28px rgba(86, 72, 47, 0.08);
-  backdrop-filter: blur(16px) saturate(1.15);
+  background: #fffaf0;
+  box-shadow: 0 1px 0 rgba(86, 72, 47, 0.06);
 }
 
 .pageHeader::before {
@@ -130,7 +129,7 @@
   border: 1px solid rgba(94, 77, 47, 0.18);
   border-radius: 1.9rem;
   background: #fffaf0;
-  box-shadow: 0 22px 50px rgba(93, 75, 41, 0.16), 0 2px 5px rgba(82, 64, 37, 0.08);
+  box-shadow: 0 2px 8px rgba(82, 64, 37, 0.08);
 }
 
 .gameBanner {
@@ -310,15 +309,6 @@
 
 .skillToast {
   border-radius: 0.7rem 1rem 0.75rem 1rem;
-}
-
-.fallingEntity {
-  /* LR/MRの大きな発光を画像の四角い領域で切らず、透過の輪郭を保つ */
-  contain: layout style;
-}
-
-.catcher {
-  contain: layout paint;
 }
 
 .catcher::after {
