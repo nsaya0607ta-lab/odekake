@@ -352,7 +352,6 @@ const LV = {
   SHIRASU_SEC: [4, 5, 6, 8, 10, 11.13, 12.25, 13.38, 14.5, 15.63],
   SHIRASU_SPAWN: [1.7, 1.8, 1.9, 2.1, 2.3, 2.41, 2.53, 2.64, 2.75, 2.86],
   ANAGO_SEC: [4, 5, 6, 7, 9, 9.94, 10.88, 11.81, 12.75, 13.69],
-  ANAGO_FALL: [1.6, 1.7, 1.8, 2.0, 2.2, 2.31, 2.43, 2.54, 2.65, 2.76],
 } as const;
 const SLANT_VX_BOOST = 3.5;
 const POINTS: Record<FrenchieCatchItem["rarity"], number> = { N: 20, R: 40, SR: 80, SSR: 140, UR: 200, LR: 300, MR: 440 };
@@ -1041,6 +1040,8 @@ export function FrenchieCatchGame({
   const spawnRateBoostValueRef = useRef(1);
   const otherSuppressUntilRef = useRef(0);
   const otherSuppressValueRef = useRef(1);
+  /** 穴子握り：発動中はダンボールに触れただけ（開口部の外側含む）でキャッチ判定になる */
+  const anagoAutoCatchUntilRef = useRef(0);
   const highRarityLockUntilRef = useRef(0);
   const treasureStreakActiveRef = useRef(false);
   const treasureStreakMultRef = useRef(1);
@@ -1938,10 +1939,11 @@ export function FrenchieCatchGame({
           }
 
           const widthFullyInsideOpening = localHitLeft >= opening.left && localHitRight <= opening.right;
-          const canCatch = entity.enteredOpening
-            && localY >= CATCH_START_LOCAL_Y
-            && localY <= OPEN_BOTTOM_LOCAL_Y + 0.10
-            && widthFullyInsideOpening;
+          const anagoAutoCatchActive = now < anagoAutoCatchUntilRef.current;
+          const touchesBoxWidth = overlap(localHitLeft, localHitRight, 0, 1) > 0;
+          const withinCatchHeight = localY >= CATCH_START_LOCAL_Y && localY <= OPEN_BOTTOM_LOCAL_Y + 0.10;
+          const canCatch = (entity.enteredOpening && withinCatchHeight && widthFullyInsideOpening)
+            || (anagoAutoCatchActive && withinCatchHeight && touchesBoxWidth);
 
           if (canCatch) {
             entity.rimChecked = true;
@@ -2645,10 +2647,8 @@ export function FrenchieCatchGame({
               }
               case "sushi_anago": {
                 const anagoSec = LV.ANAGO_SEC[lv]!;
-                fallSpeedBoostUntilRef.current = Math.max(now, fallSpeedBoostUntilRef.current) + anagoSec * 1000;
-                fallSpeedValueRef.current = LV.ANAGO_FALL[lv]!;
-                const guard = grantRandomHazardGuard();
-                effectLabel = `${anagoSec}秒間 落下速度×${LV.ANAGO_FALL[lv]} / ${guard ? HAZARD_GUARD_LABELS[guard] : "防止アイテムは満タン"}${lvTag}`;
+                anagoAutoCatchUntilRef.current = Math.max(now, anagoAutoCatchUntilRef.current) + anagoSec * 1000;
+                effectLabel = `${anagoSec}秒間 ダンボールに触れるだけでキャッチ${lvTag}`;
                 statusChanged = true;
                 break;
               }
@@ -2987,6 +2987,7 @@ export function FrenchieCatchGame({
     spawnRateBoostUntilRef.current = 0;
     otherSuppressUntilRef.current = 0;
     otherSuppressValueRef.current = 1;
+    anagoAutoCatchUntilRef.current = 0;
     highRarityLockUntilRef.current = 0;
     treasureStreakActiveRef.current = false;
     treasureStreakMultRef.current = 1;
