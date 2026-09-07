@@ -209,6 +209,13 @@ export const GACHA_PRIZES: readonly GachaPrize[] = [
   { id: "other_lantern", name: "提灯", rarity: "SSR", type: "item", image: "/collection/items/lantern.webp" },
   { id: "other_shooting_gallery", name: "射的セット", rarity: "SSR", type: "item", image: "/collection/items/shooting-gallery.webp" },
   { id: "other_milky_way", name: "天の川", rarity: "LR", type: "item", image: "/collection/items/milky-way.webp" },
+
+  // --- 通常ガチャ：寿司シリーズ ----------------------------------------
+  { id: "sushi_iwashi", name: "いわし握り", rarity: "N", type: "item", image: "/collection/items/sushi-iwashi.webp" },
+  { id: "sushi_aji", name: "あじ握り", rarity: "N", type: "item", image: "/collection/items/sushi-aji.webp" },
+  { id: "sushi_saba", name: "サバ握り", rarity: "N", type: "item", image: "/collection/items/sushi-saba.webp" },
+  { id: "sushi_maguro", name: "まぐろ握り", rarity: "N", type: "item", image: "/collection/items/sushi-maguro.webp" },
+  { id: "sushi_tamago", name: "たまご握り", rarity: "N", type: "item", image: "/collection/items/sushi-tamago.webp" },
 ];
 
 const PRIZE_BY_ID = new Map(GACHA_PRIZES.map((prize) => [prize.id, prize]));

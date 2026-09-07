@@ -11,7 +11,7 @@
  *   4. DB の gacha_rarity_for_item() にも景品のレアリティを追記する
  */
 
-export const SERIES_IDS = ["hiking", "snow", "summer"] as const;
+export const SERIES_IDS = ["hiking", "snow", "summer", "sushi"] as const;
 export type SeriesId = (typeof SERIES_IDS)[number];
 
 export function isSeriesId(value: unknown): value is SeriesId {
@@ -58,6 +58,16 @@ export const SERIES: readonly SeriesDefinition[] = [
       header: "border-sun bg-sun-soft text-[#8a6a2a]",
       accent: "border-sun bg-sun-soft text-[#8a6a2a]",
       bar: "bg-sun",
+    },
+  },
+  {
+    id: "sushi",
+    name: "寿司シリーズ",
+    description: "お寿司屋さんで集まるアイテム",
+    tone: {
+      header: "border-blossom bg-blossom-soft text-[#9c4f5b]",
+      accent: "border-blossom bg-blossom-soft text-[#9c4f5b]",
+      bar: "bg-blossom",
     },
   },
 ] as const;

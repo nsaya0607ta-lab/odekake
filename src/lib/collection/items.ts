@@ -265,6 +265,13 @@ const CURATED_ITEMS: readonly CollectionItem[] = [
   { id: "other_lantern", name: "提灯", image: "/collection/items/lantern.webp", category: "other", series: "summer", rarity: "SSR" },
   { id: "other_shooting_gallery", name: "射的セット", image: "/collection/items/shooting-gallery.webp", category: "other", series: "summer", rarity: "SSR" },
   { id: "other_milky_way", name: "天の川", image: "/collection/items/milky-way.webp", category: "other", series: "summer", rarity: "LR" },
+
+  // --- シリーズ図鑑：寿司シリーズ --------------------------------------
+  { id: "sushi_iwashi", name: "いわし握り", image: "/collection/items/sushi-iwashi.webp", category: "food", series: "sushi", rarity: "N" },
+  { id: "sushi_aji", name: "あじ握り", image: "/collection/items/sushi-aji.webp", category: "food", series: "sushi", rarity: "N" },
+  { id: "sushi_saba", name: "サバ握り", image: "/collection/items/sushi-saba.webp", category: "food", series: "sushi", rarity: "N" },
+  { id: "sushi_maguro", name: "まぐろ握り", image: "/collection/items/sushi-maguro.webp", category: "food", series: "sushi", rarity: "N" },
+  { id: "sushi_tamago", name: "たまご握り", image: "/collection/items/sushi-tamago.webp", category: "food", series: "sushi", rarity: "N" },
 ];
 
 const CURATED_IDS = new Set(CURATED_ITEMS.map((item) => item.id));
