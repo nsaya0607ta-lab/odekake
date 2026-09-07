@@ -169,7 +169,7 @@ function pickMrId(excludeCutoff = false) {
   }
   return weighted[weighted.length - 1].pid;
 }
-const TIME_BONUS_IDS = new Set(["toy_duck_plush", "toy_carrot", "food_paw_melon_bread", "sushi_salmon", "interior_anball", "other_azuki", "other_omojii", "summer_frenchie", "other_burebur"]);
+const TIME_BONUS_IDS = new Set(["toy_duck_plush", "toy_carrot", "food_paw_melon_bread", "sushi_salmon", "sushi_buri", "interior_anball", "other_azuki", "other_omojii", "summer_frenchie", "other_burebur"]);
 // おかえり(other_okaeri)は時間増加系8種そのものではないが、時間バランス調整の対象として
 // timeBonusCatchRate(見送り確率)の適用対象に加える（ボーナス出現タイマーの除外対象ではないため
 // TIME_BONUS_IDS自体には加えず、キャッチ判定にのみ加算する）
@@ -191,7 +191,7 @@ const SPAWN_DYNAMICS_IDS = new Set(["toy_rainbow_ball", "interior_stretch_rod", 
 // ナルシストアー・マフィアーも同様に2026-09-03、単独チューニング枠からこのプールのMR枠に移動
 // （ユーザー指定。主効果はそれぞれ「全アイテムのスキルがLv.MAXで発動」「フレブル数ボーナス倍率」で
 // 得点倍率そのものではないが、重み管理上の扱いとして含める）。
-const SCORE_MULT_IDS = new Set(["toy_meat", "interior_spring_flower_wreath", "other_kamunayo", "other_nisoku_a", "other_azubee", "interior_kinoko_azubee", "other_kobee", "interior_shikkoku_no_ar", "other_pink_omo", "other_narcissist_a", "other_mafia_a", "sushi_maguro_akami"]);
+const SCORE_MULT_IDS = new Set(["toy_meat", "interior_spring_flower_wreath", "other_kamunayo", "other_nisoku_a", "other_azubee", "interior_kinoko_azubee", "other_kobee", "interior_shikkoku_no_ar", "other_pink_omo", "other_narcissist_a", "other_mafia_a", "sushi_maguro_akami", "sushi_chutoro"]);
 // 通常アイテム系プール（特殊効果を持たない全67種。frenchie-catch-game.tsxのNORMAL_ITEM_IDSと同一、手動同期）。
 const NORMAL_ITEM_IDS = new Set([
   "toy_colorful_ball", "toy_rope", "toy_bone", "toy_squeaky_ball", "toy_tennis_ball",
@@ -206,6 +206,7 @@ const NORMAL_ITEM_IDS = new Set([
   "toy_frenchie_plush", "toy_frenchie_cushion", "toy_paw_macaron", "toy_star_wan_wand",
   "food_strawberry_roll_cake", "food_paw_cupcake", "food_fruit_basket", "interior_sleepy_moon",
   "other_sparkle_rope_crown",
+  "sushi_kanpachi", "sushi_ebi", "sushi_aburi_saba",
   "toy_golden_crown_ball", "interior_gold_ball", "other_nakayoshi_azubee", "other_hamigaki",
   "other_ikea", "other_orusuban", "other_kurumari_a", "other_oyatsu_no_jikan", "other_ketsunade_a",
   "other_omochi_janai", "other_oyasumi", "other_clawd",
@@ -224,7 +225,7 @@ function poolWeightTotal(ids) {
 // 変更（frenchie-catch-game.tsx ITEM_SPAWN_WEIGHTS直上のコメント参照）。該当アイテムが無いランクの
 // 予算はプールの合計から減らさず、dogの出現重みに上乗せして消化する
 // （frenchie-catch-game.tsxのXXX_UNFILLED_RANK_DOG_WEIGHTと同一値を手動同期）。
-const TIME_BONUS_UNFILLED_RANK_DOG_WEIGHT = 2120 - 1399.2;
+const TIME_BONUS_UNFILLED_RANK_DOG_WEIGHT = 2120 - 1780.8;
 const SCORE_MULT_UNFILLED_RANK_DOG_WEIGHT = 0;
 const SPAWN_DYNAMICS_UNFILLED_RANK_DOG_WEIGHT = 0;
 // 時間増加系8種＋おかえりは、プレイ時間がTIME_BONUS_CUTOFF_BASE_SEC + Lv*TIME_BONUS_CUTOFF_STEP_SEC_PER_LEVEL
@@ -299,6 +300,9 @@ function simulateOneRound(lv, catchAll, timeBonusCatchRate = 0.8, normalCatchRat
       case "toy_duck_plush": addBonusTime(LV.DUCK_SEC[lvIdx]); break;
       case "toy_carrot": addBonusTime(LV.CARROT_SEC[lvIdx]); break;
       case "sushi_salmon": addBonusTime(LV.SALMON_SEC[lvIdx]); break;
+      case "sushi_buri": addBonusTime(LV.BURI_SEC[lvIdx]); break;
+      case "sushi_chutoro": multiplier15Until = t + SCORE_MULT_DURATION_SR_SEC * 1000; multiplier15Value = LV.CHUTORO_MULT[lvIdx]; break;
+      case "sushi_kanpachi": nextMultValue = LV.KANPACHI_MULT[lvIdx]; nextMultCount = LV.KANPACHI_COUNT[lvIdx]; break;
       case "sushi_maguro_akami": multiplier15Until = t + SCORE_MULT_DURATION_R_SEC * 1000; multiplier15Value = LV.MAGURO_AKAMI_MULT[lvIdx]; break;
       case "sushi_ika": points += LV.IKA_PT[lvIdx]; break;
       case "sushi_hotate": points += LV.HOTATE_PT[lvIdx]; break;

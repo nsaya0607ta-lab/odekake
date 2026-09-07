@@ -222,6 +222,7 @@ const MYSTERY_SKILL_ITEM_IDS = [
   "food_fruit_basket", "interior_gold_ball", "other_clawd", "food_kamikami", "food_mocchurin", "other_mah",
   "other_mirror_omochi", "other_toorematen", "other_hia", "other_pink_omo",
   "sushi_salmon", "sushi_maguro_akami", "sushi_ika", "sushi_tako", "sushi_hotate",
+  "sushi_chutoro", "sushi_buri", "sushi_kanpachi", "sushi_ebi", "sushi_aburi_saba",
 ];
 
 /** アイテムごとのLv1〜5パラメータ（item_skill_levels_colored.xlsxの「スキル一覧」シート通り） */
@@ -337,13 +338,20 @@ const LV = {
   TAKO_SEC: [3, 4, 5, 6, 7, 7.75, 8.5, 9.25, 10, 10.75],
   TAKO_FALL: [1.3, 1.4, 1.5, 1.6, 1.8, 1.89, 1.99, 2.08, 2.18, 2.27],
   HOTATE_PT: [23, 30, 45, 60, 75, 84.75, 94.5, 104.25, 114, 123.75],
+  CHUTORO_MULT: [1.1, 1.3, 1.5, 1.7, 1.9, 2.05, 2.2, 2.35, 2.5, 2.65],
+  BURI_SEC: [2, 4, 6, 8, 10, 11.5, 13, 14.5, 16, 17.5],
+  KANPACHI_COUNT: [1, 1, 2, 2, 3, 3, 4, 4, 5, 5],
+  KANPACHI_MULT: [1.4, 1.6, 1.8, 2.1, 2.3, 2.47, 2.64, 2.81, 2.98, 3.14],
+  EBI_SEC: [3, 4, 5, 6, 8, 8.94, 9.88, 10.81, 11.75, 12.69],
+  ABURI_SABA_SEC: [4, 5, 6, 7, 8, 8.75, 9.5, 10.25, 11, 11.75],
+  ABURI_SABA_FALL: [1.5, 1.6, 1.7, 1.9, 2.1, 2.21, 2.33, 2.44, 2.55, 2.66],
 } as const;
 const SLANT_VX_BOOST = 3.5;
 const POINTS: Record<FrenchieCatchItem["rarity"], number> = { N: 20, R: 40, SR: 80, SSR: 140, UR: 200, LR: 300, MR: 440 };
 const RARITY_FALL_SPEED: Record<FrenchieCatchItem["rarity"], number> = { N: 1, R: 1.08, SR: 1.18, SSR: 1.32, UR: 1.5, LR: 1.75, MR: 2 };
 /** 時間が増えるスキルを持つアイテムだけ、落下速度をレアリティ別倍率で上げる */
 const TIME_BONUS_ITEM_IDS = new Set([
-  "toy_duck_plush", "toy_carrot", "food_paw_melon_bread", "sushi_salmon",
+  "toy_duck_plush", "toy_carrot", "food_paw_melon_bread", "sushi_salmon", "sushi_buri",
   "interior_anball", "other_omojii", "other_azuki", "summer_frenchie", "other_burebur",
 ]);
 /**
@@ -464,15 +472,17 @@ const ITEM_SPAWN_WEIGHTS: Partial<Record<string, number>> = {
    *
    * 時間増加系プール（予算2120、おかえりを含む）：R:636÷4=159ずつ(2026-09-07にサーモン握りを追加、
    * 既存3種+1種の4種。Rランクの予算636自体は元々満額だったため総額は変わらず、1体あたりが
-   * 212→159に下がるだけ) / SR:381.6(未充填→dog) / SSR:339.2(未充填→dog) / UR:296.8÷3 /
-   * LR:254.4÷2=127.2ずつ(夏のフレブル/おかえり) / MR:212÷1=212(ブレブル)。在籍分の実際の合計は
-   * 変わらず1399.2（残り720.8は`TIME_BONUS_UNFILLED_RANK_DOG_WEIGHT`でdogへ）。
+   * 212→159に下がるだけ) / SR:381.6÷1=381.6(ぶり握り、2026-09-07に追加してSR枠を新規充填) /
+   * SSR:339.2(未充填→dog) / UR:296.8÷3 / LR:254.4÷2=127.2ずつ(夏のフレブル/おかえり) /
+   * MR:212÷1=212(ブレブル)。在籍分の実際の合計は1399.2+381.6=1780.8（残り339.2は
+   * `TIME_BONUS_UNFILLED_RANK_DOG_WEIGHT`でdogへ）。
    */
   other_omojii: 296.8 / 3,
   toy_duck_plush: 636 / 4,
   toy_carrot: 636 / 4,
   food_paw_melon_bread: 636 / 4,
   sushi_salmon: 636 / 4,
+  sushi_buri: 381.6 / 1,
   interior_anball: 296.8 / 3,
   other_azuki: 296.8 / 3,
   summer_frenchie: 254.4 / 2,
@@ -498,14 +508,16 @@ const ITEM_SPAWN_WEIGHTS: Partial<Record<string, number>> = {
   other_mrs_green_apple: 126 / 1,
   /**
    * 得点倍率系プール（予算400）：R:120÷1=120(まぐろ(赤身)握り、2026-09-07に追加してR枠を新規充填) /
-   * SR:72÷2=36ずつ / SSR:64÷2=32ずつ / UR:56÷3 / LR:48÷2=24ずつ / MR:40÷2=20ずつ。在籍分の実際の
-   * 合計は400（残りなし。旧・残り120は`SCORE_MULT_UNFILLED_RANK_DOG_WEIGHT`でdogへ流していたが
-   * R枠が埋まったため0になった）。ピンクオモ・ナルシストアー・マフィアーも含め、全アイテム
-   * 「ランク予算÷在籍数」のみで計算する（ユーザー指定、2026-09-03〜）。
+   * SR:72÷3=24ずつ(2026-09-07に中トロ握りを追加、既存2種+1種の3種) / SSR:64÷2=32ずつ /
+   * UR:56÷3 / LR:48÷2=24ずつ / MR:40÷2=20ずつ。在籍分の実際の合計は400（残りなし。旧・残り120は
+   * `SCORE_MULT_UNFILLED_RANK_DOG_WEIGHT`でdogへ流していたがR枠が埋まったため0になった）。
+   * ピンクオモ・ナルシストアー・マフィアーも含め、全アイテム「ランク予算÷在籍数」のみで計算する
+   * （ユーザー指定、2026-09-03〜）。
    */
   sushi_maguro_akami: 120 / 1,
-  toy_meat: 72 / 2,
-  interior_spring_flower_wreath: 72 / 2,
+  toy_meat: 72 / 3,
+  interior_spring_flower_wreath: 72 / 3,
+  sushi_chutoro: 72 / 3,
   other_kamunayo: 64 / 2,
   other_nisoku_a: 64 / 2,
   other_azubee: 56 / 3,
@@ -516,11 +528,13 @@ const ITEM_SPAWN_WEIGHTS: Partial<Record<string, number>> = {
   other_narcissist_a: 40 / 2,
   other_mafia_a: 40 / 2,
   /**
-   * 通常アイテム系プール（予算6100、在籍65種）：N:2400÷25=96ずつ(25種、2026-09-06に赤りんごを追加) /
+   * 通常アイテム系プール（予算6100、在籍68種）：N:2400÷25=96ずつ(25種、2026-09-06に赤りんごを追加) /
    * R:700÷10=70ずつ(10種、2026-09-07に寿司シリーズのいか握り・たこ握り・ほたて握りを追加。
    * サーモン握り・まぐろ(赤身)握りは時間増加系・得点倍率系プールへ移動したためこちらには残らない) /
-   * SR:900(9種) / SSR:1200(12種) / UR:700(7種) / LR:200(2種) / MR:0(未在籍)。
-   * N・R以外のランクは予算÷在籍数=100ちょうどで割り切れるため、`DEFAULT_ITEM_SPAWN_WEIGHT`と同じ値のまま。
+   * SR:900÷12=75ずつ(12種、2026-09-07に寿司シリーズのかんぱち握り・えび握り・炙りサバ握りを追加。
+   * ぶり握り・中トロ握りは時間増加系・得点倍率系プールへ移動したためこちらには残らない) /
+   * SSR:1200(12種) / UR:700(7種) / LR:200(2種) / MR:0(未在籍)。
+   * N・R・SR以外のランクは予算÷在籍数=100ちょうどで割り切れるため、`DEFAULT_ITEM_SPAWN_WEIGHT`と同じ値のまま。
    * 今後このプールに新アイテムを追加する場合は、他の3プールと同じ「同ランク内で均等に重みを
    * 割り振る計算方法」（docs/item-catch-new-item-checklist.md参照）でそのランクの予算を
    * 新しい在籍数で割り直し、対象ランクの全メンバーを書き直すこと（ランク予算・プール総予算
@@ -563,15 +577,18 @@ const ITEM_SPAWN_WEIGHTS: Partial<Record<string, number>> = {
   sushi_ika: 700 / 10,
   sushi_tako: 700 / 10,
   sushi_hotate: 700 / 10,
-  toy_frenchie_plush: 100,
-  toy_frenchie_cushion: 100,
-  toy_paw_macaron: 100,
-  toy_star_wan_wand: 100,
-  food_strawberry_roll_cake: 100,
-  food_paw_cupcake: 100,
-  food_fruit_basket: 100,
-  interior_sleepy_moon: 100,
-  other_sparkle_rope_crown: 100,
+  toy_frenchie_plush: 900 / 12,
+  toy_frenchie_cushion: 900 / 12,
+  toy_paw_macaron: 900 / 12,
+  toy_star_wan_wand: 900 / 12,
+  food_strawberry_roll_cake: 900 / 12,
+  food_paw_cupcake: 900 / 12,
+  food_fruit_basket: 900 / 12,
+  interior_sleepy_moon: 900 / 12,
+  other_sparkle_rope_crown: 900 / 12,
+  sushi_kanpachi: 900 / 12,
+  sushi_ebi: 900 / 12,
+  sushi_aburi_saba: 900 / 12,
   toy_golden_crown_ball: 100,
   interior_gold_ball: 100,
   other_nakayoshi_azubee: 100,
@@ -757,15 +774,16 @@ const DOG_SPAWN_RATIO = 0.28;
  * 「普通のフレブル」(dog)の出現重みに上乗せして消化する（ITEM_SPAWN_WEIGHTS直上のコメント参照）。
  * 各値は「プール予算 − 在籍ランクの実際の重み合計」。2026-09-03、ユーザー指定で固定重みを
  * 全廃し「ランク予算÷在籍数」のみに統一したため、以下の3値も端数を丸めず正確な値にした：
- * 時間増加系: 2120−1399.2=720.8 / 得点倍率系: 400−400=0（2026-09-07にR枠が埋まり満額に） /
- * 出現量アップ制御系: 900−900=0。
+ * 時間増加系: 2120−1780.8=339.2（2026-09-07にSR枠が埋まり1399.2→1780.8に） /
+ * 得点倍率系: 400−400=0（2026-09-07にR枠が埋まり満額に） / 出現量アップ制御系: 900−900=0。
  * 新しく未充填ランクにアイテムを追加したら、対応する定数からそのランクの予算分を差し引くこと。
  * （時間増加系のMR枠は、2026-09-04にブレブルの効果を秒数プラス系へ変更したことで新たに
- * 充填された。従来のR:636+UR:296.8+LR:254.4=1187.2に、MR:212を加えて1399.2。
+ * 充填された。従来のR:636+UR:296.8+LR:254.4=1187.2に、MR:212を加えて1399.2。時間増加系の
+ * SR枠は、2026-09-07にぶり握りを追加したことで新たに充填され、1399.2にSR:381.6を加えて1780.8。
  * 出現量アップ制御系のUR枠は、2026-09-06にMrs. GREEN アーPPLEを追加したことで新たに充填され、
  * 従来のR:270+SR:162+SSR:144+LR:108+MR:90=774に、UR:126を加えて900＝プール予算満額になった）
  */
-const TIME_BONUS_UNFILLED_RANK_DOG_WEIGHT = 2120 - 1399.2;
+const TIME_BONUS_UNFILLED_RANK_DOG_WEIGHT = 2120 - 1780.8;
 /**
  * 2026-09-03、固定重み全廃・ランク予算÷在籍数のみに統一（ユーザー指定）。ITEM_SPAWN_WEIGHTS直上のコメント参照。
  * 2026-09-07、まぐろ(赤身)握りの追加でR枠(120)が新規充填されたため120→0になった。
@@ -2184,9 +2202,19 @@ export function FrenchieCatchGame({
                 effectLabel = `+${applied}秒${lvTag}`;
                 break;
               }
+              case "sushi_buri": {
+                const applied = addBonusTime(LV.BURI_SEC[lv]!);
+                effectLabel = `+${applied}秒${lvTag}`;
+                break;
+              }
               case "toy_frisbee":
                 addCountMultiplier(nextMultipliersRef, LV.FRISBEE_MULT[lv]!, 1);
                 effectLabel = `次の1個 ×${LV.FRISBEE_MULT[lv]}${lvTag}`;
+                statusChanged = true;
+                break;
+              case "sushi_kanpachi":
+                addCountMultiplier(nextMultipliersRef, LV.KANPACHI_MULT[lv]!, LV.KANPACHI_COUNT[lv]!);
+                effectLabel = `次の${LV.KANPACHI_COUNT[lv]}個 ×${LV.KANPACHI_MULT[lv]}${lvTag}`;
                 statusChanged = true;
                 break;
               case "food_paw_bowl":
@@ -2198,6 +2226,11 @@ export function FrenchieCatchGame({
               case "toy_meat":
                 addScoreMultiplier(scoreMultipliersRef, now, scaleDambourleBonusMultiplier(LV.MEAT_MULT[lv]!, dambourleUpMultiplier("score_mult_pool_effect_up")), SCORE_MULT_DURATION_SR_SEC * 1000);
                 effectLabel = `${SCORE_MULT_DURATION_SR_SEC}秒間 ×${LV.MEAT_MULT[lv]}${lvTag}`;
+                statusChanged = true;
+                break;
+              case "sushi_chutoro":
+                addScoreMultiplier(scoreMultipliersRef, now, scaleDambourleBonusMultiplier(LV.CHUTORO_MULT[lv]!, dambourleUpMultiplier("score_mult_pool_effect_up")), SCORE_MULT_DURATION_SR_SEC * 1000);
+                effectLabel = `${SCORE_MULT_DURATION_SR_SEC}秒間 ×${LV.CHUTORO_MULT[lv]}${lvTag}`;
                 statusChanged = true;
                 break;
               case "sushi_maguro_akami":
@@ -2342,6 +2375,12 @@ export function FrenchieCatchGame({
                 boxWideUntilRef.current = Math.max(now, boxWideUntilRef.current) + LV.CUPCAKE_SEC[lv]! * 1000;
                 boxWideScaleRef.current = BOX_WIDE_SCALE_DEFAULT;
                 effectLabel = `${LV.CUPCAKE_SEC[lv]}秒間 ダンボール1.5倍拡大${lvTag}`;
+                statusChanged = true;
+                break;
+              case "sushi_ebi":
+                boxWideUntilRef.current = Math.max(now, boxWideUntilRef.current) + LV.EBI_SEC[lv]! * 1000;
+                boxWideScaleRef.current = BOX_WIDE_SCALE_DEFAULT;
+                effectLabel = `${LV.EBI_SEC[lv]}秒間 ダンボール1.5倍拡大${lvTag}`;
                 statusChanged = true;
                 break;
               case "toy_paw_macaron":
@@ -2581,6 +2620,14 @@ export function FrenchieCatchGame({
                 fallSpeedBoostUntilRef.current = Math.max(now, fallSpeedBoostUntilRef.current) + takoSec * 1000;
                 fallSpeedValueRef.current = LV.TAKO_FALL[lv]!;
                 effectLabel = `${takoSec}秒間 落下速度×${LV.TAKO_FALL[lv]}${lvTag}`;
+                statusChanged = true;
+                break;
+              }
+              case "sushi_aburi_saba": {
+                const aburiSabaSec = LV.ABURI_SABA_SEC[lv]!;
+                fallSpeedBoostUntilRef.current = Math.max(now, fallSpeedBoostUntilRef.current) + aburiSabaSec * 1000;
+                fallSpeedValueRef.current = LV.ABURI_SABA_FALL[lv]!;
+                effectLabel = `${aburiSabaSec}秒間 落下速度×${LV.ABURI_SABA_FALL[lv]}${lvTag}`;
                 statusChanged = true;
                 break;
               }
