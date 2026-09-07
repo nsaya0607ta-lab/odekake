@@ -313,7 +313,8 @@
 }
 
 .fallingEntity {
-  contain: layout paint;
+  /* LR/MRの大きな発光を画像の四角い領域で切らず、透過の輪郭を保つ */
+  contain: layout style;
 }
 
 .catcher {
