@@ -582,7 +582,7 @@ function main() {
   const catchAll = mode === "all";
   const timeBonusCatchRate = process.argv[4] !== undefined ? Number(process.argv[4]) : 0.8;
   const normalCatchRate = process.argv[5] !== undefined ? Number(process.argv[5]) : 0.85;
-  const denseCatchRate = process.argv[6] !== undefined ? Number(process.argv[6]) : 0.5;
+  const denseCatchRate = process.argv[6] !== undefined ? Number(process.argv[6]) : 0.7;
   console.log(`itemPool N=${POOL_SIZE} / ROUND_SECONDS=${ROUND_SECONDS} / MAX_ROUND_SECONDS=${MAX_PLAY_SECONDS} / 試行回数=${trials} / モード=${mode}${catchAll ? "（時間減少・チョコレートも100%キャッチ）" : "（時間減少・チョコレートは回避）"} / 時間増加系8種の実キャッチ率=${timeBonusCatchRate} / 通常時キャッチ率=${normalCatchRate} / 密集時キャッチ率=${denseCatchRate}`);
   console.log(
     `プール重み予算（未充填ランク分はdogへ上乗せして消化）: ` +
