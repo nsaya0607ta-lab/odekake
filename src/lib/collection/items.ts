@@ -292,6 +292,10 @@ const CURATED_ITEMS: readonly CollectionItem[] = [
   { id: "sushi_engawa", name: "えんがわ握り", image: "/collection/items/sushi-engawa.webp", category: "food", series: "sushi", rarity: "SSR" },
   { id: "sushi_onion_salmon", name: "オニオンサーモン握り", image: "/collection/items/sushi-onion-salmon.webp", category: "food", series: "sushi", rarity: "SSR" },
   { id: "sushi_mirugai", name: "みる貝握り", image: "/collection/items/sushi-mirugai.webp", category: "food", series: "sushi", rarity: "SSR" },
+  { id: "sushi_fugu", name: "ふぐ握り", image: "/collection/items/sushi-fugu.webp", category: "food", series: "sushi", rarity: "UR" },
+  { id: "sushi_kani", name: "カニ身握り", image: "/collection/items/sushi-kani.webp", category: "food", series: "sushi", rarity: "UR" },
+  { id: "sushi_oomonhata", name: "オオモンハタ握り", image: "/collection/items/sushi-oomonhata.webp", category: "food", series: "sushi", rarity: "UR" },
+  { id: "sushi_unagi", name: "うなぎ握り", image: "/collection/items/sushi-unagi.webp", category: "food", series: "sushi", rarity: "UR" },
 ];
 
 const CURATED_IDS = new Set(CURATED_ITEMS.map((item) => item.id));

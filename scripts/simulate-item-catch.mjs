@@ -192,7 +192,7 @@ const SPAWN_DYNAMICS_IDS = new Set(["toy_rainbow_ball", "interior_stretch_rod", 
 // （ユーザー指定。主効果はそれぞれ「全アイテムのスキルがLv.MAXで発動」「フレブル数ボーナス倍率」で
 // 得点倍率そのものではないが、重み管理上の扱いとして含める）。
 const SCORE_MULT_IDS = new Set(["toy_meat", "interior_spring_flower_wreath", "other_kamunayo", "other_nisoku_a", "other_azubee", "interior_kinoko_azubee", "other_kobee", "interior_shikkoku_no_ar", "other_pink_omo", "other_narcissist_a", "other_mafia_a", "sushi_maguro_akami", "sushi_chutoro", "sushi_uni", "sushi_nama_ebi", "sushi_negishio_maguro"]);
-// 通常アイテム系プール（特殊効果を持たない全67種。frenchie-catch-game.tsxのNORMAL_ITEM_IDSと同一、手動同期）。
+// 通常アイテム系プール（特殊効果を持たない全71種。frenchie-catch-game.tsxのNORMAL_ITEM_IDSと同一、手動同期）。
 const NORMAL_ITEM_IDS = new Set([
   "toy_colorful_ball", "toy_rope", "toy_bone", "toy_squeaky_ball", "toy_tennis_ball",
   "toy_red_slipper", "toy_wood_stick", "toy_donut_rope", "food_smile_onigiri", "food_paw_taiyaki",
@@ -213,6 +213,7 @@ const NORMAL_ITEM_IDS = new Set([
   "other_omochi_janai", "other_oyasumi", "other_clawd",
   "food_mocchurin", "other_komochi", "other_omoi_bashira", "other_mah", "other_mirror_omochi",
   "other_toorematen", "other_hia",
+  "sushi_fugu", "sushi_kani", "sushi_oomonhata", "sushi_unagi",
   "hiking_frenchie", "snow_frenchie",
 ]);
 // 出現重みプールの合計値（＝プールの「予算」）。新アイテムをどれかのプールに追加してプレイ時間・
@@ -308,6 +309,10 @@ function simulateOneRound(lv, catchAll, timeBonusCatchRate = 0.8, normalCatchRat
       case "sushi_ika": points += LV.IKA_PT[lvIdx]; break;
       case "sushi_hotate": points += LV.HOTATE_PT[lvIdx]; break;
       case "sushi_onion_salmon": points += LV.ONION_SALMON_PT[lvIdx]; break;
+      case "sushi_fugu": points += LV.FUGU_PT[lvIdx]; break;
+      case "sushi_kani": points += LV.KANI_PT[lvIdx]; break;
+      case "sushi_oomonhata": points += LV.OOMONHATA_PT[lvIdx]; break;
+      case "sushi_unagi": points += LV.UNAGI_PT[lvIdx]; break;
       case "toy_frisbee": nextMultValue = LV.FRISBEE_MULT[lvIdx]; nextMultCount = 1; break;
       case "food_paw_bowl": nextBonus5 += 3; nextBonus5Value = LV.BOWL_PT[lvIdx]; break;
       case "toy_meat": multiplier15Until = t + SCORE_MULT_DURATION_SR_SEC * 1000; multiplier15Value = LV.MEAT_MULT[lvIdx]; break;

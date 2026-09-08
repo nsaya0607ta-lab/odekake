@@ -225,6 +225,7 @@ const MYSTERY_SKILL_ITEM_IDS = [
   "sushi_chutoro", "sushi_buri", "sushi_kanpachi", "sushi_ebi", "sushi_aburi_saba",
   "sushi_otoro", "sushi_uni", "sushi_shirasu", "sushi_anago", "sushi_nama_ebi",
   "sushi_bincho", "sushi_negishio_maguro", "sushi_engawa", "sushi_onion_salmon", "sushi_mirugai",
+  "sushi_fugu", "sushi_kani", "sushi_oomonhata", "sushi_unagi",
 ];
 
 /** アイテムごとのLv1〜5パラメータ（item_skill_levels_colored.xlsxの「スキル一覧」シート通り） */
@@ -361,6 +362,10 @@ const LV = {
   ONION_SALMON_PT: [60, 80, 100, 130, 160, 178.75, 197.5, 216.25, 235, 253.75],
   MIRUGAI_COUNT: [2, 2, 3, 3, 4, 4, 5, 5, 6, 6],
   MIRUGAI_MULT: [1.8, 2.0, 2.2, 2.4, 2.6, 2.75, 2.9, 3.05, 3.2, 3.35],
+  FUGU_PT: [85, 110, 140, 180, 225, 251.25, 277.5, 303.75, 330, 356.25],
+  KANI_PT: [80, 105, 135, 170, 215, 240.31, 265.63, 290.94, 316.25, 341.56],
+  OOMONHATA_PT: [75, 100, 130, 165, 205, 229.38, 253.75, 278.13, 302.5, 326.88],
+  UNAGI_PT: [90, 115, 145, 185, 230, 256.25, 282.5, 308.75, 335, 361.25],
 } as const;
 const SLANT_VX_BOOST = 3.5;
 const POINTS: Record<FrenchieCatchItem["rarity"], number> = { N: 20, R: 40, SR: 80, SSR: 140, UR: 200, LR: 300, MR: 440 };
@@ -563,7 +568,8 @@ const ITEM_SPAWN_WEIGHTS: Partial<Record<string, number>> = {
    * ぶり握り・中トロ握りは時間増加系・得点倍率系プールへ移動したためこちらには残らない) /
    * SSR:1200÷15=80ずつ(15種、2026-09-07に穴子握り＝落下速度アップ+防止付与、
    * オニオンサーモン握り＝ポイントUP系、みる貝握り＝次のN個×倍率系を追加) /
-   * UR:700(7種) / LR:200(2種) / MR:0(未在籍)。
+   * UR:700(11種、2026-09-08に寿司シリーズのふぐ握り・カニ身握り・オオモンハタ握り・うなぎ握りを
+   * 追加。いずれもスキルなしの点UP系のためこのプールのまま) / LR:200(2種) / MR:0(未在籍)。
    * N・R・SR・SSR以外のランクは予算÷在籍数=100ちょうどで割り切れるため、`DEFAULT_ITEM_SPAWN_WEIGHT`と同じ値のまま。
    * 今後このプールに新アイテムを追加する場合は、他の3プールと同じ「同ランク内で均等に重みを
    * 割り振る計算方法」（docs/item-catch-new-item-checklist.md参照）でそのランクの予算を
@@ -634,13 +640,17 @@ const ITEM_SPAWN_WEIGHTS: Partial<Record<string, number>> = {
   sushi_anago: 1200 / 15,
   sushi_onion_salmon: 1200 / 15,
   sushi_mirugai: 1200 / 15,
-  food_mocchurin: 100,
-  other_komochi: 100,
-  other_omoi_bashira: 100,
-  other_mah: 100,
-  other_mirror_omochi: 100,
-  other_toorematen: 100,
-  other_hia: 100,
+  food_mocchurin: 700 / 11,
+  other_komochi: 700 / 11,
+  other_omoi_bashira: 700 / 11,
+  other_mah: 700 / 11,
+  other_mirror_omochi: 700 / 11,
+  other_toorematen: 700 / 11,
+  other_hia: 700 / 11,
+  sushi_fugu: 700 / 11,
+  sushi_kani: 700 / 11,
+  sushi_oomonhata: 700 / 11,
+  sushi_unagi: 700 / 11,
   hiking_frenchie: 100,
   snow_frenchie: 100,
 };
@@ -2420,6 +2430,22 @@ export function FrenchieCatchGame({
               case "sushi_onion_salmon":
                 points += LV.ONION_SALMON_PT[lv]!;
                 effectLabel = `+${LV.ONION_SALMON_PT[lv]}ptボーナス${lvTag}`;
+                break;
+              case "sushi_fugu":
+                points += LV.FUGU_PT[lv]!;
+                effectLabel = `+${LV.FUGU_PT[lv]}ptボーナス${lvTag}`;
+                break;
+              case "sushi_kani":
+                points += LV.KANI_PT[lv]!;
+                effectLabel = `+${LV.KANI_PT[lv]}ptボーナス${lvTag}`;
+                break;
+              case "sushi_oomonhata":
+                points += LV.OOMONHATA_PT[lv]!;
+                effectLabel = `+${LV.OOMONHATA_PT[lv]}ptボーナス${lvTag}`;
+                break;
+              case "sushi_unagi":
+                points += LV.UNAGI_PT[lv]!;
+                effectLabel = `+${LV.UNAGI_PT[lv]}ptボーナス${lvTag}`;
                 break;
               case MOCCHURIN_ITEM_ID: {
                 points += LV.MOCCHURIN_PT[lv]!;
