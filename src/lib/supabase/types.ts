@@ -803,6 +803,10 @@ export type Database = {
         Args: { p_friend_user_id: string };
         Returns: FriendCollectionRow[];
       };
+      get_friend_dambourle: {
+        Args: { p_friend_user_id: string };
+        Returns: FriendCollectionRow[];
+      };
       get_friend_recent_visits: {
         Args: { p_friend_user_id: string; p_limit?: number };
         Returns: FriendRecentVisitRow[];

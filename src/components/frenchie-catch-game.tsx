@@ -224,6 +224,7 @@ const MYSTERY_SKILL_ITEM_IDS = [
   "sushi_salmon", "sushi_maguro_akami", "sushi_ika", "sushi_tako", "sushi_hotate",
   "sushi_chutoro", "sushi_buri", "sushi_kanpachi", "sushi_ebi", "sushi_aburi_saba",
   "sushi_otoro", "sushi_uni", "sushi_shirasu", "sushi_anago", "sushi_nama_ebi",
+  "sushi_bincho", "sushi_negishio_maguro", "sushi_engawa", "sushi_onion_salmon", "sushi_mirugai",
 ];
 
 /** アイテムごとのLv1〜5パラメータ（item_skill_levels_colored.xlsxの「スキル一覧」シート通り） */
@@ -352,13 +353,21 @@ const LV = {
   SHIRASU_SEC: [4, 5, 6, 8, 10, 11.13, 12.25, 13.38, 14.5, 15.63],
   SHIRASU_SPAWN: [1.7, 1.8, 1.9, 2.1, 2.3, 2.41, 2.53, 2.64, 2.75, 2.86],
   ANAGO_SEC: [4, 5, 6, 7, 9, 9.94, 10.88, 11.81, 12.75, 13.69],
+  BINCHO_SEC: [3, 6, 8, 10, 12, 13.69, 15.38, 17.06, 18.75, 20.44],
+  BINCHO_PT: [60, 90, 120, 150, 180, 202.5, 225, 247.5, 270, 292.5],
+  NEGISHIO_MULT: [1.2, 1.4, 1.6, 1.8, 2.0, 2.15, 2.3, 2.45, 2.6, 2.75],
+  ENGAWA_SEC: [4, 5, 6, 8, 10, 11.13, 12.25, 13.38, 14.5, 15.63],
+  ENGAWA_SPAWN: [1.5, 1.625, 1.75, 1.875, 2, 2.09, 2.19, 2.28, 2.38, 2.47],
+  ONION_SALMON_PT: [60, 80, 100, 130, 160, 178.75, 197.5, 216.25, 235, 253.75],
+  MIRUGAI_COUNT: [2, 2, 3, 3, 4, 4, 5, 5, 6, 6],
+  MIRUGAI_MULT: [1.8, 2.0, 2.2, 2.4, 2.6, 2.75, 2.9, 3.05, 3.2, 3.35],
 } as const;
 const SLANT_VX_BOOST = 3.5;
 const POINTS: Record<FrenchieCatchItem["rarity"], number> = { N: 20, R: 40, SR: 80, SSR: 140, UR: 200, LR: 300, MR: 440 };
 const RARITY_FALL_SPEED: Record<FrenchieCatchItem["rarity"], number> = { N: 1, R: 1.08, SR: 1.18, SSR: 1.32, UR: 1.5, LR: 1.75, MR: 2 };
 /** 時間が増えるスキルを持つアイテムだけ、落下速度をレアリティ別倍率で上げる */
 const TIME_BONUS_ITEM_IDS = new Set([
-  "toy_duck_plush", "toy_carrot", "food_paw_melon_bread", "sushi_salmon", "sushi_buri",
+  "toy_duck_plush", "toy_carrot", "food_paw_melon_bread", "sushi_salmon", "sushi_buri", "sushi_bincho",
   "interior_anball", "other_omojii", "other_azuki", "sushi_otoro", "summer_frenchie", "other_burebur",
 ]);
 /**
@@ -374,7 +383,7 @@ const TIME_BONUS_ITEM_IDS = new Set([
 const SPAWN_DYNAMICS_ITEM_IDS = new Set([
   "toy_rainbow_ball", "interior_stretch_rod", "toy_treasure_puzzle",
   "other_xmas_party", "other_pondeomo", "other_pondear", "other_jare_a", "interior_ragby_ar",
-  "other_mrs_green_apple", "sushi_shirasu",
+  "other_mrs_green_apple", "sushi_shirasu", "sushi_engawa",
 ]);
 /**
  * 2026-09-03、ユーザー指定で新設した4つ目のプール（通常アイテム系プール）。上記3プール・
@@ -480,9 +489,10 @@ const ITEM_SPAWN_WEIGHTS: Partial<Record<string, number>> = {
    * 時間増加系プール（予算2120、おかえりを含む）：R:636÷4=159ずつ(2026-09-07にサーモン握りを追加、
    * 既存3種+1種の4種。Rランクの予算636自体は元々満額だったため総額は変わらず、1体あたりが
    * 212→159に下がるだけ) / SR:381.6÷1=381.6(ぶり握り、2026-09-07に追加してSR枠を新規充填) /
-   * SSR:339.2(未充填→dog) / UR:296.8÷4=74.2ずつ(2026-09-07に大トロ握りを追加、既存3種+1種の4種) /
+   * SSR:339.2÷1=339.2(びんちょうまぐろ握り、2026-09-07に追加してSSR枠を新規充填) /
+   * UR:296.8÷4=74.2ずつ(2026-09-07に大トロ握りを追加、既存3種+1種の4種) /
    * LR:254.4÷2=127.2ずつ(夏のフレブル/おかえり) / MR:212÷1=212(ブレブル)。在籍分の実際の合計は
-   * 1399.2+381.6=1780.8（残り339.2は`TIME_BONUS_UNFILLED_RANK_DOG_WEIGHT`でdogへ）。
+   * 1780.8+339.2=2120（満額、残りなし）。
    */
   other_omojii: 296.8 / 4,
   toy_duck_plush: 636 / 4,
@@ -490,6 +500,7 @@ const ITEM_SPAWN_WEIGHTS: Partial<Record<string, number>> = {
   food_paw_melon_bread: 636 / 4,
   sushi_salmon: 636 / 4,
   sushi_buri: 381.6 / 1,
+  sushi_bincho: 339.2 / 1,
   interior_anball: 296.8 / 4,
   other_azuki: 296.8 / 4,
   sushi_otoro: 296.8 / 4,
@@ -497,7 +508,8 @@ const ITEM_SPAWN_WEIGHTS: Partial<Record<string, number>> = {
   other_okaeri: 254.4 / 2,
   other_burebur: 212 / 1,
   /**
-   * 出現量アップ・出現制御系プール（予算900）：R:270÷1=270 / SR:162÷1=162 / SSR:144÷4=36ずつ /
+   * 出現量アップ・出現制御系プール（予算900）：R:270÷1=270 / SR:162÷1=162 /
+   * SSR:144÷5=28.8ずつ(2026-09-07にえんがわ握りを追加、既存4種+1種の5種) /
    * UR:126÷2=63ずつ(Mrs. GREEN アーPPLE / 生しらす握り、2026-09-07に生しらす握りを追加) /
    * LR:108÷2=54ずつ / MR:90÷1=90(Xmas Party)。在籍分の実際の合計は900（残りなし。旧・残り126は
    * UR枠が埋まったため`SPAWN_DYNAMICS_UNFILLED_RANK_DOG_WEIGHT`が0になった）。
@@ -505,13 +517,14 @@ const ITEM_SPAWN_WEIGHTS: Partial<Record<string, number>> = {
    * （ユーザー指定、2026-09-03〜）。ブレブルは2026-09-04に効果を秒数プラス系へ変更し、
    * 時間増加系プールへ移動した（このプールからは離籍）。Mrs. GREEN アーPPLEは2026-09-06にUR枠へ追加。
    */
-  toy_rainbow_ball: 144 / 4,
+  toy_rainbow_ball: 144 / 5,
   interior_stretch_rod: 270 / 1,
   toy_treasure_puzzle: 162 / 1,
   other_xmas_party: 90 / 1,
-  other_pondeomo: 144 / 4,
-  other_pondear: 144 / 4,
-  other_jare_a: 144 / 4,
+  other_pondeomo: 144 / 5,
+  other_pondear: 144 / 5,
+  other_jare_a: 144 / 5,
+  sushi_engawa: 144 / 5,
   interior_ragby_ar: 108 / 2,
   other_listen_to_the_a: 108 / 2,
   other_mrs_green_apple: 126 / 2,
@@ -519,9 +532,9 @@ const ITEM_SPAWN_WEIGHTS: Partial<Record<string, number>> = {
   /**
    * 得点倍率系プール（予算400）：R:120÷1=120(まぐろ(赤身)握り、2026-09-07に追加してR枠を新規充填) /
    * SR:72÷3=24ずつ(2026-09-07に中トロ握りを追加、既存2種+1種の3種) /
-   * SSR:64÷3(2026-09-07に生えび握りを追加、既存2種+1種の3種。生えび握りはピンクオモと同じ
-   * スキル＝主効果が得点倍率ではないが、ピンクオモと同様このプールに含める運用) /
-   * UR:56÷4(2026-09-07にうに握りを追加、既存3種+1種の4種) / LR:48÷2=24ずつ / MR:40÷2=20ずつ。
+   * SSR:64÷4=16ずつ(2026-09-07にネギ塩マグロ握りを追加、既存3種+1種の4種。生えび握りはピンクオモと
+   * 同じスキル＝主効果が得点倍率ではないが、ピンクオモと同様このプールに含める運用) /
+   * UR:56÷4=14ずつ(2026-09-07にうに握りを追加、既存3種+1種の4種) / LR:48÷2=24ずつ / MR:40÷2=20ずつ。
    * 在籍分の実際の合計は400（残りなし。旧・残り120は`SCORE_MULT_UNFILLED_RANK_DOG_WEIGHT`でdogへ
    * 流していたがR枠が埋まったため0になった）。ピンクオモ・ナルシストアー・マフィアーも含め、
    * 全アイテム「ランク予算÷在籍数」のみで計算する（ユーザー指定、2026-09-03〜）。
@@ -530,9 +543,10 @@ const ITEM_SPAWN_WEIGHTS: Partial<Record<string, number>> = {
   toy_meat: 72 / 3,
   interior_spring_flower_wreath: 72 / 3,
   sushi_chutoro: 72 / 3,
-  other_kamunayo: 64 / 3,
-  other_nisoku_a: 64 / 3,
-  sushi_nama_ebi: 64 / 3,
+  other_kamunayo: 64 / 4,
+  other_nisoku_a: 64 / 4,
+  sushi_nama_ebi: 64 / 4,
+  sushi_negishio_maguro: 64 / 4,
   other_azubee: 56 / 4,
   interior_kinoko_azubee: 56 / 4,
   other_kobee: 56 / 4,
@@ -542,12 +556,13 @@ const ITEM_SPAWN_WEIGHTS: Partial<Record<string, number>> = {
   other_narcissist_a: 40 / 2,
   other_mafia_a: 40 / 2,
   /**
-   * 通常アイテム系プール（予算6100、在籍69種）：N:2400÷25=96ずつ(25種、2026-09-06に赤りんごを追加) /
+   * 通常アイテム系プール（予算6100、在籍71種）：N:2400÷25=96ずつ(25種、2026-09-06に赤りんごを追加) /
    * R:700÷10=70ずつ(10種、2026-09-07に寿司シリーズのいか握り・たこ握り・ほたて握りを追加。
    * サーモン握り・まぐろ(赤身)握りは時間増加系・得点倍率系プールへ移動したためこちらには残らない) /
    * SR:900÷12=75ずつ(12種、2026-09-07に寿司シリーズのかんぱち握り・えび握り・炙りサバ握りを追加。
    * ぶり握り・中トロ握りは時間増加系・得点倍率系プールへ移動したためこちらには残らない) /
-   * SSR:1200÷13(13種、2026-09-07に穴子握り＝落下速度アップ+防止付与を追加) /
+   * SSR:1200÷15=80ずつ(15種、2026-09-07に穴子握り＝落下速度アップ+防止付与、
+   * オニオンサーモン握り＝ポイントUP系、みる貝握り＝次のN個×倍率系を追加) /
    * UR:700(7種) / LR:200(2種) / MR:0(未在籍)。
    * N・R・SR・SSR以外のランクは予算÷在籍数=100ちょうどで割り切れるため、`DEFAULT_ITEM_SPAWN_WEIGHT`と同じ値のまま。
    * 今後このプールに新アイテムを追加する場合は、他の3プールと同じ「同ランク内で均等に重みを
@@ -604,19 +619,21 @@ const ITEM_SPAWN_WEIGHTS: Partial<Record<string, number>> = {
   sushi_kanpachi: 900 / 12,
   sushi_ebi: 900 / 12,
   sushi_aburi_saba: 900 / 12,
-  toy_golden_crown_ball: 1200 / 13,
-  interior_gold_ball: 1200 / 13,
-  other_nakayoshi_azubee: 1200 / 13,
-  other_hamigaki: 1200 / 13,
-  other_ikea: 1200 / 13,
-  other_orusuban: 1200 / 13,
-  other_kurumari_a: 1200 / 13,
-  other_oyatsu_no_jikan: 1200 / 13,
-  other_ketsunade_a: 1200 / 13,
-  other_omochi_janai: 1200 / 13,
-  other_oyasumi: 1200 / 13,
-  other_clawd: 1200 / 13,
-  sushi_anago: 1200 / 13,
+  toy_golden_crown_ball: 1200 / 15,
+  interior_gold_ball: 1200 / 15,
+  other_nakayoshi_azubee: 1200 / 15,
+  other_hamigaki: 1200 / 15,
+  other_ikea: 1200 / 15,
+  other_orusuban: 1200 / 15,
+  other_kurumari_a: 1200 / 15,
+  other_oyatsu_no_jikan: 1200 / 15,
+  other_ketsunade_a: 1200 / 15,
+  other_omochi_janai: 1200 / 15,
+  other_oyasumi: 1200 / 15,
+  other_clawd: 1200 / 15,
+  sushi_anago: 1200 / 15,
+  sushi_onion_salmon: 1200 / 15,
+  sushi_mirugai: 1200 / 15,
   food_mocchurin: 100,
   other_komochi: 100,
   other_omoi_bashira: 100,
@@ -790,16 +807,18 @@ const DOG_SPAWN_RATIO = 0.28;
  * 「普通のフレブル」(dog)の出現重みに上乗せして消化する（ITEM_SPAWN_WEIGHTS直上のコメント参照）。
  * 各値は「プール予算 − 在籍ランクの実際の重み合計」。2026-09-03、ユーザー指定で固定重みを
  * 全廃し「ランク予算÷在籍数」のみに統一したため、以下の3値も端数を丸めず正確な値にした：
- * 時間増加系: 2120−1780.8=339.2（2026-09-07にSR枠が埋まり1399.2→1780.8に） /
+ * 時間増加系: 2120−2120=0（2026-09-07にSSR枠が埋まり満額に） /
  * 得点倍率系: 400−400=0（2026-09-07にR枠が埋まり満額に） / 出現量アップ制御系: 900−900=0。
  * 新しく未充填ランクにアイテムを追加したら、対応する定数からそのランクの予算分を差し引くこと。
  * （時間増加系のMR枠は、2026-09-04にブレブルの効果を秒数プラス系へ変更したことで新たに
  * 充填された。従来のR:636+UR:296.8+LR:254.4=1187.2に、MR:212を加えて1399.2。時間増加系の
  * SR枠は、2026-09-07にぶり握りを追加したことで新たに充填され、1399.2にSR:381.6を加えて1780.8。
- * 出現量アップ制御系のUR枠は、2026-09-06にMrs. GREEN アーPPLEを追加したことで新たに充填され、
- * 従来のR:270+SR:162+SSR:144+LR:108+MR:90=774に、UR:126を加えて900＝プール予算満額になった）
+ * 同日、SSR枠にびんちょうまぐろ握りを追加したことでさらに充填され、1780.8にSSR:339.2を加えて
+ * 2120＝プール予算満額になった。出現量アップ制御系のUR枠は、2026-09-06にMrs. GREEN アーPPLEを
+ * 追加したことで新たに充填され、従来のR:270+SR:162+SSR:144+LR:108+MR:90=774に、UR:126を加えて
+ * 900＝プール予算満額になった）
  */
-const TIME_BONUS_UNFILLED_RANK_DOG_WEIGHT = 2120 - 1780.8;
+const TIME_BONUS_UNFILLED_RANK_DOG_WEIGHT = 0;
 /**
  * 2026-09-03、固定重み全廃・ランク予算÷在籍数のみに統一（ユーザー指定）。ITEM_SPAWN_WEIGHTS直上のコメント参照。
  * 2026-09-07、まぐろ(赤身)握りの追加でR枠(120)が新規充填されたため120→0になった。
@@ -2315,6 +2334,11 @@ export function FrenchieCatchGame({
                 effectLabel = `次の${LV.GOLDEN_COUNT[lv]}個 ×${LV.GOLDEN_MULT[lv]}${lvTag}`;
                 statusChanged = true;
                 break;
+              case "sushi_mirugai":
+                addCountMultiplier(nextMultipliersRef, LV.MIRUGAI_MULT[lv]!, LV.MIRUGAI_COUNT[lv]!);
+                effectLabel = `次の${LV.MIRUGAI_COUNT[lv]}個 ×${LV.MIRUGAI_MULT[lv]}${lvTag}`;
+                statusChanged = true;
+                break;
               case "interior_anball": {
                 points += LV.ANBALL_PT[lv]!;
                 const applied = addBonusTime(LV.ANBALL_SEC[lv]!);
@@ -2371,6 +2395,12 @@ export function FrenchieCatchGame({
                 effectLabel = `+${applied}秒 / +${LV.OTORO_PT[lv]}pt${lvTag}`;
                 break;
               }
+              case "sushi_bincho": {
+                const applied = addBonusTime(LV.BINCHO_SEC[lv]!);
+                points += LV.BINCHO_PT[lv]!;
+                effectLabel = `+${applied}秒 / +${LV.BINCHO_PT[lv]}pt${lvTag}`;
+                break;
+              }
               case "food_paw_pudding":
                 points += LV.PUDDING_PT[lv]!;
                 effectLabel = `+${LV.PUDDING_PT[lv]}ptボーナス${lvTag}`;
@@ -2386,6 +2416,10 @@ export function FrenchieCatchGame({
               case "sushi_hotate":
                 points += LV.HOTATE_PT[lv]!;
                 effectLabel = `+${LV.HOTATE_PT[lv]}ptボーナス${lvTag}`;
+                break;
+              case "sushi_onion_salmon":
+                points += LV.ONION_SALMON_PT[lv]!;
+                effectLabel = `+${LV.ONION_SALMON_PT[lv]}ptボーナス${lvTag}`;
                 break;
               case MOCCHURIN_ITEM_ID: {
                 points += LV.MOCCHURIN_PT[lv]!;
@@ -2565,6 +2599,11 @@ export function FrenchieCatchGame({
                 effectLabel = `${SCORE_MULT_DURATION_SSR_SEC}秒間 ×${LV.KAMUNAYO_MULT[lv]}${lvTag}`;
                 statusChanged = true;
                 break;
+              case "sushi_negishio_maguro":
+                addScoreMultiplier(scoreMultipliersRef, now, scaleDambourleBonusMultiplier(LV.NEGISHIO_MULT[lv]!, dambourleUpMultiplier("score_mult_pool_effect_up")), SCORE_MULT_DURATION_SSR_SEC * 1000);
+                effectLabel = `${SCORE_MULT_DURATION_SSR_SEC}秒間 ×${LV.NEGISHIO_MULT[lv]}${lvTag}`;
+                statusChanged = true;
+                break;
               case "hiking_frenchie":
                 magnetUntilRef.current = Math.max(now, magnetUntilRef.current) + LV.HIKING_SEC[lv]! * 1000;
                 magnetStrengthRef.current = "strong";
@@ -2720,6 +2759,15 @@ export function FrenchieCatchGame({
                 spawnRateBoostUntilRef.current = Math.max(now, spawnRateBoostUntilRef.current) + shirasuSec * 1000;
                 spawnRateBoostValueRef.current = scaleDambourleBonusMultiplier(shirasuSpawn, dambourleUpMultiplier("spawn_dynamics_effect_up"));
                 effectLabel = `${shirasuSec}秒間 アイテム出現量×${shirasuSpawn}${lvTag}`;
+                statusChanged = true;
+                break;
+              }
+              case "sushi_engawa": {
+                const engawaSec = LV.ENGAWA_SEC[lv]!;
+                const engawaSpawn = LV.ENGAWA_SPAWN[lv]!;
+                spawnRateBoostUntilRef.current = Math.max(now, spawnRateBoostUntilRef.current) + engawaSec * 1000;
+                spawnRateBoostValueRef.current = scaleDambourleBonusMultiplier(engawaSpawn, dambourleUpMultiplier("spawn_dynamics_effect_up"));
+                effectLabel = `${engawaSec}秒間 アイテム出現量×${engawaSpawn}${lvTag}`;
                 statusChanged = true;
                 break;
               }

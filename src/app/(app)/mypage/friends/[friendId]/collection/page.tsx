@@ -1,15 +1,19 @@
 import { notFound } from "next/navigation";
 import { CollectionProgress, ItemGrid } from "@/components/collection/collection-ui";
+import { FriendDambourleGrid } from "@/components/collection/dambourle-series-grid";
 import { IconLock } from "@/components/icons";
 import { PageBody } from "@/components/page-body";
 import { PageHeader } from "@/components/page-header";
 import { COLLECTION_ITEMS } from "@/lib/collection/items";
 import { getOwnedItemIds } from "@/lib/data/collection";
+import { getOwnedDambourleCounts } from "@/lib/data/dambourle";
 import {
   FriendsUnavailableError,
   getFriendCollection,
+  getFriendDambourle,
   getFriendOverview,
 } from "@/lib/data/friends";
+import { DAMBOURLE_PRIZES } from "@/lib/dambourle/prizes";
 import { requireUser } from "@/lib/supabase/server";
 
 export const metadata = { title: "フレンドの図鑑 | おでかけ記録" };
@@ -29,14 +33,19 @@ export default async function FriendCollectionPage({
     const overview = await getFriendOverview(supabase, friendId);
     if (!overview) notFound();
 
-    const [collection, viewerOwned] = overview.show_collection
+    const [collection, viewerOwned, friendDambourle, viewerDambourleCounts] = overview.show_collection
       ? await Promise.all([
           getFriendCollection(supabase, friendId),
           getOwnedItemIds(supabase, user.id),
+          getFriendDambourle(supabase, friendId),
+          getOwnedDambourleCounts(supabase, user.id),
         ])
-      : [[], new Set<string>()];
+      : [[], new Set<string>(), [], new Map<string, number>()];
     const counts = new Map(collection.map((item) => [item.item_id, item.count]));
     const owned = new Set(counts.keys());
+    const friendDambourleCounts = new Map(friendDambourle.map((item) => [item.item_id, item.count]));
+    const friendDambourleOwnedCount = DAMBOURLE_PRIZES.filter((prize) => (friendDambourleCounts.get(prize.id) ?? 0) > 0).length;
+    const viewerDambourleOwned = new Set([...viewerDambourleCounts.entries()].filter(([, count]) => count > 0).map(([id]) => id));
 
     return (
       <>
@@ -55,7 +64,10 @@ export default async function FriendCollectionPage({
               <p className="rough-pill border border-line-strong bg-card px-3 py-2 text-center text-[10px] font-semibold leading-relaxed text-ink-soft">
                 自分も持っているアイテムは内容を表示し、未所持のアイテムは出た回数だけ確認できます
               </p>
-              <CollectionProgress owned={owned.size} total={COLLECTION_ITEMS.length} />
+              <CollectionProgress
+                owned={owned.size + friendDambourleOwnedCount}
+                total={COLLECTION_ITEMS.length + DAMBOURLE_PRIZES.length}
+              />
               <ItemGrid
                 items={COLLECTION_ITEMS}
                 owned={owned}
@@ -63,6 +75,12 @@ export default async function FriendCollectionPage({
                 revealedOwned={viewerOwned}
                 showCountWhenHidden
               />
+              <section className="space-y-2.5">
+                <p className="rough-pill border border-line-strong bg-card px-3 py-2 text-center text-[10px] font-semibold leading-relaxed text-ink-soft">
+                  ダンボール {friendDambourleOwnedCount} / {DAMBOURLE_PRIZES.length}
+                </p>
+                <FriendDambourleGrid friendCounts={friendDambourleCounts} viewerOwned={viewerDambourleOwned} />
+              </section>
               <p className="pb-2 text-center text-xs text-ink-faint">
                 自分が持っていないアイテムはシークレット表示されます
               </p>
