@@ -10,6 +10,70 @@
   （ガイド画面の基礎ポイント表示・スコアシミュレーター。`frenchie-catch-game.tsx`の`POINTS`と
   値を二重管理しているため、基礎ポイントを変更したら必ずこちらも合わせて直すこと）
 
+## 【2026-09-07 最新確定22】寿司シリーズSSR5種を追加（びんちょうまぐろ握り=時間増加系/ネギ塩マグロ握り=スコア倍率系/えんがわ握り=出現量アップ系/オニオンサーモン握り=ポイントUP系/みる貝握り=次のN個×倍率系）
+
+寿司シリーズにSSRレアリティの新規景品5種を追加した。「特にない、バランスよく振り分けて欲しい」という
+ユーザー指定に従い、4プールへ1種ずつ＋通常アイテム系プールへ2種、という構成で分散配置した。
+
+**カーブの決め方**
+- びんちょうまぐろ握り（時間増加系）：SRの`sushi_buri`（秒数のみ、2〜10秒）とURの
+  `interior_anball`/`other_omojii`/`other_azuki`/`sushi_otoro`（秒数+pt複合）の中間として、
+  新規カーブ「+3秒+60pt→+12秒+180pt」。時間増加系プールのSSRランクはこれまで未充填だったため、
+  この1種で予算339.2を新規に丸ごと充填した（これによりプール予算2120が満額埋まった）。
+- ネギ塩マグロ握り（スコア倍率系）：得点倍率のSSRカーブは固定（`other_kamunayo`/`other_nisoku_a`と
+  同じ「1.2〜0.2刻み・5秒間」）なのでそのまま流用。
+- えんがわ握り（出現量アップ系）：`other_pondeomo`/`other_pondear`/`other_jare_a`と全く同じ
+  カーブ（4〜10秒間、出現量×1.5〜2）を流用。
+- オニオンサーモン握り（ポイントUP系）：SSR通常アイテムプールに既存の単純な「flat +pt」がなかった
+  ため新規カーブ「+60pt→+160pt」（SRの`food_paw_pudding`系より高く、URの`sushi_otoro`系より低い
+  水準）。
+- みる貝握り（次のN個×倍率系）：`toy_golden_crown_ball`（SSR、次の2〜4個×2〜2.5）を参考に
+  新規カーブ「次の2個×1.8→次の4個×2.6」。
+
+Lv6〜10は他の項目と同じ規則`値(5+n) = 値(Lv5) + n × (値(Lv5)−値(Lv1)) × 0.1875`で機械的に算出
+（みる貝握りの回数`MIRUGAI_COUNT`のみ、既存の`GOLDEN_COUNT`等と同様に手動で
+`[2,2,3,3,4,4,5,5,6,6]`という緩やかな階段状にした）。
+
+**プールの再配分**
+- びんちょうまぐろ握りは時間増加系プールSSRランクへ追加（未充填だった予算339.2を新規充填、
+  プール合計が1780.8→2120＝満額になり`TIME_BONUS_UNFILLED_RANK_DOG_WEIGHT`は339.2→0）。
+- ネギ塩マグロ握りは得点倍率系プールSSRランクへ追加（既存3種→4種、64÷4=16）。
+- えんがわ握りは出現量アップ・制御系プールSSRランクへ追加（既存4種→5種、144÷5=28.8）。
+- オニオンサーモン握り・みる貝握りは通常アイテム系プールSSRランクへ追加（既存13種→15種、
+  1200÷15=80）。
+
+**検算結果**（`node scripts/simulate-item-catch.mjs 1000 avoid`、密集時70%・itemPool N=92）
+
+| Lv | 秒数平均 | 秒数中央値 | p99 | 最大 | 500秒超え | スコア平均 |
+|---|---|---|---|---|---|---|
+| 1 | 96.9秒 | 94.0秒 | 189秒 | 309秒 | 0.00% | 39,459 |
+| 2 | 140.3秒 | 137.0秒 | 258秒 | 310秒 | 0.00% | 79,404 |
+| 3 | 187.1秒 | 184.0秒 | 353秒 | 408秒 | 0.00% | 154,132 |
+| 4 | 240.4秒 | 236.0秒 | 423秒 | 534秒 | 0.10% | 280,709 |
+| 5 | 306.6秒 | 300.0秒 | 541秒 | 783秒 | 2.40% | 577,018 |
+
+プール重み予算：時間増加系8種＝1992.8（未充填0。表示上「おかえりの重み127.2分」だけ実際の満額2120より
+少なく出る仕様で、これは既知の表示上の仕様であり実害はない）/ 得点倍率系8種=400（未充填0）/
+出現量アップ・制御系=899.9999999999998（未充填0、浮動小数点誤差のみ）/ 通常アイテム系=6100
+（未充填ランクなし）。いずれも意図通り、他プールの希釈は起きていない。500秒超えは既定通り気にしない
+運用のため許容。
+
+**変更内容**
+- `src/lib/collection/items.ts` / `src/lib/gacha/prizes.ts`：`sushi_bincho`/`sushi_negishio_maguro`/
+  `sushi_engawa`/`sushi_onion_salmon`/`sushi_mirugai`（いずれもSSRレアリティ）を追加。
+- `supabase/migrations/0101_sushi_series_ssr_items_2.sql`：DB側`gacha_rarity_for_item`のSSRリストに
+  5種を追加。
+- `frenchie-catch-game.tsx`：`LV`に`BINCHO_SEC`/`BINCHO_PT`/`NEGISHIO_MULT`/`ENGAWA_SEC`/
+  `ENGAWA_SPAWN`/`ONION_SALMON_PT`/`MIRUGAI_COUNT`/`MIRUGAI_MULT`を追加、`TIME_BONUS_ITEM_IDS`に
+  `sushi_bincho`、`SPAWN_DYNAMICS_ITEM_IDS`に`sushi_engawa`を追加、`runItemSkillEffect`のswitch文に
+  5種のcaseを追加、`ITEM_SPAWN_WEIGHTS`を上記の通り再配分、`TIME_BONUS_UNFILLED_RANK_DOG_WEIGHT`を
+  `2120-1780.8`→`0`に更新、`MYSTERY_SKILL_ITEM_IDS`に5種を追加。
+- `src/lib/games/item-catch-skills.ts`：SSRセクションに5種のルールブック説明文を追加。
+- `scripts/simulate-item-catch.mjs`：`TIME_BONUS_IDS`に`sushi_bincho`、`SCORE_MULT_IDS`に
+  `sushi_negishio_maguro`、`SPAWN_DYNAMICS_IDS`に`sushi_engawa`、`NORMAL_ITEM_IDS`に
+  `sushi_onion_salmon`/`sushi_mirugai`を追加、switch文に5種のcase追加、
+  `TIME_BONUS_UNFILLED_RANK_DOG_WEIGHT`を`0`に更新。
+
 ## 【2026-09-07 最新確定21】穴子握りのスキルを「落下速度アップ+防止付与」から「ダンボールに触れただけでキャッチ」に変更
 
 最新確定20で穴子握りを「落下速度アップ+防止付与」（`other_orusuban`と同系統）として実装したが、
