@@ -4,6 +4,7 @@ import { IconChevronRight, IconPlus, IconSliders, IconUser, IconUsers } from "@/
 import { PageBody } from "@/components/page-body";
 import { PageHeader } from "@/components/page-header";
 import { COLLECTION_ITEMS } from "@/lib/collection/items";
+import { DAMBOURLE_PRIZES } from "@/lib/dambourle/prizes";
 import {
   FriendsUnavailableError,
   getFriendList,
@@ -137,7 +138,7 @@ export default async function FriendsPage({
                             <span className="mt-0.5 block truncate text-xs text-ink-faint">
                               {friend.visited_prefectures}都道府県・図鑑
                               {friend.show_collection
-                                ? `${friend.collection_owned_count ?? 0}/${COLLECTION_ITEMS.length}`
+                                ? `${(friend.collection_owned_count ?? 0) + (friend.dambourle_owned_count ?? 0)}/${COLLECTION_ITEMS.length + DAMBOURLE_PRIZES.length}`
                                 : " 非公開"}
                             </span>
                           </span>
