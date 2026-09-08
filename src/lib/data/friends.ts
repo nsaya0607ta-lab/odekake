@@ -116,6 +116,27 @@ export async function getFriendCollection(
   return data ?? [];
 }
 
+/**
+ * フレンドのダンボール所持状況（user_dambourle_items）。
+ * get_friend_collection と同じis_friend/show_collectionチェックを持つRPCだが、
+ * こちらは0100マイグレーション未適用の環境でもフレンド機能全体を止めたくないため、
+ * FRIENDS_UNAVAILABLE_CODESに該当するエラーは例外を投げず空配列にフォールバックする
+ * （ホーム画面の総数 = COLLECTION_ITEMS + DAMBOURLE_PRIZES と一致させるための補助データのため）。
+ */
+export async function getFriendDambourle(
+  supabase: DB,
+  friendUserId: string,
+): Promise<FriendCollectionRow[]> {
+  const { data, error } = await supabase.rpc("get_friend_dambourle", {
+    p_friend_user_id: friendUserId,
+  });
+  if (error) {
+    if (error.code && FRIENDS_UNAVAILABLE_CODES.has(error.code)) return [];
+    throwDataError(error, "Friend dambourle collection is unavailable");
+  }
+  return data ?? [];
+}
+
 export async function getFriendRecentVisits(
   supabase: DB,
   friendUserId: string,

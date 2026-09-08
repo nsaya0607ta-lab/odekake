@@ -7,9 +7,11 @@ import { PageHeader } from "@/components/page-header";
 import { TappablePhoto } from "@/components/photo-lightbox";
 import { removeFriendAction } from "@/app/(app)/mypage/friends/actions";
 import { COLLECTION_ITEMS } from "@/lib/collection/items";
+import { DAMBOURLE_PRIZES } from "@/lib/dambourle/prizes";
 import {
   FriendsUnavailableError,
   getFriendCollection,
+  getFriendDambourle,
   getFriendOverview,
   getFriendPrefectures,
   getFriendRecentVisits,
@@ -49,9 +51,10 @@ export default async function FriendDetailPage({
     const overview = await getFriendOverview(supabase, friendId);
     if (!overview) notFound();
 
-    const [prefectures, collection, recentVisits] = await Promise.all([
+    const [prefectures, collection, dambourle, recentVisits] = await Promise.all([
       overview.show_prefectures ? getFriendPrefectures(supabase, friendId) : Promise.resolve([]),
       overview.show_collection ? getFriendCollection(supabase, friendId) : Promise.resolve([]),
+      overview.show_collection ? getFriendDambourle(supabase, friendId) : Promise.resolve([]),
       overview.show_recent_visits ? getFriendRecentVisits(supabase, friendId, 5) : Promise.resolve([]),
     ]);
     const [avatarUrls, visitPhotoUrls] = await Promise.all([
@@ -101,7 +104,7 @@ export default async function FriendDetailPage({
           </section>
 
           <PrefectureSection visible={overview.show_prefectures} prefectures={prefectures} />
-          <CollectionSection visible={overview.show_collection} collection={collection} friendId={friendId} />
+          <CollectionSection visible={overview.show_collection} collection={collection} dambourle={dambourle} friendId={friendId} />
           <RecentVisitsSection
             visible={overview.show_recent_visits}
             visits={recentVisits}
@@ -190,14 +193,20 @@ function PrefectureSection({
 function CollectionSection({
   visible,
   collection,
+  dambourle,
   friendId,
 }: {
   visible: boolean;
   collection: FriendCollectionRow[];
+  dambourle: FriendCollectionRow[];
   friendId: string;
 }) {
   const owned = new Set(collection.map((item) => item.item_id));
+  const dambourleOwned = new Set(dambourle.filter((item) => item.count > 0).map((item) => item.item_id));
   const rarities = ["N", "R", "SR", "SSR"] as const;
+  // ホーム画面の総数（COLLECTION_ITEMS + DAMBOURLE_PRIZES）と一致させる
+  const totalOwned = owned.size + dambourleOwned.size;
+  const totalCount = COLLECTION_ITEMS.length + DAMBOURLE_PRIZES.length;
 
   return (
     <section className="space-y-3">
@@ -207,8 +216,8 @@ function CollectionSection({
       ) : (
         <div className="rough-card space-y-4 p-5">
           <p className="text-center tabular-nums">
-            <span className="text-2xl font-black">{owned.size}</span>
-            <span className="text-sm text-ink-faint"> / {COLLECTION_ITEMS.length}</span>
+            <span className="text-2xl font-black">{totalOwned}</span>
+            <span className="text-sm text-ink-faint"> / {totalCount}</span>
           </p>
           <div className="grid grid-cols-4 gap-2 text-center">
             {rarities.map((rarity) => {
@@ -222,6 +231,9 @@ function CollectionSection({
               );
             })}
           </div>
+          <p className="text-center text-xs text-ink-faint tabular-nums">
+            ダンボール {dambourleOwned.size} / {DAMBOURLE_PRIZES.length}
+          </p>
           <Link
             href={`/mypage/friends/${friendId}/collection`}
             className="btn btn-primary w-full"

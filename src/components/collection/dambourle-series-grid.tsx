@@ -42,6 +42,45 @@ export function DambourleSeriesGrid({ ownedCounts }: { ownedCounts: ReadonlyMap<
   );
 }
 
+/**
+ * フレンドの図鑑用。相手の所持状況(friendCounts)に加え、閲覧者自身の所持(viewerOwned)も見て、
+ * 「相手は持っているが自分は未所持」のアイテムはItemCard/ItemGridと同じ規約で
+ * シークレット表示（名前・効果は????、出た回数だけ見せる）にする。
+ */
+export function FriendDambourleGrid({
+  friendCounts,
+  viewerOwned,
+}: {
+  friendCounts: ReadonlyMap<string, number>;
+  viewerOwned: ReadonlySet<string>;
+}) {
+  return (
+    <ul className="grid grid-cols-3 gap-2.5">
+      {DAMBOURLE_PRIZES.map((prize) => {
+        const count = friendCounts.get(prize.id) ?? 0;
+        const friendOwned = count > 0;
+        const revealed = friendOwned && viewerOwned.has(prize.id);
+        const level = revealed ? getDambourleLevel(prize.rarity, count) : 0;
+        const minSkinIndex = getDambourleMinSkinIndex(prize.id);
+        const skinIndex = revealed ? getDambourleUnlockedSkinTier(prize.id, level) : minSkinIndex;
+        return (
+          <li key={prize.id}>
+            <DambourleSeriesCard
+              name={prize.name}
+              image={getDambourleBoxImage(prize.id, skinIndex)}
+              alt={prize.name}
+              unlocked={revealed}
+              sublabel={revealed ? `${prize.rarity} / Lv${level}` : prize.rarity}
+              skillText={revealed ? `${DAMBOURLE_EFFECT_NAMES[prize.effectKey]} ${getDambourleEffectValueText(prize, level)}` : null}
+              hiddenCount={!revealed && friendOwned ? count : null}
+            />
+          </li>
+        );
+      })}
+    </ul>
+  );
+}
+
 function DambourleSeriesCard({
   name,
   image,
@@ -49,6 +88,7 @@ function DambourleSeriesCard({
   unlocked,
   sublabel,
   skillText,
+  hiddenCount = null,
 }: {
   name: string;
   image: string;
@@ -56,6 +96,7 @@ function DambourleSeriesCard({
   unlocked: boolean;
   sublabel: string;
   skillText: string | null;
+  hiddenCount?: number | null;
 }) {
   return (
     <div
@@ -82,7 +123,12 @@ function DambourleSeriesCard({
       </span>
 
       <p className={`mt-1.5 truncate text-[11px] font-bold ${unlocked ? "text-ink" : "text-ink-faint"}`}>{unlocked ? name : "？？？"}</p>
-      <p className="mt-0.5 truncate text-[9px] text-ink-faint">{unlocked ? sublabel : "ガチャで手に入れると解放"}</p>
+      <p className="mt-0.5 truncate text-[9px] text-ink-faint">
+        {unlocked ? sublabel : hiddenCount != null ? "自分は未所持" : "ガチャで手に入れると解放"}
+      </p>
+      {hiddenCount != null ? (
+        <p className="mt-0.5 truncate text-[9px] font-semibold tabular-nums text-ink-faint">出た回数 {hiddenCount}回</p>
+      ) : null}
       {skillText ? <p className="mt-0.5 truncate text-[8px] font-bold text-leaf-deep">{skillText}</p> : null}
     </div>
   );
