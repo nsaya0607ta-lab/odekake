@@ -1,0 +1,77 @@
+/*
+ * アイテムキャッチのSCORE/TIME表示用、7セグメントLED風のデジタル数字スタイル。
+ * 以前 `codex/item-catch-visual-preview-20260907` ブランチで試作されたまま
+ * mainに未マージだった実装から、デジタル数字表示の部分だけを移植したもの
+ * （HUD全体のデザイン変更・描画パフォーマンス改修は含まない）。
+ */
+
+.sevenNumber,
+.sevenNumberDigits {
+  display: inline-flex;
+  align-items: flex-end;
+}
+
+.sevenNumberDigits {
+  gap: 0.1rem;
+}
+
+.sevenDigit {
+  position: relative;
+  display: inline-block;
+  width: 0.72rem;
+  height: 1.25rem;
+  flex: 0 0 auto;
+}
+
+.sevenSegment {
+  position: absolute;
+  display: block;
+  background: rgba(63, 58, 51, 0.09);
+}
+
+.segmentA,
+.segmentD,
+.segmentG {
+  left: 14%;
+  width: 72%;
+  height: 0.13rem;
+  clip-path: polygon(10% 0, 90% 0, 100% 50%, 90% 100%, 10% 100%, 0 50%);
+}
+
+.segmentA { top: 0; }
+.segmentG { top: 50%; transform: translateY(-50%); }
+.segmentD { bottom: 0; }
+
+.segmentB,
+.segmentC,
+.segmentE,
+.segmentF {
+  width: 0.13rem;
+  height: 40%;
+  clip-path: polygon(50% 0, 100% 10%, 100% 90%, 50% 100%, 0 90%, 0 10%);
+}
+
+.segmentB { top: 6%; right: 0; }
+.segmentC { right: 0; bottom: 6%; }
+.segmentE { bottom: 6%; left: 0; }
+.segmentF { top: 6%; left: 0; }
+
+.segmentOn {
+  background: var(--color-ink);
+  box-shadow: inset 0 0 0.08rem rgba(255, 255, 255, 0.2);
+}
+
+.sevenComma {
+  position: relative;
+  width: 0.17rem;
+  height: 0.24rem;
+  margin-right: -0.03rem;
+  border-radius: 0.08rem;
+  background: var(--color-ink);
+  transform: skewX(-14deg);
+}
+
+.timeUrgent .segmentOn,
+.timeUrgent .sevenComma {
+  background: #b34735;
+}
