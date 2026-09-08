@@ -297,6 +297,7 @@ export type FriendListRow = {
   visited_municipalities: number;
   visit_count: number;
   collection_owned_count: number | null;
+  dambourle_owned_count: number | null;
   show_collection: boolean;
   friend_since: string;
 };
