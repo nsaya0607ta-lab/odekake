@@ -7,6 +7,7 @@ import { MAX_SKILL_LEVEL } from "@/lib/gacha/skill-levels";
 import { COLLECTION_ITEMS, type CollectionItem } from "@/lib/collection/items";
 import { DAMBOURLE_PRIZES, EFFECT_ROULETTE_ELIGIBLE_EFFECT_KEYS, type DambourleEffectKey } from "@/lib/dambourle/prizes";
 import { getDambourleEffectLevel } from "@/lib/dambourle/skill-levels";
+import visualStyles from "@/components/item-catch-visual.module.css";
 
 export type FrenchieCatchItem = {
   id: string;
@@ -949,6 +950,60 @@ function isCardboardTap(localX: number, localY: number) {
   const rightSide = localY >= 0.16 && localY <= 0.50 && localX >= 0.82 && localX <= 0.945;
   return front || leftSide || rightSide;
 }
+
+/** SCORE/TIME表示を7セグメントLED風のデジタル数字にするための小コンポーネント群。 */
+type SevenSegmentKey = "a" | "b" | "c" | "d" | "e" | "f" | "g";
+
+const SEVEN_SEGMENT_KEYS: readonly SevenSegmentKey[] = ["a", "b", "c", "d", "e", "f", "g"];
+const SEVEN_SEGMENT_DIGITS: Record<string, string> = {
+  "0": "abcdef",
+  "1": "bc",
+  "2": "abdeg",
+  "3": "abcdg",
+  "4": "bcfg",
+  "5": "acdfg",
+  "6": "acdefg",
+  "7": "abc",
+  "8": "abcdefg",
+  "9": "abcdfg",
+};
+const SEVEN_SEGMENT_CLASSES: Record<SevenSegmentKey, string> = {
+  a: visualStyles.segmentA!,
+  b: visualStyles.segmentB!,
+  c: visualStyles.segmentC!,
+  d: visualStyles.segmentD!,
+  e: visualStyles.segmentE!,
+  f: visualStyles.segmentF!,
+  g: visualStyles.segmentG!,
+};
+
+const SevenSegmentDigit = memo(function SevenSegmentDigit({ digit }: { digit: string }) {
+  const activeSegments = SEVEN_SEGMENT_DIGITS[digit] ?? "";
+  return (
+    <span className={visualStyles.sevenDigit}>
+      {SEVEN_SEGMENT_KEYS.map((segment) => (
+        <span
+          key={segment}
+          className={`${visualStyles.sevenSegment} ${SEVEN_SEGMENT_CLASSES[segment]} ${activeSegments.includes(segment) ? visualStyles.segmentOn : ""}`}
+        />
+      ))}
+    </span>
+  );
+});
+
+const SevenSegmentNumber = memo(function SevenSegmentNumber({ value, label }: { value: string; label: string }) {
+  return (
+    <span className={visualStyles.sevenNumber} role="img" aria-label={label}>
+      <span aria-hidden className={visualStyles.sevenNumberDigits}>
+        {Array.from(value).map((character, index) => (
+          character === ","
+            ? <span key={`comma-${index}`} className={visualStyles.sevenComma} />
+            : <SevenSegmentDigit key={`${character}-${index}`} digit={character} />
+        ))}
+      </span>
+    </span>
+  );
+});
 
 /**
  * 位置・回転・不透明度・z-indexはマウント後、rAFループがrefのDOM要素へ直接書き込む。
@@ -3204,7 +3259,7 @@ export function FrenchieCatchGame({
           <div className="flex flex-col items-start gap-1">
             <div className="relative rounded-2xl border border-white/80 bg-white/90 px-3 py-2 shadow-sm">
               <p className="text-[9px] font-bold tracking-widest text-ink-faint">SCORE</p>
-              <p className="text-xl font-black tabular-nums text-ink">{score.toLocaleString("ja-JP")}</p>
+              <SevenSegmentNumber value={score.toLocaleString("ja-JP")} label={`スコア ${score.toLocaleString("ja-JP")}`} />
               {feedback ? <span className="pointer-events-none absolute -right-2 -top-2 rounded-full bg-[#fff6cc]/95 px-2 py-0.5 text-[10px] font-black text-[#c87527] shadow-sm">+{feedback.points}</span> : null}
             </div>
             {scoreMultiplierTotal > 1 ? (
@@ -3238,7 +3293,10 @@ export function FrenchieCatchGame({
             ) : null}
           </div>
           <span className="flex-1" />
-          <div className="rounded-2xl border border-white/80 bg-white/90 px-3 py-2 text-right shadow-sm"><p className="text-[9px] font-bold tracking-widest text-ink-faint">TIME</p><p className="text-xl font-black tabular-nums text-ink">{timeLeft}</p></div>
+          <div className={`rounded-2xl border border-white/80 bg-white/90 px-3 py-2 text-right shadow-sm ${phase === "playing" && timeLeft <= 10 ? visualStyles.timeUrgent : ""}`}>
+            <p className="text-[9px] font-bold tracking-widest text-ink-faint">TIME</p>
+            <SevenSegmentNumber value={String(timeLeft).padStart(2, "0")} label={`残り ${timeLeft}秒`} />
+          </div>
         </div>
 
         {skillLogEntries.length > 0 ? (
