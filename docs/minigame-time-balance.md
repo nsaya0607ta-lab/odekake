@@ -10,6 +10,63 @@
   （ガイド画面の基礎ポイント表示・スコアシミュレーター。`frenchie-catch-game.tsx`の`POINTS`と
   値を二重管理しているため、基礎ポイントを変更したら必ずこちらも合わせて直すこと）
 
+## 【2026-09-08 最新確定23】寿司シリーズUR相当4種を追加（ふぐ握り=得点倍率系/カニ身握り=時間増加系/オオモンハタ握り=出現量アップ系/うなぎ握り=残り秒数×倍率系）
+
+寿司シリーズにUR相当の新規景品4種（画像はユーザーがChatGPTで生成したものをそのまま採用）を追加した。
+初回は「特にスキルの指定がなかった」ため4種とも通常アイテム系プールの「flat +pt」で実装したが、
+ユーザーから「既存のURのやつのスキルを参考にして」と指摘があったため、既存UR勢の主要な仕組み
+（得点倍率系・時間増加系・出現量アップ系・通常アイテム系の「残り秒数×倍率」）を1種ずつ踏襲する形に
+作り直した。
+
+**カーブの決め方**
+- ふぐ握り（得点倍率系）：`other_azubee`/`sushi_uni`と全く同じUR固定カーブ（6秒間×1.2〜2.4）を流用。
+- カニ身握り（時間増加系）：`sushi_otoro`と同型の「秒数+pt複合」の新規カーブ（+2秒+80pt→+12秒+215pt）。
+- オオモンハタ握り（出現量アップ系）：`sushi_shirasu`と全く同じカーブ（4〜10秒間、出現量×1.7〜2.3）を流用。
+- うなぎ握り（通常アイテム系）：`other_hia`と全く同じスキル（取った瞬間の残り秒数×6〜10がそのままpt）を
+  スイッチ文のfallthroughで共有。生えび握り/ピンクオモの前例（スキル完全共有）にならった。
+- Lv6〜10は他の項目と同じ規則`値(5+n) = 値(Lv5) + n × (値(Lv5)−値(Lv1)) × 0.1875`で機械的に算出
+  （カニ身握りのみ新規カーブのため対象、他3種は既存カーブそのまま流用のため対象外）。
+
+**プールの再配分**
+- ふぐ握りは得点倍率系プールUR枠へ追加（既存4種→5種、56÷5=11.2）。
+- カニ身握りは時間増加系プールUR枠へ追加（既存4種→5種、296.8÷5=59.36）。
+- オオモンハタ握りは出現量アップ・制御系プールUR枠へ追加（既存2種→3種、126÷3=42）。
+- うなぎ握りのみ通常アイテム系プールUR枠へ追加（既存7種→8種、700÷8=87.5）。
+
+**検算結果**（`node scripts/simulate-item-catch.mjs 1000 avoid`、密集時70%・itemPool N=92）
+
+| Lv | 秒数平均 | 秒数中央値 | p99 | 最大 | 500秒超え | スコア平均 |
+|---|---|---|---|---|---|---|
+| 1 | 99.3秒 | 96.0秒 | 193秒 | 278秒 | 0.00% | 40,204 |
+| 2 | 139.4秒 | 135.0秒 | 247秒 | 290秒 | 0.00% | 76,417 |
+| 3 | 180.3秒 | 176.0秒 | 315秒 | 383秒 | 0.00% | 139,554 |
+| 4 | 235.4秒 | 233.0秒 | 414秒 | 470秒 | 0.00% | 259,676 |
+| 5 | 303.9秒 | 295.0秒 | 542秒 | 660秒 | 2.40% | 535,856 |
+
+プール重み予算：時間増加系8種＝1992.8（未充填0、既知の表示仕様でおかえり分127.2少なく出る）/
+得点倍率系8種=400（未充填0）/ 出現量アップ・制御系=899.9999999999998（未充填0、浮動小数点誤差のみ）/
+通常アイテム系=6100（未充填ランクなし）。いずれも各プールの合計予算（2120/400/900/6100）から
+変わっておらず、意図通り他プールの希釈は起きていない。500秒超えは既定通り気にしない運用のため許容。
+
+**変更内容**
+- `src/lib/collection/items.ts` / `src/lib/gacha/prizes.ts`：`sushi_fugu`/`sushi_kani`/
+  `sushi_oomonhata`/`sushi_unagi`（いずれもURレアリティ）を追加。
+- `public/collection/items/`：`sushi-fugu.webp`/`sushi-kani.webp`/`sushi-oomonhata.webp`/
+  `sushi-unagi.webp`を追加（ユーザーがChatGPTで生成した画像をwebp化）。
+- `supabase/migrations/0103_sushi_series_ur_items_2.sql`：DB側`gacha_rarity_for_item`のURリストに
+  4種を追加。
+- `frenchie-catch-game.tsx`：`LV`に`FUGU_MULT`/`KANI_SEC`/`KANI_PT`/`OOMONHATA_SEC`/`OOMONHATA_SPAWN`を
+  追加、`TIME_BONUS_ITEM_IDS`に`sushi_kani`、`SPAWN_DYNAMICS_ITEM_IDS`に`sushi_oomonhata`を追加、
+  `runItemSkillEffect`のswitch文に`sushi_fugu`（`sushi_uni`と同型）/`sushi_kani`（`sushi_otoro`と同型）/
+  `sushi_oomonhata`（`sushi_shirasu`と同型）/`sushi_unagi`（`other_hia`とfallthrough共有）のcaseを追加、
+  `ITEM_SPAWN_WEIGHTS`を上記の通り再配分（得点倍率系UR5種・時間増加系UR5種・出現量アップ系UR3種・
+  通常アイテム系UR8種）、`MYSTERY_SKILL_ITEM_IDS`に4種を追加。
+- `src/lib/games/item-catch-skills.ts`：URセクションに4種のルールブック説明文を追加（既存アイテムと
+  スキルを共有するものは note にその旨を明記）。
+- `scripts/simulate-item-catch.mjs`：`TIME_BONUS_IDS`に`sushi_kani`、`SCORE_MULT_IDS`に`sushi_fugu`、
+  `SPAWN_DYNAMICS_IDS`に`sushi_oomonhata`、`NORMAL_ITEM_IDS`に`sushi_unagi`を追加、switch文に4種の
+  case追加（`LV`/`ITEM_SPAWN_WEIGHTS`はtsxから自動抽出のため個別の同期作業は不要）。
+
 ## 【2026-09-07 最新確定22】寿司シリーズSSR5種を追加（びんちょうまぐろ握り=時間増加系/ネギ塩マグロ握り=スコア倍率系/えんがわ握り=出現量アップ系/オニオンサーモン握り=ポイントUP系/みる貝握り=次のN個×倍率系）
 
 寿司シリーズにSSRレアリティの新規景品5種を追加した。「特にない、バランスよく振り分けて欲しい」という
