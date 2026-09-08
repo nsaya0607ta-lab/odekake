@@ -169,7 +169,7 @@ function pickMrId(excludeCutoff = false) {
   }
   return weighted[weighted.length - 1].pid;
 }
-const TIME_BONUS_IDS = new Set(["toy_duck_plush", "toy_carrot", "food_paw_melon_bread", "sushi_salmon", "sushi_buri", "sushi_bincho", "interior_anball", "other_azuki", "other_omojii", "sushi_otoro", "summer_frenchie", "other_burebur"]);
+const TIME_BONUS_IDS = new Set(["toy_duck_plush", "toy_carrot", "food_paw_melon_bread", "sushi_salmon", "sushi_buri", "sushi_bincho", "interior_anball", "other_azuki", "other_omojii", "sushi_otoro", "sushi_kani", "summer_frenchie", "other_burebur"]);
 // おかえり(other_okaeri)は時間増加系8種そのものではないが、時間バランス調整の対象として
 // timeBonusCatchRate(見送り確率)の適用対象に加える（ボーナス出現タイマーの除外対象ではないため
 // TIME_BONUS_IDS自体には加えず、キャッチ判定にのみ加算する）
@@ -179,7 +179,7 @@ const REDUCED_CATCH_IDS = new Set([...TIME_BONUS_IDS, "other_okaeri"]);
 // 揺らぐため、TIME_BONUS_IDSと合わせてボーナス側では除外する（frenchie-catch-game.tsxのSPAWN_DYNAMICS_ITEM_IDSと同一）
 // other_listen_to_the_a（フレブル大量発生。厳密には出現重みの計算式ではなくdogFloodそのものを起こす
 // 効果だが）は、2026-09-03、単独チューニング枠からこのプールのLR枠に移動（ユーザー指定）。
-const SPAWN_DYNAMICS_IDS = new Set(["toy_rainbow_ball", "interior_stretch_rod", "toy_treasure_puzzle", "other_xmas_party", "other_pondeomo", "other_pondear", "other_jare_a", "interior_ragby_ar", "other_listen_to_the_a", "other_mrs_green_apple", "sushi_shirasu", "sushi_engawa"]);
+const SPAWN_DYNAMICS_IDS = new Set(["toy_rainbow_ball", "interior_stretch_rod", "toy_treasure_puzzle", "other_xmas_party", "other_pondeomo", "other_pondear", "other_jare_a", "interior_ragby_ar", "other_listen_to_the_a", "other_mrs_green_apple", "sushi_shirasu", "sushi_engawa", "sushi_oomonhata"]);
 // 得点倍率プール（"○秒間×n"の得点倍率スキルを主効果として持つアイテム）。ITEM_SPAWN_WEIGHTSで
 // レアリティ別に重みを下げてある8種（frenchie-catch-game.tsxの同名コメント参照）。宝箱・夏のフレブル・
 // Xmas Partyは得点倍率効果も持つが、重みが時間バランス/出現量アップ側のチューニングで別途固定されている
@@ -191,8 +191,8 @@ const SPAWN_DYNAMICS_IDS = new Set(["toy_rainbow_ball", "interior_stretch_rod", 
 // ナルシストアー・マフィアーも同様に2026-09-03、単独チューニング枠からこのプールのMR枠に移動
 // （ユーザー指定。主効果はそれぞれ「全アイテムのスキルがLv.MAXで発動」「フレブル数ボーナス倍率」で
 // 得点倍率そのものではないが、重み管理上の扱いとして含める）。
-const SCORE_MULT_IDS = new Set(["toy_meat", "interior_spring_flower_wreath", "other_kamunayo", "other_nisoku_a", "other_azubee", "interior_kinoko_azubee", "other_kobee", "interior_shikkoku_no_ar", "other_pink_omo", "other_narcissist_a", "other_mafia_a", "sushi_maguro_akami", "sushi_chutoro", "sushi_uni", "sushi_nama_ebi", "sushi_negishio_maguro"]);
-// 通常アイテム系プール（特殊効果を持たない全71種。frenchie-catch-game.tsxのNORMAL_ITEM_IDSと同一、手動同期）。
+const SCORE_MULT_IDS = new Set(["toy_meat", "interior_spring_flower_wreath", "other_kamunayo", "other_nisoku_a", "other_azubee", "interior_kinoko_azubee", "other_kobee", "interior_shikkoku_no_ar", "other_pink_omo", "other_narcissist_a", "other_mafia_a", "sushi_maguro_akami", "sushi_chutoro", "sushi_uni", "sushi_fugu", "sushi_nama_ebi", "sushi_negishio_maguro"]);
+// 通常アイテム系プール（特殊効果を持たない全72種。frenchie-catch-game.tsxのNORMAL_ITEM_IDSと同一、手動同期）。
 const NORMAL_ITEM_IDS = new Set([
   "toy_colorful_ball", "toy_rope", "toy_bone", "toy_squeaky_ball", "toy_tennis_ball",
   "toy_red_slipper", "toy_wood_stick", "toy_donut_rope", "food_smile_onigiri", "food_paw_taiyaki",
@@ -213,7 +213,7 @@ const NORMAL_ITEM_IDS = new Set([
   "other_omochi_janai", "other_oyasumi", "other_clawd",
   "food_mocchurin", "other_komochi", "other_omoi_bashira", "other_mah", "other_mirror_omochi",
   "other_toorematen", "other_hia",
-  "sushi_fugu", "sushi_kani", "sushi_oomonhata", "sushi_unagi",
+  "sushi_unagi",
   "hiking_frenchie", "snow_frenchie",
 ]);
 // 出現重みプールの合計値（＝プールの「予算」）。新アイテムをどれかのプールに追加してプレイ時間・
@@ -309,10 +309,7 @@ function simulateOneRound(lv, catchAll, timeBonusCatchRate = 0.8, normalCatchRat
       case "sushi_ika": points += LV.IKA_PT[lvIdx]; break;
       case "sushi_hotate": points += LV.HOTATE_PT[lvIdx]; break;
       case "sushi_onion_salmon": points += LV.ONION_SALMON_PT[lvIdx]; break;
-      case "sushi_fugu": points += LV.FUGU_PT[lvIdx]; break;
-      case "sushi_kani": points += LV.KANI_PT[lvIdx]; break;
-      case "sushi_oomonhata": points += LV.OOMONHATA_PT[lvIdx]; break;
-      case "sushi_unagi": points += LV.UNAGI_PT[lvIdx]; break;
+      case "sushi_kani": addBonusTime(LV.KANI_SEC[lvIdx]); points += LV.KANI_PT[lvIdx]; break;
       case "toy_frisbee": nextMultValue = LV.FRISBEE_MULT[lvIdx]; nextMultCount = 1; break;
       case "food_paw_bowl": nextBonus5 += 3; nextBonus5Value = LV.BOWL_PT[lvIdx]; break;
       case "toy_meat": multiplier15Until = t + SCORE_MULT_DURATION_SR_SEC * 1000; multiplier15Value = LV.MEAT_MULT[lvIdx]; break;
@@ -346,6 +343,7 @@ function simulateOneRound(lv, catchAll, timeBonusCatchRate = 0.8, normalCatchRat
       case "other_listen_to_the_a": listenFloodRemaining += LV.LISTEN_DOG_COUNT[lvIdx]; break;
       case "other_azubee": multiplier2Until = t + SCORE_MULT_DURATION_UR_SEC * 1000; multiplier2Value = LV.AZUBEE_MULT[lvIdx]; break;
       case "sushi_uni": multiplier2Until = t + SCORE_MULT_DURATION_UR_SEC * 1000; multiplier2Value = LV.UNI_MULT[lvIdx]; break;
+      case "sushi_fugu": multiplier2Until = t + SCORE_MULT_DURATION_UR_SEC * 1000; multiplier2Value = LV.FUGU_MULT[lvIdx]; break;
       case "sushi_negishio_maguro": multiplier15Until = t + SCORE_MULT_DURATION_SSR_SEC * 1000; multiplier15Value = LV.NEGISHIO_MULT[lvIdx]; break;
       case "other_omojii": addBonusTime(LV.OMOJII_SEC[lvIdx]); points += LV.OMOJII_PT[lvIdx]; break;
       case "sushi_otoro": addBonusTime(LV.OTORO_SEC[lvIdx]); points += LV.OTORO_PT[lvIdx]; break;
@@ -356,7 +354,8 @@ function simulateOneRound(lv, catchAll, timeBonusCatchRate = 0.8, normalCatchRat
       case "food_paw_melon_bread": addBonusTime(LV.MELON_SEC[lvIdx]); points += LV.MELON_PT[lvIdx]; break;
       case "food_strawberry_roll_cake": nextMultValue = LV.STRAWBERRY_MULT[lvIdx]; nextMultCount = LV.STRAWBERRY_COUNT[lvIdx]; break;
       case "toy_star_wan_wand": { const rem = Math.round(Math.max(0, (endAt - t) / 1000)); points += Math.round(rem * LV.STARWAND_MULT[lvIdx]); break; }
-      case "other_hia": { const rem = Math.round(Math.max(0, (endAt - t) / 1000)); points += Math.round(rem * LV.HIA_MULT[lvIdx]); break; }
+      case "other_hia":
+      case "sushi_unagi": { const rem = Math.round(Math.max(0, (endAt - t) / 1000)); points += Math.round(rem * LV.HIA_MULT[lvIdx]); break; }
       case "interior_spring_flower_wreath": multiplier15Until = t + SCORE_MULT_DURATION_SR_SEC * 1000; multiplier15Value = LV.SPRING_MULT[lvIdx]; break;
       case "other_nisoku_a": nisokuUntil = t + SCORE_MULT_DURATION_SSR_SEC * 1000; nisokuMultValue = LV.NISOKU_A_MULT[lvIdx]; break;
       case "food_fruit_basket": personFloodRemaining += LV.FRUIT_BASKET_COUNT[lvIdx]; break;
@@ -382,6 +381,7 @@ function simulateOneRound(lv, catchAll, timeBonusCatchRate = 0.8, normalCatchRat
       case "other_pondeomo": spawnRateBoostUntil = t + LV.PONDEOMO_SEC[lvIdx] * 1000; spawnRateBoostValue = LV.PONDEOMO_SPAWN[lvIdx]; break;
       case "sushi_engawa": spawnRateBoostUntil = t + LV.ENGAWA_SEC[lvIdx] * 1000; spawnRateBoostValue = LV.ENGAWA_SPAWN[lvIdx]; break;
       case "sushi_shirasu": spawnRateBoostUntil = t + LV.SHIRASU_SEC[lvIdx] * 1000; spawnRateBoostValue = LV.SHIRASU_SPAWN[lvIdx]; break;
+      case "sushi_oomonhata": spawnRateBoostUntil = t + LV.OOMONHATA_SEC[lvIdx] * 1000; spawnRateBoostValue = LV.OOMONHATA_SPAWN[lvIdx]; break;
       case "other_pondear": spawnRateBoostUntil = t + LV.PONDEAR_SEC[lvIdx] * 1000; spawnRateBoostValue = LV.PONDEAR_SPAWN[lvIdx]; break;
       case "other_jare_a": spawnRateBoostUntil = t + LV.JARE_A_SEC[lvIdx] * 1000; spawnRateBoostValue = LV.JARE_A_SPAWN[lvIdx]; break;
       case "interior_ragby_ar": spawnRateBoostUntil = t + LV.RAGBY_SEC[lvIdx] * 1000; spawnRateBoostValue = LV.RAGBY_SPAWN[lvIdx]; break;
