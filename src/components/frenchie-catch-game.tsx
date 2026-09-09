@@ -3237,13 +3237,21 @@ export function FrenchieCatchGame({
         ))}
       </div>
 
-      <div className="flex items-center justify-between border-b border-line bg-card px-4 py-3">
-        <div>
-          <p className="text-[10px] font-bold tracking-[0.16em] text-ink-faint">MINI GAME</p>
-          <h2 className="mt-0.5 text-base font-black text-ink">アイテムキャッチ</h2>
+      {phase === "idle" ? (
+        <div className="border-b border-line bg-card px-4 py-4">
+          <div className="flex items-center gap-3">
+            <Image src={equippedBoxImage} alt={equippedBoxAlt} width={64} height={64} className="h-16 w-16 shrink-0 object-contain" />
+            <div className="min-w-0 flex-1">
+              <p className="text-xs font-bold text-ink-faint">使用するダンボール</p>
+              <p className="mt-1 break-words text-sm font-black text-ink">{equippedBoxAlt.replace(/^装備中のダンボール（(.*)）$/, "$1")}</p>
+            </div>
+            {showDambourlePicker ? <button type="button" onClick={() => router.push("/games/item-catch/dambourle")} className="min-h-11 shrink-0 rounded-full border border-line bg-card px-4 text-sm font-bold text-ink-soft">変更</button> : null}
+          </div>
+          <button type="button" onClick={startGame} className="mt-3 min-h-12 w-full rounded-full bg-leaf px-4 py-3 text-base font-black text-white shadow-sm active:translate-y-px">START</button>
+          <p className="mt-2 text-center text-xs leading-relaxed text-ink-soft">箱を押さえて左右にドラッグ · 50秒チャレンジ</p>
+          <p className="mt-1 text-center text-xs leading-relaxed text-ink-faint">所持アイテム {itemPool.length}種類 · 時間増加系は{Math.round(timeBonusCutoffSecDisplayWithDambourle)}秒まで出現</p>
         </div>
-        <span className="rounded-full bg-leaf-soft px-2.5 py-1 text-[10px] font-bold text-leaf-deep">50秒チャレンジ</span>
-      </div>
+      ) : null}
 
       <div
         ref={boardRef}
@@ -3367,10 +3375,9 @@ export function FrenchieCatchGame({
 
         {phase === "playing" ? <div className="pointer-events-none absolute bottom-[0.5%] left-1/2 z-40 -translate-x-1/2 rounded-full bg-white/70 px-2 py-0.5 text-[9px] font-bold text-ink-faint">箱を押さえて左右にドラッグ</div> : null}
 
-        {phase !== "playing" ? (
+        {phase === "finished" ? (
           <div className="absolute inset-0 z-50 flex items-center justify-center bg-[#f9f3e7]/70 px-6 backdrop-blur-[2px]">
             <div className="w-full max-w-xs rounded-[28px] border border-white/90 bg-card/95 p-5 text-center shadow-xl">
-              {phase === "finished" ? (
                 <>
                   <p className="text-[10px] font-black tracking-[0.18em] text-ink-faint">RESULT</p>
                   <p className="mt-1 text-4xl font-black tabular-nums text-ink">{score.toLocaleString("ja-JP")}</p>
@@ -3403,23 +3410,6 @@ export function FrenchieCatchGame({
                     <button type="button" onClick={() => router.push("/games")} disabled={rewardPending} className="rounded-full border border-line bg-card px-3 py-3 text-xs font-black text-ink-soft shadow-sm active:translate-y-px disabled:opacity-45">終了する</button>
                   </div>
                 </>
-              ) : (
-                <>
-                  <p className="text-[10px] font-black tracking-[0.18em] text-leaf-deep">ITEM CATCH</p>
-                  <p className="mt-1 text-xl font-black text-ink">箱でキャッチしよう！</p>
-                  <p className="mt-3 text-[9px] text-ink-faint">時間増加系アイテムは{Math.round(timeBonusCutoffSecDisplayWithDambourle)}秒まで出現</p>
-                  <button type="button" onClick={startGame} className="mt-1.5 w-full rounded-full bg-leaf px-4 py-3 text-sm font-black text-white shadow-md active:translate-y-px">START</button>
-                  {showDambourlePicker ? (
-                    <button
-                      type="button"
-                      onClick={() => router.push("/games/item-catch/dambourle")}
-                      className="mt-2 w-full rounded-full border border-line bg-card px-4 py-2 text-xs font-black text-ink-soft shadow-sm active:translate-y-px"
-                    >
-                      ダンボールを選ぶ
-                    </button>
-                  ) : null}
-                </>
-              )}
               <p className="mt-2 text-[9px] text-ink-faint">所持アイテム {itemPool.length}種類 + 初期フレブル</p>
             </div>
           </div>
