@@ -68,7 +68,7 @@ export default async function ItemCatchPage() {
         subtitle="50秒でどこまでキャッチできる？"
       />
 
-      <PageBody className="!space-y-3 !py-3">
+      <PageBody className="!space-y-3 !py-3 !pb-[calc(6rem+env(safe-area-inset-bottom))]">
         <FrenchieCatchGame
           ownedItems={catchItems}
           equippedBoxImage={equippedBoxImage}
@@ -80,14 +80,13 @@ export default async function ItemCatchPage() {
 
         <Link
           href="/games/item-catch/guide"
-          className="rough-card flex items-center gap-3 p-4 active:scale-[0.99]"
+          className="rough-card flex min-h-12 items-center gap-3 px-4 py-3 active:scale-[0.99]"
         >
-          <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-leaf-soft text-leaf-deep">
+          <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-2xl bg-leaf-soft text-leaf-deep">
             <IconNotebook size={21} />
           </span>
           <span className="min-w-0 flex-1">
-            <span className="block text-sm font-bold">ルールとスキルを見る</span>
-            <span className="mt-0.5 block text-[11px] text-ink-soft">得点のしくみと、持っているスキルの効果</span>
+            <span className="block text-sm font-bold">ルール・スキル</span>
           </span>
           <IconChevronRight size={18} className="shrink-0 text-ink-faint" />
         </Link>
