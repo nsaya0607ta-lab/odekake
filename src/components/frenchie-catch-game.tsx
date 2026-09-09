@@ -1092,6 +1092,15 @@ export function FrenchieCatchGame({
   const nextGreenAppleSpawnRef = useRef(0);
   const nextListenSpawnRef = useRef(0);
   const rafRef = useRef<number | null>(null);
+  /**
+   * 一時停止機能：すべての時刻管理（startAtRef/endAtRef/各種UntilRef）はperformance.now()の
+   * 絶対時刻ベースなので、一時停止中に経過した実時間ぶんをpausedOffsetRefに積算し、
+   * nowMs()（＝performance.now() - pausedOffsetRef）を「実質的なゲーム内時計」として
+   * 全箇所で統一して使う。こうすることで一時停止中は時間・各種タイマーが一切進まなくなる。
+   */
+  const pausedOffsetRef = useRef(0);
+  const pauseStartedAtRef = useRef(0);
+  const nowMs = useCallback(() => performance.now() - pausedOffsetRef.current, []);
   /** setScoreで画面表示する直前に必ずMath.ceilで整数化する（各加算箇所は既に整数のはずだが、
    * 表示側でも保険をかけて小数点表示が絶対に出ないようにする）。 */
   const scoreRef = useRef(0);
@@ -1211,7 +1220,7 @@ export function FrenchieCatchGame({
     return eff && eff.key === key ? Math.max(0, 1 - eff.percent / 100) : 1;
   }, []);
 
-  const [phase, setPhase] = useState<"idle" | "playing" | "finished">("idle");
+  const [phase, setPhase] = useState<"idle" | "playing" | "paused" | "finished">("idle");
   /** ラウンド中に捕まえたマフィアーの個数（結果画面表示用） */
   const [mafiaCaughtCount, setMafiaCaughtCount] = useState(0);
   const [entities, setEntities] = useState<Entity[]>([]);
@@ -1338,8 +1347,8 @@ export function FrenchieCatchGame({
    * 既存のスポーンタイマー側の時間増加系取得ペースを完全に不変に保つ。
    */
   const createEntity = useCallback((excludeTimeBonus = false): Entity => {
-    const fallSpeedBoost = performance.now() < fallSpeedBoostUntilRef.current ? fallSpeedValueRef.current : 1;
-    const slantBoost = performance.now() < slantBoostUntilRef.current ? SLANT_VX_BOOST : 1;
+    const fallSpeedBoost = nowMs() < fallSpeedBoostUntilRef.current ? fallSpeedValueRef.current : 1;
+    const slantBoost = nowMs() < slantBoostUntilRef.current ? SLANT_VX_BOOST : 1;
     const rawVy = (17 + Math.random() * 5) * 1.35;
     const spawnX = 9 + Math.random() * 82;
     const spawnY = -13 - Math.random() * 5;
@@ -1401,7 +1410,7 @@ export function FrenchieCatchGame({
       mrFloodRemainingRef.current -= 1;
       // ブレブルは時間増加系カットオフの対象なので、カットオフ発動中はMRフラッドの抽選からも除外する
       // （除外すると空になる場合のみ、フラッド自体が止まらないよう全MRへフォールバックする）
-      const cutoffActive = (performance.now() - startAtRef.current) / 1000 >= timeBonusCutoffSecRef.current;
+      const cutoffActive = (nowMs() - startAtRef.current) / 1000 >= timeBonusCutoffSecRef.current;
       const filteredMrPool = cutoffActive
         ? mrCharacterPoolRef.current.filter((item) => !TIME_BONUS_CUTOFF_ITEM_IDS.has(item.id))
         : mrCharacterPoolRef.current;
@@ -1438,7 +1447,7 @@ export function FrenchieCatchGame({
     }
 
     const hazardRoll = Math.random();
-    if (hazardRoll < POOP_SPAWN_CHANCE && performance.now() >= poopSuppressUntilRef.current) {
+    if (hazardRoll < POOP_SPAWN_CHANCE && nowMs() >= poopSuppressUntilRef.current) {
       return {
         ...base,
         itemId: POOP_ITEM_ID,
@@ -1482,8 +1491,8 @@ export function FrenchieCatchGame({
       };
     }
 
-    const hazardShieldActive = performance.now() < hazardShieldUntilRef.current;
-    const elapsedSec = (performance.now() - startAtRef.current) / 1000;
+    const hazardShieldActive = nowMs() < hazardShieldUntilRef.current;
+    const elapsedSec = (nowMs() - startAtRef.current) / 1000;
     const timeMinusWeightFactor = elapsedSec > TIME_MINUS_BOOST_AFTER_SEC ? TIME_MINUS_BOOSTED_WEIGHT / TIME_MINUS_BASE_WEIGHT : 1;
     /** ダンボールNo.7「マイナスアイテムの出現率ダウン」：時間減少/ダンボール縮小/イカスミ/しびれ/呪いのチョコレートの5種の出現率を一律で下げる */
     const negativeSpawnDownFactor = dambourleDownMultiplier("negative_spawn_down");
@@ -1515,14 +1524,14 @@ export function FrenchieCatchGame({
     }
 
     const urBoostFactor = 1 + Math.min(urBoostRef.current, UR_BOOST_MAX) / 100;
-    const otherSuppressActive = performance.now() < otherSuppressUntilRef.current;
-    const highRarityLockActive = performance.now() < highRarityLockUntilRef.current;
+    const otherSuppressActive = nowMs() < otherSuppressUntilRef.current;
+    const highRarityLockActive = nowMs() < highRarityLockUntilRef.current;
     /**
      * 出現量アップ中は時間増加系8種の重みをブースト倍率で割り、取得ペースがブーストなしの時と
      * 変わらないよう相殺する（詳細はdocs/minigame-time-balance.mdの「出現量ブーストの1/n相殺」参照）。
      * これにより出現量アップ側の倍率をどれだけ強くしても、時間増加系側のr値には影響しなくなる。
      */
-    const spawnRateBoostActive = performance.now() < spawnRateBoostUntilRef.current;
+    const spawnRateBoostActive = nowMs() < spawnRateBoostUntilRef.current;
     const timeBonusCutoffActive = elapsedSec >= timeBonusCutoffSecRef.current;
     /**
      * ダンボールNo.1「アイテム出現量アップ」：既存の出現量アップ系スキルと同じ「出現間隔そのものを
@@ -1555,7 +1564,7 @@ export function FrenchieCatchGame({
     let roll = Math.random() * (dogWeight + itemWeightTotal);
 
     if (roll < dogWeight) {
-      const dogGoldenActive = performance.now() < dogGoldenUntilRef.current;
+      const dogGoldenActive = nowMs() < dogGoldenUntilRef.current;
       if (dogGoldenActive) {
         return {
           ...base,
@@ -1629,8 +1638,8 @@ export function FrenchieCatchGame({
   const createClawdBallEntity = useCallback((): Entity | null => {
     const { soccer, gold } = clawdBallItemsRef.current;
     if (!soccer && !gold) return null;
-    const fallSpeedBoost = performance.now() < fallSpeedBoostUntilRef.current ? fallSpeedValueRef.current : 1;
-    const slantBoost = performance.now() < slantBoostUntilRef.current ? SLANT_VX_BOOST : 1;
+    const fallSpeedBoost = nowMs() < fallSpeedBoostUntilRef.current ? fallSpeedValueRef.current : 1;
+    const slantBoost = nowMs() < slantBoostUntilRef.current ? SLANT_VX_BOOST : 1;
     const rawVy = (17 + Math.random() * 5) * 1.35;
     const spawnX = 9 + Math.random() * 82;
     const spawnY = -13 - Math.random() * 5;
@@ -1669,8 +1678,8 @@ export function FrenchieCatchGame({
    * 追加で降ってくる（Clawdのサッカーボール／ゴールドボールと同じ「並行スポーン」方式）。
    */
   const createGreenAppleEntity = useCallback((): Entity => {
-    const fallSpeedBoost = performance.now() < fallSpeedBoostUntilRef.current ? fallSpeedValueRef.current : 1;
-    const slantBoost = performance.now() < slantBoostUntilRef.current ? SLANT_VX_BOOST : 1;
+    const fallSpeedBoost = nowMs() < fallSpeedBoostUntilRef.current ? fallSpeedValueRef.current : 1;
+    const slantBoost = nowMs() < slantBoostUntilRef.current ? SLANT_VX_BOOST : 1;
     const rawVy = (17 + Math.random() * 5) * 1.35;
     const spawnX = 9 + Math.random() * 82;
     const spawnY = -13 - Math.random() * 5;
@@ -1704,8 +1713,8 @@ export function FrenchieCatchGame({
    * 従来通りdogFloodRemainingRefのフラッド方式のまま（落下速度アップ等と同時発動する演出のため）。
    */
   const createListenDogEntity = useCallback((): Entity => {
-    const fallSpeedBoost = performance.now() < fallSpeedBoostUntilRef.current ? fallSpeedValueRef.current : 1;
-    const slantBoost = performance.now() < slantBoostUntilRef.current ? SLANT_VX_BOOST : 1;
+    const fallSpeedBoost = nowMs() < fallSpeedBoostUntilRef.current ? fallSpeedValueRef.current : 1;
+    const slantBoost = nowMs() < slantBoostUntilRef.current ? SLANT_VX_BOOST : 1;
     const rawVy = (17 + Math.random() * 5) * 1.35;
     const spawnX = 9 + Math.random() * 82;
     const spawnY = -13 - Math.random() * 5;
@@ -1775,8 +1784,8 @@ export function FrenchieCatchGame({
   }, []);
 
   useEffect(() => {
-    if (phase !== "playing" || performance.now() < stunUntilRef.current) return;
-    let last = performance.now();
+    if (phase !== "playing" || nowMs() < stunUntilRef.current) return;
+    let last = nowMs();
 
     /** いつものフレブル(N)を取った回数×プレイ時間(秒)を最後にまとめて加算する（小数点切り捨て） */
     const finishRound = (now: number) => {
@@ -1795,7 +1804,10 @@ export function FrenchieCatchGame({
       setPhase("finished");
     };
 
-    const frame = (now: number) => {
+    const frame = (rafNow: number) => {
+      // requestAnimationFrameが渡す時刻は一時停止中も進み続ける生のクロックなので、
+      // nowMs()と同じ基準（pausedOffsetRef分を差し引いた値）に補正してから使う。
+      const now = rafNow - pausedOffsetRef.current;
       const remaining = Math.max(0, (endAtRef.current - now) / 1000);
       setTimeLeft(Math.ceil(remaining));
       if (remaining <= 0) {
@@ -1920,10 +1932,11 @@ export function FrenchieCatchGame({
         nextGreenAppleSpawnRef.current = now + SPAWN_INTERVAL_MIN_MS + Math.random() * (SPAWN_INTERVAL_MAX_MS - SPAWN_INTERVAL_MIN_MS);
       }
       // Listen to the a-も他のアイテムのスポーンを止めず、並行スポーンで初期フレブルを追加投入する
+      // （大量発生の体感を出すため、通常スポーンと同じ間隔ではなくDOG_FLOOD_SPAWN_RATE倍で間隔を詰める）
       if (listenFloodRemainingRef.current > 0 && now >= nextListenSpawnRef.current && entitiesRef.current.length < entityCap) {
         listenFloodRemainingRef.current -= 1;
         entitiesRef.current.push(createListenDogEntity());
-        nextListenSpawnRef.current = now + SPAWN_INTERVAL_MIN_MS + Math.random() * (SPAWN_INTERVAL_MAX_MS - SPAWN_INTERVAL_MIN_MS);
+        nextListenSpawnRef.current = now + (SPAWN_INTERVAL_MIN_MS + Math.random() * (SPAWN_INTERVAL_MAX_MS - SPAWN_INTERVAL_MIN_MS)) / DOG_FLOOD_SPAWN_RATE;
       }
 
       const boxWide = now < boxWideUntilRef.current;
@@ -3080,8 +3093,60 @@ export function FrenchieCatchGame({
     };
   }, [phase]);
 
+  /**
+   * プレイ中（一時停止含む）は誤操作防止のため、ゲーム画面以外を一切さわれなくする。
+   * - body.item-catch-lockedクラス：下部ナビを隠し、item-catch-lockableを付けた要素
+   *   （戻るボタン・ルールを見るリンク・ランキング等）をpointer-events:noneにする（globals.css参照）
+   * - スクロール・スワイプ自体のロックはwanko-bowlingのBowlingScreenLockと同じ手法
+   *   （body position:fixedでスクロール位置を固定）で行う
+   * playing⇔pausedの切り替えではlocked自体は変化しないため、両エフェクトとも再実行されず
+   * （＝スクロール位置の再固定によるチラつきが起きない）、idle/finishedへ抜けたときだけ解除する。
+   */
+  const isLocked = phase === "playing" || phase === "paused";
+  useEffect(() => {
+    document.body.classList.toggle("item-catch-locked", isLocked);
+    return () => {
+      document.body.classList.remove("item-catch-locked");
+    };
+  }, [isLocked]);
+
+  useEffect(() => {
+    if (!isLocked) return;
+    const body = document.body;
+    const html = document.documentElement;
+    const scrollY = window.scrollY;
+    const previous = {
+      bodyOverflow: body.style.overflow,
+      bodyPosition: body.style.position,
+      bodyTop: body.style.top,
+      bodyWidth: body.style.width,
+      bodyOverscroll: body.style.overscrollBehavior,
+      htmlOverflow: html.style.overflow,
+      htmlOverscroll: html.style.overscrollBehavior,
+    };
+    body.style.overflow = "hidden";
+    body.style.position = "fixed";
+    body.style.top = `-${scrollY}px`;
+    body.style.width = "100%";
+    body.style.overscrollBehavior = "none";
+    html.style.overflow = "hidden";
+    html.style.overscrollBehavior = "none";
+
+    return () => {
+      body.style.overflow = previous.bodyOverflow;
+      body.style.position = previous.bodyPosition;
+      body.style.top = previous.bodyTop;
+      body.style.width = previous.bodyWidth;
+      body.style.overscrollBehavior = previous.bodyOverscroll;
+      html.style.overflow = previous.htmlOverflow;
+      html.style.overscrollBehavior = previous.htmlOverscroll;
+      window.scrollTo(0, scrollY);
+    };
+  }, [isLocked]);
+
   const startGame = useCallback(() => {
-    const now = performance.now();
+    pausedOffsetRef.current = 0;
+    const now = nowMs();
     // No.12「効果ルーレット」はここで対象9種から抽選し、以後このラウンド中は固定する
     dambourleEffectRef.current = resolveDambourleEffect(dambourleEffectPropRef.current);
     timeBonusCutoffSecRef.current = timeBonusCutoffSecDisplay
@@ -3194,11 +3259,11 @@ export function FrenchieCatchGame({
   }, [timeBonusCutoffSecDisplay, refreshEffectStatus]);
 
   const moveBox = useCallback((clientX: number) => {
-    if (performance.now() < stunUntilRef.current) return;
+    if (nowMs() < stunUntilRef.current) return;
     const rect = boardRef.current?.getBoundingClientRect();
     if (!rect || rect.width <= 0) return;
     const pointerX = ((clientX - rect.left) / rect.width) * 100;
-    const now = performance.now();
+    const now = nowMs();
     const boxScale = (now < boxShrinkUntilRef.current ? BOX_SHRINK_SCALE : now < boxWideUntilRef.current ? boxWideScaleRef.current : 1) * dambourleUpMultiplier("box_size_up");
     const dynamicHalf = BOX_HALF * boxScale;
     const nextX = clamp(pointerX - dragOffsetRef.current, dynamicHalf, 100 - dynamicHalf);
@@ -3221,13 +3286,32 @@ export function FrenchieCatchGame({
   };
 
   const pointerMove = (event: ReactPointerEvent<HTMLDivElement>) => {
-    if (phase === "playing" && draggingRef.current && performance.now() >= stunUntilRef.current) moveBox(event.clientX);
+    if (phase === "playing" && draggingRef.current && nowMs() >= stunUntilRef.current) moveBox(event.clientX);
   };
 
   const pointerEnd = (event: ReactPointerEvent<HTMLDivElement>) => {
     draggingRef.current = false;
     if (event.currentTarget.hasPointerCapture(event.pointerId)) event.currentTarget.releasePointerCapture(event.pointerId);
   };
+
+  /**
+   * 一時停止：メインループのuseEffectはphase===playingのときだけRAFを回す設計なので、
+   * phaseを変えるだけでRAFが止まり、entities/score/timeLeft等はそのまま保持される。
+   * 再開時はpausedOffsetRefに一時停止していた実時間ぶんを積算し、startAtRef/endAtRef等の
+   * 絶対時刻を巻き戻す（nowMs()がその分だけ戻るのでUntilRef系の残り時間もズレない）。
+   */
+  const pauseGame = useCallback(() => {
+    if (phase !== "playing") return;
+    draggingRef.current = false;
+    pauseStartedAtRef.current = performance.now();
+    setPhase("paused");
+  }, [phase]);
+
+  const resumeGame = useCallback(() => {
+    if (phase !== "paused") return;
+    pausedOffsetRef.current += performance.now() - pauseStartedAtRef.current;
+    setPhase("playing");
+  }, [phase]);
 
   return (
     <section className="rough-card overflow-hidden p-0">
@@ -3242,7 +3326,21 @@ export function FrenchieCatchGame({
           <p className="text-[10px] font-bold tracking-[0.16em] text-ink-faint">MINI GAME</p>
           <h2 className="mt-0.5 text-base font-black text-ink">アイテムキャッチ</h2>
         </div>
-        <span className="rounded-full bg-leaf-soft px-2.5 py-1 text-[10px] font-bold text-leaf-deep">50秒チャレンジ</span>
+        {phase === "playing" ? (
+          <button
+            type="button"
+            onClick={pauseGame}
+            aria-label="一時停止"
+            className="pressable flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-line bg-paper text-ink-soft shadow-sm active:scale-95"
+          >
+            <span aria-hidden className="flex gap-[3px]">
+              <span className="h-3.5 w-1 rounded-full bg-current" />
+              <span className="h-3.5 w-1 rounded-full bg-current" />
+            </span>
+          </button>
+        ) : (
+          <span className="rounded-full bg-leaf-soft px-2.5 py-1 text-[10px] font-bold text-leaf-deep">50秒チャレンジ</span>
+        )}
       </div>
 
       <div
@@ -3348,10 +3446,10 @@ export function FrenchieCatchGame({
           ref={catcherRef}
           role="button"
           aria-label="拾ってくだブーの段ボールを左右に動かす"
-          className={`absolute bottom-[0.5%] z-30 touch-none select-none rounded-3xl transition-[width,transform] duration-200 ${performance.now() < magnetUntilRef.current ? "shadow-[0_0_20px_6px_rgba(120,170,240,0.55)] ring-4 ring-sky-300/70" : ""}`}
+          className={`absolute bottom-[0.5%] z-30 touch-none select-none rounded-3xl transition-[width,transform] duration-200 ${nowMs() < magnetUntilRef.current ? "shadow-[0_0_20px_6px_rgba(120,170,240,0.55)] ring-4 ring-sky-300/70" : ""}`}
           style={{
             left: `${boxX}%`,
-            width: `${BOX_WIDTH * (performance.now() < boxShrinkUntilRef.current ? BOX_SHRINK_SCALE : performance.now() < boxWideUntilRef.current ? boxWideScaleRef.current : 1) * dambourleUpMultiplier("box_size_up")}%`,
+            width: `${BOX_WIDTH * (nowMs() < boxShrinkUntilRef.current ? BOX_SHRINK_SCALE : nowMs() < boxWideUntilRef.current ? boxWideScaleRef.current : 1) * dambourleUpMultiplier("box_size_up")}%`,
             height: `${BOX_HEIGHT}%`,
             transform: `translateX(-50%) scaleY(${boxBounce ? 1.015 : 1})`,
           }}
@@ -3361,7 +3459,7 @@ export function FrenchieCatchGame({
           onPointerCancel={pointerEnd}
         >
           {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src={equippedBoxImage} alt={equippedBoxAlt} draggable={false} className={`pointer-events-none absolute inset-0 h-full w-full ${performance.now() < boxWideUntilRef.current && performance.now() >= boxShrinkUntilRef.current ? "object-fill" : "object-contain"}`} />
+          <img src={equippedBoxImage} alt={equippedBoxAlt} draggable={false} className={`pointer-events-none absolute inset-0 h-full w-full ${nowMs() < boxWideUntilRef.current && nowMs() >= boxShrinkUntilRef.current ? "object-fill" : "object-contain"}`} />
           {stunned ? <span className="pointer-events-none absolute -right-4 top-1/2 -translate-y-1/2 text-2xl" aria-label="しびれ中">⚡</span> : null}
         </div>
 
@@ -3370,7 +3468,16 @@ export function FrenchieCatchGame({
         {phase !== "playing" ? (
           <div className="absolute inset-0 z-50 flex items-center justify-center bg-[#f9f3e7]/70 px-6 backdrop-blur-[2px]">
             <div className="w-full max-w-xs rounded-[28px] border border-white/90 bg-card/95 p-5 text-center shadow-xl">
-              {phase === "finished" ? (
+              {phase === "paused" ? (
+                <>
+                  <p className="text-[10px] font-black tracking-[0.18em] text-ink-faint">PAUSE</p>
+                  <p className="mt-1 text-xl font-black text-ink">一時停止中</p>
+                  <div className="mt-4 grid grid-cols-2 gap-2">
+                    <button type="button" onClick={resumeGame} className="rounded-full bg-leaf px-3 py-3 text-xs font-black text-white shadow-md active:translate-y-px">再開する</button>
+                    <button type="button" onClick={() => router.push("/games")} className="rounded-full border border-line bg-card px-3 py-3 text-xs font-black text-ink-soft shadow-sm active:translate-y-px">あきらめて終了</button>
+                  </div>
+                </>
+              ) : phase === "finished" ? (
                 <>
                   <p className="text-[10px] font-black tracking-[0.18em] text-ink-faint">RESULT</p>
                   <p className="mt-1 text-4xl font-black tabular-nums text-ink">{score.toLocaleString("ja-JP")}</p>
@@ -3420,7 +3527,9 @@ export function FrenchieCatchGame({
                   ) : null}
                 </>
               )}
-              <p className="mt-2 text-[9px] text-ink-faint">所持アイテム {itemPool.length}種類 + 初期フレブル</p>
+              {phase !== "paused" ? (
+                <p className="mt-2 text-[9px] text-ink-faint">所持アイテム {itemPool.length}種類 + 初期フレブル</p>
+              ) : null}
             </div>
           </div>
         ) : null}

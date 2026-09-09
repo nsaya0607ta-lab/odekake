@@ -62,11 +62,13 @@ export default async function ItemCatchPage() {
   return (
     <>
       <ItemCatchLiveRefresh />
-      <TopHeader
-        backHref="/games"
-        title="アイテムキャッチ"
-        subtitle="50秒でどこまでキャッチできる？"
-      />
+      <div className="item-catch-lockable">
+        <TopHeader
+          backHref="/games"
+          title="アイテムキャッチ"
+          subtitle="50秒でどこまでキャッチできる？"
+        />
+      </div>
 
       <PageBody className="!space-y-3 !py-3">
         <FrenchieCatchGame
@@ -80,7 +82,7 @@ export default async function ItemCatchPage() {
 
         <Link
           href="/games/item-catch/guide"
-          className="rough-card flex items-center gap-3 p-4 active:scale-[0.99]"
+          className="item-catch-lockable rough-card flex items-center gap-3 p-4 active:scale-[0.99]"
         >
           <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-leaf-soft text-leaf-deep">
             <IconNotebook size={21} />
@@ -92,7 +94,9 @@ export default async function ItemCatchPage() {
           <IconChevronRight size={18} className="shrink-0 text-ink-faint" />
         </Link>
 
-        <ItemCatchRanking />
+        <div className="item-catch-lockable">
+          <ItemCatchRanking />
+        </div>
       </PageBody>
     </>
   );

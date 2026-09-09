@@ -155,6 +155,19 @@
     display: none;
   }
 
+  /* アイテムキャッチのプレイ中（一時停止含む）は、誤タップでの離脱・スワイプでの
+     画面外操作を防ぐため下部ナビを隠し、ゲーム以外の要素（戻る・ルール・ランキング等）
+     を触れなくする。ロック対象の各要素にはitem-catch-lockableクラスを付ける
+     （スクロール自体のロックはfrenchie-catch-game.tsx側でbody.style直書きにより行う）。 */
+  body.item-catch-locked .app-bottom-nav {
+    display: none;
+  }
+
+  body.item-catch-locked .item-catch-lockable {
+    pointer-events: none;
+    opacity: 0.45;
+  }
+
   .sns-bottom-unread-dot {
     position: absolute;
     top: -0.15rem;
