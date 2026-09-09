@@ -69,9 +69,11 @@ export function getSeries(id: CollectionSeriesId): CollectionSeries | null {
 /**
  * シリーズの小物アイテムはミニゲーム用スキルが未整備なので、犬スキン(art持ち)以外は
  * ミニゲームに出現せず、スキルレベルの概念も持たない。
+ * ただし寿司シリーズはミニゲーム用スキル・出現重みが個別に整備済み（frenchie-catch-game.tsxの
+ * ITEM_SPAWN_WEIGHTS・スキルswitch分岐を参照）なので、他のシリーズと違い出現対象に含める。
  */
 export function hasMinigameSkillLevel(item: Pick<CollectionItem, "series" | "art">): boolean {
-  return item.series === null || item.art !== undefined;
+  return item.series === null || item.series === "sushi" || item.art !== undefined;
 }
 
 const CURATED_ITEMS: readonly CollectionItem[] = [
