@@ -1920,10 +1920,11 @@ export function FrenchieCatchGame({
         nextGreenAppleSpawnRef.current = now + SPAWN_INTERVAL_MIN_MS + Math.random() * (SPAWN_INTERVAL_MAX_MS - SPAWN_INTERVAL_MIN_MS);
       }
       // Listen to the a-も他のアイテムのスポーンを止めず、並行スポーンで初期フレブルを追加投入する
+      // （大量発生の体感を出すため、通常スポーンと同じ間隔ではなくDOG_FLOOD_SPAWN_RATE倍で間隔を詰める）
       if (listenFloodRemainingRef.current > 0 && now >= nextListenSpawnRef.current && entitiesRef.current.length < entityCap) {
         listenFloodRemainingRef.current -= 1;
         entitiesRef.current.push(createListenDogEntity());
-        nextListenSpawnRef.current = now + SPAWN_INTERVAL_MIN_MS + Math.random() * (SPAWN_INTERVAL_MAX_MS - SPAWN_INTERVAL_MIN_MS);
+        nextListenSpawnRef.current = now + (SPAWN_INTERVAL_MIN_MS + Math.random() * (SPAWN_INTERVAL_MAX_MS - SPAWN_INTERVAL_MIN_MS)) / DOG_FLOOD_SPAWN_RATE;
       }
 
       const boxWide = now < boxWideUntilRef.current;
