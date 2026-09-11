@@ -570,7 +570,10 @@ const ITEM_SPAWN_WEIGHTS: Partial<Record<string, number>> = {
   other_narcissist_a: 40 / 2,
   other_mafia_a: 40 / 2,
   /**
-   * 通常アイテム系プール（予算6100、在籍72種）：N:2400÷25=96ずつ(25種、2026-09-06に赤りんごを追加) /
+   * 通常アイテム系プール（予算6100、在籍77種）：N:2400÷30=80ずつ(30種、2026-09-11に寿司シリーズの
+   * N5種＝いわし握り・あじ握り・サバ握り・まぐろ握り・たまご握りを追加。この5種はスキルを持たず、
+   * どのプールのID一覧にも登録されないままDEFAULT_ITEM_SPAWN_WEIGHT(100)で無管理状態になっていた
+   * のを正式にこのプールへ組み込んだ） /
    * R:700÷10=70ずつ(10種、2026-09-07に寿司シリーズのいか握り・たこ握り・ほたて握りを追加。
    * サーモン握り・まぐろ(赤身)握りは時間増加系・得点倍率系プールへ移動したためこちらには残らない) /
    * SR:900÷12=75ずつ(12種、2026-09-07に寿司シリーズのかんぱち握り・えび握り・炙りサバ握りを追加。
@@ -588,31 +591,36 @@ const ITEM_SPAWN_WEIGHTS: Partial<Record<string, number>> = {
    * 「普通のフレブル」(dog)の相対確率は薄まらない。MRランクに初めて追加する場合のみ、
    * 新たにMRランク予算を設定してプール総予算に加算すること（他ランクの予算はいじらない）。
    */
-  toy_colorful_ball: 2400 / 25,
-  toy_rope: 2400 / 25,
-  toy_bone: 2400 / 25,
-  toy_squeaky_ball: 2400 / 25,
-  toy_tennis_ball: 2400 / 25,
-  toy_red_slipper: 2400 / 25,
-  toy_wood_stick: 2400 / 25,
-  toy_donut_rope: 2400 / 25,
-  food_smile_onigiri: 2400 / 25,
-  food_paw_taiyaki: 2400 / 25,
-  food_dog_milk: 2400 / 25,
-  food_cheese_cubes: 2400 / 25,
-  food_roasted_sweet_potato: 2400 / 25,
-  food_honey_butter_toast: 2400 / 25,
-  other_yellow_rain_boots: 2400 / 25,
-  accessory_red_bandana: 2400 / 25,
-  other_acorns: 2400 / 25,
-  toy_paper_airplane: 2400 / 25,
-  other_walk_water_bottle: 2400 / 25,
-  other_shiny_pinecone: 2400 / 25,
-  accessory_blue_handkerchief: 2400 / 25,
-  toy_red_balloon: 2400 / 25,
-  toy_sand_bucket: 2400 / 25,
-  accessory_walk_pouch: 2400 / 25,
-  other_red_apple: 2400 / 25,
+  toy_colorful_ball: 2400 / 30,
+  toy_rope: 2400 / 30,
+  toy_bone: 2400 / 30,
+  toy_squeaky_ball: 2400 / 30,
+  toy_tennis_ball: 2400 / 30,
+  toy_red_slipper: 2400 / 30,
+  toy_wood_stick: 2400 / 30,
+  toy_donut_rope: 2400 / 30,
+  food_smile_onigiri: 2400 / 30,
+  food_paw_taiyaki: 2400 / 30,
+  food_dog_milk: 2400 / 30,
+  food_cheese_cubes: 2400 / 30,
+  food_roasted_sweet_potato: 2400 / 30,
+  food_honey_butter_toast: 2400 / 30,
+  other_yellow_rain_boots: 2400 / 30,
+  accessory_red_bandana: 2400 / 30,
+  other_acorns: 2400 / 30,
+  toy_paper_airplane: 2400 / 30,
+  other_walk_water_bottle: 2400 / 30,
+  other_shiny_pinecone: 2400 / 30,
+  accessory_blue_handkerchief: 2400 / 30,
+  toy_red_balloon: 2400 / 30,
+  toy_sand_bucket: 2400 / 30,
+  accessory_walk_pouch: 2400 / 30,
+  other_red_apple: 2400 / 30,
+  sushi_iwashi: 2400 / 30,
+  sushi_aji: 2400 / 30,
+  sushi_saba: 2400 / 30,
+  sushi_maguro: 2400 / 30,
+  sushi_tamago: 2400 / 30,
   toy_frisbee: 700 / 10,
   toy_soccer_ball: 700 / 10,
   toy_taiyaki_plush: 700 / 10,
