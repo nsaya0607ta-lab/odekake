@@ -59,6 +59,7 @@ export const GACHA_PRIZES: readonly GachaPrize[] = [
   { id: "food_fruit_basket", name: "フルーツバスケット", rarity: "SR", type: "item", image: "/collection/items/fruit-basket.webp" },
   { id: "food_kamikami", name: "かみかみ", rarity: "R", type: "item", image: "/collection/items/kamikami.webp" },
   { id: "food_mocchurin", name: "もっちゅりん", rarity: "UR", type: "item", image: "/collection/items/mocchurin.webp" },
+  { id: "other_red_apple", name: "赤りんご", rarity: "N", type: "item", image: "/collection/items/red-apple.webp" },
 
   // --- 通常ガチャ：インテリア ----------------------------------------
   { id: "interior_stretch_rod", name: "ストレッチ棒", rarity: "R", type: "item", image: "/collection/items/stretch-rod.webp" },
@@ -107,6 +108,8 @@ export const GACHA_PRIZES: readonly GachaPrize[] = [
   { id: "other_mirror_omochi", name: "ミラーおもち", rarity: "UR", type: "item", image: "/collection/items/mirror-omochi.webp" },
   { id: "other_toorematen", name: "通れまてん", rarity: "UR", type: "item", image: "/collection/items/toorematen.webp" },
   { id: "other_hia", name: "hiA", rarity: "UR", type: "item", image: "/collection/items/hia.webp" },
+  { id: "other_mrs_green_apple", name: "Mrs. GREEN アーPPLE", rarity: "UR", type: "item", image: "/collection/items/mrs-green-apple.webp" },
+  { id: "other_pink_omo", name: "ピンクオモ", rarity: "LR", type: "item", image: "/collection/items/pink-omo.webp" },
 
   // --- 通常ガチャ：おでかけ小物 ----------------------------------------
   { id: "other_yellow_rain_boots", name: "きいろのながぐつ", rarity: "N", type: "item", image: "/collection/items/yellow-rain-boots.webp" },
