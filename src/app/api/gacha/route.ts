@@ -1,9 +1,10 @@
 import { NextResponse } from "next/server";
 import { GACHA_HUNDRED_RARITY_RATES, GACHA_PLANS, isGachaPlanId } from "@/lib/gacha/config";
 import { drawPrizes } from "@/lib/gacha/draw";
-import { getPrize } from "@/lib/gacha/prizes";
+import { GACHA_PRIZES, getPrize } from "@/lib/gacha/prizes";
 import { getSkillLevel } from "@/lib/gacha/skill-levels";
 import { getOwnedItemCounts } from "@/lib/data/collection";
+import { isManagementTestAccount, MANAGEMENT_TEST_ACCOUNT_ITEM_IDS } from "@/lib/management-test-account";
 import { checkRateLimit } from "@/lib/rate-limit";
 import { requireUser } from "@/lib/supabase/server";
 
@@ -51,7 +52,11 @@ export async function POST(request: Request) {
     );
   }
 
-  const drawn = drawPrizes(plan.draws, body.plan === "hundred" ? GACHA_HUNDRED_RARITY_RATES : undefined);
+  // 検証用の管理アカウントだけ、出現アイテムを直近追加した10種に絞る（ユーザー指定）
+  const gachaPool = isManagementTestAccount(user.displayName)
+    ? GACHA_PRIZES.filter((prize) => MANAGEMENT_TEST_ACCOUNT_ITEM_IDS.includes(prize.id))
+    : GACHA_PRIZES;
+  const drawn = drawPrizes(plan.draws, body.plan === "hundred" ? GACHA_HUNDRED_RARITY_RATES : undefined, gachaPool);
   if (drawn.length !== plan.draws) {
     console.error("Gacha prize pool is empty", { plan: body.plan, drawn: drawn.length });
     return NextResponse.json({ error: "ただいまガチャを準備中です。" }, { status: 503 });
