@@ -392,7 +392,7 @@ const LV = {
   /**
    * 天然クエ握り：出現量アップ・制御系プールLR。取得した瞬間、画面に今表示されている
    * （これから降ってくるものは対象外）マイナス系アイテム（NEGATIVE_HAZARD_IDS）のうち
-   * Lv個ぶんを時間増加系アイテムへ変化させる（ユーザー指定）。倍率・秒数は無く、変化させる個数
+   * Lv個ぶんを得点倍率系アイテムへ変化させる（ユーザー指定）。倍率・秒数は無く、変化させる個数
    * だけがLvで伸びる。
    */
   KUE_CONVERT_COUNT: [1, 2, 3, 4, 5, 6, 7, 7, 8, 9],
@@ -570,7 +570,7 @@ const ITEM_SPAWN_WEIGHTS: Partial<Record<string, number>> = {
    * このプールに含める（NODOGURO_SIZE_SCALE参照）。車海老握りは漆黒のアー（落下速度アップ）と
    * ラグビーアー（出現量アップ）の中間スキル（両方の効果を半分程度の強さで併せ持つ）のため、
    * ラグビーアーと同じ「出現制御系」の扱いでこのプールのLR枠に含める。天然クエ握りは「画面に
-   * 表示中のマイナス系アイテムをLv個ぶん時間増加系アイテムへ変化させる」という新規の出現制御系
+   * 表示中のマイナス系アイテムをLv個ぶん得点倍率系アイテムへ変化させる」という新規の出現制御系
    * スキル（KUE_CONVERT_COUNT参照）のため、2026-09-12にLR枠へ追加（既存3種→4種）。
    */
   toy_rainbow_ball: 144 / 5,
@@ -816,8 +816,18 @@ const PERSON_CHARACTER_ITEM_IDS = ["other_omochi_janai", "other_listen_to_the_a"
 const PERSON_CHARACTER_ITEMS: CollectionItem[] = PERSON_CHARACTER_ITEM_IDS
   .map((id) => COLLECTION_ITEMS.find((entry) => entry.id === id))
   .filter((entry): entry is CollectionItem => entry != null);
+/**
+ * 得点倍率系プールのメンバー一覧。`scripts/simulate-item-catch.mjs`のSCORE_MULT_IDSと同一
+ * （手動同期）。天然クエ握りが画面上のマイナス系アイテムを変化させる先として使う。
+ */
+const SCORE_MULT_CONVERT_ITEM_IDS = new Set([
+  "toy_meat", "interior_spring_flower_wreath", "other_kamunayo", "other_nisoku_a", "other_azubee",
+  "interior_kinoko_azubee", "other_kobee", "interior_shikkoku_no_ar", "other_pink_omo",
+  "other_narcissist_a", "other_mafia_a", "sushi_maguro_akami", "sushi_chutoro", "sushi_uni",
+  "sushi_fugu", "sushi_nama_ebi", "sushi_negishio_maguro", "sushi_akagai", "sushi_awabi",
+]);
 /** 天然クエ握りが画面上のマイナス系アイテムを変化させる先。未所持のものは出さないよう所持アイテムだけに絞る */
-const TIME_BONUS_CONVERT_ITEMS: CollectionItem[] = [...TIME_BONUS_ITEM_IDS]
+const SCORE_MULT_CONVERT_ITEMS: CollectionItem[] = [...SCORE_MULT_CONVERT_ITEM_IDS]
   .map((id) => COLLECTION_ITEMS.find((entry) => entry.id === id))
   .filter((entry): entry is CollectionItem => entry != null);
 /**
@@ -1111,7 +1121,12 @@ const FallingEntity = memo(function FallingEntity({
       {entity.rarity === "LR" ? <span className="absolute -inset-3 -z-10 animate-pulse rounded-full bg-[#e6b43c]/25 blur" /> : null}
     </div>
   );
-}, (prev, next) => prev.entity.id === next.entity.id);
+}, (prev, next) =>
+  prev.entity.id === next.entity.id
+  && prev.entity.image === next.entity.image
+  && prev.entity.name === next.entity.name
+  && prev.entity.rarity === next.entity.rarity,
+);
 
 export function FrenchieCatchGame({
   ownedItems,
@@ -1323,7 +1338,7 @@ export function FrenchieCatchGame({
   /** フルーツバスケット中に降ってくる「人物の入ったキャラ」。未所持のものは出さないよう所持アイテムだけに絞る */
   const personCharacterPoolRef = useRef<CollectionItem[]>([]);
   /** 天然クエ握りが画面上のマイナス系アイテムを変化させる先。未所持のものは出さないよう所持アイテムだけに絞る */
-  const timeBonusConvertPoolRef = useRef<CollectionItem[]>([]);
+  const scoreMultConvertPoolRef = useRef<CollectionItem[]>([]);
   /** Clawd中に降ってくるサッカーボール／ゴールドボール。未所持のものは出さないよう所持アイテムだけに絞る */
   const clawdBallItemsRef = useRef<{ soccer: CollectionItem | null; gold: CollectionItem | null }>({
     soccer: null,
@@ -1357,7 +1372,7 @@ export function FrenchieCatchGame({
     const pool = MYSTERY_SKILL_ITEM_IDS.filter((id) => ownedIds.has(id));
     mysterySkillPoolRef.current = pool.length > 0 ? pool : MYSTERY_SKILL_ITEM_IDS;
     personCharacterPoolRef.current = PERSON_CHARACTER_ITEMS.filter((item) => ownedIds.has(item.id));
-    timeBonusConvertPoolRef.current = TIME_BONUS_CONVERT_ITEMS.filter((item) => ownedIds.has(item.id));
+    scoreMultConvertPoolRef.current = SCORE_MULT_CONVERT_ITEMS.filter((item) => ownedIds.has(item.id));
     mrCharacterPoolRef.current = MR_CHARACTER_ITEMS.filter((item) => ownedIds.has(item.id));
     clawdBallItemsRef.current = {
       soccer: ownedIds.has(CLAWD_SOCCER_BALL_ITEM?.id ?? "") ? CLAWD_SOCCER_BALL_ITEM : null,
@@ -1887,6 +1902,14 @@ export function FrenchieCatchGame({
         return;
       }
 
+      /**
+       * 天然クエ握り用：エンティティの中身（itemId/image等）だけを書き換えた場合、
+       * entitiesの参照するidの集合自体は変わらないためidsChangedがfalseのままになり、
+       * setEntities(next)が呼ばれず見た目が更新されない（次に無関係な理由で再レンダリングが
+       * 起きるまで古い画像のまま表示され続けてしまう）。それを防ぐため、中身を書き換えた
+       * フレームは明示的にこのフラグを立てて強制的に再レンダリングさせる。
+       */
+      let forceEntityRerender = false;
       let timedEffectChanged = false;
       if (pruneScoreMultipliers(scoreMultipliersRef, now)) {
         timedEffectChanged = true;
@@ -2997,14 +3020,21 @@ export function FrenchieCatchGame({
               /**
                * 天然クエ握り：取得した瞬間、その時点で画面に表示されている（これから降ってくるものは
                * 対象外）マイナス系アイテム（NEGATIVE_HAZARD_IDS）のうちLv個ぶんを、所持している
-               * 時間増加系アイテムへランダムに変化させる（ユーザー指定）。物理状態（位置・速度・
-               * サイズ等）はそのまま引き継ぎ、見た目・itemId/kind/name/image/rarity/levelだけを
-               * 書き換える。React側の再描画（画像の切り替え）を確実に起こすため、idも新規発行する
-               * （idの変化だけでentitiesの再レンダリングをトリガーする既存の仕組みに乗せるため）。
+               * 得点倍率系アイテムへランダムに変化させる（ユーザー指定）。物理状態（位置・速度・
+               * サイズ等）はそのまま引き継ぎ、itemId/kind/name/image/rarity/levelだけを書き換える
+               * ことで「その場で変身する」演出にする（idは変えない。FallingEntityはspawnX/spawnYを
+               * 基準にした静的な座標へ現在位置をtransformで重ねる仕組みのため、idを変えて別コンポー
+               * ネントとしてマウントし直すとtransformが一瞬リセットされ、spawn地点＝画面上部から
+               * 新しいアイテムが降ってきたように見えてしまっていた）。
+               * idを変えない代わりに、entitiesの中身を書き換えたこのフレームはforceEntityRerenderを
+               * 立てて確実にsetEntities(next)を呼ばせる（idの集合が変わらない限りsetEntitiesが
+               * 呼ばれない既存の最適化を迂回する必要があるため）。FallingEntityのmemo比較関数も
+               * id以外にimage/name/rarityの変化を見るようにしてあるので、この再レンダリングで
+               * 実際に見た目（画像）が切り替わる。
                */
               case "sushi_kue": {
                 const convertCount = LV.KUE_CONVERT_COUNT[lv]!;
-                const convertPool = timeBonusConvertPoolRef.current;
+                const convertPool = scoreMultConvertPoolRef.current;
                 let convertedCount = 0;
                 if (convertPool.length > 0) {
                   for (const target of entitiesRef.current) {
@@ -3012,7 +3042,6 @@ export function FrenchieCatchGame({
                     if (target.status === "caught") continue;
                     if (!target.itemId || !NEGATIVE_HAZARD_IDS.has(target.itemId)) continue;
                     const picked = convertPool[Math.floor(Math.random() * convertPool.length)]!;
-                    target.id = nextIdRef.current++;
                     target.itemId = picked.id;
                     target.kind = "item";
                     target.name = picked.name;
@@ -3022,8 +3051,9 @@ export function FrenchieCatchGame({
                     convertedCount += 1;
                   }
                 }
+                if (convertedCount > 0) forceEntityRerender = true;
                 effectLabel = convertedCount > 0
-                  ? `画面上のマイナス系${convertedCount}個を時間増加系に変化${lvTag}`
+                  ? `画面上のマイナス系${convertedCount}個を得点倍率系に変化${lvTag}`
                   : `変化対象なし${lvTag}`;
                 statusChanged = convertedCount > 0;
                 break;
@@ -3177,7 +3207,7 @@ export function FrenchieCatchGame({
           }
         }
       }
-      if (idsChanged) {
+      if (idsChanged || forceEntityRerender) {
         mountedEntityIdsRef.current = nextIds;
         setEntities(next);
       }
