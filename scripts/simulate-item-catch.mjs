@@ -179,7 +179,7 @@ const REDUCED_CATCH_IDS = new Set([...TIME_BONUS_IDS, "other_okaeri"]);
 // 揺らぐため、TIME_BONUS_IDSと合わせてボーナス側では除外する（frenchie-catch-game.tsxのSPAWN_DYNAMICS_ITEM_IDSと同一）
 // other_listen_to_the_a（フレブル大量発生。厳密には出現重みの計算式ではなくdogFloodそのものを起こす
 // 効果だが）は、2026-09-03、単独チューニング枠からこのプールのLR枠に移動（ユーザー指定）。
-const SPAWN_DYNAMICS_IDS = new Set(["toy_rainbow_ball", "interior_stretch_rod", "toy_treasure_puzzle", "other_xmas_party", "other_pondeomo", "other_pondear", "other_jare_a", "interior_ragby_ar", "other_listen_to_the_a", "other_mrs_green_apple", "sushi_shirasu", "sushi_engawa", "sushi_oomonhata", "sushi_kazunoko", "sushi_nodoguro", "sushi_kuruma_ebi"]);
+const SPAWN_DYNAMICS_IDS = new Set(["toy_rainbow_ball", "interior_stretch_rod", "toy_treasure_puzzle", "other_xmas_party", "other_pondeomo", "other_pondear", "other_jare_a", "interior_ragby_ar", "other_listen_to_the_a", "other_mrs_green_apple", "sushi_shirasu", "sushi_engawa", "sushi_oomonhata", "sushi_kazunoko", "sushi_nodoguro", "sushi_kuruma_ebi", "sushi_kue"]);
 // 得点倍率プール（"○秒間×n"の得点倍率スキルを主効果として持つアイテム）。ITEM_SPAWN_WEIGHTSで
 // レアリティ別に重みを下げてある8種（frenchie-catch-game.tsxの同名コメント参照）。宝箱・夏のフレブル・
 // Xmas Partyは得点倍率効果も持つが、重みが時間バランス/出現量アップ側のチューニングで別途固定されている
@@ -191,7 +191,7 @@ const SPAWN_DYNAMICS_IDS = new Set(["toy_rainbow_ball", "interior_stretch_rod", 
 // ナルシストアー・マフィアーも同様に2026-09-03、単独チューニング枠からこのプールのMR枠に移動
 // （ユーザー指定。主効果はそれぞれ「全アイテムのスキルがLv.MAXで発動」「フレブル数ボーナス倍率」で
 // 得点倍率そのものではないが、重み管理上の扱いとして含める）。
-const SCORE_MULT_IDS = new Set(["toy_meat", "interior_spring_flower_wreath", "other_kamunayo", "other_nisoku_a", "other_azubee", "interior_kinoko_azubee", "other_kobee", "interior_shikkoku_no_ar", "other_pink_omo", "other_narcissist_a", "other_mafia_a", "sushi_maguro_akami", "sushi_chutoro", "sushi_uni", "sushi_fugu", "sushi_nama_ebi", "sushi_negishio_maguro"]);
+const SCORE_MULT_IDS = new Set(["toy_meat", "interior_spring_flower_wreath", "other_kamunayo", "other_nisoku_a", "other_azubee", "interior_kinoko_azubee", "other_kobee", "interior_shikkoku_no_ar", "other_pink_omo", "other_narcissist_a", "other_mafia_a", "sushi_maguro_akami", "sushi_chutoro", "sushi_uni", "sushi_fugu", "sushi_nama_ebi", "sushi_negishio_maguro", "sushi_akagai", "sushi_awabi"]);
 // 通常アイテム系プール（特殊効果を持たない全77種。frenchie-catch-game.tsxのNORMAL_ITEM_IDSと同一、手動同期）。
 const NORMAL_ITEM_IDS = new Set([
   "toy_colorful_ball", "toy_rope", "toy_bone", "toy_squeaky_ball", "toy_tennis_ball",
@@ -214,7 +214,7 @@ const NORMAL_ITEM_IDS = new Set([
   "other_omochi_janai", "other_oyasumi", "other_clawd",
   "food_mocchurin", "other_komochi", "other_omoi_bashira", "other_mah", "other_mirror_omochi",
   "other_toorematen", "other_hia",
-  "sushi_unagi",
+  "sushi_unagi", "sushi_torafugu",
   "hiking_frenchie", "snow_frenchie",
 ]);
 // 出現重みプールの合計値（＝プールの「予算」）。新アイテムをどれかのプールに追加してプレイ時間・
@@ -305,6 +305,7 @@ function simulateOneRound(lv, catchAll, timeBonusCatchRate = 0.8, normalCatchRat
       case "sushi_salmon": addBonusTime(LV.SALMON_SEC[lvIdx]); break;
       case "sushi_buri": addBonusTime(LV.BURI_SEC[lvIdx]); break;
       case "sushi_chutoro": multiplier15Until = t + SCORE_MULT_DURATION_SR_SEC * 1000; multiplier15Value = LV.CHUTORO_MULT[lvIdx]; break;
+      case "sushi_akagai": multiplier15Until = t + SCORE_MULT_DURATION_SR_SEC * 1000; multiplier15Value = LV.AKAGAI_MULT[lvIdx]; break;
       case "sushi_kanpachi": nextMultValue = LV.KANPACHI_MULT[lvIdx]; nextMultCount = LV.KANPACHI_COUNT[lvIdx]; break;
       case "sushi_maguro_akami": multiplier15Until = t + SCORE_MULT_DURATION_R_SEC * 1000; multiplier15Value = LV.MAGURO_AKAMI_MULT[lvIdx]; break;
       case "sushi_ika": points += LV.IKA_PT[lvIdx]; break;
@@ -345,6 +346,7 @@ function simulateOneRound(lv, catchAll, timeBonusCatchRate = 0.8, normalCatchRat
       case "other_azubee": multiplier2Until = t + SCORE_MULT_DURATION_UR_SEC * 1000; multiplier2Value = LV.AZUBEE_MULT[lvIdx]; break;
       case "sushi_uni": multiplier2Until = t + SCORE_MULT_DURATION_UR_SEC * 1000; multiplier2Value = LV.UNI_MULT[lvIdx]; break;
       case "sushi_fugu": multiplier2Until = t + SCORE_MULT_DURATION_UR_SEC * 1000; multiplier2Value = LV.FUGU_MULT[lvIdx]; break;
+      case "sushi_awabi": multiplier2Until = t + SCORE_MULT_DURATION_UR_SEC * 1000; multiplier2Value = LV.AWABI_MULT[lvIdx]; break;
       case "sushi_negishio_maguro": multiplier15Until = t + SCORE_MULT_DURATION_SSR_SEC * 1000; multiplier15Value = LV.NEGISHIO_MULT[lvIdx]; break;
       case "other_omojii": addBonusTime(LV.OMOJII_SEC[lvIdx]); points += LV.OMOJII_PT[lvIdx]; break;
       case "sushi_otoro": addBonusTime(LV.OTORO_SEC[lvIdx]); points += LV.OTORO_PT[lvIdx]; break;
