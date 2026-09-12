@@ -4,7 +4,7 @@ import { drawPrizes } from "@/lib/gacha/draw";
 import { GACHA_PRIZES, getPrize } from "@/lib/gacha/prizes";
 import { getSkillLevel } from "@/lib/gacha/skill-levels";
 import { getOwnedItemCounts } from "@/lib/data/collection";
-import { isManagementTestAccount, MANAGEMENT_TEST_ACCOUNT_ITEM_IDS } from "@/lib/management-test-account";
+import { isManagementTestAccount, MANAGEMENT_TEST_ACCOUNT_GACHA_ITEM_IDS } from "@/lib/management-test-account";
 import { checkRateLimit } from "@/lib/rate-limit";
 import { requireUser } from "@/lib/supabase/server";
 
@@ -57,7 +57,7 @@ export async function POST(request: Request) {
   // ではなく、常に最新のprofilesを直接見て判定する
   const { data: profile } = await supabase.from("profiles").select("display_name").eq("user_id", user.id).maybeSingle();
   const gachaPool = isManagementTestAccount(profile?.display_name)
-    ? GACHA_PRIZES.filter((prize) => MANAGEMENT_TEST_ACCOUNT_ITEM_IDS.includes(prize.id))
+    ? GACHA_PRIZES.filter((prize) => MANAGEMENT_TEST_ACCOUNT_GACHA_ITEM_IDS.includes(prize.id))
     : GACHA_PRIZES;
   const drawn = drawPrizes(plan.draws, body.plan === "hundred" ? GACHA_HUNDRED_RARITY_RATES : undefined, gachaPool);
   if (drawn.length !== plan.draws) {
