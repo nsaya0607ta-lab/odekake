@@ -24,13 +24,25 @@ function pickRarity(rates: Record<GachaRarity, number>): GachaRarity {
   return "N";
 }
 
-/** 当たったレアリティに景品が無い場合は下位レアリティへ順に落とす */
-function drawOne(rates: Record<GachaRarity, number>): GachaPrize | null {
+/**
+ * 当たったレアリティに景品が無い場合は下位レアリティへ順に落とす。それでも見つからない場合は
+ * 上位レアリティへ順に探す（pool を絞り込んだ結果、下位レアリティが1つも無いことがあるため。
+ * 通常のGACHA_PRIZESでは全レアリティに景品があるため、この上方向探索が使われることはない）。
+ */
+function drawOne(rates: Record<GachaRarity, number>, pool: readonly GachaPrize[]): GachaPrize | null {
   const start = GACHA_RARITIES.indexOf(pickRarity(rates));
   for (let index = start; index >= 0; index -= 1) {
     const rarity = GACHA_RARITIES[index];
     if (!rarity) continue;
-    const candidates = GACHA_PRIZES.filter((prize) => prize.rarity === rarity);
+    const candidates = pool.filter((prize) => prize.rarity === rarity);
+    if (candidates.length > 0) {
+      return candidates[Math.floor(Math.random() * candidates.length)] ?? null;
+    }
+  }
+  for (let index = start + 1; index < GACHA_RARITIES.length; index += 1) {
+    const rarity = GACHA_RARITIES[index];
+    if (!rarity) continue;
+    const candidates = pool.filter((prize) => prize.rarity === rarity);
     if (candidates.length > 0) {
       return candidates[Math.floor(Math.random() * candidates.length)] ?? null;
     }
@@ -38,11 +50,21 @@ function drawOne(rates: Record<GachaRarity, number>): GachaPrize | null {
   return null;
 }
 
-/** rates を省略すると通常の排出率（GACHA_RARITY_RATES）を使う。100連だけは専用の排出率を渡す。 */
-export function drawPrizes(count: number, rates: Record<GachaRarity, number> = GACHA_RARITY_RATES): GachaPrize[] {
+/**
+ * rates を省略すると通常の排出率（GACHA_RARITY_RATES）を使う。100連だけは専用の排出率を渡す。
+ * pool を渡すと、その景品一覧だけを対象に抽選する（検証用アカウント限定で出現アイテムを絞る用途、
+ * `src/lib/management-test-account.ts`参照）。pool内に存在しないレアリティを引いた場合は
+ * 下位レアリティへ順に落ちる通常の挙動のまま探すため、pool内のレアリティが偏っていても
+ * 必ずpool内のどれかが当たる（poolが空でない限りnullにはならない）。
+ */
+export function drawPrizes(
+  count: number,
+  rates: Record<GachaRarity, number> = GACHA_RARITY_RATES,
+  pool: readonly GachaPrize[] = GACHA_PRIZES,
+): GachaPrize[] {
   const results: GachaPrize[] = [];
   for (let i = 0; i < count; i += 1) {
-    const prize = drawOne(rates);
+    const prize = drawOne(rates, pool);
     if (!prize) break;
     results.push(prize);
   }

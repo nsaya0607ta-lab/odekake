@@ -179,7 +179,7 @@ const REDUCED_CATCH_IDS = new Set([...TIME_BONUS_IDS, "other_okaeri"]);
 // 揺らぐため、TIME_BONUS_IDSと合わせてボーナス側では除外する（frenchie-catch-game.tsxのSPAWN_DYNAMICS_ITEM_IDSと同一）
 // other_listen_to_the_a（フレブル大量発生。厳密には出現重みの計算式ではなくdogFloodそのものを起こす
 // 効果だが）は、2026-09-03、単独チューニング枠からこのプールのLR枠に移動（ユーザー指定）。
-const SPAWN_DYNAMICS_IDS = new Set(["toy_rainbow_ball", "interior_stretch_rod", "toy_treasure_puzzle", "other_xmas_party", "other_pondeomo", "other_pondear", "other_jare_a", "interior_ragby_ar", "other_listen_to_the_a", "other_mrs_green_apple", "sushi_shirasu", "sushi_engawa", "sushi_oomonhata"]);
+const SPAWN_DYNAMICS_IDS = new Set(["toy_rainbow_ball", "interior_stretch_rod", "toy_treasure_puzzle", "other_xmas_party", "other_pondeomo", "other_pondear", "other_jare_a", "interior_ragby_ar", "other_listen_to_the_a", "other_mrs_green_apple", "sushi_shirasu", "sushi_engawa", "sushi_oomonhata", "sushi_kazunoko", "sushi_nodoguro", "sushi_kuruma_ebi"]);
 // 得点倍率プール（"○秒間×n"の得点倍率スキルを主効果として持つアイテム）。ITEM_SPAWN_WEIGHTSで
 // レアリティ別に重みを下げてある8種（frenchie-catch-game.tsxの同名コメント参照）。宝箱・夏のフレブル・
 // Xmas Partyは得点倍率効果も持つが、重みが時間バランス/出現量アップ側のチューニングで別途固定されている
@@ -192,7 +192,7 @@ const SPAWN_DYNAMICS_IDS = new Set(["toy_rainbow_ball", "interior_stretch_rod", 
 // （ユーザー指定。主効果はそれぞれ「全アイテムのスキルがLv.MAXで発動」「フレブル数ボーナス倍率」で
 // 得点倍率そのものではないが、重み管理上の扱いとして含める）。
 const SCORE_MULT_IDS = new Set(["toy_meat", "interior_spring_flower_wreath", "other_kamunayo", "other_nisoku_a", "other_azubee", "interior_kinoko_azubee", "other_kobee", "interior_shikkoku_no_ar", "other_pink_omo", "other_narcissist_a", "other_mafia_a", "sushi_maguro_akami", "sushi_chutoro", "sushi_uni", "sushi_fugu", "sushi_nama_ebi", "sushi_negishio_maguro"]);
-// 通常アイテム系プール（特殊効果を持たない全72種。frenchie-catch-game.tsxのNORMAL_ITEM_IDSと同一、手動同期）。
+// 通常アイテム系プール（特殊効果を持たない全77種。frenchie-catch-game.tsxのNORMAL_ITEM_IDSと同一、手動同期）。
 const NORMAL_ITEM_IDS = new Set([
   "toy_colorful_ball", "toy_rope", "toy_bone", "toy_squeaky_ball", "toy_tennis_ball",
   "toy_red_slipper", "toy_wood_stick", "toy_donut_rope", "food_smile_onigiri", "food_paw_taiyaki",
@@ -200,6 +200,7 @@ const NORMAL_ITEM_IDS = new Set([
   "other_yellow_rain_boots", "accessory_red_bandana", "other_acorns", "toy_paper_airplane",
   "other_walk_water_bottle", "other_shiny_pinecone", "accessory_blue_handkerchief",
   "toy_red_balloon", "toy_sand_bucket", "accessory_walk_pouch", "other_red_apple",
+  "sushi_iwashi", "sushi_aji", "sushi_saba", "sushi_maguro", "sushi_tamago",
   "toy_frisbee", "toy_soccer_ball", "toy_taiyaki_plush", "toy_bear_plush", "food_paw_bowl",
   "food_paw_pudding", "food_kamikami",
   "sushi_ika", "sushi_tako", "sushi_hotate",
@@ -382,6 +383,14 @@ function simulateOneRound(lv, catchAll, timeBonusCatchRate = 0.8, normalCatchRat
       case "sushi_engawa": spawnRateBoostUntil = t + LV.ENGAWA_SEC[lvIdx] * 1000; spawnRateBoostValue = LV.ENGAWA_SPAWN[lvIdx]; break;
       case "sushi_shirasu": spawnRateBoostUntil = t + LV.SHIRASU_SEC[lvIdx] * 1000; spawnRateBoostValue = LV.SHIRASU_SPAWN[lvIdx]; break;
       case "sushi_oomonhata": spawnRateBoostUntil = t + LV.OOMONHATA_SEC[lvIdx] * 1000; spawnRateBoostValue = LV.OOMONHATA_SPAWN[lvIdx]; break;
+      case "sushi_kazunoko": spawnRateBoostUntil = t + LV.KAZUNOKO_SEC[lvIdx] * 1000; spawnRateBoostValue = LV.KAZUNOKO_SPAWN[lvIdx]; break;
+      // sushi_kuruma_ebiは落下速度アップ+出現量アップの複合スキルだが、落下速度側は
+      // interior_shikkoku_no_arと同様このシミュレーションではモデル化しない（キャッチ率モデルは
+      // 落下速度と独立のため）。出現量アップ側だけ反映する。
+      case "sushi_kuruma_ebi": spawnRateBoostUntil = t + LV.KURUMA_EBI_SEC[lvIdx] * 1000; spawnRateBoostValue = LV.KURUMA_EBI_SPAWN[lvIdx]; break;
+      // sushi_nodoguroは「落ちてくるアイテムのサイズを75%に縮小」という見た目・当たり判定系の
+      // 効果のみで、キャッチ率モデルにサイズという概念が無いため、他の一部項目（ピンクオモ等）と
+      // 同様にケースを追加しない（未知IDはdefaultでpoints=0のまま、時間・出現量への影響もなし）。
       case "other_pondear": spawnRateBoostUntil = t + LV.PONDEAR_SEC[lvIdx] * 1000; spawnRateBoostValue = LV.PONDEAR_SPAWN[lvIdx]; break;
       case "other_jare_a": spawnRateBoostUntil = t + LV.JARE_A_SEC[lvIdx] * 1000; spawnRateBoostValue = LV.JARE_A_SPAWN[lvIdx]; break;
       case "interior_ragby_ar": spawnRateBoostUntil = t + LV.RAGBY_SEC[lvIdx] * 1000; spawnRateBoostValue = LV.RAGBY_SPAWN[lvIdx]; break;

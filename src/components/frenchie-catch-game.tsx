@@ -227,6 +227,7 @@ const MYSTERY_SKILL_ITEM_IDS = [
   "sushi_otoro", "sushi_uni", "sushi_shirasu", "sushi_anago", "sushi_nama_ebi",
   "sushi_bincho", "sushi_negishio_maguro", "sushi_engawa", "sushi_onion_salmon", "sushi_mirugai",
   "sushi_fugu", "sushi_kani", "sushi_oomonhata", "sushi_unagi",
+  "sushi_kazunoko", "sushi_nodoguro", "sushi_kuruma_ebi",
 ];
 
 /** アイテムごとのLv1〜5パラメータ（item_skill_levels_colored.xlsxの「スキル一覧」シート通り） */
@@ -371,7 +372,26 @@ const LV = {
   /** オオモンハタ握り：出現量アップ・制御系プールUR。生しらす握りと同じカーブを流用 */
   OOMONHATA_SEC: [4, 5, 6, 8, 10, 11.13, 12.25, 13.38, 14.5, 15.63],
   OOMONHATA_SPAWN: [1.7, 1.8, 1.9, 2.1, 2.3, 2.41, 2.53, 2.64, 2.75, 2.86],
+  /** 数の子軍艦：出現量アップ・制御系プールUR。生しらす握り/オオモンハタ握りと同じカーブを流用 */
+  KAZUNOKO_SEC: [4, 5, 6, 8, 10, 11.13, 12.25, 13.38, 14.5, 15.63],
+  KAZUNOKO_SPAWN: [1.7, 1.8, 1.9, 2.1, 2.3, 2.41, 2.53, 2.64, 2.75, 2.86],
+  /**
+   * のどぐろ握り：出現量アップ・制御系プールUR。落ちてくるアイテムのサイズを一律75%に縮小する
+   * （倍率は固定、Lvで伸びるのは発動秒数だけ、ユーザー指定）。NODOGURO_SIZE_SCALE参照。
+   */
+  NODOGURO_SEC: [4, 6, 8, 10, 12, 13.5, 15, 16.5, 18, 19.5],
+  /**
+   * 車海老握り：出現量アップ・制御系プールLR。漆黒のアー（落下速度アップ）とラグビーアー
+   * （出現量アップ）の「中間スキル」（ユーザー指定）として、両方の効果を同時に、それぞれ単体の
+   * 半分程度の強さ（各倍率を1との平均に圧縮）で発動する。発動秒数もSHIKKOKU_SECとRAGBY_SECの
+   * 平均値。得点倍率は持たせない。
+   */
+  KURUMA_EBI_SEC: [6.5, 8, 9.5, 12, 16, 17.78, 19.56, 21.34, 23.13, 24.91],
+  KURUMA_EBI_FALL: [1.5, 1.6, 1.7, 1.8, 2.0, 2.09, 2.19, 2.28, 2.38, 2.47],
+  KURUMA_EBI_SPAWN: [1.5, 1.63, 1.75, 1.88, 2.0, 2.09, 2.19, 2.28, 2.38, 2.47],
 } as const;
+/** のどぐろ握り発動中、新規に降ってくるすべてのフレブル/アイテムのサイズをこの倍率に縮小する（固定値） */
+const NODOGURO_SIZE_SCALE = 0.75;
 const SLANT_VX_BOOST = 3.5;
 const POINTS: Record<FrenchieCatchItem["rarity"], number> = { N: 20, R: 40, SR: 80, SSR: 140, UR: 200, LR: 300, MR: 440 };
 const RARITY_FALL_SPEED: Record<FrenchieCatchItem["rarity"], number> = { N: 1, R: 1.08, SR: 1.18, SSR: 1.32, UR: 1.5, LR: 1.75, MR: 2 };
@@ -394,6 +414,7 @@ const SPAWN_DYNAMICS_ITEM_IDS = new Set([
   "toy_rainbow_ball", "interior_stretch_rod", "toy_treasure_puzzle",
   "other_xmas_party", "other_pondeomo", "other_pondear", "other_jare_a", "interior_ragby_ar",
   "other_mrs_green_apple", "sushi_shirasu", "sushi_engawa", "sushi_oomonhata",
+  "sushi_kazunoko", "sushi_nodoguro", "sushi_kuruma_ebi",
 ]);
 /**
  * 2026-09-03、ユーザー指定で新設した4つ目のプール（通常アイテム系プール）。上記3プール・
@@ -521,13 +542,18 @@ const ITEM_SPAWN_WEIGHTS: Partial<Record<string, number>> = {
   /**
    * 出現量アップ・出現制御系プール（予算900）：R:270÷1=270 / SR:162÷1=162 /
    * SSR:144÷5=28.8ずつ(2026-09-07にえんがわ握りを追加、既存4種+1種の5種) /
-   * UR:126÷3=42ずつ(Mrs. GREEN アーPPLE / 生しらす握り / オオモンハタ握り、2026-09-08に
-   * オオモンハタ握りを追加) /
-   * LR:108÷2=54ずつ / MR:90÷1=90(Xmas Party)。在籍分の実際の合計は900（残りなし。旧・残り126は
+   * UR:126÷5=25.2ずつ(Mrs. GREEN アーPPLE / 生しらす握り / オオモンハタ握り / 数の子軍艦 /
+   * のどぐろ握り、2026-09-12に数の子軍艦・のどぐろ握りを追加し既存3種+2種の5種) /
+   * LR:108÷3=36ずつ(ラグビーアー / Listen to the a- / 車海老握り、2026-09-12に車海老握りを追加し
+   * 既存2種+1種の3種) / MR:90÷1=90(Xmas Party)。在籍分の実際の合計は900（残りなし。旧・残り126は
    * UR枠が埋まったため`SPAWN_DYNAMICS_UNFILLED_RANK_DOG_WEIGHT`が0になった）。
    * 宝箱おやつパズル・Xmas Partyもここでは個別チューニング値ではなく「ランク予算÷在籍数」のみで計算する
    * （ユーザー指定、2026-09-03〜）。ブレブルは2026-09-04に効果を秒数プラス系へ変更し、
    * 時間増加系プールへ移動した（このプールからは離籍）。Mrs. GREEN アーPPLEは2026-09-06にUR枠へ追加。
+   * のどぐろ握りは「落ちてくるアイテムのサイズを75%に縮小」という新規の出現制御系スキルのため、
+   * このプールに含める（NODOGURO_SIZE_SCALE参照）。車海老握りは漆黒のアー（落下速度アップ）と
+   * ラグビーアー（出現量アップ）の中間スキル（両方の効果を半分程度の強さで併せ持つ）のため、
+   * ラグビーアーと同じ「出現制御系」の扱いでこのプールのLR枠に含める。
    */
   toy_rainbow_ball: 144 / 5,
   interior_stretch_rod: 270 / 1,
@@ -537,11 +563,14 @@ const ITEM_SPAWN_WEIGHTS: Partial<Record<string, number>> = {
   other_pondear: 144 / 5,
   other_jare_a: 144 / 5,
   sushi_engawa: 144 / 5,
-  interior_ragby_ar: 108 / 2,
-  other_listen_to_the_a: 108 / 2,
-  other_mrs_green_apple: 126 / 3,
-  sushi_shirasu: 126 / 3,
-  sushi_oomonhata: 126 / 3,
+  interior_ragby_ar: 108 / 3,
+  other_listen_to_the_a: 108 / 3,
+  sushi_kuruma_ebi: 108 / 3,
+  other_mrs_green_apple: 126 / 5,
+  sushi_shirasu: 126 / 5,
+  sushi_oomonhata: 126 / 5,
+  sushi_kazunoko: 126 / 5,
+  sushi_nodoguro: 126 / 5,
   /**
    * 得点倍率系プール（予算400）：R:120÷1=120(まぐろ(赤身)握り、2026-09-07に追加してR枠を新規充填) /
    * SR:72÷3=24ずつ(2026-09-07に中トロ握りを追加、既存2種+1種の3種) /
@@ -570,7 +599,10 @@ const ITEM_SPAWN_WEIGHTS: Partial<Record<string, number>> = {
   other_narcissist_a: 40 / 2,
   other_mafia_a: 40 / 2,
   /**
-   * 通常アイテム系プール（予算6100、在籍72種）：N:2400÷25=96ずつ(25種、2026-09-06に赤りんごを追加) /
+   * 通常アイテム系プール（予算6100、在籍77種）：N:2400÷30=80ずつ(30種、2026-09-11に寿司シリーズの
+   * N5種＝いわし握り・あじ握り・サバ握り・まぐろ握り・たまご握りを追加。この5種はスキルを持たず、
+   * どのプールのID一覧にも登録されないままDEFAULT_ITEM_SPAWN_WEIGHT(100)で無管理状態になっていた
+   * のを正式にこのプールへ組み込んだ） /
    * R:700÷10=70ずつ(10種、2026-09-07に寿司シリーズのいか握り・たこ握り・ほたて握りを追加。
    * サーモン握り・まぐろ(赤身)握りは時間増加系・得点倍率系プールへ移動したためこちらには残らない) /
    * SR:900÷12=75ずつ(12種、2026-09-07に寿司シリーズのかんぱち握り・えび握り・炙りサバ握りを追加。
@@ -588,31 +620,36 @@ const ITEM_SPAWN_WEIGHTS: Partial<Record<string, number>> = {
    * 「普通のフレブル」(dog)の相対確率は薄まらない。MRランクに初めて追加する場合のみ、
    * 新たにMRランク予算を設定してプール総予算に加算すること（他ランクの予算はいじらない）。
    */
-  toy_colorful_ball: 2400 / 25,
-  toy_rope: 2400 / 25,
-  toy_bone: 2400 / 25,
-  toy_squeaky_ball: 2400 / 25,
-  toy_tennis_ball: 2400 / 25,
-  toy_red_slipper: 2400 / 25,
-  toy_wood_stick: 2400 / 25,
-  toy_donut_rope: 2400 / 25,
-  food_smile_onigiri: 2400 / 25,
-  food_paw_taiyaki: 2400 / 25,
-  food_dog_milk: 2400 / 25,
-  food_cheese_cubes: 2400 / 25,
-  food_roasted_sweet_potato: 2400 / 25,
-  food_honey_butter_toast: 2400 / 25,
-  other_yellow_rain_boots: 2400 / 25,
-  accessory_red_bandana: 2400 / 25,
-  other_acorns: 2400 / 25,
-  toy_paper_airplane: 2400 / 25,
-  other_walk_water_bottle: 2400 / 25,
-  other_shiny_pinecone: 2400 / 25,
-  accessory_blue_handkerchief: 2400 / 25,
-  toy_red_balloon: 2400 / 25,
-  toy_sand_bucket: 2400 / 25,
-  accessory_walk_pouch: 2400 / 25,
-  other_red_apple: 2400 / 25,
+  toy_colorful_ball: 2400 / 30,
+  toy_rope: 2400 / 30,
+  toy_bone: 2400 / 30,
+  toy_squeaky_ball: 2400 / 30,
+  toy_tennis_ball: 2400 / 30,
+  toy_red_slipper: 2400 / 30,
+  toy_wood_stick: 2400 / 30,
+  toy_donut_rope: 2400 / 30,
+  food_smile_onigiri: 2400 / 30,
+  food_paw_taiyaki: 2400 / 30,
+  food_dog_milk: 2400 / 30,
+  food_cheese_cubes: 2400 / 30,
+  food_roasted_sweet_potato: 2400 / 30,
+  food_honey_butter_toast: 2400 / 30,
+  other_yellow_rain_boots: 2400 / 30,
+  accessory_red_bandana: 2400 / 30,
+  other_acorns: 2400 / 30,
+  toy_paper_airplane: 2400 / 30,
+  other_walk_water_bottle: 2400 / 30,
+  other_shiny_pinecone: 2400 / 30,
+  accessory_blue_handkerchief: 2400 / 30,
+  toy_red_balloon: 2400 / 30,
+  toy_sand_bucket: 2400 / 30,
+  accessory_walk_pouch: 2400 / 30,
+  other_red_apple: 2400 / 30,
+  sushi_iwashi: 2400 / 30,
+  sushi_aji: 2400 / 30,
+  sushi_saba: 2400 / 30,
+  sushi_maguro: 2400 / 30,
+  sushi_tamago: 2400 / 30,
   toy_frisbee: 700 / 10,
   toy_soccer_ball: 700 / 10,
   toy_taiyaki_plush: 700 / 10,
@@ -1137,6 +1174,8 @@ export function FrenchieCatchGame({
   const bagStockRef = useRef(0);
   const spawnRateBoostUntilRef = useRef(0);
   const spawnRateBoostValueRef = useRef(1);
+  /** のどぐろ握り：発動中に新規に降ってくるフレブル/アイテムのサイズをNODOGURO_SIZE_SCALE倍に縮小する */
+  const itemSizeShrinkUntilRef = useRef(0);
   const otherSuppressUntilRef = useRef(0);
   const otherSuppressValueRef = useRef(1);
   /** 穴子握り：発動中はダンボールに触れただけ（開口部の外側含む）でキャッチ判定になる */
@@ -1908,34 +1947,37 @@ export function FrenchieCatchGame({
         // ダンボールNo.1「アイテム出現量アップ」ぶんを常時掛け合わせる（時間増加系の重み側で1/nを相殺済み）
         : (now < spawnRateBoostUntilRef.current ? spawnRateBoostValueRef.current : 1) * dambourleUpMultiplier("item_spawn_up");
       const entityCap = spawnRate >= 3 ? TRIPLE_ENTITY_CAP : spawnRate >= 2 ? DOUBLE_ENTITY_CAP : NORMAL_ENTITY_CAP;
+      /** のどぐろ握り発動中は、経路を問わず新規に降ってくる全エンティティのサイズを一律縮小する */
+      const applySizeShrink = (entity: Entity): Entity =>
+        now < itemSizeShrinkUntilRef.current ? { ...entity, size: entity.size * NODOGURO_SIZE_SCALE } : entity;
       if (now >= nextSpawnRef.current && entitiesRef.current.length < entityCap) {
-        entitiesRef.current.push(createEntity());
+        entitiesRef.current.push(applySizeShrink(createEntity()));
         nextSpawnRef.current = now + (SPAWN_INTERVAL_MIN_MS + Math.random() * (SPAWN_INTERVAL_MAX_MS - SPAWN_INTERVAL_MIN_MS)) / spawnRate;
       }
       /** アイテム量2倍化用のボーナス出現タイマー。時間増加系は一切対象にせず(createEntityにexcludeTimeBonus=trueを渡す)、通常タイマーと全く同じ間隔で並走させる */
       if (now >= extraSpawnRef.current && entitiesRef.current.length < entityCap) {
-        entitiesRef.current.push(createEntity(true));
+        entitiesRef.current.push(applySizeShrink(createEntity(true)));
         extraSpawnRef.current = now + (SPAWN_INTERVAL_MIN_MS + Math.random() * (SPAWN_INTERVAL_MAX_MS - SPAWN_INTERVAL_MIN_MS)) / spawnRate;
       }
       if (clawdBallFloodRemainingRef.current > 0 && now >= nextClawdSpawnRef.current && entitiesRef.current.length < entityCap) {
         const ball = createClawdBallEntity();
         if (ball) {
           clawdBallFloodRemainingRef.current -= 1;
-          entitiesRef.current.push(ball);
+          entitiesRef.current.push(applySizeShrink(ball));
         }
         nextClawdSpawnRef.current = now + SPAWN_INTERVAL_MIN_MS + Math.random() * (SPAWN_INTERVAL_MAX_MS - SPAWN_INTERVAL_MIN_MS);
       }
       // 緑りんごも他のアイテムのスポーンを止めず、並行スポーンで追加投入する
       if (mrsGreenAppleSpawnRemainingRef.current > 0 && now >= nextGreenAppleSpawnRef.current && entitiesRef.current.length < entityCap) {
         mrsGreenAppleSpawnRemainingRef.current -= 1;
-        entitiesRef.current.push(createGreenAppleEntity());
+        entitiesRef.current.push(applySizeShrink(createGreenAppleEntity()));
         nextGreenAppleSpawnRef.current = now + SPAWN_INTERVAL_MIN_MS + Math.random() * (SPAWN_INTERVAL_MAX_MS - SPAWN_INTERVAL_MIN_MS);
       }
       // Listen to the a-も他のアイテムのスポーンを止めず、並行スポーンで初期フレブルを追加投入する
       // （大量発生の体感を出すため、通常スポーンと同じ間隔ではなくDOG_FLOOD_SPAWN_RATE倍で間隔を詰める）
       if (listenFloodRemainingRef.current > 0 && now >= nextListenSpawnRef.current && entitiesRef.current.length < entityCap) {
         listenFloodRemainingRef.current -= 1;
-        entitiesRef.current.push(createListenDogEntity());
+        entitiesRef.current.push(applySizeShrink(createListenDogEntity()));
         nextListenSpawnRef.current = now + (SPAWN_INTERVAL_MIN_MS + Math.random() * (SPAWN_INTERVAL_MAX_MS - SPAWN_INTERVAL_MIN_MS)) / DOG_FLOOD_SPAWN_RATE;
       }
 
@@ -2867,6 +2909,34 @@ export function FrenchieCatchGame({
                 statusChanged = true;
                 break;
               }
+              case "sushi_kazunoko": {
+                const kazunokoSec = LV.KAZUNOKO_SEC[lv]!;
+                const kazunokoSpawn = LV.KAZUNOKO_SPAWN[lv]!;
+                spawnRateBoostUntilRef.current = Math.max(now, spawnRateBoostUntilRef.current) + kazunokoSec * 1000;
+                spawnRateBoostValueRef.current = scaleDambourleBonusMultiplier(kazunokoSpawn, dambourleUpMultiplier("spawn_dynamics_effect_up"));
+                effectLabel = `${kazunokoSec}秒間 アイテム出現量×${kazunokoSpawn}${lvTag}`;
+                statusChanged = true;
+                break;
+              }
+              case "sushi_nodoguro": {
+                const nodoguroSec = LV.NODOGURO_SEC[lv]!;
+                itemSizeShrinkUntilRef.current = Math.max(now, itemSizeShrinkUntilRef.current) + nodoguroSec * 1000;
+                effectLabel = `${nodoguroSec}秒間 アイテムサイズ×${NODOGURO_SIZE_SCALE}${lvTag}`;
+                statusChanged = true;
+                break;
+              }
+              case "sushi_kuruma_ebi": {
+                const kurumaSec = LV.KURUMA_EBI_SEC[lv]!;
+                const kurumaFall = LV.KURUMA_EBI_FALL[lv]!;
+                const kurumaSpawn = LV.KURUMA_EBI_SPAWN[lv]!;
+                fallSpeedBoostUntilRef.current = Math.max(now, fallSpeedBoostUntilRef.current) + kurumaSec * 1000;
+                fallSpeedValueRef.current = kurumaFall;
+                spawnRateBoostUntilRef.current = Math.max(now, spawnRateBoostUntilRef.current) + kurumaSec * 1000;
+                spawnRateBoostValueRef.current = scaleDambourleBonusMultiplier(kurumaSpawn, dambourleUpMultiplier("spawn_dynamics_effect_up"));
+                effectLabel = `${kurumaSec}秒間 落下×${kurumaFall} / 出現量×${kurumaSpawn}${lvTag}`;
+                statusChanged = true;
+                break;
+              }
               case "sushi_engawa": {
                 const engawaSec = LV.ENGAWA_SEC[lv]!;
                 const engawaSpawn = LV.ENGAWA_SPAWN[lv]!;
@@ -3190,6 +3260,7 @@ export function FrenchieCatchGame({
     ikeaUntilRef.current = 0;
     ikeaCountRef.current = 0;
     spawnRateBoostUntilRef.current = 0;
+    itemSizeShrinkUntilRef.current = 0;
     otherSuppressUntilRef.current = 0;
     otherSuppressValueRef.current = 1;
     anagoAutoCatchUntilRef.current = 0;

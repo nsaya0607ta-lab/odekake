@@ -11,7 +11,8 @@ import { getDambourlePrize, type DambourleEffectKey } from "@/lib/dambourle/priz
 import { getDambourleLevel, getDambourleMinSkinIndex, getDambourleUnlockedSkinTier } from "@/lib/dambourle/skill-levels";
 import { getOwnedItemCounts } from "@/lib/data/collection";
 import { getEquippedDambourle, getOwnedDambourleCounts } from "@/lib/data/dambourle";
-import { getSkillLevel } from "@/lib/gacha/skill-levels";
+import { getSkillLevel, MAX_SKILL_LEVEL } from "@/lib/gacha/skill-levels";
+import { isManagementTestAccount, MANAGEMENT_TEST_ACCOUNT_ITEM_IDS } from "@/lib/management-test-account";
 import { requireUser } from "@/lib/supabase/server";
 
 export const metadata = { title: "アイテムキャッチ | おでかけ記録" };
@@ -46,18 +47,26 @@ export default async function ItemCatchPage() {
     }
   }
 
-  const catchItems = COLLECTION_ITEMS.flatMap((item) => {
-    const count = ownedItemCounts.get(item.id) ?? 0;
-    if (count <= 0 || !item.image) return [];
-    if (!hasMinigameSkillLevel(item)) return [];
-    return [{
-      id: item.id,
-      name: item.name,
-      image: item.image,
-      rarity: item.rarity,
-      level: getSkillLevel(item.rarity, count),
-    }];
-  });
+  // 検証用の管理アカウントだけ、出現アイテムを直近追加した10種に絞る（ユーザー指定。
+  // 実際の所持数に関わらず全種Lv.MAXで出現させ、新アイテムをすぐ試せるようにする）
+  const catchItems = isManagementTestAccount(user.displayName)
+    ? MANAGEMENT_TEST_ACCOUNT_ITEM_IDS.flatMap((id) => {
+        const item = COLLECTION_ITEMS.find((entry) => entry.id === id);
+        if (!item || !item.image || !hasMinigameSkillLevel(item)) return [];
+        return [{ id: item.id, name: item.name, image: item.image, rarity: item.rarity, level: MAX_SKILL_LEVEL }];
+      })
+    : COLLECTION_ITEMS.flatMap((item) => {
+        const count = ownedItemCounts.get(item.id) ?? 0;
+        if (count <= 0 || !item.image) return [];
+        if (!hasMinigameSkillLevel(item)) return [];
+        return [{
+          id: item.id,
+          name: item.name,
+          image: item.image,
+          rarity: item.rarity,
+          level: getSkillLevel(item.rarity, count),
+        }];
+      });
 
   return (
     <>
