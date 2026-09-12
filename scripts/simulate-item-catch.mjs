@@ -179,7 +179,7 @@ const REDUCED_CATCH_IDS = new Set([...TIME_BONUS_IDS, "other_okaeri"]);
 // 揺らぐため、TIME_BONUS_IDSと合わせてボーナス側では除外する（frenchie-catch-game.tsxのSPAWN_DYNAMICS_ITEM_IDSと同一）
 // other_listen_to_the_a（フレブル大量発生。厳密には出現重みの計算式ではなくdogFloodそのものを起こす
 // 効果だが）は、2026-09-03、単独チューニング枠からこのプールのLR枠に移動（ユーザー指定）。
-const SPAWN_DYNAMICS_IDS = new Set(["toy_rainbow_ball", "interior_stretch_rod", "toy_treasure_puzzle", "other_xmas_party", "other_pondeomo", "other_pondear", "other_jare_a", "interior_ragby_ar", "other_listen_to_the_a", "other_mrs_green_apple", "sushi_shirasu", "sushi_engawa", "sushi_oomonhata"]);
+const SPAWN_DYNAMICS_IDS = new Set(["toy_rainbow_ball", "interior_stretch_rod", "toy_treasure_puzzle", "other_xmas_party", "other_pondeomo", "other_pondear", "other_jare_a", "interior_ragby_ar", "other_listen_to_the_a", "other_mrs_green_apple", "sushi_shirasu", "sushi_engawa", "sushi_oomonhata", "sushi_kazunoko", "sushi_nodoguro", "sushi_kuruma_ebi"]);
 // 得点倍率プール（"○秒間×n"の得点倍率スキルを主効果として持つアイテム）。ITEM_SPAWN_WEIGHTSで
 // レアリティ別に重みを下げてある8種（frenchie-catch-game.tsxの同名コメント参照）。宝箱・夏のフレブル・
 // Xmas Partyは得点倍率効果も持つが、重みが時間バランス/出現量アップ側のチューニングで別途固定されている
@@ -383,6 +383,14 @@ function simulateOneRound(lv, catchAll, timeBonusCatchRate = 0.8, normalCatchRat
       case "sushi_engawa": spawnRateBoostUntil = t + LV.ENGAWA_SEC[lvIdx] * 1000; spawnRateBoostValue = LV.ENGAWA_SPAWN[lvIdx]; break;
       case "sushi_shirasu": spawnRateBoostUntil = t + LV.SHIRASU_SEC[lvIdx] * 1000; spawnRateBoostValue = LV.SHIRASU_SPAWN[lvIdx]; break;
       case "sushi_oomonhata": spawnRateBoostUntil = t + LV.OOMONHATA_SEC[lvIdx] * 1000; spawnRateBoostValue = LV.OOMONHATA_SPAWN[lvIdx]; break;
+      case "sushi_kazunoko": spawnRateBoostUntil = t + LV.KAZUNOKO_SEC[lvIdx] * 1000; spawnRateBoostValue = LV.KAZUNOKO_SPAWN[lvIdx]; break;
+      // sushi_kuruma_ebiは落下速度アップ+出現量アップの複合スキルだが、落下速度側は
+      // interior_shikkoku_no_arと同様このシミュレーションではモデル化しない（キャッチ率モデルは
+      // 落下速度と独立のため）。出現量アップ側だけ反映する。
+      case "sushi_kuruma_ebi": spawnRateBoostUntil = t + LV.KURUMA_EBI_SEC[lvIdx] * 1000; spawnRateBoostValue = LV.KURUMA_EBI_SPAWN[lvIdx]; break;
+      // sushi_nodoguroは「落ちてくるアイテムのサイズを75%に縮小」という見た目・当たり判定系の
+      // 効果のみで、キャッチ率モデルにサイズという概念が無いため、他の一部項目（ピンクオモ等）と
+      // 同様にケースを追加しない（未知IDはdefaultでpoints=0のまま、時間・出現量への影響もなし）。
       case "other_pondear": spawnRateBoostUntil = t + LV.PONDEAR_SEC[lvIdx] * 1000; spawnRateBoostValue = LV.PONDEAR_SPAWN[lvIdx]; break;
       case "other_jare_a": spawnRateBoostUntil = t + LV.JARE_A_SEC[lvIdx] * 1000; spawnRateBoostValue = LV.JARE_A_SPAWN[lvIdx]; break;
       case "interior_ragby_ar": spawnRateBoostUntil = t + LV.RAGBY_SEC[lvIdx] * 1000; spawnRateBoostValue = LV.RAGBY_SPAWN[lvIdx]; break;
