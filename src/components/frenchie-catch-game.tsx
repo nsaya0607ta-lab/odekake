@@ -2087,8 +2087,15 @@ export function FrenchieCatchGame({
           const anagoAutoCatchActive = now < anagoAutoCatchUntilRef.current;
           const touchesBoxWidth = overlap(localHitLeft, localHitRight, 0, 1) > 0;
           const withinCatchHeight = localY >= CATCH_START_LOCAL_Y && localY <= OPEN_BOTTOM_LOCAL_Y + 0.10;
+          /**
+           * 穴子握り発動中は「ダンボールに触れただけ」でキャッチにしたいが、withinCatchHeightは
+           * 通常キャッチ用にCATCH_START_LOCAL_Y(0.36)まで沈み込むことを要求するため、その手前
+           * （OPEN_TOP_LOCAL_Y-0.02〜CATCH_START_LOCAL_Yの間）で先に下の壁ヒット判定に引っかかって
+           * 弾かれてしまっていた。穴子握り中はwithinCatchHeightを課さず、この判定ブロックに
+           * 入った時点（bottom >= BOX_OPEN_TOP_Y）で即座にキャッチする。
+           */
           const canCatch = (entity.enteredOpening && withinCatchHeight && widthFullyInsideOpening)
-            || (anagoAutoCatchActive && withinCatchHeight && touchesBoxWidth);
+            || (anagoAutoCatchActive && touchesBoxWidth);
 
           if (canCatch) {
             entity.rimChecked = true;
