@@ -11,7 +11,8 @@ import { getDambourlePrize, type DambourleEffectKey } from "@/lib/dambourle/priz
 import { getDambourleLevel, getDambourleMinSkinIndex, getDambourleUnlockedSkinTier } from "@/lib/dambourle/skill-levels";
 import { getOwnedItemCounts } from "@/lib/data/collection";
 import { getEquippedDambourle, getOwnedDambourleCounts } from "@/lib/data/dambourle";
-import { getSkillLevel } from "@/lib/gacha/skill-levels";
+import { getSkillLevel, MAX_SKILL_LEVEL } from "@/lib/gacha/skill-levels";
+import { isManagementTestAccount, MANAGEMENT_TEST_ACCOUNT_ITEM_CATCH_IDS } from "@/lib/management-test-account";
 import { requireUser } from "@/lib/supabase/server";
 
 export const metadata = { title: "アイテムキャッチ | おでかけ記録" };
@@ -19,10 +20,13 @@ export const dynamic = "force-dynamic";
 
 export default async function ItemCatchPage() {
   const { supabase, user } = await requireUser();
-  const [ownedItemCounts, ownedDambourleCounts, equippedDambourle] = await Promise.all([
+  const [ownedItemCounts, ownedDambourleCounts, equippedDambourle, profile] = await Promise.all([
     getOwnedItemCounts(supabase, user.id),
     getOwnedDambourleCounts(supabase, user.id),
     getEquippedDambourle(supabase, user.id),
+    // 検証用アカウント判定は、更新後にJWTへ反映されるまでタイムラグが起こりうる
+    // user.displayName（JWTのuser_metadata由来）ではなく、常に最新のprofilesを直接見る
+    supabase.from("profiles").select("display_name").eq("user_id", user.id).maybeSingle(),
   ]);
 
   let equippedBoxImage = DEFAULT_BOX_IMAGE;
@@ -46,18 +50,26 @@ export default async function ItemCatchPage() {
     }
   }
 
-  const catchItems = COLLECTION_ITEMS.flatMap((item) => {
-    const count = ownedItemCounts.get(item.id) ?? 0;
-    if (count <= 0 || !item.image) return [];
-    if (!hasMinigameSkillLevel(item)) return [];
-    return [{
-      id: item.id,
-      name: item.name,
-      image: item.image,
-      rarity: item.rarity,
-      level: getSkillLevel(item.rarity, count),
-    }];
-  });
+  // 検証用の管理アカウントだけ、出現アイテムを検証対象の1種に絞る（ユーザー指定。
+  // 実際の所持数に関わらずLv.MAXで出現させ、新スキルをすぐ試せるようにする）
+  const catchItems = isManagementTestAccount(profile.data?.display_name)
+    ? MANAGEMENT_TEST_ACCOUNT_ITEM_CATCH_IDS.flatMap((id) => {
+        const item = COLLECTION_ITEMS.find((entry) => entry.id === id);
+        if (!item || !item.image || !hasMinigameSkillLevel(item)) return [];
+        return [{ id: item.id, name: item.name, image: item.image, rarity: item.rarity, level: MAX_SKILL_LEVEL }];
+      })
+    : COLLECTION_ITEMS.flatMap((item) => {
+        const count = ownedItemCounts.get(item.id) ?? 0;
+        if (count <= 0 || !item.image) return [];
+        if (!hasMinigameSkillLevel(item)) return [];
+        return [{
+          id: item.id,
+          name: item.name,
+          image: item.image,
+          rarity: item.rarity,
+          level: getSkillLevel(item.rarity, count),
+        }];
+      });
 
   return (
     <>

@@ -227,7 +227,7 @@ const MYSTERY_SKILL_ITEM_IDS = [
   "sushi_otoro", "sushi_uni", "sushi_shirasu", "sushi_anago", "sushi_nama_ebi",
   "sushi_bincho", "sushi_negishio_maguro", "sushi_engawa", "sushi_onion_salmon", "sushi_mirugai",
   "sushi_fugu", "sushi_kani", "sushi_oomonhata", "sushi_unagi",
-  "sushi_kazunoko", "sushi_nodoguro", "sushi_kuruma_ebi",
+  "sushi_kazunoko", "sushi_nodoguro", "sushi_kuruma_ebi", "sushi_akagai", "sushi_torafugu", "sushi_awabi", "sushi_kue",
 ];
 
 /** アイテムごとのLv1〜5パラメータ（item_skill_levels_colored.xlsxの「スキル一覧」シート通り） */
@@ -389,6 +389,22 @@ const LV = {
   KURUMA_EBI_SEC: [6.5, 8, 9.5, 12, 16, 17.78, 19.56, 21.34, 23.13, 24.91],
   KURUMA_EBI_FALL: [1.5, 1.6, 1.7, 1.8, 2.0, 2.09, 2.19, 2.28, 2.38, 2.47],
   KURUMA_EBI_SPAWN: [1.5, 1.63, 1.75, 1.88, 2.0, 2.09, 2.19, 2.28, 2.38, 2.47],
+  /**
+   * 天然クエ握り：出現量アップ・制御系プールLR。取得した瞬間、画面に今表示されている
+   * （これから降ってくるものは対象外）マイナス系アイテム（NEGATIVE_HAZARD_IDS）のうち
+   * Lv個ぶんを時間増加系アイテムへ変化させる（ユーザー指定）。倍率・秒数は無く、変化させる個数
+   * だけがLvで伸びる。
+   */
+  KUE_CONVERT_COUNT: [1, 2, 3, 4, 5, 6, 7, 7, 8, 9],
+  /**
+   * とらふぐ握り：通常アイテム系プールUR。一家の大オモ柱と全く同じ「発動中ハザード出現なし」
+   * スキル（hazardShieldUntilRefを共有）のため、同じ秒数カーブ(OMOI_BASHIRA_SEC)をそのまま流用する。
+   */
+  TORAFUGU_SEC: [4, 5, 6, 8, 10, 11.13, 12.25, 13.38, 14.5, 15.63],
+  /** 活アワビ握り：得点倍率系プールUR固定カーブ（other_azubee/sushi_uni/sushi_fuguと同一） */
+  AWABI_MULT: [1.2, 1.5, 1.8, 2.1, 2.4, 2.63, 2.85, 3.08, 3.3, 3.53],
+  /** 赤貝握り：得点倍率系プールSR固定カーブ（toy_meat/sushi_chutoroと同一） */
+  AKAGAI_MULT: [1.1, 1.3, 1.5, 1.7, 1.9, 2.05, 2.2, 2.35, 2.5, 2.65],
 } as const;
 /** のどぐろ握り発動中、新規に降ってくるすべてのフレブル/アイテムのサイズをこの倍率に縮小する（固定値） */
 const NODOGURO_SIZE_SCALE = 0.75;
@@ -414,7 +430,7 @@ const SPAWN_DYNAMICS_ITEM_IDS = new Set([
   "toy_rainbow_ball", "interior_stretch_rod", "toy_treasure_puzzle",
   "other_xmas_party", "other_pondeomo", "other_pondear", "other_jare_a", "interior_ragby_ar",
   "other_mrs_green_apple", "sushi_shirasu", "sushi_engawa", "sushi_oomonhata",
-  "sushi_kazunoko", "sushi_nodoguro", "sushi_kuruma_ebi",
+  "sushi_kazunoko", "sushi_nodoguro", "sushi_kuruma_ebi", "sushi_kue",
 ]);
 /**
  * 2026-09-03、ユーザー指定で新設した4つ目のプール（通常アイテム系プール）。上記3プール・
@@ -553,7 +569,9 @@ const ITEM_SPAWN_WEIGHTS: Partial<Record<string, number>> = {
    * のどぐろ握りは「落ちてくるアイテムのサイズを75%に縮小」という新規の出現制御系スキルのため、
    * このプールに含める（NODOGURO_SIZE_SCALE参照）。車海老握りは漆黒のアー（落下速度アップ）と
    * ラグビーアー（出現量アップ）の中間スキル（両方の効果を半分程度の強さで併せ持つ）のため、
-   * ラグビーアーと同じ「出現制御系」の扱いでこのプールのLR枠に含める。
+   * ラグビーアーと同じ「出現制御系」の扱いでこのプールのLR枠に含める。天然クエ握りは「画面に
+   * 表示中のマイナス系アイテムをLv個ぶん時間増加系アイテムへ変化させる」という新規の出現制御系
+   * スキル（KUE_CONVERT_COUNT参照）のため、2026-09-12にLR枠へ追加（既存3種→4種）。
    */
   toy_rainbow_ball: 144 / 5,
   interior_stretch_rod: 270 / 1,
@@ -563,9 +581,10 @@ const ITEM_SPAWN_WEIGHTS: Partial<Record<string, number>> = {
   other_pondear: 144 / 5,
   other_jare_a: 144 / 5,
   sushi_engawa: 144 / 5,
-  interior_ragby_ar: 108 / 3,
-  other_listen_to_the_a: 108 / 3,
-  sushi_kuruma_ebi: 108 / 3,
+  interior_ragby_ar: 108 / 4,
+  other_listen_to_the_a: 108 / 4,
+  sushi_kuruma_ebi: 108 / 4,
+  sushi_kue: 108 / 4,
   other_mrs_green_apple: 126 / 5,
   sushi_shirasu: 126 / 5,
   sushi_oomonhata: 126 / 5,
@@ -580,26 +599,30 @@ const ITEM_SPAWN_WEIGHTS: Partial<Record<string, number>> = {
    * 在籍分の実際の合計は400（残りなし。旧・残り120は`SCORE_MULT_UNFILLED_RANK_DOG_WEIGHT`でdogへ
    * 流していたがR枠が埋まったため0になった）。ピンクオモ・ナルシストアー・マフィアーも含め、
    * 全アイテム「ランク予算÷在籍数」のみで計算する（ユーザー指定、2026-09-03〜）。
+   * 赤貝握りは2026-09-12にSR枠へ追加（既存3種→4種、72÷4=18）。活アワビ握りも同日にUR枠へ追加
+   * （既存5種→6種、56÷6=9.33、AWABI_MULT参照）。
    */
   sushi_maguro_akami: 120 / 1,
-  toy_meat: 72 / 3,
-  interior_spring_flower_wreath: 72 / 3,
-  sushi_chutoro: 72 / 3,
+  toy_meat: 72 / 4,
+  interior_spring_flower_wreath: 72 / 4,
+  sushi_chutoro: 72 / 4,
+  sushi_akagai: 72 / 4,
   other_kamunayo: 64 / 4,
   other_nisoku_a: 64 / 4,
   sushi_nama_ebi: 64 / 4,
   sushi_negishio_maguro: 64 / 4,
-  other_azubee: 56 / 5,
-  interior_kinoko_azubee: 56 / 5,
-  other_kobee: 56 / 5,
-  sushi_uni: 56 / 5,
-  sushi_fugu: 56 / 5,
+  other_azubee: 56 / 6,
+  interior_kinoko_azubee: 56 / 6,
+  other_kobee: 56 / 6,
+  sushi_uni: 56 / 6,
+  sushi_fugu: 56 / 6,
+  sushi_awabi: 56 / 6,
   interior_shikkoku_no_ar: 48 / 2,
   other_pink_omo: 48 / 2,
   other_narcissist_a: 40 / 2,
   other_mafia_a: 40 / 2,
   /**
-   * 通常アイテム系プール（予算6100、在籍77種）：N:2400÷30=80ずつ(30種、2026-09-11に寿司シリーズの
+   * 通常アイテム系プール（予算6100、在籍78種）：N:2400÷30=80ずつ(30種、2026-09-11に寿司シリーズの
    * N5種＝いわし握り・あじ握り・サバ握り・まぐろ握り・たまご握りを追加。この5種はスキルを持たず、
    * どのプールのID一覧にも登録されないままDEFAULT_ITEM_SPAWN_WEIGHT(100)で無管理状態になっていた
    * のを正式にこのプールへ組み込んだ） /
@@ -609,9 +632,11 @@ const ITEM_SPAWN_WEIGHTS: Partial<Record<string, number>> = {
    * ぶり握り・中トロ握りは時間増加系・得点倍率系プールへ移動したためこちらには残らない) /
    * SSR:1200÷15=80ずつ(15種、2026-09-07に穴子握り＝落下速度アップ+防止付与、
    * オニオンサーモン握り＝ポイントUP系、みる貝握り＝次のN個×倍率系を追加) /
-   * UR:700(8種、2026-09-08に寿司シリーズのうなぎ握り＝other_hiaと同じ「残り秒数×倍率」スキルを
-   * 追加。ふぐ握り・カニ身握り・オオモンハタ握りは得点倍率系・時間増加系・出現量アップ系の
-   * スキルを持たせたためこのプールには含めない) / LR:200(2種) / MR:0(未在籍)。
+   * UR:700÷9=77.78ずつ(9種、2026-09-08に寿司シリーズのうなぎ握り＝other_hiaと同じ「残り秒数×倍率」
+   * スキルを追加。ふぐ握り・カニ身握り・オオモンハタ握りは得点倍率系・時間増加系・出現量アップ系の
+   * スキルを持たせたためこのプールには含めない。とらふぐ握りは2026-09-12に追加、既存8種→9種。
+   * 一家の大オモ柱と全く同じ「発動中ハザード出現なし」スキル＝hazardShieldUntilRef共有のため
+   * 同じ扱いでこのプールに含める) / LR:200(2種) / MR:0(未在籍)。
    * N・R・SR・SSR以外のランクは予算÷在籍数=100ちょうどで割り切れるため、`DEFAULT_ITEM_SPAWN_WEIGHT`と同じ値のまま。
    * 今後このプールに新アイテムを追加する場合は、他の3プールと同じ「同ランク内で均等に重みを
    * 割り振る計算方法」（docs/item-catch-new-item-checklist.md参照）でそのランクの予算を
@@ -687,14 +712,15 @@ const ITEM_SPAWN_WEIGHTS: Partial<Record<string, number>> = {
   sushi_anago: 1200 / 15,
   sushi_onion_salmon: 1200 / 15,
   sushi_mirugai: 1200 / 15,
-  food_mocchurin: 700 / 8,
-  other_komochi: 700 / 8,
-  other_omoi_bashira: 700 / 8,
-  other_mah: 700 / 8,
-  other_mirror_omochi: 700 / 8,
-  other_toorematen: 700 / 8,
-  other_hia: 700 / 8,
-  sushi_unagi: 700 / 8,
+  food_mocchurin: 700 / 9,
+  other_komochi: 700 / 9,
+  other_omoi_bashira: 700 / 9,
+  other_mah: 700 / 9,
+  other_mirror_omochi: 700 / 9,
+  other_toorematen: 700 / 9,
+  other_hia: 700 / 9,
+  sushi_unagi: 700 / 9,
+  sushi_torafugu: 700 / 9,
   hiking_frenchie: 100,
   snow_frenchie: 100,
 };
@@ -788,6 +814,10 @@ const GOLD_BALL_ITEM_ID = "interior_gold_ball";
 /** フルーツバスケットの効果中に降ってくる「人物の入ったキャラ」。本来のレアリティ・スキルのまま出現する */
 const PERSON_CHARACTER_ITEM_IDS = ["other_omochi_janai", "other_listen_to_the_a", "other_omoi_bashira", "other_xmas_party"];
 const PERSON_CHARACTER_ITEMS: CollectionItem[] = PERSON_CHARACTER_ITEM_IDS
+  .map((id) => COLLECTION_ITEMS.find((entry) => entry.id === id))
+  .filter((entry): entry is CollectionItem => entry != null);
+/** 天然クエ握りが画面上のマイナス系アイテムを変化させる先。未所持のものは出さないよう所持アイテムだけに絞る */
+const TIME_BONUS_CONVERT_ITEMS: CollectionItem[] = [...TIME_BONUS_ITEM_IDS]
   .map((id) => COLLECTION_ITEMS.find((entry) => entry.id === id))
   .filter((entry): entry is CollectionItem => entry != null);
 /**
@@ -1292,6 +1322,8 @@ export function FrenchieCatchGame({
   const mysterySkillPoolRef = useRef<string[]>(MYSTERY_SKILL_ITEM_IDS);
   /** フルーツバスケット中に降ってくる「人物の入ったキャラ」。未所持のものは出さないよう所持アイテムだけに絞る */
   const personCharacterPoolRef = useRef<CollectionItem[]>([]);
+  /** 天然クエ握りが画面上のマイナス系アイテムを変化させる先。未所持のものは出さないよう所持アイテムだけに絞る */
+  const timeBonusConvertPoolRef = useRef<CollectionItem[]>([]);
   /** Clawd中に降ってくるサッカーボール／ゴールドボール。未所持のものは出さないよう所持アイテムだけに絞る */
   const clawdBallItemsRef = useRef<{ soccer: CollectionItem | null; gold: CollectionItem | null }>({
     soccer: null,
@@ -1325,6 +1357,7 @@ export function FrenchieCatchGame({
     const pool = MYSTERY_SKILL_ITEM_IDS.filter((id) => ownedIds.has(id));
     mysterySkillPoolRef.current = pool.length > 0 ? pool : MYSTERY_SKILL_ITEM_IDS;
     personCharacterPoolRef.current = PERSON_CHARACTER_ITEMS.filter((item) => ownedIds.has(item.id));
+    timeBonusConvertPoolRef.current = TIME_BONUS_CONVERT_ITEMS.filter((item) => ownedIds.has(item.id));
     mrCharacterPoolRef.current = MR_CHARACTER_ITEMS.filter((item) => ownedIds.has(item.id));
     clawdBallItemsRef.current = {
       soccer: ownedIds.has(CLAWD_SOCCER_BALL_ITEM?.id ?? "") ? CLAWD_SOCCER_BALL_ITEM : null,
@@ -2404,6 +2437,11 @@ export function FrenchieCatchGame({
                 effectLabel = `${SCORE_MULT_DURATION_SR_SEC}秒間 ×${LV.CHUTORO_MULT[lv]}${lvTag}`;
                 statusChanged = true;
                 break;
+              case "sushi_akagai":
+                addScoreMultiplier(scoreMultipliersRef, now, scaleDambourleBonusMultiplier(LV.AKAGAI_MULT[lv]!, dambourleUpMultiplier("score_mult_pool_effect_up")), SCORE_MULT_DURATION_SR_SEC * 1000);
+                effectLabel = `${SCORE_MULT_DURATION_SR_SEC}秒間 ×${LV.AKAGAI_MULT[lv]}${lvTag}`;
+                statusChanged = true;
+                break;
               case "sushi_maguro_akami":
                 addScoreMultiplier(scoreMultipliersRef, now, scaleDambourleBonusMultiplier(LV.MAGURO_AKAMI_MULT[lv]!, dambourleUpMultiplier("score_mult_pool_effect_up")), SCORE_MULT_DURATION_R_SEC * 1000);
                 effectLabel = `${SCORE_MULT_DURATION_R_SEC}秒間 ×${LV.MAGURO_AKAMI_MULT[lv]}${lvTag}`;
@@ -2519,6 +2557,11 @@ export function FrenchieCatchGame({
               case "sushi_fugu":
                 addScoreMultiplier(scoreMultipliersRef, now, scaleDambourleBonusMultiplier(LV.FUGU_MULT[lv]!, dambourleUpMultiplier("score_mult_pool_effect_up")), SCORE_MULT_DURATION_UR_SEC * 1000);
                 effectLabel = `${SCORE_MULT_DURATION_UR_SEC}秒間 ×${LV.FUGU_MULT[lv]}${lvTag}`;
+                statusChanged = true;
+                break;
+              case "sushi_awabi":
+                addScoreMultiplier(scoreMultipliersRef, now, scaleDambourleBonusMultiplier(LV.AWABI_MULT[lv]!, dambourleUpMultiplier("score_mult_pool_effect_up")), SCORE_MULT_DURATION_UR_SEC * 1000);
+                effectLabel = `${SCORE_MULT_DURATION_UR_SEC}秒間 ×${LV.AWABI_MULT[lv]}${lvTag}`;
                 statusChanged = true;
                 break;
               case "other_omojii": {
@@ -2689,6 +2732,13 @@ export function FrenchieCatchGame({
               }
               case OMOI_BASHIRA_ITEM_ID: {
                 const shieldSec = LV.OMOI_BASHIRA_SEC[lv]!;
+                hazardShieldUntilRef.current = Math.max(now, hazardShieldUntilRef.current) + shieldSec * 1000;
+                effectLabel = `${shieldSec}秒間 ハザード出現なし${lvTag}`;
+                statusChanged = true;
+                break;
+              }
+              case "sushi_torafugu": {
+                const shieldSec = LV.TORAFUGU_SEC[lv]!;
                 hazardShieldUntilRef.current = Math.max(now, hazardShieldUntilRef.current) + shieldSec * 1000;
                 effectLabel = `${shieldSec}秒間 ハザード出現なし${lvTag}`;
                 statusChanged = true;
@@ -2942,6 +2992,40 @@ export function FrenchieCatchGame({
                 spawnRateBoostValueRef.current = scaleDambourleBonusMultiplier(kurumaSpawn, dambourleUpMultiplier("spawn_dynamics_effect_up"));
                 effectLabel = `${kurumaSec}秒間 落下×${kurumaFall} / 出現量×${kurumaSpawn}${lvTag}`;
                 statusChanged = true;
+                break;
+              }
+              /**
+               * 天然クエ握り：取得した瞬間、その時点で画面に表示されている（これから降ってくるものは
+               * 対象外）マイナス系アイテム（NEGATIVE_HAZARD_IDS）のうちLv個ぶんを、所持している
+               * 時間増加系アイテムへランダムに変化させる（ユーザー指定）。物理状態（位置・速度・
+               * サイズ等）はそのまま引き継ぎ、見た目・itemId/kind/name/image/rarity/levelだけを
+               * 書き換える。React側の再描画（画像の切り替え）を確実に起こすため、idも新規発行する
+               * （idの変化だけでentitiesの再レンダリングをトリガーする既存の仕組みに乗せるため）。
+               */
+              case "sushi_kue": {
+                const convertCount = LV.KUE_CONVERT_COUNT[lv]!;
+                const convertPool = timeBonusConvertPoolRef.current;
+                let convertedCount = 0;
+                if (convertPool.length > 0) {
+                  for (const target of entitiesRef.current) {
+                    if (convertedCount >= convertCount) break;
+                    if (target.status === "caught") continue;
+                    if (!target.itemId || !NEGATIVE_HAZARD_IDS.has(target.itemId)) continue;
+                    const picked = convertPool[Math.floor(Math.random() * convertPool.length)]!;
+                    target.id = nextIdRef.current++;
+                    target.itemId = picked.id;
+                    target.kind = "item";
+                    target.name = picked.name;
+                    target.image = picked.image ?? "";
+                    target.rarity = picked.rarity;
+                    target.level = itemLevelByIdRef.current.get(picked.id) ?? 1;
+                    convertedCount += 1;
+                  }
+                }
+                effectLabel = convertedCount > 0
+                  ? `画面上のマイナス系${convertedCount}個を時間増加系に変化${lvTag}`
+                  : `変化対象なし${lvTag}`;
+                statusChanged = convertedCount > 0;
                 break;
               }
               case "sushi_engawa": {
