@@ -20,10 +20,13 @@ export const dynamic = "force-dynamic";
 
 export default async function ItemCatchPage() {
   const { supabase, user } = await requireUser();
-  const [ownedItemCounts, ownedDambourleCounts, equippedDambourle] = await Promise.all([
+  const [ownedItemCounts, ownedDambourleCounts, equippedDambourle, profile] = await Promise.all([
     getOwnedItemCounts(supabase, user.id),
     getOwnedDambourleCounts(supabase, user.id),
     getEquippedDambourle(supabase, user.id),
+    // 検証用アカウント判定は、更新後にJWTへ反映されるまでタイムラグが起こりうる
+    // user.displayName（JWTのuser_metadata由来）ではなく、常に最新のprofilesを直接見る
+    supabase.from("profiles").select("display_name").eq("user_id", user.id).maybeSingle(),
   ]);
 
   let equippedBoxImage = DEFAULT_BOX_IMAGE;
@@ -49,7 +52,7 @@ export default async function ItemCatchPage() {
 
   // 検証用の管理アカウントだけ、出現アイテムを直近追加した10種に絞る（ユーザー指定。
   // 実際の所持数に関わらず全種Lv.MAXで出現させ、新アイテムをすぐ試せるようにする）
-  const catchItems = isManagementTestAccount(user.displayName)
+  const catchItems = isManagementTestAccount(profile.data?.display_name)
     ? MANAGEMENT_TEST_ACCOUNT_ITEM_IDS.flatMap((id) => {
         const item = COLLECTION_ITEMS.find((entry) => entry.id === id);
         if (!item || !item.image || !hasMinigameSkillLevel(item)) return [];

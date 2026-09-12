@@ -25,5 +25,5 @@ export const MANAGEMENT_TEST_ACCOUNT_ITEM_IDS: readonly string[] = [
 ];
 
 export function isManagementTestAccount(displayName: string | null | undefined): boolean {
-  return displayName === MANAGEMENT_TEST_ACCOUNT_DISPLAY_NAME;
+  return displayName?.trim() === MANAGEMENT_TEST_ACCOUNT_DISPLAY_NAME;
 }
