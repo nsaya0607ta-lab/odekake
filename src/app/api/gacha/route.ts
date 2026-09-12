@@ -52,8 +52,11 @@ export async function POST(request: Request) {
     );
   }
 
-  // 検証用の管理アカウントだけ、出現アイテムを直近追加した10種に絞る（ユーザー指定）
-  const gachaPool = isManagementTestAccount(user.displayName)
+  // 検証用の管理アカウントだけ、出現アイテムを直近追加した10種に絞る（ユーザー指定）。
+  // 更新後にJWTへ反映されるまでタイムラグが起こりうるuser.displayName（JWTのuser_metadata由来）
+  // ではなく、常に最新のprofilesを直接見て判定する
+  const { data: profile } = await supabase.from("profiles").select("display_name").eq("user_id", user.id).maybeSingle();
+  const gachaPool = isManagementTestAccount(profile?.display_name)
     ? GACHA_PRIZES.filter((prize) => MANAGEMENT_TEST_ACCOUNT_ITEM_IDS.includes(prize.id))
     : GACHA_PRIZES;
   const drawn = drawPrizes(plan.draws, body.plan === "hundred" ? GACHA_HUNDRED_RARITY_RATES : undefined, gachaPool);
