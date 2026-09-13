@@ -172,7 +172,7 @@ const CHOCOLATE_ITEM_ID = "hazard_chocolate_instant_end";
 const CHOCOLATE_IMAGE = "/collection/items/hazard-chocolate-instant-end.webp";
 /** 出現確率そのものを直接指定（0.20%） */
 const CHOCOLATE_SPAWN_CHANCE = 0.002;
-const NEGATIVE_HAZARD_IDS = new Set([TIME_MINUS_ITEM_ID, BOX_SHRINK_ITEM_ID, BLACKOUT_ITEM_ID, STUN_ITEM_ID, CHOCOLATE_ITEM_ID]);
+const NEGATIVE_HAZARD_IDS = new Set([POOP_ITEM_ID, TIME_MINUS_ITEM_ID, BOX_SHRINK_ITEM_ID, BLACKOUT_ITEM_ID, STUN_ITEM_ID, CHOCOLATE_ITEM_ID]);
 const SPAWN_INTERVAL_MIN_MS = 650;
 const SPAWN_INTERVAL_MAX_MS = 780;
 /**
@@ -2067,7 +2067,7 @@ export function FrenchieCatchGame({
           continue;
         }
 
-        if (magnetActive && entity.status === "falling" && entity.y > 20 && entity.itemId !== POOP_ITEM_ID && !NEGATIVE_HAZARD_IDS.has(entity.itemId ?? "")) {
+        if (magnetActive && entity.status === "falling" && entity.y > 20 && !NEGATIVE_HAZARD_IDS.has(entity.itemId ?? "")) {
           const dx = boxXRef.current - entity.x;
           if (Math.abs(dx) < magnetRange) entity.vx += Math.sign(dx) * magnetPull * dt;
         }
@@ -2075,7 +2075,6 @@ export function FrenchieCatchGame({
         if (
           pinkOmoPullActive &&
           (entity.status === "falling" || entity.status === "bounced") &&
-          entity.itemId !== POOP_ITEM_ID &&
           !NEGATIVE_HAZARD_IDS.has(entity.itemId ?? "")
         ) {
           const dx = boxXRef.current - entity.x;
