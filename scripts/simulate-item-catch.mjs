@@ -399,7 +399,7 @@ function simulateOneRound(lv, catchAll, timeBonusCatchRate = 0.8, normalCatchRat
       case "interior_shikkoku_no_ar": multiplier15Until = t + SCORE_MULT_DURATION_LR_SEC * 1000; multiplier15Value = LV.SHIKKOKU_MULT[lvIdx]; break;
       case "other_oyatsu_no_jikan": rewardTimeCount = 1; rewardTimeValue = LV.OYATSU_PT[lvIdx]; break;
       case "interior_gold_ball": break; // コイン加算のみ。スコアには含めない
-      case "other_narcissist_a": narcissistUntil = Math.max(t, narcissistUntil) + LV.NARCISSIST_SEC[lvIdx] * 1000; break;
+      case "other_narcissist_a": narcissistUntil = t + LV.NARCISSIST_SEC[lvIdx] * 1000; break;
       case "other_mafia_a": mafiaDogBonusMult *= LV.MAFIA_MULT[lvIdx]; break;
       case "other_okaeri": okaeriUntil = Math.max(t, okaeriUntil) + LV.OKAERI_SEC * 1000; okaeriPerCatchValue = LV.OKAERI_PER_CATCH[lvIdx]; break;
       case "other_mrs_green_apple":

@@ -10,6 +10,44 @@
   （ガイド画面の基礎ポイント表示・スコアシミュレーター。`frenchie-catch-game.tsx`の`POINTS`と
   値を二重管理しているため、基礎ポイントを変更したら必ずこちらも合わせて直すこと）
 
+## 【2026-09-13 最新確定28】「○秒間 効果」系スキルの重複取得時の挙動を「上書き＋延長」から「上書き（リセット）」に統一
+
+これまで段ボール拡大／縮小・落下速度アップ・アイテム出現量アップ・マグネット・ピンクオモ・
+ハザード出現なし・呪いの反転・とおれまてん・ナルシストアー等の「○秒間 効果」系スキル(得点倍率系
+以外)は、効果中に同種のアイテムをもう一度取ると`Math.max(now, xxxUntilRef.current) + 秒数`という式で
+残り時間に新しい秒数を**加算**していた（例: 残り2秒の状態で4秒のアイテムを取ると6秒に伸びる）。
+
+ユーザーから「重複取得時に秒数がどんどん積み重なるのは不自然では」と指摘があり、ユーザー指定で
+**上書き（`now + 秒数`でリセット）方式に統一**した。例えば落下速度アップ4秒のアイテムを取り、2秒後に
+もう一度取ると、残り2秒だったところがその瞬間から新たに4秒に戻る（6秒には伸びない）。効果の
+強さ（倍率・値）自体はこれまでも重複取得で上書き（最後に取った値を採用）だったので、そちらは変更なし。
+
+対象になった`xxxUntilRef`（`frenchie-catch-game.tsx`内、`Math.max(now, ref)+秒`パターンを検索して
+一括で`now+秒`に置換。計43箇所）: `boxWideUntilRef` `boxShrinkUntilRef` `blackoutUntilRef`
+`stunUntilRef` `highRarityLockUntilRef` `otherSuppressUntilRef` `fallSpeedBoostUntilRef`
+`spawnRateBoostUntilRef` `magnetUntilRef` `hazardShieldUntilRef` `omochiUntilRef`
+`hazardInvertUntilRef` `dogGoldenUntilRef` `itemSizeShrinkUntilRef` `poopSuppressUntilRef`
+`anagoAutoCatchUntilRef` `slantBoostUntilRef` `narcissistUntilRef`。
+
+**例外（今回の統一の対象外、従来どおり積み重ねる）:**
+- **`okaeriUntilRef`（おかえりの窓）**: 「窓を再延長できること自体」がバランス設計上の核（本メモ
+  「おかえりの窓の再延長」節で過去に詳しく検討済み。時間増加系の出現カットオフもこの前提で調整されている）
+  ため、今回は対象外とし従来どおり`Math.max(now, okaeriUntilRef.current) + 3秒`のまま維持した。
+- **`ikeaUntilRef`（イケアのくみたて中）**: 効果中のキャッチ回数を数えて終了時にボーナス化する
+  「積み上げ型」の報酬構造で、窓を延ばすこと自体が報酬の一部（`ikeaCountRef`で個数を数え、
+  ウィンドウ終了時に`個数×90pt`のくみたてボーナスを付与）。おかえりと同じ理由で対象外。
+- 得点倍率系スキル（`addScoreMultiplier`/`getScoreMultiplierProduct`による重複倍率の掛け算方式）は
+  今回の対象外（元々「秒数は独立、重なった倍率同士は掛け算」という別方式で、ユーザーからの指摘も
+  この系統には向いていなかった）。
+
+`scripts/simulate-item-catch.mjs`側は`narcissistUntil`のみ`Math.max(t, narcissistUntil) + 秒` →
+`t + 秒`に修正（`okaeriUntil`は上記の理由で`Math.max`のまま維持）。出現重み・LVテーブルは変更して
+いないため、`node scripts/simulate-item-catch.mjs 1000 avoid`の結果は最新確定27時点と誤差範囲内で
+一致することを確認済み（Lv1〜Lv5の秒数・スコア・500秒超え率とも大きな変化なし）。
+
+`src/lib/games/item-catch-skills.ts`冒頭の得点倍率についての解説コメントも、上記の「上書き＋延長」
+という記述を「上書き（リセット）」に修正済み。
+
 ## 【2026-09-13 最新確定27】天然クエ握りの変換対象にうんちを追加、ピンクオモの吸い寄せ除外を確認
 
 ユーザー指定で、天然クエ握り（`sushi_kue`）の変換対象`NEGATIVE_HAZARD_IDS`に`POOP_ITEM_ID`（うんち）を
