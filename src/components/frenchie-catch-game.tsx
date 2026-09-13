@@ -2238,7 +2238,7 @@ export function FrenchieCatchGame({
                 }
               } else if (entity.itemId === BOX_SHRINK_ITEM_ID) {
                 if (hazardInverted) {
-                  boxWideUntilRef.current = Math.max(now, boxWideUntilRef.current) + BOX_SHRINK_SECONDS * 1000;
+                  boxWideUntilRef.current = now + BOX_SHRINK_SECONDS * 1000;
                   boxWideScaleRef.current = BOX_WIDE_SCALE_DEFAULT;
                   showCatch(entity, 0, `ミラー反転！${BOX_SHRINK_SECONDS}秒間 ダンボール拡大`);
                 } else if (boxShrinkGuardRef.current > 0) {
@@ -2246,11 +2246,11 @@ export function FrenchieCatchGame({
                   setBoxShrinkGuard(0);
                   showCatch(entity, 0, `${HAZARD_GUARD_LABELS.boxShrink}で無効化！`);
                 } else {
-                  boxShrinkUntilRef.current = Math.max(now, boxShrinkUntilRef.current) + BOX_SHRINK_SECONDS * 1000;
+                  boxShrinkUntilRef.current = now + BOX_SHRINK_SECONDS * 1000;
                   showCatch(entity, 0, BOX_SHRINK_SECONDS + "秒間 ダンボール0.8倍");
                 }
               } else if (entity.itemId === BLACKOUT_ITEM_ID) {
-                blackoutUntilRef.current = Math.max(now, blackoutUntilRef.current) + BLACKOUT_SECONDS * 1000;
+                blackoutUntilRef.current = now + BLACKOUT_SECONDS * 1000;
                 setBlackoutActive(true);
                 showCatch(entity, 0, BLACKOUT_SECONDS + "秒間 上半分が見えない！");
               } else if (entity.itemId === STUN_ITEM_ID) {
@@ -2264,7 +2264,7 @@ export function FrenchieCatchGame({
                   setStunGuard(0);
                   showCatch(entity, 0, `${HAZARD_GUARD_LABELS.stun}で無効化！`);
                 } else {
-                  stunUntilRef.current = Math.max(now, stunUntilRef.current) + STUN_SECONDS * 1000;
+                  stunUntilRef.current = now + STUN_SECONDS * 1000;
                   draggingRef.current = false;
                   setStunned(true);
                   showCatch(entity, 0, STUN_SECONDS + "秒間 しびれ！");
@@ -2498,7 +2498,7 @@ export function FrenchieCatchGame({
                   effectLabel = `宝箱 ${SCORE_MULT_DURATION_SR_SEC}秒間 得点×${LV.TREASURE_DOUBLE_MULT[lv]}${lvTag}`;
                   statusChanged = true;
                 } else if (outcome === "rare_lock") {
-                  highRarityLockUntilRef.current = Math.max(now, highRarityLockUntilRef.current) + LV.TREASURE_SEC[lv]! * 1000;
+                  highRarityLockUntilRef.current = now + LV.TREASURE_SEC[lv]! * 1000;
                   effectLabel = `宝箱 ${LV.TREASURE_SEC[lv]}秒間 SSR/UR/LRのみ出現${lvTag}`;
                   statusChanged = true;
                 } else {
@@ -2539,7 +2539,7 @@ export function FrenchieCatchGame({
                 break;
               }
               case STRETCH_ROD_ITEM_ID:
-                otherSuppressUntilRef.current = Math.max(now, otherSuppressUntilRef.current) + STRETCH_ROD_SECONDS * 1000;
+                otherSuppressUntilRef.current = now + STRETCH_ROD_SECONDS * 1000;
                 otherSuppressValueRef.current = LV.STRETCH_ROD_MULT[lv]!;
                 effectLabel = `${STRETCH_ROD_SECONDS}秒間 その他×${LV.STRETCH_ROD_MULT[lv]}${lvTag}`;
                 statusChanged = true;
@@ -2551,10 +2551,10 @@ export function FrenchieCatchGame({
               }
               case XMAS_PARTY_ITEM_ID: {
                 const xmasSec = LV.XMAS_SEC[lv]!;
-                fallSpeedBoostUntilRef.current = Math.max(now, fallSpeedBoostUntilRef.current) + xmasSec * 1000;
+                fallSpeedBoostUntilRef.current = now + xmasSec * 1000;
                 fallSpeedValueRef.current = LV.XMAS_FALL[lv]!;
                 addScoreMultiplier(scoreMultipliersRef, now, scaleDambourleBonusMultiplier(LV.XMAS_SCORE[lv]!, dambourleUpMultiplier("score_mult_pool_effect_up")), SCORE_MULT_DURATION_MR_SEC * 1000);
-                spawnRateBoostUntilRef.current = Math.max(now, spawnRateBoostUntilRef.current) + xmasSec * 1000;
+                spawnRateBoostUntilRef.current = now + xmasSec * 1000;
                 spawnRateBoostValueRef.current = scaleDambourleBonusMultiplier(LV.XMAS_SPAWN[lv]!, dambourleUpMultiplier("spawn_dynamics_effect_up"));
                 dogFloodRemainingRef.current += LV.XMAS_DOG_COUNT[lv]!;
                 effectLabel = `${xmasSec}秒間 落下×${LV.XMAS_FALL[lv]}+出現量×${LV.XMAS_SPAWN[lv]} / ${SCORE_MULT_DURATION_MR_SEC}秒間 得点×${LV.XMAS_SCORE[lv]} / フレブル${LV.XMAS_DOG_COUNT[lv]}体${lvTag}`;
@@ -2645,19 +2645,19 @@ export function FrenchieCatchGame({
                 break;
               }
               case "food_paw_cupcake":
-                boxWideUntilRef.current = Math.max(now, boxWideUntilRef.current) + LV.CUPCAKE_SEC[lv]! * 1000;
+                boxWideUntilRef.current = now + LV.CUPCAKE_SEC[lv]! * 1000;
                 boxWideScaleRef.current = BOX_WIDE_SCALE_DEFAULT;
                 effectLabel = `${LV.CUPCAKE_SEC[lv]}秒間 ダンボール1.5倍拡大${lvTag}`;
                 statusChanged = true;
                 break;
               case "sushi_ebi":
-                boxWideUntilRef.current = Math.max(now, boxWideUntilRef.current) + LV.EBI_SEC[lv]! * 1000;
+                boxWideUntilRef.current = now + LV.EBI_SEC[lv]! * 1000;
                 boxWideScaleRef.current = BOX_WIDE_SCALE_DEFAULT;
                 effectLabel = `${LV.EBI_SEC[lv]}秒間 ダンボール1.5倍拡大${lvTag}`;
                 statusChanged = true;
                 break;
               case "toy_paw_macaron":
-                boxWideUntilRef.current = Math.max(now, boxWideUntilRef.current) + LV.MACARON_SEC[lv]! * 1000;
+                boxWideUntilRef.current = now + LV.MACARON_SEC[lv]! * 1000;
                 boxWideScaleRef.current = BOX_WIDE_SCALE_DEFAULT;
                 effectLabel = `${LV.MACARON_SEC[lv]}秒間 ダンボール1.5倍拡大${lvTag}`;
                 statusChanged = true;
@@ -2707,7 +2707,7 @@ export function FrenchieCatchGame({
                 statusChanged = true;
                 break;
               case "other_sparkle_rope_crown":
-                magnetUntilRef.current = Math.max(now, magnetUntilRef.current) + LV.SPARKLE_SEC[lv]! * 1000;
+                magnetUntilRef.current = now + LV.SPARKLE_SEC[lv]! * 1000;
                 magnetStrengthRef.current = LV.SPARKLE_STRENGTH[lv]!;
                 effectLabel = `${LV.SPARKLE_SEC[lv]}秒間 ミニマグネット${lvTag}`;
                 statusChanged = true;
@@ -2742,7 +2742,7 @@ export function FrenchieCatchGame({
                 const skipBlackout = Math.random() < OYASUMI_NO_BLACKOUT_CHANCE;
                 const oyasumiMult = skipBlackout ? LV.OYASUMI_MULT_NORMAL[lv]! : LV.OYASUMI_MULT_BLACKOUT[lv]!;
                 if (!skipBlackout) {
-                  blackoutUntilRef.current = Math.max(now, blackoutUntilRef.current) + OYASUMI_SECONDS * 1000;
+                  blackoutUntilRef.current = now + OYASUMI_SECONDS * 1000;
                   setBlackoutActive(true);
                 }
                 addScoreMultiplier(scoreMultipliersRef, now, scaleDambourleBonusMultiplier(oyasumiMult, dambourleUpMultiplier("score_mult_pool_effect_up")), OYASUMI_SECONDS * 1000);
@@ -2754,19 +2754,22 @@ export function FrenchieCatchGame({
               }
               case OMOI_BASHIRA_ITEM_ID: {
                 const shieldSec = LV.OMOI_BASHIRA_SEC[lv]!;
-                hazardShieldUntilRef.current = Math.max(now, hazardShieldUntilRef.current) + shieldSec * 1000;
+                hazardShieldUntilRef.current = now + shieldSec * 1000;
                 effectLabel = `${shieldSec}秒間 ハザード出現なし${lvTag}`;
                 statusChanged = true;
                 break;
               }
               case "sushi_torafugu": {
                 const shieldSec = LV.TORAFUGU_SEC[lv]!;
-                hazardShieldUntilRef.current = Math.max(now, hazardShieldUntilRef.current) + shieldSec * 1000;
+                hazardShieldUntilRef.current = now + shieldSec * 1000;
                 effectLabel = `${shieldSec}秒間 ハザード出現なし${lvTag}`;
                 statusChanged = true;
                 break;
               }
               case OKAERI_ITEM_ID: {
+                /** おかえりの窓は「再延長できること」自体がバランス設計上重要なため、
+                 * 2026-09-13の他スキル一律「上書き」化の対象外として従来どおり積み重ねる
+                 * （docs/minigame-time-balance.md「おかえりの窓の再延長」節参照） */
                 okaeriUntilRef.current = Math.max(now, okaeriUntilRef.current) + LV.OKAERI_SEC * 1000;
                 okaeriPerCatchValueRef.current = LV.OKAERI_PER_CATCH[lv]!;
                 effectLabel = `${LV.OKAERI_SEC}秒間 取った個数×${LV.OKAERI_PER_CATCH[lv]}秒${lvTag}`;
@@ -2775,7 +2778,7 @@ export function FrenchieCatchGame({
               }
               case OMOCHI_ITEM_ID: {
                 const omochiSec = LV.OMOCHI_SEC[lv]!;
-                omochiUntilRef.current = Math.max(now, omochiUntilRef.current) + omochiSec * 1000;
+                omochiUntilRef.current = now + omochiSec * 1000;
                 omochiPtValueRef.current = LV.OMOCHI_PT[lv]!;
                 effectLabel = `${omochiSec}秒間 うんちがおもちに変身 +${LV.OMOCHI_PT[lv]}pt${lvTag}`;
                 statusChanged = true;
@@ -2797,7 +2800,7 @@ export function FrenchieCatchGame({
               }
               case "other_mirror_omochi": {
                 const mirrorSec = LV.MIRROR_SEC[lv]!;
-                hazardInvertUntilRef.current = Math.max(now, hazardInvertUntilRef.current) + mirrorSec * 1000;
+                hazardInvertUntilRef.current = now + mirrorSec * 1000;
                 mirrorInvertPtValueRef.current = LV.MIRROR_INVERT_PT[lv]!;
                 effectLabel = `${mirrorSec}秒間 ハザード反転${lvTag}`;
                 statusChanged = true;
@@ -2805,7 +2808,7 @@ export function FrenchieCatchGame({
               }
               case "other_toorematen": {
                 const toorematenSec = LV.TOOREMATEN_SEC[lv]!;
-                dogGoldenUntilRef.current = Math.max(now, dogGoldenUntilRef.current) + toorematenSec * 1000;
+                dogGoldenUntilRef.current = now + toorematenSec * 1000;
                 dogGoldenPtValueRef.current = LV.TOOREMATEN_PT[lv]!;
                 effectLabel = `${toorematenSec}秒間 フレブルが金色に(+${LV.TOOREMATEN_PT[lv]}pt)${lvTag}`;
                 statusChanged = true;
@@ -2822,13 +2825,13 @@ export function FrenchieCatchGame({
                 statusChanged = true;
                 break;
               case "hiking_frenchie":
-                magnetUntilRef.current = Math.max(now, magnetUntilRef.current) + LV.HIKING_SEC[lv]! * 1000;
+                magnetUntilRef.current = now + LV.HIKING_SEC[lv]! * 1000;
                 magnetStrengthRef.current = "strong";
                 effectLabel = `${LV.HIKING_SEC[lv]}秒間 マグネット${lvTag}`;
                 statusChanged = true;
                 break;
               case "snow_frenchie":
-                boxWideUntilRef.current = Math.max(now, boxWideUntilRef.current) + LV.SNOW_SEC[lv]! * 1000;
+                boxWideUntilRef.current = now + LV.SNOW_SEC[lv]! * 1000;
                 boxWideScaleRef.current = BOX_WIDE_SCALE_STRONG;
                 effectLabel = `${LV.SNOW_SEC[lv]}秒間 ダンボール1.7倍拡大${lvTag}`;
                 statusChanged = true;
@@ -2841,7 +2844,7 @@ export function FrenchieCatchGame({
                 break;
               }
               case "interior_kinoko_azubee":
-                fallSpeedBoostUntilRef.current = Math.max(now, fallSpeedBoostUntilRef.current) + LV.KINOKO_SEC[lv]! * 1000;
+                fallSpeedBoostUntilRef.current = now + LV.KINOKO_SEC[lv]! * 1000;
                 fallSpeedValueRef.current = LV.KINOKO_FALL[lv]!;
                 addScoreMultiplier(scoreMultipliersRef, now, scaleDambourleBonusMultiplier(LV.KINOKO_SCORE[lv]!, dambourleUpMultiplier("score_mult_pool_effect_up")), SCORE_MULT_DURATION_UR_SEC * 1000);
                 effectLabel = `${LV.KINOKO_SEC[lv]}秒間 落下×${LV.KINOKO_FALL[lv]} / ${SCORE_MULT_DURATION_UR_SEC}秒間 得点×${LV.KINOKO_SCORE[lv]}${lvTag}`;
@@ -2873,7 +2876,7 @@ export function FrenchieCatchGame({
                 const suppressSec = LV.HAMIGAKI_SEC[lv]!;
                 points += LV.HAMIGAKI_PT[lv]!;
                 if (suppressSec > 0) {
-                  poopSuppressUntilRef.current = Math.max(now, poopSuppressUntilRef.current) + suppressSec * 1000;
+                  poopSuppressUntilRef.current = now + suppressSec * 1000;
                   effectLabel = LV.HAMIGAKI_PT[lv]! > 0
                     ? `うんち一掃 / ${suppressSec}秒間 出現なし / +${LV.HAMIGAKI_PT[lv]}pt${lvTag}`
                     : `うんち一掃 / ${suppressSec}秒間 出現なし${lvTag}`;
@@ -2894,7 +2897,7 @@ export function FrenchieCatchGame({
               case "other_orusuban":
               case "other_kurumari_a": {
                 const orusubanSec = LV.ORUSUBAN_SEC[lv]!;
-                fallSpeedBoostUntilRef.current = Math.max(now, fallSpeedBoostUntilRef.current) + orusubanSec * 1000;
+                fallSpeedBoostUntilRef.current = now + orusubanSec * 1000;
                 fallSpeedValueRef.current = LV.ORUSUBAN_FALL[lv]!;
                 const guard = grantRandomHazardGuard();
                 effectLabel = `${orusubanSec}秒間 落下速度×${LV.ORUSUBAN_FALL[lv]} / ${guard ? HAZARD_GUARD_LABELS[guard] : "防止アイテムは満タン"}${lvTag}`;
@@ -2903,14 +2906,14 @@ export function FrenchieCatchGame({
               }
               case "sushi_anago": {
                 const anagoSec = LV.ANAGO_SEC[lv]!;
-                anagoAutoCatchUntilRef.current = Math.max(now, anagoAutoCatchUntilRef.current) + anagoSec * 1000;
+                anagoAutoCatchUntilRef.current = now + anagoSec * 1000;
                 effectLabel = `${anagoSec}秒間 ダンボールに触れるだけでキャッチ${lvTag}`;
                 statusChanged = true;
                 break;
               }
               case "sushi_tako": {
                 const takoSec = LV.TAKO_SEC[lv]!;
-                fallSpeedBoostUntilRef.current = Math.max(now, fallSpeedBoostUntilRef.current) + takoSec * 1000;
+                fallSpeedBoostUntilRef.current = now + takoSec * 1000;
                 fallSpeedValueRef.current = LV.TAKO_FALL[lv]!;
                 effectLabel = `${takoSec}秒間 落下速度×${LV.TAKO_FALL[lv]}${lvTag}`;
                 statusChanged = true;
@@ -2918,7 +2921,7 @@ export function FrenchieCatchGame({
               }
               case "sushi_aburi_saba": {
                 const aburiSabaSec = LV.ABURI_SABA_SEC[lv]!;
-                fallSpeedBoostUntilRef.current = Math.max(now, fallSpeedBoostUntilRef.current) + aburiSabaSec * 1000;
+                fallSpeedBoostUntilRef.current = now + aburiSabaSec * 1000;
                 fallSpeedValueRef.current = LV.ABURI_SABA_FALL[lv]!;
                 effectLabel = `${aburiSabaSec}秒間 落下速度×${LV.ABURI_SABA_FALL[lv]}${lvTag}`;
                 statusChanged = true;
@@ -2927,7 +2930,7 @@ export function FrenchieCatchGame({
               case "other_pondeomo": {
                 const pondeomoSec = LV.PONDEOMO_SEC[lv]!;
                 const pondeomoSpawn = LV.PONDEOMO_SPAWN[lv]!;
-                spawnRateBoostUntilRef.current = Math.max(now, spawnRateBoostUntilRef.current) + pondeomoSec * 1000;
+                spawnRateBoostUntilRef.current = now + pondeomoSec * 1000;
                 spawnRateBoostValueRef.current = scaleDambourleBonusMultiplier(pondeomoSpawn, dambourleUpMultiplier("spawn_dynamics_effect_up"));
                 effectLabel = `${pondeomoSec}秒間 アイテム出現量×${pondeomoSpawn}${lvTag}`;
                 statusChanged = true;
@@ -2936,7 +2939,7 @@ export function FrenchieCatchGame({
               case "other_pondear": {
                 const pondearSec = LV.PONDEAR_SEC[lv]!;
                 const pondearSpawn = LV.PONDEAR_SPAWN[lv]!;
-                spawnRateBoostUntilRef.current = Math.max(now, spawnRateBoostUntilRef.current) + pondearSec * 1000;
+                spawnRateBoostUntilRef.current = now + pondearSec * 1000;
                 spawnRateBoostValueRef.current = scaleDambourleBonusMultiplier(pondearSpawn, dambourleUpMultiplier("spawn_dynamics_effect_up"));
                 effectLabel = `${pondearSec}秒間 アイテム出現量×${pondearSpawn}${lvTag}`;
                 statusChanged = true;
@@ -2945,16 +2948,16 @@ export function FrenchieCatchGame({
               case "other_jare_a": {
                 const jareASec = LV.JARE_A_SEC[lv]!;
                 const jareASpawn = LV.JARE_A_SPAWN[lv]!;
-                spawnRateBoostUntilRef.current = Math.max(now, spawnRateBoostUntilRef.current) + jareASec * 1000;
+                spawnRateBoostUntilRef.current = now + jareASec * 1000;
                 spawnRateBoostValueRef.current = scaleDambourleBonusMultiplier(jareASpawn, dambourleUpMultiplier("spawn_dynamics_effect_up"));
-                slantBoostUntilRef.current = Math.max(now, slantBoostUntilRef.current) + jareASec * 1000;
+                slantBoostUntilRef.current = now + jareASec * 1000;
                 effectLabel = `${jareASec}秒間 アイテム出現量×${jareASpawn}+斜め落下${lvTag}`;
                 statusChanged = true;
                 break;
               }
               case "interior_shikkoku_no_ar": {
                 const shikkokuSec = LV.SHIKKOKU_SEC[lv]!;
-                fallSpeedBoostUntilRef.current = Math.max(now, fallSpeedBoostUntilRef.current) + shikkokuSec * 1000;
+                fallSpeedBoostUntilRef.current = now + shikkokuSec * 1000;
                 fallSpeedValueRef.current = LV.SHIKKOKU_FALL[lv]!;
                 addScoreMultiplier(scoreMultipliersRef, now, scaleDambourleBonusMultiplier(LV.SHIKKOKU_MULT[lv]!, dambourleUpMultiplier("score_mult_pool_effect_up")), SCORE_MULT_DURATION_LR_SEC * 1000);
                 effectLabel = `${shikkokuSec}秒間 落下×${LV.SHIKKOKU_FALL[lv]} / ${SCORE_MULT_DURATION_LR_SEC}秒間 得点×${LV.SHIKKOKU_MULT[lv]}${lvTag}`;
@@ -2964,7 +2967,7 @@ export function FrenchieCatchGame({
               case "other_pink_omo":
               case "sushi_nama_ebi": {
                 const pinkOmoSec = LV.PINK_OMO_SEC[lv]!;
-                pinkOmoUntilRef.current = Math.max(now, pinkOmoUntilRef.current) + pinkOmoSec * 1000;
+                pinkOmoUntilRef.current = now + pinkOmoSec * 1000;
                 setPinkOmoActive(true);
                 effectLabel = `${pinkOmoSec}秒間 ピンクフィルター発動！アイテムが中心へ${lvTag}`;
                 statusChanged = true;
@@ -2973,7 +2976,7 @@ export function FrenchieCatchGame({
               case "sushi_shirasu": {
                 const shirasuSec = LV.SHIRASU_SEC[lv]!;
                 const shirasuSpawn = LV.SHIRASU_SPAWN[lv]!;
-                spawnRateBoostUntilRef.current = Math.max(now, spawnRateBoostUntilRef.current) + shirasuSec * 1000;
+                spawnRateBoostUntilRef.current = now + shirasuSec * 1000;
                 spawnRateBoostValueRef.current = scaleDambourleBonusMultiplier(shirasuSpawn, dambourleUpMultiplier("spawn_dynamics_effect_up"));
                 effectLabel = `${shirasuSec}秒間 アイテム出現量×${shirasuSpawn}${lvTag}`;
                 statusChanged = true;
@@ -2982,7 +2985,7 @@ export function FrenchieCatchGame({
               case "sushi_oomonhata": {
                 const oomonhataSec = LV.OOMONHATA_SEC[lv]!;
                 const oomonhataSpawn = LV.OOMONHATA_SPAWN[lv]!;
-                spawnRateBoostUntilRef.current = Math.max(now, spawnRateBoostUntilRef.current) + oomonhataSec * 1000;
+                spawnRateBoostUntilRef.current = now + oomonhataSec * 1000;
                 spawnRateBoostValueRef.current = scaleDambourleBonusMultiplier(oomonhataSpawn, dambourleUpMultiplier("spawn_dynamics_effect_up"));
                 effectLabel = `${oomonhataSec}秒間 アイテム出現量×${oomonhataSpawn}${lvTag}`;
                 statusChanged = true;
@@ -2991,7 +2994,7 @@ export function FrenchieCatchGame({
               case "sushi_kazunoko": {
                 const kazunokoSec = LV.KAZUNOKO_SEC[lv]!;
                 const kazunokoSpawn = LV.KAZUNOKO_SPAWN[lv]!;
-                spawnRateBoostUntilRef.current = Math.max(now, spawnRateBoostUntilRef.current) + kazunokoSec * 1000;
+                spawnRateBoostUntilRef.current = now + kazunokoSec * 1000;
                 spawnRateBoostValueRef.current = scaleDambourleBonusMultiplier(kazunokoSpawn, dambourleUpMultiplier("spawn_dynamics_effect_up"));
                 effectLabel = `${kazunokoSec}秒間 アイテム出現量×${kazunokoSpawn}${lvTag}`;
                 statusChanged = true;
@@ -2999,7 +3002,7 @@ export function FrenchieCatchGame({
               }
               case "sushi_nodoguro": {
                 const nodoguroSec = LV.NODOGURO_SEC[lv]!;
-                itemSizeShrinkUntilRef.current = Math.max(now, itemSizeShrinkUntilRef.current) + nodoguroSec * 1000;
+                itemSizeShrinkUntilRef.current = now + nodoguroSec * 1000;
                 effectLabel = `${nodoguroSec}秒間 アイテムサイズ×${NODOGURO_SIZE_SCALE}${lvTag}`;
                 statusChanged = true;
                 break;
@@ -3008,9 +3011,9 @@ export function FrenchieCatchGame({
                 const kurumaSec = LV.KURUMA_EBI_SEC[lv]!;
                 const kurumaFall = LV.KURUMA_EBI_FALL[lv]!;
                 const kurumaSpawn = LV.KURUMA_EBI_SPAWN[lv]!;
-                fallSpeedBoostUntilRef.current = Math.max(now, fallSpeedBoostUntilRef.current) + kurumaSec * 1000;
+                fallSpeedBoostUntilRef.current = now + kurumaSec * 1000;
                 fallSpeedValueRef.current = kurumaFall;
-                spawnRateBoostUntilRef.current = Math.max(now, spawnRateBoostUntilRef.current) + kurumaSec * 1000;
+                spawnRateBoostUntilRef.current = now + kurumaSec * 1000;
                 spawnRateBoostValueRef.current = scaleDambourleBonusMultiplier(kurumaSpawn, dambourleUpMultiplier("spawn_dynamics_effect_up"));
                 effectLabel = `${kurumaSec}秒間 落下×${kurumaFall} / 出現量×${kurumaSpawn}${lvTag}`;
                 statusChanged = true;
@@ -3060,7 +3063,7 @@ export function FrenchieCatchGame({
               case "sushi_engawa": {
                 const engawaSec = LV.ENGAWA_SEC[lv]!;
                 const engawaSpawn = LV.ENGAWA_SPAWN[lv]!;
-                spawnRateBoostUntilRef.current = Math.max(now, spawnRateBoostUntilRef.current) + engawaSec * 1000;
+                spawnRateBoostUntilRef.current = now + engawaSec * 1000;
                 spawnRateBoostValueRef.current = scaleDambourleBonusMultiplier(engawaSpawn, dambourleUpMultiplier("spawn_dynamics_effect_up"));
                 effectLabel = `${engawaSec}秒間 アイテム出現量×${engawaSpawn}${lvTag}`;
                 statusChanged = true;
@@ -3069,7 +3072,7 @@ export function FrenchieCatchGame({
               case "interior_ragby_ar": {
                 const ragbySec = LV.RAGBY_SEC[lv]!;
                 const ragbySpawn = LV.RAGBY_SPAWN[lv]!;
-                spawnRateBoostUntilRef.current = Math.max(now, spawnRateBoostUntilRef.current) + ragbySec * 1000;
+                spawnRateBoostUntilRef.current = now + ragbySec * 1000;
                 spawnRateBoostValueRef.current = scaleDambourleBonusMultiplier(ragbySpawn, dambourleUpMultiplier("spawn_dynamics_effect_up"));
                 effectLabel = `${ragbySec}秒間 アイテム出現量×${ragbySpawn}${lvTag}`;
                 statusChanged = true;
@@ -3077,7 +3080,7 @@ export function FrenchieCatchGame({
               }
               case "other_ketsunade_a": {
                 const ketsunadeSec = LV.KETSUNADE_SEC[lv]!;
-                magnetUntilRef.current = Math.max(now, magnetUntilRef.current) + ketsunadeSec * 1000;
+                magnetUntilRef.current = now + ketsunadeSec * 1000;
                 magnetStrengthRef.current = "strong";
                 const guard = grantRandomHazardGuard();
                 effectLabel = `${ketsunadeSec}秒間 なでなでマグネット / ${guard ? HAZARD_GUARD_LABELS[guard] : "防止アイテムは満タン"}${lvTag}`;
@@ -3094,7 +3097,7 @@ export function FrenchieCatchGame({
               }
               case "other_narcissist_a": {
                 const narcissistSec = LV.NARCISSIST_SEC[lv]!;
-                narcissistUntilRef.current = Math.max(now, narcissistUntilRef.current) + narcissistSec * 1000;
+                narcissistUntilRef.current = now + narcissistSec * 1000;
                 effectLabel = `${narcissistSec}秒間 全アイテムのスキルがLv.MAXに${lvTag}`;
                 statusChanged = true;
                 break;
