@@ -14,7 +14,13 @@ type Placement = {
   instanceId: string; itemId: string; x: number; y: number; scale: number;
   rotation: number; flipped: boolean; z: number;
 };
-type Room = { id: string; name: string; backgroundImage: string | null; placements: Placement[] };
+type Room = {
+  id: string;
+  name: string;
+  backgroundImage: string | null;
+  backgroundFit: "cover" | "contain";
+  placements: Placement[];
+};
 type Filter = "all" | CollectionCategory | "sushi";
 
 const STORAGE_KEY = "odekake-decoration-rooms-v2";
@@ -44,7 +50,7 @@ function createDogPlacement(): Placement {
   return { instanceId: `dog-${newId()}`, itemId: DOG_ITEM_ID, x: 28, y: 69, scale: 1.25, rotation: 0, flipped: false, z: 1 };
 }
 function createRoom(number: number): Room {
-  return { id: newId(), name: `ルーム ${number}`, backgroundImage: null, placements: [createDogPlacement()] };
+  return { id: newId(), name: `ルーム ${number}`, backgroundImage: null, backgroundFit: "cover", placements: [createDogPlacement()] };
 }
 function parsePlacements(value: unknown, validIds: ReadonlySet<string>): Placement[] {
   if (!Array.isArray(value)) return [createDogPlacement()];
@@ -75,6 +81,7 @@ function loadRooms(validIds: ReadonlySet<string>): Room[] {
           id: typeof room.id === "string" ? room.id : newId(),
           name: typeof room.name === "string" ? room.name : `ルーム ${index + 1}`,
           backgroundImage: typeof room.backgroundImage === "string" ? room.backgroundImage : null,
+          backgroundFit: room.backgroundFit === "contain" ? "contain" : "cover",
           placements: parsePlacements(room.placements, validIds),
         }];
       });
@@ -123,6 +130,8 @@ export function DecorationRoom({ items, totalCollectionCount, coinBalance }: {
   const [filter, setFilter] = useState<Filter>("all");
   const [saved, setSaved] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
+  const [hydrated, setHydrated] = useState(false);
+  const [processingBackground, setProcessingBackground] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const noticeTimerRef = useRef<number | null>(null);
   const swipeRef = useRef<{ pointerId: number; startX: number; startY: number } | null>(null);
@@ -132,7 +141,22 @@ export function DecorationRoom({ items, totalCollectionCount, coinBalance }: {
     moved: boolean; frame: number | null;
   } | null>(null);
 
-  useEffect(() => { setRooms(loadRooms(validIds)); }, [validIds]);
+  useEffect(() => {
+    setRooms(loadRooms(validIds));
+    setHydrated(true);
+  }, [validIds]);
+  useEffect(() => {
+    if (!hydrated) return;
+    const timer = window.setTimeout(() => {
+      try {
+        window.localStorage.setItem(STORAGE_KEY, JSON.stringify(rooms));
+        setSaved(true);
+      } catch {
+        setSaved(false);
+      }
+    }, 650);
+    return () => window.clearTimeout(timer);
+  }, [hydrated, rooms]);
   useEffect(() => () => {
     if (noticeTimerRef.current) window.clearTimeout(noticeTimerRef.current);
     if (dragRef.current?.frame) window.cancelAnimationFrame(dragRef.current.frame);
@@ -224,11 +248,13 @@ export function DecorationRoom({ items, totalCollectionCount, coinBalance }: {
     if (!file) return;
     if (!file.type.startsWith("image/")) { showNotice("画像ファイルを選んでください"); return; }
     if (file.size > 12 * 1024 * 1024) { showNotice("12MB以下の画像を選んでください"); return; }
+    setProcessingBackground(true);
     try {
       const backgroundImage = await resizeBackground(file);
       setRooms((current) => current.map((room, index) => index === activeRoomIndex ? { ...room, backgroundImage } : room));
       setSaved(false); showNotice("背景を変更しました。保存ボタンで確定できます");
     } catch { showNotice("この画像は読み込めませんでした"); }
+    finally { setProcessingBackground(false); }
   }
   function finishDrag(pointerId: number) {
     const drag = dragRef.current;
@@ -240,6 +266,7 @@ export function DecorationRoom({ items, totalCollectionCount, coinBalance }: {
       setPast((current) => [...current.slice(-(HISTORY_LIMIT - 1)), drag.before]);
       setFuture([]); replaceActivePlacements(next);
     }
+    drag.element.style.willChange = "auto";
     if (drag.element.hasPointerCapture(pointerId)) drag.element.releasePointerCapture(pointerId);
     dragRef.current = null;
   }
@@ -259,7 +286,7 @@ export function DecorationRoom({ items, totalCollectionCount, coinBalance }: {
 
       <div className="mx-auto max-w-lg">
         <section className="relative overflow-hidden border-b border-line bg-[#f5ead8]" aria-label="デコレーションエリア">
-          <div className="flex h-12 items-center justify-between gap-2 border-b border-white/60 bg-card/75 px-3">
+          <div className="grid h-12 grid-cols-[44px_1fr_44px] items-center gap-2 border-b border-white/60 bg-card/75 px-4">
             <button type="button" onClick={() => switchRoom(activeRoomIndex - 1)} disabled={activeRoomIndex === 0} aria-label="前の部屋" className="h-9 w-9 rounded-full bg-white/85 text-xl font-bold text-ink-soft shadow-sm disabled:opacity-30">‹</button>
             <div className="min-w-0 text-center">
               <p className="text-xs font-black">{activeRoom.name}</p>
@@ -267,12 +294,11 @@ export function DecorationRoom({ items, totalCollectionCount, coinBalance }: {
                 {rooms.map((room, index) => <span key={room.id} className={`h-1.5 rounded-full transition-all ${index === activeRoomIndex ? "w-4 bg-leaf-deep" : "w-1.5 bg-line-strong"}`} />)}
               </div>
             </div>
-            <button type="button" onClick={() => switchRoom(activeRoomIndex + 1)} disabled={activeRoomIndex === rooms.length - 1} aria-label="次の部屋" className="h-9 w-9 rounded-full bg-white/85 text-xl font-bold text-ink-soft shadow-sm disabled:opacity-30">›</button>
-            <button type="button" onClick={addRoom} disabled={rooms.length >= MAX_ROOMS} aria-label="部屋を追加" className="h-9 rounded-full bg-leaf-deep px-3 text-xs font-bold text-white shadow-sm disabled:opacity-35">＋ 部屋</button>
+            <button type="button" onClick={() => switchRoom(activeRoomIndex + 1)} disabled={activeRoomIndex === rooms.length - 1} aria-label="次の部屋" className="ml-auto h-9 w-9 rounded-full bg-white/85 text-xl font-bold text-ink-soft shadow-sm disabled:opacity-30">›</button>
           </div>
 
           <div
-            className="relative h-[47dvh] min-h-[350px] max-h-[510px] touch-none overflow-hidden bg-cover bg-center"
+            className={`relative h-[47dvh] min-h-[350px] max-h-[510px] touch-none overflow-hidden bg-[#eee7da] bg-center bg-no-repeat ${activeRoom.backgroundFit === "contain" ? "bg-contain" : "bg-cover"}`}
             style={activeRoom.backgroundImage ? { backgroundImage: `url(${activeRoom.backgroundImage})` } : undefined}
             onPointerDown={(event) => {
               if (event.target !== event.currentTarget) return;
@@ -309,6 +335,7 @@ export function DecorationRoom({ items, totalCollectionCount, coinBalance }: {
                     const roomRect = event.currentTarget.parentElement?.getBoundingClientRect();
                     if (!roomRect) return;
                     event.currentTarget.setPointerCapture(event.pointerId);
+                    event.currentTarget.style.willChange = "left, top";
                     const pointerX = ((event.clientX - roomRect.left) / roomRect.width) * 100;
                     const pointerY = ((event.clientY - roomRect.top) / roomRect.height) * 100;
                     setSelectedId(placement.instanceId);
@@ -349,13 +376,16 @@ export function DecorationRoom({ items, totalCollectionCount, coinBalance }: {
             })}
 
             {selected ? (
-              <div className="absolute bottom-3 left-1/2 z-40 flex -translate-x-1/2 gap-1.5 rounded-full border border-line bg-card/95 p-1.5 shadow-lg backdrop-blur">
-                <ToolButton label="小さく" onClick={() => changeSelected((item) => ({ ...item, scale: clamp(item.scale - .12, .55, 1.8) }))}>−</ToolButton>
-                <ToolButton label="大きく" onClick={() => changeSelected((item) => ({ ...item, scale: clamp(item.scale + .12, .55, 1.8) }))}>＋</ToolButton>
-                <ToolButton label="回転" onClick={() => changeSelected((item) => ({ ...item, rotation: (item.rotation + 45) % 360 }))}>↻</ToolButton>
-                <ToolButton label="左右反転" onClick={() => changeSelected((item) => ({ ...item, flipped: !item.flipped }))}>↔</ToolButton>
-                <ToolButton label="一番前へ" onClick={() => changeSelected((item) => ({ ...item, z: Math.max(0, ...placements.map((placed) => placed.z)) + 1 }))}><IconLayers size={18} /></ToolButton>
-                {selected.itemId !== DOG_ITEM_ID ? <ToolButton danger label="片づける" onClick={() => { apply(placements.filter((item) => item.instanceId !== selectedId)); setSelectedId(null); }}><IconTrash size={18} /></ToolButton> : null}
+              <div className={`absolute left-1/2 z-40 -translate-x-1/2 rounded-2xl border border-line bg-card/95 p-1.5 shadow-lg backdrop-blur ${selected.y > 58 ? "top-12" : "bottom-3"}`}>
+                <p className="max-w-[250px] truncate px-2 pb-1 text-center text-[9px] font-bold text-ink-soft">{itemById.get(selected.itemId)?.name}を選択中</p>
+                <div className="flex gap-1.5">
+                  <ToolButton label="小さく" onClick={() => changeSelected((item) => ({ ...item, scale: clamp(item.scale - .12, .55, 1.8) }))}>−</ToolButton>
+                  <ToolButton label="大きく" onClick={() => changeSelected((item) => ({ ...item, scale: clamp(item.scale + .12, .55, 1.8) }))}>＋</ToolButton>
+                  <ToolButton label="回転" onClick={() => changeSelected((item) => ({ ...item, rotation: (item.rotation + 45) % 360 }))}>↻</ToolButton>
+                  <ToolButton label="左右反転" onClick={() => changeSelected((item) => ({ ...item, flipped: !item.flipped }))}>↔</ToolButton>
+                  <ToolButton label="一番前へ" onClick={() => changeSelected((item) => ({ ...item, z: Math.max(0, ...placements.map((placed) => placed.z)) + 1 }))}><IconLayers size={18} /></ToolButton>
+                  {selected.itemId !== DOG_ITEM_ID ? <ToolButton danger label="片づける" onClick={() => { apply(placements.filter((item) => item.instanceId !== selectedId)); setSelectedId(null); }}><IconTrash size={18} /></ToolButton> : null}
+                </div>
               </div>
             ) : null}
           </div>
@@ -366,12 +396,14 @@ export function DecorationRoom({ items, totalCollectionCount, coinBalance }: {
           <ActionButton disabled={!future.length} onClick={redo} icon="↷" label="やり直す" />
           <ActionButton disabled={placements.every((item) => item.itemId === DOG_ITEM_ID)} onClick={() => { apply(placements.filter((item) => item.itemId === DOG_ITEM_ID)); setSelectedId(null); }} icon="⌂" label="全て片づける" />
         </div>
-        <div className="flex items-center gap-2 border-b border-line bg-card px-4 py-3">
+        <div className="grid grid-cols-2 gap-2 border-b border-line bg-card px-4 py-3">
           <input ref={fileInputRef} type="file" accept="image/jpeg,image/png,image/webp" className="hidden" onChange={(event) => { void chooseBackground(event.target.files?.[0]); event.currentTarget.value = ""; }} />
-          <button type="button" onClick={() => fileInputRef.current?.click()} className="rounded-full bg-leaf-soft px-3.5 py-2 text-xs font-bold text-leaf-deep active:scale-[.97]">▧ 背景を変更</button>
-          {activeRoom.backgroundImage ? <button type="button" onClick={() => { setRooms((current) => current.map((room, index) => index === activeRoomIndex ? { ...room, backgroundImage: null } : room)); setSaved(false); }} className="rounded-full border border-line px-3 py-2 text-xs font-bold text-ink-soft">標準に戻す</button> : null}
-          <button type="button" disabled={rooms.length === 1} onClick={deleteRoom} className="ml-auto text-[10px] font-bold text-ink-faint disabled:hidden">部屋を削除</button>
-          <p className="hidden text-right text-[9px] leading-tight text-ink-faint min-[390px]:block">推奨 1600×1500px<br />JPEG / WebP</p>
+          <button type="button" disabled={processingBackground} onClick={() => fileInputRef.current?.click()} className="min-h-11 rounded-xl bg-leaf-soft px-3 text-xs font-bold text-leaf-deep active:scale-[.97] disabled:opacity-60">{processingBackground ? "画像を準備中…" : "▧ 背景画像を選ぶ"}</button>
+          <button type="button" onClick={addRoom} disabled={rooms.length >= MAX_ROOMS} className="min-h-11 rounded-xl bg-leaf-deep px-3 text-xs font-bold text-white active:scale-[.97] disabled:opacity-35">＋ 新しい部屋</button>
+          {activeRoom.backgroundImage ? <button type="button" onClick={() => { setRooms((current) => current.map((room, index) => index === activeRoomIndex ? { ...room, backgroundFit: room.backgroundFit === "cover" ? "contain" : "cover" } : room)); setSaved(false); }} className="min-h-10 rounded-xl border border-line bg-paper px-3 text-[10px] font-bold text-ink-soft">表示：{activeRoom.backgroundFit === "cover" ? "画面いっぱい" : "画像全体"}</button> : null}
+          {activeRoom.backgroundImage ? <button type="button" onClick={() => { setRooms((current) => current.map((room, index) => index === activeRoomIndex ? { ...room, backgroundImage: null } : room)); setSaved(false); }} className="min-h-10 rounded-xl border border-line bg-paper px-3 text-[10px] font-bold text-ink-soft">標準の背景に戻す</button> : null}
+          <p className="col-span-2 text-center text-[9px] leading-relaxed text-ink-faint">推奨 1600×1500px・JPEG / WebP<br />変更内容は自動で保存されます</p>
+          <button type="button" disabled={rooms.length === 1} onClick={deleteRoom} className="col-span-2 justify-self-center px-3 py-1 text-[10px] font-bold text-ink-faint disabled:hidden">この部屋を削除</button>
         </div>
         <p className="bg-card px-4 pb-2 text-center text-[9px] font-semibold text-ink-faint">背景を左右にスワイプして部屋を切り替え</p>
 
