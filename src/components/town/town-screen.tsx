@@ -1,6 +1,6 @@
 "use client";
 
-import { BlockGardenLoader } from "@/components/block-garden/block-garden-loader";
+import { DecorationRoom, type DecorationInventoryItem } from "./decoration-room";
 import type { TownCatalogItem, TownSnapshot } from "@/lib/town/types";
 
 type TownScreenProps = {
@@ -8,18 +8,22 @@ type TownScreenProps = {
   catalog: TownCatalogItem[];
   initialCoinBalance: number;
   persistenceMode: "supabase" | "local";
+  ownedItems: DecorationInventoryItem[];
+  totalCollectionCount: number;
 };
 
 export function TownScreen(props: TownScreenProps) {
-  // The server still prepares and authorizes the existing town snapshot.
-  // Keeping the same prop contract lets us return to the placement town without a DB migration.
-  void props;
+  // The old town snapshot stays in the page contract so this preview can be rolled back
+  // without a database migration. Decoration ownership comes from the existing collection.
+  void props.initialSnapshot;
+  void props.catalog;
+  void props.persistenceMode;
 
   return (
-    <BlockGardenLoader
-      returnHref="/home"
-      title="わんこタウン"
-      eyebrow="ブロックタウン"
+    <DecorationRoom
+      items={props.ownedItems}
+      totalCollectionCount={props.totalCollectionCount}
+      coinBalance={props.initialCoinBalance}
     />
   );
 }
