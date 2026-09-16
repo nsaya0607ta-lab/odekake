@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { IconChevronLeft, IconLayers, IconTrash } from "@/components/icons";
@@ -28,6 +29,12 @@ const LEGACY_STORAGE_KEY = "odekake-decoration-room-v1";
 const DOG_ITEM_ID = "__room_dog__";
 const HISTORY_LIMIT = 24;
 const MAX_ROOMS = 5;
+const PRESET_BACKGROUNDS = [
+  { name: "朝の部屋", src: "/room-backgrounds/warm-morning.webp" },
+  { name: "ガーデン", src: "/room-backgrounds/garden-sunroom.webp" },
+  { name: "夕暮れ", src: "/room-backgrounds/moonlit-evening.webp" },
+  { name: "和室", src: "/room-backgrounds/japanese-tatami.webp" },
+] as const;
 const FILTERS: Array<{ id: Filter; label: string }> = [
   { id: "all", label: "すべて" }, { id: "toy", label: "おもちゃ" },
   { id: "food", label: "食べもの" }, { id: "interior", label: "インテリア" },
@@ -256,6 +263,13 @@ export function DecorationRoom({ items, totalCollectionCount, coinBalance }: {
     } catch { showNotice("この画像は読み込めませんでした"); }
     finally { setProcessingBackground(false); }
   }
+  function choosePresetBackground(backgroundImage: string, name: string) {
+    setRooms((current) => current.map((room, index) => index === activeRoomIndex
+      ? { ...room, backgroundImage, backgroundFit: "cover" }
+      : room));
+    setSaved(false);
+    showNotice(`${name}に変更しました`);
+  }
   function finishDrag(pointerId: number) {
     const drag = dragRef.current;
     if (!drag) return;
@@ -396,14 +410,34 @@ export function DecorationRoom({ items, totalCollectionCount, coinBalance }: {
           <ActionButton disabled={!future.length} onClick={redo} icon="↷" label="やり直す" />
           <ActionButton disabled={placements.every((item) => item.itemId === DOG_ITEM_ID)} onClick={() => { apply(placements.filter((item) => item.itemId === DOG_ITEM_ID)); setSelectedId(null); }} icon="⌂" label="全て片づける" />
         </div>
-        <div className="grid grid-cols-2 gap-2 border-b border-line bg-card px-4 py-3">
+        <div className="border-b border-line bg-card py-3">
+          <div className="flex items-center justify-between px-4">
+            <p className="text-xs font-black">おすすめ背景</p>
+            <p className="text-[9px] font-semibold text-ink-faint">タップで変更</p>
+          </div>
+          <div className="mt-2 flex gap-2 overflow-x-auto px-4 pb-2">
+            {PRESET_BACKGROUNDS.map((background) => {
+              const isActive = activeRoom.backgroundImage === background.src;
+              return (
+                <button key={background.src} type="button" onClick={() => choosePresetBackground(background.src, background.name)} className={`w-[92px] shrink-0 rounded-xl border bg-paper p-1.5 text-left transition active:scale-[.97] ${isActive ? "border-leaf ring-2 ring-leaf/30" : "border-line"}`}>
+                  <span className="relative block aspect-[16/15] overflow-hidden rounded-lg">
+                    <Image src={background.src} alt={`${background.name}の背景`} fill sizes="92px" className="object-cover" />
+                    {isActive ? <span className="absolute right-1 top-1 rounded-full bg-leaf-deep px-1.5 py-0.5 text-[8px] font-bold text-white">使用中</span> : null}
+                  </span>
+                  <span className="mt-1 block truncate text-center text-[10px] font-bold">{background.name}</span>
+                </button>
+              );
+            })}
+          </div>
+          <div className="grid grid-cols-2 gap-2 px-4">
           <input ref={fileInputRef} type="file" accept="image/jpeg,image/png,image/webp" className="hidden" onChange={(event) => { void chooseBackground(event.target.files?.[0]); event.currentTarget.value = ""; }} />
-          <button type="button" disabled={processingBackground} onClick={() => fileInputRef.current?.click()} className="min-h-11 rounded-xl bg-leaf-soft px-3 text-xs font-bold text-leaf-deep active:scale-[.97] disabled:opacity-60">{processingBackground ? "画像を準備中…" : "▧ 背景画像を選ぶ"}</button>
+          <button type="button" disabled={processingBackground} onClick={() => fileInputRef.current?.click()} className="min-h-11 rounded-xl bg-leaf-soft px-3 text-xs font-bold text-leaf-deep active:scale-[.97] disabled:opacity-60">{processingBackground ? "画像を準備中…" : "▧ 自分の画像を選ぶ"}</button>
           <button type="button" onClick={addRoom} disabled={rooms.length >= MAX_ROOMS} className="min-h-11 rounded-xl bg-leaf-deep px-3 text-xs font-bold text-white active:scale-[.97] disabled:opacity-35">＋ 新しい部屋</button>
           {activeRoom.backgroundImage ? <button type="button" onClick={() => { setRooms((current) => current.map((room, index) => index === activeRoomIndex ? { ...room, backgroundFit: room.backgroundFit === "cover" ? "contain" : "cover" } : room)); setSaved(false); }} className="min-h-10 rounded-xl border border-line bg-paper px-3 text-[10px] font-bold text-ink-soft">表示：{activeRoom.backgroundFit === "cover" ? "画面いっぱい" : "画像全体"}</button> : null}
           {activeRoom.backgroundImage ? <button type="button" onClick={() => { setRooms((current) => current.map((room, index) => index === activeRoomIndex ? { ...room, backgroundImage: null } : room)); setSaved(false); }} className="min-h-10 rounded-xl border border-line bg-paper px-3 text-[10px] font-bold text-ink-soft">標準の背景に戻す</button> : null}
           <p className="col-span-2 text-center text-[9px] leading-relaxed text-ink-faint">推奨 1600×1500px・JPEG / WebP<br />変更内容は自動で保存されます</p>
           <button type="button" disabled={rooms.length === 1} onClick={deleteRoom} className="col-span-2 justify-self-center px-3 py-1 text-[10px] font-bold text-ink-faint disabled:hidden">この部屋を削除</button>
+          </div>
         </div>
         <p className="bg-card px-4 pb-2 text-center text-[9px] font-semibold text-ink-faint">背景を左右にスワイプして部屋を切り替え</p>
 
