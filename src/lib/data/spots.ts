@@ -403,6 +403,46 @@ export async function getSpotDetail(
   };
 }
 
+export type SpotPickerItem = {
+  id: string;
+  name: string;
+  address: string | null;
+  categoryName: string | null;
+  prefectureCode: string;
+  municipalityCode: string;
+};
+
+/**
+ * 「登録済みのスポットから選ぶ」ピッカー向けの軽量な一覧。
+ * RLS（本人 or 共有旅のメンバー）が見える範囲をそのまま返す。
+ */
+export async function searchSpotsForPicker(
+  supabase: DB,
+  keyword: string,
+  limit = 20,
+): Promise<SpotPickerItem[]> {
+  const escaped = escapeForFilter(keyword);
+
+  let query = supabase
+    .from("spots")
+    .select("id, name, address, category_id, prefecture_code, municipality_code")
+    .order("created_at", { ascending: false })
+    .limit(limit);
+
+  if (escaped) query = query.or(`name.ilike.%${escaped}%,address.ilike.%${escaped}%`);
+
+  const [{ data: spots }, categoryNames] = await Promise.all([query, loadCategoryNames(supabase)]);
+
+  return (spots ?? []).map((spot) => ({
+    id: spot.id,
+    name: spot.name,
+    address: spot.address,
+    categoryName: spot.category_id ? (categoryNames.get(spot.category_id) ?? null) : null,
+    prefectureCode: spot.prefecture_code,
+    municipalityCode: spot.municipality_code,
+  }));
+}
+
 export async function loadTripTitles(supabase: DB, tripIds: string[]): Promise<Map<string, string>> {
   const unique = [...new Set(tripIds)];
   if (unique.length === 0) return new Map();
