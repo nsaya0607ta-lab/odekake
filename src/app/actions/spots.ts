@@ -98,6 +98,29 @@ const visitedSpotSchema = spotSchema.extend({
 
 type SpotInput = z.infer<typeof spotSchema>;
 
+const existingSpotVisitSchema = z.object({
+  existingSpotId: z.string().uuid("スポットを選んでください。"),
+  visitId: z.string().uuid("保存の準備が完了していません。画面を開き直してください。"),
+  tripId: z.string().uuid("旅行を選んでください。"),
+  journeyId: z.string().trim().transform((v) => v === "" ? null : v).refine((v) => v === null || /^[0-9a-f-]{36}$/i.test(v), "旅行を選び直してください。"),
+  visitedAt: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "訪問日を入力してください。"),
+  rating: z
+    .string()
+    .trim()
+    .transform((v) => (v === "" || v === "0" ? null : Number(v)))
+    .refine((v) => v === null || (Number.isInteger(v) && v >= 1 && v <= 5), "評価を選び直してください。"),
+  comment: optionalText(2000),
+  note: optionalText(2000),
+  companions: optionalText(120),
+  amount: optionalInt(10_000_000, "使用金額"),
+  stayMinutes: optionalInt(10_000, "滞在時間"),
+  congestionLevel: z
+    .string()
+    .trim()
+    .transform((v) => (v === "" ? null : Number(v)))
+    .refine((v) => v === null || [1, 2, 3].includes(v), "混雑状況を選び直してください。"),
+});
+
 type DbError = {
   code?: string;
   message?: string;
@@ -107,6 +130,7 @@ type DbError = {
 
 function collect(formData: FormData) {
   return {
+    existingSpotId: String(formData.get("existingSpotId") ?? ""),
     name: String(formData.get("name") ?? ""),
     categoryId: String(formData.get("categoryId") ?? ""),
     municipalityCode: String(formData.get("municipalityCode") ?? ""),
@@ -410,6 +434,75 @@ export async function createVisitedSpotAction(_prev: ActionState, formData: Form
   revalidatePath(`/spots/${spotId}`);
   revalidatePath(`/trips/${parsed.data.tripId}`);
   redirect(`/spots/${spotId}?saved=1&trip=${parsed.data.tripId}`);
+}
+
+/** 登録済みのスポットへ、新しい訪問記録だけを追加する（場所自体は登録し直さない） */
+export async function createVisitForExistingSpotAction(_prev: ActionState, formData: FormData): Promise<ActionState> {
+  const values = collect(formData);
+  const parsed = existingSpotVisitSchema.safeParse(values);
+
+  if (!parsed.success) {
+    return { error: "入力内容をご確認ください。", fieldErrors: fieldErrorsOf(parsed.error), values };
+  }
+
+  const { supabase, user } = await requireUser();
+
+  // 二重送信の防止
+  const { data: savedVisit } = await supabase
+    .from("visit_records")
+    .select("id, spot_id")
+    .eq("id", parsed.data.visitId)
+    .maybeSingle();
+  if (savedVisit) redirect(`/spots/${savedVisit.spot_id}?saved=1&trip=${parsed.data.tripId}`);
+
+  const { data: spot } = await supabase
+    .from("spots")
+    .select("id")
+    .eq("id", parsed.data.existingSpotId)
+    .maybeSingle();
+  if (!spot) return { error: "選んだスポットが見つかりませんでした。もう一度選び直してください。", values };
+
+  const { error: visitError } = await supabase.from("visit_records").insert({
+    id: parsed.data.visitId,
+    user_id: user.id,
+    trip_id: parsed.data.tripId,
+    journey_id: parsed.data.journeyId,
+    spot_id: spot.id,
+    visited_at: parsed.data.visitedAt,
+    rating: parsed.data.rating,
+    comment: parsed.data.comment,
+    note: parsed.data.note,
+    companions: parsed.data.companions,
+    amount: parsed.data.amount,
+    stay_minutes: parsed.data.stayMinutes,
+    congestion_level: parsed.data.congestionLevel,
+    revisit_wanted: values.revisitWanted === "on",
+    favorite: values.favorite === "on",
+  });
+
+  if (visitError) {
+    console.error("Visit insert for existing spot failed", {
+      code: visitError.code,
+      message: visitError.message,
+      details: visitError.details,
+      hint: visitError.hint,
+      tripId: parsed.data.tripId,
+      spotId: spot.id,
+    });
+    return { error: toJapaneseError(visitError, "行った場所の保存に失敗しました。"), values };
+  }
+
+  await Promise.all([
+    syncPhotos(supabase, user.id, parsed.data.tripId, parsed.data.visitId, parsePhotoPaths(formData)),
+    syncVisitTags(supabase, user.id, parsed.data.visitId, values.tags),
+  ]);
+
+  revalidatePath("/home");
+  revalidatePath("/map");
+  revalidatePath("/records");
+  revalidatePath(`/spots/${spot.id}`);
+  revalidatePath(`/trips/${parsed.data.tripId}`);
+  redirect(`/spots/${spot.id}?saved=1&trip=${parsed.data.tripId}`);
 }
 
 export async function updateSpotAction(_prev: ActionState, formData: FormData): Promise<ActionState> {

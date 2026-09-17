@@ -2,9 +2,11 @@
 
 import Link from "next/link";
 import { useActionState, useEffect, useState } from "react";
-import { createVisitedSpotAction, updateSpotAction } from "@/app/actions/spots";
+import { createVisitedSpotAction, createVisitForExistingSpotAction, updateSpotAction } from "@/app/actions/spots";
+import { ExistingSpotPicker, type ExistingSpotOption } from "@/components/existing-spot-picker";
 import { FormDraft } from "@/components/form-draft";
 import { emptyActionState, Field, FormMessage, SubmitButton } from "@/components/form";
+import { IconMapPin } from "@/components/icons";
 import {
   LocationPicker,
   type PlaceAutofill,
@@ -85,7 +87,13 @@ export function SpotForm({
   locationFromUrl?: boolean;
 }) {
   const isEdit = Boolean(spotId);
-  const action = isEdit ? updateSpotAction : createVisitedSpotAction;
+  const [spotMode, setSpotMode] = useState<"new" | "existing">("new");
+  const [existingSpot, setExistingSpot] = useState<ExistingSpotOption | null>(null);
+  const action = isEdit
+    ? updateSpotAction
+    : spotMode === "existing"
+      ? createVisitForExistingSpotAction
+      : createVisitedSpotAction;
   const [state, formAction] = useActionState(action, emptyActionState);
   const initial = { ...defaults, ...(state.values ?? {}) };
   const [tripId, setTripId] = useState(state.values?.tripId ?? initialTripId ?? destinations?.personal?.id ?? "");
@@ -164,32 +172,88 @@ export function SpotForm({
       <section className="space-y-4">
         {!isEdit ? <h2 className="px-1 text-lg font-bold text-ink">場所を選ぶ</h2> : null}
 
-        {locationPickerReady ? (
-          <div className="location-picker-top">
-            <LocationPicker
-              initial={location}
-              error={state.fieldErrors?.municipalityCode}
-              placeSearchEnabled={placeSearchEnabled}
-              onPlaceSelected={applyPlaceAutofill}
-              // v2で、旧判定ロジックが保存した都道府県・市区町村の下書きを破棄する。
-              draftKey={isEdit || locationFromUrl ? null : "visited-place-new-location-v2"}
-            />
+        {!isEdit ? (
+          <div className="grid grid-cols-2 overflow-hidden rounded-2xl border border-line-strong bg-card">
+            <button
+              type="button"
+              aria-pressed={spotMode === "new"}
+              onClick={() => setSpotMode("new")}
+              className={`min-h-12 border-r border-line px-2 text-sm font-semibold ${
+                spotMode === "new" ? "bg-leaf-soft text-leaf-deep" : "text-ink-soft"
+              }`}
+            >
+              新しい場所を登録
+            </button>
+            <button
+              type="button"
+              aria-pressed={spotMode === "existing"}
+              onClick={() => setSpotMode("existing")}
+              className={`min-h-12 px-2 text-sm font-semibold ${
+                spotMode === "existing" ? "bg-leaf-soft text-leaf-deep" : "text-ink-soft"
+              }`}
+            >
+              登録済みのスポットから選ぶ
+            </button>
           </div>
         ) : null}
 
-        <Field label="スポット名" htmlFor="name" error={state.fieldErrors?.name}>
-          <input
-            id="name"
-            name="name"
-            type="text"
-            className="field"
-            defaultValue={initial.name}
-            placeholder="〇〇カフェ"
-            maxLength={80}
-            required
-          />
-        </Field>
+        {!isEdit && spotMode === "existing" ? (
+          <>
+            <input type="hidden" name="existingSpotId" value={existingSpot?.id ?? ""} />
+            {state.fieldErrors?.existingSpotId ? (
+              <p className="text-xs text-[#a85c6a]">{state.fieldErrors.existingSpotId}</p>
+            ) : null}
+            {existingSpot ? (
+              <div className="rough-card flex items-center gap-3 border border-leaf/70 p-3.5">
+                <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-leaf-soft text-leaf-deep">
+                  <IconMapPin size={21} />
+                </span>
+                <div className="min-w-0 flex-1">
+                  <p className="text-[11px] font-semibold text-leaf-deep">選択中のスポット</p>
+                  <p className="mt-0.5 truncate text-sm font-bold">{existingSpot.name}</p>
+                  <p className="mt-0.5 truncate text-[11px] text-ink-faint">{existingSpot.address ?? "住所情報なし"}</p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setExistingSpot(null)}
+                  className="shrink-0 rounded-full border border-leaf px-3 py-1.5 text-xs font-semibold text-leaf-deep"
+                >
+                  変更
+                </button>
+              </div>
+            ) : (
+              <ExistingSpotPicker onSelect={setExistingSpot} />
+            )}
+          </>
+        ) : (
+          <>
+            {locationPickerReady ? (
+              <div className="location-picker-top">
+                <LocationPicker
+                  initial={location}
+                  error={state.fieldErrors?.municipalityCode}
+                  placeSearchEnabled={placeSearchEnabled}
+                  onPlaceSelected={applyPlaceAutofill}
+                  // v2で、旧判定ロジックが保存した都道府県・市区町村の下書きを破棄する。
+                  draftKey={isEdit || locationFromUrl ? null : "visited-place-new-location-v2"}
+                />
+              </div>
+            ) : null}
 
+            <Field label="スポット名" htmlFor="name" error={state.fieldErrors?.name}>
+              <input
+                id="name"
+                name="name"
+                type="text"
+                className="field"
+                defaultValue={initial.name}
+                placeholder="〇〇カフェ"
+                maxLength={80}
+                required={spotMode !== "existing"}
+              />
+            </Field>
+          </>
+        )}
       </section>
 
       {!isEdit ? (
@@ -375,6 +439,7 @@ export function SpotForm({
         </section>
       ) : null}
 
+      {spotMode !== "existing" ? (
       <details className="rough-card px-4 py-3">
         <summary className="cursor-pointer text-sm font-semibold text-ink-soft">場所の詳細情報</summary>
         <div className="mt-4 space-y-4">
@@ -478,6 +543,7 @@ export function SpotForm({
           </Field>
         </div>
       </details>
+      ) : null}
 
       {!isEdit && !destinations?.personal && !destinations?.shared.length ? (
         <p role="alert" className="rounded-2xl border border-blossom bg-blossom-soft px-4 py-3 text-sm text-[#8f4c59]">
@@ -488,9 +554,15 @@ export function SpotForm({
       <div className="sticky bottom-20 z-20 rounded-2xl bg-paper/95 p-2 shadow-[0_-6px_18px_rgba(83,74,58,0.08)] backdrop-blur-sm">
         <SubmitButton
           pendingLabel="保存中…"
-          disabled={!isEdit && ((!destinations?.personal && !destinations?.shared.length) || !tripId || !visitId)}
+          disabled={
+            !isEdit &&
+            ((!destinations?.personal && !destinations?.shared.length) ||
+              !tripId ||
+              !visitId ||
+              (spotMode === "existing" && !existingSpot))
+          }
         >
-          {isEdit ? "変更を保存する" : "この場所を登録する"}
+          {isEdit ? "変更を保存する" : spotMode === "existing" ? "この訪問を記録する" : "この場所を登録する"}
         </SubmitButton>
       </div>
       {!isEdit ? (
