@@ -77,16 +77,23 @@ export function VisitShortcutSetup({ endpoint }: { endpoint: string }) {
           <li><b className="text-ink">①</b> 「ショートカット」アプリで右上の「＋」を押します。</li>
           <li><b className="text-ink">②</b> 「現在地を取得」を追加します。</li>
           <li>
-            <b className="text-ink">③</b> 「場所を検索」または「ローカルビジネスを検索」を追加し、
-            検索する場所を「現在地」にします。
+            <b className="text-ink">③</b> 「メニューから選択」を追加し、「飲食店」「カフェ」「観光スポット」
+            「買い物」「ホテル」「駅」「その他」を登録します。
           </li>
-          <li><b className="text-ink">④</b> 「リストから選択」を追加し、周辺候補から1つ選べるようにします。</li>
           <li>
-            <b className="text-ink">⑤</b> 選んだ場所から「名前」「住所」「緯度」「経度」を取得します。
+            <b className="text-ink">④</b> 各メニュー内に「ローカルビジネスを検索」を追加します。
+            検索語をメニュー名、検索する場所を「現在地」にします。
+          </li>
+          <li><b className="text-ink">⑤</b> 検索結果の後ろに「リストから選択」を追加し、周辺候補から1つ選べるようにします。</li>
+          <li>
+            <b className="text-ink">⑥</b> 選んだ場所から「名前」「住所」「緯度」「経度」を取得します。
             変数をタップすると、取り出す項目を変更できます。
           </li>
-          <li><b className="text-ink">⑥</b> 「URLの内容を取得」を追加し、下の設定で送信します。</li>
+          <li><b className="text-ink">⑦</b> 「URLの内容を取得」を追加し、下の設定で送信します。</li>
         </ol>
+        <p className="mt-3 rounded-xl bg-paper-deep px-3 py-2 text-[11px] leading-5 text-ink-faint">
+          「ローカルビジネスを検索」は検索語が必須です。「その他」だけは「入力を要求」を入れ、店名や種類を入力できるようにします。
+        </p>
       </section>
 
       <section className="rough-card p-5">
