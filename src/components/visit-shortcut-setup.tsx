@@ -43,7 +43,7 @@ export function VisitShortcutSetup({ endpoint }: { endpoint: string }) {
         <p className="font-bold">ショートカットの動き</p>
         <p className="mt-2 text-sm leading-7 text-ink-soft">
           ホーム画面のショートカットを押すと、現在地の周辺施設が表示されます。
-          場所を1つ選ぶと、そのまま「自分のおでかけ」へ登録されます。
+          最初に「個人旅」か「共有旅」を選び、場所を1つ選ぶと指定した旅へ登録されます。
         </p>
       </section>
 
@@ -75,21 +75,26 @@ export function VisitShortcutSetup({ endpoint }: { endpoint: string }) {
         <p className="font-bold">2. ショートカットを作成</p>
         <ol className="mt-3 space-y-3 text-xs leading-6 text-ink-soft">
           <li><b className="text-ink">①</b> 「ショートカット」アプリで右上の「＋」を押します。</li>
-          <li><b className="text-ink">②</b> 「現在地を取得」を追加します。</li>
           <li>
-            <b className="text-ink">③</b> 「メニューから選択」を追加し、「飲食店」「カフェ」「観光スポット」
+            <b className="text-ink">②</b> 最初に「メニューから選択」を追加し、「個人旅」「共有旅」を登録します。
+            個人旅では「テキスト」に <code>personal</code>、共有旅では <code>shared</code> と入力し、
+            メニューの結果を変数「登録先」に設定します。
+          </li>
+          <li><b className="text-ink">③</b> 「現在地を取得」を追加します。</li>
+          <li>
+            <b className="text-ink">④</b> もう1つ「メニューから選択」を追加し、「飲食店」「カフェ」「観光スポット」
             「買い物」「ホテル」「駅」「その他」を登録します。
           </li>
           <li>
-            <b className="text-ink">④</b> 各メニュー内に「ローカルビジネスを検索」を追加します。
+            <b className="text-ink">⑤</b> 各メニュー内に「ローカルビジネスを検索」を追加します。
             検索語をメニュー名、検索する場所を「現在地」にします。
           </li>
-          <li><b className="text-ink">⑤</b> 検索結果の後ろに「リストから選択」を追加し、周辺候補から1つ選べるようにします。</li>
+          <li><b className="text-ink">⑥</b> 検索結果の後ろに「リストから選択」を追加し、周辺候補から1つ選べるようにします。</li>
           <li>
-            <b className="text-ink">⑥</b> 選んだ場所から「名前」「住所」「緯度」「経度」を取得します。
+            <b className="text-ink">⑦</b> 選んだ場所から「名前」「住所」「緯度」「経度」を取得します。
             変数をタップすると、取り出す項目を変更できます。
           </li>
-          <li><b className="text-ink">⑦</b> 「URLの内容を取得」を追加し、下の設定で送信します。</li>
+          <li><b className="text-ink">⑧</b> 「URLの内容を取得」を追加し、下の設定で送信します。</li>
         </ol>
         <p className="mt-3 rounded-xl bg-paper-deep px-3 py-2 text-[11px] leading-5 text-ink-faint">
           「ローカルビジネスを検索」は検索語が必須です。「その他」だけは「入力を要求」を入れ、店名や種類を入力できるようにします。
@@ -121,9 +126,14 @@ export function VisitShortcutSetup({ endpoint }: { endpoint: string }) {
   "name": 選んだ場所の名前,
   "address": 選んだ場所の住所,
   "latitude": 選んだ場所の緯度,
-  "longitude": 選んだ場所の経度
+  "longitude": 選んだ場所の経度,
+  "destinationType": 登録先
 }`
             }</pre>
+            <p className="mt-2 text-[10px] leading-5 text-ink-faint">
+              参加中の共有旅が1件なら、共有旅を選ぶだけで登録できます。複数ある場合は
+              <code className="mx-1">sharedTripName</code>に登録する共有旅名も送信してください。
+            </p>
           </div>
         </div>
       </section>
