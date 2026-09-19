@@ -22,6 +22,9 @@ const bodySchema = z.object({
   address: z.string().trim().max(200).optional().default(""),
   latitude: z.coerce.number().min(-90).max(90),
   longitude: z.coerce.number().min(-180).max(180),
+  destinationType: z.enum(["personal", "shared"]).optional().default("personal"),
+  sharedTripId: z.string().uuid().nullable().optional().default(null),
+  sharedTripName: z.string().trim().min(1).max(60).nullable().optional().default(null),
   rating: z.preprocess(normalizeRating, z.number().int().min(1).max(5).nullable()).optional().default(null),
   comment: z.string().trim().max(2000).optional().default(""),
   visitedAt: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
@@ -74,7 +77,7 @@ export async function POST(request: Request) {
   }
 
   const { url, anonKey } = requireSupabaseEnv();
-  const rpcUrl = `${url.replace(/\/$/, "")}/rest/v1/rpc/record_shortcut_visit_with_token`;
+  const rpcUrl = `${url.replace(/\/$/, "")}/rest/v1/rpc/record_shortcut_visit_with_destination_token`;
 
   let response: Response;
   try {
@@ -95,6 +98,9 @@ export async function POST(request: Request) {
         p_longitude: input.longitude,
         p_prefecture_code: nearest.municipality.prefectureCode,
         p_municipality_code: nearest.municipality.code,
+        p_destination_type: input.destinationType,
+        p_shared_trip_id: input.sharedTripId,
+        p_shared_trip_name: input.sharedTripName,
         p_rating: input.rating,
         p_comment: input.comment || null,
         p_visited_at: input.visitedAt ?? null,
@@ -121,7 +127,11 @@ export async function POST(request: Request) {
       // JSON以外のエラー本文はクライアントへ露出しない。
     }
 
-    const invalidToken = /invalid sync token/i.test(rpcError.message ?? "");
+    const rpcMessage = rpcError.message ?? "";
+    const invalidToken = /invalid sync token/i.test(rpcMessage);
+    const sharedTripRequired = /SHARED_TRIP_REQUIRED/i.test(rpcMessage);
+    const sharedTripNotFound = /SHARED_TRIP_NOT_FOUND/i.test(rpcMessage);
+    const sharedTripAmbiguous = /SHARED_TRIP_AMBIGUOUS/i.test(rpcMessage);
     console.warn("Shortcut visit RPC failed", {
       requestId,
       status: response.status,
@@ -131,10 +141,26 @@ export async function POST(request: Request) {
     return NextResponse.json(
       {
         ok: false,
-        error: invalidToken ? "連携キーが無効です。再発行してください。" : "訪問記録を保存できませんでした。",
+        error: invalidToken
+          ? "連携キーが無効です。再発行してください。"
+          : sharedTripRequired
+            ? "共有旅が複数あります。登録する共有旅の名前を指定してください。"
+            : sharedTripNotFound
+              ? "参加中の共有旅が見つかりませんでした。"
+              : sharedTripAmbiguous
+                ? "同じ名前の共有旅が複数あります。共有旅IDを指定してください。"
+                : "訪問記録を保存できませんでした。",
         requestId,
       },
-      { status: invalidToken ? 401 : 502 },
+      {
+        status: invalidToken
+          ? 401
+          : sharedTripRequired || sharedTripAmbiguous
+            ? 409
+            : sharedTripNotFound
+              ? 404
+              : 502,
+      },
     );
   }
 
@@ -157,6 +183,8 @@ export async function POST(request: Request) {
       spotId: payload.spotId ?? null,
       name: payload.name ?? input.name,
       visitedAt: payload.visitedAt ?? input.visitedAt ?? null,
+      destinationType: payload.destinationType ?? input.destinationType,
+      destinationTitle: payload.destinationTitle ?? null,
       municipality: nearest.municipality.name,
     },
     { headers: { "Cache-Control": "no-store" } },
