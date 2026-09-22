@@ -19,6 +19,7 @@ const PUBLIC_PATHS = [
   "/gacha-preview",
   "/mini-games-preview",
   "/memory-game-preview",
+  "/pachinko-game-preview",
 ];
 
 function isPublicPath(pathname: string) {
@@ -36,6 +37,7 @@ export async function middleware(request: NextRequest) {
       pathname === "/gacha-preview" ||
       pathname === "/mini-games-preview" ||
       pathname === "/memory-game-preview" ||
+      pathname === "/pachinko-game-preview" ||
       pathname === "/privacy" ||
       pathname === "/terms"
     ) {
