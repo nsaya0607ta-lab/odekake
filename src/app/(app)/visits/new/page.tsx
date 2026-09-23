@@ -29,7 +29,11 @@ export default async function NewVisitPage({
   const destinations = await getRecordDestinationHierarchy(supabase, user.id, space.name);
   const roots = [...(destinations.personal ? [destinations.personal] : []), ...destinations.shared];
   const initialRoot = roots.find((root) => root.id === requestedTripId) ?? destinations.personal ?? roots[0];
-  const initialJourneyId = initialRoot?.journeys.some((item) => item.id === requestedJourneyId)
+  const initialJourneyId = [
+    ...(initialRoot?.journeys ?? []),
+    // 共有旅の記録には、自分の個人旅行もタグとして付けられる
+    ...(initialRoot?.kind === "shared" ? (destinations.personal?.journeys ?? []) : []),
+  ].some((item) => item.id === requestedJourneyId)
     ? requestedJourneyId!
     : "";
 

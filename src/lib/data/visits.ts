@@ -2,7 +2,7 @@ import { getMunicipality } from "@/lib/geo";
 import type { SpotRow, VisitPhotoRow, VisitRecordRow } from "@/lib/supabase/types";
 import type { DB } from "./client";
 import { signPhotoPaths, signThumbOrOriginalPaths } from "./photos";
-import { loadCategoryNames, loadTripTitles } from "./spots";
+import { loadCategoryNames, loadVisitTripLabels } from "./spots";
 
 export type TimelineItem = {
   id: string;
@@ -16,6 +16,8 @@ export type TimelineItem = {
   prefectureCode: string;
   tripId: string;
   tripTitle: string;
+  /** 共有旅の記録に付けた自分の個人旅行の名前 */
+  journeyTagTitle: string | null;
   rating: number | null;
   comment: string | null;
   favorite: boolean;
@@ -60,14 +62,13 @@ export async function getTimeline(supabase: DB, filter: TimelineFilter = {}): Pr
   const visits = (data ?? []) as VisitRecordRow[];
   if (visits.length === 0) return [];
 
-  const visitTripIds = visits.map((v) => v.journey_id ?? v.trip_id);
   const visitSpotIds = visits.map((v) => v.spot_id);
   const visitIds = visits.map((v) => v.id);
 
   // 以前は旅行名を取得してから残りの問い合わせを始めていたため、
   // タイムライン表示に余分な1往復が発生していた。独立した取得は同時に行う。
-  const [tripTitles, { data: spots }, { data: photos }, categoryNames] = await Promise.all([
-    loadTripTitles(supabase, visitTripIds),
+  const [labelOf, { data: spots }, { data: photos }, categoryNames] = await Promise.all([
+    loadVisitTripLabels(supabase, visits),
     supabase.from("spots").select("*").in("id", visitSpotIds),
     supabase
       .from("visit_photos")
@@ -95,6 +96,7 @@ export async function getTimeline(supabase: DB, filter: TimelineFilter = {}): Pr
     const spot = spotById.get(visit.spot_id);
     if (!spot) return [];
     const visitPhotos = photosByVisit.get(visit.id) ?? [];
+    const label = labelOf(visit);
 
     return [
       {
@@ -108,7 +110,8 @@ export async function getTimeline(supabase: DB, filter: TimelineFilter = {}): Pr
         municipalityCode: spot.municipality_code,
         prefectureCode: spot.prefecture_code,
         tripId: visit.trip_id,
-        tripTitle: tripTitles.get(visit.journey_id ?? visit.trip_id) ?? "普段のおでかけ",
+        tripTitle: label.title ?? "普段のおでかけ",
+        journeyTagTitle: label.tagTitle,
         rating: visit.rating,
         comment: visit.comment,
         favorite: visit.favorite,
@@ -152,12 +155,12 @@ export async function getCalendarVisits(
   const visits = data ?? [];
   if (visits.length === 0) return [];
 
-  const [{ data: spots }, tripTitles] = await Promise.all([
+  const [{ data: spots }, labelOf] = await Promise.all([
     supabase
       .from("spots")
       .select("id, name")
       .in("id", [...new Set(visits.map((visit) => visit.spot_id))]),
-    loadTripTitles(supabase, visits.map((visit) => visit.journey_id ?? visit.trip_id)),
+    loadVisitTripLabels(supabase, visits),
   ]);
 
   const spotNames = new Map((spots ?? []).map((spot) => [spot.id, spot.name]));
@@ -165,13 +168,14 @@ export async function getCalendarVisits(
   return visits.flatMap((visit) => {
     const spotName = spotNames.get(visit.spot_id);
     if (!spotName) return [];
+    const label = labelOf(visit);
     return [
       {
         id: visit.id,
         visitedAt: visit.visited_at,
         spotId: visit.spot_id,
         spotName,
-        tripTitle: tripTitles.get(visit.journey_id ?? visit.trip_id) ?? "普段のおでかけ",
+        tripTitle: [label.title ?? "普段のおでかけ", label.tagTitle].filter(Boolean).join("・"),
       },
     ];
   });

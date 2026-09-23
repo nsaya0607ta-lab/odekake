@@ -25,6 +25,8 @@ export type VisitDetail = {
   record: VisitRecordRow;
   photos: Array<{ id: string; url: string | null; caption: string | null }>;
   tripTitle: string | null;
+  /** 共有旅の記録に付けた自分の個人旅行の名前 */
+  journeyTagTitle: string | null;
 };
 
 function summarize(visits: VisitRecordRow[]) {
@@ -382,7 +384,7 @@ export async function getSpotDetail(
   const allPaths = [...photosByVisit.values()].flat().map((p) => p.storage_path);
   const signed = await signPhotoPaths(supabase, allPaths);
 
-  const tripTitles = await loadTripTitles(supabase, visitList.map((v) => v.trip_id));
+  const labelOf = await loadVisitTripLabels(supabase, visitList);
 
   const visitDetails: VisitDetail[] = visitList.map((record) => ({
     record,
@@ -391,7 +393,8 @@ export async function getSpotDetail(
       url: signed.get(p.storage_path) ?? null,
       caption: p.caption,
     })),
-    tripTitle: tripTitles.get(record.trip_id) ?? null,
+    tripTitle: labelOf(record).rootTitle,
+    journeyTagTitle: labelOf(record).tagTitle,
   }));
 
   return {
@@ -441,6 +444,39 @@ export async function searchSpotsForPicker(
     prefectureCode: spot.prefecture_code,
     municipalityCode: spot.municipality_code,
   }));
+}
+
+export type VisitTripLabel = {
+  /** 記録先（共有旅の旅行、または記録先そのもの）の名前 */
+  title: string | null;
+  /** 親の記録先（個人旅・共有旅）の名前 */
+  rootTitle: string | null;
+  /** 共有旅の記録に付けた自分の個人旅行の名前（タグ） */
+  tagTitle: string | null;
+};
+
+/**
+ * 訪問記録に表示する旅の名前を決める。
+ * 共有旅の記録に個人旅行をタグとして付けた場合は、共有旅の名前と旅行名の両方を返す。
+ * 他のメンバーの個人旅行は読めないため、その場合は共有旅の名前だけになる。
+ */
+export async function loadVisitTripLabels(
+  supabase: DB,
+  visits: Array<{ trip_id: string; journey_id: string | null }>,
+): Promise<(visit: { trip_id: string; journey_id: string | null }) => VisitTripLabel> {
+  const ids = [...new Set(visits.flatMap((v) => (v.journey_id ? [v.trip_id, v.journey_id] : [v.trip_id])))];
+  const { data } = ids.length > 0
+    ? await supabase.from("trips").select("id, title, parent_trip_id").in("id", ids)
+    : { data: [] };
+  const trips = new Map((data ?? []).map((t) => [t.id, t]));
+
+  return (visit) => {
+    const root = trips.get(visit.trip_id)?.title ?? null;
+    const journey = visit.journey_id ? trips.get(visit.journey_id) : undefined;
+    if (!journey) return { title: root, rootTitle: root, tagTitle: null };
+    if (journey.parent_trip_id === visit.trip_id) return { title: journey.title, rootTitle: root, tagTitle: null };
+    return { title: root, rootTitle: root, tagTitle: journey.title };
+  };
 }
 
 export async function loadTripTitles(supabase: DB, tripIds: string[]): Promise<Map<string, string>> {
