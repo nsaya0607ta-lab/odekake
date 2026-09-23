@@ -43,7 +43,16 @@ export function TimelineCard({ item, showTrip = true }: { item: TimelineItem; sh
         </span>
       </span>
 
-      {showTrip ? <TripBadge title={item.tripTitle} /> : null}
+      {showTrip ? (
+        item.journeyTagTitle ? (
+          <span className="flex shrink-0 flex-col items-end gap-1">
+            <TripBadge title={item.tripTitle} />
+            <TripBadge title={item.journeyTagTitle} />
+          </span>
+        ) : (
+          <TripBadge title={item.tripTitle} />
+        )
+      ) : null}
     </Link>
   );
 }

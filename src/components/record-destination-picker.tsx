@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import type { RecordDestinationHierarchy } from "@/lib/data/trips";
+import type { JourneyOption, RecordDestinationHierarchy, RecordDestinationRoot } from "@/lib/data/trips";
 
 export type RecordDestinationValue = { tripId: string; journeyId: string };
 
@@ -18,6 +18,13 @@ export function RecordDestinationPicker({
   lockedTripId?: string;
   onChange?: (value: RecordDestinationValue) => void;
 }) {
+  // 共有旅の記録には、共有旅の旅行に加えて自分の個人旅行もタグとして付けられる。
+  // 記録は共有旅に1件のまま、個人旅の旅行ページにも並ぶ。
+  const journeysOf = (target: RecordDestinationRoot | null | undefined): JourneyOption[] => {
+    if (!target) return [];
+    if (target.kind !== "shared") return target.journeys;
+    return [...target.journeys, ...(destinations.personal?.journeys ?? [])];
+  };
   const allRoots = useMemo(
     () => [...(destinations.personal ? [destinations.personal] : []), ...destinations.shared],
     [destinations],
@@ -37,6 +44,8 @@ export function RecordDestinationPicker({
     : kind === "personal"
       ? destinations.personal
       : destinations.shared.find((item) => item.id === sharedId) ?? null;
+  const rootJourneys = journeysOf(root);
+  const personalTagJourneys = root?.kind === "shared" ? (destinations.personal?.journeys ?? []) : [];
   const journeyId = root && mode === "journey" ? (journeyByRoot[root.id] ?? "") : "";
 
   const emit = (nextRootId: string, nextJourneyId: string) => onChange?.({
@@ -60,9 +69,9 @@ export function RecordDestinationPicker({
               onClick={() => {
                 setKind("personal");
                 const next = destinations.personal?.id ?? "";
-                const canUseJourney = Boolean(destinations.personal?.journeys.length);
+                const canUseJourney = journeysOf(destinations.personal).length > 0;
                 if (!canUseJourney) setMode("everyday");
-                const nextJourney = journeyByRoot[next] ?? destinations.personal?.journeys[0]?.id ?? "";
+                const nextJourney = journeyByRoot[next] ?? journeysOf(destinations.personal)[0]?.id ?? "";
                 if (canUseJourney && nextJourney) setJourneyByRoot((current) => ({ ...current, [next]: nextJourney }));
                 emit(next, mode === "journey" && canUseJourney ? nextJourney : "");
               }}
@@ -77,9 +86,9 @@ export function RecordDestinationPicker({
                 const next = sharedId || destinations.shared[0]?.id || "";
                 setSharedId(next);
                 const nextRoot = destinations.shared.find((item) => item.id === next);
-                const canUseJourney = Boolean(nextRoot?.journeys.length);
+                const canUseJourney = journeysOf(nextRoot).length > 0;
                 if (!canUseJourney) setMode("everyday");
-                const nextJourney = journeyByRoot[next] ?? nextRoot?.journeys[0]?.id ?? "";
+                const nextJourney = journeyByRoot[next] ?? journeysOf(nextRoot)[0]?.id ?? "";
                 if (canUseJourney && nextJourney) setJourneyByRoot((current) => ({ ...current, [next]: nextJourney }));
                 emit(next, mode === "journey" && canUseJourney ? nextJourney : "");
               }}
@@ -100,9 +109,9 @@ export function RecordDestinationPicker({
             onChange={(event) => {
               setSharedId(event.target.value);
               const nextRoot = destinations.shared.find((item) => item.id === event.target.value);
-              const canUseJourney = Boolean(nextRoot?.journeys.length);
+              const canUseJourney = journeysOf(nextRoot).length > 0;
               if (!canUseJourney) setMode("everyday");
-              const nextJourney = journeyByRoot[event.target.value] ?? nextRoot?.journeys[0]?.id ?? "";
+              const nextJourney = journeyByRoot[event.target.value] ?? journeysOf(nextRoot)[0]?.id ?? "";
               if (canUseJourney && nextJourney) setJourneyByRoot((current) => ({ ...current, [event.target.value]: nextJourney }));
               emit(event.target.value, mode === "journey" && canUseJourney ? nextJourney : "");
             }}
@@ -125,9 +134,9 @@ export function RecordDestinationPicker({
             普段のおでかけ
           </label>
           <label
-            aria-disabled={root.journeys.length === 0}
+            aria-disabled={rootJourneys.length === 0}
             className={`flex items-center gap-3 rounded-2xl px-3 py-3 text-sm font-semibold ${
-              root.journeys.length === 0
+              rootJourneys.length === 0
                 ? "cursor-not-allowed bg-[#e8e6df] text-ink-faint opacity-70"
                 : "cursor-pointer bg-paper-deep"
             }`}
@@ -135,10 +144,10 @@ export function RecordDestinationPicker({
             <input
               type="radio"
               checked={mode === "journey"}
-              disabled={root.journeys.length === 0}
+              disabled={rootJourneys.length === 0}
               onChange={() => {
                 setMode("journey");
-                const next = journeyByRoot[root.id] ?? root.journeys[0]?.id ?? "";
+                const next = journeyByRoot[root.id] ?? rootJourneys[0]?.id ?? "";
                 setJourneyByRoot((current) => ({ ...current, [root.id]: next }));
                 emit(root.id, next);
               }}
@@ -146,11 +155,11 @@ export function RecordDestinationPicker({
             />
             <span>
               旅行を選択
-              {root.journeys.length === 0 ? <span className="ml-2 text-xs">（旅行がありません）</span> : null}
+              {rootJourneys.length === 0 ? <span className="ml-2 text-xs">（旅行がありません）</span> : null}
             </span>
           </label>
           {mode === "journey" ? (
-            root.journeys.length > 0 ? (
+            rootJourneys.length > 0 ? (
               <select
                 className="field"
                 aria-label="旅行"
@@ -162,7 +171,22 @@ export function RecordDestinationPicker({
                 required
               >
                 <option value="">旅行を選択してください</option>
-                {root.journeys.map((journey) => <option key={journey.id} value={journey.id}>{journey.title}</option>)}
+                {personalTagJourneys.length > 0 ? (
+                  <>
+                    {root.journeys.length > 0 ? (
+                      <optgroup label={`共有旅「${root.title}」の旅行`}>
+                        {root.journeys.map((journey) => <option key={journey.id} value={journey.id}>{journey.title}</option>)}
+                      </optgroup>
+                    ) : null}
+                    <optgroup label="自分の個人旅行（タグとして付ける）">
+                      {personalTagJourneys.map((journey) => (
+                        <option key={journey.id} value={journey.id}>{journey.title}</option>
+                      ))}
+                    </optgroup>
+                  </>
+                ) : (
+                  rootJourneys.map((journey) => <option key={journey.id} value={journey.id}>{journey.title}</option>)
+                )}
               </select>
             ) : (
               <p className="rounded-2xl bg-sun-soft px-3 py-3 text-xs leading-relaxed text-ink-soft">

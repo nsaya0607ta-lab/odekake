@@ -1,5 +1,6 @@
 import type { DB } from "./client";
 import { signThumbOrOriginalPaths } from "./photos";
+import { loadVisitTripLabels } from "./spots";
 import type {
   FriendGroupMemberRow,
   FriendGroupMessageRow,
@@ -150,22 +151,20 @@ export async function getSnsLinkableVisits(
   if (!visits || visits.length === 0) return [];
 
   const spotIds = [...new Set(visits.map((visit) => visit.spot_id))];
-  const tripIds = [...new Set(visits.map((visit) => visit.journey_id ?? visit.trip_id))];
-  const [{ data: spots }, { data: trips }] = await Promise.all([
+  const [{ data: spots }, labelOf] = await Promise.all([
     supabase.from("spots").select("id, name").in("id", spotIds),
-    supabase.from("trips").select("id, title").in("id", tripIds),
+    loadVisitTripLabels(supabase, visits),
   ]);
   const spotNames = new Map((spots ?? []).map((spot) => [spot.id, spot.name]));
-  const tripTitles = new Map((trips ?? []).map((trip) => [trip.id, trip.title]));
 
   return visits.flatMap((visit) => {
     const spotName = spotNames.get(visit.spot_id);
     if (!spotName) return [];
-    const tripId = visit.journey_id ?? visit.trip_id;
+    const label = labelOf(visit);
     return [{
       id: visit.id,
       spotName,
-      tripTitle: tripTitles.get(tripId) ?? "普段のおでかけ",
+      tripTitle: [label.title ?? "普段のおでかけ", label.tagTitle].filter(Boolean).join("・"),
       visitedAt: visit.visited_at,
     }];
   });
