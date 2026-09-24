@@ -97,6 +97,47 @@ export async function finalizePhotoPaths(
   return result;
 }
 
+/**
+ * 同じ一時写真を、複数の保存先へコピーする（元は消さない）。
+ * 1回の記録で複数のスポットへ同じ写真をまとめて付けたいときに使う。
+ * move と違って元ファイルは一時領域に残るが、cleanupTemporaryPhotosAction() が
+ * 期限切れとして片づける。
+ */
+export async function copyPhotoPathsTo(
+  supabase: DB,
+  paths: string[],
+  destinationPrefix: string,
+  bucket: string = PHOTO_BUCKET,
+): Promise<string[]> {
+  const result: string[] = [];
+
+  for (const path of paths) {
+    if (!isTemporaryPath(path)) {
+      result.push(path);
+      continue;
+    }
+
+    const destination = `${destinationPrefix}/${basenameOf(path)}`;
+    const { error } = await supabase.storage.from(bucket).copy(path, destination);
+
+    if (!error) {
+      result.push(destination);
+      if (bucket === PHOTO_BUCKET) {
+        void supabase.storage.from(bucket).copy(toThumbPath(path), toThumbPath(destination));
+      }
+      continue;
+    }
+
+    const { data } = await supabase.storage.from(bucket).list(destinationPrefix, {
+      search: basenameOf(path),
+      limit: 1,
+    });
+    if ((data ?? []).some((item) => item.name === basenameOf(path))) result.push(destination);
+  }
+
+  return result;
+}
+
 /** 指定したフォルダ以下のファイルをすべて消す（アカウント削除時の後片付け用） */
 export async function removeFolderRecursively(supabase: DB, prefix: string, depth = 3): Promise<number> {
   if (depth <= 0) return 0;
