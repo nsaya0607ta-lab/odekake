@@ -80,6 +80,10 @@ const RUN_CYCLE: readonly Pose[] = ["walk", "trot", "walk-tail", "trot"];
 const DOG_W = 300, DOG_H = 254, DOG_FOOT = 240;
 const DW = 80, DH = (DW * DOG_H) / DOG_W;
 const GRAV = 2500, JUMP_V = 760, DJUMP_V = 640;
+/** 道に落ちているもののうち、図鑑アイテムになる割合（残りはほね）。ボーナスタイムは多め */
+const ITEM_RATE = 0.12, ITEM_RATE_BONUS = 0.25;
+/** ほね1本の点数（コンボ倍率がかかる） */
+const BONE_PTS = 5;
 /** 走る速さ（論理px/秒）。最初はゆっくりで、約3分かけて最高速になる */
 const START_SPEED = 200, MAX_SPEED = 520;
 
@@ -324,7 +328,7 @@ export function createOsanpoRun(root: HTMLElement, opts: OsanpoRunOptions): () =
     next: 400, shield: false, chain: 0, chainT: 0, mult: 1, maxMult: 1, paused: false, deadT: 0, introT: 0,
     haul: new Map<string, number>(), happyT: 0, calm: store.get("calm") !== "0",
     sec: "normal" as Section, secT: 18, rain: 0, rainTarget: 0, rainT: 0,
-    newAch: [] as string[], newKinds: [] as string[], rainWalk: 0, rushes: 0, closes: 0, bonusGot: 0,
+    bones: 0, newAch: [] as string[], newKinds: [] as string[], rainWalk: 0, rushes: 0, closes: 0, bonusGot: 0,
     best: 0, bestD: 0, passedBest: false, recordShown: false, milestone: 100, bufT: 0, fwT: 2,
     lastResult: null as null | { score: number; m: number; items: number; rank: string },
   };
@@ -991,8 +995,15 @@ export function createOsanpoRun(root: HTMLElement, opts: OsanpoRunOptions): () =
       ky: 0, kvy: 0, rot: 0, spin: 0, birds: [], flee: false, fleeT: 0, gone: false, passed: false, ...extra,
     });
   }
-  const mkPickup = (x: number, y: number, item: RunItem | null = rollItem(), token = 0): Pickup =>
-    ({ item, token, x, y, vy: 0, ph: Math.random() * 6, taken: false, hinted: false });
+  /**
+   * 道に落とすもの。ふだんはほね（BONE_PTS点）で、図鑑アイテムはたまに混ざる（ITEM_RATE）。
+   * アイテムにはスキルがあるので、全部アイテムにすると拾うたびにスキルが出て忙しすぎる。
+   * item を渡したとき（スキルで出すとき）はそのまま使う。
+   */
+  const mkPickup = (x: number, y: number, item?: RunItem | null, token = 0): Pickup => {
+    const it = item !== undefined ? item : Math.random() < (S.sec === "bonus" ? ITEM_RATE_BONUS : ITEM_RATE) ? rollItem() : null;
+    return { item: it, token, x, y, vy: 0, ph: Math.random() * 6, taken: false, hinted: false };
+  };
   function treatArc(x0: number, x1: number, peak: number): void {
     for (let i = 0; i < 5; i++) {
       const t = i / 4;
@@ -1404,7 +1415,7 @@ export function createOsanpoRun(root: HTMLElement, opts: OsanpoRunOptions): () =
     note.className = "osr-note";
     note.textContent = opts.usesSampleItems
       ? "持っているアイテムがまだ少ないので、見本のアイテムも落ちています。ガチャで集めると、自分のアイテムが落ちてくるようになります。"
-      : "続けて拾うとコンボで最大×5。LR・MRを拾うと、一度だけぶつかっても平気なバリアが付く。";
+      : `ふだん落ちているのはほね（+${BONE_PTS}）で、ときどき図鑑アイテムが混ざる。続けて拾うとコンボで最大×5。LR・MRを拾うと、一度だけぶつかっても平気なバリアが付く。`;
     ul.appendChild(note);
   }
 
@@ -1891,7 +1902,7 @@ export function createOsanpoRun(root: HTMLElement, opts: OsanpoRunOptions): () =
       state: "intro", introT: 0, bestD: bestDistOf(STAGE_ID), passedBest: false, recordShown: false, fwT: 2,
       t: 0, speed: 0, dist: 0, bonus: 0, treats: 0, clock: STAGE.clock, next: 420, shield: false, chain: 0, chainT: 0, mult: 1, maxMult: 1,
       paused: false, deadT: 0, milestone: 100, bufT: 0, haul: new Map<string, number>(), sec: "normal", secT: 18, rain: 0, rainTarget: 0, rainT: 0,
-      newAch: [], newKinds: [], rainWalk: 0, rushes: 0, closes: 0, bonusGot: 0,
+      bones: 0, newAch: [], newKinds: [], rainWalk: 0, rushes: 0, closes: 0, bonusGot: 0,
     });
     Object.assign(P, { y: GROUND, vy: 0, ground: true, jumps: 2, sq: 1, rot: 0, inv: 0, dead: false, slide: false, slideT: 0, slideHeld: false, jumpAt: -1 });
     obstacles = []; pickups = []; texts = []; flyers = []; parts = [];
@@ -1961,7 +1972,7 @@ export function createOsanpoRun(root: HTMLElement, opts: OsanpoRunOptions): () =
     countUp($("o-score"), sc);
     $("o-best").textContent = S.best.toLocaleString();
     $("o-new").hidden = !isNew;
-    $("o-line").textContent = `${meters}m ・ アイテム${S.treats}こ ・ 最大×${S.maxMult} ・ ${fmtClock(S.clock)}帰宅`;
+    $("o-line").textContent = `${meters}m ・ ほね${S.bones} ・ アイテム${S.treats}こ ・ 最大×${S.maxMult} ・ ${fmtClock(S.clock)}帰宅`;
     const haul = $("o-haul");
     haul.replaceChildren();
     const got = [...S.haul.keys()]
@@ -2023,6 +2034,19 @@ export function createOsanpoRun(root: HTMLElement, opts: OsanpoRunOptions): () =
   function take(p: Pickup): void {
     p.taken = true;
     const { item } = p;
+    if (!item && !p.token) {
+      // ほね。コンボはつながるが、スキルは出ない
+      const prev = S.mult;
+      S.chain++; S.chainT = 1.5 + M.comboGrace; S.mult = Math.min(5, 1 + Math.floor(S.chain / 4)); S.maxMult = Math.max(S.maxMult, S.mult);
+      if (S.mult > prev) { retrigger($("combo"), "osr-pulse"); onComboUp(S.mult - prev); }
+      if (S.mult >= 5) unlock("combo5");
+      S.bones++;
+      const v = addPts(BONE_PTS * S.mult);
+      sfx.item(S.mult);
+      floatText(p.x, p.y - 14, `+${v}`, "#F3EBDD", 12);
+      puff(p.x, p.y, 4, "spark", { g: 0 });
+      return;
+    }
     if (!item) {
       // スキルで出た小さな粒
       const v = addPts(p.token);
@@ -2299,6 +2323,17 @@ export function createOsanpoRun(root: HTMLElement, opts: OsanpoRunOptions): () =
     hud.set(name, v);
     apply(v);
   }
+  /** 道に落ちているほね */
+  function drawBone(c: Ctx, x: number, y: number, k: number): void {
+    c.save(); c.translate(x, y); c.rotate(-0.35); c.scale(k, k);
+    c.fillStyle = "rgba(20,16,40,.25)"; rr(c, -8, -2, 16, 6, 3); c.fill();
+    c.fillStyle = "#FBF4E6"; c.strokeStyle = "#B9A98E"; c.lineWidth = 1.1;
+    c.beginPath();
+    for (const [bx, by] of [[-8, -3], [-8, 3], [8, -3], [8, 3]] as const) { c.moveTo(bx + 3.4, by); c.arc(bx, by, 3.4, 0, Math.PI * 2); }
+    c.fill(); c.stroke();
+    c.beginPath(); rr(c, -8, -2.6, 16, 5.2, 2); c.fill();
+    c.restore();
+  }
   function render(): void {
     const e = stageEnv(envAt(S.clock));
     const c = ctx;
@@ -2319,6 +2354,7 @@ export function createOsanpoRun(root: HTMLElement, opts: OsanpoRunOptions): () =
     if (S.rain > 0.02 && STAGE.weather !== "snow" && !M.clear) { c.fillStyle = `rgba(52,60,96,${0.22 * S.rain})`; c.fillRect(-20, -20, VW + 40, GROUND + 26); }
     for (const o of obstacles) if (o.kind === "puddle") drawPuddle(c, o.x, GROUND, o.w, S.time, e.night, STAGE_ID);
     for (const it of pickups) {
+      if (!it.item && !it.token) { drawBone(c, it.x, it.y + Math.sin(it.ph) * 2.2, M.big ? 1.3 : 1); continue; }
       if (!it.item) {
         const y = it.y + Math.sin(it.ph) * 2.2, big = it.token >= 150, r = big ? 9 : it.token >= 30 ? 6 : 4.5;
         glow(c, it.x, y, r * 3, big ? "255,132,188" : "255,214,110", 0.45);
@@ -2459,7 +2495,7 @@ export function createOsanpoRun(root: HTMLElement, opts: OsanpoRunOptions): () =
     // HUD
     setFlag("hud-left", S.state === "ready", (v) => { $("hud-left").style.visibility = v ? "hidden" : "visible"; });
     setText("score", score().toLocaleString());
-    setText("meta", `${Math.floor(S.dist / 50)}m ・ アイテム ${S.treats}`);
+    setText("meta", `${Math.floor(S.dist / 50)}m ・ ほね ${S.bones} ・ アイテム ${S.treats}`);
     setText("clock", fmtClock(S.clock));
     setText("phase", phaseName(S.clock) + (S.rain > 0.3 ? (STAGE.weather === "snow" ? "・雪" : "・雨") : ""));
     const secKey = S.state === "play" && S.sec !== "normal" ? S.sec : "";

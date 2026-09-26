@@ -65,7 +65,7 @@ export function OsanpoRunGame({ items, usesSampleItems, unlockedStages, seriesTa
             <div className="osr-hud">
               <div className="osr-hud-left" data-osr="hud-left">
                 <div className="osr-score" data-osr="score">0</div>
-                <div className="osr-meta" data-osr="meta">0m ・ アイテム 0</div>
+                <div className="osr-meta" data-osr="meta">0m ・ ほね 0 ・ アイテム 0</div>
                 <div className="osr-sec-chip" data-osr="sec-chip" hidden />
                 <div className="osr-combo" data-osr="combo" data-off="1">
                   <span data-osr="combo-text">×2 コンボ</span>
@@ -181,7 +181,7 @@ export function OsanpoRunGame({ items, usesSampleItems, unlockedStages, seriesTa
               <header className="osr-sheet-head"><button type="button" className="osr-sheet-back" data-close-sheet>‹ もどる</button><h2>ルール</h2></header>
               <div className="osr-sheet-body">
                 <p className="osr-lede">
-                  まち・山道・雪国・夏まつりの4つの道を、フレブルと散歩。落ちているのは、あなたが図鑑で持っているアイテムです。季節の道は、ガチャでその季節のフレブルを手に入れると歩けます。
+                  まち・山道・雪国・夏まつりの4つの道を、フレブルと散歩。道にはほねが落ちていて、ときどきあなたが図鑑で持っているアイテムが混ざります。アイテムを拾うと、そのアイテムのスキルが発動します。季節の道は、ガチャでその季節のフレブルを手に入れると歩けます。
                 </p>
                 <div className="osr-guide">
                   <section>
