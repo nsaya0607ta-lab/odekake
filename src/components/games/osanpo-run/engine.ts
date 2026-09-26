@@ -25,6 +25,19 @@ import {
   type OsanpoRunStageId,
 } from "@/lib/games/osanpo-run/config";
 import {
+  OSANPO_RUN_SKILL_BY_ID,
+  OSANPO_RUN_SKILL_MAX_LEVEL,
+  OSANPO_RUN_SKILLS,
+  skillValue,
+  type Buff,
+  type Fx,
+  type ItemFilter,
+  type Lv,
+  type ObsGroup,
+  type OsanpoRunSkill,
+  type SpawnShape,
+} from "@/lib/games/osanpo-run/skills";
+import {
   DEFAULT_BGM_VOLUME,
   getBgmVolume,
   getTapVolume,
@@ -46,6 +59,8 @@ export type RunItem = {
   rarity: GachaRarity;
   /** 小さく最適化した画像のURL */
   src: string;
+  /** 図鑑のスキルLv（1〜5）。スキルの強さが変わる */
+  level: number;
 };
 
 export type OsanpoRunOptions = {
@@ -79,8 +94,12 @@ type Obstacle = {
   hit: boolean; scored: boolean; hinted: boolean; minClear: number;
   ky: number; kvy: number; rot: number; spin: number;
   birds: Pigeon[]; flee: boolean; fleeT: number;
+  /** スキルで消えた（水たまりを砂場にした等） / すり抜けて点をもらった */
+  gone: boolean; passed: boolean;
 };
-type Pickup = { item: RunItem; x: number; y: number; ph: number; taken: boolean; hinted: boolean };
+/** item が null のものはスキルで出る小さな粒（token の点数だけもらえる） */
+type Pickup = { item: RunItem | null; token: number; x: number; y: number; vy: number; ph: number; taken: boolean; hinted: boolean };
+type ActiveBuff = { skill: OsanpoRunSkill; b: Buff; lv: number; key: string; t: number; count: number; acc: number; rampN: number; rainAcc: number };
 type Particle = { x: number; y: number; vx: number; vy: number; life: number; max: number; r: number; kind: "dust" | "spark" | "ring" | "splash" | "fw"; color: string; g: number; scroll: boolean };
 type FloatText = { x: number; y: number; text: string; color: string; size: number; life: number; max: number };
 type Flyer = { item: RunItem; x0: number; y0: number; t: number };
@@ -213,6 +232,19 @@ export function createOsanpoRun(root: HTMLElement, opts: OsanpoRunOptions): () =
   const seriesItems = (series: string | null) => (series ? ITEMS.filter((it) => it.series === series) : []);
 
   function rollItem(): RunItem {
+    // スキル「おもちじゃない...!?」「ごちゃまぜ」「高級魚」
+    if (K.lucky.length) {
+      const hit = K.lucky.shift()!, top = [...byRarity.get("MR")!, ...byRarity.get("LR")!];
+      if (hit && top.length) return pickOne(top);
+    }
+    if (K.reroll > 0) {
+      K.reroll--;
+      return pickOne(byRarity.get(pickOne(rarityWeights.map(([r]) => r)))!);
+    }
+    if (K.rare > 1) {
+      const boosted = rarityWeights.map(([r, w]) => [r, rarityIndex(r) >= 4 ? w * K.rare : w] as const);
+      if (Math.random() < 0.7) return pickOne(byRarity.get(pickWeighted(boosted))!);
+    }
     const stageSeries = seriesItems(STAGE.series);
     if (S.rain > 0.3 && rainItems.length && Math.random() < 0.35) return pickOne(rainItems);
     if (stageSeries.length && Math.random() < 0.3) return pickOne(stageSeries);
@@ -299,6 +331,25 @@ export function createOsanpoRun(root: HTMLElement, opts: OsanpoRunOptions): () =
   let obstacles: Obstacle[] = [], pickups: Pickup[] = [], parts: Particle[] = [], texts: FloatText[] = [], flyers: Flyer[] = [];
   const FX = { hitstop: 0, flash: 0, flashCol: "255,255,255", rareT: 0, fade: 0 };
   let FDT = 1 / 60;
+  /** アイテムスキルの状態。おさんぽのたびに作り直す */
+  const newSkillState = () => ({
+    buffs: [] as ActiveBuff[],
+    next: [] as { left: number; add: number; mul: number; up: number; dup: number; filter: ItemFilter }[],
+    best: null as null | { left: number; mul: number; top: number },
+    guards: [] as { n: number; t: number; kinds: ObsGroup; pts: number; after: number; name: string }[],
+    clears: [] as { n: number; kinds: ObsGroup; pts: number; name: string }[],
+    revives: [] as { keep: number; pts: number; mul: number; name: string }[],
+    rushPass: 0, rushMul: 1, rushInv: false, forceBonus: false,
+    rare: 1, nightMul: 1, runMul: 1,
+    delays: [] as { t: number; pts: number; name: string }[],
+    stack: 0, stackAdd: 0, cairn: 0,
+    pouchMul: 0, pouchBank: 0, keepBest: 0, bestItem: 0,
+    bigJumps: [] as number[], reroll: 0, lucky: [] as boolean[],
+    comboGuard: 0, miss: 0, lastItem: null as RunItem | null,
+    /** スピードが上がる元になる時間（「ひとやすみ」で止まり、「ゆらゆら」で0に戻る） */
+    ramp: 0, textT: 0, sparkBusy: false,
+  });
+  let K = newSkillState();
 
   const bld: Layer<MidItem> = { f: 0.08, items: [], nx: -60 };
   const near: Layer<NearItem> = { f: 0.26, items: [], nx: -120 };
@@ -937,10 +988,11 @@ export function createOsanpoRun(root: HTMLElement, opts: OsanpoRunOptions): () =
   function addObs(kind: ObstacleKind, x: number, w: number, h: number, extra: Partial<Obstacle> = {}): void {
     obstacles.push({
       kind, x, y: 0, w, h, vx: 0, low: false, hit: false, scored: false, hinted: false, minClear: 1e9,
-      ky: 0, kvy: 0, rot: 0, spin: 0, birds: [], flee: false, fleeT: 0, ...extra,
+      ky: 0, kvy: 0, rot: 0, spin: 0, birds: [], flee: false, fleeT: 0, gone: false, passed: false, ...extra,
     });
   }
-  const mkPickup = (x: number, y: number): Pickup => ({ item: rollItem(), x, y, ph: Math.random() * 6, taken: false, hinted: false });
+  const mkPickup = (x: number, y: number, item: RunItem | null = rollItem(), token = 0): Pickup =>
+    ({ item, token, x, y, vy: 0, ph: Math.random() * 6, taken: false, hinted: false });
   function treatArc(x0: number, x1: number, peak: number): void {
     for (let i = 0; i < 5; i++) {
       const t = i / 4;
@@ -965,6 +1017,19 @@ export function createOsanpoRun(root: HTMLElement, opts: OsanpoRunOptions): () =
       ["cat", t > 18 ? 1.6 : 0], ["sign", t > 30 ? 1.4 : 0], ["pigeons", t > 9 ? 1.3 : 0], ["noren", t > 14 ? 1.8 : 0], ["lowcrow", t > 22 ? 1.2 : 0],
       ["row", rush ? 0 : 1.3], ["high", rush ? 0 : 1.1],
     ] as const);
+    const blocked = (k: ObstacleKind, low = false) => K.buffs.some((a) => a.b.noSpawn && inGroup({ kind: k, low } as Obstacle, a.b.noSpawn));
+    const obsKind: Partial<Record<typeof kind, [ObstacleKind, boolean]>> = {
+      cone: ["cone", false], puddle: ["puddle", false], bike: ["bike", false], crow: ["crow", false], lowcrow: ["crow", true], double: ["cone", false],
+      cat: ["cat", false], sign: ["sign", false], pigeons: ["pigeons", false], noren: ["noren", false],
+    };
+    const ok = obsKind[kind];
+    if (ok && blocked(ok[0], ok[1])) {
+      // スキルで出ない種類のときは、かわりにアイテムを並べる
+      const h = Math.random() < 0.5 ? 0 : rand(60, 96);
+      for (let i = 0; i < 5; i++) pickups.push(mkPickup(X + i * 30, GROUND - 18 - h));
+      S.next = 170 + S.speed * 0.55 + Math.random() * S.speed * 0.8;
+      return;
+    }
     switch (kind) {
       case "cone": addObs("cone", X, 24, 34); if (Math.random() < 0.45) treatArc(X - 58, X + 82, 74); break;
       case "puddle": { const w = rand(64, 96); addObs("puddle", X, w, 6); if (Math.random() < 0.4) treatArc(X - 48, X + w + 48, 60); break; }
@@ -996,7 +1061,10 @@ export function createOsanpoRun(root: HTMLElement, opts: OsanpoRunOptions): () =
   function setSection(k: Section): void {
     S.sec = k; S.bonusGot = 0;
     if (k === "bonus") { S.secT = 6; floatText(VW / 2, GROUND * 0.32, "ボーナスタイム！", "#FFC857", 24); sfx.rare(); }
-    else if (k === "rush") { S.secT = 7; floatText(VW / 2, GROUND * 0.32, "ラッシュ！", "#FF8A5C", 24); sfx.near(); }
+    else if (k === "rush") {
+      S.secT = 7; floatText(VW / 2, GROUND * 0.32, "ラッシュ！", "#FF8A5C", 24); sfx.near();
+      if (K.rushPass > 0) { K.rushInv = true; K.rushMul = K.rushPass; K.rushPass = 0; floatText(VW / 2, GROUND * 0.44, "あずき色の風で無敵！", "#FF84BC", 16); }
+    }
     else {
       S.secT = rand(14, 18);
       if (S.t > 20 && S.rainTarget === 0 && Math.random() < 0.4) {
@@ -1053,8 +1121,15 @@ export function createOsanpoRun(root: HTMLElement, opts: OsanpoRunOptions): () =
   }
 
   /* ---------- 入力 ---------- */
-  function jump(v: number, n: 1 | 2): void {
-    P.vy = -v; P.ground = false; P.jumps = n === 1 ? 1 : 0; P.sq = 1.22; P.slide = false; P.slideHeld = false; P.jumpAt = S.time;
+  function jump(v: number, n: 1 | 2, quiet = false): void {
+    let k = M.jump;
+    if (n === 1 && !quiet && K.bigJumps.length) { k *= K.bigJumps.shift()!; puff(P.x, GROUND, 10, "ring", { vy: 30, g: 0 }); }
+    P.vy = -v * k; P.ground = false; P.jumps = n === 1 ? 1 + M.air : Math.max(0, P.jumps - 1); P.sq = 1.22; P.slide = false; P.slideHeld = false; P.jumpAt = S.time;
+    if (M.rhythm > 0 && S.state === "play") {
+      const beat = 60 / BGM.bpm, ph = (S.time % beat) / beat;
+      if (ph < 0.18 || ph > 0.82) { const got = addPts(M.rhythm); floatText(P.x + 20, P.y - 70, `♪ +${got}`, "#9BE7FF", 15); }
+    }
+    if (quiet) return;
     if (n === 1) { sfx.jump(); puff(P.x - 6, GROUND, 6, "dust", { vy: -20 }); }
     else { sfx.djump(); puff(P.x, P.y - 4, 8, "ring", { vy: 60, g: 0 }); }
   }
@@ -1258,6 +1333,17 @@ export function createOsanpoRun(root: HTMLElement, opts: OsanpoRunOptions): () =
     const p = document.createElement("p");
     p.textContent = got ? `拾った回数 ${(stats.counts[item.id] ?? 0).toLocaleString()}回 ・ 1こ ${R.points}点` : "まだ拾っていません。道のどこかに落ちているかも。";
     box.append(big, nm, tags, p);
+    const skill = OSANPO_RUN_SKILL_BY_ID.get(item.id);
+    if (skill) {
+      const lv = lvOf(item);
+      const sk = document.createElement("div"); sk.className = "osr-zk-skill";
+      const h = document.createElement("b");
+      h.textContent = `スキル「${skill.name}」${item.rarity === "N" ? "" : lv >= OSANPO_RUN_SKILL_MAX_LEVEL ? " Lv.MAX" : ` Lv${lv}`}`;
+      const d = document.createElement("p"); d.textContent = skill.desc;
+      const mx = document.createElement("small"); mx.textContent = item.rarity === "N" ? "Nはレベルなし" : `Lv.MAX：${skill.max}`;
+      sk.append(h, d, mx);
+      box.appendChild(sk);
+    }
   }
   function renderZukan(): void {
     const grid = $("zk-grid");
@@ -1440,6 +1526,360 @@ export function createOsanpoRun(root: HTMLElement, opts: OsanpoRunOptions): () =
     else fallback();
   });
 
+  /* ---------- アイテムスキル ---------- */
+  const lvOf = (item: RunItem) => (item.rarity === "N" ? 1 : clamp(item.level || 1, 1, OSANPO_RUN_SKILL_MAX_LEVEL));
+  const val = (v: Lv | undefined, lv: number, fallback = 0) => (v === undefined ? fallback : skillValue(v, lv));
+  const ival = (v: Lv | undefined, lv: number, fallback = 0) => Math.round(val(v, lv, fallback));
+  function inGroup(o: Obstacle, g: ObsGroup): boolean {
+    const k = o.kind;
+    switch (g) {
+      case "all": return true;
+      case "hard": return k === "cone" || k === "bike" || k === "sign";
+      case "rock": return k === "cone";
+      case "rockbike": return k === "cone" || k === "bike";
+      case "bikesign": return k === "bike" || k === "sign";
+      case "crow": return k === "crow" || k === "pigeons";
+      case "crowcat": return k === "crow" || k === "cat";
+      case "cat": return k === "cat" || k === "pigeons";
+      case "animals": return k === "crow" || k === "cat" || k === "pigeons";
+      case "puddle": return k === "puddle";
+      case "puddlecrow": return k === "puddle" || k === "crow";
+      case "low": return k === "noren" || (k === "crow" && o.low);
+      case "ground": return k !== "crow" && k !== "noren";
+    }
+  }
+  /** いま効いている効果をまとめたもの。毎フレームの最初に作る */
+  const M = {
+    mul: 1, magnet: 52, wide: false, big: false, jump: 1, air: 0, float: false, hop: false, auto: false, inv: false,
+    speed: 1, hold: false, stop: false, comboLock: false, comboGrace: 0, dry: false, clear: false, bright: false, tints: [] as string[],
+    rhythm: 0, over: 0,
+  };
+  function refreshMods(): void {
+    Object.assign(M, {
+      mul: 1, magnet: 52, wide: false, big: false, jump: 1, air: 0, float: false, hop: false, auto: false, inv: false,
+      speed: 1, hold: false, stop: false, comboLock: false, comboGrace: 0, dry: false, clear: false, bright: false, tints: [],
+      rhythm: 0, over: 0,
+    });
+    let step = 0;
+    for (const a of K.buffs) {
+      const { b, lv } = a;
+      if (b.mul !== undefined) M.mul *= val(b.mul, lv, 1);
+      if (b.magnet !== undefined) M.magnet = Math.max(M.magnet, val(b.magnet, lv));
+      if (b.jump !== undefined) M.jump *= val(b.jump, lv, 1);
+      if (b.air !== undefined) M.air = Math.max(M.air, b.air);
+      if (b.speed !== undefined) M.speed *= val(b.speed, lv, 1);
+      if (b.comboGrace !== undefined) M.comboGrace = Math.max(M.comboGrace, val(b.comboGrace, lv));
+      if (b.tint) M.tints.push(b.tint);
+      if (b.rhythm !== undefined) M.rhythm = Math.max(M.rhythm, val(b.rhythm, lv));
+      if (b.over !== undefined) M.over += val(b.over, lv);
+      M.wide ||= Boolean(b.wide); M.big ||= Boolean(b.big); M.float ||= Boolean(b.float); M.hop ||= Boolean(b.hop);
+      M.auto ||= Boolean(b.auto); M.inv ||= Boolean(b.inv || b.auto); M.hold ||= Boolean(b.hold); M.stop ||= Boolean(b.stop);
+      M.comboLock ||= Boolean(b.comboLock); M.dry ||= Boolean(b.dry); M.clear ||= Boolean(b.clear); M.bright ||= Boolean(b.bright);
+      step += a.acc;
+    }
+    M.mul *= (1 + step) * K.runMul * (envAt(S.clock).night > 0.5 ? K.nightMul : 1);
+  }
+  /** 加点。スキルのスコア倍率がかかった値を返す */
+  function addPts(base: number): number {
+    const v = Math.round(base * M.mul);
+    S.bonus += v;
+    return v;
+  }
+  function knock(o: Obstacle): void {
+    if (o.kind === "puddle") { o.gone = true; puff(o.x + o.w / 2, GROUND - 2, 8, "splash"); return; }
+    if (o.kind === "pigeons") { o.flee = true; return; }
+    o.hit = true; o.kvy = -460; o.spin = 8;
+    puff(o.x + o.w / 2, GROUND - o.h / 2, 8, "spark", { g: 0 });
+  }
+  function skillText(text: string, color = "#FFE7A3", size = 13): void {
+    if (K.textT > 0 && size < 15) return;
+    K.textT = 0.35;
+    floatText(P.x + 34, P.y - 92, text, color, size);
+  }
+  function startBuff(skill: OsanpoRunSkill, b: Buff, lv: number, idx: number): void {
+    const sec = val(b.sec, lv);
+    if (sec <= 0) return;
+    const key = `${skill.id}:${idx}`;
+    const same = K.buffs.find((a) => a.key === key);
+    if (same) { same.t = sec; same.lv = lv; return; }
+    K.buffs.push({ skill, b, lv, key, t: sec, count: 0, acc: 0, rampN: 0, rainAcc: 0 });
+  }
+  function endBuff(a: ActiveBuff): void {
+    const { b, lv } = a;
+    let pts = 0;
+    if (b.endPts !== undefined) pts += val(b.endPts, lv);
+    if (b.countPer !== undefined && a.count > 0) pts += a.count * val(b.countPer, lv);
+    if (pts > 0) {
+      const v = addPts(pts);
+      floatText(P.x + 40, P.y - 100, `${a.skill.name} +${v}`, "#FFC857", 17);
+      sfx.fanfare();
+    }
+  }
+  /** スキルで出すアイテム。min 以上のレアリティ / 食べ物だけ、に絞る（該当なしならいちばん近いもの） */
+  function pickItem(min?: GachaRarity, food?: boolean): RunItem {
+    if (!min && !food) return rollItem();
+    let pool = food ? ITEMS.filter((it) => it.category === "food") : ITEMS;
+    if (!pool.length) return rollItem();
+    if (min) {
+      const hi = pool.filter((it) => rarityIndex(it.rarity) >= rarityIndex(min));
+      if (hi.length) pool = hi;
+      else { const top = Math.max(...pool.map((it) => rarityIndex(it.rarity))); pool = pool.filter((it) => rarityIndex(it.rarity) === top); }
+    }
+    return pickOne(pool);
+  }
+  function spawnShape(shape: SpawnShape, n: number, make: () => Pickup["item"], token: number): void {
+    const X = VW + 30, add = (x: number, y: number, vy = 0) => { const p = mkPickup(x, y, token ? null : make(), token); p.vy = vy; pickups.push(p); };
+    for (let i = 0; i < n; i++) {
+      const t = n > 1 ? i / (n - 1) : 0.5;
+      if (shape === "row") add(X + i * 28, GROUND - 18);
+      else if (shape === "line") add(X + i * 26, GROUND - 74);
+      else if (shape === "high") add(X + i * 30, GROUND - 150 - Math.sin(t * Math.PI) * 10);
+      else if (shape === "arc") add(X + i * 30, GROUND - 20 - 90 * 4 * t * (1 - t));
+      else if (shape === "wave") add(X + i * 26, GROUND - 60 - Math.sin(t * Math.PI * 2) * 36);
+      else if (shape === "ring") { const a = (i / n) * Math.PI * 2; add(X + 60 + Math.cos(a) * 52, GROUND - 100 + Math.sin(a) * 44); }
+      else if (shape === "sky") add(rand(P.x + 80, VW + 160), -20 - i * 26, rand(120, 170));
+      else if (shape === "mid") add(X, GROUND - 84);
+      else add(X, GROUND - 40);
+    }
+  }
+  function applySkill(item: RunItem, depth = 0): void {
+    const skill = OSANPO_RUN_SKILL_BY_ID.get(item.id);
+    if (!skill || S.state !== "play") return;
+    const lv = lvOf(item);
+    if (depth === 0) skillText(`★${skill.name}`, "#FFE7A3", rarityIndex(item.rarity) >= 4 ? 16 : 13);
+    skill.fx.forEach((fx, idx) => runFx(skill, fx, lv, idx, depth));
+  }
+  function runFx(skill: OsanpoRunSkill, fx: Fx, lv: number, idx: number, depth: number): void {
+    switch (fx.op) {
+      case "buff": startBuff(skill, fx.b, lv, idx); break;
+      case "pts": { const v = addPts(val(fx.v, lv)); floatText(P.x + 20, P.y - 70, `+${v}`, "#FFC857", 14); break; }
+      case "randPts": { const v = addPts(Math.round(rand(val(fx.min, lv), val(fx.max, lv)))); floatText(P.x + 20, P.y - 70, `+${v}`, "#FFC857", 15); break; }
+      case "next": { const n = ival(fx.n, lv); if (n > 0) K.next.push({ left: n, add: val(fx.add, lv), mul: val(fx.mul, lv, 1), up: ival(fx.up, lv), dup: ival(fx.dup, lv), filter: fx.filter ?? "any" }); break; }
+      case "best": K.best = { left: ival(fx.n, lv), mul: val(fx.mul, lv, 2), top: 0 }; break;
+      case "guard": K.guards.push({ n: ival(fx.n, lv), t: fx.sec === undefined ? Infinity : val(fx.sec, lv), kinds: fx.kinds ?? "all", pts: val(fx.pts, lv), after: val(fx.after, lv), name: skill.name }); break;
+      case "clear": K.clears.push({ n: ival(fx.n, lv), kinds: fx.kinds ?? "all", pts: val(fx.pts, lv), name: skill.name }); break;
+      case "clearAll": {
+        let got = 0;
+        for (const o of obstacles) if (!o.hit && !o.gone && !o.flee && o.x < VW + 40) { knock(o); got += addPts(val(fx.pts, lv)); }
+        if (got) floatText(VW / 2, GROUND * 0.34, `${skill.name} +${got}`, "#FFC857", 20);
+        FX.flash = RM ? 0.08 : 0.2; FX.flashCol = "40,30,60";
+        break;
+      }
+      case "spawn": { const n = ival(fx.n, lv); spawnShape(fx.shape, n, () => pickItem(fx.min, fx.food), fx.token === undefined ? 0 : ival(fx.token, lv)); break; }
+      case "bonus": K.rushInv = false; setSection("bonus"); S.secT = val(fx.sec, lv); break;
+      case "bonusSoon": if (S.sec === "normal") { S.secT = Math.max(0.6, S.secT * (1 - val(fx.frac, lv))); K.forceBonus = true; } break;
+      case "rush": K.rushPass = Math.max(K.rushPass, val(fx.mul, lv, 1)); break;
+      case "clock": {
+        if (fx.add) S.clock += fx.add;
+        if (fx.set !== undefined) S.clock += (((fx.set - S.clock) % 1440) + 1440) % 1440;
+        if (fx.night !== undefined) {
+          if (envAt(S.clock).night > 0.5) spawnShape("sky", ival(fx.night, lv), () => null, 150);
+          else S.clock += ((((19 * 60 + 30) - S.clock) % 1440) + 1440) % 1440;
+        }
+        break;
+      }
+      case "revive": K.revives.push({ keep: fx.keep ?? 1, pts: val(fx.pts, lv), mul: val(fx.mul, lv, 1), name: skill.name }); break;
+      case "rare": K.rare = Math.max(K.rare, val(fx.mul, lv, 1)); break;
+      case "nightMul": K.nightMul = Math.max(K.nightMul, val(fx.mul, lv, 1)); break;
+      case "runMul": K.runMul = Math.max(K.runMul, val(fx.stage === STAGE_ID ? fx.stageMul ?? fx.mul : fx.mul, lv, 1)); break;
+      case "delay": K.delays.push({ t: fx.sec, pts: val(fx.pts, lv), name: skill.name }); break;
+      case "stack": if (K.stack < fx.max) { K.stack++; K.stackAdd += val(fx.add, lv); } break;
+      case "cairn":
+        if (++K.cairn >= fx.need) { K.cairn = 0; const v = addPts(val(fx.pts, lv)); floatText(P.x + 30, P.y - 96, `${skill.name}完成 +${v}`, "#FFC857", 17); sfx.fanfare(); }
+        else floatText(P.x + 30, P.y - 80, `${K.cairn}/${fx.need}`, "#E8E0CE", 13);
+        break;
+      case "pouch": K.pouchMul = Math.max(K.pouchMul, val(fx.mul, lv, 2)); break;
+      case "keepBest": K.keepBest += val(fx.times, lv, 1); break;
+      case "pigeons": {
+        let got = 0;
+        for (const o of obstacles) if (o.kind === "pigeons" && !o.flee) { o.flee = true; got += addPts(val(fx.per, lv) * o.birds.length); }
+        tone(1320, 0.08, "square", 0.05, 1760);
+        if (got) floatText(P.x + 40, P.y - 70, `バサバサッ +${got}`, "#C9D6E8", 15);
+        break;
+      }
+      case "bigJump": for (let i = 0; i < ival(fx.n, lv); i++) K.bigJumps.push(val(fx.mul, lv, 1.3)); break;
+      case "random": {
+        if (depth > 0) break;
+        const pool = OSANPO_RUN_SKILLS.filter((s) => s.id !== skill.id && !s.fx.some((f) => f.op === "random"));
+        for (let i = 0; i < ival(fx.n, lv); i++) {
+          const other = pickOne(pool);
+          skillText(`★${other.name}`, "#C9B8FF", 15);
+          other.fx.forEach((f, j) => runFx(other, f, lv, j, depth + 1));
+        }
+        break;
+      }
+      case "reroll": K.reroll += ival(fx.n, lv); break;
+      case "lucky": {
+        const n = ival(fx.n, lv), hits = Math.min(n, ival(fx.hits, lv));
+        const q = Array.from({ length: n }, (_, i) => i < hits);
+        for (let i = q.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [q[i], q[j]] = [q[j]!, q[i]!]; }
+        K.lucky.push(...q);
+        break;
+      }
+      case "first": { const v = addPts(val((S.haul.get(skill.id) ?? 0) <= 1 ? fx.first : fx.later, lv)); floatText(P.x + 20, P.y - 70, `+${v}`, "#FFC857", 14); break; }
+      case "series": {
+        const kinds = [...S.haul.keys()].filter((id) => ITEMS.find((it) => it.id === id)?.series === fx.series).length;
+        const v = addPts(kinds * val(fx.per, lv));
+        floatText(P.x + 20, P.y - 70, `${kinds}種類 +${v}`, "#FFC857", 14);
+        break;
+      }
+      case "combo": {
+        const add = ival(fx.add, lv) + (STAGE.weather === "snow" && S.rain > 0.3 ? ival(fx.snow, lv) : 0);
+        const prev = S.mult;
+        S.mult = Math.min(5, S.mult + add); S.chain = Math.max(S.chain, (S.mult - 1) * 4); S.chainT = Math.max(S.chainT, 1.5);
+        S.maxMult = Math.max(S.maxMult, S.mult);
+        if (S.mult > prev) { retrigger($("combo"), "osr-pulse"); onComboUp(S.mult - prev); }
+        if (S.mult >= 5) unlock("combo5");
+        break;
+      }
+      case "comboGuard": K.comboGuard += ival(fx.n, lv); break;
+      case "comboPts": { const v = addPts(Math.min(30, S.chain) * val(fx.per, lv)); floatText(P.x + 20, P.y - 70, `+${v}`, "#FFC857", 14); break; }
+      case "maxCombo": if (S.mult >= 5) { const v = addPts(val(fx.pts, lv)); floatText(P.x + 20, P.y - 76, `かんぱーい！ +${v}`, "#FFC857", 16); } break;
+      case "weatherPts": { const v = addPts(val(fx.v, lv) * (S.rain > 0.3 ? 1 : 0.5)); floatText(P.x + 20, P.y - 70, `+${v}`, "#FFC857", 14); break; }
+      case "miss": K.miss += ival(fx.n, lv); break;
+      case "echo": if (K.lastItem) { const it = K.lastItem; spawnShape("arc", ival(fx.n, lv), () => it, 0); } break;
+      case "reset": K.ramp = 0; floatText(P.x + 30, P.y - 80, "スピードが最初に戻った", "#9BE7FF", 14); break;
+    }
+  }
+  function onComboUp(steps: number): void {
+    for (const a of K.buffs) if (a.b.comboStep !== undefined) a.acc += val(a.b.comboStep, a.lv) * steps;
+  }
+  /** ぶつかったとき。true ならそのまま倒れる */
+  function resolveHit(o: Obstacle): boolean {
+    for (const a of K.buffs) {
+      if (a.b.smash !== undefined && inGroup(o, a.b.smashKinds ?? "all")) {
+        knock(o); const v = addPts(val(a.b.smash, a.lv));
+        floatText(o.x + o.w / 2, GROUND - o.h - 20, `+${v}`, "#FFC857", 14); sfx.guard();
+        return false;
+      }
+    }
+    for (const a of K.buffs) {
+      if (a.b.pass !== undefined) {
+        if (!o.passed) { o.passed = true; const v = addPts(val(a.b.pass, a.lv)); floatText(o.x + o.w / 2, GROUND - o.h - 20, `すり抜け +${v}`, "#C9B8FF", 13); }
+        return false;
+      }
+    }
+    if (M.inv || M.stop || K.rushInv) return false;
+    for (const a of K.buffs) if (a.b.immune && inGroup(o, a.b.immune)) return false;
+    const g = K.guards.find((x) => x.n > 0 && x.t > 0 && inGroup(o, x.kinds));
+    if (g) {
+      g.n--; K.cairn = 0; knock(o); P.inv = 1; sfx.guard();
+      const v = g.pts ? addPts(g.pts) : 0;
+      floatText(P.x + 10, P.y - 60, `${g.name}で助かった！${v ? ` +${v}` : ""}`, "#7EF0D0", 15);
+      puff(P.x + 10, P.y - 26, 14, "spark", { g: 0 });
+      if (g.after > 0) K.buffs.push({ skill: OSANPO_RUN_SKILL_BY_ID.get("sushi_awabi") ?? OSANPO_RUN_SKILLS[0]!, b: { sec: g.after, inv: true, label: "はりつき無敵" }, lv: 1, key: "guard-after", t: g.after, count: 0, acc: 0, rampN: 0, rainAcc: 0 });
+      return false;
+    }
+    return true;
+  }
+  /** 倒れる直前。復活スキルがあれば使う */
+  function tryRevive(o: Obstacle): boolean {
+    const r = K.revives.shift();
+    if (!r) return false;
+    knock(o); P.inv = 2; K.cairn = 0;
+    if (r.keep < 1) { const loss = Math.floor(score() * (1 - r.keep)); S.bonus -= loss; floatText(P.x + 30, P.y - 40, `-${loss}`, "#FF9A9A", 14); }
+    const v = r.pts ? addPts(r.pts) : 0;
+    floatText(VW / 2, GROUND * 0.32, `${r.name} 復活！${v ? ` +${v}` : ""}`, "#7EF0D0", 22);
+    if (r.mul > 1) K.buffs.push({ skill: OSANPO_RUN_SKILL_BY_ID.get("other_okaeri") ?? OSANPO_RUN_SKILLS[0]!, b: { sec: 10, mul: r.mul, label: "おかえりブースト" }, lv: 1, key: "revive-after", t: 10, count: 0, acc: 0, rampN: 0, rainAcc: 0 });
+    sfx.barrier(); FX.flash = RM ? 0.1 : 0.25; FX.flashCol = "126,240,208";
+    puff(P.x + 10, P.y - 26, 18, "spark", { g: 0 });
+    return true;
+  }
+  /** 毎フレームのスキル処理（プレイ中だけ） */
+  function tickSkills(dt: number): void {
+    if (K.textT > 0) K.textT -= dt;
+    for (const a of K.buffs) {
+      a.t -= dt;
+      const rain = val(a.b.rain, a.lv);
+      if (rain > 0) {
+        a.rainAcc += rain * dt;
+        while (a.rainAcc >= 1) {
+          a.rainAcc -= 1;
+          const tok = ival(a.b.rainToken, a.lv);
+          const p = mkPickup(rand(P.x + 70, VW + 60), -16, tok ? null : rollItem(), tok);
+          p.vy = rand(120, 170); pickups.push(p);
+        }
+      }
+      if (a.b.dry) { S.rainTarget = 0; S.rainT = 0; }
+    }
+    const ended = K.buffs.filter((a) => a.t <= 0);
+    if (ended.length) { K.buffs = K.buffs.filter((a) => a.t > 0); ended.forEach(endBuff); }
+    for (const g of K.guards) if (g.t !== Infinity) g.t -= dt;
+    K.guards = K.guards.filter((g) => g.n > 0 && g.t > 0);
+    for (const d of K.delays) {
+      d.t -= dt;
+      if (d.t <= 0) { const v = addPts(d.pts); floatText(P.x + 30, P.y - 90, `${d.name} できた！ +${v}`, "#FFC857", 16); sfx.fanfare(); }
+    }
+    K.delays = K.delays.filter((d) => d.t > 0);
+    // 前から来る障害物をはじく・追い払う
+    for (const o of obstacles) {
+      if (o.hit || o.gone || o.flee || o.x > P.x + 240 || o.x + o.w < P.x - 10) continue;
+      const c = K.clears.find((x) => x.n > 0 && inGroup(o, x.kinds));
+      if (c) {
+        c.n--; knock(o);
+        const v = c.pts ? addPts(c.pts) : 0;
+        floatText(o.x + o.w / 2, GROUND - o.h - 24, `${c.name}${v ? ` +${v}` : ""}`, "#9BE7FF", 13);
+        continue;
+      }
+      if (K.buffs.some((a) => a.b.repel && inGroup(o, a.b.repel))) knock(o);
+    }
+    K.clears = K.clears.filter((x) => x.n > 0);
+    // 自動でよける
+    if (M.auto) {
+      const lead = S.speed * 0.3 + 36;
+      const o = obstacles.find((x) => !x.hit && !x.gone && !x.flee && x.x + x.w > P.x - 6 && x.x - (P.x + 22) < lead);
+      if (o) {
+        if (o.kind === "noren" || o.low) { if (P.ground) slideDown(false, 0.5); }
+        else if (o.kind !== "crow" && P.ground) jump(JUMP_V, 1);
+      }
+    }
+    if (M.hop && P.ground && !P.slide) jump(560, 1, true);
+  }
+  /** アイテムを拾ったときの点数（スキルの倍率・加点を反映） */
+  function itemPoints(item: RunItem, airborne: boolean): { pts: number; copies: number; rarity: GachaRarity } {
+    const matches = (f: ItemFilter | undefined) =>
+      !f || f === "any" || (f === "food" && item.category === "food") || (f === "N" && item.rarity === "N") ||
+      (f === "NR" && (item.rarity === "N" || item.rarity === "R")) || (f === "air" && airborne);
+    let up = 0, add = K.stackAdd, mul = 1, dup = 0;
+    for (const q of K.next) {
+      if (q.left <= 0) continue;
+      q.left--;
+      if (!matches(q.filter)) continue;
+      up += q.up; add += q.add; mul *= q.mul; dup += q.dup;
+    }
+    K.next = K.next.filter((q) => q.left > 0);
+    for (const a of K.buffs) {
+      const { b, lv } = a;
+      if (b.itemMul !== undefined && matches(b.itemFilter)) mul *= val(b.itemMul, lv, 1);
+      if (b.itemAdd !== undefined && matches(b.itemFilter)) add += val(b.itemAdd, lv);
+      if (b.ramp !== undefined) { a.rampN++; add += a.rampN * val(b.ramp, lv); }
+      if (b.fresh !== undefined && (S.haul.get(item.id) ?? 0) === 0) add += val(b.fresh, lv);
+      a.count++;
+    }
+    const rarity = GACHA_RARITIES[Math.min(GACHA_RARITIES.length - 1, rarityIndex(item.rarity) + up)]!;
+    const base = RARITY_STYLES[rarity].points * S.mult;
+    return { pts: Math.round((base * mul + add) * (1 + dup) * M.mul), copies: 1 + dup, rarity };
+  }
+  /** HUD の「いま効いているスキル」 */
+  function skillChips(): string {
+    const out: string[] = [];
+    for (const a of K.buffs) {
+      const label = a.b.label ?? a.skill.name;
+      if (!out.some((x) => x.startsWith(label))) out.push(`${label} ${Math.ceil(a.t)}`);
+    }
+    const guards = K.guards.reduce((n, g) => n + g.n, 0);
+    if (guards) out.push(`守り×${guards}`);
+    const clears = K.clears.reduce((n, c) => n + c.n, 0);
+    if (clears) out.push(`はじく×${clears}`);
+    if (K.revives.length) out.push(`復活×${K.revives.length}`);
+    if (K.rushPass) out.push("ラッシュ無敵");
+    if (K.comboGuard) out.push(`コンボ守り×${K.comboGuard}`);
+    if (K.miss) out.push(`てぶくろ×${K.miss}`);
+    if (K.bigJumps.length) out.push(`大ジャンプ×${K.bigJumps.length}`);
+    if (K.cairn) out.push(`積み石 ${K.cairn}/3`);
+    return out.slice(0, 5).join("|");
+  }
+
   /* ---------- 進行 ---------- */
   const score = () => Math.floor(S.dist / 50) + S.bonus;
   function start(): void {
@@ -1455,6 +1895,7 @@ export function createOsanpoRun(root: HTMLElement, opts: OsanpoRunOptions): () =
     });
     Object.assign(P, { y: GROUND, vy: 0, ground: true, jumps: 2, sq: 1, rot: 0, inv: 0, dead: false, slide: false, slideT: 0, slideHeld: false, jumpAt: -1 });
     obstacles = []; pickups = []; texts = []; flyers = []; parts = [];
+    K = newSkillState(); refreshMods();
     applyAudio();
     floatText(P.x + 4, P.y - 84, "よーい…", "#F6EFE4", 20);
     sfx.ready();
@@ -1496,6 +1937,9 @@ export function createOsanpoRun(root: HTMLElement, opts: OsanpoRunOptions): () =
   function showOver(): void {
     S.state = "over";
     unlock("first");
+    // おさんぽの終わりに足すスキル（ポーチ・湯たんぽ）
+    if (K.pouchBank > 0) { S.bonus += K.pouchBank; K.pouchBank = 0; }
+    if (K.keepBest > 0 && K.bestItem > 0) { S.bonus += Math.round(K.bestItem * K.keepBest); K.keepBest = 0; }
     const sc = score(), isNew = sc > S.best, meters = Math.floor(S.dist / 50);
     if (isNew) { S.best = sc; store.set(`best-${STAGE_ID}`, String(sc)); }
     if (meters > bestDistOf(STAGE_ID)) store.set(`bestd-${STAGE_ID}`, String(meters));
@@ -1578,15 +2022,26 @@ export function createOsanpoRun(root: HTMLElement, opts: OsanpoRunOptions): () =
   }
   function take(p: Pickup): void {
     p.taken = true;
-    const { item } = p, R = RARITY_STYLES[item.rarity];
+    const { item } = p;
+    if (!item) {
+      // スキルで出た小さな粒
+      const v = addPts(p.token);
+      sfx.item(Math.min(5, S.mult + 1));
+      floatText(p.x, p.y - 14, `+${v}`, "#FFE7A3", p.token >= 150 ? 16 : 12);
+      puff(p.x, p.y, p.token >= 150 ? 16 : 5, "spark", { g: 0 });
+      if (p.token >= 150) sfx.fanfare();
+      return;
+    }
     const prevMult = S.mult;
-    S.chain++; S.chainT = 1.5; S.mult = Math.min(5, 1 + Math.floor(S.chain / 4)); S.maxMult = Math.max(S.maxMult, S.mult);
-    if (S.mult > prevMult) retrigger($("combo"), "osr-pulse");
+    const airborne = !P.ground;
+    S.chain++; S.chainT = 1.5 + M.comboGrace; S.mult = Math.min(5, 1 + Math.floor(S.chain / 4)); S.maxMult = Math.max(S.maxMult, S.mult);
+    if (S.mult > prevMult) { retrigger($("combo"), "osr-pulse"); onComboUp(S.mult - prevMult); }
     if (S.mult >= 5) unlock("combo5");
     flyers.push({ item, x0: p.x, y0: p.y, t: 0 });
-    S.happyT = 0.35; S.treats++;
-    S.haul.set(item.id, (S.haul.get(item.id) ?? 0) + 1);
-    stats.counts[item.id] = (stats.counts[item.id] ?? 0) + 1;
+    const got = itemPoints(item, airborne);
+    S.happyT = 0.35; S.treats += got.copies;
+    S.haul.set(item.id, (S.haul.get(item.id) ?? 0) + got.copies);
+    stats.counts[item.id] = (stats.counts[item.id] ?? 0) + got.copies;
     if (!kindSet.has(item.id)) {
       kindSet.add(item.id); S.newKinds.push(item.id); zkNew.add(item.id); saveStats();
       floatText(p.x + 14, p.y - 30, "NEW", "#7EF0D0", 12);
@@ -1595,18 +2050,49 @@ export function createOsanpoRun(root: HTMLElement, opts: OsanpoRunOptions): () =
     }
     if (S.sec === "bonus" && ++S.bonusGot >= 15) unlock("bonus15");
     if (item.rarity === "MR") unlock("mr");
-    const pts = R.points * S.mult;
+    const R = RARITY_STYLES[got.rarity];
+    let pts = got.pts;
+    if (K.pouchMul > 0) {
+      // 「ポーチにしまう」: いまは足さず、おさんぽの終わりに倍にして足す
+      K.pouchBank += Math.round(pts * K.pouchMul); K.pouchMul = 0;
+      floatText(p.x, p.y - 30, "ポーチにしまった", "#E8E0CE", 12);
+      pts = 0;
+    }
     S.bonus += pts;
-    if (item.rarity === "N" || (item.rarity === "R" && S.sec === "bonus")) { sfx.item(S.mult); floatText(p.x, p.y - 16, `+${pts}`, R.color, 13); puff(p.x, p.y, 5, "spark", { g: 0 }); }
-    else if (item.rarity === "R" || item.rarity === "SR") { sfx.item(S.mult + 1); floatText(p.x, p.y - 18, `${item.name} +${pts}`, R.color, 14); puff(p.x, p.y, 8, "spark", { g: 0 }); }
-    else { sfx.fanfare(); floatText(p.x, p.y - 20, `${item.rarity} ${item.name} +${pts}`, R.color, 16); puff(p.x, p.y, 16, "spark", { g: 0 }); }
+    K.bestItem = Math.max(K.bestItem, pts);
+    if (K.best) {
+      K.best.top = Math.max(K.best.top, pts);
+      if (--K.best.left <= 0) {
+        const extra = Math.round(K.best.top * (K.best.mul - 1));
+        if (extra > 0) { S.bonus += extra; floatText(P.x + 30, P.y - 96, `花かんざし +${extra}`, "#FFC857", 16); }
+        K.best = null;
+      }
+    }
+    const tag = got.copies > 1 ? ` ×${got.copies}` : "";
+    const upTag = got.rarity !== item.rarity ? `${got.rarity}↑ ` : "";
+    if (item.rarity === "N" || (item.rarity === "R" && S.sec === "bonus")) { sfx.item(S.mult); floatText(p.x, p.y - 16, `${upTag}+${pts}${tag}`, R.color, 13); puff(p.x, p.y, 5, "spark", { g: 0 }); }
+    else if (item.rarity === "R" || item.rarity === "SR") { sfx.item(S.mult + 1); floatText(p.x, p.y - 18, `${upTag}${item.name} +${pts}${tag}`, R.color, 14); puff(p.x, p.y, 8, "spark", { g: 0 }); }
+    else { sfx.fanfare(); floatText(p.x, p.y - 20, `${upTag}${item.rarity} ${item.name} +${pts}${tag}`, R.color, 16); puff(p.x, p.y, 16, "spark", { g: 0 }); }
     if (rarityIndex(item.rarity) >= 3) showRare(item);
     if (isBarrierRarity(item.rarity) && !S.shield) { S.shield = true; sfx.barrier(); floatText(P.x + 10, P.y - 70, "バリアが付いた！", "#7EF0D0", 15); }
+    applySkill(item);
+    K.lastItem = item;
+    // 「ぱちぱち」: 近くのアイテムももう1個
+    if (!K.sparkBusy && K.buffs.some((a) => a.b.spark)) {
+      const near = pickups.filter((q) => !q.taken && q !== p).sort((a, b) => Math.hypot(a.x - p.x, a.y - p.y) - Math.hypot(b.x - p.x, b.y - p.y))[0];
+      if (near && Math.hypot(near.x - p.x, near.y - p.y) < 150) {
+        K.sparkBusy = true;
+        puff(near.x, near.y, 8, "spark", { g: 0 });
+        take(near);
+        K.sparkBusy = false;
+      }
+    }
   }
 
   function update(dt: number): void {
     S.time += dt;
     if (S.paused) return;
+    refreshMods();
     const playing = S.state === "play";
     if (S.state === "ready") S.speed = 90;
     else if (S.state === "intro") {
@@ -1620,19 +2106,22 @@ export function createOsanpoRun(root: HTMLElement, opts: OsanpoRunOptions): () =
       }
     } else if (playing) {
       S.t += dt;
-      S.speed = START_SPEED + Math.min(MAX_SPEED - START_SPEED, S.t * 1.8);
+      if (!M.hold) K.ramp += dt;
+      S.speed = M.stop ? 0 : (START_SPEED + Math.min(MAX_SPEED - START_SPEED, K.ramp * 1.8)) * M.speed;
+      tickSkills(dt);
       S.dist += S.speed * dt;
       S.clock += dt * 1.6;
       S.next -= S.speed * dt;
       if (S.next <= 0) spawn();
       S.secT -= dt;
       if (S.secT <= 0) {
-        if (S.sec === "normal") setSection(S.t > 40 && Math.random() < 0.5 ? "rush" : "bonus");
+        if (S.sec === "normal") { setSection(!K.forceBonus && S.t > 40 && Math.random() < 0.5 ? "rush" : "bonus"); K.forceBonus = false; }
         else if (S.sec === "rush") {
           unlock("rush");
           if (++S.rushes >= 3) unlock("rush3");
-          S.bonus += 100;
-          floatText(VW / 2, GROUND * 0.32, "ラッシュ突破！ +100", "#FFC857", 20);
+          const got = addPts(100 * (K.rushInv ? K.rushMul : 1));
+          K.rushInv = false; K.rushMul = 1;
+          floatText(VW / 2, GROUND * 0.32, `ラッシュ突破！ +${got}`, "#FFC857", 20);
           sfx.mile();
           setSection("normal");
         } else setSection("normal");
@@ -1651,7 +2140,13 @@ export function createOsanpoRun(root: HTMLElement, opts: OsanpoRunOptions): () =
         S.rainT -= dt;
         if (S.rainT <= 0) { S.rainTarget = 0; floatText(VW / 2, GROUND * 0.32, STAGE.weather === "snow" ? "雪が小降りになった" : "雨がやんだ", "#A9C8FF", 16); }
       }
-      if (S.chainT > 0) { S.chainT -= dt; if (S.chainT <= 0) { S.chain = 0; S.mult = 1; } }
+      if (S.chainT > 0 && !M.comboLock) {
+        S.chainT -= dt;
+        if (S.chainT <= 0) {
+          if (K.comboGuard > 0 && S.mult > 1) { K.comboGuard--; S.chainT = 1.5; floatText(P.x + 20, P.y - 70, "コンボキープ！", "#FF9F6B", 13); }
+          else { S.chain = 0; S.mult = 1; }
+        }
+      }
       const meters = Math.floor(mtr);
       if (meters >= S.milestone) { floatText(VW / 2, GROUND * 0.35, `${S.milestone}m`, "#FFC857", 24); sfx.mile(); S.milestone += 100; }
     } else if (S.state === "dying") {
@@ -1701,7 +2196,9 @@ export function createOsanpoRun(root: HTMLElement, opts: OsanpoRunOptions): () =
     if (S.bufT > 0) S.bufT -= dt;
     if (S.happyT > 0) S.happyT -= dt;
     if (!P.ground) {
-      P.vy += GRAV * dt; P.y += P.vy * dt;
+      P.vy += GRAV * (M.float && P.vy > 0 ? 0.3 : 1) * dt;
+      if (M.float && P.vy > 230) P.vy = 230;
+      P.y += P.vy * dt;
       if (P.y >= GROUND) {
         P.y = GROUND; P.vy = 0; P.ground = true; P.jumps = 2; P.sq = 0.72;
         if (playing) { sfx.land(); puff(P.x - 4, GROUND, 5, "dust", { vy: -10 }); }
@@ -1727,13 +2224,16 @@ export function createOsanpoRun(root: HTMLElement, opts: OsanpoRunOptions): () =
       if (o.hit) { o.kvy += GRAV * dt; o.ky += o.kvy * dt; o.rot += o.spin * dt; o.x += 160 * dt; continue; }
       if (!playing) continue;
       if (o.kind !== "crow" && o.kind !== "noren" && o.x < P.x + 22 && o.x + o.w > P.x - 18) o.minClear = Math.min(o.minClear, GROUND - o.h - P.y);
+      if (o.gone) continue;
       if (P.inv <= 0 && hitTest(o)) {
+        if (!resolveHit(o)) continue;
         if (S.shield) {
           S.shield = false; P.inv = 1; o.hit = true; o.kvy = -520; o.spin = 9; sfx.guard();
           floatText(P.x + 10, P.y - 60, "バリアで助かった！", "#7EF0D0", 15);
           unlock("barrier");
           puff(P.x + 10, P.y - 26, 18, "spark", { g: 0 });
-        } else die();
+          K.cairn = 0;
+        } else if (!tryRevive(o)) die();
         continue;
       }
       if (!o.hinted && o.x < P.x + 220) {
@@ -1742,38 +2242,42 @@ export function createOsanpoRun(root: HTMLElement, opts: OsanpoRunOptions): () =
       }
       if (!o.scored && o.x + o.w < P.x - 18) {
         o.scored = true;
+        if (M.over > 0 && !o.passed && o.kind !== "puddle") { const v = addPts(M.over); floatText(P.x + 30, P.y - 84, `こえた +${v}`, "#FFE7A3", 13); }
         if ((o.kind === "noren" || o.low) && P.slide && P.ground) {
-          S.bonus += 15; floatText(P.x + 20, P.y - 50, "スライディング！ +15", "#9BE7FF", 14);
+          const v = addPts(15); floatText(P.x + 20, P.y - 50, `スライディング！ +${v}`, "#9BE7FF", 14);
           stats.slides++; saveStats();
           if (stats.slides >= 10) unlock("slide10");
         } else if (o.kind === "crow") {
-          if (P.ground) { S.bonus += 5; floatText(P.x + 20, P.y - 56, "くぐった +5", "#C9C3F0", 13); }
+          if (P.ground) { const v = addPts(5); floatText(P.x + 20, P.y - 56, `くぐった +${v}`, "#C9C3F0", 13); }
         } else if (o.kind === "pigeons") {
-          o.flee = true; S.bonus += 10;
+          o.flee = true; const v = addPts(10);
           stats.pigeons++; saveStats();
           if (stats.pigeons >= 10) unlock("pigeon10");
-          floatText(P.x + 20, P.y - 56, "バサバサッ +10", "#C9D6E8", 13);
+          floatText(P.x + 20, P.y - 56, `バサバサッ +${v}`, "#C9D6E8", 13);
           tone(900, 0.05, "triangle", 0.03); tone(1100, 0.05, "triangle", 0.03, null, 0.05);
         } else if (o.minClear >= 0 && o.minClear < 14 && o.kind !== "puddle") {
-          S.bonus += 20; sfx.near(); floatText(P.x + 20, P.y - 56, "ギリギリ！ +20", "#FFC857", 15);
+          const v = addPts(20); sfx.near(); floatText(P.x + 20, P.y - 56, `ギリギリ！ +${v}`, "#FFC857", 15);
           if (++S.closes >= 5) unlock("close5");
-        } else S.bonus += 5;
+        } else addPts(5);
       }
     }
-    obstacles = obstacles.filter((o) => o.x + o.w > -80 && o.ky < 400 && !(o.flee && o.fleeT > 2));
+    obstacles = obstacles.filter((o) => !o.gone && o.x + o.w > -80 && o.ky < 400 && !(o.flee && o.fleeT > 2));
 
     // アイテム
+    const reach = M.big ? 42 : 30;
     for (const it of pickups) {
       if (playing && !it.hinted && it.y < GROUND - 140 && it.x < P.x + 260) { it.hinted = true; hint("dj"); }
       it.x -= sp * dt; it.ph += dt * 4;
+      if (it.vy > 0) { it.y += it.vy * dt; if (it.y >= GROUND - 18) { it.y = GROUND - 18; it.vy = 0; } }
       if (!playing || it.taken) continue;
       const mx = P.x - it.x, my = P.y - 28 - it.y, d2 = mx * mx + my * my;
-      if (d2 < 52 * 52) {
-        const d = Math.sqrt(d2) || 1, pull = 520 * dt;
+      if (d2 < M.magnet * M.magnet || (M.wide && Math.abs(mx) < 46 && my > 0)) {
+        const d = Math.sqrt(d2) || 1, pull = (M.magnet > 52 || M.wide ? 760 : 520) * dt;
         it.x += (mx / d) * Math.min(pull, d); it.y += (my / d) * Math.min(pull, d);
       }
       const dx = it.x - P.x, dy = it.y - (P.y - 28);
-      if (dx * dx + dy * dy < 30 * 30) take(it);
+      if (dx * dx + dy * dy < reach * reach) take(it);
+      else if (K.miss > 0 && it.x < P.x - 40) { K.miss--; take(it); floatText(P.x - 10, P.y - 60, "てぶくろキャッチ", "#9BE7FF", 12); }
     }
     pickups = pickups.filter((it) => !it.taken && it.x > -40);
 
@@ -1812,13 +2316,19 @@ export function createOsanpoRun(root: HTMLElement, opts: OsanpoRunOptions): () =
     drawGround(c, e, lamps);
     drawMarkers(c, e);
 
-    if (S.rain > 0.02 && STAGE.weather !== "snow") { c.fillStyle = `rgba(52,60,96,${0.22 * S.rain})`; c.fillRect(-20, -20, VW + 40, GROUND + 26); }
+    if (S.rain > 0.02 && STAGE.weather !== "snow" && !M.clear) { c.fillStyle = `rgba(52,60,96,${0.22 * S.rain})`; c.fillRect(-20, -20, VW + 40, GROUND + 26); }
     for (const o of obstacles) if (o.kind === "puddle") drawPuddle(c, o.x, GROUND, o.w, S.time, e.night, STAGE_ID);
     for (const it of pickups) {
+      if (!it.item) {
+        const y = it.y + Math.sin(it.ph) * 2.2, big = it.token >= 150, r = big ? 9 : it.token >= 30 ? 6 : 4.5;
+        glow(c, it.x, y, r * 3, big ? "255,132,188" : "255,214,110", 0.45);
+        star(c, it.x, y, r, big ? "#FF9CCB" : "#FFE08A");
+        continue;
+      }
       const y = it.y + Math.sin(it.ph) * 2.2, rarity = it.item.rarity, R = RARITY_STYLES[rarity];
       if (rarity === "MR") { c.save(); c.globalCompositeOperation = "lighter"; glow(c, it.x, y, 30, hslRgb((S.time * 120 + it.x) % 360), 0.55); c.restore(); }
       else if (R.glow) glow(c, it.x, y, rarity === "R" ? 20 : 26, R.glow, rarity === "R" ? 0.35 : 0.45 + Math.sin(S.time * 5 + it.ph) * 0.1);
-      const size = rarity === "N" ? 28 : rarity === "R" || rarity === "SR" ? 30 : 34;
+      const size = (rarity === "N" ? 28 : rarity === "R" || rarity === "SR" ? 30 : 34) * (M.big ? 1.3 : 1);
       drawItemImg(c, it.item, it.x, y, size);
       if (rarityIndex(rarity) >= 3 && Math.sin(S.time * 6 + it.ph) > 0.6) star(c, it.x + 12, y - 12, 3, R.color);
     }
@@ -1831,7 +2341,8 @@ export function createOsanpoRun(root: HTMLElement, opts: OsanpoRunOptions): () =
       }
       if (!o.hit && o.kind !== "crow" && o.kind !== "noren" && !o.flee) { c.fillStyle = "rgba(20,16,40,.22)"; ell(c, o.x + o.w / 2, GROUND + 1, o.w * 0.55, 3); c.fill(); }
       if (o.kind === "crow" && !o.hit) { c.fillStyle = "rgba(20,16,40,.18)"; ell(c, o.x + o.w / 2, GROUND + 3, 13, 2.5); c.fill(); }
-      if (e.night > 0.2) {
+      if (M.bright) { c.shadowColor = "rgba(255,240,150,.95)"; c.shadowBlur = 9 * DPR * SC; }
+      else if (e.night > 0.2) {
         c.shadowColor = o.kind === "crow" ? `rgba(255,236,210,${0.95 * e.night})` : `rgba(255,228,170,${0.7 * e.night})`;
         c.shadowBlur = (o.kind === "crow" ? 7 : 5) * DPR * SC;
       }
@@ -1878,6 +2389,7 @@ export function createOsanpoRun(root: HTMLElement, opts: OsanpoRunOptions): () =
 
     const k = 1 - clamp((GROUND - P.y) / 170, 0, 0.75);
     c.fillStyle = `rgba(20,16,40,${0.22 * k})`; ell(c, P.x, GROUND + 1, 26 * k + 4, 3.5 * k + 1); c.fill();
+    if ((M.inv || M.stop || K.rushInv) && S.state === "play") { c.save(); c.globalCompositeOperation = "lighter"; glow(c, P.x, P.y - 26, 50, "255,236,170", 0.28 + Math.sin(S.time * 8) * 0.06); c.restore(); }
     if (!(P.inv > 0 && Math.floor(S.time * 16) % 2)) drawDog(c, P.x, P.y);
 
     for (const p of parts) {
@@ -1907,7 +2419,7 @@ export function createOsanpoRun(root: HTMLElement, opts: OsanpoRunOptions): () =
       c.globalAlpha = a; c.fillStyle = t.color; c.fillText(t.text, t.x, t.y); c.globalAlpha = 1;
     }
     if (STAGE.weather === "snow") {
-      const inten = 0.35 + 0.65 * S.rain, n = Math.round(drops.length * inten * (S.calm ? 0.5 : 1));
+      const inten = 0.35 + 0.65 * S.rain, n = Math.round(drops.length * inten * (S.calm ? 0.5 : 1) * (M.clear ? 0.2 : 1));
       c.fillStyle = "rgba(255,255,255,.85)";
       for (let i = 0; i < n; i++) {
         const d = drops[i]!;
@@ -1917,7 +2429,7 @@ export function createOsanpoRun(root: HTMLElement, opts: OsanpoRunOptions): () =
         c.beginPath(); c.arc(x, y, 0.8 + d.l / 12, 0, Math.PI * 2); c.fill();
       }
     } else if (S.rain > 0.02) {
-      const n = Math.round(drops.length * S.rain * (S.calm ? 0.45 : 1));
+      const n = Math.round(drops.length * S.rain * (S.calm ? 0.45 : 1) * (M.clear ? 0.2 : 1));
       c.strokeStyle = `rgba(200,220,255,${0.45 * S.rain})`; c.lineWidth = 1; c.beginPath();
       for (let i = 0; i < n; i++) {
         const d = drops[i]!;
@@ -1935,6 +2447,7 @@ export function createOsanpoRun(root: HTMLElement, opts: OsanpoRunOptions): () =
       const sun = sunLight(e);
       if (sun.warm > 0.02 && sun.day > 0.1) { c.fillStyle = `rgba(${sun.rgb},${0.07 * sun.warm * sun.day})`; c.fillRect(-20, -20, VW + 40, VH + 40); }
     }
+    if (S.state === "play") for (const tn of M.tints) { c.fillStyle = `rgba(${tn},${tn === "20,14,40" ? 0.28 : 0.1})`; c.fillRect(-20, -20, VW + 40, VH + 40); }
     if (FX.fade > 0.01) { c.fillStyle = `rgba(16,14,34,${FX.fade * 0.85})`; c.fillRect(-20, -20, VW + 40, VH + 40); }
     if (FX.flash > 0.02) { c.fillStyle = `rgba(${FX.flashCol},${FX.flash * 0.6})`; c.fillRect(-20, -20, VW + 40, VH + 40); }
     if (e.night > 0.05) {
@@ -1954,6 +2467,12 @@ export function createOsanpoRun(root: HTMLElement, opts: OsanpoRunOptions): () =
     if (secKey) {
       $("sec-chip").dataset.k = secKey;
       setText("sec-chip", `${secKey === "bonus" ? "ボーナスタイム" : "ラッシュ"} あと${Math.ceil(S.secT)}秒`);
+    }
+    const chips = S.state === "play" ? skillChips() : "";
+    setFlag("skills-on", Boolean(chips), (v) => { $("skills").hidden = !v; });
+    if (hud.get("skills") !== chips) {
+      hud.set("skills", chips);
+      $("skills").replaceChildren(...chips.split("|").filter(Boolean).map((t) => { const i = document.createElement("i"); i.textContent = t; return i; }));
     }
     setText("combo-text", `×${S.mult} コンボ`);
     $("combo-bar").style.transform = `scaleX(${clamp(S.chainT / 1.5, 0, 1).toFixed(3)})`;
