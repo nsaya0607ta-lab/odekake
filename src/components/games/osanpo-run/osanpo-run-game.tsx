@@ -143,7 +143,7 @@ export function OsanpoRunGame({ items, usesSampleItems, unlockedStages, seriesTa
                   <b data-osr="o-best">0</b>
                 </div>
               </div>
-              <p className="osr-result-line" data-osr="o-line" />
+              <dl className="osr-result-stats" data-osr="o-line" />
               <div className="osr-haul" data-osr="o-haul-wrap">
                 <div className="osr-haul-row" data-osr="o-haul" />
                 <p className="osr-new-line" data-osr="o-new-line" hidden />
