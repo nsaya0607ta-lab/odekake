@@ -13,7 +13,6 @@ import {
   isBarrierRarity,
   isOsanpoRunStageId,
   OSANPO_RUN_ACHIEVEMENTS,
-  OSANPO_RUN_COMMENTS,
   OSANPO_RUN_HINTS,
   OSANPO_RUN_RANKS,
   OSANPO_RUN_SONGS,
@@ -225,7 +224,7 @@ export function createOsanpoRun(root: HTMLElement, opts: OsanpoRunOptions): () =
     const w = img.naturalWidth * k, h = img.naturalHeight * k;
     c.drawImage(img, x - w / 2, y - h / 2, w, h);
   }
-  function spriteEl(item: RunItem, size: number, reveal = true): HTMLImageElement {
+  function spriteEl(item: RunItem, size: number, reveal = true, lazy = false): HTMLImageElement {
     const el = document.createElement("img");
     el.className = "osr-spr";
     el.src = item.src;
@@ -233,7 +232,7 @@ export function createOsanpoRun(root: HTMLElement, opts: OsanpoRunOptions): () =
     el.width = size; el.height = size;
     // アプリ共通の img { height: auto } に負けないよう、枠の大きさを直接指定する
     el.style.width = `${size}px`; el.style.height = `${size}px`;
-    el.loading = "lazy"; el.decoding = "async"; el.draggable = false;
+    el.loading = lazy ? "lazy" : "eager"; el.decoding = "async"; el.draggable = false;
     return el;
   }
 
@@ -978,7 +977,7 @@ export function createOsanpoRun(root: HTMLElement, opts: OsanpoRunOptions): () =
   let assetsReady = false;
   function press(src: "key" | "pointer"): void {
     ensureAudio();
-    if (!$("settings-panel").hidden) return;
+    if (!$("settings-panel").hidden || openSheetName) return;
     if (S.paused) { if (src === "key") resume(); return; }
     if (S.state === "ready") { if (src === "key" && assetsReady && unlocked.has(STAGE_ID)) start(); return; }
     if (S.state === "over" || S.state === "dying") return;
@@ -1006,6 +1005,7 @@ export function createOsanpoRun(root: HTMLElement, opts: OsanpoRunOptions): () =
     if (target?.closest("button, a, input") && (e.key === " " || e.key === "Enter")) return;
     if (target?.closest("input, textarea, select")) return;
     if (!$("settings-panel").hidden) { if (e.key === "Escape") { e.preventDefault(); closeSettings(); } return; }
+    if (openSheetName) { if (e.key === "Escape") { e.preventDefault(); closeSheet(); } return; }
     if (S.state === "ready" && !$("start-panel").hidden) {
       if (e.key === "ArrowLeft" || e.key === "ArrowRight") {
         e.preventDefault();
@@ -1203,7 +1203,7 @@ export function createOsanpoRun(root: HTMLElement, opts: OsanpoRunOptions): () =
       b.type = "button"; b.dataset.id = it.id; b.className = got ? "" : "osr-locked";
       b.style.setProperty("--rc", RARITY_STYLES[it.rarity].color);
       b.setAttribute("aria-label", got ? `${it.rarity} ${it.name}` : `${it.rarity} まだ拾っていないアイテム`);
-      b.appendChild(spriteEl(it, 40, got));
+      b.appendChild(spriteEl(it, 40, got, true));
       if (zkNew.has(it.id)) { const nb = document.createElement("span"); nb.className = "osr-nb"; nb.textContent = "NEW"; b.appendChild(nb); }
       on(b, "click", () => { zkNew.delete(it.id); b.querySelector(".osr-nb")?.remove(); zkShow(it.id); });
       li.appendChild(b); grid.appendChild(li);
@@ -1278,6 +1278,55 @@ export function createOsanpoRun(root: HTMLElement, opts: OsanpoRunOptions): () =
     setReturn = null;
   }
   for (const b of $$("[data-open='settings']")) on(b, "click", openSettings);
+
+  /* ---------- 別画面（ルール・ずかん・称号・記録） ---------- */
+  let openSheetName: string | null = null;
+  function openSheet(name: string): void {
+    if (S.state === "play" || S.state === "intro" || S.state === "dying") return;
+    closeSheet();
+    if (name === "zukan") renderZukan();
+    else if (name === "ach") renderAchList();
+    else if (name === "records") renderRecords();
+    const el = $(`sheet-${name}`);
+    el.hidden = false;
+    el.querySelector<HTMLElement>(".osr-sheet-body")?.scrollTo(0, 0);
+    openSheetName = name;
+    el.querySelector<HTMLElement>(".osr-sheet-back")?.focus({ preventScroll: true });
+  }
+  function closeSheet(): void {
+    if (!openSheetName) return;
+    $(`sheet-${openSheetName}`).hidden = true;
+    openSheetName = null;
+    stageEl.focus({ preventScroll: true });
+  }
+  for (const b of $$("[data-sheet]")) on(b, "click", () => { ensureAudio(); openSheet(b.dataset.sheet ?? ""); });
+  for (const b of $$("[data-close-sheet]")) on(b, "click", closeSheet);
+  function renderRecords(): void {
+    const box = $("rec-list");
+    box.replaceChildren();
+    for (const id of OSANPO_RUN_STAGE_IDS) {
+      const st = OSANPO_RUN_STAGES[id], recs = recordsOf(id);
+      const card = document.createElement("section");
+      card.className = "osr-rec-card" + (unlocked.has(id) ? "" : " osr-locked");
+      const h = document.createElement("h3"); h.textContent = st.name;
+      const sub = document.createElement("p");
+      sub.textContent = unlocked.has(id) ? `ベスト ${bestOf(id).toLocaleString()}点 ・ 最長 ${bestDistOf(id).toLocaleString()}m` : `未解放（${st.skinName}で歩ける）`;
+      card.append(h, sub);
+      const ol = document.createElement("ol"); ol.className = "osr-top5";
+      if (!recs.length) { const li = document.createElement("li"); li.className = "osr-empty"; li.textContent = "まだ記録がありません"; ol.appendChild(li); }
+      recs.forEach((r, i) => {
+        const li = document.createElement("li");
+        if (S.lastResult && id === STAGE_ID && r.t === lastRecordAt) li.className = "osr-me";
+        const d = new Date(r.t);
+        const cells = [String(i + 1), r.s.toLocaleString(), `${r.m}m`, `${d.getMonth() + 1}/${d.getDate()}`];
+        (["i", "b", "span", "small"] as const).forEach((tag, k) => { const el = document.createElement(tag); el.textContent = cells[k] ?? ""; li.appendChild(el); });
+        ol.appendChild(li);
+      });
+      card.appendChild(ol);
+      box.appendChild(card);
+    }
+  }
+  let lastRecordAt = 0;
   on($("set-close"), "click", closeSettings);
   on($("pause-btn"), "click", () => { if (S.state === "play" && !S.paused) pause(); $("pause-btn").blur(); });
   on($("mute"), "click", () => { ensureAudio(); setMuted(!muted); $("mute").blur(); stageEl.focus({ preventScroll: true }); });
@@ -1303,6 +1352,7 @@ export function createOsanpoRun(root: HTMLElement, opts: OsanpoRunOptions): () =
   /* ---------- 進行 ---------- */
   const score = () => Math.floor(S.dist / 50) + S.bonus;
   function start(): void {
+    closeSheet();
     hidePanels();
     $("copy-note").hidden = true;
     FX.fade = RM ? 0 : 1;
@@ -1368,36 +1418,22 @@ export function createOsanpoRun(root: HTMLElement, opts: OsanpoRunOptions): () =
     const now = Date.now(), recs = recordsOf(STAGE_ID);
     recs.push({ s: sc, m: meters, t: now });
     recs.sort((a, b) => b.s - a.s || a.t - b.t);
-    const top = recs.slice(0, 5);
-    store.set(`rec-${STAGE_ID}`, JSON.stringify(top));
-    const ol = $("top");
-    ol.replaceChildren();
-    $("top-title").textContent = `${STAGE.name}のベスト5`;
-    top.forEach((r, i) => {
-      const li = document.createElement("li");
-      if (r.t === now) li.className = "osr-me";
-      const d = new Date(r.t);
-      const cells = [String(i + 1), r.s.toLocaleString(), `${r.m}m`, `${d.getMonth() + 1}/${d.getDate()}`];
-      (["i", "b", "span", "small"] as const).forEach((tag, k) => { const el = document.createElement(tag); el.textContent = cells[k] ?? ""; li.appendChild(el); });
-      ol.appendChild(li);
-    });
+    store.set(`rec-${STAGE_ID}`, JSON.stringify(recs.slice(0, 5)));
+    lastRecordAt = now;
     S.lastResult = { score: sc, m: meters, items: S.treats, rank: rank.label };
     $("over-sub").textContent = `${STAGE.name} ・ ${STAGE.skinName}`;
     if (isNew && sc > 0) sfx.record(); else sfx.home();
     countUp($("o-score"), sc);
     $("o-best").textContent = S.best.toLocaleString();
     $("o-new").hidden = !isNew;
-    $("o-dist").textContent = `${meters}m`;
-    $("o-items").textContent = `${S.treats}こ`;
-    $("o-clock").textContent = fmtClock(S.clock);
-    $("o-combo").textContent = `×${S.maxMult}`;
+    $("o-line").textContent = `${meters}m ・ アイテム${S.treats}こ ・ 最大×${S.maxMult} ・ ${fmtClock(S.clock)}帰宅`;
     const haul = $("o-haul");
     haul.replaceChildren();
     const got = [...S.haul.keys()]
       .map((id) => ITEMS.find((it) => it.id === id))
       .filter((it): it is RunItem => Boolean(it))
       .sort((a, b) => rarityIndex(b.rarity) - rarityIndex(a.rarity) || (S.haul.get(b.id) ?? 0) - (S.haul.get(a.id) ?? 0))
-      .slice(0, 8);
+      .slice(0, 6);
     got.forEach((it, n) => {
       const cell = document.createElement("div");
       cell.className = "osr-cell";
@@ -1409,26 +1445,13 @@ export function createOsanpoRun(root: HTMLElement, opts: OsanpoRunOptions): () =
       cell.appendChild(b); haul.appendChild(cell);
     });
     $("o-haul-wrap").hidden = got.length === 0;
-    const counts = new Map<GachaRarity, number>();
-    for (const [id, n] of S.haul) { const it = ITEMS.find((x) => x.id === id); if (it) counts.set(it.rarity, (counts.get(it.rarity) ?? 0) + n); }
-    const br = $("o-break");
-    br.replaceChildren();
-    for (const r of GACHA_RARITIES) {
-      const n = counts.get(r);
-      if (!n) continue;
-      const sp = document.createElement("span"); sp.style.color = RARITY_STYLES[r].color; sp.textContent = `${r} ${n}`; br.appendChild(sp);
-    }
     const newLine = $("o-new-line");
     newLine.hidden = !S.newKinds.length;
     newLine.textContent = S.newKinds.length ? `ずかんに新しく ${S.newKinds.length}種類 登録（${ITEMS.filter((it) => kindSet.has(it.id)).length} / ${ITEMS.length}）` : "";
-    renderZukan();
-    let comment = OSANPO_RUN_COMMENTS[0]![1];
-    for (const [th, txt] of OSANPO_RUN_COMMENTS) if (sc >= th) comment = txt;
-    $("o-comment").textContent = comment;
     const ar = $("o-ach");
     ar.replaceChildren();
-    for (const id of S.newAch) { const sp = document.createElement("span"); sp.textContent = achName(id); ar.appendChild(sp); }
-    $("o-ach-wrap").hidden = S.newAch.length === 0;
+    for (const id of S.newAch) { const sp = document.createElement("span"); sp.textContent = `称号：${achName(id)}`; ar.appendChild(sp); }
+    ar.hidden = S.newAch.length === 0;
     $("over-title").textContent = isNew && sc > 0 ? "ただいま！ 新記録" : "ただいま！";
     $("best-top").textContent = S.best.toLocaleString();
     $("over-panel").hidden = false;
