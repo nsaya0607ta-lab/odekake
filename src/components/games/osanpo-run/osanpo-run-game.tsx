@@ -65,7 +65,7 @@ export function OsanpoRunGame({ items, usesSampleItems, unlockedStages, seriesTa
             <div className="osr-hud">
               <div className="osr-hud-left" data-osr="hud-left">
                 <div className="osr-score" data-osr="score">0</div>
-                <div className="osr-meta" data-osr="meta">0m ・ ほね 0 ・ アイテム 0</div>
+                <div className="osr-meta" data-osr="meta">0m・ほね0・アイテム0</div>
                 <div className="osr-sec-chip" data-osr="sec-chip" hidden />
                 <div className="osr-combo" data-osr="combo" data-off="1">
                   <span data-osr="combo-text">×2 コンボ</span>
@@ -92,7 +92,12 @@ export function OsanpoRunGame({ items, usesSampleItems, unlockedStages, seriesTa
             </div>
             <div className="osr-rare" data-osr="rare" hidden>
               <span className="osr-rare-icon" data-osr="rare-icon" />
-              <div><b data-osr="rare-tag">SSR</b><span className="osr-rare-name" data-osr="rare-name" /></div>
+              <div>
+                <b data-osr="rare-tag">SSR</b><span className="osr-rare-name" data-osr="rare-name" />
+                <span className="osr-rare-skill" data-osr="rare-skill" hidden>
+                  <span data-osr="rare-skill-name" /><small data-osr="rare-skill-desc" />
+                </span>
+              </div>
             </div>
             <div className="osr-hint" data-osr="hint" hidden />
             <div className="osr-ach-toast" data-osr="ach-toast" hidden><i>称号ゲット</i><b data-osr="ach-name" /></div>

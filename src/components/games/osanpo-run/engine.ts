@@ -1657,7 +1657,6 @@ export function createOsanpoRun(root: HTMLElement, opts: OsanpoRunOptions): () =
     const skill = OSANPO_RUN_SKILL_BY_ID.get(item.id);
     if (!skill || S.state !== "play") return;
     const lv = lvOf(item);
-    if (depth === 0) skillText(`★${skill.name}`, "#FFE7A3", rarityIndex(item.rarity) >= 4 ? 16 : 13);
     skill.fx.forEach((fx, idx) => runFx(skill, fx, lv, idx, depth));
   }
   function runFx(skill: OsanpoRunSkill, fx: Fx, lv: number, idx: number, depth: number): void {
@@ -2026,9 +2025,14 @@ export function createOsanpoRun(root: HTMLElement, opts: OsanpoRunOptions): () =
     $("rare-tag").textContent = `${item.rarity} ゲット`;
     $("rare-name").textContent = item.name;
     $("rare-icon").replaceChildren(spriteEl(item, 40));
+    // 発動したスキルを、アイテム名の下に出す
+    const skill = OSANPO_RUN_SKILL_BY_ID.get(item.id);
+    $("rare-skill").hidden = !skill;
+    $("rare-skill-name").textContent = skill ? `★${skill.name}` : "";
+    $("rare-skill-desc").textContent = skill?.desc ?? "";
     showAgain(el);
-    FX.rareT = 1.8;
-    sfx.rare();
+    FX.rareT = 2.6;
+    if (rarityIndex(item.rarity) >= 3) sfx.rare();
     if (item.rarity === "UR" || item.rarity === "LR" || item.rarity === "MR") { FX.flash = RM ? 0.08 : 0.18; FX.flashCol = RARITY_STYLES[item.rarity].glow ?? "255,255,255"; }
   }
   function take(p: Pickup): void {
@@ -2097,7 +2101,7 @@ export function createOsanpoRun(root: HTMLElement, opts: OsanpoRunOptions): () =
     if (item.rarity === "N" || (item.rarity === "R" && S.sec === "bonus")) { sfx.item(S.mult); floatText(p.x, p.y - 16, `${upTag}+${pts}${tag}`, R.color, 13); puff(p.x, p.y, 5, "spark", { g: 0 }); }
     else if (item.rarity === "R" || item.rarity === "SR") { sfx.item(S.mult + 1); floatText(p.x, p.y - 18, `${upTag}${item.name} +${pts}${tag}`, R.color, 14); puff(p.x, p.y, 8, "spark", { g: 0 }); }
     else { sfx.fanfare(); floatText(p.x, p.y - 20, `${upTag}${item.rarity} ${item.name} +${pts}${tag}`, R.color, 16); puff(p.x, p.y, 16, "spark", { g: 0 }); }
-    if (rarityIndex(item.rarity) >= 3) showRare(item);
+    showRare(item);
     if (isBarrierRarity(item.rarity) && !S.shield) { S.shield = true; sfx.barrier(); floatText(P.x + 10, P.y - 70, "バリアが付いた！", "#7EF0D0", 15); }
     applySkill(item);
     K.lastItem = item;
@@ -2495,7 +2499,7 @@ export function createOsanpoRun(root: HTMLElement, opts: OsanpoRunOptions): () =
     // HUD
     setFlag("hud-left", S.state === "ready", (v) => { $("hud-left").style.visibility = v ? "hidden" : "visible"; });
     setText("score", score().toLocaleString());
-    setText("meta", `${Math.floor(S.dist / 50)}m ・ ほね ${S.bones} ・ アイテム ${S.treats}`);
+    setText("meta", `${Math.floor(S.dist / 50)}m・ほね${S.bones}・アイテム${S.treats}`);
     setText("clock", fmtClock(S.clock));
     setText("phase", phaseName(S.clock) + (S.rain > 0.3 ? (STAGE.weather === "snow" ? "・雪" : "・雨") : ""));
     const secKey = S.state === "play" && S.sec !== "normal" ? S.sec : "";
