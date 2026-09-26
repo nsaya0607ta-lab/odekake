@@ -1074,7 +1074,7 @@ export function createOsanpoRun(root: HTMLElement, opts: OsanpoRunOptions): () =
     if (k === "bonus") { S.secT = 6; floatText(VW / 2, GROUND * 0.32, "ボーナスタイム！", "#FFC857", 24); sfx.rare(); }
     else if (k === "rush") {
       S.secT = 7; floatText(VW / 2, GROUND * 0.32, "ラッシュ！", "#FF8A5C", 24); sfx.near();
-      if (K.rushPass > 0) { K.rushInv = true; K.rushMul = K.rushPass; K.rushPass = 0; floatText(VW / 2, GROUND * 0.44, "あずき色の風で無敵！", "#FF84BC", 16); }
+      if (K.rushPass > 0) { K.rushInv = true; K.rushMul = K.rushPass; K.rushPass = 0; announceInv(); }
     }
     else {
       S.secT = rand(14, 18);
@@ -1617,7 +1617,24 @@ export function createOsanpoRun(root: HTMLElement, opts: OsanpoRunOptions): () =
     const key = `${skill.id}:${idx}`;
     const same = K.buffs.find((a) => a.key === key);
     if (same) { same.t = sec; same.lv = lv; return; }
+    const wasInv = invLeft() > 0;
     K.buffs.push({ skill, b, lv, key, t: sec, count: 0, acc: 0, rampN: 0, rainAcc: 0 });
+    if ((b.inv || b.auto) && !wasInv) announceInv();
+  }
+  /** 無敵の残り秒数（無敵・自動回避・止まっている・ラッシュ無敵のうち一番長いもの） */
+  function invLeft(): number {
+    let t = K.rushInv ? Math.max(0, S.secT) : 0;
+    for (const a of K.buffs) if (a.b.inv || a.b.auto || a.b.stop) t = Math.max(t, a.t);
+    return t;
+  }
+  function announceInv(): void {
+    floatText(P.x + 10, P.y - 104, "無敵！", "#FFE7A3", 22);
+    [523, 659, 784, 1046, 1318].forEach((f, i) => tone(f, 0.1, "square", 0.04, null, i * 0.05));
+    puff(P.x, P.y - 30, 14, "spark", { g: 0 });
+  }
+  /** 身代わり・バリア・復活は合わせて1回ぶんまで。新しく付くときは前のものを外す */
+  function clearWards(): void {
+    K.guards = []; K.revives = []; S.shield = false;
   }
   function endBuff(a: ActiveBuff): void {
     const { b, lv } = a;
@@ -1670,7 +1687,7 @@ export function createOsanpoRun(root: HTMLElement, opts: OsanpoRunOptions): () =
       case "randPts": { const v = addPts(Math.round(rand(val(fx.min, lv), val(fx.max, lv)))); floatText(P.x + 20, P.y - 70, `+${v}`, "#FFC857", 15); break; }
       case "next": { const n = ival(fx.n, lv); if (n > 0) K.next.push({ left: n, add: val(fx.add, lv), mul: val(fx.mul, lv, 1), up: ival(fx.up, lv), dup: ival(fx.dup, lv), filter: fx.filter ?? "any" }); break; }
       case "best": K.best = { left: ival(fx.n, lv), mul: val(fx.mul, lv, 2), top: 0 }; break;
-      case "guard": K.guards.push({ n: ival(fx.n, lv), t: fx.sec === undefined ? Infinity : val(fx.sec, lv), kinds: fx.kinds ?? "all", pts: val(fx.pts, lv), after: val(fx.after, lv), name: skill.name }); break;
+      case "guard": clearWards(); K.guards.push({ n: 1, t: fx.sec === undefined ? Infinity : val(fx.sec, lv), kinds: fx.kinds ?? "all", pts: val(fx.pts, lv), after: val(fx.after, lv), name: skill.name }); break;
       case "clear": K.clears.push({ n: ival(fx.n, lv), kinds: fx.kinds ?? "all", pts: val(fx.pts, lv), name: skill.name }); break;
       case "clearAll": {
         let got = 0;
@@ -1692,7 +1709,7 @@ export function createOsanpoRun(root: HTMLElement, opts: OsanpoRunOptions): () =
         }
         break;
       }
-      case "revive": K.revives.push({ keep: fx.keep ?? 1, pts: val(fx.pts, lv), mul: val(fx.mul, lv, 1), name: skill.name }); break;
+      case "revive": clearWards(); K.revives.push({ keep: fx.keep ?? 1, pts: val(fx.pts, lv), mul: val(fx.mul, lv, 1), name: skill.name }); break;
       case "rare": K.rare = Math.max(K.rare, val(fx.mul, lv, 1)); break;
       case "nightMul": K.nightMul = Math.max(K.nightMul, val(fx.mul, lv, 1)); break;
       case "runMul": K.runMul = Math.max(K.runMul, val(fx.stage === STAGE_ID ? fx.stageMul ?? fx.mul : fx.mul, lv, 1)); break;
@@ -1773,7 +1790,14 @@ export function createOsanpoRun(root: HTMLElement, opts: OsanpoRunOptions): () =
         return false;
       }
     }
-    if (M.inv || M.stop || K.rushInv) return false;
+    if (M.inv || M.stop || K.rushInv) {
+      // 無敵中は、ぶつかった障害物を吹っ飛ばす
+      knock(o); sfx.guard();
+      const v = addPts(10);
+      floatText(o.x + o.w / 2, GROUND - o.h - 20, `ドカッ +${v}`, "#FFE7A3", 14);
+      FX.hitstop = RM ? 0 : 0.03;
+      return false;
+    }
     for (const a of K.buffs) if (a.b.immune && inGroup(o, a.b.immune)) return false;
     const g = K.guards.find((x) => x.n > 0 && x.t > 0 && inGroup(o, x.kinds));
     if (g) {
@@ -1817,7 +1841,11 @@ export function createOsanpoRun(root: HTMLElement, opts: OsanpoRunOptions): () =
       if (a.b.dry) { S.rainTarget = 0; S.rainT = 0; }
     }
     const ended = K.buffs.filter((a) => a.t <= 0);
-    if (ended.length) { K.buffs = K.buffs.filter((a) => a.t > 0); ended.forEach(endBuff); }
+    if (ended.length) {
+      const hadInv = invLeft() > 0 || ended.some((a) => a.b.inv || a.b.auto || a.b.stop);
+      K.buffs = K.buffs.filter((a) => a.t > 0); ended.forEach(endBuff);
+      if (hadInv && invLeft() <= 0) { floatText(P.x + 10, P.y - 96, "無敵おわり", "#C9C3F0", 14); tone(784, 0.12, "triangle", 0.05, 392); }
+    }
     for (const g of K.guards) if (g.t !== Infinity) g.t -= dt;
     K.guards = K.guards.filter((g) => g.n > 0 && g.t > 0);
     for (const d of K.delays) {
@@ -1881,11 +1909,8 @@ export function createOsanpoRun(root: HTMLElement, opts: OsanpoRunOptions): () =
       const label = a.b.label ?? a.skill.name;
       if (!out.some((x) => x.startsWith(label))) out.push(`${label} ${Math.ceil(a.t)}`);
     }
-    const guards = K.guards.reduce((n, g) => n + g.n, 0);
-    if (guards) out.push(`守り×${guards}`);
     const clears = K.clears.reduce((n, c) => n + c.n, 0);
     if (clears) out.push(`はじく×${clears}`);
-    if (K.revives.length) out.push(`復活×${K.revives.length}`);
     if (K.rushPass) out.push("ラッシュ無敵");
     if (K.comboGuard) out.push(`コンボ守り×${K.comboGuard}`);
     if (K.miss) out.push(`てぶくろ×${K.miss}`);
@@ -2113,7 +2138,7 @@ export function createOsanpoRun(root: HTMLElement, opts: OsanpoRunOptions): () =
     else if (item.rarity === "R" || item.rarity === "SR") { sfx.item(S.mult + 1); floatText(p.x, p.y - 18, `${upTag}${item.name} +${pts}${tag}`, R.color, 14); puff(p.x, p.y, 8, "spark", { g: 0 }); }
     else { sfx.fanfare(); floatText(p.x, p.y - 20, `${upTag}${item.rarity} ${item.name} +${pts}${tag}`, R.color, 16); puff(p.x, p.y, 16, "spark", { g: 0 }); }
     showRare(item);
-    if (isBarrierRarity(item.rarity) && !S.shield) { S.shield = true; sfx.barrier(); floatText(P.x + 10, P.y - 70, "バリアが付いた！", "#7EF0D0", 15); }
+    if (isBarrierRarity(item.rarity) && !S.shield) { clearWards(); S.shield = true; sfx.barrier(); floatText(P.x + 10, P.y - 70, "バリアが付いた！", "#7EF0D0", 15); }
     applySkill(item);
     K.lastItem = item;
     // 「ぱちぱち」: 近くのアイテムももう1個
@@ -2440,7 +2465,29 @@ export function createOsanpoRun(root: HTMLElement, opts: OsanpoRunOptions): () =
 
     const k = 1 - clamp((GROUND - P.y) / 170, 0, 0.75);
     c.fillStyle = `rgba(20,16,40,${0.22 * k})`; ell(c, P.x, GROUND + 1, 26 * k + 4, 3.5 * k + 1); c.fill();
-    if ((M.inv || M.stop || K.rushInv) && S.state === "play") { c.save(); c.globalCompositeOperation = "lighter"; glow(c, P.x, P.y - 26, 50, "255,236,170", 0.28 + Math.sin(S.time * 8) * 0.06); c.restore(); }
+    const invT = S.state === "play" ? invLeft() : 0;
+    if (invT > 0) {
+      // 無敵: 虹色のオーラ。切れる1.5秒前から点滅して知らせる
+      const ending = invT < 1.5, blink = ending && Math.floor(S.time * (invT < 0.6 ? 16 : 9)) % 2 === 1;
+      const a = (blink ? 0.12 : 0.42) + Math.sin(S.time * 8) * 0.05;
+      c.save(); c.globalCompositeOperation = "lighter";
+      glow(c, P.x, P.y - 26, 60, hslRgb((S.time * 280) % 360), a + 0.1);
+      glow(c, P.x, P.y - 26, 34, "255,250,230", a * 0.6);
+      c.restore();
+      if (!blink) {
+        // 虹色の輪（昼の明るい背景でも無敵だとわかるように）
+        c.save(); c.lineWidth = 3;
+        for (let i = 0; i < 6; i++) {
+          c.strokeStyle = `rgba(${hslRgb((S.time * 280 + i * 60) % 360)},.9)`;
+          c.beginPath(); c.ellipse(P.x, P.y - 28, 40, 36, 0, (i / 6) * Math.PI * 2 + S.time * 3, ((i + 1) / 6) * Math.PI * 2 + S.time * 3); c.stroke();
+        }
+        c.restore();
+      }
+      if (!blink && !RM) for (let i = 0; i < 3; i++) {
+        const ang = S.time * 4 + (i * Math.PI * 2) / 3;
+        star(c, P.x + Math.cos(ang) * 34, P.y - 28 + Math.sin(ang) * 26, 2.6, `rgba(${hslRgb((S.time * 280 + i * 120) % 360)},.95)`);
+      }
+    }
     if (!(P.inv > 0 && Math.floor(S.time * 16) % 2)) drawDog(c, P.x, P.y);
 
     for (const p of parts) {
@@ -2528,7 +2575,9 @@ export function createOsanpoRun(root: HTMLElement, opts: OsanpoRunOptions): () =
     setText("combo-text", `×${S.mult} コンボ`);
     $("combo-bar").style.transform = `scaleX(${clamp(S.chainT / 1.5, 0, 1).toFixed(3)})`;
     setFlag("combo-on", S.mult > 1 && S.state === "play", (v) => { $("combo").dataset.off = v ? "0" : "1"; });
-    setFlag("charm-on", S.shield && S.state === "play", (v) => { $("charm").dataset.off = v ? "0" : "1"; });
+    const ward = S.shield ? "バリア" : K.guards[0] ? `身代わり（${K.guards[0].name}）` : K.revives[0] ? `復活（${K.revives[0].name}）` : "";
+    setFlag("charm-on", Boolean(ward) && S.state === "play", (v) => { $("charm").dataset.off = v ? "0" : "1"; });
+    if (ward) setText("charm-text", ward);
     setFlag("pause-on", S.state === "play" && !S.paused, (v) => { $("pause-btn").hidden = !v; });
     setFlag("gear-on", (S.state === "ready" || S.state === "over") && $("settings-panel").hidden, (v) => { $("gear").hidden = !v; });
     if (S.state !== "play" && S.state !== "dying" && FX.rareT > 0) { FX.rareT = 0; $("rare").hidden = true; }
