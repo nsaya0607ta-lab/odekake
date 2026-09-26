@@ -65,6 +65,8 @@ const RUN_CYCLE: readonly Pose[] = ["walk", "trot", "walk-tail", "trot"];
 const DOG_W = 300, DOG_H = 254, DOG_FOOT = 240;
 const DW = 80, DH = (DW * DOG_H) / DOG_W;
 const GRAV = 2500, JUMP_V = 760, DJUMP_V = 640;
+/** 走る速さ（論理px/秒）。最初はゆっくりで、約3分かけて最高速になる */
+const START_SPEED = 200, MAX_SPEED = 520;
 
 type GameState = "ready" | "intro" | "play" | "dying" | "over";
 type Section = "normal" | "bonus" | "rush";
@@ -89,6 +91,8 @@ type MidItem = {
   type: "building" | "house" | "pine" | "round" | "torii" | "stall";
   cols: number; rows: number; lit: boolean[]; roof: "flat" | "tank" | "antenna" | "gable"; blink: number;
   label: string; colors: [string, string];
+  /** マンションのベランダの手すり */
+  balcony: boolean;
 };
 type NearItem = { x: number; w: number; gap: number; lamp: boolean; vend: boolean; tr: boolean };
 type Layer<T> = { f: number; items: T[]; nx: number };
@@ -312,6 +316,7 @@ export function createOsanpoRun(root: HTMLElement, opts: OsanpoRunOptions): () =
       x, w, h, gap: rand(-8, 12), tone: rand(-0.07, 0.07), type: house ? "house" : "building", cols, rows,
       lit: Array.from({ length: cols * rows }, () => Math.random() < 0.5),
       roof: house ? "gable" : pickOne(["flat", "tank", "antenna", "flat"] as const), blink: rand(0, 6), label: "", colors: ["#fff", "#fff"],
+      balcony: !house && Math.random() < 0.55,
     };
   }
   function genMid(x: number): MidItem {
@@ -601,35 +606,92 @@ export function createOsanpoRun(root: HTMLElement, opts: OsanpoRunOptions): () =
       c.fillStyle = `rgba(200,196,180,${0.5 * e.night})`;
       c.beginPath(); c.arc(mx - 4, my - 2, 2.6, 0, Math.PI * 2); c.arc(mx + 3, my + 4, 1.8, 0, Math.PI * 2); c.arc(mx + 4, my - 5, 1.3, 0, Math.PI * 2); c.fill();
     }
-    const cc = mix(e.bot, WHITE, 0.35), ca = 0.5 - e.night * 0.3, span = Math.max(1560, VW + 400);
+    // 地平線あたりのにじむ光（夕焼け・朝焼けで強くなる）
+    const sun = sunLight(e);
+    if (sun.warm > 0.02) {
+      const hz = c.createLinearGradient(0, GROUND - 150, 0, GROUND);
+      hz.addColorStop(0, `rgba(${sun.rgb},0)`); hz.addColorStop(1, `rgba(${sun.rgb},${0.35 * sun.warm})`);
+      c.fillStyle = hz; c.fillRect(0, GROUND - 150, VW, 152);
+    }
+    // 高いところの薄い筋雲
+    const hc = mix(e.top, WHITE, 0.3), span = Math.max(1560, VW + 400);
+    c.fillStyle = rgb(hc, 0.16 * (1 - e.night * 0.6));
+    for (let i = 0; i < 4; i++) {
+      const x = ((((i * 420 + 60 - S.bgCam * 0.004) % span) + span) % span) - 200, y = GROUND * (0.08 + i * 0.05);
+      ell(c, x, y, 90, 2.2, -0.04); c.fill();
+      ell(c, x + 50, y + 5, 60, 1.6, -0.04); c.fill();
+    }
+    // もこもこの雲。下側は空の色、上側は光の色で陰影をつける
+    const lit = mix(mix(e.bot, WHITE, 0.55), hex("#FFD2A8"), sun.warm * 0.6), dark = mix(e.top, e.bot, 0.55);
+    const ca = 0.62 - e.night * 0.36;
     for (const cl of clouds) {
       const x = ((((cl.x - S.bgCam * 0.008) % span) + span) % span) - 200, y = cl.y * GROUND, s = cl.s;
-      c.fillStyle = rgb(cc, ca); c.beginPath();
-      for (const [dx, dy, rx, ry] of [[0, 0, 34, 8], [18, -6, 20, 9], [-14, -3, 16, 7]] as const) {
-        c.moveTo(x + (dx + rx) * s, y + dy * s);
-        c.ellipse(x + dx * s, y + dy * s, rx * s, ry * s, 0, 0, Math.PI * 2);
-      }
+      const lobes = [[0, 0, 34, 9], [18, -7, 20, 10], [-14, -4, 17, 8], [34, -1, 14, 6]] as const;
+      c.fillStyle = rgb(dark, ca); c.beginPath();
+      for (const [dx, dy, rx, ry] of lobes) { c.moveTo(x + (dx + rx) * s, y + (dy + 2) * s); c.ellipse(x + dx * s, y + (dy + 2) * s, rx * s, ry * s, 0, 0, Math.PI * 2); }
+      c.fill();
+      c.fillStyle = rgb(lit, ca); c.beginPath();
+      for (const [dx, dy, rx, ry] of lobes) { c.moveTo(x + (dx + rx * 0.9) * s, y + (dy - 1) * s); c.ellipse(x + dx * s, y + (dy - 1) * s, rx * 0.9 * s, ry * 0.8 * s, 0, 0, Math.PI * 2); }
       c.fill();
     }
   }
-  function ridge(c: Ctx, off: number, base: number, amp: number, col: string, seed: number): void {
-    c.fillStyle = col; c.beginPath(); c.moveTo(0, GROUND);
+  /** 太陽の光の強さと色。夕方・朝方ほど warm が大きい */
+  function sunLight(e: Env): { warm: number; col: RGB; rgb: string; day: number } {
+    const m = e.m;
+    const warm = clamp(clamp((m - 960) / 120, 0, 1) - clamp((m - 1150) / 50, 0, 1) + clamp((m - 330) / 40, 0, 1) - clamp((m - 450) / 60, 0, 1), 0, 1);
+    const col = mix(hex("#FFE6B8"), hex("#FF8A5C"), warm);
+    return { warm, col, rgb: `${col[0] | 0},${col[1] | 0},${col[2] | 0}`, day: 1 - e.night };
+  }
+  function ridge(c: Ctx, e: Env, off: number, base: number, amp: number, col: RGB, seed: number, snowcap = false): void {
+    const pts: [number, number][] = [];
+    let peak = base;
     for (let sx = 0; sx <= VW + 8; sx += 8) {
       const wx = sx + off;
       const h = amp * (1 + Math.sin(wx * 0.0045 + seed) * 0.55 + Math.sin(wx * 0.0117 + 1.3 + seed) * 0.3 + Math.sin(wx * 0.031 + seed * 2) * 0.1);
-      c.lineTo(sx, base - h);
+      pts.push([sx, base - h]);
+      peak = Math.min(peak, base - h);
     }
+    // 上は山の色、ふもとは空気の色に溶ける（空気遠近）
+    const g = c.createLinearGradient(0, peak, 0, GROUND);
+    g.addColorStop(0, rgb(col)); g.addColorStop(1, rgb(mix(col, e.bot, 0.38)));
+    c.fillStyle = g; c.beginPath(); c.moveTo(0, GROUND);
+    for (const [x, y] of pts) c.lineTo(x, y);
     c.lineTo(VW, GROUND); c.closePath(); c.fill();
+    if (snowcap) {
+      const line = peak + amp * 0.5;
+      c.save(); c.beginPath(); c.moveTo(0, GROUND);
+      for (const [x, y] of pts) c.lineTo(x, y);
+      c.lineTo(VW, GROUND); c.closePath(); c.clip();
+      c.fillStyle = rgb(mix([244, 248, 255], col, 0.25 + e.night * 0.45));
+      c.beginPath(); c.moveTo(0, line);
+      for (const [x] of pts) c.lineTo(x, line + Math.sin(x * 0.09 + off * 0.01) * 5 + Math.sin(x * 0.23) * 3);
+      c.lineTo(VW, 0); c.lineTo(0, 0); c.closePath(); c.fill();
+      c.restore();
+    }
+    // 稜線のふちに光が当たる
+    const sun = sunLight(e);
+    c.strokeStyle = `rgba(${sun.rgb},${0.18 + 0.3 * sun.warm * sun.day})`; c.lineWidth = 1.2;
+    c.beginPath(); pts.forEach(([x, y], i) => (i ? c.lineTo(x, y) : c.moveTo(x, y))); c.stroke();
+  }
+  /** 遠くほど霞んで見えるよう、地平線近くに空の色をうっすら重ねる */
+  function haze(c: Ctx, e: Env, from: number, to: number, a: number): void {
+    const g = c.createLinearGradient(0, from, 0, to);
+    g.addColorStop(0, rgb(e.bot, 0)); g.addColorStop(1, rgb(e.bot, a * (1 - e.night * 0.5)));
+    c.fillStyle = g; c.fillRect(0, from, VW, to - from);
   }
   function drawBuildings(c: Ctx, e: Env): void {
     const off = S.bgCam * bld.f, base = GROUND - 6, snowy = STAGE_ID === "snow";
     for (const b of bld.items) {
       const x = b.x - off;
       if (x > VW + 10 || x + b.w < -10) continue;
-      const top = base - b.h, col = shade(e.mid, b.tone);
+      const top = base - b.h, col = shade(e.mid, b.tone), sun = sunLight(e);
       c.fillStyle = rgb(col);
       if (b.type === "house") {
         c.fillRect(x + 3, top, b.w - 6, b.h);
+        c.fillStyle = rgb(shade(col, -0.12)); c.fillRect(x + b.w - 3 - (b.w - 6) * 0.22, top, (b.w - 6) * 0.22, b.h);
+        c.fillStyle = rgb(shade(col, -0.25)); c.fillRect(x + 3, top + 3, b.w - 6, 3);
+        c.fillStyle = rgb(shade(col, -0.3)); rr(c, x + b.w * 0.62, base - 17, 9, 17, 1.5); c.fill();
+        c.fillStyle = rgb(col);
         c.fillStyle = rgb(shade(col, -0.18));
         c.beginPath(); c.moveTo(x - 4, top + 3); c.lineTo(x + b.w / 2, top - b.w * 0.3); c.lineTo(x + b.w + 4, top + 3); c.closePath(); c.fill();
         if (snowy) {
@@ -638,7 +700,10 @@ export function createOsanpoRun(root: HTMLElement, opts: OsanpoRunOptions): () =
         }
       } else {
         c.fillRect(x, top, b.w, b.h);
+        c.fillStyle = rgb(shade(col, -0.12)); c.fillRect(x + b.w * 0.8, top, b.w * 0.2, b.h);
         c.fillStyle = rgb(shade(col, -0.15)); c.fillRect(x - 1, top - 3, b.w + 2, 3);
+        c.fillStyle = `rgba(${sun.rgb},${0.15 + 0.35 * sun.warm * sun.day})`; c.fillRect(x - 1, top - 3, b.w * 0.8 + 1, 1.2);
+        c.fillStyle = rgb(shade(col, -0.15));
         if (snowy) { c.fillStyle = rgb(mix([246, 249, 255], e.mid, e.night * 0.45)); rr(c, x - 2, top - 7, b.w + 4, 6, 3); c.fill(); c.fillStyle = rgb(shade(col, -0.15)); }
         if (b.roof === "tank") { c.fillRect(x + b.w * 0.58, top - 16, 16, 10); c.fillRect(x + b.w * 0.58 + 2, top - 6, 2, 6); c.fillRect(x + b.w * 0.58 + 12, top - 6, 2, 6); }
         if (b.roof === "antenna") { c.fillRect(x + b.w * 0.3, top - 22, 1.6, 22); c.fillRect(x + b.w * 0.3 - 6, top - 18, 13, 1.4); c.fillRect(x + b.w * 0.3 - 4, top - 13, 9, 1.4); }
@@ -647,11 +712,19 @@ export function createOsanpoRun(root: HTMLElement, opts: OsanpoRunOptions): () =
       const ww = 7, wh = 9, gx = 13, gyy = 17;
       const sx0 = x + (b.w - (b.cols * gx - (gx - ww))) / 2, sy0 = b.type === "house" ? top + b.h * 0.3 : top + 8;
       const dayWin = rgb(shade(col, 0.14), 0.7);
+      const frame = rgb(shade(col, -0.22), 0.7);
       for (let r = 0; r < b.rows; r++) {
         for (let i = 0; i < b.cols; i++) {
-          const lit = b.lit[r * b.cols + i] && e.night > 0.05;
-          c.fillStyle = lit ? `rgba(255,214,130,${0.25 + 0.7 * e.night})` : dayWin;
-          c.fillRect(sx0 + i * gx, sy0 + r * gyy, ww, wh);
+          const k = r * b.cols + i, lit = b.lit[k] && e.night > 0.05, wx = sx0 + i * gx, wy = sy0 + r * gyy;
+          c.fillStyle = frame; c.fillRect(wx - 1, wy - 1, ww + 2, wh + 2);
+          c.fillStyle = lit ? (k % 3 ? `rgba(255,214,130,${0.25 + 0.7 * e.night})` : `rgba(255,236,196,${0.25 + 0.7 * e.night})`) : dayWin;
+          c.fillRect(wx, wy, ww, wh);
+          if (!lit) { c.fillStyle = `rgba(255,255,255,${0.12 * (1 - e.night)})`; c.fillRect(wx, wy, ww * 0.45, wh); }
+        }
+        if (b.balcony) {
+          const ry = sy0 + r * gyy + wh + 2;
+          c.fillStyle = rgb(shade(col, -0.2)); c.fillRect(x + 2, ry, b.w - 4, 3);
+          c.fillStyle = rgb(shade(col, 0.1), 0.6); c.fillRect(x + 2, ry, b.w - 4, 0.8);
         }
       }
     }
@@ -665,15 +738,20 @@ export function createOsanpoRun(root: HTMLElement, opts: OsanpoRunOptions): () =
       const col = shade(e.mid, b.tone);
       if (b.type === "pine") {
         c.fillStyle = rgb(shade(col, -0.2)); c.fillRect(x + b.w / 2 - 2, base - 14, 4, 14);
-        c.fillStyle = rgb(col);
         for (let k = 0; k < 3; k++) {
-          const ty = base - 10 - k * b.h * 0.28, tw = b.w * (1 - k * 0.22);
-          c.beginPath(); c.moveTo(x + b.w / 2 - tw / 2, ty); c.lineTo(x + b.w / 2, ty - b.h * 0.45); c.lineTo(x + b.w / 2 + tw / 2, ty); c.closePath(); c.fill();
+          const ty = base - 10 - k * b.h * 0.28, tw = b.w * (1 - k * 0.22), tip = ty - b.h * 0.45, cx = x + b.w / 2;
+          c.fillStyle = rgb(col);
+          c.beginPath(); c.moveTo(cx - tw / 2, ty); c.lineTo(cx, tip); c.lineTo(cx + tw / 2, ty); c.closePath(); c.fill();
+          c.fillStyle = rgb(shade(col, -0.16));
+          c.beginPath(); c.moveTo(cx, tip); c.lineTo(cx + tw / 2, ty); c.lineTo(cx + tw * 0.08, ty); c.closePath(); c.fill();
         }
       } else if (b.type === "round") {
         c.fillStyle = rgb(shade(col, -0.2)); c.fillRect(x + b.w / 2 - 2.5, base - 20, 5, 20);
-        c.fillStyle = rgb(shade(col, 0.06)); c.beginPath();
+        c.fillStyle = rgb(shade(col, -0.08)); c.beginPath();
         c.arc(x + b.w / 2, base - b.h * 0.6, b.w * 0.5, 0, Math.PI * 2); c.arc(x + b.w * 0.3, base - b.h * 0.45, b.w * 0.32, 0, Math.PI * 2); c.arc(x + b.w * 0.72, base - b.h * 0.42, b.w * 0.3, 0, Math.PI * 2);
+        c.fill();
+        c.fillStyle = rgb(shade(col, 0.1)); c.beginPath();
+        c.arc(x + b.w * 0.44, base - b.h * 0.66, b.w * 0.34, 0, Math.PI * 2); c.arc(x + b.w * 0.26, base - b.h * 0.5, b.w * 0.2, 0, Math.PI * 2);
         c.fill();
       } else if (b.type === "torii") {
         const red = mix(hex("#D63A2E"), e.mid, 0.25 + e.night * 0.35);
@@ -792,11 +870,17 @@ export function createOsanpoRun(root: HTMLElement, opts: OsanpoRunOptions): () =
     }
   }
   function drawGround(c: Ctx, e: Env, lamps: [number, number][]): void {
-    c.fillStyle = rgb(e.side); c.fillRect(0, GROUND - 6, VW, 25);
+    const sg = c.createLinearGradient(0, GROUND - 6, 0, GROUND + 19);
+    sg.addColorStop(0, rgb(shade(e.side, -0.1))); sg.addColorStop(0.35, rgb(e.side)); sg.addColorStop(1, rgb(shade(e.side, 0.05)));
+    c.fillStyle = sg; c.fillRect(0, GROUND - 6, VW, 25);
     c.strokeStyle = rgb(shade(e.side, -0.05)); c.lineWidth = 1;
     c.beginPath(); c.moveTo(0, GROUND + 6); c.lineTo(VW, GROUND + 6); c.stroke();
     c.fillStyle = rgb(shade(e.side, 0.25)); c.fillRect(0, GROUND + 19, VW, 5);
-    c.fillStyle = rgb(e.road); c.fillRect(0, GROUND + 24, VW, VH - GROUND - 24);
+    c.fillStyle = rgb(shade(e.side, -0.2)); c.fillRect(0, GROUND + 23, VW, 1.5);
+    const rg = c.createLinearGradient(0, GROUND + 24, 0, VH);
+    rg.addColorStop(0, rgb(shade(e.road, 0.05))); rg.addColorStop(1, rgb(shade(e.road, -0.18)));
+    c.fillStyle = rg; c.fillRect(0, GROUND + 24, VW, VH - GROUND - 24);
+    if (STAGE_ID === "town" || STAGE_ID === "summer") { c.fillStyle = rgb(mix(e.road, WHITE, 0.35)); c.fillRect(0, GROUND + 30, VW, 1.6); }
     const ly = GROUND + 24 + (VH - GROUND - 24) * 0.5;
     if (STAGE_ID === "town") {
       c.fillStyle = rgb(mix(e.road, WHITE, 0.26));
@@ -1521,7 +1605,7 @@ export function createOsanpoRun(root: HTMLElement, opts: OsanpoRunOptions): () =
     else if (S.state === "intro") {
       S.introT += dt; S.speed = 0;
       if (S.introT >= 0.75) {
-        S.state = "play"; S.speed = 250;
+        S.state = "play"; S.speed = START_SPEED;
         sfx.go(); bgmStart();
         floatText(P.x + 4, P.y - 84, "ドン！", "#FFC857", 24);
         puff(P.x - 10, GROUND, 8, "dust", { vy: -20 });
@@ -1529,7 +1613,7 @@ export function createOsanpoRun(root: HTMLElement, opts: OsanpoRunOptions): () =
       }
     } else if (playing) {
       S.t += dt;
-      S.speed = 250 + Math.min(270, S.t * 2.2);
+      S.speed = START_SPEED + Math.min(MAX_SPEED - START_SPEED, S.t * 1.8);
       S.dist += S.speed * dt;
       S.clock += dt * 1.6;
       S.next -= S.speed * dt;
@@ -1573,7 +1657,7 @@ export function createOsanpoRun(root: HTMLElement, opts: OsanpoRunOptions): () =
     if (!S.calm) S.bgCam += S.speed * dt;
     fillLayer(bld, genMid, 200);
     fillLayer(near, genNear, 420);
-    if (playing) BGM.bpm = 120 + clamp((S.speed - 250) / 270, 0, 1) * 24;
+    if (playing) BGM.bpm = 120 + clamp((S.speed - START_SPEED) / (MAX_SPEED - START_SPEED), 0, 1) * 24;
     for (const f of flyers) f.t += dt * 2.3;
     if (flyers.some((f) => f.t >= 1)) { retrigger($("score"), "osr-bump"); flyers = flyers.filter((f) => f.t < 1); }
     if (achToastT > 0) { achToastT -= dt; if (achToastT <= 0) $("ach-toast").hidden = true; }
@@ -1709,9 +1793,13 @@ export function createOsanpoRun(root: HTMLElement, opts: OsanpoRunOptions): () =
     const c = ctx;
     c.setTransform(DPR * SC, 0, 0, DPR * SC, 0, 0);
     drawSky(c, e);
-    ridge(c, S.bgCam * 0.006, GROUND - 40, STAGE_ID === "hiking" ? 78 : STAGE_ID === "snow" ? 52 : 34, rgb(mix(e.far, e.bot, 0.45)), 2.1);
-    ridge(c, S.bgCam * 0.014, GROUND - 26, STAGE_ID === "hiking" ? 62 : 40, rgb(e.far), 0);
+    const mountains = STAGE_ID === "hiking" || STAGE_ID === "snow";
+    if (mountains) ridge(c, e, S.bgCam * 0.003 + 900, GROUND - 70, STAGE_ID === "hiking" ? 96 : 80, mix(e.far, e.bot, 0.6), 4.2, true);
+    ridge(c, e, S.bgCam * 0.006, GROUND - 40, STAGE_ID === "hiking" ? 78 : STAGE_ID === "snow" ? 52 : 34, mix(e.far, e.bot, 0.45), 2.1, STAGE_ID === "snow");
+    haze(c, e, GROUND - 90, GROUND - 20, 0.35);
+    ridge(c, e, S.bgCam * 0.014, GROUND - 26, STAGE_ID === "hiking" ? 62 : 40, e.far, 0);
     drawMid(c, e);
+    haze(c, e, GROUND - 60, GROUND - 6, 0.22);
     const lamps: [number, number][] = [];
     drawNear(c, e, lamps);
     drawGround(c, e, lamps);
@@ -1835,6 +1923,10 @@ export function createOsanpoRun(root: HTMLElement, opts: OsanpoRunOptions): () =
         c.moveTo(x, y); c.lineTo(x - d.l * 0.18, y + d.l);
       }
       c.stroke();
+    }
+    {
+      const sun = sunLight(e);
+      if (sun.warm > 0.02 && sun.day > 0.1) { c.fillStyle = `rgba(${sun.rgb},${0.07 * sun.warm * sun.day})`; c.fillRect(-20, -20, VW + 40, VH + 40); }
     }
     if (FX.fade > 0.01) { c.fillStyle = `rgba(16,14,34,${FX.fade * 0.85})`; c.fillRect(-20, -20, VW + 40, VH + 40); }
     if (FX.flash > 0.02) { c.fillStyle = `rgba(${FX.flashCol},${FX.flash * 0.6})`; c.fillRect(-20, -20, VW + 40, VH + 40); }
