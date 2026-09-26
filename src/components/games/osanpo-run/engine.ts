@@ -1118,7 +1118,7 @@ export function createOsanpoRun(root: HTMLElement, opts: OsanpoRunOptions): () =
   });
   on(stageEl, "pointermove", (e) => {
     if (!swipe || swipe.done) return;
-    const dy = e.clientY - swipe.y, lim = Math.max(26, stageEl.clientHeight * 0.06);
+    const dy = e.clientY - swipe.y, lim = Math.max(14, stageEl.clientHeight * 0.03);
     if (dy > lim && performance.now() - swipe.t < 400) { swipe.done = true; slideDown(false, 0.6); }
   });
   on(window, "pointerup", () => { swipe = null; release(); });
