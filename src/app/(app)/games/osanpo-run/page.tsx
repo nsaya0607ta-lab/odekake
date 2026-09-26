@@ -1,0 +1,54 @@
+import type { Metadata } from "next";
+import { getImageProps } from "next/image";
+import { OsanpoRunGame } from "@/components/games/osanpo-run/osanpo-run-game";
+import type { RunItem } from "@/components/games/osanpo-run/engine";
+import { CATEGORY_LABELS, COLLECTION_ITEMS, REGULAR_ITEMS, type CollectionItem } from "@/lib/collection/items";
+import { getOwnedItemCounts } from "@/lib/data/collection";
+import { getDogSkin, isSkinUnlocked } from "@/lib/dog-skins";
+import { OSANPO_RUN_STAGE_IDS, OSANPO_RUN_STAGES } from "@/lib/games/osanpo-run/config";
+import { SERIES } from "@/lib/series";
+import { requireUser } from "@/lib/supabase/server";
+import "./osanpo-run.css";
+
+export const metadata: Metadata = {
+  title: "おさんぽフレンチー | おでかけ記録",
+  description: "フレブルと散歩しながら、持っている図鑑アイテムを拾っていくミニゲーム（お試し版）。",
+};
+export const dynamic = "force-dynamic";
+
+/** 持っているアイテムがこれより少ないと道がさみしいので、通常図鑑のNアイテムを見本として混ぜる */
+const MIN_OWNED_ITEMS = 5;
+const SAMPLE_ITEM_COUNT = 12;
+
+/** キャンバスに描く大きさ(最大34px)の2倍程度に縮めた画像URL */
+function toRunItem(item: CollectionItem & { image: string }): RunItem {
+  const { props } = getImageProps({ src: item.image, alt: "", width: 48, height: 48 });
+  return { id: item.id, name: item.name, category: item.category, series: item.series, rarity: item.rarity, src: props.src };
+}
+
+export default async function OsanpoRunPage() {
+  const { supabase, user } = await requireUser();
+  const ownedCounts = await getOwnedItemCounts(supabase, user.id);
+  const ownedIds = new Set([...ownedCounts].filter(([, count]) => count > 0).map(([id]) => id));
+
+  const hasImage = (item: CollectionItem): item is CollectionItem & { image: string } => Boolean(item.image);
+  const owned = COLLECTION_ITEMS.filter(hasImage).filter((item) => ownedIds.has(item.id));
+  const usesSampleItems = owned.length < MIN_OWNED_ITEMS;
+  const samples = usesSampleItems
+    ? REGULAR_ITEMS.filter(hasImage).filter((item) => item.rarity === "N" && !ownedIds.has(item.id)).slice(0, SAMPLE_ITEM_COUNT)
+    : [];
+  const items = [...owned, ...samples].map(toRunItem);
+
+  const unlockedStages = OSANPO_RUN_STAGE_IDS.filter((id) => isSkinUnlocked(getDogSkin(OSANPO_RUN_STAGES[id].skin), ownedIds));
+  const seriesTabs = SERIES.map((series) => ({ id: series.id, name: series.name.replace(/シリーズ$/, "") }));
+
+  return (
+    <OsanpoRunGame
+      items={items}
+      usesSampleItems={usesSampleItems}
+      unlockedStages={unlockedStages}
+      seriesTabs={seriesTabs}
+      categoryLabels={CATEGORY_LABELS}
+    />
+  );
+}

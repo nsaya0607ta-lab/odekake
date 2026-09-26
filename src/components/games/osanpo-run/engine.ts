@@ -1,0 +1,1899 @@
+/**
+ * おさんぽフレンチーのゲーム本体。
+ * =============================================================
+ * キャンバスの描画・当たり判定・音・メニュー操作をまとめて持つ。
+ * React 側（osanpo-run-game.tsx）は画面の骨組みを描くだけで、
+ * createOsanpoRun() が data-osr 属性の付いた要素を探して動かす。
+ * 戻り値の関数を呼ぶと、ループ・イベント・音をすべて片付ける。
+ */
+import { getAudioContext, resumeAudioContext } from "@/lib/audio-context";
+import type { GachaRarity } from "@/lib/gacha/config";
+import { GACHA_RARITIES } from "@/lib/gacha/config";
+import {
+  isBarrierRarity,
+  isOsanpoRunStageId,
+  OSANPO_RUN_ACHIEVEMENTS,
+  OSANPO_RUN_COMMENTS,
+  OSANPO_RUN_HINTS,
+  OSANPO_RUN_RANKS,
+  OSANPO_RUN_SONGS,
+  OSANPO_RUN_STAGE_IDS,
+  OSANPO_RUN_STAGES,
+  OSANPO_RUN_STORAGE_PREFIX,
+  RARITY_STYLES,
+  type OsanpoRunHintId,
+  type OsanpoRunStage,
+  type OsanpoRunStageId,
+} from "@/lib/games/osanpo-run/config";
+import {
+  DEFAULT_BGM_VOLUME,
+  getBgmVolume,
+  getTapVolume,
+  SOUND_SETTINGS_EVENT,
+  sliderToGain,
+} from "@/lib/sound-settings";
+import {
+  drawBike, drawCat, drawCone, drawCrow, drawGoldfishTub, drawKakigoriFlag, drawLog, drawNoren, drawPigeons,
+  drawPuddle, drawRock, drawSign, drawSignpost, drawSled, drawSnowman, drawWatermelon,
+  ell, font, glow, hex, hslRgb, mix, rgb, rr, setCanvasFontFamily, shade, star, WHITE,
+  type Ctx, type Pigeon, type RGB,
+} from "./draw";
+
+export type RunItem = {
+  id: string;
+  name: string;
+  category: string;
+  series: string | null;
+  rarity: GachaRarity;
+  /** 小さく最適化した画像のURL */
+  src: string;
+};
+
+export type OsanpoRunOptions = {
+  /** 道に落ちるアイテム（基本は持っているアイテム） */
+  items: RunItem[];
+  /** 持っているアイテムが少なく、見本のアイテムを混ぜているか */
+  usesSampleItems: boolean;
+  unlockedStages: OsanpoRunStageId[];
+  bodyFontFamily: string;
+  seriesTabs: { id: string; name: string }[];
+  categoryLabels: Record<string, string>;
+};
+
+type Pose = "walk" | "trot" | "walk-tail" | "cheer" | "smile" | "bow-b" | "stand-happy" | "wave" | "sleep" | "lie-wave" | "bow";
+const POSES: readonly Pose[] = ["walk", "trot", "walk-tail", "cheer", "smile", "bow-b", "stand-happy", "wave", "sleep", "lie-wave", "bow"];
+const RUN_CYCLE: readonly Pose[] = ["walk", "trot", "walk-tail", "trot"];
+const DOG_W = 300, DOG_H = 254, DOG_FOOT = 240;
+const DW = 80, DH = (DW * DOG_H) / DOG_W;
+const GRAV = 2500, JUMP_V = 760, DJUMP_V = 640;
+
+type GameState = "ready" | "intro" | "play" | "dying" | "over";
+type Section = "normal" | "bonus" | "rush";
+type ObstacleKind = "cone" | "puddle" | "bike" | "crow" | "cat" | "sign" | "pigeons" | "noren";
+
+type Obstacle = {
+  kind: ObstacleKind;
+  x: number; y: number; w: number; h: number;
+  vx: number; low: boolean;
+  hit: boolean; scored: boolean; hinted: boolean; minClear: number;
+  ky: number; kvy: number; rot: number; spin: number;
+  birds: Pigeon[]; flee: boolean; fleeT: number;
+};
+type Pickup = { item: RunItem; x: number; y: number; ph: number; taken: boolean; hinted: boolean };
+type Particle = { x: number; y: number; vx: number; vy: number; life: number; max: number; r: number; kind: "dust" | "spark" | "ring" | "splash" | "fw"; color: string; g: number; scroll: boolean };
+type FloatText = { x: number; y: number; text: string; color: string; size: number; life: number; max: number };
+type Flyer = { item: RunItem; x0: number; y0: number; t: number };
+type Env = { m: number; top: RGB; bot: RGB; far: RGB; mid: RGB; near: RGB; night: number; side: RGB; road: RGB };
+
+type MidItem = {
+  x: number; w: number; h: number; gap: number; tone: number;
+  type: "building" | "house" | "pine" | "round" | "torii" | "stall";
+  cols: number; rows: number; lit: boolean[]; roof: "flat" | "tank" | "antenna" | "gable"; blink: number;
+  label: string; colors: [string, string];
+};
+type NearItem = { x: number; w: number; gap: number; lamp: boolean; vend: boolean; tr: boolean };
+type Layer<T> = { f: number; items: T[]; nx: number };
+
+type Stats = { pigeons: number; slides: number; plays: number; meters: number; items: number; kinds: string[]; counts: Record<string, number> };
+type RunRecord = { s: number; m: number; t: number };
+
+/* ---------- 小さな道具 ---------- */
+const rand = (a: number, b: number) => a + Math.random() * (b - a);
+const clamp = (v: number, a: number, b: number) => Math.max(a, Math.min(b, v));
+function pickWeighted<T>(options: readonly (readonly [T, number])[]): T {
+  let total = 0;
+  for (const [, w] of options) total += w;
+  let r = Math.random() * total;
+  for (const [v, w] of options) {
+    r -= w;
+    if (r < 0) return v;
+  }
+  return options[0]![0];
+}
+function pickOne<T>(list: readonly T[]): T {
+  return list[Math.floor(Math.random() * list.length)]!;
+}
+const store = {
+  get(key: string): string | null {
+    try { return window.localStorage.getItem(OSANPO_RUN_STORAGE_PREFIX + key); } catch { return null; }
+  },
+  set(key: string, value: string): void {
+    try { window.localStorage.setItem(OSANPO_RUN_STORAGE_PREFIX + key, value); } catch { /* 保存できない環境では記録しない */ }
+  },
+};
+function loadJSON<T>(key: string, fallback: T): T {
+  try {
+    const raw = store.get(key);
+    return raw ? (JSON.parse(raw) as T) : fallback;
+  } catch {
+    return fallback;
+  }
+}
+
+/* ---------- 時間帯の色 ---------- */
+const KF = ([
+  [0, "#0d1030", "#23285a", "#1e2250", "#171a3f", "#0f1130", 1],
+  [300, "#141a46", "#4a4a86", "#262a5c", "#1b1e48", "#111434", 0.9],
+  [370, "#5f6fb8", "#ffc39b", "#7b77ab", "#4f4f86", "#2c2c58", 0.35],
+  [480, "#5aa8e6", "#cdeaf7", "#9cc1dc", "#7d9cbc", "#4d5f82", 0],
+  [960, "#5aa8e6", "#cdeaf7", "#9cc1dc", "#7d9cbc", "#4d5f82", 0],
+  [1040, "#4d58a8", "#ffb489", "#9a87b3", "#6e5f93", "#3a3263", 0.12],
+  [1110, "#2b2f70", "#e0798a", "#5d4d86", "#40376b", "#241f48", 0.55],
+  [1190, "#121538", "#2e2f66", "#23265a", "#191b45", "#101233", 1],
+  [1440, "#0d1030", "#23285a", "#1e2250", "#171a3f", "#0f1130", 1],
+] as const).map((k) => ({ m: k[0], top: hex(k[1]), bot: hex(k[2]), far: hex(k[3]), mid: hex(k[4]), near: hex(k[5]), night: k[6] }));
+const SIDE_D = hex("#cbc3d8"), SIDE_N = hex("#4a4572"), ROAD_D = hex("#666a86"), ROAD_N = hex("#1f1e3c");
+
+function envAt(min: number): Env {
+  const m = ((min % 1440) + 1440) % 1440;
+  let i = 0;
+  while (i < KF.length - 2 && KF[i + 1]!.m <= m) i++;
+  const a = KF[i]!, b = KF[i + 1]!;
+  let t = (m - a.m) / (b.m - a.m);
+  t = t * t * (3 - 2 * t);
+  const night = a.night + (b.night - a.night) * t;
+  return {
+    m, night,
+    top: mix(a.top, b.top, t), bot: mix(a.bot, b.bot, t), far: mix(a.far, b.far, t), mid: mix(a.mid, b.mid, t), near: mix(a.near, b.near, t),
+    side: mix(SIDE_D, SIDE_N, night), road: mix(ROAD_D, ROAD_N, night),
+  };
+}
+const fmtClock = (min: number) => {
+  const m = Math.floor(((min % 1440) + 1440) % 1440);
+  return `${Math.floor(m / 60)}:${String(m % 60).padStart(2, "0")}`;
+};
+const phaseName = (min: number) => {
+  const m = ((min % 1440) + 1440) % 1440;
+  return m < 300 ? "深夜" : m < 420 ? "夜明け" : m < 660 ? "朝" : m < 960 ? "昼" : m < 1080 ? "夕方" : m < 1170 ? "日暮れ" : "夜";
+};
+
+export function createOsanpoRun(root: HTMLElement, opts: OsanpoRunOptions): () => void {
+  const $ = <T extends HTMLElement = HTMLElement>(name: string): T => {
+    const el = root.querySelector<T>(`[data-osr="${name}"]`);
+    if (!el) throw new Error(`osanpo-run: missing element ${name}`);
+    return el;
+  };
+  const $$ = <T extends HTMLElement = HTMLElement>(selector: string): T[] => Array.from(root.querySelectorAll<T>(selector));
+  const cleanups: (() => void)[] = [];
+  function on<K extends keyof WindowEventMap>(target: Window, type: K, fn: (e: WindowEventMap[K]) => void, options?: AddEventListenerOptions): void;
+  function on<K extends keyof DocumentEventMap>(target: Document, type: K, fn: (e: DocumentEventMap[K]) => void, options?: AddEventListenerOptions): void;
+  function on<K extends keyof HTMLElementEventMap>(target: HTMLElement, type: K, fn: (e: HTMLElementEventMap[K]) => void, options?: AddEventListenerOptions): void;
+  function on(target: EventTarget, type: string, fn: (e: never) => void, options?: AddEventListenerOptions): void {
+    const listener = fn as unknown as EventListener;
+    target.addEventListener(type, listener, options);
+    cleanups.push(() => target.removeEventListener(type, listener, options));
+  }
+
+  setCanvasFontFamily(opts.bodyFontFamily);
+  const stageEl = $("stage");
+  const cvs = $<HTMLCanvasElement>("canvas");
+  const ctxOrNull = cvs.getContext("2d");
+  if (!ctxOrNull) return () => {};
+  const ctx: Ctx = ctxOrNull;
+  const RM = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+  /* ---------- アイテム ---------- */
+  const ITEMS = opts.items;
+  const itemImages = new Map<string, HTMLImageElement>();
+  for (const item of ITEMS) {
+    const img = new Image();
+    img.decoding = "async";
+    img.src = item.src;
+    itemImages.set(item.id, img);
+  }
+  const byRarity = new Map<GachaRarity, RunItem[]>();
+  for (const r of GACHA_RARITIES) byRarity.set(r, []);
+  for (const item of ITEMS) byRarity.get(item.rarity)!.push(item);
+  const rarityWeights = GACHA_RARITIES.filter((r) => byRarity.get(r)!.length > 0).map((r) => [r, RARITY_STYLES[r].weight] as const);
+  const rarityIndex = (r: GachaRarity) => GACHA_RARITIES.indexOf(r);
+  const rainItems = ITEMS.filter((it) => /水|虹|ブーツ|長靴|傘|雨/.test(it.name));
+  const seriesItems = (series: string | null) => (series ? ITEMS.filter((it) => it.series === series) : []);
+
+  function rollItem(): RunItem {
+    const stageSeries = seriesItems(STAGE.series);
+    if (S.rain > 0.3 && rainItems.length && Math.random() < 0.35) return pickOne(rainItems);
+    if (stageSeries.length && Math.random() < 0.3) return pickOne(stageSeries);
+    return pickOne(byRarity.get(pickWeighted(rarityWeights))!);
+  }
+  function drawItemImg(c: Ctx, item: RunItem, x: number, y: number, size: number): void {
+    const img = itemImages.get(item.id);
+    if (!img || !img.complete || !img.naturalWidth) {
+      c.fillStyle = "rgba(255,255,255,.5)"; c.beginPath(); c.arc(x, y, size * 0.3, 0, Math.PI * 2); c.fill();
+      return;
+    }
+    const k = Math.min(size / img.naturalWidth, size / img.naturalHeight);
+    const w = img.naturalWidth * k, h = img.naturalHeight * k;
+    c.drawImage(img, x - w / 2, y - h / 2, w, h);
+  }
+  function spriteEl(item: RunItem, size: number, reveal = true): HTMLImageElement {
+    const el = document.createElement("img");
+    el.className = "osr-spr";
+    el.src = item.src;
+    el.alt = reveal ? item.name : "";
+    el.width = size; el.height = size;
+    // アプリ共通の img { height: auto } に負けないよう、枠の大きさを直接指定する
+    el.style.width = `${size}px`; el.style.height = `${size}px`;
+    el.loading = "lazy"; el.decoding = "async"; el.draggable = false;
+    return el;
+  }
+
+  /* ---------- 犬（ステージごとのスキン） ---------- */
+  const unlocked = new Set<OsanpoRunStageId>(opts.unlockedStages.length ? opts.unlockedStages : ["town"]);
+  unlocked.add("town");
+  const dogImages = new Map<string, HTMLImageElement>();
+  const dogSrc = (skin: string, pose: Pose) => `/characters/${skin}/${pose}.webp`;
+  function dogImage(skin: string, pose: Pose): HTMLImageElement {
+    const key = `${skin}/${pose}`;
+    let img = dogImages.get(key);
+    if (!img) {
+      img = new Image();
+      img.decoding = "async";
+      img.src = dogSrc(skin, pose);
+      dogImages.set(key, img);
+    }
+    return img;
+  }
+  const preloadSkin = (skin: string) => POSES.forEach((p) => dogImage(skin, p));
+  function setDogSprite(el: HTMLImageElement, skin: string, pose: Pose): void {
+    el.src = dogSrc(skin, pose);
+  }
+
+  /* ---------- ステージ ---------- */
+  const savedStage = store.get("stage");
+  let STAGE_ID: OsanpoRunStageId = isOsanpoRunStageId(savedStage) && unlocked.has(savedStage) ? savedStage : "town";
+  let STAGE: OsanpoRunStage = OSANPO_RUN_STAGES[STAGE_ID];
+  preloadSkin(STAGE.skin);
+
+  /* ---------- 記録（この端末に保存） ---------- */
+  const achGot = loadJSON<Record<string, number>>("ach", {});
+  const stats: Stats = Object.assign(
+    { pigeons: 0, slides: 0, plays: 0, meters: 0, items: 0, kinds: [] as string[], counts: {} as Record<string, number> },
+    loadJSON<Partial<Stats>>("stats", {}),
+  );
+  const kindSet = new Set<string>(stats.kinds);
+  const saveStats = () => { stats.kinds = [...kindSet]; store.set("stats", JSON.stringify(stats)); };
+  const bestOf = (id: OsanpoRunStageId) => Number(store.get(`best-${id}`) ?? 0) || 0;
+  const bestDistOf = (id: OsanpoRunStageId) => Number(store.get(`bestd-${id}`) ?? 0) || 0;
+  const recordsOf = (id: OsanpoRunStageId) => loadJSON<RunRecord[]>(`rec-${id}`, []);
+  const SET = Object.assign({ bgm: true, sfx: true, vib: true }, loadJSON<Partial<{ bgm: boolean; sfx: boolean; vib: boolean }>>("settings", {}));
+  let muted = store.get("muted") === "1";
+
+  /* ---------- 状態 ---------- */
+  let DPR = 1, SC = 1, VW = 533, VH = 300, GROUND = 236;
+  const P = {
+    x: 96, y: GROUND, vy: 0, ground: true, jumps: 2, sq: 1, ph: 0, rot: 0, inv: 0, dead: false, dustT: 0,
+    slide: false, slideT: 0, slideHeld: false, jumpAt: -1,
+  };
+  const S = {
+    state: "ready" as GameState, time: 0, t: 0, speed: 90, dist: 0, bonus: 0, treats: 0, clock: STAGE.clock, cam: 0, bgCam: 0,
+    next: 400, shield: false, chain: 0, chainT: 0, mult: 1, maxMult: 1, paused: false, deadT: 0, introT: 0,
+    haul: new Map<string, number>(), happyT: 0, calm: store.get("calm") !== "0",
+    sec: "normal" as Section, secT: 18, rain: 0, rainTarget: 0, rainT: 0,
+    newAch: [] as string[], newKinds: [] as string[], rainWalk: 0, rushes: 0, closes: 0, bonusGot: 0,
+    best: 0, bestD: 0, passedBest: false, recordShown: false, milestone: 100, bufT: 0, fwT: 2,
+    lastResult: null as null | { score: number; m: number; items: number; rank: string },
+  };
+  let obstacles: Obstacle[] = [], pickups: Pickup[] = [], parts: Particle[] = [], texts: FloatText[] = [], flyers: Flyer[] = [];
+  const FX = { hitstop: 0, flash: 0, flashCol: "255,255,255", rareT: 0, fade: 0 };
+  let FDT = 1 / 60;
+
+  const bld: Layer<MidItem> = { f: 0.08, items: [], nx: -60 };
+  const near: Layer<NearItem> = { f: 0.26, items: [], nx: -120 };
+  const drops = Array.from({ length: 110 }, () => ({ x: Math.random(), y: Math.random(), l: rand(8, 16), v: rand(0.9, 1.2) }));
+  const flies = Array.from({ length: 12 }, () => ({ x: Math.random(), y: rand(0.2, 1), p: rand(0, 6), s: rand(0.6, 1.2) }));
+  const stars = Array.from({ length: 90 }, () => ({ x: Math.random(), y: Math.random() * 0.62, r: rand(0.4, 1.3), p: rand(0, 6) }));
+  const clouds = Array.from({ length: 6 }, (_, i) => ({ x: i * 260 + rand(0, 120), y: rand(0.12, 0.42), s: rand(0.7, 1.3) }));
+
+  function genBuilding(x: number): MidItem {
+    const house = Math.random() < 0.42;
+    const w = house ? rand(46, 70) : rand(54, 104), h = house ? rand(36, 58) : rand(66, 156);
+    const cols = house ? (w > 58 ? 2 : 1) : Math.max(1, Math.floor((w - 12) / 13));
+    const rows = house ? 1 : Math.max(1, Math.floor((h - 18) / 17));
+    return {
+      x, w, h, gap: rand(-8, 12), tone: rand(-0.07, 0.07), type: house ? "house" : "building", cols, rows,
+      lit: Array.from({ length: cols * rows }, () => Math.random() < 0.5),
+      roof: house ? "gable" : pickOne(["flat", "tank", "antenna", "flat"] as const), blink: rand(0, 6), label: "", colors: ["#fff", "#fff"],
+    };
+  }
+  function genMid(x: number): MidItem {
+    const base = genBuilding(x);
+    if (STAGE_ID === "hiking") {
+      const pine = Math.random() < 0.6;
+      return { ...base, type: pine ? "pine" : "round", w: pine ? rand(26, 40) : rand(34, 54), h: pine ? rand(60, 130) : rand(46, 80), gap: rand(-14, 4), tone: rand(-0.08, 0.08) };
+    }
+    if (STAGE_ID === "summer") {
+      if (Math.random() < 0.12) return { ...base, type: "torii", w: 70, h: 96, gap: rand(10, 30), tone: 0 };
+      return {
+        ...base, type: "stall", w: rand(66, 86), h: rand(46, 56), gap: rand(6, 16), tone: rand(-0.05, 0.05),
+        label: pickOne(["やきそば", "かき氷", "たこ焼き", "りんご飴", "わたあめ", "金魚すくい", "ヨーヨー釣り", "射的"]),
+        colors: pickOne([["#D63A3A", "#FFFFFF"], ["#2F6FD0", "#FFFFFF"], ["#E88A1A", "#FFF3D6"], ["#2E9A6A", "#FFFFFF"]] as const).slice() as [string, string],
+      };
+    }
+    if (STAGE_ID === "snow" && base.type === "building" && Math.random() < 0.35) {
+      const alt = genBuilding(x);
+      if (alt.type === "house") return alt;
+    }
+    return base;
+  }
+  const genNear = (x: number): NearItem => ({ x, w: 6, gap: rand(230, 320), lamp: Math.random() < 0.6, vend: Math.random() < 0.3, tr: Math.random() < 0.35 });
+  function fillLayer<T extends { x: number; w: number; gap: number }>(L: Layer<T>, gen: (x: number) => T, keep: number): void {
+    const off = S.bgCam * L.f;
+    while (L.nx < off + VW + 200) {
+      const it = gen(L.nx);
+      L.items.push(it);
+      L.nx = it.x + it.w + it.gap;
+    }
+    while (L.items.length > 2 && L.items[1]!.x + keep < off) L.items.shift();
+  }
+
+  /* ---------- 画面サイズ ---------- */
+  function resize(): void {
+    const r = stageEl.getBoundingClientRect();
+    if (!r.width || !r.height) return;
+    DPR = Math.min(window.devicePixelRatio || 1, 2);
+    cvs.width = Math.round(r.width * DPR);
+    cvs.height = Math.round(r.height * DPR);
+    SC = Math.min(r.width / 380, r.height / 300);
+    VW = r.width / SC; VH = r.height / SC;
+    const g2 = VH - Math.max(64, Math.round(VH * 0.2)), d = g2 - GROUND;
+    GROUND = g2;
+    P.y += d;
+    for (const o of obstacles) if (o.kind === "crow") o.y += d;
+    for (const it of pickups) it.y += d;
+    for (const p of parts) p.y += d;
+    for (const t of texts) t.y += d;
+  }
+  const ro = new ResizeObserver(resize);
+  ro.observe(stageEl);
+  cleanups.push(() => ro.disconnect());
+  resize();
+
+  /* ---------- 音 ---------- */
+  type AudioRig = { ac: AudioContext; master: GainNode; sfx: GainNode; bgm: GainNode; noise: AudioBuffer };
+  let A: AudioRig | null = null;
+  function ensureAudio(): void {
+    if (!A) {
+      try {
+        const ac = getAudioContext();
+        const master = ac.createGain(), sfx = ac.createGain(), bgm = ac.createGain();
+        master.connect(ac.destination); sfx.connect(master); bgm.connect(master);
+        const noise = ac.createBuffer(1, Math.floor(ac.sampleRate * 0.5), ac.sampleRate);
+        const d = noise.getChannelData(0);
+        for (let i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1;
+        A = { ac, master, sfx, bgm, noise };
+        applyAudio();
+      } catch {
+        A = null;
+      }
+    }
+    void resumeAudioContext();
+  }
+  /** アプリ全体の音量設定（BGM・タップ音のスライダー）にも合わせる */
+  function applyAudio(): void {
+    if (!A) return;
+    const bgmSlider = getBgmVolume();
+    const bgmScale = bgmSlider <= 0 ? 0 : Math.min(1.5, sliderToGain(bgmSlider) / sliderToGain(DEFAULT_BGM_VOLUME));
+    A.master.gain.value = muted || S.paused ? 0 : 0.9;
+    A.sfx.gain.value = SET.sfx ? sliderToGain(getTapVolume()) : 0;
+    A.bgm.gain.value = SET.bgm ? bgmScale : 0;
+  }
+  const onSoundSettings = () => applyAudio();
+  window.addEventListener(SOUND_SETTINGS_EVENT, onSoundSettings);
+  cleanups.push(() => window.removeEventListener(SOUND_SETTINGS_EVENT, onSoundSettings));
+  function tone(f: number, dur: number, type: OscillatorType = "square", vol = 0.06, to: number | null = null, delay = 0): void {
+    if (!A || muted || !SET.sfx) return;
+    const { ac } = A;
+    const t0 = ac.currentTime + delay, o = ac.createOscillator(), g = ac.createGain();
+    o.type = type; o.frequency.setValueAtTime(f, t0);
+    if (to) o.frequency.exponentialRampToValueAtTime(to, t0 + dur);
+    g.gain.setValueAtTime(0, t0); g.gain.linearRampToValueAtTime(vol, t0 + 0.008); g.gain.exponentialRampToValueAtTime(0.0008, t0 + dur);
+    o.connect(g); g.connect(A.sfx); o.start(t0); o.stop(t0 + dur + 0.02);
+  }
+  function noise(dur: number, vol = 0.12, freq = 1200): void {
+    if (!A || muted || !SET.sfx) return;
+    const { ac } = A;
+    const t0 = ac.currentTime, s = ac.createBufferSource(), f = ac.createBiquadFilter(), g = ac.createGain();
+    s.buffer = A.noise; f.type = "lowpass"; f.frequency.value = freq;
+    g.gain.setValueAtTime(vol, t0); g.gain.exponentialRampToValueAtTime(0.001, t0 + dur);
+    s.connect(f); f.connect(g); g.connect(A.sfx); s.start(t0); s.stop(t0 + dur);
+  }
+  const mtof = (m: number) => 440 * Math.pow(2, (m - 69) / 12);
+  function noteAt(rig: AudioRig, f: number, t0: number, dur: number, type: OscillatorType, vol: number, dest: AudioNode): void {
+    const o = rig.ac.createOscillator(), g = rig.ac.createGain();
+    o.type = type; o.frequency.setValueAtTime(f, t0);
+    g.gain.setValueAtTime(0, t0); g.gain.linearRampToValueAtTime(vol, t0 + 0.01); g.gain.exponentialRampToValueAtTime(0.0008, t0 + dur);
+    o.connect(g); g.connect(dest); o.start(t0); o.stop(t0 + dur + 0.02);
+  }
+  function drum(rig: AudioRig, t0: number, f0: number, f1: number, dur: number, vol: number, dest: AudioNode): void {
+    const o = rig.ac.createOscillator(), k = rig.ac.createGain();
+    o.frequency.setValueAtTime(f0, t0); o.frequency.exponentialRampToValueAtTime(f1, t0 + dur * 0.85);
+    k.gain.setValueAtTime(vol, t0); k.gain.exponentialRampToValueAtTime(0.001, t0 + dur);
+    o.connect(k); k.connect(dest); o.start(t0); o.stop(t0 + dur + 0.02);
+  }
+  function hat(rig: AudioRig, t0: number, vol: number, dest: AudioNode, hp = 7000, dur = 0.04): void {
+    const n = rig.ac.createBufferSource(), f = rig.ac.createBiquadFilter(), k = rig.ac.createGain();
+    n.buffer = rig.noise; f.type = "highpass"; f.frequency.value = hp;
+    k.gain.setValueAtTime(vol, t0); k.gain.exponentialRampToValueAtTime(0.001, t0 + dur);
+    n.connect(f); f.connect(k); k.connect(dest); n.start(t0); n.stop(t0 + dur + 0.01);
+  }
+  const BGM = { on: false, step: 0, next: 0, bpm: 120, gain: null as GainNode | null };
+  function bgmStep(rig: AudioRig, g: GainNode, i: number, t0: number, spb: number): void {
+    const song = OSANPO_RUN_SONGS[STAGE_ID], bar = (i >> 4) & 3, st = i & 15, root = song.roots[bar as 0 | 1 | 2 | 3], m = song.melody[i] ?? 0;
+    if (song.kit === "bell") {
+      if (m) { noteAt(rig, mtof(m), t0, spb * 3.4, "sine", song.level, g); noteAt(rig, mtof(m + 12), t0, spb * 1.6, "sine", song.level * 0.3, g); }
+      if (st === 0 || st === 8) noteAt(rig, mtof(root), t0, spb * 7, "sine", 0.11, g);
+      if (st % 4 === 2) noteAt(rig, mtof(root + 12 + (st % 8 === 6 ? 7 : 0)), t0, spb * 1.4, "triangle", 0.03, g);
+      if (st === 4 || st === 12) hat(rig, t0, 0.018, g, 9000, 0.08);
+      return;
+    }
+    if (m) noteAt(rig, mtof(m), t0, spb * 1.8, song.lead, song.level, g);
+    if (song.kit === "matsuri") {
+      if (st === 0 || st === 3 || st === 8 || st === 11) { drum(rig, t0, 150, 55, 0.28, st % 8 === 0 ? 0.24 : 0.14, g); hat(rig, t0, 0.03, g, 300, 0.06); }
+      if (st % 4 === 2) { noteAt(rig, 1760, t0, 0.05, "square", 0.018, g); noteAt(rig, 2637, t0, 0.04, "square", 0.01, g); }
+      if (st === 0 || st === 8) noteAt(rig, mtof(root), t0, spb * 3, "triangle", 0.11, g);
+      if (st === 6 || st === 14) hat(rig, t0, 0.05, g, 2500, 0.03);
+      return;
+    }
+    if (st === 0 || st === 6 || st === 8 || st === 14) noteAt(rig, mtof(root + (st === 8 ? 12 : 0)), t0, spb * 1.6, "triangle", 0.13, g);
+    if (song.kit === "folk") {
+      if (st % 4 === 0) [12, 16, 19].forEach((d, k) => noteAt(rig, mtof(root + d), t0 + k * 0.018, spb * 1.2, "triangle", 0.028, g));
+      if (st === 0 || st === 8) drum(rig, t0, 110, 50, 0.12, 0.14, g);
+      if (st === 4 || st === 12) hat(rig, t0, 0.04, g, 5000, 0.05);
+      return;
+    }
+    if (st % 4 === 2) noteAt(rig, mtof(root + 24 + 4 * (bar % 2 ? 0 : 1)), t0, spb * 0.9, "sine", 0.03, g);
+    if (st === 0 || st === 8) drum(rig, t0, 130, 45, 0.14, 0.18, g);
+    if (st % 2 === 1) hat(rig, t0, st % 4 === 3 ? 0.05 : 0.025, g);
+  }
+  function bgmTick(): void {
+    if (!A || !BGM.on || S.paused) return;
+    if (!BGM.gain) { BGM.gain = A.ac.createGain(); BGM.gain.gain.value = 0.55; BGM.gain.connect(A.bgm); }
+    const spb = 60 / ((BGM.bpm * OSANPO_RUN_SONGS[STAGE_ID].bpm) / 120) / 4;
+    const now = A.ac.currentTime;
+    if (BGM.next < now) BGM.next = now + 0.05;
+    while (BGM.next < now + 0.15) {
+      bgmStep(A, BGM.gain, BGM.step, BGM.next, spb);
+      BGM.next += spb;
+      BGM.step = (BGM.step + 1) % 64;
+    }
+  }
+  function bgmStart(): void {
+    BGM.on = true; BGM.step = 0; BGM.next = 0;
+    if (BGM.gain && A) { BGM.gain.gain.cancelScheduledValues(A.ac.currentTime); BGM.gain.gain.setValueAtTime(0.55, A.ac.currentTime); }
+  }
+  function bgmStop(): void {
+    BGM.on = false;
+    if (BGM.gain && A) {
+      BGM.gain.gain.setValueAtTime(BGM.gain.gain.value, A.ac.currentTime);
+      BGM.gain.gain.linearRampToValueAtTime(0, A.ac.currentTime + 0.4);
+    }
+  }
+  let rainNode: { src: AudioBufferSourceNode; gain: GainNode } | null = null;
+  function rainSound(): void {
+    if (!A) return;
+    if (!rainNode) {
+      const src = A.ac.createBufferSource(), f = A.ac.createBiquadFilter(), gain = A.ac.createGain();
+      src.buffer = A.noise; src.loop = true; f.type = "bandpass"; f.frequency.value = 2600; f.Q.value = 0.6; gain.gain.value = 0;
+      src.connect(f); f.connect(gain); gain.connect(A.sfx); src.start(); rainNode = { src, gain };
+    }
+    rainNode.gain.gain.value = STAGE.weather === "snow" ? 0 : S.rain * 0.07 * (S.state === "play" || S.state === "dying" ? 1 : 0.4);
+  }
+  const sfx = {
+    jump: () => tone(360, 0.11, "square", 0.045, 640),
+    djump: () => tone(560, 0.12, "triangle", 0.07, 1040),
+    item: (m: number) => { const k = 1 + (m - 1) * 0.12; tone(880 * k, 0.07, "sine", 0.08); tone(1320 * k, 0.09, "sine", 0.07, null, 0.05); },
+    fanfare: () => [660, 880, 1100, 1320].forEach((f, i) => tone(f, 0.12, "triangle", 0.07, null, i * 0.06)),
+    barrier: () => { tone(523, 0.3, "triangle", 0.06); tone(784, 0.3, "triangle", 0.05, null, 0.08); tone(1046, 0.35, "sine", 0.05, null, 0.16); },
+    guard: () => { noise(0.2, 0.12, 2400); tone(420, 0.25, "sine", 0.08, 180); },
+    crash: () => { noise(0.35, 0.2, 900); tone(220, 0.3, "square", 0.06, 55); },
+    ready: () => tone(523, 0.12, "square", 0.045),
+    go: () => { tone(784, 0.22, "square", 0.05); tone(1046, 0.3, "square", 0.04, null, 0.06); },
+    rare: () => [784, 988, 1175, 1568].forEach((f, i) => tone(f, 0.18, "square", 0.045, null, i * 0.07)),
+    near: () => { tone(990, 0.06, "square", 0.035); tone(1480, 0.08, "square", 0.03, null, 0.05); },
+    mile: () => [784, 988, 1175].forEach((f, i) => tone(f, 0.14, "triangle", 0.05, null, i * 0.07)),
+    land: () => tone(140, 0.05, "sine", 0.04, 90),
+    home: () => [523, 659, 784, 1046].forEach((f, i) => tone(f, i === 3 ? 0.5 : 0.16, "triangle", 0.06, null, i * 0.13)),
+    record: () => { [523, 659, 784, 1046, 1318].forEach((f, i) => tone(f, 0.14, "square", 0.045, null, i * 0.07)); [1046, 1318, 1568].forEach((f) => tone(f, 0.7, "triangle", 0.035, null, 0.38)); },
+    pass: () => [880, 1175, 1568].forEach((f, i) => tone(f, 0.12, "triangle", 0.05, null, i * 0.06)),
+    title: () => [1046, 1318, 1568].forEach((f, i) => tone(f, 0.16, "triangle", 0.05, null, i * 0.08)),
+  };
+  function setMuted(m: boolean): void {
+    muted = m; store.set("muted", m ? "1" : "0"); applyAudio();
+    $("mute-waves").toggleAttribute("hidden", m);
+    $("mute-x").toggleAttribute("hidden", !m);
+    $("mute").setAttribute("aria-label", m ? "音を出す" : "音を消す");
+  }
+  setMuted(muted);
+
+  /* ---------- 犬の描画 ---------- */
+  function drawDog(c: Ctx, x: number, y: number): void {
+    const air = !P.ground && !P.dead, sliding = P.slide && P.ground && !P.dead;
+    let pose: Pose;
+    if (P.dead) pose = "bow-b";
+    else if (sliding) pose = "bow";
+    else if (S.state === "intro") pose = "stand-happy";
+    else if (air) pose = P.vy < -150 ? (P.jumps === 0 ? "cheer" : "stand-happy") : "smile";
+    else if (S.happyT > 0) pose = "smile";
+    else pose = RUN_CYCLE[Math.floor(P.ph / (Math.PI / 2)) % 4]!;
+    const bob = air || P.dead || sliding ? 0 : -Math.abs(Math.sin(P.ph)) * 1;
+    const img = dogImage(STAGE.skin, pose);
+    c.save();
+    c.translate(x, y + bob); c.rotate(P.rot * 0.6); c.scale(1 + (1 - P.sq) * 0.5, P.sq);
+    if (img.complete && img.naturalWidth) {
+      // 画像は左向きなので、進行方向（右）に向けて左右反転する
+      c.scale(-1, 1);
+      c.drawImage(img, -DW / 2, (-DH * DOG_FOOT) / DOG_H, DW, DH);
+    } else {
+      c.fillStyle = "#F6EFE4"; ell(c, 0, -22, 20, 16); c.fill();
+    }
+    c.restore();
+    if (S.shield) {
+      const pulse = 1 + Math.sin(S.time * 5) * 0.04;
+      c.strokeStyle = "rgba(126,240,208,.85)"; c.lineWidth = 2; c.fillStyle = "rgba(126,240,208,.08)";
+      ell(c, x, y - 28, 40 * pulse, 36 * pulse); c.fill(); c.stroke();
+      c.strokeStyle = "rgba(255,255,255,.55)"; c.lineWidth = 1.5;
+      c.beginPath(); c.ellipse(x, y - 28, 34 * pulse, 30 * pulse, 0, Math.PI * 1.1, Math.PI * 1.4); c.stroke();
+    }
+    if (P.dead) {
+      for (let i = 0; i < 3; i++) {
+        const a = S.time * 4 + (i * Math.PI * 2) / 3;
+        star(c, x + 14 + Math.cos(a) * 18, y - 40 + Math.sin(a) * 5, 3.4, "#FFC857");
+      }
+    }
+  }
+
+  /* ---------- 背景 ---------- */
+  function stageEnv(e: Env): Env {
+    const n = e.night;
+    if (STAGE_ID === "hiking") {
+      e.far = mix(e.far, [96, 140, 124], 0.35 * (1 - n * 0.6)); e.mid = mix(e.mid, [58, 104, 78], 0.5 * (1 - n * 0.5)); e.near = mix(e.near, [112, 82, 62], 0.4 * (1 - n * 0.4));
+      e.side = mix(hex("#C49B6C"), hex("#4B3E52"), n); e.road = mix(hex("#78A860"), hex("#28413A"), n);
+    } else if (STAGE_ID === "snow") {
+      e.top = mix(e.top, [196, 208, 230], 0.3 * (1 - n)); e.bot = mix(e.bot, [236, 240, 248], 0.3 * (1 - n));
+      e.far = mix(e.far, [226, 233, 246], 0.5 * (1 - n * 0.5)); e.mid = mix(e.mid, [150, 160, 196], 0.25);
+      e.side = mix(hex("#F2F5FC"), hex("#8E94C2"), n * 0.85); e.road = mix(hex("#D6DEEC"), hex("#5C6194"), n * 0.85);
+    } else if (STAGE_ID === "summer") {
+      e.side = mix(hex("#D8CCB6"), hex("#5E5270"), n); e.road = mix(hex("#5A566E"), hex("#241E3A"), n);
+    }
+    return e;
+  }
+  function drawSky(c: Ctx, e: Env): void {
+    const g = c.createLinearGradient(0, 0, 0, GROUND);
+    g.addColorStop(0, rgb(e.top)); g.addColorStop(1, rgb(e.bot));
+    c.fillStyle = g; c.fillRect(0, 0, VW, GROUND + 2);
+    if (e.night > 0.02) {
+      for (const s of stars) {
+        const a = e.night * (0.55 + 0.45 * Math.sin(S.time * 2 + s.p));
+        c.fillStyle = `rgba(255,248,230,${a})`; c.fillRect(s.x * VW, s.y * GROUND, s.r, s.r);
+      }
+    }
+    const m = e.m;
+    if (m > 330 && m < 1170) {
+      const p = (m - 330) / 840, sx = VW * (0.06 + 0.88 * p), sy = GROUND - 30 - Math.sin(Math.PI * p) * GROUND * 0.72;
+      const warm = clamp((m - 900) / 220, 0, 1) + clamp((480 - m) / 150, 0, 1);
+      const col = mix(hex("#FFF4CC"), hex("#FF9460"), clamp(warm, 0, 1));
+      glow(c, sx, sy, 90, `${col[0] | 0},${col[1] | 0},${col[2] | 0}`, 0.35);
+      c.fillStyle = rgb(col); c.beginPath(); c.arc(sx, sy, 17, 0, Math.PI * 2); c.fill();
+    }
+    if (m > 1110 || m < 400) {
+      const p = ((m - 1110 + 1440) % 1440) / 730, mx = VW * (0.1 + 0.8 * p), my = GROUND - 40 - Math.sin(Math.PI * p) * GROUND * 0.62;
+      glow(c, mx, my, 60, "244,240,220", 0.22 * e.night);
+      c.fillStyle = `rgba(244,240,220,${0.25 + 0.75 * e.night})`; c.beginPath(); c.arc(mx, my, 12, 0, Math.PI * 2); c.fill();
+      c.fillStyle = `rgba(200,196,180,${0.5 * e.night})`;
+      c.beginPath(); c.arc(mx - 4, my - 2, 2.6, 0, Math.PI * 2); c.arc(mx + 3, my + 4, 1.8, 0, Math.PI * 2); c.arc(mx + 4, my - 5, 1.3, 0, Math.PI * 2); c.fill();
+    }
+    const cc = mix(e.bot, WHITE, 0.35), ca = 0.5 - e.night * 0.3, span = Math.max(1560, VW + 400);
+    for (const cl of clouds) {
+      const x = ((((cl.x - S.bgCam * 0.008) % span) + span) % span) - 200, y = cl.y * GROUND, s = cl.s;
+      c.fillStyle = rgb(cc, ca); c.beginPath();
+      for (const [dx, dy, rx, ry] of [[0, 0, 34, 8], [18, -6, 20, 9], [-14, -3, 16, 7]] as const) {
+        c.moveTo(x + (dx + rx) * s, y + dy * s);
+        c.ellipse(x + dx * s, y + dy * s, rx * s, ry * s, 0, 0, Math.PI * 2);
+      }
+      c.fill();
+    }
+  }
+  function ridge(c: Ctx, off: number, base: number, amp: number, col: string, seed: number): void {
+    c.fillStyle = col; c.beginPath(); c.moveTo(0, GROUND);
+    for (let sx = 0; sx <= VW + 8; sx += 8) {
+      const wx = sx + off;
+      const h = amp * (1 + Math.sin(wx * 0.0045 + seed) * 0.55 + Math.sin(wx * 0.0117 + 1.3 + seed) * 0.3 + Math.sin(wx * 0.031 + seed * 2) * 0.1);
+      c.lineTo(sx, base - h);
+    }
+    c.lineTo(VW, GROUND); c.closePath(); c.fill();
+  }
+  function drawBuildings(c: Ctx, e: Env): void {
+    const off = S.bgCam * bld.f, base = GROUND - 6, snowy = STAGE_ID === "snow";
+    for (const b of bld.items) {
+      const x = b.x - off;
+      if (x > VW + 10 || x + b.w < -10) continue;
+      const top = base - b.h, col = shade(e.mid, b.tone);
+      c.fillStyle = rgb(col);
+      if (b.type === "house") {
+        c.fillRect(x + 3, top, b.w - 6, b.h);
+        c.fillStyle = rgb(shade(col, -0.18));
+        c.beginPath(); c.moveTo(x - 4, top + 3); c.lineTo(x + b.w / 2, top - b.w * 0.3); c.lineTo(x + b.w + 4, top + 3); c.closePath(); c.fill();
+        if (snowy) {
+          c.fillStyle = rgb(mix([246, 249, 255], e.mid, e.night * 0.45));
+          c.beginPath(); c.moveTo(x - 5, top + 1); c.lineTo(x + b.w / 2, top - b.w * 0.3 - 3); c.lineTo(x + b.w + 5, top + 1); c.lineTo(x + b.w + 3, top + 4); c.lineTo(x + b.w / 2, top - b.w * 0.3 + 3); c.lineTo(x - 3, top + 4); c.closePath(); c.fill();
+        }
+      } else {
+        c.fillRect(x, top, b.w, b.h);
+        c.fillStyle = rgb(shade(col, -0.15)); c.fillRect(x - 1, top - 3, b.w + 2, 3);
+        if (snowy) { c.fillStyle = rgb(mix([246, 249, 255], e.mid, e.night * 0.45)); rr(c, x - 2, top - 7, b.w + 4, 6, 3); c.fill(); c.fillStyle = rgb(shade(col, -0.15)); }
+        if (b.roof === "tank") { c.fillRect(x + b.w * 0.58, top - 16, 16, 10); c.fillRect(x + b.w * 0.58 + 2, top - 6, 2, 6); c.fillRect(x + b.w * 0.58 + 12, top - 6, 2, 6); }
+        if (b.roof === "antenna") { c.fillRect(x + b.w * 0.3, top - 22, 1.6, 22); c.fillRect(x + b.w * 0.3 - 6, top - 18, 13, 1.4); c.fillRect(x + b.w * 0.3 - 4, top - 13, 9, 1.4); }
+        if (b.h > 130 && e.night > 0.3 && Math.sin(S.time * 3 + b.blink) > 0.2) { c.fillStyle = `rgba(255,70,70,${e.night})`; c.beginPath(); c.arc(x + b.w / 2, top - 4, 1.8, 0, Math.PI * 2); c.fill(); }
+      }
+      const ww = 7, wh = 9, gx = 13, gyy = 17;
+      const sx0 = x + (b.w - (b.cols * gx - (gx - ww))) / 2, sy0 = b.type === "house" ? top + b.h * 0.3 : top + 8;
+      const dayWin = rgb(shade(col, 0.14), 0.7);
+      for (let r = 0; r < b.rows; r++) {
+        for (let i = 0; i < b.cols; i++) {
+          const lit = b.lit[r * b.cols + i] && e.night > 0.05;
+          c.fillStyle = lit ? `rgba(255,214,130,${0.25 + 0.7 * e.night})` : dayWin;
+          c.fillRect(sx0 + i * gx, sy0 + r * gyy, ww, wh);
+        }
+      }
+    }
+  }
+  function drawMid(c: Ctx, e: Env): void {
+    if (STAGE_ID === "town" || STAGE_ID === "snow") { drawBuildings(c, e); return; }
+    const off = S.bgCam * bld.f, base = GROUND - 6;
+    for (const b of bld.items) {
+      const x = b.x - off;
+      if (x > VW + 20 || x + b.w < -20) continue;
+      const col = shade(e.mid, b.tone);
+      if (b.type === "pine") {
+        c.fillStyle = rgb(shade(col, -0.2)); c.fillRect(x + b.w / 2 - 2, base - 14, 4, 14);
+        c.fillStyle = rgb(col);
+        for (let k = 0; k < 3; k++) {
+          const ty = base - 10 - k * b.h * 0.28, tw = b.w * (1 - k * 0.22);
+          c.beginPath(); c.moveTo(x + b.w / 2 - tw / 2, ty); c.lineTo(x + b.w / 2, ty - b.h * 0.45); c.lineTo(x + b.w / 2 + tw / 2, ty); c.closePath(); c.fill();
+        }
+      } else if (b.type === "round") {
+        c.fillStyle = rgb(shade(col, -0.2)); c.fillRect(x + b.w / 2 - 2.5, base - 20, 5, 20);
+        c.fillStyle = rgb(shade(col, 0.06)); c.beginPath();
+        c.arc(x + b.w / 2, base - b.h * 0.6, b.w * 0.5, 0, Math.PI * 2); c.arc(x + b.w * 0.3, base - b.h * 0.45, b.w * 0.32, 0, Math.PI * 2); c.arc(x + b.w * 0.72, base - b.h * 0.42, b.w * 0.3, 0, Math.PI * 2);
+        c.fill();
+      } else if (b.type === "torii") {
+        const red = mix(hex("#D63A2E"), e.mid, 0.25 + e.night * 0.35);
+        c.fillStyle = rgb(red);
+        c.fillRect(x + 12, base - b.h + 14, 7, b.h - 14); c.fillRect(x + b.w - 19, base - b.h + 14, 7, b.h - 14); c.fillRect(x + 4, base - b.h + 26, b.w - 8, 5);
+        c.fillStyle = rgb(shade(red, -0.45));
+        c.beginPath(); c.moveTo(x - 4, base - b.h + 6); c.quadraticCurveTo(x + b.w / 2, base - b.h + 12, x + b.w + 4, base - b.h + 6); c.lineTo(x + b.w + 1, base - b.h + 14); c.lineTo(x + 2, base - b.h + 14); c.closePath(); c.fill();
+      } else if (b.type === "stall") {
+        const top = base - b.h, lit = e.night > 0.15;
+        c.fillStyle = rgb(shade(e.mid, -0.1)); c.fillRect(x + 3, top + 12, b.w - 6, b.h - 12);
+        if (lit) { c.save(); c.globalCompositeOperation = "lighter"; glow(c, x + b.w / 2, top + 22, b.w * 0.7, "255,190,110", 0.35 * e.night); c.restore(); }
+        c.fillStyle = lit ? `rgba(255,214,150,${0.5 + 0.4 * e.night})` : rgb(shade(e.mid, 0.15)); c.fillRect(x + 6, top + 16, b.w - 12, 14);
+        const [c1, c2] = b.colors, sw = 9;
+        for (let i = 0; i * sw < b.w + 4; i++) {
+          c.fillStyle = rgb(mix(hex(i % 2 ? c2 : c1), e.mid, 0.15 + e.night * 0.2));
+          c.beginPath(); c.moveTo(x - 2 + i * sw, top); c.lineTo(x - 2 + (i + 1) * sw, top); c.lineTo(x - 2 + (i + 1) * sw, top + 10); c.arc(x - 2 + i * sw + sw / 2, top + 10, sw / 2, 0, Math.PI); c.closePath(); c.fill();
+        }
+        c.fillStyle = lit ? "#FFF6E0" : rgb(shade(e.mid, 0.35)); rr(c, x + b.w / 2 - 22, top - 13, 44, 12, 2); c.fill();
+        c.fillStyle = "#C23030"; c.font = font(8); c.textAlign = "center"; c.textBaseline = "middle"; c.fillText(b.label, x + b.w / 2, top - 6.5);
+      }
+    }
+  }
+  function drawHikingNear(c: Ctx, e: Env): void {
+    const off = S.bgCam * near.f, col = rgb(e.near), pw = 46, s0 = -(off % pw);
+    c.strokeStyle = col; c.lineWidth = 3;
+    c.beginPath(); c.moveTo(0, GROUND - 30); c.lineTo(VW, GROUND - 30); c.moveTo(0, GROUND - 16); c.lineTo(VW, GROUND - 16); c.stroke();
+    c.fillStyle = rgb(shade(e.near, -0.1));
+    for (let x = s0; x < VW + pw; x += pw) { rr(c, x, GROUND - 40, 6, 36, 2); c.fill(); }
+    for (const p of near.items) {
+      if (!p.vend) continue;
+      const x = p.x - off + 60;
+      if (x > VW + 50 || x < -60) continue;
+      c.fillStyle = rgb(shade(e.near, -0.2)); c.fillRect(x + 18, GROUND - 76, 5, 70);
+      c.fillStyle = rgb(mix(hex("#D8B07A"), e.near, 0.25 + e.night * 0.4));
+      c.beginPath(); c.moveTo(x, GROUND - 74); c.lineTo(x + 40, GROUND - 74); c.lineTo(x + 47, GROUND - 67); c.lineTo(x + 40, GROUND - 60); c.lineTo(x, GROUND - 60); c.closePath(); c.fill();
+      const kind = Math.floor(p.x / 7) % 3, left = Math.max(0.1, 3 - (S.dist / 50 / 1000) * 3).toFixed(1);
+      c.fillStyle = "#4A2E1A"; c.font = font(8); c.textAlign = "center"; c.textBaseline = "middle";
+      c.fillText(kind === 0 ? `山頂 ${left}km` : kind === 1 ? "水場 →" : "展望台 →", x + 21, GROUND - 67);
+    }
+  }
+  function drawLanterns(c: Ctx, e: Env, off: number, top: number): void {
+    const L = near.items;
+    for (let i = 0; i < L.length - 1; i++) {
+      const ax = L[i]!.x - off + 3, bx = L[i + 1]!.x - off + 3;
+      if (bx < -20 || ax > VW + 20) continue;
+      const y0 = top + 40, sag = 26;
+      c.strokeStyle = rgb(e.near); c.lineWidth = 1;
+      c.beginPath(); c.moveTo(ax, y0); c.quadraticCurveTo((ax + bx) / 2, y0 + sag * 2, bx, y0); c.stroke();
+      for (let k = 1; k < 7; k++) {
+        const t = k / 7;
+        const lx = (1 - t) * (1 - t) * ax + 2 * (1 - t) * t * ((ax + bx) / 2) + t * t * bx;
+        const ly = (1 - t) * (1 - t) * y0 + 2 * (1 - t) * t * (y0 + sag * 2) + t * t * y0;
+        if (e.night > 0.2) glow(c, lx, ly + 7, 16, k % 2 ? "255,90,60" : "255,220,160", 0.35 * e.night);
+        c.fillStyle = k % 2 ? "#E23B3B" : "#F6E7C8"; ell(c, lx, ly + 7, 4.6, 6); c.fill();
+        c.fillStyle = "#2A2440"; c.fillRect(lx - 3, ly, 6, 1.6); c.fillRect(lx - 3, ly + 12.4, 6, 1.6);
+      }
+    }
+  }
+  function drawNear(c: Ctx, e: Env, lamps: [number, number][]): void {
+    if (STAGE_ID === "hiking") { drawHikingNear(c, e); return; }
+    const off = S.bgCam * near.f, base = GROUND - 6, top = Math.max(18, GROUND - 168), col = rgb(e.near);
+    const L = near.items;
+    c.strokeStyle = rgb(e.near, 0.95); c.lineWidth = 1.1;
+    for (let i = 0; i < L.length - 1; i++) {
+      const ax = L[i]!.x - off + 3, bx = L[i + 1]!.x - off + 3;
+      if (bx < -20 || ax > VW + 20) continue;
+      for (let k = 0; k < 3; k++) {
+        const y = top + 7 + k * 6;
+        c.beginPath(); c.moveTo(ax, y); c.quadraticCurveTo((ax + bx) / 2, y + 20 + k * 3, bx, y); c.stroke();
+      }
+    }
+    for (const p of L) {
+      const x = p.x - off;
+      if (x > VW + 60 || x < -60) continue;
+      c.fillStyle = col; c.fillRect(x, top, 6, base - top); c.fillRect(x - 10, top + 5, 26, 3);
+      if (p.tr) { rr(c, x + 6, top + 26, 10, 17, 3); c.fill(); }
+      if (p.lamp && STAGE_ID !== "summer") {
+        c.strokeStyle = col; c.lineWidth = 2;
+        c.beginPath(); c.moveTo(x + 6, top + 52); c.quadraticCurveTo(x + 16, top + 44, x + 24, top + 48); c.stroke();
+        c.fillStyle = e.night > 0.2 ? `rgba(255,236,190,${0.4 + 0.6 * e.night})` : col; rr(c, x + 19, top + 47, 11, 4, 2); c.fill();
+        lamps.push([x + 24.5, top + 51]);
+      }
+    }
+    if (STAGE_ID === "summer") drawLanterns(c, e, off, top);
+    c.fillStyle = rgb(shade(e.near, 0.1)); c.fillRect(0, GROUND - 38, VW, 32);
+    c.fillStyle = rgb(shade(e.near, 0.2)); c.fillRect(0, GROUND - 41, VW, 4);
+    c.strokeStyle = rgb(shade(e.near, -0.12)); c.lineWidth = 1; c.beginPath();
+    c.moveTo(0, GROUND - 22.5); c.lineTo(VW, GROUND - 22.5);
+    const bw = 24, s0 = -(off % bw);
+    for (let x = s0; x < VW + bw; x += bw) { c.moveTo(x, GROUND - 37); c.lineTo(x, GROUND - 23); c.moveTo(x + bw / 2, GROUND - 22); c.lineTo(x + bw / 2, GROUND - 6); }
+    c.stroke();
+    if (STAGE_ID === "summer") {
+      const sw = 14, k0 = -(off % (sw * 2));
+      for (let x = k0; x < VW + sw * 2; x += sw * 2) {
+        c.fillStyle = rgb(mix(hex("#E0413A"), e.near, 0.15 + e.night * 0.3)); c.fillRect(x, GROUND - 38, sw, 32);
+        c.fillStyle = rgb(mix(hex("#F6F1EA"), e.near, 0.15 + e.night * 0.3)); c.fillRect(x + sw, GROUND - 38, sw, 32);
+      }
+      c.fillStyle = rgb(shade(e.near, 0.2)); c.fillRect(0, GROUND - 41, VW, 4);
+    }
+    if (STAGE_ID === "snow") {
+      c.fillStyle = rgb(mix([246, 249, 255], e.near, e.night * 0.45));
+      for (let x = -(off % 30) - 30; x < VW + 30; x += 30) { c.beginPath(); c.ellipse(x + 15, GROUND - 42, 17, 5, 0, 0, Math.PI * 2); c.fill(); }
+    }
+    const cans = ["#E4572E", "#FFC857", "#5CC8B5", "#7A8CFF", "#F28FB1", "#FFFFFF"];
+    for (const p of L) {
+      if (!p.vend) continue;
+      const vx = p.x - off + 80;
+      if (vx > VW + 40 || vx < -40) continue;
+      const body = mix(hex("#E9EDF5"), e.near, 0.35 + e.night * 0.25);
+      c.fillStyle = rgb(body); rr(c, vx, GROUND - 56, 28, 50, 3); c.fill();
+      c.fillStyle = e.night > 0.15 ? `rgba(205,232,255,${0.55 + 0.45 * e.night})` : "rgba(205,232,255,.75)"; c.fillRect(vx + 3, GROUND - 52, 22, 20);
+      cans.forEach((can, i) => { c.fillStyle = can; c.fillRect(vx + 5 + (i % 3) * 6.5, GROUND - 50 + Math.floor(i / 3) * 9, 4, 6.5); });
+      c.fillStyle = rgb(shade(body, -0.35)); c.fillRect(vx + 5, GROUND - 17, 18, 5);
+      c.fillStyle = "#E4572E"; c.fillRect(vx + 20, GROUND - 28, 3, 3);
+      if (e.night > 0.15) glow(c, vx + 14, GROUND - 40, 46, "190,225,255", 0.28 * e.night);
+    }
+  }
+  function drawGround(c: Ctx, e: Env, lamps: [number, number][]): void {
+    c.fillStyle = rgb(e.side); c.fillRect(0, GROUND - 6, VW, 25);
+    c.strokeStyle = rgb(shade(e.side, -0.05)); c.lineWidth = 1;
+    c.beginPath(); c.moveTo(0, GROUND + 6); c.lineTo(VW, GROUND + 6); c.stroke();
+    c.fillStyle = rgb(shade(e.side, 0.25)); c.fillRect(0, GROUND + 19, VW, 5);
+    c.fillStyle = rgb(e.road); c.fillRect(0, GROUND + 24, VW, VH - GROUND - 24);
+    const ly = GROUND + 24 + (VH - GROUND - 24) * 0.5;
+    if (STAGE_ID === "town") {
+      c.fillStyle = rgb(mix(e.road, WHITE, 0.26));
+      const dw = 96, d0 = -(S.cam % dw);
+      for (let x = d0; x < VW + dw; x += dw) c.fillRect(x, ly - 1.5, 44, 3);
+    } else if (STAGE_ID === "snow") {
+      c.fillStyle = rgb(shade(e.road, -0.12)); c.fillRect(0, ly - 8, VW, 4); c.fillRect(0, ly + 6, VW, 4);
+    } else if (STAGE_ID === "hiking") {
+      c.fillStyle = rgb(shade(e.road, -0.15));
+      const gw = 26, g0 = -(S.cam % gw);
+      for (let x = g0; x < VW + gw; x += gw) { c.fillRect(x, GROUND + 30, 1.6, 5); c.fillRect(x + 11, GROUND + 44, 1.6, 6); }
+    }
+    if (e.night > 0.1) {
+      c.save(); c.globalCompositeOperation = "lighter";
+      for (const [lx, ly2] of lamps) {
+        const g = c.createLinearGradient(0, ly2, 0, GROUND + 10);
+        g.addColorStop(0, `rgba(255,220,150,${0.16 * e.night})`); g.addColorStop(1, `rgba(255,220,150,${0.03 * e.night})`);
+        c.fillStyle = g;
+        c.beginPath(); c.moveTo(lx - 5, ly2); c.lineTo(lx + 5, ly2); c.lineTo(lx + 46, GROUND + 12); c.lineTo(lx - 46, GROUND + 12); c.closePath(); c.fill();
+        glow(c, lx, ly2, 20, "255,230,170", 0.5 * e.night);
+        c.fillStyle = `rgba(255,220,150,${0.16 * e.night})`; ell(c, lx, GROUND + 7, 50, 9); c.fill();
+      }
+      c.restore();
+    }
+  }
+  function drawMarkers(c: Ctx, e: Env): void {
+    if (S.state === "ready") return;
+    const sx = (m: number) => P.x + (m * 50 - S.dist);
+    c.textAlign = "center"; c.textBaseline = "middle"; c.font = font(8);
+    const first = Math.max(100, Math.ceil((S.dist - P.x - 60) / 5000) * 100);
+    for (let m = first; ; m += 100) {
+      const x = sx(m);
+      if (x > VW + 40) break;
+      c.fillStyle = rgb(shade(e.near, 0.15)); c.fillRect(x - 1.5, GROUND - 24, 3, 20);
+      c.fillStyle = rgb(mix(hex("#F6F3EA"), e.near, 0.15 + e.night * 0.35)); rr(c, x - 14, GROUND - 35, 28, 12, 3); c.fill();
+      c.fillStyle = "#3A3550"; c.fillText(`${m}m`, x, GROUND - 28.6);
+    }
+    if (S.bestD >= 30) {
+      const x = sx(S.bestD);
+      if (x > -40 && x < VW + 60) {
+        if (e.night > 0.2) glow(c, x + 12, GROUND - 60, 30, "255,200,87", 0.35 * e.night);
+        c.fillStyle = "#F6F3EA"; c.fillRect(x - 1.5, GROUND - 72, 3, 68);
+        const wave = Math.sin(S.time * 4) * 2;
+        c.fillStyle = "#FFC857";
+        c.beginPath(); c.moveTo(x + 1.5, GROUND - 72); c.quadraticCurveTo(x + 16, GROUND - 70 + wave, x + 30, GROUND - 64 + wave); c.lineTo(x + 1.5, GROUND - 54); c.closePath(); c.fill();
+        c.fillStyle = "#2A1E0A"; c.textAlign = "left"; c.fillText("ベスト", x + 4, GROUND - 64);
+        c.textAlign = "center"; c.fillStyle = "rgba(22,21,46,.8)"; rr(c, x - 20, GROUND - 50, 40, 12, 3); c.fill();
+        c.fillStyle = "#FFC857"; c.fillText(`${S.bestD}m`, x, GROUND - 43.6);
+      }
+    }
+  }
+
+  /* ---------- 出現 ---------- */
+  function addObs(kind: ObstacleKind, x: number, w: number, h: number, extra: Partial<Obstacle> = {}): void {
+    obstacles.push({
+      kind, x, y: 0, w, h, vx: 0, low: false, hit: false, scored: false, hinted: false, minClear: 1e9,
+      ky: 0, kvy: 0, rot: 0, spin: 0, birds: [], flee: false, fleeT: 0, ...extra,
+    });
+  }
+  const mkPickup = (x: number, y: number): Pickup => ({ item: rollItem(), x, y, ph: Math.random() * 6, taken: false, hinted: false });
+  function treatArc(x0: number, x1: number, peak: number): void {
+    for (let i = 0; i < 5; i++) {
+      const t = i / 4;
+      pickups.push(mkPickup(x0 + (x1 - x0) * t, GROUND - 20 - peak * 4 * t * (1 - t)));
+    }
+  }
+  function spawnBonusItems(X: number): number {
+    const kind = pickWeighted([["arc", 2], ["row", 1.5], ["high", 1.2], ["wave", 1.2]] as const);
+    if (kind === "arc") { treatArc(X, X + 150, rand(70, 120)); return 60; }
+    if (kind === "row") { const h = Math.random() < 0.5 ? 0 : rand(60, 96); for (let i = 0; i < 6; i++) pickups.push(mkPickup(X + i * 30, GROUND - 18 - h)); return 60; }
+    if (kind === "high") { const h = rand(150, 178); for (let i = 0; i < 5; i++) pickups.push(mkPickup(X + i * 30, GROUND - h - Math.sin((i / 4) * Math.PI) * 10)); return 40; }
+    for (let i = 0; i < 8; i++) pickups.push(mkPickup(X + i * 28, GROUND - 60 - Math.sin((i / 7) * Math.PI * 2) * 40));
+    return 90;
+  }
+  function spawn(): void {
+    const X = VW + 40, t = S.t;
+    let extra = 0;
+    if (S.sec === "bonus") { extra = spawnBonusItems(X); S.next = 110 + extra + Math.random() * 80; return; }
+    const rush = S.sec === "rush", rain = S.rain > 0.3;
+    const kind = pickWeighted([
+      ["cone", 3], ["puddle", rain ? 5 : 2], ["bike", t > 6 ? 2.2 : 0], ["crow", t > 12 ? 2 : 0], ["double", t > 24 || rush ? 1.6 : 0],
+      ["cat", t > 18 ? 1.6 : 0], ["sign", t > 30 ? 1.4 : 0], ["pigeons", t > 9 ? 1.3 : 0], ["noren", t > 14 ? 1.8 : 0], ["lowcrow", t > 22 ? 1.2 : 0],
+      ["row", rush ? 0 : 1.3], ["high", rush ? 0 : 1.1],
+    ] as const);
+    switch (kind) {
+      case "cone": addObs("cone", X, 24, 34); if (Math.random() < 0.45) treatArc(X - 58, X + 82, 74); break;
+      case "puddle": { const w = rand(64, 96); addObs("puddle", X, w, 6); if (Math.random() < 0.4) treatArc(X - 48, X + w + 48, 60); break; }
+      case "bike": addObs("bike", X, 62, 46); if (Math.random() < 0.5) treatArc(X - 60, X + 122, 92); break;
+      case "crow":
+        addObs("crow", X + 170, 34, 20, { y: GROUND - 84 - rand(0, 12), vx: rand(40, 90) });
+        if (Math.random() < 0.6) for (let i = 0; i < 4; i++) pickups.push(mkPickup(X + 40 + i * 30, GROUND - 18));
+        extra = 150; break;
+      case "lowcrow": addObs("crow", X + 170, 34, 20, { y: GROUND - 58, vx: rand(30, 60), low: true }); extra = 150; break;
+      case "double": {
+        const g = Math.max(190, S.speed * 0.62);
+        addObs("cone", X, 24, 34);
+        if (Math.random() < 0.5) addObs("cone", X + g, 24, 34); else addObs("puddle", X + g, rand(56, 76), 6);
+        extra = g; break;
+      }
+      case "cat": addObs("cat", X + 60, 34, 24, { vx: rand(60, 110) }); extra = 80; break;
+      case "sign": addObs("sign", X, 40, 48); if (Math.random() < 0.5) treatArc(X - 60, X + 100, 110); break;
+      case "pigeons": {
+        const n = 2 + Math.floor(Math.random() * 2);
+        addObs("pigeons", X, 16 + n * 18, 16, { birds: Array.from({ length: n }, (_, i) => ({ dx: 8 + i * 18 + rand(-3, 3), p: rand(0, 6), delay: i * 0.06 })) });
+        break;
+      }
+      case "noren": addObs("noren", X, 58, 0); if (Math.random() < 0.6) for (let i = 0; i < 4; i++) pickups.push(mkPickup(X - 10 + i * 28, GROUND - 14)); extra = 40; break;
+      case "row": { const h = Math.random() < 0.5 ? 0 : rand(60, 96); for (let i = 0; i < 5; i++) pickups.push(mkPickup(X + i * 30, GROUND - 18 - h)); break; }
+      case "high": { const h = rand(150, 178); for (let i = 0; i < 5; i++) pickups.push(mkPickup(X + i * 30, GROUND - h - Math.sin((i / 4) * Math.PI) * 10)); break; }
+    }
+    S.next = (170 + S.speed * 0.55 + Math.random() * S.speed * 0.8) * (rush ? 0.68 : 1) + extra;
+  }
+  function setSection(k: Section): void {
+    S.sec = k; S.bonusGot = 0;
+    if (k === "bonus") { S.secT = 6; floatText(VW / 2, GROUND * 0.32, "ボーナスタイム！", "#FFC857", 24); sfx.rare(); }
+    else if (k === "rush") { S.secT = 7; floatText(VW / 2, GROUND * 0.32, "ラッシュ！", "#FF8A5C", 24); sfx.near(); }
+    else {
+      S.secT = rand(14, 18);
+      if (S.t > 20 && S.rainTarget === 0 && Math.random() < 0.4) {
+        S.rainTarget = 1; S.rainT = rand(18, 24);
+        floatText(VW / 2, GROUND * 0.32, STAGE.weather === "snow" ? "雪が強くなってきた… 足元に注意" : "雨が降ってきた… 水たまりに注意", "#A9C8FF", 18);
+      }
+    }
+  }
+
+  /* ---------- 演出 ---------- */
+  function puff(x: number, y: number, n: number, kind: Particle["kind"], o: { vx?: number; vy?: number; g?: number; scroll?: boolean; color?: string } = {}): void {
+    const count = RM ? Math.ceil(n / 2) : n;
+    for (let i = 0; i < count; i++) {
+      parts.push({
+        x, y, vx: rand(-60, 60) + (o.vx ?? 0), vy: rand(-80, -10) + (o.vy ?? 0), life: 0, max: rand(0.35, 0.6), r: rand(2, 4.5),
+        kind, color: o.color ?? "", g: o.g ?? 200, scroll: o.scroll ?? true,
+      });
+    }
+  }
+  function floatText(x: number, y: number, text: string, color = "#F6EFE4", size = 15): void {
+    texts.push({ x, y, text, color, size, life: 0, max: 0.95 });
+  }
+  function retrigger(el: HTMLElement, cls: string): void {
+    el.classList.remove(cls);
+    void el.offsetWidth;
+    el.classList.add(cls);
+  }
+  function showAgain(el: HTMLElement): void {
+    el.hidden = true;
+    void el.offsetWidth;
+    el.hidden = false;
+  }
+
+  /* ---------- 称号 ---------- */
+  let achQueue: string[] = [], achToastT = 0;
+  function unlock(id: string): void {
+    if (achGot[id]) return;
+    achGot[id] = Date.now();
+    store.set("ach", JSON.stringify(achGot));
+    S.newAch.push(id); achQueue.push(id);
+    renderAchList();
+  }
+  const achName = (id: string) => OSANPO_RUN_ACHIEVEMENTS.find((a) => a.id === id)?.name ?? id;
+
+  /* ---------- ヒント ---------- */
+  let hintT = 0;
+  function hint(k: OsanpoRunHintId): void {
+    if (store.get(`tut-${k}`)) return;
+    store.set(`tut-${k}`, "1");
+    const el = $("hint");
+    el.textContent = OSANPO_RUN_HINTS[k];
+    showAgain(el);
+    hintT = 2.4;
+  }
+
+  /* ---------- 入力 ---------- */
+  function jump(v: number, n: 1 | 2): void {
+    P.vy = -v; P.ground = false; P.jumps = n === 1 ? 1 : 0; P.sq = 1.22; P.slide = false; P.slideHeld = false; P.jumpAt = S.time;
+    if (n === 1) { sfx.jump(); puff(P.x - 6, GROUND, 6, "dust", { vy: -20 }); }
+    else { sfx.djump(); puff(P.x, P.y - 4, 8, "ring", { vy: 60, g: 0 }); }
+  }
+  let assetsReady = false;
+  function press(src: "key" | "pointer"): void {
+    ensureAudio();
+    if (!$("settings-panel").hidden) return;
+    if (S.paused) { if (src === "key") resume(); return; }
+    if (S.state === "ready") { if (src === "key" && assetsReady && unlocked.has(STAGE_ID)) start(); return; }
+    if (S.state === "over" || S.state === "dying") return;
+    if (S.state === "intro") { S.bufT = 0.2; return; }
+    if (P.ground) jump(JUMP_V, 1);
+    else if (P.jumps > 0) jump(DJUMP_V, 2);
+    else S.bufT = 0.14;
+  }
+  function slideDown(held: boolean, dur = 0.55): void {
+    ensureAudio();
+    if (S.state !== "play" || S.paused) return;
+    if (!P.ground && S.time - P.jumpAt < 0.14 && P.vy < 0) { P.y = GROUND; P.vy = 0; P.ground = true; P.jumps = 2; }
+    if (!P.ground) { P.vy = Math.max(P.vy, 950); P.slideHeld = held; P.slideT = dur; P.slide = true; return; }
+    if (!P.slide) { tone(260, 0.12, "triangle", 0.05, 140); puff(P.x + 16, GROUND, 6, "dust", { vy: -10 }); }
+    P.slide = true; P.slideHeld = held; P.slideT = dur; P.sq = 0.85;
+  }
+  const slideUp = () => { P.slideHeld = false; };
+  const release = () => { if (S.state === "play" && P.vy < -260) P.vy = -260; };
+  const JUMP_KEYS = new Set([" ", "Spacebar", "ArrowUp", "w", "W"]);
+  const SLIDE_KEYS = new Set(["ArrowDown", "s", "S"]);
+  let swipe: { y: number; t: number; done: boolean } | null = null;
+
+  on(window, "keydown", (e) => {
+    const target = e.target instanceof Element ? e.target : null;
+    if (target?.closest("button, a, input") && (e.key === " " || e.key === "Enter")) return;
+    if (target?.closest("input, textarea, select")) return;
+    if (!$("settings-panel").hidden) { if (e.key === "Escape") { e.preventDefault(); closeSettings(); } return; }
+    if (S.state === "ready" && !$("start-panel").hidden) {
+      if (e.key === "ArrowLeft" || e.key === "ArrowRight") {
+        e.preventDefault();
+        const ids = OSANPO_RUN_STAGE_IDS.filter((id) => unlocked.has(id));
+        const i = Math.max(0, ids.indexOf(STAGE_ID));
+        selectStage(ids[(i + (e.key === "ArrowRight" ? 1 : ids.length - 1)) % ids.length]!);
+        return;
+      }
+      if (e.key === " " || e.key === "Enter") { e.preventDefault(); press("key"); }
+      return;
+    }
+    if (JUMP_KEYS.has(e.key)) { e.preventDefault(); if (!e.repeat) press("key"); }
+    else if (SLIDE_KEYS.has(e.key)) { e.preventDefault(); if (!e.repeat) slideDown(true); }
+    else if ((e.key === "p" || e.key === "P" || e.key === "Escape") && S.state === "play") { if (S.paused) resume(); else pause(); }
+  });
+  on(window, "keyup", (e) => {
+    if (JUMP_KEYS.has(e.key)) release();
+    else if (SLIDE_KEYS.has(e.key)) slideUp();
+  });
+  on(stageEl, "pointerdown", (e) => {
+    if (e.button > 0) return;
+    e.preventDefault();
+    stageEl.focus({ preventScroll: true });
+    swipe = { y: e.clientY, t: performance.now(), done: false };
+    press("pointer");
+  });
+  on(stageEl, "pointermove", (e) => {
+    if (!swipe || swipe.done) return;
+    const dy = e.clientY - swipe.y, lim = Math.max(26, stageEl.clientHeight * 0.06);
+    if (dy > lim && performance.now() - swipe.t < 400) { swipe.done = true; slideDown(false, 0.6); }
+  });
+  on(window, "pointerup", () => { swipe = null; release(); });
+  on(window, "pointercancel", () => { swipe = null; release(); });
+  on(stageEl, "contextmenu", (e) => e.preventDefault());
+  // iOS で画面ごと引っぱられないよう、ゲーム画面の上だけスクロールを止める
+  on(stageEl, "touchmove", (e) => {
+    const target = e.target instanceof Element ? e.target : null;
+    if (target?.closest(".osr-panel")) return;
+    if (e.cancelable) e.preventDefault();
+  }, { passive: false });
+  for (const el of $$(".osr-panel, .osr-icon-btn")) on(el, "pointerdown", (e) => e.stopPropagation());
+
+  /* ---------- メニュー ---------- */
+  {
+    const imgs = [...Array.from(itemImages.values()).slice(0, 40), ...POSES.map((p) => dogImage(STAGE.skin, p))];
+    const ready = () => {
+      if (assetsReady) return;
+      assetsReady = true;
+      syncStartButton();
+    };
+    Promise.all(imgs.map((im) => im.decode().catch(() => undefined))).then(ready);
+    const timer = window.setTimeout(ready, 4000);
+    cleanups.push(() => window.clearTimeout(timer));
+  }
+  function syncStartButton(): void {
+    const b = $<HTMLButtonElement>("start");
+    const open = unlocked.has(STAGE_ID);
+    b.disabled = !assetsReady || !open;
+    b.textContent = !assetsReady ? "準備中…" : open ? "おさんぽに行く" : "まだ歩けない道です";
+  }
+  on($("start"), "click", () => { if (assetsReady && unlocked.has(STAGE_ID)) { ensureAudio(); start(); } });
+
+  function buildStageList(): void {
+    const box = $("stage-list");
+    box.replaceChildren();
+    for (const id of OSANPO_RUN_STAGE_IDS) {
+      const st = OSANPO_RUN_STAGES[id], open = unlocked.has(id), b = document.createElement("button");
+      b.type = "button"; b.className = "osr-stage-card" + (open ? "" : " osr-locked"); b.dataset.id = id;
+      b.setAttribute("role", "radio"); b.setAttribute("aria-checked", String(id === STAGE_ID)); b.tabIndex = id === STAGE_ID ? 0 : -1;
+      const face = document.createElement("img");
+      face.className = "osr-face"; face.alt = ""; face.width = 52; face.height = 44; face.draggable = false;
+      setDogSprite(face, st.skin, "stand-happy");
+      const nm = document.createElement("b"); nm.textContent = st.name;
+      const bs = document.createElement("small"); bs.textContent = open ? `ベスト ${bestOf(id).toLocaleString()}` : "未解放";
+      b.append(face, nm, bs);
+      on(b, "click", () => { ensureAudio(); selectStage(id); tone(660, 0.06, "triangle", 0.04); });
+      box.appendChild(b);
+    }
+  }
+  function selectStage(id: OsanpoRunStageId): void {
+    STAGE_ID = id; STAGE = OSANPO_RUN_STAGES[id];
+    if (unlocked.has(id)) store.set("stage", id);
+    preloadSkin(STAGE.skin);
+    S.best = bestOf(id);
+    $("best-top").textContent = S.best.toLocaleString();
+    $("best-label").textContent = `じこベスト・${STAGE.name}`;
+    bld.items = []; bld.nx = S.bgCam * bld.f - 80; near.items = []; near.nx = S.bgCam * near.f - 160;
+    if (S.state === "ready") S.clock = STAGE.clock;
+    S.rain = 0; S.rainTarget = 0;
+    for (const b of $$(".osr-stage-card")) {
+      const sel = b.dataset.id === id;
+      b.setAttribute("aria-checked", String(sel)); b.tabIndex = sel ? 0 : -1;
+    }
+    for (const el of $$<HTMLImageElement>("img.osr-dog")) setDogSprite(el, STAGE.skin, (el.dataset.pose as Pose) ?? "wave");
+    $("stage-desc").textContent = unlocked.has(id)
+      ? STAGE.desc
+      : `ガチャで「${STAGE.skinName}」を手に入れると歩けるようになります。${STAGE.desc}`;
+    syncStartButton();
+  }
+  const panelIds = ["start-panel", "over-panel", "pause-panel", "settings-panel"];
+  function hidePanels(): void { for (const id of panelIds) $(id).hidden = true; }
+  function backToStart(): void {
+    S.state = "ready"; S.paused = false; S.clock = STAGE.clock; S.rain = 0; S.rainTarget = 0; S.sec = "normal";
+    applyAudio(); bgmStop();
+    Object.assign(P, { y: GROUND, vy: 0, ground: true, jumps: 2, sq: 1, rot: 0, inv: 0, dead: false, slide: false, slideHeld: false });
+    obstacles = []; pickups = []; texts = []; flyers = []; parts = [];
+    hidePanels(); buildStageList(); selectStage(STAGE_ID);
+    $("start-panel").hidden = false;
+    $("start").focus({ preventScroll: true });
+  }
+  on($("stage-btn"), "click", backToStart);
+  on($("quit"), "click", backToStart);
+  on($("restart"), "click", () => { ensureAudio(); start(); });
+  on($("retry"), "click", () => { ensureAudio(); start(); });
+  on($("resume"), "click", () => resume());
+
+  function renderAchList(): void {
+    const ul = $("ach-list");
+    ul.replaceChildren();
+    let n = 0;
+    for (const a of OSANPO_RUN_ACHIEVEMENTS) {
+      const got = Boolean(achGot[a.id]);
+      if (got) n++;
+      const li = document.createElement("li");
+      if (!got) li.className = "osr-locked";
+      const b = document.createElement("b"); b.textContent = got ? a.name : "？？？";
+      const sm = document.createElement("small"); sm.textContent = a.condition;
+      li.append(b, sm); ul.appendChild(li);
+    }
+    $("ach-count").textContent = `${n} / ${OSANPO_RUN_ACHIEVEMENTS.length}`;
+    $("life-stats").textContent = stats.plays
+      ? `これまで ${stats.plays.toLocaleString()}回 ・ 合計 ${Math.floor(stats.meters).toLocaleString()}m ・ 拾ったアイテム ${stats.items.toLocaleString()}こ（${kindSet.size}種類）`
+      : "まだ散歩の記録はありません。";
+  }
+
+  /* ---------- ずかん ---------- */
+  let zkTab = "all", zkSel: string | null = null;
+  const zkNew = new Set<string>();
+  const seriesLabel = (series: string | null) => (series ? opts.seriesTabs.find((t) => t.id === series)?.name ?? "シリーズ" : "通常");
+  function zkShow(id: string | null): void {
+    zkSel = id;
+    const box = $("zk-detail");
+    box.replaceChildren();
+    for (const b of $$(".osr-zk-grid button")) b.setAttribute("aria-pressed", String(b.dataset.id === id));
+    const item = id ? ITEMS.find((it) => it.id === id) : undefined;
+    if (!item) {
+      const p = document.createElement("p"); p.textContent = "アイテムを選ぶと、ここに詳しく出ます。";
+      box.appendChild(p);
+      return;
+    }
+    const got = kindSet.has(item.id), R = RARITY_STYLES[item.rarity];
+    const big = document.createElement("div"); big.className = "osr-zk-big" + (got ? "" : " osr-locked"); big.appendChild(spriteEl(item, 72, got));
+    const nm = document.createElement("b"); nm.textContent = got ? item.name : "？？？";
+    const tags = document.createElement("div"); tags.className = "osr-tags";
+    const t1 = document.createElement("span"); t1.textContent = item.rarity; t1.style.color = R.color;
+    const t2 = document.createElement("span"); t2.textContent = opts.categoryLabels[item.category] ?? "その他";
+    const t3 = document.createElement("span"); t3.textContent = seriesLabel(item.series);
+    tags.append(t1, t2, t3);
+    const p = document.createElement("p");
+    p.textContent = got ? `拾った回数 ${(stats.counts[item.id] ?? 0).toLocaleString()}回 ・ 1こ ${R.points}点` : "まだ拾っていません。道のどこかに落ちているかも。";
+    box.append(big, nm, tags, p);
+  }
+  function renderZukan(): void {
+    const grid = $("zk-grid");
+    grid.replaceChildren();
+    $("zk-count").textContent = `${ITEMS.filter((it) => kindSet.has(it.id)).length} / ${ITEMS.length}`;
+    const rar = $("zk-rar");
+    rar.replaceChildren();
+    for (const r of GACHA_RARITIES) {
+      const pool = byRarity.get(r)!;
+      if (!pool.length) continue;
+      const sp = document.createElement("span");
+      sp.style.color = RARITY_STYLES[r].color;
+      sp.textContent = `${r} ${pool.filter((it) => kindSet.has(it.id)).length}/${pool.length}`;
+      rar.appendChild(sp);
+    }
+    const tabs = $("zk-tabs");
+    tabs.replaceChildren();
+    const tabList = [{ id: "all", name: "すべて" }, { id: "", name: "通常" }, ...opts.seriesTabs];
+    const inTab = (it: RunItem, tab: string) => tab === "all" || (it.series ?? "") === tab;
+    for (const tab of tabList) {
+      const pool = ITEMS.filter((it) => inTab(it, tab.id));
+      if (!pool.length) continue;
+      const b = document.createElement("button");
+      b.type = "button"; b.setAttribute("role", "tab"); b.setAttribute("aria-selected", String(zkTab === tab.id));
+      b.textContent = tab.name;
+      const sm = document.createElement("small"); sm.textContent = `${pool.filter((it) => kindSet.has(it.id)).length}/${pool.length}`;
+      b.appendChild(sm);
+      on(b, "click", () => { zkTab = tab.id; renderZukan(); });
+      tabs.appendChild(b);
+    }
+    const list = ITEMS.filter((it) => inTab(it, zkTab)).sort((a, b) => rarityIndex(a.rarity) - rarityIndex(b.rarity));
+    for (const it of list) {
+      const li = document.createElement("li"), b = document.createElement("button"), got = kindSet.has(it.id);
+      b.type = "button"; b.dataset.id = it.id; b.className = got ? "" : "osr-locked";
+      b.style.setProperty("--rc", RARITY_STYLES[it.rarity].color);
+      b.setAttribute("aria-label", got ? `${it.rarity} ${it.name}` : `${it.rarity} まだ拾っていないアイテム`);
+      b.appendChild(spriteEl(it, 40, got));
+      if (zkNew.has(it.id)) { const nb = document.createElement("span"); nb.className = "osr-nb"; nb.textContent = "NEW"; b.appendChild(nb); }
+      on(b, "click", () => { zkNew.delete(it.id); b.querySelector(".osr-nb")?.remove(); zkShow(it.id); });
+      li.appendChild(b); grid.appendChild(li);
+    }
+    zkShow(zkSel && list.some((it) => it.id === zkSel) ? zkSel : null);
+  }
+  function buildRarityGuide(): void {
+    const ul = $("rarity-list");
+    ul.replaceChildren();
+    for (const r of GACHA_RARITIES) {
+      const pool = byRarity.get(r)!;
+      if (!pool.length) continue;
+      const li = document.createElement("li");
+      const tag = document.createElement("span"); tag.className = "osr-rar"; tag.textContent = r; tag.style.color = RARITY_STYLES[r].color;
+      const samples = document.createElement("span"); samples.className = "osr-samples";
+      for (const it of [...pool].sort(() => Math.random() - 0.5).slice(0, 5)) samples.appendChild(spriteEl(it, 28));
+      const pts = document.createElement("span"); pts.className = "osr-pts"; pts.textContent = `${pool.length}種 +${RARITY_STYLES[r].points}`;
+      li.append(tag, samples, pts); ul.appendChild(li);
+    }
+    const note = document.createElement("li");
+    note.className = "osr-note";
+    note.textContent = opts.usesSampleItems
+      ? "持っているアイテムがまだ少ないので、見本のアイテムも落ちています。ガチャで集めると、自分のアイテムが落ちてくるようになります。"
+      : "続けて拾うとコンボで最大×5。LR・MRを拾うと、一度だけぶつかっても平気なバリアが付く。";
+    ul.appendChild(note);
+  }
+
+  /* ---------- 設定 ---------- */
+  type OptKey = "calm" | "bgm" | "sfx" | "vib";
+  const OPTS: readonly [OptKey, string, string][] = [
+    ["calm", "ゆったりモード", "背景を止めて、道と障害物だけが動きます。酔いやすい人向け。"],
+    ["bgm", "BGM", "ステージごとの音楽を流します。"],
+    ["sfx", "効果音", "ジャンプやアイテム、雨の音。"],
+    ["vib", "振動", "ぶつかったときに振動します（対応するスマホのみ）。"],
+  ];
+  const getOpt = (k: OptKey) => (k === "calm" ? S.calm : SET[k]);
+  function setOpt(k: OptKey, v: boolean): void {
+    if (k === "calm") { S.calm = v; store.set("calm", v ? "1" : "0"); }
+    else { SET[k] = v; store.set("settings", JSON.stringify(SET)); applyAudio(); }
+    syncOpts();
+  }
+  function syncOpts(): void {
+    for (const b of $$("[data-opt]")) b.setAttribute("aria-pressed", String(getOpt(b.dataset.opt as OptKey)));
+  }
+  {
+    const box = $("set-list");
+    for (const [k, name, desc] of OPTS) {
+      const b = document.createElement("button");
+      b.type = "button"; b.className = "osr-toggle"; b.dataset.opt = k;
+      const sw = document.createElement("span"); sw.className = "osr-sw"; sw.setAttribute("aria-hidden", "true");
+      const body = document.createElement("span");
+      const bb = document.createElement("b"); bb.textContent = name;
+      const sm = document.createElement("small"); sm.textContent = desc;
+      body.append(bb, sm); b.append(sw, body); box.appendChild(b);
+    }
+    for (const b of $$("[data-opt]")) on(b, "click", () => { ensureAudio(); const k = b.dataset.opt as OptKey; setOpt(k, !getOpt(k)); });
+    syncOpts();
+  }
+  let setReturn: string | null = null;
+  function openSettings(): void {
+    ensureAudio();
+    setReturn = ["start-panel", "over-panel", "pause-panel"].find((id) => !$(id).hidden) ?? null;
+    if (setReturn) $(setReturn).hidden = true;
+    if (S.state === "play" && !S.paused) { S.paused = true; setReturn = "pause-panel"; applyAudio(); }
+    $("settings-panel").hidden = false;
+    syncOpts();
+    $("set-close").focus({ preventScroll: true });
+  }
+  function closeSettings(): void {
+    $("settings-panel").hidden = true;
+    if (setReturn) $(setReturn).hidden = false;
+    setReturn = null;
+  }
+  for (const b of $$("[data-open='settings']")) on(b, "click", openSettings);
+  on($("set-close"), "click", closeSettings);
+  on($("pause-btn"), "click", () => { if (S.state === "play" && !S.paused) pause(); $("pause-btn").blur(); });
+  on($("mute"), "click", () => { ensureAudio(); setMuted(!muted); $("mute").blur(); stageEl.focus({ preventScroll: true }); });
+  on(document, "visibilitychange", () => { if (document.hidden && S.state === "play" && !S.paused) pause(); });
+  on(window, "blur", () => { if (S.state === "play" && !S.paused) pause(); });
+  on($("copy"), "click", () => {
+    const r = S.lastResult;
+    if (!r) return;
+    const text = `おさんぽフレンチー｜${STAGE.name}で ${r.score.toLocaleString()}点（${r.m}m・アイテム${r.items}こ・ランク${r.rank}）`;
+    const note = $("copy-note");
+    note.hidden = false;
+    note.textContent = "";
+    const fallback = () => {
+      note.textContent = "コピーできなかったので、下の文を選んでコピーしてください。";
+      const inp = document.createElement("input");
+      inp.readOnly = true; inp.value = text;
+      note.appendChild(inp); inp.focus(); inp.select();
+    };
+    if (navigator.clipboard?.writeText) navigator.clipboard.writeText(text).then(() => { note.textContent = "コピーしました。"; }, fallback);
+    else fallback();
+  });
+
+  /* ---------- 進行 ---------- */
+  const score = () => Math.floor(S.dist / 50) + S.bonus;
+  function start(): void {
+    hidePanels();
+    $("copy-note").hidden = true;
+    FX.fade = RM ? 0 : 1;
+    Object.assign(S, {
+      state: "intro", introT: 0, bestD: bestDistOf(STAGE_ID), passedBest: false, recordShown: false, fwT: 2,
+      t: 0, speed: 0, dist: 0, bonus: 0, treats: 0, clock: STAGE.clock, next: 420, shield: false, chain: 0, chainT: 0, mult: 1, maxMult: 1,
+      paused: false, deadT: 0, milestone: 100, bufT: 0, haul: new Map<string, number>(), sec: "normal", secT: 18, rain: 0, rainTarget: 0, rainT: 0,
+      newAch: [], newKinds: [], rainWalk: 0, rushes: 0, closes: 0, bonusGot: 0,
+    });
+    Object.assign(P, { y: GROUND, vy: 0, ground: true, jumps: 2, sq: 1, rot: 0, inv: 0, dead: false, slide: false, slideT: 0, slideHeld: false, jumpAt: -1 });
+    obstacles = []; pickups = []; texts = []; flyers = []; parts = [];
+    applyAudio();
+    floatText(P.x + 4, P.y - 84, "よーい…", "#F6EFE4", 20);
+    sfx.ready();
+    const active = document.activeElement;
+    if (active instanceof HTMLElement && active !== stageEl) active.blur();
+    stageEl.focus({ preventScroll: true });
+  }
+  function pause(): void {
+    S.paused = true; P.slideHeld = false;
+    $("pause-msg").textContent = `いま ${Math.floor(S.dist / 50)}m・${score().toLocaleString()}点。フレンチーはひと休み中。`;
+    $("pause-panel").hidden = false;
+    applyAudio();
+    $("resume").focus({ preventScroll: true });
+  }
+  function resume(): void {
+    S.paused = false;
+    hidePanels();
+    applyAudio();
+    last = performance.now();
+    stageEl.focus({ preventScroll: true });
+  }
+  function die(): void {
+    S.state = "dying"; S.deadT = 0; P.dead = true; P.vy = -420; P.ground = false;
+    sfx.crash(); bgmStop();
+    puff(P.x + 20, P.y - 24, 14, "spark", { g: 300, scroll: false });
+    FX.hitstop = RM ? 0 : 0.08; FX.flash = RM ? 0.15 : 0.3; FX.flashCol = "255,255,255";
+    try { if (SET.vib) navigator.vibrate?.(80); } catch { /* 振動できない端末 */ }
+  }
+  function countUp(el: HTMLElement, to: number): void {
+    if (RM || to < 10) { el.textContent = to.toLocaleString(); return; }
+    const t0 = performance.now(), d = 800;
+    const step = (now: number) => {
+      const k = Math.min(1, (now - t0) / d), eased = 1 - Math.pow(1 - k, 3);
+      el.textContent = Math.round(to * eased).toLocaleString();
+      if (k < 1) requestAnimationFrame(step);
+    };
+    requestAnimationFrame(step);
+  }
+  function showOver(): void {
+    S.state = "over";
+    unlock("first");
+    const sc = score(), isNew = sc > S.best, meters = Math.floor(S.dist / 50);
+    if (isNew) { S.best = sc; store.set(`best-${STAGE_ID}`, String(sc)); }
+    if (meters > bestDistOf(STAGE_ID)) store.set(`bestd-${STAGE_ID}`, String(meters));
+    stats.plays += 1; stats.meters += meters; stats.items += S.treats;
+    saveStats(); renderAchList();
+    const rank = OSANPO_RUN_RANKS.find((r) => sc >= r.min) ?? OSANPO_RUN_RANKS[OSANPO_RUN_RANKS.length - 1]!;
+    const rankEl = $("rank");
+    rankEl.textContent = rank.label; rankEl.style.setProperty("--rk", rank.color);
+    rankEl.className = "osr-rank" + (rank.label === "SS" ? " osr-ss" : "");
+    rankEl.setAttribute("aria-label", `ランク ${rank.label}`);
+    const now = Date.now(), recs = recordsOf(STAGE_ID);
+    recs.push({ s: sc, m: meters, t: now });
+    recs.sort((a, b) => b.s - a.s || a.t - b.t);
+    const top = recs.slice(0, 5);
+    store.set(`rec-${STAGE_ID}`, JSON.stringify(top));
+    const ol = $("top");
+    ol.replaceChildren();
+    $("top-title").textContent = `${STAGE.name}のベスト5`;
+    top.forEach((r, i) => {
+      const li = document.createElement("li");
+      if (r.t === now) li.className = "osr-me";
+      const d = new Date(r.t);
+      const cells = [String(i + 1), r.s.toLocaleString(), `${r.m}m`, `${d.getMonth() + 1}/${d.getDate()}`];
+      (["i", "b", "span", "small"] as const).forEach((tag, k) => { const el = document.createElement(tag); el.textContent = cells[k] ?? ""; li.appendChild(el); });
+      ol.appendChild(li);
+    });
+    S.lastResult = { score: sc, m: meters, items: S.treats, rank: rank.label };
+    $("over-sub").textContent = `${STAGE.name} ・ ${STAGE.skinName}`;
+    if (isNew && sc > 0) sfx.record(); else sfx.home();
+    countUp($("o-score"), sc);
+    $("o-best").textContent = S.best.toLocaleString();
+    $("o-new").hidden = !isNew;
+    $("o-dist").textContent = `${meters}m`;
+    $("o-items").textContent = `${S.treats}こ`;
+    $("o-clock").textContent = fmtClock(S.clock);
+    $("o-combo").textContent = `×${S.maxMult}`;
+    const haul = $("o-haul");
+    haul.replaceChildren();
+    const got = [...S.haul.keys()]
+      .map((id) => ITEMS.find((it) => it.id === id))
+      .filter((it): it is RunItem => Boolean(it))
+      .sort((a, b) => rarityIndex(b.rarity) - rarityIndex(a.rarity) || (S.haul.get(b.id) ?? 0) - (S.haul.get(a.id) ?? 0))
+      .slice(0, 8);
+    got.forEach((it, n) => {
+      const cell = document.createElement("div");
+      cell.className = "osr-cell";
+      cell.style.animationDelay = `${0.25 + n * 0.07}s`;
+      cell.title = `${it.rarity} ${it.name} ×${S.haul.get(it.id) ?? 0}`;
+      cell.appendChild(spriteEl(it, 36));
+      if (S.newKinds.includes(it.id)) { const nb = document.createElement("span"); nb.className = "osr-nb"; nb.textContent = "NEW"; cell.appendChild(nb); }
+      const b = document.createElement("b"); b.textContent = it.rarity; b.style.color = RARITY_STYLES[it.rarity].color;
+      cell.appendChild(b); haul.appendChild(cell);
+    });
+    $("o-haul-wrap").hidden = got.length === 0;
+    const counts = new Map<GachaRarity, number>();
+    for (const [id, n] of S.haul) { const it = ITEMS.find((x) => x.id === id); if (it) counts.set(it.rarity, (counts.get(it.rarity) ?? 0) + n); }
+    const br = $("o-break");
+    br.replaceChildren();
+    for (const r of GACHA_RARITIES) {
+      const n = counts.get(r);
+      if (!n) continue;
+      const sp = document.createElement("span"); sp.style.color = RARITY_STYLES[r].color; sp.textContent = `${r} ${n}`; br.appendChild(sp);
+    }
+    const newLine = $("o-new-line");
+    newLine.hidden = !S.newKinds.length;
+    newLine.textContent = S.newKinds.length ? `ずかんに新しく ${S.newKinds.length}種類 登録（${ITEMS.filter((it) => kindSet.has(it.id)).length} / ${ITEMS.length}）` : "";
+    renderZukan();
+    let comment = OSANPO_RUN_COMMENTS[0]![1];
+    for (const [th, txt] of OSANPO_RUN_COMMENTS) if (sc >= th) comment = txt;
+    $("o-comment").textContent = comment;
+    const ar = $("o-ach");
+    ar.replaceChildren();
+    for (const id of S.newAch) { const sp = document.createElement("span"); sp.textContent = achName(id); ar.appendChild(sp); }
+    $("o-ach-wrap").hidden = S.newAch.length === 0;
+    $("over-title").textContent = isNew && sc > 0 ? "ただいま！ 新記録" : "ただいま！";
+    $("best-top").textContent = S.best.toLocaleString();
+    $("over-panel").hidden = false;
+    achQueue = []; achToastT = 0; $("ach-toast").hidden = true;
+    $("hint").hidden = true; hintT = 0;
+  }
+
+  /* ---------- 更新 ---------- */
+  function hitTest(o: Obstacle): boolean {
+    const sl = P.slide && P.ground;
+    const px0 = P.x - (sl ? 28 : 24), px1 = P.x + (sl ? 26 : 22), py0 = P.y - (sl ? 22 : 44), py1 = P.y;
+    if (o.kind === "puddle") return P.y >= GROUND - 1 && px1 - 8 > o.x + 10 && px0 + 8 < o.x + o.w - 10;
+    let ox0: number, ox1: number, oy0: number, oy1: number;
+    if (o.kind === "crow") { ox0 = o.x + 4; ox1 = o.x + o.w - 2; oy0 = o.y + 3; oy1 = o.y + o.h - 2; }
+    else if (o.kind === "cone") { ox0 = o.x + 5; ox1 = o.x + o.w - 5; oy0 = GROUND - o.h + 5; oy1 = GROUND; }
+    else if (o.kind === "noren") { ox0 = o.x + 4; ox1 = o.x + o.w - 4; oy0 = -999; oy1 = GROUND - 30; }
+    else if (o.kind === "pigeons") { if (o.flee) return false; ox0 = o.x + 2; ox1 = o.x + o.w - 2; oy0 = GROUND - o.h + 2; oy1 = GROUND; }
+    else if (o.kind === "cat") { ox0 = o.x + 3; ox1 = o.x + o.w - 4; oy0 = GROUND - o.h + 3; oy1 = GROUND; }
+    else if (o.kind === "sign") { ox0 = o.x + 5; ox1 = o.x + o.w - 5; oy0 = GROUND - o.h + 4; oy1 = GROUND; }
+    else { ox0 = o.x + 8; ox1 = o.x + o.w - 8; oy0 = GROUND - o.h + 10; oy1 = GROUND; }
+    return px1 > ox0 && px0 < ox1 && py1 > oy0 && py0 < oy1;
+  }
+  function showRare(item: RunItem): void {
+    const el = $("rare");
+    el.style.setProperty("--rc", RARITY_STYLES[item.rarity].color);
+    $("rare-tag").textContent = `${item.rarity} ゲット`;
+    $("rare-name").textContent = item.name;
+    $("rare-icon").replaceChildren(spriteEl(item, 40));
+    showAgain(el);
+    FX.rareT = 1.8;
+    sfx.rare();
+    if (item.rarity === "UR" || item.rarity === "LR" || item.rarity === "MR") { FX.flash = RM ? 0.08 : 0.18; FX.flashCol = RARITY_STYLES[item.rarity].glow ?? "255,255,255"; }
+  }
+  function take(p: Pickup): void {
+    p.taken = true;
+    const { item } = p, R = RARITY_STYLES[item.rarity];
+    const prevMult = S.mult;
+    S.chain++; S.chainT = 1.5; S.mult = Math.min(5, 1 + Math.floor(S.chain / 4)); S.maxMult = Math.max(S.maxMult, S.mult);
+    if (S.mult > prevMult) retrigger($("combo"), "osr-pulse");
+    if (S.mult >= 5) unlock("combo5");
+    flyers.push({ item, x0: p.x, y0: p.y, t: 0 });
+    S.happyT = 0.35; S.treats++;
+    S.haul.set(item.id, (S.haul.get(item.id) ?? 0) + 1);
+    stats.counts[item.id] = (stats.counts[item.id] ?? 0) + 1;
+    if (!kindSet.has(item.id)) {
+      kindSet.add(item.id); S.newKinds.push(item.id); zkNew.add(item.id); saveStats();
+      floatText(p.x + 14, p.y - 30, "NEW", "#7EF0D0", 12);
+      if (kindSet.size >= 50) unlock("kinds50");
+      if (ITEMS.every((it) => kindSet.has(it.id))) unlock("kindsAll");
+    }
+    if (S.sec === "bonus" && ++S.bonusGot >= 15) unlock("bonus15");
+    if (item.rarity === "MR") unlock("mr");
+    const pts = R.points * S.mult;
+    S.bonus += pts;
+    if (item.rarity === "N" || (item.rarity === "R" && S.sec === "bonus")) { sfx.item(S.mult); floatText(p.x, p.y - 16, `+${pts}`, R.color, 13); puff(p.x, p.y, 5, "spark", { g: 0 }); }
+    else if (item.rarity === "R" || item.rarity === "SR") { sfx.item(S.mult + 1); floatText(p.x, p.y - 18, `${item.name} +${pts}`, R.color, 14); puff(p.x, p.y, 8, "spark", { g: 0 }); }
+    else { sfx.fanfare(); floatText(p.x, p.y - 20, `${item.rarity} ${item.name} +${pts}`, R.color, 16); puff(p.x, p.y, 16, "spark", { g: 0 }); }
+    if (rarityIndex(item.rarity) >= 3) showRare(item);
+    if (isBarrierRarity(item.rarity) && !S.shield) { S.shield = true; sfx.barrier(); floatText(P.x + 10, P.y - 70, "バリアが付いた！", "#7EF0D0", 15); }
+  }
+
+  function update(dt: number): void {
+    S.time += dt;
+    if (S.paused) return;
+    const playing = S.state === "play";
+    if (S.state === "ready") S.speed = 90;
+    else if (S.state === "intro") {
+      S.introT += dt; S.speed = 0;
+      if (S.introT >= 0.75) {
+        S.state = "play"; S.speed = 250;
+        sfx.go(); bgmStart();
+        floatText(P.x + 4, P.y - 84, "ドン！", "#FFC857", 24);
+        puff(P.x - 10, GROUND, 8, "dust", { vy: -20 });
+        if (S.bufT > 0) { S.bufT = 0; jump(JUMP_V, 1); }
+      }
+    } else if (playing) {
+      S.t += dt;
+      S.speed = 250 + Math.min(270, S.t * 2.2);
+      S.dist += S.speed * dt;
+      S.clock += dt * 1.6;
+      S.next -= S.speed * dt;
+      if (S.next <= 0) spawn();
+      S.secT -= dt;
+      if (S.secT <= 0) {
+        if (S.sec === "normal") setSection(S.t > 40 && Math.random() < 0.5 ? "rush" : "bonus");
+        else if (S.sec === "rush") {
+          unlock("rush");
+          if (++S.rushes >= 3) unlock("rush3");
+          S.bonus += 100;
+          floatText(VW / 2, GROUND * 0.32, "ラッシュ突破！ +100", "#FFC857", 20);
+          sfx.mile();
+          setSection("normal");
+        } else setSection("normal");
+      }
+      const mtr = S.dist / 50;
+      if (!S.passedBest && S.bestD >= 30 && mtr > S.bestD) { S.passedBest = true; floatText(P.x + 60, GROUND * 0.42, "自己ベスト地点を突破！", "#FFC857", 18); sfx.pass(); puff(P.x + 30, P.y - 40, 16, "spark", { g: 60 }); }
+      if (!S.recordShown && S.best > 0 && score() > S.best) { S.recordShown = true; floatText(VW / 2, GROUND * 0.24, "ベストスコア更新中！", "#FFC857", 18); sfx.pass(); }
+      if (mtr >= 100) unlock("m100");
+      if (mtr >= 500) unlock("m500");
+      if (mtr >= 1000) unlock("m1000");
+      if (mtr >= 300 && STAGE_ID !== "town") unlock(STAGE_ID);
+      if (S.rain > 0.5) { S.rainWalk += dt; if (S.rainWalk >= 20) unlock("rain"); }
+      const cm = S.clock % 1440;
+      if (cm >= 21 * 60 || cm < 4 * 60) unlock("night");
+      if (S.rainT > 0) {
+        S.rainT -= dt;
+        if (S.rainT <= 0) { S.rainTarget = 0; floatText(VW / 2, GROUND * 0.32, STAGE.weather === "snow" ? "雪が小降りになった" : "雨がやんだ", "#A9C8FF", 16); }
+      }
+      if (S.chainT > 0) { S.chainT -= dt; if (S.chainT <= 0) { S.chain = 0; S.mult = 1; } }
+      const meters = Math.floor(mtr);
+      if (meters >= S.milestone) { floatText(VW / 2, GROUND * 0.35, `${S.milestone}m`, "#FFC857", 24); sfx.mile(); S.milestone += 100; }
+    } else if (S.state === "dying") {
+      S.speed *= Math.exp(-5 * dt);
+      S.deadT += dt;
+      if (S.deadT > 1.05) showOver();
+    } else if (S.state === "over") S.speed = 0;
+
+    S.cam += S.speed * dt;
+    if (!S.calm) S.bgCam += S.speed * dt;
+    fillLayer(bld, genMid, 200);
+    fillLayer(near, genNear, 420);
+    if (playing) BGM.bpm = 120 + clamp((S.speed - 250) / 270, 0, 1) * 24;
+    for (const f of flyers) f.t += dt * 2.3;
+    if (flyers.some((f) => f.t >= 1)) { retrigger($("score"), "osr-bump"); flyers = flyers.filter((f) => f.t < 1); }
+    if (achToastT > 0) { achToastT -= dt; if (achToastT <= 0) $("ach-toast").hidden = true; }
+    else if (achQueue.length) {
+      const id = achQueue.shift()!;
+      $("ach-name").textContent = achName(id);
+      showAgain($("ach-toast"));
+      achToastT = 2.4;
+      sfx.title();
+    }
+    if (hintT > 0) { hintT -= dt; if (hintT <= 0 || !playing) { hintT = 0; $("hint").hidden = true; } }
+    S.rain += (S.rainTarget - S.rain) * Math.min(1, dt * 0.8);
+    rainSound();
+    if (STAGE_ID === "summer" && S.state !== "over") {
+      S.fwT -= dt;
+      if (S.fwT <= 0 && envAt(S.clock).night > 0.4) {
+        S.fwT = rand(2.5, 5);
+        const fx = rand(VW * 0.25, VW * 0.9), fy = rand(GROUND * 0.12, GROUND * 0.38);
+        const col = pickOne(["255,120,120", "255,210,110", "140,210,255", "190,150,255", "140,255,190"]), k = RM || S.calm ? 22 : 36;
+        for (let i = 0; i < k; i++) {
+          const a = (i / k) * Math.PI * 2, v = rand(70, 95);
+          parts.push({ x: fx, y: fy, vx: Math.cos(a) * v, vy: Math.sin(a) * v, life: 0, max: 1.3, r: 1.6, kind: "fw", color: col, g: 40, scroll: false });
+        }
+        const timer = window.setTimeout(() => noise(0.6, 0.08, 220), 120);
+        cleanups.push(() => window.clearTimeout(timer));
+      }
+    }
+    FX.flash *= Math.exp(-7 * dt);
+    if (FX.fade > 0) FX.fade = Math.max(0, FX.fade - dt * 3);
+    if (FX.rareT > 0) { FX.rareT -= dt; if (FX.rareT <= 0) $("rare").hidden = true; }
+
+    // 犬
+    if (P.inv > 0) P.inv -= dt;
+    if (S.bufT > 0) S.bufT -= dt;
+    if (S.happyT > 0) S.happyT -= dt;
+    if (!P.ground) {
+      P.vy += GRAV * dt; P.y += P.vy * dt;
+      if (P.y >= GROUND) {
+        P.y = GROUND; P.vy = 0; P.ground = true; P.jumps = 2; P.sq = 0.72;
+        if (playing) { sfx.land(); puff(P.x - 4, GROUND, 5, "dust", { vy: -10 }); }
+        if (playing && S.bufT > 0) { S.bufT = 0; jump(JUMP_V, 1); }
+      }
+    }
+    if (P.slide) {
+      if (!P.slideHeld) P.slideT -= dt;
+      if (P.slideT <= 0 && !P.slideHeld) P.slide = false;
+      if (P.ground && P.slide && S.speed > 100 && Math.random() < dt * 14) puff(P.x + 18, GROUND, 1, "dust", { vy: -12 });
+    }
+    P.sq += (1 - P.sq) * Math.min(1, dt * 12);
+    const rotT = P.dead ? (P.ground ? 0 : -0.5) : P.ground ? 0 : clamp(P.vy / 2200, -0.28, 0.32);
+    P.rot += (rotT - P.rot) * Math.min(1, dt * 10);
+    if (P.ground && S.speed > 1) P.ph += dt * (S.state === "ready" ? 7 : 9 + S.speed / 40);
+    if (P.ground && S.speed > 420) { P.dustT -= dt; if (P.dustT < 0) { P.dustT = 0.11; puff(P.x - 16, GROUND, 1, "dust", { vy: -10 }); } }
+
+    // 障害物
+    const sp = S.speed;
+    for (const o of obstacles) {
+      o.x -= (sp + (playing ? o.vx : (o.vx * sp) / 300)) * dt;
+      if (o.kind === "pigeons" && o.flee) o.fleeT += dt;
+      if (o.hit) { o.kvy += GRAV * dt; o.ky += o.kvy * dt; o.rot += o.spin * dt; o.x += 160 * dt; continue; }
+      if (!playing) continue;
+      if (o.kind !== "crow" && o.kind !== "noren" && o.x < P.x + 22 && o.x + o.w > P.x - 18) o.minClear = Math.min(o.minClear, GROUND - o.h - P.y);
+      if (P.inv <= 0 && hitTest(o)) {
+        if (S.shield) {
+          S.shield = false; P.inv = 1; o.hit = true; o.kvy = -520; o.spin = 9; sfx.guard();
+          floatText(P.x + 10, P.y - 60, "バリアで助かった！", "#7EF0D0", 15);
+          unlock("barrier");
+          puff(P.x + 10, P.y - 26, 18, "spark", { g: 0 });
+        } else die();
+        continue;
+      }
+      if (!o.hinted && o.x < P.x + 220) {
+        o.hinted = true;
+        hint(o.low || o.kind === "noren" ? "slide" : o.kind === "crow" ? "crow" : o.kind === "cat" ? "cat" : "jump");
+      }
+      if (!o.scored && o.x + o.w < P.x - 18) {
+        o.scored = true;
+        if ((o.kind === "noren" || o.low) && P.slide && P.ground) {
+          S.bonus += 15; floatText(P.x + 20, P.y - 50, "スライディング！ +15", "#9BE7FF", 14);
+          stats.slides++; saveStats();
+          if (stats.slides >= 10) unlock("slide10");
+        } else if (o.kind === "crow") {
+          if (P.ground) { S.bonus += 5; floatText(P.x + 20, P.y - 56, "くぐった +5", "#C9C3F0", 13); }
+        } else if (o.kind === "pigeons") {
+          o.flee = true; S.bonus += 10;
+          stats.pigeons++; saveStats();
+          if (stats.pigeons >= 10) unlock("pigeon10");
+          floatText(P.x + 20, P.y - 56, "バサバサッ +10", "#C9D6E8", 13);
+          tone(900, 0.05, "triangle", 0.03); tone(1100, 0.05, "triangle", 0.03, null, 0.05);
+        } else if (o.minClear >= 0 && o.minClear < 14 && o.kind !== "puddle") {
+          S.bonus += 20; sfx.near(); floatText(P.x + 20, P.y - 56, "ギリギリ！ +20", "#FFC857", 15);
+          if (++S.closes >= 5) unlock("close5");
+        } else S.bonus += 5;
+      }
+    }
+    obstacles = obstacles.filter((o) => o.x + o.w > -80 && o.ky < 400 && !(o.flee && o.fleeT > 2));
+
+    // アイテム
+    for (const it of pickups) {
+      if (playing && !it.hinted && it.y < GROUND - 140 && it.x < P.x + 260) { it.hinted = true; hint("dj"); }
+      it.x -= sp * dt; it.ph += dt * 4;
+      if (!playing || it.taken) continue;
+      const mx = P.x - it.x, my = P.y - 28 - it.y, d2 = mx * mx + my * my;
+      if (d2 < 52 * 52) {
+        const d = Math.sqrt(d2) || 1, pull = 520 * dt;
+        it.x += (mx / d) * Math.min(pull, d); it.y += (my / d) * Math.min(pull, d);
+      }
+      const dx = it.x - P.x, dy = it.y - (P.y - 28);
+      if (dx * dx + dy * dy < 30 * 30) take(it);
+    }
+    pickups = pickups.filter((it) => !it.taken && it.x > -40);
+
+    for (const p of parts) { p.life += dt; p.vy += p.g * dt; p.x += (p.vx - (p.scroll ? sp : 0)) * dt; p.y += p.vy * dt; }
+    parts = parts.filter((p) => p.life < p.max);
+    for (const t of texts) { t.life += dt; t.y -= 34 * dt; }
+    texts = texts.filter((t) => t.life < t.max);
+  }
+
+  /* ---------- 描画 ---------- */
+  const hud = new Map<string, string | boolean>();
+  function setText(name: string, v: string): void {
+    if (hud.get(name) === v) return;
+    hud.set(name, v);
+    $(name).textContent = v;
+  }
+  function setFlag(name: string, v: boolean, apply: (v: boolean) => void): void {
+    if (hud.get(name) === v) return;
+    hud.set(name, v);
+    apply(v);
+  }
+  function render(): void {
+    const e = stageEnv(envAt(S.clock));
+    const c = ctx;
+    c.setTransform(DPR * SC, 0, 0, DPR * SC, 0, 0);
+    drawSky(c, e);
+    ridge(c, S.bgCam * 0.006, GROUND - 40, STAGE_ID === "hiking" ? 78 : STAGE_ID === "snow" ? 52 : 34, rgb(mix(e.far, e.bot, 0.45)), 2.1);
+    ridge(c, S.bgCam * 0.014, GROUND - 26, STAGE_ID === "hiking" ? 62 : 40, rgb(e.far), 0);
+    drawMid(c, e);
+    const lamps: [number, number][] = [];
+    drawNear(c, e, lamps);
+    drawGround(c, e, lamps);
+    drawMarkers(c, e);
+
+    if (S.rain > 0.02 && STAGE.weather !== "snow") { c.fillStyle = `rgba(52,60,96,${0.22 * S.rain})`; c.fillRect(-20, -20, VW + 40, GROUND + 26); }
+    for (const o of obstacles) if (o.kind === "puddle") drawPuddle(c, o.x, GROUND, o.w, S.time, e.night, STAGE_ID);
+    for (const it of pickups) {
+      const y = it.y + Math.sin(it.ph) * 2.2, rarity = it.item.rarity, R = RARITY_STYLES[rarity];
+      if (rarity === "MR") { c.save(); c.globalCompositeOperation = "lighter"; glow(c, it.x, y, 30, hslRgb((S.time * 120 + it.x) % 360), 0.55); c.restore(); }
+      else if (R.glow) glow(c, it.x, y, rarity === "R" ? 20 : 26, R.glow, rarity === "R" ? 0.35 : 0.45 + Math.sin(S.time * 5 + it.ph) * 0.1);
+      const size = rarity === "N" ? 28 : rarity === "R" || rarity === "SR" ? 30 : 34;
+      drawItemImg(c, it.item, it.x, y, size);
+      if (rarityIndex(rarity) >= 3 && Math.sin(S.time * 6 + it.ph) > 0.6) star(c, it.x + 12, y - 12, 3, R.color);
+    }
+    for (const o of obstacles) {
+      if (o.kind === "puddle") continue;
+      c.save();
+      if (o.hit) {
+        const cx = o.x + o.w / 2, cy = GROUND - o.h / 2 + o.ky;
+        c.translate(cx, cy); c.rotate(o.rot); c.translate(-cx, -cy); c.translate(0, o.ky);
+      }
+      if (!o.hit && o.kind !== "crow" && o.kind !== "noren" && !o.flee) { c.fillStyle = "rgba(20,16,40,.22)"; ell(c, o.x + o.w / 2, GROUND + 1, o.w * 0.55, 3); c.fill(); }
+      if (o.kind === "crow" && !o.hit) { c.fillStyle = "rgba(20,16,40,.18)"; ell(c, o.x + o.w / 2, GROUND + 3, 13, 2.5); c.fill(); }
+      if (e.night > 0.2) {
+        c.shadowColor = o.kind === "crow" ? `rgba(255,236,210,${0.95 * e.night})` : `rgba(255,228,170,${0.7 * e.night})`;
+        c.shadowBlur = (o.kind === "crow" ? 7 : 5) * DPR * SC;
+      }
+      const lk = STAGE_ID;
+      if (o.kind === "cone") {
+        if (lk === "hiking") drawRock(c, o.x, GROUND, o.w, o.h);
+        else if (lk === "snow") drawSnowman(c, o.x, GROUND, o.w, false);
+        else if (lk === "summer") drawWatermelon(c, o.x, GROUND, o.w);
+        else drawCone(c, o.x, GROUND, o.w, o.h);
+      } else if (o.kind === "bike") {
+        if (lk === "hiking") drawLog(c, o.x, GROUND, o.w);
+        else if (lk === "snow") drawSled(c, o.x, GROUND, o.w);
+        else if (lk === "summer") drawGoldfishTub(c, o.x, GROUND, o.w);
+        else drawBike(c, o.x, GROUND, o.w);
+      } else if (o.kind === "sign") {
+        if (lk === "hiking") drawSignpost(c, o.x, GROUND, o.w, o.h);
+        else if (lk === "snow") drawSnowman(c, o.x + 2, GROUND, o.w - 4, true);
+        else if (lk === "summer") drawKakigoriFlag(c, o.x, GROUND, o.w, o.h, S.time);
+        else drawSign(c, o.x, GROUND, o.w, o.h, S.time, e.night);
+      } else if (o.kind === "noren") drawNoren(c, o.x, o.w, GROUND, S.time, lk);
+      else if (o.kind === "cat") drawCat(c, o.x, GROUND, o.w, S.time, e.night, lk === "snow");
+      else if (o.kind === "pigeons") drawPigeons(c, o.x, o.birds, o.flee, o.fleeT, GROUND, S.time);
+      else if (o.kind === "crow") drawCrow(c, o.x, o.y + Math.sin(S.time * 5 + o.x * 0.01) * 2, o.w, o.h, S.time);
+      c.restore();
+    }
+    for (const o of obstacles) {
+      if (o.kind !== "crow" || o.hit || o.x <= VW - 16) continue;
+      const a = 0.75 + Math.sin(S.time * 18) * 0.25, wy = o.y + o.h / 2;
+      c.fillStyle = `rgba(228,87,46,${a})`; c.beginPath(); c.arc(VW - 18, wy, 10, 0, Math.PI * 2); c.fill();
+      c.fillStyle = "#fff"; c.font = font(14); c.textAlign = "center"; c.textBaseline = "middle"; c.fillText("!", VW - 18, wy + 1);
+    }
+    if (e.night > 0.35 && (STAGE_ID === "town" || STAGE_ID === "hiking")) {
+      c.save(); c.globalCompositeOperation = "lighter";
+      for (const f of flies) {
+        f.x -= ((S.speed * 0.25) / VW + 0.01 * f.s) * FDT;
+        if (f.x < -0.05) { f.x = 1.05; f.y = rand(0.2, 1); }
+        const fx = f.x * VW, fy = GROUND - 30 - f.y * 70 + Math.sin(S.time * 1.3 * f.s + f.p) * 8;
+        const a = (e.night - 0.35) * 1.5 * (0.4 + 0.6 * Math.max(0, Math.sin(S.time * 2.2 * f.s + f.p)));
+        glow(c, fx, fy, 9, "210,255,140", a * 0.5);
+        c.fillStyle = `rgba(235,255,190,${a})`; c.fillRect(fx - 0.8, fy - 0.8, 1.6, 1.6);
+      }
+      c.restore();
+    }
+
+    const k = 1 - clamp((GROUND - P.y) / 170, 0, 0.75);
+    c.fillStyle = `rgba(20,16,40,${0.22 * k})`; ell(c, P.x, GROUND + 1, 26 * k + 4, 3.5 * k + 1); c.fill();
+    if (!(P.inv > 0 && Math.floor(S.time * 16) % 2)) drawDog(c, P.x, P.y);
+
+    for (const p of parts) {
+      const a = 1 - p.life / p.max;
+      if (p.kind === "dust") { c.fillStyle = rgb(shade(e.side, 0.35), a * 0.7); c.beginPath(); c.arc(p.x, p.y, p.r * (1 + p.life * 2), 0, Math.PI * 2); c.fill(); }
+      else if (p.kind === "fw") { c.fillStyle = `rgba(${p.color},${a})`; c.beginPath(); c.arc(p.x, p.y, p.r * (0.6 + a * 0.6), 0, Math.PI * 2); c.fill(); }
+      else if (p.kind === "splash") { c.strokeStyle = `rgba(210,228,255,${a * 0.8})`; c.lineWidth = 1; ell(c, p.x, p.y, 1 + p.life * 22, 0.6 + p.life * 5); c.stroke(); }
+      else if (p.kind === "ring") { c.strokeStyle = `rgba(255,255,255,${a * 0.7})`; c.lineWidth = 1.5; ell(c, p.x, p.y, 4 + p.life * 50, 1.5 + p.life * 10); c.stroke(); }
+      else star(c, p.x, p.y, p.r * a + 1, `rgba(255,214,110,${a})`);
+    }
+    if (flyers.length) {
+      const r = $("score").getBoundingClientRect(), sr = stageEl.getBoundingClientRect();
+      const tx = (r.left - sr.left + 18) / SC, ty = (r.top - sr.top + 16) / SC;
+      for (const f of flyers) {
+        const kk = Math.min(1, f.t), ez = kk * kk, cx = f.x0 - 30, cy = Math.min(f.y0, ty) - 60;
+        const x = (1 - ez) * (1 - ez) * f.x0 + 2 * (1 - ez) * ez * cx + ez * ez * tx;
+        const y = (1 - ez) * (1 - ez) * f.y0 + 2 * (1 - ez) * ez * cy + ez * ez * ty;
+        c.globalAlpha = 1 - kk * 0.3; drawItemImg(c, f.item, x, y, 28 * (1 - kk * 0.55)); c.globalAlpha = 1;
+      }
+    }
+    c.textAlign = "center"; c.textBaseline = "middle"; c.lineJoin = "round";
+    for (const t of texts) {
+      const a = 1 - Math.max(0, (t.life - t.max * 0.55) / (t.max * 0.45));
+      const pop = RM ? 1 : 1 + Math.max(0, 0.25 - t.life) * 1.6;
+      c.font = font(t.size * pop);
+      c.strokeStyle = `rgba(22,21,46,${a * 0.85})`; c.lineWidth = 4; c.strokeText(t.text, t.x, t.y);
+      c.globalAlpha = a; c.fillStyle = t.color; c.fillText(t.text, t.x, t.y); c.globalAlpha = 1;
+    }
+    if (STAGE.weather === "snow") {
+      const inten = 0.35 + 0.65 * S.rain, n = Math.round(drops.length * inten * (S.calm ? 0.5 : 1));
+      c.fillStyle = "rgba(255,255,255,.85)";
+      for (let i = 0; i < n; i++) {
+        const d = drops[i]!;
+        d.y += d.v * 0.25 * FDT;
+        if (d.y > 1) { d.y -= 1.05; d.x = Math.random(); }
+        const x = d.x * VW + Math.sin(S.time + i) * 6, y = d.y * (GROUND + 24);
+        c.beginPath(); c.arc(x, y, 0.8 + d.l / 12, 0, Math.PI * 2); c.fill();
+      }
+    } else if (S.rain > 0.02) {
+      const n = Math.round(drops.length * S.rain * (S.calm ? 0.45 : 1));
+      c.strokeStyle = `rgba(200,220,255,${0.45 * S.rain})`; c.lineWidth = 1; c.beginPath();
+      for (let i = 0; i < n; i++) {
+        const d = drops[i]!;
+        d.y += d.v * 1.3 * FDT * (VH / 300); d.x -= 0.05 * FDT;
+        if (d.y > 1) {
+          d.y -= 1.05; d.x = Math.random() * 1.1;
+          if (Math.random() < 0.3 && FDT > 0) parts.push({ x: d.x * VW, y: GROUND + rand(0, 16), vx: 0, vy: 0, life: 0, max: 0.25, r: 2, kind: "splash", color: "", g: 0, scroll: true });
+        }
+        const x = d.x * VW, y = d.y * (GROUND + 24);
+        c.moveTo(x, y); c.lineTo(x - d.l * 0.18, y + d.l);
+      }
+      c.stroke();
+    }
+    if (FX.fade > 0.01) { c.fillStyle = `rgba(16,14,34,${FX.fade * 0.85})`; c.fillRect(-20, -20, VW + 40, VH + 40); }
+    if (FX.flash > 0.02) { c.fillStyle = `rgba(${FX.flashCol},${FX.flash * 0.6})`; c.fillRect(-20, -20, VW + 40, VH + 40); }
+    if (e.night > 0.05) {
+      const g = c.createRadialGradient(VW / 2, VH * 0.55, VH * 0.3, VW / 2, VH * 0.55, VW * 0.75);
+      g.addColorStop(0, "rgba(10,8,30,0)"); g.addColorStop(1, `rgba(10,8,30,${0.35 * e.night})`);
+      c.fillStyle = g; c.fillRect(-20, -20, VW + 40, VH + 40);
+    }
+
+    // HUD
+    setFlag("hud-left", S.state === "ready", (v) => { $("hud-left").style.visibility = v ? "hidden" : "visible"; });
+    setText("score", score().toLocaleString());
+    setText("meta", `${Math.floor(S.dist / 50)}m ・ アイテム ${S.treats}`);
+    setText("clock", fmtClock(S.clock));
+    setText("phase", phaseName(S.clock) + (S.rain > 0.3 ? (STAGE.weather === "snow" ? "・雪" : "・雨") : ""));
+    const secKey = S.state === "play" && S.sec !== "normal" ? S.sec : "";
+    setFlag("sec-on", Boolean(secKey), (v) => { $("sec-chip").hidden = !v; });
+    if (secKey) {
+      $("sec-chip").dataset.k = secKey;
+      setText("sec-chip", `${secKey === "bonus" ? "ボーナスタイム" : "ラッシュ"} あと${Math.ceil(S.secT)}秒`);
+    }
+    setText("combo-text", `×${S.mult} コンボ`);
+    $("combo-bar").style.transform = `scaleX(${clamp(S.chainT / 1.5, 0, 1).toFixed(3)})`;
+    setFlag("combo-on", S.mult > 1 && S.state === "play", (v) => { $("combo").dataset.off = v ? "0" : "1"; });
+    setFlag("charm-on", S.shield && S.state === "play", (v) => { $("charm").dataset.off = v ? "0" : "1"; });
+    setFlag("pause-on", S.state === "play" && !S.paused, (v) => { $("pause-btn").hidden = !v; });
+    setFlag("gear-on", (S.state === "ready" || S.state === "over") && $("settings-panel").hidden, (v) => { $("gear").hidden = !v; });
+    if (S.state !== "play" && S.state !== "dying" && FX.rareT > 0) { FX.rareT = 0; $("rare").hidden = true; }
+  }
+
+  /* ---------- よけるものの小さな絵 ---------- */
+  function drawIcons(): void {
+    const dpr = Math.min(window.devicePixelRatio || 1, 2);
+    for (const cv of $$<HTMLCanvasElement>("canvas[data-icon]")) {
+      cv.width = 56 * dpr; cv.height = 44 * dpr;
+      const c = cv.getContext("2d");
+      if (!c) continue;
+      c.setTransform(dpr, 0, 0, dpr, 0, 0);
+      c.clearRect(0, 0, 56, 44);
+      const kind = cv.dataset.icon;
+      if (kind === "cone") { drawCone(c, 6, 38, 20, 28); drawPuddle(c, 26, 32, 26, 0.3, 0, "town"); }
+      else if (kind === "bike") { c.save(); c.translate(4, 4); c.scale(0.76, 0.76); drawBike(c, 0, 48, 62); c.restore(); }
+      else if (kind === "crow") drawCrow(c, 12, 12, 34, 20, 0.1);
+      else if (kind === "cat") drawCat(c, 12, 38, 34, 0.2, 0, false);
+      else if (kind === "sign") drawSign(c, 8, 42, 40, 38, 0, 0);
+      else if (kind === "pigeons") drawPigeons(c, 6, [{ dx: 10, p: 0, delay: 0 }, { dx: 30, p: 2, delay: 0 }], false, 0, 34, 0.3);
+      else if (kind === "noren") { c.save(); c.scale(0.6, 0.6); drawNoren(c, 30, 34, 100, 0, "town"); c.restore(); }
+    }
+  }
+
+  /* ---------- ループ ---------- */
+  let last = performance.now(), raf = 0, stopped = false;
+  function frame(now: number): void {
+    if (stopped) return;
+    const dt = Math.min(1 / 30, (now - last) / 1000);
+    last = now;
+    FDT = S.paused ? 0 : dt;
+    if (FX.hitstop > 0) { FX.hitstop -= dt; FDT = 0; render(); }
+    else { update(dt); render(); bgmTick(); }
+    raf = requestAnimationFrame(frame);
+  }
+
+  buildStageList();
+  selectStage(STAGE_ID);
+  renderAchList();
+  renderZukan();
+  buildRarityGuide();
+  drawIcons();
+  void document.fonts?.ready.then(() => { if (!stopped) drawIcons(); });
+  P.y = GROUND;
+  raf = requestAnimationFrame(frame);
+
+  return () => {
+    stopped = true;
+    cancelAnimationFrame(raf);
+    for (const fn of cleanups.splice(0)) fn();
+    bgmStop();
+    if (rainNode) { try { rainNode.src.stop(); } catch { /* 停止済み */ } rainNode.src.disconnect(); rainNode = null; }
+    if (A) {
+      const rig = A;
+      window.setTimeout(() => rig.master.disconnect(), 450);
+      A = null;
+    }
+  };
+}
