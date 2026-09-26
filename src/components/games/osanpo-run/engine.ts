@@ -1393,7 +1393,11 @@ export function createOsanpoRun(root: HTMLElement, opts: OsanpoRunOptions): () =
       b.setAttribute("aria-label", got ? `${it.rarity} ${it.name}` : `${it.rarity} まだ拾っていないアイテム`);
       b.appendChild(spriteEl(it, 40, got, true));
       if (zkNew.has(it.id)) { const nb = document.createElement("span"); nb.className = "osr-nb"; nb.textContent = "NEW"; b.appendChild(nb); }
-      on(b, "click", () => { zkNew.delete(it.id); b.querySelector(".osr-nb")?.remove(); zkShow(it.id); });
+      on(b, "click", () => {
+        zkNew.delete(it.id); b.querySelector(".osr-nb")?.remove(); zkShow(it.id);
+        // スマホでは詳細が一覧の上にあるので、下の方のアイテムを選んだら詳細まで戻す
+        if (window.matchMedia("(max-width: 760px)").matches) $("zk-detail").scrollIntoView({ block: "nearest", behavior: RM ? "auto" : "smooth" });
+      });
       li.appendChild(b); grid.appendChild(li);
     }
     zkShow(zkSel && list.some((it) => it.id === zkSel) ? zkSel : null);
@@ -1966,12 +1970,19 @@ export function createOsanpoRun(root: HTMLElement, opts: OsanpoRunOptions): () =
     store.set(`rec-${STAGE_ID}`, JSON.stringify(recs.slice(0, 5)));
     lastRecordAt = now;
     S.lastResult = { score: sc, m: meters, items: S.treats, rank: rank.label };
-    $("over-sub").textContent = `${STAGE.name} ・ ${STAGE.skinName}`;
+    $("over-sub").textContent = `${STAGE.name} ・ ${STAGE.skinName} ・ ${fmtClock(S.clock)}帰宅`;
     if (isNew && sc > 0) sfx.record(); else sfx.home();
     countUp($("o-score"), sc);
     $("o-best").textContent = S.best.toLocaleString();
     $("o-new").hidden = !isNew;
-    $("o-line").textContent = `${meters}m ・ ほね${S.bones} ・ アイテム${S.treats}こ ・ 最大×${S.maxMult} ・ ${fmtClock(S.clock)}帰宅`;
+    // 距離・ほね・アイテム・コンボを小さなマスに並べる（1行に詰めると折り返して読みにくい）
+    $("o-line").replaceChildren(...([["きょり", `${meters}m`], ["ほね", `${S.bones}`], ["アイテム", `${S.treats}`], ["最大コンボ", `×${S.maxMult}`]] as const).map(([k, v]) => {
+      const cell = document.createElement("div");
+      const dt = document.createElement("dt"); dt.textContent = k;
+      const dd = document.createElement("dd"); dd.textContent = v;
+      cell.append(dt, dd);
+      return cell;
+    }));
     const haul = $("o-haul");
     haul.replaceChildren();
     const got = [...S.haul.keys()]
