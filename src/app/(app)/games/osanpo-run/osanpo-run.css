@@ -61,6 +61,10 @@
   max-width: 1040px; height: 100%; margin: 0 auto; display: flex; flex-direction: column;
   padding: 10px 10px max(10px, env(safe-area-inset-bottom));
 }
+/* タッチ端末: 画面の下ふちから下スワイプすると iOS の簡易アクセスが動くので、ゲーム画面の下に少し余白をとる */
+@media (pointer: coarse) {
+  .osr .osr-wrap { padding-bottom: max(28px, calc(env(safe-area-inset-bottom) + 18px)); }
+}
 .osr .osr-lede { margin: 0; color: var(--osr-muted); font-size: 13px; }
 
 /* ---------- ゲーム画面 ---------- */
