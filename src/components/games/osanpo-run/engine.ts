@@ -1124,6 +1124,13 @@ export function createOsanpoRun(root: HTMLElement, opts: OsanpoRunOptions): () =
   on(window, "pointerup", () => { swipe = null; release(); });
   on(window, "pointercancel", () => { swipe = null; release(); });
   on(stageEl, "contextmenu", (e) => e.preventDefault());
+  // iOS で長押しすると拡大鏡（ルーペ）や選択が出るので、ゲーム画面の上ではタッチの既定動作を止める。
+  // パネルやボタンの上はタップ（click）を生かすため止めない
+  on(stageEl, "touchstart", (e) => {
+    const target = e.target instanceof Element ? e.target : null;
+    if (target?.closest(".osr-panel, .osr-icon-btn, button, a, input, label")) return;
+    if (e.cancelable) e.preventDefault();
+  }, { passive: false });
   // iOS で画面ごと引っぱられないよう、ゲーム画面の上だけスクロールを止める
   on(stageEl, "touchmove", (e) => {
     const target = e.target instanceof Element ? e.target : null;
