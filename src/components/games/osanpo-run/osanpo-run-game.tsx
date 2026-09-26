@@ -106,61 +106,53 @@ export function OsanpoRunGame({ items, usesSampleItems, unlockedStages, seriesTa
                 <span><kbd>↓</kbd>か下スワイプでスライディング</span>
               </div>
               <button className="osr-btn" data-osr="start" type="button" disabled>準備中…</button>
+              <nav className="osr-menu" aria-label="メニュー">
+                <button type="button" data-sheet="rules">ルール</button>
+                <button type="button" data-sheet="zukan">ずかん</button>
+                <button type="button" data-sheet="ach">称号</button>
+                <button type="button" data-sheet="records">記録</button>
+              </nav>
               <div className="osr-panel-foot">
                 <button className="osr-chip-toggle" type="button" data-opt="calm" aria-pressed="true"><span className="osr-dot" aria-hidden="true" />ゆったりモード</button>
-                <span className="osr-foot-links">
-                  <a className="osr-link-btn" href="#osr-zukan">ずかん</a>
-                  <button className="osr-link-btn" type="button" data-open="settings">設定</button>
-                </span>
+                <button className="osr-link-btn" type="button" data-open="settings">設定</button>
               </div>
               <p className="osr-preview-note">お試し版のため、コインはもらえません。記録はこの端末に保存されます。</p>
             </div>
 
-            <div className="osr-panel osr-wide" data-osr="over-panel" hidden>
+            <div className="osr-panel" data-osr="over-panel" hidden>
               <div className="osr-over-head">
-                {/* 犬のポーズはゲーム中にステージのスキンへ差し替えるため、next/image ではなく img を使う */}
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img className="osr-dog" data-pose="lie-wave" src="/characters/default/lie-wave.webp" alt="" width={76} height={64} />
                 <div className="osr-over-title">
                   <h2 data-osr="over-title">ただいま！</h2>
                   <p data-osr="over-sub" />
                 </div>
                 <div className="osr-rank" data-osr="rank" role="img" aria-label="ランク">C</div>
               </div>
-              <div className="osr-over-cols">
-                <div className="osr-over-col">
-                  <dl className="osr-stats">
-                    <div className="osr-big"><dt>スコア</dt><dd data-osr="o-score">0</dd></div>
-                    <div><dt>じこベスト</dt><dd><span data-osr="o-best">0</span><span className="osr-new" data-osr="o-new" hidden>更新</span></dd></div>
-                    <div><dt>歩いた距離</dt><dd data-osr="o-dist">0m</dd></div>
-                    <div><dt>拾ったアイテム</dt><dd data-osr="o-items">0こ</dd></div>
-                    <div><dt>帰宅時刻</dt><dd data-osr="o-clock">17:20</dd></div>
-                    <div><dt>最大コンボ</dt><dd data-osr="o-combo">×1</dd></div>
-                  </dl>
-                  <p className="osr-comment" data-osr="o-comment" />
+              <div className="osr-result">
+                <div>
+                  <span className="osr-result-label">スコア</span>
+                  <b className="osr-result-score" data-osr="o-score">0</b>
                 </div>
-                <div className="osr-over-col">
-                  <div className="osr-haul" data-osr="o-haul-wrap">
-                    <h3>今回のベストアイテム</h3>
-                    <div className="osr-haul-row" data-osr="o-haul" />
-                    <p className="osr-breakdown" data-osr="o-break" />
-                    <p className="osr-new-line" data-osr="o-new-line" hidden />
-                  </div>
-                  <div className="osr-haul" data-osr="o-ach-wrap" hidden>
-                    <h3>今回ゲットした称号</h3>
-                    <div className="osr-ach-row" data-osr="o-ach" />
-                  </div>
-                  <div className="osr-haul">
-                    <h3 data-osr="top-title">この道のベスト5</h3>
-                    <ol className="osr-top5" data-osr="top" />
-                  </div>
+                <div className="osr-result-best">
+                  <span className="osr-result-label">じこベスト<span className="osr-new" data-osr="o-new" hidden>更新</span></span>
+                  <b data-osr="o-best">0</b>
                 </div>
               </div>
+              <p className="osr-result-line" data-osr="o-line" />
+              <div className="osr-haul" data-osr="o-haul-wrap">
+                <div className="osr-haul-row" data-osr="o-haul" />
+                <p className="osr-new-line" data-osr="o-new-line" hidden />
+              </div>
+              <div className="osr-ach-row" data-osr="o-ach" hidden />
               <div className="osr-btn-row">
                 <button className="osr-btn" data-osr="retry" type="button">もう一回おさんぽ</button>
                 <button className="osr-btn osr-ghost" data-osr="stage-btn" type="button">道を変える</button>
-                <button className="osr-btn osr-ghost" data-osr="copy" type="button">結果をコピー</button>
               </div>
+              <nav className="osr-menu osr-menu-small" aria-label="メニュー">
+                <button type="button" data-sheet="records">記録</button>
+                <button type="button" data-sheet="zukan">ずかん</button>
+                <button type="button" data-sheet="ach">称号</button>
+                <button type="button" data-osr="copy">コピー</button>
+              </nav>
               <p className="osr-copy-note" data-osr="copy-note" hidden />
             </div>
 
@@ -184,57 +176,70 @@ export function OsanpoRunGame({ items, usesSampleItems, unlockedStages, seriesTa
             </div>
           </div>
 
-          <p className="osr-lede">
-            まち・山道・雪国・夏まつりの4つの道を、フレブルと散歩。落ちているのは、あなたが図鑑で持っているアイテムです。季節の道は、ガチャでその季節のフレブルを手に入れると歩けます。
-          </p>
-
-          <div className="osr-guide">
-            <section>
-              <h2>そうさ</h2>
-              <ul>
-                <li className="osr-ctl"><span><kbd>スペース</kbd></span><div><b>ジャンプ</b><small>タップ・クリック・<kbd>↑</kbd><kbd>W</kbd>でもOK。長押しで高く、ちょんと押すと低く跳ぶ。</small></div></li>
-                <li className="osr-ctl"><span><kbd>↓</kbd></span><div><b>スライディング</b><small>下スワイプでもOK。のれん・低い枝・つららや、低く飛ぶカラスの下をくぐれる。空中で押すと急降下。</small></div></li>
-                <li className="osr-ctl"><span><kbd>2回</kbd></span><div><b>2段ジャンプ</b><small>空中でもう一回。高いところのアイテムも取れる。</small></div></li>
-                <li className="osr-ctl"><span><kbd>イベント</kbd></span><div><b>ボーナス・ラッシュ・雨</b><small>ときどきアイテムだらけのボーナスタイム、障害物が続くラッシュ（突破で+100）、雨や雪が来る。</small></div></li>
-                <li className="osr-ctl"><span><kbd>P</kbd></span><div><b>一時停止</b><small>右上のボタンでもOK。「最初から」「道を選ぶ」「設定」もここから。</small></div></li>
-              </ul>
+            <section className="osr-sheet" data-osr="sheet-rules" hidden aria-label="ルール">
+              <header className="osr-sheet-head"><button type="button" className="osr-sheet-back" data-close-sheet>‹ もどる</button><h2>ルール</h2></header>
+              <div className="osr-sheet-body">
+                <p className="osr-lede">
+                  まち・山道・雪国・夏まつりの4つの道を、フレブルと散歩。落ちているのは、あなたが図鑑で持っているアイテムです。季節の道は、ガチャでその季節のフレブルを手に入れると歩けます。
+                </p>
+                <div className="osr-guide">
+                  <section>
+                    <h3>そうさ</h3>
+                    <ul>
+                      <li className="osr-ctl"><span><kbd>タップ</kbd></span><div><b>ジャンプ</b><small>スペース・<kbd>↑</kbd>でもOK。長押しで高く、ちょんと押すと低く跳ぶ。空中でもう一回で2段ジャンプ。</small></div></li>
+                      <li className="osr-ctl"><span><kbd>↓</kbd></span><div><b>スライディング</b><small>下スワイプでもOK。のれん・低い枝・つららや、低く飛ぶカラスの下をくぐれる。空中で押すと急降下。</small></div></li>
+                      <li className="osr-ctl"><span><kbd>イベント</kbd></span><div><b>ボーナス・ラッシュ・雨</b><small>ときどきアイテムだらけのボーナスタイム、障害物が続くラッシュ（突破で+100）、雨や雪が来る。</small></div></li>
+                      <li className="osr-ctl"><span><kbd>II</kbd></span><div><b>一時停止</b><small>右上のボタン（キーボードはP）。「最初から」「道を選ぶ」「設定」もここから。</small></div></li>
+                    </ul>
+                  </section>
+                  <section>
+                    <h3>ひろうもの ・ あなたの図鑑アイテム</h3>
+                    <ul className="osr-rarity-list" data-osr="rarity-list" />
+                  </section>
+                  <section>
+                    <h3>よけるもの</h3>
+                    <ul>
+                      <li className="osr-note-li"><small>道ごとに見た目が変わります（例：山道では岩・倒木・道標、雪国では雪だるま・ソリ・つらら）。</small></li>
+                      <li><canvas data-icon="cone" /><div><b>コーン・水たまり</b><small>ちょんと跳べば越えられる。</small></div></li>
+                      <li><canvas data-icon="bike" /><div><b>ママチャリ</b><small>横に長いので、しっかり長押しで。</small></div></li>
+                      <li><canvas data-icon="crow" /><div><b>カラス</b><small>跳ぶとぶつかる。走ったまま下をくぐると+5。</small></div></li>
+                      <li><canvas data-icon="cat" /><div><b>ねこ</b><small>こっちに歩いてくるので、いつもより早めに跳ぶ。</small></div></li>
+                      <li><canvas data-icon="sign" /><div><b>工事中の看板</b><small>背が高い。しっかり長押しで。</small></div></li>
+                      <li><canvas data-icon="noren" /><div><b>のれん</b><small>上から垂れているので跳び越えられない。スライディングでくぐると+15。</small></div></li>
+                      <li><canvas data-icon="pigeons" /><div><b>ハト</b><small>小さくジャンプで越えると飛び立って+10。</small></div></li>
+                    </ul>
+                  </section>
+                </div>
+              </div>
             </section>
-            <section>
-              <h2>ひろうもの ・ あなたの図鑑アイテム</h2>
-              <ul className="osr-rarity-list" data-osr="rarity-list" />
+
+            <section className="osr-sheet" data-osr="sheet-zukan" hidden aria-label="ずかん">
+              <header className="osr-sheet-head"><button type="button" className="osr-sheet-back" data-close-sheet>‹ もどる</button><h2>ずかん <span data-osr="zk-count">0 / 0</span></h2></header>
+              <div className="osr-sheet-body">
+                <p className="osr-zk-rar" data-osr="zk-rar" />
+                <div className="osr-zk-tabs" data-osr="zk-tabs" role="tablist" aria-label="シリーズ" />
+                <div className="osr-zk-body">
+                  <div className="osr-zk-detail" data-osr="zk-detail" aria-live="polite" />
+                  <ul className="osr-zk-grid" data-osr="zk-grid" />
+                </div>
+              </div>
             </section>
-            <section>
-              <h2>よけるもの</h2>
-              <ul>
-                <li className="osr-note-li"><small>道ごとに見た目が変わります（例：山道では岩・倒木・道標、雪国では雪だるま・ソリ・つらら）。</small></li>
-                <li><canvas data-icon="cone" /><div><b>コーン・水たまり</b><small>ちょんと跳べば越えられる。</small></div></li>
-                <li><canvas data-icon="bike" /><div><b>ママチャリ</b><small>横に長いので、しっかり長押しで。</small></div></li>
-                <li><canvas data-icon="crow" /><div><b>カラス</b><small>跳ぶとぶつかる。走ったまま下をくぐると+5。</small></div></li>
-                <li><canvas data-icon="cat" /><div><b>ねこ</b><small>こっちに歩いてくるので、いつもより早めに跳ぶ。</small></div></li>
-                <li><canvas data-icon="sign" /><div><b>工事中の看板</b><small>背が高い。しっかり長押しで。</small></div></li>
-                <li><canvas data-icon="noren" /><div><b>のれん</b><small>上から垂れているので跳び越えられない。スライディングでくぐると+15。</small></div></li>
-                <li><canvas data-icon="pigeons" /><div><b>ハト</b><small>小さくジャンプで越えると飛び立って+10。</small></div></li>
-              </ul>
+
+            <section className="osr-sheet" data-osr="sheet-ach" hidden aria-label="称号">
+              <header className="osr-sheet-head"><button type="button" className="osr-sheet-back" data-close-sheet>‹ もどる</button><h2>称号 <span data-osr="ach-count">0 / 0</span></h2></header>
+              <div className="osr-sheet-body">
+                <ul className="osr-ach-list" data-osr="ach-list" />
+              </div>
             </section>
-          </div>
 
-          <section className="osr-sec" id="osr-zukan" aria-labelledby="osr-zukan-title">
-            <h2 id="osr-zukan-title">ずかん <span data-osr="zk-count">0 / 0</span></h2>
-            <p className="osr-zk-rar" data-osr="zk-rar" />
-            <div className="osr-zk-tabs" data-osr="zk-tabs" role="tablist" aria-label="シリーズ" />
-            <div className="osr-zk-body">
-              <ul className="osr-zk-grid" data-osr="zk-grid" />
-              <div className="osr-zk-detail" data-osr="zk-detail" aria-live="polite" />
-            </div>
-          </section>
-
-          <section className="osr-sec">
-            <h2>称号 <span data-osr="ach-count">0 / 0</span></h2>
-            <p className="osr-life-stats" data-osr="life-stats" />
-            <ul className="osr-ach-list" data-osr="ach-list" />
-          </section>
-
-          <p className="osr-foot">記録（ベストスコア・称号・ずかん）はこの端末にだけ保存されます。</p>
+            <section className="osr-sheet" data-osr="sheet-records" hidden aria-label="記録">
+              <header className="osr-sheet-head"><button type="button" className="osr-sheet-back" data-close-sheet>‹ もどる</button><h2>記録</h2></header>
+              <div className="osr-sheet-body">
+                <p className="osr-life-stats" data-osr="life-stats" />
+                <div className="osr-rec-grid" data-osr="rec-list" />
+                <p className="osr-foot">記録（ベストスコア・称号・ずかん）はこの端末にだけ保存されます。</p>
+              </div>
+            </section>
         </div>
       </main>
     </div>
