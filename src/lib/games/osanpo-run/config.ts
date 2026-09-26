@@ -135,10 +135,10 @@ export const OSANPO_RUN_COMMENTS: readonly (readonly [number, string])[] = [
 ];
 
 export const OSANPO_RUN_RANKS: readonly { min: number; label: string; color: string }[] = [
-  { min: 4000, label: "SS", color: "#FF84BC" },
-  { min: 2500, label: "S", color: "#FFC857" },
-  { min: 1400, label: "A", color: "#7EF0D0" },
-  { min: 600, label: "B", color: "#7CC4FF" },
+  { min: 35000, label: "SS", color: "#FF84BC" },
+  { min: 20000, label: "S", color: "#FFC857" },
+  { min: 10000, label: "A", color: "#7EF0D0" },
+  { min: 5000, label: "B", color: "#7CC4FF" },
   { min: 0, label: "C", color: "#ABA5CF" },
 ];
 
