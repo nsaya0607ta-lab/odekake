@@ -101,7 +101,7 @@ export function OsanpoRunGame({ items, usesSampleItems, unlockedStages, seriesTa
             </div>
             <div className="osr-hint" data-osr="hint" hidden />
             <div className="osr-ach-toast" data-osr="ach-toast" hidden><i>称号ゲット</i><b data-osr="ach-name" /></div>
-            <div className="osr-charm" data-osr="charm" data-off="1"><i>★</i>バリア発動中</div>
+            <div className="osr-charm" data-osr="charm" data-off="1"><i>★</i>守り：<span data-osr="charm-text">バリア</span></div>
 
             <div className="osr-panel" data-osr="start-panel">
               <h2>どこを散歩する？</h2>
@@ -194,7 +194,7 @@ export function OsanpoRunGame({ items, usesSampleItems, unlockedStages, seriesTa
                     <ul>
                       <li className="osr-ctl"><span><kbd>タップ</kbd></span><div><b>ジャンプ</b><small>スペース・<kbd>↑</kbd>でもOK。長押しで高く、ちょんと押すと低く跳ぶ。空中でもう一回で2段ジャンプ。</small></div></li>
                       <li className="osr-ctl"><span><kbd>↓</kbd></span><div><b>スライディング</b><small>下スワイプでもOK。のれん・低い枝・つららや、低く飛ぶカラスの下をくぐれる。空中で押すと急降下。</small></div></li>
-                      <li className="osr-ctl"><span><kbd>スキル</kbd></span><div><b>アイテムのスキル</b><small>アイテムを拾うと、そのアイテムのスキルが発動（全アイテムに1つずつ）。図鑑のスキルLvが高いほど強い。効果は「ずかん」でアイテムを選ぶと見られる。</small></div></li>
+                      <li className="osr-ctl"><span><kbd>スキル</kbd></span><div><b>アイテムのスキル</b><small>アイテムを拾うと、そのアイテムのスキルが発動（全アイテムに1つずつ）。図鑑のスキルLvが高いほど強い。身代わり・バリア・復活の「守り」は1回ぶんまでで、新しく拾うと入れかわる。効果は「ずかん」でアイテムを選ぶと見られる。</small></div></li>
                       <li className="osr-ctl"><span><kbd>イベント</kbd></span><div><b>ボーナス・ラッシュ・雨</b><small>ときどきアイテムだらけのボーナスタイム、障害物が続くラッシュ（突破で+100）、雨や雪が来る。</small></div></li>
                       <li className="osr-ctl"><span><kbd>II</kbd></span><div><b>一時停止</b><small>右上のボタン（キーボードはP）。「最初から」「道を選ぶ」「設定」もここから。</small></div></li>
                     </ul>

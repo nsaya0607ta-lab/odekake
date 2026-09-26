@@ -119,7 +119,10 @@ export type Fx =
   | { op: "next"; n: Lv; add?: Lv; mul?: Lv; up?: Lv; dup?: Lv; filter?: ItemFilter }
   /** 次の n 個のうち、いちばん点の高かったものを mul 倍 */
   | { op: "best"; n: Lv; mul: Lv }
-  /** 次にぶつかったとき n 回まで防ぐ。sec 以内だけ有効。after 秒の無敵がつく */
+  /**
+   * 次にぶつかったとき1回防ぐ（n は互換のため残しているが、守りは1回までなので1として扱う）。
+   * sec 以内だけ有効。after 秒の無敵がつく
+   */
   | { op: "guard"; n: Lv; sec?: Lv; kinds?: ObsGroup; pts?: Lv; after?: Lv }
   /** 前から来る障害物を n 個はじき飛ばす */
   | { op: "clear"; n: Lv; kinds?: ObsGroup; pts?: Lv }
@@ -135,7 +138,10 @@ export type Fx =
   | { op: "rush"; mul: Lv }
   /** 時計を進める（add 分）/ 決まった時刻にする（set）/ 夜なら粒を降らせ、昼なら夜まで進める（night） */
   | { op: "clock"; add?: number; set?: number; night?: Lv }
-  /** 1回だけ倒れても復活。keep=残るスコアの割合, pts=復活したとき, mul=復活後10秒のスコア倍率 */
+  /**
+   * 1回だけ倒れても復活。keep=残るスコアの割合, pts=復活したとき, mul=復活後10秒のスコア倍率。
+   * 身代わり・バリア・復活の「守り」は合わせて1回ぶんまでしか持てず、新しく拾うと入れかわる
+   */
   | { op: "revive"; keep?: number; pts?: Lv; mul?: Lv }
   /** このおさんぽ中、UR以上の出る確率 × mul */
   | { op: "rare"; mul: Lv }
@@ -217,7 +223,7 @@ export const OSANPO_RUN_SKILLS: readonly OsanpoRunSkill[] = [
   sk("toy_rope", "ひっぱりっこ", "combo", "5秒間、コンボが切れるまでの猶予が +0.5秒", "+1.5秒", [B({ sec: 5, comboGrace: [0.5, 1.5] })]),
   sk("toy_bone", "ほねほね貯金", "score", "拾うたび、このおさんぽ中ずっと全アイテム +1pt（10回まで貯まる）", "1回につき +3pt", [{ op: "stack", add: [1, 3], max: 10 }]),
   sk("toy_squeaky_ball", "ぴこっ！", "score", "「ぴこっ」と鳴って、画面内のハトが一斉に飛び立つ。1羽 +20pt", "1羽 +60pt", [{ op: "pigeons", per: [20, 60] }], true),
-  sk("toy_duck_plush", "ぷかぷかダイブ", "guard", "次の水たまりにぷかぷか浮いて通れる（+50pt）", "3回まで", [{ op: "guard", n: [1, 3], kinds: "puddle", pts: 50 }], true),
+  sk("toy_duck_plush", "ぷかぷかダイブ", "guard", "次の水たまりにぷかぷか浮いて通れる（+50pt）", "+150pt", [{ op: "guard", n: 1, kinds: "puddle", pts: [50, 150] }], true),
   sk("toy_carrot", "うさぎ跳び", "jump", "5秒間、ジャンプが1.2倍高くなる", "8秒間・1.5倍", [B({ sec: [5, 8], jump: [1.2, 1.5] })]),
   sk("toy_frisbee", "キャッチ＆ラン", "score", "次に拾う1個の点数 ×2", "×3", [{ op: "next", n: 1, mul: [2, 3] }]),
   sk("toy_treasure_puzzle", "宝さがし", "spawn", "少し先にSR以上のアイテムが1個出る", "SSR以上", [{ op: "spawn", n: 1, shape: "one", min: "SR" }]),
@@ -264,7 +270,7 @@ export const OSANPO_RUN_SKILLS: readonly OsanpoRunSkill[] = [
   sk("other_azubee", "あずびーダッシュ", "guard", "5秒間、猛ダッシュで無敵。通り道のアイテムを吸い寄せる", "8秒間", [B({ sec: [5, 8], inv: true, speed: 1.3, magnet: 120 })]),
   sk("other_omojii", "おじいちゃんのおさんぽ", "pace", "8秒間、のんびり歩き（速さ0.6倍）になるかわりに、スコア ×2", "12秒間・×3", [B({ sec: [8, 12], speed: 0.6, mul: [2, 3] })], true),
   sk("other_nakayoshi_azubee", "なかよしペア", "collect", "10秒間、もう1匹が取りこぼしを拾ってくれる（広く吸い寄せ）", "20秒間", [B({ sec: [10, 20], magnet: 100, wide: true })]),
-  sk("other_komochi", "こもち大行進", "guard", "子犬が3匹ついてくる。ぶつかったとき1匹ずつ身代わりになって帰っていく", "5匹", [{ op: "guard", n: [3, 5] }], true),
+  sk("other_komochi", "こもち大行進", "guard", "子犬がついてきて、ぶつかったとき1回だけ身代わりになって帰っていく", "身代わりのあと3秒無敵", [{ op: "guard", n: 1, after: [0, 3] }], true),
   sk("other_azuki", "あずき色の風", "combo", "次のラッシュを無敵で乗り切り、突破ボーナス ×2", "×3", [{ op: "rush", mul: [2, 3] }]),
   sk("other_kobee", "こびーのおねだり", "spawn", "10秒間、食べ物を拾うたび +100pt。前に食べ物が5個並ぶ", "15秒間", [B({ sec: [10, 15], itemAdd: 100, itemFilter: "food" }), { op: "spawn", n: 5, shape: "row", food: true }], true),
   sk("other_kamunayo", "かむなよ！", "guard", "次の自転車や看板をかじって壊す（+30pt）", "3回まで", [{ op: "clear", n: [1, 3], kinds: "bikesign", pts: 30 }], true),
