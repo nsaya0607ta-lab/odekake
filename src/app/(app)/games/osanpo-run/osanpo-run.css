@@ -94,6 +94,12 @@
 }
 .osr .osr-icon-btn:focus-visible { outline: 2px solid var(--osr-lantern); outline-offset: 2px; }
 .osr .osr-icon-btn svg { width: 18px; height: 18px; }
+.osr .osr-skills { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 6px; max-width: min(260px, 60vw); }
+.osr .osr-skills i { font-style: normal; font-weight: 800; font-size: 11px; line-height: 1.4; padding: 2px 8px; border-radius: 999px; background: rgba(22, 21, 46, 0.62); color: #ffe7a3; white-space: nowrap; text-shadow: none; }
+.osr .osr-zk-detail .osr-zk-skill { align-self: stretch; display: flex; flex-direction: column; gap: 2px; padding: 8px 10px; border-radius: 10px; background: rgba(255, 200, 87, 0.1); border: 1px solid rgba(255, 200, 87, 0.3); text-align: left; }
+.osr .osr-zk-detail .osr-zk-skill b { color: var(--osr-lantern); font-size: 13px; }
+.osr .osr-zk-detail .osr-zk-skill p { margin: 0; font-size: 12px; }
+.osr .osr-zk-detail .osr-zk-skill small { color: #7ef0d0; font-size: 11px; font-weight: 800; }
 .osr .osr-sec-chip { align-self: flex-start; margin-top: 6px; font-weight: 800; font-size: 12px; padding: 3px 10px; border-radius: 999px; text-shadow: none; white-space: nowrap; }
 .osr .osr-sec-chip[data-k="bonus"] { background: #ffc857; color: #2a1e0a; }
 .osr .osr-sec-chip[data-k="rush"] { background: #e4572e; color: #fff; }

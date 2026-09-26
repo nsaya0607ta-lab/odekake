@@ -4,6 +4,7 @@ import { OsanpoRunGame } from "@/components/games/osanpo-run/osanpo-run-game";
 import type { RunItem } from "@/components/games/osanpo-run/engine";
 import { CATEGORY_LABELS, COLLECTION_ITEMS, REGULAR_ITEMS, type CollectionItem } from "@/lib/collection/items";
 import { getOwnedItemCounts } from "@/lib/data/collection";
+import { getSkillLevel } from "@/lib/gacha/skill-levels";
 import { getDogSkin, isSkinUnlocked } from "@/lib/dog-skins";
 import { OSANPO_RUN_STAGE_IDS, OSANPO_RUN_STAGES } from "@/lib/games/osanpo-run/config";
 import { SERIES } from "@/lib/series";
@@ -20,10 +21,14 @@ export const dynamic = "force-dynamic";
 const MIN_OWNED_ITEMS = 5;
 const SAMPLE_ITEM_COUNT = 12;
 
-/** キャンバスに描く大きさ(最大34px)の2倍程度に縮めた画像URL */
-function toRunItem(item: CollectionItem & { image: string }): RunItem {
+/**
+ * キャンバスに描く大きさ(最大34px)の2倍程度に縮めた画像URLと、スキルLv。
+ * スキルLvはアイテムキャッチと同じ図鑑のLv（Nと見本のアイテムはLv1）。
+ */
+function toRunItem(item: CollectionItem & { image: string }, count: number): RunItem {
   const { props } = getImageProps({ src: item.image, alt: "", width: 48, height: 48 });
-  return { id: item.id, name: item.name, category: item.category, series: item.series, rarity: item.rarity, src: props.src };
+  const level = Math.max(1, getSkillLevel(item.rarity, count));
+  return { id: item.id, name: item.name, category: item.category, series: item.series, rarity: item.rarity, src: props.src, level };
 }
 
 export default async function OsanpoRunPage() {
@@ -37,7 +42,7 @@ export default async function OsanpoRunPage() {
   const samples = usesSampleItems
     ? REGULAR_ITEMS.filter(hasImage).filter((item) => item.rarity === "N" && !ownedIds.has(item.id)).slice(0, SAMPLE_ITEM_COUNT)
     : [];
-  const items = [...owned, ...samples].map(toRunItem);
+  const items = [...owned, ...samples].map((item) => toRunItem(item, ownedCounts.get(item.id) ?? 0));
 
   const unlockedStages = OSANPO_RUN_STAGE_IDS.filter((id) => isSkinUnlocked(getDogSkin(OSANPO_RUN_STAGES[id].skin), ownedIds));
   const seriesTabs = SERIES.map((series) => ({ id: series.id, name: series.name.replace(/シリーズ$/, "") }));
