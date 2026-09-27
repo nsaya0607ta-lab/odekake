@@ -122,6 +122,17 @@ export const OSANPO_RUN_ACHIEVEMENTS: readonly OsanpoRunAchievement[] = [
   { id: "hiking", name: "山道マスター", condition: "山道で300m歩く" },
   { id: "snow", name: "雪国マスター", condition: "雪国で300m歩く" },
   { id: "summer", name: "夏まつりマスター", condition: "夏まつりで300m歩く" },
+  // ---- ひとクセある仕掛け。接触してスキルで助かった場合は回避に数えない ----
+  { id: "suitcaseFirst", name: "手荷物はお預け", condition: "大脱走スーツケースをぶつからずにかわす" },
+  { id: "suitcaseUnder", name: "手荷物の下を失礼します", condition: "浮いたスーツケースの下を地面にいたまま通り抜ける" },
+  { id: "suitcaseJumps5", name: "荷物より身軽", condition: "スーツケースを跳び越える（累計5回・接触なし）" },
+  { id: "surpriseFirst", name: "置き配、飛び出し注意", condition: "びっくり宅配便をぶつからずにかわす" },
+  { id: "openBoxes5", name: "開封の儀は空中で", condition: "カエルが飛び出しきった宅配箱を跳び越える（累計5回・接触なし）" },
+  { id: "droneFirst", name: "配達員さん、頭上です", condition: "配達ドローンをぶつからずにかわす" },
+  { id: "droneSlides10", name: "低姿勢のVIP", condition: "ドローンの下をスライディングでくぐる（累計10回・接触なし）" },
+  { id: "trickTrio", name: "本日の散歩、情報量多め", condition: "1回のおさんぽでスーツケース・宅配箱・ドローンをすべて接触せずにかわす" },
+  { id: "trickStreak6", name: "町内スタント担当", condition: "途中でどの障害物にもぶつからず、新しい3種類の仕掛けを合計6回かわす" },
+  { id: "trickTour", name: "全国トラブル行脚", condition: "4つのステージそれぞれで、1回のおさんぽ中に新しい3種類すべてを接触せずにかわす" },
   // ---- 追加した障害物・スキルの称号 ----
   { id: "roller10", name: "おそうじロボの天敵", condition: "転がってくるものを跳び越える（累計10回）" },
   { id: "drop10", name: "頭上注意", condition: "上から落ちてくるものをよける（累計10回）" },
@@ -165,6 +176,9 @@ export const OSANPO_RUN_HINTS = {
   drop: "地面に影！ 上から何か落ちてくる",
   buddy: "ほかのフレブルはぶつかってもOK。ごあいさつすると点がもらえる",
   geyser: "水が止まった瞬間に通るか、2段ジャンプで越えよう",
+  suitcase: "荷物がバウンド！ 低いときは跳び越え、高いときは下を通ろう",
+  surprise: "箱がガタガタしたら飛び出す合図。2段ジャンプで高く越えよう！",
+  drone: "ランプが点滅したら降下！ 下スワイプで荷物の下をくぐろう",
 } as const;
 export type OsanpoRunHintId = keyof typeof OSANPO_RUN_HINTS;
 

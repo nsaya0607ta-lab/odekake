@@ -507,3 +507,100 @@ export function drawGeyser(c: Ctx, x: number, gy: number, w: number, top: number
   for(let i=0;i<4;i++) { const yy=-((t*80+i*top/4)%top); bead(c,2+i*6,yy,1.2,2,"#E6FAFF"); }
   c.restore(); c.restore();
 }
+
+/* ---------- ひとクセある仕掛け ---------- */
+const TRAVEL_COLORS: Record<OsanpoRunStageId, readonly [string, string]> = {
+  town: ["#BAA5EF", "#7753A2"], hiking: ["#B8CB83", "#637C54"],
+  snow: ["#A5DCEA", "#547FA8"], summer: ["#FFC89B", "#D27767"],
+};
+
+/** バウンド位置はengineから受け取り、影と本体と判定が別々に跳ねないようにする。 */
+export function drawSuitcase(c: Ctx, x: number, bottom: number, w: number, h: number, t: number, look: OsanpoRunStageId): void {
+  c.save(); c.translate(x, bottom); c.scale(w / 38, h / 34); c.lineCap = "round";
+  const [light, dark] = TRAVEL_COLORS[look];
+  for (const xx of [9, 29]) {
+    bead(c, xx, -2.8, 3, 2.8, "#424059");
+    c.save(); c.translate(xx, -2.8); c.rotate(-t * 15);
+    art(c, "M-1 -1 L1 -1 L1 1 L-1 1 Z", "#D2D9E5", "", 0); c.restore();
+  }
+  art(c, "M13 -28 L13 -32 Q19 -35 25 -32 L25 -28 L22 -28 L22 -31 L16 -31 L16 -28 Z", "#D5DFE9", "#544A69", 1);
+  art(c, "M5 -29 L31 -29 Q36 -29 36 -23 L36 -8 Q36 -4 31 -4 L6 -4 Q2 -4 2 -9 L2 -23 Q2 -29 5 -29 Z", material(c, -29, -4, light, dark), "#51405E", 1.4);
+  art(c, "M29 -28 Q35 -29 35 -23 L35 -8 Q34 -4 29 -5 Z", dark, "", 0);
+  c.strokeStyle = "rgba(255,255,255,.4)"; c.lineWidth = 1; c.beginPath();
+  for (const xx of [7, 12, 17, 22, 27]) { c.moveTo(xx, -25); c.lineTo(xx, -9); } c.stroke();
+  art(c, "M3 -23 L3 -27 L9 -28 L9 -24 Z M3 -10 L9 -10 L9 -5 L5 -5 Z M28 -28 L34 -26 L35 -23 L29 -23 Z", "#EDC994", "#866D6D", 0.6);
+  c.save(); c.translate(23, -18); c.rotate(-0.15);
+  art(c, "M-6 -5 L6 -5 L6 5 L-6 5 Z", "#FFF3CB", "#8C687E", 0.7);
+  // A tiny paw-print travel sticker, readable without font or image loading.
+  bead(c, 0, 1.4, 2.1, 1.6, "#D57D88");
+  for (const [xx, yy] of [[-2, -1], [0, -2], [2, -1]] as const) bead(c, xx, yy, 0.85, 1, "#D57D88"); c.restore();
+  c.strokeStyle = "#6B596E"; c.lineWidth = 0.8; c.beginPath(); c.moveTo(32, -20); c.lineTo(33, -15); c.stroke();
+  art(c, "M30 -15 L36 -15 L36 -8 L30 -8 Z", "#E0EFF0", "#637884", 0.7);
+  bead(c, 8, -21, 1.2, 4, "rgba(255,255,255,.3)"); c.restore();
+}
+
+/** 開封前はラベル付きの箱。予告後はバネのカエルが飛び出す。 */
+export function drawSurpriseBox(c: Ctx, x: number, ground: number, w: number, h: number, t: number, warning: boolean, look: OsanpoRunStageId): void {
+  c.save(); c.translate(x, ground); c.scale(w / 40, 1); c.lineCap = "round";
+  const [light, dark] = TRAVEL_COLORS[look], rise = Math.max(0, h - 26);
+  const frogY = -h + 14;
+  if (rise > 3) {
+    // Spring and face stay within the same changing height used by collision detection.
+    c.save(); c.beginPath(); c.rect(0, -h, 40, h); c.clip();
+    c.strokeStyle = "#65556E"; c.lineWidth = 2.5; c.beginPath(); c.moveTo(20, -22);
+    for (let i = 0; i <= 12; i++) c.lineTo(20 + (i % 2 ? 6 : -6), -22 + (frogY + 8 + 22) * i / 12);
+    c.stroke();
+    c.strokeStyle = "#DDEBF0"; c.lineWidth = 0.8; c.stroke();
+    c.save(); c.translate(20, frogY);
+    art(c, "M-11 -5 Q-16 -15 -7 -14 Q-2 -14 -3 -8 L3 -8 Q2 -15 9 -14 Q16 -13 11 -5 Q17 -3 14 5 Q10 12 0 12 Q-10 12 -14 5 Q-17 -3 -11 -5 Z", material(c, -14, 12, "#CFEBA1", "#6DAD82"), "#4F736D", 1.2);
+    bead(c, -8, -8, 4.1, 4.5, "#FFFFDE"); bead(c, 8, -8, 4.1, 4.5, "#FFFFDE");
+    for (const xx of [-8, 8]) { bead(c, xx - 0.6, -8, 1.7, 2.4, "#415868"); bead(c, xx - 1.1, -9.3, 0.6, 0.7, "#FFF"); }
+    bead(c, -10, 3, 2.7, 1.5, "#F1A4A2"); bead(c, 10, 3, 2.7, 1.5, "#F1A4A2");
+    c.strokeStyle = "#4C796A"; c.lineWidth = 1; c.beginPath(); c.moveTo(-7, 3); c.quadraticCurveTo(0, 11, 7, 3); c.stroke();
+    art(c, "M-3 11 L-9 8 L-9 16 L-3 13 L3 13 L9 16 L9 8 L3 11 Z", light, dark, 0.7);
+    c.restore(); c.restore();
+  }
+  art(c, "M2 -24 L38 -24 L37 -2 Q20 1 3 -2 Z", material(c, -24, 0, "#F5D4A0", "#C39572"), "#806276", 1.2);
+  art(c, "M27 -23 L38 -24 L37 -2 L27 -1 Z", "rgba(126,86,76,.18)", "", 0);
+  art(c, "M7 -18 L23 -18 L23 -6 L7 -6 Z", "#FFF6DB", "#AD9287", 0.5);
+  c.strokeStyle = "#A78685"; c.lineWidth = 0.7; c.beginPath(); c.moveTo(10, -14); c.lineTo(20, -14); c.moveTo(10, -10); c.lineTo(16, -10); c.stroke();
+  c.save(); c.translate(20, -24); c.rotate(warning ? Math.sin(t * 35) * 0.05 : 0);
+  if (rise > 3) {
+    art(c, "M-18 0 L-19 -8 L-4 -2 L-5 1 Z M5 1 L4 -2 L19 -8 L18 0 Z", "#EBCBA0", "#806276", 1);
+  } else {
+    art(c, "M-19 -2 L19 -2 L20 2 L-20 2 Z", "#F6DCB6", "#806276", 1);
+    art(c, "M-4 -2 L4 -2 L4 2 L-4 2 Z", light, "", 0);
+  }
+  c.restore();
+  if (warning) {
+    c.strokeStyle = "#FFE49C"; c.lineWidth = 1.5; c.beginPath();
+    c.moveTo(1, -32); c.lineTo(-2, -37); c.moveTo(37, -33); c.lineTo(40, -38); c.stroke();
+    text(c, "!", 20, -39, 13, "#FFE49C");
+  }
+  c.restore();
+}
+
+/** ローター・ランプ・荷物。降下は描画だけで動かさず、engineのbottomに従う。 */
+export function drawDeliveryDrone(c: Ctx, x: number, bottom: number, w: number, h: number, t: number, warning: boolean, look: OsanpoRunStageId): void {
+  c.save(); c.translate(x, bottom); c.scale(w / 52, h / 30); c.lineCap = "round";
+  const [light, dark] = TRAVEL_COLORS[look];
+  c.strokeStyle = "#6F7D94"; c.lineWidth = 2.2; c.beginPath();
+  c.moveTo(9, -24); c.lineTo(20, -18); c.moveTo(43, -24); c.lineTo(32, -18); c.stroke();
+  for (const xx of [9, 43]) {
+    bead(c, xx, -26, 8, 1.7, "rgba(219,239,247,.45)");
+    bead(c, xx, -26, 4 + Math.abs(Math.sin(t * 38)) * 4, 0.9, "#EFF9FE");
+    bead(c, xx, -25, 1.8, 2, "#8393A9");
+  }
+  art(c, "M17 -23 Q26 -29 35 -23 L36 -18 Q26 -12 16 -18 Z", material(c, -27, -15, "#FBFEFF", "#A1B5CF"), "#4C607B", 1.2);
+  art(c, "M18 -21 Q26 -24 34 -21 L33 -18 Q26 -15 19 -18 Z", dark, "#4C607B", 0.7);
+  bead(c, 23, -20, 1.2, 1.3, warning ? "#FFDB72" : "#8BE7D6"); bead(c, 29, -20, 1.2, 1.3, warning ? "#FFDB72" : "#8BE7D6");
+  c.strokeStyle = "#6F7D94"; c.lineWidth = 1; c.beginPath(); c.moveTo(20, -16); c.lineTo(20, -11); c.moveTo(32, -16); c.lineTo(32, -11); c.stroke();
+  art(c, "M17 -12 L35 -12 L35 -1 L17 -1 Z", material(c, -12, -1, "#F3D8AA", "#CDAC88"), "#79677D", 0.9);
+  art(c, "M24 -12 L28 -12 L28 -1 L24 -1 Z", light, "", 0);
+  art(c, "M29 -8 L33 -8 L33 -3 L29 -3 Z", "#FFF7DB", "", 0);
+  if (warning) {
+    bead(c, 26, -27, 2.6, 2.4, Math.sin(t * 20) > 0 ? "#FFE597" : "#E7A76B");
+    c.strokeStyle = "#FFDEA0"; c.lineWidth = 1; c.beginPath(); c.moveTo(22, -31); c.lineTo(20, -34); c.moveTo(30, -31); c.lineTo(32, -34); c.stroke();
+  }
+  c.restore();
+}

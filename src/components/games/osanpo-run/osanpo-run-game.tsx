@@ -241,6 +241,9 @@ export function OsanpoRunGame({ items, usesSampleItems, unlockedStages, seriesTa
                       <li><canvas data-icon="roller" /><div><b>お掃除ロボ</b><small>こっちに転がってくる。早めに跳ぶ。山道ではウリ坊、雪国では雪玉、夏まつりではビーチボール。</small></div></li>
                       <li><canvas data-icon="drop" /><div><b>植木鉢</b><small>地面に影が出たら、上から落ちてくる。跳んでいるときに当たらないように。落ちたあとは小さく跳べば越えられる。</small></div></li>
                       <li><canvas data-icon="geyser" /><div><b>スプリンクラー</b><small>水が出たり止まったりする。止まった瞬間に通るか、2段ジャンプで越える。</small></div></li>
+                      <li><canvas data-icon="suitcase" /><div><b>大脱走スーツケース</b><small>22秒から登場。荷物が跳ねながら転がってくる！ 低いときは跳び越え、高く浮いたら下を通る。接触せずに回避で+20、下を通ればさらに+15。</small></div></li>
+                      <li><canvas data-icon="surprise" /><div><b>びっくり宅配便</b><small>36秒から登場。箱がガタガタ揺れたあと、バネのカエルがびよーん！ 少しすると箱に戻る。2段ジャンプで高く越える。接触せずに回避で+30。</small></div></li>
+                      <li><canvas data-icon="drone" /><div><b>せっかち配達ドローン</b><small>48秒から登場。黄色の警告ランプのあと、荷物ごと降下してくる。下スワイプでスライディング！ 接触せずに回避で+25、滑ってくぐるとさらに+15。</small></div></li>
                       <li><canvas data-icon="buddy" /><div><b>ほかのフレブル</b><small>図鑑のフレブル（いつもの・登山・雪国・夏）がお散歩している。ぶつかってもだいじょうぶ。くんくんごあいさつで+30（少しだけ立ち止まる）。</small></div></li>
                     </ul>
                   </section>
