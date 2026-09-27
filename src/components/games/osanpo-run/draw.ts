@@ -352,3 +352,122 @@ export function drawNoren(c: Ctx, x: number, w: number, gy: number, t: number, l
   }
   text(c, look === "summer" ? "祭" : "ゆ", x + w / 2, top + (bot - top) * 0.45, 16, "#fff");
 }
+
+/* ---------- 追加の障害物 ---------- */
+
+/** 転がってくるもの（まち: お掃除ロボ／山道: ウリ坊／雪国: 雪玉／夏まつり: ビーチボール） */
+export function drawRoller(c: Ctx, x: number, gy: number, w: number, h: number, t: number, look: OsanpoRunStageId): void {
+  const cx = x + w / 2;
+  if (look === "town") {
+    // お掃除ロボ。ランプが点滅しながら進んでくる
+    c.fillStyle = "#2E2B3F"; ell(c, cx, gy - h / 2 + 1, w / 2, h / 2); c.fill();
+    c.fillStyle = "#4A4662"; ell(c, cx, gy - h / 2 - 1, w / 2 - 2, h / 2 - 3); c.fill();
+    c.fillStyle = "#6E6A8C"; ell(c, cx - 3, gy - h / 2 - 2, 6, 2.2); c.fill();
+    c.fillStyle = Math.sin(t * 10) > 0 ? "#7EF0D0" : "#2F8A74"; c.beginPath(); c.arc(cx + 6, gy - h / 2 - 2, 1.8, 0, Math.PI * 2); c.fill();
+    c.strokeStyle = "rgba(255,255,255,.55)"; c.lineWidth = 1;
+    for (let i = 0; i < 3; i++) { const a = t * 30 + i * 2.1; c.beginPath(); c.moveTo(x + 2, gy - 2); c.lineTo(x + 2 - Math.cos(a) * 4, gy - 2 - Math.sin(a) * 2); c.stroke(); }
+  } else if (look === "hiking") {
+    // ウリ坊。しましまで、足をちょこちょこ動かす
+    const by = gy - 9;
+    c.fillStyle = "#6B4A2E";
+    for (const [lx, a] of [[x + 6, 0], [x + 10, Math.PI], [x + w - 10, Math.PI], [x + w - 6, 0]] as const) { rr(c, lx + Math.sin(t * 16 + a) * 2 - 1.5, by + 3, 3, 6, 1.5); c.fill(); }
+    c.fillStyle = "#A8784A"; ell(c, cx + 1, by, w * 0.45, 7); c.fill();
+    c.strokeStyle = "#E8C99A"; c.lineWidth = 1.6; c.beginPath();
+    for (let i = 0; i < 3; i++) { const sx = cx - 6 + i * 6; c.moveTo(sx, by - 6); c.lineTo(sx + 5, by - 6); }
+    c.stroke();
+    c.fillStyle = "#A8784A"; ell(c, x + 4, by - 1, 6, 5); c.fill();
+    c.fillStyle = "#E7A4A4"; ell(c, x - 1, by + 1, 2.4, 2); c.fill();
+    c.fillStyle = "#2A1E14"; c.beginPath(); c.arc(x + 3, by - 3, 1.1, 0, Math.PI * 2); c.fill();
+  } else if (look === "snow") {
+    // 転がってくる雪玉。回っているのがわかるよう、雪の模様を回す
+    const r = h / 2 + 2, cy = gy - r;
+    c.fillStyle = "#F7FAFF"; c.beginPath(); c.arc(cx, cy, r, 0, Math.PI * 2); c.fill();
+    c.fillStyle = "rgba(160,190,230,.5)";
+    for (let i = 0; i < 4; i++) { const a = -t * 8 + i * 1.6; c.beginPath(); c.arc(cx + Math.cos(a) * r * 0.55, cy + Math.sin(a) * r * 0.55, 1.6, 0, Math.PI * 2); c.fill(); }
+    c.fillStyle = "rgba(160,190,230,.35)"; ell(c, cx + 2, cy + r * 0.45, r * 0.8, r * 0.35); c.fill();
+  } else {
+    // ころがるビーチボール
+    const r = h / 2 + 2, cy = gy - r, a0 = -t * 9;
+    const cols = ["#FF6B6B", "#FFFFFF", "#4FB7FF", "#FFFFFF", "#FFD35C", "#FFFFFF"];
+    cols.forEach((col, i) => { c.fillStyle = col; c.beginPath(); c.moveTo(cx, cy); c.arc(cx, cy, r, a0 + (i / 6) * Math.PI * 2, a0 + ((i + 1) / 6) * Math.PI * 2); c.closePath(); c.fill(); });
+    c.fillStyle = "rgba(255,255,255,.7)"; ell(c, cx - r * 0.35, cy - r * 0.4, r * 0.3, r * 0.18, -0.5); c.fill();
+  }
+}
+
+/** 上から落ちてくるもの（まち: 植木鉢／山道: まつぼっくり／雪国: 屋根の雪／夏まつり: 風鈴） */
+export function drawDropper(c: Ctx, cx: number, by: number, w: number, look: OsanpoRunStageId, landed: boolean): void {
+  const r = w / 2;
+  if (look === "town") {
+    c.fillStyle = "#C8663C"; c.beginPath(); c.moveTo(cx - r, by - w * 0.75); c.lineTo(cx + r, by - w * 0.75); c.lineTo(cx + r * 0.7, by); c.lineTo(cx - r * 0.7, by); c.closePath(); c.fill();
+    c.fillStyle = "#A64E2A"; rr(c, cx - r - 1, by - w * 0.8, w + 2, 4, 1.5); c.fill();
+    if (!landed) {
+      c.fillStyle = "#5FB05A"; c.beginPath(); c.arc(cx - 3, by - w * 0.9, 4, 0, Math.PI * 2); c.arc(cx + 3, by - w - 1, 4.5, 0, Math.PI * 2); c.fill();
+      c.fillStyle = "#FF8FB0"; c.beginPath(); c.arc(cx + 3, by - w - 3, 2, 0, Math.PI * 2); c.fill();
+    } else {
+      c.strokeStyle = "#3A2418"; c.lineWidth = 1.2; c.beginPath(); c.moveTo(cx - 2, by - w * 0.7); c.lineTo(cx + 1, by - w * 0.4); c.lineTo(cx - 1, by - 2); c.stroke();
+      c.fillStyle = "#6B4A2E"; ell(c, cx + r + 3, by - 1.5, 4, 1.8); c.fill();
+    }
+  } else if (look === "hiking") {
+    c.fillStyle = "#7A5230"; ell(c, cx, by - r, r * 0.8, r); c.fill();
+    c.fillStyle = "#A8784A";
+    for (let i = 0; i < 4; i++) { const yy = by - w + 4 + i * (w / 4.5); c.beginPath(); c.moveTo(cx - r * 0.7, yy); c.lineTo(cx, yy + 4); c.lineTo(cx + r * 0.7, yy); c.lineTo(cx, yy + 1.5); c.closePath(); c.fill(); }
+  } else if (look === "snow") {
+    c.fillStyle = "#F4F8FF"; c.beginPath(); c.arc(cx - 4, by - r * 0.7, r * 0.7, 0, Math.PI * 2); c.arc(cx + 4, by - r * 0.8, r * 0.75, 0, Math.PI * 2); c.arc(cx, by - r * 1.2, r * 0.7, 0, Math.PI * 2); c.fill();
+    c.fillStyle = "rgba(150,180,220,.45)"; ell(c, cx, by - 2, r, 2.5); c.fill();
+  } else {
+    // 風鈴。ガラスの丸に短冊
+    c.fillStyle = "rgba(200,235,255,.9)"; c.beginPath(); c.arc(cx, by - w * 0.65, r * 0.75, Math.PI, 0); c.lineTo(cx + r * 0.75, by - w * 0.55); c.lineTo(cx - r * 0.75, by - w * 0.55); c.closePath(); c.fill();
+    c.fillStyle = "#FF6B8A"; c.beginPath(); c.arc(cx - 2, by - w * 0.72, 1.8, 0, Math.PI * 2); c.arc(cx + 3, by - w * 0.68, 1.5, 0, Math.PI * 2); c.fill();
+    c.strokeStyle = "#8A7A6A"; c.lineWidth = 1; c.beginPath(); c.moveTo(cx, by - w * 0.55); c.lineTo(cx, by - w * 0.3); c.stroke();
+    c.fillStyle = "#FFD35C"; rr(c, cx - 2.5, by - w * 0.32, 5, w * 0.32, 1); c.fill();
+  }
+}
+
+/** ほかのわんこ。ぶつかっても大丈夫で、あいさつすると点がもらえる */
+export function drawBuddy(c: Ctx, x: number, gy: number, w: number, t: number, variant: number, greeted: boolean): void {
+  const palettes = [
+    ["#E9B872", "#C98F46", "#FFF3DE"], // 柴っぽい
+    ["#F3F0EA", "#C9C2B6", "#FFFFFF"], // 白い子
+    ["#6A5A52", "#453A34", "#D8CBBE"], // チョコ
+    ["#2E2A2A", "#1A1717", "#EDE4DA"], // 黒
+  ] as const;
+  const [BODY, DARK, LIGHT] = palettes[variant % palettes.length]!;
+  const cx = x + w / 2, by = gy - 12, wag = Math.sin(t * (greeted ? 22 : 10)) * (greeted ? 5 : 3);
+  // しっぽ（右側）。あいさつすると、ぶんぶん振る
+  c.strokeStyle = BODY; c.lineWidth = 3.5; c.lineCap = "round";
+  c.beginPath(); c.moveTo(x + w - 4, by - 3); c.quadraticCurveTo(x + w + 4, by - 10 + wag, x + w + 2 + wag * 0.5, by - 16); c.stroke();
+  c.fillStyle = DARK; rr(c, x + 7, by + 3, 4, 9, 2); c.fill(); rr(c, x + w - 11, by + 3, 4, 9, 2); c.fill();
+  c.fillStyle = BODY; ell(c, cx + 2, by, w * 0.4, 7.5); c.fill();
+  c.fillStyle = LIGHT; ell(c, cx, by + 3.5, w * 0.24, 3); c.fill();
+  // 頭（左向き、こっちを見ている）
+  const hx = x + 6, hy = by - 9;
+  c.fillStyle = BODY; c.beginPath(); c.arc(hx, hy, 8, 0, Math.PI * 2); c.fill();
+  c.fillStyle = DARK; ell(c, hx - 7, hy - 1, 3, 6, 0.3); c.fill(); ell(c, hx + 6, hy - 2, 3, 6, -0.3); c.fill();
+  c.fillStyle = LIGHT; ell(c, hx - 2, hy + 3.5, 4.5, 3); c.fill();
+  c.fillStyle = "#1A1410"; c.beginPath(); c.arc(hx - 3, hy - 1.5, 1.3, 0, Math.PI * 2); c.arc(hx + 2, hy - 1.5, 1.3, 0, Math.PI * 2); c.arc(hx - 2, hy + 2.2, 1.4, 0, Math.PI * 2); c.fill();
+  if (greeted) { c.fillStyle = "#FF6B8A"; c.font = font(11); c.textAlign = "center"; c.textBaseline = "middle"; c.fillText("♥", hx + 2, hy - 14 - Math.abs(Math.sin(t * 6)) * 3); }
+}
+
+/** 水が出たり止まったりするところ（まち: スプリンクラー／山道: 間欠泉／雪国: 除雪機の雪／夏まつり: 噴水） */
+export function drawGeyser(c: Ctx, x: number, gy: number, w: number, top: number, t: number, look: OsanpoRunStageId): void {
+  const cx = x + w / 2;
+  const base = look === "hiking" ? "#8A7A6A" : look === "snow" ? "#E0525E" : look === "summer" ? "#C9B79A" : "#5A6A7A";
+  c.fillStyle = base; rr(c, cx - 7, gy - 7, 14, 7, 2); c.fill();
+  c.fillStyle = "rgba(0,0,0,.2)"; rr(c, cx - 4, gy - 9, 8, 3, 1); c.fill();
+  if (top <= 0) {
+    // 止まっているあいだは、ちょろちょろ
+    c.fillStyle = look === "snow" ? "rgba(255,255,255,.7)" : "rgba(170,215,255,.6)";
+    for (let i = 0; i < 2; i++) { c.beginPath(); c.arc(cx + Math.sin(t * 7 + i) * 3, gy - 11 - i * 3, 1.4, 0, Math.PI * 2); c.fill(); }
+    return;
+  }
+  const col = look === "snow" ? "255,255,255" : look === "hiking" ? "235,240,245" : "150,205,255";
+  const g = c.createLinearGradient(0, gy - top, 0, gy);
+  g.addColorStop(0, `rgba(${col},.25)`); g.addColorStop(0.3, `rgba(${col},.8)`); g.addColorStop(1, `rgba(${col},.9)`);
+  c.fillStyle = g;
+  c.beginPath(); c.moveTo(cx - 5, gy - 8);
+  for (let i = 0; i <= 10; i++) { const yy = gy - 8 - (top - 8) * (i / 10); c.lineTo(cx - 5 - i * 0.9 + Math.sin(t * 20 + i) * 1.2, yy); }
+  for (let i = 10; i >= 0; i--) { const yy = gy - 8 - (top - 8) * (i / 10); c.lineTo(cx + 5 + i * 0.9 + Math.sin(t * 18 + i * 1.3) * 1.2, yy); }
+  c.closePath(); c.fill();
+  c.fillStyle = `rgba(${col},.85)`;
+  for (let i = 0; i < 6; i++) { const a = t * 6 + i; c.beginPath(); c.arc(cx + Math.cos(a) * (8 + i), gy - top + Math.sin(a * 1.3) * 4, 2 + (i % 2), 0, Math.PI * 2); c.fill(); }
+}

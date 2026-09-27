@@ -237,6 +237,10 @@ export function OsanpoRunGame({ items, usesSampleItems, unlockedStages, seriesTa
                       <li><canvas data-icon="sign" /><div><b>工事中の看板</b><small>背が高い。しっかり長押しで。</small></div></li>
                       <li><canvas data-icon="noren" /><div><b>のれん</b><small>上から垂れているので跳び越えられない。スライディングでくぐると+15。</small></div></li>
                       <li><canvas data-icon="pigeons" /><div><b>ハト</b><small>小さくジャンプで越えると飛び立って+10。</small></div></li>
+                      <li><canvas data-icon="roller" /><div><b>お掃除ロボ</b><small>こっちに転がってくる。早めに跳ぶ。山道ではウリ坊、雪国では雪玉、夏まつりではビーチボール。</small></div></li>
+                      <li><canvas data-icon="drop" /><div><b>植木鉢</b><small>地面に影が出たら、上から落ちてくる。跳んでいるときに当たらないように。落ちたあとは小さく跳べば越えられる。</small></div></li>
+                      <li><canvas data-icon="geyser" /><div><b>スプリンクラー</b><small>水が出たり止まったりする。止まった瞬間に通るか、2段ジャンプで越える。</small></div></li>
+                      <li><canvas data-icon="buddy" /><div><b>ほかのわんこ</b><small>ぶつかってもだいじょうぶ。くんくんごあいさつで+30（少しだけ立ち止まる）。</small></div></li>
                     </ul>
                   </section>
                 </div>

@@ -48,7 +48,7 @@ import {
   sliderToGain,
 } from "@/lib/sound-settings";
 import {
-  drawBike, drawCat, drawCone, drawCrow, drawGoldfishTub, drawKakigoriFlag, drawLog, drawNoren, drawPigeons,
+  drawBike, drawBuddy, drawCat, drawCone, drawCrow, drawDropper, drawGeyser, drawGoldfishTub, drawKakigoriFlag, drawLog, drawNoren, drawPigeons, drawRoller,
   drawPuddle, drawRock, drawSign, drawSignpost, drawSled, drawSnowman, drawWatermelon,
   ell, font, glow, hex, hslRgb, mix, rgb, rr, setCanvasFontFamily, shade, star, WHITE,
   type Ctx, type Pigeon, type RGB,
@@ -93,6 +93,10 @@ const DW = 80, DH = (DW * DOG_H) / DOG_W;
 const GRAV = 2500, JUMP_V = 760, DJUMP_V = 640;
 /** 道に落ちているもののうち、図鑑アイテムになる割合（残りはほね）。ボーナスタイムは多め */
 const ITEM_RATE = 0.12, ITEM_RATE_BONUS = 0.25;
+/** 水が出たり止まったりするところ: 1周の秒数・出ている秒数・水の高さ（ふつうのジャンプでは越えられず、2段ジャンプなら越えられる） */
+const GEYSER_CYCLE = 2, GEYSER_ON = 0.8, GEYSER_H = 124;
+/** 上から落ちてくるものの重力 */
+const DROP_G = 1400;
 /** 空から降ってくるアイテムが、落ちている間に左へ流れる速さ（道の速さに対する割合） */
 const FALL_DRIFT = 0.3;
 /** ほね1本の点数（コンボ倍率がかかる） */
@@ -102,7 +106,11 @@ const START_SPEED = 200, MAX_SPEED = 520;
 
 type GameState = "ready" | "intro" | "play" | "dying" | "over";
 type Section = "normal" | "bonus" | "rush";
-type ObstacleKind = "cone" | "puddle" | "bike" | "crow" | "cat" | "sign" | "pigeons" | "noren";
+/**
+ * roller=転がってくるもの / drop=上から落ちてくるもの / buddy=ほかのわんこ（ぶつかってもOK）/
+ * geyser=水が出たり止まったりするところ
+ */
+type ObstacleKind = "cone" | "puddle" | "bike" | "crow" | "cat" | "sign" | "pigeons" | "noren" | "roller" | "drop" | "buddy" | "geyser";
 
 type Obstacle = {
   kind: ObstacleKind;
@@ -113,6 +121,10 @@ type Obstacle = {
   birds: Pigeon[]; flee: boolean; fleeT: number;
   /** スキルで消えた（水たまりを砂場にした等） / すり抜けて点をもらった */
   gone: boolean; passed: boolean;
+  /** 落ちてくるものの落下速度 / 着地したか。水のタイミングのずれ・わんこの毛色にも使う */
+  vy: number; landed: boolean; phase: number;
+  /** ほかのわんこにあいさつ済みか */
+  greeted: boolean;
 };
 /** item が null のものはスキルで出る小さな粒（token の点数だけもらえる） */
 type Pickup = { item: RunItem | null; token: number; x: number; y: number; vy: number; ph: number; taken: boolean; hinted: boolean };
@@ -133,7 +145,7 @@ type MidItem = {
 type NearItem = { x: number; w: number; gap: number; lamp: boolean; vend: boolean; tr: boolean };
 type Layer<T> = { f: number; items: T[]; nx: number };
 
-type Stats = { pigeons: number; slides: number; plays: number; meters: number; items: number; kinds: string[]; counts: Record<string, number> };
+type Stats = { pigeons: number; slides: number; plays: number; meters: number; items: number; kinds: string[]; counts: Record<string, number>; rollers: number; drops: number; greets: number; geysers: number };
 type RunRecord = { s: number; m: number; t: number };
 
 /* ---------- 小さな道具 ---------- */
@@ -319,7 +331,7 @@ export function createOsanpoRun(root: HTMLElement, opts: OsanpoRunOptions): () =
   /* ---------- 記録（この端末に保存） ---------- */
   const achGot = loadJSON<Record<string, number>>("ach", {});
   const stats: Stats = Object.assign(
-    { pigeons: 0, slides: 0, plays: 0, meters: 0, items: 0, kinds: [] as string[], counts: {} as Record<string, number> },
+    { pigeons: 0, slides: 0, plays: 0, meters: 0, items: 0, kinds: [] as string[], counts: {} as Record<string, number>, rollers: 0, drops: 0, greets: 0, geysers: 0 },
     loadJSON<Partial<Stats>>("stats", {}),
   );
   const kindSet = new Set<string>(stats.kinds);
@@ -346,6 +358,10 @@ export function createOsanpoRun(root: HTMLElement, opts: OsanpoRunOptions): () =
     lastResult: null as null | { score: number; m: number; items: number; rank: string },
     /** このおさんぽの識別子。同じ結果を二重に送ってもコインが増えないよう、サーバー側で使う */
     roundId: "",
+    /** ほかのわんこにあいさつして立ち止まっている残り秒数 */
+    slowT: 0,
+    /** 称号用: このおさんぽで無敵中に吹っ飛ばした数・拾ったUR以上の数・発動したスキルの種類 */
+    knocks: 0, rares: 0, skillIds: new Set<string>(),
   };
   let obstacles: Obstacle[] = [], pickups: Pickup[] = [], parts: Particle[] = [], texts: FloatText[] = [], flyers: Flyer[] = [];
   const FX = { hitstop: 0, flash: 0, flashCol: "255,255,255", rareT: 0, fade: 0 };
@@ -1022,7 +1038,7 @@ export function createOsanpoRun(root: HTMLElement, opts: OsanpoRunOptions): () =
   function addObs(kind: ObstacleKind, x: number, w: number, h: number, extra: Partial<Obstacle> = {}): void {
     obstacles.push({
       kind, x, y: 0, w, h, vx: 0, low: false, hit: false, scored: false, hinted: false, minClear: 1e9,
-      ky: 0, kvy: 0, rot: 0, spin: 0, birds: [], flee: false, fleeT: 0, gone: false, passed: false, ...extra,
+      ky: 0, kvy: 0, rot: 0, spin: 0, birds: [], flee: false, fleeT: 0, gone: false, passed: false, vy: 0, landed: false, phase: 0, greeted: false, ...extra,
     });
   }
   /**
@@ -1056,12 +1072,14 @@ export function createOsanpoRun(root: HTMLElement, opts: OsanpoRunOptions): () =
     const kind = pickWeighted([
       ["cone", 3], ["puddle", rain ? 5 : 2], ["bike", t > 6 ? 2.2 : 0], ["crow", t > 12 ? 2 : 0], ["double", t > 24 || rush ? 1.6 : 0],
       ["cat", t > 18 ? 1.6 : 0], ["sign", t > 30 ? 1.4 : 0], ["pigeons", t > 9 ? 1.3 : 0], ["noren", t > 14 ? 1.8 : 0], ["lowcrow", t > 22 ? 1.2 : 0],
+      ["roller", t > 16 ? 1.4 : 0], ["drop", t > 20 ? 1.2 : 0], ["buddy", t > 8 ? 1 : 0], ["geyser", t > 26 ? 1.2 : 0],
       ["row", rush ? 0 : 1.3], ["high", rush ? 0 : 1.1],
     ] as const);
     const blocked = (k: ObstacleKind, low = false) => K.buffs.some((a) => a.b.noSpawn && inGroup({ kind: k, low } as Obstacle, a.b.noSpawn));
     const obsKind: Partial<Record<typeof kind, [ObstacleKind, boolean]>> = {
       cone: ["cone", false], puddle: ["puddle", false], bike: ["bike", false], crow: ["crow", false], lowcrow: ["crow", true], double: ["cone", false],
       cat: ["cat", false], sign: ["sign", false], pigeons: ["pigeons", false], noren: ["noren", false],
+      roller: ["roller", false], drop: ["drop", false], buddy: ["buddy", false], geyser: ["geyser", false],
     };
     const ok = obsKind[kind];
     if (ok && blocked(ok[0], ok[1])) {
@@ -1093,6 +1111,10 @@ export function createOsanpoRun(root: HTMLElement, opts: OsanpoRunOptions): () =
         addObs("pigeons", X, 16 + n * 18, 16, { birds: Array.from({ length: n }, (_, i) => ({ dx: 8 + i * 18 + rand(-3, 3), p: rand(0, 6), delay: i * 0.06 })) });
         break;
       }
+      case "roller": addObs("roller", X + 80, 30, 18, { vx: rand(55, 95) }); extra = 80; break;
+      case "drop": addObs("drop", X + 40, 22, 22, { y: -30 }); extra = 40; break;
+      case "buddy": addObs("buddy", X, 34, 26, { phase: Math.floor(rand(0, 4)) }); if (Math.random() < 0.5) treatArc(X - 50, X + 84, 70); break;
+      case "geyser": addObs("geyser", X, 24, 0, { phase: rand(0, GEYSER_CYCLE) }); extra = 30; break;
       case "noren": addObs("noren", X, 58, 0); if (Math.random() < 0.6) for (let i = 0; i < 4; i++) pickups.push(mkPickup(X - 10 + i * 28, GROUND - 14)); extra = 40; break;
       case "row": { const h = Math.random() < 0.5 ? 0 : rand(60, 96); for (let i = 0; i < 5; i++) pickups.push(mkPickup(X + i * 30, GROUND - 18 - h)); break; }
       case "high": { const h = rand(150, 178); for (let i = 0; i < 5; i++) pickups.push(mkPickup(X + i * 30, GROUND - h - Math.sin((i / 4) * Math.PI) * 10)); break; }
@@ -1597,18 +1619,20 @@ export function createOsanpoRun(root: HTMLElement, opts: OsanpoRunOptions): () =
   const ival = (v: Lv | undefined, lv: number, fallback = 0) => Math.round(val(v, lv, fallback));
   function inGroup(o: Obstacle, g: ObsGroup): boolean {
     const k = o.kind;
+    // ほかのわんこは障害物ではないので、どのスキルでもはじいたり壊したりしない
+    if (k === "buddy") return false;
     switch (g) {
       case "all": return true;
-      case "hard": return k === "cone" || k === "bike" || k === "sign";
-      case "rock": return k === "cone";
-      case "rockbike": return k === "cone" || k === "bike";
+      case "hard": return k === "cone" || k === "bike" || k === "sign" || k === "roller" || k === "drop";
+      case "rock": return k === "cone" || k === "drop";
+      case "rockbike": return k === "cone" || k === "bike" || k === "roller";
       case "bikesign": return k === "bike" || k === "sign";
       case "crow": return k === "crow" || k === "pigeons";
       case "crowcat": return k === "crow" || k === "cat";
-      case "cat": return k === "cat" || k === "pigeons";
+      case "cat": return k === "cat" || k === "pigeons" || k === "roller";
       case "animals": return k === "crow" || k === "cat" || k === "pigeons";
-      case "puddle": return k === "puddle";
-      case "puddlecrow": return k === "puddle" || k === "crow";
+      case "puddle": return k === "puddle" || k === "geyser";
+      case "puddlecrow": return k === "puddle" || k === "crow" || k === "geyser";
       case "low": return k === "noren" || (k === "crow" && o.low);
       case "ground": return k !== "crow" && k !== "noren";
     }
@@ -1755,7 +1779,7 @@ export function createOsanpoRun(root: HTMLElement, opts: OsanpoRunOptions): () =
     const skill = OSANPO_RUN_SKILL_BY_ID.get(item.id);
     if (!skill || S.state !== "play") return;
     const lv = lvOf(item);
-    if (depth === 0) sfx.skill(skill.kind);
+    if (depth === 0) { sfx.skill(skill.kind); S.skillIds.add(skill.id); if (S.skillIds.size >= 10) unlock("skills10"); }
     skill.fx.forEach((fx, idx) => runFx(skill, fx, lv, idx, depth));
   }
   function runFx(skill: OsanpoRunSkill, fx: Fx, lv: number, idx: number, depth: number): void {
@@ -1769,7 +1793,7 @@ export function createOsanpoRun(root: HTMLElement, opts: OsanpoRunOptions): () =
       case "clear": K.clears.push({ n: ival(fx.n, lv), kinds: fx.kinds ?? "all", pts: val(fx.pts, lv), name: skill.name }); break;
       case "clearAll": {
         let got = 0;
-        for (const o of obstacles) if (!o.hit && !o.gone && !o.flee && o.x < VW + 40) { knock(o); got += addPts(val(fx.pts, lv)); }
+        for (const o of obstacles) if (!o.hit && !o.gone && !o.flee && o.kind !== "buddy" && o.x < VW + 40) { knock(o); got += addPts(val(fx.pts, lv)); }
         if (got) floatText(VW / 2, GROUND * 0.34, `${skill.name} +${got}`, "#FFC857", 20);
         FX.flash = RM ? 0.08 : 0.2; FX.flashCol = "40,30,60";
         break;
@@ -1871,6 +1895,7 @@ export function createOsanpoRun(root: HTMLElement, opts: OsanpoRunOptions): () =
     if (M.inv || M.stop || K.rushInv) {
       // 無敵中は、ぶつかった障害物を吹っ飛ばす
       knock(o); sfx.guard();
+      if (++S.knocks >= 10) unlock("knock10");
       const v = addPts(10);
       floatText(o.x + o.w / 2, GROUND - o.h - 20, `ドカッ +${v}`, "#FFE7A3", 14);
       FX.hitstop = RM ? 0 : 0.03;
@@ -2092,7 +2117,7 @@ export function createOsanpoRun(root: HTMLElement, opts: OsanpoRunOptions): () =
     $("copy-note").hidden = true;
     FX.fade = RM ? 0 : 1;
     Object.assign(S, {
-      state: "intro", introT: 0, roundId: newRoundId(), bestD: bestDistOf(STAGE_ID), passedBest: false, recordShown: false, fwT: 2,
+      state: "intro", introT: 0, roundId: newRoundId(), slowT: 0, knocks: 0, rares: 0, skillIds: new Set<string>(), bestD: bestDistOf(STAGE_ID), passedBest: false, recordShown: false, fwT: 2,
       t: 0, speed: 0, dist: 0, bonus: 0, treats: 0, clock: STAGE.clock, next: 420, shield: false, chain: 0, chainT: 0, mult: 1, maxMult: 1,
       paused: false, deadT: 0, milestone: 100, bufT: 0, haul: new Map<string, number>(), sec: "normal", secT: 18, rain: 0, rainTarget: 0, rainT: 0,
       bones: 0, newAch: [], newKinds: [], rainWalk: 0, rushes: 0, closes: 0, bonusGot: 0,
@@ -2122,6 +2147,7 @@ export function createOsanpoRun(root: HTMLElement, opts: OsanpoRunOptions): () =
     stageEl.focus({ preventScroll: true });
   }
   function die(): void {
+    if (S.t < 5) unlock("quick");
     S.state = "dying"; S.deadT = 0; P.dead = true; P.vy = -420; P.ground = false;
     sfx.crash(); bgmStop();
     puff(P.x + 20, P.y - 24, 14, "spark", { g: 300, scroll: false });
@@ -2145,6 +2171,7 @@ export function createOsanpoRun(root: HTMLElement, opts: OsanpoRunOptions): () =
     if (K.pouchBank > 0) { S.bonus += K.pouchBank; K.pouchBank = 0; }
     if (K.keepBest > 0 && K.bestItem > 0) { S.bonus += Math.round(K.bestItem * K.keepBest); K.keepBest = 0; }
     const sc = score(), isNew = sc > S.best, meters = Math.floor(S.dist / 50);
+    if (sc > 0 && sc % 100 === 0) unlock("kiriban");
     if (isNew) { S.best = sc; store.set(`best-${STAGE_ID}`, String(sc)); }
     if (meters > bestDistOf(STAGE_ID)) store.set(`bestd-${STAGE_ID}`, String(meters));
     stats.plays += 1; stats.meters += meters; stats.items += S.treats;
@@ -2215,6 +2242,9 @@ export function createOsanpoRun(root: HTMLElement, opts: OsanpoRunOptions): () =
     if (o.kind === "crow") { ox0 = o.x + 4; ox1 = o.x + o.w - 2; oy0 = o.y + 3; oy1 = o.y + o.h - 2; }
     else if (o.kind === "cone") { ox0 = o.x + 5; ox1 = o.x + o.w - 5; oy0 = GROUND - o.h + 5; oy1 = GROUND; }
     else if (o.kind === "noren") { ox0 = o.x + 4; ox1 = o.x + o.w - 4; oy0 = -999; oy1 = GROUND - 30; }
+    else if (o.kind === "drop") { ox0 = o.x + 3; ox1 = o.x + o.w - 3; oy0 = o.y - o.h + 3; oy1 = o.y; }
+    else if (o.kind === "geyser") { if (o.h < 12) return false; ox0 = o.x + 4; ox1 = o.x + o.w - 4; oy0 = GROUND - o.h; oy1 = GROUND; }
+    else if (o.kind === "roller" || o.kind === "buddy") { ox0 = o.x + 4; ox1 = o.x + o.w - 4; oy0 = GROUND - o.h + 3; oy1 = GROUND; }
     else if (o.kind === "pigeons") { if (o.flee) return false; ox0 = o.x + 2; ox1 = o.x + o.w - 2; oy0 = GROUND - o.h + 2; oy1 = GROUND; }
     else if (o.kind === "cat") { ox0 = o.x + 3; ox1 = o.x + o.w - 4; oy0 = GROUND - o.h + 3; oy1 = GROUND; }
     else if (o.kind === "sign") { ox0 = o.x + 5; ox1 = o.x + o.w - 5; oy0 = GROUND - o.h + 4; oy1 = GROUND; }
@@ -2248,7 +2278,7 @@ export function createOsanpoRun(root: HTMLElement, opts: OsanpoRunOptions): () =
       S.chain++; S.chainT = 1.5 + M.comboGrace; S.mult = Math.min(5, 1 + Math.floor(S.chain / 4)); S.maxMult = Math.max(S.maxMult, S.mult);
       if (S.mult > prev) { retrigger($("combo"), "osr-pulse"); onComboUp(S.mult - prev); }
       if (S.mult >= 5) unlock("combo5");
-      S.bones++;
+      if (++S.bones >= 100) unlock("bones100");
       const v = addPts(BONE_PTS * S.mult);
       sfx.item(S.mult);
       floatText(p.x, p.y - 14, `+${v}`, "#F3EBDD", 12);
@@ -2282,6 +2312,7 @@ export function createOsanpoRun(root: HTMLElement, opts: OsanpoRunOptions): () =
     }
     if (S.sec === "bonus" && ++S.bonusGot >= 15) unlock("bonus15");
     if (item.rarity === "MR") unlock("mr");
+    if (rarityIndex(item.rarity) >= 4 && ++S.rares >= 3) unlock("rare3");
     const R = RARITY_STYLES[got.rarity];
     let pts = got.pts;
     if (K.pouchMul > 0) {
@@ -2341,7 +2372,10 @@ export function createOsanpoRun(root: HTMLElement, opts: OsanpoRunOptions): () =
     } else if (playing) {
       S.t += dt;
       if (!M.hold) K.ramp += dt;
-      S.speed = M.stop ? 0 : (START_SPEED + Math.min(MAX_SPEED - START_SPEED, K.ramp * 1.8)) * M.speed;
+      if (S.slowT > 0) S.slowT -= dt;
+      S.speed = M.stop ? 0 : (START_SPEED + Math.min(MAX_SPEED - START_SPEED, K.ramp * 1.8)) * M.speed * (S.slowT > 0 ? 0.55 : 1);
+      if (S.t >= 180) unlock("survive180");
+      if (S.clock >= 1440 + 300) unlock("dawn");
       tickSkills(dt);
       S.dist += S.speed * dt;
       S.clock += dt * 1.6;
@@ -2457,9 +2491,32 @@ export function createOsanpoRun(root: HTMLElement, opts: OsanpoRunOptions): () =
       if (o.kind === "pigeons" && o.flee) o.fleeT += dt;
       if (o.hit) { o.kvy += GRAV * dt; o.ky += o.kvy * dt; o.rot += o.spin * dt; o.x += 160 * dt; continue; }
       if (!playing) continue;
-      if (o.kind !== "crow" && o.kind !== "noren" && o.x < P.x + 22 && o.x + o.w > P.x - 18) o.minClear = Math.min(o.minClear, GROUND - o.h - P.y);
+      if (o.kind === "geyser") {
+        // 水は出たり止まったりする。出はじめは下から伸びる
+        const ph = (S.t + o.phase) % GEYSER_CYCLE;
+        o.h = ph < GEYSER_ON ? GEYSER_H * Math.min(1, ph / 0.18) : 0;
+      } else if (o.kind === "drop" && !o.landed) {
+        // フレブルの少し前に着地するタイミングで落とし始める
+        const fallT = Math.sqrt((2 * (GROUND + 40)) / DROP_G);
+        if (o.vy === 0 && o.x - P.x < S.speed * fallT + 70) { o.vy = 1; sfx.near(); }
+        if (o.vy > 0) {
+          o.vy += DROP_G * dt; o.y += o.vy * dt;
+          if (o.y >= GROUND) { o.y = GROUND; o.landed = true; o.h = 16; puff(o.x + o.w / 2, GROUND - 4, 8, "dust", { vy: -30 }); tone(180, 0.12, "triangle", 0.05, 90); }
+        }
+      }
+      if (o.kind !== "crow" && o.kind !== "noren" && o.kind !== "geyser" && o.kind !== "buddy" && !(o.kind === "drop" && !o.landed) && o.x < P.x + 22 && o.x + o.w > P.x - 18) o.minClear = Math.min(o.minClear, GROUND - o.h - P.y);
       if (o.gone) continue;
-      if (P.inv <= 0 && hitTest(o)) {
+      if (o.kind === "buddy") {
+        // ほかのわんこ。ぶつかってもよくて、あいさつすると点がもらえる（少しだけ立ち止まる）
+        if (!o.greeted && hitTest(o)) {
+          o.greeted = true; S.slowT = 0.5;
+          const v = addPts(30);
+          floatText(P.x + 20, P.y - 70, `くんくん… ごあいさつ +${v}`, "#FFB3C7", 14);
+          tone(660, 0.08, "sine", 0.05); tone(880, 0.1, "sine", 0.05, null, 0.08);
+          stats.greets++; saveStats();
+          if (stats.greets >= 20) unlock("greet20");
+        }
+      } else if (P.inv <= 0 && hitTest(o)) {
         if (!resolveHit(o)) continue;
         if (S.shield) {
           S.shield = false; P.inv = 1; o.hit = true; o.kvy = -520; o.spin = 9; sfx.guard();
@@ -2472,10 +2529,18 @@ export function createOsanpoRun(root: HTMLElement, opts: OsanpoRunOptions): () =
       }
       if (!o.hinted && o.x < P.x + 220) {
         o.hinted = true;
-        hint(o.low || o.kind === "noren" ? "slide" : o.kind === "crow" ? "crow" : o.kind === "cat" ? "cat" : "jump");
+        hint(o.low || o.kind === "noren" ? "slide" : o.kind === "crow" ? "crow" : o.kind === "cat" ? "cat"
+          : o.kind === "roller" || o.kind === "drop" || o.kind === "buddy" || o.kind === "geyser" ? o.kind : "jump");
       }
       if (!o.scored && o.x + o.w < P.x - 18) {
         o.scored = true;
+        if (o.kind === "roller") { stats.rollers++; saveStats(); if (stats.rollers >= 10) unlock("roller10"); }
+        else if (o.kind === "drop") { stats.drops++; saveStats(); if (stats.drops >= 10) unlock("drop10"); }
+        else if (o.kind === "geyser") { stats.geysers++; saveStats(); if (stats.geysers >= 10) unlock("geyser10"); }
+        if (o.kind === "buddy") {
+          if (!o.greeted) { const v = addPts(5); floatText(P.x + 20, P.y - 56, `またね +${v}`, "#FFB3C7", 13); }
+          continue;
+        }
         if (M.over > 0 && !o.passed && o.kind !== "puddle") { const v = addPts(M.over); floatText(P.x + 30, P.y - 84, `こえた +${v}`, "#FFE7A3", 13); }
         if ((o.kind === "noren" || o.low) && P.slide && P.ground) {
           const v = addPts(15); floatText(P.x + 20, P.y - 50, `スライディング！ +${v}`, "#9BE7FF", 14);
@@ -2591,7 +2656,11 @@ export function createOsanpoRun(root: HTMLElement, opts: OsanpoRunOptions): () =
         const cx = o.x + o.w / 2, cy = GROUND - o.h / 2 + o.ky;
         c.translate(cx, cy); c.rotate(o.rot); c.translate(-cx, -cy); c.translate(0, o.ky);
       }
-      if (!o.hit && o.kind !== "crow" && o.kind !== "noren" && !o.flee) { c.fillStyle = "rgba(20,16,40,.22)"; ell(c, o.x + o.w / 2, GROUND + 1, o.w * 0.55, 3); c.fill(); }
+      if (!o.hit && o.kind === "drop" && !o.landed) {
+        // 落ちてくるものの影。近づくほど濃く大きく
+        const k = clamp(1 - (GROUND - o.y) / (GROUND + 40), 0.2, 1);
+        c.fillStyle = `rgba(20,16,40,${0.35 * k})`; ell(c, o.x + o.w / 2, GROUND + 1, o.w * (0.3 + 0.35 * k), 2 + 2 * k); c.fill();
+      } else if (!o.hit && o.kind !== "crow" && o.kind !== "noren" && o.kind !== "geyser" && !o.flee) { c.fillStyle = "rgba(20,16,40,.22)"; ell(c, o.x + o.w / 2, GROUND + 1, o.w * 0.55, 3); c.fill(); }
       if (o.kind === "crow" && !o.hit) { c.fillStyle = "rgba(20,16,40,.18)"; ell(c, o.x + o.w / 2, GROUND + 3, 13, 2.5); c.fill(); }
       if (M.bright) { c.shadowColor = "rgba(255,240,150,.95)"; c.shadowBlur = 9 * DPR * SC; }
       else if (e.night > 0.2) {
@@ -2618,6 +2687,10 @@ export function createOsanpoRun(root: HTMLElement, opts: OsanpoRunOptions): () =
       else if (o.kind === "cat") drawCat(c, o.x, GROUND, o.w, S.time, e.night, lk === "snow");
       else if (o.kind === "pigeons") drawPigeons(c, o.x, o.birds, o.flee, o.fleeT, GROUND, S.time);
       else if (o.kind === "crow") drawCrow(c, o.x, o.y + Math.sin(S.time * 5 + o.x * 0.01) * 2, o.w, o.h, S.time);
+      else if (o.kind === "roller") drawRoller(c, o.x, GROUND, o.w, o.h, S.time, lk);
+      else if (o.kind === "drop") drawDropper(c, o.x + o.w / 2, o.hit ? GROUND : o.y, o.w, lk, o.landed);
+      else if (o.kind === "buddy") drawBuddy(c, o.x, GROUND, o.w, S.time, o.phase, o.greeted);
+      else if (o.kind === "geyser") drawGeyser(c, o.x, GROUND, o.w, o.h, S.time, lk);
       c.restore();
     }
     for (const o of obstacles) {
@@ -2771,6 +2844,10 @@ export function createOsanpoRun(root: HTMLElement, opts: OsanpoRunOptions): () =
       else if (kind === "sign") drawSign(c, 8, 42, 40, 38, 0, 0);
       else if (kind === "pigeons") drawPigeons(c, 6, [{ dx: 10, p: 0, delay: 0 }, { dx: 30, p: 2, delay: 0 }], false, 0, 34, 0.3);
       else if (kind === "noren") { c.save(); c.scale(0.6, 0.6); drawNoren(c, 30, 34, 100, 0, "town"); c.restore(); }
+      else if (kind === "roller") drawRoller(c, 13, 38, 30, 18, 0.3, "town");
+      else if (kind === "drop") { c.fillStyle = "rgba(20,16,40,.3)"; ell(c, 28, 40, 9, 2.5); c.fill(); drawDropper(c, 28, 28, 20, "town", false); }
+      else if (kind === "buddy") drawBuddy(c, 12, 40, 34, 0.2, 0, true);
+      else if (kind === "geyser") drawGeyser(c, 16, 42, 24, 40, 0.4, "town");
     }
   }
 
