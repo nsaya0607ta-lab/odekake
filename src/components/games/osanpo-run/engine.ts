@@ -2510,8 +2510,8 @@ export function createOsanpoRun(root: HTMLElement, opts: OsanpoRunOptions): () =
   }
 
   function update(dt: number): void {
-    S.time += dt;
     if (S.paused) return;
+    S.time += dt;
     refreshMods();
     const playing = S.state === "play";
     if (S.state === "ready") S.speed = 90;
@@ -2856,7 +2856,7 @@ export function createOsanpoRun(root: HTMLElement, opts: OsanpoRunOptions): () =
       } else if (o.kind === "noren") drawNoren(c, o.x, o.w, GROUND, S.time, lk);
       else if (o.kind === "cat") drawCat(c, o.x, GROUND, o.w, S.time, e.night, lk === "snow");
       else if (o.kind === "pigeons") drawPigeons(c, o.x, o.birds, o.flee, o.fleeT, GROUND, S.time);
-      else if (o.kind === "crow") drawCrow(c, o.x, o.y + Math.sin(S.time * 5 + o.x * 0.01) * 2, o.w, o.h, S.time);
+      else if (o.kind === "crow") drawCrow(c, o.x, o.y, o.w, o.h, S.time);
       else if (o.kind === "roller") drawRoller(c, o.x, GROUND, o.w, o.h, S.time, lk);
       else if (o.kind === "drop") drawDropper(c, o.x + o.w / 2, o.hit ? GROUND : o.y, o.w, lk, o.landed);
       else if (o.kind === "buddy") drawBuddySprite(c, o);
