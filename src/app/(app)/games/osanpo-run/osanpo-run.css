@@ -98,7 +98,7 @@
 /* 左上の「いま効いているスキル」。1行に1つずつ縦に並べる */
 .osr .osr-skills { position: absolute; top: calc(100% + 6px); left: 0; display: flex; flex-direction: column; align-items: flex-start; gap: 4px; width: max-content; max-width: min(270px, 70vw); }
 .osr .osr-sk {
-  position: relative; display: grid; grid-template-columns: 22px auto auto minmax(14px, auto); align-items: center; gap: 6px;
+  position: relative; display: grid; grid-template-columns: 22px auto minmax(14px, auto); align-items: center; gap: 6px;
   max-width: 100%; padding: 3px 8px 5px 4px; border-radius: 9px; overflow: hidden; text-shadow: none;
   background: linear-gradient(90deg, rgba(22, 21, 46, 0.86), rgba(22, 21, 46, 0.66));
   box-shadow: inset 3px 0 0 var(--kc), 0 0 0 1px rgba(255, 255, 255, 0.08), 0 4px 10px -6px rgba(0, 0, 0, 0.6);
@@ -107,7 +107,6 @@
 }
 .osr .osr-sk-ic { width: 22px; height: 22px; margin-left: 3px; border-radius: 6px; background: rgba(255, 255, 255, 0.08); display: grid; place-items: center; font-size: 12px; font-weight: 800; color: var(--kc); }
 .osr .osr-sk-ic img { width: 20px !important; height: 20px !important; object-fit: contain; }
-.osr .osr-sk-name { font-weight: 800; font-size: 12px; color: #f6efe4; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 9.5em; }
 .osr .osr-sk-tag { font-weight: 800; font-size: 10px; line-height: 1; padding: 3px 6px; border-radius: 999px; color: #1b193a; background: var(--kc); white-space: nowrap; }
 .osr .osr-sk-t { font-family: var(--osr-display); font-weight: 400; font-size: 12px; color: #fff; text-align: right; font-variant-numeric: tabular-nums; }
 .osr .osr-sk-bar { position: absolute; left: 0; right: 0; bottom: 0; height: 2px; background: var(--kc); transform-origin: left; opacity: 0.85; }
@@ -115,10 +114,9 @@
 @keyframes osr-skin { from { opacity: 0; transform: translateX(-12px); } }
 @keyframes osr-skblink { 50% { opacity: 0.45; } }
 @media (max-width: 480px) {
-  .osr .osr-sk { grid-template-columns: 20px auto auto minmax(12px, auto); gap: 5px; padding: 2px 6px 4px 3px; }
+  .osr .osr-sk { grid-template-columns: 20px auto minmax(12px, auto); gap: 5px; padding: 2px 6px 4px 3px; }
   .osr .osr-sk-ic { width: 20px; height: 20px; }
   .osr .osr-sk-ic img { width: 18px !important; height: 18px !important; }
-  .osr .osr-sk-name { font-size: 11px; max-width: 8em; }
 }
 .osr .osr-zk-detail .osr-zk-skill { align-self: stretch; display: flex; flex-direction: column; gap: 2px; padding: 8px 10px; border-radius: 10px; background: rgba(255, 200, 87, 0.1); border: 1px solid rgba(255, 200, 87, 0.3); text-align: left; }
 .osr .osr-zk-detail .osr-zk-skill b { color: var(--osr-lantern); font-size: 13px; }

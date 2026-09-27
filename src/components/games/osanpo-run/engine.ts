@@ -1966,11 +1966,12 @@ export function createOsanpoRun(root: HTMLElement, opts: OsanpoRunOptions): () =
         row.className = "osr-sk"; row.style.setProperty("--kc", KIND_COLOR[r.kind]);
         const ic = document.createElement("span"); ic.className = "osr-sk-ic";
         if (r.item) ic.appendChild(spriteEl(r.item, 20, true)); else ic.textContent = r.glyph;
-        const nm = document.createElement("span"); nm.className = "osr-sk-name"; nm.textContent = r.label;
         const tg = document.createElement("span"); tg.className = "osr-sk-tag"; tg.textContent = r.tag;
         const tm = document.createElement("b"); tm.className = "osr-sk-t";
         const bar = document.createElement("i"); bar.className = "osr-sk-bar";
-        row.append(ic, nm, tg, tm, bar);
+        // スキル名は出さない（どのアイテムかは画像、効果はタグでわかる。名前は拾ったときのポップアップで見られる）
+        row.title = r.label;
+        row.append(ic, tg, tm, bar);
         return row;
       }));
     }
