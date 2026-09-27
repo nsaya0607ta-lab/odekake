@@ -1904,7 +1904,8 @@ export function createOsanpoRun(root: HTMLElement, opts: OsanpoRunOptions): () =
     return { pts: Math.round((base * mul + add) * (1 + dup) * M.mul), copies: 1 + dup, rarity };
   }
   /** HUD の「いま効いているスキル」の1行 */
-  type SkillRow = { key: string; item: RunItem | null; glyph: string; label: string; tag: string; kind: SkillKind; t: number; max: number };
+  /** t/max があれば残り秒数、なければ count（「×2」「2/3」など）をカードの右端に出す */
+  type SkillRow = { key: string; item: RunItem | null; glyph: string; label: string; tag: string; kind: SkillKind; t: number; max: number; count: string };
   /** 効果をひと言で（左上の行の右側に出す） */
   function buffTag(b: Buff, lv: number): string {
     const x = (v: Lv | undefined) => `×${Math.round(val(v, lv, 1) * 10) / 10}`;
@@ -1938,16 +1939,17 @@ export function createOsanpoRun(root: HTMLElement, opts: OsanpoRunOptions): () =
       const label = a.b.label ?? a.skill.name;
       const same = rows.find((r) => r.label === label);
       if (same) { if (a.t > same.t) { same.t = a.t; same.max = a.max; } continue; }
-      rows.push({ key: a.key, item: itemOf(a.skill.id), glyph: "★", label, tag: buffTag(a.b, a.lv), kind: a.skill.kind, t: a.t, max: a.max || a.t });
+      rows.push({ key: a.key, item: itemOf(a.skill.id), glyph: "★", label, tag: buffTag(a.b, a.lv), kind: a.skill.kind, t: a.t, max: a.max || a.t, count: "" });
     }
-    const add = (key: string, glyph: string, label: string, tag: string, kind: SkillKind) => rows.push({ key, item: null, glyph, label, tag, kind, t: 0, max: 0 });
+    const add = (key: string, glyph: string, label: string, tag: string, count: string, kind: SkillKind) =>
+      rows.push({ key, item: null, glyph, label, tag, kind, t: 0, max: 0, count });
     const clears = K.clears.reduce((n, c) => n + c.n, 0);
-    if (clears) add("clears", "✦", K.clears[0]!.name, `はじく×${clears}`, "guard");
-    if (K.rushPass) add("rush", "⚡", "あずき色の風", "次のラッシュ無敵", "combo");
-    if (K.comboGuard) add("cguard", "♥", "コンボ守り", `×${K.comboGuard}`, "combo");
-    if (K.miss) add("miss", "✋", "てぶくろ", `×${K.miss}`, "collect");
-    if (K.bigJumps.length) add("bigjump", "⤴", "大ジャンプ", `×${K.bigJumps.length}`, "jump");
-    if (K.cairn) add("cairn", "▲", "積み石", `${K.cairn}/3`, "score");
+    if (clears) add("clears", "✦", K.clears[0]!.name, "はじく", `×${clears}`, "guard");
+    if (K.rushPass) add("rush", "⚡", "あずき色の風", "ラッシュ無敵", "×1", "combo");
+    if (K.comboGuard) add("cguard", "♥", "コンボ守り", "コンボ守り", `×${K.comboGuard}`, "combo");
+    if (K.miss) add("miss", "✋", "てぶくろ", "自動キャッチ", `×${K.miss}`, "collect");
+    if (K.bigJumps.length) add("bigjump", "⤴", "大ジャンプ", "大ジャンプ", `×${K.bigJumps.length}`, "jump");
+    if (K.cairn) add("cairn", "▲", "積み石", "積み石", `${K.cairn}/3`, "score");
     return rows.slice(0, 5);
   }
   const KIND_COLOR: Record<SkillKind, string> = {
@@ -1980,7 +1982,7 @@ export function createOsanpoRun(root: HTMLElement, opts: OsanpoRunOptions): () =
       if (!row) return;
       const tm = row.querySelector<HTMLElement>(".osr-sk-t")!, bar = row.querySelector<HTMLElement>(".osr-sk-bar")!;
       const timed = r.max > 0;
-      const txt = timed ? `${Math.ceil(r.t)}` : "";
+      const txt = timed ? `${Math.ceil(r.t)}` : r.count;
       if (tm.textContent !== txt) tm.textContent = txt;
       bar.style.transform = `scaleX(${timed ? clamp(r.t / r.max, 0, 1).toFixed(3) : "1"})`;
       row.classList.toggle("osr-sk-end", timed && r.t < 1.5);
