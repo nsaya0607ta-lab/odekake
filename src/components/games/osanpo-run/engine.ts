@@ -66,7 +66,15 @@ export type RunItem = {
   level: number;
 };
 
+/** 1回のおさんぽの結果（サーバーへ送ってスコアの記録とコインの受け取りをする） */
+/** 別画面を開いたときに送る合図（detail に画面の名前）。React 側で描いている画面の読み直しに使う */
+export const OSANPO_RUN_SHEET_OPEN_EVENT = "osanpo-run-sheet-open";
+
+export type OsanpoRunResult = { roundId: string; stage: OsanpoRunStageId; score: number; meters: number; items: number };
+
 export type OsanpoRunOptions = {
+  /** おさんぽが終わったときに呼ぶ。もらえたコインの枚数を返す（記録できなかったときは null） */
+  onRunEnd?: (result: OsanpoRunResult) => Promise<number | null>;
   /** 道に落ちるアイテム（基本は持っているアイテム） */
   items: RunItem[];
   /** 持っているアイテムが少なく、見本のアイテムを混ぜているか */
@@ -336,6 +344,8 @@ export function createOsanpoRun(root: HTMLElement, opts: OsanpoRunOptions): () =
     bones: 0, newAch: [] as string[], newKinds: [] as string[], rainWalk: 0, rushes: 0, closes: 0, bonusGot: 0,
     best: 0, bestD: 0, passedBest: false, recordShown: false, milestone: 100, bufT: 0, fwT: 2,
     lastResult: null as null | { score: number; m: number; items: number; rank: string },
+    /** このおさんぽの識別子。同じ結果を二重に送ってもコインが増えないよう、サーバー側で使う */
+    roundId: "",
   };
   let obstacles: Obstacle[] = [], pickups: Pickup[] = [], parts: Particle[] = [], texts: FloatText[] = [], flyers: Flyer[] = [];
   const FX = { hitstop: 0, flash: 0, flashCol: "255,255,255", rareT: 0, fade: 0 };
@@ -1519,6 +1529,8 @@ export function createOsanpoRun(root: HTMLElement, opts: OsanpoRunOptions): () =
     else if (name === "records") renderRecords();
     const el = $(`sheet-${name}`);
     el.hidden = false;
+    // React 側で描いている画面（フレンドのランキング）に、開いたことを知らせて読み直してもらう
+    window.dispatchEvent(new CustomEvent(OSANPO_RUN_SHEET_OPEN_EVENT, { detail: name }));
     el.querySelector<HTMLElement>(".osr-sheet-body")?.scrollTo(0, 0);
     openSheetName = name;
     el.querySelector<HTMLElement>(".osr-sheet-back")?.focus({ preventScroll: true });
@@ -2052,6 +2064,27 @@ export function createOsanpoRun(root: HTMLElement, opts: OsanpoRunOptions): () =
   }
 
   /* ---------- 進行 ---------- */
+  function newRoundId(): string {
+    try { if (typeof crypto !== "undefined" && crypto.randomUUID) return `osr-${crypto.randomUUID()}`; } catch { /* 古い端末 */ }
+    return `osr-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 12)}`;
+  }
+  /** 結果をサーバーへ送り、もらえたコインを結果画面に出す */
+  function sendResult(score: number, meters: number): void {
+    const el = $("o-coins");
+    if (!opts.onRunEnd || !S.roundId) { el.hidden = true; return; }
+    const roundId = S.roundId;
+    S.roundId = ""; // 同じおさんぽを二度送らない
+    el.hidden = false; el.dataset.state = "wait";
+    el.textContent = "コインを受け取り中…";
+    opts.onRunEnd({ roundId, stage: STAGE_ID, score, meters, items: S.treats })
+      .then((coins) => {
+        if (coins === null) { el.dataset.state = "error"; el.textContent = "通信できず、コインを受け取れませんでした"; return; }
+        el.dataset.state = coins > 0 ? "ok" : "zero";
+        el.textContent = coins > 0 ? `+${coins.toLocaleString()} コイン ゲット！` : "コインはスコア50点ごとに1枚";
+        if (coins > 0) sfx.mile();
+      })
+      .catch(() => { el.dataset.state = "error"; el.textContent = "通信できず、コインを受け取れませんでした"; });
+  }
   const score = () => Math.floor(S.dist / 50) + S.bonus;
   function start(): void {
     closeSheet();
@@ -2059,7 +2092,7 @@ export function createOsanpoRun(root: HTMLElement, opts: OsanpoRunOptions): () =
     $("copy-note").hidden = true;
     FX.fade = RM ? 0 : 1;
     Object.assign(S, {
-      state: "intro", introT: 0, bestD: bestDistOf(STAGE_ID), passedBest: false, recordShown: false, fwT: 2,
+      state: "intro", introT: 0, roundId: newRoundId(), bestD: bestDistOf(STAGE_ID), passedBest: false, recordShown: false, fwT: 2,
       t: 0, speed: 0, dist: 0, bonus: 0, treats: 0, clock: STAGE.clock, next: 420, shield: false, chain: 0, chainT: 0, mult: 1, maxMult: 1,
       paused: false, deadT: 0, milestone: 100, bufT: 0, haul: new Map<string, number>(), sec: "normal", secT: 18, rain: 0, rainTarget: 0, rainT: 0,
       bones: 0, newAch: [], newKinds: [], rainWalk: 0, rushes: 0, closes: 0, bonusGot: 0,
@@ -2127,6 +2160,7 @@ export function createOsanpoRun(root: HTMLElement, opts: OsanpoRunOptions): () =
     store.set(`rec-${STAGE_ID}`, JSON.stringify(recs.slice(0, 5)));
     lastRecordAt = now;
     S.lastResult = { score: sc, m: meters, items: S.treats, rank: rank.label };
+    sendResult(sc, meters);
     $("over-sub").textContent = `${STAGE.name} ・ ${STAGE.skinName} ・ ${fmtClock(S.clock)}帰宅`;
     if (isNew && sc > 0) sfx.record(); else sfx.home();
     countUp($("o-score"), sc);

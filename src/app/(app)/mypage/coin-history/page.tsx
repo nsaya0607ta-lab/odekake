@@ -18,6 +18,7 @@ const EVENT_LABELS: Record<CoinEventRow["event_type"], string> = {
   item_catch: "アイテムキャッチ",
   wanko_bowling: "わんこボウリング",
   snack_trail: "わんこのおやつ道",
+  osanpo_run: "おさんぽフレンチー",
 };
 
 export default async function CoinHistoryPage() {

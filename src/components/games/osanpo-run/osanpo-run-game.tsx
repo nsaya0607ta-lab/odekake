@@ -5,7 +5,8 @@ import { Dela_Gothic_One, M_PLUS_Rounded_1c } from "next/font/google";
 import { useEffect, useRef } from "react";
 import { setBgmSuppressed } from "@/lib/bgm-engine";
 import type { OsanpoRunStageId } from "@/lib/games/osanpo-run/config";
-import { createOsanpoRun, type RunItem } from "./engine";
+import { createOsanpoRun, type OsanpoRunResult, type RunItem } from "./engine";
+import { OSANPO_RUN_RANKING_REFRESH_EVENT, OsanpoRunRanking } from "./osanpo-run-ranking";
 
 const displayFont = Dela_Gothic_One({ weight: "400", subsets: ["latin"], display: "swap", preload: false, variable: "--font-osr-display" });
 const bodyFont = M_PLUS_Rounded_1c({ weight: ["500", "800"], subsets: ["latin"], display: "swap", preload: false, variable: "--font-osr-body" });
@@ -17,6 +18,24 @@ type Props = {
   seriesTabs: { id: string; name: string }[];
   categoryLabels: Record<string, string>;
 };
+
+/** 1回の結果をサーバーへ送り、スコアを記録してコインを受け取る。記録できなかったときは null */
+async function submitResult(result: OsanpoRunResult): Promise<number | null> {
+  try {
+    const response = await fetch("/api/games/osanpo-run/score", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(result),
+    });
+    if (!response.ok) return null;
+    const payload = (await response.json().catch(() => null)) as { ready?: boolean; coins?: number } | null;
+    window.dispatchEvent(new Event(OSANPO_RUN_RANKING_REFRESH_EVENT));
+    if (payload?.ready === false) return null;
+    return typeof payload?.coins === "number" ? payload.coins : null;
+  } catch {
+    return null;
+  }
+}
 
 /**
  * おさんぽフレンチーの画面。骨組みだけをここで描き、動きは engine.ts に任せる。
@@ -36,6 +55,7 @@ export function OsanpoRunGame({ items, usesSampleItems, unlockedStages, seriesTa
       seriesTabs,
       categoryLabels,
       bodyFontFamily: bodyFont.style.fontFamily,
+      onRunEnd: submitResult,
     });
     return () => {
       destroy();
@@ -48,7 +68,7 @@ export function OsanpoRunGame({ items, usesSampleItems, unlockedStages, seriesTa
       <header className="osr-top">
         <Link href="/games" className="osr-back" aria-label="ゲーム一覧へ戻る">‹</Link>
         <div className="osr-title">
-          <p>おでかけミニゲーム ・ お試し版</p>
+          <p>おでかけミニゲーム</p>
           <h1>おさんぽ<span>フレンチー</span></h1>
         </div>
         <div className="osr-best-chip" aria-live="polite">
@@ -117,12 +137,13 @@ export function OsanpoRunGame({ items, usesSampleItems, unlockedStages, seriesTa
                 <button type="button" data-sheet="zukan">ずかん</button>
                 <button type="button" data-sheet="ach">称号</button>
                 <button type="button" data-sheet="records">記録</button>
+                <button type="button" data-sheet="friends">フレンド</button>
               </nav>
               <div className="osr-panel-foot">
                 <button className="osr-chip-toggle" type="button" data-opt="calm" aria-pressed="true"><span className="osr-dot" aria-hidden="true" />ゆったりモード</button>
                 <button className="osr-link-btn" type="button" data-open="settings">設定</button>
               </div>
-              <p className="osr-preview-note">お試し版のため、コインはもらえません。記録はこの端末に保存されます。</p>
+              <p className="osr-preview-note">スコア50点ごとにコイン1枚（切り上げ）。フレンドとスコアを競えます。</p>
             </div>
 
             <div className="osr-panel" data-osr="over-panel" hidden>
@@ -148,12 +169,14 @@ export function OsanpoRunGame({ items, usesSampleItems, unlockedStages, seriesTa
                 <div className="osr-haul-row" data-osr="o-haul" />
                 <p className="osr-new-line" data-osr="o-new-line" hidden />
               </div>
+              <p className="osr-coin-line" data-osr="o-coins" hidden />
               <div className="osr-ach-row" data-osr="o-ach" hidden />
               <div className="osr-btn-row">
                 <button className="osr-btn" data-osr="retry" type="button">もう一回おさんぽ</button>
                 <button className="osr-btn osr-ghost" data-osr="stage-btn" type="button">道を変える</button>
               </div>
               <nav className="osr-menu osr-menu-small" aria-label="メニュー">
+                <button type="button" data-sheet="friends">フレンド</button>
                 <button type="button" data-sheet="records">記録</button>
                 <button type="button" data-sheet="zukan">ずかん</button>
                 <button type="button" data-sheet="ach">称号</button>
@@ -240,12 +263,19 @@ export function OsanpoRunGame({ items, usesSampleItems, unlockedStages, seriesTa
               </div>
             </section>
 
+            <section className="osr-sheet" data-osr="sheet-friends" hidden aria-label="フレンド">
+              <header className="osr-sheet-head"><button type="button" className="osr-sheet-back" data-close-sheet>‹ もどる</button><h2>フレンド</h2></header>
+              <div className="osr-sheet-body">
+                <OsanpoRunRanking />
+              </div>
+            </section>
+
             <section className="osr-sheet" data-osr="sheet-records" hidden aria-label="記録">
               <header className="osr-sheet-head"><button type="button" className="osr-sheet-back" data-close-sheet>‹ もどる</button><h2>記録</h2></header>
               <div className="osr-sheet-body">
                 <p className="osr-life-stats" data-osr="life-stats" />
                 <div className="osr-rec-grid" data-osr="rec-list" />
-                <p className="osr-foot">記録（ベストスコア・称号・ずかん）はこの端末にだけ保存されます。</p>
+                <p className="osr-foot">この画面の記録・称号・ずかんはこの端末に保存されます。フレンドと競うスコアは「フレンド」画面で見られます。</p>
               </div>
             </section>
         </div>
