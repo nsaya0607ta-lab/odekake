@@ -225,6 +225,7 @@ export function OsanpoRunGame({ items, usesSampleItems, unlockedStages, seriesTa
               <div className="osr-sheet-body">
                 <p className="osr-zk-rar" data-osr="zk-rar" />
                 <div className="osr-zk-tabs" data-osr="zk-tabs" role="tablist" aria-label="シリーズ" />
+                <div className="osr-zk-kinds" data-osr="zk-kinds" role="group" aria-label="スキルの種類で絞り込む" />
                 <div className="osr-zk-body">
                   <div className="osr-zk-detail" data-osr="zk-detail" aria-live="polite" />
                   <ul className="osr-zk-grid" data-osr="zk-grid" />

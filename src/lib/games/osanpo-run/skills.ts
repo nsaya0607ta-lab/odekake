@@ -198,6 +198,11 @@ export const SKILL_KIND_LABELS: Record<SkillKind, string> = {
   score: "スコア", guard: "守り", spawn: "出現", jump: "ジャンプ", collect: "回収", combo: "コンボ", weather: "天気・時計", pace: "速さ", revive: "復活",
 };
 
+/** 種類ごとの色（プレイ中の左上のカード・ずかんの絞り込みで使う） */
+export const SKILL_KIND_COLORS: Record<SkillKind, string> = {
+  score: "#FFC857", guard: "#7CC4FF", spawn: "#FF84BC", jump: "#7EF0D0", collect: "#C79BFF", combo: "#FF9F6B", weather: "#9FD4FF", pace: "#B8E986", revive: "#FF6B8A",
+};
+
 export type OsanpoRunSkill = {
   /** COLLECTION_ITEMS の id */
   id: string;

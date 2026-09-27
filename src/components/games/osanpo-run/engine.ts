@@ -28,6 +28,8 @@ import {
   OSANPO_RUN_SKILL_BY_ID,
   OSANPO_RUN_SKILL_MAX_LEVEL,
   OSANPO_RUN_SKILLS,
+  SKILL_KIND_COLORS,
+  SKILL_KIND_LABELS,
   skillValue,
   type Buff,
   type Fx,
@@ -578,6 +580,21 @@ export function createOsanpoRun(root: HTMLElement, opts: OsanpoRunOptions): () =
     record: () => { [523, 659, 784, 1046, 1318].forEach((f, i) => tone(f, 0.14, "square", 0.045, null, i * 0.07)); [1046, 1318, 1568].forEach((f) => tone(f, 0.7, "triangle", 0.035, null, 0.38)); },
     pass: () => [880, 1175, 1568].forEach((f, i) => tone(f, 0.12, "triangle", 0.05, null, i * 0.06)),
     title: () => [1046, 1318, 1568].forEach((f, i) => tone(f, 0.16, "triangle", 0.05, null, i * 0.08)),
+    /** スキルが発動したときの音。種類ごとに変えて、聞いただけで何が起きたかわかるように */
+    skill: (kind: SkillKind) => {
+      const d = 0.1;
+      switch (kind) {
+        case "score": tone(1320, 0.08, "square", 0.035, null, d); tone(1760, 0.16, "square", 0.035, null, d + 0.07); break;
+        case "guard": tone(330, 0.28, "triangle", 0.06, 880, d); tone(1318, 0.3, "sine", 0.035, null, d + 0.12); break;
+        case "spawn": [1568, 1318, 1175, 1046, 784].forEach((f, i) => tone(f, 0.09, "sine", 0.05, null, d + i * 0.045)); break;
+        case "jump": tone(260, 0.22, "sine", 0.08, 960, d); break;
+        case "collect": noise(0.25, 0.05, 3200); tone(520, 0.25, "sine", 0.05, 1240, d); break;
+        case "combo": [659, 784, 988].forEach((f, i) => tone(f, 0.1, "square", 0.035, null, d + i * 0.06)); break;
+        case "weather": tone(1046, 0.5, "triangle", 0.04, null, d); tone(1568, 0.6, "sine", 0.03, null, d + 0.1); break;
+        case "pace": tone(620, 0.3, "triangle", 0.05, 300, d); break;
+        case "revive": [523, 659, 784].forEach((f) => tone(f, 0.6, "sine", 0.035, null, d)); tone(1046, 0.5, "triangle", 0.03, null, d + 0.2); break;
+      }
+    },
   };
   function setMuted(m: boolean): void {
     muted = m; store.set("muted", m ? "1" : "0"); applyAudio();
@@ -1322,7 +1339,7 @@ export function createOsanpoRun(root: HTMLElement, opts: OsanpoRunOptions): () =
   }
 
   /* ---------- ずかん ---------- */
-  let zkTab = "all", zkSel: string | null = null;
+  let zkTab = "all", zkKind: SkillKind | "all" = "all", zkSel: string | null = null;
   const zkNew = new Set<string>();
   const seriesLabel = (series: string | null) => (series ? opts.seriesTabs.find((t) => t.id === series)?.name ?? "シリーズ" : "通常");
   function zkShow(id: string | null): void {
@@ -1388,7 +1405,25 @@ export function createOsanpoRun(root: HTMLElement, opts: OsanpoRunOptions): () =
       on(b, "click", () => { zkTab = tab.id; renderZukan(); });
       tabs.appendChild(b);
     }
-    const list = ITEMS.filter((it) => inTab(it, zkTab)).sort((a, b) => rarityIndex(a.rarity) - rarityIndex(b.rarity));
+    // スキルの種類で絞り込む（シリーズのタブと組み合わせて使える）
+    const kindOf = (it: RunItem) => OSANPO_RUN_SKILL_BY_ID.get(it.id)?.kind;
+    const kinds = $("zk-kinds");
+    kinds.replaceChildren();
+    const inTabList = ITEMS.filter((it) => inTab(it, zkTab));
+    for (const k of ["all", ...(Object.keys(SKILL_KIND_LABELS) as SkillKind[])] as const) {
+      const n = k === "all" ? inTabList.length : inTabList.filter((it) => kindOf(it) === k).length;
+      if (!n) continue;
+      const b = document.createElement("button");
+      b.type = "button"; b.setAttribute("aria-pressed", String(zkKind === k));
+      if (k !== "all") b.style.setProperty("--kc", SKILL_KIND_COLORS[k]);
+      b.textContent = k === "all" ? "すべてのスキル" : SKILL_KIND_LABELS[k];
+      const sm = document.createElement("small"); sm.textContent = String(n);
+      b.appendChild(sm);
+      on(b, "click", () => { zkKind = k; renderZukan(); });
+      kinds.appendChild(b);
+    }
+    if (zkKind !== "all" && !inTabList.some((it) => kindOf(it) === zkKind)) zkKind = "all";
+    const list = inTabList.filter((it) => zkKind === "all" || kindOf(it) === zkKind).sort((a, b) => rarityIndex(a.rarity) - rarityIndex(b.rarity));
     for (const it of list) {
       const li = document.createElement("li"), b = document.createElement("button"), got = kindSet.has(it.id);
       b.type = "button"; b.dataset.id = it.id; b.className = got ? "" : "osr-locked";
@@ -1692,6 +1727,7 @@ export function createOsanpoRun(root: HTMLElement, opts: OsanpoRunOptions): () =
     const skill = OSANPO_RUN_SKILL_BY_ID.get(item.id);
     if (!skill || S.state !== "play") return;
     const lv = lvOf(item);
+    if (depth === 0) sfx.skill(skill.kind);
     skill.fx.forEach((fx, idx) => runFx(skill, fx, lv, idx, depth));
   }
   function runFx(skill: OsanpoRunSkill, fx: Fx, lv: number, idx: number, depth: number): void {
@@ -1965,9 +2001,6 @@ export function createOsanpoRun(root: HTMLElement, opts: OsanpoRunOptions): () =
     if (K.cairn) add("cairn", "▲", "積み石", "積み石", `${K.cairn}/3`, "score");
     return rows.slice(0, 5);
   }
-  const KIND_COLOR: Record<SkillKind, string> = {
-    score: "#FFC857", guard: "#7CC4FF", spawn: "#FF84BC", jump: "#7EF0D0", collect: "#C79BFF", combo: "#FF9F6B", weather: "#9FD4FF", pace: "#B8E986", revive: "#FF6B8A",
-  };
   /** 左上に、効いているスキルを1行ずつ縦に並べる。行の組み合わせが変わったときだけ作り直し、残り時間は毎フレーム更新 */
   function renderSkillRows(): void {
     const rows = S.state === "play" ? skillRows() : [];
@@ -1978,7 +2011,7 @@ export function createOsanpoRun(root: HTMLElement, opts: OsanpoRunOptions): () =
       hud.set("skills", sig);
       box.replaceChildren(...rows.map((r) => {
         const row = document.createElement("div");
-        row.className = "osr-sk"; row.style.setProperty("--kc", KIND_COLOR[r.kind]);
+        row.className = "osr-sk"; row.style.setProperty("--kc", SKILL_KIND_COLORS[r.kind]);
         const ic = document.createElement("span"); ic.className = "osr-sk-ic";
         if (r.item) ic.appendChild(spriteEl(r.item, 20, true)); else ic.textContent = r.glyph;
         const tg = document.createElement("span"); tg.className = "osr-sk-tag"; tg.textContent = r.tag;
