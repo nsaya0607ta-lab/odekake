@@ -383,9 +383,6 @@
 
 /* ---------- メニューボタン ---------- */
 .osr .osr-menu { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 6px; }
-/* スタート画面は6つ（3列×2段、広い画面は1段） */
-.osr .osr-menu:not(.osr-menu-small) { grid-template-columns: repeat(3, minmax(0, 1fr)); }
-@media (min-width: 640px) { .osr .osr-menu:not(.osr-menu-small) { grid-template-columns: repeat(6, minmax(0, 1fr)); } }
 .osr .osr-menu button {
   appearance: none; border: 1px solid var(--osr-line); background: rgba(255, 255, 255, 0.05); color: var(--osr-ink);
   font-family: var(--osr-body); font-weight: 800; font-size: 13px; padding: 8px 4px; border-radius: 10px; cursor: pointer;
@@ -484,22 +481,3 @@
 .osr .osr-ps-tag { flex-shrink: 0; font-size: 10px; font-weight: 800; padding: 2px 6px; border-radius: 999px; background: var(--kc); color: #1b193a; }
 .osr .osr-ps-top em { margin-left: auto; flex-shrink: 0; font-style: normal; font-size: 11px; font-weight: 800; color: var(--osr-lantern); font-variant-numeric: tabular-nums; }
 .osr .osr-pause-skills small { display: block; margin-top: 2px; font-size: 11px; line-height: 1.45; color: var(--osr-muted); }
-
-/* ---------- きせかえ ---------- */
-.osr .osr-cs { display: flex; flex-direction: column; gap: 12px; max-width: 760px; width: 100%; margin: 0 auto; }
-.osr .osr-cs-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
-.osr .osr-cs-head p { margin: 0; font-size: 12px; color: var(--osr-muted); }
-.osr .osr-cs-coins { flex-shrink: 0; font-family: var(--osr-display); font-size: 16px; padding: 4px 12px; border-radius: 999px; background: rgba(255, 200, 87, 0.14); color: var(--osr-lantern); font-variant-numeric: tabular-nums; }
-.osr .osr-cs-msg { margin: 0; padding: 8px 12px; border-radius: 10px; background: rgba(255, 255, 255, 0.05); font-size: 12px; font-weight: 800; }
-.osr .osr-cs-group h3 { margin: 0 0 6px; font-size: 12px; font-weight: 800; letter-spacing: 0.14em; color: var(--osr-muted); }
-.osr .osr-cs-group ul { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 8px; }
-.osr .osr-cs-group li { display: flex; flex-direction: column; align-items: center; gap: 3px; padding: 10px 8px; border-radius: 12px; background: var(--osr-panel); text-align: center; box-shadow: 0 0 0 1px var(--osr-line) inset; }
-.osr .osr-cs-group li.osr-cs-worn { box-shadow: 0 0 0 2px #7ef0d0 inset; background: rgba(126, 240, 208, 0.08); }
-.osr .osr-cs-preview { width: 84px; height: 72px; }
-.osr .osr-cs-group li b { font-size: 13px; font-weight: 800; }
-.osr .osr-cs-group li small { font-size: 10px; color: var(--osr-muted); min-height: 2.8em; }
-.osr .osr-cs-group li button { margin-top: 2px; width: 100%; appearance: none; border: 1px solid var(--osr-line); background: rgba(255, 255, 255, 0.06); color: var(--osr-ink); font-family: var(--osr-body); font-weight: 800; font-size: 12px; padding: 6px 8px; border-radius: 999px; cursor: pointer; }
-.osr .osr-cs-group li button[aria-pressed="true"] { background: #7ef0d0; border-color: #7ef0d0; color: #10302a; }
-.osr .osr-cs-group li button.osr-cs-buy { background: var(--osr-lantern); border-color: var(--osr-lantern); color: #2a1e0a; }
-.osr .osr-cs-group li button:disabled { opacity: 0.45; cursor: not-allowed; }
-.osr .osr-cs-group li button:focus-visible { outline: 2px solid var(--osr-lantern); outline-offset: 2px; }

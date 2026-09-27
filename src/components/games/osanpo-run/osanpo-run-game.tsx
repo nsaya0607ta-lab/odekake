@@ -6,7 +6,6 @@ import { useEffect, useRef } from "react";
 import { setBgmSuppressed } from "@/lib/bgm-engine";
 import type { OsanpoRunStageId } from "@/lib/games/osanpo-run/config";
 import { createOsanpoRun, type OsanpoRunResult, type RunItem } from "./engine";
-import { OsanpoRunCostumes } from "./osanpo-run-costumes";
 import { OSANPO_RUN_RANKING_REFRESH_EVENT, OsanpoRunRanking } from "./osanpo-run-ranking";
 
 const displayFont = Dela_Gothic_One({ weight: "400", subsets: ["latin"], display: "swap", preload: false, variable: "--font-osr-display" });
@@ -18,10 +17,6 @@ type Props = {
   unlockedStages: OsanpoRunStageId[];
   seriesTabs: { id: string; name: string }[];
   categoryLabels: Record<string, string>;
-  /** 買ってあるきせかえ・いまのコイン・きせかえの準備ができているか */
-  ownedCostumes: string[];
-  coinBalance: number;
-  costumesReady: boolean;
 };
 
 /** 1回の結果をサーバーへ送り、スコアを記録してコインを受け取る。記録できなかったときは null */
@@ -46,7 +41,7 @@ async function submitResult(result: OsanpoRunResult): Promise<number | null> {
  * おさんぽフレンチーの画面。骨組みだけをここで描き、動きは engine.ts に任せる。
  * プレイ中はアプリ全体のBGMを止め、ゲームの曲だけが鳴るようにする。
  */
-export function OsanpoRunGame({ items, usesSampleItems, unlockedStages, seriesTabs, categoryLabels, ownedCostumes, coinBalance, costumesReady }: Props) {
+export function OsanpoRunGame({ items, usesSampleItems, unlockedStages, seriesTabs, categoryLabels }: Props) {
   const rootRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
@@ -61,13 +56,12 @@ export function OsanpoRunGame({ items, usesSampleItems, unlockedStages, seriesTa
       categoryLabels,
       bodyFontFamily: bodyFont.style.fontFamily,
       onRunEnd: submitResult,
-      ownedCostumes,
     });
     return () => {
       destroy();
       setBgmSuppressed(false);
     };
-  }, [items, usesSampleItems, unlockedStages, seriesTabs, categoryLabels, ownedCostumes]);
+  }, [items, usesSampleItems, unlockedStages, seriesTabs, categoryLabels]);
 
   return (
     <div ref={rootRef} className={`osr ${displayFont.variable} ${bodyFont.variable}`}>
@@ -144,7 +138,6 @@ export function OsanpoRunGame({ items, usesSampleItems, unlockedStages, seriesTa
                 <button type="button" data-sheet="ach">称号</button>
                 <button type="button" data-sheet="records">記録</button>
                 <button type="button" data-sheet="friends">フレンド</button>
-                <button type="button" data-sheet="costume">きせかえ</button>
               </nav>
               <div className="osr-panel-foot">
                 <button className="osr-chip-toggle" type="button" data-opt="calm" aria-pressed="true"><span className="osr-dot" aria-hidden="true" />ゆったりモード</button>
@@ -279,13 +272,6 @@ export function OsanpoRunGame({ items, usesSampleItems, unlockedStages, seriesTa
               <header className="osr-sheet-head"><button type="button" className="osr-sheet-back" data-close-sheet>‹ もどる</button><h2>フレンド</h2></header>
               <div className="osr-sheet-body">
                 <OsanpoRunRanking />
-              </div>
-            </section>
-
-            <section className="osr-sheet" data-osr="sheet-costume" hidden aria-label="きせかえ">
-              <header className="osr-sheet-head"><button type="button" className="osr-sheet-back" data-close-sheet>‹ もどる</button><h2>きせかえ</h2></header>
-              <div className="osr-sheet-body">
-                <OsanpoRunCostumes owned={ownedCostumes} balance={coinBalance} ready={costumesReady} />
               </div>
             </section>
 

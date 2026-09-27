@@ -14,10 +14,6 @@ import {
   isOsanpoRunStageId,
   OSANPO_RUN_ACHIEVEMENTS,
   OSANPO_RUN_HINTS,
-  OSANPO_RUN_OUTFIT_EVENT,
-  OSANPO_RUN_OUTFIT_KEY,
-  getOsanpoRunCostume,
-  type OsanpoRunOutfit,
   OSANPO_RUN_RANKS,
   OSANPO_RUN_SONGS,
   OSANPO_RUN_STAGE_IDS,
@@ -52,7 +48,7 @@ import {
   sliderToGain,
 } from "@/lib/sound-settings";
 import {
-  drawBike, drawBuddy, drawFaceCostume, drawHeadCostume, drawTrailBit, drawCat, drawCone, drawCrow, drawDropper, drawGeyser, drawGoldfishTub, drawKakigoriFlag, drawLog, drawNoren, drawPigeons, drawRoller,
+  drawBike, drawBuddy, drawCat, drawCone, drawCrow, drawDropper, drawGeyser, drawGoldfishTub, drawKakigoriFlag, drawLog, drawNoren, drawPigeons, drawRoller,
   drawPuddle, drawRock, drawSign, drawSignpost, drawSled, drawSnowman, drawWatermelon,
   ell, font, glow, hex, hslRgb, mix, rgb, rr, setCanvasFontFamily, shade, star, WHITE,
   type Ctx, type Pigeon, type RGB,
@@ -84,8 +80,6 @@ export type OsanpoRunOptions = {
   /** 持っているアイテムが少なく、見本のアイテムを混ぜているか */
   usesSampleItems: boolean;
   unlockedStages: OsanpoRunStageId[];
-  /** 買ってあるきせかえの id */
-  ownedCostumes?: string[];
   bodyFontFamily: string;
   seriesTabs: { id: string; name: string }[];
   categoryLabels: Record<string, string>;
@@ -139,8 +133,7 @@ type Pickup = { item: RunItem | null; token: number; x: number; y: number; vy: n
 type WeatherKind = "rainbow" | "thunder" | "sakura" | "momiji" | "aurora";
 type WeatherEvent = { kind: WeatherKind; t: number; max: number; acc: number; mul: number; nextBolt: number };
 type ActiveBuff = { skill: OsanpoRunSkill; b: Buff; lv: number; key: string; t: number; max: number; count: number; acc: number; rampN: number; rainAcc: number };
-/** kind が "trail" のときは color に足あとのきせかえの id を入れる */
-type Particle = { x: number; y: number; vx: number; vy: number; life: number; max: number; r: number; kind: "dust" | "spark" | "ring" | "splash" | "fw" | "trail"; color: string; g: number; scroll: boolean };
+type Particle = { x: number; y: number; vx: number; vy: number; life: number; max: number; r: number; kind: "dust" | "spark" | "ring" | "splash" | "fw"; color: string; g: number; scroll: boolean };
 type FloatText = { x: number; y: number; text: string; color: string; size: number; life: number; max: number };
 type Flyer = { item: RunItem; x0: number; y0: number; t: number };
 type Env = { m: number; top: RGB; bot: RGB; far: RGB; mid: RGB; near: RGB; night: number; side: RGB; road: RGB };
@@ -379,7 +372,6 @@ export function createOsanpoRun(root: HTMLElement, opts: OsanpoRunOptions): () =
   let obstacles: Obstacle[] = [], pickups: Pickup[] = [], parts: Particle[] = [], texts: FloatText[] = [], flyers: Flyer[] = [];
   const FX = { hitstop: 0, flash: 0, flashCol: "255,255,255", rareT: 0, fade: 0 };
   let FDT = 1 / 60;
-  let trailT = 0;
   /** アイテムスキルの状態。おさんぽのたびに作り直す */
   const newSkillState = () => ({
     buffs: [] as ActiveBuff[],
@@ -644,41 +636,6 @@ export function createOsanpoRun(root: HTMLElement, opts: OsanpoRunOptions): () =
   }
   setMuted(muted);
 
-  /* ---------- きせかえ ---------- */
-  const ownedCostumes = new Set(opts.ownedCostumes ?? []);
-  let outfit: OsanpoRunOutfit = {};
-  function loadOutfit(): void {
-    const saved = loadJSON<OsanpoRunOutfit>(OSANPO_RUN_OUTFIT_KEY, {});
-    outfit = {};
-    // 買っていないものは付けない（別の端末で保存した分など）
-    for (const slot of ["head", "face", "trail"] as const) {
-      const id = saved[slot];
-      if (id && ownedCostumes.has(id) && getOsanpoRunCostume(id)?.slot === slot) outfit[slot] = id;
-    }
-  }
-  loadOutfit();
-  on(window, OSANPO_RUN_OUTFIT_EVENT as keyof WindowEventMap, () => loadOutfit());
-  /**
-   * ポーズごとの頭のてっぺん（hx, top）と両目のまんなか（ex, ey）。犬の画像（300×254、左向き）の座標。
-   * 帽子やめがねをこの位置に合わせて描く
-   */
-  const HEAD_ANCHOR: Record<Pose, readonly [number, number, number, number]> = {
-    walk: [108, 42, 104, 110], trot: [98, 62, 96, 132], "walk-tail": [100, 52, 96, 124], "stand-happy": [100, 48, 96, 118],
-    cheer: [140, 44, 132, 108], smile: [100, 44, 100, 106], bow: [108, 132, 104, 176], "bow-b": [92, 112, 86, 160],
-    wave: [100, 48, 96, 118], sleep: [100, 120, 96, 160], "lie-wave": [100, 110, 96, 150],
-  };
-  /** 犬の画像と同じ座標系（drawDog の中、左右反転ずみ）で、頭と顔のきせかえを描く */
-  function drawOutfit(c: Ctx, pose: Pose): void {
-    if (!outfit.head && !outfit.face) return;
-    const [hx, top, ex, ey] = HEAD_ANCHOR[pose];
-    c.save();
-    c.translate(-DW / 2, (-DH * DOG_FOOT) / DOG_H);
-    c.scale(DW / DOG_W, DH / DOG_H);
-    if (outfit.face) drawFaceCostume(c, outfit.face, ex, ey);
-    if (outfit.head) drawHeadCostume(c, outfit.head, hx, top, S.time);
-    c.restore();
-  }
-
   /* ---------- 犬の描画 ---------- */
   function drawDog(c: Ctx, x: number, y: number): void {
     const air = !P.ground && !P.dead, sliding = P.slide && P.ground && !P.dead;
@@ -697,7 +654,6 @@ export function createOsanpoRun(root: HTMLElement, opts: OsanpoRunOptions): () =
       // 画像は左向きなので、進行方向（右）に向けて左右反転する
       c.scale(-1, 1);
       c.drawImage(img, -DW / 2, (-DH * DOG_FOOT) / DOG_H, DW, DH);
-      drawOutfit(c, pose);
     } else {
       c.fillStyle = "#F6EFE4"; ell(c, 0, -22, 20, 16); c.fill();
     }
@@ -2663,18 +2619,6 @@ export function createOsanpoRun(root: HTMLElement, opts: OsanpoRunOptions): () =
     P.rot += (rotT - P.rot) * Math.min(1, dt * 10);
     if (P.ground && S.speed > 1) P.ph += dt * (S.state === "ready" ? 7 : 9 + S.speed / 40);
     if (P.ground && S.speed > 420) { P.dustT -= dt; if (P.dustT < 0) { P.dustT = 0.11; puff(P.x - 16, GROUND, 1, "dust", { vy: -10 }); } }
-    // 足あとのきせかえ
-    if (outfit.trail && (playing || S.state === "ready") && S.speed > 1 && !RM) {
-      trailT -= dt;
-      if (trailT <= 0) {
-        trailT = outfit.trail === "trail_rainbow" ? 0.02 : 0.07;
-        const rb = outfit.trail === "trail_rainbow";
-        parts.push({
-          x: P.x - 18 + rand(-4, 4), y: P.y - (rb ? 22 : rand(8, 40)), vx: rb ? 0 : rand(-30, 10), vy: rb ? 0 : rand(-40, -10),
-          life: 0, max: rb ? 0.5 : rand(0.6, 1), r: rb ? 3.2 : rand(2.5, 4), kind: "trail", color: outfit.trail, g: rb ? 0 : -10, scroll: true,
-        });
-      }
-    }
 
     // 障害物
     const sp = S.speed;
@@ -2947,7 +2891,6 @@ export function createOsanpoRun(root: HTMLElement, opts: OsanpoRunOptions): () =
       else if (p.kind === "fw") { c.fillStyle = `rgba(${p.color},${a})`; c.beginPath(); c.arc(p.x, p.y, p.r * (0.6 + a * 0.6), 0, Math.PI * 2); c.fill(); }
       else if (p.kind === "splash") { c.strokeStyle = `rgba(210,228,255,${a * 0.8})`; c.lineWidth = 1; ell(c, p.x, p.y, 1 + p.life * 22, 0.6 + p.life * 5); c.stroke(); }
       else if (p.kind === "ring") { c.strokeStyle = `rgba(255,255,255,${a * 0.7})`; c.lineWidth = 1.5; ell(c, p.x, p.y, 4 + p.life * 50, 1.5 + p.life * 10); c.stroke(); }
-      else if (p.kind === "trail") drawTrailBit(c, p.color, p.x, p.y, p.r, a, (S.time * 200 + p.x * 2) % 360);
       else star(c, p.x, p.y, p.r * a + 1, `rgba(255,214,110,${a})`);
     }
     if (flyers.length) {
