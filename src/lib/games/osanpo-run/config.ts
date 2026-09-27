@@ -122,6 +122,19 @@ export const OSANPO_RUN_ACHIEVEMENTS: readonly OsanpoRunAchievement[] = [
   { id: "hiking", name: "山道マスター", condition: "山道で300m歩く" },
   { id: "snow", name: "雪国マスター", condition: "雪国で300m歩く" },
   { id: "summer", name: "夏まつりマスター", condition: "夏まつりで300m歩く" },
+  // ---- 追加した障害物・スキルの称号 ----
+  { id: "roller10", name: "おそうじロボの天敵", condition: "転がってくるものを跳び越える（累計10回）" },
+  { id: "drop10", name: "頭上注意", condition: "上から落ちてくるものをよける（累計10回）" },
+  { id: "greet20", name: "ごあいさつ上手", condition: "ほかのわんこにあいさつする（累計20回）" },
+  { id: "geyser10", name: "びしょぬれ回避", condition: "水が出ているところを通り抜ける（累計10回）" },
+  { id: "bones100", name: "ほね職人", condition: "1回でほねを100本拾う" },
+  { id: "skills10", name: "スキルマニア", condition: "1回で10種類のスキルを発動させる" },
+  { id: "knock10", name: "ブルドーザー", condition: "1回で無敵中に障害物を10個吹っ飛ばす" },
+  { id: "rare3", name: "引きが強い", condition: "1回でUR以上のアイテムを3個拾う" },
+  { id: "survive180", name: "3分間のおさんぽ", condition: "1回で3分間歩き続ける" },
+  { id: "quick", name: "おさんぽ終了のおしらせ", condition: "歩き出して5秒以内にぶつかる" },
+  { id: "kiriban", name: "キリ番ゲッター", condition: "スコアがちょうど100の倍数で帰る" },
+  { id: "dawn", name: "朝帰り", condition: "朝の5時まで歩き続ける" },
 ];
 
 /** 結果画面のひとこと。スコアがしきい値以上の中で一番大きいものを出す */
@@ -148,6 +161,10 @@ export const OSANPO_RUN_HINTS = {
   crow: "カラスは跳ばずに、下をくぐろう",
   cat: "猫はこっちに歩いてくる。早めに跳ぼう",
   slide: "↓キーか下スワイプでスライディング！",
+  roller: "こっちに転がってくる。早めに跳ぼう",
+  drop: "地面に影！ 上から何か落ちてくる",
+  buddy: "ほかのわんこはぶつかってもOK。ごあいさつすると点がもらえる",
+  geyser: "水が止まった瞬間に通るか、2段ジャンプで越えよう",
 } as const;
 export type OsanpoRunHintId = keyof typeof OSANPO_RUN_HINTS;
 
