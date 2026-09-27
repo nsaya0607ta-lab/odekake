@@ -4,6 +4,7 @@ import { OsanpoRunGame } from "@/components/games/osanpo-run/osanpo-run-game";
 import type { RunItem } from "@/components/games/osanpo-run/engine";
 import { CATEGORY_LABELS, COLLECTION_ITEMS, REGULAR_ITEMS, type CollectionItem } from "@/lib/collection/items";
 import { getOwnedItemCounts } from "@/lib/data/collection";
+import { getCoinSummary } from "@/lib/data/coins";
 import { getSkillLevel } from "@/lib/gacha/skill-levels";
 import { getDogSkin, isSkinUnlocked } from "@/lib/dog-skins";
 import { OSANPO_RUN_STAGE_IDS, OSANPO_RUN_STAGES } from "@/lib/games/osanpo-run/config";
@@ -33,7 +34,16 @@ function toRunItem(item: CollectionItem & { image: string }, count: number): Run
 
 export default async function OsanpoRunPage() {
   const { supabase, user } = await requireUser();
-  const ownedCounts = await getOwnedItemCounts(supabase, user.id);
+  const [ownedCounts, coinSummary, costumeRows] = await Promise.all([
+    getOwnedItemCounts(supabase, user.id),
+    getCoinSummary(supabase, user.id),
+    // きせかえのテーブルが無い（マイグレーション未適用）ときも、ゲームは遊べるようにする
+    (supabase.from.bind(supabase) as unknown as (table: string) => { select: (cols: string) => PromiseLike<{ data: { costume_id: string }[] | null; error: unknown }> })(
+      "osanpo_run_costumes",
+    ).select("costume_id"),
+  ]);
+  const ownedCostumes = (costumeRows.data ?? []).map((row) => row.costume_id);
+  const costumesReady = !costumeRows.error;
   const ownedIds = new Set([...ownedCounts].filter(([, count]) => count > 0).map(([id]) => id));
 
   const hasImage = (item: CollectionItem): item is CollectionItem & { image: string } => Boolean(item.image);
@@ -54,6 +64,9 @@ export default async function OsanpoRunPage() {
       unlockedStages={unlockedStages}
       seriesTabs={seriesTabs}
       categoryLabels={CATEGORY_LABELS}
+      ownedCostumes={ownedCostumes}
+      coinBalance={coinSummary.balance}
+      costumesReady={costumesReady}
     />
   );
 }

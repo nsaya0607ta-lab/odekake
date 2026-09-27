@@ -211,3 +211,37 @@ export const OSANPO_RUN_SONGS: Record<OsanpoRunStageId, Song> = {
 
 /** localStorage のキー接頭辞。記録はこの端末にだけ保存する */
 export const OSANPO_RUN_STORAGE_PREFIX = "odekake:osanpo-run:";
+
+/* ---------- きせかえ ---------- */
+export type OsanpoRunCostumeSlot = "head" | "face" | "trail";
+export type OsanpoRunCostume = { id: string; name: string; slot: OsanpoRunCostumeSlot; price: number; desc: string };
+
+/**
+ * コインで買えるきせかえ。1つ買えばずっと使える。頭・顔・足あとに1つずつ付けられる。
+ * 値段はサーバー側（supabase/migrations/0107_osanpo_run_costumes.sql の osanpo_run_costume_price）でも決めているので、変えるときは両方直す。
+ */
+export const OSANPO_RUN_COSTUMES: readonly OsanpoRunCostume[] = [
+  { id: "ribbon", name: "赤いリボン", slot: "head", price: 800, desc: "耳のあいだに大きなリボン" },
+  { id: "flower", name: "花かんむり", slot: "head", price: 1500, desc: "春のお花をぐるっと一周" },
+  { id: "halo", name: "天使の輪", slot: "head", price: 2500, desc: "頭の上でふわふわ光る" },
+  { id: "crown", name: "王冠", slot: "head", price: 3000, desc: "おさんぽの王さま" },
+  { id: "sunglasses", name: "サングラス", slot: "face", price: 1200, desc: "ちょっとイケてる" },
+  { id: "hearteyes", name: "ハートのめがね", slot: "face", price: 1500, desc: "ぜんぶが好きに見える" },
+  { id: "trail_bubble", name: "シャボン玉の足あと", slot: "trail", price: 800, desc: "走ったあとにシャボン玉" },
+  { id: "trail_sparkle", name: "きらきらの足あと", slot: "trail", price: 1000, desc: "走ったあとに星がきらきら" },
+  { id: "trail_note", name: "音符の足あと", slot: "trail", price: 1200, desc: "ごきげんな音符がぽろぽろ" },
+  { id: "trail_heart", name: "ハートの足あと", slot: "trail", price: 1500, desc: "ハートがふわふわ" },
+  { id: "trail_rainbow", name: "虹の足あと", slot: "trail", price: 3000, desc: "虹色の光の帯" },
+];
+
+export const OSANPO_RUN_COSTUME_SLOT_LABELS: Record<OsanpoRunCostumeSlot, string> = { head: "頭", face: "顔", trail: "足あと" };
+
+export function getOsanpoRunCostume(id: string | null | undefined): OsanpoRunCostume | null {
+  return (id && OSANPO_RUN_COSTUMES.find((c) => c.id === id)) || null;
+}
+
+/** 付けているきせかえ（この端末に保存） */
+export type OsanpoRunOutfit = Partial<Record<OsanpoRunCostumeSlot, string>>;
+export const OSANPO_RUN_OUTFIT_KEY = "outfit";
+/** きせかえを付けかえたときの合図（ゲーム側が読み直す） */
+export const OSANPO_RUN_OUTFIT_EVENT = "osanpo-run-outfit-change";

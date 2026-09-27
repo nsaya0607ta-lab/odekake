@@ -14,6 +14,10 @@ import {
   isOsanpoRunStageId,
   OSANPO_RUN_ACHIEVEMENTS,
   OSANPO_RUN_HINTS,
+  OSANPO_RUN_OUTFIT_EVENT,
+  OSANPO_RUN_OUTFIT_KEY,
+  getOsanpoRunCostume,
+  type OsanpoRunOutfit,
   OSANPO_RUN_RANKS,
   OSANPO_RUN_SONGS,
   OSANPO_RUN_STAGE_IDS,
@@ -48,7 +52,7 @@ import {
   sliderToGain,
 } from "@/lib/sound-settings";
 import {
-  drawBike, drawBuddy, drawCat, drawCone, drawCrow, drawDropper, drawGeyser, drawGoldfishTub, drawKakigoriFlag, drawLog, drawNoren, drawPigeons, drawRoller,
+  drawBike, drawBuddy, drawFaceCostume, drawHeadCostume, drawTrailBit, drawCat, drawCone, drawCrow, drawDropper, drawGeyser, drawGoldfishTub, drawKakigoriFlag, drawLog, drawNoren, drawPigeons, drawRoller,
   drawPuddle, drawRock, drawSign, drawSignpost, drawSled, drawSnowman, drawWatermelon,
   ell, font, glow, hex, hslRgb, mix, rgb, rr, setCanvasFontFamily, shade, star, WHITE,
   type Ctx, type Pigeon, type RGB,
@@ -80,6 +84,8 @@ export type OsanpoRunOptions = {
   /** 持っているアイテムが少なく、見本のアイテムを混ぜているか */
   usesSampleItems: boolean;
   unlockedStages: OsanpoRunStageId[];
+  /** 買ってあるきせかえの id */
+  ownedCostumes?: string[];
   bodyFontFamily: string;
   seriesTabs: { id: string; name: string }[];
   categoryLabels: Record<string, string>;
@@ -127,9 +133,14 @@ type Obstacle = {
   greeted: boolean;
 };
 /** item が null のものはスキルで出る小さな粒（token の点数だけもらえる） */
-type Pickup = { item: RunItem | null; token: number; x: number; y: number; vy: number; ph: number; taken: boolean; hinted: boolean };
+/** look: 天気イベントで降ってくる花びら・紅葉の見た目（ふだんは空） */
+type Pickup = { item: RunItem | null; token: number; x: number; y: number; vy: number; ph: number; taken: boolean; hinted: boolean; look: "" | "petal" | "leaf" };
+/** 天気のイベント（虹・雷・桜吹雪・紅葉・オーロラ）。mul はそのあいだのスコア倍率 */
+type WeatherKind = "rainbow" | "thunder" | "sakura" | "momiji" | "aurora";
+type WeatherEvent = { kind: WeatherKind; t: number; max: number; acc: number; mul: number; nextBolt: number };
 type ActiveBuff = { skill: OsanpoRunSkill; b: Buff; lv: number; key: string; t: number; max: number; count: number; acc: number; rampN: number; rainAcc: number };
-type Particle = { x: number; y: number; vx: number; vy: number; life: number; max: number; r: number; kind: "dust" | "spark" | "ring" | "splash" | "fw"; color: string; g: number; scroll: boolean };
+/** kind が "trail" のときは color に足あとのきせかえの id を入れる */
+type Particle = { x: number; y: number; vx: number; vy: number; life: number; max: number; r: number; kind: "dust" | "spark" | "ring" | "splash" | "fw" | "trail"; color: string; g: number; scroll: boolean };
 type FloatText = { x: number; y: number; text: string; color: string; size: number; life: number; max: number };
 type Flyer = { item: RunItem; x0: number; y0: number; t: number };
 type Env = { m: number; top: RGB; bot: RGB; far: RGB; mid: RGB; near: RGB; night: number; side: RGB; road: RGB };
@@ -360,12 +371,15 @@ export function createOsanpoRun(root: HTMLElement, opts: OsanpoRunOptions): () =
     roundId: "",
     /** ほかのわんこにあいさつして立ち止まっている残り秒数 */
     slowT: 0,
+    /** 天気のイベント（なければ null）と、次のイベントまでの秒数 */
+    wx: null as WeatherEvent | null, wxT: 30,
     /** 称号用: このおさんぽで無敵中に吹っ飛ばした数・拾ったUR以上の数・発動したスキルの種類 */
     knocks: 0, rares: 0, skillIds: new Set<string>(),
   };
   let obstacles: Obstacle[] = [], pickups: Pickup[] = [], parts: Particle[] = [], texts: FloatText[] = [], flyers: Flyer[] = [];
   const FX = { hitstop: 0, flash: 0, flashCol: "255,255,255", rareT: 0, fade: 0 };
   let FDT = 1 / 60;
+  let trailT = 0;
   /** アイテムスキルの状態。おさんぽのたびに作り直す */
   const newSkillState = () => ({
     buffs: [] as ActiveBuff[],
@@ -630,6 +644,41 @@ export function createOsanpoRun(root: HTMLElement, opts: OsanpoRunOptions): () =
   }
   setMuted(muted);
 
+  /* ---------- きせかえ ---------- */
+  const ownedCostumes = new Set(opts.ownedCostumes ?? []);
+  let outfit: OsanpoRunOutfit = {};
+  function loadOutfit(): void {
+    const saved = loadJSON<OsanpoRunOutfit>(OSANPO_RUN_OUTFIT_KEY, {});
+    outfit = {};
+    // 買っていないものは付けない（別の端末で保存した分など）
+    for (const slot of ["head", "face", "trail"] as const) {
+      const id = saved[slot];
+      if (id && ownedCostumes.has(id) && getOsanpoRunCostume(id)?.slot === slot) outfit[slot] = id;
+    }
+  }
+  loadOutfit();
+  on(window, OSANPO_RUN_OUTFIT_EVENT as keyof WindowEventMap, () => loadOutfit());
+  /**
+   * ポーズごとの頭のてっぺん（hx, top）と両目のまんなか（ex, ey）。犬の画像（300×254、左向き）の座標。
+   * 帽子やめがねをこの位置に合わせて描く
+   */
+  const HEAD_ANCHOR: Record<Pose, readonly [number, number, number, number]> = {
+    walk: [108, 42, 104, 110], trot: [98, 62, 96, 132], "walk-tail": [100, 52, 96, 124], "stand-happy": [100, 48, 96, 118],
+    cheer: [140, 44, 132, 108], smile: [100, 44, 100, 106], bow: [108, 132, 104, 176], "bow-b": [92, 112, 86, 160],
+    wave: [100, 48, 96, 118], sleep: [100, 120, 96, 160], "lie-wave": [100, 110, 96, 150],
+  };
+  /** 犬の画像と同じ座標系（drawDog の中、左右反転ずみ）で、頭と顔のきせかえを描く */
+  function drawOutfit(c: Ctx, pose: Pose): void {
+    if (!outfit.head && !outfit.face) return;
+    const [hx, top, ex, ey] = HEAD_ANCHOR[pose];
+    c.save();
+    c.translate(-DW / 2, (-DH * DOG_FOOT) / DOG_H);
+    c.scale(DW / DOG_W, DH / DOG_H);
+    if (outfit.face) drawFaceCostume(c, outfit.face, ex, ey);
+    if (outfit.head) drawHeadCostume(c, outfit.head, hx, top, S.time);
+    c.restore();
+  }
+
   /* ---------- 犬の描画 ---------- */
   function drawDog(c: Ctx, x: number, y: number): void {
     const air = !P.ground && !P.dead, sliding = P.slide && P.ground && !P.dead;
@@ -648,6 +697,7 @@ export function createOsanpoRun(root: HTMLElement, opts: OsanpoRunOptions): () =
       // 画像は左向きなので、進行方向（右）に向けて左右反転する
       c.scale(-1, 1);
       c.drawImage(img, -DW / 2, (-DH * DOG_FOOT) / DOG_H, DW, DH);
+      drawOutfit(c, pose);
     } else {
       c.fillStyle = "#F6EFE4"; ell(c, 0, -22, 20, 16); c.fill();
     }
@@ -1048,7 +1098,7 @@ export function createOsanpoRun(root: HTMLElement, opts: OsanpoRunOptions): () =
    */
   const mkPickup = (x: number, y: number, item?: RunItem | null, token = 0): Pickup => {
     const it = item !== undefined ? item : Math.random() < (S.sec === "bonus" ? ITEM_RATE_BONUS : ITEM_RATE) ? rollItem() : null;
-    return { item: it, token, x, y, vy: 0, ph: Math.random() * 6, taken: false, hinted: false };
+    return { item: it, token, x, y, vy: 0, ph: Math.random() * 6, taken: false, hinted: false, look: "" };
   };
   function treatArc(x0: number, x1: number, peak: number): void {
     for (let i = 0; i < 5; i++) {
@@ -1666,7 +1716,7 @@ export function createOsanpoRun(root: HTMLElement, opts: OsanpoRunOptions): () =
       M.comboLock ||= Boolean(b.comboLock); M.dry ||= Boolean(b.dry); M.clear ||= Boolean(b.clear); M.bright ||= Boolean(b.bright);
       step += a.acc;
     }
-    M.mul *= (1 + step) * K.runMul * (envAt(S.clock).night > 0.5 ? K.nightMul : 1);
+    M.mul *= (1 + step) * K.runMul * (envAt(S.clock).night > 0.5 ? K.nightMul : 1) * (S.wx ? S.wx.mul : 1);
   }
   /** 加点。スキルのスコア倍率がかかった値を返す */
   function addPts(base: number): number {
@@ -2007,7 +2057,7 @@ export function createOsanpoRun(root: HTMLElement, opts: OsanpoRunOptions): () =
   }
   /** HUD の「いま効いているスキル」の1行 */
   /** t/max があれば残り秒数、なければ count（「×2」「2/3」など）をカードの右端に出す */
-  type SkillRow = { key: string; item: RunItem | null; glyph: string; label: string; tag: string; kind: SkillKind; t: number; max: number; count: string };
+  type SkillRow = { key: string; item: RunItem | null; glyph: string; label: string; tag: string; kind: SkillKind; t: number; max: number; count: string; desc: string };
   /** 効果をひと言で（左上の行の右側に出す） */
   function buffTag(b: Buff, lv: number): string {
     const x = (v: Lv | undefined) => `×${Math.round(val(v, lv, 1) * 10) / 10}`;
@@ -2034,25 +2084,31 @@ export function createOsanpoRun(root: HTMLElement, opts: OsanpoRunOptions): () =
     if (b.dry || b.clear || b.bright) return "見やすい";
     return "加点";
   }
-  function skillRows(): SkillRow[] {
+  function skillRows(limit = 5): SkillRow[] {
     const rows: SkillRow[] = [];
     const itemOf = (id: string) => ITEMS.find((it) => it.id === id) ?? null;
     for (const a of K.buffs) {
       const label = a.b.label ?? a.skill.name;
       const same = rows.find((r) => r.label === label);
       if (same) { if (a.t > same.t) { same.t = a.t; same.max = a.max; } continue; }
-      rows.push({ key: a.key, item: itemOf(a.skill.id), glyph: "★", label, tag: buffTag(a.b, a.lv), kind: a.skill.kind, t: a.t, max: a.max || a.t, count: "" });
+      const isMax = a.lv >= OSANPO_RUN_SKILL_MAX_LEVEL;
+      const desc = a.b.label ? `${a.skill.name}のあとの効果` : isMax ? `${a.skill.desc}（Lv.MAX：${a.skill.max}）` : a.skill.desc;
+      rows.push({ key: a.key, item: itemOf(a.skill.id), glyph: "★", label, tag: buffTag(a.b, a.lv), kind: a.skill.kind, t: a.t, max: a.max || a.t, count: "", desc });
     }
-    const add = (key: string, glyph: string, label: string, tag: string, count: string, kind: SkillKind) =>
-      rows.push({ key, item: null, glyph, label, tag, kind, t: 0, max: 0, count });
+    const add = (key: string, glyph: string, label: string, tag: string, count: string, kind: SkillKind, desc: string) =>
+      rows.push({ key, item: null, glyph, label, tag, kind, t: 0, max: 0, count, desc });
+    if (S.wx) {
+      const info = WEATHER_INFO[S.wx.kind];
+      rows.unshift({ key: `wx-${S.wx.kind}`, item: null, glyph: info.glyph, label: info.title.split("！")[0]!, tag: info.tag, kind: "weather", t: S.wx.t, max: S.wx.max, count: "", desc: info.desc });
+    }
     const clears = K.clears.reduce((n, c) => n + c.n, 0);
-    if (clears) add("clears", "✦", K.clears[0]!.name, "はじく", `×${clears}`, "guard");
-    if (K.rushPass) add("rush", "⚡", "あずき色の風", "ラッシュ無敵", "×1", "combo");
-    if (K.comboGuard) add("cguard", "♥", "コンボ守り", "コンボ守り", `×${K.comboGuard}`, "combo");
-    if (K.miss) add("miss", "✋", "てぶくろ", "自動キャッチ", `×${K.miss}`, "collect");
-    if (K.bigJumps.length) add("bigjump", "⤴", "大ジャンプ", "大ジャンプ", `×${K.bigJumps.length}`, "jump");
-    if (K.cairn) add("cairn", "▲", "積み石", "積み石", `${K.cairn}/3`, "score");
-    return rows.slice(0, 5);
+    if (clears) add("clears", "✦", K.clears[0]!.name, "はじく", `×${clears}`, "guard", "前から来る障害物をはじき飛ばす");
+    if (K.rushPass) add("rush", "⚡", "あずき色の風", "ラッシュ無敵", "×1", "combo", "次のラッシュを無敵で乗り切り、突破ボーナスが増える");
+    if (K.comboGuard) add("cguard", "♥", "コンボ守り", "コンボ守り", `×${K.comboGuard}`, "combo", "コンボが切れそうになったら防ぐ");
+    if (K.miss) add("miss", "✋", "てぶくろ", "自動キャッチ", `×${K.miss}`, "collect", "取りこぼしたアイテムを自動で拾う");
+    if (K.bigJumps.length) add("bigjump", "⤴", "大ジャンプ", "大ジャンプ", `×${K.bigJumps.length}`, "jump", "次のジャンプが大きくなる");
+    if (K.cairn) add("cairn", "▲", "積み石", "積み石", `${K.cairn}/3`, "score", "3つ積むとボーナス（ぶつかって守られると崩れる）");
+    return rows.slice(0, limit);
   }
   /** 左上に、効いているスキルを1行ずつ縦に並べる。行の組み合わせが変わったときだけ作り直し、残り時間は毎フレーム更新 */
   function renderSkillRows(): void {
@@ -2088,6 +2144,86 @@ export function createOsanpoRun(root: HTMLElement, opts: OsanpoRunOptions): () =
     });
   }
 
+  /* ---------- 天気のイベント ---------- */
+  const WEATHER_INFO: Record<WeatherKind, { sec: number; mul: number; title: string; glyph: string; tag: string; desc: string }> = {
+    rainbow: { sec: 10, mul: 1.2, title: "虹がかかった！ スコア×1.2", glyph: "🌈", tag: "スコア×1.2", desc: "雨あがりの虹。見えているあいだスコア×1.2" },
+    thunder: { sec: 12, mul: 1, title: "かみなり！ カラスがびっくりして逃げていく", glyph: "⚡", tag: "カラス逃げる", desc: "雷が光るたびに、画面のカラスが逃げていく（1羽+20）" },
+    sakura: { sec: 14, mul: 1, title: "桜吹雪！ 花びらを拾うと+5", glyph: "🌸", tag: "花びら+5", desc: "空から花びらが舞ってくる。拾うと1枚+5" },
+    momiji: { sec: 14, mul: 1, title: "紅葉が舞ってきた！ 葉っぱを拾うと+5", glyph: "🍁", tag: "紅葉+5", desc: "空から紅葉が舞ってくる。拾うと1枚+5" },
+    aurora: { sec: 15, mul: 1.3, title: "オーロラ！ スコア×1.3", glyph: "✨", tag: "スコア×1.3", desc: "夜空にオーロラ。見えているあいだスコア×1.3" },
+  };
+  function startWeather(kind: WeatherKind): void {
+    const info = WEATHER_INFO[kind];
+    S.wx = { kind, t: info.sec, max: info.sec, acc: 0, mul: info.mul, nextBolt: 0.4 };
+    floatText(VW / 2, GROUND * 0.44, info.title, kind === "thunder" ? "#FFF3A0" : "#FFE7F2", 17);
+    sfx.title();
+  }
+  /** 道と時間帯にあう天気のイベントを、ときどき起こす */
+  function tickWeather(dt: number): void {
+    const wx = S.wx;
+    if (wx) {
+      wx.t -= dt;
+      if (wx.kind === "sakura" || wx.kind === "momiji") {
+        wx.acc += dt * 2.2;
+        while (wx.acc >= 1) {
+          wx.acc -= 1;
+          const p = mkPickup(0, -16, null, 5); p.look = wx.kind === "sakura" ? "petal" : "leaf"; aimDrop(p); p.vy *= 0.6; pickups.push(p);
+        }
+        if (!RM && Math.random() < dt * 18) parts.push({ x: rand(0, VW + 40), y: -10, vx: rand(-60, -20), vy: rand(30, 70), life: 0, max: rand(3, 5), r: rand(2, 3.5), kind: "fw", color: wx.kind === "sakura" ? "255,190,210" : pickOne(["235,110,60", "245,160,60", "220,70,50"]), g: 6, scroll: false });
+      } else if (wx.kind === "thunder") {
+        wx.nextBolt -= dt;
+        if (wx.nextBolt <= 0) {
+          wx.nextBolt = rand(1.8, 3.4);
+          FX.flash = RM ? 0.12 : 0.4; FX.flashCol = "220,230,255";
+          const timer = window.setTimeout(() => noise(0.9, 0.16, 180), 150);
+          cleanups.push(() => window.clearTimeout(timer));
+          let got = 0;
+          for (const o of obstacles) if (o.kind === "crow" && !o.hit && o.x < VW + 20) { o.vx = -380; o.hit = true; o.kvy = -300; o.spin = 4; got += addPts(20); }
+          if (got) floatText(VW / 2, GROUND * 0.36, `カラスが逃げた +${got}`, "#FFF3A0", 15);
+        }
+      }
+      if (wx.t <= 0) S.wx = null;
+      return;
+    }
+    S.wxT -= dt;
+    if (S.wxT > 0 || S.sec !== "normal") return;
+    S.wxT = rand(35, 55);
+    const night = envAt(S.clock).night > 0.5, raining = S.rain > 0.4;
+    const pool: WeatherKind[] = [];
+    if (raining && STAGE.weather !== "snow") pool.push("thunder", "thunder");
+    if (!night && !raining) pool.push("rainbow");
+    if (STAGE_ID === "town") pool.push("sakura", "sakura");
+    if (STAGE_ID === "hiking") pool.push("momiji", "momiji");
+    if (night && (STAGE_ID === "snow" || STAGE_ID === "hiking")) pool.push("aurora", "aurora");
+    if (pool.length && Math.random() < 0.75) startWeather(pickOne(pool));
+  }
+  /** 空に描く天気（虹・オーロラ・雷の空の暗さ）。山や建物より奥 */
+  function drawWeatherSky(c: Ctx): void {
+    const wx = S.wx;
+    if (!wx) return;
+    const fade = Math.min(1, (wx.max - wx.t) / 1.2, wx.t / 1.5);
+    if (wx.kind === "rainbow") {
+      const cx = VW * 0.62, cy = GROUND + 30, r0 = Math.min(VW * 0.5, 300);
+      const cols = ["255,90,90", "255,160,70", "255,225,90", "110,210,120", "90,160,255", "150,110,230"];
+      c.save(); c.lineWidth = 7;
+      cols.forEach((col, i) => { c.strokeStyle = `rgba(${col},${0.32 * fade})`; c.beginPath(); c.arc(cx, cy, r0 - i * 7, Math.PI, 0); c.stroke(); });
+      c.restore();
+    } else if (wx.kind === "aurora") {
+      c.save(); c.globalCompositeOperation = "lighter";
+      for (let b = 0; b < 3; b++) {
+        const col = ["120,255,190", "140,200,255", "200,140,255"][b]!;
+        const g = c.createLinearGradient(0, 10, 0, GROUND * 0.55);
+        g.addColorStop(0, `rgba(${col},0)`); g.addColorStop(0.5, `rgba(${col},${0.22 * fade})`); g.addColorStop(1, `rgba(${col},0)`);
+        c.fillStyle = g; c.beginPath(); c.moveTo(-20, GROUND * 0.55);
+        for (let x = -20; x <= VW + 20; x += 20) c.lineTo(x, 20 + b * 18 + Math.sin(x * 0.012 + S.time * (0.6 + b * 0.2) + b) * 22);
+        c.lineTo(VW + 20, GROUND * 0.55); c.closePath(); c.fill();
+      }
+      c.restore();
+    } else if (wx.kind === "thunder") {
+      c.fillStyle = `rgba(20,20,45,${0.28 * fade})`; c.fillRect(-20, -20, VW + 40, GROUND + 30);
+    }
+  }
+
   /* ---------- 進行 ---------- */
   function newRoundId(): string {
     try { if (typeof crypto !== "undefined" && crypto.randomUUID) return `osr-${crypto.randomUUID()}`; } catch { /* 古い端末 */ }
@@ -2117,7 +2253,7 @@ export function createOsanpoRun(root: HTMLElement, opts: OsanpoRunOptions): () =
     $("copy-note").hidden = true;
     FX.fade = RM ? 0 : 1;
     Object.assign(S, {
-      state: "intro", introT: 0, roundId: newRoundId(), slowT: 0, knocks: 0, rares: 0, skillIds: new Set<string>(), bestD: bestDistOf(STAGE_ID), passedBest: false, recordShown: false, fwT: 2,
+      state: "intro", introT: 0, roundId: newRoundId(), slowT: 0, wx: null, wxT: rand(25, 40), knocks: 0, rares: 0, skillIds: new Set<string>(), bestD: bestDistOf(STAGE_ID), passedBest: false, recordShown: false, fwT: 2,
       t: 0, speed: 0, dist: 0, bonus: 0, treats: 0, clock: STAGE.clock, next: 420, shield: false, chain: 0, chainT: 0, mult: 1, maxMult: 1,
       paused: false, deadT: 0, milestone: 100, bufT: 0, haul: new Map<string, number>(), sec: "normal", secT: 18, rain: 0, rainTarget: 0, rainT: 0,
       bones: 0, newAch: [], newKinds: [], rainWalk: 0, rushes: 0, closes: 0, bonusGot: 0,
@@ -2135,9 +2271,48 @@ export function createOsanpoRun(root: HTMLElement, opts: OsanpoRunOptions): () =
   function pause(): void {
     S.paused = true; P.slideHeld = false;
     $("pause-msg").textContent = `いま ${Math.floor(S.dist / 50)}m・${score().toLocaleString()}点。フレンチーはひと休み中。`;
+    renderPauseSkills();
     $("pause-panel").hidden = false;
     applyAudio();
     $("resume").focus({ preventScroll: true });
+  }
+  /** 休憩画面に、いま効いているスキルと守りを説明つきで並べる */
+  function renderPauseSkills(): void {
+    const box = $("pause-skills");
+    const rows = skillRows(20);
+    const ward = S.shield ? ["バリア", "LR・MRのバリア。1回だけぶつかっても平気"]
+      : K.guards[0] ? [`身代わり（${K.guards[0].name}）`, "1回だけぶつかっても平気"]
+      : K.revives[0] ? [`復活（${K.revives[0].name}）`, "1回だけ倒れても復活できる"] : null;
+    box.replaceChildren();
+    box.hidden = rows.length === 0 && !ward;
+    if (box.hidden) return;
+    const h = document.createElement("h3"); h.textContent = "いま効いているスキル";
+    const ul = document.createElement("ul");
+    for (const r of rows) {
+      const li = document.createElement("li"); li.style.setProperty("--kc", SKILL_KIND_COLORS[r.kind]);
+      const ic = document.createElement("span"); ic.className = "osr-ps-ic";
+      if (r.item) ic.appendChild(spriteEl(r.item, 26, true)); else ic.textContent = r.glyph;
+      const body = document.createElement("div");
+      const top = document.createElement("div"); top.className = "osr-ps-top";
+      const nm = document.createElement("b"); nm.textContent = r.label;
+      const tg = document.createElement("span"); tg.className = "osr-ps-tag"; tg.textContent = r.tag;
+      const rest = document.createElement("em"); rest.textContent = r.max > 0 ? `あと${Math.ceil(r.t)}秒` : r.count;
+      top.append(nm, tg, rest);
+      const d = document.createElement("small"); d.textContent = r.desc;
+      body.append(top, d);
+      li.append(ic, body); ul.appendChild(li);
+    }
+    if (ward) {
+      const li = document.createElement("li"); li.style.setProperty("--kc", "#7EF0D0");
+      const ic = document.createElement("span"); ic.className = "osr-ps-ic"; ic.textContent = "★";
+      const body = document.createElement("div");
+      const top = document.createElement("div"); top.className = "osr-ps-top";
+      const nm = document.createElement("b"); nm.textContent = `守り：${ward[0]}`;
+      top.append(nm);
+      const d = document.createElement("small"); d.textContent = ward[1]!;
+      body.append(top, d); li.append(ic, body); ul.appendChild(li);
+    }
+    box.append(h, ul);
   }
   function resume(): void {
     S.paused = false;
@@ -2256,7 +2431,7 @@ export function createOsanpoRun(root: HTMLElement, opts: OsanpoRunOptions): () =
     el.style.setProperty("--rc", RARITY_STYLES[item.rarity].color);
     $("rare-tag").textContent = `${item.rarity} ゲット`;
     $("rare-name").textContent = item.name;
-    $("rare-icon").replaceChildren(spriteEl(item, 40));
+    $("rare-icon").replaceChildren(spriteEl(item, 30));
     // 発動したスキルを、アイテム名の下に出す
     const skill = OSANPO_RUN_SKILL_BY_ID.get(item.id);
     $("rare-skill").hidden = !skill;
@@ -2373,6 +2548,7 @@ export function createOsanpoRun(root: HTMLElement, opts: OsanpoRunOptions): () =
       S.t += dt;
       if (!M.hold) K.ramp += dt;
       if (S.slowT > 0) S.slowT -= dt;
+      tickWeather(dt);
       S.speed = M.stop ? 0 : (START_SPEED + Math.min(MAX_SPEED - START_SPEED, K.ramp * 1.8)) * M.speed * (S.slowT > 0 ? 0.55 : 1);
       if (S.t >= 180) unlock("survive180");
       if (S.clock >= 1440 + 300) unlock("dawn");
@@ -2406,7 +2582,11 @@ export function createOsanpoRun(root: HTMLElement, opts: OsanpoRunOptions): () =
       if (cm >= 21 * 60 || cm < 4 * 60) unlock("night");
       if (S.rainT > 0) {
         S.rainT -= dt;
-        if (S.rainT <= 0) { S.rainTarget = 0; floatText(VW / 2, GROUND * 0.32, STAGE.weather === "snow" ? "雪が小降りになった" : "雨がやんだ", "#A9C8FF", 16); }
+        if (S.rainT <= 0) {
+          S.rainTarget = 0; floatText(VW / 2, GROUND * 0.32, STAGE.weather === "snow" ? "雪が小降りになった" : "雨がやんだ", "#A9C8FF", 16);
+          // 雨あがりの昼間は、ときどき虹がかかる
+          if (!S.wx && STAGE.weather !== "snow" && envAt(S.clock).night < 0.4 && Math.random() < 0.6) startWeather("rainbow");
+        }
       }
       if (S.chainT > 0 && !M.comboLock) {
         S.chainT -= dt;
@@ -2483,6 +2663,18 @@ export function createOsanpoRun(root: HTMLElement, opts: OsanpoRunOptions): () =
     P.rot += (rotT - P.rot) * Math.min(1, dt * 10);
     if (P.ground && S.speed > 1) P.ph += dt * (S.state === "ready" ? 7 : 9 + S.speed / 40);
     if (P.ground && S.speed > 420) { P.dustT -= dt; if (P.dustT < 0) { P.dustT = 0.11; puff(P.x - 16, GROUND, 1, "dust", { vy: -10 }); } }
+    // 足あとのきせかえ
+    if (outfit.trail && (playing || S.state === "ready") && S.speed > 1 && !RM) {
+      trailT -= dt;
+      if (trailT <= 0) {
+        trailT = outfit.trail === "trail_rainbow" ? 0.02 : 0.07;
+        const rb = outfit.trail === "trail_rainbow";
+        parts.push({
+          x: P.x - 18 + rand(-4, 4), y: P.y - (rb ? 22 : rand(8, 40)), vx: rb ? 0 : rand(-30, 10), vy: rb ? 0 : rand(-40, -10),
+          life: 0, max: rb ? 0.5 : rand(0.6, 1), r: rb ? 3.2 : rand(2.5, 4), kind: "trail", color: outfit.trail, g: rb ? 0 : -10, scroll: true,
+        });
+      }
+    }
 
     // 障害物
     const sp = S.speed;
@@ -2615,6 +2807,7 @@ export function createOsanpoRun(root: HTMLElement, opts: OsanpoRunOptions): () =
     const c = ctx;
     c.setTransform(DPR * SC, 0, 0, DPR * SC, 0, 0);
     drawSky(c, e);
+    drawWeatherSky(c);
     const mountains = STAGE_ID === "hiking" || STAGE_ID === "snow";
     if (mountains) ridge(c, e, S.bgCam * 0.003 + 900, GROUND - 70, STAGE_ID === "hiking" ? 96 : 80, mix(e.far, e.bot, 0.6), 4.2, true);
     ridge(c, e, S.bgCam * 0.006, GROUND - 40, STAGE_ID === "hiking" ? 78 : STAGE_ID === "snow" ? 52 : 34, mix(e.far, e.bot, 0.45), 2.1, STAGE_ID === "snow");
@@ -2636,6 +2829,15 @@ export function createOsanpoRun(root: HTMLElement, opts: OsanpoRunOptions): () =
         c.fillStyle = `rgba(20,16,40,${0.28 * k})`; ell(c, it.x, GROUND + 1, 6 + 8 * k, 2 + 1.5 * k); c.fill();
       }
       if (!it.item && !it.token) { drawBone(c, it.x, it.y + Math.sin(it.ph) * 2.2, M.big ? 1.3 : 1); continue; }
+      if (!it.item && it.look) {
+        // 桜の花びら・紅葉。くるくる回りながら落ちてくる
+        const y = it.y + Math.sin(it.ph) * 2.2;
+        c.save(); c.translate(it.x, y); c.rotate(Math.sin(S.time * 3 + it.ph) * 1.2);
+        if (it.look === "petal") { c.fillStyle = "#FFB8CF"; ell(c, 0, 0, 5.5, 3.2); c.fill(); c.fillStyle = "#FF8FB3"; ell(c, 2, 0, 2, 1.2); c.fill(); }
+        else { c.fillStyle = "#E8663A"; c.beginPath(); for (let i = 0; i < 5; i++) { const a = (i / 5) * Math.PI * 2 - Math.PI / 2; c.lineTo(Math.cos(a) * 6, Math.sin(a) * 6); c.lineTo(Math.cos(a + 0.6) * 2.4, Math.sin(a + 0.6) * 2.4); } c.closePath(); c.fill(); }
+        c.restore();
+        continue;
+      }
       if (!it.item) {
         const y = it.y + Math.sin(it.ph) * 2.2, big = it.token >= 150, r = big ? 9 : it.token >= 30 ? 6 : 4.5;
         glow(c, it.x, y, r * 3, big ? "255,132,188" : "255,214,110", 0.45);
@@ -2745,6 +2947,7 @@ export function createOsanpoRun(root: HTMLElement, opts: OsanpoRunOptions): () =
       else if (p.kind === "fw") { c.fillStyle = `rgba(${p.color},${a})`; c.beginPath(); c.arc(p.x, p.y, p.r * (0.6 + a * 0.6), 0, Math.PI * 2); c.fill(); }
       else if (p.kind === "splash") { c.strokeStyle = `rgba(210,228,255,${a * 0.8})`; c.lineWidth = 1; ell(c, p.x, p.y, 1 + p.life * 22, 0.6 + p.life * 5); c.stroke(); }
       else if (p.kind === "ring") { c.strokeStyle = `rgba(255,255,255,${a * 0.7})`; c.lineWidth = 1.5; ell(c, p.x, p.y, 4 + p.life * 50, 1.5 + p.life * 10); c.stroke(); }
+      else if (p.kind === "trail") drawTrailBit(c, p.color, p.x, p.y, p.r, a, (S.time * 200 + p.x * 2) % 360);
       else star(c, p.x, p.y, p.r * a + 1, `rgba(255,214,110,${a})`);
     }
     if (flyers.length) {
@@ -2808,7 +3011,7 @@ export function createOsanpoRun(root: HTMLElement, opts: OsanpoRunOptions): () =
     setText("score", score().toLocaleString());
     setText("meta", `${Math.floor(S.dist / 50)}m・ほね${S.bones}・アイテム${S.treats}`);
     setText("clock", fmtClock(S.clock));
-    setText("phase", phaseName(S.clock) + (S.rain > 0.3 ? (STAGE.weather === "snow" ? "・雪" : "・雨") : ""));
+    setText("phase", phaseName(S.clock) + (S.rain > 0.3 ? (STAGE.weather === "snow" ? "・雪" : "・雨") : "") + (S.wx ? `・${{ rainbow: "虹", thunder: "雷", sakura: "桜", momiji: "紅葉", aurora: "オーロラ" }[S.wx.kind]}` : ""));
     const secKey = S.state === "play" && S.sec !== "normal" ? S.sec : "";
     setFlag("sec-on", Boolean(secKey), (v) => { $("sec-chip").hidden = !v; });
     if (secKey) {

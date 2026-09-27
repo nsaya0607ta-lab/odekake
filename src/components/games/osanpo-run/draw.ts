@@ -471,3 +471,83 @@ export function drawGeyser(c: Ctx, x: number, gy: number, w: number, top: number
   c.fillStyle = `rgba(${col},.85)`;
   for (let i = 0; i < 6; i++) { const a = t * 6 + i; c.beginPath(); c.arc(cx + Math.cos(a) * (8 + i), gy - top + Math.sin(a * 1.3) * 4, 2 + (i % 2), 0, Math.PI * 2); c.fill(); }
 }
+
+/* ---------- きせかえ ---------- */
+
+/**
+ * 頭のきせかえ。犬の画像と同じ座標（画像1pxが1）で描く。
+ * (hx, top) は両耳のあいだの頭のてっぺん。画像は左向きのまま描き、呼び出し側で左右反転する。
+ */
+export function drawHeadCostume(c: Ctx, id: string, hx: number, top: number, t: number): void {
+  if (id === "crown") {
+    const w = 78, h = 44, y = top - 8;
+    c.fillStyle = "#FFC53D"; c.strokeStyle = "#B7791F"; c.lineWidth = 4;
+    c.beginPath(); c.moveTo(hx - w / 2, y); c.lineTo(hx - w / 2 + 4, y - h); c.lineTo(hx - w / 4, y - h * 0.45); c.lineTo(hx, y - h - 8);
+    c.lineTo(hx + w / 4, y - h * 0.45); c.lineTo(hx + w / 2 - 4, y - h); c.lineTo(hx + w / 2, y); c.closePath(); c.fill(); c.stroke();
+    c.fillStyle = "#E8584F"; c.beginPath(); c.arc(hx, y - 14, 7, 0, Math.PI * 2); c.fill();
+    c.fillStyle = "#4FB7FF"; c.beginPath(); c.arc(hx - 22, y - 12, 5, 0, Math.PI * 2); c.arc(hx + 22, y - 12, 5, 0, Math.PI * 2); c.fill();
+    c.fillStyle = "rgba(255,255,255,.7)"; c.beginPath(); c.arc(hx - 2, y - h - 6, 3, 0, Math.PI * 2); c.fill();
+  } else if (id === "ribbon") {
+    const x = hx + 26, y = top + 6;
+    c.fillStyle = "#E8445A"; c.strokeStyle = "#A8243A"; c.lineWidth = 3;
+    c.beginPath(); c.moveTo(x, y); c.bezierCurveTo(x - 34, y - 30, x - 40, y + 14, x, y); c.fill(); c.stroke();
+    c.beginPath(); c.moveTo(x, y); c.bezierCurveTo(x + 34, y - 30, x + 40, y + 14, x, y); c.fill(); c.stroke();
+    c.beginPath(); c.arc(x, y, 8, 0, Math.PI * 2); c.fill(); c.stroke();
+    c.fillStyle = "rgba(255,255,255,.55)"; ell(c, x - 16, y - 8, 6, 3, -0.5); c.fill();
+  } else if (id === "halo") {
+    const y = top - 30 + Math.sin(t * 3) * 4;
+    c.save(); c.globalCompositeOperation = "lighter";
+    glow(c, hx, y, 48, "255,230,140", 0.35);
+    c.restore();
+    c.strokeStyle = "#FFE08A"; c.lineWidth = 7; ell(c, hx, y, 38, 10); c.stroke();
+    c.strokeStyle = "rgba(255,255,255,.85)"; c.lineWidth = 2.5; ell(c, hx, y - 1, 36, 8.5); c.stroke();
+  } else if (id === "flower") {
+    const cols = ["#FF8FB3", "#FFE08A", "#B8A2FF", "#8FE3C2", "#FF8FB3", "#FFE08A", "#B8A2FF"];
+    cols.forEach((col, i) => {
+      const a = Math.PI + (i / (cols.length - 1)) * Math.PI;
+      const fx = hx + Math.cos(a) * 46, fy = top + 14 + Math.sin(a) * 18;
+      c.fillStyle = "#5FB05A"; ell(c, fx + 6, fy + 4, 7, 3.5, 0.5); c.fill();
+      c.fillStyle = col;
+      for (let p = 0; p < 5; p++) { const pa = (p / 5) * Math.PI * 2; c.beginPath(); c.arc(fx + Math.cos(pa) * 5.5, fy + Math.sin(pa) * 5.5, 5, 0, Math.PI * 2); c.fill(); }
+      c.fillStyle = "#FFF6D0"; c.beginPath(); c.arc(fx, fy, 4, 0, Math.PI * 2); c.fill();
+    });
+  }
+}
+
+/** 顔のきせかえ。(ex, ey) は両目のまんなか */
+export function drawFaceCostume(c: Ctx, id: string, ex: number, ey: number): void {
+  if (id === "sunglasses") {
+    c.fillStyle = "#1B1830";
+    rr(c, ex - 44, ey - 13, 36, 26, 11); c.fill();
+    rr(c, ex + 8, ey - 13, 36, 26, 11); c.fill();
+    c.strokeStyle = "#1B1830"; c.lineWidth = 5; c.beginPath(); c.moveTo(ex - 10, ey - 6); c.quadraticCurveTo(ex, ey - 12, ex + 10, ey - 6); c.stroke();
+    c.fillStyle = "rgba(255,255,255,.35)"; rr(c, ex - 38, ey - 9, 12, 5, 2.5); c.fill(); rr(c, ex + 14, ey - 9, 12, 5, 2.5); c.fill();
+  } else if (id === "hearteyes") {
+    for (const dx of [-26, 26]) {
+      const x = ex + dx, y = ey - 2;
+      c.fillStyle = "#FF5C8A"; c.strokeStyle = "#B8284F"; c.lineWidth = 3;
+      c.beginPath(); c.moveTo(x, y + 13);
+      c.bezierCurveTo(x - 22, y - 2, x - 12, y - 20, x, y - 8);
+      c.bezierCurveTo(x + 12, y - 20, x + 22, y - 2, x, y + 13);
+      c.fill(); c.stroke();
+      c.fillStyle = "rgba(255,255,255,.6)"; c.beginPath(); c.arc(x - 7, y - 6, 3, 0, Math.PI * 2); c.fill();
+    }
+    c.strokeStyle = "#B8284F"; c.lineWidth = 4; c.beginPath(); c.moveTo(ex - 8, ey - 4); c.lineTo(ex + 8, ey - 4); c.stroke();
+  }
+}
+
+/** 足あとのきせかえ1粒（ふつうのキャンバス座標）。a は残りの濃さ（1→0） */
+export function drawTrailBit(c: Ctx, id: string, x: number, y: number, r: number, a: number, hue: number): void {
+  if (id === "trail_sparkle") star(c, x, y, r + 1, `rgba(255,224,120,${a})`);
+  else if (id === "trail_heart") {
+    c.fillStyle = `rgba(255,110,150,${a})`; const s = r * 0.9;
+    c.beginPath(); c.moveTo(x, y + s); c.bezierCurveTo(x - s * 1.6, y - s * 0.2, x - s * 0.8, y - s * 1.5, x, y - s * 0.5); c.bezierCurveTo(x + s * 0.8, y - s * 1.5, x + s * 1.6, y - s * 0.2, x, y + s); c.fill();
+  } else if (id === "trail_note") {
+    c.fillStyle = `rgba(190,170,255,${a})`; c.font = font(r * 3); c.textAlign = "center"; c.textBaseline = "middle"; c.fillText(hue > 180 ? "♪" : "♫", x, y);
+  } else if (id === "trail_bubble") {
+    c.strokeStyle = `rgba(200,235,255,${a})`; c.lineWidth = 1.2; c.beginPath(); c.arc(x, y, r + 1.5, 0, Math.PI * 2); c.stroke();
+    c.fillStyle = `rgba(255,255,255,${a * 0.6})`; c.beginPath(); c.arc(x - r * 0.4, y - r * 0.4, 1, 0, Math.PI * 2); c.fill();
+  } else if (id === "trail_rainbow") {
+    c.fillStyle = `rgba(${hslRgb(hue)},${a * 0.8})`; c.beginPath(); c.arc(x, y, r + 1, 0, Math.PI * 2); c.fill();
+  }
+}
