@@ -317,23 +317,22 @@ export function createOsanpoRun(root: HTMLElement, opts: OsanpoRunOptions): () =
   /* ---------- 犬（ステージごとのスキン） ---------- */
   const unlocked = new Set<OsanpoRunStageId>(opts.unlockedStages.length ? opts.unlockedStages : ["town"]);
   unlocked.add("town");
-  let sunglasses = store.get("sunglasses") === "1";
   const dogImages = new Map<string, HTMLImageElement>();
-  const dogSrc = (skin: string, pose: Pose, accessorized = false) => `/characters/${skin}${accessorized && sunglasses ? "-sunglasses" : ""}/${pose}.webp`;
-  function dogImage(skin: string, pose: Pose, accessorized = false): HTMLImageElement {
-    const src = dogSrc(skin, pose, accessorized), key = src;
+  const dogSrc = (skin: string, pose: Pose) => `/characters/${skin}/${pose}.webp`;
+  function dogImage(skin: string, pose: Pose): HTMLImageElement {
+    const key = `${skin}/${pose}`;
     let img = dogImages.get(key);
     if (!img) {
       img = new Image();
       img.decoding = "async";
-      img.src = src;
+      img.src = dogSrc(skin, pose);
       dogImages.set(key, img);
     }
     return img;
   }
-  const preloadSkin = (skin: string) => POSES.forEach((p) => dogImage(skin, p, true));
+  const preloadSkin = (skin: string) => POSES.forEach((p) => dogImage(skin, p));
   function setDogSprite(el: HTMLImageElement, skin: string, pose: Pose): void {
-    el.src = dogSrc(skin, pose, true);
+    el.src = dogSrc(skin, pose);
   }
 
   /* ---------- ステージ ---------- */
@@ -678,7 +677,7 @@ export function createOsanpoRun(root: HTMLElement, opts: OsanpoRunOptions): () =
     else if (S.happyT > 0) pose = "smile";
     else pose = RUN_CYCLE[Math.floor(P.ph / (Math.PI / 2)) % 4]!;
     const bob = air || P.dead || sliding ? 0 : -Math.abs(Math.sin(P.ph)) * 1;
-    const img = dogImage(STAGE.skin, pose, true);
+    const img = dogImage(STAGE.skin, pose);
     c.save();
     c.translate(x, y + bob); c.rotate(P.rot * 0.6); c.scale(1 + (1 - P.sq) * 0.5, P.sq);
     if (img.complete && img.naturalWidth) {
@@ -1329,7 +1328,7 @@ export function createOsanpoRun(root: HTMLElement, opts: OsanpoRunOptions): () =
 
   /* ---------- メニュー ---------- */
   {
-    const imgs = [...Array.from(itemImages.values()).slice(0, 40), ...POSES.map((p) => dogImage(STAGE.skin, p, true))];
+    const imgs = [...Array.from(itemImages.values()).slice(0, 40), ...POSES.map((p) => dogImage(STAGE.skin, p))];
     const ready = () => {
       if (assetsReady) return;
       assetsReady = true;
@@ -1544,27 +1543,16 @@ export function createOsanpoRun(root: HTMLElement, opts: OsanpoRunOptions): () =
   }
 
   /* ---------- 設定 ---------- */
-  type OptKey = "calm" | "sunglasses" | "bgm" | "sfx" | "vib";
+  type OptKey = "calm" | "bgm" | "sfx" | "vib";
   const OPTS: readonly [OptKey, string, string][] = [
     ["calm", "ゆったりモード", "背景を止めて、道と障害物だけが動きます。酔いやすい人向け。"],
-    ["sunglasses", "サングラス", "メインのフレブルが、すべての動きでサングラスをかけます。"],
     ["bgm", "BGM", "ステージごとの音楽を流します。"],
     ["sfx", "効果音", "ジャンプやアイテム、雨の音。"],
     ["vib", "振動", "ぶつかったときに振動します（対応するスマホのみ）。"],
   ];
-  const getOpt = (k: OptKey) => k === "calm" ? S.calm : k === "sunglasses" ? sunglasses : SET[k];
+  const getOpt = (k: OptKey) => (k === "calm" ? S.calm : SET[k]);
   function setOpt(k: OptKey, v: boolean): void {
     if (k === "calm") { S.calm = v; store.set("calm", v ? "1" : "0"); }
-    else if (k === "sunglasses") {
-      sunglasses = v; store.set("sunglasses", v ? "1" : "0"); preloadSkin(STAGE.skin);
-      for (const el of $$<HTMLImageElement>("img.osr-dog")) setDogSprite(el, STAGE.skin, (el.dataset.pose as Pose) ?? "wave");
-      for (const card of $$(".osr-stage-card")) {
-        const id = card.dataset.id;
-        if (!id || !isOsanpoRunStageId(id)) continue;
-        const face = card.querySelector<HTMLImageElement>("img.osr-face");
-        if (face) setDogSprite(face, OSANPO_RUN_STAGES[id].skin, "stand-happy");
-      }
-    }
     else { SET[k] = v; store.set("settings", JSON.stringify(SET)); applyAudio(); }
     syncOpts();
   }
