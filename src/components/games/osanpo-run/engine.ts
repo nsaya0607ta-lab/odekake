@@ -28,6 +28,8 @@ import {
   OSANPO_RUN_SKILL_BY_ID,
   OSANPO_RUN_SKILL_MAX_LEVEL,
   OSANPO_RUN_SKILLS,
+  SKILL_KIND_COLORS,
+  SKILL_KIND_LABELS,
   skillValue,
   type Buff,
   type Fx,
@@ -83,6 +85,8 @@ const DW = 80, DH = (DW * DOG_H) / DOG_W;
 const GRAV = 2500, JUMP_V = 760, DJUMP_V = 640;
 /** 道に落ちているもののうち、図鑑アイテムになる割合（残りはほね）。ボーナスタイムは多め */
 const ITEM_RATE = 0.12, ITEM_RATE_BONUS = 0.25;
+/** 空から降ってくるアイテムが、落ちている間に左へ流れる速さ（道の速さに対する割合） */
+const FALL_DRIFT = 0.3;
 /** ほね1本の点数（コンボ倍率がかかる） */
 const BONE_PTS = 5;
 /** 走る速さ（論理px/秒）。最初はゆっくりで、約3分かけて最高速になる */
@@ -576,6 +580,21 @@ export function createOsanpoRun(root: HTMLElement, opts: OsanpoRunOptions): () =
     record: () => { [523, 659, 784, 1046, 1318].forEach((f, i) => tone(f, 0.14, "square", 0.045, null, i * 0.07)); [1046, 1318, 1568].forEach((f) => tone(f, 0.7, "triangle", 0.035, null, 0.38)); },
     pass: () => [880, 1175, 1568].forEach((f, i) => tone(f, 0.12, "triangle", 0.05, null, i * 0.06)),
     title: () => [1046, 1318, 1568].forEach((f, i) => tone(f, 0.16, "triangle", 0.05, null, i * 0.08)),
+    /** スキルが発動したときの音。種類ごとに変えて、聞いただけで何が起きたかわかるように */
+    skill: (kind: SkillKind) => {
+      const d = 0.1;
+      switch (kind) {
+        case "score": tone(1320, 0.08, "square", 0.035, null, d); tone(1760, 0.16, "square", 0.035, null, d + 0.07); break;
+        case "guard": tone(330, 0.28, "triangle", 0.06, 880, d); tone(1318, 0.3, "sine", 0.035, null, d + 0.12); break;
+        case "spawn": [1568, 1318, 1175, 1046, 784].forEach((f, i) => tone(f, 0.09, "sine", 0.05, null, d + i * 0.045)); break;
+        case "jump": tone(260, 0.22, "sine", 0.08, 960, d); break;
+        case "collect": noise(0.25, 0.05, 3200); tone(520, 0.25, "sine", 0.05, 1240, d); break;
+        case "combo": [659, 784, 988].forEach((f, i) => tone(f, 0.1, "square", 0.035, null, d + i * 0.06)); break;
+        case "weather": tone(1046, 0.5, "triangle", 0.04, null, d); tone(1568, 0.6, "sine", 0.03, null, d + 0.1); break;
+        case "pace": tone(620, 0.3, "triangle", 0.05, 300, d); break;
+        case "revive": [523, 659, 784].forEach((f) => tone(f, 0.6, "sine", 0.035, null, d)); tone(1046, 0.5, "triangle", 0.03, null, d + 0.2); break;
+      }
+    },
   };
   function setMuted(m: boolean): void {
     muted = m; store.set("muted", m ? "1" : "0"); applyAudio();
@@ -1320,7 +1339,7 @@ export function createOsanpoRun(root: HTMLElement, opts: OsanpoRunOptions): () =
   }
 
   /* ---------- ずかん ---------- */
-  let zkTab = "all", zkSel: string | null = null;
+  let zkTab = "all", zkKind: SkillKind | "all" = "all", zkSel: string | null = null;
   const zkNew = new Set<string>();
   const seriesLabel = (series: string | null) => (series ? opts.seriesTabs.find((t) => t.id === series)?.name ?? "シリーズ" : "通常");
   function zkShow(id: string | null): void {
@@ -1386,7 +1405,25 @@ export function createOsanpoRun(root: HTMLElement, opts: OsanpoRunOptions): () =
       on(b, "click", () => { zkTab = tab.id; renderZukan(); });
       tabs.appendChild(b);
     }
-    const list = ITEMS.filter((it) => inTab(it, zkTab)).sort((a, b) => rarityIndex(a.rarity) - rarityIndex(b.rarity));
+    // スキルの種類で絞り込む（シリーズのタブと組み合わせて使える）
+    const kindOf = (it: RunItem) => OSANPO_RUN_SKILL_BY_ID.get(it.id)?.kind;
+    const kinds = $("zk-kinds");
+    kinds.replaceChildren();
+    const inTabList = ITEMS.filter((it) => inTab(it, zkTab));
+    for (const k of ["all", ...(Object.keys(SKILL_KIND_LABELS) as SkillKind[])] as const) {
+      const n = k === "all" ? inTabList.length : inTabList.filter((it) => kindOf(it) === k).length;
+      if (!n) continue;
+      const b = document.createElement("button");
+      b.type = "button"; b.setAttribute("aria-pressed", String(zkKind === k));
+      if (k !== "all") b.style.setProperty("--kc", SKILL_KIND_COLORS[k]);
+      b.textContent = k === "all" ? "すべてのスキル" : SKILL_KIND_LABELS[k];
+      const sm = document.createElement("small"); sm.textContent = String(n);
+      b.appendChild(sm);
+      on(b, "click", () => { zkKind = k; renderZukan(); });
+      kinds.appendChild(b);
+    }
+    if (zkKind !== "all" && !inTabList.some((it) => kindOf(it) === zkKind)) zkKind = "all";
+    const list = inTabList.filter((it) => zkKind === "all" || kindOf(it) === zkKind).sort((a, b) => rarityIndex(a.rarity) - rarityIndex(b.rarity));
     for (const it of list) {
       const li = document.createElement("li"), b = document.createElement("button"), got = kindSet.has(it.id);
       b.type = "button"; b.dataset.id = it.id; b.className = got ? "" : "osr-locked";
@@ -1662,6 +1699,7 @@ export function createOsanpoRun(root: HTMLElement, opts: OsanpoRunOptions): () =
   }
   function spawnShape(shape: SpawnShape, n: number, make: () => Pickup["item"], token: number): void {
     const X = VW + 30, add = (x: number, y: number, vy = 0) => { const p = mkPickup(x, y, token ? null : make(), token); p.vy = vy; pickups.push(p); };
+    const drop = (y0: number) => { const p = mkPickup(0, y0, token ? null : make(), token); aimDrop(p); pickups.push(p); };
     for (let i = 0; i < n; i++) {
       const t = n > 1 ? i / (n - 1) : 0.5;
       if (shape === "row") add(X + i * 28, GROUND - 18);
@@ -1670,15 +1708,26 @@ export function createOsanpoRun(root: HTMLElement, opts: OsanpoRunOptions): () =
       else if (shape === "arc") add(X + i * 30, GROUND - 20 - 90 * 4 * t * (1 - t));
       else if (shape === "wave") add(X + i * 26, GROUND - 60 - Math.sin(t * Math.PI * 2) * 36);
       else if (shape === "ring") { const a = (i / n) * Math.PI * 2; add(X + 60 + Math.cos(a) * 52, GROUND - 100 + Math.sin(a) * 44); }
-      else if (shape === "sky") add(rand(P.x + 80, VW + 160), -20 - i * 26, rand(120, 170));
+      else if (shape === "sky") drop(-20 - i * 26);
       else if (shape === "mid") add(X, GROUND - 84);
       else add(X, GROUND - 40);
     }
+  }
+  /**
+   * 空から降らせるアイテムの x と落ちる速さを決める。
+   * 落ちきるまでに流れる分を見込んで、フレブルの少し前〜画面の右寄りに着地するようにする
+   */
+  function aimDrop(p: Pickup): void {
+    p.vy = rand(150, 190);
+    const fallT = Math.max(0, GROUND - 18 - p.y) / p.vy;
+    const land = rand(P.x + 90, Math.max(P.x + 120, VW - 40));
+    p.x = land + S.speed * FALL_DRIFT * fallT;
   }
   function applySkill(item: RunItem, depth = 0): void {
     const skill = OSANPO_RUN_SKILL_BY_ID.get(item.id);
     if (!skill || S.state !== "play") return;
     const lv = lvOf(item);
+    if (depth === 0) sfx.skill(skill.kind);
     skill.fx.forEach((fx, idx) => runFx(skill, fx, lv, idx, depth));
   }
   function runFx(skill: OsanpoRunSkill, fx: Fx, lv: number, idx: number, depth: number): void {
@@ -1835,8 +1884,8 @@ export function createOsanpoRun(root: HTMLElement, opts: OsanpoRunOptions): () =
         while (a.rainAcc >= 1) {
           a.rainAcc -= 1;
           const tok = ival(a.b.rainToken, a.lv);
-          const p = mkPickup(rand(P.x + 70, VW + 60), -16, tok ? null : rollItem(), tok);
-          p.vy = rand(120, 170); pickups.push(p);
+          const p = mkPickup(0, -16, tok ? null : rollItem(), tok);
+          aimDrop(p); pickups.push(p);
         }
       }
       if (a.b.dry) { S.rainTarget = 0; S.rainT = 0; }
@@ -1952,9 +2001,6 @@ export function createOsanpoRun(root: HTMLElement, opts: OsanpoRunOptions): () =
     if (K.cairn) add("cairn", "▲", "積み石", "積み石", `${K.cairn}/3`, "score");
     return rows.slice(0, 5);
   }
-  const KIND_COLOR: Record<SkillKind, string> = {
-    score: "#FFC857", guard: "#7CC4FF", spawn: "#FF84BC", jump: "#7EF0D0", collect: "#C79BFF", combo: "#FF9F6B", weather: "#9FD4FF", pace: "#B8E986", revive: "#FF6B8A",
-  };
   /** 左上に、効いているスキルを1行ずつ縦に並べる。行の組み合わせが変わったときだけ作り直し、残り時間は毎フレーム更新 */
   function renderSkillRows(): void {
     const rows = S.state === "play" ? skillRows() : [];
@@ -1965,7 +2011,7 @@ export function createOsanpoRun(root: HTMLElement, opts: OsanpoRunOptions): () =
       hud.set("skills", sig);
       box.replaceChildren(...rows.map((r) => {
         const row = document.createElement("div");
-        row.className = "osr-sk"; row.style.setProperty("--kc", KIND_COLOR[r.kind]);
+        row.className = "osr-sk"; row.style.setProperty("--kc", SKILL_KIND_COLORS[r.kind]);
         const ic = document.createElement("span"); ic.className = "osr-sk-ic";
         if (r.item) ic.appendChild(spriteEl(r.item, 20, true)); else ic.textContent = r.glyph;
         const tg = document.createElement("span"); tg.className = "osr-sk-tag"; tg.textContent = r.tag;
@@ -2403,7 +2449,8 @@ export function createOsanpoRun(root: HTMLElement, opts: OsanpoRunOptions): () =
     const reach = M.big ? 42 : 30;
     for (const it of pickups) {
       if (playing && !it.hinted && it.y < GROUND - 140 && it.x < P.x + 260) { it.hinted = true; hint("dj"); }
-      it.x -= sp * dt; it.ph += dt * 4;
+      // 落ちている間はゆっくり流れる（道と同じ速さだと、着地する前にフレブルを通り過ぎて取れない）
+      it.x -= sp * (it.vy > 0 ? FALL_DRIFT : 1) * dt; it.ph += dt * 4;
       if (it.vy > 0) { it.y += it.vy * dt; if (it.y >= GROUND - 18) { it.y = GROUND - 18; it.vy = 0; } }
       if (!playing || it.taken) continue;
       const mx = P.x - it.x, my = P.y - 28 - it.y, d2 = mx * mx + my * my;
@@ -2466,6 +2513,11 @@ export function createOsanpoRun(root: HTMLElement, opts: OsanpoRunOptions): () =
     if (S.rain > 0.02 && STAGE.weather !== "snow" && !M.clear) { c.fillStyle = `rgba(52,60,96,${0.22 * S.rain})`; c.fillRect(-20, -20, VW + 40, GROUND + 26); }
     for (const o of obstacles) if (o.kind === "puddle") drawPuddle(c, o.x, GROUND, o.w, S.time, e.night, STAGE_ID);
     for (const it of pickups) {
+      if (it.vy > 0) {
+        // 降ってくる途中は、真下の地面に影を出して着地点を知らせる
+        const k = clamp(1 - (GROUND - 18 - it.y) / (GROUND + 20), 0.15, 1);
+        c.fillStyle = `rgba(20,16,40,${0.28 * k})`; ell(c, it.x, GROUND + 1, 6 + 8 * k, 2 + 1.5 * k); c.fill();
+      }
       if (!it.item && !it.token) { drawBone(c, it.x, it.y + Math.sin(it.ph) * 2.2, M.big ? 1.3 : 1); continue; }
       if (!it.item) {
         const y = it.y + Math.sin(it.ph) * 2.2, big = it.token >= 150, r = big ? 9 : it.token >= 30 ? 6 : 4.5;

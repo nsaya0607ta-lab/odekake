@@ -300,11 +300,28 @@
 
 .osr .osr-zk-rar { margin: 0 0 10px; font-size: 12px; font-weight: 800; display: flex; flex-wrap: wrap; gap: 4px 12px; font-variant-numeric: tabular-nums; }
 .osr .osr-zk-tabs { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 10px; }
+/* スキルの種類で絞り込むチップ */
+.osr .osr-zk-kinds { display: flex; gap: 5px; flex-wrap: wrap; margin: -2px 0 12px; }
+.osr .osr-zk-kinds button {
+  --kc: var(--osr-ink);
+  appearance: none; display: inline-flex; align-items: center; gap: 5px; border: 1px solid var(--osr-line); background: transparent; color: var(--osr-muted);
+  font-family: var(--osr-body); font-weight: 800; font-size: 11px; padding: 3px 9px 3px 7px; border-radius: 999px; cursor: pointer;
+}
+.osr .osr-zk-kinds button::before { content: ""; width: 7px; height: 7px; border-radius: 50%; background: var(--kc); }
+.osr .osr-zk-kinds button small { font-weight: 800; opacity: 0.7; font-variant-numeric: tabular-nums; }
+.osr .osr-zk-kinds button[aria-pressed="true"] { background: var(--kc); border-color: var(--kc); color: #1b193a; }
+.osr .osr-zk-kinds button[aria-pressed="true"]::before { background: #1b193a; }
+.osr .osr-zk-kinds button:focus-visible { outline: 2px solid var(--osr-lantern); outline-offset: 2px; }
 @media (max-width: 760px) {
   /* スマホではシリーズのタブを横にスクロールさせ、3段に折り返さないように */
+  /* 横スクロールにすると縦に縮められて高さ0になる（別画面は縦に並ぶflexなので）ため、縮ませない */
+  .osr .osr-zk-tabs, .osr .osr-zk-kinds { flex-shrink: 0; }
   .osr .osr-zk-tabs { flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none; margin-inline: -14px; padding-inline: 14px; }
   .osr .osr-zk-tabs::-webkit-scrollbar { display: none; }
   .osr .osr-zk-tabs button { flex-shrink: 0; }
+  .osr .osr-zk-kinds { flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none; margin-inline: -14px; padding-inline: 14px; }
+  .osr .osr-zk-kinds::-webkit-scrollbar { display: none; }
+  .osr .osr-zk-kinds button { flex-shrink: 0; }
 }
 .osr .osr-zk-tabs button { appearance: none; border: 1px solid var(--osr-line); background: transparent; color: var(--osr-muted); font-family: var(--osr-body); font-weight: 800; font-size: 12px; padding: 5px 12px; border-radius: 999px; cursor: pointer; }
 .osr .osr-zk-tabs button[aria-selected="true"] { background: var(--osr-lantern); border-color: var(--osr-lantern); color: #2a1e0a; }
