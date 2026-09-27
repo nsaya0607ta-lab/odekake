@@ -133,26 +133,34 @@
 .osr .osr-combo[data-off="1"] { opacity: 0; transform: translateY(-4px); }
 .osr .osr-combo.osr-pulse { animation: osr-cpulse 0.25s ease-out; }
 .osr .osr-combo i { position: absolute; left: 10px; right: 10px; bottom: 2px; height: 2px; border-radius: 2px; background: rgba(42, 30, 10, 0.45); transform-origin: left center; }
+/* 操作のヒント。プレイの邪魔にならないよう画面のいちばん上に出す（スコアに重なってもよい）。長い文は折り返す */
 .osr .osr-hint {
-  position: absolute; left: 50%; bottom: 22%; transform: translateX(-50%); padding: 8px 16px; border-radius: 999px;
-  background: rgba(22, 21, 46, 0.8); color: var(--osr-ink); font-weight: 800; font-size: 15px; white-space: nowrap; pointer-events: none;
-  box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.12); animation: osr-rarein 0.3s ease-out;
+  position: absolute; z-index: 3; left: 50%; top: 6px; transform: translateX(-50%); width: max-content; max-width: calc(100% - 20px);
+  padding: 5px 12px; border-radius: 12px; text-align: center; white-space: normal; line-height: 1.4;
+  background: rgba(22, 21, 46, 0.88); color: var(--osr-ink); font-weight: 800; font-size: 13px; pointer-events: none;
+  box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.14), 0 6px 16px -8px rgba(0, 0, 0, 0.6); animation: osr-rarein 0.3s ease-out;
 }
+@media (max-width: 480px) { .osr .osr-hint { font-size: 12px; padding: 4px 10px; } }
+/* アイテムゲット。真ん中だと道が見えなくなるので、右上（時計の下）に小さく出す */
 .osr .osr-rare {
-  position: absolute; left: 50%; top: max(104px, 24%); transform: translateX(-50%); display: flex; align-items: center; gap: 10px; padding: 6px 16px 6px 8px;
-  border-radius: 14px; background: rgba(22, 21, 46, 0.78); backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px);
-  box-shadow: 0 0 0 1.5px var(--rc, #ffc857), 0 0 24px -4px var(--rc, #ffc857); pointer-events: none;
-  animation: osr-rarein 0.4s cubic-bezier(0.2, 1.4, 0.4, 1); white-space: nowrap; width: max-content; max-width: calc(100% - 32px);
+  position: absolute; right: 12px; top: 60px; display: flex; align-items: center; gap: 8px; padding: 6px 12px 6px 6px;
+  border-radius: 12px; background: rgba(22, 21, 46, 0.82); backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px);
+  box-shadow: 0 0 0 1.5px var(--rc, #ffc857), 0 0 18px -6px var(--rc, #ffc857); pointer-events: none;
+  animation: osr-rarein-r 0.35s cubic-bezier(0.2, 1.3, 0.4, 1); white-space: nowrap; width: max-content; max-width: min(250px, 60%);
 }
-.osr .osr-rare b { display: block; font-family: var(--osr-display); font-weight: 400; font-size: 13px; line-height: 1.1; color: var(--rc, #ffc857); letter-spacing: 0.06em; }
-.osr .osr-rare-name { display: block; font-weight: 800; font-size: 15px; overflow: hidden; text-overflow: ellipsis; }
-.osr .osr-rare-icon img { display: block; }
-/* スマホでは左上のスキル一覧と重ならないよう、アイテムゲットを少し下に */
-@media (max-width: 480px) { .osr .osr-rare { top: 42%; } }
+.osr .osr-rare b { display: block; font-family: var(--osr-display); font-weight: 400; font-size: 11px; line-height: 1.1; color: var(--rc, #ffc857); letter-spacing: 0.06em; }
+.osr .osr-rare-name { display: block; font-weight: 800; font-size: 13px; overflow: hidden; text-overflow: ellipsis; }
+.osr .osr-rare-icon img { display: block; width: 30px !important; height: 30px !important; }
+@keyframes osr-rarein-r { from { opacity: 0; transform: translateX(14px); } }
+/* スマホでは左上のスキル一覧と重ならない幅に */
+@media (max-width: 480px) {
+  .osr .osr-rare { top: 56px; right: 10px; max-width: calc(100% - 168px); padding: 5px 10px 5px 5px; }
+  .osr .osr-rare-icon img { width: 26px !important; height: 26px !important; }
+}
 .osr .osr-rare > div { min-width: 0; }
-.osr .osr-rare-skill { display: flex; flex-direction: column; margin-top: 3px; padding-top: 3px; border-top: 1px solid rgba(255, 255, 255, 0.14); white-space: normal; max-width: 260px; }
-.osr .osr-rare-skill > span { font-weight: 800; font-size: 13px; color: #ffe7a3; line-height: 1.3; }
-.osr .osr-rare-skill small { font-size: 11px; line-height: 1.35; color: rgba(244, 240, 255, 0.82); }
+.osr .osr-rare-skill { display: flex; flex-direction: column; margin-top: 2px; padding-top: 2px; border-top: 1px solid rgba(255, 255, 255, 0.14); white-space: normal; max-width: 200px; }
+.osr .osr-rare-skill > span { font-weight: 800; font-size: 11px; color: #ffe7a3; line-height: 1.3; }
+.osr .osr-rare-skill small { font-size: 10px; line-height: 1.35; color: rgba(244, 240, 255, 0.82); }
 .osr .osr-charm {
   position: absolute; left: 14px; bottom: 12px; display: flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 800;
   padding: 4px 10px 4px 6px; border-radius: 999px; background: rgba(214, 51, 75, 0.92); color: #fff; transition: opacity 0.2s;
@@ -460,3 +468,16 @@
 .osr .osr-rk-who small { font-size: 11px; color: var(--osr-muted); }
 .osr .osr-rk-score { font-family: var(--osr-display); font-weight: 400; font-size: 18px; font-variant-numeric: tabular-nums; white-space: nowrap; }
 .osr .osr-rk-score small { font-family: var(--osr-body); font-weight: 800; font-size: 10px; color: var(--osr-muted); margin-left: 2px; }
+
+/* ---------- 休憩画面の「いま効いているスキル」 ---------- */
+.osr .osr-pause-skills { align-self: stretch; text-align: left; max-height: 38vh; overflow-y: auto; overscroll-behavior: contain; }
+.osr .osr-pause-skills h3 { margin: 0 0 6px; font-size: 11px; font-weight: 800; letter-spacing: 0.1em; color: var(--osr-muted); }
+.osr .osr-pause-skills ul { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
+.osr .osr-pause-skills li { display: grid; grid-template-columns: 30px minmax(0, 1fr); gap: 8px; align-items: start; padding: 7px 9px; border-radius: 10px; background: rgba(255, 255, 255, 0.05); box-shadow: inset 3px 0 0 var(--kc); }
+.osr .osr-ps-ic { width: 30px; height: 30px; border-radius: 8px; display: grid; place-items: center; background: rgba(255, 255, 255, 0.08); color: var(--kc); font-weight: 800; }
+.osr .osr-ps-ic img { width: 26px !important; height: 26px !important; object-fit: contain; }
+.osr .osr-ps-top { display: flex; align-items: center; gap: 6px; min-width: 0; }
+.osr .osr-ps-top b { font-size: 13px; font-weight: 800; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
+.osr .osr-ps-tag { flex-shrink: 0; font-size: 10px; font-weight: 800; padding: 2px 6px; border-radius: 999px; background: var(--kc); color: #1b193a; }
+.osr .osr-ps-top em { margin-left: auto; flex-shrink: 0; font-style: normal; font-size: 11px; font-weight: 800; color: var(--osr-lantern); font-variant-numeric: tabular-nums; }
+.osr .osr-pause-skills small { display: block; margin-top: 2px; font-size: 11px; line-height: 1.45; color: var(--osr-muted); }

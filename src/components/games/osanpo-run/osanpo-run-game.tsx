@@ -190,6 +190,7 @@ export function OsanpoRunGame({ items, usesSampleItems, unlockedStages, seriesTa
               <img className="osr-dog" data-pose="sleep" src="/characters/default/sleep.webp" alt="" width={96} height={81} />
               <h2>ちょっと休憩</h2>
               <p data-osr="pause-msg">フレンチーはひと休み中。</p>
+              <div className="osr-pause-skills" data-osr="pause-skills" hidden />
               <button className="osr-btn" data-osr="resume" type="button">つづける</button>
               <div className="osr-btn-row">
                 <button className="osr-btn osr-ghost" data-osr="restart" type="button">最初から</button>
