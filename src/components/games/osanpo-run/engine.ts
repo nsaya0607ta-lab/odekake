@@ -97,7 +97,7 @@ const GRAV = 2500, JUMP_V = 760, DJUMP_V = 640;
 /** 道に落ちているもののうち、図鑑アイテムになる割合（残りはほね）。ボーナスタイムは多め */
 const ITEM_RATE = 0.12, ITEM_RATE_BONUS = 0.25;
 /** 水が出たり止まったりするところ: 1周の秒数・出ている秒数・水の高さ（ふつうのジャンプでは越えられず、2段ジャンプなら越えられる） */
-const GEYSER_CYCLE = 2, GEYSER_ON = 0.8, GEYSER_H = 124;
+const GEYSER_CYCLE = 1.4, GEYSER_ON = 0.8, GEYSER_H = 124;
 /** 上から落ちてくるものの重力 */
 const DROP_G = 1400;
 /** 空から降ってくるアイテムが、落ちている間に左へ流れる速さ（道の速さに対する割合） */
@@ -1102,7 +1102,7 @@ export function createOsanpoRun(root: HTMLElement, opts: OsanpoRunOptions): () =
     const kind = pickWeighted([
       ["cone", 3], ["puddle", rain ? 5 : 2], ["bike", t > 6 ? 2.2 : 0], ["crow", t > 12 ? 2 : 0], ["double", t > 24 || rush ? 1.6 : 0],
       ["cat", t > 18 ? 1.6 : 0], ["sign", t > 30 ? 1.4 : 0], ["pigeons", t > 9 ? 1.3 : 0], ["noren", t > 14 ? 1.8 : 0], ["lowcrow", t > 22 ? 1.2 : 0],
-      ["roller", t > 16 ? 1.4 : 0], ["drop", t > 20 ? 1.2 : 0], ["buddy", t > 8 ? 1 : 0], ["geyser", t > 10 ? 1.5 : 0],
+      ["roller", t > 16 ? 1.4 : 0], ["drop", t > 20 ? 1.2 : 0], ["buddy", t > 8 ? 1 : 0], ["geyser", t > 26 ? 1.2 : 0],
       ["row", rush ? 0 : 1.3], ["high", rush ? 0 : 1.1],
     ] as const);
     const blocked = (k: ObstacleKind, low = false) => K.buffs.some((a) => a.b.noSpawn && inGroup({ kind: k, low } as Obstacle, a.b.noSpawn));
@@ -2654,7 +2654,7 @@ export function createOsanpoRun(root: HTMLElement, opts: OsanpoRunOptions): () =
       if (o.kind === "geyser") {
         // 水は出たり止まったりする。出はじめは下から伸びる
         const ph = (S.t + o.phase) % GEYSER_CYCLE;
-        o.h = ph < GEYSER_ON ? GEYSER_H * Math.min(1, ph / 0.18) : 0;
+        o.h = ph < GEYSER_ON ? GEYSER_H * Math.min(1, ph / 0.1) : 0;
       } else if (o.kind === "drop" && !o.landed) {
         // フレブルの少し前に着地するタイミングで落とし始める
         const fallT = Math.sqrt((2 * (GROUND + 40)) / DROP_G);
