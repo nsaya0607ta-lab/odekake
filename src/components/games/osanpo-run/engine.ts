@@ -7,7 +7,7 @@
  * 戻り値の関数を呼ぶと、ループ・イベント・音をすべて片付ける。
  */
 import { getAudioContext, resumeAudioContext } from "@/lib/audio-context";
-import { isTrickKind, newTrickRun, newTrickStats, recordTrickClear, trickPose, TRICK_SPECS, TRICK_WARNING, type TrickKind, type TrickStats } from "@/lib/games/osanpo-run/tricks";
+import { isTrickKind, newTrickRun, newTrickStats, normalizeTrickStats, recordTrickClear, trickPose, TRICK_SPECS, TRICK_WARNING, type TrickKind, type TrickStats } from "@/lib/games/osanpo-run/tricks";
 import { DOG_SKIN_IDS, getDogSkin } from "@/lib/dog-skins";
 import type { GachaRarity } from "@/lib/gacha/config";
 import { GACHA_RARITIES } from "@/lib/gacha/config";
@@ -349,6 +349,7 @@ export function createOsanpoRun(root: HTMLElement, opts: OsanpoRunOptions): () =
     { pigeons: 0, slides: 0, plays: 0, meters: 0, items: 0, kinds: [] as string[], counts: {} as Record<string, number>, rollers: 0, drops: 0, greets: 0, geysers: 0, tricks: newTrickStats() },
     loadJSON<Partial<Stats>>("stats", {}),
   );
+  stats.tricks = normalizeTrickStats(stats.tricks);
   const kindSet = new Set<string>(stats.kinds);
   const saveStats = () => { stats.kinds = [...kindSet]; store.set("stats", JSON.stringify(stats)); };
   const bestOf = (id: OsanpoRunStageId) => Number(store.get(`best-${id}`) ?? 0) || 0;

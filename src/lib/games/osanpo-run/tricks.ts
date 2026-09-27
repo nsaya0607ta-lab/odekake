@@ -35,11 +35,33 @@ export type TrickStats = {
   droneSlides: number;
   /** 3種類すべてを1回のおさんぽで回避したステージ */
   routes: string[];
+  /** 3種類コンプリートの累計と、ステージ別の達成回数 */
+  trioRuns: number;
+  stageTrios: Record<string, number>;
 };
-export type TrickRun = { kinds: TrickKind[]; streak: number };
+export type TrickRun = { kinds: TrickKind[]; streak: number; trioRecorded: boolean };
 export type TrickStyle = { over: boolean; under: boolean; ducked: boolean };
-export const newTrickRun = (): TrickRun => ({ kinds: [], streak: 0 });
-export const newTrickStats = (): TrickStats => ({ clears: { suitcase: 0, surprise: 0, drone: 0 }, suitcaseJumps: 0, suitcaseUnder: 0, openBoxes: 0, droneSlides: 0, routes: [] });
+export const newTrickRun = (): TrickRun => ({ kinds: [], streak: 0, trioRecorded: false });
+export const newTrickStats = (): TrickStats => ({ clears: { suitcase: 0, surprise: 0, drone: 0 }, suitcaseJumps: 0, suitcaseUnder: 0, openBoxes: 0, droneSlides: 0, routes: [], trioRuns: 0, stageTrios: {} });
+
+/** 追加前の保存データや一部欠けたデータも、安全に現在の形へ揃える。 */
+export function normalizeTrickStats(value: unknown): TrickStats {
+  const base = newTrickStats();
+  if (!value || typeof value !== "object") return base;
+  const saved = value as Partial<TrickStats>;
+  const number = (n: unknown): number => typeof n === "number" && Number.isFinite(n) && n >= 0 ? n : 0;
+  const clears = saved.clears && typeof saved.clears === "object" ? saved.clears : base.clears;
+  return {
+    clears: { suitcase: number(clears.suitcase), surprise: number(clears.surprise), drone: number(clears.drone) },
+    suitcaseJumps: number(saved.suitcaseJumps), suitcaseUnder: number(saved.suitcaseUnder),
+    openBoxes: number(saved.openBoxes), droneSlides: number(saved.droneSlides),
+    routes: Array.isArray(saved.routes) ? [...new Set(saved.routes.filter((v): v is string => typeof v === "string"))] : [],
+    trioRuns: number(saved.trioRuns),
+    stageTrios: saved.stageTrios && typeof saved.stageTrios === "object"
+      ? Object.fromEntries(Object.entries(saved.stageTrios).filter(([, n]) => typeof n === "number" && Number.isFinite(n) && n >= 0))
+      : {},
+  };
+}
 
 /** 接触・バリア・すり抜けで助かった障害物は呼び出し側で除外する。獲得済み判定は既存のunlockが行う。 */
 export function recordTrickClear(stats: TrickStats, run: TrickRun, kind: TrickKind, style: TrickStyle, stage: string): string[] {
@@ -58,11 +80,22 @@ export function recordTrickClear(stats: TrickStats, run: TrickRun, kind: TrickKi
     unlocked.push("droneFirst");
     if (style.ducked && ++stats.droneSlides >= 10) unlocked.push("droneSlides10");
   }
+  if (stats.clears[kind] >= 50) unlocked.push(`${kind}Veteran`);
+  if (TRICK_KINDS.reduce((sum, id) => sum + stats.clears[id], 0) >= 200) unlocked.push("trickClears200");
+  if (stats.suitcaseUnder >= 10 && stats.openBoxes >= 20 && stats.droneSlides >= 30) unlocked.push("trickStyleMaster");
   if (run.kinds.length === TRICK_KINDS.length) {
     unlocked.push("trickTrio");
     if (!stats.routes.includes(stage)) stats.routes.push(stage);
     if (["town", "hiking", "snow", "summer"].every((id) => stats.routes.includes(id))) unlocked.push("trickTour");
+    if (!run.trioRecorded) {
+      run.trioRecorded = true;
+      stats.trioRuns++;
+      stats.stageTrios[stage] = (stats.stageTrios[stage] ?? 0) + 1;
+      if (stats.trioRuns >= 10) unlocked.push("trickTrio10");
+      if (["town", "hiking", "snow", "summer"].every((id) => (stats.stageTrios[id] ?? 0) >= 3)) unlocked.push("trickGrandTour");
+    }
   }
   if (run.streak >= 6) unlocked.push("trickStreak6");
+  if (run.streak >= 15) unlocked.push("trickStreak15");
   return unlocked;
 }
