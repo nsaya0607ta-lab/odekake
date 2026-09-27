@@ -200,7 +200,7 @@ export default async function GamesPage() {
 
             <span className="relative z-10 flex items-center gap-2">
               <span className="rounded-full bg-[#5f58b0] px-2.5 py-1 text-[10px] font-black text-white shadow-sm">NEW</span>
-              <span className="rounded-full border border-white/90 bg-white/70 px-2.5 py-1 text-[10px] font-bold text-[#5f58b0]">お試し版</span>
+              <span className="rounded-full border border-white/90 bg-white/70 px-2.5 py-1 text-[10px] font-bold text-[#5f58b0]">コイン・フレンド対戦</span>
             </span>
 
             <span className="relative z-10 mt-3 flex items-center gap-3">
