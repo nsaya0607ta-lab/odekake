@@ -194,7 +194,7 @@ export function OsanpoRunGame({ items, usesSampleItems, unlockedStages, seriesTa
                     <ul>
                       <li className="osr-ctl"><span><kbd>タップ</kbd></span><div><b>ジャンプ</b><small>スペース・<kbd>↑</kbd>でもOK。長押しで高く、ちょんと押すと低く跳ぶ。空中でもう一回で2段ジャンプ。</small></div></li>
                       <li className="osr-ctl"><span><kbd>↓</kbd></span><div><b>スライディング</b><small>下スワイプでもOK。のれん・低い枝・つららや、低く飛ぶカラスの下をくぐれる。空中で押すと急降下。</small></div></li>
-                      <li className="osr-ctl"><span><kbd>スキル</kbd></span><div><b>アイテムのスキル</b><small>アイテムを拾うと、そのアイテムのスキルが発動（全アイテムに1つずつ）。図鑑のスキルLvが高いほど強い。身代わり・バリア・復活の「守り」は1回ぶんまでで、新しく拾うと入れかわる。効果は「ずかん」でアイテムを選ぶと見られる。</small></div></li>
+                      <li className="osr-ctl"><span><kbd>スキル</kbd></span><div><b>アイテムのスキル</b><small>アイテムを拾うと、そのアイテムのスキルが発動（全アイテムに1つずつ）。図鑑のスキルLvが高いほど強い。身代わり・バリア・復活の「守り」は1回ぶんまで（強さは 復活 ＞ バリア・身代わり。今より弱い守りは付かない）。効果は「ずかん」でアイテムを選ぶと見られる。</small></div></li>
                       <li className="osr-ctl"><span><kbd>イベント</kbd></span><div><b>ボーナス・ラッシュ・雨</b><small>ときどきアイテムだらけのボーナスタイム、障害物が続くラッシュ（突破で+100）、雨や雪が来る。</small></div></li>
                       <li className="osr-ctl"><span><kbd>II</kbd></span><div><b>一時停止</b><small>右上のボタン（キーボードはP）。「最初から」「道を選ぶ」「設定」もここから。</small></div></li>
                     </ul>
