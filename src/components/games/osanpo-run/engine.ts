@@ -1156,7 +1156,7 @@ export function createOsanpoRun(root: HTMLElement, opts: OsanpoRunOptions): () =
     let k = M.jump;
     if (n === 1 && !quiet && K.bigJumps.length) { k *= K.bigJumps.shift()!; puff(P.x, GROUND, 10, "ring", { vy: 30, g: 0 }); }
     P.vy = -v * k; P.ground = false; P.jumps = n === 1 ? 1 + M.air : Math.max(0, P.jumps - 1); P.sq = 1.22; P.slide = false; P.slideHeld = false; P.jumpAt = S.time;
-    if (M.rhythm > 0 && S.state === "play") {
+    if (M.rhythm > 0 && S.state === "play" && !quiet) {
       const beat = 60 / BGM.bpm, ph = (S.time % beat) / beat;
       if (ph < 0.18 || ph > 0.82) { const got = addPts(M.rhythm); floatText(P.x + 20, P.y - 70, `♪ +${got}`, "#9BE7FF", 15); }
     }
@@ -1659,10 +1659,13 @@ export function createOsanpoRun(root: HTMLElement, opts: OsanpoRunOptions): () =
     K.buffs.push({ skill, b, lv, key, t: sec, count: 0, acc: 0, rampN: 0, rainAcc: 0, max: sec });
     if ((b.inv || b.auto) && !wasInv) announceInv();
   }
-  /** 無敵の残り秒数（無敵・自動回避・止まっている・ラッシュ無敵のうち一番長いもの） */
+  /**
+   * 無敵の残り秒数（無敵・自動回避・ラッシュ無敵のうち一番長いもの）。虹色のオーラと「無敵おわり」に使う。
+   * 止まるスキル（おるすばん等）も当たらないが、止まっているだけなので無敵の演出は出さない
+   */
   function invLeft(): number {
     let t = K.rushInv ? Math.max(0, S.secT) : 0;
-    for (const a of K.buffs) if (a.b.inv || a.b.auto || a.b.stop) t = Math.max(t, a.t);
+    for (const a of K.buffs) if (a.b.inv || a.b.auto) t = Math.max(t, a.t);
     return t;
   }
   function announceInv(): void {
@@ -1673,6 +1676,19 @@ export function createOsanpoRun(root: HTMLElement, opts: OsanpoRunOptions): () =
   /** 身代わり・バリア・復活は合わせて1回ぶんまで。新しく付くときは前のものを外す */
   function clearWards(): void {
     K.guards = []; K.revives = []; S.shield = false;
+  }
+  /** 守りの強さ。復活 > バリア・身代わり > 水たまりだけ等の限定の身代わり */
+  function wardRank(): number {
+    if (K.revives.length) return 3;
+    if (S.shield) return 2;
+    const g = K.guards[0];
+    return g ? (g.kinds === "all" ? 2 : 1) : 0;
+  }
+  /** 新しい守りを付けられるか。今の守りより弱いものは付けず、強いか同じなら入れかえる */
+  function takeWard(rank: number): boolean {
+    if (rank < wardRank()) { floatText(P.x + 10, P.y - 76, "もっと強い守りを持っている", "#C9C3F0", 12); return false; }
+    clearWards();
+    return true;
   }
   function endBuff(a: ActiveBuff): void {
     const { b, lv } = a;
@@ -1737,7 +1753,7 @@ export function createOsanpoRun(root: HTMLElement, opts: OsanpoRunOptions): () =
       case "randPts": { const v = addPts(Math.round(rand(val(fx.min, lv), val(fx.max, lv)))); floatText(P.x + 20, P.y - 70, `+${v}`, "#FFC857", 15); break; }
       case "next": { const n = ival(fx.n, lv); if (n > 0) K.next.push({ left: n, add: val(fx.add, lv), mul: val(fx.mul, lv, 1), up: ival(fx.up, lv), dup: ival(fx.dup, lv), filter: fx.filter ?? "any" }); break; }
       case "best": K.best = { left: ival(fx.n, lv), mul: val(fx.mul, lv, 2), top: 0 }; break;
-      case "guard": clearWards(); K.guards.push({ n: 1, t: fx.sec === undefined ? Infinity : val(fx.sec, lv), kinds: fx.kinds ?? "all", pts: val(fx.pts, lv), after: val(fx.after, lv), name: skill.name }); break;
+      case "guard": if (!takeWard((fx.kinds ?? "all") === "all" ? 2 : 1)) break; K.guards.push({ n: 1, t: fx.sec === undefined ? Infinity : val(fx.sec, lv), kinds: fx.kinds ?? "all", pts: val(fx.pts, lv), after: val(fx.after, lv), name: skill.name }); break;
       case "clear": K.clears.push({ n: ival(fx.n, lv), kinds: fx.kinds ?? "all", pts: val(fx.pts, lv), name: skill.name }); break;
       case "clearAll": {
         let got = 0;
@@ -1759,7 +1775,7 @@ export function createOsanpoRun(root: HTMLElement, opts: OsanpoRunOptions): () =
         }
         break;
       }
-      case "revive": clearWards(); K.revives.push({ keep: fx.keep ?? 1, pts: val(fx.pts, lv), mul: val(fx.mul, lv, 1), name: skill.name }); break;
+      case "revive": if (!takeWard(3)) break; K.revives.push({ keep: fx.keep ?? 1, pts: val(fx.pts, lv), mul: val(fx.mul, lv, 1), name: skill.name }); break;
       case "rare": K.rare = Math.max(K.rare, val(fx.mul, lv, 1)); break;
       case "nightMul": K.nightMul = Math.max(K.nightMul, val(fx.mul, lv, 1)); break;
       case "runMul": K.runMul = Math.max(K.runMul, val(fx.stage === STAGE_ID ? fx.stageMul ?? fx.mul : fx.mul, lv, 1)); break;
@@ -1892,7 +1908,7 @@ export function createOsanpoRun(root: HTMLElement, opts: OsanpoRunOptions): () =
     }
     const ended = K.buffs.filter((a) => a.t <= 0);
     if (ended.length) {
-      const hadInv = invLeft() > 0 || ended.some((a) => a.b.inv || a.b.auto || a.b.stop);
+      const hadInv = invLeft() > 0 || ended.some((a) => a.b.inv || a.b.auto);
       K.buffs = K.buffs.filter((a) => a.t > 0); ended.forEach(endBuff);
       if (hadInv && invLeft() <= 0) { floatText(P.x + 10, P.y - 96, "無敵おわり", "#C9C3F0", 14); tone(784, 0.12, "triangle", 0.05, 392); }
     }
@@ -2256,7 +2272,9 @@ export function createOsanpoRun(root: HTMLElement, opts: OsanpoRunOptions): () =
     else if (item.rarity === "R" || item.rarity === "SR") { sfx.item(S.mult + 1); floatText(p.x, p.y - 18, `${upTag}${item.name} +${pts}${tag}`, R.color, 14); puff(p.x, p.y, 8, "spark", { g: 0 }); }
     else { sfx.fanfare(); floatText(p.x, p.y - 20, `${upTag}${item.rarity} ${item.name} +${pts}${tag}`, R.color, 16); puff(p.x, p.y, 16, "spark", { g: 0 }); }
     showRare(item);
-    if (isBarrierRarity(item.rarity) && !S.shield) { clearWards(); S.shield = true; sfx.barrier(); floatText(P.x + 10, P.y - 70, "バリアが付いた！", "#7EF0D0", 15); }
+    // LR・MR のバリア。そのアイテムのスキル自体が守り（身代わり・復活）のときは、スキルの守りを優先してバリアは付けない
+    const ownWard = OSANPO_RUN_SKILL_BY_ID.get(item.id)?.fx.some((f) => f.op === "guard" || f.op === "revive");
+    if (isBarrierRarity(item.rarity) && !S.shield && !ownWard && wardRank() <= 2) { clearWards(); S.shield = true; sfx.barrier(); floatText(P.x + 10, P.y - 70, "バリアが付いた！", "#7EF0D0", 15); }
     applySkill(item);
     K.lastItem = item;
     // 「ぱちぱち」: 近くのアイテムももう1個
@@ -2460,7 +2478,7 @@ export function createOsanpoRun(root: HTMLElement, opts: OsanpoRunOptions): () =
       }
       const dx = it.x - P.x, dy = it.y - (P.y - 28);
       if (dx * dx + dy * dy < reach * reach) take(it);
-      else if (K.miss > 0 && it.x < P.x - 40) { K.miss--; take(it); floatText(P.x - 10, P.y - 60, "てぶくろキャッチ", "#9BE7FF", 12); }
+      else if (K.miss > 0 && (it.item || it.token) && it.x < P.x - 40) { K.miss--; take(it); floatText(P.x - 10, P.y - 60, "てぶくろキャッチ", "#9BE7FF", 12); }
     }
     pickups = pickups.filter((it) => !it.taken && it.x > -40);
 
