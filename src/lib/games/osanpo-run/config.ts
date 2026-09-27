@@ -125,7 +125,7 @@ export const OSANPO_RUN_ACHIEVEMENTS: readonly OsanpoRunAchievement[] = [
   // ---- 追加した障害物・スキルの称号 ----
   { id: "roller10", name: "おそうじロボの天敵", condition: "転がってくるものを跳び越える（累計10回）" },
   { id: "drop10", name: "頭上注意", condition: "上から落ちてくるものをよける（累計10回）" },
-  { id: "greet20", name: "ごあいさつ上手", condition: "ほかのわんこにあいさつする（累計20回）" },
+  { id: "greet20", name: "ごあいさつ上手", condition: "ほかのフレブルにあいさつする（累計20回）" },
   { id: "geyser10", name: "びしょぬれ回避", condition: "水が出ているところを通り抜ける（累計10回）" },
   { id: "bones100", name: "ほね職人", condition: "1回でほねを100本拾う" },
   { id: "skills10", name: "スキルマニア", condition: "1回で10種類のスキルを発動させる" },
@@ -163,7 +163,7 @@ export const OSANPO_RUN_HINTS = {
   slide: "↓キーか下スワイプでスライディング！",
   roller: "こっちに転がってくる。早めに跳ぼう",
   drop: "地面に影！ 上から何か落ちてくる",
-  buddy: "ほかのわんこはぶつかってもOK。ごあいさつすると点がもらえる",
+  buddy: "ほかのフレブルはぶつかってもOK。ごあいさつすると点がもらえる",
   geyser: "水が止まった瞬間に通るか、2段ジャンプで越えよう",
 } as const;
 export type OsanpoRunHintId = keyof typeof OSANPO_RUN_HINTS;
