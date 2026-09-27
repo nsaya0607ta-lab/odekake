@@ -168,7 +168,7 @@ export const OSANPO_RUN_RANKS: readonly { min: number; label: string; color: str
 
 export const OSANPO_RUN_HINTS = {
   jump: "タップでジャンプ！ 長押しで高く",
-  dj: "空中でもう一回タップで2段ジャンプ",
+  dj: "空中でタップで2段・3段ジャンプ",
   crow: "カラスは跳ばずに、下をくぐろう",
   cat: "猫はこっちに歩いてくる。早めに跳ぼう",
   slide: "↓キーか下スワイプでスライディング！",

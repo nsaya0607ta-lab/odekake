@@ -128,7 +128,7 @@ export function OsanpoRunGame({ items, usesSampleItems, unlockedStages, seriesTa
               <div className="osr-stages" data-osr="stage-list" role="radiogroup" aria-label="ステージ" />
               <p className="osr-stage-desc" data-osr="stage-desc" />
               <div className="osr-keys">
-                <span><kbd>スペース</kbd><kbd>↑</kbd>かタップでジャンプ（2回で2段）</span>
+                <span><kbd>スペース</kbd><kbd>↑</kbd>かタップでジャンプ（空中であと2回・3段まで）</span>
                 <span><kbd>↓</kbd>か下スワイプでスライディング</span>
               </div>
               <button className="osr-btn" data-osr="start" type="button" disabled>準備中…</button>
@@ -216,7 +216,7 @@ export function OsanpoRunGame({ items, usesSampleItems, unlockedStages, seriesTa
                   <section>
                     <h3>そうさ</h3>
                     <ul>
-                      <li className="osr-ctl"><span><kbd>タップ</kbd></span><div><b>ジャンプ</b><small>スペース・<kbd>↑</kbd>でもOK。長押しで高く、ちょんと押すと低く跳ぶ。空中でもう一回で2段ジャンプ。</small></div></li>
+                      <li className="osr-ctl"><span><kbd>タップ</kbd></span><div><b>ジャンプ</b><small>スペース・<kbd>↑</kbd>でもOK。長押しで高く、ちょんと押すと低く跳ぶ。空中でタップすると2段・3段ジャンプ。</small></div></li>
                       <li className="osr-ctl"><span><kbd>↓</kbd></span><div><b>スライディング</b><small>下スワイプでもOK。のれん・低い枝・つららや、低く飛ぶカラスの下をくぐれる。空中で押すと急降下。</small></div></li>
                       <li className="osr-ctl"><span><kbd>スキル</kbd></span><div><b>アイテムのスキル</b><small>アイテムを拾うと、そのアイテムのスキルが発動（全アイテムに1つずつ）。図鑑のスキルLvが高いほど強い。身代わり・バリア・復活の「守り」は1回ぶんまで（強さは 復活 ＞ バリア・身代わり。今より弱い守りは付かない）。効果は「ずかん」でアイテムを選ぶと見られる。</small></div></li>
                       <li className="osr-ctl"><span><kbd>イベント</kbd></span><div><b>ボーナス・ラッシュ・雨</b><small>ときどきアイテムだらけのボーナスタイム、障害物が続くラッシュ（突破で+100）、雨や雪が来る。</small></div></li>
