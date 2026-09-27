@@ -83,6 +83,8 @@ const DW = 80, DH = (DW * DOG_H) / DOG_W;
 const GRAV = 2500, JUMP_V = 760, DJUMP_V = 640;
 /** 道に落ちているもののうち、図鑑アイテムになる割合（残りはほね）。ボーナスタイムは多め */
 const ITEM_RATE = 0.12, ITEM_RATE_BONUS = 0.25;
+/** 空から降ってくるアイテムが、落ちている間に左へ流れる速さ（道の速さに対する割合） */
+const FALL_DRIFT = 0.3;
 /** ほね1本の点数（コンボ倍率がかかる） */
 const BONE_PTS = 5;
 /** 走る速さ（論理px/秒）。最初はゆっくりで、約3分かけて最高速になる */
@@ -1662,6 +1664,7 @@ export function createOsanpoRun(root: HTMLElement, opts: OsanpoRunOptions): () =
   }
   function spawnShape(shape: SpawnShape, n: number, make: () => Pickup["item"], token: number): void {
     const X = VW + 30, add = (x: number, y: number, vy = 0) => { const p = mkPickup(x, y, token ? null : make(), token); p.vy = vy; pickups.push(p); };
+    const drop = (y0: number) => { const p = mkPickup(0, y0, token ? null : make(), token); aimDrop(p); pickups.push(p); };
     for (let i = 0; i < n; i++) {
       const t = n > 1 ? i / (n - 1) : 0.5;
       if (shape === "row") add(X + i * 28, GROUND - 18);
@@ -1670,10 +1673,20 @@ export function createOsanpoRun(root: HTMLElement, opts: OsanpoRunOptions): () =
       else if (shape === "arc") add(X + i * 30, GROUND - 20 - 90 * 4 * t * (1 - t));
       else if (shape === "wave") add(X + i * 26, GROUND - 60 - Math.sin(t * Math.PI * 2) * 36);
       else if (shape === "ring") { const a = (i / n) * Math.PI * 2; add(X + 60 + Math.cos(a) * 52, GROUND - 100 + Math.sin(a) * 44); }
-      else if (shape === "sky") add(rand(P.x + 80, VW + 160), -20 - i * 26, rand(120, 170));
+      else if (shape === "sky") drop(-20 - i * 26);
       else if (shape === "mid") add(X, GROUND - 84);
       else add(X, GROUND - 40);
     }
+  }
+  /**
+   * 空から降らせるアイテムの x と落ちる速さを決める。
+   * 落ちきるまでに流れる分を見込んで、フレブルの少し前〜画面の右寄りに着地するようにする
+   */
+  function aimDrop(p: Pickup): void {
+    p.vy = rand(150, 190);
+    const fallT = Math.max(0, GROUND - 18 - p.y) / p.vy;
+    const land = rand(P.x + 90, Math.max(P.x + 120, VW - 40));
+    p.x = land + S.speed * FALL_DRIFT * fallT;
   }
   function applySkill(item: RunItem, depth = 0): void {
     const skill = OSANPO_RUN_SKILL_BY_ID.get(item.id);
@@ -1835,8 +1848,8 @@ export function createOsanpoRun(root: HTMLElement, opts: OsanpoRunOptions): () =
         while (a.rainAcc >= 1) {
           a.rainAcc -= 1;
           const tok = ival(a.b.rainToken, a.lv);
-          const p = mkPickup(rand(P.x + 70, VW + 60), -16, tok ? null : rollItem(), tok);
-          p.vy = rand(120, 170); pickups.push(p);
+          const p = mkPickup(0, -16, tok ? null : rollItem(), tok);
+          aimDrop(p); pickups.push(p);
         }
       }
       if (a.b.dry) { S.rainTarget = 0; S.rainT = 0; }
@@ -2403,7 +2416,8 @@ export function createOsanpoRun(root: HTMLElement, opts: OsanpoRunOptions): () =
     const reach = M.big ? 42 : 30;
     for (const it of pickups) {
       if (playing && !it.hinted && it.y < GROUND - 140 && it.x < P.x + 260) { it.hinted = true; hint("dj"); }
-      it.x -= sp * dt; it.ph += dt * 4;
+      // 落ちている間はゆっくり流れる（道と同じ速さだと、着地する前にフレブルを通り過ぎて取れない）
+      it.x -= sp * (it.vy > 0 ? FALL_DRIFT : 1) * dt; it.ph += dt * 4;
       if (it.vy > 0) { it.y += it.vy * dt; if (it.y >= GROUND - 18) { it.y = GROUND - 18; it.vy = 0; } }
       if (!playing || it.taken) continue;
       const mx = P.x - it.x, my = P.y - 28 - it.y, d2 = mx * mx + my * my;
@@ -2466,6 +2480,11 @@ export function createOsanpoRun(root: HTMLElement, opts: OsanpoRunOptions): () =
     if (S.rain > 0.02 && STAGE.weather !== "snow" && !M.clear) { c.fillStyle = `rgba(52,60,96,${0.22 * S.rain})`; c.fillRect(-20, -20, VW + 40, GROUND + 26); }
     for (const o of obstacles) if (o.kind === "puddle") drawPuddle(c, o.x, GROUND, o.w, S.time, e.night, STAGE_ID);
     for (const it of pickups) {
+      if (it.vy > 0) {
+        // 降ってくる途中は、真下の地面に影を出して着地点を知らせる
+        const k = clamp(1 - (GROUND - 18 - it.y) / (GROUND + 20), 0.15, 1);
+        c.fillStyle = `rgba(20,16,40,${0.28 * k})`; ell(c, it.x, GROUND + 1, 6 + 8 * k, 2 + 1.5 * k); c.fill();
+      }
       if (!it.item && !it.token) { drawBone(c, it.x, it.y + Math.sin(it.ph) * 2.2, M.big ? 1.3 : 1); continue; }
       if (!it.item) {
         const y = it.y + Math.sin(it.ph) * 2.2, big = it.token >= 150, r = big ? 9 : it.token >= 30 ? 6 : 4.5;
