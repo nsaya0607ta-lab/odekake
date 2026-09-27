@@ -1,7 +1,7 @@
 // Node 24+: node --test scripts/test-osanpo-tricks.mjs
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { trickPose, TRICK_WARNING, TRICK_KINDS, newTrickRun, newTrickStats, recordTrickClear } from '../src/lib/games/osanpo-run/tricks.ts';
+import { trickPose, TRICK_WARNING, TRICK_KINDS, newTrickRun, newTrickStats, normalizeTrickStats, recordTrickClear } from '../src/lib/games/osanpo-run/tricks.ts';
 
 const plain = { over: false, under: false, ducked: false };
 test('箱とドローンは予告が終わるまで高さを変えない', () => {
@@ -58,7 +58,7 @@ test('3種コンプリートは1回のおさんぽで。再挑戦で種類と連
   const r = newTrickRun();
   for (const kind of TRICK_KINDS.slice(0, 2)) recordTrickClear(s, r, kind, plain, 'town');
   assert.ok(recordTrickClear(s, r, 'drone', plain, 'town').includes('trickTrio'));
-  assert.deepEqual(newTrickRun(), { kinds: [], streak: 0 }); assert.deepEqual(s.routes, ['town']);
+  assert.deepEqual(newTrickRun(), { kinds: [], streak: 0, trioRecorded: false }); assert.deepEqual(s.routes, ['town']);
 });
 test('連続回避の途中で接触した場合のリセットを反映する', () => {
   const s = newTrickStats(), r = newTrickRun();
@@ -79,4 +79,24 @@ test('全国称号は4ステージ必要。同じステージを周回しても�
   }
   assert.deepEqual(s.routes, ['town', 'hiking', 'snow', 'summer']);
   assert.deepEqual(JSON.parse(JSON.stringify(s)), s);
+});
+test('以前の保存データを補完し、壊れた値を回数に使わない', () => {
+  const s = normalizeTrickStats({ clears: { suitcase: 12 }, suitcaseUnder: 3, routes: ['town', 'town'], trioRuns: -4 });
+  assert.deepEqual(s.clears, { suitcase: 12, surprise: 0, drone: 0 });
+  assert.equal(s.suitcaseUnder, 3); assert.equal(s.trioRuns, 0);
+  assert.deepEqual(s.routes, ['town']); assert.deepEqual(s.stageTrios, {});
+});
+test('やり込み称号は累計・連続・ステージ周回の条件どおり開く', () => {
+  const s = newTrickStats();
+  for (let i = 0; i < 49; i++) recordTrickClear(s, newTrickRun(), 'suitcase', plain, 'town');
+  assert.ok(recordTrickClear(s, newTrickRun(), 'suitcase', plain, 'town').includes('suitcaseVeteran'));
+  const streak = newTrickRun(); let ids = [];
+  for (let i = 0; i < 15; i++) ids = recordTrickClear(s, streak, 'drone', plain, 'town');
+  assert.ok(ids.includes('trickStreak15'));
+  for (const stage of ['town', 'hiking', 'snow', 'summer']) for (let lap = 0; lap < 3; lap++) {
+    const r = newTrickRun();
+    for (const kind of TRICK_KINDS) ids = recordTrickClear(s, r, kind, plain, stage);
+  }
+  assert.ok(ids.includes('trickGrandTour')); assert.equal(s.trioRuns, 12);
+  assert.deepEqual(s.stageTrios, { town: 3, hiking: 3, snow: 3, summer: 3 });
 });

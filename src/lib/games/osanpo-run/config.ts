@@ -133,6 +133,15 @@ export const OSANPO_RUN_ACHIEVEMENTS: readonly OsanpoRunAchievement[] = [
   { id: "trickTrio", name: "本日の散歩、情報量多め", condition: "1回のおさんぽでスーツケース・宅配箱・ドローンをすべて接触せずにかわす" },
   { id: "trickStreak6", name: "町内スタント担当", condition: "途中でどの障害物にもぶつからず、新しい3種類の仕掛けを合計6回かわす" },
   { id: "trickTour", name: "全国トラブル行脚", condition: "4つのステージそれぞれで、1回のおさんぽ中に新しい3種類すべてを接触せずにかわす" },
+  // ---- やり込み称号。仕掛けを何度も攻略した先で獲得 ----
+  { id: "suitcaseVeteran", name: "手荷物取扱主任", condition: "大脱走スーツケースを累計50回、接触せずにかわす" },
+  { id: "surpriseVeteran", name: "置き配の中身を知る犬", condition: "びっくり宅配便を累計50回、接触せずにかわす" },
+  { id: "droneVeteran", name: "配達ルートの死角", condition: "配達ドローンを累計50回、接触せずにかわす" },
+  { id: "trickClears200", name: "町内障害物対策本部長", condition: "新しい3種類の仕掛けを合計200回、接触せずにかわす" },
+  { id: "trickStreak15", name: "ノーミス大道芸", condition: "途中でどの障害物にもぶつからず、新しい仕掛けを15回連続でかわす" },
+  { id: "trickTrio10", name: "トラブル三種盛り・常連", condition: "1回のおさんぽで新しい3種類すべてをかわす挑戦を、累計10回達成する" },
+  { id: "trickStyleMaster", name: "町内アクション映画主演", condition: "下くぐり10回・カエル越え20回・ドローンスライド30回をすべて達成する" },
+  { id: "trickGrandTour", name: "全国巡業・千秋楽", condition: "4つのステージすべてで、新しい3種類の同時攻略をそれぞれ3回達成する" },
   // ---- 追加した障害物・スキルの称号 ----
   { id: "roller10", name: "おそうじロボの天敵", condition: "転がってくるものを跳び越える（累計10回）" },
   { id: "drop10", name: "頭上注意", condition: "上から落ちてくるものをよける（累計10回）" },
