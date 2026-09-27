@@ -140,10 +140,7 @@ export function OsanpoRunGame({ items, usesSampleItems, unlockedStages, seriesTa
                 <button type="button" data-sheet="friends">フレンド</button>
               </nav>
               <div className="osr-panel-foot">
-                <div className="osr-quick-options">
-                  <button className="osr-chip-toggle" type="button" data-opt="calm" aria-pressed="true"><span className="osr-dot" aria-hidden="true" />ゆったりモード</button>
-                  <button className="osr-chip-toggle" type="button" data-opt="sunglasses" aria-pressed="false"><span className="osr-dot" aria-hidden="true" />😎 サングラス</button>
-                </div>
+                <button className="osr-chip-toggle" type="button" data-opt="calm" aria-pressed="true"><span className="osr-dot" aria-hidden="true" />ゆったりモード</button>
                 <button className="osr-link-btn" type="button" data-open="settings">設定</button>
               </div>
               <p className="osr-preview-note">スコア50点ごとにコイン1枚（切り上げ）。フレンドとスコアを競えます。</p>

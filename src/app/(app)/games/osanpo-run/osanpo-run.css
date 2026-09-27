@@ -203,7 +203,6 @@
 .osr .osr-stage-card b { font-size: 13px; font-weight: 800; line-height: 1.3; }
 .osr .osr-stage-card small { font-size: 10px; color: var(--osr-muted); font-variant-numeric: tabular-nums; line-height: 1.4; }
 .osr .osr-panel-foot { display: flex; justify-content: space-between; align-items: center; gap: 8px; flex-wrap: wrap; }
-.osr .osr-quick-options { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
 .osr .osr-chip-toggle {
   appearance: none; display: inline-flex; align-items: center; gap: 8px; padding: 5px 12px 5px 8px; border-radius: 999px;
   border: 1px solid var(--osr-line); background: transparent; color: var(--osr-ink); font-family: var(--osr-body); font-weight: 800; font-size: 12px; cursor: pointer;
