@@ -96,6 +96,8 @@ const BUDDY_POSES: readonly Pose[] = ["walk", "trot"];
 const DOG_W = 300, DOG_H = 254, DOG_FOOT = 240;
 const DW = 80, DH = (DW * DOG_H) / DOG_W;
 const GRAV = 2500, JUMP_V = 760, DJUMP_V = 640;
+/** スキルなしで空中で追加できるジャンプの回数（2 = 3段ジャンプ） */
+const BASE_AIR_JUMPS = 2;
 /** 道に落ちているもののうち、図鑑アイテムになる割合（残りはほね）。ボーナスタイムは多め */
 const ITEM_RATE = 0.12, ITEM_RATE_BONUS = 0.25;
 /** 水が出たり止まったりするところ: 1周の秒数・出ている秒数・水の高さ（ふつうのジャンプでは越えられず、2段ジャンプなら越えられる） */
@@ -1236,7 +1238,7 @@ export function createOsanpoRun(root: HTMLElement, opts: OsanpoRunOptions): () =
   function jump(v: number, n: 1 | 2, quiet = false): void {
     let k = M.jump;
     if (n === 1 && !quiet && K.bigJumps.length) { k *= K.bigJumps.shift()!; puff(P.x, GROUND, 10, "ring", { vy: 30, g: 0 }); }
-    P.vy = -v * k; P.ground = false; P.jumps = n === 1 ? 1 + M.air : Math.max(0, P.jumps - 1); P.sq = 1.22; P.slide = false; P.slideHeld = false; P.jumpAt = S.time;
+    P.vy = -v * k; P.ground = false; P.jumps = n === 1 ? BASE_AIR_JUMPS + M.air : Math.max(0, P.jumps - 1); P.sq = 1.22; P.slide = false; P.slideHeld = false; P.jumpAt = S.time;
     if (M.rhythm > 0 && S.state === "play" && !quiet) {
       const beat = 60 / BGM.bpm, ph = (S.time % beat) / beat;
       if (ph < 0.18 || ph > 0.82) { const got = addPts(M.rhythm); floatText(P.x + 20, P.y - 70, `♪ +${got}`, "#9BE7FF", 15); }

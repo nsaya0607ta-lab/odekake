@@ -332,7 +332,7 @@ export const OSANPO_RUN_SKILLS: readonly OsanpoRunSkill[] = [
   sk("interior_stargazing_telescope", "流れ星観測", "spawn", "夜なら流れ星の粒が5つ降る（1つ +150pt）。昼なら時計が夜まで進む", "10個", [{ op: "clock", night: [5, 10] }]),
   sk("accessory_bear_bell", "ちりんちりん", "guard", "次に来るカラスか猫を1回追い払う", "3回まで", [{ op: "clear", n: [1, 3], kinds: "crowcat", pts: 10 }]),
   sk("accessory_hiking_backpack", "つめこみ", "score", "次の5個のアイテムが +5pt", "次の10個 +10pt", [{ op: "next", n: [5, 10], add: [5, 10] }]),
-  sk("accessory_trekking_poles", "4本足+2", "jump", "5秒間、2段ジャンプのあとにもう1回跳べる", "10秒間", [B({ sec: [5, 10], air: 1 })]),
+  sk("accessory_trekking_poles", "4本足+2", "jump", "5秒間、3段ジャンプのあとにもう1回跳べる", "10秒間", [B({ sec: [5, 10], air: 1 })]),
   sk("accessory_hiking_pin_hat", "バッジ集め", "score", "このおさんぽで拾った山道シリーズの種類数 ×20pt", "×60pt", [{ op: "series", series: "hiking", per: [20, 60] }]),
   sk("other_trail_map_compass", "道しるべ", "guard", "10秒間、障害物が光って見やすく、よけ方がわかる", "20秒間", [B({ sec: [10, 20], bright: true })]),
   sk("other_cairn", "積み石", "score", "拾うたびに石が積み上がり、3つ積むと +300pt（ぶつかって守られると崩れる）", "+900pt", [{ op: "cairn", need: 3, pts: [300, 900] }], true),
