@@ -7,6 +7,7 @@
  * 戻り値の関数を呼ぶと、ループ・イベント・音をすべて片付ける。
  */
 import { getAudioContext, resumeAudioContext } from "@/lib/audio-context";
+import { DOG_SKIN_IDS, getDogSkin } from "@/lib/dog-skins";
 import type { GachaRarity } from "@/lib/gacha/config";
 import { GACHA_RARITIES } from "@/lib/gacha/config";
 import {
@@ -88,6 +89,8 @@ export type OsanpoRunOptions = {
 type Pose = "walk" | "trot" | "walk-tail" | "cheer" | "smile" | "bow-b" | "stand-happy" | "wave" | "sleep" | "lie-wave" | "bow";
 const POSES: readonly Pose[] = ["walk", "trot", "walk-tail", "cheer", "smile", "bow-b", "stand-happy", "wave", "sleep", "lie-wave", "bow"];
 const RUN_CYCLE: readonly Pose[] = ["walk", "trot", "walk-tail", "trot"];
+/** 道で会うほかのフレブルの歩き（2コマ） */
+const BUDDY_POSES: readonly Pose[] = ["walk", "trot"];
 const DOG_W = 300, DOG_H = 254, DOG_FOOT = 240;
 const DW = 80, DH = (DW * DOG_H) / DOG_W;
 const GRAV = 2500, JUMP_V = 760, DJUMP_V = 640;
@@ -331,6 +334,8 @@ export function createOsanpoRun(root: HTMLElement, opts: OsanpoRunOptions): () =
   let STAGE_ID: OsanpoRunStageId = isOsanpoRunStageId(savedStage) && unlocked.has(savedStage) ? savedStage : "town";
   let STAGE: OsanpoRunStage = OSANPO_RUN_STAGES[STAGE_ID];
   preloadSkin(STAGE.skin);
+  // 道で会う「ほかのわんこ」は、図鑑にいるフレブル（いつもの・登山・雪国・夏）からランダム。持っていなくても出る
+  for (const skin of DOG_SKIN_IDS) for (const p of BUDDY_POSES) dogImage(skin, p);
 
   /* ---------- 記録（この端末に保存） ---------- */
   const achGot = loadJSON<Record<string, number>>("ach", {});
@@ -635,6 +640,25 @@ export function createOsanpoRun(root: HTMLElement, opts: OsanpoRunOptions): () =
     $("mute").setAttribute("aria-label", m ? "音を出す" : "音を消す");
   }
   setMuted(muted);
+
+  /* ---------- 道で会うほかのフレブル ---------- */
+  const buddySkin = (o: Obstacle) => DOG_SKIN_IDS[o.phase % DOG_SKIN_IDS.length]!;
+  const buddyName = (o: Obstacle) => getDogSkin(buddySkin(o)).name;
+  /** ほかのフレブル。こっちに向かって歩いてくる（画像はもともと左向きなので反転しない）。あいさつ後はにっこり止まってハート */
+  function drawBuddySprite(c: Ctx, o: Obstacle): void {
+    const pose: Pose = o.greeted ? "smile" : BUDDY_POSES[Math.floor(S.time * 7 + o.x * 0.01) % 2]!;
+    const img = dogImage(buddySkin(o), pose);
+    const w = DW * 0.78, h = DH * 0.78, cx = o.x + o.w / 2;
+    if (!img.complete || !img.naturalWidth) { drawBuddy(c, o.x, GROUND, o.w, S.time, o.phase, o.greeted); return; }
+    c.save();
+    c.translate(cx, GROUND - (o.greeted ? 0 : Math.abs(Math.sin(S.time * 9 + o.x)) * 1.2));
+    c.drawImage(img, -w / 2, (-h * DOG_FOOT) / DOG_H, w, h);
+    c.restore();
+    if (o.greeted) {
+      c.fillStyle = "#FF6B8A"; c.font = font(13); c.textAlign = "center"; c.textBaseline = "middle";
+      c.fillText("♥", cx - 6, GROUND - h - 4 - Math.abs(Math.sin(S.time * 6)) * 4);
+    }
+  }
 
   /* ---------- 犬の描画 ---------- */
   function drawDog(c: Ctx, x: number, y: number): void {
@@ -1078,7 +1102,7 @@ export function createOsanpoRun(root: HTMLElement, opts: OsanpoRunOptions): () =
     const kind = pickWeighted([
       ["cone", 3], ["puddle", rain ? 5 : 2], ["bike", t > 6 ? 2.2 : 0], ["crow", t > 12 ? 2 : 0], ["double", t > 24 || rush ? 1.6 : 0],
       ["cat", t > 18 ? 1.6 : 0], ["sign", t > 30 ? 1.4 : 0], ["pigeons", t > 9 ? 1.3 : 0], ["noren", t > 14 ? 1.8 : 0], ["lowcrow", t > 22 ? 1.2 : 0],
-      ["roller", t > 16 ? 1.4 : 0], ["drop", t > 20 ? 1.2 : 0], ["buddy", t > 8 ? 1 : 0], ["geyser", t > 26 ? 1.2 : 0],
+      ["roller", t > 16 ? 1.4 : 0], ["drop", t > 20 ? 1.2 : 0], ["buddy", t > 8 ? 1 : 0], ["geyser", t > 10 ? 1.5 : 0],
       ["row", rush ? 0 : 1.3], ["high", rush ? 0 : 1.1],
     ] as const);
     const blocked = (k: ObstacleKind, low = false) => K.buffs.some((a) => a.b.noSpawn && inGroup({ kind: k, low } as Obstacle, a.b.noSpawn));
@@ -1119,7 +1143,7 @@ export function createOsanpoRun(root: HTMLElement, opts: OsanpoRunOptions): () =
       }
       case "roller": addObs("roller", X + 80, 30, 18, { vx: rand(55, 95) }); extra = 80; break;
       case "drop": addObs("drop", X + 40, 22, 22, { y: -30 }); extra = 40; break;
-      case "buddy": addObs("buddy", X, 34, 26, { phase: Math.floor(rand(0, 4)) }); if (Math.random() < 0.5) treatArc(X - 50, X + 84, 70); break;
+      case "buddy": addObs("buddy", X + 60, 44, 40, { phase: Math.floor(rand(0, DOG_SKIN_IDS.length)), vx: rand(20, 40) }); if (Math.random() < 0.5) treatArc(X - 50, X + 84, 70); break;
       case "geyser": addObs("geyser", X, 24, 0, { phase: rand(0, GEYSER_CYCLE) }); extra = 30; break;
       case "noren": addObs("noren", X, 58, 0); if (Math.random() < 0.6) for (let i = 0; i < 4; i++) pickups.push(mkPickup(X - 10 + i * 28, GROUND - 14)); extra = 40; break;
       case "row": { const h = Math.random() < 0.5 ? 0 : rand(60, 96); for (let i = 0; i < 5; i++) pickups.push(mkPickup(X + i * 30, GROUND - 18 - h)); break; }
@@ -2647,7 +2671,7 @@ export function createOsanpoRun(root: HTMLElement, opts: OsanpoRunOptions): () =
         if (!o.greeted && hitTest(o)) {
           o.greeted = true; S.slowT = 0.5;
           const v = addPts(30);
-          floatText(P.x + 20, P.y - 70, `くんくん… ごあいさつ +${v}`, "#FFB3C7", 14);
+          floatText(P.x + 20, P.y - 70, `くんくん… ${buddyName(o)}にごあいさつ +${v}`, "#FFB3C7", 14);
           tone(660, 0.08, "sine", 0.05); tone(880, 0.1, "sine", 0.05, null, 0.08);
           stats.greets++; saveStats();
           if (stats.greets >= 20) unlock("greet20");
@@ -2835,7 +2859,7 @@ export function createOsanpoRun(root: HTMLElement, opts: OsanpoRunOptions): () =
       else if (o.kind === "crow") drawCrow(c, o.x, o.y + Math.sin(S.time * 5 + o.x * 0.01) * 2, o.w, o.h, S.time);
       else if (o.kind === "roller") drawRoller(c, o.x, GROUND, o.w, o.h, S.time, lk);
       else if (o.kind === "drop") drawDropper(c, o.x + o.w / 2, o.hit ? GROUND : o.y, o.w, lk, o.landed);
-      else if (o.kind === "buddy") drawBuddy(c, o.x, GROUND, o.w, S.time, o.phase, o.greeted);
+      else if (o.kind === "buddy") drawBuddySprite(c, o);
       else if (o.kind === "geyser") drawGeyser(c, o.x, GROUND, o.w, o.h, S.time, lk);
       c.restore();
     }
@@ -2908,8 +2932,10 @@ export function createOsanpoRun(root: HTMLElement, opts: OsanpoRunOptions): () =
       const a = 1 - Math.max(0, (t.life - t.max * 0.55) / (t.max * 0.45));
       const pop = RM ? 1 : 1 + Math.max(0, 0.25 - t.life) * 1.6;
       c.font = font(t.size * pop);
-      c.strokeStyle = `rgba(22,21,46,${a * 0.85})`; c.lineWidth = 4; c.strokeText(t.text, t.x, t.y);
-      c.globalAlpha = a; c.fillStyle = t.color; c.fillText(t.text, t.x, t.y); c.globalAlpha = 1;
+      // 長い文字（あいさつ等）が画面の端で切れないよう、横位置を画面内に収める
+      const half = c.measureText(t.text).width / 2 + 6, tx = Math.min(VW - half, Math.max(half, t.x));
+      c.strokeStyle = `rgba(22,21,46,${a * 0.85})`; c.lineWidth = 4; c.strokeText(t.text, tx, t.y);
+      c.globalAlpha = a; c.fillStyle = t.color; c.fillText(t.text, tx, t.y); c.globalAlpha = 1;
     }
     if (STAGE.weather === "snow") {
       const inten = 0.35 + 0.65 * S.rain, n = Math.round(drops.length * inten * (S.calm ? 0.5 : 1) * (M.clear ? 0.2 : 1));
@@ -2992,7 +3018,11 @@ export function createOsanpoRun(root: HTMLElement, opts: OsanpoRunOptions): () =
       else if (kind === "noren") { c.save(); c.scale(0.6, 0.6); drawNoren(c, 30, 34, 100, 0, "town"); c.restore(); }
       else if (kind === "roller") drawRoller(c, 13, 38, 30, 18, 0.3, "town");
       else if (kind === "drop") { c.fillStyle = "rgba(20,16,40,.3)"; ell(c, 28, 40, 9, 2.5); c.fill(); drawDropper(c, 28, 28, 20, "town", false); }
-      else if (kind === "buddy") drawBuddy(c, 12, 40, 34, 0.2, 0, true);
+      else if (kind === "buddy") {
+        const img = dogImage("summer", "walk");
+        const paint = () => { c.clearRect(0, 0, 56, 44); c.drawImage(img, 2, -1, 52, 44); };
+        if (img.complete && img.naturalWidth) paint(); else { drawBuddy(c, 12, 40, 34, 0.2, 0, true); img.addEventListener("load", paint, { once: true }); }
+      }
       else if (kind === "geyser") drawGeyser(c, 16, 42, 24, 40, 0.4, "town");
     }
   }
