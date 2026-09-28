@@ -211,6 +211,16 @@
 .osr .osr-step-boost li span { display: block; white-space: nowrap; }
 .osr .osr-step-boost li[data-on="1"] { color: #10243a; background: #9be7ff; border: 1px solid #9be7ff; }
 .osr .osr-step-boost small { font-size: 11px; color: var(--osr-muted); line-height: 1.4; }
+.osr .osr-missions { display: flex; flex-direction: column; gap: 5px; padding: 8px 10px; border-radius: 12px; border: 1px solid var(--osr-line); background: rgba(255, 224, 138, 0.05); }
+.osr .osr-missions-head { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; }
+.osr .osr-missions-head b { font-size: 12px; font-weight: 800; color: #ffe08a; }
+.osr .osr-missions-head small { font-size: 10px; color: var(--osr-muted); }
+.osr .osr-missions ul { display: flex; flex-direction: column; gap: 3px; margin: 0; padding: 0; list-style: none; }
+.osr .osr-missions li { position: relative; padding-left: 20px; font-size: 12px; line-height: 1.45; color: var(--osr-ink); }
+.osr .osr-missions li::before { content: ""; position: absolute; left: 2px; top: 3px; width: 11px; height: 11px; border-radius: 4px; border: 1.5px solid var(--osr-line); }
+.osr .osr-missions li[data-done="1"] { color: var(--osr-muted); text-decoration: line-through; }
+.osr .osr-missions li[data-done="1"]::before { content: "✓"; border-color: #ffe08a; background: #ffe08a; color: #2a1e0a; font-size: 9px; font-weight: 900; line-height: 11px; text-align: center; }
+.osr .osr-mission-line { font-size: 12px !important; font-weight: 800; color: #ffe08a !important; line-height: 1.5; }
 .osr .osr-panel-foot { display: flex; justify-content: space-between; align-items: center; gap: 8px; flex-wrap: wrap; }
 .osr .osr-chip-toggle {
   appearance: none; display: inline-flex; align-items: center; gap: 8px; padding: 5px 12px 5px 8px; border-radius: 999px;

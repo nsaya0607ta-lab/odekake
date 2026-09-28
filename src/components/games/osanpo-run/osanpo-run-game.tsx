@@ -5,6 +5,7 @@ import { Dela_Gothic_One, M_PLUS_Rounded_1c } from "next/font/google";
 import { useEffect, useRef } from "react";
 import { setBgmSuppressed } from "@/lib/bgm-engine";
 import type { OsanpoRunStageId } from "@/lib/games/osanpo-run/config";
+import type { OsanpoRunMission } from "@/lib/games/osanpo-run/missions";
 import { createOsanpoRun, type OsanpoRunResult, type RunItem } from "./engine";
 import { OSANPO_RUN_RANKING_REFRESH_EVENT, OsanpoRunRanking } from "./osanpo-run-ranking";
 
@@ -19,6 +20,9 @@ type Props = {
   categoryLabels: Record<string, string>;
   /** アプリに同期した今日の歩数（未同期は null）。歩数ブーストに使う */
   todaySteps: number | null;
+  /** 今日のミッション3つと、今日もう達成したもののID */
+  missions: OsanpoRunMission[];
+  missionsDone: string[];
 };
 
 /** 1回の結果をサーバーへ送り、スコアを記録してコインを受け取る。記録できなかったときは null */
@@ -39,11 +43,28 @@ async function submitResult(result: OsanpoRunResult): Promise<number | null> {
   }
 }
 
+/** 達成したミッションをサーバーへ送り、コインを受け取る。記録できなかったときは null */
+async function submitMission(missionId: string): Promise<number | null> {
+  try {
+    const response = await fetch("/api/games/osanpo-run/mission", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ missionId }),
+    });
+    if (!response.ok) return null;
+    const payload = (await response.json().catch(() => null)) as { ready?: boolean; coins?: number } | null;
+    if (payload?.ready === false) return null;
+    return typeof payload?.coins === "number" ? payload.coins : null;
+  } catch {
+    return null;
+  }
+}
+
 /**
  * おさんぽフレンチーの画面。骨組みだけをここで描き、動きは engine.ts に任せる。
  * プレイ中はアプリ全体のBGMを止め、ゲームの曲だけが鳴るようにする。
  */
-export function OsanpoRunGame({ items, usesSampleItems, unlockedStages, seriesTabs, categoryLabels, todaySteps }: Props) {
+export function OsanpoRunGame({ items, usesSampleItems, unlockedStages, seriesTabs, categoryLabels, todaySteps, missions, missionsDone }: Props) {
   const rootRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
@@ -57,6 +78,9 @@ export function OsanpoRunGame({ items, usesSampleItems, unlockedStages, seriesTa
       seriesTabs,
       categoryLabels,
       todaySteps,
+      missions,
+      missionsDone,
+      onMissionClear: submitMission,
       bodyFontFamily: bodyFont.style.fontFamily,
       onRunEnd: submitResult,
     });
@@ -64,7 +88,7 @@ export function OsanpoRunGame({ items, usesSampleItems, unlockedStages, seriesTa
       destroy();
       setBgmSuppressed(false);
     };
-  }, [items, usesSampleItems, unlockedStages, seriesTabs, categoryLabels, todaySteps]);
+  }, [items, usesSampleItems, unlockedStages, seriesTabs, categoryLabels, todaySteps, missions, missionsDone]);
 
   return (
     <div ref={rootRef} className={`osr ${displayFont.variable} ${bodyFont.variable}`}>
@@ -132,6 +156,7 @@ export function OsanpoRunGame({ items, usesSampleItems, unlockedStages, seriesTa
               <div className="osr-stages" data-osr="stage-list" role="radiogroup" aria-label="ステージ" />
               <p className="osr-stage-desc" data-osr="stage-desc" />
               <div className="osr-step-boost" data-osr="step-boost" />
+              <div className="osr-missions" data-osr="missions" hidden />
               <div className="osr-keys">
                 <span><kbd>スペース</kbd><kbd>↑</kbd>かタップでジャンプ（空中であと2回・3段まで）</span>
                 <span><kbd>↓</kbd>か下スワイプでスライディング</span>
@@ -175,6 +200,7 @@ export function OsanpoRunGame({ items, usesSampleItems, unlockedStages, seriesTa
                 <p className="osr-new-line" data-osr="o-new-line" hidden />
               </div>
               <p className="osr-coin-line" data-osr="o-coins" hidden />
+              <p className="osr-mission-line" data-osr="o-missions" hidden />
               <div className="osr-ach-row" data-osr="o-ach" hidden />
               <div className="osr-btn-row">
                 <button className="osr-btn" data-osr="retry" type="button">もう一回おさんぽ</button>

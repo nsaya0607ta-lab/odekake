@@ -34,6 +34,7 @@ import {
   type OsanpoRunStage,
   type OsanpoRunStageId,
 } from "@/lib/games/osanpo-run/config";
+import { MISSION_ALL_BONUS, MISSION_COINS, type OsanpoRunMission, type OsanpoRunMissionMetric } from "@/lib/games/osanpo-run/missions";
 import {
   OSANPO_RUN_SKILL_BY_ID,
   OSANPO_RUN_SKILL_MAX_LEVEL,
@@ -96,6 +97,11 @@ export type OsanpoRunOptions = {
   categoryLabels: Record<string, string>;
   /** アプリに同期した今日の歩数（未同期は null）。歩数ブーストに使う */
   todaySteps?: number | null;
+  /** 今日のミッション3つと、今日もう達成したもののID */
+  missions?: OsanpoRunMission[];
+  missionsDone?: string[];
+  /** ミッションを達成したときに呼ぶ。もらえたコインの枚数を返す（記録できなかったときは null） */
+  onMissionClear?: (missionId: string) => Promise<number | null>;
 };
 
 type Pose = "walk" | "trot" | "walk-tail" | "cheer" | "smile" | "bow-b" | "stand-happy" | "wave" | "sleep" | "lie-wave" | "bow";
@@ -383,6 +389,7 @@ export function createOsanpoRun(root: HTMLElement, opts: OsanpoRunOptions): () =
   };
   const S = {
     state: "ready" as GameState, time: 0, t: 0, speed: 90, dist: 0, bonus: 0, treats: 0, clock: STAGE.clock, cam: 0, bgCam: 0,
+    srPlus: 0, pigeonsRun: 0, slidesRun: 0, greetsRun: 0, routeCalm: 0, routeRisky: 0, bonusBest: 0, missionCoins: 0, missionsNow: [] as string[],
     stepT: 0, fork: null as null | { at: number }, route: null as null | { kind: OsanpoRunRouteKind; t: number }, forkT: 40,
     next: 400, shield: false, chain: 0, chainT: 0, mult: 1, maxMult: 1, paused: false, deadT: 0, introT: 0,
     haul: new Map<string, number>(), happyT: 0, calm: store.get("calm") !== "0",
@@ -1190,6 +1197,71 @@ export function createOsanpoRun(root: HTMLElement, opts: OsanpoRunOptions): () =
     }
     S.next = (170 + S.speed * 0.55 + Math.random() * S.speed * 0.8) * (rush ? 0.68 : 1) * routeGap() + extra;
   }
+  /* ---------- 今日のミッション ---------- */
+  const MISSIONS = opts.missions ?? [];
+  const missionDone = new Set(opts.missionsDone ?? []);
+  function missionValue(metric: OsanpoRunMissionMetric): number {
+    switch (metric) {
+      case "bones": return S.bones;
+      case "meters": return Math.floor(S.dist / 50);
+      case "items": return S.treats;
+      case "rarePlus": return S.srPlus;
+      case "pigeons": return S.pigeonsRun;
+      case "slides": return S.slidesRun;
+      case "greets": return S.greetsRun;
+      case "rushes": return S.rushes;
+      case "combo": return S.maxMult;
+      case "closes": return S.closes;
+      case "skills": return S.skillIds.size;
+      case "score": return score();
+      case "routeCalm": return S.routeCalm;
+      case "routeRisky": return S.routeRisky;
+      case "bonusGot": return S.bonusBest;
+    }
+  }
+  function tickMissions(): void {
+    for (const m of MISSIONS) {
+      if (missionDone.has(m.id) || missionValue(m.metric) < m.target) continue;
+      missionDone.add(m.id);
+      S.missionsNow.push(m.id);
+      const all = MISSIONS.every((x) => missionDone.has(x.id));
+      floatText(VW / 2, GROUND * 0.18, all ? "ミッション コンプリート！" : "ミッション達成！", "#FFE08A", 20);
+      showNote(`✓ ${m.text}`);
+      sfx.fanfare();
+      renderMissions();
+      opts.onMissionClear?.(m.id).then((coins) => { if (coins) { S.missionCoins += coins; renderMissionResult(); } }).catch(() => undefined);
+    }
+  }
+  /** スタート画面の「今日のミッション」 */
+  function renderMissions(): void {
+    const box = $("missions");
+    box.hidden = MISSIONS.length === 0;
+    if (box.hidden) return;
+    box.replaceChildren();
+    const done = MISSIONS.filter((m) => missionDone.has(m.id)).length;
+    const head = document.createElement("b");
+    head.textContent = `今日のミッション ${done}/${MISSIONS.length}`;
+    const note = document.createElement("small");
+    note.textContent = done === MISSIONS.length ? "ぜんぶ達成！ また明日" : `1つ${MISSION_COINS}コイン・ぜんぶで+${MISSION_ALL_BONUS}`;
+    const top = document.createElement("div"); top.className = "osr-missions-head"; top.append(head, note);
+    const ul = document.createElement("ul");
+    for (const m of MISSIONS) {
+      const li = document.createElement("li");
+      li.dataset.done = missionDone.has(m.id) ? "1" : "0";
+      li.textContent = m.text;
+      ul.appendChild(li);
+    }
+    box.append(top, ul);
+  }
+  /** 結果画面に、このおさんぽで達成したミッションともらったコインを出す */
+  function renderMissionResult(): void {
+    const el = $("o-missions");
+    el.hidden = S.missionsNow.length === 0;
+    if (el.hidden) return;
+    const names = S.missionsNow.map((id) => MISSIONS.find((m) => m.id === id)?.text ?? "").filter(Boolean);
+    el.textContent = `ミッション達成：${names.join("／")}${S.missionCoins > 0 ? `（+${S.missionCoins.toLocaleString()}コイン）` : ""}`;
+  }
+
   /* ---------- 分かれ道 ---------- */
   /** 上の道（calm）は障害物をまばらに・拾うものを多く、下の道（risky）は障害物を詰める */
   function routeWeight(kind: string): number {
@@ -1225,6 +1297,7 @@ export function createOsanpoRun(root: HTMLElement, opts: OsanpoRunOptions): () =
       const kind: OsanpoRunRouteKind = P.ground ? "risky" : "calm";
       S.fork = null;
       S.route = { kind, t: OSANPO_RUN_ROUTE_SEC };
+      if (kind === "calm") S.routeCalm++; else S.routeRisky++;
       floatText(VW / 2, GROUND * 0.3, `${routeName(kind)}ルートへ！`, kind === "calm" ? "#9BE3A8" : "#FFB27A", 22);
       showNote(OSANPO_RUN_ROUTE_DESC[kind]);
       sfx.pass();
@@ -1473,7 +1546,7 @@ export function createOsanpoRun(root: HTMLElement, opts: OsanpoRunOptions): () =
     applyAudio(); bgmStop();
     Object.assign(P, { y: GROUND, vy: 0, ground: true, jumps: 2, sq: 1, rot: 0, inv: 0, dead: false, slide: false, slideHeld: false });
     obstacles = []; pickups = []; texts = []; flyers = []; parts = []; S.fork = null; S.route = null;
-    hidePanels(); buildStageList(); selectStage(STAGE_ID);
+    hidePanels(); buildStageList(); selectStage(STAGE_ID); renderMissions();
     $("start-panel").hidden = false;
     $("start").focus({ preventScroll: true });
   }
@@ -2372,7 +2445,8 @@ export function createOsanpoRun(root: HTMLElement, opts: OsanpoRunOptions): () =
     FX.fade = RM ? 0 : 1;
     Object.assign(S, {
       state: "intro", introT: 0, roundId: newRoundId(), slowT: 0, wx: null, wxT: rand(25, 40), knocks: 0, rares: 0, skillIds: new Set<string>(), tricks: newTrickRun(), bestD: bestDistOf(STAGE_ID), passedBest: false, recordShown: false, fwT: 2,
-      t: 0, speed: 0, dist: 0, bonus: 0, treats: 0, clock: STAGE.clock, stepT: 0, fork: null, route: null, forkT: rand(35, 50), next: 420, shield: false, chain: 0, chainT: 0, mult: 1, maxMult: 1,
+      t: 0, speed: 0, dist: 0, bonus: 0, treats: 0, clock: STAGE.clock, srPlus: 0, pigeonsRun: 0, slidesRun: 0, greetsRun: 0, routeCalm: 0, routeRisky: 0, bonusBest: 0, missionCoins: 0, missionsNow: [],
+      stepT: 0, fork: null, route: null, forkT: rand(35, 50), next: 420, shield: false, chain: 0, chainT: 0, mult: 1, maxMult: 1,
       paused: false, deadT: 0, milestone: 100, bufT: 0, haul: new Map<string, number>(), sec: "normal", secT: 18, rain: 0, rainTarget: 0, rainT: 0,
       bones: 0, newAch: [], newKinds: [], rainWalk: 0, rushes: 0, closes: 0, bonusGot: 0,
     });
@@ -2480,6 +2554,8 @@ export function createOsanpoRun(root: HTMLElement, opts: OsanpoRunOptions): () =
     store.set(`rec-${STAGE_ID}`, JSON.stringify(recs.slice(0, 5)));
     lastRecordAt = now;
     S.lastResult = { score: sc, m: meters, items: S.treats, rank: rank.label };
+    tickMissions();
+    renderMissionResult();
     sendResult(sc, meters);
     $("over-sub").textContent = `${STAGE.name} ・ ${STAGE.skinName} ・ ${fmtClock(S.clock)}帰宅`;
     if (isNew && sc > 0) sfx.record(); else sfx.home();
@@ -2604,7 +2680,8 @@ export function createOsanpoRun(root: HTMLElement, opts: OsanpoRunOptions): () =
       if (kindSet.size >= 50) unlock("kinds50");
       if (ITEMS.every((it) => kindSet.has(it.id))) unlock("kindsAll");
     }
-    if (S.sec === "bonus" && ++S.bonusGot >= 15) unlock("bonus15");
+    if (S.sec === "bonus") { if (++S.bonusGot >= 15) unlock("bonus15"); S.bonusBest = Math.max(S.bonusBest, S.bonusGot); }
+    if (rarityIndex(item.rarity) >= 2) S.srPlus++;
     if (item.rarity === "MR") unlock("mr");
     if (rarityIndex(item.rarity) >= 4 && ++S.rares >= 3) unlock("rare3");
     const R = RARITY_STYLES[got.rarity];
@@ -2675,6 +2752,7 @@ export function createOsanpoRun(root: HTMLElement, opts: OsanpoRunOptions): () =
       if (S.clock >= 1440 + 300) unlock("dawn");
       tickSkills(dt);
       tickFork(dt);
+      tickMissions();
       S.dist += S.speed * dt;
       S.clock += dt * 1.6;
       S.next -= S.speed * dt;
@@ -2832,7 +2910,7 @@ export function createOsanpoRun(root: HTMLElement, opts: OsanpoRunOptions): () =
           const v = addPts(30);
           floatText(P.x + 20, P.y - 70, `くんくん… ${buddyName(o)}にごあいさつ +${v}`, "#FFB3C7", 14);
           tone(660, 0.08, "sine", 0.05); tone(880, 0.1, "sine", 0.05, null, 0.08);
-          stats.greets++; saveStats();
+          stats.greets++; S.greetsRun++; saveStats();
           if (stats.greets >= 20) unlock("greet20");
         }
       } else if (P.inv <= 0 && touching) {
@@ -2875,13 +2953,13 @@ export function createOsanpoRun(root: HTMLElement, opts: OsanpoRunOptions): () =
         if (M.over > 0 && !o.passed && o.kind !== "puddle") { const v = addPts(M.over); floatText(P.x + 30, P.y - 84, `こえた +${v}`, "#FFE7A3", 13); }
         if ((o.kind === "noren" || o.low) && P.slide && P.ground) {
           const v = addPts(15); floatText(P.x + 20, P.y - 50, `スライディング！ +${v}`, "#9BE7FF", 14);
-          stats.slides++; saveStats();
+          stats.slides++; S.slidesRun++; saveStats();
           if (stats.slides >= 10) unlock("slide10");
         } else if (o.kind === "crow") {
           if (P.ground) { const v = addPts(5); floatText(P.x + 20, P.y - 56, `くぐった +${v}`, "#C9C3F0", 13); }
         } else if (o.kind === "pigeons") {
           o.flee = true; const v = addPts(10);
-          stats.pigeons++; saveStats();
+          stats.pigeons++; S.pigeonsRun++; saveStats();
           if (stats.pigeons >= 10) unlock("pigeon10");
           floatText(P.x + 20, P.y - 56, `バサバサッ +${v}`, "#C9D6E8", 13);
           tone(900, 0.05, "triangle", 0.03); tone(1100, 0.05, "triangle", 0.03, null, 0.05);
@@ -3234,6 +3312,7 @@ export function createOsanpoRun(root: HTMLElement, opts: OsanpoRunOptions): () =
   buildStageList();
   selectStage(STAGE_ID);
   renderStepBoost();
+  renderMissions();
   renderAchList();
   renderZukan();
   buildRarityGuide();
