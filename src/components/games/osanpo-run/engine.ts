@@ -133,6 +133,11 @@ const FALL_DRIFT = 0.3;
 const BONE_PTS = 5;
 /** 走る速さ（論理px/秒）。最初はゆっくりで、約3分かけて最高速になる */
 const START_SPEED = 200, MAX_SPEED = 520;
+/**
+ * 背景の流れる速さ。道の速さ（最高520）をそのまま使うと奥の建物まで速く流れて酔いやすいので、
+ * 上限 BG_SPEED_MAX を超えないようにしてから BG_SPEED_RATE を掛け、BG_EASE でゆっくり追いつかせる
+ */
+const BG_SPEED_MAX = 320, BG_SPEED_RATE = 0.75, BG_EASE = 1.5;
 
 type GameState = "ready" | "intro" | "play" | "dying" | "over";
 type Section = "normal" | "bonus" | "rush";
@@ -389,12 +394,12 @@ export function createOsanpoRun(root: HTMLElement, opts: OsanpoRunOptions): () =
     slide: false, slideT: 0, slideHeld: false, jumpAt: -1,
   };
   const S = {
-    state: "ready" as GameState, time: 0, t: 0, speed: 90, dist: 0, bonus: 0, treats: 0, clock: STAGE.clock, cam: 0, bgCam: 0,
+    state: "ready" as GameState, time: 0, t: 0, speed: 90, dist: 0, bonus: 0, treats: 0, clock: STAGE.clock, cam: 0, bgCam: 0, bgV: 0,
     srPlus: 0, pigeonsRun: 0, slidesRun: 0, greetsRun: 0, routeCalm: 0, routeRisky: 0, bonusBest: 0, missionCoins: 0, missionsNow: [] as string[],
     memo: null as null | { at: number; photo: number; passed: boolean }, memoT: 20,
     stepT: 0, fork: null as null | { at: number }, route: null as null | RouteState, forkT: 40,
     next: 400, shield: false, chain: 0, chainT: 0, mult: 1, maxMult: 1, paused: false, deadT: 0, introT: 0,
-    haul: new Map<string, number>(), happyT: 0, calm: store.get("calm") !== "0",
+    haul: new Map<string, number>(), happyT: 0, calm: store.get("calm") === "1",
     sec: "normal" as Section, secT: 18, rain: 0, rainTarget: 0, rainT: 0,
     bones: 0, newAch: [] as string[], newKinds: [] as string[], rainWalk: 0, rushes: 0, closes: 0, bonusGot: 0,
     best: 0, bestD: 0, passedBest: false, recordShown: false, milestone: 100, bufT: 0, fwT: 2,
@@ -1605,7 +1610,7 @@ export function createOsanpoRun(root: HTMLElement, opts: OsanpoRunOptions): () =
   /* ---------- 設定 ---------- */
   type OptKey = "calm" | "bgm" | "sfx" | "vib";
   const OPTS: readonly [OptKey, string, string][] = [
-    ["calm", "ゆったりモード", "背景を止めて、道と障害物だけが動きます。酔いやすい人向け。"],
+    ["calm", "ゆったりモード", "背景を止めて、道と障害物だけが動きます。背景の動きで酔いやすい人向け。"],
     ["bgm", "BGM", "ステージごとの音楽を流します。"],
     ["sfx", "効果音", "ジャンプやアイテム、雨の音。"],
     ["vib", "振動", "ぶつかったときに振動します（対応するスマホのみ）。"],
@@ -2709,7 +2714,10 @@ export function createOsanpoRun(root: HTMLElement, opts: OsanpoRunOptions): () =
     } else if (S.state === "over") S.speed = 0;
 
     S.cam += S.speed * dt;
-    if (!S.calm) S.bgCam += S.speed * dt;
+    // 背景は道より遅く、なめらかに流す（酔いにくいよう、速さに上限をつけて急な加速・停止をならす）
+    const bgTarget = S.calm ? 0 : Math.min(S.speed, BG_SPEED_MAX) * BG_SPEED_RATE;
+    S.bgV += (bgTarget - S.bgV) * Math.min(1, dt * BG_EASE);
+    S.bgCam += S.bgV * dt;
     fillLayer(bld, genMid, 200);
     fillLayer(near, genNear, 420);
     if (playing) BGM.bpm = 120 + clamp((S.speed - START_SPEED) / (MAX_SPEED - START_SPEED), 0, 1) * 24;
