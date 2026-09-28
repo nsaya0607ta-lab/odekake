@@ -66,6 +66,7 @@ import {
   ell, font, glow, hex, hslRgb, mix, rgb, rr, setCanvasFontFamily, shade, star, WHITE,
   type Ctx, type Pigeon, type RGB,
 } from "./draw";
+import { drawRouteGate, drawRouteScene as drawRouteSceneLayer, ROUTE_GATE_HALF, type RouteTheme } from "./route-scene";
 
 export type RunItem = {
   id: string;
@@ -201,10 +202,6 @@ function pickWeighted<T>(options: readonly (readonly [T, number])[]): T {
     if (r < 0) return v;
   }
   return options[0]![0];
-}
-/** 番号から決まる要素（描くたびに変わらない） */
-function pickOneStable<T>(list: readonly T[], i: number): T {
-  return list[Math.abs(i) % list.length]!;
 }
 function pickOne<T>(list: readonly T[]): T {
   return list[Math.floor(Math.random() * list.length)]!;
@@ -1411,215 +1408,32 @@ export function createOsanpoRun(root: HTMLElement, opts: OsanpoRunOptions): () =
     showNote(`分かれ道！ 跳んで通ると${routeName("calm")}、そのままだと${routeName("risky")}`, 3);
   }
   /* ---------- 分かれ道のあとの景色 ---------- */
-  /** 同じ場所にはいつも同じ小物が立つよう、位置の番号から決まる 0〜1 の値 */
-  const h01 = (i: number, salt: number) => { const v = Math.sin(i * 127.1 + salt * 311.7) * 43758.5453; return v - Math.floor(v); };
-  type RouteTheme = "park" | "river" | "kamakura" | "rocks" | "arcade" | "onsen" | "yatai";
   const ROUTE_THEMES: Record<OsanpoRunStageId, Record<OsanpoRunRouteKind, RouteTheme>> = {
     town: { calm: "park", risky: "arcade" },
-    hiking: { calm: "river", risky: "rocks" },
+    hiking: { calm: "stream", risky: "ridge" },
     snow: { calm: "kamakura", risky: "onsen" },
-    summer: { calm: "river", risky: "yatai" },
+    summer: { calm: "riverbank", risky: "yatai" },
   };
   /**
-   * 入口ゲートから出口ゲートまでのあいだだけ、塀と歩道を上書きしてその道らしい景色にする。
+   * 入口ゲートから出口ゲートまでのあいだだけ切り抜いて、その道の景色を描く（route-scene.ts）。
+   * 切れ目はゲートの柱の位置に合わせて、柱で隠す。
    * 位置は道（S.dist）と同じ速さで流れるので、ゆったりモードで背景が止まっていても動いて見える
    */
   function drawRouteScene(c: Ctx, e: Env): void {
     const r = S.route;
     if (!r) return;
     const gx = P.x + (r.gate - S.dist), ex = r.exit === null ? Infinity : P.x + (r.exit - S.dist);
-    const left = Math.max(-10, gx), right = Math.min(VW + 10, ex);
+    const seamL = gx - ROUTE_GATE_HALF, seamR = ex + ROUTE_GATE_HALF;
+    const left = Math.max(-10, seamL), right = Math.min(VW + 10, seamR);
     const theme = ROUTE_THEMES[STAGE_ID][r.kind];
     if (right > left) {
       c.save();
       c.beginPath(); c.rect(left, 0, right - left, GROUND + 19); c.clip();
-      const tone = (h: string, k = 0) => rgb(mix(hex(h), e.near, 0.1 + k + e.night * 0.45));
-      const sx = (w: number) => P.x + (w - S.dist);
-      /** 間隔 gap で並ぶ小物を、画面に入る分だけ順に呼ぶ（jitter で間隔を少しばらつかせる） */
-      const each = (gap: number, salt: number, fn: (x: number, i: number) => void, jitter = 0.35) => {
-        const i0 = Math.floor((S.dist - P.x - 160 - r.gate) / gap);
-        for (let i = Math.max(0, i0); ; i++) {
-          const x = sx(r.gate + 40 + i * gap + h01(i, salt) * gap * jitter);
-          if (x > VW + 160) break;
-          fn(x, i);
-        }
-      };
-      if (theme === "park" || theme === "kamakura") {
-        const snow = theme === "kamakura";
-        // 芝生（雪原）と植え込み
-        const lg = c.createLinearGradient(0, GROUND - 60, 0, GROUND - 6);
-        lg.addColorStop(0, tone(snow ? "#EEF4FF" : "#8CCB6E")); lg.addColorStop(1, tone(snow ? "#D6E2F5" : "#5FA24E", 0.05));
-        c.fillStyle = lg; c.fillRect(left, GROUND - 60, right - left, 54);
-        each(64, 1, (x, i) => { c.fillStyle = tone(snow ? "#FFFFFF" : "#4E8F43"); ell(c, x, GROUND - 58, 26 + h01(i, 2) * 10, 9); c.fill(); });
-        // 木（雪の積もった針葉樹 / 丸い木）
-        each(snow ? 120 : 110, 3, (x, i) => {
-          const hgt = 70 + h01(i, 4) * 40;
-          c.fillStyle = tone("#7A5236", 0.1); c.fillRect(x - 3, GROUND - 40 - hgt * 0.35, 6, hgt * 0.35);
-          if (snow) {
-            for (let k = 0; k < 3; k++) {
-              const y = GROUND - 40 - hgt * 0.3 - k * hgt * 0.22, wd = 30 - k * 7;
-              c.fillStyle = tone("#3F7A5A"); c.beginPath(); c.moveTo(x - wd, y); c.lineTo(x, y - hgt * 0.34); c.lineTo(x + wd, y); c.closePath(); c.fill();
-              c.fillStyle = tone("#FFFFFF"); c.beginPath(); c.moveTo(x - wd * 0.55, y - hgt * 0.15); c.lineTo(x, y - hgt * 0.34); c.lineTo(x + wd * 0.55, y - hgt * 0.15); c.closePath(); c.fill();
-            }
-          } else {
-            const cy = GROUND - 40 - hgt * 0.55, rad = 24 + h01(i, 5) * 10;
-            c.fillStyle = tone("#3E8A45"); ell(c, x, cy, rad, rad * 0.9); c.fill();
-            c.fillStyle = tone("#58A85A"); ell(c, x - rad * 0.3, cy - rad * 0.3, rad * 0.55, rad * 0.5); c.fill();
-            if (e.night < 0.5 && h01(i, 6) < 0.5) { c.fillStyle = tone(pickOneStable(["#F28FB1", "#FFD166", "#FFFFFF"], i)); for (let k = 0; k < 5; k++) { ell(c, x - 14 + h01(i * 7 + k, 7) * 28, cy - 8 + h01(i * 5 + k, 8) * 20, 2.2, 2.2); c.fill(); } }
-          }
-        });
-        if (snow) {
-          // かまくら（中に明かり）
-          each(170, 9, (x, i) => {
-            if (h01(i, 10) < 0.35) return;
-            c.fillStyle = tone("#FFFFFF"); c.beginPath(); c.ellipse(x + 40, GROUND - 6, 26, 26, 0, Math.PI, 0); c.fill();
-            c.fillStyle = tone("#C9D6EA"); c.beginPath(); c.ellipse(x + 40, GROUND - 6, 26, 26, 0, Math.PI * 1.02, Math.PI * 1.22); c.lineTo(x + 40, GROUND - 6); c.fill();
-            c.fillStyle = e.night > 0.2 ? "#FFB85C" : "#3A3550"; c.beginPath(); c.ellipse(x + 40, GROUND - 6, 9, 12, 0, Math.PI, 0); c.fill();
-            if (e.night > 0.2) glow(c, x + 40, GROUND - 12, 26, "255,180,90", 0.5 * e.night);
-          });
-        } else {
-          // ベンチと公園の街灯
-          each(210, 11, (x, i) => {
-            if (h01(i, 12) < 0.5) {
-              c.fillStyle = tone("#A0703F"); c.fillRect(x, GROUND - 26, 40, 4); c.fillRect(x, GROUND - 36, 40, 3);
-              c.fillStyle = tone("#3A3550"); c.fillRect(x + 4, GROUND - 22, 3, 16); c.fillRect(x + 33, GROUND - 22, 3, 16);
-            } else {
-              c.fillStyle = tone("#2F3A48"); c.fillRect(x + 18, GROUND - 92, 3, 86);
-              c.fillStyle = e.night > 0.2 ? `rgba(255,236,190,${0.5 + 0.5 * e.night})` : tone("#E8EEF5"); ell(c, x + 19.5, GROUND - 96, 7, 7); c.fill();
-              if (e.night > 0.2) glow(c, x + 19.5, GROUND - 96, 40, "255,236,190", 0.45 * e.night);
-            }
-          });
-        }
-        // 土の小道（雪道）
-        c.fillStyle = tone(snow ? "#E6EEF9" : "#D9BF8C"); c.fillRect(left, GROUND - 6, right - left, 25);
-        c.fillStyle = tone(snow ? "#C7D5EA" : "#B89A66");
-        each(23, 13, (x, i) => { ell(c, x, GROUND + 2 + h01(i, 14) * 12, 2 + h01(i, 15) * 2, 1.4); c.fill(); });
-        c.fillStyle = tone(snow ? "#FFFFFF" : "#6FAF55"); c.fillRect(left, GROUND - 7, right - left, 3);
-      } else if (theme === "river") {
-        const reeds = STAGE_ID === "summer";
-        // 土手と川。川面のきらめきは道と同じ速さで流す
-        c.fillStyle = tone(reeds ? "#8DB86A" : "#6E9A5A"); c.fillRect(left, GROUND - 64, right - left, 14);
-        const wg = c.createLinearGradient(0, GROUND - 50, 0, GROUND - 6);
-        wg.addColorStop(0, tone("#6FB7E0")); wg.addColorStop(1, tone("#3F86B8", 0.05));
-        c.fillStyle = wg; c.fillRect(left, GROUND - 50, right - left, 44);
-        c.fillStyle = `rgba(255,255,255,${0.35 + 0.25 * (1 - e.night)})`;
-        each(37, 16, (x, i) => { c.fillRect(x, GROUND - 44 + h01(i, 17) * 32, 10 + h01(i, 18) * 12, 1.6); });
-        each(90, 19, (x, i) => {
-          if (reeds) {
-            c.strokeStyle = tone("#5E8F3E"); c.lineWidth = 2;
-            for (let k = 0; k < 5; k++) { const bx = x + k * 5; c.beginPath(); c.moveTo(bx, GROUND - 52); c.quadraticCurveTo(bx + 4, GROUND - 80, bx + 8 - k, GROUND - 96 + h01(i + k, 20) * 16); c.stroke(); }
-            c.fillStyle = tone("#8A6A4A"); for (let k = 0; k < 3; k++) { ell(c, x + 4 + k * 8, GROUND - 92 + h01(i + k, 21) * 14, 2, 6); c.fill(); }
-          } else {
-            c.fillStyle = tone("#8C939E"); ell(c, x, GROUND - 14, 16 + h01(i, 22) * 10, 8); c.fill();
-            c.fillStyle = tone("#A9B0BA"); ell(c, x - 4, GROUND - 17, 8, 4); c.fill();
-            c.fillStyle = tone("#4F8A4A"); for (let k = 0; k < 4; k++) { c.beginPath(); c.ellipse(x + 20 + k * 6, GROUND - 58, 3, 14, -0.5 + k * 0.35, 0, Math.PI * 2); c.fill(); }
-          }
-        });
-        c.fillStyle = tone("#CDBB98"); c.fillRect(left, GROUND - 6, right - left, 25);
-        c.fillStyle = tone("#A89878"); each(17, 23, (x, i) => { ell(c, x, GROUND + 1 + h01(i, 24) * 14, 3 + h01(i, 25) * 3, 2); c.fill(); });
-      } else if (theme === "rocks") {
-        // 岩場の尾根。ギザギザの岩と、風で傾いた低い木
-        c.fillStyle = tone("#7D838E");
-        c.beginPath(); c.moveTo(left, GROUND - 6);
-        each(26, 26, (x, i) => { c.lineTo(x, GROUND - 40 - h01(i, 27) * 50); });
-        c.lineTo(right + 20, GROUND - 6); c.closePath(); c.fill();
-        c.strokeStyle = tone("#5E646E"); c.lineWidth = 1.5;
-        each(26, 26, (x, i) => { c.beginPath(); c.moveTo(x, GROUND - 40 - h01(i, 27) * 50); c.lineTo(x + 6, GROUND - 10); c.stroke(); });
-        each(150, 28, (x, i) => {
-          if (h01(i, 29) < 0.4) return;
-          c.fillStyle = tone("#6B4F37"); c.save(); c.translate(x, GROUND - 50); c.rotate(0.35); c.fillRect(-2, -34, 4, 36); c.restore();
-          c.fillStyle = tone("#4C7A4A"); ell(c, x + 16, GROUND - 84, 22, 8, 0.25); c.fill();
-        });
-        c.fillStyle = tone("#6A6E76"); c.fillRect(left, GROUND - 6, right - left, 25);
-        c.strokeStyle = tone("#4F535A"); c.lineWidth = 1;
-        each(31, 30, (x, i) => { c.beginPath(); c.moveTo(x, GROUND - 6); c.lineTo(x + 8 * (h01(i, 31) - 0.5), GROUND + 8); c.lineTo(x + 5, GROUND + 19); c.stroke(); });
-      } else {
-        // 商店街・温泉街・屋台通り：店先がずらりと並ぶ
-        const onsen = theme === "onsen", yatai = theme === "yatai";
-        const signs = onsen ? ["ゆ", "おみやげ", "まんじゅう", "足湯", "旅館", "射的", "茶屋"]
-          : yatai ? ["やきそば", "たこ焼き", "かき氷", "わたあめ", "お面", "射的", "りんご飴"]
-          : ["パン", "花", "本", "八百屋", "喫茶", "精肉", "くすり", "和菓子", "魚"];
-        const walls = onsen ? ["#6B4A32", "#5A3E2B", "#7A5A3C"] : yatai ? ["#F3E3C3", "#F1D7A8"] : ["#F4E7D3", "#E8D7C3", "#DCE6EE", "#F2DDD5", "#E3E9D6"];
-        const awns = onsen ? ["#3F4F7A", "#7A2E2E", "#2E5A4A"] : [["#D63A3A", "#FFFFFF"], ["#2F6FD0", "#FFFFFF"], ["#2E9A6A", "#FFFFFF"], ["#E88A1A", "#FFF3D6"]].map((a) => a[0]!);
-        const top = GROUND - 118;
-        // 2階部分（後ろの建物が透けないよう、店の上もふさぐ）
-        const upper = theme === "arcade" ? GROUND - 150 : top - 26;
-        c.fillStyle = tone(onsen ? "#4A3424" : yatai ? "#3A2E4A" : "#CBB8A2", 0.08); c.fillRect(left, upper, right - left, top - upper);
-        if (!yatai) each(44, 38, (x) => { c.fillStyle = e.night > 0.2 ? `rgba(255,220,160,${0.35 + 0.4 * e.night})` : tone(onsen ? "#E8D8B8" : "#9FB6C8"); c.fillRect(x + 12, upper + 8, 18, Math.max(6, top - upper - 16)); }, 0);
-        each(88, 32, (x, i) => {
-          const w = 88;
-          c.fillStyle = tone(walls[i % walls.length]!); c.fillRect(x, top, w, GROUND - 6 - top);
-          c.fillStyle = tone(onsen ? "#3A2718" : "#8A7A6A", 0.05); c.fillRect(x + w - 2, top, 2, GROUND - 6 - top);
-          // 看板
-          const sign = signs[Math.floor(h01(i, 33) * signs.length)]!;
-          c.fillStyle = tone(onsen ? "#F3E6CC" : "#FFFFFF"); rr(c, x + 10, top + 8, w - 20, 16, 3); c.fill();
-          c.fillStyle = onsen ? "#5A2A1A" : "#3A2A1C"; c.font = font(9); c.textAlign = "center"; c.textBaseline = "middle"; c.fillText(sign, x + w / 2, top + 16.5, w - 26);
-          // ショーウィンドウ・入口
-          const lit = e.night > 0.2;
-          c.fillStyle = lit ? `rgba(255,226,160,${0.55 + 0.4 * e.night})` : tone("#BFD7E6"); c.fillRect(x + 8, top + 50, w - 16, 44);
-          if (lit) glow(c, x + w / 2, top + 72, 50, "255,210,140", 0.35 * e.night);
-          c.fillStyle = tone("#6A5A4A", 0.1); c.fillRect(x + w / 2 - 1, top + 50, 2, 44);
-          // 日よけ（のれん）
-          const aw = awns[Math.floor(h01(i, 34) * awns.length)]!;
-          if (onsen) {
-            c.fillStyle = tone(aw);
-            for (let k = 0; k < 3; k++) c.fillRect(x + 12 + k * ((w - 24) / 3), top + 36, (w - 24) / 3 - 2, 26);
-            c.fillStyle = "#FFFFFF"; c.font = font(10); c.fillText("♨", x + w / 2, top + 49);
-          } else {
-            for (let k = 0; k < 6; k++) { c.fillStyle = k % 2 ? tone("#FFFFFF") : tone(aw); c.fillRect(x + 4 + k * ((w - 8) / 6), top + 32, (w - 8) / 6, 14); }
-            c.fillStyle = tone(aw);
-            for (let k = 0; k < 6; k++) { c.beginPath(); c.arc(x + 4 + (k + 0.5) * ((w - 8) / 6), top + 46, (w - 8) / 12, 0, Math.PI); c.fill(); }
-          }
-          if (onsen && h01(i, 35) < 0.6) {
-            // 湯けむり
-            c.fillStyle = `rgba(255,255,255,${0.35 + 0.2 * Math.sin(S.time * 2 + i)})`;
-            for (let k = 0; k < 3; k++) { ell(c, x + 20 + k * 18, top - 8 - ((S.time * 18 + k * 12 + i * 7) % 36), 8, 6); c.fill(); }
-          }
-        }, 0);
-        if (theme === "arcade") {
-          // アーケードの屋根と柱
-          const ry = GROUND - 150;
-          c.fillStyle = `rgba(210,225,240,${0.55 - e.night * 0.2})`; c.fillRect(left, ry, right - left, 14);
-          c.fillStyle = tone("#6A7A8C"); c.fillRect(left, ry + 14, right - left, 4);
-          each(120, 36, (x) => { c.fillStyle = tone("#6A7A8C"); c.fillRect(x, ry + 18, 5, GROUND - 6 - ry - 18); c.beginPath(); c.moveTo(x - 20, ry); c.quadraticCurveTo(x + 2, ry - 16, x + 24, ry); c.lineWidth = 2; c.strokeStyle = tone("#6A7A8C"); c.stroke(); });
-        } else {
-          // 提灯の列
-          const ly = top - 10;
-          c.strokeStyle = tone("#3A3550"); c.lineWidth = 1; c.beginPath(); c.moveTo(left, ly); c.lineTo(right, ly); c.stroke();
-          each(44, 37, (x, i) => {
-            if (e.night > 0.2) glow(c, x, ly + 9, 16, yatai && i % 2 ? "255,90,60" : "255,220,160", 0.4 * e.night);
-            c.fillStyle = yatai && i % 2 ? "#E23B3B" : "#F6E7C8"; ell(c, x, ly + 9, 5, 7); c.fill();
-          });
-        }
-        // 石畳・タイルの道
-        const tw = 18, t0 = -((S.dist - r.gate) % (tw * 2));
-        for (let x = left + t0 - tw * 2; x < right; x += tw) {
-          const k = Math.round((x - left - t0) / tw);
-          c.fillStyle = tone(onsen ? (k % 2 ? "#8C8680" : "#9E978F") : k % 2 ? "#C98A6A" : "#E8D2B8"); c.fillRect(x, GROUND - 6, tw, 12);
-          c.fillStyle = tone(onsen ? (k % 2 ? "#9E978F" : "#8C8680") : k % 2 ? "#E8D2B8" : "#C98A6A"); c.fillRect(x, GROUND + 6, tw, 13);
-        }
-      }
+      drawRouteSceneLayer({ c, e, g: GROUND, t: S.time, base: gx, left, right, still: S.calm, calm: RM, seamL: seamL > -10, seamR: seamR < VW + 10 }, theme);
       c.restore();
     }
-    drawRouteGate(c, e, gx, r.kind, false);
-    if (Number.isFinite(ex)) drawRouteGate(c, e, ex, r.kind, true);
-  }
-  /** 入口・出口のゲート。柱2本と梁、真ん中に道の名前 */
-  function drawRouteGate(c: Ctx, e: Env, x: number, kind: OsanpoRunRouteKind, exit: boolean): void {
-    if (x < -80 || x > VW + 80) return;
-    const calm = kind === "calm";
-    const post = rgb(mix(hex(calm ? "#8A6A4A" : "#B23A3A"), e.near, 0.1 + e.night * 0.35));
-    const top = GROUND - 132;
-    c.fillStyle = post;
-    c.fillRect(x - 34, top, 7, GROUND + 4 - top); c.fillRect(x + 27, top, 7, GROUND + 4 - top);
-    c.fillRect(x - 42, top - 4, 84, 8);
-    const label = exit ? "もとの道 →" : routeName(kind);
-    c.font = font(10); c.textAlign = "center"; c.textBaseline = "middle";
-    const w = Math.max(56, c.measureText(label).width + 18);
-    if (e.night > 0.2) glow(c, x, top - 16, w, "255,226,170", 0.35 * e.night);
-    c.fillStyle = calm ? "#F3E6CC" : "#FFD166"; rr(c, x - w / 2, top - 28, w, 22, 4); c.fill();
-    c.strokeStyle = post; c.lineWidth = 2; rr(c, x - w / 2, top - 28, w, 22, 4); c.stroke();
-    c.fillStyle = calm ? "#3A5A2A" : "#5A1A1A"; c.fillText(label, x, top - 16.5);
+    if (gx > -80 && gx < VW + 80) drawRouteGate(c, e, GROUND, gx, theme, routeName(r.kind), S.time);
+    if (Number.isFinite(ex) && ex > -80 && ex < VW + 80) drawRouteGate(c, e, GROUND, ex, theme, "もとの道 →", S.time);
   }
   function drawFork(c: Ctx, e: Env): void {
     if (!S.fork) return;
