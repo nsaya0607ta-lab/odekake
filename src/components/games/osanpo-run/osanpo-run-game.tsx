@@ -8,6 +8,7 @@ import type { OsanpoRunStageId } from "@/lib/games/osanpo-run/config";
 import type { OsanpoRunMemoryPhoto } from "@/lib/data/osanpo-run";
 import type { OsanpoRunMission } from "@/lib/games/osanpo-run/missions";
 import { createOsanpoRun, type OsanpoRunResult, type RunItem } from "./engine";
+import { OsanpoRunCoop } from "./osanpo-run-coop";
 import { OSANPO_RUN_RANKING_REFRESH_EVENT, OsanpoRunRanking } from "./osanpo-run-ranking";
 
 const displayFont = Dela_Gothic_One({ weight: "400", subsets: ["latin"], display: "swap", preload: false, variable: "--font-osr-display" });
@@ -237,6 +238,11 @@ export function OsanpoRunGame({ items, usesSampleItems, unlockedStages, seriesTa
             <div className="osr-panel" data-osr="settings-panel" hidden>
               <h2>設定</h2>
               <div className="osr-set-list" data-osr="set-list" />
+              <section className="osr-nbr" aria-label="ご近所さん">
+                <h3>ご近所さんの名前</h3>
+                <p>道で会うフレブルに名前をつけられます。あいさつするほど、なかよしになります。</p>
+                <ul className="osr-nbr-list" data-osr="nb-list" />
+              </section>
               <button className="osr-btn" data-osr="set-close" type="button">とじる</button>
             </div>
           </div>
@@ -258,6 +264,8 @@ export function OsanpoRunGame({ items, usesSampleItems, unlockedStages, seriesTa
                       <li className="osr-ctl"><span><kbd>分かれ道</kbd></span><div><b>分かれ道</b><small>ときどき道しるべが出る。跳んで通ると上の道（公園など：障害物が少なく、ほねとアイテムが多い）、そのまま通ると下の道（商店街など：障害物が多いけど、SR以上が出やすい）。20秒で合流。</small></div></li>
                       <li className="osr-ctl"><span><kbd>歩数</kbd></span><div><b>歩数ブースト</b><small>アプリに同期した今日の歩数で、スタート時に効果が付く。3000歩〜 最初の10秒スコア×1.2、6000歩〜 バリア、10000歩〜 ボーナスタイムからスタート。</small></div></li>
                       <li className="osr-ctl"><span><kbd>お題</kbd></span><div><b>今日のミッション</b><small>毎日3つのお題。1つ達成で30コイン、3つそろうとさらに100コイン。</small></div></li>
+                      <li className="osr-ctl"><span><kbd>くんくん</kbd></span><div><b>においかぎ</b><small>地面に「くんくん」マークが出たら、スライディングで通ると掘り出せる。ほね・アイテム・ときどきハズレ（古いくつした）。</small></div></li>
+                      <li className="osr-ctl"><span><kbd>協力</kbd></span><div><b>協力チャレンジ</b><small>自分とフレンドの今週の合計距離で目標を目指す。達成したら「フレンド」画面で全員100コイン受け取れる。</small></div></li>
                       <li className="osr-ctl"><span><kbd>写真</kbd></span><div><b>思い出の看板</b><small>おでかけ記録に登録した写真が、道ばたの看板になって出てくる（縦長の写真は縦向き、横長の写真は横向きの看板）。前を通ると+20。</small></div></li>
                       <li className="osr-ctl"><span><kbd>II</kbd></span><div><b>一時停止</b><small>右上のボタン（キーボードはP）。「最初から」「道を選ぶ」「設定」もここから。</small></div></li>
                     </ul>
@@ -270,7 +278,7 @@ export function OsanpoRunGame({ items, usesSampleItems, unlockedStages, seriesTa
                     <h3>よけるもの</h3>
                     <ul>
                       <li className="osr-note-li"><small>道ごとに見た目が変わります（例：山道では岩・倒木・道標、雪国では雪だるま・ソリ・つらら）。</small></li>
-                      <li><canvas data-icon="cone" /><div><b>コーン・水たまり</b><small>ちょんと跳べば越えられる。</small></div></li>
+                      <li><canvas data-icon="cone" /><div><b>コーン・水たまり</b><small>ちょんと跳べば越えられる。水たまりは、空中から下スワイプの急降下で踏むと「バシャーン！」で+30（歩いて入るとアウト）。</small></div></li>
                       <li><canvas data-icon="bike" /><div><b>ママチャリ</b><small>横に長いので、しっかり長押しで。</small></div></li>
                       <li><canvas data-icon="crow" /><div><b>カラス</b><small>跳ぶとぶつかる。走ったまま下をくぐると+5。</small></div></li>
                       <li><canvas data-icon="cat" /><div><b>ねこ</b><small>こっちに歩いてくるので、いつもより早めに跳ぶ。</small></div></li>
@@ -283,7 +291,7 @@ export function OsanpoRunGame({ items, usesSampleItems, unlockedStages, seriesTa
                       <li><canvas data-icon="suitcase" /><div><b>大脱走スーツケース</b><small>22秒から登場。荷物が跳ねながら転がってくる！ 低いときは跳び越え、高く浮いたら下を通る。接触せずに回避で+20、下を通ればさらに+15。</small></div></li>
                       <li><canvas data-icon="surprise" /><div><b>びっくり宅配便</b><small>36秒から登場。箱がガタガタ揺れたあと、バネのカエルがびよーん！ 少しすると箱に戻る。2段ジャンプで高く越える。接触せずに回避で+30。</small></div></li>
                       <li><canvas data-icon="drone" /><div><b>せっかち配達ドローン</b><small>48秒から登場。黄色の警告ランプのあと、荷物ごと降下してくる。下スワイプでスライディング！ 接触せずに回避で+25、滑ってくぐるとさらに+15。</small></div></li>
-                      <li><canvas data-icon="buddy" /><div><b>ほかのフレブル</b><small>図鑑のフレブル（いつもの・登山・雪国・夏）がお散歩している。ぶつかってもだいじょうぶ。くんくんごあいさつで+30（少しだけ立ち止まる）。</small></div></li>
+                      <li><canvas data-icon="buddy" /><div><b>ほかのフレブル</b><small>図鑑のフレブル（いつもの・登山・雪国・夏）がお散歩している。ぶつかってもだいじょうぶ。くんくんごあいさつで+30〜60（少しだけ立ち止まる）。4匹には設定で名前をつけられて、あいさつするほどなかよしに（5回・15回・30回）。なかよしになると、ほねやおみやげのアイテムをくれる。</small></div></li>
                     </ul>
                   </section>
                 </div>
@@ -313,6 +321,7 @@ export function OsanpoRunGame({ items, usesSampleItems, unlockedStages, seriesTa
             <section className="osr-sheet" data-osr="sheet-friends" hidden aria-label="フレンド">
               <header className="osr-sheet-head"><button type="button" className="osr-sheet-back" data-close-sheet>‹ もどる</button><h2>フレンド</h2></header>
               <div className="osr-sheet-body">
+                <OsanpoRunCoop />
                 <OsanpoRunRanking />
               </div>
             </section>

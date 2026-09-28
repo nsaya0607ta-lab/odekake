@@ -117,6 +117,50 @@ export const OSANPO_RUN_ROUTE_DESC: Record<OsanpoRunRouteKind, string> = {
 /** 看板の前を通ったときのおまけ点 */
 export const MEMORY_SIGN_PTS = 20;
 
+/** 水たまりスタンプ：空中から急降下して水たまりに着地すると、水たまりが消えて点がもらえる */
+export const PUDDLE_STOMP_PTS = 30;
+
+/** においかぎ：くんくんマークの上をスライディングで通ると掘り出す。中身の重み */
+export const SNIFF_REWARDS = [
+  { kind: "bones", weight: 5 },
+  { kind: "item", weight: 3.5 },
+  { kind: "sock", weight: 1.5 },
+] as const;
+export type SniffRewardKind = (typeof SNIFF_REWARDS)[number]["kind"];
+
+/**
+ * ご近所さん：道で会うほかのフレブル4匹。名前は設定でつけられる（空なら defaultName）。
+ * あいさつの回数でなかよし度が上がり、会ったときの反応とおまけが変わる。
+ */
+export const OSANPO_RUN_NEIGHBOR_DEFAULT_NAMES: Record<DogSkinId, string> = {
+  default: "まる",
+  hiking: "こてつ",
+  snow: "ゆき",
+  summer: "なつ",
+};
+export const NEIGHBOR_NAME_MAX = 8;
+export const NEIGHBOR_LEVELS = [
+  { greets: 0, name: "はじめまして", pts: 30, gift: "none" },
+  { greets: 5, name: "顔見知り", pts: 40, gift: "none" },
+  { greets: 15, name: "なかよし", pts: 50, gift: "bones" },
+  { greets: 30, name: "親友", pts: 60, gift: "item" },
+] as const;
+export function neighborLevel(greets: number): number {
+  let lv = 0;
+  NEIGHBOR_LEVELS.forEach((l, i) => { if (greets >= l.greets) lv = i; });
+  return lv;
+}
+
+/**
+ * 協力チャレンジ：自分とフレンドの今週の合計距離（m）で目標を目指す。
+ * 目標は 1人あたり COOP_METERS_PER_MEMBER × 人数（COOP_GOAL_MIN〜COOP_GOAL_MAX）。達成で全員 COOP_COINS。
+ * 同じ値を DB の get_osanpo_run_coop / claim_osanpo_run_coop でも使う。
+ */
+export const COOP_METERS_PER_MEMBER = 2000;
+export const COOP_GOAL_MIN = 2000;
+export const COOP_GOAL_MAX = 20000;
+export const COOP_COINS = 100;
+
 export type RarityStyle = {
   /** 1個あたりの点数（コンボ倍率がさらに掛かる） */
   points: number;
@@ -222,6 +266,8 @@ export const OSANPO_RUN_HINTS = {
   suitcase: "荷物がバウンド！ 低いときは跳び越え、高いときは下を通ろう",
   surprise: "箱がガタガタしたら飛び出す合図。2段ジャンプで高く越えよう！",
   drone: "ランプが点滅したら降下！ 下スワイプで荷物の下をくぐろう",
+  stomp: "水たまりは、空中から下スワイプの急降下で踏むと バシャーン！",
+  sniff: "くんくんマーク！ スライディングで通ると何か掘り出せる",
 } as const;
 export type OsanpoRunHintId = keyof typeof OSANPO_RUN_HINTS;
 
