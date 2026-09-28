@@ -67,6 +67,7 @@ import {
   type Ctx, type Pigeon, type RGB,
 } from "./draw";
 import { drawRouteGate, drawRouteScene as drawRouteSceneLayer, ROUTE_GATE_HALF, type RouteTheme } from "./route-scene";
+import { drawSkyLife, drawStageGround, drawStageMid, drawStageNear, type MidItem, type NearItem, type StageView } from "./stage-scene";
 
 export type RunItem = {
   id: string;
@@ -176,15 +177,6 @@ type FloatText = { x: number; y: number; text: string; color: string; size: numb
 type Flyer = { item: RunItem; x0: number; y0: number; t: number };
 type Env = { m: number; top: RGB; bot: RGB; far: RGB; mid: RGB; near: RGB; night: number; side: RGB; road: RGB };
 
-type MidItem = {
-  x: number; w: number; h: number; gap: number; tone: number;
-  type: "building" | "house" | "pine" | "round" | "torii" | "stall";
-  cols: number; rows: number; lit: boolean[]; roof: "flat" | "tank" | "antenna" | "gable"; blink: number;
-  label: string; colors: [string, string];
-  /** マンションのベランダの手すり */
-  balcony: boolean;
-};
-type NearItem = { x: number; w: number; gap: number; lamp: boolean; vend: boolean; tr: boolean };
 type Layer<T> = { f: number; items: T[]; nx: number };
 
 type Stats = { pigeons: number; slides: number; plays: number; meters: number; items: number; kinds: string[]; counts: Record<string, number>; rollers: number; drops: number; greets: number; geysers: number; tricks: TrickStats };
@@ -852,232 +844,18 @@ export function createOsanpoRun(root: HTMLElement, opts: OsanpoRunOptions): () =
     g.addColorStop(0, rgb(e.bot, 0)); g.addColorStop(1, rgb(e.bot, a * (1 - e.night * 0.5)));
     c.fillStyle = g; c.fillRect(0, from, VW, to - from);
   }
-  function drawBuildings(c: Ctx, e: Env): void {
-    const off = S.bgCam * bld.f, base = GROUND - 6, snowy = STAGE_ID === "snow";
-    for (const b of bld.items) {
-      const x = b.x - off;
-      if (x > VW + 10 || x + b.w < -10) continue;
-      const top = base - b.h, col = shade(e.mid, b.tone), sun = sunLight(e);
-      c.fillStyle = rgb(col);
-      if (b.type === "house") {
-        c.fillRect(x + 3, top, b.w - 6, b.h);
-        c.fillStyle = rgb(shade(col, -0.12)); c.fillRect(x + b.w - 3 - (b.w - 6) * 0.22, top, (b.w - 6) * 0.22, b.h);
-        c.fillStyle = rgb(shade(col, -0.25)); c.fillRect(x + 3, top + 3, b.w - 6, 3);
-        c.fillStyle = rgb(shade(col, -0.3)); rr(c, x + b.w * 0.62, base - 17, 9, 17, 1.5); c.fill();
-        c.fillStyle = rgb(col);
-        c.fillStyle = rgb(shade(col, -0.18));
-        c.beginPath(); c.moveTo(x - 4, top + 3); c.lineTo(x + b.w / 2, top - b.w * 0.3); c.lineTo(x + b.w + 4, top + 3); c.closePath(); c.fill();
-        if (snowy) {
-          c.fillStyle = rgb(mix([246, 249, 255], e.mid, e.night * 0.45));
-          c.beginPath(); c.moveTo(x - 5, top + 1); c.lineTo(x + b.w / 2, top - b.w * 0.3 - 3); c.lineTo(x + b.w + 5, top + 1); c.lineTo(x + b.w + 3, top + 4); c.lineTo(x + b.w / 2, top - b.w * 0.3 + 3); c.lineTo(x - 3, top + 4); c.closePath(); c.fill();
-        }
-      } else {
-        c.fillRect(x, top, b.w, b.h);
-        c.fillStyle = rgb(shade(col, -0.12)); c.fillRect(x + b.w * 0.8, top, b.w * 0.2, b.h);
-        c.fillStyle = rgb(shade(col, -0.15)); c.fillRect(x - 1, top - 3, b.w + 2, 3);
-        c.fillStyle = `rgba(${sun.rgb},${0.15 + 0.35 * sun.warm * sun.day})`; c.fillRect(x - 1, top - 3, b.w * 0.8 + 1, 1.2);
-        c.fillStyle = rgb(shade(col, -0.15));
-        if (snowy) { c.fillStyle = rgb(mix([246, 249, 255], e.mid, e.night * 0.45)); rr(c, x - 2, top - 7, b.w + 4, 6, 3); c.fill(); c.fillStyle = rgb(shade(col, -0.15)); }
-        if (b.roof === "tank") { c.fillRect(x + b.w * 0.58, top - 16, 16, 10); c.fillRect(x + b.w * 0.58 + 2, top - 6, 2, 6); c.fillRect(x + b.w * 0.58 + 12, top - 6, 2, 6); }
-        if (b.roof === "antenna") { c.fillRect(x + b.w * 0.3, top - 22, 1.6, 22); c.fillRect(x + b.w * 0.3 - 6, top - 18, 13, 1.4); c.fillRect(x + b.w * 0.3 - 4, top - 13, 9, 1.4); }
-        if (b.h > 130 && e.night > 0.3 && Math.sin(S.time * 3 + b.blink) > 0.2) { c.fillStyle = `rgba(255,70,70,${e.night})`; c.beginPath(); c.arc(x + b.w / 2, top - 4, 1.8, 0, Math.PI * 2); c.fill(); }
-      }
-      const ww = 7, wh = 9, gx = 13, gyy = 17;
-      const sx0 = x + (b.w - (b.cols * gx - (gx - ww))) / 2, sy0 = b.type === "house" ? top + b.h * 0.3 : top + 8;
-      const dayWin = rgb(shade(col, 0.14), 0.7);
-      const frame = rgb(shade(col, -0.22), 0.7);
-      for (let r = 0; r < b.rows; r++) {
-        for (let i = 0; i < b.cols; i++) {
-          const k = r * b.cols + i, lit = b.lit[k] && e.night > 0.05, wx = sx0 + i * gx, wy = sy0 + r * gyy;
-          c.fillStyle = frame; c.fillRect(wx - 1, wy - 1, ww + 2, wh + 2);
-          c.fillStyle = lit ? (k % 3 ? `rgba(255,214,130,${0.25 + 0.7 * e.night})` : `rgba(255,236,196,${0.25 + 0.7 * e.night})`) : dayWin;
-          c.fillRect(wx, wy, ww, wh);
-          if (!lit) { c.fillStyle = `rgba(255,255,255,${0.12 * (1 - e.night)})`; c.fillRect(wx, wy, ww * 0.45, wh); }
-        }
-        if (b.balcony) {
-          const ry = sy0 + r * gyy + wh + 2;
-          c.fillStyle = rgb(shade(col, -0.2)); c.fillRect(x + 2, ry, b.w - 4, 3);
-          c.fillStyle = rgb(shade(col, 0.1), 0.6); c.fillRect(x + 2, ry, b.w - 4, 0.8);
-        }
-      }
-    }
+  /** 中景・近景・足もとは stage-scene.ts で描く */
+  function stageView(c: Ctx, e: Env): StageView {
+    return { c, e, stage: STAGE_ID, g: GROUND, vw: VW, vh: VH, t: S.time, calm: RM, sun: sunLight(e) };
   }
   function drawMid(c: Ctx, e: Env): void {
-    if (STAGE_ID === "town" || STAGE_ID === "snow") { drawBuildings(c, e); return; }
-    const off = S.bgCam * bld.f, base = GROUND - 6;
-    for (const b of bld.items) {
-      const x = b.x - off;
-      if (x > VW + 20 || x + b.w < -20) continue;
-      const col = shade(e.mid, b.tone);
-      if (b.type === "pine") {
-        c.fillStyle = rgb(shade(col, -0.2)); c.fillRect(x + b.w / 2 - 2, base - 14, 4, 14);
-        for (let k = 0; k < 3; k++) {
-          const ty = base - 10 - k * b.h * 0.28, tw = b.w * (1 - k * 0.22), tip = ty - b.h * 0.45, cx = x + b.w / 2;
-          c.fillStyle = rgb(col);
-          c.beginPath(); c.moveTo(cx - tw / 2, ty); c.lineTo(cx, tip); c.lineTo(cx + tw / 2, ty); c.closePath(); c.fill();
-          c.fillStyle = rgb(shade(col, -0.16));
-          c.beginPath(); c.moveTo(cx, tip); c.lineTo(cx + tw / 2, ty); c.lineTo(cx + tw * 0.08, ty); c.closePath(); c.fill();
-        }
-      } else if (b.type === "round") {
-        c.fillStyle = rgb(shade(col, -0.2)); c.fillRect(x + b.w / 2 - 2.5, base - 20, 5, 20);
-        c.fillStyle = rgb(shade(col, -0.08)); c.beginPath();
-        c.arc(x + b.w / 2, base - b.h * 0.6, b.w * 0.5, 0, Math.PI * 2); c.arc(x + b.w * 0.3, base - b.h * 0.45, b.w * 0.32, 0, Math.PI * 2); c.arc(x + b.w * 0.72, base - b.h * 0.42, b.w * 0.3, 0, Math.PI * 2);
-        c.fill();
-        c.fillStyle = rgb(shade(col, 0.1)); c.beginPath();
-        c.arc(x + b.w * 0.44, base - b.h * 0.66, b.w * 0.34, 0, Math.PI * 2); c.arc(x + b.w * 0.26, base - b.h * 0.5, b.w * 0.2, 0, Math.PI * 2);
-        c.fill();
-      } else if (b.type === "torii") {
-        const red = mix(hex("#D63A2E"), e.mid, 0.25 + e.night * 0.35);
-        c.fillStyle = rgb(red);
-        c.fillRect(x + 12, base - b.h + 14, 7, b.h - 14); c.fillRect(x + b.w - 19, base - b.h + 14, 7, b.h - 14); c.fillRect(x + 4, base - b.h + 26, b.w - 8, 5);
-        c.fillStyle = rgb(shade(red, -0.45));
-        c.beginPath(); c.moveTo(x - 4, base - b.h + 6); c.quadraticCurveTo(x + b.w / 2, base - b.h + 12, x + b.w + 4, base - b.h + 6); c.lineTo(x + b.w + 1, base - b.h + 14); c.lineTo(x + 2, base - b.h + 14); c.closePath(); c.fill();
-      } else if (b.type === "stall") {
-        const top = base - b.h, lit = e.night > 0.15;
-        c.fillStyle = rgb(shade(e.mid, -0.1)); c.fillRect(x + 3, top + 12, b.w - 6, b.h - 12);
-        if (lit) { c.save(); c.globalCompositeOperation = "lighter"; glow(c, x + b.w / 2, top + 22, b.w * 0.7, "255,190,110", 0.35 * e.night); c.restore(); }
-        c.fillStyle = lit ? `rgba(255,214,150,${0.5 + 0.4 * e.night})` : rgb(shade(e.mid, 0.15)); c.fillRect(x + 6, top + 16, b.w - 12, 14);
-        const [c1, c2] = b.colors, sw = 9;
-        for (let i = 0; i * sw < b.w + 4; i++) {
-          c.fillStyle = rgb(mix(hex(i % 2 ? c2 : c1), e.mid, 0.15 + e.night * 0.2));
-          c.beginPath(); c.moveTo(x - 2 + i * sw, top); c.lineTo(x - 2 + (i + 1) * sw, top); c.lineTo(x - 2 + (i + 1) * sw, top + 10); c.arc(x - 2 + i * sw + sw / 2, top + 10, sw / 2, 0, Math.PI); c.closePath(); c.fill();
-        }
-        c.fillStyle = lit ? "#FFF6E0" : rgb(shade(e.mid, 0.35)); rr(c, x + b.w / 2 - 22, top - 13, 44, 12, 2); c.fill();
-        c.fillStyle = "#C23030"; c.font = font(8); c.textAlign = "center"; c.textBaseline = "middle"; c.fillText(b.label, x + b.w / 2, top - 6.5);
-      }
-    }
-  }
-  function drawHikingNear(c: Ctx, e: Env): void {
-    const off = S.bgCam * near.f, col = rgb(e.near), pw = 46, s0 = -(off % pw);
-    c.strokeStyle = col; c.lineWidth = 3;
-    c.beginPath(); c.moveTo(0, GROUND - 30); c.lineTo(VW, GROUND - 30); c.moveTo(0, GROUND - 16); c.lineTo(VW, GROUND - 16); c.stroke();
-    c.fillStyle = rgb(shade(e.near, -0.1));
-    for (let x = s0; x < VW + pw; x += pw) { rr(c, x, GROUND - 40, 6, 36, 2); c.fill(); }
-    for (const p of near.items) {
-      if (!p.vend) continue;
-      const x = p.x - off + 60;
-      if (x > VW + 50 || x < -60) continue;
-      c.fillStyle = rgb(shade(e.near, -0.2)); c.fillRect(x + 18, GROUND - 76, 5, 70);
-      c.fillStyle = rgb(mix(hex("#D8B07A"), e.near, 0.25 + e.night * 0.4));
-      c.beginPath(); c.moveTo(x, GROUND - 74); c.lineTo(x + 40, GROUND - 74); c.lineTo(x + 47, GROUND - 67); c.lineTo(x + 40, GROUND - 60); c.lineTo(x, GROUND - 60); c.closePath(); c.fill();
-      const kind = Math.floor(p.x / 7) % 3, left = Math.max(0.1, 3 - (S.dist / 50 / 1000) * 3).toFixed(1);
-      c.fillStyle = "#4A2E1A"; c.font = font(8); c.textAlign = "center"; c.textBaseline = "middle";
-      c.fillText(kind === 0 ? `山頂 ${left}km` : kind === 1 ? "水場 →" : "展望台 →", x + 21, GROUND - 67);
-    }
-  }
-  function drawLanterns(c: Ctx, e: Env, off: number, top: number): void {
-    const L = near.items;
-    for (let i = 0; i < L.length - 1; i++) {
-      const ax = L[i]!.x - off + 3, bx = L[i + 1]!.x - off + 3;
-      if (bx < -20 || ax > VW + 20) continue;
-      const y0 = top + 40, sag = 26;
-      c.strokeStyle = rgb(e.near); c.lineWidth = 1;
-      c.beginPath(); c.moveTo(ax, y0); c.quadraticCurveTo((ax + bx) / 2, y0 + sag * 2, bx, y0); c.stroke();
-      for (let k = 1; k < 7; k++) {
-        const t = k / 7;
-        const lx = (1 - t) * (1 - t) * ax + 2 * (1 - t) * t * ((ax + bx) / 2) + t * t * bx;
-        const ly = (1 - t) * (1 - t) * y0 + 2 * (1 - t) * t * (y0 + sag * 2) + t * t * y0;
-        if (e.night > 0.2) glow(c, lx, ly + 7, 16, k % 2 ? "255,90,60" : "255,220,160", 0.35 * e.night);
-        c.fillStyle = k % 2 ? "#E23B3B" : "#F6E7C8"; ell(c, lx, ly + 7, 4.6, 6); c.fill();
-        c.fillStyle = "#2A2440"; c.fillRect(lx - 3, ly, 6, 1.6); c.fillRect(lx - 3, ly + 12.4, 6, 1.6);
-      }
-    }
+    drawStageMid(stageView(c, e), bld.items, S.bgCam * bld.f);
   }
   function drawNear(c: Ctx, e: Env, lamps: [number, number][]): void {
-    if (STAGE_ID === "hiking") { drawHikingNear(c, e); return; }
-    const off = S.bgCam * near.f, base = GROUND - 6, top = Math.max(18, GROUND - 168), col = rgb(e.near);
-    const L = near.items;
-    c.strokeStyle = rgb(e.near, 0.95); c.lineWidth = 1.1;
-    for (let i = 0; i < L.length - 1; i++) {
-      const ax = L[i]!.x - off + 3, bx = L[i + 1]!.x - off + 3;
-      if (bx < -20 || ax > VW + 20) continue;
-      for (let k = 0; k < 3; k++) {
-        const y = top + 7 + k * 6;
-        c.beginPath(); c.moveTo(ax, y); c.quadraticCurveTo((ax + bx) / 2, y + 20 + k * 3, bx, y); c.stroke();
-      }
-    }
-    for (const p of L) {
-      const x = p.x - off;
-      if (x > VW + 60 || x < -60) continue;
-      c.fillStyle = col; c.fillRect(x, top, 6, base - top); c.fillRect(x - 10, top + 5, 26, 3);
-      if (p.tr) { rr(c, x + 6, top + 26, 10, 17, 3); c.fill(); }
-      if (p.lamp && STAGE_ID !== "summer") {
-        c.strokeStyle = col; c.lineWidth = 2;
-        c.beginPath(); c.moveTo(x + 6, top + 52); c.quadraticCurveTo(x + 16, top + 44, x + 24, top + 48); c.stroke();
-        c.fillStyle = e.night > 0.2 ? `rgba(255,236,190,${0.4 + 0.6 * e.night})` : col; rr(c, x + 19, top + 47, 11, 4, 2); c.fill();
-        lamps.push([x + 24.5, top + 51]);
-      }
-    }
-    if (STAGE_ID === "summer") drawLanterns(c, e, off, top);
-    c.fillStyle = rgb(shade(e.near, 0.1)); c.fillRect(0, GROUND - 38, VW, 32);
-    c.fillStyle = rgb(shade(e.near, 0.2)); c.fillRect(0, GROUND - 41, VW, 4);
-    c.strokeStyle = rgb(shade(e.near, -0.12)); c.lineWidth = 1; c.beginPath();
-    c.moveTo(0, GROUND - 22.5); c.lineTo(VW, GROUND - 22.5);
-    const bw = 24, s0 = -(off % bw);
-    for (let x = s0; x < VW + bw; x += bw) { c.moveTo(x, GROUND - 37); c.lineTo(x, GROUND - 23); c.moveTo(x + bw / 2, GROUND - 22); c.lineTo(x + bw / 2, GROUND - 6); }
-    c.stroke();
-    if (STAGE_ID === "summer") {
-      const sw = 14, k0 = -(off % (sw * 2));
-      for (let x = k0; x < VW + sw * 2; x += sw * 2) {
-        c.fillStyle = rgb(mix(hex("#E0413A"), e.near, 0.15 + e.night * 0.3)); c.fillRect(x, GROUND - 38, sw, 32);
-        c.fillStyle = rgb(mix(hex("#F6F1EA"), e.near, 0.15 + e.night * 0.3)); c.fillRect(x + sw, GROUND - 38, sw, 32);
-      }
-      c.fillStyle = rgb(shade(e.near, 0.2)); c.fillRect(0, GROUND - 41, VW, 4);
-    }
-    if (STAGE_ID === "snow") {
-      c.fillStyle = rgb(mix([246, 249, 255], e.near, e.night * 0.45));
-      for (let x = -(off % 30) - 30; x < VW + 30; x += 30) { c.beginPath(); c.ellipse(x + 15, GROUND - 42, 17, 5, 0, 0, Math.PI * 2); c.fill(); }
-    }
-    const cans = ["#E4572E", "#FFC857", "#5CC8B5", "#7A8CFF", "#F28FB1", "#FFFFFF"];
-    for (const p of L) {
-      if (!p.vend) continue;
-      const vx = p.x - off + 80;
-      if (vx > VW + 40 || vx < -40) continue;
-      const body = mix(hex("#E9EDF5"), e.near, 0.35 + e.night * 0.25);
-      c.fillStyle = rgb(body); rr(c, vx, GROUND - 56, 28, 50, 3); c.fill();
-      c.fillStyle = e.night > 0.15 ? `rgba(205,232,255,${0.55 + 0.45 * e.night})` : "rgba(205,232,255,.75)"; c.fillRect(vx + 3, GROUND - 52, 22, 20);
-      cans.forEach((can, i) => { c.fillStyle = can; c.fillRect(vx + 5 + (i % 3) * 6.5, GROUND - 50 + Math.floor(i / 3) * 9, 4, 6.5); });
-      c.fillStyle = rgb(shade(body, -0.35)); c.fillRect(vx + 5, GROUND - 17, 18, 5);
-      c.fillStyle = "#E4572E"; c.fillRect(vx + 20, GROUND - 28, 3, 3);
-      if (e.night > 0.15) glow(c, vx + 14, GROUND - 40, 46, "190,225,255", 0.28 * e.night);
-    }
+    drawStageNear(stageView(c, e), near.items, S.bgCam * near.f, lamps, S.dist);
   }
   function drawGround(c: Ctx, e: Env, lamps: [number, number][]): void {
-    const sg = c.createLinearGradient(0, GROUND - 6, 0, GROUND + 19);
-    sg.addColorStop(0, rgb(shade(e.side, -0.1))); sg.addColorStop(0.35, rgb(e.side)); sg.addColorStop(1, rgb(shade(e.side, 0.05)));
-    c.fillStyle = sg; c.fillRect(0, GROUND - 6, VW, 25);
-    c.strokeStyle = rgb(shade(e.side, -0.05)); c.lineWidth = 1;
-    c.beginPath(); c.moveTo(0, GROUND + 6); c.lineTo(VW, GROUND + 6); c.stroke();
-    c.fillStyle = rgb(shade(e.side, 0.25)); c.fillRect(0, GROUND + 19, VW, 5);
-    c.fillStyle = rgb(shade(e.side, -0.2)); c.fillRect(0, GROUND + 23, VW, 1.5);
-    const rg = c.createLinearGradient(0, GROUND + 24, 0, VH);
-    rg.addColorStop(0, rgb(shade(e.road, 0.05))); rg.addColorStop(1, rgb(shade(e.road, -0.18)));
-    c.fillStyle = rg; c.fillRect(0, GROUND + 24, VW, VH - GROUND - 24);
-    if (STAGE_ID === "town" || STAGE_ID === "summer") { c.fillStyle = rgb(mix(e.road, WHITE, 0.35)); c.fillRect(0, GROUND + 30, VW, 1.6); }
-    const ly = GROUND + 24 + (VH - GROUND - 24) * 0.5;
-    if (STAGE_ID === "town") {
-      c.fillStyle = rgb(mix(e.road, WHITE, 0.26));
-      const dw = 96, d0 = -(S.cam % dw);
-      for (let x = d0; x < VW + dw; x += dw) c.fillRect(x, ly - 1.5, 44, 3);
-    } else if (STAGE_ID === "snow") {
-      c.fillStyle = rgb(shade(e.road, -0.12)); c.fillRect(0, ly - 8, VW, 4); c.fillRect(0, ly + 6, VW, 4);
-    } else if (STAGE_ID === "hiking") {
-      c.fillStyle = rgb(shade(e.road, -0.15));
-      const gw = 26, g0 = -(S.cam % gw);
-      for (let x = g0; x < VW + gw; x += gw) { c.fillRect(x, GROUND + 30, 1.6, 5); c.fillRect(x + 11, GROUND + 44, 1.6, 6); }
-    }
-    if (e.night > 0.1) {
-      c.save(); c.globalCompositeOperation = "lighter";
-      for (const [lx, ly2] of lamps) {
-        const g = c.createLinearGradient(0, ly2, 0, GROUND + 10);
-        g.addColorStop(0, `rgba(255,220,150,${0.16 * e.night})`); g.addColorStop(1, `rgba(255,220,150,${0.03 * e.night})`);
-        c.fillStyle = g;
-        c.beginPath(); c.moveTo(lx - 5, ly2); c.lineTo(lx + 5, ly2); c.lineTo(lx + 46, GROUND + 12); c.lineTo(lx - 46, GROUND + 12); c.closePath(); c.fill();
-        glow(c, lx, ly2, 20, "255,230,170", 0.5 * e.night);
-        c.fillStyle = `rgba(255,220,150,${0.16 * e.night})`; ell(c, lx, GROUND + 7, 50, 9); c.fill();
-      }
-      c.restore();
-    }
+    drawStageGround(stageView(c, e), S.cam, lamps);
   }
   function drawMarkers(c: Ctx, e: Env): void {
     if (S.state === "ready") return;
@@ -3151,6 +2929,7 @@ export function createOsanpoRun(root: HTMLElement, opts: OsanpoRunOptions): () =
     const c = ctx;
     c.setTransform(DPR * SC, 0, 0, DPR * SC, 0, 0);
     drawSky(c, e);
+    drawSkyLife(stageView(c, e));
     drawWeatherSky(c);
     const mountains = STAGE_ID === "hiking" || STAGE_ID === "snow";
     if (mountains) ridge(c, e, S.bgCam * 0.003 + 900, GROUND - 70, STAGE_ID === "hiking" ? 96 : 80, mix(e.far, e.bot, 0.6), 4.2, true);
