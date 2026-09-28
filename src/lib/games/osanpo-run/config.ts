@@ -74,6 +74,93 @@ export function isOsanpoRunStageId(value: unknown): value is OsanpoRunStageId {
   return typeof value === "string" && (OSANPO_RUN_STAGE_IDS as readonly string[]).includes(value);
 }
 
+/**
+ * 歩数ブースト。アプリに同期した「今日の歩数」に応じて、スタート時に効果が付く（段階は積み重なる）。
+ * 3000歩〜: 最初の STEP_BOOST_SEC 秒スコア×STEP_BOOST_MUL / 6000歩〜: バリア1回 / 10000歩〜: スタートでボーナスタイム
+ */
+export const OSANPO_RUN_STEP_BOOSTS = [
+  { steps: 3000, label: "スコアアップ", desc: "最初の10秒、拾ったもののスコア×1.2" },
+  { steps: 6000, label: "バリア", desc: "1回だけぶつかっても平気" },
+  { steps: 10000, label: "ボーナスタイム", desc: "スタートからボーナスタイム" },
+] as const;
+export const STEP_BOOST_SEC = 10;
+export const STEP_BOOST_MUL = 1.2;
+
+/** 今日の歩数で届いている段階の数（0〜3） */
+export function stepBoostLevel(steps: number | null): number {
+  if (steps === null) return 0;
+  return OSANPO_RUN_STEP_BOOSTS.filter((b) => steps >= b.steps).length;
+}
+
+/**
+ * 分かれ道。ときどき道しるべが出て、通る瞬間に跳んでいれば上の道（calm）、地面にいれば下の道（risky）へ進む。
+ * calm: 障害物が少なめ・ほねとアイテムが多め / risky: 障害物が多めだが、SR以上のアイテムが出やすい
+ */
+export type OsanpoRunRouteKind = "calm" | "risky";
+export const OSANPO_RUN_ROUTE_SEC = 20;
+export const OSANPO_RUN_ROUTES: Record<OsanpoRunStageId, Record<OsanpoRunRouteKind, string>> = {
+  town: { calm: "公園", risky: "商店街" },
+  hiking: { calm: "沢", risky: "尾根" },
+  snow: { calm: "かまくら広場", risky: "温泉街" },
+  summer: { calm: "河原", risky: "屋台通り" },
+};
+export const OSANPO_RUN_ROUTE_DESC: Record<OsanpoRunRouteKind, string> = {
+  calm: "障害物が少なめで、ほねとアイテムが多い",
+  risky: "障害物が多いけど、SR以上のアイテムが出やすい",
+};
+
+/**
+ * 思い出の看板。自分のおでかけ写真を道ばたの看板に貼って流す。
+ * 縦長の写真は縦向きの看板（横3:縦4）、横長・正方形の写真は横向きの看板（横4:縦3）に、
+ * はみ出す分を中央で切って貼る。
+ */
+/** 看板の前を通ったときのおまけ点 */
+export const MEMORY_SIGN_PTS = 20;
+
+/** 水たまりスタンプ：空中から急降下して水たまりに着地すると、水たまりが消えて点がもらえる */
+export const PUDDLE_STOMP_PTS = 30;
+
+/** においかぎ：くんくんマークの上をスライディングで通ると掘り出す。中身の重み */
+export const SNIFF_REWARDS = [
+  { kind: "bones", weight: 5 },
+  { kind: "item", weight: 3.5 },
+  { kind: "sock", weight: 1.5 },
+] as const;
+export type SniffRewardKind = (typeof SNIFF_REWARDS)[number]["kind"];
+
+/**
+ * ご近所さん：道で会うほかのフレブル4匹。名前は設定でつけられる（空なら defaultName）。
+ * あいさつの回数でなかよし度が上がり、会ったときの反応とおまけが変わる。
+ */
+export const OSANPO_RUN_NEIGHBOR_DEFAULT_NAMES: Record<DogSkinId, string> = {
+  default: "まる",
+  hiking: "こてつ",
+  snow: "ゆき",
+  summer: "なつ",
+};
+export const NEIGHBOR_NAME_MAX = 8;
+export const NEIGHBOR_LEVELS = [
+  { greets: 0, name: "はじめまして", pts: 30, gift: "none" },
+  { greets: 5, name: "顔見知り", pts: 40, gift: "none" },
+  { greets: 15, name: "なかよし", pts: 50, gift: "bones" },
+  { greets: 30, name: "親友", pts: 60, gift: "item" },
+] as const;
+export function neighborLevel(greets: number): number {
+  let lv = 0;
+  NEIGHBOR_LEVELS.forEach((l, i) => { if (greets >= l.greets) lv = i; });
+  return lv;
+}
+
+/**
+ * 協力チャレンジ：自分とフレンドの今週の合計距離（m）で目標を目指す。
+ * 目標は 1人あたり COOP_METERS_PER_MEMBER × 人数（COOP_GOAL_MIN〜COOP_GOAL_MAX）。達成で全員 COOP_COINS。
+ * 同じ値を DB の get_osanpo_run_coop / claim_osanpo_run_coop でも使う。
+ */
+export const COOP_METERS_PER_MEMBER = 2000;
+export const COOP_GOAL_MIN = 2000;
+export const COOP_GOAL_MAX = 20000;
+export const COOP_COINS = 100;
+
 export type RarityStyle = {
   /** 1個あたりの点数（コンボ倍率がさらに掛かる） */
   points: number;
@@ -179,6 +266,8 @@ export const OSANPO_RUN_HINTS = {
   suitcase: "荷物がバウンド！ 低いときは跳び越え、高いときは下を通ろう",
   surprise: "箱がガタガタしたら飛び出す合図。2段ジャンプで高く越えよう！",
   drone: "ランプが点滅したら降下！ 下スワイプで荷物の下をくぐろう",
+  stomp: "水たまりは、空中から下スワイプの急降下で踏むと バシャーン！",
+  sniff: "くんくんマーク！ スライディングで通ると何か掘り出せる",
 } as const;
 export type OsanpoRunHintId = keyof typeof OSANPO_RUN_HINTS;
 

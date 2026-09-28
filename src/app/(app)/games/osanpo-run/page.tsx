@@ -4,9 +4,13 @@ import { OsanpoRunGame } from "@/components/games/osanpo-run/osanpo-run-game";
 import type { RunItem } from "@/components/games/osanpo-run/engine";
 import { CATEGORY_LABELS, COLLECTION_ITEMS, REGULAR_ITEMS, type CollectionItem } from "@/lib/collection/items";
 import { getOwnedItemCounts } from "@/lib/data/collection";
+import { getExpDashboard } from "@/lib/data/exp";
+import { getOsanpoRunMemoryPhotos } from "@/lib/data/osanpo-run";
+import { todayInJapan } from "@/lib/date";
 import { getSkillLevel } from "@/lib/gacha/skill-levels";
 import { getDogSkin, isSkinUnlocked } from "@/lib/dog-skins";
 import { OSANPO_RUN_STAGE_IDS, OSANPO_RUN_STAGES } from "@/lib/games/osanpo-run/config";
+import { getDailyMissions } from "@/lib/games/osanpo-run/missions";
 import { SERIES } from "@/lib/series";
 import { requireUser } from "@/lib/supabase/server";
 import "./osanpo-run.css";
@@ -31,9 +35,35 @@ function toRunItem(item: CollectionItem & { image: string }, count: number): Run
   return { id: item.id, name: item.name, category: item.category, series: item.series, rarity: item.rarity, src: props.src, level };
 }
 
+type MissionQuery = {
+  from: (table: "osanpo_run_missions") => {
+    select: (columns: "mission_id") => {
+      eq: (column: "user_id", value: string) => {
+        eq: (column: "mission_date", value: string) => Promise<{ data: { mission_id: string }[] | null; error: { code?: string; message: string } | null }>;
+      };
+    };
+  };
+};
+
+/** 今日もう達成したミッション。テーブルがまだ無い環境では空（ミッションは遊べるが記録されない） */
+async function getMissionsDone(supabase: unknown, userId: string, date: string): Promise<string[]> {
+  const { data, error } = await (supabase as MissionQuery).from("osanpo_run_missions").select("mission_id").eq("user_id", userId).eq("mission_date", date);
+  if (error) {
+    console.warn("Osanpo run missions are unavailable", { code: error.code, message: error.message });
+    return [];
+  }
+  return (data ?? []).map((row) => row.mission_id);
+}
+
 export default async function OsanpoRunPage() {
   const { supabase, user } = await requireUser();
-  const ownedCounts = await getOwnedItemCounts(supabase, user.id);
+  const today = todayInJapan();
+  const [ownedCounts, { todaySteps }, missionsDone, memoryPhotos] = await Promise.all([
+    getOwnedItemCounts(supabase, user.id),
+    getExpDashboard(supabase, user.id),
+    getMissionsDone(supabase, user.id, today),
+    getOsanpoRunMemoryPhotos(supabase, user.id),
+  ]);
   const ownedIds = new Set([...ownedCounts].filter(([, count]) => count > 0).map(([id]) => id));
 
   const hasImage = (item: CollectionItem): item is CollectionItem & { image: string } => Boolean(item.image);
@@ -54,6 +84,10 @@ export default async function OsanpoRunPage() {
       unlockedStages={unlockedStages}
       seriesTabs={seriesTabs}
       categoryLabels={CATEGORY_LABELS}
+      todaySteps={todaySteps}
+      missions={getDailyMissions(today)}
+      missionsDone={missionsDone}
+      memoryPhotos={memoryPhotos}
     />
   );
 }

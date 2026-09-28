@@ -14,18 +14,34 @@ import { GACHA_RARITIES } from "@/lib/gacha/config";
 import {
   isBarrierRarity,
   isOsanpoRunStageId,
+  MEMORY_SIGN_PTS,
+  NEIGHBOR_LEVELS,
+  NEIGHBOR_NAME_MAX,
+  neighborLevel,
+  OSANPO_RUN_NEIGHBOR_DEFAULT_NAMES,
+  PUDDLE_STOMP_PTS,
+  SNIFF_REWARDS,
   OSANPO_RUN_ACHIEVEMENTS,
   OSANPO_RUN_HINTS,
   OSANPO_RUN_RANKS,
+  OSANPO_RUN_ROUTE_DESC,
+  OSANPO_RUN_ROUTE_SEC,
+  OSANPO_RUN_ROUTES,
   OSANPO_RUN_SONGS,
   OSANPO_RUN_STAGE_IDS,
   OSANPO_RUN_STAGES,
+  OSANPO_RUN_STEP_BOOSTS,
   OSANPO_RUN_STORAGE_PREFIX,
   RARITY_STYLES,
+  STEP_BOOST_MUL,
+  STEP_BOOST_SEC,
+  stepBoostLevel,
   type OsanpoRunHintId,
+  type OsanpoRunRouteKind,
   type OsanpoRunStage,
   type OsanpoRunStageId,
 } from "@/lib/games/osanpo-run/config";
+import { MISSION_ALL_BONUS, MISSION_COINS, type OsanpoRunMission, type OsanpoRunMissionMetric } from "@/lib/games/osanpo-run/missions";
 import {
   OSANPO_RUN_SKILL_BY_ID,
   OSANPO_RUN_SKILL_MAX_LEVEL,
@@ -56,6 +72,8 @@ import {
   ell, font, glow, hex, hslRgb, mix, rgb, rr, setCanvasFontFamily, shade, star, WHITE,
   type Ctx, type Pigeon, type RGB,
 } from "./draw";
+import { drawRouteGate, drawRouteScene as drawRouteSceneLayer, ROUTE_GATE_HALF, type RouteTheme } from "./route-scene";
+import { drawSkyLife, drawStageGround, drawStageMid, drawStageNear, type MidItem, type NearItem, type StageView } from "./stage-scene";
 
 export type RunItem = {
   id: string;
@@ -86,6 +104,15 @@ export type OsanpoRunOptions = {
   bodyFontFamily: string;
   seriesTabs: { id: string; name: string }[];
   categoryLabels: Record<string, string>;
+  /** アプリに同期した今日の歩数（未同期は null）。歩数ブーストに使う */
+  todaySteps?: number | null;
+  /** 今日のミッション3つと、今日もう達成したもののID */
+  missions?: OsanpoRunMission[];
+  missionsDone?: string[];
+  /** ミッションを達成したときに呼ぶ。もらえたコインの枚数を返す（記録できなかったときは null） */
+  onMissionClear?: (missionId: string) => Promise<number | null>;
+  /** 道ばたの看板に貼る自分のおでかけ写真（縦長は縦向き、横長は横向きの看板になる） */
+  memoryPhotos?: { src: string; name: string; pref: string }[];
 };
 
 type Pose = "walk" | "trot" | "walk-tail" | "cheer" | "smile" | "bow-b" | "stand-happy" | "wave" | "sleep" | "lie-wave" | "bow";
@@ -100,6 +127,8 @@ const GRAV = 2500, JUMP_V = 760, DJUMP_V = 640;
 const BASE_AIR_JUMPS = 2;
 /** 道に落ちているもののうち、図鑑アイテムになる割合（残りはほね）。ボーナスタイムは多め */
 const ITEM_RATE = 0.12, ITEM_RATE_BONUS = 0.25;
+/** 分かれ道：上の道でアイテムになる割合に足す分 / 下の道でSR以上が出やすくなる倍率 */
+const ROUTE_CALM_ITEM_BONUS = 0.08, ROUTE_RISKY_RARE = 2.5;
 /** 水が出たり止まったりするところ: 1周の秒数・出ている秒数・水の高さ（ふつうのジャンプでは越えられず、2段ジャンプなら越えられる） */
 const GEYSER_CYCLE = 1.4, GEYSER_ON = 0.8, GEYSER_H = 124;
 /** 上から落ちてくるものの重力 */
@@ -110,9 +139,19 @@ const FALL_DRIFT = 0.3;
 const BONE_PTS = 5;
 /** 走る速さ（論理px/秒）。最初はゆっくりで、約3分かけて最高速になる */
 const START_SPEED = 200, MAX_SPEED = 520;
+/**
+ * 背景の流れる速さ。道の速さ（最高520）をそのまま使うと奥の建物まで速く流れて酔いやすいので、
+ * 上限 BG_SPEED_MAX を超えないようにしてから BG_SPEED_RATE を掛け、BG_EASE でゆっくり追いつかせる
+ */
+const BG_SPEED_MAX = 320, BG_SPEED_RATE = 0.75, BG_EASE = 1.5;
 
 type GameState = "ready" | "intro" | "play" | "dying" | "over";
 type Section = "normal" | "bonus" | "rush";
+/**
+ * 分かれ道のあとの道。gate（入口ゲート）を過ぎると on になり、t 秒たつと exit（出口ゲート）を置く。
+ * 出口を過ぎると off に戻り、景色が画面の外へ流れきったら消す。位置はどれも S.dist と同じ単位
+ */
+type RouteState = { kind: OsanpoRunRouteKind; t: number; gate: number; exit: number | null; on: boolean };
 /**
  * roller=転がってくるもの / drop=上から落ちてくるもの / buddy=ほかのわんこ（ぶつかってもOK）/
  * geyser=水が出たり止まったりするところ
@@ -149,15 +188,6 @@ type FloatText = { x: number; y: number; text: string; color: string; size: numb
 type Flyer = { item: RunItem; x0: number; y0: number; t: number };
 type Env = { m: number; top: RGB; bot: RGB; far: RGB; mid: RGB; near: RGB; night: number; side: RGB; road: RGB };
 
-type MidItem = {
-  x: number; w: number; h: number; gap: number; tone: number;
-  type: "building" | "house" | "pine" | "round" | "torii" | "stall";
-  cols: number; rows: number; lit: boolean[]; roof: "flat" | "tank" | "antenna" | "gable"; blink: number;
-  label: string; colors: [string, string];
-  /** マンションのベランダの手すり */
-  balcony: boolean;
-};
-type NearItem = { x: number; w: number; gap: number; lamp: boolean; vend: boolean; tr: boolean };
 type Layer<T> = { f: number; items: T[]; nx: number };
 
 type Stats = { pigeons: number; slides: number; plays: number; meters: number; items: number; kinds: string[]; counts: Record<string, number>; rollers: number; drops: number; greets: number; geysers: number; tricks: TrickStats };
@@ -289,6 +319,10 @@ export function createOsanpoRun(root: HTMLElement, opts: OsanpoRunOptions): () =
       const boosted = rarityWeights.map(([r, w]) => [r, rarityIndex(r) >= 4 ? w * K.rare : w] as const);
       if (Math.random() < 0.7) return pickOne(byRarity.get(pickWeighted(boosted))!);
     }
+    if (routeOn() === "risky") {
+      const boosted = rarityWeights.map(([r, w]) => [r, rarityIndex(r) >= 2 ? w * ROUTE_RISKY_RARE : w] as const);
+      return pickOne(byRarity.get(pickWeighted(boosted))!);
+    }
     const stageSeries = seriesItems(STAGE.series);
     if (S.rain > 0.3 && rainItems.length && Math.random() < 0.35) return pickOne(rainItems);
     if (stageSeries.length && Math.random() < 0.3) return pickOne(stageSeries);
@@ -352,6 +386,12 @@ export function createOsanpoRun(root: HTMLElement, opts: OsanpoRunOptions): () =
     loadJSON<Partial<Stats>>("stats", {}),
   );
   const kindSet = new Set<string>(stats.kinds);
+  /* ---------- ご近所さん（名前となかよし度。この端末に保存） ---------- */
+  type DogSkin = (typeof DOG_SKIN_IDS)[number];
+  const neighbors = Object.assign({ names: {} as Partial<Record<DogSkin, string>>, greets: {} as Partial<Record<DogSkin, number>> }, loadJSON<{ names?: Partial<Record<DogSkin, string>>; greets?: Partial<Record<DogSkin, number>> }>("neighbors", {}));
+  const saveNeighbors = () => store.set("neighbors", JSON.stringify(neighbors));
+  const neighborName = (skin: DogSkin) => (neighbors.names[skin] ?? "").trim() || OSANPO_RUN_NEIGHBOR_DEFAULT_NAMES[skin];
+  const neighborGreets = (skin: DogSkin) => neighbors.greets[skin] ?? 0;
   const saveStats = () => { stats.kinds = [...kindSet]; store.set("stats", JSON.stringify(stats)); };
   const bestOf = (id: OsanpoRunStageId) => Number(store.get(`best-${id}`) ?? 0) || 0;
   const bestDistOf = (id: OsanpoRunStageId) => Number(store.get(`bestd-${id}`) ?? 0) || 0;
@@ -361,14 +401,24 @@ export function createOsanpoRun(root: HTMLElement, opts: OsanpoRunOptions): () =
 
   /* ---------- 状態 ---------- */
   let DPR = 1, SC = 1, VW = 533, VH = 300, GROUND = 236;
+  /** においかぎの「くんくんマーク」。x は画面の位置で、道と同じ速さで流れる */
+  type Sniff = { x: number; dug: boolean; hinted: boolean; ph: number };
+  let sniffs: Sniff[] = [];
+  /** 急降下で着地した時刻（水たまりスタンプの判定に使う） */
+  let stompAt = -1;
   const P = {
     x: 96, y: GROUND, vy: 0, ground: true, jumps: 2, sq: 1, ph: 0, rot: 0, inv: 0, dead: false, dustT: 0,
     slide: false, slideT: 0, slideHeld: false, jumpAt: -1,
+    /** 空中で下スワイプした（急降下中）。この状態で着地すると水たまりを踏める */
+    dive: false,
   };
   const S = {
-    state: "ready" as GameState, time: 0, t: 0, speed: 90, dist: 0, bonus: 0, treats: 0, clock: STAGE.clock, cam: 0, bgCam: 0,
+    state: "ready" as GameState, time: 0, t: 0, speed: 90, dist: 0, bonus: 0, treats: 0, clock: STAGE.clock, cam: 0, bgCam: 0, bgV: 0,
+    srPlus: 0, pigeonsRun: 0, slidesRun: 0, greetsRun: 0, routeCalm: 0, routeRisky: 0, bonusBest: 0, missionCoins: 0, missionsNow: [] as string[], stomps: 0, digs: 0,
+    memo: null as null | { at: number; photo: number; passed: boolean }, memoT: 20,
+    stepT: 0, fork: null as null | { at: number }, route: null as null | RouteState, forkT: 40,
     next: 400, shield: false, chain: 0, chainT: 0, mult: 1, maxMult: 1, paused: false, deadT: 0, introT: 0,
-    haul: new Map<string, number>(), happyT: 0, calm: store.get("calm") !== "0",
+    haul: new Map<string, number>(), happyT: 0, calm: store.get("calm") === "1",
     sec: "normal" as Section, secT: 18, rain: 0, rainTarget: 0, rainT: 0,
     bones: 0, newAch: [] as string[], newKinds: [] as string[], rainWalk: 0, rushes: 0, closes: 0, bonusGot: 0,
     best: 0, bestD: 0, passedBest: false, recordShown: false, milestone: 100, bufT: 0, fwT: 2,
@@ -651,7 +701,6 @@ export function createOsanpoRun(root: HTMLElement, opts: OsanpoRunOptions): () =
 
   /* ---------- 道で会うほかのフレブル ---------- */
   const buddySkin = (o: Obstacle) => DOG_SKIN_IDS[o.phase % DOG_SKIN_IDS.length]!;
-  const buddyName = (o: Obstacle) => getDogSkin(buddySkin(o)).name;
   /** ほかのフレブル。こっちに向かって歩いてくる（画像はもともと左向きなので反転しない）。あいさつ後はにっこり止まってハート */
   function drawBuddySprite(c: Ctx, o: Obstacle): void {
     const pose: Pose = o.greeted ? "smile" : BUDDY_POSES[Math.floor(S.time * 7 + o.x * 0.01) % 2]!;
@@ -664,8 +713,16 @@ export function createOsanpoRun(root: HTMLElement, opts: OsanpoRunOptions): () =
     c.restore();
     if (o.greeted) {
       c.fillStyle = "#FF6B8A"; c.font = font(13); c.textAlign = "center"; c.textBaseline = "middle";
-      c.fillText("♥", cx - 6, GROUND - h - 4 - Math.abs(Math.sin(S.time * 6)) * 4);
+      const hearts = Math.max(1, neighborLevel(neighborGreets(buddySkin(o))));
+      for (let k = 0; k < hearts; k++) c.fillText("♥", cx - 6 + (k - (hearts - 1) / 2) * 11, GROUND - h - 4 - Math.abs(Math.sin(S.time * 6 + k)) * 4);
     }
+    // 小さな名札（名前となかよし度）
+    const skin = buddySkin(o), lv = neighborLevel(neighborGreets(skin)), label = neighborName(skin);
+    c.font = font(7.5); c.textAlign = "center"; c.textBaseline = "middle";
+    const lw = c.measureText(label).width + (lv > 0 ? 18 : 10), ty = GROUND + 9;
+    c.fillStyle = "rgba(24,22,52,0.72)"; rr(c, cx - lw / 2, ty - 6, lw, 12, 6); c.fill();
+    c.fillStyle = "#FFFFFF"; c.fillText(label, cx - (lv > 0 ? 4 : 0), ty + 0.5);
+    if (lv > 0) { c.fillStyle = "#FF9EB8"; c.font = font(7); c.fillText("♥".repeat(1) + lv, cx + lw / 2 - 8, ty + 0.5); }
   }
 
   /* ---------- 犬の描画 ---------- */
@@ -818,232 +875,18 @@ export function createOsanpoRun(root: HTMLElement, opts: OsanpoRunOptions): () =
     g.addColorStop(0, rgb(e.bot, 0)); g.addColorStop(1, rgb(e.bot, a * (1 - e.night * 0.5)));
     c.fillStyle = g; c.fillRect(0, from, VW, to - from);
   }
-  function drawBuildings(c: Ctx, e: Env): void {
-    const off = S.bgCam * bld.f, base = GROUND - 6, snowy = STAGE_ID === "snow";
-    for (const b of bld.items) {
-      const x = b.x - off;
-      if (x > VW + 10 || x + b.w < -10) continue;
-      const top = base - b.h, col = shade(e.mid, b.tone), sun = sunLight(e);
-      c.fillStyle = rgb(col);
-      if (b.type === "house") {
-        c.fillRect(x + 3, top, b.w - 6, b.h);
-        c.fillStyle = rgb(shade(col, -0.12)); c.fillRect(x + b.w - 3 - (b.w - 6) * 0.22, top, (b.w - 6) * 0.22, b.h);
-        c.fillStyle = rgb(shade(col, -0.25)); c.fillRect(x + 3, top + 3, b.w - 6, 3);
-        c.fillStyle = rgb(shade(col, -0.3)); rr(c, x + b.w * 0.62, base - 17, 9, 17, 1.5); c.fill();
-        c.fillStyle = rgb(col);
-        c.fillStyle = rgb(shade(col, -0.18));
-        c.beginPath(); c.moveTo(x - 4, top + 3); c.lineTo(x + b.w / 2, top - b.w * 0.3); c.lineTo(x + b.w + 4, top + 3); c.closePath(); c.fill();
-        if (snowy) {
-          c.fillStyle = rgb(mix([246, 249, 255], e.mid, e.night * 0.45));
-          c.beginPath(); c.moveTo(x - 5, top + 1); c.lineTo(x + b.w / 2, top - b.w * 0.3 - 3); c.lineTo(x + b.w + 5, top + 1); c.lineTo(x + b.w + 3, top + 4); c.lineTo(x + b.w / 2, top - b.w * 0.3 + 3); c.lineTo(x - 3, top + 4); c.closePath(); c.fill();
-        }
-      } else {
-        c.fillRect(x, top, b.w, b.h);
-        c.fillStyle = rgb(shade(col, -0.12)); c.fillRect(x + b.w * 0.8, top, b.w * 0.2, b.h);
-        c.fillStyle = rgb(shade(col, -0.15)); c.fillRect(x - 1, top - 3, b.w + 2, 3);
-        c.fillStyle = `rgba(${sun.rgb},${0.15 + 0.35 * sun.warm * sun.day})`; c.fillRect(x - 1, top - 3, b.w * 0.8 + 1, 1.2);
-        c.fillStyle = rgb(shade(col, -0.15));
-        if (snowy) { c.fillStyle = rgb(mix([246, 249, 255], e.mid, e.night * 0.45)); rr(c, x - 2, top - 7, b.w + 4, 6, 3); c.fill(); c.fillStyle = rgb(shade(col, -0.15)); }
-        if (b.roof === "tank") { c.fillRect(x + b.w * 0.58, top - 16, 16, 10); c.fillRect(x + b.w * 0.58 + 2, top - 6, 2, 6); c.fillRect(x + b.w * 0.58 + 12, top - 6, 2, 6); }
-        if (b.roof === "antenna") { c.fillRect(x + b.w * 0.3, top - 22, 1.6, 22); c.fillRect(x + b.w * 0.3 - 6, top - 18, 13, 1.4); c.fillRect(x + b.w * 0.3 - 4, top - 13, 9, 1.4); }
-        if (b.h > 130 && e.night > 0.3 && Math.sin(S.time * 3 + b.blink) > 0.2) { c.fillStyle = `rgba(255,70,70,${e.night})`; c.beginPath(); c.arc(x + b.w / 2, top - 4, 1.8, 0, Math.PI * 2); c.fill(); }
-      }
-      const ww = 7, wh = 9, gx = 13, gyy = 17;
-      const sx0 = x + (b.w - (b.cols * gx - (gx - ww))) / 2, sy0 = b.type === "house" ? top + b.h * 0.3 : top + 8;
-      const dayWin = rgb(shade(col, 0.14), 0.7);
-      const frame = rgb(shade(col, -0.22), 0.7);
-      for (let r = 0; r < b.rows; r++) {
-        for (let i = 0; i < b.cols; i++) {
-          const k = r * b.cols + i, lit = b.lit[k] && e.night > 0.05, wx = sx0 + i * gx, wy = sy0 + r * gyy;
-          c.fillStyle = frame; c.fillRect(wx - 1, wy - 1, ww + 2, wh + 2);
-          c.fillStyle = lit ? (k % 3 ? `rgba(255,214,130,${0.25 + 0.7 * e.night})` : `rgba(255,236,196,${0.25 + 0.7 * e.night})`) : dayWin;
-          c.fillRect(wx, wy, ww, wh);
-          if (!lit) { c.fillStyle = `rgba(255,255,255,${0.12 * (1 - e.night)})`; c.fillRect(wx, wy, ww * 0.45, wh); }
-        }
-        if (b.balcony) {
-          const ry = sy0 + r * gyy + wh + 2;
-          c.fillStyle = rgb(shade(col, -0.2)); c.fillRect(x + 2, ry, b.w - 4, 3);
-          c.fillStyle = rgb(shade(col, 0.1), 0.6); c.fillRect(x + 2, ry, b.w - 4, 0.8);
-        }
-      }
-    }
+  /** 中景・近景・足もとは stage-scene.ts で描く */
+  function stageView(c: Ctx, e: Env): StageView {
+    return { c, e, stage: STAGE_ID, g: GROUND, vw: VW, vh: VH, t: S.time, calm: RM, sun: sunLight(e) };
   }
   function drawMid(c: Ctx, e: Env): void {
-    if (STAGE_ID === "town" || STAGE_ID === "snow") { drawBuildings(c, e); return; }
-    const off = S.bgCam * bld.f, base = GROUND - 6;
-    for (const b of bld.items) {
-      const x = b.x - off;
-      if (x > VW + 20 || x + b.w < -20) continue;
-      const col = shade(e.mid, b.tone);
-      if (b.type === "pine") {
-        c.fillStyle = rgb(shade(col, -0.2)); c.fillRect(x + b.w / 2 - 2, base - 14, 4, 14);
-        for (let k = 0; k < 3; k++) {
-          const ty = base - 10 - k * b.h * 0.28, tw = b.w * (1 - k * 0.22), tip = ty - b.h * 0.45, cx = x + b.w / 2;
-          c.fillStyle = rgb(col);
-          c.beginPath(); c.moveTo(cx - tw / 2, ty); c.lineTo(cx, tip); c.lineTo(cx + tw / 2, ty); c.closePath(); c.fill();
-          c.fillStyle = rgb(shade(col, -0.16));
-          c.beginPath(); c.moveTo(cx, tip); c.lineTo(cx + tw / 2, ty); c.lineTo(cx + tw * 0.08, ty); c.closePath(); c.fill();
-        }
-      } else if (b.type === "round") {
-        c.fillStyle = rgb(shade(col, -0.2)); c.fillRect(x + b.w / 2 - 2.5, base - 20, 5, 20);
-        c.fillStyle = rgb(shade(col, -0.08)); c.beginPath();
-        c.arc(x + b.w / 2, base - b.h * 0.6, b.w * 0.5, 0, Math.PI * 2); c.arc(x + b.w * 0.3, base - b.h * 0.45, b.w * 0.32, 0, Math.PI * 2); c.arc(x + b.w * 0.72, base - b.h * 0.42, b.w * 0.3, 0, Math.PI * 2);
-        c.fill();
-        c.fillStyle = rgb(shade(col, 0.1)); c.beginPath();
-        c.arc(x + b.w * 0.44, base - b.h * 0.66, b.w * 0.34, 0, Math.PI * 2); c.arc(x + b.w * 0.26, base - b.h * 0.5, b.w * 0.2, 0, Math.PI * 2);
-        c.fill();
-      } else if (b.type === "torii") {
-        const red = mix(hex("#D63A2E"), e.mid, 0.25 + e.night * 0.35);
-        c.fillStyle = rgb(red);
-        c.fillRect(x + 12, base - b.h + 14, 7, b.h - 14); c.fillRect(x + b.w - 19, base - b.h + 14, 7, b.h - 14); c.fillRect(x + 4, base - b.h + 26, b.w - 8, 5);
-        c.fillStyle = rgb(shade(red, -0.45));
-        c.beginPath(); c.moveTo(x - 4, base - b.h + 6); c.quadraticCurveTo(x + b.w / 2, base - b.h + 12, x + b.w + 4, base - b.h + 6); c.lineTo(x + b.w + 1, base - b.h + 14); c.lineTo(x + 2, base - b.h + 14); c.closePath(); c.fill();
-      } else if (b.type === "stall") {
-        const top = base - b.h, lit = e.night > 0.15;
-        c.fillStyle = rgb(shade(e.mid, -0.1)); c.fillRect(x + 3, top + 12, b.w - 6, b.h - 12);
-        if (lit) { c.save(); c.globalCompositeOperation = "lighter"; glow(c, x + b.w / 2, top + 22, b.w * 0.7, "255,190,110", 0.35 * e.night); c.restore(); }
-        c.fillStyle = lit ? `rgba(255,214,150,${0.5 + 0.4 * e.night})` : rgb(shade(e.mid, 0.15)); c.fillRect(x + 6, top + 16, b.w - 12, 14);
-        const [c1, c2] = b.colors, sw = 9;
-        for (let i = 0; i * sw < b.w + 4; i++) {
-          c.fillStyle = rgb(mix(hex(i % 2 ? c2 : c1), e.mid, 0.15 + e.night * 0.2));
-          c.beginPath(); c.moveTo(x - 2 + i * sw, top); c.lineTo(x - 2 + (i + 1) * sw, top); c.lineTo(x - 2 + (i + 1) * sw, top + 10); c.arc(x - 2 + i * sw + sw / 2, top + 10, sw / 2, 0, Math.PI); c.closePath(); c.fill();
-        }
-        c.fillStyle = lit ? "#FFF6E0" : rgb(shade(e.mid, 0.35)); rr(c, x + b.w / 2 - 22, top - 13, 44, 12, 2); c.fill();
-        c.fillStyle = "#C23030"; c.font = font(8); c.textAlign = "center"; c.textBaseline = "middle"; c.fillText(b.label, x + b.w / 2, top - 6.5);
-      }
-    }
-  }
-  function drawHikingNear(c: Ctx, e: Env): void {
-    const off = S.bgCam * near.f, col = rgb(e.near), pw = 46, s0 = -(off % pw);
-    c.strokeStyle = col; c.lineWidth = 3;
-    c.beginPath(); c.moveTo(0, GROUND - 30); c.lineTo(VW, GROUND - 30); c.moveTo(0, GROUND - 16); c.lineTo(VW, GROUND - 16); c.stroke();
-    c.fillStyle = rgb(shade(e.near, -0.1));
-    for (let x = s0; x < VW + pw; x += pw) { rr(c, x, GROUND - 40, 6, 36, 2); c.fill(); }
-    for (const p of near.items) {
-      if (!p.vend) continue;
-      const x = p.x - off + 60;
-      if (x > VW + 50 || x < -60) continue;
-      c.fillStyle = rgb(shade(e.near, -0.2)); c.fillRect(x + 18, GROUND - 76, 5, 70);
-      c.fillStyle = rgb(mix(hex("#D8B07A"), e.near, 0.25 + e.night * 0.4));
-      c.beginPath(); c.moveTo(x, GROUND - 74); c.lineTo(x + 40, GROUND - 74); c.lineTo(x + 47, GROUND - 67); c.lineTo(x + 40, GROUND - 60); c.lineTo(x, GROUND - 60); c.closePath(); c.fill();
-      const kind = Math.floor(p.x / 7) % 3, left = Math.max(0.1, 3 - (S.dist / 50 / 1000) * 3).toFixed(1);
-      c.fillStyle = "#4A2E1A"; c.font = font(8); c.textAlign = "center"; c.textBaseline = "middle";
-      c.fillText(kind === 0 ? `山頂 ${left}km` : kind === 1 ? "水場 →" : "展望台 →", x + 21, GROUND - 67);
-    }
-  }
-  function drawLanterns(c: Ctx, e: Env, off: number, top: number): void {
-    const L = near.items;
-    for (let i = 0; i < L.length - 1; i++) {
-      const ax = L[i]!.x - off + 3, bx = L[i + 1]!.x - off + 3;
-      if (bx < -20 || ax > VW + 20) continue;
-      const y0 = top + 40, sag = 26;
-      c.strokeStyle = rgb(e.near); c.lineWidth = 1;
-      c.beginPath(); c.moveTo(ax, y0); c.quadraticCurveTo((ax + bx) / 2, y0 + sag * 2, bx, y0); c.stroke();
-      for (let k = 1; k < 7; k++) {
-        const t = k / 7;
-        const lx = (1 - t) * (1 - t) * ax + 2 * (1 - t) * t * ((ax + bx) / 2) + t * t * bx;
-        const ly = (1 - t) * (1 - t) * y0 + 2 * (1 - t) * t * (y0 + sag * 2) + t * t * y0;
-        if (e.night > 0.2) glow(c, lx, ly + 7, 16, k % 2 ? "255,90,60" : "255,220,160", 0.35 * e.night);
-        c.fillStyle = k % 2 ? "#E23B3B" : "#F6E7C8"; ell(c, lx, ly + 7, 4.6, 6); c.fill();
-        c.fillStyle = "#2A2440"; c.fillRect(lx - 3, ly, 6, 1.6); c.fillRect(lx - 3, ly + 12.4, 6, 1.6);
-      }
-    }
+    drawStageMid(stageView(c, e), bld.items, S.bgCam * bld.f);
   }
   function drawNear(c: Ctx, e: Env, lamps: [number, number][]): void {
-    if (STAGE_ID === "hiking") { drawHikingNear(c, e); return; }
-    const off = S.bgCam * near.f, base = GROUND - 6, top = Math.max(18, GROUND - 168), col = rgb(e.near);
-    const L = near.items;
-    c.strokeStyle = rgb(e.near, 0.95); c.lineWidth = 1.1;
-    for (let i = 0; i < L.length - 1; i++) {
-      const ax = L[i]!.x - off + 3, bx = L[i + 1]!.x - off + 3;
-      if (bx < -20 || ax > VW + 20) continue;
-      for (let k = 0; k < 3; k++) {
-        const y = top + 7 + k * 6;
-        c.beginPath(); c.moveTo(ax, y); c.quadraticCurveTo((ax + bx) / 2, y + 20 + k * 3, bx, y); c.stroke();
-      }
-    }
-    for (const p of L) {
-      const x = p.x - off;
-      if (x > VW + 60 || x < -60) continue;
-      c.fillStyle = col; c.fillRect(x, top, 6, base - top); c.fillRect(x - 10, top + 5, 26, 3);
-      if (p.tr) { rr(c, x + 6, top + 26, 10, 17, 3); c.fill(); }
-      if (p.lamp && STAGE_ID !== "summer") {
-        c.strokeStyle = col; c.lineWidth = 2;
-        c.beginPath(); c.moveTo(x + 6, top + 52); c.quadraticCurveTo(x + 16, top + 44, x + 24, top + 48); c.stroke();
-        c.fillStyle = e.night > 0.2 ? `rgba(255,236,190,${0.4 + 0.6 * e.night})` : col; rr(c, x + 19, top + 47, 11, 4, 2); c.fill();
-        lamps.push([x + 24.5, top + 51]);
-      }
-    }
-    if (STAGE_ID === "summer") drawLanterns(c, e, off, top);
-    c.fillStyle = rgb(shade(e.near, 0.1)); c.fillRect(0, GROUND - 38, VW, 32);
-    c.fillStyle = rgb(shade(e.near, 0.2)); c.fillRect(0, GROUND - 41, VW, 4);
-    c.strokeStyle = rgb(shade(e.near, -0.12)); c.lineWidth = 1; c.beginPath();
-    c.moveTo(0, GROUND - 22.5); c.lineTo(VW, GROUND - 22.5);
-    const bw = 24, s0 = -(off % bw);
-    for (let x = s0; x < VW + bw; x += bw) { c.moveTo(x, GROUND - 37); c.lineTo(x, GROUND - 23); c.moveTo(x + bw / 2, GROUND - 22); c.lineTo(x + bw / 2, GROUND - 6); }
-    c.stroke();
-    if (STAGE_ID === "summer") {
-      const sw = 14, k0 = -(off % (sw * 2));
-      for (let x = k0; x < VW + sw * 2; x += sw * 2) {
-        c.fillStyle = rgb(mix(hex("#E0413A"), e.near, 0.15 + e.night * 0.3)); c.fillRect(x, GROUND - 38, sw, 32);
-        c.fillStyle = rgb(mix(hex("#F6F1EA"), e.near, 0.15 + e.night * 0.3)); c.fillRect(x + sw, GROUND - 38, sw, 32);
-      }
-      c.fillStyle = rgb(shade(e.near, 0.2)); c.fillRect(0, GROUND - 41, VW, 4);
-    }
-    if (STAGE_ID === "snow") {
-      c.fillStyle = rgb(mix([246, 249, 255], e.near, e.night * 0.45));
-      for (let x = -(off % 30) - 30; x < VW + 30; x += 30) { c.beginPath(); c.ellipse(x + 15, GROUND - 42, 17, 5, 0, 0, Math.PI * 2); c.fill(); }
-    }
-    const cans = ["#E4572E", "#FFC857", "#5CC8B5", "#7A8CFF", "#F28FB1", "#FFFFFF"];
-    for (const p of L) {
-      if (!p.vend) continue;
-      const vx = p.x - off + 80;
-      if (vx > VW + 40 || vx < -40) continue;
-      const body = mix(hex("#E9EDF5"), e.near, 0.35 + e.night * 0.25);
-      c.fillStyle = rgb(body); rr(c, vx, GROUND - 56, 28, 50, 3); c.fill();
-      c.fillStyle = e.night > 0.15 ? `rgba(205,232,255,${0.55 + 0.45 * e.night})` : "rgba(205,232,255,.75)"; c.fillRect(vx + 3, GROUND - 52, 22, 20);
-      cans.forEach((can, i) => { c.fillStyle = can; c.fillRect(vx + 5 + (i % 3) * 6.5, GROUND - 50 + Math.floor(i / 3) * 9, 4, 6.5); });
-      c.fillStyle = rgb(shade(body, -0.35)); c.fillRect(vx + 5, GROUND - 17, 18, 5);
-      c.fillStyle = "#E4572E"; c.fillRect(vx + 20, GROUND - 28, 3, 3);
-      if (e.night > 0.15) glow(c, vx + 14, GROUND - 40, 46, "190,225,255", 0.28 * e.night);
-    }
+    drawStageNear(stageView(c, e), near.items, S.bgCam * near.f, lamps, S.dist);
   }
   function drawGround(c: Ctx, e: Env, lamps: [number, number][]): void {
-    const sg = c.createLinearGradient(0, GROUND - 6, 0, GROUND + 19);
-    sg.addColorStop(0, rgb(shade(e.side, -0.1))); sg.addColorStop(0.35, rgb(e.side)); sg.addColorStop(1, rgb(shade(e.side, 0.05)));
-    c.fillStyle = sg; c.fillRect(0, GROUND - 6, VW, 25);
-    c.strokeStyle = rgb(shade(e.side, -0.05)); c.lineWidth = 1;
-    c.beginPath(); c.moveTo(0, GROUND + 6); c.lineTo(VW, GROUND + 6); c.stroke();
-    c.fillStyle = rgb(shade(e.side, 0.25)); c.fillRect(0, GROUND + 19, VW, 5);
-    c.fillStyle = rgb(shade(e.side, -0.2)); c.fillRect(0, GROUND + 23, VW, 1.5);
-    const rg = c.createLinearGradient(0, GROUND + 24, 0, VH);
-    rg.addColorStop(0, rgb(shade(e.road, 0.05))); rg.addColorStop(1, rgb(shade(e.road, -0.18)));
-    c.fillStyle = rg; c.fillRect(0, GROUND + 24, VW, VH - GROUND - 24);
-    if (STAGE_ID === "town" || STAGE_ID === "summer") { c.fillStyle = rgb(mix(e.road, WHITE, 0.35)); c.fillRect(0, GROUND + 30, VW, 1.6); }
-    const ly = GROUND + 24 + (VH - GROUND - 24) * 0.5;
-    if (STAGE_ID === "town") {
-      c.fillStyle = rgb(mix(e.road, WHITE, 0.26));
-      const dw = 96, d0 = -(S.cam % dw);
-      for (let x = d0; x < VW + dw; x += dw) c.fillRect(x, ly - 1.5, 44, 3);
-    } else if (STAGE_ID === "snow") {
-      c.fillStyle = rgb(shade(e.road, -0.12)); c.fillRect(0, ly - 8, VW, 4); c.fillRect(0, ly + 6, VW, 4);
-    } else if (STAGE_ID === "hiking") {
-      c.fillStyle = rgb(shade(e.road, -0.15));
-      const gw = 26, g0 = -(S.cam % gw);
-      for (let x = g0; x < VW + gw; x += gw) { c.fillRect(x, GROUND + 30, 1.6, 5); c.fillRect(x + 11, GROUND + 44, 1.6, 6); }
-    }
-    if (e.night > 0.1) {
-      c.save(); c.globalCompositeOperation = "lighter";
-      for (const [lx, ly2] of lamps) {
-        const g = c.createLinearGradient(0, ly2, 0, GROUND + 10);
-        g.addColorStop(0, `rgba(255,220,150,${0.16 * e.night})`); g.addColorStop(1, `rgba(255,220,150,${0.03 * e.night})`);
-        c.fillStyle = g;
-        c.beginPath(); c.moveTo(lx - 5, ly2); c.lineTo(lx + 5, ly2); c.lineTo(lx + 46, GROUND + 12); c.lineTo(lx - 46, GROUND + 12); c.closePath(); c.fill();
-        glow(c, lx, ly2, 20, "255,230,170", 0.5 * e.night);
-        c.fillStyle = `rgba(255,220,150,${0.16 * e.night})`; ell(c, lx, GROUND + 7, 50, 9); c.fill();
-      }
-      c.restore();
-    }
+    drawStageGround(stageView(c, e), S.cam, lamps);
   }
   function drawMarkers(c: Ctx, e: Env): void {
     if (S.state === "ready") return;
@@ -1085,7 +928,8 @@ export function createOsanpoRun(root: HTMLElement, opts: OsanpoRunOptions): () =
    * item を渡したとき（スキルで出すとき）はそのまま使う。
    */
   const mkPickup = (x: number, y: number, item?: RunItem | null, token = 0): Pickup => {
-    const it = item !== undefined ? item : Math.random() < (S.sec === "bonus" ? ITEM_RATE_BONUS : ITEM_RATE) ? rollItem() : null;
+    const rate = (S.sec === "bonus" ? ITEM_RATE_BONUS : ITEM_RATE) + (routeOn() === "calm" ? ROUTE_CALM_ITEM_BONUS : 0);
+    const it = item !== undefined ? item : Math.random() < rate ? rollItem() : null;
     return { item: it, token, x, y, vy: 0, ph: Math.random() * 6, taken: false, hinted: false, look: "" };
   };
   function treatArc(x0: number, x1: number, peak: number): void {
@@ -1107,15 +951,15 @@ export function createOsanpoRun(root: HTMLElement, opts: OsanpoRunOptions): () =
     let extra = 0;
     if (S.sec === "bonus") { extra = spawnBonusItems(X); S.next = 110 + extra + Math.random() * 80; return; }
     const rush = S.sec === "rush", rain = S.rain > 0.3;
-    const kind = pickWeighted([
+    const kind = pickWeighted(([
       ["cone", 3], ["puddle", rain ? 5 : 2], ["bike", t > 6 ? 2.2 : 0], ["crow", t > 12 ? 2 : 0], ["double", t > 24 || rush ? 1.6 : 0],
       ["cat", t > 18 ? 1.6 : 0], ["sign", t > 30 ? 1.4 : 0], ["pigeons", t > 9 ? 1.3 : 0], ["noren", t > 14 ? 1.8 : 0], ["lowcrow", t > 22 ? 1.2 : 0],
       ["roller", t > 16 ? 1.4 : 0], ["drop", t > 20 ? 1.2 : 0], ["buddy", t > 8 ? 1 : 0], ["geyser", t > 26 ? 1.2 : 0],
       ["suitcase", t > TRICK_SPECS.suitcase.from ? TRICK_SPECS.suitcase.weight : 0],
       ["surprise", t > TRICK_SPECS.surprise.from ? TRICK_SPECS.surprise.weight : 0],
       ["drone", t > TRICK_SPECS.drone.from ? TRICK_SPECS.drone.weight : 0],
-      ["row", rush ? 0 : 1.3], ["high", rush ? 0 : 1.1],
-    ] as const);
+      ["row", rush ? 0 : 1.3], ["high", rush ? 0 : 1.1], ["sniff", t > 10 && !rush ? 0.8 : 0],
+    ] as const).map(([k, w]) => [k, w * routeWeight(k)] as const));
     const blocked = (k: ObstacleKind, low = false) => K.buffs.some((a) => a.b.noSpawn && inGroup({ kind: k, low } as Obstacle, a.b.noSpawn));
     const obsKind: Partial<Record<typeof kind, [ObstacleKind, boolean]>> = {
       cone: ["cone", false], puddle: ["puddle", false], bike: ["bike", false], crow: ["crow", false], lowcrow: ["crow", true], double: ["cone", false],
@@ -1167,10 +1011,332 @@ export function createOsanpoRun(root: HTMLElement, opts: OsanpoRunOptions): () =
       case "buddy": addObs("buddy", X + 60, 44, 40, { phase: Math.floor(rand(0, DOG_SKIN_IDS.length)), vx: rand(20, 40) }); if (Math.random() < 0.5) treatArc(X - 50, X + 84, 70); break;
       case "geyser": addObs("geyser", X, 24, 0, { phase: rand(0, GEYSER_CYCLE) }); extra = 30; break;
       case "noren": addObs("noren", X, 58, 0); if (Math.random() < 0.6) for (let i = 0; i < 4; i++) pickups.push(mkPickup(X - 10 + i * 28, GROUND - 14)); extra = 40; break;
+      case "sniff": sniffs.push({ x: X + 30, dug: false, hinted: false, ph: Math.random() * 6 }); extra = 60; break;
       case "row": { const h = Math.random() < 0.5 ? 0 : rand(60, 96); for (let i = 0; i < 5; i++) pickups.push(mkPickup(X + i * 30, GROUND - 18 - h)); break; }
       case "high": { const h = rand(150, 178); for (let i = 0; i < 5; i++) pickups.push(mkPickup(X + i * 30, GROUND - h - Math.sin((i / 4) * Math.PI) * 10)); break; }
     }
-    S.next = (170 + S.speed * 0.55 + Math.random() * S.speed * 0.8) * (rush ? 0.68 : 1) + extra;
+    S.next = (170 + S.speed * 0.55 + Math.random() * S.speed * 0.8) * (rush ? 0.68 : 1) * routeGap() + extra;
+  }
+  /* ---------- 思い出の看板（自分のおでかけ写真） ---------- */
+  type MemoryPhoto = { img: HTMLImageElement; name: string; pref: string; tall: boolean };
+  const memoryPhotos: MemoryPhoto[] = [];
+  // 読み込めた写真だけ使う。縦長かどうかで看板の向きを決める
+  for (const p of opts.memoryPhotos ?? []) {
+    const img = new Image();
+    img.decoding = "async";
+    img.onload = () => {
+      if (img.naturalWidth && img.naturalHeight) memoryPhotos.push({ img, name: p.name, pref: p.pref, tall: img.naturalHeight > img.naturalWidth });
+    };
+    img.src = p.src;
+  }
+  let memoryOrder: number[] = [];
+  /** 同じ写真ばかり続かないよう、全部を一巡してから並べ直す */
+  function nextMemoryPhoto(): number {
+    if (!memoryOrder.length) {
+      memoryOrder = memoryPhotos.map((_, i) => i);
+      for (let i = memoryOrder.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [memoryOrder[i], memoryOrder[j]] = [memoryOrder[j]!, memoryOrder[i]!]; }
+    }
+    return memoryOrder.pop()!;
+  }
+  function tickMemory(dt: number): void {
+    if (S.memo) {
+      if (!S.memo.passed && S.dist >= S.memo.at) {
+        S.memo.passed = true;
+        const ph = memoryPhotos[S.memo.photo];
+        if (ph) { const v = addPts(MEMORY_SIGN_PTS); floatText(P.x + 20, P.y - 70, `思い出：${ph.name} +${v}`, "#FFD9A8", 13); }
+      }
+      if (S.dist > S.memo.at + VW) S.memo = null;
+      return;
+    }
+    if (!memoryPhotos.length) return;
+    S.memoT -= dt;
+    if (S.memoT > 0 || S.fork) return;
+    S.memo = { at: S.dist + VW + 90 - P.x, photo: nextMemoryPhoto(), passed: false };
+    S.memoT = rand(25, 35);
+  }
+  /**
+   * 木の枠に写真を入れた看板。下の札にスポット名と都道府県。
+   * 横向き（横4:縦3）は脚2本、縦向き（横3:縦4）は真ん中の支柱1本で立てる
+   */
+  function drawMemory(c: Ctx, e: Env): void {
+    if (!S.memo) return;
+    const ph = memoryPhotos[S.memo.photo];
+    if (!ph) return;
+    const x = P.x + (S.memo.at - S.dist);
+    const pw = ph.tall ? 60 : 92, phh = ph.tall ? 80 : 69, fr = 5, bw = pw + fr * 2, bh = phh + fr * 2;
+    if (x + bw / 2 < -20 || x - bw / 2 > VW + 20) return;
+    const top = GROUND - 38 - bh, left = x - bw / 2;
+    if (e.night > 0.2) glow(c, x, top + bh / 2, bw * 0.8, "255,226,170", 0.35 * e.night);
+    const wood = mix(hex("#9A6B43"), e.near, 0.1 + e.night * 0.4);
+    c.fillStyle = rgb(shade(wood, -0.15));
+    if (ph.tall) c.fillRect(x - 3, top + bh - 2, 6, GROUND - (top + bh) + 2);
+    else {
+      c.fillRect(left + 12, top + bh - 2, 5, GROUND - (top + bh) + 2);
+      c.fillRect(left + bw - 17, top + bh - 2, 5, GROUND - (top + bh) + 2);
+    }
+    c.fillStyle = rgb(wood); rr(c, left, top, bw, bh, 4); c.fill();
+    c.save();
+    rr(c, left + fr, top + fr, pw, phh, 2); c.clip();
+    // 枠（4:3 / 3:4）いっぱいに、はみ出す分は中央で切って貼る
+    const iw = ph.img.naturalWidth, ih = ph.img.naturalHeight, k = Math.max(pw / iw, phh / ih);
+    c.drawImage(ph.img, left + fr + (pw - iw * k) / 2, top + fr + (phh - ih * k) / 2, iw * k, ih * k);
+    if (e.night > 0.05) { c.fillStyle = `rgba(20,14,40,${(e.night * 0.35).toFixed(3)})`; c.fillRect(left, top, bw, bh); }
+    c.restore();
+    const label = ph.pref ? `${ph.name}（${ph.pref}）` : ph.name;
+    c.font = font(8); c.textAlign = "center"; c.textBaseline = "middle";
+    const lw = Math.min(Math.max(bw + 10, 100), c.measureText(label).width + 14);
+    c.fillStyle = "rgba(246,239,228,.95)"; rr(c, x - lw / 2, top + bh + 3, lw, 13, 3); c.fill();
+    c.fillStyle = "#3A2A1C"; c.fillText(label, x, top + bh + 10, lw - 6);
+  }
+
+  /* ---------- ご近所さんとのあいさつ ---------- */
+  function greetNeighbor(o: Obstacle): void {
+    const skin = buddySkin(o), before = neighborLevel(neighborGreets(skin));
+    neighbors.greets[skin] = neighborGreets(skin) + 1;
+    saveNeighbors();
+    const lv = neighborLevel(neighborGreets(skin)), L = NEIGHBOR_LEVELS[lv]!, name = neighborName(skin);
+    const v = addPts(L.pts);
+    floatText(P.x + 20, P.y - 70, `くんくん… ${name}にごあいさつ +${v}`, "#FFB3C7", 14);
+    if (L.gift === "bones") treatArc(P.x + 30, P.x + 170, 60);
+    else if (L.gift === "item") { pickups.push(mkPickup(P.x + 40, GROUND - 40, rollGiftItem())); floatText(P.x + 20, P.y - 90, `${name}がおみやげをくれた！`, "#FFE08A", 13); }
+    if (lv > before) {
+      floatText(VW / 2, GROUND * 0.26, `${name}と「${L.name}」になった！`, "#FFB3C7", 18);
+      sfx.fanfare(); puff(o.x + o.w / 2, GROUND - 40, 14, "spark", { g: 0 });
+    }
+  }
+  /** おみやげ・においかぎで出るアイテム。SR以上が出やすい */
+  function rollGiftItem(): RunItem {
+    const boosted = rarityWeights.map(([r, w]) => [r, rarityIndex(r) >= 2 ? w * 2.2 : w] as const);
+    return pickOne(byRarity.get(pickWeighted(boosted))!);
+  }
+
+  /* ---------- においかぎ ---------- */
+  function tickSniffs(dt: number, playing: boolean): void {
+    for (const sn of sniffs) {
+      sn.x -= S.speed * dt; sn.ph += dt;
+      if (!playing || sn.dug) continue;
+      if (!sn.hinted && sn.x < P.x + 240) { sn.hinted = true; hint("sniff"); }
+      if (P.ground && P.slide && Math.abs(sn.x - P.x) < 22) digSniff(sn);
+    }
+    sniffs = sniffs.filter((sn) => sn.x > -60);
+  }
+  function digSniff(sn: Sniff): void {
+    sn.dug = true; S.digs++;
+    puff(sn.x, GROUND - 2, RM ? 8 : 16, "dust", { vy: -90 });
+    tone(220, 0.1, "triangle", 0.05, 160); tone(520, 0.1, "square", 0.03, 700, 0.08);
+    const kind = pickWeighted(SNIFF_REWARDS.map((r) => [r.kind, r.weight] as const));
+    if (kind === "bones") {
+      treatArc(P.x + 20, P.x + 150, 70);
+      floatText(P.x + 20, P.y - 64, "ほねを掘り当てた！", "#F3EBDD", 14);
+    } else if (kind === "item") {
+      pickups.push(mkPickup(P.x + 34, GROUND - 36, rollGiftItem()));
+      floatText(P.x + 20, P.y - 64, "何か埋まってた！", "#FFE08A", 14);
+    } else {
+      const v = addPts(5);
+      floatText(P.x + 20, P.y - 64, `古いくつした… +${v}`, "#C9C3F0", 13);
+    }
+  }
+  /** 盛り土と、ゆらゆら立ちのぼる「くんくん」のにおい */
+  function drawSniffs(c: Ctx, e: Env): void {
+    for (const sn of sniffs) {
+      if (sn.x < -40 || sn.x > VW + 40) continue;
+      const soil = mix(hex(STAGE_ID === "snow" ? "#DCE4F2" : "#8A6A48"), e.near, 0.15 + e.night * 0.35);
+      if (sn.dug) {
+        c.fillStyle = rgb(shade(soil, -0.25)); ell(c, sn.x, GROUND + 1, 13, 3); c.fill();
+        c.fillStyle = rgb(soil); ell(c, sn.x + 12, GROUND - 1, 6, 3); c.fill();
+        continue;
+      }
+      c.fillStyle = rgb(soil); ell(c, sn.x, GROUND, 12, 4.5); c.fill();
+      c.fillStyle = rgb(shade(soil, 0.18)); ell(c, sn.x - 3, GROUND - 2, 5, 1.8); c.fill();
+      const a = 0.55 + 0.25 * Math.sin(sn.ph * 4);
+      c.strokeStyle = `rgba(255,226,150,${a})`; c.lineWidth = 2; c.lineCap = "round";
+      for (let k = -1; k <= 1; k++) {
+        c.beginPath();
+        for (let q = 0; q <= 8; q++) {
+          const y = GROUND - 6 - q * 3.2, x = sn.x + k * 6 + Math.sin(q * 0.9 + sn.ph * (RM ? 0 : 5) + k) * 2.4;
+          if (q) c.lineTo(x, y); else c.moveTo(x, y);
+        }
+        c.stroke();
+      }
+      const ty = GROUND - 40 - Math.sin(sn.ph * 3) * 1.5;
+      c.font = font(8); c.textAlign = "center"; c.textBaseline = "middle";
+      c.fillStyle = "rgba(40,30,60,0.55)"; rr(c, sn.x - 19, ty - 6.5, 38, 13, 6.5); c.fill();
+      c.fillStyle = "#FFE7A3"; c.fillText("くんくん", sn.x, ty + 0.5);
+    }
+  }
+
+  /* ---------- 今日のミッション ---------- */
+  const MISSIONS = opts.missions ?? [];
+  const missionDone = new Set(opts.missionsDone ?? []);
+  function missionValue(metric: OsanpoRunMissionMetric): number {
+    switch (metric) {
+      case "bones": return S.bones;
+      case "meters": return Math.floor(S.dist / 50);
+      case "items": return S.treats;
+      case "rarePlus": return S.srPlus;
+      case "pigeons": return S.pigeonsRun;
+      case "slides": return S.slidesRun;
+      case "greets": return S.greetsRun;
+      case "rushes": return S.rushes;
+      case "combo": return S.maxMult;
+      case "closes": return S.closes;
+      case "skills": return S.skillIds.size;
+      case "score": return score();
+      case "routeCalm": return S.routeCalm;
+      case "routeRisky": return S.routeRisky;
+      case "bonusGot": return S.bonusBest;
+    }
+  }
+  function tickMissions(): void {
+    for (const m of MISSIONS) {
+      if (missionDone.has(m.id) || missionValue(m.metric) < m.target) continue;
+      missionDone.add(m.id);
+      S.missionsNow.push(m.id);
+      const all = MISSIONS.every((x) => missionDone.has(x.id));
+      floatText(VW / 2, GROUND * 0.18, all ? "ミッション コンプリート！" : "ミッション達成！", "#FFE08A", 20);
+      showNote(`✓ ${m.text}`);
+      sfx.fanfare();
+      renderMissions();
+      opts.onMissionClear?.(m.id).then((coins) => { if (coins) { S.missionCoins += coins; renderMissionResult(); } }).catch(() => undefined);
+    }
+  }
+  /** スタート画面の「今日のミッション」 */
+  function renderMissions(): void {
+    const box = $("missions");
+    box.hidden = MISSIONS.length === 0;
+    if (box.hidden) return;
+    box.replaceChildren();
+    const done = MISSIONS.filter((m) => missionDone.has(m.id)).length;
+    const head = document.createElement("b");
+    head.textContent = `今日のミッション ${done}/${MISSIONS.length}`;
+    const note = document.createElement("small");
+    note.textContent = done === MISSIONS.length ? "ぜんぶ達成！ また明日" : `1つ${MISSION_COINS}コイン・ぜんぶで+${MISSION_ALL_BONUS}`;
+    const top = document.createElement("div"); top.className = "osr-missions-head"; top.append(head, note);
+    const ul = document.createElement("ul");
+    for (const m of MISSIONS) {
+      const li = document.createElement("li");
+      li.dataset.done = missionDone.has(m.id) ? "1" : "0";
+      li.textContent = m.text;
+      ul.appendChild(li);
+    }
+    box.append(top, ul);
+  }
+  /** 結果画面に、このおさんぽで達成したミッションともらったコインを出す */
+  function renderMissionResult(): void {
+    const el = $("o-missions");
+    el.hidden = S.missionsNow.length === 0;
+    if (el.hidden) return;
+    const names = S.missionsNow.map((id) => MISSIONS.find((m) => m.id === id)?.text ?? "").filter(Boolean);
+    el.textContent = `ミッション達成：${names.join("／")}${S.missionCoins > 0 ? `（+${S.missionCoins.toLocaleString()}コイン）` : ""}`;
+  }
+
+  /* ---------- 分かれ道 ---------- */
+  /** 上の道（calm）は障害物をまばらに・拾うものを多く、下の道（risky）は障害物を詰める */
+  function routeWeight(kind: string): number {
+    const k = routeOn();
+    if (!k) return 1;
+    const pickup = kind === "row" || kind === "high";
+    if (k === "calm") return pickup ? 1.8 : kind === "pigeons" || kind === "buddy" ? 1.6 : 0.7;
+    return pickup ? 0.6 : 1;
+  }
+  function routeGap(): number {
+    const k = routeOn();
+    return k === "calm" ? 1.15 : k === "risky" ? 0.85 : 1;
+  }
+  const routeName = (k: OsanpoRunRouteKind) => OSANPO_RUN_ROUTES[STAGE_ID][k];
+  /** いま効いている道（入口ゲートを過ぎてから出口ゲートを過ぎるまで） */
+  function routeOn(): OsanpoRunRouteKind | null {
+    return S.route?.on ? S.route.kind : null;
+  }
+  function showNote(text: string, sec = 2.6): void {
+    const el = $("hint");
+    el.textContent = text;
+    showAgain(el);
+    hintT = sec;
+  }
+  /** ふつうの区間で、前に障害物が残っていないときだけ、画面の右端に道しるべを出す */
+  function tickFork(dt: number): void {
+    if (S.route) {
+      const r = S.route;
+      if (!r.on && r.exit === null && S.dist >= r.gate) {
+        r.on = true;
+        floatText(VW / 2, GROUND * 0.3, `${routeName(r.kind)}に入った！`, r.kind === "calm" ? "#9BE3A8" : "#FFB27A", 20);
+        showNote(OSANPO_RUN_ROUTE_DESC[r.kind]);
+      }
+      if (r.on && r.exit === null) {
+        r.t -= dt;
+        // 時間が来たら、画面の右端に出口ゲートを置く（そこまでは今の道のまま）
+        if (r.t <= 0) r.exit = S.dist + VW + 60 - P.x;
+      }
+      if (r.on && r.exit !== null && S.dist >= r.exit) {
+        r.on = false;
+        floatText(VW / 2, GROUND * 0.3, "もとの道に合流！", "#F6EFE4", 18);
+      }
+      // 景色が画面の左へ流れきったら消して、次の分かれ道を待つ
+      if (r.exit !== null && P.x + (r.exit - S.dist) < -160) { S.route = null; S.forkT = rand(40, 60); }
+      return;
+    }
+    if (S.fork) {
+      if (S.dist < S.fork.at) return;
+      const kind: OsanpoRunRouteKind = P.ground ? "risky" : "calm";
+      S.fork = null;
+      // 入口ゲートは画面の右端から流れてくる。くぐったところから道が変わる
+      S.route = { kind, t: OSANPO_RUN_ROUTE_SEC, gate: S.dist + VW + 70 - P.x, exit: null, on: false };
+      if (kind === "calm") S.routeCalm++; else S.routeRisky++;
+      floatText(VW / 2, GROUND * 0.3, `${routeName(kind)}ルートへ！`, kind === "calm" ? "#9BE3A8" : "#FFB27A", 22);
+      sfx.pass();
+      return;
+    }
+    S.forkT -= dt;
+    if (S.forkT > 0 || S.sec !== "normal" || S.memo || obstacles.some((o) => !o.hit && !o.gone && o.x + o.w > VW - 160)) return;
+    S.fork = { at: S.dist + VW + 60 - P.x };
+    S.next = Math.max(S.next, 280);
+    showNote(`分かれ道！ 跳んで通ると${routeName("calm")}、そのままだと${routeName("risky")}`, 3);
+  }
+  /* ---------- 分かれ道のあとの景色 ---------- */
+  const ROUTE_THEMES: Record<OsanpoRunStageId, Record<OsanpoRunRouteKind, RouteTheme>> = {
+    town: { calm: "park", risky: "arcade" },
+    hiking: { calm: "stream", risky: "ridge" },
+    snow: { calm: "kamakura", risky: "onsen" },
+    summer: { calm: "riverbank", risky: "yatai" },
+  };
+  /**
+   * 入口ゲートから出口ゲートまでのあいだだけ切り抜いて、その道の景色を描く（route-scene.ts）。
+   * 切れ目はゲートの柱の位置に合わせて、柱で隠す。
+   * 位置は道（S.dist）と同じ速さで流れるので、ゆったりモードで背景が止まっていても動いて見える
+   */
+  function drawRouteScene(c: Ctx, e: Env): void {
+    const r = S.route;
+    if (!r) return;
+    const gx = P.x + (r.gate - S.dist), ex = r.exit === null ? Infinity : P.x + (r.exit - S.dist);
+    const seamL = gx - ROUTE_GATE_HALF, seamR = ex + ROUTE_GATE_HALF;
+    const left = Math.max(-10, seamL), right = Math.min(VW + 10, seamR);
+    const theme = ROUTE_THEMES[STAGE_ID][r.kind];
+    if (right > left) {
+      c.save();
+      c.beginPath(); c.rect(left, 0, right - left, GROUND + 19); c.clip();
+      drawRouteSceneLayer({ c, e, g: GROUND, t: S.time, base: gx, left, right, still: S.calm, calm: RM, seamL: seamL > -10, seamR: seamR < VW + 10 }, theme);
+      c.restore();
+    }
+    if (gx > -80 && gx < VW + 80) drawRouteGate(c, e, GROUND, gx, theme, routeName(r.kind), S.time);
+    if (Number.isFinite(ex) && ex > -80 && ex < VW + 80) drawRouteGate(c, e, GROUND, ex, theme, "もとの道 →", S.time);
+  }
+  function drawFork(c: Ctx, e: Env): void {
+    if (!S.fork) return;
+    const x = P.x + (S.fork.at - S.dist) + 8;
+    if (x < -60 || x > VW + 80) return;
+    if (e.night > 0.2) glow(c, x, GROUND - 70, 40, "255,236,190", 0.3 * e.night);
+    c.fillStyle = rgb(shade(hex("#8A6A4A"), -0.1 * e.night)); c.fillRect(x - 2.5, GROUND - 96, 5, 94);
+    const board = (y: number, up: boolean, label: string, col: string) => {
+      c.save(); c.translate(x, y); if (up) c.rotate(-0.28);
+      c.fillStyle = col;
+      c.beginPath(); c.moveTo(-6, -9); c.lineTo(46, -9); c.lineTo(56, 0); c.lineTo(46, 9); c.lineTo(-6, 9); c.closePath(); c.fill();
+      c.fillStyle = "#2A1E0A"; c.textAlign = "center"; c.textBaseline = "middle"; c.font = font(8);
+      c.fillText(label, 24, 0.5);
+      c.restore();
+    };
+    board(GROUND - 84, true, `↑${routeName("calm")}`, "#9BE3A8");
+    board(GROUND - 58, false, routeName("risky"), "#FFB27A");
   }
   function setSection(k: Section): void {
     S.sec = k; S.bonusGot = 0;
@@ -1238,7 +1404,7 @@ export function createOsanpoRun(root: HTMLElement, opts: OsanpoRunOptions): () =
   function jump(v: number, n: 1 | 2, quiet = false): void {
     let k = M.jump;
     if (n === 1 && !quiet && K.bigJumps.length) { k *= K.bigJumps.shift()!; puff(P.x, GROUND, 10, "ring", { vy: 30, g: 0 }); }
-    P.vy = -v * k; P.ground = false; P.jumps = n === 1 ? BASE_AIR_JUMPS + M.air : Math.max(0, P.jumps - 1); P.sq = 1.22; P.slide = false; P.slideHeld = false; P.jumpAt = S.time;
+    P.vy = -v * k; P.ground = false; P.jumps = n === 1 ? BASE_AIR_JUMPS + M.air : Math.max(0, P.jumps - 1); P.sq = 1.22; P.slide = false; P.slideHeld = false; P.jumpAt = S.time; P.dive = false;
     if (M.rhythm > 0 && S.state === "play" && !quiet) {
       const beat = 60 / BGM.bpm, ph = (S.time % beat) / beat;
       if (ph < 0.18 || ph > 0.82) { const got = addPts(M.rhythm); floatText(P.x + 20, P.y - 70, `♪ +${got}`, "#9BE7FF", 15); }
@@ -1263,7 +1429,7 @@ export function createOsanpoRun(root: HTMLElement, opts: OsanpoRunOptions): () =
     ensureAudio();
     if (S.state !== "play" || S.paused) return;
     if (!P.ground && S.time - P.jumpAt < 0.14 && P.vy < 0) { P.y = GROUND; P.vy = 0; P.ground = true; P.jumps = 2; }
-    if (!P.ground) { P.vy = Math.max(P.vy, 950); P.slideHeld = held; P.slideT = dur; P.slide = true; return; }
+    if (!P.ground) { P.vy = Math.max(P.vy, 950); P.slideHeld = held; P.slideT = dur; P.slide = true; P.dive = true; return; }
     if (!P.slide) { tone(260, 0.12, "triangle", 0.05, 140); puff(P.x + 16, GROUND, 6, "dust", { vy: -10 }); }
     P.slide = true; P.slideHeld = held; P.slideT = dur; P.sq = 0.85;
   }
@@ -1391,8 +1557,8 @@ export function createOsanpoRun(root: HTMLElement, opts: OsanpoRunOptions): () =
     S.state = "ready"; S.paused = false; S.clock = STAGE.clock; S.rain = 0; S.rainTarget = 0; S.sec = "normal";
     applyAudio(); bgmStop();
     Object.assign(P, { y: GROUND, vy: 0, ground: true, jumps: 2, sq: 1, rot: 0, inv: 0, dead: false, slide: false, slideHeld: false });
-    obstacles = []; pickups = []; texts = []; flyers = []; parts = [];
-    hidePanels(); buildStageList(); selectStage(STAGE_ID);
+    obstacles = []; pickups = []; texts = []; flyers = []; parts = []; sniffs = []; S.fork = null; S.route = null; S.memo = null;
+    hidePanels(); buildStageList(); selectStage(STAGE_ID); renderMissions();
     $("start-panel").hidden = false;
     $("start").focus({ preventScroll: true });
   }
@@ -1547,7 +1713,7 @@ export function createOsanpoRun(root: HTMLElement, opts: OsanpoRunOptions): () =
   /* ---------- 設定 ---------- */
   type OptKey = "calm" | "bgm" | "sfx" | "vib";
   const OPTS: readonly [OptKey, string, string][] = [
-    ["calm", "ゆったりモード", "背景を止めて、道と障害物だけが動きます。酔いやすい人向け。"],
+    ["calm", "ゆったりモード", "背景を止めて、道と障害物だけが動きます。背景の動きで酔いやすい人向け。"],
     ["bgm", "BGM", "ステージごとの音楽を流します。"],
     ["sfx", "効果音", "ジャンプやアイテム、雨の音。"],
     ["vib", "振動", "ぶつかったときに振動します（対応するスマホのみ）。"],
@@ -1575,6 +1741,31 @@ export function createOsanpoRun(root: HTMLElement, opts: OsanpoRunOptions): () =
     for (const b of $$("[data-opt]")) on(b, "click", () => { ensureAudio(); const k = b.dataset.opt as OptKey; setOpt(k, !getOpt(k)); });
     syncOpts();
   }
+  /** 設定画面の「ご近所さん」。顔・名前の入力欄・なかよし度 */
+  function renderNeighbors(): void {
+    const box = $("nb-list");
+    box.replaceChildren();
+    for (const skin of DOG_SKIN_IDS) {
+      const li = document.createElement("li");
+      const face = document.createElement("img");
+      face.className = "osr-nbr-face"; face.alt = ""; face.width = 44; face.height = 37; face.draggable = false;
+      setDogSprite(face, skin, "stand-happy");
+      const body = document.createElement("div");
+      const input = document.createElement("input");
+      input.type = "text"; input.maxLength = NEIGHBOR_NAME_MAX; input.placeholder = OSANPO_RUN_NEIGHBOR_DEFAULT_NAMES[skin];
+      input.value = neighbors.names[skin] ?? ""; input.setAttribute("aria-label", `${getDogSkin(skin).name}の名前`);
+      input.autocomplete = "off"; input.enterKeyHint = "done";
+      on(input, "input", () => { neighbors.names[skin] = input.value.slice(0, NEIGHBOR_NAME_MAX); saveNeighbors(); });
+      on(input, "keydown", (e) => { e.stopPropagation(); if (e.key === "Enter") input.blur(); });
+      const greets = neighborGreets(skin), lv = neighborLevel(greets), next = NEIGHBOR_LEVELS[lv + 1];
+      const meta = document.createElement("small");
+      meta.textContent = `${getDogSkin(skin).name}・${NEIGHBOR_LEVELS[lv]!.name}（あいさつ${greets}回${next ? `・あと${next.greets - greets}回で「${next.name}」` : ""}）`;
+      const hearts = document.createElement("span"); hearts.className = "osr-nbr-hearts"; hearts.textContent = "♥".repeat(lv) + "♡".repeat(NEIGHBOR_LEVELS.length - 1 - lv);
+      body.append(input, meta);
+      li.append(face, body, hearts);
+      box.appendChild(li);
+    }
+  }
   let setReturn: string | null = null;
   function openSettings(): void {
     ensureAudio();
@@ -1583,6 +1774,7 @@ export function createOsanpoRun(root: HTMLElement, opts: OsanpoRunOptions): () =
     if (S.state === "play" && !S.paused) { S.paused = true; setReturn = "pause-panel"; applyAudio(); }
     $("settings-panel").hidden = false;
     syncOpts();
+    renderNeighbors();
     $("set-close").focus({ preventScroll: true });
   }
   function closeSettings(): void {
@@ -1717,6 +1909,7 @@ export function createOsanpoRun(root: HTMLElement, opts: OsanpoRunOptions): () =
       M.comboLock ||= Boolean(b.comboLock); M.dry ||= Boolean(b.dry); M.clear ||= Boolean(b.clear); M.bright ||= Boolean(b.bright);
       step += a.acc;
     }
+    if (S.stepT > 0) M.mul *= STEP_BOOST_MUL;
     M.mul *= (1 + step) * K.runMul * (envAt(S.clock).night > 0.5 ? K.nightMul : 1) * (S.wx ? S.wx.mul : 1);
   }
   /** 加点。スキルのスコア倍率がかかった値を返す */
@@ -2103,6 +2296,7 @@ export function createOsanpoRun(root: HTMLElement, opts: OsanpoRunOptions): () =
       const info = WEATHER_INFO[S.wx.kind];
       rows.unshift({ key: `wx-${S.wx.kind}`, item: null, glyph: info.glyph, label: info.title.split("！")[0]!, tag: info.tag, kind: "weather", t: S.wx.t, max: S.wx.max, count: "", desc: info.desc });
     }
+    if (S.stepT > 0) rows.push({ key: "steps", item: null, glyph: "👣", label: "歩数ブースト", tag: `×${STEP_BOOST_MUL}`, kind: "score", t: S.stepT, max: STEP_BOOST_SEC, count: "", desc: OSANPO_RUN_STEP_BOOSTS[0].desc });
     const clears = K.clears.reduce((n, c) => n + c.n, 0);
     if (clears) add("clears", "✦", K.clears[0]!.name, "はじく", `×${clears}`, "guard", "前から来る障害物をはじき飛ばす");
     if (K.rushPass) add("rush", "⚡", "あずき色の風", "ラッシュ無敵", "×1", "combo", "次のラッシュを無敵で乗り切り、突破ボーナスが増える");
@@ -2249,6 +2443,38 @@ export function createOsanpoRun(root: HTMLElement, opts: OsanpoRunOptions): () =
       .catch(() => { el.dataset.state = "error"; el.textContent = "通信できず、コインを受け取れませんでした"; });
   }
   const score = () => Math.floor(S.dist / 50) + S.bonus;
+  /* ---------- 歩数ブースト（今日の歩数に応じてスタート時に付く） ---------- */
+  const todaySteps = typeof opts.todaySteps === "number" ? opts.todaySteps : null;
+  const stepLv = stepBoostLevel(todaySteps);
+  function renderStepBoost(): void {
+    const box = $("step-boost");
+    box.replaceChildren();
+    const head = document.createElement("b");
+    head.textContent = todaySteps === null ? "👣 歩数ブースト" : `👣 今日 ${todaySteps.toLocaleString()}歩`;
+    const ul = document.createElement("ul");
+    for (const [i, b] of OSANPO_RUN_STEP_BOOSTS.entries()) {
+      const li = document.createElement("li");
+      li.dataset.on = i < stepLv ? "1" : "0";
+      const st = document.createElement("span"); st.textContent = `${b.steps.toLocaleString()}歩〜`;
+      const lb = document.createElement("span"); lb.textContent = b.label;
+      li.append(st, lb);
+      li.title = b.desc;
+      ul.appendChild(li);
+    }
+    const note = document.createElement("small");
+    note.textContent = todaySteps === null
+      ? "アプリに歩数を同期すると、歩いた分だけスタートが有利になります。"
+      : stepLv === OSANPO_RUN_STEP_BOOSTS.length ? "ぜんぶ付いてスタート！" : `あと${(OSANPO_RUN_STEP_BOOSTS[stepLv]!.steps - todaySteps).toLocaleString()}歩で「${OSANPO_RUN_STEP_BOOSTS[stepLv]!.label}」`;
+    box.append(head, ul, note);
+  }
+  /** スタートの合図と同時に、届いている段階の効果を付ける */
+  function applyStepBoost(): void {
+    if (stepLv <= 0) return;
+    S.stepT = STEP_BOOST_SEC;
+    if (stepLv >= 2 && wardRank() < 2) { clearWards(); S.shield = true; sfx.barrier(); }
+    if (stepLv >= 3) setSection("bonus");
+    floatText(VW / 2, GROUND * 0.22, `歩数ブースト！ ${todaySteps?.toLocaleString() ?? 0}歩`, "#9BE7FF", 18);
+  }
   function start(): void {
     closeSheet();
     hidePanels();
@@ -2256,12 +2482,14 @@ export function createOsanpoRun(root: HTMLElement, opts: OsanpoRunOptions): () =
     FX.fade = RM ? 0 : 1;
     Object.assign(S, {
       state: "intro", introT: 0, roundId: newRoundId(), slowT: 0, wx: null, wxT: rand(25, 40), knocks: 0, rares: 0, skillIds: new Set<string>(), tricks: newTrickRun(), bestD: bestDistOf(STAGE_ID), passedBest: false, recordShown: false, fwT: 2,
-      t: 0, speed: 0, dist: 0, bonus: 0, treats: 0, clock: STAGE.clock, next: 420, shield: false, chain: 0, chainT: 0, mult: 1, maxMult: 1,
+      t: 0, speed: 0, dist: 0, bonus: 0, treats: 0, clock: STAGE.clock, srPlus: 0, pigeonsRun: 0, slidesRun: 0, greetsRun: 0, routeCalm: 0, routeRisky: 0, bonusBest: 0, missionCoins: 0, missionsNow: [], stomps: 0, digs: 0,
+      memo: null, memoT: rand(15, 25),
+      stepT: 0, fork: null, route: null, forkT: rand(35, 50), next: 420, shield: false, chain: 0, chainT: 0, mult: 1, maxMult: 1,
       paused: false, deadT: 0, milestone: 100, bufT: 0, haul: new Map<string, number>(), sec: "normal", secT: 18, rain: 0, rainTarget: 0, rainT: 0,
       bones: 0, newAch: [], newKinds: [], rainWalk: 0, rushes: 0, closes: 0, bonusGot: 0,
     });
     Object.assign(P, { y: GROUND, vy: 0, ground: true, jumps: 2, sq: 1, rot: 0, inv: 0, dead: false, slide: false, slideT: 0, slideHeld: false, jumpAt: -1 });
-    obstacles = []; pickups = []; texts = []; flyers = []; parts = [];
+    obstacles = []; pickups = []; texts = []; flyers = []; parts = []; sniffs = []; stompAt = -1; P.dive = false;
     K = newSkillState(); refreshMods();
     applyAudio();
     floatText(P.x + 4, P.y - 84, "よーい…", "#F6EFE4", 20);
@@ -2364,6 +2592,8 @@ export function createOsanpoRun(root: HTMLElement, opts: OsanpoRunOptions): () =
     store.set(`rec-${STAGE_ID}`, JSON.stringify(recs.slice(0, 5)));
     lastRecordAt = now;
     S.lastResult = { score: sc, m: meters, items: S.treats, rank: rank.label };
+    tickMissions();
+    renderMissionResult();
     sendResult(sc, meters);
     $("over-sub").textContent = `${STAGE.name} ・ ${STAGE.skinName} ・ ${fmtClock(S.clock)}帰宅`;
     if (isNew && sc > 0) sfx.record(); else sfx.home();
@@ -2488,7 +2718,8 @@ export function createOsanpoRun(root: HTMLElement, opts: OsanpoRunOptions): () =
       if (kindSet.size >= 50) unlock("kinds50");
       if (ITEMS.every((it) => kindSet.has(it.id))) unlock("kindsAll");
     }
-    if (S.sec === "bonus" && ++S.bonusGot >= 15) unlock("bonus15");
+    if (S.sec === "bonus") { if (++S.bonusGot >= 15) unlock("bonus15"); S.bonusBest = Math.max(S.bonusBest, S.bonusGot); }
+    if (rarityIndex(item.rarity) >= 2) S.srPlus++;
     if (item.rarity === "MR") unlock("mr");
     if (rarityIndex(item.rarity) >= 4 && ++S.rares >= 3) unlock("rare3");
     const R = RARITY_STYLES[got.rarity];
@@ -2546,9 +2777,11 @@ export function createOsanpoRun(root: HTMLElement, opts: OsanpoRunOptions): () =
         floatText(P.x + 4, P.y - 84, "ドン！", "#FFC857", 24);
         puff(P.x - 10, GROUND, 8, "dust", { vy: -20 });
         if (S.bufT > 0) { S.bufT = 0; jump(JUMP_V, 1); }
+        applyStepBoost();
       }
     } else if (playing) {
       S.t += dt;
+      if (S.stepT > 0) S.stepT = Math.max(0, S.stepT - dt);
       if (!M.hold) K.ramp += dt;
       if (S.slowT > 0) S.slowT -= dt;
       tickWeather(dt);
@@ -2556,6 +2789,9 @@ export function createOsanpoRun(root: HTMLElement, opts: OsanpoRunOptions): () =
       if (S.t >= 180) unlock("survive180");
       if (S.clock >= 1440 + 300) unlock("dawn");
       tickSkills(dt);
+      tickFork(dt);
+      tickMemory(dt);
+      tickMissions();
       S.dist += S.speed * dt;
       S.clock += dt * 1.6;
       S.next -= S.speed * dt;
@@ -2607,7 +2843,10 @@ export function createOsanpoRun(root: HTMLElement, opts: OsanpoRunOptions): () =
     } else if (S.state === "over") S.speed = 0;
 
     S.cam += S.speed * dt;
-    if (!S.calm) S.bgCam += S.speed * dt;
+    // 背景は道より遅く、なめらかに流す（酔いにくいよう、速さに上限をつけて急な加速・停止をならす）
+    const bgTarget = S.calm ? 0 : Math.min(S.speed, BG_SPEED_MAX) * BG_SPEED_RATE;
+    S.bgV += (bgTarget - S.bgV) * Math.min(1, dt * BG_EASE);
+    S.bgCam += S.bgV * dt;
     fillLayer(bld, genMid, 200);
     fillLayer(near, genNear, 420);
     if (playing) BGM.bpm = 120 + clamp((S.speed - START_SPEED) / (MAX_SPEED - START_SPEED), 0, 1) * 24;
@@ -2652,6 +2891,7 @@ export function createOsanpoRun(root: HTMLElement, opts: OsanpoRunOptions): () =
       P.y += P.vy * dt;
       if (P.y >= GROUND) {
         P.y = GROUND; P.vy = 0; P.ground = true; P.jumps = 2; P.sq = 0.72;
+        if (P.dive) { stompAt = S.time; P.dive = false; }
         if (playing) { sfx.land(); puff(P.x - 4, GROUND, 5, "dust", { vy: -10 }); }
         if (playing && S.bufT > 0) { S.bufT = 0; jump(JUMP_V, 1); }
       }
@@ -2667,6 +2907,7 @@ export function createOsanpoRun(root: HTMLElement, opts: OsanpoRunOptions): () =
     if (P.ground && S.speed > 1) P.ph += dt * (S.state === "ready" ? 7 : 9 + S.speed / 40);
     if (P.ground && S.speed > 420) { P.dustT -= dt; if (P.dustT < 0) { P.dustT = 0.11; puff(P.x - 16, GROUND, 1, "dust", { vy: -10 }); } }
 
+    tickSniffs(dt, playing);
     // 障害物
     const sp = S.speed;
     for (const o of obstacles) {
@@ -2697,6 +2938,17 @@ export function createOsanpoRun(root: HTMLElement, opts: OsanpoRunOptions): () =
       if (o.kind !== "crow" && o.kind !== "noren" && o.kind !== "geyser" && o.kind !== "buddy" && !(o.kind === "drop" && !o.landed) && o.x < P.x + 22 && o.x + o.w > P.x - 18) o.minClear = Math.min(o.minClear, GROUND - o.h - P.y);
       if (o.gone) continue;
       const touching = hitTest(o);
+      if (o.kind === "puddle" && touching && S.time - stompAt < 0.15) {
+        // 水たまりスタンプ：急降下で着地したら、水たまりを踏み散らしてセーフ
+        o.gone = true; o.scored = true;
+        const v = addPts(PUDDLE_STOMP_PTS);
+        floatText(P.x + 20, P.y - 64, `バシャーン！ +${v}`, "#9BE7FF", 16);
+        puff(o.x + o.w / 2, GROUND - 2, RM ? 10 : 22, "splash", { vy: -120 });
+        tone(300, 0.14, "triangle", 0.06, 120); tone(900, 0.08, "sine", 0.04, 600, 0.04);
+        FX.hitstop = RM ? 0 : 0.04;
+        S.stomps++;
+        continue;
+      }
       if (o.kind !== "buddy" && touching) {
         S.tricks.streak = 0;
         if (isTrickKind(o.kind)) o.assisted = true;
@@ -2710,10 +2962,9 @@ export function createOsanpoRun(root: HTMLElement, opts: OsanpoRunOptions): () =
         // ほかのわんこ。ぶつかってもよくて、あいさつすると点がもらえる（少しだけ立ち止まる）
         if (!o.greeted && touching) {
           o.greeted = true; S.slowT = 0.5;
-          const v = addPts(30);
-          floatText(P.x + 20, P.y - 70, `くんくん… ${buddyName(o)}にごあいさつ +${v}`, "#FFB3C7", 14);
+          greetNeighbor(o);
           tone(660, 0.08, "sine", 0.05); tone(880, 0.1, "sine", 0.05, null, 0.08);
-          stats.greets++; saveStats();
+          stats.greets++; S.greetsRun++; saveStats();
           if (stats.greets >= 20) unlock("greet20");
         }
       } else if (P.inv <= 0 && touching) {
@@ -2730,7 +2981,8 @@ export function createOsanpoRun(root: HTMLElement, opts: OsanpoRunOptions): () =
       if (!o.hinted && o.x < P.x + (isTrickKind(o.kind) ? Math.max(220, S.speed * 1.45) : 220)) {
         o.hinted = true;
         hint(isTrickKind(o.kind) ? o.kind : o.low || o.kind === "noren" ? "slide" : o.kind === "crow" ? "crow" : o.kind === "cat" ? "cat"
-          : o.kind === "roller" || o.kind === "drop" || o.kind === "buddy" || o.kind === "geyser" ? o.kind : "jump");
+          : o.kind === "roller" || o.kind === "drop" || o.kind === "buddy" || o.kind === "geyser" ? o.kind
+          : o.kind === "puddle" && stats.plays >= 1 ? "stomp" : "jump");
       }
       if (!o.scored && o.x + o.w < P.x - (isTrickKind(o.kind) ? 30 : 18)) {
         o.scored = true;
@@ -2756,13 +3008,13 @@ export function createOsanpoRun(root: HTMLElement, opts: OsanpoRunOptions): () =
         if (M.over > 0 && !o.passed && o.kind !== "puddle") { const v = addPts(M.over); floatText(P.x + 30, P.y - 84, `こえた +${v}`, "#FFE7A3", 13); }
         if ((o.kind === "noren" || o.low) && P.slide && P.ground) {
           const v = addPts(15); floatText(P.x + 20, P.y - 50, `スライディング！ +${v}`, "#9BE7FF", 14);
-          stats.slides++; saveStats();
+          stats.slides++; S.slidesRun++; saveStats();
           if (stats.slides >= 10) unlock("slide10");
         } else if (o.kind === "crow") {
           if (P.ground) { const v = addPts(5); floatText(P.x + 20, P.y - 56, `くぐった +${v}`, "#C9C3F0", 13); }
         } else if (o.kind === "pigeons") {
           o.flee = true; const v = addPts(10);
-          stats.pigeons++; saveStats();
+          stats.pigeons++; S.pigeonsRun++; saveStats();
           if (stats.pigeons >= 10) unlock("pigeon10");
           floatText(P.x + 20, P.y - 56, `バサバサッ +${v}`, "#C9D6E8", 13);
           tone(900, 0.05, "triangle", 0.03); tone(1100, 0.05, "triangle", 0.03, null, 0.05);
@@ -2827,6 +3079,7 @@ export function createOsanpoRun(root: HTMLElement, opts: OsanpoRunOptions): () =
     const c = ctx;
     c.setTransform(DPR * SC, 0, 0, DPR * SC, 0, 0);
     drawSky(c, e);
+    drawSkyLife(stageView(c, e));
     drawWeatherSky(c);
     const mountains = STAGE_ID === "hiking" || STAGE_ID === "snow";
     if (mountains) ridge(c, e, S.bgCam * 0.003 + 900, GROUND - 70, STAGE_ID === "hiking" ? 96 : 80, mix(e.far, e.bot, 0.6), 4.2, true);
@@ -2838,10 +3091,14 @@ export function createOsanpoRun(root: HTMLElement, opts: OsanpoRunOptions): () =
     const lamps: [number, number][] = [];
     drawNear(c, e, lamps);
     drawGround(c, e, lamps);
+    drawRouteScene(c, e);
     drawMarkers(c, e);
+    drawMemory(c, e);
+    drawFork(c, e);
 
     if (S.rain > 0.02 && STAGE.weather !== "snow" && !M.clear) { c.fillStyle = `rgba(52,60,96,${0.22 * S.rain})`; c.fillRect(-20, -20, VW + 40, GROUND + 26); }
     for (const o of obstacles) if (o.kind === "puddle") drawPuddle(c, o.x, GROUND, o.w, S.time, e.night, STAGE_ID);
+    drawSniffs(c, e);
     for (const it of pickups) {
       if (it.vy > 0) {
         // 降ってくる途中は、真下の地面に影を出して着地点を知らせる
@@ -3050,6 +3307,12 @@ export function createOsanpoRun(root: HTMLElement, opts: OsanpoRunOptions): () =
       $("sec-chip").dataset.k = secKey;
       setText("sec-chip", `${secKey === "bonus" ? "ボーナスタイム" : "ラッシュ"} あと${Math.ceil(S.secT)}秒`);
     }
+    const routeKind = S.state === "play" ? routeOn() : null;
+    setFlag("route-on", Boolean(routeKind), (v) => { $("route-chip").hidden = !v; });
+    if (routeKind && S.route) {
+      $("route-chip").dataset.k = routeKind;
+      setText("route-chip", S.route.exit === null ? `${routeName(routeKind)}ルート あと${Math.max(1, Math.ceil(S.route.t))}秒` : `${routeName(routeKind)}ルート まもなく合流`);
+    }
     renderSkillRows();
     setText("combo-text", `×${S.mult} コンボ`);
     $("combo-bar").style.transform = `scaleX(${clamp(S.chainT / 1.5, 0, 1).toFixed(3)})`;
@@ -3107,6 +3370,8 @@ export function createOsanpoRun(root: HTMLElement, opts: OsanpoRunOptions): () =
 
   buildStageList();
   selectStage(STAGE_ID);
+  renderStepBoost();
+  renderMissions();
   renderAchList();
   renderZukan();
   buildRarityGuide();
