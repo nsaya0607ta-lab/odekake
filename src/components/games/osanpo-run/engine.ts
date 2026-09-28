@@ -17,6 +17,9 @@ import {
   OSANPO_RUN_ACHIEVEMENTS,
   OSANPO_RUN_HINTS,
   OSANPO_RUN_RANKS,
+  OSANPO_RUN_ROUTE_DESC,
+  OSANPO_RUN_ROUTE_SEC,
+  OSANPO_RUN_ROUTES,
   OSANPO_RUN_SONGS,
   OSANPO_RUN_STAGE_IDS,
   OSANPO_RUN_STAGES,
@@ -27,6 +30,7 @@ import {
   STEP_BOOST_SEC,
   stepBoostLevel,
   type OsanpoRunHintId,
+  type OsanpoRunRouteKind,
   type OsanpoRunStage,
   type OsanpoRunStageId,
 } from "@/lib/games/osanpo-run/config";
@@ -106,6 +110,8 @@ const GRAV = 2500, JUMP_V = 760, DJUMP_V = 640;
 const BASE_AIR_JUMPS = 2;
 /** 道に落ちているもののうち、図鑑アイテムになる割合（残りはほね）。ボーナスタイムは多め */
 const ITEM_RATE = 0.12, ITEM_RATE_BONUS = 0.25;
+/** 分かれ道：上の道でアイテムになる割合に足す分 / 下の道でSR以上が出やすくなる倍率 */
+const ROUTE_CALM_ITEM_BONUS = 0.08, ROUTE_RISKY_RARE = 2.5;
 /** 水が出たり止まったりするところ: 1周の秒数・出ている秒数・水の高さ（ふつうのジャンプでは越えられず、2段ジャンプなら越えられる） */
 const GEYSER_CYCLE = 1.4, GEYSER_ON = 0.8, GEYSER_H = 124;
 /** 上から落ちてくるものの重力 */
@@ -295,6 +301,10 @@ export function createOsanpoRun(root: HTMLElement, opts: OsanpoRunOptions): () =
       const boosted = rarityWeights.map(([r, w]) => [r, rarityIndex(r) >= 4 ? w * K.rare : w] as const);
       if (Math.random() < 0.7) return pickOne(byRarity.get(pickWeighted(boosted))!);
     }
+    if (S.route?.kind === "risky") {
+      const boosted = rarityWeights.map(([r, w]) => [r, rarityIndex(r) >= 2 ? w * ROUTE_RISKY_RARE : w] as const);
+      return pickOne(byRarity.get(pickWeighted(boosted))!);
+    }
     const stageSeries = seriesItems(STAGE.series);
     if (S.rain > 0.3 && rainItems.length && Math.random() < 0.35) return pickOne(rainItems);
     if (stageSeries.length && Math.random() < 0.3) return pickOne(stageSeries);
@@ -373,7 +383,8 @@ export function createOsanpoRun(root: HTMLElement, opts: OsanpoRunOptions): () =
   };
   const S = {
     state: "ready" as GameState, time: 0, t: 0, speed: 90, dist: 0, bonus: 0, treats: 0, clock: STAGE.clock, cam: 0, bgCam: 0,
-    stepT: 0, next: 400, shield: false, chain: 0, chainT: 0, mult: 1, maxMult: 1, paused: false, deadT: 0, introT: 0,
+    stepT: 0, fork: null as null | { at: number }, route: null as null | { kind: OsanpoRunRouteKind; t: number }, forkT: 40,
+    next: 400, shield: false, chain: 0, chainT: 0, mult: 1, maxMult: 1, paused: false, deadT: 0, introT: 0,
     haul: new Map<string, number>(), happyT: 0, calm: store.get("calm") !== "0",
     sec: "normal" as Section, secT: 18, rain: 0, rainTarget: 0, rainT: 0,
     bones: 0, newAch: [] as string[], newKinds: [] as string[], rainWalk: 0, rushes: 0, closes: 0, bonusGot: 0,
@@ -1091,7 +1102,8 @@ export function createOsanpoRun(root: HTMLElement, opts: OsanpoRunOptions): () =
    * item を渡したとき（スキルで出すとき）はそのまま使う。
    */
   const mkPickup = (x: number, y: number, item?: RunItem | null, token = 0): Pickup => {
-    const it = item !== undefined ? item : Math.random() < (S.sec === "bonus" ? ITEM_RATE_BONUS : ITEM_RATE) ? rollItem() : null;
+    const rate = (S.sec === "bonus" ? ITEM_RATE_BONUS : ITEM_RATE) + (S.route?.kind === "calm" ? ROUTE_CALM_ITEM_BONUS : 0);
+    const it = item !== undefined ? item : Math.random() < rate ? rollItem() : null;
     return { item: it, token, x, y, vy: 0, ph: Math.random() * 6, taken: false, hinted: false, look: "" };
   };
   function treatArc(x0: number, x1: number, peak: number): void {
@@ -1113,7 +1125,7 @@ export function createOsanpoRun(root: HTMLElement, opts: OsanpoRunOptions): () =
     let extra = 0;
     if (S.sec === "bonus") { extra = spawnBonusItems(X); S.next = 110 + extra + Math.random() * 80; return; }
     const rush = S.sec === "rush", rain = S.rain > 0.3;
-    const kind = pickWeighted([
+    const kind = pickWeighted(([
       ["cone", 3], ["puddle", rain ? 5 : 2], ["bike", t > 6 ? 2.2 : 0], ["crow", t > 12 ? 2 : 0], ["double", t > 24 || rush ? 1.6 : 0],
       ["cat", t > 18 ? 1.6 : 0], ["sign", t > 30 ? 1.4 : 0], ["pigeons", t > 9 ? 1.3 : 0], ["noren", t > 14 ? 1.8 : 0], ["lowcrow", t > 22 ? 1.2 : 0],
       ["roller", t > 16 ? 1.4 : 0], ["drop", t > 20 ? 1.2 : 0], ["buddy", t > 8 ? 1 : 0], ["geyser", t > 26 ? 1.2 : 0],
@@ -1121,7 +1133,7 @@ export function createOsanpoRun(root: HTMLElement, opts: OsanpoRunOptions): () =
       ["surprise", t > TRICK_SPECS.surprise.from ? TRICK_SPECS.surprise.weight : 0],
       ["drone", t > TRICK_SPECS.drone.from ? TRICK_SPECS.drone.weight : 0],
       ["row", rush ? 0 : 1.3], ["high", rush ? 0 : 1.1],
-    ] as const);
+    ] as const).map(([k, w]) => [k, w * routeWeight(k)] as const));
     const blocked = (k: ObstacleKind, low = false) => K.buffs.some((a) => a.b.noSpawn && inGroup({ kind: k, low } as Obstacle, a.b.noSpawn));
     const obsKind: Partial<Record<typeof kind, [ObstacleKind, boolean]>> = {
       cone: ["cone", false], puddle: ["puddle", false], bike: ["bike", false], crow: ["crow", false], lowcrow: ["crow", true], double: ["cone", false],
@@ -1176,7 +1188,70 @@ export function createOsanpoRun(root: HTMLElement, opts: OsanpoRunOptions): () =
       case "row": { const h = Math.random() < 0.5 ? 0 : rand(60, 96); for (let i = 0; i < 5; i++) pickups.push(mkPickup(X + i * 30, GROUND - 18 - h)); break; }
       case "high": { const h = rand(150, 178); for (let i = 0; i < 5; i++) pickups.push(mkPickup(X + i * 30, GROUND - h - Math.sin((i / 4) * Math.PI) * 10)); break; }
     }
-    S.next = (170 + S.speed * 0.55 + Math.random() * S.speed * 0.8) * (rush ? 0.68 : 1) + extra;
+    S.next = (170 + S.speed * 0.55 + Math.random() * S.speed * 0.8) * (rush ? 0.68 : 1) * routeGap() + extra;
+  }
+  /* ---------- 分かれ道 ---------- */
+  /** 上の道（calm）は障害物をまばらに・拾うものを多く、下の道（risky）は障害物を詰める */
+  function routeWeight(kind: string): number {
+    const k = S.route?.kind;
+    if (!k) return 1;
+    const pickup = kind === "row" || kind === "high";
+    if (k === "calm") return pickup ? 1.8 : kind === "pigeons" || kind === "buddy" ? 1.6 : 0.7;
+    return pickup ? 0.6 : 1;
+  }
+  function routeGap(): number {
+    const k = S.route?.kind;
+    return k === "calm" ? 1.15 : k === "risky" ? 0.85 : 1;
+  }
+  const routeName = (k: OsanpoRunRouteKind) => OSANPO_RUN_ROUTES[STAGE_ID][k];
+  function showNote(text: string, sec = 2.6): void {
+    const el = $("hint");
+    el.textContent = text;
+    showAgain(el);
+    hintT = sec;
+  }
+  /** ふつうの区間で、前に障害物が残っていないときだけ、画面の右端に道しるべを出す */
+  function tickFork(dt: number): void {
+    if (S.route) {
+      S.route.t -= dt;
+      if (S.route.t <= 0) {
+        floatText(VW / 2, GROUND * 0.3, "もとの道に合流！", "#F6EFE4", 18);
+        S.route = null; S.forkT = rand(40, 60);
+      }
+      return;
+    }
+    if (S.fork) {
+      if (S.dist < S.fork.at) return;
+      const kind: OsanpoRunRouteKind = P.ground ? "risky" : "calm";
+      S.fork = null;
+      S.route = { kind, t: OSANPO_RUN_ROUTE_SEC };
+      floatText(VW / 2, GROUND * 0.3, `${routeName(kind)}ルートへ！`, kind === "calm" ? "#9BE3A8" : "#FFB27A", 22);
+      showNote(OSANPO_RUN_ROUTE_DESC[kind]);
+      sfx.pass();
+      return;
+    }
+    S.forkT -= dt;
+    if (S.forkT > 0 || S.sec !== "normal" || obstacles.some((o) => !o.hit && !o.gone && o.x + o.w > VW - 160)) return;
+    S.fork = { at: S.dist + VW + 60 - P.x };
+    S.next = Math.max(S.next, 280);
+    showNote(`分かれ道！ 跳んで通ると${routeName("calm")}、そのままだと${routeName("risky")}`, 3);
+  }
+  function drawFork(c: Ctx, e: Env): void {
+    if (!S.fork) return;
+    const x = P.x + (S.fork.at - S.dist) + 8;
+    if (x < -60 || x > VW + 80) return;
+    if (e.night > 0.2) glow(c, x, GROUND - 70, 40, "255,236,190", 0.3 * e.night);
+    c.fillStyle = rgb(shade(hex("#8A6A4A"), -0.1 * e.night)); c.fillRect(x - 2.5, GROUND - 96, 5, 94);
+    const board = (y: number, up: boolean, label: string, col: string) => {
+      c.save(); c.translate(x, y); if (up) c.rotate(-0.28);
+      c.fillStyle = col;
+      c.beginPath(); c.moveTo(-6, -9); c.lineTo(46, -9); c.lineTo(56, 0); c.lineTo(46, 9); c.lineTo(-6, 9); c.closePath(); c.fill();
+      c.fillStyle = "#2A1E0A"; c.textAlign = "center"; c.textBaseline = "middle"; c.font = font(8);
+      c.fillText(label, 24, 0.5);
+      c.restore();
+    };
+    board(GROUND - 84, true, `↑${routeName("calm")}`, "#9BE3A8");
+    board(GROUND - 58, false, routeName("risky"), "#FFB27A");
   }
   function setSection(k: Section): void {
     S.sec = k; S.bonusGot = 0;
@@ -1397,7 +1472,7 @@ export function createOsanpoRun(root: HTMLElement, opts: OsanpoRunOptions): () =
     S.state = "ready"; S.paused = false; S.clock = STAGE.clock; S.rain = 0; S.rainTarget = 0; S.sec = "normal";
     applyAudio(); bgmStop();
     Object.assign(P, { y: GROUND, vy: 0, ground: true, jumps: 2, sq: 1, rot: 0, inv: 0, dead: false, slide: false, slideHeld: false });
-    obstacles = []; pickups = []; texts = []; flyers = []; parts = [];
+    obstacles = []; pickups = []; texts = []; flyers = []; parts = []; S.fork = null; S.route = null;
     hidePanels(); buildStageList(); selectStage(STAGE_ID);
     $("start-panel").hidden = false;
     $("start").focus({ preventScroll: true });
@@ -1724,6 +1799,7 @@ export function createOsanpoRun(root: HTMLElement, opts: OsanpoRunOptions): () =
       step += a.acc;
     }
     if (S.stepT > 0) M.mul *= STEP_BOOST_MUL;
+    if (S.route) M.tints.push(S.route.kind === "calm" ? "90,200,120" : "255,140,70");
     M.mul *= (1 + step) * K.runMul * (envAt(S.clock).night > 0.5 ? K.nightMul : 1) * (S.wx ? S.wx.mul : 1);
   }
   /** 加点。スキルのスコア倍率がかかった値を返す */
@@ -2296,7 +2372,7 @@ export function createOsanpoRun(root: HTMLElement, opts: OsanpoRunOptions): () =
     FX.fade = RM ? 0 : 1;
     Object.assign(S, {
       state: "intro", introT: 0, roundId: newRoundId(), slowT: 0, wx: null, wxT: rand(25, 40), knocks: 0, rares: 0, skillIds: new Set<string>(), tricks: newTrickRun(), bestD: bestDistOf(STAGE_ID), passedBest: false, recordShown: false, fwT: 2,
-      t: 0, speed: 0, dist: 0, bonus: 0, treats: 0, clock: STAGE.clock, stepT: 0, next: 420, shield: false, chain: 0, chainT: 0, mult: 1, maxMult: 1,
+      t: 0, speed: 0, dist: 0, bonus: 0, treats: 0, clock: STAGE.clock, stepT: 0, fork: null, route: null, forkT: rand(35, 50), next: 420, shield: false, chain: 0, chainT: 0, mult: 1, maxMult: 1,
       paused: false, deadT: 0, milestone: 100, bufT: 0, haul: new Map<string, number>(), sec: "normal", secT: 18, rain: 0, rainTarget: 0, rainT: 0,
       bones: 0, newAch: [], newKinds: [], rainWalk: 0, rushes: 0, closes: 0, bonusGot: 0,
     });
@@ -2598,6 +2674,7 @@ export function createOsanpoRun(root: HTMLElement, opts: OsanpoRunOptions): () =
       if (S.t >= 180) unlock("survive180");
       if (S.clock >= 1440 + 300) unlock("dawn");
       tickSkills(dt);
+      tickFork(dt);
       S.dist += S.speed * dt;
       S.clock += dt * 1.6;
       S.next -= S.speed * dt;
@@ -2881,6 +2958,7 @@ export function createOsanpoRun(root: HTMLElement, opts: OsanpoRunOptions): () =
     drawNear(c, e, lamps);
     drawGround(c, e, lamps);
     drawMarkers(c, e);
+    drawFork(c, e);
 
     if (S.rain > 0.02 && STAGE.weather !== "snow" && !M.clear) { c.fillStyle = `rgba(52,60,96,${0.22 * S.rain})`; c.fillRect(-20, -20, VW + 40, GROUND + 26); }
     for (const o of obstacles) if (o.kind === "puddle") drawPuddle(c, o.x, GROUND, o.w, S.time, e.night, STAGE_ID);
@@ -3091,6 +3169,12 @@ export function createOsanpoRun(root: HTMLElement, opts: OsanpoRunOptions): () =
     if (secKey) {
       $("sec-chip").dataset.k = secKey;
       setText("sec-chip", `${secKey === "bonus" ? "ボーナスタイム" : "ラッシュ"} あと${Math.ceil(S.secT)}秒`);
+    }
+    const routeKind = S.state === "play" && S.route ? S.route.kind : null;
+    setFlag("route-on", Boolean(routeKind), (v) => { $("route-chip").hidden = !v; });
+    if (routeKind && S.route) {
+      $("route-chip").dataset.k = routeKind;
+      setText("route-chip", `${routeName(routeKind)}ルート あと${Math.ceil(S.route.t)}秒`);
     }
     renderSkillRows();
     setText("combo-text", `×${S.mult} コンボ`);

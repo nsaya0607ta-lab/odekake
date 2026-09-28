@@ -126,6 +126,8 @@
 .osr .osr-sec-chip { align-self: flex-start; margin-top: 6px; font-weight: 800; font-size: 12px; padding: 3px 10px; border-radius: 999px; text-shadow: none; white-space: nowrap; }
 .osr .osr-sec-chip[data-k="bonus"] { background: #ffc857; color: #2a1e0a; }
 .osr .osr-sec-chip[data-k="rush"] { background: #e4572e; color: #fff; }
+.osr .osr-sec-chip[data-k="calm"] { background: #9be3a8; color: #12301a; }
+.osr .osr-sec-chip[data-k="risky"] { background: #ffb27a; color: #3a1a06; }
 .osr .osr-combo {
   align-self: flex-start; margin-top: 6px; position: relative; overflow: hidden; font-weight: 800; font-size: 13px; padding: 3px 11px 5px;
   border-radius: 999px; background: var(--osr-lantern); color: #2a1e0a; text-shadow: none; transition: opacity 0.2s, transform 0.2s; white-space: nowrap; transform-origin: left center;

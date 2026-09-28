@@ -92,6 +92,23 @@ export function stepBoostLevel(steps: number | null): number {
   return OSANPO_RUN_STEP_BOOSTS.filter((b) => steps >= b.steps).length;
 }
 
+/**
+ * 分かれ道。ときどき道しるべが出て、通る瞬間に跳んでいれば上の道（calm）、地面にいれば下の道（risky）へ進む。
+ * calm: 障害物が少なめ・ほねとアイテムが多め / risky: 障害物が多めだが、SR以上のアイテムが出やすい
+ */
+export type OsanpoRunRouteKind = "calm" | "risky";
+export const OSANPO_RUN_ROUTE_SEC = 20;
+export const OSANPO_RUN_ROUTES: Record<OsanpoRunStageId, Record<OsanpoRunRouteKind, string>> = {
+  town: { calm: "公園", risky: "商店街" },
+  hiking: { calm: "沢", risky: "尾根" },
+  snow: { calm: "かまくら広場", risky: "温泉街" },
+  summer: { calm: "河原", risky: "屋台通り" },
+};
+export const OSANPO_RUN_ROUTE_DESC: Record<OsanpoRunRouteKind, string> = {
+  calm: "障害物が少なめで、ほねとアイテムが多い",
+  risky: "障害物が多いけど、SR以上のアイテムが出やすい",
+};
+
 export type RarityStyle = {
   /** 1個あたりの点数（コンボ倍率がさらに掛かる） */
   points: number;

@@ -90,6 +90,7 @@ export function OsanpoRunGame({ items, usesSampleItems, unlockedStages, seriesTa
                 <div className="osr-score" data-osr="score">0</div>
                 <div className="osr-meta" data-osr="meta">0m・ほね0・アイテム0</div>
                 <div className="osr-sec-chip" data-osr="sec-chip" hidden />
+                <div className="osr-sec-chip" data-osr="route-chip" hidden />
                 <div className="osr-combo" data-osr="combo" data-off="1">
                   <span data-osr="combo-text">×2 コンボ</span>
                   <i data-osr="combo-bar" />
