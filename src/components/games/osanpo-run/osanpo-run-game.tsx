@@ -111,7 +111,7 @@ export function OsanpoRunGame({ items, usesSampleItems, unlockedStages, seriesTa
 
       <main className="osr-scroll">
         <div className="osr-wrap">
-          <div className="osr-stage" data-osr="stage" tabIndex={0} role="application" aria-label="ゲーム画面。スペースキーかタップでジャンプ、下キーか下スワイプでスライディング">
+          <div className="osr-stage" data-osr="stage" tabIndex={0} role="application" aria-label="ゲーム画面。タップでジャンプ、下スワイプでスライディング">
             <canvas className="osr-canvas" data-osr="canvas" />
 
             <div className="osr-hud">
@@ -163,8 +163,8 @@ export function OsanpoRunGame({ items, usesSampleItems, unlockedStages, seriesTa
               <div className="osr-step-boost" data-osr="step-boost" />
               <div className="osr-missions" data-osr="missions" hidden />
               <div className="osr-keys">
-                <span><kbd>スペース</kbd><kbd>↑</kbd>かタップでジャンプ（空中であと2回・3段まで）</span>
-                <span><kbd>↓</kbd>か下スワイプでスライディング</span>
+                <span><kbd>タップ</kbd>でジャンプ（空中であと2回・3段まで）</span>
+                <span><kbd>下スワイプ</kbd>でスライディング</span>
               </div>
               <button className="osr-btn" data-osr="start" type="button" disabled>準備中…</button>
               <nav className="osr-menu" aria-label="メニュー">
@@ -257,8 +257,8 @@ export function OsanpoRunGame({ items, usesSampleItems, unlockedStages, seriesTa
                   <section>
                     <h3>そうさ</h3>
                     <ul>
-                      <li className="osr-ctl"><span><kbd>タップ</kbd></span><div><b>ジャンプ</b><small>スペース・<kbd>↑</kbd>でもOK。長押しで高く、ちょんと押すと低く跳ぶ。空中でタップすると2段・3段ジャンプ。</small></div></li>
-                      <li className="osr-ctl"><span><kbd>↓</kbd></span><div><b>スライディング</b><small>下スワイプでもOK。のれん・低い枝・つららや、低く飛ぶカラスの下をくぐれる。空中で押すと急降下。</small></div></li>
+                      <li className="osr-ctl"><span><kbd>タップ</kbd></span><div><b>ジャンプ</b><small>長押しで高く、ちょんとタップすると低く跳ぶ。空中でタップすると2段・3段ジャンプ。</small></div></li>
+                      <li className="osr-ctl"><span><kbd>スワイプ</kbd></span><div><b>スライディング</b><small>のれん・低い枝・つららや、低く飛ぶカラスの下をくぐれる。空中で下スワイプすると急降下。</small></div></li>
                       <li className="osr-ctl"><span><kbd>スキル</kbd></span><div><b>アイテムのスキル</b><small>アイテムを拾うと、そのアイテムのスキルが発動（全アイテムに1つずつ）。図鑑のスキルLvが高いほど強い。身代わり・バリア・復活の「守り」は1回ぶんまで（強さは 復活 ＞ バリア・身代わり。今より弱い守りは付かない）。効果は「ずかん」でアイテムを選ぶと見られる。</small></div></li>
                       <li className="osr-ctl"><span><kbd>イベント</kbd></span><div><b>ボーナス・ラッシュ・雨</b><small>ときどきアイテムだらけのボーナスタイム、障害物が続くラッシュ（突破で+100）、雨や雪が来る。</small></div></li>
                       <li className="osr-ctl"><span><kbd>分かれ道</kbd></span><div><b>分かれ道</b><small>ときどき道しるべが出る。跳んで通ると上の道（公園など：障害物が少なく、ほねとアイテムが多い）、そのまま通ると下の道（商店街など：障害物が多いけど、SR以上が出やすい）。20秒で合流。</small></div></li>
@@ -267,7 +267,7 @@ export function OsanpoRunGame({ items, usesSampleItems, unlockedStages, seriesTa
                       <li className="osr-ctl"><span><kbd>くんくん</kbd></span><div><b>においかぎ</b><small>地面に「くんくん」マークが出たら、スライディングで通ると掘り出せる。ほね・アイテム・ときどきハズレ（古いくつした）。</small></div></li>
                       <li className="osr-ctl"><span><kbd>協力</kbd></span><div><b>協力チャレンジ</b><small>自分とフレンドの今週の合計距離で目標を目指す。達成したら「フレンド」画面で全員100コイン受け取れる。</small></div></li>
                       <li className="osr-ctl"><span><kbd>写真</kbd></span><div><b>思い出の看板</b><small>おでかけ記録に登録した写真が、道ばたの看板になって出てくる（縦長の写真は縦向き、横長の写真は横向きの看板）。前を通ると+20。</small></div></li>
-                      <li className="osr-ctl"><span><kbd>II</kbd></span><div><b>一時停止</b><small>右上のボタン（キーボードはP）。「最初から」「道を選ぶ」「設定」もここから。</small></div></li>
+                      <li className="osr-ctl"><span><kbd>II</kbd></span><div><b>一時停止</b><small>右上のボタン。「最初から」「道を選ぶ」「設定」もここから。</small></div></li>
                     </ul>
                   </section>
                   <section>
