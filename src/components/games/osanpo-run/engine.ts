@@ -183,7 +183,7 @@ type Pickup = { item: RunItem | null; token: number; x: number; y: number; vy: n
 type WeatherKind = "rainbow" | "thunder" | "sakura" | "momiji" | "aurora";
 type WeatherEvent = { kind: WeatherKind; t: number; max: number; acc: number; mul: number; nextBolt: number };
 type ActiveBuff = { skill: OsanpoRunSkill; b: Buff; lv: number; key: string; t: number; max: number; count: number; acc: number; rampN: number; rainAcc: number };
-type Particle = { x: number; y: number; vx: number; vy: number; life: number; max: number; r: number; kind: "dust" | "spark" | "ring" | "splash" | "fw"; color: string; g: number; scroll: boolean };
+type Particle = { x: number; y: number; vx: number; vy: number; life: number; max: number; r: number; kind: "dust" | "spark" | "ring" | "splash" | "fw" | "drop" | "crown"; color: string; g: number; scroll: boolean };
 type FloatText = { x: number; y: number; text: string; color: string; size: number; life: number; max: number };
 type Flyer = { item: RunItem; x0: number; y0: number; t: number };
 type Env = { m: number; top: RGB; bot: RGB; far: RGB; mid: RGB; near: RGB; night: number; side: RGB; road: RGB };
@@ -1063,16 +1063,16 @@ export function createOsanpoRun(root: HTMLElement, opts: OsanpoRunOptions): () =
     const ph = memoryPhotos[S.memo.photo];
     if (!ph) return;
     const x = P.x + (S.memo.at - S.dist);
-    const pw = ph.tall ? 60 : 92, phh = ph.tall ? 80 : 69, fr = 5, bw = pw + fr * 2, bh = phh + fr * 2;
+    const pw = ph.tall ? 90 : 140, phh = ph.tall ? 120 : 105, fr = 7, bw = pw + fr * 2, bh = phh + fr * 2;
     if (x + bw / 2 < -20 || x - bw / 2 > VW + 20) return;
     const top = GROUND - 38 - bh, left = x - bw / 2;
     if (e.night > 0.2) glow(c, x, top + bh / 2, bw * 0.8, "255,226,170", 0.35 * e.night);
     const wood = mix(hex("#9A6B43"), e.near, 0.1 + e.night * 0.4);
     c.fillStyle = rgb(shade(wood, -0.15));
-    if (ph.tall) c.fillRect(x - 3, top + bh - 2, 6, GROUND - (top + bh) + 2);
+    if (ph.tall) c.fillRect(x - 4, top + bh - 2, 8, GROUND - (top + bh) + 2);
     else {
-      c.fillRect(left + 12, top + bh - 2, 5, GROUND - (top + bh) + 2);
-      c.fillRect(left + bw - 17, top + bh - 2, 5, GROUND - (top + bh) + 2);
+      c.fillRect(left + 18, top + bh - 2, 7, GROUND - (top + bh) + 2);
+      c.fillRect(left + bw - 25, top + bh - 2, 7, GROUND - (top + bh) + 2);
     }
     c.fillStyle = rgb(wood); rr(c, left, top, bw, bh, 4); c.fill();
     c.save();
@@ -1083,10 +1083,10 @@ export function createOsanpoRun(root: HTMLElement, opts: OsanpoRunOptions): () =
     if (e.night > 0.05) { c.fillStyle = `rgba(20,14,40,${(e.night * 0.35).toFixed(3)})`; c.fillRect(left, top, bw, bh); }
     c.restore();
     const label = ph.pref ? `${ph.name}（${ph.pref}）` : ph.name;
-    c.font = font(8); c.textAlign = "center"; c.textBaseline = "middle";
-    const lw = Math.min(Math.max(bw + 10, 100), c.measureText(label).width + 14);
-    c.fillStyle = "rgba(246,239,228,.95)"; rr(c, x - lw / 2, top + bh + 3, lw, 13, 3); c.fill();
-    c.fillStyle = "#3A2A1C"; c.fillText(label, x, top + bh + 10, lw - 6);
+    c.font = font(10); c.textAlign = "center"; c.textBaseline = "middle";
+    const lw = Math.min(Math.max(bw + 10, 120), c.measureText(label).width + 16);
+    c.fillStyle = "rgba(246,239,228,.95)"; rr(c, x - lw / 2, top + bh + 3, lw, 16, 4); c.fill();
+    c.fillStyle = "#3A2A1C"; c.fillText(label, x, top + bh + 11.5, lw - 8);
   }
 
   /* ---------- ご近所さんとのあいさつ ---------- */
@@ -1355,6 +1355,20 @@ export function createOsanpoRun(root: HTMLElement, opts: OsanpoRunOptions): () =
   }
 
   /* ---------- 演出 ---------- */
+  /** 水たまりスタンプのしぶき：王冠形の水の壁、波紋、放物線を描いて飛び散る水滴 */
+  function splashBurst(x: number, w: number): void {
+    const y = GROUND - 1;
+    parts.push({ x, y, vx: 0, vy: 0, life: 0, max: 0.6, r: Math.min(46, 26 + w * 0.2), kind: "crown", color: "", g: 0, scroll: true });
+    for (let k = 0; k < 3; k++) parts.push({ x, y: y + 2, vx: 0, vy: 0, life: -k * 0.08, max: 0.6, r: 2, kind: "splash", color: "", g: 0, scroll: true });
+    const n = RM ? 10 : 26;
+    for (let i = 0; i < n; i++) {
+      const side = i % 2 ? 1 : -1;
+      parts.push({
+        x: x + side * rand(2, 14), y: y - 2, vx: side * rand(40, 230), vy: -rand(220, 520), life: 0, max: rand(0.5, 0.8),
+        r: rand(2.2, 4.2), kind: "drop", color: "", g: 1500, scroll: true,
+      });
+    }
+  }
   function puff(x: number, y: number, n: number, kind: Particle["kind"], o: { vx?: number; vy?: number; g?: number; scroll?: boolean; color?: string } = {}): void {
     const count = RM ? Math.ceil(n / 2) : n;
     for (let i = 0; i < count; i++) {
@@ -2943,7 +2957,7 @@ export function createOsanpoRun(root: HTMLElement, opts: OsanpoRunOptions): () =
         o.gone = true; o.scored = true;
         const v = addPts(PUDDLE_STOMP_PTS);
         floatText(P.x + 20, P.y - 64, `バシャーン！ +${v}`, "#9BE7FF", 16);
-        puff(o.x + o.w / 2, GROUND - 2, RM ? 10 : 22, "splash", { vy: -120 });
+        splashBurst(Math.max(o.x + 10, Math.min(o.x + o.w - 10, P.x)), o.w);
         tone(300, 0.14, "triangle", 0.06, 120); tone(900, 0.08, "sine", 0.04, 600, 0.04);
         FX.hitstop = RM ? 0 : 0.04;
         S.stomps++;
@@ -3234,7 +3248,26 @@ export function createOsanpoRun(root: HTMLElement, opts: OsanpoRunOptions): () =
       if (p.kind === "dust") { c.fillStyle = rgb(shade(e.side, 0.35), a * 0.7); c.beginPath(); c.arc(p.x, p.y, p.r * (1 + p.life * 2), 0, Math.PI * 2); c.fill(); }
       else if (p.kind === "fw") { c.fillStyle = `rgba(${p.color},${a})`; c.beginPath(); c.arc(p.x, p.y, p.r * (0.6 + a * 0.6), 0, Math.PI * 2); c.fill(); }
       else if (p.kind === "splash") { c.strokeStyle = `rgba(210,228,255,${a * 0.8})`; c.lineWidth = 1; ell(c, p.x, p.y, 1 + p.life * 22, 0.6 + p.life * 5); c.stroke(); }
-      else if (p.kind === "ring") { c.strokeStyle = `rgba(255,255,255,${a * 0.7})`; c.lineWidth = 1.5; ell(c, p.x, p.y, 4 + p.life * 50, 1.5 + p.life * 10); c.stroke(); }
+      else if (p.kind === "drop") {
+        // 飛び散る水滴。進む向きに少し伸ばして、上側にハイライト（地面より下に落ちたら描かない）
+        if (p.y > GROUND + 4) continue;
+        const ang = Math.atan2(p.vy, p.vx), len = Math.min(2.2, 1 + Math.hypot(p.vx, p.vy) / 420);
+        c.fillStyle = `rgba(120,190,245,${a})`; ell(c, p.x, p.y, p.r * len, p.r, ang); c.fill();
+        c.fillStyle = `rgba(235,248,255,${a})`; ell(c, p.x - p.r * 0.3, p.y - p.r * 0.35, p.r * 0.45, p.r * 0.3); c.fill();
+      } else if (p.kind === "crown") {
+        // 王冠形のしぶき：立ち上がってから崩れる水の壁
+        const t = p.life / p.max, h = p.r * Math.sin(Math.min(1, t * 1.6) * Math.PI * 0.9), w = p.r * (0.7 + t * 0.9);
+        c.fillStyle = `rgba(150,205,250,${a * 0.75})`;
+        c.beginPath(); c.moveTo(p.x - w, p.y);
+        for (let k = 0; k <= 8; k++) {
+          const x = p.x - w + (k / 8) * w * 2, peak = k % 2 ? h : h * 0.55;
+          c.quadraticCurveTo(x - w / 8, p.y - peak * 0.6, x, p.y - peak);
+        }
+        c.lineTo(p.x + w, p.y); c.closePath(); c.fill();
+        c.fillStyle = `rgba(240,250,255,${a * 0.9})`;
+        for (let k = 1; k < 8; k += 2) { const x = p.x - w + (k / 8) * w * 2; ell(c, x, p.y - h - 2, 2.2, 2.6); c.fill(); }
+        c.strokeStyle = `rgba(200,232,255,${a * 0.8})`; c.lineWidth = 1.4; ell(c, p.x, p.y + 1, w * 1.25, 3 + t * 5); c.stroke();
+      } else if (p.kind === "ring") { c.strokeStyle = `rgba(255,255,255,${a * 0.7})`; c.lineWidth = 1.5; ell(c, p.x, p.y, 4 + p.life * 50, 1.5 + p.life * 10); c.stroke(); }
       else star(c, p.x, p.y, p.r * a + 1, `rgba(255,214,110,${a})`);
     }
     if (flyers.length) {
