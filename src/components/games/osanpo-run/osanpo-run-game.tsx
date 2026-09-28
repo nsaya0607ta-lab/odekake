@@ -5,6 +5,7 @@ import { Dela_Gothic_One, M_PLUS_Rounded_1c } from "next/font/google";
 import { useEffect, useRef } from "react";
 import { setBgmSuppressed } from "@/lib/bgm-engine";
 import type { OsanpoRunStageId } from "@/lib/games/osanpo-run/config";
+import type { OsanpoRunMemoryPhoto } from "@/lib/data/osanpo-run";
 import type { OsanpoRunMission } from "@/lib/games/osanpo-run/missions";
 import { createOsanpoRun, type OsanpoRunResult, type RunItem } from "./engine";
 import { OSANPO_RUN_RANKING_REFRESH_EVENT, OsanpoRunRanking } from "./osanpo-run-ranking";
@@ -23,6 +24,8 @@ type Props = {
   /** 今日のミッション3つと、今日もう達成したもののID */
   missions: OsanpoRunMission[];
   missionsDone: string[];
+  /** 道ばたの看板に貼る自分のおでかけ写真 */
+  memoryPhotos: OsanpoRunMemoryPhoto[];
 };
 
 /** 1回の結果をサーバーへ送り、スコアを記録してコインを受け取る。記録できなかったときは null */
@@ -64,7 +67,7 @@ async function submitMission(missionId: string): Promise<number | null> {
  * おさんぽフレンチーの画面。骨組みだけをここで描き、動きは engine.ts に任せる。
  * プレイ中はアプリ全体のBGMを止め、ゲームの曲だけが鳴るようにする。
  */
-export function OsanpoRunGame({ items, usesSampleItems, unlockedStages, seriesTabs, categoryLabels, todaySteps, missions, missionsDone }: Props) {
+export function OsanpoRunGame({ items, usesSampleItems, unlockedStages, seriesTabs, categoryLabels, todaySteps, missions, missionsDone, memoryPhotos }: Props) {
   const rootRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
@@ -81,6 +84,7 @@ export function OsanpoRunGame({ items, usesSampleItems, unlockedStages, seriesTa
       missions,
       missionsDone,
       onMissionClear: submitMission,
+      memoryPhotos,
       bodyFontFamily: bodyFont.style.fontFamily,
       onRunEnd: submitResult,
     });
@@ -88,7 +92,7 @@ export function OsanpoRunGame({ items, usesSampleItems, unlockedStages, seriesTa
       destroy();
       setBgmSuppressed(false);
     };
-  }, [items, usesSampleItems, unlockedStages, seriesTabs, categoryLabels, todaySteps, missions, missionsDone]);
+  }, [items, usesSampleItems, unlockedStages, seriesTabs, categoryLabels, todaySteps, missions, missionsDone, memoryPhotos]);
 
   return (
     <div ref={rootRef} className={`osr ${displayFont.variable} ${bodyFont.variable}`}>
@@ -251,6 +255,10 @@ export function OsanpoRunGame({ items, usesSampleItems, unlockedStages, seriesTa
                       <li className="osr-ctl"><span><kbd>↓</kbd></span><div><b>スライディング</b><small>下スワイプでもOK。のれん・低い枝・つららや、低く飛ぶカラスの下をくぐれる。空中で押すと急降下。</small></div></li>
                       <li className="osr-ctl"><span><kbd>スキル</kbd></span><div><b>アイテムのスキル</b><small>アイテムを拾うと、そのアイテムのスキルが発動（全アイテムに1つずつ）。図鑑のスキルLvが高いほど強い。身代わり・バリア・復活の「守り」は1回ぶんまで（強さは 復活 ＞ バリア・身代わり。今より弱い守りは付かない）。効果は「ずかん」でアイテムを選ぶと見られる。</small></div></li>
                       <li className="osr-ctl"><span><kbd>イベント</kbd></span><div><b>ボーナス・ラッシュ・雨</b><small>ときどきアイテムだらけのボーナスタイム、障害物が続くラッシュ（突破で+100）、雨や雪が来る。</small></div></li>
+                      <li className="osr-ctl"><span><kbd>分かれ道</kbd></span><div><b>分かれ道</b><small>ときどき道しるべが出る。跳んで通ると上の道（公園など：障害物が少なく、ほねとアイテムが多い）、そのまま通ると下の道（商店街など：障害物が多いけど、SR以上が出やすい）。20秒で合流。</small></div></li>
+                      <li className="osr-ctl"><span><kbd>歩数</kbd></span><div><b>歩数ブースト</b><small>アプリに同期した今日の歩数で、スタート時に効果が付く。3000歩〜 最初の10秒スコア×1.2、6000歩〜 バリア、10000歩〜 ボーナスタイムからスタート。</small></div></li>
+                      <li className="osr-ctl"><span><kbd>お題</kbd></span><div><b>今日のミッション</b><small>毎日3つのお題。1つ達成で30コイン、3つそろうとさらに100コイン。</small></div></li>
+                      <li className="osr-ctl"><span><kbd>写真</kbd></span><div><b>思い出の看板</b><small>おでかけ記録に登録した横長（16:9）の写真が、道ばたの看板になって出てくる。前を通ると+20。</small></div></li>
                       <li className="osr-ctl"><span><kbd>II</kbd></span><div><b>一時停止</b><small>右上のボタン（キーボードはP）。「最初から」「道を選ぶ」「設定」もここから。</small></div></li>
                     </ul>
                   </section>

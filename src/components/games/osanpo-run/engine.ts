@@ -14,6 +14,9 @@ import { GACHA_RARITIES } from "@/lib/gacha/config";
 import {
   isBarrierRarity,
   isOsanpoRunStageId,
+  MEMORY_PHOTO_ASPECT_MAX,
+  MEMORY_PHOTO_ASPECT_MIN,
+  MEMORY_SIGN_PTS,
   OSANPO_RUN_ACHIEVEMENTS,
   OSANPO_RUN_HINTS,
   OSANPO_RUN_RANKS,
@@ -102,6 +105,8 @@ export type OsanpoRunOptions = {
   missionsDone?: string[];
   /** ミッションを達成したときに呼ぶ。もらえたコインの枚数を返す（記録できなかったときは null） */
   onMissionClear?: (missionId: string) => Promise<number | null>;
+  /** 道ばたの看板に貼る自分のおでかけ写真（横長のものだけ使う） */
+  memoryPhotos?: { src: string; name: string; pref: string }[];
 };
 
 type Pose = "walk" | "trot" | "walk-tail" | "cheer" | "smile" | "bow-b" | "stand-happy" | "wave" | "sleep" | "lie-wave" | "bow";
@@ -390,6 +395,7 @@ export function createOsanpoRun(root: HTMLElement, opts: OsanpoRunOptions): () =
   const S = {
     state: "ready" as GameState, time: 0, t: 0, speed: 90, dist: 0, bonus: 0, treats: 0, clock: STAGE.clock, cam: 0, bgCam: 0,
     srPlus: 0, pigeonsRun: 0, slidesRun: 0, greetsRun: 0, routeCalm: 0, routeRisky: 0, bonusBest: 0, missionCoins: 0, missionsNow: [] as string[],
+    memo: null as null | { at: number; photo: number; passed: boolean }, memoT: 20,
     stepT: 0, fork: null as null | { at: number }, route: null as null | { kind: OsanpoRunRouteKind; t: number }, forkT: 40,
     next: 400, shield: false, chain: 0, chainT: 0, mult: 1, maxMult: 1, paused: false, deadT: 0, introT: 0,
     haul: new Map<string, number>(), happyT: 0, calm: store.get("calm") !== "0",
@@ -1197,6 +1203,73 @@ export function createOsanpoRun(root: HTMLElement, opts: OsanpoRunOptions): () =
     }
     S.next = (170 + S.speed * 0.55 + Math.random() * S.speed * 0.8) * (rush ? 0.68 : 1) * routeGap() + extra;
   }
+  /* ---------- 思い出の看板（自分のおでかけ写真） ---------- */
+  type MemoryPhoto = { img: HTMLImageElement; name: string; pref: string };
+  const memoryPhotos: MemoryPhoto[] = [];
+  // 読み込めた写真のうち、看板の枠（16:9）に合う横長のものだけ使う
+  for (const p of opts.memoryPhotos ?? []) {
+    const img = new Image();
+    img.decoding = "async";
+    img.onload = () => {
+      const r = img.naturalWidth / Math.max(1, img.naturalHeight);
+      if (r >= MEMORY_PHOTO_ASPECT_MIN && r <= MEMORY_PHOTO_ASPECT_MAX) memoryPhotos.push({ img, name: p.name, pref: p.pref });
+    };
+    img.src = p.src;
+  }
+  let memoryOrder: number[] = [];
+  /** 同じ写真ばかり続かないよう、全部を一巡してから並べ直す */
+  function nextMemoryPhoto(): number {
+    if (!memoryOrder.length) {
+      memoryOrder = memoryPhotos.map((_, i) => i);
+      for (let i = memoryOrder.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [memoryOrder[i], memoryOrder[j]] = [memoryOrder[j]!, memoryOrder[i]!]; }
+    }
+    return memoryOrder.pop()!;
+  }
+  function tickMemory(dt: number): void {
+    if (S.memo) {
+      if (!S.memo.passed && S.dist >= S.memo.at) {
+        S.memo.passed = true;
+        const ph = memoryPhotos[S.memo.photo];
+        if (ph) { const v = addPts(MEMORY_SIGN_PTS); floatText(P.x + 20, P.y - 70, `思い出：${ph.name} +${v}`, "#FFD9A8", 13); }
+      }
+      if (S.dist > S.memo.at + VW) S.memo = null;
+      return;
+    }
+    if (!memoryPhotos.length) return;
+    S.memoT -= dt;
+    if (S.memoT > 0 || S.fork) return;
+    S.memo = { at: S.dist + VW + 90 - P.x, photo: nextMemoryPhoto(), passed: false };
+    S.memoT = rand(25, 35);
+  }
+  /** 木の枠に写真を入れた看板。下の札にスポット名と都道府県 */
+  function drawMemory(c: Ctx, e: Env): void {
+    if (!S.memo) return;
+    const ph = memoryPhotos[S.memo.photo];
+    if (!ph) return;
+    const x = P.x + (S.memo.at - S.dist);
+    const pw = 104, phh = pw * 9 / 16, fr = 5, bw = pw + fr * 2, bh = phh + fr * 2;
+    if (x + bw / 2 < -20 || x - bw / 2 > VW + 20) return;
+    const top = GROUND - 38 - bh, left = x - bw / 2;
+    if (e.night > 0.2) glow(c, x, top + bh / 2, bw * 0.8, "255,226,170", 0.35 * e.night);
+    const wood = mix(hex("#9A6B43"), e.near, 0.1 + e.night * 0.4);
+    c.fillStyle = rgb(shade(wood, -0.15));
+    c.fillRect(left + 12, top + bh - 2, 5, GROUND - (top + bh) + 2);
+    c.fillRect(left + bw - 17, top + bh - 2, 5, GROUND - (top + bh) + 2);
+    c.fillStyle = rgb(wood); rr(c, left, top, bw, bh, 4); c.fill();
+    c.save();
+    rr(c, left + fr, top + fr, pw, phh, 2); c.clip();
+    // 16:9 の枠いっぱいに、はみ出す分は中央で切って貼る
+    const iw = ph.img.naturalWidth, ih = ph.img.naturalHeight, k = Math.max(pw / iw, phh / ih);
+    c.drawImage(ph.img, left + fr + (pw - iw * k) / 2, top + fr + (phh - ih * k) / 2, iw * k, ih * k);
+    if (e.night > 0.05) { c.fillStyle = `rgba(20,14,40,${(e.night * 0.35).toFixed(3)})`; c.fillRect(left, top, bw, bh); }
+    c.restore();
+    const label = ph.pref ? `${ph.name}（${ph.pref}）` : ph.name;
+    c.font = font(8); c.textAlign = "center"; c.textBaseline = "middle";
+    const lw = Math.min(bw + 10, c.measureText(label).width + 14);
+    c.fillStyle = "rgba(246,239,228,.95)"; rr(c, x - lw / 2, top + bh + 3, lw, 13, 3); c.fill();
+    c.fillStyle = "#3A2A1C"; c.fillText(label, x, top + bh + 10, bw + 4);
+  }
+
   /* ---------- 今日のミッション ---------- */
   const MISSIONS = opts.missions ?? [];
   const missionDone = new Set(opts.missionsDone ?? []);
@@ -1304,7 +1377,7 @@ export function createOsanpoRun(root: HTMLElement, opts: OsanpoRunOptions): () =
       return;
     }
     S.forkT -= dt;
-    if (S.forkT > 0 || S.sec !== "normal" || obstacles.some((o) => !o.hit && !o.gone && o.x + o.w > VW - 160)) return;
+    if (S.forkT > 0 || S.sec !== "normal" || S.memo || obstacles.some((o) => !o.hit && !o.gone && o.x + o.w > VW - 160)) return;
     S.fork = { at: S.dist + VW + 60 - P.x };
     S.next = Math.max(S.next, 280);
     showNote(`分かれ道！ 跳んで通ると${routeName("calm")}、そのままだと${routeName("risky")}`, 3);
@@ -1545,7 +1618,7 @@ export function createOsanpoRun(root: HTMLElement, opts: OsanpoRunOptions): () =
     S.state = "ready"; S.paused = false; S.clock = STAGE.clock; S.rain = 0; S.rainTarget = 0; S.sec = "normal";
     applyAudio(); bgmStop();
     Object.assign(P, { y: GROUND, vy: 0, ground: true, jumps: 2, sq: 1, rot: 0, inv: 0, dead: false, slide: false, slideHeld: false });
-    obstacles = []; pickups = []; texts = []; flyers = []; parts = []; S.fork = null; S.route = null;
+    obstacles = []; pickups = []; texts = []; flyers = []; parts = []; S.fork = null; S.route = null; S.memo = null;
     hidePanels(); buildStageList(); selectStage(STAGE_ID); renderMissions();
     $("start-panel").hidden = false;
     $("start").focus({ preventScroll: true });
@@ -2446,6 +2519,7 @@ export function createOsanpoRun(root: HTMLElement, opts: OsanpoRunOptions): () =
     Object.assign(S, {
       state: "intro", introT: 0, roundId: newRoundId(), slowT: 0, wx: null, wxT: rand(25, 40), knocks: 0, rares: 0, skillIds: new Set<string>(), tricks: newTrickRun(), bestD: bestDistOf(STAGE_ID), passedBest: false, recordShown: false, fwT: 2,
       t: 0, speed: 0, dist: 0, bonus: 0, treats: 0, clock: STAGE.clock, srPlus: 0, pigeonsRun: 0, slidesRun: 0, greetsRun: 0, routeCalm: 0, routeRisky: 0, bonusBest: 0, missionCoins: 0, missionsNow: [],
+      memo: null, memoT: rand(15, 25),
       stepT: 0, fork: null, route: null, forkT: rand(35, 50), next: 420, shield: false, chain: 0, chainT: 0, mult: 1, maxMult: 1,
       paused: false, deadT: 0, milestone: 100, bufT: 0, haul: new Map<string, number>(), sec: "normal", secT: 18, rain: 0, rainTarget: 0, rainT: 0,
       bones: 0, newAch: [], newKinds: [], rainWalk: 0, rushes: 0, closes: 0, bonusGot: 0,
@@ -2752,6 +2826,7 @@ export function createOsanpoRun(root: HTMLElement, opts: OsanpoRunOptions): () =
       if (S.clock >= 1440 + 300) unlock("dawn");
       tickSkills(dt);
       tickFork(dt);
+      tickMemory(dt);
       tickMissions();
       S.dist += S.speed * dt;
       S.clock += dt * 1.6;
@@ -3036,6 +3111,7 @@ export function createOsanpoRun(root: HTMLElement, opts: OsanpoRunOptions): () =
     drawNear(c, e, lamps);
     drawGround(c, e, lamps);
     drawMarkers(c, e);
+    drawMemory(c, e);
     drawFork(c, e);
 
     if (S.rain > 0.02 && STAGE.weather !== "snow" && !M.clear) { c.fillStyle = `rgba(52,60,96,${0.22 * S.rain})`; c.fillRect(-20, -20, VW + 40, GROUND + 26); }

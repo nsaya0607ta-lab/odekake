@@ -109,6 +109,15 @@ export const OSANPO_RUN_ROUTE_DESC: Record<OsanpoRunRouteKind, string> = {
   risky: "障害物が多いけど、SR以上のアイテムが出やすい",
 };
 
+/**
+ * 思い出の看板。自分のおでかけ写真のうち、横長（16:9 前後）のものを道ばたの看板に貼って流す。
+ * 縦横比がこの範囲に入る写真だけ使う（16:9 = 1.78）。
+ */
+export const MEMORY_PHOTO_ASPECT_MIN = 1.6;
+export const MEMORY_PHOTO_ASPECT_MAX = 1.95;
+/** 看板の前を通ったときのおまけ点 */
+export const MEMORY_SIGN_PTS = 20;
+
 export type RarityStyle = {
   /** 1個あたりの点数（コンボ倍率がさらに掛かる） */
   points: number;
