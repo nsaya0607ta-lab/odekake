@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { OSANPO_RUN_STAGE_IDS } from "@/lib/games/osanpo-run/config";
+import { isOsanpoRunDifficultyId, OSANPO_RUN_STAGE_IDS } from "@/lib/games/osanpo-run/config";
 import { checkRateLimit } from "@/lib/rate-limit";
 import { requireUser } from "@/lib/supabase/server";
 
@@ -8,7 +8,7 @@ type RpcResponse = {
   error: { code?: string; message: string } | null;
 };
 
-/** スコア÷50（切り上げ）をコインにして配るため、DB側と同じく現実的な範囲に絞る。 */
+/** スコア÷難易度ごとの数（切り上げ）をコインにして配るため、DB側と同じく現実的な範囲に絞る。 */
 const MAX_SCORE = 10_000_000;
 const MAX_METERS = 1_000_000;
 const MAX_ITEMS = 1_000_000;
@@ -30,6 +30,7 @@ export async function POST(request: Request) {
   const body = (await request.json().catch(() => null)) as {
     roundId?: unknown;
     stage?: unknown;
+    difficulty?: unknown;
     score?: unknown;
     meters?: unknown;
     items?: unknown;
@@ -45,6 +46,8 @@ export async function POST(request: Request) {
     || !isCount(body.score, MAX_SCORE)
     || !isCount(body.meters, MAX_METERS)
     || !isCount(body.items, MAX_ITEMS)
+    // 難易度ができる前の画面（開いたままのタブ）は、すべての障害物が出る「むずかしい」と同じ内容で遊んでいる
+    || (body.difficulty !== undefined && !isOsanpoRunDifficultyId(body.difficulty))
   ) {
     return NextResponse.json({ error: "ゲーム結果が正しくありません。" }, { status: 400 });
   }
@@ -60,12 +63,13 @@ export async function POST(request: Request) {
 
   const rpc = supabase.rpc.bind(supabase) as unknown as (
     fn: "record_osanpo_run_result",
-    args: { p_round_id: string; p_stage: string; p_score: number; p_meters: number; p_items: number },
+    args: { p_round_id: string; p_stage: string; p_difficulty: string; p_score: number; p_meters: number; p_items: number },
   ) => Promise<RpcResponse>;
 
   const { data, error } = await rpc("record_osanpo_run_result", {
     p_round_id: body.roundId,
     p_stage: body.stage,
+    p_difficulty: body.difficulty ?? "hard",
     p_score: body.score,
     p_meters: body.meters,
     p_items: body.items,

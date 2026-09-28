@@ -202,6 +202,17 @@
 .osr .osr-stage-card.osr-locked .osr-face { filter: grayscale(1) brightness(0.55); }
 .osr .osr-stage-card b { font-size: 13px; font-weight: 800; line-height: 1.3; }
 .osr .osr-stage-card small { font-size: 10px; color: var(--osr-muted); font-variant-numeric: tabular-nums; line-height: 1.4; }
+.osr .osr-diffs { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px; }
+.osr .osr-diffs button {
+  appearance: none; display: flex; flex-direction: column; align-items: center; gap: 1px; padding: 7px 4px; border-radius: 12px;
+  border: 1.5px solid var(--osr-line); background: rgba(255, 255, 255, 0.04); color: var(--osr-ink); font-family: var(--osr-body); cursor: pointer; min-width: 0;
+}
+.osr .osr-diffs button[aria-checked="true"] { border-color: var(--osr-lantern); background: rgba(255, 200, 87, 0.12); }
+.osr .osr-diffs button:focus-visible { outline: 2px solid var(--osr-lantern); outline-offset: 2px; }
+.osr .osr-diffs b { font-size: 13px; font-weight: 800; line-height: 1.3; }
+.osr .osr-diffs small { font-size: 10px; color: var(--osr-lantern); letter-spacing: 0.08em; line-height: 1.3; }
+.osr .osr-diff-desc { font-size: 12px !important; line-height: 1.5; margin-top: -6px !important; }
+.osr .osr-tier { font-style: normal; font-size: 10px; color: var(--osr-lantern); letter-spacing: 0.04em; margin-left: 2px; }
 .osr .osr-panel-foot { display: flex; justify-content: space-between; align-items: center; gap: 8px; flex-wrap: wrap; }
 .osr .osr-chip-toggle {
   appearance: none; display: inline-flex; align-items: center; gap: 8px; padding: 5px 12px 5px 8px; border-radius: 999px;
@@ -444,6 +455,7 @@
 .osr .osr-rk-period { display: grid; grid-template-columns: 1fr 1fr; padding: 4px; border-radius: 999px; border: 1px solid var(--osr-line); background: rgba(255, 255, 255, 0.03); }
 .osr .osr-rk-period button { appearance: none; border: 0; background: transparent; color: var(--osr-muted); font-family: var(--osr-body); font-weight: 800; font-size: 13px; padding: 8px; border-radius: 999px; cursor: pointer; }
 .osr .osr-rk-period button[aria-pressed="true"] { background: var(--osr-lantern); color: #2a1e0a; }
+.osr .osr-rk-period.osr-rk-diff { grid-template-columns: repeat(3, 1fr); }
 .osr .osr-rk-period button:focus-visible, .osr .osr-rk-retry:focus-visible { outline: 2px solid var(--osr-lantern); outline-offset: 2px; }
 .osr .osr-rk-note { margin: 0; text-align: center; font-size: 11px; color: var(--osr-muted); }
 .osr .osr-rk-me { margin: 0; padding: 9px 12px; border-radius: 12px; text-align: center; font-weight: 800; font-size: 13px; color: var(--osr-lantern); background: rgba(255, 200, 87, 0.1); border: 1px solid rgba(255, 200, 87, 0.3); }

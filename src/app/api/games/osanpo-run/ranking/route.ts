@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { signThumbOrOriginalPaths } from "@/lib/data/photos";
+import { DEFAULT_OSANPO_RUN_DIFFICULTY, isOsanpoRunDifficultyId } from "@/lib/games/osanpo-run/config";
 import { requireUser } from "@/lib/supabase/server";
 
 type RankingPeriod = "week" | "best";
@@ -61,19 +62,24 @@ function toRankingRow(value: unknown): RankingDbRow | null {
 }
 
 export async function GET(request: Request) {
-  const periodParam = new URL(request.url).searchParams.get("period") ?? "week";
+  const params = new URL(request.url).searchParams;
+  const periodParam = params.get("period") ?? "week";
+  const difficulty = params.get("difficulty") ?? DEFAULT_OSANPO_RUN_DIFFICULTY;
   if (periodParam !== "week" && periodParam !== "best") {
     return NextResponse.json({ error: "ランキング期間が正しくありません。" }, { status: 400 });
   }
   const period: RankingPeriod = periodParam;
+  if (!isOsanpoRunDifficultyId(difficulty)) {
+    return NextResponse.json({ error: "難易度が正しくありません。" }, { status: 400 });
+  }
 
   const { supabase } = await requireUser();
   const rpc = supabase.rpc.bind(supabase) as unknown as (
     fn: "get_friend_osanpo_run_ranking",
-    args: { p_period: RankingPeriod },
+    args: { p_period: RankingPeriod; p_difficulty: string },
   ) => Promise<RpcResponse>;
 
-  const { data, error } = await rpc("get_friend_osanpo_run_ranking", { p_period: period });
+  const { data, error } = await rpc("get_friend_osanpo_run_ranking", { p_period: period, p_difficulty: difficulty });
   if (error) {
     if (error.code && RANKING_UNAVAILABLE_CODES.has(error.code)) {
       return NextResponse.json({ ready: false, entries: [] }, { headers: { "Cache-Control": "no-store" } });
@@ -94,6 +100,7 @@ export async function GET(request: Request) {
     {
       ready: true,
       period,
+      difficulty,
       entries: rows.map((row) => ({
         rank: row.rank_position,
         userId: row.user_id,

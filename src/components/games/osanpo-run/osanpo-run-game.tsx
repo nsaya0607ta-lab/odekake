@@ -4,7 +4,7 @@ import Link from "next/link";
 import { Dela_Gothic_One, M_PLUS_Rounded_1c } from "next/font/google";
 import { useEffect, useRef } from "react";
 import { setBgmSuppressed } from "@/lib/bgm-engine";
-import type { OsanpoRunStageId } from "@/lib/games/osanpo-run/config";
+import { OSANPO_RUN_DIFFICULTIES, OSANPO_RUN_DIFFICULTY_IDS, type OsanpoRunStageId } from "@/lib/games/osanpo-run/config";
 import { createOsanpoRun, type OsanpoRunResult, type RunItem } from "./engine";
 import { OSANPO_RUN_RANKING_REFRESH_EVENT, OsanpoRunRanking } from "./osanpo-run-ranking";
 
@@ -127,6 +127,15 @@ export function OsanpoRunGame({ items, usesSampleItems, unlockedStages, seriesTa
               <h2>どこを散歩する？</h2>
               <div className="osr-stages" data-osr="stage-list" role="radiogroup" aria-label="ステージ" />
               <p className="osr-stage-desc" data-osr="stage-desc" />
+              <div className="osr-diffs" role="radiogroup" aria-label="難易度">
+                {OSANPO_RUN_DIFFICULTY_IDS.map((id) => (
+                  <button key={id} type="button" role="radio" aria-checked="false" tabIndex={-1} data-diff={id}>
+                    <b>{OSANPO_RUN_DIFFICULTIES[id].name}</b>
+                    <small>{"★".repeat(OSANPO_RUN_DIFFICULTIES[id].maxTier)}</small>
+                  </button>
+                ))}
+              </div>
+              <p className="osr-diff-desc" data-osr="diff-desc" />
               <div className="osr-keys">
                 <span><kbd>スペース</kbd><kbd>↑</kbd>かタップでジャンプ（空中であと2回・3段まで）</span>
                 <span><kbd>↓</kbd>か下スワイプでスライディング</span>
@@ -143,7 +152,7 @@ export function OsanpoRunGame({ items, usesSampleItems, unlockedStages, seriesTa
                 <button className="osr-chip-toggle" type="button" data-opt="calm" aria-pressed="true"><span className="osr-dot" aria-hidden="true" />ゆったりモード</button>
                 <button className="osr-link-btn" type="button" data-open="settings">設定</button>
               </div>
-              <p className="osr-preview-note">スコア50点ごとにコイン1枚（切り上げ）。フレンドとスコアを競えます。</p>
+              <p className="osr-preview-note">スコアは難易度ごとに記録され、フレンドと競えます。</p>
             </div>
 
             <div className="osr-panel" data-osr="over-panel" hidden>
@@ -231,20 +240,21 @@ export function OsanpoRunGame({ items, usesSampleItems, unlockedStages, seriesTa
                     <h3>よけるもの</h3>
                     <ul>
                       <li className="osr-note-li"><small>道ごとに見た目が変わります（例：山道では岩・倒木・道標、雪国では雪だるま・ソリ・つらら）。</small></li>
-                      <li><canvas data-icon="cone" /><div><b>コーン・水たまり</b><small>ちょんと跳べば越えられる。</small></div></li>
-                      <li><canvas data-icon="bike" /><div><b>ママチャリ</b><small>横に長いので、しっかり長押しで。</small></div></li>
-                      <li><canvas data-icon="crow" /><div><b>カラス</b><small>跳ぶとぶつかる。走ったまま下をくぐると+5。</small></div></li>
-                      <li><canvas data-icon="cat" /><div><b>ねこ</b><small>こっちに歩いてくるので、いつもより早めに跳ぶ。</small></div></li>
-                      <li><canvas data-icon="sign" /><div><b>工事中の看板</b><small>背が高い。しっかり長押しで。</small></div></li>
-                      <li><canvas data-icon="noren" /><div><b>のれん</b><small>上から垂れているので跳び越えられない。スライディングでくぐると+15。</small></div></li>
-                      <li><canvas data-icon="pigeons" /><div><b>ハト</b><small>小さくジャンプで越えると飛び立って+10。</small></div></li>
-                      <li><canvas data-icon="roller" /><div><b>お掃除ロボ</b><small>こっちに転がってくる。早めに跳ぶ。山道ではウリ坊、雪国では雪玉、夏まつりではビーチボール。</small></div></li>
-                      <li><canvas data-icon="drop" /><div><b>植木鉢</b><small>地面に影が出たら、上から落ちてくる。跳んでいるときに当たらないように。落ちたあとは小さく跳べば越えられる。</small></div></li>
-                      <li><canvas data-icon="geyser" /><div><b>スプリンクラー</b><small>水が出たり止まったりする。止まった瞬間に通るか、2段ジャンプで越える。</small></div></li>
-                      <li><canvas data-icon="suitcase" /><div><b>大脱走スーツケース</b><small>22秒から登場。荷物が跳ねながら転がってくる！ 低いときは跳び越え、高く浮いたら下を通る。接触せずに回避で+20、下を通ればさらに+15。</small></div></li>
-                      <li><canvas data-icon="surprise" /><div><b>びっくり宅配便</b><small>36秒から登場。箱がガタガタ揺れたあと、バネのカエルがびよーん！ 少しすると箱に戻る。2段ジャンプで高く越える。接触せずに回避で+30。</small></div></li>
-                      <li><canvas data-icon="drone" /><div><b>せっかち配達ドローン</b><small>48秒から登場。黄色の警告ランプのあと、荷物ごと降下してくる。下スワイプでスライディング！ 接触せずに回避で+25、滑ってくぐるとさらに+15。</small></div></li>
-                      <li><canvas data-icon="buddy" /><div><b>ほかのフレブル</b><small>図鑑のフレブル（いつもの・登山・雪国・夏）がお散歩している。ぶつかってもだいじょうぶ。くんくんごあいさつで+30（少しだけ立ち止まる）。</small></div></li>
+                      <li className="osr-note-li"><small>★の数はよけにくさ。やさしいは★1だけ、ふつうは★2まで、むずかしいは★3まで出ます。コインは、やさしいがスコア60点・ふつうが40点・むずかしいが30点ごとに1枚（切り上げ）。</small></li>
+                      <li><canvas data-icon="cone" /><div><b>コーン・水たまり <i className="osr-tier">★</i></b><small>ちょんと跳べば越えられる。</small></div></li>
+                      <li><canvas data-icon="bike" /><div><b>ママチャリ <i className="osr-tier">★★</i></b><small>横に長いので、しっかり長押しで。</small></div></li>
+                      <li><canvas data-icon="crow" /><div><b>カラス <i className="osr-tier">★</i></b><small>跳ぶとぶつかる。走ったまま下をくぐると+5。低く飛ぶカラス（★★★）はスライディングでくぐる。</small></div></li>
+                      <li><canvas data-icon="cat" /><div><b>ねこ <i className="osr-tier">★★</i></b><small>こっちに歩いてくるので、いつもより早めに跳ぶ。</small></div></li>
+                      <li><canvas data-icon="sign" /><div><b>工事中の看板 <i className="osr-tier">★★</i></b><small>背が高い。しっかり長押しで。</small></div></li>
+                      <li><canvas data-icon="noren" /><div><b>のれん <i className="osr-tier">★★</i></b><small>上から垂れているので跳び越えられない。スライディングでくぐると+15。</small></div></li>
+                      <li><canvas data-icon="pigeons" /><div><b>ハト <i className="osr-tier">★</i></b><small>小さくジャンプで越えると飛び立って+10。</small></div></li>
+                      <li><canvas data-icon="roller" /><div><b>お掃除ロボ <i className="osr-tier">★★</i></b><small>こっちに転がってくる。早めに跳ぶ。山道ではウリ坊、雪国では雪玉、夏まつりではビーチボール。</small></div></li>
+                      <li><canvas data-icon="drop" /><div><b>植木鉢 <i className="osr-tier">★★★</i></b><small>地面に影が出たら、上から落ちてくる。跳んでいるときに当たらないように。落ちたあとは小さく跳べば越えられる。</small></div></li>
+                      <li><canvas data-icon="geyser" /><div><b>スプリンクラー <i className="osr-tier">★★★</i></b><small>水が出たり止まったりする。止まった瞬間に通るか、2段ジャンプで越える。</small></div></li>
+                      <li><canvas data-icon="suitcase" /><div><b>大脱走スーツケース <i className="osr-tier">★★★</i></b><small>22秒から登場。荷物が跳ねながら転がってくる！ 低いときは跳び越え、高く浮いたら下を通る。接触せずに回避で+20、下を通ればさらに+15。</small></div></li>
+                      <li><canvas data-icon="surprise" /><div><b>びっくり宅配便 <i className="osr-tier">★★★</i></b><small>36秒から登場。箱がガタガタ揺れたあと、バネのカエルがびよーん！ 少しすると箱に戻る。2段ジャンプで高く越える。接触せずに回避で+30。</small></div></li>
+                      <li><canvas data-icon="drone" /><div><b>せっかち配達ドローン <i className="osr-tier">★★★</i></b><small>48秒から登場。黄色の警告ランプのあと、荷物ごと降下してくる。下スワイプでスライディング！ 接触せずに回避で+25、滑ってくぐるとさらに+15。</small></div></li>
+                      <li><canvas data-icon="buddy" /><div><b>ほかのフレブル <i className="osr-tier">★</i></b><small>図鑑のフレブル（いつもの・登山・雪国・夏）がお散歩している。ぶつかってもだいじょうぶ。くんくんごあいさつで+30（少しだけ立ち止まる）。</small></div></li>
                     </ul>
                   </section>
                 </div>

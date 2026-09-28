@@ -74,6 +74,48 @@ export function isOsanpoRunStageId(value: unknown): value is OsanpoRunStageId {
   return typeof value === "string" && (OSANPO_RUN_STAGE_IDS as readonly string[]).includes(value);
 }
 
+/**
+ * 難易度。出てくる障害物のランク（★1〜3）の上限と、コインの割る数が変わる。
+ * スコア・ランキングも難易度ごとに分けて記録する（DB側の record_osanpo_run_result と同じ値）。
+ */
+export const OSANPO_RUN_DIFFICULTY_IDS = ["easy", "normal", "hard"] as const;
+export type OsanpoRunDifficultyId = (typeof OSANPO_RUN_DIFFICULTY_IDS)[number];
+export type OsanpoRunObstacleTier = 1 | 2 | 3;
+
+export type OsanpoRunDifficulty = {
+  id: OsanpoRunDifficultyId;
+  name: string;
+  desc: string;
+  /** この★までの障害物が出る */
+  maxTier: OsanpoRunObstacleTier;
+  /** スコア÷この数（端数切り上げ）がコインになる */
+  coinDivisor: number;
+};
+
+export const OSANPO_RUN_DIFFICULTIES: Record<OsanpoRunDifficultyId, OsanpoRunDifficulty> = {
+  easy: { id: "easy", name: "やさしい", desc: "跳ぶだけでよけられる障害物だけ。", maxTier: 1, coinDivisor: 60 },
+  normal: { id: "normal", name: "ふつう", desc: "長押しジャンプやスライディングが必要な障害物も出る。", maxTier: 2, coinDivisor: 40 },
+  hard: { id: "hard", name: "むずかしい", desc: "動きを見てよけ方を変える、すべての障害物が出る。", maxTier: 3, coinDivisor: 30 },
+};
+
+export const DEFAULT_OSANPO_RUN_DIFFICULTY: OsanpoRunDifficultyId = "normal";
+
+export function isOsanpoRunDifficultyId(value: unknown): value is OsanpoRunDifficultyId {
+  return typeof value === "string" && (OSANPO_RUN_DIFFICULTY_IDS as readonly string[]).includes(value);
+}
+
+/**
+ * 出現パターンごとの障害物ランク。
+ * ★1: 見たら跳ぶだけ（または何もしない） / ★2: 跳ぶ強さ・タイミングやスライディングが要る /
+ * ★3: 動きを見てよけ方を選ぶ必要がある
+ */
+export const OSANPO_RUN_OBSTACLE_TIERS = {
+  cone: 1, puddle: 1, pigeons: 1, buddy: 1, crow: 1,
+  bike: 2, sign: 2, cat: 2, roller: 2, noren: 2, double: 2,
+  lowcrow: 3, drop: 3, geyser: 3, suitcase: 3, surprise: 3, drone: 3,
+} as const satisfies Record<string, OsanpoRunObstacleTier>;
+export type OsanpoRunSpawnObstacle = keyof typeof OSANPO_RUN_OBSTACLE_TIERS;
+
 export type RarityStyle = {
   /** 1個あたりの点数（コンボ倍率がさらに掛かる） */
   points: number;
