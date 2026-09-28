@@ -17,6 +17,8 @@ type Props = {
   unlockedStages: OsanpoRunStageId[];
   seriesTabs: { id: string; name: string }[];
   categoryLabels: Record<string, string>;
+  /** アプリに同期した今日の歩数（未同期は null）。歩数ブーストに使う */
+  todaySteps: number | null;
 };
 
 /** 1回の結果をサーバーへ送り、スコアを記録してコインを受け取る。記録できなかったときは null */
@@ -41,7 +43,7 @@ async function submitResult(result: OsanpoRunResult): Promise<number | null> {
  * おさんぽフレンチーの画面。骨組みだけをここで描き、動きは engine.ts に任せる。
  * プレイ中はアプリ全体のBGMを止め、ゲームの曲だけが鳴るようにする。
  */
-export function OsanpoRunGame({ items, usesSampleItems, unlockedStages, seriesTabs, categoryLabels }: Props) {
+export function OsanpoRunGame({ items, usesSampleItems, unlockedStages, seriesTabs, categoryLabels, todaySteps }: Props) {
   const rootRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
@@ -54,6 +56,7 @@ export function OsanpoRunGame({ items, usesSampleItems, unlockedStages, seriesTa
       unlockedStages,
       seriesTabs,
       categoryLabels,
+      todaySteps,
       bodyFontFamily: bodyFont.style.fontFamily,
       onRunEnd: submitResult,
     });
@@ -61,7 +64,7 @@ export function OsanpoRunGame({ items, usesSampleItems, unlockedStages, seriesTa
       destroy();
       setBgmSuppressed(false);
     };
-  }, [items, usesSampleItems, unlockedStages, seriesTabs, categoryLabels]);
+  }, [items, usesSampleItems, unlockedStages, seriesTabs, categoryLabels, todaySteps]);
 
   return (
     <div ref={rootRef} className={`osr ${displayFont.variable} ${bodyFont.variable}`}>
@@ -127,6 +130,7 @@ export function OsanpoRunGame({ items, usesSampleItems, unlockedStages, seriesTa
               <h2>どこを散歩する？</h2>
               <div className="osr-stages" data-osr="stage-list" role="radiogroup" aria-label="ステージ" />
               <p className="osr-stage-desc" data-osr="stage-desc" />
+              <div className="osr-step-boost" data-osr="step-boost" />
               <div className="osr-keys">
                 <span><kbd>スペース</kbd><kbd>↑</kbd>かタップでジャンプ（空中であと2回・3段まで）</span>
                 <span><kbd>↓</kbd>か下スワイプでスライディング</span>

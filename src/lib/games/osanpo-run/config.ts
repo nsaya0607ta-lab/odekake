@@ -74,6 +74,24 @@ export function isOsanpoRunStageId(value: unknown): value is OsanpoRunStageId {
   return typeof value === "string" && (OSANPO_RUN_STAGE_IDS as readonly string[]).includes(value);
 }
 
+/**
+ * 歩数ブースト。アプリに同期した「今日の歩数」に応じて、スタート時に効果が付く（段階は積み重なる）。
+ * 3000歩〜: 最初の STEP_BOOST_SEC 秒スコア×STEP_BOOST_MUL / 6000歩〜: バリア1回 / 10000歩〜: スタートでボーナスタイム
+ */
+export const OSANPO_RUN_STEP_BOOSTS = [
+  { steps: 3000, label: "スコアアップ", desc: "最初の10秒、拾ったもののスコア×1.2" },
+  { steps: 6000, label: "バリア", desc: "1回だけぶつかっても平気" },
+  { steps: 10000, label: "ボーナスタイム", desc: "スタートからボーナスタイム" },
+] as const;
+export const STEP_BOOST_SEC = 10;
+export const STEP_BOOST_MUL = 1.2;
+
+/** 今日の歩数で届いている段階の数（0〜3） */
+export function stepBoostLevel(steps: number | null): number {
+  if (steps === null) return 0;
+  return OSANPO_RUN_STEP_BOOSTS.filter((b) => steps >= b.steps).length;
+}
+
 export type RarityStyle = {
   /** 1個あたりの点数（コンボ倍率がさらに掛かる） */
   points: number;

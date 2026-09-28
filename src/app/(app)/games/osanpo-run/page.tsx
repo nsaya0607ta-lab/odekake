@@ -4,6 +4,7 @@ import { OsanpoRunGame } from "@/components/games/osanpo-run/osanpo-run-game";
 import type { RunItem } from "@/components/games/osanpo-run/engine";
 import { CATEGORY_LABELS, COLLECTION_ITEMS, REGULAR_ITEMS, type CollectionItem } from "@/lib/collection/items";
 import { getOwnedItemCounts } from "@/lib/data/collection";
+import { getExpDashboard } from "@/lib/data/exp";
 import { getSkillLevel } from "@/lib/gacha/skill-levels";
 import { getDogSkin, isSkinUnlocked } from "@/lib/dog-skins";
 import { OSANPO_RUN_STAGE_IDS, OSANPO_RUN_STAGES } from "@/lib/games/osanpo-run/config";
@@ -33,7 +34,10 @@ function toRunItem(item: CollectionItem & { image: string }, count: number): Run
 
 export default async function OsanpoRunPage() {
   const { supabase, user } = await requireUser();
-  const ownedCounts = await getOwnedItemCounts(supabase, user.id);
+  const [ownedCounts, { todaySteps }] = await Promise.all([
+    getOwnedItemCounts(supabase, user.id),
+    getExpDashboard(supabase, user.id),
+  ]);
   const ownedIds = new Set([...ownedCounts].filter(([, count]) => count > 0).map(([id]) => id));
 
   const hasImage = (item: CollectionItem): item is CollectionItem & { image: string } => Boolean(item.image);
@@ -54,6 +58,7 @@ export default async function OsanpoRunPage() {
       unlockedStages={unlockedStages}
       seriesTabs={seriesTabs}
       categoryLabels={CATEGORY_LABELS}
+      todaySteps={todaySteps}
     />
   );
 }

@@ -20,8 +20,12 @@ import {
   OSANPO_RUN_SONGS,
   OSANPO_RUN_STAGE_IDS,
   OSANPO_RUN_STAGES,
+  OSANPO_RUN_STEP_BOOSTS,
   OSANPO_RUN_STORAGE_PREFIX,
   RARITY_STYLES,
+  STEP_BOOST_MUL,
+  STEP_BOOST_SEC,
+  stepBoostLevel,
   type OsanpoRunHintId,
   type OsanpoRunStage,
   type OsanpoRunStageId,
@@ -86,6 +90,8 @@ export type OsanpoRunOptions = {
   bodyFontFamily: string;
   seriesTabs: { id: string; name: string }[];
   categoryLabels: Record<string, string>;
+  /** アプリに同期した今日の歩数（未同期は null）。歩数ブーストに使う */
+  todaySteps?: number | null;
 };
 
 type Pose = "walk" | "trot" | "walk-tail" | "cheer" | "smile" | "bow-b" | "stand-happy" | "wave" | "sleep" | "lie-wave" | "bow";
@@ -367,7 +373,7 @@ export function createOsanpoRun(root: HTMLElement, opts: OsanpoRunOptions): () =
   };
   const S = {
     state: "ready" as GameState, time: 0, t: 0, speed: 90, dist: 0, bonus: 0, treats: 0, clock: STAGE.clock, cam: 0, bgCam: 0,
-    next: 400, shield: false, chain: 0, chainT: 0, mult: 1, maxMult: 1, paused: false, deadT: 0, introT: 0,
+    stepT: 0, next: 400, shield: false, chain: 0, chainT: 0, mult: 1, maxMult: 1, paused: false, deadT: 0, introT: 0,
     haul: new Map<string, number>(), happyT: 0, calm: store.get("calm") !== "0",
     sec: "normal" as Section, secT: 18, rain: 0, rainTarget: 0, rainT: 0,
     bones: 0, newAch: [] as string[], newKinds: [] as string[], rainWalk: 0, rushes: 0, closes: 0, bonusGot: 0,
@@ -1717,6 +1723,7 @@ export function createOsanpoRun(root: HTMLElement, opts: OsanpoRunOptions): () =
       M.comboLock ||= Boolean(b.comboLock); M.dry ||= Boolean(b.dry); M.clear ||= Boolean(b.clear); M.bright ||= Boolean(b.bright);
       step += a.acc;
     }
+    if (S.stepT > 0) M.mul *= STEP_BOOST_MUL;
     M.mul *= (1 + step) * K.runMul * (envAt(S.clock).night > 0.5 ? K.nightMul : 1) * (S.wx ? S.wx.mul : 1);
   }
   /** 加点。スキルのスコア倍率がかかった値を返す */
@@ -2103,6 +2110,7 @@ export function createOsanpoRun(root: HTMLElement, opts: OsanpoRunOptions): () =
       const info = WEATHER_INFO[S.wx.kind];
       rows.unshift({ key: `wx-${S.wx.kind}`, item: null, glyph: info.glyph, label: info.title.split("！")[0]!, tag: info.tag, kind: "weather", t: S.wx.t, max: S.wx.max, count: "", desc: info.desc });
     }
+    if (S.stepT > 0) rows.push({ key: "steps", item: null, glyph: "👣", label: "歩数ブースト", tag: `×${STEP_BOOST_MUL}`, kind: "score", t: S.stepT, max: STEP_BOOST_SEC, count: "", desc: OSANPO_RUN_STEP_BOOSTS[0].desc });
     const clears = K.clears.reduce((n, c) => n + c.n, 0);
     if (clears) add("clears", "✦", K.clears[0]!.name, "はじく", `×${clears}`, "guard", "前から来る障害物をはじき飛ばす");
     if (K.rushPass) add("rush", "⚡", "あずき色の風", "ラッシュ無敵", "×1", "combo", "次のラッシュを無敵で乗り切り、突破ボーナスが増える");
@@ -2249,6 +2257,38 @@ export function createOsanpoRun(root: HTMLElement, opts: OsanpoRunOptions): () =
       .catch(() => { el.dataset.state = "error"; el.textContent = "通信できず、コインを受け取れませんでした"; });
   }
   const score = () => Math.floor(S.dist / 50) + S.bonus;
+  /* ---------- 歩数ブースト（今日の歩数に応じてスタート時に付く） ---------- */
+  const todaySteps = typeof opts.todaySteps === "number" ? opts.todaySteps : null;
+  const stepLv = stepBoostLevel(todaySteps);
+  function renderStepBoost(): void {
+    const box = $("step-boost");
+    box.replaceChildren();
+    const head = document.createElement("b");
+    head.textContent = todaySteps === null ? "👣 歩数ブースト" : `👣 今日 ${todaySteps.toLocaleString()}歩`;
+    const ul = document.createElement("ul");
+    for (const [i, b] of OSANPO_RUN_STEP_BOOSTS.entries()) {
+      const li = document.createElement("li");
+      li.dataset.on = i < stepLv ? "1" : "0";
+      const st = document.createElement("span"); st.textContent = `${b.steps.toLocaleString()}歩〜`;
+      const lb = document.createElement("span"); lb.textContent = b.label;
+      li.append(st, lb);
+      li.title = b.desc;
+      ul.appendChild(li);
+    }
+    const note = document.createElement("small");
+    note.textContent = todaySteps === null
+      ? "アプリに歩数を同期すると、歩いた分だけスタートが有利になります。"
+      : stepLv === OSANPO_RUN_STEP_BOOSTS.length ? "ぜんぶ付いてスタート！" : `あと${(OSANPO_RUN_STEP_BOOSTS[stepLv]!.steps - todaySteps).toLocaleString()}歩で「${OSANPO_RUN_STEP_BOOSTS[stepLv]!.label}」`;
+    box.append(head, ul, note);
+  }
+  /** スタートの合図と同時に、届いている段階の効果を付ける */
+  function applyStepBoost(): void {
+    if (stepLv <= 0) return;
+    S.stepT = STEP_BOOST_SEC;
+    if (stepLv >= 2 && wardRank() < 2) { clearWards(); S.shield = true; sfx.barrier(); }
+    if (stepLv >= 3) setSection("bonus");
+    floatText(VW / 2, GROUND * 0.22, `歩数ブースト！ ${todaySteps?.toLocaleString() ?? 0}歩`, "#9BE7FF", 18);
+  }
   function start(): void {
     closeSheet();
     hidePanels();
@@ -2256,7 +2296,7 @@ export function createOsanpoRun(root: HTMLElement, opts: OsanpoRunOptions): () =
     FX.fade = RM ? 0 : 1;
     Object.assign(S, {
       state: "intro", introT: 0, roundId: newRoundId(), slowT: 0, wx: null, wxT: rand(25, 40), knocks: 0, rares: 0, skillIds: new Set<string>(), tricks: newTrickRun(), bestD: bestDistOf(STAGE_ID), passedBest: false, recordShown: false, fwT: 2,
-      t: 0, speed: 0, dist: 0, bonus: 0, treats: 0, clock: STAGE.clock, next: 420, shield: false, chain: 0, chainT: 0, mult: 1, maxMult: 1,
+      t: 0, speed: 0, dist: 0, bonus: 0, treats: 0, clock: STAGE.clock, stepT: 0, next: 420, shield: false, chain: 0, chainT: 0, mult: 1, maxMult: 1,
       paused: false, deadT: 0, milestone: 100, bufT: 0, haul: new Map<string, number>(), sec: "normal", secT: 18, rain: 0, rainTarget: 0, rainT: 0,
       bones: 0, newAch: [], newKinds: [], rainWalk: 0, rushes: 0, closes: 0, bonusGot: 0,
     });
@@ -2546,9 +2586,11 @@ export function createOsanpoRun(root: HTMLElement, opts: OsanpoRunOptions): () =
         floatText(P.x + 4, P.y - 84, "ドン！", "#FFC857", 24);
         puff(P.x - 10, GROUND, 8, "dust", { vy: -20 });
         if (S.bufT > 0) { S.bufT = 0; jump(JUMP_V, 1); }
+        applyStepBoost();
       }
     } else if (playing) {
       S.t += dt;
+      if (S.stepT > 0) S.stepT = Math.max(0, S.stepT - dt);
       if (!M.hold) K.ramp += dt;
       if (S.slowT > 0) S.slowT -= dt;
       tickWeather(dt);
@@ -3107,6 +3149,7 @@ export function createOsanpoRun(root: HTMLElement, opts: OsanpoRunOptions): () =
 
   buildStageList();
   selectStage(STAGE_ID);
+  renderStepBoost();
   renderAchList();
   renderZukan();
   buildRarityGuide();
