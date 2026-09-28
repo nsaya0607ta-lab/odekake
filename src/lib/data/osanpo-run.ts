@@ -12,7 +12,7 @@ export type OsanpoRunMemoryPhoto = {
   pref: string;
 };
 
-/** 新しい順にこれだけ読み、ゲーム側で横長（16:9 前後）のものだけ使う */
+/** 新しい順にこれだけ読む。看板の向き（縦・横）はゲーム側で写真の縦横比から決める */
 const MEMORY_PHOTO_LIMIT = 60;
 
 export async function getOsanpoRunMemoryPhotos(supabase: DB, userId: string): Promise<OsanpoRunMemoryPhoto[]> {

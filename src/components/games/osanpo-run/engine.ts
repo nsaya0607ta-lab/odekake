@@ -14,8 +14,6 @@ import { GACHA_RARITIES } from "@/lib/gacha/config";
 import {
   isBarrierRarity,
   isOsanpoRunStageId,
-  MEMORY_PHOTO_ASPECT_MAX,
-  MEMORY_PHOTO_ASPECT_MIN,
   MEMORY_SIGN_PTS,
   OSANPO_RUN_ACHIEVEMENTS,
   OSANPO_RUN_HINTS,
@@ -105,7 +103,7 @@ export type OsanpoRunOptions = {
   missionsDone?: string[];
   /** ミッションを達成したときに呼ぶ。もらえたコインの枚数を返す（記録できなかったときは null） */
   onMissionClear?: (missionId: string) => Promise<number | null>;
-  /** 道ばたの看板に貼る自分のおでかけ写真（横長のものだけ使う） */
+  /** 道ばたの看板に貼る自分のおでかけ写真（縦長は縦向き、横長は横向きの看板になる） */
   memoryPhotos?: { src: string; name: string; pref: string }[];
 };
 
@@ -1204,15 +1202,14 @@ export function createOsanpoRun(root: HTMLElement, opts: OsanpoRunOptions): () =
     S.next = (170 + S.speed * 0.55 + Math.random() * S.speed * 0.8) * (rush ? 0.68 : 1) * routeGap() + extra;
   }
   /* ---------- 思い出の看板（自分のおでかけ写真） ---------- */
-  type MemoryPhoto = { img: HTMLImageElement; name: string; pref: string };
+  type MemoryPhoto = { img: HTMLImageElement; name: string; pref: string; tall: boolean };
   const memoryPhotos: MemoryPhoto[] = [];
-  // 読み込めた写真のうち、看板の枠（16:9）に合う横長のものだけ使う
+  // 読み込めた写真だけ使う。縦長かどうかで看板の向きを決める
   for (const p of opts.memoryPhotos ?? []) {
     const img = new Image();
     img.decoding = "async";
     img.onload = () => {
-      const r = img.naturalWidth / Math.max(1, img.naturalHeight);
-      if (r >= MEMORY_PHOTO_ASPECT_MIN && r <= MEMORY_PHOTO_ASPECT_MAX) memoryPhotos.push({ img, name: p.name, pref: p.pref });
+      if (img.naturalWidth && img.naturalHeight) memoryPhotos.push({ img, name: p.name, pref: p.pref, tall: img.naturalHeight > img.naturalWidth });
     };
     img.src = p.src;
   }
@@ -1241,33 +1238,39 @@ export function createOsanpoRun(root: HTMLElement, opts: OsanpoRunOptions): () =
     S.memo = { at: S.dist + VW + 90 - P.x, photo: nextMemoryPhoto(), passed: false };
     S.memoT = rand(25, 35);
   }
-  /** 木の枠に写真を入れた看板。下の札にスポット名と都道府県 */
+  /**
+   * 木の枠に写真を入れた看板。下の札にスポット名と都道府県。
+   * 横向き（横4:縦3）は脚2本、縦向き（横3:縦4）は真ん中の支柱1本で立てる
+   */
   function drawMemory(c: Ctx, e: Env): void {
     if (!S.memo) return;
     const ph = memoryPhotos[S.memo.photo];
     if (!ph) return;
     const x = P.x + (S.memo.at - S.dist);
-    const pw = 104, phh = pw * 9 / 16, fr = 5, bw = pw + fr * 2, bh = phh + fr * 2;
+    const pw = ph.tall ? 60 : 92, phh = ph.tall ? 80 : 69, fr = 5, bw = pw + fr * 2, bh = phh + fr * 2;
     if (x + bw / 2 < -20 || x - bw / 2 > VW + 20) return;
     const top = GROUND - 38 - bh, left = x - bw / 2;
     if (e.night > 0.2) glow(c, x, top + bh / 2, bw * 0.8, "255,226,170", 0.35 * e.night);
     const wood = mix(hex("#9A6B43"), e.near, 0.1 + e.night * 0.4);
     c.fillStyle = rgb(shade(wood, -0.15));
-    c.fillRect(left + 12, top + bh - 2, 5, GROUND - (top + bh) + 2);
-    c.fillRect(left + bw - 17, top + bh - 2, 5, GROUND - (top + bh) + 2);
+    if (ph.tall) c.fillRect(x - 3, top + bh - 2, 6, GROUND - (top + bh) + 2);
+    else {
+      c.fillRect(left + 12, top + bh - 2, 5, GROUND - (top + bh) + 2);
+      c.fillRect(left + bw - 17, top + bh - 2, 5, GROUND - (top + bh) + 2);
+    }
     c.fillStyle = rgb(wood); rr(c, left, top, bw, bh, 4); c.fill();
     c.save();
     rr(c, left + fr, top + fr, pw, phh, 2); c.clip();
-    // 16:9 の枠いっぱいに、はみ出す分は中央で切って貼る
+    // 枠（4:3 / 3:4）いっぱいに、はみ出す分は中央で切って貼る
     const iw = ph.img.naturalWidth, ih = ph.img.naturalHeight, k = Math.max(pw / iw, phh / ih);
     c.drawImage(ph.img, left + fr + (pw - iw * k) / 2, top + fr + (phh - ih * k) / 2, iw * k, ih * k);
     if (e.night > 0.05) { c.fillStyle = `rgba(20,14,40,${(e.night * 0.35).toFixed(3)})`; c.fillRect(left, top, bw, bh); }
     c.restore();
     const label = ph.pref ? `${ph.name}（${ph.pref}）` : ph.name;
     c.font = font(8); c.textAlign = "center"; c.textBaseline = "middle";
-    const lw = Math.min(bw + 10, c.measureText(label).width + 14);
+    const lw = Math.min(Math.max(bw + 10, 100), c.measureText(label).width + 14);
     c.fillStyle = "rgba(246,239,228,.95)"; rr(c, x - lw / 2, top + bh + 3, lw, 13, 3); c.fill();
-    c.fillStyle = "#3A2A1C"; c.fillText(label, x, top + bh + 10, bw + 4);
+    c.fillStyle = "#3A2A1C"; c.fillText(label, x, top + bh + 10, lw - 6);
   }
 
   /* ---------- 今日のミッション ---------- */

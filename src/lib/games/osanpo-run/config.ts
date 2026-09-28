@@ -110,11 +110,10 @@ export const OSANPO_RUN_ROUTE_DESC: Record<OsanpoRunRouteKind, string> = {
 };
 
 /**
- * 思い出の看板。自分のおでかけ写真のうち、横長（16:9 前後）のものを道ばたの看板に貼って流す。
- * 縦横比がこの範囲に入る写真だけ使う（16:9 = 1.78）。
+ * 思い出の看板。自分のおでかけ写真を道ばたの看板に貼って流す。
+ * 縦長の写真は縦向きの看板（横3:縦4）、横長・正方形の写真は横向きの看板（横4:縦3）に、
+ * はみ出す分を中央で切って貼る。
  */
-export const MEMORY_PHOTO_ASPECT_MIN = 1.6;
-export const MEMORY_PHOTO_ASPECT_MAX = 1.95;
 /** 看板の前を通ったときのおまけ点 */
 export const MEMORY_SIGN_PTS = 20;
 

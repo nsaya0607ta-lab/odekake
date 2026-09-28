@@ -258,7 +258,7 @@ export function OsanpoRunGame({ items, usesSampleItems, unlockedStages, seriesTa
                       <li className="osr-ctl"><span><kbd>分かれ道</kbd></span><div><b>分かれ道</b><small>ときどき道しるべが出る。跳んで通ると上の道（公園など：障害物が少なく、ほねとアイテムが多い）、そのまま通ると下の道（商店街など：障害物が多いけど、SR以上が出やすい）。20秒で合流。</small></div></li>
                       <li className="osr-ctl"><span><kbd>歩数</kbd></span><div><b>歩数ブースト</b><small>アプリに同期した今日の歩数で、スタート時に効果が付く。3000歩〜 最初の10秒スコア×1.2、6000歩〜 バリア、10000歩〜 ボーナスタイムからスタート。</small></div></li>
                       <li className="osr-ctl"><span><kbd>お題</kbd></span><div><b>今日のミッション</b><small>毎日3つのお題。1つ達成で30コイン、3つそろうとさらに100コイン。</small></div></li>
-                      <li className="osr-ctl"><span><kbd>写真</kbd></span><div><b>思い出の看板</b><small>おでかけ記録に登録した横長（16:9）の写真が、道ばたの看板になって出てくる。前を通ると+20。</small></div></li>
+                      <li className="osr-ctl"><span><kbd>写真</kbd></span><div><b>思い出の看板</b><small>おでかけ記録に登録した写真が、道ばたの看板になって出てくる（縦長の写真は縦向き、横長の写真は横向きの看板）。前を通ると+20。</small></div></li>
                       <li className="osr-ctl"><span><kbd>II</kbd></span><div><b>一時停止</b><small>右上のボタン（キーボードはP）。「最初から」「道を選ぶ」「設定」もここから。</small></div></li>
                     </ul>
                   </section>
