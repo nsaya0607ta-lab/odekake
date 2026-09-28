@@ -12,13 +12,8 @@ import { DOG_SKIN_IDS, getDogSkin } from "@/lib/dog-skins";
 import type { GachaRarity } from "@/lib/gacha/config";
 import { GACHA_RARITIES } from "@/lib/gacha/config";
 import {
-  DEFAULT_OSANPO_RUN_DIFFICULTY,
   isBarrierRarity,
-  isOsanpoRunDifficultyId,
   isOsanpoRunStageId,
-  OSANPO_RUN_DIFFICULTIES,
-  OSANPO_RUN_DIFFICULTY_IDS,
-  OSANPO_RUN_OBSTACLE_TIERS,
   OSANPO_RUN_ACHIEVEMENTS,
   OSANPO_RUN_HINTS,
   OSANPO_RUN_RANKS,
@@ -27,7 +22,6 @@ import {
   OSANPO_RUN_STAGES,
   OSANPO_RUN_STORAGE_PREFIX,
   RARITY_STYLES,
-  type OsanpoRunDifficultyId,
   type OsanpoRunHintId,
   type OsanpoRunStage,
   type OsanpoRunStageId,
@@ -78,10 +72,8 @@ export type RunItem = {
 /** 1回のおさんぽの結果（サーバーへ送ってスコアの記録とコインの受け取りをする） */
 /** 別画面を開いたときに送る合図（detail に画面の名前）。React 側で描いている画面の読み直しに使う */
 export const OSANPO_RUN_SHEET_OPEN_EVENT = "osanpo-run-sheet-open";
-/** 難易度を選び直したときの合図（detail: 難易度ID）。フレンドのランキングもこれに合わせて切り替える */
-export const OSANPO_RUN_DIFFICULTY_EVENT = "osanpo-run-difficulty";
 
-export type OsanpoRunResult = { roundId: string; stage: OsanpoRunStageId; difficulty: OsanpoRunDifficultyId; score: number; meters: number; items: number };
+export type OsanpoRunResult = { roundId: string; stage: OsanpoRunStageId; score: number; meters: number; items: number };
 
 export type OsanpoRunOptions = {
   /** おさんぽが終わったときに呼ぶ。もらえたコインの枚数を返す（記録できなかったときは null） */
@@ -350,8 +342,6 @@ export function createOsanpoRun(root: HTMLElement, opts: OsanpoRunOptions): () =
   let STAGE_ID: OsanpoRunStageId = isOsanpoRunStageId(savedStage) && unlocked.has(savedStage) ? savedStage : "town";
   let STAGE: OsanpoRunStage = OSANPO_RUN_STAGES[STAGE_ID];
   preloadSkin(STAGE.skin);
-  const savedDifficulty = store.get("difficulty");
-  let DIFF: OsanpoRunDifficultyId = isOsanpoRunDifficultyId(savedDifficulty) ? savedDifficulty : DEFAULT_OSANPO_RUN_DIFFICULTY;
   // 道で会う「ほかのわんこ」は、図鑑にいるフレブル（いつもの・登山・雪国・夏）からランダム。持っていなくても出る
   for (const skin of DOG_SKIN_IDS) for (const p of BUDDY_POSES) dogImage(skin, p);
 
@@ -363,11 +353,9 @@ export function createOsanpoRun(root: HTMLElement, opts: OsanpoRunOptions): () =
   );
   const kindSet = new Set<string>(stats.kinds);
   const saveStats = () => { stats.kinds = [...kindSet]; store.set("stats", JSON.stringify(stats)); };
-  // 難易度ができる前の記録は、すべての障害物が出ていたので「むずかしい」の記録として扱う（キーもそのまま）
-  const recKey = (base: string, id: OsanpoRunStageId) => (DIFF === "hard" ? `${base}-${id}` : `${base}-${id}-${DIFF}`);
-  const bestOf = (id: OsanpoRunStageId) => Number(store.get(recKey("best", id)) ?? 0) || 0;
-  const bestDistOf = (id: OsanpoRunStageId) => Number(store.get(recKey("bestd", id)) ?? 0) || 0;
-  const recordsOf = (id: OsanpoRunStageId) => loadJSON<RunRecord[]>(recKey("rec", id), []);
+  const bestOf = (id: OsanpoRunStageId) => Number(store.get(`best-${id}`) ?? 0) || 0;
+  const bestDistOf = (id: OsanpoRunStageId) => Number(store.get(`bestd-${id}`) ?? 0) || 0;
+  const recordsOf = (id: OsanpoRunStageId) => loadJSON<RunRecord[]>(`rec-${id}`, []);
   const SET = Object.assign({ bgm: true, sfx: true, vib: true }, loadJSON<Partial<{ bgm: boolean; sfx: boolean; vib: boolean }>>("settings", {}));
   let muted = store.get("muted") === "1";
 
@@ -1114,17 +1102,12 @@ export function createOsanpoRun(root: HTMLElement, opts: OsanpoRunOptions): () =
     for (let i = 0; i < 8; i++) pickups.push(mkPickup(X + i * 28, GROUND - 60 - Math.sin((i / 7) * Math.PI * 2) * 40));
     return 90;
   }
-  /** 選んでいる難易度より★の多い障害物は出さない（アイテムの並びは障害物ではないので常に出る） */
-  function tierAllowed(kind: string): boolean {
-    const tier = (OSANPO_RUN_OBSTACLE_TIERS as Record<string, number>)[kind];
-    return tier === undefined || tier <= OSANPO_RUN_DIFFICULTIES[DIFF].maxTier;
-  }
   function spawn(): void {
     const X = VW + 40, t = S.t;
     let extra = 0;
     if (S.sec === "bonus") { extra = spawnBonusItems(X); S.next = 110 + extra + Math.random() * 80; return; }
     const rush = S.sec === "rush", rain = S.rain > 0.3;
-    const kind = pickWeighted(([
+    const kind = pickWeighted([
       ["cone", 3], ["puddle", rain ? 5 : 2], ["bike", t > 6 ? 2.2 : 0], ["crow", t > 12 ? 2 : 0], ["double", t > 24 || rush ? 1.6 : 0],
       ["cat", t > 18 ? 1.6 : 0], ["sign", t > 30 ? 1.4 : 0], ["pigeons", t > 9 ? 1.3 : 0], ["noren", t > 14 ? 1.8 : 0], ["lowcrow", t > 22 ? 1.2 : 0],
       ["roller", t > 16 ? 1.4 : 0], ["drop", t > 20 ? 1.2 : 0], ["buddy", t > 8 ? 1 : 0], ["geyser", t > 26 ? 1.2 : 0],
@@ -1132,7 +1115,7 @@ export function createOsanpoRun(root: HTMLElement, opts: OsanpoRunOptions): () =
       ["surprise", t > TRICK_SPECS.surprise.from ? TRICK_SPECS.surprise.weight : 0],
       ["drone", t > TRICK_SPECS.drone.from ? TRICK_SPECS.drone.weight : 0],
       ["row", rush ? 0 : 1.3], ["high", rush ? 0 : 1.1],
-    ] as const).map(([k, w]) => [k, tierAllowed(k) ? w : 0] as const));
+    ] as const);
     const blocked = (k: ObstacleKind, low = false) => K.buffs.some((a) => a.b.noSpawn && inGroup({ kind: k, low } as Obstacle, a.b.noSpawn));
     const obsKind: Partial<Record<typeof kind, [ObstacleKind, boolean]>> = {
       cone: ["cone", false], puddle: ["puddle", false], bike: ["bike", false], crow: ["crow", false], lowcrow: ["crow", true], double: ["cone", false],
@@ -1388,7 +1371,7 @@ export function createOsanpoRun(root: HTMLElement, opts: OsanpoRunOptions): () =
     preloadSkin(STAGE.skin);
     S.best = bestOf(id);
     $("best-top").textContent = S.best.toLocaleString();
-    $("best-label").textContent = `じこベスト・${STAGE.name}・${OSANPO_RUN_DIFFICULTIES[DIFF].name}`;
+    $("best-label").textContent = `じこベスト・${STAGE.name}`;
     bld.items = []; bld.nx = S.bgCam * bld.f - 80; near.items = []; near.nx = S.bgCam * near.f - 160;
     if (S.state === "ready") S.clock = STAGE.clock;
     S.rain = 0; S.rainTarget = 0;
@@ -1401,36 +1384,6 @@ export function createOsanpoRun(root: HTMLElement, opts: OsanpoRunOptions): () =
       ? STAGE.desc
       : `ガチャで「${STAGE.skinName}」を手に入れると歩けるようになります。${STAGE.desc}`;
     syncStartButton();
-  }
-  /** 難易度を選ぶ。出る障害物・じこベスト・記録・コインの割合・フレンドのランキングが切り替わる */
-  function selectDifficulty(id: OsanpoRunDifficultyId): void {
-    DIFF = id;
-    store.set("difficulty", id);
-    const diff = OSANPO_RUN_DIFFICULTIES[id];
-    for (const b of $$<HTMLButtonElement>("[data-diff]")) {
-      const sel = b.dataset.diff === id;
-      b.setAttribute("aria-checked", String(sel)); b.tabIndex = sel ? 0 : -1;
-    }
-    $("diff-desc").textContent = `${diff.desc} スコア${diff.coinDivisor}点ごとにコイン1枚（切り上げ）。`;
-    buildStageList();
-    selectStage(STAGE_ID);
-    if (openSheetName === "records") renderRecords();
-    window.dispatchEvent(new CustomEvent(OSANPO_RUN_DIFFICULTY_EVENT, { detail: id }));
-  }
-  for (const b of $$<HTMLButtonElement>("[data-diff]")) {
-    on(b, "click", () => {
-      const id = b.dataset.diff;
-      if (!isOsanpoRunDifficultyId(id)) return;
-      ensureAudio(); selectDifficulty(id); tone(660, 0.06, "triangle", 0.04);
-    });
-    on(b, "keydown", (e) => {
-      if (e.key !== "ArrowLeft" && e.key !== "ArrowRight") return;
-      e.preventDefault(); e.stopPropagation();
-      const i = Math.max(0, OSANPO_RUN_DIFFICULTY_IDS.indexOf(DIFF)), n = OSANPO_RUN_DIFFICULTY_IDS.length;
-      const next = OSANPO_RUN_DIFFICULTY_IDS[(i + (e.key === "ArrowRight" ? 1 : n - 1)) % n]!;
-      selectDifficulty(next);
-      $$<HTMLButtonElement>(`[data-diff="${next}"]`)[0]?.focus();
-    });
   }
   const panelIds = ["start-panel", "over-panel", "pause-panel", "settings-panel"];
   function hidePanels(): void { for (const id of panelIds) $(id).hidden = true; }
@@ -1670,7 +1623,7 @@ export function createOsanpoRun(root: HTMLElement, opts: OsanpoRunOptions): () =
       const st = OSANPO_RUN_STAGES[id], recs = recordsOf(id);
       const card = document.createElement("section");
       card.className = "osr-rec-card" + (unlocked.has(id) ? "" : " osr-locked");
-      const h = document.createElement("h3"); h.textContent = `${st.name}（${OSANPO_RUN_DIFFICULTIES[DIFF].name}）`;
+      const h = document.createElement("h3"); h.textContent = st.name;
       const sub = document.createElement("p");
       sub.textContent = unlocked.has(id) ? `ベスト ${bestOf(id).toLocaleString()}点 ・ 最長 ${bestDistOf(id).toLocaleString()}m` : `未解放（${st.skinName}で歩ける）`;
       card.append(h, sub);
@@ -2286,12 +2239,11 @@ export function createOsanpoRun(root: HTMLElement, opts: OsanpoRunOptions): () =
     S.roundId = ""; // 同じおさんぽを二度送らない
     el.hidden = false; el.dataset.state = "wait";
     el.textContent = "コインを受け取り中…";
-    const diff = OSANPO_RUN_DIFFICULTIES[DIFF];
-    opts.onRunEnd({ roundId, stage: STAGE_ID, difficulty: DIFF, score, meters, items: S.treats })
+    opts.onRunEnd({ roundId, stage: STAGE_ID, score, meters, items: S.treats })
       .then((coins) => {
         if (coins === null) { el.dataset.state = "error"; el.textContent = "通信できず、コインを受け取れませんでした"; return; }
         el.dataset.state = coins > 0 ? "ok" : "zero";
-        el.textContent = coins > 0 ? `+${coins.toLocaleString()} コイン ゲット！` : `コインは${diff.name}ならスコア${diff.coinDivisor}点ごとに1枚`;
+        el.textContent = coins > 0 ? `+${coins.toLocaleString()} コイン ゲット！` : "コインはスコア50点ごとに1枚";
         if (coins > 0) sfx.mile();
       })
       .catch(() => { el.dataset.state = "error"; el.textContent = "通信できず、コインを受け取れませんでした"; });
@@ -2397,8 +2349,8 @@ export function createOsanpoRun(root: HTMLElement, opts: OsanpoRunOptions): () =
     if (K.keepBest > 0 && K.bestItem > 0) { S.bonus += Math.round(K.bestItem * K.keepBest); K.keepBest = 0; }
     const sc = score(), isNew = sc > S.best, meters = Math.floor(S.dist / 50);
     if (sc > 0 && sc % 100 === 0) unlock("kiriban");
-    if (isNew) { S.best = sc; store.set(recKey("best", STAGE_ID), String(sc)); }
-    if (meters > bestDistOf(STAGE_ID)) store.set(recKey("bestd", STAGE_ID), String(meters));
+    if (isNew) { S.best = sc; store.set(`best-${STAGE_ID}`, String(sc)); }
+    if (meters > bestDistOf(STAGE_ID)) store.set(`bestd-${STAGE_ID}`, String(meters));
     stats.plays += 1; stats.meters += meters; stats.items += S.treats;
     saveStats(); renderAchList();
     const rank = OSANPO_RUN_RANKS.find((r) => sc >= r.min) ?? OSANPO_RUN_RANKS[OSANPO_RUN_RANKS.length - 1]!;
@@ -2409,11 +2361,11 @@ export function createOsanpoRun(root: HTMLElement, opts: OsanpoRunOptions): () =
     const now = Date.now(), recs = recordsOf(STAGE_ID);
     recs.push({ s: sc, m: meters, t: now });
     recs.sort((a, b) => b.s - a.s || a.t - b.t);
-    store.set(recKey("rec", STAGE_ID), JSON.stringify(recs.slice(0, 5)));
+    store.set(`rec-${STAGE_ID}`, JSON.stringify(recs.slice(0, 5)));
     lastRecordAt = now;
     S.lastResult = { score: sc, m: meters, items: S.treats, rank: rank.label };
     sendResult(sc, meters);
-    $("over-sub").textContent = `${STAGE.name} ・ ${OSANPO_RUN_DIFFICULTIES[DIFF].name} ・ ${STAGE.skinName} ・ ${fmtClock(S.clock)}帰宅`;
+    $("over-sub").textContent = `${STAGE.name} ・ ${STAGE.skinName} ・ ${fmtClock(S.clock)}帰宅`;
     if (isNew && sc > 0) sfx.record(); else sfx.home();
     countUp($("o-score"), sc);
     $("o-best").textContent = S.best.toLocaleString();
@@ -3153,7 +3105,8 @@ export function createOsanpoRun(root: HTMLElement, opts: OsanpoRunOptions): () =
     raf = requestAnimationFrame(frame);
   }
 
-  selectDifficulty(DIFF);
+  buildStageList();
+  selectStage(STAGE_ID);
   renderAchList();
   renderZukan();
   buildRarityGuide();

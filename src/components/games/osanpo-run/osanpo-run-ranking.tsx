@@ -2,16 +2,8 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { IconUser } from "@/components/icons";
-import {
-  DEFAULT_OSANPO_RUN_DIFFICULTY,
-  isOsanpoRunDifficultyId,
-  isOsanpoRunStageId,
-  OSANPO_RUN_DIFFICULTIES,
-  OSANPO_RUN_DIFFICULTY_IDS,
-  OSANPO_RUN_STAGES,
-  type OsanpoRunDifficultyId,
-} from "@/lib/games/osanpo-run/config";
-import { OSANPO_RUN_DIFFICULTY_EVENT, OSANPO_RUN_SHEET_OPEN_EVENT } from "./engine";
+import { isOsanpoRunStageId, OSANPO_RUN_STAGES } from "@/lib/games/osanpo-run/config";
+import { OSANPO_RUN_SHEET_OPEN_EVENT } from "./engine";
 
 /** スコアを送り終えたら、この合図で一覧を取り直す */
 export const OSANPO_RUN_RANKING_REFRESH_EVENT = "osanpo-run-ranking-refresh";
@@ -37,11 +29,9 @@ const PERIOD_LABEL: Record<RankingPeriod, string> = { week: "今週", best: "こ
 /**
  * おさんぽフレンチーのフレンドランキング（自分とフレンドだけ）。
  * ゲームの「フレンド」画面の中身で、画面を開いたときとスコアを送ったあとに読み直す。
- * 難易度ごとに別のランキングで、ゲームで難易度を選び直すとこちらも切り替わる。
  */
 export function OsanpoRunRanking() {
   const [period, setPeriod] = useState<RankingPeriod>("week");
-  const [difficulty, setDifficulty] = useState<OsanpoRunDifficultyId>(DEFAULT_OSANPO_RUN_DIFFICULTY);
   const [entries, setEntries] = useState<RankingEntry[]>([]);
   const [ready, setReady] = useState<boolean | null>(null);
   const [loading, setLoading] = useState(true);
@@ -51,7 +41,7 @@ export function OsanpoRunRanking() {
     if (!silent) setLoading(true);
     setError(null);
     try {
-      const response = await fetch(`/api/games/osanpo-run/ranking?period=${period}&difficulty=${difficulty}`, { cache: "no-store" });
+      const response = await fetch(`/api/games/osanpo-run/ranking?period=${period}`, { cache: "no-store" });
       const payload = (await response.json().catch(() => null)) as RankingPayload | null;
       if (!response.ok) throw new Error(payload?.error ?? "ランキングを読み込めませんでした。");
       setReady(payload?.ready === true);
@@ -61,16 +51,7 @@ export function OsanpoRunRanking() {
     } finally {
       if (!silent) setLoading(false);
     }
-  }, [period, difficulty]);
-
-  useEffect(() => {
-    const onDifficulty = (event: Event) => {
-      const id = (event as CustomEvent<unknown>).detail;
-      if (isOsanpoRunDifficultyId(id)) setDifficulty(id);
-    };
-    window.addEventListener(OSANPO_RUN_DIFFICULTY_EVENT, onDifficulty);
-    return () => window.removeEventListener(OSANPO_RUN_DIFFICULTY_EVENT, onDifficulty);
-  }, []);
+  }, [period]);
 
   useEffect(() => {
     void load();
@@ -99,15 +80,8 @@ export function OsanpoRunRanking() {
           </button>
         ))}
       </div>
-      <div className="osr-rk-period osr-rk-diff" role="group" aria-label="難易度">
-        {OSANPO_RUN_DIFFICULTY_IDS.map((value) => (
-          <button key={value} type="button" aria-pressed={difficulty === value} onClick={() => setDifficulty(value)}>
-            {OSANPO_RUN_DIFFICULTIES[value].name}
-          </button>
-        ))}
-      </div>
       <p className="osr-rk-note">
-        {OSANPO_RUN_DIFFICULTIES[difficulty].name}の{period === "week" ? "毎週月曜 0:00（日本時間）からのベストスコア" : "これまでのベストスコア"} ・ 自分とフレンドだけ
+        {period === "week" ? "毎週月曜 0:00（日本時間）からのベストスコア" : "これまでのベストスコア"} ・ 自分とフレンドだけ
       </p>
 
       {loading && ready === null ? (
