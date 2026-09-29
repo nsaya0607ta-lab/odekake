@@ -182,7 +182,7 @@ type Pickup = { item: RunItem | null; token: number; x: number; y: number; vy: n
 /** 天気のイベント（虹・雷・桜吹雪・紅葉・オーロラ）。mul はそのあいだのスコア倍率 */
 type WeatherKind = "rainbow" | "thunder" | "sakura" | "momiji" | "aurora";
 type WeatherEvent = { kind: WeatherKind; t: number; max: number; acc: number; mul: number; nextBolt: number };
-type ActiveBuff = { skill: OsanpoRunSkill; b: Buff; lv: number; key: string; t: number; max: number; count: number; acc: number; rampN: number; rainAcc: number };
+type ActiveBuff = { skill: OsanpoRunSkill; b: Buff; lv: number; key: string; t: number; max: number; count: number; acc: number; rampN: number; rainAcc: number; rainN?: number };
 type Particle = { x: number; y: number; vx: number; vy: number; life: number; max: number; r: number; kind: "dust" | "spark" | "ring" | "splash" | "fw" | "drop" | "crown"; color: string; g: number; scroll: boolean };
 type FloatText = { x: number; y: number; text: string; color: string; size: number; life: number; max: number };
 type Flyer = { item: RunItem; x0: number; y0: number; t: number };
@@ -2023,7 +2023,7 @@ export function createOsanpoRun(root: HTMLElement, opts: OsanpoRunOptions): () =
         const a = (i / n) * Math.PI * 2, x = X + 60 + Math.cos(a) * 52, y = GROUND - 100 + Math.sin(a) * 44;
         if (token || i % 3 === 0) add(x, y); else pickups.push(mkPickup(x, y, null));
       }
-      else if (shape === "sky") drop(-20 - i * 26);
+      else if (shape === "sky") { if (token || i % 3 === 0) drop(-20 - i * 26); else { const p = mkPickup(0, -20 - i * 26, null); aimDrop(p); pickups.push(p); } }
       else if (shape === "mid") add(X, GROUND - 84);
       else add(X, GROUND - 40);
     }
@@ -2200,7 +2200,10 @@ export function createOsanpoRun(root: HTMLElement, opts: OsanpoRunOptions): () =
         while (a.rainAcc >= 1) {
           a.rainAcc -= 1;
           const tok = ival(a.b.rainToken, a.lv);
-          const p = mkPickup(0, -16, tok ? null : rollItem(), tok);
+          // アイテムが降るスキルは、輪と同じく3つに1つだけアイテムで、残りはほね
+          const n = a.rainN ?? 0; a.rainN = n + 1;
+          const item = tok ? null : n % 3 === 0 ? rollItem() : null;
+          const p = mkPickup(0, -16, item, tok);
           aimDrop(p); pickups.push(p);
         }
       }
