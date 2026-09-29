@@ -2018,7 +2018,11 @@ export function createOsanpoRun(root: HTMLElement, opts: OsanpoRunOptions): () =
       else if (shape === "high") add(X + i * 30, GROUND - 150 - Math.sin(t * Math.PI) * 10);
       else if (shape === "arc") add(X + i * 30, GROUND - 20 - 90 * 4 * t * (1 - t));
       else if (shape === "wave") add(X + i * 26, GROUND - 60 - Math.sin(t * Math.PI * 2) * 36);
-      else if (shape === "ring") { const a = (i / n) * Math.PI * 2; add(X + 60 + Math.cos(a) * 52, GROUND - 100 + Math.sin(a) * 44); }
+      else if (shape === "ring") {
+        // 輪は数が多く一度に取りやすいので、アイテムは3つに1つにして残りはほね（強すぎないように）
+        const a = (i / n) * Math.PI * 2, x = X + 60 + Math.cos(a) * 52, y = GROUND - 100 + Math.sin(a) * 44;
+        if (token || i % 3 === 0) add(x, y); else pickups.push(mkPickup(x, y, null));
+      }
       else if (shape === "sky") drop(-20 - i * 26);
       else if (shape === "mid") add(X, GROUND - 84);
       else add(X, GROUND - 40);
