@@ -138,7 +138,7 @@ const FALL_DRIFT = 0.3;
 /** ほね1本の点数（コンボ倍率がかかる） */
 const BONE_PTS = 5;
 /** 歩いた1mあたりの点 */
-const METER_PTS = 5;
+const METER_PTS = 10;
 /** 走る速さ（論理px/秒）。最初はゆっくりで、約3分かけて最高速になる */
 const START_SPEED = 200, MAX_SPEED = 520;
 /**
