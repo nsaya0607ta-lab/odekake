@@ -137,6 +137,8 @@ const DROP_G = 1400;
 const FALL_DRIFT = 0.3;
 /** ほね1本の点数（コンボ倍率がかかる） */
 const BONE_PTS = 5;
+/** 歩いた1mあたりの点 */
+const METER_PTS = 10;
 /** 走る速さ（論理px/秒）。最初はゆっくりで、約3分かけて最高速になる */
 const START_SPEED = 200, MAX_SPEED = 520;
 /**
@@ -182,7 +184,7 @@ type Pickup = { item: RunItem | null; token: number; x: number; y: number; vy: n
 /** 天気のイベント（虹・雷・桜吹雪・紅葉・オーロラ）。mul はそのあいだのスコア倍率 */
 type WeatherKind = "rainbow" | "thunder" | "sakura" | "momiji" | "aurora";
 type WeatherEvent = { kind: WeatherKind; t: number; max: number; acc: number; mul: number; nextBolt: number };
-type ActiveBuff = { skill: OsanpoRunSkill; b: Buff; lv: number; key: string; t: number; max: number; count: number; acc: number; rampN: number; rainAcc: number };
+type ActiveBuff = { skill: OsanpoRunSkill; b: Buff; lv: number; key: string; t: number; max: number; count: number; acc: number; rampN: number; rainAcc: number; rainN?: number };
 type Particle = { x: number; y: number; vx: number; vy: number; life: number; max: number; r: number; kind: "dust" | "spark" | "ring" | "splash" | "fw" | "drop" | "crown"; color: string; g: number; scroll: boolean };
 type FloatText = { x: number; y: number; text: string; color: string; size: number; life: number; max: number };
 type Flyer = { item: RunItem; x0: number; y0: number; t: number };
@@ -2018,8 +2020,12 @@ export function createOsanpoRun(root: HTMLElement, opts: OsanpoRunOptions): () =
       else if (shape === "high") add(X + i * 30, GROUND - 150 - Math.sin(t * Math.PI) * 10);
       else if (shape === "arc") add(X + i * 30, GROUND - 20 - 90 * 4 * t * (1 - t));
       else if (shape === "wave") add(X + i * 26, GROUND - 60 - Math.sin(t * Math.PI * 2) * 36);
-      else if (shape === "ring") { const a = (i / n) * Math.PI * 2; add(X + 60 + Math.cos(a) * 52, GROUND - 100 + Math.sin(a) * 44); }
-      else if (shape === "sky") drop(-20 - i * 26);
+      else if (shape === "ring") {
+        // 輪は数が多く一度に取りやすいので、アイテムは3つに1つにして残りはほね（強すぎないように）
+        const a = (i / n) * Math.PI * 2, x = X + 60 + Math.cos(a) * 52, y = GROUND - 100 + Math.sin(a) * 44;
+        if (token || i % 3 === 0) add(x, y); else pickups.push(mkPickup(x, y, null));
+      }
+      else if (shape === "sky") { if (token || i % 3 === 0) drop(-20 - i * 26); else { const p = mkPickup(0, -20 - i * 26, null); aimDrop(p); pickups.push(p); } }
       else if (shape === "mid") add(X, GROUND - 84);
       else add(X, GROUND - 40);
     }
@@ -2196,7 +2202,10 @@ export function createOsanpoRun(root: HTMLElement, opts: OsanpoRunOptions): () =
         while (a.rainAcc >= 1) {
           a.rainAcc -= 1;
           const tok = ival(a.b.rainToken, a.lv);
-          const p = mkPickup(0, -16, tok ? null : rollItem(), tok);
+          // アイテムが降るスキルは、輪と同じく3つに1つだけアイテムで、残りはほね
+          const n = a.rainN ?? 0; a.rainN = n + 1;
+          const item = tok ? null : n % 3 === 0 ? rollItem() : null;
+          const p = mkPickup(0, -16, item, tok);
           aimDrop(p); pickups.push(p);
         }
       }
@@ -2456,7 +2465,8 @@ export function createOsanpoRun(root: HTMLElement, opts: OsanpoRunOptions): () =
       })
       .catch(() => { el.dataset.state = "error"; el.textContent = "通信できず、コインを受け取れませんでした"; });
   }
-  const score = () => Math.floor(S.dist / 50) + S.bonus;
+  /** 歩いた距離の点（1mごとに METER_PTS 点）＋ 拾ったもの・スキルなどの点 */
+  const score = () => Math.floor(S.dist / 50) * METER_PTS + S.bonus;
   /* ---------- 歩数ブースト（今日の歩数に応じてスタート時に付く） ---------- */
   const todaySteps = typeof opts.todaySteps === "number" ? opts.todaySteps : null;
   const stepLv = stepBoostLevel(todaySteps);
