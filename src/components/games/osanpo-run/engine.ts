@@ -137,6 +137,8 @@ const DROP_G = 1400;
 const FALL_DRIFT = 0.3;
 /** ほね1本の点数（コンボ倍率がかかる） */
 const BONE_PTS = 5;
+/** 歩いた1mあたりの点 */
+const METER_PTS = 5;
 /** 走る速さ（論理px/秒）。最初はゆっくりで、約3分かけて最高速になる */
 const START_SPEED = 200, MAX_SPEED = 520;
 /**
@@ -2463,7 +2465,8 @@ export function createOsanpoRun(root: HTMLElement, opts: OsanpoRunOptions): () =
       })
       .catch(() => { el.dataset.state = "error"; el.textContent = "通信できず、コインを受け取れませんでした"; });
   }
-  const score = () => Math.floor(S.dist / 50) + S.bonus;
+  /** 歩いた距離の点（1mごとに METER_PTS 点）＋ 拾ったもの・スキルなどの点 */
+  const score = () => Math.floor(S.dist / 50) * METER_PTS + S.bonus;
   /* ---------- 歩数ブースト（今日の歩数に応じてスタート時に付く） ---------- */
   const todaySteps = typeof opts.todaySteps === "number" ? opts.todaySteps : null;
   const stepLv = stepBoostLevel(todaySteps);
