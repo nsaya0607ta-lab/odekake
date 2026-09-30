@@ -2,7 +2,7 @@ import { PREFECTURE_NAMES } from "@/lib/geo/prefecture-names";
 import type { DB } from "./client";
 import { signThumbOrOriginalPaths } from "./photos";
 
-/** おさんぽフレンチーの道ばたの看板に貼る、自分のおでかけ写真 */
+/** おさんぽフレンチーで飛行機が空を運んでくる、自分のおでかけ写真 */
 export type OsanpoRunMemoryPhoto = {
   /** サムネイル（長辺480px・縦横比はそのまま）の配信URL */
   src: string;
@@ -12,7 +12,7 @@ export type OsanpoRunMemoryPhoto = {
   pref: string;
 };
 
-/** 新しい順にこれだけ読む。看板の向き（縦・横）はゲーム側で写真の縦横比から決める */
+/** 新しい順にこれだけ読む。枠の向き（縦・横）はゲーム側で写真の縦横比から決める */
 const MEMORY_PHOTO_LIMIT = 60;
 
 export async function getOsanpoRunMemoryPhotos(supabase: DB, userId: string): Promise<OsanpoRunMemoryPhoto[]> {

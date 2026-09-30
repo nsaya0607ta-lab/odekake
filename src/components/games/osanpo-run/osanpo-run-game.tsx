@@ -25,7 +25,7 @@ type Props = {
   /** 今日のミッション3つと、今日もう達成したもののID */
   missions: OsanpoRunMission[];
   missionsDone: string[];
-  /** 道ばたの看板に貼る自分のおでかけ写真 */
+  /** 飛行機が空を運んでくる自分のおでかけ写真 */
   memoryPhotos: OsanpoRunMemoryPhoto[];
 };
 
@@ -266,7 +266,7 @@ export function OsanpoRunGame({ items, usesSampleItems, unlockedStages, seriesTa
                       <li className="osr-ctl"><span><kbd>お題</kbd></span><div><b>今日のミッション</b><small>毎日3つのお題。1つ達成で30コイン、3つそろうとさらに100コイン。</small></div></li>
                       <li className="osr-ctl"><span><kbd>くんくん</kbd></span><div><b>においかぎ</b><small>地面に「くんくん」マークが出たら、スライディングで通ると掘り出せる。ほね・アイテム・ときどきハズレ（古いくつした）。</small></div></li>
                       <li className="osr-ctl"><span><kbd>協力</kbd></span><div><b>協力チャレンジ</b><small>自分とフレンドの今週の合計距離で目標を目指す。達成したら「フレンド」画面で全員100コイン受け取れる。</small></div></li>
-                      <li className="osr-ctl"><span><kbd>写真</kbd></span><div><b>思い出の看板</b><small>おでかけ記録に登録した写真が、道ばたの看板になって出てくる（縦長の写真は縦向き、横長の写真は横向きの看板）。前を通ると+20。</small></div></li>
+                      <li className="osr-ctl"><span><kbd>写真</kbd></span><div><b>思い出の写真</b><small>おでかけ記録に登録した写真を、飛行機がぶら下げて空を運んでくる。真上を通ると+20。</small></div></li>
                       <li className="osr-ctl"><span><kbd>II</kbd></span><div><b>一時停止</b><small>右上のボタン。「最初から」「道を選ぶ」「設定」もここから。</small></div></li>
                     </ul>
                   </section>
