@@ -73,7 +73,7 @@ import {
   type Ctx, type Pigeon, type RGB,
 } from "./draw";
 import { drawRouteGate, drawRouteScene as drawRouteSceneLayer, ROUTE_GATE_HALF, type RouteTheme } from "./route-scene";
-import type { OsanpoRunOdekake } from "@/lib/data/osanpo-run";
+import type { OsanpoRunFriendMemory, OsanpoRunOdekake } from "@/lib/data/osanpo-run";
 import { drawSkyLife, drawStageGround, drawStageMid, drawStageNear, type MidItem, type NearItem, type StageView } from "./stage-scene";
 
 export type RunItem = {
@@ -116,6 +116,10 @@ export type OsanpoRunOptions = {
   memoryPhotos?: { src: string; name: string; pref: string; visitId: string }[];
   /** アプリの記録とのつながり（今日の記録でスコアボーナス・よく行く場所が道の景色に混ざる） */
   odekake?: OsanpoRunOdekake;
+  /** 気球が空を運んでくるフレンドのSNS投稿の写真 */
+  friendMemories?: OsanpoRunFriendMemory[];
+  /** フレンドの投稿にいいねする（外す）。できたら true */
+  onLike?: (postId: string, liked: boolean) => Promise<boolean>;
   /** 結果カードの画像と本文をSNSに投稿する */
   onShare?: (image: Blob, body: string) => Promise<{ ok: true } | { ok: false; error: string }>;
 };
@@ -428,9 +432,11 @@ export function createOsanpoRun(root: HTMLElement, opts: OsanpoRunOptions): () =
   const S = {
     state: "ready" as GameState, time: 0, t: 0, speed: 90, dist: 0, bonus: 0, treats: 0, clock: STAGE.clock, cam: 0, bgCam: 0, bgV: 0,
     srPlus: 0, pigeonsRun: 0, slidesRun: 0, greetsRun: 0, routeCalm: 0, routeRisky: 0, bonusBest: 0, missionCoins: 0, missionsNow: [] as string[], stomps: 0, digs: 0,
-    memo: null as null | { x: number; y: number; photo: number; passed: boolean; t: number }, memoT: 13,
+    memo: null as null | { x: number; y: number; photo: number; friend: boolean; passed: boolean; t: number }, memoT: 13,
     /** このおさんぽで運ばれてきた思い出の写真（memoryPhotos の番号・運ばれてきた順） */
     memSeen: [] as number[],
+    /** このおさんぽで運ばれてきたフレンドの思い出（friendPhotos の番号） */
+    friendSeen: [] as number[],
     stepT: 0, fork: null as null | { at: number }, route: null as null | RouteState, forkT: 40,
     next: 400, shield: false, chain: 0, chainT: 0, mult: 1, maxMult: 1, paused: false, deadT: 0, introT: 0,
     haul: new Map<string, number>(), happyT: 0, calm: store.get("calm") === "1",
@@ -1064,6 +1070,31 @@ export function createOsanpoRun(root: HTMLElement, opts: OsanpoRunOptions): () =
   /* ---------- 思い出の写真（自分のおでかけ写真を飛行機が運ぶ） ---------- */
   type MemoryPhoto = { img: HTMLImageElement; src: string; name: string; pref: string; visitId: string; tall: boolean };
   const memoryPhotos: MemoryPhoto[] = [];
+  /** フレンドの思い出（SNSの写真つき投稿）。気球が運んでくる */
+  type FriendPhoto = { img: HTMLImageElement; src: string; postId: string; author: string; spot: string; liked: boolean; tall: boolean };
+  const friendPhotos: FriendPhoto[] = [];
+  for (const p of opts.friendMemories ?? []) {
+    const img = new Image();
+    img.decoding = "async";
+    img.onload = () => {
+      if (img.naturalWidth && img.naturalHeight) friendPhotos.push({ img, src: p.src, postId: p.postId, author: p.author, spot: p.spot, liked: p.liked, tall: img.naturalHeight > img.naturalWidth });
+    };
+    img.src = p.src;
+  }
+  let friendOrder: number[] = [];
+  function nextFriendPhoto(): number {
+    if (!friendOrder.length) {
+      friendOrder = friendPhotos.map((_, i) => i);
+      for (let i = friendOrder.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [friendOrder[i], friendOrder[j]] = [friendOrder[j]!, friendOrder[i]!]; }
+    }
+    return friendOrder.pop()!;
+  }
+  /** 空を運ばれている写真（自分のものか、フレンドのものか） */
+  const memoPhoto = (m: { photo: number; friend: boolean }): { img: HTMLImageElement; tall: boolean } | undefined => (m.friend ? friendPhotos[m.photo] : memoryPhotos[m.photo]);
+  /** 自分の写真もフレンドの写真もあるとき、フレンドの気球になる割合 */
+  const FRIEND_MEMO_RATE = 0.4;
+  /** 気球は上の表示に隠れないよう、飛行機よりこれだけ低いところを飛ぶ */
+  const FRIEND_BALLOON_DROP = 44;
   // 読み込めた写真だけ使う。縦長かどうかで枠の向きを決める
   for (const p of opts.memoryPhotos ?? []) {
     const img = new Image();
@@ -1085,9 +1116,10 @@ export function createOsanpoRun(root: HTMLElement, opts: OsanpoRunOptions): () =
   /** 飛行機の流れる速さ（画面の px/秒）。道より遅く、空をゆっくり横切る */
   const planeSpeed = () => 70 + S.speed * 0.22;
   /** 写真の大きさ。空の広さに合わせて、横長は最大240×180、縦長は最大165×220 */
-  function memorySize(ph: MemoryPhoto): { w: number; h: number } {
+  function memorySize(ph: { tall: boolean }, friend = false): { w: number; h: number } {
     const maxW = Math.min(ph.tall ? 165 : 240, VW * (ph.tall ? 0.42 : 0.6));
-    const maxH = Math.max(70, GROUND - 120 - 60);
+    // 気球は飛行機より背が高いので、そのぶん写真を低く抑える
+    const maxH = Math.max(70, GROUND - 120 - 60 - (friend ? FRIEND_BALLOON_DROP + 12 : 0));
     let w = maxW, h = ph.tall ? (w * 4) / 3 : (w * 3) / 4;
     if (h > maxH) { h = maxH; w = ph.tall ? (h * 3) / 4 : (h * 4) / 3; }
     return { w, h };
@@ -1098,17 +1130,24 @@ export function createOsanpoRun(root: HTMLElement, opts: OsanpoRunOptions): () =
       m.x -= planeSpeed() * dt; m.t += dt;
       if (!m.passed && m.x <= P.x) {
         m.passed = true;
-        const ph = memoryPhotos[m.photo];
-        if (ph) { const v = addPts(MEMORY_SIGN_PTS); floatText(P.x + 20, P.y - 70, `思い出：${ph.name} +${v}`, "#FFD9A8", 13); }
+        if (m.friend) {
+          const fp = friendPhotos[m.photo];
+          if (fp) { const v = addPts(MEMORY_SIGN_PTS); floatText(P.x + 20, P.y - 70, `${fp.author}さんの思い出 +${v}`, "#FFB3C7", 13); }
+        } else {
+          const ph = memoryPhotos[m.photo];
+          if (ph) { const v = addPts(MEMORY_SIGN_PTS); floatText(P.x + 20, P.y - 70, `思い出：${ph.name} +${v}`, "#FFD9A8", 13); }
+        }
       }
       if (m.x < -320) S.memo = null;
       return;
     }
-    if (!memoryPhotos.length) return;
+    if (!memoryPhotos.length && !friendPhotos.length) return;
     S.memoT -= dt;
     if (S.memoT > 0) return;
-    S.memo = { x: VW + 140, y: Math.max(48, GROUND * rand(0.1, 0.16)), photo: nextMemoryPhoto(), passed: false, t: 0 };
-    if (!S.memSeen.includes(S.memo.photo)) S.memSeen.push(S.memo.photo);
+    const friend = friendPhotos.length > 0 && (!memoryPhotos.length || Math.random() < FRIEND_MEMO_RATE);
+    S.memo = { x: VW + 140, y: Math.max(48, GROUND * rand(0.1, 0.16)), photo: friend ? nextFriendPhoto() : nextMemoryPhoto(), friend, passed: false, t: 0 };
+    const seen = friend ? S.friendSeen : S.memSeen;
+    if (!seen.includes(S.memo.photo)) seen.push(S.memo.photo);
     S.memoT = rand(17, 23);
   }
   /**
@@ -1118,13 +1157,14 @@ export function createOsanpoRun(root: HTMLElement, opts: OsanpoRunOptions): () =
   function drawMemory(c: Ctx, e: Env): void {
     const m = S.memo;
     if (!m) return;
-    const ph = memoryPhotos[m.photo];
+    const ph = memoPhoto(m);
     if (!ph) return;
-    const { w, h } = memorySize(ph), fr = 5;
+    const { w, h } = memorySize(ph, m.friend), fr = 5;
     const bob = RM ? 0 : Math.sin(m.t * 1.6) * 3, swing = RM ? 0 : Math.sin(m.t * 1.3 + 0.8) * 0.045;
     const px = m.x, py = m.y + bob;
     if (px - 60 > VW + 20 || px + Math.max(w, 60) < -40) return;
     const night = e.night;
+    if (m.friend) { drawFriendBalloon(c, e, px, py + FRIEND_BALLOON_DROP, m.t, friendPhotos[m.photo]!, w, h); return; }
     // 飛行機（左向きに飛ぶ小さなプロペラ機）
     const body = mix(hex("#F4F1EA"), e.top, 0.12 + night * 0.45), accent = mix(hex("#E4572E"), e.top, 0.1 + night * 0.4);
     c.save(); c.translate(px, py); c.rotate(-0.03 + bob * 0.004);
@@ -1153,11 +1193,56 @@ export function createOsanpoRun(root: HTMLElement, opts: OsanpoRunOptions): () =
     c.drawImage(ph.img, left + fr + (w - iw * k) / 2, top + fr + (h - ih * k) / 2, iw * k, ih * k);
     if (night > 0.05) { c.fillStyle = `rgba(20,14,40,${(night * 0.3).toFixed(3)})`; c.fillRect(left, top, bw, bh); }
     c.restore();
-    const label = ph.pref ? `${ph.name}（${ph.pref}）` : ph.name;
+    const mine = memoryPhotos[m.photo]!;
+    const label = mine.pref ? `${mine.name}（${mine.pref}）` : mine.name;
     c.font = font(11); c.textAlign = "center"; c.textBaseline = "middle";
     const lw = Math.min(Math.max(bw, 120), c.measureText(label).width + 18);
     c.fillStyle = "rgba(246,239,228,.96)"; rr(c, -lw / 2, top + bh + 4, lw, 18, 5); c.fill();
     c.fillStyle = "#3A2A1C"; c.fillText(label, 0, top + bh + 13.5, lw - 8);
+    c.restore();
+  }
+
+  /** フレンドの思い出：カラフルな気球のかごから写真がぶら下がる。札には投稿した人の名前 */
+  function drawFriendBalloon(c: Ctx, e: Env, px: number, py: number, t: number, fp: FriendPhoto, w: number, h: number): void {
+    const night = e.night, fr = 5;
+    const swing = RM ? 0 : Math.sin(t * 1.1 + 0.4) * 0.04;
+    const tone = (col: string) => rgb(mix(hex(col), e.top, 0.1 + night * 0.4));
+    // 気球（上下に少し浮き沈みする）
+    const bx = px, by = py - 30, R = 30;
+    c.save();
+    c.fillStyle = tone("#FF7EB6");
+    c.beginPath(); c.moveTo(bx - R * 0.55, by + R * 0.78); c.bezierCurveTo(bx - R * 1.2, by + R * 0.2, bx - R * 1.05, by - R, bx, by - R); c.bezierCurveTo(bx + R * 1.05, by - R, bx + R * 1.2, by + R * 0.2, bx + R * 0.55, by + R * 0.78); c.closePath(); c.fill();
+    c.save(); c.clip();
+    c.fillStyle = tone("#FFE08A"); c.fillRect(bx - R * 0.42, by - R, R * 0.28, R * 2);
+    c.fillStyle = tone("#9BE7FF"); c.fillRect(bx + R * 0.14, by - R, R * 0.28, R * 2);
+    c.fillStyle = "rgba(255,255,255,0.28)"; ell(c, bx - R * 0.45, by - R * 0.45, R * 0.22, R * 0.4, -0.4); c.fill();
+    c.restore();
+    // かご
+    const kt = by + R + 8;
+    c.strokeStyle = rgb(mix(hex("#5A4A3A"), e.top, 0.2 + night * 0.4)); c.lineWidth = 1;
+    c.beginPath(); c.moveTo(bx - R * 0.5, by + R * 0.8); c.lineTo(bx - 7, kt); c.moveTo(bx + R * 0.5, by + R * 0.8); c.lineTo(bx + 7, kt); c.stroke();
+    c.fillStyle = tone("#A8744A"); rr(c, bx - 8, kt, 16, 10, 2); c.fill();
+    c.fillStyle = tone("#8A5A34"); c.fillRect(bx - 8, kt + 3, 16, 1.4);
+    c.restore();
+    // ロープと写真
+    const hx = bx, hy = kt + 10, ropeL = 16;
+    c.save(); c.translate(hx, hy); c.rotate(swing);
+    const top = ropeL, left = -w / 2 - fr, bw = w + fr * 2, bh = h + fr * 2;
+    c.strokeStyle = rgb(mix(hex("#5A4A3A"), e.top, 0.2 + night * 0.4)); c.lineWidth = 1.2;
+    c.beginPath(); c.moveTo(0, 0); c.lineTo(left + 8, top); c.moveTo(0, 0); c.lineTo(left + bw - 8, top); c.stroke();
+    if (night > 0.2) glow(c, 0, top + bh / 2, bw * 0.7, "255,190,220", 0.3 * night);
+    c.fillStyle = "rgba(20,16,40,0.18)"; rr(c, left + 3, top + 4, bw, bh, 4); c.fill();
+    c.fillStyle = rgb(mix(hex("#FFF4F8"), e.top, 0.05 + night * 0.35)); rr(c, left, top, bw, bh, 4); c.fill();
+    c.save(); rr(c, left + fr, top + fr, w, h, 2); c.clip();
+    const iw = fp.img.naturalWidth, ih = fp.img.naturalHeight, k = Math.max(w / iw, h / ih);
+    c.drawImage(fp.img, left + fr + (w - iw * k) / 2, top + fr + (h - ih * k) / 2, iw * k, ih * k);
+    if (night > 0.05) { c.fillStyle = `rgba(20,14,40,${(night * 0.3).toFixed(3)})`; c.fillRect(left, top, bw, bh); }
+    c.restore();
+    const label = fp.spot ? `${fp.author}さん・${fp.spot}` : `${fp.author}さんの思い出`;
+    c.font = font(11); c.textAlign = "center"; c.textBaseline = "middle";
+    const lw = Math.min(Math.max(bw, 120), c.measureText(label).width + 18);
+    c.fillStyle = "rgba(255,226,238,.96)"; rr(c, -lw / 2, top + bh + 4, lw, 18, 5); c.fill();
+    c.fillStyle = "#5A1E3A"; c.fillText(label, 0, top + bh + 13.5, lw - 8);
     c.restore();
   }
 
@@ -2603,7 +2688,7 @@ export function createOsanpoRun(root: HTMLElement, opts: OsanpoRunOptions): () =
     Object.assign(S, {
       state: "intro", introT: 0, roundId: newRoundId(), slowT: 0, wx: null, wxT: rand(25, 40), knocks: 0, rares: 0, skillIds: new Set<string>(), tricks: newTrickRun(), bestD: bestDistOf(STAGE_ID), passedBest: false, recordShown: false, fwT: 2,
       t: 0, speed: 0, dist: 0, bonus: 0, treats: 0, clock: STAGE.clock, srPlus: 0, pigeonsRun: 0, slidesRun: 0, greetsRun: 0, routeCalm: 0, routeRisky: 0, bonusBest: 0, missionCoins: 0, missionsNow: [], stomps: 0, digs: 0,
-      memo: null, memoT: rand(10, 17), memSeen: [],
+      memo: null, memoT: rand(10, 17), memSeen: [], friendSeen: [],
       stepT: 0, fork: null, route: null, forkT: rand(35, 50), next: 420, shield: false, chain: 0, chainT: 0, mult: 1, maxMult: 1,
       paused: false, deadT: 0, milestone: 100, bufT: 0, haul: new Map<string, number>(), sec: "normal", secT: 18, rain: 0, rainTarget: 0, rainT: 0,
       bones: 0, newAch: [], newKinds: [], rainWalk: 0, rushes: 0, closes: 0, bonusGot: 0,
@@ -2706,6 +2791,44 @@ export function createOsanpoRun(root: HTMLElement, opts: OsanpoRunOptions): () =
       list.appendChild(a);
     }
     $("o-memo").hidden = seen.length === 0;
+    renderFriendMemoryResult();
+  }
+  /** フレンドの思い出を並べ、その場でいいねできるようにする（写真のタップで投稿を開く） */
+  function renderFriendMemoryResult(): void {
+    const list = $("o-fmemo-list");
+    list.replaceChildren();
+    const seen = S.friendSeen.map((i) => friendPhotos[i]).filter((fp): fp is FriendPhoto => Boolean(fp)).slice(0, 6);
+    for (const fp of seen) {
+      const card = document.createElement("div");
+      card.className = "osr-memo-card osr-fmemo-card";
+      const a = document.createElement("a");
+      a.href = `/sns/posts/${encodeURIComponent(fp.postId)}`;
+      a.setAttribute("aria-label", `${fp.author}さんの投稿を見る`);
+      const img = document.createElement("img");
+      img.src = fp.src; img.alt = ""; img.loading = "lazy"; img.width = 64; img.height = 64;
+      const name = document.createElement("span"); name.textContent = `${fp.author}さん`;
+      a.append(img, name);
+      const like = document.createElement("button");
+      like.type = "button"; like.className = "osr-like";
+      const paint = () => {
+        like.textContent = fp.liked ? "♥ いいね済み" : "♡ いいね";
+        like.setAttribute("aria-pressed", fp.liked ? "true" : "false");
+      };
+      paint();
+      like.addEventListener("click", () => {
+        if (!opts.onLike || like.disabled) return;
+        const next = !fp.liked;
+        like.disabled = true;
+        fp.liked = next; paint();
+        void opts.onLike(fp.postId, next).then((ok) => {
+          if (!ok) { fp.liked = !next; paint(); }
+          like.disabled = false;
+        });
+      });
+      card.append(a, like);
+      list.appendChild(card);
+    }
+    $("o-fmemo").hidden = seen.length === 0;
   }
 
   /* ---------- 結果カードをSNSに投稿 ---------- */

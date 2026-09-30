@@ -2,6 +2,7 @@ import { PREFECTURE_NAMES } from "@/lib/geo/prefecture-names";
 import type { DB } from "./client";
 import { todayInJapan } from "@/lib/date";
 import { signThumbOrOriginalPaths } from "./photos";
+import { getPersonalTextFeed } from "./sns";
 
 /** おさんぽフレンチーで飛行機が空を運んでくる、自分のおでかけ写真 */
 export type OsanpoRunMemoryPhoto = {
@@ -126,4 +127,43 @@ export async function getOsanpoRunOdekake(supabase: DB, userId: string): Promise
     shopNames: shopNames.map((n) => (n.length > SHOP_NAME_MAX_CHARS ? `${n.slice(0, SHOP_NAME_MAX_CHARS - 1)}…` : n)),
     topLabels,
   };
+}
+
+/** おさんぽフレンチーで気球が空を運んでくる、フレンドのSNS投稿の写真 */
+export type OsanpoRunFriendMemory = {
+  postId: string;
+  /** 投稿の1枚目の写真（サムネイル）の配信URL */
+  src: string;
+  /** 投稿した人の表示名 */
+  author: string;
+  /** 投稿に紐づいたスポット名（無ければ空） */
+  spot: string;
+  /** すでに自分がいいねしているか */
+  liked: boolean;
+};
+
+/** 新しい投稿からこれだけ読み、写真つきのフレンドの投稿を最大 FRIEND_MEMORY_LIMIT 件使う */
+const FRIEND_FEED_LIMIT = 60;
+const FRIEND_MEMORY_LIMIT = 20;
+/** これより古い投稿は運ばない（日） */
+const FRIEND_MEMORY_DAYS = 30;
+
+export async function getOsanpoRunFriendMemories(supabase: DB, userId: string): Promise<OsanpoRunFriendMemory[]> {
+  let posts;
+  try {
+    posts = await getPersonalTextFeed(supabase, undefined, FRIEND_FEED_LIMIT);
+  } catch {
+    return [];
+  }
+  const since = Date.now() - FRIEND_MEMORY_DAYS * 24 * 60 * 60_000;
+  const picked = posts
+    .filter((post) => post.user_id !== userId && post.photo_paths.length > 0 && Date.parse(post.created_at) >= since)
+    .slice(0, FRIEND_MEMORY_LIMIT);
+  if (!picked.length) return [];
+  const urls = await signThumbOrOriginalPaths(supabase, picked.map((post) => post.photo_paths[0]!));
+  return picked.flatMap((post) => {
+    const src = urls.get(post.photo_paths[0]!);
+    if (!src) return [];
+    return [{ postId: post.id, src, author: post.display_name || "フレンド", spot: post.linked_spot_name ?? "", liked: post.my_liked }];
+  });
 }

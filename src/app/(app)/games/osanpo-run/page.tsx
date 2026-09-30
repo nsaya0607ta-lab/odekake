@@ -5,7 +5,7 @@ import type { RunItem } from "@/components/games/osanpo-run/engine";
 import { CATEGORY_LABELS, COLLECTION_ITEMS, REGULAR_ITEMS, type CollectionItem } from "@/lib/collection/items";
 import { getOwnedItemCounts } from "@/lib/data/collection";
 import { getExpDashboard } from "@/lib/data/exp";
-import { getOsanpoRunMemoryPhotos, getOsanpoRunOdekake } from "@/lib/data/osanpo-run";
+import { getOsanpoRunFriendMemories, getOsanpoRunMemoryPhotos, getOsanpoRunOdekake } from "@/lib/data/osanpo-run";
 import { todayInJapan } from "@/lib/date";
 import { getSkillLevel } from "@/lib/gacha/skill-levels";
 import { getDogSkin, isSkinUnlocked } from "@/lib/dog-skins";
@@ -58,12 +58,13 @@ async function getMissionsDone(supabase: unknown, userId: string, date: string):
 export default async function OsanpoRunPage() {
   const { supabase, user } = await requireUser();
   const today = todayInJapan();
-  const [ownedCounts, { todaySteps }, missionsDone, memoryPhotos, odekake] = await Promise.all([
+  const [ownedCounts, { todaySteps }, missionsDone, memoryPhotos, odekake, friendMemories] = await Promise.all([
     getOwnedItemCounts(supabase, user.id),
     getExpDashboard(supabase, user.id),
     getMissionsDone(supabase, user.id, today),
     getOsanpoRunMemoryPhotos(supabase, user.id),
     getOsanpoRunOdekake(supabase, user.id),
+    getOsanpoRunFriendMemories(supabase, user.id),
   ]);
   const ownedIds = new Set([...ownedCounts].filter(([, count]) => count > 0).map(([id]) => id));
 
@@ -90,6 +91,7 @@ export default async function OsanpoRunPage() {
       missionsDone={missionsDone}
       memoryPhotos={memoryPhotos}
       odekake={odekake}
+      friendMemories={friendMemories}
     />
   );
 }

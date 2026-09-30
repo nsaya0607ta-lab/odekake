@@ -474,6 +474,13 @@
 .osr .osr-memo-card img { width: 64px; height: 64px; object-fit: cover; border-radius: 3px; display: block; }
 .osr .osr-memo-card span { font-size: 10px; font-weight: 800; line-height: 1.2; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .osr .osr-memo-card:focus-visible { outline: 2px solid var(--osr-lantern); outline-offset: 2px; }
+.osr .osr-fmemo .osr-memo-title { color: #ffb3c7 !important; }
+.osr .osr-fmemo-card { width: 84px; background: #fff4f8; }
+.osr .osr-fmemo-card a { display: flex; flex-direction: column; align-items: center; gap: 4px; color: #5a1e3a; text-decoration: none; max-width: 100%; }
+.osr .osr-like { appearance: none; border: 0; border-radius: 999px; padding: 3px 6px; font-family: var(--osr-body); font-size: 10px; font-weight: 800; background: #ffd6e5; color: #b0245e; cursor: pointer; white-space: nowrap; }
+.osr .osr-like[aria-pressed="true"] { background: #ff7eb6; color: #fff; }
+.osr .osr-like:disabled { opacity: 0.6; }
+.osr .osr-like:focus-visible, .osr .osr-fmemo-card a:focus-visible { outline: 2px solid var(--osr-lantern); outline-offset: 2px; }
 .osr .osr-share-btn { width: 100%; background: linear-gradient(90deg, #ff9ec7, #ff7eb6); color: #3a0f24; }
 .osr .osr-share { display: flex; flex-direction: column; gap: 8px; padding: 10px; border-radius: 12px; border: 1px solid var(--osr-line); background: rgba(255, 255, 255, 0.04); }
 .osr .osr-share img { width: 100%; height: auto; border-radius: 8px; display: block; }
