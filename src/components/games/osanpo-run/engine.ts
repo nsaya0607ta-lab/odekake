@@ -73,7 +73,7 @@ import {
   type Ctx, type Pigeon, type RGB,
 } from "./draw";
 import { drawRouteGate, drawRouteScene as drawRouteSceneLayer, ROUTE_GATE_HALF, type RouteTheme } from "./route-scene";
-import type { OsanpoRunFriendMemory, OsanpoRunOdekake } from "@/lib/data/osanpo-run";
+import type { OsanpoRunFriendMemory, OsanpoRunMemoryPhoto, OsanpoRunOdekake } from "@/lib/data/osanpo-run";
 import { drawSkyLife, drawStageGround, drawStageMid, drawStageNear, type MidItem, type NearItem, type StageView } from "./stage-scene";
 
 export type RunItem = {
@@ -113,7 +113,7 @@ export type OsanpoRunOptions = {
   /** ミッションを達成したときに呼ぶ。もらえたコインの枚数を返す（記録できなかったときは null） */
   onMissionClear?: (missionId: string) => Promise<number | null>;
   /** 飛行機が空を運んでくる自分のおでかけ写真（縦長は縦向き、横長は横向きの枠になる） */
-  memoryPhotos?: { src: string; name: string; pref: string; visitId: string; spotId: string }[];
+  memoryPhotos?: OsanpoRunMemoryPhoto[];
   /** アプリの記録とのつながり（今日の記録でスコアボーナス・よく行く場所が道の景色に混ざる） */
   odekake?: OsanpoRunOdekake;
   /** 気球が空を運んでくるフレンドのSNS投稿の写真 */
@@ -1081,16 +1081,16 @@ export function createOsanpoRun(root: HTMLElement, opts: OsanpoRunOptions): () =
     S.next = (170 + S.speed * 0.55 + Math.random() * S.speed * 0.8) * (rush ? 0.68 : 1) * routeGap() + extra;
   }
   /* ---------- 思い出の写真（自分のおでかけ写真を飛行機が運ぶ） ---------- */
-  type MemoryPhoto = { img: HTMLImageElement; src: string; name: string; pref: string; visitId: string; spotId: string; tall: boolean };
+  type MemoryPhoto = OsanpoRunMemoryPhoto & { img: HTMLImageElement; tall: boolean };
   const memoryPhotos: MemoryPhoto[] = [];
   /** フレンドの思い出（SNSの写真つき投稿）。気球が運んでくる */
-  type FriendPhoto = { img: HTMLImageElement; src: string; postId: string; author: string; spot: string; liked: boolean; tall: boolean };
+  type FriendPhoto = OsanpoRunFriendMemory & { img: HTMLImageElement; tall: boolean };
   const friendPhotos: FriendPhoto[] = [];
   for (const p of opts.friendMemories ?? []) {
     const img = new Image();
     img.decoding = "async";
     img.onload = () => {
-      if (img.naturalWidth && img.naturalHeight) friendPhotos.push({ img, src: p.src, postId: p.postId, author: p.author, spot: p.spot, liked: p.liked, tall: img.naturalHeight > img.naturalWidth });
+      if (img.naturalWidth && img.naturalHeight) friendPhotos.push({ ...p, img, tall: img.naturalHeight > img.naturalWidth });
     };
     img.src = p.src;
   }
@@ -1113,7 +1113,7 @@ export function createOsanpoRun(root: HTMLElement, opts: OsanpoRunOptions): () =
     const img = new Image();
     img.decoding = "async";
     img.onload = () => {
-      if (img.naturalWidth && img.naturalHeight) memoryPhotos.push({ img, src: p.src, name: p.name, pref: p.pref, visitId: p.visitId, spotId: p.spotId, tall: img.naturalHeight > img.naturalWidth });
+      if (img.naturalWidth && img.naturalHeight) memoryPhotos.push({ ...p, img, tall: img.naturalHeight > img.naturalWidth });
     };
     img.src = p.src;
   }
@@ -2788,63 +2788,106 @@ export function createOsanpoRun(root: HTMLElement, opts: OsanpoRunOptions): () =
     };
     requestAnimationFrame(step);
   }
-  /** このおさんぽで飛行機が運んできた写真を並べ、タップでその日の訪問記録を開けるようにする */
+  /**
+   * このおさんぽで運ばれてきた写真を並べる。タップするとゲームの中で大きく表示する
+   * （別のページへ移ると結果画面に戻れなくなるので、ページは移らない）
+   */
   function renderMemoryResult(): void {
     const list = $("o-memo-list");
     list.replaceChildren();
     const seen = S.memSeen.map((i) => memoryPhotos[i]).filter((ph): ph is MemoryPhoto => Boolean(ph)).slice(0, 6);
     for (const ph of seen) {
-      const a = document.createElement("a");
-      // 訪問記録だけのページは無いので、スポットのページの該当の記録へ飛ぶ
-      a.href = `/spots/${encodeURIComponent(ph.spotId)}#visit-${encodeURIComponent(ph.visitId)}`;
-      a.className = "osr-memo-card";
-      a.setAttribute("aria-label", `${ph.name}の記録を見る`);
-      const img = document.createElement("img");
-      img.src = ph.src; img.alt = ""; img.loading = "lazy"; img.width = 64; img.height = 64;
-      const name = document.createElement("span"); name.textContent = ph.name;
-      a.append(img, name);
-      list.appendChild(a);
+      const card = memoCard(ph.src, ph.name, `${ph.name}の写真を大きく見る`);
+      card.addEventListener("click", () => openLightbox({ src: ph.full, title: ph.name, sub: [ph.pref, fmtDate(ph.date)].filter(Boolean).join(" ・ "), text: ph.comment }));
+      list.appendChild(card);
     }
     $("o-memo").hidden = seen.length === 0;
     renderFriendMemoryResult();
   }
-  /** フレンドの思い出を並べ、その場でいいねできるようにする（写真のタップで投稿を開く） */
+  function memoCard(src: string, label: string, aria: string): HTMLButtonElement {
+    const card = document.createElement("button");
+    card.type = "button";
+    card.className = "osr-memo-card";
+    card.setAttribute("aria-label", aria);
+    const img = document.createElement("img");
+    img.src = src; img.alt = ""; img.loading = "lazy"; img.width = 64; img.height = 64;
+    const name = document.createElement("span"); name.textContent = label;
+    card.append(img, name);
+    return card;
+  }
+  const fmtDate = (d: string) => { const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(d); return m ? `${m[1]}年${Number(m[2])}月${Number(m[3])}日` : ""; };
+  /** フレンドの投稿にいいねする（外す）。うまくいかなければ元に戻す */
+  function toggleLike(fp: FriendPhoto, repaint: () => void): void {
+    if (!opts.onLike || likeBusy.has(fp.postId)) return;
+    const next = !fp.liked;
+    likeBusy.add(fp.postId);
+    fp.liked = next; repaint();
+    void opts.onLike(fp.postId, next).then((ok) => {
+      likeBusy.delete(fp.postId);
+      if (!ok) fp.liked = !next;
+      repaint();
+    });
+  }
+  const likeBusy = new Set<string>();
+  function likeButton(fp: FriendPhoto): HTMLButtonElement {
+    const like = document.createElement("button");
+    like.type = "button"; like.className = "osr-like";
+    like.textContent = fp.liked ? "♥ いいね済み" : "♡ いいね";
+    like.setAttribute("aria-pressed", fp.liked ? "true" : "false");
+    like.disabled = likeBusy.has(fp.postId);
+    return like;
+  }
+  /** フレンドの思い出を並べ、その場でいいねできるようにする（写真のタップで大きく表示） */
   function renderFriendMemoryResult(): void {
     const list = $("o-fmemo-list");
     list.replaceChildren();
     const seen = S.friendSeen.map((i) => friendPhotos[i]).filter((fp): fp is FriendPhoto => Boolean(fp)).slice(0, 6);
     for (const fp of seen) {
-      const card = document.createElement("div");
-      card.className = "osr-memo-card osr-fmemo-card";
-      const a = document.createElement("a");
-      a.href = `/sns/posts/${encodeURIComponent(fp.postId)}`;
-      a.setAttribute("aria-label", `${fp.author}さんの投稿を見る`);
-      const img = document.createElement("img");
-      img.src = fp.src; img.alt = ""; img.loading = "lazy"; img.width = 64; img.height = 64;
-      const name = document.createElement("span"); name.textContent = `${fp.author}さん`;
-      a.append(img, name);
-      const like = document.createElement("button");
-      like.type = "button"; like.className = "osr-like";
-      const paint = () => {
-        like.textContent = fp.liked ? "♥ いいね済み" : "♡ いいね";
-        like.setAttribute("aria-pressed", fp.liked ? "true" : "false");
-      };
-      paint();
-      like.addEventListener("click", () => {
-        if (!opts.onLike || like.disabled) return;
-        const next = !fp.liked;
-        like.disabled = true;
-        fp.liked = next; paint();
-        void opts.onLike(fp.postId, next).then((ok) => {
-          if (!ok) { fp.liked = !next; paint(); }
-          like.disabled = false;
-        });
-      });
-      card.append(a, like);
-      list.appendChild(card);
+      const wrap = document.createElement("div");
+      wrap.className = "osr-fmemo-card";
+      const card = memoCard(fp.src, `${fp.author}さん`, `${fp.author}さんの写真を大きく見る`);
+      card.addEventListener("click", () => openFriendLightbox(fp));
+      const like = likeButton(fp);
+      like.addEventListener("click", () => toggleLike(fp, renderFriendMemoryResult));
+      wrap.append(card, like);
+      list.appendChild(wrap);
     }
     $("o-fmemo").hidden = seen.length === 0;
   }
+  function openFriendLightbox(fp: FriendPhoto): void {
+    const actions = document.createElement("div");
+    const paint = () => {
+      const like = likeButton(fp);
+      like.addEventListener("click", () => toggleLike(fp, () => { paint(); renderFriendMemoryResult(); }));
+      actions.replaceChildren(like);
+    };
+    paint();
+    openLightbox({ src: fp.full, title: `${fp.author}さんの思い出`, sub: fp.spot, text: fp.body, actions });
+  }
+
+  /* ---------- 写真を大きく見る（結果画面の上に重ねる） ---------- */
+  let lightboxReturn: HTMLElement | null = null;
+  function openLightbox(o: { src: string; title: string; sub: string; text: string; actions?: HTMLElement }): void {
+    lightboxReturn = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+    $<HTMLImageElement>("lb-img").src = o.src;
+    $("lb-title").textContent = o.title;
+    const sub = $("lb-sub"); sub.textContent = o.sub; sub.hidden = !o.sub;
+    const text = $("lb-text"); text.textContent = o.text; text.hidden = !o.text;
+    const actions = $("lb-actions"); actions.replaceChildren(...(o.actions ? [o.actions] : [])); actions.hidden = !o.actions;
+    $("lightbox").hidden = false;
+    $("lb-close").focus({ preventScroll: true });
+  }
+  function closeLightbox(): void {
+    const lb = $("lightbox");
+    if (lb.hidden) return;
+    lb.hidden = true;
+    $<HTMLImageElement>("lb-img").removeAttribute("src");
+    lightboxReturn?.focus({ preventScroll: true });
+    lightboxReturn = null;
+  }
+  on($("lb-close"), "click", closeLightbox);
+  on($("lightbox"), "click", (e) => { if (e.target === $("lightbox")) closeLightbox(); });
+  on(document, "keydown", (e) => { if (e.key === "Escape") closeLightbox(); });
 
   /* ---------- 結果カードをSNSに投稿 ---------- */
   let shareBlob: Blob | null = null, shareUrl: string | null = null, sharing = false;
