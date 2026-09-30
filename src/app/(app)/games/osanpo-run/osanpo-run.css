@@ -211,6 +211,12 @@
 .osr .osr-step-boost li span { display: block; white-space: nowrap; }
 .osr .osr-step-boost li[data-on="1"] { color: #10243a; background: #9be7ff; border: 1px solid #9be7ff; }
 .osr .osr-step-boost small { font-size: 11px; color: var(--osr-muted); line-height: 1.4; }
+.osr .osr-odekake { display: flex; flex-direction: column; gap: 3px; padding: 8px 10px; border-radius: 12px; border: 1px solid var(--osr-line); background: rgba(255, 217, 168, 0.05); }
+.osr .osr-odekake b { font-size: 12px; font-weight: 800; color: #ffd9a8; }
+.osr .osr-odekake[data-on="1"] { border-color: rgba(255, 217, 168, 0.55); background: rgba(255, 217, 168, 0.12); }
+.osr .osr-odekake small { font-size: 11px; color: var(--osr-muted); line-height: 1.4; }
+.osr .osr-odekake a { color: #ffd9a8; font-weight: 800; text-decoration: underline; }
+.osr .osr-odekake .osr-odekake-scene { color: #b8e986; }
 .osr .osr-missions { display: flex; flex-direction: column; gap: 5px; padding: 8px 10px; border-radius: 12px; border: 1px solid var(--osr-line); background: rgba(255, 224, 138, 0.05); }
 .osr .osr-missions-head { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; }
 .osr .osr-missions-head b { font-size: 12px; font-weight: 800; color: #ffe08a; }
@@ -457,6 +463,24 @@
 .osr .osr-coin-line[data-state="ok"] { color: #2a1e0a !important; background: linear-gradient(90deg, #ffd978, #ffc857); box-shadow: 0 4px 14px -6px rgba(255, 200, 87, 0.8); }
 .osr .osr-coin-line[data-state="ok"]::before { content: "🪙 "; }
 .osr .osr-coin-line[data-state="error"] { color: #ff9a9a !important; }
+
+.osr .osr-odekake-line { margin: 0 !important; text-align: center; font-size: 12px !important; font-weight: 800; color: #ffd9a8 !important; }
+.osr .osr-memo { display: flex; flex-direction: column; gap: 6px; }
+.osr .osr-memo-title { margin: 0 !important; font-size: 12px !important; font-weight: 800; color: #ffd9a8 !important; display: flex; justify-content: space-between; align-items: baseline; gap: 8px; }
+.osr .osr-memo-title small { font-size: 10px; color: var(--osr-muted); font-weight: 500; }
+.osr .osr-memo-list { display: flex; gap: 8px; overflow-x: auto; padding-bottom: 2px; }
+.osr .osr-memo-card { flex: 0 0 auto; width: 76px; display: flex; flex-direction: column; align-items: center; gap: 4px; padding: 5px; border-radius: 10px; background: #fff; color: #4a3f66; text-decoration: none; transform: rotate(-2deg); box-shadow: 0 4px 10px -6px rgba(0, 0, 0, 0.6); }
+.osr .osr-memo-card:nth-child(even) { transform: rotate(2deg); }
+.osr .osr-memo-card img { width: 64px; height: 64px; object-fit: cover; border-radius: 3px; display: block; }
+.osr .osr-memo-card span { font-size: 10px; font-weight: 800; line-height: 1.2; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.osr .osr-memo-card:focus-visible { outline: 2px solid var(--osr-lantern); outline-offset: 2px; }
+.osr .osr-share-btn { width: 100%; background: linear-gradient(90deg, #ff9ec7, #ff7eb6); color: #3a0f24; }
+.osr .osr-share { display: flex; flex-direction: column; gap: 8px; padding: 10px; border-radius: 12px; border: 1px solid var(--osr-line); background: rgba(255, 255, 255, 0.04); }
+.osr .osr-share img { width: 100%; height: auto; border-radius: 8px; display: block; }
+.osr .osr-share textarea { width: 100%; box-sizing: border-box; resize: vertical; padding: 8px 10px; border-radius: 10px; border: 1px solid var(--osr-line); background: rgba(0, 0, 0, 0.25); color: var(--osr-ink); font-family: var(--osr-body); font-size: 16px; line-height: 1.45; }
+.osr .osr-share-msg { margin: 0 !important; font-size: 12px !important; text-align: center; color: var(--osr-muted) !important; }
+.osr .osr-share-msg:empty { display: none; }
+.osr .osr-share-msg a { color: #ff9ec7; font-weight: 800; }
 
 /* ---------- フレンドのランキング ---------- */
 .osr .osr-rk { display: flex; flex-direction: column; gap: 10px; max-width: 640px; width: 100%; margin: 0 auto; }
