@@ -261,7 +261,7 @@ export function OsanpoRunGame({ items, usesSampleItems, unlockedStages, seriesTa
                       <li className="osr-ctl"><span><kbd>タップ</kbd></span><div><b>ジャンプ</b><small>長押しで高く、ちょんとタップすると低く跳ぶ。空中でタップすると2段・3段ジャンプ。</small></div></li>
                       <li className="osr-ctl"><span><kbd>スワイプ</kbd></span><div><b>スライディング</b><small>のれん・低い枝・つららや、低く飛ぶカラスの下をくぐれる。空中で下スワイプすると急降下。</small></div></li>
                       <li className="osr-ctl"><span><kbd>スキル</kbd></span><div><b>アイテムのスキル</b><small>アイテムを拾うと、そのアイテムのスキルが発動（全アイテムに1つずつ）。図鑑のスキルLvが高いほど強い。身代わり・バリア・復活の「守り」は1回ぶんまで（強さは 復活 ＞ バリア・身代わり。今より弱い守りは付かない）。効果は「ずかん」でアイテムを選ぶと見られる。</small></div></li>
-                      <li className="osr-ctl"><span><kbd>オーラ</kbd></span><div><b>スキルのオーラ</b><small>スキルが効いているあいだ、フレンチーが分類の色のオーラをまとう。切れる1秒前から点滅する。</small>
+                      <li className="osr-ctl"><span><kbd>オーラ</kbd></span><div><b>スキルのオーラ</b><small>道に落ちているアイテムが、拾うと発動するスキルの分類の色のオーラをまとう。</small>
                         <ul className="osr-aura-legend">
                           {(Object.keys(SKILL_KIND_LABELS) as SkillKind[]).map((k) => (
                             <li key={k}><i style={{ background: SKILL_KIND_COLORS[k], boxShadow: `0 0 8px ${SKILL_KIND_COLORS[k]}` }} />{SKILL_KIND_LABELS[k]}</li>
