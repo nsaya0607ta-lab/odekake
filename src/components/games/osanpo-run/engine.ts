@@ -139,6 +139,9 @@ const FALL_DRIFT = 0.3;
 const BONE_PTS = 5;
 /** 歩いた1mあたりの点 */
 const METER_PTS = 10;
+/** スキルを発動した瞬間のオーラが光っている秒数（効果が続くスキルは、効いているあいだずっと光る） */
+const AURA_FLASH_SEC = 1.6;
+const hexRgbStr = (h: string) => { const [r, g, b] = hex(h); return `${r},${g},${b}`; };
 /** 走る速さ（論理px/秒）。最初はゆっくりで、約3分かけて最高速になる */
 const START_SPEED = 200, MAX_SPEED = 520;
 /**
@@ -689,7 +692,7 @@ export function createOsanpoRun(root: HTMLElement, opts: OsanpoRunOptions): () =
         case "combo": [659, 784, 988].forEach((f, i) => tone(f, 0.1, "square", 0.035, null, d + i * 0.06)); break;
         case "weather": tone(1046, 0.5, "triangle", 0.04, null, d); tone(1568, 0.6, "sine", 0.03, null, d + 0.1); break;
         case "pace": tone(620, 0.3, "triangle", 0.05, 300, d); break;
-        case "revive": [523, 659, 784].forEach((f) => tone(f, 0.6, "sine", 0.035, null, d)); tone(1046, 0.5, "triangle", 0.03, null, d + 0.2); break;
+        case "bonus": [523, 659, 784].forEach((f) => tone(f, 0.6, "sine", 0.035, null, d)); tone(1046, 0.5, "triangle", 0.03, null, d + 0.2); break;
       }
     },
   };
@@ -2067,11 +2070,63 @@ export function createOsanpoRun(root: HTMLElement, opts: OsanpoRunOptions): () =
     const land = rand(P.x + 90, Math.max(P.x + 120, VW - 40));
     p.x = land + S.speed * FALL_DRIFT * fallT;
   }
+  /* ---------- スキルのオーラ（分類ごとの色） ---------- */
+  /** 発動した瞬間に光る分類と、その残り秒数（効果が続くスキルは効いているあいだずっと光る） */
+  let auraFlash: { kind: SkillKind; t: number }[] = [];
+  function flashAura(kind: SkillKind): void {
+    auraFlash = auraFlash.filter((a) => a.kind !== kind);
+    auraFlash.push({ kind, t: AURA_FLASH_SEC });
+  }
+  /** いま光らせる分類（新しいものが先頭）。効いているスキル・守り・発動直後のものを合わせる */
+  function activeAuras(): { kind: SkillKind; t: number }[] {
+    const map = new Map<SkillKind, number>();
+    for (const a of auraFlash) map.set(a.kind, Math.max(map.get(a.kind) ?? 0, a.t));
+    for (const a of K.buffs) map.set(a.skill.kind, Math.max(map.get(a.skill.kind) ?? 0, a.t));
+    // 時間つきの身代わり（○秒以内にぶつかったら守る）は、その時間だけ守りの色で光る
+    for (const g of K.guards) if (g.n > 0 && Number.isFinite(g.t) && g.t > 0) map.set("guard", Math.max(map.get("guard") ?? 0, g.t));
+    const order = [...auraFlash].reverse().map((a) => a.kind);
+    return [...map.entries()].map(([kind, t]) => ({ kind, t })).sort((a, b) => {
+      const ia = order.indexOf(a.kind), ib = order.indexOf(b.kind);
+      return (ia < 0 ? 99 : ia) - (ib < 0 ? 99 : ib) || b.t - a.t;
+    });
+  }
+  /**
+   * 犬のまわりに分類の色のオーラ。いちばん新しい分類の光を後ろにぼかし、効いている分類ぶんの光の粒が周りを回る。
+   * 効果が切れる1秒前から点滅して知らせる
+   */
+  function drawSkillAura(c: Ctx): void {
+    if (S.state !== "play") return;
+    const list = activeAuras().slice(0, 4);
+    if (!list.length) return;
+    const cx = P.x, cy = P.y - 28;
+    const top = list[0]!, col = hexRgbStr(SKILL_KIND_COLORS[top.kind]);
+    const fading = top.t < 1 && Math.floor(S.time * 10) % 2 === 1;
+    const pulse = RM ? 0 : Math.sin(S.time * 5) * 0.06;
+    c.save(); c.globalCompositeOperation = "lighter";
+    glow(c, cx, cy, 60, col, (fading ? 0.15 : 0.5) + pulse);
+    c.restore();
+    c.save(); c.lineWidth = 3.2;
+    c.strokeStyle = `rgba(${col},${fading ? 0.25 : 0.9})`;
+    c.beginPath(); c.ellipse(cx, cy + 2, 37, 33, 0, 0, Math.PI * 2); c.stroke();
+    c.lineWidth = 1.2; c.strokeStyle = `rgba(255,255,255,${fading ? 0.15 : 0.55})`;
+    c.beginPath(); c.ellipse(cx, cy + 2, 40, 36, 0, 0, Math.PI * 2); c.stroke();
+    c.restore();
+    list.forEach((a, i) => {
+      const ac = hexRgbStr(SKILL_KIND_COLORS[a.kind]), blink = a.t < 1 && Math.floor(S.time * 10) % 2 === 1;
+      if (blink) return;
+      for (let k = 0; k < 2; k++) {
+        const ang = (RM ? 0 : S.time * (2.6 + i * 0.4)) + (i / list.length) * Math.PI * 2 + k * Math.PI;
+        const x = cx + Math.cos(ang) * 38, y = cy + 2 + Math.sin(ang) * 33;
+        glow(c, x, y, 13, ac, 0.75);
+        star(c, x, y, 4.4, `rgba(${ac},1)`);
+      }
+    });
+  }
   function applySkill(item: RunItem, depth = 0): void {
     const skill = OSANPO_RUN_SKILL_BY_ID.get(item.id);
     if (!skill || S.state !== "play") return;
     const lv = lvOf(item);
-    if (depth === 0) { sfx.skill(skill.kind); S.skillIds.add(skill.id); if (S.skillIds.size >= 10) unlock("skills10"); }
+    if (depth === 0) { sfx.skill(skill.kind); S.skillIds.add(skill.id); if (S.skillIds.size >= 10) unlock("skills10"); flashAura(skill.kind); }
     skill.fx.forEach((fx, idx) => runFx(skill, fx, lv, idx, depth));
   }
   function runFx(skill: OsanpoRunSkill, fx: Fx, lv: number, idx: number, depth: number): void {
@@ -2220,6 +2275,8 @@ export function createOsanpoRun(root: HTMLElement, opts: OsanpoRunOptions): () =
   }
   /** 毎フレームのスキル処理（プレイ中だけ） */
   function tickSkills(dt: number): void {
+    for (const f of auraFlash) f.t -= dt;
+    auraFlash = auraFlash.filter((f) => f.t > 0);
     if (K.textT > 0) K.textT -= dt;
     for (const a of K.buffs) {
       a.t -= dt;
@@ -2349,7 +2406,7 @@ export function createOsanpoRun(root: HTMLElement, opts: OsanpoRunOptions): () =
     if (S.stepT > 0) rows.push({ key: "steps", item: null, glyph: "👣", label: "歩数ブースト", tag: `×${STEP_BOOST_MUL}`, kind: "score", t: S.stepT, max: STEP_BOOST_SEC, count: "", desc: OSANPO_RUN_STEP_BOOSTS[0].desc });
     const clears = K.clears.reduce((n, c) => n + c.n, 0);
     if (clears) add("clears", "✦", K.clears[0]!.name, "はじく", `×${clears}`, "guard", "前から来る障害物をはじき飛ばす");
-    if (K.rushPass) add("rush", "⚡", "あずき色の風", "ラッシュ無敵", "×1", "combo", "次のラッシュを無敵で乗り切り、突破ボーナスが増える");
+    if (K.rushPass) add("rush", "⚡", "あずき色の風", "ラッシュ無敵", "×1", "bonus", "次のラッシュを無敵で乗り切り、突破ボーナスが増える");
     if (K.comboGuard) add("cguard", "♥", "コンボ守り", "コンボ守り", `×${K.comboGuard}`, "combo", "コンボが切れそうになったら防ぐ");
     if (K.miss) add("miss", "✋", "てぶくろ", "自動キャッチ", `×${K.miss}`, "collect", "取りこぼしたアイテムを自動で拾う");
     if (K.bigJumps.length) add("bigjump", "⤴", "大ジャンプ", "大ジャンプ", `×${K.bigJumps.length}`, "jump", "次のジャンプが大きくなる");
@@ -2541,7 +2598,7 @@ export function createOsanpoRun(root: HTMLElement, opts: OsanpoRunOptions): () =
     });
     Object.assign(P, { y: GROUND, vy: 0, ground: true, jumps: 2, sq: 1, rot: 0, inv: 0, dead: false, slide: false, slideT: 0, slideHeld: false, jumpAt: -1 });
     obstacles = []; pickups = []; texts = []; flyers = []; parts = []; sniffs = []; stompAt = -1; P.dive = false;
-    K = newSkillState(); refreshMods();
+    K = newSkillState(); refreshMods(); auraFlash = [];
     applyAudio();
     floatText(P.x + 4, P.y - 84, "よーい…", "#F6EFE4", 20);
     sfx.ready();
@@ -3255,6 +3312,7 @@ export function createOsanpoRun(root: HTMLElement, opts: OsanpoRunOptions): () =
 
     const k = 1 - clamp((GROUND - P.y) / 170, 0, 0.75);
     c.fillStyle = `rgba(20,16,40,${0.22 * k})`; ell(c, P.x, GROUND + 1, 26 * k + 4, 3.5 * k + 1); c.fill();
+    drawSkillAura(c);
     const invT = S.state === "play" ? invLeft() : 0;
     if (invT > 0) {
       // 無敵: 虹色のオーラ。切れる1.5秒前から点滅して知らせる

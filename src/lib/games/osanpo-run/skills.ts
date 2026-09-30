@@ -192,15 +192,20 @@ export type Fx =
 
 export type SpawnShape = "row" | "arc" | "high" | "ring" | "wave" | "sky" | "line" | "one" | "mid";
 
-export type SkillKind = "score" | "guard" | "spawn" | "jump" | "collect" | "combo" | "weather" | "pace" | "revive";
+/**
+ * スキルの分類（何が起きるか）。プレイ中はこの色のオーラを犬がまとい、左上のカード・ずかんの絞り込みもこの色でそろえる。
+ * score 点数を増やす / guard ぶつからない・復活 / jump ジャンプ / collect 拾いやすく / spawn アイテムや粒を出す /
+ * combo コンボ / bonus ボーナスタイム・ラッシュ / weather 天気・時間・見やすさ / pace 速さ
+ */
+export type SkillKind = "score" | "guard" | "jump" | "collect" | "spawn" | "combo" | "bonus" | "weather" | "pace";
 
 export const SKILL_KIND_LABELS: Record<SkillKind, string> = {
-  score: "スコア", guard: "守り", spawn: "出現", jump: "ジャンプ", collect: "回収", combo: "コンボ", weather: "天気・時計", pace: "速さ", revive: "復活",
+  score: "点数", guard: "守り", jump: "ジャンプ", collect: "拾いやすく", spawn: "出現", combo: "コンボ", bonus: "ボーナス", weather: "天気・時間", pace: "速さ",
 };
 
-/** 種類ごとの色（プレイ中の左上のカード・ずかんの絞り込みで使う） */
+/** 分類ごとの色（プレイ中のオーラ・左上のカード・ずかんの絞り込みで使う） */
 export const SKILL_KIND_COLORS: Record<SkillKind, string> = {
-  score: "#FFC857", guard: "#7CC4FF", spawn: "#FF84BC", jump: "#7EF0D0", collect: "#C79BFF", combo: "#FF9F6B", weather: "#9FD4FF", pace: "#B8E986", revive: "#FF6B8A",
+  score: "#FFC857", guard: "#5AA6FF", jump: "#4FE3B5", collect: "#B98CFF", spawn: "#FF7EB6", combo: "#FF9A45", bonus: "#FF5A5A", weather: "#E6F4FF", pace: "#B8E986",
 };
 
 export type OsanpoRunSkill = {
@@ -250,7 +255,7 @@ export const OSANPO_RUN_SKILLS: readonly OsanpoRunSkill[] = [
   sk("food_paw_bowl", "おかわり", "score", "次の3個のアイテムが +10pt", "次の5個 +20pt", [{ op: "next", n: [3, 5], add: [10, 20] }]),
   sk("food_strawberry_roll_cake", "くるくるロール", "combo", "5秒間、コンボが下がらない", "10秒間", [B({ sec: [5, 10], comboLock: true })]),
   sk("food_paw_pudding", "ぷるぷるボディ", "guard", "3秒以内にぶつかったら、ぷるんと跳ね返って1回だけ無傷", "5秒以内", [{ op: "guard", n: 1, sec: [3, 5] }]),
-  sk("food_paw_melon_bread", "さくさく", "combo", "次のボーナスタイムが早く来る（残り時間 -20%）", "-50%", [{ op: "bonusSoon", frac: [0.2, 0.5] }]),
+  sk("food_paw_melon_bread", "さくさく", "bonus", "次のボーナスタイムが早く来る（残り時間 -20%）", "-50%", [{ op: "bonusSoon", frac: [0.2, 0.5] }]),
   sk("food_smile_onigiri", "エネルギー補給", "score", "+20pt", "+60pt", [{ op: "pts", v: [20, 60] }]),
   sk("food_paw_cupcake", "おたんじょうび", "score", "5秒間、拾うたびに +1pt, +2pt, +3pt…と増えていく", "10秒間・+2ptずつ", [B({ sec: [5, 10], ramp: [1, 2] })]),
   sk("food_paw_taiyaki", "しっぽまであんこ", "score", "いまのコンボ数 ×5pt（30コンボまで）", "コンボ数 ×15pt", [{ op: "comboPts", per: [5, 15] }]),
@@ -262,7 +267,7 @@ export const OSANPO_RUN_SKILLS: readonly OsanpoRunSkill[] = [
   sk("food_kamikami", "かみかみタイム", "score", "4秒間、ジャンプ中に拾ったアイテムの点数 +30%", "+80%", [B({ sec: 4, itemMul: [1.3, 1.8], itemFilter: "air" })]),
   sk("food_mocchurin", "もっちゅり化", "guard", "8秒間、もちもちボディで、ぶつかってもびよーんと伸びて何回でも平気", "12秒間", [B({ sec: [8, 12], inv: true, tint: "255,236,210" })], true),
   // ---------- 通常図鑑：インテリア ----------
-  sk("interior_stretch_rod", "のび〜", "jump", "5秒間、胴がのびて、のれんや低いカラスに当たらない", "10秒間", [B({ sec: [5, 10], immune: "low" })], true),
+  sk("interior_stretch_rod", "のび〜", "guard", "5秒間、胴がのびて、のれんや低いカラスに当たらない", "10秒間", [B({ sec: [5, 10], immune: "low" })], true),
   sk("interior_anball", "アンボール転がし", "guard", "10秒間、大きなボールに乗って障害物をなぎ倒す（1つ +30pt）", "15秒間", [B({ sec: [10, 15], smash: 30 })], true),
   sk("interior_kinoko_azubee", "きのこトランポリン", "jump", "8秒間、きのこで跳ねて大ジャンプ（1.4倍）。上空に星の粒が並ぶ", "12秒間", [B({ sec: [8, 12], jump: 1.4 }), { op: "spawn", n: 6, shape: "high", token: 20 }], true),
   sk("interior_gold_ball", "金ぴか", "score", "10秒間、N・Rアイテムの点数 ×3", "15秒間", [B({ sec: [10, 15], itemMul: 3, itemFilter: "NR", tint: "255,215,120" })]),
@@ -276,7 +281,7 @@ export const OSANPO_RUN_SKILLS: readonly OsanpoRunSkill[] = [
   sk("other_omojii", "おじいちゃんのおさんぽ", "pace", "8秒間、のんびり歩き（速さ0.6倍）になるかわりに、スコア ×2", "12秒間・×3", [B({ sec: [8, 12], speed: 0.6, mul: [2, 3] })], true),
   sk("other_nakayoshi_azubee", "なかよしペア", "collect", "10秒間、もう1匹が取りこぼしを拾ってくれる（広く吸い寄せ）", "20秒間", [B({ sec: [10, 20], magnet: 100, wide: true })]),
   sk("other_komochi", "こもち大行進", "guard", "子犬がついてきて、ぶつかったとき1回だけ身代わりになって帰っていく", "身代わりのあと3秒無敵", [{ op: "guard", n: 1, after: [0, 3] }], true),
-  sk("other_azuki", "あずき色の風", "combo", "次のラッシュを無敵で乗り切り、突破ボーナス ×2", "×3", [{ op: "rush", mul: [2, 3] }]),
+  sk("other_azuki", "あずき色の風", "bonus", "次のラッシュを無敵で乗り切り、突破ボーナス ×2", "×3", [{ op: "rush", mul: [2, 3] }]),
   sk("other_kobee", "こびーのおねだり", "spawn", "10秒間、食べ物を拾うたび +100pt。前に食べ物が5個並ぶ", "15秒間", [B({ sec: [10, 15], itemAdd: 100, itemFilter: "food" }), { op: "spawn", n: 5, shape: "row", food: true }], true),
   sk("other_kamunayo", "かむなよ！", "guard", "次の自転車や看板をかじって壊す（+30pt）", "3回まで", [{ op: "clear", n: [1, 3], kinds: "bikesign", pts: 30 }], true),
   sk("other_hamigaki", "ぴかぴか歯", "score", "5秒間、拾ったアイテムの点数 +50%", "10秒間", [B({ sec: [5, 10], itemMul: 1.5 })]),
@@ -285,17 +290,17 @@ export const OSANPO_RUN_SKILLS: readonly OsanpoRunSkill[] = [
   sk("other_kurumari_a", "くるまり防御", "guard", "5秒間、丸まってころころ。のれんや低いカラス、水たまりに当たらない", "10秒間", [B({ sec: [5, 10], immune: "low" }), B({ sec: [5, 10], immune: "puddle", label: "ころころ" })]),
   sk("other_pondeomo", "ぽんでリング", "spawn", "空中にほねとアイテムがリング状に6個並ぶ（アイテムは3つに1つ）", "9個", [{ op: "spawn", n: [6, 9], shape: "ring" }]),
   sk("other_pondear", "ぽんでジャンプ", "jump", "10秒間、空中で何回でもジャンプできる", "15秒間", [B({ sec: [10, 15], air: 99 })]),
-  sk("other_oyatsu_no_jikan", "おやつのじかん", "combo", "すぐにボーナスタイムが5秒はじまる", "10秒", [{ op: "bonus", sec: [5, 10] }]),
+  sk("other_oyatsu_no_jikan", "おやつのじかん", "bonus", "すぐにボーナスタイムが5秒はじまる", "10秒", [{ op: "bonus", sec: [5, 10] }]),
   sk("other_jare_a", "じゃれつき", "guard", "5秒間、猫やハト・カラスと仲良し。当たらず、じゃれるたび +40pt", "10秒間", [B({ sec: [5, 10], smash: 40, smashKinds: "animals" })], true),
   sk("other_ketsunade_a", "けつなで", "combo", "おしりをなでてもらってご機嫌。コンボ倍率が +2", "一気に最大 ×5", [{ op: "combo", add: [2, 4] }], true),
   sk("other_omochi_janai", "おもちじゃない...!?", "spawn", "次に出る5個のうち1個がLR以上（なにが出るかはお楽しみ）", "10個・うち2個", [{ op: "lucky", n: [5, 10], hits: [1, 2] }], true),
   sk("other_oyasumi", "すやすや", "guard", "3秒間、寝落ちしたまま自動で走り、障害物も自動でよける", "8秒間", [B({ sec: [3, 8], auto: true })], true),
   sk("other_nisoku_a", "二足歩行", "collect", "8秒間、立ち上がって歩き、高いところのアイテムも拾える", "12秒間", [B({ sec: [8, 12], wide: true })], true),
   sk("other_listen_to_the_a", "リッスン", "score", "10秒間、BGMの拍に合わせてジャンプすると1回 +100pt", "20秒間", [B({ sec: [10, 20], rhythm: 100, tint: "150,200,255" })], true),
-  sk("other_okaeri", "おかえり！", "revive", "1回だけ、倒れても家から迎えが来て、その場から再開できる", "再開後10秒間 スコア ×1.5", [{ op: "revive", mul: [1, 1.5] }]),
+  sk("other_okaeri", "おかえり！", "guard", "1回だけ、倒れても家から迎えが来て、その場から再開できる", "再開後10秒間 スコア ×1.5", [{ op: "revive", mul: [1, 1.5] }]),
   sk("other_omoi_bashira", "一家の大黒柱", "guard", "10秒間、どっしりして何にぶつかっても平気。ただしジャンプは少し低め", "15秒間", [B({ sec: [10, 15], inv: true, jump: 0.85 })]),
   sk("other_pink_omo", "ピンク旋風", "guard", "10秒間、画面がピンクになり、障害物がハートに（当たると +50pt）", "15秒間・アイテムも1ランクアップ", [B({ sec: [10, 15], smash: 50, tint: "255,140,200" }), { op: "next", n: [0, 10], up: 1 }], true),
-  sk("other_burebur", "ブレブル", "collect", "5秒間、ブレて分身し、どの高さのアイテムも拾う。無敵", "10秒間", [B({ sec: [5, 10], inv: true, wide: true, magnet: 130 })], true),
+  sk("other_burebur", "ブレブル", "guard", "5秒間、ブレて分身し、どの高さのアイテムも拾う。無敵", "10秒間", [B({ sec: [5, 10], inv: true, wide: true, magnet: 130 })], true),
   sk("other_xmas_party", "メリークリスマス", "spawn", "10秒間、プレゼントの粒が空から降ってくる（1つ +100pt）", "20秒間", [B({ sec: [10, 20], rain: 3, rainToken: 100, tint: "200,230,255" })], true),
   sk("other_narcissist_a", "鏡よ鏡", "score", "10秒間、スコア ×3。ただしキラキラがまぶしい", "×5", [B({ sec: 10, mul: [3, 5], tint: "255,245,200" })], true),
   sk("other_mafia_a", "ボスの命令", "guard", "画面内の障害物をすべて片づけ（1つ +100pt）、そのあと10秒間は障害物が出ない", "20秒間", [{ op: "clearAll", pts: 100 }, B({ sec: [10, 20], noSpawn: "all" })], true),
@@ -328,7 +333,7 @@ export const OSANPO_RUN_SKILLS: readonly OsanpoRunSkill[] = [
   sk("food_summit_cup_ramen", "3分待って", "score", "拾ってから3秒後に +100pt（それまでに倒れたら無し）", "+300pt", [{ op: "delay", sec: 3, pts: [100, 300] }], true),
   sk("interior_led_lantern", "足もと照らす", "weather", "20秒間、障害物が光って見やすい", "60秒間", [B({ sec: [20, 60], bright: true })]),
   sk("interior_campfire_set", "キャンプファイヤー", "score", "5秒間、アイテムの点数 +30%", "+60%", [B({ sec: 5, itemMul: [1.3, 1.6] })]),
-  sk("interior_hut_fireplace", "暖炉でひと休み", "revive", "1回だけ、倒れても暖炉の前で復活（スコア -10%）", "スコアは減らない", [{ op: "revive", keep: 0.9 }]),
+  sk("interior_hut_fireplace", "暖炉でひと休み", "guard", "1回だけ、倒れても暖炉の前で復活（スコア -10%）", "スコアは減らない", [{ op: "revive", keep: 0.9 }]),
   sk("interior_stargazing_telescope", "流れ星観測", "spawn", "夜なら流れ星の粒が5つ降る（1つ +150pt）。昼なら時計が夜まで進む", "10個", [{ op: "clock", night: [5, 10] }]),
   sk("accessory_bear_bell", "ちりんちりん", "guard", "次に来るカラスか猫を1回追い払う", "3回まで", [{ op: "clear", n: [1, 3], kinds: "crowcat", pts: 10 }]),
   sk("accessory_hiking_backpack", "つめこみ", "score", "次の5個のアイテムが +5pt", "次の10個 +10pt", [{ op: "next", n: [5, 10], add: [5, 10] }]),
@@ -341,7 +346,7 @@ export const OSANPO_RUN_SKILLS: readonly OsanpoRunSkill[] = [
   sk("other_rock_ptarmigan", "雷鳥のみちびき", "guard", "15秒間、雷鳥が先導して、自動でよけさせてくれる", "25秒間", [B({ sec: [15, 25], auto: true })]),
   // ---------- 雪国シリーズ ----------
   sk("snow_frenchie", "雪国ぐらし", "guard", "15秒間、雪でも見やすく、雪だるま（コーン）に当たっても崩して +100pt", "25秒間", [B({ sec: [15, 25], clear: true, smash: 100, smashKinds: "rock" })]),
-  sk("toy_sled", "そりすべり", "jump", "5秒間、のれんや低いカラスにそりでくぐり抜ける", "10秒間", [B({ sec: [5, 10], immune: "low" })]),
+  sk("toy_sled", "そりすべり", "guard", "5秒間、のれんや低いカラスにそりでくぐり抜ける", "10秒間", [B({ sec: [5, 10], immune: "low" })]),
   sk("toy_snowman_kit", "雪だるまジャンプ台", "jump", "次のジャンプが雪だるまの上から大ジャンプ（1.5倍）", "3回まで", [{ op: "bigJump", n: [1, 3], mul: 1.5 }], true),
   sk("toy_snowball", "雪合戦", "guard", "前のカラスに雪玉を当てて追い払う（+30pt）", "3羽まで", [{ op: "clear", n: [1, 3], kinds: "crow", pts: 30 }]),
   sk("toy_mini_skis", "すいーっ", "score", "5秒間、速さ1.2倍でアイテムの点数 ×1.3", "10秒間・×1.6", [B({ sec: [5, 10], speed: 1.2, itemMul: [1.3, 1.6] })]),
@@ -360,7 +365,7 @@ export const OSANPO_RUN_SKILLS: readonly OsanpoRunSkill[] = [
   sk("other_icicle", "ぽきっ", "guard", "前の障害物1つにつららが落ちて壊れる", "3つ", [{ op: "clear", n: [1, 3], kinds: "hard", pts: 20 }]),
   sk("other_snowflake_ornament", "結晶あつめ", "spawn", "空に結晶の粒が10個並ぶ（1個 +20pt）", "20個", [{ op: "spawn", n: [10, 20], shape: "wave", token: 20 }]),
   sk("other_snow_lantern", "灯り", "weather", "このおさんぽ中、夜のあいだずっとスコア ×1.2", "×1.5", [{ op: "nightMul", mul: [1.2, 1.5] }]),
-  sk("other_kamakura", "かまくらで休憩", "revive", "1回だけ、倒れてもかまくらで復活。中でおもちを食べて +500pt", "+1500pt", [{ op: "revive", pts: [500, 1500] }]),
+  sk("other_kamakura", "かまくらで休憩", "guard", "1回だけ、倒れてもかまくらで復活。中でおもちを食べて +500pt", "+1500pt", [{ op: "revive", pts: [500, 1500] }]),
   sk("other_diamond_dust", "きらめく空気", "spawn", "15秒間、きらめきの粒が空から降ってくる（1つ +30pt）", "25秒間", [B({ sec: [15, 25], rain: 4, rainToken: 30, tint: "210,240,255" })]),
   // ---------- 夏まつりシリーズ ----------
   sk("summer_frenchie", "まつりの主役", "spawn", "15秒間、屋台からほねとアイテムが投げこまれる（アイテムは3つに1つ）", "25秒間", [B({ sec: [15, 25], rain: 0.8 })]),
@@ -379,7 +384,7 @@ export const OSANPO_RUN_SKILLS: readonly OsanpoRunSkill[] = [
   sk("accessory_jinbei", "まつり気分", "score", "このおさんぽ中、夏まつりならスコア ×1.2（ほかの道は ×1.1）", "×1.5（ほかは ×1.2）", [{ op: "runMul", mul: [1.1, 1.2], stage: "summer", stageMul: [1.2, 1.5] }]),
   sk("other_sparkler", "ぱちぱち", "collect", "5秒間、拾うたびに火花が散って、近くのアイテムも1個いっしょに拾う", "10秒間", [B({ sec: [5, 10], spark: true })]),
   sk("other_goldfish_scoop", "すくう！", "spawn", "前に金魚の粒が10匹泳いでくる（1匹 +30pt）", "20匹", [{ op: "spawn", n: [10, 20], shape: "wave", token: 30 }]),
-  sk("interior_beach_parasol", "パラソル", "weather", "15秒間、雨がやみ、カラスにも当たらない", "30秒間", [B({ sec: [15, 30], dry: true, immune: "crow" })]),
+  sk("interior_beach_parasol", "パラソル", "guard", "15秒間、雨がやみ、カラスにも当たらない", "30秒間", [B({ sec: [15, 30], dry: true, immune: "crow" })]),
   sk("toy_fireworks_set", "打ち上げ花火", "spawn", "花火が上がり、ほねとアイテムになって9個降ってくる（アイテムは3つに1つ）", "15個", [{ op: "spawn", n: [9, 15], shape: "sky" }]),
   sk("toy_yoyo_scoop", "ヨーヨー", "score", "次に拾うアイテムが、ヨーヨーみたいに戻ってきてもう1個ぶんになる", "3個まで", [{ op: "next", n: [1, 3], dup: 1 }]),
   sk("toy_bubbles", "しゃぼん", "guard", "次の障害物をシャボン玉で包んで浮かせる", "3つまで", [{ op: "clear", n: [1, 3], kinds: "ground", pts: 15 }]),

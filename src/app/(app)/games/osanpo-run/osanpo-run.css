@@ -536,3 +536,8 @@
 .osr .osr-coop-mini { height: 5px; border-radius: 999px; background: rgba(255, 255, 255, 0.08); overflow: hidden; }
 .osr .osr-coop-mini i { display: block; height: 100%; background: var(--osr-mint); }
 .osr .osr-coop-list b { font-variant-numeric: tabular-nums; font-size: 12px; }
+
+/* ---------- スキルのオーラの色（ルール） ---------- */
+.osr .osr-guide .osr-aura-legend { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px 8px; margin: 8px 0 0; padding: 0; list-style: none; }
+.osr .osr-guide .osr-aura-legend li { display: flex; align-items: center; gap: 6px; padding: 0; margin: 0; border: 0; background: none; font-size: 12px; font-weight: 800; color: var(--osr-ink); }
+.osr .osr-aura-legend i { width: 10px; height: 10px; border-radius: 50%; flex: none; }
