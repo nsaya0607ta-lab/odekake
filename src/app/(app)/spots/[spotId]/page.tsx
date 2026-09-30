@@ -246,7 +246,7 @@ export default async function SpotDetailPage({
           ) : (
             <ul className="space-y-3">
               {visits.map(({ record, photos, tripTitle, journeyTagTitle }) => (
-                <li key={record.id} className="rough-card space-y-2 p-4">
+                <li key={record.id} id={`visit-${record.id}`} className="rough-card scroll-mt-20 space-y-2 p-4">
                   <div className="flex items-center justify-between gap-2">
                     <p className="font-semibold tabular-nums">{formatDate(record.visited_at)}</p>
                     {tripTitle || journeyTagTitle ? (

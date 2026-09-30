@@ -113,7 +113,7 @@ export type OsanpoRunOptions = {
   /** ミッションを達成したときに呼ぶ。もらえたコインの枚数を返す（記録できなかったときは null） */
   onMissionClear?: (missionId: string) => Promise<number | null>;
   /** 飛行機が空を運んでくる自分のおでかけ写真（縦長は縦向き、横長は横向きの枠になる） */
-  memoryPhotos?: { src: string; name: string; pref: string; visitId: string }[];
+  memoryPhotos?: { src: string; name: string; pref: string; visitId: string; spotId: string }[];
   /** アプリの記録とのつながり（今日の記録でスコアボーナス・よく行く場所が道の景色に混ざる） */
   odekake?: OsanpoRunOdekake;
   /** 気球が空を運んでくるフレンドのSNS投稿の写真 */
@@ -1081,7 +1081,7 @@ export function createOsanpoRun(root: HTMLElement, opts: OsanpoRunOptions): () =
     S.next = (170 + S.speed * 0.55 + Math.random() * S.speed * 0.8) * (rush ? 0.68 : 1) * routeGap() + extra;
   }
   /* ---------- 思い出の写真（自分のおでかけ写真を飛行機が運ぶ） ---------- */
-  type MemoryPhoto = { img: HTMLImageElement; src: string; name: string; pref: string; visitId: string; tall: boolean };
+  type MemoryPhoto = { img: HTMLImageElement; src: string; name: string; pref: string; visitId: string; spotId: string; tall: boolean };
   const memoryPhotos: MemoryPhoto[] = [];
   /** フレンドの思い出（SNSの写真つき投稿）。気球が運んでくる */
   type FriendPhoto = { img: HTMLImageElement; src: string; postId: string; author: string; spot: string; liked: boolean; tall: boolean };
@@ -1113,7 +1113,7 @@ export function createOsanpoRun(root: HTMLElement, opts: OsanpoRunOptions): () =
     const img = new Image();
     img.decoding = "async";
     img.onload = () => {
-      if (img.naturalWidth && img.naturalHeight) memoryPhotos.push({ img, src: p.src, name: p.name, pref: p.pref, visitId: p.visitId, tall: img.naturalHeight > img.naturalWidth });
+      if (img.naturalWidth && img.naturalHeight) memoryPhotos.push({ img, src: p.src, name: p.name, pref: p.pref, visitId: p.visitId, spotId: p.spotId, tall: img.naturalHeight > img.naturalWidth });
     };
     img.src = p.src;
   }
@@ -2795,7 +2795,8 @@ export function createOsanpoRun(root: HTMLElement, opts: OsanpoRunOptions): () =
     const seen = S.memSeen.map((i) => memoryPhotos[i]).filter((ph): ph is MemoryPhoto => Boolean(ph)).slice(0, 6);
     for (const ph of seen) {
       const a = document.createElement("a");
-      a.href = `/visits/${encodeURIComponent(ph.visitId)}`;
+      // 訪問記録だけのページは無いので、スポットのページの該当の記録へ飛ぶ
+      a.href = `/spots/${encodeURIComponent(ph.spotId)}#visit-${encodeURIComponent(ph.visitId)}`;
       a.className = "osr-memo-card";
       a.setAttribute("aria-label", `${ph.name}の記録を見る`);
       const img = document.createElement("img");

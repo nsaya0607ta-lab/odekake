@@ -12,8 +12,9 @@ export type OsanpoRunMemoryPhoto = {
   name: string;
   /** 都道府県名（分からなければ空） */
   pref: string;
-  /** この写真の訪問記録（おさんぽの結果画面から記録を開く） */
+  /** この写真の訪問記録と、そのスポット（結果画面からスポットのページの該当の記録を開く） */
   visitId: string;
+  spotId: string;
 };
 
 /** 新しい順にこれだけ読む。枠の向き（縦・横）はゲーム側で写真の縦横比から決める */
@@ -48,7 +49,7 @@ export async function getOsanpoRunMemoryPhotos(supabase: DB, userId: string): Pr
     const spot = spotId ? spotById.get(spotId) : undefined;
     if (!src || !spot) return [];
     const pref = PREFECTURE_NAMES.find((item) => item.code === spot.prefecture_code)?.name ?? "";
-    return [{ src, name: spot.name, pref, visitId: p.visit_record_id }];
+    return [{ src, name: spot.name, pref, visitId: p.visit_record_id, spotId: spot.id }];
   });
 }
 
