@@ -111,7 +111,7 @@ export type OsanpoRunOptions = {
   missionsDone?: string[];
   /** ミッションを達成したときに呼ぶ。もらえたコインの枚数を返す（記録できなかったときは null） */
   onMissionClear?: (missionId: string) => Promise<number | null>;
-  /** 道ばたの看板に貼る自分のおでかけ写真（縦長は縦向き、横長は横向きの看板になる） */
+  /** 飛行機が空を運んでくる自分のおでかけ写真（縦長は縦向き、横長は横向きの枠になる） */
   memoryPhotos?: { src: string; name: string; pref: string }[];
 };
 
@@ -139,6 +139,7 @@ const FALL_DRIFT = 0.3;
 const BONE_PTS = 5;
 /** 歩いた1mあたりの点 */
 const METER_PTS = 10;
+const hexRgbStr = (h: string) => { const [r, g, b] = hex(h); return `${r},${g},${b}`; };
 /** 走る速さ（論理px/秒）。最初はゆっくりで、約3分かけて最高速になる */
 const START_SPEED = 200, MAX_SPEED = 520;
 /**
@@ -417,7 +418,7 @@ export function createOsanpoRun(root: HTMLElement, opts: OsanpoRunOptions): () =
   const S = {
     state: "ready" as GameState, time: 0, t: 0, speed: 90, dist: 0, bonus: 0, treats: 0, clock: STAGE.clock, cam: 0, bgCam: 0, bgV: 0,
     srPlus: 0, pigeonsRun: 0, slidesRun: 0, greetsRun: 0, routeCalm: 0, routeRisky: 0, bonusBest: 0, missionCoins: 0, missionsNow: [] as string[], stomps: 0, digs: 0,
-    memo: null as null | { at: number; photo: number; passed: boolean }, memoT: 20,
+    memo: null as null | { x: number; y: number; photo: number; passed: boolean; t: number }, memoT: 13,
     stepT: 0, fork: null as null | { at: number }, route: null as null | RouteState, forkT: 40,
     next: 400, shield: false, chain: 0, chainT: 0, mult: 1, maxMult: 1, paused: false, deadT: 0, introT: 0,
     haul: new Map<string, number>(), happyT: 0, calm: store.get("calm") === "1",
@@ -689,7 +690,7 @@ export function createOsanpoRun(root: HTMLElement, opts: OsanpoRunOptions): () =
         case "combo": [659, 784, 988].forEach((f, i) => tone(f, 0.1, "square", 0.035, null, d + i * 0.06)); break;
         case "weather": tone(1046, 0.5, "triangle", 0.04, null, d); tone(1568, 0.6, "sine", 0.03, null, d + 0.1); break;
         case "pace": tone(620, 0.3, "triangle", 0.05, 300, d); break;
-        case "revive": [523, 659, 784].forEach((f) => tone(f, 0.6, "sine", 0.035, null, d)); tone(1046, 0.5, "triangle", 0.03, null, d + 0.2); break;
+        case "bonus": [523, 659, 784].forEach((f) => tone(f, 0.6, "sine", 0.035, null, d)); tone(1046, 0.5, "triangle", 0.03, null, d + 0.2); break;
       }
     },
   };
@@ -1019,10 +1020,10 @@ export function createOsanpoRun(root: HTMLElement, opts: OsanpoRunOptions): () =
     }
     S.next = (170 + S.speed * 0.55 + Math.random() * S.speed * 0.8) * (rush ? 0.68 : 1) * routeGap() + extra;
   }
-  /* ---------- 思い出の看板（自分のおでかけ写真） ---------- */
+  /* ---------- 思い出の写真（自分のおでかけ写真を飛行機が運ぶ） ---------- */
   type MemoryPhoto = { img: HTMLImageElement; name: string; pref: string; tall: boolean };
   const memoryPhotos: MemoryPhoto[] = [];
-  // 読み込めた写真だけ使う。縦長かどうかで看板の向きを決める
+  // 読み込めた写真だけ使う。縦長かどうかで枠の向きを決める
   for (const p of opts.memoryPhotos ?? []) {
     const img = new Image();
     img.decoding = "async";
@@ -1040,55 +1041,82 @@ export function createOsanpoRun(root: HTMLElement, opts: OsanpoRunOptions): () =
     }
     return memoryOrder.pop()!;
   }
+  /** 飛行機の流れる速さ（画面の px/秒）。道より遅く、空をゆっくり横切る */
+  const planeSpeed = () => 70 + S.speed * 0.22;
+  /** 写真の大きさ。空の広さに合わせて、横長は最大240×180、縦長は最大165×220 */
+  function memorySize(ph: MemoryPhoto): { w: number; h: number } {
+    const maxW = Math.min(ph.tall ? 165 : 240, VW * (ph.tall ? 0.42 : 0.6));
+    const maxH = Math.max(70, GROUND - 120 - 60);
+    let w = maxW, h = ph.tall ? (w * 4) / 3 : (w * 3) / 4;
+    if (h > maxH) { h = maxH; w = ph.tall ? (h * 3) / 4 : (h * 4) / 3; }
+    return { w, h };
+  }
   function tickMemory(dt: number): void {
     if (S.memo) {
-      if (!S.memo.passed && S.dist >= S.memo.at) {
-        S.memo.passed = true;
-        const ph = memoryPhotos[S.memo.photo];
+      const m = S.memo;
+      m.x -= planeSpeed() * dt; m.t += dt;
+      if (!m.passed && m.x <= P.x) {
+        m.passed = true;
+        const ph = memoryPhotos[m.photo];
         if (ph) { const v = addPts(MEMORY_SIGN_PTS); floatText(P.x + 20, P.y - 70, `思い出：${ph.name} +${v}`, "#FFD9A8", 13); }
       }
-      if (S.dist > S.memo.at + VW) S.memo = null;
+      if (m.x < -320) S.memo = null;
       return;
     }
     if (!memoryPhotos.length) return;
     S.memoT -= dt;
-    if (S.memoT > 0 || S.fork) return;
-    S.memo = { at: S.dist + VW + 90 - P.x, photo: nextMemoryPhoto(), passed: false };
-    S.memoT = rand(25, 35);
+    if (S.memoT > 0) return;
+    S.memo = { x: VW + 140, y: Math.max(48, GROUND * rand(0.1, 0.16)), photo: nextMemoryPhoto(), passed: false, t: 0 };
+    S.memoT = rand(17, 23);
   }
   /**
-   * 木の枠に写真を入れた看板。下の札にスポット名と都道府県。
-   * 横向き（横4:縦3）は脚2本、縦向き（横3:縦4）は真ん中の支柱1本で立てる
+   * 空を横切る飛行機に、写真がロープでぶら下がって運ばれてくる。写真の下にスポット名と都道府県の札。
+   * 写真は道や障害物より奥に描くので、アイテムや障害物を隠さない
    */
   function drawMemory(c: Ctx, e: Env): void {
-    if (!S.memo) return;
-    const ph = memoryPhotos[S.memo.photo];
+    const m = S.memo;
+    if (!m) return;
+    const ph = memoryPhotos[m.photo];
     if (!ph) return;
-    const x = P.x + (S.memo.at - S.dist);
-    const pw = ph.tall ? 90 : 140, phh = ph.tall ? 120 : 105, fr = 7, bw = pw + fr * 2, bh = phh + fr * 2;
-    if (x + bw / 2 < -20 || x - bw / 2 > VW + 20) return;
-    const top = GROUND - 38 - bh, left = x - bw / 2;
-    if (e.night > 0.2) glow(c, x, top + bh / 2, bw * 0.8, "255,226,170", 0.35 * e.night);
-    const wood = mix(hex("#9A6B43"), e.near, 0.1 + e.night * 0.4);
-    c.fillStyle = rgb(shade(wood, -0.15));
-    if (ph.tall) c.fillRect(x - 4, top + bh - 2, 8, GROUND - (top + bh) + 2);
-    else {
-      c.fillRect(left + 18, top + bh - 2, 7, GROUND - (top + bh) + 2);
-      c.fillRect(left + bw - 25, top + bh - 2, 7, GROUND - (top + bh) + 2);
-    }
-    c.fillStyle = rgb(wood); rr(c, left, top, bw, bh, 4); c.fill();
-    c.save();
-    rr(c, left + fr, top + fr, pw, phh, 2); c.clip();
-    // 枠（4:3 / 3:4）いっぱいに、はみ出す分は中央で切って貼る
-    const iw = ph.img.naturalWidth, ih = ph.img.naturalHeight, k = Math.max(pw / iw, phh / ih);
-    c.drawImage(ph.img, left + fr + (pw - iw * k) / 2, top + fr + (phh - ih * k) / 2, iw * k, ih * k);
-    if (e.night > 0.05) { c.fillStyle = `rgba(20,14,40,${(e.night * 0.35).toFixed(3)})`; c.fillRect(left, top, bw, bh); }
+    const { w, h } = memorySize(ph), fr = 5;
+    const bob = RM ? 0 : Math.sin(m.t * 1.6) * 3, swing = RM ? 0 : Math.sin(m.t * 1.3 + 0.8) * 0.045;
+    const px = m.x, py = m.y + bob;
+    if (px - 60 > VW + 20 || px + Math.max(w, 60) < -40) return;
+    const night = e.night;
+    // 飛行機（左向きに飛ぶ小さなプロペラ機）
+    const body = mix(hex("#F4F1EA"), e.top, 0.12 + night * 0.45), accent = mix(hex("#E4572E"), e.top, 0.1 + night * 0.4);
+    c.save(); c.translate(px, py); c.rotate(-0.03 + bob * 0.004);
+    c.fillStyle = rgb(shade(body, -0.12));
+    c.beginPath(); c.moveTo(22, -2); c.lineTo(34, -16); c.lineTo(40, -16); c.lineTo(36, 0); c.closePath(); c.fill();
+    c.fillStyle = rgb(body); ell(c, 4, 0, 30, 7.5); c.fill();
+    c.fillStyle = rgb(accent); c.fillRect(-10, -1.5, 34, 3);
+    c.fillStyle = rgb(mix(hex("#9FD4FF"), e.top, 0.2 + night * 0.4)); ell(c, -12, -3, 6, 3.4); c.fill();
+    c.fillStyle = rgb(shade(body, -0.18)); c.beginPath(); c.moveTo(-2, 1); c.lineTo(14, 1); c.lineTo(8, 12); c.lineTo(0, 12); c.closePath(); c.fill();
+    c.fillStyle = rgb(accent); ell(c, -26, 0, 3, 3); c.fill();
+    const blade = RM ? 7 : Math.abs(Math.sin(S.time * 40)) * 9 + 1;
+    c.fillStyle = "rgba(60,60,70,0.55)"; ell(c, -29, 0, 1.4, blade); c.fill();
+    if (night > 0.3) { c.fillStyle = Math.sin(S.time * 6) > 0 ? "#FF5A5A" : "rgba(255,90,90,.3)"; ell(c, 36, -16, 1.6, 1.6); c.fill(); }
+    c.restore();
+    // ロープと写真（振り子のように少しゆれる）
+    const hx = px + 6, hy = py + 8, ropeL = 22;
+    c.save(); c.translate(hx, hy); c.rotate(swing);
+    const top = ropeL, left = -w / 2 - fr, bw = w + fr * 2, bh = h + fr * 2;
+    c.strokeStyle = rgb(mix(hex("#5A4A3A"), e.top, 0.2 + night * 0.4)); c.lineWidth = 1.2;
+    c.beginPath(); c.moveTo(0, 0); c.lineTo(left + 8, top); c.moveTo(0, 0); c.lineTo(left + bw - 8, top); c.stroke();
+    if (night > 0.2) glow(c, 0, top + bh / 2, bw * 0.7, "255,226,170", 0.3 * night);
+    c.fillStyle = "rgba(20,16,40,0.18)"; rr(c, left + 3, top + 4, bw, bh, 4); c.fill();
+    c.fillStyle = rgb(mix(hex("#FFFFFF"), e.top, 0.05 + night * 0.35)); rr(c, left, top, bw, bh, 4); c.fill();
+    c.save(); rr(c, left + fr, top + fr, w, h, 2); c.clip();
+    const iw = ph.img.naturalWidth, ih = ph.img.naturalHeight, k = Math.max(w / iw, h / ih);
+    c.drawImage(ph.img, left + fr + (w - iw * k) / 2, top + fr + (h - ih * k) / 2, iw * k, ih * k);
+    if (night > 0.05) { c.fillStyle = `rgba(20,14,40,${(night * 0.3).toFixed(3)})`; c.fillRect(left, top, bw, bh); }
     c.restore();
     const label = ph.pref ? `${ph.name}（${ph.pref}）` : ph.name;
-    c.font = font(10); c.textAlign = "center"; c.textBaseline = "middle";
-    const lw = Math.min(Math.max(bw + 10, 120), c.measureText(label).width + 16);
-    c.fillStyle = "rgba(246,239,228,.95)"; rr(c, x - lw / 2, top + bh + 3, lw, 16, 4); c.fill();
-    c.fillStyle = "#3A2A1C"; c.fillText(label, x, top + bh + 11.5, lw - 8);
+    c.font = font(11); c.textAlign = "center"; c.textBaseline = "middle";
+    const lw = Math.min(Math.max(bw, 120), c.measureText(label).width + 18);
+    c.fillStyle = "rgba(246,239,228,.96)"; rr(c, -lw / 2, top + bh + 4, lw, 18, 5); c.fill();
+    c.fillStyle = "#3A2A1C"; c.fillText(label, 0, top + bh + 13.5, lw - 8);
+    c.restore();
   }
 
   /* ---------- ご近所さんとのあいさつ ---------- */
@@ -1290,7 +1318,7 @@ export function createOsanpoRun(root: HTMLElement, opts: OsanpoRunOptions): () =
       return;
     }
     S.forkT -= dt;
-    if (S.forkT > 0 || S.sec !== "normal" || S.memo || obstacles.some((o) => !o.hit && !o.gone && o.x + o.w > VW - 160)) return;
+    if (S.forkT > 0 || S.sec !== "normal" || obstacles.some((o) => !o.hit && !o.gone && o.x + o.w > VW - 160)) return;
     S.fork = { at: S.dist + VW + 60 - P.x };
     S.next = Math.max(S.next, 280);
     showNote(`分かれ道！ 跳んで通ると${routeName("calm")}、そのままだと${routeName("risky")}`, 3);
@@ -2322,7 +2350,7 @@ export function createOsanpoRun(root: HTMLElement, opts: OsanpoRunOptions): () =
     if (S.stepT > 0) rows.push({ key: "steps", item: null, glyph: "👣", label: "歩数ブースト", tag: `×${STEP_BOOST_MUL}`, kind: "score", t: S.stepT, max: STEP_BOOST_SEC, count: "", desc: OSANPO_RUN_STEP_BOOSTS[0].desc });
     const clears = K.clears.reduce((n, c) => n + c.n, 0);
     if (clears) add("clears", "✦", K.clears[0]!.name, "はじく", `×${clears}`, "guard", "前から来る障害物をはじき飛ばす");
-    if (K.rushPass) add("rush", "⚡", "あずき色の風", "ラッシュ無敵", "×1", "combo", "次のラッシュを無敵で乗り切り、突破ボーナスが増える");
+    if (K.rushPass) add("rush", "⚡", "あずき色の風", "ラッシュ無敵", "×1", "bonus", "次のラッシュを無敵で乗り切り、突破ボーナスが増える");
     if (K.comboGuard) add("cguard", "♥", "コンボ守り", "コンボ守り", `×${K.comboGuard}`, "combo", "コンボが切れそうになったら防ぐ");
     if (K.miss) add("miss", "✋", "てぶくろ", "自動キャッチ", `×${K.miss}`, "collect", "取りこぼしたアイテムを自動で拾う");
     if (K.bigJumps.length) add("bigjump", "⤴", "大ジャンプ", "大ジャンプ", `×${K.bigJumps.length}`, "jump", "次のジャンプが大きくなる");
@@ -2507,7 +2535,7 @@ export function createOsanpoRun(root: HTMLElement, opts: OsanpoRunOptions): () =
     Object.assign(S, {
       state: "intro", introT: 0, roundId: newRoundId(), slowT: 0, wx: null, wxT: rand(25, 40), knocks: 0, rares: 0, skillIds: new Set<string>(), tricks: newTrickRun(), bestD: bestDistOf(STAGE_ID), passedBest: false, recordShown: false, fwT: 2,
       t: 0, speed: 0, dist: 0, bonus: 0, treats: 0, clock: STAGE.clock, srPlus: 0, pigeonsRun: 0, slidesRun: 0, greetsRun: 0, routeCalm: 0, routeRisky: 0, bonusBest: 0, missionCoins: 0, missionsNow: [], stomps: 0, digs: 0,
-      memo: null, memoT: rand(15, 25),
+      memo: null, memoT: rand(10, 17),
       stepT: 0, fork: null, route: null, forkT: rand(35, 50), next: 420, shield: false, chain: 0, chainT: 0, mult: 1, maxMult: 1,
       paused: false, deadT: 0, milestone: 100, bufT: 0, haul: new Map<string, number>(), sec: "normal", secT: 18, rain: 0, rainTarget: 0, rainT: 0,
       bones: 0, newAch: [], newKinds: [], rainWalk: 0, rushes: 0, closes: 0, bonusGot: 0,
@@ -3088,6 +3116,33 @@ export function createOsanpoRun(root: HTMLElement, opts: OsanpoRunOptions): () =
     apply(v);
   }
   /** 道に落ちているほね */
+  /**
+   * 道に落ちているアイテムのオーラ。拾うと発動するスキルの分類の色で光り、輪が回る（拾う前に何が起きるか分かるように）。
+   * スキルのないアイテムは、これまでどおりレアリティの色で光る
+   */
+  function drawItemAura(c: Ctx, item: RunItem, x: number, y: number, size: number, ph: number): void {
+    const skill = OSANPO_RUN_SKILL_BY_ID.get(item.id), R = RARITY_STYLES[item.rarity];
+    if (!skill) {
+      if (R.glow && item.rarity !== "MR") glow(c, x, y, item.rarity === "R" ? 20 : 26, R.glow, item.rarity === "R" ? 0.35 : 0.45 + Math.sin(S.time * 5 + ph) * 0.1);
+      return;
+    }
+    const col = hexRgbStr(SKILL_KIND_COLORS[skill.kind]), pulse = RM ? 0 : Math.sin(S.time * 5 + ph) * 0.08;
+    const r = size * 0.62;
+    c.save(); c.globalCompositeOperation = "lighter";
+    glow(c, x, y, r + 14, col, 0.5 + pulse);
+    c.restore();
+    c.save();
+    c.lineWidth = 2.4; c.strokeStyle = `rgba(${col},0.95)`;
+    c.beginPath(); c.arc(x, y, r, 0, Math.PI * 2); c.stroke();
+    // 回る光の点（2つ）で、止まっていても目に入りやすく
+    for (let k = 0; k < 2; k++) {
+      const a = (RM ? 0.6 : S.time * 3.2 + ph) + k * Math.PI;
+      const dx = x + Math.cos(a) * r, dy = y + Math.sin(a) * r;
+      glow(c, dx, dy, 7, col, 0.8);
+      c.fillStyle = "rgba(255,255,255,0.95)"; ell(c, dx, dy, 1.6, 1.6); c.fill();
+    }
+    c.restore();
+  }
   function drawBone(c: Ctx, x: number, y: number, k: number): void {
     c.save(); c.translate(x, y); c.rotate(-0.35); c.scale(k, k);
     c.fillStyle = "rgba(20,16,40,.25)"; rr(c, -8, -2, 16, 6, 3); c.fill();
@@ -3145,12 +3200,12 @@ export function createOsanpoRun(root: HTMLElement, opts: OsanpoRunOptions): () =
         star(c, it.x, y, r, big ? "#FF9CCB" : "#FFE08A");
         continue;
       }
-      const y = it.y + Math.sin(it.ph) * 2.2, rarity = it.item.rarity, R = RARITY_STYLES[rarity];
-      if (rarity === "MR") { c.save(); c.globalCompositeOperation = "lighter"; glow(c, it.x, y, 30, hslRgb((S.time * 120 + it.x) % 360), 0.55); c.restore(); }
-      else if (R.glow) glow(c, it.x, y, rarity === "R" ? 20 : 26, R.glow, rarity === "R" ? 0.35 : 0.45 + Math.sin(S.time * 5 + it.ph) * 0.1);
+      const y = it.y + Math.sin(it.ph) * 2.2, rarity = it.item.rarity;
       const size = (rarity === "N" ? 28 : rarity === "R" || rarity === "SR" ? 30 : 34) * (M.big ? 1.3 : 1);
+      if (rarity === "MR") { c.save(); c.globalCompositeOperation = "lighter"; glow(c, it.x, y, 30, hslRgb((S.time * 120 + it.x) % 360), 0.55); c.restore(); }
+      drawItemAura(c, it.item, it.x, y, size, it.ph);
       drawItemImg(c, it.item, it.x, y, size);
-      if (rarityIndex(rarity) >= 3 && Math.sin(S.time * 6 + it.ph) > 0.6) star(c, it.x + 12, y - 12, 3, R.color);
+      if (rarityIndex(rarity) >= 3 && Math.sin(S.time * 6 + it.ph) > 0.6) star(c, it.x + 12, y - 12, 3, RARITY_STYLES[rarity].color);
     }
     for (const o of obstacles) {
       if (o.kind === "puddle") continue;

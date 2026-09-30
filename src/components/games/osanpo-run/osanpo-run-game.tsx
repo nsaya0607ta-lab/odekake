@@ -7,6 +7,7 @@ import { setBgmSuppressed } from "@/lib/bgm-engine";
 import type { OsanpoRunStageId } from "@/lib/games/osanpo-run/config";
 import type { OsanpoRunMemoryPhoto } from "@/lib/data/osanpo-run";
 import type { OsanpoRunMission } from "@/lib/games/osanpo-run/missions";
+import { SKILL_KIND_COLORS, SKILL_KIND_LABELS, type SkillKind } from "@/lib/games/osanpo-run/skills";
 import { createOsanpoRun, type OsanpoRunResult, type RunItem } from "./engine";
 import { OsanpoRunCoop } from "./osanpo-run-coop";
 import { OSANPO_RUN_RANKING_REFRESH_EVENT, OsanpoRunRanking } from "./osanpo-run-ranking";
@@ -25,7 +26,7 @@ type Props = {
   /** 今日のミッション3つと、今日もう達成したもののID */
   missions: OsanpoRunMission[];
   missionsDone: string[];
-  /** 道ばたの看板に貼る自分のおでかけ写真 */
+  /** 飛行機が空を運んでくる自分のおでかけ写真 */
   memoryPhotos: OsanpoRunMemoryPhoto[];
 };
 
@@ -260,13 +261,20 @@ export function OsanpoRunGame({ items, usesSampleItems, unlockedStages, seriesTa
                       <li className="osr-ctl"><span><kbd>タップ</kbd></span><div><b>ジャンプ</b><small>長押しで高く、ちょんとタップすると低く跳ぶ。空中でタップすると2段・3段ジャンプ。</small></div></li>
                       <li className="osr-ctl"><span><kbd>スワイプ</kbd></span><div><b>スライディング</b><small>のれん・低い枝・つららや、低く飛ぶカラスの下をくぐれる。空中で下スワイプすると急降下。</small></div></li>
                       <li className="osr-ctl"><span><kbd>スキル</kbd></span><div><b>アイテムのスキル</b><small>アイテムを拾うと、そのアイテムのスキルが発動（全アイテムに1つずつ）。図鑑のスキルLvが高いほど強い。身代わり・バリア・復活の「守り」は1回ぶんまで（強さは 復活 ＞ バリア・身代わり。今より弱い守りは付かない）。効果は「ずかん」でアイテムを選ぶと見られる。</small></div></li>
+                      <li className="osr-ctl"><span><kbd>オーラ</kbd></span><div><b>スキルのオーラ</b><small>道に落ちているアイテムが、拾うと発動するスキルの分類の色のオーラをまとう。</small>
+                        <ul className="osr-aura-legend">
+                          {(Object.keys(SKILL_KIND_LABELS) as SkillKind[]).map((k) => (
+                            <li key={k}><i style={{ background: SKILL_KIND_COLORS[k], boxShadow: `0 0 8px ${SKILL_KIND_COLORS[k]}` }} />{SKILL_KIND_LABELS[k]}</li>
+                          ))}
+                        </ul>
+                      </div></li>
                       <li className="osr-ctl"><span><kbd>イベント</kbd></span><div><b>ボーナス・ラッシュ・雨</b><small>ときどきアイテムだらけのボーナスタイム、障害物が続くラッシュ（突破で+100）、雨や雪が来る。</small></div></li>
                       <li className="osr-ctl"><span><kbd>分かれ道</kbd></span><div><b>分かれ道</b><small>ときどき道しるべが出る。跳んで通ると上の道（公園など：障害物が少なく、ほねとアイテムが多い）、そのまま通ると下の道（商店街など：障害物が多いけど、SR以上が出やすい）。20秒で合流。</small></div></li>
                       <li className="osr-ctl"><span><kbd>歩数</kbd></span><div><b>歩数ブースト</b><small>アプリに同期した今日の歩数で、スタート時に効果が付く。3000歩〜 最初の10秒スコア×1.2、6000歩〜 バリア、10000歩〜 ボーナスタイムからスタート。</small></div></li>
                       <li className="osr-ctl"><span><kbd>お題</kbd></span><div><b>今日のミッション</b><small>毎日3つのお題。1つ達成で30コイン、3つそろうとさらに100コイン。</small></div></li>
                       <li className="osr-ctl"><span><kbd>くんくん</kbd></span><div><b>においかぎ</b><small>地面に「くんくん」マークが出たら、スライディングで通ると掘り出せる。ほね・アイテム・ときどきハズレ（古いくつした）。</small></div></li>
                       <li className="osr-ctl"><span><kbd>協力</kbd></span><div><b>協力チャレンジ</b><small>自分とフレンドの今週の合計距離で目標を目指す。達成したら「フレンド」画面で全員100コイン受け取れる。</small></div></li>
-                      <li className="osr-ctl"><span><kbd>写真</kbd></span><div><b>思い出の看板</b><small>おでかけ記録に登録した写真が、道ばたの看板になって出てくる（縦長の写真は縦向き、横長の写真は横向きの看板）。前を通ると+20。</small></div></li>
+                      <li className="osr-ctl"><span><kbd>写真</kbd></span><div><b>思い出の写真</b><small>おでかけ記録に登録した写真を、飛行機がぶら下げて空を運んでくる。真上を通ると+20。</small></div></li>
                       <li className="osr-ctl"><span><kbd>II</kbd></span><div><b>一時停止</b><small>右上のボタン。「最初から」「道を選ぶ」「設定」もここから。</small></div></li>
                     </ul>
                   </section>
