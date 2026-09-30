@@ -5,7 +5,7 @@ import { Dela_Gothic_One, M_PLUS_Rounded_1c } from "next/font/google";
 import { useEffect, useRef } from "react";
 import { setBgmSuppressed } from "@/lib/bgm-engine";
 import type { OsanpoRunStageId } from "@/lib/games/osanpo-run/config";
-import type { OsanpoRunMemoryPhoto } from "@/lib/data/osanpo-run";
+import type { OsanpoRunFriendMemory, OsanpoRunMemoryPhoto, OsanpoRunOdekake } from "@/lib/data/osanpo-run";
 import type { OsanpoRunMission } from "@/lib/games/osanpo-run/missions";
 import { SKILL_KIND_COLORS, SKILL_KIND_LABELS, type SkillKind } from "@/lib/games/osanpo-run/skills";
 import { createOsanpoRun, type OsanpoRunResult, type RunItem } from "./engine";
@@ -28,6 +28,10 @@ type Props = {
   missionsDone: string[];
   /** 飛行機が空を運んでくる自分のおでかけ写真 */
   memoryPhotos: OsanpoRunMemoryPhoto[];
+  /** 今日の記録（おでかけボーナス）と、よく行く場所（道の景色） */
+  odekake: OsanpoRunOdekake;
+  /** 気球が空を運んでくるフレンドのSNS投稿の写真 */
+  friendMemories: OsanpoRunFriendMemory[];
 };
 
 /** 1回の結果をサーバーへ送り、スコアを記録してコインを受け取る。記録できなかったときは null */
@@ -65,11 +69,40 @@ async function submitMission(missionId: string): Promise<number | null> {
   }
 }
 
+/** フレンドの投稿にいいねする（外す）。できたら true */
+async function likeFriendPost(postId: string, liked: boolean): Promise<boolean> {
+  try {
+    const response = await fetch("/api/games/osanpo-run/like", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ postId, liked }),
+    });
+    return response.ok;
+  } catch {
+    return false;
+  }
+}
+
+/** 結果カードの画像と本文をSNS（フレンドへの投稿）に載せる */
+async function shareResult(image: Blob, body: string): Promise<{ ok: true } | { ok: false; error: string }> {
+  try {
+    const form = new FormData();
+    form.append("image", image, "osanpo-run.jpg");
+    form.append("body", body);
+    const response = await fetch("/api/games/osanpo-run/share", { method: "POST", body: form });
+    const payload = (await response.json().catch(() => null)) as { error?: string } | null;
+    if (!response.ok) return { ok: false, error: payload?.error ?? "投稿できませんでした。" };
+    return { ok: true };
+  } catch {
+    return { ok: false, error: "通信できず、投稿できませんでした。" };
+  }
+}
+
 /**
  * おさんぽフレンチーの画面。骨組みだけをここで描き、動きは engine.ts に任せる。
  * プレイ中はアプリ全体のBGMを止め、ゲームの曲だけが鳴るようにする。
  */
-export function OsanpoRunGame({ items, usesSampleItems, unlockedStages, seriesTabs, categoryLabels, todaySteps, missions, missionsDone, memoryPhotos }: Props) {
+export function OsanpoRunGame({ items, usesSampleItems, unlockedStages, seriesTabs, categoryLabels, todaySteps, missions, missionsDone, memoryPhotos, odekake, friendMemories }: Props) {
   const rootRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
@@ -87,6 +120,10 @@ export function OsanpoRunGame({ items, usesSampleItems, unlockedStages, seriesTa
       missionsDone,
       onMissionClear: submitMission,
       memoryPhotos,
+      odekake,
+      friendMemories,
+      onLike: likeFriendPost,
+      onShare: shareResult,
       bodyFontFamily: bodyFont.style.fontFamily,
       onRunEnd: submitResult,
     });
@@ -94,7 +131,7 @@ export function OsanpoRunGame({ items, usesSampleItems, unlockedStages, seriesTa
       destroy();
       setBgmSuppressed(false);
     };
-  }, [items, usesSampleItems, unlockedStages, seriesTabs, categoryLabels, todaySteps, missions, missionsDone, memoryPhotos]);
+  }, [items, usesSampleItems, unlockedStages, seriesTabs, categoryLabels, todaySteps, missions, missionsDone, memoryPhotos, odekake, friendMemories]);
 
   return (
     <div ref={rootRef} className={`osr ${displayFont.variable} ${bodyFont.variable}`}>
@@ -162,6 +199,7 @@ export function OsanpoRunGame({ items, usesSampleItems, unlockedStages, seriesTa
               <div className="osr-stages" data-osr="stage-list" role="radiogroup" aria-label="ステージ" />
               <p className="osr-stage-desc" data-osr="stage-desc" />
               <div className="osr-step-boost" data-osr="step-boost" />
+              <div className="osr-odekake" data-osr="odekake" />
               <div className="osr-missions" data-osr="missions" hidden />
               <div className="osr-keys">
                 <span><kbd>タップ</kbd>でジャンプ（空中であと2回・3段まで）</span>
@@ -205,6 +243,15 @@ export function OsanpoRunGame({ items, usesSampleItems, unlockedStages, seriesTa
                 <div className="osr-haul-row" data-osr="o-haul" />
                 <p className="osr-new-line" data-osr="o-new-line" hidden />
               </div>
+              <p className="osr-odekake-line" data-osr="o-odekake" hidden />
+              <div className="osr-memo" data-osr="o-memo" hidden>
+                <p className="osr-memo-title">今日運ばれてきた思い出<small>タップで記録を見る</small></p>
+                <div className="osr-memo-list" data-osr="o-memo-list" />
+              </div>
+              <div className="osr-memo osr-fmemo" data-osr="o-fmemo" hidden>
+                <p className="osr-memo-title">フレンドの思い出<small>写真のタップで投稿を見る</small></p>
+                <div className="osr-memo-list" data-osr="o-fmemo-list" />
+              </div>
               <p className="osr-coin-line" data-osr="o-coins" hidden />
               <p className="osr-mission-line" data-osr="o-missions" hidden />
               <div className="osr-ach-row" data-osr="o-ach" hidden />
@@ -219,6 +266,17 @@ export function OsanpoRunGame({ items, usesSampleItems, unlockedStages, seriesTa
                 <button type="button" data-sheet="ach">称号</button>
                 <button type="button" data-osr="copy">コピー</button>
               </nav>
+              <button className="osr-btn osr-share-btn" data-osr="share" type="button" hidden>結果をSNSに投稿</button>
+              <div className="osr-share" data-osr="share-box" hidden>
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img data-osr="share-img" alt="投稿する結果カード" width={1080} height={1080} />
+                <textarea data-osr="share-body" maxLength={280} rows={3} aria-label="投稿する文" />
+                <p className="osr-share-msg" data-osr="share-msg" aria-live="polite" />
+                <div className="osr-btn-row">
+                  <button className="osr-btn" data-osr="share-send" type="button">投稿する</button>
+                  <button className="osr-btn osr-ghost" data-osr="share-cancel" type="button">やめる</button>
+                </div>
+              </div>
               <p className="osr-copy-note" data-osr="copy-note" hidden />
             </div>
 
@@ -274,7 +332,11 @@ export function OsanpoRunGame({ items, usesSampleItems, unlockedStages, seriesTa
                       <li className="osr-ctl"><span><kbd>お題</kbd></span><div><b>今日のミッション</b><small>毎日3つのお題。1つ達成で30コイン、3つそろうとさらに100コイン。</small></div></li>
                       <li className="osr-ctl"><span><kbd>くんくん</kbd></span><div><b>においかぎ</b><small>地面に「くんくん」マークが出たら、スライディングで通ると掘り出せる。ほね・アイテム・ときどきハズレ（古いくつした）。</small></div></li>
                       <li className="osr-ctl"><span><kbd>協力</kbd></span><div><b>協力チャレンジ</b><small>自分とフレンドの今週の合計距離で目標を目指す。達成したら「フレンド」画面で全員100コイン受け取れる。</small></div></li>
-                      <li className="osr-ctl"><span><kbd>写真</kbd></span><div><b>思い出の写真</b><small>おでかけ記録に登録した写真を、飛行機がぶら下げて空を運んでくる。真上を通ると+20。</small></div></li>
+                      <li className="osr-ctl"><span><kbd>写真</kbd></span><div><b>思い出の写真</b><small>おでかけ記録に登録した写真を、飛行機がぶら下げて空を運んでくる。真上を通ると+20。写真が空を流れているあいだは障害物が出ない。運ばれてきた写真は結果画面に並び、タップでその日の記録を開ける。</small></div></li>
+                      <li className="osr-ctl"><span><kbd>気球</kbd></span><div><b>フレンドの思い出</b><small>フレンドがSNSに投稿した写真を、気球が運んでくる。真上を通ると+20。結果画面でそのままいいねできる。</small></div></li>
+                      <li className="osr-ctl"><span><kbd>記録</kbd></span><div><b>おでかけボーナス</b><small>今日のおでかけを記録していると、その日のおさんぽはスコアがぜんぶ1.2倍（コインも増える）。</small></div></li>
+                      <li className="osr-ctl"><span><kbd>景色</kbd></span><div><b>よく行く場所の景色</b><small>最近の記録で多いカテゴリに合わせて、道ぞいに木（公園・自然）や鳥居（神社・お寺）、行ったお店の名前の看板が立つ。</small></div></li>
+                      <li className="osr-ctl"><span><kbd>投稿</kbd></span><div><b>結果をSNSに投稿</b><small>おさんぽが終わったら、スコアと思い出の写真入りの結果カードをSNSに投稿できる。</small></div></li>
                       <li className="osr-ctl"><span><kbd>II</kbd></span><div><b>一時停止</b><small>右上のボタン。「最初から」「道を選ぶ」「設定」もここから。</small></div></li>
                     </ul>
                   </section>

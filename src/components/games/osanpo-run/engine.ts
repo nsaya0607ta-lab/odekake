@@ -73,6 +73,7 @@ import {
   type Ctx, type Pigeon, type RGB,
 } from "./draw";
 import { drawRouteGate, drawRouteScene as drawRouteSceneLayer, ROUTE_GATE_HALF, type RouteTheme } from "./route-scene";
+import type { OsanpoRunFriendMemory, OsanpoRunOdekake } from "@/lib/data/osanpo-run";
 import { drawSkyLife, drawStageGround, drawStageMid, drawStageNear, type MidItem, type NearItem, type StageView } from "./stage-scene";
 
 export type RunItem = {
@@ -112,8 +113,21 @@ export type OsanpoRunOptions = {
   /** ミッションを達成したときに呼ぶ。もらえたコインの枚数を返す（記録できなかったときは null） */
   onMissionClear?: (missionId: string) => Promise<number | null>;
   /** 飛行機が空を運んでくる自分のおでかけ写真（縦長は縦向き、横長は横向きの枠になる） */
-  memoryPhotos?: { src: string; name: string; pref: string }[];
+  memoryPhotos?: { src: string; name: string; pref: string; visitId: string }[];
+  /** アプリの記録とのつながり（今日の記録でスコアボーナス・よく行く場所が道の景色に混ざる） */
+  odekake?: OsanpoRunOdekake;
+  /** 気球が空を運んでくるフレンドのSNS投稿の写真 */
+  friendMemories?: OsanpoRunFriendMemory[];
+  /** フレンドの投稿にいいねする（外す）。できたら true */
+  onLike?: (postId: string, liked: boolean) => Promise<boolean>;
+  /** 結果カードの画像と本文をSNSに投稿する */
+  onShare?: (image: Blob, body: string) => Promise<{ ok: true } | { ok: false; error: string }>;
 };
+
+/** 今日おでかけを記録していると、スコアにかかる倍率 */
+export const ODEKAKE_SCORE_MULT = 1.2;
+/** 道の景色（中景）のうち、よく行く場所のものに置きかわる最大の割合 */
+const ODEKAKE_THEME_RATE = 0.4;
 
 type Pose = "walk" | "trot" | "walk-tail" | "cheer" | "smile" | "bow-b" | "stand-happy" | "wave" | "sleep" | "lie-wave" | "bow";
 const POSES: readonly Pose[] = ["walk", "trot", "walk-tail", "cheer", "smile", "bow-b", "stand-happy", "wave", "sleep", "lie-wave", "bow"];
@@ -418,7 +432,11 @@ export function createOsanpoRun(root: HTMLElement, opts: OsanpoRunOptions): () =
   const S = {
     state: "ready" as GameState, time: 0, t: 0, speed: 90, dist: 0, bonus: 0, treats: 0, clock: STAGE.clock, cam: 0, bgCam: 0, bgV: 0,
     srPlus: 0, pigeonsRun: 0, slidesRun: 0, greetsRun: 0, routeCalm: 0, routeRisky: 0, bonusBest: 0, missionCoins: 0, missionsNow: [] as string[], stomps: 0, digs: 0,
-    memo: null as null | { x: number; y: number; photo: number; passed: boolean; t: number }, memoT: 13,
+    memo: null as null | { x: number; y: number; photo: number; friend: boolean; passed: boolean; t: number }, memoT: 13,
+    /** このおさんぽで運ばれてきた思い出の写真（memoryPhotos の番号・運ばれてきた順） */
+    memSeen: [] as number[],
+    /** このおさんぽで運ばれてきたフレンドの思い出（friendPhotos の番号） */
+    friendSeen: [] as number[],
     stepT: 0, fork: null as null | { at: number }, route: null as null | RouteState, forkT: 40,
     next: 400, shield: false, chain: 0, chainT: 0, mult: 1, maxMult: 1, paused: false, deadT: 0, introT: 0,
     haul: new Map<string, number>(), happyT: 0, calm: store.get("calm") === "1",
@@ -477,7 +495,36 @@ export function createOsanpoRun(root: HTMLElement, opts: OsanpoRunOptions): () =
       balcony: !house && Math.random() < 0.55,
     };
   }
+  /** よく行く場所のカテゴリに合わせて、中景を木・鳥居・行ったお店の看板に置きかえる（無ければ null） */
+  function genThemedMid(x: number): MidItem | null {
+    const th = odekake?.themes;
+    if (!th) return null;
+    const r = Math.random() / ODEKAKE_THEME_RATE;
+    const base = genBuilding(x);
+    if (r < th.green) {
+      if (STAGE_ID === "hiking") return null;
+      const pine = STAGE_ID === "snow" && Math.random() < 0.6;
+      return { ...base, type: pine ? "pine" : "round", w: pine ? rand(26, 40) : rand(34, 54), h: pine ? rand(60, 120) : rand(46, 76), gap: rand(-6, 8), tone: rand(-0.08, 0.08) };
+    }
+    if (r < th.green + th.shrine) return { ...base, type: "torii", w: 70, h: 96, gap: rand(10, 30), tone: 0 };
+    const names = odekake?.shopNames ?? [];
+    if (r < th.green + th.shrine + th.shop && names.length && STAGE_ID !== "hiking") {
+      const label = pickOne(names);
+      if (STAGE_ID === "summer") {
+        return {
+          ...base, type: "stall", w: rand(76, 90), h: rand(46, 56), gap: rand(6, 16), tone: rand(-0.05, 0.05), label,
+          colors: pickOne([["#D63A3A", "#FFFFFF"], ["#2F6FD0", "#FFFFFF"], ["#E88A1A", "#FFF3D6"], ["#2E9A6A", "#FFFFFF"]] as const).slice() as [string, string],
+        };
+      }
+      // 屋上に、行ったお店の名前の看板を立てたビル
+      const w = rand(72, 100), h = rand(112, 150), cols = Math.max(1, Math.floor((w - 12) / 13)), rows = Math.max(1, Math.floor((h - 18) / 17));
+      return { ...base, type: "building", w, h, cols, rows, lit: Array.from({ length: cols * rows }, () => Math.random() < 0.5), roof: "flat", label };
+    }
+    return null;
+  }
   function genMid(x: number): MidItem {
+    const themed = genThemedMid(x);
+    if (themed) return themed;
     const base = genBuilding(x);
     if (STAGE_ID === "hiking") {
       const pine = Math.random() < 0.6;
@@ -949,10 +996,23 @@ export function createOsanpoRun(root: HTMLElement, opts: OsanpoRunOptions): () =
     for (let i = 0; i < 8; i++) pickups.push(mkPickup(X + i * 28, GROUND - 60 - Math.sin((i / 7) * Math.PI * 2) * 40));
     return 90;
   }
+  /**
+   * 思い出の写真（飛行機・気球）が空を流れているあいだは障害物を出さず、写真を見ながら歩けるようにする。
+   * かわりに、ほね・アイテムの列やにおいかぎの場所を置く。次に置くまでの距離を返す
+   */
+  function spawnMemoryCalm(X: number): number {
+    const r = Math.random();
+    if (r < 0.2) { sniffs.push({ x: X + 30, dug: false, hinted: false, ph: Math.random() * 6 }); return 200 + S.speed * 0.4; }
+    const h = r < 0.6 ? 0 : rand(60, 96);
+    for (let i = 0; i < 5; i++) pickups.push(mkPickup(X + i * 30, GROUND - 18 - h));
+    return 190 + S.speed * 0.5 + Math.random() * S.speed * 0.5;
+  }
   function spawn(): void {
     const X = VW + 40, t = S.t;
     let extra = 0;
     if (S.sec === "bonus") { extra = spawnBonusItems(X); S.next = 110 + extra + Math.random() * 80; return; }
+    // ラッシュ中は、写真が流れていても障害物を出す（写真のほうはラッシュ中に出ない）
+    if (S.memo && S.sec !== "rush") { S.next = spawnMemoryCalm(X); return; }
     const rush = S.sec === "rush", rain = S.rain > 0.3;
     const kind = pickWeighted(([
       ["cone", 3], ["puddle", rain ? 5 : 2], ["bike", t > 6 ? 2.2 : 0], ["crow", t > 12 ? 2 : 0], ["double", t > 24 || rush ? 1.6 : 0],
@@ -1021,14 +1081,39 @@ export function createOsanpoRun(root: HTMLElement, opts: OsanpoRunOptions): () =
     S.next = (170 + S.speed * 0.55 + Math.random() * S.speed * 0.8) * (rush ? 0.68 : 1) * routeGap() + extra;
   }
   /* ---------- 思い出の写真（自分のおでかけ写真を飛行機が運ぶ） ---------- */
-  type MemoryPhoto = { img: HTMLImageElement; name: string; pref: string; tall: boolean };
+  type MemoryPhoto = { img: HTMLImageElement; src: string; name: string; pref: string; visitId: string; tall: boolean };
   const memoryPhotos: MemoryPhoto[] = [];
+  /** フレンドの思い出（SNSの写真つき投稿）。気球が運んでくる */
+  type FriendPhoto = { img: HTMLImageElement; src: string; postId: string; author: string; spot: string; liked: boolean; tall: boolean };
+  const friendPhotos: FriendPhoto[] = [];
+  for (const p of opts.friendMemories ?? []) {
+    const img = new Image();
+    img.decoding = "async";
+    img.onload = () => {
+      if (img.naturalWidth && img.naturalHeight) friendPhotos.push({ img, src: p.src, postId: p.postId, author: p.author, spot: p.spot, liked: p.liked, tall: img.naturalHeight > img.naturalWidth });
+    };
+    img.src = p.src;
+  }
+  let friendOrder: number[] = [];
+  function nextFriendPhoto(): number {
+    if (!friendOrder.length) {
+      friendOrder = friendPhotos.map((_, i) => i);
+      for (let i = friendOrder.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [friendOrder[i], friendOrder[j]] = [friendOrder[j]!, friendOrder[i]!]; }
+    }
+    return friendOrder.pop()!;
+  }
+  /** 空を運ばれている写真（自分のものか、フレンドのものか） */
+  const memoPhoto = (m: { photo: number; friend: boolean }): { img: HTMLImageElement; tall: boolean } | undefined => (m.friend ? friendPhotos[m.photo] : memoryPhotos[m.photo]);
+  /** 自分の写真もフレンドの写真もあるとき、フレンドの気球になる割合 */
+  const FRIEND_MEMO_RATE = 0.4;
+  /** 気球は上の表示に隠れないよう、飛行機よりこれだけ低いところを飛ぶ */
+  const FRIEND_BALLOON_DROP = 44;
   // 読み込めた写真だけ使う。縦長かどうかで枠の向きを決める
   for (const p of opts.memoryPhotos ?? []) {
     const img = new Image();
     img.decoding = "async";
     img.onload = () => {
-      if (img.naturalWidth && img.naturalHeight) memoryPhotos.push({ img, name: p.name, pref: p.pref, tall: img.naturalHeight > img.naturalWidth });
+      if (img.naturalWidth && img.naturalHeight) memoryPhotos.push({ img, src: p.src, name: p.name, pref: p.pref, visitId: p.visitId, tall: img.naturalHeight > img.naturalWidth });
     };
     img.src = p.src;
   }
@@ -1044,9 +1129,10 @@ export function createOsanpoRun(root: HTMLElement, opts: OsanpoRunOptions): () =
   /** 飛行機の流れる速さ（画面の px/秒）。道より遅く、空をゆっくり横切る */
   const planeSpeed = () => 70 + S.speed * 0.22;
   /** 写真の大きさ。空の広さに合わせて、横長は最大240×180、縦長は最大165×220 */
-  function memorySize(ph: MemoryPhoto): { w: number; h: number } {
+  function memorySize(ph: { tall: boolean }, friend = false): { w: number; h: number } {
     const maxW = Math.min(ph.tall ? 165 : 240, VW * (ph.tall ? 0.42 : 0.6));
-    const maxH = Math.max(70, GROUND - 120 - 60);
+    // 気球は飛行機より背が高いので、そのぶん写真を低く抑える
+    const maxH = Math.max(70, GROUND - 120 - 60 - (friend ? FRIEND_BALLOON_DROP + 12 : 0));
     let w = maxW, h = ph.tall ? (w * 4) / 3 : (w * 3) / 4;
     if (h > maxH) { h = maxH; w = ph.tall ? (h * 3) / 4 : (h * 4) / 3; }
     return { w, h };
@@ -1057,16 +1143,25 @@ export function createOsanpoRun(root: HTMLElement, opts: OsanpoRunOptions): () =
       m.x -= planeSpeed() * dt; m.t += dt;
       if (!m.passed && m.x <= P.x) {
         m.passed = true;
-        const ph = memoryPhotos[m.photo];
-        if (ph) { const v = addPts(MEMORY_SIGN_PTS); floatText(P.x + 20, P.y - 70, `思い出：${ph.name} +${v}`, "#FFD9A8", 13); }
+        if (m.friend) {
+          const fp = friendPhotos[m.photo];
+          if (fp) { const v = addPts(MEMORY_SIGN_PTS); floatText(P.x + 20, P.y - 70, `${fp.author}さんの思い出 +${v}`, "#FFB3C7", 13); }
+        } else {
+          const ph = memoryPhotos[m.photo];
+          if (ph) { const v = addPts(MEMORY_SIGN_PTS); floatText(P.x + 20, P.y - 70, `思い出：${ph.name} +${v}`, "#FFD9A8", 13); }
+        }
       }
       if (m.x < -320) S.memo = null;
       return;
     }
-    if (!memoryPhotos.length) return;
+    if (!memoryPhotos.length && !friendPhotos.length) return;
     S.memoT -= dt;
-    if (S.memoT > 0) return;
-    S.memo = { x: VW + 140, y: Math.max(48, GROUND * rand(0.1, 0.16)), photo: nextMemoryPhoto(), passed: false, t: 0 };
+    // 写真が流れているあいだは障害物が出ないので、ラッシュ中は待つ
+    if (S.memoT > 0 || S.sec === "rush") return;
+    const friend = friendPhotos.length > 0 && (!memoryPhotos.length || Math.random() < FRIEND_MEMO_RATE);
+    S.memo = { x: VW + 140, y: Math.max(48, GROUND * rand(0.1, 0.16)), photo: friend ? nextFriendPhoto() : nextMemoryPhoto(), friend, passed: false, t: 0 };
+    const seen = friend ? S.friendSeen : S.memSeen;
+    if (!seen.includes(S.memo.photo)) seen.push(S.memo.photo);
     S.memoT = rand(17, 23);
   }
   /**
@@ -1076,13 +1171,14 @@ export function createOsanpoRun(root: HTMLElement, opts: OsanpoRunOptions): () =
   function drawMemory(c: Ctx, e: Env): void {
     const m = S.memo;
     if (!m) return;
-    const ph = memoryPhotos[m.photo];
+    const ph = memoPhoto(m);
     if (!ph) return;
-    const { w, h } = memorySize(ph), fr = 5;
+    const { w, h } = memorySize(ph, m.friend), fr = 5;
     const bob = RM ? 0 : Math.sin(m.t * 1.6) * 3, swing = RM ? 0 : Math.sin(m.t * 1.3 + 0.8) * 0.045;
     const px = m.x, py = m.y + bob;
     if (px - 60 > VW + 20 || px + Math.max(w, 60) < -40) return;
     const night = e.night;
+    if (m.friend) { drawFriendBalloon(c, e, px, py + FRIEND_BALLOON_DROP, m.t, friendPhotos[m.photo]!, w, h); return; }
     // 飛行機（左向きに飛ぶ小さなプロペラ機）
     const body = mix(hex("#F4F1EA"), e.top, 0.12 + night * 0.45), accent = mix(hex("#E4572E"), e.top, 0.1 + night * 0.4);
     c.save(); c.translate(px, py); c.rotate(-0.03 + bob * 0.004);
@@ -1111,11 +1207,56 @@ export function createOsanpoRun(root: HTMLElement, opts: OsanpoRunOptions): () =
     c.drawImage(ph.img, left + fr + (w - iw * k) / 2, top + fr + (h - ih * k) / 2, iw * k, ih * k);
     if (night > 0.05) { c.fillStyle = `rgba(20,14,40,${(night * 0.3).toFixed(3)})`; c.fillRect(left, top, bw, bh); }
     c.restore();
-    const label = ph.pref ? `${ph.name}（${ph.pref}）` : ph.name;
+    const mine = memoryPhotos[m.photo]!;
+    const label = mine.pref ? `${mine.name}（${mine.pref}）` : mine.name;
     c.font = font(11); c.textAlign = "center"; c.textBaseline = "middle";
     const lw = Math.min(Math.max(bw, 120), c.measureText(label).width + 18);
     c.fillStyle = "rgba(246,239,228,.96)"; rr(c, -lw / 2, top + bh + 4, lw, 18, 5); c.fill();
     c.fillStyle = "#3A2A1C"; c.fillText(label, 0, top + bh + 13.5, lw - 8);
+    c.restore();
+  }
+
+  /** フレンドの思い出：カラフルな気球のかごから写真がぶら下がる。札には投稿した人の名前 */
+  function drawFriendBalloon(c: Ctx, e: Env, px: number, py: number, t: number, fp: FriendPhoto, w: number, h: number): void {
+    const night = e.night, fr = 5;
+    const swing = RM ? 0 : Math.sin(t * 1.1 + 0.4) * 0.04;
+    const tone = (col: string) => rgb(mix(hex(col), e.top, 0.1 + night * 0.4));
+    // 気球（上下に少し浮き沈みする）
+    const bx = px, by = py - 30, R = 30;
+    c.save();
+    c.fillStyle = tone("#FF7EB6");
+    c.beginPath(); c.moveTo(bx - R * 0.55, by + R * 0.78); c.bezierCurveTo(bx - R * 1.2, by + R * 0.2, bx - R * 1.05, by - R, bx, by - R); c.bezierCurveTo(bx + R * 1.05, by - R, bx + R * 1.2, by + R * 0.2, bx + R * 0.55, by + R * 0.78); c.closePath(); c.fill();
+    c.save(); c.clip();
+    c.fillStyle = tone("#FFE08A"); c.fillRect(bx - R * 0.42, by - R, R * 0.28, R * 2);
+    c.fillStyle = tone("#9BE7FF"); c.fillRect(bx + R * 0.14, by - R, R * 0.28, R * 2);
+    c.fillStyle = "rgba(255,255,255,0.28)"; ell(c, bx - R * 0.45, by - R * 0.45, R * 0.22, R * 0.4, -0.4); c.fill();
+    c.restore();
+    // かご
+    const kt = by + R + 8;
+    c.strokeStyle = rgb(mix(hex("#5A4A3A"), e.top, 0.2 + night * 0.4)); c.lineWidth = 1;
+    c.beginPath(); c.moveTo(bx - R * 0.5, by + R * 0.8); c.lineTo(bx - 7, kt); c.moveTo(bx + R * 0.5, by + R * 0.8); c.lineTo(bx + 7, kt); c.stroke();
+    c.fillStyle = tone("#A8744A"); rr(c, bx - 8, kt, 16, 10, 2); c.fill();
+    c.fillStyle = tone("#8A5A34"); c.fillRect(bx - 8, kt + 3, 16, 1.4);
+    c.restore();
+    // ロープと写真
+    const hx = bx, hy = kt + 10, ropeL = 16;
+    c.save(); c.translate(hx, hy); c.rotate(swing);
+    const top = ropeL, left = -w / 2 - fr, bw = w + fr * 2, bh = h + fr * 2;
+    c.strokeStyle = rgb(mix(hex("#5A4A3A"), e.top, 0.2 + night * 0.4)); c.lineWidth = 1.2;
+    c.beginPath(); c.moveTo(0, 0); c.lineTo(left + 8, top); c.moveTo(0, 0); c.lineTo(left + bw - 8, top); c.stroke();
+    if (night > 0.2) glow(c, 0, top + bh / 2, bw * 0.7, "255,190,220", 0.3 * night);
+    c.fillStyle = "rgba(20,16,40,0.18)"; rr(c, left + 3, top + 4, bw, bh, 4); c.fill();
+    c.fillStyle = rgb(mix(hex("#FFF4F8"), e.top, 0.05 + night * 0.35)); rr(c, left, top, bw, bh, 4); c.fill();
+    c.save(); rr(c, left + fr, top + fr, w, h, 2); c.clip();
+    const iw = fp.img.naturalWidth, ih = fp.img.naturalHeight, k = Math.max(w / iw, h / ih);
+    c.drawImage(fp.img, left + fr + (w - iw * k) / 2, top + fr + (h - ih * k) / 2, iw * k, ih * k);
+    if (night > 0.05) { c.fillStyle = `rgba(20,14,40,${(night * 0.3).toFixed(3)})`; c.fillRect(left, top, bw, bh); }
+    c.restore();
+    const label = fp.spot ? `${fp.author}さん・${fp.spot}` : `${fp.author}さんの思い出`;
+    c.font = font(11); c.textAlign = "center"; c.textBaseline = "middle";
+    const lw = Math.min(Math.max(bw, 120), c.measureText(label).width + 18);
+    c.fillStyle = "rgba(255,226,238,.96)"; rr(c, -lw / 2, top + bh + 4, lw, 18, 5); c.fill();
+    c.fillStyle = "#5A1E3A"; c.fillText(label, 0, top + bh + 13.5, lw - 8);
     c.restore();
   }
 
@@ -2493,8 +2634,34 @@ export function createOsanpoRun(root: HTMLElement, opts: OsanpoRunOptions): () =
       })
       .catch(() => { el.dataset.state = "error"; el.textContent = "通信できず、コインを受け取れませんでした"; });
   }
-  /** 歩いた距離の点（1mごとに METER_PTS 点）＋ 拾ったもの・スキルなどの点 */
-  const score = () => Math.floor(S.dist / 50) * METER_PTS + S.bonus;
+  /** 今日おでかけを記録していれば、スコア全体に ODEKAKE_SCORE_MULT がかかる */
+  const odekake = opts.odekake ?? null;
+  const odekakeMult = odekake?.recordedToday ? ODEKAKE_SCORE_MULT : 1;
+  /** 歩いた距離の点（1mごとに METER_PTS 点）＋ 拾ったもの・スキルなどの点（おでかけボーナスの倍率込み） */
+  const score = () => Math.floor((Math.floor(S.dist / 50) * METER_PTS + S.bonus) * odekakeMult);
+  /* ---------- おでかけボーナス（今日の記録）と、よく行く場所の景色 ---------- */
+  function renderOdekake(): void {
+    const box = $("odekake");
+    box.replaceChildren();
+    const head = document.createElement("b");
+    head.textContent = odekake?.recordedToday ? `📍 おでかけボーナス スコア×${ODEKAKE_SCORE_MULT}` : "📍 おでかけボーナス";
+    const note = document.createElement("small");
+    if (odekake?.recordedToday) {
+      note.textContent = "今日のおでかけを記録ずみ。今日のおさんぽは、スコアがぜんぶ" + `${ODEKAKE_SCORE_MULT}倍！`;
+    } else {
+      note.append(`今日のおでかけを記録すると、その日のスコアが${ODEKAKE_SCORE_MULT}倍に。`);
+      const a = document.createElement("a"); a.href = "/add"; a.textContent = "記録する";
+      note.append(" ", a);
+    }
+    box.dataset.on = odekake?.recordedToday ? "1" : "0";
+    box.append(head, note);
+    if (odekake?.topLabels.length) {
+      const scene = document.createElement("small");
+      scene.className = "osr-odekake-scene";
+      scene.textContent = `よく行く「${odekake.topLabels.slice(0, 2).join("」「")}」が、道の景色に出てくる`;
+      box.appendChild(scene);
+    }
+  }
   /* ---------- 歩数ブースト（今日の歩数に応じてスタート時に付く） ---------- */
   const todaySteps = typeof opts.todaySteps === "number" ? opts.todaySteps : null;
   const stepLv = stepBoostLevel(todaySteps);
@@ -2535,7 +2702,7 @@ export function createOsanpoRun(root: HTMLElement, opts: OsanpoRunOptions): () =
     Object.assign(S, {
       state: "intro", introT: 0, roundId: newRoundId(), slowT: 0, wx: null, wxT: rand(25, 40), knocks: 0, rares: 0, skillIds: new Set<string>(), tricks: newTrickRun(), bestD: bestDistOf(STAGE_ID), passedBest: false, recordShown: false, fwT: 2,
       t: 0, speed: 0, dist: 0, bonus: 0, treats: 0, clock: STAGE.clock, srPlus: 0, pigeonsRun: 0, slidesRun: 0, greetsRun: 0, routeCalm: 0, routeRisky: 0, bonusBest: 0, missionCoins: 0, missionsNow: [], stomps: 0, digs: 0,
-      memo: null, memoT: rand(10, 17),
+      memo: null, memoT: rand(10, 17), memSeen: [], friendSeen: [],
       stepT: 0, fork: null, route: null, forkT: rand(35, 50), next: 420, shield: false, chain: 0, chainT: 0, mult: 1, maxMult: 1,
       paused: false, deadT: 0, milestone: 100, bufT: 0, haul: new Map<string, number>(), sec: "normal", secT: 18, rain: 0, rainTarget: 0, rainT: 0,
       bones: 0, newAch: [], newKinds: [], rainWalk: 0, rushes: 0, closes: 0, bonusGot: 0,
@@ -2621,6 +2788,172 @@ export function createOsanpoRun(root: HTMLElement, opts: OsanpoRunOptions): () =
     };
     requestAnimationFrame(step);
   }
+  /** このおさんぽで飛行機が運んできた写真を並べ、タップでその日の訪問記録を開けるようにする */
+  function renderMemoryResult(): void {
+    const list = $("o-memo-list");
+    list.replaceChildren();
+    const seen = S.memSeen.map((i) => memoryPhotos[i]).filter((ph): ph is MemoryPhoto => Boolean(ph)).slice(0, 6);
+    for (const ph of seen) {
+      const a = document.createElement("a");
+      a.href = `/visits/${encodeURIComponent(ph.visitId)}`;
+      a.className = "osr-memo-card";
+      a.setAttribute("aria-label", `${ph.name}の記録を見る`);
+      const img = document.createElement("img");
+      img.src = ph.src; img.alt = ""; img.loading = "lazy"; img.width = 64; img.height = 64;
+      const name = document.createElement("span"); name.textContent = ph.name;
+      a.append(img, name);
+      list.appendChild(a);
+    }
+    $("o-memo").hidden = seen.length === 0;
+    renderFriendMemoryResult();
+  }
+  /** フレンドの思い出を並べ、その場でいいねできるようにする（写真のタップで投稿を開く） */
+  function renderFriendMemoryResult(): void {
+    const list = $("o-fmemo-list");
+    list.replaceChildren();
+    const seen = S.friendSeen.map((i) => friendPhotos[i]).filter((fp): fp is FriendPhoto => Boolean(fp)).slice(0, 6);
+    for (const fp of seen) {
+      const card = document.createElement("div");
+      card.className = "osr-memo-card osr-fmemo-card";
+      const a = document.createElement("a");
+      a.href = `/sns/posts/${encodeURIComponent(fp.postId)}`;
+      a.setAttribute("aria-label", `${fp.author}さんの投稿を見る`);
+      const img = document.createElement("img");
+      img.src = fp.src; img.alt = ""; img.loading = "lazy"; img.width = 64; img.height = 64;
+      const name = document.createElement("span"); name.textContent = `${fp.author}さん`;
+      a.append(img, name);
+      const like = document.createElement("button");
+      like.type = "button"; like.className = "osr-like";
+      const paint = () => {
+        like.textContent = fp.liked ? "♥ いいね済み" : "♡ いいね";
+        like.setAttribute("aria-pressed", fp.liked ? "true" : "false");
+      };
+      paint();
+      like.addEventListener("click", () => {
+        if (!opts.onLike || like.disabled) return;
+        const next = !fp.liked;
+        like.disabled = true;
+        fp.liked = next; paint();
+        void opts.onLike(fp.postId, next).then((ok) => {
+          if (!ok) { fp.liked = !next; paint(); }
+          like.disabled = false;
+        });
+      });
+      card.append(a, like);
+      list.appendChild(card);
+    }
+    $("o-fmemo").hidden = seen.length === 0;
+  }
+
+  /* ---------- 結果カードをSNSに投稿 ---------- */
+  let shareBlob: Blob | null = null, shareUrl: string | null = null, sharing = false;
+  function resetShare(): void {
+    if (shareUrl) URL.revokeObjectURL(shareUrl);
+    shareBlob = null; shareUrl = null; sharing = false;
+    $("share-box").hidden = true;
+    $("share-msg").textContent = "";
+    $<HTMLButtonElement>("share-send").disabled = false;
+    $("share").hidden = !opts.onShare;
+  }
+  /** 結果カード（1080×1080）：いまのゲーム画面を背景に、スコア・ランク・距離と、運ばれてきた思い出の写真 */
+  function drawShareCard(): HTMLCanvasElement | null {
+    const r = S.lastResult;
+    if (!r) return null;
+    const W = 1080, cv = document.createElement("canvas");
+    cv.width = W; cv.height = W;
+    const c = cv.getContext("2d");
+    if (!c) return null;
+    // 背景：いまの道の景色（上 62%）。犬の足もとが下のほうに来るように切り出す
+    const topH = Math.round(W * 0.62), px = cvs.width / VW;
+    const sw = Math.min(cvs.width, (cvs.height * W) / topH), sh = (sw * topH) / W;
+    const sx = (cvs.width - sw) / 2, sy = clamp(GROUND * px - sh * 0.8, 0, Math.max(0, cvs.height - sh));
+    c.fillStyle = "#2A2350"; c.fillRect(0, 0, W, W);
+    try { c.drawImage(cvs, sx, sy, sw, sh, 0, 0, W, topH); } catch { /* 描けなければ単色のまま */ }
+    const fade = c.createLinearGradient(0, topH - 160, 0, topH);
+    fade.addColorStop(0, "rgba(33,26,64,0)"); fade.addColorStop(1, "rgba(33,26,64,0.85)");
+    c.fillStyle = fade; c.fillRect(0, topH - 160, W, 160);
+    // 下の結果パネル
+    c.fillStyle = "#211A40"; c.fillRect(0, topH, W, W - topH);
+    c.textBaseline = "alphabetic";
+    c.fillStyle = "#FFC857"; c.font = `800 44px ${opts.bodyFontFamily}`; c.textAlign = "left";
+    c.fillText("おさんぽフレンチー", 60, topH + 74);
+    c.fillStyle = "#CFC6EE"; c.font = `500 32px ${opts.bodyFontFamily}`;
+    c.fillText(`${STAGE.name} ・ ${fmtClock(S.clock)}帰宅`, 60, topH + 124);
+    c.fillStyle = "#FFFFFF"; c.font = `800 150px ${opts.bodyFontFamily}`;
+    c.fillText(r.score.toLocaleString(), 56, topH + 290);
+    const scoreW = c.measureText(r.score.toLocaleString()).width;
+    c.fillStyle = "#CFC6EE"; c.font = `800 40px ${opts.bodyFontFamily}`;
+    c.fillText("点", 70 + scoreW, topH + 290);
+    c.font = `500 34px ${opts.bodyFontFamily}`;
+    c.fillText(`${r.m}m ・ アイテム${r.items}こ${odekakeMult > 1 ? ` ・ おでかけボーナス×${ODEKAKE_SCORE_MULT}` : ""}`, 60, topH + 356);
+    // ランクのまる
+    const rank = OSANPO_RUN_RANKS.find((x) => x.label === r.rank);
+    const rx = W - 150, ry = topH + 190;
+    c.strokeStyle = rank?.color ?? "#FFC857"; c.lineWidth = 12;
+    c.beginPath(); c.arc(rx, ry, 92, 0, Math.PI * 2); c.stroke();
+    c.fillStyle = rank?.color ?? "#FFC857"; c.textAlign = "center"; c.font = `800 96px ${opts.bodyFontFamily}`;
+    c.fillText(r.rank, rx, ry + 34);
+    // 運ばれてきた思い出の写真（1枚目）をポラロイド風に
+    const ph = memoryPhotos[S.memSeen[0] ?? -1];
+    if (ph) {
+      const pw = ph.tall ? 240 : 300, phh = ph.tall ? 320 : 225, fx = W - pw - 90, fy = 70;
+      c.save(); c.translate(fx + pw / 2, fy + phh / 2); c.rotate(0.06);
+      c.fillStyle = "rgba(0,0,0,0.25)"; c.fillRect(-pw / 2 - 10, -phh / 2 - 6, pw + 28, phh + 78);
+      c.fillStyle = "#FFFFFF"; c.fillRect(-pw / 2 - 16, -phh / 2 - 16, pw + 32, phh + 84);
+      const iw = ph.img.naturalWidth, ih = ph.img.naturalHeight, kk = Math.max(pw / iw, phh / ih);
+      c.save(); c.beginPath(); c.rect(-pw / 2, -phh / 2, pw, phh); c.clip();
+      try { c.drawImage(ph.img, -iw * kk / 2, -ih * kk / 2, iw * kk, ih * kk); } catch { /* 読めない写真 */ }
+      c.restore();
+      c.fillStyle = "#4A3F66"; c.font = `800 26px ${opts.bodyFontFamily}`; c.textAlign = "center";
+      c.fillText(ph.name.length > 14 ? `${ph.name.slice(0, 13)}…` : ph.name, 0, phh / 2 + 46, pw + 20);
+      c.restore();
+    }
+    return cv;
+  }
+  function shareText(): string {
+    const r = S.lastResult;
+    if (!r) return "";
+    const memo = memoryPhotos[S.memSeen[0] ?? -1];
+    return `おさんぽフレンチーで${STAGE.name}を${r.m}mおさんぽして ${r.score.toLocaleString()}点（ランク${r.rank}）！` + (memo ? `\n思い出：${memo.name}` : "");
+  }
+  function openShare(): void {
+    if (!opts.onShare || !S.lastResult) return;
+    const card = drawShareCard();
+    if (!card) return;
+    const box = $("share-box"), msg = $("share-msg");
+    msg.textContent = "画像をつくっています…";
+    box.hidden = false;
+    box.scrollIntoView({ block: "nearest", behavior: RM ? "auto" : "smooth" });
+    $<HTMLTextAreaElement>("share-body").value = shareText();
+    card.toBlob((blob) => {
+      if (!blob) { msg.textContent = "画像をつくれませんでした。"; return; }
+      if (shareUrl) URL.revokeObjectURL(shareUrl);
+      shareBlob = blob; shareUrl = URL.createObjectURL(blob);
+      $<HTMLImageElement>("share-img").src = shareUrl;
+      msg.textContent = "";
+    }, "image/jpeg", 0.88);
+  }
+  async function sendShare(): Promise<void> {
+    if (!opts.onShare || !shareBlob || sharing) return;
+    sharing = true;
+    const btn = $<HTMLButtonElement>("share-send"), msg = $("share-msg");
+    btn.disabled = true; msg.textContent = "投稿しています…";
+    const body = $<HTMLTextAreaElement>("share-body").value.trim().slice(0, 280);
+    const res = await opts.onShare(shareBlob, body).catch(() => ({ ok: false as const, error: "投稿できませんでした。" }));
+    sharing = false;
+    if (res.ok) {
+      msg.replaceChildren("投稿しました！ ");
+      const a = document.createElement("a"); a.href = "/sns/home"; a.textContent = "SNSで見る";
+      msg.appendChild(a);
+      $("share").hidden = true;
+    } else {
+      msg.textContent = res.error; btn.disabled = false;
+    }
+  }
+  on($("share"), "click", openShare);
+  on($("share-send"), "click", () => { void sendShare(); });
+  on($("share-cancel"), "click", () => { $("share-box").hidden = true; });
+
   function showOver(): void {
     S.state = "over";
     unlock("first");
@@ -2678,6 +3011,11 @@ export function createOsanpoRun(root: HTMLElement, opts: OsanpoRunOptions): () =
       cell.appendChild(b); haul.appendChild(cell);
     });
     $("o-haul-wrap").hidden = got.length === 0;
+    const odekakeLine = $("o-odekake");
+    odekakeLine.hidden = odekakeMult <= 1;
+    odekakeLine.textContent = odekakeMult > 1 ? `📍 おでかけボーナス スコア×${ODEKAKE_SCORE_MULT}（今日の記録あり）` : "";
+    renderMemoryResult();
+    resetShare();
     const newLine = $("o-new-line");
     newLine.hidden = !S.newKinds.length;
     newLine.textContent = S.newKinds.length ? `ずかんに新しく ${S.newKinds.length}種類 登録（${ITEMS.filter((it) => kindSet.has(it.id)).length} / ${ITEMS.length}）` : "";
@@ -2830,6 +3168,7 @@ export function createOsanpoRun(root: HTMLElement, opts: OsanpoRunOptions): () =
         puff(P.x - 10, GROUND, 8, "dust", { vy: -20 });
         if (S.bufT > 0) { S.bufT = 0; jump(JUMP_V, 1); }
         applyStepBoost();
+        if (odekakeMult > 1) floatText(VW / 2, GROUND * 0.3, `おでかけボーナス スコア×${ODEKAKE_SCORE_MULT}`, "#FFD9A8", 16);
       }
     } else if (playing) {
       S.t += dt;
@@ -3469,6 +3808,7 @@ export function createOsanpoRun(root: HTMLElement, opts: OsanpoRunOptions): () =
   buildStageList();
   selectStage(STAGE_ID);
   renderStepBoost();
+  renderOdekake();
   renderMissions();
   renderAchList();
   renderZukan();

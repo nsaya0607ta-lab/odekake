@@ -81,14 +81,14 @@ function drawBuilding(v: StageView, b: MidItem, x: number): void {
     c.beginPath(); c.moveTo(x + 1, top - 7); c.lineTo(x + b.w - 1, top - 7); c.stroke();
     for (let k = 0; k <= b.w; k += 6) { c.beginPath(); c.moveTo(x + k, top - 7); c.lineTo(x + k, top - 3); c.stroke(); }
   }
-  if (b.h > 110 && h01(seed, 3) < 0.35) {
-    // 屋上の看板
-    const sw = Math.min(b.w - 8, 46), sx = x + 4;
+  if (b.label || (b.h > 110 && h01(seed, 3) < 0.35)) {
+    // 屋上の看板（label があれば、プレイヤーが行ったお店の名前）
+    const sw = b.label ? Math.min(b.w - 8, 76) : Math.min(b.w - 8, 46), sx = x + 4;
     c.fillStyle = roofCol; c.fillRect(sx + 4, top - 12, 2, 9); c.fillRect(sx + sw - 6, top - 12, 2, 9);
     if (L > 0.05) glow(c, sx + sw / 2, top - 18, sw * 0.7, "255,236,190", 0.3 * L);
     c.fillStyle = L > 0.05 ? "#FFF4DA" : rgb(mix(hex("#FFFFFF"), e.mid, 0.3)); rr(c, sx, top - 24, sw, 12, 2); c.fill();
-    c.fillStyle = pick(["#C23B3B", "#2F5E9A", "#2E7A5A"], seed, 4); c.font = font(7); c.textAlign = "center"; c.textBaseline = "middle";
-    c.fillText(pick(["おでかけ", "わんこ堂", "ホテル", "クリニック"], seed, 5), sx + sw / 2, top - 17.5, sw - 4);
+    c.fillStyle = pick(["#C23B3B", "#2F5E9A", "#2E7A5A"], seed, 4); c.font = font(b.label ? 8 : 7); c.textAlign = "center"; c.textBaseline = "middle";
+    c.fillText(b.label || pick(["おでかけ", "わんこ堂", "ホテル", "クリニック"], seed, 5), sx + sw / 2, top - 17.5, sw - 4);
   }
   if (b.h > 130 && n > 0.3 && Math.sin(v.t * 3 + b.blink) > 0.2) { c.fillStyle = `rgba(255,70,70,${n})`; c.beginPath(); c.arc(x + b.w / 2, top - 4, 1.8, 0, Math.PI * 2); c.fill(); }
   // 窓（昼は空を映し、夜はカーテン越しに灯る）
