@@ -332,7 +332,7 @@ export function OsanpoRunGame({ items, usesSampleItems, unlockedStages, seriesTa
                       <li className="osr-ctl"><span><kbd>お題</kbd></span><div><b>今日のミッション</b><small>毎日3つのお題。1つ達成で30コイン、3つそろうとさらに100コイン。</small></div></li>
                       <li className="osr-ctl"><span><kbd>くんくん</kbd></span><div><b>においかぎ</b><small>地面に「くんくん」マークが出たら、スライディングで通ると掘り出せる。ほね・アイテム・ときどきハズレ（古いくつした）。</small></div></li>
                       <li className="osr-ctl"><span><kbd>協力</kbd></span><div><b>協力チャレンジ</b><small>自分とフレンドの今週の合計距離で目標を目指す。達成したら「フレンド」画面で全員100コイン受け取れる。</small></div></li>
-                      <li className="osr-ctl"><span><kbd>写真</kbd></span><div><b>思い出の写真</b><small>おでかけ記録に登録した写真を、飛行機がぶら下げて空を運んでくる。真上を通ると+20。運ばれてきた写真は結果画面に並び、タップでその日の記録を開ける。</small></div></li>
+                      <li className="osr-ctl"><span><kbd>写真</kbd></span><div><b>思い出の写真</b><small>おでかけ記録に登録した写真を、飛行機がぶら下げて空を運んでくる。真上を通ると+20。写真が空を流れているあいだは障害物が出ない。運ばれてきた写真は結果画面に並び、タップでその日の記録を開ける。</small></div></li>
                       <li className="osr-ctl"><span><kbd>気球</kbd></span><div><b>フレンドの思い出</b><small>フレンドがSNSに投稿した写真を、気球が運んでくる。真上を通ると+20。結果画面でそのままいいねできる。</small></div></li>
                       <li className="osr-ctl"><span><kbd>記録</kbd></span><div><b>おでかけボーナス</b><small>今日のおでかけを記録していると、その日のおさんぽはスコアがぜんぶ1.2倍（コインも増える）。</small></div></li>
                       <li className="osr-ctl"><span><kbd>景色</kbd></span><div><b>よく行く場所の景色</b><small>最近の記録で多いカテゴリに合わせて、道ぞいに木（公園・自然）や鳥居（神社・お寺）、行ったお店の名前の看板が立つ。</small></div></li>

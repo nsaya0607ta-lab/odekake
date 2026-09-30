@@ -996,10 +996,23 @@ export function createOsanpoRun(root: HTMLElement, opts: OsanpoRunOptions): () =
     for (let i = 0; i < 8; i++) pickups.push(mkPickup(X + i * 28, GROUND - 60 - Math.sin((i / 7) * Math.PI * 2) * 40));
     return 90;
   }
+  /**
+   * 思い出の写真（飛行機・気球）が空を流れているあいだは障害物を出さず、写真を見ながら歩けるようにする。
+   * かわりに、ほね・アイテムの列やにおいかぎの場所を置く。次に置くまでの距離を返す
+   */
+  function spawnMemoryCalm(X: number): number {
+    const r = Math.random();
+    if (r < 0.2) { sniffs.push({ x: X + 30, dug: false, hinted: false, ph: Math.random() * 6 }); return 200 + S.speed * 0.4; }
+    const h = r < 0.6 ? 0 : rand(60, 96);
+    for (let i = 0; i < 5; i++) pickups.push(mkPickup(X + i * 30, GROUND - 18 - h));
+    return 190 + S.speed * 0.5 + Math.random() * S.speed * 0.5;
+  }
   function spawn(): void {
     const X = VW + 40, t = S.t;
     let extra = 0;
     if (S.sec === "bonus") { extra = spawnBonusItems(X); S.next = 110 + extra + Math.random() * 80; return; }
+    // ラッシュ中は、写真が流れていても障害物を出す（写真のほうはラッシュ中に出ない）
+    if (S.memo && S.sec !== "rush") { S.next = spawnMemoryCalm(X); return; }
     const rush = S.sec === "rush", rain = S.rain > 0.3;
     const kind = pickWeighted(([
       ["cone", 3], ["puddle", rain ? 5 : 2], ["bike", t > 6 ? 2.2 : 0], ["crow", t > 12 ? 2 : 0], ["double", t > 24 || rush ? 1.6 : 0],
@@ -1143,7 +1156,8 @@ export function createOsanpoRun(root: HTMLElement, opts: OsanpoRunOptions): () =
     }
     if (!memoryPhotos.length && !friendPhotos.length) return;
     S.memoT -= dt;
-    if (S.memoT > 0) return;
+    // 写真が流れているあいだは障害物が出ないので、ラッシュ中は待つ
+    if (S.memoT > 0 || S.sec === "rush") return;
     const friend = friendPhotos.length > 0 && (!memoryPhotos.length || Math.random() < FRIEND_MEMO_RATE);
     S.memo = { x: VW + 140, y: Math.max(48, GROUND * rand(0.1, 0.16)), photo: friend ? nextFriendPhoto() : nextMemoryPhoto(), friend, passed: false, t: 0 };
     const seen = friend ? S.friendSeen : S.memSeen;
