@@ -12,7 +12,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { IconChevronLeft } from "@/components/icons";
 import type { DogSkinId } from "@/lib/dog-skins";
 import type { GachaRarity } from "@/lib/gacha/config";
-import { CURTAIN_STYLES, FLOOR_STYLES, RUG_STYLES, WALLPAPER_STYLES } from "@/lib/room/themes";
+import { CURTAIN_STYLES, FLOOR_STYLES, ROOM_KIND_STYLES, RUG_STYLES, WALLPAPER_STYLES } from "@/lib/room/themes";
 import {
   clamp,
   CURTAINS,
@@ -42,8 +42,11 @@ import {
   type Placement,
   type RoomLayout,
   type RoomPhoto,
+  type RoomKind,
   type RoomStyle,
   type RoomTheme,
+  ROOM_KINDS,
+  ROOM_PRESETS,
   ROOM_STYLES,
   windowOf,
 } from "@/lib/room/types";
@@ -639,7 +642,7 @@ export function MyRoom({ entries, initialLayout, serverReady, dogSkin, dogName, 
 
           <RoomDog skin={dogSkin} phase={phase} sleepy={sleepy} lines={dogLines} quiet={editing} places={dogPlaces} weather={weather?.kind ?? null} onFx={onFurnitureFx} />
           <div className="pointer-events-none absolute inset-0" style={{ zIndex: 2000 }}>
-            <RoomLighting now={now} lamps={lampLights} at={place} weather={weather} />
+            <RoomLighting now={now} lamps={lampLights} at={place} weather={weather} room={layout.theme.room} />
           </div>
           {peek ? (
             <span className="room-bubble pointer-events-none absolute w-max max-w-[12rem] -translate-x-1/2 -translate-y-full rounded-xl bg-ink px-2.5 py-1 text-[10px] font-bold text-white shadow" style={{ left: `${clamp(peek.x, 18, 82)}%`, top: `${Math.max(4, peek.y - 0.5)}%`, zIndex: 2600 }}>{peek.text}</span>
@@ -680,7 +683,7 @@ export function MyRoom({ entries, initialLayout, serverReady, dogSkin, dogName, 
                 ))}
               </div>
               <p className="mt-2 text-[11px] font-semibold text-ink-faint">
-                {tab === "theme" ? "部屋の形（窓）・壁紙・床・カーテン・ラグを選べます" : tab === "photo" ? "スマホの写真や、おでかけ記録の写真を額に入れて飾れます" : "タップで飾る・ドラッグで動かす（アイテムは棚にも乗せられます）"}
+                {tab === "theme" ? "おへやの雰囲気・窓・壁紙・床・カーテン・ラグを選べます" : tab === "photo" ? "スマホの写真や、おでかけ記録の写真を額に入れて飾れます" : "タップで飾る・ドラッグで動かす（アイテムは棚にも乗せられます）"}
               </p>
               {tab === "item" ? (
                 <div className="-mx-4 mt-2 flex gap-2 overflow-x-auto px-4 pb-1">
@@ -817,6 +820,19 @@ const styleSwatch = (style: RoomStyle): React.CSSProperties => {
   };
   return { background: `url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 48 48'><rect width='48' height='48' fill='%23FBF3E4'/>${shape[style]}</svg>") center/cover` };
 };
+/** 部屋の雰囲気の見本（天井・壁・床の色と、それらしい形） */
+const kindSwatch = (kind: RoomKind): React.CSSProperties => {
+  const art: Record<RoomKind, string> = {
+    cozy: "<rect width='48' height='30' fill='%23FBF3E4'/><rect y='30' width='48' height='18' fill='%23E8C99A'/><rect x='6' y='7' width='14' height='13' fill='%2398CDF0' stroke='%23fff' stroke-width='2'/><path d='M20 3l4 6h-8z' fill='%23F2E2C2'/>",
+    log: "<rect width='48' height='30' fill='%23C8935C'/><path d='M0 8h48M0 15h48M0 22h48' stroke='%238E5C32' stroke-width='2'/><rect width='48' height='5' fill='%238E5C32'/><rect y='30' width='48' height='18' fill='%239C6B45'/><circle cx='4' cy='12' r='3.5' fill='%23D9A56A' stroke='%238E5C32'/><circle cx='4' cy='20' r='3.5' fill='%23D9A56A' stroke='%238E5C32'/>",
+    wa: "<rect width='48' height='30' fill='%23EFE6D2'/><rect y='30' width='48' height='18' fill='%23D7D59A'/><path d='M0 38h48' stroke='%23B9B774' stroke-width='2'/><rect x='2' width='4' height='31' fill='%238A5A34'/><rect x='42' width='4' height='31' fill='%238A5A34'/><rect x='10' y='8' width='16' height='16' fill='%23FFFBEF' stroke='%236E4424' stroke-width='2'/><path d='M15 8v16M20 8v16M10 14h16M10 19h16' stroke='%238A5A34'/>",
+    nordic: "<rect width='48' height='30' fill='%23DDE6EC'/><rect y='20' width='48' height='10' fill='%23F2F5F7'/><path d='M0 20h48' stroke='%23fff' stroke-width='2'/><rect y='30' width='48' height='18' fill='%23F1E6D6'/><circle cx='24' cy='9' r='5' fill='%23fff' stroke='%23D6DCE2'/>",
+    cafe: "<rect width='48' height='30' fill='%23D9CBB8'/><path d='M1 2h14v6H1zM17 2h14v6H17zM33 2h14v6H33zM-7 10h14v6H-7zM9 10h14v6H9zM25 10h14v6H25zM41 10h14v6H41zM1 18h14v6H1zM17 18h14v6H17zM33 18h14v6H33z' fill='%23B8604A'/><rect y='30' width='48' height='18' fill='%23B9875A'/><path d='M4 34l6 6M14 34l-6 6M24 34l6 6M34 34l-6 6M44 34l6 6' stroke='%238E6038' stroke-width='1.5'/>",
+    seaside: "<rect width='48' height='30' fill='%23F3F7FA'/><path d='M0 7h48M0 14h48M0 21h48' stroke='%23C9D8E4'/><rect y='30' width='48' height='18' fill='%23E8C99A'/><circle cx='34' cy='12' r='6' fill='none' stroke='%23E4572E' stroke-width='3' stroke-dasharray='4 3'/><rect y='27' width='48' height='3' fill='%234A7FB0'/>",
+    starry: "<rect width='48' height='30' fill='%232E3566'/><circle cx='8' cy='8' r='1.5' fill='%23F6E7A8'/><circle cx='38' cy='6' r='1.2' fill='%23F6E7A8'/><circle cx='28' cy='18' r='1.4' fill='%23F6E7A8'/><path d='M22 4a6 6 0 1 0 6 8a5 5 0 1 1 -6 -8z' fill='%23FFF0B0'/><rect y='30' width='48' height='18' fill='%23C7B4D9'/>",
+  };
+  return { background: `url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 48 48'>${art[kind]}</svg>") center/cover` };
+};
 const DECO_LABELS: Record<WallDeco, string> = { none: "なし", garland: "ガーランド", lights: "ライト", stars: "お星さま" };
 const DECO_SWATCH: Record<WallDeco, string> = {
   none: "repeating-linear-gradient(45deg, #fff 0 6px, #eee 6px 12px)",
@@ -828,7 +844,8 @@ const DECO_SWATCH: Record<WallDeco, string> = {
 function ThemePicker({ theme, onChange }: { theme: RoomTheme; onChange: (patch: Partial<RoomTheme>) => void }) {
   return (
     <div className="mt-3 space-y-4">
-      <Swatches title="へやの形" value={theme.style} options={ROOM_STYLES} label={(id) => STYLE_LABELS[id]} paint={styleSwatch} onPick={(style) => onChange({ style })} />
+      <Swatches title="おへや（えらぶと壁・床・窓もおすすめに変わります）" value={theme.room} options={ROOM_KINDS} label={(id) => ROOM_KIND_STYLES[id].label} paint={kindSwatch} onPick={(room) => onChange({ ...ROOM_PRESETS[room] })} />
+      <Swatches title="窓" value={theme.style} options={ROOM_STYLES} label={(id) => STYLE_LABELS[id]} paint={styleSwatch} onPick={(style) => onChange({ style })} />
       <Swatches title="壁紙" value={theme.wall} options={WALLPAPERS} label={(id) => WALLPAPER_STYLES[id].label} paint={(id) => ({ background: `radial-gradient(circle at 30% 30%, ${WALLPAPER_STYLES[id].ink} 0 22%, transparent 23%), ${WALLPAPER_STYLES[id].base}` })} onPick={(wall) => onChange({ wall })} />
       <Swatches title="床" value={theme.floor} options={FLOORS} label={(id) => FLOOR_STYLES[id].label} paint={(id) => ({ background: `repeating-linear-gradient(90deg, ${FLOOR_STYLES[id].base} 0 10px, ${FLOOR_STYLES[id].line} 10px 12px)` })} onPick={(floor) => onChange({ floor })} />
       <Swatches title="カーテン" value={theme.curtain} options={CURTAINS} label={(id) => CURTAIN_STYLES[id].label} paint={(id) => ({ background: CURTAIN_STYLES[id].color })} onPick={(curtain) => onChange({ curtain })} />

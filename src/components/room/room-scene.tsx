@@ -8,8 +8,8 @@
 import { memo, useMemo } from "react";
 import { skyAt, TOKYO, type GeoPoint, type SkyState } from "@/lib/room/sun";
 import { overcastOf, withWeather, type RoomWeather } from "@/lib/room/weather";
-import { CURTAIN_STYLES, FLOOR_STYLES, RUG_STYLES, WALLPAPER_STYLES } from "@/lib/room/themes";
-import { ROOM, windowOf, type RoomStyle, type RoomTheme } from "@/lib/room/types";
+import { CURTAIN_STYLES, FLOOR_STYLES, ROOM_KIND_STYLES, RUG_STYLES, WALLPAPER_STYLES } from "@/lib/room/themes";
+import { ROOM, windowOf, type RoomKind, type RoomStyle, type RoomTheme } from "@/lib/room/types";
 
 export type DayPhase = "morning" | "day" | "evening" | "night";
 
@@ -143,8 +143,9 @@ export const RoomScene = memo(function RoomScene({ theme, now, at = TOKYO, weath
       {/* 窓から入る光が壁を明るくする */}
       {sky.light > 0.1 ? <ellipse cx={px((win.x0 + win.x1) / 2)} cy={py((win.y0 + win.y1) / 2)} rx="360" ry="300" fill="url(#room-window-glow)" /> : null}
 
+      {theme.room === "nordic" ? <Wainscot win={win} /> : null}
       {/* 和室は長押（なげし）を壁にわたす */}
-      {theme.style === "shoji" ? (
+      {theme.style === "shoji" || theme.room === "wa" ? (
         <g>
           <rect x="0" y={py(5.2)} width={W} height="16" fill="#9A6A40" />
           <rect x="0" y={py(5.2)} width={W} height="3" fill="#C99A66" />
@@ -176,7 +177,7 @@ export const RoomScene = memo(function RoomScene({ theme, now, at = TOKYO, weath
       <rect x="0" y={HZ + 2} width={W} height="26" fill="url(#room-floor-ao)" />
 
       {/* 天井と左右の壁：部屋に奥行きを出す */}
-      <polygon points={`0,0 ${W},0 ${W - SIDE},${CEIL} ${SIDE},${CEIL}`} fill="url(#room-ceiling)" />
+      <polygon points={`0,0 ${W},0 ${W - SIDE},${CEIL} ${SIDE},${CEIL}`} fill={theme.room === "cozy" ? "url(#room-ceiling)" : ROOM_KIND_STYLES[theme.room].ceiling} />
       <polygon points={`0,0 ${SIDE},${CEIL} ${SIDE},${HZ} 0,${HZ + SIDE_DROP}`} fill={wall.base} />
       <polygon points={`0,0 ${SIDE},${CEIL} ${SIDE},${HZ} 0,${HZ + SIDE_DROP}`} fill="url(#room-side-left)" />
       <polygon points={`${W},0 ${W - SIDE},${CEIL} ${W - SIDE},${HZ} ${W},${HZ + SIDE_DROP}`} fill={wall.base} />
@@ -186,8 +187,10 @@ export const RoomScene = memo(function RoomScene({ theme, now, at = TOKYO, weath
       <line x1={SIDE} y1={CEIL} x2={SIDE} y2={HZ} stroke="#000" strokeOpacity="0.1" strokeWidth="2" />
       <line x1={W - SIDE} y1={CEIL} x2={W - SIDE} y2={HZ} stroke="#000" strokeOpacity="0.1" strokeWidth="2" />
       <line x1={SIDE} y1={CEIL} x2={W - SIDE} y2={CEIL} stroke="#000" strokeOpacity="0.08" strokeWidth="2" />
+      {/* 部屋の雰囲気ごとのつくり（はり・柱・腰壁・ロープ など）と幅木の色 */}
+      <RoomArch kind={theme.room} />
       {theme.style === "attic" ? <AtticCeiling /> : null}
-      <PendantLamp lit={lit} />
+      <PendantLamp lit={lit} kind={theme.room} />
     </svg>
   );
 });
@@ -233,6 +236,60 @@ function WallPattern({ id, theme }: { id: string; theme: RoomTheme }) {
           {[[18, 22, 3], [80, 40, 2], [50, 90, 2.6], [104, 100, 1.8], [30, 64, 1.4]].map(([x, y, r]) => (
             <path key={`${x}-${y}`} d={`M${x} ${y! - r! * 2}L${x! + r! * 0.6} ${y! - r! * 0.6}L${x! + r! * 2} ${y}L${x! + r! * 0.6} ${y! + r! * 0.6}L${x} ${y! + r! * 2}L${x! - r! * 0.6} ${y! + r! * 0.6}L${x! - r! * 2} ${y}L${x! - r! * 0.6} ${y! - r! * 0.6}Z`} fill={ink} opacity="0.85" />
           ))}
+        </pattern>
+      );
+    case "log":
+      // 横に積んだ丸太（上が明るく下がかげる丸み、合わせ目の深いみぞ、ところどころ節）
+      return (
+        <pattern id={id} width="400" height="56" patternUnits="userSpaceOnUse">
+          <linearGradient id={`${id}-g`} x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0" stopColor="#E0AE74" />
+            <stop offset="0.45" stopColor="#C8935C" />
+            <stop offset="1" stopColor="#8E5C32" />
+          </linearGradient>
+          <rect x="0" y="0" width="400" height="56" fill={`url(#${id}-g)`} />
+          <rect x="0" y="0" width="400" height="3" fill="#5A3518" opacity="0.7" />
+          <rect x="0" y="3" width="400" height="3" fill="#F2C48C" opacity="0.5" />
+          <path d="M20 22 q60 -4 140 2 M200 34 q80 3 180 -2" stroke="#8E5C32" strokeOpacity="0.35" strokeWidth="1.5" fill="none" />
+          <ellipse cx="120" cy="30" rx="7" ry="4.5" fill="#7A4A24" opacity="0.55" />
+          <ellipse cx="310" cy="20" rx="5" ry="3.4" fill="#7A4A24" opacity="0.45" />
+        </pattern>
+      );
+    case "brick":
+      // レンガ（段ごとに半分ずらす。色むらと目地）
+      return (
+        <pattern id={id} width="128" height="64" patternUnits="userSpaceOnUse">
+          <rect x="0" y="0" width="128" height="64" fill="#D9CBB8" />
+          {[[2, 2, "#B8604A"], [66, 2, "#A9553F"], [-30, 34, "#C26A52"], [34, 34, "#B05C46"], [98, 34, "#C26A52"]].map(([x, y, c]) => (
+            <g key={`${x}-${y}`}>
+              <rect x={x as number} y={y as number} width="60" height="28" rx="2" fill={c as string} />
+              <rect x={x as number} y={y as number} width="60" height="5" rx="2" fill="#FFFFFF" opacity="0.12" />
+              <rect x={x as number} y={(y as number) + 23} width="60" height="5" fill="#000" opacity="0.12" />
+            </g>
+          ))}
+        </pattern>
+      );
+    case "shiplap":
+      // 白い横板ばり（板と板のあいだの細い影）
+      return (
+        <pattern id={id} width="200" height="46" patternUnits="userSpaceOnUse">
+          <rect x="0" y="0" width="200" height="4" fill={ink} />
+          <rect x="0" y="4" width="200" height="2" fill="#FFFFFF" opacity="0.8" />
+          <path d="M40 20 q50 2 110 -1" stroke={ink} strokeOpacity="0.35" strokeWidth="1" fill="none" />
+        </pattern>
+      );
+    case "plaster":
+      // しっくい（ほんのりむらのある土壁）
+      return (
+        <pattern id={id} width="180" height="180" patternUnits="userSpaceOnUse">
+          {[[30, 40, 46], [120, 30, 54], [80, 120, 60], [160, 150, 42], [20, 150, 38]].map(([x, y, r]) => <circle key={`${x}`} cx={x} cy={y} r={r} fill={ink} opacity="0.12" />)}
+          {[[60, 80], [140, 90], [100, 20], [30, 110], [150, 170]].map(([x, y]) => <circle key={`d${x}`} cx={x} cy={y} r="1.6" fill="#B9A27A" opacity="0.5" />)}
+        </pattern>
+      );
+    case "fog-blue":
+      return (
+        <pattern id={id} width="40" height="40" patternUnits="userSpaceOnUse">
+          <circle cx="20" cy="20" r="1.4" fill={ink} />
         </pattern>
       );
     case "wood-panel":
@@ -841,7 +898,229 @@ function Shelves() {
   );
 }
 
-function PendantLamp({ lit }: { lit: boolean }) {
+/** 天井の明かり。部屋の雰囲気ごとに形がちがう（明かりの場所は ceilingLights） */
+function PendantLamp({ lit, kind }: { lit: boolean; kind: RoomKind }) {
+  const cx = W / 2;
+  const cord = (x: number, to: number, color = "#6A5A4A") => <line x1={x} y1="0" x2={x} y2={to} stroke={color} strokeWidth="2.5" />;
+  const glow = (x: number, y: number, r = 120) => (lit ? <ellipse cx={x} cy={y} rx={r} ry={r / 2} fill="url(#room-lamp-glow)" /> : null);
+  switch (kind) {
+    case "log":
+      // 鉄のランタン（くさりでつるす）
+      return (
+        <g>
+          {Array.from({ length: 7 }, (_, i) => <ellipse key={i} cx={cx} cy={6 + i * 9} rx="3" ry="5" fill="none" stroke="#3A2E24" strokeWidth="2" />)}
+          {glow(cx, 110)}
+          <path d={`M${cx - 20} 70 h40 l-6 -8 h-28 z`} fill="#2E2620" />
+          <rect x={cx - 18} y="70" width="36" height="46" fill={lit ? "#FFD98A" : "#E8D9B8"} opacity="0.92" />
+          {lit ? <ellipse cx={cx} cy="96" rx="7" ry="11" fill="#FFF6D0" /> : null}
+          {[cx - 18, cx, cx + 18].map((x) => <rect key={x} x={x - 2} y="70" width="4" height="46" fill="#2E2620" />)}
+          <path d={`M${cx - 22} 116 h44 l-4 8 h-36 z`} fill="#2E2620" />
+        </g>
+      );
+    case "wa":
+      // 和紙のまるいペンダント
+      return (
+        <g>
+          {cord(cx, 64)}
+          {glow(cx, 100)}
+          <ellipse cx={cx} cy="100" rx="40" ry="34" fill={lit ? "#FFF3D2" : "#F6EEDC"} />
+          {[-24, -12, 0, 12, 24].map((d) => <path key={d} d={`M${cx - Math.sqrt(1600 - d * d * 1.2)} ${100 + d} Q ${cx} ${100 + d + 4} ${cx + Math.sqrt(1600 - d * d * 1.2)} ${100 + d}`} stroke="#C9B48E" strokeOpacity="0.6" strokeWidth="1.2" fill="none" />)}
+          <ellipse cx={cx - 12} cy="88" rx="12" ry="9" fill="#FFFFFF" opacity="0.5" />
+          <rect x={cx - 10} y="62" width="20" height="6" rx="2" fill="#3A2A1C" />
+          <rect x={cx - 10} y="132" width="20" height="5" rx="2" fill="#3A2A1C" />
+        </g>
+      );
+    case "nordic":
+      // 白いガラスの丸いランプ
+      return (
+        <g>
+          {cord(cx, 70, "#2E2E2E")}
+          {glow(cx, 104)}
+          <rect x={cx - 8} y="64" width="16" height="10" rx="2" fill="#C9A15A" />
+          <circle cx={cx} cy="104" r="32" fill={lit ? "#FFF8E4" : "#F4F6F8"} />
+          <circle cx={cx} cy="104" r="32" fill="none" stroke="#D6DCE2" strokeWidth="1.5" />
+          <ellipse cx={cx - 11} cy="92" rx="10" ry="7" fill="#FFFFFF" opacity="0.85" />
+        </g>
+      );
+    case "cafe":
+      // はだか電球を3つ、長さを変えてつるす
+      return (
+        <g>
+          {[[400, 96], [500, 120], [600, 88]].map(([x, len]) => (
+            <g key={x}>
+              {cord(x!, len!, "#2A2522")}
+              {glow(x!, len! + 18, 70)}
+              <rect x={x! - 6} y={len! - 4} width="12" height="12" rx="2" fill="#2A2522" />
+              <path d={`M${x! - 9} ${len! + 8} q -6 14 0 24 q 9 8 18 0 q 6 -10 0 -24 z`} fill={lit ? "#FFE3A0" : "#F2EAD8"} opacity="0.9" stroke="#C9A878" strokeWidth="1" />
+              {lit ? <path d={`M${x! - 3} ${len! + 14} q 3 6 6 0`} stroke="#FF9A3A" strokeWidth="1.5" fill="none" /> : null}
+            </g>
+          ))}
+        </g>
+      );
+    case "seaside":
+      // 真ちゅうのマリンランプ（ロープでつるす）
+      return (
+        <g>
+          <line x1={cx} y1="0" x2={cx} y2="68" stroke="#C9A878" strokeWidth="4" strokeDasharray="5 3" />
+          {glow(cx, 104)}
+          <path d={`M${cx - 18} 74 h36 v4 h-36 z M${cx - 22} 128 h44 v6 h-44 z`} fill="#B98A3A" />
+          <path d={`M${cx - 16} 78 q -6 25 0 50 h32 q 6 -25 0 -50 z`} fill={lit ? "#FFE8B0" : "#E8EEF2"} opacity="0.92" />
+          {[cx - 10, cx, cx + 10].map((x) => <line key={x} x1={x} y1="78" x2={x} y2="128" stroke="#B98A3A" strokeWidth="2.5" />)}
+          <line x1={cx - 18} y1="103" x2={cx + 18} y2="103" stroke="#B98A3A" strokeWidth="2.5" />
+        </g>
+      );
+    case "starry":
+      // 月のランプと、惑星のモビール
+      return (
+        <g>
+          {cord(cx, 66, "#C9C2E8")}
+          {glow(cx, 100)}
+          <path d={moonPath(cx, 100, 30, 0.3)} fill={lit ? "#FFF0B0" : "#F2E6B8"} />
+          <circle cx={cx} cy="100" r="34" fill="#FFF4C8" opacity={lit ? 0.25 : 0.1} />
+          {[[cx - 150, 120, 16, "#F2A7B8", true], [cx + 140, 96, 13, "#8DBDE6", false], [cx - 240, 70, 9, "#B8E986", false], [cx + 230, 130, 10, "#F6D27A", false]].map(([x, y, r, c, ring]) => (
+            <g key={x as number}>
+              <line x1={x as number} y1="0" x2={x as number} y2={(y as number) - (r as number)} stroke="#C9C2E8" strokeWidth="1.2" />
+              <circle cx={x as number} cy={y as number} r={r as number} fill={c as string} />
+              <circle cx={(x as number) - (r as number) * 0.35} cy={(y as number) - (r as number) * 0.35} r={(r as number) * 0.35} fill="#FFFFFF" opacity="0.4" />
+              {ring ? <ellipse cx={x as number} cy={y as number} rx={(r as number) * 1.8} ry={(r as number) * 0.5} fill="none" stroke="#F6D27A" strokeWidth="2.5" transform={`rotate(-15 ${x} ${y})`} /> : null}
+            </g>
+          ))}
+        </g>
+      );
+    default:
+      return <ConeLamp lit={lit} />;
+  }
+}
+
+/** 天井の明かりの場所（部屋の %）。夜はここのまわりが明るい */
+export function ceilingLights(kind: RoomKind): { x: number; y: number; r: number }[] {
+  if (kind === "cafe") return [{ x: 40, y: 11, r: 26 }, { x: 50, y: 13, r: 28 }, { x: 60, y: 10, r: 26 }];
+  return [{ x: 50, y: 11, r: 46 }];
+}
+
+/** 北欧の部屋の腰壁（白い板の羽目板と、上の見切り）。窓のところはあける */
+function Wainscot({ win }: { win: { x0: number; x1: number; y0: number; y1: number } }) {
+  const top = py(44.5), bottom = HZ - 22;
+  const gap: [number, number] | null = win.y1 > 44 ? [px(win.x0) - 26, px(win.x1) + 26] : null;
+  const panels: React.ReactNode[] = [];
+  for (let x = 0; x < W; x += 110) {
+    if (gap && x + 110 > gap[0] && x < gap[1]) continue;
+    panels.push(
+      <g key={x}>
+        <rect x={x + 14} y={top + 22} width="82" height={bottom - top - 34} fill="#000" opacity="0.05" />
+        <rect x={x + 16} y={top + 24} width="80" height={bottom - top - 38} fill="#FAFCFD" />
+        <path d={`M${x + 16} ${bottom - 14} V${top + 24} H${x + 96}`} stroke="#FFFFFF" strokeWidth="2" fill="none" />
+        <path d={`M${x + 96} ${top + 24} V${bottom - 14} H${x + 16}`} stroke="#C9D3DA" strokeWidth="2" fill="none" />
+      </g>,
+    );
+  }
+  const seg = (x0: number, x1: number) => (
+    <g key={x0}>
+      <rect x={x0} y={top} width={x1 - x0} height={bottom - top} fill="#F2F5F7" />
+      <rect x={x0} y={top} width={x1 - x0} height="14" fill="#FFFFFF" />
+      <rect x={x0} y={top + 14} width={x1 - x0} height="5" fill="#000" opacity="0.08" />
+      <rect x={x0} y={top - 4} width={x1 - x0} height="5" fill="#000" opacity="0.06" />
+    </g>
+  );
+  return <g>{gap ? [seg(0, gap[0]), seg(gap[1], W)] : seg(0, W)}{panels}</g>;
+}
+
+/** 部屋の雰囲気ごとのつくり（天井や壁のすみ。いちばん手前に描く）と幅木の色 */
+function RoomArch({ kind }: { kind: RoomKind }) {
+  if (kind === "cozy") return null;
+  const k = ROOM_KIND_STYLES[kind];
+  const baseboard = (
+    <g>
+      <rect x="0" y={HZ - 22} width={W} height="24" fill={k.baseboard} />
+      <rect x="0" y={HZ - 22} width={W} height="3" fill="#FFFFFF" opacity="0.3" />
+      <polygon points={`0,${HZ + SIDE_DROP - 26} ${SIDE},${HZ - 22} ${SIDE},${HZ + 2} 0,${HZ + SIDE_DROP}`} fill={k.baseboard} />
+      <polygon points={`${W},${HZ + SIDE_DROP - 26} ${W - SIDE},${HZ - 22} ${W - SIDE},${HZ + 2} ${W},${HZ + SIDE_DROP}`} fill={k.baseboard} />
+      <polygon points={`0,${HZ + SIDE_DROP - 26} ${SIDE},${HZ - 22} ${SIDE},${HZ + 2} 0,${HZ + SIDE_DROP}`} fill="#000" opacity="0.15" />
+    </g>
+  );
+  switch (kind) {
+    case "log":
+      return (
+        <g>
+          {baseboard}
+          {/* 天井のはり */}
+          <rect x="0" y={CEIL - 4} width={W} height="34" fill="#8E5C32" />
+          <rect x="0" y={CEIL - 4} width={W} height="8" fill="#B98552" />
+          <rect x="0" y={CEIL + 30} width={W} height="10" fill="#2A1A0C" opacity="0.2" filter="url(#room-soft)" />
+          {/* 部屋のすみの、丸太の切り口 */}
+          {[SIDE, W - SIDE].map((x) => Array.from({ length: Math.floor((HZ - CEIL - 40) / 56) }, (_, i) => {
+            const y = CEIL + 58 + i * 56;
+            return (
+              <g key={`${x}-${i}`}>
+                <circle cx={x} cy={y} r="24" fill="#D9A56A" />
+                <circle cx={x} cy={y} r="24" fill="none" stroke="#8E5C32" strokeWidth="3" />
+                <circle cx={x} cy={y} r="15" fill="none" stroke="#B07A45" strokeWidth="1.5" />
+                <circle cx={x} cy={y} r="7" fill="none" stroke="#B07A45" strokeWidth="1.2" />
+                <circle cx={x} cy={y} r="2" fill="#8E5C32" />
+              </g>
+            );
+          }))}
+        </g>
+      );
+    case "wa":
+      return (
+        <g>
+          {baseboard}
+          {/* 天井の竿縁と、すみの柱 */}
+          {Array.from({ length: 12 }, (_, i) => <line key={i} x1={SIDE + ((W - SIDE * 2) * (i + 1)) / 13} y1={CEIL} x2={(W * (i + 1)) / 13} y2="0" stroke="#9A6A40" strokeWidth="2" />)}
+          {[SIDE, W - SIDE].map((x) => (
+            <g key={x}>
+              <rect x={x - 13} y="0" width="26" height={HZ + 4} fill="#8A5A34" />
+              <rect x={x - 13} y="0" width="6" height={HZ + 4} fill="#B07A45" />
+              <rect x={x + 9} y="0" width="4" height={HZ + 4} fill="#5A3A1C" />
+            </g>
+          ))}
+        </g>
+      );
+    case "nordic":
+      return baseboard;
+    case "cafe":
+      return (
+        <g>
+          {baseboard}
+          {/* 天井をはしる黒い配管 */}
+          <rect x="0" y={CEIL + 8} width={W} height="12" rx="6" fill="#2A2522" />
+          <rect x="0" y={CEIL + 9} width={W} height="3" fill="#6A625C" />
+          {[120, 380, 640, 900].map((x) => <rect key={x} x={x - 5} y={CEIL - 2} width="10" height="24" rx="2" fill="#1E1A18" />)}
+        </g>
+      );
+    case "seaside":
+      return (
+        <g>
+          {baseboard}
+          {/* 壁の上をめぐるロープ */}
+          <rect x="0" y={CEIL + 2} width={W} height="12" rx="6" fill="#D9C08E" />
+          <line x1="0" y1={CEIL + 8} x2={W} y2={CEIL + 8} stroke="#B89A62" strokeWidth="12" strokeDasharray="6 8" opacity="0.6" />
+          {/* 浮き輪（右の壁の上のほう） */}
+          <g transform={`translate(${W - 120} ${py(8)})`}>
+            <circle r="30" fill="none" stroke="#FFFFFF" strokeWidth="16" />
+            {[0, 90, 180, 270].map((a) => <path key={a} d={describeArc(0, 0, 30, a + 20, a + 70)} stroke="#E4572E" strokeWidth="16" fill="none" />)}
+            <circle r="30" fill="none" stroke="#C9A878" strokeWidth="2" strokeDasharray="4 4" />
+          </g>
+        </g>
+      );
+    case "starry":
+      return (
+        <g>
+          {baseboard}
+          {[[90, 6], [230, 12], [380, 4], [620, 10], [760, 5], [910, 12]].map(([x, y]) => <circle key={x} cx={x} cy={y} r="2" fill="#F6E7A8" />)}
+        </g>
+      );
+  }
+}
+
+const describeArc = (cx: number, cy: number, r: number, a0: number, a1: number) => {
+  const p = (a: number) => [cx + r * Math.cos((a * Math.PI) / 180), cy + r * Math.sin((a * Math.PI) / 180)];
+  const [x0, y0] = p(a0), [x1, y1] = p(a1);
+  return `M${x0} ${y0} A ${r} ${r} 0 0 1 ${x1} ${y1}`;
+};
+
+function ConeLamp({ lit }: { lit: boolean }) {
   const cx = W / 2;
   return (
     <g>
@@ -899,6 +1178,27 @@ function Floor({ theme }: { theme: RoomTheme }) {
           const x = (i * 137.5) % W, y = HZ + ((i * 61.8) % depth);
           return <circle key={i} cx={x} cy={y} r={1.2 + (y - HZ) / depth} fill={f.line} opacity="0.6" />;
         })}
+      </g>
+    );
+  }
+  if (theme.floor === "herringbone") {
+    // ヘリンボーン：短い板を、マスごとに向きを変えて斜めに並べる
+    const r = rows(12), c = cols(56);
+    const cells: React.ReactNode[] = [];
+    for (let i = 0; i < r.length - 1; i++) for (let j = 0; j < c.length - 1; j++) {
+      const ya = r[i]!, yb = r[i + 1]!;
+      const a = [xAt(c[j]!, ya), ya], b = [xAt(c[j + 1]!, ya), ya], cc = [xAt(c[j + 1]!, yb), yb], d = [xAt(c[j]!, yb), yb];
+      const t = (((Math.imul(i + 11, 73856093) ^ Math.imul(j + 5, 19349663)) >>> 0) % 1000) / 1000;
+      cells.push(<polygon key={`h${i}-${j}`} points={`${a.join(",")} ${b.join(",")} ${cc.join(",")} ${d.join(",")}`} fill={t < 0.5 ? "#FFFFFF" : "#000000"} opacity={(0.03 + Math.abs(t - 0.5) * 0.1).toFixed(3)} />);
+      // 列ごとに向きを変えると、矢羽根（V の字）の模様になる
+      const up = j % 2 === 0;
+      cells.push(<line key={`l${i}-${j}`} x1={up ? d[0] : a[0]} y1={up ? d[1] : a[1]} x2={up ? b[0] : cc[0]} y2={up ? b[1] : cc[1]} stroke={f.line} strokeWidth="1.4" />);
+    }
+    return (
+      <g>
+        <rect x="0" y={HZ} width={W} height={depth} fill={f.base} />
+        {cells}
+        {c.map((cc, i) => <line key={i} x1={cc[0]} y1={HZ} x2={cc[1]} y2={H} stroke={f.line} strokeWidth="1.6" />)}
       </g>
     );
   }
@@ -962,12 +1262,13 @@ function RugShape({ rug }: { rug: RoomTheme["rug"] }) {
  * 夜は部屋を暗くして、天井のライトとフロアランプのまわりだけ明るく残す。夕方は橙、朝は桃色にほんのり染める。
  * lamps は明かりの場所（部屋の %）。いつも四すみを少し暗くして、写真のような落ち着きを出す
  */
-export const RoomLighting = memo(function RoomLighting({ now, lamps, at = TOKYO, weather = null }: { now: Date; lamps: readonly { x: number; y: number; r: number }[]; at?: GeoPoint; weather?: RoomWeather | null }) {
+export const RoomLighting = memo(function RoomLighting({ now, lamps, at = TOKYO, weather = null, room = "cozy" }: { now: Date; lamps: readonly { x: number; y: number; r: number }[]; at?: GeoPoint; weather?: RoomWeather | null; room?: RoomKind }) {
   const sky = useMemo(() => withWeather(skyAt(now, at), weather), [now, at, weather]);
   const overcast = overcastOf(weather);
   const dark = Math.max(0, 1 - sky.light);
   const lit = lampsOn(sky);
-  const lights = [{ x: 50, y: 11, r: 46 }, ...lamps];
+  const lights = [...ceilingLights(room), ...lamps];
+  const kindStyle = ROOM_KIND_STYLES[room];
   const morning = sky.azimuth < 180;
   return (
     <svg viewBox={`0 0 ${W} ${H}`} preserveAspectRatio="none" className="pointer-events-none absolute inset-0 h-full w-full" aria-hidden="true" data-lighting>
@@ -995,6 +1296,8 @@ export const RoomLighting = memo(function RoomLighting({ now, lamps, at = TOKYO,
       {/* 外が暗いほど部屋も暗く。明かりがついていれば、そのまわりは明るい */}
       {dark > 0.02 ? <rect x="0" y="0" width={W} height={H} fill="#0F1438" opacity={0.56 * Math.pow(dark, 1.15)} mask="url(#room-night-mask)" /> : null}
       {lit ? lights.map((l, i) => <ellipse key={i} cx={px(l.x)} cy={py(l.y)} rx={px(l.r) * 0.8} ry={px(l.r) * 0.72} fill="url(#room-light-warm)" opacity={Math.min(1, dark * 1.6)} />) : null}
+      {/* 部屋の雰囲気の色味（ログハウスはあたたかく、北欧はすっきり など） */}
+      {kindStyle.tint ? <rect x="0" y="0" width={W} height={H} fill={kindStyle.tint} opacity={kindStyle.tintOpacity} /> : null}
       {/* くもり・雨の日は、昼でも部屋が少し青く沈む */}
       {overcast > 0.3 && sky.light > 0.2 ? <rect x="0" y="0" width={W} height={H} fill="#5E6E86" opacity={0.1 * overcast} /> : null}
       {/* 雷：ときどき部屋がぴかっと光る */}
