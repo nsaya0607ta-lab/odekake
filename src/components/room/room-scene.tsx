@@ -8,8 +8,9 @@
 import { memo, useId, useMemo } from "react";
 import { skyAt, TOKYO, type GeoPoint, type SkyState } from "@/lib/room/sun";
 import { overcastOf, WEATHER_LABEL, withWeather, type RoomWeather } from "@/lib/room/weather";
+import { EventAmbience, EventWash } from "./room-events";
 import { CURTAIN_STYLES, FLOOR_STYLES, ROOM_KIND_STYLES, RUG_STYLES, WALLPAPER_STYLES } from "@/lib/room/themes";
-import { ROOM, windowOf, type FixtureId, type RoomKind, type RoomStyle, type RoomTheme } from "@/lib/room/types";
+import { ROOM, roomEventOf, windowOf, type FixtureId, type RoomEvent, type RoomKind, type RoomStyle, type RoomTheme } from "@/lib/room/types";
 
 export type DayPhase = "morning" | "day" | "evening" | "night";
 
@@ -78,6 +79,7 @@ export const RoomScene = memo(function RoomScene({ theme, now, at = TOKYO, weath
   const sky = useMemo(() => withWeather(skyAt(now, at), weather), [now, at, weather]);
   const overcast = overcastOf(weather);
   const lit = lampsOn(sky);
+  const event = theme.events === false ? null : roomEventOf(now)?.id ?? null;
   const sunUp = sky.altitude > 0;
   // 朝夕の低い日ざしは、窓から斜めに長く差しこむ
   const beamSkew = Math.max(-1, Math.min(1, (sky.azimuth - 180) / 90)) * -110;
@@ -160,6 +162,8 @@ export const RoomScene = memo(function RoomScene({ theme, now, at = TOKYO, weath
       <rect x="0" y="0" width={W} height={HZ} fill="url(#room-wall)" />
       <rect x="0" y="0" width={W} height={HZ} fill="#7A6040" filter="url(#room-grain)" opacity="0.07" />
       <rect x="0" y="0" width={W} height={HZ} fill="url(#room-wall-shade)" />
+      {/* 行事の期間は壁の色味も変える */}
+      {event ? <EventWash event={event} /> : null}
       {/* 窓から入る光が壁を明るくする */}
       {sky.light > 0.1 ? windows.map((win, i) => <ellipse key={i} cx={px((win.x0 + win.x1) / 2)} cy={py((win.y0 + win.y1) / 2)} rx={360 * Math.min(1.6, (win.x1 - win.x0) / 30)} ry={300 * Math.min(1.6, (win.x1 - win.x0) / 30)} fill="url(#room-window-glow)" />) : null}
 
@@ -172,7 +176,8 @@ export const RoomScene = memo(function RoomScene({ theme, now, at = TOKYO, weath
           <rect x={SIDE} y={py(5.2) + 16} width={W - SIDE * 2} height="8" fill="#2A1A0C" opacity="0.12" />
         </g>
       ) : null}
-      <WallDecoration deco={theme.deco} lit={lit} />
+      {/* 行事の期間は、行事のかざり（手前の層）に入れかえる */}
+      {event ? null : <WallDecoration deco={theme.deco} lit={lit} />}
 
       {/* 床 */}
       <Floor theme={theme} />
@@ -204,6 +209,7 @@ export const RoomScene = memo(function RoomScene({ theme, now, at = TOKYO, weath
         return (
           <g key={String(right)}>
             <polygon points={wallPts} fill={wall.base} />
+            {event ? <polygon points={wallPts} fill="url(#ev-wash)" /> : null}
             <polygon points={wallPts} fill={`url(#room-side-${right ? "right" : "left"})`} />
             <polygon points={`${X(-PX)},${boardTop} ${X(SIDE)},${HZ - 22} ${X(SIDE)},${HZ + 2} ${X(-PX)},${FLOOR_FRONT}`} fill="#F1E8D8" />
           </g>
@@ -1365,7 +1371,7 @@ function RugShape({ rug }: { rug: RoomTheme["rug"] }) {
  * 夜は部屋を暗くして、天井のライトとフロアランプのまわりだけ明るく残す。夕方は橙、朝は桃色にほんのり染める。
  * lamps は明かりの場所（部屋の %）。いつも四すみを少し暗くして、写真のような落ち着きを出す
  */
-export const RoomLighting = memo(function RoomLighting({ now, lamps, at = TOKYO, weather = null, room = "cozy" }: { now: Date; lamps: readonly { x: number; y: number; r: number }[]; at?: GeoPoint; weather?: RoomWeather | null; room?: RoomKind }) {
+export const RoomLighting = memo(function RoomLighting({ now, lamps, at = TOKYO, weather = null, room = "cozy", event = null }: { now: Date; lamps: readonly { x: number; y: number; r: number }[]; at?: GeoPoint; weather?: RoomWeather | null; room?: RoomKind; event?: RoomEvent | null }) {
   const sky = useMemo(() => withWeather(skyAt(now, at), weather), [now, at, weather]);
   const overcast = overcastOf(weather);
   const dark = Math.max(0, 1 - sky.light);
@@ -1399,6 +1405,8 @@ export const RoomLighting = memo(function RoomLighting({ now, lamps, at = TOKYO,
       {/* 外が暗いほど部屋も暗く。明かりがついていれば、そのまわりは明るい */}
       {dark > 0.02 ? <rect x={-PX} y={-PT} width={W + PX * 2} height={H + PT + PB} fill="#0F1438" opacity={0.56 * Math.pow(dark, 1.15)} mask="url(#room-night-mask)" /> : null}
       {lit ? lights.map((l, i) => <ellipse key={i} cx={px(l.x)} cy={py(l.y)} rx={px(l.r) * 0.8} ry={px(l.r) * 0.72} fill="url(#room-light-warm)" opacity={Math.min(1, dark * 1.6)} />) : null}
+      {/* 行事の空気（部屋の色・舞う花びらなど・夜に灯るもの） */}
+      {event ? <EventAmbience event={event} dark={dark} /> : null}
       {/* 部屋の雰囲気の色味（ログハウスはあたたかく、北欧はすっきり など） */}
       {kindStyle.tint ? <rect x={-PX} y={-PT} width={W + PX * 2} height={H + PT + PB} fill={kindStyle.tint} opacity={kindStyle.tintOpacity} /> : null}
       {/* くもり・雨の日は、昼でも部屋が少し青く沈む */}

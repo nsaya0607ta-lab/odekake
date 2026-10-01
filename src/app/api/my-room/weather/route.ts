@@ -4,7 +4,7 @@ import { requireUser } from "@/lib/supabase/server";
 
 /**
  * わんこのおへやの窓の外の「いまの天気」（Open-Meteo）。
- * 場所は 0.1 度（約10km）に丸めてから問い合わせ、15分は同じ答えを使う。だれの場所かは外へ送らない
+ * 場所は 0.01 度（約1km）に丸めてから問い合わせ、15分は同じ答えを使う。だれの場所かは外へ送らない
  */
 export async function GET(request: Request) {
   const { user } = await requireUser();
@@ -16,8 +16,8 @@ export async function GET(request: Request) {
     return NextResponse.json({ error: "場所が正しくありません。" }, { status: 400 });
   }
   const q = new URLSearchParams({
-    latitude: (Math.round(lat * 10) / 10).toFixed(1),
-    longitude: (Math.round(lon * 10) / 10).toFixed(1),
+    latitude: (Math.round(lat * 100) / 100).toFixed(2),
+    longitude: (Math.round(lon * 100) / 100).toFixed(2),
     current: "weather_code,temperature_2m,cloud_cover,precipitation,wind_speed_10m",
     timezone: "Asia/Tokyo",
   });

@@ -7,6 +7,8 @@
  * 「もようがえ」で編集モードになり、下の引き出しから飾るものを置いたり、壁紙・床などを変えたりできる。
  * 動かすと少しあとに自動で保存する（DBが未適用の環境では端末に保存する）。
  */
+import type { StepDay } from "@/lib/data/exp";
+import { LikeButton, RoomGuests, useVisit, VisitPanel, type RoomFriend, type RoomMailItem, type VisitState } from "./room-visit";
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { IconChevronLeft } from "@/components/icons";
@@ -33,6 +35,8 @@ import {
   defaultFixtures,
   fixtureKey,
   resolvePlacements,
+  roomEventOf,
+  nextRoomEvent,
   freeShelfSpot,
   WALL_DECOS,
   type WallDeco,
@@ -59,8 +63,9 @@ import { RoomDog } from "./room-dog";
 import { composeRoomSnapshot } from "./room-snapshot";
 import { skyAt } from "@/lib/room/sun";
 import { parseRoomWeather, withWeather, type RoomWeather } from "@/lib/room/weather";
+import { EVENT_FLOOR_Y, EventFloor, EventFront } from "./room-events";
 import { dayPhaseOf, FixtureVisual, fixtureSize, lampsOn, ROOM_STAGE, RoomLighting, RoomScene, ThemeSwatch, windowRectOf, type DayPhase } from "./room-scene";
-import { DEFAULT_PLACE, prefNameOf, SkyCard, type RoomPlace } from "./sky-card";
+import { DEFAULT_PLACE, locateHere, placeShortName, SkyCard, type RoomPlace } from "./sky-card";
 
 type Tab = DecorKind | "theme";
 type ItemFilter = "all" | "toy" | "food" | "interior" | "other" | "sushi";
@@ -194,7 +199,7 @@ async function shrinkImage(file: File, max: number, quality: number): Promise<Bl
   return new Promise((resolve, reject) => canvas.toBlob((b) => (b ? resolve(b) : reject(new Error("encode failed"))), "image/jpeg", quality));
 }
 
-export function MyRoom({ entries, initialLayout, serverReady, dogSkin, dogName, serverNow }: {
+export function MyRoom({ entries, initialLayout, serverReady, dogSkin, dogName, serverNow, steps, stepHistory, visit, guests }: {
   entries: DecorEntry[];
   initialLayout: RoomLayout | null;
   serverReady: boolean;
@@ -202,6 +207,14 @@ export function MyRoom({ entries, initialLayout, serverReady, dogSkin, dogName, 
   dogName: string;
   /** サーバーで描いた時刻。最初の表示をサーバーとそろえ、そのあと端末の時刻に合わせる */
   serverNow: string;
+  /** きょうの歩数（サーバーで描いた値。あとは 30 秒ごとに取り直す） */
+  steps?: { steps: number | null; stepExp: number; coinBalance: number };
+  /** 直近の日ごとの歩数（今週のグラフ） */
+  stepHistory?: StepDay[];
+  /** フレンドの部屋にあそびに来ているとき（見るだけ。保存もしない） */
+  visit?: VisitState;
+  /** 自分の部屋に届いた「いいね」・置き手紙と、あそびに行けるフレンド */
+  guests?: { mail: RoomMailItem[]; friends: RoomFriend[] };
 }) {
   // 家具はだれでも置けるので、持ち物と合わせて「置けるもの」にする
   const validKeys = useMemo(() => new Set([...entries, ...FURNITURE_ENTRIES, ...FIXTURE_ENTRIES].map((e) => e.key)), [entries]);
@@ -220,6 +233,7 @@ export function MyRoom({ entries, initialLayout, serverReady, dogSkin, dogName, 
   const [past, setPast] = useState<RoomLayout[]>([]);
   const [future, setFuture] = useState<RoomLayout[]>([]);
   const [editing, setEditing] = useState(false);
+  const visitLike = useVisit(visit ?? { friendId: "", name: "", liked: false, likeCount: 0, myNotes: [] });
   const [selectedId, setSelectedId] = useState<string | null>(null);
   /** ドラッグ中のものを乗せようとしている棚（光らせる） */
   const [dropShelf, setDropShelf] = useState<string | null>(null);
@@ -243,9 +257,11 @@ export function MyRoom({ entries, initialLayout, serverReady, dogSkin, dogName, 
   const latest = useRef(layout);
   latest.current = layout;
   const [place, setPlace] = useState<RoomPlace>(DEFAULT_PLACE);
+  /** 端末に保存した場所を読み終えたか（読む前に東京の天気を取りに行かないため） */
+  const [placeReady, setPlaceReady] = useState(false);
   const phase: DayPhase = dayPhaseOf(now, place);
   /** お天気ボードに書く場所の名前（「岐阜」など） */
-  const placeName = prefNameOf(place.pref).replace(/(都|府|県)$/, "");
+  const placeName = placeShortName(place);
 
   const [weather, setWeather] = useState<RoomWeather | null>(null);
   /** 犬が遊んでいる家具の動き（置いたものの id → 動き） */
@@ -256,6 +272,8 @@ export function MyRoom({ entries, initialLayout, serverReady, dogSkin, dogName, 
       return cur[id] === fx ? cur : { ...cur, [id]: fx };
     });
   }, []);
+  /** いまの行事（もようがえでオフにしていれば null） */
+  const roomEvent = layout.theme.events === false ? null : roomEventOf(now)?.id ?? null;
   const lightsOn = useMemo(() => lampsOn(withWeather(skyAt(now, place), weather)), [now, place, weather]);
   /** 犬が寝る時間（日本時間の21時〜6時） */
   const sleepy = useMemo(() => { const h = Number(new Intl.DateTimeFormat("en-US", { timeZone: "Asia/Tokyo", hour: "numeric", hourCycle: "h23" }).format(now)); return h >= 21 || h < 6; }, [now]);
@@ -272,15 +290,27 @@ export function MyRoom({ entries, initialLayout, serverReady, dogSkin, dogName, 
     try {
       const raw = JSON.parse(window.localStorage.getItem(PLACE_KEY) ?? "null") as Partial<RoomPlace> | null;
       if (raw && typeof raw.lat === "number" && typeof raw.lon === "number" && Math.abs(raw.lat) <= 90 && Math.abs(raw.lon) <= 180 && typeof raw.pref === "string" && (raw.source === "gps" || raw.source === "pref")) {
-        setPlace({ lat: raw.lat, lon: raw.lon, source: raw.source, pref: raw.pref });
+        setPlace({
+          lat: raw.lat, lon: raw.lon, source: raw.source, pref: raw.pref,
+          ...(typeof raw.city === "string" ? { city: raw.city.slice(0, 20) } : {}),
+          ...(typeof raw.acc === "number" ? { acc: raw.acc } : {}),
+        });
+        // 現在地を使っていて、位置情報がもう許可されていれば、ひらくたびに正確な場所を取り直す（許可を聞く画面は出さない）
+        if (raw.source === "gps" && navigator.permissions?.query) {
+          navigator.permissions.query({ name: "geolocation" as PermissionName })
+            .then((st) => { if (st.state === "granted") return locateHere().then(changePlaceRef.current); })
+            .catch(() => { /* とれなければ前の場所のまま */ });
+        }
       }
     } catch { /* 読めなければ東京のまま */ }
+    setPlaceReady(true);
   }, []);
   // 窓の外の、いまの本当の天気（20分ごとに取り直す。取れなければ季節だけの景色）
   useEffect(() => {
+    if (!placeReady) return;
     let alive = true;
     const load = () => {
-      fetch(`/api/my-room/weather?lat=${place.lat.toFixed(1)}&lon=${place.lon.toFixed(1)}`)
+      fetch(`/api/my-room/weather?lat=${place.lat.toFixed(2)}&lon=${place.lon.toFixed(2)}`)
         .then((r) => (r.ok ? r.json() : null))
         .then((j) => { if (alive) setWeather(parseRoomWeather(j)); })
         .catch(() => { if (alive) setWeather(null); });
@@ -288,11 +318,13 @@ export function MyRoom({ entries, initialLayout, serverReady, dogSkin, dogName, 
     load();
     const t = window.setInterval(load, 20 * 60_000);
     return () => { alive = false; window.clearInterval(t); };
-  }, [place.lat, place.lon]);
+  }, [placeReady, place.lat.toFixed(2), place.lon.toFixed(2)]); // eslint-disable-line react-hooks/exhaustive-deps -- 1km より細かい動きでは取り直さない
   const changePlace = useCallback((p: RoomPlace) => {
     setPlace(p);
     try { window.localStorage.setItem(PLACE_KEY, JSON.stringify(p)); } catch { /* 保存できなくてもこの画面では使える */ }
   }, []);
+  const changePlaceRef = useRef(changePlace);
+  changePlaceRef.current = changePlace;
 
   // サーバーに保存できない環境では、端末に残っている部屋を使う
   useEffect(() => {
@@ -345,12 +377,15 @@ export function MyRoom({ entries, initialLayout, serverReady, dogSkin, dogName, 
   }, [serverReady]);
 
   /* ---------- 変更 ---------- */
+  const readOnly = !!visit;
   const commit = useCallback((next: RoomLayout, before: RoomLayout = latest.current) => {
+    // フレンドの部屋は見るだけ
+    if (readOnly) return;
     setPast((p) => [...p.slice(-(HISTORY_LIMIT - 1)), before]);
     setFuture([]);
     setLayout(next);
     setSaveState("dirty");
-  }, []);
+  }, [readOnly]);
   const changeItem = (id: string, change: (p: Placement) => Placement) => commit({ ...layout, items: layout.items.map((p) => (p.id === id ? change(p) : p)) });
   const setTheme = (patch: Partial<RoomTheme>) => commit({ ...layout, theme: { ...layout.theme, ...patch } });
   const topZ = () => Math.max(0, ...layout.items.map((p) => p.z)) + 1;
@@ -600,14 +635,16 @@ export function MyRoom({ entries, initialLayout, serverReady, dogSkin, dogName, 
     <main className="min-h-dvh bg-paper pb-[calc(env(safe-area-inset-bottom)+1.5rem)] text-ink">
       <header className="sticky top-0 z-[600] border-b border-line bg-paper/95 backdrop-blur">
         <div className="mx-auto flex h-14 max-w-lg items-center gap-2 px-3">
-          <Link href="/mypage" aria-label="マイページへ戻る" className="flex h-11 w-11 items-center justify-center rounded-full active:bg-paper-deep">
+          <Link href={visit ? "/room" : "/mypage"} aria-label={visit ? "じぶんのおへやへ戻る" : "マイページへ戻る"} className="flex h-11 w-11 items-center justify-center rounded-full active:bg-paper-deep">
             <IconChevronLeft size={24} />
           </Link>
           <div className="min-w-0 flex-1 text-center">
-            <p className="text-[10px] font-bold tracking-[0.18em] text-leaf-deep">MY ROOM</p>
-            <h1 className="truncate text-[17px] font-black">{dogName}のおへや</h1>
+            <p className="text-[10px] font-bold tracking-[0.18em] text-leaf-deep">{visit ? "FRIEND'S ROOM" : "MY ROOM"}</p>
+            <h1 className="truncate text-[17px] font-black">{visit ? `${visit.name}さんのおへや` : `${dogName}のおへや`}</h1>
           </div>
-          {editing ? (
+          {visit ? (
+            <LikeButton liked={visitLike.liked} count={visitLike.likeCount} busy={visitLike.busy} onToggle={() => void visitLike.toggleLike()} />
+          ) : editing ? (
             <button type="button" onClick={() => { setEditing(false); setSelectedId(null); if (saveState === "dirty") void persist(); }} className="min-w-[72px] rounded-full bg-leaf-deep px-4 py-2.5 text-sm font-bold text-white shadow-sm active:scale-95">
               できた
             </button>
@@ -683,8 +720,19 @@ export function MyRoom({ entries, initialLayout, serverReady, dogSkin, dogName, 
           })}
 
           <RoomDog skin={dogSkin} phase={phase} sleepy={sleepy} lines={dogLines} quiet={editing} places={dogPlaces} weather={weather?.kind ?? null} onFx={onFurnitureFx} />
+          {/* 行事のもの（部屋の左右のすみ）。置いたものと同じく、奥ほど下に重なる */}
+          {roomEvent ? (["L", "R"] as const).map((side) => (
+            <div key={side} className="pointer-events-none absolute inset-0" style={{ zIndex: 300 + Math.round(EVENT_FLOOR_Y[side] * 10) }} data-event-layer>
+              <EventFloor event={roomEvent} side={side} lit={lightsOn} />
+            </div>
+          )) : null}
+          {roomEvent ? (
+            <div className="pointer-events-none absolute inset-0" style={{ zIndex: 1990 }}>
+              <EventFront event={roomEvent} lit={lightsOn} />
+            </div>
+          ) : null}
           <div className="pointer-events-none absolute inset-0" style={{ zIndex: 2000 }}>
-            <RoomLighting now={now} lamps={lampLights} at={place} weather={weather} room={layout.theme.room} />
+            <RoomLighting now={now} lamps={lampLights} at={place} weather={weather} room={layout.theme.room} event={roomEvent} />
           </div>
           {peek ? (
             <span className="room-bubble pointer-events-none absolute w-max max-w-[12rem] -translate-x-1/2 -translate-y-full rounded-xl bg-ink px-2.5 py-1 text-[10px] font-bold text-white shadow" style={{ left: `${clamp(peek.x, 18, 82)}%`, top: `${Math.max(4, peek.y - 0.5)}%`, zIndex: 2600 }}>{peek.text}</span>
@@ -761,7 +809,7 @@ export function MyRoom({ entries, initialLayout, serverReady, dogSkin, dogName, 
                 <input ref={fileRef} type="file" accept="image/*" className="hidden" onChange={(e) => { const f = e.target.files?.[0]; if (f) void uploadPhoto(f); }} />
               ) : null}
               {tab === "theme" ? (
-                <ThemePicker theme={layout.theme} onChange={setTheme} />
+                <ThemePicker theme={layout.theme} onChange={setTheme} now={now} />
               ) : tabEntries.length || tab === "photo" ? (
                 <div className="mt-2 grid grid-cols-3 gap-2.5">
                   {tab === "photo" ? (
@@ -800,39 +848,11 @@ export function MyRoom({ entries, initialLayout, serverReady, dogSkin, dogName, 
               )}
             </section>
           </>
+        ) : visit ? (
+          <VisitPanel visit={visit} dogName={dogName} liked={visitLike.liked} likeCount={visitLike.likeCount} likeBusy={visitLike.busy} onLike={() => void visitLike.toggleLike()} />
         ) : (
           <section className="space-y-3 px-4 pt-4">
-            {/* 飾ったものの数：木の飾り棚に見立てる。押すと、もようがえのそのタブを開く */}
-            <div className="rounded-[22px] bg-[linear-gradient(180deg,#D9A56A,#A86E3C)] p-2 shadow-[0_8px_16px_-10px_rgba(80,50,20,.6)]">
-              <div className="mb-1.5 flex items-center justify-center">
-                <p className="rounded-md bg-[linear-gradient(180deg,#F2D58A,#C99A3C)] px-3 py-0.5 text-[10px] font-black tracking-wider text-[#5A3A14] shadow-[0_1px_0_rgba(255,255,255,.5)_inset,0_1px_2px_rgba(60,35,10,.4)]">{dogName}のコレクション</p>
-              </div>
-              <div className="grid grid-cols-4 gap-1.5">
-                {([["item", "アイテム", "🧸"], ["photo", "写真", "🖼️"], ["trophy", "トロフィー", "🏆"], ["pennant", "ペナント", "🚩"]] as const).map(([kind, label, icon]) => {
-                  const n = layout.items.filter((p) => entryByKey.get(p.key)?.kind === kind).length;
-                  const total = counts[kind];
-                  return (
-                    <button
-                      key={kind}
-                      type="button"
-                      onClick={() => { setEditing(true); setTab(kind); }}
-                      aria-label={`${label}を飾る（${n}/${total}）`}
-                      className="relative overflow-hidden rounded-[13px] bg-[linear-gradient(180deg,#F6E8CF,#EAD5B3)] px-1 pb-2 pt-2.5 text-center shadow-[inset_0_7px_9px_-4px_rgba(70,40,15,.45),inset_0_-2px_0_rgba(255,255,255,.4)] active:scale-[.97]"
-                    >
-                      <div className="text-[22px] leading-none drop-shadow-[0_3px_2px_rgba(70,40,15,.35)]">{icon}</div>
-                      {/* 棚板 */}
-                      <div className="mx-auto mt-1 h-[3px] w-[80%] rounded-full bg-[#B98552] shadow-[0_1px_0_rgba(255,255,255,.5)]" />
-                      <div className="mt-1 text-[14px] font-black tabular-nums text-[#4E3018]">{n}<span className="text-[10px] font-bold text-[#8A6A4A]">/{total}</span></div>
-                      <div className="text-[10px] font-bold text-[#7A5A3A]">{label}</div>
-                      <div className="mx-auto mt-1 h-1 w-[78%] overflow-hidden rounded-full bg-[#D9C3A0]">
-                        <div className="h-full rounded-full bg-leaf-deep" style={{ width: `${total ? Math.min(100, (n / total) * 100) : 0}%` }} />
-                      </div>
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
-            <SkyCard now={now} place={place} onPlace={changePlace} weather={weather} />
+            <SkyCard now={now} place={place} onPlace={changePlace} weather={weather} steps={steps} history={stepHistory} />
             <ul className="space-y-1.5 rounded-2xl border border-line bg-card px-4 py-3 text-[12px] leading-relaxed text-ink-soft shadow-sm">
               <li>🐾 {dogName}をタップすると、なでられます</li>
               <li>🖼️ 飾った写真をタップすると、その日の思い出が見られます</li>
@@ -842,6 +862,7 @@ export function MyRoom({ entries, initialLayout, serverReady, dogSkin, dogName, 
             <button type="button" onClick={() => void takeSnapshot()} disabled={shooting} className="flex w-full items-center justify-center gap-2 rounded-full bg-leaf-deep py-3 text-sm font-black text-white shadow-md active:scale-[.98] disabled:opacity-60">
               <span aria-hidden="true">📷</span>{shooting ? "撮影中…" : "記念撮影する"}
             </button>
+            {guests ? <RoomGuests mail={guests.mail} friends={guests.friends} /> : null}
             <p className="text-center text-[10px] font-semibold text-ink-faint">{saveLabel}</p>
           </section>
         )}
@@ -905,7 +926,9 @@ const styleSwatch = (style: RoomStyle): React.CSSProperties => {
 };
 const DECO_LABELS: Record<WallDeco, string> = { none: "なし", garland: "ガーランド", lights: "ライト", stars: "お星さま" };
 
-function ThemePicker({ theme, onChange }: { theme: RoomTheme; onChange: (patch: Partial<RoomTheme>) => void }) {
+function ThemePicker({ theme, onChange, now }: { theme: RoomTheme; onChange: (patch: Partial<RoomTheme>) => void; now: Date }) {
+  const event = roomEventOf(now), next = nextRoomEvent(now);
+  const eventsOn = theme.events !== false;
   return (
     <div className="mt-3 space-y-4">
       <Swatches title="おへや（えらぶと壁・床・窓もおすすめに変わります）" value={theme.room} options={ROOM_KINDS} label={(id) => ROOM_KIND_STYLES[id].label} render={(room) => <ThemeSwatch part="room" theme={ROOM_PRESETS[room]} />} onPick={(room) => onChange({ ...ROOM_PRESETS[room] })} />
@@ -915,6 +938,25 @@ function ThemePicker({ theme, onChange }: { theme: RoomTheme; onChange: (patch: 
       <Swatches title="カーテン" value={theme.curtain} options={CURTAINS} label={(id) => CURTAIN_STYLES[id].label} render={(curtain) => <ThemeSwatch part="curtain" theme={{ ...theme, curtain }} />} onPick={(curtain) => onChange({ curtain })} />
       <Swatches title="壁のかざり" value={theme.deco} options={WALL_DECOS} label={(id) => DECO_LABELS[id]} render={(deco) => <ThemeSwatch part="deco" theme={{ ...theme, deco }} />} onPick={(deco) => onChange({ deco })} />
       <Swatches title="ラグ" value={theme.rug} options={RUGS} label={(id) => RUG_STYLES[id].label} render={(rug) => <ThemeSwatch part="rug" theme={{ ...theme, rug }} />} onPick={(rug) => onChange({ rug })} />
+      {/* 季節の行事かざり */}
+      <div className="flex items-center justify-between gap-3 rounded-2xl border border-line bg-paper px-3 py-2.5">
+        <div className="min-w-0">
+          <p className="text-xs font-black text-ink-soft">季節の行事かざり</p>
+          <p className="mt-0.5 text-[10px] font-bold text-ink-faint">
+            {event ? `いまは「${event.name}」（${event.from[0]}/${event.from[1]}〜${event.to[0]}/${event.to[1]}）` : `つぎは「${next.name}」 ${next.from[0]}/${next.from[1]}から`}・お正月・ひなまつり・七夕・ハロウィン・クリスマスなど
+          </p>
+        </div>
+        <button
+          type="button"
+          role="switch"
+          aria-checked={eventsOn}
+          aria-label="季節の行事かざり"
+          onClick={() => onChange({ events: !eventsOn })}
+          className={`relative h-7 w-12 shrink-0 rounded-full transition-colors ${eventsOn ? "bg-leaf-deep" : "bg-line-strong"}`}
+        >
+          <span className={`absolute top-0.5 h-6 w-6 rounded-full bg-white shadow transition-[left] ${eventsOn ? "left-[22px]" : "left-0.5"}`} />
+        </button>
+      </div>
     </div>
   );
 }

@@ -95,6 +95,15 @@ export default async function FriendDetailPage({
             ) : null}
           </section>
 
+          <Link href={`/room/visit/${friendId}`} className="rough-card flex items-center gap-3 px-4 py-3.5 active:scale-[.99]">
+            <span aria-hidden className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-leaf-soft text-xl">🏠</span>
+            <span className="min-w-0 flex-1">
+              <span className="block text-sm font-black">わんこのおへやに あそびに行く</span>
+              <span className="block text-[11px] font-bold text-ink-soft">いいねや置き手紙をのこせます</span>
+            </span>
+            <IconChevronRight size={18} className="text-ink-faint" />
+          </Link>
+
           <section className="rough-card flex items-center justify-around px-3 py-5 text-center">
             <Stat value={overview.visited_prefecture_count} label="都道府県" />
             <span className="h-10 w-px bg-line" />

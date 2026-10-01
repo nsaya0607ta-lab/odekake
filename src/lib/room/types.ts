@@ -97,7 +97,11 @@ export type Rug = (typeof RUGS)[number];
 export type WallDeco = (typeof WALL_DECOS)[number];
 export type RoomStyle = (typeof ROOM_STYLES)[number];
 export type RoomKind = (typeof ROOM_KINDS)[number];
-export type RoomTheme = { wall: Wallpaper; floor: Floor; curtain: Curtain; rug: Rug; deco: WallDeco; style: RoomStyle; room: RoomKind };
+export type RoomTheme = {
+  wall: Wallpaper; floor: Floor; curtain: Curtain; rug: Rug; deco: WallDeco; style: RoomStyle; room: RoomKind;
+  /** 季節の行事かざり（お正月・ハロウィン・クリスマスなど）を自動で出すか。ないときは出す */
+  events?: boolean;
+};
 
 /** 端末から選んで、おへや用にアップロードした写真（Storage の users/{自分}/room/ に置く） */
 export type RoomPhoto = { id: string; path: string; date: string; title: string };
@@ -188,6 +192,7 @@ export function parseRoomLayout(value: unknown, validKeys?: ReadonlySet<string>)
     deco: oneOf(WALL_DECOS, t.deco, "none"),
     style: oneOf(ROOM_STYLES, t.style, "standard"),
     room: oneOf(ROOM_KINDS, t.room, "cozy"),
+    ...(t.events === false ? { events: false } : {}),
   };
   const rawPhotos = Array.isArray(root.photos) ? root.photos.slice(0, ROOM_MAX_PHOTOS) : [];
   const photos = rawPhotos.flatMap((raw): RoomPhoto[] => {
@@ -329,4 +334,33 @@ export function freeShelfSpot(shelfId: string, items: readonly Placement[]): num
     if (d > bestD + 1e-6) { bestD = d; best = r; }
   }
   return best;
+}
+
+/* ---------- 季節の行事かざり ---------- */
+export type RoomEvent = "newyear" | "valentine" | "hina" | "hanami" | "kodomo" | "tanabata" | "tsukimi" | "halloween" | "christmas";
+/** 行事と、かざる期間（日本時間の月日。両はしをふくむ） */
+export const ROOM_EVENTS: readonly { id: RoomEvent; name: string; from: [number, number]; to: [number, number] }[] = [
+  { id: "newyear", name: "お正月", from: [1, 1], to: [1, 7] },
+  { id: "valentine", name: "バレンタイン", from: [2, 7], to: [2, 14] },
+  { id: "hina", name: "ひなまつり", from: [2, 24], to: [3, 3] },
+  { id: "hanami", name: "お花見", from: [3, 20], to: [4, 10] },
+  { id: "kodomo", name: "こどもの日", from: [4, 25], to: [5, 5] },
+  { id: "tanabata", name: "七夕", from: [7, 1], to: [7, 7] },
+  { id: "tsukimi", name: "お月見", from: [9, 10], to: [9, 25] },
+  { id: "halloween", name: "ハロウィン", from: [10, 15], to: [10, 31] },
+  { id: "christmas", name: "クリスマス", from: [12, 10], to: [12, 25] },
+];
+const monthDay = (date: Date) => {
+  const [m, d] = new Intl.DateTimeFormat("en-US", { timeZone: "Asia/Tokyo", month: "numeric", day: "numeric" }).format(date).split("/").map(Number);
+  return (m ?? 1) * 100 + (d ?? 1);
+};
+/** いまの行事（日本時間）。なければ null */
+export function roomEventOf(date: Date): (typeof ROOM_EVENTS)[number] | null {
+  const md = monthDay(date);
+  return ROOM_EVENTS.find((e) => md >= e.from[0] * 100 + e.from[1] && md <= e.to[0] * 100 + e.to[1]) ?? null;
+}
+/** つぎの行事 */
+export function nextRoomEvent(date: Date): (typeof ROOM_EVENTS)[number] {
+  const md = monthDay(date);
+  return ROOM_EVENTS.find((e) => e.from[0] * 100 + e.from[1] > md) ?? ROOM_EVENTS[0]!;
 }

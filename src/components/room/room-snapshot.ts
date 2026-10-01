@@ -69,10 +69,16 @@ export async function composeRoomSnapshot(room: HTMLElement, caption: { title: s
   if (scene) await drawSvgAt(scene);
 
   // 飾ったものと犬を、画面と同じ重なり順で
-  const layers = Array.from(room.querySelectorAll<HTMLElement>("[data-pid], [data-dog]"))
+  const layers = Array.from(room.querySelectorAll<HTMLElement>("[data-pid], [data-dog], [data-event-layer]"))
     .sort((a, b) => Number(getComputedStyle(a).zIndex || 0) - Number(getComputedStyle(b).zIndex || 0));
 
   for (const el of layers) {
+    // 行事のもの（部屋と同じ大きさの SVG）
+    if (el.dataset.eventLayer !== undefined) {
+      const svg = el.querySelector<SVGSVGElement>("svg");
+      if (svg) { try { await drawSvgAt(svg); } catch { /* なしで続ける */ } }
+      continue;
+    }
     const body = el.querySelector<HTMLElement>("[data-body]") ?? el;
     const rect = body.getBoundingClientRect();
     const c = local(centerOf(rect).x, centerOf(rect).y);
@@ -134,6 +140,12 @@ export async function composeRoomSnapshot(room: HTMLElement, caption: { title: s
       // 読めなかったものは飛ばす
     }
     ctx.restore();
+  }
+
+  // 天井からつるした行事のかざり
+  const front = room.querySelector<SVGSVGElement>("[data-event-front]");
+  if (front) {
+    try { await drawSvgAt(front); } catch { /* かざりなしで続ける */ }
   }
 
   // 時間帯の明かり（夜の暗さ・ランプのまわりの明るさ・四すみのかげ）
