@@ -60,7 +60,7 @@ import { composeRoomSnapshot } from "./room-snapshot";
 import { skyAt } from "@/lib/room/sun";
 import { parseRoomWeather, withWeather, type RoomWeather } from "@/lib/room/weather";
 import { dayPhaseOf, FixtureVisual, fixtureSize, lampsOn, ROOM_STAGE, RoomLighting, RoomScene, ThemeSwatch, windowRectOf, type DayPhase } from "./room-scene";
-import { DEFAULT_PLACE, prefNameOf, SkyCard, type RoomPlace } from "./sky-card";
+import { DEFAULT_PLACE, locateHere, placeShortName, SkyCard, type RoomPlace } from "./sky-card";
 
 type Tab = DecorKind | "theme";
 type ItemFilter = "all" | "toy" | "food" | "interior" | "other" | "sushi";
@@ -194,7 +194,7 @@ async function shrinkImage(file: File, max: number, quality: number): Promise<Bl
   return new Promise((resolve, reject) => canvas.toBlob((b) => (b ? resolve(b) : reject(new Error("encode failed"))), "image/jpeg", quality));
 }
 
-export function MyRoom({ entries, initialLayout, serverReady, dogSkin, dogName, serverNow }: {
+export function MyRoom({ entries, initialLayout, serverReady, dogSkin, dogName, serverNow, steps }: {
   entries: DecorEntry[];
   initialLayout: RoomLayout | null;
   serverReady: boolean;
@@ -202,6 +202,8 @@ export function MyRoom({ entries, initialLayout, serverReady, dogSkin, dogName, 
   dogName: string;
   /** サーバーで描いた時刻。最初の表示をサーバーとそろえ、そのあと端末の時刻に合わせる */
   serverNow: string;
+  /** きょうの歩数（サーバーで描いた値。あとは 30 秒ごとに取り直す） */
+  steps?: { steps: number | null; stepExp: number; coinBalance: number };
 }) {
   // 家具はだれでも置けるので、持ち物と合わせて「置けるもの」にする
   const validKeys = useMemo(() => new Set([...entries, ...FURNITURE_ENTRIES, ...FIXTURE_ENTRIES].map((e) => e.key)), [entries]);
@@ -243,9 +245,11 @@ export function MyRoom({ entries, initialLayout, serverReady, dogSkin, dogName, 
   const latest = useRef(layout);
   latest.current = layout;
   const [place, setPlace] = useState<RoomPlace>(DEFAULT_PLACE);
+  /** 端末に保存した場所を読み終えたか（読む前に東京の天気を取りに行かないため） */
+  const [placeReady, setPlaceReady] = useState(false);
   const phase: DayPhase = dayPhaseOf(now, place);
   /** お天気ボードに書く場所の名前（「岐阜」など） */
-  const placeName = prefNameOf(place.pref).replace(/(都|府|県)$/, "");
+  const placeName = placeShortName(place);
 
   const [weather, setWeather] = useState<RoomWeather | null>(null);
   /** 犬が遊んでいる家具の動き（置いたものの id → 動き） */
@@ -272,15 +276,27 @@ export function MyRoom({ entries, initialLayout, serverReady, dogSkin, dogName, 
     try {
       const raw = JSON.parse(window.localStorage.getItem(PLACE_KEY) ?? "null") as Partial<RoomPlace> | null;
       if (raw && typeof raw.lat === "number" && typeof raw.lon === "number" && Math.abs(raw.lat) <= 90 && Math.abs(raw.lon) <= 180 && typeof raw.pref === "string" && (raw.source === "gps" || raw.source === "pref")) {
-        setPlace({ lat: raw.lat, lon: raw.lon, source: raw.source, pref: raw.pref });
+        setPlace({
+          lat: raw.lat, lon: raw.lon, source: raw.source, pref: raw.pref,
+          ...(typeof raw.city === "string" ? { city: raw.city.slice(0, 20) } : {}),
+          ...(typeof raw.acc === "number" ? { acc: raw.acc } : {}),
+        });
+        // 現在地を使っていて、位置情報がもう許可されていれば、ひらくたびに正確な場所を取り直す（許可を聞く画面は出さない）
+        if (raw.source === "gps" && navigator.permissions?.query) {
+          navigator.permissions.query({ name: "geolocation" as PermissionName })
+            .then((st) => { if (st.state === "granted") return locateHere().then(changePlaceRef.current); })
+            .catch(() => { /* とれなければ前の場所のまま */ });
+        }
       }
     } catch { /* 読めなければ東京のまま */ }
+    setPlaceReady(true);
   }, []);
   // 窓の外の、いまの本当の天気（20分ごとに取り直す。取れなければ季節だけの景色）
   useEffect(() => {
+    if (!placeReady) return;
     let alive = true;
     const load = () => {
-      fetch(`/api/my-room/weather?lat=${place.lat.toFixed(1)}&lon=${place.lon.toFixed(1)}`)
+      fetch(`/api/my-room/weather?lat=${place.lat.toFixed(2)}&lon=${place.lon.toFixed(2)}`)
         .then((r) => (r.ok ? r.json() : null))
         .then((j) => { if (alive) setWeather(parseRoomWeather(j)); })
         .catch(() => { if (alive) setWeather(null); });
@@ -288,11 +304,13 @@ export function MyRoom({ entries, initialLayout, serverReady, dogSkin, dogName, 
     load();
     const t = window.setInterval(load, 20 * 60_000);
     return () => { alive = false; window.clearInterval(t); };
-  }, [place.lat, place.lon]);
+  }, [placeReady, place.lat.toFixed(2), place.lon.toFixed(2)]); // eslint-disable-line react-hooks/exhaustive-deps -- 1km より細かい動きでは取り直さない
   const changePlace = useCallback((p: RoomPlace) => {
     setPlace(p);
     try { window.localStorage.setItem(PLACE_KEY, JSON.stringify(p)); } catch { /* 保存できなくてもこの画面では使える */ }
   }, []);
+  const changePlaceRef = useRef(changePlace);
+  changePlaceRef.current = changePlace;
 
   // サーバーに保存できない環境では、端末に残っている部屋を使う
   useEffect(() => {
@@ -802,37 +820,7 @@ export function MyRoom({ entries, initialLayout, serverReady, dogSkin, dogName, 
           </>
         ) : (
           <section className="space-y-3 px-4 pt-4">
-            {/* 飾ったものの数：木の飾り棚に見立てる。押すと、もようがえのそのタブを開く */}
-            <div className="rounded-[22px] bg-[linear-gradient(180deg,#D9A56A,#A86E3C)] p-2 shadow-[0_8px_16px_-10px_rgba(80,50,20,.6)]">
-              <div className="mb-1.5 flex items-center justify-center">
-                <p className="rounded-md bg-[linear-gradient(180deg,#F2D58A,#C99A3C)] px-3 py-0.5 text-[10px] font-black tracking-wider text-[#5A3A14] shadow-[0_1px_0_rgba(255,255,255,.5)_inset,0_1px_2px_rgba(60,35,10,.4)]">{dogName}のコレクション</p>
-              </div>
-              <div className="grid grid-cols-4 gap-1.5">
-                {([["item", "アイテム", "🧸"], ["photo", "写真", "🖼️"], ["trophy", "トロフィー", "🏆"], ["pennant", "ペナント", "🚩"]] as const).map(([kind, label, icon]) => {
-                  const n = layout.items.filter((p) => entryByKey.get(p.key)?.kind === kind).length;
-                  const total = counts[kind];
-                  return (
-                    <button
-                      key={kind}
-                      type="button"
-                      onClick={() => { setEditing(true); setTab(kind); }}
-                      aria-label={`${label}を飾る（${n}/${total}）`}
-                      className="relative overflow-hidden rounded-[13px] bg-[linear-gradient(180deg,#F6E8CF,#EAD5B3)] px-1 pb-2 pt-2.5 text-center shadow-[inset_0_7px_9px_-4px_rgba(70,40,15,.45),inset_0_-2px_0_rgba(255,255,255,.4)] active:scale-[.97]"
-                    >
-                      <div className="text-[22px] leading-none drop-shadow-[0_3px_2px_rgba(70,40,15,.35)]">{icon}</div>
-                      {/* 棚板 */}
-                      <div className="mx-auto mt-1 h-[3px] w-[80%] rounded-full bg-[#B98552] shadow-[0_1px_0_rgba(255,255,255,.5)]" />
-                      <div className="mt-1 text-[14px] font-black tabular-nums text-[#4E3018]">{n}<span className="text-[10px] font-bold text-[#8A6A4A]">/{total}</span></div>
-                      <div className="text-[10px] font-bold text-[#7A5A3A]">{label}</div>
-                      <div className="mx-auto mt-1 h-1 w-[78%] overflow-hidden rounded-full bg-[#D9C3A0]">
-                        <div className="h-full rounded-full bg-leaf-deep" style={{ width: `${total ? Math.min(100, (n / total) * 100) : 0}%` }} />
-                      </div>
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
-            <SkyCard now={now} place={place} onPlace={changePlace} weather={weather} />
+            <SkyCard now={now} place={place} onPlace={changePlace} weather={weather} steps={steps} />
             <ul className="space-y-1.5 rounded-2xl border border-line bg-card px-4 py-3 text-[12px] leading-relaxed text-ink-soft shadow-sm">
               <li>🐾 {dogName}をタップすると、なでられます</li>
               <li>🖼️ 飾った写真をタップすると、その日の思い出が見られます</li>

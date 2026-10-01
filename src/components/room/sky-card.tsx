@@ -5,12 +5,45 @@
  * おへやの窓の外と部屋の明るさは、これと同じ計算で決まる。場所は現在地か都道府県で選べる（わからなければ東京）。
  */
 import { useMemo, useState } from "react";
+import { STEP_COIN_MILESTONES } from "@/lib/coins";
+import { useTodaySteps, type TodaySteps } from "@/lib/use-today-steps";
 import { PREFECTURE_NAMES } from "@/lib/geo/prefecture-names";
 import { WEATHER_LABEL, withWeather, type RoomWeather } from "@/lib/room/weather";
 import { fmtJstTime, moonPhase, nearestPref, PREF_POINTS, skyAt, sunTimes, type GeoPoint } from "@/lib/room/sun";
 
-/** 空の計算に使う場所。gps は現在地（0.1度に丸めて、この端末にだけ保存する） */
-export type RoomPlace = GeoPoint & { source: "gps" | "pref" | "default"; pref: string };
+/**
+ * 空と天気の計算に使う場所。gps は現在地（この端末にだけ保存する）。
+ * city は現在地にいちばん近い市区町村、acc は位置のずれ（m）
+ */
+export type RoomPlace = GeoPoint & { source: "gps" | "pref" | "default"; pref: string; city?: string; acc?: number };
+
+/**
+ * いまいる場所をできるだけ正確にとる（GPS をつかい、前の位置は使い回さない）。
+ * 市区町村名は、近くの市区町村の代表地点からさがす（データは使うときだけ読みこむ）
+ */
+export function locateHere(): Promise<RoomPlace> {
+  return new Promise((resolve, reject) => {
+    if (typeof navigator === "undefined" || !("geolocation" in navigator)) { reject(new Error("unsupported")); return; }
+    navigator.geolocation.getCurrentPosition(
+      async (pos) => {
+        // 約10m の細かさで十分なので、小数4けたにそろえる
+        const at = { lat: Math.round(pos.coords.latitude * 1e4) / 1e4, lon: Math.round(pos.coords.longitude * 1e4) / 1e4 };
+        let pref = nearestPref(at), city: string | undefined;
+        try {
+          const { nearestMunicipality } = await import("@/lib/geo/municipalities");
+          const near = nearestMunicipality(at.lat, at.lon);
+          if (near && near.distanceMeters < 40_000) { pref = near.municipality.prefectureCode; city = near.municipality.name; }
+        } catch { /* 市区町村がわからなくても都道府県で出す */ }
+        resolve({ ...at, source: "gps", pref, city, acc: Math.round(pos.coords.accuracy) });
+      },
+      (err) => reject(err),
+      { enableHighAccuracy: true, timeout: 15_000, maximumAge: 0 },
+    );
+  });
+}
+
+/** 場所の短い名前（「岐阜市」など。お天気ボードの名ふだ用） */
+export const placeShortName = (p: RoomPlace) => (p.city ? p.city.match(/^(.+?市).+区$/)?.[1] ?? p.city : prefNameOf(p.pref).replace(/(都|府|県)$/, ""));
 export const DEFAULT_PLACE: RoomPlace = { ...PREF_POINTS["13"]!, source: "default", pref: "13" };
 export const prefNameOf = (code: string) => PREFECTURE_NAMES.find((p) => p.code === code)?.name ?? "東京都";
 
@@ -19,7 +52,22 @@ const MOON_NAMES: [number, string][] = [
 ];
 const moonName = (p: number) => MOON_NAMES.find(([max]) => p <= max)?.[1] ?? "新月";
 
-export function SkyCard({ now, place, onPlace, weather = null }: { now: Date; place: RoomPlace; onPlace: (p: RoomPlace) => void; weather?: RoomWeather | null }) {
+const NO_STEPS: TodaySteps = { steps: null, stepExp: 0, coinBalance: 0 };
+/** 歩数の道の長さ（この歩数で右はし）と、コインのボーナスがもらえる歩数（旗を立てる） */
+const TRAIL_MAX = 12_000;
+const TRAIL_X0 = 18, TRAIL_X1 = 282;
+const trailX = (n: number) => TRAIL_X0 + (Math.min(n, TRAIL_MAX) / TRAIL_MAX) * (TRAIL_X1 - TRAIL_X0);
+/** 手前の丘の上の道（x での高さ） */
+const trailY = (x: number) => 131 + Math.sin((x / 300) * Math.PI * 2.2) * 2.2;
+
+export function SkyCard({ now, place, onPlace, weather = null, steps }: {
+  now: Date; place: RoomPlace; onPlace: (p: RoomPlace) => void; weather?: RoomWeather | null;
+  /** きょうの歩数（渡したときだけ、手前の丘におさんぽの道を描く） */
+  steps?: TodaySteps;
+}) {
+  const today = useTodaySteps(steps ?? NO_STEPS);
+  const stepCount = steps ? today.steps : null;
+  const nextGoal = stepCount === null ? null : STEP_COIN_MILESTONES.find((m) => m.steps > stepCount) ?? null;
   const day = new Intl.DateTimeFormat("sv-SE", { timeZone: "Asia/Tokyo" }).format(now);
   const times = useMemo(() => sunTimes(new Date(`${day}T12:00:00+09:00`), place), [day, place]);
   const sky = withWeather(skyAt(now, place), weather);
@@ -27,25 +75,17 @@ export function SkyCard({ now, place, onPlace, weather = null }: { now: Date; pl
   const [locating, setLocating] = useState(false);
   const [geoError, setGeoError] = useState("");
   const useHere = () => {
-    if (!("geolocation" in navigator)) { setGeoError("この端末では現在地が使えません。都道府県を選んでください"); return; }
     setLocating(true);
     setGeoError("");
-    navigator.geolocation.getCurrentPosition(
-      (pos) => {
-        // 空の計算には町くらいの細かさで十分なので、0.1度（約10km）に丸める
-        const at = { lat: Math.round(pos.coords.latitude * 10) / 10, lon: Math.round(pos.coords.longitude * 10) / 10 };
-        onPlace({ ...at, source: "gps", pref: nearestPref(at) });
-        setLocating(false);
-        setOpen(false);
-      },
-      (err) => {
-        setLocating(false);
-        setGeoError(err.code === err.PERMISSION_DENIED ? "位置情報が許可されていません。都道府県を選んでください" : "現在地がわかりませんでした。都道府県を選んでください");
-      },
-      { enableHighAccuracy: false, timeout: 10_000, maximumAge: 6 * 3_600_000 },
-    );
+    locateHere()
+      .then((p) => { onPlace(p); setOpen(false); })
+      .catch((err: unknown) => {
+        const denied = typeof err === "object" && err !== null && "code" in err && (err as GeolocationPositionError).code === 1;
+        setGeoError(denied ? "位置情報が許可されていません。設定で許可するか、都道府県を選んでください" : err instanceof Error && err.message === "unsupported" ? "この端末では現在地が使えません。都道府県を選んでください" : "現在地がわかりませんでした。電波のよいところでもう一度ためしてください");
+      })
+      .finally(() => setLocating(false));
   };
-  const placeLabel = place.source === "gps" ? `${prefNameOf(place.pref)}あたり（現在地）` : prefNameOf(place.pref);
+  const placeLabel = place.source === "gps" ? `${place.city ? `${prefNameOf(place.pref)}${place.city}` : prefNameOf(place.pref)}（現在地）` : prefNameOf(place.pref);
   const moon = moonPhase(now);
   const rise = times.rise?.getTime() ?? 0, set = times.set?.getTime() ?? 0;
   const t = now.getTime();
@@ -121,6 +161,36 @@ export function SkyCard({ now, place, onPlace, weather = null }: { now: Date; pl
             ))}
             <path d="M0 126 C 60 118, 120 124, 170 121 C 220 118, 260 124, 300 120 V150 H0 Z" fill={ink("#8DBF6E", "#121A2E")} />
             {[38, 92, 248].map((x) => <g key={x} transform={`translate(${x} 122)`}><rect x="-1.5" y="-4" width="3" height="8" fill={ink("#7A5A3A", "#0C1222")} /><circle cy="-9" r="7" fill={ink("#5E9C52", "#0E1626")} /></g>)}
+            {/* おさんぽの道：きょう歩いたぶんだけ足あと。コインのボーナス地点に旗 */}
+            {stepCount !== null ? (
+              <g>
+                <path d={`M${TRAIL_X0} ${trailY(TRAIL_X0)} ${Array.from({ length: 34 }, (_, i) => { const x = TRAIL_X0 + ((i + 1) * (TRAIL_X1 - TRAIL_X0)) / 34; return `L${x.toFixed(1)} ${trailY(x).toFixed(1)}`; }).join(" ")}`} fill="none" stroke={ink("#F3E2BF", "#2C3550")} strokeWidth="5" strokeLinecap="round" />
+                {Array.from({ length: Math.floor((trailX(stepCount) - TRAIL_X0) / 7.5) }, (_, i) => {
+                  const x = TRAIL_X0 + 3 + i * 7.5, y = trailY(x) + (i % 2 ? 1.2 : -1.2);
+                  return (
+                    <g key={i} transform={`translate(${x.toFixed(1)} ${y.toFixed(1)})`} fill={ink("#9A6A40", "#E6C88A")} opacity={0.75}>
+                      <ellipse cx="0" cy="0.6" rx="1.5" ry="1.2" />
+                      <circle cx="-1.3" cy="-1.1" r="0.55" /><circle cx="0" cy="-1.5" r="0.55" /><circle cx="1.3" cy="-1.1" r="0.55" />
+                    </g>
+                  );
+                })}
+                {STEP_COIN_MILESTONES.map((m) => {
+                  const x = trailX(m.steps), y = trailY(x), done = stepCount >= m.steps;
+                  return (
+                    <g key={m.steps} transform={`translate(${x.toFixed(1)} ${y.toFixed(1)})`}>
+                      <line x1="0" y1="0" x2="0" y2="-13" stroke={ink("#7A5A3A", "#C9B48E")} strokeWidth="1.2" />
+                      <path d="M0 -13 L9 -10.5 L0 -8 Z" fill={done ? "#F2B53A" : ink("#FFFFFF", "#8A90B8")} opacity={done ? 1 : 0.8} />
+                      <text x="0" y="-15" textAnchor="middle" fontSize="5.5" fontWeight="900" fill="#FFFFFF" opacity="0.9">{m.steps / 1000}k</text>
+                    </g>
+                  );
+                })}
+                {/* いまいるところ */}
+                <g transform={`translate(${trailX(stepCount).toFixed(1)} ${(trailY(trailX(stepCount)) - 4).toFixed(1)})`}>
+                  <circle r="5.5" fill="#FFFFFF" stroke="#5E8C4A" strokeWidth="1.6" />
+                  <g fill="#5E8C4A"><ellipse cx="0" cy="1.1" rx="1.9" ry="1.5" /><circle cx="-1.7" cy="-1.3" r="0.75" /><circle cx="0" cy="-1.9" r="0.75" /><circle cx="1.7" cy="-1.3" r="0.75" /></g>
+                </g>
+              </g>
+            ) : null}
             <text x="10" y="143" fontSize="9.5" fontWeight="800" fill="#FFFFFF" opacity="0.92">日の出 {times.rise ? fmtJstTime(times.rise) : "-"}</text>
             <text x="290" y="143" fontSize="9.5" fontWeight="800" fill="#FFFFFF" opacity="0.92" textAnchor="end">日の入り {times.set ? fmtJstTime(times.set) : "-"}</text>
             <rect x="0" y="0" width="300" height="150" fill="url(#skycard-glass)" />
@@ -133,6 +203,23 @@ export function SkyCard({ now, place, onPlace, weather = null }: { now: Date; pl
           </div>
         </div>
         {/* 窓台 */}
+        {stepCount !== null ? (
+          <div className="mt-2 flex items-center gap-3 rounded-[12px] bg-[linear-gradient(180deg,#FBF6EE,#EFE4D2)] px-3 py-2 shadow-[inset_0_1px_0_#fff]">
+            <span aria-hidden className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-white text-lg shadow-sm">👣</span>
+            <div className="min-w-0 flex-1">
+              <p className="text-[10px] font-bold text-ink-faint">きょうの歩数</p>
+              <p className="flex items-baseline gap-1 leading-none text-ink" aria-live="polite">
+                <span className="text-[22px] font-black tabular-nums">{stepCount.toLocaleString("ja-JP")}</span>
+                <span className="text-[11px] font-bold text-ink-soft">歩</span>
+              </p>
+            </div>
+            <p className="shrink-0 rounded-full bg-white px-2.5 py-1 text-right text-[10px] font-bold leading-tight text-ink-soft shadow-sm">
+              {nextGoal ? <>🚩 {nextGoal.steps.toLocaleString("ja-JP")}歩まで<br />あと <span className="text-leaf-deep">{(nextGoal.steps - stepCount).toLocaleString("ja-JP")}</span>歩</> : <>🎉 10,000歩<br />たっせい！</>}
+            </p>
+          </div>
+        ) : steps ? (
+          <div className="mt-2 rounded-[12px] bg-[linear-gradient(180deg,#FBF6EE,#EFE4D2)] px-3 py-2 text-[11px] font-bold text-ink-soft shadow-[inset_0_1px_0_#fff]">👣 歩数は、ショートカットで連携すると出ます</div>
+        ) : null}
         <div className="mt-2 flex items-center justify-between gap-2 rounded-[12px] bg-[linear-gradient(180deg,#FBF6EE,#EFE4D2)] px-3 py-2 shadow-[inset_0_1px_0_#fff]">
           <p className="min-w-0 text-[12px] font-bold text-ink">{status}</p>
           <div className="flex shrink-0 items-center gap-1">
@@ -162,7 +249,10 @@ export function SkyCard({ now, place, onPlace, weather = null }: { now: Date; pl
             </select>
           </label>
           {geoError ? <p className="text-[10px] font-bold text-[#C0502E]">{geoError}</p> : null}
-          <p className="text-[10px] leading-relaxed text-ink-faint">場所はこの端末にだけ保存され、約10kmの細かさに丸めて空と天気の計算だけに使います。時刻はいつも日本時間です。</p>
+          <p className="text-[10px] leading-relaxed text-ink-faint">
+            現在地はGPSでとり、この端末にだけ保存して空と天気の計算に使います（天気は約1kmの細かさで調べます）。位置情報を許可していれば、ひらくたびに取り直します。時刻はいつも日本時間です。
+            {place.source === "gps" && place.acc ? ` いまの位置のずれ：約${place.acc >= 1000 ? `${(place.acc / 1000).toFixed(1)}km` : `${place.acc}m`}` : ""}
+          </p>
         </div>
       ) : null}
     </div>
