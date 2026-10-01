@@ -1,6 +1,7 @@
 "use client";
 
 /** わんこのおへやに置いたもの1つの見た目（図鑑アイテム・額縁の写真・トロフィー・ペナント） */
+import { useEffect, useState } from "react";
 import type { DecorEntry, FrameStyle } from "@/lib/room/types";
 import { FurnitureArt, type FurnitureFx } from "./furniture-art";
 
@@ -15,10 +16,7 @@ export const FRAME_LABELS = Object.fromEntries(Object.entries(FRAME_LOOK).map(([
 export function DecorVisual({ entry, frame = "wood", thumb = false, lit = false, fx }: { entry: DecorEntry; frame?: FrameStyle; thumb?: boolean; lit?: boolean; fx?: FurnitureFx }) {
   const label = thumb ? undefined : entry.name;
   if (entry.kind === "furniture") return <FurnitureArt id={entry.furniture} label={label} lit={lit} fx={fx} />;
-  if (entry.kind === "item") {
-    // eslint-disable-next-line @next/next/no-img-element
-    return <img src={entry.image} alt={label ?? ""} draggable={false} className="pointer-events-none block h-auto w-full select-none object-contain drop-shadow-[0_5px_3px_rgba(68,50,33,.22)]" />;
-  }
+  if (entry.kind === "item") return <GroundedImage src={entry.image} alt={label ?? ""} grounded={!thumb} />;
   if (entry.kind === "photo") {
     const look = FRAME_LOOK[frame];
     return (
@@ -97,5 +95,50 @@ export function DecorVisual({ entry, frame = "wood", thumb = false, lit = false,
       <circle cx="6.5" cy="7" r="4.2" fill="#E4572E" />
       <circle cx="5.3" cy="5.8" r="1.4" fill="#FFFFFF" opacity="0.8" />
     </svg>
+  );
+}
+
+/** 画像ごとの「下の透明な余白」の割合（一度はかったら覚えておく） */
+const bottomPad = new Map<string, number>();
+
+/** 画像の下のはしから、絵があるいちばん下の行までの割合をはかる */
+function measureBottomPad(img: HTMLImageElement): number {
+  const w = 64, h = Math.max(1, Math.round((64 * img.naturalHeight) / Math.max(1, img.naturalWidth)));
+  const canvas = document.createElement("canvas");
+  canvas.width = w; canvas.height = h;
+  const ctx = canvas.getContext("2d", { willReadFrequently: true });
+  if (!ctx) return 0;
+  ctx.drawImage(img, 0, 0, w, h);
+  const data = ctx.getImageData(0, 0, w, h).data;
+  for (let y = h - 1; y >= 0; y--) {
+    for (let x = 0; x < w; x++) if (data[(y * w + x) * 4 + 3]! > 40) return (h - 1 - y) / h;
+  }
+  return 0;
+}
+
+/**
+ * 図鑑アイテムの絵。画像の下に透明な余白があると棚や床から浮いて見えるので、
+ * 余白のぶんだけ下げて、絵の足もとを置いた場所（棚の板・床）にそろえる
+ */
+function GroundedImage({ src, alt, grounded }: { src: string; alt: string; grounded: boolean }) {
+  const [pad, setPad] = useState(() => bottomPad.get(src) ?? 0);
+  useEffect(() => { setPad(bottomPad.get(src) ?? 0); }, [src]);
+  return (
+    // eslint-disable-next-line @next/next/no-img-element
+    <img
+      src={src}
+      alt={alt}
+      draggable={false}
+      className="pointer-events-none block h-auto w-full select-none object-contain drop-shadow-[0_5px_3px_rgba(68,50,33,.22)]"
+      style={grounded && pad ? { transform: `translateY(${(pad * 100).toFixed(1)}%)` } : undefined}
+      onLoad={(e) => {
+        if (!grounded || bottomPad.has(src)) return;
+        try {
+          const p = Math.min(0.35, measureBottomPad(e.currentTarget));
+          bottomPad.set(src, p);
+          setPad(p);
+        } catch { bottomPad.set(src, 0); }
+      }}
+    />
   );
 }

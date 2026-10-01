@@ -124,8 +124,11 @@ export async function composeRoomSnapshot(room: HTMLElement, caption: { title: s
         ctx.drawImage(await svgImage(svg, w, h), -w / 2, -h / 2, w, h);
       } else if (img) {
         const pic = await loadImage(img.currentSrc || img.src);
+        // 足もとをそろえるために下へずらした分（画面と同じ位置に描く）
+        const ir = img.getBoundingClientRect(), ic = local(centerOf(ir).x, centerOf(ir).y);
+        const iw = img.offsetWidth * s, ih = img.offsetHeight * s;
         if (img.style.transform.includes("scaleX(-1)")) ctx.scale(-1, 1);
-        ctx.drawImage(pic, -w / 2, -h / 2, w, h);
+        ctx.drawImage(pic, -iw / 2, ic.y - c.y - ih / 2, iw, ih);
       }
     } catch {
       // 読めなかったものは飛ばす
