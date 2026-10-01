@@ -5,7 +5,7 @@
  * viewBox は 1000 × 1120 で、部屋の % 座標（src/lib/room/types.ts の ROOM）と同じ割合で描く。
  * 窓の外と部屋の明るさは、日本時間の今の時間帯（朝・昼・夕方・夜）に合わせる。
  */
-import { memo, useMemo } from "react";
+import { memo, useId, useMemo } from "react";
 import { skyAt, TOKYO, type GeoPoint, type SkyState } from "@/lib/room/sun";
 import { overcastOf, withWeather, type RoomWeather } from "@/lib/room/weather";
 import { CURTAIN_STYLES, FLOOR_STYLES, ROOM_KIND_STYLES, RUG_STYLES, WALLPAPER_STYLES } from "@/lib/room/themes";
@@ -1353,3 +1353,94 @@ export const RoomLighting = memo(function RoomLighting({ now, lamps, at = TOKYO,
     </svg>
   );
 });
+
+/**
+ * もようがえの見本。実際の部屋と同じ描き方で、その素材のところだけを小さく切りとって見せる
+ * （壁紙は幅木と床のきわまで、床は遠近感のある手前の床、ラグは床に敷いたところ など）
+ */
+export function ThemeSwatch({ part, theme }: { part: "wall" | "floor" | "curtain" | "rug" | "deco" | "room"; theme: RoomTheme }) {
+  const uid = `sw${useId().replace(/[^a-zA-Z0-9_-]/g, "")}`;
+  const wall = WALLPAPER_STYLES[theme.wall];
+  const wallBg = (
+    <>
+      <defs><WallPattern id={uid} theme={theme} /></defs>
+      <rect x={-PX} y={-PT} width={W + PX * 2} height={HZ + PT} fill={wall.base} />
+      <rect x={-PX} y={-PT} width={W + PX * 2} height={HZ + PT} fill={`url(#${uid})`} />
+    </>
+  );
+  const baseboard = (
+    <>
+      <rect x={-PX} y={HZ - 22} width={W + PX * 2} height="24" fill={theme.room === "cozy" ? "#F7F1E6" : ROOM_KIND_STYLES[theme.room].baseboard} />
+      <rect x={-PX} y={HZ - 22} width={W + PX * 2} height="3" fill="#FFFFFF" opacity="0.6" />
+      <rect x={-PX} y={HZ + 2} width={W + PX * 2} height="20" fill="#2A1A0A" opacity="0.12" />
+    </>
+  );
+  const svg = (viewBox: string, children: React.ReactNode) => (
+    <svg viewBox={viewBox} preserveAspectRatio="xMidYMid slice" className="block h-full w-full" aria-hidden="true">{children}</svg>
+  );
+  switch (part) {
+    case "wall":
+      // 壁紙と、幅木・床のきわ（部屋の左下あたり）
+      return svg("200 410 240 240", <>{wallBg}<Floor theme={theme} />{baseboard}</>);
+    case "floor":
+      return svg("250 720 500 500", <Floor theme={theme} />);
+    case "rug":
+      return svg("150 530 690 690", <>{wallBg}<Floor theme={theme} />{baseboard}<RugShape rug={theme.rug} /></>);
+    case "deco":
+      return svg("290 -20 280 280", <>{wallBg}<WallDecoration deco={theme.deco} lit={false} /></>);
+    case "curtain": {
+      const c = CURTAIN_STYLES[theme.curtain].color, dark = mixColor(c, "#000000", 0.22), light = mixColor(c, "#FFFFFF", 0.25);
+      const panel = (right: boolean) => {
+        const X = (x: number) => (right ? 96 - x : x);
+        return (
+          <g>
+            <path d={`M${X(10)} 12 H${X(38)} C ${X(36)} 40, ${X(26)} 52, ${X(33)} 92 H${X(10)} Z`} fill={`url(#${uid}-c)`} />
+            <path d={`M${X(10)} 88 H${X(33)} V92 H${X(10)} Z`} fill={dark} opacity="0.5" />
+            <rect x={right ? 96 - 34 : 8} y="55" width="26" height="4" rx="2" fill="#FFF3D6" transform={`rotate(${right ? 8 : -8} ${right ? 74 : 22} 57)`} />
+          </g>
+        );
+      };
+      return svg("0 0 96 96", (
+        <>
+          <defs>
+            <linearGradient id={`${uid}-c`} x1="0" y1="0" x2="1" y2="0">
+              {[0, 0.14, 0.28, 0.42, 0.56, 0.7, 0.84, 1].map((o, i) => <stop key={o} offset={o} stopColor={i % 2 ? dark : light} />)}
+            </linearGradient>
+            <linearGradient id={`${uid}-s`} x1="0" y1="0" x2="0" y2="1"><stop offset="0" stopColor="#7DB8E8" /><stop offset="1" stopColor="#D8EEFF" /></linearGradient>
+          </defs>
+          <rect width="96" height="96" fill={wall.base} />
+          <rect x="24" y="18" width="48" height="56" fill={`url(#${uid}-s)`} />
+          <path d="M24 60 Q48 52 72 58 V74 H24 Z" fill="#8DBF6E" />
+          <rect x="24" y="18" width="48" height="56" fill="none" stroke="#FFFFFF" strokeWidth="4" />
+          <path d="M48 18 V74 M24 46 H72" stroke="#FFFFFF" strokeWidth="2.5" />
+          <rect x="18" y="74" width="60" height="5" rx="1" fill="#FFFDF8" />
+          {panel(false)}
+          {panel(true)}
+          <rect x="6" y="8" width="84" height="5" rx="2.5" fill="#B08A5E" />
+          <circle cx="6" cy="10.5" r="3.5" fill="#9A7448" />
+          <circle cx="90" cy="10.5" r="3.5" fill="#9A7448" />
+        </>
+      ));
+    }
+    case "room": {
+      // 部屋全体のミニチュア（壁・窓・天井・床・幅木・照明）
+      const win = windowOf(theme.style);
+      return svg(VB, (
+        <>
+          {wallBg}
+          <rect x={px(win.x0)} y={py(win.y0)} width={px(win.x1) - px(win.x0)} height={py(win.y1) - py(win.y0)} fill="#9CCDF0" stroke="#FFFFFF" strokeWidth="18" />
+          <Floor theme={theme} />
+          {baseboard}
+          <RugShape rug={theme.rug} />
+          <polygon points={`${-PX},${-PT} ${W + PX},${-PT} ${W + PX},${CEIL_FRONT} ${W - SIDE},${CEIL} ${SIDE},${CEIL} ${-PX},${CEIL_FRONT}`} fill={theme.room === "cozy" ? "#F1E9DA" : ROOM_KIND_STYLES[theme.room].ceiling} />
+          {[false, true].map((right) => {
+            const X = (x: number) => (right ? W - x : x);
+            return <polygon key={String(right)} points={`${X(SIDE)},${CEIL} ${X(SIDE)},${HZ} ${X(-PX)},${FLOOR_FRONT} ${X(-PX)},${CEIL_FRONT}`} fill={mixColor(wall.base, "#2A1A0A", right ? 0.22 : 0.14)} />;
+          })}
+          <RoomArch kind={theme.room} />
+          <PendantLamp lit={false} kind={theme.room} />
+        </>
+      ));
+    }
+  }
+}

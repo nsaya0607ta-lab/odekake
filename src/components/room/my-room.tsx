@@ -42,7 +42,6 @@ import {
   type Placement,
   type RoomLayout,
   type RoomPhoto,
-  type RoomKind,
   type RoomStyle,
   type RoomTheme,
   ROOM_KINDS,
@@ -56,7 +55,7 @@ import { RoomDog } from "./room-dog";
 import { composeRoomSnapshot } from "./room-snapshot";
 import { skyAt } from "@/lib/room/sun";
 import { parseRoomWeather, withWeather, type RoomWeather } from "@/lib/room/weather";
-import { dayPhaseOf, lampsOn, ROOM_STAGE, RoomLighting, RoomScene, type DayPhase } from "./room-scene";
+import { dayPhaseOf, lampsOn, ROOM_STAGE, RoomLighting, RoomScene, ThemeSwatch, type DayPhase } from "./room-scene";
 import { DEFAULT_PLACE, SkyCard, type RoomPlace } from "./sky-card";
 
 type Tab = DecorKind | "theme";
@@ -826,51 +825,39 @@ const styleSwatch = (style: RoomStyle): React.CSSProperties => {
   };
   return { background: `url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 48 48'><rect width='48' height='48' fill='%23FBF3E4'/>${shape[style]}</svg>") center/cover` };
 };
-/** 部屋の雰囲気の見本（天井・壁・床の色と、それらしい形） */
-const kindSwatch = (kind: RoomKind): React.CSSProperties => {
-  const art: Record<RoomKind, string> = {
-    cozy: "<rect width='48' height='30' fill='%23FBF3E4'/><rect y='30' width='48' height='18' fill='%23E8C99A'/><rect x='6' y='7' width='14' height='13' fill='%2398CDF0' stroke='%23fff' stroke-width='2'/><path d='M20 3l4 6h-8z' fill='%23F2E2C2'/>",
-    log: "<rect width='48' height='30' fill='%23C8935C'/><path d='M0 8h48M0 15h48M0 22h48' stroke='%238E5C32' stroke-width='2'/><rect width='48' height='5' fill='%238E5C32'/><rect y='30' width='48' height='18' fill='%239C6B45'/><circle cx='4' cy='12' r='3.5' fill='%23D9A56A' stroke='%238E5C32'/><circle cx='4' cy='20' r='3.5' fill='%23D9A56A' stroke='%238E5C32'/>",
-    wa: "<rect width='48' height='30' fill='%23EFE6D2'/><rect y='30' width='48' height='18' fill='%23D7D59A'/><path d='M0 38h48' stroke='%23B9B774' stroke-width='2'/><rect x='2' width='4' height='31' fill='%238A5A34'/><rect x='42' width='4' height='31' fill='%238A5A34'/><rect x='10' y='8' width='16' height='16' fill='%23FFFBEF' stroke='%236E4424' stroke-width='2'/><path d='M15 8v16M20 8v16M10 14h16M10 19h16' stroke='%238A5A34'/>",
-    nordic: "<rect width='48' height='30' fill='%23DDE6EC'/><rect y='20' width='48' height='10' fill='%23F2F5F7'/><path d='M0 20h48' stroke='%23fff' stroke-width='2'/><rect y='30' width='48' height='18' fill='%23F1E6D6'/><circle cx='24' cy='9' r='5' fill='%23fff' stroke='%23D6DCE2'/>",
-    cafe: "<rect width='48' height='30' fill='%23D9CBB8'/><path d='M1 2h14v6H1zM17 2h14v6H17zM33 2h14v6H33zM-7 10h14v6H-7zM9 10h14v6H9zM25 10h14v6H25zM41 10h14v6H41zM1 18h14v6H1zM17 18h14v6H17zM33 18h14v6H33z' fill='%23B8604A'/><rect y='30' width='48' height='18' fill='%23B9875A'/><path d='M4 34l6 6M14 34l-6 6M24 34l6 6M34 34l-6 6M44 34l6 6' stroke='%238E6038' stroke-width='1.5'/>",
-    seaside: "<rect width='48' height='30' fill='%23F3F7FA'/><path d='M0 7h48M0 14h48M0 21h48' stroke='%23C9D8E4'/><rect y='30' width='48' height='18' fill='%23E8C99A'/><circle cx='34' cy='12' r='6' fill='none' stroke='%23E4572E' stroke-width='3' stroke-dasharray='4 3'/><rect y='27' width='48' height='3' fill='%234A7FB0'/>",
-    starry: "<rect width='48' height='30' fill='%232E3566'/><circle cx='8' cy='8' r='1.5' fill='%23F6E7A8'/><circle cx='38' cy='6' r='1.2' fill='%23F6E7A8'/><circle cx='28' cy='18' r='1.4' fill='%23F6E7A8'/><path d='M22 4a6 6 0 1 0 6 8a5 5 0 1 1 -6 -8z' fill='%23FFF0B0'/><rect y='30' width='48' height='18' fill='%23C7B4D9'/>",
-  };
-  return { background: `url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 48 48'>${art[kind]}</svg>") center/cover` };
-};
 const DECO_LABELS: Record<WallDeco, string> = { none: "なし", garland: "ガーランド", lights: "ライト", stars: "お星さま" };
-const DECO_SWATCH: Record<WallDeco, string> = {
-  none: "repeating-linear-gradient(45deg, #fff 0 6px, #eee 6px 12px)",
-  garland: "conic-gradient(from 180deg at 50% 0%, #F2A7B8 0 60deg, #8DBDE6 60deg 120deg, #F2D16B 120deg 180deg, #FFF 180deg)",
-  lights: "radial-gradient(circle at 30% 50%, #FFE38A 0 5px, transparent 6px), radial-gradient(circle at 70% 50%, #FFB3C7 0 5px, transparent 6px), #3B3F7A",
-  stars: "radial-gradient(circle at 35% 40%, #F6E7A8 0 4px, transparent 5px), radial-gradient(circle at 65% 65%, #F6E7A8 0 3px, transparent 4px), #FBF3E4",
-};
 
 function ThemePicker({ theme, onChange }: { theme: RoomTheme; onChange: (patch: Partial<RoomTheme>) => void }) {
   return (
     <div className="mt-3 space-y-4">
-      <Swatches title="おへや（えらぶと壁・床・窓もおすすめに変わります）" value={theme.room} options={ROOM_KINDS} label={(id) => ROOM_KIND_STYLES[id].label} paint={kindSwatch} onPick={(room) => onChange({ ...ROOM_PRESETS[room] })} />
+      <Swatches title="おへや（えらぶと壁・床・窓もおすすめに変わります）" value={theme.room} options={ROOM_KINDS} label={(id) => ROOM_KIND_STYLES[id].label} render={(room) => <ThemeSwatch part="room" theme={ROOM_PRESETS[room]} />} onPick={(room) => onChange({ ...ROOM_PRESETS[room] })} />
       <Swatches title="窓" value={theme.style} options={ROOM_STYLES} label={(id) => STYLE_LABELS[id]} paint={styleSwatch} onPick={(style) => onChange({ style })} />
-      <Swatches title="壁紙" value={theme.wall} options={WALLPAPERS} label={(id) => WALLPAPER_STYLES[id].label} paint={(id) => ({ background: `radial-gradient(circle at 30% 30%, ${WALLPAPER_STYLES[id].ink} 0 22%, transparent 23%), ${WALLPAPER_STYLES[id].base}` })} onPick={(wall) => onChange({ wall })} />
-      <Swatches title="床" value={theme.floor} options={FLOORS} label={(id) => FLOOR_STYLES[id].label} paint={(id) => ({ background: `repeating-linear-gradient(90deg, ${FLOOR_STYLES[id].base} 0 10px, ${FLOOR_STYLES[id].line} 10px 12px)` })} onPick={(floor) => onChange({ floor })} />
-      <Swatches title="カーテン" value={theme.curtain} options={CURTAINS} label={(id) => CURTAIN_STYLES[id].label} paint={(id) => ({ background: CURTAIN_STYLES[id].color })} onPick={(curtain) => onChange({ curtain })} />
-      <Swatches title="壁のかざり" value={theme.deco} options={WALL_DECOS} label={(id) => DECO_LABELS[id]} paint={(id) => ({ background: DECO_SWATCH[id] })} onPick={(deco) => onChange({ deco })} />
-      <Swatches title="ラグ" value={theme.rug} options={RUGS} label={(id) => RUG_STYLES[id].label} paint={(id) => (id === "none" ? { background: "repeating-linear-gradient(45deg, #fff 0 6px, #eee 6px 12px)" } : { background: RUG_STYLES[id].color })} onPick={(rug) => onChange({ rug })} />
+      <Swatches title="壁紙" value={theme.wall} options={WALLPAPERS} label={(id) => WALLPAPER_STYLES[id].label} render={(wall) => <ThemeSwatch part="wall" theme={{ ...theme, wall }} />} onPick={(wall) => onChange({ wall })} />
+      <Swatches title="床" value={theme.floor} options={FLOORS} label={(id) => FLOOR_STYLES[id].label} render={(floor) => <ThemeSwatch part="floor" theme={{ ...theme, floor }} />} onPick={(floor) => onChange({ floor })} />
+      <Swatches title="カーテン" value={theme.curtain} options={CURTAINS} label={(id) => CURTAIN_STYLES[id].label} render={(curtain) => <ThemeSwatch part="curtain" theme={{ ...theme, curtain }} />} onPick={(curtain) => onChange({ curtain })} />
+      <Swatches title="壁のかざり" value={theme.deco} options={WALL_DECOS} label={(id) => DECO_LABELS[id]} render={(deco) => <ThemeSwatch part="deco" theme={{ ...theme, deco }} />} onPick={(deco) => onChange({ deco })} />
+      <Swatches title="ラグ" value={theme.rug} options={RUGS} label={(id) => RUG_STYLES[id].label} render={(rug) => <ThemeSwatch part="rug" theme={{ ...theme, rug }} />} onPick={(rug) => onChange({ rug })} />
     </div>
   );
 }
 
-function Swatches<T extends string>({ title, value, options, label, paint, onPick }: {
-  title: string; value: T; options: readonly T[]; label: (id: T) => string; paint: (id: T) => React.CSSProperties; onPick: (id: T) => void;
+function Swatches<T extends string>({ title, value, options, label, paint, render, onPick }: {
+  title: string; value: T; options: readonly T[]; label: (id: T) => string;
+  /** 色や模様だけの見本 */
+  paint?: (id: T) => React.CSSProperties;
+  /** 実際の部屋と同じ描き方の見本 */
+  render?: (id: T) => React.ReactNode;
+  onPick: (id: T) => void;
 }) {
   return (
     <div>
       <p className="mb-1.5 text-xs font-black text-ink-soft">{title}</p>
       <div className="-mx-4 flex gap-2 overflow-x-auto px-4 pb-1">
         {options.map((id) => (
-          <button key={id} type="button" onClick={() => onPick(id)} aria-pressed={value === id} className="flex w-[64px] shrink-0 flex-col items-center gap-1">
-            <span className={`block h-12 w-12 rounded-2xl border shadow-sm ${value === id ? "border-leaf-deep ring-2 ring-leaf/50" : "border-line"}`} style={paint(id)} />
+          <button key={id} type="button" onClick={() => onPick(id)} aria-pressed={value === id} className="flex w-[70px] shrink-0 flex-col items-center gap-1">
+            <span className={`block h-14 w-14 overflow-hidden rounded-2xl border shadow-sm ${value === id ? "border-leaf-deep ring-2 ring-leaf/50" : "border-line"}`} style={paint?.(id)}>
+              {render?.(id)}
+            </span>
             <span className={`w-full truncate text-center text-[10px] font-bold ${value === id ? "text-leaf-deep" : "text-ink-soft"}`}>{label(id)}</span>
           </button>
         ))}
