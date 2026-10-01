@@ -27,6 +27,10 @@ import {
   ROOM_MAX_PHOTOS,
   ROOM_PHOTO_TITLE_MAX,
   RUGS,
+  FURNITURE,
+  FURNITURE_ENTRIES,
+  WALL_DECOS,
+  type WallDeco,
   settle,
   shelfOf,
   uploadEntry,
@@ -41,6 +45,7 @@ import {
 } from "@/lib/room/types";
 import { DecorVisual, FRAME_LABELS } from "./decor-visual";
 import { RoomDog } from "./room-dog";
+import { composeRoomSnapshot } from "./room-snapshot";
 import { dayPhaseOf, RoomScene, type DayPhase } from "./room-scene";
 
 type Tab = DecorKind | "theme";
@@ -57,6 +62,7 @@ const TABS: Array<{ id: Tab; label: string; empty: string }> = [
   { id: "photo", label: "写真", empty: "" },
   { id: "trophy", label: "トロフィー", empty: "おさんぽフレンチーで遊ぶと、道ごとのトロフィーがもらえます" },
   { id: "pennant", label: "ペナント", empty: "おでかけを記録した都道府県のペナントがもらえます" },
+  { id: "furniture", label: "家具", empty: "" },
   { id: "theme", label: "もようがえ", empty: "" },
 ];
 const ITEM_FILTERS: Array<{ id: ItemFilter; label: string }> = [
@@ -74,6 +80,7 @@ const fmtDate = (d: string) => { const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(d); r
 /** 置いたものの幅（部屋の幅に対する %）。床の奥ほど小さく、棚の上は小さめ */
 function widthOf(entry: DecorEntry, p: Placement): number {
   if (entry.kind === "photo") return 21 * p.scale;
+  if (entry.kind === "furniture") return FURNITURE[entry.furniture].width * p.scale * depthScale(p.y);
   if (entry.kind === "pennant") return 19 * p.scale;
   const onShelf = shelfOf(p) !== null;
   const base = entry.kind === "trophy" ? (onShelf ? 12 : 13) : onShelf ? 11.5 : 15.5;
@@ -111,13 +118,17 @@ const FLOOR_SPOTS = [[22, 74], [78, 76], [64, 90], [36, 92], [86, 92], [14, 88],
 function starterLayout(entries: DecorEntry[]): RoomLayout {
   const items: Placement[] = [];
   let z = 1;
-  const put = (key: string, x: number, y: number) => items.push({ id: newId(), key, x, y, scale: 1, flip: false, z: z++ });
+  // サーバーと端末で同じ表示になるよう、最初の部屋の id は決まった値にする
+  const put = (key: string, x: number, y: number) => items.push({ id: `starter-${z}`, key, x, y, scale: 1, flip: false, z: z++ });
   entries.filter((e) => e.kind === "photo").slice(0, 2).forEach((e, i) => put(e.key, WALL_SPOTS[i]![0], WALL_SPOTS[i]![1]));
   entries.filter((e) => e.kind === "pennant").slice(0, 1).forEach((e) => put(e.key, WALL_SPOTS[2]![0], WALL_SPOTS[2]![1]));
   entries.filter((e) => e.kind === "trophy").slice(0, 3).forEach((e, i) => put(e.key, 66 + i * 12, ROOM.shelves[0].y));
   const items4 = entries.filter((e): e is Extract<DecorEntry, { kind: "item" }> => e.kind === "item")
     .sort((a, b) => RARITY_ORDER.indexOf(b.rarity) - RARITY_ORDER.indexOf(a.rarity)).slice(0, 4);
   items4.forEach((e, i) => (i === 3 ? put(e.key, 70, ROOM.shelves[1].y) : put(e.key, FLOOR_SPOTS[i]![0], FLOOR_SPOTS[i]![1])));
+  // はじめから少しだけ家具を置いておく（犬はベッドで寝る）
+  put("furniture:plant", 8, 66);
+  put("furniture:dog-bed", 82, 91);
   return { theme: DEFAULT_THEME, items, photos: [] };
 }
 
@@ -158,12 +169,13 @@ export function MyRoom({ entries, initialLayout, serverReady, dogSkin, dogName, 
   /** サーバーで描いた時刻。最初の表示をサーバーとそろえ、そのあと端末の時刻に合わせる */
   serverNow: string;
 }) {
-  const validKeys = useMemo(() => new Set(entries.map((e) => e.key)), [entries]);
+  // 家具はだれでも置けるので、持ち物と合わせて「置けるもの」にする
+  const validKeys = useMemo(() => new Set([...entries, ...FURNITURE_ENTRIES].map((e) => e.key)), [entries]);
   const [layout, setLayout] = useState<RoomLayout>(() => initialLayout
     ? { ...initialLayout, items: initialLayout.items.filter((p) => validKeys.has(p.key) || p.key.startsWith("upload:")) }
     : starterLayout(entries));
   /** 持ち物に、アップロードした写真を足したもの（アップロードした写真を先に並べる） */
-  const allEntries = useMemo(() => [...layout.photos.map(uploadEntry), ...entries], [entries, layout.photos]);
+  const allEntries = useMemo(() => [...layout.photos.map(uploadEntry), ...entries, ...FURNITURE_ENTRIES], [entries, layout.photos]);
   const entryByKey = useMemo(() => new Map(allEntries.map((e) => [e.key, e])), [allEntries]);
   const [uploading, setUploading] = useState(false);
   const fileRef = useRef<HTMLInputElement | null>(null);
@@ -177,6 +189,11 @@ export function MyRoom({ entries, initialLayout, serverReady, dogSkin, dogName, 
   const [toast, setToast] = useState<string | null>(null);
   const [peek, setPeek] = useState<{ id: string; text: string } | null>(null);
   const [lightbox, setLightbox] = useState<Extract<DecorEntry, { kind: "photo" }> | null>(null);
+  const [shot, setShot] = useState<{ blob: Blob; url: string } | null>(null);
+  const [shooting, setShooting] = useState(false);
+  const [shareBody, setShareBody] = useState("");
+  const [shareState, setShareState] = useState<"idle" | "sending" | "done" | "error">("idle");
+  const [shareError, setShareError] = useState("");
   const [now, setNow] = useState(() => new Date(serverNow));
   const roomRef = useRef<HTMLDivElement | null>(null);
   const drag = useRef<{ id: string; dx: number; dy: number; before: RoomLayout; moved: boolean; pointer: number } | null>(null);
@@ -385,10 +402,23 @@ export function MyRoom({ entries, initialLayout, serverReady, dogSkin, dogName, 
     return lines;
   }, [entryByKey, layout.items, phase]);
 
+  /** 犬が向かう場所（ベッド・ごはん皿・床のもの） */
+  const dogPlaces = useMemo(() => {
+    const floor = layout.items.filter((p) => { const e = entryByKey.get(p.key); return e && !isHanging(e.kind) && !shelfOf(p); });
+    const furn = (id: string) => floor.find((p) => p.key === `furniture:${id}`);
+    const bed = furn("dog-bed") ?? furn("dog-house"), bowl = furn("bowl");
+    return {
+      // ベッドではクッションの上（少し奥）に寝て、ベッドより手前に描く。ハウスでは入り口の前
+      bed: bed ? (bed.key === "furniture:dog-house" ? { x: bed.x, y: clamp(bed.y + 1.5, ROOM.floorTop, ROOM.floorBottom), zy: bed.y + 2 } : { x: bed.x, y: bed.y - 1.5, zy: bed.y + 0.5 }) : null,
+      bowl: bowl ? { x: bowl.x, y: bowl.y } : null,
+      toys: floor.filter((p) => entryByKey.get(p.key)?.kind === "item").map((p) => ({ x: p.x, y: p.y, name: entryByKey.get(p.key)!.name })),
+    };
+  }, [entryByKey, layout.items]);
+
   const selected = layout.items.find((p) => p.id === selectedId) ?? null;
   const selectedEntry = selected ? entryByKey.get(selected.key) ?? null : null;
   const counts = useMemo(() => {
-    const c: Record<DecorKind, number> = { item: 0, photo: 0, trophy: 0, pennant: 0 };
+    const c: Record<DecorKind, number> = { item: 0, photo: 0, trophy: 0, pennant: 0, furniture: 0 };
     for (const e of allEntries) c[e.kind] += 1;
     return c;
   }, [allEntries]);
@@ -399,6 +429,58 @@ export function MyRoom({ entries, initialLayout, serverReady, dogSkin, dogName, 
     return e.category === filter;
   }), [allEntries, filter, tab]);
   const saveLabel = saveState === "saving" ? "保存中…" : saveState === "dirty" ? "保存待ち" : saveState === "error" ? "保存できませんでした" : saveState === "local" ? "この端末に保存" : "保存ずみ";
+
+  /* ---------- 記念撮影 ---------- */
+  async function takeSnapshot() {
+    const room = roomRef.current;
+    if (!room || shooting) return;
+    setShooting(true);
+    setSelectedId(null);
+    try {
+      // パシャッ（白く光らせる）
+      room.animate?.([{ filter: "brightness(1.8)" }, { filter: "brightness(1)" }], { duration: 380, easing: "ease-out" });
+      const blob = await composeRoomSnapshot(room, {
+        title: `${dogName}のおへや`,
+        sub: fmtDate(new Intl.DateTimeFormat("sv-SE", { timeZone: "Asia/Tokyo" }).format(new Date())),
+        fontFamily: getComputedStyle(document.body).fontFamily,
+      });
+      if (shot) URL.revokeObjectURL(shot.url);
+      setShot({ blob, url: URL.createObjectURL(blob) });
+      setShareBody(`${dogName}のおへやを もようがえしたよ🏠`);
+      setShareState("idle"); setShareError("");
+    } catch {
+      flash("写真をつくれませんでした");
+    } finally {
+      setShooting(false);
+    }
+  }
+  async function saveSnapshot() {
+    if (!shot) return;
+    const file = new File([shot.blob], "wanko-room.jpg", { type: "image/jpeg" });
+    try {
+      if (navigator.canShare?.({ files: [file] })) { await navigator.share({ files: [file], title: `${dogName}のおへや` }); return; }
+    } catch { /* 共有をやめたとき */ return; }
+    const a = document.createElement("a");
+    a.href = shot.url; a.download = "wanko-room.jpg";
+    document.body.appendChild(a); a.click(); a.remove();
+  }
+  async function postSnapshot() {
+    if (!shot || shareState === "sending") return;
+    setShareState("sending"); setShareError("");
+    try {
+      const form = new FormData();
+      form.append("image", shot.blob, "wanko-room.jpg");
+      form.append("body", shareBody.trim().slice(0, 280));
+      const response = await fetch("/api/my-room/share", { method: "POST", body: form });
+      const payload = (await response.json().catch(() => null)) as { error?: string } | null;
+      if (!response.ok) throw new Error(payload?.error ?? "投稿できませんでした。");
+      setShareState("done");
+    } catch (error) {
+      setShareState("error");
+      setShareError(error instanceof Error ? error.message : "投稿できませんでした。");
+    }
+  }
+  const closeShot = () => { if (shot) URL.revokeObjectURL(shot.url); setShot(null); };
 
   return (
     <main className="min-h-dvh bg-paper pb-[calc(env(safe-area-inset-bottom)+1.5rem)] text-ink">
@@ -440,6 +522,9 @@ export function MyRoom({ entries, initialLayout, serverReady, dogSkin, dogName, 
             return (
               <div
                 key={p.id}
+                data-pid={p.id}
+                data-rot={entry.kind === "pennant" ? -4 : 0}
+                data-flip={p.flip ? "1" : "0"}
                 role="button"
                 tabIndex={0}
                 aria-label={editing ? `${entry.name}を動かす` : entry.kind === "photo" ? `${entry.name}の思い出を見る` : entry.name}
@@ -459,9 +544,9 @@ export function MyRoom({ entries, initialLayout, serverReady, dogSkin, dogName, 
                 onClick={() => onItemTap(p)}
                 onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); if (editing) setSelectedId(p.id); else onItemTap(p); } }}
               >
-                {!hang && !shelfOf(p) ? <span className="pointer-events-none absolute -bottom-[4%] left-1/2 h-[10%] w-[78%] -translate-x-1/2 rounded-[50%] bg-[#4a3520]/18 blur-[2px]" /> : null}
-                <span className="relative block" style={{ transform: p.flip ? "scaleX(-1)" : undefined }}>
-                  <DecorVisual entry={entry} frame={p.frame} />
+                {!hang && !shelfOf(p) ? <span data-shadow className="pointer-events-none absolute -bottom-[4%] left-1/2 h-[10%] w-[78%] -translate-x-1/2 rounded-[50%] bg-[#4a3520]/18 blur-[2px]" /> : null}
+                <span data-body className="relative block" style={{ transform: p.flip ? "scaleX(-1)" : undefined }}>
+                  <DecorVisual entry={entry} frame={p.frame} lit={phase === "evening" || phase === "night"} />
                 </span>
                 {isSel ? <span className="pointer-events-none absolute -inset-1.5 rounded-lg border-2 border-dashed border-leaf-deep" /> : null}
                 {peek?.id === p.id ? (
@@ -471,7 +556,7 @@ export function MyRoom({ entries, initialLayout, serverReady, dogSkin, dogName, 
             );
           })}
 
-          <RoomDog skin={dogSkin} phase={phase} lines={dogLines} quiet={editing} />
+          <RoomDog skin={dogSkin} phase={phase} lines={dogLines} quiet={editing} places={dogPlaces} />
 
           {editing && selected && selectedEntry ? (
             <div className="absolute bottom-2 left-1/2 z-[500] flex -translate-x-1/2 items-center gap-1 rounded-full border border-line bg-card/95 p-1.5 shadow-lg backdrop-blur">
@@ -580,10 +665,35 @@ export function MyRoom({ entries, initialLayout, serverReady, dogSkin, dogName, 
               <li>🕰️ 窓の外と時計は、いまの時間に合わせて変わります</li>
               <li>🚩 おでかけを記録した都道府県のペナントや、おさんぽのトロフィーも飾れます</li>
             </ul>
+            <button type="button" onClick={() => void takeSnapshot()} disabled={shooting} className="flex w-full items-center justify-center gap-2 rounded-full bg-leaf-deep py-3 text-sm font-black text-white shadow-md active:scale-[.98] disabled:opacity-60">
+              <span aria-hidden="true">📷</span>{shooting ? "撮影中…" : "記念撮影する"}
+            </button>
             <p className="text-center text-[10px] font-semibold text-ink-faint">{saveLabel}</p>
           </section>
         )}
       </div>
+
+      {shot ? (
+        <div className="fixed inset-0 z-[700] flex items-center justify-center overflow-y-auto bg-[#140f22]/75 p-4 backdrop-blur-sm" role="dialog" aria-modal="true" aria-label="記念撮影" onClick={(e) => { if (e.target === e.currentTarget) closeShot(); }}>
+          <div className="room-bubble my-auto w-full max-w-sm overflow-hidden rounded-3xl bg-card shadow-2xl">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src={shot.url} alt="おへやの記念写真" className="block w-full" />
+            <div className="space-y-2.5 px-4 pb-4 pt-3">
+              <button type="button" onClick={() => void saveSnapshot()} className="w-full rounded-full bg-leaf-deep py-2.5 text-sm font-black text-white active:scale-[.98]">画像を保存・共有する</button>
+              {shareState === "done" ? (
+                <p className="rounded-2xl bg-leaf-soft px-3 py-2.5 text-center text-xs font-bold text-leaf-deep">SNSに投稿しました！ <Link href="/sns/home" className="underline">SNSで見る</Link></p>
+              ) : (
+                <div className="space-y-2 rounded-2xl border border-line bg-paper p-2.5">
+                  <textarea value={shareBody} onChange={(e) => setShareBody(e.target.value)} maxLength={280} rows={2} aria-label="投稿する文" className="w-full resize-none rounded-xl border border-line bg-card px-3 py-2 text-[16px] leading-snug" />
+                  {shareError ? <p className="text-center text-[11px] font-bold text-[#b94c60]">{shareError}</p> : null}
+                  <button type="button" onClick={() => void postSnapshot()} disabled={shareState === "sending"} className="w-full rounded-full bg-[#ff7eb6] py-2.5 text-sm font-black text-white active:scale-[.98] disabled:opacity-60">{shareState === "sending" ? "投稿中…" : "SNSに投稿する"}</button>
+                </div>
+              )}
+              <button type="button" onClick={closeShot} className="w-full rounded-full border border-line bg-paper py-2.5 text-sm font-bold text-ink-soft active:scale-[.98]">とじる</button>
+            </div>
+          </div>
+        </div>
+      ) : null}
 
       {lightbox ? (
         <div className="fixed inset-0 z-[700] flex items-center justify-center bg-[#140f22]/75 p-4 backdrop-blur-sm" role="dialog" aria-modal="true" aria-label={`${lightbox.name}の思い出`} onClick={(e) => { if (e.target === e.currentTarget) setLightbox(null); }}>
@@ -605,12 +715,21 @@ export function MyRoom({ entries, initialLayout, serverReady, dogSkin, dogName, 
   );
 }
 
+const DECO_LABELS: Record<WallDeco, string> = { none: "なし", garland: "ガーランド", lights: "ライト", stars: "お星さま" };
+const DECO_SWATCH: Record<WallDeco, string> = {
+  none: "repeating-linear-gradient(45deg, #fff 0 6px, #eee 6px 12px)",
+  garland: "conic-gradient(from 180deg at 50% 0%, #F2A7B8 0 60deg, #8DBDE6 60deg 120deg, #F2D16B 120deg 180deg, #FFF 180deg)",
+  lights: "radial-gradient(circle at 30% 50%, #FFE38A 0 5px, transparent 6px), radial-gradient(circle at 70% 50%, #FFB3C7 0 5px, transparent 6px), #3B3F7A",
+  stars: "radial-gradient(circle at 35% 40%, #F6E7A8 0 4px, transparent 5px), radial-gradient(circle at 65% 65%, #F6E7A8 0 3px, transparent 4px), #FBF3E4",
+};
+
 function ThemePicker({ theme, onChange }: { theme: RoomTheme; onChange: (patch: Partial<RoomTheme>) => void }) {
   return (
     <div className="mt-3 space-y-4">
       <Swatches title="壁紙" value={theme.wall} options={WALLPAPERS} label={(id) => WALLPAPER_STYLES[id].label} paint={(id) => ({ background: `radial-gradient(circle at 30% 30%, ${WALLPAPER_STYLES[id].ink} 0 22%, transparent 23%), ${WALLPAPER_STYLES[id].base}` })} onPick={(wall) => onChange({ wall })} />
       <Swatches title="床" value={theme.floor} options={FLOORS} label={(id) => FLOOR_STYLES[id].label} paint={(id) => ({ background: `repeating-linear-gradient(90deg, ${FLOOR_STYLES[id].base} 0 10px, ${FLOOR_STYLES[id].line} 10px 12px)` })} onPick={(floor) => onChange({ floor })} />
       <Swatches title="カーテン" value={theme.curtain} options={CURTAINS} label={(id) => CURTAIN_STYLES[id].label} paint={(id) => ({ background: CURTAIN_STYLES[id].color })} onPick={(curtain) => onChange({ curtain })} />
+      <Swatches title="壁のかざり" value={theme.deco} options={WALL_DECOS} label={(id) => DECO_LABELS[id]} paint={(id) => ({ background: DECO_SWATCH[id] })} onPick={(deco) => onChange({ deco })} />
       <Swatches title="ラグ" value={theme.rug} options={RUGS} label={(id) => RUG_STYLES[id].label} paint={(id) => (id === "none" ? { background: "repeating-linear-gradient(45deg, #fff 0 6px, #eee 6px 12px)" } : { background: RUG_STYLES[id].color })} onPick={(rug) => onChange({ rug })} />
     </div>
   );
