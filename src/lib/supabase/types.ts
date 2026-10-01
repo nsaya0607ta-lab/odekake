@@ -675,6 +675,12 @@ export type Database = {
         Update: Partial<UserDambourleItemRow>;
         Relationships: [];
       };
+      user_rooms: {
+        Row: { user_id: string; layout: Json; updated_at: string };
+        Insert: { user_id: string; layout?: Json; updated_at?: string };
+        Update: { layout?: Json; updated_at?: string };
+        Relationships: [];
+      };
       user_dambourle_equipped: {
         Row: UserDambourleEquippedRow;
         Insert: Partial<UserDambourleEquippedRow> & { user_id: string };
