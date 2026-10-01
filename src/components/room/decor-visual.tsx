@@ -2,7 +2,7 @@
 
 /** わんこのおへやに置いたもの1つの見た目（図鑑アイテム・額縁の写真・トロフィー・ペナント） */
 import type { DecorEntry, FrameStyle } from "@/lib/room/types";
-import { FurnitureArt } from "./furniture-art";
+import { FurnitureArt, type FurnitureFx } from "./furniture-art";
 
 const FRAME_LOOK: Record<FrameStyle, { label: string; border: string; pad: string; bottom: string; bw: number; depth: number }> = {
   wood: { label: "木", border: "border-[6px] border-[#B98A57]", pad: "p-[3px] bg-[#FFFAF0]", bottom: "", bw: 6, depth: 1 },
@@ -12,9 +12,9 @@ const FRAME_LOOK: Record<FrameStyle, { label: string; border: string; pad: strin
 };
 export const FRAME_LABELS = Object.fromEntries(Object.entries(FRAME_LOOK).map(([k, v]) => [k, v.label])) as Record<FrameStyle, string>;
 
-export function DecorVisual({ entry, frame = "wood", thumb = false, lit = false }: { entry: DecorEntry; frame?: FrameStyle; thumb?: boolean; lit?: boolean }) {
+export function DecorVisual({ entry, frame = "wood", thumb = false, lit = false, fx }: { entry: DecorEntry; frame?: FrameStyle; thumb?: boolean; lit?: boolean; fx?: FurnitureFx }) {
   const label = thumb ? undefined : entry.name;
-  if (entry.kind === "furniture") return <FurnitureArt id={entry.furniture} label={label} lit={lit} />;
+  if (entry.kind === "furniture") return <FurnitureArt id={entry.furniture} label={label} lit={lit} fx={fx} />;
   if (entry.kind === "item") {
     // eslint-disable-next-line @next/next/no-img-element
     return <img src={entry.image} alt={label ?? ""} draggable={false} className="pointer-events-none block h-auto w-full select-none object-contain drop-shadow-[0_5px_3px_rgba(68,50,33,.22)]" />;

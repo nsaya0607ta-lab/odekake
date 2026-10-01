@@ -11,12 +11,20 @@ import type { FurnitureId } from "@/lib/room/types";
 
 const SVG_CLASS = "pointer-events-none block h-auto w-full";
 
-type Art = { u: string; lit: boolean };
+/**
+ * 犬が遊んでいるあいだの家具の動き。
+ * wobble ゆれる / sway 葉がゆれる / squish 乗られて沈む / clatter お皿がかたかた / on 明かりがつく /
+ * inside ハウスの中からのぞく / inside-sleep ハウスの中で寝ている / nibbled クッキーを1まいもらった /
+ * book 本を1さつ引き出した / empty ごはんを食べきった
+ */
+export type FurnitureFx = "wobble" | "sway" | "squish" | "clatter" | "on" | "inside" | "inside-sleep" | "nibbled" | "book" | "empty";
 
-export function FurnitureArt({ id, label, lit }: { id: FurnitureId; label?: string; lit: boolean }) {
+type Art = { u: string; lit: boolean; fx?: FurnitureFx };
+
+export function FurnitureArt({ id, label, lit, fx }: { id: FurnitureId; label?: string; lit: boolean; fx?: FurnitureFx }) {
   const u = `fa${useId().replace(/[^a-zA-Z0-9_-]/g, "")}`;
   const a11y = label ? { role: "img" as const, "aria-label": label } : {};
-  const art: Art = { u, lit };
+  const art: Art = { u, lit, fx };
   switch (id) {
     case "sofa": return <Sofa {...art} a11y={a11y} />;
     case "dog-bed": return <DogBed {...art} a11y={a11y} />;
@@ -239,7 +247,7 @@ function Plant({ u, a11y }: P) {
   );
 }
 
-function Bookshelf({ u, a11y }: P) {
+function Bookshelf({ u, fx, a11y }: P) {
   const g = (n: string) => `${u}-${n}`;
   const books = (y: number, list: [number, number, string][]) => list.map(([x, h, c]) => (
     <g key={`${y}-${x}`}>
@@ -274,7 +282,14 @@ function Bookshelf({ u, a11y }: P) {
         </g>
       ))}
       {books(70, [[20, 40, "#D9806B"], [32, 34, "#7FA6D6"], [44, 44, "#F2D16B"], [56, 38, "#8CBF7A"], [68, 42, "#B65A7A"]])}
-      <g transform="rotate(12 92 70)"><rect x="86" y="32" width="11" height="38" rx="1.2" fill="#C7B4D9" /></g>
+      {fx === "book" ? (
+        // 引き出した本（手前にかたむいて、少し飛び出す）
+        <g transform="rotate(-22 86 70)">
+          <rect x="80" y="30" width="12" height="40" rx="1.2" fill="#B39CCC" />
+          <rect x="80" y="30" width="3.5" height="40" fill="#FFFFFF" opacity="0.3" />
+          <rect x="80" y="38" width="12" height="2.4" fill="#000" opacity="0.18" />
+        </g>
+      ) : <g transform="rotate(12 92 70)"><rect x="86" y="32" width="11" height="38" rx="1.2" fill="#C7B4D9" /></g>}
       {/* 写真立て */}
       <rect x="108" y="44" width="22" height="26" rx="2" fill="#F6EFE2" stroke="#C98F5A" strokeWidth="2.5" />
       <rect x="112" y="48" width="14" height="14" fill="#9CC4DE" />
@@ -321,7 +336,7 @@ function Lamp({ u, lit, a11y }: P) {
   );
 }
 
-function Table({ u, a11y }: P) {
+function Table({ u, fx, a11y }: P) {
   const g = (n: string) => `${u}-${n}`;
   return (
     <svg viewBox="0 0 200 120" className={SVG_CLASS} {...a11y}>
@@ -345,14 +360,14 @@ function Table({ u, a11y }: P) {
       <path d="M88 24 q9 2 0 9" stroke="#D8D2C8" strokeWidth="3" fill="none" />
       <path d="M74 14 q-4 -6 0 -10 M82 14 q-4 -6 0 -10" stroke="#FFFFFF" strokeOpacity="0.7" strokeWidth="2" fill="none" strokeLinecap="round" />
       <ellipse cx="124" cy="36" rx="18" ry="5.5" fill="#FFFFFF" />
-      {[[116, 32], [126, 30], [132, 35]].map(([x, y]) => (
+      {(fx === "nibbled" ? [[116, 32], [126, 30]] : [[116, 32], [126, 30], [132, 35]]).map(([x, y]) => (
         <g key={x}><circle cx={x} cy={y} r="5" fill="#D9A36A" /><circle cx={x! - 1.5} cy={y! - 1} r="1" fill="#7A4B2A" /><circle cx={x! + 1.5} cy={y! + 1} r="0.9" fill="#7A4B2A" /></g>
       ))}
     </svg>
   );
 }
 
-function DogHouse({ u, a11y }: P) {
+function DogHouse({ u, fx, a11y }: P) {
   const g = (n: string) => `${u}-${n}`;
   return (
     <svg viewBox="0 0 200 190" className={SVG_CLASS} {...a11y}>
@@ -380,6 +395,25 @@ function DogHouse({ u, a11y }: P) {
       {/* 入り口 */}
       <path d="M68 180 L68 128 Q100 92 132 128 L132 180 Z" fill="#A86E3C" />
       <path d="M74 180 L74 130 Q100 100 126 130 L126 180 Z" fill={`url(#${g("door")})`} />
+      {fx === "inside" ? (
+        // 中からのぞく目と鼻（ときどきまばたき）
+        <g>
+          {[88, 112].map((x) => (
+            <ellipse key={x} cx={x} cy="146" rx="4.2" ry="5" fill="#FFF8E8">
+              <animate attributeName="ry" values="5;5;0.6;5;5" keyTimes="0;0.86;0.9;0.94;1" dur="3.2s" repeatCount="indefinite" />
+            </ellipse>
+          ))}
+          {[88, 112].map((x) => <circle key={`p${x}`} cx={x + 0.8} cy="146.5" r="2.2" fill="#24160C" />)}
+          <ellipse cx="100" cy="158" rx="5" ry="3.4" fill="#3A2416" />
+          <ellipse cx="99" cy="157" rx="1.6" ry="1" fill="#FFFFFF" opacity="0.6" />
+        </g>
+      ) : null}
+      {fx === "inside-sleep" ? (
+        <g fill="#B9C0F0" fontWeight="900">
+          <text x="104" y="150" fontSize="14" opacity="0.9">z<animate attributeName="opacity" values="0;1;0" dur="2.4s" repeatCount="indefinite" /></text>
+          <text x="114" y="138" fontSize="18" opacity="0.9">Z<animate attributeName="opacity" values="0;0;1;0" dur="2.4s" repeatCount="indefinite" /></text>
+        </g>
+      ) : null}
       {/* 名ふだ */}
       <rect x="70" y="52" width="60" height="20" rx="5" fill="#FFF6E4" stroke="#A86E3C" strokeWidth="2" />
       <text x="100" y="66.5" textAnchor="middle" fontSize="12" fontWeight="900" fill="#7A4A2E">わんこ</text>
@@ -393,7 +427,7 @@ function DogHouse({ u, a11y }: P) {
   );
 }
 
-function Bowl({ u, a11y }: P) {
+function Bowl({ u, fx, a11y }: P) {
   const g = (n: string) => `${u}-${n}`;
   return (
     <svg viewBox="0 0 100 58" className={SVG_CLASS} {...a11y}>
@@ -406,8 +440,15 @@ function Bowl({ u, a11y }: P) {
       <path d="M8 20 L92 20 L80 50 Q50 56 20 50 Z" fill={`url(#${g("body")})`} />
       <ellipse cx="50" cy="20" rx="42" ry="9" fill="#DCEBFA" />
       <ellipse cx="50" cy="20" rx="35" ry="6.5" fill="#4E6E9C" />
-      <ellipse cx="50" cy="19" rx="33" ry="6" fill={`url(#${g("food")})`} />
-      {[[36, 17], [44, 15], [52, 17], [60, 15], [66, 19], [40, 21], [56, 21], [48, 19]].map(([x, y], i) => (
+      {fx === "empty" ? (
+        // 食べきったお皿（底と、のこったかけらが少し）
+        <g>
+          <ellipse cx="50" cy="21" rx="31" ry="4.6" fill="#C6DCF5" />
+          <ellipse cx="44" cy="21" rx="2" ry="1.4" fill="#A0602C" />
+          <ellipse cx="57" cy="22" rx="1.6" ry="1.1" fill="#B5753B" />
+        </g>
+      ) : <ellipse cx="50" cy="19" rx="33" ry="6" fill={`url(#${g("food")})`} />}
+      {(fx === "empty" ? [] : [[36, 17], [44, 15], [52, 17], [60, 15], [66, 19], [40, 21], [56, 21], [48, 19]]).map(([x, y], i) => (
         <g key={i}><ellipse cx={x} cy={y} rx="4" ry="3" fill={i % 2 ? "#B5753B" : "#A0602C"} /><ellipse cx={x! - 1} cy={y! - 1} rx="1.4" ry="0.9" fill="#E9B37A" opacity="0.8" /></g>
       ))}
       {/* 肉球のマーク */}

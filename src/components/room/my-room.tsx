@@ -38,12 +38,14 @@ import {
   WALLPAPERS,
   type DecorEntry,
   type DecorKind,
+  type FurnitureId,
   type Placement,
   type RoomLayout,
   type RoomPhoto,
   type RoomTheme,
 } from "@/lib/room/types";
 import { DecorVisual, FRAME_LABELS } from "./decor-visual";
+import type { FurnitureFx } from "./furniture-art";
 import { RoomDog } from "./room-dog";
 import { composeRoomSnapshot } from "./room-snapshot";
 import { skyAt } from "@/lib/room/sun";
@@ -117,6 +119,10 @@ function freeWallSpot(taken: readonly { x: number; y: number }[]): [number, numb
 
 /** 家具の奥行き（床の上で場所をとる高さ。幅に対する割合） */
 const PLACE_KEY = "odekake-room-place-v1";
+/** 家具の絵の 高さ÷幅（furniture-art.tsx の viewBox） */
+const FURNITURE_RATIO: Record<FurnitureId, number> = { sofa: 150 / 260, "dog-bed": 110 / 190, plant: 190 / 120, bookshelf: 210 / 150, lamp: 220 / 90, table: 120 / 200, "dog-house": 190 / 200, bowl: 58 / 100 };
+/** 犬が遊んでいるあいだの家具の動き（ゆれる・明かりがつく など） */
+const FX_CLASS: Partial<Record<FurnitureFx, string>> = { wobble: "room-fx-wobble", sway: "room-fx-sway", squish: "room-fx-squish", clatter: "room-fx-clatter" };
 const FURNITURE_DEPTH: Record<string, number> = { sofa: 0.35, plant: 0.2, bookshelf: 0.25, lamp: 0.2, table: 0.3, "dog-house": 0.35, bowl: 0.2, "dog-bed": 0.3 };
 
 const FLOOR_SPOTS = [[22, 74], [78, 76], [64, 90], [36, 92], [86, 92], [14, 88], [50, 66], [70, 66]] as const;
@@ -209,6 +215,14 @@ export function MyRoom({ entries, initialLayout, serverReady, dogSkin, dogName, 
   const [place, setPlace] = useState<RoomPlace>(DEFAULT_PLACE);
   const phase: DayPhase = dayPhaseOf(now, place);
   const [weather, setWeather] = useState<RoomWeather | null>(null);
+  /** 犬が遊んでいる家具の動き（置いたものの id → 動き） */
+  const [furnitureFx, setFurnitureFx] = useState<Record<string, FurnitureFx>>({});
+  const onFurnitureFx = useCallback((id: string, fx: FurnitureFx | null) => {
+    setFurnitureFx((cur) => {
+      if (!fx) { if (!(id in cur)) return cur; const next = { ...cur }; delete next[id]; return next; }
+      return cur[id] === fx ? cur : { ...cur, [id]: fx };
+    });
+  }, []);
   const lightsOn = useMemo(() => lampsOn(withWeather(skyAt(now, place), weather)), [now, place, weather]);
   /** 犬が寝る時間（日本時間の21時〜6時） */
   const sleepy = useMemo(() => { const h = Number(new Intl.DateTimeFormat("en-US", { timeZone: "Asia/Tokyo", hour: "numeric", hourCycle: "h23" }).format(now)); return h >= 21 || h < 6; }, [now]);
@@ -452,13 +466,15 @@ export function MyRoom({ entries, initialLayout, serverReady, dogSkin, dogName, 
   /** 犬が向かう場所（ベッド・ごはん皿・床のもの） */
   const dogPlaces = useMemo(() => {
     const floor = layout.items.filter((p) => { const e = entryByKey.get(p.key); return e && !isHanging(e.kind) && !shelfOf(p); });
-    const furn = (id: string) => floor.find((p) => p.key === `furniture:${id}`);
-    const bed = furn("dog-bed") ?? furn("dog-house"), bowl = furn("bowl");
     return {
-      // ベッドではクッションの上（少し奥）に寝て、ベッドより手前に描く。ハウスでは入り口の前
-      bed: bed ? (bed.key === "furniture:dog-house" ? { x: bed.x, y: clamp(bed.y + 1.5, ROOM.floorTop, ROOM.floorBottom), zy: bed.y + 2 } : { x: bed.x, y: bed.y - 1.5, zy: bed.y + 0.5 }) : null,
-      bowl: bowl ? { x: bowl.x, y: bowl.y } : null,
       toys: floor.filter((p) => entryByKey.get(p.key)?.kind === "item").map((p) => ({ x: p.x, y: p.y, name: entryByKey.get(p.key)!.name })),
+      // 家具ひとつずつの場所と大きさ（犬がそれぞれの家具で遊ぶ）
+      furniture: floor.flatMap((p) => {
+        const e = entryByKey.get(p.key);
+        if (!e || e.kind !== "furniture") return [];
+        const w = widthOf(e, p);
+        return [{ id: p.id, kind: e.furniture, x: p.x, y: p.y, w, h: (w * FURNITURE_RATIO[e.furniture]) / ROOM.aspect }];
+      }),
       // 家具のあるところ（犬は家具の上を歩かず、ここをよけて回りこむ。ベッドとハウスだけは中へ入る）
       blocks: floor.flatMap((p) => {
         const e = entryByKey.get(p.key);
@@ -602,7 +618,9 @@ export function MyRoom({ entries, initialLayout, serverReady, dogSkin, dogName, 
                 {/* 棚の上：板に落ちる小さな影 */}
                 {!hang && shelfOf(p) ? <span data-shadow className="pointer-events-none absolute -bottom-[3%] left-1/2 h-[7%] w-[84%] -translate-x-1/2 rounded-[50%] bg-[#3a2410]/30 blur-[1.5px]" /> : null}
                 <span data-body className="relative block" style={{ transform: p.flip ? "scaleX(-1)" : undefined }}>
-                  <DecorVisual entry={entry} frame={p.frame} lit={lightsOn} />
+                  <span key={furnitureFx[p.id] ?? "-"} className={`block origin-bottom ${FX_CLASS[furnitureFx[p.id]!] ?? ""}`}>
+                    <DecorVisual entry={entry} frame={p.frame} lit={lightsOn || furnitureFx[p.id] === "on"} fx={furnitureFx[p.id]} />
+                  </span>
                 </span>
                 {isSel ? (
                   <span className="room-selected pointer-events-none absolute -inset-2 rounded-xl border-2 border-white/90 shadow-[0_0_0_2px_rgba(94,140,74,.9),0_0_16px_rgba(140,200,110,.75)]">
@@ -614,7 +632,7 @@ export function MyRoom({ entries, initialLayout, serverReady, dogSkin, dogName, 
             );
           })}
 
-          <RoomDog skin={dogSkin} phase={phase} sleepy={sleepy} lines={dogLines} quiet={editing} places={dogPlaces} weather={weather?.kind ?? null} />
+          <RoomDog skin={dogSkin} phase={phase} sleepy={sleepy} lines={dogLines} quiet={editing} places={dogPlaces} weather={weather?.kind ?? null} onFx={onFurnitureFx} />
           <div className="pointer-events-none absolute inset-0" style={{ zIndex: 2000 }}>
             <RoomLighting now={now} lamps={lampLights} at={place} weather={weather} />
           </div>
