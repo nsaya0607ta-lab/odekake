@@ -65,7 +65,7 @@ import { skyAt } from "@/lib/room/sun";
 import { parseRoomWeather, withWeather, type RoomWeather } from "@/lib/room/weather";
 import { EVENT_FLOOR_Y, EventFloor, EventFront } from "./room-events";
 import { dayPhaseOf, FixtureVisual, fixtureSize, lampsOn, ROOM_STAGE, RoomLighting, RoomScene, ThemeSwatch, windowRectOf, type DayPhase } from "./room-scene";
-import { DEFAULT_PLACE, locateHere, placeShortName, SkyCard, type RoomPlace } from "./sky-card";
+import { DEFAULT_PLACE, locateHere, placeShortName, SkyCard, skyBackdrop, type RoomPlace } from "./sky-card";
 
 type Tab = DecorKind | "theme";
 type ItemFilter = "all" | "toy" | "food" | "interior" | "other" | "sushi";
@@ -274,7 +274,8 @@ export function MyRoom({ entries, initialLayout, serverReady, dogSkin, dogName, 
   }, []);
   /** いまの行事（もようがえでオフにしていれば null） */
   const roomEvent = layout.theme.events === false ? null : roomEventOf(now)?.id ?? null;
-  const lightsOn = useMemo(() => lampsOn(withWeather(skyAt(now, place), weather)), [now, place, weather]);
+  const skyNow = useMemo(() => withWeather(skyAt(now, place), weather), [now, place, weather]);
+  const lightsOn = useMemo(() => lampsOn(skyNow), [skyNow]);
   /** 犬が寝る時間（日本時間の21時〜6時） */
   const sleepy = useMemo(() => { const h = Number(new Intl.DateTimeFormat("en-US", { timeZone: "Asia/Tokyo", hour: "numeric", hourCycle: "h23" }).format(now)); return h >= 21 || h < 6; }, [now]);
 
@@ -739,6 +740,10 @@ export function MyRoom({ entries, initialLayout, serverReady, dogSkin, dogName, 
           ) : null}
           </div>
 
+          {/* 夜は部屋の下のはしを、下のお天気カードのまわりの色にとかす（境目をなじませる） */}
+          {!editing && !visit && skyNow.light < 0.9 ? (
+            <div aria-hidden className="pointer-events-none absolute inset-x-0 bottom-0 h-[9%]" style={{ zIndex: 2400, opacity: Math.min(1, (1 - skyNow.light) * 1.3), background: `linear-gradient(180deg, transparent, ${skyBackdrop(1 - skyNow.light).top})` }} />
+          ) : null}
           {editing && selected && selectedEntry ? (
             <div className="absolute bottom-2 left-1/2 z-[3000] flex -translate-x-1/2 items-center gap-1 rounded-full border border-line bg-card/95 p-1.5 shadow-lg backdrop-blur">
               <Tool label="小さく" onClick={() => changeItem(selected.id, (p) => ({ ...p, scale: clamp(p.scale - 0.12, 0.5, 2) }))}>−</Tool>

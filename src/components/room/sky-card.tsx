@@ -62,6 +62,12 @@ const trailX = (n: number) => TRAIL_X0 + (Math.min(n, TRAIL_MAX) / TRAIL_MAX) * 
 /** 手前の丘の上の道（x での高さ） */
 const trailY = (x: number) => 131 + Math.sin((x / 300) * Math.PI * 2.2) * 2.2;
 
+/** カードのまわりの色（上・まん中）。夜は、暗くなった部屋の床の色から藍へ */
+export function skyBackdrop(dark: number): { top: string; mid: string } {
+  const t = Math.min(1, dark * 1.1);
+  return { top: mix("#C9DFF0", "#3E3C56", t), mid: mix("#E3EEF7", "#232A4A", t) };
+}
+
 /** 連続記録の目標 */
 const STREAK_GOAL = 5_000;
 const DOW = ["日", "月", "火", "水", "木", "金", "土"];
@@ -165,9 +171,9 @@ export function SkyCard({ now, place, onPlace, weather = null, steps, history, h
       {/* カードのまわりも空の色に（部屋の下からつながって見えるように。下の方で紙の色にもどす） */}
       <div
         className={height ? "relative -mx-4 -mt-4 px-4 pb-1 pt-4" : "contents"}
-        style={height ? { background: `linear-gradient(180deg, ${ink("#C9DFF0", "#141A36")} 0%, ${ink("#E3EEF7", "#252C4C")} 78%, #FBF8F1 100%)` } : undefined}
+        style={height ? { background: `linear-gradient(180deg, ${skyBackdrop(dark).top} 0%, ${skyBackdrop(dark).mid} 40%, ${skyBackdrop(dark).mid} 80%, #FBF8F1 100%)` } : undefined}
       >
-      {height ? <div aria-hidden className="pointer-events-none absolute inset-x-0 top-0 h-5 bg-gradient-to-b from-[#2A1A0A]/20 to-transparent" /> : null}
+      {height ? <div aria-hidden className="pointer-events-none absolute inset-x-0 top-0 h-5 bg-gradient-to-b from-[#2A1A0A] to-transparent" style={{ opacity: 0.2 * (1 - Math.min(1, dark * 1.4)) }} /> : null}
       {/* いまの空と町（ふちなし）。下に、すりガラスの帯（もようがえ・きょうの歩数・フレンドのおへや） */}
       <div
         className={`relative isolate overflow-hidden rounded-[26px] shadow-[0_14px_28px_-16px_rgba(30,50,80,.55),0_2px_6px_-2px_rgba(30,50,80,.18)] ${height ? "" : "h-[300px]"}`}
