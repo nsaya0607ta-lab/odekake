@@ -15,6 +15,10 @@ const W = 1000;
 const H = 1120;
 const HZ = (ROOM.horizon / 100) * H;
 const px = (pct: number) => (pct / 100) * W;
+/** 左右の壁の幅・天井の高さ・左右の壁が床で手前に広がる分（部屋の箱らしさ） */
+const SIDE = 44;
+const CEIL = 20;
+const SIDE_DROP = 64;
 const py = (pct: number) => (pct / 100) * H;
 
 const SKY: Record<DayPhase, [string, string]> = {
@@ -66,6 +70,46 @@ export const RoomScene = memo(function RoomScene({ theme, phase, now }: { theme:
           <stop offset="0.35" stopColor="#000" stopOpacity="0.02" />
           <stop offset="1" stopColor="#fff" stopOpacity="0.06" />
         </linearGradient>
+        <filter id="room-grain" x="0" y="0" width="100%" height="100%">
+          <feTurbulence type="fractalNoise" baseFrequency="0.85" numOctaves="2" stitchTiles="stitch" result="n" />
+          <feColorMatrix in="n" type="matrix" values="0 0 0 0 0  0 0 0 0 0  0 0 0 0 0  0 0 0 1.4 -0.45" />
+          <feComposite in="SourceGraphic" operator="in" />
+        </filter>
+        <filter id="room-soft" x="-20%" y="-20%" width="140%" height="140%"><feGaussianBlur stdDeviation="14" /></filter>
+        <radialGradient id="room-window-glow" cx="0.5" cy="0.5" r="0.5">
+          <stop offset="0" stopColor={phase === "evening" ? "#FFC48A" : "#FFFBEA"} stopOpacity={phase === "evening" ? 0.35 : 0.55} />
+          <stop offset="1" stopColor="#FFFBEA" stopOpacity="0" />
+        </radialGradient>
+        <linearGradient id="room-baseboard" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0" stopColor="#FFFFFF" />
+          <stop offset="0.2" stopColor="#FBF6EC" />
+          <stop offset="1" stopColor="#E6DCCB" />
+        </linearGradient>
+        <linearGradient id="room-floor-ao" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0" stopColor="#2A1A0A" stopOpacity="0.22" />
+          <stop offset="1" stopColor="#2A1A0A" stopOpacity="0" />
+        </linearGradient>
+        <linearGradient id="room-ceiling" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0" stopColor="#FFFFFF" />
+          <stop offset="1" stopColor="#F1E9DA" />
+        </linearGradient>
+        <linearGradient id="room-side-left" x1="0" y1="0" x2="1" y2="0">
+          <stop offset="0" stopColor="#2A1A0A" stopOpacity="0.22" />
+          <stop offset="1" stopColor="#2A1A0A" stopOpacity="0.08" />
+        </linearGradient>
+        <linearGradient id="room-side-right" x1="1" y1="0" x2="0" y2="0">
+          <stop offset="0" stopColor="#2A1A0A" stopOpacity="0.26" />
+          <stop offset="1" stopColor="#2A1A0A" stopOpacity="0.1" />
+        </linearGradient>
+        <linearGradient id="room-glass" x1="0" y1="0" x2="1" y2="1">
+          <stop offset="0" stopColor="#FFFFFF" stopOpacity="0" />
+          <stop offset="0.42" stopColor="#FFFFFF" stopOpacity="0" />
+          <stop offset="0.46" stopColor="#FFFFFF" stopOpacity="0.32" />
+          <stop offset="0.52" stopColor="#FFFFFF" stopOpacity="0.08" />
+          <stop offset="0.56" stopColor="#FFFFFF" stopOpacity="0.22" />
+          <stop offset="0.6" stopColor="#FFFFFF" stopOpacity="0" />
+          <stop offset="1" stopColor="#FFFFFF" stopOpacity="0" />
+        </linearGradient>
         <radialGradient id="room-lamp-glow" cx="0.5" cy="0.5" r="0.5">
           <stop offset="0" stopColor="#FFE3A3" stopOpacity="0.55" />
           <stop offset="1" stopColor="#FFE3A3" stopOpacity="0" />
@@ -77,45 +121,50 @@ export const RoomScene = memo(function RoomScene({ theme, phase, now }: { theme:
         </linearGradient>
       </defs>
 
-      {/* 壁 */}
+      {/* 奥の壁（模様・紙の質感・上下のかげ） */}
       <rect x="0" y="0" width={W} height={HZ} fill={wall.base} />
       <rect x="0" y="0" width={W} height={HZ} fill="url(#room-wall)" />
+      <rect x="0" y="0" width={W} height={HZ} fill="#7A6040" filter="url(#room-grain)" opacity="0.07" />
       <rect x="0" y="0" width={W} height={HZ} fill="url(#room-wall-shade)" />
-      <rect x="0" y="0" width={W} height="16" fill="#FFFFFF" opacity="0.55" />
-      <rect x="0" y="16" width={W} height="4" fill="#000" opacity="0.06" />
+      {/* 窓から入る光が壁を明るくする */}
+      {phase !== "night" ? <ellipse cx={px((ROOM.window.x0 + ROOM.window.x1) / 2)} cy={py(24)} rx="360" ry="300" fill="url(#room-window-glow)" /> : null}
 
       <Window phase={phase} curtain={CURTAIN_STYLES[theme.curtain].color} season={seasonOf(now)} />
       <WallDecoration deco={theme.deco} lit={night || phase === "evening"} />
       <Clock now={now} night={night} />
       <Shelves />
-      <PendantLamp lit={night || phase === "evening"} />
 
       {/* 床 */}
       <Floor theme={theme} />
+      <rect x="0" y={HZ} width={W} height={H - HZ} fill="#5A4030" filter="url(#room-grain)" opacity="0.06" />
       <rect x="0" y={HZ} width={W} height={H - HZ} fill="url(#room-floor-shade)" />
       {/* 窓から差しこむ光 */}
       {phase !== "night" ? (
         <polygon
           points={`${px(ROOM.window.x0) + 30},${HZ} ${px(ROOM.window.x1) - 10},${HZ} ${px(ROOM.window.x1) + 150},${H * 0.86} ${px(ROOM.window.x0) + 120},${H * 0.86}`}
           fill={phase === "evening" ? "#FFB37A" : "#FFF6D8"}
-          opacity={phase === "day" ? 0.22 : 0.18}
+          opacity={phase === "day" ? 0.24 : 0.2}
+          filter="url(#room-soft)"
         />
       ) : null}
       {phase === "day" || phase === "morning" ? <SunDust /> : null}
       <RugShape rug={theme.rug} />
-      {/* 幅木 */}
-      <rect x="0" y={HZ - 22} width={W} height="24" fill="#FFFDF8" />
-      <rect x="0" y={HZ - 22} width={W} height="4" fill="#000" opacity="0.05" />
-      <rect x="0" y={HZ + 2} width={W} height="6" fill="#000" opacity="0.1" />
+      {/* 幅木と、壁と床の境目のかげ */}
+      <rect x="0" y={HZ - 22} width={W} height="24" fill="url(#room-baseboard)" />
+      <rect x="0" y={HZ + 2} width={W} height="26" fill="url(#room-floor-ao)" />
 
-      {/* 時間帯の明るさ。夜は部屋が暗くなり、ランプのまわりだけ明るい */}
-      {phase === "evening" ? <rect x="0" y="0" width={W} height={H} fill="#FF9A4D" opacity="0.08" /> : null}
-      {night ? (
-        <>
-          <rect x="0" y="0" width={W} height={H} fill="#141A44" opacity="0.34" />
-          <ellipse cx={W / 2} cy={420} rx={560} ry={520} fill="url(#room-lamp-glow)" />
-        </>
-      ) : null}
+      {/* 天井と左右の壁：部屋に奥行きを出す */}
+      <polygon points={`0,0 ${W},0 ${W - SIDE},${CEIL} ${SIDE},${CEIL}`} fill="url(#room-ceiling)" />
+      <polygon points={`0,0 ${SIDE},${CEIL} ${SIDE},${HZ} 0,${HZ + SIDE_DROP}`} fill={wall.base} />
+      <polygon points={`0,0 ${SIDE},${CEIL} ${SIDE},${HZ} 0,${HZ + SIDE_DROP}`} fill="url(#room-side-left)" />
+      <polygon points={`${W},0 ${W - SIDE},${CEIL} ${W - SIDE},${HZ} ${W},${HZ + SIDE_DROP}`} fill={wall.base} />
+      <polygon points={`${W},0 ${W - SIDE},${CEIL} ${W - SIDE},${HZ} ${W},${HZ + SIDE_DROP}`} fill="url(#room-side-right)" />
+      <polygon points={`0,${HZ + SIDE_DROP - 26} ${SIDE},${HZ - 22} ${SIDE},${HZ + 2} 0,${HZ + SIDE_DROP}`} fill="#F1E8D8" />
+      <polygon points={`${W},${HZ + SIDE_DROP - 26} ${W - SIDE},${HZ - 22} ${W - SIDE},${HZ + 2} ${W},${HZ + SIDE_DROP}`} fill="#F1E8D8" />
+      <line x1={SIDE} y1={CEIL} x2={SIDE} y2={HZ} stroke="#000" strokeOpacity="0.1" strokeWidth="2" />
+      <line x1={W - SIDE} y1={CEIL} x2={W - SIDE} y2={HZ} stroke="#000" strokeOpacity="0.1" strokeWidth="2" />
+      <line x1={SIDE} y1={CEIL} x2={W - SIDE} y2={CEIL} stroke="#000" strokeOpacity="0.08" strokeWidth="2" />
+      <PendantLamp lit={night || phase === "evening"} />
     </svg>
   );
 });
@@ -306,6 +355,8 @@ function Window({ phase, curtain, season }: { phase: DayPhase; curtain: string; 
       <clipPath id="room-window-clip"><rect x={x0} y={y0} width={w} height={h} /></clipPath>
       <WindowWeather season={season} x0={x0} y0={y0} w={w} h={h} />
       {season === "summer" && !night ? <g>{[0.12, 0.3].map((sx) => <g key={sx} transform={`translate(${x0 + w * sx} ${y1 - h * 0.12})`}><rect x="-2" y="-30" width="4" height="34" fill="#5E9C52" /><circle cx="0" cy="-34" r="11" fill="#F6C12E" /><circle cx="0" cy="-34" r="5" fill="#8A5A30" /></g>)}</g> : null}
+      <rect x={x0} y={y0} width={w} height={h} fill="url(#room-glass)" opacity={night ? 0.35 : 1} />
+      <rect x={x0} y={y0} width={w} height="10" fill="#000" opacity="0.12" />
       {/* 窓わく */}
       <rect x={x0} y={y0} width={w} height={h} fill="none" stroke="#FFFFFF" strokeWidth="14" />
       <rect x={x0 - 7} y={y0 - 7} width={w + 14} height={h + 14} fill="none" stroke="#D9C3A0" strokeWidth="3" />
@@ -420,9 +471,23 @@ function Floor({ theme }: { theme: RoomTheme }) {
   }
   // 木の床：消失点に向かう板の継ぎ目と、ずらした板の端
   const r = rows(9), c = cols(70);
+  // 板ごとに少しだけ色を変えて、本物の床板らしくする
+  const tones = ["#FFFFFF", "#000000"];
+  const planks: React.ReactNode[] = [];
+  for (let j = 0; j < c.length - 1; j++) {
+    for (let i = 0; i < r.length - 1; i++) {
+      // 板は縦に長いので、色は 3 段ごと（板の継ぎ目ごと）に変える
+      const seg = Math.floor((i + (j % 3)) / 3);
+      const v = Math.sin(seg * 12.9898 + j * 78.233) * 43758.5453, t = v - Math.floor(v);
+      if (t > 0.35 && t < 0.65) continue;
+      const ya = r[i]!, yb = r[i + 1]!;
+      planks.push(<polygon key={`p${i}-${j}`} points={`${xAt(c[j]!, ya)},${ya} ${xAt(c[j + 1]!, ya)},${ya} ${xAt(c[j + 1]!, yb)},${yb} ${xAt(c[j]!, yb)},${yb}`} fill={tones[t < 0.5 ? 0 : 1]} opacity={0.035 + Math.abs(t - 0.5) * 0.06} />);
+    }
+  }
   return (
     <g>
       <rect x="0" y={HZ} width={W} height={depth} fill={f.base} />
+      {planks}
       {c.map((cc, i) => <line key={i} x1={cc[0]} y1={HZ} x2={cc[1]} y2={H} stroke={f.line} strokeWidth="2" />)}
       {r.slice(1).map((y, i) => c.slice(0, -1).map((cc, j) => ((i + j) % 3 === 0 ? <line key={`${i}-${j}`} x1={xAt(cc, y)} y1={y} x2={xAt(c[j + 1]!, y)} y2={y} stroke={f.line} strokeWidth="1.6" /> : null)))}
     </g>
@@ -451,3 +516,45 @@ function RugShape({ rug }: { rug: RoomTheme["rug"] }) {
     </g>
   );
 }
+
+/**
+ * 部屋全体の明かり（飾ったものや犬にもかかるよう、いちばん上に重ねる）。
+ * 夜は部屋を暗くして、天井のライトとフロアランプのまわりだけ明るく残す。夕方は橙、朝は桃色にほんのり染める。
+ * lamps は明かりの場所（部屋の %）。いつも四すみを少し暗くして、写真のような落ち着きを出す
+ */
+export const RoomLighting = memo(function RoomLighting({ phase, lamps }: { phase: DayPhase; lamps: readonly { x: number; y: number; r: number }[] }) {
+  const night = phase === "night";
+  const lights = [{ x: 50, y: 11, r: 46 }, ...lamps];
+  return (
+    <svg viewBox={`0 0 ${W} ${H}`} preserveAspectRatio="none" className="pointer-events-none absolute inset-0 h-full w-full" aria-hidden="true" data-lighting>
+      <defs>
+        <radialGradient id="room-vignette" cx="0.5" cy="0.48" r="0.75">
+          <stop offset="0.6" stopColor="#1A1008" stopOpacity="0" />
+          <stop offset="1" stopColor="#1A1008" stopOpacity="0.22" />
+        </radialGradient>
+        <radialGradient id="room-light-hole" cx="0.5" cy="0.5" r="0.5">
+          <stop offset="0" stopColor="#000" stopOpacity="1" />
+          <stop offset="0.55" stopColor="#000" stopOpacity="0.7" />
+          <stop offset="1" stopColor="#000" stopOpacity="0" />
+        </radialGradient>
+        <radialGradient id="room-light-warm" cx="0.5" cy="0.5" r="0.5">
+          <stop offset="0" stopColor="#FFD98A" stopOpacity="0.32" />
+          <stop offset="1" stopColor="#FFD98A" stopOpacity="0" />
+        </radialGradient>
+        <mask id="room-night-mask" maskUnits="userSpaceOnUse" x="0" y="0" width={W} height={H}>
+          <rect x="0" y="0" width={W} height={H} fill="#fff" />
+          {lights.map((l, i) => <ellipse key={i} cx={px(l.x)} cy={py(l.y)} rx={px(l.r)} ry={px(l.r) * 0.9} fill="url(#room-light-hole)" />)}
+        </mask>
+      </defs>
+      {phase === "morning" ? <rect x="0" y="0" width={W} height={H} fill="#FFB8A0" opacity="0.07" /> : null}
+      {phase === "evening" ? <rect x="0" y="0" width={W} height={H} fill="#FF8A3D" opacity="0.12" /> : null}
+      {night ? (
+        <>
+          <rect x="0" y="0" width={W} height={H} fill="#0F1438" opacity="0.5" mask="url(#room-night-mask)" />
+          {lights.map((l, i) => <ellipse key={i} cx={px(l.x)} cy={py(l.y)} rx={px(l.r) * 0.8} ry={px(l.r) * 0.72} fill="url(#room-light-warm)" />)}
+        </>
+      ) : null}
+      <rect x="0" y="0" width={W} height={H} fill="url(#room-vignette)" />
+    </svg>
+  );
+});

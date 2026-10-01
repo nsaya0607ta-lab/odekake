@@ -4393,6 +4393,15 @@
   0% { transform: scale(0.94); opacity: 0; }
   100% { transform: scale(1); opacity: 1; }
 }
+/* わんこのおへやの犬：歩くと弾み、止まると息をし、寝るとゆっくり上下し、なでると跳ねる */
+@keyframes room-dog-walk { 0%, 100% { transform: translateY(0) rotate(0deg); } 25% { transform: translateY(-4%) rotate(-1.5deg); } 50% { transform: translateY(0) rotate(0deg); } 75% { transform: translateY(-4%) rotate(1.5deg); } }
+@keyframes room-dog-idle { 0%, 100% { transform: scaleY(1); } 50% { transform: scaleY(1.025); } }
+@keyframes room-dog-sleep { 0%, 100% { transform: scale(1, 1); } 50% { transform: scale(1.015, 1.04); } }
+@keyframes room-dog-hop { 0% { transform: translateY(0) scale(1, 1); } 20% { transform: translateY(0) scale(1.08, 0.9); } 45% { transform: translateY(-14%) scale(0.95, 1.06); } 70% { transform: translateY(0) scale(1.05, 0.95); } 100% { transform: translateY(0) scale(1, 1); } }
+.room-dog-walk { animation: room-dog-walk 0.42s linear infinite; transform-origin: 50% 100%; }
+.room-dog-idle { animation: room-dog-idle 2.6s ease-in-out infinite; transform-origin: 50% 100%; }
+.room-dog-sleep { animation: room-dog-sleep 3.4s ease-in-out infinite; transform-origin: 50% 100%; }
+.room-dog-hop { animation: room-dog-hop 0.7s cubic-bezier(.3,.7,.4,1) both; transform-origin: 50% 100%; }
 @media (prefers-reduced-motion: reduce) {
-  .room-heart, .room-bubble { animation: none; }
+  .room-heart, .room-bubble, .room-dog-walk, .room-dog-idle, .room-dog-sleep, .room-dog-hop { animation: none; }
 }

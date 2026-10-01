@@ -115,6 +115,12 @@ export async function composeRoomSnapshot(room: HTMLElement, caption: { title: s
     ctx.restore();
   }
 
+  // 時間帯の明かり（夜の暗さ・ランプのまわりの明るさ・四すみのかげ）
+  const lighting = room.querySelector<SVGSVGElement>("[data-lighting]");
+  if (lighting) {
+    try { ctx.drawImage(await svgImage(lighting, OUT_W, roomH), 0, 0, OUT_W, roomH); } catch { /* 明かりなしで続ける */ }
+  }
+
   // 下の帯：タイトルと日付
   ctx.fillStyle = "#FFFAF0";
   ctx.fillRect(0, roomH, OUT_W, FOOTER);

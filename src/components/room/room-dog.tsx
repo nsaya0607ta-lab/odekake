@@ -153,35 +153,43 @@ export function RoomDog({ skin, phase, lines, quiet, places }: {
   };
 
   const width = DOG_WIDTH * depthScale(dog.y);
+  const place = {
+    left: `${dog.x}%`,
+    top: `${dog.y}%`,
+    width: `${width}%`,
+    transition: dog.dur ? `left ${dog.dur}s linear, top ${dog.dur}s linear, width ${dog.dur}s linear` : "none",
+  } as const;
+  // 歩くときは弾むように、止まっているときは息をするように、寝ているときはゆっくり上下する
+  const motion = dog.pose === "walk" || dog.pose === "trot" ? "room-dog-walk" : dog.pose === "sleep" ? "room-dog-sleep" : "room-dog-idle";
   return (
-    <button
-      type="button"
-      data-dog
-      onClick={tap}
-      aria-label={night ? "寝ている犬（タップでなでる）" : "犬（タップでなでる）"}
-      className="absolute block -translate-x-1/2 -translate-y-full p-0 outline-none"
-      style={{
-        left: `${dog.x}%`,
-        top: `${dog.y}%`,
-        width: `${width}%`,
-        zIndex: 300 + Math.round((dog.zy ?? dog.y) * 10),
-        transition: dog.dur ? `left ${dog.dur}s linear, top ${dog.dur}s linear, width ${dog.dur}s linear` : "none",
-        pointerEvents: quiet ? "none" : "auto",
-      }}
-    >
-      <span data-shadow className="pointer-events-none absolute bottom-[3%] left-1/2 h-[12%] w-[62%] -translate-x-1/2 rounded-[50%] bg-[#4a3520]/20 blur-[2px]" />
-      {/* eslint-disable-next-line @next/next/no-img-element */}
-      <img data-body src={getFrenchieSrc(skin, dog.pose)} alt="" draggable={false} className="relative block h-auto w-full select-none" style={{ transform: dog.flip ? "scaleX(-1)" : undefined }} />
-      {dog.pose === "sleep" ? <span className="pointer-events-none absolute -top-[6%] right-[8%] animate-pulse text-[11px] font-black text-[#6A6FA8]">Zzz</span> : null}
-      {hearts.map((h) => <span key={h} className="room-heart pointer-events-none absolute left-1/2 top-[8%] text-lg">💗</span>)}
-      {bubble ? (
-        <span
-          key={bubble.id}
-          className={`room-bubble pointer-events-none absolute bottom-[96%] w-max max-w-[11rem] rounded-2xl border border-line bg-card px-2.5 py-1.5 text-[11px] font-bold leading-snug text-ink shadow-md ${dog.x < 28 ? "room-bubble-left left-0" : dog.x > 72 ? "room-bubble-right right-0" : "left-1/2 -translate-x-1/2"}`}
-        >
-          {bubble.text}
+    <>
+      <button
+        type="button"
+        data-dog
+        onClick={tap}
+        aria-label={night ? "寝ている犬（タップでなでる）" : "犬（タップでなでる）"}
+        className="absolute block -translate-x-1/2 -translate-y-full p-0 outline-none"
+        style={{ ...place, zIndex: 300 + Math.round((dog.zy ?? dog.y) * 10), pointerEvents: quiet ? "none" : "auto" }}
+      >
+        <span data-shadow className="pointer-events-none absolute bottom-[3%] left-1/2 h-[12%] w-[62%] -translate-x-1/2 rounded-[50%] bg-[#4a3520]/20 blur-[2px]" />
+        <span key={hearts.at(-1) ?? 0} className={`block ${hearts.length ? "room-dog-hop" : motion}`}>
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img data-body src={getFrenchieSrc(skin, dog.pose)} alt="" draggable={false} className="relative block h-auto w-full select-none" style={{ transform: dog.flip ? "scaleX(-1)" : undefined }} />
         </span>
-      ) : null}
-    </button>
+      </button>
+      {/* ふきだし・ハート・Zzz は、夜の暗さより上に出す */}
+      <div className="pointer-events-none absolute -translate-x-1/2 -translate-y-full" style={{ ...place, aspectRatio: "300 / 254", zIndex: 2500 }}>
+        {dog.pose === "sleep" ? <span className="absolute -top-[6%] right-[8%] animate-pulse text-[11px] font-black text-[#8A8FD8]">Zzz</span> : null}
+        {hearts.map((h) => <span key={h} className="room-heart absolute left-1/2 top-[8%] text-lg">💗</span>)}
+        {bubble ? (
+          <span
+            key={bubble.id}
+            className={`room-bubble absolute bottom-[96%] w-max max-w-[11rem] rounded-2xl border border-line bg-card px-2.5 py-1.5 text-[11px] font-bold leading-snug text-ink shadow-md ${dog.x < 28 ? "room-bubble-left left-0" : dog.x > 72 ? "room-bubble-right right-0" : "left-1/2 -translate-x-1/2"}`}
+          >
+            {bubble.text}
+          </span>
+        ) : null}
+      </div>
+    </>
   );
 }

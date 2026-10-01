@@ -82,6 +82,10 @@ function Furniture({ id, label, lit }: { id: FurnitureId; label?: string; lit: b
           <rect x="186" y="44" width="32" height="56" rx="14" fill="#C2644F" />
           <rect x="34" y="100" width="8" height="16" rx="2" fill="#7A4A2E" />
           <rect x="178" y="100" width="8" height="16" rx="2" fill="#7A4A2E" />
+          <rect x="36" y="30" width="66" height="8" rx="4" fill="#FFFFFF" opacity="0.22" />
+          <rect x="118" y="30" width="66" height="8" rx="4" fill="#FFFFFF" opacity="0.22" />
+          <rect x="22" y="88" width="176" height="12" rx="6" fill="#000000" opacity="0.1" />
+          <path d="M40 66 q34 8 68 0 M116 66 q34 8 68 0" fill="none" stroke="#B85E4A" strokeWidth="2" opacity="0.5" />
           <rect x="140" y="40" width="34" height="26" rx="8" fill="#FFF3D6" transform="rotate(-10 157 53)" />
           <circle cx="157" cy="53" r="5" fill="#F2B8C6" transform="rotate(-10 157 53)" />
         </svg>
@@ -92,6 +96,8 @@ function Furniture({ id, label, lit }: { id: FurnitureId; label?: string; lit: b
           <ellipse cx="80" cy="50" rx="76" ry="28" fill="#7FA6D6" />
           <ellipse cx="80" cy="46" rx="62" ry="20" fill="#F6EFE2" />
           <ellipse cx="80" cy="44" rx="50" ry="14" fill="#FFFAF0" />
+          <ellipse cx="80" cy="40" rx="46" ry="9" fill="#E9DFCC" opacity="0.6" />
+          <path d="M20 40 Q80 18 140 40" fill="none" stroke="#FFFFFF" strokeWidth="3" opacity="0.5" />
           <path d="M8 46 Q80 86 152 46" fill="none" stroke="#6A93C6" strokeWidth="6" strokeLinecap="round" />
           {[30, 60, 100, 130].map((x) => <circle key={x} cx={x} cy={62} r="3" fill="#FFFFFF" opacity="0.7" />)}
         </svg>
@@ -115,6 +121,8 @@ function Furniture({ id, label, lit }: { id: FurnitureId; label?: string; lit: b
           <rect x="4" y="4" width="112" height="162" rx="5" fill="#A8723F" />
           <rect x="12" y="12" width="96" height="146" fill="#8A5A30" />
           {[56, 106].map((y) => <rect key={y} x="12" y={y} width="96" height="6" fill="#A8723F" />)}
+          {[12, 62, 112].map((y) => <rect key={`s${y}`} x="12" y={y} width="96" height="8" fill="#000" opacity="0.12" />)}
+          <rect x="4" y="4" width="6" height="162" fill="#FFFFFF" opacity="0.12" />
           {[[14, 22, "#D9806B"], [26, 18, "#7FA6D6"], [38, 26, "#F2D16B"], [52, 20, "#8CBF7A"], [66, 24, "#B65A7A"], [80, 18, "#E8C99A"]].map(([x, h, c]) => <rect key={`a${x}`} x={x as number} y={56 - 26 - (h as number) + 22} width="11" height={h as number + 4} fill={c as string} />)}
           {[[16, "#8DBDE6"], [30, "#F2A7B8"], [44, "#C7B4D9"]].map(([x, c]) => <rect key={`b${x}`} x={x as number} y="76" width="12" height="30" fill={c as string} />)}
           <circle cx="88" cy="92" r="11" fill="#73B062" />
@@ -125,8 +133,7 @@ function Furniture({ id, label, lit }: { id: FurnitureId; label?: string; lit: b
       );
     case "lamp":
       return (
-        <svg viewBox="0 0 70 190" className={SVG_CLASS} style={{ overflow: "visible" }} {...a11y}>
-          {lit ? <ellipse cx="35" cy="40" rx="70" ry="60" fill="#FFE3A3" opacity="0.35" /> : null}
+        <svg viewBox="0 0 70 190" className={SVG_CLASS} {...a11y}>
           <path d="M12 52 L58 52 L48 12 L22 12 Z" fill={lit ? "#FFE9B0" : "#F2E2C2"} stroke="#C9A878" strokeWidth="2" />
           {lit ? <ellipse cx="35" cy="54" rx="20" ry="5" fill="#FFF6D0" /> : null}
           <rect x="33" y="52" width="4" height="122" fill="#6A5A4A" />
@@ -138,6 +145,7 @@ function Furniture({ id, label, lit }: { id: FurnitureId; label?: string; lit: b
         <svg viewBox="0 0 170 90" className={SVG_CLASS} {...a11y}>
           <ellipse cx="85" cy="30" rx="80" ry="20" fill="#C98F5A" />
           <ellipse cx="85" cy="26" rx="80" ry="20" fill="#E3B888" />
+          <ellipse cx="70" cy="21" rx="44" ry="8" fill="#FFFFFF" opacity="0.18" />
           <rect x="30" y="34" width="8" height="50" rx="3" fill="#A8723F" />
           <rect x="132" y="34" width="8" height="50" rx="3" fill="#A8723F" />
           <rect x="80" y="40" width="10" height="46" rx="3" fill="#946234" />
@@ -152,7 +160,9 @@ function Furniture({ id, label, lit }: { id: FurnitureId; label?: string; lit: b
         <svg viewBox="0 0 170 160" className={SVG_CLASS} {...a11y}>
           <rect x="22" y="62" width="126" height="92" fill="#E8B07A" />
           {[78, 96, 114, 132].map((y) => <rect key={y} x="22" y={y} width="126" height="2" fill="#C98F5A" opacity="0.6" />)}
+          <rect x="22" y="62" width="126" height="14" fill="#000" opacity="0.1" />
           <path d="M6 70 L85 8 L164 70 L150 78 L85 26 L20 78 Z" fill="#C2453A" />
+          <path d="M14 66 L85 12 L100 24 L28 76 Z" fill="#FFFFFF" opacity="0.15" />
           <path d="M60 154 L60 112 Q85 84 110 112 L110 154 Z" fill="#4A3220" />
           <rect x="62" y="44" width="46" height="16" rx="4" fill="#FFF6E4" />
           <text x="85" y="56" textAnchor="middle" fontSize="11" fontWeight="900" fill="#7A4A2E">わんこ</text>

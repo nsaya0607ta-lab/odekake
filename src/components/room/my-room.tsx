@@ -46,7 +46,7 @@ import {
 import { DecorVisual, FRAME_LABELS } from "./decor-visual";
 import { RoomDog } from "./room-dog";
 import { composeRoomSnapshot } from "./room-snapshot";
-import { dayPhaseOf, RoomScene, type DayPhase } from "./room-scene";
+import { dayPhaseOf, RoomLighting, RoomScene, type DayPhase } from "./room-scene";
 
 type Tab = DecorKind | "theme";
 type ItemFilter = "all" | "toy" | "food" | "interior" | "other" | "sushi";
@@ -187,7 +187,7 @@ export function MyRoom({ entries, initialLayout, serverReady, dogSkin, dogName, 
   const [filter, setFilter] = useState<ItemFilter>("all");
   const [saveState, setSaveState] = useState<SaveState>(serverReady ? "saved" : "local");
   const [toast, setToast] = useState<string | null>(null);
-  const [peek, setPeek] = useState<{ id: string; text: string } | null>(null);
+  const [peek, setPeek] = useState<{ id: string; text: string; x: number; y: number } | null>(null);
   const [lightbox, setLightbox] = useState<Extract<DecorEntry, { kind: "photo" }> | null>(null);
   const [shot, setShot] = useState<{ blob: Blob; url: string } | null>(null);
   const [shooting, setShooting] = useState(false);
@@ -369,13 +369,16 @@ export function MyRoom({ entries, initialLayout, serverReady, dogSkin, dogName, 
     void e;
   }
   /** 見るモードでタップ：写真は思い出を開き、ほかは名前を少し出す */
-  function onItemTap(p: Placement) {
+  function onItemTap(p: Placement, el?: HTMLElement) {
     if (editing) return;
     const entry = entryByKey.get(p.key);
     if (!entry) return;
     if (entry.kind === "photo") { setLightbox(entry); return; }
     const text = entry.kind === "item" ? `${entry.rarity} ${entry.name}` : entry.kind === "trophy" ? `${entry.name}　ベスト ${entry.score.toLocaleString("ja-JP")}点（${entry.rank}）` : `${entry.name}のペナント`;
-    setPeek({ id: p.id, text });
+    // 名前は夜の暗さより上に出すので、部屋の中の位置（そのものの上のはし）を覚えておく
+    const r = el?.getBoundingClientRect(), room = roomRef.current?.getBoundingClientRect();
+    const at = r && room ? { x: ((r.left + r.width / 2 - room.left) / room.width) * 100, y: ((r.top - room.top) / room.height) * 100 } : { x: p.x, y: p.y };
+    setPeek({ id: p.id, text, ...at });
     window.setTimeout(() => setPeek((cur) => (cur?.id === p.id ? null : cur)), 2200);
   }
 
@@ -401,6 +404,11 @@ export function MyRoom({ entries, initialLayout, serverReady, dogSkin, dogName, 
     }
     return lines;
   }, [entryByKey, layout.items, phase]);
+
+  /** フロアランプの明かり（夜はそのまわりが明るい） */
+  const lampLights = useMemo(() => layout.items
+    .filter((p) => p.key === "furniture:lamp")
+    .map((p) => ({ x: p.x, y: p.y - 15 * p.scale * depthScale(p.y), r: 20 * p.scale })), [layout.items]);
 
   /** 犬が向かう場所（ベッド・ごはん皿・床のもの） */
   const dogPlaces = useMemo(() => {
@@ -541,7 +549,7 @@ export function MyRoom({ entries, initialLayout, serverReady, dogSkin, dogName, 
                 onPointerMove={(e) => onItemMove(e, p)}
                 onPointerUp={(e) => onItemUp(e, p)}
                 onPointerCancel={(e) => onItemUp(e, p)}
-                onClick={() => onItemTap(p)}
+                onClick={(e) => onItemTap(p, e.currentTarget)}
                 onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); if (editing) setSelectedId(p.id); else onItemTap(p); } }}
               >
                 {!hang && !shelfOf(p) ? <span data-shadow className="pointer-events-none absolute -bottom-[4%] left-1/2 h-[10%] w-[78%] -translate-x-1/2 rounded-[50%] bg-[#4a3520]/18 blur-[2px]" /> : null}
@@ -549,17 +557,21 @@ export function MyRoom({ entries, initialLayout, serverReady, dogSkin, dogName, 
                   <DecorVisual entry={entry} frame={p.frame} lit={phase === "evening" || phase === "night"} />
                 </span>
                 {isSel ? <span className="pointer-events-none absolute -inset-1.5 rounded-lg border-2 border-dashed border-leaf-deep" /> : null}
-                {peek?.id === p.id ? (
-                  <span className="room-bubble pointer-events-none absolute bottom-full left-1/2 mb-1 w-max max-w-[12rem] -translate-x-1/2 rounded-xl bg-ink px-2.5 py-1 text-[10px] font-bold text-white shadow">{peek.text}</span>
-                ) : null}
+
               </div>
             );
           })}
 
           <RoomDog skin={dogSkin} phase={phase} lines={dogLines} quiet={editing} places={dogPlaces} />
+          <div className="pointer-events-none absolute inset-0" style={{ zIndex: 2000 }}>
+            <RoomLighting phase={phase} lamps={lampLights} />
+          </div>
+          {peek ? (
+            <span className="room-bubble pointer-events-none absolute w-max max-w-[12rem] -translate-x-1/2 -translate-y-full rounded-xl bg-ink px-2.5 py-1 text-[10px] font-bold text-white shadow" style={{ left: `${clamp(peek.x, 18, 82)}%`, top: `${Math.max(4, peek.y - 0.5)}%`, zIndex: 2600 }}>{peek.text}</span>
+          ) : null}
 
           {editing && selected && selectedEntry ? (
-            <div className="absolute bottom-2 left-1/2 z-[500] flex -translate-x-1/2 items-center gap-1 rounded-full border border-line bg-card/95 p-1.5 shadow-lg backdrop-blur">
+            <div className="absolute bottom-2 left-1/2 z-[3000] flex -translate-x-1/2 items-center gap-1 rounded-full border border-line bg-card/95 p-1.5 shadow-lg backdrop-blur">
               <Tool label="小さく" onClick={() => changeItem(selected.id, (p) => ({ ...p, scale: clamp(p.scale - 0.12, 0.5, 2) }))}>−</Tool>
               <Tool label="大きく" onClick={() => changeItem(selected.id, (p) => ({ ...p, scale: clamp(p.scale + 0.12, 0.5, 2) }))}>＋</Tool>
               <Tool label="左右反転" onClick={() => changeItem(selected.id, (p) => ({ ...p, flip: !p.flip }))}>↔</Tool>
