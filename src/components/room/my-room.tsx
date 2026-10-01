@@ -53,7 +53,7 @@ import { DecorVisual, FRAME_LABELS } from "./decor-visual";
 import type { FurnitureFx } from "./furniture-art";
 import { RoomDog } from "./room-dog";
 import { composeRoomSnapshot } from "./room-snapshot";
-import { skyAt } from "@/lib/room/sun";
+import { fmtJstTime, skyAt } from "@/lib/room/sun";
 import { parseRoomWeather, withWeather, type RoomWeather } from "@/lib/room/weather";
 import { dayPhaseOf, lampsOn, ROOM_STAGE, RoomLighting, RoomScene, ThemeSwatch, type DayPhase } from "./room-scene";
 import { DEFAULT_PLACE, SkyCard, type RoomPlace } from "./sky-card";
@@ -217,6 +217,16 @@ export function MyRoom({ entries, initialLayout, serverReady, dogSkin, dogName, 
   const roomRef = useRef<HTMLDivElement | null>(null);
   /** 画面に見えている外わく（記念撮影はこの範囲） */
   const frameRef = useRef<HTMLDivElement | null>(null);
+  /** 部屋を画面いっぱいに見る */
+  const [full, setFull] = useState(false);
+  useEffect(() => {
+    if (!full) return;
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") setFull(false); };
+    window.addEventListener("keydown", onKey);
+    return () => { document.body.style.overflow = prev; window.removeEventListener("keydown", onKey); };
+  }, [full]);
   const drag = useRef<{ id: string; dx: number; dy: number; before: RoomLayout; moved: boolean; pointer: number } | null>(null);
   const latest = useRef(layout);
   latest.current = layout;
@@ -578,9 +588,14 @@ export function MyRoom({ entries, initialLayout, serverReady, dogSkin, dogName, 
               できた
             </button>
           ) : (
-            <button type="button" onClick={() => setEditing(true)} className="min-w-[72px] rounded-full border border-leaf/40 bg-leaf-soft px-3 py-2.5 text-xs font-bold text-leaf-deep shadow-sm active:scale-95">
-              もようがえ
-            </button>
+            <div className="flex items-center gap-1.5">
+              <button type="button" onClick={() => { setSelectedId(null); setFull(true); }} aria-label="部屋を画面いっぱいに見る" title="全画面" className="flex h-10 w-10 items-center justify-center rounded-full border border-line bg-card text-ink-soft shadow-sm active:scale-95">
+                <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5" /></svg>
+              </button>
+              <button type="button" onClick={() => setEditing(true)} className="min-w-[72px] rounded-full border border-leaf/40 bg-leaf-soft px-3 py-2.5 text-xs font-bold text-leaf-deep shadow-sm active:scale-95">
+                もようがえ
+              </button>
+            </div>
           )}
         </div>
       </header>
@@ -588,12 +603,20 @@ export function MyRoom({ entries, initialLayout, serverReady, dogSkin, dogName, 
       <div className="mx-auto max-w-lg">
         <div
           ref={frameRef}
-          className={`isolate w-full touch-none select-none overflow-hidden ${editing ? "sticky top-14 z-[50] shadow-[0_8px_16px_-10px_rgba(60,40,20,.35)]" : "relative"}`}
-          style={{ aspectRatio: `1000 / ${1000 * ROOM.aspect}` }}
+          className={`isolate touch-none select-none overflow-hidden ${full ? "fixed inset-0 z-[4000] bg-[#2A2420]" : editing ? "sticky top-14 z-[50] w-full shadow-[0_8px_16px_-10px_rgba(60,40,20,.35)]" : "relative w-full"}`}
+          style={full ? undefined : { aspectRatio: `1000 / ${1000 * ROOM.aspect}` }}
           onPointerDown={(e) => { if (e.target === e.currentTarget || e.target === roomRef.current || (e.target as Element).tagName === "svg" || (e.target as Element).closest("svg[aria-hidden]")) setSelectedId(null); }}
         >
           {/* 部屋（奥の壁から手前の床まで）。まわりの天井・横の壁・手前の床は背景の SVG がはみ出して描く */}
-          <div ref={roomRef} className="absolute" style={{ left: `${ROOM_STAGE.left}%`, top: `${ROOM_STAGE.top}%`, width: `${ROOM_STAGE.width}%`, height: `${ROOM_STAGE.height}%` }}>
+          <div
+            ref={roomRef}
+            className="absolute"
+            style={full
+              // 全画面：画面の幅（横長の画面なら高さ）に合わせて部屋を置き、上下左右は天井・壁・床がそのまま続く
+              // （縦長のスマホは画面の幅いっぱい。上の天井より手前の床を多めに見せる）
+              ? ({ "--sw": `min(100vw, ${82 / ROOM.aspect}dvh)`, width: "var(--sw)", height: `calc(var(--sw) * ${ROOM.aspect})`, left: "calc(50% - var(--sw) / 2)", top: `calc((100% - var(--sw) * ${ROOM.aspect}) * 0.42)` } as React.CSSProperties)
+              : { left: `${ROOM_STAGE.left}%`, top: `${ROOM_STAGE.top}%`, width: `${ROOM_STAGE.width}%`, height: `${ROOM_STAGE.height}%` }}
+          >
           <RoomScene theme={layout.theme} now={now} at={place} weather={weather} />
 
           {layout.items.map((p) => {
@@ -646,13 +669,20 @@ export function MyRoom({ entries, initialLayout, serverReady, dogSkin, dogName, 
 
           <RoomDog skin={dogSkin} phase={phase} sleepy={sleepy} lines={dogLines} quiet={editing} places={dogPlaces} weather={weather?.kind ?? null} onFx={onFurnitureFx} />
           <div className="pointer-events-none absolute inset-0" style={{ zIndex: 2000 }}>
-            <RoomLighting now={now} lamps={lampLights} at={place} weather={weather} room={layout.theme.room} />
+            <RoomLighting now={now} lamps={lampLights} at={place} weather={weather} room={layout.theme.room} vignette={!full} />
           </div>
           {peek ? (
             <span className="room-bubble pointer-events-none absolute w-max max-w-[12rem] -translate-x-1/2 -translate-y-full rounded-xl bg-ink px-2.5 py-1 text-[10px] font-bold text-white shadow" style={{ left: `${clamp(peek.x, 18, 82)}%`, top: `${Math.max(4, peek.y - 0.5)}%`, zIndex: 2600 }}>{peek.text}</span>
           ) : null}
           </div>
 
+          {full ? <div aria-hidden className="pointer-events-none absolute inset-0 z-[2100] bg-[radial-gradient(ellipse_at_50%_45%,transparent_55%,rgba(26,16,8,.28))]" /> : null}
+          {full ? (
+            <div className="pointer-events-none absolute inset-x-0 top-0 z-[3000] flex items-start justify-between p-3" style={{ paddingTop: "max(12px, env(safe-area-inset-top))" }}>
+              <p className="rounded-full bg-black/35 px-3 py-1.5 text-[11px] font-bold text-white backdrop-blur">{dogName}のおへや・いま {fmtJstTime(now)}</p>
+              <button type="button" onClick={() => setFull(false)} aria-label="全画面をとじる" className="pointer-events-auto flex h-10 w-10 items-center justify-center rounded-full bg-black/40 text-xl font-bold text-white backdrop-blur active:scale-95">×</button>
+            </div>
+          ) : null}
           {editing && selected && selectedEntry ? (
             <div className="absolute bottom-2 left-1/2 z-[3000] flex -translate-x-1/2 items-center gap-1 rounded-full border border-line bg-card/95 p-1.5 shadow-lg backdrop-blur">
               <Tool label="小さく" onClick={() => changeItem(selected.id, (p) => ({ ...p, scale: clamp(p.scale - 0.12, 0.5, 2) }))}>−</Tool>
