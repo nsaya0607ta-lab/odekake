@@ -123,7 +123,10 @@ export function RoomDog({ skin, phase, lines, quiet }: {
       {dog.pose === "sleep" ? <span className="pointer-events-none absolute -top-[6%] right-[8%] animate-pulse text-[11px] font-black text-[#6A6FA8]">Zzz</span> : null}
       {hearts.map((h) => <span key={h} className="room-heart pointer-events-none absolute left-1/2 top-[8%] text-lg">💗</span>)}
       {bubble ? (
-        <span key={bubble.id} className="room-bubble pointer-events-none absolute bottom-[96%] left-1/2 w-max max-w-[11rem] -translate-x-1/2 rounded-2xl border border-line bg-card px-2.5 py-1.5 text-[11px] font-bold leading-snug text-ink shadow-md">
+        <span
+          key={bubble.id}
+          className={`room-bubble pointer-events-none absolute bottom-[96%] w-max max-w-[11rem] rounded-2xl border border-line bg-card px-2.5 py-1.5 text-[11px] font-bold leading-snug text-ink shadow-md ${dog.x < 28 ? "room-bubble-left left-0" : dog.x > 72 ? "room-bubble-right right-0" : "left-1/2 -translate-x-1/2"}`}
+        >
           {bubble.text}
         </span>
       ) : null}

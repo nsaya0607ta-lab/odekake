@@ -4386,6 +4386,7 @@
   100% { transform: translate(-50%, 0) scale(1); opacity: 1; }
 }
 .room-heart { animation: room-heart 1.3s ease-out forwards; }
+.room-bubble.room-bubble-left, .room-bubble.room-bubble-right { animation-name: room-pop; }
 .room-bubble { animation: room-bubble 0.22s ease-out both; }
 [role="dialog"] > .room-bubble { animation-name: room-pop; }
 @keyframes room-pop {

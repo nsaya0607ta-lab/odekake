@@ -17,7 +17,7 @@ export type DecorKind = "item" | "photo" | "trophy" | "pennant";
 type DecorBase = { key: string; name: string; count: number };
 export type DecorEntry =
   | (DecorBase & { kind: "item"; image: string; category: CollectionCategory; series: string | null; rarity: GachaRarity })
-  | (DecorBase & { kind: "photo"; image: string; full: string; date: string; comment: string; pref: string })
+  | (DecorBase & { kind: "photo"; image: string; full: string; date: string; comment: string; pref: string; upload?: boolean })
   | (DecorBase & { kind: "trophy"; stage: string; rank: string; color: string; score: number })
   | (DecorBase & { kind: "pennant"; emoji: string; color: string });
 
@@ -48,10 +48,17 @@ export type Curtain = (typeof CURTAINS)[number];
 export type Rug = (typeof RUGS)[number];
 export type RoomTheme = { wall: Wallpaper; floor: Floor; curtain: Curtain; rug: Rug };
 
-export type RoomLayout = { theme: RoomTheme; items: Placement[] };
+/** 端末から選んで、おへや用にアップロードした写真（Storage の users/{自分}/room/ に置く） */
+export type RoomPhoto = { id: string; path: string; date: string; title: string };
+
+export type RoomLayout = { theme: RoomTheme; items: Placement[]; photos: RoomPhoto[] };
 
 export const DEFAULT_THEME: RoomTheme = { wall: "cream", floor: "wood-light", curtain: "leaf", rug: "round-cream" };
 export const ROOM_MAX_ITEMS = 120;
+/** アップロードして飾れる写真の数 */
+export const ROOM_MAX_PHOTOS = 40;
+export const ROOM_PHOTO_TITLE_MAX = 20;
+const ROOM_PHOTO_PATH = /^users\/[0-9a-f-]{36}\/room\/[0-9a-f-]{36}\.jpg$/;
 
 /** 部屋の形（% 単位）。壁と床の境目・棚・窓 */
 export const ROOM = {
@@ -78,6 +85,26 @@ export const isHanging = (kind: DecorKind) => kind === "photo" || kind === "penn
 export const photoKey = (photoId: string) => `photo:${photoId}`;
 export const trophyKey = (stage: string) => `trophy:${stage}`;
 export const pennantKey = (prefCode: string) => `pennant:${prefCode}`;
+export const uploadKey = (photoId: string) => `upload:${photoId}`;
+
+/** アップロードした写真の配信URL（/api/photo が権限を確かめて返す） */
+export function roomPhotoUrl(path: string, thumb: boolean): string {
+  const encoded = path.split("/").map((seg) => encodeURIComponent(seg)).join("/");
+  return `/api/photo/${encoded}${thumb ? "?thumb=1" : ""}`;
+}
+
+/** アップロードした写真を、飾れるものの形にする */
+export function uploadEntry(photo: RoomPhoto): DecorEntry {
+  return {
+    kind: "photo", key: uploadKey(photo.id), name: photo.title || "じぶんの写真", image: roomPhotoUrl(photo.path, true),
+    full: roomPhotoUrl(photo.path, false), date: photo.date, comment: "", pref: "", count: 1, upload: true,
+  };
+}
+
+/** アップロードした写真のパスとして正しいか（ownerId を渡すと、その人のものだけ） */
+export function isRoomPhotoPath(path: string, ownerId?: string): boolean {
+  return ROOM_PHOTO_PATH.test(path) && (!ownerId || path.startsWith(`users/${ownerId}/room/`));
+}
 
 export function clamp(value: number, min: number, max: number): number {
   return Math.min(max, Math.max(min, value));
@@ -96,12 +123,25 @@ export function parseRoomLayout(value: unknown, validKeys?: ReadonlySet<string>)
     curtain: oneOf(CURTAINS, t.curtain, DEFAULT_THEME.curtain),
     rug: oneOf(RUGS, t.rug, DEFAULT_THEME.rug),
   };
+  const rawPhotos = Array.isArray(root.photos) ? root.photos.slice(0, ROOM_MAX_PHOTOS) : [];
+  const photos = rawPhotos.flatMap((raw): RoomPhoto[] => {
+    if (!raw || typeof raw !== "object") return [];
+    const r = raw as Record<string, unknown>;
+    if (typeof r.id !== "string" || !/^[0-9a-f-]{36}$/.test(r.id) || typeof r.path !== "string" || !isRoomPhotoPath(r.path)) return [];
+    return [{
+      id: r.id,
+      path: r.path,
+      date: typeof r.date === "string" && /^\d{4}-\d{2}-\d{2}$/.test(r.date) ? r.date : "",
+      title: typeof r.title === "string" ? r.title.trim().slice(0, ROOM_PHOTO_TITLE_MAX) : "",
+    }];
+  });
+  const uploadKeys = new Set(photos.map((ph) => uploadKey(ph.id)));
   const rawItems = Array.isArray(root.items) ? root.items.slice(0, ROOM_MAX_ITEMS) : [];
   const items = rawItems.flatMap((raw): Placement[] => {
     if (!raw || typeof raw !== "object") return [];
     const p = raw as Record<string, unknown>;
     if (typeof p.id !== "string" || typeof p.key !== "string" || p.id.length > 64 || p.key.length > 120) return [];
-    if (validKeys && !validKeys.has(p.key)) return [];
+    if (p.key.startsWith("upload:") ? !uploadKeys.has(p.key) : validKeys && !validKeys.has(p.key)) return [];
     const num = (v: unknown, fallback: number) => (typeof v === "number" && Number.isFinite(v) ? v : fallback);
     return [{
       id: p.id,
@@ -114,7 +154,7 @@ export function parseRoomLayout(value: unknown, validKeys?: ReadonlySet<string>)
       ...(typeof p.frame === "string" ? { frame: oneOf(FRAME_STYLES, p.frame, "wood") } : {}),
     }];
   });
-  return { theme, items };
+  return { theme, items, photos };
 }
 
 /** 置くもの（アイテム・トロフィー）が乗っている棚（無ければ床） */
@@ -134,7 +174,7 @@ export function depthScale(y: number): number {
 export function settle(kind: DecorKind, x: number, y: number): { x: number; y: number } {
   if (isHanging(kind)) return { x: clamp(x, 6, 94), y: clamp(y, ROOM.wallTop + 4, ROOM.wallBottom) };
   const nx = clamp(x, 4, 96);
-  const shelf = ROOM.shelves.find((s) => nx >= s.x0 + 2 && nx <= s.x1 - 2 && y > s.y - 7 && y < s.y + 5);
+  const shelf = ROOM.shelves.find((s) => nx >= s.x0 + 2 && nx <= s.x1 - 2 && y > s.y - 8 && y < s.y + 9);
   if (shelf) return { x: nx, y: shelf.y };
   return { x: nx, y: clamp(y, ROOM.floorTop, ROOM.floorBottom) };
 }

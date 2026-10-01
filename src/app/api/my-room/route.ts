@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { checkRateLimit } from "@/lib/rate-limit";
-import { parseRoomLayout, ROOM_MAX_ITEMS } from "@/lib/room/types";
+import { isRoomPhotoPath, parseRoomLayout, ROOM_MAX_ITEMS, uploadKey } from "@/lib/room/types";
 import type { Json } from "@/lib/supabase/types";
 import { requireUser } from "@/lib/supabase/server";
 
@@ -21,7 +21,11 @@ export async function PUT(request: Request) {
   if (!body?.layout || typeof body.layout !== "object" || (Array.isArray(body.layout.items) && body.layout.items.length > ROOM_MAX_ITEMS)) {
     return NextResponse.json({ error: "飾り方が正しくありません。" }, { status: 400 });
   }
-  const layout = parseRoomLayout(body.layout);
+  const parsed = parseRoomLayout(body.layout);
+  // アップロードした写真は自分のフォルダのものだけ。外したものに置いていた分も外す
+  const photos = parsed.photos.filter((ph) => isRoomPhotoPath(ph.path, user.id));
+  const keep = new Set(photos.map((ph) => uploadKey(ph.id)));
+  const layout = { ...parsed, photos, items: parsed.items.filter((p) => !p.key.startsWith("upload:") || keep.has(p.key)) };
   const { error } = await supabase
     .from("user_rooms")
     .upsert({ user_id: user.id, layout: layout as unknown as Json, updated_at: new Date().toISOString() }, { onConflict: "user_id" });

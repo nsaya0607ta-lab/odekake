@@ -24,14 +24,19 @@ import {
   parseRoomLayout,
   ROOM,
   ROOM_MAX_ITEMS,
+  ROOM_MAX_PHOTOS,
+  ROOM_PHOTO_TITLE_MAX,
   RUGS,
   settle,
   shelfOf,
+  uploadEntry,
+  uploadKey,
   WALLPAPERS,
   type DecorEntry,
   type DecorKind,
   type Placement,
   type RoomLayout,
+  type RoomPhoto,
   type RoomTheme,
 } from "@/lib/room/types";
 import { DecorVisual, FRAME_LABELS } from "./decor-visual";
@@ -49,7 +54,7 @@ const RARITY_ORDER: readonly GachaRarity[] = ["N", "R", "SR", "SSR", "UR", "LR",
 
 const TABS: Array<{ id: Tab; label: string; empty: string }> = [
   { id: "item", label: "アイテム", empty: "ガチャやミニゲームで図鑑アイテムを集めると、ここから置けます" },
-  { id: "photo", label: "写真", empty: "おでかけ記録に写真を登録すると、額に入れて飾れます" },
+  { id: "photo", label: "写真", empty: "" },
   { id: "trophy", label: "トロフィー", empty: "おさんぽフレンチーで遊ぶと、道ごとのトロフィーがもらえます" },
   { id: "pennant", label: "ペナント", empty: "おでかけを記録した都道府県のペナントがもらえます" },
   { id: "theme", label: "もようがえ", empty: "" },
@@ -77,6 +82,29 @@ function widthOf(entry: DecorEntry, p: Placement): number {
 
 /** 壁に掛けるものを置く候補（窓・時計・棚をさけた場所） */
 const WALL_SPOTS = [[48, 23], [48, 41], [21, 47], [60, 12], [91, 12], [35, 48], [8, 47]] as const;
+/** 壁で、掛けるものを置きたくない場所（窓・時計・棚・ライト）。[x0, y0, x1, y1] */
+const WALL_BLOCKS = [[4, 5, 40, 41], [67, 2, 85, 22], [56, 21, 96, 46], [43, 0, 57, 12]] as const;
+
+/** 壁に掛けるものの置き場所：窓などに重ならず、すでに掛けてあるものからいちばん離れたところ */
+function freeWallSpot(taken: readonly { x: number; y: number }[]): [number, number] {
+  // 写真1枚ぶんの大きさ（幅21% × 高さ約16%）の四角で考える
+  const hw = 11, hh = 8;
+  const overlap = (ax0: number, ay0: number, ax1: number, ay1: number, bx0: number, by0: number, bx1: number, by1: number) =>
+    Math.max(0, Math.min(ax1, bx1) - Math.max(ax0, bx0)) * Math.max(0, Math.min(ay1, by1) - Math.max(ay0, by0));
+  let best: [number, number] = [WALL_SPOTS[0][0], WALL_SPOTS[0][1]], bestScore = -Infinity;
+  for (let x = 14; x <= 86; x += 2) {
+    for (let y = 10; y <= ROOM.wallBottom - 3; y += 2) {
+      const box = [x - hw, y - hh, x + hw, y + hh] as const;
+      const blocked = WALL_BLOCKS.reduce((sum, [x0, y0, x1, y1]) => sum + overlap(...box, x0, y0, x1, y1), 0);
+      const crowd = taken.reduce((sum, t) => sum + overlap(...box, t.x - hw, t.y - hh, t.x + hw, t.y + hh), 0);
+      const near = taken.length ? Math.min(...taken.map((t) => Math.hypot(t.x - x, (t.y - y) * 1.4))) : 40;
+      const score = Math.min(near, 40) - blocked * 0.2 - crowd * 0.3 - Math.abs(x - 50) * 0.03;
+      if (score > bestScore) { bestScore = score; best = [x, y]; }
+    }
+  }
+  return best;
+}
+
 const FLOOR_SPOTS = [[22, 74], [78, 76], [64, 90], [36, 92], [86, 92], [14, 88], [50, 66], [70, 66]] as const;
 
 /** はじめて開いたときの部屋：持っているものから少しだけ飾っておく */
@@ -90,7 +118,35 @@ function starterLayout(entries: DecorEntry[]): RoomLayout {
   const items4 = entries.filter((e): e is Extract<DecorEntry, { kind: "item" }> => e.kind === "item")
     .sort((a, b) => RARITY_ORDER.indexOf(b.rarity) - RARITY_ORDER.indexOf(a.rarity)).slice(0, 4);
   items4.forEach((e, i) => (i === 3 ? put(e.key, 70, ROOM.shelves[1].y) : put(e.key, FLOOR_SPOTS[i]![0], FLOOR_SPOTS[i]![1])));
-  return { theme: DEFAULT_THEME, items };
+  return { theme: DEFAULT_THEME, items, photos: [] };
+}
+
+const todayJst = () => new Intl.DateTimeFormat("sv-SE", { timeZone: "Asia/Tokyo" }).format(new Date());
+
+/** 端末で選んだ写真を、長い辺が max px の JPEG に縮める（向きは写真の情報どおり） */
+async function shrinkImage(file: File, max: number, quality: number): Promise<Blob> {
+  let source: CanvasImageSource & { width: number; height: number };
+  let close = () => {};
+  try {
+    const bitmap = await createImageBitmap(file);
+    source = bitmap; close = () => bitmap.close();
+  } catch {
+    const url = URL.createObjectURL(file);
+    const img = new Image();
+    img.src = url;
+    await img.decode();
+    source = img; close = () => URL.revokeObjectURL(url);
+  }
+  const k = Math.min(1, max / Math.max(source.width, source.height));
+  const canvas = document.createElement("canvas");
+  canvas.width = Math.max(1, Math.round(source.width * k));
+  canvas.height = Math.max(1, Math.round(source.height * k));
+  const ctx = canvas.getContext("2d");
+  if (!ctx) throw new Error("no canvas");
+  ctx.fillStyle = "#fff"; ctx.fillRect(0, 0, canvas.width, canvas.height);
+  ctx.drawImage(source, 0, 0, canvas.width, canvas.height);
+  close();
+  return new Promise((resolve, reject) => canvas.toBlob((b) => (b ? resolve(b) : reject(new Error("encode failed"))), "image/jpeg", quality));
 }
 
 export function MyRoom({ entries, initialLayout, serverReady, dogSkin, dogName, serverNow }: {
@@ -103,10 +159,14 @@ export function MyRoom({ entries, initialLayout, serverReady, dogSkin, dogName, 
   serverNow: string;
 }) {
   const validKeys = useMemo(() => new Set(entries.map((e) => e.key)), [entries]);
-  const entryByKey = useMemo(() => new Map(entries.map((e) => [e.key, e])), [entries]);
   const [layout, setLayout] = useState<RoomLayout>(() => initialLayout
-    ? { ...initialLayout, items: initialLayout.items.filter((p) => validKeys.has(p.key)) }
+    ? { ...initialLayout, items: initialLayout.items.filter((p) => validKeys.has(p.key) || p.key.startsWith("upload:")) }
     : starterLayout(entries));
+  /** 持ち物に、アップロードした写真を足したもの（アップロードした写真を先に並べる） */
+  const allEntries = useMemo(() => [...layout.photos.map(uploadEntry), ...entries], [entries, layout.photos]);
+  const entryByKey = useMemo(() => new Map(allEntries.map((e) => [e.key, e])), [allEntries]);
+  const [uploading, setUploading] = useState(false);
+  const fileRef = useRef<HTMLInputElement | null>(null);
   const [past, setPast] = useState<RoomLayout[]>([]);
   const [future, setFuture] = useState<RoomLayout[]>([]);
   const [editing, setEditing] = useState(false);
@@ -192,27 +252,67 @@ export function MyRoom({ entries, initialLayout, serverReady, dogSkin, dogName, 
   const setTheme = (patch: Partial<RoomTheme>) => commit({ ...layout, theme: { ...layout.theme, ...patch } });
   const topZ = () => Math.max(0, ...layout.items.map((p) => p.z)) + 1;
 
-  function addEntry(entry: DecorEntry) {
-    const placed = layout.items.filter((p) => p.key === entry.key);
+  function addEntry(entry: DecorEntry, base: RoomLayout = layout) {
+    const placed = base.items.filter((p) => p.key === entry.key);
     if (placed.length >= entry.count) { setSelectedId(placed[0]?.id ?? null); flash(entry.count > 1 ? "持っている数だけ置いています" : "もう飾っています"); return; }
-    if (layout.items.length >= ROOM_MAX_ITEMS) { flash(`飾れるのは${ROOM_MAX_ITEMS}こまでです`); return; }
+    if (base.items.length >= ROOM_MAX_ITEMS) { if (base !== layout) commit(base); flash(`飾れるのは${ROOM_MAX_ITEMS}こまでです`); return; }
     let x: number, y: number;
     if (isHanging(entry.kind)) {
-      const n = layout.items.filter((p) => { const e = entryByKey.get(p.key); return e && isHanging(e.kind); }).length;
-      [x, y] = WALL_SPOTS[n % WALL_SPOTS.length]!;
-      x += (Math.floor(n / WALL_SPOTS.length) % 3) * 4;
+      const hanging = base.items.filter((p) => { const e = entryByKey.get(p.key); return (e && isHanging(e.kind)) || p.key.startsWith("upload:"); });
+      [x, y] = freeWallSpot(hanging);
     } else if (entry.kind === "trophy") {
-      const onShelf = layout.items.filter((p) => shelfOf(p)).length;
+      const onShelf = base.items.filter((p) => shelfOf(p)).length;
       const shelf = ROOM.shelves[onShelf < 6 ? 0 : 1];
       [x, y] = [shelf.x0 + 7 + ((onShelf * 11) % (shelf.x1 - shelf.x0 - 12)), shelf.y];
     } else {
-      const n = layout.items.length;
+      const n = base.items.length;
       [x, y] = FLOOR_SPOTS[n % FLOOR_SPOTS.length]!;
       x = clamp(x + ((n * 7) % 9) - 4, 6, 94);
     }
     const p: Placement = { id: newId(), key: entry.key, x, y, scale: 1, flip: false, z: topZ(), ...(entry.kind === "photo" ? { frame: "wood" as const } : {}) };
-    commit({ ...layout, items: [...layout.items, p] });
+    commit({ ...base, items: [...base.items, p] });
     setSelectedId(p.id);
+  }
+
+  /* ---------- 端末の写真をアップロードして飾る ---------- */
+  async function uploadPhoto(file: File) {
+    if (layout.photos.length >= ROOM_MAX_PHOTOS) { flash(`アップロードできる写真は${ROOM_MAX_PHOTOS}枚までです`); return; }
+    setUploading(true);
+    try {
+      const [image, thumb] = await Promise.all([shrinkImage(file, 1600, 0.86), shrinkImage(file, 480, 0.8)]);
+      const form = new FormData();
+      form.append("image", image, "photo.jpg");
+      form.append("thumb", thumb, "thumb.jpg");
+      const response = await fetch("/api/my-room/photo", { method: "POST", body: form });
+      const payload = (await response.json().catch(() => null)) as { id?: string; path?: string; error?: string } | null;
+      if (!response.ok || !payload?.id || !payload.path) throw new Error(payload?.error ?? "写真を保存できませんでした。");
+      const photo: RoomPhoto = { id: payload.id, path: payload.path, date: todayJst(), title: "" };
+      const base = { ...latest.current, photos: [photo, ...latest.current.photos] };
+      addEntry(uploadEntry(photo), base);
+      flash("写真を飾りました");
+    } catch (error) {
+      flash(error instanceof Error && error.message !== "encode failed" && error.message !== "no canvas" ? error.message : "この写真は読みこめませんでした");
+    } finally {
+      setUploading(false);
+      if (fileRef.current) fileRef.current.value = "";
+    }
+  }
+  function removeUpload(photo: RoomPhoto) {
+    if (!window.confirm("この写真をおへやから消しますか？（元に戻せません）")) return;
+    const key = uploadKey(photo.id);
+    setLayout((cur) => ({ ...cur, photos: cur.photos.filter((ph) => ph.id !== photo.id), items: cur.items.filter((p) => p.key !== key) }));
+    // 消した写真を「元に戻す」で呼び戻せないよう、履歴から外す
+    setPast([]); setFuture([]);
+    setSelectedId(null);
+    setSaveState("dirty");
+    void fetch("/api/my-room/photo", { method: "DELETE", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ path: photo.path }) }).catch(() => null);
+  }
+  function renameUpload(photoId: string) {
+    const photo = layout.photos.find((ph) => ph.id === photoId);
+    if (!photo) return;
+    const title = window.prompt(`写真のなまえ（${ROOM_PHOTO_TITLE_MAX}文字まで）`, photo.title);
+    if (title === null) return;
+    commit({ ...layout, photos: layout.photos.map((ph) => (ph.id === photoId ? { ...ph, title: title.trim().slice(0, ROOM_PHOTO_TITLE_MAX) } : ph)) });
   }
 
   const undo = () => { const prev = past.at(-1); if (!prev) return; setFuture((f) => [layout, ...f].slice(0, HISTORY_LIMIT)); setPast((p) => p.slice(0, -1)); setLayout(prev); setSelectedId(null); setSaveState("dirty"); };
@@ -289,15 +389,15 @@ export function MyRoom({ entries, initialLayout, serverReady, dogSkin, dogName, 
   const selectedEntry = selected ? entryByKey.get(selected.key) ?? null : null;
   const counts = useMemo(() => {
     const c: Record<DecorKind, number> = { item: 0, photo: 0, trophy: 0, pennant: 0 };
-    for (const e of entries) c[e.kind] += 1;
+    for (const e of allEntries) c[e.kind] += 1;
     return c;
-  }, [entries]);
-  const tabEntries = useMemo(() => entries.filter((e) => {
+  }, [allEntries]);
+  const tabEntries = useMemo(() => allEntries.filter((e) => {
     if (tab === "theme" || e.kind !== tab) return false;
     if (e.kind !== "item" || filter === "all") return true;
     if (filter === "sushi") return e.series === "sushi";
     return e.category === filter;
-  }), [entries, filter, tab]);
+  }), [allEntries, filter, tab]);
   const saveLabel = saveState === "saving" ? "保存中…" : saveState === "dirty" ? "保存待ち" : saveState === "error" ? "保存できませんでした" : saveState === "local" ? "この端末に保存" : "保存ずみ";
 
   return (
@@ -326,7 +426,7 @@ export function MyRoom({ entries, initialLayout, serverReady, dogSkin, dogName, 
       <div className="mx-auto max-w-lg">
         <div
           ref={roomRef}
-          className="relative isolate w-full touch-none select-none overflow-hidden"
+          className={`isolate w-full touch-none select-none overflow-hidden ${editing ? "sticky top-14 z-[50] shadow-[0_8px_16px_-10px_rgba(60,40,20,.35)]" : "relative"}`}
           style={{ aspectRatio: `1000 / ${1000 * ROOM.aspect}` }}
           onPointerDown={(e) => { if (e.target === e.currentTarget || (e.target as Element).tagName === "svg" || (e.target as Element).closest("svg[aria-hidden]")) setSelectedId(null); }}
         >
@@ -384,6 +484,9 @@ export function MyRoom({ entries, initialLayout, serverReady, dogSkin, dogName, 
                   <span className="text-[10px] font-black">{FRAME_LABELS[selected.frame ?? "wood"]}</span>
                 </Tool>
               ) : null}
+              {selectedEntry.kind === "photo" && selectedEntry.upload ? (
+                <Tool label="写真のなまえ" onClick={() => renameUpload(selectedEntry.key.slice("upload:".length))}>✎</Tool>
+              ) : null}
               <Tool danger label="片づける" onClick={() => { commit({ ...layout, items: layout.items.filter((p) => p.id !== selected.id) }); setSelectedId(null); }}>🗑</Tool>
             </div>
           ) : null}
@@ -405,7 +508,7 @@ export function MyRoom({ entries, initialLayout, serverReady, dogSkin, dogName, 
                 ))}
               </div>
               <p className="mt-2 text-[11px] font-semibold text-ink-faint">
-                {tab === "theme" ? "壁紙・床・カーテン・ラグを選べます" : "タップで飾る・ドラッグで動かす（アイテムは棚にも乗せられます）"}
+                {tab === "theme" ? "壁紙・床・カーテン・ラグを選べます" : tab === "photo" ? "スマホの写真や、おでかけ記録の写真を額に入れて飾れます" : "タップで飾る・ドラッグで動かす（アイテムは棚にも乗せられます）"}
               </p>
               {tab === "item" ? (
                 <div className="-mx-4 mt-2 flex gap-2 overflow-x-auto px-4 pb-1">
@@ -414,10 +517,20 @@ export function MyRoom({ entries, initialLayout, serverReady, dogSkin, dogName, 
                   ))}
                 </div>
               ) : null}
+              {tab === "photo" ? (
+                <input ref={fileRef} type="file" accept="image/*" className="hidden" onChange={(e) => { const f = e.target.files?.[0]; if (f) void uploadPhoto(f); }} />
+              ) : null}
               {tab === "theme" ? (
                 <ThemePicker theme={layout.theme} onChange={setTheme} />
-              ) : tabEntries.length ? (
+              ) : tabEntries.length || tab === "photo" ? (
                 <div className="mt-2 grid grid-cols-3 gap-2.5">
+                  {tab === "photo" ? (
+                    <button type="button" disabled={uploading} onClick={() => fileRef.current?.click()} className="flex min-w-0 flex-col items-center justify-center gap-1 rounded-2xl border-2 border-dashed border-leaf/50 bg-leaf-soft/40 p-2 text-center text-leaf-deep shadow-sm active:scale-[.97] disabled:opacity-60">
+                      <span className="text-2xl leading-none">{uploading ? "⏳" : "＋"}</span>
+                      <span className="text-[11px] font-black">{uploading ? "アップロード中…" : "写真をえらぶ"}</span>
+                      <span className="text-[9px] font-bold text-ink-faint">{layout.photos.length}/{ROOM_MAX_PHOTOS}枚</span>
+                    </button>
+                  ) : null}
                   {tabEntries.map((e) => {
                     const placed = layout.items.filter((p) => p.key === e.key).length;
                     return (
@@ -428,6 +541,16 @@ export function MyRoom({ entries, initialLayout, serverReady, dogSkin, dogName, 
                           <span className="block w-[78%]"><DecorVisual entry={e} thumb /></span>
                         </span>
                         <span className="mt-1 block truncate text-center text-[10px] font-bold">{e.name}</span>
+                        {e.kind === "photo" && e.upload ? (
+                          <span
+                            role="button"
+                            tabIndex={0}
+                            aria-label={`${e.name}を消す`}
+                            onClick={(ev) => { ev.stopPropagation(); const ph = layout.photos.find((x) => uploadKey(x.id) === e.key); if (ph) removeUpload(ph); }}
+                            onKeyDown={(ev) => { if (ev.key === "Enter") { ev.stopPropagation(); const ph = layout.photos.find((x) => uploadKey(x.id) === e.key); if (ph) removeUpload(ph); } }}
+                            className="absolute bottom-1 right-1 z-10 flex h-6 w-6 items-center justify-center rounded-full bg-blossom-soft text-[11px] font-black text-[#b94c60] shadow-sm"
+                          >×</span>
+                        ) : null}
                       </button>
                     );
                   })}
@@ -469,7 +592,7 @@ export function MyRoom({ entries, initialLayout, serverReady, dogSkin, dogName, 
             <img src={lightbox.full} alt={lightbox.name} className="block max-h-[58vh] w-full bg-paper-deep object-contain" />
             <div className="space-y-1 px-4 pb-4 pt-3">
               <p className="text-base font-black">{lightbox.name}</p>
-              <p className="text-xs font-semibold text-ink-faint">{[lightbox.pref, fmtDate(lightbox.date)].filter(Boolean).join(" ・ ")}</p>
+              <p className="text-xs font-semibold text-ink-faint">{lightbox.upload ? `${fmtDate(lightbox.date)}に飾った写真` : [lightbox.pref, fmtDate(lightbox.date)].filter(Boolean).join(" ・ ")}</p>
               {lightbox.comment ? <p className="whitespace-pre-wrap pt-1 text-[13px] leading-relaxed text-ink-soft">{lightbox.comment}</p> : null}
               <button type="button" onClick={() => setLightbox(null)} className="mt-3 w-full rounded-full border border-line bg-paper py-2.5 text-sm font-bold text-ink-soft active:scale-[.98]">とじる</button>
             </div>
