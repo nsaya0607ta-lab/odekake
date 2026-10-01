@@ -5,26 +5,34 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { IconChevronLeft, IconLayers, IconTrash } from "@/components/icons";
 import type { CollectionCategory } from "@/lib/collection/items";
 import type { GachaRarity } from "@/lib/gacha/config";
-import { clampNumber, parsePlacements, ROOM_MAX_PLACEMENTS, type DecorEntry, type DecorKind, type Placement } from "@/lib/room/decor";
 
-type Tab = DecorKind;
-type ItemFilter = "all" | CollectionCategory | "sushi";
-type SaveState = "saved" | "dirty" | "saving" | "local" | "error";
+export type DecorationInventoryItem = {
+  id: string;
+  name: string;
+  image: string;
+  category: CollectionCategory;
+  series: string | null;
+  rarity: GachaRarity;
+  count: number;
+};
 
-/** 以前の、端末にだけ保存していたころの置き方。サーバーに何も無ければここから引き継ぐ */
-const LEGACY_STORAGE_KEY = "odekake-decoration-room-v1";
+type Placement = {
+  instanceId: string;
+  itemId: string;
+  x: number;
+  y: number;
+  scale: number;
+  rotation: number;
+  flipped: boolean;
+  z: number;
+};
+
+type Filter = "all" | CollectionCategory | "sushi";
+
+const STORAGE_KEY = "odekake-decoration-room-v1";
 const HISTORY_LIMIT = 24;
-/** 動かしてからこれだけたったら自動で保存する */
-const AUTOSAVE_MS = 1200;
 
-const TABS: Array<{ id: Tab; label: string; empty: string }> = [
-  { id: "item", label: "アイテム", empty: "この種類の取得済みアイテムはまだありません" },
-  { id: "photo", label: "写真", empty: "おでかけ記録に写真を登録すると、額に入れて飾れます" },
-  { id: "trophy", label: "トロフィー", empty: "おさんぽフレンチーで遊ぶと、道ごとのトロフィーがもらえます" },
-  { id: "souvenir", label: "おみやげ", empty: "おでかけを記録した都道府県のペナントがもらえます" },
-];
-
-const ITEM_FILTERS: Array<{ id: ItemFilter; label: string }> = [
+const FILTERS: Array<{ id: Filter; label: string }> = [
   { id: "all", label: "すべて" },
   { id: "toy", label: "おもちゃ" },
   { id: "food", label: "食べもの" },
@@ -49,114 +57,65 @@ function newId() {
     : `decor-${Date.now()}-${Math.random().toString(36).slice(2)}`;
 }
 
-const clamp = clampNumber;
+function clamp(value: number, min: number, max: number) {
+  return Math.min(max, Math.max(min, value));
+}
 
-function readLegacyPlacements(validIds: ReadonlySet<string>): Placement[] {
+function parseStoredPlacements(value: string | null, validIds: ReadonlySet<string>): Placement[] {
+  if (!value) return [];
   try {
-    const raw = window.localStorage.getItem(LEGACY_STORAGE_KEY);
-    return raw ? parsePlacements(JSON.parse(raw), validIds) : [];
+    const parsed: unknown = JSON.parse(value);
+    if (!Array.isArray(parsed)) return [];
+    return parsed.flatMap((entry): Placement[] => {
+      if (!entry || typeof entry !== "object") return [];
+      const item = entry as Partial<Placement>;
+      if (typeof item.instanceId !== "string" || typeof item.itemId !== "string" || !validIds.has(item.itemId)) return [];
+      if (typeof item.x !== "number" || typeof item.y !== "number") return [];
+      return [{
+        instanceId: item.instanceId,
+        itemId: item.itemId,
+        x: clamp(item.x, 6, 94),
+        y: clamp(item.y, 10, 90),
+        scale: clamp(typeof item.scale === "number" ? item.scale : 1, 0.55, 1.8),
+        rotation: typeof item.rotation === "number" ? item.rotation : 0,
+        flipped: item.flipped === true,
+        z: typeof item.z === "number" ? item.z : 1,
+      }];
+    });
   } catch {
     return [];
   }
 }
 
 export function DecorationRoom({
-  entries,
-  initialPlacements,
-  serverReady,
+  items,
   totalCollectionCount,
   coinBalance,
 }: {
-  entries: DecorEntry[];
-  /** サーバーに保存してある置き方（まだ無ければ null） */
-  initialPlacements: Placement[] | null;
-  /** サーバーに保存できるか（できなければ端末に保存する） */
-  serverReady: boolean;
+  items: DecorationInventoryItem[];
   totalCollectionCount: number;
   coinBalance: number;
 }) {
-  const validIds = useMemo(() => new Set(entries.map((entry) => entry.key)), [entries]);
-  const entryByKey = useMemo(() => new Map(entries.map((entry) => [entry.key, entry])), [entries]);
-  const [placements, setPlacements] = useState<Placement[]>(() => (initialPlacements ?? []).filter((p) => validIds.has(p.itemId)));
+  const validIds = useMemo(() => new Set(items.map((item) => item.id)), [items]);
+  const itemById = useMemo(() => new Map(items.map((item) => [item.id, item])), [items]);
+  const [placements, setPlacements] = useState<Placement[]>([]);
   const [past, setPast] = useState<Placement[][]>([]);
   const [future, setFuture] = useState<Placement[][]>([]);
   const [selectedId, setSelectedId] = useState<string | null>(null);
-  const [tab, setTab] = useState<Tab>("item");
-  const [filter, setFilter] = useState<ItemFilter>("all");
-  const [saveState, setSaveState] = useState<SaveState>(serverReady ? "saved" : "local");
+  const [filter, setFilter] = useState<Filter>("all");
+  const [saved, setSaved] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
   const dragRef = useRef<{ id: string; before: Placement[] } | null>(null);
-  const saveTimer = useRef<number | null>(null);
-  const latest = useRef(placements);
-  latest.current = placements;
 
-  // まだサーバーに置き方が無いときは、端末に残っている以前の置き方を引き継ぐ
   useEffect(() => {
-    if (initialPlacements !== null) return;
-    const legacy = readLegacyPlacements(validIds);
-    if (legacy.length) { setPlacements(legacy); if (serverReady) setSaveState("dirty"); }
-  }, [initialPlacements, serverReady, validIds]);
+    setPlacements(parseStoredPlacements(window.localStorage.getItem(STORAGE_KEY), validIds));
+  }, [validIds]);
 
-  const flash = useCallback((text: string) => {
-    setNotice(text);
-    window.setTimeout(() => setNotice(null), 1800);
-  }, []);
-
-  const persist = useCallback(async () => {
-    const snapshot = latest.current;
-    if (!serverReady) {
-      try { window.localStorage.setItem(LEGACY_STORAGE_KEY, JSON.stringify(snapshot)); setSaveState("local"); } catch { setSaveState("error"); }
-      return;
-    }
-    setSaveState("saving");
-    try {
-      const response = await fetch("/api/room", { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ placements: snapshot }) });
-      if (!response.ok) throw new Error("save failed");
-      const payload = (await response.json().catch(() => null)) as { ready?: boolean } | null;
-      if (payload?.ready === false) { window.localStorage.setItem(LEGACY_STORAGE_KEY, JSON.stringify(snapshot)); setSaveState("local"); return; }
-      setSaveState(latest.current === snapshot ? "saved" : "dirty");
-    } catch {
-      setSaveState("error");
-    }
-  }, [serverReady]);
-
-  // 動かしたら少し待って自動で保存する
-  useEffect(() => {
-    if (saveState !== "dirty") return;
-    if (saveTimer.current) window.clearTimeout(saveTimer.current);
-    saveTimer.current = window.setTimeout(() => { void persist(); }, AUTOSAVE_MS);
-    return () => { if (saveTimer.current) window.clearTimeout(saveTimer.current); };
-  }, [placements, saveState, persist]);
-
-  // 自動保存の前にページを離れても、動かした分を送っておく
-  const saveStateRef = useRef(saveState);
-  saveStateRef.current = saveState;
-  useEffect(() => {
-    if (!serverReady) return;
-    const flush = () => {
-      if (saveStateRef.current !== "dirty") return;
-      saveStateRef.current = "saving";
-      void fetch("/api/room", { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ placements: latest.current }), keepalive: true });
-    };
-    window.addEventListener("pagehide", flush);
-    return () => { window.removeEventListener("pagehide", flush); flush(); };
-  }, [serverReady]);
-
-  const markDirty = useCallback(() => setSaveState((state) => (state === "local" && !serverReady ? "local" : "dirty")), [serverReady]);
-  // 端末に保存するときも、動かしたら自動で保存する
-  useEffect(() => {
-    if (serverReady) return;
-    try { window.localStorage.setItem(LEGACY_STORAGE_KEY, JSON.stringify(placements)); } catch { /* 保存できない端末 */ }
-  }, [placements, serverReady]);
-
-  const tabEntries = useMemo(() => entries.filter((entry) => {
-    if (entry.kind !== tab) return false;
-    if (entry.kind !== "item" || filter === "all") return true;
-    if (filter === "sushi") return entry.series === "sushi";
-    return entry.category === filter;
-  }), [entries, filter, tab]);
-  const itemCount = useMemo(() => entries.filter((entry) => entry.kind === "item").length, [entries]);
-  const kindCount = useCallback((kind: Tab) => entries.filter((entry) => entry.kind === kind).length, [entries]);
+  const filteredItems = useMemo(() => items.filter((item) => {
+    if (filter === "all") return true;
+    if (filter === "sushi") return item.series === "sushi";
+    return item.category === filter;
+  }), [filter, items]);
 
   const selected = placements.find((item) => item.instanceId === selectedId) ?? null;
 
@@ -164,38 +123,36 @@ export function DecorationRoom({
     setPast((current) => [...current.slice(-(HISTORY_LIMIT - 1)), placements]);
     setFuture([]);
     setPlacements(next);
-    markDirty();
-  }, [markDirty, placements]);
+    setSaved(false);
+  }, [placements]);
 
   const changeSelected = useCallback((change: (item: Placement) => Placement) => {
     if (!selectedId) return;
     apply(placements.map((item) => item.instanceId === selectedId ? change(item) : item));
   }, [apply, placements, selectedId]);
 
-  const addItem = useCallback((entry: DecorEntry) => {
-    const alreadyPlaced = placements.filter((placed) => placed.itemId === entry.key);
-    if (alreadyPlaced.length >= entry.count) {
+  const addItem = useCallback((item: DecorationInventoryItem) => {
+    const alreadyPlaced = placements.filter((placed) => placed.itemId === item.id);
+    if (alreadyPlaced.length >= item.count) {
       setSelectedId(alreadyPlaced[0]?.instanceId ?? null);
-      flash(entry.count > 1 ? "持っている数だけ置いています" : "もう置いています");
+      setNotice("所持数分をすでに置いています");
+      window.setTimeout(() => setNotice(null), 1800);
       return;
     }
-    if (placements.length >= ROOM_MAX_PLACEMENTS) { flash(`置けるのは${ROOM_MAX_PLACEMENTS}こまでです`); return; }
     const instanceId = newId();
-    // 写真とペナントは壁に、ほかは床に。重ならないよう、置いた数に応じて少しずつずらす
-    const onWall = entry.kind === "photo" || entry.kind === "souvenir";
-    const n = placements.length;
+    const offset = (placements.length % 5) * 3;
     apply([...placements, {
       instanceId,
-      itemId: entry.key,
-      x: 16 + ((n * 29) % 68),
-      y: onWall ? 22 + ((n * 13) % 18) : 58 + ((n * 11) % 24),
+      itemId: item.id,
+      x: clamp(50 + offset, 12, 88),
+      y: clamp(58 + offset / 2, 18, 86),
       scale: 1,
       rotation: 0,
       flipped: false,
       z: Math.max(0, ...placements.map((placed) => placed.z)) + 1,
     }]);
     setSelectedId(instanceId);
-  }, [apply, flash, placements]);
+  }, [apply, placements]);
 
   function undo() {
     const previous = past.at(-1);
@@ -204,7 +161,7 @@ export function DecorationRoom({
     setPast((current) => current.slice(0, -1));
     setPlacements(previous);
     setSelectedId(null);
-    markDirty();
+    setSaved(false);
   }
 
   function redo() {
@@ -214,29 +171,28 @@ export function DecorationRoom({
     setFuture((current) => current.slice(1));
     setPlacements(next);
     setSelectedId(null);
-    markDirty();
+    setSaved(false);
   }
 
-  const saveLabel = saveState === "saving" ? "保存中…" : saveState === "dirty" ? "保存する" : saveState === "error" ? "もう一度保存" : saveState === "local" ? "この端末に保存" : "保存済み";
+  function save() {
+    window.localStorage.setItem(STORAGE_KEY, JSON.stringify(placements));
+    setSaved(true);
+    window.setTimeout(() => setSaved(false), 1800);
+  }
 
   return (
     <main className="min-h-dvh bg-paper pb-[calc(env(safe-area-inset-bottom)+1rem)] text-ink">
       <header className="sticky top-0 z-50 border-b border-line bg-paper/95 backdrop-blur">
         <div className="mx-auto flex h-16 max-w-lg items-center gap-2 px-3">
-          <Link href="/mypage" aria-label="マイページへ戻る" className="flex h-11 w-11 items-center justify-center rounded-full active:bg-paper-deep">
+          <Link href="/home" aria-label="ホームへ戻る" className="flex h-11 w-11 items-center justify-center rounded-full active:bg-paper-deep">
             <IconChevronLeft size={25} />
           </Link>
           <div className="min-w-0 flex-1 text-center">
-            <p className="text-[10px] font-bold tracking-[0.18em] text-leaf-deep">MY ROOM</p>
-            <h1 className="text-[18px] font-black">おへや</h1>
+            <p className="text-[10px] font-bold tracking-[0.18em] text-leaf-deep">MY DECORATION</p>
+            <h1 className="text-[18px] font-black">わんこタウン</h1>
           </div>
-          <button
-            type="button"
-            onClick={() => { if (saveTimer.current) window.clearTimeout(saveTimer.current); void persist(); }}
-            disabled={saveState === "saving" || saveState === "saved"}
-            className={`min-w-[78px] rounded-full px-3.5 py-2.5 text-xs font-bold shadow-sm active:scale-95 disabled:active:scale-100 ${saveState === "saved" || saveState === "local" ? "bg-paper-deep text-ink-soft" : saveState === "error" ? "bg-blossom-soft text-[#b94c60]" : "bg-leaf-deep text-white"}`}
-          >
-            {saveLabel}
+          <button type="button" onClick={save} className="min-w-[66px] rounded-full bg-leaf-deep px-4 py-2.5 text-sm font-bold text-white shadow-sm active:scale-95">
+            {saved ? "保存済み" : "保存"}
           </button>
         </div>
       </header>
@@ -244,7 +200,7 @@ export function DecorationRoom({
       <div className="mx-auto max-w-lg">
         <section className="relative overflow-hidden border-b border-line bg-[#f5ead8]" aria-label="デコレーションエリア">
           <div className="absolute left-4 top-3 z-20 rounded-full border border-white/80 bg-white/88 px-3 py-1.5 text-[11px] font-bold text-leaf-deep shadow-sm backdrop-blur">
-            {saveState === "local" ? "この端末に保存中" : saveState === "error" ? "保存できませんでした" : "自動で保存されます"}
+            ✎ 編集中
           </div>
           <div className="absolute right-4 top-3 z-20 rounded-full border border-line bg-card/90 px-3 py-1.5 text-[10px] font-bold text-ink-soft shadow-sm">
             🪙 {coinBalance.toLocaleString("ja-JP")}
@@ -272,7 +228,7 @@ export function DecorationRoom({
             <img src="/characters/default/sit.webp" alt="部屋にいるフレンチブルドッグ" className="pointer-events-none absolute bottom-[12%] left-[13%] z-[3] h-[31%] w-auto object-contain drop-shadow-[0_7px_5px_rgba(91,64,39,.18)]" />
 
             {placements.map((placement) => {
-              const item = entryByKey.get(placement.itemId);
+              const item = itemById.get(placement.itemId);
               if (!item) return null;
               const isSelected = placement.instanceId === selectedId;
               return (
@@ -299,6 +255,7 @@ export function DecorationRoom({
                     const x = clamp(((event.clientX - room.left) / room.width) * 100, 7, 93);
                     const y = clamp(((event.clientY - room.top) / room.height) * 100, 10, 90);
                     setPlacements((current) => current.map((entry) => entry.instanceId === placement.instanceId ? { ...entry, x, y } : entry));
+                    setSaved(false);
                   }}
                   onPointerUp={() => {
                     const drag = dragRef.current;
@@ -306,14 +263,14 @@ export function DecorationRoom({
                     setPast((current) => [...current.slice(-(HISTORY_LIMIT - 1)), drag.before]);
                     setFuture([]);
                     dragRef.current = null;
-                    markDirty();
                   }}
                   role="button"
                   tabIndex={0}
                   aria-label={`${item.name}を移動`}
                 >
-                  {item.kind === "item" || item.kind === "trophy" ? <span className="pointer-events-none absolute bottom-1 left-1/2 h-3 w-[70%] -translate-x-1/2 rounded-full bg-[#735e48]/15 blur-[2px]" /> : null}
-                  <DecorVisual entry={item} />
+                  <span className="pointer-events-none absolute bottom-1 left-1/2 h-3 w-[70%] -translate-x-1/2 rounded-full bg-[#735e48]/15 blur-[2px]" />
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img src={item.image} alt={item.name} draggable={false} className="pointer-events-none relative h-full w-full object-contain drop-shadow-[0_4px_3px_rgba(68,50,33,.16)]" />
                   {isSelected ? <SelectionHandles /> : null}
                 </div>
               );
@@ -340,47 +297,42 @@ export function DecorationRoom({
 
         <section className="rounded-t-[28px] bg-card px-4 pb-6 pt-3 shadow-[0_-8px_24px_rgba(93,80,58,.08)]">
           <div className="mx-auto mb-3 h-1 w-12 rounded-full bg-line-strong" />
-          <div className="-mx-4 flex gap-1.5 overflow-x-auto px-4 pb-1" role="tablist" aria-label="飾るものの種類">
-            {TABS.map((option) => (
-              <button key={option.id} type="button" role="tab" aria-selected={tab === option.id} onClick={() => setTab(option.id)} className={`shrink-0 rounded-xl px-3.5 py-2 text-sm font-black ${tab === option.id ? "bg-leaf-deep text-white" : "bg-paper-deep text-ink-soft"}`}>
-                {option.label}<span className="ml-1 text-[10px] font-bold opacity-75">{kindCount(option.id)}</span>
+          <div className="flex items-end justify-between gap-3">
+            <div>
+              <h2 className="text-lg font-black">持っているアイテム</h2>
+              <p className="mt-0.5 text-[10px] font-semibold text-ink-faint">タップで置く・長押しで移動</p>
+            </div>
+            <p className="text-xs font-bold tabular-nums text-ink-soft">{items.length} / {totalCollectionCount}</p>
+          </div>
+
+          <div className="-mx-4 mt-3 flex gap-2 overflow-x-auto px-4 pb-2">
+            {FILTERS.map((option) => (
+              <button key={option.id} type="button" onClick={() => setFilter(option.id)} className={`shrink-0 rounded-full border px-3.5 py-2 text-xs font-bold ${filter === option.id ? "border-leaf bg-leaf-soft text-leaf-deep" : "border-line bg-paper text-ink-soft"}`}>
+                {option.label}
               </button>
             ))}
           </div>
-          <div className="mt-2 flex items-end justify-between gap-3">
-            <p className="text-[10px] font-semibold text-ink-faint">タップで置く・ドラッグで移動</p>
-            {tab === "item" ? <p className="text-xs font-bold tabular-nums text-ink-soft">{itemCount} / {totalCollectionCount}</p> : null}
-          </div>
 
-          {tab === "item" ? (
-            <div className="-mx-4 mt-2 flex gap-2 overflow-x-auto px-4 pb-2">
-              {ITEM_FILTERS.map((option) => (
-                <button key={option.id} type="button" onClick={() => setFilter(option.id)} className={`shrink-0 rounded-full border px-3.5 py-2 text-xs font-bold ${filter === option.id ? "border-leaf bg-leaf-soft text-leaf-deep" : "border-line bg-paper text-ink-soft"}`}>
-                  {option.label}
-                </button>
-              ))}
-            </div>
-          ) : null}
-
-          {tabEntries.length ? (
+          {filteredItems.length ? (
             <div className="mt-2 grid grid-cols-3 gap-2.5">
-              {tabEntries.map((entry) => {
-                const placedCount = placements.filter((placed) => placed.itemId === entry.key).length;
+              {filteredItems.map((item) => {
+                const placedCount = placements.filter((placed) => placed.itemId === item.id).length;
                 return (
-                  <button key={entry.key} type="button" onClick={() => addItem(entry)} className={`relative min-w-0 rounded-2xl border bg-paper p-2 text-left shadow-sm transition active:scale-[.97] ${selected?.itemId === entry.key ? "border-leaf ring-2 ring-leaf/30" : "border-line"}`}>
-                    {entry.kind === "item" ? <span className={`absolute left-1.5 top-1.5 z-10 rounded-full px-1.5 py-0.5 text-[9px] font-black text-white ${RARITY_STYLE[entry.rarity]}`}>{entry.rarity}</span> : null}
-                    <span className="absolute right-1.5 top-1.5 z-10 rounded-full bg-card/90 px-1.5 py-0.5 text-[9px] font-bold tabular-nums text-ink-soft">{placedCount}/{entry.count}</span>
+                  <button key={item.id} type="button" onClick={() => addItem(item)} className={`relative min-w-0 rounded-2xl border bg-paper p-2 text-left shadow-sm transition active:scale-[.97] ${selected?.itemId === item.id ? "border-leaf ring-2 ring-leaf/30" : "border-line"}`}>
+                    <span className={`absolute left-1.5 top-1.5 z-10 rounded-full px-1.5 py-0.5 text-[9px] font-black text-white ${RARITY_STYLE[item.rarity]}`}>{item.rarity}</span>
+                    <span className="absolute right-1.5 top-1.5 z-10 rounded-full bg-card/90 px-1.5 py-0.5 text-[9px] font-bold tabular-nums text-ink-soft">{placedCount}/{item.count}</span>
                     <span className="flex aspect-square items-center justify-center pt-2">
-                      <span className="flex h-[82%] w-[82%] items-center justify-center"><DecorVisual entry={entry} thumb /></span>
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img src={item.image} alt="" className="h-[78%] w-[78%] object-contain drop-shadow-[0_3px_2px_rgba(68,50,33,.14)]" />
                     </span>
-                    <span className="block truncate text-center text-[10px] font-bold">{entry.name}</span>
+                    <span className="block truncate text-center text-[10px] font-bold">{item.name}</span>
                   </button>
                 );
               })}
             </div>
           ) : (
             <div className="my-8 rounded-2xl border border-dashed border-line-strong bg-paper px-4 py-8 text-center text-sm text-ink-soft">
-              {TABS.find((option) => option.id === tab)?.empty}
+              この種類の取得済みアイテムはまだありません
             </div>
           )}
         </section>
@@ -388,49 +340,6 @@ export function DecorationRoom({
 
       {notice ? <div className="fixed bottom-5 left-1/2 z-[60] -translate-x-1/2 whitespace-nowrap rounded-full bg-ink px-4 py-2 text-xs font-bold text-white shadow-lg">{notice}</div> : null}
     </main>
-  );
-}
-
-/** 置いたもの1つの見た目（図鑑アイテム・額縁の写真・トロフィー・ペナント） */
-function DecorVisual({ entry, thumb = false }: { entry: DecorEntry; thumb?: boolean }) {
-  if (entry.kind === "item") {
-    // eslint-disable-next-line @next/next/no-img-element
-    return <img src={entry.image} alt={thumb ? "" : entry.name} draggable={false} className="pointer-events-none relative h-full w-full object-contain drop-shadow-[0_4px_3px_rgba(68,50,33,.16)]" />;
-  }
-  if (entry.kind === "photo") {
-    return (
-      <span className="pointer-events-none relative flex h-full w-full items-center justify-center">
-        <span className="block w-full rounded-[3px] border-[5px] border-[#b98a57] bg-[#fffaf0] p-[3px] shadow-[0_4px_6px_rgba(68,50,33,.25)]">
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src={entry.image} alt={thumb ? "" : entry.name} draggable={false} className="block aspect-[4/3] w-full object-cover" />
-        </span>
-      </span>
-    );
-  }
-  if (entry.kind === "trophy") {
-    return (
-      <svg viewBox="0 0 96 96" className="pointer-events-none relative h-full w-full drop-shadow-[0_4px_3px_rgba(68,50,33,.2)]" role={thumb ? undefined : "img"} aria-label={thumb ? undefined : `${entry.name} ランク${entry.rank}のトロフィー`}>
-        <path d="M30 14h36v8c0 14-7 24-18 26-11-2-18-12-18-26z" fill={entry.color} stroke="rgba(60,40,20,.35)" strokeWidth="1.5" />
-        <path d="M30 18h-8c0 9 5 15 11 16M66 18h8c0 9-5 15-11 16" fill="none" stroke={entry.color} strokeWidth="4" strokeLinecap="round" />
-        <path d="M36 18c0 10 3 18 8 22" fill="none" stroke="rgba(255,255,255,.55)" strokeWidth="3" strokeLinecap="round" />
-        <rect x="44" y="47" width="8" height="10" fill={entry.color} stroke="rgba(60,40,20,.35)" strokeWidth="1.2" />
-        <rect x="32" y="56" width="32" height="7" rx="2" fill="#8a5a34" />
-        <rect x="26" y="63" width="44" height="22" rx="3" fill="#6a4426" />
-        <text x="48" y="37" textAnchor="middle" fontSize="15" fontWeight="900" fill="#fff" stroke="rgba(60,40,20,.45)" strokeWidth=".8">{entry.rank}</text>
-        <text x="48" y="73" textAnchor="middle" fontSize="7.5" fontWeight="800" fill="#ffe7b8">{entry.name.replace(/^おさんぽ /, "")}</text>
-        <text x="48" y="82" textAnchor="middle" fontSize="7" fontWeight="700" fill="#ffe7b8">{entry.score.toLocaleString("ja-JP")}点</text>
-      </svg>
-    );
-  }
-  const label = entry.name.replace(/(県|府|都)$/, "");
-  return (
-    <svg viewBox="0 0 96 96" className="pointer-events-none relative h-full w-full drop-shadow-[0_4px_3px_rgba(68,50,33,.2)]" role={thumb ? undefined : "img"} aria-label={thumb ? undefined : `${entry.name}のおみやげペナント`}>
-      <rect x="8" y="22" width="4" height="56" rx="2" fill="#8a5a34" />
-      <path d="M12 26 L90 48 L12 70 Z" fill={entry.color} stroke="rgba(255,255,255,.85)" strokeWidth="2" strokeLinejoin="round" />
-      <path d="M12 26 L90 48 L12 70" fill="none" stroke="#fff3cf" strokeWidth="1" strokeDasharray="3 3" transform="translate(4 0) scale(.95)" />
-      <text x="26" y="54" textAnchor="middle" fontSize="16">{entry.emoji}</text>
-      <text x="54" y="52.5" textAnchor="middle" fontSize={label.length > 3 ? 9 : 11} fontWeight="900" fill="#fff">{label}</text>
-    </svg>
   );
 }
 
