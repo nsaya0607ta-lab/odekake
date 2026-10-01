@@ -6,6 +6,7 @@
  */
 import { useMemo, useState } from "react";
 import { PREFECTURE_NAMES } from "@/lib/geo/prefecture-names";
+import { WEATHER_LABEL, withWeather, type RoomWeather } from "@/lib/room/weather";
 import { fmtJstTime, moonPhase, nearestPref, PREF_POINTS, skyAt, sunTimes, type GeoPoint } from "@/lib/room/sun";
 
 /** 空の計算に使う場所。gps は現在地（0.1度に丸めて、この端末にだけ保存する） */
@@ -18,10 +19,10 @@ const MOON_NAMES: [number, string][] = [
 ];
 const moonName = (p: number) => MOON_NAMES.find(([max]) => p <= max)?.[1] ?? "新月";
 
-export function SkyCard({ now, place, onPlace }: { now: Date; place: RoomPlace; onPlace: (p: RoomPlace) => void }) {
+export function SkyCard({ now, place, onPlace, weather = null }: { now: Date; place: RoomPlace; onPlace: (p: RoomPlace) => void; weather?: RoomWeather | null }) {
   const day = new Intl.DateTimeFormat("sv-SE", { timeZone: "Asia/Tokyo" }).format(now);
   const times = useMemo(() => sunTimes(new Date(`${day}T12:00:00+09:00`), place), [day, place]);
-  const sky = skyAt(now, place);
+  const sky = withWeather(skyAt(now, place), weather);
   const [open, setOpen] = useState(false);
   const [locating, setLocating] = useState(false);
   const [geoError, setGeoError] = useState("");
@@ -53,7 +54,7 @@ export function SkyCard({ now, place, onPlace }: { now: Date; place: RoomPlace; 
   // 弧の上の太陽（日の出 0 → 日の入り 1）
   const ax = 24 + f * 252, ay = 78 - Math.sin(f * Math.PI) * 58;
   const status = up
-    ? set - t < 60 * 60_000 ? `あと${Math.max(1, Math.round((set - t) / 60_000))}分で日の入り` : sky.altitude < 12 ? (f < 0.5 ? "朝の光がやさしい時間" : "夕方の光がさしこむ時間") : "お日さまが出ている時間"
+    ? set - t < 60 * 60_000 ? `あと${Math.max(1, Math.round((set - t) / 60_000))}分で日の入り` : sky.altitude < 12 ? (f < 0.5 ? "朝の光がやさしい時間" : "夕方の光がさしこむ時間") : weatherDay(weather)
     : t < rise ? `日の出まで あと${Math.floor((rise - t) / 3_600_000)}時間${Math.round(((rise - t) % 3_600_000) / 60_000)}分` : sky.altitude > -6 ? "日が沈んで、空がのこりの色" : "夜。明かりをつけてのんびり";
   return (
     <div className="overflow-hidden rounded-2xl border border-line bg-card shadow-sm">
@@ -104,15 +105,34 @@ export function SkyCard({ now, place, onPlace }: { now: Date; place: RoomPlace; 
             <path d={moonIcon(9, moon)} fill="#F2C94C" />
           </g>
         )}
-        <text x="24" y="92" textAnchor="middle" fontSize="9" fontWeight="800" fill="#6A5A48">日の出 {times.rise ? fmtJstTime(times.rise) : "-"}</text>
-        <text x="276" y="92" textAnchor="middle" fontSize="9" fontWeight="800" fill="#6A5A48">日の入り {times.set ? fmtJstTime(times.set) : "-"}</text>
+        <text x="8" y="92" textAnchor="start" fontSize="9" fontWeight="800" fill="#6A5A48">日の出 {times.rise ? fmtJstTime(times.rise) : "-"}</text>
+        <text x="292" y="92" textAnchor="end" fontSize="9" fontWeight="800" fill="#6A5A48">日の入り {times.set ? fmtJstTime(times.set) : "-"}</text>
       </svg>
       <div className="flex items-center justify-between gap-2 px-4 pb-3 pt-1">
         <p className="text-[12px] font-bold text-ink">{status}</p>
-        <p className="shrink-0 rounded-full bg-paper-deep px-2.5 py-1 text-[10px] font-bold text-ink-soft">🌙 {moonName(moon)}</p>
+        <div className="flex shrink-0 items-center gap-1">
+          {weather ? (
+            <p className="rounded-full bg-paper-deep px-2.5 py-1 text-[10px] font-bold text-ink-soft">
+              {WEATHER_LABEL[weather.kind].icon} {WEATHER_LABEL[weather.kind].label}{weather.temp !== null ? ` ${Math.round(weather.temp)}℃` : ""}
+            </p>
+          ) : null}
+          <p className="rounded-full bg-paper-deep px-2.5 py-1 text-[10px] font-bold text-ink-soft">🌙 {moonName(moon)}</p>
+        </div>
       </div>
     </div>
   );
+}
+
+/** 昼間の天気のひとこと */
+function weatherDay(w: RoomWeather | null): string {
+  switch (w?.kind) {
+    case "rain": case "drizzle": return "雨の日。おうちでのんびり";
+    case "thunder": return "雷が鳴ってるよ。おうちにいようね";
+    case "snow": return "雪の日。あったかくしてね";
+    case "fog": return "きりで、おそとがかすんでる";
+    case "cloudy": return "くもり空。お日さまは雲のうしろ";
+    default: return "お日さまが出ている時間";
+  }
 }
 
 function moonIcon(r: number, p: number): string {

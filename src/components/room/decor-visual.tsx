@@ -4,11 +4,11 @@
 import type { DecorEntry, FrameStyle } from "@/lib/room/types";
 import { FurnitureArt } from "./furniture-art";
 
-const FRAME_LOOK: Record<FrameStyle, { label: string; border: string; pad: string; bottom: string }> = {
-  wood: { label: "木", border: "border-[6px] border-[#B98A57]", pad: "p-[3px] bg-[#FFFAF0]", bottom: "" },
-  white: { label: "白", border: "border-[6px] border-white", pad: "p-0", bottom: "" },
-  polaroid: { label: "ポラ", border: "border-[5px] border-white", pad: "p-0 bg-white", bottom: "pb-[18%]" },
-  gold: { label: "金", border: "border-[6px] border-[#D9AE4A]", pad: "p-[3px] bg-[#FFF6DA]", bottom: "" },
+const FRAME_LOOK: Record<FrameStyle, { label: string; border: string; pad: string; bottom: string; bw: number; depth: number }> = {
+  wood: { label: "木", border: "border-[6px] border-[#B98A57]", pad: "p-[3px] bg-[#FFFAF0]", bottom: "", bw: 6, depth: 1 },
+  white: { label: "白", border: "border-[6px] border-white", pad: "p-0", bottom: "", bw: 6, depth: 0.8 },
+  polaroid: { label: "ポラ", border: "border-[5px] border-white", pad: "p-0 bg-white", bottom: "pb-[18%]", bw: 5, depth: 0.25 },
+  gold: { label: "金", border: "border-[6px] border-[#D9AE4A]", pad: "p-[3px] bg-[#FFF6DA]", bottom: "", bw: 6, depth: 1 },
 };
 export const FRAME_LABELS = Object.fromEntries(Object.entries(FRAME_LOOK).map(([k, v]) => [k, v.label])) as Record<FrameStyle, string>;
 
@@ -22,9 +22,15 @@ export function DecorVisual({ entry, frame = "wood", thumb = false, lit = false 
   if (entry.kind === "photo") {
     const look = FRAME_LOOK[frame];
     return (
-      <span data-frame className={`pointer-events-none block w-full rounded-[3px] shadow-[0_6px_8px_rgba(50,35,20,.28)] ${look.border} ${look.pad} ${look.bottom}`}>
+      <span data-frame className={`pointer-events-none relative block w-full rounded-[3px] shadow-[3px_7px_9px_rgba(50,35,20,.3),0_1px_2px_rgba(50,35,20,.25)] ${look.border} ${look.pad} ${look.bottom}`}>
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img src={entry.image} alt={label ?? ""} draggable={false} className="block aspect-[4/3] w-full select-none object-cover" />
+        {/* 額の面取り（左上が光り、右下がかげる） */}
+        <span aria-hidden className="absolute rounded-[3px]" style={{ inset: -look.bw, boxShadow: `inset 1.5px 1.5px 0 rgba(255,255,255,${0.5 * look.depth}), inset -1.5px -1.5px 0 rgba(0,0,0,${0.22 * look.depth})` }} />
+        {/* 額のふちが中の写真に落とすかげ */}
+        <span aria-hidden className="absolute inset-0" style={{ boxShadow: `inset 0 0 0 1px rgba(0,0,0,${0.12 * look.depth}), inset 2px 3px 5px rgba(0,0,0,${0.3 * look.depth})` }} />
+        {/* ガラスの映りこみ */}
+        {frame !== "polaroid" ? <span aria-hidden className="absolute inset-0 bg-[linear-gradient(125deg,rgba(255,255,255,0)_38%,rgba(255,255,255,.22)_46%,rgba(255,255,255,0)_58%)]" /> : null}
       </span>
     );
   }
@@ -56,6 +62,8 @@ export function DecorVisual({ entry, frame = "wood", thumb = false, lit = false 
         <path d="M42 64h26l3 8H39z" fill={entry.color} />
         <path d="M42 64h26l3 8H39z" fill={`url(#${id}-d)`} />
         <text x="55" y="34" textAnchor="middle" fontSize="18" fontWeight="900" fill="#FFFFFF" stroke="rgba(60,40,20,.55)" strokeWidth="1">{entry.rank}</text>
+        <path d="M22 72 L28 66 H82 L88 72 Z" fill="#A87444" />
+        <path d="M28 66 H82" stroke="#C99A66" strokeWidth="1.2" />
         <rect x="20" y="72" width="70" height="52" rx="5" fill={`url(#${id}-b)`} />
         <rect x="26" y="78" width="58" height="40" rx="3" fill="#D9B062" />
         <rect x="26" y="78" width="58" height="8" rx="3" fill="#FFFFFF" opacity="0.3" />
@@ -68,11 +76,24 @@ export function DecorVisual({ entry, frame = "wood", thumb = false, lit = false 
   return (
     <svg viewBox="0 0 120 70" className="pointer-events-none block h-auto w-full drop-shadow-[0_4px_3px_rgba(68,50,33,.22)]" role={label ? "img" : undefined} aria-label={label ? `${entry.name}のペナント` : undefined}>
       <rect x="4" y="4" width="5" height="62" rx="2.5" fill="#8A5A34" />
+      <rect x="4" y="4" width="1.6" height="62" rx="0.8" fill="#B88458" />
       <path d="M9 7 L116 35 L9 63 Z" fill={entry.color} />
       <path d="M9 7 L116 35 L9 63 Z" fill="none" stroke="#FFFFFF" strokeWidth="2.4" strokeLinejoin="round" />
       <path d="M14 13 L104 35 L14 57" fill="none" stroke="#FFF3CF" strokeWidth="1.2" strokeDasharray="3 3" />
       <text x="28" y="41" textAnchor="middle" fontSize="17">{entry.emoji}</text>
       <text x="62" y="40" textAnchor="middle" fontSize={name.length > 3 ? 11 : 13} fontWeight="900" fill="#fff">{name}</text>
+      {/* 布のたわみ（上が明るく、下がかげる） */}
+      <path d="M9 7 L116 35 L9 63 Z" fill={`url(#pn-${entry.key.replace(/[^a-z0-9]/gi, "")})`} />
+      <defs>
+        <linearGradient id={`pn-${entry.key.replace(/[^a-z0-9]/gi, "")}`} x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0" stopColor="#FFFFFF" stopOpacity="0.18" />
+          <stop offset="0.5" stopColor="#FFFFFF" stopOpacity="0" />
+          <stop offset="1" stopColor="#000000" stopOpacity="0.18" />
+        </linearGradient>
+      </defs>
+      {/* 壁にとめた画びょう */}
+      <circle cx="6.5" cy="7" r="4.2" fill="#E4572E" />
+      <circle cx="5.3" cy="5.8" r="1.4" fill="#FFFFFF" opacity="0.8" />
     </svg>
   );
 }

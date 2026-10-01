@@ -47,6 +47,7 @@ import { DecorVisual, FRAME_LABELS } from "./decor-visual";
 import { RoomDog } from "./room-dog";
 import { composeRoomSnapshot } from "./room-snapshot";
 import { skyAt } from "@/lib/room/sun";
+import { parseRoomWeather, withWeather, type RoomWeather } from "@/lib/room/weather";
 import { dayPhaseOf, lampsOn, RoomLighting, RoomScene, type DayPhase } from "./room-scene";
 import { DEFAULT_PLACE, SkyCard, type RoomPlace } from "./sky-card";
 
@@ -207,7 +208,8 @@ export function MyRoom({ entries, initialLayout, serverReady, dogSkin, dogName, 
   latest.current = layout;
   const [place, setPlace] = useState<RoomPlace>(DEFAULT_PLACE);
   const phase: DayPhase = dayPhaseOf(now, place);
-  const lightsOn = useMemo(() => lampsOn(skyAt(now, place)), [now, place]);
+  const [weather, setWeather] = useState<RoomWeather | null>(null);
+  const lightsOn = useMemo(() => lampsOn(withWeather(skyAt(now, place), weather)), [now, place, weather]);
   /** 犬が寝る時間（日本時間の21時〜6時） */
   const sleepy = useMemo(() => { const h = Number(new Intl.DateTimeFormat("en-US", { timeZone: "Asia/Tokyo", hour: "numeric", hourCycle: "h23" }).format(now)); return h >= 21 || h < 6; }, [now]);
 
@@ -227,6 +229,19 @@ export function MyRoom({ entries, initialLayout, serverReady, dogSkin, dogName, 
       }
     } catch { /* 読めなければ東京のまま */ }
   }, []);
+  // 窓の外の、いまの本当の天気（20分ごとに取り直す。取れなければ季節だけの景色）
+  useEffect(() => {
+    let alive = true;
+    const load = () => {
+      fetch(`/api/my-room/weather?lat=${place.lat.toFixed(1)}&lon=${place.lon.toFixed(1)}`)
+        .then((r) => (r.ok ? r.json() : null))
+        .then((j) => { if (alive) setWeather(parseRoomWeather(j)); })
+        .catch(() => { if (alive) setWeather(null); });
+    };
+    load();
+    const t = window.setInterval(load, 20 * 60_000);
+    return () => { alive = false; window.clearInterval(t); };
+  }, [place.lat, place.lon]);
   const changePlace = useCallback((p: RoomPlace) => {
     setPlace(p);
     try { window.localStorage.setItem(PLACE_KEY, JSON.stringify(p)); } catch { /* 保存できなくてもこの画面では使える */ }
@@ -551,7 +566,7 @@ export function MyRoom({ entries, initialLayout, serverReady, dogSkin, dogName, 
           style={{ aspectRatio: `1000 / ${1000 * ROOM.aspect}` }}
           onPointerDown={(e) => { if (e.target === e.currentTarget || (e.target as Element).tagName === "svg" || (e.target as Element).closest("svg[aria-hidden]")) setSelectedId(null); }}
         >
-          <RoomScene theme={layout.theme} now={now} at={place} />
+          <RoomScene theme={layout.theme} now={now} at={place} weather={weather} />
 
           {layout.items.map((p) => {
             const entry = entryByKey.get(p.key);
@@ -599,9 +614,9 @@ export function MyRoom({ entries, initialLayout, serverReady, dogSkin, dogName, 
             );
           })}
 
-          <RoomDog skin={dogSkin} phase={phase} sleepy={sleepy} lines={dogLines} quiet={editing} places={dogPlaces} />
+          <RoomDog skin={dogSkin} phase={phase} sleepy={sleepy} lines={dogLines} quiet={editing} places={dogPlaces} weather={weather?.kind ?? null} />
           <div className="pointer-events-none absolute inset-0" style={{ zIndex: 2000 }}>
-            <RoomLighting now={now} lamps={lampLights} at={place} />
+            <RoomLighting now={now} lamps={lampLights} at={place} weather={weather} />
           </div>
           {peek ? (
             <span className="room-bubble pointer-events-none absolute w-max max-w-[12rem] -translate-x-1/2 -translate-y-full rounded-xl bg-ink px-2.5 py-1 text-[10px] font-bold text-white shadow" style={{ left: `${clamp(peek.x, 18, 82)}%`, top: `${Math.max(4, peek.y - 0.5)}%`, zIndex: 2600 }}>{peek.text}</span>
@@ -708,11 +723,11 @@ export function MyRoom({ entries, initialLayout, serverReady, dogSkin, dogName, 
                 );
               })}
             </div>
-            <SkyCard now={now} place={place} onPlace={changePlace} />
+            <SkyCard now={now} place={place} onPlace={changePlace} weather={weather} />
             <ul className="space-y-1.5 rounded-2xl border border-line bg-card px-4 py-3 text-[12px] leading-relaxed text-ink-soft shadow-sm">
               <li>🐾 {dogName}をタップすると、なでられます</li>
               <li>🖼️ 飾った写真をタップすると、その日の思い出が見られます</li>
-              <li>🕰️ 窓の外・部屋の明るさ・時計は、住んでいるところ（📍で変えられます）の、いまの時刻と季節の日の出・日の入りに合わせて変わります</li>
+              <li>🕰️ 窓の外・部屋の明るさ・時計は、住んでいるところ（📍で変えられます）の、いまの時刻・天気と、季節の日の出・日の入りに合わせて変わります</li>
               <li>🚩 おでかけを記録した都道府県のペナントや、おさんぽのトロフィーも飾れます</li>
             </ul>
             <button type="button" onClick={() => void takeSnapshot()} disabled={shooting} className="flex w-full items-center justify-center gap-2 rounded-full bg-leaf-deep py-3 text-sm font-black text-white shadow-md active:scale-[.98] disabled:opacity-60">

@@ -185,7 +185,13 @@ function Bookshelf({ u, a11y }: P) {
         <linearGradient id={g("wood")} x1="0" y1="0" x2="1" y2="0"><stop offset="0" stopColor="#C68D57" /><stop offset="1" stopColor="#8E5A30" /></linearGradient>
         <linearGradient id={g("back")} x1="0" y1="0" x2="0" y2="1"><stop offset="0" stopColor="#6E4424" /><stop offset="1" stopColor="#56331A" /></linearGradient>
       </defs>
-      <FloorShadow cx={75} cy={204} rx={70} ry={6} />
+      <FloorShadow cx={78} cy={204} rx={72} ry={6} />
+      {/* 天板と右の側板（奥ゆきを見せる） */}
+      <path d="M5.4 13.8 L129.6 13.8 L144 4 L19.8 4 Z" fill="#DDA875" />
+      <path d="M5.4 13.8 L129.6 13.8" stroke="#F2CFA2" strokeWidth="1.5" />
+      <path d="M129.6 13.8 L144 4 L144 193 L129.6 201.9 Z" fill="#7E4E28" />
+      <path d="M129.6 13.8 L144 4 L144 193 L129.6 201.9 Z" fill="#000" opacity="0.12" />
+      <g transform="translate(0 8) scale(0.9 0.96)">
       <rect x="6" y="6" width="138" height="196" rx="6" fill={`url(#${g("wood")})`} />
       <path d="M12 20 q4 60 0 120 M136 30 q-4 70 0 150" stroke="#7A4B26" strokeOpacity="0.35" strokeWidth="1.5" fill="none" />
       <rect x="16" y="16" width="118" height="178" fill={`url(#${g("back")})`} />
@@ -212,6 +218,7 @@ function Bookshelf({ u, a11y }: P) {
       {/* 本を横に積んだところ */}
       {[0, 1, 2].map((i) => <rect key={i} x={94 - i * 2} y={180 - i * 7} width={36 + i * 3} height="7" rx="1.5" fill={["#B65A7A", "#7FA6D6", "#F2D16B"][i]} />)}
       <rect x="6" y="6" width="6" height="196" fill="#FFFFFF" opacity="0.14" />
+      </g>
     </svg>
   );
 }
@@ -286,6 +293,9 @@ function DogHouse({ u, a11y }: P) {
         <radialGradient id={g("door")} cx="0.5" cy="0.25" r="0.85"><stop offset="0" stopColor="#5A3A22" /><stop offset="1" stopColor="#24160C" /></radialGradient>
       </defs>
       <FloorShadow cx={100} cy={182} rx={86} ry={8} />
+      {/* 右の側面（少し暗い） */}
+      <path d="M176 72 L192 60 L192 168 L176 180 Z" fill="#B07A45" />
+      <path d="M176 72 L192 60 L192 168 L176 180 Z" fill="#000" opacity="0.1" />
       <rect x="24" y="72" width="152" height="108" fill={`url(#${g("wall")})`} />
       {[86, 102, 118, 134, 150, 166].map((y, i) => <rect key={y} x="24" y={y} width="152" height="2" fill="#A86E3C" opacity={0.25 + (i % 2) * 0.1} />)}
       <rect x="24" y="72" width="152" height="16" fill="#000" opacity="0.14" />

@@ -8,6 +8,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { getFrenchieSrc, type DogSkinId } from "@/lib/dog-skins";
 import { clamp, depthScale, ROOM } from "@/lib/room/types";
+import type { WeatherKind } from "@/lib/room/weather";
 import type { DayPhase } from "./room-scene";
 
 const IDLE_POSES = ["stand", "sit", "sniff", "sit-side", "smile", "wonder", "yawn", "front"] as const;
@@ -118,9 +119,11 @@ export type DogPlaces = {
   blocks: { x0: number; x1: number; y0: number; y1: number }[];
 };
 
-export function RoomDog({ skin, phase, sleepy, lines, quiet, places }: {
+export function RoomDog({ skin, phase, sleepy, lines, quiet, places, weather = null }: {
   skin: DogSkinId;
   phase: DayPhase;
+  /** 窓の外の天気（わからなければ null） */
+  weather?: WeatherKind | null;
   /** タップしたときに言うことの候補（飾ってあるものの話など） */
   lines: readonly string[];
   /** もようがえ中は、じゃまにならないよう端ですわって待つ */
@@ -234,7 +237,12 @@ export function RoomDog({ skin, phase, sleepy, lines, quiet, places }: {
       // 窓の下で外をながめる
       walkTo(24, ROOM.floorTop + 2.5, () => {
         pose(pick(["wonder", "sit-side", "front"] as const));
-        say(phase === "night" ? "お星さま、見えるかな…" : phase === "evening" ? "夕やけ、きれい…" : phase === "morning" ? "いい朝だね" : "おそと、いい天気…", 2600);
+        const rainy = weather === "rain" || weather === "drizzle";
+        say(
+          weather === "thunder" ? "かみなり、こわい…" : rainy ? "雨の音がするね…" : weather === "snow" ? "雪だ！ おそとまっしろ！" : weather === "fog" ? "おそと、まっしろでなにも見えない…"
+            : phase === "night" ? (weather === "cloudy" ? "きょうはお星さま、かくれてる…" : "お星さま、見えるかな…") : phase === "evening" ? "夕やけ、きれい…" : weather === "cloudy" ? "くもってるね。おさんぽ行けるかな？" : phase === "morning" ? "いい朝だね" : "おそと、いい天気…",
+          2600,
+        );
         next(4200);
       });
     } else if (r < 0.54 && pl.bed) {
@@ -253,7 +261,7 @@ export function RoomDog({ skin, phase, sleepy, lines, quiet, places }: {
       pose(pick(IDLE_POSES));
       next(rand(2500, 5000));
     }
-  }, [later, night, phase, pose, quiet, say, walkTo]);
+  }, [later, night, phase, pose, quiet, say, walkTo, weather]);
 
   useEffect(() => {
     clearTimers();
