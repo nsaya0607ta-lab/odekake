@@ -52,20 +52,101 @@ export function SkyCard({ now, place, onPlace, weather = null }: { now: Date; pl
   const up = t >= rise && t <= set;
   const f = up && set > rise ? (t - rise) / (set - rise) : 0;
   // 弧の上の太陽（日の出 0 → 日の入り 1）
-  const ax = 24 + f * 252, ay = 78 - Math.sin(f * Math.PI) * 58;
+  const ax = 24 + f * 252, ay2 = 112 - Math.sin(f * Math.PI) * 60;
   const status = up
     ? set - t < 60 * 60_000 ? `あと${Math.max(1, Math.round((set - t) / 60_000))}分で日の入り` : sky.altitude < 12 ? (f < 0.5 ? "朝の光がやさしい時間" : "夕方の光がさしこむ時間") : weatherDay(weather)
     : t < rise ? `日の出まで あと${Math.floor((rise - t) / 3_600_000)}時間${Math.round(((rise - t) % 3_600_000) / 60_000)}分` : sky.altitude > -6 ? "日が沈んで、空がのこりの色" : "夜。明かりをつけてのんびり";
+  const dark = 1 - sky.light;
+  const kind = weather?.kind;
+  const wet = kind === "rain" || kind === "drizzle" || kind === "thunder";
+  const cloudy = kind === "cloudy" || kind === "fog" || wet || kind === "snow";
+  const ink = (day: string, night: string) => mix(day, night, Math.min(1, dark * 1.1));
   return (
-    <div className="overflow-hidden rounded-2xl border border-line bg-card shadow-sm">
-      <div className="flex items-center justify-between px-4 pt-3">
-        <p className="text-xs font-black text-ink-soft">きょうの空<span className="ml-1.5 text-[10px] font-bold text-ink-faint">いま {fmtJstTime(now)}</span></p>
-        <button type="button" onClick={() => setOpen((v) => !v)} aria-expanded={open} className="flex max-w-[60%] items-center gap-1 rounded-full border border-line bg-paper px-2.5 py-1 text-[10px] font-bold text-ink-soft active:scale-95">
-          <span aria-hidden>📍</span><span className="truncate">{placeLabel}</span><span aria-hidden className="text-ink-faint">{open ? "▲" : "▼"}</span>
-        </button>
+    <div className="space-y-2">
+      {/* 窓わくの中に、いまの空と町を見せる */}
+      <div className="rounded-[22px] border border-[#E3D6C0] bg-[linear-gradient(180deg,#FFFFFF,#F1E8D8)] p-2 shadow-[0_8px_16px_-10px_rgba(80,55,25,.5)]">
+        <div className="relative overflow-hidden rounded-[15px] shadow-[inset_0_2px_6px_rgba(40,25,10,.35)]">
+          <svg viewBox="0 0 300 150" className="block w-full" role="img" aria-label={`日の出 ${times.rise ? fmtJstTime(times.rise) : "-"}、日の入り ${times.set ? fmtJstTime(times.set) : "-"}。${status}`}>
+            <defs>
+              <linearGradient id="skycard-bg" x1="0" y1="0" x2="0" y2="1">
+                <stop offset="0" stopColor={sky.top} />
+                <stop offset="1" stopColor={sky.bottom} />
+              </linearGradient>
+              <radialGradient id="skycard-glow" cx="0.5" cy="0.5" r="0.5">
+                <stop offset="0" stopColor={up ? "#FFE9A8" : "#FFF6D0"} stopOpacity="0.85" />
+                <stop offset="1" stopColor={up ? "#FFE9A8" : "#FFF6D0"} stopOpacity="0" />
+              </radialGradient>
+              <linearGradient id="skycard-glass" x1="0" y1="0" x2="1" y2="1">
+                <stop offset="0.35" stopColor="#FFFFFF" stopOpacity="0" />
+                <stop offset="0.42" stopColor="#FFFFFF" stopOpacity="0.16" />
+                <stop offset="0.5" stopColor="#FFFFFF" stopOpacity="0" />
+              </linearGradient>
+            </defs>
+            <rect x="0" y="0" width="300" height="150" fill="url(#skycard-bg)" />
+            {/* 星 */}
+            {sky.stars > 0.05 ? STARS.map(([x, y, r], i) => <circle key={i} cx={x} cy={y} r={r} fill="#FFF8DA" opacity={sky.stars * (i % 3 ? 0.65 : 1)} />) : null}
+            {/* 太陽・月がとおる道 */}
+            <path d="M24 112 Q150 -8 276 112" fill="none" stroke="#FFFFFF" strokeOpacity="0.55" strokeWidth="1.6" strokeDasharray="3 5" />
+            {up ? (
+              <g opacity={cloudy ? 0.55 : 1}>
+                <circle cx={ax} cy={ay2} r="26" fill="url(#skycard-glow)" />
+                <circle cx={ax} cy={ay2} r="10" fill={mix("#FFD24A", "#FF9A4A", sky.warm)} />
+              </g>
+            ) : (
+              <g transform="translate(206 34)" opacity={cloudy ? 0.5 : 1}>
+                <circle r="24" fill="url(#skycard-glow)" />
+                <path d={moonIcon(10, moon)} fill="#FFF1B8" />
+              </g>
+            )}
+            {/* 雲（天気に合わせて） */}
+            {cloudy || kind === "partly" ? (
+              <g fill={wet ? ink("#B4BCC8", "#4A5068") : ink("#FFFFFF", "#5A6080")} opacity="0.92">
+                {(kind === "partly" ? CLOUDS.slice(0, 2) : CLOUDS).map(([x, y, s2], i) => (
+                  <g key={i} transform={`translate(${x} ${y}) scale(${s2})`}>
+                    <ellipse cx="0" cy="4" rx="22" ry="8" /><circle cx="-8" cy="-1" r="9" /><circle cx="5" cy="-4" r="11" /><circle cx="15" cy="1" r="7" />
+                  </g>
+                ))}
+              </g>
+            ) : null}
+            {wet ? Array.from({ length: 22 }, (_, i) => <line key={i} x1={(i * 37) % 300} y1={(i * 23) % 90} x2={((i * 37) % 300) - 3} y2={((i * 23) % 90) + 9} stroke="#DCEBFA" strokeOpacity="0.7" strokeWidth="1.3" strokeLinecap="round" />) : null}
+            {kind === "snow" ? Array.from({ length: 26 }, (_, i) => <circle key={i} cx={(i * 41) % 300} cy={(i * 29) % 110} r={1.4 + (i % 3) * 0.5} fill="#FFFFFF" opacity="0.9" />) : null}
+            {/* 遠くの山と町（夜は窓に明かり） */}
+            <path d="M0 112 C 40 92, 70 98, 110 104 C 150 90, 200 92, 240 100 C 265 94, 285 98, 300 96 V150 H0 Z" fill={ink("#A9CC93", "#1E2A44")} />
+            {HOUSES.map(([x, w, h, roof], i) => (
+              <g key={i}>
+                <rect x={x} y={124 - h} width={w} height={h + 4} fill={ink(["#F4E3C3", "#E8C7B4", "#DCE6EE", "#F2D7A6"][i % 4]!, "#161E33")} />
+                <path d={`M${x - 2} ${124 - h} L${x + w / 2} ${124 - h - roof} L${x + w + 2} ${124 - h} Z`} fill={ink(["#C9604A", "#6A8CB8", "#8A6A4A", "#5E9C52"][i % 4]!, "#10162A")} />
+                {dark > 0.55 ? <rect x={x + w / 2 - 2.5} y={124 - h + 4} width="5" height="5" fill="#FFD98A" opacity="0.9" /> : null}
+              </g>
+            ))}
+            <path d="M0 126 C 60 118, 120 124, 170 121 C 220 118, 260 124, 300 120 V150 H0 Z" fill={ink("#8DBF6E", "#121A2E")} />
+            {[38, 92, 248].map((x) => <g key={x} transform={`translate(${x} 122)`}><rect x="-1.5" y="-4" width="3" height="8" fill={ink("#7A5A3A", "#0C1222")} /><circle cy="-9" r="7" fill={ink("#5E9C52", "#0E1626")} /></g>)}
+            <text x="10" y="143" fontSize="9.5" fontWeight="800" fill="#FFFFFF" opacity="0.92">日の出 {times.rise ? fmtJstTime(times.rise) : "-"}</text>
+            <text x="290" y="143" fontSize="9.5" fontWeight="800" fill="#FFFFFF" opacity="0.92" textAnchor="end">日の入り {times.set ? fmtJstTime(times.set) : "-"}</text>
+            <rect x="0" y="0" width="300" height="150" fill="url(#skycard-glass)" />
+          </svg>
+          <div className="absolute inset-x-0 top-0 flex items-start justify-between gap-2 p-2.5">
+            <p className="rounded-full bg-black/20 px-2.5 py-1 text-[11px] font-black text-white backdrop-blur-sm">きょうの空<span className="ml-1.5 text-[10px] font-bold opacity-85">いま {fmtJstTime(now)}</span></p>
+            <button type="button" onClick={() => setOpen((v) => !v)} aria-expanded={open} className="flex max-w-[58%] items-center gap-1 rounded-full bg-white/85 px-2.5 py-1 text-[10px] font-bold text-ink-soft shadow-sm backdrop-blur-sm active:scale-95">
+              <span aria-hidden>📍</span><span className="truncate">{placeLabel}</span><span aria-hidden className="text-ink-faint">{open ? "▲" : "▼"}</span>
+            </button>
+          </div>
+        </div>
+        {/* 窓台 */}
+        <div className="mt-2 flex items-center justify-between gap-2 rounded-[12px] bg-[linear-gradient(180deg,#FBF6EE,#EFE4D2)] px-3 py-2 shadow-[inset_0_1px_0_#fff]">
+          <p className="min-w-0 text-[12px] font-bold text-ink">{status}</p>
+          <div className="flex shrink-0 items-center gap-1">
+            {weather ? (
+              <p className="rounded-full bg-white px-2.5 py-1 text-[10px] font-bold text-ink-soft shadow-sm">
+                {WEATHER_LABEL[weather.kind].icon} {WEATHER_LABEL[weather.kind].label}{weather.temp !== null ? ` ${Math.round(weather.temp)}℃` : ""}
+              </p>
+            ) : null}
+            <p className="rounded-full bg-white px-2.5 py-1 text-[10px] font-bold text-ink-soft shadow-sm">🌙 {moonName(moon)}</p>
+          </div>
+        </div>
       </div>
       {open ? (
-        <div className="mx-3 mt-2 space-y-2 rounded-xl bg-paper-deep p-2.5">
+        <div className="space-y-2 rounded-2xl border border-line bg-card p-3 shadow-sm">
           <button type="button" onClick={useHere} disabled={locating} className="w-full rounded-full bg-leaf-deep py-2 text-[12px] font-black text-white shadow-sm active:scale-[.98] disabled:opacity-60">
             {locating ? "現在地をさがしています…" : "📍 現在地を使う"}
           </button>
@@ -81,47 +162,19 @@ export function SkyCard({ now, place, onPlace, weather = null }: { now: Date; pl
             </select>
           </label>
           {geoError ? <p className="text-[10px] font-bold text-[#C0502E]">{geoError}</p> : null}
-          <p className="text-[10px] leading-relaxed text-ink-faint">場所はこの端末にだけ保存され、約10kmの細かさに丸めて空の計算だけに使います。時刻はいつも日本時間です。</p>
+          <p className="text-[10px] leading-relaxed text-ink-faint">場所はこの端末にだけ保存され、約10kmの細かさに丸めて空と天気の計算だけに使います。時刻はいつも日本時間です。</p>
         </div>
       ) : null}
-      <svg viewBox="0 0 300 96" className="block w-full" role="img" aria-label={`日の出 ${times.rise ? fmtJstTime(times.rise) : "-"}、日の入り ${times.set ? fmtJstTime(times.set) : "-"}。${status}`}>
-        <defs>
-          <linearGradient id="skycard-bg" x1="0" y1="0" x2="0" y2="1">
-            <stop offset="0" stopColor={sky.top} />
-            <stop offset="1" stopColor={sky.bottom} />
-          </linearGradient>
-        </defs>
-        <rect x="0" y="0" width="300" height="96" fill="url(#skycard-bg)" opacity="0.35" />
-        <line x1="12" y1="78" x2="288" y2="78" stroke="#8A7A68" strokeOpacity="0.35" strokeWidth="1.5" />
-        <path d="M24 78 Q150 -38 276 78" fill="none" stroke="#E0A55A" strokeWidth="2" strokeDasharray="4 4" opacity="0.8" />
-        {up ? (
-          <g>
-            <circle cx={ax} cy={ay} r="13" fill="#FFD36A" opacity="0.35" />
-            <circle cx={ax} cy={ay} r="8" fill="#FFB938" />
-          </g>
-        ) : (
-          <g transform="translate(150 34)">
-            <circle r="11" fill="#2B3266" opacity="0.15" />
-            <path d={moonIcon(9, moon)} fill="#F2C94C" />
-          </g>
-        )}
-        <text x="8" y="92" textAnchor="start" fontSize="9" fontWeight="800" fill="#6A5A48">日の出 {times.rise ? fmtJstTime(times.rise) : "-"}</text>
-        <text x="292" y="92" textAnchor="end" fontSize="9" fontWeight="800" fill="#6A5A48">日の入り {times.set ? fmtJstTime(times.set) : "-"}</text>
-      </svg>
-      <div className="flex items-center justify-between gap-2 px-4 pb-3 pt-1">
-        <p className="text-[12px] font-bold text-ink">{status}</p>
-        <div className="flex shrink-0 items-center gap-1">
-          {weather ? (
-            <p className="rounded-full bg-paper-deep px-2.5 py-1 text-[10px] font-bold text-ink-soft">
-              {WEATHER_LABEL[weather.kind].icon} {WEATHER_LABEL[weather.kind].label}{weather.temp !== null ? ` ${Math.round(weather.temp)}℃` : ""}
-            </p>
-          ) : null}
-          <p className="rounded-full bg-paper-deep px-2.5 py-1 text-[10px] font-bold text-ink-soft">🌙 {moonName(moon)}</p>
-        </div>
-      </div>
     </div>
   );
 }
+
+const STARS: [number, number, number][] = [[20, 18, 1.2], [48, 40, 0.9], [76, 14, 1.4], [104, 52, 0.8], [132, 24, 1.1], [168, 10, 0.9], [190, 58, 1.2], [232, 18, 1], [258, 48, 1.3], [284, 26, 0.9], [60, 70, 0.8], [150, 68, 1], [270, 78, 0.8]];
+const CLOUDS: [number, number, number][] = [[70, 40, 1.1], [190, 60, 0.9], [250, 30, 1.2], [120, 22, 0.8], [30, 70, 0.9]];
+/** 町の家（x, 幅, 高さ, 屋根の高さ） */
+const HOUSES: [number, number, number, number][] = [[18, 16, 12, 7], [52, 12, 16, 6], [130, 18, 10, 8], [158, 12, 14, 6], [206, 16, 12, 7], [262, 14, 15, 6]];
+const hexRgb = (h: string) => [1, 3, 5].map((i) => parseInt(h.slice(i, i + 2), 16));
+const mix = (a: string, b: string, t: number) => `#${hexRgb(a).map((v, i) => Math.round(v + (hexRgb(b)[i]! - v) * Math.max(0, Math.min(1, t))).toString(16).padStart(2, "0")).join("")}`;
 
 /** 昼間の天気のひとこと */
 function weatherDay(w: RoomWeather | null): string {

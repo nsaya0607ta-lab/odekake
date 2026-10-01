@@ -56,7 +56,7 @@ import { composeRoomSnapshot } from "./room-snapshot";
 import { skyAt } from "@/lib/room/sun";
 import { parseRoomWeather, withWeather, type RoomWeather } from "@/lib/room/weather";
 import { dayPhaseOf, lampsOn, ROOM_STAGE, RoomLighting, RoomScene, ThemeSwatch, type DayPhase } from "./room-scene";
-import { DEFAULT_PLACE, SkyCard, type RoomPlace } from "./sky-card";
+import { DEFAULT_PLACE, prefNameOf, SkyCard, type RoomPlace } from "./sky-card";
 
 type Tab = DecorKind | "theme";
 type ItemFilter = "all" | "toy" | "food" | "interior" | "other" | "sushi";
@@ -100,8 +100,8 @@ function widthOf(entry: DecorEntry, p: Placement): number {
 /** 壁に掛けるものを置く候補（窓・時計・棚をさけた場所） */
 const WALL_SPOTS = [[48, 23], [48, 41], [21, 47], [60, 12], [91, 12], [35, 48], [8, 47]] as const;
 /** 壁で、掛けるものを置きたくない場所（窓・時計・棚・ライト）。[x0, y0, x1, y1] */
-/** 壁に物を掛けにくいところ（時計・棚・天井のライト）。窓は部屋の形ごとに足す */
-const WALL_BLOCKS = [[67, 2, 85, 22], [56, 21, 96, 46], [43, 0, 57, 12]] as const;
+/** 壁に物を掛けにくいところ（時計・棚・天井のライト・お天気ボード）。窓は部屋の形ごとに足す */
+const WALL_BLOCKS = [[67, 2, 85, 22], [56, 21, 96, 46], [43, 0, 57, 12], [82, 0, 95, 16]] as const;
 
 /** 壁に掛けるものの置き場所：窓などに重ならず、すでに掛けてあるものからいちばん離れたところ */
 function freeWallSpot(taken: readonly { x: number; y: number }[], style: RoomStyle): [number, number] {
@@ -594,7 +594,7 @@ export function MyRoom({ entries, initialLayout, serverReady, dogSkin, dogName, 
         >
           {/* 部屋（奥の壁から手前の床まで）。まわりの天井・横の壁・手前の床は背景の SVG がはみ出して描く */}
           <div ref={roomRef} className="absolute" style={{ left: `${ROOM_STAGE.left}%`, top: `${ROOM_STAGE.top}%`, width: `${ROOM_STAGE.width}%`, height: `${ROOM_STAGE.height}%` }}>
-          <RoomScene theme={layout.theme} now={now} at={place} weather={weather} />
+          <RoomScene theme={layout.theme} now={now} at={place} weather={weather} placeName={prefNameOf(place.pref).replace(/(都|府|県)$/, "")} />
 
           {layout.items.map((p) => {
             const entry = entryByKey.get(p.key);
@@ -742,17 +742,35 @@ export function MyRoom({ entries, initialLayout, serverReady, dogSkin, dogName, 
           </>
         ) : (
           <section className="space-y-3 px-4 pt-4">
-            <div className="grid grid-cols-4 gap-2">
-              {([["item", "アイテム", "🧸"], ["photo", "写真", "🖼️"], ["trophy", "トロフィー", "🏆"], ["pennant", "ペナント", "🚩"]] as const).map(([kind, label, icon]) => {
-                const n = layout.items.filter((p) => entryByKey.get(p.key)?.kind === kind).length;
-                return (
-                  <div key={kind} className="rounded-2xl border border-line bg-card px-1 py-2 text-center shadow-sm">
-                    <div className="text-lg leading-none">{icon}</div>
-                    <div className="mt-1 text-[15px] font-black tabular-nums">{n}<span className="text-[10px] font-bold text-ink-faint">/{counts[kind]}</span></div>
-                    <div className="text-[10px] font-bold text-ink-soft">{label}</div>
-                  </div>
-                );
-              })}
+            {/* 飾ったものの数：木の飾り棚に見立てる。押すと、もようがえのそのタブを開く */}
+            <div className="rounded-[22px] bg-[linear-gradient(180deg,#D9A56A,#A86E3C)] p-2 shadow-[0_8px_16px_-10px_rgba(80,50,20,.6)]">
+              <div className="mb-1.5 flex items-center justify-center">
+                <p className="rounded-md bg-[linear-gradient(180deg,#F2D58A,#C99A3C)] px-3 py-0.5 text-[10px] font-black tracking-wider text-[#5A3A14] shadow-[0_1px_0_rgba(255,255,255,.5)_inset,0_1px_2px_rgba(60,35,10,.4)]">{dogName}のコレクション</p>
+              </div>
+              <div className="grid grid-cols-4 gap-1.5">
+                {([["item", "アイテム", "🧸"], ["photo", "写真", "🖼️"], ["trophy", "トロフィー", "🏆"], ["pennant", "ペナント", "🚩"]] as const).map(([kind, label, icon]) => {
+                  const n = layout.items.filter((p) => entryByKey.get(p.key)?.kind === kind).length;
+                  const total = counts[kind];
+                  return (
+                    <button
+                      key={kind}
+                      type="button"
+                      onClick={() => { setEditing(true); setTab(kind); }}
+                      aria-label={`${label}を飾る（${n}/${total}）`}
+                      className="relative overflow-hidden rounded-[13px] bg-[linear-gradient(180deg,#F6E8CF,#EAD5B3)] px-1 pb-2 pt-2.5 text-center shadow-[inset_0_7px_9px_-4px_rgba(70,40,15,.45),inset_0_-2px_0_rgba(255,255,255,.4)] active:scale-[.97]"
+                    >
+                      <div className="text-[22px] leading-none drop-shadow-[0_3px_2px_rgba(70,40,15,.35)]">{icon}</div>
+                      {/* 棚板 */}
+                      <div className="mx-auto mt-1 h-[3px] w-[80%] rounded-full bg-[#B98552] shadow-[0_1px_0_rgba(255,255,255,.5)]" />
+                      <div className="mt-1 text-[14px] font-black tabular-nums text-[#4E3018]">{n}<span className="text-[10px] font-bold text-[#8A6A4A]">/{total}</span></div>
+                      <div className="text-[10px] font-bold text-[#7A5A3A]">{label}</div>
+                      <div className="mx-auto mt-1 h-1 w-[78%] overflow-hidden rounded-full bg-[#D9C3A0]">
+                        <div className="h-full rounded-full bg-leaf-deep" style={{ width: `${total ? Math.min(100, (n / total) * 100) : 0}%` }} />
+                      </div>
+                    </button>
+                  );
+                })}
+              </div>
             </div>
             <SkyCard now={now} place={place} onPlace={changePlace} weather={weather} />
             <ul className="space-y-1.5 rounded-2xl border border-line bg-card px-4 py-3 text-[12px] leading-relaxed text-ink-soft shadow-sm">
