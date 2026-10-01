@@ -55,24 +55,43 @@ export type Placement = {
   frame?: FrameStyle;
 };
 
-export const WALLPAPERS = ["cream", "mint-stripe", "pink-gingham", "blue-dots", "flower", "night-stars", "wood-panel"] as const;
-export const FLOORS = ["wood-light", "wood-dark", "tatami", "checker", "carpet"] as const;
+export const WALLPAPERS = ["cream", "mint-stripe", "pink-gingham", "blue-dots", "flower", "night-stars", "wood-panel", "log", "brick", "shiplap", "plaster", "fog-blue"] as const;
+export const FLOORS = ["wood-light", "wood-dark", "tatami", "checker", "carpet", "herringbone", "white-wood"] as const;
 export const CURTAINS = ["leaf", "sakura", "sky", "lemon", "berry"] as const;
 export const RUGS = ["none", "round-cream", "oval-pink", "rect-green", "round-navy"] as const;
 export const WALL_DECOS = ["none", "garland", "lights", "stars"] as const;
+/**
+ * 部屋の雰囲気（天井・はり・柱・腰壁・照明・色味など、部屋のつくりそのもの）。
+ * 選ぶと、合う壁紙・床・窓などもまとめて切りかわる（そのあと個別に変えてもよい）
+ */
+export const ROOM_KINDS = ["cozy", "log", "wa", "nordic", "cafe", "seaside", "starry"] as const;
+/** 窓の形。どれも窓は必ず1つある */
+export const ROOM_STYLES = ["standard", "arch", "bay", "round", "attic", "shoji", "french"] as const;
 export type Wallpaper = (typeof WALLPAPERS)[number];
 export type Floor = (typeof FLOORS)[number];
 export type Curtain = (typeof CURTAINS)[number];
 export type Rug = (typeof RUGS)[number];
 export type WallDeco = (typeof WALL_DECOS)[number];
-export type RoomTheme = { wall: Wallpaper; floor: Floor; curtain: Curtain; rug: Rug; deco: WallDeco };
+export type RoomStyle = (typeof ROOM_STYLES)[number];
+export type RoomKind = (typeof ROOM_KINDS)[number];
+export type RoomTheme = { wall: Wallpaper; floor: Floor; curtain: Curtain; rug: Rug; deco: WallDeco; style: RoomStyle; room: RoomKind };
 
 /** 端末から選んで、おへや用にアップロードした写真（Storage の users/{自分}/room/ に置く） */
 export type RoomPhoto = { id: string; path: string; date: string; title: string };
 
 export type RoomLayout = { theme: RoomTheme; items: Placement[]; photos: RoomPhoto[] };
 
-export const DEFAULT_THEME: RoomTheme = { wall: "cream", floor: "wood-light", curtain: "leaf", rug: "round-cream", deco: "garland" };
+export const DEFAULT_THEME: RoomTheme = { wall: "cream", floor: "wood-light", curtain: "leaf", rug: "round-cream", deco: "garland", style: "standard", room: "cozy" };
+/** 部屋の雰囲気を選んだときに、いっしょに切りかえる壁紙・床・窓など */
+export const ROOM_PRESETS: Record<RoomKind, RoomTheme> = {
+  cozy: DEFAULT_THEME,
+  log: { room: "log", wall: "log", floor: "wood-dark", curtain: "berry", rug: "rect-green", deco: "none", style: "standard" },
+  wa: { room: "wa", wall: "plaster", floor: "tatami", curtain: "leaf", rug: "none", deco: "none", style: "shoji" },
+  nordic: { room: "nordic", wall: "fog-blue", floor: "white-wood", curtain: "sky", rug: "round-cream", deco: "garland", style: "french" },
+  cafe: { room: "cafe", wall: "brick", floor: "herringbone", curtain: "lemon", rug: "rect-green", deco: "lights", style: "arch" },
+  seaside: { room: "seaside", wall: "shiplap", floor: "wood-light", curtain: "sky", rug: "round-navy", deco: "none", style: "round" },
+  starry: { room: "starry", wall: "night-stars", floor: "carpet", curtain: "berry", rug: "round-navy", deco: "stars", style: "attic" },
+};
 export const ROOM_MAX_ITEMS = 120;
 /** アップロードして飾れる写真の数 */
 export const ROOM_MAX_PHOTOS = 40;
@@ -96,6 +115,7 @@ export const ROOM = {
     { y: 27, x0: 58, x1: 93 },
     { y: 42, x0: 58, x1: 93 },
   ],
+  /** いつもの部屋の窓（ほかの形は windowOf で） */
   window: { x0: 7, x1: 37, y0: 9, y1: 38 },
 } as const;
 
@@ -142,6 +162,8 @@ export function parseRoomLayout(value: unknown, validKeys?: ReadonlySet<string>)
     curtain: oneOf(CURTAINS, t.curtain, DEFAULT_THEME.curtain),
     rug: oneOf(RUGS, t.rug, DEFAULT_THEME.rug),
     deco: oneOf(WALL_DECOS, t.deco, "none"),
+    style: oneOf(ROOM_STYLES, t.style, "standard"),
+    room: oneOf(ROOM_KINDS, t.room, "cozy"),
   };
   const rawPhotos = Array.isArray(root.photos) ? root.photos.slice(0, ROOM_MAX_PHOTOS) : [];
   const photos = rawPhotos.flatMap((raw): RoomPhoto[] => {
@@ -200,3 +222,18 @@ export function settle(kind: DecorKind, x: number, y: number): { x: number; y: n
   if (shelf) return { x: nx, y: shelf.y };
   return { x: nx, y: clamp(y, ROOM.floorTop, ROOM.floorBottom) };
 }
+
+/**
+ * 部屋の形ごとの窓（外が見える範囲の外わく。部屋の %）。棚と時計のある右がわにはかからないようにしている。
+ * 大きな窓（掃き出し窓）は幅木の上まで、和室の障子は左半分だけ開いている
+ */
+const ROOM_WINDOWS: Record<RoomStyle, { x0: number; x1: number; y0: number; y1: number }> = {
+  standard: ROOM.window,
+  arch: { x0: 10, x1: 34, y0: 7, y1: 41 },
+  bay: { x0: 8, x1: 40, y0: 12, y1: 37 },
+  round: { x0: 11, x1: 33, y0: 13.2, y1: 32.8 },
+  attic: { x0: 12, x1: 32, y0: 14, y1: 40 },
+  shoji: { x0: 6, x1: 37, y0: 10, y1: 39 },
+  french: { x0: 8, x1: 31, y0: 8, y1: ROOM.horizon - 2.1 },
+};
+export const windowOf = (style: RoomStyle | undefined) => ROOM_WINDOWS[style ?? "standard"];

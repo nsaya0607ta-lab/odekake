@@ -1,5 +1,5 @@
 /** わんこのおへやの、選べる壁紙・床・カーテン・ラグの名前と色 */
-import type { Curtain, Floor, Rug, Wallpaper } from "./types";
+import type { Curtain, Floor, RoomKind, Rug, Wallpaper } from "./types";
 
 export const WALLPAPER_STYLES: Record<Wallpaper, { label: string; base: string; ink: string }> = {
   cream: { label: "クリーム", base: "#FBF3E4", ink: "#EFE2C9" },
@@ -9,6 +9,11 @@ export const WALLPAPER_STYLES: Record<Wallpaper, { label: string; base: string; 
   flower: { label: "小花", base: "#FFF8EC", ink: "#F2B8A8" },
   "night-stars": { label: "星空", base: "#2E3566", ink: "#F6E7A8" },
   "wood-panel": { label: "木の壁", base: "#E9CFA6", ink: "#D6B588" },
+  log: { label: "丸太", base: "#C8935C", ink: "#9A6838" },
+  brick: { label: "レンガ", base: "#E9DCCB", ink: "#B8604A" },
+  shiplap: { label: "白い板ばり", base: "#F3F7FA", ink: "#C9D8E4" },
+  plaster: { label: "しっくい", base: "#EFE6D2", ink: "#DCCFB2" },
+  "fog-blue": { label: "グレーブルー", base: "#DDE6EC", ink: "#C9D5DD" },
 };
 
 export const FLOOR_STYLES: Record<Floor, { label: string; base: string; line: string }> = {
@@ -17,6 +22,19 @@ export const FLOOR_STYLES: Record<Floor, { label: string; base: string; line: st
   tatami: { label: "たたみ", base: "#D7D59A", line: "#B9B774" },
   checker: { label: "タイル", base: "#F4EFE6", line: "#D9CDB8" },
   carpet: { label: "じゅうたん", base: "#C7B4D9", line: "#B49FC9" },
+  herringbone: { label: "ヘリンボーン", base: "#B9875A", line: "#8E6038" },
+  "white-wood": { label: "白い木", base: "#F1E6D6", line: "#DCCDB6" },
+};
+
+/** 部屋の雰囲気の名前と、天井・幅木の色、部屋全体にうすくかける色 */
+export const ROOM_KIND_STYLES: Record<RoomKind, { label: string; ceiling: string; baseboard: string; tint: string | null; tintOpacity: number }> = {
+  cozy: { label: "いつもの", ceiling: "#F1E9DA", baseboard: "#FBF6EC", tint: null, tintOpacity: 0 },
+  log: { label: "ログハウス", ceiling: "#B07A45", baseboard: "#7A4E2A", tint: "#FFB060", tintOpacity: 0.06 },
+  wa: { label: "和モダン", ceiling: "#D9B98E", baseboard: "#5A3A1C", tint: "#E8D4A0", tintOpacity: 0.04 },
+  nordic: { label: "北欧", ceiling: "#FFFFFF", baseboard: "#FFFFFF", tint: "#DDEBFF", tintOpacity: 0.05 },
+  cafe: { label: "カフェ", ceiling: "#3A3632", baseboard: "#3A3632", tint: "#FF9A40", tintOpacity: 0.06 },
+  seaside: { label: "海辺の家", ceiling: "#FFFFFF", baseboard: "#4A7FB0", tint: "#9ED8FF", tintOpacity: 0.05 },
+  starry: { label: "星空のへや", ceiling: "#1E2450", baseboard: "#2E3566", tint: "#6A5ACD", tintOpacity: 0.07 },
 };
 
 export const CURTAIN_STYLES: Record<Curtain, { label: string; color: string }> = {
