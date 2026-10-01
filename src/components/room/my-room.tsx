@@ -858,6 +858,7 @@ export function MyRoom({ entries, initialLayout, serverReady, dogSkin, dogName, 
               height={`max(220px, calc(100svh - 3.5rem - 1px - min(100vw, 32rem) * ${ROOM.aspect} - 2.6rem))`}
               friends={guests?.friends}
               likes={guests?.mail.filter((m) => m.kind === "like").length ?? 0}
+              onEdit={() => { setEditing(true); window.scrollTo({ top: 0, behavior: "smooth" }); }}
             />
             <ul className="space-y-1.5 rounded-2xl border border-line bg-card px-4 py-3 text-[12px] leading-relaxed text-ink-soft shadow-sm">
               <li>🐾 {dogName}をタップすると、なでられます</li>

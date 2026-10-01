@@ -83,7 +83,7 @@ function weekOf(history: StepDay[], today: string, todaySteps: number) {
 
 export type SkyFriend = { id: string; name: string; avatar: string | null };
 
-export function SkyCard({ now, place, onPlace, weather = null, steps, history, height, friends, likes = 0 }: {
+export function SkyCard({ now, place, onPlace, weather = null, steps, history, height, friends, likes = 0, onEdit }: {
   now: Date; place: RoomPlace; onPlace: (p: RoomPlace) => void; weather?: RoomWeather | null;
   /** 上の窓の高さ（CSS）。部屋の下の、画面ののこりにぴったり合わせる */
   height?: string;
@@ -91,6 +91,8 @@ export function SkyCard({ now, place, onPlace, weather = null, steps, history, h
   friends?: SkyFriend[];
   /** 自分の部屋に届いた「いいね」の数 */
   likes?: number;
+  /** 窓台の左はしの「もようがえ」ボタン */
+  onEdit?: () => void;
   /** きょうの歩数（渡したときだけ、手前の丘におさんぽの道を描く） */
   steps?: TodaySteps;
   /** 直近の日ごとの歩数（今週のグラフと連続記録） */
@@ -262,18 +264,26 @@ export function SkyCard({ now, place, onPlace, weather = null, steps, history, h
             </button>
           </div>
         </div>
-        {/* 窓台：きょうの歩数とフレンドのおへや */}
-        <div className="mt-2 flex shrink-0 items-center gap-2 rounded-[13px] bg-[linear-gradient(180deg,#FBF6EE,#EFE4D2)] p-1.5 pl-2.5 shadow-[inset_0_1px_0_#fff]">
+        {/* 窓台：もようがえ・きょうの歩数・フレンドのおへや */}
+        <div className={`mt-2 flex shrink-0 items-center gap-2 rounded-[13px] bg-[linear-gradient(180deg,#FBF6EE,#EFE4D2)] p-1.5 shadow-[inset_0_1px_0_#fff] ${onEdit ? "" : "pl-2.5"}`}>
+          {onEdit ? (
+            <button type="button" onClick={onEdit} className="flex shrink-0 flex-col items-center justify-center gap-0.5 self-stretch rounded-[11px] border border-leaf/30 bg-white px-2 py-1 text-leaf-deep shadow-sm active:scale-95">
+              <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M4 12V9a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2v3" /><path d="M3 12h18v4H3z" /><path d="M5 16v2M19 16v2" />
+              </svg>
+              <span className="text-[9px] font-black leading-none">もようがえ</span>
+            </button>
+          ) : null}
           {stepCount !== null ? (
             <div className="min-w-0 flex-1" aria-live="polite">
               <p className="flex items-baseline gap-1 leading-none text-ink">
                 <span aria-hidden className="text-[13px]">👣</span>
                 <span className="text-[20px] font-black tabular-nums">{stepCount.toLocaleString("ja-JP")}</span>
                 <span className="text-[10px] font-bold text-ink-soft">歩</span>
-                {stepWeek && stepWeek.streak >= 2 ? <span className="ml-1 rounded-full bg-[linear-gradient(90deg,#FF9A3C,#FF5E3A)] px-1.5 py-0.5 text-[9px] font-black text-white">🔥{stepWeek.streak}日</span> : null}
+                {stepWeek && stepWeek.streak >= 2 ? <span className="ml-0.5 whitespace-nowrap rounded-full bg-[linear-gradient(90deg,#FF9A3C,#FF5E3A)] px-1.5 py-0.5 text-[9px] font-black text-white">🔥{stepWeek.streak}日</span> : null}
               </p>
               <p className="mt-1 truncate text-[10px] font-bold text-ink-faint">
-                {nextGoal ? <>🚩 {nextGoal.steps.toLocaleString("ja-JP")}歩まで あと<span className="text-leaf-deep">{(nextGoal.steps - stepCount).toLocaleString("ja-JP")}</span>歩</> : <>🎉 10,000歩 たっせい！</>}
+                {nextGoal ? <>🚩{nextGoal.steps / 1000}kまで あと<span className="text-leaf-deep">{(nextGoal.steps - stepCount).toLocaleString("ja-JP")}</span>歩</> : <>🎉 10,000歩 たっせい！</>}
               </p>
             </div>
           ) : (
@@ -282,14 +292,14 @@ export function SkyCard({ now, place, onPlace, weather = null, steps, history, h
           {friends ? (
             <button type="button" onClick={() => setFriendsOpen(true)} aria-haspopup="dialog" className="relative flex shrink-0 items-center gap-2 rounded-[11px] bg-leaf-deep py-1.5 pl-1.5 pr-3 text-white shadow-[0_3px_8px_-3px_rgba(60,90,40,.7)] active:scale-95">
               <span className="flex -space-x-2" aria-hidden>
-                {(friends.length ? friends.slice(0, 3) : [{ id: "door", name: "🚪", avatar: null }]).map((f) => (
+                {(friends.length ? friends.slice(0, 2) : [{ id: "door", name: "🚪", avatar: null }]).map((f) => (
                   <span key={f.id} className="flex h-7 w-7 items-center justify-center overflow-hidden rounded-full bg-[#EAF3E2] text-[11px] font-black text-leaf-deep ring-2 ring-leaf-deep">
                     {/* eslint-disable-next-line @next/next/no-img-element */}
                     {f.avatar ? <img src={f.avatar} alt="" className="h-full w-full object-cover" /> : [...f.name][0]}
                   </span>
                 ))}
               </span>
-              <span className="text-left text-[11px] font-black leading-tight">フレンドの<br />おへやへ</span>
+              <span className="whitespace-nowrap text-left text-[11px] font-black leading-tight">フレンドの<br />おへやへ</span>
               {likes > 0 ? <span className="absolute -right-1.5 -top-1.5 rounded-full bg-[#FF6F91] px-1.5 py-0.5 text-[9px] font-black leading-none text-white shadow ring-2 ring-white">♥{likes}</span> : null}
             </button>
           ) : null}
