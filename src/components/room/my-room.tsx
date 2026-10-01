@@ -63,6 +63,7 @@ import { RoomDog } from "./room-dog";
 import { composeRoomSnapshot } from "./room-snapshot";
 import { skyAt } from "@/lib/room/sun";
 import { parseRoomWeather, withWeather, type RoomWeather } from "@/lib/room/weather";
+import { EVENT_FLOOR_Y, EventFloor, EventFront } from "./room-events";
 import { dayPhaseOf, FixtureVisual, fixtureSize, lampsOn, ROOM_STAGE, RoomLighting, RoomScene, ThemeSwatch, windowRectOf, type DayPhase } from "./room-scene";
 import { DEFAULT_PLACE, locateHere, placeShortName, SkyCard, type RoomPlace } from "./sky-card";
 
@@ -271,6 +272,8 @@ export function MyRoom({ entries, initialLayout, serverReady, dogSkin, dogName, 
       return cur[id] === fx ? cur : { ...cur, [id]: fx };
     });
   }, []);
+  /** いまの行事（もようがえでオフにしていれば null） */
+  const roomEvent = layout.theme.events === false ? null : roomEventOf(now)?.id ?? null;
   const lightsOn = useMemo(() => lampsOn(withWeather(skyAt(now, place), weather)), [now, place, weather]);
   /** 犬が寝る時間（日本時間の21時〜6時） */
   const sleepy = useMemo(() => { const h = Number(new Intl.DateTimeFormat("en-US", { timeZone: "Asia/Tokyo", hour: "numeric", hourCycle: "h23" }).format(now)); return h >= 21 || h < 6; }, [now]);
@@ -717,8 +720,19 @@ export function MyRoom({ entries, initialLayout, serverReady, dogSkin, dogName, 
           })}
 
           <RoomDog skin={dogSkin} phase={phase} sleepy={sleepy} lines={dogLines} quiet={editing} places={dogPlaces} weather={weather?.kind ?? null} onFx={onFurnitureFx} />
+          {/* 行事のもの（部屋の左右のすみ）。置いたものと同じく、奥ほど下に重なる */}
+          {roomEvent ? (["L", "R"] as const).map((side) => (
+            <div key={side} className="pointer-events-none absolute inset-0" style={{ zIndex: 300 + Math.round(EVENT_FLOOR_Y[side] * 10) }} data-event-layer>
+              <EventFloor event={roomEvent} side={side} lit={lightsOn} />
+            </div>
+          )) : null}
+          {roomEvent ? (
+            <div className="pointer-events-none absolute inset-0" style={{ zIndex: 1990 }}>
+              <EventFront event={roomEvent} lit={lightsOn} />
+            </div>
+          ) : null}
           <div className="pointer-events-none absolute inset-0" style={{ zIndex: 2000 }}>
-            <RoomLighting now={now} lamps={lampLights} at={place} weather={weather} room={layout.theme.room} />
+            <RoomLighting now={now} lamps={lampLights} at={place} weather={weather} room={layout.theme.room} event={roomEvent} />
           </div>
           {peek ? (
             <span className="room-bubble pointer-events-none absolute w-max max-w-[12rem] -translate-x-1/2 -translate-y-full rounded-xl bg-ink px-2.5 py-1 text-[10px] font-bold text-white shadow" style={{ left: `${clamp(peek.x, 18, 82)}%`, top: `${Math.max(4, peek.y - 0.5)}%`, zIndex: 2600 }}>{peek.text}</span>
