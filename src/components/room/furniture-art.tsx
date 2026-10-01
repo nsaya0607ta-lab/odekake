@@ -39,65 +39,136 @@ function Blur() {
   return <filter id="fa-blur" x="-30%" y="-80%" width="160%" height="260%"><feGaussianBlur stdDeviation="3.2" /></filter>;
 }
 
+/** 背もたれの置きクッション（ふっくらした四角） */
+const backPillow = (x0: number, x1: number) => {
+  const m = (x0 + x1) / 2;
+  return `M${x0 + 7} 31 Q${x0 + 1} 21 ${x0 + 15} 20 Q${m} 15 ${x1 - 15} 20 Q${x1 - 1} 21 ${x1 - 7} 31 Q${x1 + 2} 60 ${x1 - 5} 90 Q${m} 96 ${x0 + 5} 90 Q${x0 - 2} 60 ${x0 + 7} 31 Z`;
+};
+
 function Sofa({ u, a11y }: P) {
   const g = (n: string) => `${u}-${n}`;
+  const seats: [number, number][] = [[40, 131], [129, 220]];
   return (
     <svg viewBox="0 0 260 150" className={SVG_CLASS} {...a11y}>
       <defs>
         <Blur />
-        <linearGradient id={g("back")} x1="0" y1="0" x2="0" y2="1"><stop offset="0" stopColor="#E9A089" /><stop offset="1" stopColor="#C46A55" /></linearGradient>
-        <linearGradient id={g("cush")} x1="0" y1="0" x2="0" y2="1"><stop offset="0" stopColor="#F3B39C" /><stop offset="0.6" stopColor="#E28F77" /><stop offset="1" stopColor="#CF755F" /></linearGradient>
-        <linearGradient id={g("seat")} x1="0" y1="0" x2="0" y2="1"><stop offset="0" stopColor="#F6BBA4" /><stop offset="1" stopColor="#E5927A" /></linearGradient>
-        <linearGradient id={g("front")} x1="0" y1="0" x2="0" y2="1"><stop offset="0" stopColor="#D47A63" /><stop offset="1" stopColor="#A9533F" /></linearGradient>
-        <linearGradient id={g("arm")} x1="0" y1="0" x2="1" y2="0"><stop offset="0" stopColor="#E59A82" /><stop offset="1" stopColor="#B65B46" /></linearGradient>
-        <linearGradient id={g("leg")} x1="0" y1="0" x2="1" y2="0"><stop offset="0" stopColor="#9A6338" /><stop offset="1" stopColor="#5E3A1E" /></linearGradient>
-        <linearGradient id={g("pil")} x1="0" y1="0" x2="1" y2="1"><stop offset="0" stopColor="#FBE2A2" /><stop offset="1" stopColor="#E3B85A" /></linearGradient>
-        <pattern id={g("knit")} width="8" height="8" patternUnits="userSpaceOnUse"><path d="M0 4 q2 -3 4 0 t4 0" stroke="#FFFFFF" strokeOpacity="0.35" fill="none" strokeWidth="1.2" /></pattern>
+        {/* ベルベットの毛羽（細かいざらつき） */}
+        <filter id={g("fabric")} x="0" y="0" width="100%" height="100%">
+          <feTurbulence type="fractalNoise" baseFrequency="1.4" numOctaves="2" seed="3" result="n" />
+          <feColorMatrix in="n" type="matrix" values="0 0 0 0 0.25  0 0 0 0 0.12  0 0 0 0 0.08  0 0 0 0.22 0" result="a" />
+          <feComposite in="a" in2="SourceAlpha" operator="in" result="t" />
+          <feMerge><feMergeNode in="SourceGraphic" /><feMergeNode in="t" /></feMerge>
+        </filter>
+        <linearGradient id={g("frame")} x1="0" y1="0" x2="0" y2="1"><stop offset="0" stopColor="#D98A72" /><stop offset="1" stopColor="#A85540" /></linearGradient>
+        <radialGradient id={g("pillow")} cx="0.38" cy="0.3" r="0.85"><stop offset="0" stopColor="#F7BDA6" /><stop offset="0.55" stopColor="#E3907A" /><stop offset="1" stopColor="#B9604B" /></radialGradient>
+        <linearGradient id={g("seatTop")} x1="0" y1="0" x2="0" y2="1"><stop offset="0" stopColor="#E99A83" /><stop offset="1" stopColor="#F6B9A2" /></linearGradient>
+        <linearGradient id={g("seatFront")} x1="0" y1="0" x2="0" y2="1"><stop offset="0" stopColor="#E1907A" /><stop offset="0.7" stopColor="#C76E58" /><stop offset="1" stopColor="#A9533F" /></linearGradient>
+        <linearGradient id={g("base")} x1="0" y1="0" x2="0" y2="1"><stop offset="0" stopColor="#B9604B" /><stop offset="1" stopColor="#8A4030" /></linearGradient>
+        <linearGradient id={g("armL")} x1="0" y1="0" x2="1" y2="0"><stop offset="0" stopColor="#F2A98F" /><stop offset="0.6" stopColor="#D98069" /><stop offset="1" stopColor="#B65B46" /></linearGradient>
+        <linearGradient id={g("armR")} x1="0" y1="0" x2="1" y2="0"><stop offset="0" stopColor="#D47A63" /><stop offset="0.5" stopColor="#BF6650" /><stop offset="1" stopColor="#97483A" /></linearGradient>
+        <radialGradient id={g("scrollL")} cx="0.35" cy="0.35" r="0.7"><stop offset="0" stopColor="#F9C3AE" /><stop offset="1" stopColor="#D27D66" /></radialGradient>
+        <radialGradient id={g("scrollR")} cx="0.35" cy="0.35" r="0.7"><stop offset="0" stopColor="#E59C85" /><stop offset="1" stopColor="#B05A45" /></radialGradient>
+        <linearGradient id={g("sheen")} x1="0" y1="0" x2="1" y2="0.4"><stop offset="0" stopColor="#FFFFFF" stopOpacity="0.16" /><stop offset="0.4" stopColor="#FFFFFF" stopOpacity="0" /><stop offset="1" stopColor="#3A1008" stopOpacity="0.14" /></linearGradient>
+        <linearGradient id={g("ao")} x1="0" y1="0" x2="0" y2="1"><stop offset="0" stopColor="#5A2418" stopOpacity="0.42" /><stop offset="1" stopColor="#5A2418" stopOpacity="0" /></linearGradient>
+        <linearGradient id={g("leg")} x1="0" y1="0" x2="1" y2="0"><stop offset="0" stopColor="#B07A45" /><stop offset="1" stopColor="#5E3A1E" /></linearGradient>
+        <linearGradient id={g("mustard")} x1="0" y1="0" x2="1" y2="1"><stop offset="0" stopColor="#FCE3A0" /><stop offset="1" stopColor="#DDAE4C" /></linearGradient>
+        <linearGradient id={g("cream")} x1="0" y1="0" x2="1" y2="1"><stop offset="0" stopColor="#FFFBF2" /><stop offset="1" stopColor="#E6D8C2" /></linearGradient>
+        <linearGradient id={g("throw")} x1="0" y1="0" x2="1" y2="0"><stop offset="0" stopColor="#A4C6E6" /><stop offset="0.5" stopColor="#8BB2DA" /><stop offset="1" stopColor="#6E95BF" /></linearGradient>
+        <pattern id={g("knit")} width="7" height="9" patternUnits="userSpaceOnUse"><path d="M0 0 l3.5 4.5 l3.5 -4.5 M0 4.5 l3.5 4.5 l3.5 -4.5" stroke="#FFFFFF" strokeOpacity="0.32" fill="none" strokeWidth="1.1" /></pattern>
       </defs>
-      <FloorShadow cx={130} cy={140} rx={118} ry={9} />
-      {/* 脚 */}
-      {[30, 222].map((x) => <path key={x} d={`M${x} 124 l8 0 l-2 18 l-4 0 z`} fill={`url(#${g("leg")})`} />)}
-      {/* 背もたれ */}
-      <path d="M26 30 q0 -20 22 -20 h164 q22 0 22 20 v66 h-208 z" fill={`url(#${g("back")})`} />
-      <path d="M40 16 h180" stroke="#FFFFFF" strokeOpacity="0.28" strokeWidth="4" strokeLinecap="round" />
-      {/* 背もたれのクッション（ボタンどめ） */}
-      {[40, 132].map((x) => (
-        <g key={x}>
-          <rect x={x} y="22" width="88" height="62" rx="18" fill={`url(#${g("cush")})`} />
-          <path d={`M${x + 10} 30 q34 -6 68 0`} stroke="#FFFFFF" strokeOpacity="0.35" strokeWidth="3" fill="none" strokeLinecap="round" />
-          {[[x + 26, 44], [x + 62, 44], [x + 44, 62]].map(([bx, by]) => (
-            <g key={`${bx}-${by}`}>
-              <ellipse cx={bx} cy={by! + 1} rx="6" ry="4" fill="#C46A55" opacity="0.35" />
-              <circle cx={bx} cy={by} r="2.4" fill="#A9533F" />
-              <circle cx={bx! - 0.8} cy={by! - 0.8} r="0.9" fill="#F6C2AE" />
+      <FloorShadow cx={130} cy={141} rx={124} ry={8} o={0.3} />
+      {/* うしろの脚（奥にあるので暗く短い） */}
+      {[54, 202].map((x) => <path key={x} d={`M${x} 124 h7 l-1.5 11 h-4 z`} fill="#4A2C16" />)}
+
+      <g filter={`url(#${g("fabric")})`}>
+        {/* 背もたれのわく */}
+        <path d="M22 44 C22 20 38 11 62 11 H198 C222 11 238 20 238 44 V100 H22 Z" fill={`url(#${g("frame")})`} />
+        <path d="M40 14.5 C80 11 180 11 220 14.5" stroke="#FFFFFF" strokeOpacity="0.32" strokeWidth="3.5" fill="none" strokeLinecap="round" />
+        <path d="M22 44 C22 20 38 11 62 11 H198 C222 11 238 20 238 44 V100 H22 Z" fill={`url(#${g("sheen")})`} />
+        {/* 置きクッション（ふっくら。合わせ目のパイピング） */}
+        {seats.map(([x0, x1], i) => (
+          <g key={x0}>
+            <path d={backPillow(x0, x1)} fill="#7A3324" opacity="0.2" transform="translate(1.5 2.5)" />
+            <path d={backPillow(x0, x1)} fill={`url(#${g("pillow")})`} />
+            {/* しわ */}
+            <path d={`M${x0 + 18} ${40 + i * 3} q 10 8 6 22 M${x1 - 20} 36 q -8 14 -2 30`} stroke="#9C4A37" strokeOpacity="0.12" strokeWidth="2.2" fill="none" strokeLinecap="round" />
+            <path d={`M${x0 + 14} 27 q ${(x1 - x0) / 2 - 10} -6 ${x1 - x0 - 28} 0`} stroke="#FFFFFF" strokeOpacity="0.4" strokeWidth="3" fill="none" strokeLinecap="round" />
+          </g>
+        ))}
+        {/* 座面：上の面（奥ゆき）と、ふくらんだ前の面 */}
+        {seats.map(([x0, x1]) => (
+          <g key={`s${x0}`}>
+            <path d={`M${x0} 101 Q${x0 - 2} 88 ${x0 + 9} 86 H${x1 - 9} Q${x1 + 2} 88 ${x1} 101 Z`} fill={`url(#${g("seatTop")})`} />
+            <path d={`M${x0} 101 H${x1} Q${x1 + 4} 109 ${x1 - 1} 117 Q${(x0 + x1) / 2} 122 ${x0 + 1} 117 Q${x0 - 4} 109 ${x0} 101 Z`} fill={`url(#${g("seatFront")})`} />
+            <path d={`M${x0 + 8} 106 Q${(x0 + x1) / 2} 104 ${x1 - 8} 106`} stroke="#FFFFFF" strokeOpacity="0.22" strokeWidth="3" fill="none" strokeLinecap="round" />
+            <path d={`M${x0 + 2} 101 H${x1 - 2}`} stroke="#FAD0BE" strokeOpacity="0.85" strokeWidth="1.6" strokeLinecap="round" />
+            <path d={`M${x0 + 12} 90 H${x1 - 14}`} stroke="#FFFFFF" strokeOpacity="0.3" strokeWidth="2.5" strokeLinecap="round" />
+          </g>
+        ))}
+        {/* 背もたれと座面のさかい・座面どうしのすきまの影 */}
+        <rect x="40" y="85" width="180" height="8" fill={`url(#${g("ao")})`} />
+        <path d="M130 87 V117" stroke="#7A3324" strokeOpacity="0.35" strokeWidth="2" />
+        {/* 台座 */}
+        <rect x="26" y="112" width="208" height="16" rx="5" fill={`url(#${g("base")})`} />
+        <rect x="26" y="112" width="208" height="5" fill="#5A2418" opacity="0.25" />
+        {/* ひじかけ（くるっと巻いた形。光の当たる左は明るい） */}
+        {[[4, "L"], [216, "R"]].map(([x, side]) => {
+          const x0 = x as number, cx = x0 + 20;
+          return (
+            <g key={side as string}>
+              <path d={`M${x0 + 2} 128 V76 Q${x0} 54 ${cx} 54 Q${x0 + 40} 54 ${x0 + 38} 76 V128 Z`} fill={`url(#${g(`arm${side}`)})`} />
+              {/* 前の巻き */}
+              <ellipse cx={cx} cy="70" rx="16.5" ry="15" fill={`url(#${g(`scroll${side}`)})`} />
+              <path d={`M${cx} 70 m -9 0 a 9 8.5 0 1 1 9 8.5 a 5.5 5 0 1 1 -5.2 -5.6`} stroke="#9C4A37" strokeOpacity="0.4" strokeWidth="1.5" fill="none" strokeLinecap="round" />
+              <path d={`M${x0 + 4} 86 V126`} stroke="#FFFFFF" strokeOpacity={side === "L" ? 0.28 : 0.08} strokeWidth="3" strokeLinecap="round" />
+              <path d={`M${x0 + 36} 88 V126`} stroke="#5A2418" strokeOpacity="0.18" strokeWidth="3" strokeLinecap="round" />
+              {/* ひじかけと座面のあいだのかげ */}
+              <path d={side === "L" ? `M${x0 + 38} 86 V116` : `M${x0 + 2} 86 V116`} stroke="#5A2418" strokeOpacity="0.3" strokeWidth="3" />
             </g>
-          ))}
-        </g>
-      ))}
-      {/* 座面 */}
-      <rect x="30" y="80" width="200" height="22" rx="10" fill={`url(#${g("seat")})`} />
-      <line x1="130" y1="82" x2="130" y2="101" stroke="#C46A55" strokeWidth="1.6" />
-      <path d="M36 84 h188" stroke="#FFFFFF" strokeOpacity="0.4" strokeWidth="2.5" strokeLinecap="round" />
-      <rect x="28" y="98" width="204" height="28" rx="8" fill={`url(#${g("front")})`} />
-      <path d="M30 100 h200" stroke="#F6C2AE" strokeOpacity="0.6" strokeWidth="1.8" />
-      {/* ひじかけ（巻いたかたち） */}
-      {[[6, false], [214, true]].map(([x, right]) => (
-        <g key={String(x)}>
-          <rect x={x as number} y="52" width="40" height="76" rx="14" fill={`url(#${g("arm")})`} />
-          <ellipse cx={(x as number) + 20} cy="56" rx="20" ry="11" fill={right ? "#D8826B" : "#F0AA92"} />
-          <ellipse cx={(x as number) + 20} cy="56" rx="11" ry="5.5" fill={right ? "#C46A55" : "#DE8F77"} />
-          <path d={`M${(x as number) + 6} 72 v48`} stroke="#FFFFFF" strokeOpacity={right ? 0.08 : 0.25} strokeWidth="3" strokeLinecap="round" />
-        </g>
-      ))}
-      {/* ひざかけ（ひじかけにかけたニット） */}
-      <path d="M206 50 q14 -4 34 2 l-4 50 q-14 6 -30 0 z" fill="#8FB6DE" />
-      <path d="M206 50 q14 -4 34 2 l-4 50 q-14 6 -30 0 z" fill={`url(#${g("knit")})`} />
-      {[0, 1, 2, 3].map((i) => <line key={i} x1={210 + i * 7} y1="101" x2={209 + i * 7} y2="110" stroke="#8FB6DE" strokeWidth="2.4" strokeLinecap="round" />)}
-      {/* クッション */}
-      <g transform="rotate(-12 170 70)">
-        <rect x="150" y="54" width="42" height="34" rx="10" fill={`url(#${g("pil")})`} />
-        <path d="M171 60 l3 6 6 1 -4.5 4 1.2 6 -5.7 -3 -5.7 3 1.2 -6 -4.5 -4 6 -1 z" fill="#FFFFFF" opacity="0.75" />
+          );
+        })}
+        {/* 手前のパイピング */}
+        <path d="M30 127.5 H230" stroke="#E7957F" strokeOpacity="0.6" strokeWidth="1.2" />
       </g>
+
+      {/* 前の脚（細くとがった木の脚、先に金具） */}
+      {[18, 234].map((x) => (
+        <g key={x}>
+          <path d={`M${x - 4} 127 h8 l-2.2 13 h-3.6 z`} fill={`url(#${g("leg")})`} />
+          <rect x={x - 2} y="138" width="4" height="3" rx="1" fill="#D9B062" />
+        </g>
+      ))}
+
+      {/* クッション（からし色・タッセルつき） */}
+      <g transform="rotate(-10 72 74)">
+        <path d="M52 56 Q72 52 92 56 Q96 74 92 92 Q72 96 52 92 Q48 74 52 56 Z" fill="#8A5A20" opacity="0.25" transform="translate(2 3)" />
+        <path d="M52 56 Q72 52 92 56 Q96 74 92 92 Q72 96 52 92 Q48 74 52 56 Z" fill={`url(#${g("mustard")})`} />
+        <path d="M55 74 H89" stroke="#C99A3C" strokeOpacity="0.5" strokeWidth="1.2" strokeDasharray="3 3" />
+        <path d="M58 60 q 14 -3 26 0" stroke="#FFFFFF" strokeOpacity="0.5" strokeWidth="2" fill="none" strokeLinecap="round" />
+        {[[52, 56], [92, 56], [52, 92], [92, 92]].map(([x, y]) => (
+          <g key={`${x}${y}`} transform={`translate(${x} ${y}) rotate(${x! < 72 ? (y! < 74 ? -45 : 45) : (y! < 74 ? 45 : -45)})`}>
+            <circle cx="0" cy="0" r="1.6" fill="#B8862E" />
+            <path d={`M0 0 l${x! < 72 ? -6 : 6} -1.6 v3.2 z`} fill="#D9A84A" />
+          </g>
+        ))}
+      </g>
+      {/* クッション（クリーム・肉球の刺しゅう） */}
+      <g transform="rotate(9 186 76)">
+        <path d="M166 58 Q186 54 206 58 Q210 76 206 94 Q186 98 166 94 Q162 76 166 58 Z" fill="#7A3324" opacity="0.2" transform="translate(2 3)" />
+        <path d="M166 58 Q186 54 206 58 Q210 76 206 94 Q186 98 166 94 Q162 76 166 58 Z" fill={`url(#${g("cream")})`} />
+        <path d="M166 58 Q186 54 206 58 Q210 76 206 94 Q186 98 166 94 Q162 76 166 58 Z" fill="none" stroke="#D9806B" strokeWidth="2" />
+        <g transform="translate(186 78)" fill="#D9806B">
+          <ellipse cx="0" cy="3" rx="6" ry="5" />
+          {[-7, -2.5, 2.5, 7].map((dx, i) => <ellipse key={dx} cx={dx} cy={i === 0 || i === 3 ? -3 : -6} rx="2.3" ry="2.9" />)}
+        </g>
+      </g>
+      {/* ひざかけ（右のひじかけにかけたニット。ひだとフリンジ） */}
+      <path d="M212 56 Q232 48 252 58 L249 112 Q233 120 216 112 Z" fill="#4E6F94" opacity="0.25" transform="translate(-2 3)" />
+      <path d="M212 56 Q232 48 252 58 L249 112 Q233 120 216 112 Z" fill={`url(#${g("throw")})`} />
+      <path d="M212 56 Q232 48 252 58 L249 112 Q233 120 216 112 Z" fill={`url(#${g("knit")})`} />
+      <path d="M224 58 Q222 86 226 114 M238 56 Q240 86 236 116" stroke="#4E6F94" strokeOpacity="0.3" strokeWidth="2" fill="none" />
+      <path d="M214 58 Q232 51 250 59" stroke="#FFFFFF" strokeOpacity="0.45" strokeWidth="2" fill="none" strokeLinecap="round" />
+      {[0, 1, 2, 3, 4].map((i) => <line key={i} x1={218 + i * 7.5} y1={112 + Math.sin(i) * 2} x2={217.5 + i * 7.5} y2={121 + Math.sin(i) * 2} stroke="#8BB2DA" strokeWidth="2.2" strokeLinecap="round" />)}
     </svg>
   );
 }
