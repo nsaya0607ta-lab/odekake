@@ -29,15 +29,19 @@ import {
   RUGS,
   FURNITURE,
   FURNITURE_ENTRIES,
+  FIXTURE_ENTRIES,
+  defaultFixtures,
+  fixtureKey,
+  resolvePlacements,
   WALL_DECOS,
   type WallDeco,
   settle,
-  shelfOf,
   uploadEntry,
   uploadKey,
   WALLPAPERS,
   type DecorEntry,
   type DecorKind,
+  type FixtureId,
   type FurnitureId,
   type Placement,
   type RoomLayout,
@@ -47,7 +51,6 @@ import {
   ROOM_KINDS,
   ROOM_PRESETS,
   ROOM_STYLES,
-  windowOf,
 } from "@/lib/room/types";
 import { DecorVisual, FRAME_LABELS } from "./decor-visual";
 import type { FurnitureFx } from "./furniture-art";
@@ -55,8 +58,8 @@ import { RoomDog } from "./room-dog";
 import { composeRoomSnapshot } from "./room-snapshot";
 import { skyAt } from "@/lib/room/sun";
 import { parseRoomWeather, withWeather, type RoomWeather } from "@/lib/room/weather";
-import { dayPhaseOf, lampsOn, ROOM_STAGE, RoomLighting, RoomScene, ThemeSwatch, type DayPhase } from "./room-scene";
-import { DEFAULT_PLACE, SkyCard, type RoomPlace } from "./sky-card";
+import { dayPhaseOf, FixtureVisual, fixtureSize, lampsOn, ROOM_STAGE, RoomLighting, RoomScene, ThemeSwatch, windowRectOf, type DayPhase } from "./room-scene";
+import { DEFAULT_PLACE, prefNameOf, SkyCard, type RoomPlace } from "./sky-card";
 
 type Tab = DecorKind | "theme";
 type ItemFilter = "all" | "toy" | "food" | "interior" | "other" | "sushi";
@@ -72,6 +75,7 @@ const TABS: Array<{ id: Tab; label: string; empty: string }> = [
   { id: "photo", label: "写真", empty: "" },
   { id: "trophy", label: "トロフィー", empty: "おさんぽフレンチーで遊ぶと、道ごとのトロフィーがもらえます" },
   { id: "pennant", label: "ペナント", empty: "おでかけを記録した都道府県のペナントがもらえます" },
+  { id: "fixture", label: "窓・棚", empty: "" },
   { id: "furniture", label: "家具", empty: "" },
   { id: "theme", label: "もようがえ", empty: "" },
 ];
@@ -87,26 +91,36 @@ const RARITY_STYLE: Record<GachaRarity, string> = {
 const newId = () => (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function" ? crypto.randomUUID() : `p-${Date.now()}-${Math.random().toString(36).slice(2)}`);
 const fmtDate = (d: string) => { const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(d); return m ? `${m[1]}年${Number(m[2])}月${Number(m[3])}日` : ""; };
 
-/** 置いたものの幅（部屋の幅に対する %）。床の奥ほど小さく、棚の上は小さめ */
-function widthOf(entry: DecorEntry, p: Placement): number {
+/** 置いたものの幅（部屋の幅に対する %）。床の奥ほど小さく、棚の上は小さめ（棚の大きさに合わせて変わる） */
+function widthOf(entry: DecorEntry, p: Placement & { k?: number }, style: RoomStyle): number {
   if (entry.kind === "photo") return 21 * p.scale;
   if (entry.kind === "furniture") return FURNITURE[entry.furniture].width * p.scale * depthScale(p.y);
   if (entry.kind === "pennant") return 19 * p.scale;
-  const onShelf = shelfOf(p) !== null;
+  if (entry.kind === "fixture") return fixtureSize(entry.fixture, style).w * p.scale;
+  const onShelf = Boolean(p.on);
   const base = entry.kind === "trophy" ? (onShelf ? 12 : 13) : onShelf ? 11.5 : 15.5;
-  return base * p.scale * (onShelf ? 1 : depthScale(p.y));
+  return base * p.scale * (onShelf ? (p.k ?? 1) : depthScale(p.y));
 }
 
 /** 壁に掛けるものを置く候補（窓・時計・棚をさけた場所） */
 const WALL_SPOTS = [[48, 23], [48, 41], [21, 47], [60, 12], [91, 12], [35, 48], [8, 47]] as const;
-/** 壁で、掛けるものを置きたくない場所（窓・時計・棚・ライト）。[x0, y0, x1, y1] */
-/** 壁に物を掛けにくいところ（時計・棚・天井のライト）。窓は部屋の形ごとに足す */
-const WALL_BLOCKS = [[67, 2, 85, 22], [56, 21, 96, 46], [43, 0, 57, 12]] as const;
+/** 天井のライトのまわり（壁に物を掛けにくい）。[x0, y0, x1, y1] */
+const LAMP_BLOCK = [43, 0, 57, 12] as const;
+
+/** 窓・棚・時計などが場所をとっている範囲（部屋の %） */
+function fixtureBlocks(items: readonly Placement[], style: RoomStyle): (readonly [number, number, number, number])[] {
+  return items.flatMap((p) => {
+    const id = p.key.startsWith("fixture:") ? (p.key.slice("fixture:".length) as FixtureId) : null;
+    if (!id) return [];
+    const z = fixtureSize(id, style);
+    const w = z.w * p.scale * 0.8, h = z.h * p.scale * 0.8 / ROOM.aspect;
+    return [[p.x - w * z.ax, p.y - h * z.ay - (id === "shelf" ? 12 * p.scale : 0), p.x + w * (1 - z.ax), p.y + h * (1 - z.ay)] as const];
+  });
+}
 
 /** 壁に掛けるものの置き場所：窓などに重ならず、すでに掛けてあるものからいちばん離れたところ */
-function freeWallSpot(taken: readonly { x: number; y: number }[], style: RoomStyle): [number, number] {
-  const win = windowOf(style);
-  const blocks = [[win.x0 - 3, win.y0 - 4, win.x1 + 3, win.y1 + 3], ...WALL_BLOCKS] as const;
+function freeWallSpot(taken: readonly { x: number; y: number }[], fixtures: readonly (readonly [number, number, number, number])[]): [number, number] {
+  const blocks = [LAMP_BLOCK, ...fixtures];
   // 写真1枚ぶんの大きさ（幅21% × 高さ約16%）の四角で考える
   const hw = 11, hh = 8;
   const overlap = (ax0: number, ay0: number, ax1: number, ay1: number, bx0: number, by0: number, bx1: number, by1: number) =>
@@ -140,14 +154,15 @@ function starterLayout(entries: DecorEntry[]): RoomLayout {
   const items: Placement[] = [];
   let z = 1;
   // サーバーと端末で同じ表示になるよう、最初の部屋の id は決まった値にする
-  const put = (key: string, x: number, y: number) => items.push({ id: `starter-${z}`, key, x, y, scale: 1, flip: false, z: z++ });
+  items.push(...defaultFixtures(DEFAULT_THEME.style));
+  const put = (key: string, x: number, y: number, shelf?: { id: string; rx: number }) => items.push({ id: `starter-${z}`, key, x, y, scale: 1, flip: false, z: z++, ...(shelf ? { on: shelf.id, rx: shelf.rx } : {}) });
   entries.filter((e) => e.kind === "photo").slice(0, 2).forEach((e, i) => put(e.key, WALL_SPOTS[i]![0], WALL_SPOTS[i]![1]));
   entries.filter((e) => e.kind === "pennant").slice(0, 1).forEach((e) => put(e.key, WALL_SPOTS[2]![0], WALL_SPOTS[2]![1]));
-  entries.filter((e) => e.kind === "trophy").slice(0, 3).forEach((e, i) => put(e.key, 66 + i * 12, ROOM.shelves[0].y));
+  entries.filter((e) => e.kind === "trophy").slice(0, 3).forEach((e, i) => put(e.key, 66 + i * 12, ROOM.shelves[0].y, { id: "fx-shelf-1", rx: (8 + i * 12) / 35 }));
   const items4 = entries.filter((e): e is Extract<DecorEntry, { kind: "item" }> => e.kind === "item")
     .sort((a, b) => RARITY_ORDER.indexOf(b.rarity) - RARITY_ORDER.indexOf(a.rarity)).slice(0, 4);
-  items4.forEach((e, i) => (i === 3 ? put(e.key, 70, ROOM.shelves[1].y) : put(e.key, FLOOR_SPOTS[i]![0], FLOOR_SPOTS[i]![1])));
-  return { theme: DEFAULT_THEME, items, photos: [] };
+  items4.forEach((e, i) => (i === 3 ? put(e.key, 70, ROOM.shelves[1].y, { id: "fx-shelf-2", rx: 12 / 35 }) : put(e.key, FLOOR_SPOTS[i]![0], FLOOR_SPOTS[i]![1])));
+  return { theme: DEFAULT_THEME, items, photos: [], v: 2 };
 }
 
 const todayJst = () => new Intl.DateTimeFormat("sv-SE", { timeZone: "Asia/Tokyo" }).format(new Date());
@@ -188,12 +203,15 @@ export function MyRoom({ entries, initialLayout, serverReady, dogSkin, dogName, 
   serverNow: string;
 }) {
   // 家具はだれでも置けるので、持ち物と合わせて「置けるもの」にする
-  const validKeys = useMemo(() => new Set([...entries, ...FURNITURE_ENTRIES].map((e) => e.key)), [entries]);
+  const validKeys = useMemo(() => new Set([...entries, ...FURNITURE_ENTRIES, ...FIXTURE_ENTRIES].map((e) => e.key)), [entries]);
   const [layout, setLayout] = useState<RoomLayout>(() => initialLayout
     ? { ...initialLayout, items: initialLayout.items.filter((p) => validKeys.has(p.key) || p.key.startsWith("upload:")) }
     : starterLayout(entries));
   /** 持ち物に、アップロードした写真を足したもの（アップロードした写真を先に並べる） */
-  const allEntries = useMemo(() => [...layout.photos.map(uploadEntry), ...entries, ...FURNITURE_ENTRIES], [entries, layout.photos]);
+  const allEntries = useMemo(() => [...layout.photos.map(uploadEntry), ...entries, ...FURNITURE_ENTRIES, ...FIXTURE_ENTRIES], [entries, layout.photos]);
+  /** 棚に乗せたものの位置を、棚の位置と大きさから決めたもの（描く・動かすときはこちらを使う） */
+  const placedItems = useMemo(() => resolvePlacements(layout.items), [layout.items]);
+  const style = layout.theme.style;
   const entryByKey = useMemo(() => new Map(allEntries.map((e) => [e.key, e])), [allEntries]);
   const [uploading, setUploading] = useState(false);
   const fileRef = useRef<HTMLInputElement | null>(null);
@@ -222,6 +240,9 @@ export function MyRoom({ entries, initialLayout, serverReady, dogSkin, dogName, 
   latest.current = layout;
   const [place, setPlace] = useState<RoomPlace>(DEFAULT_PLACE);
   const phase: DayPhase = dayPhaseOf(now, place);
+  /** お天気ボードに書く場所の名前（「岐阜」など） */
+  const placeName = prefNameOf(place.pref).replace(/(都|府|県)$/, "");
+
   const [weather, setWeather] = useState<RoomWeather | null>(null);
   /** 犬が遊んでいる家具の動き（置いたものの id → 動き） */
   const [furnitureFx, setFurnitureFx] = useState<Record<string, FurnitureFx>>({});
@@ -335,19 +356,24 @@ export function MyRoom({ entries, initialLayout, serverReady, dogSkin, dogName, 
     if (placed.length >= entry.count) { setSelectedId(placed[0]?.id ?? null); flash(entry.count > 1 ? "持っている数だけ置いています" : "もう飾っています"); return; }
     if (base.items.length >= ROOM_MAX_ITEMS) { if (base !== layout) commit(base); flash(`飾れるのは${ROOM_MAX_ITEMS}こまでです`); return; }
     let x: number, y: number;
+    let shelfAt: { on: string; rx: number } | null = null;
     if (isHanging(entry.kind)) {
-      const hanging = base.items.filter((p) => { const e = entryByKey.get(p.key); return (e && isHanging(e.kind)) || p.key.startsWith("upload:"); });
-      [x, y] = freeWallSpot(hanging, base.theme.style);
-    } else if (entry.kind === "trophy") {
-      const onShelf = base.items.filter((p) => shelfOf(p)).length;
-      const shelf = ROOM.shelves[onShelf < 6 ? 0 : 1];
-      [x, y] = [shelf.x0 + 7 + ((onShelf * 11) % (shelf.x1 - shelf.x0 - 12)), shelf.y];
+      const hanging = base.items.filter((p) => { const e = entryByKey.get(p.key); return (e && isHanging(e.kind) && e.kind !== "fixture") || p.key.startsWith("upload:"); });
+      [x, y] = freeWallSpot(hanging, fixtureBlocks(base.items, base.theme.style));
+    } else if (entry.kind === "trophy" && base.items.some((p) => p.key === fixtureKey("shelf"))) {
+      // トロフィーは、乗せているものがいちばん少ない棚に並べる
+      const shelves = base.items.filter((p) => p.key === fixtureKey("shelf"));
+      const load = (s: Placement) => base.items.filter((p) => p.on === s.id).length;
+      const shelf = shelves.reduce((a, b) => (load(b) < load(a) ? b : a));
+      const n = load(shelf);
+      shelfAt = { on: shelf.id, rx: 0.14 + ((n * 0.3) % 0.75) };
+      [x, y] = [shelf.x, shelf.y];
     } else {
       const n = base.items.length;
       [x, y] = FLOOR_SPOTS[n % FLOOR_SPOTS.length]!;
       x = clamp(x + ((n * 7) % 9) - 4, 6, 94);
     }
-    const p: Placement = { id: newId(), key: entry.key, x, y, scale: 1, flip: false, z: topZ(), ...(entry.kind === "photo" ? { frame: "wood" as const } : {}) };
+    const p: Placement = { id: newId(), key: entry.key, x, y, scale: 1, flip: false, z: topZ(), ...(entry.kind === "photo" ? { frame: "wood" as const } : {}), ...(shelfAt ?? {}) };
     commit({ ...base, items: [...base.items, p] });
     setSelectedId(p.id);
   }
@@ -417,7 +443,8 @@ export function MyRoom({ entries, initialLayout, serverReady, dogSkin, dogName, 
     const entry = entryByKey.get(p.key);
     if (!entry) return;
     const at = pointerPct(e);
-    const next = settle(entry.kind, at.x - d.dx, at.y - d.dy);
+    const shelves = layout.items.filter((s) => s.key === fixtureKey("shelf") && s.id !== p.id);
+    const next = settle(entry.kind, at.x - d.dx, at.y - d.dy, shelves);
     if (!d.moved && Math.hypot(next.x - p.x, next.y - p.y) < 0.8) return;
     d.moved = true;
     setLayout((cur) => ({ ...cur, items: cur.items.map((it) => (it.id === p.id ? { ...it, ...next } : it)) }));
@@ -435,7 +462,7 @@ export function MyRoom({ entries, initialLayout, serverReady, dogSkin, dogName, 
     const entry = entryByKey.get(p.key);
     if (!entry) return;
     if (entry.kind === "photo") { setLightbox(entry); return; }
-    const text = entry.kind === "item" ? `${entry.rarity} ${entry.name}` : entry.kind === "trophy" ? `${entry.name}　ベスト ${entry.score.toLocaleString("ja-JP")}点（${entry.rank}）` : `${entry.name}のペナント`;
+    const text = entry.kind === "item" ? `${entry.rarity} ${entry.name}` : entry.kind === "trophy" ? `${entry.name}　ベスト ${entry.score.toLocaleString("ja-JP")}点（${entry.rank}）` : entry.kind === "pennant" ? `${entry.name}のペナント` : entry.name;
     // 名前は夜の暗さより上に出すので、部屋の中の位置（そのものの上のはし）を覚えておく
     const r = el?.getBoundingClientRect(), room = roomRef.current?.getBoundingClientRect();
     const at = r && room ? { x: ((r.left + r.width / 2 - room.left) / room.width) * 100, y: ((r.top - room.top) / room.height) * 100 } : { x: p.x, y: p.y };
@@ -446,7 +473,7 @@ export function MyRoom({ entries, initialLayout, serverReady, dogSkin, dogName, 
   /* ---------- 描く順番（壁 → 棚 → 床と犬は手前ほど上） ---------- */
   const zIndexOf = useMemo(() => {
     const hanging = layout.items.filter((p) => { const e = entryByKey.get(p.key); return e && isHanging(e.kind); }).sort((a, b) => a.z - b.z);
-    const shelved = layout.items.filter((p) => { const e = entryByKey.get(p.key); return e && !isHanging(e.kind) && shelfOf(p); }).sort((a, b) => a.z - b.z);
+    const shelved = layout.items.filter((p) => { const e = entryByKey.get(p.key); return e && !isHanging(e.kind) && p.on; }).sort((a, b) => a.z - b.z);
     const map = new Map<string, number>();
     hanging.forEach((p, i) => map.set(p.id, 20 + i));
     shelved.forEach((p, i) => map.set(p.id, 160 + i));
@@ -455,7 +482,7 @@ export function MyRoom({ entries, initialLayout, serverReady, dogSkin, dogName, 
   }, [entryByKey, layout.items]);
 
   const dogLines = useMemo(() => {
-    const placed = layout.items.map((p) => entryByKey.get(p.key)).filter((e): e is DecorEntry => Boolean(e));
+    const placed = layout.items.map((p) => entryByKey.get(p.key)).filter((e): e is DecorEntry => Boolean(e) && e!.kind !== "fixture");
     const lines = [phase === "morning" ? "おはよう！ きょうはどこ行く？" : phase === "evening" ? "おかえり！ おさんぽ行こ？" : "わん！ なでてくれてうれしい", "このおへや、だいすき！"];
     for (const e of placed.slice(0, 30)) {
       if (e.kind === "photo") lines.push(`${e.name}、また行きたいね！`);
@@ -466,6 +493,8 @@ export function MyRoom({ entries, initialLayout, serverReady, dogSkin, dogName, 
     return lines;
   }, [entryByKey, layout.items, phase]);
 
+  /** 置いてある窓（外が見える範囲。部屋の %） */
+  const windowRects = useMemo(() => layout.items.filter((p) => p.key === fixtureKey("window")).map((p) => windowRectOf(p, style)), [layout.items, style]);
   /** フロアランプの明かり（夜はそのまわりが明るい） */
   const lampLights = useMemo(() => layout.items
     .filter((p) => p.key === "furniture:lamp")
@@ -473,32 +502,32 @@ export function MyRoom({ entries, initialLayout, serverReady, dogSkin, dogName, 
 
   /** 犬が向かう場所（ベッド・ごはん皿・床のもの） */
   const dogPlaces = useMemo(() => {
-    const floor = layout.items.filter((p) => { const e = entryByKey.get(p.key); return e && !isHanging(e.kind) && !shelfOf(p); });
+    const floor = layout.items.filter((p) => { const e = entryByKey.get(p.key); return e && !isHanging(e.kind) && !p.on; });
     return {
       toys: floor.filter((p) => entryByKey.get(p.key)?.kind === "item").map((p) => ({ x: p.x, y: p.y, name: entryByKey.get(p.key)!.name })),
       // 窓のまん中（犬が外をながめに行く）
-      window: { x: (windowOf(layout.theme.style).x0 + windowOf(layout.theme.style).x1) / 2 },
+      window: windowRects[0] ? { x: (windowRects[0].x0 + windowRects[0].x1) / 2 } : null,
       // 家具ひとつずつの場所と大きさ（犬がそれぞれの家具で遊ぶ）
       furniture: floor.flatMap((p) => {
         const e = entryByKey.get(p.key);
         if (!e || e.kind !== "furniture") return [];
-        const w = widthOf(e, p);
+        const w = widthOf(e, p, style);
         return [{ id: p.id, kind: e.furniture, x: p.x, y: p.y, w, h: (w * FURNITURE_RATIO[e.furniture]) / ROOM.aspect }];
       }),
       // 家具のあるところ（犬は家具の上を歩かず、ここをよけて回りこむ。ベッドとハウスだけは中へ入る）
       blocks: floor.flatMap((p) => {
         const e = entryByKey.get(p.key);
         if (!e || e.kind !== "furniture") return [];
-        const w = widthOf(e, p);
+        const w = widthOf(e, p, style);
         return [{ x0: p.x - w / 2 - 3, x1: p.x + w / 2 + 3, y0: p.y - (w * (FURNITURE_DEPTH[e.furniture] ?? 0.3)) / ROOM.aspect, y1: p.y + 3 }];
       }),
     };
-  }, [entryByKey, layout.items, layout.theme.style]);
+  }, [entryByKey, layout.items, style, windowRects]);
 
   const selected = layout.items.find((p) => p.id === selectedId) ?? null;
   const selectedEntry = selected ? entryByKey.get(selected.key) ?? null : null;
   const counts = useMemo(() => {
-    const c: Record<DecorKind, number> = { item: 0, photo: 0, trophy: 0, pennant: 0, furniture: 0 };
+    const c: Record<DecorKind, number> = { item: 0, photo: 0, trophy: 0, pennant: 0, furniture: 0, fixture: 0 };
     for (const e of allEntries) c[e.kind] += 1;
     return c;
   }, [allEntries]);
@@ -594,12 +623,13 @@ export function MyRoom({ entries, initialLayout, serverReady, dogSkin, dogName, 
         >
           {/* 部屋（奥の壁から手前の床まで）。まわりの天井・横の壁・手前の床は背景の SVG がはみ出して描く */}
           <div ref={roomRef} className="absolute" style={{ left: `${ROOM_STAGE.left}%`, top: `${ROOM_STAGE.top}%`, width: `${ROOM_STAGE.width}%`, height: `${ROOM_STAGE.height}%` }}>
-          <RoomScene theme={layout.theme} now={now} at={place} weather={weather} />
+          <RoomScene theme={layout.theme} now={now} at={place} weather={weather} windows={windowRects} />
 
-          {layout.items.map((p) => {
+          {placedItems.map((p) => {
             const entry = entryByKey.get(p.key);
             if (!entry) return null;
             const hang = isHanging(entry.kind);
+            const fx = entry.kind === "fixture" ? fixtureSize(entry.fixture, style) : null;
             const isSel = editing && p.id === selectedId;
             return (
               <div
@@ -614,9 +644,9 @@ export function MyRoom({ entries, initialLayout, serverReady, dogSkin, dogName, 
                 style={{
                   left: `${p.x}%`,
                   top: `${p.y}%`,
-                  width: `${widthOf(entry, p)}%`,
+                  width: `${widthOf(entry, p, style)}%`,
                   zIndex: zIndexOf.get(p.id),
-                  transform: `translate(-50%, ${hang ? "-50%" : "-100%"}) ${entry.kind === "pennant" ? "rotate(-4deg)" : ""}`,
+                  transform: fx ? `translate(${-fx.ax * 100}%, ${-fx.ay * 100}%)` : `translate(-50%, ${hang ? "-50%" : "-100%"}) ${entry.kind === "pennant" ? "rotate(-4deg)" : ""}`,
                   touchAction: "none",
                 }}
                 onPointerDown={(e) => onItemDown(e, p)}
@@ -626,12 +656,14 @@ export function MyRoom({ entries, initialLayout, serverReady, dogSkin, dogName, 
                 onClick={(e) => onItemTap(p, e.currentTarget)}
                 onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); if (editing) setSelectedId(p.id); else onItemTap(p); } }}
               >
-                {!hang && !shelfOf(p) ? <span data-shadow className="pointer-events-none absolute -bottom-[4%] left-1/2 h-[10%] w-[78%] -translate-x-1/2 rounded-[50%] bg-[#4a3520]/18 blur-[2px]" /> : null}
+                {!hang && !p.on ? <span data-shadow className="pointer-events-none absolute -bottom-[4%] left-1/2 h-[10%] w-[78%] -translate-x-1/2 rounded-[50%] bg-[#4a3520]/18 blur-[2px]" /> : null}
                 {/* 棚の上：板に落ちる小さな影 */}
-                {!hang && shelfOf(p) ? <span data-shadow className="pointer-events-none absolute -bottom-[3%] left-1/2 h-[7%] w-[84%] -translate-x-1/2 rounded-[50%] bg-[#3a2410]/30 blur-[1.5px]" /> : null}
+                {!hang && p.on ? <span data-shadow className="pointer-events-none absolute -bottom-[3%] left-1/2 h-[7%] w-[84%] -translate-x-1/2 rounded-[50%] bg-[#3a2410]/30 blur-[1.5px]" /> : null}
                 <span data-body className="relative block" style={{ transform: p.flip ? "scaleX(-1)" : undefined }}>
                   <span key={furnitureFx[p.id] ?? "-"} className={`block origin-bottom ${FX_CLASS[furnitureFx[p.id]!] ?? ""}`}>
-                    <DecorVisual entry={entry} frame={p.frame} lit={lightsOn || furnitureFx[p.id] === "on"} fx={furnitureFx[p.id]} />
+                    {entry.kind === "fixture"
+                      ? <FixtureVisual fixture={entry.fixture} theme={layout.theme} now={now} at={place} weather={weather} placeName={placeName} />
+                      : <DecorVisual entry={entry} frame={p.frame} lit={lightsOn || furnitureFx[p.id] === "on"} fx={furnitureFx[p.id]} />}
                   </span>
                 </span>
                 {isSel ? (
@@ -667,7 +699,12 @@ export function MyRoom({ entries, initialLayout, serverReady, dogSkin, dogName, 
               {selectedEntry.kind === "photo" && selectedEntry.upload ? (
                 <Tool label="写真のなまえ" onClick={() => renameUpload(selectedEntry.key.slice("upload:".length))}>✎</Tool>
               ) : null}
-              <Tool danger label="片づける" onClick={() => { commit({ ...layout, items: layout.items.filter((p) => p.id !== selected.id) }); setSelectedId(null); }}>🗑</Tool>
+              <Tool danger label="片づける" onClick={() => {
+                const riding = layout.items.filter((p) => p.on === selected.id).length;
+                commit({ ...layout, items: layout.items.filter((p) => p.id !== selected.id && p.on !== selected.id) });
+                setSelectedId(null);
+                if (riding) flash(`棚に乗せていた${riding}こも、いっしょにしまいました`);
+              }}>🗑</Tool>
             </div>
           ) : null}
         </div>
@@ -677,7 +714,7 @@ export function MyRoom({ entries, initialLayout, serverReady, dogSkin, dogName, 
             <div className="grid grid-cols-3 gap-2 border-y border-line bg-paper-deep px-4 py-2">
               <Action disabled={!past.length} onClick={undo} label="↶ 元に戻す" />
               <Action disabled={!future.length} onClick={redo} label="↷ やり直す" />
-              <Action disabled={!layout.items.length} onClick={() => { commit({ ...layout, items: [] }); setSelectedId(null); }} label="ぜんぶ片づける" />
+              <Action disabled={!layout.items.some((p) => !p.key.startsWith("fixture:"))} onClick={() => { commit({ ...layout, items: layout.items.filter((p) => p.key.startsWith("fixture:")).map((p) => p) }); setSelectedId(null); }} label="ぜんぶ片づける" />
             </div>
             <section className="rounded-t-[26px] bg-card px-4 pb-6 pt-3 shadow-[0_-8px_24px_rgba(93,80,58,.08)]">
               <div className="-mx-4 flex gap-1.5 overflow-x-auto px-4 pb-1" role="tablist" aria-label="飾るもの">
@@ -718,7 +755,7 @@ export function MyRoom({ entries, initialLayout, serverReady, dogSkin, dogName, 
                         {e.kind === "item" ? <span className={`absolute left-1.5 top-1.5 z-10 rounded-full px-1.5 py-0.5 text-[9px] font-black text-white ${RARITY_STYLE[e.rarity]}`}>{e.rarity}</span> : null}
                         <span className="absolute right-1.5 top-1.5 z-10 rounded-full bg-card/90 px-1.5 py-0.5 text-[9px] font-bold tabular-nums text-ink-soft">{placed}/{e.count}</span>
                         <span className="flex aspect-square items-center justify-center pt-3">
-                          <span className="block w-[78%]"><DecorVisual entry={e} thumb /></span>
+                          <span className="block w-[78%]">{e.kind === "fixture" ? <FixtureVisual fixture={e.fixture} theme={layout.theme} now={now} at={place} weather={weather} placeName={placeName} /> : <DecorVisual entry={e} thumb />}</span>
                         </span>
                         <span className="mt-1 block truncate text-center text-[10px] font-bold">{e.name}</span>
                         {e.kind === "photo" && e.upload ? (
@@ -742,17 +779,35 @@ export function MyRoom({ entries, initialLayout, serverReady, dogSkin, dogName, 
           </>
         ) : (
           <section className="space-y-3 px-4 pt-4">
-            <div className="grid grid-cols-4 gap-2">
-              {([["item", "アイテム", "🧸"], ["photo", "写真", "🖼️"], ["trophy", "トロフィー", "🏆"], ["pennant", "ペナント", "🚩"]] as const).map(([kind, label, icon]) => {
-                const n = layout.items.filter((p) => entryByKey.get(p.key)?.kind === kind).length;
-                return (
-                  <div key={kind} className="rounded-2xl border border-line bg-card px-1 py-2 text-center shadow-sm">
-                    <div className="text-lg leading-none">{icon}</div>
-                    <div className="mt-1 text-[15px] font-black tabular-nums">{n}<span className="text-[10px] font-bold text-ink-faint">/{counts[kind]}</span></div>
-                    <div className="text-[10px] font-bold text-ink-soft">{label}</div>
-                  </div>
-                );
-              })}
+            {/* 飾ったものの数：木の飾り棚に見立てる。押すと、もようがえのそのタブを開く */}
+            <div className="rounded-[22px] bg-[linear-gradient(180deg,#D9A56A,#A86E3C)] p-2 shadow-[0_8px_16px_-10px_rgba(80,50,20,.6)]">
+              <div className="mb-1.5 flex items-center justify-center">
+                <p className="rounded-md bg-[linear-gradient(180deg,#F2D58A,#C99A3C)] px-3 py-0.5 text-[10px] font-black tracking-wider text-[#5A3A14] shadow-[0_1px_0_rgba(255,255,255,.5)_inset,0_1px_2px_rgba(60,35,10,.4)]">{dogName}のコレクション</p>
+              </div>
+              <div className="grid grid-cols-4 gap-1.5">
+                {([["item", "アイテム", "🧸"], ["photo", "写真", "🖼️"], ["trophy", "トロフィー", "🏆"], ["pennant", "ペナント", "🚩"]] as const).map(([kind, label, icon]) => {
+                  const n = layout.items.filter((p) => entryByKey.get(p.key)?.kind === kind).length;
+                  const total = counts[kind];
+                  return (
+                    <button
+                      key={kind}
+                      type="button"
+                      onClick={() => { setEditing(true); setTab(kind); }}
+                      aria-label={`${label}を飾る（${n}/${total}）`}
+                      className="relative overflow-hidden rounded-[13px] bg-[linear-gradient(180deg,#F6E8CF,#EAD5B3)] px-1 pb-2 pt-2.5 text-center shadow-[inset_0_7px_9px_-4px_rgba(70,40,15,.45),inset_0_-2px_0_rgba(255,255,255,.4)] active:scale-[.97]"
+                    >
+                      <div className="text-[22px] leading-none drop-shadow-[0_3px_2px_rgba(70,40,15,.35)]">{icon}</div>
+                      {/* 棚板 */}
+                      <div className="mx-auto mt-1 h-[3px] w-[80%] rounded-full bg-[#B98552] shadow-[0_1px_0_rgba(255,255,255,.5)]" />
+                      <div className="mt-1 text-[14px] font-black tabular-nums text-[#4E3018]">{n}<span className="text-[10px] font-bold text-[#8A6A4A]">/{total}</span></div>
+                      <div className="text-[10px] font-bold text-[#7A5A3A]">{label}</div>
+                      <div className="mx-auto mt-1 h-1 w-[78%] overflow-hidden rounded-full bg-[#D9C3A0]">
+                        <div className="h-full rounded-full bg-leaf-deep" style={{ width: `${total ? Math.min(100, (n / total) * 100) : 0}%` }} />
+                      </div>
+                    </button>
+                  );
+                })}
+              </div>
             </div>
             <SkyCard now={now} place={place} onPlace={changePlace} weather={weather} />
             <ul className="space-y-1.5 rounded-2xl border border-line bg-card px-4 py-3 text-[12px] leading-relaxed text-ink-soft shadow-sm">

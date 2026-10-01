@@ -72,6 +72,8 @@ export function DecorVisual({ entry, frame = "wood", thumb = false, lit = false,
       </svg>
     );
   }
+  // 窓・棚・時計は FixtureVisual で描く
+  if (entry.kind === "fixture") return null;
   const name = entry.name.replace(/(県|府|都)$/, "");
   return (
     <svg viewBox="0 0 120 70" className="pointer-events-none block h-auto w-full drop-shadow-[0_4px_3px_rgba(68,50,33,.22)]" role={label ? "img" : undefined} aria-label={label ? `${entry.name}のペナント` : undefined}>

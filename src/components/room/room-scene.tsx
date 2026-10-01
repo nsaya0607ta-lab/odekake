@@ -7,9 +7,9 @@
  */
 import { memo, useId, useMemo } from "react";
 import { skyAt, TOKYO, type GeoPoint, type SkyState } from "@/lib/room/sun";
-import { overcastOf, withWeather, type RoomWeather } from "@/lib/room/weather";
+import { overcastOf, WEATHER_LABEL, withWeather, type RoomWeather } from "@/lib/room/weather";
 import { CURTAIN_STYLES, FLOOR_STYLES, ROOM_KIND_STYLES, RUG_STYLES, WALLPAPER_STYLES } from "@/lib/room/themes";
-import { ROOM, windowOf, type RoomKind, type RoomStyle, type RoomTheme } from "@/lib/room/types";
+import { ROOM, windowOf, type FixtureId, type RoomKind, type RoomStyle, type RoomTheme } from "@/lib/room/types";
 
 export type DayPhase = "morning" | "day" | "evening" | "night";
 
@@ -69,12 +69,14 @@ const mixColor = (a: string, b: string, t: number) => {
   return `#${pa.map((v, i) => Math.round(v + (pb[i]! - v) * Math.max(0, Math.min(1, t))).toString(16).padStart(2, "0")).join("")}`;
 };
 
-export const RoomScene = memo(function RoomScene({ theme, now, at = TOKYO, weather = null }: { theme: RoomTheme; now: Date; at?: GeoPoint; weather?: RoomWeather | null }) {
+export const RoomScene = memo(function RoomScene({ theme, now, at = TOKYO, weather = null, windows = [] }: {
+  theme: RoomTheme; now: Date; at?: GeoPoint; weather?: RoomWeather | null;
+  /** 置いてある窓の外わく（部屋の %）。壁を照らす光と、床に差しこむ光に使う。窓そのものは FixtureVisual で描く */
+  windows?: readonly WindowRect[];
+}) {
   const wall = WALLPAPER_STYLES[theme.wall];
   const sky = useMemo(() => withWeather(skyAt(now, at), weather), [now, at, weather]);
   const overcast = overcastOf(weather);
-  const win = windowOf(theme.style);
-  const night = sky.light < 0.2;
   const lit = lampsOn(sky);
   const sunUp = sky.altitude > 0;
   // 朝夕の低い日ざしは、窓から斜めに長く差しこむ
@@ -159,9 +161,9 @@ export const RoomScene = memo(function RoomScene({ theme, now, at = TOKYO, weath
       <rect x="0" y="0" width={W} height={HZ} fill="#7A6040" filter="url(#room-grain)" opacity="0.07" />
       <rect x="0" y="0" width={W} height={HZ} fill="url(#room-wall-shade)" />
       {/* 窓から入る光が壁を明るくする */}
-      {sky.light > 0.1 ? <ellipse cx={px((win.x0 + win.x1) / 2)} cy={py((win.y0 + win.y1) / 2)} rx="360" ry="300" fill="url(#room-window-glow)" /> : null}
+      {sky.light > 0.1 ? windows.map((win, i) => <ellipse key={i} cx={px((win.x0 + win.x1) / 2)} cy={py((win.y0 + win.y1) / 2)} rx={360 * Math.min(1.6, (win.x1 - win.x0) / 30)} ry={300 * Math.min(1.6, (win.x1 - win.x0) / 30)} fill="url(#room-window-glow)" />) : null}
 
-      {theme.room === "nordic" ? <Wainscot win={win} /> : null}
+      {theme.room === "nordic" ? <Wainscot windows={windows} /> : null}
       {/* 和室は長押（なげし）を壁にわたす */}
       {theme.style === "shoji" || theme.room === "wa" ? (
         <g>
@@ -170,24 +172,22 @@ export const RoomScene = memo(function RoomScene({ theme, now, at = TOKYO, weath
           <rect x={SIDE} y={py(5.2) + 16} width={W - SIDE * 2} height="8" fill="#2A1A0C" opacity="0.12" />
         </g>
       ) : null}
-      <Window sky={sky} curtain={CURTAIN_STYLES[theme.curtain].color} season={seasonOf(now, at)} weather={weather} style={theme.style} />
       <WallDecoration deco={theme.deco} lit={lit} />
-      <Clock now={now} night={night} />
-      <Shelves />
 
       {/* 床 */}
       <Floor theme={theme} />
       <rect x={-PX} y={HZ} width={W + PX * 2} height={H + PB - HZ} fill="#5A4030" filter="url(#room-grain)" opacity="0.06" />
       <rect x={-PX} y={HZ} width={W + PX * 2} height={H + PB - HZ} fill="url(#room-floor-shade)" />
-      {/* 窓から差しこむ光 */}
-      {sunUp ? (
+      {/* 窓から差しこむ光（窓ごとに。低い窓ほど床の手前まで届く） */}
+      {sunUp ? windows.map((win, i) => (
         <polygon
+          key={i}
           points={`${px(win.x0) + 30},${HZ} ${px(win.x1) - 10},${HZ} ${px(win.x1) + 150 + beamSkew},${H * 0.86} ${px(win.x0) + 120 + beamSkew},${H * 0.86}`}
           fill={mixColor("#FFF6D8", "#FFAE6E", sky.warm)}
           opacity={0.26 * Math.min(1, sky.altitude / 10) * (1 - 0.9 * overcast)}
           filter="url(#room-soft)"
         />
-      ) : null}
+      )) : null}
       {sky.altitude > 8 && overcast < 0.5 ? <SunDust /> : null}
       <RugShape rug={theme.rug} />
       {/* 幅木と、壁と床の境目のかげ */}
@@ -425,7 +425,7 @@ function WallDecoration({ deco, lit }: { deco: RoomTheme["deco"]; lit: boolean }
   }
   return (
     <g>
-      {[[120, 90], [250, 60], [470, 120], [640, 70], [900, 100]].map(([x, len], i) => (
+      {[[120, 90], [250, 60], [470, 120], [640, 70], [760, 34]].map(([x, len], i) => (
         <g key={i}>
           <line x1={x} y1="20" x2={x} y2={20 + len!} stroke="#C9A878" strokeWidth="1.5" />
           <path d={`M${x} ${20 + len! - 4} l6 13 14 2 -10 10 3 14 -13 -7 -13 7 3 -14 -10 -10 14 -2 z`} fill={i % 2 ? "#F6D27A" : "#FFE9A8"} stroke="#E0B84A" strokeWidth="1.2" />
@@ -824,6 +824,65 @@ function WindowFrame({ style, x0, y0, x1, y1, curtain, sky }: { style: RoomStyle
   }
 }
 
+/**
+ * 壁かけのお天気ボード（時計のとなり）。住んでいるところの、いまの天気と気温を出す。
+ * 天気がわからないときは「--」
+ */
+function WeatherBoard({ weather, night, place }: { weather: RoomWeather | null; night: boolean; place: string }) {
+  const cx = px(88.2), cy = py(8.8), w = 96, h = 120;
+  const x0 = cx - w / 2, y0 = cy - h / 2;
+  const kind = weather?.kind;
+  const label = weather ? WEATHER_LABEL[weather.kind].label.replace("晴れ時々くもり", "晴れ時々") : "わからない";
+  const temp = weather?.temp != null ? `${Math.round(weather.temp)}` : "--";
+  const ic = { x: cx, y: y0 + 50 };
+  const cloud = (dx: number, dy: number, s: number, fill: string) => (
+    <g transform={`translate(${ic.x + dx} ${ic.y + dy}) scale(${s})`} fill={fill}>
+      <ellipse cx="0" cy="5" rx="17" ry="7" /><circle cx="-7" cy="0" r="8" /><circle cx="4" cy="-3" r="10" /><circle cx="12" cy="2" r="6" />
+    </g>
+  );
+  const sun = (dx: number, dy: number, r: number) => (
+    <g transform={`translate(${ic.x + dx} ${ic.y + dy})`}>
+      {Array.from({ length: 8 }, (_, i) => <line key={i} x1="0" y1={-r - 3} x2="0" y2={-r - 8} stroke="#F2A93A" strokeWidth="3" strokeLinecap="round" transform={`rotate(${i * 45})`} />)}
+      <circle r={r} fill="#FFC53D" /><circle r={r * 0.55} cx={-r * 0.25} cy={-r * 0.25} fill="#FFE08A" />
+    </g>
+  );
+  const moon = (dx: number, dy: number) => <path d={moonPath(ic.x + dx, ic.y + dy, 12, 0.2)} fill="#F2C94C" />;
+  let icon: React.ReactNode;
+  switch (kind) {
+    case "clear": icon = night ? <g>{moon(0, 0)}<circle cx={ic.x + 16} cy={ic.y - 10} r="2" fill="#F2C94C" /></g> : sun(0, 0, 12); break;
+    case "partly": icon = <g>{night ? moon(-8, -6) : sun(-8, -6, 10)}{cloud(5, 6, 0.85, "#FFFFFF")}{cloud(5, 6, 0.85, "#00000010")}</g>; break;
+    case "cloudy": icon = <g>{cloud(-6, -4, 0.8, "#C9CFD8")}{cloud(5, 5, 0.95, "#E4E8EE")}</g>; break;
+    case "fog": icon = <g>{cloud(0, -6, 0.85, "#DCE0E6")}{[6, 12, 18].map((d) => <line key={d} x1={ic.x - 16 + (d % 12)} y1={ic.y + d} x2={ic.x + 16 - (d % 12)} y2={ic.y + d} stroke="#B9C0CA" strokeWidth="3" strokeLinecap="round" />)}</g>; break;
+    case "drizzle": case "rain": icon = <g>{cloud(0, -6, 0.95, "#AEB8C6")}{[-10, 0, 10].map((d, i) => <path key={d} d={`M${ic.x + d} ${ic.y + 10 + (i % 2) * 3} q -3 6 0 8 q 3 -2 0 -8`} fill="#5E9BD6" />)}</g>; break;
+    case "snow": icon = <g>{cloud(0, -6, 0.95, "#DCE4EE")}{[-10, 0, 10].map((d, i) => <text key={d} x={ic.x + d} y={ic.y + 20 + (i % 2) * 3} fontSize="10" textAnchor="middle" fill="#8DB6E0">❄</text>)}</g>; break;
+    case "thunder": icon = <g>{cloud(0, -6, 0.95, "#7C8494")}<path d={`M${ic.x + 2} ${ic.y + 4} l-8 12 h6 l-4 10 l11 -14 h-6 l4 -8 z`} fill="#FFD23A" /></g>; break;
+    default: icon = cloud(0, 0, 0.9, "#E6E1D8");
+  }
+  return (
+    <g>
+      {/* くぎと、つるすひも */}
+      <path d={`M${cx - 24} ${y0 + 4} L${cx} ${y0 - 22} L${cx + 24} ${y0 + 4}`} fill="none" stroke="#8A6A4A" strokeWidth="1.5" />
+      <circle cx={cx} cy={y0 - 22} r="3" fill="#6A5A48" />
+      {/* 壁に落ちる影 */}
+      <rect x={x0 + 6} y={y0 + 9} width={w} height={h} rx="12" fill="#2A1A0C" opacity="0.2" filter="url(#room-soft)" />
+      {/* 木のわく */}
+      <rect x={x0} y={y0} width={w} height={h} rx="12" fill="url(#room-clock-rim)" />
+      <rect x={x0} y={y0} width={w} height={h} rx="12" fill="none" stroke="#6E4524" strokeOpacity="0.5" strokeWidth="1.5" />
+      <rect x={x0 + 7} y={y0 + 7} width={w - 14} height={h - 14} rx="7" fill="#FFFBF2" />
+      <rect x={x0 + 7} y={y0 + 7} width={w - 14} height="6" rx="3" fill="#000" opacity="0.06" />
+      {/* 場所の名ふだ */}
+      <rect x={cx - 26} y={y0 + 12} width="52" height="15" rx="4" fill="#E9D6B4" />
+      <text x={cx} y={y0 + 23.5} textAnchor="middle" fontSize="10" fontWeight="900" fill="#6A4A2E">{(place || "おてんき").slice(0, 5)}</text>
+      {icon}
+      {/* 気温 */}
+      <text x={cx - 2} y={y0 + 98} textAnchor="middle" fontSize="24" fontWeight="900" fill="#3A2A1C">{temp}<tspan fontSize="12" dx="1">℃</tspan></text>
+      <text x={cx} y={y0 + 110} textAnchor="middle" fontSize="8.5" fontWeight="800" fill="#8A7A68">{label}</text>
+      {/* ガラスの映りこみ */}
+      <path d={`M${x0 + 10} ${y0 + 40} L${x0 + 30} ${y0 + 10} L${x0 + 40} ${y0 + 10} L${x0 + 12} ${y0 + 54} Z`} fill="#FFFFFF" opacity="0.35" />
+    </g>
+  );
+}
+
 /** 本物の時刻（日本時間）を指す壁かけ時計 */
 function Clock({ now, night }: { now: Date; night: boolean }) {
   const parts = new Intl.DateTimeFormat("en-US", { timeZone: "Asia/Tokyo", hour: "numeric", minute: "numeric", hourCycle: "h23" }).formatToParts(now);
@@ -871,7 +930,7 @@ function Clock({ now, night }: { now: Date; night: boolean }) {
  * 壁につけた板の棚。上の面（奥ゆき）・前の厚み・金具・壁に落ちる影を描いて、物が「乗っている」ように見せる。
  * 置いたものの下のはし（棚の y）は、上の面のまん中あたりに来る
  */
-function Shelves() {
+function Shelves({ only }: { only?: number } = {}) {
   const BACK = 8, FRONT = 9, THICK = 17;
   return (
     <g>
@@ -891,7 +950,7 @@ function Shelves() {
         </linearGradient>
         <filter id="room-shelf-blur" x="-10%" y="-60%" width="120%" height="220%"><feGaussianBlur stdDeviation="7" /></filter>
       </defs>
-      {ROOM.shelves.map((s) => {
+      {ROOM.shelves.filter((_, i) => only === undefined || i === only).map((s) => {
         const x0 = px(s.x0), x1 = px(s.x1), y = py(s.y);
         const top = y - BACK, front = y + FRONT, bottom = front + THICK;
         const inset = 9;
@@ -1002,7 +1061,7 @@ function PendantLamp({ lit, kind }: { lit: boolean; kind: RoomKind }) {
           {glow(cx, 100)}
           <path d={moonPath(cx, 100, 30, 0.3)} fill={lit ? "#FFF0B0" : "#F2E6B8"} />
           <circle cx={cx} cy="100" r="34" fill="#FFF4C8" opacity={lit ? 0.25 : 0.1} />
-          {[[cx - 150, 120, 16, "#F2A7B8", true], [cx + 140, 96, 13, "#8DBDE6", false], [cx - 240, 70, 9, "#B8E986", false], [cx + 230, 130, 10, "#F6D27A", false]].map(([x, y, r, c, ring]) => (
+          {[[cx - 150, 120, 16, "#F2A7B8", true], [cx - 330, 60, 12, "#8DBDE6", false], [cx - 240, 70, 9, "#B8E986", false], [cx + 230, 130, 10, "#F6D27A", false]].map(([x, y, r, c, ring]) => (
             <g key={x as number}>
               <line x1={x as number} y1="0" x2={x as number} y2={(y as number) - (r as number)} stroke="#C9C2E8" strokeWidth="1.2" />
               <circle cx={x as number} cy={y as number} r={r as number} fill={c as string} />
@@ -1024,9 +1083,10 @@ export function ceilingLights(kind: RoomKind): { x: number; y: number; r: number
 }
 
 /** 北欧の部屋の腰壁（白い板の羽目板と、上の見切り）。窓のところはあける */
-function Wainscot({ win }: { win: { x0: number; x1: number; y0: number; y1: number } }) {
+function Wainscot({ windows }: { windows: readonly WindowRect[] }) {
   const top = py(44.5), bottom = HZ - 22;
-  const gap: [number, number] | null = win.y1 > 44 ? [px(win.x0) - 26, px(win.x1) + 26] : null;
+  const low = windows.find((w) => w.y1 > 44);
+  const gap: [number, number] | null = low ? [px(low.x0) - 26, px(low.x1) + 26] : null;
   const panels: React.ReactNode[] = [];
   for (let x = 0; x < W; x += 110) {
     if (gap && x + 110 > gap[0] && x < gap[1]) continue;
@@ -1124,7 +1184,7 @@ function RoomArch({ kind }: { kind: RoomKind }) {
           <rect x={SIDE} y={CEIL + 2} width={W - SIDE * 2} height="12" rx="6" fill="#D9C08E" />
           <line x1={SIDE} y1={CEIL + 8} x2={W - SIDE} y2={CEIL + 8} stroke="#B89A62" strokeWidth="12" strokeDasharray="6 8" opacity="0.6" />
           {/* 浮き輪（右の壁の上のほう） */}
-          <g transform={`translate(${W - 120} ${py(8)})`}>
+          <g transform={`translate(600 ${py(8)})`}>
             <circle r="30" fill="none" stroke="#FFFFFF" strokeWidth="16" />
             {[0, 90, 180, 270].map((a) => <path key={a} d={describeArc(0, 0, 30, a + 20, a + 70)} stroke="#E4572E" strokeWidth="16" fill="none" />)}
             <circle r="30" fill="none" stroke="#C9A878" strokeWidth="2" strokeDasharray="4 4" />
@@ -1443,4 +1503,90 @@ export function ThemeSwatch({ part, theme }: { part: "wall" | "floor" | "curtain
       ));
     }
   }
+}
+
+/* ---------- 窓・棚・時計・お天気ボード（動かせる部品） ---------- */
+
+export type WindowRect = { x0: number; x1: number; y0: number; y1: number };
+/** 窓のまわり（カーテン・窓台・影）のぶんの余白 */
+const WIN_M = 70;
+const CLOCK_C = { x: px(75.5), y: py(12) }, WEATHER_C = { x: px(88.2), y: py(8.8) };
+const SHELF_0 = { x0: px(ROOM.shelves[0].x0) - 10, y: py(ROOM.shelves[0].y) };
+
+/** 部品の絵の範囲（もとの部屋の座標）。部品の (x, y) はこの範囲の中の anchor の位置 */
+function fixtureView(fixture: FixtureId, style: RoomStyle): { x: number; y: number; w: number; h: number; ax: number; ay: number } {
+  switch (fixture) {
+    case "window": {
+      const win = windowOf(style);
+      const x0 = px(win.x0), y0 = py(win.y0), w = px(win.x1) - x0, h = py(win.y1) - y0;
+      return { x: x0 - WIN_M, y: y0 - WIN_M, w: w + WIN_M * 2, h: h + WIN_M * 2, ax: 0.5, ay: 0.5 };
+    }
+    case "clock": return { x: CLOCK_C.x - 75, y: CLOCK_C.y - 84, w: 150, h: 168, ax: 0.5, ay: 0.5 };
+    case "weather": return { x: WEATHER_C.x - 58, y: WEATHER_C.y - 84, w: 116, h: 168, ax: 0.5, ay: 0.5 };
+    // 棚は (x, y) が板の上の面のまん中（物を乗せる高さ）
+    case "shelf": return { x: SHELF_0.x0, y: SHELF_0.y - 14, w: 370, h: 96, ax: 0.5, ay: 14 / 96 };
+  }
+}
+
+/** 部品の大きさ（大きさ1のとき、部屋の幅・高さに対する %）と、(x, y) が絵のどこにあたるか（0〜1） */
+export function fixtureSize(fixture: FixtureId, style: RoomStyle): { w: number; h: number; ax: number; ay: number } {
+  const v = fixtureView(fixture, style);
+  return { w: (v.w / W) * 100, h: (v.h / H) * 100, ax: v.ax, ay: v.ay };
+}
+
+/** 置いた窓の、外が見える範囲（部屋の %）。壁の光・床の光・犬が外をながめる場所に使う */
+export function windowRectOf(p: { x: number; y: number; scale: number }, style: RoomStyle): WindowRect {
+  const win = windowOf(style);
+  const hw = ((win.x1 - win.x0) / 2) * p.scale, hh = ((win.y1 - win.y0) / 2) * p.scale;
+  return { x0: p.x - hw, x1: p.x + hw, y0: p.y - hh, y1: p.y + hh };
+}
+
+/**
+ * 窓・棚・時計・お天気ボード1つの絵。もとは部屋に描きこんでいたものを、その場所の範囲だけ切りとって描く。
+ * 記念撮影でも1まいの絵として読めるよう、使うグラデーションなどはこの中に入れる
+ */
+export function FixtureVisual({ fixture, theme, now, at = TOKYO, weather = null, placeName = "" }: {
+  fixture: FixtureId; theme: RoomTheme; now: Date; at?: GeoPoint; weather?: RoomWeather | null; placeName?: string;
+}) {
+  const sky = useMemo(() => withWeather(skyAt(now, at), weather), [now, at, weather]);
+  const v = fixtureView(fixture, theme.style);
+  const curtain = CURTAIN_STYLES[theme.curtain].color;
+  return (
+    <svg viewBox={`${v.x} ${v.y} ${v.w} ${v.h}`} className="pointer-events-none block h-auto w-full" aria-hidden="true" style={{ overflow: "visible" }}>
+      <defs>
+        <filter id="room-soft" x="-20%" y="-20%" width="140%" height="140%"><feGaussianBlur stdDeviation="14" /></filter>
+        {fixture === "window" ? (
+          <>
+            <linearGradient id="room-sky" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0" stopColor={sky.top} />
+              <stop offset="1" stopColor={sky.bottom} />
+            </linearGradient>
+            <linearGradient id="room-glass" x1="0" y1="0" x2="1" y2="1">
+              <stop offset="0" stopColor="#FFFFFF" stopOpacity="0" />
+              <stop offset="0.42" stopColor="#FFFFFF" stopOpacity="0" />
+              <stop offset="0.46" stopColor="#FFFFFF" stopOpacity="0.32" />
+              <stop offset="0.52" stopColor="#FFFFFF" stopOpacity="0.08" />
+              <stop offset="0.56" stopColor="#FFFFFF" stopOpacity="0.22" />
+              <stop offset="0.6" stopColor="#FFFFFF" stopOpacity="0" />
+              <stop offset="1" stopColor="#FFFFFF" stopOpacity="0" />
+            </linearGradient>
+            <linearGradient id="room-curtain" x1="0" y1="0" x2="1" y2="0">
+              {[0, 0.16, 0.33, 0.5, 0.66, 0.83, 1].map((o, i) => <stop key={o} offset={o} stopColor={curtain} stopOpacity={i % 2 ? 0.78 : 1} />)}
+            </linearGradient>
+          </>
+        ) : null}
+        {fixture === "weather" ? (
+          <linearGradient id="room-clock-rim" x1="0" y1="0" x2="1" y2="1">
+            <stop offset="0" stopColor="#E2AE78" />
+            <stop offset="0.5" stopColor="#C98F5A" />
+            <stop offset="1" stopColor="#8E5C32" />
+          </linearGradient>
+        ) : null}
+      </defs>
+      {fixture === "window" ? <Window sky={sky} curtain={curtain} season={seasonOf(now, at)} weather={weather} style={theme.style} /> : null}
+      {fixture === "clock" ? <Clock now={now} night={sky.light < 0.2} /> : null}
+      {fixture === "weather" ? <WeatherBoard weather={weather} night={sky.altitude < -4} place={placeName} /> : null}
+      {fixture === "shelf" ? <Shelves only={0} /> : null}
+    </svg>
+  );
 }
