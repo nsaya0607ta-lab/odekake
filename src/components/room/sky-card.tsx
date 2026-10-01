@@ -162,9 +162,12 @@ export function SkyCard({ now, place, onPlace, weather = null, steps, history, h
   );
   return (
     <>
-      {/* 窓わくの中に、いまの空と町。窓台に、きょうの歩数とフレンドのおへやへの入り口 */}
-      <div className="flex flex-col rounded-[22px] border border-[#E3D6C0] bg-[linear-gradient(180deg,#FFFFFF,#F1E8D8)] p-2 shadow-[0_8px_16px_-10px_rgba(80,55,25,.5)]" style={height ? { height } : undefined}>
-        <div ref={skyRef} className={`relative min-h-0 overflow-hidden rounded-[15px] shadow-[inset_0_2px_6px_rgba(40,25,10,.35)] ${height ? "flex-1" : "aspect-[2/1]"}`}>
+      {/* いまの空と町（ふちなし）。下に、すりガラスの帯（もようがえ・きょうの歩数・フレンドのおへや） */}
+      <div
+        className={`relative isolate overflow-hidden rounded-[26px] shadow-[0_14px_28px_-16px_rgba(30,50,80,.55),0_2px_6px_-2px_rgba(30,50,80,.18)] ${height ? "" : "h-[300px]"}`}
+        style={{ ...(height ? { height } : {}), backgroundColor: ink("#8DBF6E", "#121A2E") }}
+      >
+        <div ref={skyRef} className="absolute inset-x-0 top-0 bottom-[52px]">
           <svg viewBox={`0 ${-extra} 300 ${150 + extra}`} preserveAspectRatio="xMidYMax slice" className="absolute inset-0 block h-full w-full" role="img" aria-label={`日の出 ${times.rise ? fmtJstTime(times.rise) : "-"}、日の入り ${times.set ? fmtJstTime(times.set) : "-"}。${status}`}>
             <defs>
               <linearGradient id="skycard-bg" x1="0" y1="0" x2="0" y2="1">
@@ -250,24 +253,25 @@ export function SkyCard({ now, place, onPlace, weather = null, steps, history, h
                 </g>
               </g>
             ) : null}
-            <text x="10" y="143" fontSize="9.5" fontWeight="800" fill="#FFFFFF" opacity="0.92">日の出 {times.rise ? fmtJstTime(times.rise) : "-"}</text>
-            <text x="290" y="143" fontSize="9.5" fontWeight="800" fill="#FFFFFF" opacity="0.92" textAnchor="end">日の入り {times.set ? fmtJstTime(times.set) : "-"}</text>
             <rect x="0" y={-extra} width="300" height={150 + extra} fill="url(#skycard-glass)" />
           </svg>
           <div className="absolute inset-x-0 top-0 flex items-start justify-between gap-2 p-2.5">
-            <div className="flex flex-col items-start gap-1">
+            <div className="flex min-w-0 flex-col items-start gap-1">
               <p className="rounded-full bg-black/20 px-2.5 py-1 text-[11px] font-black text-white backdrop-blur-sm">きょうの空<span className="ml-1.5 text-[10px] font-bold opacity-85">いま {fmtJstTime(now)}</span></p>
-              <p className="rounded-full bg-white/25 px-2.5 py-0.5 text-[10px] font-bold text-white backdrop-blur-sm">{weatherChip ? `${weatherChip} ・ ` : ""}🌙 {moonName(moon)}</p>
+              <p className="whitespace-nowrap rounded-full bg-white/25 px-2.5 py-0.5 text-[10px] font-bold text-white backdrop-blur-sm">{weatherChip ? `${weatherChip} ・ ` : ""}🌙 {moonName(moon)}</p>
             </div>
-            <button type="button" onClick={() => setOpen(true)} aria-haspopup="dialog" className="flex max-w-[56%] items-center gap-1 rounded-full bg-white/85 px-2.5 py-1 text-[10px] font-bold text-ink-soft shadow-sm backdrop-blur-sm active:scale-95">
-              <span aria-hidden>📍</span><span className="truncate">{placeLabel}</span><span aria-hidden className="text-ink-faint">▼</span>
-            </button>
+            <div className="flex shrink-0 flex-col items-end gap-1">
+              <button type="button" onClick={() => setOpen(true)} aria-haspopup="dialog" className="flex max-w-[42vw] items-center gap-1 rounded-full bg-white/85 px-2.5 py-1 text-[10px] font-bold text-ink-soft shadow-sm backdrop-blur-sm active:scale-95">
+                <span aria-hidden>📍</span><span className="truncate">{placeLabel}</span><span aria-hidden className="text-ink-faint">▼</span>
+              </button>
+              <p className="whitespace-nowrap rounded-full bg-white/25 px-2.5 py-0.5 text-[10px] font-bold text-white backdrop-blur-sm" aria-label={`日の出 ${times.rise ? fmtJstTime(times.rise) : "-"}、日の入り ${times.set ? fmtJstTime(times.set) : "-"}`}>🌅 {times.rise ? fmtJstTime(times.rise) : "-"} ・ 🌇 {times.set ? fmtJstTime(times.set) : "-"}</p>
+            </div>
           </div>
         </div>
-        {/* 窓台：もようがえ・きょうの歩数・フレンドのおへや */}
-        <div className={`mt-2 flex shrink-0 items-center gap-2 rounded-[13px] bg-[linear-gradient(180deg,#FBF6EE,#EFE4D2)] p-1.5 shadow-[inset_0_1px_0_#fff] ${onEdit ? "" : "pl-2.5"}`}>
+        {/* すりガラスの帯：もようがえ・きょうの歩数・フレンドのおへや */}
+        <div className={`absolute inset-x-2 bottom-2 flex items-center gap-2 rounded-[19px] bg-white/80 p-1.5 shadow-[0_8px_18px_-10px_rgba(20,30,50,.55)] ring-1 ring-white/70 backdrop-blur-md ${onEdit ? "" : "pl-3"}`}>
           {onEdit ? (
-            <button type="button" onClick={onEdit} className="flex shrink-0 flex-col items-center justify-center gap-0.5 self-stretch rounded-[11px] border border-leaf/30 bg-white px-2 py-1 text-leaf-deep shadow-sm active:scale-95">
+            <button type="button" onClick={onEdit} className="flex shrink-0 flex-col items-center justify-center gap-0.5 self-stretch rounded-[14px] bg-leaf-soft px-2.5 py-1 text-leaf-deep active:scale-95">
               <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                 <path d="M4 12V9a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2v3" /><path d="M3 12h18v4H3z" /><path d="M5 16v2M19 16v2" />
               </svg>
@@ -290,7 +294,7 @@ export function SkyCard({ now, place, onPlace, weather = null, steps, history, h
             <p className="min-w-0 flex-1 text-[11px] font-bold leading-snug text-ink-soft">{steps ? "👣 歩数はショートカットで連携すると出ます" : status}</p>
           )}
           {friends ? (
-            <button type="button" onClick={() => setFriendsOpen(true)} aria-haspopup="dialog" className="relative flex shrink-0 items-center gap-2 rounded-[11px] bg-leaf-deep py-1.5 pl-1.5 pr-3 text-white shadow-[0_3px_8px_-3px_rgba(60,90,40,.7)] active:scale-95">
+            <button type="button" onClick={() => setFriendsOpen(true)} aria-haspopup="dialog" className="relative flex shrink-0 items-center gap-2 rounded-[14px] bg-leaf-deep py-1.5 pl-1.5 pr-3 text-white shadow-[0_4px_10px_-4px_rgba(60,90,40,.8)] active:scale-95">
               <span className="flex -space-x-2" aria-hidden>
                 {(friends.length ? friends.slice(0, 2) : [{ id: "door", name: "🚪", avatar: null }]).map((f) => (
                   <span key={f.id} className="flex h-7 w-7 items-center justify-center overflow-hidden rounded-full bg-[#EAF3E2] text-[11px] font-black text-leaf-deep ring-2 ring-leaf-deep">
