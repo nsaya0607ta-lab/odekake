@@ -42,7 +42,10 @@ import {
   type Placement,
   type RoomLayout,
   type RoomPhoto,
+  type RoomStyle,
   type RoomTheme,
+  ROOM_STYLES,
+  windowOf,
 } from "@/lib/room/types";
 import { DecorVisual, FRAME_LABELS } from "./decor-visual";
 import type { FurnitureFx } from "./furniture-art";
@@ -95,10 +98,13 @@ function widthOf(entry: DecorEntry, p: Placement): number {
 /** 壁に掛けるものを置く候補（窓・時計・棚をさけた場所） */
 const WALL_SPOTS = [[48, 23], [48, 41], [21, 47], [60, 12], [91, 12], [35, 48], [8, 47]] as const;
 /** 壁で、掛けるものを置きたくない場所（窓・時計・棚・ライト）。[x0, y0, x1, y1] */
-const WALL_BLOCKS = [[4, 5, 40, 41], [67, 2, 85, 22], [56, 21, 96, 46], [43, 0, 57, 12]] as const;
+/** 壁に物を掛けにくいところ（時計・棚・天井のライト）。窓は部屋の形ごとに足す */
+const WALL_BLOCKS = [[67, 2, 85, 22], [56, 21, 96, 46], [43, 0, 57, 12]] as const;
 
 /** 壁に掛けるものの置き場所：窓などに重ならず、すでに掛けてあるものからいちばん離れたところ */
-function freeWallSpot(taken: readonly { x: number; y: number }[]): [number, number] {
+function freeWallSpot(taken: readonly { x: number; y: number }[], style: RoomStyle): [number, number] {
+  const win = windowOf(style);
+  const blocks = [[win.x0 - 3, win.y0 - 4, win.x1 + 3, win.y1 + 3], ...WALL_BLOCKS] as const;
   // 写真1枚ぶんの大きさ（幅21% × 高さ約16%）の四角で考える
   const hw = 11, hh = 8;
   const overlap = (ax0: number, ay0: number, ax1: number, ay1: number, bx0: number, by0: number, bx1: number, by1: number) =>
@@ -107,7 +113,7 @@ function freeWallSpot(taken: readonly { x: number; y: number }[]): [number, numb
   for (let x = 14; x <= 86; x += 2) {
     for (let y = 10; y <= ROOM.wallBottom - 3; y += 2) {
       const box = [x - hw, y - hh, x + hw, y + hh] as const;
-      const blocked = WALL_BLOCKS.reduce((sum, [x0, y0, x1, y1]) => sum + overlap(...box, x0, y0, x1, y1), 0);
+      const blocked = blocks.reduce((sum, [x0, y0, x1, y1]) => sum + overlap(...box, x0, y0, x1, y1), 0);
       const crowd = taken.reduce((sum, t) => sum + overlap(...box, t.x - hw, t.y - hh, t.x + hw, t.y + hh), 0);
       const near = taken.length ? Math.min(...taken.map((t) => Math.hypot(t.x - x, (t.y - y) * 1.4))) : 40;
       const score = Math.min(near, 40) - blocked * 0.2 - crowd * 0.3 - Math.abs(x - 50) * 0.03;
@@ -326,7 +332,7 @@ export function MyRoom({ entries, initialLayout, serverReady, dogSkin, dogName, 
     let x: number, y: number;
     if (isHanging(entry.kind)) {
       const hanging = base.items.filter((p) => { const e = entryByKey.get(p.key); return (e && isHanging(e.kind)) || p.key.startsWith("upload:"); });
-      [x, y] = freeWallSpot(hanging);
+      [x, y] = freeWallSpot(hanging, base.theme.style);
     } else if (entry.kind === "trophy") {
       const onShelf = base.items.filter((p) => shelfOf(p)).length;
       const shelf = ROOM.shelves[onShelf < 6 ? 0 : 1];
@@ -465,6 +471,8 @@ export function MyRoom({ entries, initialLayout, serverReady, dogSkin, dogName, 
     const floor = layout.items.filter((p) => { const e = entryByKey.get(p.key); return e && !isHanging(e.kind) && !shelfOf(p); });
     return {
       toys: floor.filter((p) => entryByKey.get(p.key)?.kind === "item").map((p) => ({ x: p.x, y: p.y, name: entryByKey.get(p.key)!.name })),
+      // 窓のまん中（犬が外をながめに行く）
+      window: { x: (windowOf(layout.theme.style).x0 + windowOf(layout.theme.style).x1) / 2 },
       // 家具ひとつずつの場所と大きさ（犬がそれぞれの家具で遊ぶ）
       furniture: floor.flatMap((p) => {
         const e = entryByKey.get(p.key);
@@ -480,7 +488,7 @@ export function MyRoom({ entries, initialLayout, serverReady, dogSkin, dogName, 
         return [{ x0: p.x - w / 2 - 3, x1: p.x + w / 2 + 3, y0: p.y - (w * (FURNITURE_DEPTH[e.furniture] ?? 0.3)) / ROOM.aspect, y1: p.y + 3 }];
       }),
     };
-  }, [entryByKey, layout.items]);
+  }, [entryByKey, layout.items, layout.theme.style]);
 
   const selected = layout.items.find((p) => p.id === selectedId) ?? null;
   const selectedEntry = selected ? entryByKey.get(selected.key) ?? null : null;
@@ -672,7 +680,7 @@ export function MyRoom({ entries, initialLayout, serverReady, dogSkin, dogName, 
                 ))}
               </div>
               <p className="mt-2 text-[11px] font-semibold text-ink-faint">
-                {tab === "theme" ? "壁紙・床・カーテン・ラグを選べます" : tab === "photo" ? "スマホの写真や、おでかけ記録の写真を額に入れて飾れます" : "タップで飾る・ドラッグで動かす（アイテムは棚にも乗せられます）"}
+                {tab === "theme" ? "部屋の形（窓）・壁紙・床・カーテン・ラグを選べます" : tab === "photo" ? "スマホの写真や、おでかけ記録の写真を額に入れて飾れます" : "タップで飾る・ドラッグで動かす（アイテムは棚にも乗せられます）"}
               </p>
               {tab === "item" ? (
                 <div className="-mx-4 mt-2 flex gap-2 overflow-x-auto px-4 pb-1">
@@ -795,6 +803,20 @@ export function MyRoom({ entries, initialLayout, serverReady, dogSkin, dogName, 
   );
 }
 
+const STYLE_LABELS: Record<RoomStyle, string> = { standard: "いつもの", arch: "アーチ窓", bay: "出窓", round: "まる窓", attic: "屋根裏", shoji: "和室", french: "大きな窓" };
+/** 部屋の形の見本（壁と窓のかたち） */
+const styleSwatch = (style: RoomStyle): React.CSSProperties => {
+  const shape: Record<RoomStyle, string> = {
+    standard: "<rect x='9' y='9' width='30' height='24' fill='%2398CDF0' stroke='%23fff' stroke-width='3'/><path d='M24 9v24M9 21h30' stroke='%23fff' stroke-width='2'/>",
+    arch: "<path d='M13 38V20a11 11 0 0 1 22 0v18z' fill='%2398CDF0' stroke='%23fff' stroke-width='3'/><path d='M24 9v29M13 22h22' stroke='%23fff' stroke-width='2'/>",
+    bay: "<path d='M6 12h36v22H6z' fill='%2398CDF0' stroke='%23fff' stroke-width='3'/><path d='M14 13v20M34 13v20' stroke='%23fff' stroke-width='2'/><rect x='3' y='34' width='42' height='5' fill='%23fff'/>",
+    round: "<circle cx='24' cy='22' r='12' fill='%2398CDF0' stroke='%23A8743F' stroke-width='4'/><path d='M24 10v24M12 22h24' stroke='%23A8743F' stroke-width='2'/>",
+    attic: "<path d='M0 0h12L0 18zM48 0H36l12 18z' fill='%23D9B98E'/><path d='M15 38V20l9-8 9 8v18z' fill='%2398CDF0' stroke='%23fff' stroke-width='3'/>",
+    shoji: "<rect x='8' y='9' width='32' height='28' fill='%23FFFBEF' stroke='%236E4424' stroke-width='3'/><rect x='8' y='9' width='16' height='28' fill='%2398CDF0' stroke='%236E4424' stroke-width='3'/><path d='M30 9v28M35 9v28M24 18h16M24 27h16' stroke='%238A5A34' stroke-width='1.5'/>",
+    french: "<rect x='12' y='6' width='24' height='38' fill='%2398CDF0' stroke='%23fff' stroke-width='3'/><path d='M24 6v38' stroke='%23fff' stroke-width='2'/><path d='M12 33h24' stroke='%23F4F1EA' stroke-width='3'/>",
+  };
+  return { background: `url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 48 48'><rect width='48' height='48' fill='%23FBF3E4'/>${shape[style]}</svg>") center/cover` };
+};
 const DECO_LABELS: Record<WallDeco, string> = { none: "なし", garland: "ガーランド", lights: "ライト", stars: "お星さま" };
 const DECO_SWATCH: Record<WallDeco, string> = {
   none: "repeating-linear-gradient(45deg, #fff 0 6px, #eee 6px 12px)",
@@ -806,6 +828,7 @@ const DECO_SWATCH: Record<WallDeco, string> = {
 function ThemePicker({ theme, onChange }: { theme: RoomTheme; onChange: (patch: Partial<RoomTheme>) => void }) {
   return (
     <div className="mt-3 space-y-4">
+      <Swatches title="へやの形" value={theme.style} options={ROOM_STYLES} label={(id) => STYLE_LABELS[id]} paint={styleSwatch} onPick={(style) => onChange({ style })} />
       <Swatches title="壁紙" value={theme.wall} options={WALLPAPERS} label={(id) => WALLPAPER_STYLES[id].label} paint={(id) => ({ background: `radial-gradient(circle at 30% 30%, ${WALLPAPER_STYLES[id].ink} 0 22%, transparent 23%), ${WALLPAPER_STYLES[id].base}` })} onPick={(wall) => onChange({ wall })} />
       <Swatches title="床" value={theme.floor} options={FLOORS} label={(id) => FLOOR_STYLES[id].label} paint={(id) => ({ background: `repeating-linear-gradient(90deg, ${FLOOR_STYLES[id].base} 0 10px, ${FLOOR_STYLES[id].line} 10px 12px)` })} onPick={(floor) => onChange({ floor })} />
       <Swatches title="カーテン" value={theme.curtain} options={CURTAINS} label={(id) => CURTAIN_STYLES[id].label} paint={(id) => ({ background: CURTAIN_STYLES[id].color })} onPick={(curtain) => onChange({ curtain })} />

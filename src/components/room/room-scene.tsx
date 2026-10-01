@@ -9,7 +9,7 @@ import { memo, useMemo } from "react";
 import { skyAt, TOKYO, type GeoPoint, type SkyState } from "@/lib/room/sun";
 import { overcastOf, withWeather, type RoomWeather } from "@/lib/room/weather";
 import { CURTAIN_STYLES, FLOOR_STYLES, RUG_STYLES, WALLPAPER_STYLES } from "@/lib/room/themes";
-import { ROOM, type RoomTheme } from "@/lib/room/types";
+import { ROOM, windowOf, type RoomStyle, type RoomTheme } from "@/lib/room/types";
 
 export type DayPhase = "morning" | "day" | "evening" | "night";
 
@@ -59,6 +59,7 @@ export const RoomScene = memo(function RoomScene({ theme, now, at = TOKYO, weath
   const wall = WALLPAPER_STYLES[theme.wall];
   const sky = useMemo(() => withWeather(skyAt(now, at), weather), [now, at, weather]);
   const overcast = overcastOf(weather);
+  const win = windowOf(theme.style);
   const night = sky.light < 0.2;
   const lit = lampsOn(sky);
   const sunUp = sky.altitude > 0;
@@ -140,9 +141,17 @@ export const RoomScene = memo(function RoomScene({ theme, now, at = TOKYO, weath
       <rect x="0" y="0" width={W} height={HZ} fill="#7A6040" filter="url(#room-grain)" opacity="0.07" />
       <rect x="0" y="0" width={W} height={HZ} fill="url(#room-wall-shade)" />
       {/* 窓から入る光が壁を明るくする */}
-      {sky.light > 0.1 ? <ellipse cx={px((ROOM.window.x0 + ROOM.window.x1) / 2)} cy={py(24)} rx="360" ry="300" fill="url(#room-window-glow)" /> : null}
+      {sky.light > 0.1 ? <ellipse cx={px((win.x0 + win.x1) / 2)} cy={py((win.y0 + win.y1) / 2)} rx="360" ry="300" fill="url(#room-window-glow)" /> : null}
 
-      <Window sky={sky} curtain={CURTAIN_STYLES[theme.curtain].color} season={seasonOf(now, at)} weather={weather} />
+      {/* 和室は長押（なげし）を壁にわたす */}
+      {theme.style === "shoji" ? (
+        <g>
+          <rect x="0" y={py(5.2)} width={W} height="16" fill="#9A6A40" />
+          <rect x="0" y={py(5.2)} width={W} height="3" fill="#C99A66" />
+          <rect x="0" y={py(5.2) + 16} width={W} height="8" fill="#2A1A0C" opacity="0.12" />
+        </g>
+      ) : null}
+      <Window sky={sky} curtain={CURTAIN_STYLES[theme.curtain].color} season={seasonOf(now, at)} weather={weather} style={theme.style} />
       <WallDecoration deco={theme.deco} lit={lit} />
       <Clock now={now} night={night} />
       <Shelves />
@@ -154,7 +163,7 @@ export const RoomScene = memo(function RoomScene({ theme, now, at = TOKYO, weath
       {/* 窓から差しこむ光 */}
       {sunUp ? (
         <polygon
-          points={`${px(ROOM.window.x0) + 30},${HZ} ${px(ROOM.window.x1) - 10},${HZ} ${px(ROOM.window.x1) + 150 + beamSkew},${H * 0.86} ${px(ROOM.window.x0) + 120 + beamSkew},${H * 0.86}`}
+          points={`${px(win.x0) + 30},${HZ} ${px(win.x1) - 10},${HZ} ${px(win.x1) + 150 + beamSkew},${H * 0.86} ${px(win.x0) + 120 + beamSkew},${H * 0.86}`}
           fill={mixColor("#FFF6D8", "#FFAE6E", sky.warm)}
           opacity={0.26 * Math.min(1, sky.altitude / 10) * (1 - 0.9 * overcast)}
           filter="url(#room-soft)"
@@ -177,6 +186,7 @@ export const RoomScene = memo(function RoomScene({ theme, now, at = TOKYO, weath
       <line x1={SIDE} y1={CEIL} x2={SIDE} y2={HZ} stroke="#000" strokeOpacity="0.1" strokeWidth="2" />
       <line x1={W - SIDE} y1={CEIL} x2={W - SIDE} y2={HZ} stroke="#000" strokeOpacity="0.1" strokeWidth="2" />
       <line x1={SIDE} y1={CEIL} x2={W - SIDE} y2={CEIL} stroke="#000" strokeOpacity="0.08" strokeWidth="2" />
+      {theme.style === "attic" ? <AtticCeiling /> : null}
       <PendantLamp lit={lit} />
     </svg>
   );
@@ -387,9 +397,10 @@ function Cloud({ x, y, s, fill }: { x: number; y: number; s: number; fill: strin
   );
 }
 
-function Window({ sky, curtain, season, weather }: { sky: SkyState; curtain: string; season: Season; weather: RoomWeather | null }) {
-  const x0 = px(ROOM.window.x0), x1 = px(ROOM.window.x1), y0 = py(ROOM.window.y0), y1 = py(ROOM.window.y1);
-  const w = x1 - x0, h = y1 - y0, cx = (x0 + x1) / 2;
+function Window({ sky, curtain, season, weather, style }: { sky: SkyState; curtain: string; season: Season; weather: RoomWeather | null; style: RoomStyle }) {
+  const win = windowOf(style);
+  const x0 = px(win.x0), x1 = px(win.x1), y0 = py(win.y0), y1 = py(win.y1);
+  const w = x1 - x0, h = y1 - y0;
   const night = sky.light < 0.2;
   const dark = 1 - sky.light;
   const overcast = overcastOf(weather);
@@ -405,6 +416,7 @@ function Window({ sky, curtain, season, weather }: { sky: SkyState; curtain: str
   const sunY = horizonY - (Math.max(-6, sky.altitude) / 60) * (horizonY - y0 - 10);
   const sunColor = mixColor("#FFF6C8", "#FF8A4A", sky.warm);
   const T = 20;
+  const shape = windowShape(style, x0, y0, x1, y1);
   return (
     <g>
       <defs>
@@ -428,15 +440,33 @@ function Window({ sky, curtain, season, weather }: { sky: SkyState; curtain: str
           <stop offset="0" stopColor="#F3EADB" />
           <stop offset="1" stopColor="#D8CBB4" />
         </linearGradient>
+        {/* 外が見える形（窓の種類ごと） */}
+        <clipPath id="room-window-clip"><path d={windowShape(style, x0, y0, x1, y1)} /></clipPath>
+        <linearGradient id="room-wood-frame" x1="0" y1="0" x2="1" y2="1">
+          <stop offset="0" stopColor="#B98552" />
+          <stop offset="1" stopColor="#7A4E2A" />
+        </linearGradient>
       </defs>
-      {/* 窓わくのまわりの飾り板（壁から少し出っぱって、右下に影） */}
-      <rect x={x0 - T - 2} y={y0 - T + 4} width={w + T * 2 + 8} height={h + T * 2} rx="4" fill="#2A1A0C" opacity="0.14" filter="url(#room-soft)" />
-      <rect x={x0 - T} y={y0 - T} width={w + T * 2} height={h + T * 2} rx="3" fill="url(#room-casing)" />
-      <rect x={x0 - T} y={y0 - T} width={w + T * 2} height={h + T * 2} rx="3" fill="none" stroke="#C9B89A" strokeWidth="1.5" />
-      <rect x={x0 - 3} y={y0 - 3} width={w + 6} height={h + 6} fill="none" stroke="#CDBFA6" strokeWidth="2" />
+      {/* 窓のまわり（外の景色より奥に描く部分） */}
+      {style === "standard" || style === "bay" ? (
+        <g>
+          {/* 窓わくのまわりの飾り板（壁から少し出っぱって、右下に影） */}
+          <rect x={x0 - T - 2} y={y0 - T + 4} width={w + T * 2 + 8} height={h + T * 2} rx="4" fill="#2A1A0C" opacity="0.14" filter="url(#room-soft)" />
+          <rect x={x0 - T} y={y0 - T} width={w + T * 2} height={h + T * 2} rx="3" fill="url(#room-casing)" />
+          <rect x={x0 - T} y={y0 - T} width={w + T * 2} height={h + T * 2} rx="3" fill="none" stroke="#C9B89A" strokeWidth="1.5" />
+          <rect x={x0 - 3} y={y0 - 3} width={w + 6} height={h + 6} fill="none" stroke="#CDBFA6" strokeWidth="2" />
+        </g>
+      ) : (
+        <g>
+          {/* 窓の形にそった飾りわくと、壁に落ちる影 */}
+          <path d={shape} fill="none" stroke="#2A1A0C" strokeOpacity="0.16" strokeWidth={T * 2 + 6} filter="url(#room-soft)" transform="translate(3 6)" />
+          {style === "shoji" ? <path d={shape} fill="none" stroke="url(#room-wood-frame)" strokeWidth={T * 1.6} strokeLinejoin="round" /> : <path d={shape} fill="none" stroke="url(#room-casing)" strokeWidth={T * 2} strokeLinejoin="round" />}
+          <path d={shape} fill="none" stroke="#C9B89A" strokeWidth="1.5" />
+        </g>
+      )}
       {/* 外の景色 */}
-      <rect x={x0} y={y0} width={w} height={h} fill="url(#room-sky)" />
       <g clipPath="url(#room-window-clip)">
+      <rect x={x0} y={y0} width={w} height={h} fill="url(#room-sky)" />
         {sky.stars > 0.02 ? [[0.18, 0.2], [0.34, 0.4], [0.52, 0.16], [0.88, 0.5], [0.12, 0.55], [0.64, 0.34], [0.42, 0.08], [0.8, 0.12]].map(([sx, sy], i) => (
           <circle key={i} cx={x0 + w * sx!} cy={y0 + h * sy!} r={i % 3 ? 1.6 : 2.4} fill="#FFF8DA" opacity={sky.stars * (i % 2 ? 0.7 : 1)} />
         )) : null}
@@ -460,7 +490,6 @@ function Window({ sky, curtain, season, weather }: { sky: SkyState; curtain: str
         </g>
         {/* きりの日は景色がかすむ */}
         {weather?.kind === "fog" ? <rect x={x0} y={y0} width={w} height={h} fill="#F2F2F0" opacity={0.5 * Math.max(0.4, sky.light)} /> : null}
-      </g>
       <path d={`M${x0} ${y1 - h * 0.18} C ${x0 + w * 0.3} ${y1 - h * 0.34}, ${x0 + w * 0.62} ${y1 - h * 0.12}, ${x1} ${y1 - h * 0.26} L ${x1} ${y1} L ${x0} ${y1} Z`} fill={mixColor(snowy || (!weather && season === "snow") ? "#F4F6FA" : "#8DBF6E", "#14282C", dark * 0.9)} />
       <g transform={`translate(${x0 + w * 0.72} ${y1 - h * 0.24})`} fill={mixColor("#5E9C52", "#0F2224", dark * 0.9)}>
         <rect x="-3" y="-4" width="6" height="26" fill={mixColor("#7A5A3A", "#1E1A16", dark)} />
@@ -469,37 +498,248 @@ function Window({ sky, curtain, season, weather }: { sky: SkyState; curtain: str
       </g>
       {/* 夜は遠くの家に明かりがともる */}
       {night ? [[0.16, 0.86], [0.3, 0.9], [0.86, 0.84]].map(([sx, sy]) => <rect key={sx} x={x0 + w * sx!} y={y0 + h * sy!} width="6" height="5" fill="#FFD98A" opacity="0.85" />) : null}
-      <clipPath id="room-window-clip"><rect x={x0} y={y0} width={w} height={h} /></clipPath>
       <WindowWeather season={season} weather={weather} x0={x0} y0={y0} w={w} h={h} />
       {weather?.kind === "fog" ? <rect x={x0} y={y1 - h * 0.35} width={w} height={h * 0.35} fill="#F4F4F2" opacity={0.45 * Math.max(0.4, sky.light)} /> : null}
       {/* 雨の日はガラスに水てき */}
       {wet ? <RainOnGlass x0={x0} y0={y0} w={w} h={h} /> : null}
       {season === "summer" && !night && !wet ? <g>{[0.12, 0.3].map((sx) => <g key={sx} transform={`translate(${x0 + w * sx} ${y1 - h * 0.12})`}><rect x="-2" y="-30" width="4" height="34" fill="#5E9C52" /><circle cx="0" cy="-34" r="11" fill="#F6C12E" /><circle cx="0" cy="-34" r="5" fill="#8A5A30" /></g>)}</g> : null}
-      <rect x={x0} y={y0} width={w} height={h} fill="url(#room-glass)" opacity={night ? 0.35 : 1} />
-      {/* 窓わく（壁の厚みのぶん奥にあるので、上と左の内がわに影が落ちる） */}
-      <rect x={x0} y={y0} width={w} height={h} fill="none" stroke="#FFFFFF" strokeWidth="14" />
-      <rect x={x0 + 7} y={y0 + 7} width={w - 14} height="16" fill="url(#room-reveal-top)" />
-      <rect x={x0 + 7} y={y0 + 7} width="12" height={h - 14} fill="url(#room-reveal-left)" />
-      <rect x={cx - 4} y={y0} width="8" height={h} fill="#FFFFFF" />
-      <rect x={cx + 4} y={y0 + 7} width="3" height={h - 14} fill="#1E140A" opacity="0.1" />
-      <rect x={x0} y={y0 + h / 2 - 4} width={w} height="8" fill="#FFFFFF" />
-      <rect x={x0 + 7} y={y0 + h / 2 + 4} width={w - 14} height="4" fill="#1E140A" opacity="0.12" />
-      <rect x={x0 + 7} y={y0 + h / 2 - 4} width={w - 14} height="1.5" fill="#E8DFD0" />
-      {/* 窓台：上の面と前の厚み、下の影 */}
-      <rect x={x0 - 26} y={y1 + 26} width={w + 52} height="16" fill="#2A1A0C" opacity="0.16" filter="url(#room-soft)" />
-      <path d={`M${x0 - 14} ${y1 + 2} L${x1 + 14} ${y1 + 2} L${x1 + 26} ${y1 + 14} L${x0 - 26} ${y1 + 14} Z`} fill="url(#room-sill)" />
-      <rect x={x0 - 26} y={y1 + 14} width={w + 52} height="12" rx="2" fill="url(#room-sill-front)" />
-      <rect x={x0 - 26} y={y1 + 14} width={w + 52} height="1.5" fill="#FFFFFF" />
-      {/* カーテン */}
-      <rect x={x0 - 40} y={y0 - 34} width={w + 80} height="10" rx="5" fill="#B08A5E" />
-      <path d={`M${x0 - 34} ${y0 - 26} L${x0 + 34} ${y0 - 26} C ${x0 + 30} ${y0 + h * 0.4}, ${x0 + 6} ${y0 + h * 0.6}, ${x0 + 22} ${y1 + 26} L ${x0 - 34} ${y1 + 26} Z`} fill="url(#room-curtain)" />
-      <path d={`M${x1 + 34} ${y0 - 26} L${x1 - 34} ${y0 - 26} C ${x1 - 30} ${y0 + h * 0.4}, ${x1 - 6} ${y0 + h * 0.6}, ${x1 - 22} ${y1 + 26} L ${x1 + 34} ${y1 + 26} Z`} fill="url(#room-curtain)" />
-      <path d={`M${x0 - 40} ${y0 - 30} L${x1 + 40} ${y0 - 30} L${x1 + 40} ${y0 - 4} Q ${cx} ${y0 + 22} ${x0 - 40} ${y0 - 4} Z`} fill={curtain} />
-      <path d={`M${x0 - 40} ${y0 - 30} L${x1 + 40} ${y0 - 30} L${x1 + 40} ${y0 - 4} Q ${cx} ${y0 + 22} ${x0 - 40} ${y0 - 4} Z`} fill="#fff" opacity="0.15" />
-      <rect x={x0 - 28} y={y0 + h * 0.62} width="60" height="8" rx="4" fill="#FFF3D6" transform={`rotate(-8 ${x0} ${y0 + h * 0.62})`} />
-      <rect x={x1 - 32} y={y0 + h * 0.62} width="60" height="8" rx="4" fill="#FFF3D6" transform={`rotate(8 ${x1} ${y0 + h * 0.62})`} />
+        {/* 大きな窓の外はベランダ */}
+        {style === "french" ? <Balcony x0={x0} x1={x1} y1={y1} h={h} dark={dark} /> : null}
+      </g>
+      <path d={shape} fill="url(#room-glass)" opacity={night ? 0.35 : 1} />
+      <WindowFrame style={style} x0={x0} y0={y0} x1={x1} y1={y1} curtain={curtain} sky={sky} />
     </g>
   );
+}
+
+/** 屋根裏：左右のすみが、板ばりの斜めの天井になる */
+function AtticCeiling() {
+  const sx = W * 0.2, sy = H * 0.3;
+  const side = (flip: boolean) => {
+    const X = (x: number) => (flip ? W - x : x);
+    return (
+      <g>
+        <polygon points={`${X(0)},0 ${X(sx)},0 ${X(0)},${sy}`} fill="#E9D3B2" />
+        {/* 板ばり（斜めの線） */}
+        {[0.22, 0.42, 0.62, 0.82].map((k) => <line key={k} x1={X(sx * k)} y1="0" x2={X(0)} y2={sy * k} stroke="#B98A57" strokeOpacity="0.45" strokeWidth="2" />)}
+        <polygon points={`${X(0)},0 ${X(sx)},0 ${X(0)},${sy}`} fill="#3A2410" opacity={flip ? 0.16 : 0.08} />
+        {/* はり（太い木） */}
+        <line x1={X(sx + 8)} y1="-6" x2={X(-8)} y2={sy + 10} stroke="#8A5A30" strokeWidth="16" />
+        <line x1={X(sx + 8)} y1="-6" x2={X(-8)} y2={sy + 10} stroke="#B07A45" strokeWidth="5" transform="translate(-3 -3)" />
+        <line x1={X(sx + 14)} y1="0" x2={X(-2)} y2={sy + 18} stroke="#2A1A0C" strokeOpacity="0.15" strokeWidth="10" filter="url(#room-soft)" />
+      </g>
+    );
+  };
+  return <g>{side(false)}{side(true)}</g>;
+}
+
+/** 窓の外が見える形（SVG の path） */
+function windowShape(style: RoomStyle, x0: number, y0: number, x1: number, y1: number): string {
+  const w = x1 - x0, cx = (x0 + x1) / 2;
+  switch (style) {
+    case "arch": { const r = w / 2; return `M${x0} ${y1} V${y0 + r} A ${r} ${r} 0 0 1 ${x1} ${y0 + r} V${y1} Z`; }
+    case "round": { const r = w / 2, cy = (y0 + y1) / 2; return `M${cx - r} ${cy} A ${r} ${r} 0 1 1 ${cx + r} ${cy} A ${r} ${r} 0 1 1 ${cx - r} ${cy} Z`; }
+    case "attic": { const k = (y1 - y0) * 0.3; return `M${x0} ${y1} V${y0 + k} L${cx} ${y0} L${x1} ${y0 + k} V${y1} Z`; }
+    // 障子は左半分だけ開けてある
+    case "shoji": return `M${x0} ${y0} H${cx} V${y1} H${x0} Z`;
+    default: return `M${x0} ${y0} H${x1} V${y1} H${x0} Z`;
+  }
+}
+
+/** ベランダの手すり（大きな窓の外） */
+function Balcony({ x0, x1, y1, h, dark }: { x0: number; x1: number; y1: number; h: number; dark: number }) {
+  const top = y1 - h * 0.3, rail = mixColor("#F4F1EA", "#3A3E52", dark * 0.85), floor = mixColor("#C9C2B6", "#2A2C38", dark * 0.85);
+  return (
+    <g>
+      <rect x={x0} y={y1 - h * 0.08} width={x1 - x0} height={h * 0.08} fill={floor} />
+      {Array.from({ length: 9 }, (_, i) => <rect key={i} x={x0 + 8 + i * ((x1 - x0 - 16) / 8) - 2.5} y={top} width="5" height={h * 0.22} fill={rail} />)}
+      <rect x={x0} y={top - 6} width={x1 - x0} height="10" rx="3" fill={rail} />
+      <rect x={x0} y={top - 6} width={x1 - x0} height="3" fill="#FFFFFF" opacity={0.5 * (1 - dark)} />
+    </g>
+  );
+}
+
+/** 窓わく・窓台・カーテン（窓の種類ごと） */
+function WindowFrame({ style, x0, y0, x1, y1, curtain, sky }: { style: RoomStyle; x0: number; y0: number; x1: number; y1: number; curtain: string; sky: SkyState }) {
+  const w = x1 - x0, h = y1 - y0, cx = (x0 + x1) / 2;
+  const sill = (extra = 0) => (
+    <g>
+      <rect x={x0 - 26 - extra} y={y1 + 26} width={w + 52 + extra * 2} height="16" fill="#2A1A0C" opacity="0.16" filter="url(#room-soft)" />
+      <path d={`M${x0 - 14} ${y1 + 2} L${x1 + 14} ${y1 + 2} L${x1 + 26 + extra} ${y1 + 14 + extra * 0.6} L${x0 - 26 - extra} ${y1 + 14 + extra * 0.6} Z`} fill="url(#room-sill)" />
+      <rect x={x0 - 26 - extra} y={y1 + 14 + extra * 0.6} width={w + 52 + extra * 2} height="12" rx="2" fill="url(#room-sill-front)" />
+      <rect x={x0 - 26 - extra} y={y1 + 14 + extra * 0.6} width={w + 52 + extra * 2} height="1.5" fill="#FFFFFF" />
+    </g>
+  );
+  /** 両わきにまとめたカーテン。drop はすその位置 */
+  const drapes = (drop: number, rodY = y0 - 34, tie = 0.62) => (
+    <g>
+      <rect x={x0 - 40} y={rodY} width={w + 80} height="10" rx="5" fill="#B08A5E" />
+      {[x0 - 46, x1 + 46].map((rx) => <circle key={rx} cx={rx} cy={rodY + 5} r="8" fill="#9A7448" />)}
+      <path d={`M${x0 - 34} ${rodY + 8} L${x0 + 30} ${rodY + 8} C ${x0 + 26} ${y0 + h * 0.4}, ${x0 + 4} ${y0 + h * tie}, ${x0 + 20} ${drop} L ${x0 - 34} ${drop} Z`} fill="url(#room-curtain)" />
+      <path d={`M${x1 + 34} ${rodY + 8} L${x1 - 30} ${rodY + 8} C ${x1 - 26} ${y0 + h * 0.4}, ${x1 - 4} ${y0 + h * tie}, ${x1 - 20} ${drop} L ${x1 + 34} ${drop} Z`} fill="url(#room-curtain)" />
+      <rect x={x0 - 28} y={y0 + h * tie} width="60" height="8" rx="4" fill="#FFF3D6" transform={`rotate(-8 ${x0} ${y0 + h * tie})`} />
+      <rect x={x1 - 32} y={y0 + h * tie} width="60" height="8" rx="4" fill="#FFF3D6" transform={`rotate(8 ${x1} ${y0 + h * tie})`} />
+    </g>
+  );
+  const valance = (
+    <g>
+      <path d={`M${x0 - 40} ${y0 - 30} L${x1 + 40} ${y0 - 30} L${x1 + 40} ${y0 - 4} Q ${cx} ${y0 + 22} ${x0 - 40} ${y0 - 4} Z`} fill={curtain} />
+      <path d={`M${x0 - 40} ${y0 - 30} L${x1 + 40} ${y0 - 30} L${x1 + 40} ${y0 - 4} Q ${cx} ${y0 + 22} ${x0 - 40} ${y0 - 4} Z`} fill="#fff" opacity="0.15" />
+    </g>
+  );
+  switch (style) {
+    case "arch": {
+      const r = w / 2, sy = y0 + r;
+      return (
+        <g>
+          <path d={windowShape("arch", x0, y0, x1, y1)} fill="none" stroke="#FFFFFF" strokeWidth="14" />
+          <rect x={x0 + 7} y={sy} width="12" height={y1 - sy - 7} fill="url(#room-reveal-left)" />
+          {/* 上の半円は扇のように分ける */}
+          {[-60, -30, 0, 30, 60].map((a) => <line key={a} x1={cx} y1={sy} x2={cx + Math.sin((a * Math.PI) / 180) * r} y2={sy - Math.cos((a * Math.PI) / 180) * r} stroke="#FFFFFF" strokeWidth="6" />)}
+          <circle cx={cx} cy={sy} r={r * 0.28} fill="none" stroke="#FFFFFF" strokeWidth="6" />
+          <rect x={x0} y={sy - 4} width={w} height="8" fill="#FFFFFF" />
+          <rect x={cx - 4} y={sy} width="8" height={y1 - sy} fill="#FFFFFF" />
+          <rect x={x0} y={sy + (y1 - sy) / 2 - 3} width={w} height="6" fill="#FFFFFF" />
+          <rect x={cx + 4} y={sy + 7} width="3" height={y1 - sy - 14} fill="#1E140A" opacity="0.1" />
+          {sill()}
+          {drapes(y1 + 26, y0 - 40, 0.66)}
+        </g>
+      );
+    }
+    case "bay": {
+      // 出窓：まん中と左右の3まい。左右は斜めに奥へ向かうので、少し暗くせまく見える
+      const a = x0 + w * 0.2, b = x1 - w * 0.2;
+      return (
+        <g>
+          <path d={`M${x0} ${y0} L${a} ${y0 + 10} L${a} ${y1 - 6} L${x0} ${y1} Z`} fill="#1E140A" opacity="0.1" />
+          <path d={`M${x1} ${y0} L${b} ${y0 + 10} L${b} ${y1 - 6} L${x1} ${y1} Z`} fill="#1E140A" opacity="0.16" />
+          {/* 出窓の天井（奥まって影になる） */}
+          <path d={`M${x0} ${y0} L${x1} ${y0} L${b} ${y0 + 10} L${a} ${y0 + 10} Z`} fill="#F1E8D8" />
+          <path d={`M${x0} ${y0} L${x1} ${y0} L${b} ${y0 + 10} L${a} ${y0 + 10} Z`} fill="url(#room-reveal-top)" />
+          <rect x={x0} y={y0} width={w} height={h} fill="none" stroke="#FFFFFF" strokeWidth="14" />
+          {[a, b].map((x) => <path key={x} d={`M${x} ${y0 + 10} V${y1 - 6}`} stroke="#FFFFFF" strokeWidth="9" />)}
+          <path d={`M${x0} ${y0} L${a} ${y0 + 10} M${x1} ${y0} L${b} ${y0 + 10}`} stroke="#FFFFFF" strokeWidth="6" />
+          <rect x={a} y={y0 + h * 0.45} width={b - a} height="6" fill="#FFFFFF" />
+          {/* 深い窓台と、小さなサボテン */}
+          <path d={`M${x0} ${y1} L${x1} ${y1} L${b} ${y1 - 6} L${a} ${y1 - 6} Z`} fill="#FFFFFF" />
+          {sill(14)}
+          <g transform={`translate(${x0 + w * 0.12} ${y1 + 8})`}>
+            <path d="M-12 0 L12 0 L9 -16 L-9 -16 Z" fill="#D9806B" />
+            <rect x="-11" y="-19" width="22" height="5" rx="2" fill="#E8977F" />
+            <path d="M-4 -19 v-18 q0 -6 4 -6 q4 0 4 6 v18 z M4 -27 h6 v-8 q0 -4 -3 -4 q-3 0 -3 4 z M-4 -24 h-6 v-6 q0 -4 3 -4 q3 0 3 4 z" fill="#6FAF68" />
+          </g>
+          {/* 出窓は上のバランスだけ（出窓の中までカーテンでふさがない） */}
+          <rect x={x0 - 40} y={y0 - 34} width={w + 80} height="10" rx="5" fill="#B08A5E" />
+          {valance}
+        </g>
+      );
+    }
+    case "round": {
+      const r = w / 2, cy = (y0 + y1) / 2;
+      return (
+        <g>
+          <circle cx={cx} cy={cy} r={r} fill="none" stroke="url(#room-wood-frame)" strokeWidth="18" />
+          <circle cx={cx} cy={cy} r={r - 8} fill="none" stroke="#FFFFFF" strokeOpacity="0.85" strokeWidth="3" />
+          <path d={`M${cx - r} ${cy} A ${r} ${r} 0 0 1 ${cx + r} ${cy}`} fill="none" stroke="#1E140A" strokeOpacity="0.18" strokeWidth="10" transform={`translate(0 6)`} clipPath="url(#room-window-clip)" />
+          <rect x={cx - 4} y={cy - r} width="8" height={r * 2} fill="url(#room-wood-frame)" />
+          <rect x={cx - r} y={cy - 4} width={r * 2} height="8" fill="url(#room-wood-frame)" />
+          {[45, 135, 225, 315].map((a) => <circle key={a} cx={cx + Math.cos((a * Math.PI) / 180) * r} cy={cy + Math.sin((a * Math.PI) / 180) * r} r="3.5" fill="#E2B85A" />)}
+          {/* 下に小さな飾り棚 */}
+          <rect x={cx - r * 0.7} y={cy + r + 22} width={r * 1.4} height="10" rx="2" fill="url(#room-wood-frame)" />
+          <rect x={cx - r * 0.7} y={cy + r + 32} width={r * 1.4} height="10" fill="#2A1A0C" opacity="0.12" filter="url(#room-soft)" />
+          <g transform={`translate(${cx - r * 0.35} ${cy + r + 22})`}>
+            <path d="M-8 0 L8 0 L6 -12 L-6 -12 Z" fill="#8DBDE6" />
+            {[-5, 0, 5].map((dx, i) => <ellipse key={dx} cx={dx} cy={-18 - (i % 2) * 3} rx="3.5" ry="7" fill="#86C47A" transform={`rotate(${dx * 3} ${dx} -12)`} />)}
+          </g>
+          <g transform={`translate(${cx + r * 0.35} ${cy + r + 22})`}><rect x="-7" y="-16" width="14" height="16" rx="2" fill="#F4E3C3" /><rect x="-5" y="-14" width="4" height="12" rx="2" fill="#FFFFFF" opacity="0.5" /></g>
+        </g>
+      );
+    }
+    case "attic": {
+      const k = h * 0.3;
+      return (
+        <g>
+          <path d={windowShape("attic", x0, y0, x1, y1)} fill="none" stroke="#FFFFFF" strokeWidth="14" strokeLinejoin="round" />
+          <path d={`M${x0 + 7} ${y0 + k + 4} L${cx} ${y0 + 8} L${x1 - 7} ${y0 + k + 4}`} fill="none" stroke="#1E140A" strokeOpacity="0.16" strokeWidth="8" />
+          <rect x={cx - 4} y={y0} width="8" height={h} fill="#FFFFFF" />
+          <rect x={x0} y={y0 + k + (h - k) * 0.42} width={w} height="7" fill="#FFFFFF" />
+          {sill()}
+          {/* 小さなカフェカーテン（下半分） */}
+          <rect x={x0 - 8} y={y0 + k + (h - k) * 0.42 - 6} width={w + 16} height="6" rx="3" fill="#B08A5E" />
+          {[0, 1].map((i) => <path key={i} d={`M${i ? cx + 2 : x0 - 4} ${y0 + k + (h - k) * 0.42} H${i ? x1 + 4 : cx - 2} V${y1 - 6} Q ${i ? x1 - (w / 4) : x0 + w / 4} ${y1 + 2} ${i ? cx + 2 : x0 - 4} ${y1 - 6} Z`} fill="url(#room-curtain)" opacity="0.92" />)}
+        </g>
+      );
+    }
+    case "shoji": {
+      // 和室の障子：右は閉めた障子（外の明るさで紙が光る）、左は開いて外が見える
+      const paper = mixColor("#FFFBEF", "#5A5C70", (1 - sky.light) * 0.8);
+      const grid = (gx0: number, gx1: number, op = 1) => (
+        <g opacity={op}>
+          <rect x={gx0} y={y0} width={gx1 - gx0} height={h} fill={paper} />
+          {[1, 2].map((i) => <rect key={`v${i}`} x={gx0 + ((gx1 - gx0) * i) / 3 - 2} y={y0} width="4" height={h} fill="#8A5A34" />)}
+          {[1, 2, 3, 4, 5].map((i) => <rect key={`h${i}`} x={gx0} y={y0 + (h * i) / 6 - 2} width={gx1 - gx0} height="4" fill="#8A5A34" />)}
+          <rect x={gx0} y={y0} width={gx1 - gx0} height={h} fill="none" stroke="#6E4424" strokeWidth="9" />
+        </g>
+      );
+      return (
+        <g>
+          <rect x={x0 + 7} y={y0 + 7} width={cx - x0 - 7} height="14" fill="url(#room-reveal-top)" />
+          {/* 開けた障子は、閉めた障子に重なっている */}
+          {grid(cx + 10, x1)}
+          {grid(cx - 2, x1 - 12, 0.55)}
+          <rect x={x0} y={y0} width={cx - x0} height={h} fill="none" stroke="#6E4424" strokeWidth="9" />
+          {/* 鴨居と敷居 */}
+          <rect x={x0 - 18} y={y0 - 14} width={w + 36} height="14" fill="url(#room-wood-frame)" />
+          <rect x={x0 - 18} y={y1} width={w + 36} height="12" fill="url(#room-wood-frame)" />
+          <rect x={x0 - 18} y={y1 + 12} width={w + 36} height="10" fill="#2A1A0C" opacity="0.14" filter="url(#room-soft)" />
+          {/* 引き手 */}
+          <ellipse cx={x1 - 24} cy={y0 + h * 0.55} rx="5" ry="9" fill="#5A3A1C" />
+        </g>
+      );
+    }
+    case "french": {
+      // 掃き出し窓：左右2まいのガラス戸。床までのカーテン
+      return (
+        <g>
+          <rect x={x0} y={y0} width={w} height={h} fill="none" stroke="#FFFFFF" strokeWidth="14" />
+          <rect x={x0 + 7} y={y0 + 7} width={w - 14} height="16" fill="url(#room-reveal-top)" />
+          <rect x={cx - 5} y={y0} width="10" height={h} fill="#FFFFFF" />
+          <rect x={cx + 5} y={y0 + 7} width="3" height={h - 14} fill="#1E140A" opacity="0.1" />
+          {[x0 + 7, cx + 5].map((dx) => <rect key={dx} x={dx} y={y0 + h * 0.62} width={w / 2 - 12} height="6" fill="#FFFFFF" />)}
+          {[cx - 14, cx + 9].map((hx) => <rect key={hx} x={hx} y={y0 + h * 0.5} width="5" height="26" rx="2.5" fill="#B9A27A" />)}
+          <rect x={x0 - 10} y={y1 - 4} width={w + 20} height="8" fill="#D9CDB8" />
+          {drapes(y1 + 4, y0 - 30, 0.55)}
+        </g>
+      );
+    }
+    default:
+      return (
+        <g>
+          {/* 窓わく（壁の厚みのぶん奥にあるので、上と左の内がわに影が落ちる） */}
+          <rect x={x0} y={y0} width={w} height={h} fill="none" stroke="#FFFFFF" strokeWidth="14" />
+          <rect x={x0 + 7} y={y0 + 7} width={w - 14} height="16" fill="url(#room-reveal-top)" />
+          <rect x={x0 + 7} y={y0 + 7} width="12" height={h - 14} fill="url(#room-reveal-left)" />
+          <rect x={cx - 4} y={y0} width="8" height={h} fill="#FFFFFF" />
+          <rect x={cx + 4} y={y0 + 7} width="3" height={h - 14} fill="#1E140A" opacity="0.1" />
+          <rect x={x0} y={y0 + h / 2 - 4} width={w} height="8" fill="#FFFFFF" />
+          <rect x={x0 + 7} y={y0 + h / 2 + 4} width={w - 14} height="4" fill="#1E140A" opacity="0.12" />
+          <rect x={x0 + 7} y={y0 + h / 2 - 4} width={w - 14} height="1.5" fill="#E8DFD0" />
+          {/* 窓台：上の面と前の厚み、下の影 */}
+          <rect x={x0 - 26} y={y1 + 26} width={w + 52} height="16" fill="#2A1A0C" opacity="0.16" filter="url(#room-soft)" />
+          <path d={`M${x0 - 14} ${y1 + 2} L${x1 + 14} ${y1 + 2} L${x1 + 26} ${y1 + 14} L${x0 - 26} ${y1 + 14} Z`} fill="url(#room-sill)" />
+          <rect x={x0 - 26} y={y1 + 14} width={w + 52} height="12" rx="2" fill="url(#room-sill-front)" />
+          <rect x={x0 - 26} y={y1 + 14} width={w + 52} height="1.5" fill="#FFFFFF" />
+          {/* カーテン */}
+          <rect x={x0 - 40} y={y0 - 34} width={w + 80} height="10" rx="5" fill="#B08A5E" />
+          <path d={`M${x0 - 34} ${y0 - 26} L${x0 + 34} ${y0 - 26} C ${x0 + 30} ${y0 + h * 0.4}, ${x0 + 6} ${y0 + h * 0.6}, ${x0 + 22} ${y1 + 26} L ${x0 - 34} ${y1 + 26} Z`} fill="url(#room-curtain)" />
+          <path d={`M${x1 + 34} ${y0 - 26} L${x1 - 34} ${y0 - 26} C ${x1 - 30} ${y0 + h * 0.4}, ${x1 - 6} ${y0 + h * 0.6}, ${x1 - 22} ${y1 + 26} L ${x1 + 34} ${y1 + 26} Z`} fill="url(#room-curtain)" />
+          <path d={`M${x0 - 40} ${y0 - 30} L${x1 + 40} ${y0 - 30} L${x1 + 40} ${y0 - 4} Q ${cx} ${y0 + 22} ${x0 - 40} ${y0 - 4} Z`} fill={curtain} />
+          <path d={`M${x0 - 40} ${y0 - 30} L${x1 + 40} ${y0 - 30} L${x1 + 40} ${y0 - 4} Q ${cx} ${y0 + 22} ${x0 - 40} ${y0 - 4} Z`} fill="#fff" opacity="0.15" />
+          <rect x={x0 - 28} y={y0 + h * 0.62} width="60" height="8" rx="4" fill="#FFF3D6" transform={`rotate(-8 ${x0} ${y0 + h * 0.62})`} />
+          <rect x={x1 - 32} y={y0 + h * 0.62} width="60" height="8" rx="4" fill="#FFF3D6" transform={`rotate(8 ${x1} ${y0 + h * 0.62})`} />
+        </g>
+      );
+  }
 }
 
 /** 本物の時刻（日本時間）を指す壁かけ時計 */

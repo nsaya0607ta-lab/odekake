@@ -124,6 +124,8 @@ export function findPath(from: Pt, to: Pt, allBlocks: readonly Block[], exact = 
 /** 床に置いた家具1つ（部屋の %。x, y は下のまん中、w は幅、h は高さ） */
 export type FurnitureSpot = { id: string; kind: FurnitureId; x: number; y: number; w: number; h: number };
 export type DogPlaces = {
+  /** 窓のまん中（部屋の %） */
+  window: { x: number };
   toys: { x: number; y: number; name: string }[];
   furniture: FurnitureSpot[];
   /** 家具のあるところ（部屋の %）。うろうろするときは、ここに足をおかない */
@@ -497,7 +499,7 @@ export function RoomDog({ skin, phase, sleepy, lines, quiet, places, weather = n
       playWith(pick(pl.furniture), () => next(rand(800, 2000)));
     } else if (r < 0.7) {
       // 窓の下で外をながめる
-      walkTo(24, ROOM.floorTop + 2.5, () => {
+      walkTo(clamp(pl.window.x, 8, 92), ROOM.floorTop + 2.5, () => {
         pose(pick(["wonder", "sit-side", "front"] as const));
         const rainy = weather === "rain" || weather === "drizzle";
         say(
