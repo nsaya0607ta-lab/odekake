@@ -296,8 +296,9 @@ export function settle(kind: DecorKind, x: number, y: number, shelves: readonly 
   if (kind !== "furniture") {
     for (const s of shelves) {
       const b = shelfBoard(s);
-      if (nx >= b.x0 + 1 && nx <= b.x1 - 1 && y > b.y - 8 * s.scale && y < b.y + 9 * s.scale) {
-        return { x: nx, y: b.y, on: s.id, rx: (nx - b.x0) / (b.x1 - b.x0) };
+      // 棚の板の少し上〜少し下に落とせば乗る（指でも合わせやすいよう広めに）
+      if (nx >= b.x0 - 1 && nx <= b.x1 + 1 && y > b.y - 15 * s.scale && y < b.y + 11 * s.scale) {
+        return { x: clamp(nx, b.x0, b.x1), y: b.y, on: s.id, rx: clamp((nx - b.x0) / (b.x1 - b.x0), 0.04, 0.96) };
       }
     }
   }
@@ -318,3 +319,14 @@ const ROOM_WINDOWS: Record<RoomStyle, { x0: number; x1: number; y0: number; y1: 
   french: { x0: 8, x1: 31, y0: 8, y1: ROOM.horizon - 2.1 },
 };
 export const windowOf = (style: RoomStyle | undefined) => ROOM_WINDOWS[style ?? "standard"];
+
+/** 棚の上で、乗せているものからいちばん離れた位置（0〜1） */
+export function freeShelfSpot(shelfId: string, items: readonly Placement[]): number {
+  const taken = items.filter((p) => p.on === shelfId).map((p) => p.rx ?? 0.5);
+  let best = 0.5, bestD = -1;
+  for (let r = 0.12; r <= 0.881; r += 0.04) {
+    const d = taken.length ? Math.min(...taken.map((t) => Math.abs(t - r))) : 1 - Math.abs(r - 0.5);
+    if (d > bestD + 1e-6) { bestD = d; best = r; }
+  }
+  return best;
+}

@@ -33,6 +33,7 @@ import {
   defaultFixtures,
   fixtureKey,
   resolvePlacements,
+  freeShelfSpot,
   WALL_DECOS,
   type WallDeco,
   settle,
@@ -211,6 +212,7 @@ export function MyRoom({ entries, initialLayout, serverReady, dogSkin, dogName, 
   const allEntries = useMemo(() => [...layout.photos.map(uploadEntry), ...entries, ...FURNITURE_ENTRIES, ...FIXTURE_ENTRIES], [entries, layout.photos]);
   /** 棚に乗せたものの位置を、棚の位置と大きさから決めたもの（描く・動かすときはこちらを使う） */
   const placedItems = useMemo(() => resolvePlacements(layout.items), [layout.items]);
+  const shelfList = useMemo(() => layout.items.filter((p) => p.key === fixtureKey("shelf")), [layout.items]);
   const style = layout.theme.style;
   const entryByKey = useMemo(() => new Map(allEntries.map((e) => [e.key, e])), [allEntries]);
   const [uploading, setUploading] = useState(false);
@@ -219,6 +221,8 @@ export function MyRoom({ entries, initialLayout, serverReady, dogSkin, dogName, 
   const [future, setFuture] = useState<RoomLayout[]>([]);
   const [editing, setEditing] = useState(false);
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  /** ドラッグ中のものを乗せようとしている棚（光らせる） */
+  const [dropShelf, setDropShelf] = useState<string | null>(null);
   const [tab, setTab] = useState<Tab>("item");
   const [filter, setFilter] = useState<ItemFilter>("all");
   const [saveState, setSaveState] = useState<SaveState>(serverReady ? "saved" : "local");
@@ -365,8 +369,7 @@ export function MyRoom({ entries, initialLayout, serverReady, dogSkin, dogName, 
       const shelves = base.items.filter((p) => p.key === fixtureKey("shelf"));
       const load = (s: Placement) => base.items.filter((p) => p.on === s.id).length;
       const shelf = shelves.reduce((a, b) => (load(b) < load(a) ? b : a));
-      const n = load(shelf);
-      shelfAt = { on: shelf.id, rx: 0.14 + ((n * 0.3) % 0.75) };
+      shelfAt = { on: shelf.id, rx: freeShelfSpot(shelf.id, base.items) };
       [x, y] = [shelf.x, shelf.y];
     } else {
       const n = base.items.length;
@@ -448,11 +451,13 @@ export function MyRoom({ entries, initialLayout, serverReady, dogSkin, dogName, 
     if (!d.moved && Math.hypot(next.x - p.x, next.y - p.y) < 0.8) return;
     d.moved = true;
     setLayout((cur) => ({ ...cur, items: cur.items.map((it) => (it.id === p.id ? { ...it, ...next } : it)) }));
+    setDropShelf(next.on ?? null);
   }
   function onItemUp(e: React.PointerEvent, p: Placement) {
     const d = drag.current;
     if (!d || d.id !== p.id) return;
     drag.current = null;
+    setDropShelf(null);
     if (d.moved) { setPast((ps) => [...ps.slice(-(HISTORY_LIMIT - 1)), d.before]); setFuture([]); setSaveState("dirty"); }
     void e;
   }
@@ -666,6 +671,7 @@ export function MyRoom({ entries, initialLayout, serverReady, dogSkin, dogName, 
                       : <DecorVisual entry={entry} frame={p.frame} lit={lightsOn || furnitureFx[p.id] === "on"} fx={furnitureFx[p.id]} />}
                   </span>
                 </span>
+                {dropShelf === p.id ? <span className="pointer-events-none absolute -inset-1 rounded-xl border-2 border-dashed border-leaf bg-leaf/15 shadow-[0_0_14px_rgba(140,200,110,.8)]" /> : null}
                 {isSel ? (
                   <span className="room-selected pointer-events-none absolute -inset-2 rounded-xl border-2 border-white/90 shadow-[0_0_0_2px_rgba(94,140,74,.9),0_0_16px_rgba(140,200,110,.75)]">
                     {["-left-1.5 -top-1.5", "-right-1.5 -top-1.5", "-bottom-1.5 -left-1.5", "-bottom-1.5 -right-1.5"].map((pos) => <span key={pos} className={`absolute h-3 w-3 rounded-full border-2 border-white bg-leaf-deep shadow ${pos}`} />)}
@@ -691,6 +697,23 @@ export function MyRoom({ entries, initialLayout, serverReady, dogSkin, dogName, 
               <Tool label="大きく" onClick={() => changeItem(selected.id, (p) => ({ ...p, scale: clamp(p.scale + 0.12, 0.5, 2) }))}>＋</Tool>
               <Tool label="左右反転" onClick={() => changeItem(selected.id, (p) => ({ ...p, flip: !p.flip }))}>↔</Tool>
               <Tool label="いちばん前へ" onClick={() => changeItem(selected.id, (p) => ({ ...p, z: topZ() }))}>⇡</Tool>
+              {selectedEntry.kind === "item" || selectedEntry.kind === "trophy" ? (
+                selected.on ? (
+                  <Tool label="床におろす" onClick={() => { changeItem(selected.id, (p) => { const { on: _on, rx: _rx, ...rest } = p; return { ...rest, y: clamp(ROOM.floorTop + 14, ROOM.floorTop, ROOM.floorBottom) }; }); flash("床におろしました"); }}>
+                    <span className="text-[10px] font-black leading-none">床へ</span>
+                  </Tool>
+                ) : shelfList.length ? (
+                  <Tool label="棚にのせる" onClick={() => {
+                    // 乗せているものがいちばん少ない棚の、あいているところへ
+                    const load = (sh: Placement) => layout.items.filter((p) => p.on === sh.id).length;
+                    const shelf = shelfList.reduce((a, b) => (load(b) < load(a) ? b : a));
+                    changeItem(selected.id, (p) => ({ ...p, on: shelf.id, rx: freeShelfSpot(shelf.id, layout.items), x: shelf.x, y: shelf.y }));
+                    flash("棚にのせました");
+                  }}>
+                    <span className="text-[10px] font-black leading-none">棚へ</span>
+                  </Tool>
+                ) : null
+              ) : null}
               {selectedEntry.kind === "photo" ? (
                 <Tool label="額縁を変える" onClick={() => changeItem(selected.id, (p) => ({ ...p, frame: FRAME_STYLES[(FRAME_STYLES.indexOf(p.frame ?? "wood") + 1) % FRAME_STYLES.length] }))}>
                   <span className="text-[10px] font-black">{FRAME_LABELS[selected.frame ?? "wood"]}</span>
@@ -725,7 +748,7 @@ export function MyRoom({ entries, initialLayout, serverReady, dogSkin, dogName, 
                 ))}
               </div>
               <p className="mt-2 text-[11px] font-semibold text-ink-faint">
-                {tab === "theme" ? "おへやの雰囲気・窓・壁紙・床・カーテン・ラグを選べます" : tab === "photo" ? "スマホの写真や、おでかけ記録の写真を額に入れて飾れます" : "タップで飾る・ドラッグで動かす（アイテムは棚にも乗せられます）"}
+                {tab === "theme" ? "おへやの雰囲気・窓・壁紙・床・カーテン・ラグを選べます" : tab === "photo" ? "スマホの写真や、おでかけ記録の写真を額に入れて飾れます" : tab === "fixture" ? "窓・棚・時計も、動かす・大きさを変える・しまうができます" : "タップで飾る・ドラッグで動かす（アイテムやトロフィーは、棚へドラッグするか「棚へ」で棚に乗せられます）"}
               </p>
               {tab === "item" ? (
                 <div className="-mx-4 mt-2 flex gap-2 overflow-x-auto px-4 pb-1">
