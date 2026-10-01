@@ -127,7 +127,7 @@ const FURNITURE_DEPTH: Record<string, number> = { sofa: 0.35, plant: 0.2, booksh
 
 const FLOOR_SPOTS = [[22, 74], [78, 76], [64, 90], [36, 92], [86, 92], [14, 88], [50, 66], [70, 66]] as const;
 
-/** はじめて開いたときの部屋：持っているものから少しだけ飾っておく */
+/** はじめて開いたときの部屋：持っているものから少しだけ飾っておく（家具は置かない。「家具」タブから自分で置く） */
 function starterLayout(entries: DecorEntry[]): RoomLayout {
   const items: Placement[] = [];
   let z = 1;
@@ -139,9 +139,6 @@ function starterLayout(entries: DecorEntry[]): RoomLayout {
   const items4 = entries.filter((e): e is Extract<DecorEntry, { kind: "item" }> => e.kind === "item")
     .sort((a, b) => RARITY_ORDER.indexOf(b.rarity) - RARITY_ORDER.indexOf(a.rarity)).slice(0, 4);
   items4.forEach((e, i) => (i === 3 ? put(e.key, 70, ROOM.shelves[1].y) : put(e.key, FLOOR_SPOTS[i]![0], FLOOR_SPOTS[i]![1])));
-  // はじめから少しだけ家具を置いておく（犬はベッドで寝る）
-  put("furniture:plant", 8, 66);
-  put("furniture:dog-bed", 82, 91);
   return { theme: DEFAULT_THEME, items, photos: [] };
 }
 
