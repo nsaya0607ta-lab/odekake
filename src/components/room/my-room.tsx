@@ -740,9 +740,9 @@ export function MyRoom({ entries, initialLayout, serverReady, dogSkin, dogName, 
           ) : null}
           </div>
 
-          {/* 夜は部屋の下のはしを、下のお天気カードのまわりの色にとかす（境目をなじませる） */}
-          {!editing && !visit && skyNow.light < 0.9 ? (
-            <div aria-hidden className="pointer-events-none absolute inset-x-0 bottom-0 h-[9%]" style={{ zIndex: 2400, opacity: Math.min(1, (1 - skyNow.light) * 1.3), background: `linear-gradient(180deg, transparent, ${skyBackdrop(1 - skyNow.light).top})` }} />
+          {/* 部屋の下のはしを、下のお天気カードのまわりの色にとかす（朝・昼・夕・夜とも境目をなじませる） */}
+          {!editing && !visit ? (
+            <div aria-hidden className="pointer-events-none absolute inset-x-0 bottom-0 h-[8%]" style={{ zIndex: 2400, background: `linear-gradient(180deg, transparent, ${skyBackdrop(skyNow, FLOOR_STYLES[layout.theme.floor].base).top})` }} />
           ) : null}
           {editing && selected && selectedEntry ? (
             <div className="absolute bottom-2 left-1/2 z-[3000] flex -translate-x-1/2 items-center gap-1 rounded-full border border-line bg-card/95 p-1.5 shadow-lg backdrop-blur">
@@ -864,6 +864,7 @@ export function MyRoom({ entries, initialLayout, serverReady, dogSkin, dogName, 
               friends={guests?.friends}
               likes={guests?.mail.filter((m) => m.kind === "like").length ?? 0}
               onEdit={() => { setEditing(true); window.scrollTo({ top: 0, behavior: "smooth" }); }}
+              floor={FLOOR_STYLES[layout.theme.floor].base}
             />
             <ul className="space-y-1.5 rounded-2xl border border-line bg-card px-4 py-3 text-[12px] leading-relaxed text-ink-soft shadow-sm">
               <li>🐾 {dogName}をタップすると、なでられます</li>
