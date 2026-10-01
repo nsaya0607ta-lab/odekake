@@ -1,7 +1,7 @@
 import { PREFECTURE_NAMES } from "@/lib/geo/prefecture-names";
 import type { DB } from "./client";
 import { todayInJapan } from "@/lib/date";
-import { signThumbOrOriginalPaths } from "./photos";
+import { signPhotoPaths, signThumbOrOriginalPaths } from "./photos";
 import { getPersonalTextFeed } from "./sns";
 
 /** おさんぽフレンチーで飛行機が空を運んでくる、自分のおでかけ写真 */
@@ -12,7 +12,12 @@ export type OsanpoRunMemoryPhoto = {
   name: string;
   /** 都道府県名（分からなければ空） */
   pref: string;
-  /** この写真の訪問記録と、そのスポット（結果画面からスポットのページの該当の記録を開く） */
+  /** 結果画面で大きく見るときの原寸の配信URL */
+  full: string;
+  /** 訪問日（YYYY-MM-DD）と、そのときのひとこと（無ければ空） */
+  date: string;
+  comment: string;
+  /** この写真の訪問記録と、そのスポット */
   visitId: string;
   spotId: string;
 };
@@ -34,22 +39,26 @@ export async function getOsanpoRunMemoryPhotos(supabase: DB, userId: string): Pr
   if (!photos?.length) return [];
 
   const visitIds = [...new Set(photos.map((p) => p.visit_record_id))];
-  const { data: visits } = await supabase.from("visit_records").select("id, spot_id").in("id", visitIds);
-  const spotOfVisit = new Map((visits ?? []).map((v) => [v.id, v.spot_id]));
+  const { data: visits } = await supabase.from("visit_records").select("id, spot_id, visited_at, comment").in("id", visitIds);
+  const visitById = new Map((visits ?? []).map((v) => [v.id, v]));
   const spotIds = [...new Set((visits ?? []).map((v) => v.spot_id))];
   const { data: spots } = spotIds.length
     ? await supabase.from("spots").select("id, name, prefecture_code").in("id", spotIds)
     : { data: [] };
   const spotById = new Map((spots ?? []).map((s) => [s.id, s]));
-  const urls = await signThumbOrOriginalPaths(supabase, photos.map((p) => p.storage_path));
+  const paths = photos.map((p) => p.storage_path);
+  const [urls, fullUrls] = await Promise.all([signThumbOrOriginalPaths(supabase, paths), signPhotoPaths(supabase, paths)]);
 
   return photos.flatMap((p) => {
     const src = urls.get(p.storage_path);
-    const spotId = spotOfVisit.get(p.visit_record_id);
-    const spot = spotId ? spotById.get(spotId) : undefined;
-    if (!src || !spot) return [];
+    const visit = visitById.get(p.visit_record_id);
+    const spot = visit ? spotById.get(visit.spot_id) : undefined;
+    if (!src || !visit || !spot) return [];
     const pref = PREFECTURE_NAMES.find((item) => item.code === spot.prefecture_code)?.name ?? "";
-    return [{ src, name: spot.name, pref, visitId: p.visit_record_id, spotId: spot.id }];
+    return [{
+      src, full: fullUrls.get(p.storage_path) ?? src, name: spot.name, pref,
+      date: visit.visited_at, comment: (visit.comment ?? "").trim(), visitId: p.visit_record_id, spotId: spot.id,
+    }];
   });
 }
 
@@ -135,8 +144,11 @@ export type OsanpoRunFriendMemory = {
   postId: string;
   /** 投稿の1枚目の写真（サムネイル）の配信URL */
   src: string;
-  /** 投稿した人の表示名 */
+  /** 結果画面で大きく見るときの原寸の配信URL */
+  full: string;
+  /** 投稿した人の表示名と、投稿の本文（長いものは切る） */
   author: string;
+  body: string;
   /** 投稿に紐づいたスポット名（無ければ空） */
   spot: string;
   /** すでに自分がいいねしているか */
@@ -148,6 +160,7 @@ const FRIEND_FEED_LIMIT = 60;
 const FRIEND_MEMORY_LIMIT = 20;
 /** これより古い投稿は運ばない（日） */
 const FRIEND_MEMORY_DAYS = 30;
+const FRIEND_BODY_MAX = 120;
 
 export async function getOsanpoRunFriendMemories(supabase: DB, userId: string): Promise<OsanpoRunFriendMemory[]> {
   let posts;
@@ -161,10 +174,16 @@ export async function getOsanpoRunFriendMemories(supabase: DB, userId: string): 
     .filter((post) => post.user_id !== userId && post.photo_paths.length > 0 && Date.parse(post.created_at) >= since)
     .slice(0, FRIEND_MEMORY_LIMIT);
   if (!picked.length) return [];
-  const urls = await signThumbOrOriginalPaths(supabase, picked.map((post) => post.photo_paths[0]!));
+  const paths = picked.map((post) => post.photo_paths[0]!);
+  const [urls, fullUrls] = await Promise.all([signThumbOrOriginalPaths(supabase, paths), signPhotoPaths(supabase, paths)]);
   return picked.flatMap((post) => {
     const src = urls.get(post.photo_paths[0]!);
     if (!src) return [];
-    return [{ postId: post.id, src, author: post.display_name || "フレンド", spot: post.linked_spot_name ?? "", liked: post.my_liked }];
+    const body = post.body.trim();
+    return [{
+      postId: post.id, src, full: fullUrls.get(post.photo_paths[0]!) ?? src, author: post.display_name || "フレンド",
+      body: body.length > FRIEND_BODY_MAX ? `${body.slice(0, FRIEND_BODY_MAX - 1)}…` : body,
+      spot: post.linked_spot_name ?? "", liked: post.my_liked,
+    }];
   });
 }

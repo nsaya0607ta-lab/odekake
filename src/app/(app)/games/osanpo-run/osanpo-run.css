@@ -469,18 +469,18 @@
 .osr .osr-memo-title { margin: 0 !important; font-size: 12px !important; font-weight: 800; color: #ffd9a8 !important; display: flex; justify-content: space-between; align-items: baseline; gap: 8px; }
 .osr .osr-memo-title small { font-size: 10px; color: var(--osr-muted); font-weight: 500; }
 .osr .osr-memo-list { display: flex; gap: 8px; overflow-x: auto; padding-bottom: 2px; }
-.osr .osr-memo-card { flex: 0 0 auto; width: 76px; display: flex; flex-direction: column; align-items: center; gap: 4px; padding: 5px; border-radius: 10px; background: #fff; color: #4a3f66; text-decoration: none; transform: rotate(-2deg); box-shadow: 0 4px 10px -6px rgba(0, 0, 0, 0.6); }
+.osr .osr-memo-card { appearance: none; border: 0; font-family: var(--osr-body); cursor: pointer; flex: 0 0 auto; width: 76px; display: flex; flex-direction: column; align-items: center; gap: 4px; padding: 5px; border-radius: 10px; background: #fff; color: #4a3f66; text-decoration: none; transform: rotate(-2deg); box-shadow: 0 4px 10px -6px rgba(0, 0, 0, 0.6); }
 .osr .osr-memo-card:nth-child(even) { transform: rotate(2deg); }
 .osr .osr-memo-card img { width: 64px; height: 64px; object-fit: cover; border-radius: 3px; display: block; }
 .osr .osr-memo-card span { font-size: 10px; font-weight: 800; line-height: 1.2; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .osr .osr-memo-card:focus-visible { outline: 2px solid var(--osr-lantern); outline-offset: 2px; }
 .osr .osr-fmemo .osr-memo-title { color: #ffb3c7 !important; }
-.osr .osr-fmemo-card { width: 84px; background: #fff4f8; }
-.osr .osr-fmemo-card a { display: flex; flex-direction: column; align-items: center; gap: 4px; color: #5a1e3a; text-decoration: none; max-width: 100%; }
+.osr .osr-fmemo-card { flex: 0 0 auto; display: flex; flex-direction: column; align-items: center; gap: 5px; }
+.osr .osr-fmemo-card .osr-memo-card { background: #fff4f8; color: #5a1e3a; }
 .osr .osr-like { appearance: none; border: 0; border-radius: 999px; padding: 3px 6px; font-family: var(--osr-body); font-size: 10px; font-weight: 800; background: #ffd6e5; color: #b0245e; cursor: pointer; white-space: nowrap; }
 .osr .osr-like[aria-pressed="true"] { background: #ff7eb6; color: #fff; }
 .osr .osr-like:disabled { opacity: 0.6; }
-.osr .osr-like:focus-visible, .osr .osr-fmemo-card a:focus-visible { outline: 2px solid var(--osr-lantern); outline-offset: 2px; }
+.osr .osr-like:focus-visible { outline: 2px solid var(--osr-lantern); outline-offset: 2px; }
 .osr .osr-share-btn { width: 100%; background: linear-gradient(90deg, #ff9ec7, #ff7eb6); color: #3a0f24; }
 .osr .osr-share { display: flex; flex-direction: column; gap: 8px; padding: 10px; border-radius: 12px; border: 1px solid var(--osr-line); background: rgba(255, 255, 255, 0.04); }
 .osr .osr-share img { width: 100%; height: auto; border-radius: 8px; display: block; }
@@ -488,6 +488,16 @@
 .osr .osr-share-msg { margin: 0 !important; font-size: 12px !important; text-align: center; color: var(--osr-muted) !important; }
 .osr .osr-share-msg:empty { display: none; }
 .osr .osr-share-msg a { color: #ff9ec7; font-weight: 800; }
+
+.osr .osr-lightbox { position: absolute; inset: 0; z-index: 30; display: flex; align-items: center; justify-content: center; padding: 16px; background: rgba(12, 10, 28, 0.78); backdrop-filter: blur(4px); -webkit-backdrop-filter: blur(4px); cursor: default; }
+.osr .osr-lightbox-card { width: min(420px, 100%); max-height: 100%; overflow: auto; display: flex; flex-direction: column; gap: 6px; padding: 12px 12px 14px; border-radius: 16px; background: #fffaf2; color: #3a2a1c; box-shadow: 0 20px 44px -18px rgba(0, 0, 0, 0.8); animation: osr-pop 0.3s cubic-bezier(0.2, 0.9, 0.3, 1.2); }
+.osr .osr-lightbox-card img { width: 100%; max-height: 56vh; object-fit: contain; border-radius: 10px; background: #efe6d8; display: block; }
+.osr .osr-lightbox-card b { font-size: 16px; font-weight: 800; }
+.osr .osr-lightbox-card small { font-size: 12px; color: #7a6a58; }
+.osr .osr-lightbox-card p { margin: 0; font-size: 13px; line-height: 1.55; color: #4a3a2c; white-space: pre-wrap; }
+.osr .osr-lightbox-actions { display: flex; gap: 8px; }
+.osr .osr-lightbox-actions .osr-like { font-size: 13px; padding: 6px 14px; }
+.osr .osr-lightbox-card .osr-btn.osr-ghost { color: #3a2a1c; border-color: rgba(58, 42, 28, 0.25); }
 
 /* ---------- フレンドのランキング ---------- */
 .osr .osr-rk { display: flex; flex-direction: column; gap: 10px; max-width: 640px; width: 100%; margin: 0 auto; }
