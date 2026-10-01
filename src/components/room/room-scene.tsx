@@ -9,7 +9,7 @@ import { memo, useId, useMemo } from "react";
 import { skyAt, TOKYO, type GeoPoint, type SkyState } from "@/lib/room/sun";
 import { overcastOf, WEATHER_LABEL, withWeather, type RoomWeather } from "@/lib/room/weather";
 import { CURTAIN_STYLES, FLOOR_STYLES, ROOM_KIND_STYLES, RUG_STYLES, WALLPAPER_STYLES } from "@/lib/room/themes";
-import { ROOM, windowOf, type RoomKind, type RoomStyle, type RoomTheme } from "@/lib/room/types";
+import { ROOM, windowOf, type FixtureId, type RoomKind, type RoomStyle, type RoomTheme } from "@/lib/room/types";
 
 export type DayPhase = "morning" | "day" | "evening" | "night";
 
@@ -69,16 +69,14 @@ const mixColor = (a: string, b: string, t: number) => {
   return `#${pa.map((v, i) => Math.round(v + (pb[i]! - v) * Math.max(0, Math.min(1, t))).toString(16).padStart(2, "0")).join("")}`;
 };
 
-export const RoomScene = memo(function RoomScene({ theme, now, at = TOKYO, weather = null, placeName = "" }: {
+export const RoomScene = memo(function RoomScene({ theme, now, at = TOKYO, weather = null, windows = [] }: {
   theme: RoomTheme; now: Date; at?: GeoPoint; weather?: RoomWeather | null;
-  /** 天気ボードに書く場所の名前（「岐阜」など） */
-  placeName?: string;
+  /** 置いてある窓の外わく（部屋の %）。壁を照らす光と、床に差しこむ光に使う。窓そのものは FixtureVisual で描く */
+  windows?: readonly WindowRect[];
 }) {
   const wall = WALLPAPER_STYLES[theme.wall];
   const sky = useMemo(() => withWeather(skyAt(now, at), weather), [now, at, weather]);
   const overcast = overcastOf(weather);
-  const win = windowOf(theme.style);
-  const night = sky.light < 0.2;
   const lit = lampsOn(sky);
   const sunUp = sky.altitude > 0;
   // 朝夕の低い日ざしは、窓から斜めに長く差しこむ
@@ -163,9 +161,9 @@ export const RoomScene = memo(function RoomScene({ theme, now, at = TOKYO, weath
       <rect x="0" y="0" width={W} height={HZ} fill="#7A6040" filter="url(#room-grain)" opacity="0.07" />
       <rect x="0" y="0" width={W} height={HZ} fill="url(#room-wall-shade)" />
       {/* 窓から入る光が壁を明るくする */}
-      {sky.light > 0.1 ? <ellipse cx={px((win.x0 + win.x1) / 2)} cy={py((win.y0 + win.y1) / 2)} rx="360" ry="300" fill="url(#room-window-glow)" /> : null}
+      {sky.light > 0.1 ? windows.map((win, i) => <ellipse key={i} cx={px((win.x0 + win.x1) / 2)} cy={py((win.y0 + win.y1) / 2)} rx={360 * Math.min(1.6, (win.x1 - win.x0) / 30)} ry={300 * Math.min(1.6, (win.x1 - win.x0) / 30)} fill="url(#room-window-glow)" />) : null}
 
-      {theme.room === "nordic" ? <Wainscot win={win} /> : null}
+      {theme.room === "nordic" ? <Wainscot windows={windows} /> : null}
       {/* 和室は長押（なげし）を壁にわたす */}
       {theme.style === "shoji" || theme.room === "wa" ? (
         <g>
@@ -174,25 +172,22 @@ export const RoomScene = memo(function RoomScene({ theme, now, at = TOKYO, weath
           <rect x={SIDE} y={py(5.2) + 16} width={W - SIDE * 2} height="8" fill="#2A1A0C" opacity="0.12" />
         </g>
       ) : null}
-      <Window sky={sky} curtain={CURTAIN_STYLES[theme.curtain].color} season={seasonOf(now, at)} weather={weather} style={theme.style} />
       <WallDecoration deco={theme.deco} lit={lit} />
-      <Clock now={now} night={night} />
-      <WeatherBoard weather={weather} night={sky.altitude < -4} place={placeName} />
-      <Shelves />
 
       {/* 床 */}
       <Floor theme={theme} />
       <rect x={-PX} y={HZ} width={W + PX * 2} height={H + PB - HZ} fill="#5A4030" filter="url(#room-grain)" opacity="0.06" />
       <rect x={-PX} y={HZ} width={W + PX * 2} height={H + PB - HZ} fill="url(#room-floor-shade)" />
-      {/* 窓から差しこむ光 */}
-      {sunUp ? (
+      {/* 窓から差しこむ光（窓ごとに。低い窓ほど床の手前まで届く） */}
+      {sunUp ? windows.map((win, i) => (
         <polygon
+          key={i}
           points={`${px(win.x0) + 30},${HZ} ${px(win.x1) - 10},${HZ} ${px(win.x1) + 150 + beamSkew},${H * 0.86} ${px(win.x0) + 120 + beamSkew},${H * 0.86}`}
           fill={mixColor("#FFF6D8", "#FFAE6E", sky.warm)}
           opacity={0.26 * Math.min(1, sky.altitude / 10) * (1 - 0.9 * overcast)}
           filter="url(#room-soft)"
         />
-      ) : null}
+      )) : null}
       {sky.altitude > 8 && overcast < 0.5 ? <SunDust /> : null}
       <RugShape rug={theme.rug} />
       {/* 幅木と、壁と床の境目のかげ */}
@@ -935,7 +930,7 @@ function Clock({ now, night }: { now: Date; night: boolean }) {
  * 壁につけた板の棚。上の面（奥ゆき）・前の厚み・金具・壁に落ちる影を描いて、物が「乗っている」ように見せる。
  * 置いたものの下のはし（棚の y）は、上の面のまん中あたりに来る
  */
-function Shelves() {
+function Shelves({ only }: { only?: number } = {}) {
   const BACK = 8, FRONT = 9, THICK = 17;
   return (
     <g>
@@ -955,7 +950,7 @@ function Shelves() {
         </linearGradient>
         <filter id="room-shelf-blur" x="-10%" y="-60%" width="120%" height="220%"><feGaussianBlur stdDeviation="7" /></filter>
       </defs>
-      {ROOM.shelves.map((s) => {
+      {ROOM.shelves.filter((_, i) => only === undefined || i === only).map((s) => {
         const x0 = px(s.x0), x1 = px(s.x1), y = py(s.y);
         const top = y - BACK, front = y + FRONT, bottom = front + THICK;
         const inset = 9;
@@ -1088,9 +1083,10 @@ export function ceilingLights(kind: RoomKind): { x: number; y: number; r: number
 }
 
 /** 北欧の部屋の腰壁（白い板の羽目板と、上の見切り）。窓のところはあける */
-function Wainscot({ win }: { win: { x0: number; x1: number; y0: number; y1: number } }) {
+function Wainscot({ windows }: { windows: readonly WindowRect[] }) {
   const top = py(44.5), bottom = HZ - 22;
-  const gap: [number, number] | null = win.y1 > 44 ? [px(win.x0) - 26, px(win.x1) + 26] : null;
+  const low = windows.find((w) => w.y1 > 44);
+  const gap: [number, number] | null = low ? [px(low.x0) - 26, px(low.x1) + 26] : null;
   const panels: React.ReactNode[] = [];
   for (let x = 0; x < W; x += 110) {
     if (gap && x + 110 > gap[0] && x < gap[1]) continue;
@@ -1507,4 +1503,90 @@ export function ThemeSwatch({ part, theme }: { part: "wall" | "floor" | "curtain
       ));
     }
   }
+}
+
+/* ---------- 窓・棚・時計・お天気ボード（動かせる部品） ---------- */
+
+export type WindowRect = { x0: number; x1: number; y0: number; y1: number };
+/** 窓のまわり（カーテン・窓台・影）のぶんの余白 */
+const WIN_M = 70;
+const CLOCK_C = { x: px(75.5), y: py(12) }, WEATHER_C = { x: px(88.2), y: py(8.8) };
+const SHELF_0 = { x0: px(ROOM.shelves[0].x0) - 10, y: py(ROOM.shelves[0].y) };
+
+/** 部品の絵の範囲（もとの部屋の座標）。部品の (x, y) はこの範囲の中の anchor の位置 */
+function fixtureView(fixture: FixtureId, style: RoomStyle): { x: number; y: number; w: number; h: number; ax: number; ay: number } {
+  switch (fixture) {
+    case "window": {
+      const win = windowOf(style);
+      const x0 = px(win.x0), y0 = py(win.y0), w = px(win.x1) - x0, h = py(win.y1) - y0;
+      return { x: x0 - WIN_M, y: y0 - WIN_M, w: w + WIN_M * 2, h: h + WIN_M * 2, ax: 0.5, ay: 0.5 };
+    }
+    case "clock": return { x: CLOCK_C.x - 75, y: CLOCK_C.y - 84, w: 150, h: 168, ax: 0.5, ay: 0.5 };
+    case "weather": return { x: WEATHER_C.x - 58, y: WEATHER_C.y - 84, w: 116, h: 168, ax: 0.5, ay: 0.5 };
+    // 棚は (x, y) が板の上の面のまん中（物を乗せる高さ）
+    case "shelf": return { x: SHELF_0.x0, y: SHELF_0.y - 14, w: 370, h: 96, ax: 0.5, ay: 14 / 96 };
+  }
+}
+
+/** 部品の大きさ（大きさ1のとき、部屋の幅・高さに対する %）と、(x, y) が絵のどこにあたるか（0〜1） */
+export function fixtureSize(fixture: FixtureId, style: RoomStyle): { w: number; h: number; ax: number; ay: number } {
+  const v = fixtureView(fixture, style);
+  return { w: (v.w / W) * 100, h: (v.h / H) * 100, ax: v.ax, ay: v.ay };
+}
+
+/** 置いた窓の、外が見える範囲（部屋の %）。壁の光・床の光・犬が外をながめる場所に使う */
+export function windowRectOf(p: { x: number; y: number; scale: number }, style: RoomStyle): WindowRect {
+  const win = windowOf(style);
+  const hw = ((win.x1 - win.x0) / 2) * p.scale, hh = ((win.y1 - win.y0) / 2) * p.scale;
+  return { x0: p.x - hw, x1: p.x + hw, y0: p.y - hh, y1: p.y + hh };
+}
+
+/**
+ * 窓・棚・時計・お天気ボード1つの絵。もとは部屋に描きこんでいたものを、その場所の範囲だけ切りとって描く。
+ * 記念撮影でも1まいの絵として読めるよう、使うグラデーションなどはこの中に入れる
+ */
+export function FixtureVisual({ fixture, theme, now, at = TOKYO, weather = null, placeName = "" }: {
+  fixture: FixtureId; theme: RoomTheme; now: Date; at?: GeoPoint; weather?: RoomWeather | null; placeName?: string;
+}) {
+  const sky = useMemo(() => withWeather(skyAt(now, at), weather), [now, at, weather]);
+  const v = fixtureView(fixture, theme.style);
+  const curtain = CURTAIN_STYLES[theme.curtain].color;
+  return (
+    <svg viewBox={`${v.x} ${v.y} ${v.w} ${v.h}`} className="pointer-events-none block h-auto w-full" aria-hidden="true" style={{ overflow: "visible" }}>
+      <defs>
+        <filter id="room-soft" x="-20%" y="-20%" width="140%" height="140%"><feGaussianBlur stdDeviation="14" /></filter>
+        {fixture === "window" ? (
+          <>
+            <linearGradient id="room-sky" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0" stopColor={sky.top} />
+              <stop offset="1" stopColor={sky.bottom} />
+            </linearGradient>
+            <linearGradient id="room-glass" x1="0" y1="0" x2="1" y2="1">
+              <stop offset="0" stopColor="#FFFFFF" stopOpacity="0" />
+              <stop offset="0.42" stopColor="#FFFFFF" stopOpacity="0" />
+              <stop offset="0.46" stopColor="#FFFFFF" stopOpacity="0.32" />
+              <stop offset="0.52" stopColor="#FFFFFF" stopOpacity="0.08" />
+              <stop offset="0.56" stopColor="#FFFFFF" stopOpacity="0.22" />
+              <stop offset="0.6" stopColor="#FFFFFF" stopOpacity="0" />
+              <stop offset="1" stopColor="#FFFFFF" stopOpacity="0" />
+            </linearGradient>
+            <linearGradient id="room-curtain" x1="0" y1="0" x2="1" y2="0">
+              {[0, 0.16, 0.33, 0.5, 0.66, 0.83, 1].map((o, i) => <stop key={o} offset={o} stopColor={curtain} stopOpacity={i % 2 ? 0.78 : 1} />)}
+            </linearGradient>
+          </>
+        ) : null}
+        {fixture === "weather" ? (
+          <linearGradient id="room-clock-rim" x1="0" y1="0" x2="1" y2="1">
+            <stop offset="0" stopColor="#E2AE78" />
+            <stop offset="0.5" stopColor="#C98F5A" />
+            <stop offset="1" stopColor="#8E5C32" />
+          </linearGradient>
+        ) : null}
+      </defs>
+      {fixture === "window" ? <Window sky={sky} curtain={curtain} season={seasonOf(now, at)} weather={weather} style={theme.style} /> : null}
+      {fixture === "clock" ? <Clock now={now} night={sky.light < 0.2} /> : null}
+      {fixture === "weather" ? <WeatherBoard weather={weather} night={sky.altitude < -4} place={placeName} /> : null}
+      {fixture === "shelf" ? <Shelves only={0} /> : null}
+    </svg>
+  );
 }

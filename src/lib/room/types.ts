@@ -12,7 +12,7 @@
 import type { CollectionCategory } from "@/lib/collection/items";
 import type { GachaRarity } from "@/lib/gacha/config";
 
-export type DecorKind = "item" | "photo" | "trophy" | "pennant" | "furniture";
+export type DecorKind = "item" | "photo" | "trophy" | "pennant" | "furniture" | "fixture";
 
 type DecorBase = { key: string; name: string; count: number };
 export type DecorEntry =
@@ -20,7 +20,8 @@ export type DecorEntry =
   | (DecorBase & { kind: "photo"; image: string; full: string; date: string; comment: string; pref: string; upload?: boolean })
   | (DecorBase & { kind: "trophy"; stage: string; rank: string; color: string; score: number })
   | (DecorBase & { kind: "pennant"; emoji: string; color: string })
-  | (DecorBase & { kind: "furniture"; furniture: FurnitureId });
+  | (DecorBase & { kind: "furniture"; furniture: FurnitureId })
+  | (DecorBase & { kind: "fixture"; fixture: FixtureId });
 
 /** だれでも置ける家具（絵は decor-visual.tsx で描く）。width は床の手前に置いたときの幅（部屋の幅に対する %） */
 export const FURNITURE = {
@@ -38,6 +39,22 @@ export const FURNITURE_IDS = Object.keys(FURNITURE) as FurnitureId[];
 export const furnitureKey = (id: FurnitureId) => `furniture:${id}`;
 export const FURNITURE_ENTRIES: DecorEntry[] = FURNITURE_IDS.map((id) => ({ kind: "furniture", key: furnitureKey(id), name: FURNITURE[id].name, furniture: id, count: 2 }));
 
+/**
+ * 部屋のつくり（窓・壁の棚・かけ時計・お天気ボード）。ほかの飾りと同じように動かす・大きさを変える・しまうができる。
+ * 絵は room-scene.tsx の FixtureVisual で描く
+ */
+export const FIXTURES = {
+  window: { name: "窓", count: 2 },
+  shelf: { name: "かべの棚", count: 3 },
+  clock: { name: "かけ時計", count: 1 },
+  weather: { name: "お天気ボード", count: 1 },
+} as const;
+export type FixtureId = keyof typeof FIXTURES;
+export const FIXTURE_IDS = Object.keys(FIXTURES) as FixtureId[];
+export const fixtureKey = (id: FixtureId) => `fixture:${id}`;
+export const FIXTURE_ENTRIES: DecorEntry[] = FIXTURE_IDS.map((id) => ({ kind: "fixture", key: fixtureKey(id), name: FIXTURES[id].name, fixture: id, count: FIXTURES[id].count }));
+const isFixtureKey = (key: string) => FIXTURE_IDS.some((id) => fixtureKey(id) === key);
+
 export const FRAME_STYLES = ["wood", "white", "polaroid", "gold"] as const;
 export type FrameStyle = (typeof FRAME_STYLES)[number];
 
@@ -53,6 +70,12 @@ export type Placement = {
   z: number;
   /** 写真の額縁 */
   frame?: FrameStyle;
+  /**
+   * 棚に乗せたときの棚（置いたものの id）と、棚の左はしからの位置（0〜1）。
+   * 棚を動かしたり大きさを変えたりすると、乗せたものもいっしょに動き、同じ割合で大きさが変わる
+   */
+  on?: string;
+  rx?: number;
 };
 
 export const WALLPAPERS = ["cream", "mint-stripe", "pink-gingham", "blue-dots", "flower", "night-stars", "wood-panel", "log", "brick", "shiplap", "plaster", "fog-blue"] as const;
@@ -79,7 +102,8 @@ export type RoomTheme = { wall: Wallpaper; floor: Floor; curtain: Curtain; rug: 
 /** 端末から選んで、おへや用にアップロードした写真（Storage の users/{自分}/room/ に置く） */
 export type RoomPhoto = { id: string; path: string; date: string; title: string };
 
-export type RoomLayout = { theme: RoomTheme; items: Placement[]; photos: RoomPhoto[] };
+/** v: 2 から窓・棚・時計も items に入る（それより前の部屋は読みこむときに足す） */
+export type RoomLayout = { theme: RoomTheme; items: Placement[]; photos: RoomPhoto[]; v?: number };
 
 export const DEFAULT_THEME: RoomTheme = { wall: "cream", floor: "wood-light", curtain: "leaf", rug: "round-cream", deco: "garland", style: "standard", room: "cozy" };
 /** 部屋の雰囲気を選んだときに、いっしょに切りかえる壁紙・床・窓など */
@@ -119,7 +143,7 @@ export const ROOM = {
   window: { x0: 7, x1: 37, y0: 9, y1: 38 },
 } as const;
 
-export const isHanging = (kind: DecorKind) => kind === "photo" || kind === "pennant";
+export const isHanging = (kind: DecorKind) => kind === "photo" || kind === "pennant" || kind === "fixture";
 
 export const photoKey = (photoId: string) => `photo:${photoId}`;
 export const trophyKey = (stage: string) => `trophy:${stage}`;
@@ -183,7 +207,7 @@ export function parseRoomLayout(value: unknown, validKeys?: ReadonlySet<string>)
     if (!raw || typeof raw !== "object") return [];
     const p = raw as Record<string, unknown>;
     if (typeof p.id !== "string" || typeof p.key !== "string" || p.id.length > 64 || p.key.length > 120) return [];
-    if (p.key.startsWith("upload:") ? !uploadKeys.has(p.key) : validKeys && !validKeys.has(p.key)) return [];
+    if (p.key.startsWith("upload:") ? !uploadKeys.has(p.key) : !isFixtureKey(p.key) && validKeys && !validKeys.has(p.key)) return [];
     const num = (v: unknown, fallback: number) => (typeof v === "number" && Number.isFinite(v) ? v : fallback);
     return [{
       id: p.id,
@@ -194,14 +218,65 @@ export function parseRoomLayout(value: unknown, validKeys?: ReadonlySet<string>)
       flip: p.flip === true,
       z: Math.round(clamp(num(p.z, 1), 0, 100000)),
       ...(typeof p.frame === "string" ? { frame: oneOf(FRAME_STYLES, p.frame, "wood") } : {}),
+      ...(typeof p.on === "string" && p.on.length <= 64 ? { on: p.on, rx: clamp(num(p.rx, 0.5), 0, 1) } : {}),
     }];
   });
-  return { theme, items, photos };
+  if (root.v === 2) {
+    // 棚がなくなった（しまった）ものは床に下ろす
+    const shelfIds = new Set(items.filter((p) => p.key === fixtureKey("shelf")).map((p) => p.id));
+    return { theme, items: items.map((p) => (p.on && !shelfIds.has(p.on) ? dropOff(p) : p)), photos, v: 2 };
+  }
+  return migrateFixtures({ theme, items, photos });
 }
 
-/** 置くもの（アイテム・トロフィー）が乗っている棚（無ければ床） */
-export function shelfOf(p: { x: number; y: number }): (typeof ROOM.shelves)[number] | null {
-  return ROOM.shelves.find((s) => Math.abs(p.y - s.y) < 0.01 && p.x >= s.x0 && p.x <= s.x1) ?? null;
+/** 棚から下ろす（床の手前に置く） */
+function dropOff(p: Placement): Placement {
+  const { on: _on, rx: _rx, ...rest } = p;
+  return { ...rest, y: clamp(Math.max(p.y, ROOM.floorTop + 8), ROOM.floorTop, ROOM.floorBottom) };
+}
+
+/** はじめの窓・棚・時計・お天気ボード（いままで部屋に描きこんでいた場所） */
+export function defaultFixtures(style: RoomStyle): Placement[] {
+  const win = windowOf(style);
+  const put = (id: string, f: FixtureId, x: number, y: number, z: number): Placement => ({ id, key: fixtureKey(f), x, y, scale: 1, flip: false, z });
+  return [
+    put("fx-window-1", "window", (win.x0 + win.x1) / 2, (win.y0 + win.y1) / 2, 0),
+    put("fx-shelf-1", "shelf", (ROOM.shelves[0].x0 + ROOM.shelves[0].x1) / 2, ROOM.shelves[0].y, 0),
+    put("fx-shelf-2", "shelf", (ROOM.shelves[1].x0 + ROOM.shelves[1].x1) / 2, ROOM.shelves[1].y, 0),
+    put("fx-clock", "clock", 75.5, 12, 0),
+    put("fx-weather", "weather", 88.2, 8.8, 0),
+  ];
+}
+
+/** 窓・棚が部屋に描きこまれていたころの部屋を、動かせる窓・棚つきの部屋に直す（棚の上のものは、その棚に乗せる） */
+export function migrateFixtures(layout: RoomLayout): RoomLayout {
+  const fixtures = defaultFixtures(layout.theme.style);
+  const items = layout.items.map((p): Placement => {
+    const i = ROOM.shelves.findIndex((s) => Math.abs(p.y - s.y) < 0.01 && p.x >= s.x0 && p.x <= s.x1);
+    if (i < 0) return p;
+    const s = ROOM.shelves[i]!;
+    return { ...p, on: `fx-shelf-${i + 1}`, rx: clamp((p.x - s.x0) / (s.x1 - s.x0), 0, 1) };
+  });
+  return { ...layout, items: [...fixtures, ...items], v: 2 };
+}
+
+/** 壁の棚の板の幅（大きさ1のとき。部屋の幅に対する %）。棚の (x, y) は板の上の面のまん中 */
+export const SHELF_BOARD = 35;
+export function shelfBoard(s: Placement): { x0: number; x1: number; y: number } {
+  const w = SHELF_BOARD * s.scale;
+  return { x0: s.x - w / 2, x1: s.x + w / 2, y: s.y };
+}
+
+/** 棚に乗せたものの、いまの位置と、棚の大きさ（乗せたものもこの割合で大きさが変わる） */
+export type Placed = Placement & { k: number };
+export function resolvePlacements(items: readonly Placement[]): Placed[] {
+  const shelves = new Map(items.filter((p) => p.key === fixtureKey("shelf")).map((p) => [p.id, p]));
+  return items.map((p) => {
+    const s = p.on ? shelves.get(p.on) : undefined;
+    if (!s) return { ...p, k: 1 };
+    const b = shelfBoard(s);
+    return { ...p, x: b.x0 + (p.rx ?? 0.5) * (b.x1 - b.x0), y: b.y, k: s.scale };
+  });
 }
 
 /** 床の奥ほど小さく見せる倍率 */
@@ -211,16 +286,22 @@ export function depthScale(y: number): number {
 
 /**
  * 動かした先に合わせて位置を整える。
- * 掛けるものは壁の範囲に、置くものは棚の近くなら棚の上に、それ以外は床に乗せる
+ * 掛けるもの（写真・ペナント・窓や棚）は壁の範囲に、置くものは棚の近くなら棚の上に、それ以外は床に乗せる。
+ * 棚に乗ったら on（棚）と rx（棚の上の位置）を返し、床なら on を消す
  */
-export function settle(kind: DecorKind, x: number, y: number): { x: number; y: number } {
-  if (isHanging(kind)) return { x: clamp(x, 6, 94), y: clamp(y, ROOM.wallTop + 4, ROOM.wallBottom) };
+export function settle(kind: DecorKind, x: number, y: number, shelves: readonly Placement[] = []): { x: number; y: number; on?: string; rx?: number } {
+  if (isHanging(kind)) return { x: clamp(x, 6, 94), y: clamp(y, ROOM.wallTop + 2, ROOM.wallBottom), on: undefined, rx: undefined };
   const nx = clamp(x, 4, 96);
   // 家具は棚に乗らない
-  if (kind === "furniture") return { x: nx, y: clamp(y, ROOM.floorTop, ROOM.floorBottom) };
-  const shelf = ROOM.shelves.find((s) => nx >= s.x0 + 2 && nx <= s.x1 - 2 && y > s.y - 8 && y < s.y + 9);
-  if (shelf) return { x: nx, y: shelf.y };
-  return { x: nx, y: clamp(y, ROOM.floorTop, ROOM.floorBottom) };
+  if (kind !== "furniture") {
+    for (const s of shelves) {
+      const b = shelfBoard(s);
+      if (nx >= b.x0 + 1 && nx <= b.x1 - 1 && y > b.y - 8 * s.scale && y < b.y + 9 * s.scale) {
+        return { x: nx, y: b.y, on: s.id, rx: (nx - b.x0) / (b.x1 - b.x0) };
+      }
+    }
+  }
+  return { x: nx, y: clamp(y, ROOM.floorTop, ROOM.floorBottom), on: undefined, rx: undefined };
 }
 
 /**
