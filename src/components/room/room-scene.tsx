@@ -6,7 +6,7 @@
  * 窓の外と部屋の明るさは、日本時間の今の時間帯（朝・昼・夕方・夜）に合わせる。
  */
 import { memo, useMemo } from "react";
-import { skyAt, type SkyState } from "@/lib/room/sun";
+import { skyAt, TOKYO, type GeoPoint, type SkyState } from "@/lib/room/sun";
 import { CURTAIN_STYLES, FLOOR_STYLES, RUG_STYLES, WALLPAPER_STYLES } from "@/lib/room/themes";
 import { ROOM, type RoomTheme } from "@/lib/room/types";
 
@@ -24,21 +24,22 @@ const py = (pct: number) => (pct / 100) * H;
 
 
 export type Season = "sakura" | "rain" | "summer" | "leaves" | "snow" | "none";
-/** 窓の外の季節（日本時間の月） */
-export function seasonOf(date: Date): Season {
+/** 窓の外の季節（日本時間の月と、住んでいるところ。北海道は桜が5月で梅雨がなく、沖縄・奄美は雪が降らない） */
+export function seasonOf(date: Date, at: GeoPoint = TOKYO): Season {
   const m = Number(new Intl.DateTimeFormat("en-US", { timeZone: "Asia/Tokyo", month: "numeric" }).format(date));
-  if (m === 3 || m === 4) return "sakura";
-  if (m === 6) return "rain";
+  const north = at.lat >= 41.4, south = at.lat < 29;
+  if (north ? m === 5 : south ? m === 2 : m === 3 || m === 4) return "sakura";
+  if (m === 6 && !north) return "rain";
   if (m === 7 || m === 8) return "summer";
-  if (m === 10 || m === 11) return "leaves";
-  if (m === 12 || m <= 2) return "snow";
+  if (north ? m === 9 || m === 10 : m === 10 || m === 11) return "leaves";
+  if ((m === 12 || m <= 2 || (north && m === 3)) && !south) return "snow";
   return "none";
 }
 
 /** 日本時間と、その日の太陽の高さから決める時間帯（犬のことばなどに使う） */
-export function dayPhaseOf(date: Date): DayPhase {
+export function dayPhaseOf(date: Date, at: GeoPoint = TOKYO): DayPhase {
   const h = Number(new Intl.DateTimeFormat("en-US", { timeZone: "Asia/Tokyo", hour: "numeric", hourCycle: "h23" }).format(date));
-  const alt = skyAt(date).altitude;
+  const alt = skyAt(date, at).altitude;
   if (alt < -4) return "night";
   if (h < 11) return "morning";
   if (h >= 13 && alt < 14) return "evening";
@@ -53,9 +54,9 @@ const mixColor = (a: string, b: string, t: number) => {
   return `#${pa.map((v, i) => Math.round(v + (pb[i]! - v) * Math.max(0, Math.min(1, t))).toString(16).padStart(2, "0")).join("")}`;
 };
 
-export const RoomScene = memo(function RoomScene({ theme, now }: { theme: RoomTheme; now: Date }) {
+export const RoomScene = memo(function RoomScene({ theme, now, at = TOKYO }: { theme: RoomTheme; now: Date; at?: GeoPoint }) {
   const wall = WALLPAPER_STYLES[theme.wall];
-  const sky = useMemo(() => skyAt(now), [now]);
+  const sky = useMemo(() => skyAt(now, at), [now, at]);
   const night = sky.light < 0.2;
   const lit = lampsOn(sky);
   const sunUp = sky.altitude > 0;
@@ -139,7 +140,7 @@ export const RoomScene = memo(function RoomScene({ theme, now }: { theme: RoomTh
       {/* 窓から入る光が壁を明るくする */}
       {sky.light > 0.1 ? <ellipse cx={px((ROOM.window.x0 + ROOM.window.x1) / 2)} cy={py(24)} rx="360" ry="300" fill="url(#room-window-glow)" /> : null}
 
-      <Window sky={sky} curtain={CURTAIN_STYLES[theme.curtain].color} season={seasonOf(now)} />
+      <Window sky={sky} curtain={CURTAIN_STYLES[theme.curtain].color} season={seasonOf(now, at)} />
       <WallDecoration deco={theme.deco} lit={lit} />
       <Clock now={now} night={night} />
       <Shelves />
@@ -438,17 +439,55 @@ function Clock({ now, night }: { now: Date; night: boolean }) {
   );
 }
 
+/**
+ * 壁につけた板の棚。上の面（奥ゆき）・前の厚み・金具・壁に落ちる影を描いて、物が「乗っている」ように見せる。
+ * 置いたものの下のはし（棚の y）は、上の面のまん中あたりに来る
+ */
 function Shelves() {
+  const BACK = 8, FRONT = 9, THICK = 17;
   return (
     <g>
+      <defs>
+        <linearGradient id="room-shelf-top" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0" stopColor="#B98552" />
+          <stop offset="1" stopColor="#E2B683" />
+        </linearGradient>
+        <linearGradient id="room-shelf-front" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0" stopColor="#C38D58" />
+          <stop offset="1" stopColor="#9A6838" />
+        </linearGradient>
+        <linearGradient id="room-shelf-bracket" x1="0" y1="0" x2="1" y2="0">
+          <stop offset="0" stopColor="#5A4636" />
+          <stop offset="0.5" stopColor="#8A7462" />
+          <stop offset="1" stopColor="#4A382A" />
+        </linearGradient>
+        <filter id="room-shelf-blur" x="-10%" y="-60%" width="120%" height="220%"><feGaussianBlur stdDeviation="7" /></filter>
+      </defs>
       {ROOM.shelves.map((s) => {
         const x0 = px(s.x0), x1 = px(s.x1), y = py(s.y);
+        const top = y - BACK, front = y + FRONT, bottom = front + THICK;
+        const inset = 9;
         return (
           <g key={s.y}>
-            <rect x={x0 + 4} y={y + 4} width={x1 - x0} height="18" fill="#000" opacity="0.1" rx="3" />
-            <rect x={x0} y={y} width={x1 - x0} height="16" rx="3" fill="#C9925C" />
-            <rect x={x0} y={y} width={x1 - x0} height="4" rx="2" fill="#E3B888" />
-            {[x0 + 30, x1 - 30].map((bx) => <path key={bx} d={`M${bx - 6} ${y + 16} L${bx + 6} ${y + 16} L${bx + 6} ${y + 50} Z`} fill="#A87444" />)}
+            {/* 壁に落ちる影（棚の下にやわらかく） */}
+            <path d={`M${x0 + 6} ${bottom - 2} L${x1 + 4} ${bottom - 2} L${x1 - 10} ${bottom + 34} L${x0 + 22} ${bottom + 34} Z`} fill="#2A1A0C" opacity="0.2" filter="url(#room-shelf-blur)" />
+            {/* 金具（壁から棚の下を支える） */}
+            {[x0 + 46, x1 - 46].map((bx) => (
+              <g key={bx}>
+                <path d={`M${bx - 5} ${bottom - 1} L${bx + 5} ${bottom - 1} L${bx + 5} ${bottom + 3} L${bx - 1} ${bottom + 40} L${bx - 5} ${bottom + 40} Z`} fill="url(#room-shelf-bracket)" />
+                <circle cx={bx - 3} cy={bottom + 30} r="2" fill="#2E2218" />
+              </g>
+            ))}
+            {/* 板の奥のふち：壁とのさかいに細い影 */}
+            <rect x={x0 + inset - 2} y={top - 5} width={x1 - x0 - inset * 2 + 4} height="6" fill="#2A1A0C" opacity="0.12" rx="3" />
+            {/* 上の面（奥がせまく、手前が広い） */}
+            <path d={`M${x0 + inset} ${top} L${x1 - inset} ${top} L${x1} ${front} L${x0} ${front} Z`} fill="url(#room-shelf-top)" />
+            {[0.3, 0.62].map((k) => <path key={k} d={`M${x0 + inset * (1 - k)} ${top + (front - top) * k} L${x1 - inset * (1 - k)} ${top + (front - top) * k}`} stroke="#A87444" strokeOpacity="0.28" strokeWidth="1" />)}
+            {/* 手前の厚み */}
+            <rect x={x0} y={front} width={x1 - x0} height={THICK} fill="url(#room-shelf-front)" />
+            <rect x={x0} y={front} width={x1 - x0} height="2.5" fill="#F4D3A6" opacity="0.85" />
+            <path d={`M${x0 + 30} ${front + 8} q 40 -3 90 0 M${x1 - 140} ${front + 11} q 50 2 100 -1`} stroke="#7A4E28" strokeOpacity="0.22" strokeWidth="1.4" fill="none" />
+            <rect x={x0} y={bottom - 2.5} width={x1 - x0} height="2.5" fill="#5A3A1C" opacity="0.45" />
           </g>
         );
       })}
@@ -560,8 +599,8 @@ function RugShape({ rug }: { rug: RoomTheme["rug"] }) {
  * 夜は部屋を暗くして、天井のライトとフロアランプのまわりだけ明るく残す。夕方は橙、朝は桃色にほんのり染める。
  * lamps は明かりの場所（部屋の %）。いつも四すみを少し暗くして、写真のような落ち着きを出す
  */
-export const RoomLighting = memo(function RoomLighting({ now, lamps }: { now: Date; lamps: readonly { x: number; y: number; r: number }[] }) {
-  const sky = useMemo(() => skyAt(now), [now]);
+export const RoomLighting = memo(function RoomLighting({ now, lamps, at = TOKYO }: { now: Date; lamps: readonly { x: number; y: number; r: number }[]; at?: GeoPoint }) {
+  const sky = useMemo(() => skyAt(now, at), [now, at]);
   const dark = Math.max(0, 1 - sky.light);
   const lit = lampsOn(sky);
   const lights = [{ x: 50, y: 11, r: 46 }, ...lamps];

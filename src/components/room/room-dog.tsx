@@ -3,6 +3,7 @@
 /**
  * わんこのおへやで暮らす犬。床の上をうろうろ歩いて、すわったり、においをかいだりする。
  * 夜はラグの上で寝ていて、タップすると喜ぶ。画像は左向きなので、右へ歩くときは反転する。
+ * 家具の上は歩かず、床のマス目で道をさがして回りこむ。歩きながら重なり順を変えるので、家具の奥を通るときは家具にかくれる。
  */
 import { useCallback, useEffect, useRef, useState } from "react";
 import { getFrenchieSrc, type DogSkinId } from "@/lib/dog-skins";
@@ -18,7 +19,97 @@ const DOG_WIDTH = 25;
 const pick = <T,>(list: readonly T[]): T => list[Math.floor(Math.random() * list.length)]!;
 const rand = (a: number, b: number) => a + Math.random() * (b - a);
 
-type DogState = { x: number; y: number; pose: string; flip: boolean; dur: number; /** 重なり順に使う y（ベッドの上では、ベッドより手前に描く） */ zy?: number };
+type DogState = { x: number; y: number; pose: string; flip: boolean; /** 重なり順に使う y（ベッドの上では、ベッドより手前に描く） */ zy?: number };
+type Pt = { x: number; y: number };
+type Block = DogPlaces["blocks"][number];
+
+/* ---------- 家具をよける道さがし（床を 2% × 1% のマス目にして A*） ---------- */
+const GX0 = 5, GX1 = 95, GSX = 2;
+const GY0 = ROOM.floorTop + 1.5, GY1 = ROOM.floorBottom, GSY = 1;
+const COLS = Math.round((GX1 - GX0) / GSX) + 1, ROWS = Math.round((GY1 - GY0) / GSY) + 1;
+/** 奥行き方向は見た目より長い道のりなので、横より重く数える */
+const DEPTH_COST = 1.4;
+const inside = (b: Block, p: Pt) => p.x > b.x0 && p.x < b.x1 && p.y > b.y0 && p.y < b.y1;
+const cellPt = (i: number): Pt => ({ x: GX0 + (i % COLS) * GSX, y: GY0 + Math.floor(i / COLS) * GSY });
+const cellOf = (p: Pt) => clamp(Math.round((p.y - GY0) / GSY), 0, ROWS - 1) * COLS + clamp(Math.round((p.x - GX0) / GSX), 0, COLS - 1);
+const dist = (a: Pt, b: Pt) => Math.hypot(b.x - a.x, (b.y - a.y) * DEPTH_COST);
+
+function lineClear(a: Pt, b: Pt, blocks: readonly Block[]): boolean {
+  const n = Math.ceil(dist(a, b) / 0.6);
+  for (let k = 1; k <= n; k++) {
+    const t = k / n, p = { x: a.x + (b.x - a.x) * t, y: a.y + (b.y - a.y) * t };
+    if (blocks.some((bl) => inside(bl, p))) return false;
+  }
+  return true;
+}
+
+/** いちばん近い、家具のないところ */
+function nearestFree(p: Pt, blocks: readonly Block[]): Pt {
+  if (!blocks.some((b) => inside(b, p))) return p;
+  let best = p, bestD = Infinity;
+  for (let i = 0; i < COLS * ROWS; i++) {
+    const c = cellPt(i);
+    if (blocks.some((b) => inside(b, c))) continue;
+    const d = dist(p, c);
+    if (d < bestD) { bestD = d; best = c; }
+  }
+  return best;
+}
+
+/**
+ * from から to までの通り道（曲がり角の点の列。最後が行き先）。
+ * いま家具の中にいるとき（もようがえで上に家具を置かれたとき）は、その家具は無視して外へ出る。
+ * exact のときは行き先をそのまま使う（ベッドやハウスの中へ入るとき）
+ */
+export function findPath(from: Pt, to: Pt, allBlocks: readonly Block[], exact = false): Pt[] {
+  const blocks = allBlocks.filter((b) => !inside(b, from) && !(exact && inside(b, to)));
+  const goal = exact ? to : nearestFree(to, blocks);
+  if (lineClear(from, goal, blocks)) return [goal];
+  const n = COLS * ROWS;
+  const free = new Uint8Array(n);
+  for (let i = 0; i < n; i++) free[i] = blocks.some((b) => inside(b, cellPt(i))) ? 0 : 1;
+  const start = cellOf(from), end = cellOf(goal);
+  free[start] = 1; free[end] = 1;
+  const g = new Float64Array(n).fill(Infinity), came = new Int32Array(n).fill(-1), done = new Uint8Array(n);
+  const open: number[] = [start];
+  g[start] = 0;
+  const h = (i: number) => dist(cellPt(i), goal);
+  while (open.length) {
+    let bi = 0;
+    for (let k = 1; k < open.length; k++) if (g[open[k]!]! + h(open[k]!) < g[open[bi]!]! + h(open[bi]!)) bi = k;
+    const cur = open.splice(bi, 1)[0]!;
+    if (cur === end) break;
+    if (done[cur]) continue;
+    done[cur] = 1;
+    const cx = cur % COLS, cy = Math.floor(cur / COLS);
+    for (let dy = -1; dy <= 1; dy++) for (let dx = -1; dx <= 1; dx++) {
+      if (!dx && !dy) continue;
+      const nx = cx + dx, ny = cy + dy;
+      if (nx < 0 || ny < 0 || nx >= COLS || ny >= ROWS) continue;
+      const ni = ny * COLS + nx;
+      if (!free[ni] || done[ni]) continue;
+      // 斜めに進むとき、家具の角をかすめないようにする
+      if (dx && dy && (!free[cy * COLS + nx] || !free[ny * COLS + cx])) continue;
+      const ng = g[cur]! + dist(cellPt(cur), cellPt(ni));
+      if (ng < g[ni]!) { g[ni] = ng; came[ni] = cur; open.push(ni); }
+    }
+  }
+  if (came[end] === -1 && start !== end) return [goal];
+  const cells: Pt[] = [];
+  for (let i = end; i !== -1 && i !== start; i = came[i]!) cells.unshift(cellPt(i));
+  cells[cells.length - 1] = goal;
+  // 見通しのきく所まではまっすぐ歩く（マス目のカクカクをなくす）
+  const path: Pt[] = [];
+  let at = from, k = 0;
+  while (k < cells.length) {
+    let far = k;
+    for (let j = cells.length - 1; j > k; j--) if (lineClear(at, cells[j]!, blocks)) { far = j; break; }
+    path.push(cells[far]!);
+    at = cells[far]!;
+    k = far + 1;
+  }
+  return path;
+}
 export type DogPlaces = {
   bed: { x: number; y: number; zy: number } | null;
   bowl: { x: number; y: number } | null;
@@ -39,11 +130,12 @@ export function RoomDog({ skin, phase, sleepy, lines, quiet, places }: {
   /** ベッド・ごはん皿・床に置いたおもちゃの場所 */
   places: DogPlaces;
 }) {
-  const [dog, setDog] = useState<DogState>({ x: 30, y: 84, pose: "sit", flip: false, dur: 0 });
+  const [dog, setDog] = useState<DogState>({ x: 30, y: 84, pose: "sit", flip: false });
   const [bubble, setBubble] = useState<{ text: string; id: number } | null>(null);
   const [hearts, setHearts] = useState<number[]>([]);
   const timers = useRef<number[]>([]);
   const walkAnim = useRef<number | null>(null);
+  const stepAnim = useRef<number | null>(null);
   const busy = useRef(false);
   // 置き場所が変わるたびに暮らしを最初からやり直さないよう、最新の場所は ref で見る
   const placesRef = useRef(places);
@@ -54,6 +146,7 @@ export function RoomDog({ skin, phase, sleepy, lines, quiet, places }: {
     for (const t of timers.current) window.clearTimeout(t);
     timers.current = [];
     if (walkAnim.current) { window.clearInterval(walkAnim.current); walkAnim.current = null; }
+    if (stepAnim.current) { window.cancelAnimationFrame(stepAnim.current); stepAnim.current = null; }
   }, []);
   const later = useCallback((fn: () => void, ms: number) => { timers.current.push(window.setTimeout(fn, ms)); }, []);
 
@@ -63,19 +156,41 @@ export function RoomDog({ skin, phase, sleepy, lines, quiet, places }: {
   }, [skin]);
 
   const pos = useRef({ x: dog.x, y: dog.y });
-  const walkTo = useCallback((x: number, y: number, then: () => void, zy?: number) => {
-    const from = pos.current;
-    const dur = Math.max(0.4, Math.hypot(x - from.x, (y - from.y) * 1.4) / WALK_SPEED);
-    pos.current = { x, y };
+  /**
+   * 家具をよけながら (x, y) まで歩く。1コマごとに位置を変えるので、重なり順も歩きながら変わる。
+   * zy は着いてからの重なり順（ベッドの上など）。exact は家具の中（ベッド・ハウス）へ入るとき
+   */
+  const walkTo = useCallback((x: number, y: number, then: () => void, zy?: number, exact = false) => {
     if (walkAnim.current) window.clearInterval(walkAnim.current);
+    if (stepAnim.current) window.cancelAnimationFrame(stepAnim.current);
+    const path = findPath(pos.current, { x, y }, placesRef.current.blocks, exact);
+    let a = pos.current, seg = 0, segStart = -1;
     let frame = 0;
     walkAnim.current = window.setInterval(() => { frame += 1; setDog((cur) => ({ ...cur, pose: frame % 2 ? "trot" : "walk" })); }, 210);
-    later(() => {
-      if (walkAnim.current) { window.clearInterval(walkAnim.current); walkAnim.current = null; }
-      then();
-    }, dur * 1000);
-    setDog({ x, y, pose: "walk", flip: x > from.x, dur, zy });
-  }, [later]);
+    setDog((d) => ({ ...d, pose: "walk", zy: undefined }));
+    const step = (t: number) => {
+      if (segStart < 0) segStart = t;
+      const b = path[seg]!;
+      const dur = Math.max(80, (dist(a, b) / WALK_SPEED) * 1000);
+      const k = Math.min(1, (t - segStart) / dur);
+      const cur = { x: a.x + (b.x - a.x) * k, y: a.y + (b.y - a.y) * k };
+      pos.current = cur;
+      const flip = b.x > a.x + 0.05 ? true : b.x < a.x - 0.05 ? false : undefined;
+      if (k >= 1) {
+        a = b; seg += 1; segStart = t;
+        if (seg >= path.length) {
+          stepAnim.current = null;
+          if (walkAnim.current) { window.clearInterval(walkAnim.current); walkAnim.current = null; }
+          setDog((d) => ({ ...d, x: b.x, y: b.y, zy }));
+          then();
+          return;
+        }
+      }
+      setDog((d) => ({ ...d, x: cur.x, y: cur.y, flip: flip ?? d.flip }));
+      stepAnim.current = window.requestAnimationFrame(step);
+    };
+    stepAnim.current = window.requestAnimationFrame(step);
+  }, []);
 
   /** 少しのあいだ、ふきだしを出す */
   const say = useCallback((text: string, ms = 2400) => {
@@ -83,16 +198,16 @@ export function RoomDog({ skin, phase, sleepy, lines, quiet, places }: {
     setBubble({ text, id });
     later(() => setBubble((b) => (b?.id === id ? null : b)), ms);
   }, [later]);
-  const pose = useCallback((p: string) => setDog((d) => ({ ...d, pose: p, dur: 0 })), []);
+  const pose = useCallback((p: string) => setDog((d) => ({ ...d, pose: p })), []);
 
   const live = useCallback(() => {
     if (busy.current) return;
     const pl = placesRef.current;
-    if (quiet) { walkTo(9, ROOM.floorBottom - 3, () => setDog((d) => ({ ...d, pose: "sit", flip: true, dur: 0 }))); return; }
+    if (quiet) { walkTo(9, ROOM.floorBottom - 3, () => setDog((d) => ({ ...d, pose: "sit", flip: true }))); return; }
     if (night) {
       // 夜はベッド（なければラグ）で寝る
       const bed = pl.bed;
-      if (bed) walkTo(bed.x, bed.y, () => pose("sleep"), bed.zy);
+      if (bed) walkTo(bed.x, bed.y, () => pose("sleep"), bed.zy, true);
       else walkTo(50, 80, () => pose("sleep"));
       return;
     }
@@ -103,14 +218,14 @@ export function RoomDog({ skin, phase, sleepy, lines, quiet, places }: {
       const toy = pick(pl.toys);
       const side = toy.x < 50 ? 6 : -6;
       walkTo(clamp(toy.x + side, 6, 94), clamp(toy.y + 0.6, ROOM.floorTop + 2, ROOM.floorBottom), () => {
-        setDog((d) => ({ ...d, pose: "sniff", flip: side < 0, dur: 0 }));
+        setDog((d) => ({ ...d, pose: "sniff", flip: side < 0 }));
         later(() => { pose(pick(["cheer", "stand-happy", "wave"] as const)); say(`${toy.name}であそぶ♪`); }, 1200);
         next(4200);
       });
     } else if (r < 0.32 && pl.bowl) {
       const bowl = pl.bowl;
       walkTo(clamp(bowl.x + 6, 6, 94), clamp(bowl.y + 0.4, ROOM.floorTop + 2, ROOM.floorBottom), () => {
-        setDog((d) => ({ ...d, pose: "sniff", flip: false, dur: 0 }));
+        setDog((d) => ({ ...d, pose: "sniff", flip: false }));
         say("もぐもぐ…", 2200);
         later(() => { pose("smile"); say("ごちそうさま！", 1500); }, 2400);
         next(4600);
@@ -124,11 +239,11 @@ export function RoomDog({ skin, phase, sleepy, lines, quiet, places }: {
       });
     } else if (r < 0.54 && pl.bed) {
       const bed = pl.bed;
-      walkTo(bed.x, bed.y, () => { pose(pick(["lie-wave", "sit"] as const)); say("ごろーん", 1800); next(4500); }, bed.zy);
+      walkTo(bed.x, bed.y, () => { pose(pick(["lie-wave", "sit"] as const)); say("ごろーん", 1800); next(4500); }, bed.zy, true);
     } else if (r < 0.85) {
-      let tx = rand(10, 90), ty = rand(ROOM.floorTop + 4, ROOM.floorBottom - 2);
-      for (let k = 0; k < 10 && pl.blocks.some((b) => tx > b.x0 && tx < b.x1 && ty > b.y0 && ty < b.y1); k++) {
-        tx = rand(10, 90); ty = rand(ROOM.floorTop + 4, ROOM.floorBottom - 2);
+      let tx = rand(10, 90), ty = rand(ROOM.floorTop + 3, ROOM.floorBottom - 2);
+      for (let k = 0; k < 10 && pl.blocks.some((b) => inside(b, { x: tx, y: ty })); k++) {
+        tx = rand(10, 90); ty = rand(ROOM.floorTop + 3, ROOM.floorBottom - 2);
       }
       walkTo(tx, ty, () => {
         pose(pick(IDLE_POSES));
@@ -151,7 +266,7 @@ export function RoomDog({ skin, phase, sleepy, lines, quiet, places }: {
     clearTimers();
     busy.current = true;
     const awake = !night || Math.random() < 0.6;
-    setDog((d) => ({ ...d, pose: awake ? pick(HAPPY_POSES) : "yawn", dur: 0 }));
+    setDog((d) => ({ ...d, pose: awake ? pick(HAPPY_POSES) : "yawn" }));
     const id = Date.now();
     setBubble({ text: awake ? pick(lines.length ? lines : ["わん！"]) : "むにゃ…", id });
     setHearts((h) => [...h.slice(-4), id]);
@@ -165,7 +280,6 @@ export function RoomDog({ skin, phase, sleepy, lines, quiet, places }: {
     left: `${dog.x}%`,
     top: `${dog.y}%`,
     width: `${width}%`,
-    transition: dog.dur ? `left ${dog.dur}s linear, top ${dog.dur}s linear, width ${dog.dur}s linear` : "none",
   } as const;
   // 歩くときは弾むように、止まっているときは息をするように、寝ているときはゆっくり上下する
   const motion = dog.pose === "walk" || dog.pose === "trot" ? "room-dog-walk" : dog.pose === "sleep" ? "room-dog-sleep" : "room-dog-idle";

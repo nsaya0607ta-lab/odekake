@@ -1,21 +1,50 @@
 "use client";
 
 /**
- * 「きょうの空」：日本（東京）の日の出・日の入りと、いまの太陽の位置、月の満ち欠け。
- * おへやの窓の外と部屋の明るさは、これと同じ計算で決まる。
+ * 「きょうの空」：住んでいるところの日の出・日の入りと、いまの太陽の位置、月の満ち欠け。
+ * おへやの窓の外と部屋の明るさは、これと同じ計算で決まる。場所は現在地か都道府県で選べる（わからなければ東京）。
  */
-import { useMemo } from "react";
-import { fmtJstTime, moonPhase, skyAt, sunTimes } from "@/lib/room/sun";
+import { useMemo, useState } from "react";
+import { PREFECTURE_NAMES } from "@/lib/geo/prefecture-names";
+import { fmtJstTime, moonPhase, nearestPref, PREF_POINTS, skyAt, sunTimes, type GeoPoint } from "@/lib/room/sun";
+
+/** 空の計算に使う場所。gps は現在地（0.1度に丸めて、この端末にだけ保存する） */
+export type RoomPlace = GeoPoint & { source: "gps" | "pref" | "default"; pref: string };
+export const DEFAULT_PLACE: RoomPlace = { ...PREF_POINTS["13"]!, source: "default", pref: "13" };
+export const prefNameOf = (code: string) => PREFECTURE_NAMES.find((p) => p.code === code)?.name ?? "東京都";
 
 const MOON_NAMES: [number, string][] = [
   [0.03, "新月"], [0.2, "三日月"], [0.3, "上弦の月"], [0.45, "十三夜"], [0.55, "満月"], [0.7, "十八夜"], [0.8, "下弦の月"], [0.97, "有明月"], [1, "新月"],
 ];
 const moonName = (p: number) => MOON_NAMES.find(([max]) => p <= max)?.[1] ?? "新月";
 
-export function SkyCard({ now }: { now: Date }) {
+export function SkyCard({ now, place, onPlace }: { now: Date; place: RoomPlace; onPlace: (p: RoomPlace) => void }) {
   const day = new Intl.DateTimeFormat("sv-SE", { timeZone: "Asia/Tokyo" }).format(now);
-  const times = useMemo(() => sunTimes(new Date(`${day}T12:00:00+09:00`)), [day]);
-  const sky = skyAt(now);
+  const times = useMemo(() => sunTimes(new Date(`${day}T12:00:00+09:00`), place), [day, place]);
+  const sky = skyAt(now, place);
+  const [open, setOpen] = useState(false);
+  const [locating, setLocating] = useState(false);
+  const [geoError, setGeoError] = useState("");
+  const useHere = () => {
+    if (!("geolocation" in navigator)) { setGeoError("この端末では現在地が使えません。都道府県を選んでください"); return; }
+    setLocating(true);
+    setGeoError("");
+    navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        // 空の計算には町くらいの細かさで十分なので、0.1度（約10km）に丸める
+        const at = { lat: Math.round(pos.coords.latitude * 10) / 10, lon: Math.round(pos.coords.longitude * 10) / 10 };
+        onPlace({ ...at, source: "gps", pref: nearestPref(at) });
+        setLocating(false);
+        setOpen(false);
+      },
+      (err) => {
+        setLocating(false);
+        setGeoError(err.code === err.PERMISSION_DENIED ? "位置情報が許可されていません。都道府県を選んでください" : "現在地がわかりませんでした。都道府県を選んでください");
+      },
+      { enableHighAccuracy: false, timeout: 10_000, maximumAge: 6 * 3_600_000 },
+    );
+  };
+  const placeLabel = place.source === "gps" ? `${prefNameOf(place.pref)}あたり（現在地）` : prefNameOf(place.pref);
   const moon = moonPhase(now);
   const rise = times.rise?.getTime() ?? 0, set = times.set?.getTime() ?? 0;
   const t = now.getTime();
@@ -29,9 +58,31 @@ export function SkyCard({ now }: { now: Date }) {
   return (
     <div className="overflow-hidden rounded-2xl border border-line bg-card shadow-sm">
       <div className="flex items-center justify-between px-4 pt-3">
-        <p className="text-xs font-black text-ink-soft">きょうの空<span className="ml-1.5 text-[10px] font-bold text-ink-faint">日本（東京）</span></p>
-        <p className="text-[10px] font-bold text-ink-faint">いま {fmtJstTime(now)}</p>
+        <p className="text-xs font-black text-ink-soft">きょうの空<span className="ml-1.5 text-[10px] font-bold text-ink-faint">いま {fmtJstTime(now)}</span></p>
+        <button type="button" onClick={() => setOpen((v) => !v)} aria-expanded={open} className="flex max-w-[60%] items-center gap-1 rounded-full border border-line bg-paper px-2.5 py-1 text-[10px] font-bold text-ink-soft active:scale-95">
+          <span aria-hidden>📍</span><span className="truncate">{placeLabel}</span><span aria-hidden className="text-ink-faint">{open ? "▲" : "▼"}</span>
+        </button>
       </div>
+      {open ? (
+        <div className="mx-3 mt-2 space-y-2 rounded-xl bg-paper-deep p-2.5">
+          <button type="button" onClick={useHere} disabled={locating} className="w-full rounded-full bg-leaf-deep py-2 text-[12px] font-black text-white shadow-sm active:scale-[.98] disabled:opacity-60">
+            {locating ? "現在地をさがしています…" : "📍 現在地を使う"}
+          </button>
+          <label className="flex items-center gap-2 text-[11px] font-bold text-ink-soft">
+            <span className="shrink-0">都道府県で選ぶ</span>
+            <select
+              value={place.source === "gps" ? "" : place.pref}
+              onChange={(e) => { const code = e.target.value; const pt = PREF_POINTS[code]; if (pt) { onPlace({ ...pt, source: "pref", pref: code }); setGeoError(""); setOpen(false); } }}
+              className="min-w-0 flex-1 rounded-lg border border-line bg-card px-2 py-1.5 text-[12px] font-bold text-ink"
+            >
+              {place.source === "gps" ? <option value="">現在地を使っています</option> : null}
+              {PREFECTURE_NAMES.map((p) => <option key={p.code} value={p.code}>{p.name}</option>)}
+            </select>
+          </label>
+          {geoError ? <p className="text-[10px] font-bold text-[#C0502E]">{geoError}</p> : null}
+          <p className="text-[10px] leading-relaxed text-ink-faint">場所はこの端末にだけ保存され、約10kmの細かさに丸めて空の計算だけに使います。時刻はいつも日本時間です。</p>
+        </div>
+      ) : null}
       <svg viewBox="0 0 300 96" className="block w-full" role="img" aria-label={`日の出 ${times.rise ? fmtJstTime(times.rise) : "-"}、日の入り ${times.set ? fmtJstTime(times.set) : "-"}。${status}`}>
         <defs>
           <linearGradient id="skycard-bg" x1="0" y1="0" x2="0" y2="1">
