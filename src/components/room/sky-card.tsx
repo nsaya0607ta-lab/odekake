@@ -6,6 +6,7 @@
  */
 import { useMemo, useState } from "react";
 import { STEP_COIN_MILESTONES } from "@/lib/coins";
+import type { StepDay } from "@/lib/data/exp";
 import { useTodaySteps, type TodaySteps } from "@/lib/use-today-steps";
 import { PREFECTURE_NAMES } from "@/lib/geo/prefecture-names";
 import { WEATHER_LABEL, withWeather, type RoomWeather } from "@/lib/room/weather";
@@ -60,15 +61,37 @@ const trailX = (n: number) => TRAIL_X0 + (Math.min(n, TRAIL_MAX) / TRAIL_MAX) * 
 /** 手前の丘の上の道（x での高さ） */
 const trailY = (x: number) => 131 + Math.sin((x / 300) * Math.PI * 2.2) * 2.2;
 
-export function SkyCard({ now, place, onPlace, weather = null, steps }: {
+/** 連続記録の目標 */
+const STREAK_GOAL = 5_000;
+const DOW = ["日", "月", "火", "水", "木", "金", "土"];
+const jstDay = (d: Date) => new Intl.DateTimeFormat("sv-SE", { timeZone: "Asia/Tokyo" }).format(d);
+const shiftDay = (day: string, n: number) => jstDay(new Date(new Date(`${day}T12:00:00+09:00`).getTime() + n * 86_400_000));
+
+/** きょうまでの7日分と、目標を続けて超えた日数（きょうがまだならきのうまで） */
+function weekOf(history: StepDay[], today: string, todaySteps: number) {
+  const byDay = new Map(history.map((d) => [d.date, d.steps]));
+  byDay.set(today, Math.max(todaySteps, byDay.get(today) ?? 0));
+  const week = Array.from({ length: 7 }, (_, i) => {
+    const date = shiftDay(today, i - 6);
+    return { date, steps: byDay.get(date) ?? 0, dow: DOW[new Date(`${date}T12:00:00+09:00`).getUTCDay()]! };
+  });
+  let streak = 0;
+  for (let d = (byDay.get(today) ?? 0) >= STREAK_GOAL ? today : shiftDay(today, -1); (byDay.get(d) ?? 0) >= STREAK_GOAL; d = shiftDay(d, -1)) streak++;
+  return { week, streak, total: week.reduce((s, d) => s + d.steps, 0) };
+}
+
+export function SkyCard({ now, place, onPlace, weather = null, steps, history }: {
   now: Date; place: RoomPlace; onPlace: (p: RoomPlace) => void; weather?: RoomWeather | null;
   /** きょうの歩数（渡したときだけ、手前の丘におさんぽの道を描く） */
   steps?: TodaySteps;
+  /** 直近の日ごとの歩数（今週のグラフと連続記録） */
+  history?: StepDay[];
 }) {
   const today = useTodaySteps(steps ?? NO_STEPS);
   const stepCount = steps ? today.steps : null;
   const nextGoal = stepCount === null ? null : STEP_COIN_MILESTONES.find((m) => m.steps > stepCount) ?? null;
   const day = new Intl.DateTimeFormat("sv-SE", { timeZone: "Asia/Tokyo" }).format(now);
+  const stepWeek = useMemo(() => (stepCount === null || !history ? null : weekOf(history, day, stepCount)), [history, day, stepCount]);
   const times = useMemo(() => sunTimes(new Date(`${day}T12:00:00+09:00`), place), [day, place]);
   const sky = withWeather(skyAt(now, place), weather);
   const [open, setOpen] = useState(false);
@@ -204,7 +227,8 @@ export function SkyCard({ now, place, onPlace, weather = null, steps }: {
         </div>
         {/* 窓台 */}
         {stepCount !== null ? (
-          <div className="mt-2 flex items-center gap-3 rounded-[12px] bg-[linear-gradient(180deg,#FBF6EE,#EFE4D2)] px-3 py-2 shadow-[inset_0_1px_0_#fff]">
+          <div className="mt-2 rounded-[12px] bg-[linear-gradient(180deg,#FBF6EE,#EFE4D2)] px-3 py-2 shadow-[inset_0_1px_0_#fff]">
+          <div className="flex items-center gap-3">
             <span aria-hidden className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-white text-lg shadow-sm">👣</span>
             <div className="min-w-0 flex-1">
               <p className="text-[10px] font-bold text-ink-faint">きょうの歩数</p>
@@ -216,6 +240,8 @@ export function SkyCard({ now, place, onPlace, weather = null, steps }: {
             <p className="shrink-0 rounded-full bg-white px-2.5 py-1 text-right text-[10px] font-bold leading-tight text-ink-soft shadow-sm">
               {nextGoal ? <>🚩 {nextGoal.steps.toLocaleString("ja-JP")}歩まで<br />あと <span className="text-leaf-deep">{(nextGoal.steps - stepCount).toLocaleString("ja-JP")}</span>歩</> : <>🎉 10,000歩<br />たっせい！</>}
             </p>
+          </div>
+          {stepWeek ? <StepWeek {...stepWeek} /> : null}
           </div>
         ) : steps ? (
           <div className="mt-2 rounded-[12px] bg-[linear-gradient(180deg,#FBF6EE,#EFE4D2)] px-3 py-2 text-[11px] font-bold text-ink-soft shadow-[inset_0_1px_0_#fff]">👣 歩数は、ショートカットで連携すると出ます</div>
@@ -283,4 +309,45 @@ function moonIcon(r: number, p: number): string {
   const waxing = p < 0.5;
   const inner = waxing ? (k > 0 ? 0 : 1) : (k > 0 ? 1 : 0);
   return `M0 ${-r} A ${r} ${r} 0 0 ${waxing ? 1 : 0} 0 ${r} A ${rx} ${r} 0 0 ${inner} 0 ${-r} Z`;
+}
+
+/** 窓台の下：今週の歩数（7本の棒）と連続記録 */
+function StepWeek({ week, streak, total }: { week: { date: string; steps: number; dow: string }[]; streak: number; total: number }) {
+  const max = Math.max(STREAK_GOAL * 1.6, ...week.map((d) => d.steps));
+  const goalY = 100 - (STREAK_GOAL / max) * 100;
+  return (
+    <div className="mt-2 border-t border-dashed border-[#DCCDB4] pt-2">
+      <div className="flex items-center justify-between gap-2">
+        <p className="text-[10px] font-bold text-ink-faint">この7日間 <span className="tabular-nums text-ink-soft">{total.toLocaleString("ja-JP")}</span>歩</p>
+        <p className={`rounded-full px-2 py-0.5 text-[10px] font-black shadow-sm ${streak >= 2 ? "bg-[linear-gradient(90deg,#FF9A3C,#FF5E3A)] text-white" : "bg-white text-ink-soft"}`}>
+          {streak >= 2 ? <>🔥 {streak}日連続 {STREAK_GOAL.toLocaleString("ja-JP")}歩</> : streak === 1 ? <>✨ {STREAK_GOAL.toLocaleString("ja-JP")}歩 たっせい中</> : <>{STREAK_GOAL.toLocaleString("ja-JP")}歩で連続記録スタート</>}
+        </p>
+      </div>
+      <div className="relative mt-1.5 h-14">
+        <div aria-hidden className="absolute inset-x-0 border-t border-dashed border-[#E3A85C]/70" style={{ top: `${goalY}%` }}>
+          <span className="absolute -top-[7px] -left-0.5 rounded bg-[#FBF6EE] px-0.5 text-[7px] font-black leading-none text-[#C9822F]">5k</span>
+        </div>
+        <ol className="relative flex h-full items-end justify-between gap-1.5 pl-3" aria-label="この7日間の歩数">
+          {week.map((d, i) => {
+            const isToday = i === week.length - 1, hit = d.steps >= STREAK_GOAL;
+            return (
+              <li key={d.date} className="flex h-full flex-1 flex-col items-center justify-end" title={`${d.date} ${d.steps.toLocaleString("ja-JP")}歩`}>
+                <span className="sr-only">{d.dow}曜 {d.steps.toLocaleString("ja-JP")}歩</span>
+                <span aria-hidden
+                  className={`w-full max-w-[22px] rounded-t-[5px] rounded-b-[2px] ${isToday ? "bg-[linear-gradient(180deg,#7BC47F,#3E8E55)] shadow-[0_0_0_2px_#fff,0_2px_6px_rgba(62,142,85,.35)]" : hit ? "bg-[linear-gradient(180deg,#A9D8A0,#6DAF73)]" : "bg-[linear-gradient(180deg,#E6D8C1,#D2C0A2)]"}`}
+                  style={{ height: `${Math.max(d.steps > 0 ? 6 : 3, (d.steps / max) * 100)}%` }} />
+              </li>
+            );
+          })}
+        </ol>
+      </div>
+      <ol aria-hidden className="mt-1 flex justify-between gap-1.5 pl-3">
+        {week.map((d, i) => (
+          <li key={d.date} className={`flex-1 text-center text-[9px] font-black ${i === week.length - 1 ? "text-leaf-deep" : d.dow === "日" ? "text-[#D9705A]" : d.dow === "土" ? "text-[#5A86C9]" : "text-ink-faint"}`}>
+            {i === week.length - 1 ? "きょう" : d.dow}
+          </li>
+        ))}
+      </ol>
+    </div>
+  );
 }

@@ -100,3 +100,23 @@ export async function getExpHistory(supabase: DB, userId: string, limit = 100): 
   }
   return data ?? [];
 }
+
+export type StepDay = { date: string; steps: number };
+
+/** 直近の日ごとの歩数（古い→新しい、記録の無い日は入らない） */
+export async function getStepHistory(supabase: DB, userId: string, days = 60): Promise<StepDay[]> {
+  const from = new Date(Date.now() - days * 86_400_000);
+  const since = new Intl.DateTimeFormat("sv-SE", { timeZone: "Asia/Tokyo" }).format(from);
+  const { data, error } = await supabase
+    .from("daily_steps")
+    .select("steps, step_date")
+    .eq("user_id", userId)
+    .gte("step_date", since)
+    .order("step_date", { ascending: true })
+    .limit(days + 2);
+  if (error) {
+    console.warn("Step history is unavailable", { code: error.code, message: error.message });
+    return [];
+  }
+  return (data ?? []).map((row) => ({ date: row.step_date, steps: row.steps ?? 0 }));
+}

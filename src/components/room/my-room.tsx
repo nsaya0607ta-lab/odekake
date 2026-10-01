@@ -7,6 +7,8 @@
  * 「もようがえ」で編集モードになり、下の引き出しから飾るものを置いたり、壁紙・床などを変えたりできる。
  * 動かすと少しあとに自動で保存する（DBが未適用の環境では端末に保存する）。
  */
+import type { StepDay } from "@/lib/data/exp";
+import { LikeButton, RoomGuests, useVisit, VisitPanel, type RoomFriend, type RoomMailItem, type VisitState } from "./room-visit";
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { IconChevronLeft } from "@/components/icons";
@@ -33,6 +35,8 @@ import {
   defaultFixtures,
   fixtureKey,
   resolvePlacements,
+  roomEventOf,
+  nextRoomEvent,
   freeShelfSpot,
   WALL_DECOS,
   type WallDeco,
@@ -194,7 +198,7 @@ async function shrinkImage(file: File, max: number, quality: number): Promise<Bl
   return new Promise((resolve, reject) => canvas.toBlob((b) => (b ? resolve(b) : reject(new Error("encode failed"))), "image/jpeg", quality));
 }
 
-export function MyRoom({ entries, initialLayout, serverReady, dogSkin, dogName, serverNow, steps }: {
+export function MyRoom({ entries, initialLayout, serverReady, dogSkin, dogName, serverNow, steps, stepHistory, visit, guests }: {
   entries: DecorEntry[];
   initialLayout: RoomLayout | null;
   serverReady: boolean;
@@ -204,6 +208,12 @@ export function MyRoom({ entries, initialLayout, serverReady, dogSkin, dogName, 
   serverNow: string;
   /** きょうの歩数（サーバーで描いた値。あとは 30 秒ごとに取り直す） */
   steps?: { steps: number | null; stepExp: number; coinBalance: number };
+  /** 直近の日ごとの歩数（今週のグラフ） */
+  stepHistory?: StepDay[];
+  /** フレンドの部屋にあそびに来ているとき（見るだけ。保存もしない） */
+  visit?: VisitState;
+  /** 自分の部屋に届いた「いいね」・置き手紙と、あそびに行けるフレンド */
+  guests?: { mail: RoomMailItem[]; friends: RoomFriend[] };
 }) {
   // 家具はだれでも置けるので、持ち物と合わせて「置けるもの」にする
   const validKeys = useMemo(() => new Set([...entries, ...FURNITURE_ENTRIES, ...FIXTURE_ENTRIES].map((e) => e.key)), [entries]);
@@ -222,6 +232,7 @@ export function MyRoom({ entries, initialLayout, serverReady, dogSkin, dogName, 
   const [past, setPast] = useState<RoomLayout[]>([]);
   const [future, setFuture] = useState<RoomLayout[]>([]);
   const [editing, setEditing] = useState(false);
+  const visitLike = useVisit(visit ?? { friendId: "", name: "", liked: false, likeCount: 0, myNotes: [] });
   const [selectedId, setSelectedId] = useState<string | null>(null);
   /** ドラッグ中のものを乗せようとしている棚（光らせる） */
   const [dropShelf, setDropShelf] = useState<string | null>(null);
@@ -363,12 +374,15 @@ export function MyRoom({ entries, initialLayout, serverReady, dogSkin, dogName, 
   }, [serverReady]);
 
   /* ---------- 変更 ---------- */
+  const readOnly = !!visit;
   const commit = useCallback((next: RoomLayout, before: RoomLayout = latest.current) => {
+    // フレンドの部屋は見るだけ
+    if (readOnly) return;
     setPast((p) => [...p.slice(-(HISTORY_LIMIT - 1)), before]);
     setFuture([]);
     setLayout(next);
     setSaveState("dirty");
-  }, []);
+  }, [readOnly]);
   const changeItem = (id: string, change: (p: Placement) => Placement) => commit({ ...layout, items: layout.items.map((p) => (p.id === id ? change(p) : p)) });
   const setTheme = (patch: Partial<RoomTheme>) => commit({ ...layout, theme: { ...layout.theme, ...patch } });
   const topZ = () => Math.max(0, ...layout.items.map((p) => p.z)) + 1;
@@ -618,14 +632,16 @@ export function MyRoom({ entries, initialLayout, serverReady, dogSkin, dogName, 
     <main className="min-h-dvh bg-paper pb-[calc(env(safe-area-inset-bottom)+1.5rem)] text-ink">
       <header className="sticky top-0 z-[600] border-b border-line bg-paper/95 backdrop-blur">
         <div className="mx-auto flex h-14 max-w-lg items-center gap-2 px-3">
-          <Link href="/mypage" aria-label="マイページへ戻る" className="flex h-11 w-11 items-center justify-center rounded-full active:bg-paper-deep">
+          <Link href={visit ? "/room" : "/mypage"} aria-label={visit ? "じぶんのおへやへ戻る" : "マイページへ戻る"} className="flex h-11 w-11 items-center justify-center rounded-full active:bg-paper-deep">
             <IconChevronLeft size={24} />
           </Link>
           <div className="min-w-0 flex-1 text-center">
-            <p className="text-[10px] font-bold tracking-[0.18em] text-leaf-deep">MY ROOM</p>
-            <h1 className="truncate text-[17px] font-black">{dogName}のおへや</h1>
+            <p className="text-[10px] font-bold tracking-[0.18em] text-leaf-deep">{visit ? "FRIEND'S ROOM" : "MY ROOM"}</p>
+            <h1 className="truncate text-[17px] font-black">{visit ? `${visit.name}さんのおへや` : `${dogName}のおへや`}</h1>
           </div>
-          {editing ? (
+          {visit ? (
+            <LikeButton liked={visitLike.liked} count={visitLike.likeCount} busy={visitLike.busy} onToggle={() => void visitLike.toggleLike()} />
+          ) : editing ? (
             <button type="button" onClick={() => { setEditing(false); setSelectedId(null); if (saveState === "dirty") void persist(); }} className="min-w-[72px] rounded-full bg-leaf-deep px-4 py-2.5 text-sm font-bold text-white shadow-sm active:scale-95">
               できた
             </button>
@@ -779,7 +795,7 @@ export function MyRoom({ entries, initialLayout, serverReady, dogSkin, dogName, 
                 <input ref={fileRef} type="file" accept="image/*" className="hidden" onChange={(e) => { const f = e.target.files?.[0]; if (f) void uploadPhoto(f); }} />
               ) : null}
               {tab === "theme" ? (
-                <ThemePicker theme={layout.theme} onChange={setTheme} />
+                <ThemePicker theme={layout.theme} onChange={setTheme} now={now} />
               ) : tabEntries.length || tab === "photo" ? (
                 <div className="mt-2 grid grid-cols-3 gap-2.5">
                   {tab === "photo" ? (
@@ -818,9 +834,11 @@ export function MyRoom({ entries, initialLayout, serverReady, dogSkin, dogName, 
               )}
             </section>
           </>
+        ) : visit ? (
+          <VisitPanel visit={visit} dogName={dogName} liked={visitLike.liked} likeCount={visitLike.likeCount} likeBusy={visitLike.busy} onLike={() => void visitLike.toggleLike()} />
         ) : (
           <section className="space-y-3 px-4 pt-4">
-            <SkyCard now={now} place={place} onPlace={changePlace} weather={weather} steps={steps} />
+            <SkyCard now={now} place={place} onPlace={changePlace} weather={weather} steps={steps} history={stepHistory} />
             <ul className="space-y-1.5 rounded-2xl border border-line bg-card px-4 py-3 text-[12px] leading-relaxed text-ink-soft shadow-sm">
               <li>🐾 {dogName}をタップすると、なでられます</li>
               <li>🖼️ 飾った写真をタップすると、その日の思い出が見られます</li>
@@ -830,6 +848,7 @@ export function MyRoom({ entries, initialLayout, serverReady, dogSkin, dogName, 
             <button type="button" onClick={() => void takeSnapshot()} disabled={shooting} className="flex w-full items-center justify-center gap-2 rounded-full bg-leaf-deep py-3 text-sm font-black text-white shadow-md active:scale-[.98] disabled:opacity-60">
               <span aria-hidden="true">📷</span>{shooting ? "撮影中…" : "記念撮影する"}
             </button>
+            {guests ? <RoomGuests mail={guests.mail} friends={guests.friends} /> : null}
             <p className="text-center text-[10px] font-semibold text-ink-faint">{saveLabel}</p>
           </section>
         )}
@@ -893,7 +912,9 @@ const styleSwatch = (style: RoomStyle): React.CSSProperties => {
 };
 const DECO_LABELS: Record<WallDeco, string> = { none: "なし", garland: "ガーランド", lights: "ライト", stars: "お星さま" };
 
-function ThemePicker({ theme, onChange }: { theme: RoomTheme; onChange: (patch: Partial<RoomTheme>) => void }) {
+function ThemePicker({ theme, onChange, now }: { theme: RoomTheme; onChange: (patch: Partial<RoomTheme>) => void; now: Date }) {
+  const event = roomEventOf(now), next = nextRoomEvent(now);
+  const eventsOn = theme.events !== false;
   return (
     <div className="mt-3 space-y-4">
       <Swatches title="おへや（えらぶと壁・床・窓もおすすめに変わります）" value={theme.room} options={ROOM_KINDS} label={(id) => ROOM_KIND_STYLES[id].label} render={(room) => <ThemeSwatch part="room" theme={ROOM_PRESETS[room]} />} onPick={(room) => onChange({ ...ROOM_PRESETS[room] })} />
@@ -903,6 +924,25 @@ function ThemePicker({ theme, onChange }: { theme: RoomTheme; onChange: (patch: 
       <Swatches title="カーテン" value={theme.curtain} options={CURTAINS} label={(id) => CURTAIN_STYLES[id].label} render={(curtain) => <ThemeSwatch part="curtain" theme={{ ...theme, curtain }} />} onPick={(curtain) => onChange({ curtain })} />
       <Swatches title="壁のかざり" value={theme.deco} options={WALL_DECOS} label={(id) => DECO_LABELS[id]} render={(deco) => <ThemeSwatch part="deco" theme={{ ...theme, deco }} />} onPick={(deco) => onChange({ deco })} />
       <Swatches title="ラグ" value={theme.rug} options={RUGS} label={(id) => RUG_STYLES[id].label} render={(rug) => <ThemeSwatch part="rug" theme={{ ...theme, rug }} />} onPick={(rug) => onChange({ rug })} />
+      {/* 季節の行事かざり */}
+      <div className="flex items-center justify-between gap-3 rounded-2xl border border-line bg-paper px-3 py-2.5">
+        <div className="min-w-0">
+          <p className="text-xs font-black text-ink-soft">季節の行事かざり</p>
+          <p className="mt-0.5 text-[10px] font-bold text-ink-faint">
+            {event ? `いまは「${event.name}」（${event.from[0]}/${event.from[1]}〜${event.to[0]}/${event.to[1]}）` : `つぎは「${next.name}」 ${next.from[0]}/${next.from[1]}から`}・お正月・ひなまつり・七夕・ハロウィン・クリスマスなど
+          </p>
+        </div>
+        <button
+          type="button"
+          role="switch"
+          aria-checked={eventsOn}
+          aria-label="季節の行事かざり"
+          onClick={() => onChange({ events: !eventsOn })}
+          className={`relative h-7 w-12 shrink-0 rounded-full transition-colors ${eventsOn ? "bg-leaf-deep" : "bg-line-strong"}`}
+        >
+          <span className={`absolute top-0.5 h-6 w-6 rounded-full bg-white shadow transition-[left] ${eventsOn ? "left-[22px]" : "left-0.5"}`} />
+        </button>
+      </div>
     </div>
   );
 }

@@ -9,7 +9,7 @@ import { memo, useId, useMemo } from "react";
 import { skyAt, TOKYO, type GeoPoint, type SkyState } from "@/lib/room/sun";
 import { overcastOf, WEATHER_LABEL, withWeather, type RoomWeather } from "@/lib/room/weather";
 import { CURTAIN_STYLES, FLOOR_STYLES, ROOM_KIND_STYLES, RUG_STYLES, WALLPAPER_STYLES } from "@/lib/room/themes";
-import { ROOM, windowOf, type FixtureId, type RoomKind, type RoomStyle, type RoomTheme } from "@/lib/room/types";
+import { ROOM, roomEventOf, windowOf, type FixtureId, type RoomEvent, type RoomKind, type RoomStyle, type RoomTheme } from "@/lib/room/types";
 
 export type DayPhase = "morning" | "day" | "evening" | "night";
 
@@ -78,6 +78,7 @@ export const RoomScene = memo(function RoomScene({ theme, now, at = TOKYO, weath
   const sky = useMemo(() => withWeather(skyAt(now, at), weather), [now, at, weather]);
   const overcast = overcastOf(weather);
   const lit = lampsOn(sky);
+  const event = theme.events === false ? null : roomEventOf(now)?.id ?? null;
   const sunUp = sky.altitude > 0;
   // 朝夕の低い日ざしは、窓から斜めに長く差しこむ
   const beamSkew = Math.max(-1, Math.min(1, (sky.azimuth - 180) / 90)) * -110;
@@ -173,6 +174,7 @@ export const RoomScene = memo(function RoomScene({ theme, now, at = TOKYO, weath
         </g>
       ) : null}
       <WallDecoration deco={theme.deco} lit={lit} />
+      {event ? <EventWall event={event} lit={lit} /> : null}
 
       {/* 床 */}
       <Floor theme={theme} />
@@ -193,6 +195,7 @@ export const RoomScene = memo(function RoomScene({ theme, now, at = TOKYO, weath
       {/* 幅木と、壁と床の境目のかげ */}
       <rect x="0" y={HZ - 22} width={W} height="24" fill="url(#room-baseboard)" />
       <rect x="0" y={HZ + 2} width={W} height="26" fill="url(#room-floor-ao)" />
+      {event ? <EventFloor event={event} lit={lit} /> : null}
 
       {/* 天井と左右の壁：部屋に奥行きを出す */}
       <polygon points={`${-PX},${-PT} ${W + PX},${-PT} ${W + PX},${CEIL_FRONT} ${W - SIDE},${CEIL} ${SIDE},${CEIL} ${-PX},${CEIL_FRONT}`} fill={theme.room === "cozy" ? "url(#room-ceiling)" : ROOM_KIND_STYLES[theme.room].ceiling} />
@@ -1589,4 +1592,226 @@ export function FixtureVisual({ fixture, theme, now, at = TOKYO, weather = null,
       {fixture === "shelf" ? <Shelves only={0} /> : null}
     </svg>
   );
+}
+
+/* ---------- 季節の行事かざり（壁の上のかざりと、部屋のすみに置くもの） ---------- */
+
+/** 壁の上にわたすかざり。ひもの上の点（t: 0〜1）の位置 */
+const bunting = (t: number) => ({ x: 150 + t * 700, y: 128 + Math.sin(t * Math.PI) * 36 });
+
+function EventWall({ event, lit }: { event: RoomEvent; lit: boolean }) {
+  const n = 11;
+  const pts = Array.from({ length: n }, (_, i) => bunting((i + 0.5) / n));
+  const wire = <path d={`M150 128 Q 500 200 850 128`} fill="none" stroke="#8A6A4A" strokeWidth="2" />;
+  const heart = (x: number, y: number, r: number, c: string) => <path d={`M${x} ${y + r} C ${x - r * 1.6} ${y - r * 0.2}, ${x - r * 0.6} ${y - r * 1.4}, ${x} ${y - r * 0.4} C ${x + r * 0.6} ${y - r * 1.4}, ${x + r * 1.6} ${y - r * 0.2}, ${x} ${y + r} Z`} fill={c} />;
+  const flower = (x: number, y: number, r: number, c: string) => (
+    <g transform={`translate(${x} ${y})`}>{[0, 72, 144, 216, 288].map((a) => <ellipse key={a} cx="0" cy={-r * 0.6} rx={r * 0.45} ry={r * 0.6} fill={c} transform={`rotate(${a})`} />)}<circle r={r * 0.28} fill="#F6D27A" /></g>
+  );
+  switch (event) {
+    case "newyear":
+      // しめなわと紙垂（しで）、まん中にだいだい
+      return (
+        <g>
+          <path d="M300 118 Q 500 150 700 118" fill="none" stroke="#C9A866" strokeWidth="12" strokeLinecap="round" />
+          <path d="M300 118 Q 500 150 700 118" fill="none" stroke="#9A7A40" strokeWidth="12" strokeDasharray="6 10" strokeLinecap="round" />
+          {[360, 430, 570, 640].map((x) => <path key={x} d={`M${x} ${126 + Math.sin(((x - 300) / 400) * Math.PI) * 14} l10 0 -8 14 10 0 -8 14 10 0 -8 14`} fill="none" stroke="#FFFFFF" strokeWidth="4" strokeLinejoin="round" />)}
+          <circle cx="500" cy="150" r="16" fill="#F2913A" /><path d="M496 136 q4 -8 12 -6" stroke="#4E7A3A" strokeWidth="4" fill="none" />
+        </g>
+      );
+    case "valentine":
+      return <g>{wire}{pts.map((p, i) => <g key={i}>{heart(p.x, p.y + 14, 13, i % 2 ? "#E4577A" : "#F7A8BC")}</g>)}</g>;
+    case "hina":
+      return <g>{wire}{pts.map((p, i) => <g key={i}>{flower(p.x, p.y + 10, 14, i % 2 ? "#F5A7C0" : "#FFFFFF")}</g>)}</g>;
+    case "hanami":
+      return <g>{wire}{pts.map((p, i) => <g key={i}>{flower(p.x, p.y + 6, 15, "#F7C3D3")}{i % 3 === 0 ? <ellipse cx={p.x + 14} cy={p.y + 18} rx="7" ry="3.5" fill="#86C47A" transform={`rotate(30 ${p.x + 14} ${p.y + 18})`} /> : null}</g>)}</g>;
+    case "kodomo": {
+      // こいのぼり（ななめにわたしたひもに3びき）
+      const carp = (x: number, y: number, len: number, c: string) => (
+        <g transform={`translate(${x} ${y})`}>
+          <path d={`M0 0 Q ${len * 0.5} -${len * 0.22} ${len} 0 L ${len + 14} -12 L ${len + 8} 0 L ${len + 14} 12 L ${len} 0 Q ${len * 0.5} ${len * 0.22} 0 0 Z`} fill={c} />
+          {[0.3, 0.5, 0.7].map((k) => <path key={k} d={`M${len * k} -${len * 0.12} q 8 ${len * 0.12} 0 ${len * 0.24}`} stroke="#FFFFFF" strokeOpacity="0.6" strokeWidth="2.5" fill="none" />)}
+          <circle cx={len * 0.14} cy="-3" r="5" fill="#FFFFFF" /><circle cx={len * 0.14} cy="-3" r="2.4" fill="#222" />
+        </g>
+      );
+      return (
+        <g>
+          <path d="M180 100 L 820 150" stroke="#8A6A4A" strokeWidth="2.5" />
+          {carp(240, 112, 120, "#3A3A48")}{carp(430, 128, 100, "#E4573A")}{carp(600, 142, 84, "#3E7CC8")}
+        </g>
+      );
+    }
+    case "tanabata":
+      // わかざり（紙の輪のくさり）と星
+      return (
+        <g>
+          {Array.from({ length: 28 }, (_, i) => { const p = bunting(i / 27); return <ellipse key={i} cx={p.x} cy={p.y} rx="13" ry="8" fill="none" stroke={["#E4573A", "#F2D16B", "#5E9C52", "#3E7CC8", "#B65A7A"][i % 5]} strokeWidth="5" transform={`rotate(${i % 2 ? 70 : -20} ${p.x} ${p.y})`} />; })}
+          {[[260, 190], [500, 210], [740, 190]].map(([x, y]) => <path key={x} d={`M${x} ${y! - 12} l4 8 9 1 -7 6 2 9 -8 -5 -8 5 2 -9 -7 -6 9 -1 z`} fill="#F6D27A" />)}
+        </g>
+      );
+    case "tsukimi":
+      return (
+        <g>
+          {wire}
+          {pts.map((p, i) => (i % 2 ? <circle key={i} cx={p.x} cy={p.y + 14} r="11" fill="#FFF0B0" stroke="#E2C25A" strokeWidth="2" /> : (
+            // うさぎの顔
+            <g key={i} transform={`translate(${p.x} ${p.y + 16})`} fill="#FFFFFF" stroke="#C9C2B4" strokeWidth="1.5">
+              <ellipse cx="-5" cy="-16" rx="4" ry="11" /><ellipse cx="5" cy="-16" rx="4" ry="11" /><circle r="11" />
+              <circle cx="-4" cy="-2" r="1.6" fill="#D9627E" stroke="none" /><circle cx="4" cy="-2" r="1.6" fill="#D9627E" stroke="none" />
+            </g>
+          )))}
+        </g>
+      );
+    case "halloween":
+      return (
+        <g>
+          {wire}
+          {pts.map((p, i) => <path key={i} d={`M${p.x - 20} ${p.y} L${p.x + 20} ${p.y} L${p.x} ${p.y + 36} Z`} fill={["#F2913A", "#6A4A9A", "#2E2A36"][i % 3]} />)}
+          {/* こうもり */}
+          {[[230, 220], [770, 206], [600, 240]].map(([x, y], i) => (
+            <path key={i} d={`M${x} ${y} q -10 -12 -26 -6 q 8 2 6 10 q 8 -6 20 -4 q 0 -6 -4 -10 l4 -6 4 6 q -4 4 -4 10 q 12 -2 20 4 q -2 -8 6 -10 q -16 -6 -26 6 z`} fill="#2E2A36" opacity="0.85" />
+          ))}
+          {lit ? pts.filter((_, i) => i % 3 === 0).map((p, i) => <circle key={i} cx={p.x} cy={p.y + 14} r="16" fill="#FFB060" opacity="0.25" />) : null}
+        </g>
+      );
+    case "christmas":
+      return (
+        <g>
+          <path d="M150 128 Q 500 200 850 128" fill="none" stroke="#3E7A4A" strokeWidth="14" strokeLinecap="round" />
+          <path d="M150 128 Q 500 200 850 128" fill="none" stroke="#5E9C52" strokeWidth="7" strokeDasharray="4 8" strokeLinecap="round" />
+          {pts.map((p, i) => (
+            <g key={i}>
+              {i % 2 ? <circle cx={p.x} cy={p.y + 12} r="8" fill={["#E4573A", "#F2D16B", "#3E7CC8"][i % 3]} /> : <path d={`M${p.x - 10} ${p.y + 2} l10 6 10 -6 -4 12 4 4 -10 -4 -10 4 4 -4 z`} fill="#C9303A" />}
+              {lit ? <circle cx={p.x} cy={p.y + 6} r="12" fill="#FFE38A" opacity="0.3" /> : null}
+            </g>
+          ))}
+        </g>
+      );
+  }
+}
+
+/** 部屋のすみ（奥の床）に置く行事のもの */
+function EventFloor({ event, lit }: { event: RoomEvent; lit: boolean }) {
+  const L = { x: 140, y: HZ + 86 }, R = { x: 860, y: HZ + 96 };
+  switch (event) {
+    case "newyear":
+      // 門松
+      return (
+        <g transform={`translate(${L.x} ${L.y}) scale(1.75)`}>
+          <ellipse cx="0" cy="4" rx="46" ry="10" fill="#2A1A0C" opacity="0.2" />
+          {[[-19, -118], [0, -150], [19, -130]].map(([x, h]) => (
+            <g key={x}>
+              <rect x={x! - 7} y={h} width="14" height={-h!} fill="#6FA552" stroke="#4E7A3A" strokeWidth="1.2" />
+              <rect x={x! - 7} y={h} width="4" height={-h!} fill="#FFFFFF" opacity="0.25" />
+              {[0.35, 0.65].map((k) => <rect key={k} x={x! - 7} y={h! * k} width="14" height="2.5" fill="#4E7A3A" opacity="0.6" />)}
+              {/* ななめに切った口 */}
+              <path d={`M${x! - 7} ${h} L${x! + 7} ${h! - 12} L${x! + 7} ${h} Z`} fill="#E6F2D6" stroke="#4E7A3A" strokeWidth="1.2" />
+            </g>
+          ))}
+          {[-34, 34].map((x) => <path key={x} d={`M${x * 0.6} -56 q ${x > 0 ? 18 : -18} -10 ${x * 0.4} -30`} stroke="#3E6A3A" strokeWidth="5" fill="none" strokeLinecap="round" />)}
+          <path d="M-40 -56 L40 -56 L34 4 L-34 4 Z" fill="#C9A866" /><path d="M-40 -56 L40 -56" stroke="#9A7A40" strokeWidth="4" />
+          {[-30, -10, 10, 30].map((x) => <line key={x} x1={x} y1="-56" x2={x * 0.85} y2="4" stroke="#9A7A40" strokeWidth="2" />)}
+          <path d="M-40 -34 L40 -34" stroke="#C9303A" strokeWidth="5" />
+        </g>
+      );
+    case "valentine":
+      return (
+        <g transform={`translate(${L.x} ${L.y}) scale(1.75)`}>
+          <ellipse cx="0" cy="4" rx="44" ry="9" fill="#2A1A0C" opacity="0.2" />
+          <rect x="-34" y="-52" width="68" height="54" rx="4" fill="#F7A8BC" /><rect x="-38" y="-62" width="76" height="14" rx="3" fill="#F48AA8" />
+          <rect x="-6" y="-62" width="12" height="64" fill="#C9303A" /><path d="M0 -62 q -24 -22 -22 -4 z M0 -62 q 24 -22 22 -4 z" fill="#C9303A" />
+        </g>
+      );
+    case "hina":
+      return (
+        <g transform={`translate(${L.x} ${L.y}) scale(1.75)`}>
+          <ellipse cx="0" cy="4" rx="56" ry="10" fill="#2A1A0C" opacity="0.2" />
+          <path d="M-56 0 L56 0 L50 -26 L-50 -26 Z" fill="#D9303A" /><path d="M-50 -26 L50 -26" stroke="#F2D16B" strokeWidth="3" />
+          {[[-22, "#2E3A6A"], [22, "#D9627E"]].map(([x, c]) => (
+            <g key={x as number} transform={`translate(${x} -26)`}>
+              <path d="M-16 0 Q -18 -30 0 -36 Q 18 -30 16 0 Z" fill={c as string} /><circle cy="-44" r="10" fill="#FFF3E6" /><path d="M-10 -48 q10 -12 20 0" fill="#222" />
+            </g>
+          ))}
+        </g>
+      );
+    case "hanami":
+      return (
+        <g>
+          {Array.from({ length: 22 }, (_, i) => <ellipse key={i} cx={80 + ((i * 137) % 840)} cy={HZ + 30 + ((i * 59) % 120)} rx="6" ry="4" fill="#F7C3D3" opacity="0.9" transform={`rotate(${i * 40} ${80 + ((i * 137) % 840)} ${HZ + 30 + ((i * 59) % 120)})`} />)}
+          <g transform={`translate(${L.x} ${L.y}) scale(1.75)`}>
+            <ellipse cx="0" cy="2" rx="40" ry="10" fill="#FFFFFF" /><ellipse cx="0" cy="0" rx="40" ry="10" fill="#F4EEE4" />
+            {[["#F7A8BC", -14], ["#FFFFFF", 0], ["#9CC46A", 14]].map(([c, dx]) => <circle key={dx as number} cx={(dx as number) * 0.6} cy={-10 - (dx as number) * -0.3} r="9" fill={c as string} stroke="#E6DCCB" strokeWidth="1" />)}
+            <line x1="-18" y1="-4" x2="18" y2="-22" stroke="#B98552" strokeWidth="2" />
+          </g>
+        </g>
+      );
+    case "kodomo":
+      // かぶと
+      return (
+        <g transform={`translate(${L.x} ${L.y}) scale(1.75)`}>
+          <ellipse cx="0" cy="4" rx="46" ry="10" fill="#2A1A0C" opacity="0.2" />
+          <rect x="-40" y="-14" width="80" height="16" rx="3" fill="#7A4E2A" />
+          <path d="M-34 -14 Q -36 -60 0 -62 Q 36 -60 34 -14 Z" fill="#3A3A48" /><path d="M-34 -24 L-46 -10 M34 -24 L46 -10" stroke="#3A3A48" strokeWidth="8" strokeLinecap="round" />
+          <path d="M-20 -60 Q -30 -96 -6 -82 M20 -60 Q 30 -96 6 -82" stroke="#D9AE4A" strokeWidth="6" fill="none" strokeLinecap="round" />
+          <circle cx="0" cy="-60" r="6" fill="#D9AE4A" />
+        </g>
+      );
+    case "tanabata":
+      // 笹かざり
+      return (
+        <g transform={`translate(${L.x} ${L.y}) scale(1.75)`}>
+          <ellipse cx="0" cy="4" rx="30" ry="8" fill="#2A1A0C" opacity="0.2" />
+          <path d="M-14 4 L14 4 L10 -30 L-10 -30 Z" fill="#B98552" />
+          <path d="M0 -30 Q 6 -150 -6 -260" stroke="#5E9C52" strokeWidth="6" fill="none" />
+          {Array.from({ length: 9 }, (_, i) => { const y = -60 - i * 22, dx = i % 2 ? 1 : -1; return <ellipse key={i} cx={dx * 28} cy={y} rx="30" ry="7" fill="#7AAE5A" transform={`rotate(${dx * 24} ${dx * 28} ${y})`} />; })}
+          {[["#E4573A", -40, -90], ["#F2D16B", 30, -120], ["#3E7CC8", -30, -160], ["#B65A7A", 34, -200], ["#FFFFFF", -24, -230]].map(([c, x, y]) => <rect key={y as number} x={x as number} y={y as number} width="10" height="26" fill={c as string} stroke="#E6DCCB" strokeWidth="0.8" />)}
+        </g>
+      );
+    case "tsukimi":
+      return (
+        <g transform={`translate(${L.x} ${L.y}) scale(1.75)`}>
+          <ellipse cx="10" cy="4" rx="60" ry="10" fill="#2A1A0C" opacity="0.2" />
+          {/* すすき */}
+          <path d="M-26 0 L-14 0 L-16 -34 L-24 -34 Z" fill="#8A6A4A" />
+          {[-30, -20, -12].map((dx, i) => <g key={dx}><path d={`M-20 -34 Q ${dx} -100 ${dx - 16 + i * 10} -160`} stroke="#B9A06A" strokeWidth="2.5" fill="none" /><ellipse cx={dx - 14 + i * 10} cy={-150} rx="6" ry="18" fill="#E6D6A6" transform={`rotate(${-20 + i * 14} ${dx - 14 + i * 10} -150)`} /></g>)}
+          {/* だんご */}
+          <path d="M14 0 L64 0 L58 -18 L20 -18 Z" fill="#C9A866" />
+          {[[30, -26], [42, -26], [54, -26], [36, -38], [48, -38], [42, -50]].map(([x, y]) => <circle key={`${x}${y}`} cx={x} cy={y} r="7" fill="#FFFBF2" stroke="#E6DCCB" strokeWidth="1" />)}
+        </g>
+      );
+    case "halloween":
+      return (
+        <g transform={`translate(${L.x} ${L.y}) scale(1.75)`}>
+          {[[-30, 0, 34], [26, 2, 26], [0, -40, 22]].map(([x, y, r], i) => (
+            <g key={i} transform={`translate(${x} ${y})`}>
+              <ellipse cx="0" cy={r! * 0.1} rx={r! + 4} ry={r! * 0.35} fill="#2A1A0C" opacity="0.18" transform={`translate(0 ${r! * 0.5})`} />
+              <ellipse cx="0" cy={-r! * 0.4} rx={r!} ry={r! * 0.8} fill="#F2913A" />
+              {[-0.45, 0, 0.45].map((k) => <ellipse key={k} cx={r! * k} cy={-r! * 0.4} rx={r! * 0.32} ry={r! * 0.78} fill="none" stroke="#D9732A" strokeWidth="1.5" />)}
+              <rect x="-3" y={-r! * 1.3} width="6" height={r! * 0.3} fill="#5E7A3A" />
+              {i !== 2 ? (
+                <g fill={lit ? "#FFE38A" : "#3A2410"}>
+                  <path d={`M${-r! * 0.4} ${-r! * 0.6} l${r! * 0.15} ${-r! * 0.2} l${r! * 0.15} ${r! * 0.2} z M${r! * 0.1} ${-r! * 0.6} l${r! * 0.15} ${-r! * 0.2} l${r! * 0.15} ${r! * 0.2} z`} />
+                  <path d={`M${-r! * 0.45} ${-r! * 0.25} q ${r! * 0.45} ${r! * 0.35} ${r! * 0.9} 0 l -${r! * 0.15} ${r! * 0.12} l -${r! * 0.15} -${r! * 0.08} l -${r! * 0.15} ${r! * 0.08} l -${r! * 0.15} -${r! * 0.08} l -${r! * 0.15} ${r! * 0.08} z`} />
+                </g>
+              ) : null}
+              {lit && i !== 2 ? <circle cx="0" cy={-r! * 0.4} r={r! * 1.6} fill="#FFB060" opacity="0.18" /> : null}
+            </g>
+          ))}
+        </g>
+      );
+    case "christmas":
+      // ツリー（右のすみ）とプレゼント
+      return (
+        <g transform={`translate(${R.x} ${R.y}) scale(1.3)`}>
+          <ellipse cx="0" cy="4" rx="70" ry="12" fill="#2A1A0C" opacity="0.22" />
+          <rect x="-14" y="-30" width="28" height="32" fill="#B98552" />
+          {[[0, 70], [-40, 58], [-80, 46], [-118, 34]].map(([y, w], i) => <path key={i} d={`M${-w!} ${y! - 26} L0 ${y! - 96} L${w} ${y! - 26} Z`} fill={i % 2 ? "#3E7A4A" : "#4E8A52"} />)}
+          <path d="M0 -226 l6 12 13 2 -10 9 3 13 -12 -7 -12 7 3 -13 -10 -9 13 -2 z" fill="#F2D16B" />
+          {[[-30, -60, "#E4573A"], [26, -74, "#F2D16B"], [-16, -110, "#3E7CC8"], [18, -140, "#E4573A"], [-10, -170, "#F2D16B"], [40, -40, "#B65A7A"], [-46, -36, "#3E7CC8"]].map(([x, y, c], i) => (
+            <g key={i}><circle cx={x as number} cy={y as number} r="6" fill={c as string} />{lit ? <circle cx={x as number} cy={y as number} r="13" fill={c as string} opacity="0.3" /> : null}</g>
+          ))}
+          <rect x="-90" y="-26" width="34" height="28" fill="#E4573A" /><rect x="-76" y="-26" width="6" height="28" fill="#F2D16B" />
+          <rect x="52" y="-22" width="30" height="24" fill="#3E7CC8" /><rect x="64" y="-22" width="6" height="24" fill="#FFFFFF" />
+        </g>
+      );
+  }
 }

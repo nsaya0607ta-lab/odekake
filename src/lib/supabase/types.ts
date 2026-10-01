@@ -676,9 +676,21 @@ export type Database = {
         Relationships: [];
       };
       user_rooms: {
-        Row: { user_id: string; layout: Json; updated_at: string };
-        Insert: { user_id: string; layout?: Json; updated_at?: string };
-        Update: { layout?: Json; updated_at?: string };
+        Row: { user_id: string; layout: Json; showcase: Json; updated_at: string };
+        Insert: { user_id: string; layout?: Json; showcase?: Json; updated_at?: string };
+        Update: { layout?: Json; showcase?: Json; updated_at?: string };
+        Relationships: [];
+      };
+      room_likes: {
+        Row: { room_owner: string; user_id: string; created_at: string };
+        Insert: { room_owner: string; user_id: string; created_at?: string };
+        Update: Record<string, never>;
+        Relationships: [];
+      };
+      room_notes: {
+        Row: { id: string; room_owner: string; author_id: string; body: string; created_at: string };
+        Insert: { id?: string; room_owner: string; author_id: string; body: string; created_at?: string };
+        Update: Record<string, never>;
         Relationships: [];
       };
       user_dambourle_equipped: {
@@ -762,6 +774,14 @@ export type Database = {
     };
     Views: Record<string, never>;
     Functions: {
+      get_friend_room: {
+        Args: { p_friend_user_id: string };
+        Returns: { display_name: string; layout: Json | null; showcase: Json | null; like_count: number; liked: boolean }[];
+      };
+      get_room_mailbox: {
+        Args: { p_limit?: number };
+        Returns: { kind: "note" | "like"; id: string; user_id: string; display_name: string; body: string | null; created_at: string }[];
+      };
       get_or_create_town: { Args: Record<string, never>; Returns: Json };
       build_town_item: {
         Args: { p_item_id: string; p_grid_x: number; p_grid_y: number; p_rotation?: number };
