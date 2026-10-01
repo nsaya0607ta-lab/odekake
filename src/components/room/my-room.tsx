@@ -46,7 +46,9 @@ import {
 import { DecorVisual, FRAME_LABELS } from "./decor-visual";
 import { RoomDog } from "./room-dog";
 import { composeRoomSnapshot } from "./room-snapshot";
-import { dayPhaseOf, RoomLighting, RoomScene, type DayPhase } from "./room-scene";
+import { skyAt } from "@/lib/room/sun";
+import { dayPhaseOf, lampsOn, RoomLighting, RoomScene, type DayPhase } from "./room-scene";
+import { SkyCard } from "./sky-card";
 
 type Tab = DecorKind | "theme";
 type ItemFilter = "all" | "toy" | "food" | "interior" | "other" | "sushi";
@@ -111,6 +113,9 @@ function freeWallSpot(taken: readonly { x: number; y: number }[]): [number, numb
   }
   return best;
 }
+
+/** 家具の奥行き（床の上で場所をとる高さ。幅に対する割合） */
+const FURNITURE_DEPTH: Record<string, number> = { sofa: 0.35, plant: 0.2, bookshelf: 0.25, lamp: 0.2, table: 0.3, "dog-house": 0.35, bowl: 0.2, "dog-bed": 0.3 };
 
 const FLOOR_SPOTS = [[22, 74], [78, 76], [64, 90], [36, 92], [86, 92], [14, 88], [50, 66], [70, 66]] as const;
 
@@ -200,6 +205,9 @@ export function MyRoom({ entries, initialLayout, serverReady, dogSkin, dogName, 
   const latest = useRef(layout);
   latest.current = layout;
   const phase: DayPhase = dayPhaseOf(now);
+  const lightsOn = useMemo(() => lampsOn(skyAt(now)), [now]);
+  /** 犬が寝る時間（日本時間の21時〜6時） */
+  const sleepy = useMemo(() => { const h = Number(new Intl.DateTimeFormat("en-US", { timeZone: "Asia/Tokyo", hour: "numeric", hourCycle: "h23" }).format(now)); return h >= 21 || h < 6; }, [now]);
 
   // 時計と時間帯のために、1分ごとに今の時刻を更新する
   useEffect(() => {
@@ -420,6 +428,13 @@ export function MyRoom({ entries, initialLayout, serverReady, dogSkin, dogName, 
       bed: bed ? (bed.key === "furniture:dog-house" ? { x: bed.x, y: clamp(bed.y + 1.5, ROOM.floorTop, ROOM.floorBottom), zy: bed.y + 2 } : { x: bed.x, y: bed.y - 1.5, zy: bed.y + 0.5 }) : null,
       bowl: bowl ? { x: bowl.x, y: bowl.y } : null,
       toys: floor.filter((p) => entryByKey.get(p.key)?.kind === "item").map((p) => ({ x: p.x, y: p.y, name: entryByKey.get(p.key)!.name })),
+      // 家具のあるところ（犬がうろうろするとき、家具の上やうしろに立たないようにする）
+      blocks: floor.flatMap((p) => {
+        const e = entryByKey.get(p.key);
+        if (!e || e.kind !== "furniture" || e.furniture === "bowl" || e.furniture === "dog-bed") return [];
+        const w = widthOf(e, p);
+        return [{ x0: p.x - w / 2 - 3, x1: p.x + w / 2 + 3, y0: p.y - (w * (FURNITURE_DEPTH[e.furniture] ?? 0.3)) / ROOM.aspect, y1: p.y + 3 }];
+      }),
     };
   }, [entryByKey, layout.items]);
 
@@ -520,7 +535,7 @@ export function MyRoom({ entries, initialLayout, serverReady, dogSkin, dogName, 
           style={{ aspectRatio: `1000 / ${1000 * ROOM.aspect}` }}
           onPointerDown={(e) => { if (e.target === e.currentTarget || (e.target as Element).tagName === "svg" || (e.target as Element).closest("svg[aria-hidden]")) setSelectedId(null); }}
         >
-          <RoomScene theme={layout.theme} phase={phase} now={now} />
+          <RoomScene theme={layout.theme} now={now} />
 
           {layout.items.map((p) => {
             const entry = entryByKey.get(p.key);
@@ -554,17 +569,21 @@ export function MyRoom({ entries, initialLayout, serverReady, dogSkin, dogName, 
               >
                 {!hang && !shelfOf(p) ? <span data-shadow className="pointer-events-none absolute -bottom-[4%] left-1/2 h-[10%] w-[78%] -translate-x-1/2 rounded-[50%] bg-[#4a3520]/18 blur-[2px]" /> : null}
                 <span data-body className="relative block" style={{ transform: p.flip ? "scaleX(-1)" : undefined }}>
-                  <DecorVisual entry={entry} frame={p.frame} lit={phase === "evening" || phase === "night"} />
+                  <DecorVisual entry={entry} frame={p.frame} lit={lightsOn} />
                 </span>
-                {isSel ? <span className="pointer-events-none absolute -inset-1.5 rounded-lg border-2 border-dashed border-leaf-deep" /> : null}
+                {isSel ? (
+                  <span className="room-selected pointer-events-none absolute -inset-2 rounded-xl border-2 border-white/90 shadow-[0_0_0_2px_rgba(94,140,74,.9),0_0_16px_rgba(140,200,110,.75)]">
+                    {["-left-1.5 -top-1.5", "-right-1.5 -top-1.5", "-bottom-1.5 -left-1.5", "-bottom-1.5 -right-1.5"].map((pos) => <span key={pos} className={`absolute h-3 w-3 rounded-full border-2 border-white bg-leaf-deep shadow ${pos}`} />)}
+                  </span>
+                ) : null}
 
               </div>
             );
           })}
 
-          <RoomDog skin={dogSkin} phase={phase} lines={dogLines} quiet={editing} places={dogPlaces} />
+          <RoomDog skin={dogSkin} phase={phase} sleepy={sleepy} lines={dogLines} quiet={editing} places={dogPlaces} />
           <div className="pointer-events-none absolute inset-0" style={{ zIndex: 2000 }}>
-            <RoomLighting phase={phase} lamps={lampLights} />
+            <RoomLighting now={now} lamps={lampLights} />
           </div>
           {peek ? (
             <span className="room-bubble pointer-events-none absolute w-max max-w-[12rem] -translate-x-1/2 -translate-y-full rounded-xl bg-ink px-2.5 py-1 text-[10px] font-bold text-white shadow" style={{ left: `${clamp(peek.x, 18, 82)}%`, top: `${Math.max(4, peek.y - 0.5)}%`, zIndex: 2600 }}>{peek.text}</span>
@@ -671,10 +690,11 @@ export function MyRoom({ entries, initialLayout, serverReady, dogSkin, dogName, 
                 );
               })}
             </div>
+            <SkyCard now={now} />
             <ul className="space-y-1.5 rounded-2xl border border-line bg-card px-4 py-3 text-[12px] leading-relaxed text-ink-soft shadow-sm">
               <li>🐾 {dogName}をタップすると、なでられます</li>
               <li>🖼️ 飾った写真をタップすると、その日の思い出が見られます</li>
-              <li>🕰️ 窓の外と時計は、いまの時間に合わせて変わります</li>
+              <li>🕰️ 窓の外・部屋の明るさ・時計は、日本のいまの時刻と季節の日の出・日の入りに合わせて変わります</li>
               <li>🚩 おでかけを記録した都道府県のペナントや、おさんぽのトロフィーも飾れます</li>
             </ul>
             <button type="button" onClick={() => void takeSnapshot()} disabled={shooting} className="flex w-full items-center justify-center gap-2 rounded-full bg-leaf-deep py-3 text-sm font-black text-white shadow-md active:scale-[.98] disabled:opacity-60">

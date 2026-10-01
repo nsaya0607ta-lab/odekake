@@ -23,15 +23,19 @@ export type DogPlaces = {
   bed: { x: number; y: number; zy: number } | null;
   bowl: { x: number; y: number } | null;
   toys: { x: number; y: number; name: string }[];
+  /** 家具のあるところ（部屋の %）。うろうろするときは、ここに足をおかない */
+  blocks: { x0: number; x1: number; y0: number; y1: number }[];
 };
 
-export function RoomDog({ skin, phase, lines, quiet, places }: {
+export function RoomDog({ skin, phase, sleepy, lines, quiet, places }: {
   skin: DogSkinId;
   phase: DayPhase;
   /** タップしたときに言うことの候補（飾ってあるものの話など） */
   lines: readonly string[];
   /** もようがえ中は、じゃまにならないよう端ですわって待つ */
   quiet: boolean;
+  /** 寝る時間か（日本時間の夜おそく〜朝） */
+  sleepy: boolean;
   /** ベッド・ごはん皿・床に置いたおもちゃの場所 */
   places: DogPlaces;
 }) {
@@ -44,7 +48,7 @@ export function RoomDog({ skin, phase, lines, quiet, places }: {
   // 置き場所が変わるたびに暮らしを最初からやり直さないよう、最新の場所は ref で見る
   const placesRef = useRef(places);
   placesRef.current = places;
-  const night = phase === "night";
+  const night = sleepy;
 
   const clearTimers = useCallback(() => {
     for (const t of timers.current) window.clearTimeout(t);
@@ -115,14 +119,18 @@ export function RoomDog({ skin, phase, lines, quiet, places }: {
       // 窓の下で外をながめる
       walkTo(24, ROOM.floorTop + 2.5, () => {
         pose(pick(["wonder", "sit-side", "front"] as const));
-        say(phase === "evening" ? "夕やけ、きれい…" : phase === "morning" ? "いい朝だね" : "おそと、いい天気…", 2600);
+        say(phase === "night" ? "お星さま、見えるかな…" : phase === "evening" ? "夕やけ、きれい…" : phase === "morning" ? "いい朝だね" : "おそと、いい天気…", 2600);
         next(4200);
       });
     } else if (r < 0.54 && pl.bed) {
       const bed = pl.bed;
       walkTo(bed.x, bed.y, () => { pose(pick(["lie-wave", "sit"] as const)); say("ごろーん", 1800); next(4500); }, bed.zy);
     } else if (r < 0.85) {
-      walkTo(rand(10, 90), rand(ROOM.floorTop + 4, ROOM.floorBottom - 2), () => {
+      let tx = rand(10, 90), ty = rand(ROOM.floorTop + 4, ROOM.floorBottom - 2);
+      for (let k = 0; k < 10 && pl.blocks.some((b) => tx > b.x0 && tx < b.x1 && ty > b.y0 && ty < b.y1); k++) {
+        tx = rand(10, 90); ty = rand(ROOM.floorTop + 4, ROOM.floorBottom - 2);
+      }
+      walkTo(tx, ty, () => {
         pose(pick(IDLE_POSES));
         next(rand(2200, 4800));
       });

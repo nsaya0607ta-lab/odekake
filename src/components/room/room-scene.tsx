@@ -5,7 +5,8 @@
  * viewBox は 1000 × 1120 で、部屋の % 座標（src/lib/room/types.ts の ROOM）と同じ割合で描く。
  * 窓の外と部屋の明るさは、日本時間の今の時間帯（朝・昼・夕方・夜）に合わせる。
  */
-import { memo } from "react";
+import { memo, useMemo } from "react";
+import { skyAt, type SkyState } from "@/lib/room/sun";
 import { CURTAIN_STYLES, FLOOR_STYLES, RUG_STYLES, WALLPAPER_STYLES } from "@/lib/room/themes";
 import { ROOM, type RoomTheme } from "@/lib/room/types";
 
@@ -21,12 +22,6 @@ const CEIL = 20;
 const SIDE_DROP = 64;
 const py = (pct: number) => (pct / 100) * H;
 
-const SKY: Record<DayPhase, [string, string]> = {
-  morning: ["#FFD9B5", "#BFE3F7"],
-  day: ["#7EC6F2", "#D8F0FF"],
-  evening: ["#F59A6B", "#6E5BA6"],
-  night: ["#151C47", "#3B3F7A"],
-};
 
 export type Season = "sakura" | "rain" | "summer" | "leaves" | "snow" | "none";
 /** 窓の外の季節（日本時間の月） */
@@ -40,24 +35,39 @@ export function seasonOf(date: Date): Season {
   return "none";
 }
 
+/** 日本時間と、その日の太陽の高さから決める時間帯（犬のことばなどに使う） */
 export function dayPhaseOf(date: Date): DayPhase {
   const h = Number(new Intl.DateTimeFormat("en-US", { timeZone: "Asia/Tokyo", hour: "numeric", hourCycle: "h23" }).format(date));
-  if (h >= 5 && h < 9) return "morning";
-  if (h >= 9 && h < 16) return "day";
-  if (h >= 16 && h < 19) return "evening";
-  return "night";
+  const alt = skyAt(date).altitude;
+  if (alt < -4) return "night";
+  if (h < 11) return "morning";
+  if (h >= 13 && alt < 14) return "evening";
+  return "day";
 }
 
-export const RoomScene = memo(function RoomScene({ theme, phase, now }: { theme: RoomTheme; phase: DayPhase; now: Date }) {
+/** 部屋の明かりをつける暗さか */
+export const lampsOn = (sky: SkyState) => sky.light < 0.5;
+
+const mixColor = (a: string, b: string, t: number) => {
+  const pa = [1, 3, 5].map((i) => parseInt(a.slice(i, i + 2), 16)), pb = [1, 3, 5].map((i) => parseInt(b.slice(i, i + 2), 16));
+  return `#${pa.map((v, i) => Math.round(v + (pb[i]! - v) * Math.max(0, Math.min(1, t))).toString(16).padStart(2, "0")).join("")}`;
+};
+
+export const RoomScene = memo(function RoomScene({ theme, now }: { theme: RoomTheme; now: Date }) {
   const wall = WALLPAPER_STYLES[theme.wall];
-  const night = phase === "night";
+  const sky = useMemo(() => skyAt(now), [now]);
+  const night = sky.light < 0.2;
+  const lit = lampsOn(sky);
+  const sunUp = sky.altitude > 0;
+  // 朝夕の低い日ざしは、窓から斜めに長く差しこむ
+  const beamSkew = Math.max(-1, Math.min(1, (sky.azimuth - 180) / 90)) * -110;
   return (
     <svg viewBox={`0 0 ${W} ${H}`} preserveAspectRatio="none" className="absolute inset-0 h-full w-full" aria-hidden="true">
       <defs>
         <WallPattern id="room-wall" theme={theme} />
         <linearGradient id="room-sky" x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0" stopColor={SKY[phase][0]} />
-          <stop offset="1" stopColor={SKY[phase][1]} />
+          <stop offset="0" stopColor={sky.top} />
+          <stop offset="1" stopColor={sky.bottom} />
         </linearGradient>
         <linearGradient id="room-wall-shade" x1="0" y1="0" x2="0" y2="1">
           <stop offset="0" stopColor="#000" stopOpacity="0.06" />
@@ -77,7 +87,7 @@ export const RoomScene = memo(function RoomScene({ theme, phase, now }: { theme:
         </filter>
         <filter id="room-soft" x="-20%" y="-20%" width="140%" height="140%"><feGaussianBlur stdDeviation="14" /></filter>
         <radialGradient id="room-window-glow" cx="0.5" cy="0.5" r="0.5">
-          <stop offset="0" stopColor={phase === "evening" ? "#FFC48A" : "#FFFBEA"} stopOpacity={phase === "evening" ? 0.35 : 0.55} />
+          <stop offset="0" stopColor={mixColor("#FFFBEA", "#FFB27A", sky.warm)} stopOpacity={0.55 * sky.light} />
           <stop offset="1" stopColor="#FFFBEA" stopOpacity="0" />
         </radialGradient>
         <linearGradient id="room-baseboard" x1="0" y1="0" x2="0" y2="1">
@@ -127,10 +137,10 @@ export const RoomScene = memo(function RoomScene({ theme, phase, now }: { theme:
       <rect x="0" y="0" width={W} height={HZ} fill="#7A6040" filter="url(#room-grain)" opacity="0.07" />
       <rect x="0" y="0" width={W} height={HZ} fill="url(#room-wall-shade)" />
       {/* 窓から入る光が壁を明るくする */}
-      {phase !== "night" ? <ellipse cx={px((ROOM.window.x0 + ROOM.window.x1) / 2)} cy={py(24)} rx="360" ry="300" fill="url(#room-window-glow)" /> : null}
+      {sky.light > 0.1 ? <ellipse cx={px((ROOM.window.x0 + ROOM.window.x1) / 2)} cy={py(24)} rx="360" ry="300" fill="url(#room-window-glow)" /> : null}
 
-      <Window phase={phase} curtain={CURTAIN_STYLES[theme.curtain].color} season={seasonOf(now)} />
-      <WallDecoration deco={theme.deco} lit={night || phase === "evening"} />
+      <Window sky={sky} curtain={CURTAIN_STYLES[theme.curtain].color} season={seasonOf(now)} />
+      <WallDecoration deco={theme.deco} lit={lit} />
       <Clock now={now} night={night} />
       <Shelves />
 
@@ -139,15 +149,15 @@ export const RoomScene = memo(function RoomScene({ theme, phase, now }: { theme:
       <rect x="0" y={HZ} width={W} height={H - HZ} fill="#5A4030" filter="url(#room-grain)" opacity="0.06" />
       <rect x="0" y={HZ} width={W} height={H - HZ} fill="url(#room-floor-shade)" />
       {/* 窓から差しこむ光 */}
-      {phase !== "night" ? (
+      {sunUp ? (
         <polygon
-          points={`${px(ROOM.window.x0) + 30},${HZ} ${px(ROOM.window.x1) - 10},${HZ} ${px(ROOM.window.x1) + 150},${H * 0.86} ${px(ROOM.window.x0) + 120},${H * 0.86}`}
-          fill={phase === "evening" ? "#FFB37A" : "#FFF6D8"}
-          opacity={phase === "day" ? 0.24 : 0.2}
+          points={`${px(ROOM.window.x0) + 30},${HZ} ${px(ROOM.window.x1) - 10},${HZ} ${px(ROOM.window.x1) + 150 + beamSkew},${H * 0.86} ${px(ROOM.window.x0) + 120 + beamSkew},${H * 0.86}`}
+          fill={mixColor("#FFF6D8", "#FFAE6E", sky.warm)}
+          opacity={0.26 * Math.min(1, sky.altitude / 10)}
           filter="url(#room-soft)"
         />
       ) : null}
-      {phase === "day" || phase === "morning" ? <SunDust /> : null}
+      {sky.altitude > 8 ? <SunDust /> : null}
       <RugShape rug={theme.rug} />
       {/* 幅木と、壁と床の境目のかげ */}
       <rect x="0" y={HZ - 22} width={W} height="24" fill="url(#room-baseboard)" />
@@ -164,7 +174,7 @@ export const RoomScene = memo(function RoomScene({ theme, phase, now }: { theme:
       <line x1={SIDE} y1={CEIL} x2={SIDE} y2={HZ} stroke="#000" strokeOpacity="0.1" strokeWidth="2" />
       <line x1={W - SIDE} y1={CEIL} x2={W - SIDE} y2={HZ} stroke="#000" strokeOpacity="0.1" strokeWidth="2" />
       <line x1={SIDE} y1={CEIL} x2={W - SIDE} y2={CEIL} stroke="#000" strokeOpacity="0.08" strokeWidth="2" />
-      <PendantLamp lit={night || phase === "evening"} />
+      <PendantLamp lit={lit} />
     </svg>
   );
 });
@@ -325,33 +335,58 @@ function WallDecoration({ deco, lit }: { deco: RoomTheme["deco"]; lit: boolean }
   );
 }
 
-function Window({ phase, curtain, season }: { phase: DayPhase; curtain: string; season: Season }) {
+/** 月の満ち欠けのかたち（p: 0 新月 → 0.5 満月 → 1） */
+function moonPath(cx: number, cy: number, r: number, p: number): string {
+  const k = Math.cos(2 * Math.PI * p), rx = Math.abs(k) * r;
+  const waxing = p < 0.5;
+  const outer = waxing ? 1 : 0;
+  const inner = waxing ? (k > 0 ? 0 : 1) : (k > 0 ? 1 : 0);
+  return `M${cx} ${cy - r} A ${r} ${r} 0 0 ${outer} ${cx} ${cy + r} A ${rx} ${r} 0 0 ${inner} ${cx} ${cy - r} Z`;
+}
+
+function Window({ sky, curtain, season }: { sky: SkyState; curtain: string; season: Season }) {
   const x0 = px(ROOM.window.x0), x1 = px(ROOM.window.x1), y0 = py(ROOM.window.y0), y1 = py(ROOM.window.y1);
   const w = x1 - x0, h = y1 - y0, cx = (x0 + x1) / 2;
-  const night = phase === "night";
+  const night = sky.light < 0.2;
+  const dark = 1 - sky.light;
+  // 太陽：東（左）から西（右）へ、高さのとおりに動く。地平線（丘）より下は見えない
+  const horizonY = y1 - h * 0.22;
+  const sunX = x0 + w * Math.max(-0.2, Math.min(1.2, (sky.azimuth - 90) / 180));
+  const sunY = horizonY - (Math.max(-6, sky.altitude) / 60) * (horizonY - y0 - 10);
+  const sunColor = mixColor("#FFF6C8", "#FF8A4A", sky.warm);
   return (
     <g>
       {/* 外の景色 */}
       <rect x={x0} y={y0} width={w} height={h} fill="url(#room-sky)" />
-      {phase === "day" || phase === "morning" ? <circle cx={x0 + w * (phase === "morning" ? 0.22 : 0.74)} cy={y0 + h * (phase === "morning" ? 0.6 : 0.26)} r="26" fill="#FFF3B0" /> : null}
-      {phase === "evening" ? <circle cx={x0 + w * 0.7} cy={y0 + h * 0.74} r="32" fill="#FFC27A" opacity="0.95" /> : null}
-      {night ? (
-        <>
-          <circle cx={x0 + w * 0.72} cy={y0 + h * 0.26} r="20" fill="#FFF4C8" />
-          <circle cx={x0 + w * 0.72 + 9} cy={y0 + h * 0.26 - 6} r="18" fill={SKY.night[0]} />
-          {[[0.18, 0.2], [0.34, 0.4], [0.52, 0.16], [0.88, 0.5], [0.12, 0.55]].map(([sx, sy]) => <circle key={`${sx}`} cx={x0 + w * sx!} cy={y0 + h * sy!} r="2.2" fill="#FFF8DA" />)}
-        </>
-      ) : (
-        <g fill="#FFFFFF" opacity={phase === "evening" ? 0.5 : 0.85}>
+      <g clipPath="url(#room-window-clip)">
+        {sky.stars > 0.02 ? [[0.18, 0.2], [0.34, 0.4], [0.52, 0.16], [0.88, 0.5], [0.12, 0.55], [0.64, 0.34], [0.42, 0.08], [0.8, 0.12]].map(([sx, sy], i) => (
+          <circle key={i} cx={x0 + w * sx!} cy={y0 + h * sy!} r={i % 3 ? 1.6 : 2.4} fill="#FFF8DA" opacity={sky.stars * (i % 2 ? 0.7 : 1)} />
+        )) : null}
+        {sky.altitude > -3 ? (
+          <>
+            <circle cx={sunX} cy={sunY} r="48" fill={sunColor} opacity="0.25" />
+            <circle cx={sunX} cy={sunY} r="24" fill={sunColor} />
+          </>
+        ) : null}
+        {sky.light < 0.6 ? (
+          <g opacity={Math.min(1, (0.6 - sky.light) * 3)}>
+            <circle cx={x0 + w * 0.74} cy={y0 + h * 0.24} r="34" fill="#FFF4C8" opacity="0.12" />
+            <circle cx={x0 + w * 0.74} cy={y0 + h * 0.24} r="17" fill="#FFFFFF" opacity="0.08" />
+            <path d={moonPath(x0 + w * 0.74, y0 + h * 0.24, 17, sky.moon)} fill="#FFF4C8" />
+          </g>
+        ) : null}
+        <g fill={mixColor("#FFFFFF", "#FFC9A8", sky.warm)} opacity={0.2 + 0.7 * sky.light}>
           <ellipse cx={x0 + w * 0.3} cy={y0 + h * 0.32} rx="38" ry="13" />
           <ellipse cx={x0 + w * 0.42} cy={y0 + h * 0.27} rx="26" ry="14" />
         </g>
-      )}
-      <path d={`M${x0} ${y1 - h * 0.18} C ${x0 + w * 0.3} ${y1 - h * 0.34}, ${x0 + w * 0.62} ${y1 - h * 0.12}, ${x1} ${y1 - h * 0.26} L ${x1} ${y1} L ${x0} ${y1} Z`} fill={night ? "#1F3A3A" : phase === "evening" ? "#5E6A4A" : "#8DBF6E"} />
-      <g transform={`translate(${x0 + w * 0.72} ${y1 - h * 0.24})`} fill={night ? "#183030" : phase === "evening" ? "#4D5A3A" : "#5E9C52"}>
-        <rect x="-3" y="-4" width="6" height="26" fill={night ? "#2A2622" : "#7A5A3A"} />
+      </g>
+      <path d={`M${x0} ${y1 - h * 0.18} C ${x0 + w * 0.3} ${y1 - h * 0.34}, ${x0 + w * 0.62} ${y1 - h * 0.12}, ${x1} ${y1 - h * 0.26} L ${x1} ${y1} L ${x0} ${y1} Z`} fill={mixColor("#8DBF6E", "#14282C", dark * 0.9)} />
+      <g transform={`translate(${x0 + w * 0.72} ${y1 - h * 0.24})`} fill={mixColor("#5E9C52", "#0F2224", dark * 0.9)}>
+        <rect x="-3" y="-4" width="6" height="26" fill={mixColor("#7A5A3A", "#1E1A16", dark)} />
         <circle cx="0" cy="-18" r="20" />
       </g>
+      {/* 夜は遠くの家に明かりがともる */}
+      {night ? [[0.16, 0.86], [0.3, 0.9], [0.86, 0.84]].map(([sx, sy]) => <rect key={sx} x={x0 + w * sx!} y={y0 + h * sy!} width="6" height="5" fill="#FFD98A" opacity="0.85" />) : null}
       <clipPath id="room-window-clip"><rect x={x0} y={y0} width={w} height={h} /></clipPath>
       <WindowWeather season={season} x0={x0} y0={y0} w={w} h={h} />
       {season === "summer" && !night ? <g>{[0.12, 0.3].map((sx) => <g key={sx} transform={`translate(${x0 + w * sx} ${y1 - h * 0.12})`}><rect x="-2" y="-30" width="4" height="34" fill="#5E9C52" /><circle cx="0" cy="-34" r="11" fill="#F6C12E" /><circle cx="0" cy="-34" r="5" fill="#8A5A30" /></g>)}</g> : null}
@@ -476,12 +511,12 @@ function Floor({ theme }: { theme: RoomTheme }) {
   const planks: React.ReactNode[] = [];
   for (let j = 0; j < c.length - 1; j++) {
     for (let i = 0; i < r.length - 1; i++) {
-      // 板は縦に長いので、色は 3 段ごと（板の継ぎ目ごと）に変える
-      const seg = Math.floor((i + (j % 3)) / 3);
-      const v = Math.sin(seg * 12.9898 + j * 78.233) * 43758.5453, t = v - Math.floor(v);
-      if (t > 0.35 && t < 0.65) continue;
+      // 板は奥から手前へ長くのびるので、色は 4〜5 段ぶん（継ぎ目から継ぎ目まで）同じにする
+      const seg = Math.floor((i + (j % 4) * 1.3) / 4.5);
+      // サーバーと端末で同じ値になるよう、小数の計算ではなく整数のハッシュで決める
+      const t = (((Math.imul(seg + 7, 73856093) ^ Math.imul(j + 3, 19349663)) >>> 0) % 1000) / 1000;
       const ya = r[i]!, yb = r[i + 1]!;
-      planks.push(<polygon key={`p${i}-${j}`} points={`${xAt(c[j]!, ya)},${ya} ${xAt(c[j + 1]!, ya)},${ya} ${xAt(c[j + 1]!, yb)},${yb} ${xAt(c[j]!, yb)},${yb}`} fill={tones[t < 0.5 ? 0 : 1]} opacity={0.035 + Math.abs(t - 0.5) * 0.06} />);
+      planks.push(<polygon key={`p${i}-${j}`} points={`${xAt(c[j]!, ya)},${ya} ${xAt(c[j + 1]!, ya)},${ya} ${xAt(c[j + 1]!, yb)},${yb} ${xAt(c[j]!, yb)},${yb}`} fill={tones[t < 0.5 ? 0 : 1]} opacity={(0.02 + Math.abs(t - 0.5) * 0.08).toFixed(3)} />);
     }
   }
   return (
@@ -489,7 +524,10 @@ function Floor({ theme }: { theme: RoomTheme }) {
       <rect x="0" y={HZ} width={W} height={depth} fill={f.base} />
       {planks}
       {c.map((cc, i) => <line key={i} x1={cc[0]} y1={HZ} x2={cc[1]} y2={H} stroke={f.line} strokeWidth="2" />)}
-      {r.slice(1).map((y, i) => c.slice(0, -1).map((cc, j) => ((i + j) % 3 === 0 ? <line key={`${i}-${j}`} x1={xAt(cc, y)} y1={y} x2={xAt(c[j + 1]!, y)} y2={y} stroke={f.line} strokeWidth="1.6" /> : null)))}
+      {/* 板の継ぎ目（となりの板とはずらす） */}
+      {r.slice(1).map((y, i) => c.slice(0, -1).map((cc, j) => (Math.floor((i + 1 + (j % 4) * 1.3) / 4.5) !== Math.floor((i + (j % 4) * 1.3) / 4.5) ? <line key={`${i}-${j}`} x1={xAt(cc, y)} y1={y} x2={xAt(c[j + 1]!, y)} y2={y} stroke={f.line} strokeWidth="1.4" /> : null)))}
+      {/* 木目 */}
+      {c.slice(0, -1).map((cc, j) => <line key={`g${j}`} x1={(cc[0] + c[j + 1]![0]) / 2 + 6} y1={HZ} x2={(cc[1] + c[j + 1]![1]) / 2 + 10} y2={H} stroke={f.line} strokeOpacity="0.35" strokeWidth="0.8" />)}
     </g>
   );
 }
@@ -522,9 +560,12 @@ function RugShape({ rug }: { rug: RoomTheme["rug"] }) {
  * 夜は部屋を暗くして、天井のライトとフロアランプのまわりだけ明るく残す。夕方は橙、朝は桃色にほんのり染める。
  * lamps は明かりの場所（部屋の %）。いつも四すみを少し暗くして、写真のような落ち着きを出す
  */
-export const RoomLighting = memo(function RoomLighting({ phase, lamps }: { phase: DayPhase; lamps: readonly { x: number; y: number; r: number }[] }) {
-  const night = phase === "night";
+export const RoomLighting = memo(function RoomLighting({ now, lamps }: { now: Date; lamps: readonly { x: number; y: number; r: number }[] }) {
+  const sky = useMemo(() => skyAt(now), [now]);
+  const dark = Math.max(0, 1 - sky.light);
+  const lit = lampsOn(sky);
   const lights = [{ x: 50, y: 11, r: 46 }, ...lamps];
+  const morning = sky.azimuth < 180;
   return (
     <svg viewBox={`0 0 ${W} ${H}`} preserveAspectRatio="none" className="pointer-events-none absolute inset-0 h-full w-full" aria-hidden="true" data-lighting>
       <defs>
@@ -543,17 +584,14 @@ export const RoomLighting = memo(function RoomLighting({ phase, lamps }: { phase
         </radialGradient>
         <mask id="room-night-mask" maskUnits="userSpaceOnUse" x="0" y="0" width={W} height={H}>
           <rect x="0" y="0" width={W} height={H} fill="#fff" />
-          {lights.map((l, i) => <ellipse key={i} cx={px(l.x)} cy={py(l.y)} rx={px(l.r)} ry={px(l.r) * 0.9} fill="url(#room-light-hole)" />)}
+          {lit ? lights.map((l, i) => <ellipse key={i} cx={px(l.x)} cy={py(l.y)} rx={px(l.r)} ry={px(l.r) * 0.9} fill="url(#room-light-hole)" />) : null}
         </mask>
       </defs>
-      {phase === "morning" ? <rect x="0" y="0" width={W} height={H} fill="#FFB8A0" opacity="0.07" /> : null}
-      {phase === "evening" ? <rect x="0" y="0" width={W} height={H} fill="#FF8A3D" opacity="0.12" /> : null}
-      {night ? (
-        <>
-          <rect x="0" y="0" width={W} height={H} fill="#0F1438" opacity="0.5" mask="url(#room-night-mask)" />
-          {lights.map((l, i) => <ellipse key={i} cx={px(l.x)} cy={py(l.y)} rx={px(l.r) * 0.8} ry={px(l.r) * 0.72} fill="url(#room-light-warm)" />)}
-        </>
-      ) : null}
+      {/* 朝焼け・夕焼けの色（太陽が低いほど強い） */}
+      {sky.warm > 0.02 && sky.altitude > -8 ? <rect x="0" y="0" width={W} height={H} fill={morning ? "#FFAE96" : "#FF8A3D"} opacity={sky.warm * 0.13} /> : null}
+      {/* 外が暗いほど部屋も暗く。明かりがついていれば、そのまわりは明るい */}
+      {dark > 0.02 ? <rect x="0" y="0" width={W} height={H} fill="#0F1438" opacity={0.56 * Math.pow(dark, 1.15)} mask="url(#room-night-mask)" /> : null}
+      {lit ? lights.map((l, i) => <ellipse key={i} cx={px(l.x)} cy={py(l.y)} rx={px(l.r) * 0.8} ry={px(l.r) * 0.72} fill="url(#room-light-warm)" opacity={Math.min(1, dark * 1.6)} />) : null}
       <rect x="0" y="0" width={W} height={H} fill="url(#room-vignette)" />
     </svg>
   );

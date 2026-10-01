@@ -4402,6 +4402,8 @@
 .room-dog-idle { animation: room-dog-idle 2.6s ease-in-out infinite; transform-origin: 50% 100%; }
 .room-dog-sleep { animation: room-dog-sleep 3.4s ease-in-out infinite; transform-origin: 50% 100%; }
 .room-dog-hop { animation: room-dog-hop 0.7s cubic-bezier(.3,.7,.4,1) both; transform-origin: 50% 100%; }
+@keyframes room-selected { 0%, 100% { opacity: 1; } 50% { opacity: 0.6; } }
+.room-selected { animation: room-selected 1.6s ease-in-out infinite; }
 @media (prefers-reduced-motion: reduce) {
-  .room-heart, .room-bubble, .room-dog-walk, .room-dog-idle, .room-dog-sleep, .room-dog-hop { animation: none; }
+  .room-selected, .room-heart, .room-bubble, .room-dog-walk, .room-dog-idle, .room-dog-sleep, .room-dog-hop { animation: none; }
 }
