@@ -102,6 +102,19 @@ export async function composeRoomSnapshot(room: HTMLElement, caption: { title: s
         const iw = img.offsetWidth * s, ih = img.offsetHeight * s;
         const pic = await loadImage(img.currentSrc || img.src);
         drawCover(ctx, pic, ic.x - c.x - iw / 2, ic.y - c.y - ih / 2, iw, ih);
+        // 額の面取りと、ふちが写真に落とすかげ
+        ctx.lineWidth = 1.5 * s;
+        ctx.strokeStyle = "rgba(255,255,255,0.45)";
+        ctx.beginPath(); ctx.moveTo(-w / 2 + ctx.lineWidth, h / 2); ctx.lineTo(-w / 2 + ctx.lineWidth, -h / 2 + ctx.lineWidth); ctx.lineTo(w / 2, -h / 2 + ctx.lineWidth); ctx.stroke();
+        ctx.strokeStyle = "rgba(0,0,0,0.2)";
+        ctx.beginPath(); ctx.moveTo(w / 2 - ctx.lineWidth, -h / 2); ctx.lineTo(w / 2 - ctx.lineWidth, h / 2 - ctx.lineWidth); ctx.lineTo(-w / 2, h / 2 - ctx.lineWidth); ctx.stroke();
+        const ix = ic.x - c.x - iw / 2, iy = ic.y - c.y - ih / 2;
+        const top = ctx.createLinearGradient(0, iy, 0, iy + 6 * s);
+        top.addColorStop(0, "rgba(0,0,0,0.28)"); top.addColorStop(1, "rgba(0,0,0,0)");
+        ctx.fillStyle = top; ctx.fillRect(ix, iy, iw, 6 * s);
+        const left = ctx.createLinearGradient(ix, 0, ix + 4 * s, 0);
+        left.addColorStop(0, "rgba(0,0,0,0.2)"); left.addColorStop(1, "rgba(0,0,0,0)");
+        ctx.fillStyle = left; ctx.fillRect(ix, iy, 4 * s, ih);
       } else if (svg) {
         ctx.drawImage(await svgImage(svg, w, h), -w / 2, -h / 2, w, h);
       } else if (img) {
@@ -113,6 +126,12 @@ export async function composeRoomSnapshot(room: HTMLElement, caption: { title: s
       // 読めなかったものは飛ばす
     }
     ctx.restore();
+  }
+
+  // 時間帯の明かり（夜の暗さ・ランプのまわりの明るさ・四すみのかげ）
+  const lighting = room.querySelector<SVGSVGElement>("[data-lighting]");
+  if (lighting) {
+    try { ctx.drawImage(await svgImage(lighting, OUT_W, roomH), 0, 0, OUT_W, roomH); } catch { /* 明かりなしで続ける */ }
   }
 
   // 下の帯：タイトルと日付

@@ -5,7 +5,9 @@
  * viewBox は 1000 × 1120 で、部屋の % 座標（src/lib/room/types.ts の ROOM）と同じ割合で描く。
  * 窓の外と部屋の明るさは、日本時間の今の時間帯（朝・昼・夕方・夜）に合わせる。
  */
-import { memo } from "react";
+import { memo, useMemo } from "react";
+import { skyAt, TOKYO, type GeoPoint, type SkyState } from "@/lib/room/sun";
+import { overcastOf, withWeather, type RoomWeather } from "@/lib/room/weather";
 import { CURTAIN_STYLES, FLOOR_STYLES, RUG_STYLES, WALLPAPER_STYLES } from "@/lib/room/themes";
 import { ROOM, type RoomTheme } from "@/lib/room/types";
 
@@ -15,45 +17,60 @@ const W = 1000;
 const H = 1120;
 const HZ = (ROOM.horizon / 100) * H;
 const px = (pct: number) => (pct / 100) * W;
+/** 左右の壁の幅・天井の高さ・左右の壁が床で手前に広がる分（部屋の箱らしさ） */
+const SIDE = 44;
+const CEIL = 20;
+const SIDE_DROP = 64;
 const py = (pct: number) => (pct / 100) * H;
 
-const SKY: Record<DayPhase, [string, string]> = {
-  morning: ["#FFD9B5", "#BFE3F7"],
-  day: ["#7EC6F2", "#D8F0FF"],
-  evening: ["#F59A6B", "#6E5BA6"],
-  night: ["#151C47", "#3B3F7A"],
-};
 
 export type Season = "sakura" | "rain" | "summer" | "leaves" | "snow" | "none";
-/** 窓の外の季節（日本時間の月） */
-export function seasonOf(date: Date): Season {
+/** 窓の外の季節（日本時間の月と、住んでいるところ。北海道は桜が5月で梅雨がなく、沖縄・奄美は雪が降らない） */
+export function seasonOf(date: Date, at: GeoPoint = TOKYO): Season {
   const m = Number(new Intl.DateTimeFormat("en-US", { timeZone: "Asia/Tokyo", month: "numeric" }).format(date));
-  if (m === 3 || m === 4) return "sakura";
-  if (m === 6) return "rain";
+  const north = at.lat >= 41.4, south = at.lat < 29;
+  if (north ? m === 5 : south ? m === 2 : m === 3 || m === 4) return "sakura";
+  if (m === 6 && !north) return "rain";
   if (m === 7 || m === 8) return "summer";
-  if (m === 10 || m === 11) return "leaves";
-  if (m === 12 || m <= 2) return "snow";
+  if (north ? m === 9 || m === 10 : m === 10 || m === 11) return "leaves";
+  if ((m === 12 || m <= 2 || (north && m === 3)) && !south) return "snow";
   return "none";
 }
 
-export function dayPhaseOf(date: Date): DayPhase {
+/** 日本時間と、その日の太陽の高さから決める時間帯（犬のことばなどに使う） */
+export function dayPhaseOf(date: Date, at: GeoPoint = TOKYO): DayPhase {
   const h = Number(new Intl.DateTimeFormat("en-US", { timeZone: "Asia/Tokyo", hour: "numeric", hourCycle: "h23" }).format(date));
-  if (h >= 5 && h < 9) return "morning";
-  if (h >= 9 && h < 16) return "day";
-  if (h >= 16 && h < 19) return "evening";
-  return "night";
+  const alt = skyAt(date, at).altitude;
+  if (alt < -4) return "night";
+  if (h < 11) return "morning";
+  if (h >= 13 && alt < 14) return "evening";
+  return "day";
 }
 
-export const RoomScene = memo(function RoomScene({ theme, phase, now }: { theme: RoomTheme; phase: DayPhase; now: Date }) {
+/** 部屋の明かりをつける暗さか */
+export const lampsOn = (sky: SkyState) => sky.light < 0.5;
+
+const mixColor = (a: string, b: string, t: number) => {
+  const pa = [1, 3, 5].map((i) => parseInt(a.slice(i, i + 2), 16)), pb = [1, 3, 5].map((i) => parseInt(b.slice(i, i + 2), 16));
+  return `#${pa.map((v, i) => Math.round(v + (pb[i]! - v) * Math.max(0, Math.min(1, t))).toString(16).padStart(2, "0")).join("")}`;
+};
+
+export const RoomScene = memo(function RoomScene({ theme, now, at = TOKYO, weather = null }: { theme: RoomTheme; now: Date; at?: GeoPoint; weather?: RoomWeather | null }) {
   const wall = WALLPAPER_STYLES[theme.wall];
-  const night = phase === "night";
+  const sky = useMemo(() => withWeather(skyAt(now, at), weather), [now, at, weather]);
+  const overcast = overcastOf(weather);
+  const night = sky.light < 0.2;
+  const lit = lampsOn(sky);
+  const sunUp = sky.altitude > 0;
+  // 朝夕の低い日ざしは、窓から斜めに長く差しこむ
+  const beamSkew = Math.max(-1, Math.min(1, (sky.azimuth - 180) / 90)) * -110;
   return (
     <svg viewBox={`0 0 ${W} ${H}`} preserveAspectRatio="none" className="absolute inset-0 h-full w-full" aria-hidden="true">
       <defs>
         <WallPattern id="room-wall" theme={theme} />
         <linearGradient id="room-sky" x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0" stopColor={SKY[phase][0]} />
-          <stop offset="1" stopColor={SKY[phase][1]} />
+          <stop offset="0" stopColor={sky.top} />
+          <stop offset="1" stopColor={sky.bottom} />
         </linearGradient>
         <linearGradient id="room-wall-shade" x1="0" y1="0" x2="0" y2="1">
           <stop offset="0" stopColor="#000" stopOpacity="0.06" />
@@ -66,6 +83,46 @@ export const RoomScene = memo(function RoomScene({ theme, phase, now }: { theme:
           <stop offset="0.35" stopColor="#000" stopOpacity="0.02" />
           <stop offset="1" stopColor="#fff" stopOpacity="0.06" />
         </linearGradient>
+        <filter id="room-grain" x="0" y="0" width="100%" height="100%">
+          <feTurbulence type="fractalNoise" baseFrequency="0.85" numOctaves="2" stitchTiles="stitch" result="n" />
+          <feColorMatrix in="n" type="matrix" values="0 0 0 0 0  0 0 0 0 0  0 0 0 0 0  0 0 0 1.4 -0.45" />
+          <feComposite in="SourceGraphic" operator="in" />
+        </filter>
+        <filter id="room-soft" x="-20%" y="-20%" width="140%" height="140%"><feGaussianBlur stdDeviation="14" /></filter>
+        <radialGradient id="room-window-glow" cx="0.5" cy="0.5" r="0.5">
+          <stop offset="0" stopColor={mixColor("#FFFBEA", "#FFB27A", sky.warm)} stopOpacity={0.55 * sky.light} />
+          <stop offset="1" stopColor="#FFFBEA" stopOpacity="0" />
+        </radialGradient>
+        <linearGradient id="room-baseboard" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0" stopColor="#FFFFFF" />
+          <stop offset="0.2" stopColor="#FBF6EC" />
+          <stop offset="1" stopColor="#E6DCCB" />
+        </linearGradient>
+        <linearGradient id="room-floor-ao" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0" stopColor="#2A1A0A" stopOpacity="0.22" />
+          <stop offset="1" stopColor="#2A1A0A" stopOpacity="0" />
+        </linearGradient>
+        <linearGradient id="room-ceiling" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0" stopColor="#FFFFFF" />
+          <stop offset="1" stopColor="#F1E9DA" />
+        </linearGradient>
+        <linearGradient id="room-side-left" x1="0" y1="0" x2="1" y2="0">
+          <stop offset="0" stopColor="#2A1A0A" stopOpacity="0.22" />
+          <stop offset="1" stopColor="#2A1A0A" stopOpacity="0.08" />
+        </linearGradient>
+        <linearGradient id="room-side-right" x1="1" y1="0" x2="0" y2="0">
+          <stop offset="0" stopColor="#2A1A0A" stopOpacity="0.26" />
+          <stop offset="1" stopColor="#2A1A0A" stopOpacity="0.1" />
+        </linearGradient>
+        <linearGradient id="room-glass" x1="0" y1="0" x2="1" y2="1">
+          <stop offset="0" stopColor="#FFFFFF" stopOpacity="0" />
+          <stop offset="0.42" stopColor="#FFFFFF" stopOpacity="0" />
+          <stop offset="0.46" stopColor="#FFFFFF" stopOpacity="0.32" />
+          <stop offset="0.52" stopColor="#FFFFFF" stopOpacity="0.08" />
+          <stop offset="0.56" stopColor="#FFFFFF" stopOpacity="0.22" />
+          <stop offset="0.6" stopColor="#FFFFFF" stopOpacity="0" />
+          <stop offset="1" stopColor="#FFFFFF" stopOpacity="0" />
+        </linearGradient>
         <radialGradient id="room-lamp-glow" cx="0.5" cy="0.5" r="0.5">
           <stop offset="0" stopColor="#FFE3A3" stopOpacity="0.55" />
           <stop offset="1" stopColor="#FFE3A3" stopOpacity="0" />
@@ -77,45 +134,50 @@ export const RoomScene = memo(function RoomScene({ theme, phase, now }: { theme:
         </linearGradient>
       </defs>
 
-      {/* 壁 */}
+      {/* 奥の壁（模様・紙の質感・上下のかげ） */}
       <rect x="0" y="0" width={W} height={HZ} fill={wall.base} />
       <rect x="0" y="0" width={W} height={HZ} fill="url(#room-wall)" />
+      <rect x="0" y="0" width={W} height={HZ} fill="#7A6040" filter="url(#room-grain)" opacity="0.07" />
       <rect x="0" y="0" width={W} height={HZ} fill="url(#room-wall-shade)" />
-      <rect x="0" y="0" width={W} height="16" fill="#FFFFFF" opacity="0.55" />
-      <rect x="0" y="16" width={W} height="4" fill="#000" opacity="0.06" />
+      {/* 窓から入る光が壁を明るくする */}
+      {sky.light > 0.1 ? <ellipse cx={px((ROOM.window.x0 + ROOM.window.x1) / 2)} cy={py(24)} rx="360" ry="300" fill="url(#room-window-glow)" /> : null}
 
-      <Window phase={phase} curtain={CURTAIN_STYLES[theme.curtain].color} season={seasonOf(now)} />
-      <WallDecoration deco={theme.deco} lit={night || phase === "evening"} />
+      <Window sky={sky} curtain={CURTAIN_STYLES[theme.curtain].color} season={seasonOf(now, at)} weather={weather} />
+      <WallDecoration deco={theme.deco} lit={lit} />
       <Clock now={now} night={night} />
       <Shelves />
-      <PendantLamp lit={night || phase === "evening"} />
 
       {/* 床 */}
       <Floor theme={theme} />
+      <rect x="0" y={HZ} width={W} height={H - HZ} fill="#5A4030" filter="url(#room-grain)" opacity="0.06" />
       <rect x="0" y={HZ} width={W} height={H - HZ} fill="url(#room-floor-shade)" />
       {/* 窓から差しこむ光 */}
-      {phase !== "night" ? (
+      {sunUp ? (
         <polygon
-          points={`${px(ROOM.window.x0) + 30},${HZ} ${px(ROOM.window.x1) - 10},${HZ} ${px(ROOM.window.x1) + 150},${H * 0.86} ${px(ROOM.window.x0) + 120},${H * 0.86}`}
-          fill={phase === "evening" ? "#FFB37A" : "#FFF6D8"}
-          opacity={phase === "day" ? 0.22 : 0.18}
+          points={`${px(ROOM.window.x0) + 30},${HZ} ${px(ROOM.window.x1) - 10},${HZ} ${px(ROOM.window.x1) + 150 + beamSkew},${H * 0.86} ${px(ROOM.window.x0) + 120 + beamSkew},${H * 0.86}`}
+          fill={mixColor("#FFF6D8", "#FFAE6E", sky.warm)}
+          opacity={0.26 * Math.min(1, sky.altitude / 10) * (1 - 0.9 * overcast)}
+          filter="url(#room-soft)"
         />
       ) : null}
-      {phase === "day" || phase === "morning" ? <SunDust /> : null}
+      {sky.altitude > 8 && overcast < 0.5 ? <SunDust /> : null}
       <RugShape rug={theme.rug} />
-      {/* 幅木 */}
-      <rect x="0" y={HZ - 22} width={W} height="24" fill="#FFFDF8" />
-      <rect x="0" y={HZ - 22} width={W} height="4" fill="#000" opacity="0.05" />
-      <rect x="0" y={HZ + 2} width={W} height="6" fill="#000" opacity="0.1" />
+      {/* 幅木と、壁と床の境目のかげ */}
+      <rect x="0" y={HZ - 22} width={W} height="24" fill="url(#room-baseboard)" />
+      <rect x="0" y={HZ + 2} width={W} height="26" fill="url(#room-floor-ao)" />
 
-      {/* 時間帯の明るさ。夜は部屋が暗くなり、ランプのまわりだけ明るい */}
-      {phase === "evening" ? <rect x="0" y="0" width={W} height={H} fill="#FF9A4D" opacity="0.08" /> : null}
-      {night ? (
-        <>
-          <rect x="0" y="0" width={W} height={H} fill="#141A44" opacity="0.34" />
-          <ellipse cx={W / 2} cy={420} rx={560} ry={520} fill="url(#room-lamp-glow)" />
-        </>
-      ) : null}
+      {/* 天井と左右の壁：部屋に奥行きを出す */}
+      <polygon points={`0,0 ${W},0 ${W - SIDE},${CEIL} ${SIDE},${CEIL}`} fill="url(#room-ceiling)" />
+      <polygon points={`0,0 ${SIDE},${CEIL} ${SIDE},${HZ} 0,${HZ + SIDE_DROP}`} fill={wall.base} />
+      <polygon points={`0,0 ${SIDE},${CEIL} ${SIDE},${HZ} 0,${HZ + SIDE_DROP}`} fill="url(#room-side-left)" />
+      <polygon points={`${W},0 ${W - SIDE},${CEIL} ${W - SIDE},${HZ} ${W},${HZ + SIDE_DROP}`} fill={wall.base} />
+      <polygon points={`${W},0 ${W - SIDE},${CEIL} ${W - SIDE},${HZ} ${W},${HZ + SIDE_DROP}`} fill="url(#room-side-right)" />
+      <polygon points={`0,${HZ + SIDE_DROP - 26} ${SIDE},${HZ - 22} ${SIDE},${HZ + 2} 0,${HZ + SIDE_DROP}`} fill="#F1E8D8" />
+      <polygon points={`${W},${HZ + SIDE_DROP - 26} ${W - SIDE},${HZ - 22} ${W - SIDE},${HZ + 2} ${W},${HZ + SIDE_DROP}`} fill="#F1E8D8" />
+      <line x1={SIDE} y1={CEIL} x2={SIDE} y2={HZ} stroke="#000" strokeOpacity="0.1" strokeWidth="2" />
+      <line x1={W - SIDE} y1={CEIL} x2={W - SIDE} y2={HZ} stroke="#000" strokeOpacity="0.1" strokeWidth="2" />
+      <line x1={SIDE} y1={CEIL} x2={W - SIDE} y2={CEIL} stroke="#000" strokeOpacity="0.08" strokeWidth="2" />
+      <PendantLamp lit={lit} />
     </svg>
   );
 });
@@ -181,9 +243,14 @@ function WallPattern({ id, theme }: { id: string; theme: RoomTheme }) {
 }
 
 /** 窓の外に降るもの（桜・雨・紅葉・雪）。窓わくの内側だけに見える */
-function WindowWeather({ season, x0, y0, w, h }: { season: Season; x0: number; y0: number; w: number; h: number }) {
+/** 窓の外に降るもの。天気がわかるときは本当の雨・雪、わからないときは季節のもの。晴れていれば花びらや落ち葉が舞う */
+function WindowWeather({ season: seasonal, weather, x0, y0, w, h }: { season: Season; weather: RoomWeather | null; x0: number; y0: number; w: number; h: number }) {
+  const wet = weather && (weather.kind === "rain" || weather.kind === "drizzle" || weather.kind === "thunder");
+  const season: Season = weather
+    ? wet ? "rain" : weather.kind === "snow" ? "snow" : seasonal === "rain" || seasonal === "snow" ? "none" : seasonal
+    : seasonal;
   if (season === "none" || season === "summer") return null;
-  const n = season === "rain" ? 22 : 14;
+  const n = season === "rain" ? (weather?.kind === "drizzle" ? 14 : weather && weather.precip >= 4 ? 34 : 24) : season === "snow" && weather ? 22 : 14;
   const look = {
     sakura: { fill: "#F7B8C8", r: 5, dur: 7 },
     leaves: { fill: "#E0843A", r: 6, dur: 8 },
@@ -276,43 +343,153 @@ function WallDecoration({ deco, lit }: { deco: RoomTheme["deco"]; lit: boolean }
   );
 }
 
-function Window({ phase, curtain, season }: { phase: DayPhase; curtain: string; season: Season }) {
+/** 月の満ち欠けのかたち（p: 0 新月 → 0.5 満月 → 1） */
+function moonPath(cx: number, cy: number, r: number, p: number): string {
+  const k = Math.cos(2 * Math.PI * p), rx = Math.abs(k) * r;
+  const waxing = p < 0.5;
+  const outer = waxing ? 1 : 0;
+  const inner = waxing ? (k > 0 ? 0 : 1) : (k > 0 ? 1 : 0);
+  return `M${cx} ${cy - r} A ${r} ${r} 0 0 ${outer} ${cx} ${cy + r} A ${rx} ${r} 0 0 ${inner} ${cx} ${cy - r} Z`;
+}
+
+/** ガラスについた水てきと、つたい落ちるしずく */
+function RainOnGlass({ x0, y0, w, h }: { x0: number; y0: number; w: number; h: number }) {
+  const drops = Array.from({ length: 26 }, (_, i) => ({ x: x0 + 10 + ((i * 97) % (w - 20)), y: y0 + 10 + ((i * 61) % (h - 20)), r: 2 + (i % 4) * 0.9 }));
+  return (
+    <g clipPath="url(#room-window-clip)">
+      {drops.map((d, i) => (
+        <g key={i}>
+          <circle cx={d.x} cy={d.y} r={d.r} fill="#DCE8F4" opacity="0.45" />
+          <circle cx={d.x - d.r * 0.35} cy={d.y - d.r * 0.35} r={d.r * 0.35} fill="#FFFFFF" opacity="0.8" />
+        </g>
+      ))}
+      {[0.22, 0.58, 0.83].map((sx, i) => (
+        <path key={sx} d={`M${x0 + w * sx} ${y0 + 12} q 3 ${h * 0.2} -1 ${h * 0.45}`} stroke="#E4EEF8" strokeOpacity="0.5" strokeWidth="2.4" fill="none" strokeLinecap="round" strokeDasharray={`${h * 0.45} ${h}`}>
+          <animate attributeName="stroke-dashoffset" values={`${h * 0.45};${-h}`} dur={`${5 + i * 1.7}s`} repeatCount="indefinite" />
+        </path>
+      ))}
+    </g>
+  );
+}
+
+/** 窓の外の雲の置き場所（x, y は窓の中の割合、s は大きさ）。くもるほど多く出す */
+const CLOUDS = [[0.3, 0.3, 1], [0.78, 0.18, 0.8], [0.08, 0.14, 0.9], [0.56, 0.42, 1.1], [0.95, 0.4, 1], [0.4, 0.1, 1.2], [0.2, 0.5, 1.1], [0.7, 0.58, 1.3]] as const;
+
+function Cloud({ x, y, s, fill }: { x: number; y: number; s: number; fill: string }) {
+  return (
+    <g transform={`translate(${x} ${y}) scale(${s})`}>
+      <ellipse cx="0" cy="6" rx="44" ry="13" fill={fill} />
+      <circle cx="-16" cy="-2" r="16" fill={fill} />
+      <circle cx="8" cy="-8" r="21" fill={fill} />
+      <circle cx="28" cy="2" r="13" fill={fill} />
+      <ellipse cx="0" cy="12" rx="40" ry="6" fill="#000" opacity="0.06" />
+    </g>
+  );
+}
+
+function Window({ sky, curtain, season, weather }: { sky: SkyState; curtain: string; season: Season; weather: RoomWeather | null }) {
   const x0 = px(ROOM.window.x0), x1 = px(ROOM.window.x1), y0 = py(ROOM.window.y0), y1 = py(ROOM.window.y1);
   const w = x1 - x0, h = y1 - y0, cx = (x0 + x1) / 2;
-  const night = phase === "night";
+  const night = sky.light < 0.2;
+  const dark = 1 - sky.light;
+  const overcast = overcastOf(weather);
+  const wet = weather?.kind === "rain" || weather?.kind === "drizzle" || weather?.kind === "thunder";
+  const snowy = weather?.kind === "snow";
+  const cloudCount = weather ? Math.round(1 + overcast * 7) : 2;
+  const cloudFill = mixColor(mixColor("#FFFFFF", "#FFC9A8", sky.warm), wet || weather?.kind === "thunder" ? "#7C8494" : "#B9BEC8", overcast * 0.85);
+  // 風が強いほど雲が速く流れる
+  const cloudDur = weather ? Math.max(40, 160 - weather.wind * 3) : 140;
+  // 太陽：東（左）から西（右）へ、高さのとおりに動く。地平線（丘）より下は見えない
+  const horizonY = y1 - h * 0.22;
+  const sunX = x0 + w * Math.max(-0.2, Math.min(1.2, (sky.azimuth - 90) / 180));
+  const sunY = horizonY - (Math.max(-6, sky.altitude) / 60) * (horizonY - y0 - 10);
+  const sunColor = mixColor("#FFF6C8", "#FF8A4A", sky.warm);
+  const T = 20;
   return (
     <g>
+      <defs>
+        <linearGradient id="room-casing" x1="0" y1="0" x2="1" y2="1">
+          <stop offset="0" stopColor="#FFFFFF" />
+          <stop offset="1" stopColor="#E2D8C6" />
+        </linearGradient>
+        <linearGradient id="room-reveal-top" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0" stopColor="#1E140A" stopOpacity="0.32" />
+          <stop offset="1" stopColor="#1E140A" stopOpacity="0" />
+        </linearGradient>
+        <linearGradient id="room-reveal-left" x1="0" y1="0" x2="1" y2="0">
+          <stop offset="0" stopColor="#1E140A" stopOpacity="0.2" />
+          <stop offset="1" stopColor="#1E140A" stopOpacity="0" />
+        </linearGradient>
+        <linearGradient id="room-sill" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0" stopColor="#FFFFFF" />
+          <stop offset="1" stopColor="#EDE3D2" />
+        </linearGradient>
+        <linearGradient id="room-sill-front" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0" stopColor="#F3EADB" />
+          <stop offset="1" stopColor="#D8CBB4" />
+        </linearGradient>
+      </defs>
+      {/* 窓わくのまわりの飾り板（壁から少し出っぱって、右下に影） */}
+      <rect x={x0 - T - 2} y={y0 - T + 4} width={w + T * 2 + 8} height={h + T * 2} rx="4" fill="#2A1A0C" opacity="0.14" filter="url(#room-soft)" />
+      <rect x={x0 - T} y={y0 - T} width={w + T * 2} height={h + T * 2} rx="3" fill="url(#room-casing)" />
+      <rect x={x0 - T} y={y0 - T} width={w + T * 2} height={h + T * 2} rx="3" fill="none" stroke="#C9B89A" strokeWidth="1.5" />
+      <rect x={x0 - 3} y={y0 - 3} width={w + 6} height={h + 6} fill="none" stroke="#CDBFA6" strokeWidth="2" />
       {/* 外の景色 */}
       <rect x={x0} y={y0} width={w} height={h} fill="url(#room-sky)" />
-      {phase === "day" || phase === "morning" ? <circle cx={x0 + w * (phase === "morning" ? 0.22 : 0.74)} cy={y0 + h * (phase === "morning" ? 0.6 : 0.26)} r="26" fill="#FFF3B0" /> : null}
-      {phase === "evening" ? <circle cx={x0 + w * 0.7} cy={y0 + h * 0.74} r="32" fill="#FFC27A" opacity="0.95" /> : null}
-      {night ? (
-        <>
-          <circle cx={x0 + w * 0.72} cy={y0 + h * 0.26} r="20" fill="#FFF4C8" />
-          <circle cx={x0 + w * 0.72 + 9} cy={y0 + h * 0.26 - 6} r="18" fill={SKY.night[0]} />
-          {[[0.18, 0.2], [0.34, 0.4], [0.52, 0.16], [0.88, 0.5], [0.12, 0.55]].map(([sx, sy]) => <circle key={`${sx}`} cx={x0 + w * sx!} cy={y0 + h * sy!} r="2.2" fill="#FFF8DA" />)}
-        </>
-      ) : (
-        <g fill="#FFFFFF" opacity={phase === "evening" ? 0.5 : 0.85}>
-          <ellipse cx={x0 + w * 0.3} cy={y0 + h * 0.32} rx="38" ry="13" />
-          <ellipse cx={x0 + w * 0.42} cy={y0 + h * 0.27} rx="26" ry="14" />
+      <g clipPath="url(#room-window-clip)">
+        {sky.stars > 0.02 ? [[0.18, 0.2], [0.34, 0.4], [0.52, 0.16], [0.88, 0.5], [0.12, 0.55], [0.64, 0.34], [0.42, 0.08], [0.8, 0.12]].map(([sx, sy], i) => (
+          <circle key={i} cx={x0 + w * sx!} cy={y0 + h * sy!} r={i % 3 ? 1.6 : 2.4} fill="#FFF8DA" opacity={sky.stars * (i % 2 ? 0.7 : 1)} />
+        )) : null}
+        {sky.altitude > -3 && overcast < 0.95 ? (
+          <g opacity={1 - overcast * 0.9}>
+            <circle cx={sunX} cy={sunY} r="48" fill={sunColor} opacity="0.25" />
+            <circle cx={sunX} cy={sunY} r="24" fill={sunColor} />
+          </g>
+        ) : null}
+        {sky.light < 0.6 && overcast < 0.95 ? (
+          <g opacity={Math.min(1, (0.6 - sky.light) * 3) * (1 - overcast * 0.85)}>
+            <circle cx={x0 + w * 0.74} cy={y0 + h * 0.24} r="34" fill="#FFF4C8" opacity="0.12" />
+            <circle cx={x0 + w * 0.74} cy={y0 + h * 0.24} r="17" fill="#FFFFFF" opacity="0.08" />
+            <path d={moonPath(x0 + w * 0.74, y0 + h * 0.24, 17, sky.moon)} fill="#FFF4C8" />
+          </g>
+        ) : null}
+        {/* 雲（くもり・雨の日は多く、灰色に。風に流れる） */}
+        <g opacity={0.25 + 0.7 * Math.max(sky.light, overcast * 0.6)}>
+          <animateTransform attributeName="transform" type="translate" values={`0 0;${w * 0.18} 0;0 0`} dur={`${cloudDur}s`} repeatCount="indefinite" />
+          {CLOUDS.slice(0, cloudCount).map(([cx2, cy2, sc], i) => <Cloud key={i} x={x0 + w * cx2} y={y0 + h * cy2} s={sc * (0.8 + overcast * 0.5)} fill={cloudFill} />)}
         </g>
-      )}
-      <path d={`M${x0} ${y1 - h * 0.18} C ${x0 + w * 0.3} ${y1 - h * 0.34}, ${x0 + w * 0.62} ${y1 - h * 0.12}, ${x1} ${y1 - h * 0.26} L ${x1} ${y1} L ${x0} ${y1} Z`} fill={night ? "#1F3A3A" : phase === "evening" ? "#5E6A4A" : "#8DBF6E"} />
-      <g transform={`translate(${x0 + w * 0.72} ${y1 - h * 0.24})`} fill={night ? "#183030" : phase === "evening" ? "#4D5A3A" : "#5E9C52"}>
-        <rect x="-3" y="-4" width="6" height="26" fill={night ? "#2A2622" : "#7A5A3A"} />
-        <circle cx="0" cy="-18" r="20" />
+        {/* きりの日は景色がかすむ */}
+        {weather?.kind === "fog" ? <rect x={x0} y={y0} width={w} height={h} fill="#F2F2F0" opacity={0.5 * Math.max(0.4, sky.light)} /> : null}
       </g>
+      <path d={`M${x0} ${y1 - h * 0.18} C ${x0 + w * 0.3} ${y1 - h * 0.34}, ${x0 + w * 0.62} ${y1 - h * 0.12}, ${x1} ${y1 - h * 0.26} L ${x1} ${y1} L ${x0} ${y1} Z`} fill={mixColor(snowy || (!weather && season === "snow") ? "#F4F6FA" : "#8DBF6E", "#14282C", dark * 0.9)} />
+      <g transform={`translate(${x0 + w * 0.72} ${y1 - h * 0.24})`} fill={mixColor("#5E9C52", "#0F2224", dark * 0.9)}>
+        <rect x="-3" y="-4" width="6" height="26" fill={mixColor("#7A5A3A", "#1E1A16", dark)} />
+        <circle cx="0" cy="-18" r="20" />
+        {snowy ? <path d="M-19 -22 a 19 15 0 0 1 38 0 q -6 -4 -10 0 q -5 -5 -10 0 q -5 -4 -9 0 q -5 -3 -9 0 z" fill="#FAFCFF" /> : null}
+      </g>
+      {/* 夜は遠くの家に明かりがともる */}
+      {night ? [[0.16, 0.86], [0.3, 0.9], [0.86, 0.84]].map(([sx, sy]) => <rect key={sx} x={x0 + w * sx!} y={y0 + h * sy!} width="6" height="5" fill="#FFD98A" opacity="0.85" />) : null}
       <clipPath id="room-window-clip"><rect x={x0} y={y0} width={w} height={h} /></clipPath>
-      <WindowWeather season={season} x0={x0} y0={y0} w={w} h={h} />
-      {season === "summer" && !night ? <g>{[0.12, 0.3].map((sx) => <g key={sx} transform={`translate(${x0 + w * sx} ${y1 - h * 0.12})`}><rect x="-2" y="-30" width="4" height="34" fill="#5E9C52" /><circle cx="0" cy="-34" r="11" fill="#F6C12E" /><circle cx="0" cy="-34" r="5" fill="#8A5A30" /></g>)}</g> : null}
-      {/* 窓わく */}
+      <WindowWeather season={season} weather={weather} x0={x0} y0={y0} w={w} h={h} />
+      {weather?.kind === "fog" ? <rect x={x0} y={y1 - h * 0.35} width={w} height={h * 0.35} fill="#F4F4F2" opacity={0.45 * Math.max(0.4, sky.light)} /> : null}
+      {/* 雨の日はガラスに水てき */}
+      {wet ? <RainOnGlass x0={x0} y0={y0} w={w} h={h} /> : null}
+      {season === "summer" && !night && !wet ? <g>{[0.12, 0.3].map((sx) => <g key={sx} transform={`translate(${x0 + w * sx} ${y1 - h * 0.12})`}><rect x="-2" y="-30" width="4" height="34" fill="#5E9C52" /><circle cx="0" cy="-34" r="11" fill="#F6C12E" /><circle cx="0" cy="-34" r="5" fill="#8A5A30" /></g>)}</g> : null}
+      <rect x={x0} y={y0} width={w} height={h} fill="url(#room-glass)" opacity={night ? 0.35 : 1} />
+      {/* 窓わく（壁の厚みのぶん奥にあるので、上と左の内がわに影が落ちる） */}
       <rect x={x0} y={y0} width={w} height={h} fill="none" stroke="#FFFFFF" strokeWidth="14" />
-      <rect x={x0 - 7} y={y0 - 7} width={w + 14} height={h + 14} fill="none" stroke="#D9C3A0" strokeWidth="3" />
+      <rect x={x0 + 7} y={y0 + 7} width={w - 14} height="16" fill="url(#room-reveal-top)" />
+      <rect x={x0 + 7} y={y0 + 7} width="12" height={h - 14} fill="url(#room-reveal-left)" />
       <rect x={cx - 4} y={y0} width="8" height={h} fill="#FFFFFF" />
+      <rect x={cx + 4} y={y0 + 7} width="3" height={h - 14} fill="#1E140A" opacity="0.1" />
       <rect x={x0} y={y0 + h / 2 - 4} width={w} height="8" fill="#FFFFFF" />
-      <rect x={x0 - 18} y={y1 + 6} width={w + 36} height="14" rx="4" fill="#FFFDF8" />
-      <rect x={x0 - 18} y={y1 + 18} width={w + 36} height="4" fill="#000" opacity="0.08" />
+      <rect x={x0 + 7} y={y0 + h / 2 + 4} width={w - 14} height="4" fill="#1E140A" opacity="0.12" />
+      <rect x={x0 + 7} y={y0 + h / 2 - 4} width={w - 14} height="1.5" fill="#E8DFD0" />
+      {/* 窓台：上の面と前の厚み、下の影 */}
+      <rect x={x0 - 26} y={y1 + 26} width={w + 52} height="16" fill="#2A1A0C" opacity="0.16" filter="url(#room-soft)" />
+      <path d={`M${x0 - 14} ${y1 + 2} L${x1 + 14} ${y1 + 2} L${x1 + 26} ${y1 + 14} L${x0 - 26} ${y1 + 14} Z`} fill="url(#room-sill)" />
+      <rect x={x0 - 26} y={y1 + 14} width={w + 52} height="12" rx="2" fill="url(#room-sill-front)" />
+      <rect x={x0 - 26} y={y1 + 14} width={w + 52} height="1.5" fill="#FFFFFF" />
       {/* カーテン */}
       <rect x={x0 - 40} y={y0 - 34} width={w + 80} height="10" rx="5" fill="#B08A5E" />
       <path d={`M${x0 - 34} ${y0 - 26} L${x0 + 34} ${y0 - 26} C ${x0 + 30} ${y0 + h * 0.4}, ${x0 + 6} ${y0 + h * 0.6}, ${x0 + 22} ${y1 + 26} L ${x0 - 34} ${y1 + 26} Z`} fill="url(#room-curtain)" />
@@ -333,9 +510,23 @@ function Clock({ now, night }: { now: Date; night: boolean }) {
   const hand = (deg: number, len: number) => ({ x2: cx + Math.sin((deg * Math.PI) / 180) * len, y2: cy - Math.cos((deg * Math.PI) / 180) * len });
   return (
     <g>
-      <circle cx={cx + 3} cy={cy + 5} r={r + 8} fill="#000" opacity="0.08" />
-      <circle cx={cx} cy={cy} r={r + 8} fill="#C98F5A" />
-      <circle cx={cx} cy={cy} r={r} fill={night ? "#FFF6DE" : "#FFFDF6"} />
+      <defs>
+        <linearGradient id="room-clock-rim" x1="0" y1="0" x2="1" y2="1">
+          <stop offset="0" stopColor="#E2AE78" />
+          <stop offset="0.5" stopColor="#C98F5A" />
+          <stop offset="1" stopColor="#8E5C32" />
+        </linearGradient>
+        <radialGradient id="room-clock-face" cx="0.5" cy="0.42" r="0.6">
+          <stop offset="0.75" stopColor={night ? "#FFF6DE" : "#FFFDF6"} />
+          <stop offset="1" stopColor={night ? "#E8DCC0" : "#EDE4D2"} />
+        </radialGradient>
+      </defs>
+      {/* 壁に落ちる影（右下にずれて、ぼける） */}
+      <circle cx={cx + 7} cy={cy + 10} r={r + 9} fill="#2A1A0C" opacity="0.2" filter="url(#room-soft)" />
+      <circle cx={cx} cy={cy} r={r + 10} fill="url(#room-clock-rim)" />
+      <circle cx={cx} cy={cy} r={r + 10} fill="none" stroke="#6E4524" strokeOpacity="0.5" strokeWidth="1.5" />
+      <circle cx={cx} cy={cy} r={r + 1.5} fill="#7A4E2A" />
+      <circle cx={cx} cy={cy} r={r} fill="url(#room-clock-face)" />
       {Array.from({ length: 12 }, (_, i) => {
         const a = (i * 30 * Math.PI) / 180, l = i % 3 === 0 ? 9 : 5;
         return <line key={i} x1={cx + Math.sin(a) * (r - 4)} y1={cy - Math.cos(a) * (r - 4)} x2={cx + Math.sin(a) * (r - 4 - l)} y2={cy - Math.cos(a) * (r - 4 - l)} stroke="#6A4A2E" strokeWidth={i % 3 === 0 ? 3 : 1.6} strokeLinecap="round" />;
@@ -343,6 +534,8 @@ function Clock({ now, night }: { now: Date; night: boolean }) {
       <line x1={cx} y1={cy} {...hand((h % 12) * 30 + m * 0.5, r * 0.5)} stroke="#4A3220" strokeWidth="5" strokeLinecap="round" />
       <line x1={cx} y1={cy} {...hand(m * 6, r * 0.75)} stroke="#4A3220" strokeWidth="3.4" strokeLinecap="round" />
       <circle cx={cx} cy={cy} r="4.5" fill="#E4572E" />
+      {/* ガラスの映りこみ */}
+      <path d={`M${cx - r * 0.78} ${cy - r * 0.2} A ${r * 0.82} ${r * 0.82} 0 0 1 ${cx + r * 0.25} ${cy - r * 0.78} L ${cx + r * 0.1} ${cy - r * 0.6} A ${r * 0.62} ${r * 0.62} 0 0 0 ${cx - r * 0.6} ${cy - r * 0.08} Z`} fill="#FFFFFF" opacity="0.5" />
       {/* 肉球のかざり */}
       <g transform={`translate(${cx} ${cy + r + 22})`} fill="#C98F5A">
         <ellipse cx="0" cy="4" rx="9" ry="7" />
@@ -352,17 +545,55 @@ function Clock({ now, night }: { now: Date; night: boolean }) {
   );
 }
 
+/**
+ * 壁につけた板の棚。上の面（奥ゆき）・前の厚み・金具・壁に落ちる影を描いて、物が「乗っている」ように見せる。
+ * 置いたものの下のはし（棚の y）は、上の面のまん中あたりに来る
+ */
 function Shelves() {
+  const BACK = 8, FRONT = 9, THICK = 17;
   return (
     <g>
+      <defs>
+        <linearGradient id="room-shelf-top" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0" stopColor="#B98552" />
+          <stop offset="1" stopColor="#E2B683" />
+        </linearGradient>
+        <linearGradient id="room-shelf-front" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0" stopColor="#C38D58" />
+          <stop offset="1" stopColor="#9A6838" />
+        </linearGradient>
+        <linearGradient id="room-shelf-bracket" x1="0" y1="0" x2="1" y2="0">
+          <stop offset="0" stopColor="#5A4636" />
+          <stop offset="0.5" stopColor="#8A7462" />
+          <stop offset="1" stopColor="#4A382A" />
+        </linearGradient>
+        <filter id="room-shelf-blur" x="-10%" y="-60%" width="120%" height="220%"><feGaussianBlur stdDeviation="7" /></filter>
+      </defs>
       {ROOM.shelves.map((s) => {
         const x0 = px(s.x0), x1 = px(s.x1), y = py(s.y);
+        const top = y - BACK, front = y + FRONT, bottom = front + THICK;
+        const inset = 9;
         return (
           <g key={s.y}>
-            <rect x={x0 + 4} y={y + 4} width={x1 - x0} height="18" fill="#000" opacity="0.1" rx="3" />
-            <rect x={x0} y={y} width={x1 - x0} height="16" rx="3" fill="#C9925C" />
-            <rect x={x0} y={y} width={x1 - x0} height="4" rx="2" fill="#E3B888" />
-            {[x0 + 30, x1 - 30].map((bx) => <path key={bx} d={`M${bx - 6} ${y + 16} L${bx + 6} ${y + 16} L${bx + 6} ${y + 50} Z`} fill="#A87444" />)}
+            {/* 壁に落ちる影（棚の下にやわらかく） */}
+            <path d={`M${x0 + 6} ${bottom - 2} L${x1 + 4} ${bottom - 2} L${x1 - 10} ${bottom + 34} L${x0 + 22} ${bottom + 34} Z`} fill="#2A1A0C" opacity="0.2" filter="url(#room-shelf-blur)" />
+            {/* 金具（壁から棚の下を支える） */}
+            {[x0 + 46, x1 - 46].map((bx) => (
+              <g key={bx}>
+                <path d={`M${bx - 5} ${bottom - 1} L${bx + 5} ${bottom - 1} L${bx + 5} ${bottom + 3} L${bx - 1} ${bottom + 40} L${bx - 5} ${bottom + 40} Z`} fill="url(#room-shelf-bracket)" />
+                <circle cx={bx - 3} cy={bottom + 30} r="2" fill="#2E2218" />
+              </g>
+            ))}
+            {/* 板の奥のふち：壁とのさかいに細い影 */}
+            <rect x={x0 + inset - 2} y={top - 5} width={x1 - x0 - inset * 2 + 4} height="6" fill="#2A1A0C" opacity="0.12" rx="3" />
+            {/* 上の面（奥がせまく、手前が広い） */}
+            <path d={`M${x0 + inset} ${top} L${x1 - inset} ${top} L${x1} ${front} L${x0} ${front} Z`} fill="url(#room-shelf-top)" />
+            {[0.3, 0.62].map((k) => <path key={k} d={`M${x0 + inset * (1 - k)} ${top + (front - top) * k} L${x1 - inset * (1 - k)} ${top + (front - top) * k}`} stroke="#A87444" strokeOpacity="0.28" strokeWidth="1" />)}
+            {/* 手前の厚み */}
+            <rect x={x0} y={front} width={x1 - x0} height={THICK} fill="url(#room-shelf-front)" />
+            <rect x={x0} y={front} width={x1 - x0} height="2.5" fill="#F4D3A6" opacity="0.85" />
+            <path d={`M${x0 + 30} ${front + 8} q 40 -3 90 0 M${x1 - 140} ${front + 11} q 50 2 100 -1`} stroke="#7A4E28" strokeOpacity="0.22" strokeWidth="1.4" fill="none" />
+            <rect x={x0} y={bottom - 2.5} width={x1 - x0} height="2.5" fill="#5A3A1C" opacity="0.45" />
           </g>
         );
       })}
@@ -374,10 +605,23 @@ function PendantLamp({ lit }: { lit: boolean }) {
   const cx = W / 2;
   return (
     <g>
-      <line x1={cx} y1="0" x2={cx} y2="70" stroke="#6A5A4A" strokeWidth="3" />
+      <defs>
+        <linearGradient id="room-shade" x1="0" y1="0" x2="1" y2="0">
+          <stop offset="0" stopColor={lit ? "#E8C47C" : "#D8C29C"} />
+          <stop offset="0.35" stopColor={lit ? "#FFF0C4" : "#F6EAD2"} />
+          <stop offset="1" stopColor={lit ? "#D9AE62" : "#C8B08A"} />
+        </linearGradient>
+      </defs>
+      {/* 天井のつけ根 */}
+      <ellipse cx={cx} cy="9" rx="16" ry="5" fill="#E6DCCB" />
+      <rect x={cx - 10} y="4" width="20" height="6" rx="2" fill="#D7CBB6" />
+      <line x1={cx} y1="9" x2={cx} y2="70" stroke="#6A5A4A" strokeWidth="3" />
+      <rect x={cx - 5} y="62" width="10" height="12" rx="2" fill="#8A7A66" />
       {lit ? <ellipse cx={cx} cy="112" rx="120" ry="60" fill="url(#room-lamp-glow)" /> : null}
-      <path d={`M${cx - 52} 112 Q ${cx} 50 ${cx + 52} 112 Z`} fill={lit ? "#FFE7A8" : "#F2E2C2"} stroke="#C9A878" strokeWidth="2" />
-      <ellipse cx={cx} cy="112" rx="52" ry="8" fill={lit ? "#FFF6D0" : "#E6D2AE"} />
+      <path d={`M${cx - 52} 112 Q ${cx} 50 ${cx + 52} 112 Z`} fill="url(#room-shade)" stroke="#C9A878" strokeWidth="1.5" />
+      <path d={`M${cx - 30} 100 Q ${cx - 14} 70 ${cx + 4} 70`} fill="none" stroke="#FFFFFF" strokeOpacity="0.55" strokeWidth="3" strokeLinecap="round" />
+      <ellipse cx={cx} cy="112" rx="52" ry="8" fill={lit ? "#FFF6D0" : "#B9A07C"} />
+      <ellipse cx={cx} cy="110.5" rx="49" ry="5.5" fill={lit ? "#FFFBE8" : "#A68E6A"} />
       {lit ? <circle cx={cx} cy="116" r="10" fill="#FFF8DC" /> : null}
     </g>
   );
@@ -420,11 +664,28 @@ function Floor({ theme }: { theme: RoomTheme }) {
   }
   // 木の床：消失点に向かう板の継ぎ目と、ずらした板の端
   const r = rows(9), c = cols(70);
+  // 板ごとに少しだけ色を変えて、本物の床板らしくする
+  const tones = ["#FFFFFF", "#000000"];
+  const planks: React.ReactNode[] = [];
+  for (let j = 0; j < c.length - 1; j++) {
+    for (let i = 0; i < r.length - 1; i++) {
+      // 板は奥から手前へ長くのびるので、色は 4〜5 段ぶん（継ぎ目から継ぎ目まで）同じにする
+      const seg = Math.floor((i + (j % 4) * 1.3) / 4.5);
+      // サーバーと端末で同じ値になるよう、小数の計算ではなく整数のハッシュで決める
+      const t = (((Math.imul(seg + 7, 73856093) ^ Math.imul(j + 3, 19349663)) >>> 0) % 1000) / 1000;
+      const ya = r[i]!, yb = r[i + 1]!;
+      planks.push(<polygon key={`p${i}-${j}`} points={`${xAt(c[j]!, ya)},${ya} ${xAt(c[j + 1]!, ya)},${ya} ${xAt(c[j + 1]!, yb)},${yb} ${xAt(c[j]!, yb)},${yb}`} fill={tones[t < 0.5 ? 0 : 1]} opacity={(0.02 + Math.abs(t - 0.5) * 0.08).toFixed(3)} />);
+    }
+  }
   return (
     <g>
       <rect x="0" y={HZ} width={W} height={depth} fill={f.base} />
+      {planks}
       {c.map((cc, i) => <line key={i} x1={cc[0]} y1={HZ} x2={cc[1]} y2={H} stroke={f.line} strokeWidth="2" />)}
-      {r.slice(1).map((y, i) => c.slice(0, -1).map((cc, j) => ((i + j) % 3 === 0 ? <line key={`${i}-${j}`} x1={xAt(cc, y)} y1={y} x2={xAt(c[j + 1]!, y)} y2={y} stroke={f.line} strokeWidth="1.6" /> : null)))}
+      {/* 板の継ぎ目（となりの板とはずらす） */}
+      {r.slice(1).map((y, i) => c.slice(0, -1).map((cc, j) => (Math.floor((i + 1 + (j % 4) * 1.3) / 4.5) !== Math.floor((i + (j % 4) * 1.3) / 4.5) ? <line key={`${i}-${j}`} x1={xAt(cc, y)} y1={y} x2={xAt(c[j + 1]!, y)} y2={y} stroke={f.line} strokeWidth="1.4" /> : null)))}
+      {/* 木目 */}
+      {c.slice(0, -1).map((cc, j) => <line key={`g${j}`} x1={(cc[0] + c[j + 1]![0]) / 2 + 6} y1={HZ} x2={(cc[1] + c[j + 1]![1]) / 2 + 10} y2={H} stroke={f.line} strokeOpacity="0.35" strokeWidth="0.8" />)}
     </g>
   );
 }
@@ -437,6 +698,8 @@ function RugShape({ rug }: { rug: RoomTheme["rug"] }) {
   if (s.shape === "rect") {
     return (
       <g>
+        <polygon points={`${cx - 250},${cy - 84} ${cx + 250},${cy - 84} ${cx + 334},${cy + 120} ${cx - 334},${cy + 120}`} fill="#000" opacity="0.08" />
+        <polygon points={`${cx - 250},${cy - 90} ${cx + 250},${cy - 90} ${cx + 330},${cy + 116} ${cx - 330},${cy + 116}`} fill={mixColor(s.color, "#000000", 0.18)} />
         <polygon points={`${cx - 250},${cy - 90} ${cx + 250},${cy - 90} ${cx + 330},${cy + 110} ${cx - 330},${cy + 110}`} fill={s.color} />
         <polygon points={`${cx - 226},${cy - 74} ${cx + 226},${cy - 74} ${cx + 300},${cy + 94} ${cx - 300},${cy + 94}`} fill="none" stroke={edge} strokeWidth="5" strokeDasharray="14 10" opacity="0.8" />
       </g>
@@ -445,9 +708,62 @@ function RugShape({ rug }: { rug: RoomTheme["rug"] }) {
   const rx = s.shape === "oval" ? 330 : 270, ry = s.shape === "oval" ? 105 : 120;
   return (
     <g>
-      <ellipse cx={cx} cy={cy + 6} rx={rx} ry={ry} fill="#000" opacity="0.06" />
+      <ellipse cx={cx} cy={cy + 9} rx={rx + 4} ry={ry + 2} fill="#000" opacity="0.07" />
+      {/* 毛足の厚み（手前のふちが少し見える） */}
+      <ellipse cx={cx} cy={cy + 5} rx={rx} ry={ry} fill={mixColor(s.color, "#000000", 0.16)} />
       <ellipse cx={cx} cy={cy} rx={rx} ry={ry} fill={s.color} />
       <ellipse cx={cx} cy={cy} rx={rx - 26} ry={ry - 18} fill="none" stroke={edge} strokeWidth="5" strokeDasharray="14 10" opacity="0.7" />
     </g>
   );
 }
+
+/**
+ * 部屋全体の明かり（飾ったものや犬にもかかるよう、いちばん上に重ねる）。
+ * 夜は部屋を暗くして、天井のライトとフロアランプのまわりだけ明るく残す。夕方は橙、朝は桃色にほんのり染める。
+ * lamps は明かりの場所（部屋の %）。いつも四すみを少し暗くして、写真のような落ち着きを出す
+ */
+export const RoomLighting = memo(function RoomLighting({ now, lamps, at = TOKYO, weather = null }: { now: Date; lamps: readonly { x: number; y: number; r: number }[]; at?: GeoPoint; weather?: RoomWeather | null }) {
+  const sky = useMemo(() => withWeather(skyAt(now, at), weather), [now, at, weather]);
+  const overcast = overcastOf(weather);
+  const dark = Math.max(0, 1 - sky.light);
+  const lit = lampsOn(sky);
+  const lights = [{ x: 50, y: 11, r: 46 }, ...lamps];
+  const morning = sky.azimuth < 180;
+  return (
+    <svg viewBox={`0 0 ${W} ${H}`} preserveAspectRatio="none" className="pointer-events-none absolute inset-0 h-full w-full" aria-hidden="true" data-lighting>
+      <defs>
+        <radialGradient id="room-vignette" cx="0.5" cy="0.48" r="0.75">
+          <stop offset="0.6" stopColor="#1A1008" stopOpacity="0" />
+          <stop offset="1" stopColor="#1A1008" stopOpacity="0.22" />
+        </radialGradient>
+        <radialGradient id="room-light-hole" cx="0.5" cy="0.5" r="0.5">
+          <stop offset="0" stopColor="#000" stopOpacity="1" />
+          <stop offset="0.55" stopColor="#000" stopOpacity="0.7" />
+          <stop offset="1" stopColor="#000" stopOpacity="0" />
+        </radialGradient>
+        <radialGradient id="room-light-warm" cx="0.5" cy="0.5" r="0.5">
+          <stop offset="0" stopColor="#FFD98A" stopOpacity="0.32" />
+          <stop offset="1" stopColor="#FFD98A" stopOpacity="0" />
+        </radialGradient>
+        <mask id="room-night-mask" maskUnits="userSpaceOnUse" x="0" y="0" width={W} height={H}>
+          <rect x="0" y="0" width={W} height={H} fill="#fff" />
+          {lit ? lights.map((l, i) => <ellipse key={i} cx={px(l.x)} cy={py(l.y)} rx={px(l.r)} ry={px(l.r) * 0.9} fill="url(#room-light-hole)" />) : null}
+        </mask>
+      </defs>
+      {/* 朝焼け・夕焼けの色（太陽が低いほど強い） */}
+      {sky.warm > 0.02 && sky.altitude > -8 ? <rect x="0" y="0" width={W} height={H} fill={morning ? "#FFAE96" : "#FF8A3D"} opacity={sky.warm * 0.13} /> : null}
+      {/* 外が暗いほど部屋も暗く。明かりがついていれば、そのまわりは明るい */}
+      {dark > 0.02 ? <rect x="0" y="0" width={W} height={H} fill="#0F1438" opacity={0.56 * Math.pow(dark, 1.15)} mask="url(#room-night-mask)" /> : null}
+      {lit ? lights.map((l, i) => <ellipse key={i} cx={px(l.x)} cy={py(l.y)} rx={px(l.r) * 0.8} ry={px(l.r) * 0.72} fill="url(#room-light-warm)" opacity={Math.min(1, dark * 1.6)} />) : null}
+      {/* くもり・雨の日は、昼でも部屋が少し青く沈む */}
+      {overcast > 0.3 && sky.light > 0.2 ? <rect x="0" y="0" width={W} height={H} fill="#5E6E86" opacity={0.1 * overcast} /> : null}
+      {/* 雷：ときどき部屋がぴかっと光る */}
+      {weather?.kind === "thunder" ? (
+        <rect x="0" y="0" width={W} height={H} fill="#EEF3FF" opacity="0">
+          <animate attributeName="opacity" values="0;0;0;0;0.5;0.05;0.32;0;0" keyTimes="0;0.5;0.7;0.79;0.8;0.81;0.82;0.84;1" dur="13s" repeatCount="indefinite" />
+        </rect>
+      ) : null}
+      <rect x="0" y="0" width={W} height={H} fill="url(#room-vignette)" />
+    </svg>
+  );
+});
