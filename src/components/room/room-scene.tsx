@@ -21,6 +21,20 @@ const px = (pct: number) => (pct / 100) * W;
 const SIDE = 44;
 const CEIL = 20;
 const SIDE_DROP = 64;
+/**
+ * 引きで見せるため、奥の壁（0〜W × 0〜H）のまわりに天井・横の壁・手前の床をはみ出して描く量。
+ * 画面ではこの外わくごと表示し、飾ったものや犬は奥の部屋（0〜W × 0〜H）の上に置く
+ */
+const PX = 82, PT = 64, PB = W / 0.86 * ROOM.aspect - H - 64;
+const VB = `${-PX} ${-PT} ${W + PX * 2} ${H + PT + PB}`;
+/** 外わくの中での部屋の位置（%）。my-room.tsx で飾りと犬を置く台をここに合わせる */
+export const ROOM_STAGE = { left: (PX / (W + PX * 2)) * 100, top: (PT / (H + PT + PB)) * 100, width: (W / (W + PX * 2)) * 100, height: (H / (H + PT + PB)) * 100 };
+/** 部屋（台）から見た、背景の SVG の位置（%）。台より外にはみ出す */
+const SCENE_BOX = { left: `${(-PX / W) * 100}%`, top: `${(-PT / H) * 100}%`, width: `${((W + PX * 2) / W) * 100}%`, height: `${((H + PT + PB) / H) * 100}%` } as const;
+/** 横の壁と床・天井のさかい目（奥のかど (SIDE, y) から、手前の x へまっすぐのばしたときの y） */
+const seam = (x: number, atSide: number, atZero: number) => atSide + ((atZero - atSide) * (SIDE - x)) / SIDE;
+const FLOOR_FRONT = seam(-PX, HZ, HZ + SIDE_DROP);
+const CEIL_FRONT = seam(-PX, CEIL, 0);
 const py = (pct: number) => (pct / 100) * H;
 
 
@@ -66,7 +80,7 @@ export const RoomScene = memo(function RoomScene({ theme, now, at = TOKYO, weath
   // 朝夕の低い日ざしは、窓から斜めに長く差しこむ
   const beamSkew = Math.max(-1, Math.min(1, (sky.azimuth - 180) / 90)) * -110;
   return (
-    <svg viewBox={`0 0 ${W} ${H}`} preserveAspectRatio="none" className="absolute inset-0 h-full w-full" aria-hidden="true">
+    <svg viewBox={VB} preserveAspectRatio="none" className="absolute" style={SCENE_BOX} aria-hidden="true" data-scene>
       <defs>
         <WallPattern id="room-wall" theme={theme} />
         <linearGradient id="room-sky" x1="0" y1="0" x2="0" y2="1">
@@ -106,6 +120,10 @@ export const RoomScene = memo(function RoomScene({ theme, now, at = TOKYO, weath
         <linearGradient id="room-ceiling" x1="0" y1="0" x2="0" y2="1">
           <stop offset="0" stopColor="#FFFFFF" />
           <stop offset="1" stopColor="#F1E9DA" />
+        </linearGradient>
+        <linearGradient id="room-ceiling-shade" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0" stopColor="#2A1A0A" stopOpacity="0.14" />
+          <stop offset="1" stopColor="#2A1A0A" stopOpacity="0" />
         </linearGradient>
         <linearGradient id="room-side-left" x1="0" y1="0" x2="1" y2="0">
           <stop offset="0" stopColor="#2A1A0A" stopOpacity="0.22" />
@@ -147,9 +165,9 @@ export const RoomScene = memo(function RoomScene({ theme, now, at = TOKYO, weath
       {/* 和室は長押（なげし）を壁にわたす */}
       {theme.style === "shoji" || theme.room === "wa" ? (
         <g>
-          <rect x="0" y={py(5.2)} width={W} height="16" fill="#9A6A40" />
-          <rect x="0" y={py(5.2)} width={W} height="3" fill="#C99A66" />
-          <rect x="0" y={py(5.2) + 16} width={W} height="8" fill="#2A1A0C" opacity="0.12" />
+          <rect x={SIDE} y={py(5.2)} width={W - SIDE * 2} height="16" fill="#9A6A40" />
+          <rect x={SIDE} y={py(5.2)} width={W - SIDE * 2} height="3" fill="#C99A66" />
+          <rect x={SIDE} y={py(5.2) + 16} width={W - SIDE * 2} height="8" fill="#2A1A0C" opacity="0.12" />
         </g>
       ) : null}
       <Window sky={sky} curtain={CURTAIN_STYLES[theme.curtain].color} season={seasonOf(now, at)} weather={weather} style={theme.style} />
@@ -159,8 +177,8 @@ export const RoomScene = memo(function RoomScene({ theme, now, at = TOKYO, weath
 
       {/* 床 */}
       <Floor theme={theme} />
-      <rect x="0" y={HZ} width={W} height={H - HZ} fill="#5A4030" filter="url(#room-grain)" opacity="0.06" />
-      <rect x="0" y={HZ} width={W} height={H - HZ} fill="url(#room-floor-shade)" />
+      <rect x={-PX} y={HZ} width={W + PX * 2} height={H + PB - HZ} fill="#5A4030" filter="url(#room-grain)" opacity="0.06" />
+      <rect x={-PX} y={HZ} width={W + PX * 2} height={H + PB - HZ} fill="url(#room-floor-shade)" />
       {/* 窓から差しこむ光 */}
       {sunUp ? (
         <polygon
@@ -177,13 +195,20 @@ export const RoomScene = memo(function RoomScene({ theme, now, at = TOKYO, weath
       <rect x="0" y={HZ + 2} width={W} height="26" fill="url(#room-floor-ao)" />
 
       {/* 天井と左右の壁：部屋に奥行きを出す */}
-      <polygon points={`0,0 ${W},0 ${W - SIDE},${CEIL} ${SIDE},${CEIL}`} fill={theme.room === "cozy" ? "url(#room-ceiling)" : ROOM_KIND_STYLES[theme.room].ceiling} />
-      <polygon points={`0,0 ${SIDE},${CEIL} ${SIDE},${HZ} 0,${HZ + SIDE_DROP}`} fill={wall.base} />
-      <polygon points={`0,0 ${SIDE},${CEIL} ${SIDE},${HZ} 0,${HZ + SIDE_DROP}`} fill="url(#room-side-left)" />
-      <polygon points={`${W},0 ${W - SIDE},${CEIL} ${W - SIDE},${HZ} ${W},${HZ + SIDE_DROP}`} fill={wall.base} />
-      <polygon points={`${W},0 ${W - SIDE},${CEIL} ${W - SIDE},${HZ} ${W},${HZ + SIDE_DROP}`} fill="url(#room-side-right)" />
-      <polygon points={`0,${HZ + SIDE_DROP - 26} ${SIDE},${HZ - 22} ${SIDE},${HZ + 2} 0,${HZ + SIDE_DROP}`} fill="#F1E8D8" />
-      <polygon points={`${W},${HZ + SIDE_DROP - 26} ${W - SIDE},${HZ - 22} ${W - SIDE},${HZ + 2} ${W},${HZ + SIDE_DROP}`} fill="#F1E8D8" />
+      <polygon points={`${-PX},${-PT} ${W + PX},${-PT} ${W + PX},${CEIL_FRONT} ${W - SIDE},${CEIL} ${SIDE},${CEIL} ${-PX},${CEIL_FRONT}`} fill={theme.room === "cozy" ? "url(#room-ceiling)" : ROOM_KIND_STYLES[theme.room].ceiling} />
+      <polygon points={`${-PX},${-PT} ${W + PX},${-PT} ${W + PX},${CEIL_FRONT} ${W - SIDE},${CEIL} ${SIDE},${CEIL} ${-PX},${CEIL_FRONT}`} fill="url(#room-ceiling-shade)" />
+      {[false, true].map((right) => {
+        const X = (x: number) => (right ? W - x : x);
+        const wallPts = `${X(SIDE)},${CEIL} ${X(SIDE)},${HZ} ${X(-PX)},${FLOOR_FRONT} ${X(-PX)},${CEIL_FRONT}`;
+        const boardTop = seam(-PX, HZ - 22, HZ + SIDE_DROP - 26);
+        return (
+          <g key={String(right)}>
+            <polygon points={wallPts} fill={wall.base} />
+            <polygon points={wallPts} fill={`url(#room-side-${right ? "right" : "left"})`} />
+            <polygon points={`${X(-PX)},${boardTop} ${X(SIDE)},${HZ - 22} ${X(SIDE)},${HZ + 2} ${X(-PX)},${FLOOR_FRONT}`} fill="#F1E8D8" />
+          </g>
+        );
+      })}
       <line x1={SIDE} y1={CEIL} x2={SIDE} y2={HZ} stroke="#000" strokeOpacity="0.1" strokeWidth="2" />
       <line x1={W - SIDE} y1={CEIL} x2={W - SIDE} y2={HZ} stroke="#000" strokeOpacity="0.1" strokeWidth="2" />
       <line x1={SIDE} y1={CEIL} x2={W - SIDE} y2={CEIL} stroke="#000" strokeOpacity="0.08" strokeWidth="2" />
@@ -576,10 +601,10 @@ function AtticCeiling() {
     const X = (x: number) => (flip ? W - x : x);
     return (
       <g>
-        <polygon points={`${X(0)},0 ${X(sx)},0 ${X(0)},${sy}`} fill="#E9D3B2" />
+        <polygon points={`${X(-PX)},${-PT} ${X(sx + (PT * sx) / sy)},${-PT} ${X(0)},${sy} ${X(-PX)},${sy + (PX * sy) / sx}`} fill="#E9D3B2" />
         {/* 板ばり（斜めの線） */}
         {[0.22, 0.42, 0.62, 0.82].map((k) => <line key={k} x1={X(sx * k)} y1="0" x2={X(0)} y2={sy * k} stroke="#B98A57" strokeOpacity="0.45" strokeWidth="2" />)}
-        <polygon points={`${X(0)},0 ${X(sx)},0 ${X(0)},${sy}`} fill="#3A2410" opacity={flip ? 0.16 : 0.08} />
+        <polygon points={`${X(-PX)},${-PT} ${X(sx + (PT * sx) / sy)},${-PT} ${X(0)},${sy} ${X(-PX)},${sy + (PX * sy) / sx}`} fill="#3A2410" opacity={flip ? 0.16 : 0.08} />
         {/* はり（太い木） */}
         <line x1={X(sx + 8)} y1="-6" x2={X(-8)} y2={sy + 10} stroke="#8A5A30" strokeWidth="16" />
         <line x1={X(sx + 8)} y1="-6" x2={X(-8)} y2={sy + 10} stroke="#B07A45" strokeWidth="5" transform="translate(-3 -3)" />
@@ -1033,9 +1058,11 @@ function RoomArch({ kind }: { kind: RoomKind }) {
     <g>
       <rect x="0" y={HZ - 22} width={W} height="24" fill={k.baseboard} />
       <rect x="0" y={HZ - 22} width={W} height="3" fill="#FFFFFF" opacity="0.3" />
-      <polygon points={`0,${HZ + SIDE_DROP - 26} ${SIDE},${HZ - 22} ${SIDE},${HZ + 2} 0,${HZ + SIDE_DROP}`} fill={k.baseboard} />
-      <polygon points={`${W},${HZ + SIDE_DROP - 26} ${W - SIDE},${HZ - 22} ${W - SIDE},${HZ + 2} ${W},${HZ + SIDE_DROP}`} fill={k.baseboard} />
-      <polygon points={`0,${HZ + SIDE_DROP - 26} ${SIDE},${HZ - 22} ${SIDE},${HZ + 2} 0,${HZ + SIDE_DROP}`} fill="#000" opacity="0.15" />
+      {[false, true].map((right) => {
+        const X = (x: number) => (right ? W - x : x);
+        const pts = `${X(-PX)},${seam(-PX, HZ - 22, HZ + SIDE_DROP - 26)} ${X(SIDE)},${HZ - 22} ${X(SIDE)},${HZ + 2} ${X(-PX)},${FLOOR_FRONT}`;
+        return <g key={String(right)}><polygon points={pts} fill={k.baseboard} /><polygon points={pts} fill="#000" opacity={right ? 0.08 : 0.15} /></g>;
+      })}
     </g>
   );
   switch (kind) {
@@ -1044,9 +1071,9 @@ function RoomArch({ kind }: { kind: RoomKind }) {
         <g>
           {baseboard}
           {/* 天井のはり */}
-          <rect x="0" y={CEIL - 4} width={W} height="34" fill="#8E5C32" />
-          <rect x="0" y={CEIL - 4} width={W} height="8" fill="#B98552" />
-          <rect x="0" y={CEIL + 30} width={W} height="10" fill="#2A1A0C" opacity="0.2" filter="url(#room-soft)" />
+          <rect x={SIDE} y={CEIL - 4} width={W - SIDE * 2} height="34" fill="#8E5C32" />
+          <rect x={SIDE} y={CEIL - 4} width={W - SIDE * 2} height="8" fill="#B98552" />
+          <rect x={SIDE} y={CEIL + 30} width={W - SIDE * 2} height="10" fill="#2A1A0C" opacity="0.2" filter="url(#room-soft)" />
           {/* 部屋のすみの、丸太の切り口 */}
           {[SIDE, W - SIDE].map((x) => Array.from({ length: Math.floor((HZ - CEIL - 40) / 56) }, (_, i) => {
             const y = CEIL + 58 + i * 56;
@@ -1067,12 +1094,12 @@ function RoomArch({ kind }: { kind: RoomKind }) {
         <g>
           {baseboard}
           {/* 天井の竿縁と、すみの柱 */}
-          {Array.from({ length: 12 }, (_, i) => <line key={i} x1={SIDE + ((W - SIDE * 2) * (i + 1)) / 13} y1={CEIL} x2={(W * (i + 1)) / 13} y2="0" stroke="#9A6A40" strokeWidth="2" />)}
+          {Array.from({ length: 12 }, (_, i) => <line key={i} x1={SIDE + ((W - SIDE * 2) * (i + 1)) / 13} y1={CEIL} x2={-PX + ((W + PX * 2) * (i + 1)) / 13} y2={-PT} stroke="#9A6A40" strokeWidth="2" />)}
           {[SIDE, W - SIDE].map((x) => (
             <g key={x}>
-              <rect x={x - 13} y="0" width="26" height={HZ + 4} fill="#8A5A34" />
-              <rect x={x - 13} y="0" width="6" height={HZ + 4} fill="#B07A45" />
-              <rect x={x + 9} y="0" width="4" height={HZ + 4} fill="#5A3A1C" />
+              <rect x={x - 13} y={CEIL} width="26" height={HZ + 4 - CEIL} fill="#8A5A34" />
+              <rect x={x - 13} y={CEIL} width="6" height={HZ + 4 - CEIL} fill="#B07A45" />
+              <rect x={x + 9} y={CEIL} width="4" height={HZ + 4 - CEIL} fill="#5A3A1C" />
             </g>
           ))}
         </g>
@@ -1084,8 +1111,8 @@ function RoomArch({ kind }: { kind: RoomKind }) {
         <g>
           {baseboard}
           {/* 天井をはしる黒い配管 */}
-          <rect x="0" y={CEIL + 8} width={W} height="12" rx="6" fill="#2A2522" />
-          <rect x="0" y={CEIL + 9} width={W} height="3" fill="#6A625C" />
+          <rect x={SIDE} y={CEIL + 8} width={W - SIDE * 2} height="12" rx="6" fill="#2A2522" />
+          <rect x={SIDE} y={CEIL + 9} width={W - SIDE * 2} height="3" fill="#6A625C" />
           {[120, 380, 640, 900].map((x) => <rect key={x} x={x - 5} y={CEIL - 2} width="10" height="24" rx="2" fill="#1E1A18" />)}
         </g>
       );
@@ -1094,8 +1121,8 @@ function RoomArch({ kind }: { kind: RoomKind }) {
         <g>
           {baseboard}
           {/* 壁の上をめぐるロープ */}
-          <rect x="0" y={CEIL + 2} width={W} height="12" rx="6" fill="#D9C08E" />
-          <line x1="0" y1={CEIL + 8} x2={W} y2={CEIL + 8} stroke="#B89A62" strokeWidth="12" strokeDasharray="6 8" opacity="0.6" />
+          <rect x={SIDE} y={CEIL + 2} width={W - SIDE * 2} height="12" rx="6" fill="#D9C08E" />
+          <line x1={SIDE} y1={CEIL + 8} x2={W - SIDE} y2={CEIL + 8} stroke="#B89A62" strokeWidth="12" strokeDasharray="6 8" opacity="0.6" />
           {/* 浮き輪（右の壁の上のほう） */}
           <g transform={`translate(${W - 120} ${py(8)})`}>
             <circle r="30" fill="none" stroke="#FFFFFF" strokeWidth="16" />
@@ -1148,11 +1175,13 @@ function ConeLamp({ lit }: { lit: boolean }) {
 
 function Floor({ theme }: { theme: RoomTheme }) {
   const f = FLOOR_STYLES[theme.floor];
-  const depth = H - HZ;
+  // 引きで見せる手前のぶん（H より下）と、左右のはみ出しまで床をしく
+  const FB = H + PB, FX = -PX, FW = W + PX * 2;
+  const depth = FB - HZ;
   /** 奥から手前へ、遠近感のある横の線の位置 */
   const rows = (n: number) => Array.from({ length: n + 1 }, (_, k) => HZ + depth * Math.pow(k / n, 1.45));
   /** 消失点に向かう縦の線（奥の x と手前の x） */
-  const cols = (spacing: number) => Array.from({ length: 23 }, (_, i) => (i - 11) * spacing).map((d) => [W / 2 + d, W / 2 + d * 2.3] as const);
+  const cols = (spacing: number) => Array.from({ length: 33 }, (_, i) => (i - 16) * spacing).map((d) => [W / 2 + d, W / 2 + d * 2.3] as const);
   const xAt = (c: readonly [number, number], y: number) => c[0] + (c[1] - c[0]) * ((y - HZ) / depth);
   if (theme.floor === "checker" || theme.floor === "tatami") {
     const r = rows(theme.floor === "checker" ? 7 : 3), c = cols(theme.floor === "checker" ? 90 : 150);
@@ -1164,20 +1193,34 @@ function Floor({ theme }: { theme: RoomTheme }) {
     }
     return (
       <g>
-        <rect x="0" y={HZ} width={W} height={depth} fill={f.base} />
+        <rect x={FX} y={HZ} width={FW} height={depth} fill={f.base} />
         {cells}
-        {theme.floor === "tatami" ? r.map((y) => <rect key={y} x="0" y={y - 3} width={W} height="6" fill="#6E7A4A" opacity="0.55" />) : null}
+        {theme.floor === "tatami" ? r.map((y) => <rect key={y} x={FX} y={y - 3} width={FW} height="6" fill="#6E7A4A" opacity="0.55" />) : null}
       </g>
     );
   }
   if (theme.floor === "carpet") {
+    // じゅうたん：毛足のざらつき、奥ほど暗く手前ほど明るい毛並み、うすい織り目の段
+    const r = rows(16);
     return (
       <g>
-        <rect x="0" y={HZ} width={W} height={depth} fill={f.base} />
-        {Array.from({ length: 140 }, (_, i) => {
-          const x = (i * 137.5) % W, y = HZ + ((i * 61.8) % depth);
-          return <circle key={i} cx={x} cy={y} r={1.2 + (y - HZ) / depth} fill={f.line} opacity="0.6" />;
-        })}
+        <defs>
+          <filter id="room-carpet-pile" x="0" y="0" width="100%" height="100%">
+            <feTurbulence type="fractalNoise" baseFrequency="0.9 1.6" numOctaves="2" seed="7" result="n" />
+            <feColorMatrix in="n" type="matrix" values="0 0 0 0 0  0 0 0 0 0  0 0 0 0 0  0 0 0 1.6 -0.55" />
+            <feComposite in="SourceGraphic" operator="in" />
+          </filter>
+          <linearGradient id="room-carpet-light" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0" stopColor="#000" stopOpacity="0.16" />
+            <stop offset="0.45" stopColor="#000" stopOpacity="0" />
+            <stop offset="1" stopColor="#FFFFFF" stopOpacity="0.12" />
+          </linearGradient>
+        </defs>
+        <rect x={FX} y={HZ} width={FW} height={depth} fill={f.base} />
+        <rect x={FX} y={HZ} width={FW} height={depth} fill={f.line} filter="url(#room-carpet-pile)" opacity="0.55" />
+        <rect x={FX} y={HZ} width={FW} height={depth} fill="#FFFFFF" filter="url(#room-carpet-pile)" opacity="0.18" transform="translate(1.5 1)" />
+        {r.slice(1, -1).map((y) => <line key={y} x1={FX} y1={y} x2={FX + FW} y2={y} stroke={f.line} strokeOpacity="0.35" strokeWidth={0.6 + ((y - HZ) / depth) * 1.4} />)}
+        <rect x={FX} y={HZ} width={FW} height={depth} fill="url(#room-carpet-light)" />
       </g>
     );
   }
@@ -1196,9 +1239,9 @@ function Floor({ theme }: { theme: RoomTheme }) {
     }
     return (
       <g>
-        <rect x="0" y={HZ} width={W} height={depth} fill={f.base} />
+        <rect x={FX} y={HZ} width={FW} height={depth} fill={f.base} />
         {cells}
-        {c.map((cc, i) => <line key={i} x1={cc[0]} y1={HZ} x2={cc[1]} y2={H} stroke={f.line} strokeWidth="1.6" />)}
+        {c.map((cc, i) => <line key={i} x1={cc[0]} y1={HZ} x2={cc[1]} y2={FB} stroke={f.line} strokeWidth="1.6" />)}
       </g>
     );
   }
@@ -1219,13 +1262,13 @@ function Floor({ theme }: { theme: RoomTheme }) {
   }
   return (
     <g>
-      <rect x="0" y={HZ} width={W} height={depth} fill={f.base} />
+      <rect x={FX} y={HZ} width={FW} height={depth} fill={f.base} />
       {planks}
-      {c.map((cc, i) => <line key={i} x1={cc[0]} y1={HZ} x2={cc[1]} y2={H} stroke={f.line} strokeWidth="2" />)}
+      {c.map((cc, i) => <line key={i} x1={cc[0]} y1={HZ} x2={cc[1]} y2={FB} stroke={f.line} strokeWidth="2" />)}
       {/* 板の継ぎ目（となりの板とはずらす） */}
       {r.slice(1).map((y, i) => c.slice(0, -1).map((cc, j) => (Math.floor((i + 1 + (j % 4) * 1.3) / 4.5) !== Math.floor((i + (j % 4) * 1.3) / 4.5) ? <line key={`${i}-${j}`} x1={xAt(cc, y)} y1={y} x2={xAt(c[j + 1]!, y)} y2={y} stroke={f.line} strokeWidth="1.4" /> : null)))}
       {/* 木目 */}
-      {c.slice(0, -1).map((cc, j) => <line key={`g${j}`} x1={(cc[0] + c[j + 1]![0]) / 2 + 6} y1={HZ} x2={(cc[1] + c[j + 1]![1]) / 2 + 10} y2={H} stroke={f.line} strokeOpacity="0.35" strokeWidth="0.8" />)}
+      {c.slice(0, -1).map((cc, j) => <line key={`g${j}`} x1={(cc[0] + c[j + 1]![0]) / 2 + 6} y1={HZ} x2={(cc[1] + c[j + 1]![1]) / 2 + 10} y2={FB} stroke={f.line} strokeOpacity="0.35" strokeWidth="0.8" />)}
     </g>
   );
 }
@@ -1271,7 +1314,7 @@ export const RoomLighting = memo(function RoomLighting({ now, lamps, at = TOKYO,
   const kindStyle = ROOM_KIND_STYLES[room];
   const morning = sky.azimuth < 180;
   return (
-    <svg viewBox={`0 0 ${W} ${H}`} preserveAspectRatio="none" className="pointer-events-none absolute inset-0 h-full w-full" aria-hidden="true" data-lighting>
+    <svg viewBox={VB} preserveAspectRatio="none" className="pointer-events-none absolute" style={SCENE_BOX} aria-hidden="true" data-lighting>
       <defs>
         <radialGradient id="room-vignette" cx="0.5" cy="0.48" r="0.75">
           <stop offset="0.6" stopColor="#1A1008" stopOpacity="0" />
@@ -1286,27 +1329,27 @@ export const RoomLighting = memo(function RoomLighting({ now, lamps, at = TOKYO,
           <stop offset="0" stopColor="#FFD98A" stopOpacity="0.32" />
           <stop offset="1" stopColor="#FFD98A" stopOpacity="0" />
         </radialGradient>
-        <mask id="room-night-mask" maskUnits="userSpaceOnUse" x="0" y="0" width={W} height={H}>
-          <rect x="0" y="0" width={W} height={H} fill="#fff" />
+        <mask id="room-night-mask" maskUnits="userSpaceOnUse" x={-PX} y={-PT} width={W + PX * 2} height={H + PT + PB}>
+          <rect x={-PX} y={-PT} width={W + PX * 2} height={H + PT + PB} fill="#fff" />
           {lit ? lights.map((l, i) => <ellipse key={i} cx={px(l.x)} cy={py(l.y)} rx={px(l.r)} ry={px(l.r) * 0.9} fill="url(#room-light-hole)" />) : null}
         </mask>
       </defs>
       {/* 朝焼け・夕焼けの色（太陽が低いほど強い） */}
-      {sky.warm > 0.02 && sky.altitude > -8 ? <rect x="0" y="0" width={W} height={H} fill={morning ? "#FFAE96" : "#FF8A3D"} opacity={sky.warm * 0.13} /> : null}
+      {sky.warm > 0.02 && sky.altitude > -8 ? <rect x={-PX} y={-PT} width={W + PX * 2} height={H + PT + PB} fill={morning ? "#FFAE96" : "#FF8A3D"} opacity={sky.warm * 0.13} /> : null}
       {/* 外が暗いほど部屋も暗く。明かりがついていれば、そのまわりは明るい */}
-      {dark > 0.02 ? <rect x="0" y="0" width={W} height={H} fill="#0F1438" opacity={0.56 * Math.pow(dark, 1.15)} mask="url(#room-night-mask)" /> : null}
+      {dark > 0.02 ? <rect x={-PX} y={-PT} width={W + PX * 2} height={H + PT + PB} fill="#0F1438" opacity={0.56 * Math.pow(dark, 1.15)} mask="url(#room-night-mask)" /> : null}
       {lit ? lights.map((l, i) => <ellipse key={i} cx={px(l.x)} cy={py(l.y)} rx={px(l.r) * 0.8} ry={px(l.r) * 0.72} fill="url(#room-light-warm)" opacity={Math.min(1, dark * 1.6)} />) : null}
       {/* 部屋の雰囲気の色味（ログハウスはあたたかく、北欧はすっきり など） */}
-      {kindStyle.tint ? <rect x="0" y="0" width={W} height={H} fill={kindStyle.tint} opacity={kindStyle.tintOpacity} /> : null}
+      {kindStyle.tint ? <rect x={-PX} y={-PT} width={W + PX * 2} height={H + PT + PB} fill={kindStyle.tint} opacity={kindStyle.tintOpacity} /> : null}
       {/* くもり・雨の日は、昼でも部屋が少し青く沈む */}
-      {overcast > 0.3 && sky.light > 0.2 ? <rect x="0" y="0" width={W} height={H} fill="#5E6E86" opacity={0.1 * overcast} /> : null}
+      {overcast > 0.3 && sky.light > 0.2 ? <rect x={-PX} y={-PT} width={W + PX * 2} height={H + PT + PB} fill="#5E6E86" opacity={0.1 * overcast} /> : null}
       {/* 雷：ときどき部屋がぴかっと光る */}
       {weather?.kind === "thunder" ? (
-        <rect x="0" y="0" width={W} height={H} fill="#EEF3FF" opacity="0">
+        <rect x={-PX} y={-PT} width={W + PX * 2} height={H + PT + PB} fill="#EEF3FF" opacity="0">
           <animate attributeName="opacity" values="0;0;0;0;0.5;0.05;0.32;0;0" keyTimes="0;0.5;0.7;0.79;0.8;0.81;0.82;0.84;1" dur="13s" repeatCount="indefinite" />
         </rect>
       ) : null}
-      <rect x="0" y="0" width={W} height={H} fill="url(#room-vignette)" />
+      <rect x={-PX} y={-PT} width={W + PX * 2} height={H + PT + PB} fill="url(#room-vignette)" />
     </svg>
   );
 });

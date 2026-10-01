@@ -59,12 +59,17 @@ export async function composeRoomSnapshot(room: HTMLElement, caption: { title: s
   if (!ctx) throw new Error("no canvas");
   const local = (x: number, y: number) => ({ x: (x - box.left) * s, y: (y - box.top) * s });
 
-  // 背景（壁・窓・床…）
-  const scene = room.querySelector<SVGSVGElement>(":scope > svg");
-  if (scene) ctx.drawImage(await svgImage(scene, OUT_W, roomH), 0, 0, OUT_W, roomH);
+  /** 外わくからはみ出す SVG も、画面と同じ位置・大きさで描く */
+  const drawSvgAt = async (svg: SVGSVGElement) => {
+    const r = svg.getBoundingClientRect(), o = local(r.left, r.top);
+    ctx.drawImage(await svgImage(svg, r.width * s, r.height * s), o.x, o.y, r.width * s, r.height * s);
+  };
+  // 背景（壁・窓・床・まわりの天井や横の壁）
+  const scene = room.querySelector<SVGSVGElement>("svg[data-scene]");
+  if (scene) await drawSvgAt(scene);
 
   // 飾ったものと犬を、画面と同じ重なり順で
-  const layers = Array.from(room.querySelectorAll<HTMLElement>(":scope > [data-pid], :scope > [data-dog]"))
+  const layers = Array.from(room.querySelectorAll<HTMLElement>("[data-pid], [data-dog]"))
     .sort((a, b) => Number(getComputedStyle(a).zIndex || 0) - Number(getComputedStyle(b).zIndex || 0));
 
   for (const el of layers) {
@@ -131,7 +136,7 @@ export async function composeRoomSnapshot(room: HTMLElement, caption: { title: s
   // 時間帯の明かり（夜の暗さ・ランプのまわりの明るさ・四すみのかげ）
   const lighting = room.querySelector<SVGSVGElement>("[data-lighting]");
   if (lighting) {
-    try { ctx.drawImage(await svgImage(lighting, OUT_W, roomH), 0, 0, OUT_W, roomH); } catch { /* 明かりなしで続ける */ }
+    try { await drawSvgAt(lighting); } catch { /* 明かりなしで続ける */ }
   }
 
   // 下の帯：タイトルと日付

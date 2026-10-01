@@ -56,7 +56,7 @@ import { RoomDog } from "./room-dog";
 import { composeRoomSnapshot } from "./room-snapshot";
 import { skyAt } from "@/lib/room/sun";
 import { parseRoomWeather, withWeather, type RoomWeather } from "@/lib/room/weather";
-import { dayPhaseOf, lampsOn, RoomLighting, RoomScene, type DayPhase } from "./room-scene";
+import { dayPhaseOf, lampsOn, ROOM_STAGE, RoomLighting, RoomScene, type DayPhase } from "./room-scene";
 import { DEFAULT_PLACE, SkyCard, type RoomPlace } from "./sky-card";
 
 type Tab = DecorKind | "theme";
@@ -214,7 +214,10 @@ export function MyRoom({ entries, initialLayout, serverReady, dogSkin, dogName, 
   const [shareState, setShareState] = useState<"idle" | "sending" | "done" | "error">("idle");
   const [shareError, setShareError] = useState("");
   const [now, setNow] = useState(() => new Date(serverNow));
+  /** 部屋の台（飾りと犬の位置の基準。% で置く） */
   const roomRef = useRef<HTMLDivElement | null>(null);
+  /** 画面に見えている外わく（記念撮影はこの範囲） */
+  const frameRef = useRef<HTMLDivElement | null>(null);
   const drag = useRef<{ id: string; dx: number; dy: number; before: RoomLayout; moved: boolean; pointer: number } | null>(null);
   const latest = useRef(layout);
   latest.current = layout;
@@ -510,7 +513,7 @@ export function MyRoom({ entries, initialLayout, serverReady, dogSkin, dogName, 
 
   /* ---------- 記念撮影 ---------- */
   async function takeSnapshot() {
-    const room = roomRef.current;
+    const room = frameRef.current;
     if (!room || shooting) return;
     setShooting(true);
     setSelectedId(null);
@@ -585,11 +588,13 @@ export function MyRoom({ entries, initialLayout, serverReady, dogSkin, dogName, 
 
       <div className="mx-auto max-w-lg">
         <div
-          ref={roomRef}
+          ref={frameRef}
           className={`isolate w-full touch-none select-none overflow-hidden ${editing ? "sticky top-14 z-[50] shadow-[0_8px_16px_-10px_rgba(60,40,20,.35)]" : "relative"}`}
           style={{ aspectRatio: `1000 / ${1000 * ROOM.aspect}` }}
-          onPointerDown={(e) => { if (e.target === e.currentTarget || (e.target as Element).tagName === "svg" || (e.target as Element).closest("svg[aria-hidden]")) setSelectedId(null); }}
+          onPointerDown={(e) => { if (e.target === e.currentTarget || e.target === roomRef.current || (e.target as Element).tagName === "svg" || (e.target as Element).closest("svg[aria-hidden]")) setSelectedId(null); }}
         >
+          {/* 部屋（奥の壁から手前の床まで）。まわりの天井・横の壁・手前の床は背景の SVG がはみ出して描く */}
+          <div ref={roomRef} className="absolute" style={{ left: `${ROOM_STAGE.left}%`, top: `${ROOM_STAGE.top}%`, width: `${ROOM_STAGE.width}%`, height: `${ROOM_STAGE.height}%` }}>
           <RoomScene theme={layout.theme} now={now} at={place} weather={weather} />
 
           {layout.items.map((p) => {
@@ -647,6 +652,7 @@ export function MyRoom({ entries, initialLayout, serverReady, dogSkin, dogName, 
           {peek ? (
             <span className="room-bubble pointer-events-none absolute w-max max-w-[12rem] -translate-x-1/2 -translate-y-full rounded-xl bg-ink px-2.5 py-1 text-[10px] font-bold text-white shadow" style={{ left: `${clamp(peek.x, 18, 82)}%`, top: `${Math.max(4, peek.y - 0.5)}%`, zIndex: 2600 }}>{peek.text}</span>
           ) : null}
+          </div>
 
           {editing && selected && selectedEntry ? (
             <div className="absolute bottom-2 left-1/2 z-[3000] flex -translate-x-1/2 items-center gap-1 rounded-full border border-line bg-card/95 p-1.5 shadow-lg backdrop-blur">
