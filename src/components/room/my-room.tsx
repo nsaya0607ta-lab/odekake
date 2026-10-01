@@ -852,7 +852,13 @@ export function MyRoom({ entries, initialLayout, serverReady, dogSkin, dogName, 
           <VisitPanel visit={visit} dogName={dogName} liked={visitLike.liked} likeCount={visitLike.likeCount} likeBusy={visitLike.busy} onLike={() => void visitLike.toggleLike()} />
         ) : (
           <section className="space-y-3 px-4 pt-4">
-            <SkyCard now={now} place={place} onPlace={changePlace} weather={weather} steps={steps} history={stepHistory} />
+            <SkyCard
+              now={now} place={place} onPlace={changePlace} weather={weather} steps={steps} history={stepHistory}
+              // ヘッダー・部屋の下の、画面ののこりぴったり（部屋の幅は max-w-lg まで）
+              height={`max(220px, calc(100svh - 3.5rem - 1px - min(100vw, 32rem) * ${ROOM.aspect} - 2.6rem))`}
+              friends={guests?.friends}
+              likes={guests?.mail.filter((m) => m.kind === "like").length ?? 0}
+            />
             <ul className="space-y-1.5 rounded-2xl border border-line bg-card px-4 py-3 text-[12px] leading-relaxed text-ink-soft shadow-sm">
               <li>🐾 {dogName}をタップすると、なでられます</li>
               <li>🖼️ 飾った写真をタップすると、その日の思い出が見られます</li>
@@ -862,7 +868,7 @@ export function MyRoom({ entries, initialLayout, serverReady, dogSkin, dogName, 
             <button type="button" onClick={() => void takeSnapshot()} disabled={shooting} className="flex w-full items-center justify-center gap-2 rounded-full bg-leaf-deep py-3 text-sm font-black text-white shadow-md active:scale-[.98] disabled:opacity-60">
               <span aria-hidden="true">📷</span>{shooting ? "撮影中…" : "記念撮影する"}
             </button>
-            {guests ? <RoomGuests mail={guests.mail} friends={guests.friends} /> : null}
+            {guests ? <RoomGuests mail={guests.mail} /> : null}
             <p className="text-center text-[10px] font-semibold text-ink-faint">{saveLabel}</p>
           </section>
         )}
