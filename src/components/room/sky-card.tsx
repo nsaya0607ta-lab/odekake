@@ -162,6 +162,12 @@ export function SkyCard({ now, place, onPlace, weather = null, steps, history, h
   );
   return (
     <>
+      {/* カードのまわりも空の色に（部屋の下からつながって見えるように。下の方で紙の色にもどす） */}
+      <div
+        className={height ? "relative -mx-4 -mt-4 px-4 pb-1 pt-4" : "contents"}
+        style={height ? { background: `linear-gradient(180deg, ${ink("#C9DFF0", "#141A36")} 0%, ${ink("#E3EEF7", "#252C4C")} 78%, #FBF8F1 100%)` } : undefined}
+      >
+      {height ? <div aria-hidden className="pointer-events-none absolute inset-x-0 top-0 h-5 bg-gradient-to-b from-[#2A1A0A]/20 to-transparent" /> : null}
       {/* いまの空と町（ふちなし）。下に、すりガラスの帯（もようがえ・きょうの歩数・フレンドのおへや） */}
       <div
         className={`relative isolate overflow-hidden rounded-[26px] shadow-[0_14px_28px_-16px_rgba(30,50,80,.55),0_2px_6px_-2px_rgba(30,50,80,.18)] ${height ? "" : "h-[300px]"}`}
@@ -309,7 +315,8 @@ export function SkyCard({ now, place, onPlace, weather = null, steps, history, h
           ) : null}
         </div>
       </div>
-      {height ? <p className="-mt-1 flex items-center justify-center gap-1 text-[10px] font-bold text-ink-faint" aria-hidden><span className="animate-bounce">⌄</span>スクロールで、今週の歩数</p> : null}
+      {height ? <p className="mt-2 flex items-center justify-center gap-1 text-[10px] font-bold text-ink-faint" aria-hidden><span className="animate-bounce">⌄</span>スクロールで、今週の歩数</p> : null}
+      </div>
 
       {/* ここから下はスクロールで：今週の歩数と、空のようす */}
       {stepCount !== null ? (

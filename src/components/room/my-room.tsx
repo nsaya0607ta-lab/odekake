@@ -855,7 +855,7 @@ export function MyRoom({ entries, initialLayout, serverReady, dogSkin, dogName, 
             <SkyCard
               now={now} place={place} onPlace={changePlace} weather={weather} steps={steps} history={stepHistory}
               // ヘッダー・部屋の下の、画面ののこりぴったり（部屋の幅は max-w-lg まで）
-              height={`max(220px, calc(100svh - 3.5rem - 1px - min(100vw, 32rem) * ${ROOM.aspect} - 2.6rem))`}
+              height={`max(220px, calc(100svh - 3.5rem - 1px - min(100vw, 32rem) * ${ROOM.aspect} - 2.8rem))`}
               friends={guests?.friends}
               likes={guests?.mail.filter((m) => m.kind === "like").length ?? 0}
               onEdit={() => { setEditing(true); window.scrollTo({ top: 0, behavior: "smooth" }); }}
