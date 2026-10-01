@@ -12,14 +12,31 @@
 import type { CollectionCategory } from "@/lib/collection/items";
 import type { GachaRarity } from "@/lib/gacha/config";
 
-export type DecorKind = "item" | "photo" | "trophy" | "pennant";
+export type DecorKind = "item" | "photo" | "trophy" | "pennant" | "furniture";
 
 type DecorBase = { key: string; name: string; count: number };
 export type DecorEntry =
   | (DecorBase & { kind: "item"; image: string; category: CollectionCategory; series: string | null; rarity: GachaRarity })
   | (DecorBase & { kind: "photo"; image: string; full: string; date: string; comment: string; pref: string; upload?: boolean })
   | (DecorBase & { kind: "trophy"; stage: string; rank: string; color: string; score: number })
-  | (DecorBase & { kind: "pennant"; emoji: string; color: string });
+  | (DecorBase & { kind: "pennant"; emoji: string; color: string })
+  | (DecorBase & { kind: "furniture"; furniture: FurnitureId });
+
+/** だれでも置ける家具（絵は decor-visual.tsx で描く）。width は床の手前に置いたときの幅（部屋の幅に対する %） */
+export const FURNITURE = {
+  sofa: { name: "ソファ", width: 36 },
+  "dog-bed": { name: "わんこベッド", width: 24 },
+  plant: { name: "観葉植物", width: 13 },
+  bookshelf: { name: "本だな", width: 19 },
+  lamp: { name: "フロアランプ", width: 10 },
+  table: { name: "ローテーブル", width: 25 },
+  "dog-house": { name: "わんこハウス", width: 27 },
+  bowl: { name: "ごはん皿", width: 10 },
+} as const;
+export type FurnitureId = keyof typeof FURNITURE;
+export const FURNITURE_IDS = Object.keys(FURNITURE) as FurnitureId[];
+export const furnitureKey = (id: FurnitureId) => `furniture:${id}`;
+export const FURNITURE_ENTRIES: DecorEntry[] = FURNITURE_IDS.map((id) => ({ kind: "furniture", key: furnitureKey(id), name: FURNITURE[id].name, furniture: id, count: 2 }));
 
 export const FRAME_STYLES = ["wood", "white", "polaroid", "gold"] as const;
 export type FrameStyle = (typeof FRAME_STYLES)[number];
@@ -42,18 +59,20 @@ export const WALLPAPERS = ["cream", "mint-stripe", "pink-gingham", "blue-dots", 
 export const FLOORS = ["wood-light", "wood-dark", "tatami", "checker", "carpet"] as const;
 export const CURTAINS = ["leaf", "sakura", "sky", "lemon", "berry"] as const;
 export const RUGS = ["none", "round-cream", "oval-pink", "rect-green", "round-navy"] as const;
+export const WALL_DECOS = ["none", "garland", "lights", "stars"] as const;
 export type Wallpaper = (typeof WALLPAPERS)[number];
 export type Floor = (typeof FLOORS)[number];
 export type Curtain = (typeof CURTAINS)[number];
 export type Rug = (typeof RUGS)[number];
-export type RoomTheme = { wall: Wallpaper; floor: Floor; curtain: Curtain; rug: Rug };
+export type WallDeco = (typeof WALL_DECOS)[number];
+export type RoomTheme = { wall: Wallpaper; floor: Floor; curtain: Curtain; rug: Rug; deco: WallDeco };
 
 /** 端末から選んで、おへや用にアップロードした写真（Storage の users/{自分}/room/ に置く） */
 export type RoomPhoto = { id: string; path: string; date: string; title: string };
 
 export type RoomLayout = { theme: RoomTheme; items: Placement[]; photos: RoomPhoto[] };
 
-export const DEFAULT_THEME: RoomTheme = { wall: "cream", floor: "wood-light", curtain: "leaf", rug: "round-cream" };
+export const DEFAULT_THEME: RoomTheme = { wall: "cream", floor: "wood-light", curtain: "leaf", rug: "round-cream", deco: "garland" };
 export const ROOM_MAX_ITEMS = 120;
 /** アップロードして飾れる写真の数 */
 export const ROOM_MAX_PHOTOS = 40;
@@ -122,6 +141,7 @@ export function parseRoomLayout(value: unknown, validKeys?: ReadonlySet<string>)
     floor: oneOf(FLOORS, t.floor, DEFAULT_THEME.floor),
     curtain: oneOf(CURTAINS, t.curtain, DEFAULT_THEME.curtain),
     rug: oneOf(RUGS, t.rug, DEFAULT_THEME.rug),
+    deco: oneOf(WALL_DECOS, t.deco, "none"),
   };
   const rawPhotos = Array.isArray(root.photos) ? root.photos.slice(0, ROOM_MAX_PHOTOS) : [];
   const photos = rawPhotos.flatMap((raw): RoomPhoto[] => {
@@ -174,6 +194,8 @@ export function depthScale(y: number): number {
 export function settle(kind: DecorKind, x: number, y: number): { x: number; y: number } {
   if (isHanging(kind)) return { x: clamp(x, 6, 94), y: clamp(y, ROOM.wallTop + 4, ROOM.wallBottom) };
   const nx = clamp(x, 4, 96);
+  // 家具は棚に乗らない
+  if (kind === "furniture") return { x: nx, y: clamp(y, ROOM.floorTop, ROOM.floorBottom) };
   const shelf = ROOM.shelves.find((s) => nx >= s.x0 + 2 && nx <= s.x1 - 2 && y > s.y - 8 && y < s.y + 9);
   if (shelf) return { x: nx, y: shelf.y };
   return { x: nx, y: clamp(y, ROOM.floorTop, ROOM.floorBottom) };

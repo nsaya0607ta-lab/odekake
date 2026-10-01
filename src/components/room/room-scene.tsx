@@ -24,6 +24,18 @@ const SKY: Record<DayPhase, [string, string]> = {
   night: ["#151C47", "#3B3F7A"],
 };
 
+export type Season = "sakura" | "rain" | "summer" | "leaves" | "snow" | "none";
+/** 窓の外の季節（日本時間の月） */
+export function seasonOf(date: Date): Season {
+  const m = Number(new Intl.DateTimeFormat("en-US", { timeZone: "Asia/Tokyo", month: "numeric" }).format(date));
+  if (m === 3 || m === 4) return "sakura";
+  if (m === 6) return "rain";
+  if (m === 7 || m === 8) return "summer";
+  if (m === 10 || m === 11) return "leaves";
+  if (m === 12 || m <= 2) return "snow";
+  return "none";
+}
+
 export function dayPhaseOf(date: Date): DayPhase {
   const h = Number(new Intl.DateTimeFormat("en-US", { timeZone: "Asia/Tokyo", hour: "numeric", hourCycle: "h23" }).format(date));
   if (h >= 5 && h < 9) return "morning";
@@ -72,7 +84,8 @@ export const RoomScene = memo(function RoomScene({ theme, phase, now }: { theme:
       <rect x="0" y="0" width={W} height="16" fill="#FFFFFF" opacity="0.55" />
       <rect x="0" y="16" width={W} height="4" fill="#000" opacity="0.06" />
 
-      <Window phase={phase} curtain={CURTAIN_STYLES[theme.curtain].color} />
+      <Window phase={phase} curtain={CURTAIN_STYLES[theme.curtain].color} season={seasonOf(now)} />
+      <WallDecoration deco={theme.deco} lit={night || phase === "evening"} />
       <Clock now={now} night={night} />
       <Shelves />
       <PendantLamp lit={night || phase === "evening"} />
@@ -88,6 +101,7 @@ export const RoomScene = memo(function RoomScene({ theme, phase, now }: { theme:
           opacity={phase === "day" ? 0.22 : 0.18}
         />
       ) : null}
+      {phase === "day" || phase === "morning" ? <SunDust /> : null}
       <RugShape rug={theme.rug} />
       {/* 幅木 */}
       <rect x="0" y={HZ - 22} width={W} height="24" fill="#FFFDF8" />
@@ -166,7 +180,103 @@ function WallPattern({ id, theme }: { id: string; theme: RoomTheme }) {
   }
 }
 
-function Window({ phase, curtain }: { phase: DayPhase; curtain: string }) {
+/** 窓の外に降るもの（桜・雨・紅葉・雪）。窓わくの内側だけに見える */
+function WindowWeather({ season, x0, y0, w, h }: { season: Season; x0: number; y0: number; w: number; h: number }) {
+  if (season === "none" || season === "summer") return null;
+  const n = season === "rain" ? 22 : 14;
+  const look = {
+    sakura: { fill: "#F7B8C8", r: 5, dur: 7 },
+    leaves: { fill: "#E0843A", r: 6, dur: 8 },
+    snow: { fill: "#FFFFFF", r: 4.5, dur: 9 },
+    rain: { fill: "#C9DDF2", r: 0, dur: 1.1 },
+  }[season];
+  return (
+    <g clipPath="url(#room-window-clip)">
+      {Array.from({ length: n }, (_, i) => {
+        const x = x0 + ((i * 53) % w), delay = -((i * 0.73) % look.dur), drift = season === "rain" ? -14 : i % 2 ? 26 : -22;
+        return (
+          <g key={i}>
+            <animateTransform attributeName="transform" type="translate" from={`0 ${-h * 0.15}`} to={`${drift} ${h * 1.1}`} dur={`${look.dur}s`} begin={`${delay}s`} repeatCount="indefinite" />
+            {season === "rain" ? (
+              <line x1={x} y1={y0} x2={x - 4} y2={y0 + 16} stroke={look.fill} strokeWidth="2" strokeLinecap="round" opacity="0.8" />
+            ) : season === "leaves" ? (
+              <path d={`M${x} ${y0} q 6 -6 12 0 q -6 6 -12 0 z`} fill={i % 3 ? look.fill : "#C9532F"}>
+                <animateTransform attributeName="transform" type="rotate" from={`0 ${x + 6} ${y0}`} to={`360 ${x + 6} ${y0}`} dur="3s" repeatCount="indefinite" additive="sum" />
+              </path>
+            ) : season === "sakura" ? (
+              <ellipse cx={x} cy={y0} rx={look.r} ry={look.r * 0.62} fill={look.fill} opacity="0.95" />
+            ) : (
+              <circle cx={x} cy={y0} r={look.r * (0.6 + (i % 3) * 0.25)} fill={look.fill} opacity="0.9" />
+            )}
+          </g>
+        );
+      })}
+    </g>
+  );
+}
+
+/** 窓から差しこむ光の中を、ほこりがゆっくり舞う */
+function SunDust() {
+  return (
+    <g fill="#FFFBEA">
+      {[[300, 760], [380, 820], [450, 700], [340, 900], [520, 860], [420, 960]].map(([x, y], i) => (
+        <circle key={i} cx={x} cy={y} r={2.4 + (i % 3)} opacity="0">
+          <animate attributeName="opacity" values="0;0.8;0" dur={`${5 + i}s`} begin={`${-i * 1.3}s`} repeatCount="indefinite" />
+          <animate attributeName="cy" values={`${y};${y! - 50}`} dur={`${5 + i}s`} begin={`${-i * 1.3}s`} repeatCount="indefinite" />
+        </circle>
+      ))}
+    </g>
+  );
+}
+
+/** 壁の上のかざり（ガーランド・ライト・お星さま）。ライトは夕方と夜に灯る */
+function WallDecoration({ deco, lit }: { deco: RoomTheme["deco"]; lit: boolean }) {
+  if (deco === "none") return null;
+  const sag = (x: number) => 34 + Math.sin((x / W) * Math.PI) * 30;
+  const wire = `M0 34 Q ${W / 2} 94 ${W} 34`;
+  if (deco === "garland") {
+    const colors = ["#F2A7B8", "#8DBDE6", "#F2D16B", "#A8D99A", "#C7B4D9"];
+    return (
+      <g>
+        <path d={wire} fill="none" stroke="#B08A5E" strokeWidth="2.5" />
+        {Array.from({ length: 13 }, (_, i) => {
+          const x = 40 + i * 76, y = sag(x);
+          return <path key={i} d={`M${x - 20} ${y} L${x + 20} ${y} L${x} ${y + 34} Z`} fill={colors[i % colors.length]} stroke="#FFFFFF" strokeWidth="1.5" />;
+        })}
+      </g>
+    );
+  }
+  if (deco === "lights") {
+    const colors = ["#FFE38A", "#FFB3C7", "#9BE7FF", "#B8E986"];
+    return (
+      <g>
+        <path d={wire} fill="none" stroke="#5A6A5A" strokeWidth="2" />
+        {Array.from({ length: 16 }, (_, i) => {
+          const x = 30 + i * 62, y = sag(x) + 6, c = colors[i % colors.length]!;
+          return (
+            <g key={i}>
+              {lit ? <circle cx={x} cy={y + 8} r="20" fill={c} opacity="0.28" /> : null}
+              <rect x={x - 3} y={y - 4} width="6" height="6" fill="#5A6A5A" />
+              <ellipse cx={x} cy={y + 8} rx="7" ry="10" fill={c} opacity={lit ? 1 : 0.6} />
+            </g>
+          );
+        })}
+      </g>
+    );
+  }
+  return (
+    <g>
+      {[[120, 90], [250, 60], [470, 120], [640, 70], [900, 100]].map(([x, len], i) => (
+        <g key={i}>
+          <line x1={x} y1="20" x2={x} y2={20 + len!} stroke="#C9A878" strokeWidth="1.5" />
+          <path d={`M${x} ${20 + len! - 4} l6 13 14 2 -10 10 3 14 -13 -7 -13 7 3 -14 -10 -10 14 -2 z`} fill={i % 2 ? "#F6D27A" : "#FFE9A8"} stroke="#E0B84A" strokeWidth="1.2" />
+        </g>
+      ))}
+    </g>
+  );
+}
+
+function Window({ phase, curtain, season }: { phase: DayPhase; curtain: string; season: Season }) {
   const x0 = px(ROOM.window.x0), x1 = px(ROOM.window.x1), y0 = py(ROOM.window.y0), y1 = py(ROOM.window.y1);
   const w = x1 - x0, h = y1 - y0, cx = (x0 + x1) / 2;
   const night = phase === "night";
@@ -193,6 +303,9 @@ function Window({ phase, curtain }: { phase: DayPhase; curtain: string }) {
         <rect x="-3" y="-4" width="6" height="26" fill={night ? "#2A2622" : "#7A5A3A"} />
         <circle cx="0" cy="-18" r="20" />
       </g>
+      <clipPath id="room-window-clip"><rect x={x0} y={y0} width={w} height={h} /></clipPath>
+      <WindowWeather season={season} x0={x0} y0={y0} w={w} h={h} />
+      {season === "summer" && !night ? <g>{[0.12, 0.3].map((sx) => <g key={sx} transform={`translate(${x0 + w * sx} ${y1 - h * 0.12})`}><rect x="-2" y="-30" width="4" height="34" fill="#5E9C52" /><circle cx="0" cy="-34" r="11" fill="#F6C12E" /><circle cx="0" cy="-34" r="5" fill="#8A5A30" /></g>)}</g> : null}
       {/* 窓わく */}
       <rect x={x0} y={y0} width={w} height={h} fill="none" stroke="#FFFFFF" strokeWidth="14" />
       <rect x={x0 - 7} y={y0 - 7} width={w + 14} height={h + 14} fill="none" stroke="#D9C3A0" strokeWidth="3" />
