@@ -2069,7 +2069,7 @@ function Fan({ u, mode, a11y }: P) {
 
 /**
  * ガチャガチャ：赤い台に、透明な丸い玉（二色のカプセルがいっぱい。ガラスの厚みと映りこみ）。
- * 台には、クロームのふち・景品の見本つきの表示カード・お金の口・大きなハンドル・とびらつきの取り出し口・横のシール。
+ * 台には、クロームのふち・景品の見本つきの表示カード・お金の口・大きなハンドル・とびらつきの取り出し口。
  * spin のときはハンドルがひと回りしてカプセルがゆれ、capsule のときはカプセルが1つ、ころんと床に転がり出る
  */
 function Gacha({ u, fx, a11y }: P) {
@@ -2106,16 +2106,16 @@ function Gacha({ u, fx, a11y }: P) {
       </defs>
       <FloorShadow cx={58} cy={189} rx={50} ry={5} />
       {/* 足と台 */}
-      <rect x="12" y="177" width="84" height="8" rx="2" fill="#5A0E08" />
+      <path d="M10 177 H98 L101 173.4 V181 L98 185 H10 Z" fill="#5A0E08" />
       <path d="M13 177.6 H95" stroke="#C83A2A" strokeWidth="0.8" />
       {[16, 84].map((x) => <rect key={x} x={x} y="183" width="8" height="4" rx="1" fill="#2A0A06" />)}
-      {/* 本体：右の側面（シール・ねじ） → 前の面（クロームのふち） */}
-      <path d="M94 100 L104 93 L104 172 L94 179 Z" fill={`url(#${g("side")})`} />
-      <path d="M94.4 100.4 L103.6 94" stroke="#E04A3A" strokeWidth="0.8" />
-      <g transform="translate(99 128) skewY(-35) scale(0.55 1)" fill="#FFF7E6" opacity="0.9"><ellipse cx="0" cy="2" rx="4.6" ry="3.6" /><circle cx="-4.6" cy="-3" r="1.7" /><circle cx="-1.6" cy="-5.4" r="1.7" /><circle cx="1.6" cy="-5.4" r="1.7" /><circle cx="4.6" cy="-3" r="1.7" /></g>
-      {[[99, 106], [99, 166]].map(([x, y]) => <circle key={y} cx={x} cy={y} r="1" fill={`url(#${g("chrome")})`} />)}
-      <rect x="12" y="98" width="82" height="80" rx="5" fill={`url(#${g("red")})`} />
-      <rect x="12" y="98" width="82" height="80" rx="5" fill="none" stroke={`url(#${g("chromeH")})`} strokeWidth="2" />
+      {/* 本体：上の面と右の側面（うすい奥ゆき）→ 前の面（クロームのふち） */}
+      <path d="M14 98 L18 93.4 L98 93.4 L94 98 Z" fill="#C42A1E" />
+      <path d="M18 93.6 H98" stroke="#FF8070" strokeWidth="0.7" />
+      <path d="M94 98 L98 93.4 L98 173.4 L94 178 Z" fill={`url(#${g("side")})`} />
+      <path d="M94.3 98.4 L97.7 94.4" stroke="#E04A3A" strokeWidth="0.7" />
+      <rect x="12" y="98" width="82" height="80" rx="3" fill={`url(#${g("red")})`} />
+      <rect x="12" y="98" width="82" height="80" rx="3" fill="none" stroke={`url(#${g("chromeH")})`} strokeWidth="2" />
       <path d="M17 101.4 H89" stroke="#FFFFFF" strokeWidth="0.9" opacity="0.6" />
       <path d="M15.6 106 V170" stroke="#FFFFFF" strokeWidth="1.4" opacity="0.3" strokeLinecap="round" />
       {/* 表示カード：タイトルと、景品の見本（ほね・ボール・王冠） */}
@@ -2180,7 +2180,7 @@ function Gacha({ u, fx, a11y }: P) {
       {/* 映りこみ（窓のかたち）と光 */}
       <path d="M27 42 Q32 26 48 21" stroke="#FFFFFF" strokeWidth="4" fill="none" strokeLinecap="round" opacity="0.85" />
       <path d="M25 54 Q24 49 26 46" stroke="#FFFFFF" strokeWidth="2.2" fill="none" strokeLinecap="round" opacity="0.7" />
-      <g opacity="0.35" transform="translate(66 30) skewY(10)"><rect width="9" height="12" rx="1.4" fill="#FFFFFF" /><path d="M4.5 0 V12 M0 6 H9" stroke="#B8DCEF" strokeWidth="0.8" /></g>
+      <path d="M66 26 Q76 31 80 40" stroke="#FFFFFF" strokeWidth="2.4" fill="none" strokeLinecap="round" opacity="0.5" />
       <path d="M81 76 Q85 67 85 58" stroke="#FFFFFF" strokeWidth="1.6" fill="none" strokeLinecap="round" opacity="0.45" />
       {/* 玉のふた（かぎ穴つき） */}
       <path d="M36 22.6 Q53 9.6 70 22.6 Z" fill={`url(#${g("redV")})`} />
