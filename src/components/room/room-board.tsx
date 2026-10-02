@@ -244,13 +244,10 @@ export function RoomBoard({ children, dark = 0, drop = DEFAULT_DROP, box = "bott
   );
 }
 
-/**
- * 部屋の手前の机（木の天板）。机ごしに部屋をながめる。天板は奥ほど暗く細かい木目、手前のふちに厚み。
- * 夜は部屋と同じように暗くなる。
- */
-export function RoomDesk({ dark = 0, warm = 0 }: { dark?: number; /** 朝夕の色の強さ */ warm?: number }) {
+/** 机の大きさを測る（天板と、その手前に置くものの両方で使う） */
+function useBox(init: { w: number; h: number }) {
   const ref = useRef<HTMLDivElement>(null);
-  const [size, setSize] = useState({ w: 390, h: 340 });
+  const [size, setSize] = useState(init);
   useEffect(() => {
     const el = ref.current;
     if (!el || typeof ResizeObserver === "undefined") return;
@@ -258,60 +255,132 @@ export function RoomDesk({ dark = 0, warm = 0 }: { dark?: number; /** 朝夕の�
     ro.observe(el);
     return () => ro.disconnect();
   }, []);
-  const { w, h } = size;
-  const edge = 22, top = h - edge;
+  return [ref, size] as const;
+}
+/** 机の手前のふちの厚み（px） */
+export const DESK_EDGE = 24;
+
+/** 朝夕の色・夜の暗さ・行事の色を、部屋の明かりの層と同じようにかける */
+function Lighting({ w, h, dark, warm, tint }: { w: number; h: number; dark: number; warm: number; tint?: { tint: string; o: number } | null }) {
   const night = Math.pow(Math.max(0, Math.min(1, dark)), 1.15);
-  // 木目（奥ほど間がつまる横の線。ところどころゆらぐ）
-  const grain = Array.from({ length: 26 }, (_, i) => {
-    const t = i / 25, y = 4 + Math.pow(t, 1.6) * (top - 8);
-    const amp = 0.6 + t * 2.2, ph = i * 1.7;
-    const d = Array.from({ length: 9 }, (_, k) => { const x = (k / 8) * w; return `${k ? "L" : "M"}${x.toFixed(1)} ${(y + Math.sin(ph + k * 0.9) * amp).toFixed(1)}`; }).join(" ");
-    return { d, o: 0.1 + t * 0.12, sw: 0.5 + t * 1.1, dark: i % 3 === 0 };
-  });
-  // マグカップ（右手前）
-  const mx = w * 0.86, my = top - 26;
+  return (
+    <>
+      {warm > 0.02 ? <rect x="0" y="0" width={w} height={h} fill="#FF9A5A" opacity={warm * 0.13} /> : null}
+      {night > 0.02 ? <rect x="0" y="0" width={w} height={h} fill="#0F1438" opacity={0.56 * night} /> : null}
+      {tint ? <rect x="0" y="0" width={w} height={h} fill={tint.tint} opacity={tint.o * 0.55} /> : null}
+    </>
+  );
+}
+
+/**
+ * 部屋の手前の机（木の天板）。机ごしに部屋をながめる。
+ * 木目は、横にのばしたノイズで描く（本物の板のように、細い筋と色むら）。左の窓からの光、奥ほど少し暗く、手前のふちに丸みと厚み。
+ */
+export function RoomDesk({ dark = 0, warm = 0, tint = null }: { dark?: number; /** 朝夕の色の強さ */ warm?: number; /** 行事の色 */ tint?: { tint: string; o: number } | null }) {
+  const [ref, { w, h }] = useBox({ w: 390, h: 340 });
+  const top = h - DESK_EDGE;
   return (
     <div ref={ref} className="pointer-events-none absolute inset-0" aria-hidden="true">
       <svg width={w} height={h} viewBox={`0 0 ${w} ${h}`} className="block">
         <defs>
           <linearGradient id="desk-top" x1="0" y1="0" x2="0" y2="1">
-            <stop offset="0" stopColor="#B88752" />
-            <stop offset="0.5" stopColor="#CFA06A" />
-            <stop offset="1" stopColor="#DDB07A" />
+            <stop offset="0" stopColor="#A87444" />
+            <stop offset="0.35" stopColor="#C38E58" />
+            <stop offset="1" stopColor="#D7A66E" />
+          </linearGradient>
+          {/* 木目：細い筋（横長のノイズ）と、ゆるい色むら */}
+          <filter id="desk-grain" x="0" y="0" width="100%" height="100%">
+            <feTurbulence type="fractalNoise" baseFrequency="0.0035 0.16" numOctaves="3" seed="11" result="n" />
+            <feColorMatrix in="n" type="matrix" values="0 0 0 0 0.36  0 0 0 0 0.2  0 0 0 0 0.08  0 0 0 1.5 -0.62" />
+          </filter>
+          <filter id="desk-blotch" x="0" y="0" width="100%" height="100%">
+            <feTurbulence type="fractalNoise" baseFrequency="0.002 0.02" numOctaves="2" seed="4" result="n" />
+            <feColorMatrix in="n" type="matrix" values="0 0 0 0 0.98  0 0 0 0 0.86  0 0 0 0 0.66  0 0 0 0.9 -0.35" />
+          </filter>
+          <radialGradient id="desk-window" cx="0.1" cy="0.05" r="1">
+            <stop offset="0" stopColor="#FFF4DA" stopOpacity="0.42" />
+            <stop offset="0.6" stopColor="#FFF4DA" stopOpacity="0.08" />
+            <stop offset="1" stopColor="#FFF4DA" stopOpacity="0" />
+          </radialGradient>
+          <linearGradient id="desk-far" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0" stopColor="#3A2210" stopOpacity="0.16" />
+            <stop offset="0.25" stopColor="#3A2210" stopOpacity="0" />
           </linearGradient>
           <linearGradient id="desk-edge" x1="0" y1="0" x2="0" y2="1">
-            <stop offset="0" stopColor="#F0C994" />
-            <stop offset="0.18" stopColor="#B07A44" />
-            <stop offset="1" stopColor="#7A4E26" />
-          </linearGradient>
-          <radialGradient id="desk-light" cx="0.25" cy="0.1" r="0.9">
-            <stop offset="0" stopColor="#FFF6E0" stopOpacity="0.35" />
-            <stop offset="1" stopColor="#FFF6E0" stopOpacity="0" />
-          </radialGradient>
-          <linearGradient id="mug" x1="0" y1="0" x2="1" y2="0">
-            <stop offset="0" stopColor="#D9DEE4" /><stop offset="0.35" stopColor="#FFFFFF" /><stop offset="1" stopColor="#B9C0C9" />
+            <stop offset="0" stopColor="#F3D2A2" />
+            <stop offset="0.12" stopColor="#D2A06A" />
+            <stop offset="0.45" stopColor="#A9743F" />
+            <stop offset="1" stopColor="#6E4421" />
           </linearGradient>
         </defs>
         {/* 天板 */}
         <rect x="0" y="0" width={w} height={top} fill="url(#desk-top)" />
-        {grain.map((g, i) => <path key={i} d={g.d} fill="none" stroke={g.dark ? "#7A4A22" : "#9A6A3A"} strokeOpacity={g.o} strokeWidth={g.sw} />)}
-        <rect x="0" y="0" width={w} height={top} fill="url(#desk-light)" />
-        {/* 奥のふち（部屋の床との境目）：うすい光とかげ */}
-        <rect x="0" y="0" width={w} height="2" fill="#FFE9C4" opacity="0.7" />
-        <rect x="0" y="2" width={w} height="6" fill="#5A3818" opacity="0.08" />
-        {/* 手前のふち（厚み） */}
-        <rect x="0" y={top} width={w} height={edge} fill="url(#desk-edge)" />
-        <rect x="0" y={top} width={w} height="1.5" fill="#FFE3B8" opacity="0.9" />
-        {/* マグカップ */}
-        <ellipse cx={mx} cy={my + 22} rx="20" ry="5" fill="#2A1A0A" opacity="0.25" />
-        <path d={`M${mx + 13} ${my + 2} q 12 0 12 9 q 0 9 -12 9`} fill="none" stroke="#C3C9D1" strokeWidth="4" />
-        <path d={`M${mx - 15} ${my - 6} L${mx - 14} ${my + 18} Q ${mx} ${my + 24} ${mx + 14} ${my + 18} L${mx + 15} ${my - 6} Z`} fill="url(#mug)" />
-        <ellipse cx={mx} cy={my - 6} rx="15" ry="4.5" fill="#6A4022" />
-        <ellipse cx={mx} cy={my - 6} rx="15" ry="4.5" fill="none" stroke="#FFFFFF" strokeWidth="1.4" />
-        <path d={`M${mx - 9} ${my + 6} h 18`} stroke="#E9A0B4" strokeWidth="3" strokeLinecap="round" />
-        {/* 朝夕の色・夜の暗さ（部屋の明かりの層と同じ） */}
-        {warm > 0.02 ? <rect x="0" y="0" width={w} height={h} fill="#FF9A5A" opacity={warm * 0.13} /> : null}
-        {night > 0.02 ? <rect x="0" y="0" width={w} height={h} fill="#0F1438" opacity={0.56 * night} /> : null}
+        <rect x="0" y="0" width={w} height={top} filter="url(#desk-blotch)" opacity="0.35" />
+        <rect x="0" y="0" width={w} height={top} filter="url(#desk-grain)" opacity="0.85" />
+        <rect x="0" y="0" width={w} height={top} fill="url(#desk-window)" />
+        <rect x="0" y="0" width={w} height={top} fill="url(#desk-far)" />
+        {/* 奥のふち（部屋の床とのさかい目） */}
+        <rect x="0" y="0" width={w} height="1.5" fill="#FBE2BC" opacity="0.8" />
+        {/* 手前のふち（丸みと厚み）と、その下のかげ */}
+        <rect x="0" y={top - 3} width={w} height="3" fill="#FFF0D6" opacity="0.35" />
+        <rect x="0" y={top} width={w} height={DESK_EDGE} fill="url(#desk-edge)" />
+        <rect x="0" y={top} width={w} height={DESK_EDGE} filter="url(#desk-grain)" opacity="0.35" />
+        <rect x="0" y={top + 0.5} width={w} height="1.4" fill="#FFF3DC" opacity="0.95" />
+        <Lighting w={w} h={h} dark={dark} warm={warm} tint={tint} />
+      </svg>
+    </div>
+  );
+}
+
+/** 机の上の、ボードより手前に置いたもの（左に多肉植物の鉢、右にコーヒーのマグ） */
+export function RoomDeskFront({ dark = 0, warm = 0 }: { dark?: number; warm?: number }) {
+  const [ref, { w, h }] = useBox({ w: 390, h: 340 });
+  const y = h - DESK_EDGE - 10;
+  const mx = w - 40, px = 38;
+  const night = Math.pow(Math.max(0, Math.min(1, dark)), 1.15);
+  return (
+    <div ref={ref} className="pointer-events-none absolute inset-0" aria-hidden="true">
+      {/* 夜は、置いたものもボードのわくと同じように暗く */}
+      <svg width={w} height={h} viewBox={`0 0 ${w} ${h}`} className="block overflow-visible" style={night > 0.02 || warm > 0.02 ? { filter: `brightness(${1 - night * 0.5}) saturate(${1 - night * 0.25}) sepia(${warm * 0.15})` } : undefined}>
+        <defs>
+          <linearGradient id="mug-body" x1="0" y1="0" x2="1" y2="0">
+            <stop offset="0" stopColor="#C9CFD7" /><stop offset="0.3" stopColor="#FFFFFF" /><stop offset="0.65" stopColor="#F1F3F6" /><stop offset="1" stopColor="#A9B0BA" />
+          </linearGradient>
+          <radialGradient id="coffee" cx="0.4" cy="0.4" r="0.7"><stop offset="0" stopColor="#8A5530" /><stop offset="1" stopColor="#4A2A14" /></radialGradient>
+          <linearGradient id="pot" x1="0" y1="0" x2="1" y2="0">
+            <stop offset="0" stopColor="#B85E3A" /><stop offset="0.35" stopColor="#E08A5E" /><stop offset="1" stopColor="#9A4A2A" />
+          </linearGradient>
+          <radialGradient id="leaf" cx="0.35" cy="0.3" r="0.8"><stop offset="0" stopColor="#B9DDA0" /><stop offset="0.6" stopColor="#7BB068" /><stop offset="1" stopColor="#4E8A4A" /></radialGradient>
+          <filter id="desk-soft" x="-50%" y="-100%" width="200%" height="300%"><feGaussianBlur stdDeviation="3" /></filter>
+        </defs>
+        {/* 多肉植物の鉢 */}
+        <g>
+          <ellipse cx={px + 6} cy={y + 2} rx="24" ry="6" fill="#2A1606" opacity="0.32" filter="url(#desk-soft)" />
+          <path d={`M${px - 16} ${y - 26} L${px + 16} ${y - 26} L${px + 12} ${y} Q ${px} ${y + 4} ${px - 12} ${y} Z`} fill="url(#pot)" />
+          <rect x={px - 18} y={y - 31} width="36" height="7" rx="2.5" fill="#C8704A" />
+          <rect x={px - 18} y={y - 31} width="36" height="2" rx="1" fill="#F2A882" opacity="0.8" />
+          <ellipse cx={px} cy={y - 30} rx="15" ry="3.2" fill="#5A3A22" />
+          {[[-9, -36, -35], [9, -36, 35], [-4, -42, -12], [5, -42, 14], [0, -46, 0], [-12, -32, -60], [12, -32, 60]].map(([dx, dy, r], i) => (
+            <ellipse key={i} cx={px + dx!} cy={y + dy!} rx="5.2" ry="9" transform={`rotate(${r} ${px + dx!} ${y + dy! + 6})`} fill="url(#leaf)" stroke="#4E7A3E" strokeWidth="0.6" />
+          ))}
+        </g>
+        {/* コーヒーのマグ */}
+        <g>
+          <ellipse cx={mx + 6} cy={y + 2} rx="26" ry="6" fill="#2A1606" opacity="0.32" filter="url(#desk-soft)" />
+          <path d={`M${mx + 15} ${y - 26} q 15 0 15 11 q 0 11 -15 11`} fill="none" stroke="#D3D8DF" strokeWidth="5" />
+          <path d={`M${mx + 15} ${y - 26} q 15 0 15 11 q 0 11 -15 11`} fill="none" stroke="#FFFFFF" strokeWidth="1.4" opacity="0.7" />
+          <path d={`M${mx - 17} ${y - 32} L${mx - 16} ${y - 3} Q ${mx} ${y + 3} ${mx + 16} ${y - 3} L${mx + 17} ${y - 32} Z`} fill="url(#mug-body)" />
+          <path d={`M${mx} ${y - 10} C ${mx - 9} ${y - 15}, ${mx - 7} ${y - 22}, ${mx} ${y - 18.5} C ${mx + 7} ${y - 22}, ${mx + 9} ${y - 15}, ${mx} ${y - 10} Z`} fill="#EE8FA8" />
+          <ellipse cx={mx} cy={y - 32} rx="17" ry="4.8" fill="#EEF1F4" />
+          <ellipse cx={mx} cy={y - 31.4} rx="14.5" ry="3.8" fill="url(#coffee)" />
+          <ellipse cx={mx - 4} cy={y - 32.2} rx="5" ry="1.1" fill="#C8956A" opacity="0.6" />
+          {/* 湯気 */}
+          {[-5, 5].map((dx, i) => (
+            <path key={dx} d={`M${mx + dx} ${y - 38} q -5 -8 0 -16 q 5 -8 0 -16`} fill="none" stroke="#FFFFFF" strokeWidth="2.4" strokeLinecap="round" opacity="0.45">
+              <animate attributeName="opacity" values="0;0.55;0" dur="3.6s" begin={`${-i * 1.6}s`} repeatCount="indefinite" />
+            </path>
+          ))}
+        </g>
       </svg>
     </div>
   );

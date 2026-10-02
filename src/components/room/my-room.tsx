@@ -64,8 +64,9 @@ import { composeRoomSnapshot } from "./room-snapshot";
 import { skyAt } from "@/lib/room/sun";
 import { parseRoomWeather, withWeather, type RoomWeather } from "@/lib/room/weather";
 import { EVENT_FLOOR_Y, EventFloor, EventFront } from "./room-events";
-import { dayPhaseOf, FloorBelow, FixtureVisual, fixtureSize, lampsOn, ROOM_STAGE, RoomLighting, RoomScene, ThemeSwatch, windowRectOf, type DayPhase } from "./room-scene";
-import { RoomBoard, RoomDesk } from "./room-board";
+import { dayPhaseOf, FixtureVisual, fixtureSize, lampsOn, ROOM_STAGE, RoomLighting, RoomScene, ThemeSwatch, windowRectOf, type DayPhase } from "./room-scene";
+import { RoomBoard, RoomDesk, RoomDeskFront } from "./room-board";
+import { eventTint } from "./room-events";
 import { DEFAULT_PLACE, locateHere, placeShortName, SkyCard, type RoomPlace } from "./sky-card";
 
 type Tab = DecorKind | "theme";
@@ -200,7 +201,7 @@ async function shrinkImage(file: File, max: number, quality: number): Promise<Bl
   return new Promise((resolve, reject) => canvas.toBlob((b) => (b ? resolve(b) : reject(new Error("encode failed"))), "image/jpeg", quality));
 }
 
-export function MyRoom({ entries, initialLayout, serverReady, dogSkin, dogName, serverNow, steps, stepHistory, visit, guests, stageStyle = "floor" }: {
+export function MyRoom({ entries, initialLayout, serverReady, dogSkin, dogName, serverNow, steps, stepHistory, visit, guests }: {
   entries: DecorEntry[];
   initialLayout: RoomLayout | null;
   serverReady: boolean;
@@ -216,8 +217,6 @@ export function MyRoom({ entries, initialLayout, serverReady, dogSkin, dogName, 
   visit?: VisitState;
   /** 自分の部屋に届いた「いいね」・置き手紙と、あそびに行けるフレンド */
   guests?: { mail: RoomMailItem[]; friends: RoomFriend[] };
-  /** 部屋の手前のつくり（床にボード／机に卓上ボード／大きなボード） */
-  stageStyle?: "floor" | "desk" | "big";
 }) {
   // 家具はだれでも置けるので、持ち物と合わせて「置けるもの」にする
   const validKeys = useMemo(() => new Set([...entries, ...FURNITURE_ENTRIES, ...FIXTURE_ENTRIES].map((e) => e.key)), [entries]);
@@ -384,6 +383,9 @@ export function MyRoom({ entries, initialLayout, serverReady, dogSkin, dogName, 
   const readOnly = !!visit;
   /** ふだんの見る画面（部屋 → 手前の床 → ボード） */
   const stage = !editing && !visit;
+  /** 手前の机にも、部屋と同じ朝夕の色・行事の色をかける */
+  const deskWarm = skyNow.altitude > -8 ? skyNow.warm : 0;
+  const deskTint = roomEvent ? eventTint(roomEvent) : null;
   const commit = useCallback((next: RoomLayout, before: RoomLayout = latest.current) => {
     // フレンドの部屋は見るだけ
     if (readOnly) return;
@@ -860,11 +862,8 @@ export function MyRoom({ entries, initialLayout, serverReady, dogSkin, dogName, 
         ) : (
           // 小さい画面でもボードがつぶれないよう、最低の高さをとる（そのときだけ画面が少しスクロールする）
           <div className="relative z-10 -mt-px min-h-[300px] flex-1">
-            {stageStyle === "desk" ? <RoomDesk dark={1 - skyNow.light} warm={skyNow.altitude > -8 ? skyNow.warm : 0} /> : <FloorBelow theme={layout.theme} now={now} at={place} weather={weather} event={roomEvent} />}
-            <RoomBoard
-              dark={1 - skyNow.light}
-              drop={stageStyle === "desk" ? 16 : undefined}
-              box={stageStyle === "desk" ? "bottom-[calc(env(safe-area-inset-bottom)+28px)] top-[6px] w-[min(80%,400px)]" : stageStyle === "big" ? "bottom-[calc(env(safe-area-inset-bottom)+4px)] top-[-30px] w-[min(98%,480px)]" : undefined}
+            <RoomDesk dark={1 - skyNow.light} warm={deskWarm} tint={deskTint} />
+            <RoomBoard dark={1 - skyNow.light} drop={16} box="bottom-[calc(env(safe-area-inset-bottom)+34px)] top-[8px] w-[min(72%,380px)]"
             >
               <SkyCard
                 now={now} place={place} onPlace={changePlace} weather={weather} steps={steps} history={stepHistory}
@@ -886,6 +885,7 @@ export function MyRoom({ entries, initialLayout, serverReady, dogSkin, dogName, 
               {guests ? <RoomGuests mail={guests.mail} /> : null}
               <p className="pb-1 text-center text-[10px] font-semibold text-ink-faint">{saveLabel}</p>
             </RoomBoard>
+            <RoomDeskFront dark={1 - skyNow.light} warm={deskWarm} />
           </div>
         )}
       </div>
