@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { getCurrentDogSkin } from "@/lib/data/dog-skin";
 import { buildRoomShowcase, getRoomShop } from "@/lib/data/my-room";
 import { checkRateLimit } from "@/lib/rate-limit";
-import { isFurnitureId, isRoomPhotoPath, parseRoomLayout, ROOM_MAX_ITEMS, uploadKey } from "@/lib/room/types";
+import { capToOwned, isRoomPhotoPath, parseRoomLayout, ROOM_MAX_ITEMS, uploadKey } from "@/lib/room/types";
 import type { Json } from "@/lib/supabase/types";
 import { requireUser } from "@/lib/supabase/server";
 
@@ -27,17 +27,10 @@ export async function PUT(request: Request) {
   // アップロードした写真は自分のフォルダのものだけ。外したものに置いていた分も外す
   const photos = parsed.photos.filter((ph) => isRoomPhotoPath(ph.path, user.id));
   const keep = new Set(photos.map((ph) => uploadKey(ph.id)));
-  // 家具は買った数まで（家具のお店がまだ無い環境では、これまでどおり）
+  // 家具・窓・棚などは買った数まで（買う仕組みがまだ無い環境では、これまでどおり）。外した棚に乗せていたものは床に下ろす
   const shop = await getRoomShop(supabase, user.id);
-  const used = new Map<string, number>();
-  const ownsFurniture = (key: string) => {
-    if (!shop.ready || !key.startsWith("furniture:")) return true;
-    const id = key.slice("furniture:".length);
-    const n = (used.get(id) ?? 0) + 1;
-    used.set(id, n);
-    return isFurnitureId(id) && n <= (shop.owned[id] ?? 0);
-  };
-  const layout = { ...parsed, photos, items: parsed.items.filter((p) => (!p.key.startsWith("upload:") || keep.has(p.key)) && ownsFurniture(p.key)) };
+  const kept = parsed.items.filter((p) => !p.key.startsWith("upload:") || keep.has(p.key));
+  const layout = parseRoomLayout({ ...parsed, photos, items: capToOwned(kept, shop), v: 2 });
   // 通信の順番が入れかわって、古い飾り方が新しい飾り方を上書きしないようにする（rev は変えた時刻）
   if (layout.rev) {
     const { data: current } = await supabase.from("user_rooms").select("layout").eq("user_id", user.id).maybeSingle();

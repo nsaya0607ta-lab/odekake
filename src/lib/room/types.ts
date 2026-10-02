@@ -44,24 +44,52 @@ export const furnitureKey = (id: FurnitureId) => `furniture:${id}`;
 /** 1種類あたり持てる数 */
 export const FURNITURE_MAX = 2;
 export const FURNITURE_ENTRIES: DecorEntry[] = FURNITURE_IDS.map((id) => ({ kind: "furniture", key: furnitureKey(id), name: FURNITURE[id].name, furniture: id, count: FURNITURE_MAX }));
-/** 家具の持ち物と、青コインの残高（ready が false なら、まだ買う仕組みが無い環境なので、これまでどおり自由に置ける） */
-export type RoomShop = { ready: boolean; blueCoins: number; owned: Partial<Record<FurnitureId, number>> };
 export const isFurnitureId = (v: unknown): v is FurnitureId => typeof v === "string" && Object.prototype.hasOwnProperty.call(FURNITURE, v);
 
 /**
  * 部屋のつくり（窓・壁の棚・かけ時計・お天気ボード）。ほかの飾りと同じように動かす・大きさを変える・しまうができる。
  * 絵は room-scene.tsx の FixtureVisual で描く
  */
+/** count は1種類あたり持てる数、price は青コインの値段（DB の room_furniture_max / room_furniture_price と同じ値） */
 export const FIXTURES = {
-  window: { name: "窓", count: 2 },
-  shelf: { name: "かべの棚", count: 3 },
-  clock: { name: "かけ時計", count: 1 },
-  weather: { name: "お天気ボード", count: 1 },
+  window: { name: "窓", count: 2, price: 3000 },
+  shelf: { name: "かべの棚", count: 3, price: 1000 },
+  clock: { name: "かけ時計", count: 1, price: 1500 },
+  weather: { name: "お天気ボード", count: 1, price: 2000 },
 } as const;
 export type FixtureId = keyof typeof FIXTURES;
 export const FIXTURE_IDS = Object.keys(FIXTURES) as FixtureId[];
 export const fixtureKey = (id: FixtureId) => `fixture:${id}`;
 export const FIXTURE_ENTRIES: DecorEntry[] = FIXTURE_IDS.map((id) => ({ kind: "fixture", key: fixtureKey(id), name: FIXTURES[id].name, fixture: id, count: FIXTURES[id].count }));
+export const isFixtureId = (v: unknown): v is FixtureId => typeof v === "string" && Object.prototype.hasOwnProperty.call(FIXTURES, v);
+
+/* ---------- 青コインで買うもの（家具と、窓・棚・時計・お天気ボード） ---------- */
+export type ShopId = FurnitureId | FixtureId;
+export const isShopId = (v: unknown): v is ShopId => isFurnitureId(v) || isFixtureId(v);
+export const shopName = (id: ShopId) => (isFixtureId(id) ? FIXTURES[id].name : FURNITURE[id].name);
+export const shopPrice = (id: ShopId): number => (isFixtureId(id) ? FIXTURES[id].price : FURNITURE[id].price);
+/** 1種類あたり持てる数 */
+export const shopMax = (id: ShopId): number => (isFixtureId(id) ? FIXTURES[id].count : FURNITURE_MAX);
+export const shopKey = (id: ShopId) => (isFixtureId(id) ? fixtureKey(id) : furnitureKey(id));
+/** 置いたものの key から、買うものの id（買うものでなければ null） */
+export const shopIdOfKey = (key: string): ShopId | null => {
+  const id = key.startsWith("furniture:") ? key.slice(10) : key.startsWith("fixture:") ? key.slice(8) : null;
+  return isShopId(id) ? id : null;
+};
+/** 持っている数と、青コインの残高（ready が false なら、まだ買う仕組みが無い環境なので、これまでどおり自由に置ける） */
+export type RoomShop = { ready: boolean; blueCoins: number; owned: Partial<Record<ShopId, number>> };
+/** 買う仕組みがあるときは、持っている数をこえて置いたもの（家具・窓・棚など）を外す。図鑑アイテムなど、買うものでないものはそのまま */
+export function capToOwned(items: Placement[], shop: RoomShop | null | undefined): Placement[] {
+  if (!shop?.ready) return items;
+  const used = new Map<ShopId, number>();
+  return items.filter((p) => {
+    const id = shopIdOfKey(p.key);
+    if (!id) return true;
+    const n = (used.get(id) ?? 0) + 1;
+    used.set(id, n);
+    return n <= (shop.owned[id] ?? 0);
+  });
+}
 const isFixtureKey = (key: string) => FIXTURE_IDS.some((id) => fixtureKey(id) === key);
 
 export const FRAME_STYLES = ["wood", "white", "polaroid", "gold"] as const;
