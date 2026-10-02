@@ -37,6 +37,12 @@ export const FURNITURE = {
   "dog-house": { name: "わんこハウス", width: 27, price: 5000 },
   bowl: { name: "ごはん皿", width: 10, price: 800 },
   whiteboard: { name: "ホワイトボード", width: 24, price: 3000 },
+  kotatsu: { name: "こたつ", width: 30, price: 4500 },
+  fishbowl: { name: "金魚ばち", width: 11, price: 2500 },
+  tv: { name: "テレビ", width: 26, price: 5000 },
+  piano: { name: "ピアノ", width: 30, price: 8000 },
+  "rocking-chair": { name: "ゆりいす", width: 17, price: 3500 },
+  toybox: { name: "おもちゃ箱", width: 18, price: 2000 },
 } as const;
 export type FurnitureId = keyof typeof FURNITURE;
 export const FURNITURE_IDS = Object.keys(FURNITURE) as FurnitureId[];
@@ -63,18 +69,18 @@ export const fixtureKey = (id: FixtureId) => `fixture:${id}`;
 export const FIXTURE_ENTRIES: DecorEntry[] = FIXTURE_IDS.map((id) => ({ kind: "fixture", key: fixtureKey(id), name: FIXTURES[id].name, fixture: id, count: FIXTURES[id].count }));
 export const isFixtureId = (v: unknown): v is FixtureId => typeof v === "string" && Object.prototype.hasOwnProperty.call(FIXTURES, v);
 
-/* ---------- 青コインで買うもの（家具と、窓・棚・時計・お天気ボード） ---------- */
-export type ShopId = FurnitureId | FixtureId;
-export const isShopId = (v: unknown): v is ShopId => isFurnitureId(v) || isFixtureId(v);
-export const shopName = (id: ShopId) => (isFixtureId(id) ? FIXTURES[id].name : FURNITURE[id].name);
-export const shopPrice = (id: ShopId): number => (isFixtureId(id) ? FIXTURES[id].price : FURNITURE[id].price);
-/** 1種類あたり持てる数 */
-export const shopMax = (id: ShopId): number => (isFixtureId(id) ? FIXTURES[id].count : FURNITURE_MAX);
-export const shopKey = (id: ShopId) => (isFixtureId(id) ? fixtureKey(id) : furnitureKey(id));
-/** 置いたものの key から、買うものの id（買うものでなければ null） */
+/* ---------- 青コインで買うもの（家具・窓や棚など・もようがえのデザイン） ---------- */
+export type ShopId = FurnitureId | FixtureId | ThemeGoodId;
+export const isShopId = (v: unknown): v is ShopId => isFurnitureId(v) || isFixtureId(v) || isThemeGoodId(v);
+export const shopName = (id: ShopId) => (isFixtureId(id) ? FIXTURES[id].name : isFurnitureId(id) ? FURNITURE[id].name : themeGood(id).name);
+export const shopPrice = (id: ShopId): number => (isFixtureId(id) ? FIXTURES[id].price : isFurnitureId(id) ? FURNITURE[id].price : themeGood(id).price);
+/** 1種類あたり持てる数（もようがえのデザインは1つ） */
+export const shopMax = (id: ShopId): number => (isFixtureId(id) ? FIXTURES[id].count : isFurnitureId(id) ? FURNITURE_MAX : 1);
+export const shopKey = (id: ShopId) => (isFixtureId(id) ? fixtureKey(id) : isFurnitureId(id) ? furnitureKey(id) : `theme:${id}`);
+/** 置いたものの key から、買うものの id（置くもの〈家具・窓や棚など〉でなければ null） */
 export const shopIdOfKey = (key: string): ShopId | null => {
   const id = key.startsWith("furniture:") ? key.slice(10) : key.startsWith("fixture:") ? key.slice(8) : null;
-  return isShopId(id) ? id : null;
+  return isFurnitureId(id) || isFixtureId(id) ? id : null;
 };
 /** 持っている数と、青コインの残高（ready が false なら、まだ買う仕組みが無い環境なので、これまでどおり自由に置ける） */
 export type RoomShop = { ready: boolean; blueCoins: number; owned: Partial<Record<ShopId, number>> };
@@ -145,7 +151,16 @@ export type RoomPhoto = { id: string; path: string; date: string; title: string 
 
 /** v: 2 から窓・棚・時計も items に入る（それより前の部屋は読みこむときに足す） */
 /** rev は最後に変えた時刻（ms）。古い保存が新しい保存を上書きしないよう、くらべるのに使う */
-export type RoomLayout = { theme: RoomTheme; items: Placement[]; photos: RoomPhoto[]; v?: number; rev?: number };
+/** dogName は、わんこにつけた名前（なければ「わんこ」） */
+export type RoomLayout = { theme: RoomTheme; items: Placement[]; photos: RoomPhoto[]; v?: number; rev?: number; dogName?: string };
+/** わんこの名前の長さ（文字） */
+export const DOG_NAME_MAX = 10;
+/** わんこの名前をととのえる（前後の空白・改行・制御文字をとり、長さをそろえる。空なら undefined） */
+export function cleanDogName(v: unknown): string | undefined {
+  if (typeof v !== "string") return undefined;
+  const n = [...v.replace(/[\u0000-\u001f\u007f]/g, "").trim()].slice(0, DOG_NAME_MAX).join("");
+  return n ? n : undefined;
+}
 
 export const DEFAULT_THEME: RoomTheme = { wall: "cream", floor: "wood-light", curtain: "leaf", rug: "round-cream", deco: "garland", style: "standard", room: "cozy" };
 /** 部屋の雰囲気を選んだときに、いっしょに切りかえる壁紙・床・窓など */
@@ -158,6 +173,42 @@ export const ROOM_PRESETS: Record<RoomKind, RoomTheme> = {
   seaside: { room: "seaside", wall: "shiplap", floor: "wood-light", curtain: "sky", rug: "round-navy", deco: "none", style: "round" },
   starry: { room: "starry", wall: "night-stars", floor: "carpet", curtain: "berry", rug: "round-navy", deco: "stars", style: "attic" },
 };
+
+/* ---------- もようがえのデザイン（青コインで買う。いまの標準のデザインは無料） ---------- */
+export const THEME_PARTS = ["room", "style", "wall", "floor", "curtain", "deco", "rug"] as const;
+export type ThemePart = (typeof THEME_PARTS)[number];
+type ThemeValue<P extends ThemePart> = RoomTheme[P];
+export type ThemeGoodId = { [P in ThemePart]: `${P}-${ThemeValue<P>}` }[ThemePart];
+const THEME_OPTIONS: { [P in ThemePart]: readonly ThemeValue<P>[] } = { room: ROOM_KINDS, style: ROOM_STYLES, wall: WALLPAPERS, floor: FLOORS, curtain: CURTAINS, deco: WALL_DECOS, rug: RUGS };
+/** 種類ごとの値段（青コイン）。おへやの雰囲気は、合う壁紙・床・窓などのセット。DB の room_furniture_price と同じ値 */
+export const THEME_PRICES: Record<ThemePart, number> = { room: 6000, style: 2500, wall: 1500, floor: 2000, curtain: 800, deco: 600, rug: 1000 };
+const THEME_PART_NAMES: Record<ThemePart, string> = { room: "おへや", style: "窓の形", wall: "壁紙", floor: "床", curtain: "カーテン", deco: "壁のかざり", rug: "ラグ" };
+export const themeGoodId = <P extends ThemePart>(part: P, value: ThemeValue<P>) => `${part}-${value}` as ThemeGoodId;
+/** 無料のデザイン（いまの標準の部屋のもの・なし） */
+export const isFreeTheme = <P extends ThemePart>(part: P, value: ThemeValue<P>) => value === DEFAULT_THEME[part] || value === "none";
+export const THEME_GOOD_IDS = THEME_PARTS.flatMap((part) => (THEME_OPTIONS[part] as readonly string[]).filter((v) => !isFreeTheme(part, v as never)).map((v) => `${part}-${v}` as ThemeGoodId));
+export function isThemeGoodId(v: unknown): v is ThemeGoodId { return typeof v === "string" && (THEME_GOOD_IDS as readonly string[]).includes(v); }
+export function themeGood(id: ThemeGoodId): { part: ThemePart; value: string; price: number; name: string } {
+  const i = id.indexOf("-"), part = id.slice(0, i) as ThemePart, value = id.slice(i + 1);
+  return { part, value, price: THEME_PRICES[part], name: THEME_PART_NAMES[part] };
+}
+/** おへやの雰囲気を買うと、いっしょにもらえる（無料でない）壁紙・床・窓など */
+export function roomBundle(room: RoomKind): ThemeGoodId[] {
+  const preset = ROOM_PRESETS[room];
+  return (["style", "wall", "floor", "curtain", "deco", "rug"] as const).filter((p) => !isFreeTheme(p, preset[p] as never)).map((p) => `${p}-${preset[p]}` as ThemeGoodId);
+}
+/** 持っていないデザインは、標準のものにもどす（買う仕組みが無い環境では、そのまま） */
+export function ownedTheme(theme: RoomTheme, shop: RoomShop | null | undefined): RoomTheme {
+  if (!shop?.ready) return theme;
+  const next = { ...theme };
+  for (const part of THEME_PARTS) {
+    const v = theme[part];
+    if (isFreeTheme(part, v as never)) continue;
+    if (!shop.owned[`${part}-${v}` as ThemeGoodId]) (next as Record<ThemePart, string>)[part] = DEFAULT_THEME[part];
+  }
+  return next;
+}
+
 export const ROOM_MAX_ITEMS = 120;
 /** アップロードして飾れる写真の数 */
 export const ROOM_MAX_PHOTOS = 40;
@@ -264,7 +315,8 @@ export function parseRoomLayout(value: unknown, validKeys?: ReadonlySet<string>)
       ...(typeof p.on === "string" && p.on.length <= 64 ? { on: p.on, rx: clamp(num(p.rx, 0.5), 0, 1) } : {}),
     }];
   });
-  const rev = typeof root.rev === "number" && Number.isFinite(root.rev) && root.rev > 0 ? { rev: Math.floor(root.rev) } : {};
+  const name = cleanDogName(root.dogName);
+  const rev = { ...(typeof root.rev === "number" && Number.isFinite(root.rev) && root.rev > 0 ? { rev: Math.floor(root.rev) } : {}), ...(name ? { dogName: name } : {}) };
   if (root.v === 2) {
     // 棚がなくなった（しまった）ものは床に下ろす
     const shelfIds = new Set(items.filter((p) => p.key === fixtureKey("shelf")).map((p) => p.id));

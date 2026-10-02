@@ -98,27 +98,34 @@ export function ShootingStars({ rects, active, onWish }: {
 }
 
 /** 窓の外を通る犬の、つぎの1匹（いまは通っていなければ null） */
+type FriendDog = { id: string; name: string; dogName?: string; skin?: (typeof DOG_SKIN_IDS)[number] };
+/** 窓の外を通る犬（フレンドの犬なら、だれの犬か。名前は、タップしたときだけ見せる） */
+export type Passer = WindowPasser & { friend?: { id: string; name: string; dogName?: string } };
+
 export function useWindowPasser({ active, steps, friends }: {
   active: boolean;
   /** きょうの歩数（多いほど、よく通る） */
   steps: number | null | undefined;
   /** あそびに行けるフレンド（ときどき、その犬が通る） */
-  friends: readonly { id: string; name: string }[];
+  friends: readonly FriendDog[];
 }) {
-  const [passer, setPasser] = useState<(WindowPasser & { friendId?: string }) | null>(null);
+  const [passer, setPasser] = useState<Passer | null>(null);
   const [mounted, setMounted] = useState(false);
   useEffect(() => setMounted(true), []);
   // 0歩で 50〜80 秒おき、1万歩で 12〜20 秒おきくらい
   const busy = Math.min(1, Math.max(0, steps ?? 0) / 10000);
-  const friendKey = friends.map((f) => `${f.id}:${f.name}`).join(",");
+  const friendsRef = useRef(friends);
+  friendsRef.current = friends;
+  const friendKey = friends.map((f) => f.id).join(",");
   useEffect(() => {
     if (!active || !mounted) { setPasser(null); return; }
-    const list = friendKey ? friendKey.split(",").map((s) => { const i = s.indexOf(":"); return { id: s.slice(0, i), name: s.slice(i + 1) }; }) : [];
     let t = 0;
     const go = () => {
+      const list = friendsRef.current;
       const friend = list.length && Math.random() < 0.35 ? list[Math.floor(Math.random() * list.length)]! : null;
       const ms = 8000 + Math.random() * 3000;
-      setPasser({ id: Date.now(), src: getFrenchieSrc(DOG_SKIN_IDS[Math.floor(Math.random() * DOG_SKIN_IDS.length)]!, "walk"), dir: Math.random() < 0.5 ? 1 : -1, ms, ...(friend ? { name: [...friend.name].slice(0, 6).join(""), friendId: friend.id } : {}) });
+      const skin = friend?.skin ?? DOG_SKIN_IDS[Math.floor(Math.random() * DOG_SKIN_IDS.length)]!;
+      setPasser({ id: Date.now(), src: getFrenchieSrc(skin, "walk"), dir: Math.random() < 0.5 ? 1 : -1, ms, ...(friend ? { friend: { id: friend.id, name: friend.name, ...(friend.dogName ? { dogName: friend.dogName } : {}) } } : {}) });
       t = window.setTimeout(go, ms + (12000 + (1 - busy) * 38000) * (1 + Math.random() * 0.6));
     };
     t = window.setTimeout(go, 2500 + Math.random() * 3000);
@@ -132,17 +139,38 @@ export function useWindowPasser({ active, steps, friends }: {
   return passer;
 }
 
-/** 通っているのがフレンドの犬のとき、窓をタップするとその部屋へ */
-export function PasserLink({ rects, passer }: { rects: readonly WindowRect[]; passer: (WindowPasser & { friendId?: string }) | null }) {
-  if (!passer?.friendId || !rects.length) return null;
+/** フレンドのわんこの名札（タップしたときだけ出す。もう一度タップでそのフレンドのおへやへ） */
+function DogNameCard({ dogName, owner, href, x, y }: { dogName?: string; owner: string; href: string; x: number; y: number }) {
+  return (
+    <Link href={href} className="room-bubble absolute w-max -translate-x-1/2 -translate-y-full rounded-2xl border border-line bg-card px-3 py-1.5 text-center shadow-md" style={{ left: `${x}%`, top: `${y}%`, zIndex: 2600 }}>
+      <span className="block text-[13px] font-black text-ink">🐾 {dogName ?? "わんこ"}</span>
+      <span className="block text-[10px] font-bold text-ink-soft">{[...owner].slice(0, 8).join("")}さんちの わんこ ・ <span className="text-leaf-deep underline">おへやへ</span></span>
+    </Link>
+  );
+}
+
+/** 通っているのがフレンドの犬のとき、窓をタップすると名札が出る（名札をタップでその部屋へ） */
+export function PasserLink({ rects, passer }: { rects: readonly WindowRect[]; passer: Passer | null }) {
+  const [shown, setShown] = useState<number | null>(null);
+  useEffect(() => {
+    if (shown === null) return;
+    const t = window.setTimeout(() => setShown(null), 4000);
+    return () => window.clearTimeout(t);
+  }, [shown]);
+  const friend = passer?.friend;
+  if (!friend || !rects.length) return null;
   const r = rects[0]!;
   return (
-    <Link
-      href={`/room/visit/${passer.friendId}`}
-      aria-label={`${passer.name}さんの犬が通っています（タップで${passer.name}さんのおへやへ）`}
-      className="absolute"
-      style={{ left: `${r.x0}%`, top: `${r.y0 + (r.y1 - r.y0) * 0.45}%`, width: `${r.x1 - r.x0}%`, height: `${(r.y1 - r.y0) * 0.55}%`, zIndex: 2100 }}
-    />
+    <>
+      <button
+        type="button"
+        aria-label="窓の外を通っているわんこ（タップで名前）"
+        onClick={() => setShown(passer.id)}
+        className="absolute"
+        style={{ left: `${r.x0}%`, top: `${r.y0 + (r.y1 - r.y0) * 0.45}%`, width: `${r.x1 - r.x0}%`, height: `${(r.y1 - r.y0) * 0.55}%`, zIndex: 2100 }}
+      />
+      {shown === passer.id ? <DogNameCard dogName={friend.dogName} owner={friend.name} href={`/room/visit/${friend.id}`} x={(r.x0 + r.x1) / 2} y={r.y0 + (r.y1 - r.y0) * 0.5} /> : null}
+    </>
   );
 }
 
@@ -432,6 +460,143 @@ export function RoomMess({ mess, onClean }: { mess: readonly Mess[]; onClean: (m
         </button>
       ))}
       {poofs.map((m) => <span key={`p${m.id}`} aria-hidden className="room-wish pointer-events-none absolute text-[20px]" style={{ left: `${m.x}%`, top: `${m.y - 3}%`, zIndex: 2500 }}>✨</span>)}
+    </>
+  );
+}
+
+/* ---------- 部屋がちょっとずつよごれる ---------- */
+
+/** ピカピカでいられる、1日あたりの歩数のめやす */
+export const CLEAN_STEPS = 5000;
+
+/**
+ * 部屋のよごれぐあい（0 ピカピカ 〜 1 ほこりだらけ）。きょう・きのう・おとといの歩数から決める（きょうがいちばん効く）。
+ * きょう CLEAN_STEPS 歩あるけば、すぐピカピカ。
+ */
+export function roomDirtOf(history: readonly { date: string; steps: number }[], todaySteps: number | null | undefined, today: string): number {
+  const t = Math.max(todaySteps ?? 0, history.find((d) => d.date === today)?.steps ?? 0);
+  if (t >= CLEAN_STEPS) return 0;
+  const before = [...history].filter((d) => d.date < today).sort((a, b) => (a.date < b.date ? 1 : -1));
+  const score = t * 0.5 + (before[0]?.steps ?? CLEAN_STEPS) * 0.3 + (before[1]?.steps ?? CLEAN_STEPS) * 0.2;
+  return Math.min(1, Math.max(0, 1 - score / CLEAN_STEPS));
+}
+
+/** 床のすみのほこり（わたぼこり）と、天井のすみのクモの巣。タップすると、ピカピカにするヒント */
+export function RoomDust({ dirt, onTap }: { dirt: number; onTap: () => void }) {
+  if (dirt < 0.3) return null;
+  const bunnies = [{ x: 9, y: 62, s: 1 }, { x: 90, y: 64, s: 0.85 }, { x: 6, y: 90, s: 1.2 }, { x: 93, y: 88, s: 1 }].slice(0, dirt > 0.75 ? 4 : dirt > 0.55 ? 3 : 2);
+  return (
+    <>
+      {bunnies.map((b, i) => (
+        <button key={i} type="button" aria-label="ほこり（おさんぽに行くとピカピカになる）" onClick={onTap}
+          className="absolute -translate-x-1/2 -translate-y-full p-0" style={{ left: `${b.x}%`, top: `${b.y}%`, width: `${6 * b.s}%`, zIndex: 300 + Math.round(b.y * 10) }}>
+          <svg viewBox="0 0 40 26" className="block h-auto w-full">
+            <ellipse cx="20" cy="23" rx="16" ry="3" fill="#3A2614" opacity="0.15" />
+            <g fill="#B9B3A6" stroke="#9C9586" strokeWidth="0.6">
+              <circle cx="14" cy="15" r="8" /><circle cx="24" cy="13" r="9" /><circle cx="30" cy="18" r="6" /><circle cx="9" cy="19" r="5" />
+            </g>
+            <path d="M6 12 l-3 -3 M33 10 l3 -4 M20 4 l0 -3 M12 8 l-2 -3" stroke="#9C9586" strokeWidth="0.8" strokeLinecap="round" />
+          </svg>
+        </button>
+      ))}
+      {dirt > 0.7 ? (
+        // 天井の右のすみのクモの巣
+        <svg aria-hidden viewBox="0 0 60 60" className="pointer-events-none absolute right-0 top-0 w-[14%]" style={{ zIndex: 30 }}>
+          <g fill="none" stroke="#FFFFFF" strokeOpacity="0.75" strokeWidth="0.8">
+            {[0, 18, 36, 54, 72, 90].map((a) => <line key={a} x1="60" y1="0" x2={60 - 58 * Math.cos((a * Math.PI) / 180)} y2={58 * Math.sin((a * Math.PI) / 180)} />)}
+            {[14, 26, 38, 50].map((r) => <path key={r} d={`M${60 - r} 0 Q${60 - r * 0.75} ${r * 0.75} 60 ${r}`} />)}
+          </g>
+          <circle cx="40" cy="22" r="2.2" fill="#3A3F47" />
+        </svg>
+      ) : null}
+    </>
+  );
+}
+
+/* ---------- 観葉植物の水やり ---------- */
+
+const PLANT_KEY = "odekake-room-plant";
+export type PlantState = { stage: 0 | 1 | 2 | 3; wilted: boolean; wateredToday: boolean; days: number };
+/** 観葉植物の育ちぐあい（つぼみ・花・しおれ）。家具の絵が読む */
+export const PlantContext = createContext<PlantState | null>(null);
+
+/**
+ * 観葉植物の水やり（この端末に保存）。1日1回あげられる。
+ * この1週間で2日あげるとつぼみ、4日で花、6日で満開。3日以上あげないと、しおれる。
+ */
+export function usePlantCare(today: string) {
+  const [dates, setDates] = useState<string[]>([]);
+  useEffect(() => {
+    try { const raw = JSON.parse(readStore(PLANT_KEY) ?? "[]") as unknown; if (Array.isArray(raw)) setDates(raw.filter((d): d is string => typeof d === "string" && /^\d{4}-\d{2}-\d{2}$/.test(d)).slice(-14)); } catch { /* 読めなければ、まだあげていない */ }
+  }, []);
+  const dayNo = (d: string) => Date.UTC(Number(d.slice(0, 4)), Number(d.slice(5, 7)) - 1, Number(d.slice(8, 10))) / 86_400_000;
+  const t = dayNo(today);
+  const week = dates.filter((d) => t - dayNo(d) < 7 && t - dayNo(d) >= 0).length;
+  const last = dates.length ? Math.max(...dates.map(dayNo)) : null;
+  const state: PlantState = {
+    stage: week >= 6 ? 3 : week >= 4 ? 2 : week >= 2 ? 1 : 0,
+    wilted: last !== null && t - last >= 3,
+    wateredToday: dates.includes(today),
+    days: week,
+  };
+  const water = () => {
+    if (dates.includes(today)) return false;
+    const next = [...dates, today].slice(-14);
+    setDates(next);
+    writeStore(PLANT_KEY, JSON.stringify(next));
+    return true;
+  };
+  return { plant: state, water };
+}
+
+/* ---------- わんこのお泊まり会 ---------- */
+
+/**
+ * 週に1回（土曜の夕方〜日曜の朝）、フレンドのわんこが泊まりにくる。だれが来るかは週ごとに決まる。
+ * 夕方はラグの近くで遊び、夜は自分のわんこのとなりで寝る。タップすると、そのフレンドのおへやへ。
+ */
+export function sleepoverGuest(now: Date, friends: readonly FriendDog[]): { id: string; name: string; dogName?: string; skin: (typeof DOG_SKIN_IDS)[number] } | null {
+  if (!friends.length) return null;
+  const parts = new Intl.DateTimeFormat("en-US", { timeZone: "Asia/Tokyo", year: "numeric", month: "2-digit", day: "2-digit", weekday: "short", hour: "numeric", hourCycle: "h23" }).formatToParts(now);
+  const get = (k: string) => parts.find((p) => p.type === k)?.value ?? "";
+  const wd = get("weekday"), h = Number(get("hour"));
+  const on = (wd === "Sat" && h >= 17) || (wd === "Sun" && h < 9);
+  if (!on) return null;
+  // 土曜の日付で、その週のお客さんを決める
+  const sat = new Date(Date.UTC(Number(get("year")), Number(get("month")) - 1, Number(get("day")) - (wd === "Sun" ? 1 : 0))).toISOString().slice(0, 10);
+  const f = friends[hash(sat) % friends.length]!;
+  return { id: f.id, name: f.name, ...(f.dogName ? { dogName: f.dogName } : {}), skin: f.skin ?? DOG_SKIN_IDS[hash(f.id) % DOG_SKIN_IDS.length]! };
+}
+
+export function GuestDog({ guest, sleeping }: { guest: { id: string; name: string; dogName?: string; skin: (typeof DOG_SKIN_IDS)[number] }; sleeping: boolean }) {
+  // 起きているあいだは、ときどきポーズを変える
+  const [pose, setPose] = useState("sit");
+  const [card, setCard] = useState(false);
+  useEffect(() => {
+    if (sleeping) return;
+    const poses = ["sit", "smile", "sit-side", "wonder", "stand-happy", "sniff"];
+    const t = window.setInterval(() => setPose(poses[Math.floor(Math.random() * poses.length)]!), 3800);
+    return () => window.clearInterval(t);
+  }, [sleeping]);
+  useEffect(() => {
+    if (!card) return;
+    const t = window.setTimeout(() => setCard(false), 4000);
+    return () => window.clearTimeout(t);
+  }, [card]);
+  const x = 64, y = sleeping ? 81 : 78;
+  return (
+    <>
+      {/* 名前は出さない（タップしたときだけ名札） */}
+      <button type="button" onClick={() => setCard(true)} aria-label="おとまりに来ている フレンドのわんこ（タップで名前）"
+        className="absolute block -translate-x-1/2 -translate-y-full p-0" style={{ left: `${x}%`, top: `${y}%`, width: "22%", zIndex: 300 + Math.round(y * 10) }}>
+        <span className="pointer-events-none absolute bottom-[3%] left-1/2 h-[12%] w-[62%] -translate-x-1/2 rounded-[50%] bg-[#4a3520]/20 blur-[2px]" />
+        <span className={`block ${sleeping ? "room-dog-sleep" : "room-dog-idle"}`}>
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src={getFrenchieSrc(guest.skin, sleeping ? "sleep" : pose)} alt="" draggable={false} className="block h-auto w-full select-none" style={{ transform: "scaleX(-1)" }} />
+        </span>
+      </button>
+      {sleeping ? <span className="pointer-events-none absolute animate-pulse text-[11px] font-black text-[#8A8FD8]" style={{ left: `${x + 6}%`, top: `${y - 12}%`, zIndex: 2500 }}>Zzz</span> : null}
+      {card ? <DogNameCard dogName={guest.dogName} owner={guest.name} href={`/room/visit/${guest.id}`} x={x} y={y - 14} /> : null}
     </>
   );
 }
