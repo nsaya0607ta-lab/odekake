@@ -65,7 +65,7 @@ import { skyAt } from "@/lib/room/sun";
 import { parseRoomWeather, withWeather, type RoomWeather } from "@/lib/room/weather";
 import { EVENT_FLOOR_Y, EventFloor, EventFront } from "./room-events";
 import { dayPhaseOf, FixtureVisual, FloorBelow, fixtureSize, lampsOn, ROOM_STAGE, RoomLighting, RoomScene, ThemeSwatch, windowRectOf, type DayPhase } from "./room-scene";
-import { DESK_END, RoomBoard, RoomDesk, RoomDeskFront } from "./room-board";
+import { RoomBoard, RoomDesk, RoomDeskFront } from "./room-board";
 import { eventTint } from "./room-events";
 import { DEFAULT_PLACE, locateHere, placeShortName, SkyCard, type RoomPlace } from "./sky-card";
 
@@ -386,6 +386,16 @@ export function MyRoom({ entries, initialLayout, serverReady, dogSkin, dogName, 
   /** 手前の机にも、部屋と同じ朝夕の色・行事の色をかける */
   const deskWarm = skyNow.altitude > -8 ? skyNow.warm : 0;
   const deskTint = roomEvent ? eventTint(roomEvent) : null;
+  /** ボードが机の上から上へはみ出してよい高さ（机のむこうの床の高さ＋部屋の手前のはし少し） */
+  const stageRef = useRef<HTMLDivElement>(null);
+  const [boardAbove, setBoardAbove] = useState(220);
+  useEffect(() => {
+    const el = stageRef.current;
+    if (!el || typeof ResizeObserver === "undefined") return;
+    const ro = new ResizeObserver(() => { const hgt = el.getBoundingClientRect().height; setBoardAbove(Math.max(80, Math.round(hgt - Math.min(184, Math.max(132, hgt * 0.4)) + 26))); });
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, [stage]);
   const commit = useCallback((next: RoomLayout, before: RoomLayout = latest.current) => {
     // フレンドの部屋は見るだけ
     if (readOnly) return;
@@ -861,12 +871,13 @@ export function MyRoom({ entries, initialLayout, serverReady, dogSkin, dogName, 
           <VisitPanel visit={visit} dogName={dogName} liked={visitLike.liked} likeCount={visitLike.likeCount} likeBusy={visitLike.busy} onLike={() => void visitLike.toggleLike()} />
         ) : (
           // 小さい画面でもボードがつぶれないよう、最低の高さをとる（そのときだけ画面が少しスクロールする）
-          <div className="relative z-10 -mt-px min-h-[300px] flex-1">
+          <div ref={stageRef} className="relative z-10 -mt-px min-h-[300px] flex-1">
             <FloorBelow theme={layout.theme} now={now} at={place} weather={weather} event={roomEvent} />
             <RoomDesk dark={1 - skyNow.light} warm={deskWarm} tint={deskTint} />
             {/* ボードは机の天板の上（手前のふちより上）なら、好きなところに置けて大きさも変えられる */}
-            <div className="absolute left-0 top-[-20px] bottom-[calc(env(safe-area-inset-bottom)+30px)]" style={{ right: `${(1 - DESK_END) * 100}%` }}>
-            <RoomBoard dark={1 - skyNow.light} drop={16} place={layout.board} onPlace={(board) => commit({ ...latest.current, board })}>
+            {/* ボードの足もとは机の天板の上。上は奥の床の前にそびえる（部屋の手前のはしまで） */}
+            <div className="absolute inset-x-0 bottom-[calc(env(safe-area-inset-bottom)+26px)]" style={{ height: "calc(clamp(132px, 40%, 184px) - 30px)" }}>
+            <RoomBoard dark={1 - skyNow.light} drop={16} place={layout.board} onPlace={(board) => commit({ ...latest.current, board })} above={boardAbove}>
               <SkyCard
                 now={now} place={place} onPlace={changePlace} weather={weather} steps={steps} history={stepHistory}
                 // ボードの面の高さいっぱい

@@ -13,7 +13,6 @@
  * 夜は、わくと脚は部屋と同じように暗く、面だけは映した光で明るいまま（床にうすく光がこぼれる）。
  */
 import { useEffect, useRef, useState, type ReactNode } from "react";
-import { ROOM } from "@/lib/room/types";
 
 /** 立てる向き（右のはしを奥へ回す角度・うしろへのもたれ、度）。いまは正面向き */
 const TURN = 0, LEAN = 0;
@@ -32,7 +31,7 @@ const pts = (ps: [number, number][]) => ps.map((p) => `${p[0].toFixed(1)},${p[1]
 
 /** ボードの置き場所（机の上での位置と大きさ）。x は中心、y は足もと（どちらも机の領域の 0〜1）、w は幅（机の幅に対する割合） */
 export type BoardPlace = { x: number; y: number; w: number; /** 高さ ÷ 幅（脚まで）。なければ ASPECT */ a?: number };
-export const DEFAULT_BOARD: BoardPlace = { x: 0.52, y: 0.93, w: 0.86 };
+export const DEFAULT_BOARD: BoardPlace = { x: 0.5, y: 0.6, w: 0.74, a: 1 };
 /** ボード（脚まで）の 高さ ÷ 幅 */
 const ASPECT = 1.02;
 /** 横長〜縦長の、えらべる はば（高さ ÷ 幅） */
@@ -43,7 +42,7 @@ const clampN = (v: number, lo: number, hi: number) => Math.min(hi, Math.max(lo, 
  * 机の上のボード。わく・ペン置き・上の留め具をつかんで好きなところへ動かせ、右下のつまみで大きさを変えられる。
  * 映す面の中は、ふつうにさわる・スクロールできる。
  */
-export function RoomBoard({ children, dark = 0, drop = DEFAULT_DROP, place = DEFAULT_BOARD, onPlace }: {
+export function RoomBoard({ children, dark = 0, drop = DEFAULT_DROP, place = DEFAULT_BOARD, onPlace, above = 0 }: {
   children: ReactNode;
   /** 夜の暗さ（0〜1） */
   dark?: number;
@@ -52,6 +51,8 @@ export function RoomBoard({ children, dark = 0, drop = DEFAULT_DROP, place = DEF
   place?: BoardPlace;
   /** 動かす・大きさを変えるのを終えたとき */
   onPlace?: (p: BoardPlace) => void;
+  /** 置ける領域（机の天板）より上に、ボードがはみ出してよい高さ（px）。机に立てたボードは、奥の床の前にそびえる */
+  above?: number;
 }) {
   const DROP = drop;
   // 置ける領域（机）の大きさ
@@ -72,10 +73,11 @@ export function RoomBoard({ children, dark = 0, drop = DEFAULT_DROP, place = DEF
     const a0 = clampN(p.a ?? ASPECT, ASPECT_MIN, ASPECT_MAX);
     const wf = clampN(p.w, 0.3, 0.98);
     // 高さは机の領域の 1.15 倍まで（はみ出すぶんは幅をそのままに、高さをちぢめる）
-    const a = Math.min(a0, (area.h * 1.15) / (wf * area.w));
+    const a = Math.min(a0, (area.h + above) / (wf * area.w));
     const bwpx = wf * area.w, bhpx = bwpx * a;
     const x = clampN(p.x, (bwpx * 0.42) / area.w, 1 - (bwpx * 0.42) / area.w);
-    const y = clampN(p.y, Math.min(1, (bhpx * 0.85) / area.h), 1);
+    // 足もとは机の天板の上（奥のふちから手前のふちまで）。上は above まではみ出してよい
+    const y = clampN(p.y, Math.max(above > 0 ? 0.12 : 0, Math.min(1, (bhpx - above) / area.h)), 1);
     return { x, y, w: wf, a };
   };
   const pl = fit(live ?? place);
@@ -362,54 +364,46 @@ function Lighting({ w, h, dark, warm, tint }: { w: number; h: number; dark: numb
  * 部屋の手前の机（木の天板）。机ごしに部屋をながめる。
  * 木目は、横にのばしたノイズで描く（本物の板のように、細い筋と色むら）。左の窓からの光、奥ほど少し暗く、手前のふちに丸みと厚み。
  */
-/** 机が部屋の手前の床にかぶるぶん（px）と、机の右のはし（幅の割合） */
-export const DESK_OVERLAP = 34, DESK_END = 0.84;
-
+/**
+ * 手前の机（自分が座っている机の天板）。画面の下のほうに、浅い奥行きで見える。
+ * 天板は遠近感どおり、奥ほど木目がつまって細かく、奥のふちは細い光の線、手前のふちに丸みと厚み。
+ * 机のむこうには部屋の床が続き（FloorBelow）、ボードは机に立って床の前にそびえる。
+ */
 export function RoomDesk({ dark = 0, warm = 0, tint = null }: { dark?: number; /** 朝夕の色の強さ */ warm?: number; /** 行事の色 */ tint?: { tint: string; o: number } | null }) {
-  const [ref, { w, h }] = useBox({ w: 390, h: 370 });
+  const [ref, { w, h }] = useBox({ w: 390, h: 160 });
   const top = h - DESK_EDGE;
-  // 部屋の床の板の線が集まる点（机の座標）。部屋の外わくの高さは 幅 × ROOM.aspect で、
-  // 消える点はそのわくの上から 17% のあたり（room-scene の Floor と同じ遠近感）
-  const frameH = w * ROOM.aspect;
-  const vp = { x: w / 2, y: -(frameH * 0.83 - DESK_OVERLAP) };
-  const xr = w * DESK_END;
-  /** 机の右のはしの線（奥のかどから手前へ、床の板の線と同じ向き）の、高さ y での x */
-  const edgeX = (y: number) => xr + ((xr - vp.x) / (0 - vp.y)) * y;
-  const r = 14;
-  const topPath = `M-4 0 L${(xr - r).toFixed(1)} 0 Q ${xr.toFixed(1)} 0 ${edgeX(r * 0.75).toFixed(1)} ${(r * 0.75).toFixed(1)} L${edgeX(top).toFixed(1)} ${top} L-4 ${top} Z`;
-  const frontPath = `M-4 ${top} L${edgeX(top).toFixed(1)} ${top} L${(edgeX(top) - 1).toFixed(1)} ${h} L-4 ${h} Z`;
-  // 机の右の床に落ちるかげ（はしの線にそって、手前ほど広く）
-  const shadow = `M${edgeX(r).toFixed(1)} ${r} L${edgeX(h).toFixed(1)} ${h} L${(edgeX(h) + 38).toFixed(1)} ${h} L${(edgeX(r) + 8).toFixed(1)} ${r} Z`;
+  // 奥 → 手前の、遠近感のある位置（0〜1 を天板の y に）
+  const depthY = (t: number) => Math.pow(t, 1.7) * top;
+  const bands = Array.from({ length: 7 }, (_, i) => ({ y0: depthY(i / 7), y1: depthY((i + 1) / 7), s: 0.28 + 0.72 * ((i + 0.5) / 7) }));
+  const lines = Array.from({ length: 22 }, (_, i) => { const t = (i + 0.5) / 22, y = depthY(t); return { y, o: 0.06 + t * 0.12, sw: 0.4 + t * 1.1, wob: 0.4 + t * 1.8, ph: i * 1.9 }; });
   return (
-    <div ref={ref} className="pointer-events-none absolute inset-x-0 bottom-0" style={{ top: -DESK_OVERLAP }} aria-hidden="true">
+    <div ref={ref} className="pointer-events-none absolute inset-x-0 bottom-0" style={{ height: "clamp(132px, 40%, 184px)" }} aria-hidden="true">
+      {/* 机のむこうの床：机に近いほど少し暗い（机の下のかげ） */}
+      <div className="absolute inset-x-0 -top-7 h-7 bg-gradient-to-b from-transparent to-[#1E1206]/20" />
       <svg width={w} height={h} viewBox={`0 0 ${w} ${h}`} className="block">
         <defs>
-          <clipPath id="desk-shape"><path d={topPath} /><path d={frontPath} /></clipPath>
-          <clipPath id="desk-top-clip"><path d={topPath} /></clipPath>
           <linearGradient id="desk-top" x1="0" y1="0" x2="0" y2="1">
-            <stop offset="0" stopColor="#A87444" />
-            <stop offset="0.35" stopColor="#C38E58" />
-            <stop offset="1" stopColor="#D7A66E" />
+            <stop offset="0" stopColor="#B07B48" />
+            <stop offset="0.5" stopColor="#C8945D" />
+            <stop offset="1" stopColor="#D9A970" />
           </linearGradient>
-          {/* 木目：細い筋（横長のノイズ）と、ゆるい色むら */}
           <filter id="desk-grain" x="0" y="0" width="100%" height="100%">
-            <feTurbulence type="fractalNoise" baseFrequency="0.0035 0.16" numOctaves="3" seed="11" result="n" />
+            <feTurbulence type="fractalNoise" baseFrequency="0.004 0.13" numOctaves="3" seed="11" result="n" />
             <feColorMatrix in="n" type="matrix" values="0 0 0 0 0.36  0 0 0 0 0.2  0 0 0 0 0.08  0 0 0 1.5 -0.62" />
           </filter>
           <filter id="desk-blotch" x="0" y="0" width="100%" height="100%">
-            <feTurbulence type="fractalNoise" baseFrequency="0.002 0.02" numOctaves="2" seed="4" result="n" />
+            <feTurbulence type="fractalNoise" baseFrequency="0.003 0.03" numOctaves="2" seed="4" result="n" />
             <feColorMatrix in="n" type="matrix" values="0 0 0 0 0.98  0 0 0 0 0.86  0 0 0 0 0.66  0 0 0 0.9 -0.35" />
           </filter>
-          <filter id="desk-shadow-blur" x="-40%" y="-10%" width="180%" height="120%"><feGaussianBlur stdDeviation="9" /></filter>
-          <filter id="desk-lip-blur" x="-5%" y="-200%" width="110%" height="500%"><feGaussianBlur stdDeviation="3.5" /></filter>
-          <radialGradient id="desk-window" cx="0.1" cy="0.05" r="1">
-            <stop offset="0" stopColor="#FFF4DA" stopOpacity="0.42" />
-            <stop offset="0.6" stopColor="#FFF4DA" stopOpacity="0.08" />
+          <linearGradient id="desk-gloss" x1="0" y1="0" x2="1" y2="0">
+            <stop offset="0" stopColor="#FFF4DA" stopOpacity="0" />
+            <stop offset="0.15" stopColor="#FFF4DA" stopOpacity="0.35" />
+            <stop offset="0.45" stopColor="#FFF4DA" stopOpacity="0.08" />
             <stop offset="1" stopColor="#FFF4DA" stopOpacity="0" />
-          </radialGradient>
+          </linearGradient>
           <linearGradient id="desk-far" x1="0" y1="0" x2="0" y2="1">
-            <stop offset="0" stopColor="#3A2210" stopOpacity="0.14" />
-            <stop offset="0.2" stopColor="#3A2210" stopOpacity="0" />
+            <stop offset="0" stopColor="#3A2210" stopOpacity="0.22" />
+            <stop offset="0.35" stopColor="#3A2210" stopOpacity="0" />
           </linearGradient>
           <linearGradient id="desk-edge" x1="0" y1="0" x2="0" y2="1">
             <stop offset="0" stopColor="#F3D2A2" />
@@ -417,31 +411,33 @@ export function RoomDesk({ dark = 0, warm = 0, tint = null }: { dark?: number; /
             <stop offset="0.45" stopColor="#A9743F" />
             <stop offset="1" stopColor="#6E4421" />
           </linearGradient>
+          {bands.map((b, i) => <clipPath key={i} id={`desk-band-${i}`}><rect x="0" y={b.y0} width={w} height={b.y1 - b.y0 + 0.5} /></clipPath>)}
         </defs>
-        {/* 机のむこうの床に落ちるかげ（奥のふちのすぐ上と、右のはしの横） */}
-        <rect x="-4" y="-6" width={xr} height="12" fill="#1E1206" opacity="0.22" filter="url(#desk-lip-blur)" />
-        <path d={shadow} fill="#1E1206" opacity="0.34" filter="url(#desk-shadow-blur)" />
         {/* 天板 */}
-        <g clipPath="url(#desk-top-clip)">
-          <rect x="0" y="0" width={w} height={top} fill="url(#desk-top)" />
-          <rect x="0" y="0" width={w} height={top} filter="url(#desk-blotch)" opacity="0.35" />
-          <rect x="0" y="0" width={w} height={top} filter="url(#desk-grain)" opacity="0.85" />
-          <rect x="0" y="0" width={w} height={top} fill="url(#desk-window)" />
-          <rect x="0" y="0" width={w} height={top} fill="url(#desk-far)" />
-        </g>
-        {/* 奥のふち・右のはしの丸み（光が当たる）と、右のはしの内がわのかげ */}
-        <path d={`M-4 0.8 L${(xr - r).toFixed(1)} 0.8 Q ${(xr - 0.8).toFixed(1)} 0.8 ${(edgeX(r * 0.75) - 0.8).toFixed(1)} ${(r * 0.75).toFixed(1)}`} fill="none" stroke="#FFE7C2" strokeWidth="1.6" opacity="0.9" />
-        <path d={`M${(edgeX(r * 0.75) - 1).toFixed(1)} ${(r * 0.75).toFixed(1)} L${(edgeX(top) - 1).toFixed(1)} ${top}`} fill="none" stroke="#FFE7C2" strokeWidth="1.4" opacity="0.7" />
-        <path d={`M${(edgeX(r) - 7).toFixed(1)} ${r} L${(edgeX(top) - 10).toFixed(1)} ${top}`} fill="none" stroke="#5A3818" strokeWidth="10" opacity="0.08" />
+        <rect x="0" y="0" width={w} height={top} fill="url(#desk-top)" />
+        {/* 木目のノイズは、奥の帯ほど縦にちぢめて描く（遠近感） */}
+        {bands.map((b, i) => (
+          <g key={i} clipPath={`url(#desk-band-${i})`}>
+            <g transform={`translate(0 ${b.y0}) scale(1 ${b.s})`}>
+              <rect x="0" y="0" width={w} height={(b.y1 - b.y0) / b.s + 2} filter="url(#desk-blotch)" opacity="0.3" />
+              <rect x="0" y="0" width={w} height={(b.y1 - b.y0) / b.s + 2} filter="url(#desk-grain)" opacity="0.8" />
+            </g>
+          </g>
+        ))}
+        {lines.map((l, i) => (
+          <path key={i} d={Array.from({ length: 9 }, (_, k) => `${k ? "L" : "M"}${((k / 8) * w).toFixed(1)} ${(l.y + Math.sin(l.ph + k * 0.8) * l.wob).toFixed(1)}`).join(" ")} fill="none" stroke="#7A4A22" strokeOpacity={l.o} strokeWidth={l.sw} />
+        ))}
+        {/* 窓からの光の映りこみ（奥の左に、横長に）と、奥ほど少し暗く */}
+        <ellipse cx={w * 0.26} cy={depthY(0.3)} rx={w * 0.34} ry={top * 0.16} fill="url(#desk-gloss)" />
+        <rect x="0" y="0" width={w} height={top} fill="url(#desk-far)" />
+        {/* 奥のふち（丸めた角に光が当たる） */}
+        <rect x="0" y="0" width={w} height="1.6" fill="#FFE6BE" opacity="0.95" />
+        <rect x="0" y="1.6" width={w} height="1.2" fill="#6A4020" opacity="0.25" />
         {/* 手前のふち（丸みと厚み） */}
-        <path d={frontPath} fill="url(#desk-edge)" />
-        <g clipPath="url(#desk-shape)">
-          <rect x="0" y={top} width={w} height={DESK_EDGE} filter="url(#desk-grain)" opacity="0.35" />
-          <rect x="0" y={top - 3} width={w} height="3" fill="#FFF0D6" opacity="0.35" />
-          <rect x="0" y={top + 0.5} width={w} height="1.4" fill="#FFF3DC" opacity="0.95" />
-          {/* 朝夕の色・夜の暗さ・行事の色（机の形の中だけ。まわりの床は床の層がかける） */}
-          <Lighting w={w} h={h} dark={dark} warm={warm} tint={tint} />
-        </g>
+        <rect x="0" y={top - 3} width={w} height="3" fill="#FFF0D6" opacity="0.35" />
+        <rect x="0" y={top} width={w} height={DESK_EDGE} fill="url(#desk-edge)" />
+        <rect x="0" y={top + 0.5} width={w} height="1.4" fill="#FFF3DC" opacity="0.95" />
+        <Lighting w={w} h={h} dark={dark} warm={warm} tint={tint} />
       </svg>
     </div>
   );
@@ -449,12 +445,12 @@ export function RoomDesk({ dark = 0, warm = 0, tint = null }: { dark?: number; /
 
 /** 机の上の、ボードより手前に置いたもの（左に多肉植物の鉢、右にコーヒーのマグ） */
 export function RoomDeskFront({ dark = 0, warm = 0 }: { dark?: number; warm?: number }) {
-  const [ref, { w, h }] = useBox({ w: 390, h: 340 });
+  const [ref, { w, h }] = useBox({ w: 390, h: 160 });
   const y = h - DESK_EDGE - 10;
-  const mx = w * DESK_END - 44, px = 38;
+  const mx = w - 46, px = 36;
   const night = Math.pow(Math.max(0, Math.min(1, dark)), 1.15);
   return (
-    <div ref={ref} className="pointer-events-none absolute inset-0" aria-hidden="true">
+    <div ref={ref} className="pointer-events-none absolute inset-x-0 bottom-0" style={{ height: "clamp(132px, 40%, 184px)" }} aria-hidden="true">
       {/* 夜は、置いたものもボードのわくと同じように暗く */}
       <svg width={w} height={h} viewBox={`0 0 ${w} ${h}`} className="block overflow-visible" style={night > 0.02 || warm > 0.02 ? { filter: `brightness(${1 - night * 0.5}) saturate(${1 - night * 0.25}) sepia(${warm * 0.15})` } : undefined}>
         <defs>
