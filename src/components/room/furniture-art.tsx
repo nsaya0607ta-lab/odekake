@@ -6,9 +6,9 @@
  * 布・木・陶器それぞれの質感（ぬいめ・木目・つや）を描きこむ。
  * 同じ家具を2つ置いてもグラデーションの id がぶつからないよう、useId で id を分ける。
  */
-import { useId } from "react";
+import { useContext, useId } from "react";
 import type { FurnitureId } from "@/lib/room/types";
-import { WhiteboardDoodles } from "./room-gimmicks";
+import { PlantContext, WhiteboardDoodles } from "./room-gimmicks";
 
 const SVG_CLASS = "pointer-events-none block h-auto w-full";
 
@@ -217,9 +217,14 @@ function DogBed({ u, a11y }: P) {
 
 function Plant({ u, a11y }: P) {
   const g = (n: string) => `${u}-${n}`;
+  // 水やりの育ちぐあい（つぼみ → 花 → 満開。あげないと しおれる）
+  const care = useContext(PlantContext);
+  const wilted = care?.wilted ?? false, stage = wilted ? 0 : care?.stage ?? 0;
+  const droop = wilted ? 1.35 : 1;
   const leaves: [number, number, number, number][] = [[-48, 0, 1.05, 0], [-20, -8, 1.15, 1], [10, -10, 1.2, 0], [38, 0, 1.05, 1], [-34, 22, 0.85, 1], [28, 22, 0.85, 0], [0, 6, 0.9, 1]];
+  const flowers: [number, number][] = [[46, 30], [76, 22], [60, 12], [32, 48], [88, 44]];
   return (
-    <svg viewBox="0 0 120 190" className={SVG_CLASS} {...a11y}>
+    <svg viewBox="0 0 120 190" className={SVG_CLASS} style={wilted ? { filter: "saturate(.45) sepia(.35) brightness(.95)" } : undefined} {...a11y}>
       <defs>
         <Blur />
         <linearGradient id={g("leafA")} x1="0" y1="0" x2="1" y2="1"><stop offset="0" stopColor="#8CCB74" /><stop offset="1" stopColor="#3F8A47" /></linearGradient>
@@ -228,7 +233,7 @@ function Plant({ u, a11y }: P) {
       </defs>
       <FloorShadow cx={60} cy={182} rx={34} ry={6} />
       {leaves.map(([rot, dy, sc, k], i) => (
-        <g key={i} transform={`translate(60 ${112 + dy}) rotate(${rot}) scale(${sc})`}>
+        <g key={i} transform={`translate(60 ${112 + dy}) rotate(${rot * droop + (wilted ? (rot < 0 ? -18 : 18) : 0)}) scale(${sc * (wilted ? 0.92 : 1)})`}>
           <path d="M0 0 Q-2 -30 0 -52" stroke="#4A7E3A" strokeWidth="2.4" fill="none" />
           <path d="M0 -40 C -26 -46, -30 -84, 0 -96 C 30 -84, 26 -46, 0 -40 Z" fill={`url(#${g(k ? "leafB" : "leafA")})`} />
           {/* モンステラの切れこみ */}
@@ -237,6 +242,19 @@ function Plant({ u, a11y }: P) {
           <path d="M-14 -50 C -8 -60, -6 -78, -2 -88" stroke="#FFFFFF" strokeOpacity="0.25" strokeWidth="2" fill="none" />
         </g>
       ))}
+      {/* つぼみ・花（水やりの日数で ふえる） */}
+      {stage > 0 ? flowers.slice(0, stage === 1 ? 3 : 5).map(([fx, fy], i) => (
+        stage === 1 ? (
+          <g key={i}><path d={`M${fx} ${fy + 10} q-1 -6 0 -10`} stroke="#4A7E3A" strokeWidth="1.6" fill="none" /><ellipse cx={fx} cy={fy} rx="3.6" ry="5" fill="#F7A8C0" stroke="#D97894" strokeWidth="0.8" /></g>
+        ) : (
+          <g key={i} transform={`translate(${fx} ${fy}) scale(${stage === 3 ? 1.15 : 0.85})`}>
+            {[0, 72, 144, 216, 288].map((a) => <ellipse key={a} cx="0" cy="-5.5" rx="3.6" ry="5.4" fill={i % 2 ? "#FFD6E2" : "#FFC1D3"} stroke="#E68AA6" strokeWidth="0.6" transform={`rotate(${a})`} />)}
+            <circle r="2.8" fill="#FFD25A" />
+          </g>
+        )
+      )) : null}
+      {/* しおれた葉が、はちのまわりに落ちている */}
+      {wilted ? <g fill="#B49A5E"><ellipse cx="22" cy="180" rx="7" ry="2.4" transform="rotate(-12 22 180)" /><ellipse cx="98" cy="181" rx="6" ry="2.2" transform="rotate(10 98 181)" /></g> : null}
       {/* はち */}
       <path d="M30 120 L90 120 L83 178 Q60 184 37 178 Z" fill={`url(#${g("pot")})`} />
       <rect x="26" y="114" width="68" height="12" rx="5" fill="#FFFFFF" />

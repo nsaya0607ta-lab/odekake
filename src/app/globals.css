@@ -4398,6 +4398,8 @@
 }
 /* わんこのおへやの犬：歩くと弾み、止まると息をし、寝るとゆっくり上下し、なでると跳ねる */
 @keyframes room-dog-walk { 0%, 100% { transform: translateY(0) rotate(0deg); } 25% { transform: translateY(-4%) rotate(-1.5deg); } 50% { transform: translateY(0) rotate(0deg); } 75% { transform: translateY(-4%) rotate(1.5deg); } }
+@keyframes room-puff { 0% { transform: scale(.2); opacity: 0; } 20% { opacity: .85; } 100% { transform: scale(1.6) translateY(-30%); opacity: 0; } }
+.room-puff { background: radial-gradient(circle at 40% 40%, rgba(186,222,120,.9), rgba(150,196,90,.55) 45%, rgba(150,196,90,0) 70%); animation: room-puff 2.2s ease-out both; }
 @keyframes room-dog-shiver { 0%, 100% { transform: translateX(0); } 25% { transform: translateX(-1.6%); } 75% { transform: translateX(1.6%); } }
 .room-dog-shiver { animation: room-dog-shiver 0.14s linear infinite; }
 @keyframes room-dog-idle { 0%, 100% { transform: scaleY(1); } 50% { transform: scaleY(1.025); } }

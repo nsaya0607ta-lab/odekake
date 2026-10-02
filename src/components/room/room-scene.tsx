@@ -488,7 +488,11 @@ function Cloud({ x, y, s, fill }: { x: number; y: number; s: number; fill: strin
 /** 窓の外を通る犬（id ごとに1回、左右のはしからはしへ歩く） */
 export type WindowPasser = { id: number; src: string; dir: 1 | -1; ms: number; name?: string };
 
-function Window({ sky, curtain, season, weather, style, passer = null }: { sky: SkyState; curtain: string; season: Season; weather: RoomWeather | null; style: RoomStyle; passer?: WindowPasser | null }) {
+function Window({ sky, curtain, season, weather, style, passer = null, grime = 0 }: {
+  sky: SkyState; curtain: string; season: Season; weather: RoomWeather | null; style: RoomStyle; passer?: WindowPasser | null;
+  /** ガラスのくもり・よごれ（0 ピカピカ 〜 1 まっくもり）。おさんぽをさぼると、くもっていく */
+  grime?: number;
+}) {
   const win = windowOf(style);
   const x0 = px(win.x0), x1 = px(win.x1), y0 = py(win.y0), y1 = py(win.y1);
   const w = x1 - x0, h = y1 - y0;
@@ -632,6 +636,26 @@ function Window({ sky, curtain, season, weather, style, passer = null }: { sky: 
         })() : null}
       </g>
       <path d={shape} fill="url(#room-glass)" opacity={night ? 0.35 : 1} />
+      {/* ガラスのくもり・指のあと・ほこり（おさんぽをさぼるほど） */}
+      {grime > 0.05 ? (
+        <g clipPath="url(#room-window-clip)" opacity={Math.min(1, grime) * (night ? 0.6 : 1)}>
+          <rect x={x0} y={y0} width={w} height={h} fill="#D9D6CC" opacity="0.6" />
+          {[[0.22, 0.3, 0.2], [0.7, 0.62, 0.26], [0.45, 0.85, 0.18], [0.84, 0.2, 0.14]].map(([sx, sy, r], i) => (
+            <ellipse key={i} cx={x0 + w * sx!} cy={y0 + h * sy!} rx={w * r!} ry={h * r! * 0.6} fill="#B3AB97" opacity="0.5" />
+          ))}
+          {/* わんこの鼻のあと（下のほうに、ぽんぽん） */}
+          {[0.3, 0.38, 0.62].map((sx, i) => <ellipse key={`n${i}`} cx={x0 + w * sx} cy={y1 - h * (0.12 + (i % 2) * 0.05)} rx="9" ry="6" fill="#A39C8A" opacity="0.4" />)}
+          {Array.from({ length: 26 }, (_, i) => <circle key={`d${i}`} cx={x0 + w * (((i * 37) % 97) / 97)} cy={y0 + h * (((i * 53) % 89) / 89)} r={i % 3 ? 1.4 : 2.2} fill="#8E8775" opacity="0.5" />)}
+        </g>
+      ) : null}
+      {/* ピカピカのときは、ガラスがきらっと光る */}
+      {grime <= 0.05 && !night ? (
+        <g fill="#FFFFFF" opacity="0.9">
+          {[[0.2, 0.2], [0.78, 0.55]].map(([sx, sy], i) => (
+            <path key={i} d={`M${x0 + w * sx!} ${y0 + h * sy! - 9} l2.4 6.6 l6.6 2.4 l-6.6 2.4 l-2.4 6.6 l-2.4 -6.6 l-6.6 -2.4 l6.6 -2.4 z`} />
+          ))}
+        </g>
+      ) : null}
       <WindowFrame style={style} x0={x0} y0={y0} x1={x1} y1={y1} curtain={curtain} sky={sky} />
     </g>
   );
@@ -1627,10 +1651,12 @@ export function windowRectOf(p: { x: number; y: number; scale: number }, style: 
  * 窓・棚・時計・お天気ボード1つの絵。もとは部屋に描きこんでいたものを、その場所の範囲だけ切りとって描く。
  * 記念撮影でも1まいの絵として読めるよう、使うグラデーションなどはこの中に入れる
  */
-export function FixtureVisual({ fixture, theme, now, at = TOKYO, weather = null, placeName = "", passer = null }: {
+export function FixtureVisual({ fixture, theme, now, at = TOKYO, weather = null, placeName = "", passer = null, grime = 0 }: {
   fixture: FixtureId; theme: RoomTheme; now: Date; at?: GeoPoint; weather?: RoomWeather | null; placeName?: string;
   /** 窓の外を通る犬 */
   passer?: WindowPasser | null;
+  /** 窓ガラスのくもり（0〜1） */
+  grime?: number;
 }) {
   const sky = useMemo(() => withWeather(skyAt(now, at), weather), [now, at, weather]);
   const v = fixtureView(fixture, theme.style);
@@ -1667,7 +1693,7 @@ export function FixtureVisual({ fixture, theme, now, at = TOKYO, weather = null,
           </linearGradient>
         ) : null}
       </defs>
-      {fixture === "window" ? <Window sky={sky} curtain={curtain} season={seasonOf(now, at)} weather={weather} style={theme.style} passer={passer} /> : null}
+      {fixture === "window" ? <Window sky={sky} curtain={curtain} season={seasonOf(now, at)} weather={weather} style={theme.style} passer={passer} grime={grime} /> : null}
       {fixture === "clock" ? <Clock now={now} night={sky.light < 0.2} /> : null}
       {fixture === "weather" ? <WeatherBoard weather={weather} night={sky.altitude < -4} place={placeName} /> : null}
       {fixture === "shelf" ? <Shelves only={0} /> : null}

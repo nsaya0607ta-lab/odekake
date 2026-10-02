@@ -73,7 +73,8 @@ import { dayPhaseOf, FixtureVisual, fixtureSize, lampsOn, ROOM_STAGE, RoomLighti
 import { RoomBoard } from "./room-board";
 import { FurnitureShop } from "./room-shop";
 import { BlueCoinArt } from "@/components/coin-art";
-import { DiaryDialog, DoodleContext, PasserLink, RoomMess, ShootingStars, useRoomMess, useWindowPasser } from "./room-gimmicks";
+import { CLEAN_STEPS, DiaryDialog, DoodleContext, GuestDog, PasserLink, PlantContext, RoomDust, RoomMess, roomDirtOf, ShootingStars, sleepoverGuest, usePlantCare, useRoomMess, useWindowPasser } from "./room-gimmicks";
+import { useRouter } from "next/navigation";
 import { DEFAULT_PLACE, locateHere, placeShortName, SkyCard, skyBackdrop, type RoomPlace } from "./sky-card";
 
 type Tab = DecorKind | "theme";
@@ -573,6 +574,14 @@ export function MyRoom({ entries, initialLayout, serverReady, dogSkin, dogName, 
     if (!entry) return;
     if (entry.kind === "photo") { setLightbox(entry); return; }
     // フロアランプは、タップでつけたり消したり
+    // 観葉植物は、タップで水やり（1日1回）
+    if (entry.kind === "furniture" && entry.furniture === "plant" && !visit) {
+      if (water()) { flash(`💧 おみずを あげた！（この1週間で ${plant.days + 1}日目）`); setDogCue({ id: Date.now(), text: "おはな、さくかな？", pose: "wonder" }); }
+      else flash("きょうは もう おみずを あげたよ。また あしたね");
+      return;
+    }
+    // くもった窓は、タップでヒント
+    if (entry.kind === "fixture" && entry.fixture === "window" && dirt > 0.3) { dirtHint(); return; }
     if (entry.kind === "furniture" && entry.furniture === "lamp") {
       const on = !lampIsOn(p.id);
       setLampSwitch((cur) => ({ ...cur, [p.id]: on }));
@@ -618,6 +627,24 @@ export function MyRoom({ entries, initialLayout, serverReady, dogSkin, dogName, 
 
   /** きょうの日付（日本時間。日記はきのうまで） */
   const todayKey = useMemo(() => new Intl.DateTimeFormat("sv-SE", { timeZone: "Asia/Tokyo" }).format(now), [now]);
+  /** 部屋のよごれ（おさんぽをさぼると、窓がくもり、ほこりがたまる。自分の部屋だけ） */
+  const dirt = useMemo(() => (visit ? 0 : roomDirtOf(stepHistory ?? [], steps?.steps, todayKey)), [stepHistory, steps?.steps, todayKey, visit]);
+  const dirtHint = () => {
+    const need = Math.max(0, CLEAN_STEPS - (steps?.steps ?? 0));
+    flash(need > 0 ? `ほこりが たまってきたよ。きょう あと${need.toLocaleString()}歩 あるくと ピカピカ！` : "ピカピカ！");
+  };
+  /** 観葉植物の水やり（この端末に保存） */
+  const { plant, water } = usePlantCare(todayKey);
+  /** わんこのお泊まり会（土曜の夕方〜日曜の朝に、フレンドのわんこが来る。自分の部屋だけ） */
+  const router = useRouter();
+  const guest = useMemo(() => (visit || editing ? null : sleepoverGuest(now, guests?.friends ?? [])), [editing, guests?.friends, now, visit]);
+  const guestId = guest?.id ?? null;
+  useEffect(() => {
+    if (!guestId || !guest) return;
+    setDogCue({ id: Date.now(), text: `きょうは ${[...guest.name].slice(0, 6).join("")}さんちの わんこが おとまり！`, pose: "cheer" });
+    // お客さんが来たときだけ
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [guestId]);
   /** ホワイトボードのらくがき（きょうの日付・天気・歩数で変わる） */
   const doodleInfo = useMemo(() => ({ now, weather: weather?.kind ?? null, steps: visit ? null : steps?.steps, dogName }), [now, weather?.kind, visit, steps?.steps, dogName]);
   /** 寝言（きょうの歩数や、部屋にあるもの・おやつの夢） */
@@ -785,6 +812,7 @@ export function MyRoom({ entries, initialLayout, serverReady, dogSkin, dogName, 
   return (
     // ふだん（自分の部屋を見ているとき）は、画面ぴったり：部屋 → 部屋の下の黒板（黒板の中だけスクロール）
     <DoodleContext.Provider value={doodleInfo}>
+    <PlantContext.Provider value={visit ? null : plant}>
       <main className={stage ? "fixed inset-0 flex flex-col overflow-y-auto overflow-x-hidden bg-paper text-ink" : "min-h-dvh bg-paper pb-[calc(env(safe-area-inset-bottom)+1.5rem)] text-ink"}>
         <header className="sticky top-0 z-[600] shrink-0 border-b border-line bg-paper/95 backdrop-blur">
           <div className="mx-auto flex h-14 max-w-lg items-center gap-2 px-3">
@@ -869,7 +897,7 @@ export function MyRoom({ entries, initialLayout, serverReady, dogSkin, dogName, 
                   <span data-body className="relative block" style={{ transform: p.flip ? "scaleX(-1)" : undefined }}>
                     <span key={furnitureFx[p.id] ?? "-"} className={`block origin-bottom ${FX_CLASS[furnitureFx[p.id]!] ?? ""}`}>
                       {entry.kind === "fixture"
-                        ? <FixtureVisual fixture={entry.fixture} theme={layout.theme} now={now} at={place} weather={weather} placeName={placeName} passer={p.id === firstWindowId ? passer : null} />
+                        ? <FixtureVisual fixture={entry.fixture} theme={layout.theme} now={now} at={place} weather={weather} placeName={placeName} passer={p.id === firstWindowId ? passer : null} grime={dirt} />
                         : <DecorVisual entry={entry} frame={p.frame} lit={p.key === "furniture:lamp" ? lampIsOn(p.id) : lightsOn || furnitureFx[p.id] === "on"} fx={furnitureFx[p.id]} />}
                     </span>
                   </span>
@@ -900,6 +928,10 @@ export function MyRoom({ entries, initialLayout, serverReady, dogSkin, dogName, 
             {/* 晴れた夜は、ときどき窓の外を流れ星が流れる（タップでねがいごと） */}
             {/* フレンドの犬が通っているときは、窓をタップするとその部屋へ */}
             <PasserLink rects={windowRects} passer={passer} />
+            {/* ほこり・クモの巣（おさんぽをさぼると） */}
+            {!editing ? <RoomDust dirt={dirt} onTap={dirtHint} /> : null}
+            {/* お泊まりに来たフレンドのわんこ */}
+            {guest ? <GuestDog guest={guest} sleeping={sleepy} onTap={() => router.push(`/room/visit/${guest.id}`)} /> : null}
             <ShootingStars rects={windowRects} active={phase === "night" && !editing && (!weather || weather.kind === "clear" || weather.kind === "partly")} onWish={flash} />
             <div className="pointer-events-none absolute inset-0" style={{ zIndex: 2000 }}>
               <RoomLighting now={now} lamps={lampLights} at={place} weather={weather} room={layout.theme.room} event={roomEvent} openBottom={stage} />
@@ -1087,6 +1119,7 @@ export function MyRoom({ entries, initialLayout, serverReady, dogSkin, dogName, 
 
         {toast ? <div className="fixed bottom-6 left-1/2 z-[800] -translate-x-1/2 whitespace-nowrap rounded-full bg-ink px-4 py-2 text-xs font-bold text-white shadow-lg">{toast}</div> : null}
       </main>
+    </PlantContext.Provider>
     </DoodleContext.Provider>
   );
 }

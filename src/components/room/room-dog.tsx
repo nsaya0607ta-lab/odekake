@@ -157,6 +157,9 @@ export function RoomDog({ skin, phase, sleepy, lines, dreams = [], cue = null, q
   const [hearts, setHearts] = useState<number[]>([]);
   /** こわくて ぷるぷる ふるえている（かみなり） */
   const [shiver, setShiver] = useState(false);
+  /** ごはんを食べたばかり（このあとなでると…） */
+  const ateAt = useRef(0);
+  const [puff, setPuff] = useState<number | null>(null);
   const timers = useRef<number[]>([]);
   const walkAnim = useRef<number | null>(null);
   const stepAnim = useRef<number | null>(null);
@@ -405,7 +408,7 @@ export function RoomDog({ skin, phase, sleepy, lines, dreams = [], cue = null, q
           pose("sniff");
           fx(f.id, "clatter");
           say("もぐもぐ…", 2200);
-          later(() => { fx(f.id, "empty", 45_000); pose("smile"); say("ごちそうさま！", 1500); }, 2600);
+          later(() => { fx(f.id, "empty", 45_000); pose("smile"); say("ごちそうさま！", 1500); ateAt.current = Date.now(); }, 2600);
           later(() => pose("wink"), 3600);
           fin(4800);
         });
@@ -590,6 +593,21 @@ export function RoomDog({ skin, phase, sleepy, lines, dreams = [], cue = null, q
 
   const tap = () => {
     if (quiet) return;
+    // ごはんのすぐあとになでると、おならが出てしまう（1回だけ）
+    if (!night && ateAt.current && Date.now() - ateAt.current < 40_000) {
+      ateAt.current = 0;
+      clearTimers();
+      busy.current = true;
+      const id = Date.now();
+      setPuff(id);
+      setDog((d) => ({ ...d, pose: "wonder" }));
+      setBubble({ text: "…ぷぅ", id });
+      later(() => { setDog((d) => ({ ...d, pose: "bow" })); setBubble({ text: "しつれい しました…", id: id + 1 }); }, 1300);
+      later(() => setPuff((p) => (p === id ? null : p)), 2400);
+      later(() => setBubble(null), 3200);
+      later(() => { busy.current = false; live(); }, 3400);
+      return;
+    }
     clearTimers();
     busy.current = true;
     setShiver(false);
@@ -664,6 +682,8 @@ export function RoomDog({ skin, phase, sleepy, lines, dreams = [], cue = null, q
       {/* ふきだし・ハート・Zzz は、夜の暗さより上に出す */}
       <div className="pointer-events-none absolute -translate-x-1/2 -translate-y-full" style={{ ...place, aspectRatio: "300 / 254", zIndex: 2500 }}>
         {dog.pose === "sleep" && !hidden ? <span className="absolute right-[8%] top-[22%] animate-pulse text-[11px] font-black text-[#8A8FD8]">Zzz</span> : null}
+        {/* おなら（おしりのほうに、もやっと緑の雲） */}
+        {puff ? <span key={puff} className="room-puff absolute bottom-[14%] h-[46%] w-[46%] rounded-full" style={dog.flip ? { left: "-14%" } : { right: "-14%" }} /> : null}
         {hearts.map((h) => <span key={h} className="room-heart absolute left-1/2 top-[8%] text-lg">💗</span>)}
         {bubble ? (
           <span
