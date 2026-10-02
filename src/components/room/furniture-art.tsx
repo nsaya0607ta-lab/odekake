@@ -665,17 +665,20 @@ function Kotatsu({ u, a11y }: P) {
 
 /**
  * 金魚ばち：ふちが波うつガラスの鉢（厚みのあるふち・映りこみ・水面のゆらぎ）。
- * 中に琉金2ひき（ひれは半透明）、水草、色とりどりの小石、泡。木のスツールの上に置く。
+ * 中に琉金2ひき（ひれは半透明。尾びれをふって、はしからはしへ泳ぐ）、水草、色とりどりの小石、のぼる泡。木のスツールの上に置く。
  */
 function Fishbowl({ u, a11y }: P) {
   const g = (n: string) => `${u}-${n}`;
-  const fish = (x: number, y: number, s: number, flip: boolean, hue: [string, string]) => (
-    <g transform={`translate(${x} ${y}) scale(${flip ? -s : s} ${s})`}>
-      {/* 尾びれ（半透明・すじ） */}
-      <path d="M-8 0 C-16 -10 -26 -12 -28 -4 C-24 -1 -24 2 -28 6 C-26 13 -16 10 -8 2 Z" fill={hue[0]} opacity="0.55" />
-      <path d="M-10 0 L-26 -6 M-10 1 L-26 2 M-10 2 L-25 9" stroke={hue[1]} strokeOpacity="0.5" strokeWidth="0.7" />
+  // 位置と向き（左右）は CSS（.room-fish-a / .room-fish-b）で動かす。ここでは原点に、右向きで描く
+  const fish = (swim: string, s: number, body: string, hue: [string, string]) => (
+    <g className={swim}><g transform={`scale(${s})`}>
+      {/* 尾びれ（半透明・すじ・ゆらゆら） */}
+      <g className="room-fish-tail">
+        <path d="M-8 0 C-16 -10 -26 -12 -28 -4 C-24 -1 -24 2 -28 6 C-26 13 -16 10 -8 2 Z" fill={hue[0]} opacity="0.55" />
+        <path d="M-10 0 L-26 -6 M-10 1 L-26 2 M-10 2 L-25 9" stroke={hue[1]} strokeOpacity="0.5" strokeWidth="0.7" />
+      </g>
       {/* からだ */}
-      <ellipse cx="0" cy="0" rx="11" ry="8" fill={`url(#${g(flip ? "fishB" : "fishA")})`} />
+      <ellipse cx="0" cy="0" rx="11" ry="8" fill={`url(#${g(body)})`} />
       {/* うろこ */}
       {([[-3, -2], [1, -3], [-1, 1], [3, 0], [-5, 2]] as const).map(([a, b], i) => <path key={i} d={`M${a} ${b} q1.6 1.6 0 3.2`} stroke="#FFFFFF" strokeOpacity="0.35" strokeWidth="0.6" fill="none" />)}
       {/* 背びれ・胸びれ */}
@@ -684,7 +687,7 @@ function Fishbowl({ u, a11y }: P) {
       {/* 目 */}
       <circle cx="6.5" cy="-1.6" r="2" fill="#FFFFFF" /><circle cx="7" cy="-1.6" r="1.2" fill="#1A0F08" /><circle cx="7.4" cy="-2.1" r="0.45" fill="#FFFFFF" />
       <path d="M10.4 1.2 q-1 1 -2 0.4" stroke="#7A2A10" strokeWidth="0.6" fill="none" />
-    </g>
+    </g></g>
   );
   return (
     <svg viewBox="0 0 110 168" className={SVG_CLASS} {...a11y}>
@@ -740,11 +743,11 @@ function Fishbowl({ u, a11y }: P) {
         {([[76, 108, -6], [82, 108, 4], [86, 108, 12], [26, 108, -10]] as const).map(([x, y, r], i) => (
           <path key={i} d={`M${x} ${y} C${x! - 4} ${y! - 18} ${x! + 6} ${y! - 28} ${x! + r! * 0.3} ${y! - (40 - i * 4)}`} stroke={`url(#${g("leaf")})`} strokeWidth="3.4" fill="none" strokeLinecap="round" />
         ))}
-        {fish(40, 74, 1, false, ["#FF8A5E", "#C23A16"])}
-        {fish(68, 90, 0.82, true, ["#FFD2B8", "#E26A3A"])}
+        {fish("room-fish-a", 1, "fishA", ["#FF8A5E", "#C23A16"])}
+        {fish("room-fish-b", 0.82, "fishB", ["#FFD2B8", "#E26A3A"])}
         <rect x="0" y="40" width="110" height="90" fill={`url(#${g("edge")})`} />
         {/* 泡 */}
-        {([[50, 62, 1.8], [52, 56, 1.3], [49, 51, 1]] as const).map(([x, y, r], i) => <circle key={i} cx={x} cy={y} r={r} fill="none" stroke="#FFFFFF" strokeWidth="0.8" />)}
+        {([[50, 70, 1.8], [53, 66, 1.3], [48, 64, 1]] as const).map(([x, y, r], i) => <circle key={i} className="room-fish-bubble" style={{ animationDelay: `${-i * 1.2}s` }} cx={x} cy={y} r={r} fill="none" stroke="#FFFFFF" strokeWidth="0.8" />)}
       </g>
       {/* ガラスの鉢：うすい色・ふち（波うつ）・映りこみ */}
       <path d="M30 34 Q14 40 10 68 Q8 98 30 112 Q55 124 80 112 Q102 98 100 68 Q96 40 80 34 Z" fill={`url(#${g("glass")})`} stroke="#BFE3F2" strokeWidth="1.6" />

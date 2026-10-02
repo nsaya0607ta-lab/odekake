@@ -4435,6 +4435,30 @@
 .room-passer { animation: room-passer 9s linear both; }
 @keyframes room-passer-bob { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-2px); } }
 .room-passer-bob { animation: room-passer-bob 0.36s ease-in-out infinite; }
+/* 金魚ばちの金魚：はしまで泳いだら、くるっと向きをかえてもどる（尾びれをふりながら）。泡はのぼって消える。
+   transform は SVG の座標（px ＝ viewBox の1目もり）。動きをへらす設定のときは、最初の位置で止まる */
+.room-fish-a { transform: translate(44px, 74px); animation: room-fish-a 16s ease-in-out infinite; }
+.room-fish-b { transform: translate(66px, 90px) scaleX(-1); animation: room-fish-b 19s ease-in-out -6s infinite; }
+@keyframes room-fish-a {
+  0% { transform: translate(44px, 74px) scaleX(1); }
+  40% { transform: translate(68px, 70px) scaleX(1); }
+  47% { transform: translate(69px, 72px) scaleX(-1); }
+  87% { transform: translate(44px, 77px) scaleX(-1); }
+  94% { transform: translate(43px, 75px) scaleX(1); }
+  100% { transform: translate(44px, 74px) scaleX(1); }
+}
+@keyframes room-fish-b {
+  0% { transform: translate(66px, 90px) scaleX(-1); }
+  42% { transform: translate(40px, 93px) scaleX(-1); }
+  49% { transform: translate(39px, 91px) scaleX(1); }
+  90% { transform: translate(66px, 87px) scaleX(1); }
+  96% { transform: translate(67px, 89px) scaleX(-1); }
+  100% { transform: translate(66px, 90px) scaleX(-1); }
+}
+.room-fish-tail { transform-box: fill-box; transform-origin: right center; animation: room-fish-tail 0.7s ease-in-out infinite; }
+@keyframes room-fish-tail { 0%, 100% { transform: rotate(-9deg); } 50% { transform: rotate(9deg); } }
+.room-fish-bubble { animation: room-fish-bubble 3.6s ease-in infinite; }
+@keyframes room-fish-bubble { 0% { transform: translateY(0); opacity: 0; } 15% { opacity: 1; } 80% { opacity: 0.9; } 100% { transform: translateY(-20px); opacity: 0; } }
 @media (prefers-reduced-motion: reduce) {
-  .room-selected, .room-heart, .room-bubble, .room-dog-walk, .room-dog-idle, .room-dog-sleep, .room-dog-hop, .room-dog-shiver, .room-fx-wobble, .room-fx-sway, .room-fx-squish, .room-fx-clatter, .room-wish { animation: none; }
+  .room-selected, .room-heart, .room-bubble, .room-dog-walk, .room-dog-idle, .room-dog-sleep, .room-dog-hop, .room-dog-shiver, .room-fx-wobble, .room-fx-sway, .room-fx-squish, .room-fx-clatter, .room-wish, .room-fish-a, .room-fish-b, .room-fish-tail, .room-fish-bubble { animation: none; }
 }
