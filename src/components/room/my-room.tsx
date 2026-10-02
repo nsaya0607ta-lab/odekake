@@ -64,8 +64,8 @@ import { composeRoomSnapshot } from "./room-snapshot";
 import { skyAt } from "@/lib/room/sun";
 import { parseRoomWeather, withWeather, type RoomWeather } from "@/lib/room/weather";
 import { EVENT_FLOOR_Y, EventFloor, EventFront } from "./room-events";
-import { dayPhaseOf, FixtureVisual, fixtureSize, lampsOn, ROOM_STAGE, RoomLighting, RoomScene, ThemeSwatch, windowRectOf, type DayPhase } from "./room-scene";
-import { RoomBoard, RoomDesk, RoomDeskFront } from "./room-board";
+import { dayPhaseOf, FixtureVisual, FloorBelow, fixtureSize, lampsOn, ROOM_STAGE, RoomLighting, RoomScene, ThemeSwatch, windowRectOf, type DayPhase } from "./room-scene";
+import { DESK_END, RoomBoard, RoomDesk, RoomDeskFront } from "./room-board";
 import { eventTint } from "./room-events";
 import { DEFAULT_PLACE, locateHere, placeShortName, SkyCard, type RoomPlace } from "./sky-card";
 
@@ -862,9 +862,10 @@ export function MyRoom({ entries, initialLayout, serverReady, dogSkin, dogName, 
         ) : (
           // 小さい画面でもボードがつぶれないよう、最低の高さをとる（そのときだけ画面が少しスクロールする）
           <div className="relative z-10 -mt-px min-h-[300px] flex-1">
+            <FloorBelow theme={layout.theme} now={now} at={place} weather={weather} event={roomEvent} />
             <RoomDesk dark={1 - skyNow.light} warm={deskWarm} tint={deskTint} />
             {/* ボードは机の天板の上（手前のふちより上）なら、好きなところに置けて大きさも変えられる */}
-            <div className="absolute inset-x-0 top-0 bottom-[calc(env(safe-area-inset-bottom)+30px)]">
+            <div className="absolute left-0 top-[-20px] bottom-[calc(env(safe-area-inset-bottom)+30px)]" style={{ right: `${(1 - DESK_END) * 100}%` }}>
             <RoomBoard dark={1 - skyNow.light} drop={16} place={layout.board} onPlace={(board) => commit({ ...latest.current, board })}>
               <SkyCard
                 now={now} place={place} onPlace={changePlace} weather={weather} steps={steps} history={stepHistory}
