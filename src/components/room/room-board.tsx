@@ -31,10 +31,12 @@ const mul = (a: V3, k: number): V3 => [a[0] * k, a[1] * k, a[2] * k];
 const pts = (ps: [number, number][]) => ps.map((p) => `${p[0].toFixed(1)},${p[1].toFixed(1)}`).join(" ");
 
 /** ボードの置き場所（机の上での位置と大きさ）。x は中心、y は足もと（どちらも机の領域の 0〜1）、w は幅（机の幅に対する割合） */
-export type BoardPlace = { x: number; y: number; w: number };
+export type BoardPlace = { x: number; y: number; w: number; /** 高さ ÷ 幅（脚まで）。なければ ASPECT */ a?: number };
 export const DEFAULT_BOARD: BoardPlace = { x: 0.52, y: 0.93, w: 0.86 };
 /** ボード（脚まで）の 高さ ÷ 幅 */
 const ASPECT = 1.02;
+/** 横長〜縦長の、えらべる はば（高さ ÷ 幅） */
+const ASPECT_MIN = 0.55, ASPECT_MAX = 1.7;
 const clampN = (v: number, lo: number, hi: number) => Math.min(hi, Math.max(lo, v));
 
 /**
@@ -67,14 +69,17 @@ export function RoomBoard({ children, dark = 0, drop = DEFAULT_DROP, place = DEF
   const drag = useRef<{ mode: "move" | "size"; sx: number; sy: number; from: BoardPlace; id: number } | null>(null);
   /** 机からはみ出しすぎないようにそろえる */
   const fit = (p: BoardPlace): BoardPlace => {
-    const wf = clampN(p.w, 0.34, Math.min(0.98, (area.h * 1.15) / (area.w * ASPECT)));
-    const bwpx = wf * area.w, bhpx = bwpx * ASPECT;
+    const a0 = clampN(p.a ?? ASPECT, ASPECT_MIN, ASPECT_MAX);
+    const wf = clampN(p.w, 0.3, 0.98);
+    // 高さは机の領域の 1.15 倍まで（はみ出すぶんは幅をそのままに、高さをちぢめる）
+    const a = Math.min(a0, (area.h * 1.15) / (wf * area.w));
+    const bwpx = wf * area.w, bhpx = bwpx * a;
     const x = clampN(p.x, (bwpx * 0.42) / area.w, 1 - (bwpx * 0.42) / area.w);
-    const y = clampN(p.y, (bhpx * 0.85) / area.h, 1);
-    return { x, y, w: wf };
+    const y = clampN(p.y, Math.min(1, (bhpx * 0.85) / area.h), 1);
+    return { x, y, w: wf, a };
   };
   const pl = fit(live ?? place);
-  const w = Math.round(pl.w * area.w), h = Math.round(w * ASPECT);
+  const w = Math.round(pl.w * area.w), h = Math.round(w * (pl.a ?? ASPECT));
   const left = pl.x * area.w - w / 2, top = pl.y * area.h - h;
   const onDown = (e: React.PointerEvent) => {
     const t = e.target as HTMLElement;
@@ -89,7 +94,13 @@ export function RoomBoard({ children, dark = 0, drop = DEFAULT_DROP, place = DEF
     const dx = e.clientX - d.sx, dy = e.clientY - d.sy;
     setLive(fit(d.mode === "move"
       ? { ...d.from, x: d.from.x + dx / area.w, y: d.from.y + dy / area.h }
-      : { ...d.from, w: d.from.w + (dx * 2 + dy * 2 / ASPECT) / 2 / area.w }));
+      : (() => {
+          // 右下のかどを指についていかせる（左上は動かさない）。幅と高さは別々に変わる
+          const w0 = d.from.w * area.w, h0 = w0 * (d.from.a ?? ASPECT);
+          const l0 = d.from.x * area.w - w0 / 2, t0 = d.from.y * area.h - h0;
+          const w1 = Math.max(area.w * 0.3, w0 + dx), h1 = clampN(h0 + dy, w1 * ASPECT_MIN, w1 * ASPECT_MAX);
+          return { x: (l0 + w1 / 2) / area.w, y: (t0 + h1) / area.h, w: w1 / area.w, a: h1 / w1 };
+        })()));
   };
   const onUp = (e: React.PointerEvent) => {
     const d = drag.current;
@@ -231,8 +242,8 @@ export function RoomBoard({ children, dark = 0, drop = DEFAULT_DROP, place = DEF
         ))}
         {/* 映す面（ここだけスクロールする） */}
         <div data-board-screen className="absolute overflow-hidden rounded-[3px] bg-[#FAFBFC] shadow-[0_0_0_1px_#7E858F,0_0_0_2px_#AEB4BD]" style={{ inset: FRAME }}>
-          {/* 中身は決まった幅（SCREEN_W）で組んで、面の大きさに縮めて映す（ボードが小さくても文字がつまらない） */}
-          <div className="absolute left-0 top-0" style={{ width: SCREEN_W, height: screenH / zoom, zoom }}>
+          {/* 中身は SCREEN_W 以上の幅で組んで、面の大きさに縮めて映す（ボードが小さい・縦長・横長でも文字がつまったり、はみ出したりしない） */}
+          <div className="absolute left-0 top-0" style={{ width: screenW / zoom, height: screenH / zoom, zoom }}>
             <div className="absolute inset-0 space-y-3 overflow-y-auto overscroll-contain pb-2 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden [&>*:not(:first-child)]:mx-2">
               {children}
             </div>

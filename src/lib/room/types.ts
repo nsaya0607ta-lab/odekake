@@ -107,8 +107,8 @@ export type RoomTheme = {
 export type RoomPhoto = { id: string; path: string; date: string; title: string };
 
 /** v: 2 から窓・棚・時計も items に入る（それより前の部屋は読みこむときに足す） */
-/** 机の上のホワイトボードの置き場所（x は中心・y は足もと：机の領域の 0〜1、w は机の幅に対する幅） */
-export type RoomBoardPlace = { x: number; y: number; w: number };
+/** 机の上のホワイトボードの置き場所（x は中心・y は足もと：机の領域の 0〜1、w は机の幅に対する幅、a は高さ ÷ 幅） */
+export type RoomBoardPlace = { x: number; y: number; w: number; a?: number };
 export type RoomLayout = { theme: RoomTheme; items: Placement[]; photos: RoomPhoto[]; v?: number; board?: RoomBoardPlace };
 
 export const DEFAULT_THEME: RoomTheme = { wall: "cream", floor: "wood-light", curtain: "leaf", rug: "round-cream", deco: "garland", style: "standard", room: "cozy" };
@@ -231,7 +231,7 @@ export function parseRoomLayout(value: unknown, validKeys?: ReadonlySet<string>)
   const b = root.board && typeof root.board === "object" ? (root.board as Record<string, unknown>) : null;
   const bnum = (v: unknown) => (typeof v === "number" && Number.isFinite(v) ? v : null);
   const board = b && bnum(b.x) !== null && bnum(b.y) !== null && bnum(b.w) !== null
-    ? { board: { x: clamp(bnum(b.x)!, 0, 1), y: clamp(bnum(b.y)!, 0, 1.2), w: clamp(bnum(b.w)!, 0.2, 1) } }
+    ? { board: { x: clamp(bnum(b.x)!, 0, 1), y: clamp(bnum(b.y)!, 0, 1.2), w: clamp(bnum(b.w)!, 0.2, 1), ...(bnum(b.a) !== null ? { a: clamp(bnum(b.a)!, 0.4, 2) } : {}) } }
     : {};
   if (root.v === 2) {
     // 棚がなくなった（しまった）ものは床に下ろす

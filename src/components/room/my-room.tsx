@@ -870,7 +870,7 @@ export function MyRoom({ entries, initialLayout, serverReady, dogSkin, dogName, 
               <SkyCard
                 now={now} place={place} onPlace={changePlace} weather={weather} steps={steps} history={stepHistory}
                 // ボードの面の高さいっぱい
-                height="max(200px, 100%)"
+                height="max(150px, 100%)"
                 friends={guests?.friends}
                 likes={guests?.mail.filter((m) => m.kind === "like").length ?? 0}
                 onEdit={() => setEditing(true)}
