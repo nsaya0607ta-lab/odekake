@@ -857,7 +857,7 @@ export function MyRoom({ entries, initialLayout, serverReady, dogSkin, dogName, 
           <VisitPanel visit={visit} dogName={dogName} liked={visitLike.liked} likeCount={visitLike.likeCount} likeBusy={visitLike.busy} onLike={() => void visitLike.toggleLike()} />
         ) : (
           // 小さい画面でもボードがつぶれないよう、最低の高さをとる（そのときだけ画面が少しスクロールする）
-          <div className="relative -mt-px min-h-[300px] flex-1">
+          <div className="relative z-10 -mt-px min-h-[300px] flex-1">
             <FloorBelow theme={layout.theme} now={now} at={place} weather={weather} event={roomEvent} />
             <RoomBoard dark={1 - skyNow.light}>
               <SkyCard

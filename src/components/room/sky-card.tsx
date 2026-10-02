@@ -147,7 +147,7 @@ export function SkyCard({ now, place, onPlace, weather = null, steps, history, h
   const wet = kind === "rain" || kind === "drizzle" || kind === "thunder";
   const cloudy = kind === "cloudy" || kind === "fog" || wet || kind === "snow";
   const ink = (day: string, night: string) => mix(day, night, Math.min(1, dark * 1.1));
-  const weatherChip = weather ? `${WEATHER_LABEL[weather.kind].icon} ${WEATHER_LABEL[weather.kind].label}${weather.temp !== null ? ` ${Math.round(weather.temp)}℃` : ""}` : null;
+  const weatherChip = weather ? `${WEATHER_LABEL[weather.kind].icon} ${weather.temp !== null ? `${Math.round(weather.temp)}℃` : WEATHER_LABEL[weather.kind].label}` : null;
   const sheet = (title: string, onClose: () => void, body: React.ReactNode) => (
     <div className="fixed inset-0 z-[700] flex items-end justify-center bg-[#140f22]/55 backdrop-blur-[2px]" role="dialog" aria-modal="true" aria-label={title} onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}>
       <div className="room-bubble w-full max-w-lg rounded-t-[26px] bg-card px-4 pb-[calc(env(safe-area-inset-bottom)+1rem)] pt-2 shadow-2xl">
@@ -269,9 +269,9 @@ export function SkyCard({ now, place, onPlace, weather = null, steps, history, h
           </div>
         </div>
         {/* すりガラスの帯：もようがえ・きょうの歩数・フレンドのおへや */}
-        <div className={`absolute inset-x-2 bottom-2 flex items-center gap-2 rounded-[19px] bg-white/80 p-1.5 shadow-[0_8px_18px_-10px_rgba(20,30,50,.55)] ring-1 ring-white/70 backdrop-blur-md ${onEdit ? "" : "pl-3"}`}>
+        <div className={`absolute inset-x-2 bottom-2 flex items-center gap-1.5 rounded-[19px] bg-white/80 p-1.5 shadow-[0_8px_18px_-10px_rgba(20,30,50,.55)] ring-1 ring-white/70 backdrop-blur-md ${onEdit ? "" : "pl-3"}`}>
           {onEdit ? (
-            <button type="button" onClick={onEdit} className="flex shrink-0 flex-col items-center justify-center gap-0.5 self-stretch rounded-[14px] bg-leaf-soft px-2.5 py-1 text-leaf-deep active:scale-95">
+            <button type="button" onClick={onEdit} className="flex shrink-0 flex-col items-center justify-center gap-0.5 self-stretch rounded-[14px] bg-leaf-soft px-2 py-1 text-leaf-deep active:scale-95">
               <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                 <path d="M4 12V9a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2v3" /><path d="M3 12h18v4H3z" /><path d="M5 16v2M19 16v2" />
               </svg>
@@ -282,28 +282,28 @@ export function SkyCard({ now, place, onPlace, weather = null, steps, history, h
             <div className="min-w-0 flex-1" aria-live="polite">
               <p className="flex items-baseline gap-1 leading-none text-ink">
                 <span aria-hidden className="text-[13px]">👣</span>
-                <span className="text-[20px] font-black tabular-nums">{stepCount.toLocaleString("ja-JP")}</span>
+                <span className="text-[19px] font-black tabular-nums">{stepCount.toLocaleString("ja-JP")}</span>
                 <span className="text-[10px] font-bold text-ink-soft">歩</span>
-                {stepWeek && stepWeek.streak >= 2 ? <span className="ml-0.5 whitespace-nowrap rounded-full bg-[linear-gradient(90deg,#FF9A3C,#FF5E3A)] px-1.5 py-0.5 text-[9px] font-black text-white">🔥{stepWeek.streak}日</span> : null}
               </p>
               <p className="mt-1 truncate text-[10px] font-bold text-ink-faint">
-                {nextGoal ? <>🚩{nextGoal.steps / 1000}kまで あと<span className="text-leaf-deep">{(nextGoal.steps - stepCount).toLocaleString("ja-JP")}</span>歩</> : <>🎉 10,000歩 たっせい！</>}
+                {stepWeek && stepWeek.streak >= 2 ? <span className="mr-1 rounded-full bg-[linear-gradient(90deg,#FF9A3C,#FF5E3A)] px-1.5 py-px text-[9px] font-black text-white">🔥{stepWeek.streak}日</span> : null}
+                {nextGoal ? <>🚩あと<span className="text-leaf-deep">{(nextGoal.steps - stepCount).toLocaleString("ja-JP")}</span>歩</> : <>🎉 10,000歩！</>}
               </p>
             </div>
           ) : (
             <p className="min-w-0 flex-1 text-[11px] font-bold leading-snug text-ink-soft">{steps ? "👣 歩数はショートカットで連携すると出ます" : status}</p>
           )}
           {friends ? (
-            <button type="button" onClick={() => setFriendsOpen(true)} aria-haspopup="dialog" className="relative flex shrink-0 items-center gap-2 rounded-[14px] bg-leaf-deep py-1.5 pl-1.5 pr-3 text-white shadow-[0_4px_10px_-4px_rgba(60,90,40,.8)] active:scale-95">
-              <span className="flex -space-x-2" aria-hidden>
+            <button type="button" onClick={() => setFriendsOpen(true)} aria-haspopup="dialog" className="relative flex shrink-0 items-center gap-1.5 rounded-[14px] bg-leaf-deep py-1.5 pl-1.5 pr-2.5 text-white shadow-[0_4px_10px_-4px_rgba(60,90,40,.8)] active:scale-95">
+              <span className="flex -space-x-2.5" aria-hidden>
                 {(friends.length ? friends.slice(0, 2) : [{ id: "door", name: "🚪", avatar: null }]).map((f) => (
-                  <span key={f.id} className="flex h-7 w-7 items-center justify-center overflow-hidden rounded-full bg-[#EAF3E2] text-[11px] font-black text-leaf-deep ring-2 ring-leaf-deep">
+                  <span key={f.id} className="flex h-6 w-6 items-center justify-center overflow-hidden rounded-full bg-[#EAF3E2] text-[10px] font-black text-leaf-deep ring-2 ring-leaf-deep">
                     {/* eslint-disable-next-line @next/next/no-img-element */}
                     {f.avatar ? <img src={f.avatar} alt="" className="h-full w-full object-cover" /> : [...f.name][0]}
                   </span>
                 ))}
               </span>
-              <span className="whitespace-nowrap text-left text-[11px] font-black leading-tight">フレンドの<br />おへやへ</span>
+              <span className="whitespace-nowrap text-left text-[10.5px] font-black leading-tight">フレンドの<br />おへやへ</span>
               {likes > 0 ? <span className="absolute -right-1.5 -top-1.5 rounded-full bg-[#FF6F91] px-1.5 py-0.5 text-[9px] font-black leading-none text-white shadow ring-2 ring-white">♥{likes}</span> : null}
             </button>
           ) : null}
