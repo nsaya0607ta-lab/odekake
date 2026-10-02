@@ -862,8 +862,8 @@ export function MyRoom({ entries, initialLayout, serverReady, dogSkin, dogName, 
             <RoomBoard dark={1 - skyNow.light}>
               <SkyCard
                 now={now} place={place} onPlace={changePlace} weather={weather} steps={steps} history={stepHistory}
-                // ボードの面の高さいっぱい（下に「スクロールで」の一行ぶんをのこす）
-                height="max(200px, calc(100% - 30px))"
+                // ボードの面の高さいっぱい
+                height="max(200px, 100%)"
                 friends={guests?.friends}
                 likes={guests?.mail.filter((m) => m.kind === "like").length ?? 0}
                 onEdit={() => setEditing(true)}

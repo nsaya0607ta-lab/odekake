@@ -312,7 +312,6 @@ export function SkyCard({ now, place, onPlace, weather = null, steps, history, h
           ) : null}
         </div>
       </div>
-      {height ? <p className="!mt-1.5 flex items-center justify-center gap-1 text-[10px] font-bold text-ink-faint" aria-hidden><span className="animate-bounce">⌄</span>スクロールで、今週の歩数</p> : null}
 
       {/* ここから下はスクロールで：今週の歩数と、空のようす */}
       {stepCount !== null ? (

@@ -8,7 +8,7 @@
  * 立体のつくり
  * - ボードの板（アルミのわく・映す面）だけを CSS の 3D で傾ける（足もとのまん中を軸に、右を奥へ TURN°、上をうしろへ LEAN°）。
  *   中の画面もいっしょに傾くが、さわる・スクロールはそのまま使える。
- * - それ以外（わくの厚み・脚・横木・うしろの脚・ペン置きの棚・マーカー・床の影）は傾けずに、
+ * - それ以外（わくの厚み・アルミの三脚・まん中の柱と留め具・ペン置きの棚・マーカー・床の影）は傾けずに、
  *   CSS と同じ透視の計算（project）で 3D の点を画面に写して描く。脚の先は床の上に、影は床にねる。
  * 夜は、わくと脚は部屋と同じように暗く、面だけは映した光で明るいまま（床にうすく光がこぼれる）。
  */
@@ -68,17 +68,42 @@ export function RoomBoard({ children, dark = 0 }: { children: ReactNode; /** 夜
 
   /* ---------- 脚 ---------- */
   const legBack = -DEPTH - 4;
+  // アルミの三脚：前の2本はボードのうしろから床へ開き、うしろの1本は奥へ。まん中の柱がボードの上をおさえる
   const legs = [-1, 1].map((s) => {
-    const top = world(s * (hw - 22), bh + OVER + 4, legBack), foot = world(s * (hw + 2), vFloor(legBack), legBack);
+    const top = world(s * (hw - 40), bh * 0.6, legBack), foot = world(s * (hw + 4), vFloor(legBack), legBack);
     return { top, foot, s };
   });
-  const backTop = world(0, bh + 8, legBack - 4);
+  const backTop = world(0, bh * 0.55, legBack - 6);
+  const mastBottom = world(0, bh * 0.3, legBack - 2), mastTop = world(0, bh + OVER + 2, legBack - 2);
   const backFoot: V3 = add([w / 2, floorY, world(0, vFloor(0), 0)[2]], mul(fwd, -120));
   /** 3D の2点を結ぶ、太さのある棒（画面で幅をとる） */
   const rod = (a: V3, b: V3, width: number) => {
     const pa = project(a), pb = project(b), dx = pb[0] - pa[0], dy = pb[1] - pa[1], len = Math.hypot(dx, dy) || 1;
     const ox = (-dy / len) * width / 2, oy = (dx / len) * width / 2, ka = scaleAt(a), kb = scaleAt(b);
     return { poly: pts([[pa[0] - ox * ka, pa[1] - oy * ka], [pa[0] + ox * ka, pa[1] + oy * ka], [pb[0] + ox * kb, pb[1] + oy * kb], [pb[0] - ox * kb, pb[1] - oy * kb]]), pa, pb, ox, oy, ka, kb };
+  };
+
+  const lerp = (a: V3, b: V3, t: number): V3 => [a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t, a[2] + (b[2] - a[2]) * t];
+  /** アルミのパイプの脚（上は太く、のびる下の段は少し細い。つぎ目に黒い樹脂の留め具、先にゴムの足） */
+  const tube = (a: V3, b: V3, width: number, tone: number) => {
+    const j = lerp(a, b, 0.72);
+    const up = rod(a, j, width), lo = rod(j, b, width * 0.8), collar = rod(lerp(a, b, 0.68), lerp(a, b, 0.76), width * 1.45), foot = rod(lerp(a, b, 0.97), b, width * 1.35);
+    const body = tone < 1 ? "#A3AAB4" : "#C4CAD2", hi = tone < 1 ? "#D8DDE3" : "#FFFFFF", lo2 = tone < 1 ? "#5E656F" : "#7A818B";
+    const lines = (r: ReturnType<typeof rod>) => (
+      <>
+        <line x1={r.pa[0] - r.ox * 0.4 * r.ka} y1={r.pa[1] - r.oy * 0.4 * r.ka} x2={r.pb[0] - r.ox * 0.4 * r.kb} y2={r.pb[1] - r.oy * 0.4 * r.kb} stroke={hi} strokeWidth="1.5" opacity="0.9" />
+        <line x1={r.pa[0] + r.ox * 0.75 * r.ka} y1={r.pa[1] + r.oy * 0.75 * r.ka} x2={r.pb[0] + r.ox * 0.75 * r.kb} y2={r.pb[1] + r.oy * 0.75 * r.kb} stroke={lo2} strokeWidth="1.2" opacity="0.8" />
+      </>
+    );
+    return (
+      <g>
+        <polygon points={up.poly} fill={body} />{lines(up)}
+        <polygon points={lo.poly} fill={body} />{lines(lo)}
+        <polygon points={collar.poly} fill="#2E3238" />
+        <line x1={collar.pa[0] - collar.ox * 0.35 * collar.ka} y1={collar.pa[1] - collar.oy * 0.35 * collar.ka} x2={collar.pb[0] - collar.ox * 0.35 * collar.kb} y2={collar.pb[1] - collar.oy * 0.35 * collar.kb} stroke="#6A707A" strokeWidth="1" />
+        <polygon points={foot.poly} fill="#24272C" />
+      </g>
+    );
   };
 
   /* ---------- ペン置きの棚（板の下のはしから手前へ、水平に） ---------- */
@@ -101,7 +126,7 @@ export function RoomBoard({ children, dark = 0 }: { children: ReactNode; /** 夜
 
   return (
     <div ref={ref} className="absolute inset-x-0 bottom-[calc(env(safe-area-inset-bottom)+4px)] top-[-24px] mx-auto w-[min(96%,470px)]" style={{ perspective: `${PERSP}px`, perspectiveOrigin: `${cx}px ${cy}px` }}>
-      {/* うしろの層：床の影・脚・横木・わくの厚み */}
+      {/* うしろの層：床の影・アルミの三脚・まん中の柱・わくの厚み */}
       <svg aria-hidden width={w} height={h} viewBox={`0 0 ${w} ${h}`} className="pointer-events-none absolute inset-0 overflow-visible" style={dim}>
         <defs>
           <filter id="bd-blur" x="-30%" y="-80%" width="160%" height="260%"><feGaussianBlur stdDeviation="6" /></filter>
@@ -113,23 +138,12 @@ export function RoomBoard({ children, dark = 0 }: { children: ReactNode; /** 夜
         <polygon points={backShadow} fill="#1E1206" opacity="0.22" filter="url(#bd-blur)" />
         <polygon points={shadowPoly} fill="#1E1206" opacity="0.32" filter="url(#bd-blur)" />
         {footPts.map((f, i) => { const [x, y] = project(f), k = scaleAt(f); return <ellipse key={i} cx={x} cy={y} rx={9 * k} ry={3.2 * k} fill="#1E1206" opacity="0.5" filter="url(#bd-blur-s)" />; })}
-        {/* うしろの脚（奥へ） */}
-        {(() => { const r = rod(backTop, backFoot, 7); return <g><polygon points={r.poly} fill="#5E3A1C" /><line x1={r.pa[0]} y1={r.pa[1]} x2={r.pb[0]} y2={r.pb[1]} stroke="#8A5E36" strokeWidth="1" opacity="0.6" /></g>; })()}
-        {/* 前の脚 */}
-        {legs.map((g) => {
-          const r = rod(g.top, g.foot, 10);
-          const [fx, fy] = project(g.foot), k = scaleAt(g.foot);
-          return (
-            <g key={g.s}>
-              <polygon points={r.poly} fill="#A8723F" />
-              <line x1={r.pa[0] - r.ox * 0.45 * r.ka} y1={r.pa[1] - r.oy * 0.45 * r.ka} x2={r.pb[0] - r.ox * 0.45 * r.kb} y2={r.pb[1] - r.oy * 0.45 * r.kb} stroke="#D9A672" strokeWidth={2.2} opacity="0.85" />
-              <line x1={r.pa[0] + r.ox * 0.8 * r.ka} y1={r.pa[1] + r.oy * 0.8 * r.ka} x2={r.pb[0] + r.ox * 0.8 * r.kb} y2={r.pb[1] + r.oy * 0.8 * r.kb} stroke="#6A4020" strokeWidth={1.6} opacity="0.8" />
-              <rect x={fx - 6.5 * k} y={fy - 4 * k} width={13 * k} height={5 * k} rx={2 * k} fill="#2E2A26" />
-            </g>
-          );
-        })}
-        {/* 上の横木 */}
-        {(() => { const a = world(-hw + 14, bh + OVER, legBack), b = world(hw - 14, bh + OVER, legBack); const r = rod(a, b, 8); return <g><polygon points={r.poly} fill="#B07A46" /><line x1={r.pa[0]} y1={r.pa[1] - 2.5 * r.ka} x2={r.pb[0]} y2={r.pb[1] - 2.5 * r.kb} stroke="#E2B07C" strokeWidth="1.4" opacity="0.8" /></g>; })()}
+        {/* うしろの脚（奥へ、少し暗い） */}
+        {tube(backTop, backFoot, 6, 0.8)}
+        {/* 前の脚（ボードのうしろから床へ） */}
+        {legs.map((g) => <g key={g.s}>{tube(g.top, g.foot, 7.5, 1)}</g>)}
+        {/* まん中の柱（ボードの上に出て、留め具をささえる） */}
+        {(() => { const r = rod(mastBottom, mastTop, 7); return <g><polygon points={r.poly} fill="#B9BFC8" /><line x1={r.pa[0] - r.ox * 0.4 * r.ka} y1={r.pa[1] - r.oy * 0.4 * r.ka} x2={r.pb[0] - r.ox * 0.4 * r.kb} y2={r.pb[1] - r.oy * 0.4 * r.kb} stroke="#FFFFFF" strokeWidth="1.6" opacity="0.85" /><line x1={r.pa[0] + r.ox * 0.75 * r.ka} y1={r.pa[1] + r.oy * 0.75 * r.ka} x2={r.pb[0] + r.ox * 0.75 * r.kb} y2={r.pb[1] + r.oy * 0.75 * r.kb} stroke="#6E757F" strokeWidth="1.2" opacity="0.8" /></g>; })()}
         {/* わくの厚み（手前に来る左のはしと、上のはし） */}
         <polygon points={pts([P(-hw, 0), P(-hw, bh), P(-hw, bh, -DEPTH), P(-hw, 0, -DEPTH)])} fill="url(#bd-edge)" />
         <polygon points={pts([P(-hw, bh), P(hw, bh), P(hw, bh, -DEPTH), P(-hw, bh, -DEPTH)])} fill="url(#bd-edge-top)" />
@@ -167,8 +181,10 @@ export function RoomBoard({ children, dark = 0 }: { children: ReactNode; /** 夜
         </defs>
         {/* 留め具（板の上のはしのまん中） */}
         {(() => {
-          const a = P(-20, bh + 2, 2), b = P(20, bh + 2, 2), c = P(20, bh - 7, 2), d = P(-20, bh - 7, 2), knob = P(0, bh + 6, 4), k = scaleAt(world(0, bh, 0));
-          return <g><polygon points={pts([a, b, c, d])} fill="#3A3E46" /><polygon points={pts([a, b, P(20, bh, 2), P(-20, bh, 2)])} fill="#6A707A" /><circle cx={knob[0]} cy={knob[1]} r={5.5 * k} fill="#2E3238" /><circle cx={knob[0] - 1.5 * k} cy={knob[1] - 1.5 * k} r={1.8 * k} fill="#8A909A" /></g>;
+          // 柱の上から板の上のはしにかぶさる、黒い樹脂のつめ（前に少しだけ出る）
+          const a = P(-16, bh + 4, 2), b = P(16, bh + 4, 2), c = P(14, bh - 6, 2), d = P(-14, bh - 6, 2), k = scaleAt(world(0, bh, 0));
+          const topA = P(-16, bh + 4, legBack - 2), topB = P(16, bh + 4, legBack - 2), knob = P(0, bh + 10, legBack - 4);
+          return <g><polygon points={pts([topA, topB, b, a])} fill="#4A4F57" /><polygon points={pts([a, b, c, d])} fill="#2A2D33" /><polyline points={pts([a, b])} fill="none" stroke="#7A808A" strokeWidth="1.1" /><circle cx={knob[0]} cy={knob[1]} r={4.2 * k} fill="#2A2D33" /><circle cx={knob[0] - 1.2 * k} cy={knob[1] - 1.2 * k} r={1.4 * k} fill="#8A909A" /></g>;
         })()}
         {/* 棚：上の面・左のはし・前の面 */}
         <polygon points={pts([project(trayA), project(trayB), project(tB2), project(tA2)])} fill="url(#bd-tray-top)" />
