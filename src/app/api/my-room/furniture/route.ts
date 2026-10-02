@@ -1,13 +1,13 @@
 import { NextResponse } from "next/server";
 import { checkRateLimit } from "@/lib/rate-limit";
-import { isShopId, shopMax, shopName, shopPrice } from "@/lib/room/types";
+import { isShopId, isThemeGoodId, shopMax, shopName, shopPrice } from "@/lib/room/types";
 import { requireUser } from "@/lib/supabase/server";
 
 type RpcResponse = { data: unknown; error: { code?: string; message: string } | null };
 
 const toRecord = (value: unknown): Record<string, unknown> => (value && typeof value === "object" ? (value as Record<string, unknown>) : {});
 
-/** わんこのおへやの家具・窓・棚などを1こ、青コインで買う */
+/** わんこのおへやの家具・窓・棚など・もようがえのデザインを1こ、青コインで買う */
 export async function POST(request: Request) {
   const { supabase, user } = await requireUser();
   const body = (await request.json().catch(() => null)) as { furniture?: unknown } | null;
@@ -24,7 +24,7 @@ export async function POST(request: Request) {
   if (error) {
     const name = shopName(body.furniture);
     if (error.message.includes("BLUE_COINS_SHORT")) return NextResponse.json({ error: `青コインが足りません（${name}は${shopPrice(body.furniture).toLocaleString()}枚）。` }, { status: 400 });
-    if (error.message.includes("FURNITURE_LIMIT")) return NextResponse.json({ error: `${name}は${shopMax(body.furniture)}こまでです。` }, { status: 400 });
+    if (error.message.includes("FURNITURE_LIMIT")) return NextResponse.json({ error: isThemeGoodId(body.furniture) ? "もう持っています。" : `${name}は${shopMax(body.furniture)}こまでです。` }, { status: 400 });
     console.error("Failed to buy room furniture", { code: error.code, message: error.message });
     return NextResponse.json({ error: "買えませんでした。時間をおいてお試しください。" }, { status: 400 });
   }

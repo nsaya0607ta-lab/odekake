@@ -51,7 +51,20 @@ import {
   type Placement,
   type RoomLayout,
   type RoomShop,
+  type RoomKind,
+  type ShopId,
+  type ThemeGoodId,
+  type ThemePart,
   capToOwned,
+  cleanDogName,
+  DOG_NAME_MAX,
+  isFreeTheme,
+  isThemeGoodId,
+  ownedTheme,
+  roomBundle,
+  themeGood,
+  themeGoodId,
+  THEME_PRICES,
   FIXTURE_IDS,
   FURNITURE_IDS,
   shopName,
@@ -71,10 +84,9 @@ import { parseRoomWeather, withWeather, type RoomWeather } from "@/lib/room/weat
 import { EVENT_FLOOR_Y, EventFloor, EventFront } from "./room-events";
 import { dayPhaseOf, FixtureVisual, fixtureSize, lampsOn, ROOM_STAGE, RoomLighting, RoomScene, ThemeSwatch, windowRectOf, type DayPhase } from "./room-scene";
 import { RoomBoard } from "./room-board";
-import { FurnitureShop } from "./room-shop";
+import { BlueCoinBar, BuyDialog, FurnitureShop } from "./room-shop";
 import { BlueCoinArt } from "@/components/coin-art";
 import { CLEAN_STEPS, DiaryDialog, DoodleContext, GuestDog, PasserLink, PlantContext, RoomDust, RoomMess, roomDirtOf, ShootingStars, sleepoverGuest, usePlantCare, useRoomMess, useWindowPasser } from "./room-gimmicks";
-import { useRouter } from "next/navigation";
 import { DEFAULT_PLACE, locateHere, placeShortName, SkyCard, skyBackdrop, type RoomPlace } from "./sky-card";
 
 type Tab = DecorKind | "theme";
@@ -160,18 +172,19 @@ function freeWallSpot(taken: readonly { x: number; y: number }[], fixtures: read
 /** 家具の奥行き（床の上で場所をとる高さ。幅に対する割合） */
 const PLACE_KEY = "odekake-room-place-v1";
 /** 家具の絵の 高さ÷幅（furniture-art.tsx の viewBox） */
-const FURNITURE_RATIO: Record<FurnitureId, number> = { whiteboard: 200 / 160, sofa: 150 / 260, "dog-bed": 110 / 190, plant: 190 / 120, bookshelf: 210 / 150, lamp: 220 / 90, table: 120 / 200, "dog-house": 190 / 200, bowl: 58 / 100 };
+const FURNITURE_RATIO: Record<FurnitureId, number> = { kotatsu: 130 / 220, fishbowl: 150 / 100, tv: 160 / 200, piano: 180 / 220, "rocking-chair": 180 / 140, toybox: 120 / 160, whiteboard: 200 / 160, sofa: 150 / 260, "dog-bed": 110 / 190, plant: 190 / 120, bookshelf: 210 / 150, lamp: 220 / 90, table: 120 / 200, "dog-house": 190 / 200, bowl: 58 / 100 };
 /** 犬が遊んでいるあいだの家具の動き（ゆれる・明かりがつく など） */
 const FX_CLASS: Partial<Record<FurnitureFx, string>> = { wobble: "room-fx-wobble", sway: "room-fx-sway", squish: "room-fx-squish", clatter: "room-fx-clatter" };
-const FURNITURE_DEPTH: Record<string, number> = { whiteboard: 0.2, sofa: 0.35, plant: 0.2, bookshelf: 0.25, lamp: 0.2, table: 0.3, "dog-house": 0.35, bowl: 0.2, "dog-bed": 0.3 };
+const FURNITURE_DEPTH: Record<string, number> = { kotatsu: 0.35, fishbowl: 0.2, tv: 0.25, piano: 0.3, "rocking-chair": 0.25, toybox: 0.25, whiteboard: 0.2, sofa: 0.35, plant: 0.2, bookshelf: 0.25, lamp: 0.2, table: 0.3, "dog-house": 0.35, bowl: 0.2, "dog-bed": 0.3 };
 
 const FLOOR_SPOTS = [[22, 74], [78, 76], [64, 90], [36, 92], [86, 92], [14, 88], [50, 66], [70, 66]] as const;
 
-/** 買う仕組みがあるときは、買った数をこえる家具・窓・棚などを外す（外した棚に乗せていたものは床に下ろす。図鑑アイテムなどはそのまま） */
+/** 買う仕組みがあるときは、買った数をこえる家具・窓・棚などを外し（外した棚に乗せていたものは床に下ろす。図鑑アイテムなどはそのまま）、持っていないデザインは標準にもどす */
 function ownedOnly(layout: RoomLayout, shop: RoomShop | undefined): RoomLayout {
   if (!shop?.ready) return layout;
   const items = capToOwned(layout.items, shop);
-  return items.length === layout.items.length ? layout : parseRoomLayout({ ...layout, items, v: 2 });
+  const theme = ownedTheme(layout.theme, shop);
+  return items.length === layout.items.length ? { ...layout, theme } : parseRoomLayout({ ...layout, theme, items, v: 2 });
 }
 
 /** はじめて開いたときの部屋：持っているものから少しだけ飾っておく（家具は置かない。「家具」タブから自分で置く） */
@@ -246,6 +259,8 @@ export function MyRoom({ entries, initialLayout, serverReady, dogSkin, dogName, 
   const [layout, setLayout] = useState<RoomLayout>(() => ownedOnly(initialLayout
     ? { ...initialLayout, items: initialLayout.items.filter((p) => validKeys.has(p.key) || p.key.startsWith("upload:")) }
     : starterLayout(entries), shop));
+  /** わんこの名前（部屋に保存した名前。なければ「わんこ」） */
+  const petName = layout.dogName ?? dogName;
   /** 持ち物に、アップロードした写真を足したもの（アップロードした写真を先に並べる） */
   const allEntries = useMemo(() => [...layout.photos.map(uploadEntry), ...entries, ...FURNITURE_ENTRIES, ...FIXTURE_ENTRIES], [entries, layout.photos]);
   /** 棚に乗せたものの位置を、棚の位置と大きさから決めたもの（描く・動かすときはこちらを使う） */
@@ -636,17 +651,16 @@ export function MyRoom({ entries, initialLayout, serverReady, dogSkin, dogName, 
   /** 観葉植物の水やり（この端末に保存） */
   const { plant, water } = usePlantCare(todayKey);
   /** わんこのお泊まり会（土曜の夕方〜日曜の朝に、フレンドのわんこが来る。自分の部屋だけ） */
-  const router = useRouter();
   const guest = useMemo(() => (visit || editing ? null : sleepoverGuest(now, guests?.friends ?? [])), [editing, guests?.friends, now, visit]);
   const guestId = guest?.id ?? null;
   useEffect(() => {
     if (!guestId || !guest) return;
-    setDogCue({ id: Date.now(), text: `きょうは ${[...guest.name].slice(0, 6).join("")}さんちの わんこが おとまり！`, pose: "cheer" });
+    setDogCue({ id: Date.now(), text: `きょうは ${[...guest.name].slice(0, 6).join("")}さんちの わんこが おとまりに来たよ！`, pose: "cheer" });
     // お客さんが来たときだけ
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [guestId]);
   /** ホワイトボードのらくがき（きょうの日付・天気・歩数で変わる） */
-  const doodleInfo = useMemo(() => ({ now, weather: weather?.kind ?? null, steps: visit ? null : steps?.steps, dogName }), [now, weather?.kind, visit, steps?.steps, dogName]);
+  const doodleInfo = useMemo(() => ({ now, weather: weather?.kind ?? null, steps: visit ? null : steps?.steps, dogName: petName }), [now, weather?.kind, visit, steps?.steps, petName]);
   /** 寝言（きょうの歩数や、部屋にあるもの・おやつの夢） */
   const dogDreams = useMemo(() => {
     const dreams = ["ジャーキー…3本…", "ボール…まてまて〜…", "おさんぽ…もう1周…", "ごしゅじん…だいすき…", "それ…ぼくの…おやつ…"];
@@ -737,13 +751,13 @@ export function MyRoom({ entries, initialLayout, serverReady, dogSkin, dogName, 
       // パシャッ（白く光らせる）
       room.animate?.([{ filter: "brightness(1.8)" }, { filter: "brightness(1)" }], { duration: 380, easing: "ease-out" });
       const blob = await composeRoomSnapshot(room, {
-        title: `${dogName}のおへや`,
+        title: `${petName}のおへや`,
         sub: fmtDate(new Intl.DateTimeFormat("sv-SE", { timeZone: "Asia/Tokyo" }).format(new Date())),
         fontFamily: getComputedStyle(document.body).fontFamily,
       });
       if (shot) URL.revokeObjectURL(shot.url);
       setShot({ blob, url: URL.createObjectURL(blob) });
-      setShareBody(`${dogName}のおへやを もようがえしたよ🏠`);
+      setShareBody(`${petName}のおへやを もようがえしたよ🏠`);
       setShareState("idle"); setShareError("");
     } catch {
       flash("写真をつくれませんでした");
@@ -755,7 +769,7 @@ export function MyRoom({ entries, initialLayout, serverReady, dogSkin, dogName, 
     if (!shot) return;
     const file = new File([shot.blob], "wanko-room.jpg", { type: "image/jpeg" });
     try {
-      if (navigator.canShare?.({ files: [file] })) { await navigator.share({ files: [file], title: `${dogName}のおへや` }); return; }
+      if (navigator.canShare?.({ files: [file] })) { await navigator.share({ files: [file], title: `${petName}のおへや` }); return; }
     } catch { /* 共有をやめたとき */ return; }
     const a = document.createElement("a");
     a.href = shot.url; a.download = "wanko-room.jpg";
@@ -791,7 +805,7 @@ export function MyRoom({ entries, initialLayout, serverReady, dogSkin, dogName, 
             onEdit={() => setEditing(true)}
           />
           <ul className="space-y-1.5 rounded-2xl border border-line bg-card px-4 py-3 text-[12px] leading-relaxed text-ink-soft shadow-sm">
-            <li>🐾 {dogName}をタップすると、なでられます</li>
+            <li>🐾 {petName}をタップすると、なでられます</li>
             <li>🖼️ 飾った写真をタップすると、その日の思い出が見られます</li>
             <li>🕰️ 窓の外・部屋の明るさ・時計は、住んでいるところ（📍で変えられます）の、いまの時刻・天気と、季節の日の出・日の入りに合わせて変わります</li>
             <li>🚩 おでかけを記録した都道府県のペナントや、おさんぽのトロフィーも飾れます</li>
@@ -821,7 +835,7 @@ export function MyRoom({ entries, initialLayout, serverReady, dogSkin, dogName, 
             </Link>
             <div className="min-w-0 flex-1 text-center">
               <p className="text-[10px] font-bold tracking-[0.18em] text-leaf-deep">{visit ? "FRIEND'S ROOM" : "MY ROOM"}</p>
-              <h1 className="truncate text-[17px] font-black">{visit ? `${visit.name}さんのおへや` : `${dogName}のおへや`}</h1>
+              <h1 className="truncate text-[17px] font-black">{visit ? `${visit.name}さんのおへや` : `${petName}のおへや`}</h1>
             </div>
             {/* もっている青コイン（タップで家具のお店へ） */}
             {!visit && shopState?.ready ? (
@@ -913,7 +927,7 @@ export function MyRoom({ entries, initialLayout, serverReady, dogSkin, dogName, 
             })}
 
             {!editing && mess.length ? <RoomMess mess={mess} onClean={(m) => onCleanMess(m.id)} /> : null}
-          <RoomDog skin={dogSkin} phase={phase} sleepy={sleepy} lines={dogLines} dreams={dogDreams} cue={dogCue} quiet={editing} places={dogPlaces} weather={weather?.kind ?? null} onFx={onFurnitureFx} />
+          <RoomDog skin={dogSkin} phase={phase} sleepy={sleepy} lines={dogLines} dreams={dogDreams} cue={dogCue} introduce={visit ? petName : null} quiet={editing} places={dogPlaces} weather={weather?.kind ?? null} onFx={onFurnitureFx} />
             {/* 行事のもの（部屋の左右のすみ）。置いたものと同じく、奥ほど下に重なる */}
             {roomEvent ? (["L", "R"] as const).map((side) => (
               <div key={side} className="pointer-events-none absolute inset-0" style={{ zIndex: 300 + Math.round(EVENT_FLOOR_Y[side] * 10) }} data-event-layer>
@@ -931,7 +945,7 @@ export function MyRoom({ entries, initialLayout, serverReady, dogSkin, dogName, 
             {/* ほこり・クモの巣（おさんぽをさぼると） */}
             {!editing ? <RoomDust dirt={dirt} onTap={dirtHint} /> : null}
             {/* お泊まりに来たフレンドのわんこ */}
-            {guest ? <GuestDog guest={guest} sleeping={sleepy} onTap={() => router.push(`/room/visit/${guest.id}`)} /> : null}
+            {guest ? <GuestDog guest={guest} sleeping={sleepy} /> : null}
             <ShootingStars rects={windowRects} active={phase === "night" && !editing && (!weather || weather.kind === "clear" || weather.kind === "partly")} onWish={flash} />
             <div className="pointer-events-none absolute inset-0" style={{ zIndex: 2000 }}>
               <RoomLighting now={now} lamps={lampLights} at={place} weather={weather} room={layout.theme.room} event={roomEvent} openBottom={stage} />
@@ -1013,7 +1027,20 @@ export function MyRoom({ entries, initialLayout, serverReady, dogSkin, dogName, 
                   <input ref={fileRef} type="file" accept="image/*" className="hidden" onChange={(e) => { const f = e.target.files?.[0]; if (f) void uploadPhoto(f); }} />
                 ) : null}
                 {tab === "theme" ? (
-                  <ThemePicker theme={layout.theme} onChange={setTheme} now={now} />
+                  <ThemePicker
+                    theme={layout.theme} onChange={setTheme} now={now} shop={shopState}
+                    onBought={(id, owned, balance) => {
+                      setShopState((cur) => {
+                        if (!cur) return cur;
+                        // おへやを買うと、合う壁紙・床・窓などもセットでもらえる
+                        const bundle = isThemeGoodId(id) && themeGood(id).part === "room" ? roomBundle(themeGood(id).value as RoomKind) : [];
+                        return { ...cur, blueCoins: balance, owned: { ...cur.owned, [id]: owned, ...Object.fromEntries(bundle.map((b) => [b, 1])) } };
+                      });
+                      flash(`${shopName(id)}を買いました！`);
+                    }}
+                    dogName={petName}
+                    onDogName={(name) => { const n = cleanDogName(name); commit({ ...latest.current, ...(n ? { dogName: n } : { dogName: undefined }) }); flash(n ? `わんこの名前を「${n}」にしました` : "名前を「わんこ」にもどしました"); }}
+                  />
                 ) : (tab === "furniture" || tab === "fixture") && shopState?.ready ? (
                   <FurnitureShop
                     key={tab}
@@ -1064,7 +1091,7 @@ export function MyRoom({ entries, initialLayout, serverReady, dogSkin, dogName, 
               </section>
             </>
           ) : visit ? (
-            <VisitPanel visit={visit} dogName={dogName} liked={visitLike.liked} likeCount={visitLike.likeCount} likeBusy={visitLike.busy} onLike={() => void visitLike.toggleLike()} />
+            <VisitPanel visit={visit} dogName="わんこ" liked={visitLike.liked} likeCount={visitLike.likeCount} likeBusy={visitLike.busy} onLike={() => void visitLike.toggleLike()} />
           ) : (
             // 小さい画面でもつぶれないよう、最低の高さをとる（そのときだけ画面が少しスクロールする）
             <div ref={stageRef} className="relative z-10 -mt-px min-h-[300px] flex-1" style={{ background: `linear-gradient(180deg, ${backdrop.top} 0%, ${backdrop.mid} 42%, ${backdrop.mid} 100%)` }}>
@@ -1100,7 +1127,7 @@ export function MyRoom({ entries, initialLayout, serverReady, dogSkin, dogName, 
           </div>
         ) : null}
 
-        {diary ? <DiaryDialog history={stepHistory ?? []} today={todayKey} dogName={dogName} onClose={() => setDiary(false)} /> : null}
+        {diary ? <DiaryDialog history={stepHistory ?? []} today={todayKey} dogName={petName} onClose={() => setDiary(false)} /> : null}
 
         {lightbox ? (
           <div className="fixed inset-0 z-[700] flex items-center justify-center bg-[#140f22]/75 p-4 backdrop-blur-sm" role="dialog" aria-modal="true" aria-label={`${lightbox.name}の思い出`} onClick={(e) => { if (e.target === e.currentTarget) setLightbox(null); }}>
@@ -1140,18 +1167,55 @@ const styleSwatch = (style: RoomStyle): React.CSSProperties => {
 };
 const DECO_LABELS: Record<WallDeco, string> = { none: "なし", garland: "ガーランド", lights: "ライト", stars: "お星さま" };
 
-function ThemePicker({ theme, onChange, now }: { theme: RoomTheme; onChange: (patch: Partial<RoomTheme>) => void; now: Date }) {
+function ThemePicker({ theme, onChange, now, shop, onBought, dogName, onDogName }: {
+  theme: RoomTheme; onChange: (patch: Partial<RoomTheme>) => void; now: Date;
+  /** 青コインのお店（無ければ、どのデザインも自由に選べる） */
+  shop: RoomShop | null;
+  onBought: (id: ShopId, owned: number, balance: number) => void;
+  /** わんこの名前（部屋に保存する） */
+  dogName: string;
+  onDogName: (name: string) => void;
+}) {
   const event = roomEventOf(now), next = nextRoomEvent(now);
   const eventsOn = theme.events !== false;
+  const [buying, setBuying] = useState<{ id: ThemeGoodId; apply: () => void; thumb: React.ReactNode } | null>(null);
+  const [nameDraft, setNameDraft] = useState(dogName);
+  /** 持っていないデザイン（買うときの値段） */
+  const lockOf = <P extends ThemePart>(part: P) => (id: RoomTheme[P]) => (shop?.ready && !isFreeTheme(part, id) && !shop.owned[themeGoodId(part, id)] ? THEME_PRICES[part] : null);
+  /** えらぶ。持っていなければ、買ってからえらぶ */
+  const pick = <P extends ThemePart>(part: P, thumb: (id: RoomTheme[P]) => React.ReactNode, apply: (id: RoomTheme[P]) => void) => (id: RoomTheme[P]) => {
+    if (lockOf(part)(id) !== null) setBuying({ id: themeGoodId(part, id), apply: () => apply(id), thumb: thumb(id) });
+    else apply(id);
+  };
+  const roomThumb = (room: RoomKind) => <ThemeSwatch part="room" theme={ROOM_PRESETS[room]} />;
+  const swatch = <P extends Exclude<ThemePart, "room" | "style">>(part: P) => function Swatch(v: RoomTheme[P]) { return <ThemeSwatch part={part} theme={{ ...theme, [part]: v }} />; };
   return (
     <div className="mt-3 space-y-4">
-      <Swatches title="おへや（えらぶと壁・床・窓もおすすめに変わります）" value={theme.room} options={ROOM_KINDS} label={(id) => ROOM_KIND_STYLES[id].label} render={(room) => <ThemeSwatch part="room" theme={ROOM_PRESETS[room]} />} onPick={(room) => onChange({ ...ROOM_PRESETS[room] })} />
-      <Swatches title="窓" value={theme.style} options={ROOM_STYLES} label={(id) => STYLE_LABELS[id]} paint={styleSwatch} onPick={(style) => onChange({ style })} />
-      <Swatches title="壁紙" value={theme.wall} options={WALLPAPERS} label={(id) => WALLPAPER_STYLES[id].label} render={(wall) => <ThemeSwatch part="wall" theme={{ ...theme, wall }} />} onPick={(wall) => onChange({ wall })} />
-      <Swatches title="床" value={theme.floor} options={FLOORS} label={(id) => FLOOR_STYLES[id].label} render={(floor) => <ThemeSwatch part="floor" theme={{ ...theme, floor }} />} onPick={(floor) => onChange({ floor })} />
-      <Swatches title="カーテン" value={theme.curtain} options={CURTAINS} label={(id) => CURTAIN_STYLES[id].label} render={(curtain) => <ThemeSwatch part="curtain" theme={{ ...theme, curtain }} />} onPick={(curtain) => onChange({ curtain })} />
-      <Swatches title="壁のかざり" value={theme.deco} options={WALL_DECOS} label={(id) => DECO_LABELS[id]} render={(deco) => <ThemeSwatch part="deco" theme={{ ...theme, deco }} />} onPick={(deco) => onChange({ deco })} />
-      <Swatches title="ラグ" value={theme.rug} options={RUGS} label={(id) => RUG_STYLES[id].label} render={(rug) => <ThemeSwatch part="rug" theme={{ ...theme, rug }} />} onPick={(rug) => onChange({ rug })} />
+      {/* わんこの名前 */}
+      <div className="rounded-2xl border border-line bg-paper px-3 py-2.5">
+        <p className="text-xs font-black text-ink-soft">わんこの なまえ</p>
+        <form className="mt-1.5 flex gap-2" onSubmit={(e) => { e.preventDefault(); onDogName(nameDraft); }}>
+          <input value={nameDraft} onChange={(e) => setNameDraft([...e.target.value].slice(0, DOG_NAME_MAX).join(""))} placeholder="わんこ" aria-label="わんこの名前"
+            className="min-w-0 flex-1 rounded-xl border border-line bg-card px-3 py-2 text-[16px] font-bold" />
+          <button type="submit" disabled={nameDraft.trim() === dogName} className="shrink-0 rounded-full bg-leaf-deep px-4 text-sm font-black text-white disabled:opacity-40">きめる</button>
+        </form>
+        <p className="mt-1 text-[10px] font-bold text-ink-faint">フレンドの部屋にあそびに行ったときは、タップされたときだけ名前が出ます</p>
+      </div>
+      {shop?.ready ? <BlueCoinBar shop={shop} note="🔒のデザインは青コインで買えます。おへやは、合う壁紙・床・窓などもセットです。" /> : null}
+      <Swatches title="おへや（えらぶと壁・床・窓もおすすめに変わります）" value={theme.room} options={ROOM_KINDS} label={(id) => ROOM_KIND_STYLES[id].label} render={roomThumb} lock={lockOf("room")} onPick={pick("room", roomThumb, (room) => onChange({ ...ROOM_PRESETS[room] }))} />
+      <Swatches title="窓" value={theme.style} options={ROOM_STYLES} label={(id) => STYLE_LABELS[id]} paint={styleSwatch} lock={lockOf("style")} onPick={pick("style", (id) => <span className="block h-14 w-14" style={styleSwatch(id)} />, (style) => onChange({ style }))} />
+      <Swatches title="壁紙" value={theme.wall} options={WALLPAPERS} label={(id) => WALLPAPER_STYLES[id].label} render={swatch("wall")} lock={lockOf("wall")} onPick={pick("wall", swatch("wall"), (wall) => onChange({ wall }))} />
+      <Swatches title="床" value={theme.floor} options={FLOORS} label={(id) => FLOOR_STYLES[id].label} render={swatch("floor")} lock={lockOf("floor")} onPick={pick("floor", swatch("floor"), (floor) => onChange({ floor }))} />
+      <Swatches title="カーテン" value={theme.curtain} options={CURTAINS} label={(id) => CURTAIN_STYLES[id].label} render={swatch("curtain")} lock={lockOf("curtain")} onPick={pick("curtain", swatch("curtain"), (curtain) => onChange({ curtain }))} />
+      <Swatches title="壁のかざり" value={theme.deco} options={WALL_DECOS} label={(id) => DECO_LABELS[id]} render={swatch("deco")} lock={lockOf("deco")} onPick={pick("deco", swatch("deco"), (deco) => onChange({ deco }))} />
+      <Swatches title="ラグ" value={theme.rug} options={RUGS} label={(id) => RUG_STYLES[id].label} render={swatch("rug")} lock={lockOf("rug")} onPick={pick("rug", swatch("rug"), (rug) => onChange({ rug }))} />
+      {buying && shop ? (
+        <BuyDialog
+          id={buying.id} blueCoins={shop.blueCoins} thumb={buying.thumb} actionLabel="買ってえらぶ"
+          onClose={() => setBuying(null)}
+          onDone={(owned, balance) => { onBought(buying.id, owned, balance); buying.apply(); setBuying(null); }}
+        />
+      ) : null}
       {/* 季節の行事かざり */}
       <div className="flex items-center justify-between gap-3 rounded-2xl border border-line bg-paper px-3 py-2.5">
         <div className="min-w-0">
@@ -1175,8 +1239,10 @@ function ThemePicker({ theme, onChange, now }: { theme: RoomTheme; onChange: (pa
   );
 }
 
-function Swatches<T extends string>({ title, value, options, label, paint, render, onPick }: {
+function Swatches<T extends string>({ title, value, options, label, paint, render, lock, onPick }: {
   title: string; value: T; options: readonly T[]; label: (id: T) => string;
+  /** 持っていないときの値段（持っていれば null） */
+  lock?: (id: T) => number | null;
   /** 色や模様だけの見本 */
   paint?: (id: T) => React.CSSProperties;
   /** 実際の部屋と同じ描き方の見本 */
@@ -1189,10 +1255,12 @@ function Swatches<T extends string>({ title, value, options, label, paint, rende
       <div className="-mx-4 flex gap-2 overflow-x-auto px-4 pb-1">
         {options.map((id) => (
           <button key={id} type="button" onClick={() => onPick(id)} aria-pressed={value === id} className="flex w-[70px] shrink-0 flex-col items-center gap-1">
-            <span className={`block h-14 w-14 overflow-hidden rounded-2xl border shadow-sm ${value === id ? "border-leaf-deep ring-2 ring-leaf/50" : "border-line"}`} style={paint?.(id)}>
+            <span className={`relative block h-14 w-14 overflow-hidden rounded-2xl border shadow-sm ${value === id ? "border-leaf-deep ring-2 ring-leaf/50" : "border-line"}`} style={paint?.(id)}>
               {render?.(id)}
+              {lock?.(id) != null ? <span className="absolute inset-0 flex items-start justify-end bg-white/35 p-0.5"><span className="rounded-full bg-[#2F6FC2] px-1 text-[9px] leading-[14px]">🔒</span></span> : null}
             </span>
             <span className={`w-full truncate text-center text-[10px] font-bold ${value === id ? "text-leaf-deep" : "text-ink-soft"}`}>{label(id)}</span>
+            {lock?.(id) != null ? <span className="-mt-0.5 flex items-center gap-0.5 text-[9px] font-black tabular-nums text-[#2F6FC2]"><BlueCoinArt className="h-3 w-3" />{lock(id)!.toLocaleString()}</span> : null}
           </button>
         ))}
       </div>

@@ -3,7 +3,7 @@ import { OSANPO_RUN_RANKS, OSANPO_RUN_STAGE_IDS, OSANPO_RUN_STAGES } from "@/lib
 import { PREFECTURE_NAMES } from "@/lib/geo/prefecture-names";
 import { PENNANTS } from "@/lib/room/themes";
 import { isDogSkinId, type DogSkinId } from "@/lib/dog-skins";
-import { isShopId, parseRoomLayout, pennantKey, photoKey, trophyKey, type DecorEntry, type RoomLayout, type RoomShop } from "@/lib/room/types";
+import { cleanDogName, isShopId, parseRoomLayout, pennantKey, photoKey, trophyKey, type DecorEntry, type RoomLayout, type RoomShop } from "@/lib/room/types";
 import type { Json } from "@/lib/supabase/types";
 import type { DB } from "./client";
 import { getOwnedItemCounts } from "./collection";
@@ -51,6 +51,20 @@ export async function getRoomShop(supabase: DB, userId: string): Promise<RoomSho
   }
   const balance = coins.data?.[0]?.balance;
   return { ready: true, blueCoins: typeof balance === "number" ? balance : 0, owned };
+}
+
+/** フレンドのわんこの名前と見た目（お泊まり会・窓の外を通る犬で使う。関数がまだ無い環境では空） */
+export async function getFriendDogs(supabase: DB): Promise<Map<string, { dogName?: string; skin: DogSkinId }>> {
+  const rpc = supabase.rpc.bind(supabase) as unknown as (fn: "get_friend_dogs") => PromiseLike<{ data: unknown; error: { code?: string; message: string } | null }>;
+  const { data, error } = await rpc("get_friend_dogs");
+  const map = new Map<string, { dogName?: string; skin: DogSkinId }>();
+  if (error || !Array.isArray(data)) return map;
+  for (const row of data as Record<string, unknown>[]) {
+    if (typeof row.friend_user_id !== "string") continue;
+    const dogName = cleanDogName(row.dog_name);
+    map.set(row.friend_user_id, { ...(dogName ? { dogName } : {}), skin: isDogSkinId(row.dog_skin) ? row.dog_skin : "default" });
+  }
+  return map;
 }
 
 /** おへやに飾れるもの（図鑑アイテム・写真・トロフィー・ペナント） */

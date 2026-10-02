@@ -35,6 +35,12 @@ export function FurnitureArt({ id, label, lit, fx }: { id: FurnitureId; label?: 
     case "table": return <Table {...art} a11y={a11y} />;
     case "dog-house": return <DogHouse {...art} a11y={a11y} />;
     case "whiteboard": return <Whiteboard {...art} a11y={a11y} />;
+    case "kotatsu": return <Kotatsu {...art} a11y={a11y} />;
+    case "fishbowl": return <Fishbowl {...art} a11y={a11y} />;
+    case "tv": return <Tv {...art} a11y={a11y} />;
+    case "piano": return <Piano {...art} a11y={a11y} />;
+    case "rocking-chair": return <RockingChair {...art} a11y={a11y} />;
+    case "toybox": return <Toybox {...art} a11y={a11y} />;
     default: return <Bowl {...art} a11y={a11y} />;
   }
 }
@@ -527,6 +533,215 @@ function Whiteboard({ u, fx, a11y }: P) {
       {fx === "drawing" ? null : <g><rect x="36" y="111" width="24" height="5" rx="2.5" fill="#F4F6F8" stroke="#9AA1AB" strokeWidth="0.5" /><rect x="34" y="111" width="6" height="5" rx="2" fill="#2F6FC2" /></g>}
       <g><rect x="64" y="111" width="22" height="5" rx="2.5" fill="#F4F6F8" stroke="#9AA1AB" strokeWidth="0.5" /><rect x="62" y="111" width="6" height="5" rx="2" fill="#D9402E" /></g>
       <g><rect x="104" y="109" width="26" height="7" rx="1.5" fill="#33373E" /><rect x="104" y="114" width="26" height="2.4" fill="#E6DCC8" /></g>
+    </svg>
+  );
+}
+
+/** こたつ（木の天板と、格子もようのこたつ布団。上にみかんのかごと湯のみ） */
+function Kotatsu({ u, a11y }: P) {
+  const g = (n: string) => `${u}-${n}`;
+  return (
+    <svg viewBox="0 0 220 130" className={SVG_CLASS} {...a11y}>
+      <defs>
+        <Blur />
+        <linearGradient id={g("futon")} x1="0" y1="0" x2="0" y2="1"><stop offset="0" stopColor="#E9875E" /><stop offset="1" stopColor="#C55E3C" /></linearGradient>
+        <linearGradient id={g("top")} x1="0" y1="0" x2="0" y2="1"><stop offset="0" stopColor="#D9A46A" /><stop offset="1" stopColor="#A9733F" /></linearGradient>
+        <pattern id={g("check")} width="22" height="22" patternUnits="userSpaceOnUse">
+          <rect width="22" height="22" fill="none" />
+          <path d="M0 11 H22 M11 0 V22" stroke="#FFE2C8" strokeOpacity="0.45" strokeWidth="3" />
+          <path d="M0 3 H22 M3 0 V22" stroke="#8A3A22" strokeOpacity="0.25" strokeWidth="1.2" />
+        </pattern>
+      </defs>
+      <FloorShadow cx={110} cy={122} rx={104} ry={8} o={0.24} />
+      {/* こたつ布団（ふっくら広がる） */}
+      <path d="M26 44 Q12 70 8 112 Q60 126 110 126 Q160 126 212 112 Q208 70 194 44 Z" fill={`url(#${g("futon")})`} />
+      <path d="M26 44 Q12 70 8 112 Q60 126 110 126 Q160 126 212 112 Q208 70 194 44 Z" fill={`url(#${g("check")})`} />
+      <path d="M40 60 Q34 86 34 110 M180 60 Q186 86 186 110 M110 64 Q112 92 110 124" stroke="#8A3A22" strokeOpacity="0.25" strokeWidth="2" fill="none" />
+      <path d="M8 112 Q60 126 110 126 Q160 126 212 112" stroke="#9E4428" strokeWidth="2" fill="none" opacity="0.5" />
+      {/* 天板 */}
+      <path d="M18 34 L202 34 L196 48 L24 48 Z" fill={`url(#${g("top")})`} />
+      <path d="M34 22 L186 22 L202 34 L18 34 Z" fill="#E4B07A" />
+      <path d="M34 22 L186 22" stroke="#F6D2A4" strokeWidth="1.6" />
+      {/* みかんのかごと湯のみ */}
+      <ellipse cx="88" cy="26" rx="26" ry="6" fill="#B8864E" />
+      {[[74, 18], [90, 15], [104, 19], [82, 10]].map(([x, y], i) => <g key={i}><circle cx={x} cy={y} r="8" fill="#F59A2E" /><circle cx={x! - 2.4} cy={y! - 2.6} r="2.2" fill="#FFD08A" /><path d={`M${x} ${y! - 8} l2 -2`} stroke="#4A7E3A" strokeWidth="1.6" /></g>)}
+      <path d="M140 12 h16 l-2 14 h-12 z" fill="#7FA48A" />
+      <ellipse cx="148" cy="12" rx="8" ry="2.4" fill="#5E8A6A" />
+      <path d="M146 6 q3 -3 0 -6 M151 6 q3 -3 0 -6" stroke="#FFFFFF" strokeOpacity="0.7" strokeWidth="1.2" fill="none" />
+    </svg>
+  );
+}
+
+/** 金魚ばち（木の台の上の、まるいガラスの鉢。金魚が2ひき） */
+function Fishbowl({ u, a11y }: P) {
+  const g = (n: string) => `${u}-${n}`;
+  return (
+    <svg viewBox="0 0 100 150" className={SVG_CLASS} {...a11y}>
+      <defs>
+        <Blur />
+        <radialGradient id={g("water")} cx="0.4" cy="0.35" r="0.7"><stop offset="0" stopColor="#D8F2FF" /><stop offset="1" stopColor="#7FC4E8" /></radialGradient>
+        <clipPath id={g("bowl")}><circle cx="50" cy="62" r="36" /></clipPath>
+      </defs>
+      <FloorShadow cx={50} cy={145} rx={34} ry={5} />
+      {/* 木の台 */}
+      <rect x="18" y="96" width="64" height="8" rx="3" fill="#B98552" />
+      <path d="M24 104 L20 144 M76 104 L80 144 M50 104 L50 144" stroke="#8E5C32" strokeWidth="5" strokeLinecap="round" />
+      <path d="M26 128 H74" stroke="#8E5C32" strokeWidth="3" />
+      {/* 鉢（ガラスと水） */}
+      <circle cx="50" cy="62" r="36" fill="#FFFFFF" opacity="0.35" />
+      <g clipPath={`url(#${g("bowl")})`}>
+        <rect x="10" y="40" width="80" height="60" fill={`url(#${g("water")})`} />
+        <path d="M14 40 Q32 36 50 40 T86 40" stroke="#FFFFFF" strokeWidth="1.6" fill="none" opacity="0.8" />
+        {[[30, 92, "#E8C9A0"], [42, 95, "#A9C4D8"], [56, 93, "#F2D7B8"], [68, 92, "#C8B4A0"]].map(([x, y, c], i) => <ellipse key={i} cx={x as number} cy={y as number} rx="6" ry="4" fill={c as string} />)}
+        <path d="M70 92 q-4 -14 2 -26 M74 92 q4 -12 0 -20" stroke="#4A9A5A" strokeWidth="2.4" fill="none" strokeLinecap="round" />
+        {/* 金魚 */}
+        {[[38, 60, 1], [60, 74, -1]].map(([x, y, d], i) => (
+          <g key={i} transform={`translate(${x} ${y}) scale(${d} 1)`}>
+            <ellipse cx="0" cy="0" rx="8" ry="5" fill="#F2572E" />
+            <path d="M-7 0 l-8 -6 q2 6 0 12 z" fill="#FF8A5E" />
+            <circle cx="4" cy="-1" r="1.2" fill="#2A1A10" />
+          </g>
+        ))}
+        {[[46, 50], [49, 44], [66, 62]].map(([x, y], i) => <circle key={i} cx={x} cy={y} r="1.6" fill="none" stroke="#FFFFFF" strokeWidth="0.8" />)}
+      </g>
+      <circle cx="50" cy="62" r="36" fill="none" stroke="#BFE3F2" strokeWidth="2" />
+      <ellipse cx="50" cy="28" rx="16" ry="4" fill="none" stroke="#BFE3F2" strokeWidth="2.4" />
+      <path d="M26 46 Q22 60 28 76" stroke="#FFFFFF" strokeWidth="3" strokeLinecap="round" fill="none" opacity="0.75" />
+    </svg>
+  );
+}
+
+/** テレビ（低いテレビ台の上。画面には、わんこ番組） */
+function Tv({ u, lit, a11y }: P) {
+  const g = (n: string) => `${u}-${n}`;
+  return (
+    <svg viewBox="0 0 200 160" className={SVG_CLASS} {...a11y}>
+      <defs>
+        <Blur />
+        <linearGradient id={g("board")} x1="0" y1="0" x2="0" y2="1"><stop offset="0" stopColor="#C99460" /><stop offset="1" stopColor="#8E5C32" /></linearGradient>
+        <linearGradient id={g("sky")} x1="0" y1="0" x2="0" y2="1"><stop offset="0" stopColor="#8EC8F2" /><stop offset="1" stopColor="#D8F0FF" /></linearGradient>
+      </defs>
+      <FloorShadow cx={100} cy={154} rx={92} ry={6} />
+      {/* テレビ台 */}
+      <rect x="10" y="112" width="180" height="38" rx="4" fill={`url(#${g("board")})`} />
+      <rect x="10" y="112" width="180" height="4" fill="#E2B37E" />
+      <rect x="20" y="122" width="76" height="20" rx="2" fill="#7A4E2A" opacity="0.5" />
+      <rect x="104" y="122" width="76" height="20" rx="2" fill="#7A4E2A" opacity="0.5" />
+      <circle cx="90" cy="132" r="2" fill="#F2D2A0" /><circle cx="110" cy="132" r="2" fill="#F2D2A0" />
+      {/* テレビ */}
+      <rect x="86" y="100" width="28" height="12" rx="2" fill="#2A2D33" />
+      <rect x="20" y="14" width="160" height="90" rx="6" fill="#1E2126" />
+      <rect x="27" y="20" width="146" height="78" rx="2" fill={`url(#${g("sky")})`} />
+      <path d="M27 76 Q70 62 110 72 T173 66 L173 98 L27 98 Z" fill="#7DBE62" />
+      <circle cx="148" cy="38" r="9" fill="#FFE07A" />
+      {/* 画面の中の わんこ（走っている） */}
+      <g transform="translate(78 64)">
+        <ellipse cx="0" cy="0" rx="16" ry="9" fill="#F4EDE2" />
+        <circle cx="16" cy="-8" r="8" fill="#F4EDE2" />
+        <path d="M12 -15 l2 -8 l4 7 M19 -15 l4 -7 l1 8" fill="#E2D6C4" />
+        <circle cx="19" cy="-9" r="1.4" fill="#2A1A10" />
+        <path d="M-12 6 l-4 8 M-4 8 l-2 8 M6 8 l2 8 M12 6 l5 7" stroke="#E2D6C4" strokeWidth="3" strokeLinecap="round" />
+      </g>
+      <circle cx="110" cy="84" r="5" fill="#E05A4A" stroke="#FFFFFF" strokeWidth="1" />
+      {/* 画面のつや・夜は画面の光がもれる */}
+      <path d="M27 20 L80 20 L50 98 L27 98 Z" fill="#FFFFFF" opacity="0.12" />
+      {lit ? <rect x="20" y="14" width="160" height="90" rx="6" fill="#BFE3FF" opacity="0.12" /> : null}
+      <circle cx="170" cy="100" r="1.6" fill="#7BE07B" />
+    </svg>
+  );
+}
+
+/** アップライトピアノ（つやのある黒っぽい木・白鍵と黒鍵・楽譜） */
+function Piano({ u, a11y }: P) {
+  const g = (n: string) => `${u}-${n}`;
+  return (
+    <svg viewBox="0 0 220 180" className={SVG_CLASS} {...a11y}>
+      <defs>
+        <Blur />
+        <linearGradient id={g("body")} x1="0" y1="0" x2="1" y2="0"><stop offset="0" stopColor="#5A3420" /><stop offset="0.5" stopColor="#3E2213" /><stop offset="1" stopColor="#2A160C" /></linearGradient>
+      </defs>
+      <FloorShadow cx={110} cy={174} rx={104} ry={7} />
+      {/* 本体 */}
+      <rect x="18" y="10" width="184" height="88" rx="5" fill={`url(#${g("body")})`} />
+      <rect x="18" y="10" width="184" height="6" rx="3" fill="#6E4428" />
+      <rect x="30" y="24" width="160" height="56" rx="3" fill="#2E190E" opacity="0.6" />
+      <path d="M40 30 L100 30 L70 74 L40 74 Z" fill="#FFFFFF" opacity="0.07" />
+      {/* 楽譜 */}
+      <g transform="translate(86 30)">
+        <rect width="48" height="34" rx="1.5" fill="#FFFDF6" />
+        {[8, 14, 20, 26].map((y) => <path key={y} d={`M4 ${y} H44`} stroke="#9AA1AB" strokeWidth="0.6" />)}
+        {[[10, 14], [18, 20], [26, 11], [34, 17], [40, 23]].map(([x, y], i) => <g key={i}><ellipse cx={x} cy={y} rx="2.2" ry="1.6" fill="#2A2D33" /><path d={`M${x! + 2} ${y} v-7`} stroke="#2A2D33" strokeWidth="0.8" /></g>)}
+      </g>
+      {/* 鍵盤 */}
+      <rect x="14" y="98" width="192" height="16" rx="2" fill="#2A160C" />
+      <rect x="20" y="100" width="180" height="12" fill="#FFFFFF" />
+      {Array.from({ length: 21 }, (_, i) => <line key={i} x1={20 + i * (180 / 21)} y1="100" x2={20 + i * (180 / 21)} y2="112" stroke="#C9CED6" strokeWidth="0.8" />)}
+      {Array.from({ length: 21 }, (_, i) => ([1, 2, 4, 5, 6].includes(i % 7) ? <rect key={i} x={20 + i * (180 / 21) - 2.6} y="100" width="5.2" height="7.4" fill="#1E1E22" /> : null))}
+      {/* 下の板と脚・ペダル */}
+      <rect x="22" y="114" width="176" height="52" rx="3" fill={`url(#${g("body")})`} />
+      <rect x="34" y="122" width="152" height="34" rx="3" fill="#2E190E" opacity="0.45" />
+      <rect x="14" y="114" width="10" height="56" rx="2" fill="#3E2213" />
+      <rect x="196" y="114" width="10" height="56" rx="2" fill="#3E2213" />
+      {[96, 110, 124].map((x) => <rect key={x} x={x - 3} y="162" width="6" height="4" rx="1" fill="#D4B05A" />)}
+    </svg>
+  );
+}
+
+/** ゆりいす（弓なりの脚で、前後にゆれる木のいす。クッションつき） */
+function RockingChair({ u, a11y }: P) {
+  const g = (n: string) => `${u}-${n}`;
+  return (
+    <svg viewBox="0 0 140 180" className={SVG_CLASS} {...a11y}>
+      <defs>
+        <Blur />
+        <linearGradient id={g("wood")} x1="0" y1="0" x2="1" y2="1"><stop offset="0" stopColor="#C68D57" /><stop offset="1" stopColor="#8E5A30" /></linearGradient>
+      </defs>
+      <FloorShadow cx={70} cy={172} rx={60} ry={6} />
+      {/* 弓なりの脚 */}
+      <path d="M8 156 Q70 184 132 150" stroke="#7A4B26" strokeWidth="7" fill="none" strokeLinecap="round" />
+      <path d="M8 156 Q70 184 132 150" stroke="#C68D57" strokeWidth="3" fill="none" strokeLinecap="round" />
+      {/* 脚と座面 */}
+      <path d="M32 164 L36 112 M108 160 L104 112 M48 166 L50 118 M92 166 L90 118" stroke={`url(#${g("wood")})`} strokeWidth="6" strokeLinecap="round" />
+      <path d="M26 104 L114 104 L110 118 L30 118 Z" fill={`url(#${g("wood")})`} />
+      {/* 背もたれ */}
+      <path d="M34 106 L30 20 Q70 6 110 20 L106 106" stroke={`url(#${g("wood")})`} strokeWidth="7" fill="none" strokeLinejoin="round" />
+      {[46, 58, 70, 82, 94].map((x) => <path key={x} d={`M${x} 104 L${x + (x - 70) * 0.08} 24`} stroke="#A9733F" strokeWidth="4" strokeLinecap="round" />)}
+      <path d="M30 22 Q70 8 110 22" stroke="#E2B37E" strokeWidth="2" fill="none" />
+      {/* ひじかけ */}
+      <path d="M22 74 Q30 66 40 74 L40 106 M118 74 Q110 66 100 74 L100 106" stroke={`url(#${g("wood")})`} strokeWidth="6" fill="none" strokeLinecap="round" />
+      {/* クッション */}
+      <path d="M34 92 Q70 84 106 92 Q110 104 104 108 Q70 112 36 108 Q30 104 34 92 Z" fill="#9CC4DE" />
+      <path d="M40 96 Q70 90 100 96" stroke="#FFFFFF" strokeOpacity="0.6" strokeWidth="2" fill="none" />
+      <circle cx="70" cy="100" r="2.4" fill="#6E9CC0" />
+    </svg>
+  );
+}
+
+/** おもちゃ箱（ふたを開けた木の箱から、ボール・ほね・ロープ・あひるがのぞく） */
+function Toybox({ u, a11y }: P) {
+  const g = (n: string) => `${u}-${n}`;
+  return (
+    <svg viewBox="0 0 160 120" className={SVG_CLASS} {...a11y}>
+      <defs>
+        <Blur />
+        <linearGradient id={g("box")} x1="0" y1="0" x2="1" y2="1"><stop offset="0" stopColor="#E7B56E" /><stop offset="1" stopColor="#B7803E" /></linearGradient>
+      </defs>
+      <FloorShadow cx={80} cy={114} rx={72} ry={6} />
+      {/* うしろにたおれたふた */}
+      <path d="M22 44 L40 8 L132 8 L138 44 Z" fill="#C98F4E" />
+      <path d="M44 14 L128 14" stroke="#F2CF96" strokeWidth="2" />
+      {/* 中から見えるおもちゃ */}
+      <g transform="translate(46 40)"><circle r="16" fill="#E04A3A" /><path d="M-16 0 A16 16 0 0 0 16 0 Z" fill="#FFFFFF" /><path d="M-15 -4 Q0 4 15 -4" stroke="#FFFFFF" strokeWidth="3" fill="none" /></g>
+      <g transform="translate(88 30) rotate(-20)"><path d="M-18 -4 a5 5 0 1 1 6 -4 h22 a5 5 0 1 1 6 4 a5 5 0 1 1 -6 4 h-22 a5 5 0 1 1 -6 -4 z" fill="#FFF6E6" stroke="#E2D2B4" strokeWidth="1.4" /></g>
+      <g transform="translate(118 38)"><ellipse cx="0" cy="4" rx="12" ry="9" fill="#FFD84A" /><circle cx="6" cy="-6" r="7" fill="#FFD84A" /><path d="M12 -6 l7 2 l-7 2 z" fill="#F08A1C" /><circle cx="8" cy="-8" r="1.2" fill="#2A1A10" /></g>
+      <path d="M64 46 q6 -18 18 -14 q10 4 6 16" stroke="#7FB0E0" strokeWidth="6" fill="none" strokeLinecap="round" />
+      <path d="M64 46 q6 -18 18 -14 q10 4 6 16" stroke="#FFFFFF" strokeWidth="2" strokeDasharray="4 4" fill="none" />
+      {/* 箱 */}
+      <rect x="16" y="44" width="128" height="66" rx="6" fill={`url(#${g("box")})`} />
+      <rect x="16" y="44" width="128" height="7" rx="3" fill="#F2CF96" />
+      <path d="M16 70 H144 M16 92 H144" stroke="#9E6B30" strokeOpacity="0.35" strokeWidth="1.6" />
+      {/* 肉球のマーク */}
+      <g transform="translate(80 82)" fill="#FFF1D8"><ellipse cx="0" cy="3" rx="7" ry="5.6" /><circle cx="-7" cy="-5" r="2.6" /><circle cx="-2.4" cy="-8.6" r="2.6" /><circle cx="2.4" cy="-8.6" r="2.6" /><circle cx="7" cy="-5" r="2.6" /></g>
     </svg>
   );
 }

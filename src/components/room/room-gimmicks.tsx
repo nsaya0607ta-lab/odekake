@@ -98,27 +98,34 @@ export function ShootingStars({ rects, active, onWish }: {
 }
 
 /** 窓の外を通る犬の、つぎの1匹（いまは通っていなければ null） */
+type FriendDog = { id: string; name: string; dogName?: string; skin?: (typeof DOG_SKIN_IDS)[number] };
+/** 窓の外を通る犬（フレンドの犬なら、だれの犬か。名前は、タップしたときだけ見せる） */
+export type Passer = WindowPasser & { friend?: { id: string; name: string; dogName?: string } };
+
 export function useWindowPasser({ active, steps, friends }: {
   active: boolean;
   /** きょうの歩数（多いほど、よく通る） */
   steps: number | null | undefined;
   /** あそびに行けるフレンド（ときどき、その犬が通る） */
-  friends: readonly { id: string; name: string }[];
+  friends: readonly FriendDog[];
 }) {
-  const [passer, setPasser] = useState<(WindowPasser & { friendId?: string }) | null>(null);
+  const [passer, setPasser] = useState<Passer | null>(null);
   const [mounted, setMounted] = useState(false);
   useEffect(() => setMounted(true), []);
   // 0歩で 50〜80 秒おき、1万歩で 12〜20 秒おきくらい
   const busy = Math.min(1, Math.max(0, steps ?? 0) / 10000);
-  const friendKey = friends.map((f) => `${f.id}:${f.name}`).join(",");
+  const friendsRef = useRef(friends);
+  friendsRef.current = friends;
+  const friendKey = friends.map((f) => f.id).join(",");
   useEffect(() => {
     if (!active || !mounted) { setPasser(null); return; }
-    const list = friendKey ? friendKey.split(",").map((s) => { const i = s.indexOf(":"); return { id: s.slice(0, i), name: s.slice(i + 1) }; }) : [];
     let t = 0;
     const go = () => {
+      const list = friendsRef.current;
       const friend = list.length && Math.random() < 0.35 ? list[Math.floor(Math.random() * list.length)]! : null;
       const ms = 8000 + Math.random() * 3000;
-      setPasser({ id: Date.now(), src: getFrenchieSrc(DOG_SKIN_IDS[Math.floor(Math.random() * DOG_SKIN_IDS.length)]!, "walk"), dir: Math.random() < 0.5 ? 1 : -1, ms, ...(friend ? { name: [...friend.name].slice(0, 6).join(""), friendId: friend.id } : {}) });
+      const skin = friend?.skin ?? DOG_SKIN_IDS[Math.floor(Math.random() * DOG_SKIN_IDS.length)]!;
+      setPasser({ id: Date.now(), src: getFrenchieSrc(skin, "walk"), dir: Math.random() < 0.5 ? 1 : -1, ms, ...(friend ? { friend: { id: friend.id, name: friend.name, ...(friend.dogName ? { dogName: friend.dogName } : {}) } } : {}) });
       t = window.setTimeout(go, ms + (12000 + (1 - busy) * 38000) * (1 + Math.random() * 0.6));
     };
     t = window.setTimeout(go, 2500 + Math.random() * 3000);
@@ -132,17 +139,38 @@ export function useWindowPasser({ active, steps, friends }: {
   return passer;
 }
 
-/** 通っているのがフレンドの犬のとき、窓をタップするとその部屋へ */
-export function PasserLink({ rects, passer }: { rects: readonly WindowRect[]; passer: (WindowPasser & { friendId?: string }) | null }) {
-  if (!passer?.friendId || !rects.length) return null;
+/** フレンドのわんこの名札（タップしたときだけ出す。もう一度タップでそのフレンドのおへやへ） */
+function DogNameCard({ dogName, owner, href, x, y }: { dogName?: string; owner: string; href: string; x: number; y: number }) {
+  return (
+    <Link href={href} className="room-bubble absolute w-max -translate-x-1/2 -translate-y-full rounded-2xl border border-line bg-card px-3 py-1.5 text-center shadow-md" style={{ left: `${x}%`, top: `${y}%`, zIndex: 2600 }}>
+      <span className="block text-[13px] font-black text-ink">🐾 {dogName ?? "わんこ"}</span>
+      <span className="block text-[10px] font-bold text-ink-soft">{[...owner].slice(0, 8).join("")}さんちの わんこ ・ <span className="text-leaf-deep underline">おへやへ</span></span>
+    </Link>
+  );
+}
+
+/** 通っているのがフレンドの犬のとき、窓をタップすると名札が出る（名札をタップでその部屋へ） */
+export function PasserLink({ rects, passer }: { rects: readonly WindowRect[]; passer: Passer | null }) {
+  const [shown, setShown] = useState<number | null>(null);
+  useEffect(() => {
+    if (shown === null) return;
+    const t = window.setTimeout(() => setShown(null), 4000);
+    return () => window.clearTimeout(t);
+  }, [shown]);
+  const friend = passer?.friend;
+  if (!friend || !rects.length) return null;
   const r = rects[0]!;
   return (
-    <Link
-      href={`/room/visit/${passer.friendId}`}
-      aria-label={`${passer.name}さんの犬が通っています（タップで${passer.name}さんのおへやへ）`}
-      className="absolute"
-      style={{ left: `${r.x0}%`, top: `${r.y0 + (r.y1 - r.y0) * 0.45}%`, width: `${r.x1 - r.x0}%`, height: `${(r.y1 - r.y0) * 0.55}%`, zIndex: 2100 }}
-    />
+    <>
+      <button
+        type="button"
+        aria-label="窓の外を通っているわんこ（タップで名前）"
+        onClick={() => setShown(passer.id)}
+        className="absolute"
+        style={{ left: `${r.x0}%`, top: `${r.y0 + (r.y1 - r.y0) * 0.45}%`, width: `${r.x1 - r.x0}%`, height: `${(r.y1 - r.y0) * 0.55}%`, zIndex: 2100 }}
+      />
+      {shown === passer.id ? <DogNameCard dogName={friend.dogName} owner={friend.name} href={`/room/visit/${friend.id}`} x={(r.x0 + r.x1) / 2} y={r.y0 + (r.y1 - r.y0) * 0.5} /> : null}
+    </>
   );
 }
 
@@ -527,7 +555,7 @@ export function usePlantCare(today: string) {
  * 週に1回（土曜の夕方〜日曜の朝）、フレンドのわんこが泊まりにくる。だれが来るかは週ごとに決まる。
  * 夕方はラグの近くで遊び、夜は自分のわんこのとなりで寝る。タップすると、そのフレンドのおへやへ。
  */
-export function sleepoverGuest(now: Date, friends: readonly { id: string; name: string }[]): { id: string; name: string; skin: (typeof DOG_SKIN_IDS)[number] } | null {
+export function sleepoverGuest(now: Date, friends: readonly FriendDog[]): { id: string; name: string; dogName?: string; skin: (typeof DOG_SKIN_IDS)[number] } | null {
   if (!friends.length) return null;
   const parts = new Intl.DateTimeFormat("en-US", { timeZone: "Asia/Tokyo", year: "numeric", month: "2-digit", day: "2-digit", weekday: "short", hour: "numeric", hourCycle: "h23" }).formatToParts(now);
   const get = (k: string) => parts.find((p) => p.type === k)?.value ?? "";
@@ -537,23 +565,29 @@ export function sleepoverGuest(now: Date, friends: readonly { id: string; name: 
   // 土曜の日付で、その週のお客さんを決める
   const sat = new Date(Date.UTC(Number(get("year")), Number(get("month")) - 1, Number(get("day")) - (wd === "Sun" ? 1 : 0))).toISOString().slice(0, 10);
   const f = friends[hash(sat) % friends.length]!;
-  return { ...f, skin: DOG_SKIN_IDS[hash(f.id) % DOG_SKIN_IDS.length]! };
+  return { id: f.id, name: f.name, ...(f.dogName ? { dogName: f.dogName } : {}), skin: f.skin ?? DOG_SKIN_IDS[hash(f.id) % DOG_SKIN_IDS.length]! };
 }
 
-export function GuestDog({ guest, sleeping, onTap }: { guest: { id: string; name: string; skin: (typeof DOG_SKIN_IDS)[number] }; sleeping: boolean; onTap: () => void }) {
+export function GuestDog({ guest, sleeping }: { guest: { id: string; name: string; dogName?: string; skin: (typeof DOG_SKIN_IDS)[number] }; sleeping: boolean }) {
   // 起きているあいだは、ときどきポーズを変える
   const [pose, setPose] = useState("sit");
+  const [card, setCard] = useState(false);
   useEffect(() => {
     if (sleeping) return;
     const poses = ["sit", "smile", "sit-side", "wonder", "stand-happy", "sniff"];
     const t = window.setInterval(() => setPose(poses[Math.floor(Math.random() * poses.length)]!), 3800);
     return () => window.clearInterval(t);
   }, [sleeping]);
+  useEffect(() => {
+    if (!card) return;
+    const t = window.setTimeout(() => setCard(false), 4000);
+    return () => window.clearTimeout(t);
+  }, [card]);
   const x = 64, y = sleeping ? 81 : 78;
-  const name = [...guest.name].slice(0, 6).join("");
   return (
     <>
-      <button type="button" onClick={onTap} aria-label={`${name}さんのわんこが おとまりに来ています（タップで${name}さんのおへやへ）`}
+      {/* 名前は出さない（タップしたときだけ名札） */}
+      <button type="button" onClick={() => setCard(true)} aria-label="おとまりに来ている フレンドのわんこ（タップで名前）"
         className="absolute block -translate-x-1/2 -translate-y-full p-0" style={{ left: `${x}%`, top: `${y}%`, width: "22%", zIndex: 300 + Math.round(y * 10) }}>
         <span className="pointer-events-none absolute bottom-[3%] left-1/2 h-[12%] w-[62%] -translate-x-1/2 rounded-[50%] bg-[#4a3520]/20 blur-[2px]" />
         <span className={`block ${sleeping ? "room-dog-sleep" : "room-dog-idle"}`}>
@@ -561,11 +595,8 @@ export function GuestDog({ guest, sleeping, onTap }: { guest: { id: string; name
           <img src={getFrenchieSrc(guest.skin, sleeping ? "sleep" : pose)} alt="" draggable={false} className="block h-auto w-full select-none" style={{ transform: "scaleX(-1)" }} />
         </span>
       </button>
-      {/* 名前の札と Zzz（夜の暗さより上に） */}
-      <div className="pointer-events-none absolute -translate-x-1/2" style={{ left: `${x}%`, top: `${y - 17}%`, zIndex: 2500 }}>
-        <span className="whitespace-nowrap rounded-full bg-white/90 px-2 py-0.5 text-[10px] font-black text-leaf-deep shadow-sm">{name}さんちの わんこ</span>
-        {sleeping ? <span className="absolute -right-4 top-4 animate-pulse text-[11px] font-black text-[#8A8FD8]">Zzz</span> : null}
-      </div>
+      {sleeping ? <span className="pointer-events-none absolute animate-pulse text-[11px] font-black text-[#8A8FD8]" style={{ left: `${x + 6}%`, top: `${y - 12}%`, zIndex: 2500 }}>Zzz</span> : null}
+      {card ? <DogNameCard dogName={guest.dogName} owner={guest.name} href={`/room/visit/${guest.id}`} x={x} y={y - 14} /> : null}
     </>
   );
 }

@@ -132,7 +132,7 @@ export type DogPlaces = {
   blocks: { x0: number; x1: number; y0: number; y1: number }[];
 };
 
-export function RoomDog({ skin, phase, sleepy, lines, dreams = [], cue = null, quiet, places, weather = null, onFx }: {
+export function RoomDog({ skin, phase, sleepy, lines, dreams = [], cue = null, introduce = null, quiet, places, weather = null, onFx }: {
   skin: DogSkinId;
   phase: DayPhase;
   /** 窓の外の天気（わからなければ null） */
@@ -141,6 +141,8 @@ export function RoomDog({ skin, phase, sleepy, lines, dreams = [], cue = null, q
   lines: readonly string[];
   /** 寝ているときの寝言の候補 */
   dreams?: readonly string[];
+  /** フレンドの部屋のわんこ：タップされたら名前を言う（ふだんは名前を出さない） */
+  introduce?: string | null;
   /** 部屋で起きたことへの反応（id が変わるたびに1回、その場で言う） */
   cue?: { id: number; text: string; pose?: string } | null;
   /** もようがえ中は、じゃまにならないよう端ですわって待つ */
@@ -479,6 +481,81 @@ export function RoomDog({ skin, phase, sleepy, lines, dreams = [], cue = null, q
         });
         return;
       }
+      case "kotatsu": {
+        // こたつに足をつっこんで、ぬくぬく（夜はそのまま寝る）
+        const fr = frontOf(f, rand(-f.w * 0.15, f.w * 0.15));
+        walkTo(fr.x, f.y + 1.2, () => {
+          face(f.x);
+          if (sleepNow) { pose("sleep"); return; }
+          pose("lie-wave");
+          say(pick(["こたつ、ぬくぬく…", "ここから でられない…"]), 2000);
+          later(() => pose("sleep"), 2600);
+          later(() => { pose("yawn"); say("みかん、たべたいな", 1600); }, rand(6000, 9000));
+          fin(10_500);
+        }, f.y + 0.6);
+        return;
+      }
+      case "fishbowl": {
+        const sd = sideOf(f);
+        walkTo(sd.x, sd.y, () => {
+          face(f.x);
+          pose("wonder");
+          say("おさかな… じーっ", 1600);
+          later(() => { pose("sniff"); fx(f.id, "wobble"); say("ぱくっ…しないよ？", 1500); }, 1800);
+          later(() => { fx(f.id, null); pose("sit"); }, 3600);
+          fin(4600);
+        });
+        return;
+      }
+      case "tv": {
+        const fr = frontOf(f, 0);
+        walkTo(fr.x, Math.min(ROOM.floorBottom, f.y + 7), () => {
+          setDog((d) => ({ ...d, pose: "sit", flip: false }));
+          say(pick(["わんこ番組、おもしろい！", "ボールのCMだ！", "あ、ぼくに にてる！"]), 2200);
+          later(() => { pose("cheer"); say("ワン！", 1000); }, 3000);
+          later(() => pose("sit"), 4200);
+          fin(6000);
+        });
+        return;
+      }
+      case "piano": {
+        const fr = frontOf(f, rand(-f.w * 0.2, f.w * 0.2));
+        walkTo(fr.x, fr.y, () => {
+          face(f.x);
+          pose("wave");
+          fx(f.id, "wobble");
+          say("ポロロン♪", 1400);
+          later(() => { pose("bark"); say("ワワン ワン♪", 1400); }, 1500);
+          later(() => { fx(f.id, null); pose("wink"); say("じょうずでしょ？", 1500); }, 3000);
+          fin(4800);
+        });
+        return;
+      }
+      case "rocking-chair": {
+        const sd = sideOf(f);
+        walkTo(sd.x, sd.y, () => {
+          face(f.x);
+          pose("stand-happy");
+          fx(f.id, "sway", 4200);
+          say("ゆーらゆら〜", 1800);
+          later(() => { pose("sit-side"); say("ねむくなってきた…", 1500); }, 2400);
+          fin(4800);
+        });
+        return;
+      }
+      case "toybox": {
+        const fr = frontOf(f, 0);
+        walkTo(fr.x, fr.y, () => {
+          face(f.x);
+          pose("sniff");
+          fx(f.id, "wobble");
+          say("ごそごそ…", 1300);
+          later(() => { fx(f.id, null); pose("cheer"); say(pick(["ボール みーつけた！", "あひるさん、あった！", "ほねだ〜！"]), 1700); }, 1500);
+          later(() => pose("smile"), 3300);
+          fin(4600);
+        });
+        return;
+      }
       case "bookshelf": {
         const fr = frontOf(f, rand(-f.w * 0.2, f.w * 0.2));
         walkTo(fr.x, fr.y, () => {
@@ -489,6 +566,12 @@ export function RoomDog({ skin, phase, sleepy, lines, dreams = [], cue = null, q
           later(() => pose("sit"), 3600);
           fin(4800);
         });
+        return;
+      }
+      default: {
+        // 遊び方を決めていない家具：近くでくんくんして、つぎへ
+        const sd = sideOf(f);
+        walkTo(sd.x, sd.y, () => { face(f.x); pose("sniff"); fin(2400); });
         return;
       }
     }
@@ -502,7 +585,7 @@ export function RoomDog({ skin, phase, sleepy, lines, dreams = [], cue = null, q
     const byKind = (k: FurnitureId) => pl.furniture.find((f) => f.kind === k);
     if (night) {
       // 夜はベッド → ソファ → ハウスの中 → ラグ の順で寝る場所をさがす
-      const spot = byKind("dog-bed") ?? byKind("sofa") ?? byKind("dog-house");
+      const spot = byKind("dog-bed") ?? byKind("kotatsu") ?? byKind("sofa") ?? byKind("dog-house");
       if (spot) playWith(spot, () => {}, true);
       else walkTo(50, 80, () => pose("sleep"));
       return;
@@ -614,7 +697,7 @@ export function RoomDog({ skin, phase, sleepy, lines, dreams = [], cue = null, q
     const awake = !night || Math.random() < 0.6;
     setDog((d) => ({ ...d, pose: awake ? pick(HAPPY_POSES) : "yawn" }));
     const id = Date.now();
-    setBubble({ text: awake ? pick(lines.length ? lines : ["わん！"]) : "むにゃ…", id });
+    setBubble({ text: awake ? (introduce ? `${introduce}だよ！ よろしくね` : pick(lines.length ? lines : ["わん！"])) : "むにゃ…", id });
     setHearts((h) => [...h.slice(-4), id]);
     later(() => setHearts((h) => h.filter((x) => x !== id)), 1400);
     later(() => setBubble((b) => (b?.id === id ? null : b)), 2400);

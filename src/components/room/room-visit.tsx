@@ -5,6 +5,7 @@
  * - VisitPanel … フレンドの部屋の下に出す「いいね」と置き手紙
  * - RoomGuests … 自分の部屋の下に出す、届いた「いいね」・置き手紙と、あそびに行けるフレンドの一覧
  */
+import type { DogSkinId } from "@/lib/dog-skins";
 import Link from "next/link";
 import { useEffect, useState } from "react";
 
@@ -146,7 +147,8 @@ export function VisitPanel({ visit, dogName, liked, likeCount, onLike, likeBusy 
 }
 
 export type RoomMailItem = { kind: "note" | "like"; id: string; userId: string; name: string; body: string | null; createdAt: string };
-export type RoomFriend = { id: string; name: string; avatar: string | null };
+/** dogName・skin は、そのフレンドのわんこの名前と見た目（わからなければ無い） */
+export type RoomFriend = { id: string; name: string; avatar: string | null; dogName?: string; skin?: DogSkinId };
 
 /** 自分の部屋に届いたものと、あそびに行けるフレンド */
 export function RoomGuests({ mail, friends }: { mail: RoomMailItem[]; friends?: RoomFriend[] }) {
