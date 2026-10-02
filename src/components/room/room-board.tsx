@@ -14,8 +14,8 @@
  */
 import { useEffect, useRef, useState, type ReactNode } from "react";
 
-/** ななめに立てる角度（右のはしが奥へ）と、うしろへのもたれ（度） */
-const TURN = 15, LEAN = 6;
+/** 立てる向き（右のはしを奥へ回す角度・うしろへのもたれ、度）。いまは正面向き */
+const TURN = 0, LEAN = 0;
 /** 透視の強さ（px）。カメラは部屋と同じく、上から見おろす */
 const PERSP = 1150;
 /** 板の下のはしから床までの高さ（脚の見えるぶん）・板の上に出る脚・わくの太さ・わくの厚み（px） */
@@ -29,26 +29,75 @@ const add = (a: V3, b: V3): V3 => [a[0] + b[0], a[1] + b[1], a[2] + b[2]];
 const mul = (a: V3, k: number): V3 => [a[0] * k, a[1] * k, a[2] * k];
 const pts = (ps: [number, number][]) => ps.map((p) => `${p[0].toFixed(1)},${p[1].toFixed(1)}`).join(" ");
 
-export function RoomBoard({ children, dark = 0, drop = DEFAULT_DROP, box = "bottom-[calc(env(safe-area-inset-bottom)+10px)] top-[14px] w-[min(86%,420px)]" }: {
+/** ボードの置き場所（机の上での位置と大きさ）。x は中心、y は足もと（どちらも机の領域の 0〜1）、w は幅（机の幅に対する割合） */
+export type BoardPlace = { x: number; y: number; w: number };
+export const DEFAULT_BOARD: BoardPlace = { x: 0.5, y: 0.9, w: 0.7 };
+/** ボード（脚まで）の 高さ ÷ 幅 */
+const ASPECT = 1.02;
+const clampN = (v: number, lo: number, hi: number) => Math.min(hi, Math.max(lo, v));
+
+/**
+ * 机の上のボード。わく・ペン置き・上の留め具をつかんで好きなところへ動かせ、右下のつまみで大きさを変えられる。
+ * 映す面の中は、ふつうにさわる・スクロールできる。
+ */
+export function RoomBoard({ children, dark = 0, drop = DEFAULT_DROP, place = DEFAULT_BOARD, onPlace }: {
   children: ReactNode;
   /** 夜の暗さ（0〜1） */
   dark?: number;
-  /** 板の下のはしから、置いた面（床・机）までの高さ（px） */
+  /** 板の下のはしから、置いた面（机）までの高さ（px） */
   drop?: number;
-  /** ボードを置く場所と大きさ（Tailwind のクラス） */
-  box?: string;
+  place?: BoardPlace;
+  /** 動かす・大きさを変えるのを終えたとき */
+  onPlace?: (p: BoardPlace) => void;
 }) {
   const DROP = drop;
-  const ref = useRef<HTMLDivElement>(null);
-  const [size, setSize] = useState({ w: 360, h: 330 });
+  // 置ける領域（机）の大きさ
+  const areaRef = useRef<HTMLDivElement>(null);
+  const [area, setArea] = useState({ w: 390, h: 340 });
   useEffect(() => {
-    const el = ref.current;
+    const el = areaRef.current;
     if (!el || typeof ResizeObserver === "undefined") return;
-    const ro = new ResizeObserver(() => { const r = el.getBoundingClientRect(); setSize({ w: Math.round(r.width), h: Math.round(r.height) }); });
+    const ro = new ResizeObserver(() => { const r = el.getBoundingClientRect(); setArea({ w: Math.round(r.width), h: Math.round(r.height) }); });
     ro.observe(el);
     return () => ro.disconnect();
   }, []);
-  const { w, h } = size;
+  // ドラッグ中は手もとの値で動かし、はなしたときに保存する
+  const [live, setLive] = useState<BoardPlace | null>(null);
+  const drag = useRef<{ mode: "move" | "size"; sx: number; sy: number; from: BoardPlace; id: number } | null>(null);
+  /** 机からはみ出しすぎないようにそろえる */
+  const fit = (p: BoardPlace): BoardPlace => {
+    const wf = clampN(p.w, 0.34, Math.min(0.98, (area.h * 1.15) / (area.w * ASPECT)));
+    const bwpx = wf * area.w, bhpx = bwpx * ASPECT;
+    const x = clampN(p.x, (bwpx * 0.42) / area.w, 1 - (bwpx * 0.42) / area.w);
+    const y = clampN(p.y, (bhpx * 0.85) / area.h, 1);
+    return { x, y, w: wf };
+  };
+  const pl = fit(live ?? place);
+  const w = Math.round(pl.w * area.w), h = Math.round(w * ASPECT);
+  const left = pl.x * area.w - w / 2, top = pl.y * area.h - h;
+  const onDown = (e: React.PointerEvent) => {
+    const t = e.target as HTMLElement;
+    if (!onPlace || t.closest("[data-board-screen]")) return;
+    drag.current = { mode: t.closest("[data-board-resize]") ? "size" : "move", sx: e.clientX, sy: e.clientY, from: pl, id: e.pointerId };
+    (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
+    e.preventDefault();
+  };
+  const onMove = (e: React.PointerEvent) => {
+    const d = drag.current;
+    if (!d || d.id !== e.pointerId) return;
+    const dx = e.clientX - d.sx, dy = e.clientY - d.sy;
+    setLive(fit(d.mode === "move"
+      ? { ...d.from, x: d.from.x + dx / area.w, y: d.from.y + dy / area.h }
+      : { ...d.from, w: d.from.w + (dx * 2 + dy * 2 / ASPECT) / 2 / area.w }));
+  };
+  const onUp = (e: React.PointerEvent) => {
+    const d = drag.current;
+    if (!d || d.id !== e.pointerId) return;
+    drag.current = null;
+    const next = live;
+    setLive(null);
+    if (next && onPlace) onPlace(next);
+  };
 
   /* ---------- 3D の置き方 ---------- */
   // カメラ（透視の中心）は、まん中の、部屋の床の消えるあたり（上の方）
@@ -56,7 +105,7 @@ export function RoomBoard({ children, dark = 0, drop = DEFAULT_DROP, box = "bott
   const T = rad(TURN), L = rad(LEAN);
   // 板（足もとのまん中が原点。u 右、v 上、n 手前）。手前に来る脚の先が画面からはみ出さないよう、少し上げる
   const bw = Math.max(120, w - 34);
-  const lift = Math.round(DROP * 0.55 + bw * Math.sin(T) * 0.16);
+  const lift = Math.round(4 + bw * Math.sin(T) * 0.16 + DROP * Math.sin(T) * 0.55);
   const yb = h - DROP - lift;
   const bh = Math.max(120, (yb - OVER - 6) / Math.cos(L) * 1.02);
   /** 板の座標 → 3D（画面の px、z は手前が＋） */
@@ -139,7 +188,12 @@ export function RoomBoard({ children, dark = 0, drop = DEFAULT_DROP, box = "bott
   const backShadow = pts([project([legs[0]!.foot[0], floorY, legs[0]!.foot[2]]), project([legs[1]!.foot[0], floorY, legs[1]!.foot[2]]), project(backFoot)]);
 
   return (
-    <div ref={ref} className={`absolute inset-x-0 mx-auto ${box}`} style={{ perspective: `${PERSP}px`, perspectiveOrigin: `${cx}px ${cy}px` }}>
+    <div ref={areaRef} className="pointer-events-none absolute inset-0">
+    <div
+      className="pointer-events-auto absolute"
+      style={{ left, top, width: w, height: h, perspective: `${PERSP}px`, perspectiveOrigin: `${cx}px ${cy}px` }}
+      onPointerDown={onDown} onPointerMove={onMove} onPointerUp={onUp} onPointerCancel={onUp}
+    >
       {/* うしろの層：床の影・アルミの三脚・まん中の柱・わくの厚み */}
       <svg aria-hidden width={w} height={h} viewBox={`0 0 ${w} ${h}`} className="pointer-events-none absolute inset-0 overflow-visible" style={dim}>
         <defs>
@@ -175,7 +229,7 @@ export function RoomBoard({ children, dark = 0, drop = DEFAULT_DROP, box = "bott
           </svg>
         ))}
         {/* 映す面（ここだけスクロールする） */}
-        <div className="absolute overflow-hidden rounded-[3px] bg-[#FAFBFC] shadow-[0_0_0_1px_#7E858F,0_0_0_2px_#AEB4BD]" style={{ inset: FRAME }}>
+        <div data-board-screen className="absolute overflow-hidden rounded-[3px] bg-[#FAFBFC] shadow-[0_0_0_1px_#7E858F,0_0_0_2px_#AEB4BD]" style={{ inset: FRAME }}>
           {/* 中身は決まった幅（SCREEN_W）で組んで、面の大きさに縮めて映す（ボードが小さくても文字がつまらない） */}
           <div className="absolute left-0 top-0" style={{ width: SCREEN_W, height: screenH / zoom, zoom }}>
             <div className="absolute inset-0 space-y-3 overflow-y-auto overscroll-contain pb-2 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden [&>*:not(:first-child)]:mx-2">
@@ -240,6 +294,26 @@ export function RoomBoard({ children, dark = 0, drop = DEFAULT_DROP, box = "bott
         const c = project(add([w / 2, floorY, world(0, 0, 0)[2]], mul(fwd, 30)));
         return <div aria-hidden className="pointer-events-none absolute h-12 rounded-[50%] bg-[radial-gradient(closest-side,rgba(220,232,255,.5),rgba(220,232,255,0))]" style={{ left: c[0] - w * 0.45, top: c[1] - 24, width: w * 0.9, opacity: night * 0.5 }} />;
       })() : null}
+
+      {/* つかむところ（上の留め具とわく・左右のわく・ペン置きから下）と、大きさを変えるつまみ */}
+      {onPlace ? (
+        <>
+          {[
+            { left: 0, top: 0, width: w, height: Math.max(0, yb - bh + FRAME) },
+            { left: 0, top: yb - FRAME, width: w, height: Math.max(0, h - yb + FRAME) },
+            { left: 0, top: yb - bh, width: w / 2 - hw + FRAME, height: bh },
+            { left: w / 2 + hw - FRAME, top: yb - bh, width: w / 2 - hw + FRAME, height: bh },
+          ].map((z, i) => <div key={i} className="absolute cursor-grab touch-none active:cursor-grabbing" style={z} />)}
+          <button
+            type="button" data-board-resize aria-label="ボードの大きさを変える（右下をドラッグ）"
+            className="absolute flex h-7 w-7 cursor-nwse-resize touch-none items-center justify-center rounded-full bg-white/90 shadow-[0_2px_6px_rgba(0,0,0,.3)] ring-1 ring-black/10"
+            style={{ left: w / 2 + hw - 16, top: yb - 16 }}
+          >
+            <svg viewBox="0 0 12 12" width="12" height="12" aria-hidden><path d="M11 4 L4 11 M11 8 L8 11" stroke="#6A707A" strokeWidth="1.6" strokeLinecap="round" /></svg>
+          </button>
+        </>
+      ) : null}
+    </div>
     </div>
   );
 }

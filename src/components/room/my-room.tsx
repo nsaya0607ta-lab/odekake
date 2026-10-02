@@ -863,8 +863,9 @@ export function MyRoom({ entries, initialLayout, serverReady, dogSkin, dogName, 
           // 小さい画面でもボードがつぶれないよう、最低の高さをとる（そのときだけ画面が少しスクロールする）
           <div className="relative z-10 -mt-px min-h-[300px] flex-1">
             <RoomDesk dark={1 - skyNow.light} warm={deskWarm} tint={deskTint} />
-            <RoomBoard dark={1 - skyNow.light} drop={16} box="bottom-[calc(env(safe-area-inset-bottom)+34px)] top-[8px] w-[min(72%,380px)]"
-            >
+            {/* ボードは机の天板の上（手前のふちより上）なら、好きなところに置けて大きさも変えられる */}
+            <div className="absolute inset-x-0 top-0 bottom-[calc(env(safe-area-inset-bottom)+30px)]">
+            <RoomBoard dark={1 - skyNow.light} drop={16} place={layout.board} onPlace={(board) => commit({ ...latest.current, board })}>
               <SkyCard
                 now={now} place={place} onPlace={changePlace} weather={weather} steps={steps} history={stepHistory}
                 // ボードの面の高さいっぱい
@@ -885,6 +886,7 @@ export function MyRoom({ entries, initialLayout, serverReady, dogSkin, dogName, 
               {guests ? <RoomGuests mail={guests.mail} /> : null}
               <p className="pb-1 text-center text-[10px] font-semibold text-ink-faint">{saveLabel}</p>
             </RoomBoard>
+            </div>
             <RoomDeskFront dark={1 - skyNow.light} warm={deskWarm} />
           </div>
         )}
