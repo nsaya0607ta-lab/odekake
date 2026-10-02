@@ -4,7 +4,9 @@
  * 「きょうの空」：住んでいるところの日の出・日の入りと、いまの太陽の位置、月の満ち欠け。
  * おへやの窓の外と部屋の明るさは、これと同じ計算で決まる。場所は現在地か都道府県で選べる（わからなければ東京）。
  */
-import { useMemo, useState } from "react";
+import Link from "next/link";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { STEP_COIN_MILESTONES } from "@/lib/coins";
 import type { StepDay } from "@/lib/data/exp";
 import { useTodaySteps, type TodaySteps } from "@/lib/use-today-steps";
@@ -80,8 +82,18 @@ function weekOf(history: StepDay[], today: string, todaySteps: number) {
   return { week, streak, total: week.reduce((s, d) => s + d.steps, 0) };
 }
 
-export function SkyCard({ now, place, onPlace, weather = null, steps, history }: {
+export type SkyFriend = { id: string; name: string; avatar: string | null };
+
+export function SkyCard({ now, place, onPlace, weather = null, steps, history, height, friends, likes = 0, onEdit }: {
   now: Date; place: RoomPlace; onPlace: (p: RoomPlace) => void; weather?: RoomWeather | null;
+  /** 上の窓の高さ（CSS）。部屋の下の、画面ののこりにぴったり合わせる */
+  height?: string;
+  /** あそびに行けるフレンド（窓台のボタンから選ぶ） */
+  friends?: SkyFriend[];
+  /** 自分の部屋に届いた「いいね」の数 */
+  likes?: number;
+  /** 窓台の左はしの「もようがえ」ボタン */
+  onEdit?: () => void;
   /** きょうの歩数（渡したときだけ、手前の丘におさんぽの道を描く） */
   steps?: TodaySteps;
   /** 直近の日ごとの歩数（今週のグラフと連続記録） */
@@ -95,7 +107,19 @@ export function SkyCard({ now, place, onPlace, weather = null, steps, history }:
   const times = useMemo(() => sunTimes(new Date(`${day}T12:00:00+09:00`), place), [day, place]);
   const sky = withWeather(skyAt(now, place), weather);
   const [open, setOpen] = useState(false);
+  const [friendsOpen, setFriendsOpen] = useState(false);
   const [locating, setLocating] = useState(false);
+  // 窓が縦に長いときは、そのぶん空を上にのばす（町と道は下にそろえる）
+  const skyRef = useRef<HTMLDivElement>(null);
+  const [extra, setExtra] = useState(0);
+  useEffect(() => {
+    const el = skyRef.current;
+    if (!el || typeof ResizeObserver === "undefined") return;
+    const ro = new ResizeObserver(() => { const r = el.getBoundingClientRect(); if (r.width > 0) setExtra(Math.max(0, Math.round((300 * r.height) / r.width - 150))); });
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
+  const sy = (y: number) => -extra + (y / 80) * (80 + extra);
   const [geoError, setGeoError] = useState("");
   const useHere = () => {
     setLocating(true);
@@ -115,7 +139,7 @@ export function SkyCard({ now, place, onPlace, weather = null, steps, history }:
   const up = t >= rise && t <= set;
   const f = up && set > rise ? (t - rise) / (set - rise) : 0;
   // 弧の上の太陽（日の出 0 → 日の入り 1）
-  const ax = 24 + f * 252, ay2 = 112 - Math.sin(f * Math.PI) * 60;
+  const ax = 24 + f * 252, ay2 = 112 - Math.sin(f * Math.PI) * (60 + extra * 0.7);
   const status = up
     ? set - t < 60 * 60_000 ? `あと${Math.max(1, Math.round((set - t) / 60_000))}分で日の入り` : sky.altitude < 12 ? (f < 0.5 ? "朝の光がやさしい時間" : "夕方の光がさしこむ時間") : weatherDay(weather)
     : t < rise ? `日の出まで あと${Math.floor((rise - t) / 3_600_000)}時間${Math.round(((rise - t) % 3_600_000) / 60_000)}分` : sky.altitude > -6 ? "日が沈んで、空がのこりの色" : "夜。明かりをつけてのんびり";
@@ -124,12 +148,30 @@ export function SkyCard({ now, place, onPlace, weather = null, steps, history }:
   const wet = kind === "rain" || kind === "drizzle" || kind === "thunder";
   const cloudy = kind === "cloudy" || kind === "fog" || wet || kind === "snow";
   const ink = (day: string, night: string) => mix(day, night, Math.min(1, dark * 1.1));
+  const weatherChip = weather ? `${WEATHER_LABEL[weather.kind].icon} ${weather.temp !== null ? `${Math.round(weather.temp)}℃` : WEATHER_LABEL[weather.kind].label}` : null;
+  // 下から出るシートは、ページのいちばん上の層に出す（ボードがななめに傾けてあっても、その中に閉じこめられないように）
+  const sheet = (title: string, onClose: () => void, body: React.ReactNode) => createPortal(
+    <div className="fixed inset-0 z-[700] flex items-end justify-center bg-[#140f22]/55 backdrop-blur-[2px]" role="dialog" aria-modal="true" aria-label={title} onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}>
+      <div className="room-bubble w-full max-w-lg rounded-t-[26px] bg-card px-4 pb-[calc(env(safe-area-inset-bottom)+1rem)] pt-2 shadow-2xl">
+        <div className="mx-auto mb-3 h-1.5 w-10 rounded-full bg-line-strong" aria-hidden />
+        <div className="mb-3 flex items-center justify-between">
+          <p className="text-[15px] font-black text-ink">{title}</p>
+          <button type="button" onClick={onClose} className="rounded-full bg-paper-deep px-3 py-1.5 text-[11px] font-bold text-ink-soft">とじる</button>
+        </div>
+        {body}
+      </div>
+    </div>,
+    document.body,
+  );
   return (
-    <div className="space-y-2">
-      {/* 窓わくの中に、いまの空と町を見せる */}
-      <div className="rounded-[22px] border border-[#E3D6C0] bg-[linear-gradient(180deg,#FFFFFF,#F1E8D8)] p-2 shadow-[0_8px_16px_-10px_rgba(80,55,25,.5)]">
-        <div className="relative overflow-hidden rounded-[15px] shadow-[inset_0_2px_6px_rgba(40,25,10,.35)]">
-          <svg viewBox="0 0 300 150" className="block w-full" role="img" aria-label={`日の出 ${times.rise ? fmtJstTime(times.rise) : "-"}、日の入り ${times.set ? fmtJstTime(times.set) : "-"}。${status}`}>
+    <>
+      {/* いまの空と町（ふちなし）。下に、すりガラスの帯（もようがえ・きょうの歩数・フレンドのおへや） */}
+      <div
+        className={`relative isolate overflow-hidden ${height ? "" : "h-[300px] rounded-[26px] shadow-[0_14px_28px_-16px_rgba(30,50,80,.55),0_2px_6px_-2px_rgba(30,50,80,.18)]"}`}
+        style={{ ...(height ? { height } : {}), backgroundColor: ink("#8DBF6E", "#121A2E") }}
+      >
+        <div ref={skyRef} className="absolute inset-x-0 top-0 bottom-[52px]">
+          <svg viewBox={`0 ${-extra} 300 ${150 + extra}`} preserveAspectRatio="xMidYMax slice" className="absolute inset-0 block h-full w-full" role="img" aria-label={`日の出 ${times.rise ? fmtJstTime(times.rise) : "-"}、日の入り ${times.set ? fmtJstTime(times.set) : "-"}。${status}`}>
             <defs>
               <linearGradient id="skycard-bg" x1="0" y1="0" x2="0" y2="1">
                 <stop offset="0" stopColor={sky.top} />
@@ -145,18 +187,18 @@ export function SkyCard({ now, place, onPlace, weather = null, steps, history }:
                 <stop offset="0.5" stopColor="#FFFFFF" stopOpacity="0" />
               </linearGradient>
             </defs>
-            <rect x="0" y="0" width="300" height="150" fill="url(#skycard-bg)" />
+            <rect x="0" y={-extra} width="300" height={150 + extra} fill="url(#skycard-bg)" />
             {/* 星 */}
-            {sky.stars > 0.05 ? STARS.map(([x, y, r], i) => <circle key={i} cx={x} cy={y} r={r} fill="#FFF8DA" opacity={sky.stars * (i % 3 ? 0.65 : 1)} />) : null}
+            {sky.stars > 0.05 ? STARS.map(([x, y, r], i) => <circle key={i} cx={x} cy={sy(y)} r={r} fill="#FFF8DA" opacity={sky.stars * (i % 3 ? 0.65 : 1)} />) : null}
             {/* 太陽・月がとおる道 */}
-            <path d="M24 112 Q150 -8 276 112" fill="none" stroke="#FFFFFF" strokeOpacity="0.55" strokeWidth="1.6" strokeDasharray="3 5" />
+            <path d={`M24 112 Q150 ${-8 - extra * 1.4} 276 112`} fill="none" stroke="#FFFFFF" strokeOpacity="0.55" strokeWidth="1.6" strokeDasharray="3 5" />
             {up ? (
               <g opacity={cloudy ? 0.55 : 1}>
                 <circle cx={ax} cy={ay2} r="26" fill="url(#skycard-glow)" />
                 <circle cx={ax} cy={ay2} r="10" fill={mix("#FFD24A", "#FF9A4A", sky.warm)} />
               </g>
             ) : (
-              <g transform="translate(206 34)" opacity={cloudy ? 0.5 : 1}>
+              <g transform={`translate(206 ${34 - extra * 0.55})`} opacity={cloudy ? 0.5 : 1}>
                 <circle r="24" fill="url(#skycard-glow)" />
                 <path d={moonIcon(10, moon)} fill="#FFF1B8" />
               </g>
@@ -165,14 +207,14 @@ export function SkyCard({ now, place, onPlace, weather = null, steps, history }:
             {cloudy || kind === "partly" ? (
               <g fill={wet ? ink("#B4BCC8", "#4A5068") : ink("#FFFFFF", "#5A6080")} opacity="0.92">
                 {(kind === "partly" ? CLOUDS.slice(0, 2) : CLOUDS).map(([x, y, s2], i) => (
-                  <g key={i} transform={`translate(${x} ${y}) scale(${s2})`}>
+                  <g key={i} transform={`translate(${x} ${sy(y)}) scale(${s2})`}>
                     <ellipse cx="0" cy="4" rx="22" ry="8" /><circle cx="-8" cy="-1" r="9" /><circle cx="5" cy="-4" r="11" /><circle cx="15" cy="1" r="7" />
                   </g>
                 ))}
               </g>
             ) : null}
-            {wet ? Array.from({ length: 22 }, (_, i) => <line key={i} x1={(i * 37) % 300} y1={(i * 23) % 90} x2={((i * 37) % 300) - 3} y2={((i * 23) % 90) + 9} stroke="#DCEBFA" strokeOpacity="0.7" strokeWidth="1.3" strokeLinecap="round" />) : null}
-            {kind === "snow" ? Array.from({ length: 26 }, (_, i) => <circle key={i} cx={(i * 41) % 300} cy={(i * 29) % 110} r={1.4 + (i % 3) * 0.5} fill="#FFFFFF" opacity="0.9" />) : null}
+            {wet ? Array.from({ length: 22 }, (_, i) => <line key={i} x1={(i * 37) % 300} y1={sy((i * 23) % 90)} x2={((i * 37) % 300) - 3} y2={sy((i * 23) % 90) + 9} stroke="#DCEBFA" strokeOpacity="0.7" strokeWidth="1.3" strokeLinecap="round" />) : null}
+            {kind === "snow" ? Array.from({ length: 26 }, (_, i) => <circle key={i} cx={(i * 41) % 300} cy={sy((i * 29) % 110)} r={1.4 + (i % 3) * 0.5} fill="#FFFFFF" opacity="0.9" />) : null}
             {/* 遠くの山と町（夜は窓に明かり） */}
             <path d="M0 112 C 40 92, 70 98, 110 104 C 150 90, 200 92, 240 100 C 265 94, 285 98, 300 96 V150 H0 Z" fill={ink("#A9CC93", "#1E2A44")} />
             {HOUSES.map(([x, w, h, roof], i) => (
@@ -214,53 +256,90 @@ export function SkyCard({ now, place, onPlace, weather = null, steps, history }:
                 </g>
               </g>
             ) : null}
-            <text x="10" y="143" fontSize="9.5" fontWeight="800" fill="#FFFFFF" opacity="0.92">日の出 {times.rise ? fmtJstTime(times.rise) : "-"}</text>
-            <text x="290" y="143" fontSize="9.5" fontWeight="800" fill="#FFFFFF" opacity="0.92" textAnchor="end">日の入り {times.set ? fmtJstTime(times.set) : "-"}</text>
-            <rect x="0" y="0" width="300" height="150" fill="url(#skycard-glass)" />
+            <rect x="0" y={-extra} width="300" height={150 + extra} fill="url(#skycard-glass)" />
           </svg>
           <div className="absolute inset-x-0 top-0 flex items-start justify-between gap-2 p-2.5">
-            <p className="rounded-full bg-black/20 px-2.5 py-1 text-[11px] font-black text-white backdrop-blur-sm">きょうの空<span className="ml-1.5 text-[10px] font-bold opacity-85">いま {fmtJstTime(now)}</span></p>
-            <button type="button" onClick={() => setOpen((v) => !v)} aria-expanded={open} className="flex max-w-[58%] items-center gap-1 rounded-full bg-white/85 px-2.5 py-1 text-[10px] font-bold text-ink-soft shadow-sm backdrop-blur-sm active:scale-95">
-              <span aria-hidden>📍</span><span className="truncate">{placeLabel}</span><span aria-hidden className="text-ink-faint">{open ? "▲" : "▼"}</span>
-            </button>
+            <div className="flex min-w-0 flex-col items-start gap-1">
+              <p className="rounded-full bg-black/20 px-2.5 py-1 text-[11px] font-black text-white backdrop-blur-sm">きょうの空<span className="ml-1.5 text-[10px] font-bold opacity-85">いま {fmtJstTime(now)}</span></p>
+              <p className="whitespace-nowrap rounded-full bg-white/25 px-2.5 py-0.5 text-[10px] font-bold text-white backdrop-blur-sm">{weatherChip ? `${weatherChip} ・ ` : ""}🌙 {moonName(moon)}</p>
+            </div>
+            <div className="flex shrink-0 flex-col items-end gap-1">
+              <button type="button" onClick={() => setOpen(true)} aria-haspopup="dialog" className="flex max-w-[42vw] items-center gap-1 rounded-full bg-white/85 px-2.5 py-1 text-[10px] font-bold text-ink-soft shadow-sm backdrop-blur-sm active:scale-95">
+                <span aria-hidden>📍</span><span className="truncate">{placeLabel}</span><span aria-hidden className="text-ink-faint">▼</span>
+              </button>
+              <p className="whitespace-nowrap rounded-full bg-white/25 px-2.5 py-0.5 text-[10px] font-bold text-white backdrop-blur-sm" aria-label={`日の出 ${times.rise ? fmtJstTime(times.rise) : "-"}、日の入り ${times.set ? fmtJstTime(times.set) : "-"}`}>🌅 {times.rise ? fmtJstTime(times.rise) : "-"} ・ 🌇 {times.set ? fmtJstTime(times.set) : "-"}</p>
+            </div>
           </div>
         </div>
-        {/* 窓台 */}
-        {stepCount !== null ? (
-          <div className="mt-2 rounded-[12px] bg-[linear-gradient(180deg,#FBF6EE,#EFE4D2)] px-3 py-2 shadow-[inset_0_1px_0_#fff]">
+        {/* すりガラスの帯：もようがえ・きょうの歩数・フレンドのおへや */}
+        <div className={`absolute inset-x-2 bottom-2 flex items-center gap-1.5 rounded-[19px] bg-white/80 p-1.5 shadow-[0_8px_18px_-10px_rgba(20,30,50,.55)] ring-1 ring-white/70 backdrop-blur-md ${onEdit ? "" : "pl-3"}`}>
+          {onEdit ? (
+            <button type="button" onClick={onEdit} className="flex shrink-0 flex-col items-center justify-center gap-0.5 self-stretch rounded-[14px] bg-leaf-soft px-2 py-1 text-leaf-deep active:scale-95">
+              <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M4 12V9a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2v3" /><path d="M3 12h18v4H3z" /><path d="M5 16v2M19 16v2" />
+              </svg>
+              <span className="text-[9px] font-black leading-none">もようがえ</span>
+            </button>
+          ) : null}
+          {stepCount !== null ? (
+            <div className="min-w-0 flex-1" aria-live="polite">
+              <p className="flex items-baseline gap-1 leading-none text-ink">
+                <span aria-hidden className="text-[13px]">👣</span>
+                <span className="text-[19px] font-black tabular-nums">{stepCount.toLocaleString("ja-JP")}</span>
+                <span className="text-[10px] font-bold text-ink-soft">歩</span>
+              </p>
+              <p className="mt-1 truncate text-[10px] font-bold text-ink-faint">
+                {stepWeek && stepWeek.streak >= 2 ? <span className="mr-1 rounded-full bg-[linear-gradient(90deg,#FF9A3C,#FF5E3A)] px-1 py-px text-[9px] font-black text-white">🔥{stepWeek.streak}日</span> : null}
+                {nextGoal ? <>あと<span className="text-leaf-deep">{(nextGoal.steps - stepCount).toLocaleString("ja-JP")}</span>歩</> : <>🎉 1万歩！</>}
+              </p>
+            </div>
+          ) : (
+            <p className="min-w-0 flex-1 text-[11px] font-bold leading-snug text-ink-soft">{steps ? "👣 歩数はショートカットで連携すると出ます" : status}</p>
+          )}
+          {friends ? (
+            <button type="button" onClick={() => setFriendsOpen(true)} aria-haspopup="dialog" className="relative flex shrink-0 items-center gap-1.5 rounded-[14px] bg-leaf-deep py-1.5 pl-1.5 pr-2.5 text-white shadow-[0_4px_10px_-4px_rgba(60,90,40,.8)] active:scale-95">
+              <span className="flex -space-x-2.5" aria-hidden>
+                {(friends.length ? friends.slice(0, 2) : [{ id: "door", name: "🚪", avatar: null }]).map((f) => (
+                  <span key={f.id} className="flex h-6 w-6 items-center justify-center overflow-hidden rounded-full bg-[#EAF3E2] text-[10px] font-black text-leaf-deep ring-2 ring-leaf-deep">
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    {f.avatar ? <img src={f.avatar} alt="" className="h-full w-full object-cover" /> : [...f.name][0]}
+                  </span>
+                ))}
+              </span>
+              <span className="whitespace-nowrap text-left text-[10.5px] font-black leading-tight">フレンドの<br />おへやへ</span>
+              {likes > 0 ? <span className="absolute -right-1.5 -top-1.5 rounded-full bg-[#FF6F91] px-1.5 py-0.5 text-[9px] font-black leading-none text-white shadow ring-2 ring-white">♥{likes}</span> : null}
+            </button>
+          ) : null}
+        </div>
+      </div>
+
+      {/* ここから下はスクロールで：今週の歩数と、空のようす */}
+      {stepCount !== null ? (
+        <div className="rounded-2xl border border-line bg-card px-4 py-3 shadow-sm">
           <div className="flex items-center gap-3">
-            <span aria-hidden className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-white text-lg shadow-sm">👣</span>
+            <span aria-hidden className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-paper-deep text-lg">👣</span>
             <div className="min-w-0 flex-1">
               <p className="text-[10px] font-bold text-ink-faint">きょうの歩数</p>
-              <p className="flex items-baseline gap-1 leading-none text-ink" aria-live="polite">
+              <p className="flex items-baseline gap-1 leading-none text-ink">
                 <span className="text-[22px] font-black tabular-nums">{stepCount.toLocaleString("ja-JP")}</span>
                 <span className="text-[11px] font-bold text-ink-soft">歩</span>
               </p>
             </div>
-            <p className="shrink-0 rounded-full bg-white px-2.5 py-1 text-right text-[10px] font-bold leading-tight text-ink-soft shadow-sm">
+            <p className="shrink-0 rounded-full bg-paper-deep px-2.5 py-1 text-right text-[10px] font-bold leading-tight text-ink-soft">
               {nextGoal ? <>🚩 {nextGoal.steps.toLocaleString("ja-JP")}歩まで<br />あと <span className="text-leaf-deep">{(nextGoal.steps - stepCount).toLocaleString("ja-JP")}</span>歩</> : <>🎉 10,000歩<br />たっせい！</>}
             </p>
           </div>
           {stepWeek ? <StepWeek {...stepWeek} /> : null}
-          </div>
-        ) : steps ? (
-          <div className="mt-2 rounded-[12px] bg-[linear-gradient(180deg,#FBF6EE,#EFE4D2)] px-3 py-2 text-[11px] font-bold text-ink-soft shadow-[inset_0_1px_0_#fff]">👣 歩数は、ショートカットで連携すると出ます</div>
-        ) : null}
-        <div className="mt-2 flex items-center justify-between gap-2 rounded-[12px] bg-[linear-gradient(180deg,#FBF6EE,#EFE4D2)] px-3 py-2 shadow-[inset_0_1px_0_#fff]">
-          <p className="min-w-0 text-[12px] font-bold text-ink">{status}</p>
-          <div className="flex shrink-0 items-center gap-1">
-            {weather ? (
-              <p className="rounded-full bg-white px-2.5 py-1 text-[10px] font-bold text-ink-soft shadow-sm">
-                {WEATHER_LABEL[weather.kind].icon} {WEATHER_LABEL[weather.kind].label}{weather.temp !== null ? ` ${Math.round(weather.temp)}℃` : ""}
-              </p>
-            ) : null}
-            <p className="rounded-full bg-white px-2.5 py-1 text-[10px] font-bold text-ink-soft shadow-sm">🌙 {moonName(moon)}</p>
-          </div>
         </div>
+      ) : null}
+      <div className="flex items-center justify-between gap-2 rounded-2xl border border-line bg-card px-4 py-3 shadow-sm">
+        <p className="min-w-0 text-[12px] font-bold text-ink">{status}</p>
+        <p className="shrink-0 text-[10px] font-bold text-ink-faint">日の出 {times.rise ? fmtJstTime(times.rise) : "-"} ・ 日の入り {times.set ? fmtJstTime(times.set) : "-"}</p>
       </div>
-      {open ? (
-        <div className="space-y-2 rounded-2xl border border-line bg-card p-3 shadow-sm">
-          <button type="button" onClick={useHere} disabled={locating} className="w-full rounded-full bg-leaf-deep py-2 text-[12px] font-black text-white shadow-sm active:scale-[.98] disabled:opacity-60">
+
+      {open ? sheet("空を見る場所", () => setOpen(false), (
+        <div className="space-y-2">
+          <button type="button" onClick={useHere} disabled={locating} className="w-full rounded-full bg-leaf-deep py-2.5 text-[13px] font-black text-white shadow-sm active:scale-[.98] disabled:opacity-60">
             {locating ? "現在地をさがしています…" : "📍 現在地を使う"}
           </button>
           <label className="flex items-center gap-2 text-[11px] font-bold text-ink-soft">
@@ -268,7 +347,7 @@ export function SkyCard({ now, place, onPlace, weather = null, steps, history }:
             <select
               value={place.source === "gps" ? "" : place.pref}
               onChange={(e) => { const code = e.target.value; const pt = PREF_POINTS[code]; if (pt) { onPlace({ ...pt, source: "pref", pref: code }); setGeoError(""); setOpen(false); } }}
-              className="min-w-0 flex-1 rounded-lg border border-line bg-card px-2 py-1.5 text-[12px] font-bold text-ink"
+              className="min-w-0 flex-1 rounded-lg border border-line bg-card px-2 py-1.5 text-[16px] font-bold text-ink"
             >
               {place.source === "gps" ? <option value="">現在地を使っています</option> : null}
               {PREFECTURE_NAMES.map((p) => <option key={p.code} value={p.code}>{p.name}</option>)}
@@ -276,12 +355,30 @@ export function SkyCard({ now, place, onPlace, weather = null, steps, history }:
           </label>
           {geoError ? <p className="text-[10px] font-bold text-[#C0502E]">{geoError}</p> : null}
           <p className="text-[10px] leading-relaxed text-ink-faint">
-            現在地はGPSでとり、この端末にだけ保存して空と天気の計算に使います（天気は約1kmの細かさで調べます）。位置情報を許可していれば、ひらくたびに取り直します。時刻はいつも日本時間です。
+            いま：{placeLabel}。現在地はGPSでとり、この端末にだけ保存して空と天気の計算に使います（天気は約1kmの細かさで調べます）。位置情報を許可していれば、ひらくたびに取り直します。時刻はいつも日本時間です。
             {place.source === "gps" && place.acc ? ` いまの位置のずれ：約${place.acc >= 1000 ? `${(place.acc / 1000).toFixed(1)}km` : `${place.acc}m`}` : ""}
           </p>
         </div>
-      ) : null}
-    </div>
+      )) : null}
+      {friendsOpen && friends ? sheet("フレンドのおへやに あそびに行く", () => setFriendsOpen(false), friends.length ? (
+        <ul className="grid max-h-[50vh] grid-cols-3 gap-2 overflow-y-auto pb-1">
+          {friends.map((f) => (
+            <li key={f.id}>
+              <Link href={`/room/visit/${f.id}`} className="flex flex-col items-center gap-1.5 rounded-2xl border border-line bg-paper px-1.5 pb-2.5 pt-3 active:scale-95">
+                <span className="flex h-12 w-12 items-center justify-center overflow-hidden rounded-full bg-leaf-soft text-lg font-black text-leaf-deep shadow-[0_0_0_2px_#fff,0_1px_4px_rgba(0,0,0,.15)]">
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  {f.avatar ? <img src={f.avatar} alt="" className="h-full w-full object-cover" /> : [...f.name][0]}
+                </span>
+                <span className="w-full truncate text-center text-[11px] font-bold text-ink-soft">{f.name}</span>
+                <span className="rounded-full bg-leaf-deep px-2.5 py-0.5 text-[10px] font-black text-white">あそびに行く</span>
+              </Link>
+            </li>
+          ))}
+        </ul>
+      ) : (
+        <p className="pb-2 text-[12px] font-bold leading-relaxed text-ink-soft">フレンドになると、おたがいのおへやに あそびに行けます。<Link href="/mypage/friends" className="text-leaf-deep underline">フレンドをさがす</Link></p>
+      )) : null}
+    </>
   );
 }
 

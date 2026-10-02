@@ -5,10 +5,10 @@
  * viewBox は 1000 × 1120 で、部屋の % 座標（src/lib/room/types.ts の ROOM）と同じ割合で描く。
  * 窓の外と部屋の明るさは、日本時間の今の時間帯（朝・昼・夕方・夜）に合わせる。
  */
-import { memo, useId, useMemo } from "react";
+import { memo, useEffect, useId, useMemo, useRef, useState } from "react";
 import { skyAt, TOKYO, type GeoPoint, type SkyState } from "@/lib/room/sun";
 import { overcastOf, WEATHER_LABEL, withWeather, type RoomWeather } from "@/lib/room/weather";
-import { EventAmbience, EventWash } from "./room-events";
+import { EventAmbience, EventWash, eventTint } from "./room-events";
 import { CURTAIN_STYLES, FLOOR_STYLES, ROOM_KIND_STYLES, RUG_STYLES, WALLPAPER_STYLES } from "@/lib/room/themes";
 import { ROOM, roomEventOf, windowOf, type FixtureId, type RoomEvent, type RoomKind, type RoomStyle, type RoomTheme } from "@/lib/room/types";
 
@@ -1239,13 +1239,15 @@ function ConeLamp({ lit }: { lit: boolean }) {
   );
 }
 
-function Floor({ theme }: { theme: RoomTheme }) {
+function Floor({ theme, to = H + PB }: { theme: RoomTheme; to?: number }) {
   const f = FLOOR_STYLES[theme.floor];
   // 引きで見せる手前のぶん（H より下）と、左右のはみ出しまで床をしく
   const FB = H + PB, FX = -PX, FW = W + PX * 2;
   const depth = FB - HZ;
   /** 奥から手前へ、遠近感のある横の線の位置 */
-  const rows = (n: number) => Array.from({ length: n + 1 }, (_, k) => HZ + depth * Math.pow(k / n, 1.45));
+  // 手前にのばすとき（to が部屋の下より下）は、同じ間かくの続きを足す
+  const rows = (n: number) => { const out: number[] = []; for (let k = 0; k <= n * 4; k++) { const y = HZ + depth * Math.pow(k / n, 1.45); out.push(y); if (y >= to) break; } return out; };
+  const D = to - HZ;
   /** 消失点に向かう縦の線（奥の x と手前の x） */
   const cols = (spacing: number) => Array.from({ length: 33 }, (_, i) => (i - 16) * spacing).map((d) => [W / 2 + d, W / 2 + d * 2.3] as const);
   const xAt = (c: readonly [number, number], y: number) => c[0] + (c[1] - c[0]) * ((y - HZ) / depth);
@@ -1259,7 +1261,7 @@ function Floor({ theme }: { theme: RoomTheme }) {
     }
     return (
       <g>
-        <rect x={FX} y={HZ} width={FW} height={depth} fill={f.base} />
+        <rect x={FX} y={HZ} width={FW} height={D} fill={f.base} />
         {cells}
         {theme.floor === "tatami" ? r.map((y) => <rect key={y} x={FX} y={y - 3} width={FW} height="6" fill="#6E7A4A" opacity="0.55" />) : null}
       </g>
@@ -1282,11 +1284,11 @@ function Floor({ theme }: { theme: RoomTheme }) {
             <stop offset="1" stopColor="#FFFFFF" stopOpacity="0.12" />
           </linearGradient>
         </defs>
-        <rect x={FX} y={HZ} width={FW} height={depth} fill={f.base} />
-        <rect x={FX} y={HZ} width={FW} height={depth} fill={f.line} filter="url(#room-carpet-pile)" opacity="0.55" />
-        <rect x={FX} y={HZ} width={FW} height={depth} fill="#FFFFFF" filter="url(#room-carpet-pile)" opacity="0.18" transform="translate(1.5 1)" />
+        <rect x={FX} y={HZ} width={FW} height={D} fill={f.base} />
+        <rect x={FX} y={HZ} width={FW} height={D} fill={f.line} filter="url(#room-carpet-pile)" opacity="0.55" />
+        <rect x={FX} y={HZ} width={FW} height={D} fill="#FFFFFF" filter="url(#room-carpet-pile)" opacity="0.18" transform="translate(1.5 1)" />
         {r.slice(1, -1).map((y) => <line key={y} x1={FX} y1={y} x2={FX + FW} y2={y} stroke={f.line} strokeOpacity="0.35" strokeWidth={0.6 + ((y - HZ) / depth) * 1.4} />)}
-        <rect x={FX} y={HZ} width={FW} height={depth} fill="url(#room-carpet-light)" />
+        <rect x={FX} y={HZ} width={FW} height={D} fill="url(#room-carpet-light)" />
       </g>
     );
   }
@@ -1305,9 +1307,9 @@ function Floor({ theme }: { theme: RoomTheme }) {
     }
     return (
       <g>
-        <rect x={FX} y={HZ} width={FW} height={depth} fill={f.base} />
+        <rect x={FX} y={HZ} width={FW} height={D} fill={f.base} />
         {cells}
-        {c.map((cc, i) => <line key={i} x1={cc[0]} y1={HZ} x2={cc[1]} y2={FB} stroke={f.line} strokeWidth="1.6" />)}
+        {c.map((cc, i) => <line key={i} x1={cc[0]} y1={HZ} x2={xAt(cc, to)} y2={to} stroke={f.line} strokeWidth="1.6" />)}
       </g>
     );
   }
@@ -1328,13 +1330,13 @@ function Floor({ theme }: { theme: RoomTheme }) {
   }
   return (
     <g>
-      <rect x={FX} y={HZ} width={FW} height={depth} fill={f.base} />
+      <rect x={FX} y={HZ} width={FW} height={D} fill={f.base} />
       {planks}
-      {c.map((cc, i) => <line key={i} x1={cc[0]} y1={HZ} x2={cc[1]} y2={FB} stroke={f.line} strokeWidth="2" />)}
+      {c.map((cc, i) => <line key={i} x1={cc[0]} y1={HZ} x2={xAt(cc, to)} y2={to} stroke={f.line} strokeWidth="2" />)}
       {/* 板の継ぎ目（となりの板とはずらす） */}
       {r.slice(1).map((y, i) => c.slice(0, -1).map((cc, j) => (Math.floor((i + 1 + (j % 4) * 1.3) / 4.5) !== Math.floor((i + (j % 4) * 1.3) / 4.5) ? <line key={`${i}-${j}`} x1={xAt(cc, y)} y1={y} x2={xAt(c[j + 1]!, y)} y2={y} stroke={f.line} strokeWidth="1.4" /> : null)))}
       {/* 木目 */}
-      {c.slice(0, -1).map((cc, j) => <line key={`g${j}`} x1={(cc[0] + c[j + 1]![0]) / 2 + 6} y1={HZ} x2={(cc[1] + c[j + 1]![1]) / 2 + 10} y2={FB} stroke={f.line} strokeOpacity="0.35" strokeWidth="0.8" />)}
+      {c.slice(0, -1).map((cc, j) => <line key={`g${j}`} x1={(cc[0] + c[j + 1]![0]) / 2 + 6} y1={HZ} x2={xAt([(cc[0] + c[j + 1]![0]) / 2 + 6, (cc[1] + c[j + 1]![1]) / 2 + 10], to)} y2={to} stroke={f.line} strokeOpacity="0.35" strokeWidth="0.8" />)}
     </g>
   );
 }
@@ -1371,7 +1373,11 @@ function RugShape({ rug }: { rug: RoomTheme["rug"] }) {
  * 夜は部屋を暗くして、天井のライトとフロアランプのまわりだけ明るく残す。夕方は橙、朝は桃色にほんのり染める。
  * lamps は明かりの場所（部屋の %）。いつも四すみを少し暗くして、写真のような落ち着きを出す
  */
-export const RoomLighting = memo(function RoomLighting({ now, lamps, at = TOKYO, weather = null, room = "cozy", event = null }: { now: Date; lamps: readonly { x: number; y: number; r: number }[]; at?: GeoPoint; weather?: RoomWeather | null; room?: RoomKind; event?: RoomEvent | null }) {
+export const RoomLighting = memo(function RoomLighting({ now, lamps, at = TOKYO, weather = null, room = "cozy", event = null, openBottom = false }: {
+  now: Date; lamps: readonly { x: number; y: number; r: number }[]; at?: GeoPoint; weather?: RoomWeather | null; room?: RoomKind; event?: RoomEvent | null;
+  /** 部屋の下に机が続くとき。四すみのかげを、下のはしにはかけない */
+  openBottom?: boolean;
+}) {
   const sky = useMemo(() => withWeather(skyAt(now, at), weather), [now, at, weather]);
   const overcast = overcastOf(weather);
   const dark = Math.max(0, 1 - sky.light);
@@ -1382,7 +1388,7 @@ export const RoomLighting = memo(function RoomLighting({ now, lamps, at = TOKYO,
   return (
     <svg viewBox={VB} preserveAspectRatio="none" className="pointer-events-none absolute" style={SCENE_BOX} aria-hidden="true" data-lighting>
       <defs>
-        <radialGradient id="room-vignette" cx="0.5" cy="0.48" r="0.75">
+        <radialGradient id="room-vignette" cx="0.5" cy={openBottom ? 0.95 : 0.48} r={openBottom ? 0.9 : 0.75}>
           <stop offset="0.6" stopColor="#1A1008" stopOpacity="0" />
           <stop offset="1" stopColor="#1A1008" stopOpacity="0.22" />
         </radialGradient>
@@ -1596,5 +1602,53 @@ export function FixtureVisual({ fixture, theme, now, at = TOKYO, weather = null,
       {fixture === "weather" ? <WeatherBoard weather={weather} night={sky.altitude < -4} place={placeName} /> : null}
       {fixture === "shelf" ? <Shelves only={0} /> : null}
     </svg>
+  );
+}
+
+/**
+ * 部屋の手前に続く床（部屋の下から画面の下まで）。部屋と同じ床を、同じ遠近感のまま手前にのばし、
+ * 部屋の明かりの層と同じ色（朝夕の色・夜の暗さ・部屋の雰囲気・行事の色）をかける。
+ */
+export function FloorBelow({ theme, now, at = TOKYO, weather = null, event = null }: { theme: RoomTheme; now: Date; at?: GeoPoint; weather?: RoomWeather | null; event?: RoomEvent | null }) {
+  const ref = useRef<HTMLDivElement>(null);
+  const [ext, setExt] = useState(400);
+  useEffect(() => {
+    const el = ref.current;
+    if (!el || typeof ResizeObserver === "undefined") return;
+    const ro = new ResizeObserver(() => { const r = el.getBoundingClientRect(); if (r.width > 0) setExt(Math.max(10, Math.round((r.height * (W + PX * 2)) / r.width))); });
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
+  const sky = useMemo(() => withWeather(skyAt(now, at), weather), [now, at, weather]);
+  const dark = Math.max(0, 1 - sky.light);
+  const overcast = overcastOf(weather);
+  const kind = ROOM_KIND_STYLES[theme.room];
+  const top = H + PB, X = -PX, Wd = W + PX * 2;
+  const tint = event ? eventTint(event) : null;
+  return (
+    <div ref={ref} className="pointer-events-none absolute inset-0" aria-hidden="true">
+      <svg viewBox={`${X} ${top} ${Wd} ${ext}`} preserveAspectRatio="none" className="block h-full w-full">
+        <defs>
+          <filter id="below-grain" x="0" y="0" width="100%" height="100%">
+            <feTurbulence type="fractalNoise" baseFrequency="0.85" numOctaves="2" stitchTiles="stitch" result="n" />
+            <feColorMatrix in="n" type="matrix" values="0 0 0 0 0  0 0 0 0 0  0 0 0 0 0  0 0 0 1.4 -0.45" />
+            <feComposite in="SourceGraphic" operator="in" />
+          </filter>
+          <linearGradient id="below-shade" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0" stopColor="#FFFFFF" stopOpacity="0.06" />
+            <stop offset="1" stopColor="#2A1A0A" stopOpacity="0.12" />
+          </linearGradient>
+        </defs>
+        <Floor theme={theme} to={top + ext + 2} />
+        <rect x={X} y={top} width={Wd} height={ext} fill="#5A4030" filter="url(#below-grain)" opacity="0.06" />
+        <rect x={X} y={top} width={Wd} height={ext} fill="url(#below-shade)" />
+        {/* 部屋の明かりの層と同じ色 */}
+        {sky.warm > 0.02 && sky.altitude > -8 ? <rect x={X} y={top} width={Wd} height={ext} fill={sky.azimuth < 180 ? "#FFAE96" : "#FF8A3D"} opacity={sky.warm * 0.13} /> : null}
+        {dark > 0.02 ? <rect x={X} y={top} width={Wd} height={ext} fill="#0F1438" opacity={0.56 * Math.pow(dark, 1.15)} /> : null}
+        {tint ? <rect x={X} y={top} width={Wd} height={ext} fill={tint.tint} opacity={tint.o * 0.55} /> : null}
+        {kind.tint ? <rect x={X} y={top} width={Wd} height={ext} fill={kind.tint} opacity={kind.tintOpacity} /> : null}
+        {overcast > 0.3 && sky.light > 0.2 ? <rect x={X} y={top} width={Wd} height={ext} fill="#5E6E86" opacity={0.1 * overcast} /> : null}
+      </svg>
+    </div>
   );
 }

@@ -64,7 +64,9 @@ import { composeRoomSnapshot } from "./room-snapshot";
 import { skyAt } from "@/lib/room/sun";
 import { parseRoomWeather, withWeather, type RoomWeather } from "@/lib/room/weather";
 import { EVENT_FLOOR_Y, EventFloor, EventFront } from "./room-events";
-import { dayPhaseOf, FixtureVisual, fixtureSize, lampsOn, ROOM_STAGE, RoomLighting, RoomScene, ThemeSwatch, windowRectOf, type DayPhase } from "./room-scene";
+import { dayPhaseOf, FixtureVisual, FloorBelow, fixtureSize, lampsOn, ROOM_STAGE, RoomLighting, RoomScene, ThemeSwatch, windowRectOf, type DayPhase } from "./room-scene";
+import { DESK_END, RoomBoard, RoomDesk, RoomDeskFront } from "./room-board";
+import { eventTint } from "./room-events";
 import { DEFAULT_PLACE, locateHere, placeShortName, SkyCard, type RoomPlace } from "./sky-card";
 
 type Tab = DecorKind | "theme";
@@ -274,7 +276,8 @@ export function MyRoom({ entries, initialLayout, serverReady, dogSkin, dogName, 
   }, []);
   /** いまの行事（もようがえでオフにしていれば null） */
   const roomEvent = layout.theme.events === false ? null : roomEventOf(now)?.id ?? null;
-  const lightsOn = useMemo(() => lampsOn(withWeather(skyAt(now, place), weather)), [now, place, weather]);
+  const skyNow = useMemo(() => withWeather(skyAt(now, place), weather), [now, place, weather]);
+  const lightsOn = useMemo(() => lampsOn(skyNow), [skyNow]);
   /** 犬が寝る時間（日本時間の21時〜6時） */
   const sleepy = useMemo(() => { const h = Number(new Intl.DateTimeFormat("en-US", { timeZone: "Asia/Tokyo", hour: "numeric", hourCycle: "h23" }).format(now)); return h >= 21 || h < 6; }, [now]);
 
@@ -378,6 +381,11 @@ export function MyRoom({ entries, initialLayout, serverReady, dogSkin, dogName, 
 
   /* ---------- 変更 ---------- */
   const readOnly = !!visit;
+  /** ふだんの見る画面（部屋 → 手前の床 → ボード） */
+  const stage = !editing && !visit;
+  /** 手前の机にも、部屋と同じ朝夕の色・行事の色をかける */
+  const deskWarm = skyNow.altitude > -8 ? skyNow.warm : 0;
+  const deskTint = roomEvent ? eventTint(roomEvent) : null;
   const commit = useCallback((next: RoomLayout, before: RoomLayout = latest.current) => {
     // フレンドの部屋は見るだけ
     if (readOnly) return;
@@ -632,8 +640,9 @@ export function MyRoom({ entries, initialLayout, serverReady, dogSkin, dogName, 
   const closeShot = () => { if (shot) URL.revokeObjectURL(shot.url); setShot(null); };
 
   return (
-    <main className="min-h-dvh bg-paper pb-[calc(env(safe-area-inset-bottom)+1.5rem)] text-ink">
-      <header className="sticky top-0 z-[600] border-b border-line bg-paper/95 backdrop-blur">
+    // ふだん（自分の部屋を見ているとき）は、画面ぴったり：部屋 → 手前に続く床 → イーゼルのボード（ボードの中だけスクロール）
+    <main className={stage ? "fixed inset-0 flex flex-col overflow-y-auto overflow-x-hidden bg-paper text-ink" : "min-h-dvh bg-paper pb-[calc(env(safe-area-inset-bottom)+1.5rem)] text-ink"}>
+      <header className="sticky top-0 z-[600] shrink-0 border-b border-line bg-paper/95 backdrop-blur">
         <div className="mx-auto flex h-14 max-w-lg items-center gap-2 px-3">
           <Link href={visit ? "/room" : "/mypage"} aria-label={visit ? "じぶんのおへやへ戻る" : "マイページへ戻る"} className="flex h-11 w-11 items-center justify-center rounded-full active:bg-paper-deep">
             <IconChevronLeft size={24} />
@@ -656,10 +665,10 @@ export function MyRoom({ entries, initialLayout, serverReady, dogSkin, dogName, 
         </div>
       </header>
 
-      <div className="mx-auto max-w-lg">
+      <div className={stage ? "mx-auto flex min-h-0 w-full max-w-lg flex-1 flex-col" : "mx-auto max-w-lg"}>
         <div
           ref={frameRef}
-          className={`isolate w-full touch-none select-none overflow-hidden ${editing ? "sticky top-14 z-[50] shadow-[0_8px_16px_-10px_rgba(60,40,20,.35)]" : "relative"}`}
+          className={`isolate w-full shrink-0 touch-none select-none overflow-hidden ${editing ? "sticky top-14 z-[50] shadow-[0_8px_16px_-10px_rgba(60,40,20,.35)]" : "relative"}`}
           style={{ aspectRatio: `1000 / ${1000 * ROOM.aspect}` }}
           onPointerDown={(e) => { if (e.target === e.currentTarget || e.target === roomRef.current || (e.target as Element).tagName === "svg" || (e.target as Element).closest("svg[aria-hidden]")) setSelectedId(null); }}
         >
@@ -732,7 +741,7 @@ export function MyRoom({ entries, initialLayout, serverReady, dogSkin, dogName, 
             </div>
           ) : null}
           <div className="pointer-events-none absolute inset-0" style={{ zIndex: 2000 }}>
-            <RoomLighting now={now} lamps={lampLights} at={place} weather={weather} room={layout.theme.room} event={roomEvent} />
+            <RoomLighting now={now} lamps={lampLights} at={place} weather={weather} room={layout.theme.room} event={roomEvent} openBottom={stage} />
           </div>
           {peek ? (
             <span className="room-bubble pointer-events-none absolute w-max max-w-[12rem] -translate-x-1/2 -translate-y-full rounded-xl bg-ink px-2.5 py-1 text-[10px] font-bold text-white shadow" style={{ left: `${clamp(peek.x, 18, 82)}%`, top: `${Math.max(4, peek.y - 0.5)}%`, zIndex: 2600 }}>{peek.text}</span>
@@ -851,20 +860,36 @@ export function MyRoom({ entries, initialLayout, serverReady, dogSkin, dogName, 
         ) : visit ? (
           <VisitPanel visit={visit} dogName={dogName} liked={visitLike.liked} likeCount={visitLike.likeCount} likeBusy={visitLike.busy} onLike={() => void visitLike.toggleLike()} />
         ) : (
-          <section className="space-y-3 px-4 pt-4">
-            <SkyCard now={now} place={place} onPlace={changePlace} weather={weather} steps={steps} history={stepHistory} />
-            <ul className="space-y-1.5 rounded-2xl border border-line bg-card px-4 py-3 text-[12px] leading-relaxed text-ink-soft shadow-sm">
-              <li>🐾 {dogName}をタップすると、なでられます</li>
-              <li>🖼️ 飾った写真をタップすると、その日の思い出が見られます</li>
-              <li>🕰️ 窓の外・部屋の明るさ・時計は、住んでいるところ（📍で変えられます）の、いまの時刻・天気と、季節の日の出・日の入りに合わせて変わります</li>
-              <li>🚩 おでかけを記録した都道府県のペナントや、おさんぽのトロフィーも飾れます</li>
-            </ul>
-            <button type="button" onClick={() => void takeSnapshot()} disabled={shooting} className="flex w-full items-center justify-center gap-2 rounded-full bg-leaf-deep py-3 text-sm font-black text-white shadow-md active:scale-[.98] disabled:opacity-60">
-              <span aria-hidden="true">📷</span>{shooting ? "撮影中…" : "記念撮影する"}
-            </button>
-            {guests ? <RoomGuests mail={guests.mail} friends={guests.friends} /> : null}
-            <p className="text-center text-[10px] font-semibold text-ink-faint">{saveLabel}</p>
-          </section>
+          // 小さい画面でもボードがつぶれないよう、最低の高さをとる（そのときだけ画面が少しスクロールする）
+          <div className="relative z-10 -mt-px min-h-[300px] flex-1">
+            <FloorBelow theme={layout.theme} now={now} at={place} weather={weather} event={roomEvent} />
+            <RoomDesk dark={1 - skyNow.light} warm={deskWarm} tint={deskTint} />
+            {/* ボードは机の天板の上（手前のふちより上）なら、好きなところに置けて大きさも変えられる */}
+            <div className="absolute left-0 top-[-20px] bottom-[calc(env(safe-area-inset-bottom)+30px)]" style={{ right: `${(1 - DESK_END) * 100}%` }}>
+            <RoomBoard dark={1 - skyNow.light} drop={16} place={layout.board} onPlace={(board) => commit({ ...latest.current, board })}>
+              <SkyCard
+                now={now} place={place} onPlace={changePlace} weather={weather} steps={steps} history={stepHistory}
+                // ボードの面の高さいっぱい
+                height="max(150px, 100%)"
+                friends={guests?.friends}
+                likes={guests?.mail.filter((m) => m.kind === "like").length ?? 0}
+                onEdit={() => setEditing(true)}
+              />
+              <ul className="space-y-1.5 rounded-2xl border border-line bg-card px-4 py-3 text-[12px] leading-relaxed text-ink-soft shadow-sm">
+                <li>🐾 {dogName}をタップすると、なでられます</li>
+                <li>🖼️ 飾った写真をタップすると、その日の思い出が見られます</li>
+                <li>🕰️ 窓の外・部屋の明るさ・時計は、住んでいるところ（📍で変えられます）の、いまの時刻・天気と、季節の日の出・日の入りに合わせて変わります</li>
+                <li>🚩 おでかけを記録した都道府県のペナントや、おさんぽのトロフィーも飾れます</li>
+              </ul>
+              <button type="button" onClick={() => void takeSnapshot()} disabled={shooting} className="flex w-full items-center justify-center gap-2 rounded-full bg-leaf-deep py-3 text-sm font-black text-white shadow-md active:scale-[.98] disabled:opacity-60">
+                <span aria-hidden="true">📷</span>{shooting ? "撮影中…" : "記念撮影する"}
+              </button>
+              {guests ? <RoomGuests mail={guests.mail} /> : null}
+              <p className="pb-1 text-center text-[10px] font-semibold text-ink-faint">{saveLabel}</p>
+            </RoomBoard>
+            </div>
+            <RoomDeskFront dark={1 - skyNow.light} warm={deskWarm} />
+          </div>
         )}
       </div>
 

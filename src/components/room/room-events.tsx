@@ -1493,6 +1493,9 @@ const AMBIENCE: Record<RoomEvent, { tint: string; o: number }> = {
   christmas: { tint: "#FFB060", o: 0.07 },
 };
 
+/** 行事の部屋の色（部屋の手前にのばした床にも同じ色をかける） */
+export const eventTint = (event: RoomEvent) => AMBIENCE[event];
+
 export const EventAmbience = function EventAmbience({ event, dark }: { event: RoomEvent; dark: number }) {
   const still = useStill();
   const a = AMBIENCE[event];

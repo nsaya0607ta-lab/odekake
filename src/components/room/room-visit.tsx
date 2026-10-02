@@ -149,7 +149,7 @@ export type RoomMailItem = { kind: "note" | "like"; id: string; userId: string; 
 export type RoomFriend = { id: string; name: string; avatar: string | null };
 
 /** 自分の部屋に届いたものと、あそびに行けるフレンド */
-export function RoomGuests({ mail, friends }: { mail: RoomMailItem[]; friends: RoomFriend[] }) {
+export function RoomGuests({ mail, friends }: { mail: RoomMailItem[]; friends?: RoomFriend[] }) {
   const now = useNowMs();
   const [items, setItems] = useState(mail);
   const [showAll, setShowAll] = useState(false);
@@ -192,7 +192,7 @@ export function RoomGuests({ mail, friends }: { mail: RoomMailItem[]; friends: R
         )}
       </div>
 
-      <div className="rounded-2xl border border-line bg-card px-4 py-3 shadow-sm">
+      {friends ? <div className="rounded-2xl border border-line bg-card px-4 py-3 shadow-sm">
         <p className="text-[13px] font-black text-ink">🚪 フレンドのおへやに あそびに行く</p>
         {friends.length ? (
           <ul className="-mx-1 mt-2 flex gap-2 overflow-x-auto px-1 pb-1">
@@ -212,7 +212,7 @@ export function RoomGuests({ mail, friends }: { mail: RoomMailItem[]; friends: R
         ) : (
           <p className="mt-1 text-[11px] font-bold text-ink-faint">フレンドになると、おたがいのおへやに あそびに行けます。<Link href="/mypage/friends" className="text-leaf-deep underline">フレンドをさがす</Link></p>
         )}
-      </div>
+      </div> : null}
     </div>
   );
 }
