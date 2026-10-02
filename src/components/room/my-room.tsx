@@ -72,6 +72,7 @@ import { EVENT_FLOOR_Y, EventFloor, EventFront } from "./room-events";
 import { dayPhaseOf, FixtureVisual, fixtureSize, lampsOn, ROOM_STAGE, RoomLighting, RoomScene, ThemeSwatch, windowRectOf, type DayPhase } from "./room-scene";
 import { RoomBoard } from "./room-board";
 import { FurnitureShop } from "./room-shop";
+import { BlueCoinArt } from "@/components/coin-art";
 import { DiaryDialog, DoodleContext, PasserLink, RoomMess, ShootingStars, useRoomMess, useWindowPasser } from "./room-gimmicks";
 import { DEFAULT_PLACE, locateHere, placeShortName, SkyCard, skyBackdrop, type RoomPlace } from "./sky-card";
 
@@ -794,6 +795,18 @@ export function MyRoom({ entries, initialLayout, serverReady, dogSkin, dogName, 
               <p className="text-[10px] font-bold tracking-[0.18em] text-leaf-deep">{visit ? "FRIEND'S ROOM" : "MY ROOM"}</p>
               <h1 className="truncate text-[17px] font-black">{visit ? `${visit.name}さんのおへや` : `${dogName}のおへや`}</h1>
             </div>
+            {/* もっている青コイン（タップで家具のお店へ） */}
+            {!visit && shopState?.ready ? (
+              <button
+                type="button"
+                onClick={() => { setEditing(true); setTab("furniture"); }}
+                aria-label={`青コイン ${shopState.blueCoins.toLocaleString()}枚（家具のお店へ）`}
+                className="flex h-9 shrink-0 items-center gap-1 rounded-full border border-[#BFD7F5] bg-[#EEF5FF] pl-1.5 pr-2.5 text-[12px] font-black tabular-nums text-[#1F4F8F] shadow-sm active:scale-95"
+              >
+                <BlueCoinArt className="h-5 w-5" />
+                {shopState.blueCoins.toLocaleString()}
+              </button>
+            ) : null}
             {visit ? (
               <LikeButton liked={visitLike.liked} count={visitLike.likeCount} busy={visitLike.busy} onToggle={() => void visitLike.toggleLike()} />
             ) : editing ? (
