@@ -6,6 +6,7 @@
  */
 import Link from "next/link";
 import { useEffect, useMemo, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { STEP_COIN_MILESTONES } from "@/lib/coins";
 import type { StepDay } from "@/lib/data/exp";
 import { useTodaySteps, type TodaySteps } from "@/lib/use-today-steps";
@@ -148,7 +149,8 @@ export function SkyCard({ now, place, onPlace, weather = null, steps, history, h
   const cloudy = kind === "cloudy" || kind === "fog" || wet || kind === "snow";
   const ink = (day: string, night: string) => mix(day, night, Math.min(1, dark * 1.1));
   const weatherChip = weather ? `${WEATHER_LABEL[weather.kind].icon} ${weather.temp !== null ? `${Math.round(weather.temp)}℃` : WEATHER_LABEL[weather.kind].label}` : null;
-  const sheet = (title: string, onClose: () => void, body: React.ReactNode) => (
+  // 下から出るシートは、ページのいちばん上の層に出す（ボードがななめに傾けてあっても、その中に閉じこめられないように）
+  const sheet = (title: string, onClose: () => void, body: React.ReactNode) => createPortal(
     <div className="fixed inset-0 z-[700] flex items-end justify-center bg-[#140f22]/55 backdrop-blur-[2px]" role="dialog" aria-modal="true" aria-label={title} onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}>
       <div className="room-bubble w-full max-w-lg rounded-t-[26px] bg-card px-4 pb-[calc(env(safe-area-inset-bottom)+1rem)] pt-2 shadow-2xl">
         <div className="mx-auto mb-3 h-1.5 w-10 rounded-full bg-line-strong" aria-hidden />
@@ -158,7 +160,8 @@ export function SkyCard({ now, place, onPlace, weather = null, steps, history, h
         </div>
         {body}
       </div>
-    </div>
+    </div>,
+    document.body,
   );
   return (
     <>
@@ -286,8 +289,8 @@ export function SkyCard({ now, place, onPlace, weather = null, steps, history, h
                 <span className="text-[10px] font-bold text-ink-soft">歩</span>
               </p>
               <p className="mt-1 truncate text-[10px] font-bold text-ink-faint">
-                {stepWeek && stepWeek.streak >= 2 ? <span className="mr-1 rounded-full bg-[linear-gradient(90deg,#FF9A3C,#FF5E3A)] px-1.5 py-px text-[9px] font-black text-white">🔥{stepWeek.streak}日</span> : null}
-                {nextGoal ? <>🚩あと<span className="text-leaf-deep">{(nextGoal.steps - stepCount).toLocaleString("ja-JP")}</span>歩</> : <>🎉 10,000歩！</>}
+                {stepWeek && stepWeek.streak >= 2 ? <span className="mr-1 rounded-full bg-[linear-gradient(90deg,#FF9A3C,#FF5E3A)] px-1 py-px text-[9px] font-black text-white">🔥{stepWeek.streak}日</span> : null}
+                {nextGoal ? <>あと<span className="text-leaf-deep">{(nextGoal.steps - stepCount).toLocaleString("ja-JP")}</span>歩</> : <>🎉 1万歩！</>}
               </p>
             </div>
           ) : (

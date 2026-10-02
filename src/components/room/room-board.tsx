@@ -16,6 +16,8 @@ import { useEffect, useRef, useState, type ReactNode } from "react";
 const LEG = 40, TOP = 16, FRAME = 9, TRAY = 13;
 /** ボードの左右に、床に広がる脚のぶんの余白 */
 const SIDE = 16;
+/** ななめに立てる角度（右のはしが奥へ）と、うしろへのもたれ（度） */
+const TURN = 14, LEAN = 5;
 
 export function RoomBoard({ children, dark = 0 }: { children: ReactNode; /** 夜の暗さ（0〜1） */ dark?: number }) {
   const ref = useRef<HTMLDivElement>(null);
@@ -38,7 +40,9 @@ export function RoomBoard({ children, dark = 0 }: { children: ReactNode; /** 夜
   const shade = 1 - night * 0.5;
 
   return (
-    <div ref={ref} className="absolute inset-x-0 bottom-[calc(env(safe-area-inset-bottom)+6px)] top-[-22px] mx-auto w-[min(97%,480px)]">
+    <div ref={ref} className="absolute inset-x-0 bottom-[calc(env(safe-area-inset-bottom)+6px)] top-[-22px] mx-auto w-[min(91%,460px)]" style={{ perspective: "900px", perspectiveOrigin: "50% 40%" }}>
+      {/* ボードごと、少しななめに立てる（足もとを軸に、右を奥へ回し、上をうしろへもたせる）。中の画面もいっしょに傾くが、さわる・スクロールはそのまま使える */}
+      <div className="absolute inset-0" style={{ transform: `translateX(2.5%) rotateY(${TURN}deg) rotateX(${LEAN}deg)`, transformOrigin: "50% 96%" }}>
       <svg aria-hidden width={w} height={h} viewBox={`0 0 ${w} ${h}`} className="absolute inset-0 overflow-visible" style={{ filter: night > 0.02 ? `brightness(${shade}) saturate(${1 - night * 0.25})` : undefined }}>
         <defs>
           <linearGradient id="bd-wood" x1="0" y1="0" x2="1" y2="0">
@@ -160,6 +164,7 @@ export function RoomBoard({ children, dark = 0 }: { children: ReactNode; /** 夜
         <div aria-hidden className="pointer-events-none absolute inset-0 shadow-[inset_0_2px_4px_rgba(0,0,0,.28),inset_0_-1px_2px_rgba(0,0,0,.12)]" />
         <div aria-hidden className="pointer-events-none absolute inset-x-0 top-0 h-2 bg-gradient-to-b from-[#FAFBFC] to-transparent" />
         <div aria-hidden className="pointer-events-none absolute inset-x-0 bottom-0 h-3 bg-gradient-to-t from-[#FAFBFC] to-transparent" />
+      </div>
       </div>
       {/* 夜は、面の光が床にうすくこぼれる */}
       {night > 0.15 ? (
