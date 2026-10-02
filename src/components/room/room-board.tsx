@@ -19,7 +19,7 @@ const TURN = 15, LEAN = 6;
 /** 透視の強さ（px）。カメラは部屋と同じく、上から見おろす */
 const PERSP = 1150;
 /** 板の下のはしから床までの高さ（脚の見えるぶん）・板の上に出る脚・わくの太さ・わくの厚み（px） */
-const DROP = 38, OVER = 16, FRAME = 9, DEPTH = 9;
+const DEFAULT_DROP = 38, OVER = 16, FRAME = 9, DEPTH = 9;
 /** 映す中身を組む幅（px）。面がこれよりせまいときは、縮めて映す */
 const SCREEN_W = 350;
 
@@ -29,7 +29,16 @@ const add = (a: V3, b: V3): V3 => [a[0] + b[0], a[1] + b[1], a[2] + b[2]];
 const mul = (a: V3, k: number): V3 => [a[0] * k, a[1] * k, a[2] * k];
 const pts = (ps: [number, number][]) => ps.map((p) => `${p[0].toFixed(1)},${p[1].toFixed(1)}`).join(" ");
 
-export function RoomBoard({ children, dark = 0 }: { children: ReactNode; /** 夜の暗さ（0〜1） */ dark?: number }) {
+export function RoomBoard({ children, dark = 0, drop = DEFAULT_DROP, box = "bottom-[calc(env(safe-area-inset-bottom)+10px)] top-[14px] w-[min(86%,420px)]" }: {
+  children: ReactNode;
+  /** 夜の暗さ（0〜1） */
+  dark?: number;
+  /** 板の下のはしから、置いた面（床・机）までの高さ（px） */
+  drop?: number;
+  /** ボードを置く場所と大きさ（Tailwind のクラス） */
+  box?: string;
+}) {
+  const DROP = drop;
   const ref = useRef<HTMLDivElement>(null);
   const [size, setSize] = useState({ w: 360, h: 330 });
   useEffect(() => {
@@ -130,7 +139,7 @@ export function RoomBoard({ children, dark = 0 }: { children: ReactNode; /** 夜
   const backShadow = pts([project([legs[0]!.foot[0], floorY, legs[0]!.foot[2]]), project([legs[1]!.foot[0], floorY, legs[1]!.foot[2]]), project(backFoot)]);
 
   return (
-    <div ref={ref} className="absolute inset-x-0 bottom-[calc(env(safe-area-inset-bottom)+10px)] top-[14px] mx-auto w-[min(86%,420px)]" style={{ perspective: `${PERSP}px`, perspectiveOrigin: `${cx}px ${cy}px` }}>
+    <div ref={ref} className={`absolute inset-x-0 mx-auto ${box}`} style={{ perspective: `${PERSP}px`, perspectiveOrigin: `${cx}px ${cy}px` }}>
       {/* うしろの層：床の影・アルミの三脚・まん中の柱・わくの厚み */}
       <svg aria-hidden width={w} height={h} viewBox={`0 0 ${w} ${h}`} className="pointer-events-none absolute inset-0 overflow-visible" style={dim}>
         <defs>
@@ -231,6 +240,79 @@ export function RoomBoard({ children, dark = 0 }: { children: ReactNode; /** 夜
         const c = project(add([w / 2, floorY, world(0, 0, 0)[2]], mul(fwd, 30)));
         return <div aria-hidden className="pointer-events-none absolute h-12 rounded-[50%] bg-[radial-gradient(closest-side,rgba(220,232,255,.5),rgba(220,232,255,0))]" style={{ left: c[0] - w * 0.45, top: c[1] - 24, width: w * 0.9, opacity: night * 0.5 }} />;
       })() : null}
+    </div>
+  );
+}
+
+/**
+ * 部屋の手前の机（木の天板）。机ごしに部屋をながめる。天板は奥ほど暗く細かい木目、手前のふちに厚み。
+ * 夜は部屋と同じように暗くなる。
+ */
+export function RoomDesk({ dark = 0, warm = 0 }: { dark?: number; /** 朝夕の色の強さ */ warm?: number }) {
+  const ref = useRef<HTMLDivElement>(null);
+  const [size, setSize] = useState({ w: 390, h: 340 });
+  useEffect(() => {
+    const el = ref.current;
+    if (!el || typeof ResizeObserver === "undefined") return;
+    const ro = new ResizeObserver(() => { const r = el.getBoundingClientRect(); setSize({ w: Math.round(r.width), h: Math.round(r.height) }); });
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
+  const { w, h } = size;
+  const edge = 22, top = h - edge;
+  const night = Math.pow(Math.max(0, Math.min(1, dark)), 1.15);
+  // 木目（奥ほど間がつまる横の線。ところどころゆらぐ）
+  const grain = Array.from({ length: 26 }, (_, i) => {
+    const t = i / 25, y = 4 + Math.pow(t, 1.6) * (top - 8);
+    const amp = 0.6 + t * 2.2, ph = i * 1.7;
+    const d = Array.from({ length: 9 }, (_, k) => { const x = (k / 8) * w; return `${k ? "L" : "M"}${x.toFixed(1)} ${(y + Math.sin(ph + k * 0.9) * amp).toFixed(1)}`; }).join(" ");
+    return { d, o: 0.1 + t * 0.12, sw: 0.5 + t * 1.1, dark: i % 3 === 0 };
+  });
+  // マグカップ（右手前）
+  const mx = w * 0.86, my = top - 26;
+  return (
+    <div ref={ref} className="pointer-events-none absolute inset-0" aria-hidden="true">
+      <svg width={w} height={h} viewBox={`0 0 ${w} ${h}`} className="block">
+        <defs>
+          <linearGradient id="desk-top" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0" stopColor="#B88752" />
+            <stop offset="0.5" stopColor="#CFA06A" />
+            <stop offset="1" stopColor="#DDB07A" />
+          </linearGradient>
+          <linearGradient id="desk-edge" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0" stopColor="#F0C994" />
+            <stop offset="0.18" stopColor="#B07A44" />
+            <stop offset="1" stopColor="#7A4E26" />
+          </linearGradient>
+          <radialGradient id="desk-light" cx="0.25" cy="0.1" r="0.9">
+            <stop offset="0" stopColor="#FFF6E0" stopOpacity="0.35" />
+            <stop offset="1" stopColor="#FFF6E0" stopOpacity="0" />
+          </radialGradient>
+          <linearGradient id="mug" x1="0" y1="0" x2="1" y2="0">
+            <stop offset="0" stopColor="#D9DEE4" /><stop offset="0.35" stopColor="#FFFFFF" /><stop offset="1" stopColor="#B9C0C9" />
+          </linearGradient>
+        </defs>
+        {/* 天板 */}
+        <rect x="0" y="0" width={w} height={top} fill="url(#desk-top)" />
+        {grain.map((g, i) => <path key={i} d={g.d} fill="none" stroke={g.dark ? "#7A4A22" : "#9A6A3A"} strokeOpacity={g.o} strokeWidth={g.sw} />)}
+        <rect x="0" y="0" width={w} height={top} fill="url(#desk-light)" />
+        {/* 奥のふち（部屋の床との境目）：うすい光とかげ */}
+        <rect x="0" y="0" width={w} height="2" fill="#FFE9C4" opacity="0.7" />
+        <rect x="0" y="2" width={w} height="6" fill="#5A3818" opacity="0.08" />
+        {/* 手前のふち（厚み） */}
+        <rect x="0" y={top} width={w} height={edge} fill="url(#desk-edge)" />
+        <rect x="0" y={top} width={w} height="1.5" fill="#FFE3B8" opacity="0.9" />
+        {/* マグカップ */}
+        <ellipse cx={mx} cy={my + 22} rx="20" ry="5" fill="#2A1A0A" opacity="0.25" />
+        <path d={`M${mx + 13} ${my + 2} q 12 0 12 9 q 0 9 -12 9`} fill="none" stroke="#C3C9D1" strokeWidth="4" />
+        <path d={`M${mx - 15} ${my - 6} L${mx - 14} ${my + 18} Q ${mx} ${my + 24} ${mx + 14} ${my + 18} L${mx + 15} ${my - 6} Z`} fill="url(#mug)" />
+        <ellipse cx={mx} cy={my - 6} rx="15" ry="4.5" fill="#6A4022" />
+        <ellipse cx={mx} cy={my - 6} rx="15" ry="4.5" fill="none" stroke="#FFFFFF" strokeWidth="1.4" />
+        <path d={`M${mx - 9} ${my + 6} h 18`} stroke="#E9A0B4" strokeWidth="3" strokeLinecap="round" />
+        {/* 朝夕の色・夜の暗さ（部屋の明かりの層と同じ） */}
+        {warm > 0.02 ? <rect x="0" y="0" width={w} height={h} fill="#FF9A5A" opacity={warm * 0.13} /> : null}
+        {night > 0.02 ? <rect x="0" y="0" width={w} height={h} fill="#0F1438" opacity={0.56 * night} /> : null}
+      </svg>
     </div>
   );
 }
