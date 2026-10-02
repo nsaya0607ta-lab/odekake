@@ -11,7 +11,7 @@ import type { StepDay } from "@/lib/data/exp";
 import { useTodaySteps, type TodaySteps } from "@/lib/use-today-steps";
 import { PREFECTURE_NAMES } from "@/lib/geo/prefecture-names";
 import { WEATHER_LABEL, withWeather, type RoomWeather } from "@/lib/room/weather";
-import { fmtJstTime, moonPhase, nearestPref, PREF_POINTS, skyAt, sunTimes, type GeoPoint, type SkyState } from "@/lib/room/sun";
+import { fmtJstTime, moonPhase, nearestPref, PREF_POINTS, skyAt, sunTimes, type GeoPoint } from "@/lib/room/sun";
 
 /**
  * 空と天気の計算に使う場所。gps は現在地（この端末にだけ保存する）。
@@ -62,23 +62,6 @@ const trailX = (n: number) => TRAIL_X0 + (Math.min(n, TRAIL_MAX) / TRAIL_MAX) * 
 /** 手前の丘の上の道（x での高さ） */
 const trailY = (x: number) => 131 + Math.sin((x / 300) * Math.PI * 2.2) * 2.2;
 
-/**
- * カードのまわりの色（上・まん中）。
- * 上は「いまの明かりで見た、部屋の床の色」（朝・夕の色、夜の暗さを部屋の明かりの層と同じようにかける）にして、
- * 部屋の下のはしからつながって見えるようにする。まん中は空の色（昼はうすい青、朝夕は少しあたたかく、夜は藍）。
- */
-export function skyBackdrop(sky: SkyState, floor = "#E8C99A"): { top: string; mid: string } {
-  const dark = Math.max(0, 1 - sky.light);
-  const morning = sky.azimuth < 180;
-  let top = floor;
-  if (sky.warm > 0.02 && sky.altitude > -8) top = mix(top, morning ? "#FFAE96" : "#FF8A3D", sky.warm * 0.13);
-  top = mix(top, "#0F1438", 0.56 * Math.pow(dark, 1.15));
-  top = mix(top, "#1A1008", 0.14);
-  let mid = mix("#E3EEF7", "#232A4A", Math.min(1, dark * 1.1));
-  if (sky.warm > 0.02 && sky.altitude > -8) mid = mix(mid, morning ? "#F8DCD2" : "#F6CDB0", sky.warm * 0.45 * (1 - dark));
-  return { top, mid };
-}
-
 /** 連続記録の目標 */
 const STREAK_GOAL = 5_000;
 const DOW = ["日", "月", "火", "水", "木", "金", "土"];
@@ -100,7 +83,7 @@ function weekOf(history: StepDay[], today: string, todaySteps: number) {
 
 export type SkyFriend = { id: string; name: string; avatar: string | null };
 
-export function SkyCard({ now, place, onPlace, weather = null, steps, history, height, friends, likes = 0, onEdit, floor }: {
+export function SkyCard({ now, place, onPlace, weather = null, steps, history, height, friends, likes = 0, onEdit }: {
   now: Date; place: RoomPlace; onPlace: (p: RoomPlace) => void; weather?: RoomWeather | null;
   /** 上の窓の高さ（CSS）。部屋の下の、画面ののこりにぴったり合わせる */
   height?: string;
@@ -110,8 +93,6 @@ export function SkyCard({ now, place, onPlace, weather = null, steps, history, h
   likes?: number;
   /** 窓台の左はしの「もようがえ」ボタン */
   onEdit?: () => void;
-  /** 部屋の床の色（カードのまわりの色を、部屋の下のはしからつなげる） */
-  floor?: string;
   /** きょうの歩数（渡したときだけ、手前の丘におさんぽの道を描く） */
   steps?: TodaySteps;
   /** 直近の日ごとの歩数（今週のグラフと連続記録） */
@@ -166,7 +147,6 @@ export function SkyCard({ now, place, onPlace, weather = null, steps, history, h
   const wet = kind === "rain" || kind === "drizzle" || kind === "thunder";
   const cloudy = kind === "cloudy" || kind === "fog" || wet || kind === "snow";
   const ink = (day: string, night: string) => mix(day, night, Math.min(1, dark * 1.1));
-  const backdrop = skyBackdrop(sky, floor);
   const weatherChip = weather ? `${WEATHER_LABEL[weather.kind].icon} ${WEATHER_LABEL[weather.kind].label}${weather.temp !== null ? ` ${Math.round(weather.temp)}℃` : ""}` : null;
   const sheet = (title: string, onClose: () => void, body: React.ReactNode) => (
     <div className="fixed inset-0 z-[700] flex items-end justify-center bg-[#140f22]/55 backdrop-blur-[2px]" role="dialog" aria-modal="true" aria-label={title} onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}>
@@ -182,11 +162,6 @@ export function SkyCard({ now, place, onPlace, weather = null, steps, history, h
   );
   return (
     <>
-      {/* カードのまわりも空の色に（部屋の下からつながって見えるように。下の方で紙の色にもどす） */}
-      <div
-        className={height ? "relative -mx-4 -mt-4 px-4 pb-1 pt-4" : "contents"}
-        style={height ? { background: `linear-gradient(180deg, ${backdrop.top} 0%, ${backdrop.mid} 34%, ${backdrop.mid} 80%, #FBF8F1 100%)` } : undefined}
-      >
       {/* いまの空と町（ふちなし）。下に、すりガラスの帯（もようがえ・きょうの歩数・フレンドのおへや） */}
       <div
         className={`relative isolate overflow-hidden rounded-[26px] shadow-[0_14px_28px_-16px_rgba(30,50,80,.55),0_2px_6px_-2px_rgba(30,50,80,.18)] ${height ? "" : "h-[300px]"}`}
@@ -334,8 +309,7 @@ export function SkyCard({ now, place, onPlace, weather = null, steps, history, h
           ) : null}
         </div>
       </div>
-      {height ? <p className="mt-2 flex items-center justify-center gap-1 text-[10px] font-bold text-ink-faint" aria-hidden><span className="animate-bounce">⌄</span>スクロールで、今週の歩数</p> : null}
-      </div>
+      {height ? <p className="!mt-1.5 flex items-center justify-center gap-1 text-[10px] font-bold text-ink-faint" aria-hidden><span className="animate-bounce">⌄</span>スクロールで、今週の歩数</p> : null}
 
       {/* ここから下はスクロールで：今週の歩数と、空のようす */}
       {stepCount !== null ? (
