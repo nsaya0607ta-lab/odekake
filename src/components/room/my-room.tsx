@@ -161,6 +161,22 @@ const FURNITURE_DEPTH: Record<string, number> = { whiteboard: 0.2, sofa: 0.35, p
 
 const FLOOR_SPOTS = [[22, 74], [78, 76], [64, 90], [36, 92], [86, 92], [14, 88], [50, 66], [70, 66]] as const;
 
+/** 家具のお店があるときは、買った数をこえる家具を外す（図鑑アイテムなど、家具でないものはそのまま） */
+function ownedOnly(layout: RoomLayout, shop: RoomShop | undefined): RoomLayout {
+  if (!shop?.ready) return layout;
+  const used = new Map<string, number>();
+  return {
+    ...layout,
+    items: layout.items.filter((p) => {
+      if (!p.key.startsWith("furniture:")) return true;
+      const id = p.key.slice("furniture:".length) as FurnitureId;
+      const n = (used.get(id) ?? 0) + 1;
+      used.set(id, n);
+      return n <= (shop.owned[id] ?? 0);
+    }),
+  };
+}
+
 /** はじめて開いたときの部屋：持っているものから少しだけ飾っておく（家具は置かない。「家具」タブから自分で置く） */
 function starterLayout(entries: DecorEntry[]): RoomLayout {
   const items: Placement[] = [];
@@ -231,7 +247,7 @@ export function MyRoom({ entries, initialLayout, serverReady, dogSkin, dogName, 
   // 家具はだれでも置けるので、持ち物と合わせて「置けるもの」にする
   const validKeys = useMemo(() => new Set([...entries, ...FURNITURE_ENTRIES, ...FIXTURE_ENTRIES].map((e) => e.key)), [entries]);
   const [layout, setLayout] = useState<RoomLayout>(() => initialLayout
-    ? { ...initialLayout, items: initialLayout.items.filter((p) => validKeys.has(p.key) || p.key.startsWith("upload:")) }
+    ? ownedOnly({ ...initialLayout, items: initialLayout.items.filter((p) => validKeys.has(p.key) || p.key.startsWith("upload:")) }, shop)
     : starterLayout(entries));
   /** 持ち物に、アップロードした写真を足したもの（アップロードした写真を先に並べる） */
   const allEntries = useMemo(() => [...layout.photos.map(uploadEntry), ...entries, ...FURNITURE_ENTRIES, ...FIXTURE_ENTRIES], [entries, layout.photos]);
@@ -402,7 +418,7 @@ export function MyRoom({ entries, initialLayout, serverReady, dogSkin, dogName, 
       const d = JSON.parse(window.localStorage.getItem(draftKey) ?? "null") as { rev?: number; layout?: unknown } | null;
       if (!d?.layout || typeof d.rev !== "number") return;
       if (d.rev <= (initialLayout?.rev ?? 0)) { window.localStorage.removeItem(draftKey); return; }
-      const restored = parseRoomLayout(d.layout, validKeys);
+      const restored = ownedOnly(parseRoomLayout(d.layout, validKeys), shop);
       latest.current = restored;
       setLayout(restored);
       setSaveState("dirty");

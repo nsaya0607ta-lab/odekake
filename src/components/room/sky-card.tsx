@@ -155,8 +155,15 @@ export function SkyCard({ now, place, onPlace, weather = null, steps, history, h
   const t = now.getTime();
   const up = t >= rise && t <= set;
   const f = up && set > rise ? (t - rise) / (set - rise) : 0;
+  /** 太陽・月がとおる弧（点線と同じ2次ベジェ。左はし 0 → 右はし 1） */
+  const arcTop = -8 - extra * 1.4;
+  const arcAt = (k: number) => { const c = Math.min(1, Math.max(0, k)); return { x: 24 + 252 * c, y: 112 + 2 * c * (1 - c) * (arcTop - 112) }; };
   // 弧の上の太陽（日の出 0 → 日の入り 1）
-  const ax = 24 + f * 252, ay2 = 112 - Math.sin(f * Math.PI) * (60 + extra * 0.7);
+  const { x: ax, y: ay2 } = arcAt(f);
+  // 夜は月が同じ弧をとおる（日の入り 0 → 次の日の出 1）
+  const DAY = 86_400_000;
+  const nightFrom = t > set ? set : set - DAY, nightTo = t > set ? rise + DAY : rise;
+  const moonAt = arcAt(nightTo > nightFrom ? (t - nightFrom) / (nightTo - nightFrom) : 0.5);
   const status = up
     ? set - t < 60 * 60_000 ? `あと${Math.max(1, Math.round((set - t) / 60_000))}分で日の入り` : sky.altitude < 12 ? (f < 0.5 ? "朝の光がやさしい時間" : "夕方の光がさしこむ時間") : weatherDay(weather)
     : t < rise ? `日の出まで あと${Math.floor((rise - t) / 3_600_000)}時間${Math.round(((rise - t) % 3_600_000) / 60_000)}分` : sky.altitude > -6 ? "日が沈んで、空がのこりの色" : "夜。明かりをつけてのんびり";
@@ -208,14 +215,14 @@ export function SkyCard({ now, place, onPlace, weather = null, steps, history, h
             {/* 星 */}
             {sky.stars > 0.05 ? STARS.map(([x, y, r], i) => <circle key={i} cx={x} cy={sy(y)} r={r} fill="#FFF8DA" opacity={sky.stars * (i % 3 ? 0.65 : 1)} />) : null}
             {/* 太陽・月がとおる道 */}
-            <path d={`M24 112 Q150 ${-8 - extra * 1.4} 276 112`} fill="none" stroke="#FFFFFF" strokeOpacity="0.55" strokeWidth="1.6" strokeDasharray="3 5" />
+            <path d={`M24 112 Q150 ${arcTop} 276 112`} fill="none" stroke="#FFFFFF" strokeOpacity="0.55" strokeWidth="1.6" strokeDasharray="3 5" />
             {up ? (
               <g opacity={cloudy ? 0.55 : 1}>
                 <circle cx={ax} cy={ay2} r="26" fill="url(#skycard-glow)" />
                 <circle cx={ax} cy={ay2} r="10" fill={mix("#FFD24A", "#FF9A4A", sky.warm)} />
               </g>
             ) : (
-              <g transform={`translate(206 ${34 - extra * 0.55})`} opacity={cloudy ? 0.5 : 1}>
+              <g transform={`translate(${moonAt.x} ${moonAt.y})`} opacity={cloudy ? 0.5 : 1}>
                 <circle r="24" fill="url(#skycard-glow)" />
                 <path d={moonIcon(10, moon)} fill="#FFF1B8" />
               </g>
