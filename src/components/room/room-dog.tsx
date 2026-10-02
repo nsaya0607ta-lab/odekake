@@ -509,7 +509,20 @@ export function RoomDog({ skin, phase, sleepy, lines, dreams = [], cue = null, q
       // かみなり：ハウスの中にかくれる。なければテーブル・ソファのかげ、それもなければ部屋のすみで ぷるぷる
       const house = byKind("dog-house");
       if (house && Math.random() < 0.6) { say("かみなり、こわい…", 1400); playWith(house, () => next(rand(1500, 3000))); return; }
-      const cover = byKind("table") ?? byKind("sofa") ?? byKind("bookshelf");
+      // テーブルがあれば、その下にもぐりこむ（天板の下で、テーブルよりうしろに描く）
+      const table = byKind("table");
+      if (table) {
+        walkTo(table.x, table.y - 0.8, () => {
+          setDog((d) => ({ ...d, flip: Math.random() < 0.5 }));
+          pose("lie-wave");
+          setShiver(true);
+          say(pick(["かみなり、こわい…", "ここなら あんしん…", "ゴロゴロ、どっかいって…"]), 2400);
+          later(() => setShiver(false), 6500);
+          next(7000);
+        }, table.y - 0.6, true);
+        return;
+      }
+      const cover = byKind("sofa") ?? byKind("bookshelf");
       const at = cover ? sideOf(cover) : { x: 7, y: ROOM.floorTop + 4, side: 1 };
       walkTo(at.x, at.y, () => {
         if (cover) face(cover.x); else setDog((d) => ({ ...d, flip: false }));
