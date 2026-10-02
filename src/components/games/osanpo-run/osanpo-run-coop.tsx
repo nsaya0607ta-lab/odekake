@@ -85,12 +85,12 @@ export function OsanpoRunCoop() {
       </p>
       {done && !data.claimed ? (
         <button type="button" className="osr-coop-claim" onClick={() => void claim()} disabled={claiming}>
-          {claiming ? "受け取り中…" : `ごほうび ${data.coins ?? 100}コインを受け取る`}
+          {claiming ? "受け取り中…" : `ごほうび 青コイン${data.coins ?? 100}枚を受け取る`}
         </button>
       ) : done ? (
-        <p className="osr-coop-note">{claimedNow ? `+${claimedNow}コイン 受け取りました！` : "今週のごほうびは受け取りずみ。また来週！"}</p>
+        <p className="osr-coop-note">{claimedNow ? `青コイン +${claimedNow} 受け取りました！` : "今週のごほうびは受け取りずみ。また来週！"}</p>
       ) : (
-        <p className="osr-coop-note">達成すると、みんなそれぞれ{data.coins ?? 100}コインもらえます（月曜0時にリセット）。</p>
+        <p className="osr-coop-note">達成すると、みんなそれぞれ青コイン{data.coins ?? 100}枚もらえます（月曜0時にリセット）。</p>
       )}
       {members.length > 0 ? (
         <ul className="osr-coop-list">

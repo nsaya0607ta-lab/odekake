@@ -23,22 +23,30 @@ export type DecorEntry =
   | (DecorBase & { kind: "furniture"; furniture: FurnitureId })
   | (DecorBase & { kind: "fixture"; fixture: FixtureId });
 
-/** だれでも置ける家具（絵は decor-visual.tsx で描く）。width は床の手前に置いたときの幅（部屋の幅に対する %） */
+/**
+ * 家具（絵は furniture-art.tsx で描く）。width は床の手前に置いたときの幅（部屋の幅に対する %）。
+ * price は青コインの値段（DB の room_furniture_price と同じ値）。1種類2こまで買える
+ */
 export const FURNITURE = {
-  sofa: { name: "ソファ", width: 36 },
-  "dog-bed": { name: "わんこベッド", width: 24 },
-  plant: { name: "観葉植物", width: 13 },
-  bookshelf: { name: "本だな", width: 19 },
-  lamp: { name: "フロアランプ", width: 10 },
-  table: { name: "ローテーブル", width: 25 },
-  "dog-house": { name: "わんこハウス", width: 27 },
-  bowl: { name: "ごはん皿", width: 10 },
-  whiteboard: { name: "ホワイトボード", width: 24 },
+  sofa: { name: "ソファ", width: 36, price: 6000 },
+  "dog-bed": { name: "わんこベッド", width: 24, price: 4000 },
+  plant: { name: "観葉植物", width: 13, price: 1200 },
+  bookshelf: { name: "本だな", width: 19, price: 3000 },
+  lamp: { name: "フロアランプ", width: 10, price: 2000 },
+  table: { name: "ローテーブル", width: 25, price: 2500 },
+  "dog-house": { name: "わんこハウス", width: 27, price: 5000 },
+  bowl: { name: "ごはん皿", width: 10, price: 800 },
+  whiteboard: { name: "ホワイトボード", width: 24, price: 3000 },
 } as const;
 export type FurnitureId = keyof typeof FURNITURE;
 export const FURNITURE_IDS = Object.keys(FURNITURE) as FurnitureId[];
 export const furnitureKey = (id: FurnitureId) => `furniture:${id}`;
-export const FURNITURE_ENTRIES: DecorEntry[] = FURNITURE_IDS.map((id) => ({ kind: "furniture", key: furnitureKey(id), name: FURNITURE[id].name, furniture: id, count: 2 }));
+/** 1種類あたり持てる数 */
+export const FURNITURE_MAX = 2;
+export const FURNITURE_ENTRIES: DecorEntry[] = FURNITURE_IDS.map((id) => ({ kind: "furniture", key: furnitureKey(id), name: FURNITURE[id].name, furniture: id, count: FURNITURE_MAX }));
+/** 家具の持ち物と、青コインの残高（ready が false なら、まだ買う仕組みが無い環境なので、これまでどおり自由に置ける） */
+export type RoomShop = { ready: boolean; blueCoins: number; owned: Partial<Record<FurnitureId, number>> };
+export const isFurnitureId = (v: unknown): v is FurnitureId => typeof v === "string" && Object.prototype.hasOwnProperty.call(FURNITURE, v);
 
 /**
  * 部屋のつくり（窓・壁の棚・かけ時計・お天気ボード）。ほかの飾りと同じように動かす・大きさを変える・しまうができる。
@@ -108,7 +116,8 @@ export type RoomTheme = {
 export type RoomPhoto = { id: string; path: string; date: string; title: string };
 
 /** v: 2 から窓・棚・時計も items に入る（それより前の部屋は読みこむときに足す） */
-export type RoomLayout = { theme: RoomTheme; items: Placement[]; photos: RoomPhoto[]; v?: number };
+/** rev は最後に変えた時刻（ms）。古い保存が新しい保存を上書きしないよう、くらべるのに使う */
+export type RoomLayout = { theme: RoomTheme; items: Placement[]; photos: RoomPhoto[]; v?: number; rev?: number };
 
 export const DEFAULT_THEME: RoomTheme = { wall: "cream", floor: "wood-light", curtain: "leaf", rug: "round-cream", deco: "garland", style: "standard", room: "cozy" };
 /** 部屋の雰囲気を選んだときに、いっしょに切りかえる壁紙・床・窓など */
@@ -227,12 +236,13 @@ export function parseRoomLayout(value: unknown, validKeys?: ReadonlySet<string>)
       ...(typeof p.on === "string" && p.on.length <= 64 ? { on: p.on, rx: clamp(num(p.rx, 0.5), 0, 1) } : {}),
     }];
   });
+  const rev = typeof root.rev === "number" && Number.isFinite(root.rev) && root.rev > 0 ? { rev: Math.floor(root.rev) } : {};
   if (root.v === 2) {
     // 棚がなくなった（しまった）ものは床に下ろす
     const shelfIds = new Set(items.filter((p) => p.key === fixtureKey("shelf")).map((p) => p.id));
-    return { theme, items: items.map((p) => (p.on && !shelfIds.has(p.on) ? dropOff(p) : p)), photos, v: 2 };
+    return { theme, items: items.map((p) => (p.on && !shelfIds.has(p.on) ? dropOff(p) : p)), photos, v: 2, ...rev };
   }
-  return migrateFixtures({ theme, items, photos });
+  return { ...migrateFixtures({ theme, items, photos }), ...rev };
 }
 
 /** 棚から下ろす（床の手前に置く） */

@@ -3,7 +3,7 @@ import { OSANPO_RUN_RANKS, OSANPO_RUN_STAGE_IDS, OSANPO_RUN_STAGES } from "@/lib
 import { PREFECTURE_NAMES } from "@/lib/geo/prefecture-names";
 import { PENNANTS } from "@/lib/room/themes";
 import { isDogSkinId, type DogSkinId } from "@/lib/dog-skins";
-import { parseRoomLayout, pennantKey, photoKey, trophyKey, type DecorEntry, type RoomLayout } from "@/lib/room/types";
+import { isFurnitureId, parseRoomLayout, pennantKey, photoKey, trophyKey, type DecorEntry, type RoomLayout, type RoomShop } from "@/lib/room/types";
 import type { Json } from "@/lib/supabase/types";
 import type { DB } from "./client";
 import { getOwnedItemCounts } from "./collection";
@@ -28,6 +28,29 @@ export async function getMyRoom(supabase: DB, userId: string): Promise<MyRoomSta
     return { layout: null, ready: false };
   }
   return { layout: data ? parseRoomLayout(data.layout) : null, ready: true };
+}
+
+/** 家具の持ち物と青コインの残高（青コインの仕組みが無い環境では ready: false） */
+export async function getRoomShop(supabase: DB, userId: string): Promise<RoomShop> {
+  // 型の定義にまだ無いテーブルなので、ゆるく読む
+  const from = supabase.from.bind(supabase) as unknown as (t: string) => {
+    select: (c: string) => { eq: (k: string, v: string) => PromiseLike<{ data: Record<string, unknown>[] | null; error: { code?: string; message: string } | null }> };
+  };
+  const [coins, furniture] = await Promise.all([
+    from("user_blue_coins").select("balance").eq("user_id", userId),
+    from("user_room_furniture").select("furniture, count").eq("user_id", userId),
+  ]);
+  const error = coins.error ?? furniture.error;
+  if (error) {
+    if (!UNAVAILABLE_CODES.has(error.code ?? "")) console.warn("Room shop is unavailable", { code: error.code, message: error.message });
+    return { ready: false, blueCoins: 0, owned: {} };
+  }
+  const owned: RoomShop["owned"] = {};
+  for (const row of furniture.data ?? []) {
+    if (isFurnitureId(row.furniture) && typeof row.count === "number") owned[row.furniture] = row.count;
+  }
+  const balance = coins.data?.[0]?.balance;
+  return { ready: true, blueCoins: typeof balance === "number" ? balance : 0, owned };
 }
 
 /** おへやに飾れるもの（図鑑アイテム・写真・トロフィー・ペナント） */

@@ -1381,7 +1381,7 @@ export function createOsanpoRun(root: HTMLElement, opts: OsanpoRunOptions): () =
     const head = document.createElement("b");
     head.textContent = `今日のミッション ${done}/${MISSIONS.length}`;
     const note = document.createElement("small");
-    note.textContent = done === MISSIONS.length ? "ぜんぶ達成！ また明日" : `1つ${MISSION_COINS}コイン・ぜんぶで+${MISSION_ALL_BONUS}`;
+    note.textContent = done === MISSIONS.length ? "ぜんぶ達成！ また明日" : `1つ青コイン${MISSION_COINS}枚・ぜんぶで+${MISSION_ALL_BONUS}`;
     const top = document.createElement("div"); top.className = "osr-missions-head"; top.append(head, note);
     const ul = document.createElement("ul");
     for (const m of MISSIONS) {
@@ -1398,7 +1398,7 @@ export function createOsanpoRun(root: HTMLElement, opts: OsanpoRunOptions): () =
     el.hidden = S.missionsNow.length === 0;
     if (el.hidden) return;
     const names = S.missionsNow.map((id) => MISSIONS.find((m) => m.id === id)?.text ?? "").filter(Boolean);
-    el.textContent = `ミッション達成：${names.join("／")}${S.missionCoins > 0 ? `（+${S.missionCoins.toLocaleString()}コイン）` : ""}`;
+    el.textContent = `ミッション達成：${names.join("／")}${S.missionCoins > 0 ? `（青コイン+${S.missionCoins.toLocaleString()}）` : ""}`;
   }
 
   /* ---------- 分かれ道 ---------- */
@@ -2624,15 +2624,15 @@ export function createOsanpoRun(root: HTMLElement, opts: OsanpoRunOptions): () =
     const roundId = S.roundId;
     S.roundId = ""; // 同じおさんぽを二度送らない
     el.hidden = false; el.dataset.state = "wait";
-    el.textContent = "コインを受け取り中…";
+    el.textContent = "青コインを受け取り中…";
     opts.onRunEnd({ roundId, stage: STAGE_ID, score, meters, items: S.treats })
       .then((coins) => {
-        if (coins === null) { el.dataset.state = "error"; el.textContent = "通信できず、コインを受け取れませんでした"; return; }
+        if (coins === null) { el.dataset.state = "error"; el.textContent = "通信できず、青コインを受け取れませんでした"; return; }
         el.dataset.state = coins > 0 ? "ok" : "zero";
-        el.textContent = coins > 0 ? `+${coins.toLocaleString()} コイン ゲット！` : "コインはスコア50点ごとに1枚";
+        el.textContent = coins > 0 ? `青コイン +${coins.toLocaleString()} ゲット！` : "青コインはスコア50点ごとに1枚";
         if (coins > 0) sfx.mile();
       })
-      .catch(() => { el.dataset.state = "error"; el.textContent = "通信できず、コインを受け取れませんでした"; });
+      .catch(() => { el.dataset.state = "error"; el.textContent = "通信できず、青コインを受け取れませんでした"; });
   }
   /** 今日おでかけを記録していれば、スコア全体に ODEKAKE_SCORE_MULT がかかる */
   const odekake = opts.odekake ?? null;

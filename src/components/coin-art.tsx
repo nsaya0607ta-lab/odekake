@@ -25,6 +25,25 @@ export function CoinArt({ className }: ArtProps) {
   );
 }
 
+/** 青コイン（おさんぽフレンチーでもらえる特別なコイン。わんこのおへやの家具が買える）。金貨と同じ形で、青く光る */
+export function BlueCoinArt({ className }: ArtProps) {
+  return (
+    <svg viewBox="0 0 24 24" className={className} aria-hidden="true">
+      <ellipse cx="12" cy="12" rx="10" ry="10" fill="#3D7FD9" />
+      <ellipse cx="12" cy="11.2" rx="10" ry="9.6" fill="#7DB4F5" />
+      <ellipse cx="12" cy="11.2" rx="7.2" ry="6.9" fill="#3D7FD9" opacity="0.5" />
+      <path d="M5.6 7.4 a8 7.6 0 0 1 5 -3.6" stroke="#FFFFFF" strokeWidth="1.2" strokeLinecap="round" fill="none" opacity="0.8" />
+      <g fill="#F4FAFF">
+        <ellipse cx="12" cy="13.4" rx="3" ry="2.4" />
+        <circle cx="8.3" cy="10.4" r="1.25" />
+        <circle cx="10.6" cy="8.5" r="1.35" />
+        <circle cx="13.4" cy="8.5" r="1.35" />
+        <circle cx="15.7" cy="10.4" r="1.25" />
+      </g>
+    </svg>
+  );
+}
+
 /** 宝箱。ふたを開けて金貨があふれている */
 export function TreasureChestArt({ className }: ArtProps) {
   return (

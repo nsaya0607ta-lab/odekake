@@ -7,7 +7,7 @@
  *   ときどきフレンドの犬も通り、タップするとその部屋にあそびに行ける。
  * - ホワイトボードのらくがき：ホワイトボード（家具）を置くと、わんこが毎朝ひとつずつ描きたしていく。
  */
-import { createContext, useContext, useEffect, useState } from "react";
+import { createContext, useContext, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { DOG_SKIN_IDS, getFrenchieSrc } from "@/lib/dog-skins";
 import type { WindowPasser, WindowRect } from "./room-scene";
@@ -233,5 +233,205 @@ export function WhiteboardDoodles({ x, y, w, h, drawing = false }: { x: number; 
         </g>
       ) : null}
     </g>
+  );
+}
+
+/* ---------- わんこの日記帳 ---------- */
+
+const DIARY_EXTRA = [
+  "ばんごはんは カリカリ。おいしかった。",
+  "ボールを ソファのしたに いれちゃった。ないしょ。",
+  "ゆめで おっきな ほねを みた。",
+  "ごしゅじんが「いいこ」って いった。うれしい。",
+  "まどのそとに ねこが いた。…まけないぞ。",
+  "おふろは きらい。でも ふわふわに なった。",
+  "しらない いぬと あいさつした。いいにおい だった。",
+];
+const WEEK_JA = ["日", "月", "火", "水", "木", "金", "土"];
+
+function diaryText(steps: number, before: number | null, date: string) {
+  const n = steps.toLocaleString();
+  const main = steps <= 0 ? "おさんぽ なし。ずっと ごろごろ してた。たまには いいよね。"
+    : steps < 2000 ? `ちょっとだけ おさんぽ。${n}ほ。もっと あるきたかったな…`
+      : steps < 5000 ? `${n}ほ あるいた。こうえんの においを いっぱい かいだ。`
+        : steps < 8000 ? `${n}ほ！ ごしゅじんと たくさん あるいた。きもちよかった。`
+          : steps < 12000 ? `${n}ほも あるいた！ ごしゅじん、さかで へばってた。ぼくは へいき。`
+            : `${n}ほ！？ あしが ぼうに なりそう。ごしゅじん、ねちゃった。`;
+  const diff = before !== null && steps > before && before > 0 ? `まえのひより ${(steps - before).toLocaleString()}ほ おおい！ えらい！` : null;
+  return [main, diff, DIARY_EXTRA[hash(date) % DIARY_EXTRA.length]!].filter((x): x is string => Boolean(x));
+}
+
+/** 本だなをタップすると開く、わんこ目線の日記（きのうから、さかのぼって読める） */
+export function DiaryDialog({ history, today, dogName, onClose }: {
+  history: readonly { date: string; steps: number }[];
+  /** きょうの日付（YYYY-MM-DD、日本時間）。きょうの分はまだ書いていない */
+  today: string;
+  dogName: string;
+  onClose: () => void;
+}) {
+  const days = [...history].filter((d) => d.date < today).sort((a, b) => (a.date < b.date ? 1 : -1));
+  const [page, setPage] = useState(0);
+  const day = days[page];
+  const before = day ? days[page + 1]?.steps ?? null : null;
+  const label = day ? (() => { const [y, m, d] = day.date.split("-").map(Number); return `${m}がつ${d}にち（${WEEK_JA[new Date(Date.UTC(y!, m! - 1, d!)).getUTCDay()]}）`; })() : "";
+  return (
+    <div className="fixed inset-0 z-[700] flex items-center justify-center bg-[#140f22]/70 p-5 backdrop-blur-sm" role="dialog" aria-modal="true" aria-label={`${dogName}の日記`} onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}>
+      <div className="room-bubble relative w-full max-w-sm overflow-hidden rounded-[18px] bg-[#FFFDF6] shadow-2xl">
+        {/* 表紙のふち（とじひも）と、罫線のページ */}
+        <div className="flex items-center justify-between bg-[#C9895A] px-4 py-2.5 text-white">
+          <p className="text-sm font-black tracking-wide">📔 {[...dogName].slice(0, 8).join("")}の にっき</p>
+          <button type="button" onClick={onClose} className="rounded-full bg-white/25 px-2.5 py-0.5 text-xs font-bold">とじる</button>
+        </div>
+        <div className="relative min-h-[240px] bg-[repeating-linear-gradient(180deg,#FFFDF6_0_27px,#E9DCC6_27px_28px)] px-5 pb-4 pt-3">
+          <span aria-hidden className="absolute bottom-0 left-9 top-0 w-px bg-[#F2B8B8]" />
+          {day ? (
+            <div className="pl-6">
+              <p className="text-[15px] font-black leading-[28px] text-[#8A5A30]">{label}</p>
+              {diaryText(day.steps, before, day.date).map((t, i) => <p key={i} className="text-[14px] font-bold leading-[28px] text-ink-soft">{t}</p>)}
+              <p className="mt-1 text-right text-[13px] font-black leading-[28px] text-[#8A5A30]">🐾 {[...dogName].slice(0, 8).join("")}</p>
+            </div>
+          ) : (
+            <p className="pl-6 text-[14px] font-bold leading-[28px] text-ink-soft">まだ なにも かいてないよ。<br />あした から かくね！</p>
+          )}
+        </div>
+        {days.length > 1 ? (
+          <div className="flex items-center justify-between border-t border-[#E9DCC6] px-4 py-2 text-xs font-bold text-[#8A5A30]">
+            <button type="button" disabled={page >= days.length - 1} onClick={() => setPage((p) => p + 1)} className="rounded-full px-2 py-1 disabled:opacity-30">← まえのひ</button>
+            <span className="text-ink-faint">{page + 1} / {days.length}</span>
+            <button type="button" disabled={page === 0} onClick={() => setPage((p) => p - 1)} className="rounded-full px-2 py-1 disabled:opacity-30">つぎのひ →</button>
+          </div>
+        ) : null}
+      </div>
+    </div>
+  );
+}
+
+/* ---------- るすばん中のいたずら ---------- */
+
+export type MessKind = "fluff" | "sock" | "kibble" | "tissue" | "slipper";
+export type Mess = { id: string; kind: MessKind; x: number; y: number; r: number };
+const SEEN_KEY = "odekake-room-seen", MESS_KEY = "odekake-room-mess";
+const MESS_KINDS: MessKind[] = ["fluff", "sock", "kibble", "tissue", "slipper"];
+const HOUR = 3600_000;
+
+const readStore = (k: string) => { try { return window.localStorage.getItem(k); } catch { return null; } };
+const writeStore = (k: string, v: string | null) => { try { if (v === null) window.localStorage.removeItem(k); else window.localStorage.setItem(k, v); } catch { /* 保存できなくても遊べる */ } };
+
+/**
+ * しばらく部屋を開かなかったあいだに、わんこがやった いたずら（床に散らかったもの）。
+ * 6時間以上あけると1〜2こ、12時間で2〜3こ、1日以上で4こ。片づけるまで（この端末に）残る。
+ */
+export function useRoomMess({ enabled, floorTop, floorBottom, blocks }: {
+  enabled: boolean; floorTop: number; floorBottom: number;
+  /** 家具のあるところ（部屋の %）。散らかすものは、家具の下にもぐらないところに置く */
+  blocks: readonly { x0: number; x1: number; y0: number; y1: number }[];
+}) {
+  const [mess, setMess] = useState<Mess[]>([]);
+  const blocksRef = useRef(blocks);
+  blocksRef.current = blocks;
+  const [fresh, setFresh] = useState(false);
+  useEffect(() => {
+    if (!enabled) return;
+    const now = Date.now();
+    let list: Mess[] = [];
+    try { const raw = readStore(MESS_KEY); if (raw) list = (JSON.parse(raw) as Mess[]).filter((m) => MESS_KINDS.includes(m.kind)).slice(0, 6); } catch { list = []; }
+    const seen = Number(readStore(SEEN_KEY) ?? 0);
+    const away = seen > 0 ? now - seen : 0;
+    if (!list.length && away >= 6 * HOUR) {
+      const n = away >= 24 * HOUR ? 4 : away >= 12 * HOUR ? 2 + Math.round(Math.random()) : 1 + Math.round(Math.random());
+      const kinds = [...MESS_KINDS].sort(() => Math.random() - 0.5);
+      const free = (x: number, y: number) => !blocksRef.current.some((b) => x > b.x0 - 6 && x < b.x1 + 6 && y > b.y0 - 2 && y < b.y1 + 6)
+        && !list.some((m) => Math.abs(m.x - x) < 14 && Math.abs(m.y - y) < 6);
+      for (let i = 0; i < n; i++) {
+        let x = 0, y = 0;
+        for (let k = 0; k < 30; k++) {
+          x = 12 + Math.random() * 76; y = floorTop + 6 + Math.random() * (floorBottom - floorTop - 10);
+          if (free(x, y)) break;
+        }
+        list.push({ id: `${now}-${i}`, kind: kinds[i % kinds.length]!, x, y, r: Math.round(Math.random() * 50 - 25) });
+      }
+      writeStore(MESS_KEY, JSON.stringify(list));
+      setFresh(true);
+    }
+    setMess(list);
+    // 見ているあいだは「見ていた時刻」を更新しつづける
+    const mark = () => writeStore(SEEN_KEY, String(Date.now()));
+    mark();
+    const t = window.setInterval(mark, 60_000);
+    const onHide = () => { if (document.visibilityState === "hidden") mark(); };
+    document.addEventListener("visibilitychange", onHide);
+    return () => { window.clearInterval(t); document.removeEventListener("visibilitychange", onHide); mark(); };
+  }, [enabled, floorTop, floorBottom]);
+  const clean = (id: string) => setMess((list) => { const next = list.filter((m) => m.id !== id); writeStore(MESS_KEY, next.length ? JSON.stringify(next) : null); return next; });
+  return { mess, fresh, clean };
+}
+
+/** 散らかったもの1つの絵（viewBox 0 0 60 40） */
+function MessArt({ kind }: { kind: MessKind }) {
+  switch (kind) {
+    case "fluff": return (
+      // クッションの綿（ふわふわのかたまりと、ちぎれた布）
+      <g>
+        <ellipse cx="30" cy="34" rx="24" ry="4" fill="#3A2614" opacity="0.15" />
+        {[[18, 26, 9], [30, 22, 11], [42, 27, 8], [25, 30, 7], [37, 31, 7]].map(([x, y, r], i) => <circle key={i} cx={x} cy={y} r={r} fill="#FFFFFF" stroke="#E6E1D8" strokeWidth="1" />)}
+        <path d="M44 33 l8 -3 l3 4 l-7 3 z" fill="#E98FA8" />
+      </g>
+    );
+    case "sock": return (
+      // かたっぽの くつした（よだれで少しぬれている）
+      <g>
+        <ellipse cx="30" cy="34" rx="20" ry="3.5" fill="#3A2614" opacity="0.15" />
+        <path d="M14 14 h16 v12 q0 8 10 8 h6 q4 0 4 -4 q0 -5 -6 -6 h-4 q-4 0 -4 -4 v-6 z" fill="#7FB0E0" transform="rotate(8 30 24)" />
+        <path d="M14 14 h16 v4 h-16 z" fill="#FFFFFF" opacity="0.7" transform="rotate(8 30 24)" />
+        <path d="M20 22 h8 M20 26 h8" stroke="#5E8FC4" strokeWidth="1.5" transform="rotate(8 30 24)" />
+      </g>
+    );
+    case "kibble": return (
+      // こぼれたカリカリ
+      <g>
+        {[[12, 30], [20, 34], [27, 28], [33, 33], [40, 29], [46, 34], [24, 36], [36, 37], [16, 26], [50, 30]].map(([x, y], i) => (
+          <g key={i}><ellipse cx={x} cy={y! + 1.6} rx="3.4" ry="1.2" fill="#3A2614" opacity="0.2" /><ellipse cx={x} cy={y} rx="3.2" ry="2.4" fill={i % 3 ? "#B47A42" : "#9A6232"} /><ellipse cx={x! - 0.8} cy={y! - 0.8} rx="1.2" ry="0.7" fill="#E3B27C" /></g>
+        ))}
+      </g>
+    );
+    case "tissue": return (
+      // びりびりの ティッシュ
+      <g>
+        <ellipse cx="30" cy="34" rx="22" ry="3.5" fill="#3A2614" opacity="0.12" />
+        {[[14, 28, -20], [26, 24, 15], [38, 30, -8], [46, 24, 30], [22, 33, 40], [33, 35, -35]].map(([x, y, r], i) => (
+          <path key={i} d="M-6 -4 l4 -1 l3 2 l5 -1 l0 5 l-3 3 l-6 0 l-3 -3 z" fill="#FFFFFF" stroke="#E4E0EA" strokeWidth="0.8" transform={`translate(${x} ${y}) rotate(${r})`} />
+        ))}
+      </g>
+    );
+    default: return (
+      // かじられた スリッパ
+      <g>
+        <ellipse cx="30" cy="34" rx="22" ry="4" fill="#3A2614" opacity="0.15" />
+        <path d="M8 28 q0 -10 14 -10 h18 q12 0 12 8 q0 6 -12 6 h-18 q-14 0 -14 -4 z" fill="#F2B8C6" />
+        <path d="M22 18 q8 -6 16 0 v8 h-16 z" fill="#E98FA8" />
+        {/* かじったあと（ぎざぎざ） */}
+        <path d="M46 22 l2 2 l-2 2 l2 2 l-2 2" stroke="#FFFDF6" strokeWidth="2.4" fill="none" />
+      </g>
+    );
+  }
+}
+
+/** 床の散らかったもの。タップすると、ぽんっと片づく */
+export function RoomMess({ mess, onClean }: { mess: readonly Mess[]; onClean: (m: Mess) => void }) {
+  const [poofs, setPoofs] = useState<Mess[]>([]);
+  return (
+    <>
+      {mess.map((m) => (
+        <button
+          key={m.id} type="button" aria-label="わんこが散らかしたものを片づける"
+          className="absolute -translate-x-1/2 -translate-y-full p-0"
+          style={{ left: `${m.x}%`, top: `${m.y}%`, width: "15%", zIndex: 300 + Math.round(m.y * 10) }}
+          onClick={() => { setPoofs((p) => [...p, m]); window.setTimeout(() => setPoofs((p) => p.filter((x) => x.id !== m.id)), 900); onClean(m); }}
+        >
+          <svg viewBox="0 0 60 40" className="block h-auto w-full" style={{ transform: `rotate(${m.r * 0.3}deg)` }}><MessArt kind={m.kind} /></svg>
+        </button>
+      ))}
+      {poofs.map((m) => <span key={`p${m.id}`} aria-hidden className="room-wish pointer-events-none absolute text-[20px]" style={{ left: `${m.x}%`, top: `${m.y - 3}%`, zIndex: 2500 }}>✨</span>)}
+    </>
   );
 }
