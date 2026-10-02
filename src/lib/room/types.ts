@@ -33,6 +33,7 @@ export const FURNITURE = {
   table: { name: "ローテーブル", width: 25 },
   "dog-house": { name: "わんこハウス", width: 27 },
   bowl: { name: "ごはん皿", width: 10 },
+  whiteboard: { name: "ホワイトボード", width: 24 },
 } as const;
 export type FurnitureId = keyof typeof FURNITURE;
 export const FURNITURE_IDS = Object.keys(FURNITURE) as FurnitureId[];

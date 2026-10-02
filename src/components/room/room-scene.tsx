@@ -485,7 +485,10 @@ function Cloud({ x, y, s, fill }: { x: number; y: number; s: number; fill: strin
   );
 }
 
-function Window({ sky, curtain, season, weather, style }: { sky: SkyState; curtain: string; season: Season; weather: RoomWeather | null; style: RoomStyle }) {
+/** 窓の外を通る犬（id ごとに1回、左右のはしからはしへ歩く） */
+export type WindowPasser = { id: number; src: string; dir: 1 | -1; ms: number; name?: string };
+
+function Window({ sky, curtain, season, weather, style, passer = null }: { sky: SkyState; curtain: string; season: Season; weather: RoomWeather | null; style: RoomStyle; passer?: WindowPasser | null }) {
   const win = windowOf(style);
   const x0 = px(win.x0), x1 = px(win.x1), y0 = py(win.y0), y1 = py(win.y1);
   const w = x1 - x0, h = y1 - y0;
@@ -593,6 +596,27 @@ function Window({ sky, curtain, season, weather, style }: { sky: SkyState; curta
       {season === "summer" && !night && !wet ? <g>{[0.12, 0.3].map((sx) => <g key={sx} transform={`translate(${x0 + w * sx} ${y1 - h * 0.12})`}><rect x="-2" y="-30" width="4" height="34" fill="#5E9C52" /><circle cx="0" cy="-34" r="11" fill="#F6C12E" /><circle cx="0" cy="-34" r="5" fill="#8A5A30" /></g>)}</g> : null}
         {/* 大きな窓の外はベランダ */}
         {style === "french" ? <Balcony x0={x0} x1={x1} y1={y1} h={h} dark={dark} /> : null}
+        {/* おさんぽ中の犬が、窓の外を通りすぎる（桟やカーテンのうしろを通る） */}
+        {passer ? (() => {
+          const dh = h * 0.2, dw = dh * (300 / 254), base = y1 - h * (style === "french" ? 0.1 : 0.04);
+          const from = passer.dir > 0 ? x0 - dw - 4 : x1 + dw + 4, dx = (x1 - x0 + dw * 2 + 8) * passer.dir;
+          return (
+            <g key={passer.id} className="room-passer" style={{ ["--dx" as string]: `${dx}px`, animationDuration: `${passer.ms}ms` }}>
+              <g transform={`translate(${from} ${base})`}>
+                <g className="room-passer-bob">
+                  <ellipse cx="0" cy="-1" rx={dw * 0.32} ry={dh * 0.05} fill="#1E1206" opacity="0.18" />
+                  <image href={passer.src} x={-dw / 2} y={-dh} width={dw} height={dh} transform={passer.dir > 0 ? "scale(-1 1)" : undefined} opacity={0.35 + sky.light * 0.65} />
+                  {passer.name ? (
+                    <g transform={`translate(0 ${-dh - 8})`}>
+                      <rect x={-passer.name.length * 6 - 8} y="-12" width={passer.name.length * 12 + 16} height="17" rx="8.5" fill="#FFFFFF" opacity="0.92" />
+                      <text x="0" y="0" textAnchor="middle" fontSize="11" fontWeight="800" fill="#5E8C4A">{passer.name}</text>
+                    </g>
+                  ) : null}
+                </g>
+              </g>
+            </g>
+          );
+        })() : null}
       </g>
       <path d={shape} fill="url(#room-glass)" opacity={night ? 0.35 : 1} />
       <WindowFrame style={style} x0={x0} y0={y0} x1={x1} y1={y1} curtain={curtain} sky={sky} />
@@ -1559,8 +1583,10 @@ export function windowRectOf(p: { x: number; y: number; scale: number }, style: 
  * 窓・棚・時計・お天気ボード1つの絵。もとは部屋に描きこんでいたものを、その場所の範囲だけ切りとって描く。
  * 記念撮影でも1まいの絵として読めるよう、使うグラデーションなどはこの中に入れる
  */
-export function FixtureVisual({ fixture, theme, now, at = TOKYO, weather = null, placeName = "" }: {
+export function FixtureVisual({ fixture, theme, now, at = TOKYO, weather = null, placeName = "", passer = null }: {
   fixture: FixtureId; theme: RoomTheme; now: Date; at?: GeoPoint; weather?: RoomWeather | null; placeName?: string;
+  /** 窓の外を通る犬 */
+  passer?: WindowPasser | null;
 }) {
   const sky = useMemo(() => withWeather(skyAt(now, at), weather), [now, at, weather]);
   const v = fixtureView(fixture, theme.style);
@@ -1597,7 +1623,7 @@ export function FixtureVisual({ fixture, theme, now, at = TOKYO, weather = null,
           </linearGradient>
         ) : null}
       </defs>
-      {fixture === "window" ? <Window sky={sky} curtain={curtain} season={seasonOf(now, at)} weather={weather} style={theme.style} /> : null}
+      {fixture === "window" ? <Window sky={sky} curtain={curtain} season={seasonOf(now, at)} weather={weather} style={theme.style} passer={passer} /> : null}
       {fixture === "clock" ? <Clock now={now} night={sky.light < 0.2} /> : null}
       {fixture === "weather" ? <WeatherBoard weather={weather} night={sky.altitude < -4} place={placeName} /> : null}
       {fixture === "shelf" ? <Shelves only={0} /> : null}
