@@ -17,7 +17,7 @@ import "./osanpo-run.css";
 
 export const metadata: Metadata = {
   title: "おさんぽフレンチー | おでかけ記録",
-  description: "フレブルと散歩しながら、持っている図鑑アイテムを拾っていくミニゲーム。スコアでコインがもらえて、フレンドと競えます。",
+  description: "フレブルと散歩しながら、持っている図鑑アイテムを拾っていくミニゲーム。スコアで青コイン（わんこのおへやの家具が買える）がもらえて、フレンドと競えます。",
 };
 export const dynamic = "force-dynamic";
 

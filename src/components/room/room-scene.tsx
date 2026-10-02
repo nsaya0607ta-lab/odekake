@@ -1411,7 +1411,10 @@ function RugShape({ rug }: { rug: RoomTheme["rug"] }) {
  * lamps は明かりの場所（部屋の %）。いつも四すみを少し暗くして、写真のような落ち着きを出す
  */
 export const RoomLighting = memo(function RoomLighting({ now, lamps, at = TOKYO, weather = null, room = "cozy", event = null, openBottom = false }: {
-  now: Date; lamps: readonly { x: number; y: number; r: number }[]; at?: GeoPoint; weather?: RoomWeather | null; room?: RoomKind; event?: RoomEvent | null;
+  now: Date;
+  /** ついているフロアランプ（明かりの中心・広さ・床の位置。部屋の %）。昼でも、まわりがあたたかく明るくなる */
+  lamps: readonly { x: number; y: number; r: number; base?: number }[];
+  at?: GeoPoint; weather?: RoomWeather | null; room?: RoomKind; event?: RoomEvent | null;
   /** 部屋の下に机が続くとき。四すみのかげを、下のはしにはかけない */
   openBottom?: boolean;
 }) {
@@ -1419,7 +1422,8 @@ export const RoomLighting = memo(function RoomLighting({ now, lamps, at = TOKYO,
   const overcast = overcastOf(weather);
   const dark = Math.max(0, 1 - sky.light);
   const lit = lampsOn(sky);
-  const lights = [...ceilingLights(room), ...lamps];
+  const ceiling = lit ? ceilingLights(room) : [];
+  const lights = [...ceiling, ...lamps];
   const kindStyle = ROOM_KIND_STYLES[room];
   const morning = sky.azimuth < 180;
   return (
@@ -1431,23 +1435,50 @@ export const RoomLighting = memo(function RoomLighting({ now, lamps, at = TOKYO,
         </radialGradient>
         <radialGradient id="room-light-hole" cx="0.5" cy="0.5" r="0.5">
           <stop offset="0" stopColor="#000" stopOpacity="1" />
-          <stop offset="0.55" stopColor="#000" stopOpacity="0.7" />
+          <stop offset="0.6" stopColor="#000" stopOpacity="0.85" />
           <stop offset="1" stopColor="#000" stopOpacity="0" />
         </radialGradient>
         <radialGradient id="room-light-warm" cx="0.5" cy="0.5" r="0.5">
-          <stop offset="0" stopColor="#FFD98A" stopOpacity="0.32" />
+          <stop offset="0" stopColor="#FFE2A0" stopOpacity="0.5" />
+          <stop offset="0.5" stopColor="#FFD98A" stopOpacity="0.22" />
           <stop offset="1" stopColor="#FFD98A" stopOpacity="0" />
         </radialGradient>
+        {/* フロアランプの光（昼の明るい部屋でも分かるよう、少し濃いめ） */}
+        <radialGradient id="room-lamp-warm" cx="0.5" cy="0.5" r="0.5">
+          <stop offset="0" stopColor="#FFD27A" stopOpacity="0.62" />
+          <stop offset="0.45" stopColor="#FFCB6B" stopOpacity="0.3" />
+          <stop offset="1" stopColor="#FFCB6B" stopOpacity="0" />
+        </radialGradient>
+        {/* 天井のライトから床へ広がる光の帯 */}
+        <linearGradient id="room-light-cone" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0" stopColor="#FFF0C8" stopOpacity="0.34" />
+          <stop offset="1" stopColor="#FFE2A0" stopOpacity="0" />
+        </linearGradient>
         <mask id="room-night-mask" maskUnits="userSpaceOnUse" x={-PX} y={-PT} width={W + PX * 2} height={H + PT + PB}>
           <rect x={-PX} y={-PT} width={W + PX * 2} height={H + PT + PB} fill="#fff" />
-          {lit ? lights.map((l, i) => <ellipse key={i} cx={px(l.x)} cy={py(l.y)} rx={px(l.r)} ry={px(l.r) * 0.9} fill="url(#room-light-hole)" />) : null}
+          {lights.map((l, i) => <ellipse key={i} cx={px(l.x)} cy={py(l.y)} rx={px(l.r)} ry={px(l.r) * 0.9} fill="url(#room-light-hole)" />)}
+          {/* ランプの足もとの床も明るい */}
+          {lamps.map((l, i) => l.base ? <ellipse key={`b${i}`} cx={px(l.x)} cy={py(l.base)} rx={px(l.r) * 1.1} ry={px(l.r) * 0.32} fill="url(#room-light-hole)" /> : null)}
         </mask>
       </defs>
       {/* 朝焼け・夕焼けの色（太陽が低いほど強い） */}
       {sky.warm > 0.02 && sky.altitude > -8 ? <rect x={-PX} y={-PT} width={W + PX * 2} height={H + PT + PB} fill={morning ? "#FFAE96" : "#FF8A3D"} opacity={sky.warm * 0.13} /> : null}
       {/* 外が暗いほど部屋も暗く。明かりがついていれば、そのまわりは明るい */}
       {dark > 0.02 ? <rect x={-PX} y={-PT} width={W + PX * 2} height={H + PT + PB} fill="#0F1438" opacity={0.56 * Math.pow(dark, 1.15)} mask="url(#room-night-mask)" /> : null}
-      {lit ? lights.map((l, i) => <ellipse key={i} cx={px(l.x)} cy={py(l.y)} rx={px(l.r) * 0.8} ry={px(l.r) * 0.72} fill="url(#room-light-warm)" opacity={Math.min(1, dark * 1.6)} />) : null}
+      {/* 天井のライト：まわりのあたたかい光と、床へ広がる光の帯 */}
+      {ceiling.map((l, i) => (
+        <g key={i} opacity={Math.min(1, dark * 1.6)}>
+          <path d={`M${px(l.x) - 26} ${py(l.y) + 6} L${px(l.x) + 26} ${py(l.y) + 6} L${px(l.x) + px(l.r) * 0.95} ${py(l.y + 62)} L${px(l.x) - px(l.r) * 0.95} ${py(l.y + 62)} Z`} fill="url(#room-light-cone)" />
+          <ellipse cx={px(l.x)} cy={py(l.y)} rx={px(l.r) * 0.8} ry={px(l.r) * 0.72} fill="url(#room-light-warm)" />
+        </g>
+      ))}
+      {/* フロアランプ：昼でも、まわりと足もとの床があたたかく明るい */}
+      {lamps.map((l, i) => (
+        <g key={`l${i}`} opacity={Math.max(0.85, Math.min(1, dark * 1.8))}>
+          <ellipse cx={px(l.x)} cy={py(l.y)} rx={px(l.r) * 0.95} ry={px(l.r) * 0.9} fill="url(#room-lamp-warm)" />
+          {l.base ? <ellipse cx={px(l.x)} cy={py(l.base)} rx={px(l.r) * 1.15} ry={px(l.r) * 0.34} fill="url(#room-lamp-warm)" /> : null}
+        </g>
+      ))}
       {/* 行事の空気（部屋の色・舞う花びらなど・夜に灯るもの） */}
       {event ? <EventAmbience event={event} dark={dark} /> : null}
       {/* 部屋の雰囲気の色味（ログハウスはあたたかく、北欧はすっきり など） */}

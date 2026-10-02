@@ -217,7 +217,7 @@ export function OsanpoRunGame({ items, usesSampleItems, unlockedStages, seriesTa
                 <button className="osr-chip-toggle" type="button" data-opt="calm" aria-pressed="false"><span className="osr-dot" aria-hidden="true" />ゆったりモード</button>
                 <button className="osr-link-btn" type="button" data-open="settings">設定</button>
               </div>
-              <p className="osr-preview-note">スコア50点ごとにコイン1枚（切り上げ）。フレンドとスコアを競えます。</p>
+              <p className="osr-preview-note">スコア50点ごとに青コイン1枚（切り上げ）。青コインで、わんこのおへやの家具が買えます。フレンドとスコアを競えます。</p>
             </div>
 
             <div className="osr-panel" data-osr="over-panel" hidden>
@@ -341,12 +341,12 @@ export function OsanpoRunGame({ items, usesSampleItems, unlockedStages, seriesTa
                       <li className="osr-ctl"><span><kbd>イベント</kbd></span><div><b>ボーナス・ラッシュ・雨</b><small>ときどきアイテムだらけのボーナスタイム、障害物が続くラッシュ（突破で+100）、雨や雪が来る。</small></div></li>
                       <li className="osr-ctl"><span><kbd>分かれ道</kbd></span><div><b>分かれ道</b><small>ときどき道しるべが出る。跳んで通ると上の道（公園など：障害物が少なく、ほねとアイテムが多い）、そのまま通ると下の道（商店街など：障害物が多いけど、SR以上が出やすい）。20秒で合流。</small></div></li>
                       <li className="osr-ctl"><span><kbd>歩数</kbd></span><div><b>歩数ブースト</b><small>アプリに同期した今日の歩数で、スタート時に効果が付く。3000歩〜 最初の10秒スコア×1.2、6000歩〜 バリア、10000歩〜 ボーナスタイムからスタート。</small></div></li>
-                      <li className="osr-ctl"><span><kbd>お題</kbd></span><div><b>今日のミッション</b><small>毎日3つのお題。1つ達成で30コイン、3つそろうとさらに100コイン。</small></div></li>
+                      <li className="osr-ctl"><span><kbd>お題</kbd></span><div><b>今日のミッション</b><small>毎日3つのお題。1つ達成で青コイン30枚、3つそろうとさらに100枚。</small></div></li>
                       <li className="osr-ctl"><span><kbd>くんくん</kbd></span><div><b>においかぎ</b><small>地面に「くんくん」マークが出たら、スライディングで通ると掘り出せる。ほね・アイテム・ときどきハズレ（古いくつした）。</small></div></li>
-                      <li className="osr-ctl"><span><kbd>協力</kbd></span><div><b>協力チャレンジ</b><small>自分とフレンドの今週の合計距離で目標を目指す。達成したら「フレンド」画面で全員100コイン受け取れる。</small></div></li>
+                      <li className="osr-ctl"><span><kbd>協力</kbd></span><div><b>協力チャレンジ</b><small>自分とフレンドの今週の合計距離で目標を目指す。達成したら「フレンド」画面で全員、青コイン100枚を受け取れる。</small></div></li>
                       <li className="osr-ctl"><span><kbd>写真</kbd></span><div><b>思い出の写真</b><small>おでかけ記録に登録した写真を、飛行機がぶら下げて空を運んでくる。真上を通ると+20。写真が空を流れているあいだは障害物が出ない。運ばれてきた写真は結果画面に並び、タップで大きく見られる（訪れた日とひとことも出る）。</small></div></li>
                       <li className="osr-ctl"><span><kbd>気球</kbd></span><div><b>フレンドの思い出</b><small>フレンドがSNSに投稿した写真を、気球が運んでくる。真上を通ると+20。結果画面で大きく見たり、そのままいいねできる。</small></div></li>
-                      <li className="osr-ctl"><span><kbd>記録</kbd></span><div><b>おでかけボーナス</b><small>今日のおでかけを記録していると、その日のおさんぽはスコアがぜんぶ1.2倍（コインも増える）。</small></div></li>
+                      <li className="osr-ctl"><span><kbd>記録</kbd></span><div><b>おでかけボーナス</b><small>今日のおでかけを記録していると、その日のおさんぽはスコアがぜんぶ1.2倍（青コインも増える）。</small></div></li>
                       <li className="osr-ctl"><span><kbd>景色</kbd></span><div><b>よく行く場所の景色</b><small>最近の記録で多いカテゴリに合わせて、道ぞいに木（公園・自然）や鳥居（神社・お寺）、行ったお店の名前の看板が立つ。</small></div></li>
                       <li className="osr-ctl"><span><kbd>投稿</kbd></span><div><b>結果をSNSに投稿</b><small>おさんぽが終わったら、スコアと思い出の写真入りの結果カードをSNSに投稿できる。</small></div></li>
                       <li className="osr-ctl"><span><kbd>II</kbd></span><div><b>一時停止</b><small>右上のボタン。「最初から」「道を選ぶ」「設定」もここから。</small></div></li>

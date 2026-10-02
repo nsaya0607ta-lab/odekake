@@ -1,8 +1,8 @@
 import { NextResponse } from "next/server";
 import { getCurrentDogSkin } from "@/lib/data/dog-skin";
-import { buildRoomShowcase } from "@/lib/data/my-room";
+import { buildRoomShowcase, getRoomShop } from "@/lib/data/my-room";
 import { checkRateLimit } from "@/lib/rate-limit";
-import { isRoomPhotoPath, parseRoomLayout, ROOM_MAX_ITEMS, uploadKey } from "@/lib/room/types";
+import { isFurnitureId, isRoomPhotoPath, parseRoomLayout, ROOM_MAX_ITEMS, uploadKey } from "@/lib/room/types";
 import type { Json } from "@/lib/supabase/types";
 import { requireUser } from "@/lib/supabase/server";
 
@@ -27,7 +27,23 @@ export async function PUT(request: Request) {
   // アップロードした写真は自分のフォルダのものだけ。外したものに置いていた分も外す
   const photos = parsed.photos.filter((ph) => isRoomPhotoPath(ph.path, user.id));
   const keep = new Set(photos.map((ph) => uploadKey(ph.id)));
-  const layout = { ...parsed, photos, items: parsed.items.filter((p) => !p.key.startsWith("upload:") || keep.has(p.key)) };
+  // 家具は買った数まで（家具のお店がまだ無い環境では、これまでどおり）
+  const shop = await getRoomShop(supabase, user.id);
+  const used = new Map<string, number>();
+  const ownsFurniture = (key: string) => {
+    if (!shop.ready || !key.startsWith("furniture:")) return true;
+    const id = key.slice("furniture:".length);
+    const n = (used.get(id) ?? 0) + 1;
+    used.set(id, n);
+    return isFurnitureId(id) && n <= (shop.owned[id] ?? 0);
+  };
+  const layout = { ...parsed, photos, items: parsed.items.filter((p) => (!p.key.startsWith("upload:") || keep.has(p.key)) && ownsFurniture(p.key)) };
+  // 通信の順番が入れかわって、古い飾り方が新しい飾り方を上書きしないようにする（rev は変えた時刻）
+  if (layout.rev) {
+    const { data: current } = await supabase.from("user_rooms").select("layout").eq("user_id", user.id).maybeSingle();
+    const stored = current ? parseRoomLayout(current.layout).rev ?? 0 : 0;
+    if (stored > layout.rev) return NextResponse.json({ ok: true, ready: true, stale: true }, { headers: { "Cache-Control": "no-store" } });
+  }
   // フレンドが部屋を見るときの、飾ったものの見た目もいっしょに書く
   const showcase = await buildRoomShowcase(supabase, user.id, layout, await getCurrentDogSkin(supabase, user.id)).catch(() => null);
   const row: { user_id: string; layout: Json; updated_at: string; showcase?: Json } = { user_id: user.id, layout: layout as unknown as Json, updated_at: new Date().toISOString() };

@@ -50,6 +50,7 @@ import {
   type FurnitureId,
   type Placement,
   type RoomLayout,
+  type RoomShop,
   type RoomPhoto,
   type RoomStyle,
   type RoomTheme,
@@ -66,6 +67,7 @@ import { parseRoomWeather, withWeather, type RoomWeather } from "@/lib/room/weat
 import { EVENT_FLOOR_Y, EventFloor, EventFront } from "./room-events";
 import { dayPhaseOf, FixtureVisual, fixtureSize, lampsOn, ROOM_STAGE, RoomLighting, RoomScene, ThemeSwatch, windowRectOf, type DayPhase } from "./room-scene";
 import { RoomBoard } from "./room-board";
+import { FurnitureShop } from "./room-shop";
 import { DiaryDialog, DoodleContext, PasserLink, RoomMess, ShootingStars, useRoomMess, useWindowPasser } from "./room-gimmicks";
 import { DEFAULT_PLACE, locateHere, placeShortName, SkyCard, skyBackdrop, type RoomPlace } from "./sky-card";
 
@@ -74,6 +76,8 @@ type ItemFilter = "all" | "toy" | "food" | "interior" | "other" | "sushi";
 type SaveState = "saved" | "dirty" | "saving" | "local" | "error";
 
 const LOCAL_KEY = "odekake-my-room-v1";
+/** サーバーにまだ送れていない変更の下書き（持ち主ごと） */
+const DRAFT_KEY = "odekake-my-room-draft";
 const HISTORY_LIMIT = 30;
 const AUTOSAVE_MS = 1200;
 const RARITY_ORDER: readonly GachaRarity[] = ["N", "R", "SR", "SSR", "UR", "LR", "MR"];
@@ -203,7 +207,7 @@ async function shrinkImage(file: File, max: number, quality: number): Promise<Bl
 
 /** ボードの最初の置き場所：部屋の下いっぱい（高さは置ける範囲まで自動でちぢむ） */
 
-export function MyRoom({ entries, initialLayout, serverReady, dogSkin, dogName, serverNow, steps, stepHistory, visit, guests }: {
+export function MyRoom({ entries, initialLayout, serverReady, dogSkin, dogName, serverNow, steps, stepHistory, visit, guests, shop, ownerId }: {
   entries: DecorEntry[];
   initialLayout: RoomLayout | null;
   serverReady: boolean;
@@ -219,6 +223,10 @@ export function MyRoom({ entries, initialLayout, serverReady, dogSkin, dogName, 
   visit?: VisitState;
   /** 自分の部屋に届いた「いいね」・置き手紙と、あそびに行けるフレンド */
   guests?: { mail: RoomMailItem[]; friends: RoomFriend[] };
+  /** 家具のお店（持っている家具・青コイン）。無ければ、これまでどおり家具は自由に置ける */
+  shop?: RoomShop;
+  /** 部屋の持ち主（端末に残す下書きを、アカウントごとに分ける） */
+  ownerId?: string;
 }) {
   // 家具はだれでも置けるので、持ち物と合わせて「置けるもの」にする
   const validKeys = useMemo(() => new Set([...entries, ...FURNITURE_ENTRIES, ...FIXTURE_ENTRIES].map((e) => e.key)), [entries]);
@@ -245,6 +253,7 @@ export function MyRoom({ entries, initialLayout, serverReady, dogSkin, dogName, 
   const [filter, setFilter] = useState<ItemFilter>("all");
   const [saveState, setSaveState] = useState<SaveState>(serverReady ? "saved" : "local");
   const [toast, setToast] = useState<string | null>(null);
+  const [shopState, setShopState] = useState<RoomShop | null>(shop ?? null);
   /** 本だなの日記を開いている */
   const [diary, setDiary] = useState(false);
   /** わんこに反応してもらうこと（日記を開いた・散らかったものを片づけた など） */
@@ -347,23 +356,60 @@ export function MyRoom({ entries, initialLayout, serverReady, dogSkin, dogName, 
   const flash = useCallback((text: string) => { setToast(text); window.setTimeout(() => setToast(null), 1800); }, []);
 
   /* ---------- 保存 ---------- */
+  // 保存は1つずつ順番に送り、送るたびに rev（送った時刻）をつける。サーバーは、もっと新しい rev が
+  // 入っていれば古い保存を捨てる（通信の順番が入れかわっても、新しい飾り方が古いもので上書きされない）。
+  // まだ送れていない変更は、この端末にも下書きとして残し、次に開いたとき（戻るボタンで古い画面が出たときも）に使う。
+  const draftKey = `${DRAFT_KEY}:${ownerId ?? "me"}`;
+  const saving = useRef(false);
   const persist = useCallback(async () => {
     const snapshot = latest.current;
     if (!serverReady) {
       try { window.localStorage.setItem(LOCAL_KEY, JSON.stringify(snapshot)); setSaveState("local"); } catch { setSaveState("error"); }
       return;
     }
+    // 前の保存がまだ終わっていなければ、終わってから送る
+    if (saving.current) return;
+    saving.current = true;
     setSaveState("saving");
+    const rev = Date.now();
     try {
-      const response = await fetch("/api/my-room", { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ layout: snapshot }) });
+      const response = await fetch("/api/my-room", { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ layout: { ...snapshot, rev } }) });
       if (!response.ok) throw new Error("save failed");
       const payload = (await response.json().catch(() => null)) as { ready?: boolean } | null;
       if (payload?.ready === false) { window.localStorage.setItem(LOCAL_KEY, JSON.stringify(snapshot)); setSaveState("local"); return; }
-      setSaveState(latest.current === snapshot ? "saved" : "dirty");
+      const done = latest.current === snapshot;
+      if (done) try { const d = JSON.parse(window.localStorage.getItem(draftKey) ?? "null") as { rev?: number } | null; if (!d || (d.rev ?? 0) <= rev) window.localStorage.removeItem(draftKey); } catch { /* 下書きを消せなくても困らない */ }
+      setSaveState(done ? "saved" : "dirty");
     } catch {
       setSaveState("error");
+    } finally {
+      saving.current = false;
+      // 送っているあいだに変えた分は、つづけて送る
+      if (latest.current !== snapshot) window.setTimeout(() => { void persistRef.current(); }, 300);
     }
-  }, [serverReady]);
+  }, [draftKey, serverReady]);
+  const persistRef = useRef(persist);
+  persistRef.current = persist;
+  // 変えたら、まず端末に下書きを残す（自分の部屋だけ）
+  useEffect(() => {
+    if (saveState !== "dirty" || !serverReady || visit) return;
+    try { window.localStorage.setItem(draftKey, JSON.stringify({ rev: Date.now(), layout: latest.current })); } catch { /* 残せない端末 */ }
+  }, [draftKey, layout, saveState, serverReady, visit]);
+  // 開いたとき、サーバーの飾り方より新しい下書きがあれば、そちらを使って送りなおす
+  useEffect(() => {
+    if (!serverReady || visit) return;
+    try {
+      const d = JSON.parse(window.localStorage.getItem(draftKey) ?? "null") as { rev?: number; layout?: unknown } | null;
+      if (!d?.layout || typeof d.rev !== "number") return;
+      if (d.rev <= (initialLayout?.rev ?? 0)) { window.localStorage.removeItem(draftKey); return; }
+      const restored = parseRoomLayout(d.layout, validKeys);
+      latest.current = restored;
+      setLayout(restored);
+      setSaveState("dirty");
+    } catch { /* 読めなければサーバーの飾り方のまま */ }
+    // 開いたときに1回だけ
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
   const saveTimer = useRef<number | null>(null);
   useEffect(() => {
     if (saveState !== "dirty") return;
@@ -378,7 +424,7 @@ export function MyRoom({ entries, initialLayout, serverReady, dogSkin, dogName, 
     const flush = () => {
       if (saveStateRef.current !== "dirty") return;
       saveStateRef.current = "saving";
-      if (serverReady) void fetch("/api/my-room", { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ layout: latest.current }), keepalive: true });
+      if (serverReady) void fetch("/api/my-room", { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ layout: { ...latest.current, rev: Date.now() } }), keepalive: true });
       else try { window.localStorage.setItem(LOCAL_KEY, JSON.stringify(latest.current)); } catch { /* 保存できない端末 */ }
     };
     window.addEventListener("pagehide", flush);
@@ -514,6 +560,13 @@ export function MyRoom({ entries, initialLayout, serverReady, dogSkin, dogName, 
     const entry = entryByKey.get(p.key);
     if (!entry) return;
     if (entry.kind === "photo") { setLightbox(entry); return; }
+    // フロアランプは、タップでつけたり消したり
+    if (entry.kind === "furniture" && entry.furniture === "lamp") {
+      const on = !lampIsOn(p.id);
+      setLampSwitch((cur) => ({ ...cur, [p.id]: on }));
+      setDogCue({ id: Date.now(), text: on ? "あかるくなった！" : "まっくら…", pose: on ? "cheer" : "wonder" });
+      return;
+    }
     // 本だなには、わんこの日記がはさまっている
     if (entry.kind === "furniture" && entry.furniture === "bookshelf" && !visit) {
       setDiary(true);
@@ -576,9 +629,12 @@ export function MyRoom({ entries, initialLayout, serverReady, dogSkin, dogName, 
     friends: visit ? [] : guests?.friends ?? [],
   });
   /** フロアランプの明かり（夜はそのまわりが明るい） */
+  /** フロアランプのスイッチ（タップで切りかえ。さわっていなければ、暗くなると自動でつく） */
+  const [lampSwitch, setLampSwitch] = useState<Record<string, boolean>>({});
+  const lampIsOn = useCallback((id: string) => lampSwitch[id] ?? (lightsOn || furnitureFx[id] === "on"), [furnitureFx, lampSwitch, lightsOn]);
   const lampLights = useMemo(() => layout.items
-    .filter((p) => p.key === "furniture:lamp")
-    .map((p) => ({ x: p.x, y: p.y - 15 * p.scale * depthScale(p.y), r: 20 * p.scale })), [layout.items]);
+    .filter((p) => p.key === "furniture:lamp" && lampIsOn(p.id))
+    .map((p) => ({ x: p.x, y: p.y - 15 * p.scale * depthScale(p.y), r: 20 * p.scale, base: p.y })), [lampIsOn, layout.items]);
 
   /** 犬が向かう場所（ベッド・ごはん皿・床のもの） */
   const dogPlaces = useMemo(() => {
@@ -790,7 +846,7 @@ export function MyRoom({ entries, initialLayout, serverReady, dogSkin, dogName, 
                     <span key={furnitureFx[p.id] ?? "-"} className={`block origin-bottom ${FX_CLASS[furnitureFx[p.id]!] ?? ""}`}>
                       {entry.kind === "fixture"
                         ? <FixtureVisual fixture={entry.fixture} theme={layout.theme} now={now} at={place} weather={weather} placeName={placeName} passer={p.id === firstWindowId ? passer : null} />
-                        : <DecorVisual entry={entry} frame={p.frame} lit={lightsOn || furnitureFx[p.id] === "on"} fx={furnitureFx[p.id]} />}
+                        : <DecorVisual entry={entry} frame={p.frame} lit={p.key === "furniture:lamp" ? lampIsOn(p.id) : lightsOn || furnitureFx[p.id] === "on"} fx={furnitureFx[p.id]} />}
                     </span>
                   </span>
                   {dropShelf === p.id ? <span className="pointer-events-none absolute -inset-1 rounded-xl border-2 border-dashed border-leaf bg-leaf/15 shadow-[0_0_14px_rgba(140,200,110,.8)]" /> : null}
@@ -902,6 +958,13 @@ export function MyRoom({ entries, initialLayout, serverReady, dogSkin, dogName, 
                 ) : null}
                 {tab === "theme" ? (
                   <ThemePicker theme={layout.theme} onChange={setTheme} now={now} />
+                ) : tab === "furniture" && shopState?.ready ? (
+                  <FurnitureShop
+                    shop={shopState}
+                    placedOf={(key) => layout.items.filter((p) => p.key === key).length}
+                    onPlace={(e) => addEntry(e)}
+                    onBought={(id, owned, balance) => { setShopState((cur) => (cur ? { ...cur, blueCoins: balance, owned: { ...cur.owned, [id]: owned } } : cur)); flash(`${FURNITURE[id].name}を買いました！`); }}
+                  />
                 ) : tabEntries.length || tab === "photo" ? (
                   <div className="mt-2 grid grid-cols-3 gap-2.5">
                     {tab === "photo" ? (
