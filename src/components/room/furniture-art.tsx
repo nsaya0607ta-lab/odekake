@@ -589,14 +589,26 @@ function Kotatsu({ u, a11y }: P) {
         <radialGradient id={g("mikan")} cx="0.35" cy="0.3" r="0.75"><stop offset="0" stopColor="#FFD18A" /><stop offset="0.45" stopColor="#F79A2C" /><stop offset="1" stopColor="#D8701A" /></radialGradient>
         <linearGradient id={g("basket")} x1="0" y1="0" x2="0" y2="1"><stop offset="0" stopColor="#D8A866" /><stop offset="1" stopColor="#9E6C34" /></linearGradient>
         <linearGradient id={g("cup")} x1="0" y1="0" x2="1" y2="0"><stop offset="0" stopColor="#9DBFA4" /><stop offset="0.5" stopColor="#7FA38A" /><stop offset="1" stopColor="#5C8068" /></linearGradient>
-        <linearGradient id={g("zabuton")} x1="0" y1="0" x2="0" y2="1"><stop offset="0" stopColor="#7E9BC8" /><stop offset="1" stopColor="#56739E" /></linearGradient>
+        {/* こたつの中のヒーターが、すそから床にもれる光 */}
+        <radialGradient id={g("heat")} cx="0.5" cy="0.5" r="0.5"><stop offset="0" stopColor="#FF9A4A" stopOpacity="0.55" /><stop offset="0.6" stopColor="#FFB070" stopOpacity="0.18" /><stop offset="1" stopColor="#FFB070" stopOpacity="0" /></radialGradient>
+        {/* 布団のたれ：上は天板の下で暗く、まんなかはふくらみで明るく、すそはまた暗く */}
+        <linearGradient id={g("drape")} x1="0" y1="0" x2="0" y2="1"><stop offset="0" stopColor="#3A1206" stopOpacity="0.38" /><stop offset="0.22" stopColor="#3A1206" stopOpacity="0" /><stop offset="0.55" stopColor="#FFFFFF" stopOpacity="0.08" /><stop offset="1" stopColor="#3A1206" stopOpacity="0.22" /></linearGradient>
+        {/* 左上からの光（左は明るく、右は暗く） */}
+        <linearGradient id={g("side")} x1="0" y1="0" x2="1" y2="0"><stop offset="0" stopColor="#FFFFFF" stopOpacity="0.12" /><stop offset="0.5" stopColor="#FFFFFF" stopOpacity="0" /><stop offset="1" stopColor="#3A1206" stopOpacity="0.22" /></linearGradient>
+        <radialGradient id={g("puff")} cx="0.5" cy="0.45" r="0.55"><stop offset="0" stopColor="#FFFFFF" stopOpacity="0.16" /><stop offset="1" stopColor="#FFFFFF" stopOpacity="0" /></radialGradient>
+        <radialGradient id={g("refl")} cx="0.5" cy="0.5" r="0.5"><stop offset="0" stopColor="#F79A2C" stopOpacity="0.35" /><stop offset="1" stopColor="#F79A2C" stopOpacity="0" /></radialGradient>
       </defs>
       <FloorShadow cx={120} cy={150} rx={116} ry={8} o={0.28} />
+      <ellipse cx="120" cy="146" rx="104" ry="11" fill={`url(#${g("heat")})`} />
       {/* こたつ布団：うしろのたれ（奥）と、手前に広がるたれ */}
       <g filter={`url(#${g("cloth")})`}>
         <path d="M30 52 Q120 44 210 52 L214 64 Q120 58 26 64 Z" fill="#A9472A" />
         <path d="M24 60 Q120 52 216 60 Q232 92 230 128 Q226 136 214 134 Q206 142 192 136 Q182 146 166 138 Q150 148 134 140 Q120 148 106 140 Q90 148 74 138 Q58 146 48 136 Q34 142 26 134 Q14 136 10 128 Q8 92 24 60 Z" fill={`url(#${g("futon")})`} />
         <path d="M24 60 Q120 52 216 60 Q232 92 230 128 Q226 136 214 134 Q206 142 192 136 Q182 146 166 138 Q150 148 134 140 Q120 148 106 140 Q90 148 74 138 Q58 146 48 136 Q34 142 26 134 Q14 136 10 128 Q8 92 24 60 Z" fill={`url(#${g("tartan")})`} />
+        {/* ふくらみ（ひだのあいだが ふっくら） */}
+        {([[56, 100], [96, 102], [138, 102], [178, 100]] as const).map(([x, y], i) => <ellipse key={`p${i}`} cx={x} cy={y} rx="20" ry="34" fill={`url(#${g("puff")})`} />)}
+        <path d="M24 60 Q120 52 216 60 Q232 92 230 128 Q226 136 214 134 Q206 142 192 136 Q182 146 166 138 Q150 148 134 140 Q120 148 106 140 Q90 148 74 138 Q58 146 48 136 Q34 142 26 134 Q14 136 10 128 Q8 92 24 60 Z" fill={`url(#${g("drape")})`} />
+        <path d="M24 60 Q120 52 216 60 Q232 92 230 128 Q226 136 214 134 Q206 142 192 136 Q182 146 166 138 Q150 148 134 140 Q120 148 106 140 Q90 148 74 138 Q58 146 48 136 Q34 142 26 134 Q14 136 10 128 Q8 92 24 60 Z" fill={`url(#${g("side")})`} />
         {/* ひだ（暗いみぞと、ふくらみの光） */}
         {([[40, 18], [74, 14], [118, 16], [160, 14], [196, 18]] as const).map(([x, w], i) => (
           <g key={i}>
@@ -604,6 +616,8 @@ function Kotatsu({ u, a11y }: P) {
             <path d={`M${x + w * 0.9} 68 Q${x + w * 0.9 - 1} 100 ${x + w * 0.9 + (i % 2 ? 3 : -3)} 136`} stroke={`url(#${g("foldHi")})`} strokeWidth={w * 0.7} fill="none" />
           </g>
         ))}
+        {/* すその波のふくらみに当たる光 */}
+        <path d="M14 126 Q16 132 26 131 M38 136 Q46 140 56 136 M80 138 Q92 143 104 138 M136 138 Q148 143 160 137 M184 134 Q194 138 206 133 M216 130 Q224 132 228 126" stroke="#FFD6BC" strokeOpacity="0.55" strokeWidth="1.6" fill="none" strokeLinecap="round" />
         {/* すそのパイピングと、角のふさ */}
         <path d="M10 128 Q14 136 26 134 Q34 142 48 136 Q58 146 74 138 Q90 148 106 140 Q120 148 134 140 Q150 148 166 138 Q182 146 192 136 Q206 142 214 134 Q226 136 230 128" stroke="#8E3A20" strokeWidth="2.4" fill="none" />
         {([[12, 128], [228, 128]] as const).map(([x, y], i) => <g key={i}><circle cx={x} cy={y} r="4.6" fill="#F6C04A" /><path d={`M${x - 3} ${y + 3} l-1 8 M${x} ${y + 4} v8 M${x + 3} ${y + 3} l1 8`} stroke="#E0A62E" strokeWidth="1.4" strokeLinecap="round" /></g>)}
@@ -611,11 +625,14 @@ function Kotatsu({ u, a11y }: P) {
       {/* 天板のかげ（布団に落ちる） */}
       <path d="M22 62 Q120 54 218 62 L218 76 Q120 70 22 76 Z" fill={`url(#${g("ao")})`} />
       {/* 天板：厚み → 上の面 → 木目 → つや */}
-      <path d="M14 46 L226 46 L222 60 Q120 64 18 60 Z" fill={`url(#${g("topEdge")})`} filter={`url(#${g("grain")})`} />
-      <path d="M38 22 L202 22 L228 46 L12 46 Z" fill={`url(#${g("topFace")})`} filter={`url(#${g("grain")})`} />
-      <path d="M38 22 L202 22 L228 46 L12 46 Z" fill={`url(#${g("gloss")})`} />
-      <path d="M12 46 L228 46" stroke="#F6D2A4" strokeWidth="1.6" />
-      <path d="M38 22 L202 22" stroke="#F8DCB4" strokeWidth="1.2" opacity="0.9" />
+      <path d="M14 47 Q12 46 14 45 L226 45 Q228 46 226 47 L222 58 Q221 60 218 60.4 Q120 64 22 60.4 Q19 60 18 58 Z" fill={`url(#${g("topEdge")})`} filter={`url(#${g("grain")})`} />
+      <path d="M18 58 Q120 62 222 58" stroke="#4E2A10" strokeOpacity="0.5" strokeWidth="1.2" fill="none" />
+      <path d="M40 22 Q38 22 37 23 L13 44 Q12 46 15 46 L225 46 Q228 46 227 44 L203 23 Q202 22 200 22 Z" fill={`url(#${g("topFace")})`} filter={`url(#${g("grain")})`} />
+      <path d="M40 22 Q38 22 37 23 L13 44 Q12 46 15 46 L225 46 Q228 46 227 44 L203 23 Q202 22 200 22 Z" fill={`url(#${g("gloss")})`} />
+      {/* 天板にうつる、みかんの色 */}
+      <ellipse cx="86" cy="42" rx="26" ry="3" fill={`url(#${g("refl")})`} />
+      <path d="M15 46 L225 46" stroke="#FBDDB2" strokeWidth="1.8" strokeLinecap="round" />
+      <path d="M40 22.6 L200 22.6" stroke="#F8DCB4" strokeWidth="1.2" opacity="0.9" />
       {/* 読みかけの本 */}
       <g transform="translate(150 30) rotate(-8)">
         <path d="M0 6 L30 0 L36 9 L6 15 Z" fill="#6E8FC4" />
@@ -682,6 +699,9 @@ function Fishbowl({ u, a11y }: P) {
         <linearGradient id={g("stool")} x1="0" y1="0" x2="1" y2="0"><stop offset="0" stopColor="#D7A06A" /><stop offset="1" stopColor="#8E5A30" /></linearGradient>
         <linearGradient id={g("stoolTop")} x1="0" y1="0" x2="0" y2="1"><stop offset="0" stopColor="#E9BA86" /><stop offset="1" stopColor="#C88C54" /></linearGradient>
         <radialGradient id={g("caustic")} cx="0.5" cy="0.5" r="0.5"><stop offset="0" stopColor="#FFFFFF" stopOpacity="0.5" /><stop offset="1" stopColor="#FFFFFF" stopOpacity="0" /></radialGradient>
+        {/* 水のふちほど青く濃い（ガラスの厚みと屈折） */}
+        <radialGradient id={g("edge")} cx="0.5" cy="0.45" r="0.55"><stop offset="0.7" stopColor="#2E7EA8" stopOpacity="0" /><stop offset="1" stopColor="#2E7EA8" stopOpacity="0.32" /></radialGradient>
+        <linearGradient id={g("stone")} x1="0" y1="0" x2="1" y2="1"><stop offset="0" stopColor="#E6E0D4" /><stop offset="1" stopColor="#9C9486" /></linearGradient>
         <clipPath id={g("inside")}><path d="M30 34 Q14 40 10 68 Q8 98 30 112 Q55 124 80 112 Q102 98 100 68 Q96 40 80 34 Z" /></clipPath>
       </defs>
       <FloorShadow cx={55} cy={162} rx={36} ry={5} />
@@ -692,8 +712,9 @@ function Fishbowl({ u, a11y }: P) {
       <ellipse cx="55" cy="122" rx="38" ry="8" fill="#9E6634" filter={`url(#${g("grain")})`} />
       <ellipse cx="55" cy="119" rx="38" ry="8" fill={`url(#${g("stoolTop")})`} filter={`url(#${g("grain")})`} />
       <path d="M22 117 Q55 110 88 117" stroke="#FBE0B8" strokeWidth="1.2" fill="none" opacity="0.8" />
-      {/* 鉢の影（スツールの上） */}
+      {/* 鉢の影と、鉢を通った青い光（スツールの上） */}
       <ellipse cx="57" cy="119" rx="26" ry="4.4" fill="#4A2A10" opacity="0.28" />
+      <ellipse cx="66" cy="121" rx="16" ry="2.8" fill="#9ED8F2" opacity="0.45" />
       {/* 水と中のもの */}
       <g clipPath={`url(#${g("inside")})`}>
         <rect x="0" y="48" width="110" height="80" fill={`url(#${g("water")})`} />
@@ -706,12 +727,22 @@ function Fishbowl({ u, a11y }: P) {
         {([[22, 110, "#E8C9A0"], [32, 112, "#9DB8D0"], [42, 110, "#F2D7B8"], [52, 113, "#C9B4A2"], [62, 110, "#E8A0A0"], [72, 112, "#B0C89A"], [82, 110, "#E8C9A0"], [28, 106, "#F6E6CC"], [48, 107, "#D8C0E0"], [68, 107, "#9DB8D0"], [86, 106, "#F2D7B8"]] as const).map(([x, y, c], i) => (
           <g key={i}><ellipse cx={x as number} cy={y as number} rx="5.2" ry="3.4" fill={c as string} /><ellipse cx={(x as number) - 1.4} cy={(y as number) - 1.2} rx="1.8" ry="1" fill="#FFFFFF" opacity="0.6" /></g>
         ))}
+        {/* 小さなお城の置きもの */}
+        <g transform="translate(22 86)">
+          <path d="M0 26 V8 h4 v-4 h3 v4 h4 v-4 h3 v4 h4 v18 Z" fill={`url(#${g("stone")})`} />
+          <path d="M6 26 v-7 a3 3 0 0 1 6 0 v7 Z" fill="#4A4038" />
+          <path d="M4 4 l3.6 -7 l3.6 7 Z" fill="#C86A5A" />
+          <path d="M7.6 -3 v-6 l5 2 l-5 2" fill="#E04A3A" stroke="#7A6A5A" strokeWidth="0.5" />
+          {([[2, 12], [14, 12], [2, 18], [14, 18]] as const).map(([x, y], i) => <rect key={i} x={x} y={y} width="2.4" height="3" fill="#6A5E52" />)}
+          <path d="M1 8 h16" stroke="#FFFFFF" strokeOpacity="0.5" strokeWidth="0.8" />
+        </g>
         {/* 水草 */}
         {([[76, 108, -6], [82, 108, 4], [86, 108, 12], [26, 108, -10]] as const).map(([x, y, r], i) => (
           <path key={i} d={`M${x} ${y} C${x! - 4} ${y! - 18} ${x! + 6} ${y! - 28} ${x! + r! * 0.3} ${y! - (40 - i * 4)}`} stroke={`url(#${g("leaf")})`} strokeWidth="3.4" fill="none" strokeLinecap="round" />
         ))}
         {fish(40, 74, 1, false, ["#FF8A5E", "#C23A16"])}
         {fish(68, 90, 0.82, true, ["#FFD2B8", "#E26A3A"])}
+        <rect x="0" y="40" width="110" height="90" fill={`url(#${g("edge")})`} />
         {/* 泡 */}
         {([[50, 62, 1.8], [52, 56, 1.3], [49, 51, 1]] as const).map(([x, y, r], i) => <circle key={i} cx={x} cy={y} r={r} fill="none" stroke="#FFFFFF" strokeWidth="0.8" />)}
       </g>
@@ -722,6 +753,14 @@ function Fishbowl({ u, a11y }: P) {
       <path d="M20 52 Q14 72 20 94" stroke="#FFFFFF" strokeWidth="4" strokeLinecap="round" fill="none" opacity="0.8" />
       <path d="M27 46 Q24 52 24 58" stroke="#FFFFFF" strokeWidth="2.4" strokeLinecap="round" fill="none" opacity="0.7" />
       <path d="M88 82 Q92 92 86 102" stroke="#FFFFFF" strokeWidth="2" strokeLinecap="round" fill="none" opacity="0.45" />
+      {/* ガラスにうつる窓（十字の桟） */}
+      <g opacity="0.5" transform="translate(70 44) skewY(8)">
+        <rect width="15" height="19" rx="2" fill="#FFFFFF" opacity="0.55" />
+        <path d="M7.5 0 V19 M0 9.5 H15" stroke="#BFE3F2" strokeWidth="1.4" />
+      </g>
+      {/* ガラスの底の厚み */}
+      <path d="M30 112 Q55 124 80 112" stroke="#8CC6DE" strokeWidth="2.4" fill="none" opacity="0.7" />
+      <path d="M34 114 Q55 123 76 114" stroke="#FFFFFF" strokeWidth="1" fill="none" opacity="0.6" />
     </svg>
   );
 }
@@ -747,6 +786,9 @@ function Tv({ u, lit, a11y }: P) {
         <linearGradient id={g("glare")} x1="0" y1="0" x2="1" y2="1"><stop offset="0" stopColor="#FFFFFF" stopOpacity="0.22" /><stop offset="0.4" stopColor="#FFFFFF" stopOpacity="0.04" /><stop offset="0.41" stopColor="#FFFFFF" stopOpacity="0" /></linearGradient>
         <radialGradient id={g("sun")} cx="0.5" cy="0.5" r="0.5"><stop offset="0" stopColor="#FFF4B8" /><stop offset="0.6" stopColor="#FFE07A" /><stop offset="1" stopColor="#FFE07A" stopOpacity="0" /></radialGradient>
         <radialGradient id={g("cone")} cx="0.4" cy="0.35" r="0.7"><stop offset="0" stopColor="#5A5E66" /><stop offset="1" stopColor="#1E2024" /></radialGradient>
+        <linearGradient id={g("cubby")} x1="0" y1="0" x2="0" y2="1"><stop offset="0" stopColor="#2A1708" /><stop offset="1" stopColor="#5A3618" /></linearGradient>
+        <linearGradient id={g("rim")} x1="0" y1="0" x2="0" y2="1"><stop offset="0" stopColor="#6A707A" /><stop offset="0.08" stopColor="#2A2D33" /><stop offset="1" stopColor="#14161A" /></linearGradient>
+        <pattern id={g("mesh")} width="2.6" height="2.6" patternUnits="userSpaceOnUse"><circle cx="1.3" cy="1.3" r="0.55" fill="#000" opacity="0.55" /></pattern>
         <clipPath id={g("screen")}><rect x="31" y="18" width="168" height="94" rx="2" /></clipPath>
       </defs>
       <FloorShadow cx={115} cy={174} rx={108} ry={6} />
@@ -755,7 +797,14 @@ function Tv({ u, lit, a11y }: P) {
       <rect x="14" y="128" width="202" height="30" rx="3" fill={`url(#${g("cab")})`} filter={`url(#${g("grain")})`} />
       <path d="M18 120 L212 120 L216 128 L14 128 Z" fill={`url(#${g("cabTop")})`} filter={`url(#${g("grain")})`} />
       <path d="M14 128 H216" stroke="#E9BC88" strokeWidth="1.2" />
-      {[20, 88, 156].map((x) => (
+      {/* まん中は棚：ゲーム機（青いランプ）とソフト */}
+      <rect x="88" y="133" width="54" height="20" rx="2" fill={`url(#${g("cubby")})`} />
+      <path d="M88 135 H142" stroke="#000" strokeOpacity="0.35" strokeWidth="2" />
+      <rect x="94" y="142" width="28" height="10" rx="1.6" fill="#E9ECEF" /><rect x="94" y="142" width="28" height="2" rx="1" fill="#FFFFFF" />
+      <path d="M96 148 H112" stroke="#B8BEC6" strokeWidth="0.8" /><circle cx="118" cy="148" r="1.1" fill="#4FB6FF" /><circle cx="118" cy="148" r="2.6" fill="#4FB6FF" opacity="0.25" />
+      {[126, 130, 134].map((x, i) => <rect key={x} x={x} y={139 + (i % 2)} width="3.2" height={13 - (i % 2)} rx="0.6" fill={["#E04A3A", "#3D6FB0", "#F2B13A"][i]} />)}
+      <path d="M88 152.4 H142" stroke="#E9BC88" strokeOpacity="0.5" strokeWidth="0.8" />
+      {[20, 156].map((x) => (
         <g key={x}>
           <rect x={x} y="133" width="54" height="20" rx="2" fill={`url(#${g("drawer")})`} filter={`url(#${g("grain")})`} />
           <rect x={x} y="133" width="54" height="20" rx="2" fill="none" stroke="#5E3A1E" strokeOpacity="0.35" />
@@ -766,7 +815,10 @@ function Tv({ u, lit, a11y }: P) {
       {/* 台の上：スピーカーと小さな植物 */}
       <g>
         <rect x="18" y="98" width="16" height="22" rx="2" fill="#2A2D33" />
+        <rect x="18" y="98" width="16" height="22" rx="2" fill={`url(#${g("mesh")})`} />
+        <path d="M19 99 H33" stroke="#5A5E66" strokeWidth="0.8" />
         <circle cx="26" cy="104" r="3.4" fill={`url(#${g("cone")})`} /><circle cx="26" cy="113" r="4.6" fill={`url(#${g("cone")})`} />
+        <circle cx="25" cy="112" r="1.2" fill="#8A8E96" opacity="0.6" />
         <path d="M209 120 l2.4 -11 h10.4 l2.4 11 z" fill="#E9E2D6" />
         <path d="M216.5 109 q-8 -10 -4 -20 M216.5 109 q2 -12 9 -16 M216.5 109 q-2 -8 -10 -10" stroke="#4E9A4A" strokeWidth="2.6" fill="none" strokeLinecap="round" />
         {([[212.5, 89], [225.5, 93], [206.5, 99]] as const).map(([x, y], i) => <ellipse key={i} cx={x} cy={y} rx="3.6" ry="2.2" fill="#6CB860" transform={`rotate(${i * 50 - 30} ${x} ${y})`} />)}
@@ -774,9 +826,14 @@ function Tv({ u, lit, a11y }: P) {
       {/* スタンド */}
       <path d="M100 110 L94 120 L136 120 L130 110 Z" fill="#1E2126" />
       <rect x="92" y="118" width="46" height="3" rx="1.5" fill="#3A3E46" />
-      {/* テレビ本体（うすいふち） */}
+      {/* テレビの奥ゆき（右がわの厚み）と、うしろへ回るコード */}
+      <path d="M204 15 L211 19 L211 111 L204 116 Z" fill="#0A0B0D" />
+      <path d="M211 104 q6 6 2 14 q-2 4 3 8" stroke="#1A1C20" strokeWidth="1.6" fill="none" strokeLinecap="round" />
+      {/* テレビ本体（うすいふち・上のふちに光） */}
       <rect x="24" y="12" width="182" height="106" rx="5" fill={`url(#${g("bezel")})`} />
-      <rect x="24" y="12" width="182" height="106" rx="5" fill="none" stroke="#5A5E66" strokeWidth="0.8" />
+      <rect x="24" y="12" width="182" height="106" rx="5" fill="none" stroke={`url(#${g("rim")})`} strokeWidth="1.4" />
+      <path d="M30 12.8 H200" stroke="#9AA0AA" strokeWidth="0.7" strokeLinecap="round" opacity="0.8" />
+      <text x="115" y="116.6" textAnchor="middle" fontSize="3.4" fontWeight="800" letterSpacing="0.8" fill="#8A8E96">FRENCHIE</text>
       {/* 画面：わんこ番組 */}
       <g clipPath={`url(#${g("screen")})`}>
         <rect x="31" y="18" width="168" height="94" fill={`url(#${g("sky")})`} />
@@ -810,8 +867,17 @@ function Tv({ u, lit, a11y }: P) {
         {/* 走査のうすい線 */}
         {Array.from({ length: 24 }, (_, i) => <rect key={i} x="31" y={18 + i * 4} width="168" height="1" fill="#000" opacity="0.035" />)}
       </g>
-      {/* 映りこみ・夜は画面の光 */}
+      {/* 映りこみ（へやの窓）・夜は画面の光 */}
       <rect x="31" y="18" width="168" height="94" rx="2" fill={`url(#${g("glare")})`} />
+      <g opacity="0.07" fill="#FFFFFF"><rect x="40" y="24" width="18" height="24" rx="1" /><rect x="60" y="24" width="18" height="24" rx="1" /></g>
+      {/* 台の上のリモコン */}
+      <g transform="translate(166 124) rotate(-10)">
+        <ellipse cx="1" cy="2.4" rx="12" ry="1.6" fill="#3A2614" opacity="0.3" />
+        <rect x="-11" y="-2.2" width="22" height="4.4" rx="2" fill="#2A2D33" />
+        <rect x="-10" y="-2" width="20" height="1.2" rx="0.6" fill="#5A5E66" />
+        <circle cx="-7" cy="0.4" r="1" fill="#E04A3A" />
+        {[-3, 0, 3, 6].map((x) => <circle key={x} cx={x} cy="0.6" r="0.6" fill="#8A8E96" />)}
+      </g>
       {lit ? <rect x="24" y="12" width="182" height="106" rx="5" fill="#CFE8FF" opacity="0.12" /> : null}
       <circle cx="198" cy="114" r="1.4" fill="#7BE07B" />
     </svg>
@@ -837,6 +903,7 @@ function Piano({ u, a11y }: P) {
         <linearGradient id={g("black")} x1="0" y1="0" x2="0" y2="1"><stop offset="0" stopColor="#4A4A50" /><stop offset="0.2" stopColor="#141416" /><stop offset="1" stopColor="#060607" /></linearGradient>
         <linearGradient id={g("brass")} x1="0" y1="0" x2="1" y2="1"><stop offset="0" stopColor="#FFE8A0" /><stop offset="0.5" stopColor="#D4A84A" /><stop offset="1" stopColor="#9A7426" /></linearGradient>
         <linearGradient id={g("felt")} x1="0" y1="0" x2="0" y2="1"><stop offset="0" stopColor="#A82A2A" /><stop offset="1" stopColor="#701414" /></linearGradient>
+        <radialGradient id={g("flame")} cx="0.5" cy="0.6" r="0.5"><stop offset="0" stopColor="#FFFBE0" /><stop offset="0.5" stopColor="#FFD25A" /><stop offset="1" stopColor="#FF9A2A" stopOpacity="0" /></radialGradient>
       </defs>
       <FloorShadow cx={120} cy={200} rx={112} ry={7} o={0.32} />
       {/* 右の側板（奥ゆき） */}
@@ -844,6 +911,7 @@ function Piano({ u, a11y }: P) {
       {/* 上の面 */}
       <path d="M16 14 L210 14 L222 6 L28 6 Z" fill={`url(#${g("topF")})`} />
       <path d="M28 6 L222 6" stroke="#6A5048" strokeWidth="1" />
+      <path d="M17 14.6 L209 14.6" stroke="#8A6A60" strokeWidth="0.8" opacity="0.8" />
       {/* 本体（上の箱） */}
       <rect x="16" y="14" width="194" height="94" fill={`url(#${g("lacq")})`} />
       <rect x="28" y="24" width="170" height="62" rx="3" fill="#0C0806" opacity="0.65" />
@@ -872,8 +940,21 @@ function Piano({ u, a11y }: P) {
         <path d="M4 10 C2 4 6 -2 8 -8" stroke="#4E9A4A" strokeWidth="1.4" fill="none" />
         <g transform="translate(8 -10)">{[0, 72, 144, 216, 288].map((a) => <ellipse key={a} cx="0" cy="-3" rx="2.4" ry="3.4" fill="#FF9FB8" transform={`rotate(${a})`} />)}<circle r="1.6" fill="#FFD25A" /></g>
       </g>
-      {/* 鍵盤のふた（開いて奥にある）・赤いフェルト */}
+      {/* 金の燭台（左右） */}
+      {([[16, -1], [210, 1]] as const).map(([x, d]) => (
+        <g key={x}>
+          <path d={`M${x} 52 q${8 * d} 0 ${10 * d} -8`} stroke={`url(#${g("brass")})`} strokeWidth="2" fill="none" strokeLinecap="round" />
+          <ellipse cx={x} cy="52" rx="2.2" ry="3.4" fill={`url(#${g("brass")})`} />
+          <ellipse cx={x + 10 * d} cy="44" rx="4" ry="1.4" fill={`url(#${g("brass")})`} />
+          <rect x={x + 10 * d - 1.8} y="33" width="3.6" height="11" rx="0.8" fill="#FFF8EA" />
+          <path d={`M${x + 10 * d - 1.2} 34 v9`} stroke="#E6DCC6" strokeWidth="0.8" />
+          <ellipse cx={x + 10 * d} cy="28" rx="3.2" ry="5" fill={`url(#${g("flame")})`} />
+          <path d={`M${x + 10 * d} 33 v-1.6`} stroke="#3A2A20" strokeWidth="0.6" />
+        </g>
+      ))}
+      {/* 鍵盤のふた（開いて奥にある）・鍵盤の映りこみ・赤いフェルト */}
       <path d="M12 108 L214 108 L210 116 L16 116 Z" fill="#2A1C16" />
+      {Array.from({ length: W }, (_, i) => <rect key={`r${i}`} x={18 + i * (188 / W)} y="110" width={188 / W - 1.2} height="3.6" fill="#FFFFFF" opacity="0.07" />)}
       <rect x="18" y="114" width="190" height="3" fill={`url(#${g("felt")})`} />
       {/* 鍵盤：白鍵の上の面と前の厚み → 黒鍵 */}
       <path d="M14 117 L212 117 L214 132 L12 132 Z" fill="#0E0908" />
@@ -895,6 +976,11 @@ function Piano({ u, a11y }: P) {
       {/* 下の箱・脚・ペダル */}
       <rect x="20" y="132" width="186" height="52" fill={`url(#${g("lacq")})`} />
       <rect x="36" y="140" width="154" height="36" rx="3" fill="#0C0806" opacity="0.55" />
+      {/* 下の板の彫り（ふちどりと、まん中の飾り） */}
+      <rect x="40" y="144" width="146" height="28" rx="2" fill="none" stroke="#3E2E28" strokeWidth="1" />
+      <rect x="40.8" y="144.8" width="144.4" height="26.4" rx="2" fill="none" stroke="#000" strokeOpacity="0.5" strokeWidth="0.6" />
+      <path d="M113 150 q-10 0 -14 8 q4 8 14 8 q10 0 14 -8 q-4 -8 -14 -8 Z M95 158 h-30 M131 158 h30" stroke="#4A3630" strokeWidth="1" fill="none" />
+      <path d="M20 132.6 H206" stroke="#6A5048" strokeWidth="0.8" />
       <path d="M48 132 L66 132 L50 184 L32 184 Z" fill={`url(#${g("streak")})`} opacity="0.5" />
       {([[14, -1], [212, 1]] as const).map(([x, d], i) => (
         <g key={i}>
@@ -941,7 +1027,14 @@ function RockingChair({ u, a11y }: P) {
       {/* 背もたれ：ろくろ挽きの柱と、上の笠木 */}
       {[50, 64, 78, 92, 106].map((x) => (
         <g key={x}>
-          <path d={`M${x} 118 L${x + (x - 78) * 0.1} 34`} stroke={`url(#${g("wood")})`} strokeWidth="4.6" strokeLinecap="round" />
+          {/* まっすぐ縦の線はグラデーションの幅が0になって消えるので、単色＋光の線で描く */}
+          <path d={`M${x} 118 L${x + (x - 78) * 0.1} 34`} stroke="#B97E48" strokeWidth="4.6" strokeLinecap="round" />
+          <path d={`M${x - 0.9} 116 L${x - 0.9 + (x - 78) * 0.1} 36`} stroke="#F0C48E" strokeWidth="1.2" strokeLinecap="round" opacity="0.8" />
+          {/* ろくろ挽きの玉 */}
+          {[54, 86].map((y) => {
+            const cx = x + (x - 78) * 0.1 * ((118 - y) / 84);
+            return <g key={y}><ellipse cx={cx} cy={y} rx="3.8" ry="2.6" fill={`url(#${g("wood")})`} /><ellipse cx={cx - 1} cy={y - 0.8} rx="1.4" ry="0.8" fill="#F2CC98" opacity="0.8" /></g>;
+          })}
         </g>
       ))}
       <path d="M36 122 L30 30 Q80 10 130 30 L124 122" stroke={`url(#${g("wood")})`} strokeWidth="8" fill="none" strokeLinejoin="round" strokeLinecap="round" filter={`url(#${g("grain")})`} />
@@ -959,6 +1052,8 @@ function RockingChair({ u, a11y }: P) {
       <path d="M30 118 L130 118 L126 132 L34 132 Z" fill={`url(#${g("woodH")})`} filter={`url(#${g("grain")})`} />
       <g filter={`url(#${g("cloth")})`}>
         <path d="M36 104 Q80 94 124 104 Q132 116 124 122 Q80 130 36 122 Q28 116 36 104 Z" fill={`url(#${g("cushion")})`} />
+        <path d="M36 104 Q80 94 124 104 Q132 116 124 122 Q80 130 36 122 Q28 116 36 104 Z" fill="none" stroke="#4A7098" strokeWidth="1.6" strokeDasharray="0.1 2.6" strokeLinecap="round" />
+        <path d="M38 121 Q80 129 122 121" stroke="#4A7098" strokeOpacity="0.5" strokeWidth="1.2" fill="none" />
         <path d="M42 106 Q80 98 118 106" stroke="#FFFFFF" strokeOpacity="0.5" strokeWidth="2.2" fill="none" />
         {/* ボタンどめのくぼみ */}
         {[62, 80, 98].map((x) => <g key={x}><ellipse cx={x} cy="112" rx="5" ry="2.4" fill="#5E88B2" opacity="0.35" /><circle cx={x} cy="112" r="1.6" fill="#3E6890" /></g>)}
@@ -967,7 +1062,11 @@ function RockingChair({ u, a11y }: P) {
       <g filter={`url(#${g("cloth")})`}>
         <path d="M84 22 Q112 18 128 26 L130 70 Q120 82 104 76 Q94 86 82 78 Z" fill={`url(#${g("blanket")})`} />
         <path d="M84 22 Q112 18 128 26 L130 70 Q120 82 104 76 Q94 86 82 78 Z" fill={`url(#${g("knit")})`} />
+        {/* 2本のしま（ブランケットのふちに合わせて曲げる） */}
+        <path d="M83 50 Q106 44 129 50 L129 56 Q106 50 83 56 Z" fill="#D9675A" opacity="0.85" />
+        <path d="M83 60 Q106 54 129 60 L129 63 Q106 57 83 63 Z" fill="#5E88B2" opacity="0.8" />
         <path d="M96 24 Q98 52 94 80 M114 24 Q118 50 116 78" stroke="#C9A06A" strokeWidth="2.4" fill="none" opacity="0.55" />
+        <path d="M84 22 Q86 50 82 78" stroke="#000" strokeOpacity="0.12" strokeWidth="3" fill="none" />
         <path d="M86 26 Q108 20 126 28" stroke="#FFFFFF" strokeOpacity="0.55" strokeWidth="2" fill="none" />
         {[86, 92, 98, 104, 110, 116, 122].map((x, i) => <path key={x} d={`M${x} ${78 + (i % 2) * 2 - (x > 100 ? 2 : 0)} l${i % 2 ? 1 : -1} 7`} stroke="#D8B47E" strokeWidth="1.6" strokeLinecap="round" />)}
       </g>
@@ -1003,8 +1102,12 @@ function Toybox({ u, a11y }: P) {
       <path d="M30 46 L41 16 L146 16 L153 46 Z" fill="#000" opacity="0.08" />
       {[24, 34].map((y) => <path key={y} d={`M${32 + (54 - y) * 0.3} ${y} L${154 - (54 - y) * 0.2} ${y}`} stroke="#9E6B30" strokeOpacity="0.35" strokeWidth="1.2" />)}
       <path d="M36 10 L150 10" stroke="#F8D8A8" strokeWidth="1.6" />
-      {/* 箱の中（奥の暗がり） */}
+      {/* 箱の中（奥の暗がり・左右の内がわの壁） */}
       <path d="M20 54 L158 54 L150 64 L28 64 Z" fill={`url(#${g("inner")})`} />
+      <path d="M20 54 L28 64 L28 72 L20 72 Z" fill="#6E4420" />
+      <path d="M158 54 L150 64 L150 72 L158 72 Z" fill="#4A2A10" />
+      {/* ちょうつがい */}
+      {[52, 124].map((x) => <g key={x}><rect x={x} y="51" width="12" height="6" rx="1" fill={`url(#${g("metal")})`} /><path d={`M${x} 54 H${x + 12}`} stroke="#5A6068" strokeWidth="0.6" /></g>)}
       {/* 中のおもちゃ */}
       <g filter={`url(#${g("cloth")})`}>
         {/* にんじんのぬいぐるみ */}
@@ -1041,6 +1144,18 @@ function Toybox({ u, a11y }: P) {
           <circle cx="8" cy="2" r="1" fill="#5A6068" /><circle cx="2" cy="8" r="1" fill="#5A6068" />
         </g>
       ))}
+      {/* 右の側面のロープの取っ手 */}
+      <path d="M161 74 q4 14 6 0" stroke="#4A2A10" strokeWidth="2.6" fill="none" opacity="0.4" />
+      <path d="M161 72 q4 15 6 0" stroke="#E6D3A8" strokeWidth="2.6" fill="none" strokeLinecap="round" />
+      <path d="M161 72 q4 15 6 0" stroke="#B8955A" strokeWidth="2.6" fill="none" strokeDasharray="1.2 1.6" />
+      {[161, 167].map((x) => <circle key={x} cx={x} cy="72" r="1.8" fill={`url(#${g("metal")})`} />)}
+      {/* 名札（ひもでかけた木の札） */}
+      <path d="M128 60 L134 66 L140 60" stroke="#C9A06A" strokeWidth="0.9" fill="none" />
+      <g transform="rotate(4 134 72)">
+        <rect x="122" y="65" width="24" height="12" rx="2.4" fill="#FFF8EA" stroke="#C9A06A" strokeWidth="0.8" />
+        <circle cx="134" cy="67.4" r="0.9" fill="#C9A06A" />
+        <path d="M128 72 q1.4 -2 2.8 0 q1.4 2 2.8 0 q1.4 -2 2.8 0 q1.4 2 2.8 0" stroke="#E07A8A" strokeWidth="1" fill="none" />
+      </g>
       {/* ペンキの肉球（少しかすれ） */}
       <g transform="translate(88 98)" fill="#FFF4E0" opacity="0.92">
         <ellipse cx="0" cy="4" rx="10" ry="8" /><circle cx="-10" cy="-7" r="3.8" /><circle cx="-3.6" cy="-12.4" r="3.8" /><circle cx="3.6" cy="-12.4" r="3.8" /><circle cx="10" cy="-7" r="3.8" />
