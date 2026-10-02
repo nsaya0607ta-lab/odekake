@@ -58,11 +58,13 @@ export function RoomBoard({ children, dark = 0, drop = DEFAULT_DROP, place = DEF
   /** 三脚・留め具・置いた面の影を描くか（false なら、かべにかけたボードのように、わくとペン置きだけ） */
   stand?: boolean;
   /** 見た目：アルミのホワイトボード／木のわくのコルク掲示板（中身をポスターのようにピンでとめる） */
-  look?: "whiteboard" | "cork";
+  look?: "whiteboard" | "cork" | "chalk" | "tape";
 }) {
-  const cork = look === "cork";
+  const cork = look === "cork", chalk = look === "chalk", tape = look === "tape";
+  /** 木のわくがあるもの（掲示板・黒板） */
+  const wooden = cork || chalk;
   /** 板のはしから、映す面までの幅（コルクは 木のわく ＋ コルクの余白） */
-  const INS = cork ? WOOD + CORK_PAD : FRAME;
+  const INS = cork ? WOOD + CORK_PAD : chalk ? WOOD + 12 : tape ? 7 : FRAME;
   const DROP = drop;
   // 置ける領域（机）の大きさ
   const areaRef = useRef<HTMLDivElement>(null);
@@ -127,7 +129,8 @@ export function RoomBoard({ children, dark = 0, drop = DEFAULT_DROP, place = DEF
   const cx = w / 2, cy = -h * 0.55;
   const T = rad(TURN), L = rad(LEAN);
   // 板（足もとのまん中が原点。u 右、v 上、n 手前）。手前に来る脚の先が画面からはみ出さないよう、少し上げる
-  const bw = Math.max(120, w - 34);
+  // 三脚のないときは、左右の余白（脚が開くぶん）がいらないので広く
+  const bw = Math.max(120, w - (stand ? 34 : tape ? 14 : 8));
   const lift = Math.round(4 + bw * Math.sin(T) * 0.16 + DROP * Math.sin(T) * 0.55);
   const yb = h - DROP - lift;
   const bh = Math.max(120, (yb - OVER - 6) / Math.cos(L) * 1.02);
@@ -236,18 +239,55 @@ export function RoomBoard({ children, dark = 0, drop = DEFAULT_DROP, place = DEF
         {legs.map((g) => <g key={g.s}>{tube(g.top, g.foot, 7.5, 1)}</g>)}
         </> : (
           // 三脚なし：ボードの下にやわらかい影だけ
-          <rect x={w / 2 - hw + 6} y={yb - bh + 14} width={bw - 12} height={bh + 6} rx="10" fill="#1E1206" opacity="0.28" filter="url(#bd-blur)" />
+          <rect x={w / 2 - hw + 6} y={yb - bh + (tape ? 8 : 14)} width={bw - 12} height={bh + (tape ? 0 : 6)} rx="10" fill="#1E1206" opacity={tape ? 0.2 : 0.28} filter="url(#bd-blur)" />
         )}
         {/* まん中の柱（ボードの上に出て、留め具をささえる） */}
         {stand && (() => { const r = rod(mastBottom, mastTop, 7); return <g><polygon points={r.poly} fill="#B9BFC8" /><line x1={r.pa[0] - r.ox * 0.4 * r.ka} y1={r.pa[1] - r.oy * 0.4 * r.ka} x2={r.pb[0] - r.ox * 0.4 * r.kb} y2={r.pb[1] - r.oy * 0.4 * r.kb} stroke="#FFFFFF" strokeWidth="1.6" opacity="0.85" /><line x1={r.pa[0] + r.ox * 0.75 * r.ka} y1={r.pa[1] + r.oy * 0.75 * r.ka} x2={r.pb[0] + r.ox * 0.75 * r.kb} y2={r.pb[1] + r.oy * 0.75 * r.kb} stroke="#6E757F" strokeWidth="1.2" opacity="0.8" /></g>; })()}
         {/* わくの厚み（手前に来る左のはしと、上のはし） */}
-        <polygon points={pts([P(-hw, 0), P(-hw, bh), P(-hw, bh, -DEPTH), P(-hw, 0, -DEPTH)])} fill={cork ? "#6E4420" : "url(#bd-edge)"} />
-        <polygon points={pts([P(-hw, bh), P(hw, bh), P(hw, bh, -DEPTH), P(-hw, bh, -DEPTH)])} fill={cork ? "#B98250" : "url(#bd-edge-top)"} />
+        {tape ? null : <>
+          <polygon points={pts([P(-hw, 0), P(-hw, bh), P(-hw, bh, -DEPTH), P(-hw, 0, -DEPTH)])} fill={wooden ? "#6E4420" : "url(#bd-edge)"} />
+          <polygon points={pts([P(-hw, bh), P(hw, bh), P(hw, bh, -DEPTH), P(-hw, bh, -DEPTH)])} fill={wooden ? "#B98250" : "url(#bd-edge-top)"} />
+        </>}
       </svg>
 
       {/* ボードの板（ここだけ CSS の 3D で傾ける） */}
       <div className="absolute" style={{ left: w / 2 - hw, top: yb - bh, width: bw, height: bh, transform: `rotateY(${TURN}deg) rotateX(${LEAN}deg)`, transformOrigin: "50% 100%" }}>
-        {cork ? (
+        {tape ? (
+          // 写真のプリントのような白いふち
+          <div aria-hidden className="absolute inset-0 rounded-[3px] bg-[#FFFDF8] shadow-[0_1px_1px_rgba(40,30,20,.25)]" style={dim} />
+        ) : chalk ? (
+          // 木のわくの黒板（深い緑の面に、うすいチョークのあとと らくがき）
+          <svg aria-hidden width={bw} height={bh} viewBox={`0 0 ${bw} ${bh}`} className="absolute inset-0" style={dim}>
+            <defs>
+              <linearGradient id="ck-wood" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stopColor="#D2A06A" /><stop offset="0.5" stopColor="#B07A46" /><stop offset="1" stopColor="#86552C" /></linearGradient>
+              <filter id="ck-wood-h" x="0" y="0" width="100%" height="100%"><feTurbulence type="fractalNoise" baseFrequency="0.02 0.25" numOctaves="2" seed="5" result="n" /><feColorMatrix in="n" type="matrix" values="0 0 0 0 0.3  0 0 0 0 0.16  0 0 0 0 0.06  0 0 0 1.4 -0.55" /></filter>
+              <filter id="ck-wood-v" x="0" y="0" width="100%" height="100%"><feTurbulence type="fractalNoise" baseFrequency="0.25 0.02" numOctaves="2" seed="9" result="n" /><feColorMatrix in="n" type="matrix" values="0 0 0 0 0.3  0 0 0 0 0.16  0 0 0 0 0.06  0 0 0 1.4 -0.55" /></filter>
+              <radialGradient id="ck-slate" cx="0.45" cy="0.4" r="0.8"><stop offset="0" stopColor="#3C5C4C" /><stop offset="1" stopColor="#253B31" /></radialGradient>
+              <filter id="ck-smudge" x="0" y="0" width="100%" height="100%"><feTurbulence type="fractalNoise" baseFrequency="0.012 0.03" numOctaves="3" seed="7" result="n" /><feColorMatrix in="n" type="matrix" values="0 0 0 0 1  0 0 0 0 1  0 0 0 0 1  0 0 0 1.6 -0.78" /></filter>
+              <filter id="ck-dust" x="0" y="0" width="100%" height="100%"><feTurbulence type="fractalNoise" baseFrequency="0.85" numOctaves="1" seed="2" result="n" /><feColorMatrix in="n" type="matrix" values="0 0 0 0 1  0 0 0 0 1  0 0 0 0 1  0 0 0 2 -1.45" /></filter>
+              <clipPath id="ck-ring"><path fillRule="evenodd" d={`M0 0 H${bw} V${bh} H0 Z M${WOOD} ${WOOD} V${bh - WOOD} H${bw - WOOD} V${WOOD} Z`} /></clipPath>
+            </defs>
+            <rect x="0" y="0" width={bw} height={bh} rx="5" fill="url(#ck-wood)" />
+            <g clipPath="url(#ck-ring)">
+              <rect x="0" y="0" width={bw} height={WOOD} filter="url(#ck-wood-h)" />
+              <rect x="0" y={bh - WOOD} width={bw} height={WOOD} filter="url(#ck-wood-h)" />
+              <rect x="0" y={WOOD} width={WOOD} height={bh - WOOD * 2} filter="url(#ck-wood-v)" />
+              <rect x={bw - WOOD} y={WOOD} width={WOOD} height={bh - WOOD * 2} filter="url(#ck-wood-v)" />
+            </g>
+            {[[0, 0, WOOD, WOOD], [bw, 0, bw - WOOD, WOOD], [bw, bh, bw - WOOD, bh - WOOD], [0, bh, WOOD, bh - WOOD]].map(([x1, y1, x2, y2], i) => <line key={i} x1={x1} y1={y1} x2={x2} y2={y2} stroke="#5A3416" strokeOpacity="0.45" strokeWidth="1" />)}
+            <rect x="0.6" y="0.6" width={bw - 1.2} height={bh - 1.2} rx="4.5" fill="none" stroke="#F0C894" strokeOpacity="0.8" strokeWidth="1.2" />
+            <rect x={WOOD} y={WOOD} width={bw - WOOD * 2} height={bh - WOOD * 2} fill="url(#ck-slate)" />
+            <rect x={WOOD} y={WOOD} width={bw - WOOD * 2} height={bh - WOOD * 2} filter="url(#ck-smudge)" opacity="0.16" />
+            <rect x={WOOD} y={WOOD} width={bw - WOOD * 2} height={bh - WOOD * 2} filter="url(#ck-dust)" opacity="0.25" />
+            {/* わくの内がわのかげ */}
+            <rect x={WOOD} y={WOOD} width={bw - WOOD * 2} height="5" fill="#000" opacity="0.25" />
+            {/* よこのよはくの、チョークのらくがき（肉球・ハート・星） */}
+            <g fill="none" stroke="#F4F1E6" strokeOpacity="0.55" strokeWidth="1.2" strokeLinecap="round">
+              <g transform={`translate(${WOOD + 6} ${bh - WOOD - 7}) scale(0.5)`} fill="#F4F1E6" fillOpacity="0.5" stroke="none"><ellipse cx="0" cy="2" rx="5" ry="4" /><circle cx="-5" cy="-4" r="2" /><circle cx="-1.6" cy="-6.4" r="2" /><circle cx="2" cy="-6.4" r="2" /><circle cx="5.4" cy="-4" r="2" /></g>
+              <path d={`M${bw - WOOD - 8} ${WOOD + 9} c -3 -3 -6 0 -3 3 l 3 3 l 3 -3 c 3 -3 0 -6 -3 -3 z`} stroke="#FFB4C8" strokeOpacity="0.6" />
+            </g>
+          </svg>
+        ) : cork ? (
           // 木のわく（木目・面取り）と、コルクの面（つぶつぶ・色むら）
           <svg aria-hidden width={bw} height={bh} viewBox={`0 0 ${bw} ${bh}`} className="absolute inset-0" style={dim}>
             <defs>
@@ -306,7 +346,7 @@ export function RoomBoard({ children, dark = 0, drop = DEFAULT_DROP, place = DEF
           </>
         )}
         {/* 映す面（ここだけスクロールする） */}
-        <div data-board-screen className={`absolute overflow-hidden ${cork ? "rounded-[6px] bg-[#FBF8F1] shadow-[0_3px_6px_rgba(40,20,5,.35),0_1px_1px_rgba(40,20,5,.3)]" : "rounded-[3px] bg-[#FAFBFC] shadow-[0_0_0_1px_#7E858F,0_0_0_2px_#AEB4BD]"}`} style={{ inset: INS }}>
+        <div data-board-screen className={`absolute overflow-hidden ${cork ? "rounded-[6px] bg-[#FBF8F1] shadow-[0_3px_6px_rgba(40,20,5,.35),0_1px_1px_rgba(40,20,5,.3)]" : chalk ? "rounded-[8px] bg-[#FBF8F1] shadow-[0_4px_10px_rgba(0,0,0,.45)]" : tape ? "rounded-[2px] bg-[#FBF8F1]" : "rounded-[3px] bg-[#FAFBFC] shadow-[0_0_0_1px_#7E858F,0_0_0_2px_#AEB4BD]"}`} style={{ inset: INS }}>
           {/* 中身は SCREEN_W 以上の幅で組んで、面の大きさに縮めて映す（ボードが小さい・縦長・横長でも文字がつまったり、はみ出したりしない） */}
           <div className="absolute left-0 top-0" style={{ width: screenW / zoom, height: screenH / zoom, zoom }}>
             <div className="absolute inset-0 space-y-3 overflow-y-auto overscroll-contain pb-2 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden [&>*:not(:first-child)]:mx-2">
@@ -314,8 +354,8 @@ export function RoomBoard({ children, dark = 0, drop = DEFAULT_DROP, place = DEF
             </div>
           </div>
           {/* 面のつや（ななめの映りこみ）と、ふちの内がわのかげ（ホワイトボードのとき） */}
-          {cork ? null : <div aria-hidden className="pointer-events-none absolute inset-0 bg-[linear-gradient(112deg,rgba(255,255,255,0)_26%,rgba(255,255,255,.26)_36%,rgba(255,255,255,0)_46%,rgba(255,255,255,0)_68%,rgba(255,255,255,.12)_74%,rgba(255,255,255,0)_80%)]" />}
-          {cork ? null : <div aria-hidden className="pointer-events-none absolute inset-0 shadow-[inset_0_2px_5px_rgba(0,0,0,.25),inset_2px_0_4px_rgba(0,0,0,.08)]" />}
+          {look !== "whiteboard" ? null : <div aria-hidden className="pointer-events-none absolute inset-0 bg-[linear-gradient(112deg,rgba(255,255,255,0)_26%,rgba(255,255,255,.26)_36%,rgba(255,255,255,0)_46%,rgba(255,255,255,0)_68%,rgba(255,255,255,.12)_74%,rgba(255,255,255,0)_80%)]" />}
+          {look !== "whiteboard" ? null : <div aria-hidden className="pointer-events-none absolute inset-0 shadow-[inset_0_2px_5px_rgba(0,0,0,.25),inset_2px_0_4px_rgba(0,0,0,.08)]" />}
         </div>
       </div>
 
@@ -332,7 +372,46 @@ export function RoomBoard({ children, dark = 0, drop = DEFAULT_DROP, place = DEF
           const topA = P(-16, bh + 4, legBack - 2), topB = P(16, bh + 4, legBack - 2), knob = P(0, bh + 10, legBack - 4);
           return <g><polygon points={pts([topA, topB, b, a])} fill="#4A4F57" /><polygon points={pts([a, b, c, d])} fill="#2A2D33" /><polyline points={pts([a, b])} fill="none" stroke="#7A808A" strokeWidth="1.1" /><circle cx={knob[0]} cy={knob[1]} r={4.2 * k} fill="#2A2D33" /><circle cx={knob[0] - 1.2 * k} cy={knob[1] - 1.2 * k} r={1.4 * k} fill="#8A909A" /></g>;
         })()}
-        {cork ? (
+        {chalk ? (
+          // カードを止める丸いマグネットと、下のチョーク置き（チョーク3本・黒板けし）
+          <g>
+            <defs>
+              <radialGradient id="mag-a" cx="0.35" cy="0.3" r="0.75"><stop offset="0" stopColor="#FFE9A0" /><stop offset="0.5" stopColor="#F2B83A" /><stop offset="1" stopColor="#B8801A" /></radialGradient>
+              <radialGradient id="mag-b" cx="0.35" cy="0.3" r="0.75"><stop offset="0" stopColor="#C8F0D8" /><stop offset="0.5" stopColor="#5EB884" /><stop offset="1" stopColor="#2E7A50" /></radialGradient>
+              <linearGradient id="ck-tray" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stopColor="#E2B47E" /><stop offset="0.4" stopColor="#B88048" /><stop offset="1" stopColor="#7A4C24" /></linearGradient>
+            </defs>
+            {[{ x: w / 2 - hw + INS + 16, c: "mag-a" }, { x: w / 2 + hw - INS - 16, c: "mag-b" }].map((m) => {
+              const y = yb - bh + INS + 4;
+              return <g key={m.c}><ellipse cx={m.x + 2.5} cy={y + 4} rx="8.5" ry="4" fill="#000" opacity="0.35" /><circle cx={m.x} cy={y} r="8" fill={`url(#${m.c})`} /><ellipse cx={m.x - 2.5} cy={y - 3} rx="3" ry="1.8" fill="#FFFFFF" opacity="0.7" /></g>;
+            })}
+            <ellipse cx={w / 2} cy={yb + 10} rx={hw * 0.95} ry="4" fill="#000" opacity="0.18" />
+            <rect x={w / 2 - hw + 4} y={yb - 3} width={bw - 8} height="10" rx="3" fill="url(#ck-tray)" />
+            <rect x={w / 2 - hw + 4} y={yb - 3} width={bw - 8} height="1.6" rx="0.8" fill="#FFE2B8" opacity="0.8" />
+            {[{ x: w / 2 - hw + 26, c: "#FBFAF4", l: 24 }, { x: w / 2 - hw + 56, c: "#FFC4D2", l: 16 }, { x: w / 2 - hw + 78, c: "#FFF1A8", l: 20 }].map((c) => (
+              <g key={c.x}><rect x={c.x} y={yb - 7} width={c.l} height="5" rx="2.5" fill={c.c} /><rect x={c.x + 1} y={yb - 6.6} width={c.l - 2} height="1.4" rx="0.7" fill="#FFFFFF" opacity="0.7" /></g>
+            ))}
+            <g transform={`translate(${w / 2 + hw - 64} ${yb - 12})`}>
+              <rect x="0" y="5" width="40" height="5" rx="1.2" fill="#5A5A60" />
+              <rect x="0" y="0" width="40" height="6.5" rx="2" fill="#C8955E" />
+              <rect x="2" y="0.6" width="36" height="1.6" rx="0.8" fill="#F0C894" opacity="0.8" />
+            </g>
+          </g>
+        ) : tape ? (
+          // マスキングテープ（上の左右と、右下）
+          <g>
+            <defs>
+              <pattern id="tape-a" width="6" height="6" patternUnits="userSpaceOnUse" patternTransform="rotate(45)"><rect width="6" height="6" fill="#FFC9D6" /><rect width="3" height="6" fill="#FFB0C2" /></pattern>
+              <pattern id="tape-b" width="8" height="8" patternUnits="userSpaceOnUse"><rect width="8" height="8" fill="#BFE3F2" /><circle cx="4" cy="4" r="1.4" fill="#FFFFFF" /></pattern>
+            </defs>
+            {[{ x: w / 2 - hw + 8, y: yb - bh + 6, r: -38, f: "tape-a" }, { x: w / 2 + hw - 8, y: yb - bh + 6, r: 38, f: "tape-b" }, { x: w / 2 + hw - 10, y: yb - 6, r: -40, f: "tape-a" }].map((t, i) => (
+              <g key={i} transform={`translate(${t.x} ${t.y}) rotate(${t.r})`} opacity="0.9">
+                <rect x="-26" y="-8" width="52" height="16" fill={`url(#${t.f})`} />
+                <rect x="-26" y="-8" width="52" height="16" fill="#FFFFFF" opacity="0.18" />
+                <path d="M-26 -8 l 2 2 -2 2 2 2 -2 2 2 2 -2 2 2 2 M26 -8 l -2 2 2 2 -2 2 2 2 -2 2 2 2 -2 2" fill="none" stroke="#FFFFFF" strokeOpacity="0.6" strokeWidth="1" />
+              </g>
+            ))}
+          </g>
+        ) : cork ? (
           // 押しピン（ポスターの上の左右）
           <g>
             <defs>

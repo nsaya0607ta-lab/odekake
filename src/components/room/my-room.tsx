@@ -201,9 +201,9 @@ async function shrinkImage(file: File, max: number, quality: number): Promise<Bl
 }
 
 /** ボードの最初の置き場所：部屋の下いっぱい（高さは置ける範囲まで自動でちぢむ） */
-const BOARD_FILL = { x: 0.5, y: 1, w: 0.94, a: 1.7 };
+const BOARD_FILL = { x: 0.5, y: 1, w: 1, a: 1.7 };
 
-export function MyRoom({ entries, initialLayout, serverReady, dogSkin, dogName, serverNow, steps, stepHistory, visit, guests, stageStyle = "board" }: {
+export function MyRoom({ entries, initialLayout, serverReady, dogSkin, dogName, serverNow, steps, stepHistory, visit, guests, stageStyle = "board", boardLook = "cork" }: {
   entries: DecorEntry[];
   initialLayout: RoomLayout | null;
   serverReady: boolean;
@@ -221,6 +221,8 @@ export function MyRoom({ entries, initialLayout, serverReady, dogSkin, dogName, 
   guests?: { mail: RoomMailItem[]; friends: RoomFriend[] };
   /** 部屋の下：ホワイトボードのわくに映す（board）か、ふちなしのカード（card）か */
   stageStyle?: "board" | "card";
+  /** 部屋の下のボードの見た目（掲示板・黒板・テープで貼ったプリント） */
+  boardLook?: "cork" | "chalk" | "tape";
 }) {
   // 家具はだれでも置けるので、持ち物と合わせて「置けるもの」にする
   const validKeys = useMemo(() => new Set([...entries, ...FURNITURE_ENTRIES, ...FIXTURE_ENTRIES].map((e) => e.key)), [entries]);
@@ -896,8 +898,8 @@ export function MyRoom({ entries, initialLayout, serverReady, dogSkin, dogName, 
           <div ref={stageRef} className="relative z-10 -mt-px min-h-[300px] flex-1" style={{ background: `linear-gradient(180deg, ${backdrop.top} 0%, ${backdrop.mid} 42%, ${backdrop.mid} 100%)` }}>
             {stageStyle === "board" ? (
               // 木のわくのコルク掲示板（お天気カードをポスターのようにピンでとめる）。わくをつかんで動かす・右下で大きさを変える
-              <div className="absolute inset-x-0 top-3 bottom-[calc(env(safe-area-inset-bottom)+10px)]">
-                <RoomBoard dark={1 - skyNow.light} drop={4} stand={false} look="cork" place={layout.board ?? BOARD_FILL} onPlace={(board) => commit({ ...latest.current, board })}>
+              <div className="absolute inset-x-1 top-3 bottom-[calc(env(safe-area-inset-bottom)+10px)]">
+                <RoomBoard dark={1 - skyNow.light} drop={boardLook === "chalk" ? 14 : 4} stand={false} look={boardLook} place={layout.board ?? BOARD_FILL} onPlace={(board) => commit({ ...latest.current, board })}>
                   {stageContent}
                 </RoomBoard>
               </div>
