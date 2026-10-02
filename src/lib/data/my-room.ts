@@ -3,7 +3,7 @@ import { OSANPO_RUN_RANKS, OSANPO_RUN_STAGE_IDS, OSANPO_RUN_STAGES } from "@/lib
 import { PREFECTURE_NAMES } from "@/lib/geo/prefecture-names";
 import { PENNANTS } from "@/lib/room/themes";
 import { isDogSkinId, type DogSkinId } from "@/lib/dog-skins";
-import { isFurnitureId, parseRoomLayout, pennantKey, photoKey, trophyKey, type DecorEntry, type RoomLayout, type RoomShop } from "@/lib/room/types";
+import { isShopId, parseRoomLayout, pennantKey, photoKey, trophyKey, type DecorEntry, type RoomLayout, type RoomShop } from "@/lib/room/types";
 import type { Json } from "@/lib/supabase/types";
 import type { DB } from "./client";
 import { getOwnedItemCounts } from "./collection";
@@ -30,7 +30,7 @@ export async function getMyRoom(supabase: DB, userId: string): Promise<MyRoomSta
   return { layout: data ? parseRoomLayout(data.layout) : null, ready: true };
 }
 
-/** 家具の持ち物と青コインの残高（青コインの仕組みが無い環境では ready: false） */
+/** 持っている家具・窓・棚などの数と、青コインの残高（青コインの仕組みが無い環境では ready: false） */
 export async function getRoomShop(supabase: DB, userId: string): Promise<RoomShop> {
   // 型の定義にまだ無いテーブルなので、ゆるく読む
   const from = supabase.from.bind(supabase) as unknown as (t: string) => {
@@ -47,7 +47,7 @@ export async function getRoomShop(supabase: DB, userId: string): Promise<RoomSho
   }
   const owned: RoomShop["owned"] = {};
   for (const row of furniture.data ?? []) {
-    if (isFurnitureId(row.furniture) && typeof row.count === "number") owned[row.furniture] = row.count;
+    if (isShopId(row.furniture) && typeof row.count === "number") owned[row.furniture] = row.count;
   }
   const balance = coins.data?.[0]?.balance;
   return { ready: true, blueCoins: typeof balance === "number" ? balance : 0, owned };

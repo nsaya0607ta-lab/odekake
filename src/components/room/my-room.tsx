@@ -51,6 +51,10 @@ import {
   type Placement,
   type RoomLayout,
   type RoomShop,
+  capToOwned,
+  FIXTURE_IDS,
+  FURNITURE_IDS,
+  shopName,
   type RoomPhoto,
   type RoomStyle,
   type RoomTheme,
@@ -161,20 +165,11 @@ const FURNITURE_DEPTH: Record<string, number> = { whiteboard: 0.2, sofa: 0.35, p
 
 const FLOOR_SPOTS = [[22, 74], [78, 76], [64, 90], [36, 92], [86, 92], [14, 88], [50, 66], [70, 66]] as const;
 
-/** 家具のお店があるときは、買った数をこえる家具を外す（図鑑アイテムなど、家具でないものはそのまま） */
+/** 買う仕組みがあるときは、買った数をこえる家具・窓・棚などを外す（外した棚に乗せていたものは床に下ろす。図鑑アイテムなどはそのまま） */
 function ownedOnly(layout: RoomLayout, shop: RoomShop | undefined): RoomLayout {
   if (!shop?.ready) return layout;
-  const used = new Map<string, number>();
-  return {
-    ...layout,
-    items: layout.items.filter((p) => {
-      if (!p.key.startsWith("furniture:")) return true;
-      const id = p.key.slice("furniture:".length) as FurnitureId;
-      const n = (used.get(id) ?? 0) + 1;
-      used.set(id, n);
-      return n <= (shop.owned[id] ?? 0);
-    }),
-  };
+  const items = capToOwned(layout.items, shop);
+  return items.length === layout.items.length ? layout : parseRoomLayout({ ...layout, items, v: 2 });
 }
 
 /** はじめて開いたときの部屋：持っているものから少しだけ飾っておく（家具は置かない。「家具」タブから自分で置く） */
@@ -246,9 +241,9 @@ export function MyRoom({ entries, initialLayout, serverReady, dogSkin, dogName, 
 }) {
   // 家具はだれでも置けるので、持ち物と合わせて「置けるもの」にする
   const validKeys = useMemo(() => new Set([...entries, ...FURNITURE_ENTRIES, ...FIXTURE_ENTRIES].map((e) => e.key)), [entries]);
-  const [layout, setLayout] = useState<RoomLayout>(() => initialLayout
-    ? ownedOnly({ ...initialLayout, items: initialLayout.items.filter((p) => validKeys.has(p.key) || p.key.startsWith("upload:")) }, shop)
-    : starterLayout(entries));
+  const [layout, setLayout] = useState<RoomLayout>(() => ownedOnly(initialLayout
+    ? { ...initialLayout, items: initialLayout.items.filter((p) => validKeys.has(p.key) || p.key.startsWith("upload:")) }
+    : starterLayout(entries), shop));
   /** 持ち物に、アップロードした写真を足したもの（アップロードした写真を先に並べる） */
   const allEntries = useMemo(() => [...layout.photos.map(uploadEntry), ...entries, ...FURNITURE_ENTRIES, ...FIXTURE_ENTRIES], [entries, layout.photos]);
   /** 棚に乗せたものの位置を、棚の位置と大きさから決めたもの（描く・動かすときはこちらを使う） */
@@ -974,12 +969,16 @@ export function MyRoom({ entries, initialLayout, serverReady, dogSkin, dogName, 
                 ) : null}
                 {tab === "theme" ? (
                   <ThemePicker theme={layout.theme} onChange={setTheme} now={now} />
-                ) : tab === "furniture" && shopState?.ready ? (
+                ) : (tab === "furniture" || tab === "fixture") && shopState?.ready ? (
                   <FurnitureShop
+                    key={tab}
+                    ids={tab === "furniture" ? FURNITURE_IDS : FIXTURE_IDS}
+                    what={tab === "furniture" ? "家具" : "窓・棚"}
                     shop={shopState}
                     placedOf={(key) => layout.items.filter((p) => p.key === key).length}
                     onPlace={(e) => addEntry(e)}
-                    onBought={(id, owned, balance) => { setShopState((cur) => (cur ? { ...cur, blueCoins: balance, owned: { ...cur.owned, [id]: owned } } : cur)); flash(`${FURNITURE[id].name}を買いました！`); }}
+                    onBought={(id, owned, balance) => { setShopState((cur) => (cur ? { ...cur, blueCoins: balance, owned: { ...cur.owned, [id]: owned } } : cur)); flash(`${shopName(id)}を買いました！`); }}
+                    thumb={(e) => (e.kind === "fixture" ? <FixtureVisual fixture={e.fixture} theme={layout.theme} now={now} at={place} weather={weather} placeName={placeName} /> : <DecorVisual entry={e} thumb />)}
                   />
                 ) : tabEntries.length || tab === "photo" ? (
                   <div className="mt-2 grid grid-cols-3 gap-2.5">

@@ -1,30 +1,39 @@
 "use client";
 
 /**
- * わんこのおへや：家具のお店（もようがえの「家具」タブ）。
- * 家具は青コイン（おさんぽフレンチーでもらえる）で買う。1種類2こまで。買った家具は、タップで部屋に置ける。
+ * わんこのおへや：青コインのお店（もようがえの「家具」タブと「窓・棚」タブ）。
+ * 家具・窓・棚・時計・お天気ボードは青コイン（おさんぽフレンチーでもらえる）で買う。1種類あたり持てる数まで。
+ * 買ったものは、タップで部屋に置ける。
  */
 import Link from "next/link";
 import { useState } from "react";
 import { BlueCoinArt } from "@/components/coin-art";
-import { FURNITURE, FURNITURE_IDS, FURNITURE_MAX, furnitureKey, type DecorEntry, type FurnitureId, type RoomShop } from "@/lib/room/types";
-import { DecorVisual } from "./decor-visual";
+import type { ReactNode } from "react";
+import { FIXTURES, FURNITURE, isFixtureId, shopKey, shopMax, shopName, shopPrice, type DecorEntry, type RoomShop, type ShopId } from "@/lib/room/types";
 
-export function FurnitureShop({ shop, placedOf, onPlace, onBought }: {
+export function FurnitureShop({ ids, what, shop, placedOf, onPlace, onBought, thumb }: {
+  /** 並べるもの */
+  ids: readonly ShopId[];
+  /** 何のお店か（「家具」「窓・棚」） */
+  what: string;
   shop: RoomShop;
   /** 部屋に置いている数 */
   placedOf: (key: string) => number;
   /** 部屋に置く（count は持っている数） */
   onPlace: (entry: DecorEntry) => void;
   /** 買えたとき（持っている数と、のこりの青コイン） */
-  onBought: (id: FurnitureId, owned: number, balance: number) => void;
+  onBought: (id: ShopId, owned: number, balance: number) => void;
+  /** 小さな絵（窓や時計は、部屋の見た目に合わせて描くので、外からわたす） */
+  thumb: (entry: DecorEntry) => ReactNode;
 }) {
-  const [buying, setBuying] = useState<FurnitureId | null>(null);
+  const [buying, setBuying] = useState<ShopId | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const entryOf = (id: FurnitureId, count: number): DecorEntry => ({ kind: "furniture", key: furnitureKey(id), name: FURNITURE[id].name, furniture: id, count });
+  const entryOf = (id: ShopId, count: number): DecorEntry => (isFixtureId(id)
+    ? { kind: "fixture", key: shopKey(id), name: FIXTURES[id].name, fixture: id, count }
+    : { kind: "furniture", key: shopKey(id), name: FURNITURE[id].name, furniture: id, count });
 
-  async function buy(id: FurnitureId) {
+  async function buy(id: ShopId) {
     setBusy(true);
     setError(null);
     try {
@@ -42,7 +51,7 @@ export function FurnitureShop({ shop, placedOf, onPlace, onBought }: {
     }
   }
 
-  const target = buying ? { id: buying, price: FURNITURE[buying].price, name: FURNITURE[buying].name } : null;
+  const target = buying ? { id: buying, price: shopPrice(buying), name: shopName(buying) } : null;
   const short = target ? target.price - shop.blueCoins : 0;
 
   return (
@@ -56,12 +65,12 @@ export function FurnitureShop({ shop, placedOf, onPlace, onBought }: {
         </div>
         <Link href="/games/osanpo-run" className="shrink-0 rounded-full bg-[#2F6FC2] px-3 py-1.5 text-[11px] font-black text-white shadow-sm active:scale-95">おさんぽで ためる →</Link>
       </div>
-      <p className="mt-1.5 text-[10px] font-semibold text-ink-faint">青コインは「おさんぽフレンチー」でもらえます。家具は1種類{FURNITURE_MAX}こまで買えます。</p>
+      <p className="mt-1.5 text-[10px] font-semibold text-ink-faint">青コインは「おさんぽフレンチー」でもらえます。{what}は1種類につき、持てる数まで買えます。</p>
 
       <div className="mt-2 grid grid-cols-3 gap-2.5">
-        {FURNITURE_IDS.map((id) => {
-          const owned = shop.owned[id] ?? 0, key = furnitureKey(id), placed = placedOf(key);
-          const canBuy = owned < FURNITURE_MAX;
+        {ids.map((id) => {
+          const owned = shop.owned[id] ?? 0, key = shopKey(id), placed = placedOf(key), max = shopMax(id);
+          const canBuy = owned < max;
           return (
             <button
               key={id} type="button"
@@ -70,15 +79,15 @@ export function FurnitureShop({ shop, placedOf, onPlace, onBought }: {
             >
               <span className={`absolute right-1.5 top-1.5 z-10 rounded-full px-1.5 py-0.5 text-[9px] font-bold tabular-nums ${owned ? "bg-card/90 text-ink-soft" : "bg-[#E3EFFD] text-[#3D6FB0]"}`}>{owned ? `${placed}/${owned}` : "未購入"}</span>
               <span className={`flex aspect-square items-center justify-center pt-3 ${owned ? "" : "opacity-55 saturate-[.6]"}`}>
-                <span className="block w-[78%]"><DecorVisual entry={entryOf(id, owned)} thumb /></span>
+                <span className="block w-[78%]">{thumb(entryOf(id, owned))}</span>
               </span>
-              <span className="mt-1 block truncate text-center text-[10px] font-bold">{FURNITURE[id].name}</span>
+              <span className="mt-1 block truncate text-center text-[10px] font-bold">{shopName(id)}</span>
               {canBuy && owned <= placed ? (
                 <span className="mt-1 flex items-center justify-center gap-0.5 rounded-full bg-[#2F6FC2] py-0.5 text-[10px] font-black tabular-nums text-white">
-                  <BlueCoinArt className="h-3.5 w-3.5 shrink-0" />{FURNITURE[id].price.toLocaleString()}<span className="text-[9px]">{owned ? "で+1こ" : "で買う"}</span>
+                  <BlueCoinArt className="h-3.5 w-3.5 shrink-0" />{shopPrice(id).toLocaleString()}<span className="text-[9px]">{owned ? "で+1こ" : "で買う"}</span>
                 </span>
               ) : (
-                <span className="mt-1 block rounded-full bg-leaf-soft py-0.5 text-center text-[10px] font-black text-leaf-deep">{owned > placed ? "タップで置く" : "2こ 持っています"}</span>
+                <span className="mt-1 block rounded-full bg-leaf-soft py-0.5 text-center text-[10px] font-black text-leaf-deep">{owned > placed ? "タップで置く" : `${max}こ 持っています`}</span>
               )}
             </button>
           );
@@ -89,7 +98,7 @@ export function FurnitureShop({ shop, placedOf, onPlace, onBought }: {
         <div className="fixed inset-0 z-[700] flex items-end justify-center bg-[#140f22]/55 p-4 sm:items-center" role="dialog" aria-modal="true" aria-label={`${target.name}を買う`} onClick={(e) => { if (e.target === e.currentTarget && !busy) setBuying(null); }}>
           <div className="room-bubble w-full max-w-sm rounded-3xl bg-card p-4 shadow-2xl">
             <div className="flex items-center gap-3">
-              <span className="block w-20 shrink-0 rounded-2xl bg-paper p-1.5"><DecorVisual entry={entryOf(target.id, 1)} thumb /></span>
+              <span className="block w-20 shrink-0 rounded-2xl bg-paper p-1.5">{thumb(entryOf(target.id, 1))}</span>
               <div className="min-w-0">
                 <p className="text-base font-black">{target.name}</p>
                 <p className="mt-0.5 flex items-center gap-1 text-sm font-black tabular-nums text-[#1F4F8F]"><BlueCoinArt className="h-4 w-4" />{target.price.toLocaleString()}枚</p>
