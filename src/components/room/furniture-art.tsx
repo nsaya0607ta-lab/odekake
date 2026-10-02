@@ -2068,131 +2068,173 @@ function Fan({ u, mode, a11y }: P) {
 }
 
 /**
- * ガチャガチャ：赤い台に、透明な丸い玉（二色のカプセルがいっぱい。ガラスの厚みと映りこみ）。
- * 台には、クロームのふち・景品の見本つきの表示カード・お金の口・大きなハンドル・とびらつきの取り出し口。
+ * ガチャガチャ：赤い台に、透明な丸い玉。カプセルは上半分がすけて、中のおもちゃ（ほね・星・ボール・肉球）が見える。
+ * 奥のカプセルほど暗く、手前ほど明るく重ねる。玉にはクロームの輪・ガラスの厚み・「NEW!」の星のシール。
+ * 台には、クロームの角の金具とびょう・白いライン・景品の見本つきの表示カード・「あたりが でるかも！」のシール・
+ * お金の口・ぎざぎざの座金のハンドル・すけたとびらの取り出し口。
  * spin のときはハンドルがひと回りしてカプセルがゆれ、capsule のときはカプセルが1つ、ころんと床に転がり出る
  */
 function Gacha({ u, fx, a11y }: P) {
   const g = (n: string) => `${u}-${n}`;
-  const COLORS = ["#FF6F9A", "#4E9CE8", "#FFC83A", "#5EB848", "#A57AE8", "#FF8A3A"] as const;
-  const caps: [number, number, number][] = [];
-  // 下から積む（玉の下半分が、カプセルでいっぱい）
-  ([[88, 5, 12], [79, 7, 11.5], [70, 7, 11.5], [61, 6, 11.5], [53, 4, 11]] as const).forEach(([y, n, step], row) => {
-    for (let i = 0; i < n; i++) caps.push([53 - ((n - 1) * step) / 2 + i * step + (row % 2) * 2, y + ((i * 7 + row) % 3) * 0.9, (row * 7 + i * 5) % COLORS.length]);
+  const COLORS = ["#FF5C8A", "#3F8EE0", "#FFB81F", "#4CAF3F", "#9A66E0", "#FF7A2A"] as const;
+  const DARK = ["#C8305E", "#2463A8", "#C88A0A", "#2F7A28", "#6A3EB0", "#C8501A"] as const;
+  // 上の段（奥）から積んで、下の段（手前）を最後に描く
+  const rows = [[53, 4, 11.4], [61, 6, 11.4], [70, 7, 11.4], [79, 7, 11.4], [88, 5, 12]] as const;
+  const caps: { x: number; y: number; c: number; shade: number; k: number }[] = [];
+  rows.forEach(([y, n, step], row) => {
+    for (let i = 0; i < n; i++) {
+      const k = row * 7 + i;
+      caps.push({ x: 53 - ((n - 1) * step) / 2 + i * step + (row % 2) * 2, y: y + ((i * 7 + row) % 3) * 0.9, c: (row * 7 + i * 5) % COLORS.length, shade: (rows.length - 1 - row) * 0.07, k });
+    }
   });
-  const capsule = (x: number, y: number, c: string, r = 7, k = 0) => (
+  /** 中のおもちゃ（すけた上半分に、小さく見える） */
+  const toy = (kind: number, color: string) => {
+    switch (kind % 4) {
+      case 0: return <path d="M-3 -2.6 a1 1 0 1 1 1 -0.8 h4 a1 1 0 1 1 1 0.8 a1 1 0 1 1 -1 0.8 h-4 a1 1 0 1 1 -1 -0.8 z" fill={color} />;
+      case 1: return <path d="M0 -5 L1.1 -2.9 L3.4 -2.6 L1.7 -1.1 L2.1 1.2 L0 0.1 L-2.1 1.2 L-1.7 -1.1 L-3.4 -2.6 L-1.1 -2.9 Z" fill={color} />;
+      case 2: return <circle cx="0" cy="-2.4" r="2.4" fill={color} />;
+      default: return <g fill={color}><ellipse cx="0" cy="-1.4" rx="1.6" ry="1.2" /><circle cx="-1.7" cy="-3.2" r="0.6" /><circle cx="-0.6" cy="-4" r="0.6" /><circle cx="0.6" cy="-4" r="0.6" /><circle cx="1.7" cy="-3.2" r="0.6" /></g>;
+    }
+  };
+  const capsule = (x: number, y: number, ci: number, r = 7, k = 0, shade = 0) => (
     <g key={`${x}-${y}-${k}`} transform={`translate(${x} ${y}) rotate(${((k * 37) % 70) - 35})`}>
-      <circle r={r} fill={c} />
-      <circle r={r} fill="#000" opacity="0.12" transform={`translate(${r * 0.18} ${r * 0.22}) scale(0.82)`} />
-      <path d={`M${-r} 0 A${r} ${r} 0 0 1 ${r} 0 Z`} fill="#FFFFFF" opacity="0.66" />
-      <path d={`M${-r} 0 H${r}`} stroke="#FFFFFF" strokeWidth={r * 0.14} opacity="0.9" />
-      <path d={`M${-r} ${r * 0.08} H${r}`} stroke="#000" strokeOpacity="0.2" strokeWidth="0.5" />
-      <ellipse cx={-r * 0.36} cy={-r * 0.46} rx={r * 0.34} ry={r * 0.18} fill="#FFFFFF" opacity="0.95" />
-      <circle r={r} fill="none" stroke="#000" strokeOpacity="0.14" strokeWidth="0.5" />
+      {/* 下半分（色）→ 上半分（すける・中のおもちゃ）→ つなぎ目の帯 → 光 */}
+      <path d={`M${-r} 0 A${r} ${r} 0 0 0 ${r} 0 Z`} fill={COLORS[ci]} />
+      <path d={`M${-r * 0.8} ${r * 0.25} A${r * 0.8} ${r * 0.8} 0 0 0 ${r * 0.8} ${r * 0.25}`} stroke={DARK[ci]} strokeWidth={r * 0.18} fill="none" opacity="0.55" />
+      <path d={`M${-r} 0 A${r} ${r} 0 0 1 ${r} 0 Z`} fill="#FFFFFF" opacity="0.5" />
+      <path d={`M${-r} 0 A${r} ${r} 0 0 1 ${r} 0 Z`} fill={COLORS[ci]} opacity="0.18" />
+      <g transform={`scale(${r / 7})`}>{toy(k, DARK[(ci + 2) % DARK.length]!)}</g>
+      <path d={`M${-r} 0 H${r}`} stroke="#FFFFFF" strokeWidth={r * 0.16} />
+      <path d={`M${-r} ${r * 0.1} H${r}`} stroke={DARK[ci]} strokeWidth="0.45" />
+      <ellipse cx={-r * 0.38} cy={-r * 0.5} rx={r * 0.32} ry={r * 0.16} fill="#FFFFFF" opacity="0.95" transform={`rotate(-25 ${-r * 0.38} ${-r * 0.5})`} />
+      <circle r={r} fill="none" stroke={DARK[ci]} strokeOpacity="0.45" strokeWidth="0.5" />
+      {shade ? <circle r={r} fill="#14304A" opacity={shade} /> : null}
     </g>
   );
   return (
     <svg viewBox="0 0 124 196" className={SVG_CLASS} {...a11y}>
       <defs>
         <Blur />
-        <linearGradient id={g("red")} x1="0" y1="0" x2="1" y2="0"><stop offset="0" stopColor="#FF6A5A" /><stop offset="0.45" stopColor="#E8382A" /><stop offset="1" stopColor="#A01A12" /></linearGradient>
-        <linearGradient id={g("redV")} x1="0" y1="0" x2="0" y2="1"><stop offset="0" stopColor="#FF8070" /><stop offset="1" stopColor="#B8241A" /></linearGradient>
-        <linearGradient id={g("side")} x1="0" y1="0" x2="0" y2="1"><stop offset="0" stopColor="#A81E14" /><stop offset="1" stopColor="#6A0E08" /></linearGradient>
-        <radialGradient id={g("globe")} cx="0.35" cy="0.3" r="0.8"><stop offset="0" stopColor="#FFFFFF" stopOpacity="0.1" /><stop offset="0.78" stopColor="#DFF1FB" stopOpacity="0.28" /><stop offset="1" stopColor="#9CCDE8" stopOpacity="0.7" /></radialGradient>
+        <linearGradient id={g("red")} x1="0" y1="0" x2="1" y2="0"><stop offset="0" stopColor="#FF6E5E" /><stop offset="0.45" stopColor="#E8382A" /><stop offset="1" stopColor="#9A1810" /></linearGradient>
+        <linearGradient id={g("redV")} x1="0" y1="0" x2="0" y2="1"><stop offset="0" stopColor="#FF8676" /><stop offset="1" stopColor="#B8241A" /></linearGradient>
+        <linearGradient id={g("side")} x1="0" y1="0" x2="0" y2="1"><stop offset="0" stopColor="#A81E14" /><stop offset="1" stopColor="#5E0C06" /></linearGradient>
+        <radialGradient id={g("globe")} cx="0.36" cy="0.3" r="0.82"><stop offset="0" stopColor="#FFFFFF" stopOpacity="0.08" /><stop offset="0.72" stopColor="#DFF1FB" stopOpacity="0.24" /><stop offset="1" stopColor="#8EC4E4" stopOpacity="0.75" /></radialGradient>
         <radialGradient id={g("chrome")} cx="0.35" cy="0.3" r="0.8"><stop offset="0" stopColor="#FFFFFF" /><stop offset="0.5" stopColor="#C8CED6" /><stop offset="1" stopColor="#6E767F" /></radialGradient>
-        <linearGradient id={g("chromeH")} x1="0" y1="0" x2="1" y2="0"><stop offset="0" stopColor="#8A929C" /><stop offset="0.35" stopColor="#FFFFFF" /><stop offset="0.65" stopColor="#B8C0CA" /><stop offset="1" stopColor="#6E767F" /></linearGradient>
+        <linearGradient id={g("chromeH")} x1="0" y1="0" x2="1" y2="0"><stop offset="0" stopColor="#7E868F" /><stop offset="0.3" stopColor="#FFFFFF" /><stop offset="0.6" stopColor="#B8C0CA" /><stop offset="0.85" stopColor="#E8ECF0" /><stop offset="1" stopColor="#6E767F" /></linearGradient>
         <linearGradient id={g("bar")} x1="0" y1="0" x2="0" y2="1"><stop offset="0" stopColor="#FFFFFF" /><stop offset="1" stopColor="#9AA2AC" /></linearGradient>
+        <linearGradient id={g("gold")} x1="0" y1="0" x2="0" y2="1"><stop offset="0" stopColor="#FFF0B0" /><stop offset="1" stopColor="#E0A82A" /></linearGradient>
         <clipPath id={g("in")}><circle cx="53" cy="56" r="37" /></clipPath>
       </defs>
       <FloorShadow cx={58} cy={189} rx={50} ry={5} />
       {/* 足と台 */}
       <path d="M10 177 H98 L101 173.4 V181 L98 185 H10 Z" fill="#5A0E08" />
-      <path d="M13 177.6 H95" stroke="#C83A2A" strokeWidth="0.8" />
-      {[16, 84].map((x) => <rect key={x} x={x} y="183" width="8" height="4" rx="1" fill="#2A0A06" />)}
-      {/* 本体：上の面と右の側面（うすい奥ゆき）→ 前の面（クロームのふち） */}
+      <path d="M10.6 177.6 H97.4" stroke="#C83A2A" strokeWidth="0.8" />
+      {[14, 84].map((x) => <rect key={x} x={x} y="183" width="10" height="4.4" rx="1.2" fill={`url(#${g("chromeH")})`} />)}
+      {/* 本体：上の面と右の側面（すじ）→ 前の面（クロームのふち・角の金具・びょう・白いライン） */}
       <path d="M14 98 L18 93.4 L98 93.4 L94 98 Z" fill="#C42A1E" />
-      <path d="M18 93.6 H98" stroke="#FF8070" strokeWidth="0.7" />
+      <path d="M18 93.6 H98" stroke="#FF8676" strokeWidth="0.7" />
       <path d="M94 98 L98 93.4 L98 173.4 L94 178 Z" fill={`url(#${g("side")})`} />
-      <path d="M94.3 98.4 L97.7 94.4" stroke="#E04A3A" strokeWidth="0.7" />
+      {[110, 126, 142, 158].map((y) => <path key={y} d={`M94.6 ${y} L97.4 ${y - 3.2}`} stroke="#3A0804" strokeWidth="0.6" opacity="0.7" />)}
       <rect x="12" y="98" width="82" height="80" rx="3" fill={`url(#${g("red")})`} />
       <rect x="12" y="98" width="82" height="80" rx="3" fill="none" stroke={`url(#${g("chromeH")})`} strokeWidth="2" />
-      <path d="M17 101.4 H89" stroke="#FFFFFF" strokeWidth="0.9" opacity="0.6" />
-      <path d="M15.6 106 V170" stroke="#FFFFFF" strokeWidth="1.4" opacity="0.3" strokeLinecap="round" />
+      <path d="M16 101.6 H90" stroke="#FFFFFF" strokeWidth="0.9" opacity="0.6" />
+      <path d="M15.6 106 V168" stroke="#FFFFFF" strokeWidth="1.4" opacity="0.28" strokeLinecap="round" />
+      <path d="M14 171 H92 M14 173.6 H92" stroke="#FFF7E6" strokeWidth="0.9" opacity="0.85" />
+      {([[12, 98, 1, 1], [94, 98, -1, 1], [12, 178, 1, -1], [94, 178, -1, -1]] as const).map(([x, y, sx, sy], i) => (
+        <g key={i} transform={`translate(${x} ${y}) scale(${sx} ${sy})`}>
+          <path d="M0 0 H8 V2.4 H2.4 V8 H0 Z" fill={`url(#${g("chromeH")})`} />
+          <circle cx="4.6" cy="1.2" r="0.6" fill="#5E666F" /><circle cx="1.2" cy="4.6" r="0.6" fill="#5E666F" />
+        </g>
+      ))}
       {/* 表示カード：タイトルと、景品の見本（ほね・ボール・王冠） */}
-      <rect x="18" y="103" width="70" height="30" rx="4" fill="#FFF7E6" />
-      <rect x="18" y="103" width="70" height="30" rx="4" fill="none" stroke="#F2B13A" strokeWidth="1.2" strokeDasharray="2 1.6" />
-      <g transform="translate(26 110.6)" fill="#E8382A"><ellipse cx="0" cy="1.2" rx="2.4" ry="1.9" /><circle cx="-2.6" cy="-1.5" r="0.95" /><circle cx="-0.9" cy="-3" r="0.95" /><circle cx="0.9" cy="-3" r="0.95" /><circle cx="2.6" cy="-1.5" r="0.95" /></g>
-      <text x="57" y="113.4" textAnchor="middle" fontSize="7.4" fontWeight="900" fill="#E8382A">わんこガチャ</text>
-      <path d="M22 116.6 H84" stroke="#F2D8A8" strokeWidth="0.6" />
-      {/* 見本：ほね */}
-      <g transform="translate(32 124.6)">
-        <circle r="6" fill="#FFFFFF" stroke="#F2D8A8" strokeWidth="0.6" />
-        <path d="M-4 -1 a1.4 1.4 0 1 1 1.4 -1 h5.2 a1.4 1.4 0 1 1 1.4 1 a1.4 1.4 0 1 1 -1.4 1 h-5.2 a1.4 1.4 0 1 1 -1.4 -1 z" fill="#F4E6CC" stroke="#C9A468" strokeWidth="0.4" />
-      </g>
-      {/* 見本：ボール */}
-      <g transform="translate(53 124.6)">
-        <circle r="6" fill="#FFFFFF" stroke="#F2D8A8" strokeWidth="0.6" />
-        <circle r="3.6" fill="#5EB848" /><path d="M-3.6 -0.6 Q0 1.6 3.6 -0.6" stroke="#FFFFFF" strokeWidth="0.7" fill="none" /><circle cx="-1.2" cy="-1.4" r="0.8" fill="#FFFFFF" opacity="0.7" />
-      </g>
-      {/* 見本：王冠 */}
-      <g transform="translate(74 124.6)">
-        <circle r="6" fill="#FFFFFF" stroke="#F2D8A8" strokeWidth="0.6" />
-        <path d="M-3.6 2 L-3.6 -1.6 L-1.8 0 L0 -2.8 L1.8 0 L3.6 -1.6 L3.6 2 Z" fill="#FFC83A" stroke="#C9993A" strokeWidth="0.4" />
-        <circle cx="0" cy="0.6" r="0.6" fill="#E04A3A" />
+      <rect x="18" y="104" width="70" height="29" rx="4" fill="#FFF7E6" />
+      <rect x="18" y="104" width="70" height="29" rx="4" fill="none" stroke="#F2B13A" strokeWidth="1.2" strokeDasharray="2 1.6" />
+      <g transform="translate(25.4 111)" fill="#E8382A"><ellipse cx="0" cy="1.2" rx="2.4" ry="1.9" /><circle cx="-2.6" cy="-1.5" r="0.95" /><circle cx="-0.9" cy="-3" r="0.95" /><circle cx="0.9" cy="-3" r="0.95" /><circle cx="2.6" cy="-1.5" r="0.95" /></g>
+      <text x="55" y="113.6" textAnchor="middle" fontSize="7.4" fontWeight="900" fill="#E8382A" stroke="#FFF7E6" strokeWidth="0.3">わんこガチャ</text>
+      <path d="M22 116.8 H84" stroke="#F2D8A8" strokeWidth="0.6" />
+      {([[31, 0], [53, 1], [75, 2]] as const).map(([x, kind]) => (
+        <g key={x} transform={`translate(${x} 125)`}>
+          <circle r="6" fill="#FFFFFF" stroke="#F2D8A8" strokeWidth="0.6" />
+          {kind === 0 ? <path d="M-4 -1 a1.4 1.4 0 1 1 1.4 -1 h5.2 a1.4 1.4 0 1 1 1.4 1 a1.4 1.4 0 1 1 -1.4 1 h-5.2 a1.4 1.4 0 1 1 -1.4 -1 z" fill="#F4E6CC" stroke="#C9A468" strokeWidth="0.4" /> : null}
+          {kind === 1 ? <><circle r="3.6" fill="#4CAF3F" /><path d="M-3.6 -0.6 Q0 1.6 3.6 -0.6" stroke="#FFFFFF" strokeWidth="0.7" fill="none" /><circle cx="-1.2" cy="-1.4" r="0.8" fill="#FFFFFF" opacity="0.7" /></> : null}
+          {kind === 2 ? <><path d="M-3.6 2 L-3.6 -1.6 L-1.8 0 L0 -2.8 L1.8 0 L3.6 -1.6 L3.6 2 Z" fill="#FFC83A" stroke="#C9993A" strokeWidth="0.4" /><circle cx="0" cy="0.6" r="0.6" fill="#E04A3A" /></> : null}
+        </g>
+      ))}
+      {/* 「あたりが でるかも！」の星のシール（カードの右下にかぶせる） */}
+      <g transform="translate(86 131) rotate(12)">
+        <path d={Array.from({ length: 16 }, (_, i) => { const a = (i * Math.PI) / 8, rr = i % 2 ? 6.4 : 9; return `${i ? "L" : "M"}${(Math.cos(a) * rr).toFixed(2)} ${(Math.sin(a) * rr).toFixed(2)}`; }).join(" ") + " Z"} fill={`url(#${g("gold")})`} stroke="#E0A82A" strokeWidth="0.5" />
+        <text x="0" y="-0.6" textAnchor="middle" fontSize="2.8" fontWeight="900" fill="#C8301E">あたり</text>
+        <text x="0" y="2.6" textAnchor="middle" fontSize="2.2" fontWeight="800" fill="#C8301E">でるかも！</text>
       </g>
       {/* お金の口（クロームのわく）・ねだん */}
-      <rect x="20" y="138" width="13" height="18" rx="2.4" fill={`url(#${g("chrome")})`} stroke="#6E767F" strokeWidth="0.5" />
-      <rect x="25.4" y="141" width="2.2" height="10" rx="1.1" fill="#2A2422" />
-      <text x="26.5" y="161.6" textAnchor="middle" fontSize="4.2" fontWeight="900" fill="#FFF7E6">1かい</text>
-      <g transform="translate(26.5 166.6)"><path d="M-3.4 -0.8 a1 1 0 1 1 1 -0.7 h4.8 a1 1 0 1 1 1 0.7 a1 1 0 1 1 -1 0.7 h-4.8 a1 1 0 1 1 -1 -0.7 z" fill="#FFF7E6" /></g>
-      {/* 回すハンドル（大きな丸い座金と、とって） */}
-      <circle cx="61" cy="147" r="14.6" fill="#7A1A12" opacity="0.4" transform="translate(0.8 1)" />
-      <circle cx="61" cy="147" r="14.6" fill={`url(#${g("chrome")})`} />
-      <circle cx="61" cy="147" r="14.6" fill="none" stroke="#5E666F" strokeWidth="0.8" />
-      <circle cx="61" cy="147" r="11.4" fill="none" stroke="#FFFFFF" strokeWidth="0.6" opacity="0.6" />
+      <rect x="20" y="139" width="13" height="18" rx="2.4" fill={`url(#${g("chrome")})`} stroke="#6E767F" strokeWidth="0.5" />
+      <rect x="25.4" y="142" width="2.2" height="10" rx="1.1" fill="#2A2422" />
+      <path d="M21.4 140.4 H31.6" stroke="#FFFFFF" strokeWidth="0.6" opacity="0.9" />
+      <text x="26.5" y="162.4" textAnchor="middle" fontSize="4.2" fontWeight="900" fill="#FFF7E6">1かい</text>
+      <g transform="translate(26.5 167)"><path d="M-3.4 -0.8 a1 1 0 1 1 1 -0.7 h4.8 a1 1 0 1 1 1 0.7 a1 1 0 1 1 -1 0.7 h-4.8 a1 1 0 1 1 -1 -0.7 z" fill="#FFF7E6" /></g>
+      {/* 回すハンドル（ぎざぎざの座金と、とって） */}
+      <circle cx="61" cy="148" r="15.4" fill="#5A0E08" opacity="0.45" transform="translate(0.8 1.2)" />
+      <circle cx="61" cy="148" r="15.4" fill={`url(#${g("chrome")})`} />
+      {Array.from({ length: 36 }, (_, i) => {
+        const a = (i * Math.PI) / 18;
+        return <path key={i} d={`M${61 + Math.cos(a) * 13.6} ${148 + Math.sin(a) * 13.6} L${61 + Math.cos(a) * 15.2} ${148 + Math.sin(a) * 15.2}`} stroke="#6E767F" strokeWidth="0.6" />;
+      })}
+      <circle cx="61" cy="148" r="15.4" fill="none" stroke="#5E666F" strokeWidth="0.8" />
+      <circle cx="61" cy="148" r="11.6" fill="none" stroke="#FFFFFF" strokeWidth="0.7" opacity="0.7" />
+      <path d="M50 140 A13 13 0 0 1 64 135.4" stroke="#FFFFFF" strokeWidth="1.2" fill="none" opacity="0.8" strokeLinecap="round" />
       <g key={fx === "spin" ? "turn" : "still"} className={fx === "spin" ? "room-gacha-crank" : undefined}>
-        <rect x="47" y="143" width="28" height="8" rx="4" fill={`url(#${g("bar")})`} stroke="#6E767F" strokeWidth="0.6" />
-        <path d="M49.4 144.8 H72.6" stroke="#FFFFFF" strokeWidth="0.9" opacity="0.95" />
-        <circle cx="61" cy="147" r="4.4" fill="#E8382A" stroke="#A01A12" strokeWidth="0.6" />
-        <circle cx="59.8" cy="145.8" r="1.2" fill="#FFFFFF" opacity="0.6" />
+        <rect x="46" y="143.6" width="30" height="8.8" rx="4.4" fill={`url(#${g("bar")})`} stroke="#6E767F" strokeWidth="0.6" />
+        <path d="M48.6 145.6 H73.4" stroke="#FFFFFF" strokeWidth="1" opacity="0.95" />
+        {[50, 53, 69, 72].map((x) => <path key={x} d={`M${x} 144.6 v6.8`} stroke="#8A929C" strokeWidth="0.5" />)}
+        <circle cx="61" cy="148" r="4.8" fill="#E8382A" stroke="#9A1810" strokeWidth="0.6" />
+        <circle cx="59.6" cy="146.6" r="1.3" fill="#FFFFFF" opacity="0.65" />
       </g>
-      {/* 取り出し口（とびら・クロームのふち） */}
-      <rect x="40" y="163" width="42" height="13" rx="3.4" fill="#2A0A06" />
-      <path d="M42 164.4 H80 V169.6 Q61 173 42 169.6 Z" fill="#FFB04A" opacity="0.88" />
-      <path d="M43 165.4 H79" stroke="#FFFFFF" strokeWidth="0.8" opacity="0.7" />
-      <rect x="44" y="163.2" width="34" height="1.6" rx="0.8" fill={`url(#${g("chromeH")})`} />
-      {fx === "capsule" ? capsule(55, 172.6, COLORS[1], 3.8, 3) : null}
+      {/* 取り出し口（すけたとびら・クロームのふち・肉球のつまみ） */}
+      <rect x="38.6" y="163" width="44.8" height="13.4" rx="3.6" fill={`url(#${g("chromeH")})`} />
+      <rect x="40.4" y="164.4" width="41.2" height="10.8" rx="2.8" fill="#2A0A06" />
+      {fx === "capsule" ? capsule(55, 172, 1, 3.8, 3) : null}
+      <path d="M41.6 165.4 H80.4 V170.6 Q61 174.4 41.6 170.6 Z" fill="#FFB04A" opacity="0.72" />
+      <path d="M42.6 166.4 H79.4" stroke="#FFFFFF" strokeWidth="0.8" opacity="0.8" />
+      <g transform="translate(61 171.4)" fill="#FFF7E6" opacity="0.95"><ellipse cx="0" cy="0.7" rx="1.6" ry="1.2" /><circle cx="-1.7" cy="-1" r="0.6" /><circle cx="-0.6" cy="-1.8" r="0.6" /><circle cx="0.6" cy="-1.8" r="0.6" /><circle cx="1.7" cy="-1" r="0.6" /></g>
       {/* 玉の台（クロームの輪） */}
-      <ellipse cx="53" cy="97" rx="31" ry="6.4" fill="#5E666F" />
-      <ellipse cx="53" cy="96" rx="31" ry="6" fill={`url(#${g("chrome")})`} />
-      <ellipse cx="53" cy="94" rx="26" ry="4" fill="#B8241A" />
-      {/* 透明な玉と、中のカプセル */}
+      <ellipse cx="53" cy="97.4" rx="31.6" ry="6.6" fill="#5E666F" />
+      <ellipse cx="53" cy="96.2" rx="31.6" ry="6.2" fill={`url(#${g("chromeH")})`} />
+      <ellipse cx="53" cy="94.2" rx="26.4" ry="4" fill="#9A1810" />
+      {/* 透明な玉と、中のカプセル（奥ほど暗い） */}
       <circle cx="53" cy="56" r="38" fill="#EAF6FC" opacity="0.42" />
       <g clipPath={`url(#${g("in")})`}>
-        <ellipse cx="53" cy="92" rx="34" ry="8" fill="#9CCDE8" opacity="0.3" />
+        <ellipse cx="53" cy="94" rx="36" ry="9" fill="#5E9AC4" opacity="0.28" />
         <g key={fx === "spin" ? "jiggle" : "still"} className={fx === "spin" ? "room-gacha-jiggle" : undefined}>
-          {caps.map(([x, y, c], i) => capsule(x, y, COLORS[c]!, 7, i))}
+          {caps.map(({ x, y, c, shade, k }) => capsule(x, y, c, 7, k, shade))}
         </g>
+        <path d="M18 86 Q53 100 88 86 V96 H18 Z" fill="#5E9AC4" opacity="0.18" />
       </g>
       <circle cx="53" cy="56" r="38" fill={`url(#${g("globe")})`} />
-      <circle cx="53" cy="56" r="38" fill="none" stroke="#B8DCEF" strokeWidth="1.6" />
-      <circle cx="53" cy="56" r="36.4" fill="none" stroke="#FFFFFF" strokeWidth="0.5" opacity="0.6" />
-      {/* 映りこみ（窓のかたち）と光 */}
-      <path d="M27 42 Q32 26 48 21" stroke="#FFFFFF" strokeWidth="4" fill="none" strokeLinecap="round" opacity="0.85" />
-      <path d="M25 54 Q24 49 26 46" stroke="#FFFFFF" strokeWidth="2.2" fill="none" strokeLinecap="round" opacity="0.7" />
+      <circle cx="53" cy="56" r="38" fill="none" stroke="#A8D2EA" strokeWidth="1.8" />
+      <circle cx="53" cy="56" r="36.2" fill="none" stroke="#FFFFFF" strokeWidth="0.6" opacity="0.65" />
+      {/* 映りこみと光 */}
+      <path d="M27 42 Q32 26 48 21" stroke="#FFFFFF" strokeWidth="4.2" fill="none" strokeLinecap="round" opacity="0.88" />
+      <path d="M24.6 54 Q23.6 49 25.6 45.6" stroke="#FFFFFF" strokeWidth="2.2" fill="none" strokeLinecap="round" opacity="0.7" />
       <path d="M66 26 Q76 31 80 40" stroke="#FFFFFF" strokeWidth="2.4" fill="none" strokeLinecap="round" opacity="0.5" />
       <path d="M81 76 Q85 67 85 58" stroke="#FFFFFF" strokeWidth="1.6" fill="none" strokeLinecap="round" opacity="0.45" />
-      {/* 玉のふた（かぎ穴つき） */}
-      <path d="M36 22.6 Q53 9.6 70 22.6 Z" fill={`url(#${g("redV")})`} />
-      <ellipse cx="53" cy="22.6" rx="17" ry="3.2" fill="#8E1A10" />
-      <ellipse cx="53" cy="12.8" rx="4.6" ry="3.4" fill={`url(#${g("redV")})`} />
+      {/* ガラスの「NEW!」の星のシール */}
+      <g transform="translate(76 46) rotate(-14)">
+        <path d={Array.from({ length: 10 }, (_, i) => { const a = -Math.PI / 2 + (i * Math.PI) / 5, rr = i % 2 ? 3.6 : 7.6; return `${i ? "L" : "M"}${(Math.cos(a) * rr).toFixed(2)} ${(Math.sin(a) * rr).toFixed(2)}`; }).join(" ") + " Z"} fill="#FFE04A" stroke="#E8382A" strokeWidth="0.7" strokeLinejoin="round" />
+        <text x="0" y="1.6" textAnchor="middle" fontSize="3.2" fontWeight="900" fill="#E8382A">NEW!</text>
+      </g>
+      {/* 玉のふた（クロームの輪・かぎ穴・つまみ） */}
+      <ellipse cx="53" cy="23" rx="17.8" ry="3.6" fill={`url(#${g("chromeH")})`} />
+      <path d="M36 22.4 Q53 9.4 70 22.4 Z" fill={`url(#${g("redV")})`} />
+      <ellipse cx="53" cy="22.4" rx="17" ry="3" fill="#8E1A10" />
+      <ellipse cx="53" cy="12.6" rx="4.8" ry="3.6" fill={`url(#${g("redV")})`} />
+      <ellipse cx="51.6" cy="11.4" rx="1.6" ry="0.9" fill="#FFFFFF" opacity="0.6" />
       <path d="M43 18 Q48.6 14.4 54 14.4" stroke="#FFFFFF" strokeWidth="1.1" fill="none" opacity="0.75" />
-      <circle cx="53" cy="18.4" r="1.6" fill={`url(#${g("chrome")})`} /><path d="M53 18 v1.6" stroke="#2A2422" strokeWidth="0.6" />
+      <circle cx="61" cy="18.6" r="1.7" fill={`url(#${g("chrome")})`} /><path d="M61 18.2 v1.6" stroke="#2A2422" strokeWidth="0.6" />
       {/* 転がり出たカプセル */}
       {fx === "capsule" ? (
         <g transform="translate(112 182)">
           <ellipse cx="0" cy="5.6" rx="8" ry="2" fill="#3A2614" opacity="0.25" />
-          <g className="room-capsule-roll">{capsule(0, 0, COLORS[0], 6.4, 5)}</g>
+          <g className="room-capsule-roll">{capsule(0, 0, 0, 6.4, 5)}</g>
         </g>
       ) : null}
     </svg>
