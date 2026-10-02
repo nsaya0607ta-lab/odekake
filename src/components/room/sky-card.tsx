@@ -167,7 +167,7 @@ export function SkyCard({ now, place, onPlace, weather = null, steps, history, h
     <>
       {/* いまの空と町（ふちなし）。下に、すりガラスの帯（もようがえ・きょうの歩数・フレンドのおへや） */}
       <div
-        className={`relative isolate overflow-hidden rounded-[26px] shadow-[0_14px_28px_-16px_rgba(30,50,80,.55),0_2px_6px_-2px_rgba(30,50,80,.18)] ${height ? "" : "h-[300px]"}`}
+        className={`relative isolate overflow-hidden ${height ? "" : "h-[300px] rounded-[26px] shadow-[0_14px_28px_-16px_rgba(30,50,80,.55),0_2px_6px_-2px_rgba(30,50,80,.18)]"}`}
         style={{ ...(height ? { height } : {}), backgroundColor: ink("#8DBF6E", "#121A2E") }}
       >
         <div ref={skyRef} className="absolute inset-x-0 top-0 bottom-[52px]">

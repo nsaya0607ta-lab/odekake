@@ -20,6 +20,8 @@ const TURN = 15, LEAN = 6;
 const PERSP = 1150;
 /** 板の下のはしから床までの高さ（脚の見えるぶん）・板の上に出る脚・わくの太さ・わくの厚み（px） */
 const DROP = 38, OVER = 16, FRAME = 9, DEPTH = 9;
+/** 映す中身を組む幅（px）。面がこれよりせまいときは、縮めて映す */
+const SCREEN_W = 350;
 
 type V3 = [number, number, number];
 const rad = (d: number) => (d * Math.PI) / 180;
@@ -65,6 +67,9 @@ export function RoomBoard({ children, dark = 0 }: { children: ReactNode; /** 夜
   const nx = Math.sin(T) * Math.cos(L), nz = Math.cos(T) * Math.cos(L), nl = Math.hypot(nx, nz);
   const fwd: V3 = [nx / nl, 0, nz / nl];
   const hw = bw / 2;
+  // 映す面の大きさと、中身を縮める倍率
+  const screenW = bw - FRAME * 2, screenH = bh - FRAME * 2;
+  const zoom = Math.min(1, screenW / SCREEN_W);
 
   /* ---------- 脚 ---------- */
   const legBack = -DEPTH - 4;
@@ -125,7 +130,7 @@ export function RoomBoard({ children, dark = 0 }: { children: ReactNode; /** 夜
   const backShadow = pts([project([legs[0]!.foot[0], floorY, legs[0]!.foot[2]]), project([legs[1]!.foot[0], floorY, legs[1]!.foot[2]]), project(backFoot)]);
 
   return (
-    <div ref={ref} className="absolute inset-x-0 bottom-[calc(env(safe-area-inset-bottom)+4px)] top-[-24px] mx-auto w-[min(96%,470px)]" style={{ perspective: `${PERSP}px`, perspectiveOrigin: `${cx}px ${cy}px` }}>
+    <div ref={ref} className="absolute inset-x-0 bottom-[calc(env(safe-area-inset-bottom)+10px)] top-[14px] mx-auto w-[min(86%,420px)]" style={{ perspective: `${PERSP}px`, perspectiveOrigin: `${cx}px ${cy}px` }}>
       {/* うしろの層：床の影・アルミの三脚・まん中の柱・わくの厚み */}
       <svg aria-hidden width={w} height={h} viewBox={`0 0 ${w} ${h}`} className="pointer-events-none absolute inset-0 overflow-visible" style={dim}>
         <defs>
@@ -162,14 +167,15 @@ export function RoomBoard({ children, dark = 0 }: { children: ReactNode; /** 夜
         ))}
         {/* 映す面（ここだけスクロールする） */}
         <div className="absolute overflow-hidden rounded-[3px] bg-[#FAFBFC] shadow-[0_0_0_1px_#7E858F,0_0_0_2px_#AEB4BD]" style={{ inset: FRAME }}>
-          <div className="absolute inset-0 space-y-3 overflow-y-auto overscroll-contain p-2 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-            {children}
+          {/* 中身は決まった幅（SCREEN_W）で組んで、面の大きさに縮めて映す（ボードが小さくても文字がつまらない） */}
+          <div className="absolute left-0 top-0" style={{ width: SCREEN_W, height: screenH / zoom, zoom }}>
+            <div className="absolute inset-0 space-y-3 overflow-y-auto overscroll-contain pb-2 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden [&>*:not(:first-child)]:mx-2">
+              {children}
+            </div>
           </div>
           {/* 面のつや（ななめの映りこみ）と、ふちの内がわのかげ */}
           <div aria-hidden className="pointer-events-none absolute inset-0 bg-[linear-gradient(112deg,rgba(255,255,255,0)_26%,rgba(255,255,255,.26)_36%,rgba(255,255,255,0)_46%,rgba(255,255,255,0)_68%,rgba(255,255,255,.12)_74%,rgba(255,255,255,0)_80%)]" />
           <div aria-hidden className="pointer-events-none absolute inset-0 shadow-[inset_0_2px_5px_rgba(0,0,0,.25),inset_2px_0_4px_rgba(0,0,0,.08)]" />
-          <div aria-hidden className="pointer-events-none absolute inset-x-0 top-0 h-2 bg-gradient-to-b from-[#FAFBFC] to-transparent" />
-          <div aria-hidden className="pointer-events-none absolute inset-x-0 bottom-0 h-3 bg-gradient-to-t from-[#FAFBFC] to-transparent" />
         </div>
       </div>
 
