@@ -65,7 +65,7 @@ import { skyAt } from "@/lib/room/sun";
 import { parseRoomWeather, withWeather, type RoomWeather } from "@/lib/room/weather";
 import { EVENT_FLOOR_Y, EventFloor, EventFront } from "./room-events";
 import { dayPhaseOf, FixtureVisual, fixtureSize, lampsOn, ROOM_STAGE, RoomLighting, RoomScene, ThemeSwatch, windowRectOf, type DayPhase } from "./room-scene";
-import { DEFAULT_BOARD, RoomBoard } from "./room-board";
+import { RoomBoard } from "./room-board";
 import { DEFAULT_PLACE, locateHere, placeShortName, SkyCard, skyBackdrop, type RoomPlace } from "./sky-card";
 
 type Tab = DecorKind | "theme";
@@ -218,8 +218,6 @@ export function MyRoom({ entries, initialLayout, serverReady, dogSkin, dogName, 
   visit?: VisitState;
   /** 自分の部屋に届いた「いいね」・置き手紙と、あそびに行けるフレンド */
   guests?: { mail: RoomMailItem[]; friends: RoomFriend[] };
-  /** 部屋の下：ホワイトボードのわくに映す（board）か、ふちなしのカード（card）か */
-  /** 部屋の下のボードの見た目（掲示板・黒板・テープで貼ったプリント） */
 }) {
   // 家具はだれでも置けるので、持ち物と合わせて「置けるもの」にする
   const validKeys = useMemo(() => new Set([...entries, ...FURNITURE_ENTRIES, ...FIXTURE_ENTRIES].map((e) => e.key)), [entries]);
@@ -657,9 +655,12 @@ export function MyRoom({ entries, initialLayout, serverReady, dogSkin, dogName, 
             <li>🕰️ 窓の外・部屋の明るさ・時計は、住んでいるところ（📍で変えられます）の、いまの時刻・天気と、季節の日の出・日の入りに合わせて変わります</li>
             <li>🚩 おでかけを記録した都道府県のペナントや、おさんぽのトロフィーも飾れます</li>
           </ul>
-          <button type="button" onClick={() => void takeSnapshot()} disabled={shooting} className="flex w-full items-center justify-center gap-2 rounded-full bg-leaf-deep py-3 text-sm font-black text-white shadow-md active:scale-[.98] disabled:opacity-60">
-            <span aria-hidden="true">📷</span>{shooting ? "撮影中…" : "記念撮影する"}
-          </button>
+          {/* 黒板の中は左右に余白をとるので、ボタンは包んでから幅いっぱいにする（はみ出して横にずれないように） */}
+          <div>
+            <button type="button" onClick={() => void takeSnapshot()} disabled={shooting} className="flex w-full items-center justify-center gap-2 rounded-full bg-leaf-deep py-3 text-sm font-black text-white shadow-md active:scale-[.98] disabled:opacity-60">
+              <span aria-hidden="true">📷</span>{shooting ? "撮影中…" : "記念撮影する"}
+            </button>
+          </div>
           {guests ? <RoomGuests mail={guests.mail} /> : null}
           <p className="pb-1 text-center text-[10px] font-semibold text-ink-faint">{saveLabel}</p>
     </>
@@ -892,9 +893,9 @@ export function MyRoom({ entries, initialLayout, serverReady, dogSkin, dogName, 
         ) : (
           // 小さい画面でもつぶれないよう、最低の高さをとる（そのときだけ画面が少しスクロールする）
           <div ref={stageRef} className="relative z-10 -mt-px min-h-[300px] flex-1" style={{ background: `linear-gradient(180deg, ${backdrop.top} 0%, ${backdrop.mid} 42%, ${backdrop.mid} 100%)` }}>
-            {/* 木のわくの黒板（お天気カードをマグネットでとめる）。わくをつかんで動かす・右下で大きさを変える */}
+            {/* 木のわくの黒板（お天気カードをマグネットでとめる）。位置と大きさは決まっていて、中はたてにだけスクロールする */}
             <div className="absolute inset-x-1 top-3 bottom-[calc(env(safe-area-inset-bottom)+10px)]">
-              <RoomBoard dark={1 - skyNow.light} place={layout.board ?? DEFAULT_BOARD} onPlace={(board) => commit({ ...latest.current, board })}>
+              <RoomBoard dark={1 - skyNow.light}>
                 {stageContent}
               </RoomBoard>
             </div>

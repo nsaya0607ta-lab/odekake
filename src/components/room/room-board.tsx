@@ -15,28 +15,19 @@ const INS = WOOD + 12;
 /** カードの中身を組む幅（px）。カードがこれよりせまいときは、縮めて映す */
 const SCREEN_W = 350;
 
-/** 黒板の置き場所。x は中心、y は下のはし（どちらも置ける領域の 0〜1）、w は幅（領域の幅に対する割合） */
-export type BoardPlace = { x: number; y: number; w: number; /** 高さ ÷ 幅。なければ ASPECT */ a?: number };
-export const DEFAULT_BOARD: BoardPlace = { x: 0.5, y: 1, w: 1, a: 1.7 };
-/** 黒板の 高さ ÷ 幅 */
-const ASPECT = 1.02;
-/** 横長〜縦長の、えらべる はば（高さ ÷ 幅） */
-const ASPECT_MIN = 0.55, ASPECT_MAX = 1.7;
-const clampN = (v: number, lo: number, hi: number) => Math.min(hi, Math.max(lo, v));
+/** 黒板の幅（置ける領域の幅に対する割合）と、いちばん縦長のときの 高さ ÷ 幅 */
+const WIDTH = 0.98, ASPECT_MAX = 1.7;
 
 /**
- * 黒板。わく・チョーク置きをつかんで好きなところへ動かせ、右下のつまみで大きさと形を変えられる。
- * カードの中は、ふつうにさわる・スクロールできる。
+ * 黒板。置ける領域の下にそろえて、横いっぱい・高さは領域まで（いちばん縦長で ASPECT_MAX）。位置と大きさは変えられない。
+ * カードの中は、ふつうにさわる・たてにだけスクロールできる。
  */
-export function RoomBoard({ children, dark = 0, drop = DEFAULT_DROP, place = DEFAULT_BOARD, onPlace }: {
+export function RoomBoard({ children, dark = 0, drop = DEFAULT_DROP }: {
   children: ReactNode;
   /** 夜の暗さ（0〜1） */
   dark?: number;
   /** 黒板の下のはしから、置ける領域の下までの高さ（px） */
   drop?: number;
-  place?: BoardPlace;
-  /** 動かす・大きさを変えるのを終えたとき */
-  onPlace?: (p: BoardPlace) => void;
 }) {
   // 置ける領域の大きさ
   const areaRef = useRef<HTMLDivElement>(null);
@@ -48,52 +39,8 @@ export function RoomBoard({ children, dark = 0, drop = DEFAULT_DROP, place = DEF
     ro.observe(el);
     return () => ro.disconnect();
   }, []);
-  // ドラッグ中は手もとの値で動かし、はなしたときに保存する
-  const [live, setLive] = useState<BoardPlace | null>(null);
-  const drag = useRef<{ mode: "move" | "size"; sx: number; sy: number; from: BoardPlace; id: number } | null>(null);
-  /** 領域からはみ出しすぎないようにそろえる */
-  const fit = (p: BoardPlace): BoardPlace => {
-    const a0 = clampN(p.a ?? ASPECT, ASPECT_MIN, ASPECT_MAX);
-    const wf = clampN(p.w, 0.3, 0.98);
-    // 高さは領域まで（はみ出すぶんは幅をそのままに、高さをちぢめる）
-    const a = Math.min(a0, area.h / (wf * area.w));
-    const bwpx = wf * area.w, bhpx = bwpx * a;
-    const x = clampN(p.x, (bwpx * 0.42) / area.w, 1 - (bwpx * 0.42) / area.w);
-    const y = clampN(p.y, Math.min(1, bhpx / area.h), 1);
-    return { x, y, w: wf, a };
-  };
-  const pl = fit(live ?? place);
-  const w = Math.round(pl.w * area.w), h = Math.round(w * (pl.a ?? ASPECT));
-  const left = pl.x * area.w - w / 2, top = pl.y * area.h - h;
-  const onDown = (e: React.PointerEvent) => {
-    const t = e.target as HTMLElement;
-    if (!onPlace || t.closest("[data-board-screen]")) return;
-    drag.current = { mode: t.closest("[data-board-resize]") ? "size" : "move", sx: e.clientX, sy: e.clientY, from: pl, id: e.pointerId };
-    (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
-    e.preventDefault();
-  };
-  const onMove = (e: React.PointerEvent) => {
-    const d = drag.current;
-    if (!d || d.id !== e.pointerId) return;
-    const dx = e.clientX - d.sx, dy = e.clientY - d.sy;
-    setLive(fit(d.mode === "move"
-      ? { ...d.from, x: d.from.x + dx / area.w, y: d.from.y + dy / area.h }
-      : (() => {
-          // 右下のかどを指についていかせる（左上は動かさない）。幅と高さは別々に変わる
-          const w0 = d.from.w * area.w, h0 = w0 * (d.from.a ?? ASPECT);
-          const l0 = d.from.x * area.w - w0 / 2, t0 = d.from.y * area.h - h0;
-          const w1 = Math.max(area.w * 0.3, w0 + dx), h1 = clampN(h0 + dy, w1 * ASPECT_MIN, w1 * ASPECT_MAX);
-          return { x: (l0 + w1 / 2) / area.w, y: (t0 + h1) / area.h, w: w1 / area.w, a: h1 / w1 };
-        })()));
-  };
-  const onUp = (e: React.PointerEvent) => {
-    const d = drag.current;
-    if (!d || d.id !== e.pointerId) return;
-    drag.current = null;
-    const next = live;
-    setLive(null);
-    if (next && onPlace) onPlace(next);
-  };
+  const w = Math.round(WIDTH * area.w), h = Math.round(Math.min(w * ASPECT_MAX, area.h));
+  const left = (area.w - w) / 2, top = area.h - h;
 
   // 黒板の大きさ（左右に 4px ずつ影のよはく、下はチョーク置きのぶんをあける）
   const bw = Math.max(120, w - 8), hw = bw / 2;
@@ -109,7 +56,7 @@ export function RoomBoard({ children, dark = 0, drop = DEFAULT_DROP, place = DEF
 
   return (
     <div ref={areaRef} className="pointer-events-none absolute inset-0">
-    <div className="pointer-events-auto absolute" style={{ left, top, width: w, height: h }} onPointerDown={onDown} onPointerMove={onMove} onPointerUp={onUp} onPointerCancel={onUp}>
+    <div className="pointer-events-auto absolute" style={{ left, top, width: w, height: h }}>
       {/* うしろの層：やわらかい影と、わくの上の厚み */}
       <svg aria-hidden width={w} height={h} viewBox={`0 0 ${w} ${h}`} className="pointer-events-none absolute inset-0 overflow-visible" style={dim}>
         <defs><filter id="bd-blur" x="-30%" y="-80%" width="160%" height="260%"><feGaussianBlur stdDeviation="6" /></filter></defs>
@@ -150,11 +97,11 @@ export function RoomBoard({ children, dark = 0, drop = DEFAULT_DROP, place = DEF
             <path d={`M${bw - WOOD - 8} ${WOOD + 9} c -3 -3 -6 0 -3 3 l 3 3 l 3 -3 c 3 -3 0 -6 -3 -3 z`} stroke="#FFB4C8" strokeOpacity="0.6" />
           </g>
         </svg>
-        {/* カード（ここだけスクロールする） */}
-        <div data-board-screen className="absolute overflow-hidden rounded-[8px] bg-[#FBF8F1] shadow-[0_4px_10px_rgba(0,0,0,.45)]" style={{ inset: INS }}>
+        {/* カード（ここだけ、たてにだけスクロールする） */}
+        <div className="absolute overflow-hidden rounded-[8px] bg-[#FBF8F1] shadow-[0_4px_10px_rgba(0,0,0,.45)]" style={{ inset: INS }}>
           {/* 中身は SCREEN_W 以上の幅で組んで、カードの大きさに縮めて映す（小さい・縦長・横長でも文字がつまったり、はみ出したりしない） */}
           <div className="absolute left-0 top-0" style={{ width: screenW / zoom, height: screenH / zoom, zoom }}>
-            <div className="absolute inset-0 space-y-3 overflow-y-auto overscroll-contain pb-2 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden [&>*:not(:first-child)]:mx-2">
+            <div className="absolute inset-0 touch-pan-y space-y-3 overflow-y-auto overflow-x-hidden overscroll-contain pb-2 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden [&>*:not(:first-child)]:mx-2">
               {children}
             </div>
           </div>
@@ -187,24 +134,6 @@ export function RoomBoard({ children, dark = 0, drop = DEFAULT_DROP, place = DEF
         </g>
       </svg>
 
-      {/* つかむところ（上・左右のわく、チョーク置きから下）と、大きさを変えるつまみ */}
-      {onPlace ? (
-        <>
-          {[
-            { left: 0, top: 0, width: w, height: Math.max(0, yb - bh + INS) },
-            { left: 0, top: yb - INS, width: w, height: Math.max(0, h - yb + INS) },
-            { left: 0, top: yb - bh, width: w / 2 - hw + INS, height: bh },
-            { left: w / 2 + hw - INS, top: yb - bh, width: w / 2 - hw + INS, height: bh },
-          ].map((z, i) => <div key={i} className="absolute cursor-grab touch-none active:cursor-grabbing" style={z} />)}
-          <button
-            type="button" data-board-resize aria-label="黒板の大きさを変える（右下をドラッグ）"
-            className="absolute flex h-7 w-7 cursor-nwse-resize touch-none items-center justify-center rounded-full bg-white/90 shadow-[0_2px_6px_rgba(0,0,0,.3)] ring-1 ring-black/10"
-            style={{ left: w / 2 + hw - 16, top: yb - 16 }}
-          >
-            <svg viewBox="0 0 12 12" width="12" height="12" aria-hidden><path d="M11 4 L4 11 M11 8 L8 11" stroke="#6A707A" strokeWidth="1.6" strokeLinecap="round" /></svg>
-          </button>
-        </>
-      ) : null}
     </div>
     </div>
   );
