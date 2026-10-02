@@ -172,10 +172,17 @@ function freeWallSpot(taken: readonly { x: number; y: number }[], fixtures: read
 /** 家具の奥行き（床の上で場所をとる高さ。幅に対する割合） */
 const PLACE_KEY = "odekake-room-place-v1";
 /** 家具の絵の 高さ÷幅（furniture-art.tsx の viewBox） */
-const FURNITURE_RATIO: Record<FurnitureId, number> = { kotatsu: 158 / 240, fishbowl: 168 / 110, tv: 180 / 230, piano: 230 / 240, "rocking-chair": 210 / 160, toybox: 146 / 180, whiteboard: 200 / 160, sofa: 150 / 260, "dog-bed": 110 / 190, plant: 190 / 120, bookshelf: 210 / 150, lamp: 220 / 90, table: 120 / 200, "dog-house": 190 / 200, bowl: 58 / 100 };
+const FURNITURE_RATIO: Record<FurnitureId, number> = { kotatsu: 158 / 240, fishbowl: 168 / 110, tv: 180 / 230, piano: 230 / 240, "rocking-chair": 210 / 160, toybox: 146 / 180, birdcage: 222 / 124, hamster: 150 / 170, record: 176 / 160, fireplace: 204 / 220, fan: 196 / 104, gacha: 196 / 124, whiteboard: 200 / 160, sofa: 150 / 260, "dog-bed": 110 / 190, plant: 190 / 120, bookshelf: 210 / 150, lamp: 220 / 90, table: 120 / 200, "dog-house": 190 / 200, bowl: 58 / 100 };
 /** 犬が遊んでいるあいだの家具の動き（ゆれる・明かりがつく など） */
-const FX_CLASS: Partial<Record<FurnitureFx, string>> = { wobble: "room-fx-wobble", sway: "room-fx-sway", squish: "room-fx-squish", clatter: "room-fx-clatter" };
-const FURNITURE_DEPTH: Record<string, number> = { kotatsu: 0.35, fishbowl: 0.2, tv: 0.25, piano: 0.3, "rocking-chair": 0.25, toybox: 0.25, whiteboard: 0.2, sofa: 0.35, plant: 0.2, bookshelf: 0.25, lamp: 0.2, table: 0.3, "dog-house": 0.35, bowl: 0.2, "dog-bed": 0.3 };
+const FX_CLASS: Partial<Record<FurnitureFx, string>> = { wobble: "room-fx-wobble", sway: "room-fx-sway", squish: "room-fx-squish", clatter: "room-fx-clatter", spin: "room-fx-clatter" };
+/** 暖炉のマントルピースのかざり（タップで順に切りかえ。この端末に覚えておく） */
+const MANTEL_KEY = "odekake-room-mantel";
+const MANTEL_DECOS = ["socks", "candles", "plain"] as const;
+const MANTEL_NAMES: Record<(typeof MANTEL_DECOS)[number], string> = { socks: "くつしたと ガーランド", candles: "キャンドルと 絵", plain: "時計と 本" };
+/** ガチャのカプセルの中身（部屋の中だけの おたのしみ。持ち物にはならない） */
+const GACHA_PRIZES = ["ちいさな ほねのキーホルダー", "にくきゅうシール", "ミニミニボール", "ぴかぴかバッジ", "おさんぽ おまもり", "わんこの消しゴム", "ちいさな王冠"];
+const anyOf = <T,>(list: readonly T[]): T => list[Math.floor(Math.random() * list.length)]!;
+const FURNITURE_DEPTH: Record<string, number> = { kotatsu: 0.35, fishbowl: 0.2, tv: 0.25, piano: 0.3, "rocking-chair": 0.25, toybox: 0.25, birdcage: 0.15, hamster: 0.25, record: 0.25, fireplace: 0.3, fan: 0.15, gacha: 0.2, whiteboard: 0.2, sofa: 0.35, plant: 0.2, bookshelf: 0.25, lamp: 0.2, table: 0.3, "dog-house": 0.35, bowl: 0.2, "dog-bed": 0.3 };
 
 const FLOOR_SPOTS = [[22, 74], [78, 76], [64, 90], [36, 92], [86, 92], [14, 88], [50, 66], [70, 66]] as const;
 
@@ -286,7 +293,8 @@ export function MyRoom({ entries, initialLayout, serverReady, dogSkin, dogName, 
   const [diary, setDiary] = useState(false);
   /** わんこに反応してもらうこと（日記を開いた・散らかったものを片づけた など） */
   const [dogCue, setDogCue] = useState<{ id: number; text: string; pose?: string } | null>(null);
-  const [peek, setPeek] = useState<{ id: string; text: string; x: number; y: number } | null>(null);
+  /** 置いたものの上に少し出す文字（名前や、インコのおしゃべり） */
+  const [peek, setPeek] = useState<{ id: string; text: string; x: number; y: number; bird?: boolean } | null>(null);
   const [lightbox, setLightbox] = useState<Extract<DecorEntry, { kind: "photo" }> | null>(null);
   const [shot, setShot] = useState<{ blob: Blob; url: string } | null>(null);
   const [shooting, setShooting] = useState(false);
@@ -603,6 +611,47 @@ export function MyRoom({ entries, initialLayout, serverReady, dogSkin, dogName, 
       setDogCue({ id: Date.now(), text: on ? "あかるくなった！" : "まっくら…", pose: on ? "cheer" : "wonder" });
       return;
     }
+    if (entry.kind === "furniture") {
+      switch (entry.furniture) {
+        case "record": {
+          // レコードは、タップでかけたり止めたり（かかっていると、わんこが踊る）
+          const on = furnitureMode[p.id] !== "on";
+          setRecordSwitch((cur) => ({ ...cur, [p.id]: on }));
+          if (!on) onFurnitureFx(p.id, null);
+          setDogCue({ id: Date.now(), text: on ? "♪ おどっちゃおう！" : "あれ、おわっちゃった", pose: on ? "cheer" : "wonder" });
+          return;
+        }
+        case "fan": {
+          const on = furnitureMode[p.id] !== "on";
+          setFanSwitch((cur) => ({ ...cur, [p.id]: on }));
+          flash(on ? "扇風機を つけた（カーテンや植物が なびくよ）" : "扇風機を けした");
+          return;
+        }
+        case "fireplace": {
+          const cur = (mantel[p.id] ?? mantelDefault) as (typeof MANTEL_DECOS)[number];
+          const next = MANTEL_DECOS[(MANTEL_DECOS.indexOf(cur) + 1) % MANTEL_DECOS.length]!;
+          setMantel((m) => {
+            const saved = { ...m, [p.id]: next };
+            try { window.localStorage.setItem(MANTEL_KEY, JSON.stringify(saved)); } catch { /* 覚えられなくても、いまは変わる */ }
+            return saved;
+          });
+          flash(`マントルピースの かざりを かえた（${MANTEL_NAMES[next]}）`);
+          return;
+        }
+        case "birdcage": birdTalk(p.id); return;
+        case "hamster": {
+          fxFor(p.id, "nibbled", 20_000);
+          flash("🌻 ひまわりの種を あげた！ ほっぺが ぱんぱん");
+          return;
+        }
+        case "gacha": {
+          if (furnitureFx[p.id] === "spin") return;
+          gachaTurn(p.id);
+          return;
+        }
+        default: break;
+      }
+    }
     // 本だなには、わんこの日記がはさまっている
     if (entry.kind === "furniture" && entry.furniture === "bookshelf" && !visit) {
       setDiary(true);
@@ -685,9 +734,86 @@ export function MyRoom({ entries, initialLayout, serverReady, dogSkin, dogName, 
   /** フロアランプのスイッチ（タップで切りかえ。さわっていなければ、暗くなると自動でつく） */
   const [lampSwitch, setLampSwitch] = useState<Record<string, boolean>>({});
   const lampIsOn = useCallback((id: string) => lampSwitch[id] ?? (lightsOn || furnitureFx[id] === "on"), [furnitureFx, lampSwitch, lightsOn]);
-  const lampLights = useMemo(() => layout.items
-    .filter((p) => p.key === "furniture:lamp" && lampIsOn(p.id))
-    .map((p) => ({ x: p.x, y: p.y - 15 * p.scale * depthScale(p.y), r: 20 * p.scale, base: p.y })), [lampIsOn, layout.items]);
+  /* ---------- 動きのある家具（レコードプレーヤー・扇風機・暖炉・鳥かご・ハムスター・ガチャ） ---------- */
+  const monthJst = useMemo(() => Number(new Intl.DateTimeFormat("en-US", { timeZone: "Asia/Tokyo", month: "numeric" }).format(now)), [now]);
+  /** 暑い日は扇風機が自動でつく（気温がわからなければ7・8月） */
+  const hot = weather?.temp != null ? weather.temp >= 26 : monthJst === 7 || monthJst === 8;
+  /** 寒い季節は、わんこが暖炉の前で丸くなる */
+  const winter = [12, 1, 2].includes(monthJst) || (weather?.temp != null && weather.temp <= 8);
+  /** 夏（6〜9月）は暖炉の火を消して、キャンドルをともす */
+  const fireSeason = monthJst < 6 || monthJst > 9;
+  /** マントルピースのかざり（えらんでいなければ、11〜1月はくつした、ほかはキャンドル） */
+  const mantelDefault = [11, 12, 1].includes(monthJst) ? "socks" : "candles";
+  /** タップで切りかえたスイッチ（さわっていなければ、レコードは止まっていて、扇風機は暑い日につく） */
+  const [recordSwitch, setRecordSwitch] = useState<Record<string, boolean>>({});
+  const [fanSwitch, setFanSwitch] = useState<Record<string, boolean>>({});
+  const [mantel, setMantel] = useState<Record<string, string>>({});
+  useEffect(() => {
+    try { const raw = window.localStorage.getItem(MANTEL_KEY); if (raw) setMantel(JSON.parse(raw) as Record<string, string>); } catch { /* 読めなければ、くつした */ }
+  }, []);
+  /** 家具ごとの、いまの状態（絵と、わんこの遊び方が変わる） */
+  const furnitureMode = useMemo(() => {
+    const m: Record<string, string> = {};
+    for (const p of layout.items) {
+      if (p.key === "furniture:record") m[p.id] = furnitureFx[p.id] === "on" || recordSwitch[p.id] ? "on" : "off";
+      else if (p.key === "furniture:fan") m[p.id] = (fanSwitch[p.id] ?? hot) ? "on" : "off";
+      else if (p.key === "furniture:fireplace") m[p.id] = `${fireSeason ? "fire" : "cold"}:${mantel[p.id] ?? mantelDefault}`;
+    }
+    return m;
+  }, [fanSwitch, fireSeason, furnitureFx, hot, layout.items, mantel, mantelDefault, recordSwitch]);
+  /** 扇風機がついていれば、植物とカーテンが風でなびく */
+  const breeze = !editing && layout.items.some((p) => p.key === "furniture:fan" && furnitureMode[p.id] === "on");
+  /** しばらくのあいだだけ、家具を動かす（同じ動きのままなら、ms のあとでもとにもどす） */
+  const fxFor = useCallback((id: string, fx: FurnitureFx, ms: number) => {
+    onFurnitureFx(id, fx);
+    window.setTimeout(() => setFurnitureFx((cur) => { if (cur[id] !== fx) return cur; const next = { ...cur }; delete next[id]; return next; }), ms);
+  }, [onFurnitureFx]);
+  /** インコがしゃべる（鳥かごの上に、ふきだし） */
+  const birdLines = useMemo(() => ["オハヨー！", "ワン！ワン！", "カワイイネ", "オサンポ イク？", "ゴハン マダー？", "ピーチク パーチク♪", petName ? `${petName}！ ${petName}！` : "ワンチャン！"], [petName]);
+  const birdTalk = useCallback((id: string, text?: string) => {
+    const p = latest.current.items.find((it) => it.id === id);
+    const el = roomRef.current?.querySelector<HTMLElement>(`[data-pid="${id}"]`);
+    const r = el?.getBoundingClientRect(), room = roomRef.current?.getBoundingClientRect();
+    if (!p || !r || !room) return;
+    fxFor(id, "talk", 2400);
+    // かごは絵の左よりにある（左右反転なら右より）
+    const at = { x: ((r.left + r.width * (p.flip ? 0.55 : 0.45) - room.left) / room.width) * 100, y: ((r.top + r.height * 0.1 - room.top) / room.height) * 100 };
+    setPeek({ id, text: `🦜 ${text ?? anyOf(birdLines)}`, bird: true, ...at });
+    window.setTimeout(() => setPeek((cur) => (cur?.id === id ? null : cur)), 2600);
+  }, [birdLines, fxFor]);
+  const birdTalkRef = useRef(birdTalk);
+  birdTalkRef.current = birdTalk;
+  // インコは、ときどき ひとりでしゃべる（夜はねている）
+  const birdIds = useMemo(() => layout.items.filter((p) => p.key === "furniture:birdcage").map((p) => p.id).join(","), [layout.items]);
+  useEffect(() => {
+    if (editing || sleepy || !birdIds) return;
+    const ids = birdIds.split(",");
+    let t = 0;
+    const loop = () => { birdTalkRef.current(anyOf(ids)); t = window.setTimeout(loop, 16_000 + Math.random() * 14_000); };
+    t = window.setTimeout(loop, 5000 + Math.random() * 6000);
+    return () => window.clearTimeout(t);
+  }, [birdIds, editing, sleepy]);
+  /** ガチャのハンドルを回す（ときどき、カプセルがころんと出る） */
+  const gachaTurn = useCallback((id: string) => {
+    fxFor(id, "spin", 1300);
+    window.setTimeout(() => {
+      if (Math.random() < 0.45) {
+        fxFor(id, "capsule", 25_000);
+        flash(`カプセルから「${anyOf(GACHA_PRIZES)}」が でた！`);
+        setDogCue({ id: Date.now(), text: "なになに？ みせて！", pose: "cheer" });
+      } else flash("…からっぽ。もういっかい まわしてみて");
+    }, 1200);
+  }, [flash, fxFor]);
+
+  const lampLights = useMemo(() => [
+    ...layout.items
+      .filter((p) => p.key === "furniture:lamp" && lampIsOn(p.id))
+      .map((p) => ({ x: p.x, y: p.y - 15 * p.scale * depthScale(p.y), r: 20 * p.scale, base: p.y })),
+    // 火のある暖炉も、まわりを明るくする
+    ...(fireSeason ? layout.items
+      .filter((p) => p.key === "furniture:fireplace")
+      .map((p) => ({ x: p.x, y: p.y - 6 * p.scale * depthScale(p.y), r: 24 * p.scale, base: p.y })) : []),
+  ], [fireSeason, lampIsOn, layout.items]);
 
   /** 犬が向かう場所（ベッド・ごはん皿・床のもの） */
   const dogPlaces = useMemo(() => {
@@ -909,10 +1035,10 @@ export function MyRoom({ entries, initialLayout, serverReady, dogSkin, dogName, 
                   {/* 棚の上：板に落ちる小さな影 */}
                   {!hang && p.on ? <span data-shadow className="pointer-events-none absolute -bottom-[3%] left-1/2 h-[7%] w-[84%] -translate-x-1/2 rounded-[50%] bg-[#3a2410]/30 blur-[1.5px]" /> : null}
                   <span data-body className="relative block" style={{ transform: p.flip ? "scaleX(-1)" : undefined }}>
-                    <span key={furnitureFx[p.id] ?? "-"} className={`block origin-bottom ${FX_CLASS[furnitureFx[p.id]!] ?? ""}`}>
+                    <span key={furnitureFx[p.id] ?? "-"} className={`block origin-bottom ${FX_CLASS[furnitureFx[p.id]!] ?? (breeze && p.key === "furniture:plant" ? "room-breeze-plant" : breeze && p.key === fixtureKey("window") ? "room-breeze" : "")}`}>
                       {entry.kind === "fixture"
                         ? <FixtureVisual fixture={entry.fixture} theme={layout.theme} now={now} at={place} weather={weather} placeName={placeName} passer={p.id === firstWindowId ? passer : null} grime={dirt} />
-                        : <DecorVisual entry={entry} frame={p.frame} lit={p.key === "furniture:lamp" ? lampIsOn(p.id) : lightsOn || furnitureFx[p.id] === "on"} fx={furnitureFx[p.id]} />}
+                        : <DecorVisual entry={entry} frame={p.frame} lit={p.key === "furniture:lamp" ? lampIsOn(p.id) : lightsOn || furnitureFx[p.id] === "on"} fx={furnitureFx[p.id]} mode={furnitureMode[p.id]} />}
                     </span>
                   </span>
                   {dropShelf === p.id ? <span className="pointer-events-none absolute -inset-1 rounded-xl border-2 border-dashed border-leaf bg-leaf/15 shadow-[0_0_14px_rgba(140,200,110,.8)]" /> : null}
@@ -927,7 +1053,7 @@ export function MyRoom({ entries, initialLayout, serverReady, dogSkin, dogName, 
             })}
 
             {!editing && mess.length ? <RoomMess mess={mess} onClean={(m) => onCleanMess(m.id)} /> : null}
-          <RoomDog skin={dogSkin} phase={phase} sleepy={sleepy} lines={dogLines} dreams={dogDreams} cue={dogCue} introduce={visit ? petName : null} quiet={editing} places={dogPlaces} weather={weather?.kind ?? null} onFx={onFurnitureFx} />
+          <RoomDog skin={dogSkin} phase={phase} sleepy={sleepy} lines={dogLines} dreams={dogDreams} cue={dogCue} introduce={visit ? petName : null} quiet={editing} places={dogPlaces} weather={weather?.kind ?? null} onFx={onFurnitureFx} modes={furnitureMode} winter={winter} hot={hot} onFurnitureSay={birdTalk} />
             {/* 行事のもの（部屋の左右のすみ）。置いたものと同じく、奥ほど下に重なる */}
             {roomEvent ? (["L", "R"] as const).map((side) => (
               <div key={side} className="pointer-events-none absolute inset-0" style={{ zIndex: 300 + Math.round(EVENT_FLOOR_Y[side] * 10) }} data-event-layer>
@@ -951,7 +1077,7 @@ export function MyRoom({ entries, initialLayout, serverReady, dogSkin, dogName, 
               <RoomLighting now={now} lamps={lampLights} at={place} weather={weather} room={layout.theme.room} event={roomEvent} openBottom={stage} />
             </div>
             {peek ? (
-              <span className="room-bubble pointer-events-none absolute w-max max-w-[12rem] -translate-x-1/2 -translate-y-full rounded-xl bg-ink px-2.5 py-1 text-[10px] font-bold text-white shadow" style={{ left: `${clamp(peek.x, 18, 82)}%`, top: `${Math.max(4, peek.y - 0.5)}%`, zIndex: 2600 }}>{peek.text}</span>
+              <span className={`room-bubble pointer-events-none absolute w-max max-w-[12rem] -translate-x-1/2 -translate-y-full rounded-xl px-2.5 py-1 text-[10px] font-bold shadow ${peek.bird ? "border-2 border-[#7CC63A] bg-[#FBFFF3] text-[#2E5A1E]" : "bg-ink text-white"}`} style={{ left: `${clamp(peek.x, 18, 82)}%`, top: `${Math.max(4, peek.y - 0.5)}%`, zIndex: 2600 }}>{peek.text}</span>
             ) : null}
             </div>
 

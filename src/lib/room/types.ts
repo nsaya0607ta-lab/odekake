@@ -43,6 +43,12 @@ export const FURNITURE = {
   piano: { name: "ピアノ", width: 30, price: 8000 },
   "rocking-chair": { name: "ゆりいす", width: 17, price: 3500 },
   toybox: { name: "おもちゃ箱", width: 18, price: 2000 },
+  birdcage: { name: "鳥かご（インコ）", width: 15, price: 4000 },
+  hamster: { name: "ハムスターケージ", width: 20, price: 3000 },
+  record: { name: "レコードプレーヤー", width: 20, price: 4500 },
+  fireplace: { name: "暖炉", width: 32, price: 7000 },
+  fan: { name: "扇風機", width: 12, price: 2500 },
+  gacha: { name: "ガチャガチャ", width: 14, price: 3500 },
 } as const;
 export type FurnitureId = keyof typeof FURNITURE;
 export const FURNITURE_IDS = Object.keys(FURNITURE) as FurnitureId[];

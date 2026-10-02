@@ -4459,6 +4459,63 @@
 @keyframes room-fish-tail { 0%, 100% { transform: rotate(-9deg); } 50% { transform: rotate(9deg); } }
 .room-fish-bubble { animation: room-fish-bubble 3.6s ease-in infinite; }
 @keyframes room-fish-bubble { 0% { transform: translateY(0); opacity: 0; } 15% { opacity: 1; } 80% { opacity: 0.9; } 100% { transform: translateY(-20px); opacity: 0; } }
+/* 鳥かご：インコが首をかしげて、ときどき ぴょこっとはねる。しゃべるときは、くちばしをぱくぱく・首をふる。ブランコはゆれる */
+.room-bird { animation: room-bird-bob 7s ease-in-out infinite; }
+@keyframes room-bird-bob { 0%, 30%, 40%, 100% { transform: translateY(0); } 33% { transform: translateY(-3px); } 36% { transform: translateY(0.4px); } }
+.room-bird-head { transform-box: fill-box; transform-origin: 30% 90%; animation: room-bird-head 7s ease-in-out infinite; }
+@keyframes room-bird-head { 0%, 56% { transform: rotate(0deg); } 61%, 76% { transform: rotate(-22deg); } 81% { transform: rotate(0deg); } 87% { transform: rotate(9deg); } 93%, 100% { transform: rotate(0deg); } }
+.room-bird-talk .room-bird-head { animation: room-bird-chat 0.5s ease-in-out infinite alternate; }
+@keyframes room-bird-chat { from { transform: rotate(-7deg); } to { transform: rotate(7deg); } }
+.room-bird-talk .room-bird-beak { transform-box: fill-box; transform-origin: 0% 0%; animation: room-bird-beak 0.22s ease-in-out infinite alternate; }
+@keyframes room-bird-beak { from { transform: rotate(0deg); } to { transform: rotate(30deg); } }
+.room-bird-swing { transform-box: fill-box; transform-origin: 50% 0%; animation: room-bird-swing 3.2s ease-in-out infinite; }
+@keyframes room-bird-swing { 0%, 100% { transform: rotate(-7deg); } 50% { transform: rotate(7deg); } }
+/* ハムスター：回し車（夜は速い）と、走る足 */
+.room-wheel { transform-box: fill-box; transform-origin: center; animation: room-spin-ccw 2.6s linear infinite; }
+.room-wheel-fast { animation-duration: 0.75s; }
+@keyframes room-spin-ccw { to { transform: rotate(-360deg); } }
+@keyframes room-spin-cw { to { transform: rotate(360deg); } }
+.room-ham-run { animation: room-ham-run 0.32s ease-in-out infinite alternate; }
+.room-ham-fast, .room-ham-fast .room-ham-leg-a, .room-ham-fast .room-ham-leg-b { animation-duration: 0.14s; }
+@keyframes room-ham-run { from { transform: translateY(0); } to { transform: translateY(-1.2px); } }
+.room-ham-leg-a, .room-ham-leg-b { animation: room-ham-leg 0.32s ease-in-out infinite alternate; }
+.room-ham-leg-b { animation-direction: alternate-reverse; }
+@keyframes room-ham-leg { from { transform: translateX(-2px); } to { transform: translateX(2px); } }
+/* レコード：盤が回り、音符がのぼる */
+.room-record-spin { transform-box: fill-box; transform-origin: center; animation: room-spin-cw 1.8s linear infinite; }
+.room-note { opacity: 0; animation: room-note 3s ease-out infinite; }
+@keyframes room-note { 0% { transform: translate(0, 0) rotate(-8deg); opacity: 0; } 15% { opacity: 1; } 100% { transform: translate(var(--nx, 0px), -46px) rotate(12deg); opacity: 0; } }
+/* 暖炉・キャンドル：炎のゆらめき・火の粉・明かりのちらつき */
+.room-flame { transform-box: fill-box; transform-origin: 50% 100%; animation: room-flame 0.9s ease-in-out infinite alternate; }
+@keyframes room-flame { 0% { transform: scale(1, 1) skewX(0deg); } 35% { transform: scale(0.96, 1.07) skewX(-3deg); } 70% { transform: scale(1.03, 0.94) skewX(2deg); } 100% { transform: scale(0.98, 1.09) skewX(-1deg); } }
+.room-fire-glow { animation: room-fire-glow 1.6s ease-in-out infinite alternate; }
+@keyframes room-fire-glow { 0% { opacity: 0.7; } 40% { opacity: 1; } 70% { opacity: 0.8; } 100% { opacity: 0.95; } }
+.room-spark { opacity: 0; animation: room-spark 2.4s ease-out infinite; }
+@keyframes room-spark { 0% { transform: translate(0, 0); opacity: 0; } 10% { opacity: 1; } 100% { transform: translate(var(--sx, 0px), -40px); opacity: 0; } }
+/* 扇風機：はね・首ふり・なびくリボン */
+.room-fan-blades { transform-box: fill-box; transform-origin: center; animation: room-spin-cw 0.24s linear infinite; }
+.room-fan-swing { animation: room-fan-swing 6s ease-in-out infinite; }
+@keyframes room-fan-swing { 0%, 100% { transform: rotate(-5deg) scaleX(1); } 50% { transform: rotate(4deg) scaleX(0.84); } }
+.room-fan-ribbon { transform-box: fill-box; transform-origin: 100% 50%; animation: room-fan-ribbon 0.32s ease-in-out infinite alternate; }
+@keyframes room-fan-ribbon { from { transform: skewY(-8deg) scaleY(1); } to { transform: skewY(8deg) scaleY(0.6); } }
+/* 扇風機の風：植物とカーテンがなびく（首ふりと同じ6秒）・わんこの顔が ぶわっ */
+.room-breeze-plant { animation: room-breeze-plant 3s ease-in-out infinite; }
+@keyframes room-breeze-plant { 0%, 100% { transform: skewX(0deg); } 30% { transform: skewX(-3deg); } 60% { transform: skewX(1.5deg); } }
+.room-breeze path[fill="url(#room-curtain)"] { transform-box: fill-box; transform-origin: 50% 0%; animation: room-breeze-curtain 3s ease-in-out infinite; }
+@keyframes room-breeze-curtain { 0%, 100% { transform: skewX(0deg); } 35% { transform: skewX(-5deg); } 65% { transform: skewX(2deg); } }
+.room-dog-blown { transform-origin: 50% 80%; animation: room-dog-blown 0.1s linear infinite alternate; }
+@keyframes room-dog-blown { from { transform: skewX(-2.5deg) scaleX(1.03); } to { transform: skewX(2deg) scaleX(0.99); } }
+.room-wind { animation: room-wind 0.6s linear infinite; }
+@keyframes room-wind { from { transform: translateX(0); opacity: 0.9; } to { transform: translateX(-30%); opacity: 0; } }
+/* ガチャ：ハンドルがひと回り・カプセルがゆれる・ころんと転がり出る */
+.room-gacha-crank { transform-box: fill-box; transform-origin: center; animation: room-spin-cw 1.1s ease-in-out 1; }
+.room-gacha-jiggle { animation: room-gacha-jiggle 0.16s linear 6 alternate; }
+@keyframes room-gacha-jiggle { from { transform: translate(-1px, 0); } to { transform: translate(1px, -1.4px); } }
+.room-capsule-roll { transform-box: fill-box; transform-origin: center; animation: room-capsule-roll 1s cubic-bezier(0.3, 0.6, 0.4, 1) both; }
+@keyframes room-capsule-roll { 0% { transform: translate(-56px, -10px) rotate(0deg); opacity: 0; } 15% { opacity: 1; } 100% { transform: translate(0, 0) rotate(540deg); opacity: 1; } }
 @media (prefers-reduced-motion: reduce) {
-  .room-selected, .room-heart, .room-bubble, .room-dog-walk, .room-dog-idle, .room-dog-sleep, .room-dog-hop, .room-dog-shiver, .room-fx-wobble, .room-fx-sway, .room-fx-squish, .room-fx-clatter, .room-wish, .room-fish-a, .room-fish-b, .room-fish-tail, .room-fish-bubble { animation: none; }
+  .room-selected, .room-heart, .room-bubble, .room-dog-walk, .room-dog-idle, .room-dog-sleep, .room-dog-hop, .room-dog-shiver, .room-fx-wobble, .room-fx-sway, .room-fx-squish, .room-fx-clatter, .room-wish, .room-fish-a, .room-fish-b, .room-fish-tail, .room-fish-bubble,
+  .room-bird, .room-bird-head, .room-bird-beak, .room-bird-swing, .room-wheel, .room-ham-run, .room-ham-leg-a, .room-ham-leg-b, .room-record-spin, .room-flame, .room-fire-glow, .room-spark,
+  .room-fan-blades, .room-fan-swing, .room-fan-ribbon, .room-breeze-plant, .room-breeze path, .room-dog-blown, .room-wind, .room-gacha-crank, .room-gacha-jiggle, .room-capsule-roll { animation: none; }
+  .room-note { animation: none; opacity: 0.9; }
 }

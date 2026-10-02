@@ -13,9 +13,9 @@ const FRAME_LOOK: Record<FrameStyle, { label: string; border: string; pad: strin
 };
 export const FRAME_LABELS = Object.fromEntries(Object.entries(FRAME_LOOK).map(([k, v]) => [k, v.label])) as Record<FrameStyle, string>;
 
-export function DecorVisual({ entry, frame = "wood", thumb = false, lit = false, fx }: { entry: DecorEntry; frame?: FrameStyle; thumb?: boolean; lit?: boolean; fx?: FurnitureFx }) {
+export function DecorVisual({ entry, frame = "wood", thumb = false, lit = false, fx, mode }: { entry: DecorEntry; frame?: FrameStyle; thumb?: boolean; lit?: boolean; fx?: FurnitureFx; mode?: string }) {
   const label = thumb ? undefined : entry.name;
-  if (entry.kind === "furniture") return <FurnitureArt id={entry.furniture} label={label} lit={lit} fx={fx} />;
+  if (entry.kind === "furniture") return <FurnitureArt id={entry.furniture} label={label} lit={lit} fx={fx} mode={mode} />;
   if (entry.kind === "item") return <GroundedImage src={entry.image} alt={label ?? ""} grounded={!thumb} />;
   if (entry.kind === "photo") {
     const look = FRAME_LOOK[frame];
