@@ -15,6 +15,8 @@ import type { DayPhase } from "./room-scene";
 
 const IDLE_POSES = ["stand", "sit", "sniff", "sit-side", "smile", "wonder", "yawn", "front"] as const;
 const HAPPY_POSES = ["stand-happy", "cheer", "wave", "wink", "bark", "shake"] as const;
+/** レコードに合わせて踊るときのポーズ（右・左に向きをかえながら） */
+const DANCE_POSES = ["stand-happy", "wave", "cheer", "stand-happy", "wink", "wave"] as const;
 const ALL_POSES = ["walk", "trot", "sleep", "bow", "bow-b", "lie-wave", ...IDLE_POSES, ...HAPPY_POSES];
 /** 歩く速さ（部屋の幅の % / 秒） */
 const WALK_SPEED = 9;
@@ -132,7 +134,7 @@ export type DogPlaces = {
   blocks: { x0: number; x1: number; y0: number; y1: number }[];
 };
 
-export function RoomDog({ skin, phase, sleepy, lines, dreams = [], cue = null, introduce = null, quiet, places, weather = null, onFx }: {
+export function RoomDog({ skin, phase, sleepy, lines, dreams = [], cue = null, introduce = null, quiet, places, weather = null, onFx, modes = {}, winter = false, hot = false, onFurnitureSay }: {
   skin: DogSkinId;
   phase: DayPhase;
   /** 窓の外の天気（わからなければ null） */
@@ -153,6 +155,14 @@ export function RoomDog({ skin, phase, sleepy, lines, dreams = [], cue = null, i
   places: DogPlaces;
   /** 犬が遊んでいる家具を動かす（ゆらす・明かりをつける など。null でもとにもどす） */
   onFx?: (id: string, fx: FurnitureFx | null) => void;
+  /** 家具ごとの、いまの状態（レコードがかかっている・扇風機がついている・暖炉の火 など） */
+  modes?: Record<string, string>;
+  /** 寒い季節（暖炉の前で丸くなる） */
+  winter?: boolean;
+  /** 暑い日 */
+  hot?: boolean;
+  /** 家具がしゃべる（インコがわんこのまねをする） */
+  onFurnitureSay?: (id: string, text: string) => void;
 }) {
   const [dog, setDog] = useState<DogState>({ x: 30, y: 84, pose: "sit", flip: false });
   const [bubble, setBubble] = useState<{ text: string; id: number; dream?: boolean } | null>(null);
@@ -171,6 +181,12 @@ export function RoomDog({ skin, phase, sleepy, lines, dreams = [], cue = null, i
   placesRef.current = places;
   const fxRef = useRef(onFx);
   fxRef.current = onFx;
+  const modesRef = useRef(modes);
+  modesRef.current = modes;
+  const sayRef = useRef(onFurnitureSay);
+  sayRef.current = onFurnitureSay;
+  /** 扇風機の風を顔に受けている（1: 風が右から / -1: 左から / 0: なし） */
+  const [blown, setBlown] = useState<0 | 1 | -1>(0);
   /** いま動かしている家具（遊びを中断したら、もとにもどす） */
   const activeFx = useRef(new Set<string>());
   /** 食べきったお皿など、しばらく残る家具のようす */
@@ -185,6 +201,7 @@ export function RoomDog({ skin, phase, sleepy, lines, dreams = [], cue = null, i
     if (stepAnim.current) { window.cancelAnimationFrame(stepAnim.current); stepAnim.current = null; }
     for (const id of activeFx.current) { const keep = lasting.current.get(id); fxRef.current?.(id, keep?.fx ?? null); }
     activeFx.current.clear();
+    setBlown(0);
     // ハウスに入りかけで止まったときは、すがたを戻す
     setDog((d) => (d.alpha !== undefined && d.alpha < 1 ? { ...d, alpha: 1, zy: undefined } : d));
   }, []);
@@ -556,6 +573,122 @@ export function RoomDog({ skin, phase, sleepy, lines, dreams = [], cue = null, i
         });
         return;
       }
+      case "birdcage": {
+        // 鳥かごを見上げると、インコがわんこのまねをする → 首をかしげる
+        const sd = sideOf(f);
+        walkTo(sd.x, sd.y, () => {
+          face(f.x);
+          pose("wonder");
+          say(pick(["インコさん、こんにちは", "とりさん、なにしてるの？"]), 1500);
+          later(() => { pose("bark"); say("ワン！", 900); }, 1700);
+          later(() => sayRef.current?.(f.id, pick(["ワン！ワン！", "ワンワン！", "コンニチハ！"])), 2700);
+          later(() => { pose("wonder"); say(pick(["…いま、ぼくの まね した？", "しゃべった！？", "ふしぎな とりさん…"]), 2000); }, 4300);
+          later(() => pose("sit"), 6400);
+          fin(7000);
+        });
+        return;
+      }
+      case "hamster": {
+        const sd = sideOf(f);
+        walkTo(sd.x, sd.y, () => {
+          face(f.x);
+          pose("sniff");
+          say(night || phase === "night" ? "よるなのに げんきだね…" : "くるくる まわってる…", 1800);
+          later(() => { pose("wonder"); say(pick(["ぼくも はしりたい！", "めが まわらないの？", "いっしょに あそぼ？"]), 1800); }, 2100);
+          later(() => pose("sit-side"), 4100);
+          fin(5000);
+        });
+        return;
+      }
+      case "record": {
+        // レコードがかかっていれば前で踊る。止まっていれば、鼻でスイッチを入れてから踊る
+        const fr = frontOf(f, rand(-f.w * 0.15, f.w * 0.15));
+        walkTo(fr.x, fr.y, () => {
+          face(f.x);
+          const dance = (beats: number) => {
+            let n = 0;
+            const step = () => {
+              setDog((d) => ({ ...d, pose: DANCE_POSES[n % DANCE_POSES.length]!, flip: n % 2 ? !d.flip : d.flip }));
+              n += 1;
+              if (n < beats) later(step, 430);
+            };
+            step();
+          };
+          if (modesRef.current[f.id] === "on") {
+            say(pick(["♪ ノリノリ〜", "♪ ふりふり〜", "おどっちゃう！"]), 1600);
+            dance(12);
+            later(() => { pose("wink"); say("じょうずでしょ？", 1400); }, 5400);
+            fin(6800);
+            return;
+          }
+          pose("bow");
+          say("ぽちっ", 900);
+          later(() => { fx(f.id, "on", 90_000); say("♪ おんがく スタート！", 1400); dance(12); }, 900);
+          later(() => pose("wink"), 6400);
+          fin(7400);
+        });
+        return;
+      }
+      case "fireplace": {
+        const fr = frontOf(f, rand(-f.w * 0.12, f.w * 0.12));
+        const fire = !(modesRef.current[f.id] ?? "fire").startsWith("cold");
+        walkTo(fr.x, fr.y, () => {
+          face(f.x);
+          if (sleepNow) { spin(2, () => pose("sleep")); return; }
+          if (!fire) { pose("sniff"); say("キャンドル、きれい…", 1600); later(() => pose("sit"), 2000); fin(3400); return; }
+          if (winter) {
+            // 寒い日は、くるくる回ってから丸くなる
+            spin(2, () => {
+              pose("lie-wave");
+              say(pick(["あったか〜い…", "ぽかぽか…", "ここ、さいこう…"]), 2000);
+              later(() => pose("sleep"), 2600);
+              later(() => { pose("yawn"); say("…ねちゃってた", 1400); }, rand(8000, 10_000));
+              fin(11_500);
+            });
+            return;
+          }
+          pose("sit");
+          say(pick(["パチパチ いってる…", "ゆらゆら、きれい…"]), 1600);
+          later(() => pose("sit-side"), 2200);
+          fin(4200);
+        });
+        return;
+      }
+      case "fan": {
+        // ついていれば、風を顔に受けて「ワレワレハ…」。消えていれば、スイッチをさがす
+        const fr = frontOf(f, 0);
+        walkTo(fr.x, fr.y, () => {
+          face(f.x);
+          if (modesRef.current[f.id] !== "on") { pose("wonder"); say(hot ? "あつい… スイッチ、どこかな？" : "きょうは すずしいね", 1800); fin(3200); return; }
+          pose("front");
+          setBlown(f.x > pos.current.x ? 1 : -1);
+          say("ワ゛レ゛ワ゛レ゛ハ゛…", 2200);
+          later(() => { pose("stand-happy"); say("すずし〜い！", 1600); }, 2600);
+          later(() => setBlown(0), 4600);
+          fin(5200);
+        });
+        return;
+      }
+      case "gacha": {
+        const fr = frontOf(f, 0);
+        walkTo(fr.x, fr.y, () => {
+          face(f.x);
+          pose("sniff");
+          say("これ、なあに？", 1300);
+          later(() => { pose("bow"); fx(f.id, "spin"); say("ぐいっ…", 1000); }, 1500);
+          const lucky = Math.random() < 0.35;
+          later(() => {
+            if (lucky) {
+              fx(f.id, "capsule", 30_000);
+              pose("cheer");
+              say("カプセル でた！", 1500);
+              later(() => { pose("wonder"); say("…あけられない", 1500); }, 1900);
+            } else { fx(f.id, null); pose("sit"); say("…でなかった", 1400); }
+          }, 2800);
+          fin(lucky ? 6400 : 4600);
+        });
+        return;
+      }
       case "bookshelf": {
         const fr = frontOf(f, rand(-f.w * 0.2, f.w * 0.2));
         walkTo(fr.x, fr.y, () => {
@@ -575,7 +708,7 @@ export function RoomDog({ skin, phase, sleepy, lines, dreams = [], cue = null, i
         return;
       }
     }
-  }, [face, fx, jump, later, night, phase, pose, say, spin, toFloor, tween, walkTo]);
+  }, [face, fx, hot, jump, later, night, phase, pose, say, spin, toFloor, tween, walkTo, winter]);
 
   const live = useCallback(() => {
     if (busy.current) return;
@@ -585,7 +718,9 @@ export function RoomDog({ skin, phase, sleepy, lines, dreams = [], cue = null, i
     const byKind = (k: FurnitureId) => pl.furniture.find((f) => f.kind === k);
     if (night) {
       // 夜はベッド → ソファ → ハウスの中 → ラグ の順で寝る場所をさがす
-      const spot = byKind("dog-bed") ?? byKind("kotatsu") ?? byKind("sofa") ?? byKind("dog-house");
+      const fireplace = byKind("fireplace");
+      const warm = winter && fireplace && !(modesRef.current[fireplace.id] ?? "fire").startsWith("cold") ? fireplace : undefined;
+      const spot = byKind("dog-bed") ?? byKind("kotatsu") ?? warm ?? byKind("sofa") ?? byKind("dog-house");
       if (spot) playWith(spot, () => {}, true);
       else walkTo(50, 80, () => pose("sleep"));
       return;
@@ -620,6 +755,9 @@ export function RoomDog({ skin, phase, sleepy, lines, dreams = [], cue = null, i
       });
       return;
     }
+    // レコードがかかっていると、そこへ行って踊りたくなる
+    const playing = pl.furniture.find((f) => f.kind === "record" && modesRef.current[f.id] === "on");
+    if (playing && Math.random() < 0.55) { playWith(playing, () => next(rand(600, 1500))); return; }
     const r = Math.random();
     if (rainy && pl.window && r < 0.35) {
       // 雨の日は、窓から外をよくながめる
@@ -666,7 +804,7 @@ export function RoomDog({ skin, phase, sleepy, lines, dreams = [], cue = null, i
       pose(pick(IDLE_POSES));
       next(rand(2500, 5000));
     }
-  }, [face, later, night, phase, playWith, pose, quiet, say, walkTo, weather]);
+  }, [face, later, night, phase, playWith, pose, quiet, say, walkTo, weather, winter]);
 
   useEffect(() => {
     clearTimers();
@@ -757,7 +895,7 @@ export function RoomDog({ skin, phase, sleepy, lines, dreams = [], cue = null, i
         style={{ ...place, zIndex: 300 + Math.round((dog.zy ?? dog.y) * 10), opacity: dog.alpha ?? 1, pointerEvents: quiet || hidden ? "none" : "auto" }}
       >
         <span data-shadow className="pointer-events-none absolute bottom-[3%] left-1/2 h-[12%] w-[62%] -translate-x-1/2 rounded-[50%] bg-[#4a3520]/20 blur-[2px]" />
-        <span key={hearts.at(-1) ?? 0} className={`block ${hearts.length ? "room-dog-hop" : shiver ? "room-dog-shiver" : motion}`}>
+        <span key={hearts.at(-1) ?? 0} className={`block ${hearts.length ? "room-dog-hop" : shiver ? "room-dog-shiver" : blown ? "room-dog-blown" : motion}`}>
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img data-body src={getFrenchieSrc(skin, dog.pose)} alt="" draggable={false} className="relative block h-auto w-full select-none" style={{ transform: dog.flip ? "scaleX(-1)" : undefined }} />
         </span>
@@ -768,6 +906,12 @@ export function RoomDog({ skin, phase, sleepy, lines, dreams = [], cue = null, i
         {/* おなら（おしりのほうに、もやっと緑の雲） */}
         {puff ? <span key={puff} className="room-puff absolute bottom-[14%] h-[46%] w-[46%] rounded-full" style={dog.flip ? { left: "-14%" } : { right: "-14%" }} /> : null}
         {hearts.map((h) => <span key={h} className="room-heart absolute left-1/2 top-[8%] text-lg">💗</span>)}
+        {/* 扇風機の風（顔に当たる白いすじ） */}
+        {blown ? (
+          <span className="absolute inset-0" style={{ transform: blown < 0 ? "scaleX(-1)" : undefined }}>
+            {[22, 38, 54].map((top, i) => <span key={top} className="room-wind absolute right-[-18%] h-[3px] w-[46%] rounded-full bg-white/85" style={{ top: `${top}%`, animationDelay: `${i * 0.18}s` }} />)}
+          </span>
+        ) : null}
         {bubble ? (
           <span
             key={bubble.id}
