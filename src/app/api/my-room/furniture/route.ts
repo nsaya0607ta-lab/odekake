@@ -23,7 +23,7 @@ export async function POST(request: Request) {
   const { data, error } = await rpc("buy_room_furniture", { p_furniture: body.furniture });
   if (error) {
     const name = FURNITURE[body.furniture].name;
-    if (error.message.includes("BLUE_COINS_SHORT")) return NextResponse.json({ error: `青コインが足りません（${name}は${FURNITURE[body.furniture].price}枚）。` }, { status: 400 });
+    if (error.message.includes("BLUE_COINS_SHORT")) return NextResponse.json({ error: `青コインが足りません（${name}は${FURNITURE[body.furniture].price.toLocaleString()}枚）。` }, { status: 400 });
     if (error.message.includes("FURNITURE_LIMIT")) return NextResponse.json({ error: `${name}は2こまでです。` }, { status: 400 });
     console.error("Failed to buy room furniture", { code: error.code, message: error.message });
     return NextResponse.json({ error: "買えませんでした。時間をおいてお試しください。" }, { status: 400 });

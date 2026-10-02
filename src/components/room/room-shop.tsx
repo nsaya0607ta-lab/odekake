@@ -75,7 +75,7 @@ export function FurnitureShop({ shop, placedOf, onPlace, onBought }: {
               <span className="mt-1 block truncate text-center text-[10px] font-bold">{FURNITURE[id].name}</span>
               {canBuy && owned <= placed ? (
                 <span className="mt-1 flex items-center justify-center gap-0.5 rounded-full bg-[#2F6FC2] py-0.5 text-[10px] font-black tabular-nums text-white">
-                  <BlueCoinArt className="h-3.5 w-3.5" />{FURNITURE[id].price}{owned ? " でもう1こ" : " で買う"}
+                  <BlueCoinArt className="h-3.5 w-3.5 shrink-0" />{FURNITURE[id].price.toLocaleString()}<span className="text-[9px]">{owned ? "で+1こ" : "で買う"}</span>
                 </span>
               ) : (
                 <span className="mt-1 block rounded-full bg-leaf-soft py-0.5 text-center text-[10px] font-black text-leaf-deep">{owned > placed ? "タップで置く" : "2こ 持っています"}</span>
@@ -92,7 +92,7 @@ export function FurnitureShop({ shop, placedOf, onPlace, onBought }: {
               <span className="block w-20 shrink-0 rounded-2xl bg-paper p-1.5"><DecorVisual entry={entryOf(target.id, 1)} thumb /></span>
               <div className="min-w-0">
                 <p className="text-base font-black">{target.name}</p>
-                <p className="mt-0.5 flex items-center gap-1 text-sm font-black tabular-nums text-[#1F4F8F]"><BlueCoinArt className="h-4 w-4" />{target.price}枚</p>
+                <p className="mt-0.5 flex items-center gap-1 text-sm font-black tabular-nums text-[#1F4F8F]"><BlueCoinArt className="h-4 w-4" />{target.price.toLocaleString()}枚</p>
                 <p className="mt-0.5 text-[11px] font-bold tabular-nums text-ink-faint">のこり {shop.blueCoins.toLocaleString()}枚{short <= 0 ? ` → ${(shop.blueCoins - target.price).toLocaleString()}枚` : ""}</p>
               </div>
             </div>

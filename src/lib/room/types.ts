@@ -28,15 +28,15 @@ export type DecorEntry =
  * price は青コインの値段（DB の room_furniture_price と同じ値）。1種類2こまで買える
  */
 export const FURNITURE = {
-  sofa: { name: "ソファ", width: 36, price: 250 },
-  "dog-bed": { name: "わんこベッド", width: 24, price: 150 },
-  plant: { name: "観葉植物", width: 13, price: 50 },
-  bookshelf: { name: "本だな", width: 19, price: 120 },
-  lamp: { name: "フロアランプ", width: 10, price: 80 },
-  table: { name: "ローテーブル", width: 25, price: 100 },
-  "dog-house": { name: "わんこハウス", width: 27, price: 200 },
-  bowl: { name: "ごはん皿", width: 10, price: 30 },
-  whiteboard: { name: "ホワイトボード", width: 24, price: 120 },
+  sofa: { name: "ソファ", width: 36, price: 6000 },
+  "dog-bed": { name: "わんこベッド", width: 24, price: 4000 },
+  plant: { name: "観葉植物", width: 13, price: 1200 },
+  bookshelf: { name: "本だな", width: 19, price: 3000 },
+  lamp: { name: "フロアランプ", width: 10, price: 2000 },
+  table: { name: "ローテーブル", width: 25, price: 2500 },
+  "dog-house": { name: "わんこハウス", width: 27, price: 5000 },
+  bowl: { name: "ごはん皿", width: 10, price: 800 },
+  whiteboard: { name: "ホワイトボード", width: 24, price: 3000 },
 } as const;
 export type FurnitureId = keyof typeof FURNITURE;
 export const FURNITURE_IDS = Object.keys(FURNITURE) as FurnitureId[];

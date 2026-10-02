@@ -334,15 +334,15 @@ language sql
 immutable
 as $$
   select case p_furniture
-    when 'bowl' then 30
-    when 'plant' then 50
-    when 'lamp' then 80
-    when 'table' then 100
-    when 'bookshelf' then 120
-    when 'whiteboard' then 120
-    when 'dog-bed' then 150
-    when 'dog-house' then 200
-    when 'sofa' then 250
+    when 'bowl' then 800
+    when 'plant' then 1200
+    when 'lamp' then 2000
+    when 'table' then 2500
+    when 'bookshelf' then 3000
+    when 'whiteboard' then 3000
+    when 'dog-bed' then 4000
+    when 'dog-house' then 5000
+    when 'sofa' then 6000
     else null
   end;
 $$;
