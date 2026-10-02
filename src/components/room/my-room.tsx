@@ -172,7 +172,7 @@ function freeWallSpot(taken: readonly { x: number; y: number }[], fixtures: read
 /** 家具の奥行き（床の上で場所をとる高さ。幅に対する割合） */
 const PLACE_KEY = "odekake-room-place-v1";
 /** 家具の絵の 高さ÷幅（furniture-art.tsx の viewBox） */
-const FURNITURE_RATIO: Record<FurnitureId, number> = { kotatsu: 130 / 220, fishbowl: 150 / 100, tv: 160 / 200, piano: 180 / 220, "rocking-chair": 180 / 140, toybox: 120 / 160, whiteboard: 200 / 160, sofa: 150 / 260, "dog-bed": 110 / 190, plant: 190 / 120, bookshelf: 210 / 150, lamp: 220 / 90, table: 120 / 200, "dog-house": 190 / 200, bowl: 58 / 100 };
+const FURNITURE_RATIO: Record<FurnitureId, number> = { kotatsu: 158 / 240, fishbowl: 168 / 110, tv: 180 / 230, piano: 230 / 240, "rocking-chair": 210 / 160, toybox: 146 / 180, whiteboard: 200 / 160, sofa: 150 / 260, "dog-bed": 110 / 190, plant: 190 / 120, bookshelf: 210 / 150, lamp: 220 / 90, table: 120 / 200, "dog-house": 190 / 200, bowl: 58 / 100 };
 /** 犬が遊んでいるあいだの家具の動き（ゆれる・明かりがつく など） */
 const FX_CLASS: Partial<Record<FurnitureFx, string>> = { wobble: "room-fx-wobble", sway: "room-fx-sway", squish: "room-fx-squish", clatter: "room-fx-clatter" };
 const FURNITURE_DEPTH: Record<string, number> = { kotatsu: 0.35, fishbowl: 0.2, tv: 0.25, piano: 0.3, "rocking-chair": 0.25, toybox: 0.25, whiteboard: 0.2, sofa: 0.35, plant: 0.2, bookshelf: 0.25, lamp: 0.2, table: 0.3, "dog-house": 0.35, bowl: 0.2, "dog-bed": 0.3 };
