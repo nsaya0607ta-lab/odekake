@@ -132,7 +132,7 @@ export type DogPlaces = {
   blocks: { x0: number; x1: number; y0: number; y1: number }[];
 };
 
-export function RoomDog({ skin, phase, sleepy, lines, dreams = [], quiet, places, weather = null, onFx }: {
+export function RoomDog({ skin, phase, sleepy, lines, dreams = [], cue = null, quiet, places, weather = null, onFx }: {
   skin: DogSkinId;
   phase: DayPhase;
   /** 窓の外の天気（わからなければ null） */
@@ -141,6 +141,8 @@ export function RoomDog({ skin, phase, sleepy, lines, dreams = [], quiet, places
   lines: readonly string[];
   /** 寝ているときの寝言の候補 */
   dreams?: readonly string[];
+  /** 部屋で起きたことへの反応（id が変わるたびに1回、その場で言う） */
+  cue?: { id: number; text: string; pose?: string } | null;
   /** もようがえ中は、じゃまにならないよう端ですわって待つ */
   quiet: boolean;
   /** 寝る時間か（日本時間の夜おそく〜朝） */
@@ -153,6 +155,8 @@ export function RoomDog({ skin, phase, sleepy, lines, dreams = [], quiet, places
   const [dog, setDog] = useState<DogState>({ x: 30, y: 84, pose: "sit", flip: false });
   const [bubble, setBubble] = useState<{ text: string; id: number; dream?: boolean } | null>(null);
   const [hearts, setHearts] = useState<number[]>([]);
+  /** こわくて ぷるぷる ふるえている（かみなり） */
+  const [shiver, setShiver] = useState(false);
   const timers = useRef<number[]>([]);
   const walkAnim = useRef<number | null>(null);
   const stepAnim = useRef<number | null>(null);
@@ -500,7 +504,33 @@ export function RoomDog({ skin, phase, sleepy, lines, dreams = [], quiet, places
       else walkTo(50, 80, () => pose("sleep"));
       return;
     }
+    const rainy = weather === "rain" || weather === "drizzle";
+    if (weather === "thunder" && Math.random() < 0.65) {
+      // かみなり：ハウスの中にかくれる。なければテーブル・ソファのかげ、それもなければ部屋のすみで ぷるぷる
+      const house = byKind("dog-house");
+      if (house && Math.random() < 0.6) { say("かみなり、こわい…", 1400); playWith(house, () => next(rand(1500, 3000))); return; }
+      const cover = byKind("table") ?? byKind("sofa") ?? byKind("bookshelf");
+      const at = cover ? sideOf(cover) : { x: 7, y: ROOM.floorTop + 4, side: 1 };
+      walkTo(at.x, at.y, () => {
+        if (cover) face(cover.x); else setDog((d) => ({ ...d, flip: false }));
+        pose(pick(["sit", "lie-wave"] as const));
+        setShiver(true);
+        say(pick(["かみなり、こわい…", "ゴロゴロいってる…", "ここに かくれてよ…"]), 2200);
+        later(() => setShiver(false), 6000);
+        next(6400);
+      });
+      return;
+    }
     const r = Math.random();
+    if (rainy && pl.window && r < 0.35) {
+      // 雨の日は、窓から外をよくながめる
+      walkTo(clamp(pl.window.x, 8, 92), ROOM.floorTop + 2.5, () => {
+        pose(pick(["sit-side", "wonder", "sit"] as const));
+        say(pick(["あめ…", "雨の音がするね…", "おさんぽ、いけないね…", "あめ、やまないかな…", "てるてるぼうず、つくる？"]), 2600);
+        next(rand(4500, 7000));
+      });
+      return;
+    }
     if (r < 0.14 && pl.toys.length) {
       // おもちゃのにおいをかいで、遊ぶ
       const toy = pick(pl.toys);
@@ -517,7 +547,6 @@ export function RoomDog({ skin, phase, sleepy, lines, dreams = [], quiet, places
       // 窓の下で外をながめる
       walkTo(clamp(pl.window.x, 8, 92), ROOM.floorTop + 2.5, () => {
         pose(pick(["wonder", "sit-side", "front"] as const));
-        const rainy = weather === "rain" || weather === "drizzle";
         say(
           weather === "thunder" ? "かみなり、こわい…" : rainy ? "雨の音がするね…" : weather === "snow" ? "雪だ！ おそとまっしろ！" : weather === "fog" ? "おそと、まっしろでなにも見えない…"
             : phase === "night" ? (weather === "cloudy" ? "きょうはお星さま、かくれてる…" : "お星さま、見えるかな…") : phase === "evening" ? "夕やけ、きれい…" : weather === "cloudy" ? "くもってるね。おさんぽ行けるかな？" : phase === "morning" ? "いい朝だね" : "おそと、いい天気…",
@@ -538,7 +567,7 @@ export function RoomDog({ skin, phase, sleepy, lines, dreams = [], quiet, places
       pose(pick(IDLE_POSES));
       next(rand(2500, 5000));
     }
-  }, [later, night, phase, playWith, pose, quiet, say, walkTo, weather]);
+  }, [face, later, night, phase, playWith, pose, quiet, say, walkTo, weather]);
 
   useEffect(() => {
     clearTimers();
@@ -550,6 +579,7 @@ export function RoomDog({ skin, phase, sleepy, lines, dreams = [], quiet, places
     if (quiet) return;
     clearTimers();
     busy.current = true;
+    setShiver(false);
     const awake = !night || Math.random() < 0.6;
     setDog((d) => ({ ...d, pose: awake ? pick(HAPPY_POSES) : "yawn" }));
     const id = Date.now();
@@ -559,6 +589,19 @@ export function RoomDog({ skin, phase, sleepy, lines, dreams = [], quiet, places
     later(() => setBubble((b) => (b?.id === id ? null : b)), 2400);
     later(() => { busy.current = false; live(); }, 2000);
   };
+
+  // 部屋で起きたことに反応する（よごれを片づけてもらった など）
+  useEffect(() => {
+    if (!cue) return;
+    clearTimers();
+    busy.current = true;
+    setShiver(false);
+    if (cue.pose) setDog((d) => ({ ...d, pose: cue.pose! }));
+    say(cue.text, 2200);
+    later(() => { busy.current = false; live(); }, 2400);
+    // cue.id が変わったときだけ
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [cue?.id]);
 
   // 寝ているあいだ、ときどき寝言を言う（見えないところ〈ハウスの中〉で寝ているときは言わない）
   const dreaming = night && !quiet && dog.pose === "sleep" && (dog.alpha ?? 1) > 0.05;
@@ -600,7 +643,7 @@ export function RoomDog({ skin, phase, sleepy, lines, dreams = [], quiet, places
         style={{ ...place, zIndex: 300 + Math.round((dog.zy ?? dog.y) * 10), opacity: dog.alpha ?? 1, pointerEvents: quiet || hidden ? "none" : "auto" }}
       >
         <span data-shadow className="pointer-events-none absolute bottom-[3%] left-1/2 h-[12%] w-[62%] -translate-x-1/2 rounded-[50%] bg-[#4a3520]/20 blur-[2px]" />
-        <span key={hearts.at(-1) ?? 0} className={`block ${hearts.length ? "room-dog-hop" : motion}`}>
+        <span key={hearts.at(-1) ?? 0} className={`block ${hearts.length ? "room-dog-hop" : shiver ? "room-dog-shiver" : motion}`}>
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img data-body src={getFrenchieSrc(skin, dog.pose)} alt="" draggable={false} className="relative block h-auto w-full select-none" style={{ transform: dog.flip ? "scaleX(-1)" : undefined }} />
         </span>

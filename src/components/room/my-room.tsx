@@ -66,7 +66,7 @@ import { parseRoomWeather, withWeather, type RoomWeather } from "@/lib/room/weat
 import { EVENT_FLOOR_Y, EventFloor, EventFront } from "./room-events";
 import { dayPhaseOf, FixtureVisual, fixtureSize, lampsOn, ROOM_STAGE, RoomLighting, RoomScene, ThemeSwatch, windowRectOf, type DayPhase } from "./room-scene";
 import { RoomBoard } from "./room-board";
-import { DoodleContext, PasserLink, ShootingStars, useWindowPasser } from "./room-gimmicks";
+import { DiaryDialog, DoodleContext, PasserLink, RoomMess, ShootingStars, useRoomMess, useWindowPasser } from "./room-gimmicks";
 import { DEFAULT_PLACE, locateHere, placeShortName, SkyCard, skyBackdrop, type RoomPlace } from "./sky-card";
 
 type Tab = DecorKind | "theme";
@@ -245,6 +245,10 @@ export function MyRoom({ entries, initialLayout, serverReady, dogSkin, dogName, 
   const [filter, setFilter] = useState<ItemFilter>("all");
   const [saveState, setSaveState] = useState<SaveState>(serverReady ? "saved" : "local");
   const [toast, setToast] = useState<string | null>(null);
+  /** 本だなの日記を開いている */
+  const [diary, setDiary] = useState(false);
+  /** わんこに反応してもらうこと（日記を開いた・散らかったものを片づけた など） */
+  const [dogCue, setDogCue] = useState<{ id: number; text: string; pose?: string } | null>(null);
   const [peek, setPeek] = useState<{ id: string; text: string; x: number; y: number } | null>(null);
   const [lightbox, setLightbox] = useState<Extract<DecorEntry, { kind: "photo" }> | null>(null);
   const [shot, setShot] = useState<{ blob: Blob; url: string } | null>(null);
@@ -510,6 +514,12 @@ export function MyRoom({ entries, initialLayout, serverReady, dogSkin, dogName, 
     const entry = entryByKey.get(p.key);
     if (!entry) return;
     if (entry.kind === "photo") { setLightbox(entry); return; }
+    // 本だなには、わんこの日記がはさまっている
+    if (entry.kind === "furniture" && entry.furniture === "bookshelf" && !visit) {
+      setDiary(true);
+      setDogCue({ id: Date.now(), text: "あっ、ぼくの にっき…よんでもいいよ", pose: "bow" });
+      return;
+    }
     const text = entry.kind === "item" ? `${entry.rarity} ${entry.name}` : entry.kind === "trophy" ? `${entry.name}　ベスト ${entry.score.toLocaleString("ja-JP")}点（${entry.rank}）` : entry.kind === "pennant" ? `${entry.name}のペナント` : entry.name;
     // 名前は夜の暗さより上に出すので、部屋の中の位置（そのものの上のはし）を覚えておく
     const r = el?.getBoundingClientRect(), room = roomRef.current?.getBoundingClientRect();
@@ -541,6 +551,8 @@ export function MyRoom({ entries, initialLayout, serverReady, dogSkin, dogName, 
     return lines;
   }, [entryByKey, layout.items, phase]);
 
+  /** きょうの日付（日本時間。日記はきのうまで） */
+  const todayKey = useMemo(() => new Intl.DateTimeFormat("sv-SE", { timeZone: "Asia/Tokyo" }).format(now), [now]);
   /** ホワイトボードのらくがき（きょうの日付・天気・歩数で変わる） */
   const doodleInfo = useMemo(() => ({ now, weather: weather?.kind ?? null, steps: visit ? null : steps?.steps, dogName }), [now, weather?.kind, visit, steps?.steps, dogName]);
   /** 寝言（きょうの歩数や、部屋にあるもの・おやつの夢） */
@@ -591,6 +603,19 @@ export function MyRoom({ entries, initialLayout, serverReady, dogSkin, dogName, 
       }),
     };
   }, [entryByKey, layout.items, style, windowRects]);
+
+  /** るすばん中のいたずら（しばらく開かなかったあとは、床が散らかっている。自分の部屋だけ） */
+  const { mess, fresh: freshMess, clean: cleanMess } = useRoomMess({ enabled: !visit, floorTop: ROOM.floorTop, floorBottom: ROOM.floorBottom, blocks: dogPlaces.blocks });
+  useEffect(() => {
+    if (!freshMess) return;
+    flash("るすばん中に、わんこが なにか したみたい…");
+    setDogCue({ id: Date.now(), text: "…しらないよ？", pose: "wonder" });
+  }, [freshMess, flash]);
+  const onCleanMess = (id: string) => {
+    const left = mess.length - 1;
+    cleanMess(id);
+    setDogCue(left > 0 ? { id: Date.now(), text: ["…ごめんね", "えへへ…", "もう しないよ…たぶん"][Math.floor(Math.random() * 3)]!, pose: "bow" } : { id: Date.now(), text: "ぴかぴか！ かたづけて くれて ありがとう！", pose: "cheer" });
+  };
 
   const selected = layout.items.find((p) => p.id === selectedId) ?? null;
   const selectedEntry = selected ? entryByKey.get(selected.key) ?? null : null;
@@ -779,7 +804,8 @@ export function MyRoom({ entries, initialLayout, serverReady, dogSkin, dogName, 
               );
             })}
 
-            <RoomDog skin={dogSkin} phase={phase} sleepy={sleepy} lines={dogLines} dreams={dogDreams} quiet={editing} places={dogPlaces} weather={weather?.kind ?? null} onFx={onFurnitureFx} />
+            {!editing && mess.length ? <RoomMess mess={mess} onClean={(m) => onCleanMess(m.id)} /> : null}
+          <RoomDog skin={dogSkin} phase={phase} sleepy={sleepy} lines={dogLines} dreams={dogDreams} cue={dogCue} quiet={editing} places={dogPlaces} weather={weather?.kind ?? null} onFx={onFurnitureFx} />
             {/* 行事のもの（部屋の左右のすみ）。置いたものと同じく、奥ほど下に重なる */}
             {roomEvent ? (["L", "R"] as const).map((side) => (
               <div key={side} className="pointer-events-none absolute inset-0" style={{ zIndex: 300 + Math.round(EVENT_FLOOR_Y[side] * 10) }} data-event-layer>
@@ -950,6 +976,8 @@ export function MyRoom({ entries, initialLayout, serverReady, dogSkin, dogName, 
             </div>
           </div>
         ) : null}
+
+        {diary ? <DiaryDialog history={stepHistory ?? []} today={todayKey} dogName={dogName} onClose={() => setDiary(false)} /> : null}
 
         {lightbox ? (
           <div className="fixed inset-0 z-[700] flex items-center justify-center bg-[#140f22]/75 p-4 backdrop-blur-sm" role="dialog" aria-modal="true" aria-label={`${lightbox.name}の思い出`} onClick={(e) => { if (e.target === e.currentTarget) setLightbox(null); }}>

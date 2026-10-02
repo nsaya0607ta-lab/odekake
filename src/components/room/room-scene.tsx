@@ -596,6 +596,19 @@ function Window({ sky, curtain, season, weather, style, passer = null }: { sky: 
       {season === "summer" && !night && !wet ? <g>{[0.12, 0.3].map((sx) => <g key={sx} transform={`translate(${x0 + w * sx} ${y1 - h * 0.12})`}><rect x="-2" y="-30" width="4" height="34" fill="#5E9C52" /><circle cx="0" cy="-34" r="11" fill="#F6C12E" /><circle cx="0" cy="-34" r="5" fill="#8A5A30" /></g>)}</g> : null}
         {/* 大きな窓の外はベランダ */}
         {style === "french" ? <Balcony x0={x0} x1={x1} y1={y1} h={h} dark={dark} /> : null}
+        {/* 雪の日は、窓の外に小さな雪だるま */}
+        {snowy ? (
+          <g transform={`translate(${x0 + w * 0.26} ${y1 - h * 0.07})`}>
+            <ellipse cx="2" cy="1" rx="16" ry="3.5" fill="#1E2A3A" opacity="0.12" />
+            <circle cx="0" cy="-12" r="13" fill={mixColor("#FFFFFF", "#9AA8C0", dark * 0.7)} />
+            <circle cx="0" cy="-31" r="9" fill={mixColor("#FFFFFF", "#9AA8C0", dark * 0.7)} />
+            <circle cx="-3" cy="-33" r="1.3" fill="#2A2E34" /><circle cx="3" cy="-33" r="1.3" fill="#2A2E34" />
+            <path d="M0 -30 l6 1.6 l-6 1.2 z" fill="#F08A1C" />
+            <path d="M-8 -24 q8 4 16 0 l1 4 q-9 4 -18 0 z" fill="#D9402E" />
+            <path d="M-12 -15 l-10 -8 M12 -15 l10 -8" stroke="#6E4A2A" strokeWidth="1.8" strokeLinecap="round" />
+            <path d="M-7 -40 h14 v-3 h-3 v-8 h-8 v8 h-3 z" fill="#3A3F47" />
+          </g>
+        ) : null}
         {/* おさんぽ中の犬が、窓の外を通りすぎる（桟やカーテンのうしろを通る） */}
         {passer ? (() => {
           const dh = h * 0.2, dw = dh * (300 / 254), base = y1 - h * (style === "french" ? 0.1 : 0.04);

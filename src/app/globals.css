@@ -4398,6 +4398,8 @@
 }
 /* わんこのおへやの犬：歩くと弾み、止まると息をし、寝るとゆっくり上下し、なでると跳ねる */
 @keyframes room-dog-walk { 0%, 100% { transform: translateY(0) rotate(0deg); } 25% { transform: translateY(-4%) rotate(-1.5deg); } 50% { transform: translateY(0) rotate(0deg); } 75% { transform: translateY(-4%) rotate(1.5deg); } }
+@keyframes room-dog-shiver { 0%, 100% { transform: translateX(0); } 25% { transform: translateX(-1.6%); } 75% { transform: translateX(1.6%); } }
+.room-dog-shiver { animation: room-dog-shiver 0.14s linear infinite; }
 @keyframes room-dog-idle { 0%, 100% { transform: scaleY(1); } 50% { transform: scaleY(1.025); } }
 @keyframes room-dog-sleep { 0%, 100% { transform: scale(1, 1); } 50% { transform: scale(1.015, 1.04); } }
 @keyframes room-dog-hop { 0% { transform: translateY(0) scale(1, 1); } 20% { transform: translateY(0) scale(1.08, 0.9); } 45% { transform: translateY(-14%) scale(0.95, 1.06); } 70% { transform: translateY(0) scale(1.05, 0.95); } 100% { transform: translateY(0) scale(1, 1); } }
@@ -4432,5 +4434,5 @@
 @keyframes room-passer-bob { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-2px); } }
 .room-passer-bob { animation: room-passer-bob 0.36s ease-in-out infinite; }
 @media (prefers-reduced-motion: reduce) {
-  .room-selected, .room-heart, .room-bubble, .room-dog-walk, .room-dog-idle, .room-dog-sleep, .room-dog-hop, .room-fx-wobble, .room-fx-sway, .room-fx-squish, .room-fx-clatter, .room-wish { animation: none; }
+  .room-selected, .room-heart, .room-bubble, .room-dog-walk, .room-dog-idle, .room-dog-sleep, .room-dog-hop, .room-dog-shiver, .room-fx-wobble, .room-fx-sway, .room-fx-squish, .room-fx-clatter, .room-wish { animation: none; }
 }
