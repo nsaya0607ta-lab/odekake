@@ -132,13 +132,15 @@ export type DogPlaces = {
   blocks: { x0: number; x1: number; y0: number; y1: number }[];
 };
 
-export function RoomDog({ skin, phase, sleepy, lines, quiet, places, weather = null, onFx }: {
+export function RoomDog({ skin, phase, sleepy, lines, dreams = [], quiet, places, weather = null, onFx }: {
   skin: DogSkinId;
   phase: DayPhase;
   /** 窓の外の天気（わからなければ null） */
   weather?: WeatherKind | null;
   /** タップしたときに言うことの候補（飾ってあるものの話など） */
   lines: readonly string[];
+  /** 寝ているときの寝言の候補 */
+  dreams?: readonly string[];
   /** もようがえ中は、じゃまにならないよう端ですわって待つ */
   quiet: boolean;
   /** 寝る時間か（日本時間の夜おそく〜朝） */
@@ -149,7 +151,7 @@ export function RoomDog({ skin, phase, sleepy, lines, quiet, places, weather = n
   onFx?: (id: string, fx: FurnitureFx | null) => void;
 }) {
   const [dog, setDog] = useState<DogState>({ x: 30, y: 84, pose: "sit", flip: false });
-  const [bubble, setBubble] = useState<{ text: string; id: number } | null>(null);
+  const [bubble, setBubble] = useState<{ text: string; id: number; dream?: boolean } | null>(null);
   const [hearts, setHearts] = useState<number[]>([]);
   const timers = useRef<number[]>([]);
   const walkAnim = useRef<number | null>(null);
@@ -544,6 +546,26 @@ export function RoomDog({ skin, phase, sleepy, lines, quiet, places, weather = n
     later(() => { busy.current = false; live(); }, 2000);
   };
 
+  // 寝ているあいだ、ときどき寝言を言う（見えないところ〈ハウスの中〉で寝ているときは言わない）
+  const dreaming = night && !quiet && dog.pose === "sleep" && (dog.alpha ?? 1) > 0.05;
+  const dreamsRef = useRef(dreams);
+  dreamsRef.current = dreams;
+  useEffect(() => {
+    if (!dreaming) return;
+    let t = 0;
+    const talk = () => {
+      const d = dreamsRef.current;
+      if (d.length) {
+        const id = Date.now() + Math.random();
+        setBubble({ text: `むにゃ… ${pick(d)}`, id, dream: true });
+        window.setTimeout(() => setBubble((b) => (b?.id === id ? null : b)), 3200);
+      }
+      t = window.setTimeout(talk, rand(9000, 16000));
+    };
+    t = window.setTimeout(talk, rand(3000, 6000));
+    return () => window.clearTimeout(t);
+  }, [dreaming]);
+
   const width = DOG_WIDTH * depthScale(dog.y);
   const place = {
     left: `${dog.x}%`,
@@ -576,7 +598,7 @@ export function RoomDog({ skin, phase, sleepy, lines, quiet, places, weather = n
         {bubble ? (
           <span
             key={bubble.id}
-            className={`room-bubble absolute bottom-[96%] w-max max-w-[11rem] rounded-2xl border border-line bg-card px-2.5 py-1.5 text-[11px] font-bold leading-snug text-ink shadow-md ${dog.x < 28 ? "room-bubble-left left-0" : dog.x > 72 ? "room-bubble-right right-0" : "left-1/2 -translate-x-1/2"}`}
+            className={`room-bubble absolute bottom-[96%] w-max max-w-[11rem] rounded-2xl border px-2.5 py-1.5 text-[11px] font-bold leading-snug shadow-md ${bubble.dream ? "border-[#D8D2FF] bg-[#F3F0FF] text-[#5A5794]" : "border-line bg-card text-ink"} ${dog.x < 28 ? "room-bubble-left left-0" : dog.x > 72 ? "room-bubble-right right-0" : "left-1/2 -translate-x-1/2"}`}
           >
             {bubble.text}
           </span>

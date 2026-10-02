@@ -66,6 +66,7 @@ import { parseRoomWeather, withWeather, type RoomWeather } from "@/lib/room/weat
 import { EVENT_FLOOR_Y, EventFloor, EventFront } from "./room-events";
 import { dayPhaseOf, FixtureVisual, fixtureSize, lampsOn, ROOM_STAGE, RoomLighting, RoomScene, ThemeSwatch, windowRectOf, type DayPhase } from "./room-scene";
 import { RoomBoard } from "./room-board";
+import { ShootingStars } from "./room-gimmicks";
 import { DEFAULT_PLACE, locateHere, placeShortName, SkyCard, skyBackdrop, type RoomPlace } from "./sky-card";
 
 type Tab = DecorKind | "theme";
@@ -540,6 +541,17 @@ export function MyRoom({ entries, initialLayout, serverReady, dogSkin, dogName, 
     return lines;
   }, [entryByKey, layout.items, phase]);
 
+  /** 寝言（きょうの歩数や、部屋にあるもの・おやつの夢） */
+  const dogDreams = useMemo(() => {
+    const dreams = ["ジャーキー…3本…", "ボール…まてまて〜…", "おさんぽ…もう1周…", "ごしゅじん…だいすき…", "それ…ぼくの…おやつ…"];
+    if (steps?.steps) dreams.push(`${steps.steps.toLocaleString()}歩…まだ あるけるよ…`);
+    for (const p of layout.items) {
+      const e = entryByKey.get(p.key);
+      if (e && (e.kind === "item" || e.kind === "furniture")) dreams.push(`${e.name}…ぼくの…`);
+    }
+    return dreams.slice(0, 20);
+  }, [entryByKey, layout.items, steps?.steps]);
+
   /** 置いてある窓（外が見える範囲。部屋の %） */
   const windowRects = useMemo(() => layout.items.filter((p) => p.key === fixtureKey("window")).map((p) => windowRectOf(p, style)), [layout.items, style]);
   /** フロアランプの明かり（夜はそのまわりが明るい） */
@@ -757,7 +769,7 @@ export function MyRoom({ entries, initialLayout, serverReady, dogSkin, dogName, 
             );
           })}
 
-          <RoomDog skin={dogSkin} phase={phase} sleepy={sleepy} lines={dogLines} quiet={editing} places={dogPlaces} weather={weather?.kind ?? null} onFx={onFurnitureFx} />
+          <RoomDog skin={dogSkin} phase={phase} sleepy={sleepy} lines={dogLines} dreams={dogDreams} quiet={editing} places={dogPlaces} weather={weather?.kind ?? null} onFx={onFurnitureFx} />
           {/* 行事のもの（部屋の左右のすみ）。置いたものと同じく、奥ほど下に重なる */}
           {roomEvent ? (["L", "R"] as const).map((side) => (
             <div key={side} className="pointer-events-none absolute inset-0" style={{ zIndex: 300 + Math.round(EVENT_FLOOR_Y[side] * 10) }} data-event-layer>
@@ -769,6 +781,8 @@ export function MyRoom({ entries, initialLayout, serverReady, dogSkin, dogName, 
               <EventFront event={roomEvent} lit={lightsOn} />
             </div>
           ) : null}
+          {/* 晴れた夜は、ときどき窓の外を流れ星が流れる（タップでねがいごと） */}
+          <ShootingStars rects={windowRects} active={phase === "night" && !editing && (!weather || weather.kind === "clear" || weather.kind === "partly")} onWish={flash} />
           <div className="pointer-events-none absolute inset-0" style={{ zIndex: 2000 }}>
             <RoomLighting now={now} lamps={lampLights} at={place} weather={weather} room={layout.theme.room} event={roomEvent} openBottom={stage} />
           </div>
