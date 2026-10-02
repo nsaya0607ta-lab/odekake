@@ -5,8 +5,9 @@
  * - 流れ星：晴れた夜、ときどき窓の外を流れ星が横切る。消えるまでにタップすると、ねがいごとができる。
  * - 窓の外を通る犬：昼間、おさんぽ中の犬がときどき窓の外を通る。きょうたくさん歩いた日ほど、よく通る。
  *   ときどきフレンドの犬も通り、タップするとその部屋にあそびに行ける。
+ * - ホワイトボードのらくがき：ホワイトボード（家具）を置くと、わんこが毎朝ひとつずつ描きたしていく。
  */
-import { useEffect, useState } from "react";
+import { createContext, useContext, useEffect, useState } from "react";
 import Link from "next/link";
 import { DOG_SKIN_IDS, getFrenchieSrc } from "@/lib/dog-skins";
 import type { WindowPasser, WindowRect } from "./room-scene";
@@ -145,75 +146,92 @@ export function PasserLink({ rects, passer }: { rects: readonly WindowRect[]; pa
   );
 }
 
-/* ---------- 黒板のらくがき ---------- */
+/* ---------- ホワイトボードのらくがき ---------- */
 
-/** チョークで描く小さな絵（24×24） */
+/** マーカーで描く小さな絵（24×24） */
 const DOODLES: { color: string; d: string; fill?: boolean }[] = [
   // 肉球
-  { color: "#F4F1E6", fill: true, d: "M12 21c-3.6 0-6-1.8-6-4.2 0-2.6 2.8-4.6 6-4.6s6 2 6 4.6c0 2.4-2.4 4.2-6 4.2zM5.4 11.2a2 2.4 0 1 0 0.1 0zM9.6 7.6a2 2.4 0 1 0 0.1 0zM14.4 7.6a2 2.4 0 1 0 0.1 0zM18.6 11.2a2 2.4 0 1 0 0.1 0z" },
+  { color: "#3A3F47", fill: true, d: "M12 21c-3.6 0-6-1.8-6-4.2 0-2.6 2.8-4.6 6-4.6s6 2 6 4.6c0 2.4-2.4 4.2-6 4.2zM5.4 11.2a2 2.4 0 1 0 0.1 0zM9.6 7.6a2 2.4 0 1 0 0.1 0zM14.4 7.6a2 2.4 0 1 0 0.1 0zM18.6 11.2a2 2.4 0 1 0 0.1 0z" },
   // ほね
-  { color: "#F4F1E6", d: "M6 9a2.6 2.6 0 1 1 3-3l6 6a2.6 2.6 0 1 1 3 3 2.6 2.6 0 1 1-3 3l-6-6a2.6 2.6 0 1 1-3-3z" },
+  { color: "#8A5A30", d: "M6 9a2.6 2.6 0 1 1 3-3l6 6a2.6 2.6 0 1 1 3 3 2.6 2.6 0 1 1-3 3l-6-6a2.6 2.6 0 1 1-3-3z" },
   // ハート
-  { color: "#FFB4C8", d: "M12 20s-7-4.4-7-9.4A3.8 3.8 0 0 1 12 8.4a3.8 3.8 0 0 1 7 2.2C19 15.6 12 20 12 20z" },
+  { color: "#E0405A", d: "M12 20s-7-4.4-7-9.4A3.8 3.8 0 0 1 12 8.4a3.8 3.8 0 0 1 7 2.2C19 15.6 12 20 12 20z" },
   // 星
-  { color: "#FFF1A8", d: "M12 3.5l2.4 5.2 5.6.6-4.2 3.8 1.2 5.6L12 15.8l-5 2.9 1.2-5.6L4 9.3l5.6-.6z" },
+  { color: "#E8A21A", d: "M12 3.5l2.4 5.2 5.6.6-4.2 3.8 1.2 5.6L12 15.8l-5 2.9 1.2-5.6L4 9.3l5.6-.6z" },
   // ボール
-  { color: "#BDE3FF", d: "M12 4a8 8 0 1 0 .1 0zM4.6 9.6c4.6 1.6 10.2 1.6 14.8 0M4.6 14.4c4.6-1.6 10.2-1.6 14.8 0" },
+  { color: "#2F6FC2", d: "M12 4a8 8 0 1 0 .1 0zM4.6 9.6c4.6 1.6 10.2 1.6 14.8 0M4.6 14.4c4.6-1.6 10.2-1.6 14.8 0" },
   // おさかな
-  { color: "#BDE3FF", d: "M3.5 12c3-4.4 9-5 13.2 0-4.2 5-10.2 4.4-13.2 0zM16.7 12l4-3.4v6.8zM8 11.2v.1" },
+  { color: "#2F6FC2", d: "M3.5 12c3-4.4 9-5 13.2 0-4.2 5-10.2 4.4-13.2 0zM16.7 12l4-3.4v6.8zM8 11.2v.1" },
   // お花
-  { color: "#FFC4D2", d: "M12 9.6a2.6 2.6 0 1 0 .1 0zM12 4.4a2.6 2.6 0 0 1 0 5.2 2.6 2.6 0 0 1 0-5.2zM12 14.6a2.6 2.6 0 0 1 0 5.2 2.6 2.6 0 0 1 0-5.2zM6.9 9.5a2.6 2.6 0 0 1 4.6 2.4 2.6 2.6 0 0 1-4.6-2.4zM12.5 12.1a2.6 2.6 0 0 1 4.6 2.4 2.6 2.6 0 0 1-4.6-2.4z" },
+  { color: "#D9467A", d: "M12 9.6a2.6 2.6 0 1 0 .1 0zM12 4.4a2.6 2.6 0 0 1 0 5.2 2.6 2.6 0 0 1 0-5.2zM12 14.6a2.6 2.6 0 0 1 0 5.2 2.6 2.6 0 0 1 0-5.2zM6.9 9.5a2.6 2.6 0 0 1 4.6 2.4 2.6 2.6 0 0 1-4.6-2.4zM12.5 12.1a2.6 2.6 0 0 1 4.6 2.4 2.6 2.6 0 0 1-4.6-2.4z" },
   // おうち
-  { color: "#F4F1E6", d: "M4.5 11.5L12 5l7.5 6.5M6.5 10v9h11v-9M10.5 19v-4.5h3V19" },
+  { color: "#2E9A5A", d: "M4.5 11.5L12 5l7.5 6.5M6.5 10v9h11v-9M10.5 19v-4.5h3V19" },
   // おひさま
-  { color: "#FFE08A", d: "M12 8.4a3.6 3.6 0 1 0 .1 0zM12 2.8v2.4M12 18.8v2.4M2.8 12h2.4M18.8 12h2.4M5.5 5.5l1.7 1.7M16.8 16.8l1.7 1.7M5.5 18.5l1.7-1.7M16.8 7.2l1.7-1.7" },
+  { color: "#F08A1C", d: "M12 8.4a3.6 3.6 0 1 0 .1 0zM12 2.8v2.4M12 18.8v2.4M2.8 12h2.4M18.8 12h2.4M5.5 5.5l1.7 1.7M16.8 16.8l1.7 1.7M5.5 18.5l1.7-1.7M16.8 7.2l1.7-1.7" },
   // 足あと（てんてん）
-  { color: "#F4F1E6", fill: true, d: "M5 17a1.6 1.6 0 1 0 .1 0zM9.6 13.4a1.6 1.6 0 1 0 .1 0zM14.4 10.6a1.6 1.6 0 1 0 .1 0zM19 7a1.6 1.6 0 1 0 .1 0z" },
+  { color: "#3A3F47", fill: true, d: "M5 17a1.6 1.6 0 1 0 .1 0zM9.6 13.4a1.6 1.6 0 1 0 .1 0zM14.4 10.6a1.6 1.6 0 1 0 .1 0zM19 7a1.6 1.6 0 1 0 .1 0z" },
 ];
 
 const hash = (s: string) => { let h = 2166136261; for (let i = 0; i < s.length; i++) { h ^= s.charCodeAt(i); h = Math.imul(h, 16777619); } return h >>> 0; };
 
+/** らくがきの中身を決めるもの（部屋の画面からわたす。なければ見本のらくがき） */
+export type DoodleInfo = { now: Date; weather: string | null; steps: number | null | undefined; dogName: string };
+export const DoodleContext = createContext<DoodleInfo | null>(null);
+
 /**
- * カードの下の黒板に、わんこが毎朝ひとつずつ描きたしていく らくがき。
- * 月曜の朝に黒板けしで消して、また1つから（日曜には7つ）。横には、きょうの ひとこと。
+ * きょうのらくがき：わんこが毎朝1つずつ描きたしていく（月曜の朝に消して、また1つから。日曜には7つ）と、きょうのひとこと。
+ * 週のあいだは描く順番が同じで、週ごとに変わる。
  */
-export function ChalkDoodles({ now, weather, steps, dogName }: { now: Date; weather: string | null; steps: number | null | undefined; dogName: string }) {
-  const parts = new Intl.DateTimeFormat("en-US", { timeZone: "Asia/Tokyo", year: "numeric", month: "2-digit", day: "2-digit", weekday: "short" }).formatToParts(now);
+function doodlesOf(info: DoodleInfo | null) {
+  if (!info) return { day: "sample", shown: [DOODLES[0]!, DOODLES[2]!, DOODLES[3]!], note: "らくがき OK！" };
+  const parts = new Intl.DateTimeFormat("en-US", { timeZone: "Asia/Tokyo", year: "numeric", month: "2-digit", day: "2-digit", weekday: "short" }).formatToParts(info.now);
   const get = (t: string) => parts.find((p) => p.type === t)?.value ?? "";
   const day = `${get("year")}-${get("month")}-${get("day")}`;
   const nth = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"].indexOf(get("weekday")) + 1 || 1;
-  // その週の月曜の日付で、描く順番を決める（週のあいだは同じ順で、1日1つずつふえる）
-  const monday = new Date(Date.UTC(Number(get("year")), Number(get("month")) - 1, Number(get("day")) - (nth - 1)));
-  const order = DOODLES.map((d, i) => ({ d, k: hash(`${monday.toISOString().slice(0, 10)}:${i}`) })).sort((a, b) => a.k - b.k).map((x) => x.d);
-  const shown = order.slice(0, nth);
-
-  const wet = weather === "rain" || weather === "drizzle" || weather === "thunder";
+  const monday = new Date(Date.UTC(Number(get("year")), Number(get("month")) - 1, Number(get("day")) - (nth - 1))).toISOString().slice(0, 10);
+  const shown = DOODLES.map((d, i) => ({ d, k: hash(`${monday}:${i}`) })).sort((a, b) => a.k - b.k).map((x) => x.d).slice(0, nth);
+  const w = info.weather, wet = w === "rain" || w === "drizzle" || w === "thunder";
   const notes = [
-    nth === 1 ? "ぴかぴかの こくばん！" : null,
-    wet ? "あめ… おうちで あそぼ" : weather === "snow" ? "ゆき！ ゆき！" : weather === "clear" ? "おさんぽ びより！" : null,
-    steps && steps >= 5000 ? `${steps.toLocaleString()}ほ あるいた！` : null,
-    "ごしゅじん だいすき", "おやつ まだかな", `きょうも いいこの ${[...dogName].slice(0, 6).join("")}`, "あした どこいく？",
+    nth === 1 ? "ぴかぴかの ボード！" : null,
+    wet ? "あめ… おうちで あそぼ" : w === "snow" ? "ゆき！ ゆき！" : w === "clear" ? "おさんぽ びより！" : null,
+    info.steps && info.steps >= 5000 ? `${info.steps.toLocaleString()}ほ あるいた！` : null,
+    "ごしゅじん だいすき", "おやつ まだかな", `きょうも いいこの ${[...info.dogName].slice(0, 5).join("")}`, "あした どこいく？",
   ].filter((x): x is string => Boolean(x));
-  const note = notes[nth === 1 ? 0 : hash(day) % notes.length]!;
+  return { day, shown, note: notes[nth === 1 ? 0 : hash(day) % notes.length]! };
+}
 
+/**
+ * ホワイトボードの面に描く、らくがき（SVG の g。面の左上 x, y・幅 w・高さ h に合わせる）。
+ * drawing のときは、いちばん新しい絵をマーカーで描いているところ。
+ */
+export function WhiteboardDoodles({ x, y, w, h, drawing = false }: { x: number; y: number; w: number; h: number; drawing?: boolean }) {
+  const info = useContext(DoodleContext);
+  const { day, shown, note } = doodlesOf(info);
+  const size = Math.min(w / 4.6, h / 2.6), cols = Math.max(1, Math.floor(w / (size * 1.05)));
+  const top = y + h * 0.36;
+  const spot = (i: number) => ({ cx: x + (i % cols + 0.5) * (w / cols) + ((hash(`${day}x${i}`) % 7) - 3), cy: top + Math.floor(i / cols) * size * 1.02 + ((hash(`${day}y${i}`) % 5) - 2) });
+  const last = shown.length - 1, pen = spot(last);
   return (
-    <svg viewBox="0 0 320 36" preserveAspectRatio="xMidYMid meet" className="block h-full w-full overflow-visible">
-      <defs>
-        {/* チョークのかすれ（線のふちをざらつかせる） */}
-        <filter id="chalk-rough" x="-10%" y="-20%" width="120%" height="140%">
-          <feTurbulence type="fractalNoise" baseFrequency="1.6" numOctaves="1" seed="4" result="n" />
-          <feDisplacementMap in="SourceGraphic" in2="n" scale="1.4" result="d" />
-          <feComposite in="d" in2="n" operator="in" />
-        </filter>
-      </defs>
-      <g filter="url(#chalk-rough)">
-        <text x="6" y="23" fontSize="12.5" fontWeight="800" fill="#F4F1E6" fillOpacity="0.88" transform="rotate(-2 6 23)" letterSpacing="0.5">{note}</text>
-        {shown.map((dd, i) => (
-          <g key={i} transform={`translate(${314 - (shown.length - i) * 24} ${6 + (i % 2) * 2}) rotate(${(hash(`${day}${i}`) % 21) - 10} 12 12) scale(0.92)`}>
-            <path d={dd.d} fill={dd.fill ? dd.color : "none"} fillOpacity={dd.fill ? 0.75 : 0} stroke={dd.color} strokeOpacity="0.85" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
+    <g>
+      <text x={x + 3} y={y + h * 0.24} fontSize={Math.min(13, w / note.length * 1.5)} fontWeight="800" fill="#2F6FC2" transform={`rotate(-3 ${x + 3} ${y + h * 0.24})`}>{note}</text>
+      {shown.map((dd, i) => {
+        const p = spot(i), s = size / 24;
+        return (
+          <g key={`${day}-${i}`} transform={`translate(${p.cx - size / 2} ${p.cy - size / 2}) rotate(${(hash(`${day}${i}`) % 21) - 10} ${size / 2} ${size / 2}) scale(${s})`}>
+            <path d={dd.d} pathLength={1} className={drawing && i === last ? "room-draw" : undefined} fill={dd.fill ? dd.color : "none"} fillOpacity={dd.fill ? 0.85 : 0} stroke={dd.color} strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" />
           </g>
-        ))}
-      </g>
-    </svg>
+        );
+      })}
+      {drawing ? (
+        // 描いているマーカー（青。くるくる動く）
+        <g className="room-pen" style={{ transformOrigin: `${pen.cx}px ${pen.cy}px` }}>
+          <g transform={`translate(${pen.cx + size * 0.25} ${pen.cy - size * 0.1}) rotate(35)`}>
+            <rect x="-2.6" y="-18" width="5.2" height="16" rx="2" fill="#F4F6F8" stroke="#9AA1AB" strokeWidth="0.6" />
+            <rect x="-2.8" y="-22" width="5.6" height="6" rx="2" fill="#2F6FC2" />
+            <path d="M-1.6 -2 L0 2 L1.6 -2 Z" fill="#2F6FC2" />
+          </g>
+        </g>
+      ) : null}
+    </g>
   );
 }

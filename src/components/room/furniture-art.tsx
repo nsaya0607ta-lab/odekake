@@ -8,6 +8,7 @@
  */
 import { useId } from "react";
 import type { FurnitureId } from "@/lib/room/types";
+import { WhiteboardDoodles } from "./room-gimmicks";
 
 const SVG_CLASS = "pointer-events-none block h-auto w-full";
 
@@ -15,9 +16,9 @@ const SVG_CLASS = "pointer-events-none block h-auto w-full";
  * 犬が遊んでいるあいだの家具の動き。
  * wobble ゆれる / sway 葉がゆれる / squish 乗られて沈む / clatter お皿がかたかた / on 明かりがつく /
  * inside ハウスの中からのぞく / inside-sleep ハウスの中で寝ている / nibbled クッキーを1まいもらった /
- * book 本を1さつ引き出した / empty ごはんを食べきった
+ * book 本を1さつ引き出した / empty ごはんを食べきった / drawing ホワイトボードにらくがきしている
  */
-export type FurnitureFx = "wobble" | "sway" | "squish" | "clatter" | "on" | "inside" | "inside-sleep" | "nibbled" | "book" | "empty";
+export type FurnitureFx = "wobble" | "sway" | "squish" | "clatter" | "on" | "inside" | "inside-sleep" | "nibbled" | "book" | "empty" | "drawing";
 
 type Art = { u: string; lit: boolean; fx?: FurnitureFx };
 
@@ -33,6 +34,7 @@ export function FurnitureArt({ id, label, lit, fx }: { id: FurnitureId; label?: 
     case "lamp": return <Lamp {...art} a11y={a11y} />;
     case "table": return <Table {...art} a11y={a11y} />;
     case "dog-house": return <DogHouse {...art} a11y={a11y} />;
+    case "whiteboard": return <Whiteboard {...art} a11y={a11y} />;
     default: return <Bowl {...art} a11y={a11y} />;
   }
 }
@@ -457,6 +459,56 @@ function Bowl({ u, fx, a11y }: P) {
         {[-5.4, -1.8, 1.8, 5.4].map((dx, i) => <ellipse key={dx} cx={dx} cy={i === 0 || i === 3 ? -2.4 : -5} rx="1.6" ry="2.1" />)}
       </g>
       <path d="M14 24 Q18 38 24 48" stroke="#FFFFFF" strokeOpacity="0.6" strokeWidth="2.4" fill="none" strokeLinecap="round" />
+    </svg>
+  );
+}
+
+/** キャスターつきのホワイトボード（アルミのわく・ペン置き・脚）。面には、わんこのらくがき */
+function Whiteboard({ u, fx, a11y }: P) {
+  const g = (n: string) => `${u}-${n}`;
+  const leg = (x0: number, x1: number, back = false) => (
+    <g opacity={back ? 0.75 : 1}>
+      <path d={`M${x0 - 2.6} 116 L${x0 + 2.6} 116 L${x1 + 2.4} 188 L${x1 - 2.4} 188 Z`} fill={`url(#${g("alu")})`} />
+      <path d={`M${x0 - 1.2} 116 L${x1 - 1.1} 188`} stroke="#FFFFFF" strokeWidth="0.9" opacity="0.8" />
+      {/* キャスター */}
+      <rect x={x1 - 6} y="186" width="12" height="4" rx="1.5" fill="#4A4F57" />
+      <circle cx={x1} cy="193" r="4.4" fill="#2A2D33" />
+      <circle cx={x1 - 1.2} cy="191.8" r="1.4" fill="#8A909A" />
+    </g>
+  );
+  return (
+    <svg viewBox="0 0 160 200" className={SVG_CLASS} {...a11y}>
+      <defs>
+        <Blur />
+        <linearGradient id={g("alu")} x1="0" y1="0" x2="1" y2="0"><stop offset="0" stopColor="#E8ECF0" /><stop offset="0.5" stopColor="#C2C8D0" /><stop offset="1" stopColor="#8E959F" /></linearGradient>
+        <linearGradient id={g("frame")} x1="0" y1="0" x2="1" y2="1"><stop offset="0" stopColor="#FBFCFD" /><stop offset="0.45" stopColor="#CDD3DA" /><stop offset="1" stopColor="#959CA6" /></linearGradient>
+        <linearGradient id={g("face")} x1="0" y1="0" x2="1" y2="1"><stop offset="0" stopColor="#FFFFFF" /><stop offset="1" stopColor="#EEF1F4" /></linearGradient>
+      </defs>
+      <FloorShadow cx={80} cy={194} rx={70} ry={6} o={0.2} />
+      {/* うしろの脚（少し奥） */}
+      {leg(44, 50, true)}{leg(116, 110, true)}
+      {/* 横の補強の棒 */}
+      <rect x="28" y="158" width="104" height="4" rx="2" fill={`url(#${g("alu")})`} />
+      {/* 前の脚 */}
+      {leg(26, 18)}{leg(134, 142)}
+      {/* ボードの厚み（上のはし）と、わく */}
+      <path d="M8 8 L152 8 L148 4 L12 4 Z" fill="#B8BEC7" />
+      <rect x="6" y="7" width="148" height="110" rx="4" fill={`url(#${g("frame")})`} />
+      <rect x="12" y="13" width="136" height="98" rx="1.5" fill={`url(#${g("face")})`} />
+      <rect x="12" y="13" width="136" height="98" rx="1.5" fill="none" stroke="#7E858F" strokeWidth="0.8" />
+      {/* うすく消しのこしたあと */}
+      <path d="M30 40 q20 -6 40 2 M96 86 q16 4 30 -2" stroke="#9AA6B4" strokeOpacity="0.12" strokeWidth="5" strokeLinecap="round" fill="none" />
+      <WhiteboardDoodles x={18} y={17} w={124} h={90} drawing={fx === "drawing"} />
+      {/* つや（ななめの映りこみ） */}
+      <path d="M40 13 L66 13 L36 111 L10 111 Z" fill="#FFFFFF" opacity="0.28" />
+      {/* すみの樹脂キャップ */}
+      {[[6, 7], [154, 7], [154, 117], [6, 117]].map(([x, y], i) => <rect key={i} x={x! - 4} y={y! - 4} width="8" height="8" rx="2.5" fill="#474C54" />)}
+      {/* ペン置きと、マーカー・イレーサー */}
+      <rect x="22" y="116" width="116" height="6" rx="2" fill={`url(#${g("alu")})`} />
+      <rect x="22" y="116" width="116" height="1.6" fill="#FFFFFF" opacity="0.8" />
+      {fx === "drawing" ? null : <g><rect x="36" y="111" width="24" height="5" rx="2.5" fill="#F4F6F8" stroke="#9AA1AB" strokeWidth="0.5" /><rect x="34" y="111" width="6" height="5" rx="2" fill="#2F6FC2" /></g>}
+      <g><rect x="64" y="111" width="22" height="5" rx="2.5" fill="#F4F6F8" stroke="#9AA1AB" strokeWidth="0.5" /><rect x="62" y="111" width="6" height="5" rx="2" fill="#D9402E" /></g>
+      <g><rect x="104" y="109" width="26" height="7" rx="1.5" fill="#33373E" /><rect x="104" y="114" width="26" height="2.4" fill="#E6DCC8" /></g>
     </svg>
   );
 }

@@ -458,6 +458,20 @@ export function RoomDog({ skin, phase, sleepy, lines, dreams = [], quiet, places
         });
         return;
       }
+      case "whiteboard": {
+        // ホワイトボードの横に立って、マーカーで らくがき（ボードがかくれないよう、前には立たない）
+        const sd = sideOf(f);
+        walkTo(sd.x, sd.y, () => {
+          face(f.x);
+          pose("wonder");
+          say(pick(["なにかこうかな…", "らくがき タイム！"]), 1400);
+          later(() => { fx(f.id, "drawing", 3600); pose("stand-happy"); say("かきかき…", 2400); }, 1500);
+          later(() => { pose(pick(["cheer", "wink"] as const)); say(pick(["できた！ じょうず？", "けっさく！", "あしたも かくね"]), 1800); }, 5200);
+          later(() => pose("sit"), 7100);
+          fin(8000);
+        });
+        return;
+      }
       case "bookshelf": {
         const fr = frontOf(f, rand(-f.w * 0.2, f.w * 0.2));
         walkTo(fr.x, fr.y, () => {

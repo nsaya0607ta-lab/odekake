@@ -66,7 +66,7 @@ import { parseRoomWeather, withWeather, type RoomWeather } from "@/lib/room/weat
 import { EVENT_FLOOR_Y, EventFloor, EventFront } from "./room-events";
 import { dayPhaseOf, FixtureVisual, fixtureSize, lampsOn, ROOM_STAGE, RoomLighting, RoomScene, ThemeSwatch, windowRectOf, type DayPhase } from "./room-scene";
 import { RoomBoard } from "./room-board";
-import { ChalkDoodles, PasserLink, ShootingStars, useWindowPasser } from "./room-gimmicks";
+import { DoodleContext, PasserLink, ShootingStars, useWindowPasser } from "./room-gimmicks";
 import { DEFAULT_PLACE, locateHere, placeShortName, SkyCard, skyBackdrop, type RoomPlace } from "./sky-card";
 
 type Tab = DecorKind | "theme";
@@ -150,10 +150,10 @@ function freeWallSpot(taken: readonly { x: number; y: number }[], fixtures: read
 /** 家具の奥行き（床の上で場所をとる高さ。幅に対する割合） */
 const PLACE_KEY = "odekake-room-place-v1";
 /** 家具の絵の 高さ÷幅（furniture-art.tsx の viewBox） */
-const FURNITURE_RATIO: Record<FurnitureId, number> = { sofa: 150 / 260, "dog-bed": 110 / 190, plant: 190 / 120, bookshelf: 210 / 150, lamp: 220 / 90, table: 120 / 200, "dog-house": 190 / 200, bowl: 58 / 100 };
+const FURNITURE_RATIO: Record<FurnitureId, number> = { whiteboard: 200 / 160, sofa: 150 / 260, "dog-bed": 110 / 190, plant: 190 / 120, bookshelf: 210 / 150, lamp: 220 / 90, table: 120 / 200, "dog-house": 190 / 200, bowl: 58 / 100 };
 /** 犬が遊んでいるあいだの家具の動き（ゆれる・明かりがつく など） */
 const FX_CLASS: Partial<Record<FurnitureFx, string>> = { wobble: "room-fx-wobble", sway: "room-fx-sway", squish: "room-fx-squish", clatter: "room-fx-clatter" };
-const FURNITURE_DEPTH: Record<string, number> = { sofa: 0.35, plant: 0.2, bookshelf: 0.25, lamp: 0.2, table: 0.3, "dog-house": 0.35, bowl: 0.2, "dog-bed": 0.3 };
+const FURNITURE_DEPTH: Record<string, number> = { whiteboard: 0.2, sofa: 0.35, plant: 0.2, bookshelf: 0.25, lamp: 0.2, table: 0.3, "dog-house": 0.35, bowl: 0.2, "dog-bed": 0.3 };
 
 const FLOOR_SPOTS = [[22, 74], [78, 76], [64, 90], [36, 92], [86, 92], [14, 88], [50, 66], [70, 66]] as const;
 
@@ -541,6 +541,8 @@ export function MyRoom({ entries, initialLayout, serverReady, dogSkin, dogName, 
     return lines;
   }, [entryByKey, layout.items, phase]);
 
+  /** ホワイトボードのらくがき（きょうの日付・天気・歩数で変わる） */
+  const doodleInfo = useMemo(() => ({ now, weather: weather?.kind ?? null, steps: visit ? null : steps?.steps, dogName }), [now, weather?.kind, visit, steps?.steps, dogName]);
   /** 寝言（きょうの歩数や、部屋にあるもの・おやつの夢） */
   const dogDreams = useMemo(() => {
     const dreams = ["ジャーキー…3本…", "ボール…まてまて〜…", "おさんぽ…もう1周…", "ごしゅじん…だいすき…", "それ…ぼくの…おやつ…"];
@@ -688,283 +690,285 @@ export function MyRoom({ entries, initialLayout, serverReady, dogSkin, dogName, 
   const backdrop = skyBackdrop(skyNow, FLOOR_STYLES[layout.theme.floor].base);
 
   return (
-    // ふだん（自分の部屋を見ているとき）は、画面ぴったり：部屋 → 手前に続く床 → イーゼルのボード（ボードの中だけスクロール）
-    <main className={stage ? "fixed inset-0 flex flex-col overflow-y-auto overflow-x-hidden bg-paper text-ink" : "min-h-dvh bg-paper pb-[calc(env(safe-area-inset-bottom)+1.5rem)] text-ink"}>
-      <header className="sticky top-0 z-[600] shrink-0 border-b border-line bg-paper/95 backdrop-blur">
-        <div className="mx-auto flex h-14 max-w-lg items-center gap-2 px-3">
-          <Link href={visit ? "/room" : "/mypage"} aria-label={visit ? "じぶんのおへやへ戻る" : "マイページへ戻る"} className="flex h-11 w-11 items-center justify-center rounded-full active:bg-paper-deep">
-            <IconChevronLeft size={24} />
-          </Link>
-          <div className="min-w-0 flex-1 text-center">
-            <p className="text-[10px] font-bold tracking-[0.18em] text-leaf-deep">{visit ? "FRIEND'S ROOM" : "MY ROOM"}</p>
-            <h1 className="truncate text-[17px] font-black">{visit ? `${visit.name}さんのおへや` : `${dogName}のおへや`}</h1>
+    // ふだん（自分の部屋を見ているとき）は、画面ぴったり：部屋 → 部屋の下の黒板（黒板の中だけスクロール）
+    <DoodleContext.Provider value={doodleInfo}>
+      <main className={stage ? "fixed inset-0 flex flex-col overflow-y-auto overflow-x-hidden bg-paper text-ink" : "min-h-dvh bg-paper pb-[calc(env(safe-area-inset-bottom)+1.5rem)] text-ink"}>
+        <header className="sticky top-0 z-[600] shrink-0 border-b border-line bg-paper/95 backdrop-blur">
+          <div className="mx-auto flex h-14 max-w-lg items-center gap-2 px-3">
+            <Link href={visit ? "/room" : "/mypage"} aria-label={visit ? "じぶんのおへやへ戻る" : "マイページへ戻る"} className="flex h-11 w-11 items-center justify-center rounded-full active:bg-paper-deep">
+              <IconChevronLeft size={24} />
+            </Link>
+            <div className="min-w-0 flex-1 text-center">
+              <p className="text-[10px] font-bold tracking-[0.18em] text-leaf-deep">{visit ? "FRIEND'S ROOM" : "MY ROOM"}</p>
+              <h1 className="truncate text-[17px] font-black">{visit ? `${visit.name}さんのおへや` : `${dogName}のおへや`}</h1>
+            </div>
+            {visit ? (
+              <LikeButton liked={visitLike.liked} count={visitLike.likeCount} busy={visitLike.busy} onToggle={() => void visitLike.toggleLike()} />
+            ) : editing ? (
+              <button type="button" onClick={() => { setEditing(false); setSelectedId(null); if (saveState === "dirty") void persist(); }} className="min-w-[72px] rounded-full bg-leaf-deep px-4 py-2.5 text-sm font-bold text-white shadow-sm active:scale-95">
+                できた
+              </button>
+            ) : (
+              <button type="button" onClick={() => setEditing(true)} className="min-w-[72px] rounded-full border border-leaf/40 bg-leaf-soft px-3 py-2.5 text-xs font-bold text-leaf-deep shadow-sm active:scale-95">
+                もようがえ
+              </button>
+            )}
           </div>
-          {visit ? (
-            <LikeButton liked={visitLike.liked} count={visitLike.likeCount} busy={visitLike.busy} onToggle={() => void visitLike.toggleLike()} />
-          ) : editing ? (
-            <button type="button" onClick={() => { setEditing(false); setSelectedId(null); if (saveState === "dirty") void persist(); }} className="min-w-[72px] rounded-full bg-leaf-deep px-4 py-2.5 text-sm font-bold text-white shadow-sm active:scale-95">
-              できた
-            </button>
-          ) : (
-            <button type="button" onClick={() => setEditing(true)} className="min-w-[72px] rounded-full border border-leaf/40 bg-leaf-soft px-3 py-2.5 text-xs font-bold text-leaf-deep shadow-sm active:scale-95">
-              もようがえ
-            </button>
-          )}
-        </div>
-      </header>
+        </header>
 
-      <div className={stage ? "mx-auto flex min-h-0 w-full max-w-lg flex-1 flex-col" : "mx-auto max-w-lg"}>
-        <div
-          ref={frameRef}
-          className={`isolate w-full shrink-0 touch-none select-none overflow-hidden ${editing ? "sticky top-14 z-[50] shadow-[0_8px_16px_-10px_rgba(60,40,20,.35)]" : "relative"}`}
-          style={{ aspectRatio: `1000 / ${1000 * ROOM.aspect}` }}
-          onPointerDown={(e) => { if (e.target === e.currentTarget || e.target === roomRef.current || (e.target as Element).tagName === "svg" || (e.target as Element).closest("svg[aria-hidden]")) setSelectedId(null); }}
-        >
-          {/* 部屋（奥の壁から手前の床まで）。まわりの天井・横の壁・手前の床は背景の SVG がはみ出して描く */}
-          <div ref={roomRef} className="absolute" style={{ left: `${ROOM_STAGE.left}%`, top: `${ROOM_STAGE.top}%`, width: `${ROOM_STAGE.width}%`, height: `${ROOM_STAGE.height}%` }}>
-          <RoomScene theme={layout.theme} now={now} at={place} weather={weather} windows={windowRects} />
+        <div className={stage ? "mx-auto flex min-h-0 w-full max-w-lg flex-1 flex-col" : "mx-auto max-w-lg"}>
+          <div
+            ref={frameRef}
+            className={`isolate w-full shrink-0 touch-none select-none overflow-hidden ${editing ? "sticky top-14 z-[50] shadow-[0_8px_16px_-10px_rgba(60,40,20,.35)]" : "relative"}`}
+            style={{ aspectRatio: `1000 / ${1000 * ROOM.aspect}` }}
+            onPointerDown={(e) => { if (e.target === e.currentTarget || e.target === roomRef.current || (e.target as Element).tagName === "svg" || (e.target as Element).closest("svg[aria-hidden]")) setSelectedId(null); }}
+          >
+            {/* 部屋（奥の壁から手前の床まで）。まわりの天井・横の壁・手前の床は背景の SVG がはみ出して描く */}
+            <div ref={roomRef} className="absolute" style={{ left: `${ROOM_STAGE.left}%`, top: `${ROOM_STAGE.top}%`, width: `${ROOM_STAGE.width}%`, height: `${ROOM_STAGE.height}%` }}>
+            <RoomScene theme={layout.theme} now={now} at={place} weather={weather} windows={windowRects} />
 
-          {placedItems.map((p) => {
-            const entry = entryByKey.get(p.key);
-            if (!entry) return null;
-            const hang = isHanging(entry.kind);
-            const fx = entry.kind === "fixture" ? fixtureSize(entry.fixture, style) : null;
-            const isSel = editing && p.id === selectedId;
-            return (
-              <div
-                key={p.id}
-                data-pid={p.id}
-                data-rot={entry.kind === "pennant" ? -4 : 0}
-                data-flip={p.flip ? "1" : "0"}
-                role="button"
-                tabIndex={0}
-                aria-label={editing ? `${entry.name}を動かす` : entry.kind === "photo" ? `${entry.name}の思い出を見る` : entry.name}
-                className={`absolute ${editing ? "cursor-grab active:cursor-grabbing" : "cursor-pointer"}`}
-                style={{
-                  left: `${p.x}%`,
-                  top: `${p.y}%`,
-                  width: `${widthOf(entry, p, style)}%`,
-                  zIndex: zIndexOf.get(p.id),
-                  transform: fx ? `translate(${-fx.ax * 100}%, ${-fx.ay * 100}%)` : `translate(-50%, ${hang ? "-50%" : "-100%"}) ${entry.kind === "pennant" ? "rotate(-4deg)" : ""}`,
-                  touchAction: "none",
-                }}
-                onPointerDown={(e) => onItemDown(e, p)}
-                onPointerMove={(e) => onItemMove(e, p)}
-                onPointerUp={(e) => onItemUp(e, p)}
-                onPointerCancel={(e) => onItemUp(e, p)}
-                onClick={(e) => onItemTap(p, e.currentTarget)}
-                onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); if (editing) setSelectedId(p.id); else onItemTap(p); } }}
-              >
-                {!hang && !p.on ? <span data-shadow className="pointer-events-none absolute -bottom-[4%] left-1/2 h-[10%] w-[78%] -translate-x-1/2 rounded-[50%] bg-[#4a3520]/18 blur-[2px]" /> : null}
-                {/* 棚の上：板に落ちる小さな影 */}
-                {!hang && p.on ? <span data-shadow className="pointer-events-none absolute -bottom-[3%] left-1/2 h-[7%] w-[84%] -translate-x-1/2 rounded-[50%] bg-[#3a2410]/30 blur-[1.5px]" /> : null}
-                <span data-body className="relative block" style={{ transform: p.flip ? "scaleX(-1)" : undefined }}>
-                  <span key={furnitureFx[p.id] ?? "-"} className={`block origin-bottom ${FX_CLASS[furnitureFx[p.id]!] ?? ""}`}>
-                    {entry.kind === "fixture"
-                      ? <FixtureVisual fixture={entry.fixture} theme={layout.theme} now={now} at={place} weather={weather} placeName={placeName} passer={p.id === firstWindowId ? passer : null} />
-                      : <DecorVisual entry={entry} frame={p.frame} lit={lightsOn || furnitureFx[p.id] === "on"} fx={furnitureFx[p.id]} />}
+            {placedItems.map((p) => {
+              const entry = entryByKey.get(p.key);
+              if (!entry) return null;
+              const hang = isHanging(entry.kind);
+              const fx = entry.kind === "fixture" ? fixtureSize(entry.fixture, style) : null;
+              const isSel = editing && p.id === selectedId;
+              return (
+                <div
+                  key={p.id}
+                  data-pid={p.id}
+                  data-rot={entry.kind === "pennant" ? -4 : 0}
+                  data-flip={p.flip ? "1" : "0"}
+                  role="button"
+                  tabIndex={0}
+                  aria-label={editing ? `${entry.name}を動かす` : entry.kind === "photo" ? `${entry.name}の思い出を見る` : entry.name}
+                  className={`absolute ${editing ? "cursor-grab active:cursor-grabbing" : "cursor-pointer"}`}
+                  style={{
+                    left: `${p.x}%`,
+                    top: `${p.y}%`,
+                    width: `${widthOf(entry, p, style)}%`,
+                    zIndex: zIndexOf.get(p.id),
+                    transform: fx ? `translate(${-fx.ax * 100}%, ${-fx.ay * 100}%)` : `translate(-50%, ${hang ? "-50%" : "-100%"}) ${entry.kind === "pennant" ? "rotate(-4deg)" : ""}`,
+                    touchAction: "none",
+                  }}
+                  onPointerDown={(e) => onItemDown(e, p)}
+                  onPointerMove={(e) => onItemMove(e, p)}
+                  onPointerUp={(e) => onItemUp(e, p)}
+                  onPointerCancel={(e) => onItemUp(e, p)}
+                  onClick={(e) => onItemTap(p, e.currentTarget)}
+                  onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); if (editing) setSelectedId(p.id); else onItemTap(p); } }}
+                >
+                  {!hang && !p.on ? <span data-shadow className="pointer-events-none absolute -bottom-[4%] left-1/2 h-[10%] w-[78%] -translate-x-1/2 rounded-[50%] bg-[#4a3520]/18 blur-[2px]" /> : null}
+                  {/* 棚の上：板に落ちる小さな影 */}
+                  {!hang && p.on ? <span data-shadow className="pointer-events-none absolute -bottom-[3%] left-1/2 h-[7%] w-[84%] -translate-x-1/2 rounded-[50%] bg-[#3a2410]/30 blur-[1.5px]" /> : null}
+                  <span data-body className="relative block" style={{ transform: p.flip ? "scaleX(-1)" : undefined }}>
+                    <span key={furnitureFx[p.id] ?? "-"} className={`block origin-bottom ${FX_CLASS[furnitureFx[p.id]!] ?? ""}`}>
+                      {entry.kind === "fixture"
+                        ? <FixtureVisual fixture={entry.fixture} theme={layout.theme} now={now} at={place} weather={weather} placeName={placeName} passer={p.id === firstWindowId ? passer : null} />
+                        : <DecorVisual entry={entry} frame={p.frame} lit={lightsOn || furnitureFx[p.id] === "on"} fx={furnitureFx[p.id]} />}
+                    </span>
                   </span>
-                </span>
-                {dropShelf === p.id ? <span className="pointer-events-none absolute -inset-1 rounded-xl border-2 border-dashed border-leaf bg-leaf/15 shadow-[0_0_14px_rgba(140,200,110,.8)]" /> : null}
-                {isSel ? (
-                  <span className="room-selected pointer-events-none absolute -inset-2 rounded-xl border-2 border-white/90 shadow-[0_0_0_2px_rgba(94,140,74,.9),0_0_16px_rgba(140,200,110,.75)]">
-                    {["-left-1.5 -top-1.5", "-right-1.5 -top-1.5", "-bottom-1.5 -left-1.5", "-bottom-1.5 -right-1.5"].map((pos) => <span key={pos} className={`absolute h-3 w-3 rounded-full border-2 border-white bg-leaf-deep shadow ${pos}`} />)}
-                  </span>
+                  {dropShelf === p.id ? <span className="pointer-events-none absolute -inset-1 rounded-xl border-2 border-dashed border-leaf bg-leaf/15 shadow-[0_0_14px_rgba(140,200,110,.8)]" /> : null}
+                  {isSel ? (
+                    <span className="room-selected pointer-events-none absolute -inset-2 rounded-xl border-2 border-white/90 shadow-[0_0_0_2px_rgba(94,140,74,.9),0_0_16px_rgba(140,200,110,.75)]">
+                      {["-left-1.5 -top-1.5", "-right-1.5 -top-1.5", "-bottom-1.5 -left-1.5", "-bottom-1.5 -right-1.5"].map((pos) => <span key={pos} className={`absolute h-3 w-3 rounded-full border-2 border-white bg-leaf-deep shadow ${pos}`} />)}
+                    </span>
+                  ) : null}
+
+                </div>
+              );
+            })}
+
+            <RoomDog skin={dogSkin} phase={phase} sleepy={sleepy} lines={dogLines} dreams={dogDreams} quiet={editing} places={dogPlaces} weather={weather?.kind ?? null} onFx={onFurnitureFx} />
+            {/* 行事のもの（部屋の左右のすみ）。置いたものと同じく、奥ほど下に重なる */}
+            {roomEvent ? (["L", "R"] as const).map((side) => (
+              <div key={side} className="pointer-events-none absolute inset-0" style={{ zIndex: 300 + Math.round(EVENT_FLOOR_Y[side] * 10) }} data-event-layer>
+                <EventFloor event={roomEvent} side={side} lit={lightsOn} />
+              </div>
+            )) : null}
+            {roomEvent ? (
+              <div className="pointer-events-none absolute inset-0" style={{ zIndex: 1990 }}>
+                <EventFront event={roomEvent} lit={lightsOn} />
+              </div>
+            ) : null}
+            {/* 晴れた夜は、ときどき窓の外を流れ星が流れる（タップでねがいごと） */}
+            {/* フレンドの犬が通っているときは、窓をタップするとその部屋へ */}
+            <PasserLink rects={windowRects} passer={passer} />
+            <ShootingStars rects={windowRects} active={phase === "night" && !editing && (!weather || weather.kind === "clear" || weather.kind === "partly")} onWish={flash} />
+            <div className="pointer-events-none absolute inset-0" style={{ zIndex: 2000 }}>
+              <RoomLighting now={now} lamps={lampLights} at={place} weather={weather} room={layout.theme.room} event={roomEvent} openBottom={stage} />
+            </div>
+            {peek ? (
+              <span className="room-bubble pointer-events-none absolute w-max max-w-[12rem] -translate-x-1/2 -translate-y-full rounded-xl bg-ink px-2.5 py-1 text-[10px] font-bold text-white shadow" style={{ left: `${clamp(peek.x, 18, 82)}%`, top: `${Math.max(4, peek.y - 0.5)}%`, zIndex: 2600 }}>{peek.text}</span>
+            ) : null}
+            </div>
+
+            {/* 部屋の下のはしを、下のまわりの色にとかす（境目をなじませる） */}
+            {stage ? <div aria-hidden className="pointer-events-none absolute inset-x-0 bottom-0 h-[8%]" style={{ zIndex: 2400, background: `linear-gradient(180deg, transparent, ${backdrop.top})` }} /> : null}
+            {editing && selected && selectedEntry ? (
+              <div className="absolute bottom-2 left-1/2 z-[3000] flex -translate-x-1/2 items-center gap-1 rounded-full border border-line bg-card/95 p-1.5 shadow-lg backdrop-blur">
+                <Tool label="小さく" onClick={() => changeItem(selected.id, (p) => ({ ...p, scale: clamp(p.scale - 0.12, 0.5, 2) }))}>−</Tool>
+                <Tool label="大きく" onClick={() => changeItem(selected.id, (p) => ({ ...p, scale: clamp(p.scale + 0.12, 0.5, 2) }))}>＋</Tool>
+                <Tool label="左右反転" onClick={() => changeItem(selected.id, (p) => ({ ...p, flip: !p.flip }))}>↔</Tool>
+                <Tool label="いちばん前へ" onClick={() => changeItem(selected.id, (p) => ({ ...p, z: topZ() }))}>⇡</Tool>
+                {selectedEntry.kind === "item" || selectedEntry.kind === "trophy" ? (
+                  selected.on ? (
+                    <Tool label="床におろす" onClick={() => { changeItem(selected.id, (p) => { const { on: _on, rx: _rx, ...rest } = p; return { ...rest, y: clamp(ROOM.floorTop + 14, ROOM.floorTop, ROOM.floorBottom) }; }); flash("床におろしました"); }}>
+                      <span className="text-[10px] font-black leading-none">床へ</span>
+                    </Tool>
+                  ) : shelfList.length ? (
+                    <Tool label="棚にのせる" onClick={() => {
+                      // 乗せているものがいちばん少ない棚の、あいているところへ
+                      const load = (sh: Placement) => layout.items.filter((p) => p.on === sh.id).length;
+                      const shelf = shelfList.reduce((a, b) => (load(b) < load(a) ? b : a));
+                      changeItem(selected.id, (p) => ({ ...p, on: shelf.id, rx: freeShelfSpot(shelf.id, layout.items), x: shelf.x, y: shelf.y }));
+                      flash("棚にのせました");
+                    }}>
+                      <span className="text-[10px] font-black leading-none">棚へ</span>
+                    </Tool>
+                  ) : null
                 ) : null}
-
+                {selectedEntry.kind === "photo" ? (
+                  <Tool label="額縁を変える" onClick={() => changeItem(selected.id, (p) => ({ ...p, frame: FRAME_STYLES[(FRAME_STYLES.indexOf(p.frame ?? "wood") + 1) % FRAME_STYLES.length] }))}>
+                    <span className="text-[10px] font-black">{FRAME_LABELS[selected.frame ?? "wood"]}</span>
+                  </Tool>
+                ) : null}
+                {selectedEntry.kind === "photo" && selectedEntry.upload ? (
+                  <Tool label="写真のなまえ" onClick={() => renameUpload(selectedEntry.key.slice("upload:".length))}>✎</Tool>
+                ) : null}
+                <Tool danger label="片づける" onClick={() => {
+                  const riding = layout.items.filter((p) => p.on === selected.id).length;
+                  commit({ ...layout, items: layout.items.filter((p) => p.id !== selected.id && p.on !== selected.id) });
+                  setSelectedId(null);
+                  if (riding) flash(`棚に乗せていた${riding}こも、いっしょにしまいました`);
+                }}>🗑</Tool>
               </div>
-            );
-          })}
-
-          <RoomDog skin={dogSkin} phase={phase} sleepy={sleepy} lines={dogLines} dreams={dogDreams} quiet={editing} places={dogPlaces} weather={weather?.kind ?? null} onFx={onFurnitureFx} />
-          {/* 行事のもの（部屋の左右のすみ）。置いたものと同じく、奥ほど下に重なる */}
-          {roomEvent ? (["L", "R"] as const).map((side) => (
-            <div key={side} className="pointer-events-none absolute inset-0" style={{ zIndex: 300 + Math.round(EVENT_FLOOR_Y[side] * 10) }} data-event-layer>
-              <EventFloor event={roomEvent} side={side} lit={lightsOn} />
-            </div>
-          )) : null}
-          {roomEvent ? (
-            <div className="pointer-events-none absolute inset-0" style={{ zIndex: 1990 }}>
-              <EventFront event={roomEvent} lit={lightsOn} />
-            </div>
-          ) : null}
-          {/* 晴れた夜は、ときどき窓の外を流れ星が流れる（タップでねがいごと） */}
-          {/* フレンドの犬が通っているときは、窓をタップするとその部屋へ */}
-          <PasserLink rects={windowRects} passer={passer} />
-          <ShootingStars rects={windowRects} active={phase === "night" && !editing && (!weather || weather.kind === "clear" || weather.kind === "partly")} onWish={flash} />
-          <div className="pointer-events-none absolute inset-0" style={{ zIndex: 2000 }}>
-            <RoomLighting now={now} lamps={lampLights} at={place} weather={weather} room={layout.theme.room} event={roomEvent} openBottom={stage} />
-          </div>
-          {peek ? (
-            <span className="room-bubble pointer-events-none absolute w-max max-w-[12rem] -translate-x-1/2 -translate-y-full rounded-xl bg-ink px-2.5 py-1 text-[10px] font-bold text-white shadow" style={{ left: `${clamp(peek.x, 18, 82)}%`, top: `${Math.max(4, peek.y - 0.5)}%`, zIndex: 2600 }}>{peek.text}</span>
-          ) : null}
+            ) : null}
           </div>
 
-          {/* 部屋の下のはしを、下のまわりの色にとかす（境目をなじませる） */}
-          {stage ? <div aria-hidden className="pointer-events-none absolute inset-x-0 bottom-0 h-[8%]" style={{ zIndex: 2400, background: `linear-gradient(180deg, transparent, ${backdrop.top})` }} /> : null}
-          {editing && selected && selectedEntry ? (
-            <div className="absolute bottom-2 left-1/2 z-[3000] flex -translate-x-1/2 items-center gap-1 rounded-full border border-line bg-card/95 p-1.5 shadow-lg backdrop-blur">
-              <Tool label="小さく" onClick={() => changeItem(selected.id, (p) => ({ ...p, scale: clamp(p.scale - 0.12, 0.5, 2) }))}>−</Tool>
-              <Tool label="大きく" onClick={() => changeItem(selected.id, (p) => ({ ...p, scale: clamp(p.scale + 0.12, 0.5, 2) }))}>＋</Tool>
-              <Tool label="左右反転" onClick={() => changeItem(selected.id, (p) => ({ ...p, flip: !p.flip }))}>↔</Tool>
-              <Tool label="いちばん前へ" onClick={() => changeItem(selected.id, (p) => ({ ...p, z: topZ() }))}>⇡</Tool>
-              {selectedEntry.kind === "item" || selectedEntry.kind === "trophy" ? (
-                selected.on ? (
-                  <Tool label="床におろす" onClick={() => { changeItem(selected.id, (p) => { const { on: _on, rx: _rx, ...rest } = p; return { ...rest, y: clamp(ROOM.floorTop + 14, ROOM.floorTop, ROOM.floorBottom) }; }); flash("床におろしました"); }}>
-                    <span className="text-[10px] font-black leading-none">床へ</span>
-                  </Tool>
-                ) : shelfList.length ? (
-                  <Tool label="棚にのせる" onClick={() => {
-                    // 乗せているものがいちばん少ない棚の、あいているところへ
-                    const load = (sh: Placement) => layout.items.filter((p) => p.on === sh.id).length;
-                    const shelf = shelfList.reduce((a, b) => (load(b) < load(a) ? b : a));
-                    changeItem(selected.id, (p) => ({ ...p, on: shelf.id, rx: freeShelfSpot(shelf.id, layout.items), x: shelf.x, y: shelf.y }));
-                    flash("棚にのせました");
-                  }}>
-                    <span className="text-[10px] font-black leading-none">棚へ</span>
-                  </Tool>
-                ) : null
-              ) : null}
-              {selectedEntry.kind === "photo" ? (
-                <Tool label="額縁を変える" onClick={() => changeItem(selected.id, (p) => ({ ...p, frame: FRAME_STYLES[(FRAME_STYLES.indexOf(p.frame ?? "wood") + 1) % FRAME_STYLES.length] }))}>
-                  <span className="text-[10px] font-black">{FRAME_LABELS[selected.frame ?? "wood"]}</span>
-                </Tool>
-              ) : null}
-              {selectedEntry.kind === "photo" && selectedEntry.upload ? (
-                <Tool label="写真のなまえ" onClick={() => renameUpload(selectedEntry.key.slice("upload:".length))}>✎</Tool>
-              ) : null}
-              <Tool danger label="片づける" onClick={() => {
-                const riding = layout.items.filter((p) => p.on === selected.id).length;
-                commit({ ...layout, items: layout.items.filter((p) => p.id !== selected.id && p.on !== selected.id) });
-                setSelectedId(null);
-                if (riding) flash(`棚に乗せていた${riding}こも、いっしょにしまいました`);
-              }}>🗑</Tool>
-            </div>
-          ) : null}
-        </div>
-
-        {editing ? (
-          <>
-            <div className="grid grid-cols-3 gap-2 border-y border-line bg-paper-deep px-4 py-2">
-              <Action disabled={!past.length} onClick={undo} label="↶ 元に戻す" />
-              <Action disabled={!future.length} onClick={redo} label="↷ やり直す" />
-              <Action disabled={!layout.items.some((p) => !p.key.startsWith("fixture:"))} onClick={() => { commit({ ...layout, items: layout.items.filter((p) => p.key.startsWith("fixture:")).map((p) => p) }); setSelectedId(null); }} label="ぜんぶ片づける" />
-            </div>
-            <section className="rounded-t-[26px] bg-card px-4 pb-6 pt-3 shadow-[0_-8px_24px_rgba(93,80,58,.08)]">
-              <div className="-mx-4 flex gap-1.5 overflow-x-auto px-4 pb-1" role="tablist" aria-label="飾るもの">
-                {TABS.map((t) => (
-                  <button key={t.id} type="button" role="tab" aria-selected={tab === t.id} onClick={() => setTab(t.id)} className={`shrink-0 rounded-xl px-3 py-2 text-[13px] font-black ${tab === t.id ? "bg-leaf-deep text-white" : "bg-paper-deep text-ink-soft"}`}>
-                    {t.label}{t.id !== "theme" ? <span className="ml-1 text-[10px] font-bold opacity-75">{counts[t.id]}</span> : null}
-                  </button>
-                ))}
+          {editing ? (
+            <>
+              <div className="grid grid-cols-3 gap-2 border-y border-line bg-paper-deep px-4 py-2">
+                <Action disabled={!past.length} onClick={undo} label="↶ 元に戻す" />
+                <Action disabled={!future.length} onClick={redo} label="↷ やり直す" />
+                <Action disabled={!layout.items.some((p) => !p.key.startsWith("fixture:"))} onClick={() => { commit({ ...layout, items: layout.items.filter((p) => p.key.startsWith("fixture:")).map((p) => p) }); setSelectedId(null); }} label="ぜんぶ片づける" />
               </div>
-              <p className="mt-2 text-[11px] font-semibold text-ink-faint">
-                {tab === "theme" ? "おへやの雰囲気・窓・壁紙・床・カーテン・ラグを選べます" : tab === "photo" ? "スマホの写真や、おでかけ記録の写真を額に入れて飾れます" : tab === "fixture" ? "窓・棚・時計も、動かす・大きさを変える・しまうができます" : "タップで飾る・ドラッグで動かす（アイテムやトロフィーは、棚へドラッグするか「棚へ」で棚に乗せられます）"}
-              </p>
-              {tab === "item" ? (
-                <div className="-mx-4 mt-2 flex gap-2 overflow-x-auto px-4 pb-1">
-                  {ITEM_FILTERS.map((f) => (
-                    <button key={f.id} type="button" onClick={() => setFilter(f.id)} className={`shrink-0 rounded-full border px-3 py-1.5 text-xs font-bold ${filter === f.id ? "border-leaf bg-leaf-soft text-leaf-deep" : "border-line bg-paper text-ink-soft"}`}>{f.label}</button>
+              <section className="rounded-t-[26px] bg-card px-4 pb-6 pt-3 shadow-[0_-8px_24px_rgba(93,80,58,.08)]">
+                <div className="-mx-4 flex gap-1.5 overflow-x-auto px-4 pb-1" role="tablist" aria-label="飾るもの">
+                  {TABS.map((t) => (
+                    <button key={t.id} type="button" role="tab" aria-selected={tab === t.id} onClick={() => setTab(t.id)} className={`shrink-0 rounded-xl px-3 py-2 text-[13px] font-black ${tab === t.id ? "bg-leaf-deep text-white" : "bg-paper-deep text-ink-soft"}`}>
+                      {t.label}{t.id !== "theme" ? <span className="ml-1 text-[10px] font-bold opacity-75">{counts[t.id]}</span> : null}
+                    </button>
                   ))}
                 </div>
-              ) : null}
-              {tab === "photo" ? (
-                <input ref={fileRef} type="file" accept="image/*" className="hidden" onChange={(e) => { const f = e.target.files?.[0]; if (f) void uploadPhoto(f); }} />
-              ) : null}
-              {tab === "theme" ? (
-                <ThemePicker theme={layout.theme} onChange={setTheme} now={now} />
-              ) : tabEntries.length || tab === "photo" ? (
-                <div className="mt-2 grid grid-cols-3 gap-2.5">
-                  {tab === "photo" ? (
-                    <button type="button" disabled={uploading} onClick={() => fileRef.current?.click()} className="flex min-w-0 flex-col items-center justify-center gap-1 rounded-2xl border-2 border-dashed border-leaf/50 bg-leaf-soft/40 p-2 text-center text-leaf-deep shadow-sm active:scale-[.97] disabled:opacity-60">
-                      <span className="text-2xl leading-none">{uploading ? "⏳" : "＋"}</span>
-                      <span className="text-[11px] font-black">{uploading ? "アップロード中…" : "写真をえらぶ"}</span>
-                      <span className="text-[9px] font-bold text-ink-faint">{layout.photos.length}/{ROOM_MAX_PHOTOS}枚</span>
-                    </button>
-                  ) : null}
-                  {tabEntries.map((e) => {
-                    const placed = layout.items.filter((p) => p.key === e.key).length;
-                    return (
-                      <button key={e.key} type="button" onClick={() => addEntry(e)} className={`relative min-w-0 rounded-2xl border bg-paper p-2 text-left shadow-sm transition active:scale-[.97] ${placed ? "border-leaf/60" : "border-line"}`}>
-                        {e.kind === "item" ? <span className={`absolute left-1.5 top-1.5 z-10 rounded-full px-1.5 py-0.5 text-[9px] font-black text-white ${RARITY_STYLE[e.rarity]}`}>{e.rarity}</span> : null}
-                        <span className="absolute right-1.5 top-1.5 z-10 rounded-full bg-card/90 px-1.5 py-0.5 text-[9px] font-bold tabular-nums text-ink-soft">{placed}/{e.count}</span>
-                        <span className="flex aspect-square items-center justify-center pt-3">
-                          <span className="block w-[78%]">{e.kind === "fixture" ? <FixtureVisual fixture={e.fixture} theme={layout.theme} now={now} at={place} weather={weather} placeName={placeName} /> : <DecorVisual entry={e} thumb />}</span>
-                        </span>
-                        <span className="mt-1 block truncate text-center text-[10px] font-bold">{e.name}</span>
-                        {e.kind === "photo" && e.upload ? (
-                          <span
-                            role="button"
-                            tabIndex={0}
-                            aria-label={`${e.name}を消す`}
-                            onClick={(ev) => { ev.stopPropagation(); const ph = layout.photos.find((x) => uploadKey(x.id) === e.key); if (ph) removeUpload(ph); }}
-                            onKeyDown={(ev) => { if (ev.key === "Enter") { ev.stopPropagation(); const ph = layout.photos.find((x) => uploadKey(x.id) === e.key); if (ph) removeUpload(ph); } }}
-                            className="absolute bottom-1 right-1 z-10 flex h-6 w-6 items-center justify-center rounded-full bg-blossom-soft text-[11px] font-black text-[#b94c60] shadow-sm"
-                          >×</span>
-                        ) : null}
+                <p className="mt-2 text-[11px] font-semibold text-ink-faint">
+                  {tab === "theme" ? "おへやの雰囲気・窓・壁紙・床・カーテン・ラグを選べます" : tab === "photo" ? "スマホの写真や、おでかけ記録の写真を額に入れて飾れます" : tab === "fixture" ? "窓・棚・時計も、動かす・大きさを変える・しまうができます" : "タップで飾る・ドラッグで動かす（アイテムやトロフィーは、棚へドラッグするか「棚へ」で棚に乗せられます）"}
+                </p>
+                {tab === "item" ? (
+                  <div className="-mx-4 mt-2 flex gap-2 overflow-x-auto px-4 pb-1">
+                    {ITEM_FILTERS.map((f) => (
+                      <button key={f.id} type="button" onClick={() => setFilter(f.id)} className={`shrink-0 rounded-full border px-3 py-1.5 text-xs font-bold ${filter === f.id ? "border-leaf bg-leaf-soft text-leaf-deep" : "border-line bg-paper text-ink-soft"}`}>{f.label}</button>
+                    ))}
+                  </div>
+                ) : null}
+                {tab === "photo" ? (
+                  <input ref={fileRef} type="file" accept="image/*" className="hidden" onChange={(e) => { const f = e.target.files?.[0]; if (f) void uploadPhoto(f); }} />
+                ) : null}
+                {tab === "theme" ? (
+                  <ThemePicker theme={layout.theme} onChange={setTheme} now={now} />
+                ) : tabEntries.length || tab === "photo" ? (
+                  <div className="mt-2 grid grid-cols-3 gap-2.5">
+                    {tab === "photo" ? (
+                      <button type="button" disabled={uploading} onClick={() => fileRef.current?.click()} className="flex min-w-0 flex-col items-center justify-center gap-1 rounded-2xl border-2 border-dashed border-leaf/50 bg-leaf-soft/40 p-2 text-center text-leaf-deep shadow-sm active:scale-[.97] disabled:opacity-60">
+                        <span className="text-2xl leading-none">{uploading ? "⏳" : "＋"}</span>
+                        <span className="text-[11px] font-black">{uploading ? "アップロード中…" : "写真をえらぶ"}</span>
+                        <span className="text-[9px] font-bold text-ink-faint">{layout.photos.length}/{ROOM_MAX_PHOTOS}枚</span>
                       </button>
-                    );
-                  })}
-                </div>
-              ) : (
-                <div className="my-6 rounded-2xl border border-dashed border-line-strong bg-paper px-4 py-8 text-center text-sm text-ink-soft">{TABS.find((t) => t.id === tab)?.empty}</div>
-              )}
-            </section>
-          </>
-        ) : visit ? (
-          <VisitPanel visit={visit} dogName={dogName} liked={visitLike.liked} likeCount={visitLike.likeCount} likeBusy={visitLike.busy} onLike={() => void visitLike.toggleLike()} />
-        ) : (
-          // 小さい画面でもつぶれないよう、最低の高さをとる（そのときだけ画面が少しスクロールする）
-          <div ref={stageRef} className="relative z-10 -mt-px min-h-[300px] flex-1" style={{ background: `linear-gradient(180deg, ${backdrop.top} 0%, ${backdrop.mid} 42%, ${backdrop.mid} 100%)` }}>
-            {/* 木のわくの黒板（お天気カードをマグネットでとめる）。位置と大きさは決まっていて、中はたてにだけスクロールする */}
-            <div className="absolute inset-x-1 top-3 bottom-[calc(env(safe-area-inset-bottom)+10px)]">
-              <RoomBoard dark={1 - skyNow.light} doodle={<ChalkDoodles now={now} weather={weather?.kind ?? null} steps={steps?.steps} dogName={dogName} />}>
-                {stageContent}
-              </RoomBoard>
+                    ) : null}
+                    {tabEntries.map((e) => {
+                      const placed = layout.items.filter((p) => p.key === e.key).length;
+                      return (
+                        <button key={e.key} type="button" onClick={() => addEntry(e)} className={`relative min-w-0 rounded-2xl border bg-paper p-2 text-left shadow-sm transition active:scale-[.97] ${placed ? "border-leaf/60" : "border-line"}`}>
+                          {e.kind === "item" ? <span className={`absolute left-1.5 top-1.5 z-10 rounded-full px-1.5 py-0.5 text-[9px] font-black text-white ${RARITY_STYLE[e.rarity]}`}>{e.rarity}</span> : null}
+                          <span className="absolute right-1.5 top-1.5 z-10 rounded-full bg-card/90 px-1.5 py-0.5 text-[9px] font-bold tabular-nums text-ink-soft">{placed}/{e.count}</span>
+                          <span className="flex aspect-square items-center justify-center pt-3">
+                            <span className="block w-[78%]">{e.kind === "fixture" ? <FixtureVisual fixture={e.fixture} theme={layout.theme} now={now} at={place} weather={weather} placeName={placeName} /> : <DecorVisual entry={e} thumb />}</span>
+                          </span>
+                          <span className="mt-1 block truncate text-center text-[10px] font-bold">{e.name}</span>
+                          {e.kind === "photo" && e.upload ? (
+                            <span
+                              role="button"
+                              tabIndex={0}
+                              aria-label={`${e.name}を消す`}
+                              onClick={(ev) => { ev.stopPropagation(); const ph = layout.photos.find((x) => uploadKey(x.id) === e.key); if (ph) removeUpload(ph); }}
+                              onKeyDown={(ev) => { if (ev.key === "Enter") { ev.stopPropagation(); const ph = layout.photos.find((x) => uploadKey(x.id) === e.key); if (ph) removeUpload(ph); } }}
+                              className="absolute bottom-1 right-1 z-10 flex h-6 w-6 items-center justify-center rounded-full bg-blossom-soft text-[11px] font-black text-[#b94c60] shadow-sm"
+                            >×</span>
+                          ) : null}
+                        </button>
+                      );
+                    })}
+                  </div>
+                ) : (
+                  <div className="my-6 rounded-2xl border border-dashed border-line-strong bg-paper px-4 py-8 text-center text-sm text-ink-soft">{TABS.find((t) => t.id === tab)?.empty}</div>
+                )}
+              </section>
+            </>
+          ) : visit ? (
+            <VisitPanel visit={visit} dogName={dogName} liked={visitLike.liked} likeCount={visitLike.likeCount} likeBusy={visitLike.busy} onLike={() => void visitLike.toggleLike()} />
+          ) : (
+            // 小さい画面でもつぶれないよう、最低の高さをとる（そのときだけ画面が少しスクロールする）
+            <div ref={stageRef} className="relative z-10 -mt-px min-h-[300px] flex-1" style={{ background: `linear-gradient(180deg, ${backdrop.top} 0%, ${backdrop.mid} 42%, ${backdrop.mid} 100%)` }}>
+              {/* 木のわくの黒板（お天気カードをマグネットでとめる）。位置と大きさは決まっていて、中はたてにだけスクロールする */}
+              <div className="absolute inset-x-1 top-3 bottom-[calc(env(safe-area-inset-bottom)+10px)]">
+                <RoomBoard dark={1 - skyNow.light}>
+                  {stageContent}
+                </RoomBoard>
+              </div>
             </div>
-          </div>
-        )}
-      </div>
-
-      {shot ? (
-        <div className="fixed inset-0 z-[700] flex items-center justify-center overflow-y-auto bg-[#140f22]/75 p-4 backdrop-blur-sm" role="dialog" aria-modal="true" aria-label="記念撮影" onClick={(e) => { if (e.target === e.currentTarget) closeShot(); }}>
-          <div className="room-bubble my-auto w-full max-w-sm overflow-hidden rounded-3xl bg-card shadow-2xl">
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src={shot.url} alt="おへやの記念写真" className="block w-full" />
-            <div className="space-y-2.5 px-4 pb-4 pt-3">
-              <button type="button" onClick={() => void saveSnapshot()} className="w-full rounded-full bg-leaf-deep py-2.5 text-sm font-black text-white active:scale-[.98]">画像を保存・共有する</button>
-              {shareState === "done" ? (
-                <p className="rounded-2xl bg-leaf-soft px-3 py-2.5 text-center text-xs font-bold text-leaf-deep">SNSに投稿しました！ <Link href="/sns/home" className="underline">SNSで見る</Link></p>
-              ) : (
-                <div className="space-y-2 rounded-2xl border border-line bg-paper p-2.5">
-                  <textarea value={shareBody} onChange={(e) => setShareBody(e.target.value)} maxLength={280} rows={2} aria-label="投稿する文" className="w-full resize-none rounded-xl border border-line bg-card px-3 py-2 text-[16px] leading-snug" />
-                  {shareError ? <p className="text-center text-[11px] font-bold text-[#b94c60]">{shareError}</p> : null}
-                  <button type="button" onClick={() => void postSnapshot()} disabled={shareState === "sending"} className="w-full rounded-full bg-[#ff7eb6] py-2.5 text-sm font-black text-white active:scale-[.98] disabled:opacity-60">{shareState === "sending" ? "投稿中…" : "SNSに投稿する"}</button>
-                </div>
-              )}
-              <button type="button" onClick={closeShot} className="w-full rounded-full border border-line bg-paper py-2.5 text-sm font-bold text-ink-soft active:scale-[.98]">とじる</button>
-            </div>
-          </div>
+          )}
         </div>
-      ) : null}
 
-      {lightbox ? (
-        <div className="fixed inset-0 z-[700] flex items-center justify-center bg-[#140f22]/75 p-4 backdrop-blur-sm" role="dialog" aria-modal="true" aria-label={`${lightbox.name}の思い出`} onClick={(e) => { if (e.target === e.currentTarget) setLightbox(null); }}>
-          <div className="room-bubble w-full max-w-sm overflow-hidden rounded-3xl bg-card shadow-2xl">
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src={lightbox.full} alt={lightbox.name} className="block max-h-[58vh] w-full bg-paper-deep object-contain" />
-            <div className="space-y-1 px-4 pb-4 pt-3">
-              <p className="text-base font-black">{lightbox.name}</p>
-              <p className="text-xs font-semibold text-ink-faint">{lightbox.upload ? `${fmtDate(lightbox.date)}に飾った写真` : [lightbox.pref, fmtDate(lightbox.date)].filter(Boolean).join(" ・ ")}</p>
-              {lightbox.comment ? <p className="whitespace-pre-wrap pt-1 text-[13px] leading-relaxed text-ink-soft">{lightbox.comment}</p> : null}
-              <button type="button" onClick={() => setLightbox(null)} className="mt-3 w-full rounded-full border border-line bg-paper py-2.5 text-sm font-bold text-ink-soft active:scale-[.98]">とじる</button>
+        {shot ? (
+          <div className="fixed inset-0 z-[700] flex items-center justify-center overflow-y-auto bg-[#140f22]/75 p-4 backdrop-blur-sm" role="dialog" aria-modal="true" aria-label="記念撮影" onClick={(e) => { if (e.target === e.currentTarget) closeShot(); }}>
+            <div className="room-bubble my-auto w-full max-w-sm overflow-hidden rounded-3xl bg-card shadow-2xl">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src={shot.url} alt="おへやの記念写真" className="block w-full" />
+              <div className="space-y-2.5 px-4 pb-4 pt-3">
+                <button type="button" onClick={() => void saveSnapshot()} className="w-full rounded-full bg-leaf-deep py-2.5 text-sm font-black text-white active:scale-[.98]">画像を保存・共有する</button>
+                {shareState === "done" ? (
+                  <p className="rounded-2xl bg-leaf-soft px-3 py-2.5 text-center text-xs font-bold text-leaf-deep">SNSに投稿しました！ <Link href="/sns/home" className="underline">SNSで見る</Link></p>
+                ) : (
+                  <div className="space-y-2 rounded-2xl border border-line bg-paper p-2.5">
+                    <textarea value={shareBody} onChange={(e) => setShareBody(e.target.value)} maxLength={280} rows={2} aria-label="投稿する文" className="w-full resize-none rounded-xl border border-line bg-card px-3 py-2 text-[16px] leading-snug" />
+                    {shareError ? <p className="text-center text-[11px] font-bold text-[#b94c60]">{shareError}</p> : null}
+                    <button type="button" onClick={() => void postSnapshot()} disabled={shareState === "sending"} className="w-full rounded-full bg-[#ff7eb6] py-2.5 text-sm font-black text-white active:scale-[.98] disabled:opacity-60">{shareState === "sending" ? "投稿中…" : "SNSに投稿する"}</button>
+                  </div>
+                )}
+                <button type="button" onClick={closeShot} className="w-full rounded-full border border-line bg-paper py-2.5 text-sm font-bold text-ink-soft active:scale-[.98]">とじる</button>
+              </div>
             </div>
           </div>
-        </div>
-      ) : null}
+        ) : null}
 
-      {toast ? <div className="fixed bottom-6 left-1/2 z-[800] -translate-x-1/2 whitespace-nowrap rounded-full bg-ink px-4 py-2 text-xs font-bold text-white shadow-lg">{toast}</div> : null}
-    </main>
+        {lightbox ? (
+          <div className="fixed inset-0 z-[700] flex items-center justify-center bg-[#140f22]/75 p-4 backdrop-blur-sm" role="dialog" aria-modal="true" aria-label={`${lightbox.name}の思い出`} onClick={(e) => { if (e.target === e.currentTarget) setLightbox(null); }}>
+            <div className="room-bubble w-full max-w-sm overflow-hidden rounded-3xl bg-card shadow-2xl">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src={lightbox.full} alt={lightbox.name} className="block max-h-[58vh] w-full bg-paper-deep object-contain" />
+              <div className="space-y-1 px-4 pb-4 pt-3">
+                <p className="text-base font-black">{lightbox.name}</p>
+                <p className="text-xs font-semibold text-ink-faint">{lightbox.upload ? `${fmtDate(lightbox.date)}に飾った写真` : [lightbox.pref, fmtDate(lightbox.date)].filter(Boolean).join(" ・ ")}</p>
+                {lightbox.comment ? <p className="whitespace-pre-wrap pt-1 text-[13px] leading-relaxed text-ink-soft">{lightbox.comment}</p> : null}
+                <button type="button" onClick={() => setLightbox(null)} className="mt-3 w-full rounded-full border border-line bg-paper py-2.5 text-sm font-bold text-ink-soft active:scale-[.98]">とじる</button>
+              </div>
+            </div>
+          </div>
+        ) : null}
+
+        {toast ? <div className="fixed bottom-6 left-1/2 z-[800] -translate-x-1/2 whitespace-nowrap rounded-full bg-ink px-4 py-2 text-xs font-bold text-white shadow-lg">{toast}</div> : null}
+      </main>
+    </DoodleContext.Provider>
   );
 }
 

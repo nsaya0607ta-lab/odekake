@@ -12,8 +12,6 @@ import { useEffect, useRef, useState, type ReactNode } from "react";
 const DEFAULT_DROP = 14, WOOD = 11;
 /** 黒板のはしから、カードまでの幅（木のわく ＋ 黒板の余白） */
 const INS = WOOD + 12;
-/** らくがきを描く、カードの下の黒板の高さ（px） */
-const STRIP = 30;
 /** カードの中身を組む幅（px）。カードがこれよりせまいときは、縮めて映す */
 const SCREEN_W = 350;
 
@@ -24,14 +22,12 @@ const WIDTH = 0.98, ASPECT_MAX = 1.7;
  * 黒板。置ける領域の下にそろえて、横いっぱい・高さは領域まで（いちばん縦長で ASPECT_MAX）。位置と大きさは変えられない。
  * カードの中は、ふつうにさわる・たてにだけスクロールできる。
  */
-export function RoomBoard({ children, dark = 0, drop = DEFAULT_DROP, doodle }: {
+export function RoomBoard({ children, dark = 0, drop = DEFAULT_DROP }: {
   children: ReactNode;
   /** 夜の暗さ（0〜1） */
   dark?: number;
   /** 黒板の下のはしから、置ける領域の下までの高さ（px） */
   drop?: number;
-  /** カードの下の黒板に描く、チョークのらくがき（あるときは、そのぶんカードを上につめる） */
-  doodle?: ReactNode;
 }) {
   // 置ける領域の大きさ
   const areaRef = useRef<HTMLDivElement>(null);
@@ -51,8 +47,7 @@ export function RoomBoard({ children, dark = 0, drop = DEFAULT_DROP, doodle }: {
   const yb = h - drop - 4;
   const bh = Math.max(120, (yb - 22) * 1.02);
   // カードの大きさと、中身を縮める倍率
-  const below = doodle ? STRIP : 0;
-  const screenW = bw - INS * 2, screenH = bh - INS * 2 - below;
+  const screenW = bw - INS * 2, screenH = bh - INS * 2;
   const zoom = Math.min(1, screenW / SCREEN_W);
 
   /* ---------- 夜 ---------- */
@@ -96,15 +91,14 @@ export function RoomBoard({ children, dark = 0, drop = DEFAULT_DROP, doodle }: {
           <rect x={WOOD} y={WOOD} width={bw - WOOD * 2} height={bh - WOOD * 2} filter="url(#ck-dust)" opacity="0.25" />
           {/* わくの内がわのかげ */}
           <rect x={WOOD} y={WOOD} width={bw - WOOD * 2} height="5" fill="#000" opacity="0.25" />
-          {/* よこのよはくの、チョークのらくがき（肉球・ハート） */}
-          {doodle ? null : <g fill="none" stroke="#F4F1E6" strokeOpacity="0.55" strokeWidth="1.2" strokeLinecap="round">
+          {/* よこのよはくの、チョークのらくがき（肉球・ハート・星） */}
+          <g fill="none" stroke="#F4F1E6" strokeOpacity="0.55" strokeWidth="1.2" strokeLinecap="round">
             <g transform={`translate(${WOOD + 6} ${bh - WOOD - 7}) scale(0.5)`} fill="#F4F1E6" fillOpacity="0.5" stroke="none"><ellipse cx="0" cy="2" rx="5" ry="4" /><circle cx="-5" cy="-4" r="2" /><circle cx="-1.6" cy="-6.4" r="2" /><circle cx="2" cy="-6.4" r="2" /><circle cx="5.4" cy="-4" r="2" /></g>
             <path d={`M${bw - WOOD - 8} ${WOOD + 9} c -3 -3 -6 0 -3 3 l 3 3 l 3 -3 c 3 -3 0 -6 -3 -3 z`} stroke="#FFB4C8" strokeOpacity="0.6" />
-          </g>}
+          </g>
         </svg>
-        {doodle ? <div aria-hidden className="pointer-events-none absolute" style={{ left: INS - 4, right: INS - 4, bottom: WOOD + 3, height: STRIP + INS - WOOD - 6, ...dim }}>{doodle}</div> : null}
         {/* カード（ここだけ、たてにだけスクロールする） */}
-        <div className="absolute overflow-hidden rounded-[8px] bg-[#FBF8F1] shadow-[0_4px_10px_rgba(0,0,0,.45)]" style={{ top: INS, left: INS, right: INS, bottom: INS + below }}>
+        <div className="absolute overflow-hidden rounded-[8px] bg-[#FBF8F1] shadow-[0_4px_10px_rgba(0,0,0,.45)]" style={{ inset: INS }}>
           {/* 中身は SCREEN_W 以上の幅で組んで、カードの大きさに縮めて映す（小さい・縦長・横長でも文字がつまったり、はみ出したりしない） */}
           <div className="absolute left-0 top-0" style={{ width: screenW / zoom, height: screenH / zoom, zoom }}>
             <div className="absolute inset-0 touch-pan-y space-y-3 overflow-y-auto overflow-x-hidden overscroll-contain pb-2 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden [&>*:not(:first-child)]:mx-2">
