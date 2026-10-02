@@ -65,7 +65,7 @@ import { skyAt } from "@/lib/room/sun";
 import { parseRoomWeather, withWeather, type RoomWeather } from "@/lib/room/weather";
 import { EVENT_FLOOR_Y, EventFloor, EventFront } from "./room-events";
 import { dayPhaseOf, FixtureVisual, fixtureSize, lampsOn, ROOM_STAGE, RoomLighting, RoomScene, ThemeSwatch, windowRectOf, type DayPhase } from "./room-scene";
-import { RoomBoard } from "./room-board";
+import { DEFAULT_BOARD, RoomBoard } from "./room-board";
 import { DEFAULT_PLACE, locateHere, placeShortName, SkyCard, skyBackdrop, type RoomPlace } from "./sky-card";
 
 type Tab = DecorKind | "theme";
@@ -201,9 +201,8 @@ async function shrinkImage(file: File, max: number, quality: number): Promise<Bl
 }
 
 /** ボードの最初の置き場所：部屋の下いっぱい（高さは置ける範囲まで自動でちぢむ） */
-const BOARD_FILL = { x: 0.5, y: 1, w: 1, a: 1.7 };
 
-export function MyRoom({ entries, initialLayout, serverReady, dogSkin, dogName, serverNow, steps, stepHistory, visit, guests, stageStyle = "board", boardLook = "cork" }: {
+export function MyRoom({ entries, initialLayout, serverReady, dogSkin, dogName, serverNow, steps, stepHistory, visit, guests }: {
   entries: DecorEntry[];
   initialLayout: RoomLayout | null;
   serverReady: boolean;
@@ -220,9 +219,7 @@ export function MyRoom({ entries, initialLayout, serverReady, dogSkin, dogName, 
   /** 自分の部屋に届いた「いいね」・置き手紙と、あそびに行けるフレンド */
   guests?: { mail: RoomMailItem[]; friends: RoomFriend[] };
   /** 部屋の下：ホワイトボードのわくに映す（board）か、ふちなしのカード（card）か */
-  stageStyle?: "board" | "card";
   /** 部屋の下のボードの見た目（掲示板・黒板・テープで貼ったプリント） */
-  boardLook?: "cork" | "chalk" | "tape";
 }) {
   // 家具はだれでも置けるので、持ち物と合わせて「置けるもの」にする
   const validKeys = useMemo(() => new Set([...entries, ...FURNITURE_ENTRIES, ...FIXTURE_ENTRIES].map((e) => e.key)), [entries]);
@@ -893,24 +890,14 @@ export function MyRoom({ entries, initialLayout, serverReady, dogSkin, dogName, 
         ) : visit ? (
           <VisitPanel visit={visit} dogName={dogName} liked={visitLike.liked} likeCount={visitLike.likeCount} likeBusy={visitLike.busy} onLike={() => void visitLike.toggleLike()} />
         ) : (
-          // 小さい画面でもボードがつぶれないよう、最低の高さをとる（そのときだけ画面が少しスクロールする）
           // 小さい画面でもつぶれないよう、最低の高さをとる（そのときだけ画面が少しスクロールする）
           <div ref={stageRef} className="relative z-10 -mt-px min-h-[300px] flex-1" style={{ background: `linear-gradient(180deg, ${backdrop.top} 0%, ${backdrop.mid} 42%, ${backdrop.mid} 100%)` }}>
-            {stageStyle === "board" ? (
-              // 木のわくのコルク掲示板（お天気カードをポスターのようにピンでとめる）。わくをつかんで動かす・右下で大きさを変える
-              <div className="absolute inset-x-1 top-3 bottom-[calc(env(safe-area-inset-bottom)+10px)]">
-                <RoomBoard dark={1 - skyNow.light} drop={boardLook === "chalk" ? 14 : 4} stand={false} look={boardLook} place={layout.board ?? BOARD_FILL} onPlace={(board) => commit({ ...latest.current, board })}>
-                  {stageContent}
-                </RoomBoard>
-              </div>
-            ) : (
-              // ふちなしのカード（中だけスクロール）
-              <div className="absolute inset-x-3 top-3 bottom-[calc(env(safe-area-inset-bottom)+12px)] overflow-hidden rounded-[26px] shadow-[0_14px_28px_-16px_rgba(30,50,80,.55),0_2px_6px_-2px_rgba(30,50,80,.18)]" style={{ background: backdrop.mid }}>
-                <div className="absolute inset-0 space-y-3 overflow-y-auto overscroll-contain pb-3 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden [&>*:not(:first-child)]:mx-3">
-                  {stageContent}
-                </div>
-              </div>
-            )}
+            {/* 木のわくの黒板（お天気カードをマグネットでとめる）。わくをつかんで動かす・右下で大きさを変える */}
+            <div className="absolute inset-x-1 top-3 bottom-[calc(env(safe-area-inset-bottom)+10px)]">
+              <RoomBoard dark={1 - skyNow.light} place={layout.board ?? DEFAULT_BOARD} onPlace={(board) => commit({ ...latest.current, board })}>
+                {stageContent}
+              </RoomBoard>
+            </div>
           </div>
         )}
       </div>

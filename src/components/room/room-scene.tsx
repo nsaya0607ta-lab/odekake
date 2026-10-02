@@ -5,10 +5,10 @@
  * viewBox は 1000 × 1120 で、部屋の % 座標（src/lib/room/types.ts の ROOM）と同じ割合で描く。
  * 窓の外と部屋の明るさは、日本時間の今の時間帯（朝・昼・夕方・夜）に合わせる。
  */
-import { memo, useEffect, useId, useMemo, useRef, useState } from "react";
+import { memo, useId, useMemo } from "react";
 import { skyAt, TOKYO, type GeoPoint, type SkyState } from "@/lib/room/sun";
 import { overcastOf, WEATHER_LABEL, withWeather, type RoomWeather } from "@/lib/room/weather";
-import { EventAmbience, EventWash, eventTint } from "./room-events";
+import { EventAmbience, EventWash } from "./room-events";
 import { CURTAIN_STYLES, FLOOR_STYLES, ROOM_KIND_STYLES, RUG_STYLES, WALLPAPER_STYLES } from "@/lib/room/themes";
 import { ROOM, roomEventOf, windowOf, type FixtureId, type RoomEvent, type RoomKind, type RoomStyle, type RoomTheme } from "@/lib/room/types";
 
@@ -1602,53 +1602,5 @@ export function FixtureVisual({ fixture, theme, now, at = TOKYO, weather = null,
       {fixture === "weather" ? <WeatherBoard weather={weather} night={sky.altitude < -4} place={placeName} /> : null}
       {fixture === "shelf" ? <Shelves only={0} /> : null}
     </svg>
-  );
-}
-
-/**
- * 部屋の手前に続く床（部屋の下から画面の下まで）。部屋と同じ床を、同じ遠近感のまま手前にのばし、
- * 部屋の明かりの層と同じ色（朝夕の色・夜の暗さ・部屋の雰囲気・行事の色）をかける。
- */
-export function FloorBelow({ theme, now, at = TOKYO, weather = null, event = null }: { theme: RoomTheme; now: Date; at?: GeoPoint; weather?: RoomWeather | null; event?: RoomEvent | null }) {
-  const ref = useRef<HTMLDivElement>(null);
-  const [ext, setExt] = useState(400);
-  useEffect(() => {
-    const el = ref.current;
-    if (!el || typeof ResizeObserver === "undefined") return;
-    const ro = new ResizeObserver(() => { const r = el.getBoundingClientRect(); if (r.width > 0) setExt(Math.max(10, Math.round((r.height * (W + PX * 2)) / r.width))); });
-    ro.observe(el);
-    return () => ro.disconnect();
-  }, []);
-  const sky = useMemo(() => withWeather(skyAt(now, at), weather), [now, at, weather]);
-  const dark = Math.max(0, 1 - sky.light);
-  const overcast = overcastOf(weather);
-  const kind = ROOM_KIND_STYLES[theme.room];
-  const top = H + PB, X = -PX, Wd = W + PX * 2;
-  const tint = event ? eventTint(event) : null;
-  return (
-    <div ref={ref} className="pointer-events-none absolute inset-0" aria-hidden="true">
-      <svg viewBox={`${X} ${top} ${Wd} ${ext}`} preserveAspectRatio="none" className="block h-full w-full">
-        <defs>
-          <filter id="below-grain" x="0" y="0" width="100%" height="100%">
-            <feTurbulence type="fractalNoise" baseFrequency="0.85" numOctaves="2" stitchTiles="stitch" result="n" />
-            <feColorMatrix in="n" type="matrix" values="0 0 0 0 0  0 0 0 0 0  0 0 0 0 0  0 0 0 1.4 -0.45" />
-            <feComposite in="SourceGraphic" operator="in" />
-          </filter>
-          <linearGradient id="below-shade" x1="0" y1="0" x2="0" y2="1">
-            <stop offset="0" stopColor="#FFFFFF" stopOpacity="0.06" />
-            <stop offset="1" stopColor="#2A1A0A" stopOpacity="0.12" />
-          </linearGradient>
-        </defs>
-        <Floor theme={theme} to={top + ext + 2} />
-        <rect x={X} y={top} width={Wd} height={ext} fill="#5A4030" filter="url(#below-grain)" opacity="0.06" />
-        <rect x={X} y={top} width={Wd} height={ext} fill="url(#below-shade)" />
-        {/* 部屋の明かりの層と同じ色 */}
-        {sky.warm > 0.02 && sky.altitude > -8 ? <rect x={X} y={top} width={Wd} height={ext} fill={sky.azimuth < 180 ? "#FFAE96" : "#FF8A3D"} opacity={sky.warm * 0.13} /> : null}
-        {dark > 0.02 ? <rect x={X} y={top} width={Wd} height={ext} fill="#0F1438" opacity={0.56 * Math.pow(dark, 1.15)} /> : null}
-        {tint ? <rect x={X} y={top} width={Wd} height={ext} fill={tint.tint} opacity={tint.o * 0.55} /> : null}
-        {kind.tint ? <rect x={X} y={top} width={Wd} height={ext} fill={kind.tint} opacity={kind.tintOpacity} /> : null}
-        {overcast > 0.3 && sky.light > 0.2 ? <rect x={X} y={top} width={Wd} height={ext} fill="#5E6E86" opacity={0.1 * overcast} /> : null}
-      </svg>
-    </div>
   );
 }
