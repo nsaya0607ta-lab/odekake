@@ -66,7 +66,7 @@ import { parseRoomWeather, withWeather, type RoomWeather } from "@/lib/room/weat
 import { EVENT_FLOOR_Y, EventFloor, EventFront } from "./room-events";
 import { dayPhaseOf, FixtureVisual, fixtureSize, lampsOn, ROOM_STAGE, RoomLighting, RoomScene, ThemeSwatch, windowRectOf, type DayPhase } from "./room-scene";
 import { RoomBoard } from "./room-board";
-import { ShootingStars } from "./room-gimmicks";
+import { ChalkDoodles, PasserLink, ShootingStars, useWindowPasser } from "./room-gimmicks";
 import { DEFAULT_PLACE, locateHere, placeShortName, SkyCard, skyBackdrop, type RoomPlace } from "./sky-card";
 
 type Tab = DecorKind | "theme";
@@ -554,6 +554,13 @@ export function MyRoom({ entries, initialLayout, serverReady, dogSkin, dogName, 
 
   /** 置いてある窓（外が見える範囲。部屋の %） */
   const windowRects = useMemo(() => layout.items.filter((p) => p.key === fixtureKey("window")).map((p) => windowRectOf(p, style)), [layout.items, style]);
+  /** 窓の外を通る犬（昼間、雨でない日。いちばん目の窓だけ。きょうたくさん歩いた日ほど、よく通る） */
+  const firstWindowId = useMemo(() => layout.items.find((p) => p.key === fixtureKey("window"))?.id ?? null, [layout.items]);
+  const passer = useWindowPasser({
+    active: !editing && phase !== "night" && !(weather && ["rain", "drizzle", "thunder", "fog"].includes(weather.kind)),
+    steps: visit ? null : steps?.steps,
+    friends: visit ? [] : guests?.friends ?? [],
+  });
   /** フロアランプの明かり（夜はそのまわりが明るい） */
   const lampLights = useMemo(() => layout.items
     .filter((p) => p.key === "furniture:lamp")
@@ -754,7 +761,7 @@ export function MyRoom({ entries, initialLayout, serverReady, dogSkin, dogName, 
                 <span data-body className="relative block" style={{ transform: p.flip ? "scaleX(-1)" : undefined }}>
                   <span key={furnitureFx[p.id] ?? "-"} className={`block origin-bottom ${FX_CLASS[furnitureFx[p.id]!] ?? ""}`}>
                     {entry.kind === "fixture"
-                      ? <FixtureVisual fixture={entry.fixture} theme={layout.theme} now={now} at={place} weather={weather} placeName={placeName} />
+                      ? <FixtureVisual fixture={entry.fixture} theme={layout.theme} now={now} at={place} weather={weather} placeName={placeName} passer={p.id === firstWindowId ? passer : null} />
                       : <DecorVisual entry={entry} frame={p.frame} lit={lightsOn || furnitureFx[p.id] === "on"} fx={furnitureFx[p.id]} />}
                   </span>
                 </span>
@@ -782,6 +789,8 @@ export function MyRoom({ entries, initialLayout, serverReady, dogSkin, dogName, 
             </div>
           ) : null}
           {/* 晴れた夜は、ときどき窓の外を流れ星が流れる（タップでねがいごと） */}
+          {/* フレンドの犬が通っているときは、窓をタップするとその部屋へ */}
+          <PasserLink rects={windowRects} passer={passer} />
           <ShootingStars rects={windowRects} active={phase === "night" && !editing && (!weather || weather.kind === "clear" || weather.kind === "partly")} onWish={flash} />
           <div className="pointer-events-none absolute inset-0" style={{ zIndex: 2000 }}>
             <RoomLighting now={now} lamps={lampLights} at={place} weather={weather} room={layout.theme.room} event={roomEvent} openBottom={stage} />
@@ -909,7 +918,7 @@ export function MyRoom({ entries, initialLayout, serverReady, dogSkin, dogName, 
           <div ref={stageRef} className="relative z-10 -mt-px min-h-[300px] flex-1" style={{ background: `linear-gradient(180deg, ${backdrop.top} 0%, ${backdrop.mid} 42%, ${backdrop.mid} 100%)` }}>
             {/* 木のわくの黒板（お天気カードをマグネットでとめる）。位置と大きさは決まっていて、中はたてにだけスクロールする */}
             <div className="absolute inset-x-1 top-3 bottom-[calc(env(safe-area-inset-bottom)+10px)]">
-              <RoomBoard dark={1 - skyNow.light}>
+              <RoomBoard dark={1 - skyNow.light} doodle={<ChalkDoodles now={now} weather={weather?.kind ?? null} steps={steps?.steps} dogName={dogName} />}>
                 {stageContent}
               </RoomBoard>
             </div>
