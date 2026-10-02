@@ -12,7 +12,7 @@ import type { StepDay } from "@/lib/data/exp";
 import { useTodaySteps, type TodaySteps } from "@/lib/use-today-steps";
 import { PREFECTURE_NAMES } from "@/lib/geo/prefecture-names";
 import { WEATHER_LABEL, withWeather, type RoomWeather } from "@/lib/room/weather";
-import { fmtJstTime, moonPhase, nearestPref, PREF_POINTS, skyAt, sunTimes, type GeoPoint } from "@/lib/room/sun";
+import { fmtJstTime, moonPhase, nearestPref, PREF_POINTS, skyAt, sunTimes, type GeoPoint, type SkyState } from "@/lib/room/sun";
 
 /**
  * 空と天気の計算に使う場所。gps は現在地（この端末にだけ保存する）。
@@ -62,6 +62,23 @@ const TRAIL_X0 = 18, TRAIL_X1 = 282;
 const trailX = (n: number) => TRAIL_X0 + (Math.min(n, TRAIL_MAX) / TRAIL_MAX) * (TRAIL_X1 - TRAIL_X0);
 /** 手前の丘の上の道（x での高さ） */
 const trailY = (x: number) => 131 + Math.sin((x / 300) * Math.PI * 2.2) * 2.2;
+
+/**
+ * 部屋の下のまわりの色（上・まん中）。
+ * 上は「いまの明かりで見た、部屋の床の色」（朝・夕の色、夜の暗さを部屋の明かりの層と同じようにかける）にして、
+ * 部屋の下のはしからつながって見えるようにする。まん中は空の色（昼はうすい青、朝夕は少しあたたかく、夜は藍）。
+ */
+export function skyBackdrop(sky: SkyState, floor = "#E8C99A"): { top: string; mid: string } {
+  const dark = Math.max(0, 1 - sky.light);
+  const morning = sky.azimuth < 180;
+  let top = floor;
+  if (sky.warm > 0.02 && sky.altitude > -8) top = mix(top, morning ? "#FFAE96" : "#FF8A3D", sky.warm * 0.13);
+  top = mix(top, "#0F1438", 0.56 * Math.pow(dark, 1.15));
+  top = mix(top, "#1A1008", 0.14);
+  let mid = mix("#E3EEF7", "#232A4A", Math.min(1, dark * 1.1));
+  if (sky.warm > 0.02 && sky.altitude > -8) mid = mix(mid, morning ? "#F8DCD2" : "#F6CDB0", sky.warm * 0.45 * (1 - dark));
+  return { top, mid };
+}
 
 /** 連続記録の目標 */
 const STREAK_GOAL = 5_000;

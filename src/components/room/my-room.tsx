@@ -64,10 +64,9 @@ import { composeRoomSnapshot } from "./room-snapshot";
 import { skyAt } from "@/lib/room/sun";
 import { parseRoomWeather, withWeather, type RoomWeather } from "@/lib/room/weather";
 import { EVENT_FLOOR_Y, EventFloor, EventFront } from "./room-events";
-import { dayPhaseOf, FixtureVisual, FloorBelow, fixtureSize, lampsOn, ROOM_STAGE, RoomLighting, RoomScene, ThemeSwatch, windowRectOf, type DayPhase } from "./room-scene";
-import { RoomBoard, RoomDesk, RoomDeskFront } from "./room-board";
-import { eventTint } from "./room-events";
-import { DEFAULT_PLACE, locateHere, placeShortName, SkyCard, type RoomPlace } from "./sky-card";
+import { dayPhaseOf, FixtureVisual, fixtureSize, lampsOn, ROOM_STAGE, RoomLighting, RoomScene, ThemeSwatch, windowRectOf, type DayPhase } from "./room-scene";
+import { RoomBoard } from "./room-board";
+import { DEFAULT_PLACE, locateHere, placeShortName, SkyCard, skyBackdrop, type RoomPlace } from "./sky-card";
 
 type Tab = DecorKind | "theme";
 type ItemFilter = "all" | "toy" | "food" | "interior" | "other" | "sushi";
@@ -201,7 +200,10 @@ async function shrinkImage(file: File, max: number, quality: number): Promise<Bl
   return new Promise((resolve, reject) => canvas.toBlob((b) => (b ? resolve(b) : reject(new Error("encode failed"))), "image/jpeg", quality));
 }
 
-export function MyRoom({ entries, initialLayout, serverReady, dogSkin, dogName, serverNow, steps, stepHistory, visit, guests }: {
+/** ボードの最初の置き場所：部屋の下いっぱい（高さは置ける範囲まで自動でちぢむ） */
+const BOARD_FILL = { x: 0.5, y: 1, w: 0.94, a: 1.7 };
+
+export function MyRoom({ entries, initialLayout, serverReady, dogSkin, dogName, serverNow, steps, stepHistory, visit, guests, stageStyle = "board" }: {
   entries: DecorEntry[];
   initialLayout: RoomLayout | null;
   serverReady: boolean;
@@ -217,6 +219,8 @@ export function MyRoom({ entries, initialLayout, serverReady, dogSkin, dogName, 
   visit?: VisitState;
   /** 自分の部屋に届いた「いいね」・置き手紙と、あそびに行けるフレンド */
   guests?: { mail: RoomMailItem[]; friends: RoomFriend[] };
+  /** 部屋の下：ホワイトボードのわくに映す（board）か、ふちなしのカード（card）か */
+  stageStyle?: "board" | "card";
 }) {
   // 家具はだれでも置けるので、持ち物と合わせて「置けるもの」にする
   const validKeys = useMemo(() => new Set([...entries, ...FURNITURE_ENTRIES, ...FIXTURE_ENTRIES].map((e) => e.key)), [entries]);
@@ -383,19 +387,7 @@ export function MyRoom({ entries, initialLayout, serverReady, dogSkin, dogName, 
   const readOnly = !!visit;
   /** ふだんの見る画面（部屋 → 手前の床 → ボード） */
   const stage = !editing && !visit;
-  /** 手前の机にも、部屋と同じ朝夕の色・行事の色をかける */
-  const deskWarm = skyNow.altitude > -8 ? skyNow.warm : 0;
-  const deskTint = roomEvent ? eventTint(roomEvent) : null;
-  /** ボードが机の上から上へはみ出してよい高さ（机のむこうの床の高さ＋部屋の手前のはし少し） */
   const stageRef = useRef<HTMLDivElement>(null);
-  const [boardAbove, setBoardAbove] = useState(220);
-  useEffect(() => {
-    const el = stageRef.current;
-    if (!el || typeof ResizeObserver === "undefined") return;
-    const ro = new ResizeObserver(() => { const hgt = el.getBoundingClientRect().height; setBoardAbove(Math.max(80, Math.round(hgt - Math.min(184, Math.max(132, hgt * 0.4)) + 26))); });
-    ro.observe(el);
-    return () => ro.disconnect();
-  }, [stage]);
   const commit = useCallback((next: RoomLayout, before: RoomLayout = latest.current) => {
     // フレンドの部屋は見るだけ
     if (readOnly) return;
@@ -649,6 +641,33 @@ export function MyRoom({ entries, initialLayout, serverReady, dogSkin, dogName, 
   }
   const closeShot = () => { if (shot) URL.revokeObjectURL(shot.url); setShot(null); };
 
+  /** ボード（またはカード）に映すもの：お天気カード → 使い方・記念撮影・ポスト */
+  const stageContent = (
+    <>
+          <SkyCard
+            now={now} place={place} onPlace={changePlace} weather={weather} steps={steps} history={stepHistory}
+            // ボードの面の高さいっぱい
+            height="max(150px, 100%)"
+            friends={guests?.friends}
+            likes={guests?.mail.filter((m) => m.kind === "like").length ?? 0}
+            onEdit={() => setEditing(true)}
+          />
+          <ul className="space-y-1.5 rounded-2xl border border-line bg-card px-4 py-3 text-[12px] leading-relaxed text-ink-soft shadow-sm">
+            <li>🐾 {dogName}をタップすると、なでられます</li>
+            <li>🖼️ 飾った写真をタップすると、その日の思い出が見られます</li>
+            <li>🕰️ 窓の外・部屋の明るさ・時計は、住んでいるところ（📍で変えられます）の、いまの時刻・天気と、季節の日の出・日の入りに合わせて変わります</li>
+            <li>🚩 おでかけを記録した都道府県のペナントや、おさんぽのトロフィーも飾れます</li>
+          </ul>
+          <button type="button" onClick={() => void takeSnapshot()} disabled={shooting} className="flex w-full items-center justify-center gap-2 rounded-full bg-leaf-deep py-3 text-sm font-black text-white shadow-md active:scale-[.98] disabled:opacity-60">
+            <span aria-hidden="true">📷</span>{shooting ? "撮影中…" : "記念撮影する"}
+          </button>
+          {guests ? <RoomGuests mail={guests.mail} /> : null}
+          <p className="pb-1 text-center text-[10px] font-semibold text-ink-faint">{saveLabel}</p>
+    </>
+  );
+  /** 部屋の下のまわりの色（部屋の床の色 → 空の色）。部屋の下のはしもこの色にとかす */
+  const backdrop = skyBackdrop(skyNow, FLOOR_STYLES[layout.theme.floor].base);
+
   return (
     // ふだん（自分の部屋を見ているとき）は、画面ぴったり：部屋 → 手前に続く床 → イーゼルのボード（ボードの中だけスクロール）
     <main className={stage ? "fixed inset-0 flex flex-col overflow-y-auto overflow-x-hidden bg-paper text-ink" : "min-h-dvh bg-paper pb-[calc(env(safe-area-inset-bottom)+1.5rem)] text-ink"}>
@@ -758,6 +777,8 @@ export function MyRoom({ entries, initialLayout, serverReady, dogSkin, dogName, 
           ) : null}
           </div>
 
+          {/* 部屋の下のはしを、下のまわりの色にとかす（境目をなじませる） */}
+          {stage ? <div aria-hidden className="pointer-events-none absolute inset-x-0 bottom-0 h-[8%]" style={{ zIndex: 2400, background: `linear-gradient(180deg, transparent, ${backdrop.top})` }} /> : null}
           {editing && selected && selectedEntry ? (
             <div className="absolute bottom-2 left-1/2 z-[3000] flex -translate-x-1/2 items-center gap-1 rounded-full border border-line bg-card/95 p-1.5 shadow-lg backdrop-blur">
               <Tool label="小さく" onClick={() => changeItem(selected.id, (p) => ({ ...p, scale: clamp(p.scale - 0.12, 0.5, 2) }))}>−</Tool>
@@ -871,35 +892,23 @@ export function MyRoom({ entries, initialLayout, serverReady, dogSkin, dogName, 
           <VisitPanel visit={visit} dogName={dogName} liked={visitLike.liked} likeCount={visitLike.likeCount} likeBusy={visitLike.busy} onLike={() => void visitLike.toggleLike()} />
         ) : (
           // 小さい画面でもボードがつぶれないよう、最低の高さをとる（そのときだけ画面が少しスクロールする）
-          <div ref={stageRef} className="relative z-10 -mt-px min-h-[300px] flex-1">
-            <FloorBelow theme={layout.theme} now={now} at={place} weather={weather} event={roomEvent} />
-            <RoomDesk dark={1 - skyNow.light} warm={deskWarm} tint={deskTint} />
-            {/* ボードは机の天板の上（手前のふちより上）なら、好きなところに置けて大きさも変えられる */}
-            {/* ボードの足もとは机の天板の上。上は奥の床の前にそびえる（部屋の手前のはしまで） */}
-            <div className="absolute inset-x-0 bottom-[calc(env(safe-area-inset-bottom)+26px)]" style={{ height: "calc(clamp(132px, 40%, 184px) - 30px)" }}>
-            <RoomBoard dark={1 - skyNow.light} drop={16} place={layout.board} onPlace={(board) => commit({ ...latest.current, board })} above={boardAbove}>
-              <SkyCard
-                now={now} place={place} onPlace={changePlace} weather={weather} steps={steps} history={stepHistory}
-                // ボードの面の高さいっぱい
-                height="max(150px, 100%)"
-                friends={guests?.friends}
-                likes={guests?.mail.filter((m) => m.kind === "like").length ?? 0}
-                onEdit={() => setEditing(true)}
-              />
-              <ul className="space-y-1.5 rounded-2xl border border-line bg-card px-4 py-3 text-[12px] leading-relaxed text-ink-soft shadow-sm">
-                <li>🐾 {dogName}をタップすると、なでられます</li>
-                <li>🖼️ 飾った写真をタップすると、その日の思い出が見られます</li>
-                <li>🕰️ 窓の外・部屋の明るさ・時計は、住んでいるところ（📍で変えられます）の、いまの時刻・天気と、季節の日の出・日の入りに合わせて変わります</li>
-                <li>🚩 おでかけを記録した都道府県のペナントや、おさんぽのトロフィーも飾れます</li>
-              </ul>
-              <button type="button" onClick={() => void takeSnapshot()} disabled={shooting} className="flex w-full items-center justify-center gap-2 rounded-full bg-leaf-deep py-3 text-sm font-black text-white shadow-md active:scale-[.98] disabled:opacity-60">
-                <span aria-hidden="true">📷</span>{shooting ? "撮影中…" : "記念撮影する"}
-              </button>
-              {guests ? <RoomGuests mail={guests.mail} /> : null}
-              <p className="pb-1 text-center text-[10px] font-semibold text-ink-faint">{saveLabel}</p>
-            </RoomBoard>
-            </div>
-            <RoomDeskFront dark={1 - skyNow.light} warm={deskWarm} />
+          // 小さい画面でもつぶれないよう、最低の高さをとる（そのときだけ画面が少しスクロールする）
+          <div ref={stageRef} className="relative z-10 -mt-px min-h-[300px] flex-1" style={{ background: `linear-gradient(180deg, ${backdrop.top} 0%, ${backdrop.mid} 42%, ${backdrop.mid} 100%)` }}>
+            {stageStyle === "board" ? (
+              // ホワイトボードのわく（かべにかけたように、三脚なし）。わくをつかんで動かす・右下で大きさを変える
+              <div className="absolute inset-x-0 top-3 bottom-[calc(env(safe-area-inset-bottom)+10px)]">
+                <RoomBoard dark={1 - skyNow.light} drop={4} stand={false} place={layout.board ?? BOARD_FILL} onPlace={(board) => commit({ ...latest.current, board })}>
+                  {stageContent}
+                </RoomBoard>
+              </div>
+            ) : (
+              // ふちなしのカード（中だけスクロール）
+              <div className="absolute inset-x-3 top-3 bottom-[calc(env(safe-area-inset-bottom)+12px)] overflow-hidden rounded-[26px] shadow-[0_14px_28px_-16px_rgba(30,50,80,.55),0_2px_6px_-2px_rgba(30,50,80,.18)]" style={{ background: backdrop.mid }}>
+                <div className="absolute inset-0 space-y-3 overflow-y-auto overscroll-contain pb-3 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden [&>*:not(:first-child)]:mx-3">
+                  {stageContent}
+                </div>
+              </div>
+            )}
           </div>
         )}
       </div>

@@ -42,7 +42,7 @@ const clampN = (v: number, lo: number, hi: number) => Math.min(hi, Math.max(lo, 
  * 机の上のボード。わく・ペン置き・上の留め具をつかんで好きなところへ動かせ、右下のつまみで大きさを変えられる。
  * 映す面の中は、ふつうにさわる・スクロールできる。
  */
-export function RoomBoard({ children, dark = 0, drop = DEFAULT_DROP, place = DEFAULT_BOARD, onPlace, above = 0 }: {
+export function RoomBoard({ children, dark = 0, drop = DEFAULT_DROP, place = DEFAULT_BOARD, onPlace, above = 0, stand = true }: {
   children: ReactNode;
   /** 夜の暗さ（0〜1） */
   dark?: number;
@@ -53,6 +53,8 @@ export function RoomBoard({ children, dark = 0, drop = DEFAULT_DROP, place = DEF
   onPlace?: (p: BoardPlace) => void;
   /** 置ける領域（机の天板）より上に、ボードがはみ出してよい高さ（px）。机に立てたボードは、奥の床の前にそびえる */
   above?: number;
+  /** 三脚・留め具・置いた面の影を描くか（false なら、かべにかけたボードのように、わくとペン置きだけ） */
+  stand?: boolean;
 }) {
   const DROP = drop;
   // 置ける領域（机）の大きさ
@@ -216,6 +218,7 @@ export function RoomBoard({ children, dark = 0, drop = DEFAULT_DROP, place = DEF
           <linearGradient id="bd-edge" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stopColor="#7C838D" /><stop offset="1" stopColor="#B8BEC7" /></linearGradient>
           <linearGradient id="bd-edge-top" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stopColor="#E4E8ED" /><stop offset="1" stopColor="#A7AEB8" /></linearGradient>
         </defs>
+        {stand ? <>
         {/* 床の影：ボードの足もと全体、脚の先 */}
         <polygon points={backShadow} fill="#1E1206" opacity="0.22" filter="url(#bd-blur)" />
         <polygon points={shadowPoly} fill="#1E1206" opacity="0.32" filter="url(#bd-blur)" />
@@ -224,8 +227,12 @@ export function RoomBoard({ children, dark = 0, drop = DEFAULT_DROP, place = DEF
         {tube(backTop, backFoot, 6, 0.8)}
         {/* 前の脚（ボードのうしろから床へ） */}
         {legs.map((g) => <g key={g.s}>{tube(g.top, g.foot, 7.5, 1)}</g>)}
+        </> : (
+          // 三脚なし：ボードの下にやわらかい影だけ
+          <rect x={w / 2 - hw + 6} y={yb - bh + 14} width={bw - 12} height={bh + 6} rx="10" fill="#1E1206" opacity="0.28" filter="url(#bd-blur)" />
+        )}
         {/* まん中の柱（ボードの上に出て、留め具をささえる） */}
-        {(() => { const r = rod(mastBottom, mastTop, 7); return <g><polygon points={r.poly} fill="#B9BFC8" /><line x1={r.pa[0] - r.ox * 0.4 * r.ka} y1={r.pa[1] - r.oy * 0.4 * r.ka} x2={r.pb[0] - r.ox * 0.4 * r.kb} y2={r.pb[1] - r.oy * 0.4 * r.kb} stroke="#FFFFFF" strokeWidth="1.6" opacity="0.85" /><line x1={r.pa[0] + r.ox * 0.75 * r.ka} y1={r.pa[1] + r.oy * 0.75 * r.ka} x2={r.pb[0] + r.ox * 0.75 * r.kb} y2={r.pb[1] + r.oy * 0.75 * r.kb} stroke="#6E757F" strokeWidth="1.2" opacity="0.8" /></g>; })()}
+        {stand && (() => { const r = rod(mastBottom, mastTop, 7); return <g><polygon points={r.poly} fill="#B9BFC8" /><line x1={r.pa[0] - r.ox * 0.4 * r.ka} y1={r.pa[1] - r.oy * 0.4 * r.ka} x2={r.pb[0] - r.ox * 0.4 * r.kb} y2={r.pb[1] - r.oy * 0.4 * r.kb} stroke="#FFFFFF" strokeWidth="1.6" opacity="0.85" /><line x1={r.pa[0] + r.ox * 0.75 * r.ka} y1={r.pa[1] + r.oy * 0.75 * r.ka} x2={r.pb[0] + r.ox * 0.75 * r.kb} y2={r.pb[1] + r.oy * 0.75 * r.kb} stroke="#6E757F" strokeWidth="1.2" opacity="0.8" /></g>; })()}
         {/* わくの厚み（手前に来る左のはしと、上のはし） */}
         <polygon points={pts([P(-hw, 0), P(-hw, bh), P(-hw, bh, -DEPTH), P(-hw, 0, -DEPTH)])} fill="url(#bd-edge)" />
         <polygon points={pts([P(-hw, bh), P(hw, bh), P(hw, bh, -DEPTH), P(-hw, bh, -DEPTH)])} fill="url(#bd-edge-top)" />
@@ -263,7 +270,7 @@ export function RoomBoard({ children, dark = 0, drop = DEFAULT_DROP, place = DEF
           <linearGradient id="bd-tray-front" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stopColor="#F1F3F6" /><stop offset="0.45" stopColor="#C6CCD4" /><stop offset="1" stopColor="#8F96A0" /></linearGradient>
         </defs>
         {/* 留め具（板の上のはしのまん中） */}
-        {(() => {
+        {stand && (() => {
           // 柱の上から板の上のはしにかぶさる、黒い樹脂のつめ（前に少しだけ出る）
           const a = P(-16, bh + 4, 2), b = P(16, bh + 4, 2), c = P(14, bh - 6, 2), d = P(-14, bh - 6, 2), k = scaleAt(world(0, bh, 0));
           const topA = P(-16, bh + 4, legBack - 2), topB = P(16, bh + 4, legBack - 2), knob = P(0, bh + 10, legBack - 4);
@@ -304,7 +311,7 @@ export function RoomBoard({ children, dark = 0, drop = DEFAULT_DROP, place = DEF
       </svg>
 
       {/* 夜は、面の光が床にうすくこぼれる */}
-      {night > 0.15 ? (() => {
+      {stand && night > 0.15 ? (() => {
         const c = project(add([w / 2, floorY, world(0, 0, 0)[2]], mul(fwd, 30)));
         return <div aria-hidden className="pointer-events-none absolute h-12 rounded-[50%] bg-[radial-gradient(closest-side,rgba(220,232,255,.5),rgba(220,232,255,0))]" style={{ left: c[0] - w * 0.45, top: c[1] - 24, width: w * 0.9, opacity: night * 0.5 }} />;
       })() : null}
