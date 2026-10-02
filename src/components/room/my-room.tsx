@@ -895,9 +895,9 @@ export function MyRoom({ entries, initialLayout, serverReady, dogSkin, dogName, 
           // 小さい画面でもつぶれないよう、最低の高さをとる（そのときだけ画面が少しスクロールする）
           <div ref={stageRef} className="relative z-10 -mt-px min-h-[300px] flex-1" style={{ background: `linear-gradient(180deg, ${backdrop.top} 0%, ${backdrop.mid} 42%, ${backdrop.mid} 100%)` }}>
             {stageStyle === "board" ? (
-              // ホワイトボードのわく（かべにかけたように、三脚なし）。わくをつかんで動かす・右下で大きさを変える
+              // 木のわくのコルク掲示板（お天気カードをポスターのようにピンでとめる）。わくをつかんで動かす・右下で大きさを変える
               <div className="absolute inset-x-0 top-3 bottom-[calc(env(safe-area-inset-bottom)+10px)]">
-                <RoomBoard dark={1 - skyNow.light} drop={4} stand={false} place={layout.board ?? BOARD_FILL} onPlace={(board) => commit({ ...latest.current, board })}>
+                <RoomBoard dark={1 - skyNow.light} drop={4} stand={false} look="cork" place={layout.board ?? BOARD_FILL} onPlace={(board) => commit({ ...latest.current, board })}>
                   {stageContent}
                 </RoomBoard>
               </div>

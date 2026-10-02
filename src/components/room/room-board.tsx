@@ -20,6 +20,8 @@ const TURN = 0, LEAN = 0;
 const PERSP = 1150;
 /** 板の下のはしから床までの高さ（脚の見えるぶん）・板の上に出る脚・わくの太さ・わくの厚み（px） */
 const DEFAULT_DROP = 38, OVER = 16, FRAME = 9, DEPTH = 9;
+/** コルク掲示板：木のわくの太さと、わくの内がわに見えるコルクの幅（px） */
+const WOOD = 11, CORK_PAD = 9;
 /** 映す中身を組む幅（px）。面がこれよりせまいときは、縮めて映す */
 const SCREEN_W = 350;
 
@@ -42,7 +44,7 @@ const clampN = (v: number, lo: number, hi: number) => Math.min(hi, Math.max(lo, 
  * 机の上のボード。わく・ペン置き・上の留め具をつかんで好きなところへ動かせ、右下のつまみで大きさを変えられる。
  * 映す面の中は、ふつうにさわる・スクロールできる。
  */
-export function RoomBoard({ children, dark = 0, drop = DEFAULT_DROP, place = DEFAULT_BOARD, onPlace, above = 0, stand = true }: {
+export function RoomBoard({ children, dark = 0, drop = DEFAULT_DROP, place = DEFAULT_BOARD, onPlace, above = 0, stand = true, look = "whiteboard" }: {
   children: ReactNode;
   /** 夜の暗さ（0〜1） */
   dark?: number;
@@ -55,7 +57,12 @@ export function RoomBoard({ children, dark = 0, drop = DEFAULT_DROP, place = DEF
   above?: number;
   /** 三脚・留め具・置いた面の影を描くか（false なら、かべにかけたボードのように、わくとペン置きだけ） */
   stand?: boolean;
+  /** 見た目：アルミのホワイトボード／木のわくのコルク掲示板（中身をポスターのようにピンでとめる） */
+  look?: "whiteboard" | "cork";
 }) {
+  const cork = look === "cork";
+  /** 板のはしから、映す面までの幅（コルクは 木のわく ＋ コルクの余白） */
+  const INS = cork ? WOOD + CORK_PAD : FRAME;
   const DROP = drop;
   // 置ける領域（机）の大きさ
   const areaRef = useRef<HTMLDivElement>(null);
@@ -142,7 +149,7 @@ export function RoomBoard({ children, dark = 0, drop = DEFAULT_DROP, place = DEF
   const fwd: V3 = [nx / nl, 0, nz / nl];
   const hw = bw / 2;
   // 映す面の大きさと、中身を縮める倍率
-  const screenW = bw - FRAME * 2, screenH = bh - FRAME * 2;
+  const screenW = bw - INS * 2, screenH = bh - INS * 2;
   const zoom = Math.min(1, screenW / SCREEN_W);
 
   /* ---------- 脚 ---------- */
@@ -234,32 +241,81 @@ export function RoomBoard({ children, dark = 0, drop = DEFAULT_DROP, place = DEF
         {/* まん中の柱（ボードの上に出て、留め具をささえる） */}
         {stand && (() => { const r = rod(mastBottom, mastTop, 7); return <g><polygon points={r.poly} fill="#B9BFC8" /><line x1={r.pa[0] - r.ox * 0.4 * r.ka} y1={r.pa[1] - r.oy * 0.4 * r.ka} x2={r.pb[0] - r.ox * 0.4 * r.kb} y2={r.pb[1] - r.oy * 0.4 * r.kb} stroke="#FFFFFF" strokeWidth="1.6" opacity="0.85" /><line x1={r.pa[0] + r.ox * 0.75 * r.ka} y1={r.pa[1] + r.oy * 0.75 * r.ka} x2={r.pb[0] + r.ox * 0.75 * r.kb} y2={r.pb[1] + r.oy * 0.75 * r.kb} stroke="#6E757F" strokeWidth="1.2" opacity="0.8" /></g>; })()}
         {/* わくの厚み（手前に来る左のはしと、上のはし） */}
-        <polygon points={pts([P(-hw, 0), P(-hw, bh), P(-hw, bh, -DEPTH), P(-hw, 0, -DEPTH)])} fill="url(#bd-edge)" />
-        <polygon points={pts([P(-hw, bh), P(hw, bh), P(hw, bh, -DEPTH), P(-hw, bh, -DEPTH)])} fill="url(#bd-edge-top)" />
+        <polygon points={pts([P(-hw, 0), P(-hw, bh), P(-hw, bh, -DEPTH), P(-hw, 0, -DEPTH)])} fill={cork ? "#6E4420" : "url(#bd-edge)"} />
+        <polygon points={pts([P(-hw, bh), P(hw, bh), P(hw, bh, -DEPTH), P(-hw, bh, -DEPTH)])} fill={cork ? "#B98250" : "url(#bd-edge-top)"} />
       </svg>
 
       {/* ボードの板（ここだけ CSS の 3D で傾ける） */}
       <div className="absolute" style={{ left: w / 2 - hw, top: yb - bh, width: bw, height: bh, transform: `rotateY(${TURN}deg) rotateX(${LEAN}deg)`, transformOrigin: "50% 100%" }}>
-        {/* アルミのわく（前の面） */}
-        <div aria-hidden className="absolute inset-0 rounded-[5px] bg-[linear-gradient(135deg,#FBFCFD_0%,#D3D8DF_24%,#F1F3F6_46%,#BCC2CB_72%,#9AA1AB_100%)] shadow-[inset_0_1px_0_rgba(255,255,255,.95),inset_0_-1px_0_rgba(60,66,76,.45),inset_1px_0_0_rgba(255,255,255,.7),inset_-1px_0_0_rgba(60,66,76,.35)]" style={dim} />
-        {/* すみの樹脂キャップ */}
-        {(["left-0 top-0", "right-0 top-0 rotate-90", "right-0 bottom-0 rotate-180", "left-0 bottom-0 -rotate-90"] as const).map((pos) => (
-          <svg key={pos} aria-hidden viewBox="0 0 18 18" className={`absolute h-[18px] w-[18px] ${pos}`} style={dim}>
-            <path d="M0 6 Q0 0 6 0 L18 0 L18 7 L7 7 L7 18 L0 18 Z" fill="#474C54" />
-            <path d="M0.8 6 Q0.8 0.8 6 0.8 L17 0.8" fill="none" stroke="#858B95" strokeWidth="1.1" />
+        {cork ? (
+          // 木のわく（木目・面取り）と、コルクの面（つぶつぶ・色むら）
+          <svg aria-hidden width={bw} height={bh} viewBox={`0 0 ${bw} ${bh}`} className="absolute inset-0" style={dim}>
+            <defs>
+              <linearGradient id="cork-wood" x1="0" y1="0" x2="1" y2="1">
+                <stop offset="0" stopColor="#C68A52" /><stop offset="0.5" stopColor="#A86E3C" /><stop offset="1" stopColor="#7E4E26" />
+              </linearGradient>
+              <filter id="cork-wood-grain" x="0" y="0" width="100%" height="100%">
+                <feTurbulence type="fractalNoise" baseFrequency="0.02 0.25" numOctaves="2" seed="5" result="n" />
+                <feColorMatrix in="n" type="matrix" values="0 0 0 0 0.3  0 0 0 0 0.16  0 0 0 0 0.06  0 0 0 1.4 -0.55" />
+              </filter>
+              <filter id="cork-grain-v" x="0" y="0" width="100%" height="100%">
+                <feTurbulence type="fractalNoise" baseFrequency="0.25 0.02" numOctaves="2" seed="9" result="n" />
+                <feColorMatrix in="n" type="matrix" values="0 0 0 0 0.3  0 0 0 0 0.16  0 0 0 0 0.06  0 0 0 1.4 -0.55" />
+              </filter>
+              <filter id="cork-dots" x="0" y="0" width="100%" height="100%">
+                <feTurbulence type="fractalNoise" baseFrequency="0.9" numOctaves="2" seed="3" result="n" />
+                <feColorMatrix in="n" type="matrix" values="0 0 0 0 0.38  0 0 0 0 0.22  0 0 0 0 0.08  0 0 0 3.2 -1.45" />
+              </filter>
+              <filter id="cork-light" x="0" y="0" width="100%" height="100%">
+                <feTurbulence type="fractalNoise" baseFrequency="0.7" numOctaves="1" seed="21" result="n" />
+                <feColorMatrix in="n" type="matrix" values="0 0 0 0 1  0 0 0 0 0.92  0 0 0 0 0.78  0 0 0 2.2 -1.3" />
+              </filter>
+              <clipPath id="cork-ring"><path fillRule="evenodd" d={`M0 0 H${bw} V${bh} H0 Z M${WOOD} ${WOOD} V${bh - WOOD} H${bw - WOOD} V${WOOD} Z`} /></clipPath>
+            </defs>
+            {/* 木のわく：上下は横目、左右は縦目 */}
+            <rect x="0" y="0" width={bw} height={bh} rx="6" fill="url(#cork-wood)" />
+            <g clipPath="url(#cork-ring)">
+              <rect x="0" y="0" width={bw} height={WOOD} filter="url(#cork-wood-grain)" />
+              <rect x="0" y={bh - WOOD} width={bw} height={WOOD} filter="url(#cork-wood-grain)" />
+              <rect x="0" y={WOOD} width={WOOD} height={bh - WOOD * 2} filter="url(#cork-grain-v)" />
+              <rect x={bw - WOOD} y={WOOD} width={WOOD} height={bh - WOOD * 2} filter="url(#cork-grain-v)" />
+            </g>
+            {/* 四すみの、わくの合わせ目（ななめ） */}
+            {[[0, 0, WOOD, WOOD], [bw, 0, bw - WOOD, WOOD], [bw, bh, bw - WOOD, bh - WOOD], [0, bh, WOOD, bh - WOOD]].map(([x1, y1, x2, y2], i) => <line key={i} x1={x1} y1={y1} x2={x2} y2={y2} stroke="#5A3416" strokeOpacity="0.45" strokeWidth="1" />)}
+            <rect x="0.6" y="0.6" width={bw - 1.2} height={bh - 1.2} rx="5.5" fill="none" stroke="#E8B884" strokeOpacity="0.8" strokeWidth="1.2" />
+            <rect x={WOOD - 1.5} y={WOOD - 1.5} width={bw - WOOD * 2 + 3} height={bh - WOOD * 2 + 3} fill="none" stroke="#4A2A10" strokeOpacity="0.55" strokeWidth="1.5" />
+            {/* コルク */}
+            <rect x={WOOD} y={WOOD} width={bw - WOOD * 2} height={bh - WOOD * 2} fill="#C79362" />
+            <rect x={WOOD} y={WOOD} width={bw - WOOD * 2} height={bh - WOOD * 2} filter="url(#cork-dots)" />
+            <rect x={WOOD} y={WOOD} width={bw - WOOD * 2} height={bh - WOOD * 2} filter="url(#cork-light)" opacity="0.7" />
+            {/* わくの内がわに落ちるかげ */}
+            <rect x={WOOD} y={WOOD} width={bw - WOOD * 2} height="5" fill="#2A1606" opacity="0.18" />
+            <rect x={WOOD} y={WOOD} width="4" height={bh - WOOD * 2} fill="#2A1606" opacity="0.12" />
           </svg>
-        ))}
+        ) : (
+          <>
+            {/* アルミのわく（前の面） */}
+            <div aria-hidden className="absolute inset-0 rounded-[5px] bg-[linear-gradient(135deg,#FBFCFD_0%,#D3D8DF_24%,#F1F3F6_46%,#BCC2CB_72%,#9AA1AB_100%)] shadow-[inset_0_1px_0_rgba(255,255,255,.95),inset_0_-1px_0_rgba(60,66,76,.45),inset_1px_0_0_rgba(255,255,255,.7),inset_-1px_0_0_rgba(60,66,76,.35)]" style={dim} />
+            {/* すみの樹脂キャップ */}
+            {(["left-0 top-0", "right-0 top-0 rotate-90", "right-0 bottom-0 rotate-180", "left-0 bottom-0 -rotate-90"] as const).map((pos) => (
+              <svg key={pos} aria-hidden viewBox="0 0 18 18" className={`absolute h-[18px] w-[18px] ${pos}`} style={dim}>
+                <path d="M0 6 Q0 0 6 0 L18 0 L18 7 L7 7 L7 18 L0 18 Z" fill="#474C54" />
+                <path d="M0.8 6 Q0.8 0.8 6 0.8 L17 0.8" fill="none" stroke="#858B95" strokeWidth="1.1" />
+              </svg>
+            ))}
+          </>
+        )}
         {/* 映す面（ここだけスクロールする） */}
-        <div data-board-screen className="absolute overflow-hidden rounded-[3px] bg-[#FAFBFC] shadow-[0_0_0_1px_#7E858F,0_0_0_2px_#AEB4BD]" style={{ inset: FRAME }}>
+        <div data-board-screen className={`absolute overflow-hidden ${cork ? "rounded-[6px] bg-[#FBF8F1] shadow-[0_3px_6px_rgba(40,20,5,.35),0_1px_1px_rgba(40,20,5,.3)]" : "rounded-[3px] bg-[#FAFBFC] shadow-[0_0_0_1px_#7E858F,0_0_0_2px_#AEB4BD]"}`} style={{ inset: INS }}>
           {/* 中身は SCREEN_W 以上の幅で組んで、面の大きさに縮めて映す（ボードが小さい・縦長・横長でも文字がつまったり、はみ出したりしない） */}
           <div className="absolute left-0 top-0" style={{ width: screenW / zoom, height: screenH / zoom, zoom }}>
             <div className="absolute inset-0 space-y-3 overflow-y-auto overscroll-contain pb-2 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden [&>*:not(:first-child)]:mx-2">
               {children}
             </div>
           </div>
-          {/* 面のつや（ななめの映りこみ）と、ふちの内がわのかげ */}
-          <div aria-hidden className="pointer-events-none absolute inset-0 bg-[linear-gradient(112deg,rgba(255,255,255,0)_26%,rgba(255,255,255,.26)_36%,rgba(255,255,255,0)_46%,rgba(255,255,255,0)_68%,rgba(255,255,255,.12)_74%,rgba(255,255,255,0)_80%)]" />
-          <div aria-hidden className="pointer-events-none absolute inset-0 shadow-[inset_0_2px_5px_rgba(0,0,0,.25),inset_2px_0_4px_rgba(0,0,0,.08)]" />
+          {/* 面のつや（ななめの映りこみ）と、ふちの内がわのかげ（ホワイトボードのとき） */}
+          {cork ? null : <div aria-hidden className="pointer-events-none absolute inset-0 bg-[linear-gradient(112deg,rgba(255,255,255,0)_26%,rgba(255,255,255,.26)_36%,rgba(255,255,255,0)_46%,rgba(255,255,255,0)_68%,rgba(255,255,255,.12)_74%,rgba(255,255,255,0)_80%)]" />}
+          {cork ? null : <div aria-hidden className="pointer-events-none absolute inset-0 shadow-[inset_0_2px_5px_rgba(0,0,0,.25),inset_2px_0_4px_rgba(0,0,0,.08)]" />}
         </div>
       </div>
 
@@ -276,6 +332,25 @@ export function RoomBoard({ children, dark = 0, drop = DEFAULT_DROP, place = DEF
           const topA = P(-16, bh + 4, legBack - 2), topB = P(16, bh + 4, legBack - 2), knob = P(0, bh + 10, legBack - 4);
           return <g><polygon points={pts([topA, topB, b, a])} fill="#4A4F57" /><polygon points={pts([a, b, c, d])} fill="#2A2D33" /><polyline points={pts([a, b])} fill="none" stroke="#7A808A" strokeWidth="1.1" /><circle cx={knob[0]} cy={knob[1]} r={4.2 * k} fill="#2A2D33" /><circle cx={knob[0] - 1.2 * k} cy={knob[1] - 1.2 * k} r={1.4 * k} fill="#8A909A" /></g>;
         })()}
+        {cork ? (
+          // 押しピン（ポスターの上の左右）
+          <g>
+            <defs>
+              <radialGradient id="pin-red" cx="0.35" cy="0.3" r="0.75"><stop offset="0" stopColor="#FF9A8A" /><stop offset="0.45" stopColor="#E0423A" /><stop offset="1" stopColor="#9A1E1A" /></radialGradient>
+              <radialGradient id="pin-blue" cx="0.35" cy="0.3" r="0.75"><stop offset="0" stopColor="#A8CCFF" /><stop offset="0.45" stopColor="#3A7AD8" /><stop offset="1" stopColor="#1E4A9A" /></radialGradient>
+            </defs>
+            {[{ x: w / 2 - hw + INS + 14, c: "pin-red" }, { x: w / 2 + hw - INS - 14, c: "pin-blue" }].map((pin) => {
+              const y = yb - bh + INS + 6;
+              return (
+                <g key={pin.c}>
+                  <ellipse cx={pin.x + 3} cy={y + 5} rx="6" ry="3.2" fill="#000" opacity="0.28" />
+                  <circle cx={pin.x} cy={y} r="6.2" fill={`url(#${pin.c})`} />
+                  <circle cx={pin.x - 2} cy={y - 2.2} r="1.8" fill="#FFFFFF" opacity="0.85" />
+                </g>
+              );
+            })}
+          </g>
+        ) : <>
         {/* 棚：上の面・左のはし・前の面 */}
         <polygon points={pts([project(trayA), project(trayB), project(tB2), project(tA2)])} fill="url(#bd-tray-top)" />
         <polygon points={pts([project(trayA), project(tA2), project(down(tA2)), project(down(trayA))])} fill="#9AA1AB" />
@@ -308,6 +383,7 @@ export function RoomBoard({ children, dark = 0, drop = DEFAULT_DROP, place = DEF
             </g>
           );
         })()}
+        </>}
       </svg>
 
       {/* 夜は、面の光が床にうすくこぼれる */}
@@ -320,10 +396,10 @@ export function RoomBoard({ children, dark = 0, drop = DEFAULT_DROP, place = DEF
       {onPlace ? (
         <>
           {[
-            { left: 0, top: 0, width: w, height: Math.max(0, yb - bh + FRAME) },
-            { left: 0, top: yb - FRAME, width: w, height: Math.max(0, h - yb + FRAME) },
-            { left: 0, top: yb - bh, width: w / 2 - hw + FRAME, height: bh },
-            { left: w / 2 + hw - FRAME, top: yb - bh, width: w / 2 - hw + FRAME, height: bh },
+            { left: 0, top: 0, width: w, height: Math.max(0, yb - bh + INS) },
+            { left: 0, top: yb - INS, width: w, height: Math.max(0, h - yb + INS) },
+            { left: 0, top: yb - bh, width: w / 2 - hw + INS, height: bh },
+            { left: w / 2 + hw - INS, top: yb - bh, width: w / 2 - hw + INS, height: bh },
           ].map((z, i) => <div key={i} className="absolute cursor-grab touch-none active:cursor-grabbing" style={z} />)}
           <button
             type="button" data-board-resize aria-label="ボードの大きさを変える（右下をドラッグ）"
