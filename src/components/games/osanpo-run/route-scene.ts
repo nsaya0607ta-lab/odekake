@@ -881,6 +881,7 @@ export function drawRouteScene(v: RouteView, theme: RouteTheme): void {
     case "onsen": onsen(v, T); break;
     case "yatai": yatai(v, T); break;
   }
+  veil(v);
   // 入口・出口のきわで、もとの道と自然につながるよう少し影を落とす
   const { c, g, left, right } = v;
   const edge = (x: number, dir: 1 | -1) => {
@@ -890,6 +891,27 @@ export function drawRouteScene(v: RouteView, theme: RouteTheme): void {
   };
   if (v.seamL) edge(left, 1);
   if (v.seamR) edge(right, -1);
+}
+
+/**
+ * 景色に空気の色のもやを薄くかける。お店や屋台は色が多く、障害物と同じ高さに並ぶので、
+ * そのままだと障害物が背景にまぎれる。本道の背景（engine.ts の haze）と同じく一歩奥に引かせ、
+ * 手前に描く障害物・アイテム・犬が浮いて見えるようにする。足もとの道は、もやを弱める
+ */
+const VEIL = { top: 0.25, wall: 0.5, ground: 0.16 };
+function veil(v: RouteView): void {
+  const { c, e, g, left, right } = v;
+  const air = mix(mix(e.far, e.bot, 0.5), mix(e.far, e.near, 0.55), e.night);
+  const bottom = g + 19;
+  const k = (y: number) => Math.max(0, Math.min(1, y / bottom));
+  const grad = c.createLinearGradient(0, 0, 0, bottom);
+  grad.addColorStop(0, rgb(air, VEIL.top));
+  grad.addColorStop(k(g - 70), rgb(air, VEIL.wall));
+  grad.addColorStop(k(g - 2), rgb(air, VEIL.wall));
+  grad.addColorStop(k(g + 4), rgb(air, VEIL.ground));
+  grad.addColorStop(1, rgb(air, VEIL.ground));
+  c.fillStyle = grad;
+  c.fillRect(left, 0, right - left, bottom);
 }
 
 /** 入口・出口のゲートの半分の幅。景色の切れ目がちょうど柱の位置に来るようにする */
