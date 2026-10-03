@@ -158,7 +158,7 @@ const hexRgbStr = (h: string) => { const [r, g, b] = hex(h); return `${r},${g},$
  * 走る速さ（論理px/秒）。距離がのびても速くならず、ずっと START_SPEED で走る（スキルの倍率・ぬかるみなどは別）。
  * MAX_SPEED は BGM のテンポの目安にだけ使う
  */
-const START_SPEED = 200, MAX_SPEED = 520;
+const START_SPEED = 300, MAX_SPEED = 520;
 /**
  * 背景の流れる速さ。道の速さ（最高520）をそのまま使うと奥の建物まで速く流れて酔いやすいので、
  * 上限 BG_SPEED_MAX を超えないようにしてから BG_SPEED_RATE を掛け、BG_EASE でゆっくり追いつかせる
