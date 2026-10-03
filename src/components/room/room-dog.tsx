@@ -317,7 +317,7 @@ export function RoomDog({ skin, phase, sleepy, lines, dreams = [], cue = null, i
       };
       stepAnim.current = window.requestAnimationFrame(step);
     });
-  }, [toFloor]);
+  }, [toFloor, brushPlants]);
 
   /** 少しのあいだ、ふきだしを出す */
   const say = useCallback((text: string, ms = 2400) => {
