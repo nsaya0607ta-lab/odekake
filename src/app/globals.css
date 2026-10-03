@@ -4418,6 +4418,12 @@
 .room-fx-sway { animation: room-fx-sway 1.6s ease-in-out 2 both; transform-origin: 50% 100%; }
 .room-fx-squish { animation: room-fx-squish 0.6s ease-out both; transform-origin: 50% 100%; }
 .room-fx-clatter { animation: room-fx-clatter 0.32s linear infinite; transform-origin: 50% 100%; }
+@keyframes room-fx-swing { 0%, 100% { transform: rotate(0deg); } 18% { transform: rotate(5deg); } 40% { transform: rotate(-3.5deg); } 62% { transform: rotate(2deg); } 82% { transform: rotate(-0.8deg); } }
+@keyframes room-fx-rock { 0%, 100% { transform: rotate(0deg); } 12% { transform: rotate(-5deg); } 30% { transform: rotate(4deg); } 50% { transform: rotate(-3deg); } 70% { transform: rotate(2deg); } 86% { transform: rotate(-0.8deg); } }
+@keyframes room-fx-hop { 0%, 100% { transform: translateY(0) scale(1, 1); } 20% { transform: translateY(0) scale(1.06, 0.92); } 50% { transform: translateY(-10%) scale(0.97, 1.04); } 78% { transform: translateY(0) scale(1.03, 0.97); } }
+.room-fx-swing { animation: room-fx-swing 1.4s ease-out both; transform-origin: 50% 0%; }
+.room-fx-rock { animation: room-fx-rock 3s ease-in-out both; transform-origin: 50% 92%; }
+.room-fx-hop { animation: room-fx-hop 0.6s cubic-bezier(.3,.7,.4,1) both; transform-origin: 50% 100%; }
 @keyframes room-selected { 0%, 100% { opacity: 1; } 50% { opacity: 0.6; } }
 .room-selected { animation: room-selected 1.6s ease-in-out infinite; }
 /* 流れ星（窓の外を横切って、すっと消える）と、ねがいごとのきらきら */
@@ -4522,7 +4528,7 @@
 .room-capsule-roll { transform-box: fill-box; transform-origin: center; animation: room-capsule-roll 1s cubic-bezier(0.3, 0.6, 0.4, 1) both; }
 @keyframes room-capsule-roll { 0% { transform: translate(-56px, -10px) rotate(0deg); opacity: 0; } 15% { opacity: 1; } 100% { transform: translate(0, 0) rotate(540deg); opacity: 1; } }
 @media (prefers-reduced-motion: reduce) {
-  .room-selected, .room-heart, .room-bubble, .room-dog-walk, .room-dog-idle, .room-dog-sleep, .room-dog-hop, .room-dog-shiver, .room-fx-wobble, .room-fx-sway, .room-fx-squish, .room-fx-clatter, .room-wish, .room-fish-a, .room-fish-b, .room-fish-tail, .room-fish-bubble,
+  .room-selected, .room-heart, .room-bubble, .room-dog-walk, .room-dog-idle, .room-dog-sleep, .room-dog-hop, .room-dog-shiver, .room-fx-wobble, .room-fx-sway, .room-fx-squish, .room-fx-clatter, .room-fx-swing, .room-fx-rock, .room-fx-hop, .room-wish, .room-fish-a, .room-fish-b, .room-fish-tail, .room-fish-bubble,
   .room-bird, .room-bird-head, .room-bird-beak, .room-bird-swing, .room-wheel, .room-ham-run, .room-ham-leg-a, .room-ham-leg-b, .room-record-spin, .room-flame, .room-fire-glow, .room-spark,
   .room-fan-blades, .room-fan-swing, .room-fan-ribbon, .room-breeze-plant, .room-tv-run, .room-tv-ball, .room-tv-cloud, .room-tv-flicker, .room-breeze path, .room-dog-blown, .room-wind, .room-gacha-crank, .room-gacha-jiggle, .room-capsule-roll { animation: none; }
   .room-note { animation: none; opacity: 0.9; }

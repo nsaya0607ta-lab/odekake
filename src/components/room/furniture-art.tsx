@@ -17,9 +17,10 @@ const SVG_CLASS = "pointer-events-none block h-auto w-full";
  * wobble ゆれる / sway 葉がゆれる / squish 乗られて沈む / clatter お皿がかたかた / on 明かりがつく /
  * inside ハウスの中からのぞく / inside-sleep ハウスの中で寝ている / nibbled クッキーを1まいもらった /
  * book 本を1さつ引き出した / empty ごはんを食べきった / drawing ホワイトボードにらくがきしている /
- * talk インコがしゃべっている / spin ガチャのハンドルを回した / capsule ガチャからカプセルが出た
+ * talk インコがしゃべっている / spin ガチャのハンドルを回した / capsule ガチャからカプセルが出た /
+ * swing 壁のかざりが上を支点にゆれる / rock ゆり椅子がゆれる / hop ぴょんとはねる
  */
-export type FurnitureFx = "wobble" | "sway" | "squish" | "clatter" | "on" | "inside" | "inside-sleep" | "nibbled" | "book" | "empty" | "drawing" | "talk" | "spin" | "capsule";
+export type FurnitureFx = "wobble" | "sway" | "squish" | "clatter" | "on" | "inside" | "inside-sleep" | "nibbled" | "book" | "empty" | "drawing" | "talk" | "spin" | "capsule" | "swing" | "rock" | "hop";
 
 /**
  * 家具ごとの、いまの状態（部屋がわで決める）。

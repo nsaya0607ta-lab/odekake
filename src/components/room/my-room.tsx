@@ -174,7 +174,22 @@ const PLACE_KEY = "odekake-room-place-v1";
 /** 家具の絵の 高さ÷幅（furniture-art.tsx の viewBox） */
 const FURNITURE_RATIO: Record<FurnitureId, number> = { kotatsu: 158 / 240, fishbowl: 168 / 110, tv: 180 / 230, piano: 230 / 240, "rocking-chair": 210 / 160, toybox: 146 / 180, birdcage: 222 / 124, hamster: 150 / 170, record: 176 / 160, fireplace: 204 / 220, fan: 196 / 104, gacha: 196 / 124, whiteboard: 200 / 160, sofa: 150 / 260, "dog-bed": 110 / 190, plant: 190 / 120, bookshelf: 210 / 150, lamp: 220 / 90, table: 120 / 200, "dog-house": 190 / 200, bowl: 58 / 100 };
 /** 犬が遊んでいるあいだの家具の動き（ゆれる・明かりがつく など） */
-const FX_CLASS: Partial<Record<FurnitureFx, string>> = { wobble: "room-fx-wobble", sway: "room-fx-sway", squish: "room-fx-squish", clatter: "room-fx-clatter", spin: "room-fx-clatter" };
+const FX_CLASS: Partial<Record<FurnitureFx, string>> = { wobble: "room-fx-wobble", sway: "room-fx-sway", squish: "room-fx-squish", clatter: "room-fx-clatter", spin: "room-fx-clatter", swing: "room-fx-swing", rock: "room-fx-rock", hop: "room-fx-hop" };
+/** タップしたときの動き（専用の遊びがない家具・かざり）。cue があれば、わんこがひとこと */
+function tapMotionOf(entry: DecorEntry, onShelf?: string): { fx: FurnitureFx; ms: number; cue?: { text: string; pose: string } } | null {
+  if (isHanging(entry.kind)) return { fx: "swing", ms: 1500 };
+  if (entry.kind !== "furniture") return { fx: "hop", ms: 700 };
+  switch (entry.furniture) {
+    case "sofa": case "dog-bed": case "kotatsu": return { fx: "squish", ms: 700 };
+    case "rocking-chair": return { fx: "rock", ms: 3200, cue: { text: "ゆーら ゆーら", pose: "smile" } };
+    case "piano": return { fx: "wobble", ms: 1200, cue: { text: "ポロロン♪", pose: "wave" } };
+    case "toybox": return { fx: "hop", ms: 700, cue: { text: "おもちゃ、あそぼ！", pose: "cheer" } };
+    case "bowl": return { fx: "clatter", ms: 600, cue: { text: "ごはん？ ごはん？", pose: "cheer" } };
+    case "fishbowl": return { fx: "wobble", ms: 1200, cue: { text: "おさかな、びっくりしてる", pose: "wonder" } };
+    case "dog-house": case "table": case "whiteboard": case "bookshelf": return { fx: "wobble", ms: 1200 };
+    default: return onShelf ? { fx: "hop", ms: 700 } : null;
+  }
+}
 /** 暖炉のマントルピースのかざり（タップで順に切りかえ。この端末に覚えておく） */
 const MANTEL_KEY = "odekake-room-mantel";
 const MANTEL_DECOS = ["socks", "candles", "plain"] as const;
@@ -661,9 +676,16 @@ export function MyRoom({ entries, initialLayout, serverReady, dogSkin, dogName, 
     }
     // 本だなには、わんこの日記がはさまっている
     if (entry.kind === "furniture" && entry.furniture === "bookshelf" && !visit) {
+      if (!furnitureFx[p.id]) fxFor(p.id, "wobble", 1200);
       setDiary(true);
       setDogCue({ id: Date.now(), text: "あっ、ぼくの にっき…よんでもいいよ", pose: "bow" });
       return;
+    }
+    // そのほかの家具・かざりも、タップすると少し動く（犬が遊んでいる最中の動きはじゃましない）
+    const tap = entry.kind === "fixture" || furnitureFx[p.id] ? null : tapMotionOf(entry, p.on);
+    if (tap) {
+      fxFor(p.id, tap.fx, tap.ms);
+      if (tap.cue) setDogCue({ id: Date.now(), ...tap.cue });
     }
     const text = entry.kind === "item" ? `${entry.rarity} ${entry.name}` : entry.kind === "trophy" ? `${entry.name}　ベスト ${entry.score.toLocaleString("ja-JP")}点（${entry.rank}）` : entry.kind === "pennant" ? `${entry.name}のペナント` : entry.name;
     // 名前は夜の暗さより上に出すので、部屋の中の位置（そのものの上のはし）を覚えておく
