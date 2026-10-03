@@ -599,6 +599,7 @@ export function MyRoom({ entries, initialLayout, serverReady, dogSkin, dogName, 
     // フロアランプは、タップでつけたり消したり
     // 観葉植物は、タップで水やり（1日1回）
     if (entry.kind === "furniture" && entry.furniture === "plant" && !visit) {
+      fxFor(p.id, "sway", 1800);
       if (water()) { flash(`💧 おみずを あげた！（この1週間で ${plant.days + 1}日目）`); setDogCue({ id: Date.now(), text: "おはな、さくかな？", pose: "wonder" }); }
       else flash("きょうは もう おみずを あげたよ。また あしたね");
       return;
@@ -619,6 +620,12 @@ export function MyRoom({ entries, initialLayout, serverReady, dogSkin, dogName, 
           setRecordSwitch((cur) => ({ ...cur, [p.id]: on }));
           if (!on) onFurnitureFx(p.id, null);
           setDogCue({ id: Date.now(), text: on ? "♪ おどっちゃおう！" : "あれ、おわっちゃった", pose: on ? "cheer" : "wonder" });
+          return;
+        }
+        case "tv": {
+          const on = furnitureMode[p.id] !== "off";
+          setTvOff((cur) => ({ ...cur, [p.id]: on }));
+          setDogCue({ id: Date.now(), text: on ? "あれ、きえちゃった" : "わんこ番組、はじまるよ！", pose: on ? "wonder" : "cheer" });
           return;
         }
         case "fan": {
@@ -747,6 +754,8 @@ export function MyRoom({ entries, initialLayout, serverReady, dogSkin, dogName, 
   /** タップで切りかえたスイッチ（さわっていなければ、レコードは止まっていて、扇風機は暑い日につく） */
   const [recordSwitch, setRecordSwitch] = useState<Record<string, boolean>>({});
   const [fanSwitch, setFanSwitch] = useState<Record<string, boolean>>({});
+  /** テレビを消しているもの（タップで切りかえ。ふだんはついている） */
+  const [tvOff, setTvOff] = useState<Record<string, boolean>>({});
   const [mantel, setMantel] = useState<Record<string, string>>({});
   useEffect(() => {
     try { const raw = window.localStorage.getItem(MANTEL_KEY); if (raw) setMantel(JSON.parse(raw) as Record<string, string>); } catch { /* 読めなければ、くつした */ }
@@ -756,11 +765,12 @@ export function MyRoom({ entries, initialLayout, serverReady, dogSkin, dogName, 
     const m: Record<string, string> = {};
     for (const p of layout.items) {
       if (p.key === "furniture:record") m[p.id] = furnitureFx[p.id] === "on" || recordSwitch[p.id] ? "on" : "off";
+      else if (p.key === "furniture:tv") m[p.id] = tvOff[p.id] ? "off" : "on";
       else if (p.key === "furniture:fan") m[p.id] = (fanSwitch[p.id] ?? hot) ? "on" : "off";
       else if (p.key === "furniture:fireplace") m[p.id] = `${fireSeason ? "fire" : "cold"}:${mantel[p.id] ?? mantelDefault}`;
     }
     return m;
-  }, [fanSwitch, fireSeason, furnitureFx, hot, layout.items, mantel, mantelDefault, recordSwitch]);
+  }, [fanSwitch, fireSeason, furnitureFx, hot, layout.items, mantel, mantelDefault, recordSwitch, tvOff]);
   /** 扇風機がついていれば、植物とカーテンが風でなびく */
   const breeze = !editing && layout.items.some((p) => p.key === "furniture:fan" && furnitureMode[p.id] === "on");
   /** しばらくのあいだだけ、家具を動かす（同じ動きのままなら、ms のあとでもとにもどす） */
