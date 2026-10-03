@@ -4424,6 +4424,21 @@
 .room-fx-swing { animation: room-fx-swing 1.4s ease-out both; transform-origin: 50% 0%; }
 .room-fx-rock { animation: room-fx-rock 3s ease-in-out both; transform-origin: 50% 92%; }
 .room-fx-hop { animation: room-fx-hop 0.6s cubic-bezier(.3,.7,.4,1) both; transform-origin: 50% 100%; }
+/* 家具ごと動くあいだは、絵の中の床の影を消す（部屋がわの影は床に残る）。動きのはじめと終わりは、ふわっと */
+@keyframes fa-shadow-hide { 0%, 100% { opacity: var(--fa-o, 0.22); } 15%, 85% { opacity: 0; } }
+.room-fx-wobble .fa-shadow { animation: fa-shadow-hide 1.1s both; }
+.room-fx-sway .fa-shadow { animation: fa-shadow-hide 3.2s both; }
+.room-fx-swing .fa-shadow { animation: fa-shadow-hide 1.4s both; }
+.room-fx-rock .fa-shadow { animation: fa-shadow-hide 3s both; }
+.room-fx-hop .fa-shadow { animation: fa-shadow-hide 0.6s both; }
+.room-fx-clatter .fa-shadow { opacity: 0; }
+/* 家具の部品の動き：おもちゃが飛び出す・音符が浮かぶ・あわが上る */
+@keyframes room-part-pop { 0%, 100% { transform: translateY(0) rotate(0deg); } 40% { transform: translateY(-22px) rotate(-12deg); } 70% { transform: translateY(2px) rotate(4deg); } }
+.room-part-pop { transform-box: fill-box; transform-origin: 50% 100%; animation: room-part-pop 0.8s cubic-bezier(.3,.7,.4,1) both; }
+@keyframes room-part-note { 0% { transform: translateY(8px) scale(0.6); opacity: 0; } 25% { opacity: 1; } 100% { transform: translateY(-26px) scale(1); opacity: 0; } }
+.room-part-note { transform-box: fill-box; transform-origin: 50% 50%; animation: room-part-note 1.1s ease-out both; }
+@keyframes room-part-bubble { 0% { transform: translateY(0); opacity: 0; } 15% { opacity: 1; } 100% { transform: translateY(-60px); opacity: 0; } }
+.room-part-bubble { animation: room-part-bubble 1.2s ease-in both; }
 @keyframes room-selected { 0%, 100% { opacity: 1; } 50% { opacity: 0.6; } }
 .room-selected { animation: room-selected 1.6s ease-in-out infinite; }
 /* 流れ星（窓の外を横切って、すっと消える）と、ねがいごとのきらきら */
@@ -4528,7 +4543,7 @@
 .room-capsule-roll { transform-box: fill-box; transform-origin: center; animation: room-capsule-roll 1s cubic-bezier(0.3, 0.6, 0.4, 1) both; }
 @keyframes room-capsule-roll { 0% { transform: translate(-56px, -10px) rotate(0deg); opacity: 0; } 15% { opacity: 1; } 100% { transform: translate(0, 0) rotate(540deg); opacity: 1; } }
 @media (prefers-reduced-motion: reduce) {
-  .room-selected, .room-heart, .room-bubble, .room-dog-walk, .room-dog-idle, .room-dog-sleep, .room-dog-hop, .room-dog-shiver, .room-fx-wobble, .room-fx-sway, .room-fx-squish, .room-fx-clatter, .room-fx-swing, .room-fx-rock, .room-fx-hop, .room-wish, .room-fish-a, .room-fish-b, .room-fish-tail, .room-fish-bubble,
+  .room-selected, .room-heart, .room-bubble, .room-dog-walk, .room-dog-idle, .room-dog-sleep, .room-dog-hop, .room-dog-shiver, .room-fx-wobble, .room-fx-sway, .room-fx-squish, .room-fx-clatter, .room-fx-swing, .room-fx-rock, .room-fx-hop, .room-part-pop, .room-part-note, .room-part-bubble, .fa-shadow, .room-wish, .room-fish-a, .room-fish-b, .room-fish-tail, .room-fish-bubble,
   .room-bird, .room-bird-head, .room-bird-beak, .room-bird-swing, .room-wheel, .room-ham-run, .room-ham-leg-a, .room-ham-leg-b, .room-record-spin, .room-flame, .room-fire-glow, .room-spark,
   .room-fan-blades, .room-fan-swing, .room-fan-ribbon, .room-breeze-plant, .room-tv-run, .room-tv-ball, .room-tv-cloud, .room-tv-flicker, .room-breeze path, .room-dog-blown, .room-wind, .room-gacha-crank, .room-gacha-jiggle, .room-capsule-roll { animation: none; }
   .room-note { animation: none; opacity: 0.9; }

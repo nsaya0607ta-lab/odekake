@@ -123,6 +123,9 @@ export function findPath(from: Pt, to: Pt, allBlocks: readonly Block[], exact = 
   }
   return path;
 }
+/** 犬がそばを通ると動く家具 */
+const BRUSH_FX: Partial<Record<FurnitureId, { fx: FurnitureFx; ms: number }>> = { plant: { fx: "sway", ms: 1800 }, "rocking-chair": { fx: "rock", ms: 3200 } };
+
 /** 床に置いた家具1つ（部屋の %。x, y は下のまん中、w は幅、h は高さ） */
 export type FurnitureSpot = { id: string; kind: FurnitureId; x: number; y: number; w: number; h: number };
 export type DogPlaces = {
@@ -134,7 +137,7 @@ export type DogPlaces = {
   blocks: { x0: number; x1: number; y0: number; y1: number }[];
 };
 
-export function RoomDog({ skin, phase, sleepy, lines, dreams = [], cue = null, introduce = null, quiet, places, weather = null, onFx, modes = {}, winter = false, hot = false, onFurnitureSay }: {
+export function RoomDog({ skin, phase, sleepy, lines, dreams = [], cue = null, call = null, introduce = null, quiet, places, weather = null, onFx, modes = {}, winter = false, hot = false, onFurnitureSay }: {
   skin: DogSkinId;
   phase: DayPhase;
   /** 窓の外の天気（わからなければ null） */
@@ -147,6 +150,8 @@ export function RoomDog({ skin, phase, sleepy, lines, dreams = [], cue = null, i
   introduce?: string | null;
   /** 部屋で起きたことへの反応（id が変わるたびに1回、その場で言う） */
   cue?: { id: number; text: string; pose?: string } | null;
+  /** タップされた家具へ、遊びに行く（寝ているときは行かない） */
+  call?: { id: number; furnitureId: string } | null;
   /** もようがえ中は、じゃまにならないよう端ですわって待つ */
   quiet: boolean;
   /** 寝る時間か（日本時間の夜おそく〜朝） */
@@ -267,16 +272,19 @@ export function RoomDog({ skin, phase, sleepy, lines, dreams = [], cue = null, i
     jump(clamp(p.x + dx, 6, 94), clamp(p.y + 1.2, ROOM.floorTop + 2, ROOM.floorBottom), 0, () => { setDog((c) => ({ ...c, lift: 0 })); then(); });
   }, [jump]);
 
-  /** 観葉植物のそばを通ると、葉がさわさわゆれる（同じ植物は、しばらくゆれない） */
+  /** そばを通ると動く家具（観葉植物は葉がさわさわ、ゆり椅子は ゆらり）。同じ家具は、しばらく動かない */
   const brushedAt = useRef(new Map<string, number>());
   const brushPlants = useCallback((at: { x: number; y: number }) => {
     const now = Date.now();
     for (const f of placesRef.current.furniture) {
-      if (f.kind !== "plant") continue;
+      const brush = BRUSH_FX[f.kind];
+      if (!brush) continue;
       if (Math.abs(at.x - f.x) > f.w / 2 + 5 || Math.abs(at.y - f.y) > 7) continue;
       if (now - (brushedAt.current.get(f.id) ?? 0) < 4000) continue;
+      // 犬が遊ばせている最中（ゆり椅子に乗っている など）は、じゃましない
+      if (activeFx.current.has(f.id) || lasting.current.has(f.id)) continue;
       brushedAt.current.set(f.id, now);
-      fx(f.id, "sway", 1800);
+      fx(f.id, brush.fx, brush.ms);
     }
   }, [fx]);
 
@@ -573,7 +581,7 @@ export function RoomDog({ skin, phase, sleepy, lines, dreams = [], cue = null, i
         walkTo(sd.x, sd.y, () => {
           face(f.x);
           pose("stand-happy");
-          fx(f.id, "sway", 4200);
+          fx(f.id, "rock", 3200);
           say("ゆーらゆら〜", 1800);
           later(() => { pose("sit-side"); say("ねむくなってきた…", 1500); }, 2400);
           fin(4800);
@@ -581,13 +589,14 @@ export function RoomDog({ skin, phase, sleepy, lines, dreams = [], cue = null, i
         return;
       }
       case "toybox": {
-        const fr = frontOf(f, 0);
+        // 横から のぞきこむ（前に立つと、箱が犬にかくれてしまう）
+        const fr = sideOf(f);
         walkTo(fr.x, fr.y, () => {
           face(f.x);
           pose("sniff");
           fx(f.id, "wobble");
           say("ごそごそ…", 1300);
-          later(() => { fx(f.id, null); pose("cheer"); say(pick(["ボール みーつけた！", "あひるさん、あった！", "ほねだ〜！"]), 1700); }, 1500);
+          later(() => { fx(f.id, "hop", 900); pose("cheer"); say(pick(["ボール みーつけた！", "あひるさん、あった！", "ほねだ〜！"]), 1700); }, 1500);
           later(() => pose("smile"), 3300);
           fin(4600);
         });
@@ -874,6 +883,19 @@ export function RoomDog({ skin, phase, sleepy, lines, dreams = [], cue = null, i
     // cue.id が変わったときだけ
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [cue?.id]);
+
+  // タップされた家具へ、遊びに行く
+  useEffect(() => {
+    if (!call) return;
+    const f = placesRef.current.furniture.find((x) => x.id === call.furnitureId);
+    if (night || quiet || !f) return;
+    clearTimers();
+    busy.current = false;
+    setShiver(false);
+    playWith(f, () => later(live, rand(800, 2000)));
+    // call.id が変わったときだけ
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [call?.id]);
 
   // 寝ているあいだ、ときどき寝言を言う（見えないところ〈ハウスの中〉で寝ているときは言わない）
   const dreaming = night && !quiet && dog.pose === "sleep" && (dog.alpha ?? 1) > 0.05;
