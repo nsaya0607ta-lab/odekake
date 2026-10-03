@@ -150,8 +150,8 @@ export function RoomDog({ skin, phase, sleepy, lines, dreams = [], cue = null, c
   introduce?: string | null;
   /** 部屋で起きたことへの反応（id が変わるたびに1回、その場で言う） */
   cue?: { id: number; text: string; pose?: string } | null;
-  /** タップされた家具へ、遊びに行く（寝ているときは、ひとことだけ） */
-  call?: { id: number; furnitureId: string; text?: string } | null;
+  /** タップされた家具へ、遊びに行く（寝ているときは行かない） */
+  call?: { id: number; furnitureId: string } | null;
   /** もようがえ中は、じゃまにならないよう端ですわって待つ */
   quiet: boolean;
   /** 寝る時間か（日本時間の夜おそく〜朝） */
@@ -589,7 +589,8 @@ export function RoomDog({ skin, phase, sleepy, lines, dreams = [], cue = null, c
         return;
       }
       case "toybox": {
-        const fr = frontOf(f, 0);
+        // 横から のぞきこむ（前に立つと、箱が犬にかくれてしまう）
+        const fr = sideOf(f);
         walkTo(fr.x, fr.y, () => {
           face(f.x);
           pose("sniff");
@@ -887,14 +888,10 @@ export function RoomDog({ skin, phase, sleepy, lines, dreams = [], cue = null, c
   useEffect(() => {
     if (!call) return;
     const f = placesRef.current.furniture.find((x) => x.id === call.furnitureId);
-    if (night || quiet || !f) {
-      if (call.text && !quiet) say(call.text, 1800);
-      return;
-    }
+    if (night || quiet || !f) return;
     clearTimers();
     busy.current = false;
     setShiver(false);
-    if (call.text) say(call.text, 1400);
     playWith(f, () => later(live, rand(800, 2000)));
     // call.id が変わったときだけ
     // eslint-disable-next-line react-hooks/exhaustive-deps

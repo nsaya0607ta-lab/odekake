@@ -175,17 +175,17 @@ const PLACE_KEY = "odekake-room-place-v1";
 const FURNITURE_RATIO: Record<FurnitureId, number> = { kotatsu: 158 / 240, fishbowl: 168 / 110, tv: 180 / 230, piano: 230 / 240, "rocking-chair": 210 / 160, toybox: 146 / 180, birdcage: 222 / 124, hamster: 150 / 170, record: 176 / 160, fireplace: 204 / 220, fan: 196 / 104, gacha: 196 / 124, whiteboard: 200 / 160, sofa: 150 / 260, "dog-bed": 110 / 190, plant: 190 / 120, bookshelf: 210 / 150, lamp: 220 / 90, table: 120 / 200, "dog-house": 190 / 200, bowl: 58 / 100 };
 /** 犬が遊んでいるあいだの家具の動き（ゆれる・明かりがつく など） */
 const FX_CLASS: Partial<Record<FurnitureFx, string>> = { wobble: "room-fx-wobble", sway: "room-fx-sway", squish: "room-fx-squish", clatter: "room-fx-clatter", spin: "room-fx-clatter", swing: "room-fx-swing", rock: "room-fx-rock", hop: "room-fx-hop" };
-/** タップしたときの動き（専用の遊びがない家具・かざり）。cue があれば、わんこがひとこと */
-function tapMotionOf(entry: DecorEntry, onShelf?: string): { fx: FurnitureFx; ms: number; cue?: string } | null {
+/** タップしたときの動き（専用の遊びがない家具・かざり） */
+function tapMotionOf(entry: DecorEntry, onShelf?: string): { fx: FurnitureFx; ms: number } | null {
   if (isHanging(entry.kind)) return { fx: "swing", ms: 1500 };
   if (entry.kind !== "furniture") return { fx: "hop", ms: 700 };
   switch (entry.furniture) {
     case "sofa": case "dog-bed": case "kotatsu": return { fx: "squish", ms: 700 };
-    case "rocking-chair": return { fx: "rock", ms: 3200, cue: "ゆーら ゆーら" };
-    case "piano": return { fx: "wobble", ms: 1200, cue: "ポロロン♪" };
-    case "toybox": return { fx: "hop", ms: 900, cue: "おもちゃ、あそぼ！" };
-    case "bowl": return { fx: "clatter", ms: 600, cue: "ごはん？ ごはん？" };
-    case "fishbowl": return { fx: "wobble", ms: 1200, cue: "おさかな、びっくりしてる" };
+    case "rocking-chair": return { fx: "rock", ms: 3200 };
+    case "piano": return { fx: "wobble", ms: 1200 };
+    case "toybox": return { fx: "hop", ms: 900 };
+    case "bowl": return { fx: "clatter", ms: 600 };
+    case "fishbowl": return { fx: "wobble", ms: 1200 };
     case "dog-house": case "table": case "whiteboard": case "bookshelf": return { fx: "wobble", ms: 1200 };
     default: return onShelf ? { fx: "hop", ms: 700 } : null;
   }
@@ -311,7 +311,7 @@ export function MyRoom({ entries, initialLayout, serverReady, dogSkin, dogName, 
   /** わんこに反応してもらうこと（日記を開いた・散らかったものを片づけた など） */
   const [dogCue, setDogCue] = useState<{ id: number; text: string; pose?: string } | null>(null);
   /** タップした家具へ、わんこを呼ぶ */
-  const [dogCall, setDogCall] = useState<{ id: number; furnitureId: string; text?: string } | null>(null);
+  const [dogCall, setDogCall] = useState<{ id: number; furnitureId: string } | null>(null);
   /** 置いたものの上に少し出す文字（名前や、インコのおしゃべり） */
   const [peek, setPeek] = useState<{ id: string; text: string; x: number; y: number; bird?: boolean } | null>(null);
   const [lightbox, setLightbox] = useState<Extract<DecorEntry, { kind: "photo" }> | null>(null);
@@ -619,7 +619,7 @@ export function MyRoom({ entries, initialLayout, serverReady, dogSkin, dogName, 
     // 観葉植物は、タップで水やり（1日1回）
     if (entry.kind === "furniture" && entry.furniture === "plant" && !visit) {
       fxFor(p.id, "sway", 1800);
-      if (water()) { flash(`💧 おみずを あげた！（この1週間で ${plant.days + 1}日目）`); setDogCall({ id: Date.now(), furnitureId: p.id, text: "おはな、さくかな？" }); }
+      if (water()) { flash(`💧 おみずを あげた！（この1週間で ${plant.days + 1}日目）`); setDogCall({ id: Date.now(), furnitureId: p.id }); }
       else flash("きょうは もう おみずを あげたよ。また あしたね");
       return;
     }
@@ -650,7 +650,7 @@ export function MyRoom({ entries, initialLayout, serverReady, dogSkin, dogName, 
           });
           // つけたら、わんこが見に来る
           if (on) setDogCue({ id: Date.now(), text: "あれ、きえちゃった", pose: "wonder" });
-          else setDogCall({ id: Date.now(), furnitureId: p.id, text: "わんこ番組、はじまるよ！" });
+          else setDogCall({ id: Date.now(), furnitureId: p.id });
           return;
         }
         case "fan": {
@@ -695,8 +695,8 @@ export function MyRoom({ entries, initialLayout, serverReady, dogSkin, dogName, 
     const tap = entry.kind === "fixture" || furnitureFx[p.id] ? null : tapMotionOf(entry, p.on);
     if (tap) {
       fxFor(p.id, tap.fx, tap.ms);
-      // 床の家具なら、わんこが遊びに来る
-      if (entry.kind === "furniture" && !p.on) setDogCall({ id: Date.now(), furnitureId: p.id, text: tap.cue });
+      // 床の家具なら、わんこが遊びに来る（ひとことは、着いてから。名前のふだと重ならないように）
+      if (entry.kind === "furniture" && !p.on) setDogCall({ id: Date.now(), furnitureId: p.id });
     }
     const text = entry.kind === "item" ? `${entry.rarity} ${entry.name}` : entry.kind === "trophy" ? `${entry.name}　ベスト ${entry.score.toLocaleString("ja-JP")}点（${entry.rank}）` : entry.kind === "pennant" ? `${entry.name}のペナント` : entry.name;
     // 名前は夜の暗さより上に出すので、部屋の中の位置（そのものの上のはし）を覚えておく
