@@ -418,12 +418,17 @@ function DogHouse({ u, fx, a11y }: P) {
         <radialGradient id={g("door")} cx="0.5" cy="0.25" r="0.85"><stop offset="0" stopColor="#5A3A22" /><stop offset="1" stopColor="#24160C" /></radialGradient>
       </defs>
       <FloorShadow cx={100} cy={182} rx={86} ry={8} />
-      {/* 右の側面（少し暗い） */}
-      <path d="M176 72 L192 60 L192 168 L176 180 Z" fill="#B07A45" />
-      <path d="M176 72 L192 60 L192 168 L176 180 Z" fill="#000" opacity="0.1" />
+      {/* 右の側面（少し暗い）。上のはしは屋根の下にかくれる */}
+      <path d="M176 80 L192 82 L192 168 L176 180 Z" fill="#B07A45" />
+      <path d="M176 80 L192 82 L192 168 L176 180 Z" fill="#000" opacity="0.1" />
+      {/* 屋根の下の三角の壁（ここが無いと、名ふだのうしろが透けて見える） */}
+      <path d="M100 24 L20 86 L180 86 Z" fill={`url(#${g("wall")})`} />
+      <path d="M100 24 L20 86 L180 86 Z" fill="#000" opacity="0.08" />
       <rect x="24" y="72" width="152" height="108" fill={`url(#${g("wall")})`} />
       {[86, 102, 118, 134, 150, 166].map((y, i) => <rect key={y} x="24" y={y} width="152" height="2" fill="#A86E3C" opacity={0.25 + (i % 2) * 0.1} />)}
       <rect x="24" y="72" width="152" height="16" fill="#000" opacity="0.14" />
+      {/* 屋根の下に落ちる影 */}
+      <path d="M18 92 L100 30 L182 92" stroke="#5A3418" strokeOpacity="0.22" strokeWidth="9" fill="none" strokeLinejoin="round" />
       {/* 屋根（瓦の段） */}
       <path d="M100 10 L4 82 L18 92 L100 30 Z" fill={`url(#${g("roofL")})`} />
       <path d="M100 10 L196 82 L182 92 L100 30 Z" fill={`url(#${g("roofR")})`} />
@@ -461,7 +466,7 @@ function DogHouse({ u, fx, a11y }: P) {
         <rect x="-11" y="-3" width="22" height="6" rx="3" fill="#FFFBF0" />
         {[-11, 11].map((x) => [-3, 3].map((y) => <circle key={`${x}${y}`} cx={x} cy={y} r="3.8" fill="#FFFBF0" />))}
       </g>
-      <rect x="24" y="72" width="6" height="108" fill="#FFFFFF" opacity="0.18" />
+      <rect x="24" y="88" width="6" height="92" fill="#FFFFFF" opacity="0.18" />
     </svg>
   );
 }
