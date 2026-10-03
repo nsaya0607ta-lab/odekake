@@ -61,7 +61,8 @@ type P = Art & { a11y: object };
 
 /** 床に落ちるやわらかいかげ */
 function FloorShadow({ cx, cy, rx, ry, o = 0.22 }: { cx: number; cy: number; rx: number; ry: number; o?: number }) {
-  return <ellipse cx={cx} cy={cy} rx={rx} ry={ry} fill="#3A2614" opacity={o} filter="url(#fa-blur)" />;
+  // 家具ごとゆれる・はねるあいだは、床の影だけ消して（部屋がわの影が床に残る）、影まで傾いて見えないようにする
+  return <ellipse className="fa-shadow" cx={cx} cy={cy} rx={rx} ry={ry} fill="#3A2614" opacity={o} filter="url(#fa-blur)" style={{ "--fa-o": o } as React.CSSProperties} />;
 }
 function Blur() {
   return <filter id="fa-blur" x="-30%" y="-80%" width="160%" height="260%"><feGaussianBlur stdDeviation="3.2" /></filter>;
@@ -679,7 +680,7 @@ function Kotatsu({ u, a11y }: P) {
  * 金魚ばち：ふちが波うつガラスの鉢（厚みのあるふち・映りこみ・水面のゆらぎ）。
  * 中に琉金2ひき（ひれは半透明。尾びれをふって、はしからはしへ泳ぐ）、水草、色とりどりの小石、のぼる泡。木のスツールの上に置く。
  */
-function Fishbowl({ u, a11y }: P) {
+function Fishbowl({ u, fx, a11y }: P) {
   const g = (n: string) => `${u}-${n}`;
   // 位置と向き（左右）は CSS（.room-fish-a / .room-fish-b）で動かす。ここでは原点に、右向きで描く
   const fish = (swim: string, s: number, body: string, hue: [string, string]) => (
@@ -757,6 +758,10 @@ function Fishbowl({ u, a11y }: P) {
         ))}
         {fish("room-fish-a", 1, "fishA", ["#FF8A5E", "#C23A16"])}
         {fish("room-fish-b", 0.82, "fishB", ["#FFD2B8", "#E26A3A"])}
+        {/* 金魚鉢がゆれると、あわが ぷくぷく */}
+        {fx === "wobble" ? ([[40, 100, 2.6, 0], [56, 104, 1.8, 0.2], [70, 98, 2.2, 0.4], [48, 96, 1.4, 0.55]] as const).map(([x, y, r, d]) => (
+          <circle key={x} cx={x} cy={y} r={r} fill="#FFFFFF" fillOpacity="0.25" stroke="#FFFFFF" strokeOpacity="0.85" strokeWidth="0.7" className="room-part-bubble" style={{ animationDelay: `${d}s` }} />
+        )) : null}
         <rect x="0" y="40" width="110" height="90" fill={`url(#${g("edge")})`} />
         {/* 泡 */}
         {([[50, 70, 1.8], [53, 66, 1.3], [48, 64, 1]] as const).map(([x, y, r], i) => <circle key={i} className="room-fish-bubble" style={{ animationDelay: `${-i * 1.2}s` }} cx={x} cy={y} r={r} fill="none" stroke="#FFFFFF" strokeWidth="0.8" />)}
@@ -905,7 +910,7 @@ function Tv({ u, lit, mode, a11y }: P) {
  * アップライトピアノ：つやのある黒い塗り（強い映りこみ・右の側板で奥ゆき）・ふたを開けた鍵盤（白鍵の厚み・黒鍵のつや）。
  * 譜面台に楽譜、上にメトロノームと一輪ざし。彫りのある脚と金のペダル。
  */
-function Piano({ u, a11y }: P) {
+function Piano({ u, fx, a11y }: P) {
   const g = (n: string) => `${u}-${n}`;
   const W = 21;
   return (
@@ -1009,6 +1014,10 @@ function Piano({ u, a11y }: P) {
       {[104, 118, 132].map((x) => <g key={x}><path d={`M${x - 4} 186 h8 l2 6 h-12 z`} fill={`url(#${g("brass")})`} /><path d={`M${x - 3} 186.6 h6`} stroke="#FFF6D0" strokeWidth="0.6" /></g>)}
       {/* ロゴの金の文字 */}
       <text x="113" y="106" textAnchor="middle" fontSize="5.6" fontWeight="700" letterSpacing="1.4" fill={`url(#${g("brass")})`}>WANKO</text>
+      {/* ひいているあいだ、音符がふわっと浮かぶ */}
+      {fx === "wobble" ? ([[70, 20, "♪", "#E04A3A", 0], [118, 12, "♫", "#3D6FB0", 0.25], [164, 22, "♪", "#4E9A4A", 0.5]] as const).map(([x, y, n, c, d]) => (
+        <text key={x} x={x} y={y} textAnchor="middle" fontSize="34" fontWeight="900" fill={c} stroke="#FFFFFF" strokeWidth="1.2" paintOrder="stroke" className="room-part-note" style={{ animationDelay: `${d}s` }}>{n}</text>
+      )) : null}
     </svg>
   );
 }
@@ -1095,7 +1104,8 @@ function RockingChair({ u, a11y }: P) {
  * おもちゃ箱：板を組んだ木の箱（板目・金具の角・ペンキの肉球）。ふたは開いて、うしろに立てかけてある。
  * 中から、ボール・ロープのおもちゃ・あひる・ほね・にんじんのぬいぐるみがのぞき、ボールが1つ床に転がる。
  */
-function Toybox({ u, a11y }: P) {
+function Toybox({ u, fx, a11y }: P) {
+  const pop = fx === "hop";
   const g = (n: string) => `${u}-${n}`;
   return (
     <svg viewBox="0 0 180 146" className={SVG_CLASS} {...a11y}>
@@ -1135,21 +1145,21 @@ function Toybox({ u, a11y }: P) {
         {([[60, 58], [96, 44]] as const).map(([x, y], i) => <g key={i}><circle cx={x} cy={y} r="5.6" fill="#E6E0D4" /><path d={`M${x! - 3} ${y! + 4} l-1 6 M${x} ${y! + 5} v6 M${x! + 3} ${y! + 4} l1 6`} stroke="#D6CEC0" strokeWidth="1.4" strokeLinecap="round" /></g>)}
       </g>
       {/* あひる */}
-      <g transform="translate(124 40)">
+      <g transform="translate(124 40)"><g className={pop ? "room-part-pop" : undefined} style={{ animationDelay: "0.08s" }}>
         <ellipse cx="0" cy="8" rx="14" ry="10" fill={`url(#${g("duck")})`} />
         <circle cx="7" cy="-5" r="8.5" fill={`url(#${g("duck")})`} />
         <path d="M14 -5 q7 0 8 2.4 q-4 2 -8 1 z" fill="#F58A1C" />
         <circle cx="9" cy="-7" r="1.5" fill="#1A0F08" /><circle cx="9.5" cy="-7.6" r="0.5" fill="#FFFFFF" />
         <path d="M-10 6 q6 -6 12 0" stroke="#E0A820" strokeWidth="1.4" fill="none" />
         <ellipse cx="3" cy="-9" rx="2.8" ry="1.6" fill="#FFFFFF" opacity="0.6" />
-      </g>
+      </g></g>
       {/* ほね */}
       <g transform="translate(104 50) rotate(14)">
         <path d="M-16 -3 a4.6 4.6 0 1 1 5.6 -3 h20.8 a4.6 4.6 0 1 1 5.6 3 a4.6 4.6 0 1 1 -5.6 3 h-20.8 a4.6 4.6 0 1 1 -5.6 -3 z" fill={`url(#${g("bone")})`} stroke="#D8C8A8" strokeWidth="0.8" />
         <path d="M-10 -4 h20" stroke="#FFFFFF" strokeWidth="1.2" opacity="0.8" />
       </g>
       {/* ボール（中のと、床に転がったの） */}
-      <g transform="translate(78 50)"><circle r="11" fill={`url(#${g("ball2")})`} /><path d="M-10 -4 Q0 4 10 -4 M-10 4 Q0 -4 10 4" stroke="#FFFFFF" strokeWidth="1.6" fill="none" opacity="0.85" /></g>
+      <g transform="translate(78 50)"><g className={pop ? "room-part-pop" : undefined}><circle r="11" fill={`url(#${g("ball2")})`} /><path d="M-10 -4 Q0 4 10 -4 M-10 4 Q0 -4 10 4" stroke="#FFFFFF" strokeWidth="1.6" fill="none" opacity="0.85" /></g></g>
       {/* 箱：右の側面 → 前の面（板目・板のつなぎ） → 金具 */}
       <path d="M158 54 L170 46 L170 116 L158 130 Z" fill={`url(#${g("side")})`} filter={`url(#${g("grain")})`} />
       <rect x="18" y="54" width="140" height="76" rx="3" fill={`url(#${g("front")})`} filter={`url(#${g("grain")})`} />
