@@ -154,7 +154,10 @@ const BONE_PTS = 5;
 /** 歩いた1mあたりの点 */
 const METER_PTS = 10;
 const hexRgbStr = (h: string) => { const [r, g, b] = hex(h); return `${r},${g},${b}`; };
-/** 走る速さ（論理px/秒）。最初はゆっくりで、約3分かけて最高速になる */
+/**
+ * 走る速さ（論理px/秒）。距離がのびても速くならず、ずっと START_SPEED で走る（スキルの倍率・ぬかるみなどは別）。
+ * MAX_SPEED は BGM のテンポの目安にだけ使う
+ */
 const START_SPEED = 200, MAX_SPEED = 520;
 /**
  * 背景の流れる速さ。道の速さ（最高520）をそのまま使うと奥の建物まで速く流れて酔いやすいので、
@@ -3220,7 +3223,7 @@ export function createOsanpoRun(root: HTMLElement, opts: OsanpoRunOptions): () =
       if (!M.hold) K.ramp += dt;
       if (S.slowT > 0) S.slowT -= dt;
       tickWeather(dt);
-      S.speed = M.stop ? 0 : (START_SPEED + Math.min(MAX_SPEED - START_SPEED, K.ramp * 1.8)) * M.speed * (S.slowT > 0 ? 0.55 : 1);
+      S.speed = M.stop ? 0 : START_SPEED * M.speed * (S.slowT > 0 ? 0.55 : 1);
       if (S.t >= 180) unlock("survive180");
       if (S.clock >= 1440 + 300) unlock("dawn");
       tickSkills(dt);
