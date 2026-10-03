@@ -915,7 +915,7 @@ export function RoomDog({ skin, phase, sleepy, lines, dreams = [], cue = null, i
         {bubble ? (
           <span
             key={bubble.id}
-            className={`room-bubble absolute bottom-[96%] w-max max-w-[11rem] rounded-2xl border px-2.5 py-1.5 text-[11px] font-bold leading-snug shadow-md ${bubble.dream ? "border-[#D8D2FF] bg-[#F3F0FF] text-[#5A5794]" : "border-line bg-card text-ink"} ${dog.x < 28 ? "room-bubble-left left-0" : dog.x > 72 ? "room-bubble-right right-0" : "left-1/2 -translate-x-1/2"}`}
+            className={`room-bubble absolute bottom-[96%] w-max max-w-[11rem] rounded-2xl border px-2.5 py-1.5 text-[11px] font-bold leading-snug shadow-md ${bubble.dream ? "border-[#D8D2FF] bg-[#F3F0FF] text-[#5A5794]" : "border-line bg-card text-ink"} ${dog.x < 40 ? "room-bubble-left left-0" : dog.x > 60 ? "room-bubble-right right-0" : "left-1/2 -translate-x-1/2"}`}
           >
             {bubble.text}
           </span>
