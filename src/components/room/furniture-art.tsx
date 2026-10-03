@@ -17,9 +17,10 @@ const SVG_CLASS = "pointer-events-none block h-auto w-full";
  * wobble ゆれる / sway 葉がゆれる / squish 乗られて沈む / clatter お皿がかたかた / on 明かりがつく /
  * inside ハウスの中からのぞく / inside-sleep ハウスの中で寝ている / nibbled クッキーを1まいもらった /
  * book 本を1さつ引き出した / empty ごはんを食べきった / drawing ホワイトボードにらくがきしている /
- * talk インコがしゃべっている / spin ガチャのハンドルを回した / capsule ガチャからカプセルが出た
+ * talk インコがしゃべっている / spin ガチャのハンドルを回した / capsule ガチャからカプセルが出た /
+ * swing 壁のかざりが上を支点にゆれる / rock ゆり椅子がゆれる / hop ぴょんとはねる
  */
-export type FurnitureFx = "wobble" | "sway" | "squish" | "clatter" | "on" | "inside" | "inside-sleep" | "nibbled" | "book" | "empty" | "drawing" | "talk" | "spin" | "capsule";
+export type FurnitureFx = "wobble" | "sway" | "squish" | "clatter" | "on" | "inside" | "inside-sleep" | "nibbled" | "book" | "empty" | "drawing" | "talk" | "spin" | "capsule" | "swing" | "rock" | "hop";
 
 /**
  * 家具ごとの、いまの状態（部屋がわで決める）。
@@ -783,7 +784,8 @@ function Fishbowl({ u, a11y }: P) {
  * テレビ：うすい黒ふちの液晶（つやのある映りこみ・スタンド）と、くるみ材のテレビ台（上の面・引き出し・細い脚）。
  * 画面には、わんこ番組（青空・丘・走るフレンチー・ボール・字幕）。台の上に小さな植物とスピーカー。
  */
-function Tv({ u, lit, a11y }: P) {
+function Tv({ u, lit, mode, a11y }: P) {
+  const off = mode === "off";
   const g = (n: string) => `${u}-${n}`;
   return (
     <svg viewBox="0 0 230 180" className={SVG_CLASS} {...a11y}>
@@ -854,12 +856,12 @@ function Tv({ u, lit, a11y }: P) {
         <circle cx="168" cy="38" r="16" fill={`url(#${g("sun")})`} />
         <circle cx="168" cy="38" r="7" fill="#FFF4B8" />
         {([[66, 34, 1], [118, 28, 0.8]] as const).map(([x, y, sc], i) => (
-          <g key={i} transform={`translate(${x} ${y}) scale(${sc})`} fill="#FFFFFF"><ellipse cx="0" cy="4" rx="16" ry="6" /><circle cx="-6" cy="0" r="7" /><circle cx="5" cy="-2" r="8" /></g>
+          <g key={i} transform={`translate(${x} ${y}) scale(${sc})`} fill="#FFFFFF"><g className={off ? undefined : "room-tv-cloud"} style={{ animationDelay: `${-i * 4}s` }}><ellipse cx="0" cy="4" rx="16" ry="6" /><circle cx="-6" cy="0" r="7" /><circle cx="5" cy="-2" r="8" /></g></g>
         ))}
         <path d="M31 84 Q70 64 112 76 T199 70 L199 112 L31 112 Z" fill={`url(#${g("hill2")})`} />
         <path d="M31 94 Q80 80 130 90 T199 86 L199 112 L31 112 Z" fill={`url(#${g("hill")})`} />
         {/* 走るフレンチー */}
-        <g transform="translate(92 86)">
+        <g transform="translate(92 86)"><g className={off ? undefined : "room-tv-run"}>
           <ellipse cx="0" cy="10" rx="18" ry="2.6" fill="#2E6A2A" opacity="0.35" />
           <path d="M-14 6 l-6 7 M-6 8 l-3 8 M6 8 l4 8 M13 5 l7 6" stroke="#E2D6C4" strokeWidth="3.6" strokeLinecap="round" />
           <ellipse cx="0" cy="0" rx="17" ry="9.5" fill="#F7F1E6" />
@@ -871,8 +873,8 @@ function Tv({ u, lit, a11y }: P) {
           <ellipse cx="25" cy="-5" rx="2.6" ry="2" fill="#3A2A20" />
           <path d="M23 -2 q2 3 4 0" stroke="#3A2A20" strokeWidth="0.9" fill="none" />
           <path d="M-18 -2 q-4 -4 -2 -7" stroke="#E2D6C4" strokeWidth="2.4" fill="none" strokeLinecap="round" />
-        </g>
-        <g transform="translate(140 92)"><circle r="6" fill="#E04A3A" /><path d="M-6 0 A6 6 0 0 0 6 0 Z" fill="#FFFFFF" /></g>
+        </g></g>
+        <g transform="translate(140 92)"><g className={off ? undefined : "room-tv-ball"}><circle r="6" fill="#E04A3A" /><path d="M-6 0 A6 6 0 0 0 6 0 Z" fill="#FFFFFF" /></g></g>
         {/* 字幕と LIVE */}
         <rect x="36" y="22" width="26" height="9" rx="2" fill="#E04A3A" />
         <text x="49" y="29" textAnchor="middle" fontSize="6.4" fontWeight="900" fill="#FFFFFF">LIVE</text>
@@ -880,6 +882,7 @@ function Tv({ u, lit, a11y }: P) {
         <text x="115" y="106" textAnchor="middle" fontSize="7" fontWeight="800" fill="#FFFFFF">わんこ大集合！</text>
         {/* 走査のうすい線 */}
         {Array.from({ length: 24 }, (_, i) => <rect key={i} x="31" y={18 + i * 4} width="168" height="1" fill="#000" opacity="0.035" />)}
+        {off ? <rect x="31" y="18" width="168" height="94" fill="#15181C" /> : <rect x="31" y="18" width="168" height="94" fill="#FFFFFF" className="room-tv-flicker" />}
       </g>
       {/* 映りこみ（へやの窓）・夜は画面の光 */}
       <rect x="31" y="18" width="168" height="94" rx="2" fill={`url(#${g("glare")})`} />
@@ -892,8 +895,8 @@ function Tv({ u, lit, a11y }: P) {
         <circle cx="-7" cy="0.4" r="1" fill="#E04A3A" />
         {[-3, 0, 3, 6].map((x) => <circle key={x} cx={x} cy="0.6" r="0.6" fill="#8A8E96" />)}
       </g>
-      {lit ? <rect x="24" y="12" width="182" height="106" rx="5" fill="#CFE8FF" opacity="0.12" /> : null}
-      <circle cx="198" cy="114" r="1.4" fill="#7BE07B" />
+      {lit && !off ? <rect x="24" y="12" width="182" height="106" rx="5" fill="#CFE8FF" opacity="0.12" /> : null}
+      <circle cx="198" cy="114" r="1.4" fill={off ? "#E04A3A" : "#7BE07B"} />
     </svg>
   );
 }

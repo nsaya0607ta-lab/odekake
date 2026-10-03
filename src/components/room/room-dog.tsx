@@ -267,6 +267,19 @@ export function RoomDog({ skin, phase, sleepy, lines, dreams = [], cue = null, i
     jump(clamp(p.x + dx, 6, 94), clamp(p.y + 1.2, ROOM.floorTop + 2, ROOM.floorBottom), 0, () => { setDog((c) => ({ ...c, lift: 0 })); then(); });
   }, [jump]);
 
+  /** 観葉植物のそばを通ると、葉がさわさわゆれる（同じ植物は、しばらくゆれない） */
+  const brushedAt = useRef(new Map<string, number>());
+  const brushPlants = useCallback((at: { x: number; y: number }) => {
+    const now = Date.now();
+    for (const f of placesRef.current.furniture) {
+      if (f.kind !== "plant") continue;
+      if (Math.abs(at.x - f.x) > f.w / 2 + 5 || Math.abs(at.y - f.y) > 7) continue;
+      if (now - (brushedAt.current.get(f.id) ?? 0) < 4000) continue;
+      brushedAt.current.set(f.id, now);
+      fx(f.id, "sway", 1800);
+    }
+  }, [fx]);
+
   /**
    * 家具をよけながら (x, y) まで歩く。1コマごとに位置を変えるので、重なり順も歩きながら変わる。
    * zy は着いてからの重なり順（ベッドの上など）。exact は家具の中（ベッド・ハウス）へ入るとき
@@ -287,6 +300,7 @@ export function RoomDog({ skin, phase, sleepy, lines, dreams = [], cue = null, i
         const k = Math.min(1, (t - segStart) / dur);
         const cur = { x: a.x + (b.x - a.x) * k, y: a.y + (b.y - a.y) * k };
         pos.current = cur;
+        brushPlants(cur);
         const flip = b.x > a.x + 0.05 ? true : b.x < a.x - 0.05 ? false : undefined;
         if (k >= 1) {
           a = b; seg += 1; segStart = t;
@@ -303,7 +317,7 @@ export function RoomDog({ skin, phase, sleepy, lines, dreams = [], cue = null, i
       };
       stepAnim.current = window.requestAnimationFrame(step);
     });
-  }, [toFloor]);
+  }, [toFloor, brushPlants]);
 
   /** 少しのあいだ、ふきだしを出す */
   const say = useCallback((text: string, ms = 2400) => {
@@ -527,6 +541,12 @@ export function RoomDog({ skin, phase, sleepy, lines, dreams = [], cue = null, i
       case "tv": {
         const fr = frontOf(f, 0);
         walkTo(fr.x, Math.min(ROOM.floorBottom, f.y + 7), () => {
+          if (modesRef.current[f.id] === "off") {
+            setDog((d) => ({ ...d, pose: "wonder", flip: false }));
+            say("テレビ、きえてる…", 1800);
+            fin(3200);
+            return;
+          }
           setDog((d) => ({ ...d, pose: "sit", flip: false }));
           say(pick(["わんこ番組、おもしろい！", "ボールのCMだ！", "あ、ぼくに にてる！"]), 2200);
           later(() => { pose("cheer"); say("ワン！", 1000); }, 3000);
