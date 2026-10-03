@@ -956,7 +956,7 @@ export function MyRoom({ entries, initialLayout, serverReady, dogSkin, dogName, 
       <main className={stage ? "fixed inset-0 flex flex-col overflow-y-auto overflow-x-hidden bg-paper text-ink" : "min-h-dvh bg-paper pb-[calc(env(safe-area-inset-bottom)+1.5rem)] text-ink"}>
         <header className="sticky top-0 z-[600] shrink-0 border-b border-line bg-paper/95 backdrop-blur">
           <div className="mx-auto flex h-14 max-w-lg items-center gap-2 px-3">
-            <Link href={visit ? "/room" : "/mypage"} aria-label={visit ? "じぶんのおへやへ戻る" : "マイページへ戻る"} className="flex h-11 w-11 items-center justify-center rounded-full active:bg-paper-deep">
+            <Link href={visit ? "/room" : "/home"} aria-label={visit ? "じぶんのおへやへ戻る" : "ホームへ戻る"} className="flex h-11 w-11 items-center justify-center rounded-full active:bg-paper-deep">
               <IconChevronLeft size={24} />
             </Link>
             <div className="min-w-0 flex-1 text-center">
