@@ -1066,7 +1066,7 @@ export function createOsanpoRun(root: HTMLElement, opts: OsanpoRunOptions): () =
       case "suitcase": case "surprise": case "drone": {
         const spec = TRICK_SPECS[kind];
         // 高速でも予告の時間を確保。後続の障害物との間隔にもこの距離を足す。
-        const lead = S.speed * 0.8, phase = kind === "suitcase" ? rand(0, 1.8) : 0;
+        const lead = START_SPEED * 0.8, phase = kind === "suitcase" ? rand(0, 1.8) : 0;
         const pose = trickPose(kind, GROUND, 0, -1, phase);
         addObs(kind, X + lead, spec.width, pose.h, { y: pose.y, phase, low: kind === "drone", vx: kind === "suitcase" ? 28 : 0 });
         extra = lead + 150;
@@ -3355,29 +3355,36 @@ export function createOsanpoRun(root: HTMLElement, opts: OsanpoRunOptions): () =
     tickSniffs(dt, playing);
     // 障害物
     const sp = S.speed;
+    // 降ってくる・伸びる仕掛けは、時間ではなく「犬が進んだ距離」で動かす（ふだんの速さのとき 1）。
+    // スキルで速くなっても遅くなっても、犬が同じ位置に来たときは、同じ動きの同じところになる
+    const pace = sp / START_SPEED;
     for (const o of obstacles) {
       o.x -= (sp + (playing ? o.vx : (o.vx * sp) / 300)) * dt;
       if (o.kind === "pigeons" && o.flee) o.fleeT += dt;
       if (o.hit) { o.kvy += GRAV * dt; o.ky += o.kvy * dt; o.rot += o.spin * dt; o.x += 160 * dt; continue; }
       if (!playing) continue;
       if (isTrickKind(o.kind)) {
-        o.age += dt;
-        if (o.kind !== "suitcase" && o.activeTime < 0 && o.x - (P.x + 22) < S.speed * 1.25 + 40) o.activeTime = 0;
-        if (o.activeTime >= 0) o.activeTime += dt;
+        o.age += dt * pace;
+        if (o.kind !== "suitcase" && o.activeTime < 0 && o.x - (P.x + 22) < START_SPEED * 1.25 + 40) o.activeTime = 0;
+        if (o.activeTime >= 0) o.activeTime += dt * pace;
         const pose = trickPose(o.kind, GROUND, o.age, o.activeTime, o.phase);
         o.y = pose.y; o.h = pose.h;
       }
       if (o.kind === "geyser") {
         // 水は出たり止まったりする。出はじめは下から伸びる
-        const ph = (S.t + o.phase) % GEYSER_CYCLE;
+        o.age += dt * pace;
+        const ph = (o.age + o.phase) % GEYSER_CYCLE;
         o.h = ph < GEYSER_ON ? GEYSER_H * Math.min(1, ph / 0.1) : 0;
       } else if (o.kind === "drop" && !o.landed) {
-        // フレブルの少し前に着地するタイミングで落とし始める
-        const fallT = Math.sqrt((2 * (GROUND + 40)) / DROP_G);
-        if (o.vy === 0 && o.x - P.x < S.speed * fallT + 70) { o.vy = 1; sfx.near(); }
+        // フレブルの少し前（70px）に着地するよう、落ちる高さを残りの距離で決める（重力らしく、だんだん速く落ちる）。
+        // 落ちはじめの高さは phase に覚えておく（落ちてくるものでは phase を使っていない）
+        const fallD = START_SPEED * Math.sqrt((2 * (GROUND + 40)) / DROP_G);
+        const left = o.x - P.x - 70;
+        if (o.vy === 0 && left < fallD) { o.vy = 1; o.phase = o.y; sfx.near(); }
         if (o.vy > 0) {
-          o.vy += DROP_G * dt; o.y += o.vy * dt;
-          if (o.y >= GROUND) { o.y = GROUND; o.landed = true; o.h = 16; puff(o.x + o.w / 2, GROUND - 4, 8, "dust", { vy: -30 }); tone(180, 0.12, "triangle", 0.05, 90); }
+          const k = clamp(1 - left / fallD, 0, 1);
+          o.y = o.phase + (GROUND - o.phase) * k * k;
+          if (k >= 1) { o.y = GROUND; o.landed = true; o.h = 16; puff(o.x + o.w / 2, GROUND - 4, 8, "dust", { vy: -30 }); tone(180, 0.12, "triangle", 0.05, 90); }
         }
       }
       if (o.kind !== "crow" && o.kind !== "noren" && o.kind !== "geyser" && o.kind !== "buddy" && !(o.kind === "drop" && !o.landed) && o.x < P.x + 22 && o.x + o.w > P.x - 18) o.minClear = Math.min(o.minClear, GROUND - o.h - P.y);
