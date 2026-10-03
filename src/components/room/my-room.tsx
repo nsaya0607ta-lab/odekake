@@ -414,7 +414,17 @@ export function MyRoom({ entries, initialLayout, serverReady, dogSkin, dogName, 
   // 保存は1つずつ順番に送り、送るたびに rev（送った時刻）をつける。サーバーは、もっと新しい rev が
   // 入っていれば古い保存を捨てる（通信の順番が入れかわっても、新しい飾り方が古いもので上書きされない）。
   // まだ送れていない変更は、この端末にも下書きとして残し、次に開いたとき（戻るボタンで古い画面が出たときも）に使う。
+  // 送り終わったあとも「最後に送った飾り方」として残しておく。フレンドの部屋から戻ったときなどに、
+  // 画面の使い回しで送る前の古い飾り方が出ても、こちらのほうが新しければ、こちらを使う。
   const draftKey = `${DRAFT_KEY}:${ownerId ?? "me"}`;
+  /** 端末に残した飾り方を書きかえる（いま残っているものより古ければ、書きかえない） */
+  const keepLocal = useCallback((rev: number, snapshot: RoomLayout, saved: boolean) => {
+    try {
+      const d = JSON.parse(window.localStorage.getItem(draftKey) ?? "null") as { rev?: number } | null;
+      if (d && (d.rev ?? 0) > rev) return;
+      window.localStorage.setItem(draftKey, JSON.stringify({ rev, layout: snapshot, saved }));
+    } catch { /* 残せない端末 */ }
+  }, [draftKey]);
   const saving = useRef(false);
   const persist = useCallback(async () => {
     const snapshot = latest.current;
@@ -430,10 +440,13 @@ export function MyRoom({ entries, initialLayout, serverReady, dogSkin, dogName, 
     try {
       const response = await fetch("/api/my-room", { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ layout: { ...snapshot, rev } }) });
       if (!response.ok) throw new Error("save failed");
-      const payload = (await response.json().catch(() => null)) as { ready?: boolean } | null;
+      const payload = (await response.json().catch(() => null)) as { ready?: boolean; stale?: boolean } | null;
       if (payload?.ready === false) { window.localStorage.setItem(LOCAL_KEY, JSON.stringify(snapshot)); setSaveState("local"); return; }
       const done = latest.current === snapshot;
-      if (done) try { const d = JSON.parse(window.localStorage.getItem(draftKey) ?? "null") as { rev?: number } | null; if (!d || (d.rev ?? 0) <= rev) window.localStorage.removeItem(draftKey); } catch { /* 下書きを消せなくても困らない */ }
+      if (payload?.stale) {
+        // ほかの端末で、もっと新しい飾り方が保存されていた。端末に残した古い飾り方は使わない
+        try { const d = JSON.parse(window.localStorage.getItem(draftKey) ?? "null") as { rev?: number } | null; if (!d || (d.rev ?? 0) <= rev) window.localStorage.removeItem(draftKey); } catch { /* 消せなくても困らない */ }
+      } else if (done) keepLocal(rev, snapshot, true);
       setSaveState(done ? "saved" : "dirty");
     } catch {
       setSaveState("error");
@@ -442,25 +455,27 @@ export function MyRoom({ entries, initialLayout, serverReady, dogSkin, dogName, 
       // 送っているあいだに変えた分は、つづけて送る
       if (latest.current !== snapshot) window.setTimeout(() => { void persistRef.current(); }, 300);
     }
-  }, [draftKey, serverReady]);
+  }, [draftKey, keepLocal, serverReady]);
   const persistRef = useRef(persist);
   persistRef.current = persist;
   // 変えたら、まず端末に下書きを残す（自分の部屋だけ）
   useEffect(() => {
     if (saveState !== "dirty" || !serverReady || visit) return;
-    try { window.localStorage.setItem(draftKey, JSON.stringify({ rev: Date.now(), layout: latest.current })); } catch { /* 残せない端末 */ }
-  }, [draftKey, layout, saveState, serverReady, visit]);
-  // 開いたとき、サーバーの飾り方より新しい下書きがあれば、そちらを使って送りなおす
+    keepLocal(Date.now(), latest.current, false);
+  }, [keepLocal, layout, saveState, serverReady, visit]);
+  // 開いたとき、サーバーの飾り方より新しいものが端末にあれば、そちらを使う（まだ送れていなければ送りなおす）
   useEffect(() => {
     if (!serverReady || visit) return;
     try {
-      const d = JSON.parse(window.localStorage.getItem(draftKey) ?? "null") as { rev?: number; layout?: unknown } | null;
+      const d = JSON.parse(window.localStorage.getItem(draftKey) ?? "null") as { rev?: number; layout?: unknown; saved?: boolean } | null;
       if (!d?.layout || typeof d.rev !== "number") return;
-      if (d.rev <= (initialLayout?.rev ?? 0)) { window.localStorage.removeItem(draftKey); return; }
+      // サーバーのほうが新しい（ほかの端末で変えた など）か、同じなら、サーバーの飾り方のまま
+      if (d.rev <= (initialLayout?.rev ?? 0)) { if (!d.saved) window.localStorage.removeItem(draftKey); return; }
       const restored = ownedOnly(parseRoomLayout(d.layout, validKeys), shop);
       latest.current = restored;
       setLayout(restored);
-      setSaveState("dirty");
+      // 送り終わっているもの（画面の使い回しで古い飾り方が出ただけ）は、送りなおさない
+      setSaveState(d.saved ? "saved" : "dirty");
     } catch { /* 読めなければサーバーの飾り方のまま */ }
     // 開いたときに1回だけ
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -479,12 +494,13 @@ export function MyRoom({ entries, initialLayout, serverReady, dogSkin, dogName, 
     const flush = () => {
       if (saveStateRef.current !== "dirty") return;
       saveStateRef.current = "saving";
-      if (serverReady) void fetch("/api/my-room", { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ layout: { ...latest.current, rev: Date.now() } }), keepalive: true });
+      // 送れたかどうかは分からないので、端末には「まだ送れていない」として残す（次に開いたとき、古ければ送りなおす）
+      if (serverReady) { const rev = Date.now(); keepLocal(rev, latest.current, false); void fetch("/api/my-room", { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ layout: { ...latest.current, rev } }), keepalive: true }); }
       else try { window.localStorage.setItem(LOCAL_KEY, JSON.stringify(latest.current)); } catch { /* 保存できない端末 */ }
     };
     window.addEventListener("pagehide", flush);
     return () => { window.removeEventListener("pagehide", flush); flush(); };
-  }, [serverReady]);
+  }, [keepLocal, serverReady]);
 
   /* ---------- 変更 ---------- */
   const readOnly = !!visit;
