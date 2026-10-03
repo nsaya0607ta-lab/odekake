@@ -1476,6 +1476,13 @@ export function createOsanpoRun(root: HTMLElement, opts: OsanpoRunOptions): () =
    * 切れ目はゲートの柱の位置に合わせて、柱で隠す。
    * 位置は道（S.dist）と同じ速さで流れるので、ゆったりモードで背景が止まっていても動いて見える
    */
+  /** 画面x が、分かれ道の景色（入口ゲートと出口ゲートのあいだ）の前にあるか */
+  function overRoute(x: number): boolean {
+    const r = S.route;
+    if (!r) return false;
+    const gx = P.x + (r.gate - S.dist), ex = r.exit === null ? Infinity : P.x + (r.exit - S.dist);
+    return x > gx - ROUTE_GATE_HALF && x < ex + ROUTE_GATE_HALF;
+  }
   function drawRouteScene(c: Ctx, e: Env): void {
     const r = S.route;
     if (!r) return;
@@ -3610,6 +3617,9 @@ export function createOsanpoRun(root: HTMLElement, opts: OsanpoRunOptions): () =
       else if (e.night > 0.2) {
         c.shadowColor = o.kind === "crow" ? `rgba(255,236,210,${0.95 * e.night})` : `rgba(255,228,170,${0.7 * e.night})`;
         c.shadowBlur = (o.kind === "crow" ? 7 : 5) * DPR * SC;
+      } else if (overRoute(o.x + o.w / 2)) {
+        // 商店街・屋台などの景色の前では、白いふちで背景から切りはなす
+        c.shadowColor = "rgba(255,255,255,.95)"; c.shadowBlur = 4 * DPR * SC;
       }
       const lk = STAGE_ID;
       if (o.kind === "suitcase") drawSuitcase(c, o.x, o.y, o.w, o.h, o.age, lk);
