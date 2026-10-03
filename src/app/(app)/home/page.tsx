@@ -33,6 +33,7 @@ export const dynamic = "force-dynamic";
 
 const MINI_GAME_BUTTON_SRC = "/3215A80A-2B64-45E2-8AA5-B7CAF2E0251D.webp";
 const GACHA_BUTTON_SRC = "/4738ADDA-10DB-4664-B078-FE6262248CFB.webp";
+const ROOM_BUTTON_SRC = "/room-button.webp";
 
 export default async function HomePage({
   searchParams,
@@ -209,11 +210,17 @@ export default async function HomePage({
 
                 <Link
                   href="/room"
-                  aria-label="わんこのおへやを開く"
-                  className="mt-[-8px] flex min-h-[36px] w-full items-center justify-center gap-1.5 rounded-full border border-leaf/25 bg-card/90 px-3 text-[11px] font-black text-leaf-deep shadow-[0_4px_12px_rgba(93,128,73,0.15)] active:scale-[0.97]"
+                  aria-label="マイルームを開く"
+                  className="block aspect-[3/1] w-full overflow-visible rounded-full !border-0 !bg-transparent !p-0 !shadow-none active:scale-[0.97]"
+                  style={{ background: "transparent", boxShadow: "none", marginTop: -6 }}
                 >
-                  <span aria-hidden="true" className="text-base">🏠</span>
-                  わんこのおへや
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img
+                    src={ROOM_BUTTON_SRC}
+                    alt="マイルーム"
+                    className="block h-full w-full -translate-y-[15px] !bg-transparent object-contain"
+                    style={{ background: "transparent" }}
+                  />
                 </Link>
               </div>
             </div>
