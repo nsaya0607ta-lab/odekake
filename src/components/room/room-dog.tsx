@@ -132,6 +132,8 @@ export type DogPlaces = {
   /** 窓のまん中（部屋の %）。窓をしまっていれば null */
   window: { x: number } | null;
   toys: { x: number; y: number; name: string }[];
+  /** 飾ったおさんぽのおみやげ（high: 棚の上。下から見上げる） */
+  keepsakes?: { x: number; y: number; high: boolean; talk: readonly string[] }[];
   furniture: FurnitureSpot[];
   /** 家具のあるところ（部屋の %）。うろうろするときは、ここに足をおかない */
   blocks: { x0: number; x1: number; y0: number; y1: number }[];
@@ -805,7 +807,16 @@ export function RoomDog({ skin, phase, sleepy, lines, dreams = [], cue = null, c
       });
       return;
     }
-    if (r < 0.14 && pl.toys.length) {
+    if (r < 0.07 && pl.keepsakes?.length) {
+      // 飾ったおみやげを見に行って、自慢する（棚の上のものは、下から見上げる）
+      const k = pick(pl.keepsakes);
+      const side = k.x < 50 ? 5 : -5;
+      walkTo(clamp(k.x + (k.high ? 0 : side), 6, 94), clamp(k.y + (k.high ? 0 : 0.6), ROOM.floorTop + 2, ROOM.floorBottom), () => {
+        setDog((d) => ({ ...d, pose: k.high ? "wonder" : "sniff", flip: k.high ? d.flip : side < 0 }));
+        later(() => { pose(pick(["cheer", "stand-happy", "smile"] as const)); say(pick(k.talk), 2400); }, 1100);
+        next(4600);
+      });
+    } else if (r < 0.14 && pl.toys.length) {
       // おもちゃのにおいをかいで、遊ぶ
       const toy = pick(pl.toys);
       const side = toy.x < 50 ? 6 : -6;

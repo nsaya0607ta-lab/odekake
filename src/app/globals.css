@@ -4548,3 +4548,18 @@
   .room-fan-blades, .room-fan-swing, .room-fan-ribbon, .room-breeze-plant, .room-tv-run, .room-tv-ball, .room-tv-cloud, .room-tv-flicker, .room-breeze path, .room-dog-blown, .room-wind, .room-gacha-crank, .room-gacha-jiggle, .room-capsule-roll { animation: none; }
   .room-note { animation: none; opacity: 0.9; }
 }
+
+/* おさんぽのおみやげ：レアのきらめき・光の輪、雪のけっしょうの ゆっくり回転、もらったときの出かた */
+@keyframes room-sv-twinkle { 0%, 100% { transform: scale(0.55); opacity: 0.35; } 50% { transform: scale(1.1); opacity: 1; } }
+.room-sv-twinkle { transform-box: fill-box; transform-origin: 50% 50%; animation: room-sv-twinkle 1.8s ease-in-out infinite; }
+@keyframes room-sv-aura { 0%, 100% { opacity: 0.75; } 50% { opacity: 1; } }
+.room-sv-aura { animation: room-sv-aura 2.6s ease-in-out infinite; }
+@keyframes room-sv-spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+.room-sv-spin { transform-box: fill-box; transform-origin: 50% 50%; animation: room-sv-spin 14s linear infinite; }
+@keyframes room-sv-pop { 0% { transform: translateY(14px) scale(0.4); opacity: 0; } 60% { transform: translateY(-4px) scale(1.08); opacity: 1; } 100% { transform: translateY(0) scale(1); opacity: 1; } }
+.room-sv-pop { animation: room-sv-pop 0.55s cubic-bezier(.3,.7,.4,1.2) both; }
+@keyframes room-sv-shine { 0% { transform: translateX(-120%) skewX(-20deg); } 100% { transform: translateX(220%) skewX(-20deg); } }
+.room-sv-shine { animation: room-sv-shine 2.4s ease-in-out 0.6s infinite; }
+@media (prefers-reduced-motion: reduce) {
+  .room-sv-twinkle, .room-sv-aura, .room-sv-spin, .room-sv-pop, .room-sv-shine { animation: none; }
+}

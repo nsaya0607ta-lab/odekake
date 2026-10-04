@@ -18,26 +18,39 @@ export const SOUVENIR_IDS = [
 export type SouvenirId = (typeof SOUVENIR_IDS)[number];
 
 type Season = "spring" | "summer" | "autumn" | "winter";
-/** name: 名前 / seasons: 拾える季節（空ならいつでも） / rare: 10,000歩のときだけ */
-export const SOUVENIRS: Record<SouvenirId, { name: string; seasons: Season[]; rare?: boolean }> = {
-  pebble: { name: "まるい石", seasons: [] },
-  feather: { name: "鳥のはね", seasons: [] },
-  twig: { name: "いい感じの小えだ", seasons: [] },
-  "heart-stone": { name: "ハートの石", seasons: [], rare: true },
-  sakura: { name: "さくらの花びら", seasons: ["spring"] },
-  dandelion: { name: "たんぽぽ", seasons: ["spring"] },
-  clover: { name: "よつばのクローバー", seasons: ["spring"], rare: true },
-  shell: { name: "貝がら", seasons: ["summer"] },
-  sunflower: { name: "ひまわり", seasons: ["summer"] },
-  "sakura-shell": { name: "さくら貝", seasons: ["summer"], rare: true },
-  acorn: { name: "どんぐり", seasons: ["autumn"] },
-  maple: { name: "もみじ", seasons: ["autumn"] },
-  pinecone: { name: "まつぼっくり", seasons: ["autumn"] },
-  "gold-acorn": { name: "ぴかぴかどんぐり", seasons: ["autumn"], rare: true },
-  camellia: { name: "つばきの花", seasons: ["winter"] },
-  nanten: { name: "なんてんの実", seasons: ["winter"] },
-  "snow-crystal": { name: "ゆきのけっしょう（の形の氷）", seasons: ["winter"], rare: true },
+/**
+ * name: 名前 / seasons: 拾える季節（空ならいつでも） / rare: 10,000歩のときだけ
+ * found: もらったときの、わんこのひとこと（どこで見つけたか） / talk: 飾ったものを見に行ったときに言うこと
+ */
+export type Souvenir = { name: string; seasons: Season[]; rare?: boolean; found: string; talk: readonly string[] };
+export const SOUVENIRS: Record<SouvenirId, Souvenir> = {
+  pebble: { name: "まるい石", seasons: [], found: "川のそばで ひろったよ。すべすべ！", talk: ["この石、すべすべなんだよ", "まるい石、ぼくのたからもの"] },
+  feather: { name: "鳥のはね", seasons: [], found: "こうえんに ふわっと おちてたよ", talk: ["このはね、どの鳥さんのかな？", "ふわふわの はね…"] },
+  twig: { name: "いい感じの小えだ", seasons: [], found: "いちばん いい感じの えだを えらんだよ！", talk: ["この えだ、くわえやすいんだ", "いい感じでしょ？"] },
+  "heart-stone": { name: "ハートの石", seasons: [], rare: true, found: "ハートの形の石！ たからものだよ", talk: ["ハートの石、きらきら…", "これは とくべつな たからもの！"] },
+  sakura: { name: "さくらの花びら", seasons: ["spring"], found: "さくら並木で ひらひら つかまえたよ", talk: ["さくら、きれいだったね", "はなびら、ひらひら〜"] },
+  dandelion: { name: "たんぽぽ", seasons: ["spring"], found: "道ばたで さいてたよ。ふわふわもあるよ", talk: ["たんぽぽ、ふーって したいな", "きいろくて かわいいね"] },
+  clover: { name: "よつばのクローバー", seasons: ["spring"], rare: true, found: "よつばだよ！ くんくん さがしたんだ", talk: ["よつばの クローバー、しあわせになれるかな", "ぼく、さがすの とくいなんだ"] },
+  shell: { name: "貝がら", seasons: ["summer"], found: "すなはまで みつけたよ。うみの においがする", talk: ["貝がらから うみの音、するかな？", "うみ、また行きたいね"] },
+  sunflower: { name: "ひまわり", seasons: ["summer"], found: "おひさまみたいな お花、もらったよ", talk: ["ひまわり、おひさまの ほう むいてる！", "なつって かんじ！"] },
+  "sakura-shell": { name: "さくら貝", seasons: ["summer"], rare: true, found: "ピンクの 貝がら！ めずらしいんだって", talk: ["さくら貝、すきとおってて きれい", "めずらしいんだよ、これ"] },
+  acorn: { name: "どんぐり", seasons: ["autumn"], found: "どんぐり いっぱい おちてたよ！", talk: ["このどんぐり、ぼくが みつけたんだ！", "どんぐり、ころころ…"] },
+  maple: { name: "もみじ", seasons: ["autumn"], found: "まっかな はっぱ、きれいでしょ", talk: ["もみじ、まっか！", "あきの においが するね"] },
+  pinecone: { name: "まつぼっくり", seasons: ["autumn"], found: "まつぼっくり、くわえて かえってきたよ", talk: ["まつぼっくり、かじっちゃ だめ…？", "ちくちく するね"] },
+  "gold-acorn": { name: "ぴかぴかどんぐり", seasons: ["autumn"], rare: true, found: "ぴかぴかの どんぐり！ すごいでしょ！", talk: ["ぴかぴかどんぐり、みて みて！", "これ、きっと どんぐりの王さまだよ"] },
+  camellia: { name: "つばきの花", seasons: ["winter"], found: "さむい中で さいてたよ。まっか！", talk: ["つばき、さむくても さくんだね", "まっかで きれい"] },
+  nanten: { name: "なんてんの実", seasons: ["winter"], found: "あかい実、つやつや してたよ", talk: ["なんてんの実、つやつや", "たべちゃ だめ なんだって"] },
+  "snow-crystal": { name: "とけない雪のけっしょう", seasons: ["winter"], rare: true, found: "ふしぎ！ とけない 雪のけっしょうだよ", talk: ["雪のけっしょう、ずっと とけないの", "まほうの 雪かな？"] },
 };
+
+/** 季節の名前（まだ持っていないおみやげのヒント） */
+export const SEASON_NAMES: Record<Season, string> = { spring: "春", summer: "夏", autumn: "秋", winter: "冬" };
+/** まだ持っていないおみやげの、見つかるときのヒント */
+export function souvenirHint(id: SouvenirId): string {
+  const s = SOUVENIRS[id];
+  const when = s.seasons.length ? `${s.seasons.map((x) => SEASON_NAMES[x]).join("・")}の おさんぽで` : "いつでも おさんぽで";
+  return s.rare ? `${when}、1日10,000歩 あるくと 見つかるかも` : `${when} 見つかるかも`;
+}
 
 export const souvenirKey = (id: SouvenirId) => `souvenir:${id}`;
 export const isSouvenirId = (v: string): v is SouvenirId => (SOUVENIR_IDS as readonly string[]).includes(v);
