@@ -287,6 +287,18 @@ export const GACHA_PRIZES: readonly GachaPrize[] = [
   { id: "aichi_nagoya_castle", name: "名古屋城・金のしゃちほこ", rarity: "LR", type: "item", image: "/collection/items/aichi-nagoya-castle.webp", pref: "23" },
   { id: "aichi_frenchie", name: "愛知のフレブル", rarity: "LR", type: "dog_skin", image: "/collection/skins/aichi-frenchie.webp", pref: "23" },
 
+  // --- 都道府県ガチャ（青コイン）：静岡県 ------------------------------
+  { id: "shizuoka_oden", name: "静岡おでん", rarity: "N", type: "item", image: "/collection/items/shizuoka-oden.webp", pref: "22" },
+  { id: "shizuoka_abekawa_mochi", name: "安倍川もち", rarity: "N", type: "item", image: "/collection/items/shizuoka-abekawa-mochi.webp", pref: "22" },
+  { id: "shizuoka_sakuraebi", name: "桜えび", rarity: "N", type: "item", image: "/collection/items/shizuoka-sakuraebi.webp", pref: "22" },
+  { id: "shizuoka_hamamatsu_gyoza", name: "浜松餃子", rarity: "R", type: "item", image: "/collection/items/shizuoka-hamamatsu-gyoza.webp", pref: "22" },
+  { id: "shizuoka_green_tea", name: "静岡茶", rarity: "R", type: "item", image: "/collection/items/shizuoka-green-tea.webp", pref: "22" },
+  { id: "shizuoka_miho_no_matsubara", name: "三保の松原", rarity: "SR", type: "item", image: "/collection/items/shizuoka-miho-no-matsubara.webp", pref: "22" },
+  { id: "shizuoka_atami_onsen", name: "熱海温泉", rarity: "SR", type: "item", image: "/collection/items/shizuoka-atami-onsen.webp", pref: "22" },
+  { id: "shizuoka_hamanako_unagi", name: "浜名湖うなぎ", rarity: "SSR", type: "item", image: "/collection/items/shizuoka-hamanako-unagi.webp", pref: "22" },
+  { id: "shizuoka_omuroyama", name: "大室山・伊豆", rarity: "UR", type: "item", image: "/collection/items/shizuoka-omuroyama.webp", pref: "22" },
+  { id: "shizuoka_mt_fuji_tea", name: "富士山・茶畑", rarity: "LR", type: "item", image: "/collection/items/shizuoka-mt-fuji-tea.webp", pref: "22" },
+
   // --- 都道府県ガチャ（青コイン）：三重県 ------------------------------
   { id: "mie_ise_udon", name: "伊勢うどん", rarity: "N", type: "item", image: "/collection/items/mie-ise-udon.webp", pref: "24" },
   { id: "mie_akafuku", name: "赤福", rarity: "N", type: "item", image: "/collection/items/mie-akafuku.webp", pref: "24" },
