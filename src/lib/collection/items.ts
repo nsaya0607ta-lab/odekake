@@ -345,6 +345,13 @@ const CURATED_ITEMS: readonly CollectionItem[] = [
   { id: "aichi_nagoya_castle", name: "名古屋城・金のしゃちほこ", image: "/collection/items/aichi-nagoya-castle.webp", category: "other", series: null, rarity: "LR", pref: "23" },
   { id: "aichi_frenchie", name: "愛知のフレブル", image: "/collection/skins/aichi-frenchie.webp", category: "other", series: null, rarity: "LR", pref: "23" },
 
+  // --- 都道府県図鑑：静岡県（都道府県ガチャ） ----------------------------
+  { id: "shizuoka_oden", name: "静岡おでん", image: "/collection/items/shizuoka-oden.webp", category: "food", series: null, rarity: "N", pref: "22" },
+  { id: "shizuoka_abekawa_mochi", name: "安倍川もち", image: "/collection/items/shizuoka-abekawa-mochi.webp", category: "food", series: null, rarity: "N", pref: "22" },
+  { id: "shizuoka_sakuraebi", name: "桜えび", image: "/collection/items/shizuoka-sakuraebi.webp", category: "food", series: null, rarity: "N", pref: "22" },
+  { id: "shizuoka_hamamatsu_gyoza", name: "浜松餃子", image: "/collection/items/shizuoka-hamamatsu-gyoza.webp", category: "food", series: null, rarity: "R", pref: "22" },
+  { id: "shizuoka_green_tea", name: "静岡茶", image: "/collection/items/shizuoka-green-tea.webp", category: "food", series: null, rarity: "R", pref: "22" },
+
   // --- 都道府県図鑑：三重県（都道府県ガチャ） ----------------------------
   { id: "mie_ise_udon", name: "伊勢うどん", image: "/collection/items/mie-ise-udon.webp", category: "food", series: null, rarity: "N", pref: "24" },
   { id: "mie_akafuku", name: "赤福", image: "/collection/items/mie-akafuku.webp", category: "food", series: null, rarity: "N", pref: "24" },
