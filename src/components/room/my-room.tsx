@@ -81,8 +81,9 @@ import {
 import { DecorVisual, FRAME_LABELS } from "./decor-visual";
 import type { FurnitureFx } from "./furniture-art";
 import { RoomDog } from "./room-dog";
-import { SouvenirBook, SouvenirGift, type SouvenirNews } from "./souvenir-ui";
-import { pendingSouvenirs, pruneBrought, SOUVENIRS, souvenirKey } from "@/lib/room/souvenirs";
+import { SouvenirArt } from "./souvenir-art";
+import { headline, SouvenirBook, SouvenirGift, type SouvenirNews } from "./souvenir-ui";
+import { ownedKey, pendingSouvenirs, pruneBrought, SOUVENIR_ACTS, SOUVENIRS, souvenirKey, souvenirName, type SouvenirId } from "@/lib/room/souvenirs";
 import { composeRoomSnapshot } from "./room-snapshot";
 import { skyAt } from "@/lib/room/sun";
 import { parseRoomWeather, withWeather, type RoomWeather } from "@/lib/room/weather";
@@ -723,8 +724,10 @@ export function MyRoom({ entries, initialLayout, serverReady, dogSkin, dogName, 
       setDogCue({ id: Date.now(), text: "あっ、ぼくの にっき…よんでもいいよ", pose: "bow" });
       return;
     }
+    // 飾ったおみやげは、わんこが見に来て、おみやげごとのしぐさをする
+    if (entry.kind === "souvenir" && !furnitureFx[p.id]) { fxFor(p.id, "hop", 700); callDogs(p.id); }
     // そのほかの家具・かざりも、タップすると少し動く（犬が遊んでいる最中の動きはじゃましない）
-    const tap = entry.kind === "fixture" || furnitureFx[p.id] ? null : tapMotionOf(entry, p.on);
+    const tap = entry.kind === "fixture" || entry.kind === "souvenir" || furnitureFx[p.id] ? null : tapMotionOf(entry, p.on);
     if (tap) {
       fxFor(p.id, tap.fx, tap.ms);
       // 床の家具なら、わんこが遊びに来る（ひとことは、着いてから。名前のふだと重ならないように）
@@ -769,6 +772,8 @@ export function MyRoom({ entries, initialLayout, serverReady, dogSkin, dogName, 
    * 受け取ったら部屋の飾り方にいっしょに保存する（ほかの端末でも同じ。同じ分は二度もらわない）。自分の部屋だけ
    */
   const [souvenirNews, setSouvenirNews] = useState<SouvenirNews | null>(null);
+  /** わんこが口にくわえて見せている おみやげ（カードが出るまで） */
+  const [carrying, setCarrying] = useState<{ id: SouvenirId; shiny: boolean } | null>(null);
   useEffect(() => {
     if (visit || editing) return;
     const cur = latest.current;
@@ -777,18 +782,22 @@ export function MyRoom({ entries, initialLayout, serverReady, dogSkin, dogName, 
     const owned = { ...(cur.souvenirs ?? {}) };
     // はじめて見つけた種類には NEW をつける（同じ日に2つ来たら、1つめだけ）
     const news: SouvenirNews = pending.map((p) => {
-      const isNew = !owned[p.id];
-      owned[p.id] = Math.min(SOUVENIR_MAX, (owned[p.id] ?? 0) + 1);
-      return { id: p.id, steps: p.steps, isNew };
+      const k = ownedKey(p.id, p.shiny);
+      const isNew = !owned[k];
+      owned[k] = Math.min(SOUVENIR_MAX, (owned[k] ?? 0) + 1);
+      return { id: p.id, shiny: p.shiny, steps: p.steps, isNew };
     });
     const next: RoomLayout = { ...cur, souvenirs: owned, brought: pruneBrought([...(cur.brought ?? []), ...pending.map((p) => p.key)], todayKey) };
     latest.current = next;
     setLayout(next);
     setSaveState("dirty");
-    setSouvenirNews(news);
-    // 開いてすぐの ほかのひとこと（お客さんが来た など）と重ならないよう、少しあとで言う
-    const text = pending.length > 1 ? `ただいま！ おみやげ ${pending.length}こ もってきたよ` : `ただいま！ ${SOUVENIRS[pending[0]!.id].name}を みつけたよ`;
-    window.setTimeout(() => setDogCue({ id: Date.now(), text, pose: "cheer" }), 2600);
+    // まず、わんこが いちばんのおみやげを くわえて「ただいま！」。少ししてから おみやげ袋が出る
+    // （開いてすぐの ほかのひとこと＝お客さんが来た などと重ならないよう、ひとことは少しあと）
+    const top = headline(news);
+    setCarrying({ id: top.id, shiny: top.shiny });
+    const text = top.shiny ? `ただいま！ みて！ 色ちがいの ${SOUVENIRS[top.id].name}！` : pending.length > 1 ? `ただいま！ おみやげ ${pending.length}こ もってきたよ` : `ただいま！ ${SOUVENIRS[top.id].name}を みつけたよ`;
+    window.setTimeout(() => setDogCue({ id: Date.now(), text, pose: "stand-happy" }), 2200);
+    window.setTimeout(() => { setSouvenirNews(news); setCarrying(null); }, 4400);
   }, [editing, stepHistory, steps?.steps, todayKey, visit]);
   /** 部屋のよごれ（おさんぽをさぼると、窓がくもり、ほこりがたまる。自分の部屋だけ） */
   const dirt = useMemo(() => (visit ? 0 : roomDirtOf(stepHistory ?? [], steps?.steps, todayKey)), [stepHistory, steps?.steps, todayKey, visit]);
@@ -954,7 +963,7 @@ export function MyRoom({ entries, initialLayout, serverReady, dogSkin, dogName, 
       keepsakes: placedItems.flatMap((p) => {
         const e = entryByKey.get(p.key);
         if (e?.kind !== "souvenir") return [];
-        return [{ x: p.x, y: p.on ? ROOM.floorTop + 2.5 : p.y, high: Boolean(p.on), talk: SOUVENIRS[e.souvenir].talk }];
+        return [{ id: p.id, x: p.x, y: p.on ? ROOM.floorTop + 2.5 : p.y, high: Boolean(p.on), act: SOUVENIR_ACTS[e.souvenir], name: souvenirName(e.souvenir, e.shiny) }];
       }),
       // 窓のまん中（犬が外をながめに行く）
       window: windowRects[0] ? { x: (windowRects[0].x0 + windowRects[0].x1) / 2 } : null,
@@ -1190,7 +1199,7 @@ export function MyRoom({ entries, initialLayout, serverReady, dogSkin, dogName, 
             })}
 
             {!editing && mess.length ? <RoomMess mess={mess} onClean={(m) => onCleanMess(m.id)} /> : null}
-          <RoomDog skin={dogSkin} phase={phase} sleepy={sleepy} lines={dogLines} dreams={dogDreams} cue={dogCue} call={dogCall} introduce={visit ? petName : null} quiet={editing} places={dogPlaces} weather={weather?.kind ?? null} onFx={onFurnitureFx} modes={furnitureMode} winter={winter} hot={hot} onFurnitureSay={birdTalk} />
+          <RoomDog skin={dogSkin} phase={phase} sleepy={sleepy} lines={dogLines} dreams={dogDreams} cue={dogCue} call={dogCall} carry={carrying ? <SouvenirArt id={carrying.id} shiny={carrying.shiny} /> : null} introduce={visit ? petName : null} quiet={editing} places={dogPlaces} weather={weather?.kind ?? null} onFx={onFurnitureFx} modes={furnitureMode} winter={winter} hot={hot} onFurnitureSay={birdTalk} />
           {/* 遊びに来たフレンドのわんこ。自分のわんこと同じように暮らし、少し横にずれて並ぶ（家具は動かさない） */}
           {guest ? <RoomDog key={guest.id} skin={guest.skin} phase={phase} sleepy={sleepy} lines={guestLines} dreams={GUEST_DREAMS} call={guestCall} quiet={editing} places={dogPlaces} weather={weather?.kind ?? null} modes={furnitureMode} winter={winter} hot={hot} offset={9} onTap={setGuestCard} label="遊びに来たフレンドの犬" /> : null}
             {/* 行事のもの（部屋の左右のすみ）。置いたものと同じく、奥ほど下に重なる */}
@@ -1295,8 +1304,8 @@ export function MyRoom({ entries, initialLayout, serverReady, dogSkin, dogName, 
                   <SouvenirBook
                     owned={layout.souvenirs ?? {}}
                     now={now}
-                    placedOf={(id) => layout.items.filter((p) => p.key === souvenirKey(id)).length}
-                    onPlace={(id) => { const e = entryByKey.get(souvenirKey(id)); if (e) addEntry(e); }}
+                    placedOf={(id, shiny) => layout.items.filter((p) => p.key === souvenirKey(id, shiny)).length}
+                    onPlace={(id, shiny) => { const e = entryByKey.get(souvenirKey(id, shiny)); if (e) addEntry(e); }}
                   />
                 ) : tab === "theme" ? (
                   <ThemePicker

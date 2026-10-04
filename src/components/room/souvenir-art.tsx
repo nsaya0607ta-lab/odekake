@@ -7,7 +7,7 @@
  * 同じおみやげを2つ置いてもグラデーションの id がぶつからないよう、useId で id を分ける。
  */
 import { useId, type ReactNode } from "react";
-import type { SouvenirId } from "@/lib/room/souvenirs";
+import { SHINY_FILTER, type SouvenirId } from "@/lib/room/souvenirs";
 
 const SVG_CLASS = "pointer-events-none block h-auto w-full";
 /** 三角関数で出した座標は、サーバーと端末で最後の桁がずれることがある（表示の食いちがい）。小数2けたにそろえる */
@@ -96,7 +96,11 @@ function Dish({ g }: { g: (n: string) => string }) {
   );
 }
 
-export function SouvenirArt({ id, label }: { id: SouvenirId; label?: string }) {
+/**
+ * shiny（色ちがい）は、絵の色をまるごと変え（iPhone の Safari でも効くよう、svg 要素そのものに CSS の filter をかける）、
+ * 上に虹色のきらめきを重ねる
+ */
+export function SouvenirArt({ id, label, shiny = false }: { id: SouvenirId; label?: string; shiny?: boolean }) {
   const u = `sv${useId().replace(/[^a-zA-Z0-9_-]/g, "")}`;
   const g = (n: string) => `${u}-${n}`;
   const a11y = label ? { role: "img" as const, "aria-label": label } : {};
@@ -508,5 +512,22 @@ export function SouvenirArt({ id, label }: { id: SouvenirId; label?: string }) {
         );
     }
   })();
-  return <svg viewBox="0 0 100 100" overflow="visible" className={SVG_CLASS} {...a11y}>{body}</svg>;
+  const art = <svg viewBox="0 0 100 100" overflow="visible" className={SVG_CLASS} style={shiny ? { filter: SHINY_FILTER[id] } : undefined} {...a11y}>{body}</svg>;
+  if (!shiny) return art;
+  return (
+    <span className="pointer-events-none relative block">
+      {art}
+      {/* 色ちがいのしるし：虹色のきらめき */}
+      <svg viewBox="0 0 100 100" overflow="visible" className="pointer-events-none absolute inset-0 block h-full w-full" aria-hidden>
+        {([[16, 26, 0.9, "#FF9AC8", 0], [84, 20, 1.1, "#9AD8FF", 0.4], [88, 66, 0.7, "#C8FF9A", 0.9], [12, 70, 0.75, "#FFE07A", 1.3]] as const).map(([x, y, s, c, d], i) => (
+          <g key={i} transform={`translate(${x} ${y}) scale(${s})`}>
+            <g className="room-sv-twinkle" style={{ animationDelay: `${d}s` }}>
+              <path d="M0 -8 C 0.9 -1.8 1.8 -0.9 8 0 C 1.8 0.9 0.9 1.8 0 8 C -0.9 1.8 -1.8 0.9 -8 0 C -1.8 -0.9 -0.9 -1.8 0 -8 Z" fill={c} />
+              <circle r="1.6" fill="#FFFFFF" />
+            </g>
+          </g>
+        ))}
+      </svg>
+    </span>
+  );
 }

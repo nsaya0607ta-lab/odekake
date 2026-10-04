@@ -4563,3 +4563,9 @@
 @media (prefers-reduced-motion: reduce) {
   .room-sv-twinkle, .room-sv-aura, .room-sv-spin, .room-sv-pop, .room-sv-shine { animation: none; }
 }
+/* おみやげ袋：ぴょこぴょこ揺れて「あけて」と待つ。あけた瞬間に紙ふぶき */
+@keyframes room-sv-wiggle { 0%, 70%, 100% { transform: rotate(0deg) translateY(0); } 76% { transform: rotate(-6deg) translateY(-6px); } 82% { transform: rotate(5deg) translateY(-3px); } 88% { transform: rotate(-3deg) translateY(0); } 94% { transform: rotate(2deg); } }
+.room-sv-wiggle { transform-origin: 50% 95%; animation: room-sv-wiggle 1.8s ease-in-out infinite; }
+@keyframes room-sv-burst-dot { 0% { transform: rotate(var(--a)) translateY(0) scale(1.4); opacity: 1; } 65% { opacity: 1; } 100% { transform: rotate(var(--a)) translateY(-120px) scale(0.6); opacity: 0; } }
+.room-sv-burst > span { animation: room-sv-burst-dot 1.3s cubic-bezier(.15,.6,.35,1) both; }
+@media (prefers-reduced-motion: reduce) { .room-sv-wiggle, .room-sv-burst > span { animation: none; } .room-sv-burst { display: none; } }

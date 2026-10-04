@@ -23,6 +23,61 @@ type Season = "spring" | "summer" | "autumn" | "winter";
  * found: もらったときの、わんこのひとこと（どこで見つけたか） / talk: 飾ったものを見に行ったときに言うこと
  */
 export type Souvenir = { name: string; seasons: Season[]; rare?: boolean; found: string; talk: readonly string[] };
+
+/**
+ * 飾ったおみやげのところで、わんこがすること（おみやげごとにちがう）。
+ * pose/say: 着いてすぐ → then: 少しあと。fx: ハートが出る・ぷるぷるふるえる・くるくる回る・ぴょんとはねる
+ */
+export type SouvenirAct = { pose: string; say: string; then: { pose: string; say: string }; fx?: "hearts" | "shiver" | "spin" | "hop" };
+export const SOUVENIR_ACTS: Record<SouvenirId, SouvenirAct> = {
+  pebble: { pose: "sniff", say: "ころころ…", then: { pose: "wink", say: "すべすべで きもちいい" } },
+  feather: { pose: "sniff", say: "ふわふわ…くんくん…", then: { pose: "shake", say: "は…はっくしゅん！" } },
+  twig: { pose: "stand-happy", say: "この えだ、いい感じ！", then: { pose: "cheer", say: "とってこい、して！" }, fx: "hop" },
+  "heart-stone": { pose: "sit", say: "…きれい…", then: { pose: "smile", say: "ずっと たからもの" }, fx: "hearts" },
+  sakura: { pose: "sniff", say: "さくらの においが する", then: { pose: "smile", say: "はるって いいね" } },
+  dandelion: { pose: "stand-happy", say: "わた毛、ふーってしよう", then: { pose: "wink", say: "ふーっ！ とんでけ〜" } },
+  clover: { pose: "bow", say: "おねがいごと…", then: { pose: "cheer", say: "かなうと いいな！" }, fx: "hop" },
+  shell: { pose: "wonder", say: "…ざざーん…", then: { pose: "smile", say: "うみの音が きこえた！" } },
+  sunflower: { pose: "front", say: "おひさまみたい！", then: { pose: "cheer", say: "なつ、だいすき！" } },
+  "sakura-shell": { pose: "sit", say: "すきとおってる…", then: { pose: "wink", say: "めずらしいんだよ、これ" }, fx: "hearts" },
+  acorn: { pose: "sniff", say: "どんぐり、ころころ〜", then: { pose: "stand-happy", say: "あきの においだ！" }, fx: "spin" },
+  maple: { pose: "stand-happy", say: "がさがさっ！", then: { pose: "smile", say: "まっかで きれい" }, fx: "hop" },
+  pinecone: { pose: "sniff", say: "くんくん…", then: { pose: "shake", say: "ちくっ！ いたた…" } },
+  "gold-acorn": { pose: "wonder", say: "ぴかぴか…", then: { pose: "cheer", say: "どんぐりの 王さまだ！" }, fx: "hearts" },
+  camellia: { pose: "sniff", say: "いい におい", then: { pose: "smile", say: "さむくても さいて えらいね" } },
+  nanten: { pose: "sit", say: "おいしそう…", then: { pose: "bow", say: "…たべちゃ だめ。がまん" } },
+  "snow-crystal": { pose: "sniff", say: "ひんやり…", then: { pose: "wonder", say: "つめたい！ ぷるぷる…" }, fx: "shiver" },
+};
+
+/**
+ * 色ちがい：おみやげを1つもらうたびに、まれに（約1/SHINY_RATE）色のちがうものが来る。
+ * 絵は同じで、色をまるごと変える（filter）。名前のうしろに「・色ちがい」をつける
+ */
+export const SHINY_RATE = 16;
+export const SHINY_FILTER: Record<SouvenirId, string> = {
+  pebble: "sepia(1) saturate(3) hue-rotate(150deg) brightness(1.05)",
+  feather: "hue-rotate(140deg) saturate(2.2)",
+  twig: "sepia(.6) hue-rotate(170deg) saturate(2.4) brightness(1.1)",
+  "heart-stone": "hue-rotate(200deg) saturate(1.4)",
+  sakura: "hue-rotate(230deg) saturate(1.3)",
+  dandelion: "hue-rotate(180deg) saturate(1.3)",
+  clover: "hue-rotate(-70deg) saturate(1.5) brightness(1.08)",
+  shell: "hue-rotate(170deg) saturate(1.8)",
+  sunflower: "hue-rotate(280deg) saturate(1.2)",
+  "sakura-shell": "hue-rotate(140deg) saturate(1.4)",
+  acorn: "saturate(0) brightness(1.35) contrast(1.1)",
+  maple: "hue-rotate(60deg) saturate(1.3) brightness(1.1)",
+  pinecone: "sepia(.5) hue-rotate(80deg) saturate(1.6)",
+  "gold-acorn": "hue-rotate(160deg) saturate(1.3) brightness(1.05)",
+  camellia: "hue-rotate(-40deg) saturate(1.1) brightness(1.15)",
+  nanten: "hue-rotate(40deg) saturate(1.4) brightness(1.1)",
+  "snow-crystal": "hue-rotate(110deg) saturate(1.6)",
+};
+/** 持っている数のキー（色ちがいは「id@iro」） */
+export type SouvenirOwnedKey = SouvenirId | `${SouvenirId}@iro`;
+export const ownedKey = (id: SouvenirId, shiny = false): SouvenirOwnedKey => (shiny ? `${id}@iro` : id);
+export const isOwnedKey = (v: string): v is SouvenirOwnedKey => isSouvenirId(v.replace(/@iro$/, ""));
+export const souvenirName = (id: SouvenirId, shiny = false) => (shiny ? `${SOUVENIRS[id].name}・色ちがい` : SOUVENIRS[id].name);
 export const SOUVENIRS: Record<SouvenirId, Souvenir> = {
   pebble: { name: "まるい石", seasons: [], found: "川のそばで ひろったよ。すべすべ！", talk: ["この石、すべすべなんだよ", "まるい石、ぼくのたからもの"] },
   feather: { name: "鳥のはね", seasons: [], found: "こうえんに ふわっと おちてたよ", talk: ["このはね、どの鳥さんのかな？", "ふわふわの はね…"] },
@@ -52,7 +107,7 @@ export function souvenirHint(id: SouvenirId): string {
   return s.rare ? `${when}、1日10,000歩 あるくと 見つかるかも` : `${when} 見つかるかも`;
 }
 
-export const souvenirKey = (id: SouvenirId) => `souvenir:${id}`;
+export const souvenirKey = (id: SouvenirId, shiny = false) => `souvenir:${id}${shiny ? "@iro" : ""}`;
 export const isSouvenirId = (v: string): v is SouvenirId => (SOUVENIR_IDS as readonly string[]).includes(v);
 
 /** 日付（YYYY-MM-DD）の季節 */
@@ -96,17 +151,17 @@ export function pendingSouvenirs(
   todaySteps: number | null | undefined,
   today: string,
   brought: readonly string[],
-): { key: string; id: SouvenirId; date: string; steps: number }[] {
+): { key: string; id: SouvenirId; shiny: boolean; date: string; steps: number }[] {
   const done = new Set(brought);
   const from = dayOffset(today, -LOOKBACK_DAYS);
   const days = new Map<string, number>();
   for (const d of history) if (d.date >= from && d.date <= today) days.set(d.date, Math.max(days.get(d.date) ?? 0, d.steps));
   days.set(today, Math.max(days.get(today) ?? 0, todaySteps ?? 0));
-  const out: { key: string; id: SouvenirId; date: string; steps: number }[] = [];
+  const out: { key: string; id: SouvenirId; shiny: boolean; date: string; steps: number }[] = [];
   for (const [date, steps] of [...days].sort(([a], [b]) => (a < b ? -1 : 1))) {
     for (const m of STEP_COIN_MILESTONES) {
       const key = `${date}:${m.steps}`;
-      if (steps >= m.steps && !done.has(key)) out.push({ key, id: souvenirFor(date, m.steps), date, steps: m.steps });
+      if (steps >= m.steps && !done.has(key)) out.push({ key, id: souvenirFor(date, m.steps), shiny: hash(`${key}:iro`) % SHINY_RATE === 0, date, steps: m.steps });
     }
   }
   return out;

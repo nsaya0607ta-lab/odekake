@@ -11,7 +11,7 @@
  */
 import type { CollectionCategory } from "@/lib/collection/items";
 import type { GachaRarity } from "@/lib/gacha/config";
-import { isSouvenirId, SOUVENIR_IDS, SOUVENIRS, souvenirKey, type SouvenirId } from "./souvenirs";
+import { isOwnedKey, ownedKey, SOUVENIR_IDS, souvenirKey, souvenirName, type SouvenirId, type SouvenirOwnedKey } from "./souvenirs";
 
 export type DecorKind = "item" | "photo" | "trophy" | "pennant" | "furniture" | "fixture" | "souvenir";
 
@@ -23,7 +23,7 @@ export type DecorEntry =
   | (DecorBase & { kind: "pennant"; emoji: string; color: string })
   | (DecorBase & { kind: "furniture"; furniture: FurnitureId })
   | (DecorBase & { kind: "fixture"; fixture: FixtureId })
-  | (DecorBase & { kind: "souvenir"; souvenir: SouvenirId });
+  | (DecorBase & { kind: "souvenir"; souvenir: SouvenirId; shiny: boolean });
 
 /**
  * 家具（絵は furniture-art.tsx で描く）。width は床の手前に置いたときの幅（部屋の幅に対する %）。
@@ -163,7 +163,7 @@ export type RoomPhoto = { id: string; path: string; date: string; title: string 
 /**
  * souvenirs: おさんぽのおみやげの持っている数（souvenirs.ts）。brought: 受け取りずみの「日付:節目」（同じ分を二度もらわない）
  */
-export type RoomLayout = { theme: RoomTheme; items: Placement[]; photos: RoomPhoto[]; v?: number; rev?: number; dogName?: string; souvenirs?: Partial<Record<SouvenirId, number>>; brought?: string[] };
+export type RoomLayout = { theme: RoomTheme; items: Placement[]; photos: RoomPhoto[]; v?: number; rev?: number; dogName?: string; souvenirs?: Partial<Record<SouvenirOwnedKey, number>>; brought?: string[] };
 /** おみやげ1種類あたりの持てる数（飾れる数） */
 export const SOUVENIR_MAX = 99;
 /** わんこの名前の長さ（文字） */
@@ -250,10 +250,10 @@ export const ROOM = {
 } as const;
 
 /** おみやげ（持っていないものも、数0で入れておく。フレンドの部屋に飾ってあるものも描けるように） */
-export function souvenirEntries(owned: Partial<Record<SouvenirId, number>> = {}): DecorEntry[] {
-  return SOUVENIR_IDS.map((id) => ({ kind: "souvenir", key: souvenirKey(id), name: SOUVENIRS[id].name, souvenir: id, count: owned[id] ?? 0 }));
+export function souvenirEntries(owned: Partial<Record<SouvenirOwnedKey, number>> = {}): DecorEntry[] {
+  return [false, true].flatMap((shiny) => SOUVENIR_IDS.map((id): DecorEntry => ({ kind: "souvenir", key: souvenirKey(id, shiny), name: souvenirName(id, shiny), souvenir: id, shiny, count: owned[ownedKey(id, shiny)] ?? 0 })));
 }
-export const SOUVENIR_KEYS: ReadonlySet<string> = new Set(SOUVENIR_IDS.map(souvenirKey));
+export const SOUVENIR_KEYS: ReadonlySet<string> = new Set(SOUVENIR_IDS.flatMap((id) => [souvenirKey(id), souvenirKey(id, true)]));
 
 export const isHanging = (kind: DecorKind) => kind === "photo" || kind === "pennant" || kind === "fixture";
 
@@ -335,10 +335,10 @@ export function parseRoomLayout(value: unknown, validKeys?: ReadonlySet<string>)
     }];
   });
   const name = cleanDogName(root.dogName);
-  const souvenirs: Partial<Record<SouvenirId, number>> = {};
+  const souvenirs: Partial<Record<SouvenirOwnedKey, number>> = {};
   if (root.souvenirs && typeof root.souvenirs === "object" && !Array.isArray(root.souvenirs)) {
     for (const [k, v] of Object.entries(root.souvenirs as Record<string, unknown>)) {
-      if (isSouvenirId(k) && typeof v === "number" && Number.isFinite(v) && v >= 1) souvenirs[k] = Math.min(SOUVENIR_MAX, Math.floor(v));
+      if (isOwnedKey(k) && typeof v === "number" && Number.isFinite(v) && v >= 1) souvenirs[k] = Math.min(SOUVENIR_MAX, Math.floor(v));
     }
   }
   const brought = Array.isArray(root.brought) ? root.brought.filter((b): b is string => typeof b === "string" && /^\d{4}-\d{2}-\d{2}:\d{1,6}$/.test(b)).slice(-200) : [];
