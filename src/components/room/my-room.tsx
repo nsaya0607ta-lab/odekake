@@ -785,7 +785,7 @@ export function MyRoom({ entries, initialLayout, serverReady, dogSkin, dogName, 
       const k = ownedKey(p.id, p.shiny);
       const isNew = !owned[k];
       owned[k] = Math.min(SOUVENIR_MAX, (owned[k] ?? 0) + 1);
-      return { id: p.id, shiny: p.shiny, steps: p.steps, isNew };
+      return { id: p.id, shiny: p.shiny, steps: p.steps, date: p.date, isNew };
     });
     const next: RoomLayout = { ...cur, souvenirs: owned, brought: pruneBrought([...(cur.brought ?? []), ...pending.map((p) => p.key)], todayKey) };
     latest.current = next;
@@ -797,7 +797,8 @@ export function MyRoom({ entries, initialLayout, serverReady, dogSkin, dogName, 
     setCarrying({ id: top.id, shiny: top.shiny });
     const text = top.shiny ? `ただいま！ みて！ 色ちがいの ${SOUVENIRS[top.id].name}！` : pending.length > 1 ? `ただいま！ おみやげ ${pending.length}こ もってきたよ` : `ただいま！ ${SOUVENIRS[top.id].name}を みつけたよ`;
     window.setTimeout(() => setDogCue({ id: Date.now(), text, pose: "stand-happy" }), 2200);
-    window.setTimeout(() => { setSouvenirNews(news); setCarrying(null); }, 4400);
+    // 案内が出るまえ・出ているあいだに次の節目を越えたら、上書きせずに足す
+    window.setTimeout(() => { setSouvenirNews((cur) => (cur ? [...cur, ...news] : news)); setCarrying(null); }, 4400);
   }, [editing, stepHistory, steps?.steps, todayKey, visit]);
   /** 部屋のよごれ（おさんぽをさぼると、窓がくもり、ほこりがたまる。自分の部屋だけ） */
   const dirt = useMemo(() => (visit ? 0 : roomDirtOf(stepHistory ?? [], steps?.steps, todayKey)), [stepHistory, steps?.steps, todayKey, visit]);
@@ -983,6 +984,8 @@ export function MyRoom({ entries, initialLayout, serverReady, dogSkin, dogName, 
       }),
     };
   }, [entryByKey, layout.items, placedItems, style, windowRects]);
+  /** お客さんのわんこは、こちらのおみやげを自慢しない（見に行くのは家具とおもちゃだけ） */
+  const guestPlaces = useMemo(() => ({ ...dogPlaces, keepsakes: [] }), [dogPlaces]);
 
   /** るすばん中のいたずら（しばらく開かなかったあとは、床が散らかっている。自分の部屋だけ） */
   const { mess, fresh: freshMess, clean: cleanMess } = useRoomMess({ enabled: !visit, floorTop: ROOM.floorTop, floorBottom: ROOM.floorBottom, blocks: dogPlaces.blocks });
@@ -1201,7 +1204,7 @@ export function MyRoom({ entries, initialLayout, serverReady, dogSkin, dogName, 
             {!editing && mess.length ? <RoomMess mess={mess} onClean={(m) => onCleanMess(m.id)} /> : null}
           <RoomDog skin={dogSkin} phase={phase} sleepy={sleepy} lines={dogLines} dreams={dogDreams} cue={dogCue} call={dogCall} carry={carrying ? <SouvenirArt id={carrying.id} shiny={carrying.shiny} /> : null} introduce={visit ? petName : null} quiet={editing} places={dogPlaces} weather={weather?.kind ?? null} onFx={onFurnitureFx} modes={furnitureMode} winter={winter} hot={hot} onFurnitureSay={birdTalk} />
           {/* 遊びに来たフレンドのわんこ。自分のわんこと同じように暮らし、少し横にずれて並ぶ（家具は動かさない） */}
-          {guest ? <RoomDog key={guest.id} skin={guest.skin} phase={phase} sleepy={sleepy} lines={guestLines} dreams={GUEST_DREAMS} call={guestCall} quiet={editing} places={dogPlaces} weather={weather?.kind ?? null} modes={furnitureMode} winter={winter} hot={hot} offset={9} onTap={setGuestCard} label="遊びに来たフレンドの犬" /> : null}
+          {guest ? <RoomDog key={guest.id} skin={guest.skin} phase={phase} sleepy={sleepy} lines={guestLines} dreams={GUEST_DREAMS} call={guestCall} quiet={editing} places={guestPlaces} weather={weather?.kind ?? null} modes={furnitureMode} winter={winter} hot={hot} offset={9} onTap={setGuestCard} label="遊びに来たフレンドの犬" /> : null}
             {/* 行事のもの（部屋の左右のすみ）。置いたものと同じく、奥ほど下に重なる */}
             {roomEvent ? (["L", "R"] as const).map((side) => (
               <div key={side} className="pointer-events-none absolute inset-0" style={{ zIndex: 300 + Math.round(EVENT_FLOOR_Y[side] * 10) }} data-event-layer>
@@ -1219,7 +1222,7 @@ export function MyRoom({ entries, initialLayout, serverReady, dogSkin, dogName, 
             {/* ほこり・クモの巣（おさんぽをさぼると） */}
             {!editing ? <RoomDust dirt={dirt} onTap={dirtHint} /> : null}
             {/* 遊びに来た（おとまりの）フレンドのわんこの名ふだ */}
-            {guest && guestCard ? <DogNameCard dogName={guest.dogName} owner={guest.name} href={`/room/visit/${guest.id}`} x={clamp(guestCard.x, 18, 82)} y={Math.max(8, guestCard.y - 16)} /> : null}
+            {guest && guestCard ? <DogNameCard dogName={guest.dogName} owner={guest.name} href={`/room/visit/${guest.id}`} x={clamp(guestCard.x, 18, 82)} y={Math.max(8, guestCard.y - 24)} /> : null}
             <ShootingStars rects={windowRects} active={phase === "night" && !editing && (!weather || weather.kind === "clear" || weather.kind === "partly")} onWish={flash} />
             <div className="pointer-events-none absolute inset-0" style={{ zIndex: 2000 }}>
               <RoomLighting now={now} lamps={lampLights} at={place} weather={weather} room={layout.theme.room} event={roomEvent} openBottom={stage} />

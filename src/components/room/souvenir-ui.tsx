@@ -9,7 +9,7 @@ import { useState } from "react";
 import { ownedKey, SEASON_NAMES, SHINY_RATE, SOUVENIR_IDS, SOUVENIRS, souvenirHint, souvenirName, type SouvenirId, type SouvenirOwnedKey } from "@/lib/room/souvenirs";
 import { SouvenirArt } from "./souvenir-art";
 
-export type SouvenirNews = { id: SouvenirId; shiny: boolean; steps: number; isNew: boolean }[];
+export type SouvenirNews = { id: SouvenirId; shiny: boolean; steps: number; date: string; isNew: boolean }[];
 
 /** 虹色のふち（色ちがい） */
 const RAINBOW = "linear-gradient(120deg,#FF9AC8,#FFD84A,#8CE08A,#7FC8F2,#B89AF2)";
@@ -65,7 +65,8 @@ export function SouvenirGift({ news, dogName, onClose, onDecorate }: { news: Sou
     const hasRare = news.some((n) => SOUVENIRS[n.id].rare || n.shiny);
     const hasShiny = news.some((n) => n.shiny);
     return (
-      <div className="fixed inset-0 z-[790] flex items-end justify-center bg-black/35 px-4 pb-6 backdrop-blur-[2px] sm:items-center" onClick={onClose}>
+      // 包みのあいだは、外をタップしても とじない（あけずに見のがさないように）
+      <div className="fixed inset-0 z-[790] flex items-end justify-center bg-black/35 px-4 pb-6 backdrop-blur-[2px] sm:items-center">
         <div role="dialog" aria-modal="true" aria-label="わんこのおみやげ（つつみ）" onClick={(e) => e.stopPropagation()} className="room-sv-pop relative w-full max-w-sm rounded-[28px] border border-line bg-card px-5 pb-5 pt-4 text-center shadow-2xl">
           <p className="text-[11px] font-black tracking-[0.2em] text-leaf-deep">OSANPO SOUVENIR</p>
           <p className="mt-0.5 text-[15px] font-black text-ink">🐾 {dogName}から おみやげ！</p>
@@ -85,6 +86,8 @@ export function SouvenirGift({ news, dogName, onClose, onDecorate }: { news: Sou
   // 大きく見せたものは、ほかに同じものが無ければ下の一覧には出さない
   const groups = all.filter((n) => keyOf(n) !== keyOf(top) || n.n > 1).map((n) => (keyOf(n) === keyOf(top) ? { ...n, n: n.n - 1, isNew: false } : n));
   const maxSteps = Math.max(...news.map((n) => n.steps));
+  // 何日ぶんか（アプリを開かなかった日の分も、まとめて受け取ることがある）
+  const days = new Set(news.map((n) => n.date)).size;
   return (
     <div className="fixed inset-0 z-[790] flex items-end justify-center bg-black/35 px-4 pb-6 backdrop-blur-[2px] sm:items-center" onClick={onClose}>
       <div role="dialog" aria-modal="true" aria-label="わんこのおみやげ" onClick={(e) => e.stopPropagation()} className="room-sv-pop relative w-full max-w-sm overflow-hidden rounded-[28px] border border-line bg-card shadow-2xl">
@@ -96,7 +99,7 @@ export function SouvenirGift({ news, dogName, onClose, onDecorate }: { news: Sou
         <div className={`relative px-4 pb-3 pt-4 text-center ${top.shiny ? "bg-[linear-gradient(160deg,#FFEAF4,#E6F4FF,#F0FFE6)]" : topRare ? "bg-[linear-gradient(160deg,#FFF6D6,#FFE7A8)]" : "bg-[linear-gradient(160deg,#F3FAEC,#E2F1D4)]"}`}>
           <p className="text-[11px] font-black tracking-[0.2em] text-leaf-deep">OSANPO SOUVENIR</p>
           <p className="mt-0.5 text-[15px] font-black text-ink">🐾 {dogName}が おみやげを もってきたよ</p>
-          <p className="mt-0.5 text-[11px] font-bold text-ink-soft">{maxSteps.toLocaleString("ja-JP")}歩の おさんぽの ごほうび</p>
+          <p className="mt-0.5 text-[11px] font-bold text-ink-soft">{days > 1 ? `${days}日ぶんの おさんぽの ごほうび（いちばん ${maxSteps.toLocaleString("ja-JP")}歩）` : `${maxSteps.toLocaleString("ja-JP")}歩の おさんぽの ごほうび`}</p>
         </div>
         {/* いちばんのもの：大きく、わんこのひとことつき */}
         <div className="px-4 pt-4">
