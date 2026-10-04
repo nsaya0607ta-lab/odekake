@@ -808,7 +808,7 @@ export function MyRoom({ entries, initialLayout, serverReady, dogSkin, dogName, 
   };
   /** 観葉植物の水やり（この端末に保存） */
   const { plant, water } = usePlantCare(todayKey);
-  /** フレンドのわんこが遊びに来る日（土曜の朝10時〜日曜の朝10時。そのままおとまり。自分の部屋だけ） */
+  /** フレンドのわんこが遊びに来る日（土曜は朝10時からおとまり・ほかの日はときどき昼だけ。自分の部屋だけ） */
   const guest = useMemo(() => (visit || editing ? null : sleepoverGuest(now, guests?.friends ?? [])), [editing, guests?.friends, now, visit]);
   const guestId = guest?.id ?? null;
   useEffect(() => {
