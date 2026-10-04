@@ -298,6 +298,7 @@ export const GACHA_PRIZES: readonly GachaPrize[] = [
   { id: "shizuoka_hamanako_unagi", name: "浜名湖うなぎ", rarity: "SSR", type: "item", image: "/collection/items/shizuoka-hamanako-unagi.webp", pref: "22" },
   { id: "shizuoka_omuroyama", name: "大室山・伊豆", rarity: "UR", type: "item", image: "/collection/items/shizuoka-omuroyama.webp", pref: "22" },
   { id: "shizuoka_mt_fuji_tea", name: "富士山・茶畑", rarity: "LR", type: "item", image: "/collection/items/shizuoka-mt-fuji-tea.webp", pref: "22" },
+  { id: "shizuoka_frenchie", name: "静岡のフレブル", rarity: "LR", type: "dog_skin", image: "/collection/skins/shizuoka-frenchie.webp", pref: "22" },
 
   // --- 都道府県ガチャ（青コイン）：三重県 ------------------------------
   { id: "mie_ise_udon", name: "伊勢うどん", rarity: "N", type: "item", image: "/collection/items/mie-ise-udon.webp", pref: "24" },
