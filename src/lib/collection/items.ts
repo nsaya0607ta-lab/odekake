@@ -316,6 +316,9 @@ const CURATED_ITEMS: readonly CollectionItem[] = [
 
   // --- 都道府県図鑑：愛知県（都道府県ガチャ） ----------------------------
   { id: "aichi_frenchie", name: "愛知のフレブル", image: "/collection/skins/aichi-frenchie.webp", category: "other", series: null, rarity: "LR", pref: "23" },
+
+  // --- 都道府県図鑑：三重県（都道府県ガチャ） ----------------------------
+  { id: "mie_frenchie", name: "三重のフレブル", image: "/collection/skins/mie-frenchie.webp", category: "other", series: null, rarity: "LR", pref: "24" },
 ];
 
 const CURATED_IDS = new Set(CURATED_ITEMS.map((item) => item.id));

@@ -5,7 +5,7 @@
  * まるごと差し替える方式にしてある。
  */
 
-export const DOG_SKIN_IDS = ["default", "hiking", "snow", "summer", "gifu", "aichi"] as const;
+export const DOG_SKIN_IDS = ["default", "hiking", "snow", "summer", "gifu", "aichi", "mie"] as const;
 export type DogSkinId = (typeof DOG_SKIN_IDS)[number];
 
 /** DB migration が未適用でも選択状態を保持できるよう、ブラウザCookieを正とする。 */
@@ -76,6 +76,14 @@ export const DOG_SKINS: readonly DogSkin[] = [
     previewImage: "/collection/skins/aichi-frenchie.webp",
     hasPoseSet: true,
   },
+  {
+    id: "mie",
+    name: "三重のフレブル",
+    description: "都道府県ガチャの三重すがた",
+    unlockItemId: "mie_frenchie",
+    previewImage: "/collection/skins/mie-frenchie.webp",
+    hasPoseSet: true,
+  },
 ] as const;
 
 const SKIN_BY_ID = new Map(DOG_SKINS.map((skin) => [skin.id, skin]));
@@ -93,7 +101,7 @@ export function isSkinUnlocked(skin: DogSkin, ownedItemIds: ReadonlySet<string>)
  * 犬の画像URL。
  *
  * default は従来どおり public/characters/default/*.webp を使う。
- * hiking / snow / summer / gifu / aichi も、デフォルトと同じ300×254pxの透過WebPを直接使う。
+ * hiking / snow / summer / gifu / aichi / mie も、デフォルトと同じ300×254pxの透過WebPを直接使う。
  */
 export function getFrenchieSrc(skin: DogSkinId, pose: string): string {
   const dogSkin = getDogSkin(skin);
