@@ -101,7 +101,7 @@ function weekOf(history: StepDay[], today: string, todaySteps: number) {
 
 export type SkyFriend = { id: string; name: string; avatar: string | null };
 
-export function SkyCard({ now, place, onPlace, weather = null, steps, history, height, friends, likes = 0, onEdit }: {
+export function SkyCard({ now, place, onPlace, weather = null, steps, history, height, friends, likes = 0, onEdit, mood }: {
   now: Date; place: RoomPlace; onPlace: (p: RoomPlace) => void; weather?: RoomWeather | null;
   /** 上の窓の高さ（CSS）。部屋の下の、画面ののこりにぴったり合わせる */
   height?: string;
@@ -111,6 +111,8 @@ export function SkyCard({ now, place, onPlace, weather = null, steps, history, h
   likes?: number;
   /** 窓台の左はしの「もようがえ」ボタン */
   onEdit?: () => void;
+  /** 歩数のカードのすぐ下に出す、わんこの気分カード */
+  mood?: React.ReactNode;
   /** きょうの歩数（渡したときだけ、手前の丘におさんぽの道を描く） */
   steps?: TodaySteps;
   /** 直近の日ごとの歩数（今週のグラフと連続記録） */
@@ -356,6 +358,7 @@ export function SkyCard({ now, place, onPlace, weather = null, steps, history, h
           {stepWeek ? <StepWeek {...stepWeek} /> : null}
         </div>
       ) : null}
+      {mood ? <div>{mood}</div> : null}
       <div className="flex items-center justify-between gap-2 rounded-2xl border border-line bg-card px-4 py-3 shadow-sm">
         <p className="min-w-0 text-[12px] font-bold text-ink">{status}</p>
         <p className="shrink-0 text-[10px] font-bold text-ink-faint">日の出 {times.rise ? fmtJstTime(times.rise) : "-"} ・ 日の入り {times.set ? fmtJstTime(times.set) : "-"}</p>

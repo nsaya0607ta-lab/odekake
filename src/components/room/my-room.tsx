@@ -86,7 +86,7 @@ import { RoomDog } from "./room-dog";
 import { SouvenirArt } from "./souvenir-art";
 import { headline, SouvenirBook, SouvenirGift, type SouvenirNews } from "./souvenir-ui";
 import { CraftDone } from "./craft-ui";
-import { MoodChip, MoodSheet, useMoodCounters } from "./mood-ui";
+import { MoodCard, MoodSheet, useMoodCounters } from "./mood-ui";
 import { moodOf, moodRank, MOOD_LEVELS } from "@/lib/room/mood";
 import { CRAFTS, craftKey, type CraftId } from "@/lib/room/crafts";
 import { ownedKey, pendingSouvenirs, pruneBrought, SOUVENIR_ACTS, SOUVENIRS, souvenirKey, souvenirName, type SouvenirId } from "@/lib/room/souvenirs";
@@ -1143,6 +1143,7 @@ export function MyRoom({ entries, initialLayout, serverReady, dogSkin, dogName, 
             friends={guests?.friends}
             likes={guests?.mail.filter((m) => m.kind === "like").length ?? 0}
             onEdit={() => setEditing(true)}
+            mood={<MoodCard mood={mood} skin={dogSkin} dogName={petName} onOpen={() => setMoodOpen(true)} pulse={moodPulse} />}
           />
           <ul className="space-y-1.5 rounded-2xl border border-line bg-card px-4 py-3 text-[12px] leading-relaxed text-ink-soft shadow-sm">
             <li>🐾 {petName}をタップすると、なでられます</li>
@@ -1287,7 +1288,6 @@ export function MyRoom({ entries, initialLayout, serverReady, dogSkin, dogName, 
             {/* ほこり・クモの巣（おさんぽをさぼると） */}
             {!editing ? <RoomDust dirt={dirt} onTap={dirtHint} /> : null}
             {/* わんこの気分メーター（自分の部屋で、もようがえしていないとき） */}
-            {!visit && !editing ? <MoodChip mood={mood} onOpen={() => setMoodOpen(true)} pulse={moodPulse} /> : null}
             {/* 遊びに来た（おとまりの）フレンドのわんこの名ふだ */}
             {guest && guestCard ? <DogNameCard dogName={guest.dogName} owner={guest.name} href={`/room/visit/${guest.id}`} x={clamp(guestCard.x, 18, 82)} y={Math.max(8, guestCard.y - 24)} /> : null}
             <ShootingStars rects={windowRects} active={phase === "night" && !editing && (!weather || weather.kind === "clear" || weather.kind === "partly")} onWish={flash} />
@@ -1503,7 +1503,7 @@ export function MyRoom({ entries, initialLayout, serverReady, dogSkin, dogName, 
         {craftDone ? (
           <CraftDone id={craftDone} dogName={petName} onClose={() => setCraftDone(null)} onDecorate={() => { const e = entryByKey.get(craftKey(craftDone)); setCraftDone(null); if (e) addEntry(e); }} />
         ) : null}
-        {moodOpen ? <MoodSheet mood={mood} dogName={petName} onClose={() => setMoodOpen(false)} /> : null}
+        {moodOpen ? <MoodSheet mood={mood} skin={dogSkin} dogName={petName} onClose={() => setMoodOpen(false)} /> : null}
         {souvenirNews && !editing ? (
           <SouvenirGift news={souvenirNews} dogName={petName} onClose={() => setSouvenirNews(null)} onDecorate={() => { setSouvenirNews(null); setEditing(true); setTab("souvenir"); }} />
         ) : null}
