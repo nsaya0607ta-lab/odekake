@@ -5,12 +5,13 @@
  * 夜はラグの上で寝ていて、タップすると喜ぶ。画像は左向きなので、右へ歩くときは反転する。
  * 家具の上は歩かず、床のマス目で道をさがして回りこむ。歩きながら重なり順を変えるので、家具の奥を通るときは家具にかくれる。
  */
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 import { getFrenchieSrc, type DogSkinId } from "@/lib/dog-skins";
 import { clamp, depthScale, ROOM } from "@/lib/room/types";
 import type { FurnitureId } from "@/lib/room/types";
 import type { WeatherKind } from "@/lib/room/weather";
 import type { FurnitureFx } from "./furniture-art";
+import type { SouvenirAct } from "@/lib/room/souvenirs";
 import type { DayPhase } from "./room-scene";
 
 const IDLE_POSES = ["stand", "sit", "sniff", "sit-side", "smile", "wonder", "yawn", "front"] as const;
@@ -132,12 +133,14 @@ export type DogPlaces = {
   /** 窓のまん中（部屋の %）。窓をしまっていれば null */
   window: { x: number } | null;
   toys: { x: number; y: number; name: string }[];
+  /** 飾ったおさんぽのおみやげ（high: 棚の上。下から見上げる。act: おみやげごとのしぐさ） */
+  keepsakes?: { id: string; x: number; y: number; high: boolean; name: string; act: SouvenirAct }[];
   furniture: FurnitureSpot[];
   /** 家具のあるところ（部屋の %）。うろうろするときは、ここに足をおかない */
   blocks: { x0: number; x1: number; y0: number; y1: number }[];
 };
 
-export function RoomDog({ skin, phase, sleepy, lines, dreams = [], cue = null, call = null, introduce = null, quiet, places, weather = null, onFx, modes = {}, winter = false, hot = false, onFurnitureSay, offset = 0, onTap, label }: {
+export function RoomDog({ skin, phase, sleepy, lines, dreams = [], cue = null, call = null, introduce = null, quiet, places, weather = null, onFx, modes = {}, winter = false, hot = false, onFurnitureSay, offset = 0, onTap, label, carry = null }: {
   skin: DogSkinId;
   phase: DayPhase;
   /** 窓の外の天気（わからなければ null） */
@@ -174,6 +177,8 @@ export function RoomDog({ skin, phase, sleepy, lines, dreams = [], cue = null, c
   onTap?: (at: { x: number; y: number }) => void;
   /** 読み上げ用の名前（ふだんは「犬」） */
   label?: string;
+  /** 口にくわえて見せるもの（おさんぽのおみやげ など） */
+  carry?: ReactNode;
 }) {
   const [dog, setDog] = useState<DogState>({ x: 30 + offset, y: 84, pose: "sit", flip: false });
   const offsetRef = useRef(offset);
@@ -747,6 +752,37 @@ export function RoomDog({ skin, phase, sleepy, lines, dreams = [], cue = null, c
     }
   }, [face, fx, hot, jump, later, night, phase, pose, say, spin, toFloor, tween, walkTo, winter]);
 
+  /**
+   * 飾ったおみやげのところへ行って、おみやげごとのしぐさをする（SOUVENIR_ACTS）。
+   * 床のものはそばで、棚の上のものは下から見上げて。着いたら pose/say → 少しあとで then、fx（ハート・ぷるぷる・くるくる・ぴょん）
+   */
+  const visitKeepsake = useCallback((k: NonNullable<DogPlaces["keepsakes"]>[number], done: () => void) => {
+    // 床のものは、おみやげが犬にかくれないよう、横に少しはなれて立つ
+    const side = k.x < 50 ? 10 : -10;
+    walkTo(clamp(k.x + (k.high ? 0 : side), 6, 94), clamp(k.y + (k.high ? 0 : 0.6), ROOM.floorTop + 2, ROOM.floorBottom), () => {
+      const a = k.act;
+      setDog((d) => ({ ...d, pose: k.high && a.pose === "sniff" ? "wonder" : a.pose, flip: k.high ? d.flip : side < 0 }));
+      say(a.say, 1500);
+      later(() => {
+        pose(a.then.pose);
+        say(a.then.say, 2200);
+        if (a.fx === "hearts") {
+          const id = Date.now();
+          setHearts((h) => [...h.slice(-4), id]);
+          later(() => setHearts((h) => h.filter((x) => x !== id)), 1400);
+        } else if (a.fx === "shiver") {
+          setShiver(true);
+          later(() => setShiver(false), 1800);
+        } else if (a.fx === "spin") {
+          spin(4, () => pose(a.then.pose));
+        } else if (a.fx === "hop") {
+          jump(pos.current.x, pos.current.y, 0, () => pose(a.then.pose));
+        }
+      }, 1600);
+      later(done, 4600);
+    });
+  }, [jump, later, pose, say, spin, walkTo]);
+
   const live = useCallback(() => {
     if (busy.current) return;
     const pl = placesRef.current;
@@ -805,7 +841,10 @@ export function RoomDog({ skin, phase, sleepy, lines, dreams = [], cue = null, c
       });
       return;
     }
-    if (r < 0.14 && pl.toys.length) {
+    if (r < 0.07 && pl.keepsakes?.length) {
+      // 飾ったおみやげを見に行って、おみやげごとのしぐさをする
+      visitKeepsake(pick(pl.keepsakes), () => next(rand(800, 1800)));
+    } else if (r < 0.14 && pl.toys.length) {
       // おもちゃのにおいをかいで、遊ぶ
       const toy = pick(pl.toys);
       const side = toy.x < 50 ? 6 : -6;
@@ -841,7 +880,7 @@ export function RoomDog({ skin, phase, sleepy, lines, dreams = [], cue = null, c
       pose(pick(IDLE_POSES));
       next(rand(2500, 5000));
     }
-  }, [face, later, night, phase, playWith, pose, quiet, say, walkTo, weather, winter]);
+  }, [face, later, night, phase, playWith, pose, quiet, say, visitKeepsake, walkTo, weather, winter]);
 
   useEffect(() => {
     clearTimers();
@@ -897,11 +936,13 @@ export function RoomDog({ skin, phase, sleepy, lines, dreams = [], cue = null, c
   useEffect(() => {
     if (!call) return;
     const f = placesRef.current.furniture.find((x) => x.id === call.furnitureId);
-    if (night || quiet || !f) return;
+    const k = f ? undefined : placesRef.current.keepsakes?.find((x) => x.id === call.furnitureId);
+    if (night || quiet || (!f && !k)) return;
     clearTimers();
     busy.current = false;
     setShiver(false);
-    playWith(f, () => later(live, rand(800, 2000)));
+    if (f) playWith(f, () => later(live, rand(800, 2000)));
+    else if (k) visitKeepsake(k, () => later(live, rand(800, 2000)));
     // call.id が変わったときだけ
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [call?.id]);
@@ -949,6 +990,8 @@ export function RoomDog({ skin, phase, sleepy, lines, dreams = [], cue = null, c
         <span key={hearts.at(-1) ?? 0} className={`block ${hearts.length ? "room-dog-hop" : shiver ? "room-dog-shiver" : blown ? "room-dog-blown" : motion}`}>
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img data-body src={getFrenchieSrc(skin, dog.pose)} alt="" draggable={false} className="relative block h-auto w-full select-none" style={{ transform: dog.flip ? "scaleX(-1)" : undefined }} />
+          {/* くわえているもの（顔の向きに合わせて、口もとに） */}
+          {carry ? <span className="room-sv-pop pointer-events-none absolute block w-[34%]" style={{ top: "38%", ...(dog.flip ? { right: "8%" } : { left: "8%" }) }}>{carry}</span> : null}
         </span>
       </button>
       {/* ふきだし・ハート・Zzz は、夜の暗さより上に出す */}
