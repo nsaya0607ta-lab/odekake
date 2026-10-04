@@ -14,6 +14,8 @@ getFrenchieSrc("hiking",  "walk") => "/characters/hiking/walk.webp"
 - `hiking/` — 登山のフレブル（ガチャの `hiking_frenchie` で解放、21ポーズ配置済み）
 - `snow/` — 雪国のフレブル（ガチャの `snow_frenchie` で解放、21ポーズ配置済み）
 - `summer/` — 夏のフレブル（ガチャの `summer_frenchie` で解放、21ポーズ配置済み）
+- `gifu/` — 岐阜のフレブル（都道府県ガチャ（青コイン）の `gifu_frenchie` で解放、21ポーズ配置済み）
+- `aichi/` — 愛知のフレブル（都道府県ガチャ（青コイン）の `aichi_frenchie` で解放、21ポーズ配置済み）
 
 ## 必要なファイル名
 
@@ -25,9 +27,14 @@ getFrenchieSrc("hiking",  "walk") => "/characters/hiking/walk.webp"
 に載っているファイル名だけで足ります。
 
 新しいポーズを使うコードを足すときは、`DOG_POSE_FILES` にファイル名を
-足してから、4フォルダぶん画像を用意してください。1フォルダぶんしか
+足してから、全フォルダぶん画像を用意してください。1フォルダぶんしか
 用意できていない間は、他のスキンではその画像だけ 404 になります
 （アプリ自体は落ちません）。
 
-`default/` `hiking/` `snow/` `summer/` は、全ポーズを300×254pxの
+`default/` `hiking/` `snow/` `summer/` `gifu/` `aichi/` は、全ポーズを300×254pxの
 透過WebPで揃えています。
+
+新しいスキンを足すときは、src/lib/dog-skins.ts の DOG_SKIN_IDS / DOG_SKINS、
+src/lib/games/osanpo-run/config.ts の OSANPO_RUN_NEIGHBOR_DEFAULT_NAMES、
+DBの user_dog_skin の check と dog_skin_unlock_item / set_dog_skin も更新してください
+（例：supabase/migrations/0117_pref_gacha_blue_coins.sql）。

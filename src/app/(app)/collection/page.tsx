@@ -8,9 +8,12 @@ import {
   CATEGORY_LABELS,
   COLLECTION_CATEGORIES,
   COLLECTION_SERIES,
+  PREF_CODES_WITH_ITEMS,
+  PREF_ITEMS,
   RARITY_STARS,
   REGULAR_ITEMS,
   countOwned,
+  getPrefItems,
   getSeriesItems,
   isCollectionCategory,
   type CollectionCategory,
@@ -19,12 +22,13 @@ import {
 import { DAMBOURLE_PRIZES } from "@/lib/dambourle/prizes";
 import { getOwnedItemCounts } from "@/lib/data/collection";
 import { getOwnedDambourleCounts } from "@/lib/data/dambourle";
+import { PREFECTURE_NAMES } from "@/lib/geo/prefecture-names";
 import { requireUser } from "@/lib/supabase/server";
 
 export const metadata = { title: "図鑑 | おでかけ記録" };
 export const dynamic = "force-dynamic";
 
-type Tab = "regular" | "series";
+type Tab = "regular" | "series" | "pref";
 type SortKey = "default" | "rarity" | "name" | "count";
 
 function isSortKey(value: string | undefined): value is SortKey {
@@ -90,7 +94,7 @@ export default async function CollectionPage({
   ]);
   const owned = new Set(counts.keys());
 
-  const tab: Tab = params.tab === "series" ? "series" : "regular";
+  const tab: Tab = params.tab === "series" || params.tab === "pref" ? params.tab : "regular";
   const category = isCollectionCategory(params.category) ? params.category : null;
   const sort: SortKey = isSortKey(params.sort) ? params.sort : "default";
 
@@ -107,8 +111,10 @@ export default async function CollectionPage({
           </p>
           {tab === "regular" ? (
             <RegularTab owned={owned} counts={counts} category={category} sort={sort} />
-          ) : (
+          ) : tab === "series" ? (
             <SeriesTab owned={owned} counts={counts} dambourleCounts={dambourleCounts} />
+          ) : (
+            <PrefTab owned={owned} counts={counts} />
           )}
           <p className="pb-2 text-center text-xs text-ink-faint">
             持っていないアイテムはシルエットで表示されます
@@ -123,6 +129,7 @@ function CollectionTabs({ current }: { current: Tab }) {
   const tabs: Array<{ key: Tab; label: string; href: string; active: string }> = [
     { key: "regular", label: "通常の図鑑", href: "/collection", active: "bg-leaf-soft text-leaf-deep" },
     { key: "series", label: "シリーズ図鑑", href: "/collection?tab=series", active: "bg-sky-soft text-[#42718f]" },
+    { key: "pref", label: "都道府県図鑑", href: "/collection?tab=pref", active: "bg-[#E6EFFC] text-[#1F4F8F]" },
   ];
 
   return (
@@ -133,7 +140,7 @@ function CollectionTabs({ current }: { current: Tab }) {
           href={tab.href}
           role="tab"
           aria-selected={current === tab.key}
-          className={`rough-pill flex-1 py-2.5 text-center text-sm font-bold transition-colors ${
+          className={`rough-pill min-w-0 flex-1 whitespace-nowrap py-2.5 text-center text-[13px] font-bold transition-colors ${
             current === tab.key ? `${tab.active} shadow-sm` : "text-ink-soft"
           }`}
         >
@@ -286,6 +293,43 @@ function SeriesTab({
         </Link>
         <DambourleSeriesGrid ownedCounts={dambourleCounts} />
       </section>
+    </div>
+  );
+}
+
+/** 都道府県図鑑。都道府県ガチャ（青コイン）で出るアイテムを、県ごとにまとめて並べる */
+function PrefTab({ owned, counts }: { owned: ReadonlySet<string>; counts: ReadonlyMap<string, number> }) {
+  return (
+    <div className="space-y-4">
+      <p className="px-1 text-center text-xs text-ink-soft">
+        都道府県ガチャ（青コイン）で出る、ご当地アイテムを集められるよ
+      </p>
+
+      <CollectionProgress owned={countOwned(PREF_ITEMS, owned)} total={PREF_ITEMS.length} barClass="bg-[#3D7FD9]" />
+
+      {PREF_CODES_WITH_ITEMS.map((code) => {
+        const items = getPrefItems(code);
+        return (
+          <section key={code} className="space-y-2.5">
+            <div className="rough-pill flex items-center gap-2 border border-[#BFD7F5] bg-[#EEF5FF] px-3.5 py-2 text-[#1F4F8F]">
+              <span className="min-w-0 flex-1 truncate text-sm font-bold">{PREFECTURE_NAMES.find((p) => p.code === code)?.name ?? code}</span>
+              <span className="shrink-0 text-xs font-semibold tabular-nums">
+                {countOwned(items, owned)} / {items.length}
+              </span>
+            </div>
+            <ItemGrid items={items} owned={owned} counts={counts} />
+          </section>
+        );
+      })}
+
+      <Link
+        href="/mypage/coins#pref-gacha"
+        className="rough-pill pressable flex items-center gap-2 border border-[#BFD7F5] bg-card px-3.5 py-2 text-[#1F4F8F]"
+      >
+        <span className="min-w-0 flex-1 truncate text-xs font-bold">都道府県ガチャをまわす</span>
+        <IconChevronRight size={16} className="shrink-0" />
+      </Link>
+      <p className="px-1 text-center text-[10px] text-ink-faint">ほかの都道府県のアイテムも、これから増えていきます</p>
     </div>
   );
 }

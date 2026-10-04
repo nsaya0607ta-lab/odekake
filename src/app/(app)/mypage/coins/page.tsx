@@ -5,9 +5,11 @@ import { CoinHero } from "@/components/coin-hero";
 import { CoinLiveRefresh } from "@/components/coin-live-refresh";
 import { CoinUseCards } from "@/components/coin-use-cards";
 import { DambourleGachaSection } from "@/components/dambourle-gacha-section";
+import { GachaSection } from "@/components/gacha-section";
 import { IconChevronRight, IconPaw } from "@/components/icons";
 import { PageBody } from "@/components/page-body";
 import { TopHeader } from "@/components/page-header";
+import { getBlueCoinBalance } from "@/lib/data/blue-coins";
 import { getCoinSummary } from "@/lib/data/coins";
 import { getCurrentDogSkin } from "@/lib/data/dog-skin";
 import { getRecordSpace } from "@/lib/data/space";
@@ -20,9 +22,10 @@ export default async function CoinsPage() {
   const { supabase, user } = await requireUser();
   const space = await getRecordSpace(supabase, user.id);
 
-  const [summary, skin] = await Promise.all([
+  const [summary, skin, blueCoins] = await Promise.all([
     getCoinSummary(supabase, user.id),
     getCurrentDogSkin(supabase, user.id),
+    getBlueCoinBalance(supabase, user.id).catch(() => null),
   ]);
 
   return (
@@ -54,6 +57,8 @@ export default async function CoinsPage() {
             <IconChevronRight size={18} className="shrink-0 text-ink-faint" />
           </Link>
           <CoinUseCards balance={summary.balance} />
+          {/* 都道府県ガチャは青コイン（青コインの仕組みが無い環境では出さない） */}
+          {blueCoins !== null ? <GachaSection balance={blueCoins} pool="pref" /> : null}
           <DambourleGachaSection balance={summary.balance} />
           <CoinEarnMethods />
         </div>

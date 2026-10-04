@@ -396,7 +396,7 @@ export function createOsanpoRun(root: HTMLElement, opts: OsanpoRunOptions): () =
   let STAGE_ID: OsanpoRunStageId = isOsanpoRunStageId(savedStage) && unlocked.has(savedStage) ? savedStage : "town";
   let STAGE: OsanpoRunStage = OSANPO_RUN_STAGES[STAGE_ID];
   preloadSkin(STAGE.skin);
-  // 道で会う「ほかのわんこ」は、図鑑にいるフレブル（いつもの・登山・雪国・夏）からランダム。持っていなくても出る
+  // 道で会う「ほかのわんこ」は、図鑑にいるフレブル（いつもの・登山・雪国・夏・岐阜・愛知）からランダム。持っていなくても出る
   for (const skin of DOG_SKIN_IDS) for (const p of BUDDY_POSES) dogImage(skin, p);
 
   /* ---------- 記録（この端末に保存） ---------- */

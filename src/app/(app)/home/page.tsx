@@ -14,6 +14,7 @@ import { StepsTag } from "@/components/steps-tag";
 import { WanderingFrenchie } from "@/components/wandering-frenchie";
 import { COLLECTION_ITEMS, countOwned } from "@/lib/collection/items";
 import { loadAreaIndex } from "@/lib/data/areas";
+import { getBlueCoinBalance } from "@/lib/data/blue-coins";
 import { getCoinSummary } from "@/lib/data/coins";
 import { getOwnedItemIds } from "@/lib/data/collection";
 import { getOwnedDambourleCounts } from "@/lib/data/dambourle";
@@ -57,6 +58,7 @@ export default async function HomePage({
     friendSteps,
     noticesFeed,
     unreadNoticeCount,
+    blueCoins,
   ] = await Promise.all([
     spacePromise.then((space) => loadAreaIndex(supabase, space.tripIds)),
     getExpDashboard(supabase, user.id),
@@ -69,6 +71,7 @@ export default async function HomePage({
     getFriendsStepsRanking(supabase, 20),
     getNoticesFeed(supabase, 3),
     getUnreadNoticeCount(supabase),
+    getBlueCoinBalance(supabase, user.id).catch(() => null),
   ]);
 
   const friendAvatarPaths = [
@@ -151,7 +154,7 @@ export default async function HomePage({
         action={
           <div className="flex items-center gap-2">
             <SoundSettingsButton />
-            <CoinBadge balance={coins.balance} />
+            <CoinBadge balance={coins.balance} blueBalance={blueCoins} />
             <SharedTripBadge />
           </div>
         }
