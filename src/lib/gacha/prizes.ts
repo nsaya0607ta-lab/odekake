@@ -280,6 +280,11 @@ export const GACHA_PRIZES: readonly GachaPrize[] = [
   { id: "aichi_miso_katsu", name: "味噌カツ", rarity: "R", type: "item", image: "/collection/items/aichi-miso-katsu.webp", pref: "23" },
   { id: "aichi_takeshima", name: "竹島・蒲郡", rarity: "R", type: "item", image: "/collection/items/aichi-takeshima.webp", pref: "23" },
   { id: "aichi_tokoname", name: "常滑焼・招き猫", rarity: "SR", type: "item", image: "/collection/items/aichi-tokoname.webp", pref: "23" },
+  { id: "aichi_hatcho_miso", name: "八丁味噌", rarity: "N", type: "item", image: "/collection/items/aichi-hatcho-miso.webp", pref: "23" },
+  { id: "aichi_toyokawa_inari", name: "豊川稲荷", rarity: "SR", type: "item", image: "/collection/items/aichi-toyokawa-inari.webp", pref: "23" },
+  { id: "aichi_hitsumabushi", name: "ひつまぶし", rarity: "SSR", type: "item", image: "/collection/items/aichi-hitsumabushi.webp", pref: "23" },
+  { id: "aichi_inuyama_castle", name: "犬山城", rarity: "UR", type: "item", image: "/collection/items/aichi-inuyama-castle.webp", pref: "23" },
+  { id: "aichi_nagoya_castle", name: "名古屋城・金のしゃちほこ", rarity: "LR", type: "item", image: "/collection/items/aichi-nagoya-castle.webp", pref: "23" },
   { id: "aichi_frenchie", name: "愛知のフレブル", rarity: "LR", type: "dog_skin", image: "/collection/skins/aichi-frenchie.webp", pref: "23" },
 
   // --- 都道府県ガチャ（青コイン）：三重県 ------------------------------
