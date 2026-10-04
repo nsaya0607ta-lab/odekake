@@ -288,6 +288,11 @@ export const GACHA_PRIZES: readonly GachaPrize[] = [
   { id: "aichi_frenchie", name: "愛知のフレブル", rarity: "LR", type: "dog_skin", image: "/collection/skins/aichi-frenchie.webp", pref: "23" },
 
   // --- 都道府県ガチャ（青コイン）：三重県 ------------------------------
+  { id: "mie_ise_udon", name: "伊勢うどん", rarity: "N", type: "item", image: "/collection/items/mie-ise-udon.webp", pref: "24" },
+  { id: "mie_akafuku", name: "赤福", rarity: "N", type: "item", image: "/collection/items/mie-akafuku.webp", pref: "24" },
+  { id: "mie_tekone_sushi", name: "てこね寿司", rarity: "N", type: "item", image: "/collection/items/mie-tekone-sushi.webp", pref: "24" },
+  { id: "mie_yokkaichi_tonteki", name: "四日市とんてき", rarity: "R", type: "item", image: "/collection/items/mie-yokkaichi-tonteki.webp", pref: "24" },
+  { id: "mie_pearl", name: "三重の真珠", rarity: "R", type: "item", image: "/collection/items/mie-pearl.webp", pref: "24" },
   { id: "mie_frenchie", name: "三重のフレブル", rarity: "LR", type: "dog_skin", image: "/collection/skins/mie-frenchie.webp", pref: "24" },
 ];
 
