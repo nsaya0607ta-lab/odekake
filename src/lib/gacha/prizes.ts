@@ -293,6 +293,11 @@ export const GACHA_PRIZES: readonly GachaPrize[] = [
   { id: "mie_tekone_sushi", name: "てこね寿司", rarity: "N", type: "item", image: "/collection/items/mie-tekone-sushi.webp", pref: "24" },
   { id: "mie_yokkaichi_tonteki", name: "四日市とんてき", rarity: "R", type: "item", image: "/collection/items/mie-yokkaichi-tonteki.webp", pref: "24" },
   { id: "mie_pearl", name: "三重の真珠", rarity: "R", type: "item", image: "/collection/items/mie-pearl.webp", pref: "24" },
+  { id: "mie_iga_ninja", name: "伊賀忍者", rarity: "SR", type: "item", image: "/collection/items/mie-iga-ninja.webp", pref: "24" },
+  { id: "mie_meoto_iwa", name: "夫婦岩", rarity: "SR", type: "item", image: "/collection/items/mie-meoto-iwa.webp", pref: "24" },
+  { id: "mie_ise_ebi", name: "伊勢海老", rarity: "SSR", type: "item", image: "/collection/items/mie-ise-ebi.webp", pref: "24" },
+  { id: "mie_matsusaka_beef", name: "松阪牛", rarity: "UR", type: "item", image: "/collection/items/mie-matsusaka-beef.webp", pref: "24" },
+  { id: "mie_ise_jingu", name: "伊勢神宮", rarity: "LR", type: "item", image: "/collection/items/mie-ise-jingu.webp", pref: "24" },
   { id: "mie_frenchie", name: "三重のフレブル", rarity: "LR", type: "dog_skin", image: "/collection/skins/mie-frenchie.webp", pref: "24" },
 ];
 
