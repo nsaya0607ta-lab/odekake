@@ -356,6 +356,7 @@ const CURATED_ITEMS: readonly CollectionItem[] = [
   { id: "shizuoka_hamanako_unagi", name: "浜名湖うなぎ", image: "/collection/items/shizuoka-hamanako-unagi.webp", category: "food", series: null, rarity: "SSR", pref: "22" },
   { id: "shizuoka_omuroyama", name: "大室山・伊豆", image: "/collection/items/shizuoka-omuroyama.webp", category: "other", series: null, rarity: "UR", pref: "22" },
   { id: "shizuoka_mt_fuji_tea", name: "富士山・茶畑", image: "/collection/items/shizuoka-mt-fuji-tea.webp", category: "other", series: null, rarity: "LR", pref: "22" },
+  { id: "shizuoka_frenchie", name: "静岡のフレブル", image: "/collection/skins/shizuoka-frenchie.webp", category: "other", series: null, rarity: "LR", pref: "22" },
 
   // --- 都道府県図鑑：三重県（都道府県ガチャ） ----------------------------
   { id: "mie_ise_udon", name: "伊勢うどん", image: "/collection/items/mie-ise-udon.webp", category: "food", series: null, rarity: "N", pref: "24" },
