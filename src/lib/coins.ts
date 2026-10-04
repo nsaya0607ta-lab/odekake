@@ -34,12 +34,20 @@ export const LEVEL_MILESTONE_COIN_BONUSES = [
 export const STEP_COIN_INTERVAL = 500;
 export const STEP_COIN_AMOUNT = 60;
 
-/** 到達したものをすべて累積する歩数ボーナス。 */
+/**
+ * 到達したものをすべて累積する歩数ボーナス。3,000歩から1,000歩ごと。
+ * 累計は 5,000歩で300・8,000歩で600・10,000歩で1,100（1,000歩ごとにする前の節目と同じ）。
+ * supabase の calculate_step_coins（0116_step_milestones_every_1000.sql）と同じ値にする。
+ */
 export const STEP_COIN_MILESTONES = [
   { steps: 3000, coins: 100 },
-  { steps: 5000, coins: 200 },
-  { steps: 8000, coins: 300 },
-  { steps: 10000, coins: 500 },
+  { steps: 4000, coins: 100 },
+  { steps: 5000, coins: 100 },
+  { steps: 6000, coins: 100 },
+  { steps: 7000, coins: 100 },
+  { steps: 8000, coins: 100 },
+  { steps: 9000, coins: 100 },
+  { steps: 10000, coins: 400 },
 ] as const;
 
 /** 互換用。基本報酬の表示は STEP_COIN_INTERVAL / STEP_COIN_AMOUNT を使う。 */

@@ -467,17 +467,18 @@ export function RoomMess({ mess, onClean }: { mess: readonly Mess[]; onClean: (m
 /* ---------- 部屋がちょっとずつよごれる ---------- */
 
 /** ピカピカでいられる、1日あたりの歩数のめやす */
-export const CLEAN_STEPS = 5000;
+export const CLEAN_STEPS = 2000;
 
 /**
- * 部屋のよごれぐあい（0 ピカピカ 〜 1 ほこりだらけ）。きょう・きのう・おとといの歩数から決める（きょうがいちばん効く）。
- * きょう CLEAN_STEPS 歩あるけば、すぐピカピカ。
+ * 部屋のよごれぐあい（0 ピカピカ 〜 1 ほこりだらけ）。きょう・きのう・おとといの歩数から決める。
+ * きょう CLEAN_STEPS 歩あるけば、すぐピカピカ。毎日 CLEAN_STEPS 歩あるいていれば、朝（きょうまだ歩いていなくても）もピカピカのまま。
+ * 1日さぼると くもりはじめ（きのう0歩・おととい CLEAN_STEPS 歩なら 0.7）、2日さぼると ほこりだらけ
  */
 export function roomDirtOf(history: readonly { date: string; steps: number }[], todaySteps: number | null | undefined, today: string): number {
   const t = Math.max(todaySteps ?? 0, history.find((d) => d.date === today)?.steps ?? 0);
   if (t >= CLEAN_STEPS) return 0;
   const before = [...history].filter((d) => d.date < today).sort((a, b) => (a.date < b.date ? 1 : -1));
-  const score = t * 0.5 + (before[0]?.steps ?? CLEAN_STEPS) * 0.3 + (before[1]?.steps ?? CLEAN_STEPS) * 0.2;
+  const score = t + (before[0]?.steps ?? CLEAN_STEPS) * 0.7 + (before[1]?.steps ?? CLEAN_STEPS) * 0.3;
   return Math.min(1, Math.max(0, 1 - score / CLEAN_STEPS));
 }
 
