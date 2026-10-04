@@ -269,6 +269,9 @@ export const GACHA_PRIZES: readonly GachaPrize[] = [
   { id: "gifu_hida_takayama", name: "飛騨高山の古い町並み", rarity: "SSR", type: "item", image: "/collection/items/gifu-hida-takayama.webp", pref: "21" },
   { id: "gifu_nagara_ukai", name: "長良川鵜飼", rarity: "SSR", type: "item", image: "/collection/items/gifu-nagara-ukai.webp", pref: "21" },
   { id: "gifu_hida_beef", name: "飛騨牛", rarity: "UR", type: "item", image: "/collection/items/gifu-hida-beef.webp", pref: "21" },
+  { id: "gifu_gifu_castle", name: "岐阜城・金華山", rarity: "UR", type: "item", image: "/collection/items/gifu-gifu-castle.webp", pref: "21" },
+  { id: "gifu_shinhotaka", name: "新穂高ロープウェイ・奥飛騨温泉郷", rarity: "UR", type: "item", image: "/collection/items/gifu-shinhotaka.webp", pref: "21" },
+  { id: "gifu_shirakawago", name: "白川郷・合掌造り", rarity: "LR", type: "item", image: "/collection/items/gifu-shirakawago.webp", pref: "21" },
   { id: "gifu_frenchie", name: "岐阜のフレブル", rarity: "LR", type: "dog_skin", image: "/collection/skins/gifu-frenchie.webp", pref: "21" },
 
   // --- 都道府県ガチャ（青コイン）：愛知県 ------------------------------
