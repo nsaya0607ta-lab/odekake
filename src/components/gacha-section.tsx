@@ -12,7 +12,7 @@ import {
   type GachaPlanId,
   type GachaRarity,
 } from "@/lib/gacha/config";
-import { GachaMachineArt, SparkleArt } from "./coin-art";
+import { BlueCoinArt, GachaMachineArt, SparkleArt } from "./coin-art";
 import { primeGachaAudio } from "./gacha/audio";
 import type { AnimationDraw, DrawResult } from "./gacha/types";
 import { IconClose, IconCoin } from "./icons";
@@ -120,7 +120,22 @@ function rarityStyle(rarity: string) {
   return RARITY_STYLES[rarity as GachaRarity] ?? RARITY_STYLES.N;
 }
 
-export function GachaSection({ balance }: { balance: number }) {
+/** ガチャで使うコインの絵（黄色コイン / 青コイン） */
+function GachaCoin({ blue, size }: { blue: boolean; size: number }) {
+  if (!blue) return <IconCoin size={size} />;
+  return (
+    <span className="inline-flex shrink-0" style={{ width: size, height: size }}>
+      <BlueCoinArt className="h-full w-full" />
+    </span>
+  );
+}
+
+/**
+ * ガチャのカード。pool="coin" は通常ガチャ（黄色コイン）、pool="pref" は都道府県ガチャ（青コイン）。
+ * 値段・回数・排出率はどちらも同じ。
+ */
+export function GachaSection({ balance, pool = "coin" }: { balance: number; pool?: "coin" | "pref" }) {
+  const pref = pool === "pref";
   const router = useRouter();
   const [pending, setPending] = useState<GachaPlanId | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -143,6 +158,7 @@ export function GachaSection({ balance }: { balance: number }) {
           body: JSON.stringify({
             plan: planId,
             requestId: crypto.randomUUID(),
+            pool,
           }),
         });
         const payload = (await response.json().catch(() => null)) as
@@ -161,7 +177,7 @@ export function GachaSection({ balance }: { balance: number }) {
         setError("通信に失敗しました。");
       }
     },
-    [router],
+    [router, pool],
   );
 
   const finishAnimation = useCallback((draw: AnimationDraw) => {
@@ -195,22 +211,35 @@ export function GachaSection({ balance }: { balance: number }) {
   const rates = GACHA_DISPLAY_RARITY_RATES;
 
   return (
-    <section className="rough-card flex min-w-0 flex-col overflow-hidden p-3.5">
+    <section id={pref ? "pref-gacha" : undefined} className={`rough-card flex min-w-0 scroll-mt-20 flex-col overflow-hidden p-3.5 ${pref ? "!border-[#BFD7F5] bg-[linear-gradient(180deg,#F3F8FF,transparent_60%)]" : ""}`}>
       <h2 className="flex items-center gap-1 text-[15px] font-bold">
-        <SparkleArt className="w-3.5 shrink-0 text-sun" />
-        <span className="min-w-0 truncate">コインでガチャ</span>
+        <SparkleArt className={`w-3.5 shrink-0 ${pref ? "text-[#3D7FD9]" : "text-sun"}`} />
+        <span className="min-w-0 truncate">{pref ? "都道府県ガチャ" : "コインでガチャ"}</span>
+        {pref ? <span className="shrink-0 rounded-full bg-[#3D7FD9] px-1.5 py-0.5 text-[9px] font-black text-white">NEW</span> : null}
       </h2>
 
       <div className="mt-2 flex min-h-0 flex-1 items-start gap-0.5">
         <div className="min-w-0 flex-1">
-          <p className="text-[10px] leading-[1.65] text-ink-soft">
-            <span className="block whitespace-nowrap">コインをつかって</span>
-            <span className="block whitespace-nowrap">おもちゃやシリーズアイテムをゲット！</span>
-          </p>
-          <p className="mt-1 text-[9px] font-semibold text-ink-faint">すべて同じガチャから出ます</p>
+          {pref ? (
+            <>
+              <p className="text-[10px] leading-[1.65] text-ink-soft">
+                <span className="block whitespace-nowrap">青コインをつかって</span>
+                <span className="block whitespace-nowrap">ご当地のアイテムをゲット！</span>
+              </p>
+              <p className="mt-1 text-[9px] font-semibold text-ink-faint">いまは 岐阜県（LR 岐阜のフレブル）</p>
+            </>
+          ) : (
+            <>
+              <p className="text-[10px] leading-[1.65] text-ink-soft">
+                <span className="block whitespace-nowrap">コインをつかって</span>
+                <span className="block whitespace-nowrap">おもちゃやシリーズアイテムをゲット！</span>
+              </p>
+              <p className="mt-1 text-[9px] font-semibold text-ink-faint">すべて同じガチャから出ます</p>
+            </>
+          )}
           <p className="mt-1.5 flex items-center gap-1 text-[9px] font-bold text-ink-faint">
-            <IconCoin size={11} />
-            所持 {formatCoins(balance)}
+            <GachaCoin blue={pref} size={11} />
+            {pref ? "青コイン" : "所持"} {formatCoins(balance)}
           </p>
         </div>
         <span className="flex h-[88px] w-[44%] shrink-0 items-end justify-center">
@@ -238,13 +267,13 @@ export function GachaSection({ balance }: { balance: number }) {
               type="button"
               onClick={() => void draw(planId)}
               disabled={pending !== null || short}
-              className="flex w-full items-center justify-between rounded-full bg-leaf px-3 py-2 text-white shadow-sm transition active:translate-y-px disabled:opacity-45"
+              className={`flex w-full items-center justify-between rounded-full px-3 py-2 text-white shadow-sm transition active:translate-y-px disabled:opacity-45 ${pref ? "bg-[#3D7FD9]" : "bg-leaf"}`}
             >
               <span className="text-[11px] font-bold">
                 {pending === planId ? "まわしています…" : plan.label}
               </span>
               <span className="flex items-center gap-1 text-[10px] font-bold tabular-nums">
-                <IconCoin size={12} />
+                <GachaCoin blue={pref} size={12} />
                 {formatCoins(plan.cost)}
               </span>
             </button>
@@ -252,9 +281,14 @@ export function GachaSection({ balance }: { balance: number }) {
         })}
       </div>
       <p className="mt-1 text-center text-[8px] text-ink-faint">100連だけ、SR以上の排出率がアップします</p>
+      {pref ? (
+        <p className="mt-0.5 text-center text-[8px] leading-relaxed text-ink-faint">
+          ご当地アイテムがまだ無いランクでは、通常ガチャのアイテムが出ます
+        </p>
+      ) : null}
 
       {balance < GACHA_PLANS.single.cost && !error && (
-        <p className="mt-1.5 text-center text-[9px] text-ink-faint">コインが足りません</p>
+        <p className="mt-1.5 text-center text-[9px] text-ink-faint">{pref ? "青コインが足りません（おさんぽフレブルでもらえます）" : "コインが足りません"}</p>
       )}
       {error && (
         <p className="mt-1.5 text-center text-[9px] font-bold text-red-600" role="status">

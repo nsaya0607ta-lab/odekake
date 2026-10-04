@@ -5,6 +5,7 @@
  * series: null は通常図鑑、hiking / snow / summer はシリーズ図鑑。
  * シリーズそのものの定義（名前・見た目）は series.ts を唯一の真実源とする。
  * シリーズのアイテムもガチャは分けず、通常ガチャから排出される。
+ * pref のあるアイテムは都道府県図鑑（都道府県ガチャの景品）。通常図鑑・シリーズ図鑑には出さない。
  */
 import type { GachaRarity } from "@/lib/gacha/config";
 import { GACHA_PRIZES } from "@/lib/gacha/prizes";
@@ -40,6 +41,8 @@ export type CollectionItem = {
   series: CollectionSeriesId | null;
   rarity: GachaRarity;
   art?: ItemArtKey;
+  /** 都道府県図鑑のアイテムなら、その都道府県コード（"21" = 岐阜県） */
+  pref?: string;
 };
 
 export type CollectionSeries = {
@@ -72,7 +75,9 @@ export function getSeries(id: CollectionSeriesId): CollectionSeries | null {
  * ただし寿司シリーズはミニゲーム用スキル・出現重みが個別に整備済み（frenchie-catch-game.tsxの
  * ITEM_SPAWN_WEIGHTS・スキルswitch分岐を参照）なので、他のシリーズと違い出現対象に含める。
  */
-export function hasMinigameSkillLevel(item: Pick<CollectionItem, "series" | "art">): boolean {
+export function hasMinigameSkillLevel(item: Pick<CollectionItem, "series" | "art" | "pref">): boolean {
+  // 都道府県図鑑のアイテムは、ミニゲーム用スキル・出現重みが未整備なので出さない
+  if (item.pref) return false;
   return item.series === null || item.series === "sushi" || item.art !== undefined;
 }
 
@@ -305,6 +310,9 @@ const CURATED_ITEMS: readonly CollectionItem[] = [
   { id: "sushi_torafugu", name: "とらふぐ握り", image: "/collection/items/sushi-torafugu.webp", category: "food", series: "sushi", rarity: "UR" },
   { id: "sushi_awabi", name: "活アワビ握り", image: "/collection/items/sushi-awabi.webp", category: "food", series: "sushi", rarity: "UR" },
   { id: "sushi_kue", name: "天然クエ握り", image: "/collection/items/sushi-kue.webp", category: "food", series: "sushi", rarity: "LR" },
+
+  // --- 都道府県図鑑：岐阜県（都道府県ガチャ） ----------------------------
+  { id: "gifu_frenchie", name: "岐阜のフレブル", image: "/collection/skins/gifu-frenchie.webp", category: "other", series: null, rarity: "LR", pref: "21" },
 ];
 
 const CURATED_IDS = new Set(CURATED_ITEMS.map((item) => item.id));
@@ -323,7 +331,17 @@ const UNLISTED_PRIZES: readonly CollectionItem[] = GACHA_PRIZES.filter(
 
 export const COLLECTION_ITEMS: readonly CollectionItem[] = [...CURATED_ITEMS, ...UNLISTED_PRIZES];
 
-export const REGULAR_ITEMS: readonly CollectionItem[] = COLLECTION_ITEMS.filter((item) => item.series === null);
+export const REGULAR_ITEMS: readonly CollectionItem[] = COLLECTION_ITEMS.filter((item) => item.series === null && !item.pref);
+
+/** 都道府県図鑑のアイテム（都道府県コードの順） */
+export const PREF_ITEMS: readonly CollectionItem[] = COLLECTION_ITEMS.filter((item) => Boolean(item.pref));
+
+/** 都道府県図鑑で、アイテムがある都道府県のコード（北から順） */
+export const PREF_CODES_WITH_ITEMS: readonly string[] = [...new Set(PREF_ITEMS.map((item) => item.pref!))].sort();
+
+export function getPrefItems(prefCode: string): CollectionItem[] {
+  return PREF_ITEMS.filter((item) => item.pref === prefCode);
+}
 
 export function getSeriesItems(seriesId: CollectionSeriesId): CollectionItem[] {
   return COLLECTION_ITEMS.filter((item) => item.series === seriesId);

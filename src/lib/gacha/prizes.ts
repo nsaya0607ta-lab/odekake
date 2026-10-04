@@ -2,7 +2,7 @@
  * ガチャの景品一覧
  * =============================================================
  * id は user_gacha_items.item_id に保存されるため、一度公開した id は変更しない。
- * すべて単一の通常ガチャから排出される（シリーズ限定ガチャは設けない）。
+ * pref の無い景品は通常ガチャ（黄色コイン）から、pref のある景品は都道府県ガチャ（青コイン）から排出される。
  */
 import type { GachaRarity } from "./config";
 
@@ -15,6 +15,8 @@ export type GachaPrize = {
   type: GachaPrizeType;
   /** public/ からのパス。未用意なら null */
   image: string | null;
+  /** 都道府県ガチャの景品なら、その都道府県コード（"21" = 岐阜県）。通常ガチャには出ない */
+  pref?: string;
 };
 
 export const GACHA_PRIZES: readonly GachaPrize[] = [
@@ -250,6 +252,9 @@ export const GACHA_PRIZES: readonly GachaPrize[] = [
   { id: "sushi_torafugu", name: "とらふぐ握り", rarity: "UR", type: "item", image: "/collection/items/sushi-torafugu.webp" },
   { id: "sushi_awabi", name: "活アワビ握り", rarity: "UR", type: "item", image: "/collection/items/sushi-awabi.webp" },
   { id: "sushi_kue", name: "天然クエ握り", rarity: "LR", type: "item", image: "/collection/items/sushi-kue.webp" },
+
+  // --- 都道府県ガチャ（青コイン）：岐阜県 ------------------------------
+  { id: "gifu_frenchie", name: "岐阜のフレブル", rarity: "LR", type: "dog_skin", image: "/collection/skins/gifu-frenchie.webp", pref: "21" },
 ];
 
 const PRIZE_BY_ID = new Map(GACHA_PRIZES.map((prize) => [prize.id, prize]));
@@ -261,3 +266,8 @@ export function getPrize(id: string): GachaPrize | null {
 export function getPrizesByRarity(rarity: GachaRarity): GachaPrize[] {
   return GACHA_PRIZES.filter((prize) => prize.rarity === rarity);
 }
+
+/** 通常ガチャ（黄色コイン）の景品 */
+export const COIN_GACHA_PRIZES: readonly GachaPrize[] = GACHA_PRIZES.filter((prize) => !prize.pref);
+/** 都道府県ガチャ（青コイン）の景品 */
+export const PREF_GACHA_PRIZES: readonly GachaPrize[] = GACHA_PRIZES.filter((prize) => Boolean(prize.pref));

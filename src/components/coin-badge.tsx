@@ -1,16 +1,32 @@
 import Link from "next/link";
 import { formatCoins } from "@/lib/coins";
+import { BlueCoinArt } from "./coin-art";
 import { IconCoin } from "./icons";
 
-/** ヘッダー右上に出す所持コイン（表示のみ、押しても遷移しない） */
-export function CoinBadge({ balance }: { balance: number }) {
+/**
+ * ヘッダー右上に出す所持コイン（表示のみ、押しても遷移しない）。
+ * blueBalance を渡すと、となりに青コインも出す（ならぶぶん、少し小さくする）
+ */
+export function CoinBadge({ balance, blueBalance = null }: { balance: number; blueBalance?: number | null }) {
+  const pair = blueBalance !== null;
   return (
-    <div
-      aria-label={`所持コイン ${formatCoins(balance)}枚`}
-      className="flex shrink-0 items-center gap-1.5 rounded-full border border-[#e8d4aa] bg-sun-soft/70 px-3 py-1.5 shadow-sm"
-    >
-      <IconCoin size={20} />
-      <span className="text-sm font-bold tabular-nums text-ink">{formatCoins(balance)}</span>
+    <div className={`flex shrink-0 items-center ${pair ? "gap-1" : ""}`}>
+      <div
+        aria-label={`所持コイン ${formatCoins(balance)}枚`}
+        className={`flex shrink-0 items-center rounded-full border border-[#e8d4aa] bg-sun-soft/70 shadow-sm ${pair ? "gap-1 px-2 py-1" : "gap-1.5 px-3 py-1.5"}`}
+      >
+        <IconCoin size={pair ? 17 : 20} />
+        <span className={`font-bold tabular-nums text-ink ${pair ? "text-[13px]" : "text-sm"}`}>{formatCoins(balance)}</span>
+      </div>
+      {pair ? (
+        <div
+          aria-label={`青コイン ${formatCoins(blueBalance)}枚`}
+          className="flex shrink-0 items-center gap-1 rounded-full border border-[#BFD7F5] bg-[#EEF5FF] px-2 py-1 shadow-sm"
+        >
+          <BlueCoinArt className="h-[17px] w-[17px]" />
+          <span className="text-[13px] font-bold tabular-nums text-[#1F4F8F]">{formatCoins(blueBalance)}</span>
+        </div>
+      ) : null}
     </div>
   );
 }

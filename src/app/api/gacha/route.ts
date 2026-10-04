@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { GACHA_HUNDRED_RARITY_RATES, GACHA_PLANS, isGachaPlanId } from "@/lib/gacha/config";
-import { drawPrizes } from "@/lib/gacha/draw";
+import { drawPrizes, type GachaPool } from "@/lib/gacha/draw";
 import { getPrize } from "@/lib/gacha/prizes";
 import { getSkillLevel } from "@/lib/gacha/skill-levels";
 import { getOwnedItemCounts } from "@/lib/data/collection";
@@ -32,6 +32,7 @@ export async function POST(request: Request) {
   const body = (await request.json().catch(() => null)) as {
     plan?: unknown;
     requestId?: unknown;
+    pool?: unknown;
   } | null;
 
   if (!body || !isGachaPlanId(body.plan)) {
@@ -41,6 +42,11 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "リクエストが正しくありません。" }, { status: 400 });
   }
 
+  if (body.pool !== undefined && body.pool !== "coin" && body.pool !== "pref") {
+    return NextResponse.json({ error: "ガチャの種類が正しくありません。" }, { status: 400 });
+  }
+  // coin = 通常ガチャ（黄色コイン）、pref = 都道府県ガチャ（青コイン）。値段・回数・排出率は同じ
+  const pool: GachaPool = body.pool === "pref" ? "pref" : "coin";
   const plan = GACHA_PLANS[body.plan];
 
   const limit = checkRateLimit(`gacha:${user.id}`, 20, 60_000);
@@ -51,7 +57,7 @@ export async function POST(request: Request) {
     );
   }
 
-  const drawn = drawPrizes(plan.draws, body.plan === "hundred" ? GACHA_HUNDRED_RARITY_RATES : undefined);
+  const drawn = drawPrizes(plan.draws, body.plan === "hundred" ? GACHA_HUNDRED_RARITY_RATES : undefined, pool);
   if (drawn.length !== plan.draws) {
     console.error("Gacha prize pool is empty", { plan: body.plan, drawn: drawn.length });
     return NextResponse.json({ error: "ただいまガチャを準備中です。" }, { status: 503 });
@@ -59,14 +65,18 @@ export async function POST(request: Request) {
 
   const priorCounts = await getOwnedItemCounts(supabase, user.id);
 
-  const { data, error } = await supabase.rpc("commit_gacha_draw", {
-    p_cost: plan.cost,
-    p_request_id: body.requestId,
-    p_item_ids: drawn.map((prize) => prize.id),
-  });
+  const args = { p_cost: plan.cost, p_request_id: body.requestId, p_item_ids: drawn.map((prize) => prize.id) };
+  // commit_pref_gacha_draw は型の定義にまだ無い関数なので、ゆるく呼ぶ
+  const commitPref = supabase.rpc.bind(supabase) as unknown as (
+    fn: "commit_pref_gacha_draw",
+    args: { p_cost: number; p_request_id: string; p_item_ids: string[] },
+  ) => PromiseLike<{ data: unknown; error: { code?: string; message: string } | null }>;
+  const { data, error } = pool === "pref"
+    ? await commitPref("commit_pref_gacha_draw", args)
+    : await supabase.rpc("commit_gacha_draw", args);
 
   if (error) {
-    console.error("Failed to commit gacha draw", { code: error.code, message: error.message });
+    console.error("Failed to commit gacha draw", { pool, code: error.code, message: error.message });
     return NextResponse.json({ error: "ガチャをまわせませんでした。" }, { status: 500 });
   }
 
@@ -74,7 +84,7 @@ export async function POST(request: Request) {
   if (result.ok !== true) {
     if (result.reason === "insufficient_coins") {
       return NextResponse.json(
-        { error: "コインが足りません", balance: Number(result.balance ?? 0) },
+        { error: pool === "pref" ? "青コインが足りません" : "コインが足りません", balance: Number(result.balance ?? 0) },
         { status: 400 },
       );
     }

@@ -129,7 +129,7 @@ export const SNIFF_REWARDS = [
 export type SniffRewardKind = (typeof SNIFF_REWARDS)[number]["kind"];
 
 /**
- * ご近所さん：道で会うほかのフレブル4匹。名前は設定でつけられる（空なら defaultName）。
+ * ご近所さん：道で会うほかのフレブル5匹。名前は設定でつけられる（空なら defaultName）。
  * あいさつの回数でなかよし度が上がり、会ったときの反応とおまけが変わる。
  */
 export const OSANPO_RUN_NEIGHBOR_DEFAULT_NAMES: Record<DogSkinId, string> = {
@@ -137,6 +137,7 @@ export const OSANPO_RUN_NEIGHBOR_DEFAULT_NAMES: Record<DogSkinId, string> = {
   hiking: "こてつ",
   snow: "ゆき",
   summer: "なつ",
+  gifu: "ひだ",
 };
 export const NEIGHBOR_NAME_MAX = 8;
 export const NEIGHBOR_LEVELS = [
