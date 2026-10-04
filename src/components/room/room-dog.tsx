@@ -137,7 +137,7 @@ export type DogPlaces = {
   blocks: { x0: number; x1: number; y0: number; y1: number }[];
 };
 
-export function RoomDog({ skin, phase, sleepy, lines, dreams = [], cue = null, call = null, introduce = null, quiet, places, weather = null, onFx, modes = {}, winter = false, hot = false, onFurnitureSay }: {
+export function RoomDog({ skin, phase, sleepy, lines, dreams = [], cue = null, call = null, introduce = null, quiet, places, weather = null, onFx, modes = {}, winter = false, hot = false, onFurnitureSay, offset = 0, onTap, label }: {
   skin: DogSkinId;
   phase: DayPhase;
   /** 窓の外の天気（わからなければ null） */
@@ -168,8 +168,16 @@ export function RoomDog({ skin, phase, sleepy, lines, dreams = [], cue = null, c
   hot?: boolean;
   /** 家具がしゃべる（インコがわんこのまねをする） */
   onFurnitureSay?: (id: string, text: string) => void;
+  /** 立ち位置を横にずらす（部屋の %）。2匹で同じ家具に行っても、重ならずに並ぶ */
+  offset?: number;
+  /** タップされたとき（名ふだを出す など。犬の足もとの位置を部屋の % で渡す） */
+  onTap?: (at: { x: number; y: number }) => void;
+  /** 読み上げ用の名前（ふだんは「犬」） */
+  label?: string;
 }) {
-  const [dog, setDog] = useState<DogState>({ x: 30, y: 84, pose: "sit", flip: false });
+  const [dog, setDog] = useState<DogState>({ x: 30 + offset, y: 84, pose: "sit", flip: false });
+  const offsetRef = useRef(offset);
+  offsetRef.current = offset;
   const [bubble, setBubble] = useState<{ text: string; id: number; dream?: boolean } | null>(null);
   const [hearts, setHearts] = useState<number[]>([]);
   /** こわくて ぷるぷる ふるえている（かみなり） */
@@ -296,7 +304,7 @@ export function RoomDog({ skin, phase, sleepy, lines, dreams = [], cue = null, c
     toFloor(() => {
       if (walkAnim.current) window.clearInterval(walkAnim.current);
       if (stepAnim.current) window.cancelAnimationFrame(stepAnim.current);
-      const path = findPath(pos.current, { x, y }, placesRef.current.blocks, exact);
+      const path = findPath(pos.current, { x: clamp(x + offsetRef.current, 6, 94), y }, placesRef.current.blocks, exact);
       let a = pos.current, seg = 0, segStart = -1;
       let frame = 0;
       walkAnim.current = window.setInterval(() => { frame += 1; setDog((cur) => ({ ...cur, pose: frame % 2 ? "trot" : "walk" })); }, 210);
@@ -843,6 +851,7 @@ export function RoomDog({ skin, phase, sleepy, lines, dreams = [], cue = null, c
 
   const tap = () => {
     if (quiet) return;
+    onTap?.({ x: dog.x, y: dog.y - (dog.lift ?? 0) });
     // ごはんのすぐあとになでると、おならが出てしまう（1回だけ）
     if (!night && ateAt.current && Date.now() - ateAt.current < 40_000) {
       ateAt.current = 0;
@@ -932,7 +941,7 @@ export function RoomDog({ skin, phase, sleepy, lines, dreams = [], cue = null, c
         type="button"
         data-dog
         onClick={tap}
-        aria-label={night ? "寝ている犬（タップでなでる）" : "犬（タップでなでる）"}
+        aria-label={`${night ? "寝ている" : ""}${label ?? "犬"}（タップでなでる）`}
         className="absolute block -translate-x-1/2 -translate-y-full p-0 outline-none"
         style={{ ...place, zIndex: 300 + Math.round((dog.zy ?? dog.y) * 10), opacity: dog.alpha ?? 1, pointerEvents: quiet || hidden ? "none" : "auto" }}
       >
