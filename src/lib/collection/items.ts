@@ -322,6 +322,14 @@ const CURATED_ITEMS: readonly CollectionItem[] = [
   { id: "gifu_ayu", name: "鮎", image: "/collection/items/gifu-ayu.webp", category: "food", series: null, rarity: "R", pref: "21" },
   { id: "gifu_minoyaki", name: "美濃焼", image: "/collection/items/gifu-minoyaki.webp", category: "interior", series: null, rarity: "SR", pref: "21" },
   { id: "gifu_seki_hamono", name: "関の刃物", image: "/collection/items/gifu-seki-hamono.webp", category: "other", series: null, rarity: "SR", pref: "21" },
+  { id: "gifu_gujo_hachiman", name: "郡上八幡", image: "/collection/items/gifu-gujo-hachiman.webp", category: "other", series: null, rarity: "SR", pref: "21" },
+  { id: "gifu_gero_onsen", name: "下呂温泉", image: "/collection/items/gifu-gero-onsen.webp", category: "other", series: null, rarity: "SSR", pref: "21" },
+  { id: "gifu_hida_takayama", name: "飛騨高山の古い町並み", image: "/collection/items/gifu-hida-takayama.webp", category: "other", series: null, rarity: "SSR", pref: "21" },
+  { id: "gifu_nagara_ukai", name: "長良川鵜飼", image: "/collection/items/gifu-nagara-ukai.webp", category: "other", series: null, rarity: "SSR", pref: "21" },
+  { id: "gifu_hida_beef", name: "飛騨牛", image: "/collection/items/gifu-hida-beef.webp", category: "food", series: null, rarity: "UR", pref: "21" },
+  { id: "gifu_gifu_castle", name: "岐阜城・金華山", image: "/collection/items/gifu-gifu-castle.webp", category: "other", series: null, rarity: "UR", pref: "21" },
+  { id: "gifu_shinhotaka", name: "新穂高ロープウェイ・奥飛騨温泉郷", image: "/collection/items/gifu-shinhotaka.webp", category: "other", series: null, rarity: "UR", pref: "21" },
+  { id: "gifu_shirakawago", name: "白川郷・合掌造り", image: "/collection/items/gifu-shirakawago.webp", category: "other", series: null, rarity: "LR", pref: "21" },
   { id: "gifu_frenchie", name: "岐阜のフレブル", image: "/collection/skins/gifu-frenchie.webp", category: "other", series: null, rarity: "LR", pref: "21" },
 
   // --- 都道府県図鑑：愛知県（都道府県ガチャ） ----------------------------
