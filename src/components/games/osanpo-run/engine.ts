@@ -3350,14 +3350,16 @@ export function createOsanpoRun(root: HTMLElement, opts: OsanpoRunOptions): () =
     const rotT = P.dead ? (P.ground ? 0 : -0.5) : P.ground ? 0 : clamp(P.vy / 2200, -0.28, 0.32);
     P.rot += (rotT - P.rot) * Math.min(1, dt * 10);
     if (P.ground && S.speed > 1) P.ph += dt * (S.state === "ready" ? 7 : 9 + S.speed / 40);
-    if (P.ground && S.speed > 420) { P.dustT -= dt; if (P.dustT < 0) { P.dustT = 0.11; puff(P.x - 16, GROUND, 1, "dust", { vy: -10 }); } }
+    // 加速スキルで ふだんより速く走っているときは、足もとに土ぼこり
+    if (P.ground && S.speed > START_SPEED * 1.15) { P.dustT -= dt; if (P.dustT < 0) { P.dustT = 0.11; puff(P.x - 16, GROUND, 1, "dust", { vy: -10 }); } }
 
     tickSniffs(dt, playing);
     // 障害物
     const sp = S.speed;
     // 降ってくる・伸びる仕掛けは、時間ではなく「犬が進んだ距離」で動かす（ふだんの速さのとき 1）。
-    // スキルで速くなっても遅くなっても、犬が同じ位置に来たときは、同じ動きの同じところになる
-    const pace = sp / START_SPEED;
+    // スキルで速くなっても遅くなっても、犬が同じ位置に来たときは、同じ動きの同じところになる。
+    // 犬が止まっているあいだ（おるすばん など）は近づかないので、ふだんの時間で動かす（空中で固まらないように）
+    const pace = sp > 1 ? sp / START_SPEED : 1;
     for (const o of obstacles) {
       o.x -= (sp + (playing ? o.vx : (o.vx * sp) / 300)) * dt;
       if (o.kind === "pigeons" && o.flee) o.fleeT += dt;
@@ -3376,13 +3378,14 @@ export function createOsanpoRun(root: HTMLElement, opts: OsanpoRunOptions): () =
         const ph = (o.age + o.phase) % GEYSER_CYCLE;
         o.h = ph < GEYSER_ON ? GEYSER_H * Math.min(1, ph / 0.1) : 0;
       } else if (o.kind === "drop" && !o.landed) {
-        // フレブルの少し前（70px）に着地するよう、落ちる高さを残りの距離で決める（重力らしく、だんだん速く落ちる）。
-        // 落ちはじめの高さは phase に覚えておく（落ちてくるものでは phase を使っていない）
+        // フレブルの少し前（70px）に着地するよう、犬が fallD 進むあいだに落としきる（重力らしく、だんだん速く落ちる）。
+        // 落ちはじめの高さは phase、落ちぐあい（0〜1）は age に覚えておく（落ちてくるものでは どちらも使っていない）
         const fallD = START_SPEED * Math.sqrt((2 * (GROUND + 40)) / DROP_G);
         const left = o.x - P.x - 70;
-        if (o.vy === 0 && left < fallD) { o.vy = 1; o.phase = o.y; sfx.near(); }
+        if (o.vy === 0 && left < fallD) { o.vy = 1; o.phase = o.y; o.age = clamp(1 - left / fallD, 0, 1); sfx.near(); }
         if (o.vy > 0) {
-          const k = clamp(1 - left / fallD, 0, 1);
+          o.age += (dt * pace * START_SPEED) / fallD;
+          const k = clamp(o.age, 0, 1);
           o.y = o.phase + (GROUND - o.phase) * k * k;
           if (k >= 1) { o.y = GROUND; o.landed = true; o.h = 16; puff(o.x + o.w / 2, GROUND - 4, 8, "dust", { vy: -30 }); tone(180, 0.12, "triangle", 0.05, 90); }
         }
@@ -3430,7 +3433,7 @@ export function createOsanpoRun(root: HTMLElement, opts: OsanpoRunOptions): () =
         } else if (!tryRevive(o)) die();
         continue;
       }
-      if (!o.hinted && o.x < P.x + (isTrickKind(o.kind) ? Math.max(220, S.speed * 1.45) : 220)) {
+      if (!o.hinted && o.x < P.x + (isTrickKind(o.kind) ? START_SPEED * 1.45 : 220)) {
         o.hinted = true;
         hint(isTrickKind(o.kind) ? o.kind : o.low || o.kind === "noren" ? "slide" : o.kind === "crow" ? "crow" : o.kind === "cat" ? "cat"
           : o.kind === "roller" || o.kind === "drop" || o.kind === "buddy" || o.kind === "geyser" ? o.kind
