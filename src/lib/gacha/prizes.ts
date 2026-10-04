@@ -264,6 +264,11 @@ export const GACHA_PRIZES: readonly GachaPrize[] = [
   { id: "gifu_ayu", name: "鮎", rarity: "R", type: "item", image: "/collection/items/gifu-ayu.webp", pref: "21" },
   { id: "gifu_minoyaki", name: "美濃焼", rarity: "SR", type: "item", image: "/collection/items/gifu-minoyaki.webp", pref: "21" },
   { id: "gifu_seki_hamono", name: "関の刃物", rarity: "SR", type: "item", image: "/collection/items/gifu-seki-hamono.webp", pref: "21" },
+  { id: "gifu_gujo_hachiman", name: "郡上八幡", rarity: "SR", type: "item", image: "/collection/items/gifu-gujo-hachiman.webp", pref: "21" },
+  { id: "gifu_gero_onsen", name: "下呂温泉", rarity: "SSR", type: "item", image: "/collection/items/gifu-gero-onsen.webp", pref: "21" },
+  { id: "gifu_hida_takayama", name: "飛騨高山の古い町並み", rarity: "SSR", type: "item", image: "/collection/items/gifu-hida-takayama.webp", pref: "21" },
+  { id: "gifu_nagara_ukai", name: "長良川鵜飼", rarity: "SSR", type: "item", image: "/collection/items/gifu-nagara-ukai.webp", pref: "21" },
+  { id: "gifu_hida_beef", name: "飛騨牛", rarity: "UR", type: "item", image: "/collection/items/gifu-hida-beef.webp", pref: "21" },
   { id: "gifu_frenchie", name: "岐阜のフレブル", rarity: "LR", type: "dog_skin", image: "/collection/skins/gifu-frenchie.webp", pref: "21" },
 
   // --- 都道府県ガチャ（青コイン）：愛知県 ------------------------------
