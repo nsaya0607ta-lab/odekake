@@ -4,7 +4,7 @@
  * id は user_gacha_items.item_id に保存されるため、一度公開した id は変更しない。
  * pref の無い景品は通常ガチャ（黄色コイン）から、pref のある景品は都道府県ガチャ（青コイン）から排出される。
  */
-import type { GachaRarity } from "./config";
+import { GACHA_RARITIES, type GachaRarity } from "./config";
 
 export type GachaPrizeType = "dog_skin" | "item";
 
@@ -277,3 +277,18 @@ export function getPrizesByRarity(rarity: GachaRarity): GachaPrize[] {
 export const COIN_GACHA_PRIZES: readonly GachaPrize[] = GACHA_PRIZES.filter((prize) => !prize.pref);
 /** 都道府県ガチャ（青コイン）の景品 */
 export const PREF_GACHA_PRIZES: readonly GachaPrize[] = GACHA_PRIZES.filter((prize) => Boolean(prize.pref));
+
+/**
+ * 都道府県ガチャの排出率。都道府県ガチャには通常ガチャのアイテムを入れないので、
+ * ご当地アイテムがあるランクだけを残して、合計100%になるように割りなおす
+ * （ほかのランクの比は通常ガチャと同じ。たとえば LR しか無いうちは LR 100%）。
+ */
+export function prefGachaRates(rates: Record<GachaRarity, number>): Record<GachaRarity, number> {
+  const has = new Set(PREF_GACHA_PRIZES.map((prize) => prize.rarity));
+  const total = GACHA_RARITIES.reduce((sum, rarity) => sum + (has.has(rarity) ? Math.max(0, rates[rarity]) : 0), 0);
+  const out = {} as Record<GachaRarity, number>;
+  for (const rarity of GACHA_RARITIES) {
+    out[rarity] = total > 0 && has.has(rarity) ? Math.round((Math.max(0, rates[rarity]) / total) * 1000) / 10 : 0;
+  }
+  return out;
+}

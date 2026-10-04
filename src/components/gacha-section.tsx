@@ -15,6 +15,7 @@ import {
 import { BlueCoinArt, GachaMachineArt, SparkleArt } from "./coin-art";
 import { primeGachaAudio } from "./gacha/audio";
 import type { AnimationDraw, DrawResult } from "./gacha/types";
+import { prefGachaRates } from "@/lib/gacha/prizes";
 import { IconClose, IconCoin } from "./icons";
 
 const GachaCinematic = dynamic(
@@ -208,7 +209,8 @@ export function GachaSection({ balance, pool = "coin" }: { balance: number; pool
     void draw(plan);
   }, [draw, results]);
 
-  const rates = GACHA_DISPLAY_RARITY_RATES;
+  // 都道府県ガチャは、ご当地アイテムがあるランクだけで割りなおした排出率を出す
+  const rates = pref ? prefGachaRates(GACHA_DISPLAY_RARITY_RATES) : GACHA_DISPLAY_RARITY_RATES;
 
   return (
     <section id={pref ? "pref-gacha" : undefined} className={`rough-card flex min-w-0 scroll-mt-20 flex-col overflow-hidden p-3.5 ${pref ? "!border-[#BFD7F5] bg-[linear-gradient(180deg,#F3F8FF,transparent_60%)]" : ""}`}>
@@ -280,10 +282,13 @@ export function GachaSection({ balance, pool = "coin" }: { balance: number; pool
           );
         })}
       </div>
-      <p className="mt-1 text-center text-[8px] text-ink-faint">100連だけ、SR以上の排出率がアップします</p>
+      {/* ランクが1つしか無いうち（都道府県ガチャが LR だけのとき）は、100連の優待は関係ないので出さない */}
+      {Object.values(rates).filter((rate) => rate > 0).length > 1 ? (
+        <p className="mt-1 text-center text-[8px] text-ink-faint">100連だけ、SR以上の排出率がアップします</p>
+      ) : null}
       {pref ? (
         <p className="mt-0.5 text-center text-[8px] leading-relaxed text-ink-faint">
-          ご当地アイテムがまだ無いランクでは、通常ガチャのアイテムが出ます
+          ご当地アイテムだけが出ます（通常ガチャのアイテムは出ません）
         </p>
       ) : null}
 
