@@ -351,6 +351,10 @@ const CURATED_ITEMS: readonly CollectionItem[] = [
   { id: "shizuoka_sakuraebi", name: "桜えび", image: "/collection/items/shizuoka-sakuraebi.webp", category: "food", series: null, rarity: "N", pref: "22" },
   { id: "shizuoka_hamamatsu_gyoza", name: "浜松餃子", image: "/collection/items/shizuoka-hamamatsu-gyoza.webp", category: "food", series: null, rarity: "R", pref: "22" },
   { id: "shizuoka_green_tea", name: "静岡茶", image: "/collection/items/shizuoka-green-tea.webp", category: "food", series: null, rarity: "R", pref: "22" },
+  { id: "shizuoka_miho_no_matsubara", name: "三保の松原", image: "/collection/items/shizuoka-miho-no-matsubara.webp", category: "other", series: null, rarity: "SR", pref: "22" },
+  { id: "shizuoka_atami_onsen", name: "熱海温泉", image: "/collection/items/shizuoka-atami-onsen.webp", category: "other", series: null, rarity: "SR", pref: "22" },
+  { id: "shizuoka_hamanako_unagi", name: "浜名湖うなぎ", image: "/collection/items/shizuoka-hamanako-unagi.webp", category: "food", series: null, rarity: "SSR", pref: "22" },
+  { id: "shizuoka_omuroyama", name: "大室山・伊豆", image: "/collection/items/shizuoka-omuroyama.webp", category: "other", series: null, rarity: "UR", pref: "22" },
 
   // --- 都道府県図鑑：三重県（都道府県ガチャ） ----------------------------
   { id: "mie_ise_udon", name: "伊勢うどん", image: "/collection/items/mie-ise-udon.webp", category: "food", series: null, rarity: "N", pref: "24" },
