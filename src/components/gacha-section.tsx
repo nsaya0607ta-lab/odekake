@@ -228,7 +228,7 @@ export function GachaSection({ balance, pool = "coin" }: { balance: number; pool
                 <span className="block whitespace-nowrap">青コインをつかって</span>
                 <span className="block whitespace-nowrap">ご当地のアイテムをゲット！</span>
               </p>
-              <p className="mt-1 text-[9px] font-semibold text-ink-faint">岐阜の名物・観光地・ご当地フレブル</p>
+              <p className="mt-1 text-[9px] font-semibold text-ink-faint">岐阜・愛知の名物と観光地・ご当地フレブル</p>
             </>
           ) : (
             <>
