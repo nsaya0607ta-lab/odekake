@@ -346,6 +346,16 @@ const CURATED_ITEMS: readonly CollectionItem[] = [
   { id: "aichi_frenchie", name: "愛知のフレブル", image: "/collection/skins/aichi-frenchie.webp", category: "other", series: null, rarity: "LR", pref: "23" },
 
   // --- 都道府県図鑑：三重県（都道府県ガチャ） ----------------------------
+  { id: "mie_ise_udon", name: "伊勢うどん", image: "/collection/items/mie-ise-udon.webp", category: "food", series: null, rarity: "N", pref: "24" },
+  { id: "mie_akafuku", name: "赤福", image: "/collection/items/mie-akafuku.webp", category: "food", series: null, rarity: "N", pref: "24" },
+  { id: "mie_tekone_sushi", name: "てこね寿司", image: "/collection/items/mie-tekone-sushi.webp", category: "food", series: null, rarity: "N", pref: "24" },
+  { id: "mie_yokkaichi_tonteki", name: "四日市とんてき", image: "/collection/items/mie-yokkaichi-tonteki.webp", category: "food", series: null, rarity: "R", pref: "24" },
+  { id: "mie_pearl", name: "三重の真珠", image: "/collection/items/mie-pearl.webp", category: "accessory", series: null, rarity: "R", pref: "24" },
+  { id: "mie_iga_ninja", name: "伊賀忍者", image: "/collection/items/mie-iga-ninja.webp", category: "other", series: null, rarity: "SR", pref: "24" },
+  { id: "mie_meoto_iwa", name: "夫婦岩", image: "/collection/items/mie-meoto-iwa.webp", category: "other", series: null, rarity: "SR", pref: "24" },
+  { id: "mie_ise_ebi", name: "伊勢海老", image: "/collection/items/mie-ise-ebi.webp", category: "food", series: null, rarity: "SSR", pref: "24" },
+  { id: "mie_matsusaka_beef", name: "松阪牛", image: "/collection/items/mie-matsusaka-beef.webp", category: "food", series: null, rarity: "UR", pref: "24" },
+  { id: "mie_ise_jingu", name: "伊勢神宮", image: "/collection/items/mie-ise-jingu.webp", category: "other", series: null, rarity: "LR", pref: "24" },
   { id: "mie_frenchie", name: "三重のフレブル", image: "/collection/skins/mie-frenchie.webp", category: "other", series: null, rarity: "LR", pref: "24" },
 ];
 
