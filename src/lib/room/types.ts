@@ -11,9 +11,10 @@
  */
 import type { CollectionCategory } from "@/lib/collection/items";
 import type { GachaRarity } from "@/lib/gacha/config";
+import { CRAFT_IDS, CRAFTS, craftKey, isCraftId, type CraftId } from "./crafts";
 import { isOwnedKey, ownedKey, SOUVENIR_IDS, souvenirKey, souvenirName, type SouvenirId, type SouvenirOwnedKey } from "./souvenirs";
 
-export type DecorKind = "item" | "photo" | "trophy" | "pennant" | "furniture" | "fixture" | "souvenir";
+export type DecorKind = "item" | "photo" | "trophy" | "pennant" | "furniture" | "fixture" | "souvenir" | "craft";
 
 type DecorBase = { key: string; name: string; count: number };
 export type DecorEntry =
@@ -23,7 +24,8 @@ export type DecorEntry =
   | (DecorBase & { kind: "pennant"; emoji: string; color: string })
   | (DecorBase & { kind: "furniture"; furniture: FurnitureId })
   | (DecorBase & { kind: "fixture"; fixture: FixtureId })
-  | (DecorBase & { kind: "souvenir"; souvenir: SouvenirId; shiny: boolean });
+  | (DecorBase & { kind: "souvenir"; souvenir: SouvenirId; shiny: boolean })
+  | (DecorBase & { kind: "craft"; craft: CraftId });
 
 /**
  * 家具（絵は furniture-art.tsx で描く）。width は床の手前に置いたときの幅（部屋の幅に対する %）。
@@ -163,7 +165,7 @@ export type RoomPhoto = { id: string; path: string; date: string; title: string 
 /**
  * souvenirs: おさんぽのおみやげの持っている数（souvenirs.ts）。brought: 受け取りずみの「日付:節目」（同じ分を二度もらわない）
  */
-export type RoomLayout = { theme: RoomTheme; items: Placement[]; photos: RoomPhoto[]; v?: number; rev?: number; dogName?: string; souvenirs?: Partial<Record<SouvenirOwnedKey, number>>; brought?: string[] };
+export type RoomLayout = { theme: RoomTheme; items: Placement[]; photos: RoomPhoto[]; v?: number; rev?: number; dogName?: string; souvenirs?: Partial<Record<SouvenirOwnedKey, number>>; brought?: string[]; crafts?: Partial<Record<CraftId, number>> };
 /** おみやげ1種類あたりの持てる数（飾れる数） */
 export const SOUVENIR_MAX = 99;
 /** わんこの名前の長さ（文字） */
@@ -255,7 +257,13 @@ export function souvenirEntries(owned: Partial<Record<SouvenirOwnedKey, number>>
 }
 export const SOUVENIR_KEYS: ReadonlySet<string> = new Set(SOUVENIR_IDS.flatMap((id) => [souvenirKey(id), souvenirKey(id, true)]));
 
-export const isHanging = (kind: DecorKind) => kind === "photo" || kind === "pennant" || kind === "fixture";
+export const isHanging = (kind: DecorKind) => kind === "photo" || kind === "pennant" || kind === "fixture" || kind === "craft";
+
+/** おみやげクラフトの作品（壁に掛ける。持っていないものも数0で入れておく） */
+export function craftEntries(owned: Partial<Record<CraftId, number>> = {}): DecorEntry[] {
+  return CRAFT_IDS.map((id): DecorEntry => ({ kind: "craft", key: craftKey(id), name: CRAFTS[id].name, craft: id, count: owned[id] ?? 0 }));
+}
+export const CRAFT_KEYS: ReadonlySet<string> = new Set(CRAFT_IDS.map(craftKey));
 
 export const photoKey = (photoId: string) => `photo:${photoId}`;
 export const trophyKey = (stage: string) => `trophy:${stage}`;
@@ -341,12 +349,19 @@ export function parseRoomLayout(value: unknown, validKeys?: ReadonlySet<string>)
       if (isOwnedKey(k) && typeof v === "number" && Number.isFinite(v) && v >= 1) souvenirs[k] = Math.min(SOUVENIR_MAX, Math.floor(v));
     }
   }
+  const crafts: Partial<Record<CraftId, number>> = {};
+  if (root.crafts && typeof root.crafts === "object" && !Array.isArray(root.crafts)) {
+    for (const [k, v] of Object.entries(root.crafts as Record<string, unknown>)) {
+      if (isCraftId(k) && typeof v === "number" && Number.isFinite(v) && v >= 1) crafts[k] = Math.min(SOUVENIR_MAX, Math.floor(v));
+    }
+  }
   const brought = Array.isArray(root.brought) ? root.brought.filter((b): b is string => typeof b === "string" && /^\d{4}-\d{2}-\d{2}:\d{1,6}$/.test(b)).slice(-200) : [];
   const rev = {
     ...(typeof root.rev === "number" && Number.isFinite(root.rev) && root.rev > 0 ? { rev: Math.floor(root.rev) } : {}),
     ...(name ? { dogName: name } : {}),
     ...(Object.keys(souvenirs).length ? { souvenirs } : {}),
     ...(brought.length ? { brought } : {}),
+    ...(Object.keys(crafts).length ? { crafts } : {}),
   };
   if (root.v === 2) {
     // 棚がなくなった（しまった）ものは床に下ろす

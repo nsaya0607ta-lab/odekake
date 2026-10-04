@@ -12,6 +12,7 @@ import type { FurnitureId } from "@/lib/room/types";
 import type { WeatherKind } from "@/lib/room/weather";
 import type { FurnitureFx } from "./furniture-art";
 import type { SouvenirAct } from "@/lib/room/souvenirs";
+import { LONELY_SIGHS, MOOD_LINES, SUPER_DANCE, type MoodLevel } from "@/lib/room/mood";
 import type { DayPhase } from "./room-scene";
 
 const IDLE_POSES = ["stand", "sit", "sniff", "sit-side", "smile", "wonder", "yawn", "front"] as const;
@@ -140,7 +141,7 @@ export type DogPlaces = {
   blocks: { x0: number; x1: number; y0: number; y1: number }[];
 };
 
-export function RoomDog({ skin, phase, sleepy, lines, dreams = [], cue = null, call = null, introduce = null, quiet, places, weather = null, onFx, modes = {}, winter = false, hot = false, onFurnitureSay, offset = 0, onTap, label, carry = null }: {
+export function RoomDog({ skin, phase, sleepy, lines, dreams = [], cue = null, call = null, introduce = null, quiet, places, weather = null, onFx, modes = {}, winter = false, hot = false, onFurnitureSay, offset = 0, onTap, label, carry = null, mood = null }: {
   skin: DogSkinId;
   phase: DayPhase;
   /** 窓の外の天気（わからなければ null） */
@@ -179,8 +180,12 @@ export function RoomDog({ skin, phase, sleepy, lines, dreams = [], cue = null, c
   label?: string;
   /** 口にくわえて見せるもの（おさんぽのおみやげ など） */
   carry?: ReactNode;
+  /** きょうの気分（mood.ts）。さみしいと窓のそばで待ち、るんるんだと おどりだす。なでたときのセリフも変わる */
+  mood?: MoodLevel | null;
 }) {
   const [dog, setDog] = useState<DogState>({ x: 30 + offset, y: 84, pose: "sit", flip: false });
+  const moodRef = useRef(mood);
+  moodRef.current = mood;
   const offsetRef = useRef(offset);
   offsetRef.current = offset;
   const [bubble, setBubble] = useState<{ text: string; id: number; dream?: boolean } | null>(null);
@@ -799,6 +804,29 @@ export function RoomDog({ skin, phase, sleepy, lines, dreams = [], cue = null, c
       return;
     }
     const rainy = weather === "rain" || weather === "drizzle";
+    const m = moodRef.current;
+    if (m === "lonely" && weather !== "thunder" && Math.random() < 0.3) {
+      // さみしい：窓のそば（なければ部屋のおく）で、しょんぼり すわって待つ
+      walkTo(clamp(pl.window?.x ?? 50, 8, 92), ROOM.floorTop + 2.5, () => {
+        setDog((d) => ({ ...d, pose: pick(["sit-side", "sit", "wonder"] as const), flip: Math.random() < 0.5 }));
+        later(() => say(pick(LONELY_SIGHS), 2600), 900);
+        next(rand(6500, 9000));
+      });
+      return;
+    }
+    if (m === "super" && weather !== "thunder" && Math.random() < 0.2) {
+      // るんるん：その場で おどる（くるくる → ぴょん → ハート）
+      pose("cheer");
+      say(pick(SUPER_DANCE), 2200);
+      spin(6, () => jump(pos.current.x, pos.current.y, 0, () => {
+        const id = Date.now();
+        setHearts((h) => [...h.slice(-4), id]);
+        later(() => setHearts((h) => h.filter((x) => x !== id)), 1400);
+        pose(pick(["smile", "wink", "stand-happy"] as const));
+        next(rand(1800, 2800));
+      }));
+      return;
+    }
     if (weather === "thunder" && Math.random() < 0.65) {
       // かみなり：ハウスの中にかくれる。なければテーブル・ソファのかげ、それもなければ部屋のすみで ぷるぷる
       const house = byKind("dog-house");
@@ -880,7 +908,7 @@ export function RoomDog({ skin, phase, sleepy, lines, dreams = [], cue = null, c
       pose(pick(IDLE_POSES));
       next(rand(2500, 5000));
     }
-  }, [face, later, night, phase, playWith, pose, quiet, say, visitKeepsake, walkTo, weather, winter]);
+  }, [face, jump, later, night, phase, playWith, pose, quiet, say, spin, visitKeepsake, walkTo, weather, winter]);
 
   useEffect(() => {
     clearTimers();
@@ -912,7 +940,10 @@ export function RoomDog({ skin, phase, sleepy, lines, dreams = [], cue = null, c
     const awake = !night || Math.random() < 0.6;
     setDog((d) => ({ ...d, pose: awake ? pick(HAPPY_POSES) : "yawn" }));
     const id = Date.now();
-    setBubble({ text: awake ? (introduce ? `${introduce}だよ！ よろしくね` : pick(lines.length ? lines : ["わん！"])) : "むにゃ…", id });
+    // 気分によって、なでたときに言うことが変わる（さみしいときは、ほとんど気分のセリフ）
+    const moodLines = moodRef.current ? MOOD_LINES[moodRef.current] : [];
+    const useMood = moodLines.length > 0 && Math.random() < (moodRef.current === "lonely" ? 0.75 : 0.4);
+    setBubble({ text: awake ? (introduce ? `${introduce}だよ！ よろしくね` : pick(useMood ? moodLines : lines.length ? lines : ["わん！"])) : "むにゃ…", id });
     setHearts((h) => [...h.slice(-4), id]);
     later(() => setHearts((h) => h.filter((x) => x !== id)), 1400);
     later(() => setBubble((b) => (b?.id === id ? null : b)), 2400);
