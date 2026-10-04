@@ -254,6 +254,16 @@ export const GACHA_PRIZES: readonly GachaPrize[] = [
   { id: "sushi_kue", name: "天然クエ握り", rarity: "LR", type: "item", image: "/collection/items/sushi-kue.webp" },
 
   // --- 都道府県ガチャ（青コイン）：岐阜県 ------------------------------
+  { id: "gifu_gohei_mochi", name: "五平餅", rarity: "N", type: "item", image: "/collection/items/gifu-gohei-mochi.webp", pref: "21" },
+  { id: "gifu_meiho_ham", name: "明宝ハム", rarity: "N", type: "item", image: "/collection/items/gifu-meiho-ham.webp", pref: "21" },
+  { id: "gifu_shirakawa_tea", name: "白川茶", rarity: "N", type: "item", image: "/collection/items/gifu-shirakawa-tea.webp", pref: "21" },
+  { id: "gifu_hoba_miso", name: "朴葉味噌", rarity: "N", type: "item", image: "/collection/items/gifu-hoba-miso.webp", pref: "21" },
+  { id: "gifu_keichan", name: "鶏ちゃん", rarity: "R", type: "item", image: "/collection/items/gifu-keichan.webp", pref: "21" },
+  { id: "gifu_kuri_kinton", name: "栗きんとん", rarity: "R", type: "item", image: "/collection/items/gifu-kuri-kinton.webp", pref: "21" },
+  { id: "gifu_mino_washi", name: "美濃和紙", rarity: "R", type: "item", image: "/collection/items/gifu-mino-washi.webp", pref: "21" },
+  { id: "gifu_ayu", name: "鮎", rarity: "R", type: "item", image: "/collection/items/gifu-ayu.webp", pref: "21" },
+  { id: "gifu_minoyaki", name: "美濃焼", rarity: "SR", type: "item", image: "/collection/items/gifu-minoyaki.webp", pref: "21" },
+  { id: "gifu_seki_hamono", name: "関の刃物", rarity: "SR", type: "item", image: "/collection/items/gifu-seki-hamono.webp", pref: "21" },
   { id: "gifu_frenchie", name: "岐阜のフレブル", rarity: "LR", type: "dog_skin", image: "/collection/skins/gifu-frenchie.webp", pref: "21" },
 
   // --- 都道府県ガチャ（青コイン）：愛知県 ------------------------------

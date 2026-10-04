@@ -312,6 +312,16 @@ const CURATED_ITEMS: readonly CollectionItem[] = [
   { id: "sushi_kue", name: "天然クエ握り", image: "/collection/items/sushi-kue.webp", category: "food", series: "sushi", rarity: "LR" },
 
   // --- 都道府県図鑑：岐阜県（都道府県ガチャ） ----------------------------
+  { id: "gifu_gohei_mochi", name: "五平餅", image: "/collection/items/gifu-gohei-mochi.webp", category: "food", series: null, rarity: "N", pref: "21" },
+  { id: "gifu_meiho_ham", name: "明宝ハム", image: "/collection/items/gifu-meiho-ham.webp", category: "food", series: null, rarity: "N", pref: "21" },
+  { id: "gifu_shirakawa_tea", name: "白川茶", image: "/collection/items/gifu-shirakawa-tea.webp", category: "food", series: null, rarity: "N", pref: "21" },
+  { id: "gifu_hoba_miso", name: "朴葉味噌", image: "/collection/items/gifu-hoba-miso.webp", category: "food", series: null, rarity: "N", pref: "21" },
+  { id: "gifu_keichan", name: "鶏ちゃん", image: "/collection/items/gifu-keichan.webp", category: "food", series: null, rarity: "R", pref: "21" },
+  { id: "gifu_kuri_kinton", name: "栗きんとん", image: "/collection/items/gifu-kuri-kinton.webp", category: "food", series: null, rarity: "R", pref: "21" },
+  { id: "gifu_mino_washi", name: "美濃和紙", image: "/collection/items/gifu-mino-washi.webp", category: "other", series: null, rarity: "R", pref: "21" },
+  { id: "gifu_ayu", name: "鮎", image: "/collection/items/gifu-ayu.webp", category: "food", series: null, rarity: "R", pref: "21" },
+  { id: "gifu_minoyaki", name: "美濃焼", image: "/collection/items/gifu-minoyaki.webp", category: "interior", series: null, rarity: "SR", pref: "21" },
+  { id: "gifu_seki_hamono", name: "関の刃物", image: "/collection/items/gifu-seki-hamono.webp", category: "other", series: null, rarity: "SR", pref: "21" },
   { id: "gifu_frenchie", name: "岐阜のフレブル", image: "/collection/skins/gifu-frenchie.webp", category: "other", series: null, rarity: "LR", pref: "21" },
 
   // --- 都道府県図鑑：愛知県（都道府県ガチャ） ----------------------------
