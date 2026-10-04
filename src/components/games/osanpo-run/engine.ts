@@ -1620,7 +1620,9 @@ export function createOsanpoRun(root: HTMLElement, opts: OsanpoRunOptions): () =
     else if (P.jumps > 0) jump(DJUMP_V, 2);
     else S.bufT = 0.14;
   }
-  function slideDown(held: boolean, dur = 0.55): void {
+  /** スライディング（しゃがむ）の長さ（秒）。キー・下スワイプ・自動でくぐる のそれぞれ */
+  const SLIDE_SEC = { key: 1.55, swipe: 1.6, auto: 1.5 };
+  function slideDown(held: boolean, dur = SLIDE_SEC.key): void {
     ensureAudio();
     if (S.state !== "play" || S.paused) return;
     if (!P.ground && S.time - P.jumpAt < 0.14 && P.vy < 0) { P.y = GROUND; P.vy = 0; P.ground = true; P.jumps = 2; }
@@ -1669,7 +1671,7 @@ export function createOsanpoRun(root: HTMLElement, opts: OsanpoRunOptions): () =
   on(stageEl, "pointermove", (e) => {
     if (!swipe || swipe.done) return;
     const dy = e.clientY - swipe.y, lim = Math.max(14, stageEl.clientHeight * 0.03);
-    if (dy > lim && performance.now() - swipe.t < 400) { swipe.done = true; slideDown(false, 0.6); }
+    if (dy > lim && performance.now() - swipe.t < 400) { swipe.done = true; slideDown(false, SLIDE_SEC.swipe); }
   });
   on(window, "pointerup", () => { swipe = null; release(); });
   on(window, "pointercancel", () => { swipe = null; release(); });
@@ -2421,7 +2423,7 @@ export function createOsanpoRun(root: HTMLElement, opts: OsanpoRunOptions): () =
       const lead = S.speed * 0.3 + 36;
       const o = obstacles.find((x) => !x.hit && !x.gone && !x.flee && x.x + x.w > P.x - 6 && x.x - (P.x + 22) < lead);
       if (o) {
-        if (o.kind === "noren" || o.low) { if (P.ground) slideDown(false, 0.5); }
+        if (o.kind === "noren" || o.low) { if (P.ground) slideDown(false, SLIDE_SEC.auto); }
         else if (o.kind !== "crow" && P.ground) jump(JUMP_V, 1);
       }
     }
