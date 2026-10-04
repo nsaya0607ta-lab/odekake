@@ -140,7 +140,7 @@ export function useWindowPasser({ active, steps, friends }: {
 }
 
 /** フレンドのわんこの名札（タップしたときだけ出す。もう一度タップでそのフレンドのおへやへ） */
-function DogNameCard({ dogName, owner, href, x, y }: { dogName?: string; owner: string; href: string; x: number; y: number }) {
+export function DogNameCard({ dogName, owner, href, x, y }: { dogName?: string; owner: string; href: string; x: number; y: number }) {
   return (
     <Link href={href} className="room-bubble absolute w-max -translate-x-1/2 -translate-y-full rounded-2xl border border-line bg-card px-3 py-1.5 text-center shadow-md" style={{ left: `${x}%`, top: `${y}%`, zIndex: 2600 }}>
       <span className="block text-[13px] font-black text-ink">🐾 {dogName ?? "わんこ"}</span>
@@ -553,51 +553,19 @@ export function usePlantCare(today: string) {
 /* ---------- わんこのお泊まり会 ---------- */
 
 /**
- * 週に1回（土曜の夕方〜日曜の朝）、フレンドのわんこが泊まりにくる。だれが来るかは週ごとに決まる。
- * 夕方はラグの近くで遊び、夜は自分のわんこのとなりで寝る。タップすると、そのフレンドのおへやへ。
+ * 週に1回（土曜の朝10時〜日曜の朝10時）、フレンドのわんこが遊びにきて、そのまま泊まっていく。だれが来るかは週ごとに決まる。
+ * 昼は自分のわんこと同じように部屋で遊び（いっしょに同じ家具へ行くことも）、夜はとなりで寝る。タップすると名ふだ（そのフレンドのおへやへ）。
  */
 export function sleepoverGuest(now: Date, friends: readonly FriendDog[]): { id: string; name: string; dogName?: string; skin: (typeof DOG_SKIN_IDS)[number] } | null {
   if (!friends.length) return null;
   const parts = new Intl.DateTimeFormat("en-US", { timeZone: "Asia/Tokyo", year: "numeric", month: "2-digit", day: "2-digit", weekday: "short", hour: "numeric", hourCycle: "h23" }).formatToParts(now);
   const get = (k: string) => parts.find((p) => p.type === k)?.value ?? "";
   const wd = get("weekday"), h = Number(get("hour"));
-  const on = (wd === "Sat" && h >= 17) || (wd === "Sun" && h < 9);
+  // 土曜の朝10時に遊びに来て、そのままおとまり。日曜の朝10時に帰る
+  const on = (wd === "Sat" && h >= 10) || (wd === "Sun" && h < 10);
   if (!on) return null;
   // 土曜の日付で、その週のお客さんを決める
   const sat = new Date(Date.UTC(Number(get("year")), Number(get("month")) - 1, Number(get("day")) - (wd === "Sun" ? 1 : 0))).toISOString().slice(0, 10);
   const f = friends[hash(sat) % friends.length]!;
   return { id: f.id, name: f.name, ...(f.dogName ? { dogName: f.dogName } : {}), skin: f.skin ?? DOG_SKIN_IDS[hash(f.id) % DOG_SKIN_IDS.length]! };
-}
-
-export function GuestDog({ guest, sleeping }: { guest: { id: string; name: string; dogName?: string; skin: (typeof DOG_SKIN_IDS)[number] }; sleeping: boolean }) {
-  // 起きているあいだは、ときどきポーズを変える
-  const [pose, setPose] = useState("sit");
-  const [card, setCard] = useState(false);
-  useEffect(() => {
-    if (sleeping) return;
-    const poses = ["sit", "smile", "sit-side", "wonder", "stand-happy", "sniff"];
-    const t = window.setInterval(() => setPose(poses[Math.floor(Math.random() * poses.length)]!), 3800);
-    return () => window.clearInterval(t);
-  }, [sleeping]);
-  useEffect(() => {
-    if (!card) return;
-    const t = window.setTimeout(() => setCard(false), 4000);
-    return () => window.clearTimeout(t);
-  }, [card]);
-  const x = 64, y = sleeping ? 81 : 78;
-  return (
-    <>
-      {/* 名前は出さない（タップしたときだけ名札） */}
-      <button type="button" onClick={() => setCard(true)} aria-label="おとまりに来ている フレンドのわんこ（タップで名前）"
-        className="absolute block -translate-x-1/2 -translate-y-full p-0" style={{ left: `${x}%`, top: `${y}%`, width: "22%", zIndex: 300 + Math.round(y * 10) }}>
-        <span className="pointer-events-none absolute bottom-[3%] left-1/2 h-[12%] w-[62%] -translate-x-1/2 rounded-[50%] bg-[#4a3520]/20 blur-[2px]" />
-        <span className={`block ${sleeping ? "room-dog-sleep" : "room-dog-idle"}`}>
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src={getFrenchieSrc(guest.skin, sleeping ? "sleep" : pose)} alt="" draggable={false} className="block h-auto w-full select-none" style={{ transform: "scaleX(-1)" }} />
-        </span>
-      </button>
-      {sleeping ? <span className="pointer-events-none absolute animate-pulse text-[11px] font-black text-[#8A8FD8]" style={{ left: `${x + 6}%`, top: `${y - 12}%`, zIndex: 2500 }}>Zzz</span> : null}
-      {card ? <DogNameCard dogName={guest.dogName} owner={guest.name} href={`/room/visit/${guest.id}`} x={x} y={y - 14} /> : null}
-    </>
-  );
 }

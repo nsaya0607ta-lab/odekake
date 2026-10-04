@@ -4,6 +4,7 @@
 import { useEffect, useState } from "react";
 import type { DecorEntry, FrameStyle } from "@/lib/room/types";
 import { FurnitureArt, type FurnitureFx } from "./furniture-art";
+import { SouvenirArt } from "./souvenir-art";
 
 const FRAME_LOOK: Record<FrameStyle, { label: string; border: string; pad: string; bottom: string; bw: number; depth: number }> = {
   wood: { label: "木", border: "border-[6px] border-[#B98A57]", pad: "p-[3px] bg-[#FFFAF0]", bottom: "", bw: 6, depth: 1 },
@@ -16,6 +17,7 @@ export const FRAME_LABELS = Object.fromEntries(Object.entries(FRAME_LOOK).map(([
 export function DecorVisual({ entry, frame = "wood", thumb = false, lit = false, fx, mode }: { entry: DecorEntry; frame?: FrameStyle; thumb?: boolean; lit?: boolean; fx?: FurnitureFx; mode?: string }) {
   const label = thumb ? undefined : entry.name;
   if (entry.kind === "furniture") return <FurnitureArt id={entry.furniture} label={label} lit={lit} fx={fx} mode={mode} />;
+  if (entry.kind === "souvenir") return <SouvenirArt id={entry.souvenir} label={label} />;
   if (entry.kind === "item") return <GroundedImage src={entry.image} alt={label ?? ""} grounded={!thumb} />;
   if (entry.kind === "photo") {
     const look = FRAME_LOOK[frame];

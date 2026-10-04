@@ -11,8 +11,9 @@
  */
 import type { CollectionCategory } from "@/lib/collection/items";
 import type { GachaRarity } from "@/lib/gacha/config";
+import { isSouvenirId, SOUVENIR_IDS, SOUVENIRS, souvenirKey, type SouvenirId } from "./souvenirs";
 
-export type DecorKind = "item" | "photo" | "trophy" | "pennant" | "furniture" | "fixture";
+export type DecorKind = "item" | "photo" | "trophy" | "pennant" | "furniture" | "fixture" | "souvenir";
 
 type DecorBase = { key: string; name: string; count: number };
 export type DecorEntry =
@@ -21,7 +22,8 @@ export type DecorEntry =
   | (DecorBase & { kind: "trophy"; stage: string; rank: string; color: string; score: number })
   | (DecorBase & { kind: "pennant"; emoji: string; color: string })
   | (DecorBase & { kind: "furniture"; furniture: FurnitureId })
-  | (DecorBase & { kind: "fixture"; fixture: FixtureId });
+  | (DecorBase & { kind: "fixture"; fixture: FixtureId })
+  | (DecorBase & { kind: "souvenir"; souvenir: SouvenirId });
 
 /**
  * 家具（絵は furniture-art.tsx で描く）。width は床の手前に置いたときの幅（部屋の幅に対する %）。
@@ -158,7 +160,12 @@ export type RoomPhoto = { id: string; path: string; date: string; title: string 
 /** v: 2 から窓・棚・時計も items に入る（それより前の部屋は読みこむときに足す） */
 /** rev は最後に変えた時刻（ms）。古い保存が新しい保存を上書きしないよう、くらべるのに使う */
 /** dogName は、わんこにつけた名前（なければ「わんこ」） */
-export type RoomLayout = { theme: RoomTheme; items: Placement[]; photos: RoomPhoto[]; v?: number; rev?: number; dogName?: string };
+/**
+ * souvenirs: おさんぽのおみやげの持っている数（souvenirs.ts）。brought: 受け取りずみの「日付:節目」（同じ分を二度もらわない）
+ */
+export type RoomLayout = { theme: RoomTheme; items: Placement[]; photos: RoomPhoto[]; v?: number; rev?: number; dogName?: string; souvenirs?: Partial<Record<SouvenirId, number>>; brought?: string[] };
+/** おみやげ1種類あたりの持てる数（飾れる数） */
+export const SOUVENIR_MAX = 99;
 /** わんこの名前の長さ（文字） */
 export const DOG_NAME_MAX = 10;
 /** わんこの名前をととのえる（前後の空白・改行・制御文字をとり、長さをそろえる。空なら undefined） */
@@ -242,6 +249,12 @@ export const ROOM = {
   window: { x0: 7, x1: 37, y0: 9, y1: 38 },
 } as const;
 
+/** おみやげ（持っていないものも、数0で入れておく。フレンドの部屋に飾ってあるものも描けるように） */
+export function souvenirEntries(owned: Partial<Record<SouvenirId, number>> = {}): DecorEntry[] {
+  return SOUVENIR_IDS.map((id) => ({ kind: "souvenir", key: souvenirKey(id), name: SOUVENIRS[id].name, souvenir: id, count: owned[id] ?? 0 }));
+}
+export const SOUVENIR_KEYS: ReadonlySet<string> = new Set(SOUVENIR_IDS.map(souvenirKey));
+
 export const isHanging = (kind: DecorKind) => kind === "photo" || kind === "pennant" || kind === "fixture";
 
 export const photoKey = (photoId: string) => `photo:${photoId}`;
@@ -322,7 +335,19 @@ export function parseRoomLayout(value: unknown, validKeys?: ReadonlySet<string>)
     }];
   });
   const name = cleanDogName(root.dogName);
-  const rev = { ...(typeof root.rev === "number" && Number.isFinite(root.rev) && root.rev > 0 ? { rev: Math.floor(root.rev) } : {}), ...(name ? { dogName: name } : {}) };
+  const souvenirs: Partial<Record<SouvenirId, number>> = {};
+  if (root.souvenirs && typeof root.souvenirs === "object" && !Array.isArray(root.souvenirs)) {
+    for (const [k, v] of Object.entries(root.souvenirs as Record<string, unknown>)) {
+      if (isSouvenirId(k) && typeof v === "number" && Number.isFinite(v) && v >= 1) souvenirs[k] = Math.min(SOUVENIR_MAX, Math.floor(v));
+    }
+  }
+  const brought = Array.isArray(root.brought) ? root.brought.filter((b): b is string => typeof b === "string" && /^\d{4}-\d{2}-\d{2}:\d{1,6}$/.test(b)).slice(-200) : [];
+  const rev = {
+    ...(typeof root.rev === "number" && Number.isFinite(root.rev) && root.rev > 0 ? { rev: Math.floor(root.rev) } : {}),
+    ...(name ? { dogName: name } : {}),
+    ...(Object.keys(souvenirs).length ? { souvenirs } : {}),
+    ...(brought.length ? { brought } : {}),
+  };
   if (root.v === 2) {
     // 棚がなくなった（しまった）ものは床に下ろす
     const shelfIds = new Set(items.filter((p) => p.key === fixtureKey("shelf")).map((p) => p.id));
