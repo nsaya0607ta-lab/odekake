@@ -14,6 +14,7 @@ import {
 } from "@/components/icons";
 import { PageBody } from "@/components/page-body";
 import { TopHeader } from "@/components/page-header";
+import { SoundSettingsButton } from "@/components/sound-settings-button";
 import { requireUser } from "@/lib/supabase/server";
 
 export const metadata = { title: "マイページ | おでかけ記録" };
@@ -24,7 +25,7 @@ export default async function MyPage() {
 
   return (
     <>
-      <TopHeader title="マイページ" />
+      <TopHeader title="マイページ" action={<SoundSettingsButton />} />
       <PageBody>
         <nav>
           <ul className="rough-card divide-y divide-line overflow-hidden">

@@ -12,7 +12,7 @@ import {
 } from "@/lib/sound-settings";
 
 /**
- * ヘッダーに置く設定ボタン。押すとBGM・タップ音の音量スライダーを開く。
+ * マイページのヘッダー右上に置く設定ボタン。押すとBGM・タップ音の音量スライダーを開く。
  */
 export function SoundSettingsButton() {
   const [open, setOpen] = useState(false);
@@ -60,7 +60,7 @@ export function SoundSettingsButton() {
 
       {open ? (
         <div
-          className="absolute left-0 top-[calc(100%+8px)] z-50 w-64 rounded-2xl border border-[#e8d4aa] bg-card p-4 shadow-lg"
+          className="absolute right-0 top-[calc(100%+8px)] z-50 w-64 rounded-2xl border border-[#e8d4aa] bg-card p-4 shadow-lg"
           role="dialog"
           aria-label="音量設定"
         >
