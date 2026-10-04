@@ -333,6 +333,11 @@ const CURATED_ITEMS: readonly CollectionItem[] = [
   { id: "gifu_frenchie", name: "岐阜のフレブル", image: "/collection/skins/gifu-frenchie.webp", category: "other", series: null, rarity: "LR", pref: "21" },
 
   // --- 都道府県図鑑：愛知県（都道府県ガチャ） ----------------------------
+  { id: "aichi_kishimen", name: "きしめん", image: "/collection/items/aichi-kishimen.webp", category: "food", series: null, rarity: "N", pref: "23" },
+  { id: "aichi_tebasaki", name: "手羽先", image: "/collection/items/aichi-tebasaki.webp", category: "food", series: null, rarity: "N", pref: "23" },
+  { id: "aichi_miso_katsu", name: "味噌カツ", image: "/collection/items/aichi-miso-katsu.webp", category: "food", series: null, rarity: "R", pref: "23" },
+  { id: "aichi_takeshima", name: "竹島・蒲郡", image: "/collection/items/aichi-takeshima.webp", category: "other", series: null, rarity: "R", pref: "23" },
+  { id: "aichi_tokoname", name: "常滑焼・招き猫", image: "/collection/items/aichi-tokoname.webp", category: "interior", series: null, rarity: "SR", pref: "23" },
   { id: "aichi_frenchie", name: "愛知のフレブル", image: "/collection/skins/aichi-frenchie.webp", category: "other", series: null, rarity: "LR", pref: "23" },
 
   // --- 都道府県図鑑：三重県（都道府県ガチャ） ----------------------------

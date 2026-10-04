@@ -275,6 +275,11 @@ export const GACHA_PRIZES: readonly GachaPrize[] = [
   { id: "gifu_frenchie", name: "岐阜のフレブル", rarity: "LR", type: "dog_skin", image: "/collection/skins/gifu-frenchie.webp", pref: "21" },
 
   // --- 都道府県ガチャ（青コイン）：愛知県 ------------------------------
+  { id: "aichi_kishimen", name: "きしめん", rarity: "N", type: "item", image: "/collection/items/aichi-kishimen.webp", pref: "23" },
+  { id: "aichi_tebasaki", name: "手羽先", rarity: "N", type: "item", image: "/collection/items/aichi-tebasaki.webp", pref: "23" },
+  { id: "aichi_miso_katsu", name: "味噌カツ", rarity: "R", type: "item", image: "/collection/items/aichi-miso-katsu.webp", pref: "23" },
+  { id: "aichi_takeshima", name: "竹島・蒲郡", rarity: "R", type: "item", image: "/collection/items/aichi-takeshima.webp", pref: "23" },
+  { id: "aichi_tokoname", name: "常滑焼・招き猫", rarity: "SR", type: "item", image: "/collection/items/aichi-tokoname.webp", pref: "23" },
   { id: "aichi_frenchie", name: "愛知のフレブル", rarity: "LR", type: "dog_skin", image: "/collection/skins/aichi-frenchie.webp", pref: "23" },
 
   // --- 都道府県ガチャ（青コイン）：三重県 ------------------------------
