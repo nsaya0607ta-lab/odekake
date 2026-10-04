@@ -8,6 +8,8 @@
 import { useState } from "react";
 import { ownedKey, SEASON_NAMES, SHINY_RATE, SOUVENIR_IDS, SOUVENIRS, souvenirHint, souvenirName, type SouvenirId, type SouvenirOwnedKey } from "@/lib/room/souvenirs";
 import { SouvenirArt } from "./souvenir-art";
+import { CraftPanel } from "./craft-ui";
+import { CRAFT_IDS, CRAFTS, type CraftId } from "@/lib/room/crafts";
 
 export type SouvenirNews = { id: SouvenirId; shiny: boolean; steps: number; date: string; isNew: boolean }[];
 
@@ -151,7 +153,34 @@ const seasonNow = (d: Date) => {
 };
 
 /** おみやげ図鑑（もようがえの「おみやげ」タブ）。持っているものはタップで飾る。まだのものはシルエットとヒント */
-export function SouvenirBook({ owned, placedOf, onPlace, now }: { owned: Partial<Record<SouvenirOwnedKey, number>>; placedOf: (id: SouvenirId, shiny: boolean) => number; onPlace: (id: SouvenirId, shiny: boolean) => void; now: Date }) {
+/**
+ * もようがえの「おみやげ」タブ：「図鑑」と「クラフト」を切りかえる
+ */
+export function SouvenirBook(props: {
+  owned: Partial<Record<SouvenirOwnedKey, number>>; placedOf: (id: SouvenirId, shiny: boolean) => number; onPlace: (id: SouvenirId, shiny: boolean) => void; now: Date;
+  crafts: Partial<Record<CraftId, number>>; availableOf: (id: SouvenirId) => number; onCraft: (id: CraftId) => void; craftPlacedOf: (id: CraftId) => number; onPlaceCraft: (id: CraftId) => void;
+}) {
+  const [mode, setMode] = useState<"book" | "craft">("book");
+  const ready = CRAFT_IDS.filter((id) => (Object.entries(CRAFTS[id].needs) as [SouvenirId, number][]).every(([sid, n]) => props.availableOf(sid) >= n)).length;
+  return (
+    <div>
+      <div role="tablist" aria-label="おみやげ" className="mt-2 grid grid-cols-2 gap-1 rounded-2xl bg-paper-deep p-1">
+        {([["book", "📖 図鑑"], ["craft", "✂️ クラフト"]] as const).map(([m, label]) => (
+          <button key={m} type="button" role="tab" aria-selected={mode === m} onClick={() => setMode(m)}
+            className={`relative rounded-xl py-2 text-[12px] font-black ${mode === m ? "bg-card text-ink shadow-sm" : "text-ink-soft"}`}>
+            {label}
+            {m === "craft" && ready ? <span className="absolute right-2 top-1.5 rounded-full bg-[#E04A6A] px-1.5 text-[9px] font-black text-white">{ready}</span> : null}
+          </button>
+        ))}
+      </div>
+      {mode === "book"
+        ? <SouvenirZukan owned={props.owned} placedOf={props.placedOf} onPlace={props.onPlace} now={props.now} />
+        : <CraftPanel crafts={props.crafts} availableOf={props.availableOf} onCraft={props.onCraft} placedOf={props.craftPlacedOf} onPlace={props.onPlaceCraft} />}
+    </div>
+  );
+}
+
+function SouvenirZukan({ owned, placedOf, onPlace, now }: { owned: Partial<Record<SouvenirOwnedKey, number>>; placedOf: (id: SouvenirId, shiny: boolean) => number; onPlace: (id: SouvenirId, shiny: boolean) => void; now: Date }) {
   const [hint, setHint] = useState<SouvenirId | null>(null);
   const have = SOUVENIR_IDS.filter((id) => (owned[id] ?? 0) > 0).length;
   const shinyHave = SOUVENIR_IDS.filter((id) => (owned[ownedKey(id, true)] ?? 0) > 0).length;
