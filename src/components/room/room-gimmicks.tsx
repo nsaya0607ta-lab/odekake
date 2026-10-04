@@ -552,20 +552,31 @@ export function usePlantCare(today: string) {
 
 /* ---------- わんこのお泊まり会 ---------- */
 
+/** ふだんの日に、だれかが遊びに来る確率（%） */
+export const GUEST_DAY_CHANCE = 30;
+
 /**
- * 週に1回（土曜の朝10時〜日曜の朝10時）、フレンドのわんこが遊びにきて、そのまま泊まっていく。だれが来るかは週ごとに決まる。
- * 昼は自分のわんこと同じように部屋で遊び（いっしょに同じ家具へ行くことも）、夜はとなりで寝る。タップすると名ふだ（そのフレンドのおへやへ）。
+ * フレンドのわんこが遊びに来る。
+ * - 土曜：朝10時に来て、そのままおとまり（日曜の朝10時に帰る）。だれが来るかは週ごとに決まる
+ * - ほかの日：GUEST_DAY_CHANCE % くらいの日に、朝10時〜夜7時まで遊びに来る（夜は帰る）
+ * 来るかどうか・だれが来るかは、日付とフレンドの顔ぶれで決まる（同じ日なら、どの端末で見ても同じ）。
+ * 昼は自分のわんこと同じように部屋で遊び（いっしょに同じ家具へ行くことも）、おとまりの夜はとなりで寝る。タップすると名ふだ（そのフレンドのおへやへ）。
  */
 export function sleepoverGuest(now: Date, friends: readonly FriendDog[]): { id: string; name: string; dogName?: string; skin: (typeof DOG_SKIN_IDS)[number] } | null {
   if (!friends.length) return null;
   const parts = new Intl.DateTimeFormat("en-US", { timeZone: "Asia/Tokyo", year: "numeric", month: "2-digit", day: "2-digit", weekday: "short", hour: "numeric", hourCycle: "h23" }).formatToParts(now);
   const get = (k: string) => parts.find((p) => p.type === k)?.value ?? "";
   const wd = get("weekday"), h = Number(get("hour"));
-  // 土曜の朝10時に遊びに来て、そのままおとまり。日曜の朝10時に帰る
-  const on = (wd === "Sat" && h >= 10) || (wd === "Sun" && h < 10);
-  if (!on) return null;
-  // 土曜の日付で、その週のお客さんを決める
-  const sat = new Date(Date.UTC(Number(get("year")), Number(get("month")) - 1, Number(get("day")) - (wd === "Sun" ? 1 : 0))).toISOString().slice(0, 10);
-  const f = friends[hash(sat) % friends.length]!;
-  return { id: f.id, name: f.name, ...(f.dogName ? { dogName: f.dogName } : {}), skin: f.skin ?? DOG_SKIN_IDS[hash(f.id) % DOG_SKIN_IDS.length]! };
+  const day = (back: number) => new Date(Date.UTC(Number(get("year")), Number(get("month")) - 1, Number(get("day")) - back)).toISOString().slice(0, 10);
+  const pickFriend = (seed: string) => {
+    const f = friends[hash(seed) % friends.length]!;
+    return { id: f.id, name: f.name, ...(f.dogName ? { dogName: f.dogName } : {}), skin: f.skin ?? DOG_SKIN_IDS[hash(f.id) % DOG_SKIN_IDS.length]! };
+  };
+  // 土曜の朝10時に遊びに来て、そのままおとまり。日曜の朝10時に帰る（土曜の日付で、その週のお客さんを決める）
+  if ((wd === "Sat" && h >= 10) || (wd === "Sun" && h < 10)) return pickFriend(day(wd === "Sun" ? 1 : 0));
+  // ほかの日は、ときどき昼だけ遊びに来る
+  if (h < 10 || h >= 19) return null;
+  const date = day(0), who = friends.map((f) => f.id).sort().join(",");
+  if (hash(`${date}:visit:${who}`) % 100 >= GUEST_DAY_CHANCE) return null;
+  return pickFriend(`${date}:guest:${who}`);
 }
