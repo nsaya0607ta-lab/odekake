@@ -4,7 +4,7 @@
 -- ・都道府県ガチャは青コインでまわす（1回100・10回900・100回9000）。
 --   景品は通常ガチャと同じ user_gacha_items に入る（図鑑・犬スキンの所持判定もそのまま使える）。
 -- ・青コインの台帳（blue_coin_events）に 'pref_gacha' を足す。
--- ・犬スキンに 'gifu'（景品 gifu_frenchie）を足す。
+-- ・犬スキンに 'gifu'（景品 gifu_frenchie）と 'aichi'（景品 aichi_frenchie）を足す。
 --
 -- 抽選はアプリ側（src/lib/gacha/draw.ts の pool: "pref"）で行い、ここは
 -- 「値段が回数どおりか」を確かめて、青コインを減らし、景品を渡すだけ。
@@ -118,12 +118,12 @@ comment on function public.commit_pref_gacha_draw(integer, text, text[]) is
   '都道府県ガチャ（青コイン）を確定する。値段は回数どおり（1回100・10回900・100回9000）でないと受けつけない。';
 
 -- -------------------------------------------------------------
--- 犬スキン「岐阜のフレブル」
+-- 犬スキン「岐阜のフレブル」「愛知のフレブル」
 -- -------------------------------------------------------------
 alter table public.user_dog_skin drop constraint if exists user_dog_skin_skin_id_check;
 alter table public.user_dog_skin
   add constraint user_dog_skin_skin_id_check
-  check (skin_id in ('default', 'hiking', 'snow', 'summer', 'gifu'));
+  check (skin_id in ('default', 'hiking', 'snow', 'summer', 'gifu', 'aichi'));
 
 create or replace function public.dog_skin_unlock_item(p_skin_id text)
 returns text
@@ -136,6 +136,7 @@ as $$
     when 'snow' then 'snow_frenchie'
     when 'summer' then 'summer_frenchie'
     when 'gifu' then 'gifu_frenchie'
+    when 'aichi' then 'aichi_frenchie'
     else null
   end;
 $$;
@@ -151,7 +152,7 @@ declare
   v_item_id text;
 begin
   if v_user_id is null then raise exception 'Authentication required'; end if;
-  if p_skin_id not in ('default', 'hiking', 'snow', 'summer', 'gifu') then
+  if p_skin_id not in ('default', 'hiking', 'snow', 'summer', 'gifu', 'aichi') then
     raise exception 'Invalid skin';
   end if;
 

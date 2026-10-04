@@ -255,6 +255,9 @@ export const GACHA_PRIZES: readonly GachaPrize[] = [
 
   // --- 都道府県ガチャ（青コイン）：岐阜県 ------------------------------
   { id: "gifu_frenchie", name: "岐阜のフレブル", rarity: "LR", type: "dog_skin", image: "/collection/skins/gifu-frenchie.webp", pref: "21" },
+
+  // --- 都道府県ガチャ（青コイン）：愛知県 ------------------------------
+  { id: "aichi_frenchie", name: "愛知のフレブル", rarity: "LR", type: "dog_skin", image: "/collection/skins/aichi-frenchie.webp", pref: "23" },
 ];
 
 const PRIZE_BY_ID = new Map(GACHA_PRIZES.map((prize) => [prize.id, prize]));
