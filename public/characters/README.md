@@ -18,6 +18,7 @@ getFrenchieSrc("hiking",  "walk") => "/characters/hiking/walk.webp"
 - `aichi/` — 愛知のフレブル（都道府県ガチャ（青コイン）の `aichi_frenchie` で解放、21ポーズ配置済み）
 - `mie/` — 三重のフレブル（都道府県ガチャ（青コイン）の `mie_frenchie` で解放、21ポーズ配置済み）
 - `shizuoka/` — 静岡のフレブル（都道府県ガチャ（青コイン）の `shizuoka_frenchie` で解放、21ポーズ配置済み）
+- `nagano/` — 長野のフレブル（都道府県ガチャ（青コイン）の `nagano_frenchie` で解放、21ポーズ配置済み）
 
 ## 必要なファイル名
 
@@ -33,10 +34,10 @@ getFrenchieSrc("hiking",  "walk") => "/characters/hiking/walk.webp"
 用意できていない間は、他のスキンではその画像だけ 404 になります
 （アプリ自体は落ちません）。
 
-`default/` `hiking/` `snow/` `summer/` `gifu/` `aichi/` `mie/` `shizuoka/` は、全ポーズを300×254pxの
+`default/` `hiking/` `snow/` `summer/` `gifu/` `aichi/` `mie/` `shizuoka/` `nagano/` は、全ポーズを300×254pxの
 透過WebPで揃えています。
 
 新しいスキンを足すときは、src/lib/dog-skins.ts の DOG_SKIN_IDS / DOG_SKINS、
 src/lib/games/osanpo-run/config.ts の OSANPO_RUN_NEIGHBOR_DEFAULT_NAMES、
 DBの user_dog_skin の check と dog_skin_unlock_item / set_dog_skin も更新してください
-（例：supabase/migrations/0119_shizuoka_frenchie.sql）。
+（例：supabase/migrations/0120_nagano_frenchie.sql）。

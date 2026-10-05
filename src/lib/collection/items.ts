@@ -322,6 +322,7 @@ const CURATED_ITEMS: readonly CollectionItem[] = [
   { id: "nagano_zenkoji", name: "善光寺", image: "/collection/items/nagano-zenkoji.webp", category: "other", series: null, rarity: "SSR", pref: "20" },
   { id: "nagano_matsumoto_castle", name: "松本城", image: "/collection/items/nagano-matsumoto-castle.webp", category: "other", series: null, rarity: "UR", pref: "20" },
   { id: "nagano_kamikochi", name: "上高地・河童橋", image: "/collection/items/nagano-kamikochi.webp", category: "other", series: null, rarity: "LR", pref: "20" },
+  { id: "nagano_frenchie", name: "長野のフレブル", image: "/collection/skins/nagano-frenchie.webp", category: "other", series: null, rarity: "LR", pref: "20" },
 
   // --- 都道府県図鑑：岐阜県（都道府県ガチャ） ----------------------------
   { id: "gifu_gohei_mochi", name: "五平餅", image: "/collection/items/gifu-gohei-mochi.webp", category: "food", series: null, rarity: "N", pref: "21" },
