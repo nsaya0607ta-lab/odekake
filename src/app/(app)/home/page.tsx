@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { BackgroundCookieSync } from "@/components/background-cookie-sync";
 import { BackgroundGazeButton } from "@/components/background-gaze-button";
 import { IconUser } from "@/components/icons";
 import { TopHeader } from "@/components/page-header";
@@ -14,7 +15,7 @@ import { LevelTag } from "@/components/level-tag";
 import { StepsTag } from "@/components/steps-tag";
 import { WanderingFrenchie } from "@/components/wandering-frenchie";
 import { COLLECTION_ITEMS, countOwned } from "@/lib/collection/items";
-import { getCurrentAppBackground, getHomeLook } from "@/lib/data/app-backgrounds";
+import { getCurrentAppBackground, getHomeAppearance } from "@/lib/data/app-backgrounds";
 import { loadAreaIndex } from "@/lib/data/areas";
 import { getBlueCoinBalance } from "@/lib/data/blue-coins";
 import { getCoinSummary } from "@/lib/data/coins";
@@ -96,7 +97,12 @@ export default async function HomePage({
 
   // ホームの着せかえ（ショップで設定。いまは準備中で、使える人だけ）
   const shopAccess = canAccessShop(user.displayName);
-  const [look, background] = shopAccess ? await Promise.all([getHomeLook(), getCurrentAppBackground()]) : [DEFAULT_HOME_LOOK, "default" as const];
+  const [appearance, background] = shopAccess
+    ? await Promise.all([getHomeAppearance(supabase, user.id), getCurrentAppBackground()])
+    : [{ homeLook: DEFAULT_HOME_LOOK, savedBackground: null }, "default" as const];
+  const look = appearance.homeLook;
+  // 別の端末で背景を変えていたら、この端末の背景もそろえる
+  const backgroundOutdated = appearance.savedBackground !== null && appearance.savedBackground !== background;
 
   const expProgress = getExpProgress(expDashboard.totalExp);
   const collectedItems = countOwned(COLLECTION_ITEMS, ownedItemIds);
@@ -277,6 +283,7 @@ export default async function HomePage({
         </div>
       </PageBody>
       {shopAccess && background !== "default" ? <BackgroundGazeButton /> : null}
+      {backgroundOutdated ? <BackgroundCookieSync /> : null}
     </>
   );
 }

@@ -10,7 +10,7 @@ import { CARD_STYLE_LABELS, CARD_STYLES, HOME_CARD_LABELS, type CardStyle, type 
 
 export function HomeLookEditor({ initial }: { initial: HomeLook }) {
   const [look, setLook] = useState(initial);
-  const [status, setStatus] = useState<"idle" | "saving" | "saved" | "error">("idle");
+  const [status, setStatus] = useState<"idle" | "saving" | "saved" | "local" | "error">("idle");
 
   async function save(next: HomeLook) {
     const previous = look;
@@ -22,8 +22,9 @@ export function HomeLookEditor({ initial }: { initial: HomeLook }) {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(next),
       });
+      const payload = (await response.json().catch(() => null)) as { synced?: boolean } | null;
       if (!response.ok) throw new Error("save failed");
-      setStatus("saved");
+      setStatus(payload?.synced === false ? "local" : "saved");
     } catch {
       setLook(previous);
       setStatus("error");
@@ -128,7 +129,7 @@ export function HomeLookEditor({ initial }: { initial: HomeLook }) {
       </div>
 
       <p role="status" className="mt-2 min-h-[1.2em] px-1 text-[11px] text-ink-faint">
-        {status === "saving" ? "保存しています…" : status === "saved" ? "保存しました。ホームに反映されます" : status === "error" ? "保存できませんでした。時間をおいてお試しください" : "背景を変えているときは、ホームの右下の目のボタンで背景だけをながめられます"}
+        {status === "saving" ? "保存しています…" : status === "saved" ? "保存しました。ほかの端末のホームにも反映されます" : status === "local" ? "この端末に保存しました（ほかの端末へは、準備ができしだい反映されます）" : status === "error" ? "保存できませんでした。時間をおいてお試しください" : "背景を変えているときは、ホームの右下の目のボタンで背景だけをながめられます"}
       </p>
     </section>
   );
