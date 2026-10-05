@@ -1,10 +1,8 @@
 import { NextResponse } from "next/server";
 import {
   BOWLING_FRAME_COUNT,
-  calculateBowlingScore,
   countGoldenPinHits,
-  isValidBowlingPinFalls,
-  isValidCompletedBowlingFrames,
+  replayBowling,
   type BowlingFrame,
   type BowlingPinFalls,
 } from "@/lib/games/wanko-bowling-score";
@@ -34,20 +32,19 @@ export async function POST(request: Request) {
     || typeof body.roundId !== "string"
     || body.roundId.length < 8
     || body.roundId.length > 90
-    || !isValidCompletedBowlingFrames(body.frames)
+    || !Array.isArray(body.frames)
+    || !Array.isArray(body.pinFalls)
   ) {
     return NextResponse.json({ error: "ゲーム結果が正しくありません。" }, { status: 400 });
   }
 
   // 合計点やストライク等の回数、ゴールデンピン成功数はクライアント値を信用しない。
-  // 合法な投球列とピン番号を検証し、同じ純粋関数でサーバー側から再計算する。
+  // わんこルール（ビッグラック・フィーバー・キングピン・スプリット）も含めて、
+  // round_id と投球の記録（倒したピン番号）からブラウザと同じ関数でサーバー側で再計算する。
   const frames = body.frames as BowlingFrame[];
-  if (!isValidBowlingPinFalls(frames, body.pinFalls)) {
-    return NextResponse.json({ error: "ゲーム結果が正しくありません。" }, { status: 400 });
-  }
   const pinFalls = body.pinFalls as BowlingPinFalls;
-  const finalState = calculateBowlingScore(frames);
-  if (!finalState.isComplete) {
+  const finalState = replayBowling(body.roundId, frames, pinFalls);
+  if (!finalState.valid || !finalState.isComplete) {
     return NextResponse.json({ error: "ゲーム結果が正しくありません。" }, { status: 400 });
   }
 

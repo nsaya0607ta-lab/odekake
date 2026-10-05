@@ -7,22 +7,82 @@ import { Lane, type LaneRollResult } from "@/components/wanko-bowling/lane";
 import { ScoreBoard } from "@/components/wanko-bowling/score-board";
 import {
   BOWLING_FRAME_COUNT,
-  calculateBowlingScore,
   createEmptyFrames,
   getGoldenPinTargets,
-  isFreshRackRoll,
-  isFrameDone,
+  KING_PIN_BONUS,
+  replayBowling,
+  SPLIT_CLEAR_BONUS,
   type BowlingFrame,
+  type BowlingNextRoll,
   type BowlingPinFalls,
+  type BowlingRack,
   type GoldenPinTarget,
 } from "@/lib/games/wanko-bowling-score";
 import { getBowlingBallVisual, type OwnedBowlingBall } from "@/lib/games/wanko-bowling-balls";
 import { bowlingFx, confettiBurst, prefersReducedMotion } from "@/components/wanko-bowling/bowling-fx";
 
 type Phase = "select" | "playing" | "result";
-type Banner = "スペア！" | "ストライク！" | "ターキー！" | null;
-/** 演出（見た目だけ）：投げたあとに出す大きな文字・倒した本数 */
-type RollFx = { kind: "strike" | "turkey" | "spare" | "gutter" | "count"; pins: number; key: number };
+type Banner = "スペア！" | "ストライク！" | "ターキー！" | "メガストライク！" | "スプリットメイク！" | "キングピン撃破！" | null;
+/** 演出：投げたあとに出す大きな文字・倒した本数 */
+type RollFx = {
+  kind: "strike" | "turkey" | "mega" | "spare" | "split" | "king" | "gutter" | "count";
+  pins: number;
+  /** ボーナス点（キングピン +20・スプリット +30）。なければ 0 */
+  bonus: number;
+  key: number;
+};
+/** 新しいラックのはじめに出す帯 */
+type RackIntro = { tone: "frame" | "final" | "fever" | "big" | "split"; sub: string; title: string; key: number };
+
+const ROLL_FX_SUB: Record<RollFx["kind"], string> = {
+  strike: "STRIKE",
+  turkey: "TURKEY",
+  mega: "MEGA STRIKE",
+  spare: "SPARE",
+  split: "SPLIT MAKE",
+  king: "KING PIN",
+  gutter: "",
+  count: "",
+};
+const ROLL_FX_FALLBACK: Record<RollFx["kind"], string> = {
+  strike: "ストライク！",
+  turkey: "ターキー！",
+  mega: "メガストライク！",
+  spare: "スペア！",
+  split: "スプリットメイク！",
+  king: "キングピン撃破！",
+  gutter: "ガター…",
+  count: "",
+};
+const ROLL_FX_TEXT_CLASS: Partial<Record<RollFx["kind"], string>> = {
+  spare: bowlingFx.bannerSpare,
+  split: bowlingFx.bannerSplit,
+  king: bowlingFx.bannerKing,
+  mega: bowlingFx.bannerMega,
+  gutter: bowlingFx.bannerGutter,
+};
+const FRAME_BAND_CLASS: Partial<Record<RackIntro["tone"], string>> = {
+  final: bowlingFx.frameBandFinal,
+  fever: bowlingFx.frameBandFever,
+  big: bowlingFx.frameBandBig,
+  split: bowlingFx.frameBandSplit,
+};
+
+/** 新しくセットしたラックに合わせて、帯の文言を決める */
+function rackIntroOf(next: BowlingNextRoll): RackIntro {
+  const key = Date.now();
+  const isLast = next.frameIndex === BOWLING_FRAME_COUNT - 1;
+  if (next.rack.kind === "split") {
+    return { tone: "split", sub: "SPLIT CHALLENGE", title: `${next.rack.splitName ?? ""} を全部倒せ！ +${SPLIT_CLEAR_BONUS}`, key };
+  }
+  if (next.fever && next.rollIndex === 0) {
+    return { tone: "fever", sub: "FEVER TIME", title: next.rack.kind === "big" ? "15ピン × 2倍！" : "倒した本数 × 2倍！", key };
+  }
+  if (next.rack.kind === "big") return { tone: "big", sub: "BIG RACK", title: "15ピン！", key };
+  if (isLast && next.rollIndex === 0) return { tone: "final", sub: "FINAL", title: "キングピン出現！", key };
+  if (isLast) return { tone: "final", sub: "BONUS", title: "ボーナス投球", key };
+  return { tone: "frame", sub: "FRAME", title: `第${next.frameIndex + 1}フレーム`, key };
+}
 
 /** 結果のスコアを 0 から数え上げる（見た目だけ） */
 function useCountUp(target: number, run: boolean, durationMs = 1100) {
@@ -49,43 +109,6 @@ function useCountUp(target: number, run: boolean, durationMs = 1100) {
   return { value, done };
 }
 
-function calculateLiveBowlingScore(frames: BowlingFrame[]): number {
-  const flatRolls = frames.flatMap((frame) => frame.rolls);
-  let cursor = 0;
-  let total = 0;
-
-  frames.forEach((frame, index) => {
-    if (frame.rolls.length === 0) return;
-    const isLast = index === BOWLING_FRAME_COUNT - 1;
-
-    if (isLast) {
-      total += frame.rolls.reduce((sum, roll) => sum + roll, 0);
-      cursor += frame.rolls.length;
-      return;
-    }
-
-    const first = frame.rolls[0] ?? 0;
-    const second = frame.rolls[1];
-
-    if (first === 10) {
-      total += 10 + (flatRolls[cursor + 1] ?? 0) + (flatRolls[cursor + 2] ?? 0);
-      cursor += 1;
-      return;
-    }
-
-    if (second !== undefined && first + second === 10) {
-      total += 10 + (flatRolls[cursor + 2] ?? 0);
-      cursor += 2;
-      return;
-    }
-
-    total += frame.rolls.reduce((sum, roll) => sum + roll, 0);
-    cursor += frame.rolls.length;
-  });
-
-  return total;
-}
-
 function newRoundId(): string {
   if (typeof crypto !== "undefined" && "randomUUID" in crypto) return crypto.randomUUID();
   return `round-${Date.now()}-${Math.random().toString(16).slice(2)}`;
@@ -102,6 +125,12 @@ export function WankoBowlingGame({ ownedBalls }: { ownedBalls: OwnedBowlingBall[
     () => ownedBalls[0]?.id ?? "default_paw_ball",
   );
   const [frames, setFrames] = useState<BowlingFrame[]>(initialFrames);
+  const [pinFalls, setPinFalls] = useState<BowlingPinFalls>(createEmptyPinFalls);
+  const [roundId, setRoundId] = useState<string>(newRoundId);
+  /** レーンに並べるラック（新しいラックをセットするときだけ変わる） */
+  const [laneRack, setLaneRack] = useState<BowlingRack>(
+    () => replayBowling(roundId, initialFrames, createEmptyPinFalls()).next!.rack,
+  );
   const [frameIndex, setFrameIndex] = useState(0);
   const [laneResetSignal, setLaneResetSignal] = useState(0);
   const [newGameSignal, setNewGameSignal] = useState(0);
@@ -118,7 +147,7 @@ export function WankoBowlingGame({ ownedBalls }: { ownedBalls: OwnedBowlingBall[
   const [goldenHitCount, setGoldenHitCount] = useState(0);
   const [goldenNotice, setGoldenNotice] = useState(false);
   const [rollFx, setRollFx] = useState<RollFx | null>(null);
-  const [frameIntro, setFrameIntro] = useState<{ frame: number; key: number } | null>(null);
+  const [frameIntro, setFrameIntro] = useState<RackIntro | null>(null);
   const fxLayerRef = useRef<HTMLDivElement | null>(null);
   const resultFxLayerRef = useRef<HTMLDivElement | null>(null);
 
@@ -127,23 +156,39 @@ export function WankoBowlingGame({ ownedBalls }: { ownedBalls: OwnedBowlingBall[
   const rollLockedRef = useRef(false);
   const streakRef = useRef(0);
   const submittedRef = useRef(false);
-  const roundIdRef = useRef(newRoundId());
-  const pinFallsRef = useRef<BowlingPinFalls>(createEmptyPinFalls());
+  const roundIdRef = useRef(roundId);
+  const pinFallsRef = useRef<BowlingPinFalls>(pinFalls);
   const goldenPinTargetsRef = useRef<GoldenPinTarget[]>([]);
   const goldenHitFramesRef = useRef<Set<number>>(new Set());
   const rankingSectionIdRef = useRef("wanko-bowling-ranking");
 
-  const score = useMemo(() => calculateBowlingScore(frames), [frames]);
-  const liveScore = useMemo(() => calculateLiveBowlingScore(frames), [frames]);
+  // わんこルールを含めたスコア（API と同じ関数で計算する）
+  const score = useMemo(() => replayBowling(roundId, frames, pinFalls), [roundId, frames, pinFalls]);
+  const liveScore = score.liveTotal;
+  /** いま投げているフレームがフィーバーか（フレームが進んだときに切りかわる） */
+  const feverNow = score.next?.frameIndex === frameIndex ? score.next.fever : score.frames[frameIndex]?.fever === true;
   const ballVisual = useMemo(() => getBowlingBallVisual(selectedBallId), [selectedBallId]);
   const currentGoldenTarget = goldenPinTargets.find((item) => item.frameIndex === frameIndex);
   const currentGoldenPinId = currentGoldenTarget && !goldenHitFramesRef.current.has(frameIndex)
     ? currentGoldenTarget.pinId
     : null;
 
-  const commitFrames = useCallback((nextFrames: BowlingFrame[]) => {
+  const commitFrames = useCallback((nextFrames: BowlingFrame[], nextPinFalls: BowlingPinFalls) => {
     framesRef.current = nextFrames;
+    pinFallsRef.current = nextPinFalls;
     setFrames(nextFrames);
+    setPinFalls(nextPinFalls);
+  }, []);
+
+  /** 投げたあとの大きな文字が消えるまで、次のラックの帯は待たせる */
+  const rollFxUntilRef = useRef(0);
+  const showRackIntro = useCallback((next: BowlingNextRoll) => {
+    const intro = rackIntroOf(next);
+    const wait = Math.max(0, rollFxUntilRef.current - Date.now());
+    window.setTimeout(() => {
+      setFrameIntro(intro);
+      window.setTimeout(() => setFrameIntro((current) => (current?.key === intro.key ? null : current)), 1350);
+    }, wait);
   }, []);
 
   const commitFrameIndex = useCallback((nextIndex: number) => {
@@ -175,14 +220,18 @@ export function WankoBowlingGame({ ownedBalls }: { ownedBalls: OwnedBowlingBall[
 
   const startGame = useCallback(() => {
     const emptyFrames = createEmptyFrames();
-    commitFrames(emptyFrames);
+    const emptyPinFalls = createEmptyPinFalls();
+    commitFrames(emptyFrames, emptyPinFalls);
     commitFrameIndex(0);
     streakRef.current = 0;
     submittedRef.current = false;
     const nextRoundId = newRoundId();
     const nextGoldenPinTargets = getGoldenPinTargets(nextRoundId);
     roundIdRef.current = nextRoundId;
-    pinFallsRef.current = createEmptyPinFalls();
+    setRoundId(nextRoundId);
+    const firstRoll = replayBowling(nextRoundId, emptyFrames, emptyPinFalls).next!;
+    setLaneRack(firstRoll.rack);
+    showRackIntro(firstRoll);
     goldenPinTargetsRef.current = nextGoldenPinTargets;
     goldenHitFramesRef.current = new Set();
     setGoldenPinTargets(nextGoldenPinTargets);
@@ -199,9 +248,9 @@ export function WankoBowlingGame({ ownedBalls }: { ownedBalls: OwnedBowlingBall[
     setRollLock(false);
     document.getElementById("wanko-bowling-scroll")?.scrollTo({ top: 0, behavior: "auto" });
     setPhase("playing");
-  }, [commitFrameIndex, commitFrames, setRollLock]);
+  }, [commitFrameIndex, commitFrames, setRollLock, showRackIntro]);
 
-  const submitResult = useCallback(async (finalScore: number, finalFrames: BowlingFrame[]) => {
+  const submitResult = useCallback(async (finalScore: number, finalFrames: BowlingFrame[], finalPinFalls: BowlingPinFalls) => {
     if (submittedRef.current) return;
     submittedRef.current = true;
     setRewardPending(true);
@@ -214,7 +263,7 @@ export function WankoBowlingGame({ ownedBalls }: { ownedBalls: OwnedBowlingBall[
         body: JSON.stringify({
           roundId: roundIdRef.current,
           frames: finalFrames,
-          pinFalls: pinFallsRef.current,
+          pinFalls: finalPinFalls,
         }),
       });
       const payload = (await response.json().catch(() => null)) as {
@@ -242,34 +291,46 @@ export function WankoBowlingGame({ ownedBalls }: { ownedBalls: OwnedBowlingBall[
 
   const retryReward = useCallback(() => {
     submittedRef.current = false;
-    void submitResult(score.total, framesRef.current);
+    void submitResult(score.total, framesRef.current, pinFallsRef.current);
   }, [score.total, submitResult]);
 
   const handleRoll = useCallback((result: LaneRollResult) => {
     if (rollLockedRef.current) return;
+
+    const roundIdNow = roundIdRef.current;
+    const baseFrames = framesRef.current;
+    const basePinFalls = pinFallsRef.current;
+    const before = replayBowling(roundIdNow, baseFrames, basePinFalls).next;
+    if (!before) return;
     setRollLock(true);
 
-    const currentFrameIndex = frameIndexRef.current;
-    const baseFrames = framesRef.current;
+    const currentFrameIndex = before.frameIndex;
     const isLastFrame = currentFrameIndex === BOWLING_FRAME_COUNT - 1;
-    const currentFrame = baseFrames[currentFrameIndex] ?? { rolls: [], gutters: [] };
-    const priorRolls = [...currentFrame.rolls];
-    const priorGutters = currentFrame.gutters
-      ? [...currentFrame.gutters]
-      : Array.from({ length: priorRolls.length }, () => false);
-    const freshRack = isFreshRackRoll(currentFrameIndex, priorRolls);
-    const roll = result.knockedIds.length;
+    const standing = new Set(before.standingPinIds);
+    let knockedIds = result.knockedIds.filter((id) => standing.has(id));
+    const kingPinId = before.rack.kingPinId;
+    const kingHit = kingPinId !== null && knockedIds.includes(kingPinId);
+    // キングピンが倒れたら残りも全部倒れる（レーンでもそうなるが、記録はルールに合わせてそろえる）
+    if (kingHit) knockedIds = [...before.standingPinIds];
+    const roll = knockedIds.length;
     const isGutterRoll = result.isGutter && roll === 0;
 
-    const framePinFalls = pinFallsRef.current[currentFrameIndex] ?? [];
-    pinFallsRef.current[currentFrameIndex] = [...framePinFalls, [...result.knockedIds]];
+    const currentFrame = baseFrames[currentFrameIndex] ?? { rolls: [], gutters: [] };
+    const priorRolls = [...currentFrame.rolls];
+    const priorGutters = currentFrame.gutters && currentFrame.gutters.length === priorRolls.length
+      ? [...currentFrame.gutters]
+      : Array.from({ length: priorRolls.length }, () => false);
+
+    const nextPinFalls = basePinFalls.map((frameFalls, index) =>
+      index === currentFrameIndex ? [...frameFalls, [...knockedIds]] : frameFalls,
+    );
     const goldenTarget = goldenPinTargetsRef.current.find(
       (target) => target.frameIndex === currentFrameIndex,
     );
     if (
       goldenTarget
       && !goldenHitFramesRef.current.has(currentFrameIndex)
-      && result.knockedIds.includes(goldenTarget.pinId)
+      && knockedIds.includes(goldenTarget.pinId)
     ) {
       goldenHitFramesRef.current.add(currentFrameIndex);
       setGoldenHitCount(goldenHitFramesRef.current.size);
@@ -283,95 +344,90 @@ export function WankoBowlingGame({ ownedBalls }: { ownedBalls: OwnedBowlingBall[
       rolls: [...priorRolls, roll],
       gutters: [...priorGutters, isGutterRoll],
     };
-    const done = isFrameDone(newFrame, currentFrameIndex);
     const nextFrames = baseFrames.map((frame, index) =>
       index === currentFrameIndex ? newFrame : frame,
     );
+    const after = replayBowling(roundIdNow, nextFrames, nextPinFalls);
+    commitFrames(nextFrames, nextPinFalls);
 
-    commitFrames(nextFrames);
+    const cleared = standing.size > 0 && roll === standing.size;
+    const isSplitRack = before.rack.kind === "split";
+    const strike = before.freshRack && cleared && !isSplitRack;
+    const mega = strike && before.rack.kind === "big";
+    const spare = !before.freshRack && cleared && !isSplitRack;
+    const splitMake = isSplitRack && cleared;
 
-    if (freshRack) {
-      streakRef.current = roll === 10 ? streakRef.current + 1 : 0;
+    if (before.freshRack) {
+      streakRef.current = strike ? streakRef.current + 1 : 0;
     }
 
     let nextBanner: Banner = null;
-    const newRolls = newFrame.rolls;
-    const regularSpareCompleted =
-      newRolls.length === 2
-      && (newRolls[0] ?? 0) < 10
-      && (newRolls[0] ?? 0) + (newRolls[1] ?? 0) === 10;
-    const finalStrikeRackSpareCompleted =
-      isLastFrame
-      && newRolls.length === 3
-      && (newRolls[0] ?? 0) === 10
-      && (newRolls[1] ?? 0) < 10
-      && (newRolls[1] ?? 0) + (newRolls[2] ?? 0) === 10;
-    const spareCompleted = regularSpareCompleted || finalStrikeRackSpareCompleted;
+    if (kingHit) nextBanner = "キングピン撃破！";
+    else if (mega) nextBanner = "メガストライク！";
+    else if (strike) nextBanner = streakRef.current >= 3 ? "ターキー！" : "ストライク！";
+    else if (splitMake) nextBanner = "スプリットメイク！";
+    else if (spare) nextBanner = "スペア！";
 
-    if (roll === 10 && freshRack) {
-      nextBanner = streakRef.current >= 3 ? "ターキー！" : "ストライク！";
+    if (strike || kingHit || splitMake) {
       setShake(true);
       window.setTimeout(() => setShake(false), 450);
-    } else if (spareCompleted) {
-      nextBanner = "スペア！";
     }
 
     setBanner(nextBanner);
     if (nextBanner) window.setTimeout(() => setBanner(null), 1500);
 
-    // 演出：大きな文字・紙ふぶき・倒した本数（スコアや進み方には関係しない）
-    const fxKind: RollFx["kind"] = nextBanner === "ターキー！"
-      ? "turkey"
-      : nextBanner === "ストライク！"
-        ? "strike"
-        : nextBanner === "スペア！"
-          ? "spare"
-          : isGutterRoll
-            ? "gutter"
-            : "count";
+    // 演出：大きな文字・紙ふぶき・倒した本数
+    const fxKind: RollFx["kind"] = kingHit
+      ? "king"
+      : mega
+        ? "mega"
+        : strike
+          ? streakRef.current >= 3 ? "turkey" : "strike"
+          : splitMake
+            ? "split"
+            : spare
+              ? "spare"
+              : isGutterRoll
+                ? "gutter"
+                : "count";
     const fxKey = Date.now();
-    setRollFx({ kind: fxKind, pins: roll, key: fxKey });
+    setRollFx({
+      kind: fxKind,
+      pins: roll,
+      bonus: kingHit ? KING_PIN_BONUS : splitMake ? SPLIT_CLEAR_BONUS : 0,
+      key: fxKey,
+    });
+    rollFxUntilRef.current = fxKey + 1500;
     window.setTimeout(() => setRollFx((current) => (current?.key === fxKey ? null : current)), 1500);
-    if (fxKind === "strike" || fxKind === "turkey") confettiBurst(fxLayerRef.current, fxKind === "turkey" ? 80 : 50);
+    if (fxKind === "king" || fxKind === "mega") confettiBurst(fxLayerRef.current, 90, ["#ffd84a", "#c38bff", "#ffffff", "#ff9ad5", "#7fe0ff"]);
+    else if (fxKind === "strike" || fxKind === "turkey") confettiBurst(fxLayerRef.current, fxKind === "turkey" ? 80 : 50);
+    else if (fxKind === "split") confettiBurst(fxLayerRef.current, 40, ["#9be36a", "#ffffff", "#54d8ff", "#ffc95c"]);
     else if (fxKind === "spare") confettiBurst(fxLayerRef.current, 24, ["#54d8ff", "#c9f4ff", "#ffffff", "#7fe0ff"]);
 
-    let needsFreshRackNext = false;
-    if (isLastFrame) {
-      if (!done && ((freshRack && roll === 10) || regularSpareCompleted)) {
-        needsFreshRackNext = true;
-      }
-    } else {
-      needsFreshRackNext = done;
-    }
-
+    const next = after.next;
+    const frameDone = after.isComplete || (next !== null && next.frameIndex !== currentFrameIndex);
     const resumeDelay = nextBanner ? 900 : 550;
 
     window.setTimeout(() => {
-      if (needsFreshRackNext) setLaneResetSignal((value) => value + 1);
-
-      if (!isLastFrame && done) {
-        commitFrameIndex(currentFrameIndex + 1);
+      if (next?.freshRack) {
+        setLaneRack(next.rack);
+        setLaneResetSignal((value) => value + 1);
+        showRackIntro(next);
       }
 
-      if (isLastFrame && done) {
-        const finalState = calculateBowlingScore(nextFrames);
-        void submitResult(finalState.total, nextFrames);
+      if (!isLastFrame && frameDone && next) {
+        commitFrameIndex(next.frameIndex);
+      }
+
+      if (after.isComplete) {
+        void submitResult(after.total, nextFrames, nextPinFalls);
         window.setTimeout(() => setPhase("result"), 500);
         return;
       }
 
       setRollLock(false);
     }, resumeDelay);
-  }, [commitFrameIndex, commitFrames, setRollLock, submitResult]);
-
-  // 演出：フレームのはじめに「FRAME 3」などを出す
-  useEffect(() => {
-    if (phase !== "playing") return;
-    const key = Date.now();
-    setFrameIntro({ frame: frameIndex + 1, key });
-    const timer = window.setTimeout(() => setFrameIntro((current) => (current?.key === key ? null : current)), 1250);
-    return () => window.clearTimeout(timer);
-  }, [frameIndex, newGameSignal, phase]);
+  }, [commitFrameIndex, commitFrames, setRollLock, showRackIntro, submitResult]);
 
   // 演出：結果画面のスコアの数え上げと、自己ベストの紙ふぶき
   const resultCount = useCountUp(score.total, phase === "result");
@@ -441,6 +497,25 @@ export function WankoBowlingGame({ ownedBalls }: { ownedBalls: OwnedBowlingBall[
               <p className="font-mono text-2xl font-black tabular-nums text-white">{score.gutterCount}</p>
               <p className="mt-0.5 text-[8px] font-black tracking-[0.08em] text-white/40">ガター</p>
             </div>
+          </div>
+
+          {/* わんこルールの記録 */}
+          <div className="-mt-2 grid grid-cols-4 gap-1.5 px-4 pb-4 text-center">
+            {[
+              { label: "メガストライク", value: score.megaStrikeCount, color: "#ffd84a" },
+              { label: "フィーバー", value: score.feverFrameCount, color: "#ff8ae0" },
+              { label: "スプリット成功", value: score.splitMakeCount, color: "#a6ec74" },
+              { label: "キングピン", value: score.kingHitCount, color: "#c38bff" },
+            ].map((item, index) => (
+              <div
+                key={item.label}
+                className={`rounded-[12px] border border-white/10 bg-white/[0.03] px-1 py-2 ${bowlingFx.resultIn}`}
+                style={{ "--delay": `${520 + index * 70}ms` } as CSSProperties}
+              >
+                <p className="font-mono text-lg font-black tabular-nums" style={{ color: item.value > 0 ? item.color : "rgba(255,255,255,0.35)" }}>{item.value}</p>
+                <p className="mt-0.5 whitespace-nowrap text-[7px] font-black text-white/40">{item.label}</p>
+              </div>
+            ))}
           </div>
 
           {rewardPending ? (
@@ -522,6 +597,8 @@ export function WankoBowlingGame({ ownedBalls }: { ownedBalls: OwnedBowlingBall[
         <Lane
           ballVisual={ballVisual}
           goldenPinId={currentGoldenPinId}
+          rack={laneRack}
+          fever={feverNow}
           resetSignal={laneResetSignal}
           newGameSignal={newGameSignal}
           active={!rollLocked}
@@ -530,17 +607,20 @@ export function WankoBowlingGame({ ownedBalls }: { ownedBalls: OwnedBowlingBall[
 
         {rollFx && rollFx.kind !== "count" ? (
           <div key={rollFx.key} className={bowlingFx.bannerWrap} role="status">
-            {rollFx.kind === "strike" || rollFx.kind === "turkey" ? (
-              <span className={rollFx.kind === "turkey" ? `${bowlingFx.rays} ${bowlingFx.raysTurkey}` : bowlingFx.rays} />
+            {rollFx.kind === "strike" || rollFx.kind === "turkey" || rollFx.kind === "mega" || rollFx.kind === "king" ? (
+              <span
+                className={`${bowlingFx.rays} ${rollFx.kind === "turkey" ? bowlingFx.raysTurkey : ""} ${rollFx.kind === "mega" || rollFx.kind === "king" ? bowlingFx.raysMega : ""}`}
+              />
             ) : null}
             {rollFx.kind !== "gutter" ? (
-              <span className={bowlingFx.bannerSub}>{rollFx.kind === "turkey" ? "TURKEY" : rollFx.kind === "strike" ? "STRIKE" : "SPARE"}</span>
+              <span className={bowlingFx.bannerSub}>{ROLL_FX_SUB[rollFx.kind]}</span>
             ) : null}
             <p
-              className={`${bowlingFx.bannerText} ${rollFx.kind === "spare" ? bowlingFx.bannerSpare : ""} ${rollFx.kind === "gutter" ? bowlingFx.bannerGutter : ""}`}
+              className={`${bowlingFx.bannerText} ${ROLL_FX_TEXT_CLASS[rollFx.kind] ?? ""}`}
             >
-              {rollFx.kind === "gutter" ? "ガター…" : banner ?? (rollFx.kind === "spare" ? "スペア！" : "ストライク！")}
+              {rollFx.kind === "gutter" ? "ガター…" : banner ?? ROLL_FX_FALLBACK[rollFx.kind]}
             </p>
+            {rollFx.bonus > 0 ? <span className={bowlingFx.bannerBonus}>+{rollFx.bonus}</span> : null}
           </div>
         ) : null}
         {rollFx?.kind === "count" ? (
@@ -552,9 +632,9 @@ export function WankoBowlingGame({ ownedBalls }: { ownedBalls: OwnedBowlingBall[
         ) : null}
         {frameIntro && !rollFx ? (
           <div key={frameIntro.key} className={bowlingFx.frameIntro} aria-hidden="true">
-            <div className={frameIntro.frame === BOWLING_FRAME_COUNT ? `${bowlingFx.frameBand} ${bowlingFx.frameBandFinal}` : bowlingFx.frameBand}>
-              <small>{frameIntro.frame === BOWLING_FRAME_COUNT ? "FINAL" : "FRAME"}</small>
-              <strong>{frameIntro.frame === BOWLING_FRAME_COUNT ? "ラストフレーム" : `第${frameIntro.frame}フレーム`}</strong>
+            <div className={`${bowlingFx.frameBand} ${FRAME_BAND_CLASS[frameIntro.tone] ?? ""}`}>
+              <small>{frameIntro.sub}</small>
+              <strong>{frameIntro.title}</strong>
             </div>
           </div>
         ) : null}

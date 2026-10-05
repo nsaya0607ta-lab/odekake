@@ -498,10 +498,107 @@
   .marqueeDog,
   .marqueeBall,
   .marqueeStar,
-  .marqueePin {
+  .marqueePin,
+  .marqueeFever,
+  .feverGlow {
     animation: none !important;
   }
 }
+
+/* ===== フィーバー（ブラックライトのボウリング） ===== */
+.feverShade {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  pointer-events: none;
+  background: linear-gradient(180deg, rgba(48, 6, 92, 0.78) 0%, rgba(70, 10, 110, 0.55) 55%, rgba(30, 6, 70, 0.7) 100%);
+  mix-blend-mode: multiply;
+}
+.feverGlow {
+  position: absolute;
+  inset: 0;
+  z-index: 3;
+  pointer-events: none;
+  background:
+    repeating-linear-gradient(90deg, transparent 0 9%, rgba(255, 90, 230, 0.16) 9% 9.6%, transparent 9.6% 18%, rgba(90, 220, 255, 0.16) 18% 18.6%),
+    radial-gradient(ellipse at 50% 18%, rgba(255, 120, 240, 0.35), transparent 45%),
+    radial-gradient(ellipse at 50% 100%, rgba(90, 220, 255, 0.28), transparent 50%);
+  mix-blend-mode: screen;
+  animation: feverPulse 1.1s ease-in-out infinite;
+}
+@keyframes feverPulse {
+  0%, 100% { opacity: 0.65; }
+  50% { opacity: 1; }
+}
+.marqueeFever {
+  color: #ffd2f6;
+  font-size: 15px;
+  font-weight: 900;
+  font-style: italic;
+  letter-spacing: 0.12em;
+  text-shadow: 0 0 5px rgba(255, 90, 220, 0.95), 0 0 14px rgba(255, 60, 200, 0.6);
+  animation: marqueeBlink 0.5s steps(2, jump-none) infinite;
+}
+.marqueeFire {
+  font-size: 13px;
+  filter: drop-shadow(0 0 5px rgba(255, 140, 40, 0.95));
+}
+.marqueeFeverTrack {
+  animation-duration: 12s;
+}
+
+/* ===== わんこルールの文字 ===== */
+.raysMega {
+  background: repeating-conic-gradient(from 0deg, rgba(255, 216, 74, 0.3) 0deg 5deg, rgba(195, 139, 255, 0.24) 5deg 10deg, transparent 10deg 18deg);
+}
+.bannerMega {
+  font-size: clamp(2rem, 11vw, 3.9rem);
+  background: linear-gradient(180deg, #ffffff 0%, #fff1a0 30%, #ffc53a 55%, #ff7ad0 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  filter: drop-shadow(0 3px 0 rgba(70, 20, 60, 0.95)) drop-shadow(0 0 22px rgba(255, 150, 220, 0.7));
+}
+.bannerKing {
+  font-size: clamp(2rem, 11vw, 3.9rem);
+  background: linear-gradient(180deg, #ffffff 0%, #ffe28a 35%, #c38bff 70%, #7b3fd6 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  filter: drop-shadow(0 3px 0 rgba(40, 10, 70, 0.95)) drop-shadow(0 0 20px rgba(195, 139, 255, 0.7));
+}
+.bannerSplit {
+  font-size: clamp(2rem, 11vw, 3.8rem);
+  background: linear-gradient(180deg, #ffffff 0%, #d8ffb0 40%, #8fdc4f 65%, #3e9a2a 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  filter: drop-shadow(0 3px 0 rgba(10, 40, 10, 0.95)) drop-shadow(0 0 16px rgba(155, 227, 106, 0.6));
+}
+.bannerBonus {
+  position: relative;
+  margin-top: 2px;
+  font-size: 22px;
+  font-weight: 900;
+  color: #fff6c8;
+  text-shadow: 0 2px 0 rgba(60, 25, 0, 0.9), 0 0 12px rgba(255, 200, 80, 0.9);
+  animation: subIn 1500ms ease-out forwards;
+}
+.frameBandFever {
+  border-color: rgba(255, 110, 220, 0.6);
+  background: linear-gradient(90deg, transparent, rgba(60, 0, 70, 0.9) 18%, rgba(60, 0, 70, 0.9) 82%, transparent);
+}
+.frameBandFever small { color: rgba(255, 150, 230, 0.95); }
+.frameBandFever strong { color: #ffe0f8; text-shadow: 0 0 14px rgba(255, 90, 220, 0.8); }
+.frameBandBig {
+  border-color: rgba(255, 216, 74, 0.55);
+  background: linear-gradient(90deg, transparent, rgba(50, 30, 0, 0.88) 18%, rgba(50, 30, 0, 0.88) 82%, transparent);
+}
+.frameBandBig small { color: rgba(255, 216, 74, 0.95); }
+.frameBandBig strong { color: #fff3c0; text-shadow: 0 0 14px rgba(255, 200, 60, 0.8); }
+.frameBandSplit {
+  border-color: rgba(155, 227, 106, 0.55);
+  background: linear-gradient(90deg, transparent, rgba(10, 40, 10, 0.88) 18%, rgba(10, 40, 10, 0.88) 82%, transparent);
+}
+.frameBandSplit small { color: rgba(170, 240, 120, 0.95); }
+.frameBandSplit strong { font-size: 22px; color: #eaffd8; text-shadow: 0 0 14px rgba(155, 227, 106, 0.7); }
 
 @media (prefers-reduced-motion: reduce) {
   .spark,

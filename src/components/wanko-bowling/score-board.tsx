@@ -90,7 +90,8 @@ function RollingDigit({ char, large = false }: { char: string; large?: boolean }
 }
 
 function DigitalNumber({ value, large = false }: { value: number | null; large?: boolean }) {
-  const text = value === null ? "---" : Math.max(0, Math.min(999, value)).toString().padStart(3, "0");
+  // わんこルールで300点を超えるので、1000点からは4けたで出す
+  const text = value === null ? "---" : Math.max(0, Math.min(9999, value)).toString().padStart(3, "0");
   return (
     <span className={`wb-digital-number ${large ? "is-large" : ""}`} aria-label={value === null ? "スコア未確定" : String(value)}>
       {text.split("").map((char, index) => <RollingDigit key={index} char={char} large={large} />)}
@@ -164,20 +165,29 @@ export function ScoreBoard({
       <div className="grid w-full grid-cols-10 gap-px">
         {frames.map((frame, index) => {
           const active = index === currentFrameIndex;
-          const marks = frameRollMarks(frame, index);
           const result = score.frames[index];
+          const marks = result?.marks ?? frameRollMarks(frame, index);
+          const big = result?.rackKinds.includes("big") === true;
+          const split = result?.rackKinds.includes("split") === true;
+          const fever = result?.fever === true;
           const isBonusFrame = bonusFrameIndex === index;
           return (
             <div
               key={index}
-              className={`relative min-w-0 overflow-hidden rounded-[5px] border text-center transition-all ${active ? "z-10 border-[#63d9ff] bg-[#19384b] shadow-[0_0_10px_rgba(78,206,255,0.32)]" : "border-white/10 bg-[#0a141f]"} ${isBonusFrame ? "ring-1 ring-[#ffd66c]/85" : ""}`}
+              className={`relative min-w-0 overflow-hidden rounded-[5px] border text-center transition-all ${active ? "z-10 border-[#63d9ff] bg-[#19384b] shadow-[0_0_10px_rgba(78,206,255,0.32)]" : fever ? "border-[#ff6ed8]/60 bg-[#2a0b33]" : "border-white/10 bg-[#0a141f]"} ${isBonusFrame ? "ring-1 ring-[#ffd66c]/85" : ""}`}
             >
+              {/* わんこルールの目じるし：15ピン・スプリット・フィーバー */}
+              {big || split || fever ? (
+                <span className={`absolute left-0.5 top-0.5 text-[6px] font-black leading-none ${fever ? "text-[#ff8ae0]" : split ? "text-[#a6ec74]" : "text-[#ffd66c]"}`}>
+                  {fever ? "×2" : split ? "SP" : "15"}
+                </span>
+              ) : null}
               {isBonusFrame ? (
                 <span className={`absolute right-0.5 top-0.5 text-[7px] ${bonusAchieved ? "text-[#ffd66c]" : "text-white/55"}`} aria-label={bonusAchieved ? "ボーナスチャンス成功" : "ボーナスチャンス"}>{bonusAchieved ? "★" : "◆"}</span>
               ) : null}
               <p className={`h-[13px] text-[7px] font-black leading-[13px] ${active ? "text-[#8fe8ff]" : "text-[#8292a1]"}`}>{index + 1}</p>
               <div className="flex h-[16px] items-center justify-center gap-[clamp(1px,0.7vw,4px)] border-y border-white/10 bg-black/20">
-                {marks.map((mark, markIndex) => <span key={markIndex} className={`text-[clamp(6px,2vw,9px)] font-black tabular-nums leading-none ${mark === "X" || mark === "/" ? "text-[#ffd66c]" : "text-[#eef7ff]"}`}>{mark || "·"}</span>)}
+                {marks.map((mark, markIndex) => <span key={markIndex} className={`text-[clamp(6px,2vw,9px)] font-black tabular-nums leading-none ${mark === "X" || mark === "/" ? "text-[#ffd66c]" : mark === "◎" ? "text-[#a6ec74]" : "text-[#eef7ff]"}`}>{mark || "·"}</span>)}
               </div>
               <div className="flex h-[21px] items-center justify-center"><DigitalNumber value={result?.cumulativeScore ?? null} /></div>
             </div>

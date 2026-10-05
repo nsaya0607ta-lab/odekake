@@ -1,5 +1,6 @@
 /**
  * レーン奥の看板（LEDの電光掲示板ふう）。右から左へ、文字とわんこが流れていく。
+ * フィーバー中は「FEVER TIME」に変わって速く流れる。
  * 見た目だけ。CSS アニメーション（transform）だけで動かし、毎フレームの処理には入れない。
  */
 import fx from "./bowling-fx.module.css";
@@ -63,12 +64,39 @@ function Reel() {
   );
 }
 
-export function SignMarquee() {
+/** フィーバー中の中身（速く流れる） */
+function FeverReel() {
+  return (
+    <div className={fx.marqueeReel}>
+      <span className={fx.marqueeFire}>🔥</span>
+      <span className={fx.marqueeFever}>FEVER TIME</span>
+      <span className={fx.marqueeFire}>🔥</span>
+      <Dog src="cheer" hop />
+      <span className={fx.marqueeTextGold}>倒した本数 ×2！</span>
+      <Dog src="trot" hop delay={-350} />
+      <span className={fx.marqueeFire}>🔥</span>
+      <span className={fx.marqueeFever}>FEVER TIME</span>
+      <span className={fx.marqueeFire}>🔥</span>
+      <Dog src="roll" />
+    </div>
+  );
+}
+
+export function SignMarquee({ fever = false }: { fever?: boolean }) {
   return (
     <div className={fx.marquee} aria-hidden="true">
-      <div className={fx.marqueeTrack}>
-        <Reel />
-        <Reel />
+      <div className={fever ? `${fx.marqueeTrack} ${fx.marqueeFeverTrack}` : fx.marqueeTrack}>
+        {fever ? (
+          <>
+            <FeverReel />
+            <FeverReel />
+          </>
+        ) : (
+          <>
+            <Reel />
+            <Reel />
+          </>
+        )}
       </div>
       {/* LEDのつぶつぶと、ガラスの映りこみ */}
       <div className={fx.marqueeLed} />

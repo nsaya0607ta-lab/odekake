@@ -2,7 +2,15 @@
 
 import { useCallback, useEffect, useState } from "react";
 
-const GUIDE_SEEN_KEY = "odekake:wanko-bowling:play-guide-seen:v1";
+/** わんこルールを足したので v2 に。前のガイドを見た人にも1回だけ自動で出す */
+const GUIDE_SEEN_KEY = "odekake:wanko-bowling:play-guide-seen:v2";
+
+const WANKO_RULES = [
+  { icon: "🎳", title: "ビッグラック", color: "#ffd84a", text: "ストライクの次はピンが15本。全部倒せばメガストライク！" },
+  { icon: "🔥", title: "フィーバー", color: "#ff8ae0", text: "ターキー（3連続ストライク）のあとのフレームは、倒した本数が2倍。" },
+  { icon: "👑", title: "キングピン", color: "#c38bff", text: "10フレーム目のまんなかの大きなピン。重いので速い球で当てよう。倒すと残りも全部倒れて＋20点。" },
+  { icon: "✂️", title: "スプリット・チャレンジ", color: "#a6ec74", text: "1ゲームに2回、はじめから割れた並びで出てくる。2投以内に全部倒せば＋30点。" },
+];
 
 export function BowlingPlayGuide() {
   const [open, setOpen] = useState(false);
@@ -41,14 +49,14 @@ export function BowlingPlayGuide() {
           onClick={closeGuide}
         >
           <section
-            className="w-full max-w-sm overflow-hidden rounded-[24px] border border-[#34516a] bg-[#09131e] text-white shadow-[0_24px_80px_rgba(0,0,0,0.65)]"
+            className="max-h-[88dvh] w-full max-w-sm overflow-y-auto overscroll-contain rounded-[24px] border border-[#34516a] bg-[#09131e] text-white shadow-[0_24px_80px_rgba(0,0,0,0.65)]"
             onClick={(event) => event.stopPropagation()}
           >
             <div className="relative overflow-hidden border-b border-white/10 px-5 pb-4 pt-5 text-center">
               <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_50%_0%,rgba(84,216,255,0.24),transparent_62%)]" />
               <div className="relative">
                 <p className="text-[9px] font-black tracking-[0.14em] text-[#54d8ff]">プレイガイド</p>
-                <h2 id="bowling-guide-title" className="mt-1 text-xl font-black">投げ方のコツ</h2>
+                <h2 id="bowling-guide-title" className="mt-1 text-xl font-black">投げ方のコツとルール</h2>
                 <p className="mt-1 text-[11px] text-white/50">使う指でボールの軌道を調整できます</p>
               </div>
             </div>
@@ -74,6 +82,22 @@ export function BowlingPlayGuide() {
                   </div>
                 </div>
                 <p className="mt-2 text-[10px] leading-relaxed text-white/45">人差し指は進行方向をまっすぐ保ちやすいため、中央を狙う投げ方に向いています。</p>
+              </div>
+
+              <div className="rounded-[18px] border border-white/10 bg-white/[0.03] p-3">
+                <p className="text-[10px] font-black tracking-[0.12em] text-[#54d8ff]">わんこルール</p>
+                <p className="mt-0.5 text-[9px] text-white/40">300点が上限ではありません。どこまでいけるかな？</p>
+                <ul className="mt-2 space-y-2">
+                  {WANKO_RULES.map((rule) => (
+                    <li key={rule.title} className="flex gap-2.5">
+                      <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-white/[0.06] text-base">{rule.icon}</span>
+                      <div className="min-w-0">
+                        <p className="text-[11px] font-black" style={{ color: rule.color }}>{rule.title}</p>
+                        <p className="text-[10px] leading-relaxed text-white/60">{rule.text}</p>
+                      </div>
+                    </li>
+                  ))}
+                </ul>
               </div>
 
               <div className="rounded-[16px] border border-[#ffc95c]/25 bg-[#ffc95c]/10 px-3 py-3 text-center">

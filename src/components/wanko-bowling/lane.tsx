@@ -2,10 +2,11 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState, type PointerEvent as ReactPointerEvent } from "react";
 import Image from "next/image";
-import { PIN_LAYOUT, PIN_VISUAL_WIDTH_PCT, Pins } from "./pins";
+import { BIG_RACK_SPACING_SCALE, KING_PIN_VISUAL_SCALE, PIN_LAYOUT, PIN_VISUAL_WIDTH_PCT, Pins } from "./pins";
 import { BallTrail, bowlingFx, pinImpact, punch } from "./bowling-fx";
 import { SignMarquee } from "./sign-marquee";
 import type { BowlingBallVisual } from "@/lib/games/wanko-bowling-balls";
+import type { BowlingRack } from "@/lib/games/wanko-bowling-score";
 import {
   AXIS_ROTATION_INPUT_EXPONENT,
   ballInertiaXKgm2,
@@ -100,7 +101,20 @@ type PinBody = {
   standing: boolean;
   moving: boolean;
   visible: boolean;
+  /** キングピンは重く、大きく、倒れにくい */
+  massKg: number;
+  king: boolean;
 };
+
+/** キングピン：ふつうのピンの何倍の重さ・倒れにくさか */
+const KING_PIN_MASS_SCALE = 3;
+const KING_DIRECT_THRESHOLD_SCALE = 1.9;
+const KING_CHAIN_THRESHOLD_SCALE = 2.6;
+const KING_EXTRA_RADIUS_M = PIN_RADIUS_M * 0.4;
+/** キングピンが倒れたとき、まわりのピンをはじく速さ */
+const KING_TOPPLE_SPEED_MPS = 2.6;
+
+const NORMAL_RACK: BowlingRack = { kind: "normal", pinIds: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10], kingPinId: null, splitName: null };
 
 type CollisionResult = {
   avx: number;
@@ -122,6 +136,10 @@ export type LaneRollResult = {
 type LaneProps = {
   ballVisual: BowlingBallVisual;
   goldenPinId?: number | null;
+  /** 次に新しくセットするラック（resetSignal が変わったときに並べなおす） */
+  rack?: BowlingRack;
+  /** フィーバー中（見た目がブラックライトのボウリングになる） */
+  fever?: boolean;
   resetSignal: number;
   newGameSignal: number;
   active: boolean;
@@ -249,7 +267,7 @@ function pinVisualWidthPct(distanceM: number): number {
 
 function pinPairCollisionRadius(a: PinBody, b: PinBody): number {
   const fallReach = Math.max(a.fallProgress, b.fallProgress) * FALLEN_PIN_EXTRA_REACH_M;
-  return PIN_PAIR_RADIUS_M + fallReach;
+  return PIN_PAIR_RADIUS_M + fallReach + (a.king || b.king ? KING_EXTRA_RADIUS_M : 0);
 }
 
 function computeAxisRotation(launchAngleRad: number, curveNorm: number): { axisRotationRad: number; curveSign: number } {
@@ -384,18 +402,27 @@ function estimateCurveNorm(points: Point[], boardWidthPx: number): number {
   return combined * MAX_CURVE_NORM;
 }
 
-function createPinBody(pin: (typeof PIN_LAYOUT)[number]): PinBody {
+/**
+ * ラックに合わせてピンを置く。ラックにないピンは見えない・当たらない状態にする。
+ * ビッグラック（15本）は間隔をつめて5段に並べる。
+ */
+function createPinBody(pin: (typeof PIN_LAYOUT)[number], rack: BowlingRack = NORMAL_RACK): PinBody {
+  const present = rack.pinIds.includes(pin.id);
+  const spacing = rack.kind === "big" ? BIG_RACK_SPACING_SCALE : 1;
+  const king = present && pin.id === rack.kingPinId;
   return {
-    xM: JB_TOTAL_WIDTH_M / 2 + pin.lateralM,
-    yM: JB_HEAD_PIN_DISTANCE_M + pin.forwardM,
+    xM: JB_TOTAL_WIDTH_M / 2 + pin.lateralM * spacing,
+    yM: JB_HEAD_PIN_DISTANCE_M + pin.forwardM * spacing,
     vxMps: 0,
     vyMps: 0,
     angle: 0,
     angularVel: 0,
     fallProgress: 0,
-    standing: true,
+    standing: present,
     moving: false,
-    visible: true,
+    visible: present,
+    massKg: king ? JB_PIN_MASS_KG * KING_PIN_MASS_SCALE : JB_PIN_MASS_KG,
+    king,
   };
 }
 
@@ -462,16 +489,18 @@ function effectiveKnockSpeed(
   vy: number,
   collision: CollisionResult,
   chain: boolean,
+  target?: PinBody,
 ): { speed: number; threshold: number } {
   const travelSpeed = Math.hypot(vx, vy);
-  const impulseVelocity = collision.impulse / JB_PIN_MASS_KG;
+  const impulseVelocity = collision.impulse / (target?.massKg ?? JB_PIN_MASS_KG);
   const sideFactor = Math.abs(collision.normalX);
   const impulseWeight = chain ? CHAIN_IMPULSE_WEIGHT : DIRECT_IMPULSE_WEIGHT;
   const sideBonus = sideFactor * (chain ? CHAIN_SIDE_BONUS_MPS : DIRECT_SIDE_BONUS_MPS);
   const thresholdBase = chain ? PIN_CHAIN_KNOCK_SPEED_MPS : PIN_DIRECT_KNOCK_SPEED_MPS;
-  const threshold = chain
+  const kingScale = target?.king ? (chain ? KING_CHAIN_THRESHOLD_SCALE : KING_DIRECT_THRESHOLD_SCALE) : 1;
+  const threshold = (chain
     ? thresholdBase * (1 - sideFactor * CHAIN_SIDE_THRESHOLD_REDUCTION)
-    : thresholdBase;
+    : thresholdBase) * kingScale;
 
   return {
     speed: travelSpeed + impulseVelocity * impulseWeight + sideBonus,
@@ -542,7 +571,7 @@ const LANE_DOTS = [3, 5, 8, 11, 14, 26, 29, 32, 35, 37].map((board) => {
 /** ピンデッキ（1番ピンのまわり）。上から照らすライトの中心 */
 const DECK_CENTER_Y = worldYToPct(JB_HEAD_PIN_DISTANCE_M + PIN_DECK_DEPTH_M / 2);
 
-function LaneScenery() {
+function LaneScenery({ fever = false }: { fever?: boolean }) {
   return (
     <>
       {/* 板目・スパット・ドット・つや */}
@@ -591,7 +620,7 @@ function LaneScenery() {
         aria-hidden="true"
       >
         <div className="absolute inset-0 opacity-60" style={{ background: "radial-gradient(ellipse at 50% 120%, rgba(84,216,255,0.28), transparent 60%)" }} />
-        <SignMarquee />
+        <SignMarquee fever={fever} />
         {/* ピンを照らすライトの帯 */}
         <div className="absolute inset-x-[30%] bottom-0 h-[3px] rounded-full bg-[#fff4d6] shadow-[0_0_10px_3px_rgba(255,236,190,0.7)]" />
       </div>
@@ -604,7 +633,7 @@ function LaneScenery() {
   );
 }
 
-export function Lane({ ballVisual, goldenPinId = null, resetSignal, newGameSignal, active, onRoll }: LaneProps) {
+export function Lane({ ballVisual, goldenPinId = null, rack = NORMAL_RACK, fever = false, resetSignal, newGameSignal, active, onRoll }: LaneProps) {
   const boardRef = useRef<HTMLDivElement>(null);
   const ballRef = useRef<HTMLDivElement>(null);
   /** 演出用：回転するボール本体（ballRef は位置と大きさだけ）、火花の層、光の尾 */
@@ -616,6 +645,15 @@ export function Lane({ ballVisual, goldenPinId = null, resetSignal, newGameSigna
   useEffect(() => {
     goldenPinIdRef.current = goldenPinId;
   }, [goldenPinId]);
+  /** resetSignal と同じタイミングで変わるので、並べなおす直前に読む（この effect は並べなおしより先に書く） */
+  const rackRef = useRef<BowlingRack>(rack);
+  useEffect(() => {
+    rackRef.current = rack;
+  }, [rack]);
+  const feverRef = useRef(fever);
+  useEffect(() => {
+    feverRef.current = fever;
+  }, [fever]);
   /** ボード実寸(px)。リサイズ時だけ更新し、毎フレームの座標計算はこれを参照する */
   const boardSizeRef = useRef({ w: 0, h: 0 });
   const throwingRef = useRef(false);
@@ -666,19 +704,22 @@ export function Lane({ ballVisual, goldenPinId = null, resetSignal, newGameSigna
     const screenX = worldXToPct(body.xM, body.yM);
     const screenY = worldYToPct(body.yM);
     const widthPct = pinVisualWidthPct(body.yM);
-    const scale = widthPct / PIN_VISUAL_WIDTH_PCT;
+    const kingScale = body.king ? KING_PIN_VISUAL_SCALE : 1;
+    const scale = (widthPct / PIN_VISUAL_WIDTH_PCT) * kingScale;
     const px = anchor ? ((screenX - anchor.x) / 100) * w : 0;
     const py = anchor ? ((screenY - anchor.y) / 100) * h : 0;
+    // キングピンは大きくしても足もとが床につくよう、少し上へずらす
+    const lift = body.king ? `translateY(${(-(kingScale - 1) * 45).toFixed(1)}%) ` : "";
 
     el.style.opacity = body.visible ? "1" : "0";
     el.style.zIndex = String(500 + Math.round(screenY * 10));
     const squashY = 1 - 0.62 * body.fallProgress;
-    el.style.transform = `translate(${px}px, ${py}px) translate(-50%, -50%) rotate(${body.angle}deg) scale(${scale}, ${scale * squashY})`;
+    el.style.transform = `translate(${px}px, ${py}px) translate(-50%, -50%) ${lift}rotate(${body.angle}deg) scale(${scale}, ${scale * squashY})`;
   }, []);
 
   const resetPins = useCallback(() => {
     PIN_LAYOUT.forEach((pin) => {
-      const body = createPinBody(pin);
+      const body = createPinBody(pin, rackRef.current);
       pinBodiesRef.current.set(pin.id, body);
       writePinNode(pin.id, body);
     });
@@ -834,7 +875,7 @@ export function Lane({ ballVisual, goldenPinId = null, resetSignal, newGameSigna
     throwingRef.current = true;
     setIsThrowing(true);
     trailRef.current?.clear();
-    trailRef.current?.setColor(ballVisual.hitColor);
+    trailRef.current?.setColor(feverRef.current ? "#ff7a2e" : ballVisual.hitColor);
     /** 演出の強さ（ボールの速さ 0〜1）と、この投球で最初にピンへ当たったか */
     const fxSpeed = clamp(
       ((launch.speedMps * 3.6) - GAME_MIN_BALL_SPEED_KMH) / Math.max(1, ballMaxSpeedKmh - GAME_MIN_BALL_SPEED_KMH),
@@ -931,6 +972,27 @@ export function Lane({ ballVisual, goldenPinId = null, resetSignal, newGameSigna
         + Math.abs(offset) * 220
         + Math.abs(normalX) * 90;
       body.angularVel = spinDirection * angularMagnitude + (Math.random() - 0.5) * 100;
+
+      // キングピンが倒れたら、残りのピンを外側へはじいて全部倒す（ドミノ）
+      if (body.king) {
+        pinImpact(fxLayerRef.current, {
+          x: worldXToPct(body.xM, body.yM),
+          y: worldYToPct(body.yM) - 2,
+          strength: 1,
+          color: "#c38bff",
+          golden: true,
+          direct: true,
+        });
+        punch(boardRef.current, 1.4);
+        for (const [otherId, other] of pinBodiesRef.current) {
+          if (!other.standing || !other.visible) continue;
+          const dx = other.xM - body.xM;
+          const dy = other.yM - body.yM;
+          const distance = Math.max(0.05, Math.hypot(dx, dy));
+          const speedOut = KING_TOPPLE_SPEED_MPS * (0.8 + Math.random() * 0.4);
+          markKnocked(otherId, other, (dx / distance) * speedOut, (dy / distance) * speedOut + 0.4, body.xM, dx / distance);
+        }
+      }
     };
 
     const finish = () => {
@@ -1051,7 +1113,7 @@ export function Lane({ ballVisual, goldenPinId = null, resetSignal, newGameSigna
               bxM,
               byM,
             );
-            if (closest.distance > PIN_COLLISION_RADIUS_M) continue;
+            if (closest.distance > PIN_COLLISION_RADIUS_M + (body.king ? KING_EXTRA_RADIUS_M : 0)) continue;
 
             const collision = resolvePairCollision(
               closest.x,
@@ -1063,7 +1125,7 @@ export function Lane({ ballVisual, goldenPinId = null, resetSignal, newGameSigna
               body.yM,
               body.vxMps,
               body.vyMps,
-              JB_PIN_MASS_KG,
+              body.massKg,
               BALL_PIN_RESTITUTION,
             );
 
@@ -1087,7 +1149,7 @@ export function Lane({ ballVisual, goldenPinId = null, resetSignal, newGameSigna
               bvxMps = nextVx;
               bvyMps = nextVy;
 
-              const knock = effectiveKnockSpeed(collision.bvx, collision.bvy, collision, false);
+              const knock = effectiveKnockSpeed(collision.bvx, collision.bvy, collision, false, body);
               if (knock.speed >= knock.threshold) {
                 markKnocked(
                   pin.id,
@@ -1130,12 +1192,12 @@ export function Lane({ ballVisual, goldenPinId = null, resetSignal, newGameSigna
             bodyA.yM,
             bodyA.vxMps,
             bodyA.vyMps,
-            JB_PIN_MASS_KG,
+            bodyA.massKg,
             bodyB.xM,
             bodyB.yM,
             bodyB.vxMps,
             bodyB.vyMps,
-            JB_PIN_MASS_KG,
+            bodyB.massKg,
             PIN_PIN_RESTITUTION,
           );
           if (!collision) continue;
@@ -1146,7 +1208,7 @@ export function Lane({ ballVisual, goldenPinId = null, resetSignal, newGameSigna
           bodyB.vyMps = collision.bvy;
 
           if (aWasStanding) {
-            const knockA = effectiveKnockSpeed(collision.avx, collision.avy, collision, true);
+            const knockA = effectiveKnockSpeed(collision.avx, collision.avy, collision, true, bodyA);
             if (knockA.speed >= knockA.threshold) {
               markKnocked(idA, bodyA, collision.avx, collision.avy, bodyB.xM, -collision.normalX);
             } else {
@@ -1156,7 +1218,7 @@ export function Lane({ ballVisual, goldenPinId = null, resetSignal, newGameSigna
           }
 
           if (bWasStanding) {
-            const knockB = effectiveKnockSpeed(collision.bvx, collision.bvy, collision, true);
+            const knockB = effectiveKnockSpeed(collision.bvx, collision.bvy, collision, true, bodyB);
             if (knockB.speed >= knockB.threshold) {
               markKnocked(idB, bodyB, collision.bvx, collision.bvy, bodyA.xM, collision.normalX);
             } else {
@@ -1417,7 +1479,15 @@ export function Lane({ ballVisual, goldenPinId = null, resetSignal, newGameSigna
           <line x1={FAR_LANE_RIGHT} y1="0" x2={NEAR_LANE_RIGHT} y2="100" stroke="rgba(255,235,200,0.52)" strokeWidth="0.55" vectorEffect="non-scaling-stroke" />
         </svg>
 
-        <LaneScenery />
+        <LaneScenery fever={fever} />
+
+      {/* フィーバー中：ブラックライトのボウリング（レーンが暗い紫になり、ネオンが脈打つ） */}
+      {fever ? (
+        <>
+          <div className={bowlingFx.feverShade} style={{ clipPath: `polygon(${FAR_OUTER_LEFT}% 0%, ${FAR_OUTER_RIGHT}% 0%, ${NEAR_OUTER_RIGHT}% 100%, ${NEAR_OUTER_LEFT}% 100%)` }} aria-hidden="true" />
+          <div className={bowlingFx.feverGlow} style={{ clipPath: `polygon(${FAR_LANE_LEFT}% 0%, ${FAR_LANE_RIGHT}% 0%, ${NEAR_LANE_RIGHT}% 100%, ${NEAR_LANE_LEFT}% 100%)` }} aria-hidden="true" />
+        </>
+      ) : null}
 
         <div
           className="pointer-events-none absolute h-[2px] bg-[#8c4735]/75"
@@ -1427,7 +1497,7 @@ export function Lane({ ballVisual, goldenPinId = null, resetSignal, newGameSigna
 
         <canvas ref={trailCanvasRef} className={bowlingFx.trail} style={{ zIndex: 499 }} aria-hidden="true" />
 
-        <Pins registerNode={registerPinNode} goldenPinId={goldenPinId} />
+        <Pins registerNode={registerPinNode} goldenPinId={goldenPinId} kingPinId={rack.kingPinId} fever={fever} />
 
         <div
           ref={ballRef}
