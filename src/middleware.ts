@@ -1,5 +1,6 @@
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
+import { APP_BACKGROUND_COOKIE, isAppBackgroundId } from "@/lib/app-backgrounds";
 import { DOG_SKIN_COOKIE, isDogSkinId } from "@/lib/dog-skins";
 import { getSupabaseEnv } from "@/lib/supabase/env";
 
@@ -106,6 +107,23 @@ export async function middleware(request: NextRequest) {
       .maybeSingle();
     const skinId = isDogSkinId(skinRow?.skin_id) ? skinRow.skin_id : "default";
     response.cookies.set(DOG_SKIN_COOKIE, skinId, {
+      httpOnly: true,
+      sameSite: "lax",
+      secure: process.env.NODE_ENV === "production",
+      path: "/",
+      maxAge: 60 * 60 * 24 * 365,
+    });
+  }
+
+  // ショップで選んだアプリの背景も同じく、Cookieが無いときだけDBから一度読んで焼いておく。
+  // 背景ショップの仕組み（0122）がまだ無い環境では、いつもの背景にしておく。
+  if (isAuthenticated && userId && !isAppBackgroundId(request.cookies.get(APP_BACKGROUND_COOKIE)?.value)) {
+    const from = supabase.from.bind(supabase) as unknown as (t: string) => {
+      select: (c: string) => { eq: (k: string, v: string) => { maybeSingle: () => PromiseLike<{ data: { background_id?: unknown } | null }> } };
+    };
+    const { data: bgRow } = await from("user_app_background_choice").select("background_id").eq("user_id", userId).maybeSingle();
+    const backgroundId = isAppBackgroundId(bgRow?.background_id) ? bgRow.background_id : "default";
+    response.cookies.set(APP_BACKGROUND_COOKIE, backgroundId, {
       httpOnly: true,
       sameSite: "lax",
       secure: process.env.NODE_ENV === "production",

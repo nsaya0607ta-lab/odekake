@@ -22,6 +22,7 @@ const ITEMS = [
     icon: "/icons/navigation/records.webp",
     match: ["/records", "/trips", "/visits", "/spots"],
   },
+  { href: "/shop", label: "ショップ", icon: "/icons/navigation/shop.svg", match: ["/shop"] },
   {
     href: "/mypage",
     label: "マイページ",
@@ -43,9 +44,12 @@ function activeHref(pathname: string): string | null {
 
 export function BottomNav({
   snsLocked = false,
+  shopLocked = false,
   snsUnreadIndicator,
 }: {
   snsLocked?: boolean;
+  /** ショップが準備中（押せない）か */
+  shopLocked?: boolean;
   snsUnreadIndicator?: ReactNode;
 }) {
   const pathname = usePathname();
@@ -67,7 +71,7 @@ export function BottomNav({
         {ITEMS.map(({ href, label, icon, ...rest }) => {
           const center = "center" in rest && rest.center;
           const active = current === href;
-          const locked = href === "/sns" && snsLocked;
+          const locked = (href === "/sns" && snsLocked) || (href === "/shop" && shopLocked);
 
           if (locked) {
             return (
