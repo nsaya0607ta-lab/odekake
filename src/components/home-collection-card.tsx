@@ -40,7 +40,7 @@ export function HomeCollectionCard({
           fill
           sizes="(max-width: 480px) 100vw, 480px"
           draggable={false}
-          className="pointer-events-none select-none"
+          className="home-card-frame pointer-events-none select-none"
         />
         <div className="absolute inset-0 flex items-center" style={{ paddingLeft: "37%", paddingRight: "12%" }}>
           <div className="flex w-full min-w-0 items-center justify-between gap-2">

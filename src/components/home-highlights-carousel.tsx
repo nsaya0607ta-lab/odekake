@@ -217,7 +217,7 @@ function FrameCard({ children }: { children: ReactNode }) {
         fill
         sizes="(max-width: 480px) 100vw, 480px"
         draggable={false}
-        className="pointer-events-none select-none"
+        className="home-card-frame pointer-events-none select-none"
       />
       <div className="absolute inset-0 flex items-center justify-center px-[11%] py-[13%]">{children}</div>
     </div>
