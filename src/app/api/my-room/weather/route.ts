@@ -19,16 +19,25 @@ export async function GET(request: Request) {
     latitude: (Math.round(lat * 100) / 100).toFixed(2),
     longitude: (Math.round(lon * 100) / 100).toFixed(2),
     current: "weather_code,temperature_2m,cloud_cover,precipitation,wind_speed_10m",
+    // ホームのお天気チップ用：きょうの最高・最低気温と、いちばん高い降水確率
+    daily: "temperature_2m_max,temperature_2m_min,precipitation_probability_max",
+    forecast_days: "1",
     timezone: "Asia/Tokyo",
   });
   try {
     const res = await fetch(`https://api.open-meteo.com/v1/forecast?${q}`, { next: { revalidate: 900 }, signal: AbortSignal.timeout(6000) });
     if (!res.ok) throw new Error(`status ${res.status}`);
-    const json = (await res.json()) as { current?: Record<string, unknown> };
+    const json = (await res.json()) as { current?: Record<string, unknown>; daily?: Record<string, unknown> };
     const c = json.current;
+    const today = (key: string) => {
+      const v = json.daily?.[key];
+      return Array.isArray(v) && typeof v[0] === "number" ? v[0] : null;
+    };
     if (!c || typeof c.weather_code !== "number") throw new Error("no current weather");
     return NextResponse.json(
-      { code: c.weather_code, temp: c.temperature_2m ?? null, cloud: c.cloud_cover ?? 0, precip: c.precipitation ?? 0, wind: c.wind_speed_10m ?? 0, at: new Date().toISOString() },
+      { code: c.weather_code, temp: c.temperature_2m ?? null, cloud: c.cloud_cover ?? 0, precip: c.precipitation ?? 0, wind: c.wind_speed_10m ?? 0,
+        tmax: today("temperature_2m_max"), tmin: today("temperature_2m_min"), pop: today("precipitation_probability_max"),
+        at: new Date().toISOString() },
       { headers: { "Cache-Control": "private, max-age=600" } },
     );
   } catch (e) {

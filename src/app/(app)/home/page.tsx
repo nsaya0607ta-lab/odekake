@@ -5,6 +5,7 @@ import { PageBody } from "@/components/page-body";
 import { CoinBadge } from "@/components/coin-badge";
 import { SharedTripBadge } from "@/components/shared-trip-badge";
 import { HomeScene } from "@/components/home-scene";
+import { HomeWeatherChip, HomeWeatherProvider, HomeWeatherSky } from "@/components/home-weather";
 import { HomeCollectionCard } from "@/components/home-collection-card";
 import { HomeHighlightsCarousel } from "@/components/home-highlights-carousel";
 import { HomeNoticeCard } from "@/components/home-notice-card";
@@ -177,62 +178,66 @@ export default async function HomePage({
         <div className="mt-[10px]">
           <section className="rough-card overflow-visible">
             <div className="relative aspect-[1440/768] overflow-visible bg-transparent">
-              <HomeScene>
-                <LevelTag progress={expProgress} />
-                <StepsTag
-                  initialSteps={expDashboard.todaySteps}
-                  initialStepExp={expDashboard.todayStepExp}
-                  initialCoinBalance={coins.balance}
-                />
-              </HomeScene>
-              <WanderingFrenchie level={expProgress.level} skin={dogSkin} />
-
-              <div className="absolute right-2 top-2 z-40 flex w-[132px] flex-col" style={{ gap: 0 }}>
-                <Link
-                  href="/games"
-                  aria-label="ミニゲーム一覧を開く"
-                  className="block aspect-[3/1] w-full overflow-visible rounded-full !border-0 !bg-transparent !p-0 !shadow-none active:scale-[0.97]"
-                  style={{ background: "transparent", boxShadow: "none" }}
-                >
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img
-                    src={MINI_GAME_BUTTON_SRC}
-                    alt="ミニゲーム"
-                    className="block h-full w-full -translate-y-[6px] !bg-transparent object-contain"
-                    style={{ background: "transparent" }}
+              <HomeWeatherProvider>
+                <HomeScene>
+                  <HomeWeatherSky />
+                  <LevelTag progress={expProgress} />
+                  <StepsTag
+                    initialSteps={expDashboard.todaySteps}
+                    initialStepExp={expDashboard.todayStepExp}
+                    initialCoinBalance={coins.balance}
                   />
-                </Link>
+                </HomeScene>
+                <WanderingFrenchie level={expProgress.level} skin={dogSkin} />
+                <HomeWeatherChip />
 
-                <Link
-                  href="/mypage/coins"
-                  aria-label="ガチャを引く"
-                  className="block aspect-[3/1] w-full overflow-visible rounded-full !border-0 !bg-transparent !p-0 !shadow-none active:scale-[0.97]"
-                  style={{ background: "transparent", boxShadow: "none", marginTop: -6 }}
-                >
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img
-                    src={GACHA_BUTTON_SRC}
-                    alt="ガチャを引く"
-                    className="block h-full w-full -translate-y-[9px] !bg-transparent object-contain"
-                    style={{ background: "transparent" }}
-                  />
-                </Link>
+                <div className="absolute right-2 top-2 z-40 flex w-[132px] flex-col" style={{ gap: 0 }}>
+                  <Link
+                    href="/games"
+                    aria-label="ミニゲーム一覧を開く"
+                    className="block aspect-[3/1] w-full overflow-visible rounded-full !border-0 !bg-transparent !p-0 !shadow-none active:scale-[0.97]"
+                    style={{ background: "transparent", boxShadow: "none" }}
+                  >
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img
+                      src={MINI_GAME_BUTTON_SRC}
+                      alt="ミニゲーム"
+                      className="block h-full w-full -translate-y-[6px] !bg-transparent object-contain"
+                      style={{ background: "transparent" }}
+                    />
+                  </Link>
 
-                <Link
-                  href="/room"
-                  aria-label="マイルームを開く"
-                  className="block aspect-[3/1] w-full overflow-visible rounded-full !border-0 !bg-transparent !p-0 !shadow-none active:scale-[0.97]"
-                  style={{ background: "transparent", boxShadow: "none", marginTop: -6 }}
-                >
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img
-                    src={ROOM_BUTTON_SRC}
-                    alt="マイルーム"
-                    className="block h-full w-full -translate-y-[15px] !bg-transparent object-contain"
-                    style={{ background: "transparent" }}
-                  />
-                </Link>
-              </div>
+                  <Link
+                    href="/mypage/coins"
+                    aria-label="ガチャを引く"
+                    className="block aspect-[3/1] w-full overflow-visible rounded-full !border-0 !bg-transparent !p-0 !shadow-none active:scale-[0.97]"
+                    style={{ background: "transparent", boxShadow: "none", marginTop: -6 }}
+                  >
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img
+                      src={GACHA_BUTTON_SRC}
+                      alt="ガチャを引く"
+                      className="block h-full w-full -translate-y-[9px] !bg-transparent object-contain"
+                      style={{ background: "transparent" }}
+                    />
+                  </Link>
+
+                  <Link
+                    href="/room"
+                    aria-label="マイルームを開く"
+                    className="block aspect-[3/1] w-full overflow-visible rounded-full !border-0 !bg-transparent !p-0 !shadow-none active:scale-[0.97]"
+                    style={{ background: "transparent", boxShadow: "none", marginTop: -6 }}
+                  >
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img
+                      src={ROOM_BUTTON_SRC}
+                      alt="マイルーム"
+                      className="block h-full w-full -translate-y-[15px] !bg-transparent object-contain"
+                      style={{ background: "transparent" }}
+                    />
+                  </Link>
+                </div>
+              </HomeWeatherProvider>
             </div>
           </section>
 

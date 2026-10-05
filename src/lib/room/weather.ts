@@ -18,6 +18,11 @@ export type RoomWeather = {
   precip: number;
   /** 風速（km/h） */
   wind: number;
+  /** きょうの最高・最低気温（℃）。取れなければ null */
+  tmax?: number | null;
+  tmin?: number | null;
+  /** きょうの降水確率のいちばん高い値（%）。取れなければ null */
+  pop?: number | null;
   /** 取得した時刻（ISO） */
   at: string;
 };
@@ -82,6 +87,7 @@ export function parseRoomWeather(raw: unknown): RoomWeather | null {
   const num = (v: unknown, d: number) => (typeof v === "number" && Number.isFinite(v) ? v : d);
   if (typeof r.code !== "number") return null;
   const cloud = Math.max(0, Math.min(100, num(r.cloud, 0)));
+  const opt = (v: unknown) => (typeof v === "number" && Number.isFinite(v) ? v : null);
   return {
     kind: weatherKindOf(r.code, cloud),
     code: r.code,
@@ -89,6 +95,9 @@ export function parseRoomWeather(raw: unknown): RoomWeather | null {
     cloud,
     precip: Math.max(0, num(r.precip, 0)),
     wind: Math.max(0, num(r.wind, 0)),
+    tmax: opt(r.tmax),
+    tmin: opt(r.tmin),
+    pop: opt(r.pop) == null ? null : Math.max(0, Math.min(100, opt(r.pop)!)),
     at: typeof r.at === "string" ? r.at : new Date().toISOString(),
   };
 }

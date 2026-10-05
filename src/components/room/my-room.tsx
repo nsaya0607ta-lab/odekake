@@ -93,6 +93,7 @@ import { guestSouvenir, ownedKey, pendingSouvenirs, pruneBrought, SOUVENIR_ACTS,
 import { composeRoomSnapshot } from "./room-snapshot";
 import { skyAt } from "@/lib/room/sun";
 import { parseRoomWeather, withWeather, type RoomWeather } from "@/lib/room/weather";
+import { PLACE_KEY } from "@/lib/home-weather";
 import { EVENT_FLOOR_Y, EventFloor, EventFront } from "./room-events";
 import { dayPhaseOf, FixtureVisual, fixtureSize, lampsOn, ROOM_STAGE, RoomLighting, RoomScene, ThemeSwatch, windowRectOf, type DayPhase } from "./room-scene";
 import { RoomBoard } from "./room-board";
@@ -184,7 +185,6 @@ function freeWallSpot(taken: readonly { x: number; y: number }[], fixtures: read
 }
 
 /** 家具の奥行き（床の上で場所をとる高さ。幅に対する割合） */
-const PLACE_KEY = "odekake-room-place-v1";
 /** 家具の絵の 高さ÷幅（furniture-art.tsx の viewBox） */
 const FURNITURE_RATIO: Record<FurnitureId, number> = { kotatsu: 158 / 240, fishbowl: 168 / 110, tv: 180 / 230, piano: 230 / 240, "rocking-chair": 210 / 160, toybox: 146 / 180, birdcage: 222 / 124, hamster: 150 / 170, record: 176 / 160, fireplace: 204 / 220, fan: 196 / 104, gacha: 196 / 124, whiteboard: 200 / 160, sofa: 150 / 260, "dog-bed": 110 / 190, plant: 190 / 120, bookshelf: 210 / 150, lamp: 220 / 90, table: 120 / 200, "dog-house": 190 / 200, bowl: 58 / 100 };
 /** 犬が遊んでいるあいだの家具の動き（ゆれる・明かりがつく など） */
