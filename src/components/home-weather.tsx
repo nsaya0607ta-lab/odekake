@@ -266,7 +266,7 @@ export function HomeWeatherChip() {
   const at = TEXT_AT[shape];
   return (
     <>
-      <div className="pointer-events-none absolute top-[2.5%] z-40 flex justify-center" style={{ left: "31%", right: 146, fontSize: "clamp(7px, 2.15vw, 10.5px)" }}>
+      <div className="pointer-events-none absolute top-[5%] z-40 flex justify-center" style={{ left: "31%", right: 146, fontSize: "clamp(7px, 2.15vw, 10.5px)" }}>
         <button
           type="button"
           onClick={() => setOpen(true)}
@@ -274,20 +274,20 @@ export function HomeWeatherChip() {
           aria-label={`きょうの天気：${info.label}${w.temp != null ? `、${Math.round(w.temp)}度` : ""}。おさんぽ予報：${f.short}。くわしく見る`}
           className="home-rise pointer-events-auto flex flex-col items-center active:scale-[0.96]"
         >
-          <span className="hw-bob relative block h-[7.7em] w-[9.6em]">
+          <span className="hw-bob relative block h-[5.8em] w-[7.25em]">
             <SkyShape shape={shape} />
             {/* 気温。お日さま・お月さまは真ん中の丸に、雲は雲のおなかに書く */}
             <span className="absolute flex -translate-x-1/2 -translate-y-1/2 flex-col items-center leading-none" style={{ left: `${at.x}%`, top: `${at.y}%` }}>
               {w.temp != null ? (
                 <span className="flex items-start">
-                  <Temp t={w.temp} className="text-[2.15em] font-black tracking-tight [text-shadow:0_1px_0_rgba(255,255,255,.95)]" />
-                  <span className="mt-[0.15em] text-[0.85em] font-bold text-[#8b7a62]">℃</span>
+                  <Temp t={w.temp} className="font-black tracking-tight [text-shadow:0_1px_0_rgba(255,255,255,.95)]" style={{ fontSize: at.size }} />
+                  <span className="mt-[0.1em] text-[0.68em] font-bold text-[#8b7a62]">℃</span>
                 </span>
               ) : (
                 <span className="text-[1.05em] font-black text-[#5b4a35]">{info.label}</span>
               )}
               {w.tmax != null && w.tmin != null ? (
-                <span className="mt-[0.2em] whitespace-nowrap text-[0.78em] font-black tabular-nums [text-shadow:0_1px_0_rgba(255,255,255,.9)]">
+                <span className="mt-[0.15em] whitespace-nowrap text-[0.64em] font-black tabular-nums [text-shadow:0_1px_0_rgba(255,255,255,.9)]">
                   <Temp t={w.tmax} />
                   <span className="text-[#a8987c]"> / </span>
                   <Temp t={w.tmin} />
@@ -296,12 +296,12 @@ export function HomeWeatherChip() {
             </span>
           </span>
           {/* 背景の看板とおなじ形のリボンに、おさんぽ予報 */}
-          <span className="relative -mt-[0.55em] flex items-center [filter:drop-shadow(0_1px_1px_rgba(60,40,20,.25))]">
-            <span className="h-[1.45em] w-[0.85em] translate-y-[0.32em]" style={{ background: tone.dark, clipPath: "polygon(0 0,100% 0,100% 100%,0 100%,45% 50%)" }} />
-            <span className="relative whitespace-nowrap px-[0.65em] py-[0.3em] text-[0.9em] font-black leading-none text-white" style={{ background: tone.solid }}>
+          <span className="relative -mt-[0.3em] flex items-center opacity-[0.93] [filter:drop-shadow(0_1px_1px_rgba(60,40,20,.18))]">
+            <span className="h-[1.15em] w-[0.65em] translate-y-[0.26em]" style={{ background: tone.dark, clipPath: "polygon(0 0,100% 0,100% 100%,0 100%,45% 50%)" }} />
+            <span className="relative whitespace-nowrap px-[0.55em] py-[0.26em] text-[0.74em] font-black leading-none text-white" style={{ background: tone.solid }}>
               {f.mark} {f.short}
             </span>
-            <span className="h-[1.45em] w-[0.85em] translate-y-[0.32em]" style={{ background: tone.dark, clipPath: "polygon(0 0,100% 0,55% 50%,100% 100%,0 100%)" }} />
+            <span className="h-[1.15em] w-[0.65em] translate-y-[0.26em]" style={{ background: tone.dark, clipPath: "polygon(0 0,100% 0,55% 50%,100% 100%,0 100%)" }} />
           </span>
         </button>
       </div>
@@ -320,10 +320,10 @@ const shapeOf = (kind: WeatherKind, phase: SkyPhase): Shape => {
   return "cloud";
 };
 /** 気温を書く位置（しるしの箱に対する％） */
-const TEXT_AT: Record<Shape, { x: number; y: number }> = {
-  sun: { x: 50, y: 50 }, moon: { x: 50, y: 50 },
-  sunCloud: { x: 44, y: 64 }, moonCloud: { x: 44, y: 64 },
-  cloud: { x: 52, y: 58 }, rain: { x: 52, y: 52 }, thunder: { x: 52, y: 52 }, snow: { x: 52, y: 52 }, fog: { x: 52, y: 52 },
+const TEXT_AT: Record<Shape, { x: number; y: number; size: string }> = {
+  sun: { x: 50, y: 50, size: "1.4em" }, moon: { x: 50, y: 50, size: "1.4em" },
+  sunCloud: { x: 44, y: 64, size: "1.5em" }, moonCloud: { x: 44, y: 64, size: "1.5em" },
+  cloud: { x: 52, y: 58, size: "1.55em" }, rain: { x: 52, y: 50, size: "1.5em" }, thunder: { x: 52, y: 50, size: "1.5em" }, snow: { x: 52, y: 50, size: "1.5em" }, fog: { x: 52, y: 50, size: "1.5em" },
 };
 
 /** 雲の形（100×80 の箱） */
@@ -352,9 +352,9 @@ function Rays({ cx, cy, r, len, color }: { cx: number; cy: number; r: number; le
 function SunDisk({ cx, cy, r, inner }: { cx: number; cy: number; r: number; inner?: boolean }) {
   return (
     <>
-      <Rays cx={cx} cy={cy} r={r + 2.5} len={r * 0.42} color="#F6BE3E" />
-      <circle cx={cx} cy={cy} r={r} fill="url(#hwSun)" stroke="#E8A52C" strokeWidth="1" />
-      {inner ? <circle cx={cx} cy={cy} r={r * 0.74} fill="#FFFDF4" opacity=".95" /> : null}
+      <Rays cx={cx} cy={cy} r={r + 2.5} len={r * 0.36} color="#F8D27A" />
+      <circle cx={cx} cy={cy} r={r} fill="url(#hwSun)" stroke="#EFC067" strokeWidth=".8" />
+      {inner ? <circle cx={cx} cy={cy} r={r * 0.76} fill="#FFFBEA" opacity=".85" /> : null}
     </>
   );
 }
@@ -366,7 +366,7 @@ function MoonDisk({ cx, cy, r, inner }: { cx: number; cy: number; r: number; inn
       <circle cx={cx} cy={cy} r={r} fill="url(#hwMoon)" stroke="#D9C27A" strokeWidth="1" />
       <circle cx={cx - r * 0.45} cy={cy - r * 0.5} r={r * 0.12} fill="#E6D492" opacity=".7" />
       <circle cx={cx + r * 0.55} cy={cy + r * 0.35} r={r * 0.09} fill="#E6D492" opacity=".7" />
-      {inner ? <circle cx={cx} cy={cy} r={r * 0.74} fill="#FFFDF4" opacity=".95" /> : null}
+      {inner ? <circle cx={cx} cy={cy} r={r * 0.76} fill="#FFFBEA" opacity=".85" /> : null}
     </>
   );
 }
@@ -386,9 +386,9 @@ function SkyShape({ shape }: { shape: Shape }) {
     </g>
   );
   return (
-    <svg viewBox="0 0 100 80" className="absolute inset-0 h-full w-full overflow-visible [filter:drop-shadow(0_2px_3px_rgba(70,60,40,.18))]" aria-hidden="true">
+    <svg viewBox="0 0 100 80" className="absolute inset-0 h-full w-full overflow-visible opacity-[0.94] [filter:drop-shadow(0_1px_2px_rgba(70,60,40,.12))]" aria-hidden="true">
       <defs>
-        <radialGradient id="hwSun" cx="38%" cy="32%" r="75%"><stop offset="0" stopColor="#FFF0A8" /><stop offset=".6" stopColor="#FFD45A" /><stop offset="1" stopColor="#F5B12F" /></radialGradient>
+        <radialGradient id="hwSun" cx="38%" cy="32%" r="75%"><stop offset="0" stopColor="#FFF4C4" /><stop offset=".6" stopColor="#FFE08E" /><stop offset="1" stopColor="#F6C661" /></radialGradient>
         <radialGradient id="hwMoon" cx="38%" cy="32%" r="75%"><stop offset="0" stopColor="#FFFBE6" /><stop offset="1" stopColor="#F1DE9A" /></radialGradient>
         <linearGradient id="hwCloud" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stopColor={c0} /><stop offset="1" stopColor={c1} /></linearGradient>
       </defs>
