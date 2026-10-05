@@ -28,13 +28,10 @@ export function HomeNoticeCard({
   const summary = unreadCount > 0 ? `新着情報が${unreadCount}件あります` : "すべて既読済み";
 
   return (
-    <Link
-      href="/notices"
-      className="pressable relative block active:scale-[0.99]"
-      style={{ marginLeft: -9, marginRight: -12, marginTop: 13 }}
-      aria-label={`お知らせ。${summary}`}
-    >
+    <div className="relative block" style={{ marginLeft: -9, marginRight: -12, marginTop: 13 }}>
       <div className="relative w-full" style={{ aspectRatio: CARD_RATIO }}>
+        {/* カード全体（タイトル以外の場所）は、お知らせ一覧へ。タイトルはそれぞれのお知らせへ */}
+        <Link href="/notices" aria-label={`お知らせ一覧。${summary}`} className="pressable absolute inset-0 z-0 block active:scale-[0.99]" />
         <Image
           src={CARD_SRC}
           alt=""
@@ -44,7 +41,7 @@ export function HomeNoticeCard({
           draggable={false}
           className="pointer-events-none select-none"
         />
-        <div className="absolute inset-0 flex items-center gap-1" style={{ paddingLeft: "37%", paddingRight: "8%" }}>
+        <div className="pointer-events-none absolute inset-0 z-10 flex items-center gap-1" style={{ paddingLeft: "37%", paddingRight: "8%" }}>
           <div className="flex min-w-0 flex-1 flex-col gap-1">
             {/* 見出し（新着の数）。右の花の絵にかからないよう短く、数はバッジで目立たせる */}
             <p
@@ -55,7 +52,7 @@ export function HomeNoticeCard({
               {unreadCount > 0 ? (
                 <>
                   新着
-                  <span className="rounded-full bg-[#E8604A] px-1.5 py-px text-[11px] font-black leading-tight text-white tabular-nums">{unreadCount}</span>
+                  <span className="home-badge-pulse rounded-full bg-[#E8604A] px-1.5 py-px text-[11px] font-black leading-tight text-white tabular-nums">{unreadCount}</span>
                   件
                 </>
               ) : (
@@ -68,11 +65,16 @@ export function HomeNoticeCard({
                 const notice = latest[rowIndex];
                 if (notice) {
                   return (
-                    <div key={notice.id} className={`flex min-w-0 items-center gap-1.5 text-xs ${notice.is_read ? "text-ink-faint" : "font-bold text-ink-soft"}`}>
+                    <Link
+                      key={notice.id}
+                      href={`/notices/${notice.id}`}
+                      aria-label={`${notice.is_read ? "" : "未読 "}${notice.title}`}
+                      className={`pointer-events-auto -my-0.5 flex min-w-0 items-center gap-1.5 rounded-md py-0.5 text-xs active:bg-white/60 ${notice.is_read ? "text-ink-faint" : "font-bold text-ink-soft"}`}
+                    >
                       {/* まだ読んでいないものは色つきの点 */}
                       <span aria-hidden="true" className={`block h-1.5 w-1.5 shrink-0 rounded-full ${notice.is_read ? "bg-line-strong" : "bg-[#E8604A]"}`} />
                       <MarqueeText text={notice.title} className="min-w-0 flex-1" />
-                    </div>
+                    </Link>
                   );
                 }
                 // お知らせが3件無い時も高さが変わらないように、見えないダミー行で埋める。
@@ -95,6 +97,6 @@ export function HomeNoticeCard({
           />
         </div>
       </div>
-    </Link>
+    </div>
   );
 }

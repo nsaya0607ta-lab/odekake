@@ -49,7 +49,7 @@ export function HomeCollectionCard({
               {/* 集めた割合（バーと％） */}
               <div className="mt-1 flex items-center gap-1.5">
                 <span className="block h-1.5 min-w-0 flex-1 overflow-hidden rounded-full bg-[#EADFC8]">
-                  <span className="block h-full rounded-full bg-[linear-gradient(90deg,#8CCB74,#5E8C4A)]" style={{ width: `${total > 0 ? Math.min(100, (collected / total) * 100) : 0}%` }} />
+                  <span className="home-shine block h-full rounded-full bg-[linear-gradient(90deg,#8CCB74,#5E8C4A)]" style={{ width: `${total > 0 ? Math.min(100, (collected / total) * 100) : 0}%` }} />
                 </span>
                 <span className="shrink-0 text-[10px] font-bold tabular-nums text-ink-faint">{total > 0 ? Math.floor((collected / total) * 100) : 0}%</span>
               </div>
