@@ -124,8 +124,8 @@
     radial-gradient(70% 18% at 60% 30%, rgba(169, 155, 203, 0.22), transparent 70%),
     radial-gradient(60% 40% at 15% 0%, rgba(80, 100, 170, 0.45), transparent 70%),
     linear-gradient(180deg, #1a2140, #2a2f55 60%, #3b3560);
-  background-size: 210px 210px, 330px 330px, auto, auto, auto;
-  background-position: 0 0, 70px 110px, 0 0, 0 0, 0 0;
+  background-size: 210px 210px, 210px 210px, 210px 210px, 210px 210px, 210px 210px, 330px 330px, 330px 330px, 330px 330px, 330px 330px, 330px 330px, auto, auto, auto;
+  background-position: 0 0, 0 0, 0 0, 0 0, 0 0, 70px 110px, 70px 110px, 70px 110px, 70px 110px, 70px 110px, 0 0, 0 0, 0 0;
 }
 
 /* ---- パステルオーロラ（ゆっくり回る） ---- */
@@ -174,6 +174,6 @@
   background-image: radial-gradient(1.2px 1.2px at 20px 30px, #fff, transparent), radial-gradient(1px 1px at 90px 120px, rgba(255,255,255,.55), transparent), radial-gradient(1.6px 1.6px at 150px 60px, #fff, transparent), radial-gradient(1px 1px at 60px 170px, rgba(255,255,255,.65), transparent), radial-gradient(1.3px 1.3px at 180px 190px, #fff, transparent), radial-gradient(1.2px 1.2px at 20px 30px, #fff, transparent), radial-gradient(1px 1px at 90px 120px, rgba(255,255,255,.55), transparent), radial-gradient(1.6px 1.6px at 150px 60px, #fff, transparent), radial-gradient(1px 1px at 60px 170px, rgba(255,255,255,.65), transparent), radial-gradient(1.3px 1.3px at 180px 190px, #fff, transparent),
     radial-gradient(18% 9% at 82% 8%, rgba(255, 246, 210, 0.35), transparent 70%),
     linear-gradient(180deg, #1e2546, #343a66 70%, #4a4470);
-  background-size: 210px 210px, 330px 330px, auto, auto;
-  background-position: 0 0, 70px 110px, 0 0, 0 0;
+  background-size: 210px 210px, 210px 210px, 210px 210px, 210px 210px, 210px 210px, 330px 330px, 330px 330px, 330px 330px, 330px 330px, 330px 330px, auto, auto;
+  background-position: 0 0, 0 0, 0 0, 0 0, 0 0, 70px 110px, 70px 110px, 70px 110px, 70px 110px, 70px 110px, 0 0, 0 0;
 }

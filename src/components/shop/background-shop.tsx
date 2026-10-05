@@ -2,79 +2,65 @@
 
 /**
  * ショップ：アプリの背景を青コインで買って、使う背景を選ぶ。
- * 見本は、ホーム画面を小さくした絵の後ろに、本物と同じ背景（app-backgrounds.css）を描いている。
+ * 見本は、本物と同じ背景（app-backgrounds.css）だけを描いている。
  */
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useEffect, useRef, useState } from "react";
+import { useState } from "react";
 import { AppBackgroundPreview } from "@/components/app-background";
 import { BlueCoinArt } from "@/components/coin-art";
 import { BlueCoinBar } from "@/components/room/room-shop";
-import { APP_BACKGROUNDS, getAppBackground, type AppBackgroundId } from "@/lib/app-backgrounds";
+import { APP_BACKGROUNDS, getAppBackground, skyTimeOf, type AppBackgroundId, type SkyTime } from "@/lib/app-backgrounds";
 
-/** 見本の元の大きさ（スマホの画面の幅） */
-const PREVIEW_WIDTH = 390;
-const PREVIEW_HEIGHT = 600;
+/** 時間で変わる空の見本に並べる時間帯 */
+const SKY_TIMES: { time: SkyTime; label: string }[] = [
+  { time: "morning", label: "朝" },
+  { time: "day", label: "昼" },
+  { time: "evening", label: "夕方" },
+  { time: "night", label: "夜" },
+];
 
-/** ホーム画面を小さくした見本。枠の幅に合わせて縮める */
-function BackgroundPreview({ id, className = "" }: { id: AppBackgroundId; className?: string }) {
-  const frameRef = useRef<HTMLDivElement>(null);
-  const [scale, setScale] = useState(0.4);
-
-  useEffect(() => {
-    const frame = frameRef.current;
-    if (!frame) return;
-    const observer = new ResizeObserver(([entry]) => {
-      if (entry) setScale(entry.contentRect.width / PREVIEW_WIDTH);
-    });
-    observer.observe(frame);
-    return () => observer.disconnect();
-  }, []);
-
-  const glass = id !== "default";
+/**
+ * 背景だけの見本。zoom で柄の大きさを決める（1 で実際の画面と同じ大きさ）。
+ * 中身を zoom 分の1の大きさで描いてから縮めるので、小さな枠でも柄の密度が実物に近く見える。
+ */
+function Swatch({ id, time, zoom }: { id: AppBackgroundId; time?: SkyTime; zoom: number }) {
+  const size = `${100 / zoom}%`;
   return (
-    <div
-      ref={frameRef}
-      className={`relative w-full overflow-hidden ${className}`}
-      style={{ aspectRatio: `${PREVIEW_WIDTH} / ${PREVIEW_HEIGHT}` }}
-      aria-hidden="true"
-    >
-      <div
-        className="absolute left-0 top-0 origin-top-left"
-        style={{ width: PREVIEW_WIDTH, height: PREVIEW_HEIGHT, transform: `scale(${scale})` }}
-      >
-        <AppBackgroundPreview id={id} />
-        <div className="relative flex h-full flex-col">
-          <div className={`flex h-16 shrink-0 items-center gap-3 border-b px-4 ${glass ? "border-line/45 bg-[rgba(255,253,248,.6)]" : "border-line bg-paper/92"}`}>
-            <span className="h-10 w-10 rounded-full bg-paper-deep" />
-            <span className="h-4 w-20 rounded-full bg-ink-faint/40" />
-            <span className="ml-auto h-8 w-24 rounded-full bg-sun-soft" />
-          </div>
-          <div className="flex flex-1 flex-col gap-3 px-4 pt-4">
-            <div className="rough-card relative h-[190px] overflow-hidden">
-              <div className="absolute inset-x-0 bottom-0 h-[55%] bg-[linear-gradient(180deg,#cfe3b4,#b8d59a)]" />
-              <div className="absolute left-[18%] top-[22%] h-24 w-40 rounded-[50%] bg-[#bcd6b0]" />
-              <div className="absolute right-3 top-3 flex w-[120px] flex-col gap-1.5">
-                <span className="h-8 rounded-full bg-[#fff5df]" />
-                <span className="h-8 rounded-full bg-[#fff5df]" />
-                <span className="h-8 rounded-full bg-[#fff5df]" />
-              </div>
-            </div>
-            <div className="rough-card h-[78px]" />
-            <div className="rough-card h-[150px]" />
-          </div>
-          <div className={`flex h-[70px] shrink-0 items-center justify-around border-t px-4 ${glass ? "border-line/45 bg-[rgba(255,253,248,.66)]" : "border-line bg-card/95"}`}>
-            {[0, 1, 2, 3, 4, 5, 6].map((i) => (
-              <span key={i} className={`rounded-xl bg-ink-faint/25 ${i === 3 ? "h-11 w-11" : "h-7 w-7"}`} />
-            ))}
-          </div>
-        </div>
+    <div className="absolute inset-0 overflow-hidden" aria-hidden="true">
+      <div className="absolute left-0 top-0 origin-top-left" style={{ width: size, height: size, transform: `scale(${zoom})` }}>
+        <AppBackgroundPreview id={id} time={time} />
       </div>
     </div>
   );
 }
 
+/** 一覧・大きな見本の絵。時間で変わる空は、朝・昼・夕方・夜を縦に4つ並べる */
+function BackgroundArt({ id, zoom }: { id: AppBackgroundId; zoom: number }) {
+  if (id !== "sky-clock") return <Swatch id={id} zoom={zoom} />;
+  return (
+    <div className="absolute inset-0 grid grid-cols-4" aria-hidden="true">
+      {SKY_TIMES.map(({ time }) => (
+        <div key={time} className="relative">
+          <Swatch id={id} time={time} zoom={zoom} />
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function CheckIcon({ className }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 16 16" className={className} aria-hidden="true">
+      <path d="M3.5 8.4 6.6 11.4 12.6 4.8" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  );
+}
+
 type Status = "using" | "owned" | "locked";
+
+/** 一覧のタイルと大きな見本の、すりガラスの札 */
+const GLASS = "bg-[rgba(255,253,248,.8)] backdrop-blur-md [-webkit-backdrop-filter:blur(12px)]";
 
 export function BackgroundShop({ current: initialCurrent, owned: initialOwned, blueCoins: initialBlueCoins }: {
   current: AppBackgroundId;
@@ -88,13 +74,32 @@ export function BackgroundShop({ current: initialCurrent, owned: initialOwned, b
   const [selected, setSelected] = useState<AppBackgroundId | null>(null);
 
   const statusOf = (id: AppBackgroundId): Status => (id === current ? "using" : owned.has(id) ? "owned" : "locked");
+  const currentBg = getAppBackground(current);
 
   return (
     <>
       <BlueCoinBar shop={{ blueCoins }} note="買った背景は、アプリ全体の背景になります。いつでも切り替えられます。" />
 
+      <button
+        type="button"
+        onClick={() => setSelected(current)}
+        className="relative block aspect-[16/7] w-full overflow-hidden rounded-[22px] text-left shadow-[0_6px_18px_rgba(90,70,40,.14)] ring-1 ring-[rgba(120,100,70,.14)] active:scale-[.99]"
+      >
+        <BackgroundArt id={current} zoom={0.85} />
+        <span className={`absolute bottom-2.5 left-2.5 flex items-center gap-2 rounded-2xl px-3 py-2 shadow-sm ${GLASS}`}>
+          <span className="flex h-6 w-6 items-center justify-center rounded-full bg-leaf text-white"><CheckIcon className="h-3.5 w-3.5" /></span>
+          <span className="min-w-0">
+            <span className="block text-[10px] font-bold text-ink-faint">いま使っている背景</span>
+            <span className="block text-sm font-black">{currentBg.name}</span>
+          </span>
+        </span>
+      </button>
+
       <section>
-        <h2 className="px-1 text-base font-bold">背景</h2>
+        <div className="flex items-baseline justify-between px-1">
+          <h2 className="text-base font-bold">背景</h2>
+          <span className="text-[11px] text-ink-faint">タップで大きく見られます</span>
+        </div>
         <div className="mt-2 grid grid-cols-2 gap-3">
           {APP_BACKGROUNDS.map((bg) => {
             const status = statusOf(bg.id);
@@ -103,17 +108,26 @@ export function BackgroundShop({ current: initialCurrent, owned: initialOwned, b
                 key={bg.id}
                 type="button"
                 onClick={() => setSelected(bg.id)}
-                className={`flex min-w-0 flex-col overflow-hidden rounded-2xl border bg-card text-left shadow-sm transition active:scale-[.98] ${status === "using" ? "border-leaf ring-2 ring-leaf/40" : "border-line"}`}
+                aria-label={`${bg.name}（${status === "using" ? "使用中" : status === "owned" ? "持っています" : `青コイン${bg.price.toLocaleString()}枚`}）`}
+                className={`flex min-w-0 flex-col rounded-[22px] bg-card p-1.5 text-left shadow-[0_6px_16px_rgba(90,70,40,.1)] transition active:scale-[.98] ${
+                  status === "using" ? "ring-[2.5px] ring-leaf" : "ring-1 ring-[rgba(120,100,70,.14)]"
+                }`}
               >
-                <span className="relative block">
-                  <BackgroundPreview id={bg.id} />
+                {/* 見本の上には何も重ねず、背景そのものを見せる（しるしは角に小さく） */}
+                <span className="relative block aspect-[4/5] w-full overflow-hidden rounded-[17px] ring-1 ring-inset ring-[rgba(120,100,70,.08)]">
+                  <BackgroundArt id={bg.id} zoom={0.6} />
                   {bg.tag ? (
-                    <span className="absolute left-1.5 top-1.5 rounded-full bg-card/90 px-2 py-0.5 text-[10px] font-bold text-leaf-deep">{bg.tag}</span>
+                    <span className={`absolute left-1.5 top-1.5 rounded-full px-2 py-0.5 text-[10px] font-black text-leaf-deep shadow-sm ${GLASS}`}>{bg.tag}</span>
+                  ) : null}
+                  {status === "using" ? (
+                    <span className="absolute right-1.5 top-1.5 flex h-6 w-6 items-center justify-center rounded-full bg-leaf text-white shadow-md">
+                      <CheckIcon className="h-3.5 w-3.5" />
+                    </span>
                   ) : null}
                 </span>
-                <span className="flex flex-col gap-1 px-2.5 pb-2.5 pt-2">
-                  <span className="truncate text-sm font-bold">{bg.name}</span>
-                  <span className="truncate text-[11px] text-ink-faint">{bg.sub}</span>
+                <span className="flex flex-col gap-1 px-1 pb-0.5 pt-2">
+                  <span className="truncate text-[13px] font-black leading-tight">{bg.name}</span>
+                  <span className="truncate text-[10px] leading-tight text-ink-faint">{bg.sub}</span>
                   <StatusPill status={status} price={bg.price} />
                 </span>
               </button>
@@ -145,13 +159,13 @@ export function BackgroundShop({ current: initialCurrent, owned: initialOwned, b
 
 function StatusPill({ status, price }: { status: Status; price: number }) {
   if (status === "using") {
-    return <span className="rounded-full bg-leaf py-1 text-center text-[11px] font-black text-white">使用中</span>;
+    return <span className="mt-0.5 rounded-full bg-leaf py-1 text-center text-[11px] font-black text-white">使用中</span>;
   }
   if (status === "owned") {
-    return <span className="rounded-full bg-leaf-soft py-1 text-center text-[11px] font-black text-leaf-deep">持っています</span>;
+    return <span className="mt-0.5 rounded-full bg-leaf-soft py-1 text-center text-[11px] font-black text-leaf-deep">持っています</span>;
   }
   return (
-    <span className="flex items-center justify-center gap-1 rounded-full bg-[#2F6FC2] py-1 text-[11px] font-black tabular-nums text-white">
+    <span className="mt-0.5 flex items-center justify-center gap-1 rounded-full bg-[#2F6FC2] py-1 text-[11px] font-black tabular-nums text-white">
       <BlueCoinArt className="h-3.5 w-3.5 shrink-0" />
       {price.toLocaleString()}
     </span>
@@ -169,6 +183,7 @@ function BackgroundDialog({ id, status, blueCoins, onClose, onBought, onApplied 
   const bg = getAppBackground(id);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [skyTime, setSkyTime] = useState<SkyTime>(() => skyTimeOf(new Date()));
   const short = status === "locked" ? bg.price - blueCoins : 0;
 
   async function request(method: "POST" | "PATCH") {
@@ -201,7 +216,7 @@ function BackgroundDialog({ id, status, blueCoins, onClose, onBought, onApplied 
 
   return (
     <div
-      className="fixed inset-0 z-[700] flex items-end justify-center bg-[#140f22]/55 p-4 sm:items-center"
+      className="fixed inset-0 z-[700] flex items-end justify-center bg-[#140f22]/55 p-3 sm:items-center"
       role="dialog"
       aria-modal="true"
       aria-label={bg.name}
@@ -209,59 +224,80 @@ function BackgroundDialog({ id, status, blueCoins, onClose, onBought, onApplied 
         if (e.target === e.currentTarget && !busy) onClose();
       }}
     >
-      <div className="max-h-full w-full max-w-sm overflow-y-auto rounded-3xl bg-card p-4 shadow-2xl">
-        <div className="mx-auto w-[62%] overflow-hidden rounded-2xl border border-line">
-          <BackgroundPreview id={id} />
+      <div className="max-h-full w-full max-w-sm overflow-y-auto rounded-[28px] bg-card p-3 shadow-2xl">
+        <div className="relative aspect-[4/5] w-full overflow-hidden rounded-[22px] ring-1 ring-[rgba(120,100,70,.14)]">
+          {/* 大きな見本は、実際の画面と同じ大きさの柄で見せる */}
+          <Swatch id={id} time={id === "sky-clock" ? skyTime : undefined} zoom={1} />
+          {bg.tag ? (
+            <span className={`absolute left-3 top-3 rounded-full px-2.5 py-1 text-[11px] font-black text-leaf-deep shadow-sm ${GLASS}`}>{bg.tag}</span>
+          ) : null}
+          {status === "using" ? (
+            <span className={`absolute right-3 top-3 flex items-center gap-1 rounded-full px-2.5 py-1 text-[11px] font-black text-leaf-deep shadow-sm ${GLASS}`}>
+              <CheckIcon className="h-3.5 w-3.5" />使用中
+            </span>
+          ) : null}
+          {id === "sky-clock" ? (
+            <div className={`absolute inset-x-3 bottom-3 grid grid-cols-4 gap-1 rounded-2xl p-1 shadow-sm ${GLASS}`} role="group" aria-label="時間帯を選んで見る">
+              {SKY_TIMES.map(({ time, label }) => (
+                <button
+                  key={time}
+                  type="button"
+                  aria-pressed={skyTime === time}
+                  onClick={() => setSkyTime(time)}
+                  className={`rounded-xl py-1.5 text-[11px] font-black transition ${skyTime === time ? "bg-ink text-card" : "text-ink-soft"}`}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
+          ) : null}
         </div>
-        <div className="mt-3 flex items-center gap-2">
-          <p className="text-base font-black">{bg.name}</p>
-          {bg.tag ? <span className="rounded-full border border-leaf px-2 py-0.5 text-[10px] font-bold text-leaf-deep">{bg.tag}</span> : null}
-        </div>
-        <p className="mt-1 text-[12px] leading-relaxed text-ink-soft">{bg.description}</p>
-        {status === "locked" ? (
-          <>
-            <p className="mt-2 flex items-center gap-1 text-sm font-black tabular-nums text-[#1F4F8F]">
-              <BlueCoinArt className="h-4 w-4" />
-              {bg.price.toLocaleString()}枚
-              <span className="ml-1 text-[11px] font-bold text-ink-faint">
+
+        <div className="px-1.5 pb-1 pt-3">
+          <p className="text-lg font-black">{bg.name}</p>
+          <p className="mt-1 text-[12px] leading-relaxed text-ink-soft">{bg.description}</p>
+          {status === "locked" ? (
+            <p className="mt-2.5 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-sm font-black tabular-nums text-[#1F4F8F]">
+              <span className="flex items-center gap-1"><BlueCoinArt className="h-4 w-4" />{bg.price.toLocaleString()}枚</span>
+              <span className="text-[11px] font-bold text-ink-faint">
                 のこり {blueCoins.toLocaleString()}枚{short <= 0 ? ` → ${(blueCoins - bg.price).toLocaleString()}枚` : ""}
               </span>
             </p>
-            {short > 0 ? (
-              <p className="mt-2 rounded-2xl bg-[#FFF1F3] px-3 py-2 text-center text-[12px] font-bold text-[#b94c60]">
-                青コインが あと{short.toLocaleString()}枚 たりません
-              </p>
-            ) : null}
-          </>
-        ) : null}
-        {error ? (
-          <p role="alert" className="mt-2 rounded-2xl bg-[#FFF1F3] px-3 py-2 text-center text-[12px] font-bold text-[#b94c60]">{error}</p>
-        ) : null}
-        <div className="mt-3 grid grid-cols-2 gap-2">
-          <button
-            type="button"
-            disabled={busy}
-            onClick={onClose}
-            className="rounded-full border border-line bg-paper py-2.5 text-sm font-bold text-ink-soft active:scale-[.98]"
-          >
-            {status === "using" ? "とじる" : "やめる"}
-          </button>
-          {status === "using" ? (
-            <span className="rounded-full bg-leaf-soft py-2.5 text-center text-sm font-black text-leaf-deep">使用中です</span>
-          ) : short > 0 ? (
-            <Link href="/games/osanpo-run" className="rounded-full bg-[#2F6FC2] py-2.5 text-center text-sm font-black text-white active:scale-[.98]">
-              おさんぽで ためる
-            </Link>
-          ) : (
+          ) : null}
+          {short > 0 ? (
+            <p className="mt-2 rounded-2xl bg-[#FFF1F3] px-3 py-2 text-center text-[12px] font-bold text-[#b94c60]">
+              青コインが あと{short.toLocaleString()}枚 たりません
+            </p>
+          ) : null}
+          {error ? (
+            <p role="alert" className="mt-2 rounded-2xl bg-[#FFF1F3] px-3 py-2 text-center text-[12px] font-bold text-[#b94c60]">{error}</p>
+          ) : null}
+          <div className="mt-3 grid grid-cols-2 gap-2">
             <button
               type="button"
               disabled={busy}
-              onClick={() => void apply()}
-              className={`rounded-full py-2.5 text-sm font-black text-white shadow-md active:scale-[.98] disabled:opacity-60 ${status === "locked" ? "bg-[#2F6FC2]" : "bg-leaf"}`}
+              onClick={onClose}
+              className="rounded-full border border-line bg-paper py-2.5 text-sm font-bold text-ink-soft active:scale-[.98]"
             >
-              {busy ? "変えています…" : status === "locked" ? "買って使う" : "この背景にする"}
+              {status === "using" ? "とじる" : "やめる"}
             </button>
-          )}
+            {status === "using" ? (
+              <span className="rounded-full bg-leaf-soft py-2.5 text-center text-sm font-black text-leaf-deep">使用中です</span>
+            ) : short > 0 ? (
+              <Link href="/games/osanpo-run" className="rounded-full bg-[#2F6FC2] py-2.5 text-center text-sm font-black text-white active:scale-[.98]">
+                おさんぽで ためる
+              </Link>
+            ) : (
+              <button
+                type="button"
+                disabled={busy}
+                onClick={() => void apply()}
+                className={`rounded-full py-2.5 text-sm font-black text-white shadow-md active:scale-[.98] disabled:opacity-60 ${status === "locked" ? "bg-[#2F6FC2]" : "bg-leaf"}`}
+              >
+                {busy ? "変えています…" : status === "locked" ? "買って使う" : "この背景にする"}
+              </button>
+            )}
+          </div>
         </div>
       </div>
     </div>

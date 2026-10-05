@@ -40,9 +40,10 @@ export function AppBackground({ id }: { id: AppBackgroundId }) {
   );
 }
 
-/** ショップの見本用。枠の中に、その背景を描く（時間で変わる空は、今の時間帯で見せる） */
-export function AppBackgroundPreview({ id }: { id: AppBackgroundId }) {
-  const skyTime = useSkyTime(id === "sky-clock");
+/** ショップの見本用。枠の中に、その背景を描く（時間で変わる空は、time が無ければ今の時間帯で見せる） */
+export function AppBackgroundPreview({ id, time }: { id: AppBackgroundId; time?: SkyTime }) {
+  const currentSkyTime = useSkyTime(id === "sky-clock" && !time);
+  const skyTime = time ?? currentSkyTime;
   return (
     <div
       className="app-bg app-bg-preview"
