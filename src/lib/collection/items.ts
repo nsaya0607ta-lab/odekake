@@ -311,6 +311,18 @@ const CURATED_ITEMS: readonly CollectionItem[] = [
   { id: "sushi_awabi", name: "活アワビ握り", image: "/collection/items/sushi-awabi.webp", category: "food", series: "sushi", rarity: "UR" },
   { id: "sushi_kue", name: "天然クエ握り", image: "/collection/items/sushi-kue.webp", category: "food", series: "sushi", rarity: "LR" },
 
+  // --- 都道府県図鑑：長野県（都道府県ガチャ） ----------------------------
+  { id: "nagano_shinshu_soba", name: "信州そば", image: "/collection/items/nagano-shinshu-soba.webp", category: "food", series: null, rarity: "N", pref: "20" },
+  { id: "nagano_oyaki", name: "おやき", image: "/collection/items/nagano-oyaki.webp", category: "food", series: null, rarity: "N", pref: "20" },
+  { id: "nagano_nozawana", name: "野沢菜漬け", image: "/collection/items/nagano-nozawana.webp", category: "food", series: null, rarity: "N", pref: "20" },
+  { id: "nagano_apple", name: "信州りんご", image: "/collection/items/nagano-apple.webp", category: "food", series: null, rarity: "R", pref: "20" },
+  { id: "nagano_shichimi", name: "善光寺の七味", image: "/collection/items/nagano-shichimi.webp", category: "food", series: null, rarity: "R", pref: "20" },
+  { id: "nagano_snow_monkey", name: "地獄谷の温泉ザル", image: "/collection/items/nagano-snow-monkey.webp", category: "other", series: null, rarity: "SR", pref: "20" },
+  { id: "nagano_onbashira", name: "諏訪大社・御柱", image: "/collection/items/nagano-onbashira.webp", category: "other", series: null, rarity: "SR", pref: "20" },
+  { id: "nagano_zenkoji", name: "善光寺", image: "/collection/items/nagano-zenkoji.webp", category: "other", series: null, rarity: "SSR", pref: "20" },
+  { id: "nagano_matsumoto_castle", name: "松本城", image: "/collection/items/nagano-matsumoto-castle.webp", category: "other", series: null, rarity: "UR", pref: "20" },
+  { id: "nagano_kamikochi", name: "上高地・河童橋", image: "/collection/items/nagano-kamikochi.webp", category: "other", series: null, rarity: "LR", pref: "20" },
+
   // --- 都道府県図鑑：岐阜県（都道府県ガチャ） ----------------------------
   { id: "gifu_gohei_mochi", name: "五平餅", image: "/collection/items/gifu-gohei-mochi.webp", category: "food", series: null, rarity: "N", pref: "21" },
   { id: "gifu_meiho_ham", name: "明宝ハム", image: "/collection/items/gifu-meiho-ham.webp", category: "food", series: null, rarity: "N", pref: "21" },

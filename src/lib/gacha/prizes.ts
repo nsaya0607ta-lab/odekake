@@ -253,6 +253,18 @@ export const GACHA_PRIZES: readonly GachaPrize[] = [
   { id: "sushi_awabi", name: "活アワビ握り", rarity: "UR", type: "item", image: "/collection/items/sushi-awabi.webp" },
   { id: "sushi_kue", name: "天然クエ握り", rarity: "LR", type: "item", image: "/collection/items/sushi-kue.webp" },
 
+  // --- 都道府県ガチャ（青コイン）：長野県 ------------------------------
+  { id: "nagano_shinshu_soba", name: "信州そば", rarity: "N", type: "item", image: "/collection/items/nagano-shinshu-soba.webp", pref: "20" },
+  { id: "nagano_oyaki", name: "おやき", rarity: "N", type: "item", image: "/collection/items/nagano-oyaki.webp", pref: "20" },
+  { id: "nagano_nozawana", name: "野沢菜漬け", rarity: "N", type: "item", image: "/collection/items/nagano-nozawana.webp", pref: "20" },
+  { id: "nagano_apple", name: "信州りんご", rarity: "R", type: "item", image: "/collection/items/nagano-apple.webp", pref: "20" },
+  { id: "nagano_shichimi", name: "善光寺の七味", rarity: "R", type: "item", image: "/collection/items/nagano-shichimi.webp", pref: "20" },
+  { id: "nagano_snow_monkey", name: "地獄谷の温泉ザル", rarity: "SR", type: "item", image: "/collection/items/nagano-snow-monkey.webp", pref: "20" },
+  { id: "nagano_onbashira", name: "諏訪大社・御柱", rarity: "SR", type: "item", image: "/collection/items/nagano-onbashira.webp", pref: "20" },
+  { id: "nagano_zenkoji", name: "善光寺", rarity: "SSR", type: "item", image: "/collection/items/nagano-zenkoji.webp", pref: "20" },
+  { id: "nagano_matsumoto_castle", name: "松本城", rarity: "UR", type: "item", image: "/collection/items/nagano-matsumoto-castle.webp", pref: "20" },
+  { id: "nagano_kamikochi", name: "上高地・河童橋", rarity: "LR", type: "item", image: "/collection/items/nagano-kamikochi.webp", pref: "20" },
+
   // --- 都道府県ガチャ（青コイン）：岐阜県 ------------------------------
   { id: "gifu_gohei_mochi", name: "五平餅", rarity: "N", type: "item", image: "/collection/items/gifu-gohei-mochi.webp", pref: "21" },
   { id: "gifu_meiho_ham", name: "明宝ハム", rarity: "N", type: "item", image: "/collection/items/gifu-meiho-ham.webp", pref: "21" },
