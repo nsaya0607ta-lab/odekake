@@ -1,0 +1,341 @@
+/*
+ * 動く・変わる背景（src/components/live-backgrounds/）の見た目。
+ * ここは「描けるまで・描けないとき」に見える下地の色と、花畑・町の灯りの動き。
+ * 動きはどれも、ショップ一覧の見本（.is-still）と「動きを減らす」設定では止める。
+ */
+.app-bg-live {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+}
+
+/* ---- 下地の色 ---- */
+.app-bg[data-bg="paw-trail"] {
+  background-color: #fbf6ec;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='220' height='220'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 .42  0 0 0 0 .36  0 0 0 0 .27  0 0 0 .12 0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E"), radial-gradient(120% 70% at 50% 0%, #fffaf2 0%, transparent 70%);
+}
+.app-bg[data-bg="bubbles"] {
+  background:
+    radial-gradient(60% 38% at 12% 18%, rgba(255, 255, 255, 0.6), transparent 70%),
+    radial-gradient(55% 34% at 90% 78%, rgba(255, 214, 228, 0.5), transparent 70%),
+    linear-gradient(180deg, #cde4f6 0%, #e5e0f6 52%, #fbe5df 100%);
+}
+.app-bg[data-bg="goldfish"] {
+  background: linear-gradient(180deg, #c2e8e6 0%, #8ccdd0 100%);
+}
+.app-bg[data-bg="jelly"] {
+  background: linear-gradient(180deg, #fdf8f1 0%, #f6f1fb 100%);
+}
+.app-bg[data-bg="aurora-night"] {
+  background: linear-gradient(180deg, #050b20 0%, #0f173e 58%, #13283a 100%);
+}
+.app-bg[data-bg="weather"] {
+  background: linear-gradient(180deg, #9ccdef 0%, #cde5f5 48%, #f3f6ee 100%);
+}
+.app-bg[data-bg="garden"] {
+  background: linear-gradient(180deg, #e6f2fa 0%, #f8f6ee 58%, #f1f6e3 100%);
+}
+.app-bg[data-bg="seasons"] {
+  background: #f8f4ee;
+}
+
+/* ---- オーロラの夜：町と丘 ---- */
+.lb-town {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: clamp(120px, 24%, 230px);
+}
+.lb-town svg {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+.lb-twinkle {
+  animation: lb-twinkle 11s ease-in-out infinite;
+}
+.lb-town.is-still .lb-twinkle {
+  animation: none;
+}
+@keyframes lb-twinkle {
+  0%, 42%, 100% { opacity: 1; }
+  50%, 86% { opacity: 0.12; }
+}
+
+/* ---- 歩いて咲く花畑 ---- */
+.lb-garden {
+  position: absolute;
+  inset: 0;
+}
+.lb-vine {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 44px;
+}
+.lb-vine-left {
+  left: 0;
+}
+.lb-vine-right {
+  right: 0;
+  transform: scaleX(-1);
+}
+.lb-vine svg {
+  display: block;
+  height: 100%;
+}
+.lb-vine-stem {
+  transition: stroke-dashoffset 2.6s cubic-bezier(0.3, 0.7, 0.3, 1);
+}
+.lb-grow {
+  transform: scale(0);
+  transform-box: fill-box;
+  transition: transform 1.1s cubic-bezier(0.2, 1.5, 0.4, 1);
+}
+.lb-grow.is-on {
+  transform: scale(1);
+}
+.lb-vine-leaf {
+  transform-origin: 0% 50%;
+}
+.lb-vine-flower {
+  transform-origin: 50% 50%;
+}
+.lb-bloom {
+  transform-origin: 50% 100%;
+}
+.lb-flower {
+  position: absolute;
+  transform-origin: 50% 100%;
+  animation: lb-sway 4s ease-in-out infinite alternate;
+  will-change: transform;
+}
+.lb-flower svg {
+  display: block;
+  overflow: visible;
+}
+@keyframes lb-sway {
+  from { transform: rotate(-3deg); }
+  to { transform: rotate(3deg); }
+}
+.lb-bloom {
+  width: 100%;
+  height: 100%;
+  transform: scale(0);
+  transform-origin: 50% 100%;
+  transition: transform 1.1s cubic-bezier(0.2, 1.5, 0.4, 1);
+}
+.lb-bloom.is-on {
+  transform: scale(1);
+}
+.lb-sprout {
+  transition: opacity 0.8s ease;
+}
+.lb-sprout.is-off {
+  opacity: 0;
+}
+.lb-meadow {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+}
+.lb-meadow svg {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+/* ちょうちょ：画面いっぱいの枠ごと、横（ゆっくり）と縦（すこし速く）に動かして、ふわふわ飛ぶ道すじにする */
+.lb-fly,
+.lb-fly-y {
+  position: absolute;
+  inset: 0;
+}
+.lb-fly {
+  opacity: 0;
+  transition: opacity 1.2s ease;
+  animation: lb-fly-x 26s ease-in-out infinite alternate;
+}
+.lb-fly.is-on {
+  opacity: 1;
+}
+.lb-fly-y {
+  animation: lb-fly-y 9s ease-in-out infinite alternate;
+}
+.lb-fly-2 {
+  animation-duration: 19s;
+  animation-delay: -7s;
+}
+.lb-fly-2 .lb-fly-y {
+  animation-duration: 6.5s;
+  animation-delay: -3s;
+}
+.lb-butterfly {
+  position: absolute;
+  left: 50%;
+  top: 76%;
+  width: 28px;
+  height: 24px;
+  margin: -12px 0 0 -14px;
+  animation: lb-bob 0.8s ease-in-out infinite alternate;
+}
+.lb-fly-2 .lb-butterfly {
+  top: 64%;
+}
+@keyframes lb-fly-x {
+  from { transform: translateX(-44%); }
+  to { transform: translateX(44%); }
+}
+@keyframes lb-fly-y {
+  from { transform: translateY(-16%); }
+  to { transform: translateY(8%); }
+}
+@keyframes lb-bob {
+  from { transform: translateY(-4px) rotate(-8deg); }
+  to { transform: translateY(4px) rotate(8deg); }
+}
+.lb-wing {
+  position: absolute;
+  top: 0;
+  width: 13px;
+  height: 24px;
+  animation: lb-flap 0.2s ease-in-out infinite alternate;
+  will-change: transform;
+}
+.lb-wing::before,
+.lb-wing::after {
+  content: "";
+  position: absolute;
+}
+.lb-wing::before {
+  top: 1px;
+  width: 12px;
+  height: 12px;
+  background: radial-gradient(circle at 40% 40%, rgba(255, 255, 255, 0.7) 0 16%, transparent 18%), var(--a);
+}
+.lb-wing::after {
+  bottom: 2px;
+  width: 9px;
+  height: 9px;
+  background: var(--b);
+}
+.lb-wing-l {
+  left: 1px;
+  transform-origin: 100% 50%;
+}
+.lb-wing-l::before {
+  right: 0;
+  border-radius: 60% 40% 45% 55%;
+}
+.lb-wing-l::after {
+  right: 1px;
+  border-radius: 45% 55% 60% 40%;
+}
+.lb-wing-r {
+  right: 1px;
+  transform-origin: 0% 50%;
+}
+.lb-wing-r::before {
+  left: 0;
+  border-radius: 40% 60% 55% 45%;
+}
+.lb-wing-r::after {
+  left: 1px;
+  border-radius: 55% 45% 40% 60%;
+}
+.lb-body {
+  position: absolute;
+  left: 50%;
+  top: 4px;
+  width: 2.6px;
+  height: 16px;
+  margin-left: -1.3px;
+  border-radius: 2px;
+  background: #5b4a3f;
+}
+@keyframes lb-flap {
+  from { transform: scaleX(1); }
+  to { transform: scaleX(0.3); }
+}
+.lb-petals {
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+  transition: opacity 1.5s ease;
+}
+.lb-petals.is-on {
+  opacity: 1;
+}
+/* 見えていない（まだ咲いていない・ちょうちょが来ていない）ときは、動きを止めておく */
+.lb-petals:not(.is-on) .lb-petal,
+.lb-petals:not(.is-on) .lb-petal > i,
+.lb-fly:not(.is-on),
+.lb-fly:not(.is-on) * {
+  animation-play-state: paused;
+}
+.lb-petal {
+  position: absolute;
+  top: 0;
+  width: 12px;
+  height: 100%;
+  animation: lb-petal-fall 9s linear infinite;
+  will-change: transform;
+}
+.lb-petal > i {
+  position: absolute;
+  top: -12px;
+  left: 0;
+  width: 9px;
+  height: 7px;
+  border-radius: 60% 0 60% 0;
+  opacity: 0.85;
+  animation: lb-petal-spin 3s ease-in-out infinite alternate;
+}
+@keyframes lb-petal-fall {
+  from { transform: translateY(-4%); }
+  to { transform: translateY(104%); }
+}
+@keyframes lb-petal-spin {
+  from { transform: translateX(-18px) rotate(0deg); }
+  to { transform: translateX(18px) rotate(220deg); }
+}
+.lb-garden.is-still .lb-grow,
+.lb-garden.is-still .lb-bloom,
+.lb-garden.is-still .lb-vine-stem,
+.lb-garden.is-still .lb-sprout,
+.lb-garden.is-still .lb-fly,
+.lb-garden.is-still .lb-petals {
+  transition: none;
+}
+.lb-garden.is-still .lb-flower,
+.lb-garden.is-still .lb-fly,
+.lb-garden.is-still .lb-fly-y,
+.lb-garden.is-still .lb-butterfly,
+.lb-garden.is-still .lb-wing,
+.lb-garden.is-still .lb-petal,
+.lb-garden.is-still .lb-petal > i {
+  animation: none;
+  will-change: auto;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .lb-twinkle,
+  .lb-flower,
+  .lb-fly,
+  .lb-fly-y,
+  .lb-butterfly,
+  .lb-wing,
+  .lb-petal,
+  .lb-petal > i {
+    animation: none;
+  }
+}
+
+/* 見本（止まった絵）では、ちょうちょを左右にずらしておく */
+.lb-garden.is-still .lb-fly-1 {
+  transform: translateX(26%);
+}
+.lb-garden.is-still .lb-fly-2 {
+  transform: translateX(-30%);
+}

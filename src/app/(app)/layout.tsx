@@ -23,8 +23,8 @@ export default async function AppLayout({ children }: { children: React.ReactNod
       className={`min-h-dvh${background === "default" ? "" : " app-bg-active"}`}
       style={{ paddingBottom: "calc(var(--nav-height) + var(--safe-bottom))" }}
     >
-      {/* ショップで選んだ背景（いつものはbodyの背景のままなので置かない） */}
-      {background === "default" ? null : <AppBackground id={background} />}
+      {/* ショップで選んだ背景（いつもので、おためしもしていなければ、bodyの背景のまま何も置かない） */}
+      <AppBackground id={background} />
       {children}
       <GlobalInteractionFeedback />
       <BottomNav

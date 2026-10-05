@@ -23,6 +23,8 @@ import {
   type SavedPlace,
   type SkyPhase,
   type WalkForecast,
+  WEATHER_CACHE_KEY,
+  WEATHER_CACHE_MS,
 } from "@/lib/home-weather";
 import { MOOD_RAIN_PENALTY, MOOD_THUNDER_PENALTY } from "@/lib/room/mood";
 import { overcastOf, parseRoomWeather, WEATHER_LABEL, type RoomWeather, type WeatherKind } from "@/lib/room/weather";
@@ -39,10 +41,6 @@ const Ctx = createContext<HomeWeather | null>(null);
 /** 犬カードの中の部品が、いまの天気を受け取る。プロバイダーの外や、取れないときは null */
 export const useHomeWeather = () => useContext(Ctx);
 
-/** ホームを開くたびに問い合わせないよう、10分はこの端末に覚えておく */
-const CACHE_KEY = "odekake-home-weather-v1";
-const CACHE_MS = 10 * 60_000;
-
 export function HomeWeatherProvider({ children }: { children: React.ReactNode }) {
   const [place, setPlace] = useState<(SavedPlace & { saved: boolean }) | null>(null);
   const [weather, setWeather] = useState<RoomWeather | null>(null);
@@ -57,8 +55,8 @@ export function HomeWeatherProvider({ children }: { children: React.ReactNode })
     const load = (useCache: boolean) => {
       if (useCache) {
         try {
-          const c = JSON.parse(window.sessionStorage.getItem(CACHE_KEY) ?? "null") as { lat: string; lon: string; t: number; raw: unknown } | null;
-          if (c && c.lat === lat && c.lon === lon && Date.now() - c.t < CACHE_MS) {
+          const c = JSON.parse(window.sessionStorage.getItem(WEATHER_CACHE_KEY) ?? "null") as { lat: string; lon: string; t: number; raw: unknown } | null;
+          if (c && c.lat === lat && c.lon === lon && Date.now() - c.t < WEATHER_CACHE_MS) {
             const w = parseRoomWeather(c.raw);
             if (w) { setWeather(w); return; }
           }
@@ -70,7 +68,7 @@ export function HomeWeatherProvider({ children }: { children: React.ReactNode })
           if (!alive) return;
           const w = parseRoomWeather(raw);
           setWeather(w);
-          if (w) try { window.sessionStorage.setItem(CACHE_KEY, JSON.stringify({ lat, lon, t: Date.now(), raw })); } catch { /* 覚えられなくても表示はできる */ }
+          if (w) try { window.sessionStorage.setItem(WEATHER_CACHE_KEY, JSON.stringify({ lat, lon, t: Date.now(), raw })); } catch { /* 覚えられなくても表示はできる */ }
         })
         .catch(() => { /* 取れなければ前のまま（はじめてなら何も出さない） */ });
     };
