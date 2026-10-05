@@ -2,12 +2,13 @@
 
 import Image from "next/image";
 import { useRouter } from "next/navigation";
-import { memo, useCallback, useEffect, useMemo, useRef, useState, type MutableRefObject, type PointerEvent as ReactPointerEvent } from "react";
+import { memo, useCallback, useEffect, useMemo, useRef, useState, type CSSProperties, type MutableRefObject, type PointerEvent as ReactPointerEvent } from "react";
 import { MAX_SKILL_LEVEL } from "@/lib/gacha/skill-levels";
 import { COLLECTION_ITEMS, type CollectionItem } from "@/lib/collection/items";
 import { DAMBOURLE_PRIZES, EFFECT_ROULETTE_ELIGIBLE_EFFECT_KEYS, type DambourleEffectKey } from "@/lib/dambourle/prizes";
 import { getDambourleEffectLevel } from "@/lib/dambourle/skill-levels";
 import visualStyles from "@/components/item-catch-visual.module.css";
+import { catchBurst, fxClasses, prefersReducedMotion, shakeBoard, squashBox, type FxRarity } from "@/components/item-catch-fx";
 
 export type FrenchieCatchItem = {
   id: string;
@@ -1086,6 +1087,15 @@ const SevenSegmentNumber = memo(function SevenSegmentNumber({ value, label }: { 
  * 位置・回転・不透明度・z-indexはマウント後、rAFループがrefのDOM要素へ直接書き込む。
  * entity.idさえ変わらなければ再レンダリングしない（増減時のReact側の処理対象を最小化するため）。
  */
+/** レアの落ちてくるアイテムのまわりで光る、きらきらの色（見た目だけ） */
+const TWINKLE_COLOR: Partial<Record<string, string>> = {
+  SR: "#ffe27a",
+  SSR: "#e6c2ff",
+  UR: "#ffb1a8",
+  LR: "#fff1b0",
+  MR: "#c3cbff",
+};
+
 const FallingEntity = memo(function FallingEntity({
   entity,
   registerRef,
@@ -1119,6 +1129,12 @@ const FallingEntity = memo(function FallingEntity({
       />
       {entity.rarity === "UR" ? <span className="absolute -inset-2 -z-10 animate-pulse rounded-full bg-[#e95c4d]/15 blur-sm" /> : null}
       {entity.rarity === "LR" ? <span className="absolute -inset-3 -z-10 animate-pulse rounded-full bg-[#e6b43c]/25 blur" /> : null}
+      {entity.rarity && TWINKLE_COLOR[entity.rarity] ? (
+        <>
+          <span className={fxClasses.twinkle} style={{ left: "-8%", top: "8%", "--c": TWINKLE_COLOR[entity.rarity], animationDelay: `${(entity.id % 7) * -150}ms` } as CSSProperties} />
+          <span className={fxClasses.twinkle} style={{ right: "-6%", bottom: "4%", "--c": TWINKLE_COLOR[entity.rarity], animationDelay: `${(entity.id % 5) * -200 - 550}ms` } as CSSProperties} />
+        </>
+      ) : null}
     </div>
   );
 }, (prev, next) =>
@@ -1311,6 +1327,13 @@ export function FrenchieCatchGame({
   const [boxX, setBoxX] = useState(50);
   const [timeLeft, setTimeLeft] = useState(ROUND_SECONDS);
   const [score, setScore] = useState(0);
+  /** 演出（見た目だけ）：3・2・1・GO！ のカウント（0 が GO）、TIME UP の文字、結果のスコアの数え上げ */
+  const [countdown, setCountdown] = useState<number | null>(null);
+  const [endBanner, setEndBanner] = useState<string | null>(null);
+  const [displayScore, setDisplayScore] = useState(0);
+  const [resultCounted, setResultCounted] = useState(false);
+  const fxLayerRef = useRef<HTMLDivElement | null>(null);
+  const countdownTimersRef = useRef<ReturnType<typeof setTimeout>[]>([]);
   const [caught, setCaught] = useState(0);
   const [bagStock, setBagStock] = useState(0);
   const [stunGuard, setStunGuard] = useState(0);
@@ -1845,6 +1868,11 @@ export function FrenchieCatchGame({
   }, []);
 
   const showCatch = useCallback((entity: Entity, points: number, effect?: string) => {
+    // 演出：キャッチした場所で粒がはじけ、点数が浮かぶ。取ってはいけないもの（うんち等）は画面がゆれる
+    const bad = points < 0 || (entity.itemId?.startsWith("hazard_") === true && entity.itemId !== BAG_ITEM_ID) || effect?.includes("ゲーム終了") === true;
+    catchBurst(fxLayerRef.current, { x: clamp(entity.x, 6, 94), y: BOX_LIP_Y - 3, points, rarity: (entity.rarity ?? null) as FxRarity | null, bad });
+    squashBox(catcherRef.current?.querySelector("img"), entity.rarity === "UR" || entity.rarity === "LR" || entity.rarity === "MR");
+    if (bad) shakeBoard(boardRef.current);
     setFeedback({ name: entity.name, points, effect });
     setBoxBounce(true);
     if (feedbackTimerRef.current) clearTimeout(feedbackTimerRef.current);
@@ -3222,7 +3250,10 @@ export function FrenchieCatchGame({
         const px = ((entity.x - entity.spawnX) / 100) * boardW;
         const py = ((entity.y - entity.spawnY) / 100) * boardH;
         el.style.zIndex = String(zIndex);
-        el.style.transform = `translate(${px}px, ${py}px) translate(-50%, -50%) rotate(${entity.rotation}deg)`;
+        // 演出：ゆらゆら揺れながら落ちる（見た目だけ。当たり判定の位置は動かさない。箱に入ったら揺らさない）
+        const sway = entity.enteredOpening ? 0 : Math.sin(now * 0.0024 + entity.id * 1.7);
+        const swayPx = sway * boardW * 0.006;
+        el.style.transform = `translate(${px + swayPx}px, ${py}px) translate(-50%, -50%) rotate(${entity.rotation + sway * 7}deg)`;
       }
 
       rafRef.current = requestAnimationFrame(frame);
@@ -3452,6 +3483,70 @@ export function FrenchieCatchGame({
     setPhase("playing");
   }, [timeBonusCutoffSecDisplay, refreshEffectStatus]);
 
+  /** 演出（見た目だけ）：3・2・1・GO！ を見せてから startGame。点数・時間の計算は startGame から先で変わらない */
+  const beginGame = useCallback(() => {
+    countdownTimersRef.current.forEach(clearTimeout);
+    countdownTimersRef.current = [];
+    setEndBanner(null);
+    setResultCounted(false);
+    setDisplayScore(0);
+    if (prefersReducedMotion()) {
+      setCountdown(null);
+      startGame();
+      return;
+    }
+    const STEP_MS = 650;
+    setCountdown(3);
+    countdownTimersRef.current = [
+      setTimeout(() => setCountdown(2), STEP_MS),
+      setTimeout(() => setCountdown(1), STEP_MS * 2),
+      setTimeout(() => {
+        setCountdown(0);
+        startGame();
+      }, STEP_MS * 3),
+      setTimeout(() => setCountdown(null), STEP_MS * 3 + 700),
+    ];
+  }, [startGame]);
+
+  useEffect(() => () => countdownTimersRef.current.forEach(clearTimeout), []);
+
+  /** 演出：あそんでいる途中で終わったら「TIME UP!」などを出してから結果へ */
+  const prevPhaseRef = useRef(phase);
+  useEffect(() => {
+    const prev = prevPhaseRef.current;
+    prevPhaseRef.current = phase;
+    if (prev !== "playing" || phase !== "finished") return;
+    if (prefersReducedMotion()) return;
+    setEndBanner(timeLeft > 0 ? "ゲームセット！" : "TIME UP!");
+    const timer = setTimeout(() => setEndBanner(null), 1300);
+    return () => clearTimeout(timer);
+    // timeLeft は終わった瞬間の値だけ見ればよい
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [phase]);
+
+  /** 演出：結果のスコアを 0 から数え上げる */
+  useEffect(() => {
+    if (phase !== "finished" || endBanner !== null) return;
+    if (prefersReducedMotion() || score <= 0) {
+      setDisplayScore(score);
+      setResultCounted(true);
+      return;
+    }
+    setResultCounted(false);
+    const from = performance.now();
+    const DURATION = 900;
+    let raf = 0;
+    const tick = (now: number) => {
+      const t = Math.min(1, (now - from) / DURATION);
+      const eased = 1 - (1 - t) ** 3;
+      setDisplayScore(Math.round(score * eased));
+      if (t < 1) raf = requestAnimationFrame(tick);
+      else setResultCounted(true);
+    };
+    raf = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(raf);
+  }, [phase, endBanner, score]);
+
   const moveBox = useCallback((clientX: number) => {
     if (nowMs() < stunUntilRef.current) return;
     const rect = boardRef.current?.getBoundingClientRect();
@@ -3628,6 +3723,8 @@ export function FrenchieCatchGame({
           />
         ))}
 
+        <div ref={fxLayerRef} className={fxClasses.layer} aria-hidden />
+
         {impactX !== null ? <div className="pointer-events-none absolute z-40 -translate-x-1/2 -translate-y-1/2 animate-ping text-xl font-black text-[#d7684f]" style={{ left: `${impactX}%`, top: `${BOX_LIP_Y}%` }}>✦</div> : null}
         {feedback ? (
           <div className="pointer-events-none absolute left-1/2 top-[67%] z-40 -translate-x-1/2 text-center">
@@ -3659,7 +3756,17 @@ export function FrenchieCatchGame({
 
         {phase === "playing" ? <div className="pointer-events-none absolute bottom-[0.5%] left-1/2 z-40 -translate-x-1/2 rounded-full bg-white/70 px-2 py-0.5 text-[9px] font-bold text-ink-faint">箱を押さえて左右にドラッグ</div> : null}
 
-        {phase !== "playing" ? (
+        {phase === "playing" && timeLeft <= 3 && timeLeft > 0 && !prefersReducedMotion() ? (
+          <span key={`last-${timeLeft}`} className={`${fxClasses.count} ${fxClasses.countLast}`} aria-hidden>{timeLeft}</span>
+        ) : null}
+        {countdown !== null ? (
+          <span key={`count-${countdown}`} className={countdown === 0 ? `${fxClasses.count} ${fxClasses.countGo}` : fxClasses.count} role="status">{countdown === 0 ? "GO!" : countdown}</span>
+        ) : null}
+        {endBanner !== null ? (
+          <div className={fxClasses.endBanner} role="status"><span className={fxClasses.endText}>{endBanner}</span></div>
+        ) : null}
+
+        {phase !== "playing" && countdown === null && endBanner === null ? (
           <div className="absolute inset-0 z-50 flex items-center justify-center bg-[#f9f3e7]/70 px-6 backdrop-blur-[2px]">
             <div className="w-full max-w-xs rounded-[28px] border border-white/90 bg-card/95 p-5 text-center shadow-xl">
               {phase === "paused" ? (
@@ -3674,7 +3781,7 @@ export function FrenchieCatchGame({
               ) : phase === "finished" ? (
                 <>
                   <p className="text-[10px] font-black tracking-[0.18em] text-ink-faint">RESULT</p>
-                  <p className="mt-1 text-4xl font-black tabular-nums text-ink">{score.toLocaleString("ja-JP")}</p>
+                  <p className="mt-1 text-4xl font-black tabular-nums text-ink"><span className={`${fxClasses.resultScore} ${resultCounted ? fxClasses.resultDone : ""}`}>{displayScore.toLocaleString("ja-JP")}</span></p>
                   <div className="mt-3 grid grid-cols-1 gap-2 text-xs">
                     <div className="rounded-xl bg-paper-deep px-2 py-2"><p className="text-[9px] text-ink-faint">キャッチ</p><p className="font-black text-ink">{caught}個</p></div>
                   </div>
@@ -3700,7 +3807,7 @@ export function FrenchieCatchGame({
                     )}
                   </div>
                   <div className="mt-4 grid grid-cols-2 gap-2">
-                    <button type="button" onClick={startGame} disabled={rewardPending} className="rounded-full bg-leaf px-3 py-3 text-xs font-black text-white shadow-md active:translate-y-px disabled:opacity-45">もう一度あそぶ</button>
+                    <button type="button" onClick={beginGame} disabled={rewardPending} className="rounded-full bg-leaf px-3 py-3 text-xs font-black text-white shadow-md active:translate-y-px disabled:opacity-45">もう一度あそぶ</button>
                     <button type="button" onClick={() => router.push("/games")} disabled={rewardPending} className="rounded-full border border-line bg-card px-3 py-3 text-xs font-black text-ink-soft shadow-sm active:translate-y-px disabled:opacity-45">終了する</button>
                   </div>
                 </>
@@ -3709,7 +3816,7 @@ export function FrenchieCatchGame({
                   <p className="text-[10px] font-black tracking-[0.18em] text-leaf-deep">ITEM CATCH</p>
                   <p className="mt-1 text-xl font-black text-ink">箱でキャッチしよう！</p>
                   <p className="mt-3 text-[9px] text-ink-faint">時間増加系アイテムは{Math.round(timeBonusCutoffSecDisplayWithDambourle)}秒まで出現</p>
-                  <button type="button" onClick={startGame} className="mt-1.5 w-full rounded-full bg-leaf px-4 py-3 text-sm font-black text-white shadow-md active:translate-y-px">START</button>
+                  <button type="button" onClick={beginGame} className="mt-1.5 w-full rounded-full bg-leaf px-4 py-3 text-sm font-black text-white shadow-md active:translate-y-px">START</button>
                   {showDambourlePicker ? (
                     <button
                       type="button"
