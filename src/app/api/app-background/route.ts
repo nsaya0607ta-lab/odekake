@@ -1,10 +1,13 @@
 import { NextResponse } from "next/server";
 import { APP_BACKGROUND_COOKIE, getAppBackground, isAppBackgroundId } from "@/lib/app-backgrounds";
 import { checkRateLimit } from "@/lib/rate-limit";
+import { canAccessShop } from "@/lib/shop-access";
 import { requireUser } from "@/lib/supabase/server";
 
 type RpcResponse = { data: unknown; error: { code?: string; message: string } | null };
 type Rpc = (fn: "buy_app_background" | "set_app_background", args: { p_background: string }) => Promise<RpcResponse>;
+
+const SHOP_CLOSED = () => NextResponse.json({ error: "ショップは準備中です。" }, { status: 403 });
 
 const toRecord = (value: unknown): Record<string, unknown> => (value && typeof value === "object" ? (value as Record<string, unknown>) : {});
 
@@ -16,6 +19,7 @@ async function readBackgroundId(request: Request) {
 /** ショップの背景を1つ、青コインで買う */
 export async function POST(request: Request) {
   const { supabase, user } = await requireUser();
+  if (!canAccessShop(user.displayName)) return SHOP_CLOSED();
   const id = await readBackgroundId(request);
   if (!id || id === "default") {
     return NextResponse.json({ error: "その背景はありません。" }, { status: 400 });
@@ -43,7 +47,8 @@ export async function POST(request: Request) {
 
 /** 使う背景を選ぶ（「いつもの」か、買った背景だけ） */
 export async function PATCH(request: Request) {
-  const { supabase } = await requireUser();
+  const { supabase, user } = await requireUser();
+  if (!canAccessShop(user.displayName)) return SHOP_CLOSED();
   const id = await readBackgroundId(request);
   if (!id) {
     return NextResponse.json({ error: "その背景はありません。" }, { status: 400 });

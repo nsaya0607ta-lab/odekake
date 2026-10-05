@@ -7,6 +7,7 @@ import { PhotoCleanup } from "@/components/photo-cleanup";
 import { SnsBottomNavIndicator } from "@/components/sns/sns-bottom-nav-indicator";
 import { getCurrentAppBackground } from "@/lib/data/app-backgrounds";
 import { getCurrentDogSkin } from "@/lib/data/dog-skin";
+import { canAccessShop } from "@/lib/shop-access";
 import { canAccessSns } from "@/lib/sns-access";
 import { requireUser } from "@/lib/supabase/server";
 
@@ -28,6 +29,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
       <GlobalInteractionFeedback />
       <BottomNav
         snsLocked={!snsAvailable}
+        shopLocked={!canAccessShop(user.displayName)}
         snsUnreadIndicator={snsAvailable ? <SnsBottomNavIndicator /> : null}
       />
       <PhotoCleanup />
