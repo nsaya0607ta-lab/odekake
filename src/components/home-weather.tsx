@@ -321,7 +321,7 @@ const shapeOf = (kind: WeatherKind, phase: SkyPhase): Shape => {
 };
 /** 気温を書く位置（しるしの箱に対する％） */
 const TEXT_AT: Record<Shape, { x: number; y: number; size: string }> = {
-  sun: { x: 50, y: 50, size: "1.4em" }, moon: { x: 50, y: 50, size: "1.4em" },
+  sun: { x: 50, y: 50, size: "1.55em" }, moon: { x: 50, y: 50, size: "1.4em" },
   sunCloud: { x: 44, y: 64, size: "1.5em" }, moonCloud: { x: 44, y: 64, size: "1.5em" },
   cloud: { x: 52, y: 58, size: "1.55em" }, rain: { x: 52, y: 50, size: "1.5em" }, thunder: { x: 52, y: 50, size: "1.5em" }, snow: { x: 52, y: 50, size: "1.5em" }, fog: { x: 52, y: 50, size: "1.5em" },
 };
@@ -393,7 +393,7 @@ function SkyShape({ shape }: { shape: Shape }) {
         <linearGradient id="hwCloud" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stopColor={c0} /><stop offset="1" stopColor={c1} /></linearGradient>
       </defs>
 
-      {shape === "sun" ? <SunDisk cx={50} cy={40} r={25} inner /> : null}
+      {shape === "sun" ? <SunDisk cx={50} cy={40} r={29} inner /> : null}
       {shape === "moon" ? (
         <>
           {STARS.map(([x, y, d], i) => (
