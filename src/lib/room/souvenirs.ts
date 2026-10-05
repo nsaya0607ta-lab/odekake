@@ -1,8 +1,9 @@
 /**
- * おさんぽのおみやげ
+ * おみやげ（わんこが ひろってくるもの・フレンドのわんこが くれるもの）
  * =============================================================
- * その日の歩数が節目（STEP_COIN_MILESTONES：3,000歩から1,000歩ごと）を越えるたびに、
- * わんこがおさんぽ先で見つけたものを1つ持って帰ってくる。中身は季節で変わり、10,000歩のときはレアなもの。
+ * - おさんぽ: その日の歩数が節目（STEP_COIN_MILESTONES：3,000歩から1,000歩ごと）を越えるたびに、
+ *   わんこがおさんぽ先で ひろったものを1つ持って帰ってくる。中身は季節で変わり、10,000歩のときはレアなもの。
+ * - フレンドのわんこ: 遊びに来た日に1つ「おみやげ」をくれる（同じラインナップ・同じ出やすさ。レアは出ない）。
  * 何が来るかは「日付と節目」で決まる（同じ日に何度開いても同じ。どの端末でも同じ）。
  * もらった数は部屋の飾り方（RoomLayout.souvenirs）にいっしょに保存し、もようがえで棚や床に飾れる。
  */
@@ -121,14 +122,27 @@ const hash = (s: string) => { let h = 2166136261; for (let i = 0; i < s.length; 
 /** レアが出る節目 */
 const RARE_STEPS = 10000;
 
-/** その日・その節目で持って帰ってくるもの。季節のもの と いつでも拾えるもの から選ぶ（季節のものが出やすい） */
-export function souvenirFor(date: string, steps: number): SouvenirId {
+/** その日の季節のもの と いつでも拾えるもの から、seed で1つ選ぶ（季節のものが出やすい） */
+function pickSouvenir(date: string, rare: boolean, seed: string): SouvenirId {
   const season = seasonOf(date);
-  const rare = steps >= RARE_STEPS;
   const pool = SOUVENIR_IDS.filter((id) => Boolean(SOUVENIRS[id].rare) === rare && (SOUVENIRS[id].seasons.length === 0 || SOUVENIRS[id].seasons.includes(season)));
   // 季節のものは2倍出やすい
   const weighted = pool.flatMap((id) => (SOUVENIRS[id].seasons.length ? [id, id] : [id]));
-  return weighted[hash(`${date}:${steps}`) % weighted.length]!;
+  return weighted[hash(seed) % weighted.length]!;
+}
+
+/** その日・その節目で ひろってくるもの（10,000歩のときはレア） */
+export function souvenirFor(date: string, steps: number): SouvenirId {
+  return pickSouvenir(date, steps >= RARE_STEPS, `${date}:${steps}`);
+}
+
+/**
+ * 遊びに来たフレンドのわんこがくれる おみやげ（その日・そのわんこで1つ。何度開いても同じ）。
+ * 中身は おさんぽで ひろうものと同じラインナップ・同じ出やすさ（レアは出ない）。色ちがいも同じ確率で来る。
+ */
+export function guestSouvenir(date: string, guestId: string): { key: string; id: SouvenirId; shiny: boolean; date: string; steps: number } {
+  const key = `${date}:guest:${guestId}`;
+  return { key, id: pickSouvenir(date, false, key), shiny: hash(`${key}:iro`) % SHINY_RATE === 0, date, steps: 0 };
 }
 
 /** 何日前の分まで、あとから受け取れるか（アプリを開かなかった日の分） */
