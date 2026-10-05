@@ -1,6 +1,7 @@
 "use client";
 
 import Image from "next/image";
+import Link from "next/link";
 import { useEffect, useMemo, useRef, useState, type ReactNode, type TouchEvent } from "react";
 import { IconClock, IconMapPin, IconPaw, IconUser } from "@/components/icons";
 import { MarqueeText } from "@/components/marquee-text";
@@ -92,6 +93,8 @@ export function HomeHighlightsCarousel({
   const startAutoplay = () => {
     stopAutoplay();
     if (slides.length <= 1) return;
+    // 「視差効果を減らす」設定の人には、勝手に動かさない（点やスワイプで切りかえる）
+    if (typeof window !== "undefined" && window.matchMedia?.("(prefers-reduced-motion: reduce)").matches) return;
     timerRef.current = setInterval(() => {
       setIndex((current) => (current + 1) % slides.length);
     }, AUTO_ADVANCE_MS);
@@ -263,11 +266,11 @@ function ActivitySlide({ data }: { data: FriendActivitySlideData }) {
         みんなのおでかけ
       </span>
       <div
-        className="flex w-full flex-1 flex-col gap-1.5 overflow-y-auto overscroll-contain py-1"
+        className={`flex w-full flex-1 flex-col gap-1.5 overflow-y-auto overscroll-contain py-1 ${data.length <= 3 ? "justify-center" : ""}`}
         style={{ touchAction: "pan-y" }}
       >
         {data.map((item) => (
-          <div key={item.key} className="flex shrink-0 items-center gap-2 rounded-xl bg-paper/70 px-2.5 py-1.5">
+          <div key={item.key} className="flex shrink-0 items-center gap-2 rounded-xl bg-paper/70 px-2.5 py-1.5 shadow-[0_1px_0_rgba(120,90,50,.08)]">
             <span className="flex h-8 w-8 shrink-0 items-center justify-center overflow-hidden rounded-full bg-card">
               {item.avatarUrl ? (
                 // eslint-disable-next-line @next/next/no-img-element
@@ -289,6 +292,7 @@ function ActivitySlide({ data }: { data: FriendActivitySlideData }) {
             </span>
           </div>
         ))}
+        {data.length <= 2 ? <p className="mt-1 text-center text-[10px] font-bold text-ink-faint">この24時間に おでかけを記録した人</p> : null}
       </div>
     </div>
   );
@@ -296,6 +300,7 @@ function ActivitySlide({ data }: { data: FriendActivitySlideData }) {
 
 function StepsSlide({ data }: { data: FriendStepsSlideData }) {
   const RANK_TONE = ["sun", "sky", "apricot"] as const;
+  const top = Math.max(1, ...data.map((entry) => entry.steps));
 
   return (
     <div className="flex h-full w-full flex-col items-center">
@@ -303,14 +308,12 @@ function StepsSlide({ data }: { data: FriendStepsSlideData }) {
         フレンドの歩数
       </span>
       <div
-        className="flex w-full flex-1 flex-col gap-1 overflow-y-auto overscroll-contain py-1"
+        className={`flex w-full flex-1 flex-col gap-1 overflow-y-auto overscroll-contain py-1 ${data.length <= 4 ? "justify-center" : ""}`}
         style={{ touchAction: "pan-y" }}
       >
-        {data.map((entry) => (
-          <div
-            key={entry.id}
-            className={`flex shrink-0 items-center gap-2 rounded-xl px-2.5 py-1 ${entry.isSelf ? "bg-leaf-soft/70 ring-1 ring-leaf/50" : "bg-paper/70"}`}
-          >
+        {data.map((entry) => {
+          const row = (
+            <>
             <span
               className={`flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-[11px] font-bold ${
                 entry.rank <= 3 && RANK_TONE[entry.rank - 1]
@@ -328,15 +331,30 @@ function StepsSlide({ data }: { data: FriendStepsSlideData }) {
                 <IconUser size={14} className="text-ink-faint" />
               )}
             </span>
-            <span className="min-w-0 flex-1 truncate text-sm font-bold text-ink">
-              {entry.isSelf ? "あなた" : entry.displayName}
+            <span className="flex min-w-0 flex-1 flex-col gap-0.5">
+              <span className="flex min-w-0 items-center gap-1 text-sm font-bold text-ink">
+                <span className="truncate">{entry.isSelf ? "あなた" : entry.displayName}</span>
+                {entry.rank === 1 && entry.steps > 0 ? <span aria-label="1位" className="shrink-0 text-[12px] leading-none">👑</span> : null}
+              </span>
+              {/* いちばん歩いた人を100%にした、歩数のバー */}
+              <span aria-hidden="true" className="block h-1 overflow-hidden rounded-full bg-[#EADFC8]">
+                <span className={`block h-full rounded-full ${entry.isSelf ? "bg-leaf" : "bg-[#E8B84A]"}`} style={{ width: `${(entry.steps / top) * 100}%` }} />
+              </span>
             </span>
             <span className="flex shrink-0 items-center gap-1 text-sm font-bold tabular-nums text-ink">
               <IconPaw size={13} className="text-sun" />
               {entry.steps.toLocaleString("ja-JP")}
             </span>
-          </div>
-        ))}
+            </>
+          );
+          const cls = `flex shrink-0 items-center gap-2 rounded-xl px-2.5 py-1 ${entry.isSelf ? "bg-leaf-soft/70 ring-1 ring-leaf/50" : "bg-paper/70"}`;
+          // フレンドの行は、タップでそのフレンドのページへ（自分の行はそのまま）
+          return entry.isSelf ? (
+            <div key={entry.id} className={cls}>{row}</div>
+          ) : (
+            <Link key={entry.id} href={`/mypage/friends/${entry.id}`} aria-label={`${entry.displayName}さん ${entry.rank}位 ${entry.steps.toLocaleString("ja-JP")}歩`} className={`${cls} active:scale-[0.98]`}>{row}</Link>
+          );
+        })}
       </div>
     </div>
   );

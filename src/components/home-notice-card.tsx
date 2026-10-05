@@ -46,19 +46,31 @@ export function HomeNoticeCard({
         />
         <div className="absolute inset-0 flex items-center gap-1" style={{ paddingLeft: "37%", paddingRight: "8%" }}>
           <div className="flex min-w-0 flex-1 flex-col gap-1">
+            {/* 見出し（新着の数）。右の花の絵にかからないよう短く、数はバッジで目立たせる */}
             <p
-              className="truncate text-sm font-bold text-ink"
+              className="flex items-center gap-1 text-sm font-bold text-ink"
               style={{ marginLeft: "11%", transform: "translate(calc(10px + 3em), calc(-4px - 0.3em))" }}
+              aria-hidden="true"
             >
-              {summary}
+              {unreadCount > 0 ? (
+                <>
+                  新着
+                  <span className="rounded-full bg-[#E8604A] px-1.5 py-px text-[11px] font-black leading-tight text-white tabular-nums">{unreadCount}</span>
+                  件
+                </>
+              ) : (
+                <span className="text-ink-faint">すべて既読</span>
+              )}
             </p>
-            <div className="flex flex-col" style={{ gap: 6, transform: "translate(-1.5em, 3px)" }}>
+            {/* 右の矢印と重ならないよう、行の右はしを矢印のぶん手前で止める */}
+            <div className="flex flex-col" style={{ gap: 6, transform: "translate(-1.5em, 3px)", marginRight: "0.8em" }}>
               {Array.from({ length: 3 }).map((_, rowIndex) => {
                 const notice = latest[rowIndex];
                 if (notice) {
                   return (
-                    <div key={notice.id} className="flex min-w-0 items-baseline gap-0.5 text-xs text-ink-soft">
-                      <span className="shrink-0">・</span>
+                    <div key={notice.id} className={`flex min-w-0 items-center gap-1.5 text-xs ${notice.is_read ? "text-ink-faint" : "font-bold text-ink-soft"}`}>
+                      {/* まだ読んでいないものは色つきの点 */}
+                      <span aria-hidden="true" className={`block h-1.5 w-1.5 shrink-0 rounded-full ${notice.is_read ? "bg-line-strong" : "bg-[#E8604A]"}`} />
                       <MarqueeText text={notice.title} className="min-w-0 flex-1" />
                     </div>
                   );

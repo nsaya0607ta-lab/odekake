@@ -44,13 +44,20 @@ export function HomeCollectionCard({
         />
         <div className="absolute inset-0 flex items-center" style={{ paddingLeft: "37%", paddingRight: "12%" }}>
           <div className="flex w-full min-w-0 items-center justify-between gap-2">
-            <div className="min-w-0">
+            <div className="min-w-0 flex-1">
               <p className="truncate text-lg font-bold text-ink">図鑑を見る</p>
-              <p className="whitespace-nowrap text-xs text-ink-faint">集めたアイテムを見る</p>
+              {/* 集めた割合（バーと％） */}
+              <div className="mt-1 flex items-center gap-1.5">
+                <span className="block h-1.5 min-w-0 flex-1 overflow-hidden rounded-full bg-[#EADFC8]">
+                  <span className="block h-full rounded-full bg-[linear-gradient(90deg,#8CCB74,#5E8C4A)]" style={{ width: `${total > 0 ? Math.min(100, (collected / total) * 100) : 0}%` }} />
+                </span>
+                <span className="shrink-0 text-[10px] font-bold tabular-nums text-ink-faint">{total > 0 ? Math.floor((collected / total) * 100) : 0}%</span>
+              </div>
             </div>
             <div className="flex shrink-0 items-center gap-1">
-              <span className="text-lg font-bold tabular-nums text-leaf-deep">
-                {collected} / {total}
+              <span className="flex flex-col items-end leading-none">
+                <span className="text-lg font-bold tabular-nums text-leaf-deep">{collected}</span>
+                <span className="mt-0.5 text-[10px] font-bold tabular-nums text-ink-faint">/ {total}</span>
               </span>
               <IconChevronRight size={18} className="text-ink-faint" />
             </div>
