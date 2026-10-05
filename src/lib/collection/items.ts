@@ -322,6 +322,7 @@ const CURATED_ITEMS: readonly CollectionItem[] = [
   { id: "fukui_echizen_crab", name: "越前ガニ", image: "/collection/items/fukui-echizen-crab.webp", category: "food", series: null, rarity: "SSR", pref: "18" },
   { id: "fukui_tojinbo", name: "東尋坊", image: "/collection/items/fukui-tojinbo.webp", category: "other", series: null, rarity: "UR", pref: "18" },
   { id: "fukui_dinosaur", name: "恐竜王国・福井", image: "/collection/items/fukui-dinosaur.webp", category: "other", series: null, rarity: "LR", pref: "18" },
+  { id: "fukui_frenchie", name: "福井のフレブル", image: "/collection/skins/fukui-frenchie.webp", category: "other", series: null, rarity: "LR", pref: "18" },
 
   // --- 都道府県図鑑：長野県（都道府県ガチャ） ----------------------------
   { id: "nagano_shinshu_soba", name: "信州そば", image: "/collection/items/nagano-shinshu-soba.webp", category: "food", series: null, rarity: "N", pref: "20" },

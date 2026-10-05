@@ -264,6 +264,7 @@ export const GACHA_PRIZES: readonly GachaPrize[] = [
   { id: "fukui_echizen_crab", name: "越前ガニ", rarity: "SSR", type: "item", image: "/collection/items/fukui-echizen-crab.webp", pref: "18" },
   { id: "fukui_tojinbo", name: "東尋坊", rarity: "UR", type: "item", image: "/collection/items/fukui-tojinbo.webp", pref: "18" },
   { id: "fukui_dinosaur", name: "恐竜王国・福井", rarity: "LR", type: "item", image: "/collection/items/fukui-dinosaur.webp", pref: "18" },
+  { id: "fukui_frenchie", name: "福井のフレブル", rarity: "LR", type: "dog_skin", image: "/collection/skins/fukui-frenchie.webp", pref: "18" },
 
   // --- 都道府県ガチャ（青コイン）：長野県 ------------------------------
   { id: "nagano_shinshu_soba", name: "信州そば", rarity: "N", type: "item", image: "/collection/items/nagano-shinshu-soba.webp", pref: "20" },
