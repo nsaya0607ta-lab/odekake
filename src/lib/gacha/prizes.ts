@@ -253,6 +253,19 @@ export const GACHA_PRIZES: readonly GachaPrize[] = [
   { id: "sushi_awabi", name: "活アワビ握り", rarity: "UR", type: "item", image: "/collection/items/sushi-awabi.webp" },
   { id: "sushi_kue", name: "天然クエ握り", rarity: "LR", type: "item", image: "/collection/items/sushi-kue.webp" },
 
+  // --- 都道府県ガチャ（青コイン）：福井県 ------------------------------
+  { id: "fukui_oroshi_soba", name: "越前おろしそば", rarity: "N", type: "item", image: "/collection/items/fukui-oroshi-soba.webp", pref: "18" },
+  { id: "fukui_sauce_katsudon", name: "ソースカツ丼", rarity: "N", type: "item", image: "/collection/items/fukui-sauce-katsudon.webp", pref: "18" },
+  { id: "fukui_habutae_mochi", name: "羽二重餅", rarity: "N", type: "item", image: "/collection/items/fukui-habutae-mochi.webp", pref: "18" },
+  { id: "fukui_yakisaba_sushi", name: "焼き鯖寿司", rarity: "R", type: "item", image: "/collection/items/fukui-yakisaba-sushi.webp", pref: "18" },
+  { id: "fukui_mizu_yokan", name: "冬の水ようかん", rarity: "R", type: "item", image: "/collection/items/fukui-mizu-yokan.webp", pref: "18" },
+  { id: "fukui_sabae_glasses", name: "鯖江のめがね", rarity: "SR", type: "item", image: "/collection/items/fukui-sabae-glasses.webp", pref: "18" },
+  { id: "fukui_eiheiji", name: "永平寺", rarity: "SR", type: "item", image: "/collection/items/fukui-eiheiji.webp", pref: "18" },
+  { id: "fukui_echizen_crab", name: "越前ガニ", rarity: "SSR", type: "item", image: "/collection/items/fukui-echizen-crab.webp", pref: "18" },
+  { id: "fukui_tojinbo", name: "東尋坊", rarity: "UR", type: "item", image: "/collection/items/fukui-tojinbo.webp", pref: "18" },
+  { id: "fukui_dinosaur", name: "恐竜王国・福井", rarity: "LR", type: "item", image: "/collection/items/fukui-dinosaur.webp", pref: "18" },
+  { id: "fukui_frenchie", name: "福井のフレブル", rarity: "LR", type: "dog_skin", image: "/collection/skins/fukui-frenchie.webp", pref: "18" },
+
   // --- 都道府県ガチャ（青コイン）：長野県 ------------------------------
   { id: "nagano_shinshu_soba", name: "信州そば", rarity: "N", type: "item", image: "/collection/items/nagano-shinshu-soba.webp", pref: "20" },
   { id: "nagano_oyaki", name: "おやき", rarity: "N", type: "item", image: "/collection/items/nagano-oyaki.webp", pref: "20" },
