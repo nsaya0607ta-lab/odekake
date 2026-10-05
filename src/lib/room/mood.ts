@@ -25,7 +25,9 @@ const ORDER: MoodLevel[] = ["lonely", "normal", "happy", "super"];
 export const MOOD_WALK_FULL = 5000;
 /** きのう、これだけ歩いていれば「きのうのおさんぽ」が満点 */
 export const MOOD_YESTERDAY_STEPS = 2000;
-const PET_PTS = 5, PLAY_PTS = 4;
+const PET_PTS = 5, PLAY_PTS = 3;
+/** 項目ごとの満点（合計がちょうど 100 になるようにする。雨・雷のマイナスは別） */
+const MAX = { walk: 30, yesterday: 10, pet: 20, play: 15, room: 15, friend: 10 } as const;
 /** 雨（小雨をふくむ）・雷のときに下がる点 */
 export const MOOD_RAIN_PENALTY = 10, MOOD_THUNDER_PENALTY = 15;
 export type MoodWeather = "rain" | "thunder" | null;
@@ -41,12 +43,12 @@ export const moodRank = (l: MoodLevel) => ORDER.indexOf(l);
 
 export function moodOf(input: { steps: number; yesterday: number; pets: number; plays: number; dirt: number; guest: boolean; weather?: MoodWeather }): Mood {
   const parts: MoodPart[] = [
-    { id: "walk", label: "きょうの おさんぽ", value: Math.round(40 * Math.min(1, Math.max(0, input.steps) / MOOD_WALK_FULL)), max: 40 },
-    { id: "yesterday", label: "きのうの おさんぽ", value: Math.round(15 * Math.min(1, Math.max(0, input.yesterday) / MOOD_YESTERDAY_STEPS)), max: 15 },
-    { id: "pet", label: "なでなで", value: Math.min(25, input.pets * PET_PTS), max: 25 },
-    { id: "play", label: "いっしょに あそぶ", value: Math.min(20, input.plays * PLAY_PTS), max: 20 },
-    { id: "room", label: "おへやの きれいさ", value: Math.round(15 * (1 - Math.min(1, Math.max(0, input.dirt)))), max: 15 },
-    { id: "friend", label: "フレンドが あそびに来てる", value: input.guest ? 10 : 0, max: 10 },
+    { id: "walk", label: "きょうの おさんぽ", value: Math.round(MAX.walk * Math.min(1, Math.max(0, input.steps) / MOOD_WALK_FULL)), max: MAX.walk },
+    { id: "yesterday", label: "きのうの おさんぽ", value: Math.round(MAX.yesterday * Math.min(1, Math.max(0, input.yesterday) / MOOD_YESTERDAY_STEPS)), max: MAX.yesterday },
+    { id: "pet", label: "なでなで", value: Math.min(MAX.pet, input.pets * PET_PTS), max: MAX.pet },
+    { id: "play", label: "いっしょに あそぶ", value: Math.min(MAX.play, input.plays * PLAY_PTS), max: MAX.play },
+    { id: "room", label: "おへやの きれいさ", value: Math.round(MAX.room * (1 - Math.min(1, Math.max(0, input.dirt)))), max: MAX.room },
+    { id: "friend", label: "フレンドが あそびに来てる", value: input.guest ? MAX.friend : 0, max: MAX.friend },
   ];
   // 雨・雷の日だけ、マイナスの行を足す
   if (input.weather) {
@@ -67,7 +69,7 @@ export function moodTip(m: Mood): string {
   if (pet.value < pet.max) tips.push(`なでる（あと${Math.ceil(Math.min(need, pet.max - pet.value) / PET_PTS)}回）`);
   if (play.value < play.max) tips.push(`家具やおみやげをタップして いっしょに あそぶ`);
   if (walk.value < walk.max) {
-    const stepsNeed = Math.ceil((Math.min(need, walk.max - walk.value) / 40) * MOOD_WALK_FULL / 100) * 100;
+    const stepsNeed = Math.ceil((Math.min(need, walk.max - walk.value) / walk.max) * MOOD_WALK_FULL / 100) * 100;
     tips.push(`あと${Math.max(100, stepsNeed).toLocaleString("ja-JP")}歩 おさんぽ`);
   }
   const rainy = m.parts.some((p) => p.id === "weather");
