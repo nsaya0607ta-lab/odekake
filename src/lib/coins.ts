@@ -5,7 +5,7 @@ import { getRequiredExpForLevel } from "@/lib/exp";
  * DB側の定義は supabase/migrations/0028_coin_economy_overhaul.sql と必ず同じにする。
  */
 
-/** 7日周期の連続ログインボーナス。 */
+/** 7日周期のログインボーナス。開いた日を通算で数える（休んでも1日目へは戻らない。0125）。 */
 export const LOGIN_BONUS_SCHEDULE = [100, 120, 140, 160, 180, 200, 300] as const;
 /** 旧参照向け。1日目の金額。 */
 export const LOGIN_BONUS_COINS = LOGIN_BONUS_SCHEDULE[0];
