@@ -340,6 +340,169 @@
   50% { box-shadow: 0 0 18px rgba(255, 201, 92, 0.55); }
 }
 
+/* ===== レーン奥の電光掲示板（右から左へ流れる） ===== */
+.marquee {
+  position: absolute;
+  left: 2.5%;
+  right: 2.5%;
+  top: 9%;
+  bottom: 18%;
+  overflow: hidden;
+  border-radius: 6px;
+  background: linear-gradient(180deg, #030a12 0%, #06121e 100%);
+  box-shadow: inset 0 0 0 1px rgba(84, 216, 255, 0.28), inset 0 0 14px rgba(0, 0, 0, 0.9), 0 0 12px rgba(84, 216, 255, 0.18);
+}
+.marqueeTrack {
+  display: flex;
+  width: max-content;
+  height: 100%;
+  animation: marqueeScroll 26s linear infinite;
+  will-change: transform;
+}
+@keyframes marqueeScroll {
+  from { transform: translateX(0); }
+  to { transform: translateX(-50%); }
+}
+.marqueeReel {
+  display: flex;
+  flex: none;
+  align-items: center;
+  gap: 14px;
+  height: 100%;
+  padding: 0 18px;
+  white-space: nowrap;
+}
+.marqueeTitle {
+  font-size: 15px;
+  font-weight: 900;
+  font-style: italic;
+  letter-spacing: 0.16em;
+  color: #c9f6ff;
+  text-shadow: 0 0 5px rgba(84, 216, 255, 0.95), 0 0 12px rgba(84, 216, 255, 0.6);
+}
+.marqueeText {
+  font-size: 13px;
+  font-weight: 900;
+  color: #ffe9a8;
+  text-shadow: 0 0 5px rgba(255, 180, 60, 0.9), 0 0 12px rgba(255, 140, 40, 0.5);
+}
+.marqueeTextGold {
+  font-size: 14px;
+  font-weight: 900;
+  font-style: italic;
+  letter-spacing: 0.08em;
+  color: #ffb2cf;
+  text-shadow: 0 0 5px rgba(255, 110, 170, 0.95), 0 0 12px rgba(255, 90, 160, 0.55);
+}
+.marqueePaw {
+  font-size: 11px;
+  filter: drop-shadow(0 0 4px rgba(255, 201, 92, 0.9));
+}
+.marqueeStar {
+  font-size: 12px;
+  color: #ffd76a;
+  text-shadow: 0 0 6px rgba(255, 200, 80, 0.95);
+  animation: marqueeBlink 0.9s steps(2, jump-none) infinite;
+}
+@keyframes marqueeBlink {
+  0% { opacity: 1; }
+  100% { opacity: 0.25; }
+}
+.marqueeDog {
+  height: 82%;
+  width: auto;
+  flex: none;
+  filter: drop-shadow(0 0 4px rgba(190, 240, 255, 0.45));
+  animation: marqueeTrot 0.42s ease-in-out infinite alternate;
+}
+.marqueeDogHop {
+  animation: marqueeHop 0.7s cubic-bezier(0.3, 0, 0.6, 1) infinite;
+}
+@keyframes marqueeTrot {
+  from { transform: translateY(0) rotate(-2deg); }
+  to { transform: translateY(-2px) rotate(2deg); }
+}
+@keyframes marqueeHop {
+  0%, 100% { transform: translateY(0) scale(1, 1); }
+  15% { transform: translateY(0) scale(1.06, 0.92); }
+  50% { transform: translateY(-5px) scale(0.97, 1.04); }
+}
+/* わんこを追いかけて転がるボール */
+.marqueeBall {
+  flex: none;
+  width: 15px;
+  height: 15px;
+  margin-left: -6px;
+  border-radius: 50%;
+  background: radial-gradient(circle at 35% 30%, #9fe9ff 0%, #2a8fd0 45%, #0d3c6e 100%);
+  box-shadow: 0 0 8px rgba(84, 216, 255, 0.7);
+  position: relative;
+  animation: marqueeRoll 0.6s linear infinite;
+}
+.marqueeBall::before,
+.marqueeBall::after {
+  content: "";
+  position: absolute;
+  width: 3px;
+  height: 3px;
+  border-radius: 50%;
+  background: rgba(0, 20, 40, 0.75);
+  top: 4px;
+  left: 4px;
+}
+.marqueeBall::after {
+  left: 8px;
+  top: 3px;
+}
+@keyframes marqueeRoll {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(-360deg); }
+}
+.marqueePins {
+  display: flex;
+  align-items: flex-end;
+  gap: 2px;
+  height: 70%;
+}
+.marqueePin {
+  height: 100%;
+  width: auto;
+  filter: drop-shadow(0 0 3px rgba(255, 255, 255, 0.6));
+}
+.marqueePin:nth-child(1) { animation: marqueePinWobble 1.6s ease-in-out infinite; }
+.marqueePin:nth-child(2) { height: 88%; animation: marqueePinWobble 1.6s ease-in-out -0.4s infinite; }
+.marqueePin:nth-child(3) { animation: marqueePinWobble 1.6s ease-in-out -0.8s infinite; }
+@keyframes marqueePinWobble {
+  0%, 100% { transform: rotate(-6deg); transform-origin: 50% 100%; }
+  50% { transform: rotate(6deg); transform-origin: 50% 100%; }
+}
+/* LEDのつぶつぶ */
+.marqueeLed {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background-image: radial-gradient(circle, transparent 0 48%, rgba(2, 8, 14, 0.55) 62%);
+  background-size: 3px 3px;
+}
+/* ガラスの映りこみと、両はしのかげ */
+.marqueeGlass {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background:
+    linear-gradient(90deg, rgba(3, 10, 18, 0.95) 0%, transparent 9%, transparent 91%, rgba(3, 10, 18, 0.95) 100%),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.1) 0%, rgba(255, 255, 255, 0.02) 45%, transparent 50%);
+}
+@media (prefers-reduced-motion: reduce) {
+  .marqueeTrack,
+  .marqueeDog,
+  .marqueeBall,
+  .marqueeStar,
+  .marqueePin {
+    animation: none !important;
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   .spark,
   .flash,

@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState, type PointerEvent as
 import Image from "next/image";
 import { PIN_LAYOUT, PIN_VISUAL_WIDTH_PCT, Pins } from "./pins";
 import { BallTrail, bowlingFx, pinImpact, punch } from "./bowling-fx";
+import { SignMarquee } from "./sign-marquee";
 import type { BowlingBallVisual } from "@/lib/games/wanko-bowling-balls";
 import {
   AXIS_ROTATION_INPUT_EXPONENT,
@@ -579,7 +580,7 @@ function LaneScenery() {
         <line x1={FAR_OUTER_RIGHT} y1="0" x2={NEAR_OUTER_RIGHT} y2="100" stroke="rgba(84,216,255,0.18)" strokeWidth="6" vectorEffect="non-scaling-stroke" />
       </svg>
 
-      {/* 奥の幕（マスキングユニット）と看板。ピンの奥の暗いピット。飛んだピンやボールはこの奥へ消える */}
+      {/* 奥の幕（マスキングユニット）と電光掲示板。ピンの奥の暗いピット。飛んだピンやボールはこの奥へ消える */}
       <div
         className="pointer-events-none absolute inset-x-0 top-0 h-[9.5%]"
         style={{
@@ -590,11 +591,7 @@ function LaneScenery() {
         aria-hidden="true"
       >
         <div className="absolute inset-0 opacity-60" style={{ background: "radial-gradient(ellipse at 50% 120%, rgba(84,216,255,0.28), transparent 60%)" }} />
-        <div className="absolute left-1/2 top-[44%] flex -translate-x-1/2 -translate-y-1/2 items-center gap-1.5 whitespace-nowrap">
-          <span className="text-[9px] text-[#ffc95c] drop-shadow-[0_0_6px_rgba(255,201,92,0.9)]">🐾</span>
-          <span className="text-[13px] font-black italic tracking-[0.18em] text-[#bff2ff] [text-shadow:0_0_6px_rgba(84,216,255,0.95),0_0_14px_rgba(84,216,255,0.6)]">WANKO LANES</span>
-          <span className="text-[9px] text-[#ffc95c] drop-shadow-[0_0_6px_rgba(255,201,92,0.9)]">🐾</span>
-        </div>
+        <SignMarquee />
         {/* ピンを照らすライトの帯 */}
         <div className="absolute inset-x-[30%] bottom-0 h-[3px] rounded-full bg-[#fff4d6] shadow-[0_0_10px_3px_rgba(255,236,190,0.7)]" />
       </div>
