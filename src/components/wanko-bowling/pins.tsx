@@ -79,16 +79,28 @@ export function Pins({ registerNode, goldenPinId = null }: PinsProps) {
                     <stop offset="1" stopColor="#8a4a00" />
                   </linearGradient>
                 </defs>
-              ) : null}
+              ) : (
+                <defs>
+                  {/* 丸みが出るよう、左から光が当たった陰影をつける（見た目だけ） */}
+                  <linearGradient id={`wb-pin-${pin.id}`} x1="3" y1="0" x2="17" y2="0" gradientUnits="userSpaceOnUse">
+                    <stop stopColor="#d8cfbf" />
+                    <stop offset="0.3" stopColor="#ffffff" />
+                    <stop offset="0.55" stopColor="#f7f2e8" />
+                    <stop offset="1" stopColor="#bfb4a0" />
+                  </linearGradient>
+                </defs>
+              )}
               <ellipse cx="10" cy="31" rx="6.5" ry="2.4" fill={golden ? "rgba(255,185,30,0.36)" : "rgba(58,36,22,0.18)"} />
               <path
                 d="M10 1.5c2.3 0 3.6 2 3.2 4.1-.3 1.5-1.3 2.4-1.3 3.9 0 1.7 2.9 3.9 3.9 7.6.9 3.4.9 6.9-.4 9.9-.9 2-2.8 3.4-5.4 3.4s-4.5-1.4-5.4-3.4c-1.3-3-1.3-6.5-.4-9.9 1-3.7 3.9-5.9 3.9-7.6 0-1.5-1-2.4-1.3-3.9C6.4 3.5 7.7 1.5 10 1.5Z"
-                fill={golden ? `url(#golden-pin-${pin.id})` : "#f7f2e8"}
+                fill={golden ? `url(#golden-pin-${pin.id})` : `url(#wb-pin-${pin.id})`}
                 stroke={golden ? "rgba(255,238,142,0.9)" : "rgba(58,36,22,0.34)"}
                 strokeWidth="1"
               />
               <rect x="4.3" y="11.8" width="11.4" height="1.9" rx="0.95" fill={golden ? "#fff0a0" : "#b53632"} />
               <rect x="4.7" y="14.2" width="10.6" height="1.7" rx="0.85" fill={golden ? "#a65a00" : "#b53632"} />
+              {/* つやの線 */}
+              <path d="M7.6 4.2c-.3 1.4.6 2.6.8 4M6.4 19.5c-.6 2.4-.5 4.9.2 7" stroke="rgba(255,255,255,0.85)" strokeWidth="0.9" strokeLinecap="round" fill="none" />
             </svg>
           </div>
         );

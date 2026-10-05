@@ -1,0 +1,370 @@
+/*
+ * わんこボウリングの演出（見た目だけ。物理・スコア・コインにはさわらない）。
+ * src/components/wanko-bowling/bowling-fx.ts が、ピンに当たった場所に火花を出す。
+ */
+
+/* 演出をのせる層（レーン全体。さわれない） */
+.layer {
+  position: absolute;
+  inset: 0;
+  z-index: 1500;
+  overflow: hidden;
+  pointer-events: none;
+}
+
+/* ボールの軌跡（canvas） */
+.trail {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+}
+
+/* ピンに当たったときの火花 */
+.spark {
+  position: absolute;
+  width: var(--size, 5px);
+  height: var(--size, 5px);
+  margin: calc(var(--size, 5px) / -2) 0 0 calc(var(--size, 5px) / -2);
+  border-radius: 999px;
+  background: var(--c, #fff3c4);
+  box-shadow: 0 0 6px var(--c, #fff3c4);
+  animation: spark 520ms cubic-bezier(0.12, 0.8, 0.3, 1) forwards;
+}
+.sparkStreak {
+  width: calc(var(--size, 5px) * 3.2);
+  height: calc(var(--size, 5px) * 0.7);
+  transform-origin: 50% 50%;
+}
+@keyframes spark {
+  0% { transform: translate(0, 0) rotate(var(--rot, 0deg)) scale(1); opacity: 1; }
+  100% { transform: translate(var(--dx), var(--dy)) rotate(var(--rot, 0deg)) scale(0.2); opacity: 0; }
+}
+
+/* 当たった瞬間の白い光 */
+.flash {
+  position: absolute;
+  width: var(--size, 40px);
+  height: var(--size, 40px);
+  margin: calc(var(--size, 40px) / -2) 0 0 calc(var(--size, 40px) / -2);
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(255, 255, 255, 0.95) 0%, var(--c, rgba(255, 236, 170, 0.7)) 35%, transparent 70%);
+  mix-blend-mode: screen;
+  animation: flash 360ms ease-out forwards;
+}
+@keyframes flash {
+  0% { transform: scale(0.3); opacity: 1; }
+  100% { transform: scale(1.6); opacity: 0; }
+}
+
+/* 広がる輪（強い当たり・ゴールデンピン） */
+.shock {
+  position: absolute;
+  width: var(--size, 30px);
+  height: calc(var(--size, 30px) * 0.42);
+  margin: calc(var(--size, 30px) * -0.21) 0 0 calc(var(--size, 30px) / -2);
+  border-radius: 50%;
+  border: 2px solid var(--c, rgba(255, 240, 200, 0.85));
+  animation: shock 480ms ease-out forwards;
+}
+@keyframes shock {
+  0% { transform: scale(0.2); opacity: 0.95; }
+  100% { transform: scale(2.6); opacity: 0; border-width: 0.5px; }
+}
+
+/* 紙ふぶき（ストライク・ターキー・自己ベスト） */
+.confetti {
+  position: absolute;
+  top: -4%;
+  width: var(--w, 7px);
+  height: var(--h, 11px);
+  background: var(--c);
+  border-radius: 1.5px;
+  animation: confettiFall var(--dur, 1600ms) cubic-bezier(0.25, 0.4, 0.5, 1) var(--delay, 0ms) forwards;
+  opacity: 0;
+}
+@keyframes confettiFall {
+  0% { transform: translate(0, 0) rotate(0deg) rotateY(0deg); opacity: 1; }
+  80% { opacity: 1; }
+  100% { transform: translate(var(--dx), var(--dy, 110vh)) rotate(var(--rot, 540deg)) rotateY(720deg); opacity: 0; }
+}
+
+/* ===== 投げたあとの大きな文字 ===== */
+.bannerWrap {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 33%;
+  z-index: 40;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  pointer-events: none;
+}
+/* 文字のうしろでまわる光の筋 */
+.rays {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 150vw;
+  max-width: 720px;
+  aspect-ratio: 1;
+  transform: translate(-50%, -50%);
+  background: repeating-conic-gradient(from 0deg, rgba(255, 214, 120, 0.22) 0deg 7deg, transparent 7deg 22deg);
+  -webkit-mask-image: radial-gradient(circle, #000 0%, rgba(0, 0, 0, 0.6) 28%, transparent 62%);
+  mask-image: radial-gradient(circle, #000 0%, rgba(0, 0, 0, 0.6) 28%, transparent 62%);
+  animation: rays 1500ms ease-out forwards;
+}
+.raysTurkey {
+  background: repeating-conic-gradient(from 0deg, rgba(255, 120, 80, 0.26) 0deg 6deg, rgba(255, 220, 110, 0.18) 6deg 12deg, transparent 12deg 20deg);
+}
+@keyframes rays {
+  0% { transform: translate(-50%, -50%) rotate(0deg) scale(0.3); opacity: 0; }
+  20% { opacity: 1; }
+  80% { opacity: 1; }
+  100% { transform: translate(-50%, -50%) rotate(50deg) scale(1.1); opacity: 0; }
+}
+.bannerSub {
+  position: relative;
+  font-size: 11px;
+  font-weight: 900;
+  letter-spacing: 0.5em;
+  margin-right: -0.5em;
+  color: #ffe9a8;
+  text-shadow: 0 1px 2px rgba(60, 25, 0, 0.95), 0 0 10px rgba(255, 196, 80, 0.9);
+  animation: subIn 1500ms ease-out forwards;
+}
+@keyframes subIn {
+  0% { opacity: 0; letter-spacing: 1.4em; }
+  25% { opacity: 1; letter-spacing: 0.5em; }
+  85% { opacity: 1; }
+  100% { opacity: 0; }
+}
+.bannerText {
+  position: relative;
+  white-space: nowrap;
+  font-size: clamp(2.4rem, 13vw, 4.6rem);
+  font-weight: 900;
+  font-style: italic;
+  line-height: 1.05;
+  color: #fff6d6;
+  background: linear-gradient(180deg, #ffffff 0%, #ffe28a 38%, #ffb52e 62%, #ef6f12 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  filter: drop-shadow(0 3px 0 rgba(70, 25, 0, 0.95)) drop-shadow(0 0 18px rgba(255, 170, 50, 0.55));
+  animation: bannerIn 1500ms cubic-bezier(0.25, 1.35, 0.4, 1) forwards;
+}
+.bannerSpare {
+  background: linear-gradient(180deg, #ffffff 0%, #c9f4ff 40%, #54d8ff 65%, #1580c8 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  filter: drop-shadow(0 3px 0 rgba(4, 30, 60, 0.95)) drop-shadow(0 0 16px rgba(84, 216, 255, 0.55));
+}
+.bannerGutter {
+  font-size: clamp(1.9rem, 10vw, 3.2rem);
+  background: linear-gradient(180deg, #f2f2f2 0%, #a9b4c0 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  filter: drop-shadow(0 3px 0 rgba(10, 15, 22, 0.95));
+  animation: gutterIn 1300ms ease-out forwards;
+}
+@keyframes bannerIn {
+  0% { opacity: 0; transform: scale(2.6) skewX(-8deg); }
+  18% { opacity: 1; transform: scale(0.92) skewX(0deg); }
+  28% { transform: scale(1.06); }
+  38% { transform: scale(1); }
+  82% { opacity: 1; transform: scale(1.02); }
+  100% { opacity: 0; transform: scale(1.18); }
+}
+@keyframes gutterIn {
+  0% { opacity: 0; transform: translateY(-14px); }
+  20% { opacity: 1; transform: translateY(0); }
+  40% { transform: translateY(5px) rotate(-3deg); }
+  80% { opacity: 1; transform: translateY(8px) rotate(-4deg); }
+  100% { opacity: 0; transform: translateY(18px) rotate(-6deg); }
+}
+
+/* 倒した本数（ストライク・スペア以外） */
+.pinCount {
+  position: absolute;
+  left: 50%;
+  top: 30%;
+  z-index: 40;
+  display: flex;
+  align-items: baseline;
+  gap: 3px;
+  padding: 6px 16px 7px;
+  border-radius: 999px;
+  border: 1px solid rgba(120, 220, 255, 0.45);
+  background: rgba(6, 18, 30, 0.82);
+  box-shadow: 0 0 22px rgba(84, 216, 255, 0.28);
+  color: #e9f9ff;
+  white-space: nowrap;
+  pointer-events: none;
+  animation: chipIn 1150ms cubic-bezier(0.25, 1.4, 0.4, 1) forwards;
+}
+.pinCount b {
+  font-size: 26px;
+  font-weight: 900;
+  line-height: 1;
+  color: #54d8ff;
+}
+.pinCount span {
+  font-size: 12px;
+  font-weight: 900;
+}
+@keyframes chipIn {
+  0% { opacity: 0; transform: translate(-50%, 10px) scale(0.6); }
+  22% { opacity: 1; transform: translate(-50%, 0) scale(1.05); }
+  34% { transform: translate(-50%, 0) scale(1); }
+  80% { opacity: 1; }
+  100% { opacity: 0; transform: translate(-50%, -8px) scale(0.98); }
+}
+
+/* フレームのはじまり */
+.frameIntro {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 44%;
+  z-index: 40;
+  display: flex;
+  justify-content: center;
+  pointer-events: none;
+}
+.frameBand {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  padding: 8px 0 9px;
+  width: 100%;
+  justify-content: center;
+  background: linear-gradient(90deg, transparent, rgba(6, 18, 30, 0.86) 18%, rgba(6, 18, 30, 0.86) 82%, transparent);
+  border-top: 1px solid rgba(84, 216, 255, 0.35);
+  border-bottom: 1px solid rgba(84, 216, 255, 0.35);
+  animation: bandIn 1250ms cubic-bezier(0.3, 1, 0.4, 1) forwards;
+}
+.frameBand small {
+  font-size: 10px;
+  font-weight: 900;
+  letter-spacing: 0.3em;
+  color: rgba(84, 216, 255, 0.85);
+}
+.frameBand strong {
+  font-size: 28px;
+  font-weight: 900;
+  font-style: italic;
+  line-height: 1;
+  color: #ffffff;
+  text-shadow: 0 0 14px rgba(84, 216, 255, 0.6);
+}
+.frameBandFinal {
+  border-color: rgba(255, 201, 92, 0.5);
+  background: linear-gradient(90deg, transparent, rgba(40, 20, 0, 0.88) 18%, rgba(40, 20, 0, 0.88) 82%, transparent);
+}
+.frameBandFinal small {
+  color: rgba(255, 201, 92, 0.9);
+}
+.frameBandFinal strong {
+  color: #ffe9a8;
+  text-shadow: 0 0 14px rgba(255, 180, 60, 0.7);
+}
+@keyframes bandIn {
+  0% { opacity: 0; transform: scaleY(0.1); }
+  14% { opacity: 1; transform: scaleY(1); }
+  80% { opacity: 1; transform: scaleY(1); }
+  100% { opacity: 0; transform: scaleY(0.6); }
+}
+.frameBand > * {
+  animation: bandText 1250ms cubic-bezier(0.2, 0.9, 0.3, 1) forwards;
+}
+@keyframes bandText {
+  0% { transform: translateX(60px); opacity: 0; }
+  20% { transform: translateX(0); opacity: 1; }
+  80% { transform: translateX(-6px); opacity: 1; }
+  100% { transform: translateX(-40px); opacity: 0; }
+}
+
+/* ゴールデンピンの知らせ */
+.goldenNotice {
+  animation: goldenIn 1300ms cubic-bezier(0.25, 1.4, 0.4, 1) forwards;
+}
+@keyframes goldenIn {
+  0% { opacity: 0; transform: scale(0.5); }
+  20% { opacity: 1; transform: scale(1.08); }
+  32% { transform: scale(1); }
+  85% { opacity: 1; }
+  100% { opacity: 0; transform: translateY(-10px); }
+}
+
+/* 投げる前のボールの足もと */
+.dockRing {
+  position: absolute;
+  aspect-ratio: 1 / 0.42;
+  border-radius: 50%;
+  border: 1.5px solid rgba(140, 230, 255, 0.75);
+  box-shadow: 0 0 10px rgba(84, 216, 255, 0.55), inset 0 0 8px rgba(84, 216, 255, 0.35);
+  transform: translate(-50%, -50%);
+  pointer-events: none;
+  animation: dockRing 1600ms ease-in-out infinite;
+}
+@keyframes dockRing {
+  0%, 100% { opacity: 0.35; transform: translate(-50%, -50%) scale(0.92); }
+  50% { opacity: 0.95; transform: translate(-50%, -50%) scale(1.08); }
+}
+
+/* ===== 結果 ===== */
+.resultIn {
+  opacity: 0;
+  animation: resultIn 520ms cubic-bezier(0.2, 1.2, 0.4, 1) var(--delay, 0ms) forwards;
+}
+@keyframes resultIn {
+  0% { opacity: 0; transform: translateY(14px) scale(0.96); }
+  100% { opacity: 1; transform: translateY(0) scale(1); }
+}
+.resultScoreDone {
+  animation: scoreBump 460ms cubic-bezier(0.2, 1.6, 0.4, 1);
+}
+@keyframes scoreBump {
+  0% { transform: scale(1); }
+  40% { transform: scale(1.12); }
+  100% { transform: scale(1); }
+}
+.bestBadge {
+  animation: bestBadge 1800ms ease-in-out infinite;
+}
+@keyframes bestBadge {
+  0%, 100% { box-shadow: 0 0 0 rgba(255, 201, 92, 0); }
+  50% { box-shadow: 0 0 18px rgba(255, 201, 92, 0.55); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .spark,
+  .flash,
+  .shock,
+  .confetti,
+  .rays,
+  .dockRing {
+    display: none;
+  }
+  .bannerText,
+  .bannerSub,
+  .pinCount,
+  .frameBand,
+  .frameBand > *,
+  .goldenNotice,
+  .resultIn,
+  .resultScoreDone,
+  .bestBadge {
+    animation-duration: 1ms;
+  }
+  .bannerText,
+  .bannerSub,
+  .pinCount,
+  .frameBand,
+  .frameBand > * {
+    animation-name: none;
+  }
+}

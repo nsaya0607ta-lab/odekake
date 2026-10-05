@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
 import { BallPicker } from "@/components/wanko-bowling/ball-picker";
 import { Lane, type LaneRollResult } from "@/components/wanko-bowling/lane";
 import { ScoreBoard } from "@/components/wanko-bowling/score-board";
@@ -17,9 +17,37 @@ import {
   type GoldenPinTarget,
 } from "@/lib/games/wanko-bowling-score";
 import { getBowlingBallVisual, type OwnedBowlingBall } from "@/lib/games/wanko-bowling-balls";
+import { bowlingFx, confettiBurst, prefersReducedMotion } from "@/components/wanko-bowling/bowling-fx";
 
 type Phase = "select" | "playing" | "result";
 type Banner = "スペア！" | "ストライク！" | "ターキー！" | null;
+/** 演出（見た目だけ）：投げたあとに出す大きな文字・倒した本数 */
+type RollFx = { kind: "strike" | "turkey" | "spare" | "gutter" | "count"; pins: number; key: number };
+
+/** 結果のスコアを 0 から数え上げる（見た目だけ） */
+function useCountUp(target: number, run: boolean, durationMs = 1100) {
+  const [value, setValue] = useState(run ? 0 : target);
+  const [done, setDone] = useState(!run);
+  useEffect(() => {
+    if (!run || prefersReducedMotion() || target <= 0) {
+      setValue(target);
+      setDone(true);
+      return;
+    }
+    setDone(false);
+    const from = performance.now();
+    let raf = 0;
+    const tick = (now: number) => {
+      const t = Math.min(1, (now - from) / durationMs);
+      setValue(Math.round(target * (1 - (1 - t) ** 3)));
+      if (t < 1) raf = requestAnimationFrame(tick);
+      else setDone(true);
+    };
+    raf = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(raf);
+  }, [target, run, durationMs]);
+  return { value, done };
+}
 
 function calculateLiveBowlingScore(frames: BowlingFrame[]): number {
   const flatRolls = frames.flatMap((frame) => frame.rolls);
@@ -89,6 +117,10 @@ export function WankoBowlingGame({ ownedBalls }: { ownedBalls: OwnedBowlingBall[
   const [goldenPinTargets, setGoldenPinTargets] = useState<GoldenPinTarget[]>([]);
   const [goldenHitCount, setGoldenHitCount] = useState(0);
   const [goldenNotice, setGoldenNotice] = useState(false);
+  const [rollFx, setRollFx] = useState<RollFx | null>(null);
+  const [frameIntro, setFrameIntro] = useState<{ frame: number; key: number } | null>(null);
+  const fxLayerRef = useRef<HTMLDivElement | null>(null);
+  const resultFxLayerRef = useRef<HTMLDivElement | null>(null);
 
   const framesRef = useRef<BowlingFrame[]>(initialFrames);
   const frameIndexRef = useRef(0);
@@ -287,6 +319,22 @@ export function WankoBowlingGame({ ownedBalls }: { ownedBalls: OwnedBowlingBall[
     setBanner(nextBanner);
     if (nextBanner) window.setTimeout(() => setBanner(null), 1500);
 
+    // 演出：大きな文字・紙ふぶき・倒した本数（スコアや進み方には関係しない）
+    const fxKind: RollFx["kind"] = nextBanner === "ターキー！"
+      ? "turkey"
+      : nextBanner === "ストライク！"
+        ? "strike"
+        : nextBanner === "スペア！"
+          ? "spare"
+          : isGutterRoll
+            ? "gutter"
+            : "count";
+    const fxKey = Date.now();
+    setRollFx({ kind: fxKind, pins: roll, key: fxKey });
+    window.setTimeout(() => setRollFx((current) => (current?.key === fxKey ? null : current)), 1500);
+    if (fxKind === "strike" || fxKind === "turkey") confettiBurst(fxLayerRef.current, fxKind === "turkey" ? 80 : 50);
+    else if (fxKind === "spare") confettiBurst(fxLayerRef.current, 24, ["#54d8ff", "#c9f4ff", "#ffffff", "#7fe0ff"]);
+
     let needsFreshRackNext = false;
     if (isLastFrame) {
       if (!done && ((freshRack && roll === 10) || regularSpareCompleted)) {
@@ -316,6 +364,23 @@ export function WankoBowlingGame({ ownedBalls }: { ownedBalls: OwnedBowlingBall[
     }, resumeDelay);
   }, [commitFrameIndex, commitFrames, setRollLock, submitResult]);
 
+  // 演出：フレームのはじめに「FRAME 3」などを出す
+  useEffect(() => {
+    if (phase !== "playing") return;
+    const key = Date.now();
+    setFrameIntro({ frame: frameIndex + 1, key });
+    const timer = window.setTimeout(() => setFrameIntro((current) => (current?.key === key ? null : current)), 1250);
+    return () => window.clearTimeout(timer);
+  }, [frameIndex, newGameSignal, phase]);
+
+  // 演出：結果画面のスコアの数え上げと、自己ベストの紙ふぶき
+  const resultCount = useCountUp(score.total, phase === "result");
+  useEffect(() => {
+    if (phase !== "result" || !isNewBest) return;
+    const timer = window.setTimeout(() => confettiBurst(resultFxLayerRef.current, 70), 300);
+    return () => window.clearTimeout(timer);
+  }, [phase, isNewBest]);
+
   const goToRanking = useCallback(() => {
     window.dispatchEvent(new Event("wanko-bowling-ranking-refresh"));
     document.getElementById(rankingSectionIdRef.current)?.scrollIntoView({ behavior: "smooth", block: "start" });
@@ -337,18 +402,22 @@ export function WankoBowlingGame({ ownedBalls }: { ownedBalls: OwnedBowlingBall[
   if (phase === "result") {
     return (
       <div className="h-full overflow-y-auto overscroll-none py-1">
-        <section className="overflow-hidden rounded-[24px] border border-[#26394d] bg-[#09131e] text-white shadow-[0_20px_55px_rgba(0,0,0,0.42)]">
+        <section className="relative overflow-hidden rounded-[24px] border border-[#26394d] bg-[#09131e] text-white shadow-[0_20px_55px_rgba(0,0,0,0.42)]">
+          <div ref={resultFxLayerRef} className={bowlingFx.layer} aria-hidden="true" />
           <div className="relative overflow-hidden border-b border-white/10 px-4 py-6 text-center">
             <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_50%_10%,rgba(84,216,255,0.24),transparent_58%)]" />
             <div className="relative">
               <p className="text-[9px] font-black tracking-[0.18em] text-[#54d8ff]">最終結果</p>
               <p className="mt-1 text-base font-black tracking-wide text-white/75">全10フレーム終了</p>
               <p className="mt-4 text-[10px] font-black tracking-[0.12em] text-white/40">最終スコア</p>
-              <p className="mt-0.5 font-mono text-[64px] font-black leading-none tracking-[-0.08em] text-white drop-shadow-[0_0_22px_rgba(84,216,255,0.4)]">
-                {score.total}
+              <p
+                className={`mt-0.5 font-mono text-[64px] font-black leading-none tracking-[-0.08em] text-white drop-shadow-[0_0_22px_rgba(84,216,255,0.4)] ${resultCount.done ? bowlingFx.resultScoreDone : ""}`}
+                aria-label={`最終スコア ${score.total}`}
+              >
+                {resultCount.value}
               </p>
               {isNewBest ? (
-                <p className="mx-auto mt-3 w-fit rounded-full border border-[#ffc95c]/50 bg-[#ffc95c]/10 px-4 py-1 text-[10px] font-black tracking-[0.18em] text-[#ffc95c]">
+                <p className={`mx-auto mt-3 w-fit rounded-full border border-[#ffc95c]/50 bg-[#ffc95c]/10 px-4 py-1 text-[10px] font-black tracking-[0.18em] text-[#ffc95c] ${bowlingFx.bestBadge}`}>
                   自己ベスト更新
                 </p>
               ) : (
@@ -360,15 +429,15 @@ export function WankoBowlingGame({ ownedBalls }: { ownedBalls: OwnedBowlingBall[
           </div>
 
           <div className="grid grid-cols-3 gap-2 p-4 text-center">
-            <div className="rounded-[14px] border border-white/10 bg-white/[0.04] px-2 py-3">
+            <div className={`rounded-[14px] border border-white/10 bg-white/[0.04] px-2 py-3 ${bowlingFx.resultIn}`} style={{ "--delay": "250ms" } as CSSProperties}>
               <p className="font-mono text-2xl font-black tabular-nums text-[#54d8ff]">{score.strikeCount}</p>
               <p className="mt-0.5 text-[8px] font-black tracking-[0.08em] text-white/40">ストライク</p>
             </div>
-            <div className="rounded-[14px] border border-white/10 bg-white/[0.04] px-2 py-3">
+            <div className={`rounded-[14px] border border-white/10 bg-white/[0.04] px-2 py-3 ${bowlingFx.resultIn}`} style={{ "--delay": "360ms" } as CSSProperties}>
               <p className="font-mono text-2xl font-black tabular-nums text-[#ffc95c]">{score.spareCount}</p>
               <p className="mt-0.5 text-[8px] font-black tracking-[0.08em] text-white/40">スペア</p>
             </div>
-            <div className="rounded-[14px] border border-white/10 bg-white/[0.04] px-2 py-3">
+            <div className={`rounded-[14px] border border-white/10 bg-white/[0.04] px-2 py-3 ${bowlingFx.resultIn}`} style={{ "--delay": "470ms" } as CSSProperties}>
               <p className="font-mono text-2xl font-black tabular-nums text-white">{score.gutterCount}</p>
               <p className="mt-0.5 text-[8px] font-black tracking-[0.08em] text-white/40">ガター</p>
             </div>
@@ -390,7 +459,7 @@ export function WankoBowlingGame({ ownedBalls }: { ownedBalls: OwnedBowlingBall[
               </button>
             </div>
           ) : earnedCoins !== null ? (
-            <div className="mx-4 mb-2 rounded-[14px] border border-[#ffc95c]/30 bg-[#ffc95c]/10 px-4 py-3 text-center">
+            <div className={`mx-4 mb-2 rounded-[14px] border border-[#ffc95c]/30 bg-[#ffc95c]/10 px-4 py-3 text-center ${bowlingFx.resultIn}`} style={{ "--delay": "560ms" } as CSSProperties}>
               <p className="text-[8px] font-black tracking-[0.12em] text-[#ffc95c]/70">獲得コイン</p>
               <p className="mt-0.5 font-mono text-xl font-black text-[#ffc95c]">
                 +{earnedCoins.toLocaleString("ja-JP")} コイン
@@ -459,16 +528,40 @@ export function WankoBowlingGame({ ownedBalls }: { ownedBalls: OwnedBowlingBall[
           onRoll={handleRoll}
         />
 
-        {banner ? (
-          <div className="pointer-events-none absolute left-1/2 top-[35%] z-40 -translate-x-1/2">
-            <p className="wanko-bowl-banner whitespace-nowrap bg-gradient-to-b from-white via-[#ffc95c] to-[#ef7b18] bg-clip-text text-[clamp(2.2rem,12vw,4.2rem)] font-black italic leading-none text-transparent drop-shadow-[0_4px_0_rgba(49,19,0,0.85)]">
-              {banner}
+        {rollFx && rollFx.kind !== "count" ? (
+          <div key={rollFx.key} className={bowlingFx.bannerWrap} role="status">
+            {rollFx.kind === "strike" || rollFx.kind === "turkey" ? (
+              <span className={rollFx.kind === "turkey" ? `${bowlingFx.rays} ${bowlingFx.raysTurkey}` : bowlingFx.rays} />
+            ) : null}
+            {rollFx.kind !== "gutter" ? (
+              <span className={bowlingFx.bannerSub}>{rollFx.kind === "turkey" ? "TURKEY" : rollFx.kind === "strike" ? "STRIKE" : "SPARE"}</span>
+            ) : null}
+            <p
+              className={`${bowlingFx.bannerText} ${rollFx.kind === "spare" ? bowlingFx.bannerSpare : ""} ${rollFx.kind === "gutter" ? bowlingFx.bannerGutter : ""}`}
+            >
+              {rollFx.kind === "gutter" ? "ガター…" : banner ?? (rollFx.kind === "spare" ? "スペア！" : "ストライク！")}
             </p>
           </div>
         ) : null}
+        {rollFx?.kind === "count" ? (
+          <p key={rollFx.key} className={bowlingFx.pinCount} role="status">
+            {rollFx.pins === 9 ? <span>おしい！</span> : null}
+            <b>{rollFx.pins}</b>
+            <span>本</span>
+          </p>
+        ) : null}
+        {frameIntro && !rollFx ? (
+          <div key={frameIntro.key} className={bowlingFx.frameIntro} aria-hidden="true">
+            <div className={frameIntro.frame === BOWLING_FRAME_COUNT ? `${bowlingFx.frameBand} ${bowlingFx.frameBandFinal}` : bowlingFx.frameBand}>
+              <small>{frameIntro.frame === BOWLING_FRAME_COUNT ? "FINAL" : "FRAME"}</small>
+              <strong>{frameIntro.frame === BOWLING_FRAME_COUNT ? "ラストフレーム" : `第${frameIntro.frame}フレーム`}</strong>
+            </div>
+          </div>
+        ) : null}
+        <div ref={fxLayerRef} className={bowlingFx.layer} style={{ zIndex: 35 }} aria-hidden="true" />
 
         {goldenNotice ? (
-          <div className="pointer-events-none absolute left-1/2 top-[48%] z-50 -translate-x-1/2 rounded-full border border-[#ffd75f]/55 bg-[#2b1900]/90 px-4 py-2 shadow-[0_0_24px_rgba(255,191,35,0.5)]">
+          <div className={`pointer-events-none absolute left-1/2 top-[48%] z-50 -translate-x-1/2 ${bowlingFx.goldenNotice} rounded-full border border-[#ffd75f]/55 bg-[#2b1900]/90 px-4 py-2 shadow-[0_0_24px_rgba(255,191,35,0.5)]`}>
             <p className="whitespace-nowrap text-sm font-black text-[#ffe47e]">ゴールデンピン！ ＋10コイン</p>
           </div>
         ) : null}
