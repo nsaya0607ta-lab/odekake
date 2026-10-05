@@ -9,6 +9,15 @@ import {
   STEP_COIN_MILESTONES,
   formatCoins,
 } from "@/lib/coins";
+import {
+  BLUE_FIRST_MUNICIPALITY,
+  BLUE_FIRST_PREFECTURE,
+  BLUE_LOGIN_STREAK,
+  BLUE_OSANPO_COOP,
+  BLUE_OSANPO_MISSION,
+  BLUE_OSANPO_MISSION_ALL,
+} from "@/lib/blue-coin-rewards";
+import { BlueCoinArt } from "./coin-art";
 import { IconChevronDown, IconCoin } from "./icons";
 
 /** コインの取得方法をまとめて表示する折りたたみ。 */
@@ -103,7 +112,33 @@ export function CoinEarnMethods() {
             すでに持っている景品が出たとき、レア度に応じてコインの一部が戻ります。
           </p>
         </div>
+
+        <div className="rounded-2xl border border-[#BFD7F5] bg-[linear-gradient(135deg,#F2F8FF,#E3EFFD)] p-2.5">
+          <p className="flex items-center gap-1 font-bold text-[#1F4F8F]">
+            <BlueCoinArt className="h-3.5 w-3.5" />
+            青コイン（家具・背景・都道府県ガチャに使えます）
+          </p>
+          <div className="mt-1.5 flex flex-wrap gap-1.5">
+            <BlueChip label="はじめての市区町村" coins={BLUE_FIRST_MUNICIPALITY} />
+            <BlueChip label="はじめての都道府県" coins={BLUE_FIRST_PREFECTURE} />
+            <BlueChip label="7日連続ログイン" coins={BLUE_LOGIN_STREAK} />
+            <BlueChip label="おさんぽミッション1つ" coins={BLUE_OSANPO_MISSION} />
+            <BlueChip label="ミッション3つ全部" coins={BLUE_OSANPO_MISSION_ALL} />
+            <BlueChip label="協力チャレンジ（週1回）" coins={BLUE_OSANPO_COOP} />
+          </div>
+          <p className="mt-2 text-[10px] leading-relaxed text-[#3D6FB0]">
+            はじめての場所は、訪問を登録したときに1か所につき1回だけもらえます。おさんぽフレンチーは、スコアに応じてもらえます。
+          </p>
+        </div>
       </div>
     </details>
+  );
+}
+
+function BlueChip({ label, coins }: { label: string; coins: number }) {
+  return (
+    <span className="flex items-center gap-1 rounded-full bg-white/80 px-2 py-1 tabular-nums text-[#1F4F8F]">
+      {label} <BlueCoinArt className="h-3 w-3" />+{formatCoins(coins)}
+    </span>
   );
 }

@@ -41,6 +41,8 @@ export async function POST() {
       granted: result.granted === true,
       amount: typeof result.amount === "number" ? result.amount : 0,
       balance: typeof result.balance === "number" ? result.balance : 0,
+      // 7日目は青コインもいっしょ（0125 より前の DB では返ってこないので 0）
+      blueAmount: typeof result.blue_amount === "number" ? result.blue_amount : 0,
       // 端末の時計がずれていても、次に出すかどうかはサーバーが数えた日付で決める
       date: typeof result.date === "string" ? result.date : null,
     },

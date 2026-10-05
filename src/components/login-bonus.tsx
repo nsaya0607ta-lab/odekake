@@ -5,7 +5,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { formatCoins } from "@/lib/coins";
 import { todayInJapan } from "@/lib/date";
 import { getFrenchieSrc, type DogSkinId } from "@/lib/dog-skins";
-import { CoinArt } from "./coin-art";
+import { BlueCoinArt, CoinArt } from "./coin-art";
 import { IconClose } from "./icons";
 
 /**
@@ -21,7 +21,8 @@ import { IconClose } from "./icons";
 
 const SEEN_KEY_PREFIX = "odekake:login-bonus-checked-on";
 
-type Reward = { amount: number; balance: number };
+/** blueAmount は7日目（7日連続）にいっしょにもらえる青コイン。ふだんは 0 */
+type Reward = { amount: number; balance: number; blueAmount: number };
 
 function waitForSplash(): Promise<void> {
   return new Promise((resolve) => {
@@ -69,6 +70,7 @@ export function LoginBonus({ skin = "default", userId }: { skin?: DogSkinId; use
           granted?: boolean;
           amount?: number;
           balance?: number;
+          blueAmount?: number;
           date?: string | null;
         };
 
@@ -84,7 +86,7 @@ export function LoginBonus({ skin = "default", userId }: { skin?: DogSkinId; use
 
         await waitForSplash();
         if (cancelled) return;
-        setReward({ amount: data.amount ?? 0, balance: data.balance ?? 0 });
+        setReward({ amount: data.amount ?? 0, balance: data.balance ?? 0, blueAmount: data.blueAmount ?? 0 });
       } catch {
         // 圏外なら次に開いたときに再試行する。
       }
@@ -230,6 +232,15 @@ export function LoginBonus({ skin = "default", userId }: { skin?: DogSkinId; use
             <br />
             今日もおさんぽ、いってらっしゃい。
           </p>
+
+          {reward.blueAmount > 0 ? (
+            <p className="mt-3 flex items-center justify-center gap-1.5 rounded-2xl border border-[#BFD7F5] bg-[linear-gradient(135deg,#F2F8FF,#E3EFFD)] px-3 py-2 text-[12px] font-bold text-[#1F4F8F]">
+              7日連続ボーナス
+              <BlueCoinArt className="h-4 w-4" />
+              <span className="font-black tabular-nums">+{formatCoins(reward.blueAmount)}</span>
+              <span className="text-[11px]">青コイン</span>
+            </p>
+          ) : null}
 
           <p className="mt-3 flex items-center justify-center gap-1.5 rounded-full bg-paper-deep py-2 text-[11px] text-ink-soft">
             いまのコイン

@@ -4,11 +4,12 @@
  * わんこのおへや：青コインのお店。
  * - FurnitureShop … もようがえの「家具」タブと「窓・棚」タブ。1種類あたり持てる数まで買え、買ったものはタップで部屋に置ける
  * - BuyDialog … 1つ買うときの確認（家具・窓や棚・もようがえのデザインで共通）
- * 青コインは「おさんぽフレンチー」でもらえる。
+ * 青コインは「おさんぽフレンチー」・はじめての場所の登録・7日連続ログインでもらえる（src/lib/blue-coin-rewards.ts）。
  */
 import Link from "next/link";
 import { useState, type ReactNode } from "react";
 import { BlueCoinArt } from "@/components/coin-art";
+import { BLUE_COIN_SOURCES_SHORT } from "@/lib/blue-coin-rewards";
 import { FIXTURES, FURNITURE, isFixtureId, shopKey, shopMax, shopName, shopPrice, type DecorEntry, type FixtureId, type FurnitureId, type RoomShop, type ShopId } from "@/lib/room/types";
 
 /** 部屋に置くもの（家具と、窓・棚など） */
@@ -26,7 +27,7 @@ export function BlueCoinBar({ shop, note }: { shop: Pick<RoomShop, "blueCoins">;
         </div>
         <Link href="/games/osanpo-run" className="shrink-0 rounded-full bg-[#2F6FC2] px-3 py-1.5 text-[11px] font-black text-white shadow-sm active:scale-95">おさんぽで ためる →</Link>
       </div>
-      <p className="mt-1.5 text-[10px] font-semibold text-ink-faint">青コインは「おさんぽフレンチー」でもらえます。{note}</p>
+      <p className="mt-1.5 text-[10px] font-semibold text-ink-faint">{BLUE_COIN_SOURCES_SHORT}{note}</p>
     </>
   );
 }
