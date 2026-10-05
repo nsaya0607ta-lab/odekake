@@ -75,6 +75,7 @@ import {
 import { drawRouteGate, drawRouteScene as drawRouteSceneLayer, ROUTE_GATE_HALF, type RouteTheme } from "./route-scene";
 import type { OsanpoRunFriendMemory, OsanpoRunMemoryPhoto, OsanpoRunOdekake } from "@/lib/data/osanpo-run";
 import { drawSkyLife, drawStageGround, drawStageMid, drawStageNear, type MidItem, type NearItem, type StageView } from "./stage-scene";
+import { drawBeam, drawBurst, drawForeground, drawSpeedLines, drawSunFlare, drawVignette, makeSpeedLines } from "./polish";
 
 export type RunItem = {
   id: string;
@@ -203,7 +204,7 @@ type Pickup = { item: RunItem | null; token: number; x: number; y: number; vy: n
 type WeatherKind = "rainbow" | "thunder" | "sakura" | "momiji" | "aurora";
 type WeatherEvent = { kind: WeatherKind; t: number; max: number; acc: number; mul: number; nextBolt: number };
 type ActiveBuff = { skill: OsanpoRunSkill; b: Buff; lv: number; key: string; t: number; max: number; count: number; acc: number; rampN: number; rainAcc: number; rainN?: number };
-type Particle = { x: number; y: number; vx: number; vy: number; life: number; max: number; r: number; kind: "dust" | "spark" | "ring" | "splash" | "fw" | "drop" | "crown"; color: string; g: number; scroll: boolean };
+type Particle = { x: number; y: number; vx: number; vy: number; life: number; max: number; r: number; kind: "dust" | "spark" | "ring" | "splash" | "fw" | "drop" | "crown" | "beam" | "burst"; color: string; g: number; scroll: boolean };
 type FloatText = { x: number; y: number; text: string; color: string; size: number; life: number; max: number };
 type Flyer = { item: RunItem; x0: number; y0: number; t: number };
 type Env = { m: number; top: RGB; bot: RGB; far: RGB; mid: RGB; near: RGB; night: number; side: RGB; road: RGB };
@@ -457,7 +458,10 @@ export function createOsanpoRun(root: HTMLElement, opts: OsanpoRunOptions): () =
     knocks: 0, rares: 0, skillIds: new Set<string>(), tricks: newTrickRun(),
   };
   let obstacles: Obstacle[] = [], pickups: Pickup[] = [], parts: Particle[] = [], texts: FloatText[] = [], flyers: Flyer[] = [];
-  const FX = { hitstop: 0, flash: 0, flashCol: "255,255,255", rareT: 0, fade: 0 };
+  const FX = { hitstop: 0, flash: 0, flashCol: "255,255,255", rareT: 0, fade: 0, shake: 0 };
+  /** 見た目だけ：風の線、犬の残像の高さ（新しい順） */
+  const speedLines = makeSpeedLines(14);
+  const dogTrail: number[] = [];
   let FDT = 1 / 60;
   /** アイテムスキルの状態。おさんぽのたびに作り直す */
   const newSkillState = () => ({
@@ -779,7 +783,8 @@ export function createOsanpoRun(root: HTMLElement, opts: OsanpoRunOptions): () =
   }
 
   /* ---------- 犬の描画 ---------- */
-  function drawDog(c: Ctx, x: number, y: number): void {
+  /** ghost は残像・水たまりの映りこみ用（バリアや星は描かない） */
+  function drawDog(c: Ctx, x: number, y: number, ghost = false): void {
     const air = !P.ground && !P.dead, sliding = P.slide && P.ground && !P.dead;
     let pose: Pose;
     if (P.dead) pose = "bow-b";
@@ -800,6 +805,7 @@ export function createOsanpoRun(root: HTMLElement, opts: OsanpoRunOptions): () =
       c.fillStyle = "#F6EFE4"; ell(c, 0, -22, 20, 16); c.fill();
     }
     c.restore();
+    if (ghost) return;
     if (S.shield) {
       const pulse = 1 + Math.sin(S.time * 5) * 0.04;
       c.strokeStyle = "rgba(126,240,208,.85)"; c.lineWidth = 2; c.fillStyle = "rgba(126,240,208,.08)";
@@ -846,6 +852,8 @@ export function createOsanpoRun(root: HTMLElement, opts: OsanpoRunOptions): () =
       const warm = clamp((m - 900) / 220, 0, 1) + clamp((480 - m) / 150, 0, 1);
       const col = mix(hex("#FFF4CC"), hex("#FF9460"), clamp(warm, 0, 1));
       glow(c, sx, sy, 90, `${col[0] | 0},${col[1] | 0},${col[2] | 0}`, 0.35);
+      // 演出：光の筋とレンズのきらめき（雨の日は出さない）
+      if (S.rain < 0.3) drawSunFlare(c, { sx, sy, col, warm: clamp(warm, 0, 1), day: (1 - e.night) * (1 - S.rain), t: S.time, vw: VW, vh: VH, still: RM || S.calm });
       c.fillStyle = rgb(col); c.beginPath(); c.arc(sx, sy, 17, 0, Math.PI * 2); c.fill();
     }
     if (m > 1110 || m < 400) {
@@ -2344,7 +2352,7 @@ export function createOsanpoRun(root: HTMLElement, opts: OsanpoRunOptions): () =
       if (++S.knocks >= 10) unlock("knock10");
       const v = addPts(10);
       floatText(o.x + o.w / 2, GROUND - o.h - 20, `ドカッ +${v}`, "#FFE7A3", 14);
-      FX.hitstop = RM ? 0 : 0.03;
+      FX.hitstop = RM ? 0 : 0.03; FX.shake = Math.max(FX.shake, 2.5);
       return false;
     }
     for (const a of K.buffs) if (a.b.immune && inGroup(o, a.b.immune)) return false;
@@ -2353,7 +2361,7 @@ export function createOsanpoRun(root: HTMLElement, opts: OsanpoRunOptions): () =
       g.n--; K.cairn = 0; knock(o); P.inv = 1; sfx.guard();
       const v = g.pts ? addPts(g.pts) : 0;
       floatText(P.x + 10, P.y - 60, `${g.name}で助かった！${v ? ` +${v}` : ""}`, "#7EF0D0", 15);
-      puff(P.x + 10, P.y - 26, 14, "spark", { g: 0 });
+      puff(P.x + 10, P.y - 26, 14, "spark", { g: 0 }); FX.shake = Math.max(FX.shake, 4);
       if (g.after > 0) K.buffs.push({ skill: OSANPO_RUN_SKILL_BY_ID.get("sushi_awabi") ?? OSANPO_RUN_SKILLS[0]!, b: { sec: g.after, inv: true, label: "はりつき無敵" }, lv: 1, key: "guard-after", t: g.after, count: 0, acc: 0, rampN: 0, rainAcc: 0, max: g.after });
       return false;
     }
@@ -2368,7 +2376,7 @@ export function createOsanpoRun(root: HTMLElement, opts: OsanpoRunOptions): () =
     const v = r.pts ? addPts(r.pts) : 0;
     floatText(VW / 2, GROUND * 0.32, `${r.name} 復活！${v ? ` +${v}` : ""}`, "#7EF0D0", 22);
     if (r.mul > 1) K.buffs.push({ skill: OSANPO_RUN_SKILL_BY_ID.get("other_okaeri") ?? OSANPO_RUN_SKILLS[0]!, b: { sec: 10, mul: r.mul, label: "おかえりブースト" }, lv: 1, key: "revive-after", t: 10, count: 0, acc: 0, rampN: 0, rainAcc: 0, max: 10 });
-    sfx.barrier(); FX.flash = RM ? 0.1 : 0.25; FX.flashCol = "126,240,208";
+    sfx.barrier(); FX.flash = RM ? 0.1 : 0.25; FX.flashCol = "126,240,208"; FX.shake = Math.max(FX.shake, 5);
     puff(P.x + 10, P.y - 26, 18, "spark", { g: 0 });
     return true;
   }
@@ -2787,7 +2795,7 @@ export function createOsanpoRun(root: HTMLElement, opts: OsanpoRunOptions): () =
     S.state = "dying"; S.deadT = 0; P.dead = true; P.vy = -420; P.ground = false;
     sfx.crash(); bgmStop();
     puff(P.x + 20, P.y - 24, 14, "spark", { g: 300, scroll: false });
-    FX.hitstop = RM ? 0 : 0.08; FX.flash = RM ? 0.15 : 0.3; FX.flashCol = "255,255,255";
+    FX.hitstop = RM ? 0 : 0.08; FX.flash = RM ? 0.15 : 0.3; FX.flashCol = "255,255,255"; FX.shake = 8;
     try { if (SET.vib) navigator.vibrate?.(80); } catch { /* 振動できない端末 */ }
   }
   function countUp(el: HTMLElement, to: number): void {
@@ -3191,6 +3199,12 @@ export function createOsanpoRun(root: HTMLElement, opts: OsanpoRunOptions): () =
     if (item.rarity === "N" || (item.rarity === "R" && S.sec === "bonus")) { sfx.item(S.mult); floatText(p.x, p.y - 16, `${upTag}+${pts}${tag}`, R.color, 13); puff(p.x, p.y, 5, "spark", { g: 0 }); }
     else if (item.rarity === "R" || item.rarity === "SR") { sfx.item(S.mult + 1); floatText(p.x, p.y - 18, `${upTag}${item.name} +${pts}${tag}`, R.color, 14); puff(p.x, p.y, 8, "spark", { g: 0 }); }
     else { sfx.fanfare(); floatText(p.x, p.y - 20, `${upTag}${item.rarity} ${item.name} +${pts}${tag}`, R.color, 16); puff(p.x, p.y, 16, "spark", { g: 0 }); }
+    // 演出：SR以上は放射する光、SSR以上は空からの光の柱
+    if (!RM && rarityIndex(item.rarity) >= 2) {
+      const glowCol = R.glow ?? "255,255,255";
+      parts.push({ x: p.x, y: p.y, vx: 0, vy: 0, life: 0, max: 0.6, r: Math.random() * Math.PI, kind: "burst", color: glowCol, g: 0, scroll: true });
+      if (rarityIndex(item.rarity) >= 3) parts.push({ x: p.x, y: GROUND, vx: 0, vy: 0, life: 0, max: 1.1, r: 0, kind: "beam", color: glowCol, g: 0, scroll: true });
+    }
     showRare(item);
     // LR・MR のバリア。そのアイテムのスキル自体が守り（身代わり・復活）のときは、スキルの守りを優先してバリアは付けない
     const ownWard = OSANPO_RUN_SKILL_BY_ID.get(item.id)?.fx.some((f) => f.op === "guard" || f.op === "revive");
@@ -3325,6 +3339,7 @@ export function createOsanpoRun(root: HTMLElement, opts: OsanpoRunOptions): () =
       }
     }
     FX.flash *= Math.exp(-7 * dt);
+    FX.shake *= Math.exp(-9 * dt);
     if (FX.fade > 0) FX.fade = Math.max(0, FX.fade - dt * 3);
     if (FX.rareT > 0) { FX.rareT -= dt; if (FX.rareT <= 0) $("rare").hidden = true; }
 
@@ -3402,7 +3417,7 @@ export function createOsanpoRun(root: HTMLElement, opts: OsanpoRunOptions): () =
         floatText(P.x + 20, P.y - 64, `バシャーン！ +${v}`, "#9BE7FF", 16);
         splashBurst(Math.max(o.x + 10, Math.min(o.x + o.w - 10, P.x)), o.w);
         tone(300, 0.14, "triangle", 0.06, 120); tone(900, 0.08, "sine", 0.04, 600, 0.04);
-        FX.hitstop = RM ? 0 : 0.04;
+        FX.hitstop = RM ? 0 : 0.04; FX.shake = Math.max(FX.shake, 3);
         S.stomps++;
         continue;
       }
@@ -3561,7 +3576,10 @@ export function createOsanpoRun(root: HTMLElement, opts: OsanpoRunOptions): () =
   function render(): void {
     const e = stageEnv(envAt(S.clock));
     const c = ctx;
-    c.setTransform(DPR * SC, 0, 0, DPR * SC, 0, 0);
+    // 演出：ぶつかったときに画面がゆれる（動きを減らす設定・ゆったりモードではゆらさない）
+    const shake = RM || S.calm || FX.shake < 0.2 ? 0 : FX.shake;
+    const shx = shake ? (Math.random() - 0.5) * shake : 0, shy = shake ? (Math.random() - 0.5) * shake * 0.6 : 0;
+    c.setTransform(DPR * SC, 0, 0, DPR * SC, shx * DPR * SC, shy * DPR * SC);
     drawSky(c, e);
     drawSkyLife(stageView(c, e));
     drawWeatherSky(c);
@@ -3714,6 +3732,27 @@ export function createOsanpoRun(root: HTMLElement, opts: OsanpoRunOptions): () =
         star(c, P.x + Math.cos(ang) * 34, P.y - 28 + Math.sin(ang) * 26, 2.6, `rgba(${hslRgb((S.time * 280 + i * 120) % 360)},.95)`);
       }
     }
+    // 演出：ぬれた道に犬が映る（雨の日）
+    if (S.rain > 0.25 && STAGE.weather !== "snow" && !P.dead) {
+      c.save();
+      c.beginPath(); c.rect(-20, GROUND, VW + 40, VH - GROUND + 20); c.clip();
+      c.translate(0, GROUND * 2); c.scale(1, -1);
+      c.globalAlpha = 0.2 * Math.min(1, S.rain);
+      drawDog(c, P.x, P.y, true);
+      c.restore();
+    }
+    // 演出：ラッシュ中・無敵中は、走った跡に残像
+    dogTrail.unshift(P.y);
+    if (dogTrail.length > 10) dogTrail.length = 10;
+    if (S.state === "play" && !RM && !P.dead && (S.sec === "rush" || invT > 0)) {
+      const tint = S.sec === "rush" ? 1 : 0.7;
+      for (let k = 3; k >= 1; k -= 1) {
+        c.save();
+        c.globalAlpha = 0.13 * tint * (4 - k) / 3;
+        drawDog(c, P.x - k * 11, dogTrail[k * 2] ?? P.y, true);
+        c.restore();
+      }
+    }
     if (!(P.inv > 0 && Math.floor(S.time * 16) % 2)) drawDog(c, P.x, P.y);
 
     for (const p of parts) {
@@ -3741,6 +3780,8 @@ export function createOsanpoRun(root: HTMLElement, opts: OsanpoRunOptions): () =
         for (let k = 1; k < 8; k += 2) { const x = p.x - w + (k / 8) * w * 2; ell(c, x, p.y - h - 2, 2.2, 2.6); c.fill(); }
         c.strokeStyle = `rgba(200,232,255,${a * 0.8})`; c.lineWidth = 1.4; ell(c, p.x, p.y + 1, w * 1.25, 3 + t * 5); c.stroke();
       } else if (p.kind === "ring") { c.strokeStyle = `rgba(255,255,255,${a * 0.7})`; c.lineWidth = 1.5; ell(c, p.x, p.y, 4 + p.life * 50, 1.5 + p.life * 10); c.stroke(); }
+      else if (p.kind === "beam") drawBeam(c, p.x, GROUND, p.color, p.life / p.max);
+      else if (p.kind === "burst") drawBurst(c, p.x, p.y, p.color, p.life / p.max, p.r + p.life * 1.5);
       else star(c, p.x, p.y, p.r * a + 1, `rgba(255,214,110,${a})`);
     }
     if (flyers.length) {
@@ -3762,6 +3803,13 @@ export function createOsanpoRun(root: HTMLElement, opts: OsanpoRunOptions): () =
       const half = c.measureText(t.text).width / 2 + 6, tx = Math.min(VW - half, Math.max(half, t.x));
       c.strokeStyle = `rgba(22,21,46,${a * 0.85})`; c.lineWidth = 4; c.strokeText(t.text, tx, t.y);
       c.globalAlpha = a; c.fillStyle = t.color; c.fillText(t.text, tx, t.y); c.globalAlpha = 1;
+    }
+    // 演出：ラッシュ中や速いときの風の線と、手前を流れる草花
+    if (!RM && !S.calm) {
+      const fast = clamp((S.speed - MAX_SPEED * 0.8) / (MAX_SPEED * 0.2), 0, 1) * 0.55;
+      const windy = S.state === "play" ? Math.max(S.sec === "rush" ? 1 : 0, fast) : 0;
+      drawSpeedLines(c, speedLines, { strength: windy, dt: FDT, vw: VW, ground: GROUND, color: e.night > 0.5 ? "190,210,255" : "255,255,255" });
+      drawForeground(c, { stage: STAGE_ID, cam: S.cam, vw: VW, vh: VH, ground: GROUND, night: e.night, side: e.side, t: S.time });
     }
     if (STAGE.weather === "snow") {
       const inten = 0.35 + 0.65 * S.rain, n = Math.round(drops.length * inten * (S.calm ? 0.5 : 1) * (M.clear ? 0.2 : 1));
@@ -3795,6 +3843,8 @@ export function createOsanpoRun(root: HTMLElement, opts: OsanpoRunOptions): () =
     if (S.state === "play") for (const tn of M.tints) { c.fillStyle = `rgba(${tn},${tn === "20,14,40" ? 0.28 : 0.1})`; c.fillRect(-20, -20, VW + 40, VH + 40); }
     if (FX.fade > 0.01) { c.fillStyle = `rgba(16,14,34,${FX.fade * 0.85})`; c.fillRect(-20, -20, VW + 40, VH + 40); }
     if (FX.flash > 0.02) { c.fillStyle = `rgba(${FX.flashCol},${FX.flash * 0.6})`; c.fillRect(-20, -20, VW + 40, VH + 40); }
+    // 演出：昼も四すみを少しだけ暗く（夜は下のもっと強いかげがかかる）
+    drawVignette(c, VW, VH, 0.16 * (1 - e.night));
     if (e.night > 0.05) {
       const g = c.createRadialGradient(VW / 2, VH * 0.55, VH * 0.3, VW / 2, VH * 0.55, VW * 0.75);
       g.addColorStop(0, "rgba(10,8,30,0)"); g.addColorStop(1, `rgba(10,8,30,${0.35 * e.night})`);
