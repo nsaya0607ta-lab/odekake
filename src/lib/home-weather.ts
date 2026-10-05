@@ -10,6 +10,10 @@ import type { RoomWeather, WeatherKind } from "@/lib/room/weather";
 /** マイルームが場所を保存しているキー（my-room.tsx と同じものを使う） */
 export const PLACE_KEY = "odekake-room-place-v1";
 
+/** ホームを開くたびに問い合わせないよう、10分はこの端末に天気を覚えておく（背景の「おそとの天気」も同じものを使う） */
+export const WEATHER_CACHE_KEY = "odekake-home-weather-v1";
+export const WEATHER_CACHE_MS = 10 * 60_000;
+
 export type SavedPlace = GeoPoint & { pref: string; city?: string };
 
 /** この端末に保存された場所。なければ東京 */
