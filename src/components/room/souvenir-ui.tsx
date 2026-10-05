@@ -2,7 +2,8 @@
 
 /**
  * おさんぽのおみやげの画面
- * - SouvenirGift: わんこが持って帰ってきたときの「おみやげ」カード（ひとつずつポンと出る。はじめてのものに NEW、レアは金色に光る）
+ * - SouvenirGift: おさんぽで わんこが ひろってきたとき（すぐに中身を見せる）と、
+ *   遊びに来たフレンドのわんこが おみやげをくれたとき（包みをタップであける）のカード。はじめてのものに NEW、レアは金色に光る
  * - SouvenirBook: もようがえの「おみやげ」タブ。全種類の図鑑（まだのものはシルエットとヒント）から、棚や床に飾る
  */
 import { useState } from "react";
@@ -59,21 +60,22 @@ function GiftBag({ dogName, glow }: { dogName: string; glow: boolean }) {
   );
 }
 
-export function SouvenirGift({ news, dogName, onClose, onDecorate }: { news: SouvenirNews; dogName: string; onClose: () => void; onDecorate: () => void }) {
-  // まずは包みのまま。タップであける
-  const [open, setOpen] = useState(false);
+/** from: おみやげをくれた フレンドのわんこ（無ければ、自分のわんこが おさんぽで ひろってきたもの） */
+export function SouvenirGift({ news, dogName, from = null, onClose, onDecorate }: { news: SouvenirNews; dogName: string; from?: { owner: string; dogName: string } | null; onClose: () => void; onDecorate: () => void }) {
+  // フレンドからの おみやげは、まず包みのまま（タップであける）。おさんぽで ひろったものは、すぐに見せる
+  const [open, setOpen] = useState(!from);
   const top = headline(news);
-  if (!open) {
+  if (!open && from) {
     const hasRare = news.some((n) => SOUVENIRS[n.id].rare || n.shiny);
     const hasShiny = news.some((n) => n.shiny);
     return (
       // 包みのあいだは、外をタップしても とじない（あけずに見のがさないように）
       <div className="fixed inset-0 z-[790] flex items-end justify-center bg-black/35 px-4 pb-6 backdrop-blur-[2px] sm:items-center">
-        <div role="dialog" aria-modal="true" aria-label="わんこのおみやげ（つつみ）" onClick={(e) => e.stopPropagation()} className="room-sv-pop relative w-full max-w-sm rounded-[28px] border border-line bg-card px-5 pb-5 pt-4 text-center shadow-2xl">
-          <p className="text-[11px] font-black tracking-[0.2em] text-leaf-deep">OSANPO SOUVENIR</p>
-          <p className="mt-0.5 text-[15px] font-black text-ink">🐾 {dogName}から おみやげ！</p>
+        <div role="dialog" aria-modal="true" aria-label="フレンドのわんこからの おみやげ（つつみ）" onClick={(e) => e.stopPropagation()} className="room-sv-pop relative w-full max-w-sm rounded-[28px] border border-line bg-card px-5 pb-5 pt-4 text-center shadow-2xl">
+          <p className="text-[11px] font-black tracking-[0.2em] text-[#C8543E]">FRIEND&apos;S GIFT</p>
+          <p className="mt-0.5 text-[15px] font-black text-ink">🎁 {from.owner}さんちの {from.dogName}から おみやげ！</p>
           <button type="button" onClick={() => setOpen(true)} aria-label="おみやげを あける" className="mx-auto mt-2 block w-40 active:scale-95">
-            <span className="room-sv-wiggle block"><GiftBag dogName={dogName} glow={hasRare} /></span>
+            <span className="room-sv-wiggle block"><GiftBag dogName={from.dogName} glow={hasRare} /></span>
           </button>
           <p className="mt-1 text-[12px] font-black text-ink-soft">{hasShiny ? "にじいろに ひかってる…！？ " : hasRare ? "なにか ひかってる…！？ " : ""}タップして あけてね</p>
           <p className="mt-0.5 text-[10px] font-bold text-ink-faint">{news.length}こ 入ってるみたい</p>
@@ -92,16 +94,26 @@ export function SouvenirGift({ news, dogName, onClose, onDecorate }: { news: Sou
   const days = new Set(news.map((n) => n.date)).size;
   return (
     <div className="fixed inset-0 z-[790] flex items-end justify-center bg-black/35 px-4 pb-6 backdrop-blur-[2px] sm:items-center" onClick={onClose}>
-      <div role="dialog" aria-modal="true" aria-label="わんこのおみやげ" onClick={(e) => e.stopPropagation()} className="room-sv-pop relative w-full max-w-sm overflow-hidden rounded-[28px] border border-line bg-card shadow-2xl">
+      <div role="dialog" aria-modal="true" aria-label={from ? "フレンドのわんこからの おみやげ" : "わんこが ひろってきたもの"} onClick={(e) => e.stopPropagation()} className="room-sv-pop relative w-full max-w-sm overflow-hidden rounded-[28px] border border-line bg-card shadow-2xl">
         {/* あけた瞬間のキラキラ */}
         <span aria-hidden className="room-sv-burst pointer-events-none absolute left-1/2 top-[38%] z-10 block h-0 w-0">
           {Array.from({ length: 12 }, (_, i) => <span key={i} className="absolute -left-1.5 -top-1.5 block h-3 w-3 rounded-full" style={{ background: ["#FFD84A", "#FF8FB3", "#8CCB74", "#7FC8F2"][i % 4], ["--a" as string]: `${i * 30}deg` }} />)}
         </span>
         {/* 上の帯：きょうの歩数のしるし */}
         <div className={`relative px-4 pb-3 pt-4 text-center ${top.shiny ? "bg-[linear-gradient(160deg,#FFEAF4,#E6F4FF,#F0FFE6)]" : topRare ? "bg-[linear-gradient(160deg,#FFF6D6,#FFE7A8)]" : "bg-[linear-gradient(160deg,#F3FAEC,#E2F1D4)]"}`}>
-          <p className="text-[11px] font-black tracking-[0.2em] text-leaf-deep">OSANPO SOUVENIR</p>
-          <p className="mt-0.5 text-[15px] font-black text-ink">🐾 {dogName}が おみやげを もってきたよ</p>
-          <p className="mt-0.5 text-[11px] font-bold text-ink-soft">{days > 1 ? `${days}日ぶんの おさんぽの ごほうび（いちばん ${maxSteps.toLocaleString("ja-JP")}歩）` : `${maxSteps.toLocaleString("ja-JP")}歩の おさんぽの ごほうび`}</p>
+          {from ? (
+            <>
+              <p className="text-[11px] font-black tracking-[0.2em] text-[#C8543E]">FRIEND&apos;S GIFT</p>
+              <p className="mt-0.5 text-[15px] font-black text-ink">🎁 {from.dogName}が おみやげを くれたよ！</p>
+              <p className="mt-0.5 text-[11px] font-bold text-ink-soft">{from.owner}さんちから あそびに来てくれた おれい</p>
+            </>
+          ) : (
+            <>
+              <p className="text-[11px] font-black tracking-[0.2em] text-leaf-deep">OSANPO FIND</p>
+              <p className="mt-0.5 text-[15px] font-black text-ink">🐾 {dogName}が {news.length > 1 ? `${news.length}こ` : `${souvenirName(top.id, top.shiny)}を`} ひろってきたよ！</p>
+              <p className="mt-0.5 text-[11px] font-bold text-ink-soft">{days > 1 ? `${days}日ぶんの おさんぽで みつけた（いちばん ${maxSteps.toLocaleString("ja-JP")}歩）` : `${maxSteps.toLocaleString("ja-JP")}歩の おさんぽで みつけた`}</p>
+            </>
+          )}
         </div>
         {/* いちばんのもの：大きく、わんこのひとことつき */}
         <div className="px-4 pt-4">
@@ -116,14 +128,14 @@ export function SouvenirGift({ news, dogName, onClose, onDecorate }: { news: Sou
                 {top.isNew ? <span className="rounded-full bg-[#E04A6A] px-2 py-0.5 text-[9px] font-black text-white">NEW</span> : null}
               </div>
               <p className="mt-1 text-[15px] font-black leading-tight text-ink">{souvenirName(top.id, top.shiny)}</p>
-              <p className="mt-1.5 rounded-2xl rounded-tl-sm bg-card px-2.5 py-1.5 text-[11px] font-bold leading-snug text-ink-soft shadow-sm">「{top.shiny ? `みて！ いつもと ちがう いろの ${SOUVENIRS[top.id].name}！ めったに ないんだよ` : SOUVENIRS[top.id].found}」</p>
+              <p className="mt-1.5 rounded-2xl rounded-tl-sm bg-card px-2.5 py-1.5 text-[11px] font-bold leading-snug text-ink-soft shadow-sm">「{from ? (top.shiny ? `いつもと ちがう いろの ${SOUVENIRS[top.id].name}、みつけたから あげる！` : `${dogName}に あげる！ 気に入ってくれると いいな`) : top.shiny ? `みて！ いつもと ちがう いろの ${SOUVENIRS[top.id].name}！ めったに ないんだよ` : SOUVENIRS[top.id].found}」</p>
             </div>
           </div>
         </div>
         {/* ほかのもの：ひとつずつポンと出る */}
         {groups.length ? (
           <div className="mt-3 flex flex-wrap justify-center gap-2 px-4">
-            <p className="w-full text-center text-[10px] font-black text-ink-faint">ほかにも もってきたよ</p>
+            <p className="w-full text-center text-[10px] font-black text-ink-faint">ほかにも ひろってきたよ</p>
             {groups.map((n, i) => (
               <div key={keyOf(n)} className="room-sv-pop relative flex w-[66px] flex-col items-center" style={{ animationDelay: `${0.25 + i * 0.12}s` }}>
                 <span className={`relative block w-14 rounded-2xl border p-1 ${n.shiny ? "border-transparent" : SOUVENIRS[n.id].rare ? "border-[#E8B84A] bg-[#FFFBEA]" : "border-line bg-paper"}`}
@@ -198,7 +210,7 @@ function SouvenirZukan({ owned, placedOf, onPlace, now }: { owned: Partial<Recor
           <p className="text-[11px] font-bold tabular-nums text-ink-soft"><span className="text-[15px] font-black text-leaf-deep">{have}</span> / {SOUVENIR_IDS.length} しゅるい</p>
         </div>
         <div className="mt-1.5 h-2 overflow-hidden rounded-full bg-paper-deep"><div className="h-full rounded-full bg-[linear-gradient(90deg,#8CCB74,#5E8C4A)]" style={{ width: `${(have / SOUVENIR_IDS.length) * 100}%` }} /></div>
-        <p className="mt-1.5 text-[10px] font-semibold leading-relaxed text-ink-faint">1日3,000歩から1,000歩ごとに、わんこが おさんぽのおみやげを持って帰ってきます（10,000歩はレア）。季節で見つかるものが かわります。</p>
+        <p className="mt-1.5 text-[10px] font-semibold leading-relaxed text-ink-faint">1日3,000歩から1,000歩ごとに、わんこが おさんぽで なにかを ひろってきます（10,000歩はレア）。フレンドのわんこが遊びに来た日は、おみやげを くれます。季節で見つかるものが かわります。</p>
       </div>
       {groups.map((grp) => (
         <section key={grp.key} className="mt-3">
