@@ -4,6 +4,7 @@ import Link from "next/link";
 import { Dela_Gothic_One, M_PLUS_Rounded_1c } from "next/font/google";
 import { useEffect, useRef } from "react";
 import { setBgmSuppressed } from "@/lib/bgm-engine";
+import { DOG_SKIN_IDS } from "@/lib/dog-skins";
 import type { OsanpoRunStageId } from "@/lib/games/osanpo-run/config";
 import type { OsanpoRunFriendMemory, OsanpoRunMemoryPhoto, OsanpoRunOdekake } from "@/lib/data/osanpo-run";
 import type { OsanpoRunMission } from "@/lib/games/osanpo-run/missions";
@@ -373,7 +374,7 @@ export function OsanpoRunGame({ items, usesSampleItems, unlockedStages, seriesTa
                       <li><canvas data-icon="suitcase" /><div><b>大脱走スーツケース</b><small>22秒から登場。荷物が跳ねながら転がってくる！ 低いときは跳び越え、高く浮いたら下を通る。接触せずに回避で+20、下を通ればさらに+15。</small></div></li>
                       <li><canvas data-icon="surprise" /><div><b>びっくり宅配便</b><small>36秒から登場。箱がガタガタ揺れたあと、バネのカエルがびよーん！ 少しすると箱に戻る。2段ジャンプで高く越える。接触せずに回避で+30。</small></div></li>
                       <li><canvas data-icon="drone" /><div><b>せっかち配達ドローン</b><small>48秒から登場。黄色の警告ランプのあと、荷物ごと降下してくる。下スワイプでスライディング！ 接触せずに回避で+25、滑ってくぐるとさらに+15。</small></div></li>
-                      <li><canvas data-icon="buddy" /><div><b>ほかのフレブル</b><small>図鑑のフレブル（いつもの・登山・雪国・夏）がお散歩している。ぶつかってもだいじょうぶ。くんくんごあいさつで+30〜60（少しだけ立ち止まる）。4匹には設定で名前をつけられて、あいさつするほどなかよしに（5回・15回・30回）。なかよしになると、ほねやおみやげのアイテムをくれる。</small></div></li>
+                      <li><canvas data-icon="buddy" /><div><b>ほかのフレブル</b><small>図鑑のフレブル（いつもの・登山・雪国・夏・ご当地のフレブル）がお散歩している。ぶつかってもだいじょうぶ。くんくんごあいさつで+30〜60（少しだけ立ち止まる）。{DOG_SKIN_IDS.length}匹には設定で名前をつけられて、あいさつするほどなかよしに（5回・15回・30回）。なかよしになると、ほねやおみやげのアイテムをくれる。</small></div></li>
                     </ul>
                   </section>
                 </div>
