@@ -1337,186 +1337,198 @@ export function Lane({ ballVisual, goldenPinId = null, resetSignal, newGameSigna
     setBallPosition(ballStartXRef.current, 0, 0);
   }, [active, setBallPosition, setPositionLocked]);
 
+  const canControl = active && !isThrowing;
+
   return (
-    <div
-      ref={boardRef}
-      data-bowling-gesture-block="true"
-      onPointerDown={onPointerDown}
-      onPointerMove={onPointerMove}
-      onPointerUp={onPointerUp}
-      onPointerCancel={onPointerCancel}
-      className="relative h-full min-h-0 w-full touch-none select-none overflow-hidden"
-      style={{
-        touchAction: "none",
-        overscrollBehavior: "none",
-        borderRadius: "22px 22px 26px 26px",
-        background: "radial-gradient(ellipse at 50% 5%, rgba(103,152,190,0.22), transparent 25%), linear-gradient(180deg, #050a10 0%, #15171a 24%, #302016 63%, #21140f 100%)",
-        boxShadow: "inset 0 1px 0 rgba(255,255,255,0.18), inset 0 22px 34px -22px rgba(0,0,0,0.95), inset 0 -28px 42px -28px rgba(0,0,0,0.9)",
-      }}
-    >
+    <div className="flex h-full min-h-0 w-full flex-col">
       <div
-        className="pointer-events-none absolute left-1/2 top-0 h-[24%] w-[54%] -translate-x-1/2"
+        ref={boardRef}
+        data-bowling-gesture-block="true"
+        onPointerDown={onPointerDown}
+        onPointerMove={onPointerMove}
+        onPointerUp={onPointerUp}
+        onPointerCancel={onPointerCancel}
+        className="relative min-h-0 w-full flex-1 touch-none select-none overflow-hidden"
         style={{
-          background: "linear-gradient(180deg, rgba(4,8,13,0.96), rgba(13,19,25,0.78) 58%, transparent)",
-          clipPath: `polygon(${50 - FAR_OUTER_LEFT}% 0%, ${50 + FAR_OUTER_LEFT}% 0%, ${100 - FAR_OUTER_LEFT}% 100%, ${FAR_OUTER_LEFT}% 100%)`,
-          filter: "drop-shadow(0 12px 18px rgba(0,0,0,0.5))",
+          touchAction: "none",
+          overscrollBehavior: "none",
+          // 上はスコアボードとつなげ、下は操作バーとつなげるので角は丸めない
+          borderRadius: 0,
+          background: "radial-gradient(ellipse at 50% 5%, rgba(103,152,190,0.22), transparent 25%), linear-gradient(180deg, #050a10 0%, #15171a 24%, #302016 63%, #21140f 100%)",
+          boxShadow: "inset 0 1px 0 rgba(255,255,255,0.18), inset 0 22px 34px -22px rgba(0,0,0,0.95), inset 0 -28px 42px -28px rgba(0,0,0,0.9)",
         }}
-        aria-hidden="true"
-      />
-
-      <div
-        className="pointer-events-none absolute inset-0"
-        style={{
-          clipPath: `polygon(${FAR_LANE_LEFT}% 0%, ${FAR_LANE_RIGHT}% 0%, ${NEAR_LANE_RIGHT}% 100%, ${NEAR_LANE_LEFT}% 100%)`,
-          background: "radial-gradient(ellipse at 50% 92%, rgba(255,230,177,0.34), transparent 52%), linear-gradient(180deg, #ba7b43 0%, #dca766 34%, #e6bd7d 72%, #cc9252 100%)",
-          boxShadow: "inset 0 0 28px rgba(63,35,17,0.24), inset 0 -18px 22px rgba(83,42,18,0.14)",
-        }}
-        aria-hidden="true"
-      />
-
-      <div
-        className="pointer-events-none absolute inset-0"
-        style={{
-          clipPath: `polygon(${FAR_OUTER_LEFT}% 0%, ${FAR_LANE_LEFT}% 0%, ${NEAR_LANE_LEFT}% 100%, ${NEAR_OUTER_LEFT}% 100%)`,
-          background: "linear-gradient(90deg, #17191b, #3b342c 48%, #765236 82%, #a4764b)",
-          boxShadow: "inset -5px 0 9px rgba(0,0,0,0.62), inset 1px 0 rgba(255,255,255,0.08)",
-        }}
-        aria-hidden="true"
-      />
-      <div
-        className="pointer-events-none absolute inset-0"
-        style={{
-          clipPath: `polygon(${FAR_LANE_RIGHT}% 0%, ${FAR_OUTER_RIGHT}% 0%, ${NEAR_OUTER_RIGHT}% 100%, ${NEAR_LANE_RIGHT}% 100%)`,
-          background: "linear-gradient(270deg, #17191b, #3b342c 48%, #765236 82%, #a4764b)",
-          boxShadow: "inset 5px 0 9px rgba(0,0,0,0.62), inset -1px 0 rgba(255,255,255,0.08)",
-        }}
-        aria-hidden="true"
-      />
-
-      <svg className="pointer-events-none absolute inset-0 h-full w-full" viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true">
-        {[-0.8, -0.6, -0.4, -0.2, 0, 0.2, 0.4, 0.6, 0.8].map((n) => (
-          <line
-            key={n}
-            x1={50 + n * FAR_LANE_HALF}
-            y1="0"
-            x2={50 + n * NEAR_LANE_HALF}
-            y2="100"
-            stroke="rgba(255,255,255,0.14)"
-            strokeWidth="0.15"
-          />
-        ))}
-        <polygon
-          points={`${OIL_LEFT},${OIL_END_Y} ${OIL_RIGHT},${OIL_END_Y} ${NEAR_LANE_RIGHT},100 ${NEAR_LANE_LEFT},100`}
-          fill="rgba(255,255,255,0.055)"
-        />
-        <line x1={FAR_LANE_LEFT} y1="0" x2={NEAR_LANE_LEFT} y2="100" stroke="rgba(255,235,200,0.52)" strokeWidth="0.55" vectorEffect="non-scaling-stroke" />
-        <line x1={FAR_LANE_RIGHT} y1="0" x2={NEAR_LANE_RIGHT} y2="100" stroke="rgba(255,235,200,0.52)" strokeWidth="0.55" vectorEffect="non-scaling-stroke" />
-      </svg>
-
-      <LaneScenery />
-
-      <div
-        className="pointer-events-none absolute h-[2px] bg-[#8c4735]/75"
-        style={{ left: `${NEAR_LANE_LEFT}%`, right: `${100 - NEAR_LANE_RIGHT}%`, top: `${FOUL_LINE_Y}%` }}
-        aria-hidden="true"
-      />
-
-      <canvas ref={trailCanvasRef} className={bowlingFx.trail} style={{ zIndex: 499 }} aria-hidden="true" />
-
-      <Pins registerNode={registerPinNode} goldenPinId={goldenPinId} />
-
-      <div
-        ref={ballRef}
-        className="pointer-events-none absolute aspect-square will-change-transform"
-        style={{
-          width: `${ballVisualWidthPct(0)}%`,
-          left: "50%",
-          top: `${DOCK_Y}%`,
-          transform: "translate(-50%, -50%)",
-        }}
-        aria-hidden="true"
       >
-        {/* 床に落ちる影（回らない） */}
-        <span className="absolute left-1/2 top-[88%] h-[34%] w-[104%] -translate-x-1/2 -translate-y-1/2 rounded-[50%] bg-[radial-gradient(ellipse,rgba(30,14,4,0.55)_0%,rgba(30,14,4,0.22)_45%,transparent_72%)]" />
-        {active && !isThrowing ? (
-          <span className={bowlingFx.dockRing} style={{ left: "50%", top: "86%", width: "150%" }} />
-        ) : null}
         <div
-          ref={ballBodyRef}
-          className="absolute inset-0 overflow-hidden rounded-full shadow-[0_4px_10px_rgba(0,0,0,0.38)]"
+          className="pointer-events-none absolute left-1/2 top-0 h-[24%] w-[54%] -translate-x-1/2"
           style={{
-            background: `radial-gradient(circle at 32% 28%, ${ballVisual.bodyGradient[0]}, ${ballVisual.bodyGradient[1]})`,
-            boxShadow: ballVisual.premiumEffect ? `0 0 14px 4px ${ballVisual.hitColor}` : undefined,
+            background: "linear-gradient(180deg, rgba(4,8,13,0.96), rgba(13,19,25,0.78) 58%, transparent)",
+            clipPath: `polygon(${50 - FAR_OUTER_LEFT}% 0%, ${50 + FAR_OUTER_LEFT}% 0%, ${100 - FAR_OUTER_LEFT}% 100%, ${FAR_OUTER_LEFT}% 100%)`,
+            filter: "drop-shadow(0 12px 18px rgba(0,0,0,0.5))",
           }}
+          aria-hidden="true"
+        />
+
+        <div
+          className="pointer-events-none absolute inset-0"
+          style={{
+            clipPath: `polygon(${FAR_LANE_LEFT}% 0%, ${FAR_LANE_RIGHT}% 0%, ${NEAR_LANE_RIGHT}% 100%, ${NEAR_LANE_LEFT}% 100%)`,
+            background: "radial-gradient(ellipse at 50% 92%, rgba(255,230,177,0.34), transparent 52%), linear-gradient(180deg, #ba7b43 0%, #dca766 34%, #e6bd7d 72%, #cc9252 100%)",
+            boxShadow: "inset 0 0 28px rgba(63,35,17,0.24), inset 0 -18px 22px rgba(83,42,18,0.14)",
+          }}
+          aria-hidden="true"
+        />
+
+        <div
+          className="pointer-events-none absolute inset-0"
+          style={{
+            clipPath: `polygon(${FAR_OUTER_LEFT}% 0%, ${FAR_LANE_LEFT}% 0%, ${NEAR_LANE_LEFT}% 100%, ${NEAR_OUTER_LEFT}% 100%)`,
+            background: "linear-gradient(90deg, #17191b, #3b342c 48%, #765236 82%, #a4764b)",
+            boxShadow: "inset -5px 0 9px rgba(0,0,0,0.62), inset 1px 0 rgba(255,255,255,0.08)",
+          }}
+          aria-hidden="true"
+        />
+        <div
+          className="pointer-events-none absolute inset-0"
+          style={{
+            clipPath: `polygon(${FAR_LANE_RIGHT}% 0%, ${FAR_OUTER_RIGHT}% 0%, ${NEAR_OUTER_RIGHT}% 100%, ${NEAR_LANE_RIGHT}% 100%)`,
+            background: "linear-gradient(270deg, #17191b, #3b342c 48%, #765236 82%, #a4764b)",
+            boxShadow: "inset 5px 0 9px rgba(0,0,0,0.62), inset -1px 0 rgba(255,255,255,0.08)",
+          }}
+          aria-hidden="true"
+        />
+
+        <svg className="pointer-events-none absolute inset-0 h-full w-full" viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true">
+          {[-0.8, -0.6, -0.4, -0.2, 0, 0.2, 0.4, 0.6, 0.8].map((n) => (
+            <line
+              key={n}
+              x1={50 + n * FAR_LANE_HALF}
+              y1="0"
+              x2={50 + n * NEAR_LANE_HALF}
+              y2="100"
+              stroke="rgba(255,255,255,0.14)"
+              strokeWidth="0.15"
+            />
+          ))}
+          <polygon
+            points={`${OIL_LEFT},${OIL_END_Y} ${OIL_RIGHT},${OIL_END_Y} ${NEAR_LANE_RIGHT},100 ${NEAR_LANE_LEFT},100`}
+            fill="rgba(255,255,255,0.055)"
+          />
+          <line x1={FAR_LANE_LEFT} y1="0" x2={NEAR_LANE_LEFT} y2="100" stroke="rgba(255,235,200,0.52)" strokeWidth="0.55" vectorEffect="non-scaling-stroke" />
+          <line x1={FAR_LANE_RIGHT} y1="0" x2={NEAR_LANE_RIGHT} y2="100" stroke="rgba(255,235,200,0.52)" strokeWidth="0.55" vectorEffect="non-scaling-stroke" />
+        </svg>
+
+        <LaneScenery />
+
+        <div
+          className="pointer-events-none absolute h-[2px] bg-[#8c4735]/75"
+          style={{ left: `${NEAR_LANE_LEFT}%`, right: `${100 - NEAR_LANE_RIGHT}%`, top: `${FOUL_LINE_Y}%` }}
+          aria-hidden="true"
+        />
+
+        <canvas ref={trailCanvasRef} className={bowlingFx.trail} style={{ zIndex: 499 }} aria-hidden="true" />
+
+        <Pins registerNode={registerPinNode} goldenPinId={goldenPinId} />
+
+        <div
+          ref={ballRef}
+          className="pointer-events-none absolute aspect-square will-change-transform"
+          style={{
+            width: `${ballVisualWidthPct(0)}%`,
+            left: "50%",
+            top: `${DOCK_Y}%`,
+            transform: "translate(-50%, -50%)",
+          }}
+          aria-hidden="true"
         >
-          {ballVisual.image ? (
-            <Image src={ballVisual.image} alt="" fill sizes="60px" className="object-cover" />
-          ) : (
-            <>
-              <span className="absolute left-[34%] top-[28%] h-[10%] w-[10%] rounded-full bg-black/40" />
-              <span className="absolute left-[49%] top-[22%] h-[9%] w-[9%] rounded-full bg-black/40" />
-              <span className="absolute left-[52%] top-[38%] h-[9%] w-[9%] rounded-full bg-black/40" />
-            </>
-          )}
+          {/* 床に落ちる影（回らない） */}
+          <span className="absolute left-1/2 top-[88%] h-[34%] w-[104%] -translate-x-1/2 -translate-y-1/2 rounded-[50%] bg-[radial-gradient(ellipse,rgba(30,14,4,0.55)_0%,rgba(30,14,4,0.22)_45%,transparent_72%)]" />
+          {active && !isThrowing ? (
+            <span className={bowlingFx.dockRing} style={{ left: "50%", top: "86%", width: "150%" }} />
+          ) : null}
+          <div
+            ref={ballBodyRef}
+            className="absolute inset-0 overflow-hidden rounded-full shadow-[0_4px_10px_rgba(0,0,0,0.38)]"
+            style={{
+              background: `radial-gradient(circle at 32% 28%, ${ballVisual.bodyGradient[0]}, ${ballVisual.bodyGradient[1]})`,
+              boxShadow: ballVisual.premiumEffect ? `0 0 14px 4px ${ballVisual.hitColor}` : undefined,
+            }}
+          >
+            {ballVisual.image ? (
+              <Image src={ballVisual.image} alt="" fill sizes="60px" className="object-cover" />
+            ) : (
+              <>
+                <span className="absolute left-[34%] top-[28%] h-[10%] w-[10%] rounded-full bg-black/40" />
+                <span className="absolute left-[49%] top-[22%] h-[9%] w-[9%] rounded-full bg-black/40" />
+                <span className="absolute left-[52%] top-[38%] h-[9%] w-[9%] rounded-full bg-black/40" />
+              </>
+            )}
+          </div>
+          {/* つや（光の当たる向きは回っても変わらない） */}
+          <span className="absolute inset-0 rounded-full bg-[radial-gradient(circle_at_32%_24%,rgba(255,255,255,0.75)_0%,rgba(255,255,255,0.18)_16%,transparent_34%)] shadow-[inset_-3px_-5px_9px_rgba(0,0,0,0.32),inset_2px_2px_4px_rgba(255,255,255,0.25)]" />
         </div>
-        {/* つや（光の当たる向きは回っても変わらない） */}
-        <span className="absolute inset-0 rounded-full bg-[radial-gradient(circle_at_32%_24%,rgba(255,255,255,0.75)_0%,rgba(255,255,255,0.18)_16%,transparent_34%)] shadow-[inset_-3px_-5px_9px_rgba(0,0,0,0.32),inset_2px_2px_4px_rgba(255,255,255,0.25)]" />
+
+        <div ref={fxLayerRef} className={bowlingFx.layer} aria-hidden="true" />
       </div>
 
-      <div ref={fxLayerRef} className={bowlingFx.layer} aria-hidden="true" />
-
-      {active && !isThrowing ? (
-        <div
-          data-bowling-position-controls="true"
-          className="absolute left-2 top-2 z-[1600] flex items-center rounded-xl border border-white/15 bg-[#08131f]/90 p-1 shadow-[0_6px_18px_rgba(0,0,0,0.38)] backdrop-blur-md"
-          onPointerDown={(event) => {
-            event.stopPropagation();
-          }}
-        >
+      {/*
+        操作バー。レーンの上に重ねると看板やピンが隠れるので、レーンの下（親指の届くところ）に置く。
+        投球中も場所は変えずにボタンだけ止めて、レーンの大きさがガタつかないようにする。
+      */}
+      <div
+        data-bowling-controls="true"
+        className="relative flex shrink-0 touch-none select-none items-center gap-2 border-t border-[#54d8ff]/20 bg-[linear-gradient(180deg,#0c1824,#070f18)] px-2 py-1.5"
+        style={{ borderRadius: "0 0 26px 26px", paddingBottom: "max(6px, env(safe-area-inset-bottom))" }}
+        onPointerDown={(event) => event.stopPropagation()}
+      >
+        <div data-bowling-position-controls="true" className="min-w-0 flex-1">
           {positionLocked ? (
-            <button type="button" onPointerUp={handleUnlockPosition} className="min-h-10 rounded-lg border border-[#638099] bg-[#142638] px-3 text-[10px] font-black text-[#cfeeff] active:scale-[0.98]">
+            <button
+              type="button"
+              onPointerUp={handleUnlockPosition}
+              disabled={!canControl}
+              className="flex min-h-10 w-full items-center justify-center gap-1 rounded-[14px] border border-[#638099] bg-[#142638] px-3 text-[11px] font-black text-[#cfeeff] active:scale-[0.98] disabled:opacity-40"
+            >
               ↺ 位置を変更
             </button>
           ) : (
-            <button type="button" onPointerUp={handleConfirmPosition} className="min-h-10 rounded-lg bg-[linear-gradient(135deg,#1b9bc4,#16749b)] px-4 text-[11px] font-black text-white shadow-[0_0_16px_rgba(45,190,229,0.25)] active:scale-[0.98]">
+            <button
+              type="button"
+              onPointerUp={handleConfirmPosition}
+              disabled={!canControl}
+              className="flex min-h-10 w-full items-center justify-center gap-1 rounded-[14px] bg-[linear-gradient(135deg,#1b9bc4,#16749b)] px-3 text-[12px] font-black text-white shadow-[0_0_16px_rgba(45,190,229,0.3)] active:scale-[0.98] disabled:opacity-40"
+            >
               ✓ この位置に決定
             </button>
           )}
         </div>
-      ) : null}
 
-      {active && !isThrowing ? (
         <div
           data-bowling-throw-mode-controls="true"
-          className="absolute right-2 top-2 z-[1600] flex flex-col items-stretch gap-1 rounded-xl border border-white/15 bg-[#08131f]/90 p-1 shadow-[0_6px_18px_rgba(0,0,0,0.38)] backdrop-blur-md"
-          onPointerDown={(event) => {
-            event.stopPropagation();
-          }}
+          role="radiogroup"
+          aria-label="投げ方"
+          className="relative grid h-10 w-[46%] shrink-0 grid-cols-2 rounded-[14px] border border-white/10 bg-[#0a1520] p-[3px]"
         >
-          <button
-            type="button"
-            onPointerUp={() => setThrowMode("straight")}
-            className={`min-h-9 rounded-lg px-3 text-[10px] font-black active:scale-[0.98] ${
-              throwMode === "straight"
-                ? "bg-[linear-gradient(135deg,#1b9bc4,#16749b)] text-white shadow-[0_0_16px_rgba(45,190,229,0.25)]"
-                : "border border-[#638099] bg-[#142638] text-[#cfeeff]"
-            }`}
-          >
-            ストレート
-          </button>
-          <button
-            type="button"
-            onPointerUp={() => setThrowMode("curve")}
-            className={`min-h-9 rounded-lg px-3 text-[10px] font-black active:scale-[0.98] ${
-              throwMode === "curve"
-                ? "bg-[linear-gradient(135deg,#1b9bc4,#16749b)] text-white shadow-[0_0_16px_rgba(45,190,229,0.25)]"
-                : "border border-[#638099] bg-[#142638] text-[#cfeeff]"
-            }`}
-          >
-            カーブ
-          </button>
+          {/* えらんでいる方へすべる、つまみ */}
+          <span
+            className="pointer-events-none absolute bottom-[3px] top-[3px] w-[calc(50%-3px)] rounded-[11px] bg-[linear-gradient(135deg,#1b9bc4,#16749b)] shadow-[0_0_14px_rgba(45,190,229,0.35)] transition-transform duration-200 ease-out"
+            style={{ left: 3, transform: throwMode === "curve" ? "translateX(100%)" : "translateX(0)" }}
+            aria-hidden="true"
+          />
+          {(["straight", "curve"] as const).map((mode) => (
+            <button
+              key={mode}
+              type="button"
+              role="radio"
+              aria-checked={throwMode === mode}
+              onPointerUp={() => setThrowMode(mode)}
+              disabled={!canControl}
+              className={`relative z-[1] rounded-[11px] text-[11px] font-black transition-colors disabled:opacity-40 ${throwMode === mode ? "text-white" : "text-[#8fb4cc]"}`}
+            >
+              {mode === "straight" ? "ストレート" : "カーブ"}
+            </button>
+          ))}
         </div>
-      ) : null}
+      </div>
     </div>
   );
 }
