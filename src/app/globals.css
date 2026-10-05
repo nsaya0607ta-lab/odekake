@@ -4595,9 +4595,19 @@
 .hw-twinkle { animation: hw-twinkle 2.6s ease-in-out infinite; }
 .hw-glow { animation: hw-glow 5s ease-in-out infinite; }
 .hw-fog { animation: hw-fog 14s ease-in-out infinite alternate; }
-@keyframes hw-sway { 0%, 100% { transform: rotate(-1.1deg); } 50% { transform: rotate(1.1deg); } }
-.hw-sway { transform-origin: 50% 0; animation: hw-sway 5.5s ease-in-out infinite; }
+@keyframes hw-bob { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-2px); } }
+.hw-bob { animation: hw-bob 6s ease-in-out infinite; }
+@keyframes hw-spin { to { transform: rotate(360deg); } }
+.hw-spin { animation: hw-spin 40s linear infinite; }
+@keyframes hw-drop { 0% { transform: translateY(-3px); opacity: 0; } 25% { opacity: 1; } 100% { transform: translateY(9px); opacity: 0; } }
+.hw-drop { animation: hw-drop 1.15s ease-in infinite; }
+@keyframes hw-flake { 0% { transform: translate(0, -3px); opacity: 0; } 25% { opacity: 1; } 100% { transform: translate(2px, 10px); opacity: 0; } }
+.hw-flake { animation: hw-flake 2.6s linear infinite; }
+@keyframes hw-bolt { 0%, 70%, 100% { opacity: 1; } 74%, 80% { opacity: .25; } 77% { opacity: 1; } }
+.hw-bolt { animation: hw-bolt 3.2s linear infinite; }
+@keyframes hw-mist { 0%, 100% { transform: translateX(-4px); } 50% { transform: translateX(4px); } }
+.hw-mist { animation: hw-mist 4.5s ease-in-out infinite; }
 @media (prefers-reduced-motion: reduce) {
   .hw-rain, .hw-snow, .hw-flash { animation: none; display: none; }
-  .hw-twinkle, .hw-glow, .hw-fog, .hw-sway { animation: none; }
+  .hw-twinkle, .hw-glow, .hw-fog, .hw-bob, .hw-spin, .hw-drop, .hw-flake, .hw-bolt, .hw-mist { animation: none; }
 }

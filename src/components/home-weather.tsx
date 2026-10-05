@@ -248,13 +248,13 @@ function Temp({ t, className, style }: { t: number; className?: string; style?: 
 }
 
 const TONE = {
-  best: { text: "#2E8B4E", bg: "#E4F5E5", ring: "#9ED3A6" },
-  good: { text: "#3C7FA8", bg: "#E3F0F8", ring: "#A9CDE3" },
-  care: { text: "#C0661E", bg: "#FFF0DC", ring: "#F0C48E" },
-  stay: { text: "#6B6F86", bg: "#ECEDF3", ring: "#C2C5D6" },
+  best: { text: "#2E8B4E", bg: "#E4F5E5", ring: "#9ED3A6", solid: "#5E9E5A", dark: "#467A43" },
+  good: { text: "#3C7FA8", bg: "#E3F0F8", ring: "#A9CDE3", solid: "#5B93BF", dark: "#44729A" },
+  care: { text: "#C0661E", bg: "#FFF0DC", ring: "#F0C48E", solid: "#DA8A43", dark: "#AE6A2E" },
+  stay: { text: "#6B6F86", bg: "#ECEDF3", ring: "#C2C5D6", solid: "#868AA2", dark: "#696C82" },
 } as const;
 
-/** 空に浮かぶお天気チップ。看板とボタンのあいだの空に置く */
+/** 空に浮かぶお天気のしるし。看板とボタンのあいだの空に置く。形が天気で変わる */
 export function HomeWeatherChip() {
   const hw = useHomeWeather();
   const [open, setOpen] = useState(false);
@@ -262,75 +262,188 @@ export function HomeWeatherChip() {
   const { weather: w, forecast: f } = hw;
   const info = iconOf(w.kind, hw.phase);
   const tone = TONE[f.tone];
+  const shape = shapeOf(w.kind, hw.phase);
+  const at = TEXT_AT[shape];
   return (
     <>
-      {/* 空の上からロープでつるした木の札。背景の看板と同じ色・ふちどり・葉っぱにそろえる */}
-      <div className="pointer-events-none absolute top-0 z-40 flex justify-center" style={{ left: "31%", right: 146, fontSize: "clamp(7px, 2.15vw, 10.5px)" }}>
-        <div className="home-rise">
-          <div className="hw-sway relative pt-[2.7em]">
-            {/* ロープ（ねじれ模様）と、札の上の金具 */}
-            {(["left-[20%]", "right-[20%]"] as const).map((side) => (
-              <span key={side} className={`absolute top-0 ${side} flex h-[3.25em] w-[0.42em] flex-col items-center`} aria-hidden="true">
-                <span className="w-full flex-1 rounded-b-sm border-x-[0.5px] border-[#8E6232]" style={{ background: "repeating-linear-gradient(155deg,#E0B86A 0 0.28em,#B98A45 0.28em 0.42em)" }} />
-                <span className="-mt-[0.1em] block h-[0.62em] w-[0.62em] rounded-full border-[0.16em] border-[#8E6232] bg-[#F3D49A]" />
-              </span>
-            ))}
-            <button
-              type="button"
-              onClick={() => setOpen(true)}
-              aria-haspopup="dialog"
-              aria-label={`きょうの天気：${info.label}${w.temp != null ? `、${Math.round(w.temp)}度` : ""}。おさんぽ予報：${f.short}。くわしく見る`}
-              className="pointer-events-auto relative block rounded-[0.95em] border-[1.5px] border-[#9C6B35] bg-[#F4D79C] p-[0.22em] text-left shadow-[0_2px_0_rgba(140,95,45,.35),0_5px_9px_rgba(80,55,25,.22)] active:scale-[0.96]"
-            >
-              <span
-                className="flex flex-col items-stretch rounded-[0.75em] border border-[#D7AE6E]/80 px-[0.6em] pb-[0.4em] pt-[0.45em]"
-                style={{ background: "repeating-linear-gradient(178deg, rgba(196,148,80,0) 0 0.55em, rgba(196,148,80,.09) 0.55em 0.62em), linear-gradient(180deg,#FCEFCD,#F7E3B6)" }}
-              >
-                <span className="flex items-center gap-[0.35em] leading-none">
-                  <span className="text-[1.75em] leading-none [filter:drop-shadow(0_1px_0_rgba(120,80,30,.25))]" aria-hidden="true">{info.icon}</span>
-                  {w.temp != null ? (
-                    <span className="flex items-start leading-none">
-                      <Temp t={w.temp} className="text-[2.15em] font-black tracking-tight [text-shadow:0_1px_0_rgba(255,248,225,.95)]" />
-                      <span className="mt-[0.15em] text-[0.95em] font-bold text-[#8b6a43]">℃</span>
-                    </span>
-                  ) : (
-                    <span className="text-[1.1em] font-bold text-[#5b4a35]">{info.label}</span>
-                  )}
-                  {w.tmax != null && w.tmin != null ? (
-                    <span className="ml-[0.1em] flex flex-col gap-[0.2em] border-l border-dashed border-[#C9A06A] pl-[0.35em] text-[0.92em] font-black leading-none">
-                      <span className="whitespace-nowrap"><span className="text-[#C9785A]">↑</span><Temp t={w.tmax} /></span>
-                      <span className="whitespace-nowrap"><span className="text-[#6F95B8]">↓</span><Temp t={w.tmin} /></span>
-                    </span>
-                  ) : null}
+      <div className="pointer-events-none absolute top-[2.5%] z-40 flex justify-center" style={{ left: "31%", right: 146, fontSize: "clamp(7px, 2.15vw, 10.5px)" }}>
+        <button
+          type="button"
+          onClick={() => setOpen(true)}
+          aria-haspopup="dialog"
+          aria-label={`きょうの天気：${info.label}${w.temp != null ? `、${Math.round(w.temp)}度` : ""}。おさんぽ予報：${f.short}。くわしく見る`}
+          className="home-rise pointer-events-auto flex flex-col items-center active:scale-[0.96]"
+        >
+          <span className="hw-bob relative block h-[7.7em] w-[9.6em]">
+            <SkyShape shape={shape} />
+            {/* 気温。お日さま・お月さまは真ん中の丸に、雲は雲のおなかに書く */}
+            <span className="absolute flex -translate-x-1/2 -translate-y-1/2 flex-col items-center leading-none" style={{ left: `${at.x}%`, top: `${at.y}%` }}>
+              {w.temp != null ? (
+                <span className="flex items-start">
+                  <Temp t={w.temp} className="text-[2.15em] font-black tracking-tight [text-shadow:0_1px_0_rgba(255,255,255,.95)]" />
+                  <span className="mt-[0.15em] text-[0.85em] font-bold text-[#8b7a62]">℃</span>
                 </span>
-                <span
-                  className="mt-[0.4em] flex items-center justify-center gap-[0.25em] whitespace-nowrap rounded-full px-[0.6em] py-[0.25em] text-[0.95em] font-black leading-none"
-                  style={{ color: tone.text, background: tone.bg, boxShadow: `inset 0 0 0 1px ${tone.ring}` }}
-                >
-                  <span>{f.mark}</span>
-                  <span>{f.short}</span>
+              ) : (
+                <span className="text-[1.05em] font-black text-[#5b4a35]">{info.label}</span>
+              )}
+              {w.tmax != null && w.tmin != null ? (
+                <span className="mt-[0.2em] whitespace-nowrap text-[0.78em] font-black tabular-nums [text-shadow:0_1px_0_rgba(255,255,255,.9)]">
+                  <Temp t={w.tmax} />
+                  <span className="text-[#a8987c]"> / </span>
+                  <Temp t={w.tmin} />
                 </span>
-              </span>
-              {/* 角の葉っぱと小さな花（背景の看板とおそろい） */}
-              <svg viewBox="0 0 24 20" className="pointer-events-none absolute -right-[0.7em] -top-[0.75em] h-[1.9em] w-[2.3em]" aria-hidden="true">
-                <path d="M4 15 C3 9 8 5 13 6 C12 11 9 15 4 15Z" fill="#9CC665" stroke="#4E7A2C" strokeWidth="0.9" strokeLinejoin="round" />
-                <path d="M5 14 L11 8" stroke="#4E7A2C" strokeWidth="0.6" />
-                <path d="M9 15 C11 10 16 8 21 10 C19 14 14 17 9 15Z" fill="#B5D77A" stroke="#4E7A2C" strokeWidth="0.9" strokeLinejoin="round" />
-                <path d="M10 14.6 L18 11" stroke="#4E7A2C" strokeWidth="0.6" />
-              </svg>
-              <svg viewBox="0 0 20 20" className="pointer-events-none absolute -bottom-[0.55em] -right-[0.5em] h-[1.5em] w-[1.5em]" aria-hidden="true">
-                <path d="M3 13 C2 9 6 7 9 9 C8 12 6 14 3 13Z" fill="#9CC665" stroke="#4E7A2C" strokeWidth="0.8" />
-                {[0, 72, 144, 216, 288].map((a) => (
-                  <ellipse key={a} cx="12" cy="7.2" rx="2.6" ry="3.2" fill="#FFFDF6" stroke="#B49A72" strokeWidth="0.6" transform={`rotate(${a} 12 10)`} />
-                ))}
-                <circle cx="12" cy="10" r="1.9" fill="#F4C542" stroke="#C99A24" strokeWidth="0.5" />
-              </svg>
-            </button>
-          </div>
-        </div>
+              ) : null}
+            </span>
+          </span>
+          {/* 背景の看板とおなじ形のリボンに、おさんぽ予報 */}
+          <span className="relative -mt-[0.55em] flex items-center [filter:drop-shadow(0_1px_1px_rgba(60,40,20,.25))]">
+            <span className="h-[1.45em] w-[0.85em] translate-y-[0.32em]" style={{ background: tone.dark, clipPath: "polygon(0 0,100% 0,100% 100%,0 100%,45% 50%)" }} />
+            <span className="relative whitespace-nowrap px-[0.65em] py-[0.3em] text-[0.9em] font-black leading-none text-white" style={{ background: tone.solid }}>
+              {f.mark} {f.short}
+            </span>
+            <span className="h-[1.45em] w-[0.85em] translate-y-[0.32em]" style={{ background: tone.dark, clipPath: "polygon(0 0,100% 0,55% 50%,100% 100%,0 100%)" }} />
+          </span>
+        </button>
       </div>
       {open ? <WeatherSheet hw={hw} onClose={() => setOpen(false)} /> : null}
     </>
+  );
+}
+
+type Shape = "sun" | "sunCloud" | "moon" | "moonCloud" | "cloud" | "rain" | "thunder" | "snow" | "fog";
+const shapeOf = (kind: WeatherKind, phase: SkyPhase): Shape => {
+  const night = phase === "night";
+  if (kind === "clear") return night ? "moon" : "sun";
+  if (kind === "partly") return night ? "moonCloud" : "sunCloud";
+  if (kind === "drizzle" || kind === "rain") return "rain";
+  if (kind === "thunder" || kind === "snow" || kind === "fog") return kind;
+  return "cloud";
+};
+/** 気温を書く位置（しるしの箱に対する％） */
+const TEXT_AT: Record<Shape, { x: number; y: number }> = {
+  sun: { x: 50, y: 50 }, moon: { x: 50, y: 50 },
+  sunCloud: { x: 44, y: 64 }, moonCloud: { x: 44, y: 64 },
+  cloud: { x: 52, y: 58 }, rain: { x: 52, y: 52 }, thunder: { x: 52, y: 52 }, snow: { x: 52, y: 52 }, fog: { x: 52, y: 52 },
+};
+
+/** 雲の形（100×80 の箱） */
+const CLOUD = "M22 70 Q5 70 6 56 Q7 43 21 42 Q20 25 38 22 Q47 9 62 14 Q76 7 85 21 Q98 23 96 39 Q100 45 98 55 Q96 70 80 70 Z";
+/** 雨・雪の雲は少し上にずらして、下に降るものの場所をあける */
+const CLOUD_HIGH = "M22 60 Q5 60 6 47 Q7 35 21 34 Q20 18 38 15 Q47 3 62 8 Q76 1 85 14 Q98 16 96 31 Q100 37 98 46 Q96 60 80 60 Z";
+
+const CLOUD_FILL: Record<"cloud" | "rain" | "thunder" | "snow" | "fog", [string, string, string]> = {
+  cloud: ["#FFFFFF", "#E9EFF6", "#C9D5E2"],
+  rain: ["#F1F5FA", "#C9D5E3", "#9FB0C5"],
+  thunder: ["#E4E8F1", "#B7BFD1", "#8790A8"],
+  snow: ["#FFFFFF", "#EEF4FC", "#C6D4E6"],
+  fog: ["#FBFCFD", "#E7EBEF", "#CBD2DA"],
+};
+
+function Rays({ cx, cy, r, len, color }: { cx: number; cy: number; r: number; len: number; color: string }) {
+  return (
+    <g className="hw-spin" style={{ transformOrigin: `${cx}px ${cy}px`, transformBox: "view-box" }}>
+      {Array.from({ length: 12 }, (_, i) => (
+        <rect key={i} x={cx - 2.4} y={cy - r - len} width="4.8" height={len} rx="2.4" fill={color} transform={`rotate(${i * 30} ${cx} ${cy})`} />
+      ))}
+    </g>
+  );
+}
+
+function SunDisk({ cx, cy, r, inner }: { cx: number; cy: number; r: number; inner?: boolean }) {
+  return (
+    <>
+      <Rays cx={cx} cy={cy} r={r + 2.5} len={r * 0.42} color="#F6BE3E" />
+      <circle cx={cx} cy={cy} r={r} fill="url(#hwSun)" stroke="#E8A52C" strokeWidth="1" />
+      {inner ? <circle cx={cx} cy={cy} r={r * 0.74} fill="#FFFDF4" opacity=".95" /> : null}
+    </>
+  );
+}
+
+function MoonDisk({ cx, cy, r, inner }: { cx: number; cy: number; r: number; inner?: boolean }) {
+  return (
+    <>
+      <circle cx={cx} cy={cy} r={r + 5} fill="#FFF4C8" opacity=".25" className="hw-glow" />
+      <circle cx={cx} cy={cy} r={r} fill="url(#hwMoon)" stroke="#D9C27A" strokeWidth="1" />
+      <circle cx={cx - r * 0.45} cy={cy - r * 0.5} r={r * 0.12} fill="#E6D492" opacity=".7" />
+      <circle cx={cx + r * 0.55} cy={cy + r * 0.35} r={r * 0.09} fill="#E6D492" opacity=".7" />
+      {inner ? <circle cx={cx} cy={cy} r={r * 0.74} fill="#FFFDF4" opacity=".95" /> : null}
+    </>
+  );
+}
+
+const STARS: readonly [number, number, number][] = [[8, 14, 0], [92, 10, 0.8], [96, 62, 1.6], [4, 60, 2.2], [78, 76, 1.1]];
+
+/** 天気の形そのもの（お日さま・雲・雨雲・雷雲・雪雲・きり・お月さま） */
+function SkyShape({ shape }: { shape: Shape }) {
+  const cloudKind = shape === "rain" || shape === "thunder" || shape === "snow" || shape === "fog" ? shape : "cloud";
+  const [c0, c1, edge] = CLOUD_FILL[cloudKind];
+  const high = shape === "rain" || shape === "thunder" || shape === "snow" || shape === "fog";
+  const cloud = (transform?: string) => (
+    <g transform={transform}>
+      <path d={high ? CLOUD_HIGH : CLOUD} fill={edge} opacity=".45" transform="translate(0 2.5)" />
+      <path d={high ? CLOUD_HIGH : CLOUD} fill="url(#hwCloud)" stroke={edge} strokeWidth="1.1" strokeLinejoin="round" />
+      <ellipse cx="40" cy={high ? 22 : 30} rx="12" ry="5" fill="#FFFFFF" opacity=".55" />
+    </g>
+  );
+  return (
+    <svg viewBox="0 0 100 80" className="absolute inset-0 h-full w-full overflow-visible [filter:drop-shadow(0_2px_3px_rgba(70,60,40,.18))]" aria-hidden="true">
+      <defs>
+        <radialGradient id="hwSun" cx="38%" cy="32%" r="75%"><stop offset="0" stopColor="#FFF0A8" /><stop offset=".6" stopColor="#FFD45A" /><stop offset="1" stopColor="#F5B12F" /></radialGradient>
+        <radialGradient id="hwMoon" cx="38%" cy="32%" r="75%"><stop offset="0" stopColor="#FFFBE6" /><stop offset="1" stopColor="#F1DE9A" /></radialGradient>
+        <linearGradient id="hwCloud" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stopColor={c0} /><stop offset="1" stopColor={c1} /></linearGradient>
+      </defs>
+
+      {shape === "sun" ? <SunDisk cx={50} cy={40} r={25} inner /> : null}
+      {shape === "moon" ? (
+        <>
+          {STARS.map(([x, y, d], i) => (
+            <path key={i} className="hw-twinkle" style={{ animationDelay: `${-d}s`, transformOrigin: `${x}px ${y}px`, transformBox: "view-box" }} d={`M${x} ${y - 4} L${x + 1.1} ${y - 1.1} L${x + 4} ${y} L${x + 1.1} ${y + 1.1} L${x} ${y + 4} L${x - 1.1} ${y + 1.1} L${x - 4} ${y} L${x - 1.1} ${y - 1.1}Z`} fill="#FFF3B8" />
+          ))}
+          <MoonDisk cx={50} cy={40} r={27} inner />
+        </>
+      ) : null}
+      {shape === "sunCloud" ? (
+        <>
+          <SunDisk cx={66} cy={25} r={16} />
+          {cloud("translate(-2 12) scale(0.86)")}
+        </>
+      ) : null}
+      {shape === "moonCloud" ? (
+        <>
+          <MoonDisk cx={66} cy={24} r={16} />
+          {cloud("translate(-2 12) scale(0.86)")}
+        </>
+      ) : null}
+      {shape === "cloud" ? cloud() : null}
+
+      {/* 雨つぶ */}
+      {shape === "rain"
+        ? [26, 40, 54, 68, 82].map((x, i) => (
+            <path key={x} className="hw-drop" style={{ animationDelay: `${-i * 0.23}s` }} d={`M${x} ${i % 2 ? 64 : 62} q-4 6.2 0 9 q4 -2.8 0 -9Z`} fill="#86BDEB" stroke="#4F86BD" strokeWidth=".8" />
+          ))
+        : null}
+      {/* 雪 */}
+      {shape === "snow"
+        ? [26, 42, 58, 74].map((x, i) => (
+            <g key={x} className="hw-flake" style={{ animationDelay: `${-i * 0.6}s` }} stroke="#7FA7D8" strokeWidth="1.4" strokeLinecap="round">
+              {[0, 60, 120].map((a) => (
+                <line key={a} x1={x} y1={i % 2 ? 62 : 64.5} x2={x} y2={i % 2 ? 71 : 73.5} transform={`rotate(${a} ${x} ${i % 2 ? 66.5 : 69})`} />
+              ))}
+            </g>
+          ))
+        : null}
+      {/* いなずま */}
+      {shape === "thunder" ? <path className="hw-bolt" d="M56 56 L46 70 L53 70 L47 80 L62 64 L55 64 L60 56Z" fill="#FFD84A" stroke="#D9A21B" strokeWidth="1" strokeLinejoin="round" /> : null}
+
+      {high ? cloud() : null}
+
+      {/* きり：雲の下を、もやの線がゆっくり流れる */}
+      {shape === "fog"
+        ? [64, 70, 76].map((y, i) => (
+            <rect key={y} className="hw-mist" style={{ animationDelay: `${-i * 1.5}s` }} x={14 + i * 6} y={y} width={60 - i * 8} height="3" rx="1.5" fill="#D5DCE4" />
+          ))
+        : null}
+    </svg>
   );
 }
 
