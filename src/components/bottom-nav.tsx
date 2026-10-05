@@ -22,6 +22,7 @@ const ITEMS = [
     icon: "/icons/navigation/records.webp",
     match: ["/records", "/trips", "/visits", "/spots"],
   },
+  { href: "/shop", label: "ショップ", icon: "/icons/navigation/shop.svg", match: ["/shop"] },
   {
     href: "/mypage",
     label: "マイページ",

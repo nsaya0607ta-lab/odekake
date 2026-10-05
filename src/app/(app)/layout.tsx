@@ -1,9 +1,11 @@
 import { Suspense } from "react";
+import { AppBackground } from "@/components/app-background";
 import { BottomNav } from "@/components/bottom-nav";
 import { GlobalInteractionFeedback } from "@/components/global-interaction-feedback";
 import { LoginBonus } from "@/components/login-bonus";
 import { PhotoCleanup } from "@/components/photo-cleanup";
 import { SnsBottomNavIndicator } from "@/components/sns/sns-bottom-nav-indicator";
+import { getCurrentAppBackground } from "@/lib/data/app-backgrounds";
 import { getCurrentDogSkin } from "@/lib/data/dog-skin";
 import { canAccessSns } from "@/lib/sns-access";
 import { requireUser } from "@/lib/supabase/server";
@@ -12,11 +14,16 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   // (app) 配下はすべてログイン必須の画面なので、ここで確かめてよい。
   // requireUser は React cache でまとめられるので、各ページが個別に呼んでも
   // 通信は増えない。
-  const { user } = await requireUser();
+  const [{ user }, background] = await Promise.all([requireUser(), getCurrentAppBackground()]);
   const snsAvailable = canAccessSns(user.email);
 
   return (
-    <div className="min-h-dvh" style={{ paddingBottom: "calc(var(--nav-height) + var(--safe-bottom))" }}>
+    <div
+      className={`min-h-dvh${background === "default" ? "" : " app-bg-active"}`}
+      style={{ paddingBottom: "calc(var(--nav-height) + var(--safe-bottom))" }}
+    >
+      {/* ショップで選んだ背景（いつものはbodyの背景のままなので置かない） */}
+      {background === "default" ? null : <AppBackground id={background} />}
       {children}
       <GlobalInteractionFeedback />
       <BottomNav

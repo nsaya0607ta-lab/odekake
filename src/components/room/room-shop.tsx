@@ -15,7 +15,7 @@ import { FIXTURES, FURNITURE, isFixtureId, shopKey, shopMax, shopName, shopPrice
 type PlaceableId = FurnitureId | FixtureId;
 
 /** 青コインの残高と、ためかた */
-export function BlueCoinBar({ shop, note }: { shop: RoomShop; note: string }) {
+export function BlueCoinBar({ shop, note }: { shop: Pick<RoomShop, "blueCoins">; note: string }) {
   return (
     <>
       <div className="flex items-center gap-2.5 rounded-2xl border border-[#BFD7F5] bg-[linear-gradient(135deg,#F2F8FF,#E3EFFD)] px-3 py-2.5">

@@ -1,0 +1,179 @@
+/*
+ * アプリの背景（ショップで青コインで買う）。id は src/lib/app-backgrounds.ts の APP_BACKGROUNDS と同じ。
+ * src/components/app-background.tsx が、画面いっぱいに固定した .app-bg を一番うしろに置く。
+ * iPhone は background-attachment: fixed が効かないので、固定した要素に背景を描いている。
+ * 柄（SVG）は、ここに直接書いている（外部の画像は読みこまない）。
+ */
+.app-bg {
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  overflow: hidden;
+  pointer-events: none;
+}
+/* ショップの見本では、枠の中に収める */
+.app-bg.app-bg-preview {
+  position: absolute;
+  z-index: 0;
+}
+.app-bg-layer {
+  position: absolute;
+  inset: 0;
+}
+/* ホーム以外では、暗い背景に明るい色を重ねて、文字を読みやすくする */
+.app-bg[data-dim="true"]::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: rgba(251, 248, 241, 0.8);
+}
+
+/* 背景を変えているときは、上のヘッダーと下のナビをすりガラス風にして、背景をうっすら透かす */
+.app-bg-active header.sticky {
+  background-color: rgba(255, 253, 248, 0.6);
+  backdrop-filter: blur(14px) saturate(1.3);
+  -webkit-backdrop-filter: blur(14px) saturate(1.3);
+  border-bottom-color: rgba(207, 197, 176, 0.45);
+}
+.app-bg-active .app-bottom-nav {
+  background-color: rgba(255, 253, 248, 0.66);
+  backdrop-filter: blur(16px) saturate(1.3);
+  -webkit-backdrop-filter: blur(16px) saturate(1.3);
+  border-top-color: rgba(207, 197, 176, 0.45);
+}
+
+/* ---- いつもの（globals.css の body と同じ） ---- */
+.app-bg[data-bg="default"] {
+  background-color: var(--color-paper);
+  background-image: radial-gradient(rgba(150, 138, 118, 0.055) 1px, transparent 1px);
+  background-size: 22px 22px;
+}
+
+/* ---- 肉球スタンプ ---- */
+.app-bg[data-bg="paw"] {
+  background-color: #fbf6ec;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='230' height='230' viewBox='0 0 150 150'%3E%3Cdefs%3E%3Cg id='p'%3E%3Cellipse cx='0' cy='6' rx='9' ry='7.5'/%3E%3Cellipse cx='-10.5' cy='-5.5' rx='3.6' ry='4.6'/%3E%3Cellipse cx='-3.8' cy='-11.5' rx='3.6' ry='4.8'/%3E%3Cellipse cx='3.8' cy='-11.5' rx='3.6' ry='4.8'/%3E%3Cellipse cx='10.5' cy='-5.5' rx='3.6' ry='4.6'/%3E%3C/g%3E%3C/defs%3E%3Cuse href='%23p' transform='translate(32 36) rotate(-18)' fill='%23e3bf7f' opacity='.5'/%3E%3Cuse href='%23p' transform='translate(108 64) rotate(24) scale(.8)' fill='%23e3a3ad' opacity='.5'/%3E%3Cuse href='%23p' transform='translate(58 114) rotate(-6) scale(.92)' fill='%23a9c793' opacity='.55'/%3E%3Cuse href='%23p' transform='translate(128 132) rotate(40) scale(.6)' fill='%239cbcd6' opacity='.5'/%3E%3C/svg%3E"), url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='220' height='220'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 .42  0 0 0 0 .36  0 0 0 0 .27  0 0 0 .14 0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+}
+
+/* ---- 和紙 ---- */
+.app-bg[data-bg="washi"] {
+  background-color: #f6efdf;
+}
+.app-bg[data-bg="washi"] .app-bg-layer {
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='360' height='360'%3E%3Cfilter id='f'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.03 .07' numOctaves='4' seed='4' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 1  0 0 0 0 .99  0 0 0 0 .95  0 0 0 -3 1.6'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23f)'/%3E%3C/svg%3E"), url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='220' height='220'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 .42  0 0 0 0 .36  0 0 0 0 .27  0 0 0 .14 0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E"),
+    radial-gradient(120% 80% at 50% 40%, transparent 55%, rgba(170, 140, 95, 0.16));
+}
+
+/* ---- 水彩にじみ ---- */
+.app-bg[data-bg="watercolor"] {
+  background-color: #fbf8f1;
+}
+.app-bg[data-bg="watercolor"] .app-bg-layer {
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='220' height='220'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 .42  0 0 0 0 .36  0 0 0 0 .27  0 0 0 .14 0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E"),
+    radial-gradient(42% 26% at 10% 14%, rgba(127, 168, 201, 0.38), transparent 70%),
+    radial-gradient(34% 22% at 92% 30%, rgba(221, 154, 166, 0.34), transparent 70%),
+    radial-gradient(46% 28% at 74% 72%, rgba(127, 165, 104, 0.3), transparent 70%),
+    radial-gradient(38% 24% at 14% 86%, rgba(224, 184, 98, 0.34), transparent 70%),
+    radial-gradient(30% 18% at 40% 48%, rgba(169, 155, 203, 0.2), transparent 70%);
+}
+
+/* ---- 秋の落ち葉 ---- */
+.app-bg[data-bg="autumn"] {
+  background-color: #fbf2e4;
+}
+.app-bg[data-bg="autumn"] .app-bg-layer {
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='240' height='240' viewBox='0 0 240 240'%3E%3Cdefs%3E%3Cg id='g'%3E%3Cpath d='M0 0 C -15 -5 -22 -22 -17 -32 Q -9 -36 -2 -31 L 0 -25 L 2 -31 Q 9 -36 17 -32 C 22 -22 15 -5 0 0 Z'/%3E%3Cpath d='M0 0 L 0 12' stroke-width='1.6' stroke-linecap='round' fill='none'/%3E%3C/g%3E%3Cg id='l'%3E%3Cpath d='M0 -22 C 12 -14 12 10 0 20 C -12 10 -12 -14 0 -22 Z'/%3E%3Cpath d='M0 -18 L 0 26' stroke-width='1.4' stroke-linecap='round' fill='none'/%3E%3C/g%3E%3C/defs%3E%3Cuse href='%23g' transform='translate(46 58) rotate(-24)' fill='%23e8b553' stroke='%23e8b553' opacity='.5'/%3E%3Cuse href='%23l' transform='translate(168 44) rotate(38)' fill='%23d9825b' stroke='%23d9825b' opacity='.42'/%3E%3Cuse href='%23g' transform='translate(196 168) rotate(56) scale(.8)' fill='%23eac36a' stroke='%23eac36a' opacity='.45'/%3E%3Cuse href='%23l' transform='translate(78 176) rotate(-62) scale(.9)' fill='%23c9694f' stroke='%23c9694f' opacity='.38'/%3E%3Cuse href='%23g' transform='translate(132 112) rotate(150) scale(.6)' fill='%23d9825b' stroke='%23d9825b' opacity='.35'/%3E%3C/svg%3E"), url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='220' height='220'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 .42  0 0 0 0 .36  0 0 0 0 .27  0 0 0 .14 0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E"), linear-gradient(180deg, #fcf4e6, #f7e3cf);
+}
+
+/* ---- おでかけ地図 ---- */
+.app-bg[data-bg="map"] {
+  background-color: #f3efe1;
+}
+.app-bg[data-bg="map"] .app-bg-layer {
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 390 844' preserveAspectRatio='xMidYMid slice'%3E%3Cpath d='M-10 150 C 90 110 160 250 250 280 S 400 380 330 520 S 120 640 190 760 S 330 820 410 800' fill='none' stroke='%23d58f74' stroke-width='2.4' stroke-dasharray='2 9' stroke-linecap='round' opacity='.75'/%3E%3Cg transform='translate(250 280)' opacity='.8'%3E%3Cpath d='M0 0 C -7 -9 -9 -13 -9 -17 A 9 9 0 1 1 9 -17 C 9 -13 7 -9 0 0 Z' fill='%23dd9aa6'/%3E%3Ccircle cx='0' cy='-17' r='3.4' fill='%23fffdf8'/%3E%3C/g%3E%3Cg transform='translate(190 760)' opacity='.8'%3E%3Cpath d='M0 0 C -7 -9 -9 -13 -9 -17 A 9 9 0 1 1 9 -17 C 9 -13 7 -9 0 0 Z' fill='%237fa568'/%3E%3Ccircle cx='0' cy='-17' r='3.4' fill='%23fffdf8'/%3E%3C/g%3E%3C/svg%3E"), url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='520' height='520'%3E%3Cfilter id='c' x='0' y='0' width='100%25' height='100%25'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.0045' numOctaves='2' seed='11' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 0  0 0 0 0 0  0 0 0 0 0  1.6 0 0 0 -.3'/%3E%3CfeComponentTransfer%3E%3CfeFuncA type='discrete' tableValues='0 1 0 1 0 1 0 1 0 1 0 1 0 1'/%3E%3C/feComponentTransfer%3E%3CfeConvolveMatrix order='3' kernelMatrix='-1 -1 -1 -1 8 -1 -1 -1 -1' preserveAlpha='false'/%3E%3CfeColorMatrix values='0 0 0 0 .52  0 0 0 0 .47  0 0 0 0 .33  0 0 0 1 0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23c)'/%3E%3C/svg%3E"),
+    linear-gradient(rgba(127, 168, 201, 0.16) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(127, 168, 201, 0.16) 1px, transparent 1px), url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='220' height='220'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 .42  0 0 0 0 .36  0 0 0 0 .27  0 0 0 .14 0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+  background-size: cover, 520px 520px, 64px 64px, 64px 64px, 220px 220px;
+  background-position: center, 0 0, 0 0, 0 0, 0 0;
+  background-repeat: no-repeat, repeat, repeat, repeat, repeat;
+}
+
+/* ---- 空と丘 ---- */
+.app-bg[data-bg="scenery"] {
+  background-color: #e5f1f6;
+}
+.app-bg[data-bg="scenery"] .app-bg-layer {
+  background-image:
+    radial-gradient(22% 4% at 20% 12%, rgba(255, 255, 255, 0.95), transparent 70%),
+    radial-gradient(16% 3.5% at 30% 10.5%, rgba(255, 255, 255, 0.95), transparent 70%),
+    radial-gradient(24% 4% at 78% 24%, rgba(255, 255, 255, 0.9), transparent 70%),
+    radial-gradient(14% 3% at 86% 22.5%, rgba(255, 255, 255, 0.9), transparent 70%),
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 390 260' preserveAspectRatio='none'%3E%3Cpath d='M0 90 C 70 40 150 60 210 90 S 330 70 390 50 L 390 260 L 0 260 Z' fill='%23d7e6c8'/%3E%3Cpath d='M0 150 C 90 110 170 120 250 150 S 360 140 390 120 L 390 260 L 0 260 Z' fill='%23c3d9ae'/%3E%3Cpath d='M0 205 C 110 175 220 190 390 175 L 390 260 L 0 260 Z' fill='%23aecb95'/%3E%3C/svg%3E"),
+    linear-gradient(180deg, #cfe5f3 0%, #e7f2f2 45%, #f2f2e2 70%);
+  background-size: auto, auto, auto, auto, 100% 38%, auto;
+  background-position: 0 0, 0 0, 0 0, 0 0, bottom, 0 0;
+  background-repeat: no-repeat;
+}
+
+/* ---- 星空 ---- */
+.app-bg[data-bg="starry"] {
+  background-color: #1c2340;
+}
+.app-bg[data-bg="starry"] .app-bg-layer {
+  background-image: radial-gradient(1.2px 1.2px at 20px 30px, #fff, transparent), radial-gradient(1px 1px at 90px 120px, rgba(255,255,255,.55), transparent), radial-gradient(1.6px 1.6px at 150px 60px, #fff, transparent), radial-gradient(1px 1px at 60px 170px, rgba(255,255,255,.65), transparent), radial-gradient(1.3px 1.3px at 180px 190px, #fff, transparent), radial-gradient(1.2px 1.2px at 20px 30px, #fff, transparent), radial-gradient(1px 1px at 90px 120px, rgba(255,255,255,.55), transparent), radial-gradient(1.6px 1.6px at 150px 60px, #fff, transparent), radial-gradient(1px 1px at 60px 170px, rgba(255,255,255,.65), transparent), radial-gradient(1.3px 1.3px at 180px 190px, #fff, transparent),
+    radial-gradient(70% 18% at 60% 30%, rgba(169, 155, 203, 0.22), transparent 70%),
+    radial-gradient(60% 40% at 15% 0%, rgba(80, 100, 170, 0.45), transparent 70%),
+    linear-gradient(180deg, #1a2140, #2a2f55 60%, #3b3560);
+  background-size: 210px 210px, 330px 330px, auto, auto, auto;
+  background-position: 0 0, 70px 110px, 0 0, 0 0, 0 0;
+}
+
+/* ---- パステルオーロラ（ゆっくり回る） ---- */
+.app-bg[data-bg="aurora"] {
+  background-color: #f7f4fa;
+}
+.app-bg[data-bg="aurora"] .app-bg-layer {
+  inset: -25%;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='220' height='220'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 .42  0 0 0 0 .36  0 0 0 0 .27  0 0 0 .14 0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E"),
+    radial-gradient(40% 32% at 20% 22%, #cfe3f7, transparent 70%),
+    radial-gradient(36% 30% at 80% 26%, #f6d6e1, transparent 70%),
+    radial-gradient(40% 32% at 34% 66%, #d6eed6, transparent 70%),
+    radial-gradient(38% 32% at 78% 74%, #fbe4c2, transparent 70%),
+    radial-gradient(30% 24% at 52% 46%, #e6dcf6, transparent 70%);
+  animation: app-bg-drift 40s ease-in-out infinite alternate;
+}
+@keyframes app-bg-drift {
+  from { transform: rotate(0deg) scale(1); }
+  to { transform: rotate(24deg) scale(1.08); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .app-bg[data-bg="aurora"] .app-bg-layer { animation: none; }
+}
+
+/* ---- 時間で変わる空（data-time は app-background.tsx が日本時間で決める） ---- */
+.app-bg[data-bg="sky-clock"][data-time="morning"] { background-color: #fdeee0; }
+.app-bg[data-bg="sky-clock"][data-time="morning"] .app-bg-layer {
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='220' height='220'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 .42  0 0 0 0 .36  0 0 0 0 .27  0 0 0 .14 0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E"),
+    radial-gradient(50% 22% at 85% 6%, rgba(255, 226, 170, 0.9), transparent 70%),
+    linear-gradient(180deg, #fbdcc8 0%, #fdf0dc 45%, #fbf8f1 80%);
+}
+.app-bg[data-bg="sky-clock"][data-time="day"] { background-color: #e4f1f8; }
+.app-bg[data-bg="sky-clock"][data-time="day"] .app-bg-layer {
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='220' height='220'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 .42  0 0 0 0 .36  0 0 0 0 .27  0 0 0 .14 0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E"),
+    radial-gradient(40% 18% at 15% 5%, rgba(255, 255, 240, 0.9), transparent 70%),
+    linear-gradient(180deg, #c7e2f4 0%, #e6f2f5 50%, #f7f5ea 85%);
+}
+.app-bg[data-bg="sky-clock"][data-time="evening"] { background-color: #f6d9cf; }
+.app-bg[data-bg="sky-clock"][data-time="evening"] .app-bg-layer {
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='220' height='220'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 .42  0 0 0 0 .36  0 0 0 0 .27  0 0 0 .14 0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E"),
+    radial-gradient(60% 20% at 50% 100%, rgba(255, 190, 120, 0.55), transparent 70%),
+    linear-gradient(180deg, #b9a6d4 0%, #eab4bc 45%, #f8cfa8 85%);
+}
+.app-bg[data-bg="sky-clock"][data-time="night"] { background-color: #232a4a; }
+.app-bg[data-bg="sky-clock"][data-time="night"] .app-bg-layer {
+  background-image: radial-gradient(1.2px 1.2px at 20px 30px, #fff, transparent), radial-gradient(1px 1px at 90px 120px, rgba(255,255,255,.55), transparent), radial-gradient(1.6px 1.6px at 150px 60px, #fff, transparent), radial-gradient(1px 1px at 60px 170px, rgba(255,255,255,.65), transparent), radial-gradient(1.3px 1.3px at 180px 190px, #fff, transparent), radial-gradient(1.2px 1.2px at 20px 30px, #fff, transparent), radial-gradient(1px 1px at 90px 120px, rgba(255,255,255,.55), transparent), radial-gradient(1.6px 1.6px at 150px 60px, #fff, transparent), radial-gradient(1px 1px at 60px 170px, rgba(255,255,255,.65), transparent), radial-gradient(1.3px 1.3px at 180px 190px, #fff, transparent),
+    radial-gradient(18% 9% at 82% 8%, rgba(255, 246, 210, 0.35), transparent 70%),
+    linear-gradient(180deg, #1e2546, #343a66 70%, #4a4470);
+  background-size: 210px 210px, 330px 330px, auto, auto;
+  background-position: 0 0, 70px 110px, 0 0, 0 0;
+}
