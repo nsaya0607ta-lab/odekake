@@ -20,12 +20,13 @@ import { getOwnedDambourleCounts } from "@/lib/data/dambourle";
 import { DAMBOURLE_PRIZES } from "@/lib/dambourle/prizes";
 import { getCurrentDogSkin } from "@/lib/data/dog-skin";
 import { getExpDashboard } from "@/lib/data/exp";
-import { getFriendsActivityFeed, getFriendsStepsRanking } from "@/lib/data/friends";
+import { getFriendList, getFriendsActivityFeed, getFriendsStepsRanking } from "@/lib/data/friends";
 import { getNoticesFeed, getUnreadNoticeCount } from "@/lib/data/notices";
 import { signThumbOrOriginalPaths } from "@/lib/data/photos";
 import { getRecordSpace } from "@/lib/data/space";
 import { getExpProgress } from "@/lib/exp";
 import { MUNICIPALITIES, PREFECTURES } from "@/lib/geo";
+import { PREFECTURE_NAMES } from "@/lib/geo/prefecture-names";
 import { requireUser } from "@/lib/supabase/server";
 
 export const metadata = { title: "あなたの旅 | おでかけ記録" };
@@ -58,6 +59,7 @@ export default async function HomePage({
     noticesFeed,
     unreadNoticeCount,
     blueCoins,
+    friendList,
   ] = await Promise.all([
     spacePromise.then((space) => loadAreaIndex(supabase, space.tripIds)),
     getExpDashboard(supabase, user.id),
@@ -71,7 +73,10 @@ export default async function HomePage({
     getNoticesFeed(supabase, 3),
     getUnreadNoticeCount(supabase),
     getBlueCoinBalance(supabase, user.id).catch(() => null),
+    // みんなのおでかけの行から、フレンドのページへ行けるようにするため（取れなくてもホームは出す）
+    getFriendList(supabase).catch(() => []),
   ]);
+  const friendIds = new Set(friendList.map((f) => f.friend_user_id));
 
   const friendAvatarPaths = [
     ...friendActivity.flatMap((row) => (row.profile_image_url ? [row.profile_image_url] : [])),
@@ -108,7 +113,11 @@ export default async function HomePage({
       displayName: row.display_name,
       avatarUrl: row.profile_image_url ? (friendAvatarUrls.get(row.profile_image_url) ?? null) : null,
       spotName: row.spot_name,
+      prefName: PREFECTURE_NAMES.find((p) => p.code === row.prefecture_code)?.name ?? null,
       registeredAt: row.registered_at,
+      // 自分 → 記録、フレンド → そのフレンドのページ（共有旅だけの人はリンクなし）
+      href: row.friend_user_id === user.id ? "/records" : friendIds.has(row.friend_user_id) ? `/mypage/friends/${row.friend_user_id}` : null,
+      isSelf: row.friend_user_id === user.id,
     }));
 
   // フレンドの歩数ランキングに自分も加えて、自分の順位も分かるようにする。
@@ -227,8 +236,11 @@ export default async function HomePage({
             </div>
           </section>
 
-          <HomeNoticeCard unreadCount={unreadNoticeCount} notices={noticesFeed} />
+          <div className="home-rise" style={{ animationDelay: "80ms" }}>
+            <HomeNoticeCard unreadCount={unreadNoticeCount} notices={noticesFeed} />
+          </div>
 
+          <div className="home-rise" style={{ animationDelay: "160ms" }}>
           <HomeHighlightsCarousel
             stats={{
               prefectures: areas.totals.visitedPrefectures,
@@ -240,8 +252,11 @@ export default async function HomePage({
             activity={latestFriendActivity}
             stepsRanking={friendStepsRanking}
           />
+          </div>
 
-          <HomeCollectionCard collected={totalCollectedCount} total={totalCollectionCount} />
+          <div className="home-rise" style={{ animationDelay: "240ms" }}>
+            <HomeCollectionCard collected={totalCollectedCount} total={totalCollectionCount} />
+          </div>
         </div>
       </PageBody>
     </>

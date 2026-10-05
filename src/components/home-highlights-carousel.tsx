@@ -1,6 +1,7 @@
 "use client";
 
 import Image from "next/image";
+import Link from "next/link";
 import { useEffect, useMemo, useRef, useState, type ReactNode, type TouchEvent } from "react";
 import { IconClock, IconMapPin, IconPaw, IconUser } from "@/components/icons";
 import { MarqueeText } from "@/components/marquee-text";
@@ -32,7 +33,12 @@ export type FriendActivitySlideData = {
   displayName: string;
   avatarUrl: string | null;
   spotName: string;
+  /** 都道府県名（「岐阜県」など）。分からなければ null */
+  prefName?: string | null;
   registeredAt: string;
+  /** タップしたときに行く先（自分 → 記録、フレンド → フレンドのページ）。無ければタップできない */
+  href?: string | null;
+  isSelf?: boolean;
 }[];
 
 export type FriendStepsSlideData = {
@@ -92,6 +98,8 @@ export function HomeHighlightsCarousel({
   const startAutoplay = () => {
     stopAutoplay();
     if (slides.length <= 1) return;
+    // 「視差効果を減らす」設定の人には、勝手に動かさない（点やスワイプで切りかえる）
+    if (typeof window !== "undefined" && window.matchMedia?.("(prefers-reduced-motion: reduce)").matches) return;
     timerRef.current = setInterval(() => {
       setIndex((current) => (current + 1) % slides.length);
     }, AUTO_ADVANCE_MS);
@@ -222,11 +230,45 @@ function SlideContent({ slide }: { slide: Slide }) {
   return <StepsSlide data={slide.data} />;
 }
 
+/** 0 から数字が増えていく（「視差効果を減らす」設定なら、すぐ最後の数に） */
+function useCountUp(target: number, ms = 900) {
+  const [value, setValue] = useState(target);
+  useEffect(() => {
+    if (typeof window === "undefined" || window.matchMedia?.("(prefers-reduced-motion: reduce)").matches || target <= 0) { setValue(target); return; }
+    let raf = 0;
+    const start = performance.now();
+    const tick = (t: number) => {
+      const k = Math.min(1, (t - start) / ms);
+      setValue(Math.round(target * (1 - Math.pow(1 - k, 3))));
+      if (k < 1) raf = requestAnimationFrame(tick);
+    };
+    setValue(0);
+    raf = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(raf);
+  }, [target, ms]);
+  return value;
+}
+
+/** アイコンのまわりの、達成率のリング */
+function ProgressRing({ ratio, color }: { ratio: number; color: string }) {
+  const r = 30, c = 2 * Math.PI * r;
+  return (
+    <svg viewBox="0 0 68 68" className="pointer-events-none absolute -inset-[6px] h-[calc(100%+12px)] w-[calc(100%+12px)] -rotate-90" aria-hidden="true">
+      <circle cx="34" cy="34" r={r} fill="none" stroke="#EADFC8" strokeWidth="4" />
+      <circle cx="34" cy="34" r={r} fill="none" stroke={color} strokeWidth="4" strokeLinecap="round" strokeDasharray={`${Math.max(0.02, Math.min(1, ratio)) * c} ${c}`} className="transition-[stroke-dasharray] duration-1000 ease-out" />
+    </svg>
+  );
+}
+
+function StatValue({ value }: { value: number }) {
+  return <>{useCountUp(value).toLocaleString("ja-JP")}</>;
+}
+
 function StatsSlide({ data }: { data: HomeStatsSlideData }) {
   const items = [
-    { icon: STAT_ICON_SRC.prefectures, value: data.prefectures, total: data.prefectureTotal, label: "都道府県" },
-    { icon: STAT_ICON_SRC.municipalities, value: data.municipalities, total: data.municipalityTotal, label: "市区町村など" },
-    { icon: STAT_ICON_SRC.visits, value: data.visits, total: null, label: "訪問数" },
+    { icon: STAT_ICON_SRC.prefectures, value: data.prefectures, total: data.prefectureTotal, label: "都道府県", href: "/map", ring: "#7FAE5F" },
+    { icon: STAT_ICON_SRC.municipalities, value: data.municipalities, total: data.municipalityTotal, label: "市区町村など", href: "/map", ring: "#6C9BD2" },
+    { icon: STAT_ICON_SRC.visits, value: data.visits, total: null, label: "訪問数", href: "/records", ring: "" },
   ];
 
   return (
@@ -236,20 +278,25 @@ function StatsSlide({ data }: { data: HomeStatsSlideData }) {
       </span>
       <div className="grid w-full flex-1 grid-cols-3 items-center" style={{ marginTop: 15 }}>
         {items.map((item, itemIndex) => (
-          <div
+          <Link
             key={item.label}
-            className={`flex flex-col items-center gap-2 px-0.5 text-center ${itemIndex > 0 ? "border-l border-line-strong/60" : ""}`}
+            href={item.href}
+            aria-label={`${item.label} ${item.value}${item.total !== null ? ` / ${item.total}` : "回"}。${item.href === "/map" ? "地図" : "記録"}を見る`}
+            className={`flex flex-col items-center gap-2 px-0.5 py-1 text-center transition-opacity active:opacity-60 ${itemIndex > 0 ? "border-l border-line-strong/60" : ""}`}
           >
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src={item.icon} alt="" aria-hidden="true" draggable={false} className="h-14 w-14 select-none" />
+            <span className="relative block h-14 w-14">
+              {item.total !== null ? <ProgressRing ratio={item.value / Math.max(1, item.total)} color={item.ring} /> : null}
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src={item.icon} alt="" aria-hidden="true" draggable={false} className="relative h-14 w-14 select-none" />
+            </span>
             <span className="flex flex-col items-center gap-0.5 leading-none">
-              <span className="text-2xl font-bold tabular-nums text-ink">{item.value}</span>
+              <span className="text-2xl font-bold tabular-nums text-ink"><StatValue value={item.value} /></span>
               <span className="text-[11px] font-bold whitespace-nowrap tabular-nums text-ink-faint">
                 {item.total !== null ? `/ ${item.total}` : "回"}
               </span>
             </span>
             <span className="text-xs font-bold text-ink-soft">{item.label}</span>
-          </div>
+          </Link>
         ))}
       </div>
     </div>
@@ -263,11 +310,13 @@ function ActivitySlide({ data }: { data: FriendActivitySlideData }) {
         みんなのおでかけ
       </span>
       <div
-        className="flex w-full flex-1 flex-col gap-1.5 overflow-y-auto overscroll-contain py-1"
+        className={`flex w-full flex-1 flex-col gap-1.5 overflow-y-auto overscroll-contain py-1 ${data.length <= 3 ? "justify-center" : ""}`}
         style={{ touchAction: "pan-y" }}
       >
-        {data.map((item) => (
-          <div key={item.key} className="flex shrink-0 items-center gap-2 rounded-xl bg-paper/70 px-2.5 py-1.5">
+        {data.map((item) => {
+          const cls = `flex shrink-0 items-center gap-2 rounded-xl px-2.5 py-1.5 shadow-[0_1px_0_rgba(120,90,50,.08)] ${item.isSelf ? "bg-leaf-soft/70 ring-1 ring-leaf/40" : "bg-paper/70"}`;
+          const inner = (
+          <>
             <span className="flex h-8 w-8 shrink-0 items-center justify-center overflow-hidden rounded-full bg-card">
               {item.avatarUrl ? (
                 // eslint-disable-next-line @next/next/no-img-element
@@ -276,19 +325,27 @@ function ActivitySlide({ data }: { data: FriendActivitySlideData }) {
                 <IconUser size={16} className="text-ink-faint" />
               )}
             </span>
-            <span className="min-w-0 flex-1 truncate text-sm font-bold text-ink">{item.displayName}</span>
+            <span className="min-w-0 flex-1 truncate text-sm font-bold text-ink">{item.isSelf ? "あなた" : item.displayName}</span>
             <span className="flex min-w-0 shrink-0 flex-col items-end gap-0.5">
               <span className="flex min-w-0 items-center gap-1 text-sm font-bold text-leaf-deep">
                 <IconMapPin size={14} className="shrink-0" />
                 <MarqueeText text={item.spotName} className="max-w-[110px]" />
               </span>
               <span className="flex items-center gap-1 text-[10px] text-ink-faint">
+                {item.prefName ? <span className="font-bold text-ink-soft">{item.prefName}</span> : null}
                 <IconClock size={10} />
                 {formatRelativeTimeJa(item.registeredAt)}
               </span>
             </span>
-          </div>
-        ))}
+          </>
+          );
+          return item.href ? (
+            <Link key={item.key} href={item.href} aria-label={`${item.isSelf ? "あなた" : item.displayName} ${item.prefName ?? ""}${item.spotName} ${formatRelativeTimeJa(item.registeredAt)}`} className={`${cls} active:scale-[0.98]`}>{inner}</Link>
+          ) : (
+            <div key={item.key} className={cls}>{inner}</div>
+          );
+        })}
+        {data.length <= 2 ? <p className="mt-1 text-center text-[10px] font-bold text-ink-faint">この24時間に おでかけを記録した人</p> : null}
       </div>
     </div>
   );
@@ -296,6 +353,7 @@ function ActivitySlide({ data }: { data: FriendActivitySlideData }) {
 
 function StepsSlide({ data }: { data: FriendStepsSlideData }) {
   const RANK_TONE = ["sun", "sky", "apricot"] as const;
+  const top = Math.max(1, ...data.map((entry) => entry.steps));
 
   return (
     <div className="flex h-full w-full flex-col items-center">
@@ -303,14 +361,12 @@ function StepsSlide({ data }: { data: FriendStepsSlideData }) {
         フレンドの歩数
       </span>
       <div
-        className="flex w-full flex-1 flex-col gap-1 overflow-y-auto overscroll-contain py-1"
+        className={`flex w-full flex-1 flex-col gap-1 overflow-y-auto overscroll-contain py-1 ${data.length <= 4 ? "justify-center" : ""}`}
         style={{ touchAction: "pan-y" }}
       >
-        {data.map((entry) => (
-          <div
-            key={entry.id}
-            className={`flex shrink-0 items-center gap-2 rounded-xl px-2.5 py-1 ${entry.isSelf ? "bg-leaf-soft/70 ring-1 ring-leaf/50" : "bg-paper/70"}`}
-          >
+        {data.map((entry) => {
+          const row = (
+            <>
             <span
               className={`flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-[11px] font-bold ${
                 entry.rank <= 3 && RANK_TONE[entry.rank - 1]
@@ -328,15 +384,31 @@ function StepsSlide({ data }: { data: FriendStepsSlideData }) {
                 <IconUser size={14} className="text-ink-faint" />
               )}
             </span>
-            <span className="min-w-0 flex-1 truncate text-sm font-bold text-ink">
-              {entry.isSelf ? "あなた" : entry.displayName}
+            <span className="flex min-w-0 flex-1 flex-col gap-0.5">
+              <span className="flex min-w-0 items-center gap-1 text-sm font-bold text-ink">
+                <span className="truncate">{entry.isSelf ? "あなた" : entry.displayName}</span>
+                {entry.rank === 1 && entry.steps > 0 ? <span aria-label="1位" className="shrink-0 text-[12px] leading-none">👑</span> : null}
+              </span>
+              {/* いちばん歩いた人を100%にした、歩数のバー */}
+              <span aria-hidden="true" className="block h-1 overflow-hidden rounded-full bg-[#EADFC8]">
+                <span className={`block h-full rounded-full ${entry.isSelf ? "bg-leaf" : "bg-[#E8B84A]"}`} style={{ width: `${(entry.steps / top) * 100}%` }} />
+              </span>
             </span>
             <span className="flex shrink-0 items-center gap-1 text-sm font-bold tabular-nums text-ink">
               <IconPaw size={13} className="text-sun" />
               {entry.steps.toLocaleString("ja-JP")}
             </span>
-          </div>
-        ))}
+            </>
+          );
+          const first = entry.rank === 1 && entry.steps > 0;
+          const cls = `flex shrink-0 items-center gap-2 rounded-xl px-2.5 py-1 ${entry.isSelf ? "bg-leaf-soft/70 ring-1 ring-leaf/50" : first ? "bg-[linear-gradient(90deg,#FFF4D2,#FFFBEF)] ring-1 ring-[#E8C25A]/60" : "bg-paper/70"} ${first ? "home-shine" : ""}`;
+          // フレンドの行は、タップでそのフレンドのページへ（自分の行はそのまま）
+          return entry.isSelf ? (
+            <div key={entry.id} className={cls}>{row}</div>
+          ) : (
+            <Link key={entry.id} href={`/mypage/friends/${entry.id}`} aria-label={`${entry.displayName}さん ${entry.rank}位 ${entry.steps.toLocaleString("ja-JP")}歩`} className={`${cls} active:scale-[0.98]`}>{row}</Link>
+          );
+        })}
       </div>
     </div>
   );
