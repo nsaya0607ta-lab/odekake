@@ -264,6 +264,7 @@ export const GACHA_PRIZES: readonly GachaPrize[] = [
   { id: "nagano_zenkoji", name: "善光寺", rarity: "SSR", type: "item", image: "/collection/items/nagano-zenkoji.webp", pref: "20" },
   { id: "nagano_matsumoto_castle", name: "松本城", rarity: "UR", type: "item", image: "/collection/items/nagano-matsumoto-castle.webp", pref: "20" },
   { id: "nagano_kamikochi", name: "上高地・河童橋", rarity: "LR", type: "item", image: "/collection/items/nagano-kamikochi.webp", pref: "20" },
+  { id: "nagano_frenchie", name: "長野のフレブル", rarity: "LR", type: "dog_skin", image: "/collection/skins/nagano-frenchie.webp", pref: "20" },
 
   // --- 都道府県ガチャ（青コイン）：岐阜県 ------------------------------
   { id: "gifu_gohei_mochi", name: "五平餅", rarity: "N", type: "item", image: "/collection/items/gifu-gohei-mochi.webp", pref: "21" },
