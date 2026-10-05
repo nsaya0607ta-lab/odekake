@@ -42,7 +42,7 @@ export function CoinEarnMethods() {
             ))}
           </div>
           <p className="mt-2 text-[10px] leading-relaxed text-ink-faint">
-            日本時間で毎日連続して開くと7日目まで増えます。7日目の次は1日目へ戻り、1日空くと連続日数も1日目へ戻ります。
+            日本時間で1日1回、開いた日を通算で数えて7日目まで増えます。7日目の次は1日目へ戻ります。休んでも1日目には戻らず、続きから数えます。
           </p>
         </div>
 

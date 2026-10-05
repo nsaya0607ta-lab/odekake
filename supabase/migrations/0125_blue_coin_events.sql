@@ -6,8 +6,11 @@
 --   EXP の「初めての市区町村／都道府県」（exp_events。1人1か所につき1回だけ入る）に合わせて付与する。
 --   訪問を消して登録しなおしても、青コインのキーが残るので二重にはもらえない。
 --   これより前の登録にはさかのぼって付与しない（この SQL を適用したあとの登録から）。
--- ・ログインした日の通算（1日目から数えた合計の日数。休んでもへらない）が 7 の倍数になった日に 400。
---   これまでのログイン日（coin_events の login）も数に入る。claim_login_bonus に足す。
+-- ・ログインボーナス（黄色のコイン）を、連続日数ではなく通算のログイン日数で数える。
+--   これまでは1日空くと1日目（100枚）へ戻っていたが、休んでも戻らず、通算の続きから
+--   100→120→140→160→180→200→300 をくり返す。
+-- ・ログインした日の通算（1日目から数えた合計の日数。休んでもへらない）が 7 の倍数になった日に、青コイン 400。
+--   これまでのログイン日（coin_events の login）も数に入る。どちらも claim_login_bonus を作り直して入れる。
 begin;
 
 do $$
@@ -62,7 +65,7 @@ when (new.event_type in ('first_municipality', 'first_prefecture'))
 execute function public.award_first_place_blue_coins();
 
 -- -------------------------------------------------------------
--- 通算ログイン（0028 の claim_login_bonus に、通算7日ごとの青コインを足したもの）
+-- 通算ログイン（0028 の claim_login_bonus を、連続ではなく通算で数え、通算7日ごとの青コインを足したもの）
 -- -------------------------------------------------------------
 create or replace function public.claim_login_bonus()
 returns jsonb
@@ -73,8 +76,7 @@ as $$
 declare
   v_user_id uuid := auth.uid();
   v_today date := (timezone('Asia/Tokyo', now()))::date;
-  v_cursor date;
-  v_consecutive integer := 0;
+  v_prior_days integer := 0;
   v_streak_day integer;
   v_next_day integer;
   v_amount integer;
@@ -85,20 +87,14 @@ declare
 begin
   if v_user_id is null then raise exception 'Authentication required'; end if;
 
-  v_cursor := v_today - 1;
-  loop
-    exit when not exists (
-      select 1
-        from public.coin_events
-       where user_id = v_user_id
-         and event_type = 'login'
-         and event_date = v_cursor
-    );
-    v_consecutive := v_consecutive + 1;
-    v_cursor := v_cursor - 1;
-  end loop;
+  -- きのうまでに開いた日の合計（通算）。休んでも1日目へは戻らず、7日ごとにひとまわりする
+  select count(*)::integer into v_prior_days
+    from public.coin_events
+   where user_id = v_user_id
+     and event_type = 'login'
+     and event_date < v_today;
 
-  v_streak_day := (v_consecutive % 7) + 1;
+  v_streak_day := (v_prior_days % 7) + 1;
   v_next_day := (v_streak_day % 7) + 1;
   v_amount := public.coin_login_bonus(v_streak_day);
 
@@ -112,10 +108,7 @@ begin
   returning id into v_event_id;
 
   -- 通算のログイン日数（きょうを入れて）。7日ごとに青コインもいっしょに
-  select count(*)::integer into v_total_days
-    from public.coin_events
-   where user_id = v_user_id
-     and event_type = 'login';
+  v_total_days := v_prior_days + 1;
 
   if v_event_id is not null and v_total_days > 0 and v_total_days % 7 = 0 then
     if public.add_blue_coin_event(
