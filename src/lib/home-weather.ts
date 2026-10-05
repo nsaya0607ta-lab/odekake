@@ -108,28 +108,6 @@ export function walkForecastOf(w: RoomWeather, phase: SkyPhase = "day"): WalkFor
   return { mark: "◯", short: "おさんぽ OK", advice: "おさんぽに行けそうです。いってらっしゃい！", tone: "good" };
 }
 
-/** 犬が天気について話すことば（ときどき1つ選ぶ） */
-export function dogWeatherLines(w: RoomWeather, phase: SkyPhase): string[] {
-  const t = w.temp;
-  const lines: string[] = [];
-  if (w.kind === "thunder") lines.push("かみなり、こわい…", "ゴロゴロいってる…");
-  else if (w.kind === "rain") lines.push("雨だから おうちで あそぼ", "ぬれるの きらい…", "雨の音がするね");
-  else if (w.kind === "drizzle") lines.push("ぽつぽつ してきた？", "レインコート きる？");
-  else if (w.kind === "snow") lines.push("雪だ！ まっしろ！", "雪、たべていい？", "足がつめたーい！");
-  else if (w.kind === "fog") lines.push("まっしろで なにも見えない…");
-  else if ((w.kind === "clear" || w.kind === "partly") && (t == null || t < 29)) lines.push(phase === "night" ? "星が きれいだね" : "いい天気だね！", "おさんぽ 行きたいな");
-  else if (w.kind === "cloudy") lines.push("くもってるね", "雨、ふらないといいな");
-  if (t != null) {
-    if (t >= 31) lines.push("あ、あつい…", "お水 ちょうだい…", "地面あつくて 歩けない…");
-    else if (t >= 27) lines.push("きょうは あついね…", "日かげで やすも");
-    else if (t <= 3) lines.push("さむいよ〜", "ぶるぶる…");
-    else if (t <= 8) lines.push("ちょっと さむいね", "あったかい服 きたいな");
-    else if (t >= 15 && t <= 24 && w.kind !== "rain" && w.kind !== "thunder") lines.push("ぽかぽかで 気持ちいい〜");
-  }
-  if (w.pop != null && w.pop >= 60 && w.kind !== "rain" && w.kind !== "thunder") lines.push("あとで雨 ふるかも？");
-  return lines;
-}
-
 /** 天気に合わせて、立ち止まったときの仕草を出やすくする（基本ポーズ名 → 重み） */
 export function restWeightsOf(w: RoomWeather | null): Partial<Record<string, number>> {
   if (!w) return {};

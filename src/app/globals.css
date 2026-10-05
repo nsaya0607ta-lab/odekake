@@ -4589,15 +4589,15 @@
 @keyframes hw-twinkle { 0%, 100% { opacity: .25; transform: scale(.8); } 50% { opacity: 1; transform: scale(1.15); } }
 @keyframes hw-glow { 0%, 100% { opacity: .75; } 50% { opacity: 1; } }
 @keyframes hw-fog { from { transform: translateX(-12%); } to { transform: translateX(12%); } }
-@keyframes hw-bubble { 0% { opacity: 0; transform: translateY(4px) scale(.85); } 12% { opacity: 1; transform: translateY(0) scale(1.04); } 20%, 86% { opacity: 1; transform: none; } 100% { opacity: 0; transform: translateY(-3px); } }
 .hw-rain { animation: hw-rain linear infinite; }
 .hw-snow { animation: hw-snow linear infinite; }
 .hw-flash { animation: hw-flash 9s linear infinite; }
 .hw-twinkle { animation: hw-twinkle 2.6s ease-in-out infinite; }
 .hw-glow { animation: hw-glow 5s ease-in-out infinite; }
 .hw-fog { animation: hw-fog 14s ease-in-out infinite alternate; }
-.hw-bubble { animation: hw-bubble 3.2s ease-out both; }
+@keyframes hw-sway { 0%, 100% { transform: rotate(-1.1deg); } 50% { transform: rotate(1.1deg); } }
+.hw-sway { transform-origin: 50% 0; animation: hw-sway 5.5s ease-in-out infinite; }
 @media (prefers-reduced-motion: reduce) {
   .hw-rain, .hw-snow, .hw-flash { animation: none; display: none; }
-  .hw-twinkle, .hw-glow, .hw-fog, .hw-bubble { animation: none; }
+  .hw-twinkle, .hw-glow, .hw-fog, .hw-sway { animation: none; }
 }

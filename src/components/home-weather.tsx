@@ -14,7 +14,6 @@ import Link from "next/link";
 import { createContext, useContext, useEffect, useMemo, useState } from "react";
 import { createPortal } from "react-dom";
 import {
-  dogWeatherLines,
   placeLabel,
   readSavedPlace,
   skyPhaseOf,
@@ -33,8 +32,6 @@ type HomeWeather = {
   place: SavedPlace & { saved: boolean };
   phase: SkyPhase;
   forecast: WalkForecast;
-  /** 犬が話すことば */
-  lines: string[];
 };
 
 const Ctx = createContext<HomeWeather | null>(null);
@@ -88,7 +85,7 @@ export function HomeWeatherProvider({ children }: { children: React.ReactNode })
   const value = useMemo<HomeWeather | null>(() => {
     if (!place || !weather) return null;
     const phase = skyPhaseOf(now, place);
-    return { weather, place, phase, forecast: walkForecastOf(weather, phase), lines: dogWeatherLines(weather, phase) };
+    return { weather, place, phase, forecast: walkForecastOf(weather, phase) };
   }, [now, place, weather]);
 
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>;
@@ -267,40 +264,70 @@ export function HomeWeatherChip() {
   const tone = TONE[f.tone];
   return (
     <>
-      <div className="pointer-events-none absolute z-40 flex justify-center" style={{ left: "31%", right: 146, top: "3.5%" }}>
-        <button
-          type="button"
-          onClick={() => setOpen(true)}
-          aria-haspopup="dialog"
-          aria-label={`きょうの天気：${info.label}${w.temp != null ? `、${Math.round(w.temp)}度` : ""}。おさんぽ予報：${f.short}。くわしく見る`}
-          className="home-rise pointer-events-auto flex max-w-full flex-col items-stretch rounded-[14px] border border-white/90 bg-white/[0.82] px-[0.55em] py-[0.35em] text-left shadow-[0_3px_10px_rgba(70,60,40,.18)] backdrop-blur-[3px] active:scale-[0.96]"
-          style={{ fontSize: "clamp(7px, 2.15vw, 10.5px)" }}
-        >
-          <span className="flex items-center gap-[0.35em] leading-none">
-            <span className="text-[1.75em] leading-none [filter:drop-shadow(0_1px_1px_rgba(0,0,0,.12))]" aria-hidden="true">{info.icon}</span>
-            {w.temp != null ? (
-              <span className="flex items-start leading-none">
-                <Temp t={w.temp} className="text-[2.15em] font-black tracking-tight [text-shadow:0_1px_0_rgba(255,255,255,.9)]" />
-                <span className="mt-[0.15em] text-[0.95em] font-bold text-[#8b7355]">℃</span>
+      {/* 空の上からロープでつるした木の札。背景の看板と同じ色・ふちどり・葉っぱにそろえる */}
+      <div className="pointer-events-none absolute top-0 z-40 flex justify-center" style={{ left: "31%", right: 146, fontSize: "clamp(7px, 2.15vw, 10.5px)" }}>
+        <div className="home-rise">
+          <div className="hw-sway relative pt-[2.7em]">
+            {/* ロープ（ねじれ模様）と、札の上の金具 */}
+            {(["left-[20%]", "right-[20%]"] as const).map((side) => (
+              <span key={side} className={`absolute top-0 ${side} flex h-[3.25em] w-[0.42em] flex-col items-center`} aria-hidden="true">
+                <span className="w-full flex-1 rounded-b-sm border-x-[0.5px] border-[#8E6232]" style={{ background: "repeating-linear-gradient(155deg,#E0B86A 0 0.28em,#B98A45 0.28em 0.42em)" }} />
+                <span className="-mt-[0.1em] block h-[0.62em] w-[0.62em] rounded-full border-[0.16em] border-[#8E6232] bg-[#F3D49A]" />
               </span>
-            ) : (
-              <span className="text-[1.1em] font-bold text-[#5b4a35]">{info.label}</span>
-            )}
-            {w.tmax != null && w.tmin != null ? (
-              <span className="ml-[0.1em] flex flex-col gap-[0.2em] text-[0.92em] font-black leading-none">
-                <span className="whitespace-nowrap"><span className="text-[#C9785A]">↑</span><Temp t={w.tmax} /></span>
-                <span className="whitespace-nowrap"><span className="text-[#6F95B8]">↓</span><Temp t={w.tmin} /></span>
+            ))}
+            <button
+              type="button"
+              onClick={() => setOpen(true)}
+              aria-haspopup="dialog"
+              aria-label={`きょうの天気：${info.label}${w.temp != null ? `、${Math.round(w.temp)}度` : ""}。おさんぽ予報：${f.short}。くわしく見る`}
+              className="pointer-events-auto relative block rounded-[0.95em] border-[1.5px] border-[#9C6B35] bg-[#F4D79C] p-[0.22em] text-left shadow-[0_2px_0_rgba(140,95,45,.35),0_5px_9px_rgba(80,55,25,.22)] active:scale-[0.96]"
+            >
+              <span
+                className="flex flex-col items-stretch rounded-[0.75em] border border-[#D7AE6E]/80 px-[0.6em] pb-[0.4em] pt-[0.45em]"
+                style={{ background: "repeating-linear-gradient(178deg, rgba(196,148,80,0) 0 0.55em, rgba(196,148,80,.09) 0.55em 0.62em), linear-gradient(180deg,#FCEFCD,#F7E3B6)" }}
+              >
+                <span className="flex items-center gap-[0.35em] leading-none">
+                  <span className="text-[1.75em] leading-none [filter:drop-shadow(0_1px_0_rgba(120,80,30,.25))]" aria-hidden="true">{info.icon}</span>
+                  {w.temp != null ? (
+                    <span className="flex items-start leading-none">
+                      <Temp t={w.temp} className="text-[2.15em] font-black tracking-tight [text-shadow:0_1px_0_rgba(255,248,225,.95)]" />
+                      <span className="mt-[0.15em] text-[0.95em] font-bold text-[#8b6a43]">℃</span>
+                    </span>
+                  ) : (
+                    <span className="text-[1.1em] font-bold text-[#5b4a35]">{info.label}</span>
+                  )}
+                  {w.tmax != null && w.tmin != null ? (
+                    <span className="ml-[0.1em] flex flex-col gap-[0.2em] border-l border-dashed border-[#C9A06A] pl-[0.35em] text-[0.92em] font-black leading-none">
+                      <span className="whitespace-nowrap"><span className="text-[#C9785A]">↑</span><Temp t={w.tmax} /></span>
+                      <span className="whitespace-nowrap"><span className="text-[#6F95B8]">↓</span><Temp t={w.tmin} /></span>
+                    </span>
+                  ) : null}
+                </span>
+                <span
+                  className="mt-[0.4em] flex items-center justify-center gap-[0.25em] whitespace-nowrap rounded-full px-[0.6em] py-[0.25em] text-[0.95em] font-black leading-none"
+                  style={{ color: tone.text, background: tone.bg, boxShadow: `inset 0 0 0 1px ${tone.ring}` }}
+                >
+                  <span>{f.mark}</span>
+                  <span>{f.short}</span>
+                </span>
               </span>
-            ) : null}
-          </span>
-          <span
-            className="mt-[0.4em] flex items-center justify-center gap-[0.25em] whitespace-nowrap rounded-full px-[0.6em] py-[0.25em] text-[0.95em] font-black leading-none"
-            style={{ color: tone.text, background: tone.bg, boxShadow: `inset 0 0 0 1px ${tone.ring}` }}
-          >
-            <span>{f.mark}</span>
-            <span>{f.short}</span>
-          </span>
-        </button>
+              {/* 角の葉っぱと小さな花（背景の看板とおそろい） */}
+              <svg viewBox="0 0 24 20" className="pointer-events-none absolute -right-[0.7em] -top-[0.75em] h-[1.9em] w-[2.3em]" aria-hidden="true">
+                <path d="M4 15 C3 9 8 5 13 6 C12 11 9 15 4 15Z" fill="#9CC665" stroke="#4E7A2C" strokeWidth="0.9" strokeLinejoin="round" />
+                <path d="M5 14 L11 8" stroke="#4E7A2C" strokeWidth="0.6" />
+                <path d="M9 15 C11 10 16 8 21 10 C19 14 14 17 9 15Z" fill="#B5D77A" stroke="#4E7A2C" strokeWidth="0.9" strokeLinejoin="round" />
+                <path d="M10 14.6 L18 11" stroke="#4E7A2C" strokeWidth="0.6" />
+              </svg>
+              <svg viewBox="0 0 20 20" className="pointer-events-none absolute -bottom-[0.55em] -right-[0.5em] h-[1.5em] w-[1.5em]" aria-hidden="true">
+                <path d="M3 13 C2 9 6 7 9 9 C8 12 6 14 3 13Z" fill="#9CC665" stroke="#4E7A2C" strokeWidth="0.8" />
+                {[0, 72, 144, 216, 288].map((a) => (
+                  <ellipse key={a} cx="12" cy="7.2" rx="2.6" ry="3.2" fill="#FFFDF6" stroke="#B49A72" strokeWidth="0.6" transform={`rotate(${a} 12 10)`} />
+                ))}
+                <circle cx="12" cy="10" r="1.9" fill="#F4C542" stroke="#C99A24" strokeWidth="0.5" />
+              </svg>
+            </button>
+          </div>
+        </div>
       </div>
       {open ? <WeatherSheet hw={hw} onClose={() => setOpen(false)} /> : null}
     </>

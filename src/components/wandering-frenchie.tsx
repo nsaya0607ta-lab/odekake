@@ -210,7 +210,6 @@ type Walker = {
 };
 
 const rand = (min: number, max: number) => min + Math.random() * (max - min);
-const pick = <T,>(items: readonly T[]): T => items[Math.floor(Math.random() * items.length)] as T;
 /** 重みつきで1つ選ぶ（天気で出やすくした仕草に使う） */
 const pickWeighted = <T,>(items: readonly T[], weightOf: (item: T) => number): T => {
   const total = items.reduce((sum, item) => sum + weightOf(item), 0);
@@ -221,9 +220,6 @@ const pickWeighted = <T,>(items: readonly T[], weightOf: (item: T) => number): T
   }
   return items[items.length - 1] as T;
 };
-
-/** 天気のことばを話す間隔（ms）。話しすぎるとうるさいので、最低これだけあける */
-const SAY_GAP = 15_000;
 
 export function WanderingFrenchie({
   level = 1,
@@ -252,7 +248,6 @@ export function WanderingFrenchie({
   const hw = useHomeWeather();
   const weatherRef = useRef(hw);
   weatherRef.current = hw;
-  const [say, setSay] = useState<{ text: string; id: number } | null>(null);
   const bobNode = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -269,18 +264,11 @@ export function WanderingFrenchie({
       );
     };
 
-    // 天気が届いてから少しして、最初のひとことを言えるように
-    let lastSay = Date.now() - SAY_GAP + 3000;
     const rest = (from: Walker) => {
       const now = weatherRef.current;
       const weights = restWeightsOf(now?.weather ?? null);
       const { pose, min, max } = pickWeighted(availableRests, (r) => weights[r.pose] ?? 1);
       setWalker({ ...from, pose, walking: false, travelMs: 0 });
-      if (now && now.lines.length && Date.now() - lastSay > SAY_GAP && Math.random() < 0.45) {
-        lastSay = Date.now();
-        setSay({ text: pick(now.lines), id: lastSay });
-        wait(3200, () => setSay(null));
-      }
       wait(rand(min, max), () => startWalk(from));
     };
 
@@ -702,36 +690,13 @@ export function WanderingFrenchie({
           transformOrigin: "50% 100%",
         }}
       >
-        {/* 天気のひとこと。反転の外に置いて、犬が向きを変えても文字が裏返らないようにする */}
-        {say ? (
-          <div
-            key={say.id}
-            className="absolute bottom-[86%] z-10"
-            style={{
-              // 右はしにいるときは吹き出しを左へ寄せて、カードの外へはみ出さないようにする
-              left: "50%",
-              transform: `translateX(${walker.x > 74 ? -82 : walker.x < 52 ? -30 : -50}%)`,
-            }}
-          >
-            <div
-              className="hw-bubble relative whitespace-nowrap rounded-full border border-[#E9DCC4] bg-white/95 px-[0.75em] py-[0.35em] font-bold leading-none text-[#5b4a35] shadow-[0_2px_6px_rgba(90,70,40,.18)]"
-              style={{ fontSize: "clamp(7px, 2.1vw, 10.5px)" }}
-            >
-              {say.text}
-              <span
-                className="absolute top-full h-0 w-0 border-x-[4px] border-t-[5px] border-x-transparent border-t-white"
-                style={{ left: walker.x > 74 ? "82%" : walker.x < 52 ? "30%" : "50%", transform: "translateX(-50%)" }}
-              />
-            </div>
-          </div>
-        ) : null}
         {/* 反転 */}
         <div
           className="transition-transform ease-out"
           style={{
             transform: `scaleX(${walker.facing})`,
             transitionDuration: `${TURN_MS}ms`,
-            // 夜と夕方は、景色に合わせて犬も少し暗く・あたたかい色に（吹き出しには かけない）
+            // 夜と夕方は、景色に合わせて犬も少し暗く・あたたかい色に
             filter:
               hw?.phase === "night"
                 ? "brightness(.8) saturate(.85)"
