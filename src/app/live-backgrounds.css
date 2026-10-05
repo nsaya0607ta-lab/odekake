@@ -339,3 +339,24 @@
 .lb-garden.is-still .lb-fly-2 {
   transform: translateX(-30%);
 }
+
+/* ---- ホームの着せかえ（src/lib/home-look.ts） ---- */
+/* カードの透け感：紙の絵だけを薄くして、うしろの背景を透かす（文字・アイコンはそのまま） */
+.home-cards-soft .home-card-frame {
+  opacity: 0.8;
+}
+.home-cards-clear .home-card-frame {
+  opacity: 0.55;
+}
+
+/*
+ * 背景をながめるモード：ヘッダー・ページ・下のナビをかくす（背景はそのまま、タップもできる）。
+ * ページ本体（main）は表示のアニメーションで不透明度を持ちつづけるので、!important で上書きする
+ */
+html[data-gaze] header.sticky,
+html[data-gaze] main,
+html[data-gaze] .app-bottom-nav {
+  opacity: 0 !important;
+  pointer-events: none;
+  transition: opacity 0.45s ease;
+}

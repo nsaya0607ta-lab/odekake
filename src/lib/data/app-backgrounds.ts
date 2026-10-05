@@ -1,5 +1,6 @@
 import { cookies } from "next/headers";
 import { APP_BACKGROUND_COOKIE, isAppBackgroundId, type AppBackgroundId } from "@/lib/app-backgrounds";
+import { HOME_LOOK_COOKIE, parseHomeLook, type HomeLook } from "@/lib/home-look";
 import type { DB } from "./client";
 
 const UNAVAILABLE_CODES = new Set(["42P01", "PGRST205"]);
@@ -30,4 +31,10 @@ export async function getOwnedAppBackgrounds(supabase: DB, userId: string): Prom
     if (isAppBackgroundId(row.background_id)) owned.add(row.background_id);
   }
   return owned;
+}
+
+/** ホームの着せかえ（カードの並び・出す出さない・透け感）。Cookie から読む */
+export async function getHomeLook(): Promise<HomeLook> {
+  const cookieStore = await cookies();
+  return parseHomeLook(cookieStore.get(HOME_LOOK_COOKIE)?.value);
 }

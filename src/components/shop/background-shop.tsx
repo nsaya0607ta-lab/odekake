@@ -16,6 +16,7 @@ import { BlueCoinArt } from "@/components/coin-art";
 import type { LiveMode } from "@/components/live-backgrounds/engine";
 import { setTryOnBackground, useTryOnBackground } from "@/components/live-backgrounds/try-on";
 import { BlueCoinBar } from "@/components/room/room-shop";
+import { HomeLookEditor } from "@/components/shop/home-look-editor";
 import {
   APP_BACKGROUND_GROUPS,
   APP_BACKGROUNDS,
@@ -27,6 +28,7 @@ import {
   type BackgroundSignals,
   type BackgroundVariant,
 } from "@/lib/app-backgrounds";
+import type { HomeLook } from "@/lib/home-look";
 
 const NO_VARIANTS: readonly BackgroundVariant[] = [];
 
@@ -76,10 +78,11 @@ type Status = "using" | "owned" | "locked";
 /** 見本の上に置く、すりガラスの札 */
 const GLASS = "bg-[rgba(255,253,248,.82)] backdrop-blur-md [-webkit-backdrop-filter:blur(12px)]";
 
-export function BackgroundShop({ current: initialCurrent, owned: initialOwned, blueCoins: initialBlueCoins }: {
+export function BackgroundShop({ current: initialCurrent, owned: initialOwned, blueCoins: initialBlueCoins, homeLook }: {
   current: AppBackgroundId;
   owned: AppBackgroundId[];
   blueCoins: number;
+  homeLook: HomeLook;
 }) {
   const router = useRouter();
   const tryOn = useTryOnBackground();
@@ -109,6 +112,8 @@ export function BackgroundShop({ current: initialCurrent, owned: initialOwned, b
           </span>
         </span>
       </button>
+
+      <HomeLookEditor initial={homeLook} />
 
       {APP_BACKGROUND_GROUPS.map((group) => (
         <section key={group.id}>

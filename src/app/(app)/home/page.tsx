@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { BackgroundGazeButton } from "@/components/background-gaze-button";
 import { IconUser } from "@/components/icons";
 import { TopHeader } from "@/components/page-header";
 import { PageBody } from "@/components/page-body";
@@ -13,6 +14,7 @@ import { LevelTag } from "@/components/level-tag";
 import { StepsTag } from "@/components/steps-tag";
 import { WanderingFrenchie } from "@/components/wandering-frenchie";
 import { COLLECTION_ITEMS, countOwned } from "@/lib/collection/items";
+import { getCurrentAppBackground, getHomeLook } from "@/lib/data/app-backgrounds";
 import { loadAreaIndex } from "@/lib/data/areas";
 import { getBlueCoinBalance } from "@/lib/data/blue-coins";
 import { getCoinSummary } from "@/lib/data/coins";
@@ -28,6 +30,8 @@ import { getRecordSpace } from "@/lib/data/space";
 import { getExpProgress } from "@/lib/exp";
 import { MUNICIPALITIES, PREFECTURES } from "@/lib/geo";
 import { PREFECTURE_NAMES } from "@/lib/geo/prefecture-names";
+import { DEFAULT_HOME_LOOK, type HomeCardId } from "@/lib/home-look";
+import { canAccessShop } from "@/lib/shop-access";
 import { requireUser } from "@/lib/supabase/server";
 
 export const metadata = { title: "あなたの旅 | おでかけ記録" };
@@ -90,6 +94,10 @@ export default async function HomePage({
   ]);
   const avatarUrl = ownAvatarPath ? (ownAvatarUrls.get(ownAvatarPath) ?? null) : null;
 
+  // ホームの着せかえ（ショップで設定。いまは準備中で、使える人だけ）
+  const shopAccess = canAccessShop(user.displayName);
+  const [look, background] = shopAccess ? await Promise.all([getHomeLook(), getCurrentAppBackground()]) : [DEFAULT_HOME_LOOK, "default" as const];
+
   const expProgress = getExpProgress(expDashboard.totalExp);
   const collectedItems = countOwned(COLLECTION_ITEMS, ownedItemIds);
   // 図鑑の母数・所持数に、通常図鑑とは別モデルのダンボールぶんも合算する
@@ -144,6 +152,24 @@ export default async function HomePage({
     rank: entryIndex + 1,
   }));
 
+  const cards: Record<HomeCardId, React.ReactNode> = {
+    notice: <HomeNoticeCard unreadCount={unreadNoticeCount} notices={noticesFeed} />,
+    highlights: (
+      <HomeHighlightsCarousel
+        stats={{
+          prefectures: areas.totals.visitedPrefectures,
+          prefectureTotal: PREFECTURES.length,
+          municipalities: areas.totals.visitedMunicipalities,
+          municipalityTotal: MUNICIPALITIES.length,
+          visits: areas.totals.visits,
+        }}
+        activity={latestFriendActivity}
+        stepsRanking={friendStepsRanking}
+      />
+    ),
+    collection: <HomeCollectionCard collected={totalCollectedCount} total={totalCollectionCount} />,
+  };
+
   return (
     <>
       <TopHeader
@@ -175,7 +201,7 @@ export default async function HomePage({
           </p>
         ) : null}
 
-        <div className="mt-[10px]">
+        <div className={`mt-[10px] home-cards-${look.cards}`}>
           <section className="rough-card overflow-visible">
             <div className="relative aspect-[1440/768] overflow-visible bg-transparent">
               <HomeWeatherProvider>
@@ -241,29 +267,16 @@ export default async function HomePage({
             </div>
           </section>
 
-          <div className="home-rise" style={{ animationDelay: "80ms" }}>
-            <HomeNoticeCard unreadCount={unreadNoticeCount} notices={noticesFeed} />
-          </div>
-
-          <div className="home-rise" style={{ animationDelay: "160ms" }}>
-          <HomeHighlightsCarousel
-            stats={{
-              prefectures: areas.totals.visitedPrefectures,
-              prefectureTotal: PREFECTURES.length,
-              municipalities: areas.totals.visitedMunicipalities,
-              municipalityTotal: MUNICIPALITIES.length,
-              visits: areas.totals.visits,
-            }}
-            activity={latestFriendActivity}
-            stepsRanking={friendStepsRanking}
-          />
-          </div>
-
-          <div className="home-rise" style={{ animationDelay: "240ms" }}>
-            <HomeCollectionCard collected={totalCollectedCount} total={totalCollectionCount} />
-          </div>
+          {look.order
+            .filter((id) => !look.hidden.includes(id))
+            .map((id, index) => (
+              <div key={id} className="home-rise" style={{ animationDelay: `${80 * (index + 1)}ms` }}>
+                {cards[id]}
+              </div>
+            ))}
         </div>
       </PageBody>
+      {shopAccess && background !== "default" ? <BackgroundGazeButton /> : null}
     </>
   );
 }

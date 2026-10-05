@@ -39,7 +39,7 @@ export function HomeNoticeCard({
           fill
           sizes="(max-width: 480px) 100vw, 480px"
           draggable={false}
-          className="pointer-events-none select-none"
+          className="home-card-frame pointer-events-none select-none"
         />
         <div className="pointer-events-none absolute inset-0 z-10 flex items-center gap-1" style={{ paddingLeft: "37%", paddingRight: "8%" }}>
           <div className="flex min-w-0 flex-1 flex-col gap-1">
