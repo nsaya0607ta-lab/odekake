@@ -1,7 +1,9 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { useHomeWeather } from "@/components/home-weather";
 import { getFrenchieSrc, type DogSkinId } from "@/lib/dog-skins";
+import { restWeightsOf } from "@/lib/home-weather";
 
 /**
  * ホーム画面のバンドを歩き回るフレブル。
@@ -208,7 +210,16 @@ type Walker = {
 };
 
 const rand = (min: number, max: number) => min + Math.random() * (max - min);
-const pick = <T,>(items: readonly T[]): T => items[Math.floor(Math.random() * items.length)] as T;
+/** 重みつきで1つ選ぶ（天気で出やすくした仕草に使う） */
+const pickWeighted = <T,>(items: readonly T[], weightOf: (item: T) => number): T => {
+  const total = items.reduce((sum, item) => sum + weightOf(item), 0);
+  let r = Math.random() * total;
+  for (const item of items) {
+    r -= weightOf(item);
+    if (r <= 0) return item;
+  }
+  return items[items.length - 1] as T;
+};
 
 export function WanderingFrenchie({
   level = 1,
@@ -233,6 +244,10 @@ export function WanderingFrenchie({
   });
   const [stepUp, setStepUp] = useState(false);
   const poseNodes = useRef<Record<string, HTMLImageElement | null>>({});
+  // ホームの天気（HomeWeatherProvider の中にいるときだけ）。歩き回りの流れは止めたくないので ref で渡す
+  const hw = useHomeWeather();
+  const weatherRef = useRef(hw);
+  weatherRef.current = hw;
   const bobNode = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -250,7 +265,9 @@ export function WanderingFrenchie({
     };
 
     const rest = (from: Walker) => {
-      const { pose, min, max } = pick(availableRests);
+      const now = weatherRef.current;
+      const weights = restWeightsOf(now?.weather ?? null);
+      const { pose, min, max } = pickWeighted(availableRests, (r) => weights[r.pose] ?? 1);
       setWalker({ ...from, pose, walking: false, travelMs: 0 });
       wait(rand(min, max), () => startWalk(from));
     };
@@ -676,7 +693,17 @@ export function WanderingFrenchie({
         {/* 反転 */}
         <div
           className="transition-transform ease-out"
-          style={{ transform: `scaleX(${walker.facing})`, transitionDuration: `${TURN_MS}ms` }}
+          style={{
+            transform: `scaleX(${walker.facing})`,
+            transitionDuration: `${TURN_MS}ms`,
+            // 夜と夕方は、景色に合わせて犬も少し暗く・あたたかい色に
+            filter:
+              hw?.phase === "night"
+                ? "brightness(.8) saturate(.85)"
+                : hw?.phase === "evening"
+                  ? "sepia(.12) saturate(1.05)"
+                  : undefined,
+          }}
         >
           {/* 上下の揺れ */}
           <div ref={bobNode} className="frenchie-bob">

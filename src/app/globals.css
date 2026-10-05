@@ -4582,3 +4582,32 @@
   .home-rise, .home-badge-pulse { animation: none; }
   .home-shine::after { animation: none; display: none; }
 }
+/* ホームの犬カードの天気（home-weather.tsx）。雨・雪は px で落とす（カードの高さは最大 256px） */
+@keyframes hw-rain { from { transform: translate3d(0, -40px, 0) rotate(12deg); } to { transform: translate3d(-64px, 300px, 0) rotate(12deg); } }
+@keyframes hw-snow { 0% { transform: translate3d(0, -12px, 0); } 50% { transform: translate3d(10px, 130px, 0); } 100% { transform: translate3d(-4px, 280px, 0); } }
+@keyframes hw-flash { 0%, 88%, 91%, 94%, 100% { opacity: 0; } 89% { opacity: .55; } 92.5% { opacity: .35; } }
+@keyframes hw-twinkle { 0%, 100% { opacity: .25; transform: scale(.8); } 50% { opacity: 1; transform: scale(1.15); } }
+@keyframes hw-glow { 0%, 100% { opacity: .75; } 50% { opacity: 1; } }
+@keyframes hw-fog { from { transform: translateX(-12%); } to { transform: translateX(12%); } }
+.hw-rain { animation: hw-rain linear infinite; }
+.hw-snow { animation: hw-snow linear infinite; }
+.hw-flash { animation: hw-flash 9s linear infinite; }
+.hw-twinkle { animation: hw-twinkle 2.6s ease-in-out infinite; }
+.hw-glow { animation: hw-glow 5s ease-in-out infinite; }
+.hw-fog { animation: hw-fog 14s ease-in-out infinite alternate; }
+@keyframes hw-bob { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-2px); } }
+.hw-bob { animation: hw-bob 6s ease-in-out infinite; }
+@keyframes hw-spin { to { transform: rotate(360deg); } }
+.hw-spin { animation: hw-spin 40s linear infinite; }
+@keyframes hw-drop { 0% { transform: translateY(-3px); opacity: 0; } 25% { opacity: 1; } 100% { transform: translateY(9px); opacity: 0; } }
+.hw-drop { animation: hw-drop 1.15s ease-in infinite; }
+@keyframes hw-flake { 0% { transform: translate(0, -3px); opacity: 0; } 25% { opacity: 1; } 100% { transform: translate(2px, 10px); opacity: 0; } }
+.hw-flake { animation: hw-flake 2.6s linear infinite; }
+@keyframes hw-bolt { 0%, 70%, 100% { opacity: 1; } 74%, 80% { opacity: .25; } 77% { opacity: 1; } }
+.hw-bolt { animation: hw-bolt 3.2s linear infinite; }
+@keyframes hw-mist { 0%, 100% { transform: translateX(-4px); } 50% { transform: translateX(4px); } }
+.hw-mist { animation: hw-mist 4.5s ease-in-out infinite; }
+@media (prefers-reduced-motion: reduce) {
+  .hw-rain, .hw-snow, .hw-flash { animation: none; display: none; }
+  .hw-twinkle, .hw-glow, .hw-fog, .hw-bob, .hw-spin, .hw-drop, .hw-flake, .hw-bolt, .hw-mist { animation: none; }
+}
