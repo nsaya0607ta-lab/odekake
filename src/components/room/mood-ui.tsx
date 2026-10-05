@@ -87,14 +87,14 @@ export function MoodSheet({ mood, skin, dogName, onClose }: { mood: Mood; skin: 
           <ul className="mt-3 space-y-1.5">
             {mood.parts.map((p) => (
               <li key={p.id} className="flex items-center gap-2 text-[11px]">
-                <span className="w-[8.5rem] shrink-0 font-bold text-ink-soft">{p.label}</span>
-                <span className="h-2 flex-1 overflow-hidden rounded-full bg-paper-deep"><span className="block h-full rounded-full bg-leaf" style={{ width: `${(p.value / p.max) * 100}%` }} /></span>
-                <span className="w-10 shrink-0 text-right font-black tabular-nums text-ink">{p.value}<span className="text-[9px] text-ink-faint">/{p.max}</span></span>
+                <span className={`w-[8.5rem] shrink-0 font-bold ${p.minus ? "text-[#4F6FA8]" : "text-ink-soft"}`}>{p.minus ? "☔ " : ""}{p.label}</span>
+                <span className="h-2 flex-1 overflow-hidden rounded-full bg-paper-deep"><span className={`block h-full rounded-full ${p.minus ? "bg-[#8FA3C8]" : "bg-leaf"}`} style={{ width: `${(Math.abs(p.value) / p.max) * 100}%` }} /></span>
+                <span className={`w-10 shrink-0 text-right font-black tabular-nums ${p.minus ? "text-[#4F6FA8]" : "text-ink"}`}>{p.minus ? `−${Math.abs(p.value)}` : <>{p.value}<span className="text-[9px] text-ink-faint">/{p.max}</span></>}</span>
               </li>
             ))}
           </ul>
           <p className="mt-3 rounded-2xl bg-paper-deep px-3 py-2 text-[11px] font-bold leading-relaxed text-ink-soft">💡 {moodTip(mood)}</p>
-          <p className="mt-2 text-[9.5px] font-semibold leading-relaxed text-ink-faint">きぶんで わんこの ようすが かわります（さみしいと 窓のそばで まっている・るんるんだと おどりだす）。なでた回数・あそんだ回数は 毎日 0 から。</p>
+          <p className="mt-2 text-[9.5px] font-semibold leading-relaxed text-ink-faint">きぶんで わんこの ようすが かわります（さみしいと 窓のそばで まっている・るんるんだと おどりだす）。雨・かみなりの日は おさんぽに行けないので、少し下がります。なでた回数・あそんだ回数は 毎日 0 から。</p>
         </div>
         <div className="px-4 pb-4 pt-3">
           <button type="button" onClick={onClose} className="w-full rounded-full bg-leaf-deep py-3 text-xs font-black text-white active:scale-95">とじる</button>

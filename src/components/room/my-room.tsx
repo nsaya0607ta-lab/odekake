@@ -87,7 +87,7 @@ import { SouvenirArt } from "./souvenir-art";
 import { headline, SouvenirBook, SouvenirGift, type SouvenirNews } from "./souvenir-ui";
 import { CraftDone } from "./craft-ui";
 import { MoodCard, MoodSheet, useMoodCounters } from "./mood-ui";
-import { moodOf, moodRank, MOOD_LEVELS } from "@/lib/room/mood";
+import { moodOf, moodRank, moodWeatherOf, MOOD_LEVELS } from "@/lib/room/mood";
 import { CRAFTS, craftKey, type CraftId } from "@/lib/room/crafts";
 import { ownedKey, pendingSouvenirs, pruneBrought, SOUVENIR_ACTS, SOUVENIRS, souvenirKey, souvenirName, type SouvenirId } from "@/lib/room/souvenirs";
 import { composeRoomSnapshot } from "./room-snapshot";
@@ -208,6 +208,31 @@ function tapMotionOf(entry: DecorEntry, onShelf?: string): { fx: FurnitureFx; ms
 const TOGETHER_KINDS = new Set<string>(["tv", "sofa", "toybox", "kotatsu", "dog-bed", "piano", "fireplace", "record", "fishbowl", "bowl"]);
 /** お客さんのわんこの寝言 */
 const GUEST_DREAMS = ["むにゃ… おうちの ベッド…", "あしたも あそぼ…", "おやつ… はんぶんこ…"];
+
+/**
+ * わんこどうしの おしゃべり。h = 自分のわんこ（ホスト）、g = 遊びに来たわんこ（ゲスト）。
+ * {host} {guest} は、それぞれの名前に置きかえる
+ */
+type DogTalk = readonly (readonly ["h" | "g", string, string])[];
+const DOG_TALKS: readonly DogTalk[] = [
+  [["h", "ねえねえ、{guest}！", "stand-happy"], ["g", "なあに？", "wonder"], ["h", "あそびに来てくれて うれしい！", "cheer"], ["g", "ぼくも うれしい！", "smile"]],
+  [["g", "このおへや、いいにおい〜", "sniff"], ["h", "えへへ、ぼくの においだよ", "wink"], ["g", "おちつく〜", "smile"]],
+  [["h", "おやつ なにが すき？", "wonder"], ["g", "ささみ！", "bark"], ["h", "わかる〜！", "cheer"], ["g", "こんど はんぶんこ しよ", "wink"]],
+  [["g", "きょう、おさんぽ いった？", "wonder"], ["h", "いったよ！ はっぱが いっぱい！", "stand-happy"], ["g", "いいな〜", "sit"]],
+  [["h", "かくれんぼ しよ！", "cheer"], ["g", "いいよ！ 10かぞえるね", "sit"], ["g", "いーち、にーい…", "wink"], ["h", "（しっぽ でてる…）", "bow"]],
+  [["g", "{host}の ごしゅじん、やさしい？", "wonder"], ["h", "うん！ いっぱい なでてくれる", "smile"], ["g", "うちも だよ！", "cheer"]],
+  [["h", "おしりの におい、かいでいい？", "sniff"], ["g", "どうぞ どうぞ", "bow"], ["h", "…ふむふむ。げんきそうだね！", "wink"]],
+  [["g", "ボール、どっちが はやく とるか きょうそう！", "bow-b"], ["h", "まけないよ〜！", "bow"], ["g", "よーい…", "stand"], ["h", "どん！", "cheer"]],
+  [["h", "あしたも あそべる？", "wonder"], ["g", "また くるね！", "wave"], ["h", "やくそくだよ", "smile"]],
+  [["g", "ふわぁ…ちょっと ねむいかも", "yawn"], ["h", "いっしょに おひるね しよ", "sit"], ["g", "うん…", "smile"]],
+];
+const DOG_TALKS_RAIN: readonly DogTalk[] = [
+  [["h", "雨だね…", "sit"], ["g", "おさんぽ、行けないね", "sit-side"], ["h", "おへやで あそぼ！", "stand-happy"], ["g", "うん！", "cheer"]],
+  [["g", "ぽつぽつ…いい音", "wonder"], ["h", "あめ、ちょっと すき", "smile"], ["g", "ぬれるのは きらい〜", "shake"]],
+];
+const DOG_TALKS_THUNDER: readonly DogTalk[] = [
+  [["h", "かみなり、こわいね…", "sit"], ["g", "くっついてて いい？", "sit-side"], ["h", "いいよ。いっしょなら へいき", "smile"]],
+];
 /** 暖炉のマントルピースのかざり（タップで順に切りかえ。この端末に覚えておく） */
 const MANTEL_KEY = "odekake-room-mantel";
 /** 消してあるテレビ（この端末に覚えておく） */
@@ -331,6 +356,8 @@ export function MyRoom({ entries, initialLayout, serverReady, dogSkin, dogName, 
   /** タップした家具へ、わんこを呼ぶ（遊びに来ているフレンドのわんこも、いっしょに来る） */
   const [dogCall, setDogCall] = useState<{ id: number; furnitureId: string } | null>(null);
   const [guestCall, setGuestCall] = useState<{ id: number; furnitureId: string } | null>(null);
+  /** 遊びに来たわんこに しゃべらせる（犬どうしの おしゃべり） */
+  const [guestCue, setGuestCue] = useState<{ id: number; text: string; pose?: string } | null>(null);
   const callDogsRef = useRef<() => void>(() => {});
   /** byUser: タップで呼んだ（いっしょに遊んだ回数になり、きぶんが上がる） */
   const callDogs = useCallback((furnitureId: string, byUser = true) => {
@@ -365,12 +392,26 @@ export function MyRoom({ entries, initialLayout, serverReady, dogSkin, dogName, 
   const [weather, setWeather] = useState<RoomWeather | null>(null);
   /** 犬が遊んでいる家具の動き（置いたものの id → 動き） */
   const [furnitureFx, setFurnitureFx] = useState<Record<string, FurnitureFx>>({});
-  const onFurnitureFx = useCallback((id: string, fx: FurnitureFx | null) => {
+  /**
+   * 家具の動きは「だれが動かしているか」ごとに持つ（タップした人・自分のわんこ・遊びに来たわんこ）。
+   * 2匹が同じ家具で遊んでいて片方が離れても、もう片方が遊んでいるあいだは動いたままにするため。
+   */
+  const fxLayers = useRef<Record<"user" | "main" | "guest", Record<string, FurnitureFx>>>({ user: {}, main: {}, guest: {} });
+  const setFxLayer = useCallback((who: "user" | "main" | "guest", id: string, fx: FurnitureFx | null) => {
+    const L = fxLayers.current;
+    if (fx) L[who][id] = fx;
+    // タップで止めたとき（レコードを止めた など）は、わんこが動かしていた分もいっしょに止める
+    else if (who === "user") { delete L.user[id]; delete L.main[id]; delete L.guest[id]; }
+    else delete L[who][id];
+    const merged = L.user[id] ?? L.main[id] ?? L.guest[id] ?? null;
     setFurnitureFx((cur) => {
-      if (!fx) { if (!(id in cur)) return cur; const next = { ...cur }; delete next[id]; return next; }
-      return cur[id] === fx ? cur : { ...cur, [id]: fx };
+      if (!merged) { if (!(id in cur)) return cur; const next = { ...cur }; delete next[id]; return next; }
+      return cur[id] === merged ? cur : { ...cur, [id]: merged };
     });
   }, []);
+  const onFurnitureFx = useCallback((id: string, fx: FurnitureFx | null) => setFxLayer("user", id, fx), [setFxLayer]);
+  const onMainDogFx = useCallback((id: string, fx: FurnitureFx | null) => setFxLayer("main", id, fx), [setFxLayer]);
+  const onGuestDogFx = useCallback((id: string, fx: FurnitureFx | null) => setFxLayer("guest", id, fx), [setFxLayer]);
   /** いまの行事（もようがえでオフにしていれば null） */
   const roomEvent = layout.theme.events === false ? null : roomEventOf(now)?.id ?? null;
   const skyNow = useMemo(() => withWeather(skyAt(now, place), weather), [now, place, weather]);
@@ -827,6 +868,9 @@ export function MyRoom({ entries, initialLayout, serverReady, dogSkin, dogName, 
   useEffect(() => {
     if (!guestId || !guest) return;
     setDogCue({ id: Date.now(), text: `きょうは ${[...guest.name].slice(0, 6).join("")}さんちの わんこが あそびに来たよ！`, pose: "cheer" });
+    // ホストのあとに、ゲストが返事をする
+    const hi = window.setTimeout(() => setGuestCue({ id: Date.now(), text: "おじゃまします！ よろしくね", pose: "wave" }), 2600);
+    return () => window.clearTimeout(hi);
     // お客さんが来たときだけ
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [guestId]);
@@ -857,6 +901,32 @@ export function MyRoom({ entries, initialLayout, serverReady, dogSkin, dogName, 
     t = window.setTimeout(loop, 12_000 + Math.random() * 8_000);
     return () => window.clearTimeout(t);
   }, [editing, guestId, sleepy]);
+  // ときどき、2匹で おしゃべりする（ひとことずつ、かわりばんこ。起きているあいだ）
+  const talkRef = useRef<() => number>(() => 0);
+  const talkTimers = useRef<number[]>([]);
+  talkRef.current = () => {
+    if (!guest) return 0;
+    const kind = weather?.kind;
+    const pool = kind === "thunder" ? [...DOG_TALKS_THUNDER, ...DOG_TALKS_RAIN] : kind === "rain" || kind === "drizzle" ? [...DOG_TALKS_RAIN, ...DOG_TALKS] : DOG_TALKS;
+    const talk = pool[Math.floor(Math.random() * pool.length)]!;
+    const name = (s: string) => s.replace("{host}", petName || "きみ").replace("{guest}", guest.dogName || "きみ");
+    const base = Date.now();
+    talk.forEach(([who, text, pose], i) => {
+      talkTimers.current.push(window.setTimeout(() => {
+        const cue = { id: base + i, text: name(text), pose };
+        if (who === "h") setDogCue(cue); else setGuestCue(cue);
+      }, i * 2600));
+    });
+    return talk.length * 2600;
+  };
+  useEffect(() => {
+    if (!guestId || sleepy || editing) return;
+    let t = 0;
+    const loop = () => { talkTimers.current = []; const ms = talkRef.current(); t = window.setTimeout(loop, ms + 28_000 + Math.random() * 22_000); };
+    t = window.setTimeout(loop, 20_000 + Math.random() * 10_000);
+    // もようがえを始めた・寝る時間になった・帰ったときは、とちゅうの おしゃべりも止める
+    return () => { window.clearTimeout(t); for (const x of talkTimers.current) window.clearTimeout(x); talkTimers.current = []; };
+  }, [editing, guestId, sleepy]);
 
   /* ---------- わんこの気分メーター（自分の部屋だけ） ---------- */
   const counters = useMoodCounters(ownerId ?? "me", todayKey);
@@ -868,8 +938,8 @@ export function MyRoom({ entries, initialLayout, serverReady, dogSkin, dogName, 
     return (stepHistory ?? []).find((x) => x.date === y)?.steps ?? 0;
   }, [stepHistory, todayKey]);
   const mood = useMemo(
-    () => moodOf({ steps: steps?.steps ?? 0, yesterday: yesterdaySteps, pets: counters.pets, plays: counters.plays, dirt, guest: Boolean(guest) }),
-    [counters.pets, counters.plays, dirt, guest, steps?.steps, yesterdaySteps],
+    () => moodOf({ steps: steps?.steps ?? 0, yesterday: yesterdaySteps, pets: counters.pets, plays: counters.plays, dirt, guest: Boolean(guest), weather: moodWeatherOf(weather?.kind) }),
+    [counters.pets, counters.plays, dirt, guest, steps?.steps, weather?.kind, yesterdaySteps],
   );
   const [moodOpen, setMoodOpen] = useState(false);
   const [moodPulse, setMoodPulse] = useState(0);
@@ -968,9 +1038,9 @@ export function MyRoom({ entries, initialLayout, serverReady, dogSkin, dogName, 
   const breeze = !editing && layout.items.some((p) => p.key === "furniture:fan" && furnitureMode[p.id] === "on");
   /** しばらくのあいだだけ、家具を動かす（同じ動きのままなら、ms のあとでもとにもどす） */
   const fxFor = useCallback((id: string, fx: FurnitureFx, ms: number) => {
-    onFurnitureFx(id, fx);
-    window.setTimeout(() => setFurnitureFx((cur) => { if (cur[id] !== fx) return cur; const next = { ...cur }; delete next[id]; return next; }), ms);
-  }, [onFurnitureFx]);
+    setFxLayer("user", id, fx);
+    window.setTimeout(() => { if (fxLayers.current.user[id] === fx) { delete fxLayers.current.user[id]; setFxLayer("main", id, fxLayers.current.main[id] ?? null); } }, ms);
+  }, [setFxLayer]);
   /** インコがしゃべる（鳥かごの上に、ふきだし） */
   const birdLines = useMemo(() => ["オハヨー！", "ワン！ワン！", "カワイイネ", "オサンポ イク？", "ゴハン マダー？", "ピーチク パーチク♪", petName ? `${petName}！ ${petName}！` : "ワンチャン！"], [petName]);
   const birdTalk = useCallback((id: string, text?: string) => {
@@ -1268,9 +1338,9 @@ export function MyRoom({ entries, initialLayout, serverReady, dogSkin, dogName, 
             })}
 
             {!editing && mess.length ? <RoomMess mess={mess} onClean={(m) => onCleanMess(m.id)} /> : null}
-          <RoomDog skin={dogSkin} phase={phase} sleepy={sleepy} lines={dogLines} dreams={dogDreams} cue={dogCue} call={dogCall} carry={carrying ? <SouvenirArt id={carrying.id} shiny={carrying.shiny} /> : null} introduce={visit ? petName : null} quiet={editing} places={dogPlaces} weather={weather?.kind ?? null} onFx={onFurnitureFx} modes={furnitureMode} winter={winter} hot={hot} onFurnitureSay={birdTalk} mood={visit ? null : mood.level} onTap={visit ? undefined : counters.addPet} />
+          <RoomDog skin={dogSkin} phase={phase} sleepy={sleepy} lines={dogLines} dreams={dogDreams} cue={dogCue} call={dogCall} carry={carrying ? <SouvenirArt id={carrying.id} shiny={carrying.shiny} /> : null} introduce={visit ? petName : null} quiet={editing} places={dogPlaces} weather={weather?.kind ?? null} onFx={onMainDogFx} modes={furnitureMode} winter={winter} hot={hot} onFurnitureSay={birdTalk} mood={visit ? null : mood.level} onTap={visit ? undefined : counters.addPet} />
           {/* 遊びに来たフレンドのわんこ。自分のわんこと同じように暮らし、少し横にずれて並ぶ（家具は動かさない） */}
-          {guest ? <RoomDog key={guest.id} skin={guest.skin} phase={phase} sleepy={sleepy} lines={guestLines} dreams={GUEST_DREAMS} call={guestCall} quiet={editing} places={guestPlaces} weather={weather?.kind ?? null} modes={furnitureMode} winter={winter} hot={hot} offset={9} onTap={setGuestCard} label="遊びに来たフレンドの犬" /> : null}
+          {guest ? <RoomDog key={guest.id} skin={guest.skin} phase={phase} sleepy={sleepy} lines={guestLines} dreams={GUEST_DREAMS} cue={guestCue} call={guestCall} quiet={editing} places={guestPlaces} weather={weather?.kind ?? null} onFx={onGuestDogFx} modes={furnitureMode} winter={winter} hot={hot} onFurnitureSay={birdTalk} offset={9} onTap={setGuestCard} label="遊びに来たフレンドの犬" /> : null}
             {/* 行事のもの（部屋の左右のすみ）。置いたものと同じく、奥ほど下に重なる */}
             {roomEvent ? (["L", "R"] as const).map((side) => (
               <div key={side} className="pointer-events-none absolute inset-0" style={{ zIndex: 300 + Math.round(EVENT_FLOOR_Y[side] * 10) }} data-event-layer>
