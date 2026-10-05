@@ -5,6 +5,7 @@ import type { GachaRarity } from "@/lib/gacha/config";
 import { playGachaCue, setGachaAudioPlaybackRate } from "./audio";
 import styles from "./gacha-cinematic.module.css";
 import type { AnimationDraw, DrawResult } from "./types";
+import { lockPageScroll } from "@/lib/scroll-lock";
 
 type Phase = "準備中" | "ガチャ起動" | "カプセル排出" | "カプセル開封" | "力をためている…" | "……" | "レアリティ昇格" | "結果発表";
 type BurstIntensity = "normal" | "large" | "mega";
@@ -47,40 +48,9 @@ function applyPromotedCapsuleStyle(capsule: HTMLDivElement, rarity: Extract<Gach
   if (rareClassName) capsule.classList.add(rareClassName);
 }
 
+/** モーダル表示中は、うしろのページがスクロールしないようにする（くわしくは scroll-lock.ts） */
 function useBodyScrollLock() {
-  useEffect(() => {
-    const body = document.body;
-    const root = document.documentElement;
-    const scrollY = window.scrollY;
-    const previous = {
-      position: body.style.position,
-      top: body.style.top,
-      left: body.style.left,
-      right: body.style.right,
-      width: body.style.width,
-      overflow: body.style.overflow,
-      overscrollBehavior: root.style.overscrollBehavior,
-    };
-
-    body.style.position = "fixed";
-    body.style.top = `-${scrollY}px`;
-    body.style.left = "0";
-    body.style.right = "0";
-    body.style.width = "100%";
-    body.style.overflow = "hidden";
-    root.style.overscrollBehavior = "none";
-
-    return () => {
-      body.style.position = previous.position;
-      body.style.top = previous.top;
-      body.style.left = previous.left;
-      body.style.right = previous.right;
-      body.style.width = previous.width;
-      body.style.overflow = previous.overflow;
-      root.style.overscrollBehavior = previous.overscrollBehavior;
-      window.scrollTo(0, scrollY);
-    };
-  }, []);
+  useEffect(() => lockPageScroll(), []);
 }
 
 function lowPowerDevice() {
