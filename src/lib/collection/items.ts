@@ -317,6 +317,11 @@ const CURATED_ITEMS: readonly CollectionItem[] = [
   { id: "fukui_habutae_mochi", name: "羽二重餅", image: "/collection/items/fukui-habutae-mochi.webp", category: "food", series: null, rarity: "N", pref: "18" },
   { id: "fukui_yakisaba_sushi", name: "焼き鯖寿司", image: "/collection/items/fukui-yakisaba-sushi.webp", category: "food", series: null, rarity: "R", pref: "18" },
   { id: "fukui_mizu_yokan", name: "冬の水ようかん", image: "/collection/items/fukui-mizu-yokan.webp", category: "food", series: null, rarity: "R", pref: "18" },
+  { id: "fukui_sabae_glasses", name: "鯖江のめがね", image: "/collection/items/fukui-sabae-glasses.webp", category: "accessory", series: null, rarity: "SR", pref: "18" },
+  { id: "fukui_eiheiji", name: "永平寺", image: "/collection/items/fukui-eiheiji.webp", category: "other", series: null, rarity: "SR", pref: "18" },
+  { id: "fukui_echizen_crab", name: "越前ガニ", image: "/collection/items/fukui-echizen-crab.webp", category: "food", series: null, rarity: "SSR", pref: "18" },
+  { id: "fukui_tojinbo", name: "東尋坊", image: "/collection/items/fukui-tojinbo.webp", category: "other", series: null, rarity: "UR", pref: "18" },
+  { id: "fukui_dinosaur", name: "恐竜王国・福井", image: "/collection/items/fukui-dinosaur.webp", category: "other", series: null, rarity: "LR", pref: "18" },
 
   // --- 都道府県図鑑：長野県（都道府県ガチャ） ----------------------------
   { id: "nagano_shinshu_soba", name: "信州そば", image: "/collection/items/nagano-shinshu-soba.webp", category: "food", series: null, rarity: "N", pref: "20" },
