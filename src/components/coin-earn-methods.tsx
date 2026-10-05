@@ -12,7 +12,8 @@ import {
 import {
   BLUE_FIRST_MUNICIPALITY,
   BLUE_FIRST_PREFECTURE,
-  BLUE_LOGIN_STREAK,
+  BLUE_LOGIN_TOTAL,
+  BLUE_LOGIN_TOTAL_EVERY,
   BLUE_OSANPO_COOP,
   BLUE_OSANPO_MISSION,
   BLUE_OSANPO_MISSION_ALL,
@@ -121,13 +122,13 @@ export function CoinEarnMethods() {
           <div className="mt-1.5 flex flex-wrap gap-1.5">
             <BlueChip label="はじめての市区町村" coins={BLUE_FIRST_MUNICIPALITY} />
             <BlueChip label="はじめての都道府県" coins={BLUE_FIRST_PREFECTURE} />
-            <BlueChip label="7日連続ログイン" coins={BLUE_LOGIN_STREAK} />
+            <BlueChip label={`通算${BLUE_LOGIN_TOTAL_EVERY}日ログインごと`} coins={BLUE_LOGIN_TOTAL} />
             <BlueChip label="おさんぽミッション1つ" coins={BLUE_OSANPO_MISSION} />
             <BlueChip label="ミッション3つ全部" coins={BLUE_OSANPO_MISSION_ALL} />
             <BlueChip label="協力チャレンジ（週1回）" coins={BLUE_OSANPO_COOP} />
           </div>
           <p className="mt-2 text-[10px] leading-relaxed text-[#3D6FB0]">
-            はじめての場所は、訪問を登録したときに1か所につき1回だけもらえます。おさんぽフレンチーは、スコアに応じてもらえます。
+            はじめての場所は、訪問を登録したときに1か所につき1回だけもらえます。ログインは1日目からの通算日数で数え、休んでもへりません。おさんぽフレンチーは、スコアに応じてもらえます。
           </p>
         </div>
       </div>

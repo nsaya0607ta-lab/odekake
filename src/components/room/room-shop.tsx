@@ -4,7 +4,7 @@
  * わんこのおへや：青コインのお店。
  * - FurnitureShop … もようがえの「家具」タブと「窓・棚」タブ。1種類あたり持てる数まで買え、買ったものはタップで部屋に置ける
  * - BuyDialog … 1つ買うときの確認（家具・窓や棚・もようがえのデザインで共通）
- * 青コインは「おさんぽフレンチー」・はじめての場所の登録・7日連続ログインでもらえる（src/lib/blue-coin-rewards.ts）。
+ * 青コインは「おさんぽフレンチー」・はじめての場所の登録・通算7日ごとのログインでもらえる（src/lib/blue-coin-rewards.ts）。
  */
 import Link from "next/link";
 import { useState, type ReactNode } from "react";

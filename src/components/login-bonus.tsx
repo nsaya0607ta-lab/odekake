@@ -21,8 +21,8 @@ import { IconClose } from "./icons";
 
 const SEEN_KEY_PREFIX = "odekake:login-bonus-checked-on";
 
-/** blueAmount は7日目（7日連続）にいっしょにもらえる青コイン。ふだんは 0 */
-type Reward = { amount: number; balance: number; blueAmount: number };
+/** blueAmount は通算7日ごとにいっしょにもらえる青コイン（ふだんは 0）。totalDays は通算のログイン日数 */
+type Reward = { amount: number; balance: number; blueAmount: number; totalDays: number | null };
 
 function waitForSplash(): Promise<void> {
   return new Promise((resolve) => {
@@ -71,6 +71,7 @@ export function LoginBonus({ skin = "default", userId }: { skin?: DogSkinId; use
           amount?: number;
           balance?: number;
           blueAmount?: number;
+          totalDays?: number | null;
           date?: string | null;
         };
 
@@ -86,7 +87,7 @@ export function LoginBonus({ skin = "default", userId }: { skin?: DogSkinId; use
 
         await waitForSplash();
         if (cancelled) return;
-        setReward({ amount: data.amount ?? 0, balance: data.balance ?? 0, blueAmount: data.blueAmount ?? 0 });
+        setReward({ amount: data.amount ?? 0, balance: data.balance ?? 0, blueAmount: data.blueAmount ?? 0, totalDays: data.totalDays ?? null });
       } catch {
         // 圏外なら次に開いたときに再試行する。
       }
@@ -235,7 +236,7 @@ export function LoginBonus({ skin = "default", userId }: { skin?: DogSkinId; use
 
           {reward.blueAmount > 0 ? (
             <p className="mt-3 flex items-center justify-center gap-1.5 rounded-2xl border border-[#BFD7F5] bg-[linear-gradient(135deg,#F2F8FF,#E3EFFD)] px-3 py-2 text-[12px] font-bold text-[#1F4F8F]">
-              7日連続ボーナス
+              {reward.totalDays ? `通算${reward.totalDays}日ボーナス` : "通算ログインボーナス"}
               <BlueCoinArt className="h-4 w-4" />
               <span className="font-black tabular-nums">+{formatCoins(reward.blueAmount)}</span>
               <span className="text-[11px]">青コイン</span>

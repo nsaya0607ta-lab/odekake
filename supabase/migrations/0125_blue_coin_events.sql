@@ -6,7 +6,8 @@
 --   EXP の「初めての市区町村／都道府県」（exp_events。1人1か所につき1回だけ入る）に合わせて付与する。
 --   訪問を消して登録しなおしても、青コインのキーが残るので二重にはもらえない。
 --   これより前の登録にはさかのぼって付与しない（この SQL を適用したあとの登録から）。
--- ・ログインボーナスの7日目（7日連続で開いた日）に 400。claim_login_bonus に足す。
+-- ・ログインした日の通算（1日目から数えた合計の日数。休んでもへらない）が 7 の倍数になった日に 400。
+--   これまでのログイン日（coin_events の login）も数に入る。claim_login_bonus に足す。
 begin;
 
 do $$
@@ -61,7 +62,7 @@ when (new.event_type in ('first_municipality', 'first_prefecture'))
 execute function public.award_first_place_blue_coins();
 
 -- -------------------------------------------------------------
--- 7日連続ログイン（0028 の claim_login_bonus に、7日目の青コインを足したもの）
+-- 通算ログイン（0028 の claim_login_bonus に、通算7日ごとの青コインを足したもの）
 -- -------------------------------------------------------------
 create or replace function public.claim_login_bonus()
 returns jsonb
@@ -80,6 +81,7 @@ declare
   v_event_id uuid;
   v_balance integer;
   v_blue_amount integer := 0;
+  v_total_days integer := 0;
 begin
   if v_user_id is null then raise exception 'Authentication required'; end if;
 
@@ -109,12 +111,17 @@ begin
   on conflict (user_id, idempotency_key) do nothing
   returning id into v_event_id;
 
-  -- 7日目（7日連続）は、青コインもいっしょに
-  if v_event_id is not null and v_streak_day = 7 then
+  -- 通算のログイン日数（きょうを入れて）。7日ごとに青コインもいっしょに
+  select count(*)::integer into v_total_days
+    from public.coin_events
+   where user_id = v_user_id
+     and event_type = 'login';
+
+  if v_event_id is not null and v_total_days > 0 and v_total_days % 7 = 0 then
     if public.add_blue_coin_event(
-      v_user_id, 'login_streak', 400,
-      'login-streak:' || v_today::text,
-      jsonb_build_object('label', '7日連続ログイン')
+      v_user_id, 'login_total', 400,
+      'login-total:' || v_total_days::text,
+      jsonb_build_object('label', '通算' || v_total_days::text || '日ログイン', 'total_days', v_total_days)
     ) then
       v_blue_amount := 400;
     end if;
@@ -130,7 +137,8 @@ begin
     'date', v_today,
     'streak_day', v_streak_day,
     'next_amount', public.coin_login_bonus(v_next_day),
-    'blue_amount', v_blue_amount
+    'blue_amount', v_blue_amount,
+    'total_days', v_total_days
   );
 end;
 $$;
