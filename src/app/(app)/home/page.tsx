@@ -8,6 +8,7 @@ import { CoinBadge } from "@/components/coin-badge";
 import { SharedTripBadge } from "@/components/shared-trip-badge";
 import { HomeScene } from "@/components/home-scene";
 import { HomeWeatherChip, HomeWeatherProvider, HomeWeatherSky } from "@/components/home-weather";
+import { homeCardMarginTop } from "@/lib/home-card-layout";
 import { HomeCollectionCard } from "@/components/home-collection-card";
 import { HomeHighlightsCarousel } from "@/components/home-highlights-carousel";
 import { HomeNoticeCard } from "@/components/home-notice-card";
@@ -275,8 +276,9 @@ export default async function HomePage({
 
           {look.order
             .filter((id) => !look.hidden.includes(id))
-            .map((id, index) => (
-              <div key={id} className="home-rise" style={{ animationDelay: `${80 * (index + 1)}ms` }}>
+            .map((id, index, shown) => (
+              // どの順番でも、1つ上のカードの紙とのあいだが同じになるよう、絵の透明なふちの分を計算してずらす
+              <div key={id} className="home-rise" style={{ animationDelay: `${80 * (index + 1)}ms`, marginTop: homeCardMarginTop(index === 0 ? "scene" : shown[index - 1]!, id) }}>
                 {cards[id]}
               </div>
             ))}

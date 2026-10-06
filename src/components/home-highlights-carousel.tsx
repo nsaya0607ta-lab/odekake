@@ -1,5 +1,6 @@
 "use client";
 
+import { CARD_BLEED } from "@/lib/home-card-layout";
 import Image from "next/image";
 import Link from "next/link";
 import { useEffect, useMemo, useRef, useState, type ReactNode, type TouchEvent } from "react";
@@ -154,7 +155,7 @@ export function HomeHighlightsCarousel({
     <section
       aria-label="実績とフレンドの様子"
       className="relative"
-      style={{ marginLeft: -9, marginRight: -12, marginTop: -5 }}
+      style={{ marginLeft: -CARD_BLEED.left, marginRight: -CARD_BLEED.right }}
     >
       <div
         className="relative overflow-hidden"
@@ -178,9 +179,10 @@ export function HomeHighlightsCarousel({
       </div>
 
       {slides.length > 1 ? (
+        // 点は額縁の中（下のほう）に重ねる。カードの高さを変えないよう absolute にする（並べかえ時の間かく計算のため）
         <div
-          className="relative z-10 flex items-center justify-center gap-1.5"
-          style={{ marginTop: -34 }}
+          className="absolute inset-x-0 z-10 flex items-center justify-center gap-1.5"
+          style={{ bottom: 28 }}
           role="tablist"
           aria-label="表示切り替え"
         >
