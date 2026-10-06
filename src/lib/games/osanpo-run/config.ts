@@ -20,10 +20,9 @@ export type OsanpoRunStage = {
   /** 犬スキン。季節ステージはそのスキンを持っていると遊べる */
   skin: DogSkinId;
   skinName: string;
-  /** スタート時刻（0時からの分） */
-  clock: number;
   /** このステージで出やすくなる図鑑シリーズ */
   series: string | null;
+  /** 本当の天気が取れないときの、このステージの降りもの（雪国は雪、ほかはときどき雨） */
   weather: "rain" | "snow";
 };
 
@@ -31,40 +30,36 @@ export const OSANPO_RUN_STAGES: Record<OsanpoRunStageId, OsanpoRunStage> = {
   town: {
     id: "town",
     name: "まち",
-    desc: "夕方5時20分、いつもの住宅街。電柱と自販機の並ぶ道を、日が暮れて星が出るまで。",
+    desc: "いつもの住宅街。電柱と自販機の並ぶ道を、のんびり歩こう。",
     skin: "default",
     skinName: "いつものフレブル",
-    clock: 17 * 60 + 20,
     series: null,
     weather: "rain",
   },
   hiking: {
     id: "hiking",
     name: "山道",
-    desc: "夜明け前の山道。朝日が昇るなか山頂を目指す。岩や倒木、低く張り出した枝に気をつけて。",
+    desc: "山頂を目指す山道。岩や倒木、低く張り出した枝に気をつけて。",
     skin: "hiking",
     skinName: "登山のフレブル",
-    clock: 5 * 60 + 40,
     series: "hiking",
     weather: "rain",
   },
   snow: {
     id: "snow",
     name: "雪国",
-    desc: "雪の降る午後の町。雪だるまやソリ、軒先のつららをかわしながら、凍った道を進む。",
+    desc: "雪の積もった町。雪だるまやソリ、軒先のつららをかわしながら、凍った道を進む。",
     skin: "snow",
     skinName: "雪国のフレブル",
-    clock: 15 * 60 + 10,
     series: "snow",
     weather: "snow",
   },
   summer: {
     id: "summer",
     name: "夏まつり",
-    desc: "夏まつりの夕暮れ。屋台と提灯の参道を歩いていくと、夜には花火が上がる。",
+    desc: "夏まつりの参道。屋台と提灯の道を歩こう。夜に来ると花火が上がる。",
     skin: "summer",
     skinName: "夏のフレブル",
-    clock: 18 * 60 + 30,
     series: "summer",
     weather: "rain",
   },

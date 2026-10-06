@@ -193,6 +193,9 @@
 .osr .osr-keys { display: flex; flex-wrap: wrap; gap: 6px 12px; font-size: 13px; color: var(--osr-ink); }
 .osr .osr-keys span { display: inline-flex; align-items: center; gap: 6px; }
 .osr .osr-stage-desc { font-size: 13px !important; line-height: 1.6; min-height: 3.2em; }
+/* いまの本当の時刻・天気（ゲームの空はこれに合わせる） */
+.osr .osr-live-sky { margin: -4px 0 0; font-size: 11px !important; line-height: 1.5; color: #A9C8FF; }
+.osr .osr-live-sky:empty { display: none; }
 .osr .osr-stages { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 6px; }
 .osr .osr-stage-card {
   appearance: none; display: flex; flex-direction: column; align-items: center; gap: 0; padding: 6px 4px 7px; border-radius: 12px;
