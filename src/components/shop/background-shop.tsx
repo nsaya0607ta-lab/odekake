@@ -13,7 +13,7 @@ import { useMemo, useState } from "react";
 import { createPortal } from "react-dom";
 import { AppBackgroundPreview } from "@/components/app-background";
 import { BlueCoinArt } from "@/components/coin-art";
-import type { LiveMode } from "@/components/live-backgrounds/engine";
+import { requestTiltPermission, type LiveMode } from "@/components/live-backgrounds/engine";
 import { setTryOnBackground, useTryOnBackground } from "@/components/live-backgrounds/try-on";
 import { BlueCoinBar } from "@/components/room/room-shop";
 import { HomeLookEditor } from "@/components/shop/home-look-editor";
@@ -220,7 +220,10 @@ function BackgroundDialog({ id, status, blueCoins, onClose, onTry, onBought, onA
   const [touched, setTouched] = useState(false);
   const short = status === "locked" ? bg.price - blueCoins : 0;
   const signals = useMemo(() => variants.find((v) => v.key === variantKey)?.signals ?? {}, [variants, variantKey]);
-  const touchable = bg.tag === "さわれる";
+  const touchable = bg.tag === "さわれる" || bg.tag === "なぞれる" || bg.tag === "かたむける";
+  const traceable = bg.group === "trace" || id === "snow-globe";
+  const tiltable = bg.group === "tilt";
+  const hint = bg.tag === "なぞれる" ? "見本を指でなぞってみてね" : tiltable ? "スマホをかたむけてみてね（タップでも）" : "見本をタップしてみてね";
 
   async function request(method: "POST" | "PATCH") {
     const response = await fetch("/api/app-background", {
@@ -266,7 +269,13 @@ function BackgroundDialog({ id, status, blueCoins, onClose, onTry, onBought, onA
         <div
           className="relative aspect-[4/5] w-full overflow-hidden rounded-[22px] ring-1 ring-[rgba(120,100,70,.14)]"
           data-live-tap={touchable ? "" : undefined}
-          onPointerDown={() => setTouched(true)}
+          // なぞる背景は、見本の上でなぞってもダイアログがスクロールしないようにする
+          style={traceable ? { touchAction: "none" } : undefined}
+          onPointerDown={() => {
+            setTouched(true);
+            // iPhone は、さわった直後にしか「かたむき」の許可を聞けない
+            if (tiltable) void requestTiltPermission();
+          }}
         >
           {/* 大きな見本は、実際の画面と同じ大きさの柄で、動くものは動かして見せる */}
           <Swatch id={id} zoom={1} mode="preview" signals={signals} />
@@ -280,7 +289,7 @@ function BackgroundDialog({ id, status, blueCoins, onClose, onTry, onBought, onA
           ) : null}
           {touchable && !touched ? (
             <span className={`pointer-events-none absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 rounded-full px-3 py-1.5 text-[12px] font-black text-ink shadow-md ${GLASS}`}>
-              見本をタップしてみてね
+              {hint}
             </span>
           ) : null}
           {variants.length ? (
@@ -328,7 +337,10 @@ function BackgroundDialog({ id, status, blueCoins, onClose, onTry, onBought, onA
             <button
               type="button"
               disabled={busy}
-              onClick={onTry}
+              onClick={() => {
+                if (tiltable) void requestTiltPermission();
+                onTry();
+              }}
               className="mt-3 w-full rounded-full border-[1.5px] border-[#2F6FC2] bg-card py-2 text-[13px] font-black text-[#2F6FC2] active:scale-[.98]"
             >
               アプリでためす（買う前に、ホームなどで見られます）
@@ -353,7 +365,10 @@ function BackgroundDialog({ id, status, blueCoins, onClose, onTry, onBought, onA
               <button
                 type="button"
                 disabled={busy}
-                onClick={() => void apply()}
+                onClick={() => {
+                  if (tiltable) void requestTiltPermission();
+                  void apply();
+                }}
                 className={`rounded-full py-2.5 text-sm font-black text-white shadow-md active:scale-[.98] disabled:opacity-60 ${status === "locked" ? "bg-[#2F6FC2]" : "bg-leaf"}`}
               >
                 {busy ? "変えています…" : status === "locked" ? "買って使う" : "この背景にする"}

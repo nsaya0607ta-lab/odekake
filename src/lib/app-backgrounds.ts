@@ -36,17 +36,29 @@ export const APP_BACKGROUND_IDS = [
   "holo",
   "glass",
   "sumi",
+  "balloons",
+  "local-train",
+  "zen-sand",
+  "fireflies",
+  "paint-bloom",
+  "marbles",
+  "snow-globe",
+  "my-map",
+  "my-stars",
 ] as const;
 export type AppBackgroundId = (typeof APP_BACKGROUND_IDS)[number];
 
 export const APP_BACKGROUND_COOKIE = "odekake_app_bg";
 
-/** ショップでの並び（動く／変わる／シンプルアート／柄・風景） */
-export type AppBackgroundGroup = "move" | "change" | "art" | "pattern";
+/** ショップでの並び（動く／なぞる／かたむける／変わる／記録で育つ／シンプルアート／柄・風景） */
+export type AppBackgroundGroup = "move" | "trace" | "tilt" | "change" | "record" | "art" | "pattern";
 
 export const APP_BACKGROUND_GROUPS: readonly { id: AppBackgroundGroup; title: string; note: string }[] = [
   { id: "move", title: "動く背景", note: "ゆっくり動いたり、さわると反応したりします" },
+  { id: "trace", title: "なぞる背景", note: "画面を指でなぞると、そのあとが残ります。スクロールしながらでも描けます" },
+  { id: "tilt", title: "かたむける背景", note: "スマホをかたむけると、中のものが転がったり舞ったりします" },
   { id: "change", title: "変わる背景", note: "時間・天気・歩数・季節で、見た目が変わります" },
+  { id: "record", title: "記録で育つ背景", note: "あなたのおでかけの記録で、絵が育っていきます。行くほど にぎやかに" },
   { id: "art", title: "シンプルアート", note: "シンプルだけど、ひと目でちがう。色と光だけで見せる背景です" },
   { id: "pattern", title: "柄・風景", note: "動かない、落ちついた背景です" },
 ];
@@ -82,11 +94,23 @@ export const APP_BACKGROUNDS: readonly AppBackground[] = [
   { id: "jelly", name: "とろけるゼリー", sub: "ぷるぷる、まざりあう", description: "パステルカラーのゼリーが、ゆっくりくっついたり、はなれたりします。つやつやの光もいっしょに動きます。", price: 4000, group: "move", tag: "動く", live: true },
   { id: "aurora-night", name: "オーロラの夜", sub: "流れ星と町の灯り", description: "夜空にオーロラがゆらめき、ときどき流れ星が走ります。下には小さな町の灯り。ホーム以外の画面では、文字が読みやすいように薄めて表示します。", price: 4000, group: "move", tag: "動く", dark: true, live: true },
   { id: "aurora", name: "パステルオーロラ", sub: "ゆっくり動く", description: "5色のふんわりしたグラデーションが、40秒かけてゆっくり回ります。", price: 4000, group: "move", tag: "動く" },
+  { id: "balloons", name: "ふうせん", sub: "色とりどりに、ふわふわ", description: "色とりどりのふうせんと、わんこの顔のふうせんが、ゆらゆら空へのぼっていきます。ふうせんをタップするとパチンと割れて紙ふぶき。空いているところをタップすると、そこから1つ飛んでいきます。", price: 4000, group: "move", tag: "さわれる", live: true },
+  { id: "local-train", name: "ローカル線", sub: "わんこを乗せて走る電車", description: "山と田んぼのあいだを、わんこたちを乗せた小さな電車がことこと走ります。雲が流れ、ときどき鳥も。画面をタップすると、電車がすぐに来てくれます。", price: 4000, group: "move", tag: "さわれる", live: true },
+  // ---- なぞる背景 ----
+  { id: "zen-sand", name: "枯山水", sub: "指で砂に模様を描く", description: "石と苔のまわりに、砂の波もようが広がる庭。画面をなぞると、熊手でかいたような筋が砂に残り、しばらくすると元の模様にもどります。ときどき紅葉がひらりと落ちてきます。", price: 4000, group: "trace", tag: "なぞれる", live: true },
+  { id: "fireflies", name: "ほたるの川辺", sub: "指に集まる光", description: "夜の川辺を、ほたるがふわふわ光りながら飛びます。画面をなぞると、ほたるが指のまわりに集まってきて、指を離すとまた散っていきます。ホーム以外の画面では、文字が読みやすいように薄めて表示します。", price: 4000, group: "trace", tag: "なぞれる", dark: true, live: true },
+  { id: "paint-bloom", name: "にじむ絵の具", sub: "なぞると水彩がひろがる", description: "画用紙の上を指でなぞると、水彩の絵の具がじわっとにじんで広がります。色はなぞるうちに少しずつ変わり、重なったところは混ざります。ときどき、ぽたっと絵の具のしずくも。", price: 4000, group: "trace", tag: "なぞれる", live: true },
+  // ---- かたむける背景 ----
+  { id: "marbles", name: "ビー玉", sub: "かたむけると転がる", description: "ガラスのビー玉が、スマホをかたむけた方へ転がって、ぶつかり合います。タップすると、そのまわりのビー玉がはじけます。iPhoneでは、はじめに「動きと向き」の許可を聞かれます（許可しなくても、ゆっくり転がります）。", price: 4000, group: "tilt", tag: "かたむける", live: true },
+  { id: "snow-globe", name: "スノードーム", sub: "ふると雪が舞う", description: "雪の町を閉じこめたスノードーム。スマホをかたむけたり、画面をなぞったりすると雪がうずを巻いて舞い上がり、ゆっくり降りつもります。タップでひとふり。", price: 4000, group: "tilt", tag: "かたむける", live: true },
   // ---- 変わる背景 ----
   { id: "weather", name: "おそとの天気", sub: "晴れ・雨・雪がそのまま", description: "いまの天気をそのまま背景にします。晴れなら光がさし、雨なら雨つぶ、雪なら雪が降り、夜は月と星が出ます。場所はマイルームで選んだところ（選んでいなければ東京）です。", price: 4000, group: "change", tag: "天気", live: true },
   { id: "garden", name: "歩いて咲く花畑", sub: "歩くほどお花が咲く", description: "きょう歩いた歩数で、画面のふちのつると花畑が育ちます。500歩ごとにお花がひとつ咲き、5,000歩でちょうちょが来て、10,000歩で満開です。毎日0歩から育ちます。", price: 4000, group: "change", tag: "歩数", live: true },
   { id: "seasons", name: "四季めぐり", sub: "季節で自動で変わる", description: "季節にあわせて、春は桜、夏はほたる、秋は落ち葉、冬は雪が舞います。季節が変わると、背景も自動で変わります。", price: 4000, group: "change", tag: "季節", live: true },
   { id: "sky-clock", name: "時間で変わる空", sub: "朝・昼・夕方・夜", description: "開いている時刻（日本時間）に合わせて、朝・昼・夕方・夜の空に自動で切り替わります。夜は星が出ます。", price: 4000, group: "change", tag: "時間帯" },
+  // ---- 記録で育つ背景 ----
+  { id: "my-map", name: "あなたの日本地図", sub: "行った県が色づく", description: "あなたが行った都道府県が、水彩の色で日本地図に色づきます。たくさん行った県ほど濃く、行った市区町村には小さな点がつきます。記録を増やすと、背景も育っていきます。", price: 5000, group: "record", tag: "記録", live: true },
+  { id: "my-stars", name: "おでかけ星図", sub: "行った町が星になる", description: "夜空に日本の形の星くずが広がり、あなたが行った市区町村が明るい星になります。同じ県の星どうしは線でつながって、あなただけの星座に。ときどき流れ星も。ホーム以外の画面では、文字が読みやすいように薄めて表示します。", price: 5000, group: "record", tag: "記録", dark: true, live: true },
   // ---- シンプルアート ----
   { id: "mesh", name: "グラデーションメッシュ", sub: "色がゆっくり溶け合う", description: "ピンク・水色・ミント・杏・ラベンダーのやわらかい色のかたまりが、ゆっくり回りながら溶け合います。", price: 3000, group: "art", tag: "動く" },
   { id: "holo", name: "ホログラム", sub: "虹色の箔に光が流れる", description: "パステルの虹色の箔が少しずつ動き、ときどき光の筋がすーっと流れます。小さなきらめきつき。", price: 3000, group: "art", tag: "動く" },
@@ -148,7 +172,11 @@ export type BackgroundSignals = {
   /** きょうの歩数。わからないときは null */
   steps?: number | null;
   season?: Season;
+  /** 記録で育つ背景の記録。mine は自分の記録、それ以外はショップの見本 */
+  records?: RecordsKind;
 };
+
+export type RecordsKind = "mine" | "few" | "some" | "all";
 
 /** ホーム以外で薄めて表示するか（暗い背景のときだけ） */
 export function isDarkBackground(id: AppBackgroundId, signals: BackgroundSignals): boolean {
@@ -184,6 +212,18 @@ export const BACKGROUND_VARIANTS: Partial<Record<AppBackgroundId, readonly Backg
     { key: "6000", label: "6,000歩", signals: { steps: 6000 } },
     { key: "10000", label: "10,000歩", signals: { steps: 10000 } },
   ],
+  "my-map": [
+    { key: "mine", label: "あなた", signals: { records: "mine" } },
+    { key: "few", label: "5県", signals: { records: "few" } },
+    { key: "some", label: "21県", signals: { records: "some" } },
+    { key: "all", label: "全国", signals: { records: "all" } },
+  ],
+  "my-stars": [
+    { key: "mine", label: "あなた", signals: { records: "mine" } },
+    { key: "few", label: "5県", signals: { records: "few" } },
+    { key: "some", label: "21県", signals: { records: "some" } },
+    { key: "all", label: "全国", signals: { records: "all" } },
+  ],
   seasons: [
     { key: "spring", label: "春", signals: { season: "spring" } },
     { key: "summer", label: "夏", signals: { season: "summer" } },
@@ -198,6 +238,8 @@ export const POSTER_VARIANTS: Partial<Record<AppBackgroundId, readonly string[]>
   weather: ["clear", "rain", "snow", "night"],
   seasons: ["spring", "summer", "autumn", "winter"],
   garden: ["10000"],
+  "my-map": ["some"],
+  "my-stars": ["some"],
 };
 
 /** 大きな見本を開いたときに、最初に見せる切りかえ（いまの時間帯・季節に近いもの） */
@@ -206,5 +248,6 @@ export function defaultVariantKey(id: AppBackgroundId, now: Date): string | null
   if (id === "seasons") return seasonOf(now);
   if (id === "weather") return skyTimeOf(now) === "night" ? "night" : "clear";
   if (id === "garden") return "6000";
+  if (id === "my-map" || id === "my-stars") return "mine";
   return null;
 }

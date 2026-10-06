@@ -391,3 +391,46 @@ html[data-gaze-settle] .app-bottom-nav {
     transform 0.42s cubic-bezier(0.22, 0.8, 0.3, 1),
     opacity 0.42s ease !important;
 }
+
+/* ---- 新しい背景（ふうせん・ローカル線・なぞる・かたむける・記録で育つ）の下地 ---- */
+.app-bg[data-bg="balloons"] {
+  background:
+    radial-gradient(70% 30% at 20% 0%, rgba(255, 246, 220, 0.9), transparent 70%),
+    linear-gradient(180deg, #9fd0f2 0%, #c6e3f5 50%, #f6eadb 100%);
+}
+.app-bg[data-bg="local-train"] {
+  background: linear-gradient(180deg, #a6d3f0 0%, #d4ebf5 45%, #eef3e4 70%, #c7df98 100%);
+}
+.app-bg[data-bg="zen-sand"] {
+  background-color: #ebe2cd;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='220' height='220'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 .45  0 0 0 0 .38  0 0 0 0 .26  0 0 0 .22 0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+}
+.app-bg[data-bg="fireflies"] {
+  background: linear-gradient(180deg, #0a1428 0%, #12243c 50%, #0f2033 72%, #0a1624 100%);
+}
+.app-bg[data-bg="paint-bloom"] {
+  background-color: #fcf9f2;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='220' height='220'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.75' numOctaves='3' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 .5  0 0 0 0 .45  0 0 0 0 .38  0 0 0 .13 0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+}
+.app-bg[data-bg="marbles"] {
+  background-color: #efe3cf;
+  background-image:
+    radial-gradient(120% 80% at 50% 30%, rgba(255, 250, 238, 0.7), transparent 70%),
+    repeating-linear-gradient(90deg, rgba(160, 120, 70, 0.05) 0 2px, transparent 2px 7px),
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='220' height='220'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.02 .4' numOctaves='3' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 .55  0 0 0 0 .4  0 0 0 0 .25  0 0 0 .16 0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+}
+.app-bg[data-bg="snow-globe"] {
+  background: radial-gradient(90% 60% at 50% 30%, #eef4fc 0%, transparent 70%), linear-gradient(180deg, #b8cbe8 0%, #d6e2f4 55%, #eef3fa 100%);
+}
+.app-bg[data-bg="my-map"] {
+  background-color: #faf5ea;
+  background-image:
+    radial-gradient(120% 80% at 50% 45%, transparent 60%, rgba(190, 160, 110, 0.18)),
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='220' height='220'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 .42  0 0 0 0 .36  0 0 0 0 .27  0 0 0 .12 0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+}
+.app-bg[data-bg="my-stars"] {
+  background:
+    radial-gradient(60% 40% at 70% 30%, rgba(90, 80, 170, 0.35), transparent 70%),
+    radial-gradient(50% 35% at 20% 70%, rgba(40, 90, 150, 0.3), transparent 70%),
+    linear-gradient(180deg, #060a1f 0%, #0d1638 60%, #151c45 100%);
+}

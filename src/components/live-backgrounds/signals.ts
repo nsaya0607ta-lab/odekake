@@ -112,6 +112,7 @@ export function useBackgroundSignals(id: AppBackgroundId): BackgroundSignals {
     if (id === "weather") return { weather };
     if (id === "garden") return { steps };
     if (id === "seasons") return { season };
+    if (id === "my-map" || id === "my-stars") return { records: "mine" };
     return {};
   }, [id, skyTime, weather, steps, season]);
 }
