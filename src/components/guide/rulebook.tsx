@@ -2,7 +2,7 @@
 
 import Image from "next/image";
 import Link from "next/link";
-import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import type { GachaRarity } from "@/lib/gacha/config";
 import { LEVEL_REWARDS, getTotalExpForLevel } from "@/lib/exp";
 import { CapsuleArt } from "@/components/gacha/capsule-art";
@@ -26,13 +26,13 @@ import {
 import styles from "./rulebook.module.css";
 
 const TABS = [
-  { id: "start", label: "はじめに", emoji: "📖" },
-  { id: "record", label: "記録・地図", emoji: "🗾" },
-  { id: "level", label: "レベル・コイン", emoji: "⭐" },
-  { id: "gacha", label: "ガチャ・図鑑", emoji: "🎁" },
-  { id: "games", label: "ミニゲーム", emoji: "🎮" },
-  { id: "room", label: "おへや・ショップ", emoji: "🏠" },
-  { id: "home", label: "ホーム", emoji: "🐶" },
+  { id: "start", label: "はじめに", art: "/splash/balloon.webp" },
+  { id: "record", label: "記録・地図", art: "/icons/navigation/map.webp" },
+  { id: "level", label: "レベル・コイン", art: "coin" },
+  { id: "gacha", label: "ガチャ・図鑑", art: "/gacha/art/capsule-SSR-s.webp" },
+  { id: "games", label: "ミニゲーム", art: "/splash/game-item-catch.webp" },
+  { id: "room", label: "おへや・ショップ", art: "/splash/house.webp" },
+  { id: "home", label: "ホーム", art: "/splash/items/frenchie-plush.webp" },
 ] as const;
 type TabId = (typeof TABS)[number]["id"];
 
@@ -57,13 +57,24 @@ export function Rulebook() {
   const choose = useCallback((next: TabId) => {
     setTab(next);
     window.history.replaceState(null, "", `#${next}`);
-    window.scrollTo({ top: 0, behavior: "smooth" });
   }, []);
 
-  // 選んだタブを、タブの列のまん中へ
+  // 章を切りかえたら、新しい章はいちばん上から読みはじめる（前の章の位置を引きつがない）
+  const firstRender = useRef(true);
+  useLayoutEffect(() => {
+    if (firstRender.current) {
+      firstRender.current = false;
+      return;
+    }
+    window.scrollTo({ top: 0, left: 0, behavior: "instant" });
+  }, [tab]);
+
+  // 選んだタブを、タブの列のまん中へ（横だけ動かす。scrollIntoView は縦にも動いてしまう）
   useEffect(() => {
-    const active = tabsRef.current?.querySelector<HTMLElement>(`[data-tab="${tab}"]`);
-    active?.scrollIntoView({ inline: "center", block: "nearest", behavior: "smooth" });
+    const row = tabsRef.current;
+    const active = row?.querySelector<HTMLElement>(`[data-tab="${tab}"]`);
+    if (!row || !active) return;
+    row.scrollTo({ left: active.offsetLeft - (row.clientWidth - active.offsetWidth) / 2, behavior: "smooth" });
   }, [tab]);
 
   const index = TABS.findIndex((item) => item.id === tab);
@@ -83,8 +94,8 @@ export function Rulebook() {
             className={styles.tab}
             onClick={() => choose(item.id)}
           >
-            <span aria-hidden="true">{item.emoji}</span>
-            {item.label}
+            <span className={styles.tabArt} aria-hidden="true"><ChapterArt art={item.art} /></span>
+            <span className={styles.tabLabel}>{item.label}</span>
           </button>
         ))}
       </div>
@@ -116,6 +127,12 @@ export function Rulebook() {
 }
 
 /* ------------------------------------------------------------------ 部品 */
+
+/** 章・しくみの図に使う小さな絵（"coin" はコインの絵、それ以外は画像のパス） */
+function ChapterArt({ art }: { art: string }) {
+  if (art === "coin") return <CoinArt className="h-full w-full" />;
+  return <Image src={art} alt="" width={64} height={64} />;
+}
 
 function Section({ title, kicker, children }: { title: string; kicker?: string; children: ReactNode }) {
   return (
@@ -241,11 +258,11 @@ const NAV = [
 ] as const;
 
 const LOOP = [
-  { label: "おでかけ", sub: "記録する", emoji: "🚶" },
-  { label: "コイン", sub: "たまる", emoji: "🪙" },
-  { label: "ガチャ", sub: "回す", emoji: "🎁" },
-  { label: "図鑑", sub: "スキルが育つ", emoji: "📕" },
-  { label: "ゲーム", sub: "高得点", emoji: "🎮" },
+  { label: "おでかけ", sub: "記録する", art: "/splash/balloon.webp" },
+  { label: "コイン", sub: "たまる", art: "coin" },
+  { label: "ガチャ", sub: "回す", art: "/splash/gacha-machine.webp" },
+  { label: "図鑑", sub: "スキルが育つ", art: "/splash/items/rainbow-ball.webp" },
+  { label: "ゲーム", sub: "高得点", art: "/splash/game-bowling.webp" },
 ] as const;
 
 function StartChapter({ onGo }: { onGo: (tab: TabId) => void }) {
@@ -269,14 +286,11 @@ function StartChapter({ onGo }: { onGo: (tab: TabId) => void }) {
         <div className={styles.loop}>
           {LOOP.map((item, i) => (
             <div key={item.label} className={styles.loopNode} data-active={i === step}>
-              <span className={styles.loopEmoji}>{item.emoji}</span>
+              <span className={styles.loopArt} aria-hidden="true"><ChapterArt art={item.art} /></span>
               <b>{item.label}</b>
               <small>{item.sub}</small>
             </div>
           ))}
-          <svg className={styles.loopRing} viewBox="0 0 100 100" aria-hidden="true">
-            <circle cx="50" cy="50" r="38" />
-          </svg>
         </div>
         <p className={styles.body}>
           場所を記録したり歩いたりすると <b>EXP</b> と <b>コイン</b> がたまります。コインでガチャを回して <b>図鑑</b> を集めると、
@@ -322,7 +336,7 @@ function StartChapter({ onGo }: { onGo: (tab: TabId) => void }) {
         <div className={styles.toc}>
           {TABS.slice(1).map((item) => (
             <button key={item.id} type="button" onClick={() => onGo(item.id)}>
-              <span aria-hidden="true">{item.emoji}</span>
+              <span className={styles.tocArt} aria-hidden="true"><ChapterArt art={item.art} /></span>
               {item.label}
             </button>
           ))}
