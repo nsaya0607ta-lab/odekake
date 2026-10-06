@@ -141,24 +141,21 @@
   animation: rainbowShow 6s ease both;
 }
 
+/* 雲（public/splash/cloud-*.webp。描いてもらった絵を切り抜いたもの） */
 .cloud {
   position: absolute;
   left: 0;
-  width: 70px;
-  height: 22px;
-  border-radius: 999px;
-  color: #fff;
-  background: currentColor;
-  box-shadow: 18px -11px 0 5px currentColor, 42px -2px 0 2px currentColor;
-  opacity: 0.92;
+  background: center / contain no-repeat;
+  opacity: 0.95;
   animation: cloudDrift linear infinite;
-  transition: color 1s ease, opacity 1s ease;
+  transition: opacity 1s ease, filter 1s ease;
 }
-.cloud1 { top: 4.5%; animation-duration: 64s; animation-delay: -18s; }
-.cloud2 { top: 36%; animation-duration: 88s; animation-delay: -52s; scale: 0.8; opacity: 0.8; }
-.cloud3 { top: 45%; animation-duration: 110s; animation-delay: -80s; scale: 1.2; opacity: 0.75; }
-.root[data-phase="night"] .cloud { opacity: 0.1; }
-.root[data-weather="rain"] .cloud { color: #c3c9d6; opacity: 0.95; }
+.cloud1 { top: 3.5%; width: clamp(84px, 27vw, 132px); aspect-ratio: 260 / 135; background-image: url("/splash/cloud-1.webp"); animation-duration: 64s; animation-delay: -18s; }
+.cloud2 { top: 35%; width: clamp(66px, 21vw, 104px); aspect-ratio: 260 / 173; background-image: url("/splash/cloud-2.webp"); animation-duration: 88s; animation-delay: -52s; opacity: 0.85; }
+.cloud3 { top: 44%; width: clamp(96px, 31vw, 150px); aspect-ratio: 260 / 138; background-image: url("/splash/cloud-3.webp"); animation-duration: 110s; animation-delay: -80s; opacity: 0.8; }
+.root[data-phase="evening"] .cloud { filter: sepia(0.25) saturate(1.3) hue-rotate(-12deg); }
+.root[data-phase="night"] .cloud { opacity: 0.16; filter: brightness(0.6) saturate(0.6); }
+.root[data-weather="rain"] .cloud { opacity: 0.95; filter: grayscale(0.65) brightness(0.84); }
 
 /* ------------------------------------------------------------ 舞台（スマホの幅にそろえる） */
 .stage {
@@ -578,8 +575,8 @@
 .backTree {
   position: absolute;
   z-index: 11;
-  top: 46.8%;
-  left: 87%;
+  bottom: 43.7%;
+  left: 66.5%;
   width: clamp(22px, 6.4vw, 32px);
   height: auto;
   pointer-events: none;
@@ -614,7 +611,8 @@
 .house {
   position: absolute;
   z-index: 11;
-  top: 49.6%;
+  /* 丘の稜線（この横位置で下から約 44%）に少しめりこませて、地面に建っているように */
+  bottom: 42.9%;
   left: 73%;
   width: clamp(46px, 13.5vw, 64px);
   padding: 0;
@@ -623,7 +621,17 @@
   animation: popUp 0.6s 1.05s cubic-bezier(0.3, 1.5, 0.5, 1) both;
 }
 .houseBody { position: relative; display: block; transform-origin: 50% 100%; }
-.houseBody img { display: block; width: 100%; height: auto; filter: drop-shadow(0 3px 3px rgba(60, 40, 20, 0.2)); }
+.houseBody img { position: relative; display: block; width: 100%; height: auto; filter: drop-shadow(0 2px 2px rgba(60, 40, 20, 0.2)); }
+/* 家の足もとの影（地面に置いてある感じ） */
+.houseShadow {
+  position: absolute;
+  left: -6%;
+  right: -6%;
+  bottom: -5%;
+  height: 16%;
+  border-radius: 50%;
+  background: radial-gradient(closest-side, rgba(70, 90, 40, 0.38), transparent);
+}
 /* 窓の明かり。位置は public/splash/house.webp の窓ガラス（幅の 18.3〜31.0% / 69.3〜82.0%、高さの 64.2〜77.8%） */
 .houseWindow {
   position: absolute;
@@ -658,8 +666,8 @@
   opacity: 0;
 }
 .houseLit .smoke { animation: smoke 1.8s ease-out both; }
-.houseLit .smoke:nth-of-type(4) { animation-delay: 0.3s; }
-.houseLit .smoke:nth-of-type(5) { animation-delay: 0.6s; }
+.houseLit .smoke:nth-of-type(5) { animation-delay: 0.3s; }
+.houseLit .smoke:nth-of-type(6) { animation-delay: 0.6s; }
 
 /* ------------------------------------------------------------ 写真（ポラロイド） */
 .bunting {

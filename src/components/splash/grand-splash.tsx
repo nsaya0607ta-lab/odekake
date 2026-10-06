@@ -695,6 +695,7 @@ export function GrandSplash({ onFinish }: { onFinish: () => void }) {
         {/* ---------- マイルーム（遠くの小さな家）：タップで明かりがつき、えんとつから煙 ---------- */}
         <button type="button" className={`${styles.house} ${house ? styles.houseLit : ""}`} onClick={onHouse} aria-label="マイルーム">
           <span key={house} className={`${styles.houseBody} ${house ? styles.houseBump : ""}`} aria-hidden="true">
+            <i className={styles.houseShadow} />
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img src="/splash/house.webp" alt="" draggable={false} />
             {/* 窓の明かり（夜と、タップしたとき） */}
@@ -706,7 +707,7 @@ export function GrandSplash({ onFinish }: { onFinish: () => void }) {
             <i className={styles.smoke} />
           </span>
         </button>
-        {/* 家のとなりの、遠くの木 */}
+        {/* 家のとなり（左）の、遠くの木 */}
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img className={styles.backTree} src="/splash/tree-b.webp" alt="" aria-hidden="true" draggable={false} />
 
