@@ -23,7 +23,7 @@ import { restWeightsOf } from "@/lib/home-weather";
  *
  * 用事：ふだんは気ままに歩き回るが、用事が入るとそれを先に片づける。
  * - 歩数の書き換え（steps-tag.tsx から home-dog-bus.ts 経由）：看板の前まで歩き、魔法のペンを出して書く
- * - 空から降ってきたコイン：走って拾いに行く（タップでも拾える）。1回 5 枚（/api/coins/home-drop）
+ * - 空から降ってきたコイン：走って拾いに行く（タップでも拾える）。ふつう 5・中レア 20・高レア 100 枚（/api/coins/home-drop）
  */
 
 /**
@@ -236,10 +236,24 @@ const WRITE_MS = 1300;
 const COIN_TICK_MS = 5000;
 const COIN_CHANCE = 0.2;
 const COIN_BLUE_CHANCE = 0.5;
+/**
+ * レア度。降ったコインのうち、ふつう 85%・中レア 12%・高レア 3%。もらえる枚数は黄色も青も同じで、
+ * ふつう 5・中レア 20・高レア 100（枚数は DB が決める。ここは見た目と抽選だけ）。
+ * 中レアはひとまわり大きく光の粒が回る。高レアは大きく、虹の輪と光の柱といっしょにゆっくり降りてくる。
+ */
+type CoinTier = "common" | "rare" | "epic";
+const COIN_TIERS: Record<CoinTier, { chance: number; amount: number; size: number; fallMs: number }> = {
+  common: { chance: 0.85, amount: 5, size: 1, fallMs: 1050 },
+  rare: { chance: 0.12, amount: 20, size: 1.3, fallMs: 1250 },
+  epic: { chance: 0.03, amount: 100, size: 1.75, fallMs: 1900 },
+};
+const pickCoinTier = (): CoinTier => {
+  const r = Math.random();
+  return r < COIN_TIERS.epic.chance ? "epic" : r < COIN_TIERS.epic.chance + COIN_TIERS.rare.chance ? "rare" : "common";
+};
 const COIN_MAX_ON_GROUND = 3;
 /** コインの大きさ（カード幅に対する％。手前のとき） */
 const COIN_WIDTH = 6.4;
-const COIN_FALL_MS = 1050;
 const PEN_SRC = "/home-magic-pen.webp";
 
 /**
@@ -283,6 +297,7 @@ type Walker = {
 type Coin = {
   id: string;
   kind: "coin" | "blue";
+  tier: CoinTier;
   x: number;
   depth: number;
   /** 空から足もとまで落ちる距離（px） */
@@ -363,10 +378,10 @@ export function WanderingFrenchie({
       void fetch("/api/coins/home-drop", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ dropId: id, kind: coin.kind }),
+        body: JSON.stringify({ dropId: id, kind: coin.kind, tier: coin.tier }),
       })
         .then((response) => (response.ok ? response.json() : null))
-        .then((body: { granted?: boolean; kind?: "coin" | "blue"; amount?: number; reason?: string | null } | null) => {
+        .then((body: { granted?: boolean; kind?: "coin" | "blue"; tier?: CoinTier; amount?: number; reason?: string | null } | null) => {
           if (!body) return finish();
           if (body.reason === "too_soon" && tries < 3) {
             setTimeout(() => claim(tries + 1), 8500);
@@ -498,9 +513,9 @@ export function WanderingFrenchie({
       if (!coin || coin.state === "taken") return;
       // コインのとなりで止まって、鼻先で拾う（近づいてきた側に立つ）
       const from = walkerRef.current;
-      const reach = 6 * depthScale(coin.depth);
+      const reach = (6 + (COIN_TIERS[coin.tier].size - 1) * 3) * depthScale(coin.depth);
       const x = Math.min(92, Math.max(10, from.x < coin.x ? coin.x - reach : coin.x + reach));
-      if (!(await walkTo(t, x, coin.depth, 1.9))) return;
+      if (!(await walkTo(t, x, coin.depth, coin.tier === "common" ? 1.9 : 2.3))) return;
       const still = coinsRef.current.find((c) => c.id === id);
       if (!still || still.state === "taken") return;
       // コインのほうを向く
@@ -512,8 +527,9 @@ export function WanderingFrenchie({
       set({ ...walkerRef.current, pose: "sniff", walking: false, travelMs: 0 });
       await sleep(450);
       collectRef.current(id);
+      // 高レアは大よろこびで少し長めに
       set({ ...walkerRef.current, pose: "happy" });
-      await sleep(1000);
+      await sleep(coin.tier === "epic" ? 1800 : coin.tier === "rare" ? 1300 : 1000);
     };
 
     const runNext = async () => {
@@ -542,7 +558,13 @@ export function WanderingFrenchie({
       return true;
     });
     enqueueCoinRef.current = (id) => {
-      tasks.push({ kind: "coin", id });
+      // レアなコインは、ふつうのコインより先に拾いに行く（歩数を書く用事のあと）
+      const tier = coinsRef.current.find((c) => c.id === id)?.tier ?? "common";
+      if (tier === "common") tasks.push({ kind: "coin", id });
+      else {
+        const at = tasks.findIndex((task) => task.kind === "coin" && coinsRef.current.find((c) => c.id === task.id)?.tier === "common");
+        tasks.splice(at < 0 ? tasks.length : at, 0, { kind: "coin", id });
+      }
       void runNext();
     };
 
@@ -567,9 +589,11 @@ export function WanderingFrenchie({
       const box = boxRef.current;
       if (!box) return;
       const depth = Math.random();
+      const tier = pickCoinTier();
       const coin: Coin = {
         id: crypto.randomUUID().replace(/-/g, ""),
         kind: Math.random() < COIN_BLUE_CHANCE ? "blue" : "coin",
+        tier,
         x: rand(30, 90),
         depth,
         fallPx: box.clientHeight * (1 - depthBottom(depth) / 100) + 24,
@@ -580,7 +604,7 @@ export function WanderingFrenchie({
       setTimeout(() => {
         setCoins((list) => list.map((c) => (c.id === coin.id && c.state === "falling" ? { ...c, state: "ground" } : c)));
         enqueueCoinRef.current(coin.id);
-      }, COIN_FALL_MS);
+      }, COIN_TIERS[tier].fallMs);
     }, COIN_TICK_MS);
     return () => clearInterval(id);
   }, []);
@@ -1021,10 +1045,41 @@ export function WanderingFrenchie({
           0%, 100% { opacity: 0; transform: scale(0.4) rotate(0deg); }
           50%      { opacity: 1; transform: scale(1) rotate(45deg); }
         }
-        .home-coin-fall { animation: home-coin-fall ${COIN_FALL_MS}ms both; }
+        .home-coin-fall { animation: home-coin-fall var(--fall-ms) both; }
         .home-coin-spin { animation: home-coin-spin 900ms linear infinite; }
         .home-coin-ground .home-coin-spin { animation-duration: 2400ms; }
-        .home-coin-shadow { animation: home-coin-shadow ${COIN_FALL_MS}ms both; }
+        .home-coin-shadow { animation: home-coin-shadow var(--fall-ms) both; }
+        /* 中レア：まわりを光の粒が回る */
+        @keyframes home-coin-orbit { to { transform: rotate(360deg); } }
+        .home-coin-orbit { animation: home-coin-orbit 1800ms linear infinite; }
+        /* 高レア：うしろで虹の輪がゆっくり回り、空から光の柱がさす */
+        @keyframes home-coin-halo {
+          0%   { transform: rotate(0deg) scale(1);    opacity: .85; }
+          50%  { transform: rotate(180deg) scale(1.12); opacity: 1; }
+          100% { transform: rotate(360deg) scale(1);  opacity: .85; }
+        }
+        .home-coin-halo {
+          background: conic-gradient(from 0deg, #ff8fb1, #ffd36e, #a6f08a, #7fd3ff, #b79bff, #ff8fb1);
+          -webkit-mask: radial-gradient(circle, transparent 52%, #000 56%, #000 63%, transparent 68%);
+          mask: radial-gradient(circle, transparent 52%, #000 56%, #000 63%, transparent 68%);
+          filter: blur(0.6px);
+          animation: home-coin-halo 2600ms linear infinite;
+        }
+        @keyframes home-coin-pillar {
+          0%   { opacity: 0; transform: scaleX(0.4); }
+          20%  { opacity: 1; transform: scaleX(1); }
+          100% { opacity: .55; transform: scaleX(0.9); }
+        }
+        .home-coin-pillar { transform-origin: 50% 100%; animation: home-coin-pillar var(--fall-ms) ease-out both; }
+        .home-coin-ground .home-coin-pillar { animation: home-coin-pillar-fade 1600ms ease-out both; }
+        @keyframes home-coin-pillar-fade { from { opacity: .55; } to { opacity: 0; } }
+        /* 拾ったときの紙ふぶき（中レアは少し、高レアはたくさん） */
+        @keyframes home-coin-burst {
+          0%   { transform: translate(-50%, -50%) translate(0, 0) rotate(0deg) scale(.4); opacity: 1; }
+          70%  { opacity: 1; }
+          100% { transform: translate(-50%, -50%) translate(var(--bx), var(--by)) rotate(var(--r)) scale(1); opacity: 0; }
+        }
+        .home-coin-burst { animation: home-coin-burst 1000ms cubic-bezier(.15,.75,.3,1) both; box-shadow: 0 0 2px rgba(255,255,255,.9); }
         .home-coin-take { animation: home-coin-take 620ms cubic-bezier(0.3, 0.8, 0.4, 1) both; }
         .home-coin-label { animation: home-coin-label 1500ms ease-out both; }
         .home-coin-glint { animation: home-coin-glint 1400ms ease-in-out infinite; }
@@ -1041,7 +1096,9 @@ export function WanderingFrenchie({
       {/* 空から降ってきたコイン（奥行きで大きさと前後が決まる） */}
       {coins.map((coin) => {
         const scale = depthScale(coin.depth);
+        const tier = COIN_TIERS[coin.tier];
         const Art = coin.kind === "blue" ? BlueCoinArt : CoinArt;
+        const blue = coin.kind === "blue";
         return (
           <div
             key={coin.id}
@@ -1049,11 +1106,28 @@ export function WanderingFrenchie({
             style={{
               left: `${coin.x}%`,
               bottom: `${depthBottom(coin.depth)}%`,
-              width: `${COIN_WIDTH * scale}%`,
+              width: `${COIN_WIDTH * tier.size * scale}%`,
               transform: "translateX(-50%)",
               zIndex: zOf(coin.depth) + 2,
+              ["--fall-ms" as string]: `${tier.fallMs}ms`,
             }}
           >
+            {/* 高レア：空から光の柱 */}
+            {coin.tier === "epic" && coin.state !== "taken" ? (
+              <span
+                className={`home-coin-pillar pointer-events-none absolute left-1/2 block ${coin.state === "ground" ? "home-coin-ground" : ""}`}
+                style={{
+                  bottom: "40%",
+                  width: "120%",
+                  height: `${coin.fallPx}px`,
+                  marginLeft: "-60%",
+                  background: blue
+                    ? "linear-gradient(to top, rgba(150,205,255,.75), rgba(150,205,255,0))"
+                    : "linear-gradient(to top, rgba(255,232,150,.8), rgba(255,232,150,0))",
+                  filter: "blur(2px)",
+                }}
+              />
+            ) : null}
             {/* 足もとの影 */}
             <span
               className={`absolute left-1/2 block rounded-[50%] bg-[rgba(70,60,30,.28)] ${coin.state === "taken" ? "opacity-0 transition-opacity duration-300" : "home-coin-shadow"}`}
@@ -1061,25 +1135,85 @@ export function WanderingFrenchie({
             />
             <button
               type="button"
-              aria-label={coin.kind === "blue" ? "青コインを拾う" : "コインを拾う"}
+              aria-label={`${coin.tier === "epic" ? "おおばん" : coin.tier === "rare" ? "きらきら" : ""}${blue ? "青コイン" : "コイン"}を拾う`}
               disabled={coin.state === "taken"}
               onClick={() => collectRef.current(coin.id)}
               className={`pointer-events-auto relative block w-full ${coin.state === "falling" ? "home-coin-fall" : coin.state === "ground" ? "home-coin-ground" : "home-coin-take"}`}
               style={{ ["--fall" as string]: `${coin.fallPx}px`, aspectRatio: "1", touchAction: "manipulation" }}
             >
-              <span className="home-coin-spin block h-full w-full" style={{ filter: coin.kind === "blue" ? "drop-shadow(0 0 3px rgba(90,160,255,.8))" : "drop-shadow(0 0 2px rgba(255,210,90,.7))" }}>
+              {/* 高レア：うしろで回る虹の輪 */}
+              {coin.tier === "epic" ? <span className="home-coin-halo pointer-events-none absolute -inset-[24%] block rounded-full" /> : null}
+              <span
+                className="home-coin-spin relative block h-full w-full"
+                style={{
+                  filter:
+                    coin.tier === "epic"
+                      ? `drop-shadow(0 0 5px ${blue ? "rgba(110,180,255,.95)" : "rgba(255,215,110,.95)"}) brightness(1.08)`
+                      : blue
+                        ? "drop-shadow(0 0 3px rgba(90,160,255,.8))"
+                        : "drop-shadow(0 0 2px rgba(255,210,90,.7))",
+                }}
+              >
                 <Art className="h-full w-full" />
               </span>
+              {/* 中レア・高レア：まわりを回る光の粒 */}
+              {coin.tier !== "common" ? (
+                <span className="home-coin-orbit pointer-events-none absolute -inset-[30%] block" aria-hidden="true">
+                  {[0, 120, 240].map((deg) => (
+                    <span
+                      key={deg}
+                      className="absolute left-1/2 top-0 block h-[18%] w-[18%] rounded-full"
+                      style={{
+                        transform: `rotate(${deg}deg)`,
+                        transformOrigin: "50% 280%",
+                        marginLeft: "-9%",
+                        background: `radial-gradient(circle, #fff 0 30%, ${blue ? "#9fd0ff" : "#ffe08a"} 55%, transparent 72%)`,
+                      }}
+                    />
+                  ))}
+                </span>
+              ) : null}
               <span className="home-coin-glint absolute -right-[18%] -top-[18%] block h-[46%] w-[46%] text-white" aria-hidden="true">
                 <svg viewBox="0 0 10 10" className="h-full w-full"><path d="M5 0 6 4 10 5 6 6 5 10 4 6 0 5 4 4Z" fill="currentColor" /></svg>
               </span>
             </button>
+            {/* 拾ったときの紙ふぶき（中レア・高レア） */}
+            {coin.state === "taken" && coin.tier !== "common"
+              ? Array.from({ length: coin.tier === "epic" ? 16 : 7 }, (_, i) => {
+                  const count = coin.tier === "epic" ? 16 : 7;
+                  // 毎回同じ形にならないよう、向き・飛ぶ距離・大きさを少しずつずらす（id から決めるので描き直しても変わらない）
+                  const jitter = ((coin.id.charCodeAt(i % coin.id.length) * (i + 3)) % 100) / 100;
+                  const angle = (i / count) * Math.PI * 2 + jitter * 0.6;
+                  const dist = (coin.tier === "epic" ? 330 : 210) * (0.55 + jitter * 0.45);
+                  const size = 0.7 + jitter * 0.6;
+                  return (
+                    <span
+                      key={i}
+                      className="home-coin-burst pointer-events-none absolute left-1/2 top-1/2 block rounded-[2px]"
+                      style={{
+                        width: `${12 * size}%`,
+                        height: `${20 * size}%`,
+                        background: ["#ff8fb1", "#ffd36e", "#8fd98a", "#7fc8ff", "#b79bff"][i % 5],
+                        animationDelay: `${Math.round(jitter * 90)}ms`,
+                        ["--bx" as string]: `${Math.cos(angle) * dist}%`,
+                        ["--by" as string]: `${Math.sin(angle) * dist * 0.7 - 120}%`,
+                        ["--r" as string]: `${(i % 2 ? 1 : -1) * (180 + jitter * 300)}deg`,
+                      }}
+                    />
+                  );
+                })
+              : null}
             {coin.label ? (
               <span
                 className="home-coin-label pointer-events-none absolute bottom-full left-1/2 whitespace-nowrap rounded-full px-1.5 py-0.5 font-black leading-none text-white"
                 style={{
-                  fontSize: "clamp(8px, 2.6vw, 12px)",
-                  background: coin.kind === "blue" ? "rgba(46,110,200,.9)" : "rgba(214,150,40,.92)",
+                  fontSize: coin.tier === "epic" ? "clamp(10px, 3.4vw, 15px)" : coin.tier === "rare" ? "clamp(9px, 3vw, 13px)" : "clamp(8px, 2.6vw, 12px)",
+                  background:
+                    coin.tier === "epic"
+                      ? "linear-gradient(90deg, #ff7aa8, #ffb84d, #5fc8ff, #9b7bff)"
+                      : blue
+                        ? "rgba(46,110,200,.9)"
+                        : "rgba(214,150,40,.92)",
                   boxShadow: "0 2px 6px rgba(60,40,10,.25)",
                 }}
               >
