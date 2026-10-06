@@ -8,6 +8,7 @@ import { formatCoins } from "@/lib/coins";
 import { DAMBOURLE_PLANS, type DambourlePlanId } from "@/lib/dambourle/config";
 import { DambourleMachineArt, SparkleArt } from "./coin-art";
 import { GachaResultModal } from "./gacha-section";
+import { warmGachaArt } from "./gacha/art";
 import { primeGachaAudio } from "./gacha/audio";
 import type { AnimationDraw, DrawResult } from "./gacha/types";
 import { IconCoin } from "./icons";
@@ -45,6 +46,7 @@ export function DambourleGachaSection({ balance }: { balance: number }) {
     async (planId: DambourlePlanId) => {
       if (inFlight.current) return;
       primeGachaAudio();
+      warmGachaArt();
       inFlight.current = true;
       setPending(planId);
       setError(null);

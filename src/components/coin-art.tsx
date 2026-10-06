@@ -68,9 +68,9 @@ export function TreasureChestArt({ className }: ArtProps) {
 /** ガチャ（カプセルトイの機械） */
 export function GachaMachineArt({ className }: ArtProps) {
   return (
-    // ユーザー提供の完成画像から、ガチャ機をそのまま切り出した素材。
+    // ガチャ演出と同じマシンの部品を、1枚に重ねた絵（public/gacha/art/、作り方は docs/gacha-illustrated-animation.md）。
     // eslint-disable-next-line @next/next/no-img-element
-    <img src="/gacha/reference/lucky-paws-machine.webp" className={className} alt="" aria-hidden="true" draggable={false} />
+    <img src="/gacha/art/machine-still.webp" className={className} alt="" aria-hidden="true" draggable={false} />
   );
 }
 

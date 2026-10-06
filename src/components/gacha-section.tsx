@@ -13,6 +13,7 @@ import {
   type GachaRarity,
 } from "@/lib/gacha/config";
 import { BlueCoinArt, GachaMachineArt, SparkleArt } from "./coin-art";
+import { warmGachaArt } from "./gacha/art";
 import { primeGachaAudio } from "./gacha/audio";
 import type { AnimationDraw, DrawResult } from "./gacha/types";
 import { prefGachaRates } from "@/lib/gacha/prizes";
@@ -117,6 +118,7 @@ export function GachaSection({ balance, pool = "coin" }: { balance: number; pool
     async (planId: GachaPlanId) => {
       if (inFlight.current) return;
       primeGachaAudio();
+      warmGachaArt();
       inFlight.current = true;
       setPending(planId);
       setError(null);
