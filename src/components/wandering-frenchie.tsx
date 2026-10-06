@@ -2,7 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
-import { BlueCoinArt, CoinArt } from "@/components/coin-art";
+import { HomeCoinArt } from "@/components/home-coin-art";
 import { useHomeWeather } from "@/components/home-weather";
 import { getFrenchieSrc, type DogSkinId } from "@/lib/dog-skins";
 import { registerStepsWriter, type StepsWriteRequest } from "@/lib/home-dog-bus";
@@ -239,13 +239,14 @@ const COIN_BLUE_CHANCE = 0.5;
 /**
  * レア度。降ったコインのうち、ふつう 85%・中レア 12%・高レア 3%。もらえる枚数は黄色も青も同じで、
  * ふつう 5・中レア 20・高レア 100（枚数は DB が決める。ここは見た目と抽選だけ）。
- * 中レアはひとまわり大きく光の粒が回る。高レアは大きく、虹の輪と光の柱といっしょにゆっくり降りてくる。
+ * まわりに演出をつけるのではなく、コインそのものを豪華にして差をつける（絵は home-coin-art.tsx）。
+ * 中レアは縁に刻みのある重たい金貨、高レアは宝石つきの小判（おおばん）。大きいほどゆっくり降りてくる。
  */
 type CoinTier = "common" | "rare" | "epic";
 const COIN_TIERS: Record<CoinTier, { chance: number; amount: number; size: number; fallMs: number }> = {
   common: { chance: 0.85, amount: 5, size: 1, fallMs: 1050 },
-  rare: { chance: 0.12, amount: 20, size: 1.3, fallMs: 1250 },
-  epic: { chance: 0.03, amount: 100, size: 1.75, fallMs: 1900 },
+  rare: { chance: 0.12, amount: 20, size: 1.25, fallMs: 1250 },
+  epic: { chance: 0.03, amount: 100, size: 1.55, fallMs: 1700 },
 };
 const pickCoinTier = (): CoinTier => {
   const r = Math.random();
@@ -1049,30 +1050,6 @@ export function WanderingFrenchie({
         .home-coin-spin { animation: home-coin-spin 900ms linear infinite; }
         .home-coin-ground .home-coin-spin { animation-duration: 2400ms; }
         .home-coin-shadow { animation: home-coin-shadow var(--fall-ms) both; }
-        /* 中レア：まわりを光の粒が回る */
-        @keyframes home-coin-orbit { to { transform: rotate(360deg); } }
-        .home-coin-orbit { animation: home-coin-orbit 1800ms linear infinite; }
-        /* 高レア：うしろで虹の輪がゆっくり回り、空から光の柱がさす */
-        @keyframes home-coin-halo {
-          0%   { transform: rotate(0deg) scale(1);    opacity: .85; }
-          50%  { transform: rotate(180deg) scale(1.12); opacity: 1; }
-          100% { transform: rotate(360deg) scale(1);  opacity: .85; }
-        }
-        .home-coin-halo {
-          background: conic-gradient(from 0deg, #ff8fb1, #ffd36e, #a6f08a, #7fd3ff, #b79bff, #ff8fb1);
-          -webkit-mask: radial-gradient(circle, transparent 52%, #000 56%, #000 63%, transparent 68%);
-          mask: radial-gradient(circle, transparent 52%, #000 56%, #000 63%, transparent 68%);
-          filter: blur(0.6px);
-          animation: home-coin-halo 2600ms linear infinite;
-        }
-        @keyframes home-coin-pillar {
-          0%   { opacity: 0; transform: scaleX(0.4); }
-          20%  { opacity: 1; transform: scaleX(1); }
-          100% { opacity: .55; transform: scaleX(0.9); }
-        }
-        .home-coin-pillar { transform-origin: 50% 100%; animation: home-coin-pillar var(--fall-ms) ease-out both; }
-        .home-coin-ground .home-coin-pillar { animation: home-coin-pillar-fade 1600ms ease-out both; }
-        @keyframes home-coin-pillar-fade { from { opacity: .55; } to { opacity: 0; } }
         /* 拾ったときの紙ふぶき（中レアは少し、高レアはたくさん） */
         @keyframes home-coin-burst {
           0%   { transform: translate(-50%, -50%) translate(0, 0) rotate(0deg) scale(.4); opacity: 1; }
@@ -1097,7 +1074,6 @@ export function WanderingFrenchie({
       {coins.map((coin) => {
         const scale = depthScale(coin.depth);
         const tier = COIN_TIERS[coin.tier];
-        const Art = coin.kind === "blue" ? BlueCoinArt : CoinArt;
         const blue = coin.kind === "blue";
         return (
           <div
@@ -1112,22 +1088,6 @@ export function WanderingFrenchie({
               ["--fall-ms" as string]: `${tier.fallMs}ms`,
             }}
           >
-            {/* 高レア：空から光の柱 */}
-            {coin.tier === "epic" && coin.state !== "taken" ? (
-              <span
-                className={`home-coin-pillar pointer-events-none absolute left-1/2 block ${coin.state === "ground" ? "home-coin-ground" : ""}`}
-                style={{
-                  bottom: "40%",
-                  width: "120%",
-                  height: `${coin.fallPx}px`,
-                  marginLeft: "-60%",
-                  background: blue
-                    ? "linear-gradient(to top, rgba(150,205,255,.75), rgba(150,205,255,0))"
-                    : "linear-gradient(to top, rgba(255,232,150,.8), rgba(255,232,150,0))",
-                  filter: "blur(2px)",
-                }}
-              />
-            ) : null}
             {/* 足もとの影 */}
             <span
               className={`absolute left-1/2 block rounded-[50%] bg-[rgba(70,60,30,.28)] ${coin.state === "taken" ? "opacity-0 transition-opacity duration-300" : "home-coin-shadow"}`}
@@ -1141,38 +1101,12 @@ export function WanderingFrenchie({
               className={`pointer-events-auto relative block w-full ${coin.state === "falling" ? "home-coin-fall" : coin.state === "ground" ? "home-coin-ground" : "home-coin-take"}`}
               style={{ ["--fall" as string]: `${coin.fallPx}px`, aspectRatio: "1", touchAction: "manipulation" }}
             >
-              {/* 高レア：うしろで回る虹の輪 */}
-              {coin.tier === "epic" ? <span className="home-coin-halo pointer-events-none absolute -inset-[24%] block rounded-full" /> : null}
               <span
                 className="home-coin-spin relative block h-full w-full"
-                style={{
-                  filter:
-                    coin.tier === "epic"
-                      ? `drop-shadow(0 0 5px ${blue ? "rgba(110,180,255,.95)" : "rgba(255,215,110,.95)"}) brightness(1.08)`
-                      : blue
-                        ? "drop-shadow(0 0 3px rgba(90,160,255,.8))"
-                        : "drop-shadow(0 0 2px rgba(255,210,90,.7))",
-                }}
+                style={{ filter: blue ? "drop-shadow(0 0 2px rgba(90,160,255,.7))" : "drop-shadow(0 0 2px rgba(255,210,90,.7))" }}
               >
-                <Art className="h-full w-full" />
+                <HomeCoinArt kind={coin.kind} tier={coin.tier} />
               </span>
-              {/* 中レア・高レア：まわりを回る光の粒 */}
-              {coin.tier !== "common" ? (
-                <span className="home-coin-orbit pointer-events-none absolute -inset-[30%] block" aria-hidden="true">
-                  {[0, 120, 240].map((deg) => (
-                    <span
-                      key={deg}
-                      className="absolute left-1/2 top-0 block h-[18%] w-[18%] rounded-full"
-                      style={{
-                        transform: `rotate(${deg}deg)`,
-                        transformOrigin: "50% 280%",
-                        marginLeft: "-9%",
-                        background: `radial-gradient(circle, #fff 0 30%, ${blue ? "#9fd0ff" : "#ffe08a"} 55%, transparent 72%)`,
-                      }}
-                    />
-                  ))}
-                </span>
-              ) : null}
               <span className="home-coin-glint absolute -right-[18%] -top-[18%] block h-[46%] w-[46%] text-white" aria-hidden="true">
                 <svg viewBox="0 0 10 10" className="h-full w-full"><path d="M5 0 6 4 10 5 6 6 5 10 4 6 0 5 4 4Z" fill="currentColor" /></svg>
               </span>
