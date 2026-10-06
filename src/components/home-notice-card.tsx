@@ -16,12 +16,31 @@ import type { NoticeFeedRow } from "@/lib/supabase/types";
 const CARD_RATIO = "2172 / 724";
 
 /**
- * 見出し（新着◯件）の位置。絵に描いてある「お知らせ」の札の右どなりに置く。
- * 冬の絵は紙のふちに木のわくがあるので、わくにかからないよう少し下げる。
+ * 文字の置き場所。絵に描いてある「お知らせ」の札・左の小物・右の飾りに かからないようにする。
+ * - pad：文字の箱の左右（カードの幅に対する％）
+ * - heading：見出し（新着◯件）。札の右どなりに置く
+ * - rows：お知らせの行。left/top は行の箱のずらし
+ * 冬は紙のふちに木のわくがあるので見出しを少し下げる。豪華は左の小物（王冠・方位磁針）と右の飾りが大きいので、文字の箱をせまくする。
  */
-const HEADING_SHIFT: Record<HomeSkinTheme, string> = {
-  default: "translate(calc(10px + 3em), calc(-4px - 0.3em))",
-  winter: "translate(calc(14px + 3em), calc(5px - 0.3em))",
+const NOTICE_LAYOUT: Record<HomeSkinTheme, { pad: [string, string]; heading: React.CSSProperties; rows: React.CSSProperties; chevron: string }> = {
+  default: {
+    pad: ["37%", "8%"],
+    heading: { marginLeft: "11%", transform: "translate(calc(10px + 3em), calc(-4px - 0.3em))" },
+    rows: { gap: 6, transform: "translate(-1.5em, 3px)" },
+    chevron: "translate(-2em, 12px)",
+  },
+  winter: {
+    pad: ["37%", "8%"],
+    heading: { marginLeft: "11%", transform: "translate(calc(14px + 3em), calc(5px - 0.3em))" },
+    rows: { gap: 6, transform: "translate(-1.5em, 3px)" },
+    chevron: "translate(-2em, 12px)",
+  },
+  deluxe: {
+    pad: ["43.5%", "15%"],
+    heading: { marginLeft: "33%", transform: "translate(14px, calc(3px - 0.3em))" },
+    rows: { gap: 4, transform: "translate(0, 1px)" },
+    chevron: "translate(-0.2em, 8px)",
+  },
 };
 
 export function HomeNoticeCard({
@@ -37,6 +56,7 @@ export function HomeNoticeCard({
   notices: NoticeFeedRow[];
 }) {
   const latest = notices.slice(0, 3);
+  const layout = NOTICE_LAYOUT[skin];
   const summary = unreadCount > 0 ? `新着情報が${unreadCount}件あります` : "すべて既読済み";
 
   return (
@@ -53,12 +73,12 @@ export function HomeNoticeCard({
           draggable={false}
           className="home-card-frame pointer-events-none select-none"
         />
-        <div className="pointer-events-none absolute inset-0 z-10 flex items-center gap-1" style={{ paddingLeft: "37%", paddingRight: "8%" }}>
+        <div className="pointer-events-none absolute inset-0 z-10 flex items-center gap-1" style={{ paddingLeft: layout.pad[0], paddingRight: layout.pad[1] }}>
           <div className="flex min-w-0 flex-1 flex-col gap-1">
             {/* 見出し（新着の数）。右の花の絵にかからないよう短く、数はバッジで目立たせる */}
             <p
               className="flex items-center gap-1 text-sm font-bold text-ink"
-              style={{ marginLeft: "11%", transform: HEADING_SHIFT[skin] }}
+              style={layout.heading}
               aria-hidden="true"
             >
               {unreadCount > 0 ? (
@@ -72,7 +92,7 @@ export function HomeNoticeCard({
               )}
             </p>
             {/* 右の矢印と重ならないよう、行の右はしを矢印のぶん手前で止める */}
-            <div className="flex flex-col" style={{ gap: 6, transform: "translate(-1.5em, 3px)", marginRight: "0.8em" }}>
+            <div className="flex flex-col" style={{ ...layout.rows, marginRight: "0.8em" }}>
               {Array.from({ length: 3 }).map((_, rowIndex) => {
                 const notice = latest[rowIndex];
                 if (notice) {
@@ -105,7 +125,7 @@ export function HomeNoticeCard({
           <IconChevronRight
             size={18}
             className="shrink-0 text-ink-faint"
-            style={{ transform: "translate(-2em, 12px)" }}
+            style={{ transform: layout.chevron }}
           />
         </div>
       </div>

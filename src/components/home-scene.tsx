@@ -28,6 +28,9 @@ export const SCENE_RATIO = "1440 / 768";
  * 冬：
  * - 上の板: x 83〜515 / y 150〜370、下の板: x 85〜518 / y 425〜655
  * - リボン（帯のまん中）が上 x185〜415 / y172〜222、下 x195〜415 / y447〜497
+ * 豪華：
+ * - 上の板（リボン込み）: x 112〜585 / y 155〜370、下の板: x 112〜585 / y 405〜628
+ * - リボン（帯のまん中）が上 x225〜470 / y162〜218、下 x225〜470 / y418〜478
  */
 type Box = { left: string; top: string; width: string; height: string };
 type SceneLayout = { levelBoard: Box; levelBanner: Box; levelPanel: Box; stepsBoard: Box; stepsBanner: Box; stepsPanel: Box };
@@ -48,6 +51,14 @@ const SCENE_LAYOUTS: Record<HomeSkinTheme, SceneLayout> = {
     stepsBoard: { left: "5%", top: "46.4%", width: "25.2%", height: "25.1%" },
     stepsBanner: { left: "25.4%", top: "9.6%", width: "50.8%", height: "21.7%" },
     stepsPanel: { left: "9%", top: "36%", width: "82%", height: "54%" },
+  },
+  deluxe: {
+    levelBoard: { left: "6.5%", top: "16.9%", width: "27.5%", height: "23.5%" },
+    levelBanner: { left: "23.9%", top: "3.3%", width: "51.8%", height: "26%" },
+    levelPanel: { left: "10%", top: "33%", width: "80%", height: "58%" },
+    stepsBoard: { left: "6.5%", top: "44.2%", width: "27.5%", height: "24.3%" },
+    stepsBanner: { left: "23.9%", top: "5.8%", width: "51.8%", height: "26.9%" },
+    stepsPanel: { left: "9%", top: "37%", width: "82%", height: "57%" },
   },
 };
 

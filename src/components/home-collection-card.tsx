@@ -40,6 +40,13 @@ const RARITY_RING: Record<GachaRarity, string> = {
   MR: "#4B3F9E",
 };
 
+/** 文字の箱の左右（カードの幅に対する％）。豪華は左の図鑑の絵と右の飾りが大きいので、せまくする */
+const TEXT_PAD: Record<HomeSkinTheme, [string, string]> = {
+  default: ["35%", "11%"],
+  winter: ["35%", "11%"],
+  deluxe: ["41.5%", "15.5%"],
+};
+
 export function HomeCollectionCard({
   collected,
   total,
@@ -75,7 +82,7 @@ export function HomeCollectionCard({
         />
         <div
           className="absolute inset-0 flex items-center"
-          style={{ paddingLeft: "35%", paddingRight: "11%", paddingTop: "3.2%", paddingBottom: "2.6%" }}
+          style={{ paddingLeft: TEXT_PAD[skin][0], paddingRight: TEXT_PAD[skin][1], paddingTop: "3.2%", paddingBottom: "2.6%" }}
         >
           <div className="flex w-full min-w-0 items-center gap-1">
             <div className="min-w-0 flex-1">

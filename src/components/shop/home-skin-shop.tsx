@@ -24,6 +24,13 @@ import {
   type HomeSkins,
 } from "@/lib/home-skins";
 
+/** テーマごとの見本の台の色 */
+const THEME_TINT: Record<HomeSkinTheme, string> = {
+  default: "bg-paper",
+  winter: "bg-[linear-gradient(180deg,#eef4fb,#fbf8f1)] ring-[rgba(120,140,170,.18)]",
+  deluxe: "bg-[linear-gradient(180deg,#fbf3dc,#fdf9ef)] ring-[rgba(190,150,60,.28)]",
+};
+
 type Confirm = { theme: HomeSkinTheme; part: HomeSkinPart | "set" } | null;
 
 export function HomeSkinShop({
@@ -127,7 +134,7 @@ export function HomeSkinShop({
         const setConfirming = confirm?.theme === theme && confirm.part === "set";
         const short = set - blueCoins;
         return (
-          <div key={theme} className="mt-3 overflow-hidden rounded-[20px] bg-[linear-gradient(180deg,#eef4fb,#fbf8f1)] ring-1 ring-[rgba(120,140,170,.18)]">
+          <div key={theme} className={`mt-3 overflow-hidden rounded-[20px] ring-1 ${THEME_TINT[theme]}`}>
             <div className="flex gap-3 p-3">
               <MiniHome theme={theme} />
               <div className="min-w-0 flex-1">

@@ -5,13 +5,13 @@
  * - 「セット」で、そのテーマの持っていないカードをまとめて買って（2割引）、ぜんぶ一度に変えることもできる
  * - 文字やボタンの位置は変えない。新しい絵は、いまの絵と同じ大きさ・同じ紙の位置にそろえてある
  *   （わんこのカードの看板だけは絵によって少し位置がちがうので、テーマごとに位置を持つ）
- * - 値段は DB の home_skin_price（0132）と同じにする
+ * - 値段は DB の home_skin_price（0132・0133）と同じにする
  */
 
 export const HOME_SKIN_PARTS = ["scene", "notice", "highlights", "collection"] as const;
 export type HomeSkinPart = (typeof HOME_SKIN_PARTS)[number];
 
-export const HOME_SKIN_THEMES = ["default", "winter"] as const;
+export const HOME_SKIN_THEMES = ["default", "winter", "deluxe"] as const;
 export type HomeSkinTheme = (typeof HOME_SKIN_THEMES)[number];
 
 export type HomeSkins = Record<HomeSkinPart, HomeSkinTheme>;
@@ -36,6 +36,12 @@ export const HOME_SKIN_THEME_INFO: Record<HomeSkinTheme, HomeSkinThemeInfo> = {
     sub: "雪の野原と木のわく",
     description: "雪の野原をわんこが歩き、カードは雪をかぶった木のわくに。雪だるまやまつぼっくりが添えてあります。",
     prices: { scene: 1500, notice: 800, highlights: 800, collection: 800 },
+  },
+  deluxe: {
+    name: "豪華",
+    sub: "金のわくと宮殿の庭",
+    description: "湖と古城の見える宮殿の庭を、わんこが歩きます。カードは金のわくに、王冠・宝石・真珠をあしらいました。",
+    prices: { scene: 2000, notice: 1000, highlights: 1000, collection: 1000 },
   },
 };
 
@@ -73,11 +79,11 @@ export function normalizeHomeSkins(value: unknown): HomeSkins {
 
 /** カードの絵（public/ の画像） */
 export const HOME_SKIN_ART = {
-  notice: { default: "/notice-card.webp", winter: "/home-skins/winter/notice.webp" },
-  collection: { default: "/collection-card.webp", winter: "/home-skins/winter/collection.webp" },
-  highlights: { default: "/home-highlights-frame.webp", winter: "/home-skins/winter/highlights.webp" },
-  scene: { default: "/characters/home-scene.webp", winter: "/home-skins/winter/scene.webp" },
-  sceneFrame: { default: "/home-scene-frame.webp", winter: "/home-skins/winter/scene-frame.webp" },
+  notice: { default: "/notice-card.webp", winter: "/home-skins/winter/notice.webp", deluxe: "/home-skins/deluxe/notice.webp" },
+  collection: { default: "/collection-card.webp", winter: "/home-skins/winter/collection.webp", deluxe: "/home-skins/deluxe/collection.webp" },
+  highlights: { default: "/home-highlights-frame.webp", winter: "/home-skins/winter/highlights.webp", deluxe: "/home-skins/deluxe/highlights.webp" },
+  scene: { default: "/characters/home-scene.webp", winter: "/home-skins/winter/scene.webp", deluxe: "/home-skins/deluxe/scene.webp" },
+  sceneFrame: { default: "/home-scene-frame.webp", winter: "/home-skins/winter/scene-frame.webp", deluxe: "/home-skins/deluxe/scene-frame.webp" },
 } as const satisfies Record<string, Record<HomeSkinTheme, string>>;
 
 /** ショップの見本で小さく見せる絵 */
