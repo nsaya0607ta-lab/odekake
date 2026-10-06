@@ -2,8 +2,11 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState, type PointerEvent as ReactPointerEvent } from "react";
 import Image from "next/image";
-import { PIN_LAYOUT, PIN_VISUAL_WIDTH_PCT, Pins } from "./pins";
+import { BIG_RACK_SPACING_SCALE, KING_PIN_VISUAL_SCALE, PIN_LAYOUT, PIN_VISUAL_WIDTH_PCT, Pins } from "./pins";
+import { BallTrail, bowlingFx, pinImpact, punch } from "./bowling-fx";
+import { SignMarquee } from "./sign-marquee";
 import type { BowlingBallVisual } from "@/lib/games/wanko-bowling-balls";
+import type { BowlingRack } from "@/lib/games/wanko-bowling-score";
 import {
   AXIS_ROTATION_INPUT_EXPONENT,
   ballInertiaXKgm2,
@@ -98,7 +101,20 @@ type PinBody = {
   standing: boolean;
   moving: boolean;
   visible: boolean;
+  /** キングピンは重く、大きく、倒れにくい */
+  massKg: number;
+  king: boolean;
 };
+
+/** キングピン：ふつうのピンの何倍の重さ・倒れにくさか */
+const KING_PIN_MASS_SCALE = 3;
+const KING_DIRECT_THRESHOLD_SCALE = 1.9;
+const KING_CHAIN_THRESHOLD_SCALE = 2.6;
+const KING_EXTRA_RADIUS_M = PIN_RADIUS_M * 0.4;
+/** キングピンが倒れたとき、まわりのピンをはじく速さ */
+const KING_TOPPLE_SPEED_MPS = 2.6;
+
+const NORMAL_RACK: BowlingRack = { kind: "normal", pinIds: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10], kingPinId: null, splitName: null };
 
 type CollisionResult = {
   avx: number;
@@ -120,6 +136,10 @@ export type LaneRollResult = {
 type LaneProps = {
   ballVisual: BowlingBallVisual;
   goldenPinId?: number | null;
+  /** 次に新しくセットするラック（resetSignal が変わったときに並べなおす） */
+  rack?: BowlingRack;
+  /** フィーバー中（見た目がブラックライトのボウリングになる） */
+  fever?: boolean;
   resetSignal: number;
   newGameSignal: number;
   active: boolean;
@@ -247,7 +267,7 @@ function pinVisualWidthPct(distanceM: number): number {
 
 function pinPairCollisionRadius(a: PinBody, b: PinBody): number {
   const fallReach = Math.max(a.fallProgress, b.fallProgress) * FALLEN_PIN_EXTRA_REACH_M;
-  return PIN_PAIR_RADIUS_M + fallReach;
+  return PIN_PAIR_RADIUS_M + fallReach + (a.king || b.king ? KING_EXTRA_RADIUS_M : 0);
 }
 
 function computeAxisRotation(launchAngleRad: number, curveNorm: number): { axisRotationRad: number; curveSign: number } {
@@ -382,18 +402,27 @@ function estimateCurveNorm(points: Point[], boardWidthPx: number): number {
   return combined * MAX_CURVE_NORM;
 }
 
-function createPinBody(pin: (typeof PIN_LAYOUT)[number]): PinBody {
+/**
+ * ラックに合わせてピンを置く。ラックにないピンは見えない・当たらない状態にする。
+ * ビッグラック（15本）は間隔をつめて5段に並べる。
+ */
+function createPinBody(pin: (typeof PIN_LAYOUT)[number], rack: BowlingRack = NORMAL_RACK): PinBody {
+  const present = rack.pinIds.includes(pin.id);
+  const spacing = rack.kind === "big" ? BIG_RACK_SPACING_SCALE : 1;
+  const king = present && pin.id === rack.kingPinId;
   return {
-    xM: JB_TOTAL_WIDTH_M / 2 + pin.lateralM,
-    yM: JB_HEAD_PIN_DISTANCE_M + pin.forwardM,
+    xM: JB_TOTAL_WIDTH_M / 2 + pin.lateralM * spacing,
+    yM: JB_HEAD_PIN_DISTANCE_M + pin.forwardM * spacing,
     vxMps: 0,
     vyMps: 0,
     angle: 0,
     angularVel: 0,
     fallProgress: 0,
-    standing: true,
+    standing: present,
     moving: false,
-    visible: true,
+    visible: present,
+    massKg: king ? JB_PIN_MASS_KG * KING_PIN_MASS_SCALE : JB_PIN_MASS_KG,
+    king,
   };
 }
 
@@ -460,16 +489,18 @@ function effectiveKnockSpeed(
   vy: number,
   collision: CollisionResult,
   chain: boolean,
+  target?: PinBody,
 ): { speed: number; threshold: number } {
   const travelSpeed = Math.hypot(vx, vy);
-  const impulseVelocity = collision.impulse / JB_PIN_MASS_KG;
+  const impulseVelocity = collision.impulse / (target?.massKg ?? JB_PIN_MASS_KG);
   const sideFactor = Math.abs(collision.normalX);
   const impulseWeight = chain ? CHAIN_IMPULSE_WEIGHT : DIRECT_IMPULSE_WEIGHT;
   const sideBonus = sideFactor * (chain ? CHAIN_SIDE_BONUS_MPS : DIRECT_SIDE_BONUS_MPS);
   const thresholdBase = chain ? PIN_CHAIN_KNOCK_SPEED_MPS : PIN_DIRECT_KNOCK_SPEED_MPS;
-  const threshold = chain
+  const kingScale = target?.king ? (chain ? KING_CHAIN_THRESHOLD_SCALE : KING_DIRECT_THRESHOLD_SCALE) : 1;
+  const threshold = (chain
     ? thresholdBase * (1 - sideFactor * CHAIN_SIDE_THRESHOLD_REDUCTION)
-    : thresholdBase;
+    : thresholdBase) * kingScale;
 
   return {
     speed: travelSpeed + impulseVelocity * impulseWeight + sideBonus,
@@ -511,9 +542,118 @@ const PIN_ANCHOR: ReadonlyMap<number, { x: number; y: number }> = new Map(
   PIN_LAYOUT.map((pin) => [pin.id, { x: pin.x, y: pin.y }]),
 );
 
-export function Lane({ ballVisual, goldenPinId = null, resetSignal, newGameSignal, active, onRoll }: LaneProps) {
+/* ===== レーンの飾り（見た目だけ。物理の座標はそのまま、透視投影で描く） ===== */
+const LANE_BOARD_COUNT = 39;
+const boardCenterXM = (board: number) => JB_GUTTER_WIDTH_M + ((board - 0.5) / LANE_BOARD_COUNT) * JB_LANE_WIDTH_M;
+const toScreen = (xM: number, yM: number) => `${worldXToPct(xM, yM).toFixed(2)},${worldYToPct(yM).toFixed(2)}`;
+
+/** 板目（1枚おきに少しだけ色を変える） */
+const BOARD_STRIPES = Array.from({ length: Math.floor(LANE_BOARD_COUNT / 2) }, (_, i) => {
+  const a = -1 + ((i * 2 + 1) / LANE_BOARD_COUNT) * 2;
+  const b = -1 + ((i * 2 + 2) / LANE_BOARD_COUNT) * 2;
+  return `${50 + a * FAR_LANE_HALF},0 ${50 + b * FAR_LANE_HALF},0 ${50 + b * NEAR_LANE_HALF},100 ${50 + a * NEAR_LANE_HALF},100`;
+});
+
+/** スパット（目印の三角）。本物と同じく 5枚ごと・中央ほど奥（12〜16フィート）に並べる */
+const LANE_ARROWS = [5, 10, 15, 20, 25, 30, 35].map((board) => {
+  const yM = 4.88 - (Math.abs(board - 20) / 15) * 1.22;
+  const x = boardCenterXM(board);
+  const half = (JB_LANE_WIDTH_M / LANE_BOARD_COUNT) * 0.75;
+  return `${toScreen(x, yM + 0.42)} ${toScreen(x + half, yM)} ${toScreen(x, yM + 0.1)} ${toScreen(x - half, yM)}`;
+});
+
+/** ガイドドット（7フィート） */
+const LANE_DOTS = [3, 5, 8, 11, 14, 26, 29, 32, 35, 37].map((board) => {
+  const yM = 2.13;
+  return { x: worldXToPct(boardCenterXM(board), yM), y: worldYToPct(yM) };
+});
+
+/** ピンデッキ（1番ピンのまわり）。上から照らすライトの中心 */
+const DECK_CENTER_Y = worldYToPct(JB_HEAD_PIN_DISTANCE_M + PIN_DECK_DEPTH_M / 2);
+
+function LaneScenery({ fever = false }: { fever?: boolean }) {
+  return (
+    <>
+      {/* 板目・スパット・ドット・つや */}
+      <svg className="pointer-events-none absolute inset-0 h-full w-full" viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true">
+        <defs>
+          <linearGradient id="wb-lane-gloss" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0" stopColor="#fff6dc" stopOpacity="0.38" />
+            <stop offset="0.35" stopColor="#fff6dc" stopOpacity="0.1" />
+            <stop offset="0.7" stopColor="#fff6dc" stopOpacity="0.16" />
+            <stop offset="1" stopColor="#fff6dc" stopOpacity="0" />
+          </linearGradient>
+          <radialGradient id="wb-deck-light" cx="0.5" cy="0.5" r="0.5">
+            <stop offset="0" stopColor="#fff8e4" stopOpacity="0.55" />
+            <stop offset="0.55" stopColor="#ffe6b0" stopOpacity="0.16" />
+            <stop offset="1" stopColor="#ffe6b0" stopOpacity="0" />
+          </radialGradient>
+        </defs>
+        {BOARD_STRIPES.map((points, index) => (
+          <polygon key={index} points={points} fill={index % 3 === 0 ? "rgba(122,62,22,0.07)" : "rgba(255,240,210,0.045)"} />
+        ))}
+        {/* 天井のライトがレーンに映りこむ縦のつや */}
+        <polygon points={`${50 - FAR_LANE_HALF * 0.34},0 ${50 - FAR_LANE_HALF * 0.08},0 ${50 - NEAR_LANE_HALF * 0.02},100 ${50 - NEAR_LANE_HALF * 0.36},100`} fill="url(#wb-lane-gloss)" />
+        <polygon points={`${50 + FAR_LANE_HALF * 0.3},0 ${50 + FAR_LANE_HALF * 0.42},0 ${50 + NEAR_LANE_HALF * 0.5},100 ${50 + NEAR_LANE_HALF * 0.36},100`} fill="url(#wb-lane-gloss)" opacity="0.6" />
+        <ellipse cx="50" cy={DECK_CENTER_Y} rx={FAR_LANE_HALF * 1.25} ry="9" fill="url(#wb-deck-light)" />
+        {LANE_ARROWS.map((points, index) => (
+          <polygon key={index} points={points} fill="rgba(74,34,14,0.62)" stroke="rgba(255,236,200,0.35)" strokeWidth="0.12" />
+        ))}
+        {LANE_DOTS.map((dot, index) => (
+          <ellipse key={index} cx={dot.x} cy={dot.y} rx="0.55" ry="0.28" fill="rgba(74,34,14,0.55)" />
+        ))}
+        {/* ガターの外側のふち（ネオン） */}
+        <line x1={FAR_OUTER_LEFT} y1="0" x2={NEAR_OUTER_LEFT} y2="100" stroke="rgba(84,216,255,0.55)" strokeWidth="1.2" vectorEffect="non-scaling-stroke" />
+        <line x1={FAR_OUTER_RIGHT} y1="0" x2={NEAR_OUTER_RIGHT} y2="100" stroke="rgba(84,216,255,0.55)" strokeWidth="1.2" vectorEffect="non-scaling-stroke" />
+        <line x1={FAR_OUTER_LEFT} y1="0" x2={NEAR_OUTER_LEFT} y2="100" stroke="rgba(84,216,255,0.18)" strokeWidth="6" vectorEffect="non-scaling-stroke" />
+        <line x1={FAR_OUTER_RIGHT} y1="0" x2={NEAR_OUTER_RIGHT} y2="100" stroke="rgba(84,216,255,0.18)" strokeWidth="6" vectorEffect="non-scaling-stroke" />
+      </svg>
+
+      {/* 奥の幕（マスキングユニット）と電光掲示板。ピンの奥の暗いピット。飛んだピンやボールはこの奥へ消える */}
+      <div
+        className="pointer-events-none absolute inset-x-0 top-0 h-[9.5%]"
+        style={{
+          zIndex: 1400,
+          background: "linear-gradient(180deg, #0b1a2b 0%, #0f2338 62%, #081321 100%)",
+          boxShadow: "0 6px 14px rgba(0,0,0,0.55), inset 0 -1px 0 rgba(84,216,255,0.35)",
+        }}
+        aria-hidden="true"
+      >
+        <div className="absolute inset-0 opacity-60" style={{ background: "radial-gradient(ellipse at 50% 120%, rgba(84,216,255,0.28), transparent 60%)" }} />
+        <SignMarquee fever={fever} />
+        {/* ピンを照らすライトの帯 */}
+        <div className="absolute inset-x-[30%] bottom-0 h-[3px] rounded-full bg-[#fff4d6] shadow-[0_0_10px_3px_rgba(255,236,190,0.7)]" />
+      </div>
+      <div
+        className="pointer-events-none absolute inset-x-0 top-[9.5%] h-[2.2%]"
+        style={{ zIndex: 1400, background: "linear-gradient(180deg, rgba(0,0,0,0.85), rgba(0,0,0,0))" }}
+        aria-hidden="true"
+      />
+    </>
+  );
+}
+
+export function Lane({ ballVisual, goldenPinId = null, rack = NORMAL_RACK, fever = false, resetSignal, newGameSignal, active, onRoll }: LaneProps) {
   const boardRef = useRef<HTMLDivElement>(null);
   const ballRef = useRef<HTMLDivElement>(null);
+  /** 演出用：回転するボール本体（ballRef は位置と大きさだけ）、火花の層、光の尾 */
+  const ballBodyRef = useRef<HTMLDivElement>(null);
+  const fxLayerRef = useRef<HTMLDivElement>(null);
+  const trailCanvasRef = useRef<HTMLCanvasElement>(null);
+  const trailRef = useRef<BallTrail | null>(null);
+  const goldenPinIdRef = useRef<number | null>(goldenPinId);
+  useEffect(() => {
+    goldenPinIdRef.current = goldenPinId;
+  }, [goldenPinId]);
+  /** resetSignal と同じタイミングで変わるので、並べなおす直前に読む（この effect は並べなおしより先に書く） */
+  const rackRef = useRef<BowlingRack>(rack);
+  useEffect(() => {
+    rackRef.current = rack;
+  }, [rack]);
+  const feverRef = useRef(fever);
+  useEffect(() => {
+    feverRef.current = fever;
+  }, [fever]);
   /** ボード実寸(px)。リサイズ時だけ更新し、毎フレームの座標計算はこれを参照する */
   const boardSizeRef = useRef({ w: 0, h: 0 });
   const throwingRef = useRef(false);
@@ -564,19 +704,22 @@ export function Lane({ ballVisual, goldenPinId = null, resetSignal, newGameSigna
     const screenX = worldXToPct(body.xM, body.yM);
     const screenY = worldYToPct(body.yM);
     const widthPct = pinVisualWidthPct(body.yM);
-    const scale = widthPct / PIN_VISUAL_WIDTH_PCT;
+    const kingScale = body.king ? KING_PIN_VISUAL_SCALE : 1;
+    const scale = (widthPct / PIN_VISUAL_WIDTH_PCT) * kingScale;
     const px = anchor ? ((screenX - anchor.x) / 100) * w : 0;
     const py = anchor ? ((screenY - anchor.y) / 100) * h : 0;
+    // キングピンは大きくしても足もとが床につくよう、少し上へずらす
+    const lift = body.king ? `translateY(${(-(kingScale - 1) * 45).toFixed(1)}%) ` : "";
 
     el.style.opacity = body.visible ? "1" : "0";
     el.style.zIndex = String(500 + Math.round(screenY * 10));
     const squashY = 1 - 0.62 * body.fallProgress;
-    el.style.transform = `translate(${px}px, ${py}px) translate(-50%, -50%) rotate(${body.angle}deg) scale(${scale}, ${scale * squashY})`;
+    el.style.transform = `translate(${px}px, ${py}px) translate(-50%, -50%) ${lift}rotate(${body.angle}deg) scale(${scale}, ${scale * squashY})`;
   }, []);
 
   const resetPins = useCallback(() => {
     PIN_LAYOUT.forEach((pin) => {
-      const body = createPinBody(pin);
+      const body = createPinBody(pin, rackRef.current);
       pinBodiesRef.current.set(pin.id, body);
       writePinNode(pin.id, body);
     });
@@ -610,6 +753,8 @@ export function Lane({ ballVisual, goldenPinId = null, resetSignal, newGameSigna
     const px = ((screenX - BALL_BASE_LEFT_PCT) / 100) * w;
     const py = ((screenY - BALL_BASE_TOP_PCT) / 100) * h;
     el.style.zIndex = String(501 + Math.round(screenY * 10));
+    const body = ballBodyRef.current ?? el;
+    if (throwingRef.current) trailRef.current?.push((screenX / 100) * w, (screenY / 100) * h, (widthPct / 200) * w);
 
     const visualRollDeg = rotateDeg * 0.16;
     const phaseRad = visualRollDeg * Math.PI / 180;
@@ -618,8 +763,9 @@ export function Lane({ ballVisual, goldenPinId = null, resetSignal, newGameSigna
     if (curveStrength < 0.04) {
       const highlightY = 28 + Math.sin(phaseRad) * 12;
       const forwardRollDeg = visualRollDeg * 0.18;
-      el.style.background = `radial-gradient(circle at 32% ${highlightY}%, ${ballVisual.bodyGradient[0]}, ${ballVisual.bodyGradient[1]})`;
-      el.style.transform = `translate(${px}px, ${py}px) translate(-50%, -50%) scale(${scale}) rotate(${forwardRollDeg}deg)`;
+      body.style.background = `radial-gradient(circle at 32% ${highlightY}%, ${ballVisual.bodyGradient[0]}, ${ballVisual.bodyGradient[1]})`;
+      el.style.transform = `translate(${px}px, ${py}px) translate(-50%, -50%) scale(${scale})`;
+      body.style.transform = `rotate(${forwardRollDeg}deg)`;
       return;
     }
 
@@ -629,8 +775,9 @@ export function Lane({ ballVisual, goldenPinId = null, resetSignal, newGameSigna
     const axisTiltDeg = curveDirection * (8 + curveStrength * 14) * surfaceFactor;
     const highlightX = 32 + Math.sin(phaseRad * curveDirection) * 10 * curveStrength * surfaceFactor;
     const highlightY = 28 + Math.cos(phaseRad) * 7 * curveStrength;
-    el.style.background = `radial-gradient(circle at ${highlightX}% ${highlightY}%, ${ballVisual.bodyGradient[0]}, ${ballVisual.bodyGradient[1]})`;
-    el.style.transform = `translate(${px}px, ${py}px) translate(-50%, -50%) scale(${scale}) rotate(${sideSpinDeg + axisTiltDeg}deg)`;
+    body.style.background = `radial-gradient(circle at ${highlightX}% ${highlightY}%, ${ballVisual.bodyGradient[0]}, ${ballVisual.bodyGradient[1]})`;
+    el.style.transform = `translate(${px}px, ${py}px) translate(-50%, -50%) scale(${scale})`;
+    body.style.transform = `rotate(${sideSpinDeg + axisTiltDeg}deg)`;
   }, [ballVisual.bodyGradient]);
 
   const setStartPositionFromScreenX = useCallback((screenXPct: number) => {
@@ -677,17 +824,28 @@ export function Lane({ ballVisual, goldenPinId = null, resetSignal, newGameSigna
   useEffect(() => {
     const board = boardRef.current;
     if (!board) return;
+    const canvas = trailCanvasRef.current;
+    if (canvas && !trailRef.current) trailRef.current = new BallTrail(canvas);
     const measure = () => {
       boardSizeRef.current = { w: board.clientWidth, h: board.clientHeight };
+      trailRef.current?.resize(board.clientWidth, board.clientHeight);
     };
     measure();
     const observer = new ResizeObserver(measure);
     observer.observe(board);
-    return () => observer.disconnect();
+    return () => {
+      observer.disconnect();
+      trailRef.current?.clear();
+    };
   }, []);
 
   useEffect(() => {
+    trailRef.current?.setColor(ballVisual.hitColor);
+  }, [ballVisual.hitColor]);
+
+  useEffect(() => {
     resetPins();
+    trailRef.current?.clear();
     throwingRef.current = false;
     setIsThrowing(false);
     activePointerRef.current = null;
@@ -716,6 +874,15 @@ export function Lane({ ballVisual, goldenPinId = null, resetSignal, newGameSigna
   }) => {
     throwingRef.current = true;
     setIsThrowing(true);
+    trailRef.current?.clear();
+    trailRef.current?.setColor(feverRef.current ? "#ff7a2e" : ballVisual.hitColor);
+    /** 演出の強さ（ボールの速さ 0〜1）と、この投球で最初にピンへ当たったか */
+    const fxSpeed = clamp(
+      ((launch.speedMps * 3.6) - GAME_MIN_BALL_SPEED_KMH) / Math.max(1, ballMaxSpeedKmh - GAME_MIN_BALL_SPEED_KMH),
+      0,
+      1,
+    );
+    let fxFirstHit = true;
 
     let bxM = launch.startXM;
     let byM = 0;
@@ -773,9 +940,23 @@ export function Lane({ ballVisual, goldenPinId = null, resetSignal, newGameSigna
       vy: number,
       hitFromX: number,
       normalX = 0,
+      direct = false,
     ) => {
       if (!body.standing) return;
       knockedThisThrow.add(id);
+      // 演出：倒れた場所で火花（物理には関係しない）
+      pinImpact(fxLayerRef.current, {
+        x: worldXToPct(body.xM, body.yM),
+        y: worldYToPct(body.yM) - 1.2,
+        strength: direct ? 0.45 + fxSpeed * 0.55 : 0.25 + Math.min(1, Math.hypot(vx, vy) / 6) * 0.5,
+        color: ballVisual.hitColor,
+        golden: id === goldenPinIdRef.current,
+        direct,
+      });
+      if (direct && fxFirstHit) {
+        fxFirstHit = false;
+        punch(boardRef.current, 0.5 + fxSpeed);
+      }
       body.standing = false;
       body.moving = true;
       body.visible = true;
@@ -791,6 +972,27 @@ export function Lane({ ballVisual, goldenPinId = null, resetSignal, newGameSigna
         + Math.abs(offset) * 220
         + Math.abs(normalX) * 90;
       body.angularVel = spinDirection * angularMagnitude + (Math.random() - 0.5) * 100;
+
+      // キングピンが倒れたら、残りのピンを外側へはじいて全部倒す（ドミノ）
+      if (body.king) {
+        pinImpact(fxLayerRef.current, {
+          x: worldXToPct(body.xM, body.yM),
+          y: worldYToPct(body.yM) - 2,
+          strength: 1,
+          color: "#c38bff",
+          golden: true,
+          direct: true,
+        });
+        punch(boardRef.current, 1.4);
+        for (const [otherId, other] of pinBodiesRef.current) {
+          if (!other.standing || !other.visible) continue;
+          const dx = other.xM - body.xM;
+          const dy = other.yM - body.yM;
+          const distance = Math.max(0.05, Math.hypot(dx, dy));
+          const speedOut = KING_TOPPLE_SPEED_MPS * (0.8 + Math.random() * 0.4);
+          markKnocked(otherId, other, (dx / distance) * speedOut, (dy / distance) * speedOut + 0.4, body.xM, dx / distance);
+        }
+      }
     };
 
     const finish = () => {
@@ -911,7 +1113,7 @@ export function Lane({ ballVisual, goldenPinId = null, resetSignal, newGameSigna
               bxM,
               byM,
             );
-            if (closest.distance > PIN_COLLISION_RADIUS_M) continue;
+            if (closest.distance > PIN_COLLISION_RADIUS_M + (body.king ? KING_EXTRA_RADIUS_M : 0)) continue;
 
             const collision = resolvePairCollision(
               closest.x,
@@ -923,7 +1125,7 @@ export function Lane({ ballVisual, goldenPinId = null, resetSignal, newGameSigna
               body.yM,
               body.vxMps,
               body.vyMps,
-              JB_PIN_MASS_KG,
+              body.massKg,
               BALL_PIN_RESTITUTION,
             );
 
@@ -947,7 +1149,7 @@ export function Lane({ ballVisual, goldenPinId = null, resetSignal, newGameSigna
               bvxMps = nextVx;
               bvyMps = nextVy;
 
-              const knock = effectiveKnockSpeed(collision.bvx, collision.bvy, collision, false);
+              const knock = effectiveKnockSpeed(collision.bvx, collision.bvy, collision, false, body);
               if (knock.speed >= knock.threshold) {
                 markKnocked(
                   pin.id,
@@ -956,6 +1158,7 @@ export function Lane({ ballVisual, goldenPinId = null, resetSignal, newGameSigna
                   collision.bvy,
                   closest.x,
                   collision.normalX,
+                  true,
                 );
               }
             }
@@ -989,12 +1192,12 @@ export function Lane({ ballVisual, goldenPinId = null, resetSignal, newGameSigna
             bodyA.yM,
             bodyA.vxMps,
             bodyA.vyMps,
-            JB_PIN_MASS_KG,
+            bodyA.massKg,
             bodyB.xM,
             bodyB.yM,
             bodyB.vxMps,
             bodyB.vyMps,
-            JB_PIN_MASS_KG,
+            bodyB.massKg,
             PIN_PIN_RESTITUTION,
           );
           if (!collision) continue;
@@ -1005,7 +1208,7 @@ export function Lane({ ballVisual, goldenPinId = null, resetSignal, newGameSigna
           bodyB.vyMps = collision.bvy;
 
           if (aWasStanding) {
-            const knockA = effectiveKnockSpeed(collision.avx, collision.avy, collision, true);
+            const knockA = effectiveKnockSpeed(collision.avx, collision.avy, collision, true, bodyA);
             if (knockA.speed >= knockA.threshold) {
               markKnocked(idA, bodyA, collision.avx, collision.avy, bodyB.xM, -collision.normalX);
             } else {
@@ -1015,7 +1218,7 @@ export function Lane({ ballVisual, goldenPinId = null, resetSignal, newGameSigna
           }
 
           if (bWasStanding) {
-            const knockB = effectiveKnockSpeed(collision.bvx, collision.bvy, collision, true);
+            const knockB = effectiveKnockSpeed(collision.bvx, collision.bvy, collision, true, bodyB);
             if (knockB.speed >= knockB.threshold) {
               markKnocked(idB, bodyB, collision.bvx, collision.bvy, bodyA.xM, collision.normalX);
             } else {
@@ -1062,7 +1265,7 @@ export function Lane({ ballVisual, goldenPinId = null, resetSignal, newGameSigna
     };
 
     requestAnimationFrame(step);
-  }, [ballMassKg, ballMaxSpeedKmh, ballInertia, onRoll, setBallPosition, writePinNode]);
+  }, [ballMassKg, ballMaxSpeedKmh, ballInertia, ballVisual.hitColor, onRoll, setBallPosition, writePinNode]);
 
   const onPointerDown = useCallback((event: ReactPointerEvent<HTMLDivElement>) => {
     event.preventDefault();
@@ -1123,6 +1326,13 @@ export function Lane({ ballVisual, goldenPinId = null, resetSignal, newGameSigna
     if (pointerModeRef.current !== "throw") return;
 
     pointsRef.current.push({ x: event.clientX, y: event.clientY, t: performance.now() });
+    // 演出：指でなぞった跡を光らせる
+    const swipeBoard = boardRef.current;
+    if (swipeBoard && trailRef.current) {
+      const rect = swipeBoard.getBoundingClientRect();
+      trailRef.current.setColor("#54d8ff");
+      trailRef.current.push(event.clientX - rect.left, event.clientY - rect.top, 9);
+    }
     if (pointsRef.current.length > MAX_SWIPE_SAMPLES) {
       pointsRef.current.splice(1, pointsRef.current.length - MAX_SWIPE_SAMPLES);
     }
@@ -1189,166 +1399,206 @@ export function Lane({ ballVisual, goldenPinId = null, resetSignal, newGameSigna
     setBallPosition(ballStartXRef.current, 0, 0);
   }, [active, setBallPosition, setPositionLocked]);
 
+  const canControl = active && !isThrowing;
+
   return (
-    <div
-      ref={boardRef}
-      data-bowling-gesture-block="true"
-      onPointerDown={onPointerDown}
-      onPointerMove={onPointerMove}
-      onPointerUp={onPointerUp}
-      onPointerCancel={onPointerCancel}
-      className="relative h-full min-h-0 w-full touch-none select-none overflow-hidden"
-      style={{
-        touchAction: "none",
-        overscrollBehavior: "none",
-        borderRadius: "22px 22px 26px 26px",
-        background: "radial-gradient(ellipse at 50% 5%, rgba(103,152,190,0.22), transparent 25%), linear-gradient(180deg, #050a10 0%, #15171a 24%, #302016 63%, #21140f 100%)",
-        boxShadow: "inset 0 1px 0 rgba(255,255,255,0.18), inset 0 22px 34px -22px rgba(0,0,0,0.95), inset 0 -28px 42px -28px rgba(0,0,0,0.9)",
-      }}
-    >
+    <div className="flex h-full min-h-0 w-full flex-col">
       <div
-        className="pointer-events-none absolute left-1/2 top-0 h-[24%] w-[54%] -translate-x-1/2"
+        ref={boardRef}
+        data-bowling-gesture-block="true"
+        onPointerDown={onPointerDown}
+        onPointerMove={onPointerMove}
+        onPointerUp={onPointerUp}
+        onPointerCancel={onPointerCancel}
+        className="relative min-h-0 w-full flex-1 touch-none select-none overflow-hidden"
         style={{
-          background: "linear-gradient(180deg, rgba(4,8,13,0.96), rgba(13,19,25,0.78) 58%, transparent)",
-          clipPath: `polygon(${50 - FAR_OUTER_LEFT}% 0%, ${50 + FAR_OUTER_LEFT}% 0%, ${100 - FAR_OUTER_LEFT}% 100%, ${FAR_OUTER_LEFT}% 100%)`,
-          filter: "drop-shadow(0 12px 18px rgba(0,0,0,0.5))",
+          touchAction: "none",
+          overscrollBehavior: "none",
+          // 上はスコアボードとつなげ、下は操作バーとつなげるので角は丸めない
+          borderRadius: 0,
+          background: "radial-gradient(ellipse at 50% 5%, rgba(103,152,190,0.22), transparent 25%), linear-gradient(180deg, #050a10 0%, #15171a 24%, #302016 63%, #21140f 100%)",
+          boxShadow: "inset 0 1px 0 rgba(255,255,255,0.18), inset 0 22px 34px -22px rgba(0,0,0,0.95), inset 0 -28px 42px -28px rgba(0,0,0,0.9)",
         }}
-        aria-hidden="true"
-      />
-
-      <div
-        className="pointer-events-none absolute inset-0"
-        style={{
-          clipPath: `polygon(${FAR_LANE_LEFT}% 0%, ${FAR_LANE_RIGHT}% 0%, ${NEAR_LANE_RIGHT}% 100%, ${NEAR_LANE_LEFT}% 100%)`,
-          background: "radial-gradient(ellipse at 50% 92%, rgba(255,230,177,0.34), transparent 52%), linear-gradient(180deg, #ba7b43 0%, #dca766 34%, #e6bd7d 72%, #cc9252 100%)",
-          boxShadow: "inset 0 0 28px rgba(63,35,17,0.24), inset 0 -18px 22px rgba(83,42,18,0.14)",
-        }}
-        aria-hidden="true"
-      />
-
-      <div
-        className="pointer-events-none absolute inset-0"
-        style={{
-          clipPath: `polygon(${FAR_OUTER_LEFT}% 0%, ${FAR_LANE_LEFT}% 0%, ${NEAR_LANE_LEFT}% 100%, ${NEAR_OUTER_LEFT}% 100%)`,
-          background: "linear-gradient(90deg, #17191b, #3b342c 48%, #765236 82%, #a4764b)",
-          boxShadow: "inset -5px 0 9px rgba(0,0,0,0.62), inset 1px 0 rgba(255,255,255,0.08)",
-        }}
-        aria-hidden="true"
-      />
-      <div
-        className="pointer-events-none absolute inset-0"
-        style={{
-          clipPath: `polygon(${FAR_LANE_RIGHT}% 0%, ${FAR_OUTER_RIGHT}% 0%, ${NEAR_OUTER_RIGHT}% 100%, ${NEAR_LANE_RIGHT}% 100%)`,
-          background: "linear-gradient(270deg, #17191b, #3b342c 48%, #765236 82%, #a4764b)",
-          boxShadow: "inset 5px 0 9px rgba(0,0,0,0.62), inset -1px 0 rgba(255,255,255,0.08)",
-        }}
-        aria-hidden="true"
-      />
-
-      <svg className="pointer-events-none absolute inset-0 h-full w-full" viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true">
-        {[-0.8, -0.6, -0.4, -0.2, 0, 0.2, 0.4, 0.6, 0.8].map((n) => (
-          <line
-            key={n}
-            x1={50 + n * FAR_LANE_HALF}
-            y1="0"
-            x2={50 + n * NEAR_LANE_HALF}
-            y2="100"
-            stroke="rgba(255,255,255,0.14)"
-            strokeWidth="0.15"
-          />
-        ))}
-        <polygon
-          points={`${OIL_LEFT},${OIL_END_Y} ${OIL_RIGHT},${OIL_END_Y} ${NEAR_LANE_RIGHT},100 ${NEAR_LANE_LEFT},100`}
-          fill="rgba(255,255,255,0.055)"
-        />
-        <line x1={FAR_LANE_LEFT} y1="0" x2={NEAR_LANE_LEFT} y2="100" stroke="rgba(255,235,200,0.52)" strokeWidth="0.55" vectorEffect="non-scaling-stroke" />
-        <line x1={FAR_LANE_RIGHT} y1="0" x2={NEAR_LANE_RIGHT} y2="100" stroke="rgba(255,235,200,0.52)" strokeWidth="0.55" vectorEffect="non-scaling-stroke" />
-      </svg>
-
-      <div
-        className="pointer-events-none absolute h-[2px] bg-[#8c4735]/75"
-        style={{ left: `${NEAR_LANE_LEFT}%`, right: `${100 - NEAR_LANE_RIGHT}%`, top: `${FOUL_LINE_Y}%` }}
-        aria-hidden="true"
-      />
-
-      <Pins registerNode={registerPinNode} goldenPinId={goldenPinId} />
-
-      <div
-        ref={ballRef}
-        className="pointer-events-none absolute aspect-square overflow-hidden rounded-full shadow-[0_4px_10px_rgba(0,0,0,0.38)] will-change-transform"
-        style={{
-          width: `${ballVisualWidthPct(0)}%`,
-          left: "50%",
-          top: `${DOCK_Y}%`,
-          transform: "translate(-50%, -50%)",
-          background: `radial-gradient(circle at 32% 28%, ${ballVisual.bodyGradient[0]}, ${ballVisual.bodyGradient[1]})`,
-          boxShadow: ballVisual.premiumEffect ? `0 0 14px 4px ${ballVisual.hitColor}` : undefined,
-        }}
-        aria-hidden="true"
       >
-        {ballVisual.image ? (
-          <Image src={ballVisual.image} alt="" fill sizes="60px" className="object-cover" />
-        ) : (
-          <>
-            <span className="absolute left-[34%] top-[28%] h-[10%] w-[10%] rounded-full bg-black/40" />
-            <span className="absolute left-[49%] top-[22%] h-[9%] w-[9%] rounded-full bg-black/40" />
-            <span className="absolute left-[52%] top-[38%] h-[9%] w-[9%] rounded-full bg-black/40" />
-          </>
-        )}
+        <div
+          className="pointer-events-none absolute left-1/2 top-0 h-[24%] w-[54%] -translate-x-1/2"
+          style={{
+            background: "linear-gradient(180deg, rgba(4,8,13,0.96), rgba(13,19,25,0.78) 58%, transparent)",
+            clipPath: `polygon(${50 - FAR_OUTER_LEFT}% 0%, ${50 + FAR_OUTER_LEFT}% 0%, ${100 - FAR_OUTER_LEFT}% 100%, ${FAR_OUTER_LEFT}% 100%)`,
+            filter: "drop-shadow(0 12px 18px rgba(0,0,0,0.5))",
+          }}
+          aria-hidden="true"
+        />
+
+        <div
+          className="pointer-events-none absolute inset-0"
+          style={{
+            clipPath: `polygon(${FAR_LANE_LEFT}% 0%, ${FAR_LANE_RIGHT}% 0%, ${NEAR_LANE_RIGHT}% 100%, ${NEAR_LANE_LEFT}% 100%)`,
+            background: "radial-gradient(ellipse at 50% 92%, rgba(255,230,177,0.34), transparent 52%), linear-gradient(180deg, #ba7b43 0%, #dca766 34%, #e6bd7d 72%, #cc9252 100%)",
+            boxShadow: "inset 0 0 28px rgba(63,35,17,0.24), inset 0 -18px 22px rgba(83,42,18,0.14)",
+          }}
+          aria-hidden="true"
+        />
+
+        <div
+          className="pointer-events-none absolute inset-0"
+          style={{
+            clipPath: `polygon(${FAR_OUTER_LEFT}% 0%, ${FAR_LANE_LEFT}% 0%, ${NEAR_LANE_LEFT}% 100%, ${NEAR_OUTER_LEFT}% 100%)`,
+            background: "linear-gradient(90deg, #17191b, #3b342c 48%, #765236 82%, #a4764b)",
+            boxShadow: "inset -5px 0 9px rgba(0,0,0,0.62), inset 1px 0 rgba(255,255,255,0.08)",
+          }}
+          aria-hidden="true"
+        />
+        <div
+          className="pointer-events-none absolute inset-0"
+          style={{
+            clipPath: `polygon(${FAR_LANE_RIGHT}% 0%, ${FAR_OUTER_RIGHT}% 0%, ${NEAR_OUTER_RIGHT}% 100%, ${NEAR_LANE_RIGHT}% 100%)`,
+            background: "linear-gradient(270deg, #17191b, #3b342c 48%, #765236 82%, #a4764b)",
+            boxShadow: "inset 5px 0 9px rgba(0,0,0,0.62), inset -1px 0 rgba(255,255,255,0.08)",
+          }}
+          aria-hidden="true"
+        />
+
+        <svg className="pointer-events-none absolute inset-0 h-full w-full" viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true">
+          {[-0.8, -0.6, -0.4, -0.2, 0, 0.2, 0.4, 0.6, 0.8].map((n) => (
+            <line
+              key={n}
+              x1={50 + n * FAR_LANE_HALF}
+              y1="0"
+              x2={50 + n * NEAR_LANE_HALF}
+              y2="100"
+              stroke="rgba(255,255,255,0.14)"
+              strokeWidth="0.15"
+            />
+          ))}
+          <polygon
+            points={`${OIL_LEFT},${OIL_END_Y} ${OIL_RIGHT},${OIL_END_Y} ${NEAR_LANE_RIGHT},100 ${NEAR_LANE_LEFT},100`}
+            fill="rgba(255,255,255,0.055)"
+          />
+          <line x1={FAR_LANE_LEFT} y1="0" x2={NEAR_LANE_LEFT} y2="100" stroke="rgba(255,235,200,0.52)" strokeWidth="0.55" vectorEffect="non-scaling-stroke" />
+          <line x1={FAR_LANE_RIGHT} y1="0" x2={NEAR_LANE_RIGHT} y2="100" stroke="rgba(255,235,200,0.52)" strokeWidth="0.55" vectorEffect="non-scaling-stroke" />
+        </svg>
+
+        <LaneScenery fever={fever} />
+
+      {/* フィーバー中：ブラックライトのボウリング（レーンが暗い紫になり、ネオンが脈打つ） */}
+      {fever ? (
+        <>
+          <div className={bowlingFx.feverShade} style={{ clipPath: `polygon(${FAR_OUTER_LEFT}% 0%, ${FAR_OUTER_RIGHT}% 0%, ${NEAR_OUTER_RIGHT}% 100%, ${NEAR_OUTER_LEFT}% 100%)` }} aria-hidden="true" />
+          <div className={bowlingFx.feverGlow} style={{ clipPath: `polygon(${FAR_LANE_LEFT}% 0%, ${FAR_LANE_RIGHT}% 0%, ${NEAR_LANE_RIGHT}% 100%, ${NEAR_LANE_LEFT}% 100%)` }} aria-hidden="true" />
+        </>
+      ) : null}
+
+        <div
+          className="pointer-events-none absolute h-[2px] bg-[#8c4735]/75"
+          style={{ left: `${NEAR_LANE_LEFT}%`, right: `${100 - NEAR_LANE_RIGHT}%`, top: `${FOUL_LINE_Y}%` }}
+          aria-hidden="true"
+        />
+
+        <canvas ref={trailCanvasRef} className={bowlingFx.trail} style={{ zIndex: 499 }} aria-hidden="true" />
+
+        <Pins registerNode={registerPinNode} goldenPinId={goldenPinId} kingPinId={rack.kingPinId} fever={fever} />
+
+        <div
+          ref={ballRef}
+          className="pointer-events-none absolute aspect-square will-change-transform"
+          style={{
+            width: `${ballVisualWidthPct(0)}%`,
+            left: "50%",
+            top: `${DOCK_Y}%`,
+            transform: "translate(-50%, -50%)",
+          }}
+          aria-hidden="true"
+        >
+          {/* 床に落ちる影（回らない） */}
+          <span className="absolute left-1/2 top-[88%] h-[34%] w-[104%] -translate-x-1/2 -translate-y-1/2 rounded-[50%] bg-[radial-gradient(ellipse,rgba(30,14,4,0.55)_0%,rgba(30,14,4,0.22)_45%,transparent_72%)]" />
+          {active && !isThrowing ? (
+            <span className={bowlingFx.dockRing} style={{ left: "50%", top: "86%", width: "150%" }} />
+          ) : null}
+          <div
+            ref={ballBodyRef}
+            className="absolute inset-0 overflow-hidden rounded-full shadow-[0_4px_10px_rgba(0,0,0,0.38)]"
+            style={{
+              background: `radial-gradient(circle at 32% 28%, ${ballVisual.bodyGradient[0]}, ${ballVisual.bodyGradient[1]})`,
+              boxShadow: ballVisual.premiumEffect ? `0 0 14px 4px ${ballVisual.hitColor}` : undefined,
+            }}
+          >
+            {ballVisual.image ? (
+              <Image src={ballVisual.image} alt="" fill sizes="60px" className="object-cover" />
+            ) : (
+              <>
+                <span className="absolute left-[34%] top-[28%] h-[10%] w-[10%] rounded-full bg-black/40" />
+                <span className="absolute left-[49%] top-[22%] h-[9%] w-[9%] rounded-full bg-black/40" />
+                <span className="absolute left-[52%] top-[38%] h-[9%] w-[9%] rounded-full bg-black/40" />
+              </>
+            )}
+          </div>
+          {/* つや（光の当たる向きは回っても変わらない） */}
+          <span className="absolute inset-0 rounded-full bg-[radial-gradient(circle_at_32%_24%,rgba(255,255,255,0.75)_0%,rgba(255,255,255,0.18)_16%,transparent_34%)] shadow-[inset_-3px_-5px_9px_rgba(0,0,0,0.32),inset_2px_2px_4px_rgba(255,255,255,0.25)]" />
+        </div>
+
+        <div ref={fxLayerRef} className={bowlingFx.layer} aria-hidden="true" />
       </div>
 
-      {active && !isThrowing ? (
-        <div
-          data-bowling-position-controls="true"
-          className="absolute left-2 top-2 z-[1600] flex items-center rounded-xl border border-white/15 bg-[#08131f]/90 p-1 shadow-[0_6px_18px_rgba(0,0,0,0.38)] backdrop-blur-md"
-          onPointerDown={(event) => {
-            event.stopPropagation();
-          }}
-        >
+      {/*
+        操作バー。レーンの上に重ねると看板やピンが隠れるので、レーンの下（親指の届くところ）に置く。
+        投球中も場所は変えずにボタンだけ止めて、レーンの大きさがガタつかないようにする。
+      */}
+      <div
+        data-bowling-controls="true"
+        className="relative flex shrink-0 touch-none select-none items-center gap-2 border-t border-[#54d8ff]/20 bg-[linear-gradient(180deg,#0c1824,#070f18)] px-2 py-1.5"
+        style={{ borderRadius: "0 0 26px 26px", paddingBottom: "max(6px, env(safe-area-inset-bottom))" }}
+        onPointerDown={(event) => event.stopPropagation()}
+      >
+        <div data-bowling-position-controls="true" className="min-w-0 flex-1">
           {positionLocked ? (
-            <button type="button" onPointerUp={handleUnlockPosition} className="min-h-10 rounded-lg border border-[#638099] bg-[#142638] px-3 text-[10px] font-black text-[#cfeeff] active:scale-[0.98]">
+            <button
+              type="button"
+              onPointerUp={handleUnlockPosition}
+              disabled={!canControl}
+              className="flex min-h-10 w-full items-center justify-center gap-1 rounded-[14px] border border-[#638099] bg-[#142638] px-3 text-[11px] font-black text-[#cfeeff] active:scale-[0.98] disabled:opacity-40"
+            >
               ↺ 位置を変更
             </button>
           ) : (
-            <button type="button" onPointerUp={handleConfirmPosition} className="min-h-10 rounded-lg bg-[linear-gradient(135deg,#1b9bc4,#16749b)] px-4 text-[11px] font-black text-white shadow-[0_0_16px_rgba(45,190,229,0.25)] active:scale-[0.98]">
+            <button
+              type="button"
+              onPointerUp={handleConfirmPosition}
+              disabled={!canControl}
+              className="flex min-h-10 w-full items-center justify-center gap-1 rounded-[14px] bg-[linear-gradient(135deg,#1b9bc4,#16749b)] px-3 text-[12px] font-black text-white shadow-[0_0_16px_rgba(45,190,229,0.3)] active:scale-[0.98] disabled:opacity-40"
+            >
               ✓ この位置に決定
             </button>
           )}
         </div>
-      ) : null}
 
-      {active && !isThrowing ? (
         <div
           data-bowling-throw-mode-controls="true"
-          className="absolute right-2 top-2 z-[1600] flex flex-col items-stretch gap-1 rounded-xl border border-white/15 bg-[#08131f]/90 p-1 shadow-[0_6px_18px_rgba(0,0,0,0.38)] backdrop-blur-md"
-          onPointerDown={(event) => {
-            event.stopPropagation();
-          }}
+          role="radiogroup"
+          aria-label="投げ方"
+          className="relative grid h-10 w-[46%] shrink-0 grid-cols-2 rounded-[14px] border border-white/10 bg-[#0a1520] p-[3px]"
         >
-          <button
-            type="button"
-            onPointerUp={() => setThrowMode("straight")}
-            className={`min-h-9 rounded-lg px-3 text-[10px] font-black active:scale-[0.98] ${
-              throwMode === "straight"
-                ? "bg-[linear-gradient(135deg,#1b9bc4,#16749b)] text-white shadow-[0_0_16px_rgba(45,190,229,0.25)]"
-                : "border border-[#638099] bg-[#142638] text-[#cfeeff]"
-            }`}
-          >
-            ストレート
-          </button>
-          <button
-            type="button"
-            onPointerUp={() => setThrowMode("curve")}
-            className={`min-h-9 rounded-lg px-3 text-[10px] font-black active:scale-[0.98] ${
-              throwMode === "curve"
-                ? "bg-[linear-gradient(135deg,#1b9bc4,#16749b)] text-white shadow-[0_0_16px_rgba(45,190,229,0.25)]"
-                : "border border-[#638099] bg-[#142638] text-[#cfeeff]"
-            }`}
-          >
-            カーブ
-          </button>
+          {/* えらんでいる方へすべる、つまみ */}
+          <span
+            className="pointer-events-none absolute bottom-[3px] top-[3px] w-[calc(50%-3px)] rounded-[11px] bg-[linear-gradient(135deg,#1b9bc4,#16749b)] shadow-[0_0_14px_rgba(45,190,229,0.35)] transition-transform duration-200 ease-out"
+            style={{ left: 3, transform: throwMode === "curve" ? "translateX(100%)" : "translateX(0)" }}
+            aria-hidden="true"
+          />
+          {(["straight", "curve"] as const).map((mode) => (
+            <button
+              key={mode}
+              type="button"
+              role="radio"
+              aria-checked={throwMode === mode}
+              onPointerUp={() => setThrowMode(mode)}
+              disabled={!canControl}
+              className={`relative z-[1] rounded-[11px] text-[11px] font-black transition-colors disabled:opacity-40 ${throwMode === mode ? "text-white" : "text-[#8fb4cc]"}`}
+            >
+              {mode === "straight" ? "ストレート" : "カーブ"}
+            </button>
+          ))}
         </div>
-      ) : null}
+      </div>
     </div>
   );
 }
