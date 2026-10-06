@@ -25,8 +25,17 @@ export async function GET(request: Request) {
     timezone: "Asia/Tokyo",
   });
   try {
-    const res = await fetch(`https://api.open-meteo.com/v1/forecast?${q}`, { next: { revalidate: 900 }, signal: AbortSignal.timeout(6000) });
-    if (!res.ok) throw new Error(`status ${res.status}`);
+    // 天気サービスがたまたま遅い・失敗したときは、1回だけやり直す（ホームを開いた直後に天気が出ないのを防ぐ）
+    let res: Response | null = null;
+    for (let attempt = 0; attempt < 2; attempt++) {
+      try {
+        res = await fetch(`https://api.open-meteo.com/v1/forecast?${q}`, { next: { revalidate: 900 }, signal: AbortSignal.timeout(attempt === 0 ? 5000 : 6000) });
+        if (res.ok) break;
+      } catch (e) {
+        if (attempt === 1) throw e;
+      }
+    }
+    if (!res?.ok) throw new Error(`status ${res?.status ?? "none"}`);
     const json = (await res.json()) as { current?: Record<string, unknown>; daily?: Record<string, unknown> };
     const c = json.current;
     const today = (key: string) => {

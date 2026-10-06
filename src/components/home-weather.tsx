@@ -23,11 +23,13 @@ import {
   type SavedPlace,
   type SkyPhase,
   type WalkForecast,
-  WEATHER_CACHE_KEY,
+  cachedWeather,
+  requestWeather,
   WEATHER_CACHE_MS,
+  WEATHER_LAST_MS,
 } from "@/lib/home-weather";
 import { MOOD_RAIN_PENALTY, MOOD_THUNDER_PENALTY } from "@/lib/room/mood";
-import { overcastOf, parseRoomWeather, WEATHER_LABEL, type RoomWeather, type WeatherKind } from "@/lib/room/weather";
+import { overcastOf, WEATHER_LABEL, type RoomWeather, type WeatherKind } from "@/lib/room/weather";
 
 type HomeWeather = {
   weather: RoomWeather;
@@ -53,24 +55,14 @@ export function HomeWeatherProvider({ children }: { children: React.ReactNode })
     const lat = place.lat.toFixed(2), lon = place.lon.toFixed(2);
     let alive = true;
     const load = (useCache: boolean) => {
-      if (useCache) {
-        try {
-          const c = JSON.parse(window.sessionStorage.getItem(WEATHER_CACHE_KEY) ?? "null") as { lat: string; lon: string; t: number; raw: unknown } | null;
-          if (c && c.lat === lat && c.lon === lon && Date.now() - c.t < WEATHER_CACHE_MS) {
-            const w = parseRoomWeather(c.raw);
-            if (w) { setWeather(w); return; }
-          }
-        } catch { /* 覚えていなければ問い合わせる */ }
-      }
-      fetch(`/api/my-room/weather?lat=${lat}&lon=${lon}`)
-        .then((r) => (r.ok ? r.json() : null))
-        .then((raw: unknown) => {
-          if (!alive) return;
-          const w = parseRoomWeather(raw);
-          setWeather(w);
-          if (w) try { window.sessionStorage.setItem(WEATHER_CACHE_KEY, JSON.stringify({ lat, lon, t: Date.now(), raw })); } catch { /* 覚えられなくても表示はできる */ }
-        })
-        .catch(() => { /* 取れなければ前のまま（はじめてなら何も出さない） */ });
+      // 10分以内に取った天気があれば、それを使う
+      const fresh = useCache ? cachedWeather(lat, lon, WEATHER_CACHE_MS) : null;
+      if (fresh) { setWeather(fresh); return; }
+      // 古くても（3時間まで）最後に取れた天気をまず出しておき、新しいのが届いたら差しかえる
+      const last = cachedWeather(lat, lon, WEATHER_LAST_MS);
+      if (last) setWeather((prev) => prev ?? last);
+      // 取れなかったときは前の天気のまま（空にはしない）
+      void requestWeather(lat, lon).then((w) => { if (alive && w) setWeather(w); });
     };
     load(true);
     const t = window.setInterval(() => { load(false); setNow(new Date()); }, 20 * 60_000);
