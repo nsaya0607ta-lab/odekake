@@ -173,6 +173,9 @@ const FALL_DRIFT = 0.3;
 const BONE_PTS = 5;
 /** 歩いた1mあたりの点 */
 const METER_PTS = 10;
+/** この距離（m）を超えたら、障害物を DENSE_RATE 倍の数だけ出す */
+const DENSE_FROM_M = 700;
+const DENSE_RATE = 1.2;
 const hexRgbStr = (h: string) => { const [r, g, b] = hex(h); return `${r},${g},${b}`; };
 /**
  * 走る速さ（論理px/秒）。距離がのびても速くならず、ずっと START_SPEED で走る（スキルの倍率・ぬかるみなどは別）。
@@ -1112,7 +1115,10 @@ export function createOsanpoRun(root: HTMLElement, opts: OsanpoRunOptions): () =
       case "row": { const h = Math.random() < 0.5 ? 0 : rand(60, 96); for (let i = 0; i < 5; i++) pickups.push(mkPickup(X + i * 30, GROUND - 18 - h)); break; }
       case "high": { const h = rand(150, 178); for (let i = 0; i < 5; i++) pickups.push(mkPickup(X + i * 30, GROUND - h - Math.sin((i / 4) * Math.PI) * 10)); break; }
     }
-    S.next = (170 + S.speed * 0.55 + Math.random() * S.speed * 0.8) * (rush ? 0.68 : 1) * routeGap() + extra;
+    // 700m を超えたら、障害物どうしの間かくを詰めて、出てくる数を 2 割ふやす（1 / 1.2）。
+    // extra（予告のための距離や、2連の間かく）は安全のための分なので詰めない
+    const dense = S.dist / 50 >= DENSE_FROM_M ? 1 / DENSE_RATE : 1;
+    S.next = (170 + S.speed * 0.55 + Math.random() * S.speed * 0.8) * (rush ? 0.68 : 1) * routeGap() * dense + extra;
   }
   /* ---------- 思い出の写真（自分のおでかけ写真を飛行機が運ぶ） ---------- */
   type MemoryPhoto = OsanpoRunMemoryPhoto & { img: HTMLImageElement; tall: boolean };
