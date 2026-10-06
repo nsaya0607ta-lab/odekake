@@ -162,16 +162,82 @@ function Phone({ children, label }: { children: ReactNode; label: string }) {
   );
 }
 
+/** 本物のアプリの画面を、スマホのわくに入れて横にめくって見せる（自動でもめくれる） */
+type Screen = { src: string; title: string; text: string; wide?: boolean };
+
+function Screens({ screens }: { screens: readonly Screen[] }) {
+  const [index, setIndex] = useState(0);
+  const [paused, setPaused] = useState(false);
+  const trackRef = useRef<HTMLDivElement>(null);
+
+  const go = useCallback((next: number) => {
+    const track = trackRef.current;
+    const slide = track?.children[next] as HTMLElement | undefined;
+    if (track && slide) track.scrollTo({ left: slide.offsetLeft - (track.clientWidth - slide.clientWidth) / 2, behavior: "smooth" });
+  }, []);
+
+  useEffect(() => {
+    if (paused || screens.length < 2) return;
+    const id = window.setInterval(() => go((index + 1) % screens.length), 3800);
+    return () => window.clearInterval(id);
+  }, [go, index, paused, screens.length]);
+
+  const onScroll = () => {
+    const track = trackRef.current;
+    if (!track) return;
+    const center = track.scrollLeft + track.clientWidth / 2;
+    let best = 0;
+    let bestDistance = Infinity;
+    Array.from(track.children).forEach((child, i) => {
+      const el = child as HTMLElement;
+      const distance = Math.abs(el.offsetLeft + el.clientWidth / 2 - center);
+      if (distance < bestDistance) {
+        bestDistance = distance;
+        best = i;
+      }
+    });
+    if (best !== index) setIndex(best);
+  };
+
+  const current = screens[index] ?? screens[0];
+  return (
+    <div className={styles.screens} onPointerDown={() => setPaused(true)}>
+      <div className={styles.screensTrack} ref={trackRef} onScroll={onScroll}>
+        {screens.map((screen, i) => (
+          <figure key={screen.src} className={styles.screen} data-wide={screen.wide ? "" : undefined} data-active={i === index}>
+            <div className={styles.screenFrame}>
+              <Image src={screen.src} alt={screen.title} width={screen.wide ? 600 : 360} height={screen.wide ? 322 : 780} sizes={screen.wide ? "320px" : "190px"} />
+            </div>
+          </figure>
+        ))}
+      </div>
+      {current ? (
+        <div className={styles.screenCaption} aria-live="polite" key={current.src}>
+          <b>{current.title}</b>
+          <p>{current.text}</p>
+        </div>
+      ) : null}
+      {screens.length > 1 ? (
+        <div className={styles.dots} aria-label="画面をえらぶ">
+          {screens.map((screen, i) => (
+            <button key={screen.src} type="button" aria-label={screen.title} aria-current={i === index} data-on={i === index} onClick={() => { setPaused(true); go(i); }} />
+          ))}
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
 /* ------------------------------------------------------------------ はじめに */
 
 const NAV = [
-  { id: "home", label: "ホーム", icon: "/icons/navigation/home.webp", text: "わんこと今日の歩数・レベル・コイン。カードを並べかえたり、横にスワイプして背景だけ眺めたりできます。" },
-  { id: "sns", label: "SNS", icon: "/icons/navigation/sns.svg", text: "おでかけの写真を、フレンドやグループと見せ合います。" },
+  { id: "home", label: "ホーム", icon: "/icons/navigation/home.webp", text: "わんこと、今日の歩数・おでかけレベル。右上のボタンから「ミニゲーム」「ガチャ」「マイルーム」へ行けます。" },
+  { id: "sns", label: "SNS", icon: "/icons/navigation/sns.svg", text: "おでかけの写真を、フレンドやグループと見せ合います（順番に公開中で、まだ使えない人もいます）。" },
   { id: "map", label: "地図", icon: "/icons/navigation/map.webp", text: "行った市区町村が日本地図に色づいていきます。" },
   { id: "add", label: "追加", icon: "/icons/navigation/add.webp", text: "行った場所を登録・旅行を作る入口。ここから記録が始まります。" },
   { id: "records", label: "記録", icon: "/icons/navigation/records.webp", text: "訪問・旅行・スポットの一覧。お気に入りや また行きたい もここ。" },
-  { id: "shop", label: "ショップ", icon: "/icons/navigation/shop.svg", text: "青コインで、アプリ全体の背景を買えます。" },
-  { id: "mypage", label: "マイページ", icon: "/icons/navigation/mypage.webp", text: "プロフィール・コインの履歴・歩数の連携・わんこの着せかえなど。" },
+  { id: "shop", label: "ショップ", icon: "/icons/navigation/shop.svg", text: "青コインでアプリ全体の背景を買えます。ホームのカードの並び・透け感もここで変えられます。" },
+  { id: "mypage", label: "マイページ", icon: "/icons/navigation/mypage.webp", text: "プロフィール・コインの履歴・歩数の連携・犬のすがたなど。" },
 ] as const;
 
 const LOOP = [
@@ -246,7 +312,7 @@ function StartChapter({ onGo }: { onGo: (tab: TabId) => void }) {
           <div className={styles.coinCard} data-blue>
             <span className={styles.coinIcon}><BlueCoinArt className="h-full w-full" /></span>
             <b>青コイン</b>
-            <p>はじめての土地・通算ログイン・おさんぽフレンチーでたまる。背景・家具・都道府県ガチャに使う。</p>
+            <p>はじめての土地・通算ログイン・おさんぽフレンチー・ホームに降るコインでたまる。背景・家具・都道府県ガチャに使う。</p>
             <button type="button" onClick={() => onGo("room")}>使いみち →</button>
           </div>
         </div>
@@ -487,6 +553,17 @@ function GachaChapter() {
     <>
       <Hero title="ガチャ・図鑑" lead="コインでガチャを回して、図鑑を埋めよう。同じものが出るとスキルが育ちます。" art={<span className={styles.machineArt}><GachaMachineArt className="h-full w-auto" /></span>} />
 
+      <Section kicker="じっさいの画面" title="ガチャはこんな流れ">
+        <Screens
+          screens={[
+            { src: "/guide/gacha-machine.webp", title: "① ハンドルを回す", text: "ホームの「ガチャを引く」から。ハンドルを指でぐるっと回すか、下のボタンをタップ。ランプの色で、いいものが出るか予告されます。" },
+            { src: "/guide/gacha-capsule.webp", title: "② カプセルをタップ", text: "取り出し口からカプセルが転がり出てきます。カプセルの色がレアの色。タップで開けます。" },
+            { src: "/guide/gacha-reveal.webp", title: "③ 中身が出てくる", text: "中のアイテムが飛び出して、図鑑に入ります。はじめてのものには NEW がつきます。" },
+            { src: "/guide/gacha-tray.webp", title: "10連・100連は受け皿へ", text: "10個が受け皿に並びます。好きなカプセルをタップするか「ぜんぶ開ける」で。SSR以上は大きな演出で開きます。" },
+          ]}
+        />
+      </Section>
+
       <Section kicker="まわしかた" title="1回・10連・100連">
         <div className={styles.planRow}>
           {(Object.keys(GACHA_PLANS) as (keyof typeof GACHA_PLANS)[]).map((plan) => (
@@ -496,12 +573,8 @@ function GachaChapter() {
             </div>
           ))}
         </div>
-        <ol className={styles.steps}>
-          <li>ハンドルを指で回す（タップでもOK）。ランプが光る色で、いいものが出るか予告します</li>
-          <li>出てきたカプセルをタップして開ける</li>
-          <li>10連・100連は受け皿に並びます。「ぜんぶ開ける」でまとめて。SSR以上は大きな演出で開きます</li>
-        </ol>
-        <Tip>右上の「AUTO」でタップを待たずに進み、「×2・×3」で速くなります。いつでもスキップできます。100連はSR以上が少し出やすくなります。</Tip>
+        <Tip>演出中は左上の「AUTO」でタップを待たずに進み、「×1」を押すと2倍・3倍速に。右上からいつでもスキップできます。100連はSR以上が少し出やすくなります。</Tip>
+        <Tip>ほかに、青コインで回す「都道府県ガチャ」（ご当地アイテム）と、アイテムキャッチで使う箱が出る「ダンボールガチャ」もあります。</Tip>
       </Section>
 
       <Section kicker="排出率" title="どのくらい出る？">
@@ -565,18 +638,57 @@ function GachaChapter() {
 /* ------------------------------------------------------------------ ミニゲーム */
 
 const GAMES = [
-  { id: "item-catch", name: "アイテムキャッチ", icon: "/games/item-catch/menu-icon-v2.webp", how: "箱を左右に動かして、落ちてくるお宝をキャッチ", time: "約50秒", reward: "100スコアごとに1コイン", tip: "図鑑のスキルが効く。時間が延びるアイテムもあります。ゲーム内のルールブックでスキルの効果を全部見られます。" },
-  { id: "osanpo-run", name: "おさんぽフレンチー", icon: "/games/osanpo-run/menu-icon.webp", how: "タップでジャンプ。跳んで・くぐって・拾い集める", time: "エンドレス", reward: "青コイン（毎日のミッション1つ30・全部で+100、週1の協力チャレンジ100）", tip: "道には自分の図鑑アイテムが落ちています。進むほど障害物が増えます。" },
-  { id: "wanko-bowling", name: "わんこボウリング", icon: "/games/wanko-bowling/menu-icon-v2.webp", how: "スワイプで投球。お気に入りのボールでストライクを狙う", time: "最後まで", reward: "倒したピンのスコア5点ごとに1コイン", tip: "ボールによって曲がり方や重さがちがいます。" },
-  { id: "snack-trail", name: "わんこのおやつ道", icon: "/games/snack-trail/menu-icon-preview.webp", how: "スワイプで方向転換。おやつを集めて足あとをのばす", time: "エンドレス", reward: "ハイスコアをめざす", tip: "自分の足あとにぶつからないように。" },
+  {
+    id: "item-catch",
+    name: "アイテムキャッチ",
+    icon: "/games/item-catch/menu-icon-v2.webp",
+    shot: "/guide/game-catch.webp",
+    how: "指で箱を左右に動かして、落ちてくるアイテムをキャッチ",
+    time: "約50秒",
+    reward: "遊びきると、スコア100ごとにコイン1枚（最低1枚）",
+    tip: "図鑑で集めたR以上のアイテムが落ちてきて、取るとそのアイテムのスキル（得点アップ・時間がのびる など）が発動します。スキルの効果は、ゲーム画面の「ルールとスキルを見る」でぜんぶ見られます。",
+  },
+  {
+    id: "osanpo-run",
+    name: "おさんぽフレンチー",
+    icon: "/games/osanpo-run/menu-icon.webp",
+    shot: "/guide/game-run.webp",
+    how: "タップでジャンプ（空中であと2回・3段まで）、下にスワイプでスライディング",
+    time: "エンドレス",
+    reward: "スコア50ごとに青コイン1枚。毎日のミッション1つ30枚・3つ全部で+100、週1の協力チャレンジ100枚",
+    tip: "道には自分の図鑑アイテムが落ちています。今日の歩数が多いとスコアアップやバリアがつき、その日におでかけを記録しているとスコアが1.2倍。進むほど障害物が増えます。",
+  },
+  {
+    id: "wanko-bowling",
+    name: "わんこボウリング",
+    icon: "/games/wanko-bowling/menu-icon-v2.webp",
+    shot: "/guide/game-bowling.webp",
+    how: "立つ位置を決めて、スワイプで投げる（ストレート・カーブを選べる）",
+    time: "10フレーム",
+    reward: "最後まで投げると、スコアがそのままコインに（金色のピンを倒すと+10）",
+    tip: "図鑑のボールを持っていると、そのボールで投げられます。ボールごとに重さや曲がり方がちがいます。",
+  },
+  {
+    id: "snack-trail",
+    name: "わんこのおやつ道",
+    icon: "/games/snack-trail/menu-icon-preview.webp",
+    shot: "/guide/game-snack.webp",
+    how: "スワイプで向きを変えて、おやつを集めながら道をのばす",
+    time: "エンドレス",
+    reward: "スコアの3分の2がコインに",
+    tip: "5個目で強化スキル。肉球の道や罠に触れるとコンボが0に。1分ごとにどこかへ壁が出てくるので、ぶつからないように。",
+  },
 ] as const;
 
 function GamesChapter() {
   const [open, setOpen] = useState<string>(GAMES[0].id);
   return (
     <>
-      <Hero title="ミニゲーム" lead="すきま時間にひと遊び。図鑑で育てたスキルが、ゲームで役に立ちます。" art={<Image src="/splash/game-item-catch.webp" alt="" width={92} height={92} />} />
-      <Section kicker="4つのゲーム" title="遊びかたと、もらえるもの">
+      <Hero title="ミニゲーム" lead="ホームの「ミニゲーム」から。図鑑で育てたスキルが、ゲームで役に立ちます。" art={<Image src="/splash/game-item-catch.webp" alt="" width={92} height={92} />} />
+      <Section kicker="じっさいのプレイ画面" title="4つのゲーム">
+        <Screens screens={GAMES.map((game) => ({ src: game.shot, title: game.name, text: game.how }))} />
+      </Section>
+      <Section kicker="くわしく" title="遊びかたと、もらえるもの">
         <div className={styles.gameList}>
           {GAMES.map((game) => {
             const isOpen = open === game.id;
@@ -593,7 +705,7 @@ function GamesChapter() {
                 {isOpen ? (
                   <div className={styles.gameBody}>
                     <dl className={styles.facts}>
-                      <div><dt>プレイ時間</dt><dd>{game.time}</dd></div>
+                      <div><dt>プレイ</dt><dd>{game.time}</dd></div>
                       <div><dt>もらえるもの</dt><dd>{game.reward}</dd></div>
                     </dl>
                     <p className={styles.body}>{game.tip}</p>
@@ -604,29 +716,8 @@ function GamesChapter() {
             );
           })}
         </div>
-        <CatchDemo />
       </Section>
     </>
-  );
-}
-
-/** アイテムキャッチの見本：箱が左右に動いて、落ちてくるカプセルを受けとめる */
-function CatchDemo() {
-  const [score, setScore] = useState(0);
-  useEffect(() => {
-    const id = window.setInterval(() => setScore((value) => (value >= 990 ? 0 : value + 30)), 600);
-    return () => window.clearInterval(id);
-  }, []);
-  return (
-    <div className={styles.catchDemo} aria-label="アイテムキャッチの見本アニメーション">
-      <span className={styles.catchScore}>SCORE {score}</span>
-      {(["R", "N", "SR", "R", "SSR"] as const).map((rarity, i) => (
-        <span key={i} className={styles.catchItem} style={{ left: `${12 + i * 18}%`, animationDelay: `${i * 0.6}s` }}>
-          <CapsuleArt rarity={rarity} small />
-        </span>
-      ))}
-      <span className={styles.catchBox} />
-    </div>
   );
 }
 
@@ -642,33 +733,32 @@ function RoomChapter() {
           <li><span>🗺️</span>はじめての市区町村を記録<b>100</b></li>
           <li><span>🏯</span>はじめての都道府県を記録<b>600</b></li>
           <li><span>📅</span>通算ログインが7の倍数の日<b>400</b></li>
-          <li><span>🐶</span>おさんぽフレンチーの毎日のミッション<b>30〜</b></li>
+          <li><span>🐶</span>おさんぽフレンチー（スコア50ごとに1枚・ミッション1つ）<b>1〜30</b></li>
           <li><span>🤝</span>おさんぽフレンチーの協力チャレンジ（週1）<b>100</b></li>
           <li><span>✨</span>ホームの犬カードに降ってくる青コイン<b>5〜100</b></li>
         </ul>
       </Section>
 
       <Section kicker="ショップ" title="アプリ全体の背景を着せかえ">
-        <div className={styles.shopDemo}>
-          {["paw", "watercolor", "starry", "aurora", "dog-parade"].map((id, i) => (
-            <span key={id} className={styles.swatch} data-bg={id} style={{ animationDelay: `${i * 1.6}s` }} />
-          ))}
-          <span className={styles.shopLabel}>ショップ → 見本をタップ →「アプリでためす」で、買う前にホームで見られます</span>
-        </div>
-        <Tip>動く背景・さわれる背景もあります。買った背景はいつでも「いつもの」に戻せます。</Tip>
+        <Screens
+          screens={[
+            { src: "/guide/shop-dialog.webp", title: "見本をタップすると、くわしく見られる", text: "動く背景・さわれる背景もあります。「アプリでためす」を押すと、買う前にホームなどで見られます。気に入ったら「買って使う」。" },
+          ]}
+        />
+        <Tip>買った背景はいつでも「いつもの」に戻せます。ショップの「ホームの着せかえ」で、ホームのカードの並び順・出す出さない・透け感も変えられます。</Tip>
       </Section>
 
-      <Section kicker="おへや" title="わんこのお部屋">
+      <Section kicker="おへや" title="わんこのお部屋（ホームの「マイルーム」）">
         <ul className={styles.steps}>
-          <li>家具を青コインで買って、好きな場所に置く</li>
-          <li>おさんぽで拾った <b>おみやげ</b> を飾る。飾らない分は材料にして、壁に飾る作品をクラフトできる</li>
-          <li>フレンドのお部屋にあそびに行って、おみやげを置いてこられる</li>
+          <li>家具を青コインで買って、「もようがえ」で好きな場所に置く</li>
+          <li>その日の歩数が3,000歩から1,000歩ごとの節目をこえるたびに、わんこが <b>おみやげ</b> を拾ってきます（1万歩ではレアなもの）。棚や床に飾れて、飾らない分は材料にして壁に飾る作品をクラフトできます</li>
+          <li>フレンドのお部屋にあそびに行って「いいね」や置き手紙を残せます。遊びに来たフレンドのわんこは、おみやげをくれます</li>
           <li>家具やおみやげをタップすると、わんこがいっしょに遊びます（ごきげんが上がる）</li>
         </ul>
       </Section>
 
       <Section kicker="都道府県ガチャ" title="ご当地アイテム">
-        <p className={styles.body}>青コインで回す、ご当地の名物や観光地のアイテムが出るガチャです。ご当地のフレブルの着せかえもあります。</p>
+        <p className={styles.body}>青コインで回す、ご当地の名物や観光地のアイテムが出るガチャです（コインのガチャのアイテムは出ません）。集めたアイテムによって、ご当地のフレブルの着せかえが解放されます（マイページ →「犬のすがたを選ぶ」）。</p>
       </Section>
     </>
   );
@@ -696,6 +786,14 @@ function HomeChapter() {
   return (
     <>
       <Hero title="ホーム" lead="わんこが暮らしている、あなたのホーム。さわって・待って・眺めて楽しめます。" art={<Image src="/splash/photo-osanpo.webp" alt="" width={92} height={92} className={styles.heroPhoto} />} />
+
+      <Section kicker="じっさいの画面" title="ホームのわんこカード">
+        <Screens
+          screens={[
+            { src: "/guide/home-card.webp", title: "わんこと、レベル・今日の歩数", text: "左上の看板が「おでかけレベル」（タップでくわしく）と「今日の歩数」。わんこは歩きまわって、いろんなしぐさを見せてくれます。", wide: true },
+          ]}
+        />
+      </Section>
 
       <Section kicker="降ってくるコイン" title={`${HOME_DROP.everySeconds}秒ごとに${HOME_DROP.chance}%で、空からコイン`}>
         <div className={styles.dropStage} aria-label="コインが降ってくる見本。タップで拾えます">
@@ -736,8 +834,8 @@ function HomeChapter() {
           {[
             ["✍️", "歩数を書く", "アプリを開くと、わんこがペンで今日の歩数をボードに書きこみます"],
             ["🐾", "奥・手前に歩く", "わんこは奥へ行くと小さく、手前に来ると大きく見えます"],
-            ["👆", "カードの並べかえ", "ホームのカードは順番を入れかえられます"],
-            ["🌅", "背景だけ見る", "ホームを横にスワイプすると、背景だけをゆっくり眺められます"],
+            ["🎮", "3つの入口", "わんこカードの右上から、ミニゲーム・ガチャ・マイルームへ"],
+            ["🌅", "背景だけ見る", "ショップの背景を使っているときは、ホームを横にスワイプすると背景だけを眺められます"],
             ["🌦️", "天気と時間", "空の色や天気が、時間に合わせて変わります"],
             ["📚", "このルールブック", "右上の本のアイコンから、いつでも開けます"],
           ].map(([emoji, title, text]) => (
