@@ -5,8 +5,8 @@ import { requireUser } from "@/lib/supabase/server";
 /**
  * ホームの犬カードに降ってきたコインを受け取る（1回 5 枚）。
  *
- * 降るかどうかはアプリ側で決めているので、1日の回数・青の回数・間かく・二重受け取りは
- * すべて DB（claim_home_coin_drop）が止める。ここはむだな呼び出しを間引くだけ。
+ * 1日の回数に上限はない。間かく（8秒）と二重受け取りは DB（claim_home_coin_drop）が止める。
+ * ここはむだな呼び出しを間引くだけ。
  */
 
 function toRecord(value: unknown): Record<string, unknown> {
@@ -44,7 +44,6 @@ export async function POST(request: Request) {
       granted: result.granted === true,
       kind: result.kind === "blue" ? "blue" : "coin",
       amount: typeof result.amount === "number" ? result.amount : 0,
-      remaining: typeof result.remaining === "number" ? result.remaining : null,
       reason: typeof result.reason === "string" ? result.reason : null,
     },
     { headers: { "Cache-Control": "no-store" } },

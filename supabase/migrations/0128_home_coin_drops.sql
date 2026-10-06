@@ -3,8 +3,7 @@
 -- =============================================================
 -- 0125 の後に適用する。
 -- ・ホームの犬カードに、ときどき空からコイン（黄色 or 青）が降ってくる。犬が取りに行くか、タップで拾うと
---   1回につき 5 枚もらえる。降るかどうかはアプリ側（5秒ごとに5%）で決めるので、DB 側で上限を決めて守る。
---   ・1日（日本時間）に受け取れるのは 10 回まで（青はそのうち 3 回まで。こえたぶんは黄色で渡す）
+--   1回につき 5 枚もらえる。降るかどうかはアプリ側（5秒ごとに5%）で決める。1日の回数に上限はつけない。
 --   ・前に受け取ってから 8 秒たっていないときは受け取らない（連打・自動化よけ）
 --   ・同じコイン（drop_id）は1回だけ
 -- ・あわせて、青コインの台帳の種類チェックを直す。
@@ -47,15 +46,9 @@ as $$
 declare
   v_user_id uuid := auth.uid();
   v_amount constant integer := 5;
-  v_daily_limit constant integer := 10;
-  v_blue_limit constant integer := 3;
   v_today date := (timezone('Asia/Tokyo', now()))::date;
-  v_day_start timestamptz := (v_today::timestamp at time zone 'Asia/Tokyo');
   v_key text;
-  v_yellow_today integer;
-  v_blue_today integer;
   v_last timestamptz;
-  v_kind text;
   v_applied boolean;
   v_balance integer;
   v_blue_balance integer;
@@ -75,25 +68,19 @@ begin
     return jsonb_build_object('ok', true, 'granted', false, 'reason', 'duplicate');
   end if;
 
-  select count(*), max(created_at) into v_yellow_today, v_last
+  -- いちばん最近に受け取った時刻（黄色と青のどちらでも）
+  select max(created_at) into v_last
     from public.coin_events
-   where user_id = v_user_id and event_type = 'home_drop' and event_date = v_today;
-  select count(*), greatest(v_last, max(created_at)) into v_blue_today, v_last
+   where user_id = v_user_id and event_type = 'home_drop' and created_at > now() - interval '1 minute';
+  select greatest(v_last, max(created_at)) into v_last
     from public.blue_coin_events
-   where user_id = v_user_id and event_type = 'home_drop' and created_at >= v_day_start;
+   where user_id = v_user_id and event_type = 'home_drop' and created_at > now() - interval '1 minute';
 
-  if v_yellow_today + v_blue_today >= v_daily_limit then
-    return jsonb_build_object('ok', true, 'granted', false, 'reason', 'daily_limit', 'remaining', 0);
-  end if;
   if v_last is not null and v_last > now() - interval '8 seconds' then
-    return jsonb_build_object('ok', true, 'granted', false, 'reason', 'too_soon',
-      'remaining', v_daily_limit - v_yellow_today - v_blue_today);
+    return jsonb_build_object('ok', true, 'granted', false, 'reason', 'too_soon');
   end if;
 
-  -- 青は1日3回まで。こえたぶんは黄色で渡す
-  v_kind := case when p_kind = 'blue' and v_blue_today < v_blue_limit then 'blue' else 'coin' end;
-
-  if v_kind = 'blue' then
+  if p_kind = 'blue' then
     v_applied := public.add_blue_coin_event(
       v_user_id, 'home_drop', v_amount, v_key,
       jsonb_build_object('label', 'ホームで拾った青コイン', 'drop_id', p_drop_id)
@@ -111,9 +98,8 @@ begin
   return jsonb_build_object(
     'ok', true,
     'granted', v_applied,
-    'kind', v_kind,
+    'kind', p_kind,
     'amount', case when v_applied then v_amount else 0 end,
-    'remaining', greatest(0, v_daily_limit - v_yellow_today - v_blue_today - case when v_applied then 1 else 0 end),
     'balance', coalesce(v_balance, 0),
     'blue_balance', coalesce(v_blue_balance, 0)
   );
