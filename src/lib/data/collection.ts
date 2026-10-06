@@ -33,3 +33,29 @@ export async function getOwnedItemCounts(supabase: DB, userId: string): Promise<
 
   return new Map((data ?? []).map((row) => [row.item_id, Math.max(0, row.count)]));
 }
+
+/**
+ * ホームの図鑑カード用：持っているアイテムと、最近はじめて手に入れた順のアイテム。
+ * 1回の問い合わせで両方を取る（getOwnedItemIds と同じ表を見る）。
+ */
+export async function getOwnedItemsForHome(
+  supabase: DB,
+  userId: string,
+): Promise<{ ids: Set<string>; recent: { id: string; obtainedAt: string }[] }> {
+  const { data, error } = await supabase
+    .from("user_gacha_items")
+    .select("item_id,first_obtained_at")
+    .eq("user_id", userId)
+    .order("first_obtained_at", { ascending: false });
+
+  if (error) {
+    console.warn("Collection is unavailable", { code: error.code, message: error.message });
+    return { ids: new Set(), recent: [] };
+  }
+
+  const rows = data ?? [];
+  return {
+    ids: new Set(rows.map((row) => row.item_id)),
+    recent: rows.map((row) => ({ id: row.item_id, obtainedAt: row.first_obtained_at })),
+  };
+}

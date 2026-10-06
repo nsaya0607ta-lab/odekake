@@ -9,7 +9,7 @@ import { SharedTripBadge } from "@/components/shared-trip-badge";
 import { HomeScene } from "@/components/home-scene";
 import { HomeWeatherChip, HomeWeatherProvider, HomeWeatherSky } from "@/components/home-weather";
 import { homeCardMarginTop } from "@/lib/home-card-layout";
-import { HomeCollectionCard } from "@/components/home-collection-card";
+import { HomeCollectionCard, type HomeCollectionRecentItem } from "@/components/home-collection-card";
 import { HomeHighlightsCarousel } from "@/components/home-highlights-carousel";
 import { HomeNoticeCard } from "@/components/home-notice-card";
 import { LevelTag } from "@/components/level-tag";
@@ -20,7 +20,7 @@ import { getCurrentAppBackground, getHomeAppearance } from "@/lib/data/app-backg
 import { loadAreaIndex } from "@/lib/data/areas";
 import { getBlueCoinBalance } from "@/lib/data/blue-coins";
 import { getCoinSummary } from "@/lib/data/coins";
-import { getOwnedItemIds } from "@/lib/data/collection";
+import { getOwnedItemsForHome } from "@/lib/data/collection";
 import { getOwnedDambourleCounts } from "@/lib/data/dambourle";
 import { DAMBOURLE_PRIZES } from "@/lib/dambourle/prizes";
 import { getCurrentDogSkin } from "@/lib/data/dog-skin";
@@ -57,7 +57,7 @@ export default async function HomePage({
     areas,
     expDashboard,
     coins,
-    ownedItemIds,
+    ownedItems,
     dogSkin,
     dambourleCounts,
     profileResult,
@@ -71,7 +71,7 @@ export default async function HomePage({
     spacePromise.then((space) => loadAreaIndex(supabase, space.tripIds)),
     getExpDashboard(supabase, user.id),
     getCoinSummary(supabase, user.id),
-    getOwnedItemIds(supabase, user.id),
+    getOwnedItemsForHome(supabase, user.id),
     getCurrentDogSkin(supabase, user.id),
     getOwnedDambourleCounts(supabase, user.id).catch(() => new Map<string, number>()),
     supabase.from("profiles").select("profile_image_url").eq("user_id", user.id).maybeSingle(),
@@ -106,7 +106,16 @@ export default async function HomePage({
   const backgroundOutdated = appearance.savedBackground !== null && appearance.savedBackground !== background;
 
   const expProgress = getExpProgress(expDashboard.totalExp);
-  const collectedItems = countOwned(COLLECTION_ITEMS, ownedItemIds);
+  const collectedItems = countOwned(COLLECTION_ITEMS, ownedItems.ids);
+  // 図鑑カードに出す「最近手に入れたもの」（24時間以内は NEW）
+  const collectionItemById = new Map(COLLECTION_ITEMS.map((item) => [item.id, item]));
+  const newSince = Date.now() - 24 * 60 * 60 * 1000;
+  const recentCollection: HomeCollectionRecentItem[] = ownedItems.recent
+    .flatMap(({ id, obtainedAt }) => {
+      const item = collectionItemById.get(id);
+      return item ? [{ id: item.id, name: item.name, image: item.image, art: item.art, rarity: item.rarity, isNew: Date.parse(obtainedAt) > newSince }] : [];
+    })
+    .slice(0, 4);
   // 図鑑の母数・所持数に、通常図鑑とは別モデルのダンボールぶんも合算する
   const collectedDambourle = DAMBOURLE_PRIZES.filter((prize) => (dambourleCounts.get(prize.id) ?? 0) > 0).length;
   const totalCollectionCount = COLLECTION_ITEMS.length + DAMBOURLE_PRIZES.length;
@@ -174,7 +183,7 @@ export default async function HomePage({
         stepsRanking={friendStepsRanking}
       />
     ),
-    collection: <HomeCollectionCard collected={totalCollectedCount} total={totalCollectionCount} />,
+    collection: <HomeCollectionCard collected={totalCollectedCount} total={totalCollectionCount} recent={recentCollection} />,
   };
 
   return (
