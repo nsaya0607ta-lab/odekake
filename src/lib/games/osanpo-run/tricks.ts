@@ -10,6 +10,11 @@ export function isTrickKind(kind: string): kind is TrickKind {
   return kind === "suitcase" || kind === "surprise" || kind === "drone";
 }
 export const TRICK_WARNING = 0.65;
+/**
+ * びっくり宅配便が飛び出す高さ（箱の 26 にたす分）。走る速さが 300 になって見えてから届くまでが短くなったので、
+ * 2段ジャンプでないと越えられない高さ（以前は 94）から、ふつうのジャンプ（長押し）で越えられる高さにした
+ */
+export const SURPRISE_POP = 40;
 export const SUITCASE_CYCLE = 1.8;
 const smooth = (n: number) => { const t = Math.max(0, Math.min(1, n)); return t * t * (3 - 2 * t); };
 
@@ -22,7 +27,7 @@ export function trickPose(kind: TrickKind, ground: number, age: number, activeTi
   const warning = activeTime >= 0 && activeTime < TRICK_WARNING ? 1 - activeTime / TRICK_WARNING : 0;
   if (kind === "surprise") {
     const pop = smooth((activeTime - TRICK_WARNING) / 0.18) * (1 - smooth((activeTime - 1.7) / 0.3));
-    return { y: ground, h: 26 + 94 * pop, warning };
+    return { y: ground, h: 26 + SURPRISE_POP * pop, warning };
   }
   return { y: ground - 82 + 50 * smooth((activeTime - TRICK_WARNING) / 0.3), h: TRICK_SPECS.drone.height, warning };
 }

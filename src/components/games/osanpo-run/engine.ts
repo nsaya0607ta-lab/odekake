@@ -7,7 +7,7 @@
  * 戻り値の関数を呼ぶと、ループ・イベント・音をすべて片付ける。
  */
 import { getAudioContext, resumeAudioContext } from "@/lib/audio-context";
-import { isTrickKind, newTrickRun, newTrickStats, recordTrickClear, trickPose, TRICK_SPECS, TRICK_WARNING, type TrickKind, type TrickStats } from "@/lib/games/osanpo-run/tricks";
+import { isTrickKind, newTrickRun, newTrickStats, recordTrickClear, SURPRISE_POP, trickPose, TRICK_SPECS, TRICK_WARNING, type TrickKind, type TrickStats } from "@/lib/games/osanpo-run/tricks";
 import { DOG_SKIN_IDS, getDogSkin } from "@/lib/dog-skins";
 import type { GachaRarity } from "@/lib/gacha/config";
 import { GACHA_RARITIES } from "@/lib/gacha/config";
@@ -145,7 +145,8 @@ const ITEM_RATE = 0.12, ITEM_RATE_BONUS = 0.25;
 /** 分かれ道：上の道でアイテムになる割合に足す分 / 下の道でSR以上が出やすくなる倍率 */
 const ROUTE_CALM_ITEM_BONUS = 0.08, ROUTE_RISKY_RARE = 2.5;
 /** 水が出たり止まったりするところ: 1周の秒数・出ている秒数・水の高さ（ふつうのジャンプでは越えられず、2段ジャンプなら越えられる） */
-const GEYSER_CYCLE = 1.4, GEYSER_ON = 0.8, GEYSER_H = 124;
+/** 噴水の高さは、ふつうのジャンプ（長押し）で越えられる高さ（以前は 124 で2段ジャンプが必要だった） */
+const GEYSER_CYCLE = 1.4, GEYSER_ON = 0.8, GEYSER_H = 64;
 /** 上から落ちてくるものの重力 */
 const DROP_G = 1400;
 /** 空から降ってくるアイテムが、落ちている間に左へ流れる速さ（道の速さに対する割合） */
@@ -1057,14 +1058,14 @@ export function createOsanpoRun(root: HTMLElement, opts: OsanpoRunOptions): () =
         addObs("crow", X + 170, 34, 20, { y: GROUND - 84 - rand(0, 12), vx: rand(40, 90) });
         if (Math.random() < 0.6) for (let i = 0; i < 4; i++) pickups.push(mkPickup(X + 40 + i * 30, GROUND - 18));
         extra = 150; break;
-      case "lowcrow": addObs("crow", X + 170, 34, 20, { y: GROUND - 58, vx: rand(30, 60), low: true }); extra = 150; break;
+      case "lowcrow": addObs("crow", X + 170, 34, 20, { y: GROUND - 58, vx: rand(20, 40), low: true }); extra = 150; break;
       case "double": {
         const g = Math.max(190, S.speed * 0.62);
         addObs("cone", X, 24, 34);
         if (Math.random() < 0.5) addObs("cone", X + g, 24, 34); else addObs("puddle", X + g, rand(56, 76), 6);
         extra = g; break;
       }
-      case "cat": addObs("cat", X + 60, 34, 24, { vx: rand(60, 110) }); extra = 80; break;
+      case "cat": addObs("cat", X + 60, 34, 24, { vx: rand(35, 65) }); extra = 80; break;
       case "sign": addObs("sign", X, 40, 48); if (Math.random() < 0.5) treatArc(X - 60, X + 100, 110); break;
       case "pigeons": {
         const n = 2 + Math.floor(Math.random() * 2);
@@ -1080,7 +1081,7 @@ export function createOsanpoRun(root: HTMLElement, opts: OsanpoRunOptions): () =
         extra = lead + 150;
         break;
       }
-      case "roller": addObs("roller", X + 80, 30, 18, { vx: rand(55, 95) }); extra = 80; break;
+      case "roller": addObs("roller", X + 80, 30, 18, { vx: rand(35, 60) }); extra = 80; break;
       case "drop": addObs("drop", X + 40, 22, 22, { y: -30 }); extra = 40; break;
       case "buddy": addObs("buddy", X + 60, 44, 40, { phase: Math.floor(rand(0, DOG_SKIN_IDS.length)), vx: rand(20, 40) }); if (Math.random() < 0.5) treatArc(X - 50, X + 84, 70); break;
       case "geyser": addObs("geyser", X, 24, 0, { phase: rand(0, GEYSER_CYCLE) }); extra = 30; break;
@@ -1505,6 +1506,13 @@ export function createOsanpoRun(root: HTMLElement, opts: OsanpoRunOptions): () =
       c.save();
       c.beginPath(); c.rect(left, 0, right - left, GROUND + 19); c.clip();
       drawRouteSceneLayer({ c, e, g: GROUND, t: S.time, base: gx, left, right, still: S.calm, calm: RM, seamL: seamL > -10, seamR: seamR < VW + 10 }, theme);
+      // 店先などのにぎやかな景色に、空の色のうすいベールをかけて一歩うしろに下げる（障害物が見やすいように）
+      const veil = c.createLinearGradient(0, GROUND - 190, 0, GROUND + 19);
+      const vc = mix(e.top, e.bot, 0.6);
+      veil.addColorStop(0, rgb(vc, 0));
+      veil.addColorStop(0.35, rgb(vc, 0.26));
+      veil.addColorStop(1, rgb(vc, 0.42));
+      c.fillStyle = veil; c.fillRect(left, GROUND - 190, right - left, 209);
       c.restore();
     }
     if (gx > -80 && gx < VW + 80) drawRouteGate(c, e, GROUND, gx, theme, routeName(r.kind), S.time);
@@ -3100,7 +3108,11 @@ export function createOsanpoRun(root: HTMLElement, opts: OsanpoRunOptions): () =
     const px0 = P.x - (sl ? 28 : 24), px1 = P.x + (sl ? 26 : 22), py0 = P.y - (sl ? 22 : 44), py1 = P.y;
     if (o.kind === "puddle") return P.y >= GROUND - 1 && px1 - 8 > o.x + 10 && px0 + 8 < o.x + o.w - 10;
     let ox0: number, ox1: number, oy0: number, oy1: number;
-    if (isTrickKind(o.kind)) { ox0 = o.x + 3; ox1 = o.x + o.w - 3; oy0 = o.y - o.h + 2; oy1 = o.y; }
+    if (isTrickKind(o.kind)) {
+      // びっくり宅配便は、飛び出したバネと顔のあたり（箱より細い）だけを当たりにする
+      const inset = o.kind === "surprise" && o.h > 30 ? 8 : 3;
+      ox0 = o.x + inset; ox1 = o.x + o.w - inset; oy0 = o.y - o.h + 2; oy1 = o.y;
+    }
     else if (o.kind === "crow") { ox0 = o.x + 4; ox1 = o.x + o.w - 2; oy0 = o.y + 3; oy1 = o.y + o.h - 2; }
     else if (o.kind === "cone") { ox0 = o.x + 5; ox1 = o.x + o.w - 5; oy0 = GROUND - o.h + 5; oy1 = GROUND; }
     else if (o.kind === "noren") { ox0 = o.x + 4; ox1 = o.x + o.w - 4; oy0 = -999; oy1 = GROUND - 30; }
@@ -3428,7 +3440,7 @@ export function createOsanpoRun(root: HTMLElement, opts: OsanpoRunOptions): () =
       if (isTrickKind(o.kind) && !o.assisted && o.x < P.x + 22 && o.x + o.w > P.x - 24) {
         if (o.kind === "suitcase" && P.ground && o.y < GROUND - (P.slide ? 26 : 48)) o.under = true;
         if (o.kind === "drone" && P.slide && P.ground) o.ducked = true;
-        if (!P.ground && P.y <= o.y - o.h + 2 && (o.kind !== "surprise" || o.h >= 119.9)) o.over = true;
+        if (!P.ground && P.y <= o.y - o.h + 2 && (o.kind !== "surprise" || o.h >= 26 + SURPRISE_POP - 0.1)) o.over = true;
       }
       if (o.kind === "buddy") {
         // ほかのわんこ。ぶつかってもよくて、あいさつすると点がもらえる（少しだけ立ち止まる）
@@ -3573,6 +3585,36 @@ export function createOsanpoRun(root: HTMLElement, opts: OsanpoRunOptions): () =
     c.beginPath(); rr(c, -8, -2.6, 16, 5.2, 2); c.fill();
     c.restore();
   }
+  /** 障害物そのものの絵（ステージごとに見た目がかわる） */
+  function drawObstacleShape(c: Ctx, o: Obstacle, e: Env): void {
+    const lk = STAGE_ID;
+    if (o.kind === "suitcase") drawSuitcase(c, o.x, o.y, o.w, o.h, o.age, lk);
+    else if (o.kind === "surprise") drawSurpriseBox(c, o.x, GROUND, o.w, o.h, o.age, o.activeTime >= 0 && o.activeTime < TRICK_WARNING, lk);
+    else if (o.kind === "drone") drawDeliveryDrone(c, o.x, o.y, o.w, o.h, o.age, o.activeTime >= 0 && o.activeTime < TRICK_WARNING, lk);
+    else if (o.kind === "cone") {
+      if (lk === "hiking") drawRock(c, o.x, GROUND, o.w, o.h);
+      else if (lk === "snow") drawSnowman(c, o.x, GROUND, o.w, false);
+      else if (lk === "summer") drawWatermelon(c, o.x, GROUND, o.w);
+      else drawCone(c, o.x, GROUND, o.w, o.h);
+    } else if (o.kind === "bike") {
+      if (lk === "hiking") drawLog(c, o.x, GROUND, o.w);
+      else if (lk === "snow") drawSled(c, o.x, GROUND, o.w);
+      else if (lk === "summer") drawGoldfishTub(c, o.x, GROUND, o.w);
+      else drawBike(c, o.x, GROUND, o.w);
+    } else if (o.kind === "sign") {
+      if (lk === "hiking") drawSignpost(c, o.x, GROUND, o.w, o.h);
+      else if (lk === "snow") drawSnowman(c, o.x + 2, GROUND, o.w - 4, true);
+      else if (lk === "summer") drawKakigoriFlag(c, o.x, GROUND, o.w, o.h, S.time);
+      else drawSign(c, o.x, GROUND, o.w, o.h, S.time, e.night);
+    } else if (o.kind === "noren") drawNoren(c, o.x, o.w, GROUND, S.time, lk);
+    else if (o.kind === "cat") drawCat(c, o.x, GROUND, o.w, S.time, e.night, lk === "snow");
+    else if (o.kind === "pigeons") drawPigeons(c, o.x, o.birds, o.flee, o.fleeT, GROUND, S.time);
+    else if (o.kind === "crow") drawCrow(c, o.x, o.y, o.w, o.h, S.time);
+    else if (o.kind === "roller") drawRoller(c, o.x, GROUND, o.w, o.h, S.time, lk);
+    else if (o.kind === "drop") drawDropper(c, o.x + o.w / 2, o.hit ? GROUND : o.y, o.w, lk, o.landed);
+    else if (o.kind === "buddy") drawBuddySprite(c, o);
+    else if (o.kind === "geyser") drawGeyser(c, o.x, GROUND, o.w, o.h, S.time, lk);
+  }
   function render(): void {
     const e = stageEnv(envAt(S.clock));
     const c = ctx;
@@ -3650,38 +3692,27 @@ export function createOsanpoRun(root: HTMLElement, opts: OsanpoRunOptions): () =
       else if (e.night > 0.2) {
         c.shadowColor = o.kind === "crow" ? `rgba(255,236,210,${0.95 * e.night})` : `rgba(255,228,170,${0.7 * e.night})`;
         c.shadowBlur = (o.kind === "crow" ? 7 : 5) * DPR * SC;
-      } else if (overRoute(o.x + o.w / 2)) {
-        // 商店街・屋台などの景色の前では、白いふちで背景から切りはなす
-        c.shadowColor = "rgba(255,255,255,.95)"; c.shadowBlur = 4 * DPR * SC;
       }
-      const lk = STAGE_ID;
-      if (o.kind === "suitcase") drawSuitcase(c, o.x, o.y, o.w, o.h, o.age, lk);
-      else if (o.kind === "surprise") drawSurpriseBox(c, o.x, GROUND, o.w, o.h, o.age, o.activeTime >= 0 && o.activeTime < TRICK_WARNING, lk);
-      else if (o.kind === "drone") drawDeliveryDrone(c, o.x, o.y, o.w, o.h, o.age, o.activeTime >= 0 && o.activeTime < TRICK_WARNING, lk);
-      else if (o.kind === "cone") {
-        if (lk === "hiking") drawRock(c, o.x, GROUND, o.w, o.h);
-        else if (lk === "snow") drawSnowman(c, o.x, GROUND, o.w, false);
-        else if (lk === "summer") drawWatermelon(c, o.x, GROUND, o.w);
-        else drawCone(c, o.x, GROUND, o.w, o.h);
-      } else if (o.kind === "bike") {
-        if (lk === "hiking") drawLog(c, o.x, GROUND, o.w);
-        else if (lk === "snow") drawSled(c, o.x, GROUND, o.w);
-        else if (lk === "summer") drawGoldfishTub(c, o.x, GROUND, o.w);
-        else drawBike(c, o.x, GROUND, o.w);
-      } else if (o.kind === "sign") {
-        if (lk === "hiking") drawSignpost(c, o.x, GROUND, o.w, o.h);
-        else if (lk === "snow") drawSnowman(c, o.x + 2, GROUND, o.w - 4, true);
-        else if (lk === "summer") drawKakigoriFlag(c, o.x, GROUND, o.w, o.h, S.time);
-        else drawSign(c, o.x, GROUND, o.w, o.h, S.time, e.night);
-      } else if (o.kind === "noren") drawNoren(c, o.x, o.w, GROUND, S.time, lk);
-      else if (o.kind === "cat") drawCat(c, o.x, GROUND, o.w, S.time, e.night, lk === "snow");
-      else if (o.kind === "pigeons") drawPigeons(c, o.x, o.birds, o.flee, o.fleeT, GROUND, S.time);
-      else if (o.kind === "crow") drawCrow(c, o.x, o.y, o.w, o.h, S.time);
-      else if (o.kind === "roller") drawRoller(c, o.x, GROUND, o.w, o.h, S.time, lk);
-      else if (o.kind === "drop") drawDropper(c, o.x + o.w / 2, o.hit ? GROUND : o.y, o.w, lk, o.landed);
-      else if (o.kind === "buddy") drawBuddySprite(c, o);
-      else if (o.kind === "geyser") drawGeyser(c, o.x, GROUND, o.w, o.h, S.time, lk);
+      const busyBack = !M.bright && !o.hit && overRoute(o.x + o.w / 2);
+      if (busyBack) {
+        // にぎやかな景色の前：濃いふちどり → 白いふち の2回描いて、背景からはっきり切りはなす
+        c.shadowColor = "rgba(18,14,40,.9)"; c.shadowBlur = 6 * DPR * SC;
+        drawObstacleShape(c, o, e);
+        c.shadowColor = "rgba(255,255,255,.95)"; c.shadowBlur = 2.5 * DPR * SC;
+      }
+      drawObstacleShape(c, o, e);
       c.restore();
+    }
+    // にぎやかな景色の前では、これから来る障害物の頭の上に「！」の目じるし
+    for (const o of obstacles) {
+      if (o.hit || o.gone || o.scored || isTrickKind(o.kind) || o.kind === "crow" || o.kind === "buddy" || o.kind === "noren") continue;
+      if (o.kind === "drop" && !o.landed) continue;
+      const cx = o.x + o.w / 2;
+      if (cx < P.x + 10 || cx > VW + 10 || !overRoute(cx)) continue;
+      const top = GROUND - Math.max(o.kind === "geyser" ? 30 : o.h, 8) - 14 + (RM ? 0 : Math.sin(S.time * 7 + o.x * 0.05) * 2.5);
+      c.fillStyle = "rgba(18,14,40,.85)"; c.beginPath(); c.moveTo(cx - 8, top - 13); c.lineTo(cx + 8, top - 13); c.lineTo(cx, top); c.closePath(); c.fill();
+      c.fillStyle = "#FF7A59"; c.beginPath(); c.moveTo(cx - 6, top - 12); c.lineTo(cx + 6, top - 12); c.lineTo(cx, top - 2); c.closePath(); c.fill();
+      c.fillStyle = "#fff"; c.font = font(8); c.textAlign = "center"; c.textBaseline = "middle"; c.fillText("!", cx, top - 8.5);
     }
     for (const o of obstacles) {
       if (isTrickKind(o.kind) && o.kind !== "suitcase" && !o.hit && o.x > VW - 20 && o.activeTime >= 0 && o.activeTime < TRICK_WARNING) {
