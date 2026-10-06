@@ -32,7 +32,8 @@ const NOTICE_LAYOUT: Record<HomeSkinTheme, { pad: [string, string]; heading: Rea
   winter: {
     pad: ["37%", "8%"],
     heading: { marginLeft: "11%", transform: "translate(calc(14px + 3em), calc(5px - 0.3em))" },
-    rows: { gap: 6, transform: "translate(-1.5em, 3px)" },
+    // 左下のココアと葉に3行目がかからないよう、行は左へずらさない
+    rows: { gap: 5, transform: "translate(0.2em, 1px)" },
     chevron: "translate(-2em, 12px)",
   },
   deluxe: {
