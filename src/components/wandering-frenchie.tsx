@@ -230,13 +230,11 @@ const PEN_OUT_MS = 520;
 const WRITE_MS = 1300;
 
 /**
- * コイン：5秒ごとに抽選する。1回 5 枚（枚数は DB が決める）。青と黄色は半々。1日の回数に上限はない。
- * ホームを開いているあいだ、平均して1時間に 100 回降る（= 500 枚）ようにする：
- * 1時間の抽選は 3600 / 5 = 720 回なので、1回あたり 100 / 720（約 14%）
+ * コイン：5秒ごとに 20% で降る。1回 5 枚（枚数は DB が決める）。青と黄色は半々。1日の回数に上限はない。
+ * ホームを開いているあいだ、平均して1時間に 144 回（3600 / 5 × 20%）＝ 720 枚。
  */
 const COIN_TICK_MS = 5000;
-const COIN_DROPS_PER_HOUR = 100;
-const COIN_CHANCE = COIN_DROPS_PER_HOUR / (3_600_000 / COIN_TICK_MS);
+const COIN_CHANCE = 0.2;
 const COIN_BLUE_CHANCE = 0.5;
 const COIN_MAX_ON_GROUND = 3;
 /** コインの大きさ（カード幅に対する％。手前のとき） */
