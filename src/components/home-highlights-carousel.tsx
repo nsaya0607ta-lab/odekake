@@ -160,6 +160,8 @@ export function HomeHighlightsCarousel({
       <div
         className="relative overflow-hidden"
         style={{ touchAction: "pan-y" }}
+        // このカードの中の横スワイプはカードの切り替えに使う（背景をながめるスワイプにしない）
+        data-gaze-swipe-ignore=""
         onTouchStart={handleTouchStart}
         onTouchMove={handleTouchMove}
         onTouchEnd={handleTouchEnd}
