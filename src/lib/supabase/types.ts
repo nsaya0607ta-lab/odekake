@@ -799,6 +799,7 @@ export type Database = {
       };
       area_stats: { Args: { p_trip_ids?: string[] }; Returns: AreaStatsRow[] };
       claim_login_bonus: { Args: Record<string, never>; Returns: Json };
+      claim_home_coin_drop: { Args: { p_drop_id: string; p_kind: string }; Returns: Json };
       commit_gacha_draw: {
         Args: { p_cost: number; p_request_id: string; p_item_ids: string[] };
         Returns: Json;
