@@ -53,6 +53,23 @@ const IDLE_POSES: readonly DogPose[] = ["sniff", "sit", "wink", "stand-happy"];
 
 const rand = (min: number, max: number) => min + Math.random() * (max - min);
 
+/**
+ * 写真を吊るすひも。viewBox（横 0〜100・縦 0〜10）の2次ベジェで、両はしの高さ END、まん中のたるみ SAG。
+ * 写真はクリップがひもを挟む位置に吊るしたいので、ひもの高さをここから計算して写真の top に使う。
+ * STRING_HEIGHT は .string の高さ（.bunting に対する％。CSS と合わせる）
+ */
+const STRING_END = 5;
+const STRING_SAG = 14;
+const STRING_HEIGHT = 34;
+const STRING_D = `M0 ${STRING_END} Q 50 ${STRING_SAG} 100 ${STRING_END}`;
+/** 横 x%（.bunting の幅に対する％）のところの、ひもの高さ（.bunting の高さに対する％） */
+function stringTopAt(x: number): number {
+  // 制御点の x がまん中（50）なので、横の位置 x はそのまま t（0〜1）になる
+  const t = x / 100;
+  const y = (1 - t) ** 2 * STRING_END + 2 * t * (1 - t) * STRING_SAG + t ** 2 * STRING_END;
+  return (y / 10) * STRING_HEIGHT;
+}
+
 /** タップした要素のまん中を、景色（stage）に対する％で */
 function centerOf(el: Element | null, stage: HTMLElement | null): { x: number; y: number } {
   if (!el || !stage) return { x: 50, y: 50 };
@@ -135,13 +152,14 @@ export function GrandSplash({ onFinish }: { onFinish: () => void }) {
       setSkin(id);
     };
     const fallback = window.setTimeout(() => settle("default"), 1400);
-    fetch("/api/dog-skin", { cache: "no-store" })
+    // ログインしていないときはログイン画面へ転送されるので、転送はたどらずに「いつもの」にする
+    fetch("/api/dog-skin", { cache: "no-store", redirect: "manual" })
       .then((r) => (r.ok ? r.json() : null))
       .then((body: { skinId?: unknown } | null) => settle(isDogSkinId(body?.skinId) ? body.skinId : "default"))
       .catch(() => settle("default"));
 
     // 今日の歩数（ログインしていなければ取れないので、そのときは「てくてく」）
-    fetch("/api/steps/today", { cache: "no-store" })
+    fetch("/api/steps/today", { cache: "no-store", redirect: "manual" })
       .then((r) => (r.ok ? r.json() : null))
       .then((body: { ok?: boolean; todaySteps?: unknown } | null) => {
         if (body?.ok && typeof body.todaySteps === "number") setSteps(body.todaySteps);
@@ -591,21 +609,8 @@ export function GrandSplash({ onFinish }: { onFinish: () => void }) {
         {/* ---------- 気球 ---------- */}
         <button type="button" className={styles.balloon} onClick={onBalloon} aria-label="気球">
           <span key={balloonKey} className={`${styles.balloonBody} ${balloonKey ? styles.balloonLoop : ""}`} aria-hidden="true">
-            <svg viewBox="0 0 60 84">
-              <defs>
-                <linearGradient id="splash-balloon" x1="0" x2="1">
-                  <stop offset="0" stopColor="#ff9fb3" /><stop offset=".33" stopColor="#ff9fb3" />
-                  <stop offset=".33" stopColor="#fff3dc" /><stop offset=".66" stopColor="#fff3dc" />
-                  <stop offset=".66" stopColor="#8fd0ff" /><stop offset="1" stopColor="#8fd0ff" />
-                </linearGradient>
-              </defs>
-              <path d="M30 2C14 2 4 14 4 28c0 14 14 24 20 34h12c6-10 20-20 20-34C56 14 46 2 30 2Z" fill="url(#splash-balloon)" stroke="#c99a6a" strokeWidth="1.6" />
-              <path d="M22 4c-6 12-6 40 2 58M38 4c6 12 6 40-2 58" stroke="#c99a6a" strokeWidth="1" fill="none" opacity=".55" />
-              <path d="M24 62l2 8M36 62l-2 8" stroke="#a07a52" strokeWidth="1.2" />
-              <rect x="22" y="70" width="16" height="11" rx="2.5" fill="#c99a6a" stroke="#8d6a45" strokeWidth="1.2" />
-              <path d="M24 74h12" stroke="#f3dcb5" strokeWidth="1.2" />
-              <ellipse cx="18" cy="20" rx="4" ry="8" fill="#fff" opacity=".35" transform="rotate(20 18 20)" />
-            </svg>
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src="/splash/balloon.webp" alt="" draggable={false} />
           </span>
         </button>
 
@@ -680,8 +685,6 @@ export function GrandSplash({ onFinish }: { onFinish: () => void }) {
               );
             })}
           </span>
-          <span className={`${styles.tree} ${styles.treeLeft}`} />
-          <span className={`${styles.tree} ${styles.treeRight}`} />
           <span className={styles.flowers}>
             {[8, 18, 31, 68, 80, 91].map((x, i) => (
               <i key={x} style={{ left: `${x}%`, ["--i" as string]: i }} />
@@ -691,34 +694,46 @@ export function GrandSplash({ onFinish }: { onFinish: () => void }) {
 
         {/* ---------- マイルーム（遠くの小さな家）：タップで明かりがつき、えんとつから煙 ---------- */}
         <button type="button" className={`${styles.house} ${house ? styles.houseLit : ""}`} onClick={onHouse} aria-label="マイルーム">
-          <svg key={house} viewBox="0 0 60 56" aria-hidden="true" className={house ? styles.houseBump : ""}>
-            <circle className={styles.smoke} cx="43" cy="6" r="3.2" />
-            <circle className={styles.smoke} cx="44" cy="4" r="2.6" />
-            <circle className={styles.smoke} cx="42" cy="5" r="2.2" />
-            <rect x="39" y="9" width="7" height="12" rx="1" fill="#b46a52" />
-            <path d="M5 28 L30 7 L55 28 Z" fill="#e36f5d" stroke="#b44f40" strokeWidth="2" strokeLinejoin="round" />
-            <rect x="10" y="26" width="40" height="27" rx="2" fill="#fff5e2" stroke="#c9a77d" strokeWidth="2" />
-            <rect className={styles.houseWindow} x="15" y="31" width="10" height="9" rx="1.5" stroke="#c9a77d" strokeWidth="1.4" />
-            <rect className={styles.houseWindow} x="35" y="31" width="10" height="9" rx="1.5" stroke="#c9a77d" strokeWidth="1.4" />
-            <rect x="26" y="39" width="8" height="14" rx="2" fill="#a77a50" />
-            <circle cx="32" cy="46.5" r=".9" fill="#ffd86b" />
-            <path d="M23 30 L30 24 L37 30" stroke="#fff" strokeWidth="1.2" fill="none" opacity=".7" />
-          </svg>
+          <span key={house} className={`${styles.houseBody} ${house ? styles.houseBump : ""}`} aria-hidden="true">
+            <i className={styles.houseShadow} />
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src="/splash/house.webp" alt="" draggable={false} />
+            {/* 窓の明かり（夜と、タップしたとき） */}
+            <i className={`${styles.houseWindow} ${styles.houseWindowLeft}`} />
+            <i className={`${styles.houseWindow} ${styles.houseWindowRight}`} />
+            {/* えんとつの煙 */}
+            <i className={styles.smoke} />
+            <i className={styles.smoke} />
+            <i className={styles.smoke} />
+          </span>
         </button>
+        {/* 家のとなり（左）の、遠くの木 */}
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img className={styles.backTree} src="/splash/tree-b.webp" alt="" aria-hidden="true" draggable={false} />
 
         {/* ---------- 写真（ひもに吊るしたポラロイド） ---------- */}
         <div className={styles.bunting}>
+          {/* ひもの両はしは、木の横にのびた枝の先に結んである（右の木は左右反転した絵） */}
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img className={`${styles.tree} ${styles.treeLeft}`} src="/splash/tree-a.webp" alt="" aria-hidden="true" draggable={false} />
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img className={`${styles.tree} ${styles.treeRight}`} src="/splash/tree-a-flip.webp" alt="" aria-hidden="true" draggable={false} />
           <svg className={styles.string} viewBox="0 0 100 10" preserveAspectRatio="none" aria-hidden="true">
-            <path d="M0 2 Q 50 11 100 2" />
+            <path d={STRING_D} />
+            {/* 両はしは木の枝に結んである */}
+            <circle className={styles.knot} cx="0.6" cy={STRING_END} r="0.9" />
+            <circle className={styles.knot} cx="99.4" cy={STRING_END} r="0.9" />
           </svg>
           {POLAROIDS.map((photo, i) => {
             const state = photos[photo.id]!;
+            const x = 20 + i * 30;
             return (
               <button
                 type="button"
                 key={photo.id}
                 className={`${styles.photo} ${state.flipped ? styles.photoFlipped : ""}`}
-                style={{ left: `${20 + i * 30}%`, top: `${i === 1 ? 46 : 26}%`, ["--tilt" as string]: `${photo.tilt}deg`, ["--i" as string]: i }}
+                // 写真の上はしを、ひもの少し上に。クリップ（上へ 6px はみ出す）がひもを挟む
+                style={{ left: `${x}%`, top: `calc(${stringTopAt(x).toFixed(2)}% - 2px)`, ["--tilt" as string]: `${photo.tilt}deg`, ["--i" as string]: i }}
                 onClick={(e) => onPhoto(e, photo.id)}
                 aria-label={`写真「${photo.caption}」いいね ${state.likes}`}
               >
@@ -781,24 +796,28 @@ export function GrandSplash({ onFinish }: { onFinish: () => void }) {
 
         {/* ---------- ミニゲームの道しるべ ---------- */}
         <div className={styles.signpost}>
-          <span className={styles.post} aria-hidden="true" />
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img className={styles.post} src="/splash/signpost.webp" alt="" aria-hidden="true" draggable={false} />
           <span className={styles.signTop}>ミニゲーム</span>
           {GAME_SIGNS.map((sign, i) => (
             <button
               type="button"
               key={sign.id}
-              className={`${styles.sign} ${i % 2 ? styles.signRight : styles.signLeft}`}
-              style={{ ["--i" as string]: i }}
+              className={`${styles.sign} ${i ? styles.sign2 : styles.sign1}`}
               onClick={(e) => onSign(e, sign.id, sign.say)}
               aria-label={sign.label}
             >
               <span key={signs[sign.id] ?? 0} className={styles.signBoard}>
                 {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img src={sign.icon} alt="" draggable={false} className={signSay?.id === sign.id ? styles.signIconHop : ""} key={signSay?.id === sign.id ? signSay.key : 0} />
-                <span>
-                  {sign.lines[0]}
-                  <br />
-                  {sign.lines[1]}
+                <img className={styles.signWood} src={`/splash/sign-board-${i + 1}.webp`} alt="" draggable={false} />
+                <span className={styles.signText}>
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img src={sign.icon} alt="" draggable={false} className={signSay?.id === sign.id ? styles.signIconHop : ""} key={signSay?.id === sign.id ? signSay.key : 0} />
+                  <span>
+                    {sign.lines[0]}
+                    <br />
+                    {sign.lines[1]}
+                  </span>
                 </span>
               </span>
             </button>
