@@ -4,8 +4,7 @@
  */
 import { useEffect, useMemo, useState } from "react";
 import { seasonOf, skyTimeOf, type AppBackgroundId, type BackgroundSignals, type Season, type SkyTime, type WeatherSignal } from "@/lib/app-backgrounds";
-import { readSavedPlace, skyPhaseOf, WEATHER_CACHE_KEY, WEATHER_CACHE_MS } from "@/lib/home-weather";
-import { parseRoomWeather } from "@/lib/room/weather";
+import { cachedWeather, readSavedPlace, requestWeather, skyPhaseOf, WEATHER_CACHE_MS, WEATHER_LAST_MS } from "@/lib/home-weather";
 
 /** 時間帯（日本時間）。1分ごとに見直す */
 export function useSkyTime(enabled: boolean): SkyTime {
@@ -48,37 +47,12 @@ function useLiveWeather(enabled: boolean): WeatherSignal | null {
       if (alive && kind) setWeather({ kind, phase: skyPhaseOf(new Date(), place) });
     };
     const load = (useCache: boolean) => {
-      if (useCache) {
-        try {
-          const cached = JSON.parse(window.sessionStorage.getItem(WEATHER_CACHE_KEY) ?? "null") as { lat: string; lon: string; t: number; raw: unknown } | null;
-          if (cached && cached.lat === lat && cached.lon === lon && Date.now() - cached.t < WEATHER_CACHE_MS) {
-            const parsed = parseRoomWeather(cached.raw);
-            if (parsed) {
-              kind = parsed.kind;
-              publish();
-              return;
-            }
-          }
-        } catch {
-          // 覚えていなければ問い合わせる
-        }
-      }
-      fetch(`/api/my-room/weather?lat=${lat}&lon=${lon}`)
-        .then((response) => (response.ok ? response.json() : null))
-        .then((raw: unknown) => {
-          const parsed = parseRoomWeather(raw);
-          if (!parsed) return;
-          kind = parsed.kind;
-          publish();
-          try {
-            window.sessionStorage.setItem(WEATHER_CACHE_KEY, JSON.stringify({ lat, lon, t: Date.now(), raw }));
-          } catch {
-            // 覚えられなくても表示はできる
-          }
-        })
-        .catch(() => {
-          // 取れなければ前のまま
-        });
+      const fresh = useCache ? cachedWeather(lat, lon, WEATHER_CACHE_MS) : null;
+      if (fresh) { kind = fresh.kind; publish(); return; }
+      // 古くても最後に取れた天気をまず使い、新しいのが届いたら差しかえる（取れなければ前のまま）
+      const last = kind ? null : cachedWeather(lat, lon, WEATHER_LAST_MS);
+      if (last) { kind = last.kind; publish(); }
+      void requestWeather(lat, lon).then((w) => { if (w) { kind = w.kind; publish(); } });
     };
     load(true);
     // 天気は20分ごと、時間帯（昼→夕方→夜）は5分ごとに見直す

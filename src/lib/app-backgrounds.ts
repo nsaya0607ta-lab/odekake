@@ -28,17 +28,26 @@ export const APP_BACKGROUND_IDS = [
   "weather",
   "garden",
   "seasons",
+  "fireworks",
+  "paper-planes",
+  "cloud-sea",
+  "dog-parade",
+  "mesh",
+  "holo",
+  "glass",
+  "sumi",
 ] as const;
 export type AppBackgroundId = (typeof APP_BACKGROUND_IDS)[number];
 
 export const APP_BACKGROUND_COOKIE = "odekake_app_bg";
 
-/** ショップでの並び（動く／変わる／柄・風景） */
-export type AppBackgroundGroup = "move" | "change" | "pattern";
+/** ショップでの並び（動く／変わる／シンプルアート／柄・風景） */
+export type AppBackgroundGroup = "move" | "change" | "art" | "pattern";
 
 export const APP_BACKGROUND_GROUPS: readonly { id: AppBackgroundGroup; title: string; note: string }[] = [
   { id: "move", title: "動く背景", note: "ゆっくり動いたり、さわると反応したりします" },
   { id: "change", title: "変わる背景", note: "時間・天気・歩数・季節で、見た目が変わります" },
+  { id: "art", title: "シンプルアート", note: "シンプルだけど、ひと目でちがう。色と光だけで見せる背景です" },
   { id: "pattern", title: "柄・風景", note: "動かない、落ちついた背景です" },
 ];
 
@@ -63,6 +72,10 @@ const DEFAULT_BACKGROUND: AppBackground = { id: "default", name: "いつもの",
 
 export const APP_BACKGROUNDS: readonly AppBackground[] = [
   // ---- 動く背景 ----
+  { id: "fireworks", name: "花火大会", sub: "夜空に花火が開く", description: "夜の町の上に、菊・牡丹・しだれ柳・輪・小花の花火が次々と上がります。ときどき、まとめて上がるスターマインも。画面をタップすると、その場所に花火が上がります。ホーム以外の画面では、文字が読みやすいように薄めて表示します。", price: 4000, group: "move", tag: "さわれる", dark: true, live: true },
+  { id: "paper-planes", name: "紙ひこうき", sub: "青空をすーっと飛ぶ", description: "色紙の紙ひこうきが、点線の跡を残しながら青空を飛んでいきます。ときどき宙がえりも。画面をタップすると、そこから1機飛んでいきます。", price: 4000, group: "move", tag: "さわれる", live: true },
+  { id: "cloud-sea", name: "雲の上", sub: "朝焼けと雲海", description: "朝焼けの空の下に、どこまでも雲海が広がります。雲はゆっくり手前へ流れてきて、お日さまの光が雲のもりあがりを照らします。", price: 4000, group: "move", tag: "動く", live: true },
+  { id: "dog-parade", name: "わんこパレード", sub: "フレブルたちがおさんぽ", description: "いろいろな服を着たフレブルたちが、画面の下をとことこ歩いていきます。ときどき立ち止まってにおいをかいだり、手をふったり。画面をタップすると、近くの子がジャンプします。", price: 4000, group: "move", tag: "さわれる", live: true },
   { id: "paw-trail", name: "わんこの足あと", sub: "見えないわんこがおさんぽ", description: "見えないわんこが、画面の上をてくてく歩いて足あとを残します。ときどきペンキをふんで、カラフルな足あとになることも。画面をタップすると、そこへかけよってきます。", price: 4000, group: "move", tag: "さわれる", live: true },
   { id: "bubbles", name: "シャボン玉", sub: "虹色にひかって、ふわふわ", description: "虹色にひかるシャボン玉が、ゆらゆら浮かんでいきます。ときどき、ふーっとまとめて飛んできます。タップするとパチンとはじけます。", price: 4000, group: "move", tag: "さわれる", live: true },
   { id: "goldfish", name: "きんぎょの池", sub: "光がゆらめく水面", description: "水面の光がゆらめく池を、金魚が泳ぎます。画面をタップすると波紋が広がって、金魚がびっくりしてにげていきます。", price: 4000, group: "move", tag: "さわれる", live: true },
@@ -74,6 +87,11 @@ export const APP_BACKGROUNDS: readonly AppBackground[] = [
   { id: "garden", name: "歩いて咲く花畑", sub: "歩くほどお花が咲く", description: "きょう歩いた歩数で、画面のふちのつると花畑が育ちます。500歩ごとにお花がひとつ咲き、5,000歩でちょうちょが来て、10,000歩で満開です。毎日0歩から育ちます。", price: 4000, group: "change", tag: "歩数", live: true },
   { id: "seasons", name: "四季めぐり", sub: "季節で自動で変わる", description: "季節にあわせて、春は桜、夏はほたる、秋は落ち葉、冬は雪が舞います。季節が変わると、背景も自動で変わります。", price: 4000, group: "change", tag: "季節", live: true },
   { id: "sky-clock", name: "時間で変わる空", sub: "朝・昼・夕方・夜", description: "開いている時刻（日本時間）に合わせて、朝・昼・夕方・夜の空に自動で切り替わります。夜は星が出ます。", price: 4000, group: "change", tag: "時間帯" },
+  // ---- シンプルアート ----
+  { id: "mesh", name: "グラデーションメッシュ", sub: "色がゆっくり溶け合う", description: "ピンク・水色・ミント・杏・ラベンダーのやわらかい色のかたまりが、ゆっくり回りながら溶け合います。", price: 3000, group: "art", tag: "動く" },
+  { id: "holo", name: "ホログラム", sub: "虹色の箔に光が流れる", description: "パステルの虹色の箔が少しずつ動き、ときどき光の筋がすーっと流れます。小さなきらめきつき。", price: 3000, group: "art", tag: "動く" },
+  { id: "glass", name: "すりガラス", sub: "たて筋のガラス越しの色", description: "たて筋の入ったすりガラスの向こうに、あざやかな色がにじんで見えます。", price: 3000, group: "art" },
+  { id: "sumi", name: "墨と金箔", sub: "和紙ににじむ墨と金", description: "和紙のすみに墨がにじみ、金箔と金の筆あとを散らしています。", price: 3000, group: "art" },
   // ---- 柄・風景 ----
   DEFAULT_BACKGROUND,
   { id: "paw", name: "肉球スタンプ", sub: "4色の肉球柄", description: "ベージュ・ピンク・ミント・水色の肉球を、角度を変えて散らしています。", price: 1500, group: "pattern" },

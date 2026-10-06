@@ -5,7 +5,7 @@
  */
 import { PREFECTURE_NAMES } from "@/lib/geo/prefecture-names";
 import { PREF_POINTS, skyAt, type GeoPoint } from "@/lib/room/sun";
-import type { RoomWeather, WeatherKind } from "@/lib/room/weather";
+import { parseRoomWeather, type RoomWeather, type WeatherKind } from "@/lib/room/weather";
 
 /** マイルームが場所を保存しているキー（my-room.tsx と同じものを使う） */
 export const PLACE_KEY = "odekake-room-place-v1";
@@ -13,6 +13,74 @@ export const PLACE_KEY = "odekake-room-place-v1";
 /** ホームを開くたびに問い合わせないよう、10分はこの端末に天気を覚えておく（背景の「おそとの天気」も同じものを使う） */
 export const WEATHER_CACHE_KEY = "odekake-home-weather-v1";
 export const WEATHER_CACHE_MS = 10 * 60_000;
+
+/**
+ * 最後に取れた天気。アプリを閉じても消えないところ（localStorage）に覚えておき、
+ * 開いた直後はまずこれを出してから、新しい天気に差しかえる（はじめの数秒、天気が空にならないように）
+ */
+export const WEATHER_LAST_KEY = "odekake-weather-last-v1";
+export const WEATHER_LAST_MS = 3 * 60 * 60_000;
+
+type CachedWeather = { lat: string; lon: string; t: number; raw: unknown };
+
+function readCache(storage: Storage, key: string, lat: string, lon: string, maxAgeMs: number): RoomWeather | null {
+  try {
+    const c = JSON.parse(storage.getItem(key) ?? "null") as CachedWeather | null;
+    if (c && c.lat === lat && c.lon === lon && Date.now() - c.t < maxAgeMs) return parseRoomWeather(c.raw);
+  } catch {
+    // 読めなければ覚えていないのと同じ
+  }
+  return null;
+}
+
+/** 覚えている天気。maxAgeMs より古いもの・場所がちがうものは使わない */
+export function cachedWeather(lat: string, lon: string, maxAgeMs: number): RoomWeather | null {
+  if (typeof window === "undefined") return null;
+  if (maxAgeMs <= WEATHER_CACHE_MS) {
+    try { return readCache(window.sessionStorage, WEATHER_CACHE_KEY, lat, lon, maxAgeMs); } catch { return null; }
+  }
+  try {
+    return readCache(window.sessionStorage, WEATHER_CACHE_KEY, lat, lon, maxAgeMs) ?? readCache(window.localStorage, WEATHER_LAST_KEY, lat, lon, maxAgeMs);
+  } catch {
+    return null;
+  }
+}
+
+const inflight = new Map<string, Promise<RoomWeather | null>>();
+const RETRY_WAITS = [0, 1500, 4000, 10_000];
+
+/**
+ * いまの天気を問い合わせる。失敗したら少し待ってやり直す（1.5秒・4秒・10秒）。
+ * ホーム・背景・おさんぽが同時に呼んでも、問い合わせは1回にまとめる。取れたら覚えておく
+ */
+export function requestWeather(lat: string, lon: string): Promise<RoomWeather | null> {
+  const key = `${lat},${lon}`;
+  const running = inflight.get(key);
+  if (running) return running;
+  const job = (async () => {
+    for (const wait of RETRY_WAITS) {
+      if (wait) await new Promise((resolve) => setTimeout(resolve, wait));
+      try {
+        const response = await fetch(`/api/my-room/weather?lat=${lat}&lon=${lon}`);
+        // 429（問い合わせすぎ）は、待ってもすぐには直らないのでやめる
+        if (response.status === 429) return null;
+        if (!response.ok) continue;
+        const raw: unknown = await response.json();
+        const weather = parseRoomWeather(raw);
+        if (!weather) continue;
+        const entry = JSON.stringify({ lat, lon, t: Date.now(), raw } satisfies CachedWeather);
+        try { window.sessionStorage.setItem(WEATHER_CACHE_KEY, entry); } catch { /* 覚えられなくても表示はできる */ }
+        try { window.localStorage.setItem(WEATHER_LAST_KEY, entry); } catch { /* 同上 */ }
+        return weather;
+      } catch {
+        // 通信できなければ、少し待ってやり直す
+      }
+    }
+    return null;
+  })().finally(() => inflight.delete(key));
+  inflight.set(key, job);
+  return job;
+}
 
 export type SavedPlace = GeoPoint & { pref: string; city?: string };
 
