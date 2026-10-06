@@ -1,11 +1,12 @@
 "use client";
 
-import { forwardRef, useCallback, useEffect, useImperativeHandle, useMemo, useRef, useState } from "react";
+import { forwardRef, useCallback, useEffect, useImperativeHandle, useMemo, useRef, useState, type RefObject } from "react";
 import type { GachaRarity } from "@/lib/gacha/config";
 import { playGachaCue, setGachaAudioPlaybackRate } from "./audio";
 import styles from "./gacha-cinematic.module.css";
 import type { AnimationDraw, DrawResult } from "./types";
 import { lockPageScroll } from "@/lib/scroll-lock";
+import { MachineArtwork, DoorArtwork, IllustratedHandle, IllustratedCapsule } from "./illustrated-artwork";
 
 type Phase = "準備中" | "ガチャ起動" | "カプセル排出" | "カプセル開封" | "力をためている…" | "……" | "レアリティ昇格" | "結果発表";
 type BurstIntensity = "normal" | "large" | "mega";
@@ -44,6 +45,7 @@ function chunk<T>(items: T[], size: number): T[][] {
 
 function applyPromotedCapsuleStyle(capsule: HTMLDivElement, rarity: Extract<GachaRarity, "LR" | "MR">) {
   capsule.dataset.rarity = rarity;
+  capsule.querySelectorAll("image").forEach((image) => image.setAttribute("href", `/gacha/illustrated/capsule-${rarity}.jpg`));
   const rareClassName = styles.batchCapsuleRare;
   if (rareClassName) capsule.classList.add(rareClassName);
 }
@@ -51,6 +53,33 @@ function applyPromotedCapsuleStyle(capsule: HTMLDivElement, rarity: Extract<Gach
 /** モーダル表示中は、うしろのページがスクロールしないようにする（くわしくは scroll-lock.ts） */
 function useBodyScrollLock() {
   useEffect(() => lockPageScroll(), []);
+}
+
+function useModalFocus(rootRef: RefObject<HTMLDivElement | null>) {
+  useEffect(() => {
+    const root = rootRef.current;
+    if (!root) return;
+    const previous = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+    root.focus({ preventScroll: true });
+    const trap = (event: KeyboardEvent) => {
+      if (event.key !== "Tab") return;
+      const buttons = Array.from(root.querySelectorAll<HTMLButtonElement>("button:not(:disabled)"))
+        .filter((button) => button.offsetParent !== null);
+      const first = buttons[0];
+      const last = buttons[buttons.length - 1];
+      if (!first || !last) { event.preventDefault(); return; }
+      if (event.shiftKey && (document.activeElement === first || document.activeElement === root)) {
+        event.preventDefault(); last.focus();
+      } else if (!event.shiftKey && (document.activeElement === last || document.activeElement === root)) {
+        event.preventDefault(); first.focus();
+      }
+    };
+    root.addEventListener("keydown", trap);
+    return () => {
+      root.removeEventListener("keydown", trap);
+      if (previous?.isConnected) previous.focus({ preventScroll: true });
+    };
+  }, [rootRef]);
 }
 
 function lowPowerDevice() {
@@ -201,10 +230,13 @@ function MultiCapsuleIntro({ results, promotion, planLabel, roundLabel, playback
   const columns = 5;
   const hasShakeTell = useMemo(() => hasTellRarity(results, SHAKE_TELL_RARITIES), [results]);
   const hasMrTell = useMemo(() => hasTellRarity(results, ["MR"]), [results]);
-  const [batchPhase, setBatchPhase] = useState(`${results.length}個のカプセル排出！`);
+  const [batchPhase, setBatchPhase] = useState("ガチャ起動");
+  const [awaitingTurn, setAwaitingTurn] = useState(false);
   const rootRef = useRef<HTMLDivElement>(null);
+  useModalFocus(rootRef);
   const machineRef = useRef<HTMLDivElement>(null);
   const knobRef = useRef<HTMLSpanElement>(null);
+  const doorRef = useRef<HTMLSpanElement>(null);
   const capsuleRefs = useRef<HTMLDivElement[]>([]);
   const flashRef = useRef<HTMLDivElement>(null);
   const promotionCopyRef = useRef<HTMLDivElement>(null);
@@ -247,6 +279,13 @@ function MultiCapsuleIntro({ results, promotion, planLabel, roundLabel, playback
     skipRoundRef.current?.();
   }, []);
 
+  const turnHandle = useCallback(() => {
+    if (!timelineRef.current?.paused()) return;
+    setAwaitingTurn(false);
+    setBatchPhase("ガチャ起動");
+    timelineRef.current.resume();
+  }, []);
+
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
       if (event.key === "Escape") skipAll();
@@ -284,7 +323,11 @@ function MultiCapsuleIntro({ results, promotion, planLabel, roundLabel, playback
         : [{ x: -8, rotation: -2 }, { x: 8, rotation: 1.8 }, { x: -6, rotation: -1.2 }, { x: 0, rotation: 0 }];
       const shakeDuration = hasShakeTell ? 0.9 : 0.72;
 
-      tl.fromTo(machineRef.current, { opacity: 0, scale: 0.78, y: 22 }, { opacity: 1, scale: 1, y: 0, duration: 0.4, ease: "back.out(1.4)" })
+      tl.fromTo(machineRef.current, { opacity: 0, scale: 0.78, y: 22, xPercent: -50, yPercent: -50 }, { opacity: 1, scale: 1, y: 0, duration: 0.4, ease: "back.out(1.4)" })
+        .addPause(undefined, () => {
+          setBatchPhase("ハンドルを回してね");
+          setAwaitingTurn(true);
+        })
         .call(() => playGachaCue("turn"))
         .to(machineRef.current, { keyframes: shakeKeyframes, duration: shakeDuration, ease: hasShakeTell ? "power2.inOut" : "none" })
         .to(knobRef.current, { rotation: 720, duration: 1.1, ease: "power3.inOut" }, "<");
@@ -299,7 +342,9 @@ function MultiCapsuleIntro({ results, promotion, planLabel, roundLabel, playback
           .to(machineRef.current, { filter: "brightness(1) drop-shadow(0 0 0px transparent)", duration: 0.55 });
       }
 
-      tl.addLabel("capsuleDrop", ">-0.12");
+      tl.to(doorRef.current, { rotationX: -82, duration: 0.22 })
+        .call(() => setBatchPhase(`${results.length}個のカプセル排出！`));
+      tl.addLabel("capsuleDrop");
 
       const offsetUnit = 48;
 
@@ -316,7 +361,8 @@ function MultiCapsuleIntro({ results, promotion, planLabel, roundLabel, playback
       });
 
       const dropSequenceDuration = Math.max(0, capsules.length - 1) * MULTI_DROP_INTERVAL + MULTI_DROP_DURATION;
-      tl.to(machineRef.current, { opacity: 0.68, scale: 0.94, duration: 0.3 }, `capsuleDrop+=${dropSequenceDuration.toFixed(3)}`);
+      tl.to(machineRef.current, { opacity: 0.68, scale: 0.94, duration: 0.3 }, `capsuleDrop+=${dropSequenceDuration.toFixed(3)}`)
+        .to(doorRef.current, { rotationX: 0, duration: 0.22 }, "<");
 
       const promotionTarget = promotion ? capsules[promotion.index] : undefined;
       if (promotion && promotionTarget) {
@@ -356,7 +402,7 @@ function MultiCapsuleIntro({ results, promotion, planLabel, roundLabel, playback
         tl.to({}, { duration: 0.82 })
           .call(complete);
       }
-    });
+    }).catch(() => { if (!disposed) complete(); });
 
     return () => {
       disposed = true;
@@ -366,7 +412,7 @@ function MultiCapsuleIntro({ results, promotion, planLabel, roundLabel, playback
   }, [columns, complete, hasMrTell, hasShakeTell, promotion, results]);
 
   return (
-    <div ref={rootRef} className={`${styles.root} ${styles.batchRoot}`} role="dialog" aria-modal="true" aria-label={`${eyebrowLabel}のカプセル排出演出`}>
+    <div ref={rootRef} className={`${styles.root} ${styles.batchRoot}`} role="dialog" tabIndex={-1} aria-modal="true" aria-label={`${eyebrowLabel}のカプセル排出演出`}>
       <div className={styles.backdrop} />
       <div className={styles.ambient} />
       <div className={styles.vignette} />
@@ -385,10 +431,14 @@ function MultiCapsuleIntro({ results, promotion, planLabel, roundLabel, playback
       )}
 
       <div className={styles.batchStage}>
-        <div ref={machineRef} className={styles.batchMachineWrap}>
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img className={styles.machine} src="/gacha/reference/lucky-paws-machine.webp" alt="ガチャマシン" draggable={false} />
-          <span ref={knobRef} className={styles.knob} aria-hidden="true" />
+        <div ref={machineRef} className={styles.batchMachineWrap} data-running={batchPhase === "ガチャ起動" && !awaitingTurn}>
+          <MachineArtwork />
+          <div className={styles.domeCapsules} aria-hidden="true">
+            {(["N", "R", "SR", "R", "N", "SR"] as const).map((r, index) => <span key={index}><IllustratedCapsule rarity={r} /></span>)}
+          </div>
+          <span className={styles.predictionLamp} data-lit={batchPhase === "ガチャ起動" && !awaitingTurn} data-tell={hasMrTell ? "MR" : hasShakeTell ? "LR" : results.some((r) => ["SR", "SSR", "UR"].includes(r.rarity)) ? "gold" : "normal"} />
+          <IllustratedHandle knobRef={knobRef} active={awaitingTurn} onTurn={turnHandle} />
+          <span ref={doorRef} className={styles.machineDoor}><DoorArtwork /></span>
         </div>
 
         <div className={styles.batchTray} aria-label={`排出された${results.length}個のカプセル`}>
@@ -401,13 +451,12 @@ function MultiCapsuleIntro({ results, promotion, planLabel, roundLabel, playback
               <div
                 key={`${result.id}-${index}`}
                 ref={(node) => { if (node) capsuleRefs.current[index] = node; }}
-                className={styles.batchCapsule}
+                className={`${styles.batchCapsule} ${["SSR", "UR", "LR", "MR"].includes(capsuleRarity) ? styles.batchCapsuleRare : ""}`}
                 data-rarity={capsuleRarity}
                 aria-label={`${index + 1}個目のカプセル`}
               >
                 <span className={styles.batchCapsuleGlow} />
-                <span className={styles.capsule} />
-                <span className={styles.capsuleBand} />
+                <IllustratedCapsule rarity={capsuleRarity} />
                 {isPromotionTarget ? (
                   <span className={styles.capsuleSparkles} aria-hidden="true">
                     <i /><i /><i /><i /><i /><i /><i /><i />
@@ -420,6 +469,7 @@ function MultiCapsuleIntro({ results, promotion, planLabel, roundLabel, playback
         <div ref={promotionCopyRef} className={styles.batchPromotionCopy} aria-live="assertive">確変！</div>
       </div>
 
+      {awaitingTurn && <button className={styles.interactionHint} type="button" autoFocus onClick={turnHandle}>ハンドルを回す ↻</button>}
       <PixiEffects ref={particlesRef} enabled />
       <div ref={flashRef} className={styles.flash} />
     </div>
@@ -445,6 +495,7 @@ function GachaCinematicScene({ result, current, total, capsuleOnly, planLabel, r
   const hasShakeTell = rarity === "LR" || rarity === "MR";
   const hasMrTell = rarity === "MR";
   const [phase, setPhase] = useState<Phase>("準備中");
+  const [interaction, setInteraction] = useState<"turn" | "open" | null>(null);
   const completeRef = useRef(false);
   const sceneCompleteRef = useRef(onSceneComplete);
   const skipAllRef = useRef(onSkipAll);
@@ -478,10 +529,15 @@ function GachaCinematicScene({ result, current, total, capsuleOnly, planLabel, r
   }, []);
 
   const rootRef = useRef<HTMLDivElement>(null);
+  useModalFocus(rootRef);
   const machineRef = useRef<HTMLDivElement>(null);
   const knobRef = useRef<HTMLSpanElement>(null);
+  const doorRef = useRef<HTMLSpanElement>(null);
   const capsuleRef = useRef<HTMLDivElement>(null);
   const capsuleGlowRef = useRef<HTMLSpanElement>(null);
+  const capsuleTopRef = useRef<HTMLSpanElement>(null);
+  const capsuleBottomRef = useRef<HTMLSpanElement>(null);
+  const specialBackgroundRef = useRef<HTMLDivElement>(null);
   const blackoutRef = useRef<HTMLDivElement>(null);
   const atmosphereRef = useRef<HTMLDivElement>(null);
   const auraRef = useRef<HTMLDivElement>(null);
@@ -507,6 +563,12 @@ function GachaCinematicScene({ result, current, total, capsuleOnly, planLabel, r
     const sceneBaseRate = capsuleOnly ? MULTI_REVEAL_TIME_SCALE : 1;
     timelineRef.current?.timeScale(sceneBaseRate * playbackRate);
   }, [capsuleOnly, playbackRate]);
+
+  const resumeInteraction = useCallback(() => {
+    if (completeRef.current || !timelineRef.current?.paused()) return;
+    setInteraction(null);
+    timelineRef.current.resume();
+  }, []);
 
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
@@ -618,9 +680,10 @@ function GachaCinematicScene({ result, current, total, capsuleOnly, planLabel, r
 
         tl.call(() => {
           setPhase("ガチャ起動");
-          playGachaCue("turn");
         })
-          .fromTo(machine, { opacity: 0, scale: 0.84, y: 36 }, { opacity: 1, scale: 1, y: 0, duration: 0.42, ease: "back.out(1.35)" })
+          .fromTo(machine, { opacity: 0, scale: 0.84, y: 36, xPercent: -50, yPercent: -50 }, { opacity: 1, scale: 1, y: 0, duration: 0.42, ease: "back.out(1.35)" })
+          .addPause(undefined, () => setInteraction("turn"))
+          .call(() => playGachaCue("turn"))
           .to(machine, { keyframes: turnShakeKeyframes, duration: turnShakeDuration, ease: hasShakeTell ? "power2.inOut" : "none" }, ">-0.08")
           .to(knob, { rotation: 360, duration: 0.78, ease: "power3.inOut" }, "<0.03");
 
@@ -633,7 +696,8 @@ function GachaCinematicScene({ result, current, total, capsuleOnly, planLabel, r
             .to(machine, { filter: "brightness(1) drop-shadow(0 0 0px transparent)", duration: 0.55 });
         }
 
-        tl.call(() => {
+        tl.to(doorRef.current, { rotationX: -82, duration: 0.22 })
+          .call(() => {
             setPhase("カプセル排出");
             playGachaCue("drop");
           })
@@ -647,7 +711,11 @@ function GachaCinematicScene({ result, current, total, capsuleOnly, planLabel, r
 
       const blackoutOpacity = rarity === "LR" ? 1 : rarity === "MR" ? 0.72 : rarity === "UR" ? 0.64 : rarity === "SSR" ? 0.48 : 0.56;
 
-      tl.to(blackout, { opacity: blackoutOpacity, duration: 0.46 }, capsuleOnly ? "<0.12" : "<")
+      tl.addPause(undefined, () => {
+          setPhase("カプセル開封");
+          setInteraction("open");
+        })
+        .to(blackout, { opacity: blackoutOpacity, duration: 0.46 })
         .call(() => {
           setPhase("力をためている…");
           playGachaCue("charge");
@@ -657,6 +725,9 @@ function GachaCinematicScene({ result, current, total, capsuleOnly, planLabel, r
         .to(cracks, { opacity: 1, duration: 0.08 })
         .to(crackLines, { strokeDashoffset: 0, duration: 0.32, stagger: 0.035, ease: "power3.out" }, "<")
         .call(() => playGachaCue("crack"), undefined, "<")
+        .to(capsuleTopRef.current, { yPercent: -72, rotation: -16, opacity: 0, duration: 0.58, ease: "power2.out" })
+        .to(capsuleBottomRef.current, { yPercent: 54, rotation: 12, opacity: 0, duration: 0.58, ease: "power2.out" }, "<")
+        .to(specialBackgroundRef.current, { opacity: 1, duration: 0.65 }, "<")
         .to(beam, { opacity: 0.94, scaleX: 1, duration: 0.45, ease: "power3.out" })
         .to(atmosphere, { opacity: rarity === "SSR" ? 0.92 : 0.72, rotation: 48, duration: 0.58 }, "<")
         .to(aura, { opacity: 0.86, scale: 1, rotation: 42, duration: 0.58 }, "<")
@@ -711,7 +782,7 @@ function GachaCinematicScene({ result, current, total, capsuleOnly, planLabel, r
 
       reveal(tl, ">");
       tl.timeScale((capsuleOnly ? MULTI_REVEAL_TIME_SCALE : 1) * playbackRateRef.current);
-    });
+    }).catch(() => { if (!disposed) completeScene(); });
 
     return () => {
       disposed = true;
@@ -722,8 +793,9 @@ function GachaCinematicScene({ result, current, total, capsuleOnly, planLabel, r
 
   const image = result.image;
   return (
-    <div ref={rootRef} className={styles.root} data-rarity={rarity} role="dialog" aria-modal="true" aria-label={`${total > 1 ? `${current}個目` : "1回"}のガチャ演出`}>
+    <div ref={rootRef} className={styles.root} data-rarity={rarity} role="dialog" tabIndex={-1} aria-modal="true" aria-label={`${total > 1 ? `${current}個目` : "1回"}のガチャ演出`}>
       <div className={styles.backdrop} />
+      {rarity === "LR" || rarity === "MR" ? <div ref={specialBackgroundRef} className={styles.specialBackground} data-rarity={rarity} /> : null}
       <div className={styles.ambient} />
       <div ref={atmosphereRef} className={styles.rarityAtmosphere} />
       <div className={styles.vignette} />
@@ -750,17 +822,22 @@ function GachaCinematicScene({ result, current, total, capsuleOnly, planLabel, r
 
       <div className={styles.stage}>
         <div className={styles.floor} />
-        <div ref={machineRef} className={styles.machineWrap}>
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img className={styles.machine} src="/gacha/reference/lucky-paws-machine.webp" alt="ガチャマシン" draggable={false} />
-          <span ref={knobRef} className={styles.knob} aria-hidden="true" />
+        <div ref={machineRef} className={styles.machineWrap} data-running={phase === "ガチャ起動" && interaction !== "turn"}>
+          <MachineArtwork />
+          <div className={styles.domeCapsules} aria-hidden="true">
+            {(["N", "R", "SR", "R", "N", "SR"] as const).map((r, index) => <span key={index}><IllustratedCapsule rarity={r} /></span>)}
+          </div>
+          <span className={styles.predictionLamp} data-lit={phase === "ガチャ起動" && interaction !== "turn"} data-tell={hasMrTell ? "MR" : hasShakeTell ? "LR" : ["SR", "SSR", "UR"].includes(rarity) ? "gold" : "normal"} />
+          <IllustratedHandle knobRef={knobRef} active={interaction === "turn"} onTurn={resumeInteraction} />
+          <span ref={doorRef} className={styles.machineDoor}><DoorArtwork /></span>
         </div>
 
         <div ref={beamRef} className={styles.beam} />
         <div ref={capsuleRef} className={styles.capsuleWrap} aria-label={`${rarity}カプセル`}>
           <span ref={capsuleGlowRef} className={styles.capsuleGlow} />
-          <span className={styles.capsule} />
-          <span className={styles.capsuleBand} />
+          <span ref={capsuleTopRef} className={styles.capsuleHalf}><IllustratedCapsule rarity={rarity} part="top" /></span>
+          <span ref={capsuleBottomRef} className={styles.capsuleHalf}><IllustratedCapsule rarity={rarity} part="bottom" /></span>
+          {interaction === "open" && <button type="button" className={styles.capsuleOpenButton} onClick={resumeInteraction} aria-label="カプセルを開ける" />}
         </div>
 
         <div ref={auraRef} className={styles.auraRing} />
@@ -796,6 +873,7 @@ function GachaCinematicScene({ result, current, total, capsuleOnly, planLabel, r
         </div>
       </div>
 
+      {interaction && <button className={styles.interactionHint} type="button" autoFocus onClick={resumeInteraction}>{interaction === "turn" ? "ハンドルを回す ↻" : "タップして開ける ✨"}</button>}
       <PixiEffects ref={particlesRef} enabled />
       <div className={styles.shockwaves} aria-hidden="true">
         {[0, 1].map((index) => <span key={index} ref={(node) => { if (node) shockwaveRefs.current[index] = node; }} className={styles.shockwave} />)}
@@ -878,6 +956,16 @@ export function GachaCinematic({ draw, onComplete }: { draw: AnimationDraw; onCo
       if (!result.image) continue;
       const image = new Image();
       image.src = result.image;
+    }
+    // Preload the small illustrated parts once the already-drawn results arrive.
+    for (const name of ["machine", "handle", "door", "background-shop", ...["N", "R", "SR", "SSR", "UR", "LR", "MR"].map((r) => `capsule-${r}`)]) {
+      const image = new Image();
+      image.src = `/gacha/illustrated/${name}.jpg`;
+    }
+    for (const rarity of ["LR", "MR"]) {
+      if (!draw.results.some((r) => r.rarity === rarity)) continue;
+      const image = new Image();
+      image.src = `/gacha/illustrated/background-${rarity}.jpg`;
     }
   }, [draw.results]);
 
