@@ -173,9 +173,14 @@ const FALL_DRIFT = 0.3;
 const BONE_PTS = 5;
 /** 歩いた1mあたりの点 */
 const METER_PTS = 10;
-/** この距離（m）を超えたら、障害物を DENSE_RATE 倍の数だけ出す */
-const DENSE_FROM_M = 700;
-const DENSE_RATE = 1.2;
+/**
+ * 障害物の数の倍率。はじめから DENSE_BASE 倍で、DENSE_STEP_M（m）進むごとに DENSE_STEP ずつ増える
+ * （0〜299m は 1.1 倍、300〜599m は 1.2 倍…）。間かくが詰まりすぎないよう DENSE_MAX 倍で止める
+ */
+const DENSE_BASE = 1.1;
+const DENSE_STEP_M = 300;
+const DENSE_STEP = 0.1;
+const DENSE_MAX = 2;
 const hexRgbStr = (h: string) => { const [r, g, b] = hex(h); return `${r},${g},${b}`; };
 /**
  * 走る速さ（論理px/秒）。距離がのびても速くならず、ずっと START_SPEED で走る（スキルの倍率・ぬかるみなどは別）。
@@ -1117,7 +1122,7 @@ export function createOsanpoRun(root: HTMLElement, opts: OsanpoRunOptions): () =
     }
     // 700m を超えたら、障害物どうしの間かくを詰めて、出てくる数を 2 割ふやす（1 / 1.2）。
     // extra（予告のための距離や、2連の間かく）は安全のための分なので詰めない
-    const dense = S.dist / 50 >= DENSE_FROM_M ? 1 / DENSE_RATE : 1;
+    const dense = 1 / Math.min(DENSE_MAX, DENSE_BASE + Math.floor(S.dist / 50 / DENSE_STEP_M) * DENSE_STEP);
     S.next = (170 + S.speed * 0.55 + Math.random() * S.speed * 0.8) * (rush ? 0.68 : 1) * routeGap() * dense + extra;
   }
   /* ---------- 思い出の写真（自分のおでかけ写真を飛行機が運ぶ） ---------- */
