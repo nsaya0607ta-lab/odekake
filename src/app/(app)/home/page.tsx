@@ -5,6 +5,7 @@ import { IconUser } from "@/components/icons";
 import { TopHeader } from "@/components/page-header";
 import { PageBody } from "@/components/page-body";
 import { CoinBadge } from "@/components/coin-badge";
+import { GuideBadge } from "@/components/guide-badge";
 import { SharedTripBadge } from "@/components/shared-trip-badge";
 import { HomeScene } from "@/components/home-scene";
 import { HomeWeatherChip, HomeWeatherProvider, HomeWeatherSky } from "@/components/home-weather";
@@ -205,6 +206,7 @@ export default async function HomePage({
         action={
           <div className="flex items-center gap-2">
             <CoinBadge balance={coins.balance} blueBalance={blueCoins} />
+            <GuideBadge />
             <SharedTripBadge />
           </div>
         }

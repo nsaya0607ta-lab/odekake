@@ -1,9 +1,7 @@
 /**
- * ショップは準備中。ユーザー名「しゅん」だけが先に使える（ナビ・画面・APIで同じ判定を使う）。
- * 全員に公開するときは true を返すようにする。
+ * ショップ（青コインで背景を買う）を使えるか。2026-10 から全員に公開している。
+ * ナビ・画面・APIで同じ判定を使うので、また一部の人だけにしたいときはここを変える。
  */
-const SHOP_PREVIEW_USERS = new Set(["しゅん"]);
-
-export function canAccessShop(displayName: string | null | undefined): boolean {
-  return SHOP_PREVIEW_USERS.has(displayName?.trim() ?? "");
+export function canAccessShop(_displayName?: string | null): boolean {
+  return true;
 }
