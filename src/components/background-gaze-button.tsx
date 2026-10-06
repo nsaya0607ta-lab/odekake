@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 
 /**
- * 背景をながめるモード（ホームの右下のボタン、またはホームを横にスワイプ）。
+ * 背景をながめるモード（ホームを横にスワイプ）。
  * ヘッダー・カード・下のナビをかくして、背景だけを画面いっぱいに見せる。
  * さわれる背景は、そのまま画面をタップして遊べる。もどるボタン・もう一度横スワイプ・Esc でもとにもどる。
  *
@@ -197,18 +197,6 @@ export function BackgroundGazeButton() {
     );
   }
 
-  return (
-    <button
-      type="button"
-      onClick={() => toggle(true)}
-      aria-label="背景をながめる（ホームを横にスワイプしてもながめられます）"
-      className="fixed right-3 z-[35] flex h-11 w-11 items-center justify-center rounded-full border border-white/70 bg-[rgba(255,253,248,.78)] text-leaf-deep shadow-[0_6px_16px_rgba(60,45,25,.16)] backdrop-blur-md active:scale-95"
-      style={{ bottom: "calc(var(--nav-height) + var(--safe-bottom) + 12px)" }}
-    >
-      <svg viewBox="0 0 24 24" className="h-5 w-5" aria-hidden="true">
-        <path d="M2.5 12s3.5-6.5 9.5-6.5 9.5 6.5 9.5 6.5-3.5 6.5-9.5 6.5S2.5 12 2.5 12Z" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinejoin="round" />
-        <circle cx="12" cy="12" r="3" fill="currentColor" />
-      </svg>
-    </button>
-  );
+  // 目のボタンは置かない（ホームを横にスワイプすると、ながめるモードになる）
+  return null;
 }

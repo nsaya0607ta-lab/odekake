@@ -570,3 +570,35 @@
   .page, .section, .heroArt, .coinStack, .coinIcon, .rateBar i, .trayCapsule, .catchItem, .catchBox, .dropCoin, .swatch, .headerGuide, .navText p, .gameBody, .trayBest { animation: none !important; }
   .swatch[data-bg="paw"] { opacity: 1; }
 }
+
+/* ---------- 本物の画面（横にめくる） ---------- */
+
+.screens { margin: 0 -16px; }
+.screensTrack {
+  display: flex;
+  gap: 14px;
+  padding: 6px calc(50% - 95px) 10px;
+  overflow-x: auto;
+  scroll-snap-type: x mandatory;
+  scrollbar-width: none;
+}
+.screensTrack::-webkit-scrollbar { display: none; }
+.screen { flex: none; width: 190px; margin: 0; scroll-snap-align: center; transition: transform .35s ease, opacity .35s ease; opacity: .55; transform: scale(.92); }
+.screen[data-active="true"] { opacity: 1; transform: none; }
+.screen[data-wide] { width: min(320px, 82vw); }
+.screensTrack:has(.screen[data-wide]) { padding-inline: calc(50% - min(160px, 41vw)); }
+.screenFrame {
+  overflow: hidden;
+  border: 6px solid #2f2a25;
+  border-radius: 26px;
+  background: #2f2a25;
+  box-shadow: 0 12px 24px rgb(40 30 20 / 24%);
+}
+.screen[data-wide] .screenFrame { border-width: 4px; border-radius: 18px; }
+.screenFrame img { display: block; width: 100%; height: auto; }
+.screenCaption { margin: 4px 16px 0; padding: 12px 14px; border-radius: 16px; background: #faf6ec; animation: rise .3s ease-out both; }
+.screenCaption b { color: var(--ink); font-size: 14px; }
+.screenCaption p { margin: 4px 0 0; color: var(--soft); font-size: 12.5px; line-height: 1.7; }
+.dots { display: flex; justify-content: center; gap: 6px; margin-top: 10px; }
+.dots button { width: 8px; height: 8px; padding: 0; border: 0; border-radius: 999px; background: #d9cfb9; transition: width .25s, background .25s; }
+.dots button[data-on="true"] { width: 22px; background: #6f9a59; }
