@@ -1,3 +1,4 @@
+import { cookies } from "next/headers";
 import { NextResponse } from "next/server";
 import { DOG_SKIN_COOKIE, getDogSkin, isDogSkinId } from "@/lib/dog-skins";
 import { requireUser } from "@/lib/supabase/server";
@@ -9,6 +10,18 @@ import { requireUser } from "@/lib/supabase/server";
  * 適用されていなくても切り替えできる。ガチャ景品の所持判定は既存の
  * user_gacha_items でサーバー側から確認する。
  */
+/**
+ * いま選んでいる犬スキン（起動画面の犬に使う）。Cookie は httpOnly なので、画面からはここで読む。
+ * Cookie を見るだけで DB には問い合わせない。未ログイン・未設定なら default。
+ */
+export async function GET() {
+  const value = (await cookies()).get(DOG_SKIN_COOKIE)?.value;
+  return NextResponse.json(
+    { skinId: isDogSkinId(value) ? value : "default" },
+    { headers: { "Cache-Control": "private, no-store" } },
+  );
+}
+
 export async function PATCH(request: Request) {
   const { supabase, user } = await requireUser();
 
