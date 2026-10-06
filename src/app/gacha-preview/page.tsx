@@ -11,7 +11,10 @@ const GachaCinematic = dynamic(
   { ssr: false },
 );
 
-const PREVIEW_RESULTS: Record<Extract<GachaRarity, "SSR" | "UR" | "LR" | "MR">, DrawResult> = {
+const PREVIEW_RESULTS: Record<GachaRarity, DrawResult> = {
+  N: { id: "preview-n", name: "カラフルボール", rarity: "N", type: "item", image: "/collection/items/colorful-ball.webp", isNew: true, previousLevel: 0, newLevel: 1 },
+  R: { id: "preview-r", name: "あひるのぬいぐるみ", rarity: "R", type: "item", image: "/collection/items/duck-plush.webp", isNew: true, previousLevel: 0, newLevel: 1 },
+  SR: { id: "preview-sr", name: "宝箱おやつパズル", rarity: "SR", type: "item", image: "/collection/items/treasure-puzzle.webp", isNew: true, previousLevel: 0, newLevel: 1 },
   SSR: {
     id: "preview-ssr",
     name: "虹色わんこボール",
@@ -55,6 +58,9 @@ const PREVIEW_RESULTS: Record<Extract<GachaRarity, "SSR" | "UR" | "LR" | "MR">, 
 };
 
 const BUTTON_STYLES = {
+  N: "from-stone-100 to-amber-100 text-stone-800",
+  R: "from-sky-200 to-blue-400 text-blue-950",
+  SR: "from-amber-200 to-yellow-500 text-amber-950",
   SSR: "from-fuchsia-500 via-amber-300 to-cyan-400 text-slate-950",
   UR: "from-red-700 via-red-500 to-amber-400 text-white",
   LR: "from-black via-zinc-900 to-amber-500 text-amber-100",
@@ -160,7 +166,7 @@ export default function GachaPreviewPage() {
         <p className="text-[10px] font-black tracking-[0.22em] text-[#9a876e]">PREVIEW ONLY</p>
         <h1 className="mt-2 text-3xl font-black">ガチャ演出プレビュー</h1>
         <p className="mt-3 text-sm font-semibold leading-7 text-[#75644e]">
-          レアリティを選ぶと、保存やコイン消費を行わずに演出だけ再生します。
+          レアリティを選ぶと、保存やコイン消費を行わずに演出だけ再生します。ハンドルを回して、出てきたカプセルをタップして開けてください。
         </p>
 
         <div className="mt-8 grid grid-cols-2 gap-3">
@@ -173,7 +179,7 @@ export default function GachaPreviewPage() {
             >
               <span className="block text-2xl font-black tracking-[0.12em]">{rarity}</span>
               <span className="mt-3 block text-[11px] font-black opacity-80">
-                {rarity === "SSR" ? "虹色の光" : rarity === "UR" ? "赤雷・2段爆発" : rarity === "LR" ? "黒金・大爆発" : "停止・亀裂・昇格"}
+                {rarity === "N" ? "クリーム色のカプセル" : rarity === "R" ? "水色・肉球もよう" : rarity === "SR" ? "金色・星もよう" : rarity === "SSR" ? "虹色の光" : rarity === "UR" ? "赤雷・2段爆発" : rarity === "LR" ? "黒金・大爆発" : "停止・亀裂・昇格"}
               </span>
             </button>
           ))}

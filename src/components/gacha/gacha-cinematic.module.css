@@ -22,6 +22,157 @@
 .root[data-rarity="LR"] { --fx-primary: #e9b949; --fx-secondary: #fff0a0; --fx-deep: #080808; }
 .root[data-rarity="MR"] { --fx-primary: #7e65ff; --fx-secondary: #54d6ff; --fx-deep: #09052d; }
 
+.root .backdrop,
+.root[data-rarity] .backdrop {
+  background: linear-gradient(180deg, rgb(17 14 29 / 12%), rgb(24 16 28 / 22%)), url("/gacha/illustrated/background-shop.jpg") center 65% / cover no-repeat;
+}
+
+.specialBackground {
+  position: absolute;
+  inset: 0;
+  z-index: -4;
+  opacity: 0;
+  pointer-events: none;
+  background: url("/gacha/illustrated/background-LR.jpg") center / cover no-repeat;
+}
+
+.specialBackground[data-rarity="MR"] {
+  background-image: url("/gacha/illustrated/background-MR.jpg");
+}
+
+.machineArt {
+  display: block;
+  width: 100%;
+  height: auto;
+  overflow: visible;
+  filter: drop-shadow(0 16px 14px rgb(34 22 14 / 35%));
+}
+
+.handleButton {
+  position: absolute;
+  z-index: 4;
+  left: 38.9%;
+  top: 56%;
+  width: 39%;
+  aspect-ratio: 1;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  touch-action: none;
+  cursor: grab;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.handleButton:active { cursor: grabbing; }
+.handleButton:disabled { cursor: default; }
+.handleButton:focus-visible { outline: 3px solid #fff6ad; border-radius: 50%; }
+
+.illustratedKnob,
+.illustratedKnob svg { display: block; width: 100%; height: 100%; }
+.illustratedKnob { transform-origin: center; will-change: transform; }
+
+.machineDoor {
+  position: absolute;
+  z-index: 3;
+  left: 66.8%;
+  top: 71.9%;
+  width: 19%;
+  aspect-ratio: 1;
+  transform-origin: 50% 6%;
+  backface-visibility: hidden;
+  filter: drop-shadow(0 2px 2px rgb(64 54 29 / 30%));
+}
+
+.machineDoor svg { width: 100%; height: 100%; }
+
+.predictionLamp {
+  position: absolute;
+  z-index: 3;
+  left: 47.2%;
+  top: 23.7%;
+  width: 6.8%;
+  aspect-ratio: 1;
+  border-radius: 50%;
+  opacity: 0;
+  background: #fffce7;
+}
+
+.predictionLamp[data-lit="true"] { opacity: .85; box-shadow: 0 0 12px 4px #fff6af; }
+.predictionLamp[data-lit="true"][data-tell="gold"] { background: #ffdd65; box-shadow: 0 0 16px 7px #ffc547; }
+.predictionLamp[data-lit="true"][data-tell="LR"] { background: #ffe69c; box-shadow: 0 0 22px 9px #eeba46; }
+.predictionLamp[data-lit="true"][data-tell="MR"] { background: #eee0ff; box-shadow: 0 0 22px 10px #b983ff, 0 0 34px 16px #73dbff; }
+
+.domeCapsules {
+  position: absolute;
+  left: 17%;
+  top: 30%;
+  width: 68%;
+  height: 25%;
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  align-content: end;
+  gap: 0;
+  opacity: .9;
+  clip-path: ellipse(50% 65% at 50% 45%);
+  pointer-events: none;
+}
+
+.domeCapsules span { display: block; width: 100%; margin-top: -25%; }
+[data-running="true"] .domeCapsules span { animation: capsuleTumble .36s ease-in-out infinite alternate; }
+[data-running="true"] .domeCapsules span:nth-child(even) { animation-delay: -.18s; }
+
+@keyframes capsuleTumble {
+  from { transform: translate(-3px, -5px) rotate(-12deg); }
+  to { transform: translate(3px, 6px) rotate(16deg); }
+}
+
+.capsuleArt { display: block; width: 100%; height: 100%; overflow: visible; }
+.capsuleHalf { position: absolute; inset: 0; display: block; transform-origin: center; }
+
+/* Invisible result/effect layers must not intercept the handle or capsule. */
+.freeze,
+.reveal,
+.fakeResult,
+.beam,
+.auraRing,
+.floor,
+.capsuleHalf,
+.capsuleGlow,
+.batchPromotionCopy {
+  pointer-events: none;
+}
+
+.capsuleOpenButton {
+  position: absolute;
+  inset: 0;
+  z-index: 3;
+  border: 0;
+  border-radius: 50%;
+  background: transparent;
+  cursor: pointer;
+}
+.capsuleOpenButton:focus-visible { outline: 2px solid #fff2a8; outline-offset: 4px; }
+
+.interactionHint {
+  position: absolute;
+  z-index: 80;
+  bottom: max(28px, env(safe-area-inset-bottom));
+  left: 50%;
+  transform: translateX(-50%);
+  min-height: 48px;
+  padding: 12px 24px;
+  width: max-content;
+  max-width: calc(100% - 32px);
+  border: 1px solid rgb(255 226 153 / 80%);
+  border-radius: 999px;
+  background: rgb(48 31 25 / 85%);
+  color: #fff6d5;
+  font: inherit;
+  font-weight: 800;
+  font-size: 14px;
+  box-shadow: 0 5px 26px rgb(36 24 12 / 30%);
+}
+
 .backdrop,
 .vignette,
 .blackout,
@@ -917,4 +1068,29 @@
   .batchCapsuleRare .batchCapsuleGlow,
   .batchCapsuleRare::before,
   .capsuleSparkles i { animation: none; }
+}
+
+/* The illustrated machine includes a taller glass dome than the old asset. */
+.root .machineWrap {
+  top: 45%;
+  width: min(88vw, 400px, calc((100dvh - 150px) * .66));
+  perspective: 650px;
+}
+.root .batchMachineWrap {
+  top: 29%;
+  width: min(60vw, 230px, calc((100dvh - 160px) * .38));
+  perspective: 650px;
+}
+.root .batchTray {
+  top: 60%;
+  padding: 12px;
+  border: 1px solid rgb(242 210 146 / 60%);
+  border-radius: 24px;
+  background: linear-gradient(180deg, rgb(122 86 57 / 50%), rgb(53 35 37 / 80%));
+  box-shadow: inset 0 2px 5px rgb(255 236 195 / 30%), 0 12px 28px rgb(31 15 13 / 35%);
+}
+.root .capsuleWrap { width: min(29vw, 118px); }
+.root .capsuleWrap:has(.capsuleOpenButton) { filter: drop-shadow(0 0 14px var(--fx-primary)); }
+@media (prefers-reduced-motion: reduce) {
+  .root .domeCapsules span { animation: none; }
 }
