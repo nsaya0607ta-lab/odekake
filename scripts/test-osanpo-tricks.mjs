@@ -20,13 +20,13 @@ test('箱が伸びる高さとドローンが降りる高さは連続かつ範�
   for (let i = 0; i <= 300; i++) {
     const t = i / 200;
     const box = trickPose('surprise', 240, t, t), drone = trickPose('drone', 240, t, t);
-    assert.ok(box.h >= lastH && box.h <= 120); assert.ok(box.h - lastH < 5);
+    assert.ok(box.h >= lastH && box.h <= 26 + 40); assert.ok(box.h - lastH < 5);
     assert.ok(drone.y >= lastY && drone.y <= 208); assert.ok(drone.y - lastY < 2);
     assert.equal(drone.h, 30); lastH = box.h; lastY = drone.y;
   }
-  assert.equal(lastH, 120); assert.equal(lastY, 208);
+  assert.equal(lastH, 26 + 40); assert.equal(lastY, 208);
   assert.equal(trickPose('surprise', 240, 2.1, 2.1).h, 26);
-  assert.ok(trickPose('surprise', 240, 1.85, 1.85).h < 120);
+  assert.ok(trickPose('surprise', 240, 1.85, 1.85).h < 26 + 40);
 });
 test('スーツケースは接地と高さ88のバウンドを繰り返し、画面サイズに追従する', () => {
   for (let t = 0; t < 10; t += 1 / 60) {
