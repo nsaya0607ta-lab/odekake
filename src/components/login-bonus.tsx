@@ -26,7 +26,9 @@ type Reward = { amount: number; balance: number; blueAmount: number; totalDays: 
 
 function waitForSplash(): Promise<void> {
   return new Promise((resolve) => {
-    if (!document.querySelector(".app-splash")) return resolve();
+    // 起動画面（[data-app-splash]）と、読み込み中の画面（.app-splash）が消えるのを待つ
+    const splashOpen = () => Boolean(document.querySelector("[data-app-splash], .app-splash"));
+    if (!splashOpen()) return resolve();
 
     const done = () => {
       observer.disconnect();
@@ -34,7 +36,7 @@ function waitForSplash(): Promise<void> {
       resolve();
     };
     const observer = new MutationObserver(() => {
-      if (!document.querySelector(".app-splash")) done();
+      if (!splashOpen()) done();
     });
     observer.observe(document.body, { childList: true, subtree: true });
 
