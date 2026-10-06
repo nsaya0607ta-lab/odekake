@@ -32,8 +32,8 @@ export const HOME_CARD_GEOMETRY: Record<HomeCardId, CardGeometry> = {
   notice: { ratio: 2172 / 724, paperTop: 63 / 724, paperBottom: 673 / 724 },
   // public/home-highlights-frame.webp（1536×1024）：紙は 33〜970px
   highlights: { ratio: 1536 / 1024, paperTop: 33 / 1024, paperBottom: 970 / 1024, narrower: 4 },
-  // public/collection-card.webp（2172×724 を 2172×615 にのばして表示）：紙は 66〜668px
-  collection: { ratio: 2172 / 615, paperTop: 66 / 724, paperBottom: 668 / 724 },
+  // public/collection-card.webp（2172×724）：紙は 66〜668px
+  collection: { ratio: 2172 / 724, paperTop: 66 / 724, paperBottom: 668 / 724 },
 };
 
 /**
