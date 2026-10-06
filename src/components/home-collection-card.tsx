@@ -1,4 +1,5 @@
 import { CARD_BLEED } from "@/lib/home-card-layout";
+import { HOME_SKIN_ART, type HomeSkinTheme } from "@/lib/home-skins";
 import Image from "next/image";
 import Link from "next/link";
 import { ItemArt } from "@/components/collection/item-art";
@@ -18,7 +19,6 @@ import type { GachaRarity } from "@/lib/gacha/config";
  */
 const CARD_RATIO = "2172 / 724";
 
-const CARD_SRC = "/collection-card.webp";
 
 export type HomeCollectionRecentItem = {
   id: string;
@@ -44,7 +44,10 @@ export function HomeCollectionCard({
   collected,
   total,
   recent,
+  skin = "default",
 }: {
+  /** カードの絵がら（ショップで買ったもの） */
+  skin?: HomeSkinTheme;
   collected: number;
   total: number;
   recent: HomeCollectionRecentItem[];
@@ -62,7 +65,7 @@ export function HomeCollectionCard({
     >
       <div className="relative w-full" style={{ aspectRatio: CARD_RATIO }}>
         <Image
-          src={CARD_SRC}
+          src={HOME_SKIN_ART.collection[skin]}
           alt=""
           aria-hidden="true"
           fill

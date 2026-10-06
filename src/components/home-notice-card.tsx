@@ -1,4 +1,5 @@
 import { CARD_BLEED } from "@/lib/home-card-layout";
+import { HOME_SKIN_ART, type HomeSkinTheme } from "@/lib/home-skins";
 import Image from "next/image";
 import Link from "next/link";
 import { IconChevronRight } from "@/components/icons";
@@ -14,12 +15,22 @@ import type { NoticeFeedRow } from "@/lib/supabase/types";
  */
 const CARD_RATIO = "2172 / 724";
 
-const CARD_SRC = "/notice-card.webp";
+/**
+ * 見出し（新着◯件）の位置。絵に描いてある「お知らせ」の札の右どなりに置く。
+ * 冬の絵は紙のふちに木のわくがあるので、わくにかからないよう少し下げる。
+ */
+const HEADING_SHIFT: Record<HomeSkinTheme, string> = {
+  default: "translate(calc(10px + 3em), calc(-4px - 0.3em))",
+  winter: "translate(calc(14px + 3em), calc(5px - 0.3em))",
+};
 
 export function HomeNoticeCard({
   unreadCount,
   notices,
+  skin = "default",
 }: {
+  /** カードの絵がら（ショップで買ったもの） */
+  skin?: HomeSkinTheme;
   /** 直近24時間に作成された、自分がまだ読んでいないお知らせの件数 */
   unreadCount: number;
   /** 新しい順の最新お知らせ（先頭3件を表示） */
@@ -34,7 +45,7 @@ export function HomeNoticeCard({
         {/* カード全体（タイトル以外の場所）は、お知らせ一覧へ。タイトルはそれぞれのお知らせへ */}
         <Link href="/notices" aria-label={`お知らせ一覧。${summary}`} className="pressable absolute inset-0 z-0 block active:scale-[0.99]" />
         <Image
-          src={CARD_SRC}
+          src={HOME_SKIN_ART.notice[skin]}
           alt=""
           aria-hidden="true"
           fill
@@ -47,7 +58,7 @@ export function HomeNoticeCard({
             {/* 見出し（新着の数）。右の花の絵にかからないよう短く、数はバッジで目立たせる */}
             <p
               className="flex items-center gap-1 text-sm font-bold text-ink"
-              style={{ marginLeft: "11%", transform: "translate(calc(10px + 3em), calc(-4px - 0.3em))" }}
+              style={{ marginLeft: "11%", transform: HEADING_SHIFT[skin] }}
               aria-hidden="true"
             >
               {unreadCount > 0 ? (

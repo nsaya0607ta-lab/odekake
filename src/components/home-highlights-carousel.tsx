@@ -1,9 +1,10 @@
 "use client";
 
 import { CARD_BLEED } from "@/lib/home-card-layout";
+import { HOME_SKIN_ART, type HomeSkinTheme } from "@/lib/home-skins";
 import Image from "next/image";
 import Link from "next/link";
-import { useEffect, useMemo, useRef, useState, type ReactNode, type TouchEvent } from "react";
+import { createContext, useContext, useEffect, useMemo, useRef, useState, type ReactNode, type TouchEvent } from "react";
 import { IconClock, IconMapPin, IconPaw, IconUser } from "@/components/icons";
 import { MarqueeText } from "@/components/marquee-text";
 import { formatRelativeTimeJa } from "@/lib/date";
@@ -13,7 +14,8 @@ const SWIPE_THRESHOLD_PX = 40;
 
 /** public/home-highlights-frame.webp の実ピクセル比（1536×1024）。3スライド共通の紙の枠。 */
 const CARD_RATIO = "1536 / 1024";
-const FRAME_SRC = "/home-highlights-frame.webp";
+/** 紙の枠の絵（カードの絵がらで変わる）。3スライドとも同じ絵を使う */
+const FrameSrc = createContext<string>(HOME_SKIN_ART.highlights.default);
 
 const STAT_ICON_SRC = {
   prefectures: "/icon-prefectures.webp",
@@ -70,7 +72,10 @@ export function HomeHighlightsCarousel({
   stats,
   activity,
   stepsRanking,
+  skin = "default",
 }: {
+  /** カードの絵がら（ショップで買ったもの） */
+  skin?: HomeSkinTheme;
   stats: HomeStatsSlideData;
   activity: FriendActivitySlideData;
   stepsRanking: FriendStepsSlideData;
@@ -152,6 +157,7 @@ export function HomeHighlightsCarousel({
   };
 
   return (
+    <FrameSrc.Provider value={HOME_SKIN_ART.highlights[skin]}>
     <section
       aria-label="実績とフレンドの様子"
       className="relative"
@@ -207,15 +213,17 @@ export function HomeHighlightsCarousel({
         </div>
       ) : null}
     </section>
+    </FrameSrc.Provider>
   );
 }
 
 /** 3スライド共通の紙の枠（テープ・花の水彩イラスト）を背景にして、中身を重ねる。 */
 function FrameCard({ children }: { children: ReactNode }) {
+  const src = useContext(FrameSrc);
   return (
     <div className="relative w-full" style={{ aspectRatio: CARD_RATIO }}>
       <Image
-        src={FRAME_SRC}
+        src={src}
         alt=""
         aria-hidden="true"
         fill

@@ -34,6 +34,7 @@ import { getExpProgress } from "@/lib/exp";
 import { MUNICIPALITIES, PREFECTURES } from "@/lib/geo";
 import { PREFECTURE_NAMES } from "@/lib/geo/prefecture-names";
 import { DEFAULT_HOME_LOOK, type HomeCardId } from "@/lib/home-look";
+import { DEFAULT_HOME_SKINS } from "@/lib/home-skins";
 import { canAccessShop } from "@/lib/shop-access";
 import { requireUser } from "@/lib/supabase/server";
 
@@ -101,8 +102,9 @@ export default async function HomePage({
   const shopAccess = canAccessShop(user.displayName);
   const [appearance, background] = shopAccess
     ? await Promise.all([getHomeAppearance(supabase, user.id), getCurrentAppBackground()])
-    : [{ homeLook: DEFAULT_HOME_LOOK, savedBackground: null }, "default" as const];
+    : [{ homeLook: DEFAULT_HOME_LOOK, savedBackground: null, homeSkins: DEFAULT_HOME_SKINS }, "default" as const];
   const look = appearance.homeLook;
+  const skins = appearance.homeSkins;
   // 別の端末で背景を変えていたら、この端末の背景もそろえる
   const backgroundOutdated = appearance.savedBackground !== null && appearance.savedBackground !== background;
 
@@ -170,7 +172,7 @@ export default async function HomePage({
   }));
 
   const cards: Record<HomeCardId, React.ReactNode> = {
-    notice: <HomeNoticeCard unreadCount={unreadNoticeCount} notices={noticesFeed} />,
+    notice: <HomeNoticeCard unreadCount={unreadNoticeCount} notices={noticesFeed} skin={skins.notice} />,
     highlights: (
       <HomeHighlightsCarousel
         stats={{
@@ -182,9 +184,10 @@ export default async function HomePage({
         }}
         activity={latestFriendActivity}
         stepsRanking={friendStepsRanking}
+        skin={skins.highlights}
       />
     ),
-    collection: <HomeCollectionCard collected={totalCollectedCount} total={totalCollectionCount} recent={recentCollection} />,
+    collection: <HomeCollectionCard collected={totalCollectedCount} total={totalCollectionCount} recent={recentCollection} skin={skins.collection} />,
   };
 
   return (
@@ -223,7 +226,7 @@ export default async function HomePage({
           <section className="rough-card overflow-visible">
             <div className="relative aspect-[1440/768] overflow-visible bg-transparent">
               <HomeWeatherProvider>
-                <HomeScene>
+                <HomeScene skin={skins.scene}>
                   <HomeWeatherSky />
                   <LevelTag progress={expProgress} />
                   <StepsTag
