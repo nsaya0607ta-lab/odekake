@@ -41,7 +41,7 @@ export const HOME_SKIN_THEME_INFO: Record<HomeSkinTheme, HomeSkinThemeInfo> = {
     name: "豪華",
     sub: "金のわくと宮殿の庭",
     description: "湖と古城の見える宮殿の庭を、わんこが歩きます。カードは金のわくに、王冠・宝石・真珠をあしらいました。",
-    prices: { scene: 2000, notice: 1000, highlights: 1000, collection: 1000 },
+    prices: { scene: 1500, notice: 800, highlights: 800, collection: 800 },
   },
 };
 
