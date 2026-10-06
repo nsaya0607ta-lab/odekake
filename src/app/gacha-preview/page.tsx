@@ -3,6 +3,7 @@
 import dynamic from "next/dynamic";
 import { useState } from "react";
 import type { GachaRarity } from "@/lib/gacha/config";
+import { warmGachaArt } from "@/components/gacha/art";
 import { primeGachaAudio } from "@/components/gacha/audio";
 import type { AnimationDraw, DrawResult } from "@/components/gacha/types";
 
@@ -147,16 +148,19 @@ export default function GachaPreviewPage() {
 
   const play = (rarity: keyof typeof PREVIEW_RESULTS) => {
     primeGachaAudio();
+    warmGachaArt();
     setActive({ plan: "single", results: [PREVIEW_RESULTS[rarity]] });
   };
 
   const playTen = (forcePromotion = false) => {
     primeGachaAudio();
+    warmGachaArt();
     setActive(createTenPull(forcePromotion));
   };
 
   const playHundred = () => {
     primeGachaAudio();
+    warmGachaArt();
     setActive(createHundredPull());
   };
 
@@ -179,7 +183,7 @@ export default function GachaPreviewPage() {
             >
               <span className="block text-2xl font-black tracking-[0.12em]">{rarity}</span>
               <span className="mt-3 block text-[11px] font-black opacity-80">
-                {rarity === "N" ? "クリーム色のカプセル" : rarity === "R" ? "水色・肉球もよう" : rarity === "SR" ? "金色・星もよう" : rarity === "SSR" ? "虹色の光" : rarity === "UR" ? "赤雷・2段爆発" : rarity === "LR" ? "黒金・大爆発" : "停止・亀裂・昇格"}
+                {rarity === "N" ? "クリーム色のカプセル" : rarity === "R" ? "水色・肉球もよう" : rarity === "SR" ? "金色・星もよう" : rarity === "SSR" ? "虹色の光" : rarity === "UR" ? "赤雷・2段爆発" : rarity === "LR" ? "黒金・大爆発" : "ふつうのカプセルが化ける"}
               </span>
             </button>
           ))}
@@ -191,7 +195,7 @@ export default function GachaPreviewPage() {
           className="mt-4 min-h-24 w-full rounded-[28px] bg-gradient-to-r from-[#222034] via-[#7848c9] to-[#2ba8c7] p-5 text-left text-white shadow-[0_14px_28px_rgba(73,59,43,.2)] active:scale-[.98]"
         >
           <span className="block text-2xl font-black tracking-[0.08em]">10連を再生</span>
-          <span className="mt-2 block text-[11px] font-black text-white/80">1 / 10から順番に、全10個の演出を確認</span>
+          <span className="mt-2 block text-[11px] font-black text-white/80">受け皿に並んだ10個をタップで開ける（SR以上は大きく開く）</span>
         </button>
 
         <button
@@ -209,7 +213,7 @@ export default function GachaPreviewPage() {
           className="mt-3 min-h-24 w-full rounded-[28px] bg-gradient-to-r from-[#0f4d2e] via-[#1c8f52] to-[#e3b74e] p-5 text-left text-white shadow-[0_14px_28px_rgba(73,59,43,.2)] active:scale-[.98]"
         >
           <span className="block text-2xl font-black tracking-[0.08em]">100連を再生</span>
-          <span className="mt-2 block text-[11px] font-black text-white/80">100個のカプセル排出 → SR以上だけ個別演出</span>
+          <span className="mt-2 block text-[11px] font-black text-white/80">10個ずつ受け皿へ。「ぜんぶ開ける」やAUTOで一気に開ける</span>
         </button>
 
         <div className="mt-7 rounded-[24px] border border-[#dfd1b9] bg-white/70 p-4 text-xs font-semibold leading-6 text-[#7d6d58]">

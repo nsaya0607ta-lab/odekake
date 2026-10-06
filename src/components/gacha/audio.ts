@@ -1,4 +1,7 @@
-type GachaCue = "turn" | "drop" | "charge" | "crack" | "flash" | "explosion" | "reveal";
+type GachaCue = "turn" | "drop" | "charge" | "crack" | "flash" | "explosion" | "reveal" | "tick" | "ding" | "pop" | "land" | "door";
+
+/** ランプの「ピン」の高さ（段がすすむほど高くなる） */
+const DING_NOTES = [880, 1046.5, 1318.5, 1568, 2093];
 
 let audioContext: AudioContext | null = null;
 let masterGain: GainNode | null = null;
@@ -104,9 +107,37 @@ function ratchetClick(context: AudioContext, delay: number, pitch: number) {
   tone(context, pitch, pitch * 0.68, 0.052, 0.12, "triangle", delay);
 }
 
-export function playGachaCue(cue: GachaCue) {
+/** level は ding（ランプの段）と tick（ハンドルのカチッ）の高さに使う */
+export function playGachaCue(cue: GachaCue, level = 0) {
   const context = getAudioContext();
   if (!context || context.state !== "running") return;
+
+  if (cue === "tick") {
+    ratchetClick(context, 0, 880 + (level % 4) * 36);
+    return;
+  }
+  if (cue === "ding") {
+    const note = DING_NOTES[Math.min(DING_NOTES.length - 1, Math.max(0, level))] ?? 880;
+    tone(context, note, note, 0.5, 0.13, "sine");
+    tone(context, note * 2, note * 2, 0.32, 0.05, "sine", 0.01);
+    tone(context, note * 1.5, note * 1.5, 0.42, 0.04, "triangle", 0.05);
+    return;
+  }
+  if (cue === "pop") {
+    tone(context, 520, 1180, 0.09, 0.2, "triangle");
+    noise(context, 0.06, 0.12, { type: "highpass", frequency: 2600, attack: 0.002 });
+    return;
+  }
+  if (cue === "land") {
+    tone(context, 360, 170, 0.08, 0.16, "triangle");
+    noise(context, 0.05, 0.1, { type: "lowpass", frequency: 900, attack: 0.002 });
+    return;
+  }
+  if (cue === "door") {
+    noise(context, 0.07, 0.16, { type: "bandpass", frequency: 1400, q: 1.4, attack: 0.002 });
+    tone(context, 240, 150, 0.09, 0.14, "triangle");
+    return;
+  }
 
   if (cue === "turn") {
     tone(context, 96, 58, 0.46, 0.34, "sine");
