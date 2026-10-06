@@ -42,6 +42,15 @@ export const IconPlus = (p: IconProps) => (
   </Base>
 );
 
+/** ひらいた本（ルールブック） */
+export const IconBook = (p: IconProps) => (
+  <Base {...p}>
+    <path d="M12 6.5C10.3 5.2 7.9 4.8 4.5 5v12.6c3.4-.2 5.8.2 7.5 1.5" />
+    <path d="M12 6.5c1.7-1.3 4.1-1.7 7.5-1.5v12.6c-3.4-.2-5.8.2-7.5 1.5" />
+    <path d="M12 6.5v12.6" />
+  </Base>
+);
+
 export const IconNotebook = (p: IconProps) => (
   <Base {...p}>
     <rect x="4" y="4" width="16" height="16" rx="3.5" />

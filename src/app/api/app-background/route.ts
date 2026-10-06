@@ -35,6 +35,10 @@ export async function POST(request: Request) {
     const bg = getAppBackground(id);
     if (error.message.includes("BLUE_COINS_SHORT")) return NextResponse.json({ error: `青コインが足りません（${bg.name}は${bg.price.toLocaleString()}枚）。` }, { status: 400 });
     if (error.message.includes("BACKGROUND_OWNED")) return NextResponse.json({ error: "もう持っています。" }, { status: 400 });
+    if (error.message.includes("INVALID_BACKGROUND")) {
+      console.error("App background price is missing in the database (apply the latest app_background migration)", { id });
+      return NextResponse.json({ error: "この背景はまだ準備中です。少し待ってからお試しください。" }, { status: 400 });
+    }
     console.error("Failed to buy app background", { code: error.code, message: error.message });
     return NextResponse.json({ error: "買えませんでした。時間をおいてお試しください。" }, { status: 400 });
   }
