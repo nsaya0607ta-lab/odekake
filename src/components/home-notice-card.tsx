@@ -1,3 +1,4 @@
+import { CARD_BLEED } from "@/lib/home-card-layout";
 import Image from "next/image";
 import Link from "next/link";
 import { IconChevronRight } from "@/components/icons";
@@ -28,7 +29,7 @@ export function HomeNoticeCard({
   const summary = unreadCount > 0 ? `新着情報が${unreadCount}件あります` : "すべて既読済み";
 
   return (
-    <div className="relative block" style={{ marginLeft: -9, marginRight: -12, marginTop: 13 }}>
+    <div className="relative block" style={{ marginLeft: -CARD_BLEED.left, marginRight: -CARD_BLEED.right }}>
       <div className="relative w-full" style={{ aspectRatio: CARD_RATIO }}>
         {/* カード全体（タイトル以外の場所）は、お知らせ一覧へ。タイトルはそれぞれのお知らせへ */}
         <Link href="/notices" aria-label={`お知らせ一覧。${summary}`} className="pressable absolute inset-0 z-0 block active:scale-[0.99]" />

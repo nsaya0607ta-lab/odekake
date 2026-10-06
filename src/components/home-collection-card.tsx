@@ -1,3 +1,4 @@
+import { CARD_BLEED } from "@/lib/home-card-layout";
 import Image from "next/image";
 import Link from "next/link";
 import { IconChevronRight } from "@/components/icons";
@@ -29,7 +30,7 @@ export function HomeCollectionCard({
     <Link
       href="/collection"
       className="pressable relative block active:scale-[0.99]"
-      style={{ marginLeft: -9, marginRight: -12, marginTop: 16 }}
+      style={{ marginLeft: -CARD_BLEED.left, marginRight: -CARD_BLEED.right }}
       aria-label={`図鑑を見る（${collected} / ${total}）`}
     >
       <div className="relative w-full" style={{ aspectRatio: CARD_RATIO }}>
