@@ -222,22 +222,44 @@ const CARD_ASPECT = 1440 / 768;
 const DEPTH_STRETCH = 1.6;
 
 /** 歩数を書くときに立つ場所（看板の右下。ペン先が数字の右はしに届く） */
-const WRITE_SPOT = { x: 30.5, depth: 0.36 };
+const WRITE_SPOT = { x: 28, depth: 0.36 };
 /** 書くとき、後ろ足で立ちあがる高さ（犬の絵の高さに対する％） */
-const WRITE_LIFT = 10;
+const WRITE_LIFT = 16;
 /** ペンを出してから書きはじめるまで / 書いている長さ（steps-tag.tsx の INK_MS と合わせる） */
 const PEN_OUT_MS = 520;
 const WRITE_MS = 1300;
 
-/** コイン：5秒ごとに 5% で降る。1回 5 枚（枚数は DB が決める）。青は 4 回に1回くらい。1日の回数に上限はない */
-const COIN_TICK_MS = 5000;
-const COIN_CHANCE = 0.05;
+/** コイン：8秒ごとに 8% で降る。1回 5 枚（枚数は DB が決める）。青は 4 回に1回くらい。1日の回数に上限はない */
+const COIN_TICK_MS = 8000;
+const COIN_CHANCE = 0.08;
 const COIN_BLUE_CHANCE = 0.25;
 const COIN_MAX_ON_GROUND = 3;
 /** コインの大きさ（カード幅に対する％。手前のとき） */
 const COIN_WIDTH = 6.4;
 const COIN_FALL_MS = 1050;
 const PEN_SRC = "/home-magic-pen.webp";
+
+/**
+ * 前足をあげた絵（wave.webp・300×254）での、あげた前足（肉球）のまん中。絵の幅・高さに対する％。
+ * スキンごとに描き位置が少しちがうので実測した。ペンはここでにぎらせ、前足だけをペンの上に重ねなおす。
+ */
+const WAVE_PAW: Partial<Record<DogSkinId, [number, number]>> = {
+  default: [21.7, 38.2],
+  hiking: [26.7, 42.1],
+  summer: [26.7, 41.3],
+  snow: [25.7, 40.2],
+  aichi: [23.3, 45.3],
+  gifu: [24, 42.1],
+  mie: [20.7, 42.1],
+  shizuoka: [25.7, 37.4],
+  nagano: [34, 45.3],
+  fukui: [23.3, 42.1],
+};
+const WAVE_PAW_FALLBACK: [number, number] = [25, 41.3];
+/** ペンの大きさ（犬の絵の幅に対する％。正方形の箱） */
+const PEN_SIZE = 26;
+/** 前足でかくす丸の半径（犬の絵の幅に対する％） */
+const PAW_RADIUS = 5.6;
 
 type Walker = {
   x: number;
@@ -574,6 +596,7 @@ export function WanderingFrenchie({
   }, [walker.walking, walker.stepMs]);
 
   const activePose: string = walker.walking ? (stepUp ? "walk" : "stand") : walker.pose;
+  const paw = WAVE_PAW[skin] ?? WAVE_PAW_FALLBACK;
 
   // 動きのある仕草は、その仕草に切り替わるたびに頭から再生し直す
   useEffect(() => {
@@ -936,16 +959,16 @@ export function WanderingFrenchie({
         .frenchie-lift { transition: transform 360ms cubic-bezier(0.34, 1.3, 0.5, 1); transform-origin: 50% 100%; }
         /* 魔法のペン：きらっと出てきて、書いている間はペン先をこまかく走らせる */
         @keyframes frenchie-pen-in {
-          0%   { opacity: 0; transform: rotate(140deg) scale(0.2); filter: brightness(2.2) drop-shadow(0 0 6px #9fd0ff); }
-          60%  { opacity: 1; transform: rotate(92deg) scale(1.12); filter: brightness(1.5) drop-shadow(0 0 5px #9fd0ff); }
-          100% { opacity: 1; transform: rotate(100deg) scale(1);    filter: drop-shadow(0 0 3px rgba(120,180,255,.75)); }
+          0%   { opacity: 0; transform: rotate(155deg) scale(0.2); filter: brightness(2.2) drop-shadow(0 0 6px #9fd0ff); }
+          60%  { opacity: 1; transform: rotate(107deg) scale(1.12); filter: brightness(1.5) drop-shadow(0 0 5px #9fd0ff); }
+          100% { opacity: 1; transform: rotate(115deg) scale(1);    filter: drop-shadow(0 0 3px rgba(120,180,255,.75)); }
         }
         @keyframes frenchie-pen-write {
-          0%, 100% { transform: rotate(100deg) translate(0, 0); }
-          20%      { transform: rotate(94deg)  translate(-2%, 3%); }
-          40%      { transform: rotate(104deg) translate(2%, -2%); }
-          60%      { transform: rotate(96deg)  translate(-1%, 4%); }
-          80%      { transform: rotate(103deg) translate(2%, -1%); }
+          0%, 100% { transform: rotate(115deg) translate(0, 0); }
+          20%      { transform: rotate(110deg) translate(-2%, 3%); }
+          40%      { transform: rotate(119deg) translate(2%, -2%); }
+          60%      { transform: rotate(112deg) translate(-1%, 4%); }
+          80%      { transform: rotate(118deg) translate(2%, -1%); }
         }
         .frenchie-pen {
           animation:
@@ -1103,31 +1126,6 @@ export function WanderingFrenchie({
             <div className="frenchie-lift" style={{ transform: walker.pose === "write" ? `translateY(-${WRITE_LIFT}%)` : undefined }}>
             {/* 呼吸。歩きの揺れや仕草の動きと transform を奪い合わないよう層を分ける */}
             <div className="frenchie-breath relative">
-              {/* 魔法のペン。犬の絵より先に置いて、あげた前足のうしろから出す（前足でにぎって見える）。ペン先は看板のほう（左上） */}
-              {walker.pen ? (
-                <span className="pointer-events-none absolute block" style={{ left: "0%", top: "10%", width: "36%", aspectRatio: "1" }}>
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img src={PEN_SRC} alt="" draggable={false} className="frenchie-pen block h-full w-full select-none" />
-                  {[
-                    ["-60%", "-40%", "4%", "0%"],
-                    ["-20%", "-80%", "16%", "-4%"],
-                    ["-80%", "10%", "-2%", "12%"],
-                  ].map(([sx, sy, left, top], i) => (
-                    <span
-                      key={i}
-                      className="frenchie-pen-spark absolute block h-[16%] w-[16%] rounded-full"
-                      style={{
-                        left,
-                        top,
-                        background: "radial-gradient(circle, #fff 0 30%, #9fd0ff 55%, transparent 72%)",
-                        animationDelay: `${PEN_OUT_MS + i * 230}ms`,
-                        ["--sx" as string]: sx,
-                        ["--sy" as string]: sy,
-                      }}
-                    />
-                  ))}
-                </span>
-              ) : null}
               {/* 全ポーズを重ねて置き、表示だけ切り替える。切り替え時のちらつきを防ぐ */}
               {visibleKeys.map((key) => (
                 // eslint-disable-next-line @next/next/no-img-element
@@ -1153,6 +1151,50 @@ export function WanderingFrenchie({
                   }}
                 />
               ))}
+              {/* 魔法のペン。あげた前足でにぎらせ、ペン先を看板（左上）へ向ける。
+                  ペンは犬の手前に出し、前足だけをペンの上に描きなおして「にぎっている」ように見せる */}
+              {walker.pen ? (
+                <>
+                  <span
+                    className="pointer-events-none absolute block"
+                    style={{
+                      left: `${paw[0] - PEN_SIZE * 0.528}%`,
+                      top: `${paw[1] - ((PEN_SIZE * 300) / 254) * 0.621}%`,
+                      width: `${PEN_SIZE}%`,
+                      aspectRatio: "1",
+                    }}
+                  >
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img src={PEN_SRC} alt="" draggable={false} className="frenchie-pen block h-full w-full select-none" />
+                    {[
+                      ["-70%", "-50%", "14%", "-10%"],
+                      ["-30%", "-90%", "26%", "-14%"],
+                      ["-90%", "0%", "8%", "2%"],
+                    ].map(([sx, sy, left, top], i) => (
+                      <span
+                        key={i}
+                        className="frenchie-pen-spark absolute block h-[20%] w-[20%] rounded-full"
+                        style={{
+                          left,
+                          top,
+                          background: "radial-gradient(circle, #fff 0 30%, #9fd0ff 55%, transparent 72%)",
+                          animationDelay: `${PEN_OUT_MS + i * 230}ms`,
+                          ["--sx" as string]: sx,
+                          ["--sy" as string]: sy,
+                        }}
+                      />
+                    ))}
+                  </span>
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img
+                    src={getFrenchieSrc(skin, POSE_FILES.write!)}
+                    alt=""
+                    draggable={false}
+                    className="frenchie-gesture frenchie-m-write pointer-events-none absolute inset-0 h-auto w-full select-none"
+                    style={{ clipPath: `circle(${PAW_RADIUS}% at ${paw[0]}% ${paw[1]}%)` }}
+                  />
+                </>
+              ) : null}
             </div>
             </div>
           </div>
