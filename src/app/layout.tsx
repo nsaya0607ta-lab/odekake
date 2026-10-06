@@ -6,6 +6,7 @@ import { BgmPlayer } from "@/components/bgm-player";
 import "./globals.css";
 import "./app-backgrounds.css";
 import "./live-backgrounds.css";
+import "./art-backgrounds.css";
 import "./compact-form-fields.css";
 import "./lr-aura.css";
 import "./wanko-bowling-controls.css";

@@ -13,6 +13,10 @@ export const LIVE_LOADERS: Partial<Record<AppBackgroundId, () => Promise<{ mount
   weather: () => import("./weather"),
   garden: () => import("./garden"),
   seasons: () => import("./seasons"),
+  fireworks: () => import("./fireworks"),
+  "paper-planes": () => import("./paper-planes"),
+  "cloud-sea": () => import("./cloud-sea"),
+  "dog-parade": () => import("./dog-parade"),
 };
 
 export const isLiveBackground = (id: AppBackgroundId) => id in LIVE_LOADERS;
