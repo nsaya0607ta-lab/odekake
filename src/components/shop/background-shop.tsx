@@ -17,6 +17,7 @@ import { requestTiltPermission, type LiveMode } from "@/components/live-backgrou
 import { setTryOnBackground, useTryOnBackground } from "@/components/live-backgrounds/try-on";
 import { BlueCoinBar } from "@/components/room/room-shop";
 import { HomeLookEditor } from "@/components/shop/home-look-editor";
+import { HomeSkinShop } from "@/components/shop/home-skin-shop";
 import {
   APP_BACKGROUND_GROUPS,
   APP_BACKGROUNDS,
@@ -29,6 +30,7 @@ import {
   type BackgroundVariant,
 } from "@/lib/app-backgrounds";
 import type { HomeLook } from "@/lib/home-look";
+import type { HomeSkins } from "@/lib/home-skins";
 
 const NO_VARIANTS: readonly BackgroundVariant[] = [];
 
@@ -78,11 +80,14 @@ type Status = "using" | "owned" | "locked";
 /** 見本の上に置く、すりガラスの札 */
 const GLASS = "bg-[rgba(255,253,248,.82)] backdrop-blur-md [-webkit-backdrop-filter:blur(12px)]";
 
-export function BackgroundShop({ current: initialCurrent, owned: initialOwned, blueCoins: initialBlueCoins, homeLook }: {
+export function BackgroundShop({ current: initialCurrent, owned: initialOwned, blueCoins: initialBlueCoins, homeLook, homeSkins, ownedHomeSkins }: {
   current: AppBackgroundId;
   owned: AppBackgroundId[];
   blueCoins: number;
   homeLook: HomeLook;
+  homeSkins: HomeSkins;
+  /** 買ったカードの絵がら。DB の準備がまだなら null */
+  ownedHomeSkins: string[] | null;
 }) {
   const router = useRouter();
   const tryOn = useTryOnBackground();
@@ -114,6 +119,8 @@ export function BackgroundShop({ current: initialCurrent, owned: initialOwned, b
       </button>
 
       <HomeLookEditor initial={homeLook} />
+
+      <HomeSkinShop initialSkins={homeSkins} initialOwned={ownedHomeSkins} blueCoins={blueCoins} onBalance={setBlueCoins} />
 
       {APP_BACKGROUND_GROUPS.map((group) => (
         <section key={group.id}>

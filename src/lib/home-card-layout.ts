@@ -10,6 +10,7 @@
  * カードの高さは画面の幅で変わるので、幅に対する％（margin の％は親の幅が基準）で計算する。
  */
 import type { HomeCardId } from "@/lib/home-look";
+import type { HomeSkins, HomeSkinTheme } from "@/lib/home-skins";
 
 /** カードの紙と紙のあいだ（px） */
 export const CARD_GAP_PX = 14;
@@ -37,6 +38,24 @@ export const HOME_CARD_GEOMETRY: Record<HomeCardId, CardGeometry> = {
 };
 
 /**
+ * 絵がら（home-skins）で紙の上下の位置がちがうカード。ここに無いものは HOME_CARD_GEOMETRY のまま。
+ * 豪華のお知らせ・図鑑は紙がいまの絵より少し薄い（左右はそろえてある）。
+ */
+const SKIN_GEOMETRY: Partial<Record<HomeSkinTheme, Partial<Record<HomeCardId, Pick<CardGeometry, "paperTop" | "paperBottom">>>>> = {
+  deluxe: {
+    // public/home-skins/deluxe/notice.webp：紙は 81〜653px
+    notice: { paperTop: 81 / 724, paperBottom: 653 / 724 },
+    // public/home-skins/deluxe/collection.webp：紙は 86〜648px
+    collection: { paperTop: 86 / 724, paperBottom: 648 / 724 },
+  },
+};
+
+function geometryOf(id: HomeCardId, skins?: Partial<HomeSkins>): CardGeometry {
+  const theme = skins?.[id];
+  return { ...HOME_CARD_GEOMETRY[id], ...(theme ? SKIN_GEOMETRY[theme]?.[id] : undefined) };
+}
+
+/**
  * 犬のカード（いちばん上）は、額縁の絵がカードの下へ はみ出している。
  * home-scene.tsx の額縁（top -30.82%・height 167.87%）と、home-scene-frame.webp の枠の下端（824/1024px）から、
  * カードの高さの約 4.3% ぶん下に枠がある。カードの縦横比は 1440 / 768
@@ -52,20 +71,20 @@ function artWidth(g: CardGeometry): string {
 }
 
 /** そのカードの「絵の上の、紙より上の透明なところ」の高さ（CSS の式） */
-function transparentAbove(id: HomeCardId): string {
-  const g = HOME_CARD_GEOMETRY[id];
+function transparentAbove(id: HomeCardId, skins?: Partial<HomeSkins>): string {
+  const g = geometryOf(id, skins);
   return `${artWidth(g)} * ${n(g.paperTop / g.ratio)}`;
 }
 
 /** 1つ上のカードの「紙より下の透明なところ」の高さ（犬のカードは枠がはみ出すのでマイナス） */
-function transparentBelow(prev: HomeCardId | "scene"): string {
+function transparentBelow(prev: HomeCardId | "scene", skins?: Partial<HomeSkins>): string {
   // 犬のカードは 1px の線（rough-card）の内側に絵があるので、絵の幅は 100% - 2px、枠のはみ出しは線の 1px ぶん少ない
   if (prev === "scene") return `((100% - 2px) * ${n(-SCENE_FRAME_OVERHANG / SCENE_RATIO)} + 1px)`;
-  const g = HOME_CARD_GEOMETRY[prev];
+  const g = geometryOf(prev, skins);
   return `${artWidth(g)} * ${n((1 - g.paperBottom) / g.ratio)}`;
 }
 
-/** 1つ上が prev のときの、このカードの margin-top */
-export function homeCardMarginTop(prev: HomeCardId | "scene", id: HomeCardId): string {
-  return `calc(${CARD_GAP_PX}px - ${transparentBelow(prev)} - ${transparentAbove(id)})`;
+/** 1つ上が prev のときの、このカードの margin-top（skins はカードの絵がら） */
+export function homeCardMarginTop(prev: HomeCardId | "scene", id: HomeCardId, skins?: Partial<HomeSkins>): string {
+  return `calc(${CARD_GAP_PX}px - ${transparentBelow(prev, skins)} - ${transparentAbove(id, skins)})`;
 }

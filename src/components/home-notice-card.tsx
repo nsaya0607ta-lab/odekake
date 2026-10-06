@@ -1,4 +1,5 @@
 import { CARD_BLEED } from "@/lib/home-card-layout";
+import { HOME_SKIN_ART, type HomeSkinTheme } from "@/lib/home-skins";
 import Image from "next/image";
 import Link from "next/link";
 import { IconChevronRight } from "@/components/icons";
@@ -14,18 +15,49 @@ import type { NoticeFeedRow } from "@/lib/supabase/types";
  */
 const CARD_RATIO = "2172 / 724";
 
-const CARD_SRC = "/notice-card.webp";
+/**
+ * 文字の置き場所。絵に描いてある「お知らせ」の札・左の小物・右の飾りに かからないようにする。
+ * - pad：文字の箱の左右（カードの幅に対する％）
+ * - heading：見出し（新着◯件）。札の右どなりに置く
+ * - rows：お知らせの行。left/top は行の箱のずらし
+ * 冬は紙のふちに木のわくがあるので見出しを少し下げる。豪華は左の小物（王冠・方位磁針）と右の飾りが大きいので、文字の箱をせまくする。
+ */
+const NOTICE_LAYOUT: Record<HomeSkinTheme, { pad: [string, string]; heading: React.CSSProperties; rows: React.CSSProperties; chevron: string }> = {
+  default: {
+    pad: ["37%", "8%"],
+    heading: { marginLeft: "11%", transform: "translate(calc(10px + 3em), calc(-4px - 0.3em))" },
+    rows: { gap: 6, transform: "translate(-1.5em, 3px)" },
+    chevron: "translate(-2em, 12px)",
+  },
+  winter: {
+    pad: ["37%", "8%"],
+    heading: { marginLeft: "11%", transform: "translate(calc(14px + 3em), calc(5px - 0.3em))" },
+    // 左下のココアと葉に3行目がかからないよう、行は左へずらさない
+    rows: { gap: 5, transform: "translate(0.2em, 1px)" },
+    chevron: "translate(-2em, 12px)",
+  },
+  deluxe: {
+    pad: ["43.5%", "15%"],
+    heading: { marginLeft: "33%", transform: "translate(14px, calc(3px - 0.3em))" },
+    rows: { gap: 4, transform: "translate(0, 1px)" },
+    chevron: "translate(-0.2em, 8px)",
+  },
+};
 
 export function HomeNoticeCard({
   unreadCount,
   notices,
+  skin = "default",
 }: {
+  /** カードの絵がら（ショップで買ったもの） */
+  skin?: HomeSkinTheme;
   /** 直近24時間に作成された、自分がまだ読んでいないお知らせの件数 */
   unreadCount: number;
   /** 新しい順の最新お知らせ（先頭3件を表示） */
   notices: NoticeFeedRow[];
 }) {
   const latest = notices.slice(0, 3);
+  const layout = NOTICE_LAYOUT[skin];
   const summary = unreadCount > 0 ? `新着情報が${unreadCount}件あります` : "すべて既読済み";
 
   return (
@@ -34,7 +66,7 @@ export function HomeNoticeCard({
         {/* カード全体（タイトル以外の場所）は、お知らせ一覧へ。タイトルはそれぞれのお知らせへ */}
         <Link href="/notices" aria-label={`お知らせ一覧。${summary}`} className="pressable absolute inset-0 z-0 block active:scale-[0.99]" />
         <Image
-          src={CARD_SRC}
+          src={HOME_SKIN_ART.notice[skin]}
           alt=""
           aria-hidden="true"
           fill
@@ -42,12 +74,12 @@ export function HomeNoticeCard({
           draggable={false}
           className="home-card-frame pointer-events-none select-none"
         />
-        <div className="pointer-events-none absolute inset-0 z-10 flex items-center gap-1" style={{ paddingLeft: "37%", paddingRight: "8%" }}>
+        <div className="pointer-events-none absolute inset-0 z-10 flex items-center gap-1" style={{ paddingLeft: layout.pad[0], paddingRight: layout.pad[1] }}>
           <div className="flex min-w-0 flex-1 flex-col gap-1">
             {/* 見出し（新着の数）。右の花の絵にかからないよう短く、数はバッジで目立たせる */}
             <p
               className="flex items-center gap-1 text-sm font-bold text-ink"
-              style={{ marginLeft: "11%", transform: "translate(calc(10px + 3em), calc(-4px - 0.3em))" }}
+              style={layout.heading}
               aria-hidden="true"
             >
               {unreadCount > 0 ? (
@@ -61,7 +93,7 @@ export function HomeNoticeCard({
               )}
             </p>
             {/* 右の矢印と重ならないよう、行の右はしを矢印のぶん手前で止める */}
-            <div className="flex flex-col" style={{ gap: 6, transform: "translate(-1.5em, 3px)", marginRight: "0.8em" }}>
+            <div className="flex flex-col" style={{ ...layout.rows, marginRight: "0.8em" }}>
               {Array.from({ length: 3 }).map((_, rowIndex) => {
                 const notice = latest[rowIndex];
                 if (notice) {
@@ -94,7 +126,7 @@ export function HomeNoticeCard({
           <IconChevronRight
             size={18}
             className="shrink-0 text-ink-faint"
-            style={{ transform: "translate(-2em, 12px)" }}
+            style={{ transform: layout.chevron }}
           />
         </div>
       </div>
