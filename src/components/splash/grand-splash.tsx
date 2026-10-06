@@ -53,6 +53,23 @@ const IDLE_POSES: readonly DogPose[] = ["sniff", "sit", "wink", "stand-happy"];
 
 const rand = (min: number, max: number) => min + Math.random() * (max - min);
 
+/**
+ * 写真を吊るすひも。viewBox（横 0〜100・縦 0〜10）の2次ベジェで、両はしの高さ END、まん中のたるみ SAG。
+ * 写真はクリップがひもを挟む位置に吊るしたいので、ひもの高さをここから計算して写真の top に使う。
+ * STRING_HEIGHT は .string の高さ（.bunting に対する％。CSS と合わせる）
+ */
+const STRING_END = 5;
+const STRING_SAG = 14;
+const STRING_HEIGHT = 34;
+const STRING_D = `M0 ${STRING_END} Q 50 ${STRING_SAG} 100 ${STRING_END}`;
+/** 横 x%（.bunting の幅に対する％）のところの、ひもの高さ（.bunting の高さに対する％） */
+function stringTopAt(x: number): number {
+  // 制御点の x がまん中（50）なので、横の位置 x はそのまま t（0〜1）になる
+  const t = x / 100;
+  const y = (1 - t) ** 2 * STRING_END + 2 * t * (1 - t) * STRING_SAG + t ** 2 * STRING_END;
+  return (y / 10) * STRING_HEIGHT;
+}
+
 /** タップした要素のまん中を、景色（stage）に対する％で */
 function centerOf(el: Element | null, stage: HTMLElement | null): { x: number; y: number } {
   if (!el || !stage) return { x: 50, y: 50 };
@@ -135,13 +152,14 @@ export function GrandSplash({ onFinish }: { onFinish: () => void }) {
       setSkin(id);
     };
     const fallback = window.setTimeout(() => settle("default"), 1400);
-    fetch("/api/dog-skin", { cache: "no-store" })
+    // ログインしていないときはログイン画面へ転送されるので、転送はたどらずに「いつもの」にする
+    fetch("/api/dog-skin", { cache: "no-store", redirect: "manual" })
       .then((r) => (r.ok ? r.json() : null))
       .then((body: { skinId?: unknown } | null) => settle(isDogSkinId(body?.skinId) ? body.skinId : "default"))
       .catch(() => settle("default"));
 
     // 今日の歩数（ログインしていなければ取れないので、そのときは「てくてく」）
-    fetch("/api/steps/today", { cache: "no-store" })
+    fetch("/api/steps/today", { cache: "no-store", redirect: "manual" })
       .then((r) => (r.ok ? r.json() : null))
       .then((body: { ok?: boolean; todaySteps?: unknown } | null) => {
         if (body?.ok && typeof body.todaySteps === "number") setSteps(body.todaySteps);
@@ -709,16 +727,21 @@ export function GrandSplash({ onFinish }: { onFinish: () => void }) {
         {/* ---------- 写真（ひもに吊るしたポラロイド） ---------- */}
         <div className={styles.bunting}>
           <svg className={styles.string} viewBox="0 0 100 10" preserveAspectRatio="none" aria-hidden="true">
-            <path d="M0 2 Q 50 11 100 2" />
+            <path d={STRING_D} />
+            {/* 両はしは木の枝に結んである */}
+            <circle className={styles.knot} cx="0.6" cy={STRING_END} r="0.9" />
+            <circle className={styles.knot} cx="99.4" cy={STRING_END} r="0.9" />
           </svg>
           {POLAROIDS.map((photo, i) => {
             const state = photos[photo.id]!;
+            const x = 20 + i * 30;
             return (
               <button
                 type="button"
                 key={photo.id}
                 className={`${styles.photo} ${state.flipped ? styles.photoFlipped : ""}`}
-                style={{ left: `${20 + i * 30}%`, top: `${i === 1 ? 46 : 26}%`, ["--tilt" as string]: `${photo.tilt}deg`, ["--i" as string]: i }}
+                // 写真の上はしを、ひもの少し上に。クリップ（上へ 6px はみ出す）がひもを挟む
+                style={{ left: `${x}%`, top: `calc(${stringTopAt(x).toFixed(2)}% - 2px)`, ["--tilt" as string]: `${photo.tilt}deg`, ["--i" as string]: i }}
                 onClick={(e) => onPhoto(e, photo.id)}
                 aria-label={`写真「${photo.caption}」いいね ${state.likes}`}
               >

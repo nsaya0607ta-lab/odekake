@@ -554,22 +554,24 @@
   opacity: 0;
   animation: footstep 2.7s ease-in-out infinite;
 }
+/* 木はひもの両はしを結ぶ柱も兼ねる。ひもの端（.bunting の左右 7%）に梢が届くよう背を高くし、
+   広い画面でも舞台（.stage）のはしにそろえる */
 .tree {
   position: absolute;
   bottom: 52%;
   width: clamp(54px, 16vw, 86px);
-  aspect-ratio: 0.62;
+  aspect-ratio: 0.5;
   transform-origin: 50% 100%;
   animation: treeSway 5s ease-in-out infinite;
   background:
-    radial-gradient(circle at 50% 30%, var(--tree) 0 31%, transparent 32%),
-    radial-gradient(circle at 26% 46%, var(--tree-dark) 0 24%, transparent 25%),
-    radial-gradient(circle at 74% 46%, var(--tree-dark) 0 24%, transparent 25%),
-    radial-gradient(circle at 50% 54%, var(--tree) 0 26%, transparent 27%),
-    linear-gradient(var(--trunk), var(--trunk)) 50% 100% / 13% 38% no-repeat;
+    radial-gradient(circle at 50% 24%, var(--tree) 0 30%, transparent 31%),
+    radial-gradient(circle at 26% 38%, var(--tree-dark) 0 23%, transparent 24%),
+    radial-gradient(circle at 74% 38%, var(--tree-dark) 0 23%, transparent 24%),
+    radial-gradient(circle at 50% 46%, var(--tree) 0 25%, transparent 26%),
+    linear-gradient(var(--trunk), var(--trunk)) 50% 100% / 13% 46% no-repeat;
 }
-.treeLeft { left: 1.5%; }
-.treeRight { right: 1.5%; animation-delay: -2.5s; }
+.treeLeft { left: calc(50% - min(50vw, 280px) + min(1vw, 6px)); }
+.treeRight { right: calc(50% - min(50vw, 280px) + min(1vw, 6px)); animation-delay: -2.5s; }
 .flowers i {
   position: absolute;
   bottom: 8%;
@@ -631,6 +633,7 @@
   position: absolute;
   inset: 0 0 auto 0;
   width: 100%;
+  /* grand-splash.tsx の STRING_HEIGHT と合わせる（写真の吊るし位置の計算に使う） */
   height: 34%;
   overflow: visible;
 }
@@ -638,6 +641,13 @@
   fill: none;
   stroke: #8b6b4a;
   stroke-width: 1.5;
+  vector-effect: non-scaling-stroke;
+}
+/* 結び目。横にのびた絵の中なので、縦横の比が崩れないよう線の太さで丸く見せる */
+.knot {
+  fill: #8b6b4a;
+  stroke: #8b6b4a;
+  stroke-width: 4;
   vector-effect: non-scaling-stroke;
 }
 .photo {
@@ -703,16 +713,27 @@
   line-height: 1.2;
   text-align: center;
 }
+/* 木の洗濯ばさみ。ひもを挟んで、写真の上はしをつまむ */
 .clip {
   position: absolute;
-  top: -6px;
+  top: -7px;
   left: 50%;
   width: 7px;
-  height: 13px;
+  height: 14px;
   margin-left: -3.5px;
   border-radius: 2px;
   background: linear-gradient(90deg, #c98f52, #e3b072 50%, #c98f52);
   box-shadow: 0 1px 2px rgba(60, 40, 20, 0.3);
+}
+.clip::after {
+  content: "";
+  position: absolute;
+  left: 50%;
+  top: 4px;
+  width: 1px;
+  height: 7px;
+  margin-left: -0.5px;
+  background: rgba(110, 70, 30, 0.55);
 }
 
 /* ------------------------------------------------------------ ガチャ */
@@ -965,6 +986,9 @@
   transition: opacity 0.12s ease;
 }
 .dogPose { position: absolute; inset: 0; }
+/* 歩いている間の絵の入れ替えは一瞬で（重ねて薄くすると、犬が透けて見える） */
+.dogWalking .dogBase,
+.dogWalking .dogPose { transition: none; }
 .dogShadow {
   position: absolute;
   left: 22%;
