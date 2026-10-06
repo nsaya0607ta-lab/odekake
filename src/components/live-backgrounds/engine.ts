@@ -190,3 +190,105 @@ export function makeSprite(width: number, height: number, draw: (ctx: CanvasRend
   if (ctx) draw(ctx);
   return sprite;
 }
+
+/**
+ * 画面を指でなぞった位置を、背景の枠の中の位置（CSSピクセル）で受けとる。
+ * - アプリの背景（full）は画面のどこをなぞっても反応する。スクロールのじゃまはしない（passive で受けるだけ）
+ *   iPhone はスクロールが始まると pointermove が止まるので、指は touchmove で受ける
+ * - ショップの大きな見本は、見本の枠（data-live-tap）の上だけ
+ * start は指を置いたとき（なぞりの始まり。線をつなげないため）
+ */
+export function onBackgroundDrag(
+  host: HTMLElement,
+  mode: LiveMode,
+  callback: (x: number, y: number, start: boolean) => void,
+): () => void {
+  if (mode === "still") return () => {};
+  const target: EventTarget | null = mode === "full" ? window : host.closest("[data-live-tap]");
+  if (!target) return () => {};
+  const toLocal = (clientX: number, clientY: number, start: boolean) => {
+    const rect = host.getBoundingClientRect();
+    if (!rect.width || !rect.height) return;
+    callback(((clientX - rect.left) / rect.width) * host.clientWidth, ((clientY - rect.top) / rect.height) * host.clientHeight, start);
+  };
+  const skip = (e: Event) => mode === "preview" && e.target instanceof Element && Boolean(e.target.closest("button, a"));
+  let mouseDown = false;
+  const onPointerDown = (event: Event) => {
+    const e = event as PointerEvent;
+    if (skip(e)) return;
+    if (e.pointerType === "mouse") mouseDown = true;
+    toLocal(e.clientX, e.clientY, true);
+  };
+  const onPointerMove = (event: Event) => {
+    const e = event as PointerEvent;
+    // 指は touchmove で受ける（ここで受けると2回になる）
+    if (e.pointerType === "touch" || (e.pointerType === "mouse" && !mouseDown)) return;
+    toLocal(e.clientX, e.clientY, false);
+  };
+  const onPointerUp = () => {
+    mouseDown = false;
+  };
+  const onTouchMove = (event: Event) => {
+    const e = event as TouchEvent;
+    if (skip(e)) return;
+    for (const touch of Array.from(e.touches)) toLocal(touch.clientX, touch.clientY, false);
+  };
+  target.addEventListener("pointerdown", onPointerDown, { passive: true });
+  target.addEventListener("pointermove", onPointerMove, { passive: true });
+  target.addEventListener("touchmove", onTouchMove, { passive: true });
+  window.addEventListener("pointerup", onPointerUp, { passive: true });
+  return () => {
+    target.removeEventListener("pointerdown", onPointerDown);
+    target.removeEventListener("pointermove", onPointerMove);
+    target.removeEventListener("touchmove", onTouchMove);
+    window.removeEventListener("pointerup", onPointerUp);
+  };
+}
+
+type OrientationPermission = { requestPermission?: () => Promise<"granted" | "denied"> };
+
+/**
+ * iPhone で「かたむき」を受けとる許可をもらう。ボタンを押したときなど、さわった直後にしか呼べない。
+ * 許可がいらない端末（Android など）は、そのまま true。
+ */
+export async function requestTiltPermission(): Promise<boolean> {
+  if (typeof window === "undefined" || typeof DeviceOrientationEvent === "undefined") return false;
+  const request = (DeviceOrientationEvent as unknown as OrientationPermission).requestPermission;
+  if (typeof request !== "function") return true;
+  try {
+    return (await request.call(DeviceOrientationEvent)) === "granted";
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * スマホのかたむきを、重力の向き（gx: 右が＋、gy: 下が＋。それぞれ -1〜1）で受けとる。
+ * 机に置いた状態ではなく、ふつうに手に持った角度（少し手前に起こした状態）をまっすぐとする。
+ * かたむきが取れない端末・許可がない iPhone では何も届かない（背景の側で、ゆっくりした自動のゆれにする）。
+ * iPhone は許可をもらうまで届かないので、アプリの背景（full）では最初に画面をさわったときに一度だけ許可を聞く。
+ */
+export function onTilt(mode: LiveMode, callback: (gx: number, gy: number) => void): () => void {
+  if (mode === "still" || typeof window === "undefined" || typeof DeviceOrientationEvent === "undefined") return () => {};
+  const handler = (event: Event) => {
+    const e = event as DeviceOrientationEvent;
+    if (e.beta === null || e.gamma === null) return;
+    const gx = clamp(e.gamma / 35, -1, 1);
+    // ふつうに持つと 40〜50 度起きている。そこからの差を見る
+    const gy = clamp((e.beta - 45) / 35, -1, 1);
+    callback(gx, gy);
+  };
+  window.addEventListener("deviceorientation", handler);
+  let asked = false;
+  const ask = () => {
+    if (asked) return;
+    asked = true;
+    void requestTiltPermission();
+  };
+  const needsPermission = typeof (DeviceOrientationEvent as unknown as OrientationPermission).requestPermission === "function";
+  if (mode === "full" && needsPermission) window.addEventListener("pointerup", ask, { once: true });
+  return () => {
+    window.removeEventListener("deviceorientation", handler);
+    window.removeEventListener("pointerup", ask);
+  };
+}

@@ -17,6 +17,15 @@ export const LIVE_LOADERS: Partial<Record<AppBackgroundId, () => Promise<{ mount
   "paper-planes": () => import("./paper-planes"),
   "cloud-sea": () => import("./cloud-sea"),
   "dog-parade": () => import("./dog-parade"),
+  balloons: () => import("./balloons"),
+  "local-train": () => import("./local-train"),
+  "zen-sand": () => import("./zen-sand"),
+  fireflies: () => import("./fireflies"),
+  "paint-bloom": () => import("./paint-bloom"),
+  marbles: () => import("./marbles"),
+  "snow-globe": () => import("./snow-globe"),
+  "my-map": () => import("./my-map"),
+  "my-stars": () => import("./my-stars"),
 };
 
 export const isLiveBackground = (id: AppBackgroundId) => id in LIVE_LOADERS;
