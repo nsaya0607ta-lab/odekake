@@ -74,6 +74,7 @@ import {
 } from "./draw";
 import { drawRouteGate, drawRouteScene as drawRouteSceneLayer, ROUTE_GATE_HALF, type RouteTheme } from "./route-scene";
 import type { OsanpoRunFriendMemory, OsanpoRunMemoryPhoto, OsanpoRunOdekake } from "@/lib/data/osanpo-run";
+import type { WeatherKind as RoomWeatherKind } from "@/lib/room/weather";
 import { drawSkyLife, drawStageGround, drawStageMid, drawStageNear, type MidItem, type NearItem, type StageView } from "./stage-scene";
 import { drawBeam, drawBurst, drawForeground, drawSpeedLines, drawSunFlare, drawVignette, makeSpeedLines } from "./polish";
 
@@ -123,7 +124,24 @@ export type OsanpoRunOptions = {
   onLike?: (postId: string, liked: boolean) => Promise<boolean>;
   /** 結果カードの画像と本文をSNSに投稿する */
   onShare?: (image: Blob, body: string) => Promise<{ ok: true } | { ok: false; error: string }>;
+  /** いまの本当の天気（ホームと同じ場所）。まだ届いていない・取れないときは null */
+  liveWeather?: () => OsanpoRunLiveWeather | null;
 };
+
+/** 本当の天気。kind はマイルームと同じ分け方 */
+export type OsanpoRunLiveWeather = { kind: RoomWeatherKind; place: string };
+
+/** 本当の天気ごとの、降りものの強さ（S.rain の目標）と空のくもり具合 */
+const LIVE_PRECIP: Record<RoomWeatherKind, number> = { clear: 0, partly: 0, cloudy: 0, fog: 0, drizzle: 0.55, rain: 1, snow: 0.85, thunder: 1 };
+const LIVE_OVERCAST: Record<RoomWeatherKind, number> = { clear: 0, partly: 0.15, cloudy: 0.5, fog: 0.55, drizzle: 0.55, rain: 0.7, snow: 0.6, thunder: 0.85 };
+const LIVE_LABEL: Record<RoomWeatherKind, string> = { clear: "☀️ 晴れ", partly: "🌤️ 晴れ時々くもり", cloudy: "☁️ くもり", fog: "🌫️ きり", drizzle: "🌦️ 小雨", rain: "☔ 雨", snow: "❄️ 雪", thunder: "⛈️ 雷雨" };
+
+/** いまの日本時間（0時からの分） */
+function realClockMinutes(): number {
+  const parts = new Intl.DateTimeFormat("en-US", { timeZone: "Asia/Tokyo", hour: "numeric", minute: "numeric", second: "numeric", hourCycle: "h23" }).formatToParts(new Date());
+  const get = (type: string) => Number(parts.find((p) => p.type === type)?.value ?? 0);
+  return get("hour") * 60 + get("minute") + get("second") / 60;
+}
 
 /** 今日おでかけを記録していると、スコアにかかる倍率 */
 export const ODEKAKE_SCORE_MULT = 1.2;
@@ -435,7 +453,11 @@ export function createOsanpoRun(root: HTMLElement, opts: OsanpoRunOptions): () =
     dive: false,
   };
   const S = {
-    state: "ready" as GameState, time: 0, t: 0, speed: 90, dist: 0, bonus: 0, treats: 0, clock: STAGE.clock, cam: 0, bgCam: 0, bgV: 0,
+    state: "ready" as GameState, time: 0, t: 0, speed: 90, dist: 0, bonus: 0, treats: 0, clock: realClockMinutes(), cam: 0, bgCam: 0, bgV: 0,
+    /** 時刻は本当の時刻：おさんぽを始めたときの時刻（分）と、そのときの performance.now()。clockOff はスキルで進めた・戻した分 */
+    clockBase: realClockMinutes(), clockT0: 0, clockOff: 0, clockStart: 0,
+    /** 空のくもり具合（0〜1。本当の天気から） */
+    overcast: 0,
     srPlus: 0, pigeonsRun: 0, slidesRun: 0, greetsRun: 0, routeCalm: 0, routeRisky: 0, bonusBest: 0, missionCoins: 0, missionsNow: [] as string[], stomps: 0, digs: 0,
     memo: null as null | { x: number; y: number; photo: number; friend: boolean; passed: boolean; t: number }, memoT: 13,
     /** このおさんぽで運ばれてきた思い出の写真（memoryPhotos の番号・運ばれてきた順） */
@@ -713,7 +735,7 @@ export function createOsanpoRun(root: HTMLElement, opts: OsanpoRunOptions): () =
       src.buffer = A.noise; src.loop = true; f.type = "bandpass"; f.frequency.value = 2600; f.Q.value = 0.6; gain.gain.value = 0;
       src.connect(f); f.connect(gain); gain.connect(A.sfx); src.start(); rainNode = { src, gain };
     }
-    rainNode.gain.gain.value = STAGE.weather === "snow" ? 0 : S.rain * 0.07 * (S.state === "play" || S.state === "dying" ? 1 : 0.4);
+    rainNode.gain.gain.value = precipKind() === "snow" ? 0 : S.rain * 0.07 * (S.state === "play" || S.state === "dying" ? 1 : 0.4);
   }
   const sfx = {
     jump: () => tone(360, 0.11, "square", 0.045, 640),
@@ -854,7 +876,7 @@ export function createOsanpoRun(root: HTMLElement, opts: OsanpoRunOptions): () =
       const col = mix(hex("#FFF4CC"), hex("#FF9460"), clamp(warm, 0, 1));
       glow(c, sx, sy, 90, `${col[0] | 0},${col[1] | 0},${col[2] | 0}`, 0.35);
       // 演出：光の筋とレンズのきらめき（雨の日は出さない）
-      if (S.rain < 0.3) drawSunFlare(c, { sx, sy, col, warm: clamp(warm, 0, 1), day: (1 - e.night) * (1 - S.rain), t: S.time, vw: VW, vh: VH, still: RM || S.calm });
+      if (S.rain < 0.3 && S.overcast < 0.4) drawSunFlare(c, { sx, sy, col, warm: clamp(warm, 0, 1), day: (1 - e.night) * (1 - S.rain) * (1 - S.overcast), t: S.time, vw: VW, vh: VH, still: RM || S.calm });
       c.fillStyle = rgb(col); c.beginPath(); c.arc(sx, sy, 17, 0, Math.PI * 2); c.fill();
     }
     if (m > 1110 || m < 400) {
@@ -1544,7 +1566,7 @@ export function createOsanpoRun(root: HTMLElement, opts: OsanpoRunOptions): () =
     }
     else {
       S.secT = rand(14, 18);
-      if (S.t > 20 && S.rainTarget === 0 && Math.random() < 0.4) {
+      if (!live() && S.t > 20 && S.rainTarget === 0 && Math.random() < 0.4) {
         S.rainTarget = 1; S.rainT = rand(18, 24);
         floatText(VW / 2, GROUND * 0.32, STAGE.weather === "snow" ? "雪が強くなってきた… 足元に注意" : "雨が降ってきた… 水たまりに注意", "#A9C8FF", 18);
       }
@@ -1752,8 +1774,8 @@ export function createOsanpoRun(root: HTMLElement, opts: OsanpoRunOptions): () =
     $("best-top").textContent = S.best.toLocaleString();
     $("best-label").textContent = `じこベスト・${STAGE.name}`;
     bld.items = []; bld.nx = S.bgCam * bld.f - 80; near.items = []; near.nx = S.bgCam * near.f - 160;
-    if (S.state === "ready") S.clock = STAGE.clock;
-    S.rain = 0; S.rainTarget = 0;
+    if (S.state === "ready") S.clock = realClockMinutes();
+    S.rain = liveRain(); S.rainTarget = S.rain;
     for (const b of $$(".osr-stage-card")) {
       const sel = b.dataset.id === id;
       b.setAttribute("aria-checked", String(sel)); b.tabIndex = sel ? 0 : -1;
@@ -1767,7 +1789,7 @@ export function createOsanpoRun(root: HTMLElement, opts: OsanpoRunOptions): () =
   const panelIds = ["start-panel", "over-panel", "pause-panel", "settings-panel"];
   function hidePanels(): void { for (const id of panelIds) $(id).hidden = true; }
   function backToStart(): void {
-    S.state = "ready"; S.paused = false; S.clock = STAGE.clock; S.rain = 0; S.rainTarget = 0; S.sec = "normal";
+    S.state = "ready"; S.paused = false; S.clock = realClockMinutes(); S.rain = liveRain(); S.rainTarget = S.rain; S.sec = "normal";
     applyAudio(); bgmStop();
     Object.assign(P, { y: GROUND, vy: 0, ground: true, jumps: 2, sq: 1, rot: 0, inv: 0, dead: false, slide: false, slideHeld: false });
     obstacles = []; pickups = []; texts = []; flyers = []; parts = []; sniffs = []; S.fork = null; S.route = null; S.memo = null;
@@ -2265,11 +2287,13 @@ export function createOsanpoRun(root: HTMLElement, opts: OsanpoRunOptions): () =
       case "bonusSoon": if (S.sec === "normal") { S.secT = Math.max(0.6, S.secT * (1 - val(fx.frac, lv))); K.forceBonus = true; } break;
       case "rush": K.rushPass = Math.max(K.rushPass, val(fx.mul, lv, 1)); break;
       case "clock": {
-        if (fx.add) S.clock += fx.add;
-        if (fx.set !== undefined) S.clock += (((fx.set - S.clock) % 1440) + 1440) % 1440;
+        // 時刻は本当の時刻で進むので、スキルで動かした分は clockOff にためておく
+        const shift = (d: number) => { S.clock += d; S.clockOff += d; };
+        if (fx.add) shift(fx.add);
+        if (fx.set !== undefined) shift((((fx.set - S.clock) % 1440) + 1440) % 1440);
         if (fx.night !== undefined) {
           if (envAt(S.clock).night > 0.5) spawnShape("sky", ival(fx.night, lv), () => null, 150);
-          else S.clock += ((((19 * 60 + 30) - S.clock) % 1440) + 1440) % 1440;
+          else shift(((((19 * 60 + 30) - S.clock) % 1440) + 1440) % 1440);
         }
         break;
       }
@@ -2319,7 +2343,7 @@ export function createOsanpoRun(root: HTMLElement, opts: OsanpoRunOptions): () =
         break;
       }
       case "combo": {
-        const add = ival(fx.add, lv) + (STAGE.weather === "snow" && S.rain > 0.3 ? ival(fx.snow, lv) : 0);
+        const add = ival(fx.add, lv) + (precipKind() === "snow" && S.rain > 0.3 ? ival(fx.snow, lv) : 0);
         const prev = S.mult;
         S.mult = Math.min(5, S.mult + add); S.chain = Math.max(S.chain, (S.mult - 1) * 4); S.chainT = Math.max(S.chainT, 1.5);
         S.maxMult = Math.max(S.maxMult, S.mult);
@@ -2574,6 +2598,27 @@ export function createOsanpoRun(root: HTMLElement, opts: OsanpoRunOptions): () =
     floatText(VW / 2, GROUND * 0.44, info.title, kind === "thunder" ? "#FFF3A0" : "#FFE7F2", 17);
     sfx.title();
   }
+  /* ---------- 本当の天気 ---------- */
+  const live = () => opts.liveWeather?.() ?? null;
+  /** 本当の天気がわかっているときの降りものの強さ。わからなければ 0 */
+  const liveRain = () => { const w = live(); return w ? LIVE_PRECIP[w.kind] : 0; };
+  /** 降っているものの種類。本当の天気がわかればそれに合わせる（雪国で雨なら雨、まちで雪なら雪）。わからなければステージどおり */
+  function precipKind(): "rain" | "snow" {
+    const w = live();
+    if (!w) return STAGE.weather;
+    return w.kind === "snow" ? "snow" : "rain";
+  }
+  /** 本当の天気を、降りもの・空のくもり具合に反映する（スキルの「晴らす」はこのあとで上書きする） */
+  let liveShown = "";
+  function applyLiveWeather(dt: number): void {
+    const w = live();
+    S.overcast += ((w ? LIVE_OVERCAST[w.kind] : 0) - S.overcast) * Math.min(1, dt * 0.8);
+    const text = w ? `いまの${w.place}の空：${LIVE_LABEL[w.kind]}（時間と天気は本当の空と同じ）` : "時間は、いまの本当の時刻と同じ";
+    if (text !== liveShown) { liveShown = text; $("live-sky").textContent = text; }
+    if (!w) return;
+    S.rainTarget = LIVE_PRECIP[w.kind]; S.rainT = 0;
+    if (S.state === "ready") S.rain = S.rainTarget;
+  }
   /** 道と時間帯にあう天気のイベントを、ときどき起こす */
   function tickWeather(dt: number): void {
     const wx = S.wx;
@@ -2606,8 +2651,11 @@ export function createOsanpoRun(root: HTMLElement, opts: OsanpoRunOptions): () =
     S.wxT = rand(35, 55);
     const night = envAt(S.clock).night > 0.5, raining = S.rain > 0.4;
     const pool: WeatherKind[] = [];
-    if (raining && STAGE.weather !== "snow") pool.push("thunder", "thunder");
-    if (!night && !raining) pool.push("rainbow");
+    const w = live();
+    // 雷は、本当に雷雨のときだけ（本当の天気がわからないときは、これまでどおり雨のとき）
+    if (w ? w.kind === "thunder" : raining && STAGE.weather !== "snow") pool.push("thunder", "thunder");
+    // 虹は、晴れている昼だけ
+    if (!night && !raining && (!w || w.kind === "clear" || w.kind === "partly")) pool.push("rainbow");
     if (STAGE_ID === "town") pool.push("sakura", "sakura");
     if (STAGE_ID === "hiking") pool.push("momiji", "momiji");
     if (night && (STAGE_ID === "snow" || STAGE_ID === "hiking")) pool.push("aurora", "aurora");
@@ -2729,10 +2777,10 @@ export function createOsanpoRun(root: HTMLElement, opts: OsanpoRunOptions): () =
     FX.fade = RM ? 0 : 1;
     Object.assign(S, {
       state: "intro", introT: 0, roundId: newRoundId(), slowT: 0, wx: null, wxT: rand(25, 40), knocks: 0, rares: 0, skillIds: new Set<string>(), tricks: newTrickRun(), bestD: bestDistOf(STAGE_ID), passedBest: false, recordShown: false, fwT: 2,
-      t: 0, speed: 0, dist: 0, bonus: 0, treats: 0, clock: STAGE.clock, srPlus: 0, pigeonsRun: 0, slidesRun: 0, greetsRun: 0, routeCalm: 0, routeRisky: 0, bonusBest: 0, missionCoins: 0, missionsNow: [], stomps: 0, digs: 0,
+      t: 0, speed: 0, dist: 0, bonus: 0, treats: 0, clock: realClockMinutes(), clockBase: realClockMinutes(), clockT0: performance.now(), clockOff: 0, clockStart: realClockMinutes(), srPlus: 0, pigeonsRun: 0, slidesRun: 0, greetsRun: 0, routeCalm: 0, routeRisky: 0, bonusBest: 0, missionCoins: 0, missionsNow: [], stomps: 0, digs: 0,
       memo: null, memoT: rand(10, 17), memSeen: [], friendSeen: [],
       stepT: 0, fork: null, route: null, forkT: rand(35, 50), next: 420, shield: false, chain: 0, chainT: 0, mult: 1, maxMult: 1,
-      paused: false, deadT: 0, milestone: 100, bufT: 0, haul: new Map<string, number>(), sec: "normal", secT: 18, rain: 0, rainTarget: 0, rainT: 0,
+      paused: false, deadT: 0, milestone: 100, bufT: 0, haul: new Map<string, number>(), sec: "normal", secT: 18, rain: liveRain(), rainTarget: liveRain(), rainT: 0,
       bones: 0, newAch: [], newKinds: [], rainWalk: 0, rushes: 0, closes: 0, bonusGot: 0,
     });
     Object.assign(P, { y: GROUND, vy: 0, ground: true, jumps: 2, sq: 1, rot: 0, inv: 0, dead: false, slide: false, slideT: 0, slideHeld: false, jumpAt: -1 });
@@ -3240,6 +3288,8 @@ export function createOsanpoRun(root: HTMLElement, opts: OsanpoRunOptions): () =
     S.time += dt;
     refreshMods();
     const playing = S.state === "play";
+    if (S.state === "ready") S.clock = realClockMinutes();
+    applyLiveWeather(dt);
     if (S.state === "ready") S.speed = 90;
     else if (S.state === "intro") {
       S.introT += dt; S.speed = 0;
@@ -3251,6 +3301,7 @@ export function createOsanpoRun(root: HTMLElement, opts: OsanpoRunOptions): () =
         if (S.bufT > 0) { S.bufT = 0; jump(JUMP_V, 1); }
         applyStepBoost();
         if (odekakeMult > 1) floatText(VW / 2, GROUND * 0.3, `おでかけボーナス スコア×${ODEKAKE_SCORE_MULT}`, "#FFD9A8", 16);
+        if (liveRain() > 0.3) floatText(VW / 2, GROUND * 0.4, precipKind() === "snow" ? "雪が降っている… 足元に注意" : "雨が降っている… 水たまりに注意", "#A9C8FF", 16);
       }
     } else if (playing) {
       S.t += dt;
@@ -3260,13 +3311,14 @@ export function createOsanpoRun(root: HTMLElement, opts: OsanpoRunOptions): () =
       tickWeather(dt);
       S.speed = M.stop ? 0 : START_SPEED * M.speed * (S.slowT > 0 ? 0.55 : 1);
       if (S.t >= 180) unlock("survive180");
-      if (S.clock >= 1440 + 300) unlock("dawn");
+      // 朝の5時をまたいで歩き続けたら
+      if (Math.floor((S.clock - 300) / 1440) > Math.floor((S.clockStart - 300) / 1440)) unlock("dawn");
       tickSkills(dt);
       tickFork(dt);
       tickMemory(dt);
       tickMissions();
       S.dist += S.speed * dt;
-      S.clock += dt * 1.6;
+      S.clock = S.clockBase + (performance.now() - S.clockT0) / 60000 + S.clockOff;
       S.next -= S.speed * dt;
       if (S.next <= 0) spawn();
       S.secT -= dt;
@@ -3295,9 +3347,9 @@ export function createOsanpoRun(root: HTMLElement, opts: OsanpoRunOptions): () =
       if (S.rainT > 0) {
         S.rainT -= dt;
         if (S.rainT <= 0) {
-          S.rainTarget = 0; floatText(VW / 2, GROUND * 0.32, STAGE.weather === "snow" ? "雪が小降りになった" : "雨がやんだ", "#A9C8FF", 16);
+          S.rainTarget = 0; floatText(VW / 2, GROUND * 0.32, precipKind() === "snow" ? "雪が小降りになった" : "雨がやんだ", "#A9C8FF", 16);
           // 雨あがりの昼間は、ときどき虹がかかる
-          if (!S.wx && STAGE.weather !== "snow" && envAt(S.clock).night < 0.4 && Math.random() < 0.6) startWeather("rainbow");
+          if (!S.wx && precipKind() !== "snow" && envAt(S.clock).night < 0.4 && Math.random() < 0.6) startWeather("rainbow");
         }
       }
       if (S.chainT > 0 && !M.comboLock) {
@@ -3623,6 +3675,14 @@ export function createOsanpoRun(root: HTMLElement, opts: OsanpoRunOptions): () =
     const shx = shake ? (Math.random() - 0.5) * shake : 0, shy = shake ? (Math.random() - 0.5) * shake * 0.6 : 0;
     c.setTransform(DPR * SC, 0, 0, DPR * SC, shx * DPR * SC, shy * DPR * SC);
     drawSky(c, e);
+    if (S.overcast > 0.01) {
+      // くもり・雨・雪の日は、空を灰色に（夜は暗く）
+      const g = c.createLinearGradient(0, 0, 0, GROUND);
+      const grey = e.night > 0.5 ? "58,60,78" : "150,156,172";
+      g.addColorStop(0, `rgba(${grey},${0.62 * S.overcast})`);
+      g.addColorStop(1, `rgba(${grey},${0.38 * S.overcast})`);
+      c.fillStyle = g; c.fillRect(-20, -20, VW + 40, GROUND + 22);
+    }
     drawSkyLife(stageView(c, e));
     drawWeatherSky(c);
     const mountains = STAGE_ID === "hiking" || STAGE_ID === "snow";
@@ -3636,11 +3696,16 @@ export function createOsanpoRun(root: HTMLElement, opts: OsanpoRunOptions): () =
     drawNear(c, e, lamps);
     drawGround(c, e, lamps);
     drawRouteScene(c, e);
+    if (live()?.kind === "fog") {
+      const g = c.createLinearGradient(0, GROUND * 0.35, 0, GROUND);
+      g.addColorStop(0, "rgba(226,230,238,0)"); g.addColorStop(1, `rgba(226,230,238,${0.45 * (1 - e.night * 0.5)})`);
+      c.fillStyle = g; c.fillRect(-20, GROUND * 0.35, VW + 40, GROUND * 0.65 + 2);
+    }
     drawMarkers(c, e);
     drawMemory(c, e);
     drawFork(c, e);
 
-    if (S.rain > 0.02 && STAGE.weather !== "snow" && !M.clear) { c.fillStyle = `rgba(52,60,96,${0.22 * S.rain})`; c.fillRect(-20, -20, VW + 40, GROUND + 26); }
+    if (S.rain > 0.02 && precipKind() !== "snow" && !M.clear) { c.fillStyle = `rgba(52,60,96,${0.22 * S.rain})`; c.fillRect(-20, -20, VW + 40, GROUND + 26); }
     for (const o of obstacles) if (o.kind === "puddle") drawPuddle(c, o.x, GROUND, o.w, S.time, e.night, STAGE_ID);
     drawSniffs(c, e);
     for (const it of pickups) {
@@ -3764,7 +3829,7 @@ export function createOsanpoRun(root: HTMLElement, opts: OsanpoRunOptions): () =
       }
     }
     // 演出：ぬれた道に犬が映る（雨の日）
-    if (S.rain > 0.25 && STAGE.weather !== "snow" && !P.dead) {
+    if (S.rain > 0.25 && precipKind() !== "snow" && !P.dead) {
       c.save();
       c.beginPath(); c.rect(-20, GROUND, VW + 40, VH - GROUND + 20); c.clip();
       c.translate(0, GROUND * 2); c.scale(1, -1);
@@ -3842,8 +3907,9 @@ export function createOsanpoRun(root: HTMLElement, opts: OsanpoRunOptions): () =
       drawSpeedLines(c, speedLines, { strength: windy, dt: FDT, vw: VW, ground: GROUND, color: e.night > 0.5 ? "190,210,255" : "255,255,255" });
       drawForeground(c, { stage: STAGE_ID, cam: S.cam, vw: VW, vh: VH, ground: GROUND, night: e.night, side: e.side, t: S.time });
     }
-    if (STAGE.weather === "snow") {
-      const inten = 0.35 + 0.65 * S.rain, n = Math.round(drops.length * inten * (S.calm ? 0.5 : 1) * (M.clear ? 0.2 : 1));
+    // 本当の天気がわかっているときは、雪が降っているときだけ雪を降らせる（わからなければ雪国はいつも雪）
+    if (precipKind() === "snow" && (!live() || S.rain > 0.02)) {
+      const inten = live() ? S.rain : 0.35 + 0.65 * S.rain, n = Math.round(drops.length * inten * (S.calm ? 0.5 : 1) * (M.clear ? 0.2 : 1));
       c.fillStyle = "rgba(255,255,255,.85)";
       for (let i = 0; i < n; i++) {
         const d = drops[i]!;
@@ -3887,7 +3953,8 @@ export function createOsanpoRun(root: HTMLElement, opts: OsanpoRunOptions): () =
     setText("score", score().toLocaleString());
     setText("meta", `${Math.floor(S.dist / 50)}m・ほね${S.bones}・アイテム${S.treats}`);
     setText("clock", fmtClock(S.clock));
-    setText("phase", phaseName(S.clock) + (S.rain > 0.3 ? (STAGE.weather === "snow" ? "・雪" : "・雨") : "") + (S.wx ? `・${{ rainbow: "虹", thunder: "雷", sakura: "桜", momiji: "紅葉", aurora: "オーロラ" }[S.wx.kind]}` : ""));
+    const lw = live(), cloudTag = lw && S.rain <= 0.3 ? (lw.kind === "cloudy" ? "・くもり" : lw.kind === "fog" ? "・きり" : "") : "";
+    setText("phase", phaseName(S.clock) + (S.rain > 0.3 ? (precipKind() === "snow" ? "・雪" : "・雨") : cloudTag) + (S.wx ? `・${{ rainbow: "虹", thunder: "雷", sakura: "桜", momiji: "紅葉", aurora: "オーロラ" }[S.wx.kind]}` : ""));
     const secKey = S.state === "play" && S.sec !== "normal" ? S.sec : "";
     setFlag("sec-on", Boolean(secKey), (v) => { $("sec-chip").hidden = !v; });
     if (secKey) {

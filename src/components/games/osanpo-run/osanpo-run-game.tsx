@@ -8,7 +8,9 @@ import type { OsanpoRunStageId } from "@/lib/games/osanpo-run/config";
 import type { OsanpoRunFriendMemory, OsanpoRunMemoryPhoto, OsanpoRunOdekake } from "@/lib/data/osanpo-run";
 import type { OsanpoRunMission } from "@/lib/games/osanpo-run/missions";
 import { SKILL_KIND_COLORS, SKILL_KIND_LABELS, type SkillKind } from "@/lib/games/osanpo-run/skills";
-import { createOsanpoRun, type OsanpoRunResult, type RunItem } from "./engine";
+import { createOsanpoRun, type OsanpoRunLiveWeather, type OsanpoRunResult, type RunItem } from "./engine";
+import { placeLabel, readSavedPlace, WEATHER_CACHE_KEY, WEATHER_CACHE_MS } from "@/lib/home-weather";
+import { parseRoomWeather } from "@/lib/room/weather";
 import { OsanpoRunCoop } from "./osanpo-run-coop";
 import { OSANPO_RUN_RANKING_REFRESH_EVENT, OsanpoRunRanking } from "./osanpo-run-ranking";
 
@@ -99,6 +101,33 @@ async function shareResult(image: Blob, body: string): Promise<{ ok: true } | { 
 }
 
 /**
+ * いまの本当の天気（ホーム・マイルームと同じ場所・同じ Open-Meteo）。10分はこの端末に覚えておいた答えを使う。
+ * 取れないときは null のまま（ゲームはこれまでどおり、ときどき雨・雪国は雪になる）
+ */
+function loadLiveWeather(onLoad: (weather: OsanpoRunLiveWeather) => void): void {
+  const place = readSavedPlace();
+  const lat = place.lat.toFixed(2), lon = place.lon.toFixed(2), label = placeLabel(place);
+  try {
+    const cached = JSON.parse(window.sessionStorage.getItem(WEATHER_CACHE_KEY) ?? "null") as { lat: string; lon: string; t: number; raw: unknown } | null;
+    if (cached && cached.lat === lat && cached.lon === lon && Date.now() - cached.t < WEATHER_CACHE_MS) {
+      const parsed = parseRoomWeather(cached.raw);
+      if (parsed) { onLoad({ kind: parsed.kind, place: label }); return; }
+    }
+  } catch {
+    // 覚えていなければ問い合わせる
+  }
+  fetch(`/api/my-room/weather?lat=${lat}&lon=${lon}`)
+    .then((response) => (response.ok ? response.json() : null))
+    .then((raw: unknown) => {
+      const parsed = parseRoomWeather(raw);
+      if (!parsed) return;
+      onLoad({ kind: parsed.kind, place: label });
+      try { window.sessionStorage.setItem(WEATHER_CACHE_KEY, JSON.stringify({ lat, lon, t: Date.now(), raw })); } catch { /* 覚えられなくても遊べる */ }
+    })
+    .catch(() => { /* 取れなければ、これまでどおりの天気 */ });
+}
+
+/**
  * おさんぽフレンチーの画面。骨組みだけをここで描き、動きは engine.ts に任せる。
  * プレイ中はアプリ全体のBGMを止め、ゲームの曲だけが鳴るようにする。
  */
@@ -109,6 +138,12 @@ export function OsanpoRunGame({ items, usesSampleItems, unlockedStages, seriesTa
     const root = rootRef.current;
     if (!root) return;
     setBgmSuppressed(true);
+    // 時間と天気は本当の空に合わせる。天気は届いたときから反映し、10分ごとに見なおす
+    let liveWeather: OsanpoRunLiveWeather | null = null;
+    let alive = true;
+    const refreshWeather = () => loadLiveWeather((w) => { if (alive) liveWeather = w; });
+    refreshWeather();
+    const weatherTimer = window.setInterval(refreshWeather, WEATHER_CACHE_MS);
     const destroy = createOsanpoRun(root, {
       items,
       usesSampleItems,
@@ -126,8 +161,11 @@ export function OsanpoRunGame({ items, usesSampleItems, unlockedStages, seriesTa
       onShare: shareResult,
       bodyFontFamily: bodyFont.style.fontFamily,
       onRunEnd: submitResult,
+      liveWeather: () => liveWeather,
     });
     return () => {
+      alive = false;
+      window.clearInterval(weatherTimer);
       destroy();
       setBgmSuppressed(false);
     };
@@ -198,6 +236,7 @@ export function OsanpoRunGame({ items, usesSampleItems, unlockedStages, seriesTa
               <h2>どこを散歩する？</h2>
               <div className="osr-stages" data-osr="stage-list" role="radiogroup" aria-label="ステージ" />
               <p className="osr-stage-desc" data-osr="stage-desc" />
+              <p className="osr-live-sky" data-osr="live-sky" />
               <div className="osr-step-boost" data-osr="step-boost" />
               <div className="osr-odekake" data-osr="odekake" />
               <div className="osr-missions" data-osr="missions" hidden />
