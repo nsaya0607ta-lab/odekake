@@ -1,8 +1,11 @@
 "use client";
 
+import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
+import { BlueCoinArt, CoinArt } from "@/components/coin-art";
 import { useHomeWeather } from "@/components/home-weather";
 import { getFrenchieSrc, type DogSkinId } from "@/lib/dog-skins";
+import { registerStepsWriter, type StepsWriteRequest } from "@/lib/home-dog-bus";
 import { restWeightsOf } from "@/lib/home-weather";
 
 /**
@@ -14,6 +17,13 @@ import { restWeightsOf } from "@/lib/home-weather";
  *
  * 変形は要素ごとに分けてある（移動 / 反転 / 上下の揺れ）。ひとつの要素に重ねると
  * transition と animation が同じ transform を奪い合って壊れる。
+ *
+ * 奥行き：犬は芝の上を手前（大きい）から奥（小さい）まで歩く。奥ほど足もとが上がって小さくなり、
+ * 画面の上では同じ歩幅でもゆっくり進んで見える（depthBottom / depthScale）。
+ *
+ * 用事：ふだんは気ままに歩き回るが、用事が入るとそれを先に片づける。
+ * - 歩数の書き換え（steps-tag.tsx から home-dog-bus.ts 経由）：看板の前まで歩き、魔法のペンを出して書く
+ * - 空から降ってきたコイン：走って拾いに行く（タップでも拾える）。1回 5 枚（/api/coins/home-drop）
  */
 
 /**
@@ -97,6 +107,8 @@ const MOTIONS: readonly Motion[] = [
 const POSE_FILES: Record<string, string> = {
   ...POSES,
   ...Object.fromEntries(MOTIONS.map((motion) => [motion.id, motion.art])),
+  // 歩数を書くとき：前足をあげた絵に、魔法のペンを持たせる
+  write: "wave",
 };
 
 /**
@@ -106,9 +118,10 @@ const POSE_FILES: Record<string, string> = {
  * すると体ごと入れ替わって二重写しになるので、報酬モーションは1枚絵のまま
  * transform だけで動かしている。基本ポーズはこれまでどおり静止画。
  */
-const GESTURE_CLASS: Record<string, string> = Object.fromEntries(
-  MOTIONS.map((motion) => [motion.id, `frenchie-m-${motion.id}`]),
-);
+const GESTURE_CLASS: Record<string, string> = {
+  ...Object.fromEntries(MOTIONS.map((motion) => [motion.id, `frenchie-m-${motion.id}`])),
+  write: "frenchie-m-write",
+};
 
 /** 立ち止まったときの仕草と、その長さ（ms） */
 type Rest = { pose: string; min: number; max: number; requiredLevel?: number };
@@ -194,8 +207,39 @@ const DOG_WIDTH = 22;
  * 歩く。中心合わせなので、犬の左右には DOG_WIDTH の半分（11%）ずつ体がある。左は看板に、
  * 右はカードの縁に、それぞれ被らないところで止めてある。
  */
-const MIN_X = 44;
-const MAX_X = 88;
+const MIN_X = 42;
+const MAX_X = 86;
+
+/**
+ * 奥行き（depth：0 = いちばん手前、1 = いちばん奥）から、足もとの高さ（カードの高さに対する％）と大きさを出す。
+ * 絵の芝は下から 44% まで。いちばん奥でも地平線の手前で止まり、遠くの犬は半分くらいの大きさになる。
+ */
+const depthBottom = (depth: number) => 1.5 + depth * 27;
+const depthScale = (depth: number) => 1.06 - depth * 0.5;
+/** カードの縦横比（幅 ÷ 高さ）。奥へ歩く距離を、横へ歩く距離と同じものさしで測るのに使う */
+const CARD_ASPECT = 1440 / 768;
+/** 奥行きの見かけの縮み（画面では短く見えても、実際にはこれだけ長く歩いている） */
+const DEPTH_STRETCH = 1.6;
+
+/** 歩数を書くときに立つ場所（看板の右下。ペン先が数字の右はしに届く） */
+const WRITE_SPOT = { x: 28, depth: 0.36 };
+/** 書くとき、後ろ足で立ちあがる高さ（犬の絵の高さに対する％） */
+const WRITE_LIFT = 16;
+/** ペンを出してから書きはじめるまで / 書いている長さ（steps-tag.tsx の INK_MS と合わせる） */
+const PEN_OUT_MS = 520;
+const WRITE_MS = 1300;
+
+/** コイン：5秒ごとに 5% で降る。1回 5 枚（枚数は DB が決める）。青は 4 回に1回くらい（1日の回数と青の回数は DB が決める） */
+const COIN_TICK_MS = 5000;
+const COIN_CHANCE = 0.05;
+const COIN_BLUE_CHANCE = 0.25;
+const COIN_MAX_ON_GROUND = 3;
+/** コインの大きさ（カード幅に対する％。手前のとき） */
+const COIN_WIDTH = 6.4;
+const COIN_FALL_MS = 1050;
+/** 今日はもう拾えない（DB の上限）と分かったら、その日はもう降らせない */
+const COIN_CAP_KEY = "home-drop-capped";
+const PEN_SRC = "/home-magic-pen.webp";
 
 type Walker = {
   x: number;
@@ -207,7 +251,44 @@ type Walker = {
   pose: string;
   walking: boolean;
   travelMs: number;
+  /** 立ち姿と踏み出しを入れ替える間隔（走るときは短く） */
+  stepMs: number;
+  /** 魔法のペンを持っているか */
+  pen: boolean;
 };
+
+type Coin = {
+  id: string;
+  kind: "coin" | "blue";
+  x: number;
+  depth: number;
+  /** 空から足もとまで落ちる距離（px） */
+  fallPx: number;
+  state: "falling" | "ground" | "taken";
+  /** 拾ったあとに出す文字（「+5」など） */
+  label: string | null;
+};
+
+const clamp01 = (v: number) => Math.min(1, Math.max(0, v));
+const zOf = (depth: number) => 10 + Math.round((1 - depth) * 100);
+
+function jstToday(): string {
+  return new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Tokyo" }).format(new Date());
+}
+function coinCapped(): boolean {
+  try {
+    return localStorage.getItem(COIN_CAP_KEY) === jstToday();
+  } catch {
+    return false;
+  }
+}
+function markCoinCapped() {
+  try {
+    localStorage.setItem(COIN_CAP_KEY, jstToday());
+  } catch {
+    // 覚えられなくても、DB が受け取らないだけ
+  }
+}
 
 const rand = (min: number, max: number) => min + Math.random() * (max - min);
 /** 重みつきで1つ選ぶ（天気で出やすくした仕草に使う） */
@@ -229,10 +310,11 @@ export function WanderingFrenchie({
   /** 表示する犬スキン。所持していないスキンを渡さないのは呼び出し側の責任 */
   skin?: DogSkinId;
 }) {
-  // 基本ポーズは常に、報酬モーションは解放済みのものだけ重ねて置く
+  // 基本ポーズは常に、報酬モーションは解放済みのものだけ重ねて置く。書くときの絵（wave）はいつでも
   const visibleKeys: string[] = [
     ...POSE_KEYS,
     ...MOTIONS.filter((motion) => motion.level <= level).map((motion) => motion.id),
+    "write",
   ];
   const [walker, setWalker] = useState<Walker>({
     x: 66,
@@ -241,7 +323,10 @@ export function WanderingFrenchie({
     pose: "stand",
     walking: false,
     travelMs: 0,
+    stepMs: STEP_MS,
+    pen: false,
   });
+  const walkerRef = useRef(walker);
   const [stepUp, setStepUp] = useState(false);
   const poseNodes = useRef<Record<string, HTMLImageElement | null>>({});
   // ホームの天気（HomeWeatherProvider の中にいるときだけ）。歩き回りの流れは止めたくないので ref で渡す
@@ -249,60 +334,256 @@ export function WanderingFrenchie({
   const weatherRef = useRef(hw);
   weatherRef.current = hw;
   const bobNode = useRef<HTMLDivElement>(null);
+  const boxRef = useRef<HTMLDivElement>(null);
+  const moverRef = useRef<HTMLDivElement>(null);
+
+  const [coins, setCoins] = useState<Coin[]>([]);
+  const coinsRef = useRef(coins);
+  coinsRef.current = coins;
+  /** 犬への用事（コインを拾いに行く）を外から足す口。歩き回りの effect の中で差しかえる */
+  const enqueueCoinRef = useRef<(id: string) => void>(() => {});
+  const router = useRouter();
+  const lastRefreshRef = useRef(0);
+
+  // 拾う（犬が拾っても、タップで拾っても同じ）。数は DB が決めて返す
+  const collectCoin = (id: string) => {
+    const coin = coinsRef.current.find((c) => c.id === id);
+    if (!coin || coin.state === "taken") return;
+    const setLabel = (label: string | null) =>
+      setCoins((list) => list.map((c) => (c.id === id ? { ...c, label } : c)));
+    setCoins((list) => list.map((c) => (c.id === id ? { ...c, state: "taken" } : c)));
+    // 拾ったコインは消えるが、「+5」を出しおわるまで場所は残しておく
+    const finish = () => setTimeout(() => setCoins((list) => list.filter((c) => c.id !== id)), 1600);
+
+    // 続けて拾うと DB が「間かくが短い（8秒）」と断るので、そのときは少し待って受け取りなおす
+    const claim = (tries: number) => {
+      void fetch("/api/coins/home-drop", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ dropId: id, kind: coin.kind }),
+      })
+        .then((response) => (response.ok ? response.json() : null))
+        .then((body: { granted?: boolean; kind?: "coin" | "blue"; amount?: number; remaining?: number | null; reason?: string | null } | null) => {
+          if (!body) return finish();
+          if (body.reason === "too_soon" && tries < 3) {
+            setTimeout(() => claim(tries + 1), 8500);
+            return;
+          }
+          if (body.granted && body.amount) {
+            setCoins((list) => list.map((c) => (c.id === id ? { ...c, kind: body.kind ?? c.kind, label: `+${body.amount}` } : c)));
+            // 上のコインの数を新しくする（何度も続けて取り直さない）
+            if (Date.now() - lastRefreshRef.current > 3000) {
+              lastRefreshRef.current = Date.now();
+              router.refresh();
+            }
+          } else if (body.reason === "daily_limit") {
+            setLabel("きょうはここまで");
+          }
+          if (body.remaining === 0 || body.reason === "daily_limit") markCoinCapped();
+          finish();
+        })
+        .catch(() => finish());
+    };
+    claim(0);
+  };
+  const collectRef = useRef(collectCoin);
+  collectRef.current = collectCoin;
 
   useEffect(() => {
     if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
     const availableRests = ALL_RESTS.filter((rest) => (rest.requiredLevel ?? 1) <= level);
 
-    let cancelled = false;
-    const timers: ReturnType<typeof setTimeout>[] = [];
-    const wait = (ms: number, fn: () => void) => {
-      timers.push(
-        setTimeout(() => {
-          if (!cancelled) fn();
-        }, ms),
-      );
+    let alive = true;
+    /** いまの動きの番号。用事が割りこむと増えて、それまでの動きは止まる */
+    let token = 0;
+    let busy = false;
+    const timers = new Set<ReturnType<typeof setTimeout>>();
+    type Task = { kind: "write" } | { kind: "coin"; id: string };
+    const tasks: Task[] = [];
+    let writeRequest: StepsWriteRequest | null = null;
+
+    const sleep = (ms: number) =>
+      new Promise<void>((resolve) => {
+        const id = setTimeout(() => {
+          timers.delete(id);
+          resolve();
+        }, ms);
+        timers.add(id);
+      });
+    const live = (t: number) => alive && t === token;
+    const set = (next: Walker) => {
+      walkerRef.current = next;
+      setWalker(next);
     };
 
-    const rest = (from: Walker) => {
+    /** 歩いている途中で止める：いま見えている場所を読んで、そこに立たせる */
+    const freeze = () => {
+      const node = moverRef.current;
+      const box = boxRef.current;
+      const current = walkerRef.current;
+      if (!node || !box || !current.walking) return;
+      const style = getComputedStyle(node);
+      const x = (parseFloat(style.left) / box.clientWidth) * 100;
+      const bottom = (parseFloat(style.bottom) / box.clientHeight) * 100;
+      if (!Number.isFinite(x) || !Number.isFinite(bottom)) return;
+      set({ ...current, x, depth: clamp01((bottom - depthBottom(0)) / (depthBottom(1) - depthBottom(0))), pose: "stand", walking: false, travelMs: 1 });
+    };
+
+    const walkTo = async (t: number, x: number, depth: number, speed = 1): Promise<boolean> => {
+      const from = walkerRef.current;
+      const dx = x - from.x;
+      const facing: 1 | -1 = Math.abs(dx) < 1.5 ? from.facing : dx > 0 ? -1 : 1;
+      // 振り向きは止まったまま済ませる
+      if (facing !== from.facing) {
+        set({ ...from, facing, pose: "stand", walking: false, travelMs: 1 });
+        await sleep(TURN_MS);
+      } else {
+        await sleep(60);
+      }
+      if (!live(t)) return false;
+      // 奥ほど小さく見えるので、同じ速さで歩いても画面の上ではゆっくり進む
+      const meanScale = (depthScale(from.depth) + depthScale(depth)) / 2;
+      const ground = Math.hypot(dx, ((depthBottom(depth) - depthBottom(from.depth)) / CARD_ASPECT) * DEPTH_STRETCH);
+      const travelMs = Math.max(260, (ground / meanScale / (SPEED * speed)) * 1000);
+      set({ x, depth, facing, pose: "walk", walking: true, travelMs, stepMs: STEP_MS / Math.pow(speed, 0.6), pen: false });
+      await sleep(travelMs);
+      return live(t);
+    };
+
+    const rest = async (t: number) => {
       const now = weatherRef.current;
       const weights = restWeightsOf(now?.weather ?? null);
       const { pose, min, max } = pickWeighted(availableRests, (r) => weights[r.pose] ?? 1);
-      setWalker({ ...from, pose, walking: false, travelMs: 0 });
-      wait(rand(min, max), () => startWalk(from));
+      set({ ...walkerRef.current, pose, walking: false, travelMs: 0 });
+      await sleep(rand(min, max));
+      return live(t);
     };
 
-    const startWalk = (from: Walker) => {
-      // ちょこっと動いて止まる、を避けてある程度の距離を歩かせる
-      let target = rand(MIN_X, MAX_X);
-      if (Math.abs(target - from.x) < 7) {
-        const middle = (MIN_X + MAX_X) / 2;
-        target = from.x < middle ? rand(middle + 2, MAX_X) : rand(MIN_X, middle - 2);
+    const wander = async (t: number) => {
+      while (live(t)) {
+        const from = walkerRef.current;
+        // ちょこっと動いて止まる、を避けてある程度の距離を歩かせる
+        let target = rand(MIN_X, MAX_X);
+        if (Math.abs(target - from.x) < 7) {
+          const middle = (MIN_X + MAX_X) / 2;
+          target = from.x < middle ? rand(middle + 2, MAX_X) : rand(MIN_X, middle - 2);
+        }
+        // ときどき大きく奥や手前へ。ふだんは今の奥行きのまわり
+        const depth = Math.random() < 0.35 ? Math.random() : clamp01(from.depth + rand(-0.4, 0.4));
+        if (!(await walkTo(t, target, depth))) return;
+        if (!(await rest(t))) return;
       }
-      const facing: 1 | -1 = target > from.x ? -1 : 1;
-      const depth = Math.min(1, Math.max(0, from.depth + rand(-0.35, 0.35)));
-      const travelMs = (Math.abs(target - from.x) / SPEED) * 1000;
-      const turning = facing !== from.facing;
-
-      // 振り向きは止まったまま済ませる
-      setWalker((current) => ({ ...current, facing, pose: "stand", walking: false }));
-
-      wait(turning ? TURN_MS : 80, () => {
-        const next: Walker = { x: target, depth, facing, pose: "walk", walking: true, travelMs };
-        setWalker(next);
-        wait(travelMs, () => rest(next));
-      });
     };
 
-    wait(700, () =>
-      startWalk({ x: 66, depth: 0.45, facing: 1, pose: "stand", walking: false, travelMs: 0 }),
-    );
+    const writeSteps = async (t: number) => {
+      if (!(await walkTo(t, WRITE_SPOT.x, WRITE_SPOT.depth, 2.1))) return;
+      // 看板のほう（左）を向く
+      if (walkerRef.current.facing !== 1) {
+        set({ ...walkerRef.current, facing: 1, pose: "stand", walking: false, travelMs: 1 });
+        await sleep(TURN_MS);
+      }
+      // 後ろ足で立って、魔法のペンを出す
+      set({ ...walkerRef.current, pose: "write", walking: false, travelMs: 0, pen: true });
+      await sleep(PEN_OUT_MS);
+      writeRequest?.write();
+      await sleep(WRITE_MS);
+      set({ ...walkerRef.current, pose: "happy", pen: false });
+      writeRequest?.done();
+      writeRequest = null;
+      await sleep(1100);
+    };
+
+    const fetchCoin = async (t: number, id: string) => {
+      const coin = coinsRef.current.find((c) => c.id === id);
+      if (!coin || coin.state === "taken") return;
+      // コインのとなりで止まって、鼻先で拾う（近づいてきた側に立つ）
+      const from = walkerRef.current;
+      const reach = 6 * depthScale(coin.depth);
+      const x = Math.min(92, Math.max(10, from.x < coin.x ? coin.x - reach : coin.x + reach));
+      if (!(await walkTo(t, x, coin.depth, 1.9))) return;
+      const still = coinsRef.current.find((c) => c.id === id);
+      if (!still || still.state === "taken") return;
+      // コインのほうを向く
+      const facing: 1 | -1 = coin.x > walkerRef.current.x ? -1 : 1;
+      if (facing !== walkerRef.current.facing) {
+        set({ ...walkerRef.current, facing, pose: "stand", walking: false, travelMs: 1 });
+        await sleep(TURN_MS);
+      }
+      set({ ...walkerRef.current, pose: "sniff", walking: false, travelMs: 0 });
+      await sleep(450);
+      collectRef.current(id);
+      set({ ...walkerRef.current, pose: "happy" });
+      await sleep(1000);
+    };
+
+    const runNext = async () => {
+      if (busy || !alive) return;
+      const task = tasks.shift();
+      if (!task) return;
+      busy = true;
+      const t = ++token;
+      for (const id of timers) clearTimeout(id);
+      timers.clear();
+      freeze();
+      if (task.kind === "write") await writeSteps(t);
+      else await fetchCoin(t, task.id);
+      busy = false;
+      if (!alive) return;
+      if (tasks.length) void runNext();
+      else void wander(++token);
+    };
+
+    const unregister = registerStepsWriter((request) => {
+      if (!alive) return false;
+      // 書いている途中に頼みなおされたら、新しいほうに書く
+      writeRequest = request;
+      if (!tasks.some((task) => task.kind === "write")) tasks.unshift({ kind: "write" });
+      void runNext();
+      return true;
+    });
+    enqueueCoinRef.current = (id) => {
+      tasks.push({ kind: "coin", id });
+      void runNext();
+    };
+
+    void sleep(700).then(() => {
+      if (alive && !busy) void wander(++token);
+    });
 
     return () => {
-      cancelled = true;
+      alive = false;
+      unregister();
+      enqueueCoinRef.current = () => {};
       for (const id of timers) clearTimeout(id);
     };
   }, [level]);
+
+  // 5秒ごとに 5% で、空からコインが降る（画面を見ているときだけ）
+  useEffect(() => {
+    if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+    const id = setInterval(() => {
+      if (document.visibilityState !== "visible" || coinCapped()) return;
+      if (coinsRef.current.length >= COIN_MAX_ON_GROUND || Math.random() >= COIN_CHANCE) return;
+      const box = boxRef.current;
+      if (!box) return;
+      const depth = Math.random();
+      const coin: Coin = {
+        id: crypto.randomUUID().replace(/-/g, ""),
+        kind: Math.random() < COIN_BLUE_CHANCE ? "blue" : "coin",
+        x: rand(30, 90),
+        depth,
+        fallPx: box.clientHeight * (1 - depthBottom(depth) / 100) + 24,
+        state: "falling",
+        label: null,
+      };
+      setCoins((list) => [...list, coin]);
+      setTimeout(() => {
+        setCoins((list) => list.map((c) => (c.id === coin.id && c.state === "falling" ? { ...c, state: "ground" } : c)));
+        enqueueCoinRef.current(coin.id);
+      }, COIN_FALL_MS);
+    }, COIN_TICK_MS);
+    return () => clearInterval(id);
+  }, []);
 
   // 歩いている間だけ、立ち姿と踏み出しを入れ替える
   useEffect(() => {
@@ -313,9 +594,9 @@ export function WanderingFrenchie({
     // 歩き出しは踏み出しの絵から。ここを立ち姿のまま始めると、最初の1歩ぶん
     // （STEP_MS）だけ足を止めたまま横に滑る
     setStepUp(true);
-    const id = setInterval(() => setStepUp((v) => !v), STEP_MS);
+    const id = setInterval(() => setStepUp((v) => !v), walker.stepMs);
     return () => clearInterval(id);
-  }, [walker.walking]);
+  }, [walker.walking, walker.stepMs]);
 
   const activePose: string = walker.walking ? (stepUp ? "walk" : "stand") : walker.pose;
 
@@ -347,7 +628,8 @@ export function WanderingFrenchie({
   }, [walker.pose, walker.walking]);
 
   return (
-    <div className="pointer-events-none absolute inset-0 overflow-hidden" aria-hidden="true">
+    // z-[15]：看板（z-10）より手前、右上のボタン（z-40）より奥。犬とコインの前後は、この中で奥行きから決める
+    <div ref={boxRef} className="pointer-events-none absolute inset-0 z-[15] overflow-hidden">
       <style>{`
         /* 上下は1歩ごと、左右の揺れは2歩で1往復。踏み替え（0% / 50%）を必ず
            いちばん低いところに合わせると、絵が入れ替わる瞬間が沈み込みに隠れる */
@@ -666,6 +948,86 @@ export function WanderingFrenchie({
 
         ${MOTION_RULES}
 
+        /* 歩数を書く：前足をあげたまま、ペンを走らせるぶんだけ小さく揺れる */
+        .frenchie-m-write { animation: fm-write ${PEN_OUT_MS + WRITE_MS}ms ease-in-out both; }
+        @keyframes fm-write {
+          0%, 28%  { transform: rotate(0deg)    translateX(0); }
+          36%, 60% { transform: rotate(-2.5deg) translateX(-1px); }
+          48%, 72% { transform: rotate(1deg)    translateX(1px); }
+          84%      { transform: rotate(-1.5deg) translateX(0); }
+          100%     { transform: rotate(0deg)    translateX(0); }
+        }
+        /* 後ろ足で立ちあがる（ペンが看板に届くところまで） */
+        .frenchie-lift { transition: transform 360ms cubic-bezier(0.34, 1.3, 0.5, 1); transform-origin: 50% 100%; }
+        /* 魔法のペン：きらっと出てきて、書いている間はペン先をこまかく走らせる */
+        @keyframes frenchie-pen-in {
+          0%   { opacity: 0; transform: rotate(150deg) scale(0.2); filter: brightness(2.2) drop-shadow(0 0 6px #9fd0ff); }
+          60%  { opacity: 1; transform: rotate(100deg) scale(1.12); filter: brightness(1.5) drop-shadow(0 0 5px #9fd0ff); }
+          100% { opacity: 1; transform: rotate(110deg) scale(1);    filter: drop-shadow(0 0 3px rgba(120,180,255,.75)); }
+        }
+        @keyframes frenchie-pen-write {
+          0%, 100% { transform: rotate(110deg) translate(0, 0); }
+          20%      { transform: rotate(104deg) translate(-2%, 3%); }
+          40%      { transform: rotate(114deg) translate(2%, -2%); }
+          60%      { transform: rotate(106deg) translate(-1%, 4%); }
+          80%      { transform: rotate(113deg) translate(2%, -1%); }
+        }
+        .frenchie-pen {
+          animation:
+            frenchie-pen-in ${PEN_OUT_MS}ms cubic-bezier(0.34, 1.4, 0.5, 1) both,
+            frenchie-pen-write 260ms ease-in-out ${PEN_OUT_MS}ms ${Math.floor(WRITE_MS / 260)};
+          filter: drop-shadow(0 0 3px rgba(120,180,255,.75));
+        }
+        /* ペン先からこぼれる光の粒 */
+        @keyframes frenchie-pen-spark {
+          0%   { opacity: 0; transform: translate(0, 0) scale(0.4); }
+          30%  { opacity: 1; }
+          100% { opacity: 0; transform: translate(var(--sx), var(--sy)) scale(1); }
+        }
+        .frenchie-pen-spark { animation: frenchie-pen-spark 700ms ease-out ${PEN_OUT_MS}ms 2 both; }
+
+        /* 空から降ってくるコイン：落ちて、2回はねて止まる。くるくる回りつづける */
+        @keyframes home-coin-fall {
+          0%   { transform: translateY(calc(-1 * var(--fall))); animation-timing-function: cubic-bezier(0.5, 0, 1, 0.6); }
+          62%  { transform: translateY(0); animation-timing-function: cubic-bezier(0, 0.4, 0.5, 1); }
+          76%  { transform: translateY(-34%); animation-timing-function: cubic-bezier(0.5, 0, 1, 0.6); }
+          88%  { transform: translateY(0); animation-timing-function: cubic-bezier(0, 0.4, 0.5, 1); }
+          94%  { transform: translateY(-10%); }
+          100% { transform: translateY(0); }
+        }
+        @keyframes home-coin-spin {
+          0%, 100% { transform: scaleX(1); }
+          50%      { transform: scaleX(0.18); }
+        }
+        @keyframes home-coin-shadow {
+          0%   { opacity: 0;   transform: scale(0.3); }
+          62%  { opacity: 1;   transform: scale(1); }
+          76%  { opacity: 0.6; transform: scale(0.8); }
+          100% { opacity: 1;   transform: scale(1); }
+        }
+        @keyframes home-coin-take {
+          0%   { transform: translateY(0)     scale(1);   opacity: 1; }
+          35%  { transform: translateY(-70%)  scale(1.35); opacity: 1; }
+          100% { transform: translateY(-160%) scale(0.6); opacity: 0; }
+        }
+        @keyframes home-coin-label {
+          0%   { transform: translate(-50%, 0);     opacity: 0; }
+          20%  { transform: translate(-50%, -40%);  opacity: 1; }
+          75%  { transform: translate(-50%, -110%); opacity: 1; }
+          100% { transform: translate(-50%, -150%); opacity: 0; }
+        }
+        @keyframes home-coin-glint {
+          0%, 100% { opacity: 0; transform: scale(0.4) rotate(0deg); }
+          50%      { opacity: 1; transform: scale(1) rotate(45deg); }
+        }
+        .home-coin-fall { animation: home-coin-fall ${COIN_FALL_MS}ms both; }
+        .home-coin-spin { animation: home-coin-spin 900ms linear infinite; }
+        .home-coin-ground .home-coin-spin { animation-duration: 2400ms; }
+        .home-coin-shadow { animation: home-coin-shadow ${COIN_FALL_MS}ms both; }
+        .home-coin-take { animation: home-coin-take 620ms cubic-bezier(0.3, 0.8, 0.4, 1) both; }
+        .home-coin-label { animation: home-coin-label 1500ms ease-out both; }
+        .home-coin-glint { animation: home-coin-glint 1400ms ease-in-out infinite; }
+
         @media (prefers-reduced-motion: reduce) {
           .frenchie-walking .frenchie-bob { animation: none; }
           .frenchie-breath { animation: none; }
@@ -675,8 +1037,62 @@ export function WanderingFrenchie({
         }
       `}</style>
 
+      {/* 空から降ってきたコイン（奥行きで大きさと前後が決まる） */}
+      {coins.map((coin) => {
+        const scale = depthScale(coin.depth);
+        const Art = coin.kind === "blue" ? BlueCoinArt : CoinArt;
+        return (
+          <div
+            key={coin.id}
+            className="absolute"
+            style={{
+              left: `${coin.x}%`,
+              bottom: `${depthBottom(coin.depth)}%`,
+              width: `${COIN_WIDTH * scale}%`,
+              transform: "translateX(-50%)",
+              zIndex: zOf(coin.depth) + 2,
+            }}
+          >
+            {/* 足もとの影 */}
+            <span
+              className={`absolute left-1/2 block rounded-[50%] bg-[rgba(70,60,30,.28)] ${coin.state === "taken" ? "opacity-0 transition-opacity duration-300" : "home-coin-shadow"}`}
+              style={{ width: "90%", height: "22%", bottom: "-8%", marginLeft: "-45%" }}
+            />
+            <button
+              type="button"
+              aria-label={coin.kind === "blue" ? "青コインを拾う" : "コインを拾う"}
+              disabled={coin.state === "taken"}
+              onClick={() => collectRef.current(coin.id)}
+              className={`pointer-events-auto relative block w-full ${coin.state === "falling" ? "home-coin-fall" : coin.state === "ground" ? "home-coin-ground" : "home-coin-take"}`}
+              style={{ ["--fall" as string]: `${coin.fallPx}px`, aspectRatio: "1", touchAction: "manipulation" }}
+            >
+              <span className="home-coin-spin block h-full w-full" style={{ filter: coin.kind === "blue" ? "drop-shadow(0 0 3px rgba(90,160,255,.8))" : "drop-shadow(0 0 2px rgba(255,210,90,.7))" }}>
+                <Art className="h-full w-full" />
+              </span>
+              <span className="home-coin-glint absolute -right-[18%] -top-[18%] block h-[46%] w-[46%] text-white" aria-hidden="true">
+                <svg viewBox="0 0 10 10" className="h-full w-full"><path d="M5 0 6 4 10 5 6 6 5 10 4 6 0 5 4 4Z" fill="currentColor" /></svg>
+              </span>
+            </button>
+            {coin.label ? (
+              <span
+                className="home-coin-label pointer-events-none absolute bottom-full left-1/2 whitespace-nowrap rounded-full px-1.5 py-0.5 font-black leading-none text-white"
+                style={{
+                  fontSize: "clamp(8px, 2.6vw, 12px)",
+                  background: coin.kind === "blue" ? "rgba(46,110,200,.9)" : "rgba(214,150,40,.92)",
+                  boxShadow: "0 2px 6px rgba(60,40,10,.25)",
+                }}
+              >
+                {coin.label}
+              </span>
+            ) : null}
+          </div>
+        );
+      })}
+
       {/* 移動 */}
       <div
+        ref={moverRef}
+        aria-hidden="true"
         className={`absolute transition-[left,bottom,transform] ease-linear ${
           walker.walking ? "frenchie-walking" : ""
         }`}
@@ -684,10 +1100,11 @@ export function WanderingFrenchie({
           width: `${DOG_WIDTH}%`,
           left: `${walker.x}%`,
           // 絵の芝は下から 44% までなので、奥へ行っても地平線を越えないところで止める
-          bottom: `${4 + walker.depth * 7}%`,
+          bottom: `${depthBottom(walker.depth)}%`,
           transitionDuration: `${walker.travelMs || 420}ms`,
-          transform: `translateX(-50%) scale(${1 - walker.depth * 0.16})`,
+          transform: `translateX(-50%) scale(${depthScale(walker.depth)})`,
           transformOrigin: "50% 100%",
+          zIndex: zOf(walker.depth),
         }}
       >
         {/* 反転 */}
@@ -706,7 +1123,9 @@ export function WanderingFrenchie({
           }}
         >
           {/* 上下の揺れ */}
-          <div ref={bobNode} className="frenchie-bob">
+          <div ref={bobNode} className="frenchie-bob" style={walker.walking ? { animationDuration: `${walker.stepMs * 2}ms` } : undefined}>
+            {/* 書くときに後ろ足で立ちあがる。ペンも一緒に持ちあがる */}
+            <div className="frenchie-lift" style={{ transform: walker.pose === "write" ? `translateY(-${WRITE_LIFT}%)` : undefined }}>
             {/* 呼吸。歩きの揺れや仕草の動きと transform を奪い合わないよう層を分ける */}
             <div className="frenchie-breath relative">
               {/* 全ポーズを重ねて置き、表示だけ切り替える。切り替え時のちらつきを防ぐ */}
@@ -734,6 +1153,32 @@ export function WanderingFrenchie({
                   }}
                 />
               ))}
+              {/* 魔法のペン。あげた前足（絵の左 26%・上 39% あたり）に持たせ、ペン先を看板へ向ける */}
+              {walker.pen ? (
+                <span className="pointer-events-none absolute block" style={{ left: "10%", top: "20%", width: "32%", aspectRatio: "1" }}>
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img src={PEN_SRC} alt="" draggable={false} className="frenchie-pen block h-full w-full select-none" />
+                  {[
+                    ["-60%", "-30%", "6%", "8%"],
+                    ["-30%", "-70%", "22%", "0%"],
+                    ["-75%", "10%", "0%", "26%"],
+                  ].map(([sx, sy, left, top], i) => (
+                    <span
+                      key={i}
+                      className="frenchie-pen-spark absolute block h-[16%] w-[16%] rounded-full"
+                      style={{
+                        left,
+                        top,
+                        background: "radial-gradient(circle, #fff 0 30%, #9fd0ff 55%, transparent 72%)",
+                        animationDelay: `${PEN_OUT_MS + i * 230}ms`,
+                        ["--sx" as string]: sx,
+                        ["--sy" as string]: sy,
+                      }}
+                    />
+                  ))}
+                </span>
+              ) : null}
+            </div>
             </div>
           </div>
         </div>
