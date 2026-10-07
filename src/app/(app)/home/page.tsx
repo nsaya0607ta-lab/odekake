@@ -31,6 +31,7 @@ import { getExpDashboard } from "@/lib/data/exp";
 import { getFriendList, getFriendsActivityFeed, getFriendsStepsRanking } from "@/lib/data/friends";
 import { getNoticesFeed, getUnreadNoticeCount } from "@/lib/data/notices";
 import { signThumbOrOriginalPaths } from "@/lib/data/photos";
+import { getRedCoinBalance } from "@/lib/data/red-coins";
 import { getRecordSpace } from "@/lib/data/space";
 import { getExpProgress } from "@/lib/exp";
 import { MUNICIPALITIES, PREFECTURES } from "@/lib/geo";
@@ -71,6 +72,7 @@ export default async function HomePage({
     unreadNoticeCount,
     blueCoins,
     friendList,
+    redCoins,
   ] = await Promise.all([
     spacePromise.then((space) => loadAreaIndex(supabase, space.tripIds)),
     getExpDashboard(supabase, user.id),
@@ -86,6 +88,7 @@ export default async function HomePage({
     getBlueCoinBalance(supabase, user.id).catch(() => null),
     // みんなのおでかけの行から、フレンドのページへ行けるようにするため（取れなくてもホームは出す）
     getFriendList(supabase).catch(() => []),
+    getRedCoinBalance(supabase, user.id).catch(() => null),
   ]);
   const friendIds = new Set(friendList.map((f) => f.friend_user_id));
 
@@ -210,7 +213,7 @@ export default async function HomePage({
         }
         action={
           <div className="flex items-center gap-2">
-            <CoinBadge balance={coins.balance} blueBalance={blueCoins} />
+            <CoinBadge balance={coins.balance} blueBalance={blueCoins} redBalance={redCoins} />
             <GuideBadge />
             <SharedTripBadge />
           </div>

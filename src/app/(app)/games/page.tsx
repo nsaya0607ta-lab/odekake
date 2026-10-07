@@ -13,6 +13,7 @@ const WANKO_BOWLING_CARD_SRC = "/games/wanko-bowling/menu-icon-v2.webp";
 const SNACK_TRAIL_CARD_SRC = "/games/snack-trail/menu-icon-preview.webp";
 const MEMORY_GAME_CARD_SRC = "/collection/items/duck-plush.webp";
 const OSANPO_RUN_CARD_SRC = "/games/osanpo-run/menu-icon.webp";
+const PINBALL_CARD_SRC = "/games/pinball/menu-icon.webp";
 
 export default async function GamesPage() {
   const { user } = await requireUser();
@@ -241,6 +242,57 @@ export default async function GamesPage() {
             </span>
           </Link>
 
+          <Link
+            href="/games/pinball"
+            aria-label="ご当地ピンボールで遊ぶ"
+            className="pressable group relative block overflow-hidden rounded-[30px] border border-[#f1c4bf] bg-gradient-to-br from-[#fffafa] via-[#fdeeed] to-[#f8d9d5] p-5 text-ink shadow-[0_14px_34px_rgba(190,70,62,0.14)] transition-transform active:scale-[0.985]"
+          >
+            <span aria-hidden="true" className="absolute -right-8 -top-10 h-32 w-32 rounded-full border border-white/75 bg-white/25" />
+            <span aria-hidden="true" className="absolute -bottom-10 left-9 h-28 w-28 rounded-full bg-[#ff8a7a]/22 blur-md" />
+
+            <span className="relative z-10 flex items-center gap-2">
+              <span className="rounded-full bg-[#d0574e] px-2.5 py-1 text-[10px] font-black text-white shadow-sm">GAME 05</span>
+              <span className="rounded-full border border-white/90 bg-white/70 px-2.5 py-1 text-[10px] font-bold text-[#b8473f]">NEW・赤コイン</span>
+            </span>
+
+            <span className="relative z-10 mt-3 flex items-center gap-3">
+              <span className="min-w-0 flex-1 pb-1">
+                <span className="block text-[10px] font-black tracking-[0.08em] text-[#b8473f]">はじいて、集めて、県制覇！</span>
+                <span className="mt-1 block text-[21px] font-black tracking-[-0.03em]">ご当地ピンボール</span>
+                <span className="mt-1.5 block text-[11px] font-bold leading-relaxed text-ink-soft">都道府県ガチャのアイテムが台に並ぶピンボール。</span>
+              </span>
+
+              <span className="relative h-[108px] w-[108px] shrink-0 overflow-hidden rounded-[25px] border border-white/80 bg-white/65 shadow-[0_8px_18px_rgba(80,66,46,0.09)]">
+                <Image
+                  src={PINBALL_CARD_SRC}
+                  alt=""
+                  aria-hidden="true"
+                  fill
+                  sizes="108px"
+                  className="object-cover"
+                />
+                <span aria-hidden="true" className="absolute inset-x-0 top-0 h-1/3 bg-gradient-to-b from-white/20 to-transparent" />
+              </span>
+            </span>
+
+            <span className="relative z-10 mt-4 flex items-center justify-between rounded-[18px] border border-white/90 bg-white/70 px-3 py-2.5 shadow-[inset_0_1px_0_rgba(255,255,255,0.95)]">
+              <span className="flex min-w-0 items-center gap-3">
+                <span className="min-w-0">
+                  <span className="block text-[8px] font-black text-[#b8473f]">プレイ形式</span>
+                  <span className="block text-[11px] font-black text-ink">3球制</span>
+                </span>
+                <span aria-hidden="true" className="h-7 w-px bg-[#efc3bd]" />
+                <span className="min-w-0">
+                  <span className="block text-[8px] font-black text-[#b8473f]">操作</span>
+                  <span className="block truncate text-[11px] font-black text-ink">左右タップでフリッパー</span>
+                </span>
+              </span>
+              <span className="ml-2 flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-[#d0574e] text-xl font-black leading-none text-white shadow-[0_5px_12px_rgba(208,87,78,0.25)] transition-transform group-active:translate-x-0.5">
+                ›
+              </span>
+            </span>
+          </Link>
+
           {canSeeMemoryGamePreview && (
           <Link
             href="/memory-game-preview"
@@ -251,7 +303,7 @@ export default async function GamesPage() {
             <span aria-hidden="true" className="absolute -bottom-10 left-9 h-28 w-28 rounded-full bg-[#b9a4dd]/24 blur-md" />
 
             <span className="relative z-10 flex items-center gap-2">
-              <span className="rounded-full bg-[#8b74b8] px-2.5 py-1 text-[10px] font-black text-white shadow-sm">GAME 05</span>
+              <span className="rounded-full bg-[#8b74b8] px-2.5 py-1 text-[10px] font-black text-white shadow-sm">GAME 06</span>
             </span>
 
             <span className="relative z-10 mt-3 flex items-center gap-3">
@@ -296,7 +348,7 @@ export default async function GamesPage() {
 
         <p className="flex items-center justify-center gap-1.5 py-1 text-[10px] font-bold text-ink-faint">
           <span aria-hidden="true">🪙</span>
-          スコアに応じてコインを獲得できます（おさんぽフレンチーは青コイン）
+          スコアに応じてコインを獲得できます（おさんぽフレンチーは青コイン・ご当地ピンボールは赤コイン）
         </p>
       </PageBody>
     </>

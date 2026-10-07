@@ -1,0 +1,716 @@
+/* ご当地ピンボール */
+
+.play {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  display: flex;
+  flex-direction: column;
+  background: #05080d;
+  color: #fff;
+  touch-action: none;
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-touch-callout: none;
+  overscroll-behavior: none;
+}
+
+/* ---------- 上の表示 ---------- */
+
+.hud {
+  position: relative;
+  z-index: 3;
+  flex-shrink: 0;
+  padding: calc(env(safe-area-inset-top) + 6px) 10px 6px;
+  background: linear-gradient(180deg, rgba(5, 8, 13, 0.98), rgba(5, 8, 13, 0.82));
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.hudRow {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.iconButton {
+  display: flex;
+  height: 34px;
+  width: 34px;
+  flex-shrink: 0;
+  align-items: center;
+  justify-content: center;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  background: rgba(255, 255, 255, 0.06);
+  color: #fff;
+  font-size: 13px;
+  font-weight: 900;
+}
+
+.iconButton:active {
+  transform: scale(0.94);
+}
+
+.scoreBox {
+  flex: 1;
+  min-width: 0;
+  text-align: center;
+}
+
+.tableName {
+  display: block;
+  font-size: 9px;
+  font-weight: 900;
+  letter-spacing: 0.12em;
+  color: var(--pb-accent);
+}
+
+.score {
+  display: block;
+  font-family: "Hiragino Maru Gothic ProN", "Arial Rounded MT Bold", "Yu Gothic", sans-serif;
+  font-size: 26px;
+  font-weight: 900;
+  line-height: 1.05;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.01em;
+  text-shadow: 0 0 12px var(--pb-accent-soft);
+}
+
+.mult {
+  margin-left: 6px;
+  display: inline-block;
+  border-radius: 6px;
+  padding: 1px 5px;
+  vertical-align: 5px;
+  background: var(--pb-accent2);
+  color: #111;
+  font-size: 11px;
+  font-weight: 900;
+}
+
+.balls {
+  display: flex;
+  flex-shrink: 0;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 2px;
+  min-width: 34px;
+}
+
+.ballDots {
+  display: flex;
+  gap: 3px;
+}
+
+.ballDot {
+  height: 9px;
+  width: 9px;
+  border-radius: 999px;
+  background: radial-gradient(circle at 35% 30%, #fff, #9aa6b2 55%, #3b434c);
+}
+
+.ballDotUsed {
+  opacity: 0.22;
+}
+
+.ballLabel {
+  font-size: 9px;
+  font-weight: 900;
+  color: rgba(255, 255, 255, 0.6);
+}
+
+/* スタンプ帳 */
+
+.stamps {
+  margin-top: 6px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+}
+
+.stamp {
+  position: relative;
+  height: 30px;
+  width: 30px;
+  flex-shrink: 0;
+  overflow: hidden;
+  border-radius: 999px;
+  border: 1.5px solid rgba(255, 255, 255, 0.16);
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.stamp img {
+  height: 100%;
+  width: 100%;
+  object-fit: cover;
+  filter: grayscale(1) brightness(0.45);
+  opacity: 0.6;
+  transition: filter 0.3s ease, opacity 0.3s ease;
+}
+
+.stampLit {
+  border-color: var(--pb-accent);
+  animation: pb-stamp-lit 1s ease-in-out infinite;
+}
+
+.stampLit img {
+  filter: grayscale(0.2) brightness(0.9);
+  opacity: 0.9;
+}
+
+.stampDone {
+  border-color: var(--pb-accent);
+  box-shadow: 0 0 10px var(--pb-accent-soft);
+  animation: pb-stamp-pop 0.5s ease-out;
+}
+
+.stampDone img {
+  filter: none;
+  opacity: 1;
+}
+
+.stampMark {
+  position: absolute;
+  right: -1px;
+  bottom: -1px;
+  display: flex;
+  height: 12px;
+  width: 12px;
+  align-items: center;
+  justify-content: center;
+  border-radius: 999px;
+  background: var(--pb-accent);
+  color: #111;
+  font-size: 8px;
+  font-weight: 900;
+}
+
+.stampCount {
+  margin-left: 4px;
+  font-size: 10px;
+  font-weight: 900;
+  color: rgba(255, 255, 255, 0.7);
+  font-variant-numeric: tabular-nums;
+}
+
+@keyframes pb-stamp-lit {
+  50% {
+    box-shadow: 0 0 10px var(--pb-accent-soft);
+  }
+}
+
+@keyframes pb-stamp-pop {
+  0% {
+    transform: scale(1.6);
+  }
+  60% {
+    transform: scale(0.9);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+
+/* 効果中のスキル */
+
+/* 折り返すと台の大きさが変わってしまうので、いつも1行（あふれたぶんは右がかくれる） */
+.chips {
+  margin-top: 5px;
+  display: flex;
+  height: 18px;
+  flex-wrap: nowrap;
+  gap: 4px;
+  overflow: hidden;
+}
+
+.chip:first-child {
+  margin-left: auto;
+}
+
+.chip:last-child {
+  margin-right: auto;
+}
+
+.chip {
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  border-radius: 999px;
+  padding: 1px 7px;
+  background: rgba(255, 255, 255, 0.1);
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  font-size: 10px;
+  font-weight: 900;
+  font-variant-numeric: tabular-nums;
+}
+
+.chipHot {
+  background: var(--pb-accent2);
+  border-color: transparent;
+  color: #111;
+}
+
+/* ---------- 台 ---------- */
+
+.stage {
+  position: relative;
+  min-height: 0;
+  flex: 1;
+  padding-bottom: env(safe-area-inset-bottom);
+}
+
+.canvas {
+  display: block;
+  height: 100%;
+  width: 100%;
+}
+
+/* 大きな文字 */
+
+.banner {
+  pointer-events: none;
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 22%;
+  z-index: 4;
+  padding: 0 12px;
+  text-align: center;
+  animation: pb-banner-in 0.35s cubic-bezier(0.2, 1.4, 0.4, 1) both;
+}
+
+.bannerOut {
+  animation: pb-banner-out 0.3s ease-in both;
+}
+
+.bannerTitle {
+  display: block;
+  font-size: clamp(24px, 8.6vw, 38px);
+  font-weight: 900;
+  line-height: 1.1;
+  /* 「ゲッ／ト！」のように言葉の途中で折り返さない（空白のところで折り返す） */
+  word-break: keep-all;
+  overflow-wrap: anywhere;
+  letter-spacing: 0.02em;
+  color: #fff;
+  -webkit-text-stroke: 1.2px rgba(0, 0, 0, 0.55);
+  text-shadow:
+    0 3px 0 rgba(0, 0, 0, 0.45),
+    0 0 22px var(--pb-banner-glow, rgba(255, 255, 255, 0.5));
+}
+
+.bannerSub {
+  margin-top: 6px;
+  display: inline-block;
+  max-width: 100%;
+  border-radius: 12px;
+  padding: 4px 10px;
+  background: rgba(0, 0, 0, 0.58);
+  font-size: 12px;
+  font-weight: 900;
+  line-height: 1.35;
+  color: rgba(255, 255, 255, 0.92);
+}
+
+.tone-info {
+  --pb-banner-glow: rgba(255, 255, 255, 0.45);
+}
+
+.tone-good {
+  --pb-banner-glow: rgba(255, 226, 122, 0.85);
+}
+
+.tone-great {
+  --pb-banner-glow: rgba(125, 249, 255, 0.9);
+}
+
+.tone-epic {
+  --pb-banner-glow: rgba(255, 157, 226, 1);
+}
+
+.tone-epic .bannerTitle {
+  font-size: clamp(30px, 11vw, 48px);
+  color: #fff8e6;
+  -webkit-text-stroke: 1.6px color-mix(in srgb, var(--pb-accent2) 70%, #000);
+  text-shadow:
+    0 3px 0 color-mix(in srgb, var(--pb-accent2) 55%, #000),
+    0 0 18px var(--pb-accent),
+    0 0 36px var(--pb-accent2);
+  animation: pb-epic 0.6s ease-in-out infinite alternate;
+}
+
+.tone-bad {
+  --pb-banner-glow: rgba(255, 138, 128, 0.85);
+}
+
+@keyframes pb-banner-in {
+  0% {
+    opacity: 0;
+    transform: translateY(12px) scale(0.6);
+  }
+  100% {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes pb-banner-out {
+  to {
+    opacity: 0;
+    transform: translateY(-10px) scale(1.06);
+  }
+}
+
+@keyframes pb-epic {
+  to {
+    transform: scale(1.06);
+  }
+}
+
+/* プランジャー（打ち出し）：打ち出しレーンの玉の少し上に、ゲージと目印を出す */
+
+.plunger {
+  pointer-events: none;
+  position: absolute;
+  right: 3px;
+  bottom: calc(env(safe-area-inset-bottom) + 15%);
+  z-index: 4;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 5px;
+}
+
+.plungerHint {
+  border-radius: 10px;
+  padding: 4px 7px;
+  background: rgba(0, 0, 0, 0.66);
+  font-size: 10px;
+  font-weight: 900;
+  line-height: 1.3;
+  text-align: right;
+  white-space: nowrap;
+  animation: pb-hint 1.4s ease-in-out infinite;
+}
+
+.plungerHint b {
+  color: var(--pb-accent2);
+}
+
+@keyframes pb-hint {
+  50% {
+    transform: translateY(3px);
+  }
+}
+
+.gaugeWrap {
+  display: flex;
+  align-items: stretch;
+  gap: 3px;
+}
+
+.gauge {
+  position: relative;
+  height: 128px;
+  width: 16px;
+  overflow: hidden;
+  border-radius: 8px;
+  border: 1.5px solid rgba(255, 255, 255, 0.45);
+  background: rgba(0, 0, 0, 0.6);
+}
+
+.gaugeFill {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 0;
+  background: linear-gradient(180deg, var(--pb-accent2), var(--pb-accent));
+}
+
+.gaugeMark {
+  position: absolute;
+  left: 0;
+  right: 0;
+  height: 1px;
+  background: rgba(255, 255, 255, 0.7);
+}
+
+.gaugeLabels {
+  position: relative;
+  height: 128px;
+  width: 24px;
+}
+
+.gaugeLabel {
+  position: absolute;
+  right: 0;
+  transform: translateY(-50%);
+  border-radius: 6px;
+  padding: 0 3px;
+  font-size: 10px;
+  font-weight: 900;
+  line-height: 14px;
+  color: rgba(255, 255, 255, 0.85);
+  background: rgba(0, 0, 0, 0.55);
+}
+
+.gaugeLabelOn {
+  background: var(--pb-accent2);
+  color: #111;
+}
+
+/* はじめの説明（左右のどこを押すか） */
+
+.touchGuide {
+  pointer-events: none;
+  position: absolute;
+  inset: 0;
+  z-index: 3;
+  display: flex;
+  animation: pb-fade 0.5s ease both;
+}
+
+.touchHalf {
+  display: flex;
+  flex: 1;
+  align-items: flex-end;
+  justify-content: center;
+  padding-bottom: 46%;
+  font-size: 12px;
+  font-weight: 900;
+  color: rgba(255, 255, 255, 0.85);
+}
+
+.touchHalf + .touchHalf {
+  border-left: 1px dashed rgba(255, 255, 255, 0.25);
+}
+
+.touchHalf span {
+  border-radius: 999px;
+  padding: 6px 12px;
+  background: rgba(0, 0, 0, 0.55);
+}
+
+@keyframes pb-fade {
+  from {
+    opacity: 0;
+  }
+}
+
+/* ---------- 一時停止・結果 ---------- */
+
+.sheetBack {
+  position: absolute;
+  inset: 0;
+  z-index: 8;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 18px;
+  background: rgba(3, 6, 10, 0.72);
+  backdrop-filter: blur(3px);
+  -webkit-backdrop-filter: blur(3px);
+  animation: pb-fade 0.25s ease both;
+  touch-action: auto;
+}
+
+.sheet {
+  width: 100%;
+  max-width: 360px;
+  max-height: 100%;
+  overflow-y: auto;
+  border-radius: 26px;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  background: linear-gradient(180deg, #19202b, #0d1219);
+  padding: 20px 18px 18px;
+  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.5);
+  animation: pb-sheet 0.4s cubic-bezier(0.2, 1.3, 0.4, 1) both;
+}
+
+@keyframes pb-sheet {
+  from {
+    opacity: 0;
+    transform: translateY(18px) scale(0.94);
+  }
+}
+
+.sheetTitle {
+  font-size: 20px;
+  font-weight: 900;
+  text-align: center;
+}
+
+.sheetSub {
+  margin-top: 4px;
+  font-size: 11px;
+  font-weight: 700;
+  text-align: center;
+  color: rgba(255, 255, 255, 0.6);
+}
+
+.bigScore {
+  margin-top: 10px;
+  text-align: center;
+  font-family: "Hiragino Maru Gothic ProN", "Arial Rounded MT Bold", "Yu Gothic", sans-serif;
+  font-size: 40px;
+  font-weight: 900;
+  font-variant-numeric: tabular-nums;
+  color: var(--pb-accent);
+  text-shadow: 0 0 18px var(--pb-accent-soft);
+}
+
+.best {
+  margin: 4px auto 0;
+  display: table;
+  border-radius: 999px;
+  padding: 3px 12px;
+  background: var(--pb-accent2);
+  color: #111;
+  font-size: 12px;
+  font-weight: 900;
+  animation: pb-epic 0.5s ease-in-out infinite alternate;
+}
+
+.statGrid {
+  margin-top: 14px;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 6px;
+}
+
+.stat {
+  border-radius: 14px;
+  padding: 8px 10px;
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.statLabel {
+  display: block;
+  font-size: 9px;
+  font-weight: 900;
+  color: rgba(255, 255, 255, 0.55);
+}
+
+.statValue {
+  display: block;
+  font-size: 16px;
+  font-weight: 900;
+  font-variant-numeric: tabular-nums;
+}
+
+.coins {
+  margin-top: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  border-radius: 16px;
+  padding: 10px 12px;
+  background: linear-gradient(90deg, rgba(226, 64, 64, 0.22), rgba(255, 140, 120, 0.12));
+  border: 1px solid rgba(255, 140, 120, 0.35);
+  font-weight: 900;
+}
+
+.coinsGain {
+  font-size: 20px;
+  font-variant-numeric: tabular-nums;
+  color: #ffb4a8;
+}
+
+.coinsBalance {
+  font-size: 10px;
+  color: rgba(255, 255, 255, 0.65);
+}
+
+.buttons {
+  margin-top: 14px;
+  display: grid;
+  gap: 8px;
+}
+
+.primary {
+  height: 48px;
+  border-radius: 999px;
+  background: linear-gradient(180deg, var(--pb-accent), color-mix(in srgb, var(--pb-accent) 70%, #000));
+  color: #141414;
+  font-size: 15px;
+  font-weight: 900;
+  box-shadow: 0 6px 16px var(--pb-accent-soft);
+}
+
+.secondary {
+  height: 44px;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  background: rgba(255, 255, 255, 0.06);
+  color: #fff;
+  font-size: 13px;
+  font-weight: 900;
+}
+
+.primary:active,
+.secondary:active {
+  transform: scale(0.98);
+}
+
+.resultItems {
+  margin-top: 12px;
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 4px;
+}
+
+.resultItem {
+  height: 34px;
+  width: 34px;
+  overflow: hidden;
+  border-radius: 999px;
+  border: 1.5px solid var(--pb-accent);
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.resultItem img {
+  height: 100%;
+  width: 100%;
+  object-fit: cover;
+}
+
+.volume {
+  margin-top: 12px;
+  display: grid;
+  gap: 8px;
+  border-radius: 16px;
+  padding: 10px 12px;
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.volume label {
+  display: grid;
+  grid-template-columns: 64px 1fr;
+  align-items: center;
+  gap: 8px;
+  font-size: 11px;
+  font-weight: 900;
+  color: rgba(255, 255, 255, 0.8);
+}
+
+.volume input {
+  width: 100%;
+  accent-color: var(--pb-accent);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .banner,
+  .bannerOut,
+  .tone-epic .bannerTitle,
+  .stampLit,
+  .stampDone,
+  .plungerHint,
+  .best,
+  .sheet {
+    animation: none;
+  }
+}

@@ -6,7 +6,8 @@ import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, typ
 import type { GachaRarity } from "@/lib/gacha/config";
 import { LEVEL_REWARDS, getTotalExpForLevel } from "@/lib/exp";
 import { CapsuleArt } from "@/components/gacha/capsule-art";
-import { BlueCoinArt, CoinArt, GachaMachineArt } from "@/components/coin-art";
+import { BlueCoinArt, CoinArt, GachaMachineArt, RedCoinArt } from "@/components/coin-art";
+import { RED_COIN_MAX, RED_COIN_POINTS } from "@/lib/games/pinball/config";
 import { HomeCoinArt } from "@/components/home-coin-art";
 import {
   GACHA_DUPLICATE_COINS,
@@ -315,7 +316,7 @@ function StartChapter({ onGo }: { onGo: (tab: TabId) => void }) {
         </div>
       </Section>
 
-      <Section kicker="2つのコイン" title="黄色いコインと、青いコイン">
+      <Section kicker="3つのコイン" title="黄色・青・赤のコイン">
         <div className={styles.twoCol}>
           <div className={styles.coinCard}>
             <span className={styles.coinIcon}><CoinArt className="h-full w-full" /></span>
@@ -328,6 +329,12 @@ function StartChapter({ onGo }: { onGo: (tab: TabId) => void }) {
             <b>青コイン</b>
             <p>はじめての土地・通算ログイン・おさんぽフレンチー・ホームに降るコインでたまる。背景・家具・都道府県ガチャに使う。</p>
             <button type="button" onClick={() => onGo("room")}>使いみち →</button>
+          </div>
+          <div className={styles.coinCard} data-red>
+            <span className={styles.coinIcon}><RedCoinArt className="h-full w-full" /></span>
+            <b>赤コイン</b>
+            <p>ご当地ピンボールのスコアでたまる。使いみちはこれから（いまはためておけます）。</p>
+            <button type="button" onClick={() => onGo("games")}>ためかた →</button>
           </div>
         </div>
       </Section>
@@ -683,6 +690,16 @@ const GAMES = [
     tip: "図鑑のボールを持っていると、そのボールで投げられます。ボールごとに重さや曲がり方がちがいます。",
   },
   {
+    id: "pinball",
+    name: "ご当地ピンボール",
+    icon: "/games/pinball/menu-icon.webp",
+    shot: "/guide/game-pinball.webp",
+    how: "画面の左半分・右半分を押してフリッパー。打ち出しは右下を下へ引いて離す",
+    time: "3球制（平均2分くらい）",
+    reward: `スコア${RED_COIN_POINTS.toLocaleString("ja-JP")}点ごとに赤コイン1枚（1プレイ${RED_COIN_MAX.toLocaleString("ja-JP")}枚まで）`,
+    tip: "都道府県ガチャのご当地アイテムを1つでも持っている県の台で遊べます（いつもの台はだれでも）。台に浮かぶアイテムにボールを当てると、その場でスキルが発動。8個集めると「県制覇！」でマルチボールになり、ジャックポットがねらえます。",
+  },
+  {
     id: "snack-trail",
     name: "わんこのおやつ道",
     icon: "/games/snack-trail/menu-icon-preview.webp",
@@ -699,7 +716,7 @@ function GamesChapter() {
   return (
     <>
       <Hero title="ミニゲーム" lead="ホームの「ミニゲーム」から。図鑑で育てたスキルが、ゲームで役に立ちます。" art={<Image src="/splash/game-item-catch.webp" alt="" width={92} height={92} />} />
-      <Section kicker="じっさいのプレイ画面" title="4つのゲーム">
+      <Section kicker="じっさいのプレイ画面" title="5つのゲーム">
         <Screens screens={GAMES.map((game) => ({ src: game.shot, title: game.name, text: game.how }))} />
       </Section>
       <Section kicker="くわしく" title="遊びかたと、もらえるもの">
@@ -772,7 +789,7 @@ function RoomChapter() {
       </Section>
 
       <Section kicker="都道府県ガチャ" title="ご当地アイテム">
-        <p className={styles.body}>青コインで回す、ご当地の名物や観光地のアイテムが出るガチャです（コインのガチャのアイテムは出ません）。集めたアイテムによって、ご当地のフレブルの着せかえが解放されます（マイページ →「犬のすがたを選ぶ」）。</p>
+        <p className={styles.body}>青コインで回す、ご当地の名物や観光地のアイテムが出るガチャです（コインのガチャのアイテムは出ません）。集めたアイテムによって、ご当地のフレブルの着せかえが解放されます（マイページ →「犬のすがたを選ぶ」）。集めたご当地アイテムは「ご当地ピンボール」の台にも並び、ボールで集めるとスキルが発動します。</p>
       </Section>
     </>
   );

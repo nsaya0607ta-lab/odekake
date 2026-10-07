@@ -318,10 +318,12 @@
 
 .coinCard { display: flex; flex-direction: column; align-items: flex-start; gap: 4px; padding: 14px; border-radius: 18px; background: #fff7df; }
 .coinCard[data-blue] { background: #e9f2fd; }
+.coinCard[data-red] { background: #fdebe9; grid-column: 1 / -1; }
 .coinCard b { color: var(--ink); font-size: 14px; }
 .coinCard p { margin: 0; color: var(--soft); font-size: 11.5px; line-height: 1.6; }
 .coinCard button { margin-top: 4px; padding: 0; border: 0; background: none; color: #5d8049; font: inherit; font-size: 12px; font-weight: 900; }
 .coinCard[data-blue] button { color: #2f6db5; }
+.coinCard[data-red] button { color: #c7353b; }
 .coinIcon { width: 38px; height: 38px; animation: spinY 3.4s ease-in-out infinite; }
 
 .toc { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }

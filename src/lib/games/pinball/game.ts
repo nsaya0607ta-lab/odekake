@@ -1,0 +1,1024 @@
+/**
+ * ご当地ピンボールのルール
+ * =============================================================
+ * 物理（physics.ts）が積んだ「起きたこと」を受けて、得点・ライト・スタンプ帳・スキル・モードを進める。
+ * 画面（描画・音）は Game の中身を毎フレーム読むのと、fx に積まれた演出を取り出して使うだけにする。
+ *
+ * 1ゲームの流れ
+ *   serve（打ち出し待ち）→ play → ボールを落とす → bonus（ボーナス集計）→ 次のボール … 3球で over
+ *   ・打ち出しから BALL_SAVE_SEC 秒は、落としても戻ってくる（ボールセーブ）
+ *   ・台に光るアイテムをショットで集める → その場でスキル発動。8個そろうと「〇〇県 制覇！」（3球マルチボール）
+ *   ・上のレーン「お・で・か・け」がそろうとボーナス倍率アップ。ドロップターゲットを3つ倒すとガチャ穴が開く
+ */
+import type { GachaRarity } from "@/lib/gacha/config";
+import {
+  BALL_SAVE_SEC,
+  BONUS,
+  COMBO_WINDOW_SEC,
+  CONQUEST_EXTRA_BALLS,
+  CONQUEST_SAVE_SEC,
+  GACHA_AWARDS,
+  ITEM_POINTS,
+  ITEM_RELOCATE_SEC,
+  KICKBACK_AT_SERVE,
+  LIT_ITEMS,
+  MAX_BONUS_X,
+  MAX_COMBO,
+  MAX_EXTRA_BALLS,
+  MAX_SCORE_MULT,
+  PINBALL_BALLS,
+  POINTS,
+  SLOW_SCALE,
+  STAMP_COUNT,
+  type GachaAwardId,
+} from "./config";
+import {
+  addBall,
+  createWorld,
+  ejectScoop,
+  isOnPlunger,
+  kickback,
+  releasePlunger,
+  STEP,
+  stepWorld,
+  type Ball,
+  type PhysEvent,
+  type World,
+} from "./physics";
+import type { PinballSkill } from "./skills";
+import { ITEM_PICKUP_R, SHOT_IDS, TABLE, type Pt, type ShotId } from "./table";
+
+/* ---------- 型 ---------- */
+
+export type PinballItem = {
+  /** 図鑑の id。？カプセルは "capsule:番号" */
+  id: string;
+  name: string;
+  /** null は ？カプセル */
+  rarity: GachaRarity | null;
+  level: number;
+  skill: PinballSkill | null;
+  /** 描く画像（public/ からのパス、または最適化済みのURL） */
+  image: string | null;
+};
+
+/** スタンプ帳の1つ。spot は台に浮かんでいる場所（TABLE.itemSpots の番号）、litAt はそこに出た時刻 */
+export type Stamp = { item: PinballItem; collected: boolean; spot: number | null; litAt: number };
+
+export type Tone = "info" | "good" | "great" | "epic" | "bad";
+
+export type SfxId =
+  | "flipper" | "flipperHit" | "bumper" | "sling" | "drop" | "dropsAll" | "lane" | "lanesAll" | "spinner"
+  | "rampUp" | "rampDone" | "rampFail" | "orbit" | "scoop" | "eject" | "gacha" | "kickback" | "save"
+  | "drain" | "launch" | "item" | "skill" | "combo" | "jackpot" | "superJackpot" | "conquest" | "extraBall"
+  | "bonus" | "gameOver" | "skillShot" | "outlane" | "inlane" | "metal" | "rubber" | "ballBall" | "serve";
+
+export type GameFx =
+  | { type: "msg"; title: string; sub?: string; tone: Tone; ms?: number }
+  | { type: "pop"; x: number; y: number; text: string; tone: Tone }
+  | { type: "sfx"; id: SfxId; level?: number; x?: number }
+  | { type: "flash"; id: string }
+  | { type: "collect"; slot: number; from: Pt }
+  | { type: "skill"; slot: number; skill: PinballSkill }
+  | { type: "gacha"; label: string }
+  | { type: "shake"; power: number }
+  | { type: "conquest" }
+  | { type: "ballLost"; bonus: number }
+  | { type: "gameOver" };
+
+export type GamePhase = "serve" | "play" | "bonus" | "over";
+
+type Timed = { factor: number; until: number };
+
+export type Game = {
+  world: World;
+  rand: () => number;
+  /** この台で集められるアイテム（持っているご当地アイテム） */
+  pool: PinballItem[];
+  /** 「岐阜県」など。演出の文字に使う */
+  tableName: string;
+  /** 8個そろったときの大きな文字（「岐阜県 制覇！」） */
+  conquestTitle: string;
+  phase: GamePhase;
+  /** いま何球目か（1〜3） */
+  ball: number;
+  /** 待っているエクストラボール */
+  extraBalls: number;
+  extraBallsAwarded: number;
+  score: number;
+  /** ゲームが始まってからの時間（秒）。一時停止中は進まない */
+  clock: number;
+  /** 最初に打ち出してからの時間（記録用） */
+  playTime: number;
+  started: boolean;
+  simAcc: number;
+
+  saveUntil: number;
+  /** 次に台へ出た玉からボールセーブを始める */
+  saveArmed: boolean;
+  bonusX: number;
+  perBall: { items: number; ramps: number; orbits: number; bumpers: number; drops: number };
+
+  lanes: [boolean, boolean, boolean, boolean];
+  /** スキルショットで光っているレーン（-1 は無し） */
+  skillLane: number;
+  skillShotArmed: boolean;
+  skillShotUntil: number;
+  kickbackLit: [boolean, boolean];
+  gateUntil: number;
+  mults: Timed[];
+  bumperMults: Timed[];
+  slowUntil: number;
+  comboAdd: number;
+  comboAddUntil: number;
+  combo: number;
+  lastMajorAt: number;
+
+  stamps: Stamp[];
+  extraLit: number;
+  conquests: number;
+  mode: "normal" | "conquest";
+  jackpots: Record<ShotId, boolean>;
+  superLit: boolean;
+  jackpotsMade: number;
+
+  scoopBall: Ball | null;
+  scoopEjectAt: number;
+  dropsResetAt: number;
+  launchQueue: { at: number; power: number }[];
+  /** 台に出た玉（ボールセーブを始めたか） */
+  inPlay: Set<number>;
+  orbitEnter: Map<number, { side: "left" | "right"; at: number }>;
+  /** キックバックで打ち返した玉（そのままオービットを回っても、オービットのショットには数えない） */
+  kickedAt: Map<number, number>;
+  bonusUntil: number;
+  lastBonus: number;
+  /** 最後にボールを落としたところ（演出用） */
+  stats: { items: number; jackpots: number; maxCombo: number; ramps: number; orbits: number; bumpers: number; skillShots: number; saves: number };
+  fx: GameFx[];
+  prevPressed: [boolean, boolean];
+};
+
+/* ---------- 準備 ---------- */
+
+const CAPSULE_RARITIES: readonly GachaRarity[] = ["N", "R", "SR", "SSR", "UR", "LR", "MR"];
+
+/** ？カプセル（得点だけ） */
+export function capsuleItem(index: number): PinballItem {
+  const r = CAPSULE_RARITIES[index % CAPSULE_RARITIES.length]!;
+  return { id: `capsule:${index}`, name: "？カプセル", rarity: null, level: 0, skill: null, image: `/gacha/art/capsule-${r}-s.webp` };
+}
+
+function shuffle<T>(list: readonly T[], rand: () => number): T[] {
+  const out = [...list];
+  for (let i = out.length - 1; i > 0; i -= 1) {
+    const j = Math.floor(rand() * (i + 1));
+    [out[i], out[j]] = [out[j]!, out[i]!];
+  }
+  return out;
+}
+
+/** スタンプ帳（8個）。持っているアイテムからえらび、足りないぶんは ？カプセル */
+function pickStamps(pool: readonly PinballItem[], rand: () => number, round: number): Stamp[] {
+  const picked = shuffle(pool, rand).slice(0, STAMP_COUNT);
+  for (let i = picked.length; i < STAMP_COUNT; i += 1) picked.push(capsuleItem(i + round * 3));
+  return shuffle(picked, rand).map((item) => ({ item, collected: false, spot: null, litAt: 0 }));
+}
+
+export type CreateGameOptions = { pool: readonly PinballItem[]; tableName: string; conquestTitle?: string; seed?: number };
+
+export function createGame({ pool, tableName, conquestTitle, seed = Math.floor(Math.random() * 2 ** 31) }: CreateGameOptions): Game {
+  const world = createWorld(seed);
+  const g: Game = {
+    world,
+    rand: world.rand,
+    pool: [...pool],
+    tableName,
+    conquestTitle: conquestTitle ?? `${tableName} 制覇！`,
+    phase: "serve",
+    ball: 1,
+    extraBalls: 0,
+    extraBallsAwarded: 0,
+    score: 0,
+    clock: 0,
+    playTime: 0,
+    started: false,
+    simAcc: 0,
+    saveUntil: 0,
+    saveArmed: true,
+    bonusX: 1,
+    perBall: { items: 0, ramps: 0, orbits: 0, bumpers: 0, drops: 0 },
+    lanes: [false, false, false, false],
+    skillLane: -1,
+    skillShotArmed: false,
+    skillShotUntil: 0,
+    kickbackLit: [false, false],
+    gateUntil: 0,
+    mults: [],
+    bumperMults: [],
+    slowUntil: 0,
+    comboAdd: 0,
+    comboAddUntil: 0,
+    combo: 0,
+    lastMajorAt: -99,
+    stamps: [],
+    extraLit: 0,
+    conquests: 0,
+    mode: "normal",
+    jackpots: { leftOrbit: false, leftRamp: false, scoop: false, rightRamp: false, rightOrbit: false },
+    superLit: false,
+    jackpotsMade: 0,
+    scoopBall: null,
+    scoopEjectAt: 0,
+    dropsResetAt: 0,
+    launchQueue: [],
+    inPlay: new Set(),
+    orbitEnter: new Map(),
+    kickedAt: new Map(),
+    bonusUntil: 0,
+    lastBonus: 0,
+    stats: { items: 0, jackpots: 0, maxCombo: 0, ramps: 0, orbits: 0, bumpers: 0, skillShots: 0, saves: 0 },
+    fx: [],
+    prevPressed: [false, false],
+  };
+  g.stamps = pickStamps(g.pool, g.rand, 0);
+  serveBall(g);
+  lightItems(g);
+  return g;
+}
+
+/* ---------- 便利なもの ---------- */
+
+export function scoreMult(g: Game): number {
+  let m = 1;
+  for (const t of g.mults) if (t.until > g.clock) m *= t.factor;
+  return Math.min(MAX_SCORE_MULT, m);
+}
+
+export function bumperMult(g: Game): number {
+  let m = 1;
+  for (const t of g.bumperMults) if (t.until > g.clock) m *= t.factor;
+  return Math.min(25, m);
+}
+
+export function isBallSaveOn(g: Game): boolean {
+  return g.clock < g.saveUntil || (g.saveArmed && g.phase === "serve");
+}
+
+export function collectedCount(g: Game): number {
+  return g.stamps.reduce((n, s) => n + (s.collected ? 1 : 0), 0);
+}
+
+/** 台にのっている玉の数（打ち出しレーン・ランプの上・ガチャ穴の中も数える） */
+export function ballsOnTable(g: Game): number {
+  return g.world.balls.length;
+}
+
+function sfx(g: Game, id: SfxId, level?: number, x?: number): void {
+  g.fx.push({ type: "sfx", id, level, x });
+}
+
+function msg(g: Game, title: string, tone: Tone, sub?: string, ms?: number): void {
+  g.fx.push({ type: "msg", title, sub, tone, ms });
+}
+
+function addPoints(g: Game, base: number, at?: Pt, tone: Tone = "info", noMult = false): number {
+  const value = Math.round(base * (noMult ? 1 : scoreMult(g)));
+  g.score += value;
+  if (at && value >= 1000) g.fx.push({ type: "pop", x: at.x, y: at.y, text: `+${value.toLocaleString("ja-JP")}`, tone });
+  return value;
+}
+
+const SHOT_AT: Record<ShotId, Pt> = Object.fromEntries(TABLE.shots.map((s) => [s.id, s.icon])) as Record<ShotId, Pt>;
+
+/* ---------- 打ち出し ---------- */
+
+function serveBall(g: Game): void {
+  const { x, y } = TABLE.plungerRest;
+  addBall(g.world, x, y);
+  g.phase = "serve";
+  g.saveArmed = true;
+  // ボールごとに、左のキックバックは点いた状態で始まる（使ったらドロップターゲット3つで点けなおす）
+  if (KICKBACK_AT_SERVE) g.kickbackLit[0] = true;
+  g.skillLane = Math.floor(g.rand() * 4);
+  g.skillShotArmed = true;
+  sfx(g, "serve");
+}
+
+/** プランジャーを引く（0〜1）。打ち出しレーンに玉がのっているときだけ */
+export function setPlungerPull(g: Game, pull: number): void {
+  if (g.phase === "over" || g.phase === "bonus") return;
+  const onPlunger = g.world.balls.some((b) => isOnPlunger(g.world, b));
+  g.world.plungerPull = onPlunger ? Math.max(0, Math.min(1, pull)) : 0;
+}
+
+/** プランジャーを離す */
+export function launch(g: Game, power: number): boolean {
+  if (g.phase === "over" || g.phase === "bonus") return false;
+  const ball = releasePlunger(g.world, power);
+  if (!ball) return false;
+  g.started = true;
+  sfx(g, "launch", power);
+  return true;
+}
+
+export function canLaunch(g: Game): boolean {
+  return (g.phase === "serve" || g.phase === "play") && g.launchQueue.length === 0 && g.world.balls.some((b) => isOnPlunger(g.world, b));
+}
+
+function queueLaunch(g: Game, delay: number): void {
+  const last = g.launchQueue.length ? g.launchQueue[g.launchQueue.length - 1]!.at : g.clock;
+  g.launchQueue.push({ at: Math.max(g.clock + delay, last + 0.7), power: 0.82 + g.rand() * 0.12 });
+}
+
+/* ---------- フリッパー ---------- */
+
+export function setFlipper(g: Game, side: 0 | 1, pressed: boolean): void {
+  if (g.phase === "over") pressed = false;
+  g.world.flippers[side].pressed = pressed;
+  if (pressed && !g.prevPressed[side]) {
+    sfx(g, "flipper", side);
+    // レーンチェンジ：フリッパーを押すと、上のレーンの光がとなりへ動く
+    const l = g.lanes;
+    g.lanes = side === 0 ? [l[1], l[2], l[3], l[0]] : [l[3], l[0], l[1], l[2]];
+    if (g.phase === "serve" && g.skillLane >= 0) g.skillLane = (g.skillLane + (side === 0 ? 3 : 1)) % 4;
+  }
+  g.prevPressed[side] = pressed;
+}
+
+/* ---------- アイテム ---------- */
+
+/** レア度ごとの、浮かぶ場所の選ばれやすさ（tier 0〜2）。レアなものほど狙いにくい場所に出る */
+const TIER_WEIGHT: Record<"low" | "mid" | "high" | "top", readonly [number, number, number]> = {
+  low: [3, 2, 0.6],
+  mid: [2, 3, 1],
+  high: [1, 2, 3],
+  top: [0.3, 1.5, 4],
+};
+
+function tierOf(item: PinballItem): keyof typeof TIER_WEIGHT {
+  if (!item.rarity || item.rarity === "N") return "low";
+  if (item.rarity === "R") return "mid";
+  if (item.rarity === "SR" || item.rarity === "SSR") return "high";
+  return "top";
+}
+
+/** あいている場所を1つえらぶ（今いる場所 avoid と、ほかのアイテムがいる場所はのぞく） */
+function pickSpot(g: Game, item: PinballItem, avoid: number | null): number | null {
+  const used = new Set(g.stamps.flatMap((s) => (s.spot !== null && !s.collected ? [s.spot] : [])));
+  const w = TIER_WEIGHT[tierOf(item)];
+  const free = TABLE.itemSpots.flatMap((spot, i) => (used.has(i) || i === avoid ? [] : [{ i, w: w[spot.tier] }]));
+  const total = free.reduce((sum, f) => sum + f.w, 0);
+  if (!free.length || total <= 0) return null;
+  let r = g.rand() * total;
+  for (const f of free) {
+    r -= f.w;
+    if (r < 0) return f.i;
+  }
+  return free[free.length - 1]!.i;
+}
+
+function lightItems(g: Game): void {
+  if (g.mode === "conquest") return;
+  let lit = g.stamps.filter((s) => s.spot !== null && !s.collected).length;
+  const max = LIT_ITEMS + g.extraLit;
+  for (const stamp of g.stamps) {
+    if (lit >= max) break;
+    if (stamp.collected || stamp.spot !== null) continue;
+    const spot = pickSpot(g, stamp.item, null);
+    if (spot === null) break;
+    stamp.spot = spot;
+    stamp.litAt = g.clock;
+    lit += 1;
+  }
+}
+
+/** 同じ場所に長くいるアイテムは、別の場所へうつる */
+function relocateItems(g: Game): void {
+  for (const stamp of g.stamps) {
+    if (stamp.collected || stamp.spot === null || g.clock - stamp.litAt < ITEM_RELOCATE_SEC) continue;
+    const next = pickSpot(g, stamp.item, stamp.spot);
+    if (next !== null) stamp.spot = next;
+    stamp.litAt = g.clock;
+  }
+}
+
+/** 浮かんでいるアイテムに玉が当たったか（物理の1ステップごとに見る。速い玉が通りぬけないように） */
+function checkPickups(g: Game): void {
+  for (let i = 0; i < g.stamps.length; i += 1) {
+    const stamp = g.stamps[i]!;
+    if (stamp.collected || stamp.spot === null) continue;
+    const spot = TABLE.itemSpots[stamp.spot]!;
+    for (const b of g.world.balls) {
+      if (b.mode !== "field") continue;
+      const dx = b.x - spot.x;
+      const dy = b.y - spot.y;
+      if (dx * dx + dy * dy < ITEM_PICKUP_R * ITEM_PICKUP_R) {
+        collectItem(g, i);
+        break;
+      }
+    }
+  }
+}
+
+function collectItem(g: Game, index: number): void {
+  const stamp = g.stamps[index]!;
+  const spot = stamp.spot !== null ? TABLE.itemSpots[stamp.spot] : undefined;
+  const from: Pt = spot ? { x: spot.x, y: spot.y } : SHOT_AT.scoop;
+  stamp.collected = true;
+  stamp.spot = null;
+  const { item } = stamp;
+  const points = ITEM_POINTS[item.rarity ?? "capsule"] * (1 + g.conquests);
+  addPoints(g, points, from, "great");
+  g.perBall.items += 1;
+  g.stats.items += 1;
+  g.fx.push({ type: "collect", slot: index, from });
+  sfx(g, "item", item.rarity ? ["N", "R", "SR", "SSR", "UR", "LR", "MR"].indexOf(item.rarity) : 0);
+  if (g.extraLit > 0) g.extraLit -= 1;
+  const done = collectedCount(g);
+  if (item.skill) {
+    msg(g, `${item.name} ゲット！`, "great", `${item.skill.title}：${item.skill.text}`, 2600);
+    g.fx.push({ type: "skill", slot: index, skill: item.skill });
+    applySkill(g, item.skill);
+  } else {
+    msg(g, `${item.name} ゲット！`, "good", `スタンプ ${done} / ${STAMP_COUNT}`, 1800);
+  }
+  if (done >= g.stamps.length) startConquest(g);
+  else lightItems(g);
+}
+
+/* ---------- スキル ---------- */
+
+function openScoop(g: Game): void {
+  g.world.dropsUp = g.world.dropsUp.map(() => false);
+}
+
+function applySkill(g: Game, skill: PinballSkill): void {
+  sfx(g, "skill", skill.level);
+  for (const e of skill.effects) {
+    switch (e.type) {
+      case "save":
+        g.saveUntil = Math.max(g.saveUntil, g.clock + e.sec);
+        break;
+      case "mult":
+        g.mults.push({ factor: e.factor, until: g.clock + e.sec });
+        break;
+      case "bumperMult":
+        g.bumperMults.push({ factor: e.factor, until: g.clock + e.sec });
+        break;
+      case "slow":
+        g.slowUntil = Math.max(g.slowUntil, g.clock + e.sec);
+        break;
+      case "gate":
+        g.gateUntil = Math.max(g.gateUntil, g.clock + e.sec);
+        break;
+      case "kickback":
+        g.kickbackLit[0] = true;
+        if (e.both) g.kickbackLit[1] = true;
+        break;
+      case "bonusX":
+        g.bonusX = Math.min(MAX_BONUS_X, g.bonusX + e.add);
+        break;
+      case "drops":
+        openScoop(g);
+        break;
+      case "call":
+        g.extraLit += e.count;
+        lightItems(g);
+        break;
+      case "combo":
+        g.comboAdd = Math.max(g.comboAdd, e.addSec);
+        g.comboAddUntil = g.clock + e.sec;
+        break;
+      case "multiball":
+        for (let i = 0; i < e.balls; i += 1) queueLaunch(g, 0.5 + i * 0.7);
+        g.saveUntil = Math.max(g.saveUntil, g.clock + e.saveSec);
+        break;
+      case "points":
+        addPoints(g, e.value, SHOT_AT.scoop, "great");
+        break;
+    }
+  }
+}
+
+/* ---------- 県制覇モード ---------- */
+
+function startConquest(g: Game): void {
+  g.conquests += 1;
+  addPoints(g, POINTS.conquest * g.conquests, { x: 240, y: 520 }, "epic", true);
+  g.mode = "conquest";
+  g.superLit = false;
+  g.jackpotsMade = 0;
+  for (const id of SHOT_IDS) g.jackpots[id] = id !== "scoop";
+  for (const s of g.stamps) s.spot = null;
+  g.extraLit = 0;
+  for (let i = 0; i < CONQUEST_EXTRA_BALLS; i += 1) queueLaunch(g, 1.2 + i * 0.8);
+  g.saveUntil = Math.max(g.saveUntil, g.clock + CONQUEST_SAVE_SEC);
+  msg(g, g.conquestTitle, "epic", g.conquests > 1 ? `${g.conquests}回目！ マルチボールでジャックポットをねらえ` : "マルチボールでジャックポットをねらえ", 3400);
+  sfx(g, "conquest");
+  g.fx.push({ type: "conquest" });
+  g.fx.push({ type: "shake", power: 1 });
+}
+
+function endConquest(g: Game): void {
+  g.mode = "normal";
+  for (const id of SHOT_IDS) g.jackpots[id] = false;
+  g.superLit = false;
+  g.stamps = pickStamps(g.pool, g.rand, g.conquests);
+  msg(g, "新しいスタンプ帳", "info", "また8個そろえると、もう一度制覇！", 2200);
+  lightItems(g);
+}
+
+function jackpotShot(g: Game, id: ShotId): boolean {
+  if (g.mode !== "conquest") return false;
+  if (id === "scoop" && g.superLit) {
+    g.superLit = false;
+    addPoints(g, POINTS.superJackpot * g.conquests, SHOT_AT.scoop, "epic");
+    g.stats.jackpots += 1;
+    msg(g, "スーパージャックポット！", "epic", undefined, 2600);
+    sfx(g, "superJackpot");
+    g.fx.push({ type: "shake", power: 1 });
+    for (const s of SHOT_IDS) g.jackpots[s] = s !== "scoop";
+    return true;
+  }
+  if (!g.jackpots[id]) return false;
+  g.jackpots[id] = false;
+  g.jackpotsMade += 1;
+  g.stats.jackpots += 1;
+  addPoints(g, POINTS.jackpot * g.conquests, SHOT_AT[id], "epic");
+  sfx(g, "jackpot");
+  g.fx.push({ type: "shake", power: 0.6 });
+  if (SHOT_IDS.every((s) => !g.jackpots[s])) {
+    g.superLit = true;
+    openScoop(g);
+    msg(g, "ジャックポット！", "epic", "スーパージャックポット点灯！ ガチャ穴をねらえ", 2400);
+  } else {
+    msg(g, "ジャックポット！", "epic", undefined, 1600);
+  }
+  return true;
+}
+
+/* ---------- ショット ---------- */
+
+function majorShot(g: Game, id: ShotId): void {
+  const window = COMBO_WINDOW_SEC + (g.clock < g.comboAddUntil ? g.comboAdd : 0);
+  g.combo = g.clock - g.lastMajorAt <= window ? Math.min(MAX_COMBO, g.combo + 1) : 1;
+  g.lastMajorAt = g.clock;
+  g.stats.maxCombo = Math.max(g.stats.maxCombo, g.combo);
+  g.skillShotArmed = false;
+  g.skillLane = -1;
+
+  const at = SHOT_AT[id];
+  if (id === "leftOrbit" || id === "rightOrbit") {
+    addPoints(g, POINTS.orbit * g.combo, at, "good");
+    g.perBall.orbits += 1;
+    g.stats.orbits += 1;
+    sfx(g, "orbit", g.combo);
+  } else if (id === "leftRamp" || id === "rightRamp") {
+    addPoints(g, POINTS.ramp * g.combo, at, "good");
+    g.perBall.ramps += 1;
+    g.stats.ramps += 1;
+    sfx(g, "rampDone", g.combo);
+  } else {
+    addPoints(g, POINTS.scoop * g.combo, at, "good");
+    sfx(g, "scoop");
+  }
+  g.fx.push({ type: "flash", id: `shot:${id}` });
+  if (g.combo >= 2) {
+    msg(g, `${g.combo}コンボ！`, g.combo >= 4 ? "great" : "good", undefined, 1100);
+    sfx(g, "combo", g.combo);
+  }
+
+  jackpotShot(g, id);
+}
+
+/* ---------- ガチャ穴 ---------- */
+
+function gachaAward(g: Game): void {
+  const hasLit = g.stamps.some((s) => s.spot !== null && !s.collected);
+  const canCall = g.mode === "normal" && g.stamps.some((s) => !s.collected && s.spot === null);
+  const candidates = GACHA_AWARDS.filter((a) => {
+    if (a.id === "kickback") return !(g.kickbackLit[0] && g.kickbackLit[1]);
+    if (a.id === "extraBall") return g.extraBallsAwarded < 1;
+    if (a.id === "stamp") return hasLit && g.mode === "normal";
+    if (a.id === "call") return canCall;
+    return true;
+  });
+  const total = candidates.reduce((sum, a) => sum + a.weight, 0);
+  let r = g.rand() * total;
+  let award: GachaAwardId = "points50k";
+  for (const a of candidates) {
+    r -= a.weight;
+    if (r < 0) {
+      award = a.id;
+      break;
+    }
+  }
+  const label = GACHA_AWARDS.find((a) => a.id === award)!.label;
+  g.fx.push({ type: "gacha", label });
+  sfx(g, "gacha");
+  switch (award) {
+    case "points50k":
+      addPoints(g, 50000, SHOT_AT.scoop, "great");
+      break;
+    case "points100k":
+      addPoints(g, 100000, SHOT_AT.scoop, "great");
+      break;
+    case "save":
+      g.saveUntil = Math.max(g.saveUntil, g.clock + 10);
+      break;
+    case "kickback":
+      if (!g.kickbackLit[0]) g.kickbackLit[0] = true;
+      else g.kickbackLit[1] = true;
+      break;
+    case "bonusx":
+      g.bonusX = Math.min(MAX_BONUS_X, g.bonusX + 1);
+      break;
+    case "call":
+      g.extraLit += 1;
+      lightItems(g);
+      break;
+    case "stamp": {
+      const index = g.stamps.findIndex((s) => s.spot !== null && !s.collected);
+      if (index >= 0) collectItem(g, index);
+      break;
+    }
+    case "extraBall":
+      awardExtraBall(g);
+      break;
+  }
+  msg(g, "ガチャ！", "great", label, 2000);
+}
+
+function awardExtraBall(g: Game): void {
+  if (g.extraBallsAwarded >= MAX_EXTRA_BALLS) return;
+  g.extraBallsAwarded += 1;
+  g.extraBalls += 1;
+  msg(g, "エクストラボール！", "epic", "このボールのあと、もう1回あそべる", 2400);
+  sfx(g, "extraBall");
+}
+
+/* ---------- 起きたことの処理 ---------- */
+
+function sideOf(id: string): 0 | 1 {
+  return id.endsWith("Right") ? 1 : 0;
+}
+
+function findBall(g: Game, id: number): Ball | undefined {
+  return g.world.balls.find((b) => b.id === id);
+}
+
+function cancelSkillShot(g: Game): void {
+  if (g.skillShotArmed && g.phase === "play") {
+    g.skillShotArmed = false;
+    g.skillLane = -1;
+  }
+}
+
+function handleEvent(g: Game, e: PhysEvent): void {
+  switch (e.type) {
+    case "bumper": {
+      const value = addPoints(g, POINTS.bumper * bumperMult(g));
+      g.fx.push({ type: "pop", x: e.x, y: e.y - 30, text: `+${value.toLocaleString("ja-JP")}`, tone: bumperMult(g) > 1 ? "great" : "info" });
+      g.fx.push({ type: "flash", id: `bumper:${e.index}` });
+      g.perBall.bumpers += 1;
+      g.stats.bumpers += 1;
+      sfx(g, "bumper", e.index);
+      cancelSkillShot(g);
+      break;
+    }
+    case "sling":
+      addPoints(g, POINTS.sling);
+      g.fx.push({ type: "flash", id: `sling:${e.index}` });
+      sfx(g, "sling", e.index);
+      break;
+    case "drop": {
+      addPoints(g, POINTS.drop, TABLE.drops[e.index] ? { x: (TABLE.drops[e.index]!.a.x + TABLE.drops[e.index]!.b.x) / 2, y: 530 } : undefined);
+      g.perBall.drops += 1;
+      sfx(g, "drop", e.index);
+      if (g.world.dropsUp.every((up) => !up)) {
+        addPoints(g, POINTS.dropsAll, { x: 240, y: 500 }, "good");
+        sfx(g, "dropsAll");
+        if (!g.kickbackLit[0]) {
+          g.kickbackLit[0] = true;
+          msg(g, "ガチャ穴オープン！", "good", "キックバック点灯", 1600);
+        } else {
+          msg(g, "ガチャ穴オープン！", "good", undefined, 1400);
+        }
+      }
+      cancelSkillShot(g);
+      break;
+    }
+    case "hit":
+      sfx(g, e.mat === "rubber" || e.mat === "post" ? "rubber" : "metal", Math.min(1, e.speed / 3000), e.x);
+      break;
+    case "flipperHit":
+      if (e.speed > 900) sfx(g, "flipperHit", Math.min(1, e.speed / 3500));
+      break;
+    case "ballBall":
+      sfx(g, "ballBall", Math.min(1, e.speed / 2500));
+      break;
+    case "sensor":
+      handleSensor(g, e);
+      break;
+    case "rampEnter":
+      sfx(g, "rampUp");
+      cancelSkillShot(g);
+      break;
+    case "rampTop":
+      break;
+    case "rampDone":
+      majorShot(g, e.id === "left" ? "leftRamp" : "rightRamp");
+      break;
+    case "rampFail":
+      sfx(g, "rampFail");
+      break;
+    case "scoop": {
+      const ball = findBall(g, e.ballId);
+      if (!ball) break;
+      g.scoopBall = ball;
+      g.scoopEjectAt = g.clock + 1.9;
+      majorShot(g, "scoop");
+      gachaAward(g);
+      break;
+    }
+    case "drain":
+      handleDrain(g, e.ballId);
+      break;
+    case "stuck":
+      break;
+  }
+}
+
+function handleSensor(g: Game, e: Extract<PhysEvent, { type: "sensor" }>): void {
+  switch (e.id) {
+    case "lane0":
+    case "lane1":
+    case "lane2":
+    case "lane3": {
+      const i = Number(e.id.slice(4));
+      if (g.skillShotArmed && g.phase === "play") {
+        if (i === g.skillLane) {
+          g.stats.skillShots += 1;
+          addPoints(g, POINTS.skillShot, { x: TABLE.laneX[i]!, y: TABLE.laneY + 40 }, "epic");
+          msg(g, "スキルショット！", "epic", `「${"おでかけ"[i]}」のレーンにぴったり`, 2000);
+          sfx(g, "skillShot");
+        }
+        g.skillShotArmed = false;
+        g.skillLane = -1;
+      }
+      if (!g.lanes[i]) {
+        g.lanes[i] = true;
+        addPoints(g, POINTS.lane, { x: TABLE.laneX[i]!, y: TABLE.laneY + 30 });
+        sfx(g, "lane", i);
+        if (g.lanes.every(Boolean)) {
+          g.bonusX = Math.min(MAX_BONUS_X, g.bonusX + 1);
+          addPoints(g, POINTS.lanesAll, { x: 240, y: 190 }, "good");
+          msg(g, "おでかけ完成！", "good", `ボーナス ×${g.bonusX}`, 1600);
+          sfx(g, "lanesAll");
+          g.fx.push({ type: "flash", id: "lanes" });
+          g.lanes = [false, false, false, false];
+        }
+      } else {
+        addPoints(g, POINTS.lane / 3);
+        sfx(g, "lane", i);
+      }
+      break;
+    }
+    case "spinner": {
+      const speed = Math.hypot(e.vx, e.vy);
+      const spins = Math.max(1, Math.min(24, Math.round(speed / 220)));
+      addPoints(g, POINTS.spinner * spins, { x: 24, y: 380 });
+      sfx(g, "spinner", spins);
+      g.fx.push({ type: "flash", id: `spinner:${spins}` });
+      cancelSkillShot(g);
+      break;
+    }
+    case "orbitLeftMouth":
+    case "orbitRightMouth":
+      if (e.vy < 0 && g.clock - (g.kickedAt.get(e.ballId) ?? -99) > 1.5) {
+        g.orbitEnter.set(e.ballId, { side: e.id === "orbitLeftMouth" ? "left" : "right", at: g.clock });
+      }
+      break;
+    case "orbitTop": {
+      const enter = g.orbitEnter.get(e.ballId);
+      g.orbitEnter.delete(e.ballId);
+      if (!enter || g.clock - enter.at > 2.6) break;
+      if (enter.side === "left" && e.vx > 0) majorShot(g, "leftOrbit");
+      else if (enter.side === "right" && e.vx < 0) majorShot(g, "rightOrbit");
+      break;
+    }
+    case "inlaneLeft":
+    case "inlaneRight":
+      if (e.vy > 0) {
+        addPoints(g, POINTS.inlane);
+        sfx(g, "inlane");
+      }
+      break;
+    case "outlaneLeft":
+    case "outlaneRight":
+      if (e.vy > 0) {
+        addPoints(g, POINTS.outlane);
+        sfx(g, "outlane");
+      }
+      break;
+    case "kickbackLeft":
+    case "kickbackRight": {
+      const side = sideOf(e.id);
+      const ball = findBall(g, e.ballId);
+      if (e.vy > 0 && ball && g.kickbackLit[side]) {
+        kickback(g.world, ball);
+        g.kickedAt.set(ball.id, g.clock);
+        g.kickbackLit[side] = false;
+        addPoints(g, POINTS.kickback);
+        msg(g, "キックバック！", "good", undefined, 1100);
+        sfx(g, "kickback");
+        g.fx.push({ type: "flash", id: `kickback:${side}` });
+      }
+      break;
+    }
+    case "shooterExit":
+      break;
+  }
+}
+
+function handleDrain(g: Game, ballId: number): void {
+  g.orbitEnter.delete(ballId);
+  const wasInPlay = g.inPlay.has(ballId);
+  g.inPlay.delete(ballId);
+  if (g.phase === "bonus" || g.phase === "over") return;
+  if (g.clock < g.saveUntil && wasInPlay) {
+    g.stats.saves += 1;
+    msg(g, "ボールセーブ！", "good", "ボールが戻ってくるよ", 1300);
+    sfx(g, "save");
+    queueLaunch(g, 0.8);
+    return;
+  }
+  sfx(g, "drain");
+  if (g.world.balls.length > 0 || g.launchQueue.length > 0) return;
+  endOfBall(g);
+}
+
+function endOfBall(g: Game): void {
+  const p = g.perBall;
+  const raw = p.items * BONUS.item + p.ramps * BONUS.ramp + p.orbits * BONUS.orbit + p.bumpers * BONUS.bumper + p.drops * BONUS.drop;
+  const bonus = raw * g.bonusX;
+  g.score += bonus;
+  g.lastBonus = bonus;
+  g.phase = "bonus";
+  g.bonusUntil = g.clock + 2.6;
+  g.fx.push({ type: "ballLost", bonus });
+  msg(g, "ボーナス", "info", `${raw.toLocaleString("ja-JP")} × ${g.bonusX} = ${bonus.toLocaleString("ja-JP")}`, 2400);
+  sfx(g, "bonus");
+  g.perBall = { items: 0, ramps: 0, orbits: 0, bumpers: 0, drops: 0 };
+  g.bonusX = 1;
+  g.mults = [];
+  g.bumperMults = [];
+  g.slowUntil = 0;
+  g.gateUntil = 0;
+  g.combo = 0;
+  g.saveUntil = 0;
+  if (g.mode === "conquest") endConquest(g);
+}
+
+function nextBall(g: Game): void {
+  if (g.extraBalls > 0) {
+    g.extraBalls -= 1;
+    msg(g, "もう1回！", "great", "エクストラボール", 1600);
+    serveBall(g);
+    return;
+  }
+  if (g.ball < PINBALL_BALLS) {
+    g.ball += 1;
+    msg(g, `ボール ${g.ball}`, "info", g.ball === PINBALL_BALLS ? "ラストボール！" : undefined, 1400);
+    serveBall(g);
+    return;
+  }
+  g.phase = "over";
+  g.world.flippers[0].pressed = false;
+  g.world.flippers[1].pressed = false;
+  g.fx.push({ type: "gameOver" });
+  sfx(g, "gameOver");
+}
+
+/* ---------- 時間で進むもの ---------- */
+
+function tick(g: Game): void {
+  const { world } = g;
+  world.outlaneGate = g.clock < g.gateUntil ? [true, true] : [false, false];
+  if (g.mults.length) g.mults = g.mults.filter((t) => t.until > g.clock);
+  if (g.bumperMults.length) g.bumperMults = g.bumperMults.filter((t) => t.until > g.clock);
+
+  // 自動の打ち出し（ボールセーブ・マルチボール）
+  if (g.launchQueue.length && g.clock >= g.launchQueue[0]!.at && g.phase !== "bonus" && g.phase !== "over") {
+    const onPlunger = world.balls.find((b) => isOnPlunger(world, b));
+    const inLane = world.balls.some((b) => b.x > 486 && b.y > 300);
+    if (onPlunger && Math.abs(onPlunger.vy) < 30) {
+      const next = g.launchQueue.shift()!;
+      world.plungerPull = 0;
+      releasePlunger(world, next.power);
+      g.started = true;
+      sfx(g, "launch", next.power);
+    } else if (!inLane) {
+      const { x, y } = TABLE.plungerRest;
+      addBall(world, x, y);
+      g.launchQueue[0]!.at = g.clock + 0.4;
+    }
+  }
+
+  // 台に出た玉からボールセーブを始める
+  for (const b of world.balls) {
+    if (g.inPlay.has(b.id) || b.mode !== "field") continue;
+    if (b.x < 480 || b.y < 250) {
+      g.inPlay.add(b.id);
+      if (g.phase === "serve") {
+        g.phase = "play";
+        g.skillShotUntil = g.clock + 5;
+        if (g.saveArmed) {
+          g.saveUntil = Math.max(g.saveUntil, g.clock + BALL_SAVE_SEC);
+          g.saveArmed = false;
+        }
+      }
+    }
+  }
+
+  if (g.skillShotArmed && g.phase === "play" && g.clock > g.skillShotUntil) {
+    g.skillShotArmed = false;
+    g.skillLane = -1;
+  }
+
+  // ガチャ穴から玉を出す（予定に入っていない玉が穴にいたら、念のため出す予定に入れる）
+  if (!g.scoopBall) {
+    const held = world.balls.find((b) => b.mode === "scoop");
+    if (held) {
+      g.scoopBall = held;
+      g.scoopEjectAt = g.clock + 1;
+    }
+  }
+  if (g.scoopBall && g.clock >= g.scoopEjectAt) {
+    const ball = g.scoopBall;
+    g.scoopBall = null;
+    if (ball.mode === "scoop") {
+      ejectScoop(world, ball);
+      sfx(g, "eject");
+      g.dropsResetAt = g.clock + 0.7;
+    }
+  }
+  // ドロップターゲットを立てなおす（スーパージャックポット中は開けたまま）
+  if (g.dropsResetAt && g.clock >= g.dropsResetAt && !g.superLit) {
+    const near = world.balls.some((b) => b.mode === "field" && b.y > 515 && b.y < 575 && b.x > 195 && b.x < 285);
+    if (near) {
+      g.dropsResetAt = g.clock + 0.3;
+    } else {
+      world.dropsUp = world.dropsUp.map(() => true);
+      g.dropsResetAt = 0;
+    }
+  }
+
+  if (g.mode === "conquest" && g.launchQueue.length === 0 && world.balls.length <= 1 && g.phase === "play") {
+    const inPlayBalls = world.balls.filter((b) => g.inPlay.has(b.id) || b.mode !== "field");
+    if (inPlayBalls.length <= 1) endConquest(g);
+  }
+
+  if (g.phase === "bonus" && g.clock >= g.bonusUntil) nextBall(g);
+}
+
+/* ---------- 1フレーム ---------- */
+
+/**
+ * dtReal 秒（実際の時間）ぶん進める。スロー中は台の時間がゆっくり進む。
+ * 画面が重くて遅れたぶんは、追いつこうとせずに捨てる（玉がワープしないように）。
+ */
+export function stepGame(g: Game, dtReal: number): void {
+  if (g.phase === "over") return;
+  const dt = Math.min(0.05, Math.max(0, dtReal));
+  g.clock += dt;
+  if (g.started) g.playTime += dt;
+  const scale = g.clock < g.slowUntil ? SLOW_SCALE : 1;
+  g.simAcc += dt * scale;
+  let steps = Math.floor(g.simAcc / STEP);
+  if (steps > 60) {
+    steps = 60;
+    g.simAcc = 0;
+  } else {
+    g.simAcc -= steps * STEP;
+  }
+  for (let i = 0; i < steps; i += 1) {
+    stepWorld(g.world, 1);
+    if (g.world.events.length) {
+      const events = g.world.events;
+      g.world.events = [];
+      for (const e of events) handleEvent(g, e);
+    }
+    if (g.mode === "normal" && g.phase !== "bonus") checkPickups(g);
+  }
+  relocateItems(g);
+  tick(g);
+}
+
+/** 演出を取り出す（取り出したぶんは消える） */
+export function takeFx(g: Game): GameFx[] {
+  const out = g.fx;
+  g.fx = [];
+  return out;
+}

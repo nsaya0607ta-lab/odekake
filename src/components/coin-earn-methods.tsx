@@ -18,7 +18,8 @@ import {
   BLUE_OSANPO_MISSION,
   BLUE_OSANPO_MISSION_ALL,
 } from "@/lib/blue-coin-rewards";
-import { BlueCoinArt } from "./coin-art";
+import { RED_COIN_MAX, RED_COIN_POINTS } from "@/lib/games/pinball/config";
+import { BlueCoinArt, RedCoinArt } from "./coin-art";
 import { IconChevronDown, IconCoin } from "./icons";
 
 /** コインの取得方法をまとめて表示する折りたたみ。 */
@@ -129,6 +130,21 @@ export function CoinEarnMethods() {
           </div>
           <p className="mt-2 text-[10px] leading-relaxed text-[#3D6FB0]">
             はじめての場所は、訪問を登録したときに1か所につき1回だけもらえます。ログインは1日目からの通算日数で数え、休んでもへりません。おさんぽフレンチーは、スコアに応じてもらえます。
+          </p>
+        </div>
+
+        <div className="rounded-2xl border border-[#F2C4BF] bg-[linear-gradient(135deg,#FFF4F2,#FCE3DF)] p-2.5">
+          <p className="flex items-center gap-1 font-bold text-[#9C2B31]">
+            <RedCoinArt className="h-3.5 w-3.5" />
+            赤コイン（使いみちは準備中・ためておけます）
+          </p>
+          <div className="mt-1.5 flex flex-wrap gap-1.5">
+            <span className="flex items-center gap-1 rounded-full bg-white/80 px-2 py-1 tabular-nums text-[#9C2B31]">
+              ご当地ピンボール {RED_COIN_POINTS.toLocaleString("ja-JP")}点ごと <RedCoinArt className="h-[11px] w-[11px]" />+1
+            </span>
+          </div>
+          <p className="mt-2 text-[10px] leading-relaxed text-[#B0464C]">
+            1プレイで{RED_COIN_MAX.toLocaleString("ja-JP")}枚までもらえます。ご当地アイテムをたくさん集めるほど、台のスキルが強くなってたまりやすくなります。
           </p>
         </div>
       </div>
