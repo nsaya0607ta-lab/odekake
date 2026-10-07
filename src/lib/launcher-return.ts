@@ -15,11 +15,11 @@ const STATE_KEY = "odekakeHomePage";
 
 export type LaunchReturn = { path: string; id: string; t: number };
 
-/** いまのホームのページを履歴に書いておく（ほかのページから戻ってきたとき、そのページで開く） */
+/** いまのホームのページを履歴に書いておく（ほかのページから戻ってきたとき、そのページで開く）。0 はホーム、1 から先はアプリの画面の何枚目か */
 export function rememberHomePage(page: number) {
   try {
     const state = (window.history.state ?? {}) as Record<string, unknown>;
-    const value = page === 1 ? 1 : 0;
+    const value = Number.isInteger(page) && page > 0 ? page : 0;
     if ((state[STATE_KEY] ?? 0) === value) return;
     window.history.replaceState({ ...state, [STATE_KEY]: value }, "");
   } catch {
@@ -37,12 +37,14 @@ export function homePageToRestore(): number {
     // 読めなければ履歴だけを見る
   }
   const state = window.history.state as Record<string, unknown> | null;
-  return open || state?.[STATE_KEY] === 1 ? 1 : 0;
+  const saved = state?.[STATE_KEY];
+  if (typeof saved === "number" && Number.isInteger(saved) && saved > 0) return saved;
+  return open ? 1 : 0;
 }
 
 /** アプリの画面からアプリ（ページ）を開くとき */
-export function markLaunch(id: string, href: string) {
-  rememberHomePage(1);
+export function markLaunch(id: string, href: string, page = 1) {
+  rememberHomePage(page);
   try {
     const path = new URL(href, window.location.href).pathname;
     window.sessionStorage.setItem(KEY, JSON.stringify({ path, id, t: Date.now() } satisfies LaunchReturn));

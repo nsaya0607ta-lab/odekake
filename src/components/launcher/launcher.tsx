@@ -117,36 +117,48 @@ function Tile({ item, size }: { item: LauncherItem; size: number }) {
 
 /* ------------------------------------------------------------------ 並べ方 */
 
-type Geometry = { pad: number; cellW: number; icon: number; rowH: number; width: number };
+/**
+ * rows：1ページに入る段の数（1枚目は上の2段がウィジェット）。page：1ページの幅（画面の幅。ページは横にこの幅ずつならぶ）
+ */
+type Geometry = { pad: number; cellW: number; icon: number; rowH: number; width: number; rows: number; page: number };
 
 /** 下の「検索」とページの点のぶん（いちばん下のアイコンの文字から、ここまでは空ける） */
 const BOTTOM_STACK = 36 + 10 + 17;
 const BOTTOM_GAP = 22;
 
 /**
- * アイコンの大きさと段の高さ。avail（ウィジェットの上はしから、下の「検索」の上の余白まで）に
- * rows 段が収まるように、まず段のあいだをつめ、それでも入らなければアイコンを少し小さくする
+ * アイコンの大きさと段の高さ。アイコンはいつもの大きさのまま、avail（ウィジェットの上はしから、
+ * 下の「検索」の上の余白まで）に入るだけの段をならべる。入りきらないアイコンは次のページへ（iPhone と同じ）
  */
-function geometryFor(width: number, avail?: number | null, rows?: number): Geometry {
+function geometryFor(width: number, avail: number | null, page: number): Geometry {
   const pad = Math.max(14, Math.round(width * 0.045));
   const cellW = (width - pad * 2) / 4;
-  let icon = Math.min(66, Math.round(cellW * 0.72));
+  const icon = Math.min(66, Math.round(cellW * 0.72));
   let rowH = icon + 33;
-  if (avail && rows && rows > 1) {
-    // いちばん下の段は、アイコンと名前（約20px）だけ
-    const fit = (i: number) => Math.floor((avail - i - 20) / (rows - 1));
-    rowH = Math.min(icon + 33, fit(icon));
-    if (rowH < icon + 27) {
-      icon = Math.max(40, Math.min(icon, Math.floor((avail - 20 - 25 * (rows - 1)) / rows)));
-      rowH = Math.max(icon + 24, Math.min(icon + 33, fit(icon)));
-    }
+  let rows = 6;
+  if (avail) {
+    // いちばん下の段は、アイコンと名前（約20px）だけ。段のあいだは icon+27 まではつめてよい
+    rows = Math.max(3, Math.floor((avail - icon - 20) / (icon + 27)) + 1);
+    rowH = Math.min(icon + 33, Math.floor((avail - icon - 20) / (rows - 1)));
   }
-  return { pad, cellW, icon, rowH, width };
+  return { pad, cellW, icon, rowH, width, rows, page };
 }
 
-/** ウィジェットが上の2段（8マス）を使うので、アプリは9マス目から */
+/** ウィジェットが1枚目の上の2段（8マス）を使う */
 const WIDGET_SLOTS = 8;
-const slotXY = (g: Geometry, slot: number) => ({ x: g.pad + (slot % 4) * g.cellW, y: Math.floor(slot / 4) * g.rowH });
+/** 1枚目・2枚目から先に入るアイコンの数 */
+const firstCap = (g: Geometry) => (g.rows - 2) * 4;
+const pageCap = (g: Geometry) => g.rows * 4;
+const pagesFor = (g: Geometry, count: number) => 1 + (count > firstCap(g) ? Math.ceil((count - firstCap(g)) / pageCap(g)) : 0);
+/** i 番目のアイコンが何枚目のどのマスか */
+const placeOf = (g: Geometry, i: number) => (i < firstCap(g) ? { page: 0, slot: i + WIDGET_SLOTS } : { page: 1 + Math.floor((i - firstCap(g)) / pageCap(g)), slot: (i - firstCap(g)) % pageCap(g) });
+/** i 番目のアイコンの場所（アイコンの並びの左上から） */
+const posOf = (g: Geometry, i: number) => {
+  const { page, slot } = placeOf(g, i);
+  return { x: page * g.page + g.pad + (slot % 4) * g.cellW, y: Math.floor(slot / 4) * g.rowH };
+};
+/** lp 枚目の slot マス目は何番目のアイコンか */
+const indexAt = (g: Geometry, lp: number, slot: number) => (lp === 0 ? slot - WIDGET_SLOTS : firstCap(g) + (lp - 1) * pageCap(g) + slot);
 
 /** 開いたフォルダの大きさと場所 */
 function folderGeometry(appCount: number, g: Geometry, height: number) {
@@ -186,6 +198,7 @@ export function Launcher({
   returnFrom,
   onBlockSwipe,
   onGoPage,
+  onAppPages,
 }: {
   options: LauncherOptions;
   data: LauncherData;
@@ -197,6 +210,8 @@ export function Launcher({
   /** 長押し・並べかえ・フォルダのあいだは、ページの横スワイプを止める */
   onBlockSwipe: (blocked: boolean) => void;
   onGoPage: (page: number) => void;
+  /** アプリの画面が何枚になったか */
+  onAppPages: (pages: number) => void;
 }) {
   const router = useRouter();
   const hw = useHomeWeather();
@@ -248,6 +263,7 @@ export function Launcher({
   fdragRef.current = fdrag;
   mergeRef.current = merge;
   const mergeTimer = useRef(0);
+  const edgeTimer = useRef<{ dir: number; timer: number } | null>(null);
   const reorderTimer = useRef<{ idx: number; timer: number } | null>(null);
 
   /** 並びとフォルダ（非表示のものもふくめた全部）を覚える */
@@ -351,22 +367,26 @@ export function Launcher({
     const next = Math.floor(bottom.bottom - BOTTOM_STACK - BOTTOM_GAP - grid.top);
     setAvail((cur) => (cur === next ? cur : next));
   }, [width, height]);
-  const rows = 2 + Math.ceil(items.length / 4);
-  const roomy = geometryFor(width, avail, rows);
-  // 小さな画面で、それでも入らないときは「検索」を出さず、そのぶん下まで使う（編集中のボタンは、ページの点の横に小さく）
-  const compact = avail != null && (rows - 1) * roomy.rowH + roomy.icon + 20 > avail;
-  const g = compact ? geometryFor(width, (avail ?? 0) + 36 + 10, rows) : roomy;
+  const screenW = typeof window === "undefined" ? width : window.innerWidth;
+  const g = geometryFor(width, avail, screenW);
+  const appPages = pagesFor(g, items.length);
+  useEffect(() => onAppPages(appPages), [appPages, onAppPages]);
+  /** いま見ている、アプリの画面の何枚目か（0 から） */
+  const lp = Math.max(0, Math.min(appPages - 1, page - 1));
+  const lpRef = useRef(lp);
+  lpRef.current = lp;
   const blocked = Boolean(menu || folder || search || drag || fdrag || launch || alert || screenMenu || hiddenSheet || weatherOpen);
   useEffect(() => onBlockSwipe(blocked), [blocked, onBlockSwipe]);
 
   // アプリの画面からはなれたら、編集・メニューなどはおしまい
+  const onLauncher = page >= 1 && page <= appPages;
   useEffect(() => {
-    if (page === 1) return;
+    if (onLauncher) return;
     setEditing(false);
     setMenu(null);
     setSearch(false);
     setScreenMenu(null);
-  }, [page]);
+  }, [onLauncher]);
 
   /* ---------------------------------------------------------- 開く・もどる */
 
@@ -380,7 +400,7 @@ export function Launcher({
         else window.location.assign(href);
         return;
       }
-      markLaunch(app.id, href);
+      markLaunch(app.id, href, 1 + lpRef.current);
       router.prefetch(href);
       setLaunch({ app, rect: el ? rectOf(el) : null, grown: false });
       setSearch(false);
@@ -482,7 +502,7 @@ export function Launcher({
       const index = at?.index ?? itemsRef.current.findIndex((item) => item.id === id);
       if (!grid || index < 0) return;
       const box = grid.getBoundingClientRect();
-      const pos = slotXY(g, index + WIDGET_SLOTS);
+      const pos = posOf(g, index);
       const dx = at?.dx ?? clientX - box.left - pos.x;
       const dy = at?.dy ?? clientY - box.top - pos.y;
       setEditing(true);
@@ -557,12 +577,40 @@ export function Launcher({
     setDrag({ ...d, x, y });
     const list = itemsRef.current;
     const from = list.findIndex((item) => item.id === d.id);
+    // 画面のはしで少し止まったら、となりのページへ（iPhone と同じ）
+    const edge = e.clientX > window.innerWidth - 26 ? 1 : e.clientX < 26 ? -1 : 0;
+    const next = lpRef.current + edge;
+    if (edge && next >= 0 && next < pagesFor(g, list.length + (edge > 0 ? 1 : 0))) {
+      if (edgeTimer.current?.dir !== edge) {
+        if (edgeTimer.current) window.clearTimeout(edgeTimer.current.timer);
+        const at = { pointerId: e.pointerId, clientX: e.clientX, clientY: e.clientY };
+        edgeTimer.current = {
+          dir: edge,
+          timer: window.setTimeout(() => {
+            edgeTimer.current = null;
+            onGoPage(1 + lpRef.current + edge);
+            // ページがすべっているあいだも、持っているアイコンが指の下についてくるように
+            const until = performance.now() + 650;
+            const follow = () => {
+              if (!dragRef.current || performance.now() > until) return;
+              dragHandlers.current.move(at as PointerEvent);
+              requestAnimationFrame(follow);
+            };
+            requestAnimationFrame(follow);
+          }, 550),
+        };
+      }
+    } else if (edgeTimer.current) {
+      window.clearTimeout(edgeTimer.current.timer);
+      edgeTimer.current = null;
+    }
     const cx = x + g.cellW / 2, cy = y + g.icon / 2;
-    const col = Math.max(0, Math.min(3, Math.floor((cx - g.pad) / g.cellW)));
-    const row = Math.max(2, Math.floor(cy / g.rowH));
-    const idx = Math.max(0, Math.min(list.length - 1, row * 4 + col - WIDGET_SLOTS));
+    const here = lpRef.current;
+    const col = Math.max(0, Math.min(3, Math.floor((cx - here * g.page - g.pad) / g.cellW)));
+    const row = Math.max(here === 0 ? 2 : 0, Math.min(g.rows - 1, Math.floor(cy / g.rowH)));
+    const idx = Math.max(0, Math.min(list.length - 1, indexAt(g, here, row * 4 + col)));
     const target = list[idx];
-    const tp = slotXY(g, idx + WIDGET_SLOTS);
+    const tp = posOf(g, idx);
     const near = Math.abs(cx - (tp.x + g.cellW / 2)) < g.icon * 0.36 && Math.abs(cy - (tp.y + g.icon / 2)) < g.icon * 0.38;
     // アイコンのまん中に重ねたら：少し待ってフォルダにする用意（重ねる相手が大きくなる）
     if (target && idx !== from && near && list[from]?.kind === "app") {
@@ -609,6 +657,8 @@ export function Launcher({
     const d = dragRef.current;
     if (!d || e.pointerId !== d.pointerId) return;
     clearReorder();
+    if (edgeTimer.current) window.clearTimeout(edgeTimer.current.timer);
+    edgeTimer.current = null;
     window.clearTimeout(mergeTimer.current);
     const m = mergeRef.current;
     setMerge(null);
@@ -745,7 +795,7 @@ export function Launcher({
   /* ---------------------------------------------------------- 描く */
 
   const cellStyle = (slot: number, override?: { x: number; y: number }): CSSProperties => {
-    const { x, y } = override ?? slotXY(g, slot);
+    const { x, y } = override ?? posOf(g, slot);
     return { width: g.cellW, transform: `translate3d(${x}px, ${y}px, 0)` };
   };
 
@@ -839,7 +889,7 @@ export function Launcher({
 
   return (
     <div className={styles.grid} style={ROOT_VARS}>
-      <div className={styles.scrim} />
+      <div className={styles.scrim} style={{ transform: "translate3d(var(--pageX, 0px), 0, 0)" }} />
       <div
         ref={gridRef}
         className={styles.grid}
@@ -867,13 +917,13 @@ export function Launcher({
           onLong={openScreenMenu}
         />
 
-        {items.map((item, index) => cell(item, index + WIDGET_SLOTS))}
+        {items.map((item, index) => cell(item, index))}
       </div>
 
       {/* 検索（編集中は「再表示」「完了」）とページの点 */}
-      <div ref={bottomRef} className={styles.bottom} style={{ bottom: "calc(var(--nav-height) + var(--safe-bottom) + 12px)" }}>
-        {compact && !editing ? null : editing ? (
-          <div className={styles.editBar} data-compact={compact ? "true" : undefined}>
+      <div ref={bottomRef} className={styles.bottom} style={{ bottom: "calc(var(--nav-height) + var(--safe-bottom) + 12px)", transform: "translate3d(var(--pageX, 0px), 0, 0)" }}>
+        {editing ? (
+          <div className={styles.editBar}>
             {hidden.length ? (
               <button type="button" className={styles.glassPill} onClick={() => setHiddenSheet(true)}>
                 <EyeGlyph size={16} />
@@ -893,7 +943,7 @@ export function Launcher({
         )}
         <div className={styles.dots} role="tablist" aria-label="ページ" style={{ pointerEvents: "auto" }}>
           {Array.from({ length: pageCount }, (_, i) => (
-            <button key={i} type="button" role="tab" aria-selected={page === i} aria-label={i === 0 ? "ホーム" : i === 1 ? "アプリ" : "背景"} className={styles.dot} data-on={page === i} onClick={() => onGoPage(i)} style={{ border: 0, padding: 0 }} />
+            <button key={i} type="button" role="tab" aria-selected={page === i} aria-label={i === 0 ? "ホーム" : i <= appPages ? `アプリ ${i}ページ目` : "背景"} className={styles.dot} data-on={page === i} onClick={() => onGoPage(i)} style={{ border: 0, padding: 0 }} />
           ))}
         </div>
       </div>
