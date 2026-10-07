@@ -2,7 +2,7 @@
 
 /**
  * ホームを横にスワイプして、ページを切りかえる（iPhone のホーム画面と同じさわり心地）。
- *   0: ホーム（いつもの画面） → 1: アプリの画面（launcher.tsx） → 2: 背景をながめる（背景を変えているときだけ）
+ *   0: ホーム（いつもの画面） → 1〜: アプリの画面（launcher.tsx。入りきらなければ2枚目、3枚目…） → 最後: 背景をながめる（背景を変えているときだけ）
  *
  * - 指に吸いつくように動き、はしでは引っぱるほど重くなる（ゴムのような手ごたえ）
  * - はなすと、指の速さを引きついだバネの動きで、となりのページへ（1回で動くのは1ページまで）
@@ -41,8 +41,13 @@ const rubber = (over: number, dim: number) => (1 - 1 / ((Math.abs(over) * 0.55) 
 
 export function HomePager({ data, sns, memoryGame, gaze }: { data: LauncherData; sns: boolean; memoryGame: boolean; gaze: boolean }) {
   const pathname = usePathname();
-  const pageCount = gaze ? 3 : 2;
+  /** アプリの画面の枚数（アイコンの数と画面の高さで決まる。launcher.tsx から教えてもらう） */
+  const [appPages, setAppPages] = useState(1);
+  const appPagesRef = useRef(1);
+  appPagesRef.current = appPages;
+  const pageCount = 1 + appPages + (gaze ? 1 : 0);
   const maxPage = pageCount - 1;
+  const gazePage = gaze ? 1 + appPages : -1;
   const [page, setPage] = useState(0);
   const [visible, setVisible] = useState(false);
   const [hint, setHint] = useState(false);
@@ -80,7 +85,7 @@ export function HomePager({ data, sns, memoryGame, gaze }: { data: LauncherData;
           el.style.setProperty("pointer-events", "none");
         }
         // 背景のページへ向かうほど、下のナビを消す
-        const fade = Math.max(0, Math.min(1, p - 1));
+        const fade = Math.max(0, Math.min(1, p - appPagesRef.current));
         if (nav) {
           nav.style.setProperty("opacity", String(1 - fade), "important");
           nav.style.setProperty("transform", `translate3d(0,${fade * 24}px,0)`, "important");
@@ -88,8 +93,11 @@ export function HomePager({ data, sns, memoryGame, gaze }: { data: LauncherData;
         }
       }
       if (launcher) {
+        const last = appPagesRef.current;
         launcher.style.transform = `translate3d(${(1 - p) * w}px,0,0)`;
-        launcher.style.visibility = p > 0.001 && p < 1.999 ? "visible" : "hidden";
+        // 下の検索とページの点は、アプリの画面のページをめくっても動かない（iPhone と同じ）
+        launcher.style.setProperty("--pageX", `${Math.max(0, Math.min(last - 1, p - 1)) * w}px`);
+        launcher.style.visibility = p > 0.001 && p < last + 0.999 ? "visible" : "hidden";
       }
     },
     [],
@@ -117,7 +125,7 @@ export function HomePager({ data, sns, memoryGame, gaze }: { data: LauncherData;
           anim.current = null;
           setPage(target);
           setVisible(target > 0);
-          rememberHomePage(target);
+          rememberHomePage(target <= appPagesRef.current ? target : 0);
           return;
         }
         apply(x);
@@ -134,11 +142,12 @@ export function HomePager({ data, sns, memoryGame, gaze }: { data: LauncherData;
   useLayoutEffect(() => {
     const launched = readLaunch();
     clearLaunch();
-    if (homePageToRestore() !== 1) return;
+    const restore = homePageToRestore();
+    if (restore < 1) return;
     setReturnFrom(launched?.id ?? null);
     setVisible(true);
-    setPage(1);
-    apply(1);
+    setPage(restore);
+    apply(restore);
   }, [apply]);
 
   useEffect(() => {
@@ -159,11 +168,11 @@ export function HomePager({ data, sns, memoryGame, gaze }: { data: LauncherData;
 
   // 背景のページに来たら、少しだけ案内を出す
   useEffect(() => {
-    if (page !== 2) return;
+    if (page !== gazePage) return;
     setHint(true);
     const id = window.setTimeout(() => setHint(false), 2600);
     return () => window.clearTimeout(id);
-  }, [page]);
+  }, [page, gazePage]);
 
   // 横スワイプ
   useEffect(() => {
@@ -304,6 +313,20 @@ export function HomePager({ data, sns, memoryGame, gaze }: { data: LauncherData;
   }, [pathname, apply]);
   useEffect(() => () => apply(0), [apply]);
 
+  // アプリの画面の枚数が変わったら（アイコンを非表示にした・ページの外へ出たときなど）、はみ出したページから戻す
+  const onAppPages = useCallback(
+    (n: number) => {
+      const pages = Math.max(1, n);
+      if (pages === appPagesRef.current) return;
+      appPagesRef.current = pages;
+      setAppPages(pages);
+      const max = pages + (gaze ? 1 : 0);
+      if (!anim.current && pos.current > max) springTo(max);
+      else if (!anim.current && pos.current > 0) apply(pos.current);
+    },
+    [gaze, springTo, apply],
+  );
+
   const onBlockSwipe = useCallback((b: boolean) => {
     blocked.current = b;
   }, []);
@@ -319,7 +342,7 @@ export function HomePager({ data, sns, memoryGame, gaze }: { data: LauncherData;
         aria-label="アプリ"
       >
         {visible || warm ? (
-          <Launcher options={options} data={data} page={page} pageCount={pageCount} returnFrom={returnFrom} onBlockSwipe={onBlockSwipe} onGoPage={goPage} />
+          <Launcher options={options} data={data} page={page} pageCount={pageCount} returnFrom={returnFrom} onBlockSwipe={onBlockSwipe} onGoPage={goPage} onAppPages={onAppPages} />
         ) : null}
       </div>
       {gaze ? (
