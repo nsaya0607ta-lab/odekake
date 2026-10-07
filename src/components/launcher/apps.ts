@@ -70,6 +70,8 @@ export function launcherItems({ sns, memoryGame }: LauncherOptions): LauncherIte
     app({ id: "coin-history", name: "コインの記録", href: "/mypage/coin-history", tint: ["#6f86ee", "#2d3a9c"], keywords: ["こいん", "りれき", "履歴", "青コイン"] }),
     app({ id: "google", name: "Google", href: "https://www.google.com/", external: true, tint: ["#ffffff", "#f1f3f4"], keywords: ["ぐーぐる", "検索", "けんさく", "グーグル"] }),
     app({ id: "chatgpt", name: "ChatGPT", href: "https://chatgpt.com/", external: true, tint: ["#2b2b2b", "#000000"], keywords: ["ちゃっとじーぴーてぃー", "チャットGPT", "AI", "えーあい"] }),
+    app({ id: "claude", name: "Claude", href: "https://claude.ai/", external: true, tint: ["#f5f4ee", "#e9e6da"], keywords: ["くろーど", "クロード", "AI", "えーあい"] }),
+    app({ id: "instagram", name: "Instagram", href: "https://www.instagram.com/", external: true, tint: ["#e1306c", "#833ab4"], keywords: ["いんすたぐらむ", "インスタ", "いんすた", "写真"] }),
   );
   return items;
 }
