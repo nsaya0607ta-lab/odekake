@@ -31,7 +31,7 @@ import {
 import { MOOD_RAIN_PENALTY, MOOD_THUNDER_PENALTY } from "@/lib/room/mood";
 import { overcastOf, WEATHER_LABEL, type RoomWeather, type WeatherKind } from "@/lib/room/weather";
 
-type HomeWeather = {
+export type HomeWeather = {
   weather: RoomWeather;
   place: SavedPlace & { saved: boolean };
   phase: SkyPhase;
@@ -454,7 +454,7 @@ const NIGHT_SKY = "linear-gradient(160deg,#3A4A8A,#22305E 75%)";
 const SCALE_MIN = -5, SCALE_MAX = 38;
 const pos = (t: number) => `${Math.max(0, Math.min(100, ((t - SCALE_MIN) / (SCALE_MAX - SCALE_MIN)) * 100))}%`;
 
-function WeatherSheet({ hw, onClose }: { hw: HomeWeather; onClose: () => void }) {
+export function WeatherSheet({ hw, onClose }: { hw: HomeWeather; onClose: () => void }) {
   const { weather: w, place, forecast: f, phase } = hw;
   const info = iconOf(w.kind, phase);
   const tone = TONE[f.tone];

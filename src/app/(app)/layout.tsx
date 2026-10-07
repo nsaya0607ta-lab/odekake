@@ -2,6 +2,7 @@ import { Suspense } from "react";
 import { AppBackground } from "@/components/app-background";
 import { BottomNav } from "@/components/bottom-nav";
 import { GlobalInteractionFeedback } from "@/components/global-interaction-feedback";
+import { LauncherReturnBridge } from "@/components/launcher/launcher-return-bridge";
 import { LoginBonus } from "@/components/login-bonus";
 import { PhotoCleanup } from "@/components/photo-cleanup";
 import { SnsBottomNavIndicator } from "@/components/sns/sns-bottom-nav-indicator";
@@ -27,6 +28,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
       <AppBackground id={background} />
       {children}
       <GlobalInteractionFeedback />
+      <LauncherReturnBridge />
       <BottomNav
         snsLocked={!snsAvailable}
         shopLocked={!canAccessShop(user.displayName)}

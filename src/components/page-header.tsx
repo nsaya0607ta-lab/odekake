@@ -3,7 +3,9 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import type { ReactNode } from "react";
+import { backToLauncher } from "@/lib/launcher-return";
 import { IconChevronLeft } from "./icons";
+import { useLaunchedHere } from "./launcher/launcher-return-bridge";
 
 type Props = {
   title: string;
@@ -69,9 +71,22 @@ export function TopHeader({
   action?: ReactNode;
   backHref?: string;
 }) {
+  const router = useRouter();
+  // アプリの画面から開いたときは、戻るボタンがない画面でも出して、アプリの画面へもどれるようにする
+  const fromLauncher = useLaunchedHere();
   return (
     <header className="sticky top-0 z-30 border-b border-line bg-paper/92 backdrop-blur-sm">
       <div className="mx-auto flex max-w-lg items-center gap-2 px-4 py-3">
+        {fromLauncher && !backHref ? (
+          <button
+            type="button"
+            aria-label="戻る"
+            onClick={() => backToLauncher((href) => router.push(href))}
+            className="-ml-1 flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-ink-soft transition-colors active:bg-paper-deep"
+          >
+            <IconChevronLeft />
+          </button>
+        ) : null}
         {backHref ? (
           <Link
             href={backHref}
