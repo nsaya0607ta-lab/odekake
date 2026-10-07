@@ -21,7 +21,7 @@ import { createPortal } from "react-dom";
 import { useHomeWeather, WeatherSheet } from "@/components/home-weather";
 import { markLaunch, rememberHomePage } from "@/lib/launcher-return";
 import { applyHidden, buildItems, defaultHidden, flattenApps, folderNameFor, HIDDEN_KEY, iconSrc, LAYOUT_KEY, launcherItems, toStored, type LauncherApp, type LauncherFolder, type LauncherItem, type LauncherOptions, type StoredEntry } from "./apps";
-import { EditGlyph, EyeGlyph, HiddenSheet, HideAlert, ScreenMenu, type HiddenEntry } from "./sheets";
+import { EditGlyph, EyeGlyph, HiddenSheet, HideAlert, OpenSiteAlert, ScreenMenu, type HiddenEntry } from "./sheets";
 import { ClockWeatherWidget, StepsWidget } from "./widgets";
 import styles from "./launcher.module.css";
 
@@ -86,15 +86,15 @@ const isIOS = () =>
   typeof navigator !== "undefined" && (/iPhone|iPad|iPod/.test(navigator.userAgent) || (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1));
 
 /**
- * そのサービスのアプリで開く。アプリへ移れなかったとき（入っていないとき）だけ、サイトを Safari で開く。
+ * そのサービスのアプリで開く。アプリへ移れなかったとき（入っていないとき）だけ onNotOpened を呼ぶ（「サイトで開きますか？」を出す）。
  *
  * アプリが開いたかどうかは、このページが少しでも裏へまわったか（見えなくなった・止められた）で見分ける。
- * どれか1つでも起きたら、アプリへ移れたものとして、あとからサイトを開くことはしない（アプリから戻ってきたときも）。
+ * どれか1つでも起きたら、アプリへ移れたものとして、何もしない（アプリから戻ってきたときも）。
  * - 見えなくなった・ページを離れた（visibilitychange・pagehide）
  * - タイマーが止まっていた（裏へまわると止まるので、時計を細かく見て、間があいたら）
  * - 「"YouTube" で開きますか？」が出て、答えるまでに時間がかかった（3秒以上。開いてアプリを使っていたとみなす）
  */
-function openAppOrSite(appUrl: string, href: string) {
+function openAppOrSite(appUrl: string, onNotOpened: () => void) {
   let left = false;
   let blurAt = 0;
   let last = performance.now();
@@ -121,9 +121,9 @@ function openAppOrSite(appUrl: string, href: string) {
   };
   const decide = () => {
     stop();
-    if (!left && document.visibilityState === "visible") openInSafari(href);
+    if (!left && document.visibilityState === "visible") onNotOpened();
   };
-  // 確認が出ていたとき：画面にもどってきたところで決める（すぐ「キャンセル」なら、サイトを開く）
+  // 確認が出ていたとき：画面にもどってきたところで決める
   const onFocus = () => {
     if (blurAt && performance.now() - blurAt > 3000) left = true;
     window.setTimeout(decide, 300);
@@ -383,6 +383,8 @@ export function Launcher({
   const [screenMenu, setScreenMenu] = useState<{ x: number; y: number } | null>(null);
   const [hiddenSheet, setHiddenSheet] = useState(false);
   const [weatherOpen, setWeatherOpen] = useState(false);
+  /** アプリが開けなかった外のサービス（「サイトで開きますか？」を出す） */
+  const [siteAsk, setSiteAsk] = useState<LauncherApp | null>(null);
   const press = useRef<Press | null>(null);
   const gridRef = useRef<HTMLDivElement>(null);
   const emptyPress = useRef<{ timer: number; x: number; y: number } | null>(null);
@@ -577,7 +579,8 @@ export function Launcher({
         if (isStandalone() && isIOS()) {
           // ホーム画面から開いたアプリ：そのサービスのアプリが入っていればアプリで、なければ Safari（別のアプリ）でサイトを開く
           // （アプリの中の小さなブラウザでは開かない）
-          if (app.appUrl && href === app.href) openAppOrSite(app.appUrl, href);
+          // アプリへ移れなかったときも、勝手にサイトへは飛ばさず「サイトで開きますか？」と聞く
+          if (app.appUrl && href === app.href) openAppOrSite(app.appUrl, () => setSiteAsk(app));
           else openInSafari(href);
           return;
         }
@@ -1205,6 +1208,15 @@ export function Launcher({
         />
       ) : null}
       {weatherOpen && hw ? <WeatherSheet hw={hw} onClose={() => setWeatherOpen(false)} /> : null}
+      {siteAsk ? (
+        <OpenSiteAlert
+          name={siteAsk.name}
+          icon={<Tile item={siteAsk} size={58} />}
+          rootStyle={ROOT_VARS}
+          onCancel={() => setSiteAsk(null)}
+          onOpen={() => { const target = siteAsk; setSiteAsk(null); openInSafari(target.href); }}
+        />
+      ) : null}
       {launch ? <LaunchView state={launch} size={g.icon} /> : null}
     </div>
   );

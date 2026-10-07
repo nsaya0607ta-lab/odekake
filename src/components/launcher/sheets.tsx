@@ -58,6 +58,36 @@ export function HideAlert({ name, icon, isFolder, onCancel, onHide, rootStyle }:
   );
 }
 
+/** アプリが開けなかったとき：「サイトで開きますか？」 */
+export function OpenSiteAlert({ name, icon, onCancel, onOpen, rootStyle }: {
+  name: string;
+  icon: ReactNode;
+  onCancel: () => void;
+  onOpen: () => void;
+  rootStyle: CSSProperties;
+}) {
+  const [shown, hide] = useShown();
+  const close = (then: () => void) => {
+    hide();
+    window.setTimeout(then, 200);
+  };
+  return createPortal(
+    <div className={styles.alertVeil} data-open={shown} style={rootStyle} onPointerDown={(e) => e.stopPropagation()}>
+      <div className={styles.alert} role="alertdialog" aria-modal="true" aria-labelledby="launcher-site-title" aria-describedby="launcher-site-msg">
+        <div className={styles.alertIcon}>{icon}</div>
+        <p id="launcher-site-title" className={styles.alertTitle}>「{name}」のアプリが開けませんでした</p>
+        <p id="launcher-site-msg" className={styles.alertMsg}>アプリが入っていないときは、Safari でサイトを開けます。</p>
+        <div className={styles.alertActions}>
+          <button type="button" onClick={() => close(onCancel)}>キャンセル</button>
+          {/* サイトを開くのは、押したその場で（間をあけると、ブラウザに止められることがある） */}
+          <button type="button" className={styles.strong} onClick={() => { hide(); onOpen(); }}>サイトで開く</button>
+        </div>
+      </div>
+    </div>,
+    document.body,
+  );
+}
+
 export function ScreenMenu({ x, y, hiddenCount, onClose, onEdit, onReshow, rootStyle }: {
   x: number;
   y: number;

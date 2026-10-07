@@ -893,6 +893,8 @@
 }
 
 .alertActions .destructive { color: #ff3b30; }
+.alertActions .strong { background: #0a84ff; color: #fff; }
+.alertActions .strong:active { background: #0874e0; }
 
 /* ---------- 非表示のアプリの一覧（下から出るシート） ---------- */
 
