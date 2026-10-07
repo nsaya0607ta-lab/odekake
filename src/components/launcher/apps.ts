@@ -72,6 +72,12 @@ export function launcherItems({ sns, memoryGame }: LauncherOptions): LauncherIte
     app({ id: "chatgpt", name: "ChatGPT", href: "https://chatgpt.com/", external: true, tint: ["#2b2b2b", "#000000"], keywords: ["ちゃっとじーぴーてぃー", "チャットGPT", "AI", "えーあい"] }),
     app({ id: "claude", name: "Claude", href: "https://claude.ai/", external: true, tint: ["#f5f4ee", "#e9e6da"], keywords: ["くろーど", "クロード", "AI", "えーあい"] }),
     app({ id: "instagram", name: "Instagram", href: "https://www.instagram.com/", external: true, tint: ["#e1306c", "#833ab4"], keywords: ["いんすたぐらむ", "インスタ", "いんすた", "写真"] }),
+    app({ id: "google-maps", name: "マップ", href: "https://www.google.com/maps", external: true, tint: ["#ffffff", "#f1f3f4"], keywords: ["ぐーぐるまっぷ", "Googleマップ", "地図", "ちず", "道案内"] }),
+    app({ id: "yahoo-weather", name: "Yahoo!天気", href: "https://weather.yahoo.co.jp/weather/", external: true, tint: ["#4aa3f4", "#1e6fd6"], keywords: ["やふー", "てんき", "天気", "雨", "あめ", "雨雲"] }),
+    // わんこOKのお店：近くの「ペット可」のお店を Google マップでさがす
+    app({ id: "dog-spots", name: "わんこOK", href: `https://www.google.com/maps/search/${encodeURIComponent("ペット可 お店")}`, external: true, tint: ["#ffcf8a", "#f08a3c"], keywords: ["ぺっとか", "ペット可", "犬連れ", "いぬ", "おでかけ", "カフェ"] }),
+    app({ id: "google-photos", name: "フォト", href: "https://photos.google.com/", external: true, tint: ["#ffffff", "#f1f3f4"], keywords: ["ぐーぐるふぉと", "Googleフォト", "写真", "しゃしん", "アルバム"] }),
+    app({ id: "youtube", name: "YouTube", href: "https://www.youtube.com/", external: true, tint: ["#ffffff", "#f1f3f4"], keywords: ["ゆーちゅーぶ", "ユーチューブ", "動画", "どうが"] }),
   );
   return items;
 }
