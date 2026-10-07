@@ -17,6 +17,8 @@ export type LauncherApp = {
   shortcuts?: { label: string; href: string }[];
   /** 外のサイト（確認なしで、別の画面で開く） */
   external?: boolean;
+  /** そのサービスのアプリを開くリンク（入っていればアプリで、なければ href のサイトを開く） */
+  appUrl?: string;
   /** 赤い数字のバッジ */
   badge?: "notices";
 };
@@ -68,18 +70,35 @@ export function launcherItems({ sns, memoryGame }: LauncherOptions): LauncherIte
     app({ id: "mypage", name: "マイページ", href: "/mypage", tint: ["#ffffff", "#eae2d4"], keywords: ["まいぺーじ", "プロフィール", "設定"] }),
     app({ id: "dog-skin", name: "犬のすがた", href: "/mypage/dog-skin", tint: ["#ddd2ff", "#9a84ee"], keywords: ["いぬ", "すがた", "スキン", "フレブル"] }),
     app({ id: "coin-history", name: "コインの記録", href: "/mypage/coin-history", tint: ["#6f86ee", "#2d3a9c"], keywords: ["こいん", "りれき", "履歴", "青コイン"] }),
-    app({ id: "google", name: "Google", href: "https://www.google.com/", external: true, tint: ["#ffffff", "#f1f3f4"], keywords: ["ぐーぐる", "検索", "けんさく", "グーグル"] }),
-    app({ id: "chatgpt", name: "ChatGPT", href: "https://chatgpt.com/", external: true, tint: ["#2b2b2b", "#000000"], keywords: ["ちゃっとじーぴーてぃー", "チャットGPT", "AI", "えーあい"] }),
-    app({ id: "claude", name: "Claude", href: "https://claude.ai/", external: true, tint: ["#f5f4ee", "#e9e6da"], keywords: ["くろーど", "クロード", "AI", "えーあい"] }),
-    app({ id: "instagram", name: "Instagram", href: "https://www.instagram.com/", external: true, tint: ["#e1306c", "#833ab4"], keywords: ["いんすたぐらむ", "インスタ", "いんすた", "写真"] }),
-    app({ id: "google-maps", name: "マップ", href: "https://www.google.com/maps", external: true, tint: ["#ffffff", "#f1f3f4"], keywords: ["ぐーぐるまっぷ", "Googleマップ", "地図", "ちず", "道案内"] }),
-    app({ id: "yahoo-weather", name: "Yahoo!天気", href: "https://weather.yahoo.co.jp/weather/", external: true, tint: ["#4aa3f4", "#1e6fd6"], keywords: ["やふー", "てんき", "天気", "雨", "あめ", "雨雲"] }),
+    app({ id: "google", name: "Google", href: "https://www.google.com/", external: true, appUrl: "google://", tint: ["#ffffff", "#f1f3f4"], keywords: ["ぐーぐる", "検索", "けんさく", "グーグル"] }),
+    app({ id: "chatgpt", name: "ChatGPT", href: "https://chatgpt.com/", external: true, appUrl: "chatgpt://", tint: ["#2b2b2b", "#000000"], keywords: ["ちゃっとじーぴーてぃー", "チャットGPT", "AI", "えーあい"] }),
+    app({ id: "claude", name: "Claude", href: "https://claude.ai/", external: true, appUrl: "claude://", tint: ["#f5f4ee", "#e9e6da"], keywords: ["くろーど", "クロード", "AI", "えーあい"] }),
+    app({ id: "instagram", name: "Instagram", href: "https://www.instagram.com/", external: true, appUrl: "instagram://app", tint: ["#e1306c", "#833ab4"], keywords: ["いんすたぐらむ", "インスタ", "いんすた", "写真"] }),
+    app({ id: "google-maps", name: "マップ", href: "https://www.google.com/maps", external: true, appUrl: "comgooglemaps://", tint: ["#ffffff", "#f1f3f4"], keywords: ["ぐーぐるまっぷ", "Googleマップ", "地図", "ちず", "道案内"] }),
+    app({ id: "yahoo-weather", name: "Yahoo!天気", href: "https://weather.yahoo.co.jp/weather/", external: true, appUrl: "yjweather://", tint: ["#4aa3f4", "#1e6fd6"], keywords: ["やふー", "てんき", "天気", "雨", "あめ", "雨雲"] }),
     // わんこOKのお店：近くの「ペット可」のお店を Google マップでさがす
-    app({ id: "dog-spots", name: "わんこOK", href: `https://www.google.com/maps/search/${encodeURIComponent("ペット可 お店")}`, external: true, tint: ["#ffcf8a", "#f08a3c"], keywords: ["ぺっとか", "ペット可", "犬連れ", "いぬ", "おでかけ", "カフェ"] }),
-    app({ id: "google-photos", name: "フォト", href: "https://photos.google.com/", external: true, tint: ["#ffffff", "#f1f3f4"], keywords: ["ぐーぐるふぉと", "Googleフォト", "写真", "しゃしん", "アルバム"] }),
-    app({ id: "youtube", name: "YouTube", href: "https://www.youtube.com/", external: true, tint: ["#ffffff", "#f1f3f4"], keywords: ["ゆーちゅーぶ", "ユーチューブ", "動画", "どうが"] }),
+    app({ id: "dog-spots", name: "わんこOK", href: `https://www.google.com/maps/search/${encodeURIComponent("ペット可 お店")}`, external: true, appUrl: `comgooglemaps://?q=${encodeURIComponent("ペット可 お店")}`, tint: ["#ffcf8a", "#f08a3c"], keywords: ["ぺっとか", "ペット可", "犬連れ", "いぬ", "おでかけ", "カフェ"] }),
+    app({ id: "google-photos", name: "フォト", href: "https://photos.google.com/", external: true, appUrl: "googlephotos://", tint: ["#ffffff", "#f1f3f4"], keywords: ["ぐーぐるふぉと", "Googleフォト", "写真", "しゃしん", "アルバム"] }),
+    app({ id: "youtube", name: "YouTube", href: "https://www.youtube.com/", external: true, appUrl: "youtube://", tint: ["#ffffff", "#f1f3f4"], keywords: ["ゆーちゅーぶ", "ユーチューブ", "動画", "どうが"] }),
   );
-  return items;
+  // はじめに出しておくアプリと、その並び。ほかのアプリは非表示にしておく（画面を長押しして「再表示」から出せる）
+  const rank = new Map(DEFAULT_SHOWN.map((id, i) => [id, i]));
+  return items
+    .map((item, i) => ({ item, i }))
+    .sort((a, b) => (rank.get(a.item.id) ?? 100 + a.i) - (rank.get(b.item.id) ?? 100 + b.i))
+    .map(({ item }) => item);
+}
+
+/** はじめからアプリの画面に出ているもの（この順に並ぶ） */
+export const DEFAULT_SHOWN = [
+  "folder-games", "gacha", "collection", "room", "friends", "dog-skin",
+  "google", "chatgpt", "claude", "instagram", "google-maps", "yahoo-weather", "google-photos", "youtube",
+];
+
+/** はじめは非表示にしておくもの（DEFAULT_SHOWN にない、いちばん上の段のアプリとフォルダ） */
+export function defaultHidden(items: readonly LauncherItem[]): string[] {
+  const shown = new Set(DEFAULT_SHOWN);
+  return items.filter((item) => !shown.has(item.id)).map((item) => item.id);
 }
 
 /** フォルダの中も含めて、アプリを1列に（さがすとき用） */
@@ -103,7 +122,7 @@ export function applyOrder(items: LauncherItem[], order: readonly string[] | nul
 export const ORDER_KEY = "odekake_launcher_order_v1";
 
 /** かくしたアプリ（id の並び）をこの端末に覚えるキー */
-export const HIDDEN_KEY = "odekake_launcher_hidden_v1";
+export const HIDDEN_KEY = "odekake_launcher_hidden_v2";
 
 /** かくしたアプリをのぞく（フォルダの中のアプリも。中がからになったフォルダも出さない） */
 export function applyHidden(items: readonly LauncherItem[], hidden: ReadonlySet<string>): LauncherItem[] {
@@ -121,7 +140,7 @@ export function applyHidden(items: readonly LauncherItem[], hidden: ReadonlySet<
  * アプリは id の文字、フォルダは { id, name, apps }。利用者がアプリどうしを重ねて作ったフォルダも、ここに入る。
  */
 export type StoredEntry = string | { id: string; name: string; apps: string[] };
-export const LAYOUT_KEY = "odekake_launcher_layout_v1";
+export const LAYOUT_KEY = "odekake_launcher_layout_v2";
 
 export function toStored(items: readonly LauncherItem[]): StoredEntry[] {
   return items.map((item) => (item.kind === "app" ? item.id : { id: item.id, name: item.name, apps: item.apps.map((a) => a.id) }));
