@@ -39,6 +39,7 @@ export function launcherItems({ sns, memoryGame }: LauncherOptions): LauncherIte
     app({ id: "osanpo-run", name: "おさんぽフレンチー", href: "/games/osanpo-run", tint: ["#5b5f8e", "#2c3355"], keywords: ["おさんぽ", "ラン", "走る", "ゲーム", "青コイン"], shortcuts: [{ label: "遊ぶ", href: "/games/osanpo-run" }] }),
     app({ id: "wanko-bowling", name: "わんこボウリング", href: "/games/wanko-bowling", tint: ["#8ec5ff", "#3f6fe6"], keywords: ["ぼうりんぐ", "ボウリング", "ゲーム"], shortcuts: [{ label: "遊ぶ", href: "/games/wanko-bowling" }] }),
     app({ id: "snack-trail", name: "わんこのおやつ道", href: "/games/snack-trail", tint: ["#cfe9b8", "#8cc56a"], keywords: ["おやつ", "すなっく", "ゲーム"], shortcuts: [{ label: "遊ぶ", href: "/games/snack-trail" }] }),
+    app({ id: "pinball", name: "ご当地ピンボール", href: "/games/pinball", tint: ["#ffb4a4", "#d9545b"], keywords: ["ぴんぼーる", "ピンボール", "ご当地", "赤コイン", "ゲーム"], shortcuts: [{ label: "遊ぶ", href: "/games/pinball" }, { label: "ルールとスキル", href: "/games/pinball/guide" }] }),
   ];
   if (memoryGame) {
     games.push(app({ id: "memory-game", name: "しん犬すいじゃく", href: "/memory-game-preview", tint: ["#a6eef4", "#2fb2cf"], keywords: ["しんけいすいじゃく", "めもりー", "ゲーム"] }));
