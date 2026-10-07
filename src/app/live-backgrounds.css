@@ -349,49 +349,6 @@
   opacity: 0.55;
 }
 
-/*
- * 背景をながめるモード：ヘッダー・ページ・下のナビをかくす（背景はそのまま、タップもできる）。
- * ページ本体（main）は表示のアニメーションで不透明度を持ちつづけるので、!important で上書きする
- */
-html[data-gaze] header.sticky,
-html[data-gaze] main,
-html[data-gaze] .app-bottom-nav {
-  opacity: 0 !important;
-  /* 横スワイプで入ったときは、流した先（画面の外）にとどめておく */
-  transform: translateX(var(--gaze-out, 0px)) !important;
-  pointer-events: none;
-  transition: opacity 0.45s ease;
-}
-
-/*
- * ホームを横にスワイプして、背景をながめるモードに出入りする（background-gaze-button.tsx）。
- * 指で動かしているあいだはそのまま指について行き、はなしたら少しかけて流れる。
- * data-gaze より後に書いて、同じ強さの指定を上書きする
- */
-html[data-gaze-drag] header.sticky,
-html[data-gaze-drag] main,
-html[data-gaze-drag] .app-bottom-nav,
-html[data-gaze-settle] header.sticky,
-html[data-gaze-settle] main,
-html[data-gaze-settle] .app-bottom-nav {
-  transform: translateX(var(--gaze-dx, 0px)) !important;
-  opacity: var(--gaze-alpha, 1) !important;
-  pointer-events: none;
-  will-change: transform, opacity;
-}
-html[data-gaze-drag] header.sticky,
-html[data-gaze-drag] main,
-html[data-gaze-drag] .app-bottom-nav {
-  transition: none !important;
-}
-html[data-gaze-settle] header.sticky,
-html[data-gaze-settle] main,
-html[data-gaze-settle] .app-bottom-nav {
-  transition:
-    transform 0.42s cubic-bezier(0.22, 0.8, 0.3, 1),
-    opacity 0.42s ease !important;
-}
-
 /* ---- 新しい背景（ふうせん・ローカル線・なぞる・かたむける・記録で育つ）の下地 ---- */
 .app-bg[data-bg="balloons"] {
   background:

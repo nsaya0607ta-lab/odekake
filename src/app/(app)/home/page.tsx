@@ -1,6 +1,8 @@
 import Link from "next/link";
 import { BackgroundCookieSync } from "@/components/background-cookie-sync";
-import { BackgroundGazeButton } from "@/components/background-gaze-button";
+import { HomePager } from "@/components/launcher/home-pager";
+import { canSeeMemoryGame } from "@/lib/games/memory-game-access";
+import { canAccessSns } from "@/lib/sns-access";
 import { IconUser } from "@/components/icons";
 import { TopHeader } from "@/components/page-header";
 import { PageBody } from "@/components/page-body";
@@ -298,7 +300,21 @@ export default async function HomePage({
             ))}
         </div>
       </PageBody>
-      {shopAccess && background !== "default" ? <BackgroundGazeButton /> : null}
+      {/* 左にスワイプ：アプリの画面 → （背景を変えていれば）背景をながめるページ */}
+      <HomePager
+        data={{
+          steps: expDashboard.todaySteps ?? 0,
+          level: expProgress.level,
+          progressPercent: expProgress.progressPercent,
+          toNext: Math.max(0, expProgress.nextLevelExp - expProgress.totalExp),
+          coins: coins.balance,
+          blueCoins,
+          unreadNotices: unreadNoticeCount,
+        }}
+        sns={canAccessSns(user.email)}
+        memoryGame={canSeeMemoryGame(user.displayName)}
+        gaze={shopAccess && background !== "default"}
+      />
       {backgroundOutdated ? <BackgroundCookieSync /> : null}
     </>
   );

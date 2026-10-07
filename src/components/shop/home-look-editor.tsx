@@ -129,7 +129,7 @@ export function HomeLookEditor({ initial }: { initial: HomeLook }) {
       </div>
 
       <p role="status" className="mt-2 min-h-[1.2em] px-1 text-[11px] text-ink-faint">
-        {status === "saving" ? "保存しています…" : status === "saved" ? "保存しました。ほかの端末のホームにも反映されます" : status === "local" ? "この端末に保存しました（ほかの端末へは、準備ができしだい反映されます）" : status === "error" ? "保存できませんでした。時間をおいてお試しください" : "背景を変えているときは、ホームを横にスワイプすると背景だけをながめられます"}
+        {status === "saving" ? "保存しています…" : status === "saved" ? "保存しました。ほかの端末のホームにも反映されます" : status === "local" ? "この端末に保存しました（ほかの端末へは、準備ができしだい反映されます）" : status === "error" ? "保存できませんでした。時間をおいてお試しください" : "ホームを左にスワイプするとアプリの画面、もう一度スワイプすると背景だけをながめられます"}
       </p>
     </section>
   );
