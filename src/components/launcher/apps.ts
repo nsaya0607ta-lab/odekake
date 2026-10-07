@@ -69,6 +69,18 @@ export function launcherItems({ sns, memoryGame }: LauncherOptions): LauncherIte
     { kind: "folder", id: "folder-odekake", name: "おでかけ", apps: odekake, keywords: ["おでかけ", "旅"] },
     app({ id: "mypage", name: "マイページ", href: "/mypage", tint: ["#ffffff", "#eae2d4"], keywords: ["まいぺーじ", "プロフィール", "設定"] }),
     app({ id: "dog-skin", name: "犬のすがた", href: "/mypage/dog-skin", tint: ["#ddd2ff", "#9a84ee"], keywords: ["いぬ", "すがた", "スキン", "フレブル"] }),
+    app({
+      id: "infra",
+      name: "インフラ",
+      href: "/infra",
+      tint: ["#7393ff", "#2a338f"],
+      keywords: ["いんふら", "サーバー", "さーばー", "ネットワーク", "しくみ", "まなぶ", "学ぶ", "べんきょう", "勉強"],
+      shortcuts: [
+        { label: "ステージ", href: "/infra" },
+        { label: "ずかん", href: "/infra?tab=glossary" },
+        { label: "ラボ", href: "/infra?tab=lab" },
+      ],
+    }),
     app({ id: "coin-history", name: "コインの記録", href: "/mypage/coin-history", tint: ["#6f86ee", "#2d3a9c"], keywords: ["こいん", "りれき", "履歴", "青コイン"] }),
     app({ id: "google", name: "Google", href: "https://www.google.com/", external: true, appUrl: "google://", tint: ["#ffffff", "#f1f3f4"], keywords: ["ぐーぐる", "検索", "けんさく", "グーグル"] }),
     app({ id: "chatgpt", name: "ChatGPT", href: "https://chatgpt.com/", external: true, appUrl: "chatgpt://", tint: ["#2b2b2b", "#000000"], keywords: ["ちゃっとじーぴーてぃー", "チャットGPT", "AI", "えーあい"] }),
@@ -91,7 +103,7 @@ export function launcherItems({ sns, memoryGame }: LauncherOptions): LauncherIte
 
 /** はじめからアプリの画面に出ているもの（この順に並ぶ） */
 export const DEFAULT_SHOWN = [
-  "folder-games", "gacha", "collection", "room", "friends", "dog-skin",
+  "folder-games", "gacha", "collection", "room", "friends", "dog-skin", "infra",
   "google", "chatgpt", "claude", "instagram", "google-maps", "yahoo-weather", "google-photos", "youtube",
 ];
 
