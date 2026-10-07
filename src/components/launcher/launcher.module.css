@@ -118,6 +118,32 @@
   to { transform: scale(1); opacity: 1; }
 }
 
+/* ほかのアイコンに重ねたとき：重ねる相手が大きくなり、うしろにフォルダの形が出る */
+.cell[data-merge="ready"] .press,
+.cell[data-merge="ready"][data-editing="true"]:not([data-dragging="true"]) .press {
+  animation: none;
+  transform: scale(1.12);
+}
+
+.mergeHalo {
+  position: absolute;
+  inset: -16%;
+  background: rgba(255, 255, 255, 0.45);
+  -webkit-backdrop-filter: blur(16px) saturate(1.6);
+  backdrop-filter: blur(16px) saturate(1.6);
+  box-shadow: inset 0 0 0 0.8px rgba(255, 255, 255, 0.8);
+  animation: popIn 0.28s cubic-bezier(0.3, 1.4, 0.5, 1) both;
+}
+
+/* フォルダの中で持ち上げたアイコン */
+.floatTile {
+  position: fixed;
+  z-index: 95;
+  transform: scale(1.14);
+  filter: drop-shadow(0 16px 20px rgba(40, 25, 10, 0.3));
+  pointer-events: none;
+}
+
 /* iPhone と同じ、角がなめらかに丸い四角（スーパー楕円） */
 .squircle {
   -webkit-mask-image: var(--squircle);
@@ -574,6 +600,49 @@
   text-align: center;
   text-shadow: 0 0 8px rgba(255, 255, 255, 0.9);
   transition: opacity 0.3s;
+}
+
+/* 編集中のフォルダの名前 */
+.folderNameField {
+  position: relative;
+  display: inline-flex;
+  width: min(300px, calc(100vw - 64px));
+  align-items: center;
+  height: 50px;
+  padding: 0 14px 0 20px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.5);
+  -webkit-backdrop-filter: blur(20px) saturate(1.6);
+  backdrop-filter: blur(20px) saturate(1.6);
+  box-shadow: inset 0 0 0 0.6px rgba(255, 255, 255, 0.85);
+  text-shadow: none;
+}
+
+.folderNameField input {
+  min-width: 0;
+  flex: 1;
+  border: 0;
+  outline: 0;
+  background: transparent;
+  color: #1d1a16;
+  font: inherit;
+  font-size: 24px;
+  font-weight: 700;
+  text-align: center;
+  user-select: text;
+  -webkit-user-select: text;
+}
+
+.folderNameField button {
+  display: grid;
+  width: 22px;
+  height: 22px;
+  flex-shrink: 0;
+  place-items: center;
+  border: 0;
+  border-radius: 999px;
+  background: rgba(60, 50, 40, 0.28);
+  color: #fff;
 }
 
 /* 長押しのメニュー */

@@ -20,7 +20,7 @@ import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, typ
 import { createPortal } from "react-dom";
 import { useHomeWeather, WeatherSheet } from "@/components/home-weather";
 import { markLaunch } from "@/lib/launcher-return";
-import { applyHidden, applyOrder, flattenApps, HIDDEN_KEY, iconSrc, launcherItems, ORDER_KEY, type LauncherApp, type LauncherFolder, type LauncherItem, type LauncherOptions } from "./apps";
+import { applyHidden, applyOrder, buildItems, flattenApps, folderNameFor, HIDDEN_KEY, iconSrc, LAYOUT_KEY, launcherItems, ORDER_KEY, toStored, type LauncherApp, type LauncherFolder, type LauncherItem, type LauncherOptions, type StoredEntry } from "./apps";
 import { EditGlyph, EyeGlyph, HiddenSheet, HideAlert, ScreenMenu, type HiddenEntry } from "./sheets";
 import { ClockWeatherWidget, StepsWidget } from "./widgets";
 import styles from "./launcher.module.css";
@@ -64,6 +64,15 @@ const writeList = (key: string, list: string[]) => {
     window.localStorage.setItem(key, JSON.stringify(list));
   } catch {
     // 覚えられなくても、この画面のあいだはそのまま
+  }
+};
+
+const readLayout = (): StoredEntry[] | null => {
+  try {
+    const v = JSON.parse(window.localStorage.getItem(LAYOUT_KEY) ?? "null") as unknown;
+    return Array.isArray(v) ? (v as StoredEntry[]) : null;
+  } catch {
+    return null;
   }
 };
 
@@ -121,14 +130,32 @@ function geometryFor(width: number): Geometry {
 const WIDGET_SLOTS = 8;
 const slotXY = (g: Geometry, slot: number) => ({ x: g.pad + (slot % 4) * g.cellW, y: Math.floor(slot / 4) * g.rowH });
 
+/** 開いたフォルダの大きさと場所 */
+function folderGeometry(appCount: number, g: Geometry, height: number) {
+  const vw = typeof window === "undefined" ? 390 : window.innerWidth;
+  const pw = Math.min(vw - 52, 330);
+  const inner = 20;
+  const cw = (pw - inner * 2) / 3;
+  const rows = Math.max(1, Math.ceil(appCount / 3));
+  const ph = inner * 2 + rows * g.rowH - 6;
+  const x = (vw - pw) / 2;
+  const y = Math.max(120, height * 0.46 - ph / 2);
+  return { pw, ph, inner, cw, x, y };
+}
+
 const initialWidth = () => (typeof window === "undefined" ? 390 : Math.min(window.innerWidth, 520));
 
 /* ------------------------------------------------------------------ 本体 */
 
 type Press = { id: string; pointerId: number; x0: number; y0: number; timer: number; long: boolean; moved: boolean; inFolder: boolean; editing: boolean };
 type Drag = { id: string; pointerId: number; dx: number; dy: number; x: number; y: number };
-type MenuState = { item: LauncherItem; rect: Rect; open: boolean };
-type FolderState = { folder: LauncherFolder; rect: Rect; open: boolean };
+/** フォルダの中でのドラッグ（x, y は画面の上の指の位置、ox, oy は指がアイコンのどこを持っているか） */
+type FolderDrag = { id: string; folderId: string; pointerId: number; ox: number; oy: number; x: number; y: number };
+/** ドラッグ中のアイコンを重ねようとしている相手（ready になったら、はなすとフォルダになる） */
+type Merge = { id: string; ready: boolean };
+/** folderId：フォルダの中のアプリを長押ししたとき */
+type MenuState = { item: LauncherItem; rect: Rect; open: boolean; folderId?: string };
+type FolderState = { folder: LauncherFolder; rect: Rect; open: boolean; focusName?: boolean };
 /** closing：アプリから戻ってきたとき（画面がアイコンへ吸いこまれる） */
 type LaunchState = { app: LauncherApp; rect: Rect | null; grown: boolean; closing?: boolean; fading?: boolean };
 type CellOpts = { inFolder?: boolean; plain?: boolean; style?: CSSProperties; jiggle?: number };
@@ -156,15 +183,24 @@ export function Launcher({
   const router = useRouter();
   const hw = useHomeWeather();
   const baseItems = useMemo(() => launcherItems(options), [options]);
-  const [order, setOrder] = useState<string[] | null>(() => (typeof window === "undefined" ? null : readList(ORDER_KEY)));
+  // 並びとフォルダ（前の版で並び順だけを覚えていたら、それを引きつぐ）
+  const [layout, setLayout] = useState<StoredEntry[] | null>(() => {
+    if (typeof window === "undefined") return null;
+    const saved = readLayout();
+    if (saved) return saved;
+    const order = readList(ORDER_KEY);
+    return order ? toStored(applyOrder(launcherItems(options), order)) : null;
+  });
   const [hidden, setHidden] = useState<string[]>(() => (typeof window === "undefined" ? [] : readList(HIDDEN_KEY) ?? []));
-  const ordered = useMemo(() => applyOrder(baseItems, order), [baseItems, order]);
+  const ordered = useMemo(() => buildItems(baseItems, layout), [baseItems, layout]);
   const items = useMemo(() => applyHidden(ordered, new Set(hidden)), [ordered, hidden]);
   const [width, setWidth] = useState(initialWidth);
   const [height, setHeight] = useState(() => (typeof window === "undefined" ? 844 : window.innerHeight));
   const [pressed, setPressed] = useState<string | null>(null);
   const [editing, setEditing] = useState(false);
   const [drag, setDrag] = useState<Drag | null>(null);
+  const [fdrag, setFdrag] = useState<FolderDrag | null>(null);
+  const [merge, setMerge] = useState<Merge | null>(null);
   const [menu, setMenu] = useState<MenuState | null>(null);
   const [folder, setFolder] = useState<FolderState | null>(null);
   const [launch, setLaunch] = useState<LaunchState | null>(null);
@@ -179,16 +215,98 @@ export function Launcher({
   const gridRef = useRef<HTMLDivElement>(null);
   const emptyPress = useRef<{ timer: number; x: number; y: number } | null>(null);
   const removeDown = useRef<string | null>(null);
+  const folderPanelRef = useRef<HTMLDivElement>(null);
+  // ドラッグは画面全体で受けるので、いちばん新しい値を ref からも読めるようにしておく
+  const orderedRef = useRef(ordered);
+  const itemsRef = useRef(items);
+  const dragRef = useRef(drag);
+  const fdragRef = useRef(fdrag);
+  const folderRef = useRef(folder);
+  folderRef.current = folder;
+  const mergeRef = useRef(merge);
+  orderedRef.current = ordered;
+  itemsRef.current = items;
+  dragRef.current = drag;
+  fdragRef.current = fdrag;
+  mergeRef.current = merge;
+  const mergeTimer = useRef(0);
+  const reorderTimer = useRef<{ idx: number; timer: number } | null>(null);
 
+  /** 並びとフォルダ（非表示のものもふくめた全部）を覚える */
+  const commit = useCallback((full: LauncherItem[]) => {
+    const stored = toStored(full);
+    orderedRef.current = full;
+    setLayout(stored);
+    writeList(LAYOUT_KEY, stored as unknown as string[]);
+  }, []);
+
+  /** 見えている並びを覚える（非表示のアプリは、いまの並びのうしろに置いておく。再表示すると、いちばんうしろに出る） */
   const saveOrder = useCallback(
-    (next: LauncherItem[]) => {
-      // 非表示のアプリは、いまの並びのうしろに覚えておく（再表示すると、いちばんうしろに出る）
-      const shown = next.map((item) => item.id);
-      const ids = [...shown, ...ordered.map((item) => item.id).filter((id) => !shown.includes(id))];
-      setOrder(ids);
-      writeList(ORDER_KEY, ids);
+    (visible: LauncherItem[]) => {
+      const full = orderedRef.current;
+      const byId = new Map(full.map((item) => [item.id, item]));
+      const shown = new Set(visible.map((item) => item.id));
+      commit([...visible.map((item) => byId.get(item.id) ?? item), ...full.filter((item) => !shown.has(item.id))]);
     },
-    [ordered],
+    [commit],
+  );
+
+  /** アプリを、ほかのアプリ（→新しいフォルダ）かフォルダに入れる。できたフォルダの id を返す */
+  const mergeInto = useCallback(
+    (dragId: string, targetId: string): string | null => {
+      const full = orderedRef.current;
+      const dragged = full.find((item) => item.id === dragId);
+      if (!dragged || dragged.kind !== "app") return null;
+      let made: string | null = null;
+      const next = full.flatMap((item): LauncherItem[] => {
+        if (item.id === dragId) return [];
+        if (item.id !== targetId) return [item];
+        if (item.kind === "folder") return [{ ...item, apps: [...item.apps, dragged] }];
+        made = `folder-${Date.now().toString(36)}`;
+        return [{ kind: "folder", id: made, name: folderNameFor([item, dragged]), apps: [item, dragged], keywords: [] }];
+      });
+      commit(next);
+      return made;
+    },
+    [commit],
+  );
+
+  /** フォルダからアプリを出す（フォルダのすぐうしろに置く。フォルダがからになったら消す） */
+  const takeOut = useCallback(
+    (folderId: string, appId: string) => {
+      const full = orderedRef.current;
+      const at = full.findIndex((item) => item.id === folderId);
+      const box = full[at];
+      if (!box || box.kind !== "folder") return;
+      const app = box.apps.find((a) => a.id === appId);
+      if (!app) return;
+      const apps = box.apps.filter((a) => a.id !== appId);
+      const next = [...full];
+      next.splice(at, 1, ...(apps.length ? [{ ...box, apps }] : []), app);
+      commit(next);
+    },
+    [commit],
+  );
+
+  /** フォルダの中の並びを覚える（中の非表示のアプリは、うしろに置いておく） */
+  const reorderInFolder = useCallback(
+    (folderId: string, visibleApps: LauncherApp[]) => {
+      commit(orderedRef.current.map((item) => {
+        if (item.id !== folderId || item.kind !== "folder") return item;
+        const shown = new Set(visibleApps.map((a) => a.id));
+        return { ...item, apps: [...visibleApps, ...item.apps.filter((a) => !shown.has(a.id))] };
+      }));
+    },
+    [commit],
+  );
+
+  const renameFolder = useCallback(
+    (folderId: string, name: string) => {
+      const clean = name.trim().slice(0, 20);
+      if (!clean) return;
+      commit(orderedRef.current.map((item) => (item.id === folderId && item.kind === "folder" ? { ...item, name: clean } : item)));
+    },
+    [commit],
   );
 
   const saveHidden = useCallback((next: string[]) => {
@@ -206,7 +324,7 @@ export function Launcher({
   }, []);
 
   const g = geometryFor(width);
-  const blocked = Boolean(menu || folder || search || drag || launch || alert || screenMenu || hiddenSheet || weatherOpen);
+  const blocked = Boolean(menu || folder || search || drag || fdrag || launch || alert || screenMenu || hiddenSheet || weatherOpen);
   useEffect(() => onBlockSwipe(blocked), [blocked, onBlockSwipe]);
 
   // アプリの画面からはなれたら、編集・メニューなどはおしまい
@@ -249,8 +367,8 @@ export function Launcher({
     window.setTimeout(() => setLaunch((cur) => (cur?.closing ? null : cur)), 600);
   }, [returnFrom, baseItems, items]);
 
-  const openFolder = useCallback((f: LauncherFolder, el: Element) => {
-    setFolder({ folder: f, rect: rectOf(el), open: false });
+  const openFolder = useCallback((f: LauncherFolder, el: Element, focusName = false) => {
+    setFolder({ folder: f, rect: rectOf(el), open: false, focusName });
     requestAnimationFrame(() => requestAnimationFrame(() => setFolder((cur) => (cur ? { ...cur, open: true } : cur))));
   }, []);
   const closeFolder = useCallback(() => {
@@ -266,12 +384,13 @@ export function Launcher({
       if (folder.open) closeFolder();
       return;
     }
-    if (live.apps.length !== folder.folder.apps.length) setFolder((cur) => (cur ? { ...cur, folder: live } : cur));
+    const sig = (f: LauncherFolder) => `${f.name}|${f.apps.map((a) => a.id).join(",")}`;
+    if (sig(live) !== sig(folder.folder)) setFolder((cur) => (cur ? { ...cur, folder: live } : cur));
   }, [items, folder, closeFolder]);
 
-  const openMenu = useCallback((item: LauncherItem, el: Element) => {
+  const openMenu = useCallback((item: LauncherItem, el: Element, folderId?: string) => {
     if ("vibrate" in navigator) navigator.vibrate?.(8);
-    setMenu({ item, rect: rectOf(el), open: false });
+    setMenu({ item, rect: rectOf(el), open: false, folderId });
     requestAnimationFrame(() => requestAnimationFrame(() => setMenu((cur) => (cur ? { ...cur, open: true } : cur))));
   }, []);
   const closeMenu = useCallback(() => {
@@ -296,39 +415,191 @@ export function Launcher({
     (ids: string[]) => {
       saveHidden(hidden.filter((id) => !ids.includes(id)));
       // もどったアプリ（フォルダの中なら、そのフォルダ）を、ぽんと出す
-      const tops = ids.map((id) => baseItems.find((item) => item.id === id || (item.kind === "folder" && item.apps.some((a) => a.id === id)))?.id ?? id);
+      const tops = ids.map((id) => orderedRef.current.find((item) => item.id === id || (item.kind === "folder" && item.apps.some((a) => a.id === id)))?.id ?? id);
       setAppear(tops);
       window.setTimeout(() => setAppear([]), 700);
     },
-    [hidden, saveHidden, baseItems],
+    [hidden, saveHidden],
   );
 
   const hiddenEntries = useMemo<HiddenEntry[]>(() => {
-    const all = flattenApps(baseItems);
+    const all = flattenApps(ordered);
     return hidden.flatMap((id): HiddenEntry[] => {
-      const top = baseItems.find((item) => item.id === id);
+      const top = ordered.find((item) => item.id === id);
       if (top) return [{ id, name: top.name, tile: <Tile item={top} size={46} /> }];
       const app = all.find((a) => a.id === id);
       if (!app) return [];
-      const parent = baseItems.find((item) => item.kind === "folder" && item.apps.some((a) => a.id === id));
+      const parent = ordered.find((item) => item.kind === "folder" && item.apps.some((a) => a.id === id));
       return [{ id, name: app.name, folder: parent?.name, tile: <Tile item={app} size={46} /> }];
     });
-  }, [hidden, baseItems]);
+  }, [hidden, ordered]);
 
   /* ---------------------------------------------------------- 押す・長押し・並べかえ */
 
   const startDrag = useCallback(
-    (id: string, pointerId: number, clientX: number, clientY: number) => {
+    (id: string, pointerId: number, clientX: number, clientY: number, at?: { index: number; dx: number; dy: number }) => {
       const grid = gridRef.current;
-      const index = items.findIndex((item) => item.id === id);
+      const index = at?.index ?? itemsRef.current.findIndex((item) => item.id === id);
       if (!grid || index < 0) return;
       const box = grid.getBoundingClientRect();
       const pos = slotXY(g, index + WIDGET_SLOTS);
+      const dx = at?.dx ?? clientX - box.left - pos.x;
+      const dy = at?.dy ?? clientY - box.top - pos.y;
       setEditing(true);
-      setDrag({ id, pointerId, dx: clientX - box.left - pos.x, dy: clientY - box.top - pos.y, x: pos.x, y: pos.y });
+      setDrag({ id, pointerId, dx, dy, x: clientX - box.left - dx, y: clientY - box.top - dy });
     },
-    [items, g],
+    [g],
   );
+
+  /** フォルダの中でアイコンを持ち上げる */
+  const startFolderDrag = useCallback((id: string, pointerId: number, clientX: number, clientY: number, tile: Element) => {
+    const f = folderRef.current;
+    if (!f) return;
+    const r = tile.getBoundingClientRect();
+    setEditing(true);
+    setFdrag({ id, folderId: f.folder.id, pointerId, ox: clientX - r.left, oy: clientY - r.top, x: clientX, y: clientY });
+  }, []);
+
+  const clearReorder = () => {
+    if (reorderTimer.current) window.clearTimeout(reorderTimer.current.timer);
+    reorderTimer.current = null;
+  };
+  const clearMerge = () => {
+    window.clearTimeout(mergeTimer.current);
+    if (mergeRef.current) setMerge(null);
+  };
+
+  // ドラッグ中の指の動き（画面全体で受ける。フォルダの外へ出したアイコンも、そのまま並べかえへ続けられるように）
+  const onDragMove = (e: PointerEvent) => {
+    const fd = fdragRef.current;
+    if (fd && e.pointerId === fd.pointerId) {
+      setFdrag({ ...fd, x: e.clientX, y: e.clientY });
+      const panel = folderPanelRef.current?.getBoundingClientRect();
+      if (!panel) return;
+      const out = 16;
+      if (e.clientX < panel.left - out || e.clientX > panel.right + out || e.clientY < panel.top - out || e.clientY > panel.bottom + out) {
+        // フォルダの外へ出した → フォルダから外して、ホーム画面の並べかえへ
+        const list = itemsRef.current;
+        const at = list.findIndex((item) => item.id === fd.folderId);
+        const box = list[at];
+        const remains = box?.kind === "folder" && box.apps.length > 1;
+        takeOut(fd.folderId, fd.id);
+        closeFolder();
+        setFdrag(null);
+        startDrag(fd.id, fd.pointerId, e.clientX, e.clientY, { index: remains ? at + 1 : Math.max(0, at), dx: fd.ox + (g.cellW - g.icon) / 2, dy: fd.oy });
+        return;
+      }
+      // フォルダの中での並べかえ
+      const box = itemsRef.current.find((item) => item.id === fd.folderId);
+      if (!box || box.kind !== "folder") return;
+      const geo = folderGeometry(box.apps.length, g, height);
+      const cx = e.clientX - fd.ox + g.icon / 2 - (panel.left + geo.inner);
+      const cy = e.clientY - fd.oy + g.icon / 2 - (panel.top + geo.inner);
+      const col = Math.max(0, Math.min(2, Math.floor(cx / geo.cw)));
+      const row = Math.max(0, Math.floor(cy / g.rowH));
+      const to = Math.max(0, Math.min(box.apps.length - 1, row * 3 + col));
+      const from = box.apps.findIndex((a) => a.id === fd.id);
+      if (from >= 0 && to !== from) {
+        const next = [...box.apps];
+        const [moved] = next.splice(from, 1);
+        next.splice(to, 0, moved!);
+        reorderInFolder(box.id, next);
+      }
+      return;
+    }
+
+    const d = dragRef.current;
+    if (!d || e.pointerId !== d.pointerId) return;
+    const grid = gridRef.current?.getBoundingClientRect();
+    if (!grid) return;
+    const x = e.clientX - grid.left - d.dx;
+    const y = e.clientY - grid.top - d.dy;
+    setDrag({ ...d, x, y });
+    const list = itemsRef.current;
+    const from = list.findIndex((item) => item.id === d.id);
+    const cx = x + g.cellW / 2, cy = y + g.icon / 2;
+    const col = Math.max(0, Math.min(3, Math.floor((cx - g.pad) / g.cellW)));
+    const row = Math.max(2, Math.floor(cy / g.rowH));
+    const idx = Math.max(0, Math.min(list.length - 1, row * 4 + col - WIDGET_SLOTS));
+    const target = list[idx];
+    const tp = slotXY(g, idx + WIDGET_SLOTS);
+    const near = Math.abs(cx - (tp.x + g.cellW / 2)) < g.icon * 0.36 && Math.abs(cy - (tp.y + g.icon / 2)) < g.icon * 0.38;
+    // アイコンのまん中に重ねたら：少し待ってフォルダにする用意（重ねる相手が大きくなる）
+    if (target && idx !== from && near && list[from]?.kind === "app") {
+      clearReorder();
+      if (mergeRef.current?.id !== target.id) {
+        window.clearTimeout(mergeTimer.current);
+        setMerge({ id: target.id, ready: false });
+        mergeTimer.current = window.setTimeout(() => {
+          setMerge((m) => (m?.id === target.id ? { ...m, ready: true } : m));
+          if ("vibrate" in navigator) navigator.vibrate?.(6);
+        }, 280);
+      }
+      return;
+    }
+    clearMerge();
+    // アイコンのあいだに来たら：少しとまったところで入れかえる（ほかのアイコンはアニメーションでよける）
+    if (idx === from) {
+      clearReorder();
+      return;
+    }
+    if (reorderTimer.current?.idx === idx) return;
+    clearReorder();
+    reorderTimer.current = {
+      idx,
+      timer: window.setTimeout(() => {
+        reorderTimer.current = null;
+        const now = itemsRef.current;
+        const f = now.findIndex((item) => item.id === d.id);
+        if (f < 0 || f === idx || idx >= now.length) return;
+        const next = [...now];
+        const [moved] = next.splice(f, 1);
+        next.splice(idx, 0, moved!);
+        saveOrder(next);
+      }, 260),
+    };
+  };
+
+  const onDragEnd = (e: PointerEvent) => {
+    const fd = fdragRef.current;
+    if (fd && e.pointerId === fd.pointerId) {
+      setFdrag(null);
+      return;
+    }
+    const d = dragRef.current;
+    if (!d || e.pointerId !== d.pointerId) return;
+    clearReorder();
+    window.clearTimeout(mergeTimer.current);
+    const m = mergeRef.current;
+    setMerge(null);
+    setDrag(null);
+    if (!m?.ready) return;
+    const made = mergeInto(d.id, m.id);
+    if (!made) return;
+    // 新しくできたフォルダを開く（名前をすぐ変えられるように）
+    requestAnimationFrame(() => requestAnimationFrame(() => {
+      const box = itemsRef.current.find((item) => item.id === made);
+      const el = gridRef.current?.querySelector(`[data-id="${made}"] [data-tile]`);
+      if (box?.kind === "folder" && el) openFolder(box, el);
+    }));
+  };
+
+  const dragHandlers = useRef({ move: onDragMove, end: onDragEnd });
+  dragHandlers.current = { move: onDragMove, end: onDragEnd };
+  const anyDrag = Boolean(drag || fdrag);
+  useEffect(() => {
+    if (!anyDrag) return;
+    const move = (e: PointerEvent) => dragHandlers.current.move(e);
+    const end = (e: PointerEvent) => dragHandlers.current.end(e);
+    window.addEventListener("pointermove", move);
+    window.addEventListener("pointerup", end);
+    window.addEventListener("pointercancel", end);
+    return () => {
+      window.removeEventListener("pointermove", move);
+      window.removeEventListener("pointerup", end);
+      window.removeEventListener("pointercancel", end);
+    };
+  }, [anyDrag]);
 
   const onCellDown = (event: ReactPointerEvent, item: LauncherItem, inFolder = false) => {
     event.stopPropagation();
@@ -346,49 +617,33 @@ export function Launcher({
       if (!press.current || press.current.moved) return;
       press.current.long = true;
       setPressed(null);
-      if (!inFolder) openMenu(item, el.querySelector("[data-tile]") ?? el);
+      openMenu(item, el.querySelector("[data-tile]") ?? el, inFolder ? folderRef.current?.folder.id : undefined);
     }, 460);
     press.current = { id: item.id, pointerId: event.pointerId, x0: event.clientX, y0: event.clientY, timer, long: false, moved: false, inFolder, editing: false };
   };
 
   const onCellMove = (event: ReactPointerEvent) => {
     const p = press.current;
-    if (drag && event.pointerId === drag.pointerId) {
-      const box = gridRef.current?.getBoundingClientRect();
-      if (!box) return;
-      const x = event.clientX - box.left - drag.dx;
-      const y = event.clientY - box.top - drag.dy;
-      setDrag({ ...drag, x, y });
-      // 指の下のマスへ入れかえる（ほかのアイコンはアニメーションでよける）
-      const cx = x + g.cellW / 2, cy = y + g.icon / 2;
-      const col = Math.max(0, Math.min(3, Math.floor((cx - g.pad) / g.cellW)));
-      const row = Math.max(2, Math.floor(cy / g.rowH));
-      const target = Math.max(0, Math.min(items.length - 1, row * 4 + col - WIDGET_SLOTS));
-      const from = items.findIndex((item) => item.id === drag.id);
-      if (from >= 0 && target !== from) {
-        const next = [...items];
-        const [moved] = next.splice(from, 1);
-        next.splice(target, 0, moved!);
-        saveOrder(next);
-      }
-      return;
-    }
     if (!p || event.pointerId !== p.pointerId) return;
     const dist = Math.hypot(event.clientX - p.x0, event.clientY - p.y0);
+    const lift = () => {
+      press.current = null;
+      const tile = (event.currentTarget as Element).querySelector("[data-tile]") ?? event.currentTarget;
+      if (p.inFolder) startFolderDrag(p.id, event.pointerId, event.clientX, event.clientY, tile);
+      else startDrag(p.id, event.pointerId, event.clientX, event.clientY);
+    };
     if (p.editing) {
-      if (!p.moved && dist > 6 && !p.inFolder) {
+      if (!p.moved && dist > 6) {
         p.moved = true;
-        press.current = null;
-        startDrag(p.id, event.pointerId, event.clientX, event.clientY);
+        lift();
       }
       return;
     }
-    if (p.long && menu && dist > 12 && !p.inFolder) {
+    if (p.long && menu && dist > 12) {
       // メニューが出たまま指を動かしたら、そのまま並べかえへ
       setMenu(null);
-      press.current = null;
       (event.currentTarget as Element).setPointerCapture?.(event.pointerId);
-      startDrag(p.id, event.pointerId, event.clientX, event.clientY);
+      lift();
       return;
     }
     if (!p.long && dist > 8) {
@@ -399,10 +654,7 @@ export function Launcher({
   };
 
   const onCellUp = (event: ReactPointerEvent, item: LauncherItem) => {
-    if (drag && event.pointerId === drag.pointerId) {
-      setDrag(null);
-      return;
-    }
+    if (dragRef.current || fdragRef.current) return;
     const p = press.current;
     press.current = null;
     setPressed(null);
@@ -418,7 +670,6 @@ export function Launcher({
     if (press.current) window.clearTimeout(press.current.timer);
     press.current = null;
     setPressed(null);
-    setDrag(null);
   };
 
   // 何もないところを長押し → メニュー（編集・非表示のアプリを再表示）。編集中に何もないところをタップ → 完了
@@ -480,7 +731,8 @@ export function Launcher({
         data-dragging={dragging ? "true" : undefined}
         data-removing={removing === item.id ? "true" : undefined}
         data-appear={appear.includes(item.id) ? "true" : undefined}
-        data-hidden={(launch?.app.id === item.id && !launch.fading) || (menu?.item.id === item.id && !opts.inFolder) ? "true" : undefined}
+        data-hidden={(launch?.app.id === item.id && !launch.fading) || menu?.item.id === item.id || (opts.inFolder && fdrag?.id === item.id) ? "true" : undefined}
+        data-merge={merge?.id === item.id && !opts.inFolder ? (merge.ready ? "ready" : "near") : undefined}
         role="button"
         tabIndex={0}
         aria-label={item.kind === "folder" ? `${item.name}フォルダ（${item.apps.length}個のアプリ）` : `${item.name}${badge ? `（${badge}件）` : ""}`}
@@ -498,6 +750,7 @@ export function Launcher({
         }}
       >
         <span className={styles.press} data-tile="">
+          {merge?.id === item.id && merge.ready && !opts.inFolder ? <span className={`${styles.mergeHalo} ${styles.squircle}`} aria-hidden="true" /> : null}
           <Tile item={item} size={size} />
           {badge && !jiggling ? <span className={styles.badge}>{badge > 99 ? "99+" : badge}</span> : null}
           {jiggling && !dragging ? (
@@ -602,7 +855,19 @@ export function Launcher({
         </div>
       </div>
 
-      {folder ? <FolderView state={folder} g={g} height={height} editing={editing} cell={cell} onClose={closeFolder} /> : null}
+      {folder ? (
+        <FolderView
+          state={folder}
+          g={g}
+          height={height}
+          editing={editing}
+          cell={cell}
+          panelRef={folderPanelRef}
+          drag={fdrag}
+          onClose={closeFolder}
+          onRename={(name) => renameFolder(folder.folder.id, name)}
+        />
+      ) : null}
       {menu ? (
         <ContextMenu
           state={menu}
@@ -612,6 +877,13 @@ export function Launcher({
           onHide={() => { const m = menu; closeMenu(); window.setTimeout(() => setAlert(m.item), 200); }}
           onOpen={(href) => { const m = menu; closeMenu(); if (m.item.kind === "app") open(m.item, null, href); }}
           onOpenFolderApp={(app) => { closeMenu(); open(app, null); }}
+          onTakeOut={menu.folderId ? () => { const m = menu; closeMenu(); takeOut(m.folderId!, m.item.id); } : undefined}
+          onRename={menu.item.kind === "folder" ? () => {
+            const m = menu;
+            closeMenu();
+            const el = gridRef.current?.querySelector(`[data-id="${m.item.id}"] [data-tile]`);
+            if (m.item.kind === "folder" && el) { setEditing(true); openFolder(m.item, el, true); }
+          } : undefined}
         />
       ) : null}
       {search ? <Spotlight items={items} cell={cell} onClose={() => setSearch(false)} onOpen={(app) => { setSearch(false); open(app, null); }} /> : null}
@@ -653,43 +925,87 @@ export function Launcher({
 
 /* ------------------------------------------------------------------ フォルダ */
 
-function FolderView({ state, g, height, editing, cell, onClose }: {
+function FolderView({ state, g, height, editing, cell, panelRef, drag, onClose, onRename }: {
   state: FolderState;
   g: Geometry;
   height: number;
   editing: boolean;
   cell: (item: LauncherItem, slot: number, opts?: CellOpts) => ReactNode;
+  panelRef: React.RefObject<HTMLDivElement | null>;
+  drag: FolderDrag | null;
   onClose: () => void;
+  onRename: (name: string) => void;
 }) {
   const { folder, rect, open } = state;
-  const vw = window.innerWidth;
-  const pw = Math.min(vw - 52, 330);
-  const inner = 20;
-  const cw = (pw - inner * 2) / 3;
-  const rows = Math.max(1, Math.ceil(folder.apps.length / 3));
-  const ph = inner * 2 + rows * g.rowH - 6;
-  const x = (vw - pw) / 2;
-  const y = Math.max(120, height * 0.46 - ph / 2);
+  const { pw, ph, inner, cw, x, y } = folderGeometry(folder.apps.length, g, height);
   const from = `translate(${rect.left - x}px, ${rect.top - y}px) scale(${rect.width / pw}, ${rect.height / ph})`;
+  const dragged = drag ? folder.apps.find((a) => a.id === drag.id) : undefined;
   return createPortal(
     <div className={styles.veil} data-open={open} onPointerDown={(e) => e.target === e.currentTarget && onClose()} style={ROOT_VARS}>
-      <div className={styles.folderTitle} style={{ top: y - 58, opacity: open ? 1 : 0, transform: open ? "none" : "scale(0.85)" }}>{folder.name}</div>
-      <div className={styles.folderPanel} style={{ left: x, top: y, width: pw, height: ph, transform: open ? "none" : from, borderRadius: open ? 38 : 16 }}>
+      <div className={styles.folderTitle} style={{ top: y - 62, opacity: open ? 1 : 0, transform: open ? "none" : "scale(0.85)" }}>
+        {editing ? <FolderName name={folder.name} focus={Boolean(state.focusName && open)} onRename={onRename} /> : folder.name}
+      </div>
+      <div ref={panelRef} className={styles.folderPanel} style={{ left: x, top: y, width: pw, height: ph, transform: open ? "none" : from, borderRadius: open ? 38 : 16 }}>
         <div style={{ position: "absolute", inset: inner, opacity: open ? 1 : 0, transition: "opacity .25s" }}>
           {folder.apps.map((app, i) =>
             cell(app, i, { inFolder: true, style: { width: cw, transform: `translate3d(${(i % 3) * cw}px, ${Math.floor(i / 3) * g.rowH}px, 0)` } }),
           )}
         </div>
       </div>
-      {editing ? <p className={styles.folderHint} style={{ top: y + ph + 18, opacity: open ? 1 : 0 }}>× を押すと、そのアプリだけ非表示にできます</p> : null}
+      {editing ? (
+        <p className={styles.folderHint} style={{ top: y + ph + 18, opacity: open && !drag ? 1 : 0 }}>
+          フォルダの外へドラッグすると、フォルダから外せます
+        </p>
+      ) : null}
+      {drag && dragged ? (
+        <div className={styles.floatTile} style={{ left: drag.x - drag.ox, top: drag.y - drag.oy }}>
+          <Tile item={dragged} size={g.icon} />
+        </div>
+      ) : null}
     </div>,
     document.body,
   );
 }
 
+/** 編集中のフォルダの名前（タップして書きかえられる） */
+function FolderName({ name, focus, onRename }: { name: string; focus: boolean; onRename: (name: string) => void }) {
+  const [value, setValue] = useState(name);
+  const ref = useRef<HTMLInputElement>(null);
+  useEffect(() => setValue(name), [name]);
+  useEffect(() => {
+    if (focus) ref.current?.select();
+  }, [focus]);
+  const save = () => {
+    if (value.trim() && value.trim() !== name) onRename(value);
+    else setValue(name);
+  };
+  return (
+    <span className={styles.folderNameField} onPointerDown={(e) => e.stopPropagation()}>
+      <input
+        ref={ref}
+        value={value}
+        maxLength={20}
+        aria-label="フォルダの名前"
+        enterKeyHint="done"
+        onChange={(e) => setValue(e.target.value)}
+        onBlur={save}
+        onKeyDown={(e) => {
+          if (e.key === "Enter") (e.target as HTMLInputElement).blur();
+          if (e.key === "Escape") { setValue(name); (e.target as HTMLInputElement).blur(); }
+        }}
+      />
+      {value ? (
+        <button type="button" aria-label="名前を消す" onPointerDown={(e) => e.preventDefault()} onClick={() => { setValue(""); ref.current?.focus(); }}>
+          <svg width="9" height="9" viewBox="0 0 10 10" aria-hidden="true"><path d="M1.5 1.5l7 7M8.5 1.5l-7 7" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" /></svg>
+        </button>
+      ) : null}
+    </span>
+  );
+}
+
 /* ------------------------------------------------------------------ 長押しのメニュー */
 
-function ContextMenu({ state, g, onClose, onEdit, onHide, onOpen, onOpenFolderApp }: {
+function ContextMenu({ state, g, onClose, onEdit, onHide, onOpen, onOpenFolderApp, onTakeOut, onRename }: {
   state: MenuState;
   g: Geometry;
   onClose: () => void;
@@ -697,11 +1013,15 @@ function ContextMenu({ state, g, onClose, onEdit, onHide, onOpen, onOpenFolderAp
   onHide: () => void;
   onOpen: (href: string) => void;
   onOpenFolderApp: (app: LauncherApp) => void;
+  /** フォルダの中のアプリのとき */
+  onTakeOut?: () => void;
+  /** フォルダのとき */
+  onRename?: () => void;
 }) {
   const { item, rect, open } = state;
   const vw = window.innerWidth, vh = window.innerHeight;
-  const rows = item.kind === "folder" ? item.apps.length : (item.shortcuts?.length ?? 1);
-  const menuH = rows * 44 + 8 + 88;
+  const rows = (item.kind === "folder" ? item.apps.length : (item.shortcuts?.length ?? 1)) + (onTakeOut || onRename ? 1 : 0);
+  const menuH = rows * 46 + 8 + 92;
   const below = rect.top + rect.height + 14 + menuH < vh - 20;
   const left = Math.max(12, Math.min(vw - 252, rect.left + rect.width / 2 - 120));
   const top = below ? rect.top + rect.height + 14 : Math.max(12, rect.top - 14 - menuH);
@@ -730,6 +1050,18 @@ function ContextMenu({ state, g, onClose, onEdit, onHide, onOpen, onOpenFolderAp
               </button>
             ))}
         <div className={styles.menuGap} />
+        {onRename ? (
+          <button type="button" role="menuitem" onClick={onRename}>
+            名前を変更
+            <svg width="18" height="18" viewBox="0 0 18 18" aria-hidden="true"><path d="M3 13.5V15h1.5l8.6-8.6-1.5-1.5L3 13.5Zm11.8-8.1a1 1 0 0 0 0-1.4l-.8-.8a1 1 0 0 0-1.4 0l-.9.9 1.5 1.5.9-.9Z" fill="currentColor" /></svg>
+          </button>
+        ) : null}
+        {onTakeOut ? (
+          <button type="button" role="menuitem" onClick={onTakeOut}>
+            フォルダから外す
+            <svg width="18" height="18" viewBox="0 0 18 18" aria-hidden="true"><rect x="2" y="5" width="9" height="9" rx="2.4" fill="none" stroke="currentColor" strokeWidth="1.5" /><path d="M9 9l6.5-6.5M11 2.5h4.5V7" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" /></svg>
+          </button>
+        ) : null}
         <button type="button" role="menuitem" onClick={onEdit}>
           ホーム画面を編集
           <EditGlyph />

@@ -103,3 +103,72 @@ export function applyHidden(items: readonly LauncherItem[], hidden: ReadonlySet<
     return apps.length ? [{ ...item, apps }] : [];
   });
 }
+
+/**
+ * 並びとフォルダ（グループ）を、この端末に覚える形。
+ * アプリは id の文字、フォルダは { id, name, apps }。利用者がアプリどうしを重ねて作ったフォルダも、ここに入る。
+ */
+export type StoredEntry = string | { id: string; name: string; apps: string[] };
+export const LAYOUT_KEY = "odekake_launcher_layout_v1";
+
+export function toStored(items: readonly LauncherItem[]): StoredEntry[] {
+  return items.map((item) => (item.kind === "app" ? item.id : { id: item.id, name: item.name, apps: item.apps.map((a) => a.id) }));
+}
+
+/** フォルダの名前（はじめにつける名前。あとから変えられる） */
+export function folderNameFor(apps: readonly LauncherApp[]): string {
+  const all = (word: string) => apps.every((a) => a.keywords.includes(word) || a.name.includes(word));
+  if (all("ゲーム")) return "ゲーム";
+  if (apps.every((a) => a.href.startsWith("/mypage"))) return "マイページ";
+  return "フォルダ";
+}
+
+/**
+ * 覚えている並び・フォルダを、いまのアプリに当てはめる。
+ * - 知らない id は捨てる。中がからになったフォルダは出さない
+ * - 覚えていないアプリ（あとから増えたもの）は、もとのフォルダがあればその中へ、なければいちばんうしろへ
+ */
+export function buildItems(base: readonly LauncherItem[], stored: readonly StoredEntry[] | null): LauncherItem[] {
+  if (!stored) return [...base];
+  const apps = new Map(flattenApps(base).map((a) => [a.id, a]));
+  const baseFolders = new Map(base.flatMap((item) => (item.kind === "folder" ? [[item.id, item] as const] : [])));
+  const used = new Set<string>();
+  const take = (id: string) => {
+    const a = apps.get(id);
+    if (!a || used.has(id)) return null;
+    used.add(id);
+    return a;
+  };
+  const result: LauncherItem[] = [];
+  for (const entry of stored) {
+    if (typeof entry === "string") {
+      const folder = baseFolders.get(entry);
+      if (folder) {
+        // 前の形（並び順だけ）で覚えていたフォルダ
+        const inside = folder.apps.flatMap((a) => take(a.id) ?? []);
+        if (inside.length) result.push({ ...folder, apps: inside });
+        continue;
+      }
+      const a = take(entry);
+      if (a) result.push(a);
+      continue;
+    }
+    if (!entry || typeof entry.id !== "string" || !Array.isArray(entry.apps)) continue;
+    const inside = entry.apps.flatMap((id) => (typeof id === "string" ? take(id) ?? [] : []));
+    if (!inside.length) continue;
+    const name = typeof entry.name === "string" && entry.name.trim() ? entry.name.trim().slice(0, 20) : folderNameFor(inside);
+    result.push({ kind: "folder", id: entry.id, name, apps: inside, keywords: baseFolders.get(entry.id)?.keywords ?? [] });
+  }
+  for (const item of base) {
+    const rest = item.kind === "folder" ? item.apps : [item];
+    for (const a of rest) {
+      if (used.has(a.id)) continue;
+      used.add(a.id);
+      const home = item.kind === "folder" ? result.find((r): r is LauncherFolder => r.kind === "folder" && r.id === item.id) : undefined;
+      if (home) home.apps = [...home.apps, a];
+      else if (item.kind === "folder") result.push({ ...item, apps: [a] });
+      else result.push(a);
+    }
+  }
+  return result;
+}
