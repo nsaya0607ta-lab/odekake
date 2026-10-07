@@ -20,7 +20,7 @@ import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, typ
 import { createPortal } from "react-dom";
 import { useHomeWeather, WeatherSheet } from "@/components/home-weather";
 import { markLaunch, rememberHomePage } from "@/lib/launcher-return";
-import { applyHidden, applyOrder, buildItems, flattenApps, folderNameFor, HIDDEN_KEY, iconSrc, LAYOUT_KEY, launcherItems, ORDER_KEY, toStored, type LauncherApp, type LauncherFolder, type LauncherItem, type LauncherOptions, type StoredEntry } from "./apps";
+import { applyHidden, buildItems, defaultHidden, flattenApps, folderNameFor, HIDDEN_KEY, iconSrc, LAYOUT_KEY, launcherItems, toStored, type LauncherApp, type LauncherFolder, type LauncherItem, type LauncherOptions, type StoredEntry } from "./apps";
 import { EditGlyph, EyeGlyph, HiddenSheet, HideAlert, ScreenMenu, type HiddenEntry } from "./sheets";
 import { ClockWeatherWidget, StepsWidget } from "./widgets";
 import styles from "./launcher.module.css";
@@ -80,6 +80,47 @@ const readLayout = (): StoredEntry[] | null => {
 const isStandalone = () =>
   (typeof navigator !== "undefined" && (navigator as Navigator & { standalone?: boolean }).standalone === true) ||
   (typeof window !== "undefined" && window.matchMedia?.("(display-mode: standalone)").matches === true);
+
+/** iPhone・iPad か（iPad は Mac のふりをするので、さわれる画面かどうかも見る） */
+const isIOS = () =>
+  typeof navigator !== "undefined" && (/iPhone|iPad|iPod/.test(navigator.userAgent) || (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1));
+
+/**
+ * そのサービスのアプリで開く。入っていなければ（アプリへ移らなければ）、サイトを Safari で開く。
+ * iPhone が「"YouTube" で開きますか？」と聞いているあいだは、答えが出るまで待つ
+ */
+function openAppOrSite(appUrl: string, href: string) {
+  let hidden = false;
+  const onHide = () => {
+    if (document.visibilityState === "hidden") hidden = true;
+  };
+  document.addEventListener("visibilitychange", onHide);
+  const done = () => document.removeEventListener("visibilitychange", onHide);
+  window.location.href = appUrl;
+  window.setTimeout(() => {
+    if (hidden) {
+      done();
+      return;
+    }
+    if (document.hasFocus()) {
+      done();
+      openInSafari(href);
+      return;
+    }
+    const onFocus = () => {
+      window.removeEventListener("focus", onFocus);
+      window.setTimeout(() => {
+        done();
+        if (!hidden) openInSafari(href);
+      }, 400);
+    };
+    window.addEventListener("focus", onFocus);
+    window.setTimeout(() => {
+      window.removeEventListener("focus", onFocus);
+      done();
+    }, 20_000);
+  }, 1200);
+}
 
 /**
  * 外のサイトを Safari で開く（ホーム画面のアプリから）。
@@ -199,7 +240,7 @@ const cellXY = (g: Geometry, n: number) => {
 };
 /** 端末に覚えるときの形（何ページ目の何マス目か。画面の高さで1ページのマスの数が変わっても、なるべく同じページに置けるように） */
 type SavedSlot = { p: number; s: number };
-const POS_KEY = "odekake_launcher_pos_v1";
+const POS_KEY = "odekake_launcher_pos_v2";
 const readPos = (): Record<string, SavedSlot> => {
   try {
     const v = JSON.parse(window.localStorage.getItem(POS_KEY) ?? "null") as unknown;
@@ -296,15 +337,9 @@ export function Launcher({
   const router = useRouter();
   const hw = useHomeWeather();
   const baseItems = useMemo(() => launcherItems(options), [options]);
-  // 並びとフォルダ（前の版で並び順だけを覚えていたら、それを引きつぐ）
-  const [layout, setLayout] = useState<StoredEntry[] | null>(() => {
-    if (typeof window === "undefined") return null;
-    const saved = readLayout();
-    if (saved) return saved;
-    const order = readList(ORDER_KEY);
-    return order ? toStored(applyOrder(launcherItems(options), order)) : null;
-  });
-  const [hidden, setHidden] = useState<string[]>(() => (typeof window === "undefined" ? [] : readList(HIDDEN_KEY) ?? []));
+  // 並びとフォルダ（覚えていなければ、はじめの並び）
+  const [layout, setLayout] = useState<StoredEntry[] | null>(() => (typeof window === "undefined" ? null : readLayout()));
+  const [hidden, setHidden] = useState<string[]>(() => (typeof window === "undefined" ? [] : readList(HIDDEN_KEY) ?? defaultHidden(launcherItems(options))));
   /** アイコンを置いたマス（並べかえたことがなければ、から。そのときは順につめて置く） */
   const [saved, setSaved] = useState<Record<string, SavedSlot>>(() => (typeof window === "undefined" ? {} : readPos()));
   const ordered = useMemo(() => buildItems(baseItems, layout), [baseItems, layout]);
@@ -517,10 +552,11 @@ export function Launcher({
         setSearch(false);
         // 戻ってきたとき、いまのページ（アプリの画面の何枚目か）で開くように
         rememberHomePage(1 + lpRef.current);
-        if (isStandalone()) {
-          // ホーム画面から開いたアプリ：アプリの中の小さなブラウザではなく、Safari（別のアプリ）で開く。
-          // iPhone（iOS 17〜）は「x-safari-https://」で Safari に渡せる。渡せたら、このアプリは裏へまわる
-          openInSafari(href);
+        if (isStandalone() && isIOS()) {
+          // ホーム画面から開いたアプリ：そのサービスのアプリが入っていればアプリで、なければ Safari（別のアプリ）でサイトを開く
+          // （アプリの中の小さなブラウザでは開かない）
+          if (app.appUrl && href === app.href) openAppOrSite(app.appUrl, href);
+          else openInSafari(href);
           return;
         }
         // （"noopener" をつけると、開けても null が返ってくるので、あとから切りはなす）
