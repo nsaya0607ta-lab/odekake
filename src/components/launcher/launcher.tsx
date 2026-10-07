@@ -19,7 +19,7 @@ import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties, type PointerEvent as ReactPointerEvent, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 import { useHomeWeather, WeatherSheet } from "@/components/home-weather";
-import { markLaunch } from "@/lib/launcher-return";
+import { markLaunch, rememberHomePage } from "@/lib/launcher-return";
 import { applyHidden, applyOrder, buildItems, flattenApps, folderNameFor, HIDDEN_KEY, iconSrc, LAYOUT_KEY, launcherItems, ORDER_KEY, toStored, type LauncherApp, type LauncherFolder, type LauncherItem, type LauncherOptions, type StoredEntry } from "./apps";
 import { EditGlyph, EyeGlyph, HiddenSheet, HideAlert, ScreenMenu, type HiddenEntry } from "./sheets";
 import { ClockWeatherWidget, StepsWidget } from "./widgets";
@@ -75,6 +75,11 @@ const readLayout = (): StoredEntry[] | null => {
     return null;
   }
 };
+
+/** ホーム画面に追加したアプリとして開いているか（iPhone の Safari の navigator.standalone と、表示モード） */
+const isStandalone = () =>
+  (typeof navigator !== "undefined" && (navigator as Navigator & { standalone?: boolean }).standalone === true) ||
+  (typeof window !== "undefined" && window.matchMedia?.("(display-mode: standalone)").matches === true);
 
 /* ------------------------------------------------------------------ アイコン */
 
@@ -480,6 +485,15 @@ export function Launcher({
       if (app.external) {
         // 外のサイト：指をはなしたその場で開く（間をあけると、ブラウザに止められることがある）
         setSearch(false);
+        // 戻ってきたとき、いまのページ（アプリの画面の何枚目か）で開くように
+        rememberHomePage(1 + lpRef.current);
+        if (isStandalone()) {
+          // ホーム画面から開いたアプリ：新しい窓は作らずにそのまま移る。iPhone がアプリの上にブラウザを重ねて開く
+          // （マップや YouTube のアプリが入っていれば、そのアプリへ）。新しい窓を作ると、アプリへ渡ったあとに白い窓だけが残る
+          window.location.assign(href);
+          return;
+        }
+        // （"noopener" をつけると、開けても null が返ってくるので、あとから切りはなす）
         const win = window.open(href, "_blank");
         if (win) win.opener = null;
         else window.location.assign(href);
