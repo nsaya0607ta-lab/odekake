@@ -46,10 +46,10 @@ const SCENE_LAYOUTS: Record<HomeSkinTheme, SceneLayout> = {
   },
   winter: {
     levelBoard: { left: "4.8%", top: "16.4%", width: "25.2%", height: "24%" },
-    levelBanner: { left: "23.4%", top: "10%", width: "53%", height: "22.7%" },
+    levelBanner: { left: "23.4%", top: "5%", width: "53%", height: "22.7%" },
     levelPanel: { left: "9.5%", top: "37%", width: "81%", height: "52%" },
     stepsBoard: { left: "5%", top: "46.4%", width: "25.2%", height: "25.1%" },
-    stepsBanner: { left: "25.4%", top: "9.6%", width: "50.8%", height: "21.7%" },
+    stepsBanner: { left: "25.4%", top: "4.8%", width: "50.8%", height: "21.7%" },
     stepsPanel: { left: "9%", top: "36%", width: "82%", height: "54%" },
   },
   deluxe: {
