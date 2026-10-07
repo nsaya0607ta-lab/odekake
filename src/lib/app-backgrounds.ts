@@ -95,7 +95,7 @@ export const APP_BACKGROUNDS: readonly AppBackground[] = [
   { id: "aurora-night", name: "オーロラの夜", sub: "流れ星と町の灯り", description: "夜空にオーロラがゆらめき、ときどき流れ星が走ります。下には小さな町の灯り。ホーム以外の画面では、文字が読みやすいように薄めて表示します。", price: 4000, group: "move", tag: "動く", dark: true, live: true },
   { id: "aurora", name: "パステルオーロラ", sub: "ゆっくり動く", description: "5色のふんわりしたグラデーションが、40秒かけてゆっくり回ります。", price: 4000, group: "move", tag: "動く" },
   { id: "balloons", name: "ふうせん", sub: "色とりどりに、ふわふわ", description: "色とりどりのふうせんと、わんこの顔のふうせんが、ゆらゆら空へのぼっていきます。ふうせんをタップするとパチンと割れて紙ふぶき。空いているところをタップすると、そこから1つ飛んでいきます。", price: 4000, group: "move", tag: "さわれる", live: true },
-  { id: "local-train", name: "ローカル線", sub: "わんこを乗せて走る電車", description: "山と田んぼのあいだを、わんこたちを乗せた小さな電車がことこと走ります。雲が流れ、ときどき鳥も。画面をタップすると、電車がすぐに来てくれます。", price: 4000, group: "move", tag: "さわれる", live: true },
+  { id: "local-train", name: "ローカル線", sub: "わんこを乗せて走る電車", description: "山と田んぼのあいだを、わんこたちを乗せた小さな電車がことこと走ります。雲が流れ、ときどき鳥も。開いている時刻で朝・昼・夕方・夜の景色に変わり、夜は窓に明かりがともります。画面をタップすると電車がすぐに来て、汽笛を鳴らします。", price: 4000, group: "move", tag: "さわれる", live: true },
   // ---- なぞる背景 ----
   { id: "zen-sand", name: "枯山水", sub: "指で砂に模様を描く", description: "石と苔のまわりに、砂の波もようが広がる庭。画面をなぞると、熊手でかいたような筋が砂に残り、しばらくすると元の模様にもどります。ときどき紅葉がひらりと落ちてきます。", price: 4000, group: "trace", tag: "なぞれる", live: true },
   { id: "fireflies", name: "ほたるの川辺", sub: "指に集まる光", description: "夜の川辺を、ほたるがふわふわ光りながら飛びます。画面をなぞると、ほたるが指のまわりに集まってきて、指を離すとまた散っていきます。ホーム以外の画面では、文字が読みやすいように薄めて表示します。", price: 4000, group: "trace", tag: "なぞれる", dark: true, live: true },
@@ -180,7 +180,7 @@ export type RecordsKind = "mine" | "few" | "some" | "all";
 
 /** ホーム以外で薄めて表示するか（暗い背景のときだけ） */
 export function isDarkBackground(id: AppBackgroundId, signals: BackgroundSignals): boolean {
-  if (id === "sky-clock") return signals.skyTime === "night";
+  if (id === "sky-clock" || id === "local-train") return signals.skyTime === "night";
   if (id === "weather") return signals.weather?.phase === "night";
   if (id === "seasons") return signals.season === "summer";
   return Boolean(getAppBackground(id).dark);
@@ -189,7 +189,15 @@ export function isDarkBackground(id: AppBackgroundId, signals: BackgroundSignals
 /** ショップの見本で切りかえて見せる「◯◯のとき」 */
 export type BackgroundVariant = { key: string; label: string; signals: BackgroundSignals };
 
+const SKY_TIME_VARIANTS: readonly BackgroundVariant[] = [
+  { key: "morning", label: "朝", signals: { skyTime: "morning" } },
+  { key: "day", label: "昼", signals: { skyTime: "day" } },
+  { key: "evening", label: "夕方", signals: { skyTime: "evening" } },
+  { key: "night", label: "夜", signals: { skyTime: "night" } },
+];
+
 export const BACKGROUND_VARIANTS: Partial<Record<AppBackgroundId, readonly BackgroundVariant[]>> = {
+  "local-train": SKY_TIME_VARIANTS,
   "sky-clock": [
     { key: "morning", label: "朝", signals: { skyTime: "morning" } },
     { key: "day", label: "昼", signals: { skyTime: "day" } },
@@ -238,13 +246,14 @@ export const POSTER_VARIANTS: Partial<Record<AppBackgroundId, readonly string[]>
   weather: ["clear", "rain", "snow", "night"],
   seasons: ["spring", "summer", "autumn", "winter"],
   garden: ["10000"],
+  "local-train": ["day"],
   "my-map": ["some"],
   "my-stars": ["some"],
 };
 
 /** 大きな見本を開いたときに、最初に見せる切りかえ（いまの時間帯・季節に近いもの） */
 export function defaultVariantKey(id: AppBackgroundId, now: Date): string | null {
-  if (id === "sky-clock") return skyTimeOf(now);
+  if (id === "sky-clock" || id === "local-train") return skyTimeOf(now);
   if (id === "seasons") return seasonOf(now);
   if (id === "weather") return skyTimeOf(now) === "night" ? "night" : "clear";
   if (id === "garden") return "6000";
