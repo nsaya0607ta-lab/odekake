@@ -66,14 +66,14 @@ const SCENE_FRAME_OVERHANG = -0.3082 + (824 / 1024) * 1.6787 - 1;
 const n = (v: number) => v.toFixed(5);
 
 /** 絵の幅（CSS の式） */
-function artWidth(g: CardGeometry): string {
+function artWidth(): string {
   return `(100% + ${CARD_BLEED.left + CARD_BLEED.right}px)`;
 }
 
 /** そのカードの「絵の上の、紙より上の透明なところ」の高さ（CSS の式） */
 function transparentAbove(id: HomeCardId, skins?: Partial<HomeSkins>): string {
   const g = geometryOf(id, skins);
-  return `${artWidth(g)} * ${n(g.paperTop / g.ratio)}`;
+  return `${artWidth()} * ${n(g.paperTop / g.ratio)}`;
 }
 
 /** 1つ上のカードの「紙より下の透明なところ」の高さ（犬のカードは枠がはみ出すのでマイナス） */
@@ -81,7 +81,7 @@ function transparentBelow(prev: HomeCardId | "scene", skins?: Partial<HomeSkins>
   // 犬のカードは 1px の線（rough-card）の内側に絵があるので、絵の幅は 100% - 2px、枠のはみ出しは線の 1px ぶん少ない
   if (prev === "scene") return `((100% - 2px) * ${n(-SCENE_FRAME_OVERHANG / SCENE_RATIO)} + 1px)`;
   const g = geometryOf(prev, skins);
-  return `${artWidth(g)} * ${n((1 - g.paperBottom) / g.ratio)}`;
+  return `${artWidth()} * ${n((1 - g.paperBottom) / g.ratio)}`;
 }
 
 /** 1つ上が prev のときの、このカードの margin-top（skins はカードの絵がら） */
