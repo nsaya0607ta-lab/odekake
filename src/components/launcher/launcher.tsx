@@ -146,19 +146,64 @@ function geometryFor(width: number, avail: number | null, page: number): Geometr
 
 /** ウィジェットが1枚目の上の2段（8マス）を使う */
 const WIDGET_SLOTS = 8;
-/** 1枚目・2枚目から先に入るアイコンの数 */
-const firstCap = (g: Geometry) => (g.rows - 2) * 4;
-const pageCap = (g: Geometry) => g.rows * 4;
-const pagesFor = (g: Geometry, count: number) => 1 + (count > firstCap(g) ? Math.ceil((count - firstCap(g)) / pageCap(g)) : 0);
-/** i 番目のアイコンが何枚目のどのマスか */
-const placeOf = (g: Geometry, i: number) => (i < firstCap(g) ? { page: 0, slot: i + WIDGET_SLOTS } : { page: 1 + Math.floor((i - firstCap(g)) / pageCap(g)), slot: (i - firstCap(g)) % pageCap(g) });
-/** i 番目のアイコンの場所（アイコンの並びの左上から） */
-const posOf = (g: Geometry, i: number) => {
-  const { page, slot } = placeOf(g, i);
-  return { x: page * g.page + g.pad + (slot % 4) * g.cellW, y: Math.floor(slot / 4) * g.rowH };
+/**
+ * アイコンの場所は、ページをまたいだマスの通し番号で持つ（1ページ = rows×4 マス。1枚目の上の8マスはウィジェット）。
+ * iPhone と同じく、好きなマスに置けて、あいだのマスは空いたままでよい。
+ */
+const perPage = (g: Geometry) => g.rows * 4;
+const usable = (g: Geometry, n: number) => n >= 0 && !(n < perPage(g) && n % perPage(g) < WIDGET_SLOTS);
+const nextUsable = (g: Geometry, n: number) => {
+  let m = n;
+  while (!usable(g, m)) m++;
+  return m;
 };
-/** lp 枚目の slot マス目は何番目のアイコンか */
-const indexAt = (g: Geometry, lp: number, slot: number) => (lp === 0 ? slot - WIDGET_SLOTS : firstCap(g) + (lp - 1) * pageCap(g) + slot);
+/** マスの通し番号 → 画面の上の場所（アイコンの並びの左上から） */
+const cellXY = (g: Geometry, n: number) => {
+  const p = Math.floor(n / perPage(g)), s = n % perPage(g);
+  return { x: p * g.page + g.pad + (s % 4) * g.cellW, y: Math.floor(s / 4) * g.rowH };
+};
+/** 端末に覚えるときの形（何ページ目の何マス目か。画面の高さで1ページのマスの数が変わっても、なるべく同じページに置けるように） */
+type SavedSlot = { p: number; s: number };
+const POS_KEY = "odekake_launcher_pos_v1";
+const readPos = (): Record<string, SavedSlot> => {
+  try {
+    const v = JSON.parse(window.localStorage.getItem(POS_KEY) ?? "null") as unknown;
+    return v && typeof v === "object" && !Array.isArray(v) ? (v as Record<string, SavedSlot>) : {};
+  } catch {
+    return {};
+  }
+};
+
+/**
+ * それぞれのアイコンを、どのマスに置くか決める。
+ * 覚えているマスがあればそこへ（重なったら次の空いているマスへ）。覚えていないアイコン（はじめて・あとから増えたもの）は、いちばんうしろの空いているマスへ。
+ */
+function placeItems(g: Geometry, items: readonly LauncherItem[], saved: Record<string, SavedSlot>): Map<string, number> {
+  const per = perPage(g);
+  const taken = new Set<number>();
+  const out = new Map<string, number>();
+  const want = items.flatMap((item) => {
+    const at = saved[item.id];
+    return at && Number.isInteger(at.p) && Number.isInteger(at.s) && at.p >= 0 && at.s >= 0 ? [{ id: item.id, n: at.p * per + Math.min(at.s, per - 1) }] : [];
+  });
+  want.sort((a, b) => a.n - b.n);
+  for (const w of want) {
+    let n = nextUsable(g, w.n);
+    while (taken.has(n)) n = nextUsable(g, n + 1);
+    taken.add(n);
+    out.set(w.id, n);
+  }
+  let tail = taken.size ? Math.max(...taken) + 1 : WIDGET_SLOTS;
+  for (const item of items) {
+    if (out.has(item.id)) continue;
+    let n = nextUsable(g, tail);
+    while (taken.has(n)) n = nextUsable(g, n + 1);
+    taken.add(n);
+    out.set(item.id, n);
+    tail = n + 1;
+  }
+  return out;
+}
 
 /** 開いたフォルダの大きさと場所 */
 function folderGeometry(appCount: number, g: Geometry, height: number) {
@@ -225,6 +270,8 @@ export function Launcher({
     return order ? toStored(applyOrder(launcherItems(options), order)) : null;
   });
   const [hidden, setHidden] = useState<string[]>(() => (typeof window === "undefined" ? [] : readList(HIDDEN_KEY) ?? []));
+  /** アイコンを置いたマス（並べかえたことがなければ、から。そのときは順につめて置く） */
+  const [saved, setSaved] = useState<Record<string, SavedSlot>>(() => (typeof window === "undefined" ? {} : readPos()));
   const ordered = useMemo(() => buildItems(baseItems, layout), [baseItems, layout]);
   const items = useMemo(() => applyHidden(ordered, new Set(hidden)), [ordered, hidden]);
   const [width, setWidth] = useState(initialWidth);
@@ -274,16 +321,26 @@ export function Launcher({
     writeList(LAYOUT_KEY, stored as unknown as string[]);
   }, []);
 
-  /** 見えている並びを覚える（非表示のアプリは、いまの並びのうしろに置いておく。再表示すると、いちばんうしろに出る） */
-  const saveOrder = useCallback(
-    (visible: LauncherItem[]) => {
-      const full = orderedRef.current;
-      const byId = new Map(full.map((item) => [item.id, item]));
-      const shown = new Set(visible.map((item) => item.id));
-      commit([...visible.map((item) => byId.get(item.id) ?? item), ...full.filter((item) => !shown.has(item.id))]);
-    },
-    [commit],
-  );
+  /** いまの置き場所を覚える（非表示のアプリが前にいたマスも、そのまま覚えておく。再表示したとき、空いていればそこにもどる） */
+  const geoRef = useRef<Geometry | null>(null);
+  const savePlacement = useCallback((map: Map<string, number>, drop: string[] = []) => {
+    const geo = geoRef.current;
+    if (!geo) return;
+    const per = perPage(geo);
+    setSaved((cur) => {
+      const next: Record<string, SavedSlot> = { ...cur };
+      for (const id of drop) delete next[id];
+      for (const [id, n] of map) next[id] = { p: Math.floor(n / per), s: n % per };
+      try {
+        window.localStorage.setItem(POS_KEY, JSON.stringify(next));
+      } catch {
+        // 覚えられなくても、この画面のあいだはそのまま
+      }
+      return next;
+    });
+    placeRef.current = map;
+  }, []);
+
 
   /** アプリを、ほかのアプリ（→新しいフォルダ）かフォルダに入れる。できたフォルダの id を返す */
   const mergeInto = useCallback(
@@ -300,26 +357,46 @@ export function Launcher({
         return [{ kind: "folder", id: made, name: folderNameFor([item, dragged]), apps: [item, dragged], keywords: [] }];
       });
       commit(next);
+      const map = new Map(placeRef.current);
+      const at = map.get(targetId);
+      map.delete(dragId);
+      if (made && at != null) {
+        map.delete(targetId);
+        map.set(made, at);
+      }
+      savePlacement(map, made ? [dragId, targetId] : [dragId]);
       return made;
     },
-    [commit],
+    [commit, savePlacement],
   );
 
   /** フォルダからアプリを出す（フォルダのすぐうしろに置く。フォルダがからになったら消す） */
   const takeOut = useCallback(
-    (folderId: string, appId: string) => {
+    (folderId: string, appId: string): number | null => {
       const full = orderedRef.current;
       const at = full.findIndex((item) => item.id === folderId);
       const box = full[at];
-      if (!box || box.kind !== "folder") return;
+      const geo = geoRef.current;
+      if (!box || box.kind !== "folder" || !geo) return null;
       const app = box.apps.find((a) => a.id === appId);
-      if (!app) return;
+      if (!app) return null;
       const apps = box.apps.filter((a) => a.id !== appId);
       const next = [...full];
       next.splice(at, 1, ...(apps.length ? [{ ...box, apps }] : []), app);
       commit(next);
+      // フォルダのあとの、いちばん近い空いているマスへ（フォルダがからになったら、そのマスへ）
+      const map = new Map(placeRef.current);
+      const from = map.get(folderId) ?? WIDGET_SLOTS;
+      if (!apps.length) map.delete(folderId);
+      const taken = new Set(map.values());
+      let n = apps.length ? from + 1 : from;
+      n = nextUsable(geo, n);
+      while (taken.has(n)) n = nextUsable(geo, n + 1);
+      map.set(appId, n);
+      savePlacement(map, apps.length ? [] : [folderId]);
+      return n;
     },
-    [commit],
+    [commit, savePlacement],
   );
 
   /** フォルダの中の並びを覚える（中の非表示のアプリは、うしろに置いておく） */
@@ -369,7 +446,15 @@ export function Launcher({
   }, [width, height]);
   const screenW = typeof window === "undefined" ? width : window.innerWidth;
   const g = geometryFor(width, avail, screenW);
-  const appPages = pagesFor(g, items.length);
+  geoRef.current = g;
+  const placement = useMemo(() => placeItems(g, items, saved), [g.rows, g.page, items, saved]); // eslint-disable-line react-hooks/exhaustive-deps
+  const placeRef = useRef(placement);
+  placeRef.current = placement;
+  const lastPage = Math.floor(Math.max(WIDGET_SLOTS, ...placement.values()) / perPage(g));
+  // 並べかえ中は、うしろに空のページを1枚出す（そこへも置ける。iPhone と同じ）
+  const appPages = lastPage + 1 + (drag ? 1 : 0);
+  const appPagesRef = useRef(appPages);
+  appPagesRef.current = appPages;
   useEffect(() => onAppPages(appPages), [appPages, onAppPages]);
   /** いま見ている、アプリの画面の何枚目か（0 から） */
   const lp = Math.max(0, Math.min(appPages - 1, page - 1));
@@ -497,12 +582,12 @@ export function Launcher({
   /* ---------------------------------------------------------- 押す・長押し・並べかえ */
 
   const startDrag = useCallback(
-    (id: string, pointerId: number, clientX: number, clientY: number, at?: { index: number; dx: number; dy: number }) => {
+    (id: string, pointerId: number, clientX: number, clientY: number, at?: { slot: number; dx: number; dy: number }) => {
       const grid = gridRef.current;
-      const index = at?.index ?? itemsRef.current.findIndex((item) => item.id === id);
-      if (!grid || index < 0) return;
+      const slot = at?.slot ?? placeRef.current.get(id);
+      if (!grid || slot == null) return;
       const box = grid.getBoundingClientRect();
-      const pos = posOf(g, index);
+      const pos = cellXY(g, slot);
       const dx = at?.dx ?? clientX - box.left - pos.x;
       const dy = at?.dy ?? clientY - box.top - pos.y;
       setEditing(true);
@@ -539,14 +624,10 @@ export function Launcher({
       const out = 16;
       if (e.clientX < panel.left - out || e.clientX > panel.right + out || e.clientY < panel.top - out || e.clientY > panel.bottom + out) {
         // フォルダの外へ出した → フォルダから外して、ホーム画面の並べかえへ
-        const list = itemsRef.current;
-        const at = list.findIndex((item) => item.id === fd.folderId);
-        const box = list[at];
-        const remains = box?.kind === "folder" && box.apps.length > 1;
-        takeOut(fd.folderId, fd.id);
+        const slot = takeOut(fd.folderId, fd.id);
         closeFolder();
         setFdrag(null);
-        startDrag(fd.id, fd.pointerId, e.clientX, e.clientY, { index: remains ? at + 1 : Math.max(0, at), dx: fd.ox + (g.cellW - g.icon) / 2, dy: fd.oy });
+        if (slot != null) startDrag(fd.id, fd.pointerId, e.clientX, e.clientY, { slot, dx: fd.ox + (g.cellW - g.icon) / 2, dy: fd.oy });
         return;
       }
       // フォルダの中での並べかえ
@@ -580,7 +661,7 @@ export function Launcher({
     // 画面のはしで少し止まったら、となりのページへ（iPhone と同じ）
     const edge = e.clientX > window.innerWidth - 26 ? 1 : e.clientX < 26 ? -1 : 0;
     const next = lpRef.current + edge;
-    if (edge && next >= 0 && next < pagesFor(g, list.length + (edge > 0 ? 1 : 0))) {
+    if (edge && next >= 0 && next < appPagesRef.current) {
       if (edgeTimer.current?.dir !== edge) {
         if (edgeTimer.current) window.clearTimeout(edgeTimer.current.timer);
         const at = { pointerId: e.pointerId, clientX: e.clientX, clientY: e.clientY };
@@ -608,12 +689,15 @@ export function Launcher({
     const here = lpRef.current;
     const col = Math.max(0, Math.min(3, Math.floor((cx - here * g.page - g.pad) / g.cellW)));
     const row = Math.max(here === 0 ? 2 : 0, Math.min(g.rows - 1, Math.floor(cy / g.rowH)));
-    const idx = Math.max(0, Math.min(list.length - 1, indexAt(g, here, row * 4 + col)));
-    const target = list[idx];
-    const tp = posOf(g, idx);
+    const tn = here * perPage(g) + row * 4 + col;
+    const place = placeRef.current;
+    const mine = place.get(d.id);
+    const occupant = [...place].find(([id, n]) => n === tn && id !== d.id)?.[0];
+    const target = occupant ? list.find((item) => item.id === occupant) : undefined;
+    const tp = cellXY(g, tn);
     const near = Math.abs(cx - (tp.x + g.cellW / 2)) < g.icon * 0.36 && Math.abs(cy - (tp.y + g.icon / 2)) < g.icon * 0.38;
     // アイコンのまん中に重ねたら：少し待ってフォルダにする用意（重ねる相手が大きくなる）
-    if (target && idx !== from && near && list[from]?.kind === "app") {
+    if (target && near && list[from]?.kind === "app") {
       clearReorder();
       if (mergeRef.current?.id !== target.id) {
         window.clearTimeout(mergeTimer.current);
@@ -626,25 +710,33 @@ export function Launcher({
       return;
     }
     clearMerge();
-    // アイコンのあいだに来たら：少しとまったところで入れかえる（ほかのアイコンはアニメーションでよける）
-    if (idx === from) {
+    if (tn === mine) {
       clearReorder();
       return;
     }
-    if (reorderTimer.current?.idx === idx) return;
+    if (reorderTimer.current?.idx === tn) return;
     clearReorder();
+    // 空いているマスなら、そのままそこへ（あいだが空いていてよい）。
+    // ほかのアイコンのはしに来たら、そのマスに入り、そこから先のアイコンを次の空いているマスまで1つずつ送る
     reorderTimer.current = {
-      idx,
+      idx: tn,
       timer: window.setTimeout(() => {
         reorderTimer.current = null;
-        const now = itemsRef.current;
-        const f = now.findIndex((item) => item.id === d.id);
-        if (f < 0 || f === idx || idx >= now.length) return;
-        const next = [...now];
-        const [moved] = next.splice(f, 1);
-        next.splice(idx, 0, moved!);
-        saveOrder(next);
-      }, 260),
+        const map = new Map(placeRef.current);
+        map.delete(d.id);
+        const bySlot = new Map([...map].map(([id, n]) => [n, id]));
+        let n = tn;
+        let mover = bySlot.get(n);
+        while (mover) {
+          const m = nextUsable(g, n + 1);
+          const following = bySlot.get(m);
+          map.set(mover, m);
+          mover = following;
+          n = m;
+        }
+        map.set(d.id, tn);
+        savePlacement(map);
+      }, occupant ? 260 : 140),
     };
   };
 
@@ -795,7 +887,7 @@ export function Launcher({
   /* ---------------------------------------------------------- 描く */
 
   const cellStyle = (slot: number, override?: { x: number; y: number }): CSSProperties => {
-    const { x, y } = override ?? posOf(g, slot);
+    const { x, y } = override ?? cellXY(g, slot);
     return { width: g.cellW, transform: `translate3d(${x}px, ${y}px, 0)` };
   };
 
@@ -917,7 +1009,7 @@ export function Launcher({
           onLong={openScreenMenu}
         />
 
-        {items.map((item, index) => cell(item, index))}
+        {items.map((item, index) => cell(item, placement.get(item.id) ?? index + WIDGET_SLOTS))}
       </div>
 
       {/* 検索（編集中は「再表示」「完了」）とページの点 */}
