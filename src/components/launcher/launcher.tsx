@@ -86,40 +86,62 @@ const isIOS = () =>
   typeof navigator !== "undefined" && (/iPhone|iPad|iPod/.test(navigator.userAgent) || (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1));
 
 /**
- * そのサービスのアプリで開く。入っていなければ（アプリへ移らなければ）、サイトを Safari で開く。
- * iPhone が「"YouTube" で開きますか？」と聞いているあいだは、答えが出るまで待つ
+ * そのサービスのアプリで開く。アプリへ移れなかったとき（入っていないとき）だけ、サイトを Safari で開く。
+ *
+ * アプリが開いたかどうかは、このページが少しでも裏へまわったか（見えなくなった・止められた）で見分ける。
+ * どれか1つでも起きたら、アプリへ移れたものとして、あとからサイトを開くことはしない（アプリから戻ってきたときも）。
+ * - 見えなくなった・ページを離れた（visibilitychange・pagehide）
+ * - タイマーが止まっていた（裏へまわると止まるので、時計を細かく見て、間があいたら）
+ * - 「"YouTube" で開きますか？」が出て、答えるまでに時間がかかった（3秒以上。開いてアプリを使っていたとみなす）
  */
 function openAppOrSite(appUrl: string, href: string) {
-  let hidden = false;
-  const onHide = () => {
-    if (document.visibilityState === "hidden") hidden = true;
+  let left = false;
+  let blurAt = 0;
+  let last = performance.now();
+  const markLeft = () => {
+    left = true;
   };
-  document.addEventListener("visibilitychange", onHide);
-  const done = () => document.removeEventListener("visibilitychange", onHide);
+  const onBlur = () => {
+    blurAt = performance.now();
+  };
+  const beat = window.setInterval(() => {
+    const now = performance.now();
+    if (now - last > 900) left = true;
+    last = now;
+  }, 200);
+  document.addEventListener("visibilitychange", markLeft);
+  window.addEventListener("pagehide", markLeft);
+  window.addEventListener("blur", onBlur);
+  const stop = () => {
+    window.clearInterval(beat);
+    document.removeEventListener("visibilitychange", markLeft);
+    window.removeEventListener("pagehide", markLeft);
+    window.removeEventListener("blur", onBlur);
+    window.removeEventListener("focus", onFocus);
+  };
+  const decide = () => {
+    stop();
+    if (!left && document.visibilityState === "visible") openInSafari(href);
+  };
+  // 確認が出ていたとき：画面にもどってきたところで決める（すぐ「キャンセル」なら、サイトを開く）
+  const onFocus = () => {
+    if (blurAt && performance.now() - blurAt > 3000) left = true;
+    window.setTimeout(decide, 300);
+  };
   window.location.href = appUrl;
   window.setTimeout(() => {
-    if (hidden) {
-      done();
+    if (left) {
+      stop();
       return;
     }
     if (document.hasFocus()) {
-      done();
-      openInSafari(href);
+      decide();
       return;
     }
-    const onFocus = () => {
-      window.removeEventListener("focus", onFocus);
-      window.setTimeout(() => {
-        done();
-        if (!hidden) openInSafari(href);
-      }, 400);
-    };
     window.addEventListener("focus", onFocus);
-    window.setTimeout(() => {
-      window.removeEventListener("focus", onFocus);
-      done();
-    }, 20_000);
-  }, 1200);
+    // 答えが出ないまま長くたったら、もう何もしない
+    window.setTimeout(stop, 30_000);
+  }, 1500);
 }
 
 /**
