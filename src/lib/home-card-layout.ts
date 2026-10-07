@@ -24,15 +24,13 @@ type CardGeometry = {
   /** 紙の上端・下端が、絵の高さの何割のところにあるか（public/ の画像から測った値） */
   paperTop: number;
   paperBottom: number;
-  /** 絵の幅が「親の幅 + 21px」よりせまいときの差（px）。ハイライトはスライドに左右 2px の内側余白がある */
-  narrower?: number;
 };
 
 export const HOME_CARD_GEOMETRY: Record<HomeCardId, CardGeometry> = {
   // public/notice-card.webp（2172×724）：紙は 63〜673px
   notice: { ratio: 2172 / 724, paperTop: 63 / 724, paperBottom: 673 / 724 },
   // public/home-highlights-frame.webp（1536×1024）：紙は 33〜970px
-  highlights: { ratio: 1536 / 1024, paperTop: 33 / 1024, paperBottom: 970 / 1024, narrower: 4 },
+  highlights: { ratio: 1536 / 1024, paperTop: 33 / 1024, paperBottom: 970 / 1024 },
   // public/collection-card.webp（2172×724）：紙は 66〜668px
   collection: { ratio: 2172 / 724, paperTop: 66 / 724, paperBottom: 668 / 724 },
 };
@@ -47,6 +45,8 @@ const SKIN_GEOMETRY: Partial<Record<HomeSkinTheme, Partial<Record<HomeCardId, Pi
     notice: { paperTop: 81 / 724, paperBottom: 653 / 724 },
     // public/home-skins/deluxe/collection.webp：紙は 86〜648px
     collection: { paperTop: 86 / 724, paperBottom: 648 / 724 },
+    // public/home-skins/deluxe/highlights.webp：紙は 37〜974px（左上のリボンが切れないよう、少し下げてある）
+    highlights: { paperTop: 37 / 1024, paperBottom: 974 / 1024 },
   },
 };
 
@@ -66,14 +66,14 @@ const SCENE_FRAME_OVERHANG = -0.3082 + (824 / 1024) * 1.6787 - 1;
 const n = (v: number) => v.toFixed(5);
 
 /** 絵の幅（CSS の式） */
-function artWidth(g: CardGeometry): string {
-  return `(100% + ${CARD_BLEED.left + CARD_BLEED.right - (g.narrower ?? 0)}px)`;
+function artWidth(): string {
+  return `(100% + ${CARD_BLEED.left + CARD_BLEED.right}px)`;
 }
 
 /** そのカードの「絵の上の、紙より上の透明なところ」の高さ（CSS の式） */
 function transparentAbove(id: HomeCardId, skins?: Partial<HomeSkins>): string {
   const g = geometryOf(id, skins);
-  return `${artWidth(g)} * ${n(g.paperTop / g.ratio)}`;
+  return `${artWidth()} * ${n(g.paperTop / g.ratio)}`;
 }
 
 /** 1つ上のカードの「紙より下の透明なところ」の高さ（犬のカードは枠がはみ出すのでマイナス） */
@@ -81,7 +81,7 @@ function transparentBelow(prev: HomeCardId | "scene", skins?: Partial<HomeSkins>
   // 犬のカードは 1px の線（rough-card）の内側に絵があるので、絵の幅は 100% - 2px、枠のはみ出しは線の 1px ぶん少ない
   if (prev === "scene") return `((100% - 2px) * ${n(-SCENE_FRAME_OVERHANG / SCENE_RATIO)} + 1px)`;
   const g = geometryOf(prev, skins);
-  return `${artWidth(g)} * ${n((1 - g.paperBottom) / g.ratio)}`;
+  return `${artWidth()} * ${n((1 - g.paperBottom) / g.ratio)}`;
 }
 
 /** 1つ上が prev のときの、このカードの margin-top（skins はカードの絵がら） */

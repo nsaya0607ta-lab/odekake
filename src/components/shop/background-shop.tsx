@@ -2,20 +2,19 @@
 
 /**
  * ショップ：アプリの背景を青コインで買って、使う背景を選ぶ。
- * - 一覧は「動く背景」「変わる背景」「柄・風景」に分けて並べる。見本は背景だけを、1枚の絵で見せる
+ * - 上のタブで「背景」「ホームのカード」「並び・透け感」を切りかえる。背景は種類のボタンでしぼりこめ、「すべて」は種類ごとに横に並べる
  * - タップすると大きな見本が開き、動く背景はそのまま動く（さわれる背景は、見本をさわると反応する）
  * - 変わる背景は「雨のとき」「10,000歩のとき」などを切りかえて見られる
  * - 「アプリでためす」で、買う前にアプリ全体の背景を一時的に切りかえられる
  */
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { createPortal } from "react-dom";
 import { AppBackgroundPreview } from "@/components/app-background";
 import { BlueCoinArt } from "@/components/coin-art";
 import { requestTiltPermission, type LiveMode } from "@/components/live-backgrounds/engine";
 import { setTryOnBackground, useTryOnBackground } from "@/components/live-backgrounds/try-on";
-import { BlueCoinBar } from "@/components/room/room-shop";
 import { HomeLookEditor } from "@/components/shop/home-look-editor";
 import { HomeSkinShop } from "@/components/shop/home-skin-shop";
 import {
@@ -25,6 +24,7 @@ import {
   POSTER_VARIANTS,
   defaultVariantKey,
   getAppBackground,
+  type AppBackgroundGroup,
   type AppBackgroundId,
   type BackgroundSignals,
   type BackgroundVariant,
@@ -33,6 +33,32 @@ import type { HomeLook } from "@/lib/home-look";
 import type { HomeSkins } from "@/lib/home-skins";
 
 const NO_VARIANTS: readonly BackgroundVariant[] = [];
+
+/** ショップの売り場（いちばん上のタブ） */
+const SHOP_TABS = [
+  { id: "bg", label: "背景", sub: "アプリ全体" },
+  { id: "cards", label: "ホームのカード", sub: "冬・豪華など" },
+  { id: "look", label: "並び・透け感", sub: "無料" },
+] as const;
+type ShopTab = (typeof SHOP_TABS)[number]["id"];
+const isShopTab = (v: string): v is ShopTab => SHOP_TABS.some((t) => t.id === v);
+
+/** 背景の種類のしぼりこみ */
+type GroupFilter = "all" | "owned" | AppBackgroundGroup;
+const GROUP_LABELS: Record<AppBackgroundGroup, string> = {
+  move: "動く",
+  trace: "なぞる",
+  tilt: "かたむける",
+  change: "変わる",
+  record: "記録で育つ",
+  art: "シンプル",
+  pattern: "柄・風景",
+};
+const GROUP_FILTERS: readonly { id: GroupFilter; label: string }[] = [
+  { id: "all", label: "すべて" },
+  ...APP_BACKGROUND_GROUPS.map((g) => ({ id: g.id as GroupFilter, label: GROUP_LABELS[g.id] })),
+  { id: "owned", label: "持っている" },
+];
 
 /**
  * 背景だけの見本。zoom で柄の大きさを決める（1 で実際の画面と同じ大きさ）。
@@ -96,77 +122,172 @@ export function BackgroundShop({ current: initialCurrent, owned: initialOwned, b
   const [blueCoins, setBlueCoins] = useState(initialBlueCoins);
   const [selected, setSelected] = useState<AppBackgroundId | null>(null);
 
+  const [tab, setTab] = useState<ShopTab>("bg");
+  const [group, setGroup] = useState<GroupFilter>("all");
+
+  // URL の #cards などで、そのタブを開く（ホームの「着せかえ」から来たときなど）
+  useEffect(() => {
+    const hash = window.location.hash.slice(1);
+    if (isShopTab(hash)) setTab(hash);
+  }, []);
+  const chooseTab = (next: ShopTab) => {
+    setTab(next);
+    window.history.replaceState(null, "", next === "bg" ? window.location.pathname : `#${next}`);
+    window.scrollTo({ top: 0, behavior: "instant" });
+  };
+
   const statusOf = (id: AppBackgroundId): Status => (id === current ? "using" : owned.has(id) ? "owned" : "locked");
   const currentBg = getAppBackground(current);
+  const ownedCount = APP_BACKGROUNDS.filter((bg) => bg.id !== "default" && owned.has(bg.id)).length;
+
+  const tile = (bg: (typeof APP_BACKGROUNDS)[number], size: "row" | "grid") => {
+    const status = statusOf(bg.id);
+    const trying = tryOn === bg.id;
+    return (
+      <button
+        key={bg.id}
+        type="button"
+        onClick={() => setSelected(bg.id)}
+        aria-label={`${bg.name}（${status === "using" ? "使用中" : status === "owned" ? "持っています" : `青コイン${bg.price.toLocaleString()}枚`}）`}
+        className={`flex min-w-0 flex-col rounded-[18px] bg-card p-1 text-left shadow-[0_4px_12px_rgba(90,70,40,.1)] transition active:scale-[.97] ${
+          size === "row" ? "w-[112px] shrink-0 snap-start" : ""
+        } ${status === "using" ? "ring-[2.5px] ring-leaf" : trying ? "ring-[2.5px] ring-[#2F6FC2]" : "ring-1 ring-[rgba(120,100,70,.14)]"}`}
+      >
+        {/* 見本の上には何も重ねず、背景そのものを見せる（しるしは角に小さく） */}
+        <span className="relative block aspect-[4/5] w-full overflow-hidden rounded-[14px] ring-1 ring-inset ring-[rgba(120,100,70,.08)]">
+          <BackgroundArt id={bg.id} zoom={0.5} />
+          {bg.tag ? (
+            <span className={`absolute left-1 top-1 rounded-full px-1.5 py-px text-[9px] font-black text-leaf-deep shadow-sm ${GLASS}`}>{bg.tag}</span>
+          ) : null}
+          {status === "using" ? (
+            <span className="absolute right-1 top-1 flex h-5 w-5 items-center justify-center rounded-full bg-leaf text-white shadow-md">
+              <CheckIcon className="h-3 w-3" />
+            </span>
+          ) : trying ? (
+            <span className="absolute right-1 top-1 rounded-full bg-[#2F6FC2] px-1.5 py-px text-[9px] font-black text-white shadow-md">おためし</span>
+          ) : null}
+        </span>
+        <span className="flex flex-col gap-0.5 px-0.5 pb-0.5 pt-1.5">
+          <span className="truncate text-[12px] font-black leading-tight">{bg.name}</span>
+          <StatusPill status={status} price={bg.price} />
+        </span>
+      </button>
+    );
+  };
+
+  const visible = (id: GroupFilter) =>
+    APP_BACKGROUNDS.filter((bg) => (id === "owned" ? owned.has(bg.id) : id === "all" ? true : bg.group === id));
 
   return (
     <>
-      <BlueCoinBar shop={{ blueCoins }} note="買った背景は、アプリ全体の背景になります。いつでも切り替えられます。" />
+      {/* 青コイン（1行にまとめる） */}
+      <div className="flex items-center gap-2 rounded-2xl border border-[#BFD7F5] bg-[linear-gradient(135deg,#F2F8FF,#E3EFFD)] py-2 pl-2.5 pr-2">
+        <BlueCoinArt className="h-7 w-7 shrink-0 drop-shadow-sm" />
+        <p className="min-w-0 flex-1 text-[11px] font-bold text-[#3D6FB0]">
+          青コイン <span className="text-lg font-black tabular-nums text-[#1F4F8F]">{blueCoins.toLocaleString()}</span>
+          <span className="text-[11px] text-[#1F4F8F]">枚</span>
+        </p>
+        <Link href="/games/osanpo-run" className="shrink-0 rounded-full bg-[#2F6FC2] px-3 py-1.5 text-[11px] font-black text-white shadow-sm active:scale-95">ためる →</Link>
+      </div>
 
-      <button
-        type="button"
-        onClick={() => setSelected(current)}
-        className="relative block aspect-[16/7] w-full overflow-hidden rounded-[22px] text-left shadow-[0_6px_18px_rgba(90,70,40,.14)] ring-1 ring-[rgba(120,100,70,.14)] active:scale-[.99]"
-      >
-        <BackgroundArt id={current} zoom={0.85} />
-        <span className={`absolute bottom-2.5 left-2.5 flex items-center gap-2 rounded-2xl px-3 py-2 shadow-sm ${GLASS}`}>
-          <span className="flex h-6 w-6 items-center justify-center rounded-full bg-leaf text-white"><CheckIcon className="h-3.5 w-3.5" /></span>
-          <span className="min-w-0">
-            <span className="block text-[10px] font-bold text-ink-faint">いま使っている背景</span>
-            <span className="block text-sm font-black">{currentBg.name}</span>
-          </span>
-        </span>
-      </button>
+      {/* いちばん上のタブ（ヘッダーの下にくっつく） */}
+      <div className="sticky top-[69px] z-20 -mx-4 bg-[rgba(251,248,241,.92)] px-4 pb-2 pt-2 backdrop-blur-md" role="tablist" aria-label="ショップの売り場">
+        <div className="grid grid-cols-3 gap-1 rounded-2xl bg-paper-deep p-1 ring-1 ring-[rgba(120,100,70,.12)]">
+          {SHOP_TABS.map((item) => (
+            <button
+              key={item.id}
+              type="button"
+              role="tab"
+              aria-selected={tab === item.id}
+              onClick={() => chooseTab(item.id)}
+              className={`flex flex-col items-center gap-0.5 rounded-xl py-1.5 transition ${tab === item.id ? "bg-card text-ink shadow-sm" : "text-ink-faint"}`}
+            >
+              <span className="text-[13px] font-black leading-tight">{item.label}</span>
+              <span className="text-[9.5px] font-bold leading-tight opacity-80">{item.sub}</span>
+            </button>
+          ))}
+        </div>
 
-      <HomeLookEditor initial={homeLook} />
-
-      <HomeSkinShop initialSkins={homeSkins} initialOwned={ownedHomeSkins} blueCoins={blueCoins} onBalance={setBlueCoins} />
-
-      {APP_BACKGROUND_GROUPS.map((group) => (
-        <section key={group.id}>
-          <div className="px-1">
-            <h2 className="text-base font-bold">{group.title}</h2>
-            <p className="mt-0.5 text-[11px] text-ink-faint">{group.note}</p>
-          </div>
-          <div className="mt-2 grid grid-cols-2 gap-3">
-            {APP_BACKGROUNDS.filter((bg) => bg.group === group.id).map((bg) => {
-              const status = statusOf(bg.id);
-              const trying = tryOn === bg.id;
+        {tab === "bg" ? (
+          <div className="-mx-4 mt-2 flex gap-1.5 overflow-x-auto px-4 [scrollbar-width:none]" role="group" aria-label="背景の種類">
+            {GROUP_FILTERS.map((item) => {
+              const count = visible(item.id).length;
+              const on = group === item.id;
               return (
                 <button
-                  key={bg.id}
+                  key={item.id}
                   type="button"
-                  onClick={() => setSelected(bg.id)}
-                  aria-label={`${bg.name}（${status === "using" ? "使用中" : status === "owned" ? "持っています" : `青コイン${bg.price.toLocaleString()}枚`}）`}
-                  className={`flex min-w-0 flex-col rounded-[22px] bg-card p-1.5 text-left shadow-[0_6px_16px_rgba(90,70,40,.1)] transition active:scale-[.98] ${
-                    status === "using" ? "ring-[2.5px] ring-leaf" : trying ? "ring-[2.5px] ring-[#2F6FC2]" : "ring-1 ring-[rgba(120,100,70,.14)]"
+                  aria-pressed={on}
+                  onClick={() => {
+                    setGroup(item.id);
+                    window.scrollTo({ top: 0, behavior: "instant" });
+                  }}
+                  className={`flex shrink-0 items-center gap-1 rounded-full px-3 py-1.5 text-[12px] font-black transition ${
+                    on ? "bg-ink text-card" : "bg-card text-ink-soft ring-1 ring-[rgba(120,100,70,.16)]"
                   }`}
                 >
-                  {/* 見本の上には何も重ねず、背景そのものを見せる（しるしは角に小さく） */}
-                  <span className="relative block aspect-[4/5] w-full overflow-hidden rounded-[17px] ring-1 ring-inset ring-[rgba(120,100,70,.08)]">
-                    <BackgroundArt id={bg.id} zoom={0.6} />
-                    {bg.tag ? (
-                      <span className={`absolute left-1.5 top-1.5 rounded-full px-2 py-0.5 text-[10px] font-black text-leaf-deep shadow-sm ${GLASS}`}>{bg.tag}</span>
-                    ) : null}
-                    {status === "using" ? (
-                      <span className="absolute right-1.5 top-1.5 flex h-6 w-6 items-center justify-center rounded-full bg-leaf text-white shadow-md">
-                        <CheckIcon className="h-3.5 w-3.5" />
-                      </span>
-                    ) : trying ? (
-                      <span className="absolute right-1.5 top-1.5 rounded-full bg-[#2F6FC2] px-2 py-0.5 text-[10px] font-black text-white shadow-md">おためし中</span>
-                    ) : null}
-                  </span>
-                  <span className="flex flex-col gap-1 px-1 pb-0.5 pt-2">
-                    <span className="truncate text-[13px] font-black leading-tight">{bg.name}</span>
-                    <span className="truncate text-[10px] leading-tight text-ink-faint">{bg.sub}</span>
-                    <StatusPill status={status} price={bg.price} />
-                  </span>
+                  {item.label}
+                  <span className={`rounded-full px-1.5 text-[10px] tabular-nums ${on ? "bg-white/20" : "bg-paper-deep text-ink-faint"}`}>{count}</span>
                 </button>
               );
             })}
           </div>
-        </section>
-      ))}
+        ) : null}
+      </div>
+
+      {tab === "bg" ? (
+        <>
+          <button
+            type="button"
+            onClick={() => setSelected(current)}
+            className="relative flex w-full items-center gap-3 overflow-hidden rounded-[20px] bg-card p-1.5 pr-3 text-left shadow-[0_4px_12px_rgba(90,70,40,.1)] ring-1 ring-[rgba(120,100,70,.14)] active:scale-[.99]"
+          >
+            <span className="relative block h-14 w-24 shrink-0 overflow-hidden rounded-[14px]">
+              <BackgroundArt id={current} zoom={0.5} />
+            </span>
+            <span className="min-w-0 flex-1">
+              <span className="block text-[10px] font-bold text-ink-faint">いま使っている背景</span>
+              <span className="block truncate text-sm font-black">{currentBg.name}</span>
+            </span>
+            <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-leaf text-white"><CheckIcon className="h-3.5 w-3.5" /></span>
+          </button>
+
+          {group === "all" ? (
+            APP_BACKGROUND_GROUPS.map((g) => {
+              const items = APP_BACKGROUNDS.filter((bg) => bg.group === g.id);
+              return (
+                <section key={g.id} aria-label={g.title}>
+                  <div className="flex items-end justify-between gap-2 px-1">
+                    <div className="min-w-0">
+                      <h2 className="text-[15px] font-black">{g.title}<span className="ml-1.5 text-[11px] font-bold text-ink-faint">{items.length}</span></h2>
+                      <p className="mt-0.5 line-clamp-1 text-[10.5px] text-ink-faint">{g.note}</p>
+                    </div>
+                    <button type="button" onClick={() => setGroup(g.id)} className="shrink-0 rounded-full bg-paper-deep px-2.5 py-1 text-[11px] font-black text-ink-soft active:scale-95">
+                      すべて見る
+                    </button>
+                  </div>
+                  <div className="-mx-4 mt-2 flex snap-x gap-2 overflow-x-auto px-4 pb-1 [scrollbar-width:none]">
+                    {items.map((bg) => tile(bg, "row"))}
+                  </div>
+                </section>
+              );
+            })
+          ) : (
+            <section aria-label={GROUP_FILTERS.find((f) => f.id === group)?.label}>
+              {group !== "owned" ? (
+                <p className="px-1 text-[11px] text-ink-faint">{APP_BACKGROUND_GROUPS.find((g) => g.id === group)?.note}</p>
+              ) : ownedCount === 0 ? (
+                <p className="rounded-2xl bg-card px-4 py-6 text-center text-[12px] text-ink-faint ring-1 ring-[rgba(120,100,70,.14)]">まだ買った背景はありません</p>
+              ) : null}
+              <div className="mt-2 grid grid-cols-3 gap-2">{visible(group).map((bg) => tile(bg, "grid"))}</div>
+            </section>
+          )}
+        </>
+      ) : tab === "cards" ? (
+        <HomeSkinShop initialSkins={homeSkins} initialOwned={ownedHomeSkins} blueCoins={blueCoins} onBalance={setBlueCoins} />
+      ) : (
+        <HomeLookEditor initial={homeLook} />
+      )}
 
       {selected ? (
         <BackgroundDialog

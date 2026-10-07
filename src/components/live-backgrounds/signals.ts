@@ -103,12 +103,12 @@ function useTodayStepCount(enabled: boolean): number | null {
 
 /** 背景 id に合わせて、使う値だけを読む */
 export function useBackgroundSignals(id: AppBackgroundId): BackgroundSignals {
-  const skyTime = useSkyTime(id === "sky-clock");
+  const skyTime = useSkyTime(id === "sky-clock" || id === "local-train");
   const weather = useLiveWeather(id === "weather");
   const steps = useTodayStepCount(id === "garden");
   const season = useSeason(id === "seasons");
   return useMemo(() => {
-    if (id === "sky-clock") return { skyTime };
+    if (id === "sky-clock" || id === "local-train") return { skyTime };
     if (id === "weather") return { weather };
     if (id === "garden") return { steps };
     if (id === "seasons") return { season };

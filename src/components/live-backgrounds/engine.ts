@@ -68,10 +68,13 @@ export function startLoop(
   let running = false;
   let onScreen = true;
 
+  // 前に描いた時刻。dt はここからの実際の経過時間にする（間引きの調整ぶんを足しこむと、時間が速く進んでしまう）
+  let prev = 0;
   const tick = (now: number) => {
     raf = requestAnimationFrame(tick);
     if (!last) {
       last = now;
+      prev = now;
       frame(t, 0);
       return;
     }
@@ -79,7 +82,8 @@ export function startLoop(
     if (elapsed < interval - 2) return;
     last = now - (elapsed % interval);
     // 長く止まっていたあとでも、粒が一気に飛ばないように1回ぶんは0.1秒まで
-    const dt = Math.min(elapsed, 100) / 1000;
+    const dt = Math.min(now - prev, 100) / 1000;
+    prev = now;
     t += dt;
     frame(t, dt);
   };

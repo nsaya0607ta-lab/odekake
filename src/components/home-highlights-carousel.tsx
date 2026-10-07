@@ -177,7 +177,8 @@ export function HomeHighlightsCarousel({
           style={{ transform: `translateX(-${index * 100}%)` }}
         >
           {slides.map((slide, slideIndex) => (
-            <div key={slideIndex} className="w-full shrink-0 grow-0 basis-full px-0.5">
+            // 左右の余白は入れない（絵の幅をほかのカードとそろえて、紙のふちを同じ位置にする）
+            <div key={slideIndex} className="w-full shrink-0 grow-0 basis-full">
               <FrameCard>
                 <SlideContent slide={slide} />
               </FrameCard>
