@@ -81,6 +81,36 @@ const isStandalone = () =>
   (typeof navigator !== "undefined" && (navigator as Navigator & { standalone?: boolean }).standalone === true) ||
   (typeof window !== "undefined" && window.matchMedia?.("(display-mode: standalone)").matches === true);
 
+/**
+ * 外のサイトを Safari で開く（ホーム画面のアプリから）。
+ * Safari へ渡せなかった（古い iPhone など、この画面のまま）ときは、アプリの上に重ねて開く
+ */
+function openInSafari(href: string) {
+  const url = new URL(href);
+  if (url.protocol !== "https:" && url.protocol !== "http:") {
+    window.location.assign(href);
+    return;
+  }
+  // Safari へ移った・「Safari で開きますか？」が出た（画面から手がはなれた）ときは、重ねて開かない
+  let left = false;
+  const onLeave = () => {
+    left = true;
+  };
+  const onHide = () => {
+    if (document.visibilityState === "hidden") left = true;
+  };
+  document.addEventListener("visibilitychange", onHide);
+  window.addEventListener("blur", onLeave);
+  window.addEventListener("pagehide", onLeave);
+  window.location.href = `x-safari-${href}`;
+  window.setTimeout(() => {
+    document.removeEventListener("visibilitychange", onHide);
+    window.removeEventListener("blur", onLeave);
+    window.removeEventListener("pagehide", onLeave);
+    if (!left && document.visibilityState === "visible" && document.hasFocus()) window.location.assign(href);
+  }, 1500);
+}
+
 /* ------------------------------------------------------------------ アイコン */
 
 /** アプリのアイコン（色の地・絵・影・ふちの光まで1枚に焼いた絵） */
@@ -488,9 +518,9 @@ export function Launcher({
         // 戻ってきたとき、いまのページ（アプリの画面の何枚目か）で開くように
         rememberHomePage(1 + lpRef.current);
         if (isStandalone()) {
-          // ホーム画面から開いたアプリ：新しい窓は作らずにそのまま移る。iPhone がアプリの上にブラウザを重ねて開く
-          // （マップや YouTube のアプリが入っていれば、そのアプリへ）。新しい窓を作ると、アプリへ渡ったあとに白い窓だけが残る
-          window.location.assign(href);
+          // ホーム画面から開いたアプリ：アプリの中の小さなブラウザではなく、Safari（別のアプリ）で開く。
+          // iPhone（iOS 17〜）は「x-safari-https://」で Safari に渡せる。渡せたら、このアプリは裏へまわる
+          openInSafari(href);
           return;
         }
         // （"noopener" をつけると、開けても null が返ってくるので、あとから切りはなす）
