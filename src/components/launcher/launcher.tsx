@@ -340,6 +340,14 @@ export function Launcher({
 
   const open = useCallback(
     (app: LauncherApp, el: Element | null, href = app.href) => {
+      if (app.external) {
+        // 外のサイト：指をはなしたその場で開く（間をあけると、ブラウザに止められることがある）
+        setSearch(false);
+        const win = window.open(href, "_blank");
+        if (win) win.opener = null;
+        else window.location.assign(href);
+        return;
+      }
       markLaunch(app.id, href);
       router.prefetch(href);
       setLaunch({ app, rect: el ? rectOf(el) : null, grown: false });
@@ -611,7 +619,7 @@ export function Launcher({
       press.current = { id: item.id, pointerId: event.pointerId, x0: event.clientX, y0: event.clientY, timer: 0, long: false, moved: false, inFolder, editing: true };
       return;
     }
-    if (item.kind === "app") router.prefetch(item.href);
+    if (item.kind === "app" && !item.external) router.prefetch(item.href);
     setPressed(item.id);
     const timer = window.setTimeout(() => {
       if (!press.current || press.current.moved) return;

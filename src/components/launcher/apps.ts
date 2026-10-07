@@ -15,6 +15,8 @@ export type LauncherApp = {
   keywords: string[];
   /** 長押しのメニュー（すぐにできること） */
   shortcuts?: { label: string; href: string }[];
+  /** 外のサイト（確認なしで、別の画面で開く） */
+  external?: boolean;
   /** 赤い数字のバッジ */
   badge?: "notices";
 };
@@ -66,6 +68,8 @@ export function launcherItems({ sns, memoryGame }: LauncherOptions): LauncherIte
     app({ id: "mypage", name: "マイページ", href: "/mypage", tint: ["#ffffff", "#eae2d4"], keywords: ["まいぺーじ", "プロフィール", "設定"] }),
     app({ id: "dog-skin", name: "犬のすがた", href: "/mypage/dog-skin", tint: ["#ddd2ff", "#9a84ee"], keywords: ["いぬ", "すがた", "スキン", "フレブル"] }),
     app({ id: "coin-history", name: "コインの記録", href: "/mypage/coin-history", tint: ["#6f86ee", "#2d3a9c"], keywords: ["こいん", "りれき", "履歴", "青コイン"] }),
+    app({ id: "google", name: "Google", href: "https://www.google.com/", external: true, tint: ["#ffffff", "#f1f3f4"], keywords: ["ぐーぐる", "検索", "けんさく", "グーグル"] }),
+    app({ id: "chatgpt", name: "ChatGPT", href: "https://chatgpt.com/", external: true, tint: ["#2b2b2b", "#000000"], keywords: ["ちゃっとじーぴーてぃー", "チャットGPT", "AI", "えーあい"] }),
   );
   return items;
 }
