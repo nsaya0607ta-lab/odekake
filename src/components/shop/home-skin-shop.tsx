@@ -50,6 +50,10 @@ export function HomeSkinShop({
   const [confirm, setConfirm] = useState<Confirm>(null);
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState<{ tone: "ok" | "error"; text: string } | null>(null);
+  // 一度に見せるテーマは1つ（上のボタンで切りかえる）。いま使っているテーマがあれば、それから
+  const [view, setView] = useState<HomeSkinTheme>(
+    () => SHOP_HOME_SKIN_THEMES.find((t) => HOME_SKIN_PARTS.some((part) => initialSkins[part] === t)) ?? SHOP_HOME_SKIN_THEMES[0]!,
+  );
 
   if (initialOwned === null) {
     return (
@@ -127,7 +131,27 @@ export function HomeSkinShop({
         </Link>
       </div>
 
-      {SHOP_HOME_SKIN_THEMES.map((theme) => {
+      <div className="mt-3 flex gap-1.5" role="group" aria-label="カードの絵がら">
+        {SHOP_HOME_SKIN_THEMES.map((theme) => {
+          const using = HOME_SKIN_PARTS.filter((part) => skins[part] === theme).length;
+          return (
+            <button
+              key={theme}
+              type="button"
+              aria-pressed={view === theme}
+              onClick={() => setView(theme)}
+              className={`flex flex-1 items-center justify-center gap-1.5 rounded-xl py-2 text-[13px] font-black transition ${
+                view === theme ? "bg-ink text-card" : "bg-paper text-ink-soft ring-1 ring-[rgba(120,100,70,.16)]"
+              }`}
+            >
+              {HOME_SKIN_THEME_INFO[theme].name}
+              {using > 0 ? <span className={`rounded-full px-1.5 text-[10px] ${view === theme ? "bg-white/20" : "bg-leaf-soft text-leaf-deep"}`}>{using}枚 使用中</span> : null}
+            </button>
+          );
+        })}
+      </div>
+
+      {SHOP_HOME_SKIN_THEMES.filter((theme) => theme === view).map((theme) => {
         const info = HOME_SKIN_THEME_INFO[theme];
         const { full, set, missing } = homeSkinSetPrice(theme, owned);
         const allUsing = HOME_SKIN_PARTS.every((part) => skins[part] === theme);
