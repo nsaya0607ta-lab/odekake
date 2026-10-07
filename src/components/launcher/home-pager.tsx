@@ -9,9 +9,11 @@
  * - ホームのヘッダーとページは左へ流れ、アプリの画面が右から入る。下のナビは、背景のページでだけ消える
  * - 横に動かせる部品（カルーセルなど）の上で始めたスワイプは、その部品にまかせる
  * - 下のナビの「ホーム」・Esc で、ホームへもどる。トラックパッドの横スクロール・左右キーでも動かせる
+ * - アプリの画面から開いたページから戻ってきたときは、アプリの画面のまま開く（iPhone と同じ）
  */
 import { usePathname } from "next/navigation";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { clearLaunch, homePageToRestore, readLaunch, rememberHomePage } from "@/lib/launcher-return";
 import { lockPageScroll } from "@/lib/scroll-lock";
 import { Launcher, type LauncherData } from "./launcher";
 import styles from "./launcher.module.css";
@@ -44,6 +46,9 @@ export function HomePager({ data, sns, memoryGame, gaze }: { data: LauncherData;
   const [page, setPage] = useState(0);
   const [visible, setVisible] = useState(false);
   const [hint, setHint] = useState(false);
+  /** アプリの画面を前もって組み立てておく（はじめてスワイプしたとき、アイコンの絵がもう読みこまれているように） */
+  const [warm, setWarm] = useState(false);
+  const [returnFrom, setReturnFrom] = useState<string | null>(null);
   const launcherRef = useRef<HTMLDivElement>(null);
   const pos = useRef(0);
   const anim = useRef<{ raf: number } | null>(null);
@@ -112,6 +117,7 @@ export function HomePager({ data, sns, memoryGame, gaze }: { data: LauncherData;
           anim.current = null;
           setPage(target);
           setVisible(target > 0);
+          rememberHomePage(target);
           return;
         }
         apply(x);
@@ -123,6 +129,27 @@ export function HomePager({ data, sns, memoryGame, gaze }: { data: LauncherData;
   );
 
   const goPage = useCallback((target: number, v0 = 0) => springTo(Math.max(0, Math.min(maxPage, target)), v0), [springTo, maxPage]);
+
+  // ほかのページから戻ってきたとき：アプリの画面にいたなら、アプリの画面のまま開く（画面がアイコンへもどる動きつき）
+  useLayoutEffect(() => {
+    const launched = readLaunch();
+    clearLaunch();
+    if (homePageToRestore() !== 1) return;
+    setReturnFrom(launched?.id ?? null);
+    setVisible(true);
+    setPage(1);
+    apply(1);
+  }, [apply]);
+
+  useEffect(() => {
+    // Safari には requestIdleCallback がないので、そのときは少し待ってから
+    if (typeof window.requestIdleCallback === "function") {
+      const id = window.requestIdleCallback(() => setWarm(true), { timeout: 2500 });
+      return () => window.cancelIdleCallback(id);
+    }
+    const id = window.setTimeout(() => setWarm(true), 1200);
+    return () => window.clearTimeout(id);
+  }, []);
 
   // ページがホーム以外のあいだは、うしろのページをスクロールさせない
   useEffect(() => {
@@ -271,8 +298,9 @@ export function HomePager({ data, sns, memoryGame, gaze }: { data: LauncherData;
   }, [goPage]);
 
   // ほかのページへ移るとき・はずすときは、動かした画面をもとにもどす
+  const homePath = useRef(pathname);
   useEffect(() => {
-    if (pathname !== "/home") apply(0);
+    if (pathname !== homePath.current) apply(0);
   }, [pathname, apply]);
   useEffect(() => () => apply(0), [apply]);
 
@@ -290,7 +318,9 @@ export function HomePager({ data, sns, memoryGame, gaze }: { data: LauncherData;
         role="region"
         aria-label="アプリ"
       >
-        {visible ? <Launcher options={options} data={data} page={page} pageCount={pageCount} onBlockSwipe={onBlockSwipe} onGoPage={goPage} /> : null}
+        {visible || warm ? (
+          <Launcher options={options} data={data} page={page} pageCount={pageCount} returnFrom={returnFrom} onBlockSwipe={onBlockSwipe} onGoPage={goPage} />
+        ) : null}
       </div>
       {gaze ? (
         <div className={styles.gazeHint} style={{ bottom: "calc(var(--safe-bottom) + 28px)", opacity: hint ? 1 : 0 }} aria-live="polite">

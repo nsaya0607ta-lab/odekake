@@ -301,20 +301,14 @@ export default async function HomePage({
         </div>
       </PageBody>
       {/* 左にスワイプ：アプリの画面 → （背景を変えていれば）背景をながめるページ */}
-      <HomePager
-        data={{
-          steps: expDashboard.todaySteps ?? 0,
-          level: expProgress.level,
-          progressPercent: expProgress.progressPercent,
-          toNext: Math.max(0, expProgress.nextLevelExp - expProgress.totalExp),
-          coins: coins.balance,
-          blueCoins,
-          unreadNotices: unreadNoticeCount,
-        }}
-        sns={canAccessSns(user.email)}
-        memoryGame={canSeeMemoryGame(user.displayName)}
-        gaze={shopAccess && background !== "default"}
-      />
+      <HomeWeatherProvider>
+        <HomePager
+          data={{ steps: expDashboard.todaySteps ?? 0, unreadNotices: unreadNoticeCount }}
+          sns={canAccessSns(user.email)}
+          memoryGame={canSeeMemoryGame(user.displayName)}
+          gaze={shopAccess && background !== "default"}
+        />
+      </HomeWeatherProvider>
       {backgroundOutdated ? <BackgroundCookieSync /> : null}
     </>
   );
