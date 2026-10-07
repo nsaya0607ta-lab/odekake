@@ -60,14 +60,23 @@ export function HomePager({ data, sns, memoryGame, gaze }: { data: LauncherData;
   const blocked = useRef(false);
   const options = useMemo(() => ({ sns, memoryGame }), [sns, memoryGame]);
 
+  /** 動かす部品と画面の幅は、フレームごとに探さず覚えておく（つかんだとき・動かし始めに引きなおす） */
+  const cache = useRef<{ header: HTMLElement | null; main: HTMLElement | null; nav: HTMLElement | null; w: number } | null>(null);
+  const refreshCache = useCallback(() => {
+    cache.current = {
+      header: document.querySelector<HTMLElement>("header.sticky"),
+      main: document.querySelector<HTMLElement>("main"),
+      nav: document.querySelector<HTMLElement>(".app-bottom-nav"),
+      w: window.innerWidth || 1,
+    };
+  }, []);
+
   /** p（ページの位置。0〜maxPage、はしは少しはみ出す）に合わせて、画面を動かす */
   const apply = useCallback(
     (p: number) => {
       pos.current = p;
-      const w = window.innerWidth || 1;
-      const header = document.querySelector<HTMLElement>("header.sticky");
-      const main = document.querySelector<HTMLElement>("main");
-      const nav = document.querySelector<HTMLElement>(".app-bottom-nav");
+      if (!cache.current || (cache.current.main && !cache.current.main.isConnected)) refreshCache();
+      const { header, main, nav, w } = cache.current!;
       const launcher = launcherRef.current;
       const home = Math.max(-0.3, Math.min(p, 1.2));
       if (p === 0) {
@@ -81,15 +90,18 @@ export function HomePager({ data, sns, memoryGame, gaze }: { data: LauncherData;
         for (const el of [header, main]) {
           if (!el) continue;
           el.style.setProperty("transform", `translate3d(${-home * w}px,0,0)`, "important");
-          el.style.setProperty("will-change", "transform");
-          el.style.setProperty("pointer-events", "none");
+          if (el.style.pointerEvents !== "none") {
+            el.style.setProperty("will-change", "transform");
+            el.style.setProperty("pointer-events", "none");
+          }
         }
         // 背景のページへ向かうほど、下のナビを消す
         const fade = Math.max(0, Math.min(1, p - appPagesRef.current));
         if (nav) {
           nav.style.setProperty("opacity", String(1 - fade), "important");
           nav.style.setProperty("transform", `translate3d(0,${fade * 24}px,0)`, "important");
-          nav.style.setProperty("pointer-events", fade > 0.5 ? "none" : "auto");
+          const pe = fade > 0.5 ? "none" : "auto";
+          if (nav.style.pointerEvents !== pe) nav.style.setProperty("pointer-events", pe);
         }
       }
       if (launcher) {
@@ -100,14 +112,15 @@ export function HomePager({ data, sns, memoryGame, gaze }: { data: LauncherData;
         launcher.style.visibility = p > 0.001 && p < last + 0.999 ? "visible" : "hidden";
       }
     },
-    [],
+    [refreshCache],
   );
 
   /** バネの動きで target へ（v は指をはなしたときの速さ。ページ/秒） */
   const springTo = useCallback(
     (target: number, v0 = 0) => {
       if (anim.current) cancelAnimationFrame(anim.current.raf);
-      const k = 290, c = 2 * Math.sqrt(k) * 0.86;
+      refreshCache();
+      const k = 320, c = 2 * Math.sqrt(k) * 0.9;
       let x = pos.current, v = v0, last = performance.now();
       setVisible(true);
       const tick = (now: number) => {
@@ -120,7 +133,7 @@ export function HomePager({ data, sns, memoryGame, gaze }: { data: LauncherData;
           v += a * h;
           x += v * h;
         }
-        if (Math.abs(x - target) < 0.0006 && Math.abs(v) < 0.01) {
+        if (Math.abs(x - target) < 0.0015 && Math.abs(v) < 0.03) {
           apply(target);
           anim.current = null;
           setPage(target);
@@ -133,7 +146,7 @@ export function HomePager({ data, sns, memoryGame, gaze }: { data: LauncherData;
       };
       anim.current = { raf: requestAnimationFrame(tick) };
     },
-    [apply],
+    [apply, refreshCache],
   );
 
   const goPage = useCallback((target: number, v0 = 0) => springTo(Math.max(0, Math.min(maxPage, target)), v0), [springTo, maxPage]);
@@ -189,6 +202,9 @@ export function HomePager({ data, sns, memoryGame, gaze }: { data: LauncherData;
         cancelAnimationFrame(anim.current.raf);
         anim.current = null;
       }
+      // 動かし始めてからアプリの画面を組み立てると指が引っかかるので、つかんだ時点で用意する
+      setWarm(true);
+      refreshCache();
       drag = { x, y, start: pos.current, axis: null, samples: [{ x, t: performance.now() }] };
     };
 
@@ -209,13 +225,13 @@ export function HomePager({ data, sns, memoryGame, gaze }: { data: LauncherData;
       }
       if (drag.axis !== "x") return;
       if (event.cancelable) event.preventDefault();
-      const w = window.innerWidth || 1;
+      const w = cache.current?.w ?? (window.innerWidth || 1);
       let p = drag.start - dx / w;
       if (p < 0) p = -rubber(-p * w, w) / w;
       else if (p > maxPage) p = maxPage + rubber((p - maxPage) * w, w) / w;
       apply(p);
       drag.samples.push({ x, t: performance.now() });
-      if (drag.samples.length > 6) drag.samples.shift();
+      if (drag.samples.length > 10) drag.samples.shift();
     };
 
     const end = () => {
@@ -226,7 +242,9 @@ export function HomePager({ data, sns, memoryGame, gaze }: { data: LauncherData;
         return;
       }
       const w = window.innerWidth || 1;
-      const first = d.samples[0]!, last = d.samples[d.samples.length - 1]!;
+      const last = d.samples[d.samples.length - 1]!;
+      // 指をはなす直前の100ミリ秒だけで速さを測る（ゆっくり動かしてから払ったときも素直に）
+      const first = d.samples.find((s) => last.t - s.t <= 100) ?? d.samples[0]!;
       const dt = Math.max(1, last.t - first.t);
       const vPages = (-(last.x - first.x) / dt) * 1000 / w; // ページ/秒（左へはらうと＋）
       let target = Math.round(pos.current);
@@ -292,7 +310,7 @@ export function HomePager({ data, sns, memoryGame, gaze }: { data: LauncherData;
       window.removeEventListener("wheel", onWheel);
       window.removeEventListener("keydown", onKey);
     };
-  }, [apply, goPage, maxPage]);
+  }, [apply, goPage, maxPage, refreshCache]);
 
   // 下のナビの「ホーム」を押したら、ホームのページへもどる（ページの読みこみはしない）
   useEffect(() => {
