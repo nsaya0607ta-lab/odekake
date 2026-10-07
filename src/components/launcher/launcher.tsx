@@ -119,11 +119,29 @@ function Tile({ item, size }: { item: LauncherItem; size: number }) {
 
 type Geometry = { pad: number; cellW: number; icon: number; rowH: number; width: number };
 
-function geometryFor(width: number): Geometry {
+/** 下の「検索」とページの点のぶん（いちばん下のアイコンの文字から、ここまでは空ける） */
+const BOTTOM_STACK = 36 + 10 + 17;
+const BOTTOM_GAP = 22;
+
+/**
+ * アイコンの大きさと段の高さ。avail（ウィジェットの上はしから、下の「検索」の上の余白まで）に
+ * rows 段が収まるように、まず段のあいだをつめ、それでも入らなければアイコンを少し小さくする
+ */
+function geometryFor(width: number, avail?: number | null, rows?: number): Geometry {
   const pad = Math.max(14, Math.round(width * 0.045));
   const cellW = (width - pad * 2) / 4;
-  const icon = Math.min(66, Math.round(cellW * 0.72));
-  return { pad, cellW, icon, rowH: icon + 33, width };
+  let icon = Math.min(66, Math.round(cellW * 0.72));
+  let rowH = icon + 33;
+  if (avail && rows && rows > 1) {
+    // いちばん下の段は、アイコンと名前（約20px）だけ
+    const fit = (i: number) => Math.floor((avail - i - 20) / (rows - 1));
+    rowH = Math.min(icon + 33, fit(icon));
+    if (rowH < icon + 27) {
+      icon = Math.max(40, Math.min(icon, Math.floor((avail - 20 - 25 * (rows - 1)) / rows)));
+      rowH = Math.max(icon + 24, Math.min(icon + 33, fit(icon)));
+    }
+  }
+  return { pad, cellW, icon, rowH, width };
 }
 
 /** ウィジェットが上の2段（8マス）を使うので、アプリは9マス目から */
@@ -323,7 +341,21 @@ export function Launcher({
     return () => window.removeEventListener("resize", measure);
   }, []);
 
-  const g = geometryFor(width);
+  // ウィジェットからアイコンの最後の段までが、下のナビ（と検索・ページの点）にかからないように、空いている高さをはかる
+  const bottomRef = useRef<HTMLDivElement>(null);
+  const [avail, setAvail] = useState<number | null>(null);
+  useLayoutEffect(() => {
+    const grid = gridRef.current?.getBoundingClientRect();
+    const bottom = bottomRef.current?.getBoundingClientRect();
+    if (!grid || !bottom) return;
+    const next = Math.floor(bottom.bottom - BOTTOM_STACK - BOTTOM_GAP - grid.top);
+    setAvail((cur) => (cur === next ? cur : next));
+  }, [width, height]);
+  const rows = 2 + Math.ceil(items.length / 4);
+  const roomy = geometryFor(width, avail, rows);
+  // 小さな画面で、それでも入らないときは「検索」を出さず、そのぶん下まで使う（編集中のボタンは、ページの点の横に小さく）
+  const compact = avail != null && (rows - 1) * roomy.rowH + roomy.icon + 20 > avail;
+  const g = compact ? geometryFor(width, (avail ?? 0) + 36 + 10, rows) : roomy;
   const blocked = Boolean(menu || folder || search || drag || fdrag || launch || alert || screenMenu || hiddenSheet || weatherOpen);
   useEffect(() => onBlockSwipe(blocked), [blocked, onBlockSwipe]);
 
@@ -801,6 +833,9 @@ export function Launcher({
   const widgetH = g.rowH + g.icon - 4;
   const leftX = g.pad + (g.cellW - g.icon) / 2;
   const rightX = g.pad + g.cellW * 2 + (g.cellW - g.icon) / 2;
+  // 小さな画面で段をつめたときは、文字がきゅうくつにならないよう、ウィジェットをまるごと縮める（中の並びはいつもの大きさのまま）
+  const wk = Math.min(1, widgetH / 154);
+  const widgetBox = (left: number): CSSProperties => (wk < 1 ? { left: left / wk, top: 0, width: widgetW / wk, height: widgetH / wk, zoom: wk } : { left, top: 0, width: widgetW, height: widgetH });
 
   return (
     <div className={styles.grid} style={ROOT_VARS}>
@@ -817,14 +852,14 @@ export function Launcher({
         <ClockWeatherWidget
           hw={hw}
           editing={editing}
-          style={{ left: leftX, top: 0, width: widgetW, height: widgetH, "--jd": "-0.11s" } as CSSProperties}
+          style={{ ...widgetBox(leftX), "--jd": "-0.11s" } as CSSProperties}
           onOpen={() => (hw ? setWeatherOpen(true) : null)}
           onLong={openScreenMenu}
         />
         <StepsWidget
           steps={data.steps}
           editing={editing}
-          style={{ left: rightX, top: 0, width: widgetW, height: widgetH, "--jd": "-0.04s" } as CSSProperties}
+          style={{ ...widgetBox(rightX), "--jd": "-0.04s" } as CSSProperties}
           onOpen={() => {
             markLaunch("steps", "/mypage/exp-history");
             router.push("/mypage/exp-history");
@@ -836,9 +871,9 @@ export function Launcher({
       </div>
 
       {/* 検索（編集中は「再表示」「完了」）とページの点 */}
-      <div className={styles.bottom} style={{ bottom: "calc(var(--nav-height) + var(--safe-bottom) + 12px)" }}>
-        {editing ? (
-          <div className={styles.editBar}>
+      <div ref={bottomRef} className={styles.bottom} style={{ bottom: "calc(var(--nav-height) + var(--safe-bottom) + 12px)" }}>
+        {compact && !editing ? null : editing ? (
+          <div className={styles.editBar} data-compact={compact ? "true" : undefined}>
             {hidden.length ? (
               <button type="button" className={styles.glassPill} onClick={() => setHiddenSheet(true)}>
                 <EyeGlyph size={16} />
