@@ -4,6 +4,7 @@
  * アプリ「インフラ」のいちばん外側。
  * - トップ：タブ「ステージ」（路線図）・「ずかん」・「ラボ」・「サーバー室」
  * - ?stage=s3 … ステージを遊ぶ（ブラウザの「戻る」で一覧へ）
+ * - ?tab=room&room=hello … サーバー室のレッスン（room=free は「自由に作る」）。全画面で、「戻る」でサーバー室の一覧へ
  * - ?view=backstage … おまけ「このアプリの裏側」
  */
 import Image from "next/image";
@@ -19,7 +20,7 @@ import { PARTS } from "./model";
 import { emptyProgress, isCleared, isUnlocked, loadProgress, saveProgress, totalStars, unlockedParts, unlockedTerms, type Progress } from "./progress";
 import { BottomSheet } from "./sheets";
 import { setSoundEnabled } from "./sound";
-import { ServerRoomView } from "./server-room";
+import { RoomMenu, RoomScreen, isRoomScreen } from "./server-room";
 import { STAGES, stageById, type StageDef } from "./stages";
 import { SoundButton, StagePlay } from "./stage-play";
 import styles from "./infra.module.css";
@@ -42,6 +43,8 @@ export function InfraApp() {
   const view = params.get("view");
   const tabParam = params.get("tab");
   const tab: Tab = tabParam === "glossary" || tabParam === "lab" || tabParam === "room" ? tabParam : "stages";
+  const roomParam = params.get("room");
+  const roomScreen = tab === "room" && isRoomScreen(roomParam) ? roomParam : null;
   const [progress, setProgress] = useState<Progress>(emptyProgress);
   const [loaded, setLoaded] = useState(false);
   const pushed = useRef(false);
@@ -102,6 +105,14 @@ export function InfraApp() {
           }}
           onToggleSound={toggleSound}
         />
+      </div>
+    );
+  }
+
+  if (roomScreen && loaded) {
+    return (
+      <div className={styles.shell}>
+        <RoomScreen id={roomScreen} onExit={back} onOpen={(id) => go(`tab=room&room=${id}`, false)} />
       </div>
     );
   }
@@ -177,7 +188,7 @@ export function InfraApp() {
         ) : null}
         {tab === "glossary" ? <Glossary unlocked={terms} /> : null}
         {tab === "lab" && loaded ? <Lab parts={labParts} /> : null}
-        {tab === "room" && loaded ? <ServerRoomView /> : null}
+        {tab === "room" && loaded ? <RoomMenu onOpen={(id) => go(`tab=room&room=${id}`, true)} /> : null}
       </div>
     </div>
   );

@@ -5,7 +5,7 @@
  *   外とつながる道具（fetch など）は消してあるので、ブラウザの外へは何も送れない。固まったら terminate して作りなおす
  * - ロードバランサー … 元気なサーバー（/health に 2xx を返した）にだけ振り分ける。返事が遅すぎたら 504
  * - CDN … 返事の Cache-Control: max-age を読んで、その秒数だけ同じ返事を使い回す
- * - データベース・キャッシュ … サーバーのプログラムから env.db・env.cache で使う（この画面が持っている。DB はこの端末に覚える）
+ * - データベース・キャッシュ … サーバーのプログラムから env.db・env.cache で使う（この画面が持っている。DB は、自由に作るではこの端末に覚え、レッスンでは覚えない）
  * くわしくは docs/infra-app.md の「サーバー室」。
  */
 
@@ -17,13 +17,17 @@ export type Entry = { id: number; at: number; req: HttpReq; res: HttpRes; ms: nu
 export type LogLine = { id: number; at: number; server: string; text: string };
 
 export type ServerStatus = "starting" | "up" | "frozen" | "stopped" | "error";
-export type ServerView = { name: string; status: ServerStatus; healthy: boolean; inflight: number; served: number; error: string | null };
+/** boots … 何回起動したか（再起動したかを見分ける） */
+export type ServerView = { name: string; status: ServerStatus; healthy: boolean; inflight: number; served: number; boots: number; error: string | null };
 export type Method = "GET" | "POST" | "PUT" | "DELETE";
 export const METHODS: readonly Method[] = ["GET", "POST", "PUT", "DELETE"];
 /** 本文を送れるメソッド */
 export const hasBody = (m: string) => m === "POST" || m === "PUT";
 export type RoomSettings = { count: number; lb: "rr" | "least"; cdn: boolean; autoHeal: boolean };
-export type BurstResult = { total: number; ok: number; fail: number; avgMs: number; by: Record<string, number> };
+/** by … 返事をしたところごとの数、codes … ステータスコードごとの数 */
+export type BurstResult = { total: number; ok: number; fail: number; avgMs: number; by: Record<string, number>; codes: Record<number, number> };
+/** persist … データベースをこの端末に覚えるか（レッスンでは覚えない） */
+export type RoomOptions = { persist?: boolean };
 
 /** サーバーの返事を待つ時間（これをこえたら 504） */
 export const REQUEST_TIMEOUT = 3000;
@@ -199,15 +203,19 @@ export class ServerRoom {
   private cache = new Map<string, { value: unknown; until: number }>();
   private cdn = new Map<string, { res: HttpRes; at: number; until: number }>();
   private listeners = new Set<() => void>();
+  /** データベース・キャッシュが使われた回数（画面で光らせる） */
+  touches = { db: 0, cache: 0 };
   private nextId = 1;
   private rr = 0;
   private timer: number;
   private disposed = false;
+  private readonly persist: boolean;
 
-  constructor(code: string, settings: RoomSettings) {
+  constructor(code: string, settings: RoomSettings, opts: RoomOptions = {}) {
     this.code = code;
     this.settings = settings;
-    this.loadDb();
+    this.persist = opts.persist ?? true;
+    if (this.persist) this.loadDb();
     this.timer = window.setInterval(() => this.healthCheck(), HEALTH_EVERY);
     this.deploy(code);
   }
@@ -244,7 +252,7 @@ export class ServerRoom {
   private setCount(n: number) {
     while (this.servers.length > n) this.kill(this.servers.pop()!);
     while (this.servers.length < n) {
-      const s: Srv = { name: `サーバー${this.servers.length + 1}`, status: "starting", healthy: false, inflight: 0, served: 0, error: null, worker: null, pending: new Map(), fails: 0, checking: false, heals: [], gaveUp: false };
+      const s: Srv = { name: `サーバー${this.servers.length + 1}`, status: "starting", healthy: false, inflight: 0, served: 0, boots: 0, error: null, worker: null, pending: new Map(), fails: 0, checking: false, heals: [], gaveUp: false };
       this.servers.push(s);
       this.boot(s);
     }
@@ -252,6 +260,7 @@ export class ServerRoom {
   }
 
   private boot(s: Srv) {
+    s.boots++;
     s.status = "starting";
     s.healthy = false;
     s.error = null;
@@ -321,6 +330,9 @@ export class ServerRoom {
       }
     };
     const [k, v, n] = args as [string, unknown, number];
+    if (op.startsWith("db.")) this.touches.db++;
+    else if (op.startsWith("cache.")) this.touches.cache++;
+    this.emit();
     switch (op) {
       case "db.get":
         return reply(this.db.has(k) ? this.db.get(k) : null);
@@ -525,8 +537,23 @@ export class ServerRoom {
     const list = await Promise.all(Array.from({ length: n }, () => this.send(method, path, body)));
     const by: Record<string, number> = {};
     for (const e of list) by[e.by] = (by[e.by] ?? 0) + 1;
+    const codes: Record<number, number> = {};
+    for (const e of list) codes[e.res.status] = (codes[e.res.status] ?? 0) + 1;
     const ok = list.filter((e) => e.res.status < 400).length;
-    return { total: n, ok, fail: n - ok, avgMs: Math.round(list.reduce((s, e) => s + e.ms, 0) / n), by };
+    return { total: n, ok, fail: n - ok, avgMs: Math.round(list.reduce((s, e) => s + e.ms, 0) / n), by, codes };
+  }
+
+  /** サーバーがみんな起動して、ヘルスチェックに合格したか（固まった・止めたサーバーは数えない。プログラムのまちがいで動けなければ false） */
+  ready(): boolean {
+    if (this.servers.some((s) => s.status === "error")) return false;
+    const live = this.servers.filter((s) => s.status === "starting" || s.status === "up");
+    return live.length > 0 && live.every((s) => s.healthy);
+  }
+
+  /** キャッシュに覚えている残りの秒数（なければ 0） */
+  cacheLeft(key: string): number {
+    const c = this.cache.get(key);
+    return c ? Math.max(0, Math.ceil((c.until - Date.now()) / 1000)) : 0;
   }
 
   /* ------------------------------------------------------------ 小物 */
@@ -553,6 +580,7 @@ export class ServerRoom {
   }
 
   private saveDb() {
+    if (!this.persist) return;
     try {
       window.localStorage.setItem(DB_KEY, JSON.stringify([...this.db]));
     } catch {

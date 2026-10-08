@@ -57,9 +57,12 @@
 
 - ステージの数字（交通量・事件・目標・パーツの数値）を変えたら `node scripts/simulate-infra.mjs 40` で確かめ、docs の表も更新する。
   シミュレーターのしくみだけを変えたとき（リファクタリングなど）は、変える前と後で出力が1文字も変わらないことを確かめる。
-- `sim.ts`・`layout.ts`・`design.ts`・`export.ts`・`room.ts` を変えたら `node scripts/fuzz-infra.mjs 2000` を通す。
+- `sim.ts`・`layout.ts`・`design.ts`・`export.ts`・`room.ts`・`room-lessons.ts` を変えたら `node scripts/fuzz-infra.mjs 2000` を通す。
   書き出し（`export.ts`）を変えたら、`FUZZ_VALIDATE=1` で `docker compose config`・`terraform validate` も通す（docs の 6.7）。
 - シミュレーターはリンク（つなぎ方）のとおりにアクセスを流す。ステージは置いたパーツから `computeLinks` でつなぎ方が決まるので、
   `computeLinks` の並び順を変えるとステージの結果が変わる。
 - サーバー室の Worker のコード（`room.ts` の `WORKER_SOURCE`）では、外とつながる道具（fetch など）を消す処理を外さないこと。
   HTTP のヘッダーの値は英数字だけにする（日本語は本文へ）。
+- サーバー室は「1つの画面に、いまやること1つ」が方針（ごちゃごちゃしてわからない、という声で作りなおした）。レッスンのステップに
+  ボタンや説明を足しすぎない。くわしいもの（本物の HTTP・プログラム全体・記録）は、開いたときだけ出す。
+  レッスン（`room-lessons.ts`）やお手本（`room-templates.ts`）を変えたら、ブラウザで5つとも通しでやって確かめる（docs の 6.6・6.7）。

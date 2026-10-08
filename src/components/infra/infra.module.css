@@ -2607,124 +2607,787 @@ li[data-on="1"] .goalStar {
   color: var(--faint);
   font-size: 10.5px;
 }
-/* サーバー室 */
+/* ------------------------------------------------------------ サーバー室 */
+
+/* 入口（レッスンの一覧） */
 .room {
   padding: 12px 0 0;
 }
-.room > .glossaryLead {
-  margin: 4px 16px 10px;
-}
-.roomTopo {
-  display: grid;
-  justify-items: center;
-  gap: 4px;
-  margin: 0 12px;
-  padding: 12px;
+.roomIntro {
+  margin: 0 14px;
+  padding: 14px;
   border: 1px solid var(--line);
   border-radius: 20px;
   background: var(--panel);
 }
-.roomNode {
-  display: flex;
-  align-items: center;
+.roomIntro p {
+  margin: 10px 0 0;
+  color: #dbe5fb;
+  font-size: 13.5px;
+  line-height: 1.75;
+}
+.roomLessons {
+  display: grid;
   gap: 8px;
-  min-width: 170px;
-  padding: 6px 10px;
-  border: 1px solid color-mix(in srgb, var(--c) 40%, transparent);
-  border-radius: 14px;
-  background: color-mix(in srgb, var(--c) 8%, transparent);
+  margin: 12px 14px 0;
+  padding: 0;
+  list-style: none;
 }
-.roomNode .paletteIcon {
-  width: 32px;
-  height: 32px;
-}
-.roomNode b,
-.roomNode small {
-  display: block;
-}
-.roomNode b {
-  font-size: 13px;
-}
-.roomNode small {
-  color: var(--soft);
-  font-size: 10.5px;
-}
-.roomArrow {
-  color: var(--faint);
-  font-size: 13px;
-  line-height: 1;
-}
-.roomServers {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(96px, 1fr));
-  gap: 6px;
-  width: 100%;
-}
-.roomServer {
-  display: grid;
-  gap: 2px;
-  padding: 8px;
-  border: 1.5px solid rgba(255, 255, 255, 0.12);
-  border-radius: 14px;
-  background: rgba(255, 255, 255, 0.04);
-  transition: border-color 0.2s, opacity 0.2s;
-}
-.roomServer[data-healthy="1"] {
-  border-color: color-mix(in srgb, var(--c) 70%, transparent);
-  box-shadow: 0 0 14px color-mix(in srgb, var(--c) 25%, transparent);
-}
-.roomServer[data-status="frozen"],
-.roomServer[data-status="error"] {
-  border-color: rgba(255, 107, 129, 0.7);
-}
-.roomServer[data-status="stopped"] {
-  opacity: 0.5;
-}
-.roomServerHead {
+.roomLesson,
+.roomFree {
   display: flex;
   align-items: center;
-  gap: 5px;
-  color: color-mix(in srgb, var(--c) 72%, #fff);
-}
-.roomServerHead b {
-  color: var(--text);
-  font-size: 12.5px;
-}
-.roomServer small {
-  color: var(--soft);
-  font-size: 10.5px;
-}
-.roomServer[data-status="frozen"] small:first-of-type,
-.roomServer[data-status="error"] small:first-of-type {
-  color: #ffb3c0;
-}
-.roomServerBtns {
-  display: flex;
-  gap: 4px;
-  margin-top: 4px;
-}
-.roomServerBtns button {
-  flex: 1;
-  height: 28px;
+  gap: 12px;
+  width: 100%;
+  padding: 12px 14px;
   border: 1px solid var(--line);
-  border-radius: 9px;
-  background: rgba(255, 255, 255, 0.05);
-  color: var(--soft);
+  border-radius: 18px;
+  background: var(--panel);
+  text-align: left;
+  transition: transform 0.12s, border-color 0.2s;
+}
+.roomLesson:active,
+.roomFree:active {
+  transform: scale(0.98);
+}
+.roomLesson[data-next="1"] {
+  border-color: rgba(124, 245, 190, 0.5);
+  background:
+    radial-gradient(80% 120% at 0% 0%, rgba(124, 245, 190, 0.14), transparent 60%),
+    linear-gradient(160deg, #1a3168, #0f1c40);
+  box-shadow: 0 10px 26px rgba(0, 0, 0, 0.3), 0 0 24px rgba(124, 245, 190, 0.1);
+}
+.roomLessonNo {
+  display: grid;
+  place-items: center;
+  flex: 0 0 auto;
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  background: rgba(103, 232, 249, 0.14);
+  color: var(--sky);
+  font-size: 15px;
+  font-weight: 900;
+}
+.roomLesson[data-done="1"] .roomLessonNo {
+  background: rgba(124, 245, 190, 0.2);
+  color: var(--mint);
+}
+.roomLessonText {
+  display: grid;
+  flex: 1;
+  gap: 1px;
+  min-width: 0;
+}
+.roomLessonText small {
+  color: var(--faint);
   font-size: 10.5px;
   font-weight: 800;
 }
-.roomServerBtns button:disabled {
-  opacity: 0.4;
+.roomLesson[data-next="1"] .roomLessonText small {
+  color: var(--mint);
 }
-.roomData {
-  display: flex;
-  flex-wrap: wrap;
-  justify-content: center;
-  gap: 6px;
+.roomLessonText b {
+  font-size: 15px;
+  font-weight: 900;
 }
-.roomData .roomNode {
+.roomLessonText em {
+  color: var(--soft);
+  font-size: 11.5px;
+  font-style: normal;
+}
+.roomLessonGo {
+  flex: 0 0 auto;
+  color: var(--faint);
+  font-size: 11px;
+}
+.roomFree {
+  width: calc(100% - 28px);
+  margin: 10px 14px 0;
+  border-style: dashed;
+  border-color: var(--line-strong);
+}
+
+/* 全画面（レッスン・自由に作る）の見出し */
+.rmHeadText {
+  flex: 1;
   min-width: 0;
 }
+.rmHeadText small {
+  display: block;
+  color: var(--sky);
+  font-size: 10.5px;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+}
+.rmHeadText h1 {
+  margin: 0;
+  overflow: hidden;
+  font-family: var(--round);
+  font-size: 19px;
+  font-weight: 900;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* 構成の図：あなた →（CDN）→ ロードバランサー → サーバー（→ データベース・キャッシュ） */
+.rmap {
+  margin: 6px 12px 0;
+  padding: 8px 12px 4px;
+  border: 1px solid var(--line);
+  border-radius: 20px;
+  background: var(--panel);
+}
+.rmapTop {
+  display: flex;
+  justify-content: flex-end;
+  margin: 2px 0 0;
+}
+.rmapWatch {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 3px 9px;
+  border-radius: 999px;
+  background: rgba(124, 245, 190, 0.14);
+  color: var(--mint);
+  font-size: 10.5px;
+  font-weight: 800;
+}
+.rmapGrid {
+  display: grid;
+  align-items: center;
+}
+/* 絵の上下に、名前のぶんのすきま（線が絵のまん中に来るように） */
+.rmapNode {
+  display: grid;
+  grid-template-rows: 26px 40px 26px;
+  justify-items: center;
+}
+.rmapNode::before {
+  content: "";
+}
+.rmapIcon {
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: 40px;
+  height: 40px;
+  border: 1.5px solid color-mix(in srgb, var(--c) 60%, transparent);
+  border-radius: 30%;
+  background: color-mix(in srgb, var(--c) 18%, #0d1838);
+  color: color-mix(in srgb, var(--c) 72%, #fff);
+}
+.rmapLabel {
+  align-self: start;
+  margin-top: 4px;
+  color: var(--soft);
+  font-size: 10px;
+  font-weight: 700;
+  line-height: 1.15;
+  text-align: center;
+  white-space: nowrap;
+}
+.rmapLink {
+  position: relative;
+  height: 2px;
+  margin: 0 7px 0 5px;
+  background: rgba(170, 196, 255, 0.22);
+}
+.rmapLink::after {
+  content: "";
+  position: absolute;
+  top: -4px;
+  right: -3px;
+  border-width: 5px 0 5px 6px;
+  border-style: solid;
+  border-color: transparent transparent transparent rgba(170, 196, 255, 0.45);
+}
+.rmapLink i {
+  position: absolute;
+  top: -3px;
+  left: 0;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  opacity: 0;
+}
+.rmap[data-flow="go"] .rmapLink i {
+  background: var(--sky);
+  box-shadow: 0 0 10px var(--sky);
+  animation: rmGo 0.9s linear infinite;
+}
+.rmap[data-flow="back"] .rmapLink[data-on="1"] i {
+  background: var(--mint);
+  box-shadow: 0 0 10px var(--mint);
+  animation: rmBack 0.65s ease-out 2;
+}
+/* サーバーの列：上下のすきまは同じ（まん中にそろう）。下にデータベースがあれば、すきまに線を引く */
+.rmapServers {
+  display: flex;
+  flex-direction: column;
+  align-self: stretch;
+}
+.rmapServers::before,
+.rmapServers::after {
+  content: "";
+  flex: 1 1 0;
+  min-height: 0;
+}
+.rmapServers[data-stem="1"]::after {
+  background: linear-gradient(rgba(170, 196, 255, 0.22), rgba(170, 196, 255, 0.22)) center / 2px 100% no-repeat;
+}
+.rmapServer {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  width: 100%;
+  padding: 6px 8px;
+  border: 1.5px solid color-mix(in srgb, var(--c) 65%, transparent);
+  border-radius: 12px;
+  background: color-mix(in srgb, var(--c) 12%, #0d1838);
+  color: color-mix(in srgb, var(--c) 72%, #fff);
+  text-align: left;
+  transition: border-color 0.25s, opacity 0.25s, background 0.25s;
+}
+.rmapServer + .rmapServer {
+  margin-top: 6px;
+}
+.rmapServer > span {
+  display: grid;
+  min-width: 0;
+}
+.rmapServer b {
+  color: var(--text);
+  font-size: 12px;
+  font-weight: 800;
+  line-height: 1.25;
+}
+.rmapServer small {
+  color: var(--soft);
+  font-size: 10px;
+  font-weight: 700;
+  line-height: 1.2;
+}
+.rmapServer[data-tone="ok"] small {
+  color: var(--mint);
+}
+.rmapServer[data-tone="wait"] {
+  border-style: dashed;
+  border-color: rgba(255, 255, 255, 0.28);
+}
+.rmapServer[data-tone="ng"] {
+  border-style: dashed;
+  border-color: rgba(255, 107, 129, 0.8);
+  background: rgba(255, 107, 129, 0.1);
+}
+.rmapServer[data-tone="ng"] small {
+  color: #ffb3c0;
+}
+.rmapServer[data-tone="off"] {
+  border-style: dashed;
+  opacity: 0.45;
+}
+.rmapServer[data-busy="1"] {
+  animation: rmBusy 0.8s ease-in-out infinite alternate;
+}
+button.rmapServer:active {
+  transform: scale(0.97);
+}
+/* サーバーの下に、データベース・キャッシュ */
+.rmapData {
+  position: relative;
+  display: flex;
+  grid-column: -2 / -1;
+  grid-row: 2;
+  justify-content: space-around;
+  padding-top: 13px;
+}
+.rmapData::before,
+.rmapData[data-two="1"]::after,
+.rmapData .rmapIcon::before {
+  content: "";
+  position: absolute;
+  background: rgba(170, 196, 255, 0.22);
+}
+.rmapData::before {
+  top: 0;
+  left: calc(50% - 1px);
+  width: 2px;
+  height: 7px;
+}
+.rmapData[data-two="1"]::after {
+  top: 6px;
+  left: 25%;
+  right: 25%;
+  height: 2px;
+}
+.rmapData .rmapIcon::before {
+  top: -7.5px;
+  left: calc(50% - 1px);
+  width: 2px;
+  height: 6px;
+}
+.rmapData .rmapNode {
+  grid-template-rows: 40px 24px;
+}
+.rmapData .rmapNode::before {
+  content: none;
+}
+/* 返事をしたところに出すしるし（200・404・HIT・件数） */
+.rmapBubble {
+  position: absolute;
+  top: -11px;
+  right: -12px;
+  z-index: 2;
+  padding: 1px 6px;
+  border-radius: 8px;
+  background: var(--mint);
+  color: #052a1c;
+  font-size: 11px;
+  font-weight: 900;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.35);
+  pointer-events: none;
+  animation: rmBubble 0.4s ease both;
+}
+.rmapServer .rmapBubble {
+  right: -8px;
+}
+.rmapBubble[data-tone="warn"] {
+  background: var(--amber);
+  color: #3a2300;
+}
+.rmapBubble[data-tone="ng"] {
+  background: var(--danger);
+  color: #fff;
+}
+/* データベース・キャッシュが使われたとき */
+.rmapPulse {
+  position: absolute;
+  inset: -3px;
+  border: 2px solid color-mix(in srgb, var(--c) 80%, #fff);
+  border-radius: 30%;
+  pointer-events: none;
+  animation: rmPulse 0.7s ease-out forwards;
+}
+
+/* レッスンのステップ（いまやること → ボタン → 返事 → わかったこと） */
+.rlStep {
+  margin: 10px 12px 0;
+  padding: 14px;
+  border: 1px solid var(--line-strong);
+  border-radius: 22px;
+  background: linear-gradient(165deg, #1a2d5e, #101d42 70%);
+  box-shadow: 0 14px 34px rgba(0, 0, 0, 0.35);
+  animation: rlIn 0.35s ease both;
+}
+.rlCount {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  color: var(--sky);
+  font-size: 11px;
+  font-weight: 900;
+  letter-spacing: 0.06em;
+}
+.rlDots {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+.rlDots i {
+  width: 6px;
+  height: 6px;
+  border-radius: 3px;
+  background: rgba(255, 255, 255, 0.16);
+  transition: width 0.3s, background 0.3s;
+}
+.rlDots i[data-on="1"] {
+  background: var(--mint);
+}
+.rlDots i[data-cur="1"] {
+  width: 18px;
+  background: var(--sky);
+}
+.rlSay {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  margin-top: 10px;
+}
+.rlSay p {
+  flex: 1;
+  margin: 0;
+  padding: 10px 12px;
+  border-radius: 4px 16px 16px 16px;
+  background: rgba(255, 255, 255, 0.06);
+  font-size: 14.5px;
+  font-weight: 700;
+  line-height: 1.7;
+}
+.term {
+  padding: 0 1px;
+  color: #ffe08a;
+  font-weight: 900;
+}
+.rlField {
+  display: grid;
+  gap: 5px;
+  margin-top: 12px;
+}
+.rlField span {
+  color: var(--soft);
+  font-size: 11.5px;
+  font-weight: 800;
+}
+/* iOS で入力のたびに拡大されないように 16px */
+.rlField input {
+  width: 100%;
+  height: 46px;
+  padding: 0 12px;
+  border: 1px solid var(--line-strong);
+  border-radius: 12px;
+  background: #060b1c;
+  color: var(--text);
+  font-size: 16px;
+}
+.rlCodeBox {
+  display: grid;
+  gap: 5px;
+}
+.rlStep > .rlCodeBox {
+  margin-top: 10px;
+}
+.rlCodeBox small {
+  color: var(--faint);
+  font-size: 10.5px;
+  font-weight: 800;
+}
+button.rlAction {
+  flex-direction: column;
+  gap: 3px;
+  width: 100%;
+  height: auto;
+  min-height: 56px;
+  margin-top: 12px;
+  padding: 8px 16px;
+  font-size: 16px;
+  white-space: normal;
+}
+button.rlAction small {
+  font: 700 11px/1.2 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  opacity: 0.72;
+}
+.rlResult {
+  display: grid;
+  gap: 10px;
+  margin-top: 14px;
+  padding-top: 14px;
+  border-top: 1px dashed var(--line-strong);
+  animation: rlIn 0.3s ease both;
+}
+.rlLearn,
+.rlRetry {
+  margin: 0;
+  padding: 10px 12px;
+  border-radius: 14px;
+  font-size: 13.5px;
+  line-height: 1.75;
+}
+.rlLearn {
+  border: 1px solid rgba(124, 245, 190, 0.3);
+  background: rgba(124, 245, 190, 0.08);
+}
+.rlLearn::before {
+  content: "わかったこと";
+  display: block;
+  margin-bottom: 2px;
+  color: var(--mint);
+  font-size: 11px;
+  font-weight: 900;
+  letter-spacing: 0.06em;
+}
+.rlRetry {
+  border: 1px solid rgba(255, 200, 87, 0.35);
+  background: rgba(255, 200, 87, 0.08);
+  color: #ffe3a3;
+}
+button.rlNext {
+  width: 100%;
+  height: 50px;
+  font-size: 15.5px;
+}
+.rlLinks {
+  display: flex;
+  justify-content: center;
+  gap: 8px;
+  padding: 14px 12px 0;
+}
+.rlLinks button {
+  padding: 8px 14px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.04);
+  color: var(--soft) !important;
+  font-size: 12px;
+  font-weight: 800;
+}
+.rlClear {
+  display: grid;
+  justify-items: center;
+  gap: 2px;
+  padding: 4px 0;
+  text-align: center;
+}
+.rlClear span {
+  font-size: 34px;
+  line-height: 1.2;
+}
+.rlClear b {
+  font-family: var(--round);
+  font-size: 22px;
+  font-weight: 900;
+}
+.rlClear small {
+  color: var(--soft);
+  font-size: 12px;
+}
+.rlSumHead {
+  margin: 12px 0 4px;
+  color: var(--mint);
+  font-size: 11.5px;
+  font-weight: 900;
+  letter-spacing: 0.06em;
+}
+.rlSummary {
+  display: grid;
+  gap: 4px;
+  margin: 0;
+  padding: 0 0 0 20px;
+  font-size: 13.5px;
+  line-height: 1.65;
+  list-style: disc;
+}
+.rlSummary li::marker {
+  color: var(--mint);
+}
+.rlClearBtns {
+  display: grid;
+  gap: 8px;
+  margin-top: 14px;
+}
+.rlSumNote {
+  margin: 10px 0 0;
+  color: var(--soft);
+  font-size: 12px;
+  line-height: 1.6;
+  text-align: center;
+}
+
+/* 返事の見せ方 */
+.rcEntry {
+  display: grid;
+  gap: 7px;
+}
+.rcHead {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 8px;
+}
+.rcHead b {
+  font-size: 14.5px;
+  font-weight: 900;
+}
+.rcHead small {
+  color: var(--soft);
+  font-size: 11px;
+}
+.rcBody {
+  -webkit-user-select: text;
+  user-select: text;
+  max-height: 150px;
+  margin: 0;
+  overflow: auto;
+  padding: 10px 12px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: #060b1c;
+  color: #eef4ff;
+  font: 600 14px/1.6 var(--sans);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.rcBody[data-json="1"] {
+  font: 12px/1.55 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+}
+button.rcRawBtn {
+  justify-self: start;
+  padding: 2px 0;
+  border: 0;
+  background: none;
+  color: var(--sky) !important;
+  font-size: 11.5px;
+  font-weight: 800;
+}
+.rcBars {
+  display: grid;
+  gap: 5px;
+}
+.rcBars > div {
+  display: grid;
+  grid-template-columns: 5.4em minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+  font-weight: 700;
+}
+.rcTrack {
+  height: 10px;
+  overflow: hidden;
+  border-radius: 5px;
+  background: rgba(255, 255, 255, 0.06);
+}
+.rcTrack i {
+  display: block;
+  height: 100%;
+  border-radius: 5px;
+  background: linear-gradient(90deg, #2fd29a, #8ef8c9);
+}
+.rcCodes {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 12px;
+}
+.rcCodes > span {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--soft);
+  font-size: 11.5px;
+  font-weight: 700;
+}
+.rcDb {
+  display: grid;
+  gap: 4px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.rcDb li {
+  -webkit-user-select: text;
+  user-select: text;
+  display: grid;
+  grid-template-columns: minmax(0, 2fr) minmax(0, 3fr);
+  gap: 10px;
+  padding: 7px 10px;
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.04);
+  font: 12px/1.5 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  overflow-wrap: anywhere;
+}
+.rcDb b {
+  color: var(--sky);
+}
+/* プログラム（行番号・色分け・光る行） */
+.rcCode {
+  -webkit-user-select: text;
+  user-select: text;
+  max-height: 52dvh;
+  margin: 0;
+  overflow: auto;
+  padding: 8px 0;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: #060b1c;
+  color: #d7e3ff;
+  font: 11.5px/1.6 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+}
+.rcLine {
+  display: grid;
+  grid-template-columns: 2.6em minmax(0, 1fr);
+}
+.rcLine > i {
+  -webkit-user-select: none;
+  user-select: none;
+  padding-right: 8px;
+  color: var(--faint);
+  font-style: normal;
+  text-align: right;
+}
+.rcLine > span {
+  padding-right: 10px;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.rcLine[data-hit="1"] {
+  background: rgba(255, 210, 122, 0.14);
+  box-shadow: inset 3px 0 0 #ffd27a;
+}
+.rcLine[data-hit="1"] > i {
+  color: #ffd27a;
+}
+.tkCom {
+  color: #7d8db3;
+}
+.tkStr {
+  color: #9ff5cf;
+}
+.tkKw {
+  color: #ffb4e6;
+}
+
+/* 自由に作る */
+.rfLead {
+  margin: 0 16px 8px;
+  color: var(--soft);
+  font-size: 12px;
+  line-height: 1.6;
+}
+.rfError {
+  display: grid;
+  gap: 6px;
+  margin: 10px 12px 0;
+}
+.rfTools {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  padding: 10px 12px 0;
+}
+.rfTools button {
+  width: 100%;
+  font-size: 14px;
+}
+.rfSend {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 8px;
+  padding-top: 2px;
+}
+.rfSend button {
+  font-size: 15px;
+}
+.rfCodeHead {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+.rfCodeHead .sheetTitle {
+  margin: 4px 0;
+}
+.rfConfig {
+  display: grid;
+  gap: 12px;
+}
+.rfConfig .sheetTitle {
+  margin-bottom: 0;
+}
+
 .roomPanel {
   display: grid;
   gap: 8px;
@@ -2749,29 +3412,6 @@ li[data-on="1"] .goalStar {
   margin: 0;
   color: var(--soft);
   font-size: 11.5px;
-}
-.roomSteps {
-  display: grid;
-  gap: 3px;
-  margin: 0;
-  padding: 8px 12px 8px 30px;
-  list-style: decimal;
-  border-radius: 12px;
-  background: rgba(124, 245, 190, 0.07);
-  color: var(--text);
-  font-size: 12px;
-  line-height: 1.6;
-}
-.roomSteps::before {
-  content: "やってみよう";
-  margin: 0 0 2px -18px;
-  color: var(--mint);
-  font-size: 11px;
-  font-weight: 900;
-}
-.roomSteps li::marker {
-  color: var(--mint);
-  font-weight: 900;
 }
 .roomConsole time {
   color: var(--faint);
@@ -2811,13 +3451,6 @@ li[data-on="1"] .goalStar {
 .roomBody {
   font-size: 16px;
 }
-/* 指でさわる画面（スマホ）では、入力欄にさわったとき拡大されないように 16px にして、長い行は折り返す */
-@media (pointer: coarse) {
-  .roomCode {
-    font-size: 16px;
-    white-space: pre-wrap;
-  }
-}
 .roomReqRow {
   display: grid;
   grid-template-columns: auto 1fr;
@@ -2835,15 +3468,6 @@ li[data-on="1"] .goalStar {
   background: rgba(255, 107, 129, 0.12);
   color: #ffb3c0;
   font-size: 12px;
-}
-.roomBurst {
-  margin: 0;
-  padding: 8px 10px;
-  border-radius: 10px;
-  background: rgba(124, 245, 190, 0.08);
-  color: var(--text);
-  font-size: 12px;
-  line-height: 1.5;
 }
 .roomLog,
 .roomConsole {
@@ -2923,6 +3547,95 @@ li[data-on="1"] .goalStar {
   max-height: 260px;
   white-space: pre-wrap;
   overflow-wrap: anywhere;
+}
+/* 指でさわる画面（スマホ）では、入力欄にさわったとき拡大されないように 16px にして、長い行は折り返す */
+@media (pointer: coarse) {
+  .roomCode {
+    font-size: 16px;
+    white-space: pre-wrap;
+  }
+}
+
+@keyframes rmGo {
+  0% {
+    left: 0;
+    opacity: 0;
+  }
+  15%,
+  85% {
+    opacity: 1;
+  }
+  100% {
+    left: calc(100% - 8px);
+    opacity: 0;
+  }
+}
+@keyframes rmBack {
+  0% {
+    left: calc(100% - 8px);
+    opacity: 0;
+  }
+  15% {
+    opacity: 1;
+  }
+  100% {
+    left: 0;
+    opacity: 0;
+  }
+}
+@keyframes rmBusy {
+  from {
+    box-shadow: 0 0 0 1px color-mix(in srgb, var(--c) 30%, transparent), 0 0 6px color-mix(in srgb, var(--c) 20%, transparent);
+  }
+  to {
+    box-shadow: 0 0 0 2px color-mix(in srgb, var(--c) 65%, transparent), 0 0 20px color-mix(in srgb, var(--c) 50%, transparent);
+  }
+}
+@keyframes rmBubble {
+  0% {
+    opacity: 0;
+    transform: scale(0.4);
+  }
+  60% {
+    opacity: 1;
+    transform: scale(1.15);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+@keyframes rmPulse {
+  0% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  100% {
+    opacity: 0;
+    transform: scale(1.45);
+  }
+}
+@keyframes rlIn {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .rmapLink i,
+  .rmapServer[data-busy="1"],
+  .rmapBubble,
+  .rlStep,
+  .rlResult {
+    animation: none !important;
+  }
+  .rmapPulse {
+    display: none;
+  }
 }
 .labHud {
   display: grid;
