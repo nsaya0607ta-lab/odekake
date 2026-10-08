@@ -42,6 +42,10 @@
   `docs/pinball.md` のバランスの表も更新すること（目標：ふつうの腕前で赤コイン平均約200枚・1プレイ平均2分半くらい）。
 - 台の形を変えたら `node scripts/simulate-pinball.mjs stuck 600` で、玉が止まってしまう場所が出ないことも確かめる
   （上を向いた平らな面を作ると、玉が乗って止まる）。玉の速さは `config.ts` の `GAME_SPEED` だけで変える。
+- ガチャで集めるほど強くなる仕組み（図鑑ボーナス・Lv5の覚醒・限界突破の★・新しいスキル）の強さを変えたら、
+  `PINBALL_LV=5 PINBALL_STARS=5 node scripts/simulate-pinball.mjs 300 average 18` でも確かめる
+  （目標：全部そろえて育てきった人が、この仕組みの前の全部Lv5の人の1.5倍くらい。ふつうの集め方は約200枚のまま。
+  数字は docs/pinball.md の「ガチャで集めるほど強くなる」）。覚醒には玉が長く残る効果（セーブ・キックバック）を足さない。
 - 赤コインの換算（`config.ts` の `RED_COIN_POINTS` / `RED_COIN_MAX`）を変えるときは、
   データベースの `record_pinball_result` も新しいマイグレーションで同じ数字にすること。
 - `tables.ts` は地図のデータを読むサーバー専用のファイル。ブラウザ側のコードから import しないこと。

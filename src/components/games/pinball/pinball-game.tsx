@@ -76,6 +76,9 @@ function TableCard({ table, best, onPlay }: { table: PinballTableInfo; best: num
               </span>
             </span>
           ) : null}
+          {table.unlocked && table.zukan > 1 ? (
+            <span className="mt-1 block text-[10px] font-black text-[#ffe08a]">図鑑ボーナス ×{table.zukan.toFixed(2)}（すべての得点）</span>
+          ) : null}
         </span>
         {table.unlocked ? (
           <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-xl font-black text-black" style={{ background: theme.colors.accent }}>
@@ -161,7 +164,7 @@ export function PinballGame({ tables, bests: initialBests, redCoins: initialCoin
           <p className="relative text-[10px] font-black tracking-[0.1em] text-[#ff8a80]">はじいて、集めて、県制覇！</p>
           <p className="relative mt-1 text-[22px] font-black leading-tight">ご当地アイテムの台で遊ぼう</p>
           <p className="relative mt-2 text-[11px] font-bold leading-relaxed text-white/70">
-            台に浮かぶご当地アイテムにボールを当てて集めると、その場でスキルが発動。{STAMP_COUNT}個そろうと「県制覇！」でマルチボール。3球で終わり、スコアに応じて赤コインがもらえます。
+            台に浮かぶご当地アイテムにボールを当てて集めると、その場でスキルが発動。どれでも{STAMP_COUNT}つ集めると「県制覇！」でマルチボール。その県のアイテムをたくさん持っているほど、図鑑ボーナスで得点が上がります。3球で終わり、スコアに応じて赤コインがもらえます。
           </p>
           <div className="relative mt-3 grid grid-cols-3 gap-2 text-center">
             {[

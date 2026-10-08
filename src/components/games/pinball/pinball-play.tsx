@@ -2,9 +2,10 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
 import { RedCoinArt } from "@/components/coin-art";
-import { FULL_PLUNGE_POWER, PINBALL_BALLS, SKILL_SHOT_POWER } from "@/lib/games/pinball/config";
+import { FULL_PLUNGE_POWER, MAX_SCORE, PINBALL_BALLS, SKILL_SHOT_POWER } from "@/lib/games/pinball/config";
 import {
   canLaunch,
+  collectedCount,
   createGame,
   isBallSaveOn,
   launch,
@@ -46,6 +47,7 @@ type Hud = {
   ball: number;
   extra: number;
   mult: number;
+  /** スタンプ帳：入ったもの（done）→ いま台に浮かんでいるもの（lit）→ まだ空いているところ（image が null） */
   stamps: { image: string | null; name: string; done: boolean; lit: boolean }[];
   collected: number;
   chips: { label: string; sec: number | null; hot: boolean }[];
@@ -89,6 +91,17 @@ function bannerFont(title: string, epic: boolean): CSSProperties | undefined {
   return { fontSize: `max(17px, min(${two.toFixed(2)}vw, ${max}px))` };
 }
 
+function readStamps(g: Game): Hud["stamps"] {
+  const waiting = g.mode === "normal" ? g.lit.filter((l) => !l.encore).map((l) => l.item) : [];
+  let next = 0;
+  return g.book.map((item) => {
+    if (item) return { image: item.image, name: item.name, done: true, lit: false };
+    const lit = waiting[next];
+    next += 1;
+    return lit ? { image: lit.image, name: lit.name, done: false, lit: true } : { image: null, name: "", done: false, lit: false };
+  });
+}
+
 function readHud(g: Game): Hud {
   const chips: Hud["chips"] = [];
   const left = (until: number) => Math.max(0, Math.ceil(until - g.clock));
@@ -101,6 +114,9 @@ function readHud(g: Game): Hud {
   if (g.clock < g.gateUntil) chips.push({ label: "ふさぐ", sec: left(g.gateUntil), hot: false });
   if (g.clock < g.slowUntil) chips.push({ label: "スロー", sec: left(g.slowUntil), hot: false });
   if (g.clock < g.comboAddUntil) chips.push({ label: "コンボ受付", sec: left(g.comboAddUntil), hot: false });
+  if (g.clock < g.magnetUntil) chips.push({ label: "マグネット", sec: left(g.magnetUntil), hot: true });
+  if (g.clock < g.stamp2Until) chips.push({ label: "スタンプ2倍", sec: left(g.stamp2Until), hot: true });
+  if (g.reserves.length) chips.push({ label: g.reserves.length > 1 ? `JP予約×${g.reserves.length}` : "JP予約", sec: null, hot: true });
   if (g.kickbackLit[0] || g.kickbackLit[1]) chips.push({ label: g.kickbackLit[0] && g.kickbackLit[1] ? "キック左右" : g.kickbackLit[0] ? "キック左" : "キック右", sec: null, hot: false });
   const onPlunger = canLaunch(g);
   return {
@@ -108,8 +124,8 @@ function readHud(g: Game): Hud {
     ball: g.ball,
     extra: g.extraBalls,
     mult,
-    stamps: g.stamps.map((s) => ({ image: s.item.image, name: s.item.name, done: s.collected, lit: s.spot !== null && !s.collected })),
-    collected: g.stamps.filter((s) => s.collected).length,
+    stamps: readStamps(g),
+    collected: collectedCount(g),
     chips,
     launchable: onPlunger,
     skillLane: g.phase === "serve" ? g.skillLane : -1,
@@ -259,7 +275,8 @@ export function PinballPlay({ table, theme, best, onExit, onRestart, onRecorded 
         body: JSON.stringify({
           roundId: roundIdRef.current,
           table: table.id,
-          score: g.score,
+          // 記録できるのは MAX_SCORE まで（こえたぶんはカンスト。赤コインはそれよりずっと手前で上限になる）
+          score: Math.min(MAX_SCORE, g.score),
           durationMs: Math.round(g.playTime * 1000),
           items: g.stats.items,
           conquests: g.conquests,
@@ -272,7 +289,8 @@ export function PinballPlay({ table, theme, best, onExit, onRestart, onRecorded 
         | null;
       if (response.ok && payload?.ready === false) {
         setSubmit({ state: "offline" });
-        onRecorded(table.id, { score: g.score, isBest: best === null || g.score > best, coins: null, balance: null });
+        const kept = Math.min(MAX_SCORE, g.score);
+        onRecorded(table.id, { score: kept, isBest: best === null || kept > best, coins: null, balance: null });
         return;
       }
       if (!response.ok || !payload?.ok) throw new Error(payload?.error ?? "記録できませんでした。");
@@ -280,7 +298,7 @@ export function PinballPlay({ table, theme, best, onExit, onRestart, onRecorded 
       const balance = typeof payload.balance === "number" ? payload.balance : null;
       const isBest = payload.isBest === true;
       setSubmit({ state: "done", coins, balance, isBest });
-      onRecorded(table.id, { score: g.score, isBest, coins, balance });
+      onRecorded(table.id, { score: Math.min(MAX_SCORE, g.score), isBest, coins, balance });
     } catch (error) {
       setSubmit({ state: "error", message: error instanceof Error ? error.message : "記録できませんでした。" });
     }
@@ -292,7 +310,7 @@ export function PinballPlay({ table, theme, best, onExit, onRestart, onRecorded 
     const canvas = canvasRef.current;
     const stage = stageRef.current;
     if (!canvas || !stage) return;
-    const game = createGame({ pool: table.pool, tableName: theme.name, conquestTitle: theme.conquestTitle });
+    const game = createGame({ pool: table.pool, tableName: theme.name, conquestTitle: theme.conquestTitle, zukan: table.zukan });
     gameRef.current = game;
     // 開発中だけ、ブラウザから台を動かせるようにする（画面の確認・自動テスト用）
     if (process.env.NODE_ENV !== "production") {
@@ -307,7 +325,7 @@ export function PinballPlay({ table, theme, best, onExit, onRestart, onRecorded 
 
     // アイテムの絵を読みこむ
     const sources = new Set<string>();
-    for (const item of [...table.pool, ...table.bumperItems, ...game.stamps.map((s) => s.item)]) if (item.image) sources.add(item.image);
+    for (const item of [...table.pool, ...table.bumperItems, ...game.candidates]) if (item.image) sources.add(item.image);
     const images: HTMLImageElement[] = [];
     for (const src of sources) {
       const img = new Image();
@@ -342,7 +360,7 @@ export function PinballPlay({ table, theme, best, onExit, onRestart, onRecorded 
         stepGame(g, dt);
         const fx = takeFx(g);
         if (fx.length) {
-          renderer.pushFx(fx, g);
+          renderer.pushFx(fx);
           audio.play(fx);
           for (const f of fx) {
             if (f.type === "msg") queueBanner(f);
@@ -554,7 +572,10 @@ export function PinballPlay({ table, theme, best, onExit, onRestart, onRecorded 
             ❚❚
           </button>
           <div className={styles.scoreBox}>
-            <span className={styles.tableName}>{theme.name}</span>
+            <span className={styles.tableName}>
+              {theme.name}
+              {table.zukan > 1 ? <span className={styles.zukan}>図鑑ボーナス×{table.zukan.toFixed(2)}</span> : null}
+            </span>
             <span className={styles.score} aria-live="off">
               {(hud?.score ?? 0).toLocaleString("ja-JP")}
               {hud && hud.mult > 1 ? <span className={styles.mult}>×{hud.mult}</span> : null}
@@ -571,11 +592,13 @@ export function PinballPlay({ table, theme, best, onExit, onRestart, onRecorded 
         </div>
         <div className={styles.stamps} aria-label={`スタンプ帳 ${hud?.collected ?? 0} / ${hud?.stamps.length ?? 8}`}>
           {(hud?.stamps ?? []).map((s, i) => (
-            <span key={`${i}-${s.image}`} className={`${styles.stamp} ${s.done ? styles.stampDone : s.lit ? styles.stampLit : ""}`} title={s.name}>
+            <span key={`${i}-${s.image}`} className={`${styles.stamp} ${s.done ? styles.stampDone : s.lit ? styles.stampLit : styles.stampEmpty}`} title={s.name || undefined}>
               {s.image ? (
                 // eslint-disable-next-line @next/next/no-img-element
                 <img src={s.image} alt="" draggable={false} />
-              ) : null}
+              ) : (
+                "？"
+              )}
               {s.done ? <span className={styles.stampMark}>✓</span> : null}
             </span>
           ))}

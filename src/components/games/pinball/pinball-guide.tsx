@@ -14,9 +14,14 @@ export type GuideSkillRow = {
   count: number;
   /** いまのスキルLv（0 は未所持・スキルなし） */
   level: number;
+  /** 限界突破の★（Lv5 のあとに引いたぶん） */
+  stars: number;
+  /** ★でのびた、いまの強さ（★が無いときは null） */
+  starText: string | null;
 };
 
-export type GuidePref = { id: string; name: string; accent: string; rows: GuideSkillRow[] };
+/** zukan はこの県の図鑑ボーナス（すべての得点にかかる倍率） */
+export type GuidePref = { id: string; name: string; accent: string; rows: GuideSkillRow[]; zukan: number };
 
 /** 県ごとのスキル一覧（タブで切りかえ） */
 export function PinballSkillTabs({ prefs }: { prefs: GuidePref[] }) {
@@ -43,7 +48,9 @@ export function PinballSkillTabs({ prefs }: { prefs: GuidePref[] }) {
         ))}
       </div>
       <p className="mt-2 text-[10px] font-bold text-white/50">
-        持っている {owned} / {pref.rows.length} 種 ・ スキルLvは図鑑と同じ（同じアイテムを集めるほど上がる）
+        持っている {owned} / {pref.rows.length} 種
+        {pref.zukan > 1 ? <b className="ml-1 text-[#ffe08a]">図鑑ボーナス ×{pref.zukan.toFixed(2)}</b> : null}
+        <span className="block">スキルLvは図鑑と同じ（同じアイテムを集めるほど上がる）。Lv5で覚醒、そのあとは★</span>
       </p>
       <ul className="mt-2 space-y-2">
         {pref.rows.map((row) => (
@@ -66,6 +73,7 @@ export function PinballSkillTabs({ prefs }: { prefs: GuidePref[] }) {
               </span>
               <span className="shrink-0 text-right text-[10px] font-black text-white/70">
                 {row.count > 0 ? (row.level > 0 ? (row.level >= 5 ? "Lv.MAX" : `Lv${row.level}`) : `${row.count}こ`) : "未所持"}
+                {row.stars > 0 ? <span className="block text-[#ffe08a]">{"★".repeat(row.stars)}</span> : null}
               </span>
             </div>
             {row.levels ? (
@@ -78,12 +86,17 @@ export function PinballSkillTabs({ prefs }: { prefs: GuidePref[] }) {
                       className={`flex items-center gap-2 rounded-xl px-2 py-1 text-[10.5px] font-bold ${on ? "text-black" : "bg-black/20 text-white/70"}`}
                       style={on ? { background: pref.accent } : undefined}
                     >
-                      <span className="w-9 shrink-0 font-black">{i === 4 ? "MAX" : `Lv${i + 1}`}</span>
+                      <span className="w-9 shrink-0 font-black">{i === 4 ? "覚醒" : `Lv${i + 1}`}</span>
                       <span className="min-w-0">{text}</span>
                     </li>
                   );
                 })}
               </ol>
+            ) : null}
+            {row.starText ? (
+              <p className="mt-1 rounded-xl border border-[#ffe08a]/40 bg-[#ffe08a]/10 px-2 py-1 text-[10.5px] font-bold text-[#ffe08a]">
+                {"★".repeat(row.stars)} いまの強さ：{row.starText}
+              </p>
             ) : null}
           </li>
         ))}

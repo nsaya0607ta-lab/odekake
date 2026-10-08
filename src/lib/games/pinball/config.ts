@@ -41,6 +41,27 @@ export const CONQUEST_EXTRA_BALLS = 2;
 export const CONQUEST_SAVE_SEC = 12;
 
 /**
+ * 図鑑ボーナス：その県のご当地アイテム（台に出るもの）を何種類持っているかで、すべての得点にかける倍率。
+ * 持っている割合 × ZUKAN_BONUS_MAX だけ上がり、全部そろえると 1 + ZUKAN_BONUS_MAX 倍（いつもの台は 1 倍）
+ */
+export const ZUKAN_BONUS_MAX = 0.1;
+
+export function zukanBonus(owned: number, total: number): number {
+  if (total <= 0 || owned <= 0) return 1;
+  return Math.round((1 + ZUKAN_BONUS_MAX * Math.min(1, owned / total)) * 100) / 100;
+}
+
+/**
+ * 限界突破（★）：スキルLvが MAX になったあとも同じアイテムを引くと、1つごとに★が1つ（STAR_MAX まで）。
+ * ★1つで、そのアイテムのスキルの秒数・得点と、アイテムを取ったときの得点が STAR_RATE ずつ上がる
+ */
+export const STAR_MAX = 5;
+export const STAR_RATE = 0.05;
+/** スキル「おかわり」で台にもう一度出たアイテムは、この秒数で消える。取ったときの得点はふつうの ENCORE_POINTS 倍 */
+export const ENCORE_SEC = 30;
+export const ENCORE_POINTS = 0.5;
+
+/**
  * スキルショット：上のレーン「お・で・か・け」に入りやすい引き量（physics.ts の PLUNGER_CURVE で決まる）。
  * 打ち出しゲージの目印と、シミュレーターのボットが使う。これより強く（FULL_PLUNGE_POWER〜）引くと1周する
  */
@@ -68,6 +89,8 @@ export const POINTS = {
   conquest: 500000,
   jackpot: 250000,
   superJackpot: 1000000,
+  /** スキル「おかわり」で、もう一度出せるアイテムが無かったとき */
+  encoreMiss: 30000,
 } as const;
 
 /** アイテムを集めたときの得点（県制覇の回数ぶん大きくなる：×(1 + 制覇回数)） */
