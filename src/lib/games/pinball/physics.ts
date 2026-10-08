@@ -13,7 +13,6 @@ import {
   BALL_R,
   DRAIN_Y,
   GRAVITY,
-  TABLE,
   TABLE_H,
   TABLE_W,
   type FlipperDef,
@@ -220,7 +219,7 @@ export type PhysEvent =
   | { type: "sling"; index: number; ballId: number }
   | { type: "drop"; index: number; ballId: number }
   | { type: "standup"; index: number; ballId: number }
-  | { type: "pinwheel"; ballId: number; speed: number }
+  | { type: "pinwheel"; index: number; ballId: number; speed: number }
   | { type: "gateKick"; index: number; ballId: number }
   | { type: "hit"; mat: Material; speed: number; x: number; y: number }
   | { type: "flipperHit"; index: number; speed: number; ballId: number }
@@ -253,8 +252,8 @@ export type World = {
   slingReadyAt: number[];
   standupReadyAt: number[];
   gateKickReadyAt: [number, number];
-  /** かざぐるまの向き（rad）と回る速さ（rad/s、正が時計まわり） */
-  pinwheel: { angle: number; omega: number; readyAt: number };
+  /** かざぐるまの向き（rad）と回る速さ（rad/s、正が時計まわり）。table.pinwheels と同じ順 */
+  pinwheels: { angle: number; omega: number; readyAt: number }[];
   /** 当たり音を鳴らしすぎないように */
   hitSoundAt: number;
   nextBallId: number;
@@ -273,14 +272,19 @@ export function mulberry32(seed: number): () => number {
   };
 }
 
-let sharedCollision: Collision | null = null;
+/** 当たり判定の下調べは台ごとに一度だけ作る */
+const collisionCache = new WeakMap<TableGeometry, Collision>();
 
-export function createWorld(seed = 1, table: TableGeometry = TABLE): World {
-  if (!sharedCollision || table !== TABLE) sharedCollision = buildCollision(table);
+export function createWorld(seed: number, table: TableGeometry): World {
+  let col = collisionCache.get(table);
+  if (!col) {
+    col = buildCollision(table);
+    collisionCache.set(table, col);
+  }
   const [fl, fr] = table.flippers;
   return {
     table,
-    col: table === TABLE ? sharedCollision : buildCollision(table),
+    col,
     balls: [],
     flippers: [
       { def: fl, angle: fl.rest, omega: 0, pressed: false, upSign: fl.up < fl.rest ? -1 : 1 },
@@ -296,7 +300,7 @@ export function createWorld(seed = 1, table: TableGeometry = TABLE): World {
     slingReadyAt: table.slings.map(() => 0),
     standupReadyAt: table.standups.flatMap((bank) => bank.targets.map(() => 0)),
     gateKickReadyAt: [0, 0],
-    pinwheel: { angle: 0, omega: table.pinwheel.omega, readyAt: 0 },
+    pinwheels: table.pinwheels.map((pw) => ({ angle: 0, omega: pw.omega, readyAt: 0 })),
     hitSoundAt: 0,
     nextBallId: 1,
     rand: mulberry32(seed),
@@ -605,7 +609,8 @@ function collideStatic(world: World, ball: Ball): void {
     const pen = minD - d;
     if (ci.bumper >= 0 && world.time >= world.bumperReadyAt[ci.bumper]!) {
       world.bumperReadyAt[ci.bumper] = world.time + BUMPER_KICK.cooldown;
-      kick(ball, nx, ny, pen, BUMPER_KICK.base, BUMPER_KICK.gain, BUMPER_KICK.max);
+      const kickScale = world.table.bumperKick;
+      kick(ball, nx, ny, pen, BUMPER_KICK.base * kickScale, BUMPER_KICK.gain, BUMPER_KICK.max * kickScale);
       world.events.push({ type: "bumper", index: ci.bumper, ballId: ball.id, x: ci.x, y: ci.y });
       continue;
     }
@@ -736,7 +741,17 @@ function stepRamp(world: World, ball: Ball, dt: number): void {
     world.events.push({ type: "rampFail", id: def.id, ballId: ball.id });
   } else if (ball.s >= rp.total) {
     const end = def.path[def.path.length - 1]!;
-    const sp = Math.min(RAMP.exitMax, Math.max(350, ball.sv));
+    let sp = Math.min(RAMP.exitMax, Math.max(350, ball.sv));
+    let dx = def.exitDir.x;
+    let dy = def.exitDir.y;
+    if (def.exitSpread) {
+      // 台の上へ落とすランプは、向きと速さを少しばらつかせる
+      const a = (world.rand() - 0.5) * 2 * def.exitSpread;
+      const c = Math.cos(a);
+      const sn = Math.sin(a);
+      [dx, dy] = [dx * c - dy * sn, dx * sn + dy * c];
+      sp *= 0.85 + world.rand() * 0.3;
+    }
     ball.mode = "field";
     ball.ramp = null;
     ball.z = 0;
@@ -744,8 +759,8 @@ function stepRamp(world: World, ball: Ball, dt: number): void {
     ball.y = end.y;
     ball.px = end.x;
     ball.py = end.y - 1;
-    ball.vx = def.exitDir.x * sp;
-    ball.vy = def.exitDir.y * sp;
+    ball.vx = dx * sp;
+    ball.vy = dy * sp;
     world.events.push({ type: "rampDone", id: def.id, ballId: ball.id });
   }
 }
@@ -845,16 +860,16 @@ function stepFieldBall(world: World, ball: Ball, dt: number): void {
 
   for (let iter = 0; iter < 2; iter += 1) {
     collideStatic(world, ball);
-    collidePinwheel(world, ball);
+    for (let k = 0; k < world.pinwheels.length; k += 1) collidePinwheel(world, ball, k);
     collideFlipper(world, ball, world.flippers[0], 0);
     collideFlipper(world, ball, world.flippers[1], 1);
   }
 }
 
-/** かざぐるまの羽根の先の位置（描画用にも使う） */
-export function pinwheelArm(world: World, k: number): { ux: number; uy: number } {
-  const def = world.table.pinwheel;
-  const a = world.pinwheel.angle + (k * Math.PI * 2) / def.arms;
+/** かざぐるま index の羽根 k の向き（描画用にも使う） */
+export function pinwheelArm(world: World, index: number, k: number): { ux: number; uy: number } {
+  const def = world.table.pinwheels[index]!;
+  const a = world.pinwheels[index]!.angle + (k * Math.PI * 2) / def.arms;
   return { ux: Math.cos(a), uy: Math.sin(a) };
 }
 
@@ -862,9 +877,9 @@ export function pinwheelArm(world: World, k: number): { ux: number; uy: number }
  * 玉とかざぐるま（まん中の軸と、回っている羽根）の当たり。羽根の当たった場所の速さ（ω × r）を玉に渡し、
  * 玉がおした向きに羽根も回る（強く当てると速く回り、ゆっくりふだんの速さに戻る）
  */
-function collidePinwheel(world: World, ball: Ball): void {
-  const def = world.table.pinwheel;
-  const st = world.pinwheel;
+function collidePinwheel(world: World, ball: Ball, index: number): void {
+  const def = world.table.pinwheels[index]!;
+  const st = world.pinwheels[index]!;
   const dx = ball.x - def.x;
   const dy = ball.y - def.y;
   const reach = def.len + def.r + BALL_R;
@@ -877,7 +892,7 @@ function collidePinwheel(world: World, ball: Ball): void {
     if (pen > 0) best = { nx: dx / d, ny: dy / d, pen, cx: (dx / d) * def.hubR, cy: (dy / d) * def.hubR };
   }
   for (let k = 0; k < def.arms; k += 1) {
-    const { ux, uy } = pinwheelArm(world, k);
+    const { ux, uy } = pinwheelArm(world, index, k);
     let t = dx * ux + dy * uy;
     if (t < 0) t = 0;
     else if (t > def.len) t = def.len;
@@ -904,7 +919,7 @@ function collidePinwheel(world: World, ball: Ball): void {
   st.omega = Math.max(-PINWHEEL.maxOmega, Math.min(PINWHEEL.maxOmega, st.omega));
   if (impact > 150 && world.time >= st.readyAt) {
     st.readyAt = world.time + PINWHEEL.cooldown;
-    world.events.push({ type: "pinwheel", ballId: ball.id, speed: impact });
+    world.events.push({ type: "pinwheel", index, ballId: ball.id, speed: impact });
   }
 }
 
@@ -930,9 +945,11 @@ export function stepWorld(world: World, steps: number): void {
     world.time += dt;
     updateFlipper(world.flippers[0], dt);
     updateFlipper(world.flippers[1], dt);
-    const pw = world.pinwheel;
-    pw.angle += pw.omega * dt;
-    pw.omega += (world.table.pinwheel.omega - pw.omega) * (dt / PINWHEEL.relax);
+    for (let k = 0; k < world.pinwheels.length; k += 1) {
+      const pw = world.pinwheels[k]!;
+      pw.angle += pw.omega * dt;
+      pw.omega += (world.table.pinwheels[k]!.omega - pw.omega) * (dt / PINWHEEL.relax);
+    }
     for (const ball of world.balls) {
       if (ball.mode === "field") {
         stepFieldBall(world, ball, dt);

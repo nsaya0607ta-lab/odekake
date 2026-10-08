@@ -7,8 +7,9 @@
  * 1ゲームの流れ
  *   serve（打ち出し待ち）→ play → ボールを落とす → bonus（ボーナス集計）→ 次のボール … 3球で over
  *   ・打ち出しから BALL_SAVE_SEC 秒は、落としても戻ってくる（ボールセーブ）
- *   ・台に光るアイテムをショットで集める → その場でスキル発動。どれでも8つ（スタンプ帳）そろうと「〇〇県 制覇！」（3球マルチボール）
- *   ・台に出るのは、持っているその県のアイテム全部から（まだ出ていないものが先）。すべての得点に図鑑ボーナスがかかる
+ *   ・台に光るアイテムをショットで集める → その場でスキル発動。どれでも8つ（スタンプ帳）そろうと「制覇！」（3球マルチボール）
+ *   ・台に出るのは、持っているご当地アイテム全部から（どの県のものも。まだ出ていないものが先）。すべての得点に図鑑ボーナスがかかる
+ *   ・台の形はマップごとにちがう（maps.ts）。ゲームは world.table の形だけを見る
  *   ・上のレーン「お・で・か・け」がそろうとボーナス倍率アップ。ドロップターゲットを3つ倒すとガチャ穴が開く
  */
 import type { GachaRarity } from "@/lib/gacha/config";
@@ -51,7 +52,7 @@ import {
   type World,
 } from "./physics";
 import type { PinballSkill } from "./skills";
-import { ITEM_PICKUP_R, SHOT_IDS, TABLE, type Pt, type ShotId } from "./table";
+import { ITEM_PICKUP_R, SHOT_IDS, type Pt, type ShotId, type TableGeometry } from "./table";
 
 /* ---------- 型 ---------- */
 
@@ -70,7 +71,7 @@ export type PinballItem = {
 };
 
 /**
- * 台に浮かんでいるアイテム。spot は TABLE.itemSpots の番号、litAt はそこに出た時刻。
+ * 台に浮かんでいるアイテム。spot は台（world.table）の itemSpots の番号、litAt はそこに出た時刻。
  * encore は スキル「おかわり」でもう一度出たもの（取るとスキルはもう一度、スタンプは増えない。until で消える）
  */
 export type LitItem = { item: PinballItem; spot: number; litAt: number; encore: boolean; until: number };
@@ -117,11 +118,11 @@ export type Game = {
   shown: Set<string>;
   /** このゲームで取ったアイテム（新しいものが後ろ。スキル「おかわり」で使う） */
   taken: PinballItem[];
-  /** 図鑑ボーナス（その県のアイテムを何種類持っているか。すべての得点にかける） */
+  /** 図鑑ボーナス（ご当地アイテムを何種類持っているか。すべての得点にかける） */
   zukan: number;
-  /** 「岐阜県」など。演出の文字に使う */
+  /** マップの名前（「はねはね台」など）。演出の文字に使う */
   tableName: string;
-  /** 8個そろったときの大きな文字（「岐阜県 制覇！」） */
+  /** 8個そろったときの大きな文字（「ご当地 制覇！」） */
   conquestTitle: string;
   phase: GamePhase;
   /** いま何球目か（1〜3） */
@@ -211,6 +212,8 @@ function newBook(g: Game): void {
 }
 
 export type CreateGameOptions = {
+  /** マップの形（maps.ts の getPinballTable） */
+  table: TableGeometry;
   pool: readonly PinballItem[];
   tableName: string;
   conquestTitle?: string;
@@ -220,8 +223,8 @@ export type CreateGameOptions = {
   speed?: number;
 };
 
-export function createGame({ pool, tableName, conquestTitle, zukan = 1, seed = Math.floor(Math.random() * 2 ** 31), speed = GAME_SPEED }: CreateGameOptions): Game {
-  const world = createWorld(seed);
+export function createGame({ table, pool, tableName, conquestTitle, zukan = 1, seed = Math.floor(Math.random() * 2 ** 31), speed = GAME_SPEED }: CreateGameOptions): Game {
+  const world = createWorld(seed, table);
   const g: Game = {
     world,
     rand: world.rand,
@@ -253,7 +256,7 @@ export function createGame({ pool, tableName, conquestTitle, zukan = 1, seed = M
     skillShotArmed: false,
     skillShotUntil: 0,
     kickbackLit: [false, false],
-    standups: TABLE.standups.flatMap((bank) => bank.targets.map(() => false)),
+    standups: table.standups.flatMap((bank) => bank.targets.map(() => false)),
     gateUntil: 0,
     mults: [],
     bumperMults: [],
@@ -334,12 +337,15 @@ function addPoints(g: Game, base: number, at?: Pt, tone: Tone = "info", noMult =
   return value;
 }
 
-const SHOT_AT: Record<ShotId, Pt> = Object.fromEntries(TABLE.shots.map((s) => [s.id, s.icon])) as Record<ShotId, Pt>;
+/** ショットのアイテムの絵の位置（得点の文字を出すところ） */
+function shotAt(g: Game, id: ShotId): Pt {
+  return g.world.table.shots.find((s) => s.id === id)!.icon;
+}
 
 /* ---------- 打ち出し ---------- */
 
 function serveBall(g: Game): void {
-  const { x, y } = TABLE.plungerRest;
+  const { x, y } = g.world.table.plungerRest;
   addBall(g.world, x, y);
   g.phase = "serve";
   g.saveArmed = true;
@@ -412,7 +418,7 @@ function tierOf(item: PinballItem): keyof typeof TIER_WEIGHT {
 function pickSpot(g: Game, item: PinballItem, avoid: number | null): number | null {
   const used = new Set(g.lit.map((l) => l.spot));
   const w = TIER_WEIGHT[tierOf(item)];
-  const free = TABLE.itemSpots.flatMap((spot, i) => (used.has(i) || i === avoid ? [] : [{ i, w: w[spot.tier] }]));
+  const free = g.world.table.itemSpots.flatMap((spot, i) => (used.has(i) || i === avoid ? [] : [{ i, w: w[spot.tier] }]));
   const total = free.reduce((sum, f) => sum + f.w, 0);
   if (!free.length || total <= 0) return null;
   let r = g.rand() * total;
@@ -482,7 +488,7 @@ function relocateItems(g: Game): void {
 /** 浮かんでいるアイテムに玉が当たったか（物理の1ステップごとに見る。速い玉が通りぬけないように） */
 function checkPickups(g: Game): void {
   for (let i = g.lit.length - 1; i >= 0; i -= 1) {
-    const spot = TABLE.itemSpots[g.lit[i]!.spot]!;
+    const spot = g.world.table.itemSpots[g.lit[i]!.spot]!;
     for (const b of g.world.balls) {
       if (b.mode !== "field") continue;
       const dx = b.x - spot.x;
@@ -492,7 +498,7 @@ function checkPickups(g: Game): void {
         break;
       }
     }
-    // 取ったアイテムで県制覇になると、残りは台から消える
+    // 取ったアイテムで制覇になると、残りは台から消える
     if (g.mode !== "normal") return;
   }
 }
@@ -502,8 +508,8 @@ function collectItem(g: Game, index: number): void {
   if (!l) return;
   g.lit.splice(index, 1);
   const { item } = l;
-  const spot = TABLE.itemSpots[l.spot];
-  const from: Pt = spot ? { x: spot.x, y: spot.y } : SHOT_AT.scoop;
+  const spot = g.world.table.itemSpots[l.spot];
+  const from: Pt = spot ? { x: spot.x, y: spot.y } : shotAt(g, "scoop");
   // おかわりで取ったときは、得点は半分（スキルはもう一度）
   const points = ITEM_POINTS[item.rarity ?? "capsule"] * (1 + g.conquests) * (1 + STAR_RATE * item.stars) * (l.encore ? ENCORE_POINTS : 1);
   addPoints(g, points, from, "great");
@@ -573,7 +579,7 @@ function encoreItems(g: Game, count: number): void {
     g.lit.push({ item, spot, litAt: g.clock, encore: true, until: g.clock + ENCORE_SEC });
     made += 1;
   }
-  if (made === 0) addPoints(g, POINTS.encoreMiss, SHOT_AT.scoop, "great");
+  if (made === 0) addPoints(g, POINTS.encoreMiss, shotAt(g, "scoop"), "great");
 }
 
 /* ---------- スキル ---------- */
@@ -625,7 +631,7 @@ function applySkill(g: Game, skill: PinballSkill, fromEncore: boolean): void {
         g.saveUntil = Math.max(g.saveUntil, g.clock + e.saveSec);
         break;
       case "points":
-        addPoints(g, e.value, SHOT_AT.scoop, "great");
+        addPoints(g, e.value, shotAt(g, "scoop"), "great");
         break;
       case "magnet":
         // 穴の前のターゲットを倒して、効いているあいだは開けたまま（立っていると吸い寄せても入れない）
@@ -645,7 +651,7 @@ function applySkill(g: Game, skill: PinballSkill, fromEncore: boolean): void {
   }
 }
 
-/* ---------- 県制覇モード ---------- */
+/* ---------- 制覇モード ---------- */
 
 function startConquest(g: Game): void {
   g.conquests += 1;
@@ -682,7 +688,7 @@ function jackpotShot(g: Game, id: ShotId): boolean {
   if (g.mode !== "conquest") return false;
   if (id === "scoop" && g.superLit) {
     g.superLit = false;
-    addPoints(g, POINTS.superJackpot * g.conquests, SHOT_AT.scoop, "epic");
+    addPoints(g, POINTS.superJackpot * g.conquests, shotAt(g, "scoop"), "epic");
     g.stats.jackpots += 1;
     msg(g, "スーパージャックポット！", "epic", undefined, 2600);
     sfx(g, "superJackpot");
@@ -694,7 +700,7 @@ function jackpotShot(g: Game, id: ShotId): boolean {
   g.jackpots[id] = false;
   g.jackpotsMade += 1;
   g.stats.jackpots += 1;
-  addPoints(g, POINTS.jackpot * g.conquests, SHOT_AT[id], "epic");
+  addPoints(g, POINTS.jackpot * g.conquests, shotAt(g, id), "epic");
   sfx(g, "jackpot");
   g.fx.push({ type: "shake", power: 0.6 });
   if (SHOT_IDS.every((s) => !g.jackpots[s])) {
@@ -717,7 +723,7 @@ function majorShot(g: Game, id: ShotId): void {
   g.skillShotArmed = false;
   g.skillLane = -1;
 
-  const at = SHOT_AT[id];
+  const at = shotAt(g, id);
   if (id === "leftOrbit" || id === "rightOrbit") {
     addPoints(g, POINTS.orbit * g.combo, at, "good");
     g.perBall.orbits += 1;
@@ -754,7 +760,7 @@ function majorShot(g: Game, id: ShotId): void {
 
 /** 1組（3つ）を全部光らせた：得点と、アイテムをもう1か所よぶ（よべないときは得点を上乗せ）。光は消して、また最初から */
 function standupsComplete(g: Game, bankIndex: number): void {
-  const bank = TABLE.standups[bankIndex]!;
+  const bank = g.world.table.standups[bankIndex]!;
   const at = { x: bank.center.x + (bank.side === "left" ? 30 : -30), y: bank.center.y + 46 };
   for (let k = 0; k < 3; k += 1) g.standups[bankIndex * 3 + k] = false;
   const canCall = g.mode === "normal" && availableItems(g).length > 0;
@@ -797,10 +803,10 @@ function gachaAward(g: Game): void {
   sfx(g, "gacha");
   switch (award) {
     case "points50k":
-      addPoints(g, 50000, SHOT_AT.scoop, "great");
+      addPoints(g, 50000, shotAt(g, "scoop"), "great");
       break;
     case "points100k":
-      addPoints(g, 100000, SHOT_AT.scoop, "great");
+      addPoints(g, 100000, shotAt(g, "scoop"), "great");
       break;
     case "save":
       g.saveUntil = Math.max(g.saveUntil, g.clock + 10);
@@ -872,7 +878,7 @@ function handleEvent(g: Game, e: PhysEvent): void {
       break;
     case "standup": {
       const bankIndex = Math.floor(e.index / 3);
-      const bank = TABLE.standups[bankIndex]!;
+      const bank = g.world.table.standups[bankIndex]!;
       const target = bank.targets[e.index % 3]!;
       const at = { x: (target.a.x + target.b.x) / 2 + target.face.x * 22, y: (target.a.y + target.b.y) / 2 + target.face.y * 22 };
       const fresh = !g.standups[e.index];
@@ -887,7 +893,7 @@ function handleEvent(g: Game, e: PhysEvent): void {
     }
     case "pinwheel": {
       addPoints(g, POINTS.pinwheel);
-      g.fx.push({ type: "flash", id: "pinwheel" });
+      g.fx.push({ type: "flash", id: `pinwheel:${e.index}` });
       sfx(g, "pinwheel", Math.min(1, e.speed / 2500));
       break;
     }
@@ -896,7 +902,8 @@ function handleEvent(g: Game, e: PhysEvent): void {
       sfx(g, "gateKick");
       break;
     case "drop": {
-      addPoints(g, POINTS.drop, TABLE.drops[e.index] ? { x: (TABLE.drops[e.index]!.a.x + TABLE.drops[e.index]!.b.x) / 2, y: 530 } : undefined);
+      const d = g.world.table.drops[e.index];
+      addPoints(g, POINTS.drop, d ? { x: (d.a.x + d.b.x) / 2, y: 530 } : undefined);
       g.perBall.drops += 1;
       sfx(g, "drop", e.index);
       if (g.world.dropsUp.every((up) => !up)) {
@@ -964,7 +971,7 @@ function handleSensor(g: Game, e: Extract<PhysEvent, { type: "sensor" }>): void 
       if (g.skillShotArmed && g.phase === "play") {
         if (i === g.skillLane) {
           g.stats.skillShots += 1;
-          addPoints(g, POINTS.skillShot, { x: TABLE.laneX[i]!, y: TABLE.laneY + 40 }, "epic");
+          addPoints(g, POINTS.skillShot, { x: g.world.table.laneX[i]!, y: g.world.table.laneY + 40 }, "epic");
           msg(g, "スキルショット！", "epic", `「${"おでかけ"[i]}」のレーンにぴったり`, 2000);
           sfx(g, "skillShot");
         }
@@ -973,7 +980,7 @@ function handleSensor(g: Game, e: Extract<PhysEvent, { type: "sensor" }>): void 
       }
       if (!g.lanes[i]) {
         g.lanes[i] = true;
-        addPoints(g, POINTS.lane, { x: TABLE.laneX[i]!, y: TABLE.laneY + 30 });
+        addPoints(g, POINTS.lane, { x: g.world.table.laneX[i]!, y: g.world.table.laneY + 30 });
         sfx(g, "lane", i);
         if (g.lanes.every(Boolean)) {
           g.bonusX = Math.min(MAX_BONUS_X, g.bonusX + 1);
@@ -1129,7 +1136,7 @@ function tick(g: Game): void {
       g.started = true;
       sfx(g, "launch", next.power);
     } else if (!inLane) {
-      const { x, y } = TABLE.plungerRest;
+      const { x, y } = world.table.plungerRest;
       addBall(world, x, y);
       g.launchQueue[0]!.at = g.clock + 0.4;
     }

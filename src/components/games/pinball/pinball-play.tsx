@@ -19,7 +19,8 @@ import {
   type GameFx,
   type Tone,
 } from "@/lib/games/pinball/game";
-import type { PinballTableInfo } from "@/lib/games/pinball/tables";
+import { getPinballTable } from "@/lib/games/pinball/maps";
+import type { PinballLobby } from "@/lib/games/pinball/tables";
 import type { PinballTheme } from "@/lib/games/pinball/themes";
 import { DEFAULT_BGM_VOLUME, DEFAULT_TAP_VOLUME, getBgmVolume, getTapVolume, setBgmVolume, setTapVolume } from "@/lib/sound-settings";
 import { PinballAudio } from "./audio";
@@ -34,7 +35,10 @@ export type PinballResult = {
 };
 
 type Props = {
-  table: PinballTableInfo;
+  /** 遊ぶマップ */
+  mapId: string;
+  /** 台に出すアイテム・図鑑ボーナス・床の県の形（どのマップも同じ） */
+  lobby: PinballLobby;
   theme: PinballTheme;
   best: number | null;
   onExit: () => void;
@@ -191,7 +195,7 @@ function useScreenLock(): void {
   }, []);
 }
 
-export function PinballPlay({ table, theme, best, onExit, onRestart, onRecorded }: Props) {
+export function PinballPlay({ mapId, lobby, theme, best, onExit, onRestart, onRecorded }: Props) {
   useScreenLock();
   const rootRef = useRef<HTMLDivElement | null>(null);
   const stageRef = useRef<HTMLDivElement | null>(null);
@@ -274,7 +278,7 @@ export function PinballPlay({ table, theme, best, onExit, onRestart, onRecorded 
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           roundId: roundIdRef.current,
-          table: table.id,
+          table: mapId,
           // 記録できるのは MAX_SCORE まで（こえたぶんはカンスト。青コインはそれよりずっと手前で上限になる）
           score: Math.min(MAX_SCORE, g.score),
           durationMs: Math.round(g.playTime * 1000),
@@ -290,7 +294,7 @@ export function PinballPlay({ table, theme, best, onExit, onRestart, onRecorded 
       if (response.ok && payload?.ready === false) {
         setSubmit({ state: "offline" });
         const kept = Math.min(MAX_SCORE, g.score);
-        onRecorded(table.id, { score: kept, isBest: best === null || kept > best, coins: null, balance: null });
+        onRecorded(mapId, { score: kept, isBest: best === null || kept > best, coins: null, balance: null });
         return;
       }
       if (!response.ok || !payload?.ok) throw new Error(payload?.error ?? "記録できませんでした。");
@@ -298,11 +302,11 @@ export function PinballPlay({ table, theme, best, onExit, onRestart, onRecorded 
       const balance = typeof payload.balance === "number" ? payload.balance : null;
       const isBest = payload.isBest === true;
       setSubmit({ state: "done", coins, balance, isBest });
-      onRecorded(table.id, { score: Math.min(MAX_SCORE, g.score), isBest, coins, balance });
+      onRecorded(mapId, { score: Math.min(MAX_SCORE, g.score), isBest, coins, balance });
     } catch (error) {
       setSubmit({ state: "error", message: error instanceof Error ? error.message : "記録できませんでした。" });
     }
-  }, [best, onRecorded, table.id]);
+  }, [best, onRecorded, mapId]);
 
   /* ---------- 準備と毎フレーム ---------- */
 
@@ -310,13 +314,14 @@ export function PinballPlay({ table, theme, best, onExit, onRestart, onRecorded 
     const canvas = canvasRef.current;
     const stage = stageRef.current;
     if (!canvas || !stage) return;
-    const game = createGame({ pool: table.pool, tableName: theme.name, conquestTitle: theme.conquestTitle, zukan: table.zukan });
+    const geometry = getPinballTable(mapId);
+    const game = createGame({ table: geometry, pool: lobby.pool, tableName: theme.name, conquestTitle: theme.conquestTitle, zukan: lobby.zukan });
     gameRef.current = game;
     // 開発中だけ、ブラウザから台を動かせるようにする（画面の確認・自動テスト用）
     if (process.env.NODE_ENV !== "production") {
       (window as unknown as { __pinball?: unknown }).__pinball = { game, setFlipper, launch, setPlungerPull };
     }
-    const renderer = new PinballRenderer(canvas, { theme, shape: table.shape, bumperItems: table.bumperItems });
+    const renderer = new PinballRenderer(canvas, { table: geometry, theme, shape: lobby.shape, bumperItems: lobby.bumperItems });
     rendererRef.current = renderer;
     const audio = new PinballAudio(theme);
     audioRef.current = audio;
@@ -325,7 +330,7 @@ export function PinballPlay({ table, theme, best, onExit, onRestart, onRecorded 
 
     // アイテムの絵を読みこむ
     const sources = new Set<string>();
-    for (const item of [...table.pool, ...table.bumperItems, ...game.candidates]) if (item.image) sources.add(item.image);
+    for (const item of [...lobby.pool, ...lobby.bumperItems.slice(0, geometry.bumpers.length), ...game.candidates]) if (item.image) sources.add(item.image);
     const images: HTMLImageElement[] = [];
     for (const src of sources) {
       const img = new Image();
@@ -574,7 +579,7 @@ export function PinballPlay({ table, theme, best, onExit, onRestart, onRecorded 
           <div className={styles.scoreBox}>
             <span className={styles.tableName}>
               {theme.name}
-              {table.zukan > 1 ? <span className={styles.zukan}>図鑑ボーナス×{table.zukan.toFixed(2)}</span> : null}
+              {lobby.zukan > 1 ? <span className={styles.zukan}>図鑑ボーナス×{lobby.zukan.toFixed(2)}</span> : null}
             </span>
             <span className={styles.score} aria-live="off">
               {(hud?.score ?? 0).toLocaleString("ja-JP")}
@@ -743,7 +748,7 @@ export function PinballPlay({ table, theme, best, onExit, onRestart, onRecorded 
                   <span className={styles.statValue}>{g.stats.items}個</span>
                 </div>
                 <div className={styles.stat}>
-                  <span className={styles.statLabel}>{table.id === "default" ? "コンプリート" : "県制覇"}</span>
+                  <span className={styles.statLabel}>制覇</span>
                   <span className={styles.statValue}>{g.conquests}回</span>
                 </div>
                 <div className={styles.stat}>

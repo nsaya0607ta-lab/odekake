@@ -36,13 +36,13 @@ export const MAX_EXTRA_BALLS = 2;
 export const SLOW_SCALE = 0.62;
 /** 得点倍率の上限（2倍と3倍が重なっても ×6 まで） */
 export const MAX_SCORE_MULT = 6;
-/** 県制覇モードで追加するボール（はじめの1球と合わせて3球） */
+/** 制覇モードで追加するボール（はじめの1球と合わせて3球） */
 export const CONQUEST_EXTRA_BALLS = 2;
 export const CONQUEST_SAVE_SEC = 12;
 
 /**
- * 図鑑ボーナス：その県のご当地アイテム（台に出るもの）を何種類持っているかで、すべての得点にかける倍率。
- * 持っている割合 × ZUKAN_BONUS_MAX だけ上がり、全部そろえると 1 + ZUKAN_BONUS_MAX 倍（いつもの台は 1 倍）
+ * 図鑑ボーナス：ご当地アイテム（台に出るもの。全部の県）を何種類持っているかで、すべての得点にかける倍率。
+ * 持っている割合 × ZUKAN_BONUS_MAX だけ上がり、全部そろえると 1 + ZUKAN_BONUS_MAX 倍（1つも持っていなければ 1 倍）
  */
 export const ZUKAN_BONUS_MAX = 0.1;
 
@@ -93,7 +93,7 @@ export const POINTS = {
   encoreMiss: 30000,
 } as const;
 
-/** アイテムを集めたときの得点（県制覇の回数ぶん大きくなる：×(1 + 制覇回数)） */
+/** アイテムを集めたときの得点（制覇の回数ぶん大きくなる：×(1 + 制覇回数)） */
 export const ITEM_POINTS: Record<GachaRarity | "capsule", number> = {
   capsule: 25000,
   N: 30000,
@@ -136,5 +136,5 @@ export function coinsForScore(score: number): number {
 
 /** サーバーで受けつけるスコアの上限（明らかにおかしい値をはじく） */
 export const MAX_SCORE = 200_000_000;
-/** 1秒あたりにとれる得点の上限の目安（県制覇とジャックポットが続いても届かない大きさ） */
+/** 1秒あたりにとれる得点の上限の目安（制覇とジャックポットが続いても届かない大きさ） */
 export const MAX_SCORE_PER_SECOND = 400_000;
