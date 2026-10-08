@@ -186,6 +186,42 @@ export function Lab({ parts }: { parts: ReadonlySet<PartKind> }) {
               DB を止める
             </button>
           ) : null}
+          {parts.has("monitor") ? (
+            <button
+              type="button"
+              className={styles.btnGhost}
+              disabled={!sim}
+              onClick={() => {
+                if (sim && !sim.slowDown(30)) sfx("wrong");
+              }}
+            >
+              サーバーを不調に
+            </button>
+          ) : null}
+          {parts.has("backup") ? (
+            <button
+              type="button"
+              className={styles.btnGhost}
+              disabled={!sim}
+              onClick={() => {
+                if (sim && !sim.wipe()) sfx("wrong");
+              }}
+            >
+              DB のデータを消す
+            </button>
+          ) : null}
+          {parts.has("region") ? (
+            <button
+              type="button"
+              className={styles.btnGhost}
+              disabled={!sim}
+              onClick={() => {
+                if (sim && !sim.outage(20)) sfx("wrong");
+              }}
+            >
+              停電（20秒）
+            </button>
+          ) : null}
           <button
             type="button"
             className={styles.btnGhost}

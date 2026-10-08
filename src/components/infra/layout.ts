@@ -16,7 +16,8 @@ export type BoardLayout = {
   usersY: number;
 };
 
-export type Wire = { a: string; b: string; kind: "main" | "data" | "dns" | "repl" | "job" | "user" };
+/** ctl = オートスケール・監視が見張っている線（点線） */
+export type Wire = { a: string; b: string; kind: "main" | "data" | "dns" | "repl" | "job" | "user" | "ctl" };
 
 const TIER_ORDER: Tier[] = ["edge", "lb", "app", "data", "back"];
 const TIER_LABEL: Record<Tier, string> = { edge: "入口", lb: "振り分け", app: "サーバー", data: "データ", back: "裏方" };
@@ -24,7 +25,9 @@ const TIER_OF: Record<SlotId, Tier> = {
   dns: "edge",
   cdn: "edge",
   waf: "edge",
+  region: "edge",
   lb: "lb",
+  auto: "lb",
   app1: "app",
   app2: "app",
   app3: "app",
@@ -33,8 +36,10 @@ const TIER_OF: Record<SlotId, Tier> = {
   db: "data",
   replica: "data",
   queue: "data",
+  backup: "data",
   worker1: "back",
   worker2: "back",
+  monitor: "back",
 };
 
 const spread = (n: number, from: number, to: number) => Array.from({ length: n }, (_, i) => from + ((i + 0.5) / n) * (to - from));
@@ -57,25 +62,37 @@ export function computeLayout(slots: readonly SlotId[], opts: { bot: boolean; fa
     const y = tierY.get(tier)!;
     const inTier = slots.filter((s) => TIER_OF[s] === tier);
     if (tier === "edge") {
-      // DNS は道のわき（左）。CDN・WAF は利用者からの道の上
-      const main = inTier.filter((s) => s !== "dns");
-      if (inTier.includes("dns")) pos.set("dns", { x: main.length ? 0.13 : 0.18, y: main.length ? y - 0.035 : y });
-      const xs = main.length === 1 ? [0.56] : spread(main.length, 0.3, 0.92);
+      // DNS は道のわき（左）。CDN・WAF は利用者からの道の上。予備の拠点（大阪）は遠く（右はし）
+      const main = inTier.filter((s) => s !== "dns" && s !== "region");
+      const region = inTier.includes("region");
+      if (inTier.includes("dns")) pos.set("dns", { x: main.length || region ? 0.13 : 0.18, y: main.length || region ? y - 0.035 : y });
+      if (region) pos.set("region", { x: 0.88, y: y - 0.035 });
+      const xs = main.length === 1 ? [region ? 0.5 : 0.56] : spread(main.length, 0.3, region ? 0.74 : 0.92);
       main.forEach((s, i) => pos.set(s, { x: xs[i]!, y }));
       continue;
     }
     if (tier === "back") {
-      inTier.forEach((s, i) => pos.set(s, { x: inTier.length === 1 ? 0.5 : i === 0 ? 0.385 : 0.615, y }));
+      // 監視は左はし。ワーカーは、あとでキューの真下あたりに
+      const workers = inTier.filter((s) => s !== "monitor");
+      if (inTier.includes("monitor")) pos.set("monitor", { x: workers.length ? 0.14 : 0.5, y });
+      workers.forEach((s, i) => pos.set(s, { x: workers.length === 1 ? 0.5 : i === 0 ? 0.385 : 0.615, y }));
       continue;
     }
-    const order = tier === "data" ? (["cache", "db", "replica", "queue"] as SlotId[]).filter((s) => inTier.includes(s)) : inTier;
+    if (tier === "lb") {
+      // オートスケールは、ロードバランサーの横で見張る
+      const hasLb = inTier.includes("lb");
+      if (hasLb) pos.set("lb", { x: 0.5, y });
+      if (inTier.includes("auto")) pos.set("auto", { x: hasLb ? 0.84 : 0.5, y });
+      continue;
+    }
+    const order = tier === "data" ? (["cache", "db", "replica", "queue", "backup"] as SlotId[]).filter((s) => inTier.includes(s)) : inTier;
     const xs = order.length === 1 ? [0.5] : spread(order.length, 0.06, 0.94);
     order.forEach((s, i) => pos.set(s, { x: xs[i]!, y }));
   }
   // ワーカーは、キューの真下あたりに
   const queue = pos.get("queue");
   if (queue) {
-    const workers = slots.filter((s) => TIER_OF[s] === "back");
+    const workers = slots.filter((s) => s === "worker1" || s === "worker2");
     const by = tierY.get("back") ?? queue.y + 0.12;
     const cx = Math.min(0.86, Math.max(0.14, queue.x - 0.05));
     workers.forEach((s, i) => pos.set(s, { x: workers.length === 1 ? cx : cx + (i === 0 ? -0.11 : 0.11), y: by }));
@@ -106,6 +123,7 @@ export function computeWires(placed: ReadonlySet<SlotId>): Wire[] {
   for (let i = 0; i < USER_COUNT; i++) {
     if (origin) wires.push({ a: `u${i}`, b: origin, kind: "user" });
     if (has("cdn")) wires.push({ a: `u${i}`, b: "cdn", kind: "user" });
+    if (has("region")) wires.push({ a: `u${i}`, b: "region", kind: "user" });
     if (has("dns")) wires.push({ a: `u${i}`, b: "dns", kind: "dns" });
   }
   if (has("cdn") && origin) wires.push({ a: "cdn", b: origin, kind: "main" });
@@ -123,6 +141,9 @@ export function computeWires(placed: ReadonlySet<SlotId>): Wire[] {
     for (const d of dbs) wires.push({ a: w, b: d, kind: "job" });
   }
   if (has("db") && has("replica")) wires.push({ a: "db", b: "replica", kind: "repl" });
+  if (has("backup") && dbs[0]) wires.push({ a: dbs[0], b: "backup", kind: "repl" });
+  if (has("auto")) for (const a of apps) wires.push({ a: "auto", b: a, kind: "ctl" });
+  if (has("monitor")) for (const t of [...apps, ...dbs]) wires.push({ a: "monitor", b: t, kind: "ctl" });
   return wires;
 }
 

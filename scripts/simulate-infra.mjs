@@ -67,6 +67,17 @@ const ALTERNATIVES = {
     "サーバー2台": "-app3",
     "サーバー4台": "+app4",
   },
+  s11: {
+    "サーバー4台（オートなし）": [P("app2", "app"), P("app3", "app"), P("app4", "app")],
+    "サーバー3台（オートなし）": [P("app2", "app"), P("app3", "app")],
+    "オート + サーバー3台": [P("auto", "auto"), P("app2", "app"), P("app3", "app")],
+  },
+  s12: { "サーバー4台（監視なし）": [P("app4", "app")], "DB を M に（監視なし）": [P("app4", "app"), P("db", "db", 1)] },
+  s13: { "消えてからバックアップ": [P("backup", "backup", 0, 25)] },
+  s14: {
+    "大阪だけ（TTL ふつう）": [P("region", "region")],
+    "TTL 短めだけ": [P("dns", "dns", 1)],
+  },
 };
 
 function runOnce(stage, placements, seed) {

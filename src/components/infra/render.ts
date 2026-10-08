@@ -18,6 +18,7 @@ function packetColor(r: SimReq): string {
   if (r.dns) return LOOKUP_COLOR;
   if (r.kind === "job") return JOB_COLOR;
   if (r.kind === "repl") return REPL_COLOR;
+  if (r.kind === "snap") return PARTS.backup.color;
   if (r.returning && !r.miss) return r.kind === "attack" ? REQ_INFO.attack.color : RESPONSE_COLOR;
   return REQ_INFO[r.kind as ReqType].color;
 }
@@ -136,9 +137,10 @@ export class BoardRenderer {
     b.lineCap = "round";
     for (const { wire, path, color } of this.wirePaths) {
       const user = wire.kind === "user" || wire.kind === "dns";
-      b.setLineDash(wire.kind === "dns" || wire.kind === "repl" ? [2, 6] : []);
-      b.lineWidth = user ? 1 : 1.6;
-      b.strokeStyle = user ? "rgba(170, 196, 255, 0.07)" : "rgba(170, 196, 255, 0.14)";
+      const ctl = wire.kind === "ctl";
+      b.setLineDash(wire.kind === "dns" || wire.kind === "repl" ? [2, 6] : ctl ? [1, 5] : []);
+      b.lineWidth = user || ctl ? 1 : 1.6;
+      b.strokeStyle = user || ctl ? "rgba(170, 196, 255, 0.07)" : "rgba(170, 196, 255, 0.14)";
       b.stroke(path);
       if (!sim) continue;
       const na = isUserId(wire.a) ? null : sim.nodes.get(wire.a as SlotId);
@@ -204,7 +206,7 @@ export class BoardRenderer {
       const pos = this.curvePx(r.from, r.to, ease(p));
       if (!pos) continue;
       const color = packetColor(r);
-      const small = r.kind === "repl" ? 0.6 : r.returning ? 0.82 : 1;
+      const small = r.kind === "repl" || r.kind === "snap" ? 0.6 : r.returning ? 0.82 : 1;
       // 尾
       if (!this.reduced) {
         b.globalCompositeOperation = "lighter";

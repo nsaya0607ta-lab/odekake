@@ -36,16 +36,22 @@ type TileRefs = { root: HTMLElement; ring: SVGCircleElement | null; stat: HTMLEl
 type Cache = { load: number; stat: string; state: string; role: string };
 
 function statText(sim: InfraSim, node: SimNode): string {
-  if (node.down) return "停止中";
+  if (node.down) return node.downKind === "restart" ? "再起動中" : "停止中";
   switch (node.kind) {
     case "app":
+      if (node.asleep) return "おやすみ中";
+      if (node.bootUntil > sim.now) return "起動中…";
+      if (node.draining) return "片づけ中";
+      return `${node.slowUntil > sim.now ? "不調 " : ""}${node.busy.length}/${node.cap}${node.wait.length ? `・待${node.wait.length}` : ""}`;
     case "worker":
+    case "region":
       return `${node.busy.length}/${node.cap}${node.wait.length ? `・待${node.wait.length}` : ""}`;
     case "cache":
     case "cdn":
       return `ヒット ${Math.round(sim.hitRate(node) * 100)}%`;
     case "db":
     case "replica":
+      if (node.lost) return sim.restoreAt < Infinity ? "復元中…" : "データ消失";
       return `${node.busy.length}/${node.cap}${node.wait.length ? `・待${node.wait.length}` : ""}`;
     case "queue":
       return `${node.jobs.length}件`;
@@ -55,7 +61,26 @@ function statText(sim: InfraSim, node: SimNode): string {
       return `${node.served}回`;
     case "lb":
       return `${node.served}件`;
+    case "auto": {
+      const apps = sim.apps();
+      return `動いている ${apps.filter((a) => !a.asleep).length}/${apps.length}台`;
+    }
+    case "monitor":
+      return node.served ? `アラート ${node.served}回` : "見張り中";
+    case "backup":
+      return sim.restoreAt < Infinity ? "復元中…" : `保存 ${node.served}回`;
   }
+}
+
+/** タイルの見た目の状態（infra.module.css の data-state） */
+function tileState(sim: InfraSim, node: SimNode): string {
+  if (node.down) return node.downKind === "restart" ? "restart" : "down";
+  if (node.lost) return "lost";
+  if (node.asleep) return "sleep";
+  if (node.bootUntil > sim.now) return "boot";
+  if (node.slowUntil > sim.now) return "slow";
+  const hot = node.qmax > 0 && node.wait.length >= Math.max(2, Math.ceil(node.qmax * 0.45));
+  return hot ? "hot" : node.busy.length ? "busy" : "";
 }
 
 export function Board({ slots, placements, fixed, sim, paused, speed, bot, farUsers, hint, selected, onSlot, onTick }: Props) {
@@ -127,8 +152,7 @@ export function Board({ slots, placements, fixed, sim, paused, speed, bot, farUs
       const node = s.nodes.get(slot);
       if (!node) continue;
       const load = node.down ? 0 : Math.min(1, node.busy.length / Math.max(1, node.cap));
-      const hot = !node.down && node.qmax > 0 && node.wait.length >= Math.max(2, Math.ceil(node.qmax * 0.45));
-      const state = node.down ? "down" : hot ? "hot" : node.busy.length ? "busy" : "";
+      const state = tileState(s, node);
       const role = node.kind === "db" || node.kind === "replica" ? (s.primaryDb === slot ? "primary" : "replica") : "";
       const stat = statText(s, node);
       const prev = cache.current.get(slot);

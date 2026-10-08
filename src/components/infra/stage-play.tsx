@@ -261,7 +261,7 @@ export function StagePlay({
       <div className={styles.timebar} aria-hidden="true">
         <i style={{ width: `${progressPct}%` }} />
         {stage.setup.events.map((e, k) => (
-          <b key={k} style={{ left: `${(e.t / stage.setup.duration) * 100}%` }} data-tone={e.kind === "crash" ? "danger" : e.tone ?? "info"} />
+          <b key={k} style={{ left: `${(e.t / stage.setup.duration) * 100}%` }} data-tone={e.kind === "banner" ? e.tone ?? "info" : "danger"} />
         ))}
       </div>
 

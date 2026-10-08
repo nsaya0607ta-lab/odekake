@@ -6,7 +6,7 @@
 import { useEffect, useState, type CSSProperties, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 import { Glyph } from "./glyphs";
-import { PARTS, SLOT_KIND, partCost, slotLabel, yen, type Placement, type SlotId } from "./model";
+import { PARTS, SLOT_KIND, partCost, slotLabel, yen, type PartKind, type Placement, type SlotId } from "./model";
 import type { InfraSim } from "./sim";
 import styles from "./infra.module.css";
 
@@ -45,6 +45,15 @@ type PartSheetProps = {
   onClose: () => void;
   onPlace: (slot: SlotId, size: number) => void;
   onRemove: (slot: SlotId) => void;
+};
+
+/** 「同時に◯件」では言えないパーツの説明 */
+const CAP_NOTE: Partial<Record<PartKind, string>> = {
+  worker: "同時に 2件",
+  queue: "仕事をためておける",
+  auto: "置いたサーバーを、混み具合に合わせて起こす・休ませる",
+  monitor: "止まった・遅いに気づいて、自動で再起動",
+  backup: "ときどき DB を保存。消えたら元にもどす",
 };
 
 export function PartSheet({ slot, placements, fixed, budget, sim, isNew, onClose, onPlace, onRemove }: PartSheetProps) {
@@ -103,10 +112,8 @@ export function PartSheet({ slot, placements, fixed, budget, sim, isNew, onClose
               disabled={over && !selected}
               onClick={() => onPlace(slot, i)}
             >
-              <span className={styles.sizeName}>{spec.sizes.length > 1 ? `${s.label} サイズ` : current ? "設置ずみ" : "置く"}</span>
-              <span className={styles.sizeCap}>
-                {kind === "worker" ? `同時に ${s.cap}件` : kind === "queue" ? "仕事をためておける" : `同時に ${s.cap}件・待ち ${s.queue}件まで`}
-              </span>
+              <span className={styles.sizeName}>{s.name ?? (spec.sizes.length > 1 ? `${s.label} サイズ` : current ? "設置ずみ" : "置く")}</span>
+              <span className={styles.sizeCap}>{s.note ?? CAP_NOTE[kind] ?? `同時に ${s.cap}件・待ち ${s.queue}件まで`}</span>
               <span className={styles.sizeCost}>
                 {yen(cost)}
                 <small>/月</small>
@@ -139,14 +146,24 @@ function LiveStats({ sim, slot }: { sim: InfraSim; slot: SlotId }) {
   const node = sim.nodes.get(slot);
   if (!node) return null;
   const rows: [string, string][] = [];
-  if (node.down) rows.push(["状態", "停止中"]);
-  else if (node.cap > 0 && node.kind !== "queue") rows.push(["処理中", `${node.busy.length} / ${node.cap}`]);
+  if (node.down) rows.push(["状態", node.downKind === "restart" ? "再起動中" : "停止中"]);
+  else if (node.asleep) rows.push(["状態", "おやすみ中（月額なし）"]);
+  else if (node.bootUntil > sim.now) rows.push(["状態", "起動中"]);
+  else if (node.slowUntil > sim.now) rows.push(["状態", "調子が悪い（とても遅い）"]);
+  else if (node.lost) rows.push(["状態", "データが消えている"]);
+  if (!node.down && node.cap > 0 && node.kind !== "queue") rows.push(["処理中", `${node.busy.length} / ${node.cap}`]);
   if (node.qmax > 0 && node.kind !== "queue") rows.push(["待ち", `${node.wait.length} / ${node.qmax}`]);
   if (node.kind === "cache" || node.kind === "cdn") rows.push(["ヒット率", `${Math.round(sim.hitRate(node) * 100)}%`]);
   if (node.kind === "queue") rows.push(["たまっている仕事", `${node.jobs.length}件`]);
   if (node.kind === "waf") rows.push(["防いだ攻撃", `${node.blocked}件`]);
   if (node.kind === "db" || node.kind === "replica") rows.push(["役わり", sim.primaryDb === slot ? "本番" : "予備（読みこみ担当）"]);
-  rows.push(["処理した数", `${node.served}件`]);
+  if (node.kind === "auto") {
+    const apps = sim.apps();
+    rows.push(["動いているサーバー", `${apps.filter((a) => !a.asleep).length} / ${apps.length}台`]);
+    rows.push(["起こした回数", `${node.served}回`]);
+  } else if (node.kind === "monitor") rows.push(["アラート", `${node.served}回`]);
+  else if (node.kind === "backup") rows.push(["保存した回数", `${node.served}回`]);
+  else rows.push(["処理した数", `${node.served}件`]);
   if (node.dropped) rows.push(["断った数（503）", `${node.dropped}件`]);
   return (
     <dl className={styles.liveStats}>
