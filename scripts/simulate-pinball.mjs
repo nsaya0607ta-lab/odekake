@@ -3,7 +3,7 @@
  * ご当地ピンボールのシミュレーター
  * =============================================================
  * 本番と同じ物理・ルール（src/lib/games/pinball/*.ts）を Node でそのまま動かし、
- * 人に近い打ち方をするボットに何ゲームも遊ばせて、1プレイの長さ・得点・赤コインの分布を測る。
+ * 人に近い打ち方をするボットに何ゲームも遊ばせて、1プレイの長さ・得点・青コインの分布を測る。
  * 台の形や数字を変えたら、これで確かめてから docs/pinball.md の結果を更新すること。
  *
  * 使い方:
@@ -271,7 +271,7 @@ function playGame(skillName, seed, poolSize) {
     score: g.score,
     items: g.stats.items,
     conquests: g.conquests,
-    coins: C.redCoinsForScore(g.score),
+    coins: C.coinsForScore(g.score),
     saves: g.stats.saves,
     jackpots: g.stats.jackpots,
     scoops: g.stats.scoops,
@@ -305,7 +305,7 @@ function runGames(count, skillName, poolSize) {
   console.log(`\n=== ${skillName}（${count}ゲーム・アイテム${poolSize}種${FIXED_LV ? `・Lv${FIXED_LV}` : ""}${FIXED_STARS ? `・★${FIXED_STARS}` : ""}・図鑑×${zukan}・玉の速さ ${SPEED}）===`);
   console.log(`プレイ時間  平均 ${fmt(t.mean, 1)}秒  中央 ${fmt(t.p50, 1)}  10% ${fmt(t.p10, 1)}  90% ${fmt(t.p90, 1)}`);
   console.log(`スコア      平均 ${fmt(sc.mean)}  中央 ${fmt(sc.p50)}  10% ${fmt(sc.p10)}  90% ${fmt(sc.p90)}`);
-  console.log(`赤コイン    平均 ${fmt(coins.mean, 1)}枚  中央 ${fmt(coins.p50)}  10% ${fmt(coins.p10)}  90% ${fmt(coins.p90)}`);
+  console.log(`青コイン    平均 ${fmt(coins.mean, 1)}枚  中央 ${fmt(coins.p50)}  10% ${fmt(coins.p10)}  90% ${fmt(coins.p90)}`);
   const per = (k) => fmt(col(k).mean, 2);
   console.log(`1ゲームあたり  アイテム ${per("items")}  県制覇 ${per("conquests")}  ジャックポット ${per("jackpots")}  ランプ ${per("ramps")}  オービット ${per("orbits")}  スキルショット ${per("skillShots")}  ガチャ穴 ${per("scoops")}  ボールセーブ ${per("saves")}  アウトレーン ${per("outlanes")}`);
   const conquered = rows.filter((r) => r.conquests > 0).length;

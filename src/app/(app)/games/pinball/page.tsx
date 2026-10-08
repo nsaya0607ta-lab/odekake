@@ -2,13 +2,14 @@ import type { Metadata } from "next";
 import { getImageProps } from "next/image";
 import { PinballGame } from "@/components/games/pinball/pinball-game";
 import { getOwnedItemCounts } from "@/lib/data/collection";
-import { getPinballBests, getRedCoinBalance } from "@/lib/data/red-coins";
+import { getBlueCoinBalance } from "@/lib/data/blue-coins";
+import { getPinballBests } from "@/lib/data/pinball";
 import { buildPinballTables } from "@/lib/games/pinball/tables";
 import { requireUser } from "@/lib/supabase/server";
 
 export const metadata: Metadata = {
   title: "ご当地ピンボール | おでかけ記録",
-  description: "都道府県ガチャのご当地アイテムが並ぶピンボール。アイテムを集めてスキルを発動、どれでも8つ集めて県制覇。集めるほど図鑑ボーナスで得点アップ。スコアで赤コインがもらえます。",
+  description: "都道府県ガチャのご当地アイテムが並ぶピンボール。アイテムを集めてスキルを発動、どれでも8つ集めて県制覇。集めるほど図鑑ボーナスで得点アップ。スコアで青コインがもらえます。",
 };
 export const dynamic = "force-dynamic";
 
@@ -19,11 +20,11 @@ function optimize(src: string, width: number): string {
 
 export default async function PinballPage() {
   const { supabase, user } = await requireUser();
-  const [owned, bests, redCoins] = await Promise.all([
+  const [owned, bests, blueCoins] = await Promise.all([
     getOwnedItemCounts(supabase, user.id),
     getPinballBests(supabase, user.id),
-    getRedCoinBalance(supabase, user.id).catch(() => null),
+    getBlueCoinBalance(supabase, user.id).catch(() => null),
   ]);
   const tables = buildPinballTables(owned, optimize);
-  return <PinballGame tables={tables} bests={bests} redCoins={redCoins} />;
+  return <PinballGame tables={tables} bests={bests} blueCoins={blueCoins} />;
 }

@@ -1,5 +1,5 @@
 import { useId } from "react";
-import { BlueCoinArt, CoinArt, RedCoinArt } from "@/components/coin-art";
+import { BlueCoinArt, CoinArt } from "@/components/coin-art";
 
 /**
  * ホームの犬カードに降ってくるコインの絵（レア度で、コインそのものの豪華さを変える）。
@@ -9,16 +9,15 @@ import { BlueCoinArt, CoinArt, RedCoinArt } from "@/components/coin-art";
  * - 高レア（epic）：小判の形をした「おおばん」。表面に細い横すじの刻み、まん中に肉球の形の宝石
  *   （黄色はルビー、青はサファイア）、上下の縁にも小さな宝石。地金は黄色が金、青がプラチナ
  *
- * 色は黄色・青・赤の3系統。どれも同じ形で、色だけ変える（赤の高レアは、地金が赤銅・宝石が黄金色のトパーズ）。
+ * 色は黄色・青の2系統。どちらも同じ形で、色だけ変える。
  */
 
-type Kind = "coin" | "blue" | "red";
+type Kind = "coin" | "blue";
 type Tier = "common" | "rare" | "epic";
 
 const METAL = {
   coin: { light: "#FFF6C4", mid: "#F6C850", dark: "#C98A1C", edge: "#9A6412", line: "#B47A18", bead: "#FFF1B0", emboss: "#E3A92E" },
   blue: { light: "#EEF6FF", mid: "#86B6F2", dark: "#2F64BE", edge: "#1E4A93", line: "#3A6CC2", bead: "#E4F1FF", emboss: "#5E92DD" },
-  red: { light: "#FFE6E1", mid: "#F07A72", dark: "#C7353B", edge: "#8E1F28", line: "#B2323A", bead: "#FFE3DE", emboss: "#E2585A" },
 } as const;
 
 /** 高レアの青は、サファイアが映えるように地金をプラチナ（銀白）にする */
@@ -27,7 +26,6 @@ const PLATINUM = { light: "#FFFFFF", mid: "#D5E1F2", dark: "#8EA5C8", edge: "#5F
 const GEM = {
   coin: { light: "#FFC2D3", mid: "#F2416E", dark: "#9E1240" },
   blue: { light: "#C8E9FF", mid: "#3B8CF0", dark: "#173E9E" },
-  red: { light: "#FFF4C2", mid: "#F5B921", dark: "#A8670A" },
 } as const;
 
 /** 肉球の形（まん中の大きな玉と、上の4つの指） */
@@ -165,6 +163,5 @@ export function HomeCoinArt({ kind, tier }: { kind: Kind; tier: Tier }) {
   const uid = `hc${useId().replace(/[^a-zA-Z0-9]/g, "")}`;
   if (tier === "rare") return <RareCoin kind={kind} uid={uid} />;
   if (tier === "epic") return <EpicCoin kind={kind} uid={uid} />;
-  if (kind === "red") return <RedCoinArt className="h-full w-full" />;
   return kind === "blue" ? <BlueCoinArt className="h-full w-full" /> : <CoinArt className="h-full w-full" />;
 }

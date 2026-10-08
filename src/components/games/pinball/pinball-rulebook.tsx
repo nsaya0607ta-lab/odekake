@@ -1,11 +1,13 @@
 import { getImageProps } from "next/image";
 import Link from "next/link";
-import { RedCoinArt } from "@/components/coin-art";
+import { BlueCoinArt } from "@/components/coin-art";
 import { GACHA_RARITIES } from "@/lib/gacha/config";
 import { getSkillLevel } from "@/lib/gacha/skill-levels";
 import {
   BALL_SAVE_SEC,
   BONUS,
+  COIN_MAX,
+  COIN_POINTS,
   COMBO_WINDOW_SEC,
   CONQUEST_EXTRA_BALLS,
   ENCORE_POINTS,
@@ -18,8 +20,6 @@ import {
   MAX_SCORE_MULT,
   PINBALL_BALLS,
   POINTS,
-  RED_COIN_MAX,
-  RED_COIN_POINTS,
   STAMP_COUNT,
   STAR_MAX,
   STAR_RATE,
@@ -131,7 +131,7 @@ export function PinballRulebook({ owned }: { owned: ReadonlyMap<string, number> 
             {[
               ["BALL", `${PINBALL_BALLS}球`, "1ゲーム"],
               ["STAMP", `${STAMP_COUNT}個`, "で県制覇"],
-              ["REWARD", `÷${n(RED_COIN_POINTS)}`, "赤コイン"],
+              ["REWARD", `÷${n(COIN_POINTS)}`, "青コイン"],
             ].map(([label, value, note]) => (
               <div key={label} className="rounded-2xl border border-white/10 bg-black/25 px-1 py-2.5">
                 <span className="block text-[8px] font-black tracking-[0.14em] text-white/45">{label}</span>
@@ -278,11 +278,11 @@ export function PinballRulebook({ owned }: { owned: ReadonlyMap<string, number> 
         </section>
 
         <section className="space-y-2">
-          <Title no="08" eyebrow="REWARD" title="赤コイン" />
+          <Title no="08" eyebrow="REWARD" title="青コイン" />
           <Card className="text-center">
-            <RedCoinArt className="mx-auto h-10 w-10" />
-            <p className="mt-1 text-lg font-black">スコア ÷ {n(RED_COIN_POINTS)} = 赤コイン</p>
-            <p className="mt-1 text-[10px] text-white/55">小数点以下は切り捨て・1プレイ{n(RED_COIN_MAX)}枚まで・使いみちは準備中</p>
+            <BlueCoinArt className="mx-auto h-10 w-10" />
+            <p className="mt-1 text-lg font-black">スコア ÷ {n(COIN_POINTS)} = 青コイン</p>
+            <p className="mt-1 text-[10px] text-white/55">小数点以下は切り捨て・1プレイ{n(COIN_MAX)}枚まで・背景・家具などに使えます</p>
           </Card>
         </section>
 

@@ -958,45 +958,47 @@ select pg_temp.record('グループ削除で写真とメッセージも消える
   and (select count(*) from public.friend_group_messages where group_id = :'sns_group_a'::uuid) = 0);
 
 -- -------------------------------------------------------------
--- ご当地ピンボールと赤コイン
+-- ご当地ピンボールと青コイン
 -- -------------------------------------------------------------
 -- ここでは alice と bob が相互フレンド（carol はどちらとも友達ではない）。
--- 赤コインは スコア ÷ 9500（切り捨て）、1プレイ 3000 まで。同じ round_id は二重に記録・付与しない。
+-- 青コインは スコア ÷ 11875（切り捨て）、1プレイ 2400 まで（0136。はじめの赤コインの8割）。
+-- 同じ round_id は二重に記録・付与しない。青コインの残高はほかのテストでも動くので、ピンボールの台帳の行で確かめる。
 -- 結果の置き場はコインガチャのテストの gacha_last / gacha_as を使う。
 
 select pg_temp.gacha_as(:'alice',
   $q$select public.record_pinball_result('pb-alice-0001', '21', 1234567, 120000, 6, 0, 0, 3)$q$);
-select pg_temp.record('ピンボール: スコア÷9500（切り捨て）の赤コインが付く',
-  (select (result ->> 'coins')::integer from gacha_last) = 129
-  and (select (result ->> 'balance')::integer from gacha_last) = 129
+select pg_temp.record('ピンボール: スコア÷11875（切り捨て）の青コインが付く',
+  (select (result ->> 'coins')::integer from gacha_last) = 103
+  and (select (result ->> 'balance')::integer from gacha_last) = (select balance from public.user_blue_coins where user_id = :'alice')
   and (select result ->> 'applied' from gacha_last) = 'true'
   and (select result ->> 'is_best' from gacha_last) = 'true'
-  and (select balance from public.user_red_coins where user_id = :'alice') = 129);
+  and (select coalesce(sum(amount), 0) from public.blue_coin_events where user_id = :'alice' and event_type = 'pinball') = 103);
 
 select pg_temp.gacha_as(:'alice',
   $q$select public.record_pinball_result('pb-alice-0001', '21', 1234567, 120000, 6, 0, 0, 3)$q$);
 select pg_temp.record('ピンボール: 同じプレイを送り直しても二重に付かない（1回目の枚数を返す）',
   (select result ->> 'applied' from gacha_last) = 'false'
-  and (select (result ->> 'coins')::integer from gacha_last) = 129
+  and (select (result ->> 'coins')::integer from gacha_last) = 103
   and (select result ->> 'is_best' from gacha_last) = 'false'
-  and (select balance from public.user_red_coins where user_id = :'alice') = 129
-  and (select count(*) from public.red_coin_events where user_id = :'alice') = 1
+  and (select count(*) from public.blue_coin_events where user_id = :'alice' and event_type = 'pinball') = 1
   and (select count(*) from public.pinball_scores where user_id = :'alice') = 1);
 
 select pg_temp.gacha_as(:'alice',
   $q$select public.record_pinball_result('pb-alice-0002', 'default', 50000000, 600000, 30, 3, 9, 5)$q$);
-select pg_temp.record('ピンボール: 1プレイの赤コインは3000枚まで',
-  (select (result ->> 'coins')::integer from gacha_last) = 3000
-  and (select balance from public.user_red_coins where user_id = :'alice') = 3129
-  and (select total_earned from public.user_red_coins where user_id = :'alice') = 3129);
+select pg_temp.record('ピンボール: 1プレイの青コインは2400枚まで',
+  (select (result ->> 'coins')::integer from gacha_last) = 2400
+  and (select coalesce(sum(amount), 0) from public.blue_coin_events where user_id = :'alice' and event_type = 'pinball') = 2503);
 
 select pg_temp.gacha_as(:'alice',
-  $q$select public.record_pinball_result('pb-alice-0003', '21', 9499, 30000, 0, 0, 0, 0)$q$);
-select pg_temp.record('ピンボール: 9499点は0枚。ベストは台ごとで、前の記録のまま',
+  $q$select public.record_pinball_result('pb-alice-0003', '21', 11874, 30000, 0, 0, 0, 0)$q$);
+select pg_temp.record('ピンボール: 11874点は0枚。ベストは台ごとで、前の記録のまま',
   (select (result ->> 'coins')::integer from gacha_last) = 0
   and (select (result ->> 'best')::integer from gacha_last) = 1234567
   and (select result ->> 'is_best' from gacha_last) = 'false'
-  and (select count(*) from public.red_coin_events where user_id = :'alice') = 2);
+  and (select count(*) from public.blue_coin_events where user_id = :'alice' and event_type = 'pinball') = 2);
+
+select pg_temp.record('ピンボール: もう赤コインは付かない',
+  (select count(*) from public.red_coin_events) = 0);
 
 select pg_temp.expect_denied('ピンボール: 遊んだ時間のわりに大きすぎるスコアは記録できない', :'alice',
   $q$select public.record_pinball_result('pb-alice-0004', '21', 20000000, 10000, 0, 0, 0, 0)$q$);
@@ -1009,6 +1011,7 @@ select pg_temp.record('ピンボール: 未ログインは記録の関数を呼�
   not has_function_privilege('anon', 'public.record_pinball_result(text, text, integer, integer, integer, integer, integer, integer)', 'execute')
   and has_function_privilege('authenticated', 'public.record_pinball_result(text, text, integer, integer, integer, integer, integer, integer)', 'execute')
   and not has_function_privilege('authenticated', 'public.add_red_coin_event(uuid, text, integer, text, jsonb)', 'execute')
+  and not has_function_privilege('authenticated', 'public.add_blue_coin_event(uuid, text, integer, text, jsonb)', 'execute')
   and not has_function_privilege('anon', 'public.get_friend_pinball_ranking(text)', 'execute'));
 
 select pg_temp.expect_blocked('赤コイン: 残高を直接書きかえられない', :'alice',
@@ -1020,9 +1023,6 @@ select pg_temp.expect_denied('ピンボール: 記録を直接書きこめない
 select pg_temp.expect_blocked('ピンボール: 記録を直接書きかえられない', :'alice',
   $q$update public.pinball_scores set score = 199999999$q$);
 
-select pg_temp.expect_count('赤コイン: 自分の台帳は見える', :'alice', 'select * from public.red_coin_events', 2);
-select pg_temp.expect_count('赤コイン: 他人の残高と台帳は見えない', :'bob',
-  'select user_id from public.user_red_coins union all select user_id from public.red_coin_events', 0);
 select pg_temp.expect_count('ピンボール: 他人の記録は直接見えない', :'bob', 'select * from public.pinball_scores', 0);
 
 -- ランキングは自分とフレンドだけ（全部の台まとめて、ベストを出した台つき）
@@ -1053,52 +1053,29 @@ select pg_temp.record('ピンボール: 今週のランキングにも今日の�
 select pg_temp.expect_denied('ピンボール: ランキングの期間は week か best だけ', :'alice',
   $q$select * from public.get_friend_pinball_ranking('month')$q$);
 
--- 新しいプレイは1時間に40回まで（関数を直接呼んで赤コインをかせがれないように）。再送はそのまま通す。
+-- 新しいプレイは1時間に40回まで（関数を直接呼んで青コインをかせがれないように）。再送はそのまま通す。
 insert into public.pinball_scores (user_id, round_id, table_id, score, duration_ms)
 select :'bob', 'pb-bob-bulk-' || lpad(i::text, 4, '0'), 'default', 1000, 60000 from generate_series(1, 39) i;
 select pg_temp.record('ピンボール: 1時間に41回目のプレイは記録できない',
   pg_temp.run_as(:'bob', $q$select public.record_pinball_result('pb-bob-0099', 'default', 1000, 60000, 0, 0, 0, 0)$q$) like '%TOO_MANY_ROUNDS%');
 select pg_temp.expect_ok('ピンボール: 回数の制限中でも、記録ずみのプレイの再送は通る', :'bob',
   $q$select public.record_pinball_result('pb-bob-0001', '23', 2000000, 90000, 4, 0, 0, 2)$q$);
-select pg_temp.record('ピンボール: 再送で bob の赤コインは増えない',
-  (select balance from public.user_red_coins where user_id = :'bob') = 210);
+select pg_temp.record('ピンボール: 再送で bob の青コインは増えない',
+  (select coalesce(sum(amount), 0) from public.blue_coin_events where user_id = :'bob' and event_type = 'pinball') = 168);
 
--- -------------------------------------------------------------
--- ホームに降ってくる赤コイン（0135）
--- -------------------------------------------------------------
--- 黄色・青と同じ決まり：ふつう5枚、同じコインは1回だけ、前の受け取りから8秒（3色のどれでも）、
--- 中レア・高レアは直近1時間の回数まで（3色あわせて。超えたらふつうとして渡す）。
-select pg_temp.gacha_as(:'alice',
-  $q$select public.claim_home_coin_drop('red-drop-alice-01', 'red', 'common')$q$);
-select pg_temp.record('赤コイン: ホームに降った赤コインを拾うと5枚',
-  (select result ->> 'granted' from gacha_last) = 'true'
-  and (select result ->> 'kind' from gacha_last) = 'red'
-  and (select (result ->> 'amount')::integer from gacha_last) = 5
-  and (select count(*) from public.red_coin_events where user_id = :'alice' and event_type = 'home_drop' and amount = 5) = 1
-  and (select (result ->> 'red_balance')::integer from gacha_last) = (select balance from public.user_red_coins where user_id = :'alice'));
-
-select pg_temp.gacha_as(:'alice',
-  $q$select public.claim_home_coin_drop('red-drop-alice-01', 'red', 'common')$q$);
-select pg_temp.record('赤コイン: 同じコインは2回拾えない',
-  (select result ->> 'reason' from gacha_last) = 'duplicate'
-  and (select count(*) from public.red_coin_events where user_id = :'alice' and event_type = 'home_drop') = 1);
-
-select pg_temp.gacha_as(:'alice',
-  $q$select public.claim_home_coin_drop('coin-drop-alice-02', 'coin', 'common')$q$);
-select pg_temp.record('赤コイン: 拾ってから8秒は、ほかの色のコインも受け取らない',
-  (select result ->> 'reason' from gacha_last) = 'too_soon');
-
-insert into public.red_coin_events (user_id, event_type, amount, idempotency_key, metadata, created_at)
-select :'bob', 'home_drop', 100, 'home-drop:bulk-epic-' || i, '{"tier":"epic"}'::jsonb, now() - interval '30 seconds'
-  from generate_series(1, 8) i;
+-- 0136 より前のプレイ（赤コインで付けたもの）を送り直しても、青コインは付けない
+insert into public.pinball_scores (user_id, round_id, table_id, score, duration_ms, coins, played_at)
+values (:'bob', 'pb-bob-old-0001', '23', 950000, 90000, 100, now() - interval '2 hours');
 select pg_temp.gacha_as(:'bob',
-  $q$select public.claim_home_coin_drop('red-drop-bob-0001', 'red', 'epic')$q$);
-select pg_temp.record('赤コイン: 高レアの回数（1時間に8回）を超えると、ふつう（5枚）として渡す',
-  (select result ->> 'granted' from gacha_last) = 'true'
-  and (select result ->> 'tier' from gacha_last) = 'common'
-  and (select (result ->> 'amount')::integer from gacha_last) = 5);
+  $q$select public.record_pinball_result('pb-bob-old-0001', '23', 950000, 90000, 0, 0, 0, 0)$q$);
+select pg_temp.record('ピンボール: 赤コインのころのプレイの再送では、青コインは付かない',
+  (select result ->> 'applied' from gacha_last) = 'false'
+  and (select coalesce(sum(amount), 0) from public.blue_coin_events where user_id = :'bob' and event_type = 'pinball') = 168);
 
-select pg_temp.expect_denied('赤コイン: ホームのコインの色がちがうと受け取れない', :'alice',
+-- ホームに降るコインは黄色・青だけ（0136 で赤はやめた）
+select pg_temp.expect_denied('赤コイン: ホームの赤コインはもう受け取れない', :'alice',
+  $q$select public.claim_home_coin_drop('red-drop-alice-01', 'red', 'common')$q$);
+select pg_temp.expect_denied('ホームのコインの色がちがうと受け取れない', :'alice',
   $q$select public.claim_home_coin_drop('gold-drop-alice-01', 'gold', 'common')$q$);
 
 -- 後続のアカウント削除テストに影響しないよう、フレンド関係を戻しておく。
@@ -1138,7 +1115,7 @@ select pg_temp.record('オーナー削除でそうびも消える',
 select pg_temp.record('オーナー削除で犬スキンの選択も消える',
   (select count(*) from public.user_dog_skin) = 0);
 
-select pg_temp.record('アカウント削除で赤コインとピンボールの記録も消える',
+select pg_temp.record('アカウント削除で赤コインの残高・台帳とピンボールの記録も消える',
   (select count(*) from public.user_red_coins) = 0
   and (select count(*) from public.red_coin_events) = 0
   and (select count(*) from public.pinball_scores) = 0);

@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
-import { RedCoinArt } from "@/components/coin-art";
+import { BlueCoinArt } from "@/components/coin-art";
 import { FULL_PLUNGE_POWER, MAX_SCORE, PINBALL_BALLS, SKILL_SHOT_POWER } from "@/lib/games/pinball/config";
 import {
   canLaunch,
@@ -275,7 +275,7 @@ export function PinballPlay({ table, theme, best, onExit, onRestart, onRecorded 
         body: JSON.stringify({
           roundId: roundIdRef.current,
           table: table.id,
-          // 記録できるのは MAX_SCORE まで（こえたぶんはカンスト。赤コインはそれよりずっと手前で上限になる）
+          // 記録できるのは MAX_SCORE まで（こえたぶんはカンスト。青コインはそれよりずっと手前で上限になる）
           score: Math.min(MAX_SCORE, g.score),
           durationMs: Math.round(g.playTime * 1000),
           items: g.stats.items,
@@ -756,16 +756,16 @@ export function PinballPlay({ table, theme, best, onExit, onRestart, onRecorded 
                 </div>
               </div>
               <div className={styles.coins}>
-                <RedCoinArt className="h-7 w-7" />
+                <BlueCoinArt className="h-7 w-7" />
                 {submit.state === "done" ? (
                   <span>
-                    <span className={styles.coinsGain}>+{submit.coins.toLocaleString("ja-JP")}</span> 赤コイン
+                    <span className={styles.coinsGain}>+{submit.coins.toLocaleString("ja-JP")}</span> 青コイン
                     {submit.balance !== null ? <span className={styles.coinsBalance}> （のこり {submit.balance.toLocaleString("ja-JP")}枚）</span> : null}
                   </span>
                 ) : submit.state === "sending" || submit.state === "idle" ? (
                   <span className={styles.coinsBalance}>記録しています…</span>
                 ) : submit.state === "offline" ? (
-                  <span className={styles.coinsBalance}>赤コインは準備中です（スコアだけ表示）</span>
+                  <span className={styles.coinsBalance}>青コインは準備中です（スコアだけ表示）</span>
                 ) : (
                   <span className={styles.coinsBalance}>
                     {submit.message}{" "}

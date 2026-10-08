@@ -60,8 +60,6 @@ export const VISIT_EXP = [
 export const HOME_DROP = {
   everySeconds: 5,
   chance: 20,
-  /** 赤コイン（ご当地ピンボール）は、黄色・青とは別にこの％で降る */
-  redChance: 5,
   tiers: [
     { tier: "common", label: "ふつう", rate: 85, amount: 5 },
     { tier: "rare", label: "中レア", rate: 12, amount: 20 },

@@ -6,8 +6,8 @@ import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, typ
 import type { GachaRarity } from "@/lib/gacha/config";
 import { LEVEL_REWARDS, getTotalExpForLevel } from "@/lib/exp";
 import { CapsuleArt } from "@/components/gacha/capsule-art";
-import { BlueCoinArt, CoinArt, GachaMachineArt, RedCoinArt } from "@/components/coin-art";
-import { RED_COIN_MAX, RED_COIN_POINTS } from "@/lib/games/pinball/config";
+import { BlueCoinArt, CoinArt, GachaMachineArt } from "@/components/coin-art";
+import { COIN_MAX as PINBALL_COIN_MAX, COIN_POINTS as PINBALL_COIN_POINTS } from "@/lib/games/pinball/config";
 import { HomeCoinArt } from "@/components/home-coin-art";
 import {
   GACHA_DUPLICATE_COINS,
@@ -316,7 +316,7 @@ function StartChapter({ onGo }: { onGo: (tab: TabId) => void }) {
         </div>
       </Section>
 
-      <Section kicker="3つのコイン" title="黄色・青・赤のコイン">
+      <Section kicker="2つのコイン" title="黄色いコインと、青いコイン">
         <div className={styles.twoCol}>
           <div className={styles.coinCard}>
             <span className={styles.coinIcon}><CoinArt className="h-full w-full" /></span>
@@ -327,14 +327,8 @@ function StartChapter({ onGo }: { onGo: (tab: TabId) => void }) {
           <div className={styles.coinCard} data-blue>
             <span className={styles.coinIcon}><BlueCoinArt className="h-full w-full" /></span>
             <b>青コイン</b>
-            <p>はじめての土地・通算ログイン・おさんぽフレンチー・ホームに降るコインでたまる。背景・家具・都道府県ガチャに使う。</p>
+            <p>はじめての土地・通算ログイン・おさんぽフレンチー・ご当地ピンボール・ホームに降るコインでたまる。背景・家具・都道府県ガチャに使う。</p>
             <button type="button" onClick={() => onGo("room")}>使いみち →</button>
-          </div>
-          <div className={styles.coinCard} data-red>
-            <span className={styles.coinIcon}><RedCoinArt className="h-full w-full" /></span>
-            <b>赤コイン</b>
-            <p>ご当地ピンボールのスコアと、ホームに降ってくるコインでたまる。使いみちはこれから（いまはためておけます）。</p>
-            <button type="button" onClick={() => onGo("games")}>ためかた →</button>
           </div>
         </div>
       </Section>
@@ -696,7 +690,7 @@ const GAMES = [
     shot: "/guide/game-pinball.webp",
     how: "画面の左半分・右半分を押してフリッパー。打ち出しは右下を下へ引いて離す",
     time: "3球制（平均2分半くらい）",
-    reward: `スコア${RED_COIN_POINTS.toLocaleString("ja-JP")}点ごとに赤コイン1枚（1プレイ${RED_COIN_MAX.toLocaleString("ja-JP")}枚まで）`,
+    reward: `スコア${PINBALL_COIN_POINTS.toLocaleString("ja-JP")}点ごとに青コイン1枚（1プレイ${PINBALL_COIN_MAX.toLocaleString("ja-JP")}枚まで）`,
     tip: "都道府県ガチャのご当地アイテムを1つでも持っている県の台で遊べます（いつもの台はだれでも）。台に浮かぶアイテムにボールを当てると、その場でスキルが発動。どれでも8つ集めると「県制覇！」でマルチボールになり、ジャックポットがねらえます。その県のアイテムをたくさん持っているほど図鑑ボーナスで得点が上がり、Lv5で覚醒・そのあとは★でスキルが強くなります。",
   },
   {
@@ -797,7 +791,7 @@ function RoomChapter() {
 
 /* ------------------------------------------------------------------ ホーム */
 
-type FallingCoin = { id: number; x: number; kind: "coin" | "blue" | "red"; tier: "common" | "rare" | "epic" };
+type FallingCoin = { id: number; x: number; kind: "coin" | "blue"; tier: "common" | "rare" | "epic" };
 
 function HomeChapter() {
   const [coins, setCoins] = useState<FallingCoin[]>([]);
@@ -808,9 +802,7 @@ function HomeChapter() {
       const roll = Math.random() * 100;
       const tier = roll < HOME_DROP.tiers[2].rate ? "epic" : roll < HOME_DROP.tiers[2].rate + HOME_DROP.tiers[1].rate ? "rare" : "common";
       seq.current += 1;
-      const kindRoll = Math.random() * (HOME_DROP.chance + HOME_DROP.redChance);
-      const kind = kindRoll < HOME_DROP.chance / 2 ? "coin" : kindRoll < HOME_DROP.chance ? "blue" : "red";
-      const coin: FallingCoin = { id: seq.current, x: 10 + Math.random() * 80, kind, tier };
+      const coin: FallingCoin = { id: seq.current, x: 10 + Math.random() * 80, kind: Math.random() < 0.5 ? "blue" : "coin", tier };
       setCoins((current) => [...current.slice(-5), coin]);
     }, 1100);
     return () => window.clearInterval(id);
@@ -854,13 +846,12 @@ function HomeChapter() {
             <div key={item.tier} className={styles.tier}>
               <span className={styles.tierCoin}><HomeCoinArt kind="coin" tier={item.tier} /></span>
               <span className={styles.tierCoin}><HomeCoinArt kind="blue" tier={item.tier} /></span>
-              <span className={styles.tierCoin}><HomeCoinArt kind="red" tier={item.tier} /></span>
               <b>{item.label}</b>
               <small>{item.rate}%・{item.amount}枚</small>
             </div>
           ))}
         </div>
-        <Tip>落ちたコインは、わんこが走って取りに行ってくれます。黄色と青は半々。それとは別に、{HOME_DROP.everySeconds}秒ごとに{HOME_DROP.redChance}%で赤コイン（ご当地ピンボールのコイン）も降ってきます。</Tip>
+        <Tip>落ちたコインは、わんこが走って取りに行ってくれます。黄色と青は半々。</Tip>
       </Section>
 
       <Section kicker="左にスワイプ" title="アプリの画面と、背景だけの画面">
