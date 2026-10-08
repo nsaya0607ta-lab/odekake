@@ -1,3 +1,4 @@
+import { resolvePinballMapId } from "@/lib/games/pinball/maps";
 import type { DB } from "./client";
 
 const UNAVAILABLE_CODES = new Set(["42P01", "PGRST205"]);
@@ -17,7 +18,7 @@ function loose(supabase: DB): LooseFrom {
   return supabase.from.bind(supabase) as unknown as LooseFrom;
 }
 
-/** ご当地ピンボールの台ごとの自分のベスト */
+/** ご当地ピンボールの台（マップ）ごとの自分のベスト。前の「県の台」の記録は、同じ形のいつもの台のベストに入れる */
 export async function getPinballBests(supabase: DB, userId: string): Promise<Record<string, number>> {
   const { data, error } = await loose(supabase)("pinball_scores")
     .select("table_id,score")
@@ -30,7 +31,7 @@ export async function getPinballBests(supabase: DB, userId: string): Promise<Rec
   }
   const bests: Record<string, number> = {};
   for (const row of data ?? []) {
-    const table = typeof row.table_id === "string" ? row.table_id : null;
+    const table = typeof row.table_id === "string" ? resolvePinballMapId(row.table_id) : null;
     const score = Number(row.score);
     if (table && Number.isFinite(score) && !(table in bests)) bests[table] = score;
   }

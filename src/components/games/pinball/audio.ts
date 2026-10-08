@@ -186,7 +186,8 @@ export class PinballAudio {
         this.tone(240, 0.06, "triangle", 0.12 + level * 0.15, { to: 120 });
         break;
       case "bumper": {
-        const ring = [72, 76, 79][level] ?? 72;
+        // バンパーごとに少しちがう高さ（バンパーが4つ以上のマップは、3つの高さをくり返す）
+        const ring = [72, 76, 79][Math.abs(Math.round(level)) % 3] ?? 72;
         this.tone(620, 0.09, "sine", 0.32, { to: 170 });
         this.noise(0.05, 0.16, 2600, { q: 1.5 });
         this.tone(mtof(ring), 0.22, "triangle", 0.12, { delay: 0.01 });

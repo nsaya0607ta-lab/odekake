@@ -20,8 +20,8 @@ export type GuideSkillRow = {
   starText: string | null;
 };
 
-/** zukan はこの県の図鑑ボーナス（すべての得点にかかる倍率） */
-export type GuidePref = { id: string; name: string; accent: string; rows: GuideSkillRow[]; zukan: number };
+/** 県ごとのアイテムの一覧（図鑑ボーナスは全部の県まとめてなので、ここには持たない） */
+export type GuidePref = { id: string; name: string; accent: string; rows: GuideSkillRow[] };
 
 /** 県ごとのスキル一覧（タブで切りかえ） */
 export function PinballSkillTabs({ prefs }: { prefs: GuidePref[] }) {
@@ -48,8 +48,7 @@ export function PinballSkillTabs({ prefs }: { prefs: GuidePref[] }) {
         ))}
       </div>
       <p className="mt-2 text-[10px] font-bold text-white/50">
-        持っている {owned} / {pref.rows.length} 種
-        {pref.zukan > 1 ? <b className="ml-1 text-[#ffe08a]">図鑑ボーナス ×{pref.zukan.toFixed(2)}</b> : null}
+        {pref.name}のアイテム：持っている {owned} / {pref.rows.length} 種
         <span className="block">スキルLvは図鑑と同じ（同じアイテムを集めるほど上がる）。Lv5で覚醒、そのあとは★</span>
       </p>
       <ul className="mt-2 space-y-2">

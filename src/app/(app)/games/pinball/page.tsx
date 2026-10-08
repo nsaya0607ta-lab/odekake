@@ -4,12 +4,12 @@ import { PinballGame } from "@/components/games/pinball/pinball-game";
 import { getOwnedItemCounts } from "@/lib/data/collection";
 import { getBlueCoinBalance } from "@/lib/data/blue-coins";
 import { getPinballBests } from "@/lib/data/pinball";
-import { buildPinballTables } from "@/lib/games/pinball/tables";
+import { buildPinballLobby } from "@/lib/games/pinball/tables";
 import { requireUser } from "@/lib/supabase/server";
 
 export const metadata: Metadata = {
   title: "ご当地ピンボール | おでかけ記録",
-  description: "都道府県ガチャのご当地アイテムが並ぶピンボール。アイテムを集めてスキルを発動、どれでも8つ集めて県制覇。集めるほど図鑑ボーナスで得点アップ。スコアで青コインがもらえます。",
+  description: "都道府県ガチャのご当地アイテムが並ぶピンボール。形のちがうマップで、アイテムを集めてスキルを発動、どれでも8つ集めて制覇。集めるほど図鑑ボーナスで得点アップ。スコアで青コインがもらえます。",
 };
 export const dynamic = "force-dynamic";
 
@@ -25,6 +25,6 @@ export default async function PinballPage() {
     getPinballBests(supabase, user.id),
     getBlueCoinBalance(supabase, user.id).catch(() => null),
   ]);
-  const tables = buildPinballTables(owned, optimize);
-  return <PinballGame tables={tables} bests={bests} blueCoins={blueCoins} />;
+  const lobby = buildPinballLobby(owned, optimize);
+  return <PinballGame lobby={lobby} bests={bests} blueCoins={blueCoins} />;
 }

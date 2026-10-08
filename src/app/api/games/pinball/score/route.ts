@@ -1,7 +1,6 @@
 import { NextResponse } from "next/server";
-import { getOwnedItemCounts } from "@/lib/data/collection";
 import { MAX_SCORE, MAX_SCORE_PER_SECOND } from "@/lib/games/pinball/config";
-import { isPinballTableUnlocked } from "@/lib/games/pinball/items";
+import { resolvePinballMapId } from "@/lib/games/pinball/maps";
 import { checkRateLimit } from "@/lib/rate-limit";
 import { requireUser } from "@/lib/supabase/server";
 
@@ -20,15 +19,16 @@ function toRecord(value: unknown): Record<string, unknown> {
 
 /**
  * ご当地ピンボールの1プレイの結果を記録し、青コインを受け取る。
- * 物理はブラウザで動くので、ここでは「ありえる値か」と「その台で遊べる人か」を確かめる
- * （スコアのわりに短すぎる時間・持っていない県の台はうけつけない）。青コインの枚数はサーバーで決める。
+ * 物理はブラウザで動くので、ここでは「ありえる値か」と「ある台（マップ）か」を確かめる
+ * （スコアのわりに短すぎる時間・知らない台はうけつけない。マップはだれでも遊べる）。青コインの枚数はサーバーで決める。
  */
 export async function POST(request: Request) {
   const { supabase, user } = await requireUser();
   const body = toRecord(await request.json().catch(() => null));
 
   const roundId = typeof body.roundId === "string" && body.roundId.length >= 8 && body.roundId.length <= 100 ? body.roundId : null;
-  const table = typeof body.table === "string" ? body.table : null;
+  // 前の「県の台」（都道府県コード）は、同じ形のいつもの台として記録する（古い画面から送られてきたとき）
+  const table = typeof body.table === "string" ? resolvePinballMapId(body.table) : null;
   const score = int(body.score, 0, MAX_SCORE);
   const durationMs = int(body.durationMs, 0, 3 * 60 * 60 * 1000);
   const items = int(body.items, 0, 10000);
@@ -40,11 +40,6 @@ export async function POST(request: Request) {
   }
   if (score > (Math.floor(durationMs / 1000) + 30) * MAX_SCORE_PER_SECOND) {
     return NextResponse.json({ error: "ゲーム結果が正しくありません。" }, { status: 400 });
-  }
-
-  const owned = await getOwnedItemCounts(supabase, user.id);
-  if (!isPinballTableUnlocked(table, owned)) {
-    return NextResponse.json({ error: "この台はまだ遊べません。" }, { status: 403 });
   }
 
   // 1ゲーム1〜数分。直接 API を連打して青コインを稼がれないようにする
@@ -82,7 +77,9 @@ export async function POST(request: Request) {
   });
 
   if (error) {
-    if (error.code && UNAVAILABLE_CODES.has(error.code)) {
+    // マップの記録を受けつけるマイグレーション（0137）がまだのとき、新しいマップの記録は INVALID_TABLE になる。
+    // そのときも「準備中」として返す（遊べて、スコアは画面に出る）
+    if ((error.code && UNAVAILABLE_CODES.has(error.code)) || error.message.includes("INVALID_TABLE")) {
       return NextResponse.json({ ok: true, ready: false }, { headers: { "Cache-Control": "no-store" } });
     }
     if (error.message.includes("TOO_MANY_ROUNDS")) {

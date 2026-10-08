@@ -3,10 +3,14 @@
  * =============================================================
  * 単位はミリメートル。x は右、y は下（手前）が正。台の大きさ・玉の大きさ・フリッパーの長さは
  * 本物のピンボール台（約52×107cm・玉の直径27mm・フリッパー約7.5cm）に近い比率にしてある。
- * 県ごとの「着せ替え」で変わるのは色・絵・音だけで、形はすべての台で共通（ランキングを1つにできる）。
+ *
+ * 台（マップ）は何種類かある（maps.ts）。どのマップも「骨組み」は同じ：外わく・打ち出しレーン・上のレーン・
+ * オービット・ランプの入口・ガチャ穴とドロップターゲット・スリングショット・インレーン／アウトレーン・フリッパー。
+ * マップごとに変わるのは、上半分の部品（バンパー・かざぐるま・ポスト・スタンドアップターゲットの位置など）と、
+ * アイテムが浮かぶ場所・ランプの道（MapSpec）。骨組みが同じなので、ショットの狙い方とルールはどのマップでも同じ。
  *
  * 壁は「中心線＋太さ（r）」で持つ。玉は中心線から r + BALL_R の距離でぶつかる。
- * 物理（physics.ts）と描画（components/games/pinball/render.ts）は、どちらもこのファイルだけを見る。
+ * 物理（physics.ts）と描画（components/games/pinball/render.ts）は、どちらもゲームが持つ台（world.table）だけを見る。
  * 形を変えたら scripts/simulate-pinball.mjs で、全部のショットがフリッパーから狙えるかを確かめること。
  */
 
@@ -41,7 +45,8 @@ export type WallDef = {
   look?: "frame" | "guide" | "rail" | "inlane" | "sling" | "lane" | "scoop" | "ramp-mouth" | "ramp-roof" | "shooter" | "standup-back";
 };
 
-export type CircleDef = { x: number; y: number; r: number; mat: Material; look: "post" | "lane-post" };
+/** ポスト。look は描き方：post＝ゴムの輪のポスト、lane-post＝上のレーンのしきりの頭、peg＝めっきのくぎ */
+export type CircleDef = { x: number; y: number; r: number; mat: Material; look: "post" | "lane-post" | "peg" };
 
 export type BumperDef = { x: number; y: number; r: number };
 
@@ -94,6 +99,11 @@ export type RampDef = {
   topEnd: number;
   /** 降りたところの向き */
   exitDir: Pt;
+  /**
+   * 降りるときの向きのばらつき（ラジアン。この幅で左右にずれ、速さも少しばらつく）。インレーンへ戻らずに台の上へ
+   * 落とすランプにつける（いつも同じ所に落ちると、その先の玉の行き先まで毎回ほとんど同じになってしまう）
+   */
+  exitSpread?: number;
 };
 
 export type DropTargetDef = { a: Pt; b: Pt };
@@ -123,11 +133,14 @@ export type ShotDef = {
 /**
  * ご当地アイテムが浮かぶ場所。玉の中心が r 以内を通ると取れる。
  * tier 0 はよく玉が通るところ、2 はランプやオービットの入口など狙わないと届かないところ。
+ * shot は、そのショットを打てば通る場所（シミュレーターのボットが狙うのに使う。無いところはどこからでも）
  */
-export type ItemSpot = { x: number; y: number; tier: 0 | 1 | 2 };
+export type ItemSpot = { x: number; y: number; tier: 0 | 1 | 2; shot?: ShotId };
 export const ITEM_PICKUP_R = 26;
 
 export type TableGeometry = {
+  /** マップの id（maps.ts） */
+  id: string;
   walls: readonly WallDef[];
   circles: readonly CircleDef[];
   bumpers: readonly BumperDef[];
@@ -137,7 +150,10 @@ export type TableGeometry = {
   ramps: readonly [RampDef, RampDef];
   drops: readonly DropTargetDef[];
   standups: readonly [StandupBankDef, StandupBankDef];
-  pinwheel: PinwheelDef;
+  /** かざぐるま（マップによって 0〜いくつか） */
+  pinwheels: readonly PinwheelDef[];
+  /** バンパーがはじく強さの倍率（1 がふつう） */
+  bumperKick: number;
   /** ガチャ穴（キックアウトホール）。玉の中心がここに入ると吸いこむ */
   scoop: Pt & { r: number; ejectFrom: Pt };
   /** 打ち出しレーンで玉がのる位置 */
@@ -155,6 +171,39 @@ export type TableGeometry = {
   artBox: { x: number; y: number; w: number; h: number };
 };
 
+/** ランプの道（入口から出口まで）。入口の位置（ふつうのランプと同じところ）から始めること */
+export type RampShapeSpec = { path: readonly Pt[]; ascentEnd: number; topEnd: number; exitDir: Pt; exitSpread?: number };
+
+/**
+ * マップごとに変わるところ（maps.ts で決める）。ここに無いもの（骨組み）は、どのマップでも同じ。
+ * 右がわの部品は書かない（左右対称のものは、左だけ書いて折り返す。そうでないものは両方書く）
+ */
+export type MapSpec = {
+  id: string;
+  bumpers: readonly BumperDef[];
+  pinwheels: readonly PinwheelDef[];
+  /** 左のスタンドアップターゲットの組の中心（右の組は折り返し） */
+  standupCenter: Pt;
+  /** 足すポスト（ゴムのポスト・くぎ） */
+  posts?: readonly CircleDef[];
+  /** 足す壁 */
+  walls?: readonly WallDef[];
+  /** 足すスリングショット（上のほうにある小さなもの。はじく面は a→c） */
+  slings?: readonly SlingDef[];
+  itemSpots: readonly ItemSpot[];
+  /** 左のランプの道（右はその折り返し）。無ければ、のぼって同じがわのインレーンへ戻るふつうのランプ */
+  ramp?: RampShapeSpec;
+  /** 右のランプの道を左と変えるとき（書くのは右のランプの道そのもの。無ければ左の折り返し） */
+  rampRight?: RampShapeSpec;
+  /** バンパーがはじく強さの倍率（無ければ 1） */
+  bumperKick?: number;
+  /**
+   * ガチャ穴のかこいの上をあける幅（両はしの壁の中心の間、mm）。あけると、上から落ちてきた玉もガチャ穴に入る
+   * （パチンコのまん中の入賞口のように）。無ければ、とがったアーチでふさぐ
+   */
+  scoopTopOpening?: number;
+};
+
 /* ---------- 作図の道具 ---------- */
 
 /** 円弧（a0 → a1、ラジアン。y が下向きなので角度は時計回り） */
@@ -168,7 +217,7 @@ export function arc(cx: number, cy: number, r: number, a0: number, a1: number, s
 }
 
 /** なめらかな曲線（2次ベジェ） */
-function quad(p0: Pt, c: Pt, p1: Pt, steps: number): Pt[] {
+export function quad(p0: Pt, c: Pt, p1: Pt, steps: number): Pt[] {
   const out: Pt[] = [];
   for (let i = 0; i <= steps; i += 1) {
     const t = i / steps;
@@ -178,15 +227,30 @@ function quad(p0: Pt, c: Pt, p1: Pt, steps: number): Pt[] {
   return out;
 }
 
-const p = (x: number, y: number): Pt => ({ x, y });
+export const p = (x: number, y: number): Pt => ({ x, y });
 /** 台のまんなか（打ち出しレーンをのぞいた部分の中心）。左右対称のものはここで折り返す */
-const CX = 240;
-const mirror = (pt: Pt): Pt => ({ x: CX * 2 - pt.x, y: pt.y });
-const DEG = Math.PI / 180;
+export const CX = 240;
+export const mirror = (pt: Pt): Pt => ({ x: CX * 2 - pt.x, y: pt.y });
+export const DEG = Math.PI / 180;
 
 /* ---------- 台の形 ---------- */
 
-function buildTable(): TableGeometry {
+/** ふつうのランプ：入口からまっすぐのぼり、頂上で外がわへ曲がって、ワイヤーで同じがわのインレーンへ降りる */
+export const STANDARD_RAMP: RampShapeSpec = {
+  path: [
+    p(124, 600),
+    p(124, 414),
+    ...arc(82, 414, 42, 0, -Math.PI, 16).slice(1),
+    p(40, 610),
+    ...quad(p(40, 610), p(40, 700), p(64, 756), 8).slice(1),
+  ],
+  ascentEnd: 1,
+  topEnd: 1 + 16,
+  exitDir: p(0.28, 0.96),
+};
+
+/** マップの形を組み立てる（骨組み＋マップごとの部品）。壁とポストの順番は当たり判定の順番になるので、変えると結果が少し変わる */
+export function buildTable(spec: MapSpec): TableGeometry {
   const walls: WallDef[] = [];
   const circles: CircleDef[] = [];
 
@@ -227,12 +291,21 @@ function buildTable(): TableGeometry {
   const SCOOP_Y = 456;
   // 左半分は中心 (246, 456)・半径39 の円弧で、x=240 のてっぺんまで。右半分はその折り返し
   const archL = arc(246, SCOOP_Y, 39, Math.PI, Math.PI + Math.acos(6 / 39), 10);
-  walls.push({
-    pts: [p(207, 549), p(207, SCOOP_Y), ...archL.slice(1), ...archL.slice(0, -1).reverse().map(mirror), p(273, 549)],
-    r: 3,
-    mat: "metal",
-    look: "scoop",
-  });
+  if (spec.scoopTopOpening) {
+    // 上をあけるマップ：アーチを、まん中から opening/2 のところで切る（左右2本の壁になる）
+    const endX = CX - spec.scoopTopOpening / 2;
+    const cut = Math.PI + Math.acos((246 - endX) / 39);
+    const sideL = [p(207, 549), p(207, SCOOP_Y), ...arc(246, SCOOP_Y, 39, Math.PI, cut, 8).slice(1)];
+    walls.push({ pts: sideL, r: 3, mat: "metal", look: "scoop" });
+    walls.push({ pts: sideL.map(mirror), r: 3, mat: "metal", look: "scoop" });
+  } else {
+    walls.push({
+      pts: [p(207, 549), p(207, SCOOP_Y), ...archL.slice(1), ...archL.slice(0, -1).reverse().map(mirror), p(273, 549)],
+      r: 3,
+      mat: "metal",
+      look: "scoop",
+    });
+  }
 
   // ランプの入口（下だけ開いた箱。上へ横切った玉はランプに乗る）。
   // 箱の上（ランプの下にもぐった玉が上から落ちてくるところ）は山形の屋根にして、玉が乗って止まらないようにする
@@ -267,11 +340,7 @@ function buildTable(): TableGeometry {
   // アウトレーンの下（ドレインへ落ちる通り道の外がわ）
   walls.push({ pts: [p(0, 900), p(0, 1012)], r: 2, mat: "metal", look: "guide" });
 
-  const bumpers: BumperDef[] = [
-    { x: 182, y: 248, r: 28 },
-    { x: 298, y: 248, r: 28 },
-    { x: 240, y: 334, r: 28 },
-  ];
+  const bumpers: BumperDef[] = spec.bumpers.map((b) => ({ ...b }));
 
   // フリッパー：支点の間 180mm、下がっているときの先端のすき間 約40mm（ここが真ん中のドレイン）
   const FL_LEN = 78;
@@ -299,33 +368,28 @@ function buildTable(): TableGeometry {
     { id: "shooterExit", a: p(486, 330), b: p(522, 330) },
   ];
 
-  // ランプ：右フリッパーから左ランプ、左フリッパーから右ランプを狙う。降りた玉は同じ側のインレーンへ
-  const rampPathL: Pt[] = [
-    p(124, 600),
-    p(124, 414),
-    ...arc(82, 414, 42, 0, -Math.PI, 16).slice(1),
-    p(40, 610),
-    ...quad(p(40, 610), p(40, 700), p(64, 756), 8).slice(1),
-  ];
-  const ascentEndL = 1;
-  const topEndL = 1 + 16;
+  // ランプ：右フリッパーから左ランプ、左フリッパーから右ランプを狙う。入口（ここから下）はどのマップも同じ
+  const rampSpec = spec.ramp ?? STANDARD_RAMP;
   const rampL: RampDef = {
     id: "left",
     mouthA: p(101, 590),
     mouthB: p(147, 590),
-    path: rampPathL,
-    ascentEnd: ascentEndL,
-    topEnd: topEndL,
-    exitDir: p(0.28, 0.96),
+    path: rampSpec.path,
+    ascentEnd: rampSpec.ascentEnd,
+    topEnd: rampSpec.topEnd,
+    exitDir: rampSpec.exitDir,
+    exitSpread: rampSpec.exitSpread,
   };
+  const rightSpec = spec.rampRight;
   const rampR: RampDef = {
     id: "right",
     mouthA: mirror(rampL.mouthB),
     mouthB: mirror(rampL.mouthA),
-    path: rampPathL.map(mirror),
-    ascentEnd: ascentEndL,
-    topEnd: topEndL,
-    exitDir: p(-0.28, 0.96),
+    path: rightSpec ? rightSpec.path : rampSpec.path.map(mirror),
+    ascentEnd: (rightSpec ?? rampSpec).ascentEnd,
+    topEnd: (rightSpec ?? rampSpec).topEnd,
+    exitDir: rightSpec ? rightSpec.exitDir : p(-rampSpec.exitDir.x, rampSpec.exitDir.y),
+    exitSpread: (rightSpec ?? rampSpec).exitSpread,
   };
 
   // スタンドアップターゲット：上の左右のすみ。反対がわのフリッパーから、ガチャ穴の横の通り道とランプの下を
@@ -342,10 +406,16 @@ function buildTable(): TableGeometry {
     walls.push({ pts: [flip(at(-31, -2.5)), flip(at(31, -2.5))], r: 4.5, mat: "plastic", look: "standup-back" });
     return { side, center: flip(center), targets: [target(-19), target(0), target(19)] };
   };
-  const standups: [StandupBankDef, StandupBankDef] = [makeBank("left", p(96, 215)), makeBank("right", p(96, 215))];
+  const standups: [StandupBankDef, StandupBankDef] = [makeBank("left", spec.standupCenter), makeBank("right", spec.standupCenter)];
 
-  // かざぐるま：上のレーンの出口の下（まん中のレーンのしきりの真下）。いつも時計まわりにゆっくり回る
-  const pinwheel: PinwheelDef = { x: CX, y: 192, arms: 4, len: 19, r: 4.5, hubR: 6.5, omega: 2.6 };
+  // マップごとに足す部品（壁・ポスト・小さなスリングショット）。骨組みのあとに足す
+  for (const w of spec.walls ?? []) walls.push(w);
+  for (const c of spec.posts ?? []) circles.push(c);
+  const extraSlings = spec.slings ?? [];
+  for (const s of extraSlings) {
+    walls.push({ pts: [s.a, s.b, s.c], r: 3, mat: "plastic", look: "sling" });
+    for (const v of [s.a, s.b, s.c]) circles.push({ x: v.x, y: v.y, r: 5, mat: "post", look: "post" });
+  }
 
   const drops: DropTargetDef[] = [
     { a: p(211, 545), b: p(229, 545) },
@@ -361,33 +431,19 @@ function buildTable(): TableGeometry {
     { id: "rightOrbit", name: "右オービット", icon: p(450, 600), arrow: { x: 428, y: 650, angle: -68 * DEG } },
   ];
 
-  const itemSpots: ItemSpot[] = [
-    // バンパーのまわり（玉がよく来る。まん中はバンパー3つのあいだ）
-    { x: 128, y: 300, tier: 0 },
-    { x: 352, y: 300, tier: 0 },
-    { x: 240, y: 277, tier: 0 },
-    // 通路・ガチャ穴の前
-    { x: 178, y: 470, tier: 1 },
-    { x: 302, y: 470, tier: 1 },
-    { x: 240, y: 612, tier: 1 },
-    // ランプ・オービットの入口
-    { x: 124, y: 646, tier: 2 },
-    { x: 356, y: 646, tier: 2 },
-    { x: 24, y: 520, tier: 2 },
-    { x: 456, y: 520, tier: 2 },
-  ];
-
   return {
+    id: spec.id,
     walls,
     circles,
     bumpers,
-    slings: [slingL, slingR],
+    slings: [slingL, slingR, ...extraSlings],
     flippers: [flipperL, flipperR],
     sensors,
     ramps: [rampL, rampR],
     drops,
     standups,
-    pinwheel,
+    pinwheels: spec.pinwheels.map((pw) => ({ ...pw })),
+    bumperKick: spec.bumperKick ?? 1,
     scoop: { x: 240, y: 464, r: 14, ejectFrom: p(240, 488) },
     plungerRest: p(504, 938),
     shooterGate: { a: p(522, 266), b: p(484, 302), allow: p(0, -1) },
@@ -398,9 +454,7 @@ function buildTable(): TableGeometry {
     laneX: [156, 212, 268, 324],
     laneY,
     shots,
-    itemSpots,
+    itemSpots: spec.itemSpots.map((spot) => ({ ...spot })),
     artBox: { x: 150, y: 620, w: 180, h: 190 },
   };
 }
-
-export const TABLE: TableGeometry = buildTable();

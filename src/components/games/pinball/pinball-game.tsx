@@ -5,137 +5,76 @@ import { useCallback, useMemo, useState, type CSSProperties } from "react";
 import { BlueCoinArt } from "@/components/coin-art";
 import { RARITY_STYLES } from "@/lib/gacha/config";
 import { STAMP_COUNT } from "@/lib/games/pinball/config";
-import type { PinballTableInfo } from "@/lib/games/pinball/tables";
-import { getPinballTheme, type PinballTheme } from "@/lib/games/pinball/themes";
+import { resolvePinballMapId } from "@/lib/games/pinball/maps";
+import type { PinballLobby } from "@/lib/games/pinball/tables";
+import { getPinballTheme } from "@/lib/games/pinball/themes";
+import { PinballMapPreview } from "./pinball-map-preview";
 import { PinballPlay, type PinballResult } from "./pinball-play";
 import { PINBALL_RANKING_REFRESH_EVENT, PinballRanking } from "./pinball-ranking";
 
 type Props = {
-  tables: PinballTableInfo[];
-  /** 台ごとの自分のベスト */
+  lobby: PinballLobby;
+  /** 台（マップ）ごとの自分のベスト */
   bests: Record<string, number>;
   /** 青コインの残高（仕組みがまだ無い環境では null） */
   blueCoins: number | null;
 };
 
-function ShapeIcon({ table, theme }: { table: PinballTableInfo; theme: PinballTheme }) {
-  const id = `pb-shape-${table.id}`;
-  if (!table.shape) return null;
-  const [x0, y0, x1, y1] = table.shape.bbox;
-  const pad = (x1 - x0) * 0.06;
-  return (
-    <svg viewBox={`${x0 - pad} ${y0 - pad} ${x1 - x0 + pad * 2} ${y1 - y0 + pad * 2}`} className="h-full w-full" aria-hidden="true">
-      <defs>
-        <linearGradient id={id} x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0%" stopColor={theme.colors.shape} />
-          <stop offset="100%" stopColor={theme.colors.accent} />
-        </linearGradient>
-      </defs>
-      {table.shape.paths.map((d, i) => (
-        <path key={i} d={d} fill={`url(#${id})`} fillOpacity={table.unlocked ? 0.9 : 0.25} stroke={theme.colors.shape} strokeOpacity={0.9} strokeWidth={(x1 - x0) * 0.012} />
-      ))}
-    </svg>
-  );
-}
-
-function TableCard({ table, best, onPlay }: { table: PinballTableInfo; best: number | null; onPlay: () => void }) {
-  const theme = getPinballTheme(table.id, table.name);
+function MapCard({ mapId, best, onPlay }: { mapId: string; best: number | null; onPlay: () => void }) {
+  const theme = getPinballTheme(mapId);
   const style = {
     background: `linear-gradient(135deg, ${theme.colors.bg0}, ${theme.colors.bg1})`,
     borderColor: `${theme.colors.accent}55`,
   } as CSSProperties;
-  const isDefault = table.id === "default";
-  const ratio = table.totalCount ? table.ownedCount / table.totalCount : 0;
-
-  const body = (
-    <>
+  return (
+    <button type="button" onClick={onPlay} className="pressable relative block w-full overflow-hidden rounded-[26px] border p-3.5 text-left active:scale-[0.99]" style={style} aria-label={`${theme.name}で遊ぶ`}>
       <span aria-hidden="true" className="absolute -right-10 -top-10 h-32 w-32 rounded-full opacity-30 blur-2xl" style={{ background: theme.colors.accent }} />
-      <span className="relative flex items-center gap-3">
-        <span className="relative flex h-[78px] w-[78px] shrink-0 items-center justify-center rounded-[20px] border border-white/10 bg-black/25 p-2">
-          <ShapeIcon table={table} theme={theme} />
-          {!table.unlocked ? <span className="absolute inset-0 flex items-center justify-center text-2xl">🔒</span> : null}
+      <span className="relative flex gap-3">
+        <span className="flex h-[132px] w-[70px] shrink-0 items-center justify-center rounded-[16px] border border-white/10 bg-black/30 p-1">
+          <PinballMapPreview mapId={mapId} theme={theme} className="h-full w-full" />
         </span>
-        <span className="min-w-0 flex-1">
+        <span className="flex min-w-0 flex-1 flex-col">
           <span className="flex items-center gap-1.5">
             <span className="rounded-full px-2 py-0.5 text-[9px] font-black text-black" style={{ background: theme.colors.accent }}>
-              {isDefault ? "だれでも" : table.unlocked ? "あそべる" : "まだ"}
+              {theme.title}
             </span>
-            {best !== null ? <span className="text-[10px] font-black tabular-nums text-white/70">ベスト {best.toLocaleString("ja-JP")}</span> : null}
+            <span className="text-[10px] font-black tracking-[0.05em] text-white/70" aria-label={`むずかしさ ${theme.difficulty}`}>
+              {"★".repeat(theme.difficulty)}
+              <span className="text-white/25">{"★".repeat(3 - theme.difficulty)}</span>
+            </span>
           </span>
           <span className="mt-1 block text-[19px] font-black leading-tight text-white">{theme.name}</span>
-          <span className="mt-0.5 block truncate text-[11px] font-bold" style={{ color: theme.colors.accent }}>
-            {theme.title}
-          </span>
-          {!isDefault ? (
-            <span className="mt-1.5 flex items-center gap-2">
-              <span className="h-1.5 flex-1 overflow-hidden rounded-full bg-white/10">
-                <span className="block h-full rounded-full" style={{ width: `${ratio * 100}%`, background: theme.colors.accent }} />
+          <span className="mt-1.5 flex flex-wrap gap-1">
+            {theme.features.map((f) => (
+              <span key={f} className="rounded-full border border-white/15 bg-black/25 px-2 py-0.5 text-[10px] font-black" style={{ color: theme.colors.accent }}>
+                {f}
               </span>
-              <span className="shrink-0 text-[10px] font-black tabular-nums text-white/75">
-                {table.ownedCount} / {table.totalCount}
-              </span>
-            </span>
-          ) : null}
-          {table.unlocked && table.zukan > 1 ? (
-            <span className="mt-1 block text-[10px] font-black text-[#ffe08a]">図鑑ボーナス ×{table.zukan.toFixed(2)}（すべての得点）</span>
-          ) : null}
-        </span>
-        {table.unlocked ? (
-          <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-xl font-black text-black" style={{ background: theme.colors.accent }}>
-            ›
+            ))}
           </span>
-        ) : null}
-      </span>
-      <span className="relative mt-3 block text-[11px] font-bold leading-relaxed text-white/70">
-        {table.unlocked ? theme.lead : `都道府県ガチャで${theme.name}のアイテムを1つ当てると、この台で遊べます。`}
-      </span>
-      {table.preview.length ? (
-        <span className="relative mt-2.5 flex items-center gap-1.5">
-          {table.preview.map((item) => (
-            <span key={item.id} className="relative h-9 w-9 overflow-hidden rounded-full border border-white/20 bg-white/90" title={item.name}>
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src={item.image} alt="" className="h-full w-full object-cover" />
-              <span className={`absolute bottom-0 left-0 right-0 text-center text-[7px] font-black leading-[10px] ${RARITY_STYLES[item.rarity].badge}`}>{item.rarity}</span>
+          <span className="mt-1.5 block text-[11px] font-bold leading-relaxed text-white/70">{theme.lead}</span>
+          <span className="mt-auto flex items-center justify-between pt-1.5">
+            <span className="text-[10px] font-black tabular-nums text-white/70">{best !== null ? `ベスト ${best.toLocaleString("ja-JP")}` : "まだ遊んでいません"}</span>
+            <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-lg font-black text-black" style={{ background: theme.colors.accent }}>
+              ›
             </span>
-          ))}
-          {table.ownedCount > table.preview.length ? <span className="text-[10px] font-black text-white/60">ほか{table.ownedCount - table.preview.length}種</span> : null}
+          </span>
         </span>
-      ) : null}
-    </>
-  );
-
-  if (!table.unlocked) {
-    return (
-      <Link
-        href="/mypage/coins"
-        className="pressable relative block overflow-hidden rounded-[26px] border p-4 opacity-80 active:scale-[0.99]"
-        style={style}
-        aria-label={`${theme.name}の台（まだ遊べません。都道府県ガチャへ）`}
-      >
-        {body}
-        <span className="relative mt-3 flex items-center justify-center rounded-full border border-white/20 bg-black/25 py-2 text-[11px] font-black text-white/85">都道府県ガチャへ</span>
-      </Link>
-    );
-  }
-  return (
-    <button type="button" onClick={onPlay} className="pressable relative block w-full overflow-hidden rounded-[26px] border p-4 text-left active:scale-[0.99]" style={style} aria-label={`${theme.name}の台で遊ぶ`}>
-      {body}
+      </span>
     </button>
   );
 }
 
-export function PinballGame({ tables, bests: initialBests, blueCoins: initialCoins }: Props) {
+export function PinballGame({ lobby, bests: initialBests, blueCoins: initialCoins }: Props) {
   const [playing, setPlaying] = useState<string | null>(null);
   const [runKey, setRunKey] = useState(0);
   const [bests, setBests] = useState(initialBests);
   const [blueCoins, setBlueCoins] = useState(initialCoins);
-  const table = tables.find((t) => t.id === playing) ?? null;
-  const theme = useMemo(() => (table ? getPinballTheme(table.id, table.name) : null), [table]);
-  const tableNames = useMemo(() => Object.fromEntries(tables.map((t) => [t.id, t.name])), [tables]);
-  const unlockedPrefs = tables.filter((t) => t.id !== "default" && t.unlocked).length;
+  const theme = useMemo(() => (playing ? getPinballTheme(playing) : null), [playing]);
+  // ランキングに出す台の名前（前の「県の台」の記録は、同じ形のいつもの台として出す）
+  const tableName = useCallback((id: string) => getPinballTheme(resolvePinballMapId(id) ?? id).name, []);
 
-  const onRecorded = useCallback((tableId: string, result: PinballResult) => {
-    setBests((prev) => (result.score > (prev[tableId] ?? -1) ? { ...prev, [tableId]: result.score } : prev));
+  const onRecorded = useCallback((mapId: string, result: PinballResult) => {
+    setBests((prev) => (result.score > (prev[mapId] ?? -1) ? { ...prev, [mapId]: result.score } : prev));
     if (result.balance !== null) setBlueCoins(result.balance);
     window.dispatchEvent(new Event(PINBALL_RANKING_REFRESH_EVENT));
   }, []);
@@ -161,10 +100,10 @@ export function PinballGame({ tables, bests: initialBests, blueCoins: initialCoi
       <main className="mx-auto max-w-[480px] space-y-4 px-4 pt-4">
         <section className="relative overflow-hidden rounded-[28px] border border-[#ff8a80]/25 bg-[linear-gradient(135deg,#2a1116,#121521)] p-5">
           <span aria-hidden="true" className="absolute -right-6 -top-8 h-28 w-28 rounded-full bg-[#ff6b6b]/25 blur-2xl" />
-          <p className="relative text-[10px] font-black tracking-[0.1em] text-[#ff8a80]">はじいて、集めて、県制覇！</p>
+          <p className="relative text-[10px] font-black tracking-[0.1em] text-[#ff8a80]">はじいて、集めて、制覇！</p>
           <p className="relative mt-1 text-[22px] font-black leading-tight">ご当地アイテムの台で遊ぼう</p>
           <p className="relative mt-2 text-[11px] font-bold leading-relaxed text-white/70">
-            台に浮かぶご当地アイテムにボールを当てて集めると、その場でスキルが発動。どれでも{STAMP_COUNT}つ集めると「県制覇！」でマルチボール。その県のアイテムをたくさん持っているほど、図鑑ボーナスで得点が上がります。3球で終わり、スコアに応じて青コインがもらえます。
+            台に浮かぶご当地アイテムにボールを当てて集めると、その場でスキルが発動。どれでも{STAMP_COUNT}つ集めると「制覇！」でマルチボール。台はマップごとに形がちがいます。3球で終わり、スコアに応じて青コインがもらえます。
           </p>
           <div className="relative mt-3 grid grid-cols-3 gap-2 text-center">
             {[
@@ -178,20 +117,48 @@ export function PinballGame({ tables, bests: initialBests, blueCoins: initialCoi
               </span>
             ))}
           </div>
+          <div className="relative mt-3 rounded-2xl border border-white/10 bg-black/25 p-3">
+            <p className="flex items-center justify-between gap-2 text-[11px] font-black">
+              <span>台に出るご当地アイテム</span>
+              <span className="tabular-nums text-white/75">
+                {lobby.ownedCount} / {lobby.totalCount}種
+              </span>
+            </p>
+            <span className="mt-1.5 block h-1.5 overflow-hidden rounded-full bg-white/10">
+              <span className="block h-full rounded-full bg-[#ffd166]" style={{ width: `${lobby.totalCount ? (lobby.ownedCount / lobby.totalCount) * 100 : 0}%` }} />
+            </span>
+            {lobby.preview.length ? (
+              <span className="mt-2 flex items-center gap-1.5">
+                {lobby.preview.map((item) => (
+                  <span key={item.id} className="relative h-9 w-9 overflow-hidden rounded-full border border-white/20 bg-white/90" title={item.name}>
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img src={item.image} alt="" className="h-full w-full object-cover" />
+                    <span className={`absolute bottom-0 left-0 right-0 text-center text-[7px] font-black leading-[10px] ${RARITY_STYLES[item.rarity].badge}`}>{item.rarity}</span>
+                  </span>
+                ))}
+                {lobby.ownedCount > lobby.preview.length ? <span className="text-[10px] font-black text-white/60">ほか{lobby.ownedCount - lobby.preview.length}種</span> : null}
+              </span>
+            ) : null}
+            <p className="mt-2 text-[10px] font-bold leading-relaxed text-white/60">
+              {lobby.ownedCount > 0
+                ? <>持っているアイテムは、どの県のものも全部どのマップにも出ます。<b className="text-[#ffe08a]">図鑑ボーナス ×{lobby.zukan.toFixed(2)}</b>（すべての得点）</>
+                : <>都道府県ガチャでご当地アイテムを当てると、台に出てきてスキルが使えます（いまは ？カプセルが出ます）。</>}
+            </p>
+          </div>
         </section>
 
-        <section className="space-y-3" aria-label="台をえらぶ">
+        <section className="space-y-3" aria-label="マップをえらぶ">
           <div className="flex items-end justify-between px-1">
-            <h2 className="text-[15px] font-black">台をえらぶ</h2>
-            <span className="text-[10px] font-bold text-white/55">ご当地の台 {unlockedPrefs} / {tables.length - 1}</span>
+            <h2 className="text-[15px] font-black">マップをえらぶ</h2>
+            <span className="text-[10px] font-bold text-white/55">{lobby.maps.length}つのマップ</span>
           </div>
-          {tables.map((t) => (
-            <TableCard
-              key={t.id}
-              table={t}
-              best={bests[t.id] ?? null}
+          {lobby.maps.map((id) => (
+            <MapCard
+              key={id}
+              mapId={id}
+              best={bests[id] ?? null}
               onPlay={() => {
-                setPlaying(t.id);
+                setPlaying(id);
                 setRunKey((k) => k + 1);
               }}
             />
@@ -202,20 +169,21 @@ export function PinballGame({ tables, bests: initialBests, blueCoins: initialCoi
           <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-[#ff6b6b]/20 text-lg">📖</span>
           <span className="min-w-0 flex-1">
             <span className="block text-sm font-black">ルールとスキルを見る</span>
-            <span className="mt-0.5 block text-[11px] font-bold text-white/55">台のしかけ・得点・アイテムごとのスキル</span>
+            <span className="mt-0.5 block text-[11px] font-bold text-white/55">マップのしかけ・得点・アイテムごとのスキル</span>
           </span>
           <span className="text-white/40">›</span>
         </Link>
 
-        <PinballRanking tableNames={tableNames} />
+        <PinballRanking tableName={tableName} />
       </main>
 
-      {table && theme ? (
+      {playing && theme ? (
         <PinballPlay
           key={runKey}
-          table={table}
+          mapId={playing}
+          lobby={lobby}
           theme={theme}
-          best={bests[table.id] ?? null}
+          best={bests[playing] ?? null}
           onExit={() => setPlaying(null)}
           onRestart={() => setRunKey((k) => k + 1)}
           onRecorded={onRecorded}

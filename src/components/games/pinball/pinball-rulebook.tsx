@@ -26,11 +26,13 @@ import {
   ZUKAN_BONUS_MAX,
   zukanBonus,
 } from "@/lib/games/pinball/config";
-import { pinballPrefCodes, pinballPrefItems } from "@/lib/games/pinball/items";
+import { pinballItems, pinballPrefCodes, pinballPrefItems } from "@/lib/games/pinball/items";
+import { PINBALL_MAP_IDS } from "@/lib/games/pinball/maps";
 import { describeSkillLevels, getPinballSkill, starsForCount } from "@/lib/games/pinball/skills";
 import { getPinballTheme } from "@/lib/games/pinball/themes";
 import { PREFECTURE_NAMES } from "@/lib/geo/prefecture-names";
 import { PinballSkillTabs, type GuidePref } from "./pinball-guide";
+import { PinballMapPreview } from "./pinball-map-preview";
 
 const n = (v: number) => v.toLocaleString("ja-JP");
 
@@ -51,16 +53,20 @@ function Card({ children, className = "" }: { children: React.ReactNode; classNa
   return <div className={`rounded-[22px] border border-white/10 bg-white/[0.04] p-3.5 ${className}`}>{children}</div>;
 }
 
+/** スキル一覧の県のタブの色（県の順にくり返す） */
+const PREF_ACCENTS = ["#f2a541", "#c7e8f3", "#f2c14e", "#9fd356", "#f5c542", "#e8d5b5", "#ff8a80", "#7df9ff"];
+
 const GADGETS: { icon: string; name: string; body: string }[] = [
   { icon: "🎯", name: "スキルショット", body: `打ち出しで、光っているレーン（お・で・か・け）にぴったり入れると${n(POINTS.skillShot)}点。打ち出しゲージの目印が、入りやすい強さです。光る場所は、打ち出す前にフリッパーで動かせます。` },
   { icon: "🔤", name: "上のレーン「お・で・か・け」", body: `玉が通るとレーンが光り、4つそろうとボーナス倍率+1（最大×${MAX_BONUS_X}）。フリッパーを押すたびに光がとなりへ動くので、空いているところへ寄せられます。` },
-  { icon: "🎏", name: "かざぐるま", body: `上のレーンの出口の下で、いつもゆっくり回っている羽根。当たると${n(POINTS.pinwheel)}点で、強く当てるほど速く回ります。どこへはね返るかは、羽根の向きしだい。` },
+  { icon: "🎏", name: "かざぐるま（風車）", body: `いつもゆっくり回っている羽根。当たると${n(POINTS.pinwheel)}点で、強く当てるほど速く回ります。どこへはね返るかは、羽根の向きしだい。` },
   { icon: "💥", name: "バンパー", body: `当たると${n(POINTS.bumper)}点で強くはじき返します。上にのっているのは、あなたの持っているご当地アイテム（レア度の高い順）です。` },
+  { icon: "📍", name: "くぎ（くぎと風車の台）", body: "パチンコのくぎ。当たると、玉がカチカチと向きを変えながら落ちてきます。得点はありません。" },
   { icon: "🌀", name: "オービット（左右の外まわり）", body: `外まわりのレーンを1周すると${n(POINTS.orbit)}点。左のオービットの入口にはスピナーがあり、勢いよく通るほど回って点が入ります。` },
-  { icon: "🛝", name: "ランプ（左右の坂道）", body: `坂をのぼりきると${n(POINTS.ramp)}点。弱いと途中で戻ってきます。降りた玉は同じ側のインレーンへ戻るので、左右交互に「8の字」でつなぐのがコツ。` },
+  { icon: "🛝", name: "ランプ（左右の坂道）", body: `坂をのぼりきると${n(POINTS.ramp)}点。弱いと途中で戻ってきます。のぼった玉の行き先はマップしだい（いつもの台は同じがわのインレーンへ戻るので、左右交互に「8の字」でつなぐのがコツ）。` },
   { icon: "⚡", name: "コンボ", body: `オービット・ランプ・ガチャ穴を${COMBO_WINDOW_SEC}秒以内に続けて決めると、得点が×2、×3…（最大×${MAX_COMBO}）。` },
   { icon: "🚩", name: "スタンドアップターゲット（左右の上のすみ）", body: `倒れない的が3つずつ。前から当てると光り（${n(POINTS.standup)}点）、3つ全部光らせると${n(POINTS.standupsAll)}点＋アイテムをもう1か所よびます。反対がわのフリッパーから、ガチャ穴の横をぬけてランプの下を通すと届きます。` },
-  { icon: "🎰", name: "ドロップターゲットとガチャ穴", body: `まん中の3つの的を全部倒すと、奥の「ガチャ穴」が開きます（キックバックも点灯）。穴に入れるとカプセルから何かが出ます。` },
+  { icon: "🎰", name: "ドロップターゲットとガチャ穴", body: `まん中の3つの的を全部倒すと、奥の「ガチャ穴」が開きます（キックバックも点灯）。穴に入れるとカプセルから何かが出ます。くぎと風車の台のガチャ穴は上もあいていて、上から落ちてきた玉も入ります。` },
   { icon: "🦵", name: "キックバック", body: "アウトレーン（いちばん外側）に落ちても、「キック」のランプが点いていれば打ち返してくれます。左はボールを出すたびに点いた状態で始まり、使ったらドロップターゲットを全部倒すと点けなおせます。右はガチャ穴やスキルで点きます。" },
   { icon: "🛟", name: "ボールセーブ", body: `打ち出してから${BALL_SAVE_SEC}秒は、落としてもボールが戻ってきます。フリッパーの間の「セーブ」が光っている間です。` },
 ];
@@ -85,8 +91,11 @@ const SKILL_WORDS: [string, string][] = [
 export function PinballRulebook({ owned }: { owned: ReadonlyMap<string, number> }) {
   const optimize = (src: string) => getImageProps({ src, alt: "", width: 96, height: 96 }).props.src;
 
-  const prefs: GuidePref[] = pinballPrefCodes().map((code) => {
-    const theme = getPinballTheme(code, PREFECTURE_NAMES.find((p) => p.code === code)?.name);
+  const allItems = pinballItems();
+  const ownedKinds = allItems.filter((item) => (owned.get(item.id) ?? 0) > 0).length;
+  const zukan = zukanBonus(ownedKinds, allItems.length);
+  const prefs: GuidePref[] = pinballPrefCodes().map((code, index) => {
+    const name = PREFECTURE_NAMES.find((p) => p.code === code)?.name ?? "ご当地";
     const rows = pinballPrefItems(code)
       .slice()
       .sort((a, b) => GACHA_RARITIES.indexOf(b.rarity) - GACHA_RARITIES.indexOf(a.rarity))
@@ -107,8 +116,7 @@ export function PinballRulebook({ owned }: { owned: ReadonlyMap<string, number> 
           starText: stars > 0 ? (getPinballSkill(item.id, item.name, item.rarity, 5, stars)?.text ?? null) : null,
         };
       });
-    const ownedKinds = rows.filter((r) => r.count > 0).length;
-    return { id: code, name: theme.name, accent: theme.colors.accent, rows, zukan: zukanBonus(ownedKinds, rows.length) };
+    return { id: code, name, accent: PREF_ACCENTS[index % PREF_ACCENTS.length]!, rows };
   });
 
   return (
@@ -130,7 +138,7 @@ export function PinballRulebook({ owned }: { owned: ReadonlyMap<string, number> 
           <div className="mt-4 grid grid-cols-3 gap-2 text-center">
             {[
               ["BALL", `${PINBALL_BALLS}球`, "1ゲーム"],
-              ["STAMP", `${STAMP_COUNT}個`, "で県制覇"],
+              ["STAMP", `${STAMP_COUNT}個`, "で制覇"],
               ["REWARD", `÷${n(COIN_POINTS)}`, "青コイン"],
             ].map(([label, value, note]) => (
               <div key={label} className="rounded-2xl border border-white/10 bg-black/25 px-1 py-2.5">
@@ -155,7 +163,45 @@ export function PinballRulebook({ owned }: { owned: ReadonlyMap<string, number> 
         </section>
 
         <section className="space-y-2">
-          <Title no="02" eyebrow="TABLE" title="台のしかけ" />
+          <Title no="02" eyebrow="MAPS" title="マップ" />
+          <Card>
+            <p className="text-[11.5px] leading-relaxed text-white/80">
+              台は{PINBALL_MAP_IDS.length}つのマップから選べます。どのマップも、フリッパー・スリングショット・上のレーン・オービット・ランプの入口・ガチャ穴の場所は同じで、上半分のしかけとランプの行き先がちがいます。ルールと得点・スキルはどのマップも同じです。
+            </p>
+          </Card>
+          <div className="space-y-2">
+            {PINBALL_MAP_IDS.map((id) => {
+              const theme = getPinballTheme(id);
+              return (
+                <Card key={id}>
+                  <div className="flex items-start gap-3">
+                    <PinballMapPreview mapId={id} theme={theme} className="h-[96px] w-[51px] shrink-0" />
+                    <span className="min-w-0">
+                      <span className="flex items-center gap-1.5">
+                        <span className="text-[13px] font-black">{theme.name}</span>
+                        <span className="text-[10px] font-black text-white/70">
+                          {"★".repeat(theme.difficulty)}
+                          <span className="text-white/25">{"★".repeat(3 - theme.difficulty)}</span>
+                        </span>
+                      </span>
+                      <span className="mt-0.5 block text-[11px] leading-relaxed text-white/70">{theme.lead}</span>
+                      <span className="mt-1 flex flex-wrap gap-1">
+                        {theme.features.map((f) => (
+                          <span key={f} className="rounded-full border border-white/10 bg-black/25 px-2 py-0.5 text-[9.5px] font-bold" style={{ color: theme.colors.accent }}>
+                            {f}
+                          </span>
+                        ))}
+                      </span>
+                    </span>
+                  </div>
+                </Card>
+              );
+            })}
+          </div>
+        </section>
+
+        <section className="space-y-2">
+          <Title no="03" eyebrow="TABLE" title="台のしかけ" />
           <div className="space-y-2">
             {GADGETS.map((g) => (
               <Card key={g.name}>
@@ -182,10 +228,10 @@ export function PinballRulebook({ owned }: { owned: ReadonlyMap<string, number> 
         </section>
 
         <section className="space-y-2">
-          <Title no="03" eyebrow="STAMP" title="アイテムを集める" />
+          <Title no="04" eyebrow="STAMP" title="アイテムを集める" />
           <Card>
             <ul className="space-y-2 text-[11.5px] leading-relaxed text-white/80">
-              <li>台には、その県で<b className="text-white">持っているご当地アイテムが全部</b>出てきます（このゲームでまだ出ていないものが先）。どれでも <b className="text-white">{STAMP_COUNT}つ</b> 取ると、画面の上のスタンプ帳がうまります。持っているのが{STAMP_COUNT}種類より少ないと、足りないぶんは「？カプセル」になります。</li>
+              <li>台には、<b className="text-white">持っているご当地アイテムが全部</b>（どの県のものも、どのマップにも）出てきます（このゲームでまだ出ていないものが先）。どれでも <b className="text-white">{STAMP_COUNT}つ</b> 取ると、画面の上のスタンプ帳がうまります。持っているのが{STAMP_COUNT}種類より少ないと、足りないぶんは「？カプセル」になります。</li>
               <li>アイテムは台の上に1つずつ浮かびます。<b className="text-white">ボールを当てると取れて、その場でスキルが発動</b>。レア度が高いものほど、ランプやオービットの入口など狙いにくい場所に出ます。</li>
               <li>{ITEM_RELOCATE_SEC}秒たっても取れないと、別の場所へうつります。まだ出ていないアイテムがあれば、そのアイテムに入れかわります（まわりの輪が残り時間）。</li>
               <li>スキルがあるのは R 以上のアイテム。N と ？カプセルは得点だけです。スキルLvは図鑑と同じで、同じアイテムを集めるほど強くなります。</li>
@@ -194,10 +240,10 @@ export function PinballRulebook({ owned }: { owned: ReadonlyMap<string, number> 
         </section>
 
         <section className="space-y-2">
-          <Title no="04" eyebrow="COLLECTION" title="ガチャで集めるほど強くなる" />
+          <Title no="05" eyebrow="COLLECTION" title="ガチャで集めるほど強くなる" />
           <Card>
             <ul className="space-y-2 text-[11.5px] leading-relaxed text-white/80">
-              <li><b className="text-white">図鑑ボーナス</b>：その県のアイテムを何種類持っているかで、<b className="text-white">すべての得点</b>にかかる倍率。全部そろえると ×{(1 + ZUKAN_BONUS_MAX).toFixed(2)}（半分なら ×{zukanBonus(1, 2).toFixed(2)}）。台えらびと、遊んでいる画面の上に出ます。</li>
+              <li><b className="text-white">図鑑ボーナス</b>：台に出るご当地アイテム（全部の県で{allItems.length}種）を何種類持っているかで、<b className="text-white">すべての得点</b>にかかる倍率。全部そろえると ×{(1 + ZUKAN_BONUS_MAX).toFixed(2)}（半分なら ×{zukanBonus(1, 2).toFixed(2)}）。いまのあなたは {ownedKinds}種で <b className="text-[#ffe08a]">×{zukan.toFixed(2)}</b>。台えらびと、遊んでいる画面の上にも出ます。</li>
               <li><b className="text-white">Lv5で覚醒</b>：同じアイテムを集めてスキルLvが MAX（Lv5）になると、スキルの効果がひとつ増えます（下のスキル一覧の「覚醒」）。</li>
               <li><b className="text-white">限界突破 ★</b>：Lv5 のあとも同じアイテムを引くと、1つごとに★がつきます（最大★{STAR_MAX}）。★1つで、そのアイテムのスキルの秒数と得点、取ったときの得点が +{Math.round(STAR_RATE * 100)}%。</li>
               <li><b className="text-white">おかわり</b>で出たアイテムは、取ってもスタンプは増えませんが、スキルがもう一度発動します（得点は{ENCORE_POINTS === 0.5 ? "半分" : `${ENCORE_POINTS}倍`}）。</li>
@@ -206,10 +252,10 @@ export function PinballRulebook({ owned }: { owned: ReadonlyMap<string, number> 
         </section>
 
         <section className="space-y-2">
-          <Title no="05" eyebrow="CONQUEST" title="県制覇とジャックポット" />
+          <Title no="06" eyebrow="CONQUEST" title="制覇とジャックポット" />
           <Card>
             <ul className="space-y-2 text-[11.5px] leading-relaxed text-white/80">
-              <li>スタンプが{STAMP_COUNT}つそろうと「<b className="text-white">〇〇県 制覇！</b>」で {n(POINTS.conquest)}点 × 制覇した回数。ボールが{CONQUEST_EXTRA_BALLS}つ増えて、3球のマルチボールになります。</li>
+              <li>スタンプが{STAMP_COUNT}つそろうと「<b className="text-white">制覇！</b>」で {n(POINTS.conquest)}点 × 制覇した回数。ボールが{CONQUEST_EXTRA_BALLS}つ増えて、3球のマルチボールになります。</li>
               <li>制覇モードの間は、左右のランプとオービットが「ジャックポット」（{n(POINTS.jackpot)}点 × 制覇の回数）。4つ全部決めるとガチャ穴が「スーパージャックポット」（{n(POINTS.superJackpot)}点 × 制覇の回数）。</li>
               <li>ボールが1つに戻ると制覇モードは終わり、新しいスタンプ帳が始まります。集めたアイテムの得点も、制覇するたびに大きくなります。</li>
             </ul>
@@ -217,7 +263,7 @@ export function PinballRulebook({ owned }: { owned: ReadonlyMap<string, number> 
         </section>
 
         <section className="space-y-2">
-          <Title no="06" eyebrow="SCORE" title="得点" />
+          <Title no="07" eyebrow="SCORE" title="得点" />
           <Card>
             <table className="w-full border-collapse text-[11px]">
               <tbody>
@@ -260,7 +306,7 @@ export function PinballRulebook({ owned }: { owned: ReadonlyMap<string, number> 
         </section>
 
         <section className="space-y-2">
-          <Title no="07" eyebrow="SKILLS" title="ご当地アイテムのスキル" />
+          <Title no="08" eyebrow="SKILLS" title="ご当地アイテムのスキル" />
           <Card>
             <p className="text-[11px] font-black text-white/80">スキルのことば</p>
             <dl className="mt-2 grid grid-cols-2 gap-1.5">
@@ -278,7 +324,7 @@ export function PinballRulebook({ owned }: { owned: ReadonlyMap<string, number> 
         </section>
 
         <section className="space-y-2">
-          <Title no="08" eyebrow="REWARD" title="青コイン" />
+          <Title no="09" eyebrow="REWARD" title="青コイン" />
           <Card className="text-center">
             <BlueCoinArt className="mx-auto h-10 w-10" />
             <p className="mt-1 text-lg font-black">スコア ÷ {n(COIN_POINTS)} = 青コイン</p>

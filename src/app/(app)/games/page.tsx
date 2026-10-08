@@ -257,9 +257,9 @@ export default async function GamesPage() {
 
             <span className="relative z-10 mt-3 flex items-center gap-3">
               <span className="min-w-0 flex-1 pb-1">
-                <span className="block text-[10px] font-black tracking-[0.08em] text-[#b8473f]">はじいて、集めて、県制覇！</span>
+                <span className="block text-[10px] font-black tracking-[0.08em] text-[#b8473f]">はじいて、集めて、制覇！</span>
                 <span className="mt-1 block text-[21px] font-black tracking-[-0.03em]">ご当地ピンボール</span>
-                <span className="mt-1.5 block text-[11px] font-bold leading-relaxed text-ink-soft">都道府県ガチャのアイテムが台に並ぶピンボール。</span>
+                <span className="mt-1.5 block text-[11px] font-bold leading-relaxed text-ink-soft">都道府県ガチャのアイテムが台に並ぶピンボール。マップは4種類。</span>
               </span>
 
               <span className="relative h-[108px] w-[108px] shrink-0 overflow-hidden rounded-[25px] border border-white/80 bg-white/65 shadow-[0_8px_18px_rgba(80,66,46,0.09)]">

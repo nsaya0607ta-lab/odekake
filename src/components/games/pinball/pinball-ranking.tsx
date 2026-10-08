@@ -23,8 +23,8 @@ type RankingPayload = { ready?: boolean; entries?: RankingEntry[]; error?: strin
 
 const PERIOD_LABEL: Record<RankingPeriod, string> = { week: "今週", best: "これまで" };
 
-/** ご当地ピンボールのフレンドランキング（全部の台まとめて。ベストを出した台も出す） */
-export function PinballRanking({ tableNames }: { tableNames: Record<string, string> }) {
+/** ご当地ピンボールのフレンドランキング（全部の台まとめて。ベストを出した台も出す。tableName は台の id → 名前） */
+export function PinballRanking({ tableName }: { tableName: (id: string) => string }) {
   const [period, setPeriod] = useState<RankingPeriod>("week");
   const [entries, setEntries] = useState<RankingEntry[]>([]);
   const [ready, setReady] = useState<boolean | null>(null);
@@ -130,7 +130,7 @@ export function PinballRanking({ tableNames }: { tableNames: Record<string, stri
                     {entry.displayName}
                     {entry.isMe ? <span className="ml-1.5 rounded-full bg-[#ff6b6b] px-1.5 py-px text-[9px] text-white">あなた</span> : null}
                   </span>
-                  <span className="block truncate text-[10px] font-bold text-white/45">{tableNames[entry.table] ?? "ご当地の台"}</span>
+                  <span className="block truncate text-[10px] font-bold text-white/45">{tableName(entry.table)}</span>
                 </span>
                 <span className="shrink-0 text-right text-[14px] font-black tabular-nums text-white">
                   {entry.score.toLocaleString("ja-JP")}

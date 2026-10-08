@@ -11,7 +11,7 @@
 import { ENCORE_SEC, ITEM_RELOCATE_SEC, STAMP_COUNT } from "@/lib/games/pinball/config";
 import { ballsOnTable, collectedCount, isBallSaveOn, scoreMult, type Game, type GameFx, type PinballItem, type Tone } from "@/lib/games/pinball/game";
 import { flipperTip, PLUNGER_TRAVEL, rampPoint, type FlipperState } from "@/lib/games/pinball/physics";
-import { BALL_R, ITEM_PICKUP_R, TABLE, TABLE_H, TABLE_W, type Pt, type RampDef, type ShotId, type WallDef } from "@/lib/games/pinball/table";
+import { BALL_R, ITEM_PICKUP_R, TABLE_H, TABLE_W, type Pt, type RampDef, type ShotId, type TableGeometry, type WallDef } from "@/lib/games/pinball/table";
 import type { PinballPattern, PinballTheme } from "@/lib/games/pinball/themes";
 import {
   alongLine,
@@ -36,9 +36,11 @@ import {
 export type PinballShape = { paths: readonly string[]; bbox: readonly [number, number, number, number] };
 
 export type RenderAssets = {
+  /** マップの形（ゲームと同じもの） */
+  table: TableGeometry;
   theme: PinballTheme;
   shape: PinballShape | null;
-  /** バンパー3つの上にのせるアイテム（足りなければカプセル） */
+  /** バンパーの上にのせるアイテム（バンパーの数より少なければ、くり返して使う） */
   bumperItems: readonly PinballItem[];
 };
 
@@ -82,8 +84,8 @@ function circlePathAt(x: number, y: number, r: number): Path2D {
 }
 
 /** スタンドアップターゲットの前（床）のランプの位置 */
-function standupInsertPos(index: number): Pt {
-  const t = TABLE.standups[Math.floor(index / 3)]!.targets[index % 3]!;
+function standupInsertPos(table: TableGeometry, index: number): Pt {
+  const t = table.standups[Math.floor(index / 3)]!.targets[index % 3]!;
   return { x: (t.a.x + t.b.x) / 2 + t.face.x * 19, y: (t.a.y + t.b.y) / 2 + t.face.y * 19 };
 }
 
@@ -109,8 +111,8 @@ const TONE_COLOR: Record<Tone, string> = {
   bad: "#ff8a80",
 };
 
-function shotPos(id: ShotId): Pt & { angle: number } {
-  return TABLE.shots.find((s) => s.id === id)!.arrow;
+function shotPos(table: TableGeometry, id: ShotId): Pt & { angle: number } {
+  return table.shots.find((s) => s.id === id)!.arrow;
 }
 
 /** 台の外わく（ここより内側が床） */
@@ -486,6 +488,7 @@ export class PinballRenderer {
   private readonly canvas: HTMLCanvasElement;
   private readonly ctx: CanvasRenderingContext2D;
   private assets: RenderAssets;
+  private readonly table: TableGeometry;
   private cssW = 0;
   private cssH = 0;
   private dpr = 1;
@@ -505,15 +508,16 @@ export class PinballRenderer {
   private particles: Particle[] = [];
   private popups: Popup[] = [];
   private flying: Flying[] = [];
-  private bumperFlash = [0, 0, 0];
-  private slingFlash = [0, 0];
+  private readonly bumperFlash: number[];
+  private readonly slingFlash: number[];
   private shotFlash = new Map<string, number>();
   private kickFlash = [0, 0];
   private standupFlash = [0, 0, 0, 0, 0, 0];
   private standupsAllFlash = [0, 0];
-  private pinwheelFlash = 0;
+  private readonly pinwheelFlash: number[];
   private gateFlash = [0, 0];
-  private pinwheelSprite: { body: HTMLCanvasElement; shadow: HTMLCanvasElement; half: number } | null = null;
+  /** かざぐるまの羽根の絵（かざぐるまごと） */
+  private pinwheelSprites = new Map<number, { body: HTMLCanvasElement; shadow: HTMLCanvasElement; half: number }>();
   private spinAngle = 0;
   private spinSpeed = 0;
   private shake = 0;
@@ -527,11 +531,15 @@ export class PinballRenderer {
     this.canvas = canvas;
     this.ctx = canvas.getContext("2d", { alpha: false })!;
     this.assets = assets;
-    this.ramps = TABLE.ramps.map(rampShape);
+    this.table = assets.table;
+    this.bumperFlash = this.table.bumpers.map(() => 0);
+    this.slingFlash = this.table.slings.map(() => 0);
+    this.pinwheelFlash = this.table.pinwheels.map(() => 0);
+    this.ramps = this.table.ramps.map(rampShape);
     this.reducedMotion = typeof window !== "undefined" && window.matchMedia?.("(prefers-reduced-motion: reduce)").matches === true;
     if (assets.shape) {
       const [x0, y0, x1, y1] = assets.shape.bbox;
-      const box = TABLE.artBox;
+      const box = this.table.artBox;
       const s = Math.min(box.w / (x1 - x0), box.h / (y1 - y0)) * 0.92;
       this.shapeTransform = [s, box.x + box.w / 2 - ((x0 + x1) / 2) * s, box.y + box.h / 2 - ((y0 + y1) / 2) * s];
       const p = new Path2D();
@@ -565,7 +573,7 @@ export class PinballRenderer {
     this.glows.clear();
     this.tokens.clear();
     this.bumperSprites.clear();
-    this.pinwheelSprite = null;
+    this.pinwheelSprites.clear();
   }
 
   /** 画面の点（CSS px）→ 台の座標（mm） */
@@ -641,8 +649,8 @@ export class PinballRenderer {
           if (kind === "bumper") {
             const i = Number(arg);
             this.bumperFlash[i] = 1;
-            const b = TABLE.bumpers[i]!;
-            this.burst(b.x, b.y, 7, this.assets.theme.colors.accent, 26);
+            const b = this.table.bumpers[i];
+            if (b) this.burst(b.x, b.y, 7, this.assets.theme.colors.accent, 26);
           } else if (kind === "sling") {
             this.slingFlash[Number(arg)] = 1;
           } else if (kind === "spinner") {
@@ -652,19 +660,20 @@ export class PinballRenderer {
           } else if (kind === "shot") {
             this.shotFlash.set(arg!, 1);
           } else if (kind === "lanes") {
-            for (const x of TABLE.laneX) this.burst(x, TABLE.laneY, 6, this.assets.theme.colors.accent, 20);
+            for (const x of this.table.laneX) this.burst(x, this.table.laneY, 6, this.assets.theme.colors.accent, 20);
           } else if (kind === "standup") {
             const i = Number(arg);
             this.standupFlash[i] = 1;
-            const t = TABLE.standups[Math.floor(i / 3)]!.targets[i % 3]!;
+            const t = this.table.standups[Math.floor(i / 3)]!.targets[i % 3]!;
             this.burst((t.a.x + t.b.x) / 2 + t.face.x * 4, (t.a.y + t.b.y) / 2 + t.face.y * 4, 6, this.assets.theme.colors.accent2, 18);
           } else if (kind === "standupsAll") {
             const b = Number(arg);
             this.standupsAllFlash[b] = 1;
-            const c = TABLE.standups[b]!.center;
+            const c = this.table.standups[b]!.center;
             this.burst(c.x, c.y, 18, "#ffffff", 34, "star");
           } else if (kind === "pinwheel") {
-            this.pinwheelFlash = 1;
+            const i = Number(arg) || 0;
+            if (i < this.pinwheelFlash.length) this.pinwheelFlash[i] = 1;
           } else if (kind === "gate") {
             this.gateFlash[Number(arg)] = 1;
           }
@@ -703,7 +712,7 @@ export class PinballRenderer {
           }
           break;
         case "gacha":
-          this.burst(TABLE.scoop.x, TABLE.scoop.y, 24, this.assets.theme.colors.accent2, 46, "star");
+          this.burst(this.table.scoop.x, this.table.scoop.y, 24, this.assets.theme.colors.accent2, 46, "star");
           break;
         case "skill":
           this.flash = Math.max(this.flash, 0.35);
@@ -766,7 +775,7 @@ export class PinballRenderer {
       ctx.restore();
     }
     this.drawInsertsOff(ctx);
-    this.drawPinwheelBase(ctx);
+    this.table.pinwheels.forEach((_, i) => this.drawPinwheelBase(ctx, i));
     this.drawGI(ctx);
     this.drawEdgeShade(ctx);
     this.drawRampShadows(ctx);
@@ -775,7 +784,7 @@ export class PinballRenderer {
     ctx.restore();
 
     this.drawBumperBases(ctx);
-    for (const w of TABLE.walls) this.drawWall(ctx, w);
+    for (const w of this.table.walls) this.drawWall(ctx, w);
     this.drawStandupBanks(ctx);
     this.drawSlingBodies(ctx);
     this.drawPosts(ctx);
@@ -837,16 +846,16 @@ export class PinballRenderer {
       ctx.fillStyle = g;
       ctx.fillRect(x - r, y - r, r * 2, r * 2);
     };
-    for (const s of TABLE.slings) {
+    for (const s of this.table.slings) {
       const cx = (s.a.x + s.b.x + s.c.x) / 3;
       const cy = (s.a.y + s.b.y + s.c.y) / 3;
       spot(cx, cy, 70, GI_COLOR, 0.16);
     }
-    for (const b of TABLE.bumpers) spot(b.x, b.y, 64, colors.accent, 0.1);
-    for (const x of TABLE.laneX) spot(x, 132, 30, GI_COLOR, 0.12);
+    for (const b of this.table.bumpers) spot(b.x, b.y, 64, colors.accent, 0.1);
+    for (const x of this.table.laneX) spot(x, 132, 30, GI_COLOR, 0.12);
     for (const x of [96, 384]) spot(x, 868, 52, GI_COLOR, 0.1);
-    spot(TABLE.scoop.x, TABLE.scoop.y + 10, 46, colors.accent, 0.1);
-    for (const r of TABLE.ramps) spot(r.path[0]!.x, 622, 40, GI_COLOR, 0.08);
+    spot(this.table.scoop.x, this.table.scoop.y + 10, 46, colors.accent, 0.1);
+    for (const r of this.table.ramps) spot(r.path[0]!.x, 622, 40, GI_COLOR, 0.08);
     ctx.restore();
   }
 
@@ -883,7 +892,7 @@ export class PinballRenderer {
   private drawRecesses(ctx: CanvasRenderingContext2D): void {
     const { colors } = this.assets.theme;
     // ガチャ穴（キックアウトホール）：めっきのふちの、深い穴
-    const sc = TABLE.scoop;
+    const sc = this.table.scoop;
     const pit = ctx.createRadialGradient(sc.x + 2, sc.y + 3, 1, sc.x, sc.y, 16);
     pit.addColorStop(0, "#000000");
     pit.addColorStop(0.62, "#05040a");
@@ -916,7 +925,7 @@ export class PinballRenderer {
     chromeRing(ctx, sc.x, sc.y, 16.6, 2.6);
 
     // ドロップターゲットのみぞ
-    for (const d of TABLE.drops) {
+    for (const d of this.table.drops) {
       const x0 = d.a.x - 1.2;
       const w = d.b.x - d.a.x + 2.4;
       ctx.fillStyle = "#040507";
@@ -976,7 +985,7 @@ export class PinballRenderer {
 
   /** ランプの入口（玉がまだ床の上を転がっているところ）：床のつづきと、めっきの入口の板 */
   private drawRampFloorLower(ctx: CanvasRenderingContext2D): void {
-    for (const r of TABLE.ramps) {
+    for (const r of this.table.ramps) {
       const x = r.path[0]!.x;
       this.paintRampFloor(ctx, [{ x, y: 604 }, { x, y: RAMP_SPLIT_Y }]);
       // 入口の板（床に乗っている薄いめっきの板）
@@ -998,7 +1007,7 @@ export class PinballRenderer {
   private drawBumperBases(ctx: CanvasRenderingContext2D): void {
     const { colors } = this.assets.theme;
     const k = this.k;
-    for (const b of TABLE.bumpers) {
+    for (const b of this.table.bumpers) {
       const body = new Path2D();
       body.arc(b.x + 3.5, b.y + 6, b.r + 3, 0, TAU);
       softFill(ctx, k, body, "rgba(0,0,0,0.6)", 7);
@@ -1089,7 +1098,7 @@ export class PinballRenderer {
 
   /** スリングショットの頂点にあるポストか（カバーの下に描くので、ふつうのポストとは別に描く） */
   private isSlingPost(x: number, y: number): boolean {
-    return TABLE.slings.some((s) => [s.a, s.b, s.c].some((v) => Math.abs(v.x - x) < 0.01 && Math.abs(v.y - y) < 0.01));
+    return this.table.slings.some((s) => [s.a, s.b, s.c].some((v) => Math.abs(v.x - x) < 0.01 && Math.abs(v.y - y) < 0.01));
   }
 
   /**
@@ -1100,7 +1109,7 @@ export class PinballRenderer {
   private drawSlingBodies(ctx: CanvasRenderingContext2D): void {
     const { colors } = this.assets.theme;
     const k = this.k;
-    for (const s of TABLE.slings) {
+    for (const s of this.table.slings) {
       // カバーの下：外がわの2辺のゴムと、3本のポストのゴムの輪
       rubberBand(ctx, k, polyline([s.a, s.b, s.c]), 6, { lift: 0.9 });
       for (const v of [s.a, s.b, s.c]) rubberRing(ctx, k, v.x, v.y, 5.3, 2.6, { lift: 0.9 });
@@ -1153,8 +1162,8 @@ export class PinballRenderer {
    */
   private drawStandupBanks(ctx: CanvasRenderingContext2D): void {
     const k = this.k;
-    TABLE.standups.forEach((bank, bi) => {
-      const back = TABLE.walls.filter((w) => w.look === "standup-back")[bi];
+    this.table.standups.forEach((bank, bi) => {
+      const back = this.table.walls.filter((w) => w.look === "standup-back")[bi];
       if (!back) return;
       const [a, b] = [back.pts[0]!, back.pts[1]!];
       const body = capsulePath(a, b, back.r);
@@ -1197,7 +1206,7 @@ export class PinballRenderer {
    */
   private paintStandup(ctx: CanvasRenderingContext2D, index: number, on: number): void {
     const { colors } = this.assets.theme;
-    const t = TABLE.standups[Math.floor(index / 3)]!.targets[index % 3]!;
+    const t = this.table.standups[Math.floor(index / 3)]!.targets[index % 3]!;
     const ux = (t.b.x - t.a.x) / (Math.hypot(t.b.x - t.a.x, t.b.y - t.a.y) || 1);
     const uy = (t.b.y - t.a.y) / (Math.hypot(t.b.x - t.a.x, t.b.y - t.a.y) || 1);
     const half = Math.hypot(t.b.x - t.a.x, t.b.y - t.a.y) / 2 + 1.5;
@@ -1244,7 +1253,7 @@ export class PinballRenderer {
       const all = this.standupsAllFlash[Math.floor(i / 3)]!;
       const on = g.standups[i] ? 1 : all > 0 ? (Math.sin(this.time * 50) > 0 ? all : 0) : 0;
       if (on <= 0 && f <= 0) continue;
-      const t = TABLE.standups[Math.floor(i / 3)]!.targets[i % 3]!;
+      const t = this.table.standups[Math.floor(i / 3)]!.targets[i % 3]!;
       const cx = (t.a.x + t.b.x) / 2;
       const cy = (t.a.y + t.b.y) / 2;
       ctx.globalCompositeOperation = "lighter";
@@ -1257,9 +1266,9 @@ export class PinballRenderer {
   }
 
   /** かざぐるまの下の床（印刷の輪）と、軸の影 */
-  private drawPinwheelBase(ctx: CanvasRenderingContext2D): void {
+  private drawPinwheelBase(ctx: CanvasRenderingContext2D, index: number): void {
     const { colors } = this.assets.theme;
-    const pw = TABLE.pinwheel;
+    const pw = this.table.pinwheels[index]!;
     const R = pw.len + pw.r + 3;
     ctx.save();
     ctx.lineWidth = 1.2;
@@ -1282,9 +1291,9 @@ export class PinballRenderer {
   }
 
   /** かざぐるまの羽根（前もって描いた絵を回して使う）と、その影 */
-  private buildPinwheelSprite(): { body: HTMLCanvasElement; shadow: HTMLCanvasElement; half: number } {
+  private buildPinwheelSprite(index: number): { body: HTMLCanvasElement; shadow: HTMLCanvasElement; half: number } {
     const { colors } = this.assets.theme;
-    const pw = TABLE.pinwheel;
+    const pw = this.table.pinwheels[index]!;
     const k = this.k;
     const half = pw.len + pw.r + 2;
     const px = Math.max(8, Math.ceil(half * 2 * k));
@@ -1343,12 +1352,16 @@ export class PinballRenderer {
   }
 
   /** かざぐるま：回る羽根（速いときは残像）・影・まんなかのめっきの軸 */
-  private drawPinwheel(ctx: CanvasRenderingContext2D, g: Game, dt: number): void {
+  private drawPinwheel(ctx: CanvasRenderingContext2D, g: Game, dt: number, index: number): void {
     const { colors } = this.assets.theme;
-    const pw = TABLE.pinwheel;
-    if (!this.pinwheelSprite) this.pinwheelSprite = this.buildPinwheelSprite();
-    const { body, shadow: sh, half } = this.pinwheelSprite;
-    const { angle, omega } = g.world.pinwheel;
+    const pw = this.table.pinwheels[index]!;
+    let sprite = this.pinwheelSprites.get(index);
+    if (!sprite) {
+      sprite = this.buildPinwheelSprite(index);
+      this.pinwheelSprites.set(index, sprite);
+    }
+    const { body, shadow: sh, half } = sprite;
+    const { angle, omega } = g.world.pinwheels[index]!;
     const draw = (img: HTMLCanvasElement, x: number, y: number, a: number, alpha: number) => {
       ctx.save();
       ctx.globalAlpha = alpha;
@@ -1366,11 +1379,12 @@ export class PinballRenderer {
       draw(body, pw.x, pw.y, angle - step, 0.3);
     }
     draw(body, pw.x, pw.y, angle, 1);
-    if (this.pinwheelFlash > 0) {
+    const flash = this.pinwheelFlash[index]!;
+    if (flash > 0) {
       ctx.globalCompositeOperation = "lighter";
-      this.lightAt(ctx, pw.x, pw.y, 34, colors.accent, this.pinwheelFlash * 0.75);
+      this.lightAt(ctx, pw.x, pw.y, 34, colors.accent, flash * 0.75);
       ctx.globalCompositeOperation = "source-over";
-      this.pinwheelFlash = Math.max(0, this.pinwheelFlash - dt * 5);
+      this.pinwheelFlash[index] = Math.max(0, flash - dt * 5);
     }
     // 軸（光は回らない）
     ctx.beginPath();
@@ -1385,9 +1399,24 @@ export class PinballRenderer {
   private drawPosts(ctx: CanvasRenderingContext2D): void {
     const { colors } = this.assets.theme;
     const k = this.k;
-    for (const ci of TABLE.circles) {
+    for (const ci of this.table.circles) {
       if (this.isSlingPost(ci.x, ci.y)) continue;
-      if (ci.look === "lane-post") {
+      if (ci.look === "peg") {
+        // くぎ：しんちゅう（金色）の丸い頭。ゴムの輪はなく、右下に小さな影
+        ctx.fillStyle = "rgba(0,0,0,0.5)";
+        ctx.beginPath();
+        ctx.arc(ci.x + 1.1, ci.y + 1.8, ci.r * 0.95, 0, TAU);
+        ctx.fill();
+        const brass = ctx.createRadialGradient(ci.x - ci.r * 0.4, ci.y - ci.r * 0.45, ci.r * 0.05, ci.x, ci.y, ci.r);
+        brass.addColorStop(0, "#fff7dc");
+        brass.addColorStop(0.35, "#ecc86e");
+        brass.addColorStop(0.8, "#9c6d22");
+        brass.addColorStop(1, "#4d340b");
+        ctx.fillStyle = brass;
+        ctx.beginPath();
+        ctx.arc(ci.x, ci.y, ci.r, 0, TAU);
+        ctx.fill();
+      } else if (ci.look === "lane-post") {
         plasticPost(ctx, k, ci.x, ci.y, ci.r + 0.6, colors.accent2, { lift: 0.9 });
       } else {
         rubberRing(ctx, k, ci.x, ci.y, ci.r + 0.3, 2.6, { lift: 0.9 });
@@ -1420,7 +1449,7 @@ export class PinballRenderer {
   /** 打ち出しレーン：出口の一方通行のゲートと、プランジャーのケース */
   private drawShooterParts(ctx: CanvasRenderingContext2D): void {
     const k = this.k;
-    const gate = TABLE.shooterGate;
+    const gate = this.table.shooterGate;
     chromeTube(ctx, k, polyline([gate.a, gate.b]), 2.6, { lift: 0.9 });
     chromeDisc(ctx, gate.b.x, gate.b.y, 2.4, true);
     // 外わくがわの軸受け
@@ -1524,18 +1553,18 @@ export class PinballRenderer {
     const { colors } = this.assets.theme;
     const lit = on > 0;
     if (id.kind === "lane") {
-      const x = TABLE.laneX[id.index]!;
+      const x = this.table.laneX[id.index]!;
       this.paintInsert(ctx, circlePathAt(x, 128, 12), { x: x - 12, y: 116, w: 24, h: 24 }, color ?? colors.accent, on);
       this.insertText(ctx, LANE_LETTERS[id.index]!, x, 129, 14, color ?? colors.accent, lit);
     } else if (id.kind === "shot") {
-      const at = shotPos(id.id);
+      const at = shotPos(this.table, id.id);
       this.paintInsert(ctx, this.arrowShape(at), { x: at.x - 15, y: at.y - 15, w: 30, h: 30 }, color ?? colors.accent, on);
     } else if (id.kind === "kick") {
       const x = KICKER_X[id.index]!;
       this.paintInsert(ctx, this.pillShape(x - 13, 822, 26, 16, 5), { x: x - 13, y: 822, w: 26, h: 16 }, color ?? colors.accent2, on);
       this.insertText(ctx, "キック", x, 830.5, 7, color ?? colors.accent2, lit);
     } else if (id.kind === "standup") {
-      const p = standupInsertPos(id.index);
+      const p = standupInsertPos(this.table, id.index);
       this.paintInsert(ctx, circlePathAt(p.x, p.y, 5.5), { x: p.x - 5.5, y: p.y - 5.5, w: 11, h: 11 }, color ?? colors.accent2, on);
     } else if (id.kind === "bonus") {
       const x = 200 + id.index * 20;
@@ -1551,7 +1580,7 @@ export class PinballRenderer {
   private drawInsertsOff(ctx: CanvasRenderingContext2D): void {
     const { colors } = this.assets.theme;
     for (let i = 0; i < 4; i += 1) this.drawInsert(ctx, { kind: "lane", index: i }, 0);
-    for (const s of TABLE.shots) this.drawInsert(ctx, { kind: "shot", id: s.id }, 0);
+    for (const s of this.table.shots) this.drawInsert(ctx, { kind: "shot", id: s.id }, 0);
     for (let i = 0; i < 2; i += 1) this.drawInsert(ctx, { kind: "kick", index: i }, 0);
     for (let i = 0; i < 5; i += 1) this.drawInsert(ctx, { kind: "bonus", index: i }, 0);
     for (let i = 0; i < 6; i += 1) this.drawInsert(ctx, { kind: "standup", index: i }, 0);
@@ -1782,7 +1811,7 @@ export class PinballRenderer {
     this.drawKickers(ctx, g);
     this.drawSpinner(ctx, dt);
     this.drawStandupsLit(ctx, g, dt);
-    this.drawPinwheel(ctx, g, dt);
+    this.table.pinwheels.forEach((_, i) => this.drawPinwheel(ctx, g, dt, i));
     this.drawBumpers(ctx, dt);
     this.drawSlings(ctx, dt);
     this.drawGates(ctx, g);
@@ -1823,14 +1852,14 @@ export class PinballRenderer {
     const lit: { id: InsertId; on: number; color: string; x: number; y: number; r: number }[] = [];
 
     // 上のレーン（スキルショットのレーンは点滅）
-    TABLE.laneX.forEach((x, i) => {
+    this.table.laneX.forEach((x, i) => {
       const skill = g.skillLane === i;
       if (!g.lanes[i] && !skill) return;
       lit.push({ id: { kind: "lane", index: i }, on: skill ? blink(3) : 1, color: skill ? colors.accent2 : colors.accent, x, y: 128, r: 26 });
     });
     // ショットの矢印：コンボ受付中・ジャックポット・ガチャ穴が開いているとき
     const comboOn = g.clock - g.lastMajorAt < 4 && g.combo >= 1;
-    for (const s of TABLE.shots) {
+    for (const s of this.table.shots) {
       let on = 0;
       let color = colors.accent;
       if (g.jackpots[s.id]) {
@@ -1870,7 +1899,7 @@ export class PinballRenderer {
       const all = this.standupsAllFlash[Math.floor(i / 3)]!;
       const on = g.standups[i] ? 1 : all > 0 ? blink(8) * all : 0;
       if (on > 0) {
-        const p = standupInsertPos(i);
+        const p = standupInsertPos(this.table, i);
         lit.push({ id: { kind: "standup", index: i }, on, color: colors.accent2, x: p.x, y: p.y, r: 15 });
       }
     }
@@ -1895,7 +1924,7 @@ export class PinballRenderer {
     const { colors } = this.assets.theme;
     const done = g.mode === "conquest" ? STAMP_COUNT : collectedCount(g);
     const ratio = done / STAMP_COUNT;
-    const box = TABLE.artBox;
+    const box = this.table.artBox;
     const [s, tx, ty] = this.shapeTransform;
     ctx.save();
     ctx.transform(s, 0, 0, s, tx, ty);
@@ -1937,7 +1966,7 @@ export class PinballRenderer {
     const open = g.world.dropsUp.every((u) => !u);
     if (!open && !g.superLit && !g.scoopBall) return;
     const { colors } = this.assets.theme;
-    const sc = TABLE.scoop;
+    const sc = this.table.scoop;
     const color = g.superLit ? "#ff9de2" : colors.accent;
     ctx.globalCompositeOperation = "lighter";
     this.lightAt(ctx, sc.x, sc.y, 34, color, 0.55 + 0.25 * Math.sin(this.time * 6));
@@ -1958,7 +1987,7 @@ export class PinballRenderer {
     if (g.clock >= g.magnetUntil || g.phase === "over") return;
     const fade = Math.min(1, (g.magnetUntil - g.clock) / 0.8);
     const color = "#7df9ff";
-    const mouth = { x: TABLE.scoop.x, y: 549 };
+    const mouth = { x: this.table.scoop.x, y: 549 };
     ctx.globalCompositeOperation = "lighter";
     this.lightAt(ctx, mouth.x, mouth.y + 18, 70, color, (0.3 + 0.12 * Math.sin(this.time * 7)) * fade);
     ctx.lineCap = "round";
@@ -1974,7 +2003,7 @@ export class PinballRenderer {
     ctx.strokeStyle = rgba(color, 0.85 * fade);
     ctx.lineWidth = 1.8;
     ctx.beginPath();
-    ctx.arc(TABLE.scoop.x, TABLE.scoop.y, 18, 0, TAU);
+    ctx.arc(this.table.scoop.x, this.table.scoop.y, 18, 0, TAU);
     ctx.stroke();
     ctx.globalCompositeOperation = "source-over";
   }
@@ -1982,7 +2011,7 @@ export class PinballRenderer {
   /** ドロップターゲット：起きているときは上の面と手前の面が見える（当たり判定の 7mm の中に収める） */
   private drawDrops(ctx: CanvasRenderingContext2D, g: Game): void {
     const { colors } = this.assets.theme;
-    TABLE.drops.forEach((d, i) => {
+    this.table.drops.forEach((d, i) => {
       const x0 = d.a.x;
       const w = d.b.x - d.a.x;
       const y = d.a.y;
@@ -2107,7 +2136,7 @@ export class PinballRenderer {
     if (g.mode !== "normal") return;
     const { colors } = this.assets.theme;
     for (const l of g.lit) {
-      const spot = TABLE.itemSpots[l.spot]!;
+      const spot = this.table.itemSpots[l.spot]!;
       const bob = Math.sin(this.time * 3 + l.spot) * 2.5;
       const x = spot.x;
       const y = spot.y + bob;
@@ -2154,8 +2183,9 @@ export class PinballRenderer {
    * lit は当たった瞬間の絵（胴が明るく光り、リングが下がって細く見える）
    */
   private bumperSprite(i: number, lit: boolean): HTMLCanvasElement {
-    const b = TABLE.bumpers[i]!;
-    const item = this.assets.bumperItems[i];
+    const b = this.table.bumpers[i]!;
+    const items = this.assets.bumperItems;
+    const item = items.length ? items[i % items.length] : undefined;
     const img = item?.image ? this.images.get(item.image) : undefined;
     const ready = Boolean(img && img.complete && img.naturalWidth);
     const key = `${i}|${lit ? 1 : 0}|${ready ? 1 : 0}`;
@@ -2239,7 +2269,7 @@ export class PinballRenderer {
 
   private drawBumpers(ctx: CanvasRenderingContext2D, dt: number): void {
     const { colors } = this.assets.theme;
-    TABLE.bumpers.forEach((b, i) => {
+    this.table.bumpers.forEach((b, i) => {
       const f = this.bumperFlash[i]!;
       const half = b.r + 3;
       if (f > 0) {
@@ -2260,7 +2290,7 @@ export class PinballRenderer {
   /** スリングショットのはじく面（ゴム）。当たると外へふくらみ、カバーが光る */
   private drawSlings(ctx: CanvasRenderingContext2D, dt: number): void {
     const { colors } = this.assets.theme;
-    TABLE.slings.forEach((s, i) => {
+    this.table.slings.forEach((s, i) => {
       const f = this.slingFlash[i]!;
       const mx = (s.a.x + s.c.x) / 2;
       const my = (s.a.y + s.c.y) / 2;
@@ -2305,7 +2335,7 @@ export class PinballRenderer {
     if (!g.world.outlaneGate[0] && !g.world.outlaneGate[1]) return;
     const left = g.gateUntil - g.clock;
     const blinkA = left < 2 ? (Math.sin(this.time * 30) > 0 ? 1 : 0.3) : 1;
-    TABLE.outlaneGates.forEach((gate, i) => {
+    this.table.outlaneGates.forEach((gate, i) => {
       if (!g.world.outlaneGate[i]) return;
       // はね返した瞬間は強く光る
       const kick = this.gateFlash[i]!;
@@ -2439,7 +2469,7 @@ export class PinballRenderer {
       let y = b.y;
       let r = BALL_R;
       if (isRamp && b.ramp) {
-        const def = TABLE.ramps.find((rp) => rp.id === b.ramp)!;
+        const def = this.table.ramps.find((rp) => rp.id === b.ramp)!;
         const p = rampPoint(def, b.s);
         x = p.x;
         y = p.y;
@@ -2463,7 +2493,7 @@ export class PinballRenderer {
   /** プランジャー：めっきの棒とばね、先の黒いゴム */
   private drawPlunger(ctx: CanvasRenderingContext2D, g: Game): void {
     const pull = g.world.plungerPull;
-    const top = TABLE.plungerRest.y + BALL_R + 1 + pull * PLUNGER_TRAVEL;
+    const top = this.table.plungerRest.y + BALL_R + 1 + pull * PLUNGER_TRAVEL;
     const x = 504;
     // 棒
     const rod = ctx.createLinearGradient(x - 2.5, 0, x + 2.5, 0);
