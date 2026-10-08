@@ -240,7 +240,7 @@ export default async function HomePage({
                     initialCoinBalance={coins.balance}
                   />
                 </HomeScene>
-                <WanderingFrenchie level={expProgress.level} skin={dogSkin} />
+                <WanderingFrenchie level={expProgress.level} skin={dogSkin} redDrops={redCoins !== null} />
                 <HomeWeatherChip />
 
                 <div className="absolute right-2 top-2 z-40 flex w-[132px] flex-col" style={{ gap: 0 }}>

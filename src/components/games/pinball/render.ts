@@ -68,6 +68,7 @@ type InsertId =
   | { kind: "shot"; id: ShotId }
   | { kind: "kick"; index: number }
   | { kind: "bonus"; index: number }
+  | { kind: "standup"; index: number }
   | { kind: "save" };
 
 /** ボールセーブのランプの色 */
@@ -76,6 +77,22 @@ const SAVE_COLOR = "#7df9ff";
 function circlePathAt(x: number, y: number, r: number): Path2D {
   const path = new Path2D();
   path.arc(x, y, r, 0, TAU);
+  return path;
+}
+
+/** スタンドアップターゲットの前（床）のランプの位置 */
+function standupInsertPos(index: number): Pt {
+  const t = TABLE.standups[Math.floor(index / 3)]!.targets[index % 3]!;
+  return { x: (t.a.x + t.b.x) / 2 + t.face.x * 19, y: (t.a.y + t.b.y) / 2 + t.face.y * 19 };
+}
+
+/** 線分 a→b を太さ r の丸い棒にした形（スタンドアップターゲット・その台） */
+function capsulePath(a: Pt, b: Pt, r: number): Path2D {
+  const ang = Math.atan2(b.y - a.y, b.x - a.x);
+  const path = new Path2D();
+  path.arc(a.x, a.y, r, ang + Math.PI / 2, ang - Math.PI / 2);
+  path.arc(b.x, b.y, r, ang - Math.PI / 2, ang + Math.PI / 2);
+  path.closePath();
   return path;
 }
 
@@ -491,6 +508,11 @@ export class PinballRenderer {
   private slingFlash = [0, 0];
   private shotFlash = new Map<string, number>();
   private kickFlash = [0, 0];
+  private standupFlash = [0, 0, 0, 0, 0, 0];
+  private standupsAllFlash = [0, 0];
+  private pinwheelFlash = 0;
+  private gateFlash = [0, 0];
+  private pinwheelSprite: { body: HTMLCanvasElement; shadow: HTMLCanvasElement; half: number } | null = null;
   private spinAngle = 0;
   private spinSpeed = 0;
   private shake = 0;
@@ -542,6 +564,7 @@ export class PinballRenderer {
     this.glows.clear();
     this.tokens.clear();
     this.bumperSprites.clear();
+    this.pinwheelSprite = null;
   }
 
   /** 画面の点（CSS px）→ 台の座標（mm） */
@@ -629,6 +652,20 @@ export class PinballRenderer {
             this.shotFlash.set(arg!, 1);
           } else if (kind === "lanes") {
             for (const x of TABLE.laneX) this.burst(x, TABLE.laneY, 6, this.assets.theme.colors.accent, 20);
+          } else if (kind === "standup") {
+            const i = Number(arg);
+            this.standupFlash[i] = 1;
+            const t = TABLE.standups[Math.floor(i / 3)]!.targets[i % 3]!;
+            this.burst((t.a.x + t.b.x) / 2 + t.face.x * 4, (t.a.y + t.b.y) / 2 + t.face.y * 4, 6, this.assets.theme.colors.accent2, 18);
+          } else if (kind === "standupsAll") {
+            const b = Number(arg);
+            this.standupsAllFlash[b] = 1;
+            const c = TABLE.standups[b]!.center;
+            this.burst(c.x, c.y, 18, "#ffffff", 34, "star");
+          } else if (kind === "pinwheel") {
+            this.pinwheelFlash = 1;
+          } else if (kind === "gate") {
+            this.gateFlash[Number(arg)] = 1;
           }
           break;
         }
@@ -729,6 +766,7 @@ export class PinballRenderer {
       ctx.restore();
     }
     this.drawInsertsOff(ctx);
+    this.drawPinwheelBase(ctx);
     this.drawGI(ctx);
     this.drawEdgeShade(ctx);
     this.drawRampShadows(ctx);
@@ -738,6 +776,7 @@ export class PinballRenderer {
 
     this.drawBumperBases(ctx);
     for (const w of TABLE.walls) this.drawWall(ctx, w);
+    this.drawStandupBanks(ctx);
     this.drawSlingBodies(ctx);
     this.drawPosts(ctx);
     this.drawSpinnerFrame(ctx);
@@ -985,7 +1024,23 @@ export class PinballRenderer {
   }
 
   private drawWall(ctx: CanvasRenderingContext2D, w: WallDef): void {
-    if (w.look === "frame" || w.look === "sling") return;
+    if (w.look === "frame" || w.look === "sling" || w.look === "standup-back") return;
+    if (w.look === "ramp-roof") {
+      // ランプの下の支え（入口の箱の山形の屋根）。透明なランプごしに、黒い支えとして見える
+      const path = polyline(w.pts);
+      ctx.save();
+      ctx.lineCap = "round";
+      ctx.lineJoin = "round";
+      ctx.lineWidth = w.r * 2;
+      ctx.strokeStyle = "#20242a";
+      ctx.stroke(path);
+      ctx.translate(-0.5, -0.8);
+      ctx.lineWidth = 1;
+      ctx.strokeStyle = "rgba(255,255,255,0.22)";
+      ctx.stroke(path);
+      ctx.restore();
+      return;
+    }
     // 外わくにかさなるだけの線（アウトレーンの下の外がわ）は外わくで描いてある
     if (w.pts.every((p) => p.x <= 0.5)) return;
     const k = this.k;
@@ -1090,6 +1145,240 @@ export class PinballRenderer {
       // カバーの上に出ているねじ（はじく面の両はしは drawSlings でゴムの上に描く）
       chromeDisc(ctx, s.b.x, s.b.y, 2.6, true);
     }
+  }
+
+  /**
+   * スタンドアップターゲットの台（黒いプラスチックの台・ねじ）と、消えているときの的。
+   * 的は台の前のへりに並び、光ると drawStandupsLit で明るく描きなおす
+   */
+  private drawStandupBanks(ctx: CanvasRenderingContext2D): void {
+    const k = this.k;
+    TABLE.standups.forEach((bank, bi) => {
+      const back = TABLE.walls.filter((w) => w.look === "standup-back")[bi];
+      if (!back) return;
+      const [a, b] = [back.pts[0]!, back.pts[1]!];
+      const body = capsulePath(a, b, back.r);
+      // 台の影と本体（左上が明るいプラスチック）
+      ctx.save();
+      shadow(ctx, k, 1.8, 3, 3.4, "rgba(0,0,0,0.6)");
+      const g = ctx.createLinearGradient(a.x, a.y - 8, a.x, a.y + 8);
+      g.addColorStop(0, "#4b525c");
+      g.addColorStop(0.45, "#262a31");
+      g.addColorStop(1, "#111317");
+      ctx.fillStyle = g;
+      ctx.fill(body);
+      noShadow(ctx);
+      ctx.lineWidth = 0.7;
+      ctx.strokeStyle = "rgba(255,255,255,0.28)";
+      ctx.stroke(body);
+      ctx.restore();
+      // 上の面のつや
+      ctx.save();
+      ctx.clip(body);
+      ctx.lineWidth = 1.4;
+      ctx.lineCap = "round";
+      ctx.strokeStyle = "rgba(255,255,255,0.18)";
+      const off = { x: -bank.targets[0].face.x * 3, y: -bank.targets[0].face.y * 3 };
+      ctx.beginPath();
+      ctx.moveTo(a.x + off.x, a.y + off.y);
+      ctx.lineTo(b.x + off.x, b.y + off.y);
+      ctx.stroke();
+      ctx.restore();
+      // 両はしのねじ
+      for (const t of [0.04, 0.96]) chromeDisc(ctx, a.x + (b.x - a.x) * t, a.y + (b.y - a.y) * t, 2.1, true);
+      // 消えている的
+      bank.targets.forEach((_, ti) => this.paintStandup(ctx, bi * 3 + ti, 0));
+    });
+  }
+
+  /**
+   * スタンドアップターゲット1つ（on: 0 消えている 〜 1 点いている）。台の前のへりから少し飛び出した、
+   * 角の丸い色つきプラスチックの板（玉が当たる前の面は、当たり判定の前の面と同じ位置）
+   */
+  private paintStandup(ctx: CanvasRenderingContext2D, index: number, on: number): void {
+    const { colors } = this.assets.theme;
+    const t = TABLE.standups[Math.floor(index / 3)]!.targets[index % 3]!;
+    const ux = (t.b.x - t.a.x) / (Math.hypot(t.b.x - t.a.x, t.b.y - t.a.y) || 1);
+    const uy = (t.b.y - t.a.y) / (Math.hypot(t.b.x - t.a.x, t.b.y - t.a.y) || 1);
+    const half = Math.hypot(t.b.x - t.a.x, t.b.y - t.a.y) / 2 + 1.5;
+    const cx = (t.a.x + t.b.x) / 2;
+    const cy = (t.a.y + t.b.y) / 2;
+    const corner = (s: number, d: number): Pt => ({ x: cx + ux * s + t.face.x * d, y: cy + uy * s + t.face.y * d });
+    const pts = [corner(-half, -2.5), corner(half, -2.5), corner(half, 2.5), corner(-half, 2.5)];
+    const block = roundedPolygon(pts, 1.4);
+    const g = ctx.createLinearGradient(cx - t.face.x * 2.5, cy - t.face.y * 2.5, cx + t.face.x * 2.5, cy + t.face.y * 2.5);
+    if (on > 0) {
+      g.addColorStop(0, "#ffffff");
+      g.addColorStop(0.45, lighten(colors.accent2, 0.45));
+      g.addColorStop(1, lighten(colors.accent2, 0.1));
+    } else {
+      g.addColorStop(0, lighten(colors.accent2, 0.05));
+      g.addColorStop(1, darken(colors.accent2, 0.5));
+    }
+    ctx.fillStyle = g;
+    ctx.fill(block);
+    ctx.lineWidth = 0.6;
+    ctx.strokeStyle = "rgba(0,0,0,0.6)";
+    ctx.stroke(block);
+    // 前の面のへりのつやと、まんなかの印（点いているときはテーマの色で光る）
+    ctx.lineWidth = 0.9;
+    ctx.lineCap = "round";
+    ctx.strokeStyle = on > 0 ? "rgba(255,255,255,0.95)" : "rgba(255,255,255,0.4)";
+    const e0 = corner(-half + 1.6, 1.5);
+    const e1 = corner(half - 1.6, 1.5);
+    ctx.beginPath();
+    ctx.moveTo(e0.x, e0.y);
+    ctx.lineTo(e1.x, e1.y);
+    ctx.stroke();
+    ctx.fillStyle = on > 0 ? rgba(colors.accent, 1) : "rgba(255,255,255,0.55)";
+    ctx.beginPath();
+    ctx.arc(cx, cy, 1.4, 0, TAU);
+    ctx.fill();
+  }
+
+  /** 光っているスタンドアップターゲット（当たった瞬間は白く光る） */
+  private drawStandupsLit(ctx: CanvasRenderingContext2D, g: Game, dt: number): void {
+    const { colors } = this.assets.theme;
+    for (let i = 0; i < 6; i += 1) {
+      const f = this.standupFlash[i]!;
+      const all = this.standupsAllFlash[Math.floor(i / 3)]!;
+      const on = g.standups[i] ? 1 : all > 0 ? (Math.sin(this.time * 50) > 0 ? all : 0) : 0;
+      if (on <= 0 && f <= 0) continue;
+      const t = TABLE.standups[Math.floor(i / 3)]!.targets[i % 3]!;
+      const cx = (t.a.x + t.b.x) / 2;
+      const cy = (t.a.y + t.b.y) / 2;
+      ctx.globalCompositeOperation = "lighter";
+      this.lightAt(ctx, cx + t.face.x * 4, cy + t.face.y * 4, 20 + f * 10, colors.accent2, Math.max(on * 0.55, f));
+      ctx.globalCompositeOperation = "source-over";
+      this.paintStandup(ctx, i, Math.max(on, f));
+      if (f > 0) this.standupFlash[i] = Math.max(0, f - dt * 5);
+    }
+    for (let b = 0; b < 2; b += 1) if (this.standupsAllFlash[b]! > 0) this.standupsAllFlash[b] = Math.max(0, this.standupsAllFlash[b]! - dt * 0.9);
+  }
+
+  /** かざぐるまの下の床（印刷の輪）と、軸の影 */
+  private drawPinwheelBase(ctx: CanvasRenderingContext2D): void {
+    const { colors } = this.assets.theme;
+    const pw = TABLE.pinwheel;
+    const R = pw.len + pw.r + 3;
+    ctx.save();
+    ctx.lineWidth = 1.2;
+    ctx.strokeStyle = rgba(colors.accent, 0.4);
+    ctx.setLineDash([3, 2.4]);
+    ctx.beginPath();
+    ctx.arc(pw.x, pw.y, R, 0, TAU);
+    ctx.stroke();
+    ctx.setLineDash([]);
+    ctx.lineWidth = 0.8;
+    ctx.strokeStyle = rgba(colors.accent, 0.22);
+    for (let i = 0; i < 12; i += 1) {
+      const a = (i / 12) * TAU;
+      ctx.beginPath();
+      ctx.moveTo(pw.x + Math.cos(a) * (pw.hubR + 3), pw.y + Math.sin(a) * (pw.hubR + 3));
+      ctx.lineTo(pw.x + Math.cos(a) * (R - 2), pw.y + Math.sin(a) * (R - 2));
+      ctx.stroke();
+    }
+    ctx.restore();
+  }
+
+  /** かざぐるまの羽根（前もって描いた絵を回して使う）と、その影 */
+  private buildPinwheelSprite(): { body: HTMLCanvasElement; shadow: HTMLCanvasElement; half: number } {
+    const { colors } = this.assets.theme;
+    const pw = TABLE.pinwheel;
+    const k = this.k;
+    const half = pw.len + pw.r + 2;
+    const px = Math.max(8, Math.ceil(half * 2 * k));
+    const paint = (target: HTMLCanvasElement, silhouette: boolean) => {
+      const ctx = target.getContext("2d")!;
+      ctx.setTransform(k, 0, 0, k, px / 2, px / 2);
+      const palette = [colors.accent2, colors.accent, colors.accent2, colors.accent];
+      for (let i = 0; i < pw.arms; i += 1) {
+        const a = (i / pw.arms) * TAU;
+        const ux = Math.cos(a);
+        const uy = Math.sin(a);
+        const from = { x: ux * (pw.hubR - 1), y: uy * (pw.hubR - 1) };
+        const to = { x: ux * pw.len, y: uy * pw.len };
+        const blade = capsulePath(from, to, pw.r);
+        if (silhouette) {
+          ctx.fillStyle = "#000";
+          ctx.fill(blade);
+          continue;
+        }
+        const nx = -uy;
+        const ny = ux;
+        const color = palette[i % palette.length]!;
+        const g = ctx.createLinearGradient(nx * pw.r, ny * pw.r, -nx * pw.r, -ny * pw.r);
+        g.addColorStop(0, lighten(color, 0.45));
+        g.addColorStop(0.5, rgba(color, 1));
+        g.addColorStop(1, darken(color, 0.4));
+        ctx.fillStyle = g;
+        ctx.fill(blade);
+        ctx.lineWidth = 0.55;
+        ctx.strokeStyle = "rgba(0,0,0,0.55)";
+        ctx.stroke(blade);
+        // 羽根の折り目（かざぐるまの紙の折り目）と、先のつや
+        ctx.lineWidth = 0.7;
+        ctx.strokeStyle = "rgba(255,255,255,0.75)";
+        ctx.beginPath();
+        ctx.moveTo(from.x + nx * 1.2, from.y + ny * 1.2);
+        ctx.lineTo(to.x + nx * 1.2, to.y + ny * 1.2);
+        ctx.stroke();
+        ctx.fillStyle = "rgba(255,255,255,0.55)";
+        ctx.beginPath();
+        ctx.arc(to.x + nx * 1.1, to.y + ny * 1.1, 1.1, 0, TAU);
+        ctx.fill();
+      }
+    };
+    const body = makeCanvas(px, px);
+    paint(body, false);
+    // 影：黒い形をぼかす
+    const sil = makeCanvas(px, px);
+    paint(sil, true);
+    const shadowCanvas = makeCanvas(px, px);
+    const sctx = shadowCanvas.getContext("2d")!;
+    sctx.filter = `blur(${Math.max(1, 1.6 * k)}px)`;
+    sctx.globalAlpha = 0.55;
+    sctx.drawImage(sil, 0, 0);
+    return { body, shadow: shadowCanvas, half };
+  }
+
+  /** かざぐるま：回る羽根（速いときは残像）・影・まんなかのめっきの軸 */
+  private drawPinwheel(ctx: CanvasRenderingContext2D, g: Game, dt: number): void {
+    const { colors } = this.assets.theme;
+    const pw = TABLE.pinwheel;
+    if (!this.pinwheelSprite) this.pinwheelSprite = this.buildPinwheelSprite();
+    const { body, shadow: sh, half } = this.pinwheelSprite;
+    const { angle, omega } = g.world.pinwheel;
+    const draw = (img: HTMLCanvasElement, x: number, y: number, a: number, alpha: number) => {
+      ctx.save();
+      ctx.globalAlpha = alpha;
+      ctx.translate(x, y);
+      ctx.rotate(a);
+      ctx.drawImage(img, -half, -half, half * 2, half * 2);
+      ctx.restore();
+    };
+    draw(sh, pw.x + 2.2, pw.y + 3.6, angle, 1);
+    const fast = Math.abs(omega);
+    if (fast > 4.5) {
+      // 回る向きと逆に、うすい残像
+      const step = Math.min(0.5, fast * 0.022) * Math.sign(omega);
+      draw(body, pw.x, pw.y, angle - step * 2, 0.16);
+      draw(body, pw.x, pw.y, angle - step, 0.3);
+    }
+    draw(body, pw.x, pw.y, angle, 1);
+    if (this.pinwheelFlash > 0) {
+      ctx.globalCompositeOperation = "lighter";
+      this.lightAt(ctx, pw.x, pw.y, 34, colors.accent, this.pinwheelFlash * 0.75);
+      ctx.globalCompositeOperation = "source-over";
+      this.pinwheelFlash = Math.max(0, this.pinwheelFlash - dt * 5);
+    }
+    // 軸（光は回らない）
+    ctx.beginPath();
+    ctx.arc(pw.x + 0.8, pw.y + 1.3, pw.hubR, 0, TAU);
+    ctx.fillStyle = "rgba(0,0,0,0.35)";
+    ctx.fill();
+    chromeRing(ctx, pw.x, pw.y, pw.hubR - 0.9, 1.8);
+    chromeDisc(ctx, pw.x, pw.y, pw.hubR - 1.8, true);
   }
 
   /** ポスト：ゴムの輪＋めっきの頭。上のレーンのしきりの頭は色つきプラスチック */
@@ -1245,6 +1534,9 @@ export class PinballRenderer {
       const x = KICKER_X[id.index]!;
       this.paintInsert(ctx, this.pillShape(x - 13, 822, 26, 16, 5), { x: x - 13, y: 822, w: 26, h: 16 }, color ?? colors.accent2, on);
       this.insertText(ctx, "キック", x, 830.5, 7, color ?? colors.accent2, lit);
+    } else if (id.kind === "standup") {
+      const p = standupInsertPos(id.index);
+      this.paintInsert(ctx, circlePathAt(p.x, p.y, 5.5), { x: p.x - 5.5, y: p.y - 5.5, w: 11, h: 11 }, color ?? colors.accent2, on);
     } else if (id.kind === "bonus") {
       const x = 200 + id.index * 20;
       this.paintInsert(ctx, circlePathAt(x, 838, 7.5), { x: x - 7.5, y: 830.5, w: 15, h: 15 }, color ?? colors.accent, on);
@@ -1262,6 +1554,7 @@ export class PinballRenderer {
     for (const s of TABLE.shots) this.drawInsert(ctx, { kind: "shot", id: s.id }, 0);
     for (let i = 0; i < 2; i += 1) this.drawInsert(ctx, { kind: "kick", index: i }, 0);
     for (let i = 0; i < 5; i += 1) this.drawInsert(ctx, { kind: "bonus", index: i }, 0);
+    for (let i = 0; i < 6; i += 1) this.drawInsert(ctx, { kind: "standup", index: i }, 0);
     this.drawInsert(ctx, { kind: "save" }, 0);
     // ガチャ穴の文字（印刷）
     ctx.font = `bold 10px ${FONT}`;
@@ -1487,6 +1780,8 @@ export class PinballRenderer {
     this.drawDrops(ctx, g);
     this.drawKickers(ctx, g);
     this.drawSpinner(ctx, dt);
+    this.drawStandupsLit(ctx, g, dt);
+    this.drawPinwheel(ctx, g, dt);
     this.drawBumpers(ctx, dt);
     this.drawSlings(ctx, dt);
     this.drawGates(ctx, g);
@@ -1563,6 +1858,15 @@ export class PinballRenderer {
     });
     // ボーナス倍率
     for (let i = 0; i < 5; i += 1) if (g.bonusX >= i + 2) lit.push({ id: { kind: "bonus", index: i }, on: 1, color: colors.accent, x: 200 + i * 20, y: 838, r: 15 });
+    // スタンドアップターゲットの前のランプ（光らせた的・1組そろったときはまとめて点滅）
+    for (let i = 0; i < 6; i += 1) {
+      const all = this.standupsAllFlash[Math.floor(i / 3)]!;
+      const on = g.standups[i] ? 1 : all > 0 ? blink(8) * all : 0;
+      if (on > 0) {
+        const p = standupInsertPos(i);
+        lit.push({ id: { kind: "standup", index: i }, on, color: colors.accent2, x: p.x, y: p.y, r: 15 });
+      }
+    }
     // ボールセーブ（切れる前は速く点滅）
     if (isBallSaveOn(g)) {
       const left = g.saveUntil - g.clock;
@@ -1953,9 +2257,18 @@ export class PinballRenderer {
   private drawGates(ctx: CanvasRenderingContext2D, g: Game): void {
     if (!g.world.outlaneGate[0] && !g.world.outlaneGate[1]) return;
     const left = g.gateUntil - g.clock;
-    const a = left < 2 ? (Math.sin(this.time * 30) > 0 ? 1 : 0.3) : 1;
+    const blinkA = left < 2 ? (Math.sin(this.time * 30) > 0 ? 1 : 0.3) : 1;
     TABLE.outlaneGates.forEach((gate, i) => {
       if (!g.world.outlaneGate[i]) return;
+      // はね返した瞬間は強く光る
+      const kick = this.gateFlash[i]!;
+      const a = Math.min(1, blinkA + kick);
+      if (kick > 0) {
+        ctx.globalCompositeOperation = "lighter";
+        this.lightAt(ctx, (gate.a.x + gate.b.x) / 2, (gate.a.y + gate.b.y) / 2 - 6, 46, "#ffffff", kick * 0.9);
+        ctx.globalCompositeOperation = "source-over";
+        this.gateFlash[i] = Math.max(0, kick - 0.05);
+      }
       const dx = gate.b.x - gate.a.x;
       const dy = gate.b.y - gate.a.y;
       const len = Math.hypot(dx, dy) || 1;

@@ -23,7 +23,8 @@ import { restWeightsOf } from "@/lib/home-weather";
  *
  * 用事：ふだんは気ままに歩き回るが、用事が入るとそれを先に片づける。
  * - 歩数の書き換え（steps-tag.tsx から home-dog-bus.ts 経由）：看板の前まで歩き、魔法のペンを出して書く
- * - 空から降ってきたコイン：走って拾いに行く（タップでも拾える）。ふつう 5・中レア 20・高レア 100 枚（/api/coins/home-drop）
+ * - 空から降ってきたコイン：走って拾いに行く（タップでも拾える）。ふつう 5・中レア 20・高レア 100 枚（/api/coins/home-drop）。
+ *   黄色・青のほかに、ご当地ピンボールの赤コインも降る
  */
 
 /**
@@ -232,10 +233,12 @@ const WRITE_MS = 1300;
 /**
  * コイン：5秒ごとに 20% で降る。1回 5 枚（枚数は DB が決める）。青と黄色は半々。1日の回数に上限はない。
  * ホームを開いているあいだ、平均して1時間に 144 回（3600 / 5 × 20%）＝ 720 枚。
+ * 赤コイン（ご当地ピンボール）は、黄色・青とは別に 5秒ごとに 5%（黄色・青の降る数は変えない）。
  */
 const COIN_TICK_MS = 5000;
 const COIN_CHANCE = 0.2;
 const COIN_BLUE_CHANCE = 0.5;
+const COIN_RED_CHANCE = 0.05;
 /**
  * レア度。降ったコインのうち、ふつう 85%・中レア 12%・高レア 3%。もらえる枚数は黄色も青も同じで、
  * ふつう 5・中レア 20・高レア 100（枚数は DB が決める。ここは見た目と抽選だけ）。
@@ -295,9 +298,11 @@ type Walker = {
   pen: boolean;
 };
 
+type CoinKind = "coin" | "blue" | "red";
+
 type Coin = {
   id: string;
-  kind: "coin" | "blue";
+  kind: CoinKind;
   tier: CoinTier;
   x: number;
   depth: number;
@@ -326,10 +331,13 @@ const pickWeighted = <T,>(items: readonly T[], weightOf: (item: T) => number): T
 export function WanderingFrenchie({
   level = 1,
   skin = "default",
+  redDrops = false,
 }: {
   level?: number;
   /** 表示する犬スキン。所持していないスキンを渡さないのは呼び出し側の責任 */
   skin?: DogSkinId;
+  /** 赤コインも降らせるか（赤コインの仕組みがある環境だけ） */
+  redDrops?: boolean;
 }) {
   // 基本ポーズは常に、報酬モーションは解放済みのものだけ重ねて置く。書くときの絵（wave）はいつでも
   const visibleKeys: string[] = [
@@ -365,6 +373,9 @@ export function WanderingFrenchie({
   const enqueueCoinRef = useRef<(id: string) => void>(() => {});
   const router = useRouter();
   const lastRefreshRef = useRef(0);
+  /** 赤コインを降らせてよいか（DB がまだ赤に対応していないと分かったら、この画面ではもう降らせない） */
+  const redOkRef = useRef(redDrops);
+  redOkRef.current = redOkRef.current && redDrops;
 
   // 拾う（犬が拾っても、タップで拾っても同じ）。数は DB が決めて返す
   const collectCoin = (id: string) => {
@@ -382,8 +393,9 @@ export function WanderingFrenchie({
         body: JSON.stringify({ dropId: id, kind: coin.kind, tier: coin.tier }),
       })
         .then((response) => (response.ok ? response.json() : null))
-        .then((body: { granted?: boolean; kind?: "coin" | "blue"; tier?: CoinTier; amount?: number; reason?: string | null } | null) => {
+        .then((body: { granted?: boolean; kind?: CoinKind; tier?: CoinTier; amount?: number; reason?: string | null } | null) => {
           if (!body) return finish();
+          if (body.reason === "unavailable") redOkRef.current = false;
           if (body.reason === "too_soon" && tries < 3) {
             setTimeout(() => claim(tries + 1), 8500);
             return;
@@ -581,19 +593,24 @@ export function WanderingFrenchie({
     };
   }, [level]);
 
-  // 5秒ごとに 5% で、空からコインが降る（画面を見ているときだけ）
+  // 5秒ごとに、空からコインが降る（黄色・青は 20%、赤はそれとは別に 5%。画面を見ているときだけ）
   useEffect(() => {
     if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
     const id = setInterval(() => {
       if (document.visibilityState !== "visible") return;
-      if (coinsRef.current.length >= COIN_MAX_ON_GROUND || Math.random() >= COIN_CHANCE) return;
+      if (coinsRef.current.length >= COIN_MAX_ON_GROUND) return;
+      // 黄色・青（いままでどおり）か、それとは別の赤（赤コインの仕組みがあるときだけ）
+      const roll = Math.random();
+      const kind: CoinKind | null =
+        roll < COIN_CHANCE ? (Math.random() < COIN_BLUE_CHANCE ? "blue" : "coin") : redOkRef.current && roll < COIN_CHANCE + COIN_RED_CHANCE ? "red" : null;
+      if (!kind) return;
       const box = boxRef.current;
       if (!box) return;
       const depth = Math.random();
       const tier = pickCoinTier();
       const coin: Coin = {
         id: crypto.randomUUID().replace(/-/g, ""),
-        kind: Math.random() < COIN_BLUE_CHANCE ? "blue" : "coin",
+        kind,
         tier,
         x: rand(30, 90),
         depth,
@@ -1075,6 +1092,7 @@ export function WanderingFrenchie({
         const scale = depthScale(coin.depth);
         const tier = COIN_TIERS[coin.tier];
         const blue = coin.kind === "blue";
+        const red = coin.kind === "red";
         return (
           <div
             key={coin.id}
@@ -1095,7 +1113,7 @@ export function WanderingFrenchie({
             />
             <button
               type="button"
-              aria-label={`${coin.tier === "epic" ? "おおばん" : coin.tier === "rare" ? "きらきら" : ""}${blue ? "青コイン" : "コイン"}を拾う`}
+              aria-label={`${coin.tier === "epic" ? "おおばん" : coin.tier === "rare" ? "きらきら" : ""}${blue ? "青コイン" : red ? "赤コイン" : "コイン"}を拾う`}
               disabled={coin.state === "taken"}
               onClick={() => collectRef.current(coin.id)}
               className={`pointer-events-auto relative block w-full ${coin.state === "falling" ? "home-coin-fall" : coin.state === "ground" ? "home-coin-ground" : "home-coin-take"}`}
@@ -1103,7 +1121,7 @@ export function WanderingFrenchie({
             >
               <span
                 className="home-coin-spin relative block h-full w-full"
-                style={{ filter: blue ? "drop-shadow(0 0 2px rgba(90,160,255,.7))" : "drop-shadow(0 0 2px rgba(255,210,90,.7))" }}
+                style={{ filter: blue ? "drop-shadow(0 0 2px rgba(90,160,255,.7))" : red ? "drop-shadow(0 0 2px rgba(255,110,96,.75))" : "drop-shadow(0 0 2px rgba(255,210,90,.7))" }}
               >
                 <HomeCoinArt kind={coin.kind} tier={coin.tier} />
               </span>
@@ -1147,7 +1165,9 @@ export function WanderingFrenchie({
                       ? "linear-gradient(90deg, #ff7aa8, #ffb84d, #5fc8ff, #9b7bff)"
                       : blue
                         ? "rgba(46,110,200,.9)"
-                        : "rgba(214,150,40,.92)",
+                        : red
+                          ? "rgba(199,53,59,.92)"
+                          : "rgba(214,150,40,.92)",
                   boxShadow: "0 2px 6px rgba(60,40,10,.25)",
                 }}
               >
