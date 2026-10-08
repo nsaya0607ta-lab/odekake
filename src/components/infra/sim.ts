@@ -31,21 +31,22 @@ import {
   SCALE_OUT_COOLDOWN,
   SCALE_OUT_LOAD,
   SERVICE,
-  SLOT_ORDER,
   SLOW_FACTOR,
   TIMEOUT,
   TRAVEL,
   USER_COUNT,
   WAF_BLOCK,
   PARTS,
+  compareIds,
   partCost,
   partSize,
   slotLabel,
+  type NodeId,
   type PartKind,
   type Placement,
   type ReqType,
-  type SlotId,
 } from "./model";
+import { USERS, computeLinks, type Link } from "./layout";
 
 export type Rates = Partial<Record<ReqType, number>>;
 export type Tone = "info" | "warn" | "danger" | "good";
@@ -153,11 +154,11 @@ export type SimReq = {
   /** 重い処理をキューに任せる */
   async: boolean;
   /** 向かっている先（混み具合の見積もりに数えている） */
-  inc: SlotId | null;
+  inc: NodeId | null;
 };
 
 export type SimNode = {
-  id: SlotId;
+  id: NodeId;
   kind: PartKind;
   size: number;
   cap: number;
@@ -200,7 +201,7 @@ export type SimNode = {
 };
 
 /** site … DNS に教わった行き先（いつもの拠点か、予備の拠点か） */
-export type SimUser = { far: boolean; dnsUntil: number; site: "main" | "region"; lastWrite: SlotId | null; mood: number; okAt: number; failAt: number };
+export type SimUser = { far: boolean; dnsUntil: number; site: "main" | "region"; lastWrite: NodeId | null; mood: number; okAt: number; failAt: number };
 
 /** 1秒ごとの記録（結果のグラフ） */
 export type Sample = { t: number; ok: number; fail: number; lat: number | null; cost: number };
@@ -224,6 +225,8 @@ export type Metrics = {
 const LEGIT = new Set<ReqKind>(["page", "static", "write", "heavy"]);
 const FAIL_LABEL: Record<FailReason, string> = { busy: "503", timeout: "504", down: "×", dns: "?", missing: "データなし", noserver: "×", late: "期限切れ", lost: "消えた" };
 const FAIL_COLOR = "#ff6b81";
+const DB_KINDS: readonly PartKind[] = ["db", "replica"];
+const ENTRY_KINDS: readonly PartKind[] = ["waf", "lb", "app"];
 /** 停電でも止まらないパーツ（いつもの拠点の外にある） */
 const OUTSIDE = new Set<PartKind>(["dns", "cdn", "region", "monitor", "backup"]);
 
@@ -243,7 +246,7 @@ export const isUserId = (id: string) => id === "bot" || /^u\d+$/.test(id);
 export class InfraSim {
   now = 0;
   readonly setup: SimSetup;
-  readonly nodes = new Map<SlotId, SimNode>();
+  readonly nodes = new Map<NodeId, SimNode>();
   reqs: SimReq[] = [];
   readonly users: SimUser[];
   /** 描画が受けとる効果（受けとったら空にする） */
@@ -255,7 +258,7 @@ export class InfraSim {
   readonly seen = new Set<TipId>();
   readonly m: Metrics;
   series: Sample[] = [];
-  primaryDb: SlotId | null = null;
+  primaryDb: NodeId | null = null;
   /** DNS が「いつもの拠点が止まっている」と気づいているか */
   dnsKnowsMainDown = false;
   /** いちばん新しいバックアップの時刻 */
@@ -272,7 +275,13 @@ export class InfraSim {
   private sec = { ok: 0, fail: 0, latSum: 0, latN: 0 };
   private nextSample = 1;
   private rr = 0;
+  private rrEntry = 0;
   private lbSent = 0;
+  /** 置いてあるパーツ（処理する順） */
+  private order: SimNode[] = [];
+  /** つながり（a → そこからつながっている先。つないだ順） */
+  private out = new Map<string, NodeId[]>();
+  private linkSet = new Set<string>();
   /** オートスケールが見ている混み具合（なめらかにしたもの）と、次に動ける時刻 */
   private autoLoad = 0;
   private autoNext = 0;
@@ -284,7 +293,8 @@ export class InfraSim {
   private mainUpAt = -Infinity;
   private outageNotice = false;
 
-  constructor(setup: SimSetup, placements: readonly Placement[], seed = 1) {
+  /** links を省くと、置いたパーツからふつうのつなぎ方を決める（ステージ）。ラボでは自分でつないだリンクをわたす */
+  constructor(setup: SimSetup, placements: readonly Placement[], seed = 1, links?: readonly Link[]) {
     this.setup = setup;
     this.rand = mulberry32(seed);
     const farCount = Math.round(setup.farRatio * USER_COUNT);
@@ -317,7 +327,7 @@ export class InfraSim {
       costAcc: 0,
       peakCost: 0,
     };
-    this.setPlacements(placements);
+    this.setPlacements(placements, links);
   }
 
   /* ------------------------------------------------------------ 外から使うもの */
@@ -366,8 +376,8 @@ export class InfraSim {
     return { success: ok + fail ? ok / (ok + fail) : null, latency: latN ? latSum / latN : null, rate: (ok + fail) / span };
   }
 
-  /** パーツの置き方を変える（本番の途中でも） */
-  setPlacements(placements: readonly Placement[]) {
+  /** パーツの置き方・つなぎ方を変える（本番の途中でも）。links を省くと、ふつうのつなぎ方 */
+  setPlacements(placements: readonly Placement[], links?: readonly Link[]) {
     const want = new Map(placements.map((p) => [p.slot, p]));
     for (const node of [...this.nodes.values()]) {
       const p = want.get(node.id);
@@ -416,25 +426,35 @@ export class InfraSim {
         node.qmax = s.queue;
       }
     }
-    if (!this.primaryDb || !this.nodes.has(this.primaryDb)) {
-      this.primaryDb = (this.nodes.get("db") ?? this.nodes.get("replica"))?.id ?? null;
+    this.order = [...this.nodes.values()].sort((a, b) => compareIds(a.id, b.id));
+    this.out.clear();
+    this.linkSet.clear();
+    for (const l of links ?? computeLinks(this.nodes.keys())) {
+      if (l.a !== USERS && !this.nodes.has(l.a)) continue;
+      if (!this.nodes.has(l.b) || this.linkSet.has(`${l.a}>${l.b}`)) continue;
+      this.linkSet.add(`${l.a}>${l.b}`);
+      const list = this.out.get(l.a);
+      if (list) list.push(l.b);
+      else this.out.set(l.a, [l.b]);
     }
-    // オートスケールがあれば、新しく置いたサーバーは休んだ状態から（すでに起きているサーバーがあるとき）。
-    // オートスケールを外したら、休んでいたサーバーはみんな起こす
-    const apps = this.apps();
-    if (this.nodes.has("auto")) {
-      let awake = apps.some((a) => !created.includes(a) && !a.asleep && !a.down);
-      for (const a of apps) {
+    if (!this.primaryDb || !this.nodes.has(this.primaryDb)) {
+      this.primaryDb = (this.nodes.get("db") ?? this.dbs()[0])?.id ?? null;
+    }
+    // オートスケールが見ているサーバーは、新しく置いたら休んだ状態から（すでに起きているサーバーがあるとき）。
+    // オートスケールを外したら（見られていないサーバーは）、休んでいたサーバーはみんな起こす
+    const auto = this.nodes.get("auto");
+    const watched = auto ? this.next(auto.id, ["app"]) : [];
+    let awake = watched.some((a) => !created.includes(a) && !a.asleep && !a.down);
+    for (const a of this.apps()) {
+      if (watched.includes(a)) {
         if (!created.includes(a)) continue;
         if (awake) a.asleep = true;
         else awake = true;
+        continue;
       }
-    } else {
-      for (const a of apps) {
-        if (a.asleep) a.bootUntil = this.now + BOOT_TIME;
-        a.asleep = false;
-        a.draining = false;
-      }
+      if (a.asleep) a.bootUntil = this.now + BOOT_TIME;
+      a.asleep = false;
+      a.draining = false;
     }
     // 消えたデータは、新しく置いた DB にもない（写しをもらうので）
     if (this.dbs().some((d) => d.lost)) for (const d of created) if (d.kind === "db" || d.kind === "replica") d.lost = true;
@@ -552,9 +572,8 @@ export class InfraSim {
       if (r.state === "travel" && r.t1 <= now) this.arrive(r);
     }
 
-    for (const id of SLOT_ORDER) {
-      const node = this.nodes.get(id);
-      if (!node || node.down) continue;
+    for (const node of this.order) {
+      if (node.down) continue;
       if (node.busy.some((r) => r.doneAt <= now)) {
         const done = node.busy.filter((r) => r.doneAt <= now);
         node.busy = node.busy.filter((r) => r.doneAt > now);
@@ -635,7 +654,7 @@ export class InfraSim {
     if (bot) this.m.attacks++;
     if (user && this.setup.requiresDns) {
       if (user.dnsUntil <= this.now) {
-        const dns = this.nodes.get("dns");
+        const dns = this.next(USERS, ["dns"])[0];
         if (!dns) {
           this.tip("dns-missing");
           this.fail(req, "dns");
@@ -661,14 +680,14 @@ export class InfraSim {
   private sendToEntry(req: SimReq) {
     // DNS が予備の拠点を教えていたら、そちらへ
     if (this.users[req.user]?.site === "region") {
-      const region = this.nodes.get("region");
+      const region = this.next(USERS, ["region"])[0];
       if (region) {
         this.forward(req, region.id);
         return;
       }
     }
-    const cdn = req.kind === "static" ? this.nodes.get("cdn") : undefined;
-    const target = cdn ? cdn.id : this.originEntry();
+    const cdn = req.kind === "static" ? this.next(USERS, ["cdn"])[0] : undefined;
+    const target = cdn ? cdn.id : this.entryFrom(USERS);
     if (!target) {
       this.tip("no-server");
       this.fail(req, "noserver");
@@ -681,14 +700,14 @@ export class InfraSim {
   private travelTime(from: string, to: string, req: SimReq): number {
     const userEnd = isUserId(from) ? to : isUserId(to) ? from : null;
     if (userEnd) {
-      const kind = this.nodes.get(userEnd as SlotId)?.kind;
+      const kind = this.nodes.get(userEnd)?.kind;
       if (kind === "dns") return req.far ? TRAVEL.userDnsFar : TRAVEL.userDnsNear;
       if (kind === "cdn") return TRAVEL.userCdn;
       if (kind === "region") return TRAVEL.userRegion;
       return req.far ? TRAVEL.userOriginFar : TRAVEL.userOriginNear;
     }
-    const a = this.nodes.get(from as SlotId)?.kind;
-    const b = this.nodes.get(to as SlotId)?.kind;
+    const a = this.nodes.get(from)?.kind;
+    const b = this.nodes.get(to)?.kind;
     if (a === "cdn" || b === "cdn") return TRAVEL.cdnOrigin;
     const data = (k: PartKind | undefined) => k === "db" || k === "replica";
     if (data(a) || data(b)) return TRAVEL.data;
@@ -702,7 +721,7 @@ export class InfraSim {
     req.t0 = this.now;
     req.t1 = this.now + this.travelTime(req.from, to, req);
     if (!req.returning) {
-      const node = this.nodes.get(to as SlotId);
+      const node = this.nodes.get(to);
       if (node) {
         node.incoming++;
         req.inc = node.id;
@@ -743,7 +762,7 @@ export class InfraSim {
         const user = this.users[req.user];
         if (user) {
           user.dnsUntil = this.now + this.ttl();
-          const region = this.nodes.get("region");
+          const region = this.next(USERS, ["region"])[0];
           user.site = this.dnsKnowsMainDown && region && !region.down ? "region" : "main";
         }
         this.sendToEntry(req);
@@ -752,7 +771,7 @@ export class InfraSim {
       this.complete(req);
       return;
     }
-    const node = this.nodes.get(to as SlotId);
+    const node = this.nodes.get(to);
     if (req.kind === "repl" || req.kind === "snap") {
       req.state = "gone";
       if (node) node.activity += 0.4;
@@ -830,7 +849,7 @@ export class InfraSim {
         // 調子の悪いサーバーは、とても遅い
         const slow = node.slowUntil > this.now ? SLOW_FACTOR : 1;
         if (req.kind === "heavy") {
-          const q = this.nodes.get("queue");
+          const q = this.next(node.id, ["queue"])[0];
           req.async = Boolean(q && !q.down);
           return (req.async ? SERVICE.app.heavyQueued : SERVICE.app.heavy) * slow;
         }
@@ -861,7 +880,7 @@ export class InfraSim {
           node.misses++;
           req.viaCdn = true;
         }
-        const origin = this.originEntry();
+        const origin = this.entryFrom(node.id);
         if (!origin) this.fail(req, "noserver");
         else this.forward(req, origin);
         return;
@@ -876,15 +895,15 @@ export class InfraSim {
           this.tip("waf-block");
           return;
         }
-        const next = this.lbOrApp();
+        const next = this.entryFrom(node.id);
         if (!next) this.fail(req, "noserver");
         else this.forward(req, next);
         return;
       }
       case "lb": {
-        const app = this.pickApp();
+        const app = this.pickApp(node);
         if (!app) {
-          this.fail(req, this.apps().length ? "down" : "noserver");
+          this.fail(req, this.next(node.id, ["app"]).length ? "down" : "noserver");
           return;
         }
         this.lbSent++;
@@ -960,9 +979,12 @@ export class InfraSim {
         return;
       }
       case "worker": {
-        const db = this.primary();
-        if (db) {
-          this.forward(req, db.id);
+        // 仕上がりを本番DB に書く（DB とつながっていなければ、ワーカーの中で終わり）
+        const dbs = this.next(node.id, DB_KINDS);
+        if (dbs.length) {
+          const db = this.primary();
+          if (db && dbs.includes(db)) this.forward(req, db.id);
+          else this.fail(req, "down");
           return;
         }
         this.jobDone(req, node);
@@ -992,7 +1014,7 @@ export class InfraSim {
         this.respond(req);
         return;
       case "heavy": {
-        const q = this.nodes.get("queue");
+        const q = this.next(node.id, ["queue"])[0];
         if (req.async && q && !q.down) {
           this.forward(req, q.id);
           return;
@@ -1002,13 +1024,14 @@ export class InfraSim {
         return;
       }
       case "page": {
-        if (this.dbs().length) {
-          const cache = this.nodes.get("cache");
+        const dbs = this.next(node.id, DB_KINDS);
+        if (dbs.length) {
+          const cache = this.next(node.id, ["cache"])[0];
           if (cache && !cache.down) {
             this.forward(req, cache.id);
             return;
           }
-          const db = this.pickReadDb();
+          const db = this.pickReadDb(dbs);
           if (db) this.forward(req, db.id);
           else this.fail(req, "down");
           return;
@@ -1024,9 +1047,12 @@ export class InfraSim {
         return;
       }
       case "write": {
-        const db = this.primary();
-        if (db) {
-          this.forward(req, db.id);
+        // 書きこみは本番DB だけ（予備DB は読みこみ専用）
+        const dbs = this.next(node.id, DB_KINDS);
+        if (dbs.length) {
+          const db = this.primary();
+          if (db && dbs.includes(db)) this.forward(req, db.id);
+          else this.fail(req, "down");
           return;
         }
         const user = this.users[req.user];
@@ -1046,14 +1072,14 @@ export class InfraSim {
       req.needDb = false;
       req.miss = false;
       req.fillCache = true;
-      const db = this.pickReadDb();
+      const db = this.pickReadDb(this.next(node.id, DB_KINDS));
       if (db) this.forward(req, db.id);
       else this.fail(req, "down");
       return;
     }
     if (node.kind === "app" && req.fillCache) {
       req.fillCache = false;
-      const cache = this.nodes.get("cache");
+      const cache = this.next(node.id, ["cache"])[0];
       if (cache && !cache.down) cache.warm = Math.min(CACHE_WARM * 1.5, cache.warm + 1);
     }
     if (node.kind === "cdn" && req.viaCdn) {
@@ -1083,9 +1109,10 @@ export class InfraSim {
     return job;
   }
 
+  /** 書いたデータを、つながっている DB に写す（本番 → 予備。フェイルオーバーのあとは逆向きにも） */
   private replicate(from: SimNode) {
     for (const other of this.dbs()) {
-      if (other === from || other.down) continue;
+      if (other === from || other.down || !(this.linked(from.id, other.id) || this.linked(other.id, from.id))) continue;
       this.sendPacket("repl", from.id, other.id, TRAVEL.data * 1.4);
       this.tip("repl");
     }
@@ -1094,9 +1121,8 @@ export class InfraSim {
   private pullJobs() {
     const q = this.nodes.get("queue");
     if (!q || q.down || !q.jobs.length) return;
-    for (const id of ["worker1", "worker2"] as const) {
-      const w = this.nodes.get(id);
-      if (!w || w.down) continue;
+    for (const w of this.next(q.id, ["worker"])) {
+      if (w.down) continue;
       while (w.busy.length + w.incoming < w.cap && q.jobs.length) {
         const job = q.jobs.shift()!;
         job.at = q.id;
@@ -1129,7 +1155,7 @@ export class InfraSim {
     const traveling = req.state === "travel";
     const where = traveling ? { at: req.from, to: req.to, p: Math.min(1, Math.max(0, (this.now - req.t0) / Math.max(1e-6, req.t1 - req.t0))) } : { at: req.at };
     if (req.state === "wait" || req.state === "service") {
-      const node = this.nodes.get(req.at as SlotId);
+      const node = this.nodes.get(req.at);
       if (node) {
         if (req.state === "wait") {
           node.wait = node.wait.filter((r) => r !== req);
@@ -1151,7 +1177,7 @@ export class InfraSim {
     }
     this.fx.push({ kind: "text", ...where, text: FAIL_LABEL[reason], color: FAIL_COLOR });
     this.fx.push({ kind: "burst", ...where, color: FAIL_COLOR, n: 4 });
-    if (reason === "busy" && this.nodes.get(req.at as SlotId)?.kind === "app") this.tip("busy");
+    if (reason === "busy" && this.nodes.get(req.at)?.kind === "app") this.tip("busy");
     if (reason === "timeout") this.tip("timeout");
     if (reason === "down" && this.dnsKnowsMainDown && user?.site === "main" && this.nodes.has("region")) this.tip("ttl-stale");
   }
@@ -1160,20 +1186,25 @@ export class InfraSim {
 
   /** サーバー（1台目から順に） */
   apps(): SimNode[] {
-    const out: SimNode[] = [];
-    for (const id of ["app1", "app2", "app3", "app4"] as const) {
-      const n = this.nodes.get(id);
-      if (n) out.push(n);
-    }
-    return out;
+    return this.order.filter((n) => n.kind === "app");
   }
 
   /** データベース（本番と予備） */
   dbs(): SimNode[] {
+    return this.order.filter((n) => n.kind === "db" || n.kind === "replica");
+  }
+
+  /** a から b へつながっているか（a は USERS か、パーツの id） */
+  linked(a: string, b: NodeId): boolean {
+    return this.linkSet.has(`${a}>${b}`);
+  }
+
+  /** a からつながっている、その種類のパーツ（つないだ順） */
+  next(a: string, kinds: readonly PartKind[]): SimNode[] {
     const out: SimNode[] = [];
-    for (const id of ["db", "replica"] as const) {
+    for (const id of this.out.get(a) ?? []) {
       const n = this.nodes.get(id);
-      if (n) out.push(n);
+      if (n && kinds.includes(n.kind)) out.push(n);
     }
     return out;
   }
@@ -1182,19 +1213,21 @@ export class InfraSim {
     return this.primaryDb ? this.nodes.get(this.primaryDb) ?? null : null;
   }
 
-  /** 外から入ってくる入口（WAF → ロードバランサー → 1台目のサーバー の順にあるもの） */
-  private originEntry(): string | null {
-    return this.nodes.get("waf")?.id ?? this.lbOrApp();
-  }
-
-  private lbOrApp(): string | null {
-    const apps = this.apps();
-    return this.nodes.get("lb")?.id ?? (apps.find((a) => !a.asleep) ?? apps[0])?.id ?? null;
+  /**
+   * from（利用者・CDN・WAF）の次の行き先（WAF・ロードバランサー・サーバー）。
+   * いくつもつながっていたら、順番に（DNS ラウンドロビン）。休んでいるサーバーは、ほかに行き先があればとばす
+   */
+  private entryFrom(from: string): NodeId | null {
+    const all = this.next(from, ENTRY_KINDS);
+    const list = all.length > 1 ? all.filter((n) => !n.asleep && !n.draining) : all;
+    if (!list.length) return all[0]?.id ?? null;
+    if (list.length === 1) return list[0]!.id;
+    return list[this.rrEntry++ % list.length]!.id;
   }
 
   /** ロードバランサーの振り分け：止まっていると気づいたサーバー・休んでいるサーバーはのぞいて、いちばんすいているところへ */
-  private pickApp(): SimNode | null {
-    const apps = this.apps().filter((a) => !a.lbKnowsDown && this.inService(a));
+  private pickApp(lb: SimNode): SimNode | null {
+    const apps = this.next(lb.id, ["app"]).filter((a) => !a.lbKnowsDown && this.inService(a));
     if (!apps.length) return null;
     let best: SimNode | null = null;
     let bestLoad = Infinity;
@@ -1210,11 +1243,11 @@ export class InfraSim {
     return best;
   }
 
-  /** 読みこみは、動いている DB（本番・予備）のうち、すいているほうへ */
-  private pickReadDb(): SimNode | null {
+  /** 読みこみは、つながっている DB（本番・予備）のうち、動いていて、すいているほうへ */
+  private pickReadDb(dbs: readonly SimNode[]): SimNode | null {
     let best: SimNode | null = null;
     let bestLoad = Infinity;
-    for (const d of this.dbs()) {
+    for (const d of dbs) {
       if (d.down) continue;
       const load = (d.busy.length + d.wait.length + d.incoming) / d.cap;
       if (load < bestLoad) {
@@ -1222,7 +1255,8 @@ export class InfraSim {
         bestLoad = load;
       }
     }
-    return best ?? this.primary();
+    const p = this.primary();
+    return best ?? (p && dbs.includes(p) ? p : null);
   }
 
   /** オートスケールで休んでいない・起きている途中でない・休む準備中でない */
@@ -1308,7 +1342,7 @@ export class InfraSim {
     const mainDown = now < this.mainUpAt;
     if (mainDown && !this.dnsKnowsMainDown && now - this.mainDownAt >= DNS_HEALTH_DELAY && this.nodes.has("dns")) {
       this.dnsKnowsMainDown = true;
-      const region = this.nodes.get("region");
+      const region = this.next(USERS, ["region"])[0];
       if (region && !region.down) {
         this.text("dns", "大阪へ案内", PARTS.region.color, true);
         this.banners.push({ text: "DNS：大阪の拠点へ案内を切りかえ", tone: "good" });
@@ -1333,7 +1367,7 @@ export class InfraSim {
     const mon = this.nodes.get("monitor");
     if (!mon || mon.down) return;
     const now = this.now;
-    for (const node of [...this.apps(), ...this.dbs()]) {
+    for (const node of this.next(mon.id, ["app", ...DB_KINDS])) {
       if (node.alerted) continue;
       if (node.down) {
         if (node.downKind !== "crash" || node.recoverAt <= now + RESTART_TIME || now - node.downAt < MONITOR_DETECT) continue;
@@ -1365,9 +1399,8 @@ export class InfraSim {
   /** オートスケール：サーバーの混み具合を見て、休んでいるサーバーを起こしたり、すいたら休ませたりする */
   private autoscale(h: number) {
     const now = this.now;
-    const apps = this.apps();
     // 休む準備ができたサーバーは、手もちが終わったら休む
-    for (const a of apps) {
+    for (const a of this.apps()) {
       if (a.draining && !a.busy.length && !a.wait.length && !a.incoming) {
         a.draining = false;
         a.asleep = true;
@@ -1376,6 +1409,8 @@ export class InfraSim {
     }
     const auto = this.nodes.get("auto");
     if (!auto || auto.down) return;
+    // オートスケールが見ているのは、つながっているサーバーだけ
+    const apps = this.next(auto.id, ["app"]);
     let cap = 0, load = 0;
     for (const a of apps) {
       if (a.asleep || a.draining || a.down) continue;
@@ -1413,7 +1448,8 @@ export class InfraSim {
   /** バックアップ：ときどき DB の中身を保存し、消えたら元にもどす */
   private checkBackup() {
     const bk = this.nodes.get("backup");
-    if (!bk || bk.down) return;
+    // DB とつながっていないバックアップは、何も保存できない
+    if (!bk || bk.down || !this.dbs().some((d) => this.linked(d.id, bk.id))) return;
     const now = this.now;
     const db = this.primary();
     if (now >= this.nextSnapshot) {
@@ -1450,7 +1486,7 @@ export class InfraSim {
   }
 
   /** 利用者とは関係のない、パーツどうしのやりとり（写し・保存）の光る点 */
-  private sendPacket(kind: "repl" | "snap", from: SlotId, to: SlotId, time: number) {
+  private sendPacket(kind: "repl" | "snap", from: NodeId, to: NodeId, time: number) {
     this.reqs.push({
       id: this.nextId++,
       kind,

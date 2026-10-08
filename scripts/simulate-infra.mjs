@@ -10,7 +10,7 @@
  * - 「お手本」では、ほぼ毎回 ★3 がとれること
  * - 別のやり方（力ずく・まちがった直し方）では、★ が欠けること（学んでほしいことが伝わるか）
  *
- * src/components/infra の model.ts / sim.ts / stages.ts を TypeScript のまま読みこむ（その場で JS に変換する）。
+ * src/components/infra の model.ts / layout.ts / sim.ts / stages.ts を TypeScript のまま読みこむ（その場で JS に変換する）。
  */
 import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
@@ -21,7 +21,7 @@ import ts from "typescript";
 const root = join(dirname(fileURLToPath(import.meta.url)), "..");
 const src = join(root, "src/components/infra");
 const out = mkdtempSync(join(tmpdir(), "infra-sim-"));
-for (const name of ["model", "sim", "stages"]) {
+for (const name of ["model", "layout", "sim", "stages"]) {
   const code = readFileSync(join(src, `${name}.ts`), "utf8");
   const js = ts
     .transpileModule(code, { compilerOptions: { module: ts.ModuleKind.ESNext, target: ts.ScriptTarget.ES2022 } })

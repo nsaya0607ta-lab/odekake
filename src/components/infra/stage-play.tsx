@@ -7,7 +7,7 @@ import Image from "next/image";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Board } from "./board";
 import { IntroOverlay, MASCOT } from "./intro";
-import { SLOT_KIND, USER_COUNT, partCost, yen, type Placement, type SlotId } from "./model";
+import { USER_COUNT, kindOf, partCost, yen, type NodeId, type Placement } from "./model";
 import type { Progress } from "./progress";
 import { ResultOverlay, type ResultInfo } from "./result";
 import { PartSheet } from "./sheets";
@@ -42,7 +42,7 @@ export function StagePlay({
   const [paused, setPaused] = useState(false);
   const [speed, setSpeed] = useState(1);
   const [hud, setHud] = useState<Hud>({ success: null, latency: null, cost: 0, now: 0 });
-  const [sheet, setSheet] = useState<SlotId | null>(null);
+  const [sheet, setSheet] = useState<NodeId | null>(null);
   const [toast, setToast] = useState<Toast | null>(null);
   const toastRef = useRef<Toast | null>(null);
   const toastQueue = useRef<string[]>([]);
@@ -204,8 +204,8 @@ export function StagePlay({
 
   /* ------------------------------------------------ パーツ */
 
-  const place = (slot: SlotId, size: number) => {
-    const kind = stage.fixed.find((p) => p.slot === slot)?.kind ?? SLOT_KIND[slot];
+  const place = (slot: NodeId, size: number) => {
+    const kind = stage.fixed.find((p) => p.slot === slot)?.kind ?? kindOf(slot);
     setPlacements((cur) => {
       const exists = cur.find((p) => p.slot === slot);
       if (exists) return cur.map((p) => (p.slot === slot ? { ...p, size } : p));
@@ -213,7 +213,7 @@ export function StagePlay({
     });
     sfx("place");
   };
-  const remove = (slot: SlotId) => {
+  const remove = (slot: NodeId) => {
     if (fixed.has(slot)) return;
     setPlacements((cur) => cur.filter((p) => p.slot !== slot));
     setSheet(null);
@@ -352,7 +352,7 @@ export function StagePlay({
         fixed={fixed}
         budget={stage.budget}
         sim={sim}
-        isNew={sheet ? stage.newParts.includes(SLOT_KIND[sheet]) : false}
+        isNew={sheet ? stage.newParts.includes(kindOf(sheet)) : false}
         onClose={() => setSheet(null)}
         onPlace={(slot, size) => {
           place(slot, size);

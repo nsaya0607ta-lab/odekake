@@ -6,7 +6,7 @@
 import { useEffect, useState, type CSSProperties, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 import { Glyph } from "./glyphs";
-import { PARTS, SLOT_KIND, partCost, slotLabel, yen, type PartKind, type Placement, type SlotId } from "./model";
+import { PARTS, kindOf, partCost, slotLabel, yen, type NodeId, type PartKind, type Placement } from "./model";
 import type { InfraSim } from "./sim";
 import styles from "./infra.module.css";
 
@@ -35,16 +35,16 @@ export function BottomSheet({ open, onClose, children, label, light }: { open: b
 }
 
 type PartSheetProps = {
-  slot: SlotId | null;
+  slot: NodeId | null;
   placements: readonly Placement[];
-  fixed: ReadonlySet<SlotId>;
+  fixed: ReadonlySet<NodeId>;
   budget: number;
   sim: InfraSim | null;
   /** このパーツをはじめて見る（このステージで新しく出てきた） */
   isNew: boolean;
   onClose: () => void;
-  onPlace: (slot: SlotId, size: number) => void;
-  onRemove: (slot: SlotId) => void;
+  onPlace: (slot: NodeId, size: number) => void;
+  onRemove: (slot: NodeId) => void;
 };
 
 /** 「同時に◯件」では言えないパーツの説明 */
@@ -66,7 +66,7 @@ export function PartSheet({ slot, placements, fixed, budget, sim, isNew, onClose
   }, [slot, sim]);
 
   if (!slot) return null;
-  const kind = SLOT_KIND[slot];
+  const kind = kindOf(slot);
   const spec = PARTS[kind];
   const current = placements.find((p) => p.slot === slot) ?? null;
   const total = placements.reduce((s, p) => s + partCost(p.kind, p.size), 0);
@@ -142,7 +142,7 @@ export function PartSheet({ slot, placements, fixed, budget, sim, isNew, onClose
   );
 }
 
-function LiveStats({ sim, slot }: { sim: InfraSim; slot: SlotId }) {
+function LiveStats({ sim, slot }: { sim: InfraSim; slot: NodeId }) {
   const node = sim.nodes.get(slot);
   if (!node) return null;
   const rows: [string, string][] = [];

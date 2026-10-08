@@ -273,14 +273,31 @@ export const SLOT_ORDER: readonly SlotId[] = [
   "monitor",
 ];
 
+/**
+ * 盤面のパーツの名前（id）。ステージではマスの名前（SlotId）と同じ。
+ * ラボ（自由設計）では、1つしか置けないものは種類の名前そのまま（"lb"・"db" など）、
+ * いくつも置けるものは種類の名前＋番号（"app5"・"worker3"・"replica2"）。
+ */
+export type NodeId = string;
+
+/** id からパーツの種類（末尾の番号をとる） */
+export const kindOf = (id: NodeId): PartKind => id.replace(/\d+$/, "") as PartKind;
+
+/** id の末尾の番号（なければ 0） */
+export const numOf = (id: NodeId): number => Number(/\d+$/.exec(id)?.[0] ?? 0);
+
+/** 置く順・処理する順（種類の順、同じ種類は番号の順）。ステージでは SLOT_ORDER と同じ並びになる */
+export function compareIds(a: NodeId, b: NodeId): number {
+  return PART_KINDS.indexOf(kindOf(a)) - PART_KINDS.indexOf(kindOf(b)) || numOf(a) - numOf(b);
+}
+
 /** 置いたパーツ（size は PARTS[kind].sizes の何番目か） */
-export type Placement = { slot: SlotId; kind: PartKind; size: number };
+export type Placement = { slot: NodeId; kind: PartKind; size: number };
 
 /** マスにいるパーツの呼び名（「サーバー2」など） */
-export function slotLabel(slot: SlotId): string {
-  const kind = SLOT_KIND[slot];
-  const n = /\d$/.test(slot) ? slot.slice(-1) : "";
-  return `${PARTS[kind].short}${n}`;
+export function slotLabel(slot: NodeId): string {
+  const n = /\d+$/.exec(slot)?.[0] ?? "";
+  return `${PARTS[kindOf(slot)].short}${n}`;
 }
 
 export const REQ_INFO: Record<ReqType, { name: string; color: string; note: string }> = {

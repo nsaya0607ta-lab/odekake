@@ -1,9 +1,13 @@
 /**
- * 盤面のマスの位置（0〜1 の割合）と、パーツどうしをつなぐ線。
+ * 盤面のパーツの位置（0〜1 の割合）と、パーツどうしをつなぐ線。
  * 上から 利用者 → 入口（DNS・CDN・WAF）→ ロードバランサー → サーバー → データ → 裏方。
- * マスの位置はステージのマスの並びだけで決まる（置いても外しても、ほかのマスは動かない）。
+ * ステージでは、マスの位置はマスの並びだけで決まる（置いても外しても、ほかのマスは動かない）。
+ *
+ * つなぎ方は「リンク」（a → b。a が利用者に近いほう）で表す。シミュレーターはリンクのとおりにアクセスを流す。
+ * ステージでは置いたパーツから自動で決まり（computeLinks）、ラボ（自由設計）では自分でつなぎかえられる。
+ * 画面の線（Wire）は、リンクの「利用者」を6人ぶんに広げたもの。
  */
-import { SLOT_KIND, USER_COUNT, type SlotId, type Tier } from "./model";
+import { PARTS, USER_COUNT, compareIds, kindOf, type NodeId, type PartKind, type Tier } from "./model";
 
 export type Pt = { x: number; y: number };
 
@@ -17,85 +21,102 @@ export type BoardLayout = {
 };
 
 /** ctl = オートスケール・監視が見張っている線（点線） */
-export type Wire = { a: string; b: string; kind: "main" | "data" | "dns" | "repl" | "job" | "user" | "ctl" };
+export type WireKind = "main" | "data" | "dns" | "repl" | "job" | "user" | "ctl";
+export type Wire = { a: string; b: string; kind: WireKind };
+
+/** リンクの「利用者」側の名前 */
+export const USERS = "users";
+/** a → b のつながり（a は USERS か、パーツの id） */
+export type Link = { a: string; b: NodeId; kind: WireKind };
 
 const TIER_ORDER: Tier[] = ["edge", "lb", "app", "data", "back"];
 const TIER_LABEL: Record<Tier, string> = { edge: "入口", lb: "振り分け", app: "サーバー", data: "データ", back: "裏方" };
-const TIER_OF: Record<SlotId, Tier> = {
-  dns: "edge",
-  cdn: "edge",
-  waf: "edge",
-  region: "edge",
-  lb: "lb",
-  auto: "lb",
-  app1: "app",
-  app2: "app",
-  app3: "app",
-  app4: "app",
-  cache: "data",
-  db: "data",
-  replica: "data",
-  queue: "data",
-  backup: "data",
-  worker1: "back",
-  worker2: "back",
-  monitor: "back",
-};
+/** 1行に並べるパーツの数（これより多いと、2行に分ける） */
+const PER_ROW = 5;
 
+const tierOf = (id: NodeId): Tier => PARTS[kindOf(id)].tier;
 const spread = (n: number, from: number, to: number) => Array.from({ length: n }, (_, i) => from + ((i + 0.5) / n) * (to - from));
 
-export function computeLayout(slots: readonly SlotId[], opts: { bot: boolean; farUsers: number }): BoardLayout {
+/** 盤面の行の数（ラボで、盤面の高さを決めるのに使う） */
+export function lineCount(slots: readonly NodeId[]): number {
+  let n = 0;
+  for (const tier of TIER_ORDER) {
+    const k = slots.filter((s) => tierOf(s) === tier).length;
+    if (k) n += tier === "app" || tier === "data" ? Math.ceil(k / PER_ROW) : 1;
+  }
+  return n;
+}
+
+/** range … パーツの行を並べる高さの範囲（0〜1。省くと 0.28〜0.82） */
+export function computeLayout(slots: readonly NodeId[], opts: { bot: boolean; farUsers: number; range?: { top: number; bottom: number } }): BoardLayout {
   const pos = new Map<string, Pt>();
   const usersY = 0.075;
-  const present = TIER_ORDER.filter((t) => slots.some((s) => TIER_OF[s] === t));
+  const ids = [...slots].sort(compareIds);
+  const present = TIER_ORDER.filter((t) => ids.some((s) => tierOf(s) === t));
+  // サーバーとデータの段は、多すぎると2行に分ける
+  const lines: { tier: Tier; ids: NodeId[] }[] = [];
+  for (const tier of present) {
+    const inTier = ids.filter((s) => tierOf(s) === tier);
+    const n = tier === "app" || tier === "data" ? Math.ceil(inTier.length / PER_ROW) : 1;
+    const per = Math.ceil(inTier.length / n);
+    for (let k = 0; k < n; k++) lines.push({ tier, ids: inTier.slice(k * per, (k + 1) * per) });
+  }
   // 下は少しあけておく（タイルの下の名前・数字と、組み立て中の案内が重ならないように）
-  const top = 0.28, bottom = 0.82;
-  const tierY = new Map<Tier, number>();
-  present.forEach((t, i) => tierY.set(t, present.length === 1 ? 0.55 : top + (i * (bottom - top)) / (present.length - 1)));
+  const { top, bottom } = opts.range ?? { top: 0.28, bottom: 0.82 };
+  const lineY = lines.map((_, i) => (lines.length === 1 ? 0.55 : top + (i * (bottom - top)) / (lines.length - 1)));
 
   // 利用者（攻撃があるステージは、右はしにロボット）
   const userTo = opts.bot ? 0.8 : 0.94;
   spread(USER_COUNT, 0.06, userTo).forEach((x, i) => pos.set(`u${i}`, { x, y: usersY }));
   if (opts.bot) pos.set("bot", { x: 0.915, y: usersY });
 
-  for (const tier of present) {
-    const y = tierY.get(tier)!;
-    const inTier = slots.filter((s) => TIER_OF[s] === tier);
+  const workers: NodeId[] = [];
+  let backY = 0;
+  lines.forEach(({ tier, ids: row }, li) => {
+    const y = lineY[li]!;
     if (tier === "edge") {
       // DNS は道のわき（左）。CDN・WAF は利用者からの道の上。予備の拠点（大阪）は遠く（右はし）
-      const main = inTier.filter((s) => s !== "dns" && s !== "region");
-      const region = inTier.includes("region");
-      if (inTier.includes("dns")) pos.set("dns", { x: main.length || region ? 0.13 : 0.18, y: main.length || region ? y - 0.035 : y });
-      if (region) pos.set("region", { x: 0.88, y: y - 0.035 });
+      const main = row.filter((s) => kindOf(s) !== "dns" && kindOf(s) !== "region");
+      const dns = row.find((s) => kindOf(s) === "dns");
+      const region = row.find((s) => kindOf(s) === "region");
+      if (dns) pos.set(dns, { x: main.length || region ? 0.13 : 0.18, y: main.length || region ? y - 0.035 : y });
+      if (region) pos.set(region, { x: 0.88, y: y - 0.035 });
       const xs = main.length === 1 ? [region ? 0.5 : 0.56] : spread(main.length, 0.3, region ? 0.74 : 0.92);
       main.forEach((s, i) => pos.set(s, { x: xs[i]!, y }));
-      continue;
-    }
-    if (tier === "back") {
-      // 監視は左はし。ワーカーは、あとでキューの真下あたりに
-      const workers = inTier.filter((s) => s !== "monitor");
-      if (inTier.includes("monitor")) pos.set("monitor", { x: workers.length ? 0.14 : 0.5, y });
-      workers.forEach((s, i) => pos.set(s, { x: workers.length === 1 ? 0.5 : i === 0 ? 0.385 : 0.615, y }));
-      continue;
+      return;
     }
     if (tier === "lb") {
       // オートスケールは、ロードバランサーの横で見張る
-      const hasLb = inTier.includes("lb");
-      if (hasLb) pos.set("lb", { x: 0.5, y });
-      if (inTier.includes("auto")) pos.set("auto", { x: hasLb ? 0.84 : 0.5, y });
-      continue;
+      const lb = row.find((s) => kindOf(s) === "lb");
+      const auto = row.find((s) => kindOf(s) === "auto");
+      if (lb) pos.set(lb, { x: 0.5, y });
+      if (auto) pos.set(auto, { x: lb ? 0.84 : 0.5, y });
+      return;
     }
-    const order = tier === "data" ? (["cache", "db", "replica", "queue", "backup"] as SlotId[]).filter((s) => inTier.includes(s)) : inTier;
-    const xs = order.length === 1 ? [0.5] : spread(order.length, 0.06, 0.94);
-    order.forEach((s, i) => pos.set(s, { x: xs[i]!, y }));
-  }
+    if (tier === "back") {
+      // 監視は左はし。ワーカーは、あとでキューの真下あたりに
+      backY = y;
+      const ws = row.filter((s) => kindOf(s) === "worker");
+      workers.push(...ws);
+      const monitor = row.find((s) => kindOf(s) === "monitor");
+      if (monitor) pos.set(monitor, { x: ws.length ? 0.14 : 0.5, y });
+      const xs = ws.length === 1 ? [0.5] : ws.length === 2 ? [0.385, 0.615] : spread(ws.length, monitor ? 0.28 : 0.06, 0.94);
+      ws.forEach((s, i) => pos.set(s, { x: xs[i]!, y }));
+      return;
+    }
+    const xs = row.length === 1 ? [0.5] : spread(row.length, 0.06, 0.94);
+    row.forEach((s, i) => pos.set(s, { x: xs[i]!, y }));
+  });
   // ワーカーは、キューの真下あたりに
-  const queue = pos.get("queue");
-  if (queue) {
-    const workers = slots.filter((s) => s === "worker1" || s === "worker2");
-    const by = tierY.get("back") ?? queue.y + 0.12;
-    const cx = Math.min(0.86, Math.max(0.14, queue.x - 0.05));
-    workers.forEach((s, i) => pos.set(s, { x: workers.length === 1 ? cx : cx + (i === 0 ? -0.11 : 0.11), y: by }));
+  const queue = ids.find((s) => kindOf(s) === "queue");
+  const qp = queue ? pos.get(queue) : undefined;
+  if (qp && workers.length) {
+    const by = backY || qp.y + 0.12;
+    const gap = 0.22;
+    const half = ((workers.length - 1) * gap) / 2;
+    const lo = (ids.some((s) => kindOf(s) === "monitor") ? 0.3 : 0.08) + half;
+    const cx = Math.min(0.92 - half, Math.max(lo, workers.length <= 2 ? Math.min(0.86, Math.max(0.14, qp.x - 0.05)) : qp.x));
+    workers.forEach((s, i) => pos.set(s, { x: workers.length === 1 ? cx : cx - half + i * gap, y: by }));
   }
 
   const farSpan =
@@ -109,42 +130,88 @@ export function computeLayout(slots: readonly SlotId[], opts: { bot: boolean; fa
         })()
       : null;
 
-  const rows = present.map((t) => ({ label: TIER_LABEL[t], y: tierY.get(t)! }));
+  // 段の名前は、その段の行のまんなかに
+  const rows = present.map((t) => {
+    const ys = lines.flatMap((l, i) => (l.tier === t ? [lineY[i]!] : []));
+    return { label: TIER_LABEL[t], y: ys.reduce((a, b) => a + b, 0) / ys.length };
+  });
   return { pos, rows, farSpan, usersY };
 }
 
-/** 置いてあるパーツから、つなぐ線を決める（シミュレーターの道順と同じ考え方） */
-export function computeWires(placed: ReadonlySet<SlotId>): Wire[] {
-  const has = (s: SlotId) => placed.has(s);
-  const apps = (["app1", "app2", "app3", "app4"] as SlotId[]).filter(has);
-  const wires: Wire[] = [];
-  const origin: SlotId | undefined = has("waf") ? "waf" : has("lb") ? "lb" : apps[0];
-  const behindWaf: SlotId | undefined = has("lb") ? "lb" : apps[0];
-  for (let i = 0; i < USER_COUNT; i++) {
-    if (origin) wires.push({ a: `u${i}`, b: origin, kind: "user" });
-    if (has("cdn")) wires.push({ a: `u${i}`, b: "cdn", kind: "user" });
-    if (has("region")) wires.push({ a: `u${i}`, b: "region", kind: "user" });
-    if (has("dns")) wires.push({ a: `u${i}`, b: "dns", kind: "dns" });
-  }
-  if (has("cdn") && origin) wires.push({ a: "cdn", b: origin, kind: "main" });
-  if (has("waf") && behindWaf) wires.push({ a: "waf", b: behindWaf, kind: "main" });
-  if (has("lb")) for (const a of apps) wires.push({ a: "lb", b: a, kind: "main" });
-  const dbs = (["db", "replica"] as SlotId[]).filter(has);
+/**
+ * 置いてあるパーツから、ふつうのつなぎ方を決める（ステージはいつもこれ。ラボの「自動でつなぐ」もこれ）。
+ * 入口は WAF → ロードバランサー → いちばん前のサーバー の順にあるもの。
+ */
+export function computeLinks(placed: Iterable<NodeId>): Link[] {
+  const ids = [...placed].sort(compareIds);
+  const of = (k: PartKind) => ids.filter((s) => kindOf(s) === k);
+  const one = (k: PartKind): NodeId | undefined => of(k)[0];
+  const apps = of("app");
+  const dbs = [...of("db"), ...of("replica")];
+  const [waf, lb, cdn, region, dns, cache, queue, db, backup, auto, monitor] = (["waf", "lb", "cdn", "region", "dns", "cache", "queue", "db", "backup", "auto", "monitor"] as const).map(one);
+  const links: Link[] = [];
+  const origin = waf ?? lb ?? apps[0];
+  const behindWaf = lb ?? apps[0];
+  if (origin) links.push({ a: USERS, b: origin, kind: "user" });
+  if (cdn) links.push({ a: USERS, b: cdn, kind: "user" });
+  if (region) links.push({ a: USERS, b: region, kind: "user" });
+  if (dns) links.push({ a: USERS, b: dns, kind: "dns" });
+  if (cdn && origin) links.push({ a: cdn, b: origin, kind: "main" });
+  if (waf && behindWaf) links.push({ a: waf, b: behindWaf, kind: "main" });
+  if (lb) for (const a of apps) links.push({ a: lb, b: a, kind: "main" });
   for (const a of apps) {
-    if (has("cache")) wires.push({ a, b: "cache", kind: "data" });
-    for (const d of dbs) wires.push({ a, b: d, kind: "data" });
-    if (has("queue")) wires.push({ a, b: "queue", kind: "data" });
+    if (cache) links.push({ a, b: cache, kind: "data" });
+    for (const d of dbs) links.push({ a, b: d, kind: "data" });
+    if (queue) links.push({ a, b: queue, kind: "data" });
   }
-  for (const w of ["worker1", "worker2"] as SlotId[]) {
-    if (!has(w)) continue;
-    if (has("queue")) wires.push({ a: "queue", b: w, kind: "job" });
-    for (const d of dbs) wires.push({ a: w, b: d, kind: "job" });
+  for (const w of of("worker")) {
+    if (queue) links.push({ a: queue, b: w, kind: "job" });
+    for (const d of dbs) links.push({ a: w, b: d, kind: "job" });
   }
-  if (has("db") && has("replica")) wires.push({ a: "db", b: "replica", kind: "repl" });
-  if (has("backup") && dbs[0]) wires.push({ a: dbs[0], b: "backup", kind: "repl" });
-  if (has("auto")) for (const a of apps) wires.push({ a: "auto", b: a, kind: "ctl" });
-  if (has("monitor")) for (const t of [...apps, ...dbs]) wires.push({ a: "monitor", b: t, kind: "ctl" });
+  if (db) for (const r of of("replica")) links.push({ a: db, b: r, kind: "repl" });
+  if (backup && dbs[0]) links.push({ a: dbs[0], b: backup, kind: "repl" });
+  if (auto) for (const a of apps) links.push({ a: auto, b: a, kind: "ctl" });
+  if (monitor) for (const t of [...apps, ...dbs]) links.push({ a: monitor, b: t, kind: "ctl" });
+  return links;
+}
+
+/** 画面に出す線（利用者とのリンクは、6人ぶんに広げる） */
+export function expandWires(links: readonly Link[]): Wire[] {
+  const wires: Wire[] = [];
+  const fromUsers = links.filter((l) => l.a === USERS);
+  for (let i = 0; i < USER_COUNT; i++) for (const l of fromUsers) wires.push({ a: `u${i}`, b: l.b, kind: l.kind });
+  for (const l of links) if (l.a !== USERS) wires.push({ a: l.a, b: l.b, kind: l.kind });
   return wires;
+}
+
+/** 置いてあるパーツから、つなぐ線を決める（ステージ用） */
+export function computeWires(placed: ReadonlySet<NodeId>): Wire[] {
+  return expandWires(computeLinks(placed));
+}
+
+/** つないでよい組み合わせ（a が利用者に近いほう）と、その線の種類 */
+const CAN_LINK: Partial<Record<PartKind | typeof USERS, Partial<Record<PartKind, WireKind>>>> = {
+  users: { dns: "dns", cdn: "user", waf: "user", lb: "user", app: "user", region: "user" },
+  cdn: { waf: "main", lb: "main", app: "main" },
+  waf: { lb: "main", app: "main" },
+  lb: { app: "main" },
+  auto: { app: "ctl" },
+  app: { cache: "data", db: "data", replica: "data", queue: "data" },
+  queue: { worker: "job" },
+  worker: { db: "job", replica: "job" },
+  db: { replica: "repl", backup: "repl" },
+  monitor: { app: "ctl", db: "ctl", replica: "ctl" },
+};
+
+/** a と b をつなげるなら、向きをそろえたリンクを返す（どちらから選んでもよい） */
+export function linkBetween(a: string, b: string): Link | null {
+  const ka = a === USERS ? USERS : kindOf(a);
+  const kb = b === USERS ? USERS : kindOf(b);
+  const ab = CAN_LINK[ka]?.[kb as PartKind];
+  if (ab && b !== USERS) return { a, b, kind: ab };
+  const ba = CAN_LINK[kb]?.[ka as PartKind];
+  if (ba && a !== USERS) return { a: b, b: a, kind: ba };
+  return null;
 }
 
 /** 2点を結ぶなめらかな曲線の上の点（t: 0〜1）。上下につなぐときは縦向きに出入りする */
@@ -169,6 +236,3 @@ function bez(p0: Pt, p1: Pt, p2: Pt, p3: Pt, t: number): Pt {
   const a = u * u * u, b = 3 * u * u * t, c = 3 * u * t * t, d = t * t * t;
   return { x: a * p0.x + b * p1.x + c * p2.x + d * p3.x, y: a * p0.y + b * p1.y + c * p2.y + d * p3.y };
 }
-
-export const slotTier = (slot: SlotId) => TIER_OF[slot];
-export const slotKind = (slot: SlotId) => SLOT_KIND[slot];
