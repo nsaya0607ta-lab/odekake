@@ -8,6 +8,7 @@
  * 部品の材質（めっき・ゴム・プラスチック）の描き方は materials.ts。光は左上から当たり、影は右下に落ちる。
  * 重い影（shadowBlur）は、一度だけ描く base / overlay と前もって作る絵の中でだけ使う（毎フレームは使わない）。
  */
+import { ENCORE_SEC, ITEM_RELOCATE_SEC, STAMP_COUNT } from "@/lib/games/pinball/config";
 import { ballsOnTable, collectedCount, isBallSaveOn, scoreMult, type Game, type GameFx, type PinballItem, type Tone } from "@/lib/games/pinball/game";
 import { flipperTip, PLUNGER_TRAVEL, rampPoint, type FlipperState } from "@/lib/games/pinball/physics";
 import { BALL_R, ITEM_PICKUP_R, TABLE, TABLE_H, TABLE_W, type Pt, type RampDef, type ShotId, type WallDef } from "@/lib/games/pinball/table";
@@ -632,7 +633,7 @@ export class PinballRenderer {
 
   /* ---------- 演出を受けとる ---------- */
 
-  pushFx(list: readonly GameFx[], game: Game): void {
+  pushFx(list: readonly GameFx[]): void {
     for (const fx of list) {
       switch (fx.type) {
         case "flash": {
@@ -673,8 +674,7 @@ export class PinballRenderer {
           if (this.popups.length < 18) this.popups.push({ x: fx.x, y: fx.y, text: fx.text, life: 1, tone: fx.tone });
           break;
         case "collect": {
-          const stamp = game.stamps[fx.slot];
-          if (stamp) this.flying.push({ item: stamp.item, x0: fx.from.x, y0: fx.from.y, t: 0 });
+          this.flying.push({ item: fx.item, x0: fx.from.x, y0: fx.from.y, t: 0 });
           this.burst(fx.from.x, fx.from.y, 22, "#ffffff", 40, "star");
           this.flash = Math.max(this.flash, 0.25);
           this.flashColor = this.assets.theme.colors.accent;
@@ -1777,6 +1777,7 @@ export class PinballRenderer {
     this.drawLitInserts(ctx, g);
     this.drawShapeFill(ctx, g);
     this.drawScoopLight(ctx, g);
+    this.drawMagnet(ctx, g);
     this.drawDrops(ctx, g);
     this.drawKickers(ctx, g);
     this.drawSpinner(ctx, dt);
@@ -1835,6 +1836,12 @@ export class PinballRenderer {
       if (g.jackpots[s.id]) {
         on = blink(4);
         color = colors.accent2;
+      } else if (g.reserves.length && (s.id === "leftRamp" || s.id === "rightRamp")) {
+        on = blink(3);
+        color = "#ffd54f";
+      } else if (s.id === "scoop" && g.clock < g.magnetUntil) {
+        on = blink(5);
+        color = "#7df9ff";
       } else if (s.id === "scoop" && g.superLit) {
         on = blink(6);
         color = "#ff9de2";
@@ -1886,8 +1893,8 @@ export class PinballRenderer {
   private drawShapeFill(ctx: CanvasRenderingContext2D, g: Game): void {
     if (!this.shapePath) return;
     const { colors } = this.assets.theme;
-    const done = g.mode === "conquest" ? g.stamps.length : collectedCount(g);
-    const ratio = done / Math.max(1, g.stamps.length);
+    const done = g.mode === "conquest" ? STAMP_COUNT : collectedCount(g);
+    const ratio = done / STAMP_COUNT;
     const box = TABLE.artBox;
     const [s, tx, ty] = this.shapeTransform;
     ctx.save();
@@ -1943,6 +1950,32 @@ export class PinballRenderer {
       ctx.arc(sc.x, sc.y, 19.5, a0, a0 + 1.1);
       ctx.stroke();
     }
+    ctx.globalCompositeOperation = "source-over";
+  }
+
+  /** スキル「マグネット」：ガチャ穴の口へ向かって縮んでいく光の弧（穴へ吸いこむ）。切れる前はうすくなる */
+  private drawMagnet(ctx: CanvasRenderingContext2D, g: Game): void {
+    if (g.clock >= g.magnetUntil || g.phase === "over") return;
+    const fade = Math.min(1, (g.magnetUntil - g.clock) / 0.8);
+    const color = "#7df9ff";
+    const mouth = { x: TABLE.scoop.x, y: 549 };
+    ctx.globalCompositeOperation = "lighter";
+    this.lightAt(ctx, mouth.x, mouth.y + 18, 70, color, (0.3 + 0.12 * Math.sin(this.time * 7)) * fade);
+    ctx.lineCap = "round";
+    for (let k = 0; k < 4; k += 1) {
+      const phase = (this.time * 0.85 + k / 4) % 1;
+      const r = 18 + 92 * (1 - phase);
+      ctx.strokeStyle = rgba(color, Math.sin(phase * Math.PI) * 0.8 * fade);
+      ctx.lineWidth = 1.4 + 1.6 * phase;
+      ctx.beginPath();
+      ctx.arc(mouth.x, mouth.y, r, Math.PI * 0.14, Math.PI * 0.86);
+      ctx.stroke();
+    }
+    ctx.strokeStyle = rgba(color, 0.85 * fade);
+    ctx.lineWidth = 1.8;
+    ctx.beginPath();
+    ctx.arc(TABLE.scoop.x, TABLE.scoop.y, 18, 0, TAU);
+    ctx.stroke();
     ctx.globalCompositeOperation = "source-over";
   }
 
@@ -2069,28 +2102,30 @@ export class PinballRenderer {
     plate(this.spinAngle, 1);
   }
 
-  /** 浮かんでいるご当地アイテム */
+  /** 浮かんでいるご当地アイテム（おかわりで出たものは金色の輪と札） */
   private drawItems(ctx: CanvasRenderingContext2D, g: Game): void {
     if (g.mode !== "normal") return;
     const { colors } = this.assets.theme;
-    for (const stamp of g.stamps) {
-      if (stamp.collected || stamp.spot === null) continue;
-      const spot = TABLE.itemSpots[stamp.spot]!;
-      const bob = Math.sin(this.time * 3 + stamp.spot) * 2.5;
+    for (const l of g.lit) {
+      const spot = TABLE.itemSpots[l.spot]!;
+      const bob = Math.sin(this.time * 3 + l.spot) * 2.5;
       const x = spot.x;
       const y = spot.y + bob;
-      const rare = stamp.item.rarity && ["SSR", "UR", "LR", "MR"].includes(stamp.item.rarity);
+      const rare = l.item.rarity && ["SSR", "UR", "LR", "MR"].includes(l.item.rarity);
+      const ring = l.encore ? "#ffd54f" : rare ? colors.accent2 : colors.accent;
       ctx.globalCompositeOperation = "lighter";
-      this.lightAt(ctx, x, y, ITEM_PICKUP_R + 14, rare ? colors.accent2 : colors.accent, 0.65 + 0.25 * Math.sin(this.time * 5));
+      this.lightAt(ctx, x, y, ITEM_PICKUP_R + 14, ring, 0.65 + 0.25 * Math.sin(this.time * 5));
       ctx.globalCompositeOperation = "source-over";
-      // 移動までの残り時間
-      const left = 1 - Math.min(1, (g.clock - stamp.litAt) / 20);
+      // 移動まで（おかわりは消えるまで）の残り時間
+      const left = l.encore
+        ? Math.max(0, Math.min(1, (l.until - g.clock) / ENCORE_SEC))
+        : 1 - Math.min(1, (g.clock - l.litAt) / ITEM_RELOCATE_SEC);
       ctx.beginPath();
       ctx.arc(x, y, ITEM_PICKUP_R - 3, -Math.PI / 2, -Math.PI / 2 + TAU * left);
       ctx.lineWidth = 2.2;
-      ctx.strokeStyle = left < 0.2 ? "#ff8a80" : "rgba(255,255,255,0.85)";
+      ctx.strokeStyle = left < 0.2 ? "#ff8a80" : l.encore ? "rgba(255,226,140,0.95)" : "rgba(255,255,255,0.85)";
       ctx.stroke();
-      const tok = this.token(stamp.item, ITEM_PICKUP_R - 6, rare ? colors.accent2 : colors.accent);
+      const tok = this.token(l.item, ITEM_PICKUP_R - 6, ring);
       const r = ITEM_PICKUP_R - 6;
       if (tok) ctx.drawImage(tok, x - r, y - r, r * 2, r * 2);
       else {
@@ -2098,6 +2133,18 @@ export class PinballRenderer {
         ctx.arc(x, y, r, 0, TAU);
         ctx.fillStyle = "#fff4d6";
         ctx.fill();
+      }
+      if (l.encore) {
+        const w = 30;
+        const ty = y + r + 5;
+        ctx.fillStyle = "rgba(60,36,0,0.85)";
+        this.roundRect(ctx, x - w / 2, ty - 5, w, 10, 5);
+        ctx.fill();
+        ctx.fillStyle = "#ffe08a";
+        ctx.font = `900 6.5px ${FONT}`;
+        ctx.textAlign = "center";
+        ctx.textBaseline = "middle";
+        ctx.fillText("おかわり", x, ty + 0.3);
       }
     }
   }

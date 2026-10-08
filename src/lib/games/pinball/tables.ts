@@ -3,15 +3,17 @@
  * =============================================================
  * ・いつもの台（ガチャカプセルの台）はだれでも遊べる
  * ・県の台は、その県のご当地アイテムを1つでも持っていれば遊べる（犬のすがたは数えない・台にも出さない）
- * ・スキルLvは図鑑のLv（所持数）。バンパーの絵は持っているアイテムのレア度の高い順に3つ
+ * ・スキルLvは図鑑のLv（所持数）。Lv MAX のあとに引いたぶんは限界突破の★。バンパーの絵は持っているアイテムのレア度の高い順に3つ
+ * ・図鑑ボーナス（すべての得点にかける倍率）は、その県のアイテムを何種類持っているかで決まる
  * 地図のデータ（geo）を読むので、ブラウザ側のコードからは import しないこと。
  */
 import { GACHA_RARITIES, type GachaRarity } from "@/lib/gacha/config";
 import { getSkillLevel } from "@/lib/gacha/skill-levels";
 import { PREFECTURES } from "@/lib/geo";
+import { zukanBonus } from "./config";
 import { capsuleItem, type PinballItem } from "./game";
 import { pinballPrefCodes, pinballPrefItems } from "./items";
-import { getPinballSkill } from "./skills";
+import { getPinballSkill, starsForCount } from "./skills";
 import { DEFAULT_TABLE_ID, getPinballTheme } from "./themes";
 
 export type PinballShapeData = { paths: string[]; bbox: [number, number, number, number] };
@@ -25,7 +27,9 @@ export type PinballTableInfo = {
   /** 持っているご当地アイテムの種類（犬のすがたをのぞく） */
   ownedCount: number;
   totalCount: number;
-  /** スタンプ帳に出るアイテム（持っているもの） */
+  /** 図鑑ボーナス（すべての得点にかける倍率。いつもの台は 1） */
+  zukan: number;
+  /** 台に出るアイテム（持っているもの） */
   pool: PinballItem[];
   /** バンパーの上にのせる3つ */
   bumperItems: PinballItem[];
@@ -68,6 +72,7 @@ export function buildPinballTables(owned: ReadonlyMap<string, number>, optimize:
     unlocked: true,
     ownedCount: 0,
     totalCount: 0,
+    zukan: 1,
     pool: [],
     bumperItems: [5, 2, 4].map((i) => ({ ...capsuleItem(i), image: optimize(capsuleItem(i).image!, 128) })),
     shape: shapeOfAll(codes),
@@ -84,12 +89,14 @@ export function buildPinballTables(owned: ReadonlyMap<string, number>, optimize:
     const pool: PinballItem[] = ownedItems.map((item) => {
       const count = owned.get(item.id) ?? 0;
       const level = item.rarity === "N" ? 0 : Math.max(1, getSkillLevel(item.rarity, count));
+      const stars = starsForCount(item.rarity, count);
       return {
         id: item.id,
         name: item.name,
         rarity: item.rarity,
         level,
-        skill: getPinballSkill(item.id, item.name, item.rarity, level),
+        stars,
+        skill: getPinballSkill(item.id, item.name, item.rarity, level, stars),
         image: optimize(item.image!, 128),
       };
     });
@@ -107,6 +114,7 @@ export function buildPinballTables(owned: ReadonlyMap<string, number>, optimize:
       unlocked: ownedItems.length > 0,
       ownedCount: ownedItems.length,
       totalCount: items.length,
+      zukan: zukanBonus(ownedItems.length, items.length),
       pool,
       bumperItems,
       shape: shapeOfPref(code),

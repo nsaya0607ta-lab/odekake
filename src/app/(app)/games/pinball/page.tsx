@@ -8,7 +8,7 @@ import { requireUser } from "@/lib/supabase/server";
 
 export const metadata: Metadata = {
   title: "ご当地ピンボール | おでかけ記録",
-  description: "都道府県ガチャのご当地アイテムが並ぶピンボール。アイテムを集めてスキルを発動、8個そろえて県制覇。スコアで赤コインがもらえます。",
+  description: "都道府県ガチャのご当地アイテムが並ぶピンボール。アイテムを集めてスキルを発動、どれでも8つ集めて県制覇。集めるほど図鑑ボーナスで得点アップ。スコアで赤コインがもらえます。",
 };
 export const dynamic = "force-dynamic";
 

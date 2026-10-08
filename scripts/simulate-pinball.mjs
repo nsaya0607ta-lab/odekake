@@ -202,9 +202,12 @@ const SPOT_SHOT = { 3: "scoop", 4: "scoop", 5: "scoop", 6: "leftRamp", 7: "right
 function aimTargets(g, side) {
   const cross = side === 0 ? ["rightRamp", "rightOrbit"] : ["leftRamp", "leftOrbit"];
   const lit = new Set();
-  for (const s of g.stamps) if (!s.collected && s.spot !== null && SPOT_SHOT[s.spot]) lit.add(SPOT_SHOT[s.spot]);
+  for (const l of g.lit) if (SPOT_SHOT[l.spot]) lit.add(SPOT_SHOT[l.spot]);
   for (const id of T.SHOT_IDS) if (g.jackpots[id]) lit.add(id);
   if (g.superLit) lit.add("scoop");
+  // スキルが効いているあいだは、人もそこを狙う（マグネット＝ガチャ穴、ジャックポット予約＝ランプ）
+  if (g.clock < g.magnetUntil) lit.add("scoop");
+  if (g.reserves.length) lit.add(side === 0 ? "rightRamp" : "leftRamp");
   const want = [...lit].filter((id) => cross.includes(id) || id === "scoop");
   const pick = want.length ? want : [...cross, "scoop"];
   return pick.map((id) => (id === "scoop" ? AIM_ALONG.center : id.endsWith("Ramp") ? AIM_ALONG.ramp : AIM_ALONG.orbit));
@@ -212,22 +215,38 @@ function aimTargets(g, side) {
 
 /* ---------- 1ゲーム ---------- */
 
+/** アイテムのLv（ふだんは Lv1〜3 のランダム。PINBALL_LV=5 のように決めて試せる） */
+const FIXED_LV = Number(process.env.PINBALL_LV) || 0;
+/** 限界突破の★（Lv5 のときだけ。PINBALL_STARS=5 のように決めて試せる） */
+const FIXED_STARS = Number(process.env.PINBALL_STARS) || 0;
+
+/** 岐阜県のアイテム（台に出る18種）。前から n 個を持っていることにする（8 = N〜SSR、12 = UR・LR まで、18 = 全部） */
+const GIFU_ITEMS = [
+  ["gifu_gohei_mochi", "五平餅", "N"], ["gifu_meiho_ham", "明宝ハム", "N"], ["gifu_keichan", "鶏ちゃん", "R"],
+  ["gifu_kuri_kinton", "栗きんとん", "R"], ["gifu_ayu", "鮎", "R"], ["gifu_minoyaki", "美濃焼", "SR"],
+  ["gifu_seki_hamono", "関の刃物", "SR"], ["gifu_gero_onsen", "下呂温泉", "SSR"], ["gifu_hida_takayama", "飛騨高山の古い町並み", "SSR"],
+  ["gifu_hida_beef", "飛騨牛", "UR"], ["gifu_shinhotaka", "新穂高ロープウェイ", "UR"], ["gifu_shirakawago", "白川郷・合掌造り", "LR"],
+  ["gifu_shirakawa_tea", "白川茶", "N"], ["gifu_hoba_miso", "朴葉味噌", "N"], ["gifu_mino_washi", "美濃和紙", "R"],
+  ["gifu_gujo_hachiman", "郡上八幡", "SR"], ["gifu_nagara_ukai", "長良川鵜飼", "SSR"], ["gifu_gifu_castle", "岐阜城・金華山", "UR"],
+];
+
 function samplePool(n, rand) {
-  const prefItems = [
-    ["gifu_gohei_mochi", "五平餅", "N"], ["gifu_meiho_ham", "明宝ハム", "N"], ["gifu_keichan", "鶏ちゃん", "R"],
-    ["gifu_kuri_kinton", "栗きんとん", "R"], ["gifu_ayu", "鮎", "R"], ["gifu_minoyaki", "美濃焼", "SR"],
-    ["gifu_seki_hamono", "関の刃物", "SR"], ["gifu_gero_onsen", "下呂温泉", "SSR"], ["gifu_hida_takayama", "飛騨高山の古い町並み", "SSR"],
-    ["gifu_hida_beef", "飛騨牛", "UR"], ["gifu_shinhotaka", "新穂高ロープウェイ", "UR"], ["gifu_shirakawago", "白川郷・合掌造り", "LR"],
-  ];
-  return prefItems.slice(0, n).map(([id, name, rarity]) => {
-    const level = rarity === "N" ? 0 : 1 + Math.floor(rand() * 3);
-    return { id, name, rarity, level, skill: S.getPinballSkill(id, name, rarity, level), image: null };
+  return GIFU_ITEMS.slice(0, n).map(([id, name, rarity]) => {
+    let level = 0;
+    if (rarity !== "N") {
+      const roll = 1 + Math.floor(rand() * 3);
+      level = FIXED_LV || roll;
+    }
+    const stars = level >= 5 ? FIXED_STARS : 0;
+    return { id, name, rarity, level, stars, skill: S.getPinballSkill(id, name, rarity, level, stars), image: null };
   });
 }
 
 function playGame(skillName, seed, poolSize) {
   const rand = P.mulberry32(seed * 7919 + 13);
-  const g = G.createGame({ pool: samplePool(poolSize, rand), tableName: "岐阜県", seed, speed: SPEED });
+  // 図鑑ボーナスは、岐阜県の18種のうち何種類持っているか（いつもの台＝0種は 1 倍）
+  const zukan = C.zukanBonus(poolSize, GIFU_ITEMS.length);
+  const g = G.createGame({ pool: samplePool(poolSize, rand), tableName: "岐阜県", zukan, seed, speed: SPEED });
   const bot = makeBot(SKILLS[skillName], rand);
   const ballTimes = [];
   let ballStart = 0;
@@ -255,6 +274,7 @@ function playGame(skillName, seed, poolSize) {
     coins: C.redCoinsForScore(g.score),
     saves: g.stats.saves,
     jackpots: g.stats.jackpots,
+    scoops: g.stats.scoops,
     ramps: g.stats.ramps,
     orbits: g.stats.orbits,
     skillShots: g.stats.skillShots,
@@ -281,12 +301,13 @@ function runGames(count, skillName, poolSize) {
   const t = col("time");
   const sc = col("score");
   const coins = col("coins");
-  console.log(`\n=== ${skillName}（${count}ゲーム・アイテム${poolSize}種・玉の速さ ${SPEED}）===`);
+  const zukan = C.zukanBonus(poolSize, GIFU_ITEMS.length);
+  console.log(`\n=== ${skillName}（${count}ゲーム・アイテム${poolSize}種${FIXED_LV ? `・Lv${FIXED_LV}` : ""}${FIXED_STARS ? `・★${FIXED_STARS}` : ""}・図鑑×${zukan}・玉の速さ ${SPEED}）===`);
   console.log(`プレイ時間  平均 ${fmt(t.mean, 1)}秒  中央 ${fmt(t.p50, 1)}  10% ${fmt(t.p10, 1)}  90% ${fmt(t.p90, 1)}`);
   console.log(`スコア      平均 ${fmt(sc.mean)}  中央 ${fmt(sc.p50)}  10% ${fmt(sc.p10)}  90% ${fmt(sc.p90)}`);
   console.log(`赤コイン    平均 ${fmt(coins.mean, 1)}枚  中央 ${fmt(coins.p50)}  10% ${fmt(coins.p10)}  90% ${fmt(coins.p90)}`);
   const per = (k) => fmt(col(k).mean, 2);
-  console.log(`1ゲームあたり  アイテム ${per("items")}  県制覇 ${per("conquests")}  ジャックポット ${per("jackpots")}  ランプ ${per("ramps")}  オービット ${per("orbits")}  スキルショット ${per("skillShots")}  ボールセーブ ${per("saves")}  アウトレーン ${per("outlanes")}`);
+  console.log(`1ゲームあたり  アイテム ${per("items")}  県制覇 ${per("conquests")}  ジャックポット ${per("jackpots")}  ランプ ${per("ramps")}  オービット ${per("orbits")}  スキルショット ${per("skillShots")}  ガチャ穴 ${per("scoops")}  ボールセーブ ${per("saves")}  アウトレーン ${per("outlanes")}`);
   const conquered = rows.filter((r) => r.conquests > 0).length;
   console.log(`県制覇できたゲーム ${fmt((conquered / count) * 100, 1)}%`);
   return rows;
@@ -412,15 +433,18 @@ function stuckReport(count) {
   for (const [key, v] of list) console.log(`  (${key})  ${v.n}回  うち長く止まった ${v.long}回`);
 }
 
-if (process.env.PINBALL_DEBUG_EXPORT) globalThis.__pb = { G, P, T, C, S, SKILLS, makeBot, botStep, samplePool, SPEED };
-
-const [arg1 = "300", arg2 = "all", arg3 = "8"] = process.argv.slice(2);
-if (arg1 === "shotmap") shotmap();
-else if (arg1 === "plunger") plunger();
-else if (arg1 === "stuck") stuckReport(Number(arg2) || 300);
-else {
-  const count = Number(arg1) || 300;
-  const poolSize = Number(arg3) || 0;
-  const names = arg2 === "all" ? ["beginner", "average", "good"] : [arg2];
-  for (const name of names) runGames(count, name, poolSize);
+// PINBALL_DEBUG_EXPORT があるときは、中身を渡すだけで何も回さない（調べもの用のスクリプトから import して使う）
+if (process.env.PINBALL_DEBUG_EXPORT) {
+  globalThis.__pb = { G, P, T, C, S, SKILLS, makeBot, botStep, samplePool, playGame, GIFU_ITEMS, SPEED };
+} else {
+  const [arg1 = "300", arg2 = "all", arg3 = "8"] = process.argv.slice(2);
+  if (arg1 === "shotmap") shotmap();
+  else if (arg1 === "plunger") plunger();
+  else if (arg1 === "stuck") stuckReport(Number(arg2) || 300);
+  else {
+    const count = Number(arg1) || 300;
+    const poolSize = Number(arg3) || 0;
+    const names = arg2 === "all" ? ["beginner", "average", "good"] : [arg2];
+    for (const name of names) runGames(count, name, poolSize);
+  }
 }

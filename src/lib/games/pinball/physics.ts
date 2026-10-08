@@ -72,6 +72,11 @@ const STANDUP_THRESHOLD = 120;
 const GATE_KICK_SPEED = 950;
 /** かざぐるま：当たった玉が羽根をどれだけ回すか・回る速さの上限・ふだんの速さへ戻る時間（秒） */
 const PINWHEEL = { spin: 0.004, maxOmega: 14, relax: 1.6, cooldown: 0.1 };
+/**
+ * スキル「マグネット」：ガチャ穴の前（x が x±halfWidth、y が holeY〜zoneBottom）を上っていく玉を、
+ * 穴の口のまん中へ寄せる（pull・damp）。かこいの中（mouthY より上）では、穴まで上がりきれるように持ち上げる（lift）
+ */
+const MAGNET = { x: 240, holeY: 464, mouthY: 549, zoneBottom: 760, halfWidth: 115, inner: 30, pull: 55, damp: 4, maxAx: 5000, lift: 1900 };
 /** キックバック（アウトレーンから打ち返す速さ） */
 export const KICKBACK_SPEED = 3150;
 /**
@@ -238,6 +243,8 @@ export type World = {
   dropsUp: boolean[];
   /** アウトレーンの扉（スキル）が閉まっているか */
   outlaneGate: [boolean, boolean];
+  /** スキル「マグネット」：ガチャ穴の前を上っていく玉を、穴へ吸い寄せる */
+  magnet: boolean;
   /** プランジャーを引いている量（0〜1） */
   plungerPull: number;
   time: number;
@@ -281,6 +288,7 @@ export function createWorld(seed = 1, table: TableGeometry = TABLE): World {
     ],
     dropsUp: table.drops.map(() => true),
     outlaneGate: [false, false],
+    magnet: false,
     plungerPull: 0,
     time: 0,
     events: [],
@@ -801,10 +809,25 @@ function collideBalls(world: World): void {
   }
 }
 
+/**
+ * マグネットの力。上へ動いている玉にだけ効かせる（止まった玉・落ちてくる玉は引かない。
+ * 引きつづけると、その場で止まってしまう。ガチャ穴から出てきた玉も下へ動いているので、すぐ戻らない）
+ */
+function pullToScoop(world: World, ball: Ball, dt: number): void {
+  if (ball.vy > -40) return;
+  const dx = MAGNET.x - ball.x;
+  if (Math.abs(dx) > MAGNET.halfWidth || ball.y > MAGNET.zoneBottom || ball.y < MAGNET.holeY) return;
+  if (world.balls.some((b) => b.mode === "scoop")) return;
+  const ax = Math.max(-MAGNET.maxAx, Math.min(MAGNET.maxAx, dx * MAGNET.pull - ball.vx * MAGNET.damp));
+  ball.vx += ax * dt;
+  if (ball.y < MAGNET.mouthY && Math.abs(dx) < MAGNET.inner) ball.vy -= MAGNET.lift * dt;
+}
+
 function stepFieldBall(world: World, ball: Ball, dt: number): void {
   ball.px = ball.x;
   ball.py = ball.y;
   ball.vy += GRAVITY * dt;
+  if (world.magnet) pullToScoop(world, ball, dt);
   // ころがり抵抗（ごくわずか）。ほとんど止まっている玉には効かせない
   // （効かせると、ポストやアーチのてっぺんなど、ほぼ平らなところで玉が止まったままになる）
   const sp = Math.hypot(ball.vx, ball.vy);

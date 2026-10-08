@@ -8,6 +8,8 @@ import {
   BONUS,
   COMBO_WINDOW_SEC,
   CONQUEST_EXTRA_BALLS,
+  ENCORE_POINTS,
+  ENCORE_SEC,
   GACHA_AWARDS,
   ITEM_POINTS,
   ITEM_RELOCATE_SEC,
@@ -19,9 +21,13 @@ import {
   RED_COIN_MAX,
   RED_COIN_POINTS,
   STAMP_COUNT,
+  STAR_MAX,
+  STAR_RATE,
+  ZUKAN_BONUS_MAX,
+  zukanBonus,
 } from "@/lib/games/pinball/config";
 import { pinballPrefCodes, pinballPrefItems } from "@/lib/games/pinball/items";
-import { describeSkillLevels } from "@/lib/games/pinball/skills";
+import { describeSkillLevels, getPinballSkill, starsForCount } from "@/lib/games/pinball/skills";
 import { getPinballTheme } from "@/lib/games/pinball/themes";
 import { PREFECTURE_NAMES } from "@/lib/geo/prefecture-names";
 import { PinballSkillTabs, type GuidePref } from "./pinball-guide";
@@ -70,6 +76,10 @@ const SKILL_WORDS: [string, string][] = [
   ["全倒し", "ターゲットが倒れて穴が開く"],
   ["よぶ", "台に浮かぶアイテムが増える"],
   ["コンボ受付", "コンボがつながる時間がのびる"],
+  ["マグネット", "ガチャ穴が開いて、前を通る玉を吸い寄せる"],
+  ["スタンプ2倍", "その間に取ったアイテムは、スタンプが2つ進む"],
+  ["おかわり", `さっき取ったアイテムがもう一度出る（${ENCORE_SEC}秒で消える）`],
+  ["JP予約", "次のランプがジャックポットになる"],
 ];
 
 export function PinballRulebook({ owned }: { owned: ReadonlyMap<string, number> }) {
@@ -82,6 +92,7 @@ export function PinballRulebook({ owned }: { owned: ReadonlyMap<string, number> 
       .sort((a, b) => GACHA_RARITIES.indexOf(b.rarity) - GACHA_RARITIES.indexOf(a.rarity))
       .map((item) => {
         const count = owned.get(item.id) ?? 0;
+        const stars = starsForCount(item.rarity, count);
         const desc = describeSkillLevels(item.id, item.name, item.rarity);
         return {
           id: item.id,
@@ -92,9 +103,12 @@ export function PinballRulebook({ owned }: { owned: ReadonlyMap<string, number> 
           levels: desc?.levels ?? null,
           count,
           level: count > 0 && item.rarity !== "N" ? Math.max(1, getSkillLevel(item.rarity, count)) : 0,
+          stars,
+          starText: stars > 0 ? (getPinballSkill(item.id, item.name, item.rarity, 5, stars)?.text ?? null) : null,
         };
       });
-    return { id: code, name: theme.name, accent: theme.colors.accent, rows };
+    const ownedKinds = rows.filter((r) => r.count > 0).length;
+    return { id: code, name: theme.name, accent: theme.colors.accent, rows, zukan: zukanBonus(ownedKinds, rows.length) };
   });
 
   return (
@@ -171,19 +185,31 @@ export function PinballRulebook({ owned }: { owned: ReadonlyMap<string, number> 
           <Title no="03" eyebrow="STAMP" title="アイテムを集める" />
           <Card>
             <ul className="space-y-2 text-[11.5px] leading-relaxed text-white/80">
-              <li>1回のゲームで集めるのは <b className="text-white">{STAMP_COUNT}個</b>（画面の上のスタンプ帳）。持っているご当地アイテムから選ばれ、足りないぶんは「？カプセル」になります。</li>
+              <li>台には、その県で<b className="text-white">持っているご当地アイテムが全部</b>出てきます（このゲームでまだ出ていないものが先）。どれでも <b className="text-white">{STAMP_COUNT}つ</b> 取ると、画面の上のスタンプ帳がうまります。持っているのが{STAMP_COUNT}種類より少ないと、足りないぶんは「？カプセル」になります。</li>
               <li>アイテムは台の上に1つずつ浮かびます。<b className="text-white">ボールを当てると取れて、その場でスキルが発動</b>。レア度が高いものほど、ランプやオービットの入口など狙いにくい場所に出ます。</li>
-              <li>{ITEM_RELOCATE_SEC}秒たっても取れないと、別の場所へうつります（まわりの輪が残り時間）。</li>
+              <li>{ITEM_RELOCATE_SEC}秒たっても取れないと、別の場所へうつります。まだ出ていないアイテムがあれば、そのアイテムに入れかわります（まわりの輪が残り時間）。</li>
               <li>スキルがあるのは R 以上のアイテム。N と ？カプセルは得点だけです。スキルLvは図鑑と同じで、同じアイテムを集めるほど強くなります。</li>
             </ul>
           </Card>
         </section>
 
         <section className="space-y-2">
-          <Title no="04" eyebrow="CONQUEST" title="県制覇とジャックポット" />
+          <Title no="04" eyebrow="COLLECTION" title="ガチャで集めるほど強くなる" />
           <Card>
             <ul className="space-y-2 text-[11.5px] leading-relaxed text-white/80">
-              <li>{STAMP_COUNT}個そろうと「<b className="text-white">〇〇県 制覇！</b>」で {n(POINTS.conquest)}点 × 制覇した回数。ボールが{CONQUEST_EXTRA_BALLS}つ増えて、3球のマルチボールになります。</li>
+              <li><b className="text-white">図鑑ボーナス</b>：その県のアイテムを何種類持っているかで、<b className="text-white">すべての得点</b>にかかる倍率。全部そろえると ×{(1 + ZUKAN_BONUS_MAX).toFixed(2)}（半分なら ×{zukanBonus(1, 2).toFixed(2)}）。台えらびと、遊んでいる画面の上に出ます。</li>
+              <li><b className="text-white">Lv5で覚醒</b>：同じアイテムを集めてスキルLvが MAX（Lv5）になると、スキルの効果がひとつ増えます（下のスキル一覧の「覚醒」）。</li>
+              <li><b className="text-white">限界突破 ★</b>：Lv5 のあとも同じアイテムを引くと、1つごとに★がつきます（最大★{STAR_MAX}）。★1つで、そのアイテムのスキルの秒数と得点、取ったときの得点が +{Math.round(STAR_RATE * 100)}%。</li>
+              <li><b className="text-white">おかわり</b>で出たアイテムは、取ってもスタンプは増えませんが、スキルがもう一度発動します（得点は{ENCORE_POINTS === 0.5 ? "半分" : `${ENCORE_POINTS}倍`}）。</li>
+            </ul>
+          </Card>
+        </section>
+
+        <section className="space-y-2">
+          <Title no="05" eyebrow="CONQUEST" title="県制覇とジャックポット" />
+          <Card>
+            <ul className="space-y-2 text-[11.5px] leading-relaxed text-white/80">
+              <li>スタンプが{STAMP_COUNT}つそろうと「<b className="text-white">〇〇県 制覇！</b>」で {n(POINTS.conquest)}点 × 制覇した回数。ボールが{CONQUEST_EXTRA_BALLS}つ増えて、3球のマルチボールになります。</li>
               <li>制覇モードの間は、左右のランプとオービットが「ジャックポット」（{n(POINTS.jackpot)}点 × 制覇の回数）。4つ全部決めるとガチャ穴が「スーパージャックポット」（{n(POINTS.superJackpot)}点 × 制覇の回数）。</li>
               <li>ボールが1つに戻ると制覇モードは終わり、新しいスタンプ帳が始まります。集めたアイテムの得点も、制覇するたびに大きくなります。</li>
             </ul>
@@ -191,7 +217,7 @@ export function PinballRulebook({ owned }: { owned: ReadonlyMap<string, number> 
         </section>
 
         <section className="space-y-2">
-          <Title no="05" eyebrow="SCORE" title="得点" />
+          <Title no="06" eyebrow="SCORE" title="得点" />
           <Card>
             <table className="w-full border-collapse text-[11px]">
               <tbody>
@@ -217,7 +243,7 @@ export function PinballRulebook({ owned }: { owned: ReadonlyMap<string, number> 
             </table>
           </Card>
           <Card>
-            <p className="text-[11px] font-black text-white/80">アイテムを取ったとき（× 制覇の回数+1）</p>
+            <p className="text-[11px] font-black text-white/80">アイテムを取ったとき（× 制覇の回数+1・★1つで+{Math.round(STAR_RATE * 100)}%）</p>
             <div className="mt-2 grid grid-cols-4 gap-1.5 text-center">
               {(["capsule", "N", "R", "SR", "SSR", "UR", "LR"] as const).map((r) => (
                 <div key={r} className="rounded-xl bg-black/25 px-1 py-1.5">
@@ -229,11 +255,12 @@ export function PinballRulebook({ owned }: { owned: ReadonlyMap<string, number> 
             <p className="mt-2 text-[10px] leading-relaxed text-white/55">
               ボールが終わったときのボーナス：（取ったアイテム×{n(BONUS.item)}＋ランプ×{n(BONUS.ramp)}＋オービット×{n(BONUS.orbit)}＋バンパー×{n(BONUS.bumper)}＋ターゲット×{n(BONUS.drop)}）× ボーナス倍率
             </p>
+            <p className="mt-1 text-[10px] leading-relaxed text-white/55">ここに書いた得点には、どれも図鑑ボーナスがかかります。</p>
           </Card>
         </section>
 
         <section className="space-y-2">
-          <Title no="06" eyebrow="SKILLS" title="ご当地アイテムのスキル" />
+          <Title no="07" eyebrow="SKILLS" title="ご当地アイテムのスキル" />
           <Card>
             <p className="text-[11px] font-black text-white/80">スキルのことば</p>
             <dl className="mt-2 grid grid-cols-2 gap-1.5">
@@ -251,7 +278,7 @@ export function PinballRulebook({ owned }: { owned: ReadonlyMap<string, number> 
         </section>
 
         <section className="space-y-2">
-          <Title no="07" eyebrow="REWARD" title="赤コイン" />
+          <Title no="08" eyebrow="REWARD" title="赤コイン" />
           <Card className="text-center">
             <RedCoinArt className="mx-auto h-10 w-10" />
             <p className="mt-1 text-lg font-black">スコア ÷ {n(RED_COIN_POINTS)} = 赤コイン</p>

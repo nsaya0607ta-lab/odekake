@@ -65,6 +65,12 @@
   color: var(--pb-accent);
 }
 
+.zukan {
+  margin-left: 6px;
+  color: #ffe08a;
+  letter-spacing: 0.04em;
+}
+
 .score {
   display: block;
   font-family: "Hiragino Maru Gothic ProN", "Arial Rounded MT Bold", "Yu Gothic", sans-serif;
@@ -168,6 +174,16 @@
 .stampDone img {
   filter: none;
   opacity: 1;
+}
+
+.stampEmpty {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-style: dashed;
+  color: rgba(255, 255, 255, 0.3);
+  font-size: 12px;
+  font-weight: 900;
 }
 
 .stampMark {

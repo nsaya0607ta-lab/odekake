@@ -7,7 +7,8 @@
  * 1ゲームの流れ
  *   serve（打ち出し待ち）→ play → ボールを落とす → bonus（ボーナス集計）→ 次のボール … 3球で over
  *   ・打ち出しから BALL_SAVE_SEC 秒は、落としても戻ってくる（ボールセーブ）
- *   ・台に光るアイテムをショットで集める → その場でスキル発動。8個そろうと「〇〇県 制覇！」（3球マルチボール）
+ *   ・台に光るアイテムをショットで集める → その場でスキル発動。どれでも8つ（スタンプ帳）そろうと「〇〇県 制覇！」（3球マルチボール）
+ *   ・台に出るのは、持っているその県のアイテム全部から（まだ出ていないものが先）。すべての得点に図鑑ボーナスがかかる
  *   ・上のレーン「お・で・か・け」がそろうとボーナス倍率アップ。ドロップターゲットを3つ倒すとガチャ穴が開く
  */
 import type { GachaRarity } from "@/lib/gacha/config";
@@ -17,6 +18,8 @@ import {
   COMBO_WINDOW_SEC,
   CONQUEST_EXTRA_BALLS,
   CONQUEST_SAVE_SEC,
+  ENCORE_POINTS,
+  ENCORE_SEC,
   GACHA_AWARDS,
   GAME_SPEED,
   ITEM_POINTS,
@@ -31,6 +34,7 @@ import {
   POINTS,
   SLOW_SCALE,
   STAMP_COUNT,
+  STAR_RATE,
   type GachaAwardId,
 } from "./config";
 import {
@@ -58,13 +62,18 @@ export type PinballItem = {
   /** null は ？カプセル */
   rarity: GachaRarity | null;
   level: number;
+  /** 限界突破の★（0〜5。アイテムを取ったときの得点が★1つで STAR_RATE ずつ上がる） */
+  stars: number;
   skill: PinballSkill | null;
   /** 描く画像（public/ からのパス、または最適化済みのURL） */
   image: string | null;
 };
 
-/** スタンプ帳の1つ。spot は台に浮かんでいる場所（TABLE.itemSpots の番号）、litAt はそこに出た時刻 */
-export type Stamp = { item: PinballItem; collected: boolean; spot: number | null; litAt: number };
+/**
+ * 台に浮かんでいるアイテム。spot は TABLE.itemSpots の番号、litAt はそこに出た時刻。
+ * encore は スキル「おかわり」でもう一度出たもの（取るとスキルはもう一度、スタンプは増えない。until で消える）
+ */
+export type LitItem = { item: PinballItem; spot: number; litAt: number; encore: boolean; until: number };
 
 export type Tone = "info" | "good" | "great" | "epic" | "bad";
 
@@ -80,8 +89,9 @@ export type GameFx =
   | { type: "pop"; x: number; y: number; text: string; tone: Tone }
   | { type: "sfx"; id: SfxId; level?: number; x?: number }
   | { type: "flash"; id: string }
-  | { type: "collect"; slot: number; from: Pt }
-  | { type: "skill"; slot: number; skill: PinballSkill }
+  /** アイテムを取った（slot はスタンプ帳の入った場所。おかわりは -1） */
+  | { type: "collect"; item: PinballItem; slot: number; from: Pt }
+  | { type: "skill"; skill: PinballSkill }
   | { type: "gacha"; label: string }
   | { type: "shake"; power: number }
   | { type: "conquest" }
@@ -97,6 +107,18 @@ export type Game = {
   rand: () => number;
   /** この台で集められるアイテム（持っているご当地アイテム） */
   pool: PinballItem[];
+  /** いまのスタンプ帳で台に出せるもの（持っているアイテム。8種類に足りないときは ？カプセルで足す） */
+  candidates: PinballItem[];
+  /** スタンプ帳（STAMP_COUNT こ）。取った順に入る（スタンプ2倍のときは同じアイテムが2つ）。null はまだ */
+  book: (PinballItem | null)[];
+  /** 台に浮かんでいるアイテム */
+  lit: LitItem[];
+  /** このゲームで台に出たアイテム（まだ出ていないものから先に出す） */
+  shown: Set<string>;
+  /** このゲームで取ったアイテム（新しいものが後ろ。スキル「おかわり」で使う） */
+  taken: PinballItem[];
+  /** 図鑑ボーナス（その県のアイテムを何種類持っているか。すべての得点にかける） */
+  zukan: number;
   /** 「岐阜県」など。演出の文字に使う */
   tableName: string;
   /** 8個そろったときの大きな文字（「岐阜県 制覇！」） */
@@ -139,8 +161,13 @@ export type Game = {
   comboAddUntil: number;
   combo: number;
   lastMajorAt: number;
+  /** スキル「マグネット」（ガチャ穴へ吸い寄せる）が切れる時刻 */
+  magnetUntil: number;
+  /** スキル「スタンプ2倍」が切れる時刻 */
+  stamp2Until: number;
+  /** スキル「ジャックポット予約」：次のランプで1つずつ使う（値は1回の点） */
+  reserves: number[];
 
-  stamps: Stamp[];
   extraLit: number;
   conquests: number;
   mode: "normal" | "conquest";
@@ -160,7 +187,7 @@ export type Game = {
   bonusUntil: number;
   lastBonus: number;
   /** 最後にボールを落としたところ（演出用） */
-  stats: { items: number; jackpots: number; maxCombo: number; ramps: number; orbits: number; bumpers: number; skillShots: number; saves: number };
+  stats: { items: number; jackpots: number; maxCombo: number; ramps: number; orbits: number; bumpers: number; skillShots: number; saves: number; scoops: number };
   fx: GameFx[];
   prevPressed: [boolean, boolean];
 };
@@ -172,33 +199,39 @@ const CAPSULE_RARITIES: readonly GachaRarity[] = ["N", "R", "SR", "SSR", "UR", "
 /** ？カプセル（得点だけ） */
 export function capsuleItem(index: number): PinballItem {
   const r = CAPSULE_RARITIES[index % CAPSULE_RARITIES.length]!;
-  return { id: `capsule:${index}`, name: "？カプセル", rarity: null, level: 0, skill: null, image: `/gacha/art/capsule-${r}-s.webp` };
+  return { id: `capsule:${index}`, name: "？カプセル", rarity: null, level: 0, stars: 0, skill: null, image: `/gacha/art/capsule-${r}-s.webp` };
 }
 
-function shuffle<T>(list: readonly T[], rand: () => number): T[] {
-  const out = [...list];
-  for (let i = out.length - 1; i > 0; i -= 1) {
-    const j = Math.floor(rand() * (i + 1));
-    [out[i], out[j]] = [out[j]!, out[i]!];
-  }
-  return out;
+/** 新しいスタンプ帳。台に出せるのは持っているアイテム全部（8種類に足りないぶんは ？カプセル） */
+function newBook(g: Game): void {
+  const list = [...g.pool];
+  for (let i = list.length; i < STAMP_COUNT; i += 1) list.push(capsuleItem(i + g.conquests * 3));
+  g.candidates = list;
+  g.book = Array.from({ length: STAMP_COUNT }, () => null);
 }
 
-/** スタンプ帳（8個）。持っているアイテムからえらび、足りないぶんは ？カプセル */
-function pickStamps(pool: readonly PinballItem[], rand: () => number, round: number): Stamp[] {
-  const picked = shuffle(pool, rand).slice(0, STAMP_COUNT);
-  for (let i = picked.length; i < STAMP_COUNT; i += 1) picked.push(capsuleItem(i + round * 3));
-  return shuffle(picked, rand).map((item) => ({ item, collected: false, spot: null, litAt: 0 }));
-}
+export type CreateGameOptions = {
+  pool: readonly PinballItem[];
+  tableName: string;
+  conquestTitle?: string;
+  /** 図鑑ボーナス（config.ts の zukanBonus。いつもの台は 1） */
+  zukan?: number;
+  seed?: number;
+  speed?: number;
+};
 
-export type CreateGameOptions = { pool: readonly PinballItem[]; tableName: string; conquestTitle?: string; seed?: number; speed?: number };
-
-export function createGame({ pool, tableName, conquestTitle, seed = Math.floor(Math.random() * 2 ** 31), speed = GAME_SPEED }: CreateGameOptions): Game {
+export function createGame({ pool, tableName, conquestTitle, zukan = 1, seed = Math.floor(Math.random() * 2 ** 31), speed = GAME_SPEED }: CreateGameOptions): Game {
   const world = createWorld(seed);
   const g: Game = {
     world,
     rand: world.rand,
     pool: [...pool],
+    candidates: [],
+    book: [],
+    lit: [],
+    shown: new Set(),
+    taken: [],
+    zukan: Math.max(1, zukan),
     tableName,
     conquestTitle: conquestTitle ?? `${tableName} 制覇！`,
     phase: "serve",
@@ -229,7 +262,9 @@ export function createGame({ pool, tableName, conquestTitle, seed = Math.floor(M
     comboAddUntil: 0,
     combo: 0,
     lastMajorAt: -99,
-    stamps: [],
+    magnetUntil: 0,
+    stamp2Until: 0,
+    reserves: [],
     extraLit: 0,
     conquests: 0,
     mode: "normal",
@@ -245,11 +280,11 @@ export function createGame({ pool, tableName, conquestTitle, seed = Math.floor(M
     kickedAt: new Map(),
     bonusUntil: 0,
     lastBonus: 0,
-    stats: { items: 0, jackpots: 0, maxCombo: 0, ramps: 0, orbits: 0, bumpers: 0, skillShots: 0, saves: 0 },
+    stats: { items: 0, jackpots: 0, maxCombo: 0, ramps: 0, orbits: 0, bumpers: 0, skillShots: 0, saves: 0, scoops: 0 },
     fx: [],
     prevPressed: [false, false],
   };
-  g.stamps = pickStamps(g.pool, g.rand, 0);
+  newBook(g);
   serveBall(g);
   lightItems(g);
   return g;
@@ -273,8 +308,9 @@ export function isBallSaveOn(g: Game): boolean {
   return g.clock < g.saveUntil || (g.saveArmed && g.phase === "serve");
 }
 
+/** スタンプ帳にいくつ入ったか */
 export function collectedCount(g: Game): number {
-  return g.stamps.reduce((n, s) => n + (s.collected ? 1 : 0), 0);
+  return g.book.reduce((n, item) => n + (item ? 1 : 0), 0);
 }
 
 /** 台にのっている玉の数（打ち出しレーン・ランプの上・ガチャ穴の中も数える） */
@@ -290,8 +326,9 @@ function msg(g: Game, title: string, tone: Tone, sub?: string, ms?: number): voi
   g.fx.push({ type: "msg", title, sub, tone, ms });
 }
 
+/** 得点を足す（得点倍率と図鑑ボーナスをかける。noMult は得点倍率だけかけない） */
 function addPoints(g: Game, base: number, at?: Pt, tone: Tone = "info", noMult = false): number {
-  const value = Math.round(base * (noMult ? 1 : scoreMult(g)));
+  const value = Math.round(base * (noMult ? 1 : scoreMult(g)) * g.zukan);
   g.score += value;
   if (at && value >= 1000) g.fx.push({ type: "pop", x: at.x, y: at.y, text: `+${value.toLocaleString("ja-JP")}`, tone });
   return value;
@@ -373,7 +410,7 @@ function tierOf(item: PinballItem): keyof typeof TIER_WEIGHT {
 
 /** あいている場所を1つえらぶ（今いる場所 avoid と、ほかのアイテムがいる場所はのぞく） */
 function pickSpot(g: Game, item: PinballItem, avoid: number | null): number | null {
-  const used = new Set(g.stamps.flatMap((s) => (s.spot !== null && !s.collected ? [s.spot] : [])));
+  const used = new Set(g.lit.map((l) => l.spot));
   const w = TIER_WEIGHT[tierOf(item)];
   const free = TABLE.itemSpots.flatMap((spot, i) => (used.has(i) || i === avoid ? [] : [{ i, w: w[spot.tier] }]));
   const total = free.reduce((sum, f) => sum + f.w, 0);
@@ -386,37 +423,66 @@ function pickSpot(g: Game, item: PinballItem, avoid: number | null): number | nu
   return free[free.length - 1]!.i;
 }
 
+/** 台に出せるアイテム（スタンプ帳にまだ入っていなくて、いま浮かんでいないもの。おかわりで出ているものも同じ絵が2つ並ばないようにのぞく） */
+function availableItems(g: Game): PinballItem[] {
+  const onTable = new Set(g.lit.map((l) => l.item.id));
+  const inBook = new Set(g.book.flatMap((item) => (item ? [item.id] : [])));
+  return g.candidates.filter((item) => !inBook.has(item.id) && !onTable.has(item.id));
+}
+
+/** 次に台へ出すアイテム（このゲームでまだ出ていないものから先に。あとはランダム。freshOnly はまだ出ていないものだけ） */
+function pickNextItem(g: Game, freshOnly = false): PinballItem | null {
+  const list = availableItems(g);
+  const fresh = list.filter((item) => !g.shown.has(item.id));
+  const from = fresh.length || freshOnly ? fresh : list;
+  return from[Math.floor(g.rand() * from.length)] ?? null;
+}
+
 function lightItems(g: Game): void {
   if (g.mode === "conquest") return;
-  let lit = g.stamps.filter((s) => s.spot !== null && !s.collected).length;
+  let lit = g.lit.filter((l) => !l.encore).length;
   const max = LIT_ITEMS + g.extraLit;
-  for (const stamp of g.stamps) {
-    if (lit >= max) break;
-    if (stamp.collected || stamp.spot !== null) continue;
-    const spot = pickSpot(g, stamp.item, null);
+  while (lit < max) {
+    const item = pickNextItem(g);
+    if (!item) break;
+    const spot = pickSpot(g, item, null);
     if (spot === null) break;
-    stamp.spot = spot;
-    stamp.litAt = g.clock;
+    g.lit.push({ item, spot, litAt: g.clock, encore: false, until: Infinity });
+    g.shown.add(item.id);
     lit += 1;
   }
 }
 
-/** 同じ場所に長くいるアイテムは、別の場所へうつる */
+/**
+ * 同じ場所に長くいるアイテムは、別の場所へうつる。このゲームでまだ出ていないアイテムがあれば、入れかわってからうつる
+ * （持っているアイテムが多いほど、1ゲームでいろいろ出てくる）。おかわりのアイテムは時間で消える
+ */
 function relocateItems(g: Game): void {
-  for (const stamp of g.stamps) {
-    if (stamp.collected || stamp.spot === null || g.clock - stamp.litAt < ITEM_RELOCATE_SEC) continue;
-    const next = pickSpot(g, stamp.item, stamp.spot);
-    if (next !== null) stamp.spot = next;
-    stamp.litAt = g.clock;
+  if (g.mode !== "normal") return;
+  for (let i = g.lit.length - 1; i >= 0; i -= 1) {
+    const l = g.lit[i]!;
+    if (l.encore && g.clock >= l.until) {
+      g.lit.splice(i, 1);
+      continue;
+    }
+    if (g.clock - l.litAt < ITEM_RELOCATE_SEC) continue;
+    if (!l.encore) {
+      const next = pickNextItem(g, true);
+      if (next) {
+        l.item = next;
+        g.shown.add(next.id);
+      }
+    }
+    const spot = pickSpot(g, l.item, l.spot);
+    if (spot !== null) l.spot = spot;
+    l.litAt = g.clock;
   }
 }
 
 /** 浮かんでいるアイテムに玉が当たったか（物理の1ステップごとに見る。速い玉が通りぬけないように） */
 function checkPickups(g: Game): void {
-  for (let i = 0; i < g.stamps.length; i += 1) {
-    const stamp = g.stamps[i]!;
-    if (stamp.collected || stamp.spot === null) continue;
-    const spot = TABLE.itemSpots[stamp.spot]!;
+  for (let i = g.lit.length - 1; i >= 0; i -= 1) {
+    const spot = TABLE.itemSpots[g.lit[i]!.spot]!;
     for (const b of g.world.balls) {
       if (b.mode !== "field") continue;
       const dx = b.x - spot.x;
@@ -426,33 +492,88 @@ function checkPickups(g: Game): void {
         break;
       }
     }
+    // 取ったアイテムで県制覇になると、残りは台から消える
+    if (g.mode !== "normal") return;
   }
 }
 
 function collectItem(g: Game, index: number): void {
-  const stamp = g.stamps[index]!;
-  const spot = stamp.spot !== null ? TABLE.itemSpots[stamp.spot] : undefined;
+  const l = g.lit[index];
+  if (!l) return;
+  g.lit.splice(index, 1);
+  const { item } = l;
+  const spot = TABLE.itemSpots[l.spot];
   const from: Pt = spot ? { x: spot.x, y: spot.y } : SHOT_AT.scoop;
-  stamp.collected = true;
-  stamp.spot = null;
-  const { item } = stamp;
-  const points = ITEM_POINTS[item.rarity ?? "capsule"] * (1 + g.conquests);
+  // おかわりで取ったときは、得点は半分（スキルはもう一度）
+  const points = ITEM_POINTS[item.rarity ?? "capsule"] * (1 + g.conquests) * (1 + STAR_RATE * item.stars) * (l.encore ? ENCORE_POINTS : 1);
   addPoints(g, points, from, "great");
   g.perBall.items += 1;
   g.stats.items += 1;
-  g.fx.push({ type: "collect", slot: index, from });
   sfx(g, "item", item.rarity ? ["N", "R", "SR", "SSR", "UR", "LR", "MR"].indexOf(item.rarity) : 0);
+
+  // おかわり：スタンプは増えない。スキルはもう一度（おかわりがおかわりを呼ばないように）
+  if (l.encore) {
+    g.fx.push({ type: "collect", item, slot: -1, from });
+    if (item.skill) {
+      msg(g, `おかわり！ ${item.name}`, "great", `${item.skill.title}：${item.skill.text}`, 2600);
+      g.fx.push({ type: "skill", skill: item.skill });
+      applySkill(g, item.skill, true);
+    } else {
+      msg(g, `おかわり！ ${item.name}`, "good", undefined, 1600);
+    }
+    return;
+  }
+
   if (g.extraLit > 0) g.extraLit -= 1;
+  // スタンプ帳に入れる（スタンプ2倍の間は2つ）
+  const want = g.clock < g.stamp2Until ? 2 : 1;
+  let slot = -1;
+  let added = 0;
+  for (let k = 0; k < g.book.length && added < want; k += 1) {
+    if (g.book[k]) continue;
+    g.book[k] = item;
+    if (slot < 0) slot = k;
+    added += 1;
+  }
+  g.taken.push(item);
   const done = collectedCount(g);
+  g.fx.push({ type: "collect", item, slot, from });
+  if (added > 1) g.fx.push({ type: "pop", x: from.x, y: from.y - 34, text: "スタンプ×2", tone: "epic" });
   if (item.skill) {
     msg(g, `${item.name} ゲット！`, "great", `${item.skill.title}：${item.skill.text}`, 2600);
-    g.fx.push({ type: "skill", slot: index, skill: item.skill });
-    applySkill(g, item.skill);
+    g.fx.push({ type: "skill", skill: item.skill });
+    applySkill(g, item.skill, false);
   } else {
-    msg(g, `${item.name} ゲット！`, "good", `スタンプ ${done} / ${STAMP_COUNT}`, 1800);
+    msg(g, `${item.name} ゲット！`, "good", `スタンプ ${done} / ${STAMP_COUNT}${added > 1 ? "（2つ進んだ！）" : ""}`, 1800);
   }
-  if (done >= g.stamps.length) startConquest(g);
+  if (done >= STAMP_COUNT) startConquest(g);
   else lightItems(g);
+}
+
+/**
+ * スキル「おかわり」：このゲームで取ったアイテム（新しい順・スキルのあるものが先）を、台にもう一度出す。
+ * 出せるものが無いときは得点
+ */
+function encoreItems(g: Game, count: number): void {
+  const onTable = new Set(g.lit.map((l) => l.item.id));
+  const seen = new Set<string>();
+  const recent: PinballItem[] = [];
+  for (let k = g.taken.length - 1; k >= 0; k -= 1) {
+    const item = g.taken[k]!;
+    if (seen.has(item.id) || onTable.has(item.id) || item.skill?.kind === "encore") continue;
+    seen.add(item.id);
+    recent.push(item);
+  }
+  const ordered = [...recent.filter((item) => item.skill), ...recent.filter((item) => !item.skill)];
+  let made = 0;
+  for (const item of ordered) {
+    if (made >= count) break;
+    const spot = pickSpot(g, item, null);
+    if (spot === null) break;
+    g.lit.push({ item, spot, litAt: g.clock, encore: true, until: g.clock + ENCORE_SEC });
+    made += 1;
+  }
+  if (made === 0) addPoints(g, POINTS.encoreMiss, SHOT_AT.scoop, "great");
 }
 
 /* ---------- スキル ---------- */
@@ -461,7 +582,8 @@ function openScoop(g: Game): void {
   g.world.dropsUp = g.world.dropsUp.map(() => false);
 }
 
-function applySkill(g: Game, skill: PinballSkill): void {
+/** スキルの効果を起こす（fromEncore は おかわりで取ったとき。おかわりの効果はもう起こさない） */
+function applySkill(g: Game, skill: PinballSkill, fromEncore: boolean): void {
   sfx(g, "skill", skill.level);
   for (const e of skill.effects) {
     switch (e.type) {
@@ -505,6 +627,20 @@ function applySkill(g: Game, skill: PinballSkill): void {
       case "points":
         addPoints(g, e.value, SHOT_AT.scoop, "great");
         break;
+      case "magnet":
+        // 穴の前のターゲットを倒して、効いているあいだは開けたまま（立っていると吸い寄せても入れない）
+        g.magnetUntil = Math.max(g.magnetUntil, g.clock + e.sec);
+        openScoop(g);
+        break;
+      case "stamp2":
+        g.stamp2Until = Math.max(g.stamp2Until, g.clock + e.sec);
+        break;
+      case "encore":
+        if (!fromEncore) encoreItems(g, e.count);
+        break;
+      case "jackpot":
+        for (let k = 0; k < e.shots; k += 1) g.reserves.push(e.value);
+        break;
     }
   }
 }
@@ -518,7 +654,8 @@ function startConquest(g: Game): void {
   g.superLit = false;
   g.jackpotsMade = 0;
   for (const id of SHOT_IDS) g.jackpots[id] = id !== "scoop";
-  for (const s of g.stamps) s.spot = null;
+  // 浮かんでいたアイテムは消える（おかわりのアイテムだけは、制覇モードが終わるまで待つ）
+  g.lit = g.lit.filter((l) => l.encore);
   g.extraLit = 0;
   for (let i = 0; i < CONQUEST_EXTRA_BALLS; i += 1) queueLaunch(g, 1.2 + i * 0.8);
   g.saveUntil = Math.max(g.saveUntil, g.clock + CONQUEST_SAVE_SEC);
@@ -532,8 +669,12 @@ function endConquest(g: Game): void {
   g.mode = "normal";
   for (const id of SHOT_IDS) g.jackpots[id] = false;
   g.superLit = false;
-  g.stamps = pickStamps(g.pool, g.rand, g.conquests);
-  msg(g, "新しいスタンプ帳", "info", "また8個そろえると、もう一度制覇！", 2200);
+  newBook(g);
+  for (const l of g.lit) {
+    l.litAt = g.clock;
+    l.until = g.clock + ENCORE_SEC;
+  }
+  msg(g, "新しいスタンプ帳", "info", `また${STAMP_COUNT}つそろえると、もう一度制覇！`, 2200);
   lightItems(g);
 }
 
@@ -598,6 +739,15 @@ function majorShot(g: Game, id: ShotId): void {
   }
 
   jackpotShot(g, id);
+  // ジャックポット予約（スキル）：ランプで1つ使う
+  if ((id === "leftRamp" || id === "rightRamp") && g.reserves.length) {
+    const value = g.reserves.shift()!;
+    addPoints(g, value * (1 + g.conquests), at, "epic");
+    g.stats.jackpots += 1;
+    msg(g, "予約ジャックポット！", "epic", g.reserves.length ? `のこり${g.reserves.length}回` : undefined, 1800);
+    sfx(g, "jackpot");
+    g.fx.push({ type: "shake", power: 0.5 });
+  }
 }
 
 /* ---------- スタンドアップターゲット ---------- */
@@ -607,7 +757,7 @@ function standupsComplete(g: Game, bankIndex: number): void {
   const bank = TABLE.standups[bankIndex]!;
   const at = { x: bank.center.x + (bank.side === "left" ? 30 : -30), y: bank.center.y + 46 };
   for (let k = 0; k < 3; k += 1) g.standups[bankIndex * 3 + k] = false;
-  const canCall = g.mode === "normal" && g.stamps.some((s) => !s.collected && s.spot === null);
+  const canCall = g.mode === "normal" && availableItems(g).length > 0;
   addPoints(g, POINTS.standupsAll * (canCall ? 1 : 2), at, "great");
   g.fx.push({ type: "flash", id: `standupsAll:${bankIndex}` });
   sfx(g, "standupsAll");
@@ -623,8 +773,8 @@ function standupsComplete(g: Game, bankIndex: number): void {
 /* ---------- ガチャ穴 ---------- */
 
 function gachaAward(g: Game): void {
-  const hasLit = g.stamps.some((s) => s.spot !== null && !s.collected);
-  const canCall = g.mode === "normal" && g.stamps.some((s) => !s.collected && s.spot === null);
+  const hasLit = g.lit.some((l) => !l.encore);
+  const canCall = g.mode === "normal" && availableItems(g).length > 0;
   const candidates = GACHA_AWARDS.filter((a) => {
     if (a.id === "kickback") return !(g.kickbackLit[0] && g.kickbackLit[1]);
     if (a.id === "extraBall") return g.extraBallsAwarded < 1;
@@ -667,7 +817,7 @@ function gachaAward(g: Game): void {
       lightItems(g);
       break;
     case "stamp": {
-      const index = g.stamps.findIndex((s) => s.spot !== null && !s.collected);
+      const index = g.lit.findIndex((l) => !l.encore);
       if (index >= 0) collectItem(g, index);
       break;
     }
@@ -791,6 +941,7 @@ function handleEvent(g: Game, e: PhysEvent): void {
       if (!ball) break;
       g.scoopBall = ball;
       g.scoopEjectAt = g.clock + 1.9;
+      g.stats.scoops += 1;
       majorShot(g, "scoop");
       gachaAward(g);
       break;
@@ -916,13 +1067,14 @@ function handleDrain(g: Game, ballId: number): void {
 function endOfBall(g: Game): void {
   const p = g.perBall;
   const raw = p.items * BONUS.item + p.ramps * BONUS.ramp + p.orbits * BONUS.orbit + p.bumpers * BONUS.bumper + p.drops * BONUS.drop;
-  const bonus = raw * g.bonusX;
+  const bonus = Math.round(raw * g.bonusX * g.zukan);
   g.score += bonus;
   g.lastBonus = bonus;
   g.phase = "bonus";
   g.bonusUntil = g.clock + 2.6;
   g.fx.push({ type: "ballLost", bonus });
-  msg(g, "ボーナス", "info", `${raw.toLocaleString("ja-JP")} × ${g.bonusX} = ${bonus.toLocaleString("ja-JP")}`, 2400);
+  const zukanText = g.zukan > 1 ? ` × 図鑑${g.zukan}` : "";
+  msg(g, "ボーナス", "info", `${raw.toLocaleString("ja-JP")} × ${g.bonusX}${zukanText} = ${bonus.toLocaleString("ja-JP")}`, 2400);
   sfx(g, "bonus");
   g.perBall = { items: 0, ramps: 0, orbits: 0, bumpers: 0, drops: 0 };
   g.bonusX = 1;
@@ -930,6 +1082,8 @@ function endOfBall(g: Game): void {
   g.bumperMults = [];
   g.slowUntil = 0;
   g.gateUntil = 0;
+  g.magnetUntil = 0;
+  g.stamp2Until = 0;
   g.combo = 0;
   g.saveUntil = 0;
   if (g.mode === "conquest") endConquest(g);
@@ -960,6 +1114,7 @@ function nextBall(g: Game): void {
 function tick(g: Game): void {
   const { world } = g;
   world.outlaneGate = g.clock < g.gateUntil ? [true, true] : [false, false];
+  world.magnet = g.clock < g.magnetUntil && g.phase !== "bonus";
   if (g.mults.length) g.mults = g.mults.filter((t) => t.until > g.clock);
   if (g.bumperMults.length) g.bumperMults = g.bumperMults.filter((t) => t.until > g.clock);
 
@@ -1018,8 +1173,8 @@ function tick(g: Game): void {
       g.dropsResetAt = g.clock + 0.7;
     }
   }
-  // ドロップターゲットを立てなおす（スーパージャックポット中は開けたまま）
-  if (g.dropsResetAt && g.clock >= g.dropsResetAt && !g.superLit) {
+  // ドロップターゲットを立てなおす（スーパージャックポット中・マグネット中は開けたまま）
+  if (g.dropsResetAt && g.clock >= g.dropsResetAt && !g.superLit && g.clock >= g.magnetUntil) {
     // ガチャ穴の中・かこいの中（ターゲットの上）・すぐ下に玉がいるあいだは立てない
     // （立てると、中の玉がターゲットの上に乗って止まる。穴の中の玉も、出てくるときにかこいに閉じこめられる）
     const near = g.scoopBall !== null || world.balls.some((b) => b.mode === "scoop" || (b.mode === "field" && insideScoopArea(b, 575)));
