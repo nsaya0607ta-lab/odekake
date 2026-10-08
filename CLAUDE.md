@@ -49,3 +49,17 @@
 - 青コインの換算（`config.ts` の `COIN_POINTS` / `COIN_MAX`）を変えるときは、
   データベースの `record_pinball_result` も新しいマイグレーションで同じ数字にすること。
 - `tables.ts` は地図のデータを読むサーバー専用のファイル。ブラウザ側のコードから import しないこと。
+
+## インフラ（`src/components/infra/`）を調整するとき
+
+**必ず `docs/infra-app.md` を読んでから作業すること。** ステージ・パーツ・シミュレーションのルール・ラボ（自由設計）・
+サーバー室・確かめかたがまとまっている。
+
+- ステージの数字（交通量・事件・目標・パーツの数値）を変えたら `node scripts/simulate-infra.mjs 40` で確かめ、docs の表も更新する。
+  シミュレーターのしくみだけを変えたとき（リファクタリングなど）は、変える前と後で出力が1文字も変わらないことを確かめる。
+- `sim.ts`・`layout.ts`・`design.ts`・`export.ts`・`room.ts` を変えたら `node scripts/fuzz-infra.mjs 2000` を通す。
+  書き出し（`export.ts`）を変えたら、`FUZZ_VALIDATE=1` で `docker compose config`・`terraform validate` も通す（docs の 6.7）。
+- シミュレーターはリンク（つなぎ方）のとおりにアクセスを流す。ステージは置いたパーツから `computeLinks` でつなぎ方が決まるので、
+  `computeLinks` の並び順を変えるとステージの結果が変わる。
+- サーバー室の Worker のコード（`room.ts` の `WORKER_SOURCE`）では、外とつながる道具（fetch など）を消す処理を外さないこと。
+  HTTP のヘッダーの値は英数字だけにする（日本語は本文へ）。

@@ -517,11 +517,18 @@ export class InfraSim {
   /** いつもの拠点を、まるごと止める（停電）。DNS・CDN・予備の拠点・監視・バックアップは別の場所にあるので動いている */
   outage(duration: number): boolean {
     if (this.now < this.mainUpAt) return false;
-    const targets = [...this.nodes.values()].filter((n) => !OUTSIDE.has(n.kind) && !n.down);
     this.mainDownAt = this.now;
     this.mainUpAt = this.now + duration;
     this.outageNotice = true;
-    for (const n of targets) this.crashNode(n, duration, "outage");
+    for (const n of this.nodes.values()) {
+      if (OUTSIDE.has(n.kind)) continue;
+      if (!n.down) this.crashNode(n, duration, "outage");
+      else {
+        // もともと止まっていたパーツも、電気がもどるまでは直らない（監視の再起動も効かない）
+        n.recoverAt = Math.max(n.recoverAt, this.mainUpAt);
+        n.downKind = "outage";
+      }
+    }
     this.banners.push({ text: "⚡ 停電！ 拠点がまるごと止まった", tone: "danger" });
     this.tip("outage");
     return true;
@@ -793,6 +800,11 @@ export class InfraSim {
     }
     if (req.returning) {
       this.passBack(req, node);
+      return;
+    }
+    // オートスケールで休んでいるサーバーは、電源が切れているのと同じ
+    if (node.asleep) {
+      this.fail(req, "down");
       return;
     }
     this.enqueue(node, req);
@@ -1448,8 +1460,11 @@ export class InfraSim {
   /** バックアップ：ときどき DB の中身を保存し、消えたら元にもどす */
   private checkBackup() {
     const bk = this.nodes.get("backup");
-    // DB とつながっていないバックアップは、何も保存できない
-    if (!bk || bk.down || !this.dbs().some((d) => this.linked(d.id, bk.id))) return;
+    // DB とつながっていないバックアップは、何も保存できない（元にもどしている途中なら、そこでやめになる）
+    if (!bk || bk.down || !this.dbs().some((d) => this.linked(d.id, bk.id))) {
+      this.restoreAt = Infinity;
+      return;
+    }
     const now = this.now;
     const db = this.primary();
     if (now >= this.nextSnapshot) {
@@ -1521,6 +1536,11 @@ export class InfraSim {
     this.nodes.delete(node.id);
     for (const r of this.reqs) if (r.inc === node.id) r.inc = null;
     if (this.primaryDb === node.id) this.primaryDb = null;
+    // バックアップを外したら、保存しておいた中身もいっしょになくなる
+    if (node.kind === "backup") {
+      this.lastSnapshot = -Infinity;
+      this.restoreAt = Infinity;
+    }
   }
 
   /* ------------------------------------------------------------ 小物 */

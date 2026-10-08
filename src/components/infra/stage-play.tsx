@@ -62,8 +62,19 @@ export function StagePlay({
   const cost = placements.reduce((s, p) => s + partCost(p.kind, p.size), 0);
   const index = STAGES.findIndex((s) => s.id === stage.id);
   const hasNext = index >= 0 && index < STAGES.length - 1;
+  // ヒント：お手本にあって、まだ置いていないマス。はじめからあるパーツは、設定（DNS の TTL など）がお手本とちがうとき
   const hintSlots = useMemo(
-    () => new Set(hint ? stage.solution.filter((p) => !fixed.has(p.slot) && !placements.some((q) => q.slot === p.slot)).map((p) => p.slot) : []),
+    () =>
+      new Set(
+        hint
+          ? stage.solution
+              .filter((p) => {
+                const cur = placements.find((q) => q.slot === p.slot);
+                return cur ? fixed.has(p.slot) && cur.size !== p.size : !fixed.has(p.slot);
+              })
+              .map((p) => p.slot)
+          : [],
+      ),
     [hint, stage, fixed, placements],
   );
 

@@ -7,10 +7,10 @@
  */
 import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
 import { Board } from "./board";
-import { addPart, autoWire, countOf, defaultDesign, designWarnings, loadDesign, removePart, resizePart, saveDesign, toggleLink, LIMITS, type Design } from "./design";
+import { addPart, autoWire, countOf, designWarnings, loadDesign, removePart, resizePart, saveDesign, toggleLink, LIMITS, type Design } from "./design";
 import { exportDesign } from "./export";
 import { Glyph } from "./glyphs";
-import { USERS, lineCount } from "./layout";
+import { USERS, lineCount, linkBetween } from "./layout";
 import { PARTS, PART_KINDS, partCost, slotLabel, yen, type NodeId, type PartKind } from "./model";
 import { BottomSheet, PartSheet } from "./sheets";
 import { InfraSim, type Rates, type SimSetup, type Tone } from "./sim";
@@ -22,17 +22,37 @@ type Note = { id: number; text: string; tone: "ok" | "ng" };
 
 const FAR_USERS = 3;
 const NO_FIXED = new Set<NodeId>();
+/** 「もとにもどす」でもどれる回数 */
+const UNDO_MAX = 40;
 const nameOf = (id: string) => (id === USERS ? "利用者" : slotLabel(id));
 
 export function Lab({ parts }: { parts: ReadonlySet<PartKind> }) {
   const dnsOn = parts.has("dns");
-  const [design, setDesignState] = useState<Design>(() => defaultDesign(parts));
-  // 覚えておいた設計図は、画面が出てから読む（サーバーで描くときは localStorage がないので）
-  useEffect(() => setDesignState(loadDesign(parts)), [parts]);
+  // ラボはブラウザの中でだけ描く（infra-app.tsx が、進み具合を読んでから出す）ので、はじめから覚えておいた設計図を読める
+  const [design, setDesignState] = useState<Design>(() => loadDesign(parts));
+  const designRef = useRef(design);
+  const history = useRef<Design[]>([]);
+  const [canUndo, setCanUndo] = useState(false);
+  /** 設計図を変える（ひとつ前の形を「もとにもどす」用にとっておく） */
   const setDesign = useCallback((d: Design) => {
+    history.current = [...history.current, designRef.current].slice(-UNDO_MAX);
+    setCanUndo(true);
+    designRef.current = d;
     setDesignState(d);
     saveDesign(d);
   }, []);
+  const undo = () => {
+    const prev = history.current.pop();
+    if (!prev) return;
+    designRef.current = prev;
+    setDesignState(prev);
+    saveDesign(prev);
+    setCanUndo(history.current.length > 0);
+    setLinkFrom(null);
+    setSheet(null);
+    sfx("remove");
+    flash("ひとつ前の形にもどしました");
+  };
 
   const [sim, setSim] = useState<InfraSim | null>(null);
   const [paused, setPaused] = useState(false);
@@ -54,6 +74,13 @@ export function Lab({ parts }: { parts: ReadonlySet<PartKind> }) {
   const lines = lineCount(slots);
   const boardHeight = Math.max(420, 180 + Math.max(0, lines - 1) * 112 + 100);
   const rowRange = useMemo(() => ({ top: 180 / boardHeight, bottom: (boardHeight - 100) / boardHeight }), [boardHeight]);
+  // 線をつなぐモードで選んだものと、つなげる相手
+  const targets = useMemo(() => {
+    const out = new Set<string>();
+    if (!linking || !linkFrom) return out;
+    for (const c of [USERS, ...slots]) if (c !== linkFrom && linkBetween(linkFrom, c)) out.add(c);
+    return out;
+  }, [linking, linkFrom, slots]);
   const warnings = useMemo(() => {
     const list = designWarnings(design);
     if (dnsOn && !slots.includes("dns")) list.unshift("DNS がないと、利用者はお店の住所をしらべられません");
@@ -182,10 +209,13 @@ export function Lab({ parts }: { parts: ReadonlySet<PartKind> }) {
             setDesign(autoWire(design));
             setLinkFrom(null);
             sfx("place");
-            flash("ふつうのつなぎ方に組みなおしました");
+            flash("ふつうのつなぎ方に組みなおしました（「↶」でもどせます）");
           }}
         >
           自動でつなぐ
+        </button>
+        <button type="button" className={styles.btnGhost} onClick={undo} disabled={!canUndo} aria-label="もとにもどす" title="もとにもどす">
+          ↶
         </button>
         <button type="button" className={styles.btnPrimary} onClick={() => setExporting(true)}>
           本物の設定にする
@@ -194,7 +224,11 @@ export function Lab({ parts }: { parts: ReadonlySet<PartKind> }) {
 
       {linking ? (
         <p className={styles.labHint} role="status">
-          {linkFrom ? `「${nameOf(linkFrom)}」から… つなぐ先をタップ（もう一度タップでやめる）` : "つなぎたい2つを順にタップ。つながっていたら外れます。いちばん上の利用者の列もタップできます"}
+          {linkFrom
+            ? targets.size
+              ? `「${nameOf(linkFrom)}」から… 光っている相手をタップ（つながっていたら外れます）`
+              : `「${nameOf(linkFrom)}」とつなげる相手が、いまはありません`
+            : "つなぎたい2つを順にタップ。つながっていたら外れます。いちばん上の利用者の列もタップできます"}
         </p>
       ) : null}
 
@@ -213,6 +247,8 @@ export function Lab({ parts }: { parts: ReadonlySet<PartKind> }) {
           onSlot={(id) => (linking ? pick(id) : setSheet(id))}
           onUsers={linking ? () => pick(USERS) : undefined}
           usersSelected={linkFrom === USERS}
+          targets={targets}
+          focus={linking ? linkFrom : null}
           rowRange={rowRange}
           onTick={onTick}
         />

@@ -107,15 +107,17 @@ export function computeLayout(slots: readonly NodeId[], opts: { bot: boolean; fa
     const xs = row.length === 1 ? [0.5] : spread(row.length, 0.06, 0.94);
     row.forEach((s, i) => pos.set(s, { x: xs[i]!, y }));
   });
-  // ワーカーは、キューの真下あたりに
+  // ワーカーは、キューの真下あたりに（左はしに監視がいれば、それをよけて。多いときは間をつめる）
   const queue = ids.find((s) => kindOf(s) === "queue");
   const qp = queue ? pos.get(queue) : undefined;
   if (qp && workers.length) {
     const by = backY || qp.y + 0.12;
-    const gap = 0.22;
+    const lo = ids.some((s) => kindOf(s) === "monitor") ? 0.3 : 0.08;
+    const hi = 0.92;
+    const gap = Math.min(0.22, (hi - lo) / Math.max(1, workers.length - 1));
     const half = ((workers.length - 1) * gap) / 2;
-    const lo = (ids.some((s) => kindOf(s) === "monitor") ? 0.3 : 0.08) + half;
-    const cx = Math.min(0.92 - half, Math.max(lo, workers.length <= 2 ? Math.min(0.86, Math.max(0.14, qp.x - 0.05)) : qp.x));
+    const want = workers.length <= 2 ? Math.min(0.86, Math.max(0.14, qp.x - 0.05)) : qp.x;
+    const cx = Math.min(hi - half, Math.max(lo + half, want));
     workers.forEach((s, i) => pos.set(s, { x: workers.length === 1 ? cx : cx - half + i * gap, y: by }));
   }
 
@@ -200,6 +202,8 @@ const CAN_LINK: Partial<Record<PartKind | typeof USERS, Partial<Record<PartKind,
   queue: { worker: "job" },
   worker: { db: "job", replica: "job" },
   db: { replica: "repl", backup: "repl" },
+  // 予備DB からバックアップをとることもある（本番DB の手をわずらわせないように）
+  replica: { backup: "repl" },
   monitor: { app: "ctl", db: "ctl", replica: "ctl" },
 };
 

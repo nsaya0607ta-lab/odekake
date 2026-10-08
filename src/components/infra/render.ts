@@ -40,6 +40,8 @@ export class BoardRenderer {
   private readonly sprites = new Map<string, HTMLCanvasElement>();
   private particles: Particle[] = [];
   private texts: FloatText[] = [];
+  /** 線をつなぐときに選んでいるパーツ（その線を目立たせる。"users" なら利用者の線） */
+  private focus: string | null = null;
   reduced = false;
 
   constructor(back: HTMLCanvasElement, front: HTMLCanvasElement) {
@@ -58,6 +60,10 @@ export class BoardRenderer {
       canvas.height = Math.round(this.h * dpr);
     }
     this.buildWires();
+  }
+
+  setFocus(id: string | null) {
+    this.focus = id;
   }
 
   setLayout(layout: BoardLayout, wires: Wire[]) {
@@ -135,12 +141,20 @@ export class BoardRenderer {
   private drawWires(sim: InfraSim | null, t: number) {
     const b = this.back;
     b.lineCap = "round";
+    const focus = this.focus;
     for (const { wire, path, color } of this.wirePaths) {
       const user = wire.kind === "user" || wire.kind === "dns";
       const ctl = wire.kind === "ctl";
       b.setLineDash(wire.kind === "dns" || wire.kind === "repl" ? [2, 6] : ctl ? [1, 5] : []);
-      b.lineWidth = user || ctl ? 1 : 1.6;
-      b.strokeStyle = user || ctl ? "rgba(170, 196, 255, 0.07)" : "rgba(170, 196, 255, 0.14)";
+      if (focus) {
+        // 選んでいるパーツの線だけ、くっきり（ほかはうすく）
+        const mine = wire.a === focus || wire.b === focus || (focus === "users" && isUserId(wire.a));
+        b.lineWidth = mine ? 2.2 : 1;
+        b.strokeStyle = mine ? hexA("#ffd27a", 0.75) : "rgba(170, 196, 255, 0.05)";
+      } else {
+        b.lineWidth = user || ctl ? 1 : 1.6;
+        b.strokeStyle = user || ctl ? "rgba(170, 196, 255, 0.07)" : "rgba(170, 196, 255, 0.14)";
+      }
       b.stroke(path);
       if (!sim) continue;
       const na = isUserId(wire.a) ? null : sim.nodes.get(wire.a);

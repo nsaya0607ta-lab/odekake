@@ -80,6 +80,7 @@ export function launcherItems({ sns, memoryGame }: LauncherOptions): LauncherIte
         { label: "ステージ", href: "/infra" },
         { label: "ずかん", href: "/infra?tab=glossary" },
         { label: "ラボ", href: "/infra?tab=lab" },
+        { label: "サーバー室", href: "/infra?tab=room" },
       ],
     }),
     app({ id: "coin-history", name: "コインの記録", href: "/mypage/coin-history", tint: ["#6f86ee", "#2d3a9c"], keywords: ["こいん", "りれき", "履歴", "青コイン"] }),
