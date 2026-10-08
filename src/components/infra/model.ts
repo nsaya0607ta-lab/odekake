@@ -6,7 +6,7 @@
  * 数値を変えたら `node scripts/simulate-infra.mjs` で各ステージの目標値を確かめること（docs/infra-app.md）。
  */
 
-export type PartKind = "dns" | "cdn" | "waf" | "lb" | "app" | "cache" | "db" | "replica" | "queue" | "worker";
+export type PartKind = "dns" | "cdn" | "waf" | "region" | "lb" | "auto" | "app" | "cache" | "db" | "replica" | "queue" | "backup" | "worker" | "monitor";
 
 /** アクセスの種類（attack 以外が、本物のお客さん） */
 export type ReqType = "page" | "static" | "write" | "heavy" | "attack";
@@ -15,7 +15,8 @@ export const REQ_TYPES: readonly ReqType[] = ["page", "static", "write", "heavy"
 /** 盤面の段（上から） */
 export type Tier = "edge" | "lb" | "app" | "data" | "back";
 
-export type PartSize = { label: string; cap: number; queue: number; cost: number };
+/** name / note があれば、置くシートでは「S サイズ」のかわりにこちらを出す（DNS の TTL など、大きさではない選択肢） */
+export type PartSize = { label: string; cap: number; queue: number; cost: number; name?: string; note?: string };
 
 export type PartSpec = {
   kind: PartKind;
@@ -46,7 +47,11 @@ export const PARTS: Record<PartKind, PartSpec> = {
     analogy: "電話帳",
     color: "#8b9dff",
     tier: "edge",
-    sizes: [{ label: "", cap: 40, queue: 100, cost: 100 }],
+    // 2つ目は TTL を短くしたもの（住所が変わったとき早く伝わるが、問い合わせが増える）
+    sizes: [
+      { label: "", cap: 40, queue: 100, cost: 100, name: "TTL 15秒（ふつう）", note: "答えを15秒覚えておく" },
+      { label: "短", cap: 40, queue: 100, cost: 100, name: "TTL 3秒（短め）", note: "住所が変わるとすぐ伝わる。問い合わせは増える" },
+    ],
   },
   cdn: {
     kind: "cdn",
@@ -70,6 +75,17 @@ export const PARTS: Record<PartKind, PartSpec> = {
     tier: "edge",
     sizes: [{ label: "", cap: 60, queue: 100, cost: 2000 }],
   },
+  region: {
+    kind: "region",
+    name: "予備の拠点（大阪）",
+    short: "大阪",
+    en: "Another Region",
+    role: "遠くの町に用意した、お店まるごとの予備。いつもの拠点が全部止まったら、DNS がこちらを案内する",
+    analogy: "となり町の支店",
+    color: "#e879f9",
+    tier: "edge",
+    sizes: [{ label: "", cap: 8, queue: 16, cost: 7000 }],
+  },
   lb: {
     kind: "lb",
     name: "ロードバランサー",
@@ -80,6 +96,17 @@ export const PARTS: Record<PartKind, PartSpec> = {
     color: "#ffc857",
     tier: "lb",
     sizes: [{ label: "", cap: 60, queue: 100, cost: 2500 }],
+  },
+  auto: {
+    kind: "auto",
+    name: "オートスケール",
+    short: "オート",
+    en: "Auto Scaling",
+    role: "混み具合を見て、置いたサーバーを自動で起こしたり休ませたりする。休んでいるサーバーは月額がかからない",
+    analogy: "混んだら休憩中の店員さんを呼ぶ店長",
+    color: "#4ade80",
+    tier: "lb",
+    sizes: [{ label: "", cap: 0, queue: 0, cost: 1000 }],
   },
   app: {
     kind: "app",
@@ -143,6 +170,17 @@ export const PARTS: Record<PartKind, PartSpec> = {
     tier: "data",
     sizes: [{ label: "", cap: 50, queue: 100, cost: 800 }],
   },
+  backup: {
+    kind: "backup",
+    name: "バックアップ",
+    short: "バックアップ",
+    en: "Backup",
+    role: "データベースの中身を、ときどき別の場所に保存しておく。消えてしまったら、ここから元にもどす",
+    analogy: "台帳のコピーを金庫にしまう",
+    color: "#94a3b8",
+    tier: "data",
+    sizes: [{ label: "", cap: 0, queue: 0, cost: 1200 }],
+  },
   worker: {
     kind: "worker",
     name: "ワーカー",
@@ -154,6 +192,17 @@ export const PARTS: Record<PartKind, PartSpec> = {
     tier: "back",
     sizes: [{ label: "", cap: 2, queue: 0, cost: 2500 }],
   },
+  monitor: {
+    kind: "monitor",
+    name: "監視",
+    short: "監視",
+    en: "Monitoring",
+    role: "サーバーや DB の様子（速さ・止まっていないか）をいつも見張り、おかしくなったら知らせて自動で再起動する",
+    analogy: "見回りの警備員さん",
+    color: "#60a5fa",
+    tier: "back",
+    sizes: [{ label: "", cap: 0, queue: 0, cost: 1500 }],
+  },
 };
 
 export const PART_KINDS = Object.keys(PARTS) as PartKind[];
@@ -162,13 +211,33 @@ export const PART_KINDS = Object.keys(PARTS) as PartKind[];
  * 盤面のマス。1つのマスには決まった種類のパーツだけが置ける（スマホでも迷わず置けるように）。
  * サーバーは app1 から順に「1台目、2台目…」。ロードバランサーがないときは、いちばん前のサーバーにだけアクセスが来る
  */
-export type SlotId = "dns" | "cdn" | "waf" | "lb" | "app1" | "app2" | "app3" | "app4" | "cache" | "db" | "replica" | "queue" | "worker1" | "worker2";
+export type SlotId =
+  | "dns"
+  | "cdn"
+  | "waf"
+  | "region"
+  | "lb"
+  | "auto"
+  | "app1"
+  | "app2"
+  | "app3"
+  | "app4"
+  | "cache"
+  | "db"
+  | "replica"
+  | "queue"
+  | "backup"
+  | "worker1"
+  | "worker2"
+  | "monitor";
 
 export const SLOT_KIND: Record<SlotId, PartKind> = {
   dns: "dns",
   cdn: "cdn",
   waf: "waf",
+  region: "region",
   lb: "lb",
+  auto: "auto",
   app1: "app",
   app2: "app",
   app3: "app",
@@ -177,20 +246,58 @@ export const SLOT_KIND: Record<SlotId, PartKind> = {
   db: "db",
   replica: "replica",
   queue: "queue",
+  backup: "backup",
   worker1: "worker",
   worker2: "worker",
+  monitor: "monitor",
 };
 
-export const SLOT_ORDER: readonly SlotId[] = ["dns", "cdn", "waf", "lb", "app1", "app2", "app3", "app4", "cache", "db", "replica", "queue", "worker1", "worker2"];
+export const SLOT_ORDER: readonly SlotId[] = [
+  "dns",
+  "cdn",
+  "waf",
+  "region",
+  "lb",
+  "auto",
+  "app1",
+  "app2",
+  "app3",
+  "app4",
+  "cache",
+  "db",
+  "replica",
+  "queue",
+  "backup",
+  "worker1",
+  "worker2",
+  "monitor",
+];
+
+/**
+ * 盤面のパーツの名前（id）。ステージではマスの名前（SlotId）と同じ。
+ * ラボ（自由設計）では、1つしか置けないものは種類の名前そのまま（"lb"・"db" など）、
+ * いくつも置けるものは種類の名前＋番号（"app5"・"worker3"・"replica2"）。
+ */
+export type NodeId = string;
+
+/** id からパーツの種類（末尾の番号をとる） */
+export const kindOf = (id: NodeId): PartKind => id.replace(/\d+$/, "") as PartKind;
+
+/** id の末尾の番号（なければ 0） */
+export const numOf = (id: NodeId): number => Number(/\d+$/.exec(id)?.[0] ?? 0);
+
+/** 置く順・処理する順（種類の順、同じ種類は番号の順）。ステージでは SLOT_ORDER と同じ並びになる */
+export function compareIds(a: NodeId, b: NodeId): number {
+  return PART_KINDS.indexOf(kindOf(a)) - PART_KINDS.indexOf(kindOf(b)) || numOf(a) - numOf(b);
+}
 
 /** 置いたパーツ（size は PARTS[kind].sizes の何番目か） */
-export type Placement = { slot: SlotId; kind: PartKind; size: number };
+export type Placement = { slot: NodeId; kind: PartKind; size: number };
 
 /** マスにいるパーツの呼び名（「サーバー2」など） */
-export function slotLabel(slot: SlotId): string {
-  const kind = SLOT_KIND[slot];
-  const n = /\d$/.test(slot) ? slot.slice(-1) : "";
-  return `${PARTS[kind].short}${n}`;
+export function slotLabel(slot: NodeId): string {
+  const n = /\d+$/.exec(slot)?.[0] ?? "";
+  return `${PARTS[kindOf(slot)].short}${n}`;
 }
 
 export const REQ_INFO: Record<ReqType, { name: string; color: string; note: string }> = {
@@ -221,6 +328,8 @@ export const SERVICE = {
   db: { read: 0.45, write: 0.6, job: 0.3 },
   queue: 0.03,
   worker: 1.6,
+  /** 予備の拠点（サーバーと DB がひとまとめ） */
+  region: 0.5,
 } as const;
 
 /** 移動にかかる時間（ゲーム内の秒） */
@@ -235,12 +344,17 @@ export const TRAVEL = {
   cdnOrigin: 0.45,
   internal: 0.12,
   data: 0.15,
+  /** 予備の拠点（大阪）は遠いので、少し時間がかかる */
+  userRegion: 0.7,
 } as const;
 
 /** これより長くかかったアクセスは、タイムアウト（504） */
 export const TIMEOUT = 8;
-/** 利用者が DNS の答えを覚えておく時間（TTL） */
+/** 利用者が DNS の答えを覚えておく時間（TTL）。DNS を「TTL 短め」にすると DNS_TTL_SHORT */
 export const DNS_TTL = 15;
+export const DNS_TTL_SHORT = 3;
+/** DNS が、いつもの拠点が止まったことに気づくまで（DNS のヘルスチェック） */
+export const DNS_HEALTH_DELAY = 1;
 /** ロードバランサーが、サーバーの故障・復旧に気づくまでの時間（ヘルスチェック） */
 export const HEALTH_DELAY = 0.8;
 /** 本番DB が止まってから、予備DB が本番に昇格するまで */
@@ -256,6 +370,26 @@ export const CDN_WARM = 24;
 export const QUEUE_MAX_JOBS = 120;
 /** キューに入ってから、これより長く待たされた仕事は「期限切れ」（失敗に数える） */
 export const JOB_DEADLINE = 8;
+
+/** オートスケール：混み具合（処理中＋待ち ÷ 同時に処理できる数）がこれをこえたら1台起こし、下回ったら1台休ませる */
+export const SCALE_OUT_LOAD = 0.6;
+export const SCALE_IN_LOAD = 0.3;
+/** 休んでいたサーバーが起きて、仕事を受けられるようになるまで */
+export const BOOT_TIME = 2;
+/** 1台起こしたあと・休ませたあと、次に動くまで待つ時間 */
+export const SCALE_OUT_COOLDOWN = 1.5;
+export const SCALE_IN_COOLDOWN = 4;
+
+/** 監視：止まった・遅くなったことに気づくまでと、自動の再起動にかかる時間 */
+export const MONITOR_DETECT = 1;
+export const RESTART_TIME = 2;
+/** 調子の悪いサーバーは、処理がこの倍だけ遅くなる */
+export const SLOW_FACTOR = 7;
+
+/** バックアップ：データの保存の間隔・消えたことに気づくまで・元にもどすのにかかる時間 */
+export const BACKUP_EVERY = 4;
+export const BACKUP_DETECT = 1.2;
+export const RESTORE_TIME = 2.5;
 
 /** 利用者（盤面のいちばん上に並ぶ人）の数 */
 export const USER_COUNT = 6;

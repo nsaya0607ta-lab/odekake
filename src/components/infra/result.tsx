@@ -8,7 +8,7 @@ import { createPortal } from "react-dom";
 import { termById } from "./glossary";
 import { yen } from "./model";
 import { Teacher } from "./intro";
-import type { FailReason, Metrics, Sample } from "./sim";
+import type { FailReason, Metrics, Sample, StageEvent } from "./sim";
 import type { Goal, Quiz, Result, StageDef } from "./stages";
 import { sfx } from "./sound";
 import styles from "./infra.module.css";
@@ -31,6 +31,7 @@ const ADVICE: Record<FailReason, string> = {
   missing: "データが見つからないアクセスがありました。データをどこに置くか考えてみよう。",
   noserver: "行き先のサーバーがありませんでした。",
   late: "期限までに終わらなかった加工がありました。ワーカーは足りている？",
+  lost: "データが消えたまま、読めないアクセスがありました。消える前の写し（バックアップ）はとってある？",
 };
 
 const FAIL_NAME: Record<FailReason, string> = {
@@ -41,7 +42,11 @@ const FAIL_NAME: Record<FailReason, string> = {
   missing: "データなし",
   noserver: "行き先なし",
   late: "加工の期限切れ",
+  lost: "データ消失",
 };
+
+/** グラフに縦線で出す事件の名前 */
+const INCIDENT: Record<Exclude<StageEvent["kind"], "banner">, string> = { crash: "故障", slow: "不調", wipe: "消失", outage: "停電" };
 
 export function ResultOverlay({
   stage,
@@ -319,7 +324,7 @@ function ResultChart({ series, goal, stage }: { series: Sample[]; goal: Goal; st
   const pts = useMemo(() => smooth(series), [series]);
   const duration = Math.max(1, series.length ? series[series.length - 1]!.t : stage.setup.duration);
   const latMax = niceMax(Math.max(goal.latency * 1.25, ...pts.map((p) => p.lat ?? 0)));
-  const crashes = stage.setup.events.filter((e) => e.kind === "crash").map((e) => e.t);
+  const crashes = stage.setup.events.flatMap((e) => (e.kind === "banner" ? [] : [{ t: e.t, label: INCIDENT[e.kind] }]));
   const H = 92;
   const top = 10;
   const plotH = 64;
@@ -396,12 +401,12 @@ function ResultChart({ series, goal, stage }: { series: Sample[]; goal: Goal; st
             </text>
           </g>
         ))}
-        {crashes.map((t, i) => (
-          <g key={t}>
+        {crashes.map(({ t, label }, i) => (
+          <g key={i}>
             <line x1={xOf(t)} x2={xOf(t)} y1={top} y2={top + plotH} className={styles.chartEvent} />
-            {kind === "rate" && (i === 0 || xOf(t) - xOf(crashes[i - 1]!) > 34) ? (
+            {kind === "rate" && (i === 0 || xOf(t) - xOf(crashes[i - 1]!.t) > 34) ? (
               <text x={xOf(t) + 3} y={top + plotH - 5} className={styles.chartTick}>
-                故障
+                {label}
               </text>
             ) : null}
           </g>

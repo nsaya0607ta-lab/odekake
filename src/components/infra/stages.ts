@@ -81,6 +81,7 @@ export function keyframes(keys: Key[]): (t: number) => Rates {
 }
 
 const P = (slot: SlotId, kind: PartKind, size = 0, at?: number): Placement & { at?: number } => (at == null ? { slot, kind, size } : { slot, kind, size, at });
+/** ステージ10（総まとめ）で使うマス。ステージ11からのパーツは入れない */
 const ALL_SLOTS: SlotId[] = ["dns", "cdn", "waf", "lb", "app1", "app2", "app3", "app4", "cache", "db", "replica", "queue", "worker1", "worker2"];
 
 export const STAGES: StageDef[] = [
@@ -672,6 +673,245 @@ export const STAGES: StageDef[] = [
       P("worker2", "worker"),
     ],
   },
+  {
+    id: "s11",
+    no: 11,
+    title: "昼は大混雑、夜はひま",
+    subtitle: "混み具合に合わせて、サーバーの数を自動で変えよう",
+    topic: "オートスケール",
+    newParts: ["auto"],
+    intro: [
+      {
+        title: "1日の中で、混み方が変わる",
+        body: "お昼休みや夕方はアクセスが多いけど、朝や夜はがらがら。いちばん混む時間に合わせてサーバーをそろえておくと、ひまな時間にもずっとお金がかかります。",
+      },
+      {
+        title: "自動で増やして、自動で減らす",
+        body: "オートスケールは混み具合を見張っていて、混んできたら休んでいるサーバーを起こし（スケールアウト）、すいたら休ませます（スケールイン）。休んでいるサーバーには、月額がかかりません。",
+        flow: [
+          { icon: "auto", label: "オートスケール", say: "混んできた！ 起きて" },
+          { icon: "app", label: "サーバー", say: "起動中…" },
+        ],
+        analogy: "オートスケールは、混んだら休憩中の店員さんを呼ぶ店長",
+      },
+      {
+        title: "置いた数が、増やせる上限",
+        body: "サーバーのマスに置いた台数までなら、自動で増やせます。ただし、起きて仕事を始めるまでには少し時間がかかります。",
+      },
+    ],
+    slots: ["dns", "lb", "auto", "app1", "app2", "app3", "app4", "cache", "db"],
+    fixed: [P("dns", "dns"), P("lb", "lb"), P("app1", "app"), P("cache", "cache"), P("db", "db")],
+    budget: 30000,
+    goal: { success: 0.95, latency: 230, cost: 18400 },
+    setup: {
+      requiresDns: true,
+      farRatio: 0,
+      duration: 60,
+      traffic: keyframes([
+        { t: 0, page: 3, write: 0.4 },
+        { t: 12, page: 4, write: 0.5 },
+        { t: 24, page: 21, write: 1.5 },
+        { t: 34, page: 21, write: 1.5 },
+        { t: 40, page: 4, write: 0.5 },
+        { t: 60, page: 3, write: 0.4 },
+      ]),
+      events: [
+        { t: 15, kind: "banner", text: "🍙 お昼休み！ アクセスが増えてきた", tone: "warn" },
+        { t: 38, kind: "banner", text: "🌙 夜になって、すいてきた", tone: "info" },
+      ],
+    },
+    tips: ["busy", "scale-out", "scale-in", "timeout"],
+    hint: "オートスケールを置いて、空いているサーバーのマスにもサーバーを置いておこう（置いた台数が、増やせる上限）。休んでいるサーバーは月額がかかりません。",
+    takeaways: [
+      "アクセスは1日の中で波がある。いちばん混む時間に合わせっぱなしだと、お金がむだになる",
+      "オートスケールは、混んだら増やし（スケールアウト）、すいたら減らす（スケールイン）",
+      "起きるまで時間がかかるので、急な混雑には少し余裕をもたせておく",
+    ],
+    quiz: [
+      {
+        q: "オートスケールのいちばん良いところは？",
+        choices: ["混み具合に合わせて台数が変わり、むだなお金がかからない", "サーバー1台が速くなる", "悪いアクセスを止められる"],
+        answer: 0,
+        why: "混むときだけ台数を増やし、すいたら減らすので、使った分だけのお金ですみます。",
+      },
+    ],
+    terms: ["autoscale", "peak"],
+    solution: [P("dns", "dns"), P("lb", "lb"), P("app1", "app"), P("cache", "cache"), P("db", "db"), P("auto", "auto"), P("app2", "app"), P("app3", "app"), P("app4", "app")],
+  },
+  {
+    id: "s12",
+    no: 12,
+    title: "だれも気づかない…",
+    subtitle: "おかしくなったら、すぐ気づいて直そう",
+    topic: "監視",
+    newParts: ["monitor"],
+    intro: [
+      {
+        title: "止まってはいないけど、とても遅い",
+        body: "サーバーは、こわれて止まるだけではありません。メモリが足りなくなって、動いてはいるのにとても遅くなることもあります。ロードバランサーのヘルスチェックは「返事があるか」しか見ないので、遅いだけだと気づけません。",
+      },
+      {
+        title: "いつも見張る「監視」",
+        body: "監視は、それぞれのパーツの速さや混み具合（メトリクス）をいつも記録して、おかしな値になったらアラートで知らせます。決まった直し方（再起動など）は、自動でやらせることもできます。",
+        flow: [
+          { icon: "monitor", label: "監視", say: "サーバー2 が遅い！" },
+          { icon: "app", label: "サーバー", say: "再起動して元気に" },
+        ],
+        analogy: "監視は、見回りの警備員さん",
+      },
+      {
+        title: "早く気づけば、早く直せる",
+        body: "夜中にこわれても、気づくのが朝なら、それまでお店は困ったまま。気づくのが早いほど、早く直せます。",
+      },
+    ],
+    slots: ["dns", "lb", "app1", "app2", "app3", "app4", "cache", "db", "monitor"],
+    fixed: [P("dns", "dns"), P("lb", "lb"), P("app1", "app"), P("app2", "app"), P("app3", "app"), P("cache", "cache"), P("db", "db")],
+    budget: 30000,
+    goal: { success: 0.9, latency: 260, cost: 20200 },
+    setup: {
+      requiresDns: true,
+      farRatio: 0,
+      duration: 50,
+      traffic: keyframes([{ t: 0, page: 15, write: 1 }]),
+      events: [
+        { t: 10, kind: "slow", index: 1, duration: 40 },
+        { t: 24, kind: "crash", target: "app", index: 0, duration: 26 },
+        { t: 37, kind: "crash", target: "app", index: 1, duration: 13 },
+      ],
+    },
+    tips: ["slow", "health", "monitor-alert", "spof", "busy", "timeout"],
+    hint: "監視を置こう。サーバーを増やしても、遅いサーバーや止まった DB はそのままだよ。",
+    takeaways: [
+      "こわれ方は「止まる」だけじゃない。動いているのに、とても遅くなることもある",
+      "監視は、速さや混み具合（メトリクス）を見張り、おかしければアラートで知らせる",
+      "早く気づいて、決まった直し方（再起動など）は自動でやると、止まっている時間が短くなる",
+    ],
+    quiz: [
+      {
+        q: "サーバーが止まってはいないけど、とても遅くなった。気づけるのは？",
+        choices: ["監視（速さなどの数字を見張る）", "ロードバランサーのヘルスチェック", "DNS"],
+        answer: 0,
+        why: "ヘルスチェックは返事があるかを見るだけ。速さなどの数字（メトリクス）を見張る監視なら、遅いことにも気づけます。",
+      },
+    ],
+    terms: ["monitoring", "metrics", "alert"],
+    solution: [P("dns", "dns"), P("lb", "lb"), P("app1", "app"), P("app2", "app"), P("app3", "app"), P("cache", "cache"), P("db", "db"), P("monitor", "monitor")],
+  },
+  {
+    id: "s13",
+    no: 13,
+    title: "データが消えた！",
+    subtitle: "もしものときに、元にもどせるように",
+    topic: "バックアップ",
+    newParts: ["backup"],
+    intro: [
+      {
+        title: "うっかり、全部消しちゃった",
+        body: "作業のまちがいや、プログラムの不具合で、データベースの中身が消えてしまうことがあります。データがなければ、ページを見に来た人に何も返せません。",
+      },
+      {
+        title: "予備DB があるから大丈夫…？",
+        body: "予備DB（レプリカ）は、本番DB の変化をいつも写しています。だから「消した」という操作も、すぐに写ってしまいます。予備DB は故障には強いけど、まちがいからは守ってくれません。",
+        flow: [
+          { icon: "db", label: "本番DB", say: "消しちゃった…" },
+          { icon: "replica", label: "予備DB", say: "こっちも消えた！" },
+        ],
+      },
+      {
+        title: "ときどき、別の場所に保存",
+        body: "バックアップは、ときどきデータを別の場所に保存しておくこと。消えても、保存したときの状態に元にもどせます（リストア）。消えてから置いても間に合わないので、先に置いておこう。",
+        flow: [
+          { icon: "db", label: "本番DB" },
+          { icon: "backup", label: "バックアップ", say: "保存しておくね" },
+        ],
+        analogy: "バックアップは、台帳のコピーを金庫にしまうこと",
+      },
+    ],
+    slots: ["dns", "lb", "app1", "app2", "cache", "db", "replica", "backup"],
+    fixed: [P("dns", "dns"), P("lb", "lb"), P("app1", "app"), P("app2", "app"), P("cache", "cache"), P("db", "db"), P("replica", "replica")],
+    budget: 30000,
+    goal: { success: 0.92, latency: 280, cost: 20900 },
+    setup: {
+      requiresDns: true,
+      farRatio: 0,
+      duration: 60,
+      traffic: keyframes([{ t: 0, page: 7, write: 1.2 }]),
+      events: [{ t: 22, kind: "wipe" }],
+    },
+    tips: ["repl", "wipe", "repl-lost", "backup-late", "restore", "cache-hit"],
+    hint: "本番の前に、バックアップを置いておこう。予備DB にも消したことが写ってしまうので、予備DB だけでは元にもどせないよ。",
+    takeaways: [
+      "データは、まちがいや不具合で消えてしまうことがある",
+      "予備DB は「消した」ことまで写すので、まちがいからは守れない",
+      "バックアップをとっておけば、保存したときの状態に元にもどせる（リストア）",
+    ],
+    quiz: [
+      {
+        q: "まちがえて消したデータを、元にもどせるのは？",
+        choices: ["バックアップ", "予備DB（レプリカ）", "キャッシュ"],
+        answer: 0,
+        why: "予備DB には「消した」ことも写されてしまいます。前の状態を保存しておくバックアップなら、元にもどせます。",
+      },
+    ],
+    terms: ["backup", "restore"],
+    solution: [P("dns", "dns"), P("lb", "lb"), P("app1", "app"), P("app2", "app"), P("cache", "cache"), P("db", "db"), P("replica", "replica"), P("backup", "backup")],
+  },
+  {
+    id: "s14",
+    no: 14,
+    title: "町じゅうが停電！",
+    subtitle: "拠点がまるごと止まっても、お店を続けよう",
+    topic: "マルチリージョン",
+    newParts: ["region"],
+    intro: [
+      {
+        title: "建物ごと止まることもある",
+        body: "大きな地震や停電で、サーバーが置いてある建物（データセンター）ごと止まることがあります。サーバーを何台に増やしても、みんな同じ場所にあれば、いっしょに止まってしまいます。",
+      },
+      {
+        title: "遠くの町に、もう1つのお店",
+        body: "遠くの地域（リージョン）にも、サーバーとデータの写しをそろえておきます。いつもの拠点が止まったら、DNS が「こっちへどうぞ」と予備の拠点を案内します。",
+        flow: [
+          { icon: "user", label: "スマホ", say: "odekake.app はどこ？" },
+          { icon: "dns", label: "DNS", say: "いまは大阪へ！" },
+          { icon: "region", label: "大阪の拠点", say: "いらっしゃい" },
+        ],
+        analogy: "予備の拠点は、となり町の支店",
+      },
+      {
+        title: "TTL が長いと、切りかえが遅れる",
+        body: "スマホは DNS の答えを TTL のあいだ覚えていて、そのあいだは止まった拠点へ行ってしまいます。DNS をタップすると、TTL を短くできます（そのかわり、問い合わせが増えます）。",
+      },
+    ],
+    slots: ["dns", "region", "lb", "app1", "app2", "app3", "cache", "db", "replica"],
+    fixed: [P("dns", "dns"), P("lb", "lb"), P("app1", "app"), P("app2", "app"), P("cache", "cache"), P("db", "db"), P("replica", "replica")],
+    budget: 34000,
+    goal: { success: 0.9, latency: 240, cost: 26600 },
+    setup: {
+      requiresDns: true,
+      farRatio: 0,
+      duration: 65,
+      traffic: keyframes([{ t: 0, page: 6, write: 0.8 }]),
+      events: [{ t: 23, kind: "outage", duration: 42 }],
+    },
+    tips: ["outage", "spof", "dns-failover", "ttl-stale", "dns-cached"],
+    hint: "予備の拠点（大阪）を置こう。それから DNS をタップして、TTL を短くしておくと、切りかえが早くなるよ。",
+    takeaways: [
+      "同じ場所にあるパーツは、停電や災害でいっしょに止まる",
+      "遠くの地域（リージョン）に予備の拠点を用意し、DNS で案内を切りかえる",
+      "TTL が長いと、利用者はしばらく古い住所へ行ってしまう。切りかえの速さと問い合わせの数のバランス",
+    ],
+    quiz: [
+      {
+        q: "データセンターがまるごと停電！ お店を続けるには？",
+        choices: ["遠くの地域に、予備の拠点を用意しておく", "同じ場所のサーバーを増やす", "キャッシュを置く"],
+        answer: 0,
+        why: "同じ場所のパーツは、みんないっしょに止まります。遠くの地域（リージョン）に予備があれば、そちらで続けられます。",
+      },
+    ],
+    terms: ["region", "dr"],
+    solution: [P("dns", "dns", 1), P("lb", "lb"), P("app1", "app"), P("app2", "app"), P("cache", "cache"), P("db", "db"), P("replica", "replica"), P("region", "region")],
+  },
 ];
 
 export const stageById = (id: string) => STAGES.find((s) => s.id === id);
@@ -732,4 +972,15 @@ export const TIPS: Record<TipId, string> = {
   "waf-block": "WAF が攻撃を入口で止めました！",
   "attack-hit": "攻撃がサーバーまで届いて、手がふさがっています！",
   timeout: "待たされすぎて、あきらめられてしまいました（504 タイムアウト）。",
+  "scale-out": "混んできたので、オートスケールが休んでいたサーバーを起こしました（スケールアウト）。起きるまで少しかかります。",
+  "scale-in": "すいてきたので、オートスケールがサーバーを休ませました（スケールイン）。休んでいるあいだは月額がかかりません。",
+  slow: "サーバーがとても遅くなった…。でも止まってはいないので、ロードバランサーのヘルスチェックでは気づけません。",
+  "monitor-alert": "監視がおかしな様子に気づいて（アラート）、自動で再起動しました。",
+  wipe: "データベースの中身が消えた！ ページを読みに来ても、データがありません。",
+  "repl-lost": "予備DB にも「消した」ことが写されてしまいました。予備DB は、まちがいからは守ってくれません。",
+  restore: "バックアップから元にもどせました（リストア）！",
+  "backup-late": "消える前に保存したバックアップがないので、元にもどせません…。バックアップは前もってとっておこう。",
+  outage: "拠点がまるごと止まると、同じ場所にあるパーツはみんないっしょに止まってしまいます。",
+  "dns-failover": "DNS が、止まった拠点のかわりに予備の拠点（大阪）を案内しはじめました。",
+  "ttl-stale": "DNS の答えを覚えている（TTL の）あいだは、止まった拠点へ行ってしまいます。",
 };

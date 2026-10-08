@@ -10,7 +10,7 @@
  * - 「お手本」では、ほぼ毎回 ★3 がとれること
  * - 別のやり方（力ずく・まちがった直し方）では、★ が欠けること（学んでほしいことが伝わるか）
  *
- * src/components/infra の model.ts / sim.ts / stages.ts を TypeScript のまま読みこむ（その場で JS に変換する）。
+ * src/components/infra の model.ts / layout.ts / sim.ts / stages.ts を TypeScript のまま読みこむ（その場で JS に変換する）。
  */
 import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
@@ -21,7 +21,7 @@ import ts from "typescript";
 const root = join(dirname(fileURLToPath(import.meta.url)), "..");
 const src = join(root, "src/components/infra");
 const out = mkdtempSync(join(tmpdir(), "infra-sim-"));
-for (const name of ["model", "sim", "stages"]) {
+for (const name of ["model", "layout", "sim", "stages"]) {
   const code = readFileSync(join(src, `${name}.ts`), "utf8");
   const js = ts
     .transpileModule(code, { compilerOptions: { module: ts.ModuleKind.ESNext, target: ts.ScriptTarget.ES2022 } })
@@ -66,6 +66,17 @@ const ALTERNATIVES = {
     "キャッシュなし": "-cache",
     "サーバー2台": "-app3",
     "サーバー4台": "+app4",
+  },
+  s11: {
+    "サーバー4台（オートなし）": [P("app2", "app"), P("app3", "app"), P("app4", "app")],
+    "サーバー3台（オートなし）": [P("app2", "app"), P("app3", "app")],
+    "オート + サーバー3台": [P("auto", "auto"), P("app2", "app"), P("app3", "app")],
+  },
+  s12: { "サーバー4台（監視なし）": [P("app4", "app")], "DB を M に（監視なし）": [P("app4", "app"), P("db", "db", 1)] },
+  s13: { "消えてからバックアップ": [P("backup", "backup", 0, 25)] },
+  s14: {
+    "大阪だけ（TTL ふつう）": [P("region", "region")],
+    "TTL 短めだけ": [P("dns", "dns", 1)],
   },
 };
 

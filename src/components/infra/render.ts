@@ -5,7 +5,7 @@
  * パーツのタイルと利用者は DOM（board.tsx）。
  */
 import { curvePoint, type BoardLayout, type Pt, type Wire } from "./layout";
-import { JOB_COLOR, LOOKUP_COLOR, PARTS, REPL_COLOR, REQ_INFO, RESPONSE_COLOR, SLOT_KIND, type ReqType, type SlotId } from "./model";
+import { JOB_COLOR, LOOKUP_COLOR, PARTS, REPL_COLOR, REQ_INFO, RESPONSE_COLOR, kindOf, type ReqType } from "./model";
 import { isUserId, type Fx, type InfraSim, type SimReq } from "./sim";
 
 type Particle = { x: number; y: number; vx: number; vy: number; life: number; max: number; color: string; size: number };
@@ -18,6 +18,7 @@ function packetColor(r: SimReq): string {
   if (r.dns) return LOOKUP_COLOR;
   if (r.kind === "job") return JOB_COLOR;
   if (r.kind === "repl") return REPL_COLOR;
+  if (r.kind === "snap") return PARTS.backup.color;
   if (r.returning && !r.miss) return r.kind === "attack" ? REQ_INFO.attack.color : RESPONSE_COLOR;
   return REQ_INFO[r.kind as ReqType].color;
 }
@@ -91,7 +92,7 @@ export class BoardRenderer {
         if (i === 0) path.moveTo(p.x * this.w, p.y * this.h);
         else path.lineTo(p.x * this.w, p.y * this.h);
       }
-      const color = isUserId(wire.b) ? "#9fb4ff" : PARTS[SLOT_KIND[wire.b as SlotId]].color;
+      const color = isUserId(wire.b) ? "#9fb4ff" : PARTS[kindOf(wire.b)].color;
       this.wirePaths.push({ wire, path, color });
     }
   }
@@ -136,13 +137,14 @@ export class BoardRenderer {
     b.lineCap = "round";
     for (const { wire, path, color } of this.wirePaths) {
       const user = wire.kind === "user" || wire.kind === "dns";
-      b.setLineDash(wire.kind === "dns" || wire.kind === "repl" ? [2, 6] : []);
-      b.lineWidth = user ? 1 : 1.6;
-      b.strokeStyle = user ? "rgba(170, 196, 255, 0.07)" : "rgba(170, 196, 255, 0.14)";
+      const ctl = wire.kind === "ctl";
+      b.setLineDash(wire.kind === "dns" || wire.kind === "repl" ? [2, 6] : ctl ? [1, 5] : []);
+      b.lineWidth = user || ctl ? 1 : 1.6;
+      b.strokeStyle = user || ctl ? "rgba(170, 196, 255, 0.07)" : "rgba(170, 196, 255, 0.14)";
       b.stroke(path);
       if (!sim) continue;
-      const na = isUserId(wire.a) ? null : sim.nodes.get(wire.a as SlotId);
-      const nb = sim.nodes.get(wire.b as SlotId);
+      const na = isUserId(wire.a) ? null : sim.nodes.get(wire.a);
+      const nb = sim.nodes.get(wire.b);
       const act = Math.min(na ? na.activity : 9, nb ? nb.activity : 0);
       if (act < 0.06 || nb?.down || na?.down) continue;
       const alpha = Math.min(user ? 0.22 : 0.6, act * (user ? 0.03 : 0.09));
@@ -204,7 +206,7 @@ export class BoardRenderer {
       const pos = this.curvePx(r.from, r.to, ease(p));
       if (!pos) continue;
       const color = packetColor(r);
-      const small = r.kind === "repl" ? 0.6 : r.returning ? 0.82 : 1;
+      const small = r.kind === "repl" || r.kind === "snap" ? 0.6 : r.returning ? 0.82 : 1;
       // 尾
       if (!this.reduced) {
         b.globalCompositeOperation = "lighter";
