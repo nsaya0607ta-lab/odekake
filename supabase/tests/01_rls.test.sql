@@ -1063,6 +1063,44 @@ select pg_temp.expect_ok('ピンボール: 回数の制限中でも、記録ず�
 select pg_temp.record('ピンボール: 再送で bob の赤コインは増えない',
   (select balance from public.user_red_coins where user_id = :'bob') = 210);
 
+-- -------------------------------------------------------------
+-- ホームに降ってくる赤コイン（0135）
+-- -------------------------------------------------------------
+-- 黄色・青と同じ決まり：ふつう5枚、同じコインは1回だけ、前の受け取りから8秒（3色のどれでも）、
+-- 中レア・高レアは直近1時間の回数まで（3色あわせて。超えたらふつうとして渡す）。
+select pg_temp.gacha_as(:'alice',
+  $q$select public.claim_home_coin_drop('red-drop-alice-01', 'red', 'common')$q$);
+select pg_temp.record('赤コイン: ホームに降った赤コインを拾うと5枚',
+  (select result ->> 'granted' from gacha_last) = 'true'
+  and (select result ->> 'kind' from gacha_last) = 'red'
+  and (select (result ->> 'amount')::integer from gacha_last) = 5
+  and (select count(*) from public.red_coin_events where user_id = :'alice' and event_type = 'home_drop' and amount = 5) = 1
+  and (select (result ->> 'red_balance')::integer from gacha_last) = (select balance from public.user_red_coins where user_id = :'alice'));
+
+select pg_temp.gacha_as(:'alice',
+  $q$select public.claim_home_coin_drop('red-drop-alice-01', 'red', 'common')$q$);
+select pg_temp.record('赤コイン: 同じコインは2回拾えない',
+  (select result ->> 'reason' from gacha_last) = 'duplicate'
+  and (select count(*) from public.red_coin_events where user_id = :'alice' and event_type = 'home_drop') = 1);
+
+select pg_temp.gacha_as(:'alice',
+  $q$select public.claim_home_coin_drop('coin-drop-alice-02', 'coin', 'common')$q$);
+select pg_temp.record('赤コイン: 拾ってから8秒は、ほかの色のコインも受け取らない',
+  (select result ->> 'reason' from gacha_last) = 'too_soon');
+
+insert into public.red_coin_events (user_id, event_type, amount, idempotency_key, metadata, created_at)
+select :'bob', 'home_drop', 100, 'home-drop:bulk-epic-' || i, '{"tier":"epic"}'::jsonb, now() - interval '30 seconds'
+  from generate_series(1, 8) i;
+select pg_temp.gacha_as(:'bob',
+  $q$select public.claim_home_coin_drop('red-drop-bob-0001', 'red', 'epic')$q$);
+select pg_temp.record('赤コイン: 高レアの回数（1時間に8回）を超えると、ふつう（5枚）として渡す',
+  (select result ->> 'granted' from gacha_last) = 'true'
+  and (select result ->> 'tier' from gacha_last) = 'common'
+  and (select (result ->> 'amount')::integer from gacha_last) = 5);
+
+select pg_temp.expect_denied('赤コイン: ホームのコインの色がちがうと受け取れない', :'alice',
+  $q$select public.claim_home_coin_drop('gold-drop-alice-01', 'gold', 'common')$q$);
+
 -- 後続のアカウント削除テストに影響しないよう、フレンド関係を戻しておく。
 delete from public.friendships where user_id in (:'alice', :'bob') and friend_user_id in (:'alice', :'bob');
 

@@ -10,6 +10,7 @@
  *   node scripts/simulate-pinball.mjs [ゲーム数(既定300)] [beginner|average|good|all(既定)] [持っているアイテム数(既定8)]
  *   node scripts/simulate-pinball.mjs shotmap      … フリッパーのどこで打つとどこへ飛ぶか（台の形の確認）
  *   node scripts/simulate-pinball.mjs plunger      … 打ち出しの強さごとに、玉が最初に通るところ
+ *   node scripts/simulate-pinball.mjs stuck [ゲーム数] … 玉が止まってしまう場所（形を変えたら、ここに何も出ないことを確かめる）
  *
  * ボットの腕前（SKILLS）は「ふつう」を、ピンボールを少し遊んだことがある人くらいにしてある：
  *   反応のばらつき（秒）・何もしないで見送ってしまう確率・玉を止めて狙う確率・狙いのずれ（mm）
@@ -57,6 +58,8 @@ const SKILLS = {
 };
 /** スキルショットのレーンに入りやすい引き量 */
 const LANE_POWER = C.SKILL_SHOT_POWER;
+/** 玉の速さ（ふだんは config.ts の GAME_SPEED。PINBALL_SPEED=0.7 のように変えて試せる） */
+const SPEED = Number(process.env.PINBALL_SPEED) || C.GAME_SPEED;
 /** 止めた玉を落としてから打つとき、フリッパーのどこ（支点からの距離 mm）で打つとどこへ行くか */
 const AIM_ALONG = { center: 32, ramp: 62, orbit: 71 };
 
@@ -165,8 +168,9 @@ function botStep(g, bot) {
 
     if (st.mode === "catch") {
       // 当たる少し前に上げて、そのまま持つ
+      // 当たるまでの時間は台の上の時間。人の反応のばらつき（実際の秒）は、玉が遅いぶん台の上では小さくなる
       const ttc = fr.vn < -1 ? (fr.height - 24) / -fr.vn : 0;
-      if (ttc < 0.12 + gauss(rand) * skill.reaction) {
+      if (ttc < 0.12 + gauss(rand) * skill.reaction * g.speed) {
         press = true;
         st.mode = "cradle";
         st.settledAt = 0;
@@ -223,7 +227,7 @@ function samplePool(n, rand) {
 
 function playGame(skillName, seed, poolSize) {
   const rand = P.mulberry32(seed * 7919 + 13);
-  const g = G.createGame({ pool: samplePool(poolSize, rand), tableName: "岐阜県", seed });
+  const g = G.createGame({ pool: samplePool(poolSize, rand), tableName: "岐阜県", seed, speed: SPEED });
   const bot = makeBot(SKILLS[skillName], rand);
   const ballTimes = [];
   let ballStart = 0;
@@ -277,7 +281,7 @@ function runGames(count, skillName, poolSize) {
   const t = col("time");
   const sc = col("score");
   const coins = col("coins");
-  console.log(`\n=== ${skillName}（${count}ゲーム・アイテム${poolSize}種）===`);
+  console.log(`\n=== ${skillName}（${count}ゲーム・アイテム${poolSize}種・玉の速さ ${SPEED}）===`);
   console.log(`プレイ時間  平均 ${fmt(t.mean, 1)}秒  中央 ${fmt(t.p50, 1)}  10% ${fmt(t.p10, 1)}  90% ${fmt(t.p90, 1)}`);
   console.log(`スコア      平均 ${fmt(sc.mean)}  中央 ${fmt(sc.p50)}  10% ${fmt(sc.p10)}  90% ${fmt(sc.p90)}`);
   console.log(`赤コイン    平均 ${fmt(coins.mean, 1)}枚  中央 ${fmt(coins.p50)}  10% ${fmt(coins.p10)}  90% ${fmt(coins.p90)}`);
@@ -322,6 +326,8 @@ function shotmap() {
           else if (e.type === "drop") target = `ドロップ${e.index}`;
           else if (e.type === "bumper") target = "バンパー";
           else if (e.type === "scoop") target = "ガチャ穴";
+          else if (e.type === "standup") target = `立ち的${e.index}`;
+          else if (e.type === "pinwheel") target = "かざぐるま";
           else if (e.type === "sensor" && /orbit.*Mouth/.test(e.id) && e.vy < 0) target = e.id;
           else if (e.type === "sensor" && /^lane/.test(e.id)) target = "上のレーン";
           else if (e.type === "drain") target = "drain";
@@ -358,9 +364,60 @@ function plunger() {
   }
 }
 
+/**
+ * 玉が止まってしまう場所：ふつうの腕前で遊ばせて、玉がほとんど動かないまま 0.5秒（台の時間）たった場所を数える。
+ * フリッパーで止めている玉・打ち出しレーン・ガチャ穴の中は数えない（ここに出る場所は、形を直すべきところ）
+ */
+function stuckReport(count) {
+  const spots = new Map();
+  let episodes = 0;
+  let long = 0;
+  let totalTime = 0;
+  for (let i = 0; i < count; i += 1) {
+    const rand = P.mulberry32((i + 1) * 7919 + 13);
+    const g = G.createGame({ pool: samplePool(8, rand), tableName: "岐阜県", seed: i + 1, speed: SPEED });
+    const bot = makeBot(SKILLS.average, rand);
+    const flagged = new Map();
+    for (let frame = 0; frame < 60 * 60 * 30 && g.phase !== "over"; frame += 1) {
+      botStep(g, bot);
+      G.stepGame(g, 1 / 60);
+      G.takeFx(g);
+      for (const b of g.world.balls) {
+        if (b.mode !== "field") continue;
+        const state = flagged.get(b.id) ?? 0;
+        if (b.still > 0.5 && state === 0) {
+          flagged.set(b.id, 1);
+          episodes += 1;
+          const key = `${Math.round(b.x / 10) * 10},${Math.round(b.y / 10) * 10}`;
+          const spot = spots.get(key) ?? { n: 0, long: 0 };
+          spot.n += 1;
+          spots.set(key, spot);
+        } else if (b.still > 2.3 && state === 1) {
+          flagged.set(b.id, 2);
+          long += 1;
+          const key = `${Math.round(b.x / 10) * 10},${Math.round(b.y / 10) * 10}`;
+          const spot = spots.get(key) ?? { n: 0, long: 0 };
+          spot.long += 1;
+          spots.set(key, spot);
+        } else if (b.still < 0.05 && state !== 0) {
+          flagged.set(b.id, 0);
+        }
+      }
+    }
+    totalTime += g.playTime;
+  }
+  console.log(`\n=== 玉が止まった場所（${count}ゲーム・合計 ${fmt(totalTime / 60, 1)}分） ===`);
+  console.log(`0.5秒以上止まった回数 ${episodes}（1ゲーム ${fmt(episodes / count, 2)}回）・2.3秒以上（玉ゆらしが入る）${long}回`);
+  const list = [...spots.entries()].sort((a, b) => b[1].n - a[1].n).slice(0, 30);
+  for (const [key, v] of list) console.log(`  (${key})  ${v.n}回  うち長く止まった ${v.long}回`);
+}
+
+if (process.env.PINBALL_DEBUG_EXPORT) globalThis.__pb = { G, P, T, C, S, SKILLS, makeBot, botStep, samplePool, SPEED };
+
 const [arg1 = "300", arg2 = "all", arg3 = "8"] = process.argv.slice(2);
 if (arg1 === "shotmap") shotmap();
 else if (arg1 === "plunger") plunger();
+else if (arg1 === "stuck") stuckReport(Number(arg2) || 300);
 else {
   const count = Number(arg1) || 300;
   const poolSize = Number(arg3) || 0;

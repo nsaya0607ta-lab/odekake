@@ -18,6 +18,7 @@ import {
   CONQUEST_EXTRA_BALLS,
   CONQUEST_SAVE_SEC,
   GACHA_AWARDS,
+  GAME_SPEED,
   ITEM_POINTS,
   ITEM_RELOCATE_SEC,
   KICKBACK_AT_SERVE,
@@ -71,7 +72,8 @@ export type SfxId =
   | "flipper" | "flipperHit" | "bumper" | "sling" | "drop" | "dropsAll" | "lane" | "lanesAll" | "spinner"
   | "rampUp" | "rampDone" | "rampFail" | "orbit" | "scoop" | "eject" | "gacha" | "kickback" | "save"
   | "drain" | "launch" | "item" | "skill" | "combo" | "jackpot" | "superJackpot" | "conquest" | "extraBall"
-  | "bonus" | "gameOver" | "skillShot" | "outlane" | "inlane" | "metal" | "rubber" | "ballBall" | "serve";
+  | "bonus" | "gameOver" | "skillShot" | "outlane" | "inlane" | "metal" | "rubber" | "ballBall" | "serve"
+  | "standup" | "standupsAll" | "pinwheel" | "gateKick";
 
 export type GameFx =
   | { type: "msg"; title: string; sub?: string; tone: Tone; ms?: number }
@@ -112,6 +114,8 @@ export type Game = {
   playTime: number;
   started: boolean;
   simAcc: number;
+  /** 玉の速さ（GAME_SPEED。シミュレーターで変えて試せるように、ゲームごとに持つ） */
+  speed: number;
 
   saveUntil: number;
   /** 次に台へ出た玉からボールセーブを始める */
@@ -125,6 +129,8 @@ export type Game = {
   skillShotArmed: boolean;
   skillShotUntil: number;
   kickbackLit: [boolean, boolean];
+  /** スタンドアップターゲットが光っているか（左の3つ → 右の3つ） */
+  standups: boolean[];
   gateUntil: number;
   mults: Timed[];
   bumperMults: Timed[];
@@ -185,9 +191,9 @@ function pickStamps(pool: readonly PinballItem[], rand: () => number, round: num
   return shuffle(picked, rand).map((item) => ({ item, collected: false, spot: null, litAt: 0 }));
 }
 
-export type CreateGameOptions = { pool: readonly PinballItem[]; tableName: string; conquestTitle?: string; seed?: number };
+export type CreateGameOptions = { pool: readonly PinballItem[]; tableName: string; conquestTitle?: string; seed?: number; speed?: number };
 
-export function createGame({ pool, tableName, conquestTitle, seed = Math.floor(Math.random() * 2 ** 31) }: CreateGameOptions): Game {
+export function createGame({ pool, tableName, conquestTitle, seed = Math.floor(Math.random() * 2 ** 31), speed = GAME_SPEED }: CreateGameOptions): Game {
   const world = createWorld(seed);
   const g: Game = {
     world,
@@ -204,6 +210,7 @@ export function createGame({ pool, tableName, conquestTitle, seed = Math.floor(M
     playTime: 0,
     started: false,
     simAcc: 0,
+    speed,
     saveUntil: 0,
     saveArmed: true,
     bonusX: 1,
@@ -213,6 +220,7 @@ export function createGame({ pool, tableName, conquestTitle, seed = Math.floor(M
     skillShotArmed: false,
     skillShotUntil: 0,
     kickbackLit: [false, false],
+    standups: TABLE.standups.flatMap((bank) => bank.targets.map(() => false)),
     gateUntil: 0,
     mults: [],
     bumperMults: [],
@@ -592,6 +600,26 @@ function majorShot(g: Game, id: ShotId): void {
   jackpotShot(g, id);
 }
 
+/* ---------- スタンドアップターゲット ---------- */
+
+/** 1組（3つ）を全部光らせた：得点と、アイテムをもう1か所よぶ（よべないときは得点を上乗せ）。光は消して、また最初から */
+function standupsComplete(g: Game, bankIndex: number): void {
+  const bank = TABLE.standups[bankIndex]!;
+  const at = { x: bank.center.x + (bank.side === "left" ? 30 : -30), y: bank.center.y + 46 };
+  for (let k = 0; k < 3; k += 1) g.standups[bankIndex * 3 + k] = false;
+  const canCall = g.mode === "normal" && g.stamps.some((s) => !s.collected && s.spot === null);
+  addPoints(g, POINTS.standupsAll * (canCall ? 1 : 2), at, "great");
+  g.fx.push({ type: "flash", id: `standupsAll:${bankIndex}` });
+  sfx(g, "standupsAll");
+  if (canCall) {
+    g.extraLit += 1;
+    lightItems(g);
+    msg(g, "的コンプリート！", "great", "アイテムをもう1か所よぶ", 1600);
+  } else {
+    msg(g, "的コンプリート！", "great", undefined, 1300);
+  }
+}
+
 /* ---------- ガチャ穴 ---------- */
 
 function gachaAward(g: Game): void {
@@ -691,6 +719,31 @@ function handleEvent(g: Game, e: PhysEvent): void {
       addPoints(g, POINTS.sling);
       g.fx.push({ type: "flash", id: `sling:${e.index}` });
       sfx(g, "sling", e.index);
+      break;
+    case "standup": {
+      const bankIndex = Math.floor(e.index / 3);
+      const bank = TABLE.standups[bankIndex]!;
+      const target = bank.targets[e.index % 3]!;
+      const at = { x: (target.a.x + target.b.x) / 2 + target.face.x * 22, y: (target.a.y + target.b.y) / 2 + target.face.y * 22 };
+      const fresh = !g.standups[e.index];
+      g.standups[e.index] = true;
+      addPoints(g, fresh ? POINTS.standup : Math.round(POINTS.standup / 3), at, fresh ? "good" : "info");
+      g.fx.push({ type: "flash", id: `standup:${e.index}` });
+      sfx(g, "standup", e.index % 3);
+      cancelSkillShot(g);
+      const lit = [0, 1, 2].every((k) => g.standups[bankIndex * 3 + k]);
+      if (lit) standupsComplete(g, bankIndex);
+      break;
+    }
+    case "pinwheel": {
+      addPoints(g, POINTS.pinwheel);
+      g.fx.push({ type: "flash", id: "pinwheel" });
+      sfx(g, "pinwheel", Math.min(1, e.speed / 2500));
+      break;
+    }
+    case "gateKick":
+      g.fx.push({ type: "flash", id: `gate:${e.index}` });
+      sfx(g, "gateKick");
       break;
     case "drop": {
       addPoints(g, POINTS.drop, TABLE.drops[e.index] ? { x: (TABLE.drops[e.index]!.a.x + TABLE.drops[e.index]!.b.x) / 2, y: 530 } : undefined);
@@ -796,14 +849,15 @@ function handleSensor(g: Game, e: Extract<PhysEvent, { type: "sensor" }>): void 
     }
     case "orbitLeftMouth":
     case "orbitRightMouth":
-      if (e.vy < 0 && g.clock - (g.kickedAt.get(e.ballId) ?? -99) > 1.5) {
-        g.orbitEnter.set(e.ballId, { side: e.id === "orbitLeftMouth" ? "left" : "right", at: g.clock });
+      // オービットの判定は、玉が実際に走った時間（台の上の時間）で見る（玉の速さやスローで変わらないように）
+      if (e.vy < 0 && g.world.time - (g.kickedAt.get(e.ballId) ?? -99) > 1.5) {
+        g.orbitEnter.set(e.ballId, { side: e.id === "orbitLeftMouth" ? "left" : "right", at: g.world.time });
       }
       break;
     case "orbitTop": {
       const enter = g.orbitEnter.get(e.ballId);
       g.orbitEnter.delete(e.ballId);
-      if (!enter || g.clock - enter.at > 2.6) break;
+      if (!enter || g.world.time - enter.at > 2.6) break;
       if (enter.side === "left" && e.vx > 0) majorShot(g, "leftOrbit");
       else if (enter.side === "right" && e.vx < 0) majorShot(g, "rightOrbit");
       break;
@@ -828,7 +882,7 @@ function handleSensor(g: Game, e: Extract<PhysEvent, { type: "sensor" }>): void 
       const ball = findBall(g, e.ballId);
       if (e.vy > 0 && ball && g.kickbackLit[side]) {
         kickback(g.world, ball);
-        g.kickedAt.set(ball.id, g.clock);
+        g.kickedAt.set(ball.id, g.world.time);
         g.kickbackLit[side] = false;
         addPoints(g, POINTS.kickback);
         msg(g, "キックバック！", "good", undefined, 1100);
@@ -966,13 +1020,20 @@ function tick(g: Game): void {
   }
   // ドロップターゲットを立てなおす（スーパージャックポット中は開けたまま）
   if (g.dropsResetAt && g.clock >= g.dropsResetAt && !g.superLit) {
-    const near = world.balls.some((b) => b.mode === "field" && b.y > 515 && b.y < 575 && b.x > 195 && b.x < 285);
+    // ガチャ穴の中・かこいの中（ターゲットの上）・すぐ下に玉がいるあいだは立てない
+    // （立てると、中の玉がターゲットの上に乗って止まる。穴の中の玉も、出てくるときにかこいに閉じこめられる）
+    const near = g.scoopBall !== null || world.balls.some((b) => b.mode === "scoop" || (b.mode === "field" && insideScoopArea(b, 575)));
     if (near) {
       g.dropsResetAt = g.clock + 0.3;
     } else {
       world.dropsUp = world.dropsUp.map(() => true);
       g.dropsResetAt = 0;
     }
+  }
+  // 念のため：ターゲットが立っているのに、かこいの中に玉がいたら、ターゲットを倒して出してあげる
+  if (world.dropsUp.some(Boolean) && world.balls.some((b) => b.mode === "field" && insideScoopArea(b, 535))) {
+    world.dropsUp = world.dropsUp.map(() => false);
+    g.dropsResetAt = g.clock + 0.7;
   }
 
   if (g.mode === "conquest" && g.launchQueue.length === 0 && world.balls.length <= 1 && g.phase === "play") {
@@ -981,6 +1042,11 @@ function tick(g: Game): void {
   }
 
   if (g.phase === "bonus" && g.clock >= g.bonusUntil) nextBall(g);
+}
+
+/** 玉がガチャ穴のかこいの中（とその下の bottom まで）にいるか */
+function insideScoopArea(b: Ball, bottom: number): boolean {
+  return b.x > 195 && b.x < 285 && b.y > 405 && b.y < bottom;
 }
 
 /* ---------- 1フレーム ---------- */
@@ -994,7 +1060,7 @@ export function stepGame(g: Game, dtReal: number): void {
   const dt = Math.min(0.05, Math.max(0, dtReal));
   g.clock += dt;
   if (g.started) g.playTime += dt;
-  const scale = g.clock < g.slowUntil ? SLOW_SCALE : 1;
+  const scale = g.speed * (g.clock < g.slowUntil ? SLOW_SCALE : 1);
   g.simAcc += dt * scale;
   let steps = Math.floor(g.simAcc / STEP);
   if (steps > 60) {

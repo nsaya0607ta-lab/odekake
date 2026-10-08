@@ -48,10 +48,12 @@ function Card({ children, className = "" }: { children: React.ReactNode; classNa
 const GADGETS: { icon: string; name: string; body: string }[] = [
   { icon: "🎯", name: "スキルショット", body: `打ち出しで、光っているレーン（お・で・か・け）にぴったり入れると${n(POINTS.skillShot)}点。打ち出しゲージの目印が、入りやすい強さです。光る場所は、打ち出す前にフリッパーで動かせます。` },
   { icon: "🔤", name: "上のレーン「お・で・か・け」", body: `玉が通るとレーンが光り、4つそろうとボーナス倍率+1（最大×${MAX_BONUS_X}）。フリッパーを押すたびに光がとなりへ動くので、空いているところへ寄せられます。` },
+  { icon: "🎏", name: "かざぐるま", body: `上のレーンの出口の下で、いつもゆっくり回っている羽根。当たると${n(POINTS.pinwheel)}点で、強く当てるほど速く回ります。どこへはね返るかは、羽根の向きしだい。` },
   { icon: "💥", name: "バンパー", body: `当たると${n(POINTS.bumper)}点で強くはじき返します。上にのっているのは、あなたの持っているご当地アイテム（レア度の高い順）です。` },
   { icon: "🌀", name: "オービット（左右の外まわり）", body: `外まわりのレーンを1周すると${n(POINTS.orbit)}点。左のオービットの入口にはスピナーがあり、勢いよく通るほど回って点が入ります。` },
   { icon: "🛝", name: "ランプ（左右の坂道）", body: `坂をのぼりきると${n(POINTS.ramp)}点。弱いと途中で戻ってきます。降りた玉は同じ側のインレーンへ戻るので、左右交互に「8の字」でつなぐのがコツ。` },
   { icon: "⚡", name: "コンボ", body: `オービット・ランプ・ガチャ穴を${COMBO_WINDOW_SEC}秒以内に続けて決めると、得点が×2、×3…（最大×${MAX_COMBO}）。` },
+  { icon: "🚩", name: "スタンドアップターゲット（左右の上のすみ）", body: `倒れない的が3つずつ。前から当てると光り（${n(POINTS.standup)}点）、3つ全部光らせると${n(POINTS.standupsAll)}点＋アイテムをもう1か所よびます。反対がわのフリッパーから、ガチャ穴の横をぬけてランプの下を通すと届きます。` },
   { icon: "🎰", name: "ドロップターゲットとガチャ穴", body: `まん中の3つの的を全部倒すと、奥の「ガチャ穴」が開きます（キックバックも点灯）。穴に入れるとカプセルから何かが出ます。` },
   { icon: "🦵", name: "キックバック", body: "アウトレーン（いちばん外側）に落ちても、「キック」のランプが点いていれば打ち返してくれます。左はボールを出すたびに点いた状態で始まり、使ったらドロップターゲットを全部倒すと点けなおせます。右はガチャ穴やスキルで点きます。" },
   { icon: "🛟", name: "ボールセーブ", body: `打ち出してから${BALL_SAVE_SEC}秒は、落としてもボールが戻ってきます。フリッパーの間の「セーブ」が光っている間です。` },
@@ -61,7 +63,7 @@ const GADGETS: { icon: string; name: string; body: string }[] = [
 /** スキルの説明に出てくることば */
 const SKILL_WORDS: [string, string][] = [
   ["セーブ", "落としてもボールが戻ってくる"],
-  ["ふさぐ", "アウトレーンにフタをする"],
+  ["ふさぐ", "アウトレーンの光の扉が玉をはね返す"],
   ["ボール+1", "もう1つ出てマルチボール"],
   ["得点2倍・3倍", `重なるとかけ算（最大×${MAX_SCORE_MULT}）`],
   ["スロー", "台の動きがゆっくりになる"],
@@ -199,6 +201,8 @@ export function PinballRulebook({ owned }: { owned: ReadonlyMap<string, number> 
                   ["上のレーン（4つで）", `${n(POINTS.lane)}（${n(POINTS.lanesAll)}）`],
                   ["スピナー（1回転）", n(POINTS.spinner)],
                   ["ドロップターゲット（3つで）", `${n(POINTS.drop)}（${n(POINTS.dropsAll)}）`],
+                  ["スタンドアップターゲット（3つで）", `${n(POINTS.standup)}（${n(POINTS.standupsAll)}）`],
+                  ["かざぐるま", n(POINTS.pinwheel)],
                   ["オービット", n(POINTS.orbit)],
                   ["ランプ", n(POINTS.ramp)],
                   ["ガチャ穴", `${n(POINTS.scoop)}＋ガチャ`],

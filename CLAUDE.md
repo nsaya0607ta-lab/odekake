@@ -39,7 +39,9 @@
 バランスの結果表と、新しい県やアイテムを足すときの手順がまとまっている。
 
 - 台の形・物理・得点などの数字を変えたら `node scripts/simulate-pinball.mjs 300 all 8` で確かめ、
-  `docs/pinball.md` のバランスの表も更新すること（目標：ふつうの腕前で平均2分・赤コイン平均約200枚）。
+  `docs/pinball.md` のバランスの表も更新すること（目標：ふつうの腕前で赤コイン平均約200枚・1プレイ平均2分半くらい）。
+- 台の形を変えたら `node scripts/simulate-pinball.mjs stuck 600` で、玉が止まってしまう場所が出ないことも確かめる
+  （上を向いた平らな面を作ると、玉が乗って止まる）。玉の速さは `config.ts` の `GAME_SPEED` だけで変える。
 - 赤コインの換算（`config.ts` の `RED_COIN_POINTS` / `RED_COIN_MAX`）を変えるときは、
   データベースの `record_pinball_result` も新しいマイグレーションで同じ数字にすること。
 - `tables.ts` は地図のデータを読むサーバー専用のファイル。ブラウザ側のコードから import しないこと。

@@ -142,6 +142,9 @@ export function CoinEarnMethods() {
             <span className="flex items-center gap-1 rounded-full bg-white/80 px-2 py-1 tabular-nums text-[#9C2B31]">
               ご当地ピンボール {RED_COIN_POINTS.toLocaleString("ja-JP")}点ごと <RedCoinArt className="h-[11px] w-[11px]" />+1
             </span>
+            <span className="flex items-center gap-1 rounded-full bg-white/80 px-2 py-1 tabular-nums text-[#9C2B31]">
+              ホームに降ってくる赤コイン <RedCoinArt className="h-[11px] w-[11px]" />+5〜100
+            </span>
           </div>
           <p className="mt-2 text-[10px] leading-relaxed text-[#B0464C]">
             1プレイで{RED_COIN_MAX.toLocaleString("ja-JP")}枚までもらえます。ご当地アイテムをたくさん集めるほど、台のスキルが強くなってたまりやすくなります。

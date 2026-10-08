@@ -333,7 +333,7 @@ function StartChapter({ onGo }: { onGo: (tab: TabId) => void }) {
           <div className={styles.coinCard} data-red>
             <span className={styles.coinIcon}><RedCoinArt className="h-full w-full" /></span>
             <b>赤コイン</b>
-            <p>ご当地ピンボールのスコアでたまる。使いみちはこれから（いまはためておけます）。</p>
+            <p>ご当地ピンボールのスコアと、ホームに降ってくるコインでたまる。使いみちはこれから（いまはためておけます）。</p>
             <button type="button" onClick={() => onGo("games")}>ためかた →</button>
           </div>
         </div>
@@ -695,7 +695,7 @@ const GAMES = [
     icon: "/games/pinball/menu-icon.webp",
     shot: "/guide/game-pinball.webp",
     how: "画面の左半分・右半分を押してフリッパー。打ち出しは右下を下へ引いて離す",
-    time: "3球制（平均2分くらい）",
+    time: "3球制（平均2分半くらい）",
     reward: `スコア${RED_COIN_POINTS.toLocaleString("ja-JP")}点ごとに赤コイン1枚（1プレイ${RED_COIN_MAX.toLocaleString("ja-JP")}枚まで）`,
     tip: "都道府県ガチャのご当地アイテムを1つでも持っている県の台で遊べます（いつもの台はだれでも）。台に浮かぶアイテムにボールを当てると、その場でスキルが発動。8個集めると「県制覇！」でマルチボールになり、ジャックポットがねらえます。",
   },
@@ -797,7 +797,7 @@ function RoomChapter() {
 
 /* ------------------------------------------------------------------ ホーム */
 
-type FallingCoin = { id: number; x: number; kind: "coin" | "blue"; tier: "common" | "rare" | "epic" };
+type FallingCoin = { id: number; x: number; kind: "coin" | "blue" | "red"; tier: "common" | "rare" | "epic" };
 
 function HomeChapter() {
   const [coins, setCoins] = useState<FallingCoin[]>([]);
@@ -808,7 +808,9 @@ function HomeChapter() {
       const roll = Math.random() * 100;
       const tier = roll < HOME_DROP.tiers[2].rate ? "epic" : roll < HOME_DROP.tiers[2].rate + HOME_DROP.tiers[1].rate ? "rare" : "common";
       seq.current += 1;
-      const coin: FallingCoin = { id: seq.current, x: 10 + Math.random() * 80, kind: Math.random() < 0.5 ? "blue" : "coin", tier };
+      const kindRoll = Math.random() * (HOME_DROP.chance + HOME_DROP.redChance);
+      const kind = kindRoll < HOME_DROP.chance / 2 ? "coin" : kindRoll < HOME_DROP.chance ? "blue" : "red";
+      const coin: FallingCoin = { id: seq.current, x: 10 + Math.random() * 80, kind, tier };
       setCoins((current) => [...current.slice(-5), coin]);
     }, 1100);
     return () => window.clearInterval(id);
@@ -852,12 +854,13 @@ function HomeChapter() {
             <div key={item.tier} className={styles.tier}>
               <span className={styles.tierCoin}><HomeCoinArt kind="coin" tier={item.tier} /></span>
               <span className={styles.tierCoin}><HomeCoinArt kind="blue" tier={item.tier} /></span>
+              <span className={styles.tierCoin}><HomeCoinArt kind="red" tier={item.tier} /></span>
               <b>{item.label}</b>
               <small>{item.rate}%・{item.amount}枚</small>
             </div>
           ))}
         </div>
-        <Tip>落ちたコインは、わんこが走って取りに行ってくれます。黄色と青は半々。</Tip>
+        <Tip>落ちたコインは、わんこが走って取りに行ってくれます。黄色と青は半々。それとは別に、{HOME_DROP.everySeconds}秒ごとに{HOME_DROP.redChance}%で赤コイン（ご当地ピンボールのコイン）も降ってきます。</Tip>
       </Section>
 
       <Section kicker="左にスワイプ" title="アプリの画面と、背景だけの画面">

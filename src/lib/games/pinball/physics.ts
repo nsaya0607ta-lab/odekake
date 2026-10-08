@@ -32,7 +32,7 @@ const MAX_SPEED = 7000;
 /* ---------- 材質 ---------- */
 
 type MatSpec = { e: number; eFall: number; mu: number };
-const MATS: Record<Material | "flipper" | "flipperSwing" | "drop" | "bumper", MatSpec> = {
+const MATS: Record<Material | "flipper" | "flipperSwing" | "drop" | "bumper" | "standup" | "pinwheel", MatSpec> = {
   // e：はね返り（遅い当たり）、eFall：速い当たりでどれだけ下がるか（3m/sで）、mu：こすれ
   metal: { e: 0.34, eFall: 0.06, mu: 0.02 },
   plastic: { e: 0.32, eFall: 0.06, mu: 0.04 },
@@ -42,6 +42,8 @@ const MATS: Record<Material | "flipper" | "flipperSwing" | "drop" | "bumper", Ma
   flipperSwing: { e: 0.12, eFall: 0, mu: 0.06 },
   drop: { e: 0.22, eFall: 0, mu: 0.05 },
   bumper: { e: 0.7, eFall: 0.2, mu: 0.1 },
+  standup: { e: 0.42, eFall: 0.12, mu: 0.06 },
+  pinwheel: { e: 0.5, eFall: 0.16, mu: 0.1 },
 };
 /** これより遅い当たりは、はね返さない（坂で止まっている玉がふるえないように） */
 const REST_SPEED = 70;
@@ -61,6 +63,15 @@ const BUMPER_KICK = { base: 1750, gain: 0.22, max: 3100, cooldown: 0.08 };
 const SLING_KICK = { base: 1450, gain: 0.25, max: 2700, threshold: 260, cooldown: 0.1 };
 /** ドロップターゲットが倒れる当たりの強さ */
 const DROP_THRESHOLD = 110;
+/** スタンドアップターゲットが光る当たりの強さ（前の面に、これより速く当たったとき） */
+const STANDUP_THRESHOLD = 120;
+/**
+ * スキル「ふさぐ」の光の扉：乗った玉を上へはね上げる速さ（mm/s）。オービットの通り道を少しのぼって、
+ * 同じがわのガイドからインレーンへ戻ってくる強さ（扉の上で止まったままにしない）
+ */
+const GATE_KICK_SPEED = 950;
+/** かざぐるま：当たった玉が羽根をどれだけ回すか・回る速さの上限・ふだんの速さへ戻る時間（秒） */
+const PINWHEEL = { spin: 0.004, maxOmega: 14, relax: 1.6, cooldown: 0.1 };
 /** キックバック（アウトレーンから打ち返す速さ） */
 export const KICKBACK_SPEED = 3150;
 /**
@@ -94,7 +105,7 @@ export const PLUNGER_TRAVEL = 34;
 
 /* ---------- 形を当たり判定用に組み直す ---------- */
 
-type SegKind = "wall" | "sling" | "drop" | "gate" | "outlaneGate" | "plunger";
+type SegKind = "wall" | "sling" | "drop" | "standup" | "gate" | "outlaneGate" | "plunger";
 type Seg = {
   ax: number; ay: number; bx: number; by: number;
   ux: number; uy: number; len: number;
@@ -103,6 +114,8 @@ type Seg = {
   idx: number;
   /** 片側からだけ当たる壁（中心からの距離の2乗がこれより小さい玉だけ当たる） */
   inside: { x: number; y: number; r2: number } | null;
+  /** スタンドアップターゲットの前の面の向き */
+  face: Pt | null;
 };
 type Circ = { x: number; y: number; r: number; mat: Material; bumper: number };
 
@@ -118,12 +131,12 @@ type Collision = { segs: Seg[]; circs: Circ[]; cells: { s: number[]; c: number[]
 function buildCollision(table: TableGeometry): Collision {
   const segs: Seg[] = [];
   const circs: Circ[] = [];
-  const addSeg = (a: Pt, b: Pt, r: number, mat: Material, kind: SegKind, idx = -1, inside: Seg["inside"] = null) => {
+  const addSeg = (a: Pt, b: Pt, r: number, mat: Material, kind: SegKind, idx = -1, inside: Seg["inside"] = null, face: Pt | null = null) => {
     const dx = b.x - a.x;
     const dy = b.y - a.y;
     const len = Math.hypot(dx, dy);
     if (len < 1e-6) return;
-    segs.push({ ax: a.x, ay: a.y, bx: b.x, by: b.y, ux: dx / len, uy: dy / len, len, r, mat, kind, idx, inside });
+    segs.push({ ax: a.x, ay: a.y, bx: b.x, by: b.y, ux: dx / len, uy: dy / len, len, r, mat, kind, idx, inside, face });
   };
   for (const w of table.walls) {
     const pts = w.closed ? [...w.pts, w.pts[0]!] : w.pts;
@@ -132,6 +145,7 @@ function buildCollision(table: TableGeometry): Collision {
   }
   table.slings.forEach((s, i) => addSeg(s.a, s.c, 4, "rubber", "sling", i));
   table.drops.forEach((d, i) => addSeg(d.a, d.b, 3.5, "plastic", "drop", i));
+  table.standups.forEach((bank, bi) => bank.targets.forEach((t, ti) => addSeg(t.a, t.b, 2.5, "plastic", "standup", bi * 3 + ti, null, t.face)));
   addSeg(table.shooterGate.a, table.shooterGate.b, 2, "metal", "gate");
   table.outlaneGates.forEach((g, i) => addSeg(g.a, g.b, 3, "metal", "outlaneGate", i));
   // 打ち出しレーンの床（プランジャーの先）。引くと下がる
@@ -200,6 +214,9 @@ export type PhysEvent =
   | { type: "bumper"; index: number; ballId: number; x: number; y: number }
   | { type: "sling"; index: number; ballId: number }
   | { type: "drop"; index: number; ballId: number }
+  | { type: "standup"; index: number; ballId: number }
+  | { type: "pinwheel"; ballId: number; speed: number }
+  | { type: "gateKick"; index: number; ballId: number }
   | { type: "hit"; mat: Material; speed: number; x: number; y: number }
   | { type: "flipperHit"; index: number; speed: number; ballId: number }
   | { type: "sensor"; id: SensorId; ballId: number; vx: number; vy: number; dir: 1 | -1 }
@@ -227,6 +244,10 @@ export type World = {
   events: PhysEvent[];
   bumperReadyAt: number[];
   slingReadyAt: number[];
+  standupReadyAt: number[];
+  gateKickReadyAt: [number, number];
+  /** かざぐるまの向き（rad）と回る速さ（rad/s、正が時計まわり） */
+  pinwheel: { angle: number; omega: number; readyAt: number };
   /** 当たり音を鳴らしすぎないように */
   hitSoundAt: number;
   nextBallId: number;
@@ -265,6 +286,9 @@ export function createWorld(seed = 1, table: TableGeometry = TABLE): World {
     events: [],
     bumperReadyAt: table.bumpers.map(() => 0),
     slingReadyAt: table.slings.map(() => 0),
+    standupReadyAt: table.standups.flatMap((bank) => bank.targets.map(() => 0)),
+    gateKickReadyAt: [0, 0],
+    pinwheel: { angle: 0, omega: table.pinwheel.omega, readyAt: 0 },
     hitSoundAt: 0,
     nextBallId: 1,
     rand: mulberry32(seed),
@@ -419,8 +443,10 @@ function resolve(ball: Ball, nx: number, ny: number, pen: number, svx: number, s
   const tvx = rvx - vn * nx;
   const tvy = rvy - vn * ny;
   const tLen = Math.hypot(tvx, tvy);
-  // こすれ（クーロン摩擦）：はね返りの強さに比例して、横すべりを少しだけ止める
-  const jt = Math.min(tLen, spec.mu * (1 + e) * impact);
+  // こすれ（クーロン摩擦）：はね返りの強さに比例して、横すべりを少しだけ止める。
+  // 押しつけられているだけの遅い当たり（転がっている・乗っている玉）には効かせない
+  // （効かせると「すべり止め」になって、ポストやアーチのてっぺんのような、ほぼ平らな所で玉が止まる）
+  const jt = impact > REST_SPEED ? Math.min(tLen, spec.mu * (1 + e) * impact) : 0;
   const tScale = tLen > 1e-6 ? (tLen - jt) / tLen : 0;
   rvx = tvx * tScale - e * vn * nx;
   rvy = tvy * tScale - e * vn * ny;
@@ -514,6 +540,34 @@ function collideStatic(world: World, ball: Ball): void {
         world.events.push({ type: "sling", index: sg.idx, ballId: ball.id });
         continue;
       }
+    }
+    if (sg.kind === "outlaneGate") {
+      // 光の扉の上（アウトレーンがわ）に乗った玉は、上へはね上げる。扉の下からは、ふつうの壁
+      const upx = sg.uy;
+      const upy = -sg.ux;
+      const above = (ball.x - sg.ax) * (upy < 0 ? upx : -upx) + (ball.y - sg.ay) * (upy < 0 ? upy : -upy) > 0;
+      if (above) {
+        ball.x += nx * pen;
+        ball.y += ny * pen;
+        if (world.time >= world.gateKickReadyAt[sg.idx as 0 | 1]) {
+          world.gateKickReadyAt[sg.idx as 0 | 1] = world.time + 0.2;
+          ball.vx = (sg.idx === 0 ? 70 : -70) + (world.rand() - 0.5) * 60;
+          ball.vy = -GATE_KICK_SPEED * (0.95 + world.rand() * 0.1);
+          world.events.push({ type: "gateKick", index: sg.idx, ballId: ball.id });
+        }
+        continue;
+      }
+    }
+    if (sg.kind === "standup") {
+      const vn = -(ball.vx * nx + ball.vy * ny);
+      const impact = resolve(ball, nx, ny, pen, 0, 0, MATS.standup);
+      const front = sg.face ? nx * sg.face.x + ny * sg.face.y > 0.35 : false;
+      if (front && vn > STANDUP_THRESHOLD && world.time >= world.standupReadyAt[sg.idx]!) {
+        world.standupReadyAt[sg.idx] = world.time + 0.15;
+        world.events.push({ type: "standup", index: sg.idx, ballId: ball.id });
+      }
+      emitHit(world, "plastic", impact, ball.x, ball.y);
+      continue;
     }
     if (sg.kind === "drop") {
       const vn = -(ball.vx * nx + ball.vy * ny);
@@ -751,10 +805,11 @@ function stepFieldBall(world: World, ball: Ball, dt: number): void {
   ball.px = ball.x;
   ball.py = ball.y;
   ball.vy += GRAVITY * dt;
-  // ころがり抵抗（ごくわずか）
+  // ころがり抵抗（ごくわずか）。ほとんど止まっている玉には効かせない
+  // （効かせると、ポストやアーチのてっぺんなど、ほぼ平らなところで玉が止まったままになる）
   const sp = Math.hypot(ball.vx, ball.vy);
   if (sp > 1e-3) {
-    const drop = Math.min(sp, (55 + sp * 0.03) * dt);
+    const drop = Math.min(sp, (55 * Math.min(1, sp / 60) + sp * 0.03) * dt);
     ball.vx -= (ball.vx / sp) * drop;
     ball.vy -= (ball.vy / sp) * drop;
   }
@@ -767,8 +822,66 @@ function stepFieldBall(world: World, ball: Ball, dt: number): void {
 
   for (let iter = 0; iter < 2; iter += 1) {
     collideStatic(world, ball);
+    collidePinwheel(world, ball);
     collideFlipper(world, ball, world.flippers[0], 0);
     collideFlipper(world, ball, world.flippers[1], 1);
+  }
+}
+
+/** かざぐるまの羽根の先の位置（描画用にも使う） */
+export function pinwheelArm(world: World, k: number): { ux: number; uy: number } {
+  const def = world.table.pinwheel;
+  const a = world.pinwheel.angle + (k * Math.PI * 2) / def.arms;
+  return { ux: Math.cos(a), uy: Math.sin(a) };
+}
+
+/**
+ * 玉とかざぐるま（まん中の軸と、回っている羽根）の当たり。羽根の当たった場所の速さ（ω × r）を玉に渡し、
+ * 玉がおした向きに羽根も回る（強く当てると速く回り、ゆっくりふだんの速さに戻る）
+ */
+function collidePinwheel(world: World, ball: Ball): void {
+  const def = world.table.pinwheel;
+  const st = world.pinwheel;
+  const dx = ball.x - def.x;
+  const dy = ball.y - def.y;
+  const reach = def.len + def.r + BALL_R;
+  if (dx * dx + dy * dy > reach * reach) return;
+  let best: { nx: number; ny: number; pen: number; cx: number; cy: number } | null = null;
+  // 軸
+  {
+    const d = Math.hypot(dx, dy) || 1e-6;
+    const pen = def.hubR + BALL_R - d;
+    if (pen > 0) best = { nx: dx / d, ny: dy / d, pen, cx: (dx / d) * def.hubR, cy: (dy / d) * def.hubR };
+  }
+  for (let k = 0; k < def.arms; k += 1) {
+    const { ux, uy } = pinwheelArm(world, k);
+    let t = dx * ux + dy * uy;
+    if (t < 0) t = 0;
+    else if (t > def.len) t = def.len;
+    const qx = ux * t;
+    const qy = uy * t;
+    const ex = dx - qx;
+    const ey = dy - qy;
+    const d = Math.hypot(ex, ey) || 1e-6;
+    const pen = def.r + BALL_R - d;
+    if (pen <= 0 || (best && pen <= best.pen)) continue;
+    best = { nx: ex / d, ny: ey / d, pen, cx: qx + (ex / d) * def.r, cy: qy + (ey / d) * def.r };
+  }
+  if (!best) return;
+  const svx = -st.omega * best.cy;
+  const svy = st.omega * best.cx;
+  const beforeX = ball.vx;
+  const beforeY = ball.vy;
+  const impact = resolve(ball, best.nx, best.ny, best.pen, svx, svy, MATS.pinwheel);
+  if (impact <= 0) return;
+  // 玉が受けた力の反対向きに、羽根が回る（中心からの距離 × 押した力）
+  const jx = ball.vx - beforeX;
+  const jy = ball.vy - beforeY;
+  st.omega -= PINWHEEL.spin * (best.cx * jy - best.cy * jx) / Math.max(4, def.len);
+  st.omega = Math.max(-PINWHEEL.maxOmega, Math.min(PINWHEEL.maxOmega, st.omega));
+  if (impact > 150 && world.time >= st.readyAt) {
+    st.readyAt = world.time + PINWHEEL.cooldown;
+    world.events.push({ type: "pinwheel", ballId: ball.id, speed: impact });
   }
 }
 
@@ -794,6 +907,9 @@ export function stepWorld(world: World, steps: number): void {
     world.time += dt;
     updateFlipper(world.flippers[0], dt);
     updateFlipper(world.flippers[1], dt);
+    const pw = world.pinwheel;
+    pw.angle += pw.omega * dt;
+    pw.omega += (world.table.pinwheel.omega - pw.omega) * (dt / PINWHEEL.relax);
     for (const ball of world.balls) {
       if (ball.mode === "field") {
         stepFieldBall(world, ball, dt);

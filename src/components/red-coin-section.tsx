@@ -33,7 +33,7 @@ export function RedCoinSection({ balance, events, tableNames }: { balance: numbe
         </Link>
       </div>
       <p className="mt-2 text-[11px] leading-relaxed text-ink-soft">
-        ご当地ピンボールのスコア{RED_COIN_POINTS.toLocaleString("ja-JP")}点ごとに1枚。使いみちはこれから増えるので、いまはためておけます。
+        ご当地ピンボールのスコア{RED_COIN_POINTS.toLocaleString("ja-JP")}点ごとに1枚。ホームの犬カードにも、ときどき降ってきます。使いみちはこれから増えるので、いまはためておけます。
       </p>
       {events && events.length > 0 ? (
         <ul className="mt-3 divide-y divide-line rounded-2xl border border-line bg-card">

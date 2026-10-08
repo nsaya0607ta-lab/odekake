@@ -315,6 +315,26 @@ export class PinballAudio {
       case "ballBall":
         this.noise(0.02, 0.1 + level * 0.2, 5200, { q: 3 });
         break;
+      case "standup": {
+        // 的のスイッチの「コツッ」と、光る音（左・まん中・右で高さを変える）
+        this.noise(0.03, 0.2, 1500, { q: 1.4 });
+        this.tone(mtof(this.scaleNote(5 + level * 2, 1)), 0.14, "square", 0.07, { delay: 0.01 });
+        break;
+      }
+      case "standupsAll":
+        this.arp([this.scaleNote(5, 1), this.scaleNote(7, 1), this.scaleNote(9, 1), this.scaleNote(12, 1)], 0.05, 0.22, "square", 0.09);
+        this.tone(mtof(this.scaleNote(12, 1)), 0.4, "triangle", 0.08, { delay: 0.2 });
+        break;
+      case "pinwheel":
+        // 羽根に当たる木の「カタッ」
+        this.noise(0.022, 0.12 + level * 0.14, 2300, { q: 5 });
+        this.tone(520 + level * 260, 0.035, "triangle", 0.06);
+        break;
+      case "gateKick":
+        // 光の扉ではね上げる「ビュン」
+        this.tone(300, 0.16, "sawtooth", 0.06, { to: 1200 });
+        this.noise(0.1, 0.1, 2500, { type: "highpass" });
+        break;
     }
   }
 

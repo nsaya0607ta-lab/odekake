@@ -9,6 +9,12 @@ import type { GachaRarity } from "@/lib/gacha/config";
 
 /** 1ゲームのボールの数 */
 export const PINBALL_BALLS = 3;
+/**
+ * 玉の速さ（台の上の時間の進み方）。1 だと本物の台と同じ速さで、スマホの画面では目で追いにくいので、
+ * 少しゆっくりにしてある。物理（玉・フリッパー・バンパー）だけが遅くなり、ボールセーブなどの秒数は実際の秒のまま。
+ * 形・強さの調整（打ち出しの強さ・フリッパーの狙い）は変わらないので、ここだけで速さを変えられる
+ */
+export const GAME_SPEED = 0.75;
 /** ボールを打ち出してから、落としても戻ってくる時間（秒） */
 export const BALL_SAVE_SEC = 8;
 /** ボールを出すたびに左のキックバックを点けておく */
@@ -38,7 +44,7 @@ export const CONQUEST_SAVE_SEC = 12;
  * スキルショット：上のレーン「お・で・か・け」に入りやすい引き量（physics.ts の PLUNGER_CURVE で決まる）。
  * 打ち出しゲージの目印と、シミュレーターのボットが使う。これより強く（FULL_PLUNGE_POWER〜）引くと1周する
  */
-export const SKILL_SHOT_POWER: readonly [number, number, number, number] = [0.6, 0.52, 0.41, 0.33];
+export const SKILL_SHOT_POWER: readonly [number, number, number, number] = [0.6, 0.515, 0.43, 0.335];
 export const FULL_PLUNGE_POWER = 0.66;
 
 export const POINTS = {
@@ -55,6 +61,9 @@ export const POINTS = {
   ramp: 25000,
   scoop: 10000,
   kickback: 5000,
+  standup: 3000,
+  standupsAll: 30000,
+  pinwheel: 500,
   skillShot: 75000,
   conquest: 500000,
   jackpot: 250000,
