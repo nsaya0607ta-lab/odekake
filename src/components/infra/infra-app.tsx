@@ -2,7 +2,7 @@
 
 /**
  * アプリ「インフラ」のいちばん外側。
- * - トップ：タブ「ステージ」（路線図）・「ずかん」・「ラボ」
+ * - トップ：タブ「ステージ」（路線図）・「ずかん」・「ラボ」・「サーバー室」
  * - ?stage=s3 … ステージを遊ぶ（ブラウザの「戻る」で一覧へ）
  * - ?view=backstage … おまけ「このアプリの裏側」
  */
@@ -19,15 +19,17 @@ import { PARTS } from "./model";
 import { emptyProgress, isCleared, isUnlocked, loadProgress, saveProgress, totalStars, unlockedParts, unlockedTerms, type Progress } from "./progress";
 import { BottomSheet } from "./sheets";
 import { setSoundEnabled } from "./sound";
+import { ServerRoomView } from "./server-room";
 import { STAGES, stageById, type StageDef } from "./stages";
 import { SoundButton, StagePlay } from "./stage-play";
 import styles from "./infra.module.css";
 
-type Tab = "stages" | "glossary" | "lab";
+type Tab = "stages" | "glossary" | "lab" | "room";
 const TABS: { id: Tab; label: string }[] = [
   { id: "stages", label: "ステージ" },
   { id: "glossary", label: "ずかん" },
   { id: "lab", label: "ラボ" },
+  { id: "room", label: "サーバー室" },
 ];
 
 /** おまけ「このアプリの裏側」が開くステージ（CDN まで習ったら） */
@@ -39,7 +41,7 @@ export function InfraApp() {
   const stageId = params.get("stage");
   const view = params.get("view");
   const tabParam = params.get("tab");
-  const tab: Tab = tabParam === "glossary" || tabParam === "lab" ? tabParam : "stages";
+  const tab: Tab = tabParam === "glossary" || tabParam === "lab" || tabParam === "room" ? tabParam : "stages";
   const [progress, setProgress] = useState<Progress>(emptyProgress);
   const [loaded, setLoaded] = useState(false);
   const pushed = useRef(false);
@@ -174,6 +176,7 @@ export function InfraApp() {
         ) : null}
         {tab === "glossary" ? <Glossary unlocked={terms} /> : null}
         {tab === "lab" && loaded ? <Lab parts={unlockedParts(progress)} /> : null}
+        {tab === "room" && loaded ? <ServerRoomView /> : null}
       </div>
     </div>
   );

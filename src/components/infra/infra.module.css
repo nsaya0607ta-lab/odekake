@@ -2586,6 +2586,287 @@ li[data-on="1"] .goalStar {
   color: var(--faint);
   font-size: 10.5px;
 }
+/* サーバー室 */
+.room {
+  padding: 12px 0 0;
+}
+.room > .glossaryLead {
+  margin: 4px 16px 10px;
+}
+.roomTopo {
+  display: grid;
+  justify-items: center;
+  gap: 4px;
+  margin: 0 12px;
+  padding: 12px;
+  border: 1px solid var(--line);
+  border-radius: 20px;
+  background: var(--panel);
+}
+.roomNode {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 170px;
+  padding: 6px 10px;
+  border: 1px solid color-mix(in srgb, var(--c) 40%, transparent);
+  border-radius: 14px;
+  background: color-mix(in srgb, var(--c) 8%, transparent);
+}
+.roomNode .paletteIcon {
+  width: 32px;
+  height: 32px;
+}
+.roomNode b,
+.roomNode small {
+  display: block;
+}
+.roomNode b {
+  font-size: 13px;
+}
+.roomNode small {
+  color: var(--soft);
+  font-size: 10.5px;
+}
+.roomArrow {
+  color: var(--faint);
+  font-size: 13px;
+  line-height: 1;
+}
+.roomServers {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(96px, 1fr));
+  gap: 6px;
+  width: 100%;
+}
+.roomServer {
+  display: grid;
+  gap: 2px;
+  padding: 8px;
+  border: 1.5px solid rgba(255, 255, 255, 0.12);
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.04);
+  transition: border-color 0.2s, opacity 0.2s;
+}
+.roomServer[data-healthy="1"] {
+  border-color: color-mix(in srgb, var(--c) 70%, transparent);
+  box-shadow: 0 0 14px color-mix(in srgb, var(--c) 25%, transparent);
+}
+.roomServer[data-status="frozen"],
+.roomServer[data-status="error"] {
+  border-color: rgba(255, 107, 129, 0.7);
+}
+.roomServer[data-status="stopped"] {
+  opacity: 0.5;
+}
+.roomServerHead {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  color: color-mix(in srgb, var(--c) 72%, #fff);
+}
+.roomServerHead b {
+  color: var(--text);
+  font-size: 12.5px;
+}
+.roomServer small {
+  color: var(--soft);
+  font-size: 10.5px;
+}
+.roomServer[data-status="frozen"] small:first-of-type,
+.roomServer[data-status="error"] small:first-of-type {
+  color: #ffb3c0;
+}
+.roomServerBtns {
+  display: flex;
+  gap: 4px;
+  margin-top: 4px;
+}
+.roomServerBtns button {
+  flex: 1;
+  height: 28px;
+  border: 1px solid var(--line);
+  border-radius: 9px;
+  background: rgba(255, 255, 255, 0.05);
+  color: var(--soft);
+  font-size: 10.5px;
+  font-weight: 800;
+}
+.roomServerBtns button:disabled {
+  opacity: 0.4;
+}
+.roomData {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 6px;
+}
+.roomData .roomNode {
+  min-width: 0;
+}
+.roomPanel {
+  display: grid;
+  gap: 8px;
+  margin: 10px 12px 0;
+  padding: 12px 14px;
+  border: 1px solid var(--line);
+  border-radius: 18px;
+  background: var(--panel);
+}
+.roomTitle {
+  margin: 0;
+  font-size: 14.5px;
+  font-weight: 900;
+}
+.roomTitle small {
+  margin-left: 6px;
+  color: var(--faint);
+  font-size: 10.5px;
+  font-weight: 700;
+}
+.roomNote {
+  margin: 0;
+  color: var(--soft);
+  font-size: 11.5px;
+}
+.roomChoice {
+  display: grid;
+  gap: 4px;
+}
+.roomChoice > span {
+  color: var(--soft);
+  font-size: 12px;
+  font-weight: 700;
+}
+.roomCode,
+.roomBody,
+.roomReqRow input,
+.roomReqRow select {
+  width: 100%;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: #060b1c;
+  color: #d7e3ff;
+  font: 12px/1.55 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+}
+.roomCode,
+.roomBody {
+  padding: 10px 12px;
+  resize: vertical;
+  white-space: pre;
+  overflow-x: auto;
+  tab-size: 2;
+}
+/* iOS で入力のたびに拡大されないように、入力欄は 16px */
+.roomReqRow input,
+.roomReqRow select,
+.roomBody {
+  font-size: 16px;
+}
+.roomReqRow {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 6px;
+}
+.roomReqRow input,
+.roomReqRow select {
+  height: 42px;
+  padding: 0 10px;
+}
+.roomError {
+  margin: 0;
+  padding: 8px 10px;
+  border-radius: 10px;
+  background: rgba(255, 107, 129, 0.12);
+  color: #ffb3c0;
+  font-size: 12px;
+}
+.roomBurst {
+  margin: 0;
+  padding: 8px 10px;
+  border-radius: 10px;
+  background: rgba(124, 245, 190, 0.08);
+  color: var(--text);
+  font-size: 12px;
+  line-height: 1.5;
+}
+.roomLog,
+.roomConsole {
+  display: grid;
+  gap: 4px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.roomConsole {
+  max-height: 220px;
+  overflow: auto;
+  font: 11px/1.5 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  color: var(--soft);
+  overflow-wrap: anywhere;
+}
+.roomConsole b {
+  color: var(--text);
+}
+.roomEntry > button {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 6px 8px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.03);
+  text-align: left;
+}
+.roomStatus {
+  flex: 0 0 auto;
+  min-width: 40px;
+  padding: 3px 6px;
+  border-radius: 8px;
+  background: rgba(124, 245, 190, 0.18);
+  color: var(--mint);
+  font-size: 12px;
+  font-weight: 900;
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+}
+.roomStatus[data-tone="warn"] {
+  background: rgba(255, 200, 87, 0.18);
+  color: var(--amber);
+}
+.roomStatus[data-tone="ng"] {
+  background: rgba(255, 107, 129, 0.2);
+  color: #ffb3c0;
+}
+.roomEntryMain {
+  display: grid;
+  min-width: 0;
+}
+.roomEntryMain b {
+  overflow: hidden;
+  font: 700 12.5px/1.4 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.roomEntryMain small {
+  color: var(--soft);
+  font-size: 10.5px;
+}
+.roomRaw {
+  display: grid;
+  gap: 4px;
+  padding: 6px 0 4px;
+}
+.roomRaw small {
+  color: var(--faint);
+  font-size: 10.5px;
+}
+.roomRaw .codeBlock {
+  max-height: 260px;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
 .labHud {
   display: grid;
   grid-template-columns: 1.2fr 1fr 1fr;
