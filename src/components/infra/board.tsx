@@ -34,6 +34,10 @@ type Props = {
   /** 線をつなぐモード（ラボ）：利用者の列もタップできる。usersSelected なら利用者の列を光らせる */
   onUsers?: () => void;
   usersSelected?: boolean;
+  /** 線をつなぐモードで、選んだパーツとつなげる相手（光らせる） */
+  targets?: ReadonlySet<string>;
+  /** 線をつなぐモードで選んでいるもの（その線を目立たせる。"users" なら利用者） */
+  focus?: string | null;
   /** パーツの行を並べる高さの範囲（ラボ。盤面が縦に長いとき） */
   rowRange?: { top: number; bottom: number };
   /** 1秒に8回ほど呼ぶ（成績の表示・お知らせ用） */
@@ -70,7 +74,8 @@ function statText(sim: InfraSim, node: SimNode): string {
     case "lb":
       return `${node.served}件`;
     case "auto": {
-      const apps = sim.apps();
+      // オートスケールが見ているサーバー（つながっているもの）
+      const apps = sim.next(node.id, ["app"]);
       return `動いている ${apps.filter((a) => !a.asleep).length}/${apps.length}台`;
     }
     case "monitor":
@@ -91,7 +96,7 @@ function tileState(sim: InfraSim, node: SimNode): string {
   return hot ? "hot" : node.busy.length ? "busy" : "";
 }
 
-export function Board({ slots, placements, links, fixed, sim, paused, speed, bot, farUsers, hint, selected, onSlot, onUsers, usersSelected, rowRange, onTick }: Props) {
+export function Board({ slots, placements, links, fixed, sim, paused, speed, bot, farUsers, hint, selected, onSlot, onUsers, usersSelected, targets, focus, rowRange, onTick }: Props) {
   const boxRef = useRef<HTMLDivElement>(null);
   const backRef = useRef<HTMLCanvasElement>(null);
   const frontRef = useRef<HTMLCanvasElement>(null);
@@ -158,6 +163,14 @@ export function Board({ slots, placements, links, fixed, sim, paused, speed, bot
     rendererRef.current?.clearFx();
     cache.current.clear();
   }, [sim]);
+
+  // 線をつなぐモードで選んだパーツの線を目立たせる（止まっているときも描きなおす）
+  useEffect(() => {
+    const r = rendererRef.current;
+    if (!r) return;
+    r.setFocus(focus ?? null);
+    if (!live.current.sim || live.current.paused) r.draw(live.current.sim, 0);
+  }, [focus]);
 
   /** タイル・利用者の見た目を、シミュレーターの今に合わせる */
   const syncDom = useCallback((s: InfraSim) => {
@@ -299,6 +312,7 @@ export function Board({ slots, placements, links, fixed, sim, paused, speed, bot
               type="button"
               className={styles.usersHit}
               data-selected={usersSelected ? "1" : undefined}
+              data-target={targets?.has("users") ? "1" : undefined}
               style={{ top: layout.usersY * size.h - 26, height: 52 }}
               onClick={onUsers}
               aria-label="利用者（つなぐ）"
@@ -343,6 +357,8 @@ export function Board({ slots, placements, links, fixed, sim, paused, speed, bot
                 className={styles.tile}
                 style={style}
                 data-selected={selected === slot ? "1" : undefined}
+                data-target={targets?.has(slot) ? "1" : undefined}
+                data-hint={hint?.has(slot) ? "1" : undefined}
                 data-fixed={fixed.has(slot) ? "1" : undefined}
                 onClick={() => onSlot(slot)}
                 aria-label={`${slotLabel(slot)}（${spec.name}）`}

@@ -8,24 +8,27 @@ import { useEffect, useReducer, useRef, useState, type CSSProperties } from "rea
 import { Glyph } from "./glyphs";
 import { PARTS } from "./model";
 import { ROOM_TEMPLATES, templateById, type Try } from "./room-templates";
-import { ServerRoom, rawRequest, rawResponse, type BurstResult, type Entry, type RoomSettings, type ServerStatus } from "./room";
+import { METHODS, ServerRoom, bracketHint, hasBody, rawRequest, rawResponse, statusMeaning, type BurstResult, type Entry, type Method, type RoomSettings, type ServerStatus } from "./room";
 import { sfx } from "./sound";
 import styles from "./infra.module.css";
 
 const KEY = "odekake_infra_room_v1";
 const DEFAULT_SETTINGS: RoomSettings = { count: 2, lb: "rr", cdn: false, autoHeal: false };
 
-type Saved = { code: string; template: string; settings: RoomSettings };
+/** code … デプロイしたプログラム、draft … 書きかけ（デプロイ前でも、閉じても消えないように） */
+type Saved = { code: string; draft: string; template: string; settings: RoomSettings };
 
 function loadSaved(): Saved {
   const first = ROOM_TEMPLATES[0]!;
-  const base: Saved = { code: first.code, template: first.id, settings: DEFAULT_SETTINGS };
+  const base: Saved = { code: first.code, draft: first.code, template: first.id, settings: DEFAULT_SETTINGS };
   try {
     const raw = JSON.parse(window.localStorage.getItem(KEY) ?? "null") as Partial<Saved> | null;
     if (!raw || typeof raw !== "object") return base;
     const s = (raw.settings ?? {}) as Partial<RoomSettings>;
+    const code = typeof raw.code === "string" && raw.code.length < 50000 ? raw.code : base.code;
     return {
-      code: typeof raw.code === "string" && raw.code.length < 50000 ? raw.code : base.code,
+      code,
+      draft: typeof raw.draft === "string" && raw.draft.length < 50000 ? raw.draft : code,
       template: typeof raw.template === "string" && templateById(raw.template) ? raw.template : base.template,
       settings: {
         count: s.count === 1 || s.count === 2 || s.count === 3 ? s.count : DEFAULT_SETTINGS.count,
@@ -53,9 +56,9 @@ export function ServerRoomView() {
   const [saved] = useState(loadSaved);
   const [room, setRoom] = useState<ServerRoom | null>(null);
   const [, bump] = useReducer((n: number) => n + 1, 0);
-  const [draft, setDraft] = useState(saved.code);
+  const [draft, setDraft] = useState(saved.draft);
   const [template, setTemplate] = useState(saved.template);
-  const [method, setMethod] = useState<"GET" | "POST">("GET");
+  const [method, setMethod] = useState<Method>("GET");
   const [path, setPath] = useState("/");
   const [body, setBody] = useState("");
   const [open, setOpen] = useState<number | null>(null);
@@ -79,13 +82,22 @@ export function ServerRoomView() {
     save(savedRef.current);
   };
 
+  // 書きかけのプログラムも、少し待ってから覚えておく（デプロイしないで閉じても消えないように）
+  useEffect(() => {
+    const t = window.setTimeout(() => {
+      savedRef.current = { ...savedRef.current, draft };
+      save(savedRef.current);
+    }, 600);
+    return () => window.clearTimeout(t);
+  }, [draft]);
+
   const tpl = templateById(template) ?? ROOM_TEMPLATES[0]!;
   const changed = room ? draft !== room.code : false;
 
   const deploy = () => {
     if (!room) return;
     room.deploy(draft);
-    persist({ code: draft, template });
+    persist({ code: draft, draft, template });
     setBurst(null);
     sfx("start");
   };
@@ -113,11 +125,11 @@ export function ServerRoomView() {
     setBurst(null);
     try {
       if (n === 1) {
-        const e = await room.send(method, path, method === "POST" ? body : null);
+        const e = await room.send(method, path, hasBody(method) ? body : null);
         setOpen(e.id);
         sfx(e.res.status < 400 ? "good" : "wrong");
       } else {
-        const r = await room.burst(method, path, method === "POST" ? body : null, n);
+        const r = await room.burst(method, path, hasBody(method) ? body : null, n);
         setBurst(r);
         setOpen(null);
         sfx(r.fail ? "wrong" : "good");
@@ -136,11 +148,12 @@ export function ServerRoomView() {
   const settings = room?.settings ?? saved.settings;
   const dbRows = room ? [...room.db].slice(0, 60) : [];
   const errors = room ? [...new Set(room.servers.filter((s) => s.status === "error" && s.error).map((s) => s.error!))] : [];
+  const hint = errors.length && room ? bracketHint(room.code) : null;
 
   return (
     <div className={styles.room}>
       <p className={styles.glossaryLead}>
-        本物のプログラムで動くサーバーを、ブラウザの中に立ち上げる部屋です。プログラムを書いて「デプロイ」し、リクエストを送ると、本物の HTTP の返事が返ってきます。サーバーはこの画面の中だけで動き、外のインターネットには何も送りません。
+        本物のプログラムで動くサーバーを、ブラウザの中に立ち上げる部屋です。プログラムを書いて「デプロイ」し、リクエストを送ると、本物の HTTP の返事が返ってきます。サーバーはこの画面の中だけで動き、プログラムからは外とつながる道具（fetch など）を使えないようにしてあります。
       </p>
 
       {/* 構成図 */}
@@ -232,6 +245,11 @@ export function ServerRoomView() {
           ))}
         </div>
         <p className={styles.roomNote}>{tpl.note}</p>
+        <ol className={styles.roomSteps} aria-label="やってみよう">
+          {tpl.steps.map((step) => (
+            <li key={step}>{step}</li>
+          ))}
+        </ol>
         <textarea
           className={styles.roomCode}
           value={draft}
@@ -248,6 +266,7 @@ export function ServerRoomView() {
             {e}
           </p>
         ))}
+        {hint ? <p className={styles.roomError}>ヒント：{hint}</p> : null}
         <div className={styles.labRow} style={{ padding: "8px 0 0" }}>
           <button type="button" className={styles.btnPrimary} style={{ flex: 1 }} onClick={deploy} disabled={!room}>
             {changed ? "デプロイ（書きかえを反映）" : "もう一度デプロイ"}
@@ -266,13 +285,16 @@ export function ServerRoomView() {
           ))}
         </div>
         <div className={styles.roomReqRow}>
-          <select value={method} onChange={(e) => setMethod(e.target.value as "GET" | "POST")} aria-label="メソッド">
-            <option value="GET">GET</option>
-            <option value="POST">POST</option>
+          <select value={method} onChange={(e) => setMethod(e.target.value as Method)} aria-label="メソッド">
+            {METHODS.map((m) => (
+              <option key={m} value={m}>
+                {m}
+              </option>
+            ))}
           </select>
           <input value={path} onChange={(e) => setPath(e.target.value)} aria-label="パス" spellCheck={false} autoCapitalize="off" autoCorrect="off" />
         </div>
-        {method === "POST" ? <textarea className={styles.roomBody} value={body} onChange={(e) => setBody(e.target.value)} rows={2} placeholder="送る本文" aria-label="本文" /> : null}
+        {hasBody(method) ? <textarea className={styles.roomBody} value={body} onChange={(e) => setBody(e.target.value)} rows={2} placeholder="送る本文" aria-label="本文" /> : null}
         <div className={styles.labRow} style={{ padding: "8px 0 0" }}>
           <button type="button" className={styles.btnPrimary} style={{ flex: 1 }} onClick={() => void send(1)} disabled={!room || busy}>
             送る
@@ -315,7 +337,7 @@ export function ServerRoomView() {
         <ul className={styles.roomConsole}>
           {(room?.logs ?? []).slice(0, 40).map((l) => (
             <li key={l.id}>
-              <b>{l.server}</b> {l.text}
+              <time>{clock(l.at)}</time> <b>{l.server}</b> {l.text}
             </li>
           ))}
         </ul>
@@ -338,7 +360,14 @@ export function ServerRoomView() {
           <p className={styles.roomNote}>からっぽです</p>
         )}
         <div className={styles.sheetActions}>
-          <button type="button" className={styles.btnGhost} onClick={() => room?.clearDb()} disabled={!dbRows.length}>
+          <button
+            type="button"
+            className={styles.btnGhost}
+            onClick={() => {
+              if (room && window.confirm("データベースの中身を、全部消します。よいですか？")) room.clearDb();
+            }}
+            disabled={!dbRows.length}
+          >
             データベースを空にする
           </button>
         </div>
@@ -361,7 +390,7 @@ function LogItem({ e, open, onToggle }: { e: Entry; open: boolean; onToggle: () 
             {e.req.method} {e.req.path}
           </b>
           <small>
-            {e.by}
+            {statusMeaning(e.res.status)}・{e.by}
             {cache ? `・CDN ${cache}` : ""}・{e.ms}ms
           </small>
         </span>
@@ -391,6 +420,8 @@ function Node({ icon, color, name, sub }: { icon: "user" | "cdn" | "lb" | "db" |
     </div>
   );
 }
+
+const clock = (at: number) => new Date(at).toLocaleTimeString("ja-JP", { hour: "2-digit", minute: "2-digit", second: "2-digit" });
 
 const Arrow = () => (
   <span className={styles.roomArrow} aria-hidden="true">

@@ -115,6 +115,7 @@ export function InfraApp() {
   }
 
   const stars = totalStars(progress);
+  const labParts = unlockedParts(progress);
   const terms = unlockedTerms(progress);
   const quizCount = STAGES.filter((s) => progress.quiz[s.id]).length;
   const nextStage = STAGES.find((s, i) => isUnlocked(progress, i) && !isCleared(progress, s.id)) ?? null;
@@ -175,7 +176,7 @@ export function InfraApp() {
           />
         ) : null}
         {tab === "glossary" ? <Glossary unlocked={terms} /> : null}
-        {tab === "lab" && loaded ? <Lab parts={unlockedParts(progress)} /> : null}
+        {tab === "lab" && loaded ? <Lab parts={labParts} /> : null}
         {tab === "room" && loaded ? <ServerRoomView /> : null}
       </div>
     </div>

@@ -2,6 +2,7 @@
  * ラボで組み立てた構成を、本物のインフラの設定ファイルにする（学習用の見本）。
  * - docker-compose.yml … パソコンの中に、同じ構成を作る（クラウドにしかないパーツはコメントで説明）
  * - nginx.conf … ロードバランサーの振り分け先（docker-compose から使う）
+ * - prometheus.yml … 監視が見張る先（docker-compose から使う）
  * - main.tf … AWS（クラウド）に同じ構成を作る Terraform
  * つなぎ方（リンク）も反映する：ロードバランサーが振り分けるサーバー、サーバーがつながる DB・キャッシュ・キュー など。
  * 本物の値が要るところ（OS イメージ・ネットワーク・パスワード）は variable にしてある。
@@ -29,6 +30,8 @@ type View = {
   of: (k: PartKind) => NodeId[];
   one: (k: PartKind) => NodeId | undefined;
   from: (a: string, k?: PartKind) => NodeId[];
+  /** b につながっている元（k の種類だけ） */
+  into: (b: NodeId, k?: PartKind) => string[];
   size: (id: NodeId) => number;
 };
 
@@ -39,8 +42,24 @@ function view(d: Design): View {
     of: (k) => ids.filter((s) => kindOf(s) === k),
     one: (k) => ids.find((s) => kindOf(s) === k),
     from: (a, k) => d.links.filter((l) => l.a === a && (!k || kindOf(l.b) === k)).map((l) => l.b),
+    into: (b, k) => d.links.filter((l) => l.b === b && (!k || (l.a !== USERS && kindOf(l.a) === k))).map((l) => l.a),
     size: (id) => d.placements.find((p) => p.slot === id)?.size ?? 0,
   };
+}
+
+/** 予備DB の写す元（つながっている本番DB） */
+const replicaSource = (v: View, id: NodeId) => v.into(id, "db")[0];
+/** バックアップが保存する DB（つながっている本番DB・予備DB） */
+const backupSource = (v: View, id: NodeId) => v.into(id, "db")[0] ?? v.into(id, "replica")[0];
+
+/** パソコンの中で、外（ブラウザ）から入れる入口にするサーバー：利用者・WAF・CDN からつながっている最初のサーバー */
+function exposedApp(v: View): NodeId | undefined {
+  const fronts = [USERS, ...v.of("waf"), ...v.of("cdn")];
+  for (const f of fronts) {
+    const app = v.from(f, "app")[0];
+    if (app) return app;
+  }
+  return v.of("app")[0];
 }
 
 /** docker-compose / Terraform での名前（予備DB は db-replica） */
@@ -60,6 +79,7 @@ function compose(v: View): string {
   w("# app のプログラムは、このファイルと同じフォルダの Dockerfile から作る想定です");
   const cloud = v.ids.filter((s) => ["dns", "cdn", "waf", "region", "auto"].includes(kindOf(s)));
   if (cloud.length) w(`# ${cloud.map(slotLabel).join("・")} はクラウドのサービスなので、main.tf（Terraform）のほうに書いてあります`);
+  const head = L.length;
   w("services:");
   if (lb) {
     const ups = v.from(lb, "app");
@@ -71,11 +91,11 @@ function compose(v: View): string {
     w("      - ./nginx.conf:/etc/nginx/nginx.conf:ro");
     if (ups.length) w(`    depends_on: [${ups.join(", ")}]`);
   }
-  const entryApps = v.from(USERS, "app").concat(v.one("waf") ? v.from(v.one("waf")!, "app") : []);
+  const exposed = lb ? undefined : exposedApp(v);
   v.of("app").forEach((id) => {
     w(`  ${id}: # ${slotLabel(id)}（${PARTS.app.sizes[v.size(id)]!.label} サイズ）`);
     w("    build: .");
-    if (!lb && entryApps[0] === id) {
+    if (exposed === id) {
       w("    ports:");
       w('      - "8080:3000"');
     }
@@ -109,7 +129,7 @@ function compose(v: View): string {
     w("      - db-data:/var/lib/postgresql/data");
   }
   replicas.forEach((id) => {
-    const src = v.ids.find((s) => v.from(s, "replica").includes(id) && kindOf(s) === "db");
+    const src = replicaSource(v, id);
     w(`  ${svc(id)}: # ${slotLabel(id)}（本番DB の写し）`);
     if (!src) w("    # ※ 本番DB とつながっていないので、写す元がありません");
     w("    # 写し（レプリケーション）を本当に動かすには、本番DB にも写し用のユーザーと設定が要ります（ここでは省略）");
@@ -128,7 +148,7 @@ function compose(v: View): string {
   }
   const backup = v.one("backup");
   if (backup) {
-    const src = v.ids.find((s) => v.from(s, "backup").includes(backup));
+    const src = backupSource(v, backup);
     w(`  ${backup}: # バックアップ（1時間ごとに DB を保存）`);
     if (!src) w("    # ※ DB とつながっていないので、保存するものがありません");
     w("    image: postgres:16");
@@ -140,15 +160,43 @@ function compose(v: View): string {
   }
   const monitor = v.one("monitor");
   if (monitor) {
-    w(`  ${monitor}: # 監視（数字を集める Prometheus。見張る先は prometheus.yml に書く）`);
+    w(`  ${monitor}: # 監視（数字を集める Prometheus。見張る先は prometheus.yml）`);
     w("    image: prom/prometheus:v2.53.0");
     w("    ports:");
     w('      - "9090:9090"');
+    w("    volumes:");
+    w("      - ./prometheus.yml:/etc/prometheus/prometheus.yml:ro");
   }
+  // パソコンの中で動かすものが1つもなければ、からっぽの services にする（それでも正しい形）
+  if (L.length === head + 1) L[head] = "services: {} # パソコンの中で動かすサービスは、まだありません";
   if (db) {
     w("volumes:");
     w("  db-data:");
   }
+  return L.join("\n") + "\n";
+}
+
+/* ------------------------------------------------------------ prometheus.yml */
+
+function prometheus(v: View): string | null {
+  const monitor = v.one("monitor");
+  if (!monitor) return null;
+  const apps = v.from(monitor, "app");
+  const dbs = [...v.from(monitor, "db"), ...v.from(monitor, "replica")];
+  const L = [
+    "# 監視（Prometheus）の設定（docker-compose の monitor が読む）",
+    "# 見張る先から15秒ごとに数字（メトリクス）を集めます。サーバーのプログラムが /metrics に数字を出す想定です",
+    "global:",
+    "  scrape_interval: 15s",
+    "scrape_configs:",
+  ];
+  if (apps.length) {
+    L.push("  - job_name: app", "    metrics_path: /metrics", "    static_configs:", `      - targets: [${apps.map((a) => `"${a}:3000"`).join(", ")}]`);
+  }
+  if (dbs.length) {
+    L.push(`  # DB（${dbs.map(svc).join("・")}）の数字を集めるには、postgres-exporter をそばに置きます（ここでは省略）`);
+  }
+  if (!apps.length) L.push("  [] # ※ 見張るサーバーとつながっていません");
   return L.join("\n") + "\n";
 }
 
@@ -209,10 +257,29 @@ function terraform(v: View): string {
   const w = (s = "") => L.push(s);
   const lb = v.one("lb"), cdn = v.one("cdn"), waf = v.one("waf"), dns = v.one("dns"), region = v.one("region");
   const auto = v.one("auto"), cache = v.one("cache"), db = v.one("db"), queue = v.one("queue"), backup = v.one("backup"), monitor = v.one("monitor");
-  const replicas = v.of("replica");
+  // 予備DB は、写す元の本番DB とつながっているものだけ作れる
+  const replicas = v.of("replica").filter((r) => replicaSource(v, r));
+  const loose = v.of("replica").filter((r) => !replicaSource(v, r));
+  const backupFrom = backup ? backupSource(v, backup) : undefined;
+  const backupTarget = backupFrom && (kindOf(backupFrom) === "db" || replicas.includes(backupFrom)) ? backupFrom : undefined;
   const scaled = auto ? v.from(auto, "app") : [];
   const fixedApps = v.of("app").filter((a) => !scaled.includes(a));
   const lbApps = lb ? v.from(lb, "app") : [];
+  const behindWaf = waf ? v.from(waf).find((b) => ["lb", "app"].includes(kindOf(b))) : undefined;
+  /** 外から見た入口の住所（決まった住所がないとき＝オートスケールのサーバーなどは null） */
+  const host = (id: NodeId | undefined): string | null => {
+    if (!id) return null;
+    const k = kindOf(id);
+    if (k === "lb") return `aws_lb.${tf(id)}.dns_name`;
+    if (k === "cdn") return `aws_cloudfront_distribution.${tf(id)}.domain_name`;
+    if (k === "waf") return host(behindWaf);
+    if (k === "app") return scaled.includes(id) ? null : `aws_instance.${tf(id)}.public_dns`;
+    return null;
+  };
+  const cdnOrigin = cdn ? host(v.from(cdn).find((b) => ["waf", "lb", "app"].includes(kindOf(b)))) : null;
+  /** DNS が案内する先（CDN があれば CDN、なければ利用者がつながっている入口） */
+  const siteEntry = dns ? host(cdn && v.from(USERS).includes(cdn) ? cdn : v.from(USERS).find((b) => ["waf", "lb", "app"].includes(kindOf(b)))) : null;
+  const needOrigin = (cdn && !cdnOrigin) || (dns && !siteEntry && !(region && lb));
 
   w("# わんこ商店の構成を、AWS に作る Terraform（学習用の見本）");
   w("# terraform init → terraform plan で、何が作られるかを確かめられます。");
@@ -246,6 +313,12 @@ function terraform(v: View): string {
   w('  description = "サーバーやロードバランサーを置くネットワーク（2つ以上）"');
   w("  type        = list(string)");
   w("}");
+  if (needOrigin) {
+    w('variable "origin_domain" {');
+    w('  description = "お店の入口の住所。決まった住所の入口（ロードバランサーなど）がつながっていないので、自分で入れる"');
+    w("  type        = string");
+    w("}");
+  }
   if (db) {
     w('variable "db_password" {');
     w("  type      = string");
@@ -262,7 +335,7 @@ function terraform(v: View): string {
     w("  type = list(string)");
     w("}");
   }
-  if (backup) {
+  if (backupTarget) {
     w('variable "backup_role_arn" {');
     w('  description = "AWS Backup が使う IAM ロール"');
     w("  type        = string");
@@ -369,7 +442,7 @@ function terraform(v: View): string {
 
   // データベース
   if (db) {
-    const keep = backup ? 7 : replicas.length ? 1 : 0;
+    const keep = backupTarget === db ? 7 : replicas.length ? 1 : 0;
     w();
     w(`# データベース（PostgreSQL・${PARTS.db.sizes[v.size(db)]!.label} サイズ）`);
     w(`resource "aws_db_instance" "${tf(db)}" {`);
@@ -381,24 +454,30 @@ function terraform(v: View): string {
     w('  username                = "shop"');
     w("  password                = var.db_password");
     w(
-      `  backup_retention_period = ${keep}${backup ? " # 毎日の自動バックアップを7日ぶん残す" : replicas.length ? " # 予備DB を作るには、自動バックアップが1日以上必要" : ""}`,
+      `  backup_retention_period = ${keep}${keep === 7 ? " # 毎日の自動バックアップを7日ぶん残す" : keep ? " # 予備DB を作るには、自動バックアップが1日以上必要" : ""}`,
     );
     w("  skip_final_snapshot     = true");
     w("}");
   }
   for (const r of replicas) {
-    const src = v.ids.find((s) => kindOf(s) === "db" && v.from(s, "replica").includes(r));
     w();
     w(`# ${slotLabel(r)}（本番DB の写し。読みこみを手伝い、本番が止まったら昇格させる）`);
-    if (!src) w("# ※ 本番DB とつながっていないので、写す元がありません");
     w(`resource "aws_db_instance" "${tf(r)}" {`);
     w(`  identifier          = "shop-${svc(r)}"`);
-    w(`  replicate_source_db = aws_db_instance.${tf(src ?? "db")}.identifier`);
+    w(`  replicate_source_db = aws_db_instance.${tf(replicaSource(v, r)!)}.identifier`);
     w('  instance_class      = "db.t3.micro"');
     w("  skip_final_snapshot = true");
     w("}");
   }
-  if (backup && db) {
+  for (const r of loose) {
+    w();
+    w(`# ※ ${slotLabel(r)} は本番DB とつながっていないので、写す元がなく、作れません（本番DB を置いて、線でつなごう）`);
+  }
+  if (backup && !backupTarget) {
+    w();
+    w(`# ※ ${slotLabel(backup)} は DB とつながっていないので、保存するものがありません`);
+  }
+  if (backupTarget) {
     w();
     w("# バックアップ（AWS Backup で、毎日 DB を別の場所に保存する）");
     w('resource "aws_backup_vault" "main" {');
@@ -421,7 +500,7 @@ function terraform(v: View): string {
     w('  name         = "shop-db"');
     w("  plan_id      = aws_backup_plan.daily.id");
     w("  iam_role_arn = var.backup_role_arn");
-    w(`  resources    = [aws_db_instance.${tf(db)}.arn]`);
+    w(`  resources    = [aws_db_instance.${tf(backupTarget)}.arn]`);
     w("}");
   }
 
@@ -446,7 +525,6 @@ function terraform(v: View): string {
   }
 
   // 入口：WAF・CDN・DNS
-  const behindWaf = waf ? v.from(waf).find((b) => ["lb", "app"].includes(kindOf(b))) : undefined;
   if (waf) {
     w();
     w("# WAF（よくある攻撃の形と、1つの相手からの多すぎるアクセスを止める）");
@@ -507,24 +585,13 @@ function terraform(v: View): string {
     } else w("# ※ AWS の WAF は、サーバー（EC2）に直接はつけられません。ロードバランサーの前に置こう");
   }
 
-  /** 外から見たお店の入口（DNS が指す先） */
-  const host = (id: NodeId | undefined): string | null => {
-    if (!id) return null;
-    const k = kindOf(id);
-    if (k === "lb") return `aws_lb.${tf(id)}.dns_name`;
-    if (k === "cdn") return `aws_cloudfront_distribution.${tf(id)}.domain_name`;
-    if (k === "waf") return host(behindWaf);
-    if (k === "app") return scaled.includes(id) ? null : `aws_instance.${tf(id)}.public_dns`;
-    return null;
-  };
   if (cdn) {
-    const origin = host(v.from(cdn).find((b) => ["waf", "lb", "app"].includes(kindOf(b))));
     w();
     w("# CDN（画像などを、利用者の近くの拠点から返す）");
     w(`resource "aws_cloudfront_distribution" "${tf(cdn)}" {`);
     w("  enabled = true");
     w("  origin {");
-    w(`    domain_name = ${origin ?? '"" # ※ CDN の後ろにつながっている入口がありません'}`);
+    w(`    domain_name = ${cdnOrigin ?? "var.origin_domain"}`);
     w('    origin_id   = "shop"');
     w("    custom_origin_config {");
     w("      http_port              = 80");
@@ -564,7 +631,6 @@ function terraform(v: View): string {
 
   if (dns) {
     const ttl = REAL_TTL[v.size(dns)] ?? 300;
-    const entry = host(cdn && v.from(USERS).includes(cdn) ? cdn : v.from(USERS).find((b) => ["waf", "lb", "app"].includes(kindOf(b))));
     w();
     w(`# DNS（名前 → 住所）。TTL ${ttl}秒${v.size(dns) === 1 ? "（短め：切りかえが早く伝わる）" : ""}`);
     w('resource "aws_route53_zone" "main" {');
@@ -582,7 +648,7 @@ function terraform(v: View): string {
       w("  request_interval  = 10");
       w("}");
       for (const [name, target, type] of [
-        ["tokyo", entry ?? `aws_lb.${tf(lb)}.dns_name`, "PRIMARY"],
+        ["tokyo", siteEntry ?? `aws_lb.${tf(lb)}.dns_name`, "PRIMARY"],
         ["osaka", "aws_lb.osaka.dns_name", "SECONDARY"],
       ] as const) {
         w();
@@ -608,15 +674,18 @@ function terraform(v: View): string {
       w('  name    = "www.${var.domain}"');
       w('  type    = "CNAME"');
       w(`  ttl     = ${ttl}`);
-      if (!entry) w("  # ※ 決まった住所の入口がありません（オートスケールのサーバーは住所が変わるので、ロードバランサーを前に置こう）");
-      w(`  records = [${entry ?? ""}]`);
+      w(`  records = [${siteEntry ?? "var.origin_domain"}]`);
       w("}");
     }
   }
 
   // 監視
   if (monitor) {
-    const watched = v.from(monitor);
+    const watched = v.from(monitor).filter((t) => kindOf(t) !== "replica" || replicas.includes(t));
+    if (watched.some((t) => scaled.includes(t))) {
+      w();
+      w("# オートスケールのサーバーは、元気がなければ Auto Scaling が自動で入れかえます");
+    }
     w();
     w("# 監視（CloudWatch）。おかしな値になったら、アラートを送る");
     w('resource "aws_sns_topic" "alerts" {');
@@ -709,6 +778,8 @@ export function exportDesign(d: Design): { files: ExportFile[]; rows: ExportRow[
   const files: ExportFile[] = [{ name: "docker-compose.yml", lang: "yaml", body: compose(v) }];
   const conf = nginx(v);
   if (conf) files.push({ name: "nginx.conf", lang: "nginx", body: conf });
+  const prom = prometheus(v);
+  if (prom) files.push({ name: "prometheus.yml", lang: "yaml", body: prom });
   files.push({ name: "main.tf", lang: "hcl", body: terraform(v) });
   return { files, rows: rows(v) };
 }

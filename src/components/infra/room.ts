@@ -18,6 +18,10 @@ export type LogLine = { id: number; at: number; server: string; text: string };
 
 export type ServerStatus = "starting" | "up" | "frozen" | "stopped" | "error";
 export type ServerView = { name: string; status: ServerStatus; healthy: boolean; inflight: number; served: number; error: string | null };
+export type Method = "GET" | "POST" | "PUT" | "DELETE";
+export const METHODS: readonly Method[] = ["GET", "POST", "PUT", "DELETE"];
+/** 本文を送れるメソッド */
+export const hasBody = (m: string) => m === "POST" || m === "PUT";
 export type RoomSettings = { count: number; lb: "rr" | "least"; cdn: boolean; autoHeal: boolean };
 export type BurstResult = { total: number; ok: number; fail: number; avgMs: number; by: Record<string, number> };
 
@@ -31,7 +35,13 @@ const MAX_BODY = 20000;
 const MAX_ENTRIES = 80;
 const MAX_LOGS = 120;
 const MAX_DB_KEYS = 300;
+/** データベースの1件の大きさの上限（JSON にしたときの文字数）と、名前の長さの上限 */
+const MAX_DB_VALUE = 10000;
+const MAX_DB_KEY = 200;
 const DB_KEY = "odekake_infra_room_db_v1";
+/** 監視の自動の再起動：この時間のうちに、この回数まで（それより多いと、再起動してもむだなのであきらめる） */
+const HEAL_WINDOW = 30000;
+const HEAL_MAX = 3;
 
 export const REASON: Record<number, string> = {
   200: "OK",
@@ -57,7 +67,7 @@ export const REASON: Record<number, string> = {
  * 1. 外とつながる道具を消す 2. env（db・cache・sleep）を用意する 3. 書いたプログラムを読みこむ 4. リクエストを待つ
  */
 const WORKER_SOURCE = String.raw`"use strict";
-for (const name of ["fetch", "XMLHttpRequest", "WebSocket", "WebSocketStream", "EventSource", "importScripts", "indexedDB", "caches", "Worker", "SharedWorker", "BroadcastChannel", "WebTransport"]) {
+for (const name of ["fetch", "XMLHttpRequest", "WebSocket", "WebSocketStream", "EventSource", "importScripts", "indexedDB", "caches", "Worker", "SharedWorker", "BroadcastChannel", "WebTransport", "Notification"]) {
   let o = self;
   while (o) {
     try { if (Object.prototype.hasOwnProperty.call(o, name)) delete o[name]; } catch (e) {}
@@ -72,6 +82,13 @@ if (typeof Response.json !== "function") {
     return new Response(JSON.stringify(data), Object.assign({}, init, { headers }));
   };
 }
+// エラーが、書いたプログラムの何行目で起きたか（わかるブラウザだけ）。new Function は前に2行つけるので、その分を引く
+const where = (err) => {
+  const st = String((err && err.stack) || "");
+  const m = /<anonymous>:(\d+):\d+/.exec(st) || /> Function:(\d+):\d+/.exec(st);
+  const line = m ? Number(m[1]) - 2 : 0;
+  return line > 0 ? "（" + line + "行目）" : "";
+};
 let handler = null;
 let rpcId = 0;
 const pending = new Map();
@@ -133,14 +150,14 @@ self.onmessage = async (e) => {
       const body = await res.text();
       postMessage({ type: "res", id: m.id, status: res.status, statusText: res.statusText, headers: Array.from(res.headers), body });
     } catch (err) {
-      postMessage({ type: "res", id: m.id, status: 500, statusText: "", headers: [["content-type", "text/plain; charset=utf-8"]], body: "サーバーのプログラムでエラー：" + String((err && err.message) || err) });
+      postMessage({ type: "res", id: m.id, status: 500, statusText: "", headers: [["content-type", "text/plain; charset=utf-8"]], body: "サーバーのプログラムでエラー" + where(err) + "：" + String((err && err.message) || err) });
     }
   }
 };
 `;
 
 type Waiter = (r: HttpRes | "timeout" | "down") => void;
-type Srv = ServerView & { worker: Worker | null; pending: Map<number, Waiter>; fails: number; checking: boolean };
+type Srv = ServerView & { worker: Worker | null; pending: Map<number, Waiter>; fails: number; checking: boolean; heals: number[]; gaveUp: boolean };
 
 let workerUrl: string | null = null;
 function workerScript(): string {
@@ -227,7 +244,7 @@ export class ServerRoom {
   private setCount(n: number) {
     while (this.servers.length > n) this.kill(this.servers.pop()!);
     while (this.servers.length < n) {
-      const s: Srv = { name: `サーバー${this.servers.length + 1}`, status: "starting", healthy: false, inflight: 0, served: 0, error: null, worker: null, pending: new Map(), fails: 0, checking: false };
+      const s: Srv = { name: `サーバー${this.servers.length + 1}`, status: "starting", healthy: false, inflight: 0, served: 0, error: null, worker: null, pending: new Map(), fails: 0, checking: false, heals: [], gaveUp: false };
       this.servers.push(s);
       this.boot(s);
     }
@@ -246,9 +263,15 @@ export class ServerRoom {
     w.onerror = (e) => {
       e.preventDefault();
       if (s.worker !== w) return;
-      s.status = "error";
-      s.error = e.message || "サーバーが止まりました";
-      this.emit();
+      // 起動中のエラーは、動き出せないので止める。動いてからのエラー（setTimeout の中など）は、ログに出すだけ
+      if (s.status === "starting") {
+        s.status = "error";
+        s.error = e.message || "サーバーが動き出せませんでした";
+        this.emit();
+        return;
+      }
+      // new Function は前に2行つけるので、その分を引く（行がわからないブラウザでは出さない）
+      this.log(s.name, `エラー${e.lineno > 2 ? `（${e.lineno - 2}行目）` : ""}：${(e.message || "わからないエラー").replace(/^Uncaught\s+/, "")}`);
     };
     w.postMessage({ type: "init", code: this.code, name: s.name });
   }
@@ -301,11 +324,20 @@ export class ServerRoom {
     switch (op) {
       case "db.get":
         return reply(this.db.has(k) ? this.db.get(k) : null);
-      case "db.put":
+      case "db.put": {
+        if (k.length > MAX_DB_KEY) return reply(null, `名前が長すぎます（${MAX_DB_KEY}文字まで）`);
+        let size = 0;
+        try {
+          size = JSON.stringify(v ?? null).length;
+        } catch {
+          return reply(null, "この中身は保存できません（文字・数・配列・オブジェクトにしよう）");
+        }
+        if (size > MAX_DB_VALUE) return reply(null, `1件が大きすぎます（${MAX_DB_VALUE}文字まで）`);
         if (!this.db.has(k) && this.db.size >= MAX_DB_KEYS) return reply(null, `データベースがいっぱいです（${MAX_DB_KEYS}件まで）`);
         this.db.set(k, v);
         this.saveDb();
         return reply(true);
+      }
       case "db.delete":
         this.db.delete(k);
         this.saveDb();
@@ -313,6 +345,7 @@ export class ServerRoom {
       case "db.list":
         return reply([...this.db].filter(([key]) => key.startsWith(k)).map(([key, value]) => ({ key, value })));
       case "db.incr": {
+        if (!this.db.has(k) && this.db.size >= MAX_DB_KEYS) return reply(null, `データベースがいっぱいです（${MAX_DB_KEYS}件まで）`);
         const next = (Number(this.db.get(k)) || 0) + (Number(v) || 1);
         this.db.set(k, next);
         this.saveDb();
@@ -350,6 +383,11 @@ export class ServerRoom {
   restart(i: number, why = "再起動しました") {
     const s = this.servers[i];
     if (!s) return;
+    if (why === "再起動しました") {
+      // 手で再起動したら、監視の「あきらめ」もやりなおし
+      s.heals = [];
+      s.gaveUp = false;
+    }
     this.kill(s);
     this.boot(s);
     this.log(s.name, why);
@@ -403,7 +441,18 @@ export class ServerRoom {
       s.healthy = false;
       this.log("ロードバランサー", `${s.name} の様子がおかしいので、振り分けをやめます（${s.error}）`);
     }
-    if (s.fails >= 2 && this.settings.autoHeal) this.restart(this.servers.indexOf(s), "監視が気づいて、自動で再起動しました");
+    if (s.fails >= 2 && this.settings.autoHeal && !s.gaveUp) {
+      const now = Date.now();
+      s.heals = s.heals.filter((t) => now - t < HEAL_WINDOW);
+      if (s.heals.length >= HEAL_MAX) {
+        // 何度再起動しても直らない（プログラムそのものがおかしい）。本物の監視でも、くり返すのをやめて人に知らせる
+        s.gaveUp = true;
+        this.log("監視", `${s.name} は、${HEAL_WINDOW / 1000}秒に${HEAL_MAX}回再起動しても直りません。再起動をやめます（プログラムを見直そう。/health に 200 を返している？）`);
+      } else {
+        s.heals.push(now);
+        this.restart(this.servers.indexOf(s), "監視が気づいて、自動で再起動しました");
+      }
+    }
     this.emit();
   }
 
@@ -425,15 +474,15 @@ export class ServerRoom {
   }
 
   async send(method: string, rawPath: string, body: string | null): Promise<Entry> {
-    const path = rawPath.startsWith("/") ? rawPath : `/${rawPath}`;
+    const path = normalizePath(rawPath);
     const headers: Header[] = [
       ["host", "odekake.lab"],
       ["user-agent", "wanko-browser/1.0"],
       ["accept", "*/*"],
     ];
-    const hasBody = method !== "GET" && body != null;
-    if (hasBody) headers.push(["content-type", "text/plain; charset=utf-8"]);
-    const req: HttpReq = { method, path, headers, body: hasBody ? body : null };
+    const withBody = hasBody(method) && body != null;
+    if (withBody) headers.push(["content-type", "text/plain; charset=utf-8"]);
+    const req: HttpReq = { method, path, headers, body: withBody ? body : null };
     const t0 = performance.now();
     let res: HttpRes;
     let by = "ロードバランサー";
@@ -453,7 +502,7 @@ export class ServerRoom {
         this.emit();
         const r = await this.ask(s, req, REQUEST_TIMEOUT);
         s.inflight = Math.max(0, s.inflight - 1);
-        s.served++;
+        if (r !== "timeout" && r !== "down") s.served++;
         if (r === "timeout") res = plain(504, `${s.name} から ${REQUEST_TIMEOUT / 1000}秒たっても返事がありません`);
         else if (r === "down") res = plain(502, `${s.name} が止まっていて、返事をもらえませんでした`);
         else res = { ...r, headers: [...r.headers, ["x-served-by", asciiName(s.name)]] };
@@ -476,7 +525,7 @@ export class ServerRoom {
     const list = await Promise.all(Array.from({ length: n }, () => this.send(method, path, body)));
     const by: Record<string, number> = {};
     for (const e of list) by[e.by] = (by[e.by] ?? 0) + 1;
-    const ok = list.filter((e) => e.res.status < 500).length;
+    const ok = list.filter((e) => e.res.status < 400).length;
     return { total: n, ok, fail: n - ok, avgMs: Math.round(list.reduce((s, e) => s + e.ms, 0) / n), by };
   }
 
@@ -516,6 +565,100 @@ export class ServerRoom {
     window.clearInterval(this.timer);
     for (const s of this.servers) this.kill(s);
     this.listeners.clear();
+  }
+}
+
+/** ステータスコードの意味（ひとことで） */
+export function statusMeaning(code: number): string {
+  const exact: Record<number, string> = {
+    200: "成功",
+    201: "作成できた",
+    204: "成功（本文なし）",
+    301: "引っこした（ずっと）",
+    302: "引っこした（いまだけ）",
+    304: "前と同じ",
+    400: "お願いの形がおかしい",
+    401: "ログインが要る",
+    403: "見せられない",
+    404: "見つからない",
+    405: "そのメソッドは使えない",
+    429: "多すぎる",
+    500: "サーバーのプログラムのエラー",
+    502: "サーバーが止まっていた",
+    503: "元気なサーバーがいない",
+    504: "時間切れ",
+  };
+  if (exact[code]) return exact[code];
+  if (code < 300) return "成功";
+  if (code < 400) return "別の場所へ";
+  if (code < 500) return "お願いのまちがい";
+  return "サーバー側の問題";
+}
+
+/**
+ * プログラムのかっこ・文字列の閉じわすれをさがす（文法エラーのときのヒント。わからなければ null）。
+ * コメント・文字列の中はとばす。正規表現などで、まちがえることもある
+ */
+export function bracketHint(code: string): string | null {
+  const pair: Record<string, string> = { ")": "(", "]": "[", "}": "{" };
+  const stack: { ch: string; line: number }[] = [];
+  let line = 1;
+  for (let i = 0; i < code.length; i++) {
+    const c = code[i]!;
+    if (c === "\n") {
+      line++;
+      continue;
+    }
+    if (c === "/" && code[i + 1] === "/") {
+      while (i < code.length && code[i] !== "\n") i++;
+      i--;
+      continue;
+    }
+    if (c === "/" && code[i + 1] === "*") {
+      i += 2;
+      while (i < code.length && !(code[i] === "*" && code[i + 1] === "/")) {
+        if (code[i] === "\n") line++;
+        i++;
+      }
+      i++;
+      continue;
+    }
+    if (c === '"' || c === "'" || c === "`") {
+      const start = line;
+      i++;
+      while (i < code.length && code[i] !== c) {
+        if (code[i] === "\\") i++;
+        else if (code[i] === "\n") {
+          if (c !== "`") return `${start}行目の ${c} が閉じていません`;
+          line++;
+        }
+        i++;
+      }
+      if (i >= code.length) return `${start}行目の ${c} が閉じていません`;
+      continue;
+    }
+    if (c === "(" || c === "[" || c === "{") stack.push({ ch: c, line });
+    else if (c === ")" || c === "]" || c === "}") {
+      const open = stack.pop();
+      if (!open) return `${line}行目の ${c} に、組になる ${pair[c]} がありません`;
+      if (open.ch !== pair[c]) return `${open.line}行目の ${open.ch} と、${line}行目の ${c} が組になっていません`;
+    }
+  }
+  const open = stack.pop();
+  return open ? `${open.line}行目の ${open.ch} が閉じていません` : null;
+}
+
+/**
+ * 入力されたパスを、本物の HTTP で送る形にする（前後の空白をとる・「/」から始める・日本語などは %E3%… に）。
+ * https://… と URL ごと入れたときは、パスと ? 以降だけを使う
+ */
+export function normalizePath(raw: string): string {
+  const t = raw.trim();
+  try {
+    const u = /^https?:\/\//i.test(t) ? new URL(t) : new URL(t.startsWith("/") ? t : `/${t}`, "https://odekake.lab");
+    return `${u.pathname}${u.search}`;
+  } catch {
+    return "/";
   }
 }
 

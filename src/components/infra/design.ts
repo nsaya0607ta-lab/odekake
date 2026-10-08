@@ -26,8 +26,29 @@ export const LIMITS: Record<PartKind, number> = {
   monitor: 1,
 };
 
-/** 置いたり外したりしたら、全体のつなぎ方を組みなおすパーツ（入口の並びが変わるので） */
+/** 置いたり外したりしたら、入口のつなぎ方を組みなおすパーツ（入口の並びが変わるので） */
 const REWIRE = new Set<PartKind>(["cdn", "waf", "lb"]);
+
+/**
+ * 入口のつなぎ方（利用者 → 入口、CDN・WAF・ロードバランサー → その先）。
+ * 入口のパーツを置いた・外したときは、ここだけ組みなおして、ほかの線（DB・キュー・監視など）は自分でつないだまま残す
+ */
+const isEntryLink = (l: Link) => (l.a === USERS && !["dns", "region"].includes(kindOf(l.b))) || REWIRE.has(kindOf(l.a));
+
+function rewireEntry(placements: Placement[], links: Link[]): Link[] {
+  const ids = placements.map((p) => p.slot);
+  const keep = links.filter((l) => !isEntryLink(l) && (l.a === USERS || ids.includes(l.a)) && ids.includes(l.b));
+  return [...computeLinks(ids).filter(isEntryLink), ...keep];
+}
+
+/** 正しい id か（1つしか置けないものは種類の名前、いくつも置けるものは番号つき。予備DB の1台目は "replica"） */
+function validId(slot: string): boolean {
+  const kind = kindOf(slot);
+  if (!PART_KINDS.includes(kind)) return false;
+  if (LIMITS[kind] === 1) return slot === kind;
+  if (kind === "replica") return slot === "replica" || /^replica[2-9]$/.test(slot);
+  return new RegExp(`^${kind}[1-9]\\d*$`).test(slot);
+}
 
 const KEY = "odekake_infra_lab_v2";
 
@@ -52,14 +73,14 @@ export function addPart(d: Design, kind: PartKind): { design: Design; id: NodeId
   const id = newId(d, kind);
   const placements = [...d.placements, { slot: id, kind, size: 0 }];
   const ids = placements.map((p) => p.slot);
-  if (REWIRE.has(kind)) return { design: sortDesign({ placements, links: computeLinks(ids) }), id, rewired: true };
+  if (REWIRE.has(kind)) return { design: sortDesign({ placements, links: rewireEntry(placements, d.links) }), id, rewired: true };
   const add = computeLinks(ids).filter((l) => (l.a === id || l.b === id) && !d.links.some((x) => sameLink(x, l)));
   return { design: sortDesign({ placements, links: [...d.links, ...add] }), id, rewired: false };
 }
 
 export function removePart(d: Design, id: NodeId): { design: Design; rewired: boolean } {
   const placements = d.placements.filter((p) => p.slot !== id);
-  if (REWIRE.has(kindOf(id))) return { design: { placements, links: computeLinks(placements.map((p) => p.slot)) }, rewired: true };
+  if (REWIRE.has(kindOf(id))) return { design: { placements, links: rewireEntry(placements, d.links) }, rewired: true };
   return { design: { placements, links: d.links.filter((l) => l.a !== id && l.b !== id) }, rewired: false };
 }
 
@@ -111,6 +132,10 @@ export function designWarnings(d: Design): string[] {
     } else if (k === "region") {
       if (!into(id).includes(USERS)) out.push(`${name} が利用者とつながっていません`);
     } else if (!reach.has(id)) out.push(`${name} にはアクセスが届きません`);
+    else if ((k === "cdn" || k === "waf") && !from(id).some((b) => ["waf", "lb", "app"].includes(kindOf(b)))) {
+      out.push(k === "cdn" ? `${name} の後ろに入口がないので、CDN にない画像は返せません` : `${name} の後ろに、通したアクセスの行き先がありません`);
+    } else if (k === "lb" && !from(id).some((b) => kindOf(b) === "app")) out.push(`${name} に、振り分ける先のサーバーがつながっていません`);
+    else if (k === "queue" && !from(id).some((b) => kindOf(b) === "worker")) out.push(`${name} の仕事を片づけるワーカーが、つながっていません`);
     if (k === "app" && from(id).some((b) => kindOf(b) === "replica") && !from(id).some((b) => kindOf(b) === "db")) {
       out.push(`${name} は予備DB としかつながっていないので、投稿を書きこめません（書きこみは本番DB だけ）`);
     }
@@ -133,18 +158,21 @@ export function loadDesign(parts: ReadonlySet<PartKind>): Design {
     const placements: Placement[] = [];
     const seen = new Set<string>();
     for (const p of Array.isArray(r.placements) ? r.placements : []) {
+      if (!p || typeof p !== "object") continue;
       const slot = (p as { slot?: unknown }).slot;
       const size = (p as { size?: unknown }).size;
-      if (typeof slot !== "string" || seen.has(slot)) continue;
+      if (typeof slot !== "string" || seen.has(slot) || !validId(slot)) continue;
       const kind = kindOf(slot);
-      if (!PART_KINDS.includes(kind) || !parts.has(kind) || !/^[a-z]+\d*$/.test(slot)) continue;
+      if (!parts.has(kind)) continue;
       if (placements.filter((x) => x.kind === kind).length >= LIMITS[kind]) continue;
       seen.add(slot);
       placements.push({ slot, kind, size: typeof size === "number" && size >= 0 && size < PARTS[kind].sizes.length ? Math.floor(size) : 0 });
     }
-    if (!placements.length) return defaultDesign(parts);
+    // 保存したものが読めなかったときだけ、はじめの形にする（自分で全部外したときは、からっぽのまま）
+    if (!placements.length && !Array.isArray(r.placements)) return defaultDesign(parts);
     const links: Link[] = [];
     for (const l of Array.isArray(r.links) ? r.links : []) {
+      if (!l || typeof l !== "object") continue;
       const a = (l as { a?: unknown }).a, b = (l as { b?: unknown }).b;
       if (typeof a !== "string" || typeof b !== "string") continue;
       if ((a !== USERS && !seen.has(a)) || !seen.has(b)) continue;

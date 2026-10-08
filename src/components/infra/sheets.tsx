@@ -158,7 +158,7 @@ function LiveStats({ sim, slot }: { sim: InfraSim; slot: NodeId }) {
   if (node.kind === "waf") rows.push(["防いだ攻撃", `${node.blocked}件`]);
   if (node.kind === "db" || node.kind === "replica") rows.push(["役わり", sim.primaryDb === slot ? "本番" : "予備（読みこみ担当）"]);
   if (node.kind === "auto") {
-    const apps = sim.apps();
+    const apps = sim.next(node.id, ["app"]);
     rows.push(["動いているサーバー", `${apps.filter((a) => !a.asleep).length} / ${apps.length}台`]);
     rows.push(["起こした回数", `${node.served}回`]);
   } else if (node.kind === "monitor") rows.push(["アラート", `${node.served}回`]);

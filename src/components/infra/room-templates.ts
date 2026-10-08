@@ -3,14 +3,22 @@
  * どれも /health（ロードバランサーのヘルスチェック）に返事をする。
  */
 
-export type Try = { method: "GET" | "POST"; path: string; body?: string };
-export type RoomTemplate = { id: string; name: string; note: string; tries: Try[]; code: string };
+import type { Method } from "./room";
+
+export type Try = { method: Method; path: string; body?: string };
+/** steps … 「やってみよう」（何を送って、どこを見るとよいか） */
+export type RoomTemplate = { id: string; name: string; note: string; steps: string[]; tries: Try[]; code: string };
 
 export const ROOM_TEMPLATES: RoomTemplate[] = [
   {
     id: "hello",
     name: "はじめてのサーバー",
     note: "ページごとに、ちがう返事をする",
+    steps: [
+      "「GET /」を送ってみよう。本文と、ステータス 200（成功）が返ってくる",
+      "「20回まとめて」を押すと、サーバー1・サーバー2 に順番に振り分けられる",
+      "「GET /nai」は 404（見つからない）。プログラムに if を足して、新しいページを作ってデプロイしよう",
+    ],
     tries: [
       { method: "GET", path: "/" },
       { method: "GET", path: "/hello" },
@@ -40,6 +48,11 @@ async function onRequest(request, env) {
     id: "db",
     name: "データベースを使う",
     note: "どのサーバーに来ても、同じデータが見える",
+    steps: [
+      "「GET /」を何回か送ると、どのサーバーが返事をしても、人数が1つずつふえる（データベースはみんなで1つ）",
+      "「POST /reviews」でレビューを書いて、「GET /reviews」で読んでみよう",
+      "いちばん下の「データベースの中身」も見てみよう。この端末に残るので、画面を閉じても消えない",
+    ],
     tries: [
       { method: "GET", path: "/" },
       { method: "POST", path: "/reviews", body: "ドッグランが広くて最高！" },
@@ -79,6 +92,11 @@ async function onRequest(request, env) {
     id: "cache",
     name: "キャッシュで速く",
     note: "時間のかかる答えを、しばらく覚えておく",
+    steps: [
+      "「GET /ranking」を送ると、はじめは 0.8秒くらいかかる（作りたて）",
+      "すぐにもう一度送ると、あっというまに返ってくる（キャッシュ）。10秒たつと、また作りなおし",
+      "サーバーを3台にしても速いまま。キャッシュも、みんなで1つ",
+    ],
     tries: [{ method: "GET", path: "/ranking" }],
     code: `// 人気ランキングを作るのに、時間がかかる（0.8秒）とします
 async function makeRanking(env) {
@@ -111,6 +129,11 @@ async function onRequest(request, env) {
     id: "cdn",
     name: "CDN に覚えてもらう",
     note: "返事に「使い回してOK」と書くと、CDN が代わりに返す",
+    steps: [
+      "上の「CDN」を「あり」にする",
+      "「GET /logo」を2回送る。2回目は「CDN HIT」で、サーバーまで行かずに返ってくる（0ms）",
+      "「GET /time」は no-store（使い回さないで）なので、毎回サーバーが返事をする",
+    ],
     tries: [
       { method: "GET", path: "/logo" },
       { method: "GET", path: "/time" },
@@ -142,6 +165,11 @@ async function onRequest(request, env) {
     id: "broken",
     name: "こわれやすいサーバー",
     note: "エラー・遅い・固まる を、わざと起こす",
+    steps: [
+      "「GET /lucky」を「20回まとめて」送ると、ときどき 500（サーバーのエラー）になる",
+      "「GET /slow」は、3秒で待ちきれずに 504（時間切れ）",
+      "「GET /freeze」でサーバーが固まる。ヘルスチェックで外されるのを見たら、上の「監視」を「あり」にして、もう一度",
+    ],
     tries: [
       { method: "GET", path: "/lucky" },
       { method: "GET", path: "/slow" },
