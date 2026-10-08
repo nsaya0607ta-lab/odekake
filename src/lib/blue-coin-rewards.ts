@@ -1,6 +1,7 @@
 /**
  * 青コインがもらえるもの（家具・背景・都道府県ガチャに使う）。
  * 数は DB と同じにする：おさんぽフレンチーは 0111、はじめての場所と通算ログインは 0125。
+ * ご当地ピンボールの青コインは src/lib/games/pinball/config.ts（COIN_POINTS・COIN_MAX）と 0136。
  */
 
 /** はじめての市区町村を登録したとき */
@@ -17,4 +18,4 @@ export const BLUE_OSANPO_MISSION_ALL = 100;
 export const BLUE_OSANPO_COOP = 100;
 
 /** お店のコインの帯に出す、ためかたの短い説明 */
-export const BLUE_COIN_SOURCES_SHORT = "青コインは「おさんぽフレンチー」・はじめての市区町村や都道府県の登録・通算7日ごとのログインでもらえます。";
+export const BLUE_COIN_SOURCES_SHORT = "青コインは「おさんぽフレンチー」「ご当地ピンボール」・はじめての市区町村や都道府県の登録・通算7日ごとのログインでもらえます。";

@@ -19,9 +19,9 @@ function toRecord(value: unknown): Record<string, unknown> {
 }
 
 /**
- * ご当地ピンボールの1プレイの結果を記録し、赤コインを受け取る。
+ * ご当地ピンボールの1プレイの結果を記録し、青コインを受け取る。
  * 物理はブラウザで動くので、ここでは「ありえる値か」と「その台で遊べる人か」を確かめる
- * （スコアのわりに短すぎる時間・持っていない県の台はうけつけない）。赤コインの枚数はサーバーで決める。
+ * （スコアのわりに短すぎる時間・持っていない県の台はうけつけない）。青コインの枚数はサーバーで決める。
  */
 export async function POST(request: Request) {
   const { supabase, user } = await requireUser();
@@ -47,7 +47,7 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "この台はまだ遊べません。" }, { status: 403 });
   }
 
-  // 1ゲーム1〜数分。直接 API を連打して赤コインを稼がれないようにする
+  // 1ゲーム1〜数分。直接 API を連打して青コインを稼がれないようにする
   const limit = checkRateLimit(`pinball:${user.id}`, 40, 60 * 60_000);
   if (!limit.allowed) {
     return NextResponse.json(

@@ -252,7 +252,7 @@ export default async function GamesPage() {
 
             <span className="relative z-10 flex items-center gap-2">
               <span className="rounded-full bg-[#d0574e] px-2.5 py-1 text-[10px] font-black text-white shadow-sm">GAME 05</span>
-              <span className="rounded-full border border-white/90 bg-white/70 px-2.5 py-1 text-[10px] font-bold text-[#b8473f]">NEW・赤コイン</span>
+              <span className="rounded-full border border-white/90 bg-white/70 px-2.5 py-1 text-[10px] font-bold text-[#b8473f]">NEW・青コイン</span>
             </span>
 
             <span className="relative z-10 mt-3 flex items-center gap-3">
@@ -348,7 +348,7 @@ export default async function GamesPage() {
 
         <p className="flex items-center justify-center gap-1.5 py-1 text-[10px] font-bold text-ink-faint">
           <span aria-hidden="true">🪙</span>
-          スコアに応じてコインを獲得できます（おさんぽフレンチーは青コイン・ご当地ピンボールは赤コイン）
+          スコアに応じてコインを獲得できます（おさんぽフレンチーとご当地ピンボールは青コイン）
         </p>
       </PageBody>
     </>

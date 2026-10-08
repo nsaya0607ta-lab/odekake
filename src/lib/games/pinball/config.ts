@@ -1,8 +1,8 @@
 /**
- * ご当地ピンボールの数字（得点・時間・赤コイン）
+ * ご当地ピンボールの数字（得点・時間・青コイン）
  * =============================================================
- * ゲーム本体（game.ts）・ルール説明・サーバー（スコアの記録と赤コイン）が同じ値を見る。
- * 赤コインの換算（RED_COIN_*）を変えるときは supabase/migrations の record_pinball_result も同じにする。
+ * ゲーム本体（game.ts）・ルール説明・サーバー（スコアの記録と青コイン）が同じ値を見る。
+ * 青コインの換算（COIN_POINTS・COIN_MAX）を変えるときは supabase/migrations の record_pinball_result も同じにする。
  * 1プレイの長さ・得点の分布は scripts/simulate-pinball.mjs で確かめる（結果は docs/pinball.md）。
  */
 import type { GachaRarity } from "@/lib/gacha/config";
@@ -122,15 +122,16 @@ export const GACHA_AWARDS = [
 export type GachaAwardId = (typeof GACHA_AWARDS)[number]["id"];
 
 /**
- * 赤コイン：スコア ÷ RED_COIN_POINTS（切り捨て）、1プレイ RED_COIN_MAX まで。
- * 平均的な腕前（1プレイ約2分）で約200枚になるように決めてある（docs/pinball.md）。
+ * 青コイン：スコア ÷ COIN_POINTS（切り捨て）、1プレイ COIN_MAX まで。
+ * はじめは赤コイン（スコア ÷ 9,500・3,000枚まで）だったが、赤コインはやめて青コインにし、枚数は8割にした
+ * （9,500 ÷ 0.8 = 11,875、3,000 × 0.8 = 2,400）。平均的な腕前で約160枚（docs/pinball.md）。
  */
-export const RED_COIN_POINTS = 9500;
-export const RED_COIN_MAX = 3000;
+export const COIN_POINTS = 11875;
+export const COIN_MAX = 2400;
 
-export function redCoinsForScore(score: number): number {
+export function coinsForScore(score: number): number {
   if (!Number.isFinite(score) || score <= 0) return 0;
-  return Math.min(RED_COIN_MAX, Math.floor(score / RED_COIN_POINTS));
+  return Math.min(COIN_MAX, Math.floor(score / COIN_POINTS));
 }
 
 /** サーバーで受けつけるスコアの上限（明らかにおかしい値をはじく） */

@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useCallback, useMemo, useState, type CSSProperties } from "react";
-import { RedCoinArt } from "@/components/coin-art";
+import { BlueCoinArt } from "@/components/coin-art";
 import { RARITY_STYLES } from "@/lib/gacha/config";
 import { STAMP_COUNT } from "@/lib/games/pinball/config";
 import type { PinballTableInfo } from "@/lib/games/pinball/tables";
@@ -14,8 +14,8 @@ type Props = {
   tables: PinballTableInfo[];
   /** 台ごとの自分のベスト */
   bests: Record<string, number>;
-  /** 赤コインの残高（仕組みがまだ無い環境では null） */
-  redCoins: number | null;
+  /** 青コインの残高（仕組みがまだ無い環境では null） */
+  blueCoins: number | null;
 };
 
 function ShapeIcon({ table, theme }: { table: PinballTableInfo; theme: PinballTheme }) {
@@ -124,11 +124,11 @@ function TableCard({ table, best, onPlay }: { table: PinballTableInfo; best: num
   );
 }
 
-export function PinballGame({ tables, bests: initialBests, redCoins: initialCoins }: Props) {
+export function PinballGame({ tables, bests: initialBests, blueCoins: initialCoins }: Props) {
   const [playing, setPlaying] = useState<string | null>(null);
   const [runKey, setRunKey] = useState(0);
   const [bests, setBests] = useState(initialBests);
-  const [redCoins, setRedCoins] = useState(initialCoins);
+  const [blueCoins, setBlueCoins] = useState(initialCoins);
   const table = tables.find((t) => t.id === playing) ?? null;
   const theme = useMemo(() => (table ? getPinballTheme(table.id, table.name) : null), [table]);
   const tableNames = useMemo(() => Object.fromEntries(tables.map((t) => [t.id, t.name])), [tables]);
@@ -136,7 +136,7 @@ export function PinballGame({ tables, bests: initialBests, redCoins: initialCoin
 
   const onRecorded = useCallback((tableId: string, result: PinballResult) => {
     setBests((prev) => (result.score > (prev[tableId] ?? -1) ? { ...prev, [tableId]: result.score } : prev));
-    if (result.balance !== null) setRedCoins(result.balance);
+    if (result.balance !== null) setBlueCoins(result.balance);
     window.dispatchEvent(new Event(PINBALL_RANKING_REFRESH_EVENT));
   }, []);
 
@@ -150,10 +150,10 @@ export function PinballGame({ tables, bests: initialBests, redCoins: initialCoin
           <p className="text-[8px] font-black tracking-[0.18em] text-[#ff8a80]">GAME 05</p>
           <h1 className="truncate text-[16px] font-black">ご当地ピンボール</h1>
         </div>
-        {redCoins !== null ? (
-          <span className="flex shrink-0 items-center gap-1 rounded-full border border-[#ff8a80]/40 bg-[#3a1418] px-2.5 py-1" aria-label={`赤コイン ${redCoins.toLocaleString("ja-JP")}枚`}>
-            <RedCoinArt className="h-[18px] w-[18px]" />
-            <span className="text-[13px] font-black tabular-nums text-[#ffd3cd]">{redCoins.toLocaleString("ja-JP")}</span>
+        {blueCoins !== null ? (
+          <span className="flex shrink-0 items-center gap-1 rounded-full border border-[#8ab8ff]/40 bg-[#14223a] px-2.5 py-1" aria-label={`青コイン ${blueCoins.toLocaleString("ja-JP")}枚`}>
+            <BlueCoinArt className="h-[18px] w-[18px]" />
+            <span className="text-[13px] font-black tabular-nums text-[#d3e4ff]">{blueCoins.toLocaleString("ja-JP")}</span>
           </span>
         ) : null}
       </header>
@@ -164,7 +164,7 @@ export function PinballGame({ tables, bests: initialBests, redCoins: initialCoin
           <p className="relative text-[10px] font-black tracking-[0.1em] text-[#ff8a80]">はじいて、集めて、県制覇！</p>
           <p className="relative mt-1 text-[22px] font-black leading-tight">ご当地アイテムの台で遊ぼう</p>
           <p className="relative mt-2 text-[11px] font-bold leading-relaxed text-white/70">
-            台に浮かぶご当地アイテムにボールを当てて集めると、その場でスキルが発動。どれでも{STAMP_COUNT}つ集めると「県制覇！」でマルチボール。その県のアイテムをたくさん持っているほど、図鑑ボーナスで得点が上がります。3球で終わり、スコアに応じて赤コインがもらえます。
+            台に浮かぶご当地アイテムにボールを当てて集めると、その場でスキルが発動。どれでも{STAMP_COUNT}つ集めると「県制覇！」でマルチボール。その県のアイテムをたくさん持っているほど、図鑑ボーナスで得点が上がります。3球で終わり、スコアに応じて青コインがもらえます。
           </p>
           <div className="relative mt-3 grid grid-cols-3 gap-2 text-center">
             {[
