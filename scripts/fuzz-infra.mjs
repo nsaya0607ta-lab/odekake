@@ -30,7 +30,7 @@ import ts from "typescript";
 const root = join(dirname(fileURLToPath(import.meta.url)), "..");
 const src = join(root, "src/components/infra");
 const out = mkdtempSync(join(tmpdir(), "infra-fuzz-"));
-for (const name of ["model", "layout", "sim", "design", "export", "room", "room-templates"]) {
+for (const name of ["model", "layout", "sim", "design", "export", "room", "room-templates", "room-lessons"]) {
   const code = readFileSync(join(src, `${name}.ts`), "utf8");
   const js = ts
     .transpileModule(code, { compilerOptions: { module: ts.ModuleKind.ESNext, target: ts.ScriptTarget.ES2022 } })
@@ -44,7 +44,8 @@ const { InfraSim } = await load("sim");
 const D = await load("design");
 const { exportDesign } = await load("export");
 const room = await load("room");
-const { ROOM_TEMPLATES } = await load("room-templates");
+const { ROOM_TEMPLATES, templateById } = await load("room-templates");
+const lessons = await load("room-lessons");
 rmSync(out, { recursive: true, force: true });
 
 let yaml = null;
@@ -341,9 +342,10 @@ function checkRoomParts() {
   eq(room.normalizePath(""), "/", "パス：から");
   for (const t of ROOM_TEMPLATES) {
     eq(room.bracketHint(t.code), null, `お手本「${t.name}」で、かっこのヒントがまちがって出る`);
-    must(t.steps.length >= 2 && t.tries.length >= 1, `お手本「${t.name}」の「やってみよう」が足りない`);
+    must(t.tries.length >= 1, `お手本「${t.name}」に、すぐ送れるお願いがない`);
     must(/\/health/.test(t.code), `お手本「${t.name}」が /health に返事をしない`);
   }
+  checkLessons(eq);
   eq(room.bracketHint("function f() {\n  return (1;\n}"), "2行目の ( と、3行目の } が組になっていません", "かっこのヒント：組ちがい");
   eq(room.bracketHint("if (a) {\n  b();\n"), "1行目の { が閉じていません", "かっこのヒント：閉じわすれ");
   eq(room.bracketHint("x = 1);"), "1行目の ) に、組になる ( がありません", "かっこのヒント：開きわすれ");
@@ -360,6 +362,60 @@ function checkRoomParts() {
   eq(room.statusMeaning(418), "お願いのまちがい", "ステータスの意味：4xx");
   eq(room.statusMeaning(299), "成功", "ステータスの意味：2xx");
   eq(room.hasBody("PUT") && room.hasBody("POST") && !room.hasBody("GET") && !room.hasBody("DELETE"), true, "本文を送るメソッド");
+}
+
+/**
+ * レッスンの台本：お手本があるか・光らせる行がプログラムの中にあるか・書きかえても壊れないか・**ことば** の閉じわすれ など。
+ * （サーバーが本物の返事をするかは、ブラウザで通しでやって確かめる。docs の 6.7）
+ */
+function checkLessons(eq) {
+  const { LESSONS, editedMark, quoteInside, serverIndex, splitTerms } = lessons;
+  const ids = new Set();
+  const terms = (text, what) => must(splitTerms(text).length % 2 === 1, `${what}：** の閉じわすれ`, text);
+  // learn を呼ぶための、それらしい結果
+  const entry = { id: 1, at: 0, ms: 12, by: "サーバー2", req: { method: "GET", path: "/", headers: [], body: null }, res: { status: 200, statusText: "OK", headers: [["x-cache", "HIT"]], body: "作りたて キャッシュ" } };
+  const burst = { total: 5, ok: 5, fail: 0, avgMs: 9, by: { サーバー1: 5 }, codes: { 200: 5, 500: 2 } };
+  LESSONS.forEach((l, k) => {
+    const what = `レッスン${l.no}「${l.title}」`;
+    must(!ids.has(l.id), `${what}：id がかぶっている`);
+    ids.add(l.id);
+    eq(l.no, k + 1, `${what}：番号が順番でない`);
+    const tpl = templateById(l.template);
+    must(Boolean(tpl), `${what}：お手本 ${l.template} がない`);
+    must(l.steps.length >= 2 && l.summary.length >= 1, `${what}：ステップか、まとめが足りない`);
+    let code = tpl.code;
+    const ctx = {};
+    l.steps.forEach((st, j) => {
+      const at = `${what} ステップ${j + 1}`;
+      const a = st.action;
+      must(Boolean(st.say && a.label), `${at}：説明かボタンの文字がない`);
+      terms(st.say, at);
+      if (a.kind === "send") {
+        must(room.METHODS.includes(a.method) && a.path.startsWith("/"), `${at}：送るお願いがおかしい`, a);
+        must(Number.isInteger(a.times ?? 1) && (a.times ?? 1) >= 1 && (a.times ?? 1) <= 20, `${at}：まとめて送る回数がおかしい`, a.times);
+        must(a.editBody == null || room.hasBody(a.method), `${at}：本文を送れないメソッドに本文がある`);
+      } else if (a.kind === "edit") {
+        must(code.split(a.find).length === 2, `${at}：書きかえるところ（${a.find}）がプログラムに1つだけあるはず`);
+        for (const word of ["ようこそ", 'a"b', "c\\d", "$&$1", "x"]) {
+          const next = code.replace(a.find, () => quoteInside(word));
+          eq(room.bracketHint(next), null, `${at}：「${word}」に書きかえると、プログラムがこわれる`);
+          must(next.split("\n").some((line) => line.includes(editedMark(word))), `${at}：書きかえた行が見つからない（${word}）`);
+        }
+        ctx.edited = "ようこそ";
+        code = code.replace(a.find, () => quoteInside(ctx.edited));
+      } else if (a.kind === "set") must(Object.keys(a.patch).length > 0, `${at}：変える設定がない`);
+      else must(a.kind === "db", `${at}：知らない action`, a);
+      must(!st.until === !st.waiting, `${at}：until と waiting は組で書く`);
+      const marks = typeof st.code === "function" ? st.code(ctx) : (st.code ?? []);
+      for (const m of marks) must(code.split("\n").some((line) => line.includes(m)), `${at}：光らせる行（${m}）がプログラムにない`);
+      if (a.kind === "send" && /freeze/.test(a.path)) ctx.frozen = 0;
+      const learn = typeof st.learn === "function" ? st.learn({ entry, burst }, ctx) : st.learn;
+      must(typeof learn === "string" && learn.length > 0 && !/undefined|NaN|\[object/.test(learn), `${at}：わかったことがおかしい`, learn);
+      terms(learn, `${at} わかったこと`);
+    });
+  });
+  eq(serverIndex("サーバー2（失敗）"), 1, "サーバーの番号：失敗");
+  eq(serverIndex("CDN"), -1, "サーバーの番号：サーバーでない");
 }
 
 /* ------------------------------------------------------------ 実行 */
