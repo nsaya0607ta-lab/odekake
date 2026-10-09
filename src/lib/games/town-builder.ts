@@ -44,18 +44,21 @@ function linkedStationCount(tiles: Tile[]): number {
     const queue = [start];
     visited.add(start);
     let stations = 0;
+    let rails = 0;
     for (let at = 0; at < queue.length; at++) {
       const i = queue[at]!;
       if (tiles[i] === "station") stations++;
+      if (tiles[i] === "rail") rails++;
       const x = i % MAP_SIZE, y = Math.floor(i / MAP_SIZE);
       for (const next of neighbours(x, y)) {
+        if (tiles[i] === "station" && tiles[next] === "station") continue;
         if (TRANSPORT.includes(tiles[next] ?? "grass") && !visited.has(next)) {
           visited.add(next);
           queue.push(next);
         }
       }
     }
-    if (stations >= 2) linked += stations;
+    if (stations >= 2 && rails > 0) linked += stations;
   }
   return linked;
 }
