@@ -45,6 +45,7 @@ import {
   isOnPlunger,
   kickback,
   releasePlunger,
+  STAGE_DROP_R,
   STEP,
   stepWorld,
   type Ball,
@@ -52,7 +53,7 @@ import {
   type World,
 } from "./physics";
 import type { PinballSkill } from "./skills";
-import { ITEM_PICKUP_R, SHOT_IDS, type Pt, type ShotId, type TableGeometry } from "./table";
+import { BALL_R, ITEM_PICKUP_R, SHOT_IDS, type Pt, type ShotId, type TableGeometry } from "./table";
 
 /* ---------- 型 ---------- */
 
@@ -179,6 +180,8 @@ export type Game = {
   scoopBall: Ball | null;
   scoopEjectAt: number;
   dropsResetAt: number;
+  /** 自分で作るステージのドロップターゲットを立てなおす時刻（全部たおれたあと。0 は予定なし） */
+  stageDropsResetAt: number;
   launchQueue: { at: number; power: number }[];
   /** 台に出た玉（ボールセーブを始めたか） */
   inPlay: Set<number>;
@@ -277,6 +280,7 @@ export function createGame({ table, pool, tableName, conquestTitle, zukan = 1, s
     scoopBall: null,
     scoopEjectAt: 0,
     dropsResetAt: 0,
+    stageDropsResetAt: 0,
     launchQueue: [],
     inPlay: new Set(),
     orbitEnter: new Map(),
@@ -919,6 +923,34 @@ function handleEvent(g: Game, e: PhysEvent): void {
       cancelSkillShot(g);
       break;
     }
+    case "stageDrop": {
+      // 自分で作るステージのドロップターゲット：全部たおすと、ターゲットの数に合わせたボーナス。少しして立ちなおる
+      const drops = g.world.table.stageDrops;
+      const d = drops[e.index];
+      addPoints(g, POINTS.stageDrop, d ? { x: (d.a.x + d.b.x) / 2, y: (d.a.y + d.b.y) / 2 - 16 } : undefined);
+      g.fx.push({ type: "flash", id: `stageDrop:${e.index}` });
+      sfx(g, "drop", e.index % 3);
+      if (g.world.stageDropsUp.every((up) => !up)) {
+        const c = drops.reduce((acc, t) => ({ x: acc.x + (t.a.x + t.b.x) / 2 / drops.length, y: acc.y + (t.a.y + t.b.y) / 2 / drops.length }), { x: 0, y: 0 });
+        addPoints(g, POINTS.stageDropsAll * drops.length, { x: c.x, y: c.y - 30 }, "good");
+        g.fx.push({ type: "flash", id: "stageDropsAll" });
+        sfx(g, "dropsAll");
+        if (drops.length >= 2) msg(g, "ターゲット コンプリート！", "good", undefined, 1200);
+        g.stageDropsResetAt = g.clock + 1.2;
+      }
+      cancelSkillShot(g);
+      break;
+    }
+    case "spin": {
+      // 自分で作るステージのスピナー：くぐった速さだけ回って、回ったぶん点が入る（オービットのスピナーと同じ数え方）
+      const sp = g.world.table.spinners[e.index];
+      const spins = Math.max(1, Math.min(24, Math.round(Math.hypot(e.vx, e.vy) / 220)));
+      addPoints(g, POINTS.spinner * spins, sp ? { x: sp.x, y: sp.y - 18 } : undefined);
+      sfx(g, "spinner", spins);
+      g.fx.push({ type: "flash", id: `spin:${e.index}:${spins}` });
+      cancelSkillShot(g);
+      break;
+    }
     case "hit":
       sfx(g, e.mat === "rubber" || e.mat === "post" ? "rubber" : "metal", Math.min(1, e.speed / 3000), e.x);
       break;
@@ -1192,6 +1224,18 @@ function tick(g: Game): void {
       g.dropsResetAt = 0;
     }
   }
+  // 自分で作るステージのドロップターゲットを立てなおす。ターゲットに重なっている玉がいるあいだは待つ
+  // （重なったまま立てると、玉がターゲットの中に入ってしまう）
+  if (g.stageDropsResetAt && g.clock >= g.stageDropsResetAt) {
+    const clear = BALL_R + STAGE_DROP_R + 2;
+    const blocked = world.balls.some((b) => b.mode === "field" && world.table.stageDrops.some((d) => distToSegment(b, d.a, d.b) < clear));
+    if (blocked) {
+      g.stageDropsResetAt = g.clock + 0.3;
+    } else {
+      world.stageDropsUp = world.stageDropsUp.map(() => true);
+      g.stageDropsResetAt = 0;
+    }
+  }
   // 念のため：ターゲットが立っているのに、かこいの中に玉がいたら、ターゲットを倒して出してあげる
   if (world.dropsUp.some(Boolean) && world.balls.some((b) => b.mode === "field" && insideScoopArea(b, 535))) {
     world.dropsUp = world.dropsUp.map(() => false);
@@ -1204,6 +1248,15 @@ function tick(g: Game): void {
   }
 
   if (g.phase === "bonus" && g.clock >= g.bonusUntil) nextBall(g);
+}
+
+/** 点から線分までの近さ */
+function distToSegment(q: Pt, a: Pt, b: Pt): number {
+  const dx = b.x - a.x;
+  const dy = b.y - a.y;
+  const len2 = dx * dx + dy * dy;
+  const t = len2 > 0 ? Math.max(0, Math.min(1, ((q.x - a.x) * dx + (q.y - a.y) * dy) / len2)) : 0;
+  return Math.hypot(q.x - a.x - dx * t, q.y - a.y - dy * t);
 }
 
 /** 玉がガチャ穴のかこいの中（とその下の bottom まで）にいるか */

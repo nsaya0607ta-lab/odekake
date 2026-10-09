@@ -505,20 +505,31 @@ function randomStage(rand) {
     }
   }
   const dense = rand() < 0.5;
+  // 新しい部品（ガイドレール〜ドロップターゲット）は、ステージの半分くらいで使う（全部の部品を同時に詰めこむと、どれも少ししか置けない）
+  const extra = rand() < 0.5;
+  const upTo = (n) => (extra ? Math.floor(rand() * (n + 1)) : 0);
   const want = {
     bumper: Math.floor(rand() * 9),
     pinwheel: Math.floor(rand() * 5),
     post: Math.floor(rand() * 17),
     peg: dense ? 30 + Math.floor(rand() * 31) : Math.floor(rand() * 20),
     sling: Math.floor(rand() * 5),
+    rail: upTo(8),
+    rubber: upTo(6),
+    block: upTo(6),
+    bar: upTo(2),
+    spinner: upTo(3),
+    drop: upTo(6),
   };
   const make = (kind, pt) => {
     if (kind === "bumper") return { kind, ...pt, size: pick(["s", "m", "l"]) };
-    if (kind === "pinwheel") return { kind, ...pt, dir: rand() < 0.5 ? 1 : -1 };
+    if (kind === "pinwheel" || kind === "bar") return { kind, ...pt, dir: rand() < 0.5 ? 1 : -1 };
     if (kind === "sling") return { kind, ...pt, face: rand() < 0.5 ? "left" : "right" };
+    if (kind === "rail" || kind === "rubber") return { kind, ...pt, angle: pick(ST.WALL_ANGLES) };
+    if (kind === "drop") return { kind, ...pt, angle: pick(ST.DROP_ANGLES) };
     return { kind, ...pt };
   };
-  for (const kind of ["sling", "pinwheel", "bumper", "post", "peg"]) {
+  for (const kind of ["bar", "sling", "pinwheel", "spinner", "bumper", "drop", "rubber", "rail", "block", "post", "peg"]) {
     for (let n = 0; n < want[kind]; n += 1) {
       for (let tries = 0; tries < 60; tries += 1) {
         spec.parts.push(make(kind, at()));

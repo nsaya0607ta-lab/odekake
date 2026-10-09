@@ -42,10 +42,14 @@ export type RenderAssets = {
   shape: PinballShape | null;
   /** バンパーの上にのせるアイテム（バンパーの数より少なければ、くり返して使う） */
   bumperItems: readonly PinballItem[];
+  /** 画面に収める範囲（mm）。無ければ台の全体（ステージのエディターは、台の上のほうだけを大きく見せる） */
+  view?: ViewRect;
 };
 
+export type ViewRect = { x0: number; y0: number; w: number; h: number };
+
 /** 台のまわりの余白も入れた、画面に収める範囲（mm） */
-const VIEW = { x0: -14, y0: -14, w: TABLE_W + 28, h: TABLE_H + 14 };
+const VIEW: ViewRect = { x0: -14, y0: -14, w: TABLE_W + 28, h: TABLE_H + 14 };
 const FONT = '"Hiragino Maru Gothic ProN","ヒラギノ丸ゴ ProN W4","Arial Rounded MT Bold","Yu Gothic",sans-serif';
 const TAU = Math.PI * 2;
 const LANE_LETTERS = ["お", "で", "か", "け"];
@@ -516,6 +520,9 @@ export class PinballRenderer {
   private standupsAllFlash = [0, 0];
   private readonly pinwheelFlash: number[];
   private gateFlash = [0, 0];
+  /** 自分で作るステージのスピナー（板の向きと回る速さ）・ドロップターゲットの光（table.spinners・stageDrops と同じ順） */
+  private readonly stageSpin: { angle: number; speed: number }[];
+  private readonly stageDropFlash: number[];
   /** かざぐるまの羽根の絵（かざぐるまごと） */
   private pinwheelSprites = new Map<number, { body: HTMLCanvasElement; shadow: HTMLCanvasElement; half: number }>();
   private spinAngle = 0;
@@ -535,6 +542,8 @@ export class PinballRenderer {
     this.bumperFlash = this.table.bumpers.map(() => 0);
     this.slingFlash = this.table.slings.map(() => 0);
     this.pinwheelFlash = this.table.pinwheels.map(() => 0);
+    this.stageSpin = this.table.spinners.map(() => ({ angle: 0, speed: 0 }));
+    this.stageDropFlash = this.table.stageDrops.map(() => 0);
     this.ramps = this.table.ramps.map(rampShape);
     this.reducedMotion = typeof window !== "undefined" && window.matchMedia?.("(prefers-reduced-motion: reduce)").matches === true;
     if (assets.shape) {
@@ -558,15 +567,16 @@ export class PinballRenderer {
 
   /** 表示する大きさ（CSS px）が変わったとき */
   resize(cssW: number, cssH: number, dpr: number): void {
+    const view = this.assets.view ?? VIEW;
     this.cssW = cssW;
     this.cssH = cssH;
     this.dpr = dpr;
     this.canvas.width = Math.round(cssW * dpr);
     this.canvas.height = Math.round(cssH * dpr);
-    this.scale = Math.min(cssW / VIEW.w, cssH / VIEW.h);
-    this.offX = (cssW - VIEW.w * this.scale) / 2 - VIEW.x0 * this.scale;
+    this.scale = Math.min(cssW / view.w, cssH / view.h);
+    this.offX = (cssW - view.w * this.scale) / 2 - view.x0 * this.scale;
     // 縦に余るときは下にそろえる（フリッパーが親指に近くなる）
-    this.offY = cssH - VIEW.h * this.scale - VIEW.y0 * this.scale;
+    this.offY = cssH - view.h * this.scale - view.y0 * this.scale;
     this.base = null;
     this.overlay = null;
     this.ballSprite = null;
@@ -588,6 +598,11 @@ export class PinballRenderer {
 
   get mmToPx(): number {
     return this.scale;
+  }
+
+  /** キャンバス全体に見えている範囲（台の座標・mm）。上に重ねる SVG の viewBox に使う */
+  visibleRect(): ViewRect {
+    return { x0: -this.offX / this.scale, y0: -this.offY / this.scale, w: this.cssW / this.scale, h: this.cssH / this.scale };
   }
 
   /** 1mm がキャンバスの何画素か（影のぼかしの大きさに使う） */
@@ -645,7 +660,7 @@ export class PinballRenderer {
     for (const fx of list) {
       switch (fx.type) {
         case "flash": {
-          const [kind, arg] = fx.id.split(":");
+          const [kind, arg, arg2] = fx.id.split(":");
           if (kind === "bumper") {
             const i = Number(arg);
             this.bumperFlash[i] = 1;
@@ -676,6 +691,18 @@ export class PinballRenderer {
             if (i < this.pinwheelFlash.length) this.pinwheelFlash[i] = 1;
           } else if (kind === "gate") {
             this.gateFlash[Number(arg)] = 1;
+          } else if (kind === "spin") {
+            const st = this.stageSpin[Number(arg)];
+            if (st) st.speed = Math.max(st.speed, Number(arg2) * 9);
+          } else if (kind === "stageDrop") {
+            const i = Number(arg);
+            const d = this.table.stageDrops[i];
+            if (d) {
+              this.stageDropFlash[i] = 1;
+              this.burst((d.a.x + d.b.x) / 2, (d.a.y + d.b.y) / 2, 6, this.assets.theme.colors.accent, 18);
+            }
+          } else if (kind === "stageDropsAll") {
+            for (const d of this.table.stageDrops) this.burst((d.a.x + d.b.x) / 2, (d.a.y + d.b.y) / 2, 10, "#ffffff", 30, "star");
           }
           break;
         }
@@ -789,6 +816,7 @@ export class PinballRenderer {
     this.drawSlingBodies(ctx);
     this.drawPosts(ctx);
     this.drawSpinnerFrame(ctx);
+    this.drawStageSpinnerFrames(ctx);
     this.drawShooterParts(ctx);
     return c;
   }
@@ -1070,8 +1098,84 @@ export class PinballRenderer {
       this.drawClearWall(ctx, path, RAMP_WALL_W, "butt");
       return;
     }
+    if (w.look === "rubber") {
+      // ゴムのかべ：2本のポストに張ったゴム（太さは当たり判定と同じ）。両はしにポストのめっきの頭
+      rubberBand(ctx, k, polyline(w.pts), w.r * 2, { lift: 0.9 });
+      for (const v of [w.pts[0]!, w.pts[w.pts.length - 1]!]) chromeDisc(ctx, v.x, v.y, w.r * 0.62, true);
+      return;
+    }
+    if (w.look === "block") {
+      this.drawBlock(ctx, w);
+      return;
+    }
     const path = polyline(w.pts, w.closed);
     chromeTube(ctx, k, path, w.r * 2, { lift: w.look === "lane" ? 0.8 : 1, tint: colors.rail });
+  }
+
+  /**
+   * プラスチックのブロック（自分で作るステージ）：当たり判定の形（中心線の多角形を r だけ太らせた形）のとおりに、
+   * 色つきの透明プラスチックで描く。中に電球の光と、印刷された肉球
+   */
+  private drawBlock(ctx: CanvasRenderingContext2D, w: WallDef): void {
+    const { colors } = this.assets.theme;
+    const k = this.k;
+    const n = w.pts.length;
+    const cx = w.pts.reduce((sum, p) => sum + p.x, 0) / n;
+    const cy = w.pts.reduce((sum, p) => sum + p.y, 0) / n;
+    // 角を r だけ外へ（各辺を r ずつ外へずらした多角形の角。角の丸みの中心がもとの角になる）
+    const outer = w.pts.map((cur, i) => {
+      const prev = w.pts[(i + n - 1) % n]!;
+      const next = w.pts[(i + 1) % n]!;
+      const n1 = { x: cur.y - prev.y, y: prev.x - cur.x };
+      const n2 = { x: next.y - cur.y, y: cur.x - next.x };
+      const l1 = Math.hypot(n1.x, n1.y) || 1;
+      const l2 = Math.hypot(n2.x, n2.y) || 1;
+      // 外向きにそろえる（重心から遠ざかる向き）
+      const s1 = (cur.x - cx) * n1.x + (cur.y - cy) * n1.y >= 0 ? 1 : -1;
+      const s2 = (cur.x - cx) * n2.x + (cur.y - cy) * n2.y >= 0 ? 1 : -1;
+      const u1 = { x: (n1.x / l1) * s1, y: (n1.y / l1) * s1 };
+      const u2 = { x: (n2.x / l2) * s2, y: (n2.y / l2) * s2 };
+      const bis = { x: u1.x + u2.x, y: u1.y + u2.y };
+      const bl = Math.hypot(bis.x, bis.y) || 1;
+      const cosHalf = (u1.x * bis.x + u1.y * bis.y) / bl;
+      const d = w.r / Math.max(0.2, cosHalf);
+      return { x: cur.x + (bis.x / bl) * d, y: cur.y + (bis.y / bl) * d };
+    });
+    const path = roundedPolygon(outer, w.r);
+    const xs = outer.map((p) => p.x);
+    const ys = outer.map((p) => p.y);
+    const box = { x: Math.min(...xs), y: Math.min(...ys), w: Math.max(...xs) - Math.min(...xs), h: Math.max(...ys) - Math.min(...ys) };
+    plasticSheet(ctx, k, path, colors.accent2, box, { lift: 1.2, opacity: 0.9 });
+    ctx.save();
+    ctx.clip(path);
+    ctx.globalCompositeOperation = "lighter";
+    const lamp = ctx.createRadialGradient(cx, cy, 0, cx, cy, box.w * 0.55);
+    lamp.addColorStop(0, rgba(GI_COLOR, 0.55));
+    lamp.addColorStop(1, rgba(GI_COLOR, 0));
+    ctx.fillStyle = lamp;
+    ctx.fillRect(box.x, box.y, box.w, box.h);
+    ctx.globalCompositeOperation = "source-over";
+    ctx.fillStyle = "rgba(255,255,255,0.6)";
+    ctx.fill(pawPath(cx, cy + 1.5, Math.min(box.w, box.h) * 0.22));
+    ctx.restore();
+  }
+
+  /** スピナーの軸受け（自分で作るステージ）：板の両はしのめっきの金具と、細い軸。板は毎フレーム drawStageSpinners で描く */
+  private drawStageSpinnerFrames(ctx: CanvasRenderingContext2D): void {
+    for (const sp of this.table.spinners) {
+      const half = sp.w / 2;
+      ctx.save();
+      ctx.lineCap = "round";
+      ctx.strokeStyle = "rgba(0,0,0,0.45)";
+      ctx.lineWidth = 1.4;
+      ctx.beginPath();
+      ctx.moveTo(sp.x - half + 1.4, sp.y + 2.4);
+      ctx.lineTo(sp.x + half + 1.4, sp.y + 2.4);
+      ctx.stroke();
+      ctx.restore();
+      chromeTube(ctx, this.k, polyline([{ x: sp.x - half - 3, y: sp.y }, { x: sp.x + half + 3, y: sp.y }]), 1.4, { lift: 0.6 });
+      for (const x of [sp.x - half - 3, sp.x + half + 3]) chromeDisc(ctx, x, sp.y, 2.8, true);
+    }
   }
 
   /** 透明なプラスチックの壁（ランプの横の壁）。ふちが光り、中は少しだけ色がつく */
@@ -1808,6 +1912,7 @@ export class PinballRenderer {
     this.drawScoopLight(ctx, g);
     this.drawMagnet(ctx, g);
     this.drawDrops(ctx, g);
+    this.drawStageDrops(ctx, g, dt);
     this.drawKickers(ctx, g);
     this.drawSpinner(ctx, dt);
     this.drawStandupsLit(ctx, g, dt);
@@ -1817,6 +1922,8 @@ export class PinballRenderer {
     this.drawGates(ctx, g);
     this.drawFlippers(ctx, g.world.flippers);
     this.drawBalls(ctx, g, false);
+    // スピナーの板は、下をくぐる玉より上
+    this.drawStageSpinners(ctx, dt);
     ctx.setTransform(1, 0, 0, 1, 0, 0);
     ctx.drawImage(this.overlay, sx * this.dpr, sy * this.dpr);
     this.setTableTransform(ctx, sx, sy);
@@ -2052,6 +2159,114 @@ export class PinballRenderer {
       ctx.moveTo(x0 + 0.5, y - 3.1);
       ctx.lineTo(x0 + w - 0.5, y - 3.1);
       ctx.stroke();
+    });
+  }
+
+  /**
+   * 自分で作るステージのドロップターゲット。ガチャ穴の前のものと同じ絵を、置いた向きに回して描く
+   * （立っているときは手前の面と上の面、たおれたら床と同じ高さの頭だけ）
+   */
+  private drawStageDrops(ctx: CanvasRenderingContext2D, g: Game, dt: number): void {
+    const { colors } = this.assets.theme;
+    this.table.stageDrops.forEach((d, i) => {
+      const cx = (d.a.x + d.b.x) / 2;
+      const cy = (d.a.y + d.b.y) / 2;
+      const w = Math.hypot(d.b.x - d.a.x, d.b.y - d.a.y);
+      const x0 = -w / 2;
+      ctx.save();
+      ctx.translate(cx, cy);
+      ctx.rotate(Math.atan2(d.b.y - d.a.y, d.b.x - d.a.x));
+      if (!g.world.stageDropsUp[i]) {
+        ctx.fillStyle = darken(colors.accent, 0.62);
+        ctx.fillRect(x0 + 0.6, -2.4, w - 1.2, 4.8);
+        ctx.fillStyle = "rgba(255,255,255,0.12)";
+        ctx.fillRect(x0 + 0.6, -2.4, w - 1.2, 0.8);
+        ctx.restore();
+        return;
+      }
+      ctx.fillStyle = "rgba(0,0,0,0.45)";
+      ctx.fillRect(x0 + 1.6, -1, w, 7.5);
+      const front = ctx.createLinearGradient(0, 0, 0, 3.6);
+      front.addColorStop(0, lighten(colors.accent, 0.12));
+      front.addColorStop(1, darken(colors.accent, 0.42));
+      ctx.fillStyle = front;
+      ctx.fillRect(x0, 0, w, 3.6);
+      const top = ctx.createLinearGradient(x0, 0, x0 + w, 0);
+      top.addColorStop(0, lighten(colors.accent, 0.62));
+      top.addColorStop(0.5, lighten(colors.accent, 0.35));
+      top.addColorStop(1, rgba(colors.accent, 1));
+      ctx.fillStyle = top;
+      ctx.fillRect(x0, -3.5, w, 3.5);
+      ctx.fillStyle = "rgba(255,255,255,0.85)";
+      for (const off of [-w / 4, 0, w / 4]) {
+        ctx.beginPath();
+        ctx.arc(off, 1.7, 1.1, 0, TAU);
+        ctx.fill();
+      }
+      ctx.strokeStyle = "rgba(0,0,0,0.55)";
+      ctx.lineWidth = 0.5;
+      ctx.strokeRect(x0, -3.5, w, 7.1);
+      ctx.strokeStyle = "rgba(255,255,255,0.75)";
+      ctx.beginPath();
+      ctx.moveTo(x0 + 0.5, -3.1);
+      ctx.lineTo(x0 + w - 0.5, -3.1);
+      ctx.stroke();
+      ctx.restore();
+      const flash = this.stageDropFlash[i]!;
+      if (flash > 0) {
+        ctx.globalCompositeOperation = "lighter";
+        this.lightAt(ctx, cx, cy, 30, colors.accent, flash * 0.7);
+        ctx.globalCompositeOperation = "source-over";
+        this.stageDropFlash[i] = Math.max(0, flash - dt * 4);
+      }
+    });
+  }
+
+  /** 自分で作るステージのスピナーの板（くぐった玉の速さで回り、だんだん止まる。速いときは残像） */
+  private drawStageSpinners(ctx: CanvasRenderingContext2D, dt: number): void {
+    const { colors } = this.assets.theme;
+    this.table.spinners.forEach((sp, i) => {
+      const st = this.stageSpin[i]!;
+      st.angle += st.speed * dt;
+      st.speed = Math.max(0, st.speed - dt * 40);
+      const x0 = sp.x - sp.w / 2;
+      const plate = (angle: number, alpha: number) => {
+        const c = Math.cos(angle);
+        const h = Math.abs(c) * 8.5 + 0.8;
+        const front = c >= 0;
+        ctx.globalAlpha = alpha;
+        const g = ctx.createLinearGradient(0, sp.y - h / 2, 0, sp.y + h / 2);
+        if (front) {
+          g.addColorStop(0, "#ffffff");
+          g.addColorStop(0.5, "#c4ccd5");
+          g.addColorStop(1, "#6d7884");
+        } else {
+          g.addColorStop(0, "#c6ced6");
+          g.addColorStop(1, "#4d5661");
+        }
+        ctx.fillStyle = g;
+        ctx.fillRect(x0, sp.y - h / 2, sp.w, h);
+        if (front && h > 3) {
+          ctx.fillStyle = rgba(colors.accent, 0.9);
+          ctx.fillRect(x0 + 4, sp.y - h * 0.18, sp.w - 8, h * 0.36);
+        }
+        ctx.strokeStyle = "rgba(0,0,0,0.55)";
+        ctx.lineWidth = 0.5;
+        ctx.strokeRect(x0, sp.y - h / 2, sp.w, h);
+        if (front && Math.abs(c) > 0.93) {
+          ctx.fillStyle = "rgba(255,255,255,0.9)";
+          ctx.fillRect(x0 + 1, sp.y - h / 2 + 0.6, sp.w - 2, 0.7);
+        }
+        ctx.globalAlpha = 1;
+      };
+      // 板の影（板が立っているほど細い）
+      ctx.fillStyle = "rgba(0,0,0,0.35)";
+      ctx.fillRect(x0 + 2, sp.y + 1.5, sp.w, Math.abs(Math.cos(st.angle)) * 6 + 1);
+      if (st.speed > 8) {
+        plate(st.angle - 0.5, 0.18);
+        plate(st.angle - 0.25, 0.32);
+      }
+      plate(st.angle, 1);
     });
   }
 

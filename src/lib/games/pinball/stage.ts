@@ -9,14 +9,16 @@
  *
  * 玉が止まらないように、置いた部品どうし・部品と骨組みのすき間は、どこも STAGE_GAP（31mm）以上にする
  * （玉の直径は 27mm。せまいすき間や、2つの部品のくぼみに玉が乗ると止まる。かざぐるまは羽根のとどく円で数える）。
- * 部品の値段・はじめから持っている数・持てる数を変えたら、マイグレーションの pinball_part_* も同じにする（いまは 0138）。
+ * 部品の値段・はじめから持っている数・持てる数を変えたら、マイグレーションの pinball_part_* も同じにする（いまは 0139）。
+ * 部品の種類を足したら、データベースの save_pinball_stage の種類の一覧にも足す（いまは 0139）。
  */
 import { COASTER_RAMP, COASTER_RAMP_RIGHT, DEFAULT_MAP_ID, SHOT_SPOTS, TOP_RAMP } from "./maps";
-import { buildTable, CX, p, type CircleDef, type MapSpec, type Pt, type SlingDef, type TableGeometry } from "./table";
+import { STAGE_DROP_R } from "./physics";
+import { buildTable, CX, p, type CircleDef, type DropTargetDef, type MapSpec, type PinwheelDef, type Pt, type SlingDef, type SpinnerDef, type TableGeometry, type WallDef } from "./table";
 
 /* ---------- 部品のカタログ ---------- */
 
-export type PinballPartId = "bumper" | "pinwheel" | "post" | "peg" | "sling" | "ramp_top" | "ramp_cross";
+export type PinballPartId = "bumper" | "pinwheel" | "post" | "peg" | "sling" | "rail" | "rubber" | "block" | "bar" | "spinner" | "drop" | "ramp_top" | "ramp_cross";
 
 export type PinballPartInfo = {
   id: PinballPartId;
@@ -27,20 +29,29 @@ export type PinballPartInfo = {
   pack: number;
   /** はじめから持っている数 */
   free: number;
-  /** 持てる数（はじめのぶんもふくめて）。1つのステージに置けるのも、この数まで */
-  max: number;
+  /**
+   * 持てる数（はじめのぶんもふくめて）。null は上限なし（2026-10-09〜、ランプのほかは上限なし。ユーザー指定）。
+   * 1つのステージに置ける数は、持っている数まで。部品どうしのすき間（STAGE_GAP）があるので、置ける数は台の広さで自然に決まる
+   */
+  max: number | null;
   /** 部品の説明（ショップに出す） */
   lead: string;
 };
 
 export const PINBALL_PARTS: readonly PinballPartInfo[] = [
-  { id: "bumper", name: "バンパー", price: 300, pack: 1, free: 3, max: 8, lead: "当たると玉をはじき飛ばす。大きさは3つからえらべる" },
-  { id: "pinwheel", name: "かざぐるま", price: 400, pack: 1, free: 1, max: 4, lead: "いつも回っている羽根。回る向きをえらべる" },
-  { id: "post", name: "ゴムのポスト", price: 50, pack: 1, free: 4, max: 16, lead: "小さなゴムの柱。玉の通り道を作る" },
-  { id: "peg", name: "くぎ（10本）", price: 100, pack: 10, free: 10, max: 60, lead: "パチンコのくぎ。カチカチ当たりながら落ちてくる" },
-  { id: "sling", name: "ミニスリングショット", price: 400, pack: 1, free: 0, max: 4, lead: "ゴムの面に当たると、横へはじく。向きをえらべる" },
-  { id: "ramp_top", name: "てっぺんランプ", price: 1200, pack: 1, free: 0, max: 1, lead: "ランプをのぼった玉を、インレーンではなく台のてっぺんに落とす" },
-  { id: "ramp_cross", name: "コースターランプ", price: 1800, pack: 1, free: 0, max: 1, lead: "左右のランプがXに交わって、反対がわのインレーンへ降りてくる" },
+  { id: "bumper", name: "バンパー", price: 900, pack: 1, free: 3, max: null, lead: "当たると玉をはじき飛ばす。大きさは3つからえらべる" },
+  { id: "pinwheel", name: "かざぐるま", price: 1200, pack: 1, free: 1, max: null, lead: "いつも回っている羽根。回る向きをえらべる" },
+  { id: "post", name: "ゴムのポスト", price: 150, pack: 1, free: 4, max: null, lead: "小さなゴムの柱。玉の通り道を作る" },
+  { id: "peg", name: "くぎ（10本）", price: 300, pack: 10, free: 10, max: null, lead: "パチンコのくぎ。カチカチ当たりながら落ちてくる" },
+  { id: "sling", name: "ミニスリングショット", price: 1200, pack: 1, free: 0, max: null, lead: "ゴムの面に当たると、横へはじく。向きをえらべる" },
+  { id: "rail", name: "ガイドレール", price: 450, pack: 1, free: 2, max: null, lead: "まっすぐな金属のレール。玉の通り道を作る。向きを変えられる" },
+  { id: "rubber", name: "ゴムのかべ", price: 600, pack: 1, free: 0, max: null, lead: "2本のポストに張ったゴム。当たった玉がよくはねる。向きを変えられる" },
+  { id: "block", name: "ブロック", price: 450, pack: 1, free: 0, max: null, lead: "ひし形のプラスチックのかたまり。玉をななめにはね返す" },
+  { id: "bar", name: "回転バー", price: 1500, pack: 1, free: 0, max: null, lead: "ゆっくり回る長いバー。近くの玉をはらいのける。回る向きをえらべる" },
+  { id: "spinner", name: "スピナー", price: 1200, pack: 1, free: 0, max: null, lead: "玉がくぐると板がくるくる回って、回ったぶん点が入る" },
+  { id: "drop", name: "ドロップターゲット", price: 900, pack: 1, free: 0, max: null, lead: "当てるとたおれる的。全部たおすとボーナスが入って、また立つ。向きを変えられる" },
+  { id: "ramp_top", name: "てっぺんランプ", price: 3600, pack: 1, free: 0, max: 1, lead: "ランプをのぼった玉を、インレーンではなく台のてっぺんに落とす" },
+  { id: "ramp_cross", name: "コースターランプ", price: 5400, pack: 1, free: 0, max: 1, lead: "左右のランプがXに交わって、反対がわのインレーンへ降りてくる" },
 ];
 
 export function getPinballPart(id: string): PinballPartInfo | null {
@@ -52,7 +63,10 @@ export type OwnedParts = Record<PinballPartId, number>;
 /** 持っている部品の数（はじめのぶん＋買ったぶん）。rows は user_pinball_parts の行（買ったぶん） */
 export function ownedPinballParts(bought: Partial<Record<string, number>>): OwnedParts {
   const out = {} as OwnedParts;
-  for (const part of PINBALL_PARTS) out[part.id] = Math.min(part.max, part.free + Math.max(0, Math.floor(bought[part.id] ?? 0)));
+  for (const part of PINBALL_PARTS) {
+    const have = part.free + Math.max(0, Math.floor(bought[part.id] ?? 0));
+    out[part.id] = part.max === null ? have : Math.min(part.max, have);
+  }
   return out;
 }
 
@@ -61,16 +75,33 @@ export function ownedPinballParts(bought: Partial<Record<string, number>>): Owne
 export type BumperSize = "s" | "m" | "l";
 export const BUMPER_RADIUS: Record<BumperSize, number> = { s: 18, m: 23, l: 28 };
 
-/** 置ける部品（ランプは部品ではなくステージの設定） */
+/**
+ * 置ける部品（ランプは部品ではなくステージの設定）。angle は向き（度。0 が横、90 がたて。y は下向きなので、
+ * 30 は右下がりの「＼」、150 は左下がりの「／」）。えらべる向きは WALL_ANGLES・DROP_ANGLES
+ */
 export type StagePart =
   | { kind: "bumper"; x: number; y: number; size: BumperSize }
   | { kind: "pinwheel"; x: number; y: number; /** 1 が時計まわり */ dir: 1 | -1 }
   | { kind: "post"; x: number; y: number }
   | { kind: "peg"; x: number; y: number }
-  | { kind: "sling"; x: number; y: number; /** ゴムの面が向いているがわ */ face: "left" | "right" };
+  | { kind: "sling"; x: number; y: number; /** ゴムの面が向いているがわ */ face: "left" | "right" }
+  | { kind: "rail"; x: number; y: number; angle: number }
+  | { kind: "rubber"; x: number; y: number; angle: number }
+  | { kind: "block"; x: number; y: number }
+  | { kind: "bar"; x: number; y: number; /** 1 が時計まわり */ dir: 1 | -1 }
+  | { kind: "spinner"; x: number; y: number }
+  | { kind: "drop"; x: number; y: number; angle: number };
 
 export type StagePartKind = StagePart["kind"];
-export const STAGE_PART_KINDS: readonly StagePartKind[] = ["bumper", "pinwheel", "post", "peg", "sling"];
+export const STAGE_PART_KINDS: readonly StagePartKind[] = ["bumper", "pinwheel", "post", "peg", "sling", "rail", "rubber", "block", "bar", "spinner", "drop"];
+
+/**
+ * ガイドレール・ゴムのかべの向き。横（0°）に近い向きはえらべない（平らな面に玉が乗って止まる）。
+ * 左右を折り返しても、この中のどれかになる
+ */
+export const WALL_ANGLES: readonly number[] = [30, 45, 60, 90, 120, 135, 150];
+/** ドロップターゲットの向き（横もえらべる。上に乗った玉も、落ちてきた勢いでたおれる） */
+export const DROP_ANGLES: readonly number[] = [0, 30, 60, 90, 120, 150];
 
 export type StageRamp = "standard" | "top" | "cross";
 export const STAGE_RAMPS: readonly StageRamp[] = ["standard", "top", "cross"];
@@ -122,6 +153,17 @@ const SLING_DEPTH = 12;
 const PINWHEEL = { arms: 4, len: 19, r: 4.5, hubR: 6.5, omega: 2.6 } as const;
 const POST_R = 6;
 const PEG_R = 3.5;
+/** ガイドレール（金属の丸い棒）・ゴムのかべ（2本のポストに張ったゴム）の長さと太さ（半径） */
+const RAIL = { len: 64, r: 4 } as const;
+const RUBBER = { len: 56, r: 4 } as const;
+/** ブロック：中心線のひし形（まん中から角まで d）を r だけ太らせた形（外の大きさは 40mm） */
+const BLOCK = { d: 17, r: 3 } as const;
+/** 回転バー：2本の長い羽根のかざぐるま（ゆっくり回る） */
+const BAR = { arms: 2, len: 34, r: 4.5, hubR: 7, omega: 1.8 } as const;
+/** スピナーの板の幅（両はしの金具は板から 3mm 外） */
+const SPINNER_W = 40;
+/** ドロップターゲットの幅 */
+const DROP_W = 28;
 
 export const PART_NAMES: Record<StagePartKind, string> = {
   bumper: "バンパー",
@@ -129,6 +171,12 @@ export const PART_NAMES: Record<StagePartKind, string> = {
   post: "ポスト",
   peg: "くぎ",
   sling: "スリングショット",
+  rail: "ガイドレール",
+  rubber: "ゴムのかべ",
+  block: "ブロック",
+  bar: "回転バー",
+  spinner: "スピナー",
+  drop: "ドロップターゲット",
 };
 
 /** はじめのアイテムの場所（いつもの台と同じ） */
@@ -178,6 +226,17 @@ function parsePart(raw: unknown): StagePart | null {
       return { kind: "peg", x, y };
     case "sling":
       return raw.face === "left" || raw.face === "right" ? { kind: "sling", x, y, face: raw.face } : null;
+    case "rail":
+    case "rubber":
+      return typeof raw.angle === "number" && WALL_ANGLES.includes(raw.angle) ? { kind: raw.kind, x, y, angle: raw.angle } : null;
+    case "drop":
+      return typeof raw.angle === "number" && DROP_ANGLES.includes(raw.angle) ? { kind: "drop", x, y, angle: raw.angle } : null;
+    case "block":
+      return { kind: "block", x, y };
+    case "bar":
+      return raw.dir === 1 || raw.dir === -1 ? { kind: "bar", x, y, dir: raw.dir } : null;
+    case "spinner":
+      return { kind: "spinner", x, y };
     default:
       return null;
   }
@@ -221,8 +280,9 @@ export function cleanStageName(raw: unknown): string | null {
 
 /* ---------- 形（当たり判定の円と線） ---------- */
 
-/** 太さのある線（a と b が同じなら円） */
-type Prim = { ax: number; ay: number; bx: number; by: number; r: number };
+/** 太さのある線（a と b が同じなら円）。エディターで、動かしている部品の形を描くのにも使う */
+export type StagePrim = { ax: number; ay: number; bx: number; by: number; r: number };
+type Prim = StagePrim;
 const circlePrim = (x: number, y: number, r: number): Prim => ({ ax: x, ay: y, bx: x, by: y, r });
 const segPrim = (a: Pt, b: Pt, r: number): Prim => ({ ax: a.x, ay: a.y, bx: b.x, by: b.y, r });
 
@@ -255,6 +315,23 @@ function gapOf(a: readonly Prim[], b: readonly Prim[]): number {
   return best;
 }
 
+/** 形をかこむ四角（太さもふくめ、まわりに margin を足す） */
+type Box = { x0: number; x1: number; y0: number; y1: number };
+
+function boxOf(shape: readonly Prim[], margin: number): Box {
+  const box: Box = { x0: Infinity, x1: -Infinity, y0: Infinity, y1: -Infinity };
+  for (const u of shape) {
+    box.x0 = Math.min(box.x0, u.ax - u.r - margin, u.bx - u.r - margin);
+    box.x1 = Math.max(box.x1, u.ax + u.r + margin, u.bx + u.r + margin);
+    box.y0 = Math.min(box.y0, u.ay - u.r - margin, u.by - u.r - margin);
+    box.y1 = Math.max(box.y1, u.ay + u.r + margin, u.by + u.r + margin);
+  }
+  return box;
+}
+
+/** 四角どうしが重ならない（＝margin をつけた形どうしのすき間は margin より広い） */
+const apart = (a: Box, b: Box) => a.x0 > b.x1 || a.x1 < b.x0 || a.y0 > b.y1 || a.y1 < b.y0;
+
 /** スリングショットの三角（上・外がわ・下。ゴムの面は上と下を結ぶ線で、face のがわを向く） */
 export function stageSlingDef(part: Extract<StagePart, { kind: "sling" }>): SlingDef {
   const out = part.face === "right" ? -SLING_DEPTH : SLING_DEPTH;
@@ -263,6 +340,24 @@ export function stageSlingDef(part: Extract<StagePart, { kind: "sling" }>): Slin
   const bottom = p(part.x, part.y + SLING_HALF);
   // SlingDef の side は描くときの左右（ゴムの面が右を向くのは、台の左がわに置くスリングと同じ）
   return part.face === "right" ? { side: "left", a: top, b: back, c: bottom } : { side: "right", a: bottom, b: back, c: top };
+}
+
+/** 向きのある部品（ガイドレール・ゴムのかべ・ドロップターゲット）の両はし */
+function partEnds(part: { x: number; y: number; angle: number }, len: number): [Pt, Pt] {
+  const a = (part.angle * Math.PI) / 180;
+  const dx = (Math.cos(a) * len) / 2;
+  const dy = (Math.sin(a) * len) / 2;
+  return [p(part.x - dx, part.y - dy), p(part.x + dx, part.y + dy)];
+}
+
+/** ブロックの中心線のひし形（上・右・下・左） */
+function blockCorners(part: { x: number; y: number }): Pt[] {
+  return [p(part.x, part.y - BLOCK.d), p(part.x + BLOCK.d, part.y), p(part.x, part.y + BLOCK.d), p(part.x - BLOCK.d, part.y)];
+}
+
+/** スピナーの板の両はしの金具（板の幅 + 3mm ずつ外） */
+function spinnerEnds(part: { x: number; y: number }): [Pt, Pt] {
+  return [p(part.x - SPINNER_W / 2 - 3, part.y), p(part.x + SPINNER_W / 2 + 3, part.y)];
 }
 
 /** 部品の形（すき間を数えるときの形。かざぐるまは羽根のとどく円、スリングショットは三角のふち） */
@@ -279,6 +374,29 @@ export function partShape(part: StagePart): Prim[] {
     case "sling": {
       const s = stageSlingDef(part);
       return [segPrim(s.a, s.b, 5), segPrim(s.b, s.c, 5), segPrim(s.a, s.c, 5)];
+    }
+    case "rail": {
+      const [a, b] = partEnds(part, RAIL.len);
+      return [segPrim(a, b, RAIL.r)];
+    }
+    case "rubber": {
+      const [a, b] = partEnds(part, RUBBER.len);
+      return [segPrim(a, b, RUBBER.r)];
+    }
+    case "block": {
+      const c = blockCorners(part);
+      return c.map((pt, i) => segPrim(pt, c[(i + 1) % c.length]!, BLOCK.r));
+    }
+    case "bar":
+      return [circlePrim(part.x, part.y, BAR.len + BAR.r)];
+    case "spinner": {
+      // 玉は板に当たらないが、まわりに部品を寄せない（板と金具の絵が重ならないように）
+      const [a, b] = spinnerEnds(part);
+      return [segPrim(a, b, 3)];
+    }
+    case "drop": {
+      const [a, b] = partEnds(part, DROP_W);
+      return [segPrim(a, b, STAGE_DROP_R)];
     }
   }
 }
@@ -301,12 +419,25 @@ export function partRadius(part: StagePart): number {
       return PEG_R;
     case "sling":
       return SLING_HALF + 5;
+    case "rail":
+      return RAIL.len / 2 + RAIL.r;
+    case "rubber":
+      return RUBBER.len / 2 + RUBBER.r;
+    case "block":
+      return BLOCK.d + BLOCK.r;
+    case "bar":
+      return BAR.len + BAR.r;
+    case "spinner":
+      return SPINNER_W / 2 + 6;
+    case "drop":
+      return DROP_W / 2 + STAGE_DROP_R;
   }
 }
 
 /* ---------- 骨組みの形（部品を置いていないステージ） ---------- */
 
-type SkeletonPrim = Prim & { name: string };
+/** 骨組みの線と、それをかこむ四角（置ける所をたくさん調べるので、遠い線は四角だけ見てとばす） */
+type SkeletonPrim = Prim & { name: string; box: Box };
 
 const SKELETON_NAMES: Record<string, string> = {
   frame: "台のふち",
@@ -328,15 +459,16 @@ function skeletonPrims(): SkeletonPrim[] {
   if (skeleton) return skeleton;
   const table = buildTable({ id: STAGE_TABLE_ID, bumpers: [], pinwheels: [], standupCenter: STANDUP_CENTER, itemSpots: [] });
   const out: SkeletonPrim[] = [];
+  const add = (prim: Prim, name: string) => out.push({ ...prim, name, box: boxOf([prim], 0) });
   for (const w of table.walls) {
     const pts = w.closed ? [...w.pts, w.pts[0]!] : w.pts;
     const name = SKELETON_NAMES[w.look ?? ""] ?? "台のかべ";
-    for (let i = 0; i + 1 < pts.length; i += 1) out.push({ ...segPrim(pts[i]!, pts[i + 1]!, w.r), name });
+    for (let i = 0; i + 1 < pts.length; i += 1) add(segPrim(pts[i]!, pts[i + 1]!, w.r), name);
   }
-  for (const c of table.circles) out.push({ ...circlePrim(c.x, c.y, c.r), name: c.look === "lane-post" ? "上のレーン" : "ポスト" });
-  for (const bank of table.standups) for (const t of bank.targets) out.push({ ...segPrim(t.a, t.b, 2.5), name: "ターゲット" });
-  for (const d of table.drops) out.push({ ...segPrim(d.a, d.b, 3.5), name: "ドロップターゲット" });
-  out.push({ ...segPrim(table.shooterGate.a, table.shooterGate.b, 2), name: "打ち出しレーン" });
+  for (const c of table.circles) add(circlePrim(c.x, c.y, c.r), c.look === "lane-post" ? "上のレーン" : "ポスト");
+  for (const bank of table.standups) for (const t of bank.targets) add(segPrim(t.a, t.b, 2.5), "ターゲット");
+  for (const d of table.drops) add(segPrim(d.a, d.b, 3.5), "ドロップターゲット");
+  add(segPrim(table.shooterGate.a, table.shooterGate.b, 2), "打ち出しレーン");
   skeleton = out;
   return out;
 }
@@ -365,7 +497,9 @@ export function partProblem(spec: StageSpec, index: number): string | null {
   if (!part) return null;
   if (!inArea(part)) return "ここには置けません（台の上のほうに置いてね）";
   const shape = partShape(part);
+  const near = boxOf(shape, STAGE_GAP);
   for (const s of skeletonPrims()) {
+    if (apart(near, s.box)) continue;
     const gap = gapOf(shape, [s]);
     if (gap < STAGE_GAP - 0.01) return `${s.name}に近すぎます（すき間 ${mm(gap)}・${STAGE_GAP}mm 以上あけてね）`;
   }
@@ -409,7 +543,9 @@ export function itemProblem(spec: StageSpec, index: number): string | null {
   if (!item) return null;
   if (!inArea(item)) return "ここには置けません（台の上のほうに置いてね）";
   const at = [circlePrim(item.x, item.y, 0)];
+  const near = boxOf(at, ITEM_CLEAR);
   for (const s of skeletonPrims()) {
+    if (apart(near, s.box)) continue;
     if (gapOf(at, [s]) < ITEM_CLEAR) return `${s.name}に近すぎます`;
   }
   for (const part of spec.parts) {
@@ -445,7 +581,7 @@ export function validateStage(spec: StageSpec, owned?: OwnedParts): StageIssue[]
   if (spec.parts.length > STAGE_PARTS_MAX) issues.push({ target: { type: "stage" }, message: `部品は全部で${STAGE_PARTS_MAX}こまでです` });
   const counts = stagePartCounts(spec);
   for (const part of PINBALL_PARTS) {
-    const limit = Math.min(part.max, owned ? owned[part.id] : part.max);
+    const limit = Math.min(part.max ?? Infinity, owned ? owned[part.id] : Infinity);
     if (counts[part.id] > limit) {
       issues.push({
         target: { type: "stage" },
@@ -469,17 +605,55 @@ export function validateStage(spec: StageSpec, owned?: OwnedParts): StageIssue[]
 /** ステージの形（骨組み＋置いた部品）。物理・描画・シミュレーターはこれを使う */
 export function buildStageTable(spec: StageSpec): TableGeometry {
   const posts: CircleDef[] = [];
+  const walls: WallDef[] = [];
+  const pinwheels: PinwheelDef[] = [];
+  const spinners: SpinnerDef[] = [];
+  const stageDrops: DropTargetDef[] = [];
   for (const part of spec.parts) {
-    if (part.kind === "post") posts.push({ x: part.x, y: part.y, r: POST_R, mat: "post", look: "post" });
-    // くぎのはね返りもゴムのポストと同じ（金属だと勢いをなくして、くぎの上にのりやすい）
-    else if (part.kind === "peg") posts.push({ x: part.x, y: part.y, r: PEG_R, mat: "post", look: "peg" });
+    switch (part.kind) {
+      case "post":
+        posts.push({ x: part.x, y: part.y, r: POST_R, mat: "post", look: "post" });
+        break;
+      case "peg":
+        // くぎのはね返りもゴムのポストと同じ（金属だと勢いをなくして、くぎの上にのりやすい）
+        posts.push({ x: part.x, y: part.y, r: PEG_R, mat: "post", look: "peg" });
+        break;
+      case "pinwheel":
+        pinwheels.push({ x: part.x, y: part.y, ...PINWHEEL, omega: PINWHEEL.omega * part.dir });
+        break;
+      case "bar":
+        pinwheels.push({ x: part.x, y: part.y, ...BAR, omega: BAR.omega * part.dir });
+        break;
+      case "rail":
+        walls.push({ pts: partEnds(part, RAIL.len), r: RAIL.r, mat: "metal", look: "guide" });
+        break;
+      case "rubber":
+        walls.push({ pts: partEnds(part, RUBBER.len), r: RUBBER.r, mat: "rubber", look: "rubber" });
+        break;
+      case "block":
+        walls.push({ pts: blockCorners(part), r: BLOCK.r, mat: "plastic", closed: true, look: "block" });
+        break;
+      case "spinner":
+        spinners.push({ x: part.x, y: part.y, w: SPINNER_W });
+        break;
+      case "drop": {
+        const [a, b] = partEnds(part, DROP_W);
+        stageDrops.push({ a, b });
+        break;
+      }
+      default:
+        break;
+    }
   }
   const mapSpec: MapSpec = {
     id: STAGE_TABLE_ID,
     bumpers: spec.parts.flatMap((part) => (part.kind === "bumper" ? [{ x: part.x, y: part.y, r: BUMPER_RADIUS[part.size] }] : [])),
-    pinwheels: spec.parts.flatMap((part) => (part.kind === "pinwheel" ? [{ x: part.x, y: part.y, ...PINWHEEL, omega: PINWHEEL.omega * part.dir }] : [])),
+    pinwheels,
     standupCenter: STANDUP_CENTER,
     posts,
+    walls,
+    spinners,
+    stageDrops,
     slings: spec.parts.flatMap((part) => (part.kind === "sling" ? [stageSlingDef(part)] : [])),
     itemSpots: [...spec.items.map((item) => ({ x: item.x, y: item.y, tier: 0 as const })), ...SHOT_SPOTS],
     ramp: spec.ramp === "top" ? TOP_RAMP : spec.ramp === "cross" ? COASTER_RAMP : undefined,
@@ -499,12 +673,30 @@ export function mirrorPart(part: StagePart): StagePart {
   const x = CX * 2 - part.x;
   switch (part.kind) {
     case "pinwheel":
+    case "bar":
       return { ...part, x, dir: part.dir === 1 ? -1 : 1 };
     case "sling":
       return { ...part, x, face: part.face === "left" ? "right" : "left" };
+    case "rail":
+    case "rubber":
+    case "drop":
+      return { ...part, x, angle: (180 - part.angle) % 180 };
     default:
       return { ...part, x };
   }
+}
+
+/** 向きを変えられる部品か */
+export function canRotatePart(part: StagePart): part is Extract<StagePart, { angle: number }> {
+  return part.kind === "rail" || part.kind === "rubber" || part.kind === "drop";
+}
+
+/** 向きを次の向きにした部品（エディターの「向きを変える」。向きの無い部品はそのまま） */
+export function rotatePart(part: StagePart): StagePart {
+  if (!canRotatePart(part)) return part;
+  const list = part.kind === "drop" ? DROP_ANGLES : WALL_ANGLES;
+  const i = list.indexOf(part.angle);
+  return { ...part, angle: list[(i + 1) % list.length]! };
 }
 
 /** 部品のおおまかな位置で、ステージが同じかどうか（名前・見た目・公開だけを変えたときは、記録を消さない） */

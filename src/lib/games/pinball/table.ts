@@ -41,8 +41,8 @@ export type WallDef = {
    * オービットのガイドは、上から降りてきた玉はインレーンへ導き、キックバックで下から上がる玉は通す
    */
   onlyInside?: { x: number; y: number; r: number };
-  /** 描画の種類。物理には関係しない */
-  look?: "frame" | "guide" | "rail" | "inlane" | "sling" | "lane" | "scoop" | "ramp-mouth" | "ramp-roof" | "shooter" | "standup-back";
+  /** 描画の種類。物理には関係しない（rubber＝2本のポストに張ったゴム、block＝プラスチックのブロック。どちらも自分で作るステージの部品） */
+  look?: "frame" | "guide" | "rail" | "inlane" | "sling" | "lane" | "scoop" | "ramp-mouth" | "ramp-roof" | "shooter" | "standup-back" | "rubber" | "block";
 };
 
 /** ポスト。look は描き方：post＝ゴムの輪のポスト、lane-post＝上のレーンのしきりの頭、peg＝めっきのくぎ */
@@ -109,6 +109,12 @@ export type RampDef = {
 export type DropTargetDef = { a: Pt; b: Pt };
 
 /**
+ * スピナー（自分で作るステージの部品）：横向きの板。玉は当たらずに下をくぐりぬけ、くぐった速さだけ板が回って点が入る。
+ * (x, y) が板のまん中、w が板の幅（mm）
+ */
+export type SpinnerDef = { x: number; y: number; w: number };
+
+/**
  * スタンドアップターゲット（立っている的）。倒れずに、当たると光る。face は前の面の向き（玉が来る側）で、
  * 後ろや横から当たっても数えない。3つで1組（左右に1組ずつ）
  */
@@ -152,6 +158,12 @@ export type TableGeometry = {
   standups: readonly [StandupBankDef, StandupBankDef];
   /** かざぐるま（マップによって 0〜いくつか） */
   pinwheels: readonly PinwheelDef[];
+  /** スピナー（自分で作るステージの部品。オービットのスピナーはセンサーの "spinner"） */
+  spinners: readonly SpinnerDef[];
+  /**
+   * 自分で作るステージのドロップターゲット（1つずつ置く）。ガチャ穴の前の drops とは別で、全部たおすとボーナスが入って立ちなおる
+   */
+  stageDrops: readonly DropTargetDef[];
   /** バンパーがはじく強さの倍率（1 がふつう） */
   bumperKick: number;
   /** ガチャ穴（キックアウトホール）。玉の中心がここに入ると吸いこむ */
@@ -190,6 +202,10 @@ export type MapSpec = {
   walls?: readonly WallDef[];
   /** 足すスリングショット（上のほうにある小さなもの。はじく面は a→c） */
   slings?: readonly SlingDef[];
+  /** スピナー（自分で作るステージ） */
+  spinners?: readonly SpinnerDef[];
+  /** ドロップターゲット（自分で作るステージ） */
+  stageDrops?: readonly DropTargetDef[];
   itemSpots: readonly ItemSpot[];
   /** 左のランプの道（右はその折り返し）。無ければ、のぼって同じがわのインレーンへ戻るふつうのランプ */
   ramp?: RampShapeSpec;
@@ -443,6 +459,8 @@ export function buildTable(spec: MapSpec): TableGeometry {
     drops,
     standups,
     pinwheels: spec.pinwheels.map((pw) => ({ ...pw })),
+    spinners: (spec.spinners ?? []).map((sp) => ({ ...sp })),
+    stageDrops: (spec.stageDrops ?? []).map((d) => ({ a: { ...d.a }, b: { ...d.b } })),
     bumperKick: spec.bumperKick ?? 1,
     scoop: { x: 240, y: 464, r: 14, ejectFrom: p(240, 488) },
     plungerRest: p(504, 938),
