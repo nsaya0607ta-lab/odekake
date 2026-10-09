@@ -42,7 +42,7 @@
 | `supabase/migrations/0136_pinball_blue_coins.sql` | 報酬を青コインに・ホームの赤コインをやめる・持っていた赤コインを青に換える（0138 でまた赤にもどした） |
 | `supabase/migrations/0137_pinball_maps.sql` | 記録の台の id をマップの id にする |
 | `supabase/migrations/0138_pinball_stages_red_coins.sql` | 赤コインの復活（ピンボール・ホームに降る赤コイン・ログイン）・部品（`pinball_part_catalog`・`buy_pinball_part`）・ステージ（`pinball_stages`・`save_pinball_stage`・`get_pinball_stages`・`get_pinball_stage_ranking`）・記録の `stage_id`（`record_pinball_result` はいまここ） |
-| `supabase/migrations/0140_pinball_red_coins_x2_5.sql` | もらえる赤コインを2.5倍（`record_pinball_result`・`claim_home_coin_drop`・`claim_login_bonus` はいまここ）・部品の持てる数の上限なし（`pinball_part_catalog` はいまここ） |
+| `supabase/migrations/0140_pinball_red_coins_x2_5.sql` | もらえる赤コインを2.5倍・1プレイ100,000枚まで（`record_pinball_result`・`claim_login_bonus` はいまここ）・部品の持てる数の上限なし（`pinball_part_catalog` はいまここ） |
 | `supabase/migrations/0139_pinball_parts_prices_obstacles.sql` | 部品の値段を3倍に・新しい部品（ガイドレール・ゴムのかべ・ブロック・回転バー・スピナー・ドロップターゲット）。`pinball_part_catalog`・`save_pinball_stage`（部品の種類の一覧）はいまここ |
 | `src/lib/data/pinball.ts` | マップごとの自分のベスト（前の県の台の記録は、いつもの台のベストに入れる）・ステージの一覧・買った部品 |
 | `src/lib/data/red-coins.ts`・`src/lib/red-coin-rewards.ts`・`src/components/red-coin-section.tsx` | 赤コインの残高・履歴・ためかた（コインの画面） |
@@ -251,8 +251,8 @@
 
 ## 赤コインと記録
 
-- **2026-10-09：もらえる赤コインをどれも2.5倍にした（ユーザー指定・0140）。** ピンボールはスコア ÷ 4,750（1プレイ 6,000枚まで）、
-  ホームに降る赤コインは 13・50・250枚（黄色・青は 5・20・100 のまま）、ログインは1日 125枚。
+- **2026-10-09：もらえる赤コインを2.5倍にした（ユーザー指定・0140）。** ピンボールはスコア ÷ 4,750（1プレイ 100,000枚まで）、
+  ログインは1日 125枚。ホームに降る赤コインは今まで通り（5・20・100枚）。
   ふつうの腕前の平均は 388.6枚（200ゲーム）。下のバランスの表の赤コインは、2.5倍する前の換算（÷11,875）の数字。
 
 - 赤コイン＝スコア ÷ 11,875（切り捨て）、1プレイ2,400枚まで。どのマップでも、自分やフレンドのステージでも同じ。

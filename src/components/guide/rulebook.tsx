@@ -839,8 +839,7 @@ function HomeChapter() {
               data-tier={coin.tier}
               style={{ left: `${coin.x}%` }}
               onClick={() => {
-                const tier = HOME_DROP.tiers.find((item) => item.tier === coin.tier);
-                const amount = (coin.kind === "red" ? tier?.redAmount : tier?.amount) ?? 5;
+                const amount = HOME_DROP.tiers.find((item) => item.tier === coin.tier)?.amount ?? 5;
                 setGot((value) => value + amount);
                 setCoins((current) => current.filter((item) => item.id !== coin.id));
               }}
@@ -858,9 +857,7 @@ function HomeChapter() {
               <span className={styles.tierCoin}><HomeCoinArt kind="blue" tier={item.tier} /></span>
               <span className={styles.tierCoin}><HomeCoinArt kind="red" tier={item.tier} /></span>
               <b>{item.label}</b>
-              <small>
-                {item.rate}%・{item.amount}枚（赤は{item.redAmount}枚）
-              </small>
+              <small>{item.rate}%・{item.amount}枚</small>
             </div>
           ))}
         </div>

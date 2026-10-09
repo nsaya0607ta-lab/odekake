@@ -145,7 +145,7 @@ export function CoinEarnMethods() {
               ご当地ピンボール {PINBALL_COIN_POINTS.toLocaleString("ja-JP")}点ごと <RedCoinArt className="h-[11px] w-[11px]" />+1
             </span>
             <span className="flex items-center gap-1 rounded-full bg-white/80 px-2 py-1 tabular-nums text-[#9C2B31]">
-              ホームに降ってくる赤コイン <RedCoinArt className="h-[11px] w-[11px]" />+{HOME_DROP.tiers[0].redAmount}〜{HOME_DROP.tiers[2].redAmount}
+              ホームに降ってくる赤コイン <RedCoinArt className="h-[11px] w-[11px]" />+{HOME_DROP.tiers[0].amount}〜{HOME_DROP.tiers[2].amount}
             </span>
             <span className="flex items-center gap-1 rounded-full bg-white/80 px-2 py-1 tabular-nums text-[#9C2B31]">
               ログイン（1日1回） <RedCoinArt className="h-[11px] w-[11px]" />+{RED_LOGIN_COINS}

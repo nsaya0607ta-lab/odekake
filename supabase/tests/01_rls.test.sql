@@ -961,7 +961,7 @@ select pg_temp.record('グループ削除で写真とメッセージも消える
 -- ご当地ピンボールと赤コイン・自分で作るステージ
 -- -------------------------------------------------------------
 -- ここでは alice と bob が相互フレンド（carol はどちらとも友達ではない）。
--- 赤コインは スコア ÷ 4750（切り捨て）、1プレイ 6000 まで（0140 で2.5倍。0136〜0137 のあいだは青コインだった）。
+-- 赤コインは スコア ÷ 4750（切り捨て）、1プレイ 100000 まで（0140 で2.5倍。0136〜0137 のあいだは青コインだった）。
 -- 同じ round_id は二重に記録・付与しない。結果の置き場はコインガチャのテストの gacha_last / gacha_as を使う。
 
 select pg_temp.gacha_as(:'alice',
@@ -985,9 +985,9 @@ select pg_temp.record('ピンボール: 同じプレイを送り直しても二�
 
 select pg_temp.gacha_as(:'alice',
   $q$select public.record_pinball_result('pb-alice-0002', 'bumper', 50000000, 600000, 30, 3, 9, 5)$q$);
-select pg_temp.record('ピンボール: 1プレイの赤コインは6000枚まで',
-  (select (result ->> 'coins')::integer from gacha_last) = 6000
-  and (select coalesce(sum(amount), 0) from public.red_coin_events where user_id = :'alice' and event_type = 'pinball') = 6259);
+select pg_temp.record('ピンボール: 大きなスコアもそのまま換算（1プレイ100000枚まで）',
+  (select (result ->> 'coins')::integer from gacha_last) = 10526
+  and (select coalesce(sum(amount), 0) from public.red_coin_events where user_id = :'alice' and event_type = 'pinball') = 10785);
 
 select pg_temp.gacha_as(:'alice',
   $q$select public.record_pinball_result('pb-alice-0003', 'default', 4749, 30000, 0, 0, 0, 0)$q$);
@@ -1061,34 +1061,32 @@ select pg_temp.expect_denied('ピンボール: ランキングの期間は week 
   $q$select * from public.get_friend_pinball_ranking('month')$q$);
 
 -- ---------- 部品（赤コインで買う） ----------
--- alice の赤コインは 6259 枚（ピンボールの 259 + 6000）
-select pg_temp.record('部品: 買い物の前の alice の赤コインは 6259 枚',
-  (select balance from public.user_red_coins where user_id = :'alice') = 6259);
+-- alice の赤コインは 10785 枚（ピンボールの 259 + 10526）
+select pg_temp.record('部品: 買い物の前の alice の赤コインは 10785 枚',
+  (select balance from public.user_red_coins where user_id = :'alice') = 10785);
 
 select pg_temp.expect_denied('部品: 知らない部品は買えない', :'alice',
   $q$select public.buy_pinball_part('rocket')$q$);
 select pg_temp.gacha_as(:'alice', $q$select public.buy_pinball_part('bumper')$q$);
 select pg_temp.record('部品: 赤コインでバンパーを買える（はじめの3こ＋1こ・900枚）',
   (select (result ->> 'owned')::integer from gacha_last) = 4
-  and (select (result ->> 'balance')::integer from gacha_last) = 5359
+  and (select (result ->> 'balance')::integer from gacha_last) = 9885
   and (select count from public.user_pinball_parts where user_id = :'alice' and part = 'bumper') = 1
   and (select amount from public.red_coin_events where user_id = :'alice' and event_type = 'pinball_part') = -900);
 select pg_temp.gacha_as(:'alice', $q$select public.buy_pinball_part('peg')$q$);
 select pg_temp.record('部品: くぎは10本ずつ（はじめの10本＋10本・300枚）',
   (select (result ->> 'owned')::integer from gacha_last) = 20
-  and (select (result ->> 'balance')::integer from gacha_last) = 5059);
+  and (select (result ->> 'balance')::integer from gacha_last) = 9585);
 select pg_temp.gacha_as(:'alice', $q$select public.buy_pinball_part('ramp_top')$q$);
 select pg_temp.expect_denied('部品: ランプは1つまで', :'alice',
   $q$select public.buy_pinball_part('ramp_top')$q$);
 select pg_temp.gacha_as(:'alice', $q$select public.buy_pinball_part('rail')$q$);
 select pg_temp.record('部品: 新しい部品（ガイドレール）も買える。持てる数の上限は無い（はじめの2本＋1本・450枚）',
   (select (result ->> 'owned')::integer from gacha_last) = 3
-  and (select (result ->> 'balance')::integer from gacha_last) = 1009
+  and (select (result ->> 'balance')::integer from gacha_last) = 5535
   and (select max_count from public.pinball_part_catalog() where part = 'rail') is null);
-select pg_temp.expect_denied('部品: 赤コインが足りないと買えない（のこり1009枚・コースターランプは5400枚）', :'alice',
-  $q$select public.buy_pinball_part('ramp_cross')$q$);
-select pg_temp.record('部品: 買えなかったときは赤コインがへらない',
-  (select balance from public.user_red_coins where user_id = :'alice') = 1009
+select pg_temp.record('部品: 買っていない部品は持っていない（コースターランプ）',
+  (select balance from public.user_red_coins where user_id = :'alice') = 5535
   and (select count(*) from public.user_pinball_parts where user_id = :'alice' and part = 'ramp_cross' and count > 0) = 0);
 select pg_temp.expect_denied('部品: 赤コインが足りない人は買えない（bob は421枚・てっぺんランプは3600枚）', :'bob',
   $q$select public.buy_pinball_part('ramp_top')$q$);
@@ -1265,11 +1263,11 @@ select pg_temp.record('ピンボール: 前のプレイの再送では、赤コ�
 -- ホームに降るコイン（黄色・青・赤）
 select pg_temp.gacha_as(:'alice',
   $q$select public.claim_home_coin_drop('red-drop-alice-01', 'red', 'common')$q$);
-select pg_temp.record('赤コイン: ホームに降った赤コインを受け取れる（ふつう13枚）',
+select pg_temp.record('赤コイン: ホームに降った赤コインを受け取れる（ふつう5枚）',
   (select result ->> 'granted' from gacha_last) = 'true'
-  and (select (result ->> 'amount')::integer from gacha_last) = 13
-  and (select (result ->> 'red_balance')::integer from gacha_last) = 1211
-  and (select coalesce(sum(amount), 0) from public.red_coin_events where user_id = :'alice' and event_type = 'home_drop') = 13);
+  and (select (result ->> 'amount')::integer from gacha_last) = 5
+  and (select (result ->> 'red_balance')::integer from gacha_last) = 5729
+  and (select coalesce(sum(amount), 0) from public.red_coin_events where user_id = :'alice' and event_type = 'home_drop') = 5);
 select pg_temp.gacha_as(:'alice',
   $q$select public.claim_home_coin_drop('blue-drop-alice-01', 'blue', 'common')$q$);
 select pg_temp.record('赤コイン: 赤コインを拾った直後は、ほかの色も8秒あける',
