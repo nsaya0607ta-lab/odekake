@@ -128,7 +128,7 @@ export function TownBuilder({ userId }: { userId: string }) {
     if (!loaded) return;
     const x = i % MAP_SIZE, y = Math.floor(i / MAP_SIZE);
     if (inspect) {
-      const tile = tiles[i];
+      const tile = tiles[i] ?? "grass";
       setNotice("場所 " + (x + 1) + "," + (y + 1) + "： " +
         (BUILDINGS.find(v => v.id === tile)?.title ?? "更地"));
       return;
@@ -197,7 +197,7 @@ export function TownBuilder({ userId }: { userId: string }) {
             </defs>
             <rect width="1000" height="585" fill="url(#town-sky)" />
             <ellipse cx="500" cy="314" rx="490" ry="245" fill="#75bd9a" opacity=".23" />
-            {ORDER.map(i => <TileArt key={i} index={i} tile={tiles[i]} tiles={tiles}
+            {ORDER.map(i => <TileArt key={i} index={i} tile={tiles[i] ?? "grass"} tiles={tiles}
               hovered={hover === i} selected={false} onSelect={place} onHover={setHover} />)}
             <text x="500" y="560" textAnchor="middle" fontSize="13" fill="#487c60" fontWeight="bold">
               マップを横にスクロールできます • タップで建設
