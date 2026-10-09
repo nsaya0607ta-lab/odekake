@@ -173,7 +173,7 @@ export type TableGeometry = {
   /** 打ち出しレーンの出口の一方通行ゲート（上へは通れて、上からは通れない） */
   shooterGate: { a: Pt; b: Pt; allow: Pt };
   /** アウトレーンを閉じるスキル用の扉（ふだんは無い） */
-  outlaneGates: readonly [{ a: Pt; b: Pt }, { a: Pt; b: Pt }];
+  outlaneGates: readonly { a: Pt; b: Pt }[];
   /** 上のレーン「お・で・か・け」の中心 x */
   laneX: readonly number[];
   laneY: number;
@@ -499,6 +499,7 @@ export function buildTable(spec: MapSpec): TableGeometry {
     sensors: table.sensors.filter((s) => s.id === "shooterExit"),
     drops: [],
     standups: [],
+    outlaneGates: [],
     scoop: { ...table.scoop, r: 0 },
     laneX: [],
     shots: hasRamps ? shots.filter((s) => s.id === "leftRamp" || s.id === "rightRamp") : [],
