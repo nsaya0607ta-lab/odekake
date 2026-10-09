@@ -42,10 +42,14 @@ export type RenderAssets = {
   shape: PinballShape | null;
   /** バンパーの上にのせるアイテム（バンパーの数より少なければ、くり返して使う） */
   bumperItems: readonly PinballItem[];
+  /** 画面に収める範囲（mm）。無ければ台の全体（ステージのエディターは、台の上のほうだけを大きく見せる） */
+  view?: ViewRect;
 };
 
+export type ViewRect = { x0: number; y0: number; w: number; h: number };
+
 /** 台のまわりの余白も入れた、画面に収める範囲（mm） */
-const VIEW = { x0: -14, y0: -14, w: TABLE_W + 28, h: TABLE_H + 14 };
+const VIEW: ViewRect = { x0: -14, y0: -14, w: TABLE_W + 28, h: TABLE_H + 14 };
 const FONT = '"Hiragino Maru Gothic ProN","ヒラギノ丸ゴ ProN W4","Arial Rounded MT Bold","Yu Gothic",sans-serif';
 const TAU = Math.PI * 2;
 const LANE_LETTERS = ["お", "で", "か", "け"];
@@ -558,15 +562,16 @@ export class PinballRenderer {
 
   /** 表示する大きさ（CSS px）が変わったとき */
   resize(cssW: number, cssH: number, dpr: number): void {
+    const view = this.assets.view ?? VIEW;
     this.cssW = cssW;
     this.cssH = cssH;
     this.dpr = dpr;
     this.canvas.width = Math.round(cssW * dpr);
     this.canvas.height = Math.round(cssH * dpr);
-    this.scale = Math.min(cssW / VIEW.w, cssH / VIEW.h);
-    this.offX = (cssW - VIEW.w * this.scale) / 2 - VIEW.x0 * this.scale;
+    this.scale = Math.min(cssW / view.w, cssH / view.h);
+    this.offX = (cssW - view.w * this.scale) / 2 - view.x0 * this.scale;
     // 縦に余るときは下にそろえる（フリッパーが親指に近くなる）
-    this.offY = cssH - VIEW.h * this.scale - VIEW.y0 * this.scale;
+    this.offY = cssH - view.h * this.scale - view.y0 * this.scale;
     this.base = null;
     this.overlay = null;
     this.ballSprite = null;
@@ -588,6 +593,11 @@ export class PinballRenderer {
 
   get mmToPx(): number {
     return this.scale;
+  }
+
+  /** キャンバス全体に見えている範囲（台の座標・mm）。上に重ねる SVG の viewBox に使う */
+  visibleRect(): ViewRect {
+    return { x0: -this.offX / this.scale, y0: -this.offY / this.scale, w: this.cssW / this.scale, h: this.cssH / this.scale };
   }
 
   /** 1mm がキャンバスの何画素か（影のぼかしの大きさに使う） */

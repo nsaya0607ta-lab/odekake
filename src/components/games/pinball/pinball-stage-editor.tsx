@@ -1,9 +1,10 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState, type PointerEvent as ReactPointerEvent } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type PointerEvent as ReactPointerEvent, type ReactNode } from "react";
 import { RedCoinArt } from "@/components/coin-art";
-import { SHOT_SPOTS, TOP_RAMP } from "@/lib/games/pinball/maps";
+import { TOP_RAMP } from "@/lib/games/pinball/maps";
 import {
+  BUMPER_RADIUS,
   cleanStageName,
   mirrorPart,
   partProblem,
@@ -15,6 +16,7 @@ import {
   RAMP_NAMES,
   RAMP_PART,
   snapStagePoint,
+  stageSlingDef,
   STAGE_AREA,
   STAGE_GAP,
   STAGE_LOOKS,
@@ -32,14 +34,18 @@ import {
   type StageSpec,
 } from "@/lib/games/pinball/stage";
 import { CX, type Pt } from "@/lib/games/pinball/table";
-import { getPinballTheme } from "@/lib/games/pinball/themes";
-import { PinballTableShapes } from "./pinball-map-preview";
+import type { PinballLobby } from "@/lib/games/pinball/tables";
+import { getPinballTheme, type PinballTheme } from "@/lib/games/pinball/themes";
 import { PinballPartIcon } from "./pinball-part-icon";
+import { PinballStageBoard } from "./pinball-stage-board";
+import type { ViewRect } from "./render";
 
 export type StageDraft = { id: string | null; name: string; spec: StageSpec; shared: boolean };
 
 type Props = {
   draft: StageDraft;
+  /** 台に出すアイテム・バンパーの絵・床の県の形（遊ぶ画面と同じもの） */
+  lobby: PinballLobby;
   /** 持っている部品の数（はじめのぶん＋買ったぶん） */
   owned: OwnedParts;
   redCoins: number | null;
@@ -51,11 +57,17 @@ type Props = {
 };
 
 type Selection = { type: "part" | "item"; index: number } | null;
+/**
+ * 指で動かしている間の、台の絵のもと。部品を動かしている間はその部品をのぞいた形のまま描き（動かすたびに台の絵を
+ * 作りなおすと重い）、動かしている部品は上の SVG に描く。アイテムの場所は、その場所の絵だけを消す。
+ * bumper は動かしているバンパーの番号（バンパーの中で何番目か。笠の絵はこの番号で決まるので、ほかのバンパーの絵がずれないようにする）
+ */
+type Frozen = { spec: StageSpec; part: number | null; item: number | null; bumper: number | null };
 type Drag = { type: "part" | "item"; index: number; pointerId: number; start: Pt; origin: Pt; moved: boolean };
 type Message = { text: string; tone: "error" | "info" | "ok" };
 
 /** エディターに見せる台の範囲（台の上のほう。mm） */
-const VIEW = { x: -10, y: 40, w: 542, h: 610 };
+const EDITOR_VIEW: ViewRect = { x0: -10, y0: 40, w: 542, h: 610 };
 const SIZE_LABEL: Record<BumperSize, string> = { s: "小", m: "中", l: "大" };
 
 function clonePart(part: StagePart, at: Pt): StagePart {
@@ -76,7 +88,63 @@ function newPart(kind: StagePartKind, at: Pt): StagePart {
   }
 }
 
-export function PinballStageEditor({ draft, owned, redCoins, onClose, onSaved, onDeleted, onTestPlay, onOpenShop }: Props) {
+/** 指で動かしている部品（台の絵は置いたときに描きなおすので、動かしている間はこの簡単な絵で見せる。バンパーは笠の絵も出す） */
+function PartGhost({ part, theme, ok, image }: { part: StagePart; theme: PinballTheme; ok: boolean; image?: string }) {
+  const { colors } = theme;
+  const ring = ok ? "#7dffb0" : "#ff4d4d";
+  let body: ReactNode;
+  switch (part.kind) {
+    case "bumper": {
+      const r = BUMPER_RADIUS[part.size];
+      const cap = r - 5;
+      body = (
+        <>
+          <circle cx={part.x} cy={part.y} r={r} fill={colors.accent} fillOpacity={0.85} stroke="#ffffff" strokeWidth={3} />
+          {image ? (
+            <>
+              <clipPath id="stage-ghost-cap">
+                <circle cx={part.x} cy={part.y} r={cap} />
+              </clipPath>
+              <circle cx={part.x} cy={part.y} r={cap} fill="#ffffff" />
+              <image href={image} x={part.x - cap} y={part.y - cap} width={cap * 2} height={cap * 2} preserveAspectRatio="xMidYMid slice" clipPath="url(#stage-ghost-cap)" />
+            </>
+          ) : (
+            <circle cx={part.x} cy={part.y} r={r * 0.55} fill="#ffffff" fillOpacity={0.75} />
+          )}
+        </>
+      );
+      break;
+    }
+    case "pinwheel":
+      body = (
+        <g stroke={colors.accent2} strokeWidth={9} strokeLinecap="round">
+          <line x1={part.x - 19} y1={part.y} x2={part.x + 19} y2={part.y} />
+          <line x1={part.x} y1={part.y - 19} x2={part.x} y2={part.y + 19} />
+          <circle cx={part.x} cy={part.y} r={6.5} fill={colors.accent2} />
+        </g>
+      );
+      break;
+    case "post":
+      body = <circle cx={part.x} cy={part.y} r={6} fill="#eef2f7" stroke="#2b3240" strokeWidth={2} />;
+      break;
+    case "peg":
+      body = <circle cx={part.x} cy={part.y} r={4.5} fill="#e2b95c" stroke="#7a5a1c" strokeWidth={1.2} />;
+      break;
+    case "sling": {
+      const s = stageSlingDef(part);
+      body = <path d={`M${s.a.x} ${s.a.y}L${s.b.x} ${s.b.y}L${s.c.x} ${s.c.y}Z`} fill={colors.accent} fillOpacity={0.7} stroke="#ffffff" strokeWidth={3} strokeLinejoin="round" />;
+      break;
+    }
+  }
+  return (
+    <g pointerEvents="none">
+      <circle cx={part.x} cy={part.y} r={partRadius(part) + 7} fill={ring} fillOpacity={0.12} stroke={ring} strokeWidth={4} />
+      {body}
+    </g>
+  );
+}
+
+export function PinballStageEditor({ draft, lobby, owned, redCoins, onClose, onSaved, onDeleted, onTestPlay, onOpenShop }: Props) {
   const [name, setName] = useState(draft.name);
   const [spec, setSpec] = useState<StageSpec>(draft.spec);
   const [shared, setShared] = useState(draft.shared);
@@ -88,13 +156,17 @@ export function PinballStageEditor({ draft, owned, redCoins, onClose, onSaved, o
   const [busy, setBusy] = useState<"save" | "delete" | null>(null);
   /** 動かしている部品を置ける所（ドラッグを始めたときに数える） */
   const [dragGuide, setDragGuide] = useState<Pt[] | null>(null);
+  const [frozen, setFrozen] = useState<Frozen | null>(null);
   const svgRef = useRef<SVGSVGElement | null>(null);
   const dragRef = useRef<Drag | null>(null);
   const specRef = useRef(spec);
   specRef.current = spec;
 
   const theme = useMemo(() => getPinballTheme(spec.look), [spec.look]);
-  const table = useMemo(() => buildStageTable(spec), [spec]);
+  // 台の絵のもと（指で動かしている間は、動かす前の形のまま）
+  const renderSpec = frozen?.spec ?? spec;
+  const renderTable = useMemo(() => buildStageTable(renderSpec), [renderSpec]);
+  const bumperItems = useMemo(() => (frozen?.bumper != null ? lobby.bumperItems.filter((_, i) => i !== frozen.bumper) : lobby.bumperItems), [frozen, lobby]);
   const counts = useMemo(() => stagePartCounts(spec), [spec]);
   const issues = useMemo(() => validateStage(spec, owned), [spec, owned]);
   const badParts = useMemo(() => new Set(issues.flatMap((i) => (i.target.type === "part" ? [i.target.index] : []))), [issues]);
@@ -103,6 +175,7 @@ export function PinballStageEditor({ draft, owned, redCoins, onClose, onSaved, o
   // 置こうとしている部品を置ける所（点で見せる）
   const placeGuide = useMemo(() => (placing ? placeableSpots(spec, (at) => newPart(placing, at), null) : null), [placing, spec]);
   const guide = dragGuide ?? placeGuide;
+  const guidePath = useMemo(() => (guide ? guide.map((pt) => `M${pt.x - 2.6} ${pt.y}a2.6 2.6 0 1 0 5.2 0a2.6 2.6 0 1 0 -5.2 0`).join("") : null), [guide]);
 
   // 後ろの画面を動かさない
   useEffect(() => {
@@ -194,9 +267,23 @@ export function PinballStageEditor({ draft, owned, redCoins, onClose, onSaved, o
     const at = toTable(event);
     if (!at) return;
     const to = snapStagePoint(drag.origin.x + at.x - drag.start.x, drag.origin.y + at.y - drag.start.y);
-    if (!drag.moved && Math.hypot(at.x - drag.start.x, at.y - drag.start.y) < 3) return;
-    drag.moved = true;
     const current = specRef.current;
+    if (!drag.moved) {
+      if (Math.hypot(at.x - drag.start.x, at.y - drag.start.y) < 3) return;
+      drag.moved = true;
+      // 動かしはじめたら、台の絵はその部品をのぞいた形にする（アイテムは、その場所の絵だけを消す）
+      const part = drag.type === "part" ? current.parts[drag.index]! : null;
+      setFrozen(
+        part
+          ? {
+              spec: { ...current, parts: current.parts.filter((_, i) => i !== drag.index) },
+              part: drag.index,
+              item: null,
+              bumper: part.kind === "bumper" ? current.parts.slice(0, drag.index).filter((other) => other.kind === "bumper").length : null,
+            }
+          : { spec: current, part: null, item: drag.index, bumper: null },
+      );
+    }
     if (drag.type === "part") {
       const parts = current.parts.slice();
       parts[drag.index] = clonePart(parts[drag.index]!, to);
@@ -219,6 +306,7 @@ export function PinballStageEditor({ draft, owned, redCoins, onClose, onSaved, o
     if (!drag || drag.pointerId !== event.pointerId) return;
     dragRef.current = null;
     setDragGuide(null);
+    setFrozen(null);
     if (!drag.moved) return;
     const current = specRef.current;
     // 置けない所で指をはなしたら、もとの場所にもどす
@@ -353,7 +441,7 @@ export function PinballStageEditor({ draft, owned, redCoins, onClose, onSaved, o
 
   return (
     <div className="fixed inset-0 z-50 overflow-y-auto bg-[#0b0d14] text-white" role="dialog" aria-modal="true" aria-label="ステージを作る">
-      <header className="sticky top-0 z-10 flex items-center gap-2 border-b border-white/10 bg-[#0b0d14]/95 px-3 py-2 backdrop-blur" style={{ paddingTop: "max(8px, env(safe-area-inset-top))" }}>
+      <header data-dark-header className="sticky top-0 z-10 flex items-center gap-2 border-b border-white/10 bg-[#0b0d14]/95 px-3 py-2 backdrop-blur" style={{ paddingTop: "max(8px, env(safe-area-inset-top))" }}>
         <button type="button" onClick={close} className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-white/15 bg-white/5 text-lg font-black active:scale-95" aria-label="エディターをとじる">
           ‹
         </button>
@@ -378,26 +466,21 @@ export function PinballStageEditor({ draft, owned, redCoins, onClose, onSaved, o
       </header>
 
       <div className="mx-auto max-w-[480px] px-2 pb-28 pt-2">
-        <div className="relative overflow-hidden rounded-[20px] border border-white/10 bg-black">
-          <svg
-            ref={svgRef}
-            viewBox={`${VIEW.x} ${VIEW.y} ${VIEW.w} ${VIEW.h}`}
-            className="block h-auto w-full touch-none select-none"
-            style={{ aspectRatio: `${VIEW.w} / ${VIEW.h}`, cursor: placing ? "crosshair" : "default" }}
+        <div className="relative">
+          <PinballStageBoard
+            table={renderTable}
+            theme={theme}
+            lobby={lobby}
+            bumperItems={bumperItems}
+            view={EDITOR_VIEW}
+            hiddenItem={frozen?.item ?? null}
+            svgRef={svgRef}
             onPointerDown={onPointerDown}
             onPointerMove={onPointerMove}
             onPointerUp={endDrag}
-            onPointerCancel={endDrag}
-            role="img"
-            aria-label="ステージの台。部品をタップしてえらび、ドラッグで動かす"
+            cursor={placing ? "crosshair" : "default"}
+            label="ステージの台。部品をタップしてえらび、ドラッグで動かす"
           >
-            <defs>
-              <linearGradient id="pb-editor-floor" x1="0" y1="0" x2="0" y2="1">
-                <stop offset="0%" stopColor={theme.colors.bg0} />
-                <stop offset="100%" stopColor={theme.colors.bg1} />
-              </linearGradient>
-            </defs>
-            <PinballTableShapes table={table} theme={theme} floor="url(#pb-editor-floor)" />
             {/* 部品を置ける所（部品のまん中） */}
             <rect
               x={STAGE_AREA.x0}
@@ -406,38 +489,30 @@ export function PinballStageEditor({ draft, owned, redCoins, onClose, onSaved, o
               height={STAGE_AREA.y1 - STAGE_AREA.y0}
               fill="none"
               stroke="#ffffff"
-              strokeOpacity={placing ? 0.55 : 0.25}
+              strokeOpacity={placing || frozen ? 0.6 : 0.22}
               strokeWidth={2}
               strokeDasharray="8 8"
               rx={10}
+              pointerEvents="none"
             />
-            {/* いまの部品を置ける所 */}
-            {guide ? (
-              <g pointerEvents="none" fill="#7dffb0" fillOpacity={0.55}>
-                {guide.map((pt) => (
-                  <circle key={`g${pt.x}-${pt.y}`} cx={pt.x} cy={pt.y} r={2.6} />
-                ))}
-              </g>
-            ) : null}
+            {/* いまの部品を置ける所（点は数百こあるので、1本の path にまとめて描く） */}
+            {guidePath ? <path d={guidePath} fill="#7dffb0" fillOpacity={0.7} pointerEvents="none" /> : null}
             {/* てっぺんランプの出口（玉が落ちてくる所） */}
             {spec.ramp === "top"
               ? [rampExit, { x: CX * 2 - rampExit.x, y: rampExit.y }].map((pt, i) => (
-                  <circle key={`exit${i}`} cx={pt.x} cy={pt.y} r={40} fill="#ffffff" fillOpacity={0.06} stroke="#ffffff" strokeOpacity={0.3} strokeDasharray="4 6" strokeWidth={2} />
+                  <circle key={`exit${i}`} cx={pt.x} cy={pt.y} r={40} fill="#ffffff" fillOpacity={0.06} stroke="#ffffff" strokeOpacity={0.35} strokeDasharray="4 6" strokeWidth={2} pointerEvents="none" />
                 ))
               : null}
-            {/* どのステージも同じ、アイテムが浮かぶ場所 */}
-            {SHOT_SPOTS.map((spot, i) => (
-              <circle key={`shot${i}`} cx={spot.x} cy={spot.y} r={9} fill="#ffd166" fillOpacity={0.25} />
-            ))}
-            {/* 部品のしるし（えらんでいる・置き方に問題がある） */}
+            {/* 部品のしるし（えらんでいる・置き方に問題がある。動かしている部品は下で描く） */}
             {spec.parts.map((part, index) => {
+              if (frozen?.part === index) return null;
               const isSelected = selected?.type === "part" && selected.index === index;
               const bad = badParts.has(index);
               if (!isSelected && !bad) return null;
               return (
                 <g key={`mark${index}`} pointerEvents="none">
                   {isSelected ? (
-                    <circle cx={part.x} cy={part.y} r={partRadius(part) + STAGE_GAP} fill="none" stroke="#ffffff" strokeOpacity={0.35} strokeDasharray="5 6" strokeWidth={2} />
+                    <circle cx={part.x} cy={part.y} r={partRadius(part) + STAGE_GAP} fill="none" stroke="#ffffff" strokeOpacity={0.4} strokeDasharray="5 6" strokeWidth={2} />
                   ) : null}
                   <circle cx={part.x} cy={part.y} r={partRadius(part) + 6} fill="none" stroke={bad ? "#ff4d4d" : "#ffffff"} strokeWidth={bad ? 5 : 4} />
                 </g>
@@ -447,16 +522,41 @@ export function PinballStageEditor({ draft, owned, redCoins, onClose, onSaved, o
             {spec.items.map((item, index) => {
               const isSelected = selected?.type === "item" && selected.index === index;
               const bad = badItems.has(index);
+              const dragging = frozen?.item === index;
               return (
                 <g key={`item${index}`} pointerEvents="none">
-                  <circle cx={item.x} cy={item.y} r={20} fill="#ffd166" fillOpacity={0.18} stroke={bad ? "#ff4d4d" : isSelected ? "#ffffff" : "#ffd166"} strokeWidth={isSelected || bad ? 4 : 2.5} strokeDasharray={isSelected ? undefined : "5 4"} />
-                  <text x={item.x} y={item.y + 7} textAnchor="middle" fontSize={20} fontWeight={900} fill="#ffd166">
-                    ★
-                  </text>
+                  {dragging ? (
+                    <>
+                      <circle cx={item.x} cy={item.y} r={20} fill="#fff4d6" stroke={bad ? "#ff4d4d" : "#7dffb0"} strokeWidth={4} />
+                      <text x={item.x} y={item.y + 7} textAnchor="middle" fontSize={20} fontWeight={900} fill="#d79a1e">
+                        ★
+                      </text>
+                    </>
+                  ) : (
+                    <circle
+                      cx={item.x}
+                      cy={item.y}
+                      r={25}
+                      fill="none"
+                      stroke={bad ? "#ff4d4d" : isSelected ? "#ffffff" : "#ffd166"}
+                      strokeOpacity={bad || isSelected ? 1 : 0.55}
+                      strokeWidth={isSelected || bad ? 4 : 2}
+                      strokeDasharray={isSelected || bad ? undefined : "5 5"}
+                    />
+                  )}
                 </g>
               );
             })}
-          </svg>
+            {/* 指で動かしている部品 */}
+            {frozen?.part !== null && frozen?.part !== undefined && spec.parts[frozen.part] ? (
+              <PartGhost
+                part={spec.parts[frozen.part]!}
+                theme={theme}
+                ok={!badParts.has(frozen.part)}
+                image={frozen.bumper !== null ? lobby.bumperItems[frozen.bumper]?.image ?? undefined : undefined}
+              />
+            ) : null}
+          </PinballStageBoard>
           {placing ? (
             <p className="pointer-events-none absolute left-2 top-2 rounded-full bg-black/70 px-2.5 py-1 text-[10px] font-black text-[#ffd166]">
               {PART_NAMES[placing]}を置く所をタップ（緑の点のところに置けます）

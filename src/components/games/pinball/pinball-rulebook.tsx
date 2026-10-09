@@ -122,7 +122,7 @@ export function PinballRulebook({ owned }: { owned: ReadonlyMap<string, number> 
 
   return (
     <div className="min-h-dvh bg-[radial-gradient(120%_50%_at_50%_0%,#3a1418_0%,#0b0d14_55%,#07090e_100%)] pb-10 text-white">
-      <header className="sticky top-0 z-20 flex items-center gap-3 border-b border-white/10 bg-[#0b0d14]/85 px-3 py-2 backdrop-blur" style={{ paddingTop: "max(8px, env(safe-area-inset-top))" }}>
+      <header data-dark-header className="sticky top-0 z-20 flex items-center gap-3 border-b border-white/10 bg-[#0b0d14]/85 px-3 py-2 backdrop-blur" style={{ paddingTop: "max(8px, env(safe-area-inset-top))" }}>
         <Link href="/games/pinball" className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-white/15 bg-white/5 text-lg font-black active:scale-95" aria-label="ご当地ピンボールへ戻る">
           ‹
         </Link>

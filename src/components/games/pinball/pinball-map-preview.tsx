@@ -33,8 +33,8 @@ export function PinballMapPreview({ mapId, table: given, uid, theme, className }
   );
 }
 
-/** 台の形（床・壁・ランプ・ポスト・かざぐるま・バンパー・ガチャ穴・フリッパー）。エディターでも同じ絵を使う */
-export function PinballTableShapes({ table, theme, floor }: { table: TableGeometry; theme: PinballTheme; floor: string }) {
+/** 台の形（床・壁・ランプ・ポスト・かざぐるま・バンパー・ガチャ穴・フリッパー） */
+function PinballTableShapes({ table, theme, floor }: { table: TableGeometry; theme: PinballTheme; floor: string }) {
   const { colors } = theme;
   return (
     <>

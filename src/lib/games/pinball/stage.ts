@@ -255,6 +255,23 @@ function gapOf(a: readonly Prim[], b: readonly Prim[]): number {
   return best;
 }
 
+/** 形をかこむ四角（太さもふくめ、まわりに margin を足す） */
+type Box = { x0: number; x1: number; y0: number; y1: number };
+
+function boxOf(shape: readonly Prim[], margin: number): Box {
+  const box: Box = { x0: Infinity, x1: -Infinity, y0: Infinity, y1: -Infinity };
+  for (const u of shape) {
+    box.x0 = Math.min(box.x0, u.ax - u.r - margin, u.bx - u.r - margin);
+    box.x1 = Math.max(box.x1, u.ax + u.r + margin, u.bx + u.r + margin);
+    box.y0 = Math.min(box.y0, u.ay - u.r - margin, u.by - u.r - margin);
+    box.y1 = Math.max(box.y1, u.ay + u.r + margin, u.by + u.r + margin);
+  }
+  return box;
+}
+
+/** 四角どうしが重ならない（＝margin をつけた形どうしのすき間は margin より広い） */
+const apart = (a: Box, b: Box) => a.x0 > b.x1 || a.x1 < b.x0 || a.y0 > b.y1 || a.y1 < b.y0;
+
 /** スリングショットの三角（上・外がわ・下。ゴムの面は上と下を結ぶ線で、face のがわを向く） */
 export function stageSlingDef(part: Extract<StagePart, { kind: "sling" }>): SlingDef {
   const out = part.face === "right" ? -SLING_DEPTH : SLING_DEPTH;
@@ -306,7 +323,8 @@ export function partRadius(part: StagePart): number {
 
 /* ---------- 骨組みの形（部品を置いていないステージ） ---------- */
 
-type SkeletonPrim = Prim & { name: string };
+/** 骨組みの線と、それをかこむ四角（置ける所をたくさん調べるので、遠い線は四角だけ見てとばす） */
+type SkeletonPrim = Prim & { name: string; box: Box };
 
 const SKELETON_NAMES: Record<string, string> = {
   frame: "台のふち",
@@ -328,15 +346,16 @@ function skeletonPrims(): SkeletonPrim[] {
   if (skeleton) return skeleton;
   const table = buildTable({ id: STAGE_TABLE_ID, bumpers: [], pinwheels: [], standupCenter: STANDUP_CENTER, itemSpots: [] });
   const out: SkeletonPrim[] = [];
+  const add = (prim: Prim, name: string) => out.push({ ...prim, name, box: boxOf([prim], 0) });
   for (const w of table.walls) {
     const pts = w.closed ? [...w.pts, w.pts[0]!] : w.pts;
     const name = SKELETON_NAMES[w.look ?? ""] ?? "台のかべ";
-    for (let i = 0; i + 1 < pts.length; i += 1) out.push({ ...segPrim(pts[i]!, pts[i + 1]!, w.r), name });
+    for (let i = 0; i + 1 < pts.length; i += 1) add(segPrim(pts[i]!, pts[i + 1]!, w.r), name);
   }
-  for (const c of table.circles) out.push({ ...circlePrim(c.x, c.y, c.r), name: c.look === "lane-post" ? "上のレーン" : "ポスト" });
-  for (const bank of table.standups) for (const t of bank.targets) out.push({ ...segPrim(t.a, t.b, 2.5), name: "ターゲット" });
-  for (const d of table.drops) out.push({ ...segPrim(d.a, d.b, 3.5), name: "ドロップターゲット" });
-  out.push({ ...segPrim(table.shooterGate.a, table.shooterGate.b, 2), name: "打ち出しレーン" });
+  for (const c of table.circles) add(circlePrim(c.x, c.y, c.r), c.look === "lane-post" ? "上のレーン" : "ポスト");
+  for (const bank of table.standups) for (const t of bank.targets) add(segPrim(t.a, t.b, 2.5), "ターゲット");
+  for (const d of table.drops) add(segPrim(d.a, d.b, 3.5), "ドロップターゲット");
+  add(segPrim(table.shooterGate.a, table.shooterGate.b, 2), "打ち出しレーン");
   skeleton = out;
   return out;
 }
@@ -365,7 +384,9 @@ export function partProblem(spec: StageSpec, index: number): string | null {
   if (!part) return null;
   if (!inArea(part)) return "ここには置けません（台の上のほうに置いてね）";
   const shape = partShape(part);
+  const near = boxOf(shape, STAGE_GAP);
   for (const s of skeletonPrims()) {
+    if (apart(near, s.box)) continue;
     const gap = gapOf(shape, [s]);
     if (gap < STAGE_GAP - 0.01) return `${s.name}に近すぎます（すき間 ${mm(gap)}・${STAGE_GAP}mm 以上あけてね）`;
   }
@@ -409,7 +430,9 @@ export function itemProblem(spec: StageSpec, index: number): string | null {
   if (!item) return null;
   if (!inArea(item)) return "ここには置けません（台の上のほうに置いてね）";
   const at = [circlePrim(item.x, item.y, 0)];
+  const near = boxOf(at, ITEM_CLEAR);
   for (const s of skeletonPrims()) {
+    if (apart(near, s.box)) continue;
     if (gapOf(at, [s]) < ITEM_CLEAR) return `${s.name}に近すぎます`;
   }
   for (const part of spec.parts) {

@@ -28,9 +28,10 @@
   background: rgba(251, 248, 241, 0.8);
 }
 
-/* 背景を変えているとき・ショップでおためし中は、上のヘッダーと下のナビをすりガラス風にして、背景をうっすら透かす */
-.app-bg-active header.sticky,
-html[data-bg-try] header.sticky {
+/* 背景を変えているとき・ショップでおためし中は、上のヘッダーと下のナビをすりガラス風にして、背景をうっすら透かす。
+   暗い画面のヘッダー（data-dark-header。ご当地ピンボールなど）は、明るいすりガラスにすると灰色になって読みにくいので、そのままにする */
+.app-bg-active header.sticky:not([data-dark-header]),
+html[data-bg-try] header.sticky:not([data-dark-header]) {
   background-color: rgba(255, 253, 248, 0.6);
   backdrop-filter: blur(14px) saturate(1.3);
   -webkit-backdrop-filter: blur(14px) saturate(1.3);

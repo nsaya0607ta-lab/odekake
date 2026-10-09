@@ -30,8 +30,9 @@
 | `src/components/games/pinball/pinball-game.tsx` | 台えらび（マップえらび・ステージ）の画面・ランキング。エディター・部品のお店・遊ぶ画面をここから開く |
 | `src/components/games/pinball/pinball-stages.tsx` | 台えらびの「ステージ」（マイステージ・フレンドのステージ・ステージごとのランキング） |
 | `src/components/games/pinball/pinball-stage-editor.tsx` | ステージのエディター（部品を置く・動かす・置ける所を緑の点で見せる・テストプレイ・保存・公開・削除） |
+| `src/components/games/pinball/pinball-stage-board.tsx` | エディターの台（遊ぶ画面と同じ render.ts で台の上のほうを描き、上に透明な SVG を重ねて、えらんだ部品のしるし・置ける所の点・動かしている部品を描く） |
 | `src/components/games/pinball/pinball-parts-shop.tsx` / `pinball-part-icon.tsx` | 部品のお店（赤コインで買う）と部品の小さな絵 |
-| `src/components/games/pinball/pinball-map-preview.tsx` | マップ・ステージの形の小さな絵（台えらび・ルールのページ・エディター。台の形のデータからそのまま描く） |
+| `src/components/games/pinball/pinball-map-preview.tsx` | マップ・ステージの形の小さな絵（台えらび・ルールのページ。台の形のデータからそのまま描く） |
 | `src/components/games/pinball/pinball-rulebook.tsx` / `pinball-guide.tsx` | ルールとスキルのページ（数字は config.ts から出すので、数字を変えても直さなくてよい） |
 | `src/app/(app)/games/pinball/` | `/games/pinball`（台えらび）・`/games/pinball/guide`（ルール） |
 | `src/app/api/games/pinball/score` / `ranking` | 結果の記録（赤コイン。マップでもステージでも）・フレンドランキング |
@@ -125,6 +126,8 @@
   台の形（table.ts・maps.ts）を変えたら、描画も合わせて確かめること（ランプのワイヤーがバンパーや風車の上を通らないようにする）。
 - 重さの目安（ヘッドレスの Chrome・390×700・dpr 2）：base 約10ms・overlay 約6ms（作りなおすときだけ）。
   毎フレームの描画は、スマホの大きさ（390×844・dpr 2）で 60fps のまま（フレームの間かく 95% が 16.8ms 以内）。
+- 見せる範囲は `RenderAssets.view`（mm。無ければ台の全体）。ステージのエディターは台の上のほう（`EDITOR_VIEW`）だけを大きく描き、
+  上に重ねる SVG の viewBox を `visibleRect()` にそろえる（SVG の座標＝台の座標になるので、タップした位置も SVG から台の座標にできる）。
 
 ## 物理（physics.ts）
 
@@ -287,6 +290,11 @@
   - てっぺんランプの出口（玉が落ちてくる所）から 40mm 以内には置かない。
   - アイテムの場所（自分で動かせる3か所・どのステージも同じ7か所）に部品を重ねない（20mm あける）。アイテムどうしは 44mm あける。
   - 持っている部品の数・ランプをこえない（データベースの `save_pinball_stage` も数える）。
+- **エディター**の台は、遊ぶ画面と同じ描画（`pinball-stage-board.tsx`）。形が変わるたびに描画を作りなおす（スマホで1回 数十ms）ので、
+  部品を指で動かしている間は作りなおさない（その部品をのぞいた形のまま描き、動かしている部品は上の SVG に簡単な絵で描く。
+  バンパーの笠の絵はバンパーの番号で決まるので、動かしている間もほかのバンパーの絵がずれないようにしてある）。
+  置ける所の点（`placeableSpots`）は 12mm ごとに `partProblem` をかける。`partProblem` は骨組みの線を四角で先にふるい分けて、
+  遠い線は計算しない（結果は同じ。1回 約2ms）。
 - 置き方を確かめる場所は3つ：エディター（置けない所には置けず、動かして置けない所ではなすと戻る。置ける所を緑の点で見せる）、
   保存の API（`validateStage`。持っている部品の数も）、データベース（データの形・部品の数・1人6つまで）。データベースを直接呼べば
   すき間の決まりはすりぬけられるが、台えらび（`getPinballStages`）でも `validateStage` をかけて、問題のあるフレンドのステージは出さない
