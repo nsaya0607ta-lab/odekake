@@ -532,7 +532,11 @@ export class PinballRenderer {
   private flashColor = "#ffffff";
   private conquestGlow = 0;
   private time = 0;
+  private frameDt = 0;
+  /** 直近80msの軌跡。高速の玉を目で追えるようにする（物理には影響しない） */
+  private ballTrails = new Map<number, { x: number; y: number; at: number; ramp: boolean }[]>();
   private reducedMotion = false;
+  private disposed = false;
 
   constructor(canvas: HTMLCanvasElement, assets: RenderAssets) {
     this.canvas = canvas;
@@ -559,6 +563,7 @@ export class PinballRenderer {
 
   /** 画像を読みこんだら知らせてもらう（読みこみ前はカプセルの絵の代わりに色の丸で描く） */
   setImage(src: string, img: HTMLImageElement): void {
+    if (this.disposed) return;
     this.images.set(src, img);
     for (const key of [...this.tokens.keys()]) if (key.startsWith(`${src}|`)) this.tokens.delete(key);
     // バンパーの笠だけ描きなおす（床の絵は画像を使わないので作りなおさない）
@@ -567,6 +572,7 @@ export class PinballRenderer {
 
   /** 表示する大きさ（CSS px）が変わったとき */
   resize(cssW: number, cssH: number, dpr: number): void {
+    if (this.disposed) return;
     const view = this.assets.view ?? VIEW;
     this.cssW = cssW;
     this.cssH = cssH;
@@ -584,6 +590,25 @@ export class PinballRenderer {
     this.tokens.clear();
     this.bumperSprites.clear();
     this.pinwheelSprites.clear();
+  }
+
+  /** 台の切り替え時に描画用バッファをすぐ解放する */
+  dispose(): void {
+    if (this.disposed) return;
+    this.disposed = true;
+    const buffers = [this.base, this.overlay, this.ballSprite, ...this.glows.values(), ...this.tokens.values(), ...this.bumperSprites.values(), ...[...this.pinwheelSprites.values()].flatMap((sprite) => [sprite.body, sprite.shadow])];
+    for (const canvas of buffers) if (canvas) { canvas.width = 0; canvas.height = 0; }
+    this.base = this.overlay = this.ballSprite = null;
+    this.glows.clear();
+    this.tokens.clear();
+    this.bumperSprites.clear();
+    this.pinwheelSprites.clear();
+    this.images.clear();
+    this.ballTrails.clear();
+    this.particles = [];
+    this.popups = [];
+    this.flying = [];
+    this.canvas.width = this.canvas.height = 0;
   }
 
   /** 画面の点（CSS px）→ 台の座標（mm） */
@@ -815,7 +840,7 @@ export class PinballRenderer {
     this.drawStandupBanks(ctx);
     this.drawSlingBodies(ctx);
     this.drawPosts(ctx);
-    this.drawSpinnerFrame(ctx);
+    if (!this.table.freeform) this.drawSpinnerFrame(ctx);
     this.drawStageSpinnerFrames(ctx);
     this.drawShooterParts(ctx);
     return c;
@@ -882,7 +907,7 @@ export class PinballRenderer {
     for (const b of this.table.bumpers) spot(b.x, b.y, 64, colors.accent, 0.1);
     for (const x of this.table.laneX) spot(x, 132, 30, GI_COLOR, 0.12);
     for (const x of [96, 384]) spot(x, 868, 52, GI_COLOR, 0.1);
-    spot(this.table.scoop.x, this.table.scoop.y + 10, 46, colors.accent, 0.1);
+    if (this.table.scoop.r > 0) spot(this.table.scoop.x, this.table.scoop.y + 10, 46, colors.accent, 0.1);
     for (const r of this.table.ramps) spot(r.path[0]!.x, 622, 40, GI_COLOR, 0.08);
     ctx.restore();
   }
@@ -921,36 +946,38 @@ export class PinballRenderer {
     const { colors } = this.assets.theme;
     // ガチャ穴（キックアウトホール）：めっきのふちの、深い穴
     const sc = this.table.scoop;
-    const pit = ctx.createRadialGradient(sc.x + 2, sc.y + 3, 1, sc.x, sc.y, 16);
-    pit.addColorStop(0, "#000000");
-    pit.addColorStop(0.62, "#05040a");
-    pit.addColorStop(0.86, darken(colors.accent, 0.75));
-    pit.addColorStop(1, "rgba(0,0,0,0.9)");
-    ctx.fillStyle = pit;
-    ctx.beginPath();
-    ctx.arc(sc.x, sc.y, 16, 0, TAU);
-    ctx.fill();
-    // 穴の内がわの壁：光が当たるのは向こうがわ（右下）、手前（左上）はふちの影になる
-    const wall = ctx.createLinearGradient(sc.x + 11, sc.y + 11, sc.x - 6, sc.y - 6);
-    wall.addColorStop(0, "rgba(190,200,214,0.5)");
-    wall.addColorStop(0.5, "rgba(80,90,104,0.14)");
-    wall.addColorStop(1, "rgba(0,0,0,0)");
-    ctx.lineWidth = 3.2;
-    ctx.strokeStyle = wall;
-    ctx.beginPath();
-    ctx.arc(sc.x, sc.y, 13.1, -Math.PI * 0.2, Math.PI * 0.8);
-    ctx.stroke();
-    ctx.lineWidth = 3.4;
-    ctx.strokeStyle = "rgba(0,0,0,0.7)";
-    ctx.beginPath();
-    ctx.arc(sc.x, sc.y, 13.1, Math.PI * 0.85, Math.PI * 1.75);
-    ctx.stroke();
-    // 奥のけり出し板
-    ctx.fillStyle = "rgba(96,106,118,0.5)";
-    ctx.beginPath();
-    ctx.ellipse(sc.x, sc.y - 6.5, 6, 1.9, 0, 0, TAU);
-    ctx.fill();
-    chromeRing(ctx, sc.x, sc.y, 16.6, 2.6);
+    if (sc.r > 0) {
+      const pit = ctx.createRadialGradient(sc.x + 2, sc.y + 3, 1, sc.x, sc.y, 16);
+      pit.addColorStop(0, "#000000");
+      pit.addColorStop(0.62, "#05040a");
+      pit.addColorStop(0.86, darken(colors.accent, 0.75));
+      pit.addColorStop(1, "rgba(0,0,0,0.9)");
+      ctx.fillStyle = pit;
+      ctx.beginPath();
+      ctx.arc(sc.x, sc.y, 16, 0, TAU);
+      ctx.fill();
+      // 穴の内がわの壁：光が当たるのは向こうがわ（右下）、手前（左上）はふちの影になる
+      const wall = ctx.createLinearGradient(sc.x + 11, sc.y + 11, sc.x - 6, sc.y - 6);
+      wall.addColorStop(0, "rgba(190,200,214,0.5)");
+      wall.addColorStop(0.5, "rgba(80,90,104,0.14)");
+      wall.addColorStop(1, "rgba(0,0,0,0)");
+      ctx.lineWidth = 3.2;
+      ctx.strokeStyle = wall;
+      ctx.beginPath();
+      ctx.arc(sc.x, sc.y, 13.1, -Math.PI * 0.2, Math.PI * 0.8);
+      ctx.stroke();
+      ctx.lineWidth = 3.4;
+      ctx.strokeStyle = "rgba(0,0,0,0.7)";
+      ctx.beginPath();
+      ctx.arc(sc.x, sc.y, 13.1, Math.PI * 0.85, Math.PI * 1.75);
+      ctx.stroke();
+      // 奥のけり出し板
+      ctx.fillStyle = "rgba(96,106,118,0.5)";
+      ctx.beginPath();
+      ctx.ellipse(sc.x, sc.y - 6.5, 6, 1.9, 0, 0, TAU);
+      ctx.fill();
+      chromeRing(ctx, sc.x, sc.y, 16.6, 2.6);
+    }
 
     // ドロップターゲットのみぞ
     for (const d of this.table.drops) {
@@ -966,7 +993,7 @@ export class PinballRenderer {
     }
 
     // キックバックの押し出し板が入る穴
-    for (const x of KICKER_X) {
+    for (const x of this.table.freeform ? [] : KICKER_X) {
       ctx.fillStyle = "#040507";
       this.roundRect(ctx, x - KICKER.w / 2 - 1.5, KICKER.y - 1.5, KICKER.w + 3, KICKER.h + 3, 2.5);
       ctx.fill();
@@ -1683,18 +1710,18 @@ export class PinballRenderer {
   /** 床のランプ（消えているとき） */
   private drawInsertsOff(ctx: CanvasRenderingContext2D): void {
     const { colors } = this.assets.theme;
-    for (let i = 0; i < 4; i += 1) this.drawInsert(ctx, { kind: "lane", index: i }, 0);
+    for (let i = 0; i < this.table.laneX.length; i += 1) this.drawInsert(ctx, { kind: "lane", index: i }, 0);
     for (const s of this.table.shots) this.drawInsert(ctx, { kind: "shot", id: s.id }, 0);
-    for (let i = 0; i < 2; i += 1) this.drawInsert(ctx, { kind: "kick", index: i }, 0);
+    if (!this.table.freeform) for (let i = 0; i < 2; i += 1) this.drawInsert(ctx, { kind: "kick", index: i }, 0);
     for (let i = 0; i < 5; i += 1) this.drawInsert(ctx, { kind: "bonus", index: i }, 0);
-    for (let i = 0; i < 6; i += 1) this.drawInsert(ctx, { kind: "standup", index: i }, 0);
+    for (let i = 0; i < this.table.standups.length * 3; i += 1) this.drawInsert(ctx, { kind: "standup", index: i }, 0);
     this.drawInsert(ctx, { kind: "save" }, 0);
     // ガチャ穴の文字（印刷）
     ctx.font = `bold 10px ${FONT}`;
     ctx.textAlign = "center";
     ctx.textBaseline = "middle";
     ctx.fillStyle = rgba(colors.accent, 0.5);
-    ctx.fillText("ガチャ穴", 240, 400);
+    if (this.table.scoop.r > 0) ctx.fillText("ガチャ穴", 240, 400);
   }
 
   private roundRect(ctx: CanvasRenderingContext2D, x: number, y: number, w: number, h: number, r: number): void {
@@ -1889,8 +1916,24 @@ export class PinballRenderer {
   /* ---------- 毎フレーム ---------- */
 
   draw(g: Game, dt: number): void {
+    if (this.disposed) return;
     const ctx = this.ctx;
+    this.frameDt = dt;
     this.time += dt;
+    const live = new Set(g.world.balls.map((ball) => ball.id));
+    for (const id of this.ballTrails.keys()) if (!live.has(id)) this.ballTrails.delete(id);
+    if (dt > 0 && !this.reducedMotion) {
+      for (const b of g.world.balls) {
+        if (b.mode !== "field" && b.mode !== "ramp") {
+          this.ballTrails.delete(b.id);
+          continue;
+        }
+        const ramp = b.mode === "ramp";
+        const trail = (this.ballTrails.get(b.id) ?? []).filter((p) => this.time - p.at < 0.08 && p.ramp === ramp);
+        trail.push({ x: b.x, y: b.y, at: this.time, ramp });
+        this.ballTrails.set(b.id, trail.slice(-12));
+      }
+    }
     if (!this.base) this.base = this.buildBase();
     if (!this.overlay) this.overlay = this.buildOverlay();
     if (!this.ballSprite) this.ballSprite = makeBallSprite(Math.max(8, Math.round(BALL_R * 2 * this.scale * this.dpr)));
@@ -1913,8 +1956,10 @@ export class PinballRenderer {
     this.drawMagnet(ctx, g);
     this.drawDrops(ctx, g);
     this.drawStageDrops(ctx, g, dt);
-    this.drawKickers(ctx, g);
-    this.drawSpinner(ctx, dt);
+    if (!this.table.freeform) {
+      this.drawKickers(ctx, g);
+      this.drawSpinner(ctx, dt);
+    }
     this.drawStandupsLit(ctx, g, dt);
     this.table.pinwheels.forEach((_, i) => this.drawPinwheel(ctx, g, dt, i));
     this.drawBumpers(ctx, dt);
@@ -1989,12 +2034,12 @@ export class PinballRenderer {
       const flash = this.shotFlash.get(s.id) ?? 0;
       if (flash > 0) {
         on = Math.max(on, flash);
-        this.shotFlash.set(s.id, Math.max(0, flash - 0.03));
+        this.shotFlash.set(s.id, Math.max(0, flash - this.frameDt * 1.8));
       }
       if (on > 0) lit.push({ id: { kind: "shot", id: s.id }, on, color, x: s.arrow.x, y: s.arrow.y, r: 34 });
     }
     // キックバック
-    KICKER_X.forEach((x, i) => {
+    (this.table.freeform ? [] : KICKER_X).forEach((x, i) => {
       const k = this.kickFlash[i]!;
       const on = g.kickbackLit[i] ? 1 : k;
       if (on > 0) lit.push({ id: { kind: "kick", index: i }, on, color: colors.accent2, x, y: 830, r: 22 });
@@ -2070,6 +2115,7 @@ export class PinballRenderer {
 
   /** ガチャ穴が開いているときは、穴のふちが光ってまわる */
   private drawScoopLight(ctx: CanvasRenderingContext2D, g: Game): void {
+    if (this.table.scoop.r <= 0) return;
     const open = g.world.dropsUp.every((u) => !u);
     if (!open && !g.superLit && !g.scoopBall) return;
     const { colors } = this.assets.theme;
@@ -2091,6 +2137,7 @@ export class PinballRenderer {
 
   /** スキル「マグネット」：ガチャ穴の口へ向かって縮んでいく光の弧（穴へ吸いこむ）。切れる前はうすくなる */
   private drawMagnet(ctx: CanvasRenderingContext2D, g: Game): void {
+    if (this.table.scoop.r <= 0) return;
     if (g.clock >= g.magnetUntil || g.phase === "over") return;
     const fade = Math.min(1, (g.magnetUntil - g.clock) / 0.8);
     const color = "#7df9ff";
@@ -2559,7 +2606,7 @@ export class PinballRenderer {
         ctx.globalCompositeOperation = "lighter";
         this.lightAt(ctx, (gate.a.x + gate.b.x) / 2, (gate.a.y + gate.b.y) / 2 - 6, 46, "#ffffff", kick * 0.9);
         ctx.globalCompositeOperation = "source-over";
-        this.gateFlash[i] = Math.max(0, kick - 0.05);
+        this.gateFlash[i] = Math.max(0, kick - this.frameDt * 3);
       }
       const dx = gate.b.x - gate.a.x;
       const dy = gate.b.y - gate.a.y;
@@ -2683,6 +2730,26 @@ export class PinballRenderer {
       let x = b.x;
       let y = b.y;
       let r = BALL_R;
+      const trail = this.ballTrails.get(b.id);
+      if (trail && trail.length > 1 && !this.reducedMotion) {
+        ctx.save();
+        ctx.lineCap = "round";
+        for (let i = 1; i < trail.length; i += 1) {
+          const prev = trail[i - 1]!;
+          const at = trail[i]!;
+          // けり出しなどの瞬間移動はつながない
+          const distance = Math.hypot(at.x - prev.x, at.y - prev.y);
+          if (distance < 3 || distance > 100) continue;
+          const fade = Math.max(0, 1 - (this.time - at.at) / 0.08);
+          ctx.strokeStyle = rgba(this.assets.theme.colors.accent2, fade * 0.22);
+          ctx.lineWidth = BALL_R * (0.25 + fade * 0.55);
+          ctx.beginPath();
+          ctx.moveTo(prev.x, prev.y);
+          ctx.lineTo(at.x, at.y);
+          ctx.stroke();
+        }
+        ctx.restore();
+      }
       if (isRamp && b.ramp) {
         const def = this.table.ramps.find((rp) => rp.id === b.ramp)!;
         const p = rampPoint(def, b.s);

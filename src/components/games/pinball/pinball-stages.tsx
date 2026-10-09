@@ -175,7 +175,7 @@ export function PinballStages({ stages, redCoins, onPlay, onEdit, onCreate, onOp
         className="flex w-full items-center justify-center gap-2 rounded-[22px] border border-dashed border-[#ff8a80]/50 bg-[#ff6b6b]/10 py-3.5 text-[14px] font-black text-[#ffd3cd] active:scale-[0.99] disabled:opacity-50"
       >
         <span className="text-xl leading-none">＋</span>
-        {full ? `ステージは${STAGE_LIMIT}つまで（消すと作れます）` : "新しいステージを作る"}
+        {full ? `ステージは${STAGE_LIMIT}つまで（消すと作れます）` : "白紙から新しいステージを作る"}
       </button>
 
       {mine.length ? (

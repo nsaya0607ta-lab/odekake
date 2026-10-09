@@ -52,7 +52,7 @@ import {
   type PhysEvent,
   type World,
 } from "./physics";
-import type { PinballSkill } from "./skills";
+import type { PinballSkill, SkillEffect } from "./skills";
 import { BALL_R, ITEM_PICKUP_R, SHOT_IDS, type Pt, type ShotId, type TableGeometry } from "./table";
 
 /* ---------- 型 ---------- */
@@ -226,12 +226,62 @@ export type CreateGameOptions = {
   speed?: number;
 };
 
+/** 自由な台では、置いていない設備を使うスキルを有効な効果と説明に置き換える */
+function skillForTable(skill: PinballSkill, table: TableGeometry): PinballSkill {
+  if (!table.freeform) return skill;
+  let text = skill.text;
+  let changed = false;
+  const effects = skill.effects.flatMap<SkillEffect>((effect) => {
+    if (effect.type === "gate" && !table.outlaneGates.length) {
+      changed = true;
+      text = text.replace("アウトレーンをふさぐ", "ボールセーブ").replace(`${effect.sec}秒ふさぐ`, `${effect.sec}秒セーブ`);
+      return [{ type: "save", sec: effect.sec }];
+    }
+    if (effect.type === "kickback") {
+      changed = true;
+      const sec = BALL_SAVE_SEC * (effect.both ? 2 : 1);
+      text = text.replace("左右のキックバック点灯", `ボールセーブ ${sec}秒`).replace("左のキックバック点灯", `ボールセーブ ${sec}秒`).replace("左右キックバック", `ボールセーブ${sec}秒`);
+      return [{ type: "save", sec }];
+    }
+    if (effect.type === "magnet" && table.scoop.r === 0) {
+      changed = true;
+      text = text.replace("ガチャ穴マグネット", "得点2倍").replace(`マグネット${effect.sec}秒`, `${effect.sec}秒2倍`);
+      return [{ type: "mult", factor: 2, sec: effect.sec }];
+    }
+    if (effect.type === "bumperMult" && !table.bumpers.length) {
+      changed = true;
+      text = text.replace(`バンパー${effect.factor}倍`, "得点2倍");
+      return [{ type: "mult", factor: 2, sec: effect.sec }];
+    }
+    if (effect.type === "combo" && !table.shots.length) {
+      changed = true;
+      text = text.replace(`${effect.sec}秒間 コンボ受付 +${effect.addSec}秒`, `${effect.sec}秒間 得点2倍`);
+      return [{ type: "mult", factor: 2, sec: effect.sec }];
+    }
+    if (effect.type === "jackpot" && !table.ramps.length) {
+      changed = true;
+      text = text.replace(/次のランプ\d+回が /, "その場で ").replace("ジャックポット", "");
+      return [{ type: "points", value: effect.value * effect.shots }];
+    }
+    if (effect.type === "drops" && !table.drops.length) {
+      changed = true;
+      text = text.replace("ターゲット全倒し＋", "");
+      return [];
+    }
+    return [effect];
+  });
+  return changed ? { ...skill, effects, text } : skill;
+}
+
 export function createGame({ table, pool, tableName, conquestTitle, zukan = 1, seed = Math.floor(Math.random() * 2 ** 31), speed = GAME_SPEED }: CreateGameOptions): Game {
   const world = createWorld(seed, table);
   const g: Game = {
     world,
     rand: world.rand,
-    pool: [...pool],
+    pool: pool.map((item) => {
+      const skill = item.skill ? skillForTable(item.skill, table) : null;
+      return skill === item.skill ? item : { ...item, skill };
+    }),
     candidates: [],
     book: [],
     lit: [],
@@ -343,7 +393,7 @@ function addPoints(g: Game, base: number, at?: Pt, tone: Tone = "info", noMult =
 
 /** ショットのアイテムの絵の位置（得点の文字を出すところ） */
 function shotAt(g: Game, id: ShotId): Pt {
-  return g.world.table.shots.find((s) => s.id === id)!.icon;
+  return g.world.table.shots.find((s) => s.id === id)?.icon ?? { x: 240, y: 520 };
 }
 
 /* ---------- 打ち出し ---------- */
@@ -354,9 +404,9 @@ function serveBall(g: Game): void {
   g.phase = "serve";
   g.saveArmed = true;
   // ボールごとに、左のキックバックは点いた状態で始まる（使ったらドロップターゲット3つで点けなおす）
-  if (KICKBACK_AT_SERVE) g.kickbackLit[0] = true;
-  g.skillLane = Math.floor(g.rand() * 4);
-  g.skillShotArmed = true;
+  if (KICKBACK_AT_SERVE && !g.world.table.freeform) g.kickbackLit[0] = true;
+  g.skillLane = g.world.table.laneX.length ? Math.floor(g.rand() * 4) : -1;
+  g.skillShotArmed = g.skillLane >= 0;
   sfx(g, "serve");
 }
 
@@ -638,6 +688,11 @@ function applySkill(g: Game, skill: PinballSkill, fromEncore: boolean): void {
         addPoints(g, e.value, shotAt(g, "scoop"), "great");
         break;
       case "magnet":
+        if (g.world.table.scoop.r === 0) {
+          // ガチャ穴を置かない自由な台では、同じ時間の得点2倍にする
+          g.mults.push({ factor: 2, until: g.clock + e.sec });
+          break;
+        }
         // 穴の前のターゲットを倒して、効いているあいだは開けたまま（立っていると吸い寄せても入れない）
         g.magnetUntil = Math.max(g.magnetUntil, g.clock + e.sec);
         openScoop(g);
@@ -663,13 +718,14 @@ function startConquest(g: Game): void {
   g.mode = "conquest";
   g.superLit = false;
   g.jackpotsMade = 0;
-  for (const id of SHOT_IDS) g.jackpots[id] = id !== "scoop";
+  for (const id of SHOT_IDS) g.jackpots[id] = id !== "scoop" && (!g.world.table.freeform || g.world.table.shots.some((shot) => shot.id === id));
   // 浮かんでいたアイテムは消える（おかわりのアイテムだけは、制覇モードが終わるまで待つ）
   g.lit = g.lit.filter((l) => l.encore);
   g.extraLit = 0;
   for (let i = 0; i < CONQUEST_EXTRA_BALLS; i += 1) queueLaunch(g, 1.2 + i * 0.8);
   g.saveUntil = Math.max(g.saveUntil, g.clock + CONQUEST_SAVE_SEC);
-  msg(g, g.conquestTitle, "epic", g.conquests > 1 ? `${g.conquests}回目！ マルチボールでジャックポットをねらえ` : "マルチボールでジャックポットをねらえ", 3400);
+  const goal = g.world.table.freeform && !g.world.table.shots.length ? "マルチボールで高得点をねらえ" : "マルチボールでジャックポットをねらえ";
+  msg(g, g.conquestTitle, "epic", g.conquests > 1 ? `${g.conquests}回目！ ${goal}` : goal, 3400);
   sfx(g, "conquest");
   g.fx.push({ type: "conquest" });
   g.fx.push({ type: "shake", power: 1 });
@@ -690,14 +746,14 @@ function endConquest(g: Game): void {
 
 function jackpotShot(g: Game, id: ShotId): boolean {
   if (g.mode !== "conquest") return false;
-  if (id === "scoop" && g.superLit) {
+  if ((id === "scoop" || g.world.table.freeform) && g.superLit) {
     g.superLit = false;
     addPoints(g, POINTS.superJackpot * g.conquests, shotAt(g, "scoop"), "epic");
     g.stats.jackpots += 1;
     msg(g, "スーパージャックポット！", "epic", undefined, 2600);
     sfx(g, "superJackpot");
     g.fx.push({ type: "shake", power: 1 });
-    for (const s of SHOT_IDS) g.jackpots[s] = s !== "scoop";
+    for (const s of SHOT_IDS) g.jackpots[s] = s !== "scoop" && (!g.world.table.freeform || g.world.table.shots.some((shot) => shot.id === s));
     return true;
   }
   if (!g.jackpots[id]) return false;
@@ -710,7 +766,7 @@ function jackpotShot(g: Game, id: ShotId): boolean {
   if (SHOT_IDS.every((s) => !g.jackpots[s])) {
     g.superLit = true;
     openScoop(g);
-    msg(g, "ジャックポット！", "epic", "スーパージャックポット点灯！ ガチャ穴をねらえ", 2400);
+    msg(g, "ジャックポット！", "epic", g.world.table.freeform ? "スーパージャックポット点灯！ もう一度ランプをねらえ" : "スーパージャックポット点灯！ ガチャ穴をねらえ", 2400);
   } else {
     msg(g, "ジャックポット！", "epic", undefined, 1600);
   }
@@ -1153,7 +1209,7 @@ function nextBall(g: Game): void {
 function tick(g: Game): void {
   const { world } = g;
   world.outlaneGate = g.clock < g.gateUntil ? [true, true] : [false, false];
-  world.magnet = g.clock < g.magnetUntil && g.phase !== "bonus";
+  world.magnet = world.table.scoop.r > 0 && g.clock < g.magnetUntil && g.phase !== "bonus";
   if (g.mults.length) g.mults = g.mults.filter((t) => t.until > g.clock);
   if (g.bumperMults.length) g.bumperMults = g.bumperMults.filter((t) => t.until > g.clock);
 

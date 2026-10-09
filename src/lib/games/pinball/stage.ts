@@ -1,7 +1,7 @@
 /**
  * 自分で作るステージ（ご当地ピンボール）
  * =============================================================
- * ステージは「骨組み（どのマップも同じ）＋上半分に置いた部品」。部品は赤コインで買う（はじめから持っているぶんもある）。
+ * 新しいステージは白紙から作る。base が無い旧ステージは従来の骨組みを保つ。
  * 作ったステージはフレンドに公開して、おたがいに遊べる（記録はステージごと。docs/pinball.md の「ステージ」）。
  *
  * ここにあるのは、ステージのデータの形・部品のカタログ・確かめ（validateStage）・台の形への組み立て（buildStageTable）。
@@ -117,6 +117,8 @@ export const STAGE_LOOKS: readonly string[] = ["default", "bumper", "pachinko", 
 
 export type StageSpec = {
   v: 1;
+  /** 新規作成は白紙。省略した旧データは従来の骨組みで読む（保存形式の互換性） */
+  base?: "blank";
   look: string;
   ramp: StageRamp;
   parts: StagePart[];
@@ -144,6 +146,10 @@ const RAMP_EXIT_CLEAR = 40;
 
 /** 部品を置ける所（部品のまん中）。台の上半分（上のレーンの下から、ガチャ穴の上まで） */
 export const STAGE_AREA = { x0: 40, x1: 440, y0: 168, y1: 424 } as const;
+export const FREE_STAGE_AREA = { x0: 26, x1: 454, y0: 64, y1: 818 } as const;
+export function stageArea(spec: StageSpec) {
+  return spec.base === "blank" ? FREE_STAGE_AREA : STAGE_AREA;
+}
 
 /** スタンドアップターゲットの組の位置（いつもの台と同じ） */
 const STANDUP_CENTER = p(96, 215);
@@ -181,6 +187,16 @@ export const PART_NAMES: Record<StagePartKind, string> = {
 
 /** はじめのアイテムの場所（いつもの台と同じ） */
 export const DEFAULT_STAGE_ITEMS: [Pt, Pt, Pt] = [p(128, 300), p(352, 300), p(240, 277)];
+
+/** 部品・ランプ・固定のレーンを置いていない、新しい台 */
+export function emptyStage(look: string = DEFAULT_MAP_ID): StageSpec {
+  return { v: 1, base: "blank", look, ramp: "standard", parts: [], items: DEFAULT_STAGE_ITEMS.map((pt) => ({ ...pt })) as [Pt, Pt, Pt] };
+}
+
+/** 白紙の台では standard は「ランプなし」。ほかの2種類は購入したランプを設置する */
+export function stageRampName(spec: StageSpec, ramp: StageRamp): string {
+  return spec.base === "blank" && ramp === "standard" ? "ランプなし" : RAMP_NAMES[ramp];
+}
 
 /**
  * 新しいステージ（はじめから持っている部品だけで作った形）。
@@ -248,6 +264,7 @@ function parsePart(raw: unknown): StagePart | null {
  */
 export function parseStageSpec(raw: unknown): StageSpec | null {
   if (!isObj(raw) || raw.v !== 1) return null;
+  if (raw.base !== undefined && raw.base !== "blank") return null;
   if (typeof raw.look !== "string" || !STAGE_LOOKS.includes(raw.look)) return null;
   if (typeof raw.ramp !== "string" || !STAGE_RAMPS.includes(raw.ramp as StageRamp)) return null;
   if (!Array.isArray(raw.parts) || raw.parts.length > STAGE_PARTS_MAX) return null;
@@ -266,7 +283,7 @@ export function parseStageSpec(raw: unknown): StageSpec | null {
     if (x === null || y === null) return null;
     items.push(p(x, y));
   }
-  return { v: 1, look: raw.look, ramp: raw.ramp as StageRamp, parts, items: [items[0]!, items[1]!, items[2]!] };
+  return { v: 1, ...(raw.base === "blank" ? { base: "blank" as const } : {}), look: raw.look, ramp: raw.ramp as StageRamp, parts, items: [items[0]!, items[1]!, items[2]!] };
 }
 
 /** ステージの名前（前後の空白をとって 1〜16 文字・改行などは使わない）。だめなら null */
@@ -454,10 +471,13 @@ const SKELETON_NAMES: Record<string, string> = {
 };
 
 let skeleton: SkeletonPrim[] | null = null;
+const freeSkeleton = new Map<StageRamp, SkeletonPrim[]>();
 
-function skeletonPrims(): SkeletonPrim[] {
-  if (skeleton) return skeleton;
-  const table = buildTable({ id: STAGE_TABLE_ID, bumpers: [], pinwheels: [], standupCenter: STANDUP_CENTER, itemSpots: [] });
+function skeletonPrims(spec: StageSpec): SkeletonPrim[] {
+  const free = spec.base === "blank";
+  const cached = free ? freeSkeleton.get(spec.ramp) : skeleton;
+  if (cached) return cached;
+  const table = buildStageTable({ ...spec, parts: [] });
   const out: SkeletonPrim[] = [];
   const add = (prim: Prim, name: string) => out.push({ ...prim, name, box: boxOf([prim], 0) });
   for (const w of table.walls) {
@@ -469,7 +489,11 @@ function skeletonPrims(): SkeletonPrim[] {
   for (const bank of table.standups) for (const t of bank.targets) add(segPrim(t.a, t.b, 2.5), "ターゲット");
   for (const d of table.drops) add(segPrim(d.a, d.b, 3.5), "ドロップターゲット");
   add(segPrim(table.shooterGate.a, table.shooterGate.b, 2), "打ち出しレーン");
-  skeleton = out;
+  if (free) {
+    // フリッパーの振れる範囲をあける。部品を置いて操作をふさがない
+    for (const f of table.flippers) add(circlePrim(f.pivot.x, f.pivot.y, f.len + f.r0), "フリッパーの動く範囲");
+    freeSkeleton.set(spec.ramp, out);
+  } else skeleton = out;
   return out;
 }
 
@@ -488,17 +512,21 @@ export type StageIssue = {
   message: string;
 };
 
-const inArea = (pt: Pt) => pt.x >= STAGE_AREA.x0 && pt.x <= STAGE_AREA.x1 && pt.y >= STAGE_AREA.y0 && pt.y <= STAGE_AREA.y1;
+const inArea = (spec: StageSpec, pt: Pt) => {
+  const area = stageArea(spec);
+  return pt.x >= area.x0 && pt.x <= area.x1 && pt.y >= area.y0 && pt.y <= area.y1;
+};
+const stageItemSpots = (spec: StageSpec): readonly Pt[] => spec.base === "blank" ? spec.items : [...spec.items, ...SHOT_SPOTS];
 const mm = (n: number) => `${Math.max(0, Math.floor(n))}mm`;
 
 /** 部品 i の置き方の問題（無ければ null）。エディターで、動かしている部品が置けるかを見るのにも使う */
 export function partProblem(spec: StageSpec, index: number): string | null {
   const part = spec.parts[index];
   if (!part) return null;
-  if (!inArea(part)) return "ここには置けません（台の上のほうに置いてね）";
+  if (!inArea(spec, part)) return spec.base === "blank" ? "ここには置けません（点線の中に置いてね）" : "ここには置けません（台の上のほうに置いてね）";
   const shape = partShape(part);
   const near = boxOf(shape, STAGE_GAP);
-  for (const s of skeletonPrims()) {
+  for (const s of skeletonPrims(spec)) {
     if (apart(near, s.box)) continue;
     const gap = gapOf(shape, [s]);
     if (gap < STAGE_GAP - 0.01) return `${s.name}に近すぎます（すき間 ${mm(gap)}・${STAGE_GAP}mm 以上あけてね）`;
@@ -514,7 +542,7 @@ export function partProblem(spec: StageSpec, index: number): string | null {
   for (const exit of rampExits(spec.ramp)) {
     if (gapOf(shape, [circlePrim(exit.x, exit.y, 0)]) < RAMP_EXIT_CLEAR) return "ランプの出口（玉が落ちてくる所）に近すぎます";
   }
-  for (const spot of [...spec.items, ...SHOT_SPOTS]) {
+  for (const spot of stageItemSpots(spec)) {
     if (gapOf(shape, [circlePrim(spot.x, spot.y, 0)]) < ITEM_CLEAR) return "アイテムが浮かぶ場所に重なっています";
   }
   return null;
@@ -527,8 +555,9 @@ export function partProblem(spec: StageSpec, index: number): string | null {
  */
 export function placeableSpots(spec: StageSpec, make: (at: Pt) => StagePart, ignore: number | null, step = 12): Pt[] {
   const out: Pt[] = [];
-  for (let y = STAGE_AREA.y0; y <= STAGE_AREA.y1; y += step) {
-    for (let x = STAGE_AREA.x0; x <= STAGE_AREA.x1; x += step) {
+  const area = stageArea(spec);
+  for (let y = area.y0; y <= area.y1; y += step) {
+    for (let x = area.x0; x <= area.x1; x += step) {
       const moved = make(p(x, y));
       const parts = ignore === null ? [...spec.parts, moved] : spec.parts.map((other, i) => (i === ignore ? moved : other));
       if (!partProblem({ ...spec, parts }, ignore ?? parts.length - 1)) out.push(p(x, y));
@@ -541,10 +570,10 @@ export function placeableSpots(spec: StageSpec, make: (at: Pt) => StagePart, ign
 export function itemProblem(spec: StageSpec, index: number): string | null {
   const item = spec.items[index];
   if (!item) return null;
-  if (!inArea(item)) return "ここには置けません（台の上のほうに置いてね）";
+  if (!inArea(spec, item)) return "ここには置けません（点線の中に置いてね）";
   const at = [circlePrim(item.x, item.y, 0)];
   const near = boxOf(at, ITEM_CLEAR);
-  for (const s of skeletonPrims()) {
+  for (const s of skeletonPrims(spec)) {
     if (apart(near, s.box)) continue;
     if (gapOf(at, [s]) < ITEM_CLEAR) return `${s.name}に近すぎます`;
   }
@@ -556,7 +585,7 @@ export function itemProblem(spec: StageSpec, index: number): string | null {
     const other = spec.items[j]!;
     if (Math.hypot(other.x - item.x, other.y - item.y) < ITEM_SPACING) return "ほかのアイテムの場所に近すぎます";
   }
-  for (const spot of SHOT_SPOTS) {
+  for (const spot of spec.base === "blank" ? [] : SHOT_SPOTS) {
     if (Math.hypot(spot.x - item.x, spot.y - item.y) < ITEM_SPACING) return "ほかのアイテムの場所に近すぎます";
   }
   return null;
@@ -647,6 +676,7 @@ export function buildStageTable(spec: StageSpec): TableGeometry {
   }
   const mapSpec: MapSpec = {
     id: STAGE_TABLE_ID,
+    bare: spec.base === "blank",
     bumpers: spec.parts.flatMap((part) => (part.kind === "bumper" ? [{ x: part.x, y: part.y, r: BUMPER_RADIUS[part.size] }] : [])),
     pinwheels,
     standupCenter: STANDUP_CENTER,
@@ -655,7 +685,7 @@ export function buildStageTable(spec: StageSpec): TableGeometry {
     spinners,
     stageDrops,
     slings: spec.parts.flatMap((part) => (part.kind === "sling" ? [stageSlingDef(part)] : [])),
-    itemSpots: [...spec.items.map((item) => ({ x: item.x, y: item.y, tier: 0 as const })), ...SHOT_SPOTS],
+    itemSpots: [...spec.items.map((item) => ({ x: item.x, y: item.y, tier: 0 as const })), ...(spec.base === "blank" ? [] : SHOT_SPOTS)],
     ramp: spec.ramp === "top" ? TOP_RAMP : spec.ramp === "cross" ? COASTER_RAMP : undefined,
     rampRight: spec.ramp === "cross" ? COASTER_RAMP_RIGHT : undefined,
   };
@@ -701,5 +731,5 @@ export function rotatePart(part: StagePart): StagePart {
 
 /** 部品のおおまかな位置で、ステージが同じかどうか（名前・見た目・公開だけを変えたときは、記録を消さない） */
 export function sameStageLayout(a: StageSpec, b: StageSpec): boolean {
-  return JSON.stringify([a.ramp, a.parts, a.items]) === JSON.stringify([b.ramp, b.parts, b.items]);
+  return JSON.stringify([a.base, a.ramp, a.parts, a.items]) === JSON.stringify([b.base, b.ramp, b.parts, b.items]);
 }

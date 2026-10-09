@@ -492,8 +492,8 @@ function stuckReport(count, mapId) {
  */
 function randomStage(rand) {
   const pick = (list) => list[Math.floor(rand() * list.length)];
-  const spec = { v: 1, look: pick(ST.STAGE_LOOKS), ramp: pick(ST.STAGE_RAMPS), parts: [], items: ST.DEFAULT_STAGE_ITEMS.map((pt) => ({ ...pt })) };
-  const area = ST.STAGE_AREA;
+  const spec = { v: 1, ...(process.env.PINBALL_STAGE_BASE === "blank" ? { base: "blank" } : {}), look: pick(ST.STAGE_LOOKS), ramp: pick(ST.STAGE_RAMPS), parts: [], items: ST.DEFAULT_STAGE_ITEMS.map((pt) => ({ ...pt })) };
+  const area = ST.stageArea(spec);
   const at = () => ST.snapStagePoint(area.x0 + rand() * (area.x1 - area.x0), area.y0 + rand() * (area.y1 - area.y0));
   // アイテムの場所を先にずらす（置けなければ、はじめの場所のまま）
   for (let k = 0; k < 3; k += 1) {

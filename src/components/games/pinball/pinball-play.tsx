@@ -87,6 +87,9 @@ type Submit =
 const LANE_LETTERS = ["お", "で", "か", "け"];
 /** プランジャーを引ききるまでの指の移動（px） */
 const PULL_PX = 150;
+const LEFT_KEYS = new Set(["KeyZ", "ArrowLeft", "ShiftLeft"]);
+const RIGHT_KEYS = new Set(["Slash", "ArrowRight", "ShiftRight", "KeyM"]);
+const PLUNGE_KEYS = new Set(["Space", "ArrowDown", "Enter"]);
 
 function makeRoundId(): string {
   if (typeof crypto !== "undefined" && "randomUUID" in crypto) return crypto.randomUUID();
@@ -221,6 +224,8 @@ export function PinballPlay({ course, lobby, theme, best, onExit, onRestart, onR
   const roundIdRef = useRef(makeRoundId());
   const pointers = useRef(new Map<number, { role: "left" | "right" | "plunger"; startY: number; pull: number }>());
   const keyPull = useRef<{ at: number } | null>(null);
+  const heldKeys = useRef(new Set<string>());
+  const [held, setHeld] = useState<[boolean, boolean]>([false, false]);
   const bannerQueue = useRef<Banner[]>([]);
   const [hud, setHud] = useState<Hud | null>(null);
   const [banner, setBanner] = useState<(Banner & { out?: boolean }) | null>(null);
@@ -418,20 +423,29 @@ export function PinballPlay({ course, lobby, theme, best, onExit, onRestart, onR
     raf = requestAnimationFrame(loop);
 
     const onVisibility = () => {
-      if (document.hidden && !pausedRef.current && gameRef.current?.phase !== "over") {
+      if (!pausedRef.current && gameRef.current?.phase !== "over") {
         pausedRef.current = true;
+        pointers.current.clear();
+        heldKeys.current.clear();
+        keyPull.current = null;
+        setFlipper(game, 0, false);
+        setFlipper(game, 1, false);
+        setPlungerPull(game, 0);
+        setHeld([false, false]);
         setPaused(true);
         audio.setPaused(true);
       }
     };
-    document.addEventListener("visibilitychange", onVisibility);
+    const onHidden = () => { if (document.hidden) onVisibility(); };
+    document.addEventListener("visibilitychange", onHidden);
     window.addEventListener("blur", onVisibility);
 
     return () => {
       cancelAnimationFrame(raf);
       window.clearTimeout(overTimer);
       ro.disconnect();
-      document.removeEventListener("visibilitychange", onVisibility);
+      renderer.dispose();
+      document.removeEventListener("visibilitychange", onHidden);
       window.removeEventListener("blur", onVisibility);
       audio.destroy();
       for (const img of images) img.onload = null;
@@ -453,7 +467,11 @@ export function PinballPlay({ course, lobby, theme, best, onExit, onRestart, onR
   const pressSide = useCallback((side: 0 | 1, down: boolean) => {
     const g = gameRef.current;
     if (!g || pausedRef.current) return;
-    setFlipper(g, side, down);
+    const role = side === 0 ? "left" : "right";
+    const keys = side === 0 ? LEFT_KEYS : RIGHT_KEYS;
+    const pressed = down || [...pointers.current.values()].some((p) => p.role === role) || [...heldKeys.current].some((key) => keys.has(key) || key.startsWith(`button:${side}:`));
+    setFlipper(g, side, pressed);
+    setHeld((previous) => previous[side] === pressed ? previous : side === 0 ? [pressed, previous[1]] : [previous[0], pressed]);
   }, []);
 
   useEffect(() => {
@@ -462,7 +480,9 @@ export function PinballPlay({ course, lobby, theme, best, onExit, onRestart, onR
     const sideHeld = (role: "left" | "right") => [...pointers.current.values()].some((p) => p.role === role);
     const onDown = (e: PointerEvent) => {
       const target = e.target instanceof Element ? e.target : null;
-      if (target?.closest("button, a, input, [data-pinball-ui]")) return;
+      const control = target?.closest("[data-pinball-control]");
+      if (!control && target?.closest("button, a, input, select, [data-pinball-ui]")) return;
+      if (e.pointerType === "mouse" && e.button !== 0) return;
       e.preventDefault();
       wake();
       const g = gameRef.current;
@@ -470,8 +490,8 @@ export function PinballPlay({ course, lobby, theme, best, onExit, onRestart, onR
       const rect = root.getBoundingClientRect();
       const x = e.clientX - rect.left;
       const y = e.clientY - rect.top;
-      let role: "left" | "right" | "plunger" = x < rect.width / 2 ? "left" : "right";
-      if (canLaunch(g) && x > rect.width * 0.6 && y > rect.height * 0.45) role = "plunger";
+      let role: "left" | "right" | "plunger" = control?.getAttribute("data-pinball-control") === "left" ? "left" : control ? "right" : x < rect.width / 2 ? "left" : "right";
+      if (!control && canLaunch(g) && x > rect.width * 0.6 && y > rect.height * 0.45 && ![...pointers.current.values()].some((p) => p.role === "plunger") && !keyPull.current) role = "plunger";
       pointers.current.set(e.pointerId, { role, startY: e.clientY, pull: 0 });
       try {
         root.setPointerCapture(e.pointerId);
@@ -497,7 +517,7 @@ export function PinballPlay({ course, lobby, theme, best, onExit, onRestart, onR
       const g = gameRef.current;
       if (!g) return;
       if (p.role === "plunger") {
-        if (p.pull > 0.04 && !pausedRef.current) launch(g, p.pull);
+        if (e.type === "pointerup" && p.pull > 0.04 && !pausedRef.current) launch(g, p.pull);
         else setPlungerPull(g, 0);
       } else if (!sideHeld(p.role)) {
         pressSide(p.role === "left" ? 0 : 1, false);
@@ -507,6 +527,7 @@ export function PinballPlay({ course, lobby, theme, best, onExit, onRestart, onR
     root.addEventListener("pointermove", onMove);
     root.addEventListener("pointerup", onUp);
     root.addEventListener("pointercancel", onUp);
+    root.addEventListener("lostpointercapture", onUp);
     const ctxMenu = (e: Event) => e.preventDefault();
     root.addEventListener("contextmenu", ctxMenu);
     return () => {
@@ -514,16 +535,18 @@ export function PinballPlay({ course, lobby, theme, best, onExit, onRestart, onR
       root.removeEventListener("pointermove", onMove);
       root.removeEventListener("pointerup", onUp);
       root.removeEventListener("pointercancel", onUp);
+      root.removeEventListener("lostpointercapture", onUp);
       root.removeEventListener("contextmenu", ctxMenu);
     };
   }, [pressSide, wake]);
 
   // パソコンのキーボード（左：Z / ←、右：/ / →、打ち出し：スペース / ↓、一時停止：Esc / P）
   useEffect(() => {
-    const left = new Set(["KeyZ", "ArrowLeft", "ShiftLeft"]);
-    const right = new Set(["Slash", "ArrowRight", "ShiftRight", "KeyM"]);
-    const plunge = new Set(["Space", "ArrowDown", "Enter"]);
+    const left = LEFT_KEYS;
+    const right = RIGHT_KEYS;
+    const plunge = PLUNGE_KEYS;
     const onDown = (e: KeyboardEvent) => {
+      if (e.target instanceof Element && e.target.closest("input, textarea, select, [contenteditable='true']")) return;
       if (e.repeat) {
         if (plunge.has(e.code) || left.has(e.code) || right.has(e.code)) e.preventDefault();
         return;
@@ -537,27 +560,37 @@ export function PinballPlay({ course, lobby, theme, best, onExit, onRestart, onR
       if (pausedRef.current) return;
       if (left.has(e.code)) {
         e.preventDefault();
+        heldKeys.current.add(e.code);
         wake();
         pressSide(0, true);
       } else if (right.has(e.code)) {
         e.preventDefault();
+        heldKeys.current.add(e.code);
         wake();
         pressSide(1, true);
       } else if (plunge.has(e.code) && canLaunch(g)) {
         e.preventDefault();
         wake();
-        keyPull.current = { at: performance.now() };
+        heldKeys.current.add(e.code);
+        keyPull.current ??= { at: performance.now() };
       }
     };
     const onUp = (e: KeyboardEvent) => {
+      const buttonSides = ([0, 1] as const).filter((side) => heldKeys.current.delete(`button:${side}:${e.code}`));
+      heldKeys.current.delete(e.code);
       const g = gameRef.current;
       if (!g) return;
+      if (buttonSides.length) {
+        e.preventDefault();
+        buttonSides.forEach((side) => pressSide(side, false));
+        return;
+      }
       if (left.has(e.code)) pressSide(0, false);
       else if (right.has(e.code)) pressSide(1, false);
-      else if (plunge.has(e.code) && keyPull.current) {
+      else if (plunge.has(e.code) && keyPull.current && ![...heldKeys.current].some((key) => plunge.has(key))) {
         const power = Math.min(1, (performance.now() - keyPull.current.at) / 900);
         keyPull.current = null;
-        launch(g, power);
+        if (!pausedRef.current) launch(g, power);
       }
     };
     window.addEventListener("keydown", onDown);
@@ -580,6 +613,9 @@ export function PinballPlay({ course, lobby, theme, best, onExit, onRestart, onR
       setFlipper(g, 0, false);
       setFlipper(g, 1, false);
       pointers.current.clear();
+      heldKeys.current.clear();
+      keyPull.current = null;
+      setHeld([false, false]);
       setPlungerPull(g, 0);
     }
   };
@@ -677,18 +713,18 @@ export function PinballPlay({ course, lobby, theme, best, onExit, onRestart, onR
             </span>
             <div className={styles.gaugeWrap}>
               <div className={styles.gaugeLabels}>
-                {SKILL_SHOT_POWER.map((power, lane) => (
+                {(course.type === "stage" && course.spec.base === "blank" ? [] : SKILL_SHOT_POWER).map((power, lane) => (
                   <span key={lane} className={`${styles.gaugeLabel} ${hud?.skillLane === lane ? styles.gaugeLabelOn : ""}`} style={{ top: markFor(power) }}>
                     {LANE_LETTERS[lane]}
                   </span>
                 ))}
                 <span className={styles.gaugeLabel} style={{ top: markFor(0.86) }}>
-                  1周
+                  {course.type === "stage" && course.spec.base === "blank" ? "強い" : "1周"}
                 </span>
               </div>
               <div className={styles.gauge}>
                 <div className={styles.gaugeFill} style={{ height: `${(hud?.pull ?? 0) * 100}%` }} />
-                {SKILL_SHOT_POWER.map((power) => (
+                {(course.type === "stage" && course.spec.base === "blank" ? [] : SKILL_SHOT_POWER).map((power) => (
                   <span key={power} className={styles.gaugeMark} style={{ top: markFor(power) }} />
                 ))}
                 <span className={styles.gaugeMark} style={{ top: markFor(FULL_PLUNGE_POWER) }} />
@@ -815,6 +851,21 @@ export function PinballPlay({ course, lobby, theme, best, onExit, onRestart, onR
             </div>
           </div>
         ) : null}
+      </div>
+      <div className={styles.controls}>
+        {([0, 1] as const).map((side) => (
+          <button key={side} type="button" data-pinball-control={side === 0 ? "left" : "right"} className={`${styles.flipperButton} ${held[side] ? styles.flipperButtonHeld : ""}`} disabled={paused || over} aria-pressed={held[side]} aria-label={`${side === 0 ? "左" : "右"}フリッパー`} onKeyDown={(event) => {
+            if (event.code !== "Space" && event.code !== "Enter") return;
+            event.preventDefault();
+            event.stopPropagation();
+            if (event.repeat) return;
+            heldKeys.current.add(`button:${side}:${event.code}`);
+            wake();
+            pressSide(side, true);
+          }}>
+            <span aria-hidden="true">{side === 0 ? "◀" : "▶"}</span> {side === 0 ? "左" : "右"}フリッパー
+          </button>
+        ))}
       </div>
     </div>
   );

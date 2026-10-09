@@ -86,7 +86,7 @@ function PinballTableShapes({ table, theme, floor }: { table: TableGeometry; the
         <circle key={`b${i}`} cx={b.x} cy={b.y} r={b.r} fill={colors.accent} stroke="#ffffff" strokeOpacity={0.7} strokeWidth={5} />
       ))}
       {/* ガチャ穴 */}
-      <circle cx={table.scoop.x} cy={table.scoop.y} r={15} fill="#000000" stroke={colors.accent} strokeWidth={5} />
+      {table.scoop.r > 0 ? <circle cx={table.scoop.x} cy={table.scoop.y} r={15} fill="#000000" stroke={colors.accent} strokeWidth={5} /> : null}
       {/* フリッパー */}
       {table.flippers.map((f) => (
         <line

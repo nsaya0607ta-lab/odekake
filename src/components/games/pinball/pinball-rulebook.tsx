@@ -339,9 +339,10 @@ export function PinballRulebook({ owned }: { owned: ReadonlyMap<string, number> 
           <Title no="10" eyebrow="STAGE" title="自分でステージを作る" />
           <Card>
             <p className="text-[11px] leading-relaxed text-white/75">
-              台の上のほうに、赤コインで買った部品を自由に置いて、自分だけのステージを作れます（{STAGE_LIMIT}つまで）。フリッパー・ランプの入口・ガチャ穴などの骨組みは、どのステージも同じです。
+              新しいステージは白紙から作れます（{STAGE_LIMIT}つまで）。基本設備は外枠・打ち出し口・左右のフリッパーだけ。バンパー・くぎ・レールなどを台の上下に自由に置いて、オリジナルの通り道を作れます。ランプは使いたいときに選びます。
               「フレンドに公開」にすると、フレンドが遊べて、ステージごとにランキングが出ます（部品を動かすと、それまでの記録はリセット）。
             </p>
+            <p className="mt-2 text-[11px] leading-relaxed text-white/75">「上を拡大」「下を拡大」で細かく配置できます。コピー・左右対称の配置・元に戻す・やり直すに対応。★のアイテムが出る場所も動かせます。以前作ったステージは従来の台として遊べます。</p>
             <p className="mt-2 text-[11px] leading-relaxed text-white/75">
               玉がはさまって止まらないように、部品どうし・部品と台のかべのあいだは <b className="text-[#ffe08a]">{STAGE_GAP}mm 以上</b>（玉の直径は 27mm）あけます。近すぎるところには置けません。
             </p>

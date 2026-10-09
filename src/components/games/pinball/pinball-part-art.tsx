@@ -154,6 +154,10 @@ export function PinballPartArt({ art, theme, bumperItem, className }: { art: Pin
         copy.height = canvas.height;
         copy.getContext("2d")?.drawImage(canvas, 0, 0);
         cache.set(key, copy);
+        renderer.dispose();
+        canvas.width = copy.width;
+        canvas.height = copy.height;
+        canvas.getContext("2d")?.drawImage(copy, 0, 0);
       });
     };
 
