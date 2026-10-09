@@ -39,6 +39,30 @@ export default async function GamesPage() {
 
         <section className="space-y-4" aria-label="ゲーム一覧">
           <Link
+            href="/games/town-builder"
+            aria-label="ぼくのまちづくりで遊ぶ"
+            className="pressable group relative block overflow-hidden rounded-[30px] border border-[#a7cebb] bg-gradient-to-br from-[#f4fff2] via-[#e5f6e7] to-[#d2ece6] p-5 text-ink shadow-[0_14px_34px_rgba(69,132,87,0.15)] transition-transform active:scale-[0.985]"
+          >
+            <span className="relative z-10 flex items-center gap-2">
+              <span className="rounded-full bg-[#3a805e] px-2.5 py-1 text-[10px] font-black text-white shadow-sm">NEW CITY</span>
+              <span className="rounded-full border border-white/90 bg-white/75 px-2.5 py-1 text-[10px] font-bold text-[#32764f]">自由建築・自動保存</span>
+            </span>
+            <span className="relative z-10 mt-3 flex items-center gap-3">
+              <span className="min-w-0 flex-1">
+                <span className="block text-[10px] font-black tracking-[0.08em] text-[#447d5b]">道路・鉄道を引いて、街を育てよう</span>
+                <span className="mt-1 block text-[21px] font-black tracking-[-0.03em]">ぼくのまちづくり</span>
+                <span className="mt-1.5 block text-[11px] font-bold leading-relaxed text-ink-soft">OpenTTDの発想から生まれた、自由な箱庭シミュレーション。</span>
+              </span>
+              <span className="flex h-[108px] w-[108px] shrink-0 items-center justify-center rounded-[25px] border border-white/80 bg-gradient-to-b from-[#bce4ce] to-[#8dc9af] text-6xl shadow-[0_8px_18px_rgba(80,66,46,0.09)]" aria-hidden="true">🏘️</span>
+            </span>
+            <span className="relative z-10 mt-4 flex items-center justify-between rounded-[18px] border border-white/90 bg-white/65 px-3 py-2.5">
+              <span className="flex items-center gap-4 text-[11px] font-black text-[#457958]">
+                <span>プレイ：自由・エンドレス</span><span>操作：建設タップ</span>
+              </span>
+              <span className="ml-2 flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-[#3a805e] text-xl font-black text-white">›</span>
+            </span>
+          </Link>
+          <Link
             href="/games/item-catch"
             aria-label="アイテムキャッチで遊ぶ"
             className="pressable group relative block overflow-hidden rounded-[30px] border border-[#efd7a8] bg-gradient-to-br from-[#fffdf8] via-[#fff5df] to-[#fbe7bd] p-5 shadow-[0_14px_34px_rgba(184,125,51,0.13)] transition-transform active:scale-[0.985]"
