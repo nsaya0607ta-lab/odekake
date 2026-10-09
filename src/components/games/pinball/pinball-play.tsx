@@ -444,6 +444,7 @@ export function PinballPlay({ course, lobby, theme, best, onExit, onRestart, onR
       cancelAnimationFrame(raf);
       window.clearTimeout(overTimer);
       ro.disconnect();
+      renderer.dispose();
       document.removeEventListener("visibilitychange", onHidden);
       window.removeEventListener("blur", onVisibility);
       audio.destroy();

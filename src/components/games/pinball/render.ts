@@ -536,6 +536,7 @@ export class PinballRenderer {
   /** 直近80msの軌跡。高速の玉を目で追えるようにする（物理には影響しない） */
   private ballTrails = new Map<number, { x: number; y: number; at: number; ramp: boolean }[]>();
   private reducedMotion = false;
+  private disposed = false;
 
   constructor(canvas: HTMLCanvasElement, assets: RenderAssets) {
     this.canvas = canvas;
@@ -562,6 +563,7 @@ export class PinballRenderer {
 
   /** 画像を読みこんだら知らせてもらう（読みこみ前はカプセルの絵の代わりに色の丸で描く） */
   setImage(src: string, img: HTMLImageElement): void {
+    if (this.disposed) return;
     this.images.set(src, img);
     for (const key of [...this.tokens.keys()]) if (key.startsWith(`${src}|`)) this.tokens.delete(key);
     // バンパーの笠だけ描きなおす（床の絵は画像を使わないので作りなおさない）
@@ -570,6 +572,7 @@ export class PinballRenderer {
 
   /** 表示する大きさ（CSS px）が変わったとき */
   resize(cssW: number, cssH: number, dpr: number): void {
+    if (this.disposed) return;
     const view = this.assets.view ?? VIEW;
     this.cssW = cssW;
     this.cssH = cssH;
@@ -587,6 +590,25 @@ export class PinballRenderer {
     this.tokens.clear();
     this.bumperSprites.clear();
     this.pinwheelSprites.clear();
+  }
+
+  /** 台の切り替え時に描画用バッファをすぐ解放する */
+  dispose(): void {
+    if (this.disposed) return;
+    this.disposed = true;
+    const buffers = [this.base, this.overlay, this.ballSprite, ...this.glows.values(), ...this.tokens.values(), ...this.bumperSprites.values(), ...[...this.pinwheelSprites.values()].flatMap((sprite) => [sprite.body, sprite.shadow])];
+    for (const canvas of buffers) if (canvas) { canvas.width = 0; canvas.height = 0; }
+    this.base = this.overlay = this.ballSprite = null;
+    this.glows.clear();
+    this.tokens.clear();
+    this.bumperSprites.clear();
+    this.pinwheelSprites.clear();
+    this.images.clear();
+    this.ballTrails.clear();
+    this.particles = [];
+    this.popups = [];
+    this.flying = [];
+    this.canvas.width = this.canvas.height = 0;
   }
 
   /** 画面の点（CSS px）→ 台の座標（mm） */
@@ -1894,6 +1916,7 @@ export class PinballRenderer {
   /* ---------- 毎フレーム ---------- */
 
   draw(g: Game, dt: number): void {
+    if (this.disposed) return;
     const ctx = this.ctx;
     this.frameDt = dt;
     this.time += dt;

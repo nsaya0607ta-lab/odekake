@@ -586,8 +586,11 @@ export function PinballStageEditor({ draft, lobby, owned, redCoins, suspended = 
   const nextBumperItem = lobby.bumperItems[Math.min(counts.bumper, lobby.bumperItems.length - 1)] ?? null;
   const rampExit = TOP_RAMP.path[TOP_RAMP.path.length - 1]!;
 
+  // 編集状態・履歴は保ち、テストプレイとお店では台と部品プレビューの描画を解放する
+  if (suspended) return null;
+
   return (
-    <div className={`fixed inset-0 z-50 overflow-y-auto bg-[#0b0d14] text-white${suspended ? " invisible" : ""}`} role="dialog" aria-modal="true" aria-label="ステージを作る" aria-hidden={suspended || undefined} inert={suspended}>
+    <div className="fixed inset-0 z-50 overflow-y-auto bg-[#0b0d14] text-white" role="dialog" aria-modal="true" aria-label="ステージを作る">
       <header data-dark-header className="sticky top-0 z-10 flex items-center gap-2 border-b border-white/10 bg-[#0b0d14]/95 px-3 py-2 backdrop-blur" style={{ paddingTop: "max(8px, env(safe-area-inset-top))" }}>
         <button type="button" onClick={close} className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-white/15 bg-white/5 text-lg font-black active:scale-95" aria-label="エディターをとじる">
           ‹
@@ -638,7 +641,6 @@ export function PinballStageEditor({ draft, lobby, owned, redCoins, suspended = 
             bumperItems={bumperItems}
             view={view}
             fitToScreen={spec.base === "blank" && zoom === "all"}
-            active={!suspended}
             hiddenItem={frozen?.item ?? null}
             svgRef={svgRef}
             onPointerDown={onPointerDown}
