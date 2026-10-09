@@ -43,6 +43,8 @@ export async function POST() {
       balance: typeof result.balance === "number" ? result.balance : 0,
       // 通算7日ごとは青コインもいっしょ（0125 より前の DB では返ってこないので 0）
       blueAmount: typeof result.blue_amount === "number" ? result.blue_amount : 0,
+      // 毎日の赤コイン（0138 より前の DB では返ってこないので 0）
+      redAmount: typeof result.red_amount === "number" ? result.red_amount : 0,
       totalDays: typeof result.total_days === "number" ? result.total_days : null,
       // 端末の時計がずれていても、次に出すかどうかはサーバーが数えた日付で決める
       date: typeof result.date === "string" ? result.date : null,

@@ -911,7 +911,9 @@ function collidePinwheel(world: World, ball: Ball, index: number): void {
   const beforeX = ball.vx;
   const beforeY = ball.vy;
   const impact = resolve(ball, best.nx, best.ny, best.pen, svx, svy, MATS.pinwheel);
-  if (impact <= 0) return;
+  // 羽根の上に乗っているだけの玉では、羽根をおし返さない（乗った玉の重さで羽根が止まると、2本の羽根のあいだに
+  // 玉がのったまま、両方がゆっくりしか動かなくなる。上に何もないかざぐるまで起きた）
+  if (impact <= REST_SPEED) return;
   // 玉が受けた力の反対向きに、羽根が回る（中心からの距離 × 押した力）
   const jx = ball.vx - beforeX;
   const jy = ball.vy - beforeY;

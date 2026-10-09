@@ -1,14 +1,25 @@
 import { getPinballTable } from "@/lib/games/pinball/maps";
-import type { Pt } from "@/lib/games/pinball/table";
+import type { Pt, TableGeometry } from "@/lib/games/pinball/table";
 import type { PinballTheme } from "@/lib/games/pinball/themes";
 
 const d = (pts: readonly Pt[], closed = false) => `M${pts.map((pt) => `${pt.x.toFixed(1)} ${pt.y.toFixed(1)}`).join("L")}${closed ? "Z" : ""}`;
 
+type Props = {
+  /** マップの id（table を渡さないとき） */
+  mapId?: string;
+  /** 台の形（自分で作るステージ） */
+  table?: TableGeometry;
+  /** グラデーションの id に使う（同じ画面に同じ id が2つあると、色がまざる） */
+  uid?: string;
+  theme: PinballTheme;
+  className?: string;
+};
+
 /** 台えらびのカードに出す、マップの形の小さな絵（台の形のデータからそのまま描く） */
-export function PinballMapPreview({ mapId, theme, className }: { mapId: string; theme: PinballTheme; className?: string }) {
-  const table = getPinballTable(mapId);
+export function PinballMapPreview({ mapId, table: given, uid, theme, className }: Props) {
+  const table = given ?? getPinballTable(mapId ?? "");
   const { colors } = theme;
-  const gradId = `pb-map-${mapId}`;
+  const gradId = `pb-map-${uid ?? mapId ?? table.id}`;
   return (
     <svg viewBox="-14 -14 550 1028" className={className} aria-hidden="true">
       <defs>
@@ -17,8 +28,18 @@ export function PinballMapPreview({ mapId, theme, className }: { mapId: string; 
           <stop offset="100%" stopColor={colors.bg1} />
         </linearGradient>
       </defs>
+      <PinballTableShapes table={table} theme={theme} floor={`url(#${gradId})`} />
+    </svg>
+  );
+}
+
+/** 台の形（床・壁・ランプ・ポスト・かざぐるま・バンパー・ガチャ穴・フリッパー）。エディターでも同じ絵を使う */
+export function PinballTableShapes({ table, theme, floor }: { table: TableGeometry; theme: PinballTheme; floor: string }) {
+  const { colors } = theme;
+  return (
+    <>
       {/* 床 */}
-      <path d="M0 1000 L0 261 A261 261 0 0 1 522 261 L522 1000 Z" fill={`url(#${gradId})`} stroke={colors.rail} strokeOpacity={0.55} strokeWidth={10} />
+      <path d="M0 1000 L0 261 A261 261 0 0 1 522 261 L522 1000 Z" fill={floor} stroke={colors.rail} strokeOpacity={0.55} strokeWidth={10} />
       {/* 壁・レール */}
       {table.walls
         .filter((w) => w.look !== "frame")
@@ -72,6 +93,6 @@ export function PinballMapPreview({ mapId, theme, className }: { mapId: string; 
           strokeLinecap="round"
         />
       ))}
-    </svg>
+    </>
   );
 }

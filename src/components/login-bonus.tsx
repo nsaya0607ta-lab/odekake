@@ -5,7 +5,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { formatCoins } from "@/lib/coins";
 import { todayInJapan } from "@/lib/date";
 import { getFrenchieSrc, type DogSkinId } from "@/lib/dog-skins";
-import { BlueCoinArt, CoinArt } from "./coin-art";
+import { BlueCoinArt, CoinArt, RedCoinArt } from "./coin-art";
 import { IconClose } from "./icons";
 
 /**
@@ -21,8 +21,11 @@ import { IconClose } from "./icons";
 
 const SEEN_KEY_PREFIX = "odekake:login-bonus-checked-on";
 
-/** blueAmount は通算7日ごとにいっしょにもらえる青コイン（ふだんは 0）。totalDays は通算のログイン日数 */
-type Reward = { amount: number; balance: number; blueAmount: number; totalDays: number | null };
+/**
+ * blueAmount は通算7日ごとにいっしょにもらえる青コイン（ふだんは 0）。redAmount は毎日の赤コイン
+ * （ご当地ピンボールのステージの部品に使う）。totalDays は通算のログイン日数
+ */
+type Reward = { amount: number; balance: number; blueAmount: number; redAmount: number; totalDays: number | null };
 
 function waitForSplash(): Promise<void> {
   return new Promise((resolve) => {
@@ -73,6 +76,7 @@ export function LoginBonus({ skin = "default", userId }: { skin?: DogSkinId; use
           amount?: number;
           balance?: number;
           blueAmount?: number;
+          redAmount?: number;
           totalDays?: number | null;
           date?: string | null;
         };
@@ -89,7 +93,7 @@ export function LoginBonus({ skin = "default", userId }: { skin?: DogSkinId; use
 
         await waitForSplash();
         if (cancelled) return;
-        setReward({ amount: data.amount ?? 0, balance: data.balance ?? 0, blueAmount: data.blueAmount ?? 0, totalDays: data.totalDays ?? null });
+        setReward({ amount: data.amount ?? 0, balance: data.balance ?? 0, blueAmount: data.blueAmount ?? 0, redAmount: data.redAmount ?? 0, totalDays: data.totalDays ?? null });
       } catch {
         // 圏外なら次に開いたときに再試行する。
       }
@@ -242,6 +246,15 @@ export function LoginBonus({ skin = "default", userId }: { skin?: DogSkinId; use
               <BlueCoinArt className="h-4 w-4" />
               <span className="font-black tabular-nums">+{formatCoins(reward.blueAmount)}</span>
               <span className="text-[11px]">青コイン</span>
+            </p>
+          ) : null}
+
+          {reward.redAmount > 0 ? (
+            <p className="mt-2 flex items-center justify-center gap-1.5 rounded-2xl border border-[#F2C4BF] bg-[linear-gradient(135deg,#FFF4F2,#FCE3DF)] px-3 py-2 text-[12px] font-bold text-[#9C2B31]">
+              ピンボールの部品に
+              <RedCoinArt className="h-4 w-4" />
+              <span className="font-black tabular-nums">+{formatCoins(reward.redAmount)}</span>
+              <span className="text-[11px]">赤コイン</span>
             </p>
           ) : null}
 

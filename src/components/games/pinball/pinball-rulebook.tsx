@@ -1,6 +1,6 @@
 import { getImageProps } from "next/image";
 import Link from "next/link";
-import { BlueCoinArt } from "@/components/coin-art";
+import { RedCoinArt } from "@/components/coin-art";
 import { GACHA_RARITIES } from "@/lib/gacha/config";
 import { getSkillLevel } from "@/lib/gacha/skill-levels";
 import {
@@ -29,6 +29,7 @@ import {
 import { pinballItems, pinballPrefCodes, pinballPrefItems } from "@/lib/games/pinball/items";
 import { PINBALL_MAP_IDS } from "@/lib/games/pinball/maps";
 import { describeSkillLevels, getPinballSkill, starsForCount } from "@/lib/games/pinball/skills";
+import { PINBALL_PARTS, STAGE_GAP, STAGE_LIMIT } from "@/lib/games/pinball/stage";
 import { getPinballTheme } from "@/lib/games/pinball/themes";
 import { PREFECTURE_NAMES } from "@/lib/geo/prefecture-names";
 import { PinballSkillTabs, type GuidePref } from "./pinball-guide";
@@ -139,7 +140,7 @@ export function PinballRulebook({ owned }: { owned: ReadonlyMap<string, number> 
             {[
               ["BALL", `${PINBALL_BALLS}球`, "1ゲーム"],
               ["STAMP", `${STAMP_COUNT}個`, "で制覇"],
-              ["REWARD", `÷${n(COIN_POINTS)}`, "青コイン"],
+              ["REWARD", `÷${n(COIN_POINTS)}`, "赤コイン"],
             ].map(([label, value, note]) => (
               <div key={label} className="rounded-2xl border border-white/10 bg-black/25 px-1 py-2.5">
                 <span className="block text-[8px] font-black tracking-[0.14em] text-white/45">{label}</span>
@@ -324,11 +325,44 @@ export function PinballRulebook({ owned }: { owned: ReadonlyMap<string, number> 
         </section>
 
         <section className="space-y-2">
-          <Title no="09" eyebrow="REWARD" title="青コイン" />
+          <Title no="09" eyebrow="REWARD" title="赤コイン" />
           <Card className="text-center">
-            <BlueCoinArt className="mx-auto h-10 w-10" />
-            <p className="mt-1 text-lg font-black">スコア ÷ {n(COIN_POINTS)} = 青コイン</p>
-            <p className="mt-1 text-[10px] text-white/55">小数点以下は切り捨て・1プレイ{n(COIN_MAX)}枚まで・背景・家具などに使えます</p>
+            <RedCoinArt className="mx-auto h-10 w-10" />
+            <p className="mt-1 text-lg font-black">スコア ÷ {n(COIN_POINTS)} = 赤コイン</p>
+            <p className="mt-1 text-[10px] text-white/55">
+              小数点以下は切り捨て・1プレイ{n(COIN_MAX)}枚まで（マップでも、自分やフレンドのステージでも同じ）。ステージの部品を買うのに使えます
+            </p>
+          </Card>
+        </section>
+
+        <section className="space-y-2">
+          <Title no="10" eyebrow="STAGE" title="自分でステージを作る" />
+          <Card>
+            <p className="text-[11px] leading-relaxed text-white/75">
+              台の上のほうに、赤コインで買った部品を自由に置いて、自分だけのステージを作れます（{STAGE_LIMIT}つまで）。フリッパー・ランプの入口・ガチャ穴などの骨組みは、どのステージも同じです。
+              「フレンドに公開」にすると、フレンドが遊べて、ステージごとにランキングが出ます（部品を動かすと、それまでの記録はリセット）。
+            </p>
+            <p className="mt-2 text-[11px] leading-relaxed text-white/75">
+              玉がはさまって止まらないように、部品どうし・部品と台のかべのあいだは <b className="text-[#ffe08a]">{STAGE_GAP}mm 以上</b>（玉の直径は 27mm）あけます。近すぎるところには置けません。
+            </p>
+            <ul className="mt-3 divide-y divide-white/10 rounded-2xl border border-white/10 bg-black/25">
+              {PINBALL_PARTS.map((part) => (
+                <li key={part.id} className="flex items-center gap-2 px-3 py-2">
+                  <span className="min-w-0 flex-1">
+                    <span className="block text-[12px] font-black">{part.name}</span>
+                    <span className="block text-[10px] text-white/55">{part.lead}</span>
+                  </span>
+                  <span className="shrink-0 text-right text-[10px] font-bold text-white/70">
+                    <span className="flex items-center justify-end gap-1 text-[12px] font-black tabular-nums text-[#ffd3cd]">
+                      <RedCoinArt className="h-3.5 w-3.5" />
+                      {n(part.price)}
+                    </span>
+                    {part.free ? `はじめから${part.free}こ・` : ""}
+                    {part.max}こまで
+                  </span>
+                </li>
+              ))}
+            </ul>
           </Card>
         </section>
 

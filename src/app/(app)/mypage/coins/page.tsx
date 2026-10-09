@@ -9,10 +9,14 @@ import { GachaSection } from "@/components/gacha-section";
 import { IconChevronRight, IconPaw } from "@/components/icons";
 import { PageBody } from "@/components/page-body";
 import { TopHeader } from "@/components/page-header";
+import { RedCoinSection } from "@/components/red-coin-section";
 import { getBlueCoinBalance } from "@/lib/data/blue-coins";
 import { getCoinSummary } from "@/lib/data/coins";
 import { getCurrentDogSkin } from "@/lib/data/dog-skin";
+import { getRedCoinBalance, getRedCoinEvents } from "@/lib/data/red-coins";
 import { getRecordSpace } from "@/lib/data/space";
+import { PINBALL_MAP_IDS } from "@/lib/games/pinball/maps";
+import { getPinballTheme } from "@/lib/games/pinball/themes";
 import { requireUser } from "@/lib/supabase/server";
 
 export const metadata = { title: "おでかけコイン | おでかけ記録" };
@@ -22,11 +26,15 @@ export default async function CoinsPage() {
   const { supabase, user } = await requireUser();
   const space = await getRecordSpace(supabase, user.id);
 
-  const [summary, skin, blueCoins] = await Promise.all([
+  const [summary, skin, blueCoins, redCoins, redEvents] = await Promise.all([
     getCoinSummary(supabase, user.id),
     getCurrentDogSkin(supabase, user.id),
     getBlueCoinBalance(supabase, user.id).catch(() => null),
+    getRedCoinBalance(supabase, user.id).catch(() => null),
+    getRedCoinEvents(supabase, user.id, 10).catch(() => null),
   ]);
+  // 赤コインの履歴に出す台（マップ）の名前
+  const tableNames: Record<string, string> = Object.fromEntries(PINBALL_MAP_IDS.map((id) => [id, getPinballTheme(id).name]));
 
   return (
     <>
@@ -60,6 +68,8 @@ export default async function CoinsPage() {
           {/* 都道府県ガチャは青コイン（青コインの仕組みが無い環境では出さない） */}
           {blueCoins !== null ? <GachaSection balance={blueCoins} pool="pref" /> : null}
           <DambourleGachaSection balance={summary.balance} />
+          {/* 赤コイン（ご当地ピンボールのステージの部品に使う）。仕組みが無い環境では出さない */}
+          {redCoins !== null ? <RedCoinSection balance={redCoins} events={redEvents} tableNames={tableNames} /> : null}
           <CoinEarnMethods />
         </div>
       </PageBody>
