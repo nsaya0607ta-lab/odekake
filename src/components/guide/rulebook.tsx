@@ -6,8 +6,9 @@ import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, typ
 import type { GachaRarity } from "@/lib/gacha/config";
 import { LEVEL_REWARDS, getTotalExpForLevel } from "@/lib/exp";
 import { CapsuleArt } from "@/components/gacha/capsule-art";
-import { BlueCoinArt, CoinArt, GachaMachineArt } from "@/components/coin-art";
+import { BlueCoinArt, CoinArt, GachaMachineArt, RedCoinArt } from "@/components/coin-art";
 import { COIN_MAX as PINBALL_COIN_MAX, COIN_POINTS as PINBALL_COIN_POINTS } from "@/lib/games/pinball/config";
+import { RED_LOGIN_COINS } from "@/lib/red-coin-rewards";
 import { HomeCoinArt } from "@/components/home-coin-art";
 import {
   GACHA_DUPLICATE_COINS,
@@ -316,7 +317,7 @@ function StartChapter({ onGo }: { onGo: (tab: TabId) => void }) {
         </div>
       </Section>
 
-      <Section kicker="2つのコイン" title="黄色いコインと、青いコイン">
+      <Section kicker="3つのコイン" title="黄色・青・赤のコイン">
         <div className={styles.twoCol}>
           <div className={styles.coinCard}>
             <span className={styles.coinIcon}><CoinArt className="h-full w-full" /></span>
@@ -327,8 +328,14 @@ function StartChapter({ onGo }: { onGo: (tab: TabId) => void }) {
           <div className={styles.coinCard} data-blue>
             <span className={styles.coinIcon}><BlueCoinArt className="h-full w-full" /></span>
             <b>青コイン</b>
-            <p>はじめての土地・通算ログイン・おさんぽフレンチー・ご当地ピンボール・ホームに降るコインでたまる。背景・家具・都道府県ガチャに使う。</p>
+            <p>はじめての土地・通算ログイン・おさんぽフレンチー・ホームに降るコインでたまる。背景・家具・都道府県ガチャに使う。</p>
             <button type="button" onClick={() => onGo("room")}>使いみち →</button>
+          </div>
+          <div className={styles.coinCard} data-red>
+            <span className={styles.coinIcon}><RedCoinArt className="h-full w-full" /></span>
+            <b>赤コイン</b>
+            <p>ご当地ピンボールのスコア・ホームに降ってくるコイン・毎日のログイン（{RED_LOGIN_COINS}枚）でたまる。ご当地ピンボールで、自分のステージを作る部品を買うのに使う。</p>
+            <button type="button" onClick={() => onGo("games")}>ためかた →</button>
           </div>
         </div>
       </Section>
@@ -690,8 +697,8 @@ const GAMES = [
     shot: "/guide/game-pinball.webp",
     how: "画面の左半分・右半分を押してフリッパー。打ち出しは右下を下へ引いて離す",
     time: "3球制（平均2分半くらい）",
-    reward: `スコア${PINBALL_COIN_POINTS.toLocaleString("ja-JP")}点ごとに青コイン1枚（1プレイ${PINBALL_COIN_MAX.toLocaleString("ja-JP")}枚まで）`,
-    tip: "台は形のちがうマップ（いつもの台・バンパーだらけの「はねはね台」など）から選べて、どれもだれでも遊べます。都道府県ガチャで集めたご当地アイテムは、どの県のものも全部の台に出てきます。アイテムにボールを当てると、その場でスキルが発動。どれでも8つ集めると「制覇！」でマルチボールになり、ジャックポットがねらえます。ご当地アイテムをたくさん持っているほど図鑑ボーナスで得点が上がり、Lv5で覚醒・そのあとは★でスキルが強くなります。",
+    reward: `スコア${PINBALL_COIN_POINTS.toLocaleString("ja-JP")}点ごとに赤コイン1枚（1プレイ${PINBALL_COIN_MAX.toLocaleString("ja-JP")}枚まで）`,
+    tip: "台は形のちがうマップ（いつもの台・バンパーだらけの「はねはね台」など）から選べて、どれもだれでも遊べます。赤コインで部品（バンパー・かざぐるま・くぎ・ランプなど）を買うと、自分のステージを作れて、公開するとフレンドも遊べます。都道府県ガチャで集めたご当地アイテムは、どの県のものも全部の台に出てきます。アイテムにボールを当てると、その場でスキルが発動。どれでも8つ集めると「制覇！」でマルチボールになり、ジャックポットがねらえます。ご当地アイテムをたくさん持っているほど図鑑ボーナスで得点が上がり、Lv5で覚醒・そのあとは★でスキルが強くなります。",
   },
   {
     id: "snack-trail",
@@ -791,7 +798,7 @@ function RoomChapter() {
 
 /* ------------------------------------------------------------------ ホーム */
 
-type FallingCoin = { id: number; x: number; kind: "coin" | "blue"; tier: "common" | "rare" | "epic" };
+type FallingCoin = { id: number; x: number; kind: "coin" | "blue" | "red"; tier: "common" | "rare" | "epic" };
 
 function HomeChapter() {
   const [coins, setCoins] = useState<FallingCoin[]>([]);
@@ -802,7 +809,9 @@ function HomeChapter() {
       const roll = Math.random() * 100;
       const tier = roll < HOME_DROP.tiers[2].rate ? "epic" : roll < HOME_DROP.tiers[2].rate + HOME_DROP.tiers[1].rate ? "rare" : "common";
       seq.current += 1;
-      const coin: FallingCoin = { id: seq.current, x: 10 + Math.random() * 80, kind: Math.random() < 0.5 ? "blue" : "coin", tier };
+      const kindRoll = Math.random() * (HOME_DROP.chance + HOME_DROP.redChance);
+      const kind = kindRoll < HOME_DROP.chance / 2 ? "coin" : kindRoll < HOME_DROP.chance ? "blue" : "red";
+      const coin: FallingCoin = { id: seq.current, x: 10 + Math.random() * 80, kind, tier };
       setCoins((current) => [...current.slice(-5), coin]);
     }, 1100);
     return () => window.clearInterval(id);
@@ -846,12 +855,13 @@ function HomeChapter() {
             <div key={item.tier} className={styles.tier}>
               <span className={styles.tierCoin}><HomeCoinArt kind="coin" tier={item.tier} /></span>
               <span className={styles.tierCoin}><HomeCoinArt kind="blue" tier={item.tier} /></span>
+              <span className={styles.tierCoin}><HomeCoinArt kind="red" tier={item.tier} /></span>
               <b>{item.label}</b>
               <small>{item.rate}%・{item.amount}枚</small>
             </div>
           ))}
         </div>
-        <Tip>落ちたコインは、わんこが走って取りに行ってくれます。黄色と青は半々。</Tip>
+        <Tip>落ちたコインは、わんこが走って取りに行ってくれます。黄色と青は半々。それとは別に、{HOME_DROP.everySeconds}秒ごとに{HOME_DROP.redChance}%で赤コイン（ご当地ピンボールのステージの部品に使うコイン）も降ってきます。</Tip>
       </Section>
 
       <Section kicker="左にスワイプ" title="アプリの画面と、背景だけの画面">

@@ -624,14 +624,24 @@
   gap: 8px;
   border-radius: 16px;
   padding: 10px 12px;
-  background: linear-gradient(90deg, rgba(64, 120, 226, 0.24), rgba(120, 170, 255, 0.12));
-  border: 1px solid rgba(120, 170, 255, 0.35);
+  background: linear-gradient(90deg, rgba(226, 64, 64, 0.22), rgba(255, 140, 120, 0.12));
+  border: 1px solid rgba(255, 140, 120, 0.35);
   font-weight: 900;
+}
+
+/* 赤コインにもどす前の DB では青コインがつく */
+.coins[data-kind="blue"] {
+  background: linear-gradient(90deg, rgba(64, 120, 226, 0.24), rgba(120, 170, 255, 0.12));
+  border-color: rgba(120, 170, 255, 0.35);
 }
 
 .coinsGain {
   font-size: 20px;
   font-variant-numeric: tabular-nums;
+  color: #ffb4a8;
+}
+
+.coins[data-kind="blue"] .coinsGain {
   color: #b4d0ff;
 }
 

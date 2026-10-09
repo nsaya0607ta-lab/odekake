@@ -3,7 +3,7 @@
  * ご当地ピンボールのシミュレーター
  * =============================================================
  * 本番と同じ物理・ルール（src/lib/games/pinball/*.ts）を Node でそのまま動かし、
- * 人に近い打ち方をするボットに何ゲームも遊ばせて、1プレイの長さ・得点・青コインの分布を測る。
+ * 人に近い打ち方をするボットに何ゲームも遊ばせて、1プレイの長さ・得点・赤コインの分布を測る。
  * 台の形や数字を変えたら、これで確かめてから docs/pinball.md の結果を更新すること。
  *
  * 使い方（マップは maps.ts の id。"all" で全部のマップ、書かなければ いつもの台＝default）:
@@ -12,12 +12,16 @@
  *   node scripts/simulate-pinball.mjs plunger [マップ]          … 打ち出しの強さごとに、玉が最初に通るところ
  *   node scripts/simulate-pinball.mjs stuck [ゲーム数] [マップ] … 玉が止まってしまう場所（形を変えたら、ここに何も出ないことを確かめる）
  *   node scripts/simulate-pinball.mjs gaps [マップ]             … 動かない部品どうしの 14〜31mm のすき間（玉がはさまりやすい。いつもの台にもあるものはのぞく）
+ *   node scripts/simulate-pinball.mjs stagefuzz [ステージ数] [ゲーム数] … でたらめに作ったステージ（エディターで作れる形）で玉が止まらないか
+ *   node scripts/simulate-pinball.mjs stagebalance [ステージ数] [ゲーム数] [腕前] … でたらめなステージで、赤コインをどれくらい稼げるか
+ * マップのかわりに stage:starter（はじめのステージ）・stage:<JSON のファイル>（自分で作るステージ）も使える。
  * 持っているアイテムは ALL_ITEMS の前から（8 = 岐阜県の N〜SSR）。図鑑ボーナスは全部の県のうち何種類持っているか。
  *
  * ボットの腕前（SKILLS）は「ふつう」を、ピンボールを少し遊んだことがある人くらいにしてある：
  *   反応のばらつき（秒）・何もしないで見送ってしまう確率・玉を止めて狙う確率・狙いのずれ（mm）
  * Node 22.18 以上（TypeScript の型をそのまま外して読み込める版）が必要。
  */
+import { readFileSync, writeFileSync } from "node:fs";
 import { register } from "node:module";
 import path from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
@@ -52,6 +56,29 @@ const C = await load("src/lib/games/pinball/config.ts");
 const S = await load("src/lib/games/pinball/skills.ts");
 const M = await load("src/lib/games/pinball/maps.ts");
 const I = await load("src/lib/games/pinball/items.ts");
+const ST = await load("src/lib/games/pinball/stage.ts");
+
+/* ---------- 台 ---------- */
+
+/**
+ * 台の形。マップの id か、自分で作るステージ（"stage:starter" ＝はじめのステージ、"stage:<JSON のファイル>"）。
+ * ステージは validateStage を通らないものは使わない（エディターで作れない形は、確かめても意味がないので）
+ */
+const stageTables = new Map();
+function tableFor(id) {
+  if (!id.startsWith("stage:")) return M.getPinballTable(id);
+  const cached = stageTables.get(id);
+  if (cached) return cached;
+  const src = id.slice(6);
+  const spec = src === "starter" ? ST.starterStage() : ST.parseStageSpec(JSON.parse(readFileSync(src, "utf8")));
+  if (!spec) throw new Error(`${src} はステージの形になっていません`);
+  const issues = ST.validateStage(spec);
+  if (issues.length) throw new Error(`${src} は置き方に問題があります：${issues.map((i) => i.message).join(" / ")}`);
+  const table = ST.buildStageTable(spec);
+  stageTables.set(id, table);
+  return table;
+}
+const tableLabel = (id) => (id === M.DEFAULT_MAP_ID ? "" : id.startsWith("stage:") ? `ステージ ${id.slice(6)}・` : `マップ ${id}・`);
 
 /* ---------- ボット ---------- */
 
@@ -257,11 +284,11 @@ function samplePool(n, rand) {
   });
 }
 
-function playGame(skillName, seed, poolSize, mapId = M.DEFAULT_MAP_ID) {
+function playGame(skillName, seed, poolSize, mapId = M.DEFAULT_MAP_ID, table = tableFor(mapId)) {
   const rand = P.mulberry32(seed * 7919 + 13);
   // 図鑑ボーナスは、台に出るご当地アイテム（全部の県）のうち何種類持っているか（0種は 1 倍）
   const zukan = C.zukanBonus(poolSize, ALL_ITEMS.length);
-  const g = G.createGame({ table: M.getPinballTable(mapId), pool: samplePool(poolSize, rand), tableName: "岐阜県", zukan, seed, speed: SPEED });
+  const g = G.createGame({ table, pool: samplePool(poolSize, rand), tableName: "岐阜県", zukan, seed, speed: SPEED });
   const bot = makeBot(SKILLS[skillName], rand);
   const ballTimes = [];
   let ballStart = 0;
@@ -318,10 +345,10 @@ function runGames(count, skillName, poolSize, mapId = M.DEFAULT_MAP_ID) {
   const sc = col("score");
   const coins = col("coins");
   const zukan = C.zukanBonus(poolSize, ALL_ITEMS.length);
-  console.log(`\n=== ${skillName}（${mapId === M.DEFAULT_MAP_ID ? "" : `マップ ${mapId}・`}${count}ゲーム・アイテム${poolSize}種${FIXED_LV ? `・Lv${FIXED_LV}` : ""}${FIXED_STARS ? `・★${FIXED_STARS}` : ""}・図鑑×${zukan}・玉の速さ ${SPEED}）===`);
+  console.log(`\n=== ${skillName}（${tableLabel(mapId)}${count}ゲーム・アイテム${poolSize}種${FIXED_LV ? `・Lv${FIXED_LV}` : ""}${FIXED_STARS ? `・★${FIXED_STARS}` : ""}・図鑑×${zukan}・玉の速さ ${SPEED}）===`);
   console.log(`プレイ時間  平均 ${fmt(t.mean, 1)}秒  中央 ${fmt(t.p50, 1)}  10% ${fmt(t.p10, 1)}  90% ${fmt(t.p90, 1)}`);
   console.log(`スコア      平均 ${fmt(sc.mean)}  中央 ${fmt(sc.p50)}  10% ${fmt(sc.p10)}  90% ${fmt(sc.p90)}`);
-  console.log(`青コイン    平均 ${fmt(coins.mean, 1)}枚  中央 ${fmt(coins.p50)}  10% ${fmt(coins.p10)}  90% ${fmt(coins.p90)}`);
+  console.log(`赤コイン    平均 ${fmt(coins.mean, 1)}枚  中央 ${fmt(coins.p50)}  10% ${fmt(coins.p10)}  90% ${fmt(coins.p90)}`);
   const per = (k) => fmt(col(k).mean, 2);
   console.log(`1ゲームあたり  アイテム ${per("items")}  県制覇 ${per("conquests")}  ジャックポット ${per("jackpots")}  ランプ ${per("ramps")}  オービット ${per("orbits")}  スキルショット ${per("skillShots")}  ガチャ穴 ${per("scoops")}  ボールセーブ ${per("saves")}  アウトレーン ${per("outlanes")}  バンパー ${per("bumpers")}`);
   const conquered = rows.filter((r) => r.conquests > 0).length;
@@ -332,7 +359,7 @@ function runGames(count, skillName, poolSize, mapId = M.DEFAULT_MAP_ID) {
 /* ---------- 台の確認 ---------- */
 
 function shotmap(mapId) {
-  const table = M.getPinballTable(mapId);
+  const table = tableFor(mapId);
   for (const side of ["left", "right"]) {
     const fi = side === "left" ? 0 : 1;
     const start = side === "left" ? { x: 64, y: 760 } : { x: 416, y: 760 };
@@ -378,7 +405,7 @@ function shotmap(mapId) {
 }
 
 function plunger(mapId) {
-  const table = M.getPinballTable(mapId);
+  const table = tableFor(mapId);
   console.log("引いた量  速さ  最初に通ったところ（シード5つ）");
   for (let power = 0.2; power <= 1.0001; power += 0.02) {
     const res = {};
@@ -403,18 +430,21 @@ function plunger(mapId) {
   }
 }
 
-/**
- * 玉が止まってしまう場所：ふつうの腕前で遊ばせて、玉がほとんど動かないまま 0.5秒（台の時間）たった場所を数える。
- * フリッパーで止めている玉・打ち出しレーン・ガチャ穴の中は数えない（ここに出る場所は、形を直すべきところ）
- */
-function stuckReport(count, mapId) {
+/** 1つの台で count ゲーム遊ばせて、玉が止まった回数と場所を数える（stuck・stagefuzz で使う） */
+function stuckRun(table, count) {
   const spots = new Map();
   let episodes = 0;
   let long = 0;
   let totalTime = 0;
+  const mark = (b, field) => {
+    const key = `${Math.round(b.x / 10) * 10},${Math.round(b.y / 10) * 10}`;
+    const spot = spots.get(key) ?? { n: 0, long: 0 };
+    spot[field] += 1;
+    spots.set(key, spot);
+  };
   for (let i = 0; i < count; i += 1) {
     const rand = P.mulberry32((i + 1) * 7919 + 13);
-    const g = G.createGame({ table: M.getPinballTable(mapId), pool: samplePool(8, rand), tableName: "岐阜県", seed: i + 1, speed: SPEED });
+    const g = G.createGame({ table, pool: samplePool(8, rand), tableName: "岐阜県", seed: i + 1, speed: SPEED });
     const bot = makeBot(SKILLS.average, rand);
     const flagged = new Map();
     for (let frame = 0; frame < 60 * 60 * 30 && g.phase !== "over"; frame += 1) {
@@ -427,17 +457,11 @@ function stuckReport(count, mapId) {
         if (b.still > 0.5 && state === 0) {
           flagged.set(b.id, 1);
           episodes += 1;
-          const key = `${Math.round(b.x / 10) * 10},${Math.round(b.y / 10) * 10}`;
-          const spot = spots.get(key) ?? { n: 0, long: 0 };
-          spot.n += 1;
-          spots.set(key, spot);
+          mark(b, "n");
         } else if (b.still > 2.3 && state === 1) {
           flagged.set(b.id, 2);
           long += 1;
-          const key = `${Math.round(b.x / 10) * 10},${Math.round(b.y / 10) * 10}`;
-          const spot = spots.get(key) ?? { n: 0, long: 0 };
-          spot.long += 1;
-          spots.set(key, spot);
+          mark(b, "long");
         } else if (b.still < 0.05 && state !== 0) {
           flagged.set(b.id, 0);
         }
@@ -445,10 +469,128 @@ function stuckReport(count, mapId) {
     }
     totalTime += g.playTime;
   }
-  console.log(`\n=== 玉が止まった場所（${mapId === M.DEFAULT_MAP_ID ? "" : `マップ ${mapId}・`}${count}ゲーム・合計 ${fmt(totalTime / 60, 1)}分） ===`);
+  return { spots, episodes, long, totalTime };
+}
+
+/**
+ * 玉が止まってしまう場所：ふつうの腕前で遊ばせて、玉がほとんど動かないまま 0.5秒（台の時間）たった場所を数える。
+ * フリッパーで止めている玉・打ち出しレーン・ガチャ穴の中は数えない（ここに出る場所は、形を直すべきところ）
+ */
+function stuckReport(count, mapId) {
+  const { spots, episodes, long, totalTime } = stuckRun(tableFor(mapId), count);
+  console.log(`\n=== 玉が止まった場所（${tableLabel(mapId)}${count}ゲーム・合計 ${fmt(totalTime / 60, 1)}分） ===`);
   console.log(`0.5秒以上止まった回数 ${episodes}（1ゲーム ${fmt(episodes / count, 2)}回）・2.3秒以上（玉ゆらしが入る）${long}回`);
   const list = [...spots.entries()].sort((a, b) => b[1].n - a[1].n).slice(0, 30);
   for (const [key, v] of list) console.log(`  (${key})  ${v.n}回  うち長く止まった ${v.long}回`);
+}
+
+/* ---------- 自分で作るステージ ---------- */
+
+/**
+ * でたらめなステージ（エディターで作れるもの＝validateStage を通るものだけ）。部品の数もでたらめにして、
+ * 置ける所をさがして詰めこむ（たくさん置くほど、ちょうど 31mm のすき間がたくさんできる）
+ */
+function randomStage(rand) {
+  const pick = (list) => list[Math.floor(rand() * list.length)];
+  const spec = { v: 1, look: pick(ST.STAGE_LOOKS), ramp: pick(ST.STAGE_RAMPS), parts: [], items: ST.DEFAULT_STAGE_ITEMS.map((pt) => ({ ...pt })) };
+  const area = ST.STAGE_AREA;
+  const at = () => ST.snapStagePoint(area.x0 + rand() * (area.x1 - area.x0), area.y0 + rand() * (area.y1 - area.y0));
+  // アイテムの場所を先にずらす（置けなければ、はじめの場所のまま）
+  for (let k = 0; k < 3; k += 1) {
+    for (let tries = 0; tries < 30; tries += 1) {
+      const prev = spec.items[k];
+      spec.items[k] = at();
+      if (!ST.itemProblem(spec, k)) break;
+      spec.items[k] = prev;
+    }
+  }
+  const dense = rand() < 0.5;
+  const want = {
+    bumper: Math.floor(rand() * 9),
+    pinwheel: Math.floor(rand() * 5),
+    post: Math.floor(rand() * 17),
+    peg: dense ? 30 + Math.floor(rand() * 31) : Math.floor(rand() * 20),
+    sling: Math.floor(rand() * 5),
+  };
+  const make = (kind, pt) => {
+    if (kind === "bumper") return { kind, ...pt, size: pick(["s", "m", "l"]) };
+    if (kind === "pinwheel") return { kind, ...pt, dir: rand() < 0.5 ? 1 : -1 };
+    if (kind === "sling") return { kind, ...pt, face: rand() < 0.5 ? "left" : "right" };
+    return { kind, ...pt };
+  };
+  for (const kind of ["sling", "pinwheel", "bumper", "post", "peg"]) {
+    for (let n = 0; n < want[kind]; n += 1) {
+      for (let tries = 0; tries < 60; tries += 1) {
+        spec.parts.push(make(kind, at()));
+        if (!ST.partProblem(spec, spec.parts.length - 1)) break;
+        spec.parts.pop();
+      }
+    }
+  }
+  const issues = ST.validateStage(spec);
+  if (issues.length) throw new Error(`でたらめなステージが validateStage を通りません：${issues[0].message}`);
+  return spec;
+}
+
+/**
+ * でたらめなステージで、どれくらい赤コインを稼げるか（ステージごとの平均の分布。いつもの台とくらべる）。
+ * いちばん稼げたステージ・いちばん稼げなかったステージは JSON に書き出す
+ */
+function stageBalance(stages, games, skillName = "average") {
+  const base = [];
+  for (let i = 0; i < games; i += 1) base.push(playGame(skillName, i + 1, 8).coins);
+  const baseMean = base.reduce((a, b) => a + b, 0) / games;
+  const rows = [];
+  for (let s = 0; s < stages; s += 1) {
+    const spec = randomStage(P.mulberry32((s + 1) * 104729 + 7));
+    const table = ST.buildStageTable(spec);
+    let sum = 0;
+    let time = 0;
+    for (let i = 0; i < games; i += 1) {
+      const r = playGame(skillName, i + 1, 8, M.DEFAULT_MAP_ID, table);
+      sum += r.coins;
+      time += r.time;
+    }
+    rows.push({ s, mean: sum / games, time: time / games, parts: spec.parts.length, ramp: spec.ramp, spec });
+  }
+  rows.sort((a, b) => a.mean - b.mean);
+  const means = rows.map((r) => r.mean);
+  const q = (p) => means[Math.min(means.length - 1, Math.floor(p * means.length))];
+  console.log(`\n=== でたらめなステージ ${stages}こ × ${games}ゲーム（${skillName}・アイテム8種） ===`);
+  console.log(`いつもの台 ${fmt(baseMean, 1)}枚（同じ ${games}ゲーム）`);
+  console.log(`ステージごとの赤コインの平均  いちばん少ない ${fmt(means[0], 1)}  10% ${fmt(q(0.1), 1)}  中央 ${fmt(q(0.5), 1)}  90% ${fmt(q(0.9), 1)}  いちばん多い ${fmt(means[means.length - 1], 1)}`);
+  console.log(`いつもの台とくらべて  中央 ${fmt((q(0.5) / baseMean - 1) * 100, 0)}%  90% ${fmt((q(0.9) / baseMean - 1) * 100, 0)}%  いちばん多い ${fmt((means[means.length - 1] / baseMean - 1) * 100, 0)}%`);
+  for (const r of [...rows.slice(0, 2), ...rows.slice(-3)]) {
+    const file = `stagebalance-${r.s}.json`;
+    writeFileSync(file, JSON.stringify(r.spec));
+    console.log(`  ステージ${r.s}  ${fmt(r.mean, 1)}枚・${fmt(r.time, 0)}秒・部品${r.parts}こ・ランプ ${r.ramp}  → ${file}`);
+  }
+}
+
+/** でたらめなステージをたくさん作って、玉が止まらないかを確かめる（止まったステージは JSON に書き出す） */
+function stageFuzz(stages, games) {
+  let long = 0;
+  let episodes = 0;
+  let totalGames = 0;
+  const bad = [];
+  for (let s = 0; s < stages; s += 1) {
+    const spec = randomStage(P.mulberry32((s + 1) * 104729 + 7));
+    const res = stuckRun(ST.buildStageTable(spec), games);
+    long += res.long;
+    episodes += res.episodes;
+    totalGames += games;
+    if (res.long > 0) {
+      const where = [...res.spots.entries()].filter(([, v]) => v.long > 0).map(([k, v]) => `(${k})×${v.long}`).join(" ");
+      bad.push({ s, long: res.long, where, spec });
+    }
+  }
+  console.log(`\n=== でたらめなステージ ${stages}こ × ${games}ゲーム（ふつうの腕前） ===`);
+  console.log(`0.5秒以上止まった回数 ${episodes}（1ゲーム ${fmt(episodes / totalGames, 2)}回）・2.3秒以上（玉ゆらしが入る）${long}回・止まったステージ ${bad.length}こ`);
+  for (const b of bad.slice(0, 20)) {
+    const file = `stagefuzz-${b.s}.json`;
+    writeFileSync(file, JSON.stringify(b.spec));
+    console.log(`  ステージ${b.s}  長く止まった ${b.long}回  ${b.where}  → ${file}（node scripts/simulate-pinball.mjs stuck 100 stage:${file}）`);
+  }
 }
 
 /**
@@ -494,7 +636,7 @@ function narrowGaps(table) {
 
 function gapReport(mapId) {
   const base = narrowGaps(M.getPinballTable(M.DEFAULT_MAP_ID));
-  const gaps = narrowGaps(M.getPinballTable(mapId));
+  const gaps = narrowGaps(tableFor(mapId));
   const list = [...gaps.entries()].filter(([k]) => mapId === M.DEFAULT_MAP_ID || !base.has(k)).sort((a, b) => a[1] - b[1]);
   console.log(`\n=== せまいすき間（マップ ${mapId}${mapId === M.DEFAULT_MAP_ID ? "" : "・いつもの台にもあるものはのぞく"}）: ${list.length}か所 ===`);
   for (const [k, gap] of list) console.log(`  ${gap.toFixed(1)}mm  ${k}`);
@@ -502,15 +644,18 @@ function gapReport(mapId) {
 
 // PINBALL_DEBUG_EXPORT があるときは、中身を渡すだけで何も回さない（調べもの用のスクリプトから import して使う）
 if (process.env.PINBALL_DEBUG_EXPORT) {
-  globalThis.__pb = { G, P, T, C, S, M, I, SKILLS, makeBot, botStep, samplePool, playGame, GIFU_ITEMS, ALL_ITEMS, SPEED };
+  globalThis.__pb = { G, P, T, C, S, M, I, ST, SKILLS, makeBot, botStep, samplePool, playGame, GIFU_ITEMS, ALL_ITEMS, SPEED };
 } else {
   const args = process.argv.slice(2);
   /** マップ（"all" で全部のマップ。無ければ、いつもの台） */
   const mapsOf = (arg) => (arg === "all" ? [...M.PINBALL_MAP_IDS] : [arg ?? M.DEFAULT_MAP_ID]);
-  for (const id of args[0] === "shotmap" || args[0] === "plunger" || args[0] === "gaps" ? mapsOf(args[1]) : args[0] === "stuck" ? mapsOf(args[2]) : mapsOf(args[3])) {
-    if (!M.isPinballMapId(id)) throw new Error(`マップ ${id} はありません（${M.PINBALL_MAP_IDS.join(" / ")}）`);
+  const mapArgs = args[0] === "shotmap" || args[0] === "plunger" || args[0] === "gaps" ? mapsOf(args[1]) : args[0] === "stuck" ? mapsOf(args[2]) : args[0] === "stagefuzz" || args[0] === "stagebalance" ? [] : mapsOf(args[3]);
+  for (const id of mapArgs) {
+    if (!M.isPinballMapId(id) && !id.startsWith("stage:")) throw new Error(`マップ ${id} はありません（${M.PINBALL_MAP_IDS.join(" / ")}・または stage:<ファイル>）`);
   }
-  if (args[0] === "shotmap") for (const id of mapsOf(args[1])) shotmap(id);
+  if (args[0] === "stagefuzz") stageFuzz(Number(args[1]) || 100, Number(args[2]) || 20);
+  else if (args[0] === "stagebalance") stageBalance(Number(args[1]) || 40, Number(args[2]) || 100, args[3] ?? "average");
+  else if (args[0] === "shotmap") for (const id of mapsOf(args[1])) shotmap(id);
   else if (args[0] === "plunger") for (const id of mapsOf(args[1])) plunger(id);
   else if (args[0] === "stuck") for (const id of mapsOf(args[2])) stuckReport(Number(args[1]) || 300, id);
   else if (args[0] === "gaps") for (const id of mapsOf(args[1])) gapReport(id);

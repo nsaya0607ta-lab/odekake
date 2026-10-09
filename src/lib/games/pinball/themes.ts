@@ -209,3 +209,12 @@ export const PINBALL_THEMES: Record<string, PinballTheme> = {
 export function getPinballTheme(id: string): PinballTheme {
   return PINBALL_THEMES[id] ?? PINBALL_THEMES[DEFAULT_MAP_ID]!;
 }
+
+/**
+ * 自分で作るステージの見た目。色・床の模様・曲・制覇のことばは、えらんだマップの見た目（look）のものを使い、
+ * 名前だけステージの名前にする
+ */
+export function stageTheme(look: string, name: string): PinballTheme {
+  const base = getPinballTheme(look);
+  return { ...base, id: "stage", name, title: "ステージ", lead: "", features: [] };
+}

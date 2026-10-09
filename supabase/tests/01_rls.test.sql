@@ -958,68 +958,75 @@ select pg_temp.record('グループ削除で写真とメッセージも消える
   and (select count(*) from public.friend_group_messages where group_id = :'sns_group_a'::uuid) = 0);
 
 -- -------------------------------------------------------------
--- ご当地ピンボールと青コイン
+-- ご当地ピンボールと赤コイン・自分で作るステージ
 -- -------------------------------------------------------------
 -- ここでは alice と bob が相互フレンド（carol はどちらとも友達ではない）。
--- 青コインは スコア ÷ 11875（切り捨て）、1プレイ 2400 まで（0136。はじめの赤コインの8割）。
--- 同じ round_id は二重に記録・付与しない。青コインの残高はほかのテストでも動くので、ピンボールの台帳の行で確かめる。
--- 結果の置き場はコインガチャのテストの gacha_last / gacha_as を使う。
+-- 赤コインは スコア ÷ 11875（切り捨て）、1プレイ 2400 まで（0138。0136〜0137 のあいだは青コインだった）。
+-- 同じ round_id は二重に記録・付与しない。結果の置き場はコインガチャのテストの gacha_last / gacha_as を使う。
 
 select pg_temp.gacha_as(:'alice',
-  $q$select public.record_pinball_result('pb-alice-0001', '21', 1234567, 120000, 6, 0, 0, 3)$q$);
-select pg_temp.record('ピンボール: スコア÷11875（切り捨て）の青コインが付く',
+  $q$select public.record_pinball_result('pb-alice-0001', 'default', 1234567, 120000, 6, 0, 0, 3)$q$);
+select pg_temp.record('ピンボール: スコア÷11875（切り捨て）の赤コインが付く',
   (select (result ->> 'coins')::integer from gacha_last) = 103
-  and (select (result ->> 'balance')::integer from gacha_last) = (select balance from public.user_blue_coins where user_id = :'alice')
+  and (select result ->> 'kind' from gacha_last) = 'red'
+  and (select (result ->> 'balance')::integer from gacha_last) = (select balance from public.user_red_coins where user_id = :'alice')
   and (select result ->> 'applied' from gacha_last) = 'true'
   and (select result ->> 'is_best' from gacha_last) = 'true'
-  and (select coalesce(sum(amount), 0) from public.blue_coin_events where user_id = :'alice' and event_type = 'pinball') = 103);
+  and (select coalesce(sum(amount), 0) from public.red_coin_events where user_id = :'alice' and event_type = 'pinball') = 103);
 
 select pg_temp.gacha_as(:'alice',
-  $q$select public.record_pinball_result('pb-alice-0001', '21', 1234567, 120000, 6, 0, 0, 3)$q$);
+  $q$select public.record_pinball_result('pb-alice-0001', 'default', 1234567, 120000, 6, 0, 0, 3)$q$);
 select pg_temp.record('ピンボール: 同じプレイを送り直しても二重に付かない（1回目の枚数を返す）',
   (select result ->> 'applied' from gacha_last) = 'false'
   and (select (result ->> 'coins')::integer from gacha_last) = 103
   and (select result ->> 'is_best' from gacha_last) = 'false'
-  and (select count(*) from public.blue_coin_events where user_id = :'alice' and event_type = 'pinball') = 1
+  and (select count(*) from public.red_coin_events where user_id = :'alice' and event_type = 'pinball') = 1
   and (select count(*) from public.pinball_scores where user_id = :'alice') = 1);
 
 select pg_temp.gacha_as(:'alice',
-  $q$select public.record_pinball_result('pb-alice-0002', 'default', 50000000, 600000, 30, 3, 9, 5)$q$);
-select pg_temp.record('ピンボール: 1プレイの青コインは2400枚まで',
+  $q$select public.record_pinball_result('pb-alice-0002', 'bumper', 50000000, 600000, 30, 3, 9, 5)$q$);
+select pg_temp.record('ピンボール: 1プレイの赤コインは2400枚まで',
   (select (result ->> 'coins')::integer from gacha_last) = 2400
-  and (select coalesce(sum(amount), 0) from public.blue_coin_events where user_id = :'alice' and event_type = 'pinball') = 2503);
+  and (select coalesce(sum(amount), 0) from public.red_coin_events where user_id = :'alice' and event_type = 'pinball') = 2503);
 
 select pg_temp.gacha_as(:'alice',
-  $q$select public.record_pinball_result('pb-alice-0003', '21', 11874, 30000, 0, 0, 0, 0)$q$);
+  $q$select public.record_pinball_result('pb-alice-0003', 'default', 11874, 30000, 0, 0, 0, 0)$q$);
 select pg_temp.record('ピンボール: 11874点は0枚。ベストは台ごとで、前の記録のまま',
   (select (result ->> 'coins')::integer from gacha_last) = 0
   and (select (result ->> 'best')::integer from gacha_last) = 1234567
   and (select result ->> 'is_best' from gacha_last) = 'false'
-  and (select count(*) from public.blue_coin_events where user_id = :'alice' and event_type = 'pinball') = 2);
+  and (select count(*) from public.red_coin_events where user_id = :'alice' and event_type = 'pinball') = 2);
 
-select pg_temp.record('ピンボール: もう赤コインは付かない',
-  (select count(*) from public.red_coin_events) = 0);
+select pg_temp.record('ピンボール: もう青コインは付かない',
+  (select count(*) from public.blue_coin_events where event_type = 'pinball') = 0);
 
 select pg_temp.expect_denied('ピンボール: 遊んだ時間のわりに大きすぎるスコアは記録できない', :'alice',
-  $q$select public.record_pinball_result('pb-alice-0004', '21', 20000000, 10000, 0, 0, 0, 0)$q$);
-select pg_temp.expect_denied('ピンボール: 台のIDの形がちがうと記録できない', :'alice',
-  $q$select public.record_pinball_result('pb-alice-0005', 'gifu', 1000, 60000, 0, 0, 0, 0)$q$);
+  $q$select public.record_pinball_result('pb-alice-0004', 'default', 20000000, 10000, 0, 0, 0, 0)$q$);
+select pg_temp.expect_denied('ピンボール: 台のIDの形がちがうと記録できない（前の県の台のIDも）', :'alice',
+  $q$select public.record_pinball_result('pb-alice-0005', '21', 1000, 60000, 0, 0, 0, 0)$q$);
 select pg_temp.expect_denied('ピンボール: 短すぎる round_id は記録できない', :'alice',
-  $q$select public.record_pinball_result('pb-1', '21', 1000, 60000, 0, 0, 0, 0)$q$);
+  $q$select public.record_pinball_result('pb-1', 'default', 1000, 60000, 0, 0, 0, 0)$q$);
+select pg_temp.expect_denied('ピンボール: ステージの台は、ステージの番号が無いと記録できない', :'alice',
+  $q$select public.record_pinball_result('pb-alice-0006', 'stage', 1000, 60000, 0, 0, 0, 0)$q$);
 
 select pg_temp.record('ピンボール: 未ログインは記録の関数を呼べず、台帳の関数はだれも直接呼べない',
-  not has_function_privilege('anon', 'public.record_pinball_result(text, text, integer, integer, integer, integer, integer, integer)', 'execute')
-  and has_function_privilege('authenticated', 'public.record_pinball_result(text, text, integer, integer, integer, integer, integer, integer)', 'execute')
+  not has_function_privilege('anon', 'public.record_pinball_result(text, text, integer, integer, integer, integer, integer, integer, uuid)', 'execute')
+  and has_function_privilege('authenticated', 'public.record_pinball_result(text, text, integer, integer, integer, integer, integer, integer, uuid)', 'execute')
+  and to_regprocedure('public.record_pinball_result(text, text, integer, integer, integer, integer, integer, integer)') is null
   and not has_function_privilege('authenticated', 'public.add_red_coin_event(uuid, text, integer, text, jsonb)', 'execute')
   and not has_function_privilege('authenticated', 'public.add_blue_coin_event(uuid, text, integer, text, jsonb)', 'execute')
-  and not has_function_privilege('anon', 'public.get_friend_pinball_ranking(text)', 'execute'));
+  and not has_function_privilege('authenticated', 'public.can_play_pinball_stage(uuid, uuid)', 'execute')
+  and not has_function_privilege('anon', 'public.get_friend_pinball_ranking(text)', 'execute')
+  and not has_function_privilege('anon', 'public.save_pinball_stage(uuid, text, jsonb, boolean)', 'execute')
+  and not has_function_privilege('anon', 'public.buy_pinball_part(text)', 'execute')
+  and not has_function_privilege('anon', 'public.get_pinball_stages()', 'execute'));
 
 select pg_temp.expect_blocked('赤コイン: 残高を直接書きかえられない', :'alice',
   $q$update public.user_red_coins set balance = 999999$q$);
 select pg_temp.expect_denied('赤コイン: 台帳に直接書きこめない', :'alice', format(
   $q$insert into public.red_coin_events (user_id, event_type, amount, idempotency_key) values (%L, 'pinball', 5000, 'hack-1')$q$, :'alice'));
 select pg_temp.expect_denied('ピンボール: 記録を直接書きこめない', :'alice', format(
-  $q$insert into public.pinball_scores (user_id, round_id, table_id, score, duration_ms) values (%L, 'pb-hack-0001', '21', 100000000, 1000)$q$, :'alice'));
+  $q$insert into public.pinball_scores (user_id, round_id, table_id, score, duration_ms) values (%L, 'pb-hack-0001', 'default', 100000000, 1000)$q$, :'alice'));
 select pg_temp.expect_blocked('ピンボール: 記録を直接書きかえられない', :'alice',
   $q$update public.pinball_scores set score = 199999999$q$);
 
@@ -1027,7 +1034,7 @@ select pg_temp.expect_count('ピンボール: 他人の記録は直接見えな�
 
 -- ランキングは自分とフレンドだけ（全部の台まとめて、ベストを出した台つき）
 select pg_temp.gacha_as(:'bob',
-  $q$select public.record_pinball_result('pb-bob-0001', '23', 2000000, 90000, 4, 0, 0, 2)$q$);
+  $q$select public.record_pinball_result('pb-bob-0001', 'coaster', 2000000, 90000, 4, 0, 0, 2)$q$);
 select pg_temp.gacha_as(:'carol',
   $q$select public.record_pinball_result('pb-carol-0001', 'default', 90000000, 900000, 4, 0, 0, 2)$q$);
 
@@ -1046,37 +1053,226 @@ end $$;
 
 select pg_temp.record('ピンボール: ランキングは自分とフレンドだけ・ベストを出した台つき',
   pg_temp.pinball_ranking_as(:'alice', 'best') = jsonb_build_array(
-    jsonb_build_object('rank', 1, 'user', :'alice'::uuid, 'score', 50000000, 'table', 'default', 'me', true),
-    jsonb_build_object('rank', 2, 'user', :'bob'::uuid, 'score', 2000000, 'table', '23', 'me', false)));
+    jsonb_build_object('rank', 1, 'user', :'alice'::uuid, 'score', 50000000, 'table', 'bumper', 'me', true),
+    jsonb_build_object('rank', 2, 'user', :'bob'::uuid, 'score', 2000000, 'table', 'coaster', 'me', false)));
 select pg_temp.record('ピンボール: 今週のランキングにも今日のプレイが入る',
   jsonb_array_length(pg_temp.pinball_ranking_as(:'alice', 'week')) = 2);
 select pg_temp.expect_denied('ピンボール: ランキングの期間は week か best だけ', :'alice',
   $q$select * from public.get_friend_pinball_ranking('month')$q$);
 
--- 新しいプレイは1時間に40回まで（関数を直接呼んで青コインをかせがれないように）。再送はそのまま通す。
+-- ---------- 部品（赤コインで買う） ----------
+-- alice の赤コインは 2503 枚（ピンボールの 103 + 2400）
+
+select pg_temp.expect_denied('部品: 知らない部品は買えない', :'alice',
+  $q$select public.buy_pinball_part('rocket')$q$);
+select pg_temp.gacha_as(:'alice', $q$select public.buy_pinball_part('bumper')$q$);
+select pg_temp.record('部品: 赤コインでバンパーを買える（はじめの3こ＋1こ・300枚）',
+  (select (result ->> 'owned')::integer from gacha_last) = 4
+  and (select (result ->> 'balance')::integer from gacha_last) = 2203
+  and (select count from public.user_pinball_parts where user_id = :'alice' and part = 'bumper') = 1
+  and (select amount from public.red_coin_events where user_id = :'alice' and event_type = 'pinball_part') = -300);
+select pg_temp.gacha_as(:'alice', $q$select public.buy_pinball_part('peg')$q$);
+select pg_temp.record('部品: くぎは10本ずつ（はじめの10本＋10本）',
+  (select (result ->> 'owned')::integer from gacha_last) = 20
+  and (select (result ->> 'balance')::integer from gacha_last) = 2103);
+select pg_temp.gacha_as(:'alice', $q$select public.buy_pinball_part('ramp_top')$q$);
+select pg_temp.expect_denied('部品: ランプは1つまで', :'alice',
+  $q$select public.buy_pinball_part('ramp_top')$q$);
+select pg_temp.expect_denied('部品: 赤コインが足りないと買えない（のこり903枚・コースターランプは1800枚）', :'alice',
+  $q$select public.buy_pinball_part('ramp_cross')$q$);
+select pg_temp.record('部品: 買えなかったときは赤コインがへらない',
+  (select balance from public.user_red_coins where user_id = :'alice') = 903
+  and (select count(*) from public.user_pinball_parts where user_id = :'alice' and part = 'ramp_cross' and count > 0) = 0);
+select pg_temp.expect_denied('部品: 赤コインが足りない人は買えない（bob は168枚・てっぺんランプは1200枚）', :'bob',
+  $q$select public.buy_pinball_part('ramp_top')$q$);
+select pg_temp.expect_blocked('部品: 持っている数を直接書きかえられない', :'alice',
+  $q$update public.user_pinball_parts set count = 999$q$);
+select pg_temp.expect_denied('部品: 持っている数を直接書きこめない', :'alice', format(
+  $q$insert into public.user_pinball_parts (user_id, part, count) values (%L, 'sling', 4)$q$, :'alice'));
+select pg_temp.expect_count('部品: 他人の部品は見えない', :'bob', 'select * from public.user_pinball_parts', 0);
+
+-- ---------- ステージ ----------
+-- 置き方（すき間）はアプリの API が確かめる。ここではデータの形・持っている部品の数・見える人・記録を確かめる
+
+\set stage_ok '{"v":1,"look":"default","ramp":"top","parts":[{"kind":"bumper","x":156,"y":262,"size":"l"},{"kind":"bumper","x":324,"y":262,"size":"l"},{"kind":"bumper","x":240,"y":340,"size":"l"},{"kind":"bumper","x":240,"y":200,"size":"s"}],"items":[{"x":120,"y":300},{"x":360,"y":300},{"x":240,"y":280}]}'
+\set stage_moved '{"v":1,"look":"default","ramp":"top","parts":[{"kind":"bumper","x":160,"y":262,"size":"l"},{"kind":"bumper","x":324,"y":262,"size":"l"},{"kind":"bumper","x":240,"y":340,"size":"l"},{"kind":"bumper","x":240,"y":200,"size":"s"}],"items":[{"x":120,"y":300},{"x":360,"y":300},{"x":240,"y":280}]}'
+\set stage_5bumpers '{"v":1,"look":"default","ramp":"standard","parts":[{"kind":"bumper","x":156,"y":262,"size":"l"},{"kind":"bumper","x":324,"y":262,"size":"l"},{"kind":"bumper","x":240,"y":340,"size":"l"},{"kind":"bumper","x":240,"y":200,"size":"s"},{"kind":"bumper","x":100,"y":400,"size":"m"}],"items":[{"x":120,"y":300},{"x":360,"y":300},{"x":240,"y":280}]}'
+\set stage_cross '{"v":1,"look":"default","ramp":"cross","parts":[],"items":[{"x":120,"y":300},{"x":360,"y":300},{"x":240,"y":280}]}'
+\set stage_bad_look '{"v":1,"look":"space","ramp":"standard","parts":[],"items":[{"x":120,"y":300},{"x":360,"y":300},{"x":240,"y":280}]}'
+\set stage_bad_part '{"v":1,"look":"default","ramp":"standard","parts":[{"kind":"rocket","x":200,"y":200}],"items":[{"x":120,"y":300},{"x":360,"y":300},{"x":240,"y":280}]}'
+\set stage_empty '{"v":1,"look":"pachinko","ramp":"standard","parts":[],"items":[{"x":120,"y":300},{"x":360,"y":300},{"x":240,"y":280}]}'
+
+select pg_temp.gacha_as(:'alice', format(
+  $q$select public.save_pinball_stage(null, 'みんなの台', %L::jsonb, true)$q$, :'stage_ok'));
+select result ->> 'id' as stage_a from gacha_last \gset
+select pg_temp.record('ステージ: 持っている部品で作って公開できる',
+  (select result ->> 'ok' from gacha_last) = 'true'
+  and (select shared from public.pinball_stages where id = :'stage_a') = true);
+
+select pg_temp.gacha_as(:'alice', format(
+  $q$select public.save_pinball_stage(null, 'ないしょの台', %L::jsonb, false)$q$, :'stage_empty'));
+select result ->> 'id' as stage_private from gacha_last \gset
+
+select pg_temp.expect_denied('ステージ: 持っているより多いバンパーは置けない', :'alice', format(
+  $q$select public.save_pinball_stage(null, 'バンパー5こ', %L::jsonb, false)$q$, :'stage_5bumpers'));
+select pg_temp.expect_denied('ステージ: 持っていないランプは使えない', :'alice', format(
+  $q$select public.save_pinball_stage(null, 'コースター', %L::jsonb, false)$q$, :'stage_cross'));
+select pg_temp.expect_denied('ステージ: 知らない見た目は使えない', :'alice', format(
+  $q$select public.save_pinball_stage(null, 'うちゅう', %L::jsonb, false)$q$, :'stage_bad_look'));
+select pg_temp.expect_denied('ステージ: 知らない部品は置けない', :'alice', format(
+  $q$select public.save_pinball_stage(null, 'ロケット', %L::jsonb, false)$q$, :'stage_bad_part'));
+select pg_temp.expect_denied('ステージ: 名前が空だと保存できない', :'alice', format(
+  $q$select public.save_pinball_stage(null, '   ', %L::jsonb, false)$q$, :'stage_ok'));
+select pg_temp.expect_denied('ステージ: 名前は16文字まで', :'alice', format(
+  $q$select public.save_pinball_stage(null, 'あいうえおかきくけこさしすせそたち', %L::jsonb, false)$q$, :'stage_ok'));
+select pg_temp.expect_denied('ステージ: ステージを直接書きこめない', :'alice', format(
+  $q$insert into public.pinball_stages (user_id, name, spec) values (%L, 'ずる', '{}'::jsonb)$q$, :'alice'));
+select pg_temp.expect_blocked('ステージ: ステージを直接書きかえられない', :'alice',
+  $q$update public.pinball_stages set shared = true$q$);
+select pg_temp.expect_denied('ステージ: 他人のステージは保存できない', :'bob', format(
+  $q$select public.save_pinball_stage(%L, 'のっとり', %L::jsonb, true)$q$, :'stage_a', :'stage_ok'));
+
+select pg_temp.expect_count('ステージ: フレンドには公開したステージだけ見える', :'bob',
+  'select * from public.pinball_stages', 1);
+select pg_temp.expect_count('ステージ: 自分のステージは公開していなくても見える', :'alice',
+  'select * from public.pinball_stages', 2);
+select pg_temp.expect_count('ステージ: フレンドでない人には見えない', :'carol',
+  'select * from public.pinball_stages', 0);
+select pg_temp.expect_count('ステージ: 一覧の関数でも、フレンドには公開したステージだけ', :'bob',
+  'select * from public.get_pinball_stages() where not is_mine', 1);
+select pg_temp.expect_count('ステージ: 一覧の関数でも、フレンドでない人には何も出ない', :'carol',
+  'select * from public.get_pinball_stages()', 0);
+
+-- フレンドが遊ぶ（記録はステージごと・赤コインも付く）
+select pg_temp.gacha_as(:'bob', format(
+  $q$select public.record_pinball_result('pb-bob-stage-0001', 'stage', 3000000, 120000, 5, 0, 0, 2, %L)$q$, :'stage_a'));
+select pg_temp.record('ステージ: フレンドが公開したステージを遊ぶと、記録と赤コインが付く',
+  (select result ->> 'applied' from gacha_last) = 'true'
+  and (select (result ->> 'coins')::integer from gacha_last) = 252
+  and (select result ->> 'is_best' from gacha_last) = 'true'
+  and (select stage_id from public.pinball_scores where user_id = :'bob' and round_id = 'pb-bob-stage-0001') = :'stage_a'::uuid);
+select pg_temp.expect_denied('ステージ: 公開していないステージは、フレンドでも遊べない', :'bob', format(
+  $q$select public.record_pinball_result('pb-bob-stage-0002', 'stage', 1000, 60000, 0, 0, 0, 0, %L)$q$, :'stage_private'));
+select pg_temp.expect_denied('ステージ: フレンドでない人は遊べない', :'carol', format(
+  $q$select public.record_pinball_result('pb-carol-stage-0001', 'stage', 1000, 60000, 0, 0, 0, 0, %L)$q$, :'stage_a'));
+select pg_temp.expect_denied('ステージ: ステージの番号はステージの台でだけ使える', :'bob', format(
+  $q$select public.record_pinball_result('pb-bob-stage-0003', 'default', 1000, 60000, 0, 0, 0, 0, %L)$q$, :'stage_a'));
+select pg_temp.gacha_as(:'alice', format(
+  $q$select public.record_pinball_result('pb-alice-stage-0001', 'stage', 900000, 120000, 5, 0, 0, 2, %L)$q$, :'stage_a'));
+
+create or replace function pg_temp.stage_ranking_as(p_user uuid, p_stage uuid)
+returns jsonb language plpgsql as $$
+declare v jsonb;
+begin
+  perform public.test_login(p_user);
+  set local role authenticated;
+  select coalesce(jsonb_agg(jsonb_build_object('rank', r.rank_position, 'user', r.user_id, 'score', r.best_score, 'me', r.is_me)
+                   order by r.rank_position), '[]'::jsonb)
+    into v from public.get_pinball_stage_ranking(p_stage) r;
+  set local role postgres;
+  return v;
+end $$;
+
+create or replace function pg_temp.stage_row_as(p_user uuid, p_stage uuid)
+returns jsonb language plpgsql as $$
+declare v jsonb;
+begin
+  perform public.test_login(p_user);
+  set local role authenticated;
+  select jsonb_build_object('mine', s.is_mine, 'my_best', s.my_best, 'top', s.top_score, 'plays', s.plays)
+    into v from public.get_pinball_stages() s where s.id = p_stage;
+  set local role postgres;
+  return v;
+end $$;
+
+select pg_temp.record('ステージ: ステージのランキングは、そのステージのプレイだけ',
+  pg_temp.stage_ranking_as(:'alice', :'stage_a') = jsonb_build_array(
+    jsonb_build_object('rank', 1, 'user', :'bob'::uuid, 'score', 3000000, 'me', false),
+    jsonb_build_object('rank', 2, 'user', :'alice'::uuid, 'score', 900000, 'me', true)));
+select pg_temp.record('ステージ: 一覧に、自分のベスト・いちばん・遊ばれた回数が出る',
+  pg_temp.stage_row_as(:'alice', :'stage_a') = jsonb_build_object('mine', true, 'my_best', 900000, 'top', 3000000, 'plays', 1)
+  and pg_temp.stage_row_as(:'bob', :'stage_a') = jsonb_build_object('mine', false, 'my_best', 3000000, 'top', 3000000, 'plays', 1));
+select pg_temp.record('ステージ: 全部の台のランキングには、ステージのプレイは入らない',
+  pg_temp.pinball_ranking_as(:'alice', 'best') = jsonb_build_array(
+    jsonb_build_object('rank', 1, 'user', :'alice'::uuid, 'score', 50000000, 'table', 'bumper', 'me', true),
+    jsonb_build_object('rank', 2, 'user', :'bob'::uuid, 'score', 2000000, 'table', 'coaster', 'me', false)));
+select pg_temp.expect_denied('ステージ: フレンドでない人はステージのランキングを見られない', :'carol', format(
+  $q$select * from public.get_pinball_stage_ranking(%L)$q$, :'stage_a'));
+
+-- 名前だけ変えても記録は残る。部品を動かすと、それより前のプレイはランキングに出ない
+select pg_temp.gacha_as(:'alice', format(
+  $q$select public.save_pinball_stage(%L, 'みんなの台２', %L::jsonb, true)$q$, :'stage_a', :'stage_ok'));
+select pg_temp.record('ステージ: 名前を変えただけなら、記録はそのまま',
+  (select result ->> 'layout_changed' from gacha_last) = 'false'
+  and jsonb_array_length(pg_temp.stage_ranking_as(:'alice', :'stage_a')) = 2);
+select pg_temp.gacha_as(:'alice', format(
+  $q$select public.save_pinball_stage(%L, 'みんなの台２', %L::jsonb, true)$q$, :'stage_a', :'stage_moved'));
+select pg_temp.record('ステージ: 部品を動かすと、前のプレイはランキングに出ない',
+  (select result ->> 'layout_changed' from gacha_last) = 'true'
+  and pg_temp.stage_ranking_as(:'alice', :'stage_a') = '[]'::jsonb
+  and pg_temp.stage_row_as(:'bob', :'stage_a') = jsonb_build_object('mine', false, 'my_best', null, 'top', null, 'plays', 1));
+
+-- 1人6つまで（いま2つ）
+select pg_temp.expect_ok('ステージ: 3つ目', :'alice', format($q$select public.save_pinball_stage(null, '3', %L::jsonb, false)$q$, :'stage_empty'));
+select pg_temp.expect_ok('ステージ: 4つ目', :'alice', format($q$select public.save_pinball_stage(null, '4', %L::jsonb, false)$q$, :'stage_empty'));
+select pg_temp.expect_ok('ステージ: 5つ目', :'alice', format($q$select public.save_pinball_stage(null, '5', %L::jsonb, false)$q$, :'stage_empty'));
+select pg_temp.expect_ok('ステージ: 6つ目', :'alice', format($q$select public.save_pinball_stage(null, '6', %L::jsonb, false)$q$, :'stage_empty'));
+select pg_temp.expect_denied('ステージ: 7つ目は作れない', :'alice', format(
+  $q$select public.save_pinball_stage(null, '7', %L::jsonb, false)$q$, :'stage_empty'));
+
+select pg_temp.expect_denied('ステージ: 他人のステージは消せない', :'bob', format(
+  $q$select public.delete_pinball_stage(%L)$q$, :'stage_a'));
+select pg_temp.expect_ok('ステージ: 自分のステージは消せる', :'alice', format(
+  $q$select public.delete_pinball_stage(%L)$q$, :'stage_a'));
+select pg_temp.record('ステージ: 消しても、遊んだ記録（赤コインの元）は残る',
+  (select count(*) from public.pinball_stages where id = :'stage_a') = 0
+  and (select stage_id from public.pinball_scores where user_id = :'bob' and round_id = 'pb-bob-stage-0001') is null
+  and (select table_id from public.pinball_scores where user_id = :'bob' and round_id = 'pb-bob-stage-0001') = 'stage');
+
+-- 新しいプレイは1時間に40回まで（関数を直接呼んで赤コインをかせがれないように）。再送はそのまま通す。
 insert into public.pinball_scores (user_id, round_id, table_id, score, duration_ms)
-select :'bob', 'pb-bob-bulk-' || lpad(i::text, 4, '0'), 'default', 1000, 60000 from generate_series(1, 39) i;
+select :'bob', 'pb-bob-bulk-' || lpad(i::text, 4, '0'), 'default', 1000, 60000 from generate_series(1, 38) i;
 select pg_temp.record('ピンボール: 1時間に41回目のプレイは記録できない',
   pg_temp.run_as(:'bob', $q$select public.record_pinball_result('pb-bob-0099', 'default', 1000, 60000, 0, 0, 0, 0)$q$) like '%TOO_MANY_ROUNDS%');
 select pg_temp.expect_ok('ピンボール: 回数の制限中でも、記録ずみのプレイの再送は通る', :'bob',
-  $q$select public.record_pinball_result('pb-bob-0001', '23', 2000000, 90000, 4, 0, 0, 2)$q$);
-select pg_temp.record('ピンボール: 再送で bob の青コインは増えない',
-  (select coalesce(sum(amount), 0) from public.blue_coin_events where user_id = :'bob' and event_type = 'pinball') = 168);
+  $q$select public.record_pinball_result('pb-bob-0001', 'coaster', 2000000, 90000, 4, 0, 0, 2)$q$);
+select pg_temp.record('ピンボール: 再送で bob の赤コインは増えない（168 + ステージの252）',
+  (select coalesce(sum(amount), 0) from public.red_coin_events where user_id = :'bob' and event_type = 'pinball') = 420);
 
--- 0136 より前のプレイ（赤コインで付けたもの）を送り直しても、青コインは付けない
+-- 0138 より前のプレイ（青コインで付けたもの）を送り直しても、赤コインは付けない
 insert into public.pinball_scores (user_id, round_id, table_id, score, duration_ms, coins, played_at)
-values (:'bob', 'pb-bob-old-0001', '23', 950000, 90000, 100, now() - interval '2 hours');
+values (:'bob', 'pb-bob-old-0001', 'default', 950000, 90000, 80, now() - interval '2 hours');
 select pg_temp.gacha_as(:'bob',
-  $q$select public.record_pinball_result('pb-bob-old-0001', '23', 950000, 90000, 0, 0, 0, 0)$q$);
-select pg_temp.record('ピンボール: 赤コインのころのプレイの再送では、青コインは付かない',
+  $q$select public.record_pinball_result('pb-bob-old-0001', 'default', 950000, 90000, 0, 0, 0, 0)$q$);
+select pg_temp.record('ピンボール: 前のプレイの再送では、赤コインは付かない',
   (select result ->> 'applied' from gacha_last) = 'false'
-  and (select coalesce(sum(amount), 0) from public.blue_coin_events where user_id = :'bob' and event_type = 'pinball') = 168);
+  and (select coalesce(sum(amount), 0) from public.red_coin_events where user_id = :'bob' and event_type = 'pinball') = 420);
 
--- ホームに降るコインは黄色・青だけ（0136 で赤はやめた）
-select pg_temp.expect_denied('赤コイン: ホームの赤コインはもう受け取れない', :'alice',
+-- ホームに降るコイン（黄色・青・赤）
+select pg_temp.gacha_as(:'alice',
   $q$select public.claim_home_coin_drop('red-drop-alice-01', 'red', 'common')$q$);
+select pg_temp.record('赤コイン: ホームに降った赤コインを受け取れる（ふつう5枚）',
+  (select result ->> 'granted' from gacha_last) = 'true'
+  and (select (result ->> 'amount')::integer from gacha_last) = 5
+  and (select (result ->> 'red_balance')::integer from gacha_last) = 983
+  and (select coalesce(sum(amount), 0) from public.red_coin_events where user_id = :'alice' and event_type = 'home_drop') = 5);
+select pg_temp.gacha_as(:'alice',
+  $q$select public.claim_home_coin_drop('blue-drop-alice-01', 'blue', 'common')$q$);
+select pg_temp.record('赤コイン: 赤コインを拾った直後は、ほかの色も8秒あける',
+  (select result ->> 'reason' from gacha_last) = 'too_soon');
 select pg_temp.expect_denied('ホームのコインの色がちがうと受け取れない', :'alice',
   $q$select public.claim_home_coin_drop('gold-drop-alice-01', 'gold', 'common')$q$);
+
+-- ログイン（毎日 赤コイン50枚）
+select pg_temp.gacha_as(:'carol', $q$select public.claim_login_bonus()$q$);
+select pg_temp.record('赤コイン: ログインで毎日50枚',
+  (select result ->> 'granted' from gacha_last) = 'true'
+  and (select (result ->> 'red_amount')::integer from gacha_last) = 50
+  and (select coalesce(sum(amount), 0) from public.red_coin_events where user_id = :'carol' and event_type = 'login') = 50);
+select pg_temp.gacha_as(:'carol', $q$select public.claim_login_bonus()$q$);
+select pg_temp.record('赤コイン: 同じ日の2回目のログインでは付かない',
+  (select (result ->> 'red_amount')::integer from gacha_last) = 0
+  and (select coalesce(sum(amount), 0) from public.red_coin_events where user_id = :'carol' and event_type = 'login') = 50);
 
 -- 後続のアカウント削除テストに影響しないよう、フレンド関係を戻しておく。
 delete from public.friendships where user_id in (:'alice', :'bob') and friend_user_id in (:'alice', :'bob');
@@ -1115,10 +1311,12 @@ select pg_temp.record('オーナー削除でそうびも消える',
 select pg_temp.record('オーナー削除で犬スキンの選択も消える',
   (select count(*) from public.user_dog_skin) = 0);
 
-select pg_temp.record('アカウント削除で赤コインの残高・台帳とピンボールの記録も消える',
+select pg_temp.record('アカウント削除で赤コインの残高・台帳とピンボールの記録・部品・ステージも消える',
   (select count(*) from public.user_red_coins) = 0
   and (select count(*) from public.red_coin_events) = 0
-  and (select count(*) from public.pinball_scores) = 0);
+  and (select count(*) from public.pinball_scores) = 0
+  and (select count(*) from public.user_pinball_parts) = 0
+  and (select count(*) from public.pinball_stages) = 0);
 
 -- -------------------------------------------------------------
 -- 結果

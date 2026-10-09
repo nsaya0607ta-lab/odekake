@@ -15,6 +15,7 @@ import { capsuleItem, type PinballItem } from "./game";
 import { pinballItems, pinballPrefCodes } from "./items";
 import { PINBALL_MAP_IDS, getPinballTable } from "./maps";
 import { getPinballSkill, starsForCount } from "./skills";
+import { getPinballPart } from "./stage";
 
 export type PinballShapeData = { paths: string[]; bbox: [number, number, number, number] };
 
@@ -23,7 +24,7 @@ export type PinballLobby = {
   maps: string[];
   /** 台に出るアイテム（持っているもの全部。レア度の高い順） */
   pool: PinballItem[];
-  /** バンパーの上にのせるアイテム（いちばんバンパーの多いマップのぶん。足りないところは ？カプセル） */
+  /** バンパーの上にのせるアイテム（いちばんバンパーの多いマップ・ステージのぶん。足りないところは ？カプセル） */
   bumperItems: PinballItem[];
   /** 図鑑ボーナス（すべての得点にかける倍率。アイテムを持っていなければ 1） */
   zukan: number;
@@ -73,7 +74,8 @@ export function buildPinballLobby(owned: ReadonlyMap<string, number>, optimize: 
       image: optimize(item.image!, 128),
     };
   });
-  const maxBumpers = Math.max(...PINBALL_MAP_IDS.map((id) => getPinballTable(id).bumpers.length));
+  // 自分で作るステージは、バンパーを持てる数まで置ける
+  const maxBumpers = Math.max(getPinballPart("bumper")?.max ?? 0, ...PINBALL_MAP_IDS.map((id) => getPinballTable(id).bumpers.length));
   const bumperItems = pool.slice(0, maxBumpers);
   for (let i = bumperItems.length; i < maxBumpers; i += 1) {
     const cap = capsuleItem(CAPSULE_ORDER[i % CAPSULE_ORDER.length]!);

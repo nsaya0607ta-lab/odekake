@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
-import { BlueCoinArt } from "@/components/coin-art";
+import { BlueCoinArt, RedCoinArt } from "@/components/coin-art";
 import { FULL_PLUNGE_POWER, MAX_SCORE, PINBALL_BALLS, SKILL_SHOT_POWER } from "@/lib/games/pinball/config";
 import {
   canLaunch,
@@ -20,6 +20,7 @@ import {
   type Tone,
 } from "@/lib/games/pinball/game";
 import { getPinballTable } from "@/lib/games/pinball/maps";
+import { buildStageTable, type StageSpec } from "@/lib/games/pinball/stage";
 import type { PinballLobby } from "@/lib/games/pinball/tables";
 import type { PinballTheme } from "@/lib/games/pinball/themes";
 import { DEFAULT_BGM_VOLUME, DEFAULT_TAP_VOLUME, getBgmVolume, getTapVolume, setBgmVolume, setTapVolume } from "@/lib/sound-settings";
@@ -34,16 +35,28 @@ export type PinballResult = {
   balance: number | null;
 };
 
+/**
+ * 遊ぶ台：マップか、自分で作るステージ。ステージの test はエディターのテストプレイ（記録しない・コインもつかない）。
+ * key は、ベストを覚えておく名前（マップの id か "stage:<ステージの番号>"）
+ */
+export type PinballCourse =
+  | { type: "map"; id: string }
+  | { type: "stage"; id: string | null; spec: StageSpec; test: boolean };
+
+export function courseKey(course: PinballCourse): string {
+  return course.type === "map" ? course.id : `stage:${course.id ?? "test"}`;
+}
+
 type Props = {
-  /** 遊ぶマップ */
-  mapId: string;
+  /** 遊ぶ台 */
+  course: PinballCourse;
   /** 台に出すアイテム・図鑑ボーナス・床の県の形（どのマップも同じ） */
   lobby: PinballLobby;
   theme: PinballTheme;
   best: number | null;
   onExit: () => void;
   onRestart: () => void;
-  onRecorded: (tableId: string, result: PinballResult) => void;
+  onRecorded: (key: string, result: PinballResult) => void;
 };
 
 type Hud = {
@@ -66,8 +79,9 @@ type Banner = { title: string; sub?: string; tone: Tone; ms: number; key: number
 type Submit =
   | { state: "idle" }
   | { state: "sending" }
-  | { state: "done"; coins: number; balance: number | null; isBest: boolean }
+  | { state: "done"; coins: number; balance: number | null; isBest: boolean; kind: "red" | "blue" }
   | { state: "offline" }
+  | { state: "test" }
   | { state: "error"; message: string };
 
 const LANE_LETTERS = ["お", "で", "か", "け"];
@@ -195,7 +209,7 @@ function useScreenLock(): void {
   }, []);
 }
 
-export function PinballPlay({ mapId, lobby, theme, best, onExit, onRestart, onRecorded }: Props) {
+export function PinballPlay({ course, lobby, theme, best, onExit, onRestart, onRecorded }: Props) {
   useScreenLock();
   const rootRef = useRef<HTMLDivElement | null>(null);
   const stageRef = useRef<HTMLDivElement | null>(null);
@@ -271,6 +285,12 @@ export function PinballPlay({ mapId, lobby, theme, best, onExit, onRestart, onRe
   const sendResult = useCallback(async () => {
     const g = gameRef.current;
     if (!g) return;
+    // エディターのテストプレイは記録しない（保存する前の形なので）
+    if (course.type === "stage" && (course.test || !course.id)) {
+      setSubmit({ state: "test" });
+      return;
+    }
+    const key = courseKey(course);
     setSubmit({ state: "sending" });
     try {
       const response = await fetch("/api/games/pinball/score", {
@@ -278,8 +298,8 @@ export function PinballPlay({ mapId, lobby, theme, best, onExit, onRestart, onRe
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           roundId: roundIdRef.current,
-          table: mapId,
-          // 記録できるのは MAX_SCORE まで（こえたぶんはカンスト。青コインはそれよりずっと手前で上限になる）
+          ...(course.type === "map" ? { table: course.id } : { stageId: course.id }),
+          // 記録できるのは MAX_SCORE まで（こえたぶんはカンスト。赤コインはそれよりずっと手前で上限になる）
           score: Math.min(MAX_SCORE, g.score),
           durationMs: Math.round(g.playTime * 1000),
           items: g.stats.items,
@@ -289,24 +309,26 @@ export function PinballPlay({ mapId, lobby, theme, best, onExit, onRestart, onRe
         }),
       });
       const payload = (await response.json().catch(() => null)) as
-        | { ok?: boolean; ready?: boolean; coins?: number; balance?: number; isBest?: boolean; error?: string }
+        | { ok?: boolean; ready?: boolean; kind?: string; coins?: number; balance?: number; isBest?: boolean; error?: string }
         | null;
       if (response.ok && payload?.ready === false) {
         setSubmit({ state: "offline" });
         const kept = Math.min(MAX_SCORE, g.score);
-        onRecorded(mapId, { score: kept, isBest: best === null || kept > best, coins: null, balance: null });
+        onRecorded(key, { score: kept, isBest: best === null || kept > best, coins: null, balance: null });
         return;
       }
       if (!response.ok || !payload?.ok) throw new Error(payload?.error ?? "記録できませんでした。");
       const coins = typeof payload.coins === "number" ? payload.coins : 0;
+      // もらったコインの色（赤コインにもどす前の DB では青コイン）
+      const kind = payload.kind === "blue" ? "blue" : "red";
       const balance = typeof payload.balance === "number" ? payload.balance : null;
       const isBest = payload.isBest === true;
-      setSubmit({ state: "done", coins, balance, isBest });
-      onRecorded(mapId, { score: Math.min(MAX_SCORE, g.score), isBest, coins, balance });
+      setSubmit({ state: "done", coins, balance, isBest, kind });
+      onRecorded(key, { score: Math.min(MAX_SCORE, g.score), isBest, coins, balance: kind === "red" ? balance : null });
     } catch (error) {
       setSubmit({ state: "error", message: error instanceof Error ? error.message : "記録できませんでした。" });
     }
-  }, [best, onRecorded, mapId]);
+  }, [best, onRecorded, course]);
 
   /* ---------- 準備と毎フレーム ---------- */
 
@@ -314,7 +336,7 @@ export function PinballPlay({ mapId, lobby, theme, best, onExit, onRestart, onRe
     const canvas = canvasRef.current;
     const stage = stageRef.current;
     if (!canvas || !stage) return;
-    const geometry = getPinballTable(mapId);
+    const geometry = course.type === "map" ? getPinballTable(course.id) : buildStageTable(course.spec);
     const game = createGame({ table: geometry, pool: lobby.pool, tableName: theme.name, conquestTitle: theme.conquestTitle, zukan: lobby.zukan });
     gameRef.current = game;
     // 開発中だけ、ブラウザから台を動かせるようにする（画面の確認・自動テスト用）
@@ -722,7 +744,7 @@ export function PinballPlay({ mapId, lobby, theme, best, onExit, onRestart, onRe
                   最初からやりなおす
                 </button>
                 <button type="button" className={styles.secondary} onClick={onExit}>
-                  やめて台えらびへ
+                  {course.type === "stage" && course.test ? "やめてエディターへ" : "やめて台えらびへ"}
                 </button>
               </div>
             </div>
@@ -737,7 +759,7 @@ export function PinballPlay({ mapId, lobby, theme, best, onExit, onRestart, onRe
                 {theme.name} ・ {Math.floor(g.playTime / 60)}分{Math.round(g.playTime % 60)}秒
               </p>
               <p className={styles.bigScore}>{g.score.toLocaleString("ja-JP")}</p>
-              {(submit.state === "done" && submit.isBest) || (submit.state !== "done" && (best === null || g.score > best) && g.score > 0) ? (
+              {submit.state === "test" ? null : (submit.state === "done" && submit.isBest) || (submit.state !== "done" && (best === null || g.score > best) && g.score > 0) ? (
                 <p className={styles.best}>ベスト更新！</p>
               ) : best !== null ? (
                 <p className={styles.sheetSub}>ベスト {best.toLocaleString("ja-JP")}</p>
@@ -760,17 +782,19 @@ export function PinballPlay({ mapId, lobby, theme, best, onExit, onRestart, onRe
                   <span className={styles.statValue}>{g.stats.maxCombo}</span>
                 </div>
               </div>
-              <div className={styles.coins}>
-                <BlueCoinArt className="h-7 w-7" />
+              <div className={styles.coins} data-kind={submit.state === "done" ? submit.kind : "red"}>
+                {submit.state === "done" && submit.kind === "blue" ? <BlueCoinArt className="h-7 w-7" /> : <RedCoinArt className="h-7 w-7" />}
                 {submit.state === "done" ? (
                   <span>
-                    <span className={styles.coinsGain}>+{submit.coins.toLocaleString("ja-JP")}</span> 青コイン
+                    <span className={styles.coinsGain}>+{submit.coins.toLocaleString("ja-JP")}</span> {submit.kind === "blue" ? "青コイン" : "赤コイン"}
                     {submit.balance !== null ? <span className={styles.coinsBalance}> （のこり {submit.balance.toLocaleString("ja-JP")}枚）</span> : null}
                   </span>
+                ) : submit.state === "test" ? (
+                  <span className={styles.coinsBalance}>テストプレイなので、記録と赤コインはありません</span>
                 ) : submit.state === "sending" || submit.state === "idle" ? (
                   <span className={styles.coinsBalance}>記録しています…</span>
                 ) : submit.state === "offline" ? (
-                  <span className={styles.coinsBalance}>青コインは準備中です（スコアだけ表示）</span>
+                  <span className={styles.coinsBalance}>赤コインは準備中です（スコアだけ表示）</span>
                 ) : (
                   <span className={styles.coinsBalance}>
                     {submit.message}{" "}
@@ -785,7 +809,7 @@ export function PinballPlay({ mapId, lobby, theme, best, onExit, onRestart, onRe
                   もう一度あそぶ
                 </button>
                 <button type="button" className={styles.secondary} onClick={onExit}>
-                  台えらびにもどる
+                  {course.type === "stage" && course.test ? "エディターにもどる" : "台えらびにもどる"}
                 </button>
               </div>
             </div>

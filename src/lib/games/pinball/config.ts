@@ -1,8 +1,8 @@
 /**
- * ご当地ピンボールの数字（得点・時間・青コイン）
+ * ご当地ピンボールの数字（得点・時間・赤コイン）
  * =============================================================
- * ゲーム本体（game.ts）・ルール説明・サーバー（スコアの記録と青コイン）が同じ値を見る。
- * 青コインの換算（COIN_POINTS・COIN_MAX）を変えるときは supabase/migrations の record_pinball_result も同じにする。
+ * ゲーム本体（game.ts）・ルール説明・サーバー（スコアの記録と赤コイン）が同じ値を見る。
+ * 赤コインの換算（COIN_POINTS・COIN_MAX）を変えるときは supabase/migrations の record_pinball_result も同じにする（いまは 0138）。
  * 1プレイの長さ・得点の分布は scripts/simulate-pinball.mjs で確かめる（結果は docs/pinball.md）。
  */
 import type { GachaRarity } from "@/lib/gacha/config";
@@ -122,9 +122,10 @@ export const GACHA_AWARDS = [
 export type GachaAwardId = (typeof GACHA_AWARDS)[number]["id"];
 
 /**
- * 青コイン：スコア ÷ COIN_POINTS（切り捨て）、1プレイ COIN_MAX まで。
- * はじめは赤コイン（スコア ÷ 9,500・3,000枚まで）だったが、赤コインはやめて青コインにし、枚数は8割にした
- * （9,500 ÷ 0.8 = 11,875、3,000 × 0.8 = 2,400）。平均的な腕前で約160枚（docs/pinball.md）。
+ * 赤コイン：スコア ÷ COIN_POINTS（切り捨て）、1プレイ COIN_MAX まで。自分で作るステージの部品を買うのに使う。
+ * はじめは赤コイン（スコア ÷ 9,500・3,000枚まで）→ 使い道が無かったので青コインにして枚数を8割に（9,500 ÷ 0.8 = 11,875、
+ * 3,000 × 0.8 = 2,400。0136）→ ステージの部品を買えるようにして、赤コインにもどした（枚数は青コインのときのまま。0138）。
+ * 平均的な腕前で約160枚（docs/pinball.md）。
  */
 export const COIN_POINTS = 11875;
 export const COIN_MAX = 2400;

@@ -13,8 +13,8 @@ import { arc, buildTable, CX, DEG, mirror, p, quad, type CircleDef, type ItemSpo
 /** いちばん基本のマップ（はじめからある台。前の「いつもの台」と同じ形） */
 export const DEFAULT_MAP_ID = "default";
 
-/** 骨組みの上でアイテムが浮かぶ場所（ガチャ穴の前・ランプとオービットの入口）。どのマップも同じ */
-const SHOT_SPOTS: readonly ItemSpot[] = [
+/** 骨組みの上でアイテムが浮かぶ場所（ガチャ穴の前・ランプとオービットの入口）。どのマップも同じ（自分で作るステージも） */
+export const SHOT_SPOTS: readonly ItemSpot[] = [
   // 通路・ガチャ穴の前
   { x: 178, y: 470, tier: 1, shot: "scoop" },
   { x: 302, y: 470, tier: 1, shot: "scoop" },
@@ -53,17 +53,23 @@ const DEFAULT_SPEC: MapSpec = {
  * スリングショットの外がわとスタンドアップターゲットの間も 28mm 以上あけて、玉が通りぬけるようにしてある
  * （スリングを外へ 3mm 太くしただけで、ここに玉がはさまって止まった）
  */
+/**
+ * てっぺんへ運ぶランプ（はねはね台）：のぼりきると、ワイヤーで上へ運ばれて、台の上のまん中の少し左（右のランプは右）に落ちる
+ * （インレーンへは戻らない）。自分で作るステージの「てっぺんランプ」も同じ形
+ */
+export const TOP_RAMP: RampShapeSpec = {
+  path: [p(124, 600), p(124, 420), p(124, 372), ...quad(p(124, 372), p(124, 186), p(191, 177), 12).slice(1)],
+  ascentEnd: 1,
+  topEnd: 2,
+  exitDir: p(0.8, 0.6),
+  // 落ちる向きを ±15° ばらつかせる（ぴったり同じ所に落ちると、その先の行き先が毎回同じになる）
+  exitSpread: 15 * DEG,
+};
+
 const BUMPER_SPEC: MapSpec = {
   id: "bumper",
-  // ランプ：のぼりきると、ワイヤーで上へ運ばれて、バンパーの部屋の上から飛びこむ（インレーンへは戻らない）
-  ramp: {
-    path: [p(124, 600), p(124, 420), p(124, 372), ...quad(p(124, 372), p(124, 186), p(191, 177), 12).slice(1)],
-    ascentEnd: 1,
-    topEnd: 2,
-    exitDir: p(0.8, 0.6),
-    // 落ちる向きを ±15° ばらつかせる（ぴったり同じ所に落ちると、その先の行き先が毎回同じになる）
-    exitSpread: 15 * DEG,
-  },
+  // ランプ：のぼりきると、ワイヤーで上へ運ばれて、バンパーの部屋の上から飛びこむ
+  ramp: TOP_RAMP,
   bumpers: [
     { x: 240, y: 198, r: 23 },
     { x: 187, y: 250, r: 23 },
@@ -181,11 +187,13 @@ function crossingRamp(): RampShapeSpec {
  * ジェットコースター台：左右のランプが X に交わって、反対がわのインレーンへ降りてくる長いランプ。
  * 右のフリッパーで左のランプを打つと、玉は右のインレーンへ戻ってくるので、同じショットをくり返しねらえる
  */
-const COASTER_RAMP = crossingRamp();
+export const COASTER_RAMP: RampShapeSpec = crossingRamp();
+/** 右のコースターランプ（左の折り返し。左のインレーンへ降りる） */
+export const COASTER_RAMP_RIGHT: RampShapeSpec = { ...COASTER_RAMP, path: COASTER_RAMP.path.map(mirror), exitDir: p(-COASTER_RAMP.exitDir.x, COASTER_RAMP.exitDir.y) };
 const COASTER_SPEC: MapSpec = {
   id: "coaster",
   ramp: COASTER_RAMP,
-  rampRight: { ...COASTER_RAMP, path: COASTER_RAMP.path.map(mirror), exitDir: p(-COASTER_RAMP.exitDir.x, COASTER_RAMP.exitDir.y) },
+  rampRight: COASTER_RAMP_RIGHT,
   bumpers: [
     { x: 120, y: 300, r: 22 },
     { x: 360, y: 300, r: 22 },
