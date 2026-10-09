@@ -5,16 +5,19 @@ import { RedCoinArt } from "@/components/coin-art";
 import { TOP_RAMP } from "@/lib/games/pinball/maps";
 import {
   BUMPER_RADIUS,
+  canRotatePart,
   cleanStageName,
   mirrorPart,
   partProblem,
   partRadius,
+  partShape,
   partShapeDistance,
   PART_NAMES,
   placeableSpots,
   PINBALL_PARTS,
   RAMP_NAMES,
   RAMP_PART,
+  rotatePart,
   snapStagePoint,
   stageSlingDef,
   STAGE_AREA,
@@ -80,10 +83,21 @@ function newPart(kind: StagePartKind, at: Pt): StagePart {
       return { kind, x: at.x, y: at.y, size: "m" };
     case "pinwheel":
       return { kind, x: at.x, y: at.y, dir: 1 };
+    case "bar":
+      return { kind, x: at.x, y: at.y, dir: at.x < CX ? 1 : -1 };
     case "sling":
       // 台のまん中へ向けてはじく
       return { kind, x: at.x, y: at.y, face: at.x < CX ? "right" : "left" };
-    default:
+    case "rail":
+    case "rubber":
+      // 台のまん中へ向けて下がる向き（左がわは「＼」、右がわは「／」）
+      return { kind, x: at.x, y: at.y, angle: at.x < CX ? 60 : 120 };
+    case "drop":
+      return { kind, x: at.x, y: at.y, angle: 0 };
+    case "post":
+    case "peg":
+    case "block":
+    case "spinner":
       return { kind, x: at.x, y: at.y };
   }
 }
@@ -133,6 +147,56 @@ function PartGhost({ part, theme, ok, image }: { part: StagePart; theme: Pinball
     case "sling": {
       const s = stageSlingDef(part);
       body = <path d={`M${s.a.x} ${s.a.y}L${s.b.x} ${s.b.y}L${s.c.x} ${s.c.y}Z`} fill={colors.accent} fillOpacity={0.7} stroke="#ffffff" strokeWidth={3} strokeLinejoin="round" />;
+      break;
+    }
+    case "bar": {
+      // 回転バー：羽根のとどく円と、横にした2本の羽根
+      const reach = partRadius(part);
+      body = (
+        <>
+          <circle cx={part.x} cy={part.y} r={reach} fill="none" stroke={colors.accent} strokeOpacity={0.6} strokeWidth={1.5} strokeDasharray="4 4" />
+          <line x1={part.x - reach + 4.5} y1={part.y} x2={part.x + reach - 4.5} y2={part.y} stroke={colors.accent2} strokeWidth={9} strokeLinecap="round" />
+          <circle cx={part.x} cy={part.y} r={7} fill="#c9d2dc" />
+        </>
+      );
+      break;
+    }
+    case "block": {
+      // 当たり判定の形（中心線のひし形を、線の太さで太らせる）のとおりに描く
+      const prims = partShape(part);
+      const pts = prims.map((q) => `${q.ax},${q.ay}`).join(" ");
+      body = <polygon points={pts} fill={colors.accent2} fillOpacity={0.8} stroke={colors.accent2} strokeWidth={(prims[0]?.r ?? 3) * 2} strokeLinejoin="round" />;
+      break;
+    }
+    case "spinner": {
+      const [pr] = partShape(part);
+      if (!pr) break;
+      body = (
+        <>
+          <line x1={pr.ax} y1={pr.ay} x2={pr.bx} y2={pr.by} stroke="#c9d2dc" strokeWidth={1.6} />
+          <rect x={pr.ax + 3} y={part.y - 4.5} width={pr.bx - pr.ax - 6} height={9} fill="#d9dfe6" stroke={colors.accent} strokeWidth={2} />
+        </>
+      );
+      break;
+    }
+    case "rail":
+    case "rubber":
+    case "drop": {
+      // まっすぐな部品：当たり判定の太さのまま線で描く（ゴムは白、ターゲットは色）
+      const [pr] = partShape(part);
+      if (!pr) break;
+      const color = part.kind === "rail" ? "#c9d2dc" : part.kind === "rubber" ? "#f4f0e7" : colors.accent;
+      body = (
+        <>
+          <line x1={pr.ax} y1={pr.ay} x2={pr.bx} y2={pr.by} stroke={color} strokeWidth={pr.r * 2} strokeLinecap={part.kind === "drop" ? "butt" : "round"} />
+          {part.kind === "rubber"
+            ? [
+                [pr.ax, pr.ay],
+                [pr.bx, pr.by],
+              ].map(([x, y]) => <circle key={`${x}-${y}`} cx={x} cy={y} r={2.6} fill="#9aa5b2" />)
+            : null}
+        </>
+      );
       break;
     }
   }
@@ -342,6 +406,31 @@ export function PinballStageEditor({ draft, lobby, owned, redCoins, onClose, onS
       return;
     }
     setSpec(next);
+  };
+
+  /** えらんでいる部品の向きを次の向きにする（置けない向きはとばす。どの向きも置けなければ、そのまま） */
+  const rotateSelected = () => {
+    if (selected?.type !== "part") return;
+    const current = specRef.current;
+    const original = current.parts[selected.index];
+    if (!original || !canRotatePart(original)) return;
+    let part: StagePart = original;
+    let firstProblem: string | null = null;
+    for (let tries = 0; tries < 8; tries += 1) {
+      part = rotatePart(part);
+      if (!canRotatePart(part) || part.angle === original.angle) break;
+      const parts = current.parts.slice();
+      parts[selected.index] = part;
+      const next = { ...current, parts };
+      const problem = partProblem(next, selected.index);
+      if (!problem) {
+        setSpec(next);
+        say(`${PART_NAMES[part.kind]}の向きを変えました（${part.angle}°）`, "ok");
+        return;
+      }
+      firstProblem ??= problem;
+    }
+    say(`ほかの向きには置けません：${firstProblem ?? ""}`);
   };
 
   const removeSelected = () => {
@@ -593,13 +682,18 @@ export function PinballStageEditor({ draft, lobby, owned, redCoins, onClose, onS
                   </button>
                 ))
               : null}
-            {selectedPart.kind === "pinwheel" ? (
+            {selectedPart.kind === "pinwheel" || selectedPart.kind === "bar" ? (
               <button
                 type="button"
-                onClick={() => changeSelected((part) => ({ ...(part as Extract<StagePart, { kind: "pinwheel" }>), dir: (part as Extract<StagePart, { kind: "pinwheel" }>).dir === 1 ? -1 : 1 }))}
+                onClick={() => changeSelected((part) => (part.kind === "pinwheel" || part.kind === "bar" ? { ...part, dir: part.dir === 1 ? -1 : 1 } : part))}
                 className="rounded-full bg-white/10 px-3 py-1.5 text-[12px] font-black"
               >
                 {selectedPart.dir === 1 ? "↻ 時計まわり" : "↺ 反時計まわり"}
+              </button>
+            ) : null}
+            {canRotatePart(selectedPart) ? (
+              <button type="button" onClick={rotateSelected} className="rounded-full bg-white/10 px-3 py-1.5 text-[12px] font-black" aria-label={`向きを変える（いまは ${selectedPart.angle}°）`}>
+                ↻ 向きを変える
               </button>
             ) : null}
             {selectedPart.kind === "sling" ? (
@@ -632,7 +726,7 @@ export function PinballStageEditor({ draft, lobby, owned, redCoins, onClose, onS
               <span className="ml-0.5">部品のお店 ›</span>
             </button>
           </div>
-          <div className="mt-1.5 grid grid-cols-5 gap-1.5">
+          <div className="mt-1.5 grid grid-cols-4 gap-1.5">
             {STAGE_PART_KINDS.map((kind) => {
               const left = owned[kind] - counts[kind];
               const active = placing === kind;
@@ -662,8 +756,8 @@ export function PinballStageEditor({ draft, lobby, owned, redCoins, onClose, onS
                     bumperItem={nextBumperItem}
                     className="h-10 w-10 rounded-xl shadow-[0_2px_6px_rgba(0,0,0,0.45)] ring-1 ring-white/15"
                   />
-                  <span className="mt-1 text-[9px] font-black leading-none">{PART_NAMES[kind]}</span>
-                  <span className="mt-0.5 text-[9px] font-bold tabular-nums text-white/60">
+                  <span className="mt-1 text-center text-[9px] font-black leading-[1.15]">{PART_NAMES[kind]}</span>
+                  <span className="mt-auto pt-0.5 text-[9px] font-bold tabular-nums text-white/60">
                     {counts[kind]}/{owned[kind]}
                   </span>
                 </button>

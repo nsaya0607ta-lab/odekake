@@ -1061,29 +1061,36 @@ select pg_temp.expect_denied('ピンボール: ランキングの期間は week 
   $q$select * from public.get_friend_pinball_ranking('month')$q$);
 
 -- ---------- 部品（赤コインで買う） ----------
--- alice の赤コインは 2503 枚（ピンボールの 103 + 2400）
+-- alice の赤コインは 2503 枚（ピンボールの 103 + 2400）。部品の値段（0139 で3倍）には足りないので、
+-- もう1回遊んでおく（1プレイ 2400 枚まで）→ 4903 枚
+select pg_temp.gacha_as(:'alice',
+  $q$select public.record_pinball_result('pb-alice-0007', 'pachinko', 30000000, 600000, 0, 0, 0, 0)$q$);
+select pg_temp.record('部品: 買い物の前の alice の赤コインは 4903 枚',
+  (select balance from public.user_red_coins where user_id = :'alice') = 4903);
 
 select pg_temp.expect_denied('部品: 知らない部品は買えない', :'alice',
   $q$select public.buy_pinball_part('rocket')$q$);
 select pg_temp.gacha_as(:'alice', $q$select public.buy_pinball_part('bumper')$q$);
-select pg_temp.record('部品: 赤コインでバンパーを買える（はじめの3こ＋1こ・300枚）',
+select pg_temp.record('部品: 赤コインでバンパーを買える（はじめの3こ＋1こ・900枚）',
   (select (result ->> 'owned')::integer from gacha_last) = 4
-  and (select (result ->> 'balance')::integer from gacha_last) = 2203
+  and (select (result ->> 'balance')::integer from gacha_last) = 4003
   and (select count from public.user_pinball_parts where user_id = :'alice' and part = 'bumper') = 1
-  and (select amount from public.red_coin_events where user_id = :'alice' and event_type = 'pinball_part') = -300);
+  and (select amount from public.red_coin_events where user_id = :'alice' and event_type = 'pinball_part') = -900);
 select pg_temp.gacha_as(:'alice', $q$select public.buy_pinball_part('peg')$q$);
-select pg_temp.record('部品: くぎは10本ずつ（はじめの10本＋10本）',
+select pg_temp.record('部品: くぎは10本ずつ（はじめの10本＋10本・300枚）',
   (select (result ->> 'owned')::integer from gacha_last) = 20
-  and (select (result ->> 'balance')::integer from gacha_last) = 2103);
+  and (select (result ->> 'balance')::integer from gacha_last) = 3703);
 select pg_temp.gacha_as(:'alice', $q$select public.buy_pinball_part('ramp_top')$q$);
 select pg_temp.expect_denied('部品: ランプは1つまで', :'alice',
   $q$select public.buy_pinball_part('ramp_top')$q$);
-select pg_temp.expect_denied('部品: 赤コインが足りないと買えない（のこり903枚・コースターランプは1800枚）', :'alice',
+select pg_temp.expect_denied('部品: 赤コインが足りないと買えない（のこり103枚・コースターランプは5400枚）', :'alice',
   $q$select public.buy_pinball_part('ramp_cross')$q$);
+select pg_temp.expect_denied('部品: 新しい部品も、赤コインが足りないと買えない（ガイドレールは450枚）', :'alice',
+  $q$select public.buy_pinball_part('rail')$q$);
 select pg_temp.record('部品: 買えなかったときは赤コインがへらない',
-  (select balance from public.user_red_coins where user_id = :'alice') = 903
+  (select balance from public.user_red_coins where user_id = :'alice') = 103
   and (select count(*) from public.user_pinball_parts where user_id = :'alice' and part = 'ramp_cross' and count > 0) = 0);
-select pg_temp.expect_denied('部品: 赤コインが足りない人は買えない（bob は168枚・てっぺんランプは1200枚）', :'bob',
+select pg_temp.expect_denied('部品: 赤コインが足りない人は買えない（bob は168枚・てっぺんランプは3600枚）', :'bob',
   $q$select public.buy_pinball_part('ramp_top')$q$);
 select pg_temp.expect_blocked('部品: 持っている数を直接書きかえられない', :'alice',
   $q$update public.user_pinball_parts set count = 999$q$);
@@ -1101,6 +1108,9 @@ select pg_temp.expect_count('部品: 他人の部品は見えない', :'bob', 's
 \set stage_bad_look '{"v":1,"look":"space","ramp":"standard","parts":[],"items":[{"x":120,"y":300},{"x":360,"y":300},{"x":240,"y":280}]}'
 \set stage_bad_part '{"v":1,"look":"default","ramp":"standard","parts":[{"kind":"rocket","x":200,"y":200}],"items":[{"x":120,"y":300},{"x":360,"y":300},{"x":240,"y":280}]}'
 \set stage_empty '{"v":1,"look":"pachinko","ramp":"standard","parts":[],"items":[{"x":120,"y":300},{"x":360,"y":300},{"x":240,"y":280}]}'
+\set stage_rails '{"v":1,"look":"default","ramp":"standard","parts":[{"kind":"rail","x":100,"y":220,"angle":60},{"kind":"rail","x":380,"y":220,"angle":120}],"items":[{"x":120,"y":300},{"x":360,"y":300},{"x":240,"y":280}]}'
+\set stage_3rails '{"v":1,"look":"default","ramp":"standard","parts":[{"kind":"rail","x":100,"y":220,"angle":60},{"kind":"rail","x":380,"y":220,"angle":120},{"kind":"rail","x":240,"y":400,"angle":90}],"items":[{"x":120,"y":300},{"x":360,"y":300},{"x":240,"y":280}]}'
+\set stage_spinner '{"v":1,"look":"default","ramp":"standard","parts":[{"kind":"spinner","x":240,"y":220}],"items":[{"x":120,"y":300},{"x":360,"y":300},{"x":240,"y":280}]}'
 
 select pg_temp.gacha_as(:'alice', format(
   $q$select public.save_pinball_stage(null, 'みんなの台', %L::jsonb, true)$q$, :'stage_ok'));
@@ -1121,6 +1131,10 @@ select pg_temp.expect_denied('ステージ: 知らない見た目は使えない
   $q$select public.save_pinball_stage(null, 'うちゅう', %L::jsonb, false)$q$, :'stage_bad_look'));
 select pg_temp.expect_denied('ステージ: 知らない部品は置けない', :'alice', format(
   $q$select public.save_pinball_stage(null, 'ロケット', %L::jsonb, false)$q$, :'stage_bad_part'));
+select pg_temp.expect_denied('ステージ: 新しい部品も、持っている数（ガイドレールははじめの2本）より多くは置けない', :'alice', format(
+  $q$select public.save_pinball_stage(null, 'レール3本', %L::jsonb, false)$q$, :'stage_3rails'));
+select pg_temp.expect_denied('ステージ: 持っていない新しい部品（スピナー）は置けない', :'alice', format(
+  $q$select public.save_pinball_stage(null, 'スピナー', %L::jsonb, false)$q$, :'stage_spinner'));
 select pg_temp.expect_denied('ステージ: 名前が空だと保存できない', :'alice', format(
   $q$select public.save_pinball_stage(null, '   ', %L::jsonb, false)$q$, :'stage_ok'));
 select pg_temp.expect_denied('ステージ: 名前は16文字まで', :'alice', format(
@@ -1213,7 +1227,7 @@ select pg_temp.record('ステージ: 部品を動かすと、前のプレイは�
   and pg_temp.stage_row_as(:'bob', :'stage_a') = jsonb_build_object('mine', false, 'my_best', null, 'top', null, 'plays', 1));
 
 -- 1人6つまで（いま2つ）
-select pg_temp.expect_ok('ステージ: 3つ目', :'alice', format($q$select public.save_pinball_stage(null, '3', %L::jsonb, false)$q$, :'stage_empty'));
+select pg_temp.expect_ok('ステージ: 3つ目（新しい部品のガイドレールを、はじめから持っている2本まで置ける）', :'alice', format($q$select public.save_pinball_stage(null, '3', %L::jsonb, false)$q$, :'stage_rails'));
 select pg_temp.expect_ok('ステージ: 4つ目', :'alice', format($q$select public.save_pinball_stage(null, '4', %L::jsonb, false)$q$, :'stage_empty'));
 select pg_temp.expect_ok('ステージ: 5つ目', :'alice', format($q$select public.save_pinball_stage(null, '5', %L::jsonb, false)$q$, :'stage_empty'));
 select pg_temp.expect_ok('ステージ: 6つ目', :'alice', format($q$select public.save_pinball_stage(null, '6', %L::jsonb, false)$q$, :'stage_empty'));
@@ -1254,7 +1268,7 @@ select pg_temp.gacha_as(:'alice',
 select pg_temp.record('赤コイン: ホームに降った赤コインを受け取れる（ふつう5枚）',
   (select result ->> 'granted' from gacha_last) = 'true'
   and (select (result ->> 'amount')::integer from gacha_last) = 5
-  and (select (result ->> 'red_balance')::integer from gacha_last) = 983
+  and (select (result ->> 'red_balance')::integer from gacha_last) = 183
   and (select coalesce(sum(amount), 0) from public.red_coin_events where user_id = :'alice' and event_type = 'home_drop') = 5);
 select pg_temp.gacha_as(:'alice',
   $q$select public.claim_home_coin_drop('blue-drop-alice-01', 'blue', 'common')$q$);

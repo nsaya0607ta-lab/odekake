@@ -85,6 +85,9 @@ export const POINTS = {
   standup: 3000,
   standupsAll: 30000,
   pinwheel: 500,
+  /** 自分で作るステージのドロップターゲット（1つたおすごと）と、全部たおしたときのボーナス（ターゲット1つあたり） */
+  stageDrop: 1000,
+  stageDropsAll: 3000,
   skillShot: 75000,
   conquest: 500000,
   jackpot: 250000,

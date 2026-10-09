@@ -47,9 +47,9 @@ function PinballTableShapes({ table, theme, floor }: { table: TableGeometry; the
           <path
             key={`w${i}`}
             d={d(w.pts, w.closed)}
-            fill={w.look === "sling" ? colors.accent : "none"}
-            fillOpacity={0.55}
-            stroke={w.look === "ramp-mouth" ? colors.plastic : colors.rail}
+            fill={w.look === "sling" ? colors.accent : w.look === "block" ? colors.accent2 : "none"}
+            fillOpacity={w.look === "block" ? 0.85 : 0.55}
+            stroke={w.look === "ramp-mouth" ? colors.plastic : w.look === "rubber" ? "#f4f0e7" : w.look === "block" ? colors.accent2 : colors.rail}
             strokeOpacity={0.85}
             strokeWidth={Math.max(6, w.r * 2.4)}
             strokeLinecap="round"
@@ -67,12 +67,19 @@ function PinballTableShapes({ table, theme, floor }: { table: TableGeometry; the
       {table.circles.map((c, i) => (
         <circle key={`c${i}`} cx={c.x} cy={c.y} r={c.look === "peg" ? 6 : c.r + 2} fill={c.look === "peg" ? colors.accent : colors.rail} fillOpacity={0.9} />
       ))}
-      {/* かざぐるま */}
+      {/* かざぐるま（2本羽根の回転バーは横の1本） */}
       {table.pinwheels.map((pw, i) => (
         <g key={`p${i}`} stroke={colors.accent2} strokeWidth={9} strokeLinecap="round">
           <line x1={pw.x - pw.len} y1={pw.y} x2={pw.x + pw.len} y2={pw.y} />
-          <line x1={pw.x} y1={pw.y - pw.len} x2={pw.x} y2={pw.y + pw.len} />
+          {pw.arms > 2 ? <line x1={pw.x} y1={pw.y - pw.len} x2={pw.x} y2={pw.y + pw.len} /> : null}
         </g>
+      ))}
+      {/* スピナー・ドロップターゲット（自分で作るステージ） */}
+      {table.spinners.map((sp, i) => (
+        <rect key={`s${i}`} x={sp.x - sp.w / 2} y={sp.y - 5} width={sp.w} height={10} fill="#d9dfe6" stroke={colors.accent} strokeWidth={3} />
+      ))}
+      {table.stageDrops.map((dt, i) => (
+        <path key={`d${i}`} d={d([dt.a, dt.b])} stroke={colors.accent} strokeWidth={12} />
       ))}
       {/* バンパー */}
       {table.bumpers.map((b, i) => (

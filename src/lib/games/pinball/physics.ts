@@ -62,6 +62,8 @@ const BUMPER_KICK = { base: 1750, gain: 0.22, max: 3100, cooldown: 0.08 };
 const SLING_KICK = { base: 1450, gain: 0.25, max: 2700, threshold: 260, cooldown: 0.1 };
 /** ドロップターゲットが倒れる当たりの強さ */
 const DROP_THRESHOLD = 110;
+/** 自分で作るステージのドロップターゲットの太さ（半径 mm。ガチャ穴の前のものと同じ） */
+export const STAGE_DROP_R = 3.5;
 /** スタンドアップターゲットが光る当たりの強さ（前の面に、これより速く当たったとき） */
 const STANDUP_THRESHOLD = 120;
 /**
@@ -109,12 +111,12 @@ export const PLUNGER_TRAVEL = 34;
 
 /* ---------- 形を当たり判定用に組み直す ---------- */
 
-type SegKind = "wall" | "sling" | "drop" | "standup" | "gate" | "outlaneGate" | "plunger";
+type SegKind = "wall" | "sling" | "drop" | "stageDrop" | "standup" | "gate" | "outlaneGate" | "plunger";
 type Seg = {
   ax: number; ay: number; bx: number; by: number;
   ux: number; uy: number; len: number;
   r: number; mat: Material; kind: SegKind;
-  /** スリング・ドロップ・アウトレーンの扉の番号 */
+  /** スリング・ドロップ（ステージのドロップも）・アウトレーンの扉の番号 */
   idx: number;
   /** 片側からだけ当たる壁（中心からの距離の2乗がこれより小さい玉だけ当たる） */
   inside: { x: number; y: number; r2: number } | null;
@@ -152,6 +154,8 @@ function buildCollision(table: TableGeometry): Collision {
   table.standups.forEach((bank, bi) => bank.targets.forEach((t, ti) => addSeg(t.a, t.b, 2.5, "plastic", "standup", bi * 3 + ti, null, t.face)));
   addSeg(table.shooterGate.a, table.shooterGate.b, 2, "metal", "gate");
   table.outlaneGates.forEach((g, i) => addSeg(g.a, g.b, 3, "metal", "outlaneGate", i));
+  // 自分で作るステージのドロップターゲット（マップには無いので、マップの当たり判定の並びは変わらない）
+  table.stageDrops.forEach((d, i) => addSeg(d.a, d.b, STAGE_DROP_R, "plastic", "stageDrop", i));
   // 打ち出しレーンの床（プランジャーの先）。引くと下がる
   const floorY = table.plungerRest.y + BALL_R + 1;
   addSeg({ x: 486, y: floorY }, { x: 522, y: floorY }, 1, "rubber", "plunger");
@@ -201,8 +205,8 @@ export type Ball = {
   still: number;
   /** 最後にフリッパーに触れた時刻 */
   flipperAt: number;
-  /** センサーごとの最後に反応した時刻（二重に数えない） */
-  sensorAt: Partial<Record<SensorId, number>>;
+  /** センサー・スピナーごとの最後に反応した時刻（二重に数えない。スピナーは spin0, spin1, …） */
+  sensorAt: Partial<Record<SensorId | `spin${number}`, number>>;
 };
 
 export type FlipperState = {
@@ -218,6 +222,8 @@ export type PhysEvent =
   | { type: "bumper"; index: number; ballId: number; x: number; y: number }
   | { type: "sling"; index: number; ballId: number }
   | { type: "drop"; index: number; ballId: number }
+  | { type: "stageDrop"; index: number; ballId: number }
+  | { type: "spin"; index: number; ballId: number; vx: number; vy: number }
   | { type: "standup"; index: number; ballId: number }
   | { type: "pinwheel"; index: number; ballId: number; speed: number }
   | { type: "gateKick"; index: number; ballId: number }
@@ -240,6 +246,8 @@ export type World = {
   flippers: [FlipperState, FlipperState];
   /** ドロップターゲットが立っているか */
   dropsUp: boolean[];
+  /** 自分で作るステージのドロップターゲットが立っているか（table.stageDrops と同じ順） */
+  stageDropsUp: boolean[];
   /** アウトレーンの扉（スキル）が閉まっているか */
   outlaneGate: [boolean, boolean];
   /** スキル「マグネット」：ガチャ穴の前を上っていく玉を、穴へ吸い寄せる */
@@ -291,6 +299,7 @@ export function createWorld(seed: number, table: TableGeometry): World {
       { def: fr, angle: fr.rest, omega: 0, pressed: false, upSign: fr.up < fr.rest ? -1 : 1 },
     ],
     dropsUp: table.drops.map(() => true),
+    stageDropsUp: table.stageDrops.map(() => true),
     outlaneGate: [false, false],
     magnet: false,
     plungerPull: 0,
@@ -495,6 +504,7 @@ function collideStatic(world: World, ball: Ball): void {
   for (let i = 0; i < cell.s.length; i += 1) {
     const sg = col.segs[cell.s[i]!]!;
     if (sg.kind === "drop" && !world.dropsUp[sg.idx]) continue;
+    if (sg.kind === "stageDrop" && !world.stageDropsUp[sg.idx]) continue;
 
     if (sg.kind === "outlaneGate" && !world.outlaneGate[sg.idx]) continue;
     let ay = sg.ay;
@@ -581,12 +591,17 @@ function collideStatic(world: World, ball: Ball): void {
       emitHit(world, "plastic", impact, ball.x, ball.y);
       continue;
     }
-    if (sg.kind === "drop") {
+    if (sg.kind === "drop" || sg.kind === "stageDrop") {
       const vn = -(ball.vx * nx + ball.vy * ny);
       const impact = resolve(ball, nx, ny, pen, 0, 0, MATS.drop);
       if (vn > DROP_THRESHOLD) {
-        world.dropsUp[sg.idx] = false;
-        world.events.push({ type: "drop", index: sg.idx, ballId: ball.id });
+        if (sg.kind === "drop") {
+          world.dropsUp[sg.idx] = false;
+          world.events.push({ type: "drop", index: sg.idx, ballId: ball.id });
+        } else {
+          world.stageDropsUp[sg.idx] = false;
+          world.events.push({ type: "stageDrop", index: sg.idx, ballId: ball.id });
+        }
       } else {
         emitHit(world, "plastic", impact, ball.x, ball.y);
       }
@@ -646,6 +661,26 @@ function crossSensors(world: World, ball: Ball): void {
     // 向き：センサーの線の左右どちら側へ抜けたか（s2 の符号）
     world.events.push({ type: "sensor", id: sn.id, ballId: ball.id, vx: ball.vx, vy: ball.vy, dir: s2 > 0 ? 1 : -1 });
   }
+}
+
+/**
+ * スピナー（自分で作るステージ）：板の線を玉の中心が横切ったら知らせる（板には当たらない）。
+ * 同じ玉が同じスピナーを 0.12秒のうちに何度も横切っても、1回にする
+ */
+function crossSpinners(world: World, ball: Ball): void {
+  const { px, py, x, y } = ball;
+  world.table.spinners.forEach((sp, index) => {
+    const half = sp.w / 2;
+    if ((py < sp.y && y < sp.y) || (py > sp.y && y > sp.y) || py === y) return;
+    // 板の高さ（sp.y）を横切ったところの x
+    const cx = px + ((x - px) * (sp.y - py)) / (y - py);
+    if (cx < sp.x - half || cx > sp.x + half) return;
+    const key = `spin${index}` as const;
+    const last = ball.sensorAt[key] ?? -1;
+    if (world.time - last < 0.12) return;
+    ball.sensorAt[key] = world.time;
+    world.events.push({ type: "spin", index, ballId: ball.id, vx: ball.vx, vy: ball.vy });
+  });
 }
 
 /* ---------- ランプ ---------- */
@@ -956,6 +991,7 @@ export function stepWorld(world: World, steps: number): void {
       if (ball.mode === "field") {
         stepFieldBall(world, ball, dt);
         crossSensors(world, ball);
+        if (world.table.spinners.length) crossSpinners(world, ball);
         checkRampMouths(world, ball);
         if (ball.mode === "field") {
           const sc = world.table.scoop;
