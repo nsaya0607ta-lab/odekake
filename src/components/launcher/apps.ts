@@ -29,13 +29,12 @@ export type LauncherItem = LauncherApp | LauncherFolder;
 const app = (a: Omit<LauncherApp, "kind">): LauncherApp => ({ kind: "app", ...a });
 
 /** アプリのアイコンの絵 */
-export const iconSrc = (id: string) => id === "frenchie-town" ? "/games/frenchie-town/menu-icon.svg" : `/launcher/icons/${id}.webp`;
+export const iconSrc = (id: string) => `/launcher/icons/${id}.webp`;
 
 export type LauncherOptions = { sns: boolean; memoryGame: boolean };
 
 export function launcherItems({ sns, memoryGame }: LauncherOptions): LauncherItem[] {
   const games: LauncherApp[] = [
-    app({ id: "frenchie-town", name: "フレンチーの街づくり", href: "/games/frenchie-town", tint: ["#d8eee4", "#86b5a1"], keywords: ["まちづくり", "街", "3D", "白コイン", "フレンチー", "ゲーム"], shortcuts: [{ label: "街へ行く", href: "/games/frenchie-town" }] }),
     app({ id: "item-catch", name: "アイテムキャッチ", href: "/games/item-catch", tint: ["#ffd57e", "#ff9640"], keywords: ["あいてむきゃっち", "キャッチ", "ゲーム"], shortcuts: [{ label: "遊ぶ", href: "/games/item-catch" }, { label: "ダンボール図鑑", href: "/games/item-catch/dambourle" }] }),
     app({ id: "osanpo-run", name: "おさんぽフレンチー", href: "/games/osanpo-run", tint: ["#5b5f8e", "#2c3355"], keywords: ["おさんぽ", "ラン", "走る", "ゲーム", "青コイン"], shortcuts: [{ label: "遊ぶ", href: "/games/osanpo-run" }] }),
     app({ id: "wanko-bowling", name: "わんこボウリング", href: "/games/wanko-bowling", tint: ["#8ec5ff", "#3f6fe6"], keywords: ["ぼうりんぐ", "ボウリング", "ゲーム"], shortcuts: [{ label: "遊ぶ", href: "/games/wanko-bowling" }] }),
