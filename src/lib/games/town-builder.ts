@@ -45,7 +45,7 @@ function linkedStationCount(tiles: Tile[]): number {
     visited.add(start);
     let stations = 0;
     for (let at = 0; at < queue.length; at++) {
-      const i = queue[at];
+      const i = queue[at]!;
       if (tiles[i] === "station") stations++;
       const x = i % MAP_SIZE, y = Math.floor(i / MAP_SIZE);
       for (const next of neighbours(x, y)) {
@@ -111,7 +111,7 @@ function growTown(town: Town): Town {
   for (let y = 0; y < MAP_SIZE; y++) for (let x = 0; x < MAP_SIZE; x++) {
     const i = indexAt(x, y);
     if (tiles[i] !== "grass" || !touchesRoad(tiles, x, y)) continue;
-    const alreadyDeveloped = neighbours(x, y).some(n => ["house", "shop", "park"].includes(tiles[n]));
+    const alreadyDeveloped = neighbours(x, y).some(n => ["house", "shop", "park"].includes(tiles[n] ?? "grass"));
     if (alreadyDeveloped) choices.push(i);
   }
   if (!choices.length) return town;
