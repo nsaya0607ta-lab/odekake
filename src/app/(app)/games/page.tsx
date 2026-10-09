@@ -38,11 +38,6 @@ export default async function GamesPage() {
         </section>
 
         <section className="space-y-4" aria-label="ゲーム一覧">
-          <Link href="/games/frenchie-town" aria-label="フレンチーの街づくりで遊ぶ" className="pressable group block overflow-hidden rounded-[30px] border border-[#bcd9ca] bg-gradient-to-br from-[#fcfff9] via-[#eaf5ee] to-[#d8ebe2] p-5 shadow-[0_14px_34px_rgba(74,123,104,0.13)]">
-            <span className="flex items-center gap-2"><span className="rounded-full bg-[#598773] px-2.5 py-1 text-[10px] font-black text-white">NEW</span><span className="text-[10px] font-bold text-[#527765]">3D・白コイン・試作版</span></span>
-            <span className="mt-3 flex items-center gap-3"><span className="min-w-0 flex-1"><span className="block text-[10px] font-black text-[#527765]">わんこと暮らす、小さな島。</span><span className="mt-1 block text-[21px] font-black tracking-[-0.03em] text-ink">フレンチーの街づくり</span><span className="mt-1.5 block text-[11px] font-bold leading-relaxed text-ink-soft">白コインでおうちやお店を建てよう。歩くわんこをなでて、自分だけの街に。</span></span><Image src="/games/frenchie-town/menu-icon.svg" alt="" width={108} height={108} className="shrink-0 rounded-[25px]" /></span>
-            <span className="mt-4 flex items-center justify-between rounded-[18px] bg-white/65 px-3 py-2.5 text-[11px] font-black text-[#527765]"><span>好きな場所に建築・街を回して眺める</span><span className="text-2xl">›</span></span>
-          </Link>
           <Link
             href="/games/item-catch"
             aria-label="アイテムキャッチで遊ぶ"
@@ -353,7 +348,7 @@ export default async function GamesPage() {
 
         <p className="flex items-center justify-center gap-1.5 py-1 text-[10px] font-bold text-ink-faint">
           <span aria-hidden="true">🪙</span>
-          おさんぽフレンチーは青コイン・ピンボールは赤コイン。街づくりの白コインは試作版専用です。
+          スコアに応じてコインを獲得できます（おさんぽフレンチーは青コイン・ご当地ピンボールは赤コイン）
         </p>
       </PageBody>
     </>
