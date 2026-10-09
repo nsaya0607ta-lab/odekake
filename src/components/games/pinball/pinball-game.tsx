@@ -8,7 +8,7 @@ import type { PinballStageInfo } from "@/lib/data/pinball";
 import { RARITY_STYLES } from "@/lib/gacha/config";
 import { STAMP_COUNT } from "@/lib/games/pinball/config";
 import { DEFAULT_MAP_ID, resolvePinballMapId } from "@/lib/games/pinball/maps";
-import { ownedPinballParts, starterStage, type PinballPartId, type StageSpec } from "@/lib/games/pinball/stage";
+import { emptyStage, ownedPinballParts, type PinballPartId, type StageSpec } from "@/lib/games/pinball/stage";
 import type { PinballLobby } from "@/lib/games/pinball/tables";
 import { getPinballTheme, stageTheme } from "@/lib/games/pinball/themes";
 import { PinballMapPreview } from "./pinball-map-preview";
@@ -271,7 +271,7 @@ export function PinballGame({ lobby, bests: initialBests, redCoins: initialCoins
             redCoins={redCoins}
             onPlay={playStage}
             onEdit={(stage) => stage.spec && openEditor({ id: stage.id, name: stage.name, spec: stage.spec, shared: stage.shared })}
-            onCreate={() => openEditor({ id: null, name: "わたしのステージ", spec: starterStage(), shared: true })}
+            onCreate={() => openEditor({ id: null, name: "わたしのステージ", spec: emptyStage(), shared: true })}
             onOpenShop={() => setShopOpen(true)}
           />
         ) : null}
@@ -292,6 +292,7 @@ export function PinballGame({ lobby, bests: initialBests, redCoins: initialCoins
         <PinballStageEditor
           key={editorKey}
           draft={editing}
+          suspended={playing !== null || shopOpen}
           lobby={lobby}
           owned={owned}
           redCoins={redCoins}

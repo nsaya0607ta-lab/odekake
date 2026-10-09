@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState, type PointerEvent as ReactPointerEvent, type ReactNode } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type PointerEvent as ReactPointerEvent, type ReactNode, type SetStateAction } from "react";
 import { RedCoinArt } from "@/components/coin-art";
 import { TOP_RAMP } from "@/lib/games/pinball/maps";
 import {
@@ -15,12 +15,12 @@ import {
   PART_NAMES,
   placeableSpots,
   PINBALL_PARTS,
-  RAMP_NAMES,
   RAMP_PART,
   rotatePart,
   snapStagePoint,
   stageSlingDef,
-  STAGE_AREA,
+  stageArea,
+  stageRampName,
   STAGE_GAP,
   STAGE_LOOKS,
   STAGE_NAME_MAX,
@@ -52,6 +52,7 @@ type Props = {
   /** 持っている部品の数（はじめのぶん＋買ったぶん） */
   owned: OwnedParts;
   redCoins: number | null;
+  suspended?: boolean;
   onClose: () => void;
   onSaved: (saved: StageDraft & { id: string }) => void;
   onDeleted: (id: string) => void;
@@ -66,11 +67,16 @@ type Selection = { type: "part" | "item"; index: number } | null;
  * bumper は動かしているバンパーの番号（バンパーの中で何番目か。笠の絵はこの番号で決まるので、ほかのバンパーの絵がずれないようにする）
  */
 type Frozen = { spec: StageSpec; part: number | null; item: number | null; bumper: number | null };
-type Drag = { type: "part" | "item"; index: number; pointerId: number; start: Pt; origin: Pt; moved: boolean };
+type Drag = { type: "part" | "item"; index: number; pointerId: number; start: Pt; origin: Pt; before: StageSpec; moved: boolean };
 type Message = { text: string; tone: "error" | "info" | "ok" };
 
 /** エディターに見せる台の範囲（台の上のほう。mm） */
 const EDITOR_VIEW: ViewRect = { x0: -10, y0: 40, w: 542, h: 610 };
+const FREE_EDITOR_VIEWS: Record<"all" | "top" | "bottom", ViewRect> = {
+  all: { x0: -10, y0: -10, w: 542, h: 1020 },
+  top: { x0: -10, y0: 40, w: 542, h: 540 },
+  bottom: { x0: -10, y0: 450, w: 542, h: 540 },
+};
 const SIZE_LABEL: Record<BumperSize, string> = { s: "小", m: "中", l: "大" };
 
 function clonePart(part: StagePart, at: Pt): StagePart {
@@ -208,15 +214,17 @@ function PartGhost({ part, theme, ok, image }: { part: StagePart; theme: Pinball
   );
 }
 
-export function PinballStageEditor({ draft, lobby, owned, redCoins, onClose, onSaved, onDeleted, onTestPlay, onOpenShop }: Props) {
+export function PinballStageEditor({ draft, lobby, owned, redCoins, suspended = false, onClose, onSaved, onDeleted, onTestPlay, onOpenShop }: Props) {
   const [name, setName] = useState(draft.name);
-  const [spec, setSpec] = useState<StageSpec>(draft.spec);
+  const [spec, setSpecState] = useState<StageSpec>(draft.spec);
+  const [zoom, setZoom] = useState<"all" | "top" | "bottom">("all");
+  const history = useRef<{ past: StageSpec[]; future: StageSpec[] }>({ past: [], future: [] });
   const [shared, setShared] = useState(draft.shared);
   const [stageId, setStageId] = useState<string | null>(draft.id);
   const [saved, setSaved] = useState(() => JSON.stringify([draft.name, draft.spec, draft.shared]));
   const [selected, setSelected] = useState<Selection>(null);
   const [placing, setPlacing] = useState<StagePartKind | null>(null);
-  const [message, setMessage] = useState<Message | null>({ text: "部品をえらんで、台の上のほう（点線の中）をタップすると置けます。置いた部品はドラッグで動かせます。", tone: "info" });
+  const [message, setMessage] = useState<Message | null>({ text: "部品をえらんで、点線の中をタップすると置けます。置いた部品はドラッグで動かせます。", tone: "info" });
   const [busy, setBusy] = useState<"save" | "delete" | null>(null);
   /** 動かしている部品を置ける所（ドラッグを始めたときに数える） */
   const [dragGuide, setDragGuide] = useState<Pt[] | null>(null);
@@ -225,6 +233,19 @@ export function PinballStageEditor({ draft, lobby, owned, redCoins, onClose, onS
   const dragRef = useRef<Drag | null>(null);
   const specRef = useRef(spec);
   specRef.current = spec;
+  const setSpec = useCallback((value: SetStateAction<StageSpec>, record = true) => {
+    const before = specRef.current;
+    const next = typeof value === "function" ? value(before) : value;
+    if (JSON.stringify(before) === JSON.stringify(next)) return;
+    if (record) {
+      history.current.past = [...history.current.past.slice(-49), before];
+      history.current.future = [];
+    }
+    specRef.current = next;
+    setSpecState(next);
+  }, []);
+  const area = stageArea(spec);
+  const view = spec.base === "blank" ? FREE_EDITOR_VIEWS[zoom] : EDITOR_VIEW;
 
   const theme = useMemo(() => getPinballTheme(spec.look), [spec.look]);
   // 台の絵のもと（指で動かしている間は、動かす前の形のまま）
@@ -302,10 +323,11 @@ export function PinballStageEditor({ draft, lobby, owned, redCoins, onClose, onS
       setSelected({ type: "part", index: next.parts.length - 1 });
       say(`${PART_NAMES[kind]}を置きました`, "ok");
     },
-    [owned, say, noneLeft],
+    [owned, say, noneLeft, setSpec],
   );
 
   const onPointerDown = (event: ReactPointerEvent<SVGSVGElement>) => {
+    if (dragRef.current || (event.pointerType === "mouse" && event.button !== 0)) return;
     const at = toTable(event);
     if (!at) return;
     if (placing) {
@@ -317,7 +339,7 @@ export function PinballStageEditor({ draft, lobby, owned, redCoins, onClose, onS
     if (!hit) return;
     const current = specRef.current;
     const origin = hit.type === "part" ? { x: current.parts[hit.index]!.x, y: current.parts[hit.index]!.y } : { ...current.items[hit.index]! };
-    dragRef.current = { type: hit.type, index: hit.index, pointerId: event.pointerId, start: at, origin, moved: false };
+    dragRef.current = { type: hit.type, index: hit.index, pointerId: event.pointerId, start: at, origin, before: current, moved: false };
     event.currentTarget.setPointerCapture(event.pointerId);
     if (hit.type === "part") {
       const part = current.parts[hit.index]!;
@@ -352,14 +374,14 @@ export function PinballStageEditor({ draft, lobby, owned, redCoins, onClose, onS
       const parts = current.parts.slice();
       parts[drag.index] = clonePart(parts[drag.index]!, to);
       const next = { ...current, parts };
-      setSpec(next);
+      setSpec(next, false);
       const problem = partProblem(next, drag.index);
       setMessage(problem ? { text: problem, tone: "error" } : { text: "ここに置けます", tone: "ok" });
     } else {
       const items = current.items.slice() as StageSpec["items"];
       items[drag.index] = to;
       const next = { ...current, items };
-      setSpec(next);
+      setSpec(next, false);
       const problem = itemProblem(next, drag.index);
       setMessage(problem ? { text: problem, tone: "error" } : { text: "ここに置けます", tone: "ok" });
     }
@@ -373,24 +395,58 @@ export function PinballStageEditor({ draft, lobby, owned, redCoins, onClose, onS
     setFrozen(null);
     if (!drag.moved) return;
     const current = specRef.current;
-    // 置けない所で指をはなしたら、もとの場所にもどす
-    if (drag.type === "part") {
-      const problem = partProblem(current, drag.index);
-      if (problem) {
-        const parts = current.parts.slice();
-        parts[drag.index] = clonePart(parts[drag.index]!, drag.origin);
-        setSpec({ ...current, parts });
-        say(`${problem}。もとの場所にもどしました`);
-      }
-    } else {
-      const problem = itemProblem(current, drag.index);
-      if (problem) {
-        const items = current.items.slice() as StageSpec["items"];
-        items[drag.index] = drag.origin;
-        setSpec({ ...current, items });
-        say(`${problem}。もとの場所にもどしました`);
-      }
+    const problem = drag.type === "part" ? partProblem(current, drag.index) : itemProblem(current, drag.index);
+    if (event.type === "pointercancel" || problem) {
+      setSpec(drag.before, false);
+      say(problem ? `${problem}。もとの場所にもどしました` : "移動を取り消しました", "info");
+      return;
     }
+    if (JSON.stringify(current) !== JSON.stringify(drag.before)) {
+      history.current.past = [...history.current.past.slice(-49), drag.before];
+      history.current.future = [];
+      say("移動しました", "ok");
+    }
+  };
+
+  const undo = () => {
+    if (dragRef.current) return;
+    const previous = history.current.past.pop();
+    if (!previous) return;
+    history.current.future.push(specRef.current);
+    setSpec(previous, false);
+    setSelected(null);
+    setPlacing(null);
+    say("ひとつ前にもどしました", "info");
+  };
+  const redo = () => {
+    if (dragRef.current) return;
+    const next = history.current.future.pop();
+    if (!next) return;
+    history.current.past.push(specRef.current);
+    setSpec(next, false);
+    setSelected(null);
+    setPlacing(null);
+    say("やり直しました", "info");
+  };
+  const clearParts = () => {
+    if (!spec.parts.length || dragRef.current) return;
+    setSpec({ ...spec, parts: [] });
+    setSelected(null);
+    setPlacing(null);
+    say("部品をすべてはずしました。「元に戻す」で戻せます", "info");
+  };
+  const duplicateSelected = () => {
+    if (!selectedPart) return;
+    if (counts[selectedPart.kind] >= owned[selectedPart.kind]) {
+      say(noneLeft(selectedPart.kind));
+      return;
+    }
+    const spots = placeableSpots(spec, (at) => clonePart(selectedPart, at), null);
+    const at = spots.reduce<Pt | null>((best, point) => !best || Math.hypot(point.x - selectedPart.x, point.y - selectedPart.y) < Math.hypot(best.x - selectedPart.x, best.y - selectedPart.y) ? point : best, null);
+    if (!at) return say("コピーを置ける場所がありません");
+    setSpec({ ...spec, parts: [...spec.parts, clonePart(selectedPart, at)] });
+    setSelected({ type: "part", index: spec.parts.length });
+    say("近くにコピーしました。ドラッグで動かせます", "ok");
   };
 
   /** えらんでいる部品を変える（変えたら置けなくなるときは変えない） */
@@ -531,7 +587,7 @@ export function PinballStageEditor({ draft, lobby, owned, redCoins, onClose, onS
   const rampExit = TOP_RAMP.path[TOP_RAMP.path.length - 1]!;
 
   return (
-    <div className="fixed inset-0 z-50 overflow-y-auto bg-[#0b0d14] text-white" role="dialog" aria-modal="true" aria-label="ステージを作る">
+    <div className={`fixed inset-0 z-50 overflow-y-auto bg-[#0b0d14] text-white${suspended ? " invisible" : ""}`} role="dialog" aria-modal="true" aria-label="ステージを作る" aria-hidden={suspended || undefined} inert={suspended}>
       <header data-dark-header className="sticky top-0 z-10 flex items-center gap-2 border-b border-white/10 bg-[#0b0d14]/95 px-3 py-2 backdrop-blur" style={{ paddingTop: "max(8px, env(safe-area-inset-top))" }}>
         <button type="button" onClick={close} className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-white/15 bg-white/5 text-lg font-black active:scale-95" aria-label="エディターをとじる">
           ‹
@@ -556,14 +612,33 @@ export function PinballStageEditor({ draft, lobby, owned, redCoins, onClose, onS
         </button>
       </header>
 
-      <div className="mx-auto max-w-[480px] px-2 pb-28 pt-2">
+      <div className="mx-auto max-w-[480px] px-2 pb-40 pt-2">
+        <div className="mb-2 rounded-2xl border border-white/10 bg-white/[0.04] p-3">
+          <p className="text-[13px] font-black text-[#ffd166]">{spec.base === "blank" ? "白紙から、あなただけの台を作ろう" : "ステージを編集"}</p>
+          <p className="mt-1 text-[11px] leading-relaxed text-white/65">{spec.base === "blank" ? "基本設備は外枠・打ち出し口・左右のフリッパーだけ。ランプもレーンも置かれていません。上下を自由に作れます。★はアイテムが出る場所です。" : "この台は従来の骨組みを使います。新しく作るステージは、白紙から始まります。"}</p>
+          <div className="mt-2 flex flex-wrap gap-1.5">
+            <button type="button" onClick={undo} disabled={!history.current.past.length} className="rounded-full bg-white/10 px-3 py-2 text-[11px] font-bold disabled:opacity-30">↶ 元に戻す</button>
+            <button type="button" onClick={redo} disabled={!history.current.future.length} className="rounded-full bg-white/10 px-3 py-2 text-[11px] font-bold disabled:opacity-30">↷ やり直す</button>
+            <button type="button" onClick={clearParts} disabled={!spec.parts.length} className="ml-auto rounded-full bg-white/10 px-3 py-2 text-[11px] font-bold disabled:opacity-30">部品をすべてはずす</button>
+          </div>
+        </div>
+        {spec.base === "blank" ? (
+          <div className="sticky top-[68px] z-[5] mb-2 flex items-center gap-1 rounded-full border border-white/10 bg-[#0b0d14]/95 p-1 backdrop-blur">
+            {([ ["all", "台全体"], ["top", "上を拡大"], ["bottom", "下を拡大"] ] as const).map(([key, label]) => (
+              <button key={key} type="button" disabled={frozen !== null} onClick={() => setZoom(key)} aria-pressed={zoom === key} className={`flex-1 rounded-full py-2 text-[11px] font-black ${zoom === key ? "bg-[#ffd166] text-black" : "text-white/65"}`}>{label}</button>
+            ))}
+            <span className="px-2 text-[10px] font-bold text-white/50">{spec.parts.length}こ</span>
+          </div>
+        ) : null}
         <div className="relative">
           <PinballStageBoard
             table={renderTable}
             theme={theme}
             lobby={lobby}
             bumperItems={bumperItems}
-            view={EDITOR_VIEW}
+            view={view}
+            fitToScreen={spec.base === "blank" && zoom === "all"}
+            active={!suspended}
             hiddenItem={frozen?.item ?? null}
             svgRef={svgRef}
             onPointerDown={onPointerDown}
@@ -574,10 +649,10 @@ export function PinballStageEditor({ draft, lobby, owned, redCoins, onClose, onS
           >
             {/* 部品を置ける所（部品のまん中） */}
             <rect
-              x={STAGE_AREA.x0}
-              y={STAGE_AREA.y0}
-              width={STAGE_AREA.x1 - STAGE_AREA.x0}
-              height={STAGE_AREA.y1 - STAGE_AREA.y0}
+              x={area.x0}
+              y={area.y0}
+              width={area.x1 - area.x0}
+              height={area.y1 - area.y0}
               fill="none"
               stroke="#ffffff"
               strokeOpacity={placing || frozen ? 0.6 : 0.22}
@@ -708,6 +783,7 @@ export function PinballStageEditor({ draft, lobby, owned, redCoins, onClose, onS
             <button type="button" onClick={mirrorSelected} className="rounded-full bg-white/10 px-3 py-1.5 text-[12px] font-black">
               ⇋ 反対がわにも
             </button>
+            <button type="button" onClick={duplicateSelected} className="rounded-full bg-white/10 px-3 py-1.5 text-[12px] font-black">コピー</button>
             <button type="button" onClick={removeSelected} className="ml-auto rounded-full bg-[#3a1418] px-3 py-1.5 text-[12px] font-black text-[#ffb4a8]">
               はずす
             </button>
@@ -782,7 +858,7 @@ export function PinballStageEditor({ draft, lobby, owned, redCoins, onClose, onS
                     onClick={() => {
                       if (locked) {
                         const price = PINBALL_PARTS.find((p) => p.id === need)?.price ?? 0;
-                        say(`${RAMP_NAMES[ramp]}は、部品のお店で買えます（赤コイン${price.toLocaleString("ja-JP")}枚）`, "info");
+                        say(`${stageRampName(spec, ramp)}は、部品のお店で買えます（赤コイン${price.toLocaleString("ja-JP")}枚）`, "info");
                         onOpenShop();
                         return;
                       }
@@ -790,13 +866,13 @@ export function PinballStageEditor({ draft, lobby, owned, redCoins, onClose, onS
                     }}
                     className={`overflow-hidden rounded-2xl border-2 text-[11px] font-black active:scale-95 ${active ? "border-[#ff6b6b] bg-[#ff6b6b]/20" : "border-white/10 bg-white/[0.04]"} ${locked ? "text-white/45" : ""}`}
                     aria-pressed={active}
-                    aria-label={locked ? `${RAMP_NAMES[ramp]}（部品のお店で買えます）` : RAMP_NAMES[ramp]}
+                    aria-label={locked ? `${stageRampName(spec, ramp)}（部品のお店で買えます）` : stageRampName(spec, ramp)}
                   >
                     <span className="relative block">
-                      <PinballPartArt art={RAMP_ART[ramp]} theme={theme} className={`block h-[58px] w-full ${locked ? "opacity-35" : ""}`} />
+                      {spec.base === "blank" && ramp === "standard" ? <span className="flex h-[58px] items-center justify-center text-2xl text-white/40" aria-hidden="true">∅</span> : <PinballPartArt art={RAMP_ART[ramp]} theme={theme} className={`block h-[58px] w-full ${locked ? "opacity-35" : ""}`} />}
                       {locked ? <span className="absolute inset-0 flex items-center justify-center text-[18px]">🔒</span> : null}
                     </span>
-                    <span className="block px-1 py-1.5">{RAMP_NAMES[ramp]}</span>
+                    <span className="block px-1 py-1.5">{stageRampName(spec, ramp)}</span>
                   </button>
                 );
               })}
@@ -842,6 +918,16 @@ export function PinballStageEditor({ draft, lobby, owned, redCoins, onClose, onS
 
       {/* 下のボタン */}
       <div className="fixed inset-x-0 bottom-0 z-10 border-t border-white/10 bg-[#0b0d14]/95 px-4 pt-2 backdrop-blur" style={{ paddingBottom: "max(10px, env(safe-area-inset-bottom))" }}>
+        <div className="mx-auto mb-2 flex max-w-[480px] items-center gap-2">
+          <label className="flex min-w-0 flex-1 items-center gap-2 text-[11px] font-bold">
+            <span className="shrink-0 text-white/60">部品</span>
+            <select value={placing ?? ""} onChange={(e) => { setPlacing((e.target.value || null) as StagePartKind | null); setSelected(null); }} className="min-w-0 flex-1 rounded-xl border border-white/15 bg-[#20232e] px-2 py-2 text-white" aria-label="置く部品を選ぶ">
+              <option value="">選ぶ・動かす</option>
+              {STAGE_PART_KINDS.map((kind) => <option key={kind} value={kind} disabled={owned[kind] <= counts[kind]}>{PART_NAMES[kind]}（残り{Math.max(0, owned[kind] - counts[kind])}）</option>)}
+            </select>
+          </label>
+          {selectedPart ? <button type="button" onClick={removeSelected} className="rounded-full bg-[#3a1418] px-3 py-2 text-[11px] font-bold text-[#ffb4a8]">選んだ部品をはずす</button> : placing ? <button type="button" onClick={() => setPlacing(null)} className="rounded-full bg-white/10 px-3 py-2 text-[11px] font-bold">選択に戻る</button> : null}
+        </div>
         <div className="mx-auto flex max-w-[480px] gap-2">
           <button type="button" onClick={testPlay} className="h-12 flex-1 rounded-full border border-white/15 bg-white/10 text-[14px] font-black active:scale-[0.99]">
             ▶ テストプレイ

@@ -56,6 +56,20 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: issues[0]!.message, issues: issues.map((i) => i.message) }, { status: 400 });
   }
 
+  // 台の土台は新規作成で決める。旧ステージを空の台へ変えるには新しく作る。
+  // DB は既存の parts/items/ramp の変更でランキングをリセットするので、base だけの変更は受けつけない。
+  if (id !== null) {
+    const from = supabase.from.bind(supabase) as unknown as (table: string) => {
+      select: (columns: string) => { eq: (column: string, value: string) => { eq: (column: string, value: string) => { maybeSingle: () => Promise<{ data: { spec: unknown } | null; error: unknown }> } } };
+    };
+    const existing = await from("pinball_stages").select("spec").eq("id", id).eq("user_id", user.id).maybeSingle();
+    if (existing.error) return NextResponse.json({ error: "ステージを確認できませんでした。もう一度お試しください。" }, { status: 503 });
+    if (!existing.data) return NextResponse.json({ error: "このステージは見つかりませんでした。" }, { status: 404 });
+    if (parseStageSpec(existing.data.spec)?.base !== spec.base) {
+      return NextResponse.json({ error: "白紙の台は「新しく作る」から作成してください。" }, { status: 400 });
+    }
+  }
+
   const rpc = supabase.rpc.bind(supabase) as unknown as (
     fn: "save_pinball_stage",
     args: { p_id: string | null; p_name: string; p_spec: unknown; p_shared: boolean },

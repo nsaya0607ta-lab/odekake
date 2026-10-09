@@ -153,9 +153,9 @@ export type TableGeometry = {
   slings: readonly SlingDef[];
   flippers: readonly [FlipperDef, FlipperDef];
   sensors: readonly SensorDef[];
-  ramps: readonly [RampDef, RampDef];
+  ramps: readonly RampDef[];
   drops: readonly DropTargetDef[];
-  standups: readonly [StandupBankDef, StandupBankDef];
+  standups: readonly StandupBankDef[];
   /** かざぐるま（マップによって 0〜いくつか） */
   pinwheels: readonly PinwheelDef[];
   /** スピナー（自分で作るステージの部品。オービットのスピナーはセンサーの "spinner"） */
@@ -175,12 +175,14 @@ export type TableGeometry = {
   /** アウトレーンを閉じるスキル用の扉（ふだんは無い） */
   outlaneGates: readonly [{ a: Pt; b: Pt }, { a: Pt; b: Pt }];
   /** 上のレーン「お・で・か・け」の中心 x */
-  laneX: readonly [number, number, number, number];
+  laneX: readonly number[];
   laneY: number;
   shots: readonly ShotDef[];
   itemSpots: readonly ItemSpot[];
   /** 県の形を描くところ（台のまんなか下） */
   artBox: { x: number; y: number; w: number; h: number };
+  /** 白紙から作る台。固定の仕掛けは置かない */
+  freeform?: boolean;
 };
 
 /** ランプの道（入口から出口まで）。入口の位置（ふつうのランプと同じところ）から始めること */
@@ -192,6 +194,8 @@ export type RampShapeSpec = { path: readonly Pt[]; ascentEnd: number; topEnd: nu
  */
 export type MapSpec = {
   id: string;
+  /** 外枠・打ち出し口・フリッパー以外は、自分で置いたものだけ */
+  bare?: boolean;
   bumpers: readonly BumperDef[];
   pinwheels: readonly PinwheelDef[];
   /** 左のスタンドアップターゲットの組の中心（右の組は折り返し） */
@@ -447,7 +451,7 @@ export function buildTable(spec: MapSpec): TableGeometry {
     { id: "rightOrbit", name: "右オービット", icon: p(450, 600), arrow: { x: 428, y: 650, angle: -68 * DEG } },
   ];
 
-  return {
+  const table: TableGeometry = {
     id: spec.id,
     walls,
     circles,
@@ -474,5 +478,29 @@ export function buildTable(spec: MapSpec): TableGeometry {
     shots,
     itemSpots: spec.itemSpots.map((spot) => ({ ...spot })),
     artBox: { x: 150, y: 620, w: 180, h: 190 },
+  };
+  if (!spec.bare) return table;
+  const hasRamps = spec.ramp !== undefined;
+  return {
+    ...table,
+    freeform: true,
+    walls: [
+      walls[0]!, walls[1]!,
+      ...(hasRamps ? walls.filter((w) => w.look === "ramp-mouth" || w.look === "ramp-roof") : []),
+      ...(spec.walls ?? []),
+      ...extraSlings.map((s): WallDef => ({ pts: [s.a, s.b, s.c], r: 3, mat: "plastic", look: "sling" })),
+    ],
+    circles: [
+      ...(spec.posts ?? []),
+      ...extraSlings.flatMap((s) => [s.a, s.b, s.c].map((v): CircleDef => ({ ...v, r: 5, mat: "post", look: "post" }))),
+    ],
+    slings: [...extraSlings],
+    ramps: hasRamps ? table.ramps : [],
+    sensors: table.sensors.filter((s) => s.id === "shooterExit"),
+    drops: [],
+    standups: [],
+    scoop: { ...table.scoop, r: 0 },
+    laneX: [],
+    shots: hasRamps ? shots.filter((s) => s.id === "leftRamp" || s.id === "rightRamp") : [],
   };
 }

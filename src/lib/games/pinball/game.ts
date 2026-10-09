@@ -343,7 +343,7 @@ function addPoints(g: Game, base: number, at?: Pt, tone: Tone = "info", noMult =
 
 /** ショットのアイテムの絵の位置（得点の文字を出すところ） */
 function shotAt(g: Game, id: ShotId): Pt {
-  return g.world.table.shots.find((s) => s.id === id)!.icon;
+  return g.world.table.shots.find((s) => s.id === id)?.icon ?? { x: 240, y: 520 };
 }
 
 /* ---------- 打ち出し ---------- */
@@ -354,9 +354,9 @@ function serveBall(g: Game): void {
   g.phase = "serve";
   g.saveArmed = true;
   // ボールごとに、左のキックバックは点いた状態で始まる（使ったらドロップターゲット3つで点けなおす）
-  if (KICKBACK_AT_SERVE) g.kickbackLit[0] = true;
-  g.skillLane = Math.floor(g.rand() * 4);
-  g.skillShotArmed = true;
+  if (KICKBACK_AT_SERVE && !g.world.table.freeform) g.kickbackLit[0] = true;
+  g.skillLane = g.world.table.laneX.length ? Math.floor(g.rand() * 4) : -1;
+  g.skillShotArmed = g.skillLane >= 0;
   sfx(g, "serve");
 }
 
@@ -638,6 +638,11 @@ function applySkill(g: Game, skill: PinballSkill, fromEncore: boolean): void {
         addPoints(g, e.value, shotAt(g, "scoop"), "great");
         break;
       case "magnet":
+        if (g.world.table.scoop.r === 0) {
+          // ガチャ穴を置かない自由な台では、同じ時間の得点2倍にする
+          g.mults.push({ factor: 2, until: g.clock + e.sec });
+          break;
+        }
         // 穴の前のターゲットを倒して、効いているあいだは開けたまま（立っていると吸い寄せても入れない）
         g.magnetUntil = Math.max(g.magnetUntil, g.clock + e.sec);
         openScoop(g);
@@ -1153,7 +1158,7 @@ function nextBall(g: Game): void {
 function tick(g: Game): void {
   const { world } = g;
   world.outlaneGate = g.clock < g.gateUntil ? [true, true] : [false, false];
-  world.magnet = g.clock < g.magnetUntil && g.phase !== "bonus";
+  world.magnet = world.table.scoop.r > 0 && g.clock < g.magnetUntil && g.phase !== "bonus";
   if (g.mults.length) g.mults = g.mults.filter((t) => t.until > g.clock);
   if (g.bumperMults.length) g.bumperMults = g.bumperMults.filter((t) => t.until > g.clock);
 

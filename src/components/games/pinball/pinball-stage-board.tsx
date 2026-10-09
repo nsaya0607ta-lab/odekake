@@ -16,6 +16,10 @@ type Props = {
   bumperItems: readonly PinballItem[];
   /** 見せる範囲（台の座標・mm）。この縦横比で表示する */
   view: ViewRect;
+  /** 全体表示は操作パレットの上に台全体が収まる高さにする */
+  fitToScreen: boolean;
+  /** テストプレイ中は背景のエディターを描画しない */
+  active: boolean;
   /** 描かないアイテムの場所（動かしている間は、上に重ねた絵で見せる） */
   hiddenItem: number | null;
   svgRef: RefObject<SVGSVGElement | null>;
@@ -33,7 +37,7 @@ type Props = {
  * えらんだ部品のしるし・置ける所の点・動かしている部品などは SVG に描く（SVG の座標は台の座標と同じ）。
  * 台の絵（床・部品）は形が変わるたびに作りなおす（部品を指で動かしている間は作りなおさない）
  */
-export function PinballStageBoard({ table, theme, lobby, bumperItems, view, hiddenItem, svgRef, onPointerDown, onPointerMove, onPointerUp, cursor, label, children }: Props) {
+export function PinballStageBoard({ table, theme, lobby, bumperItems, view, fitToScreen, active, hiddenItem, svgRef, onPointerDown, onPointerMove, onPointerUp, cursor, label, children }: Props) {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const wrapRef = useRef<HTMLDivElement | null>(null);
   const rendererRef = useRef<PinballRenderer | null>(null);
@@ -77,7 +81,10 @@ export function PinballStageBoard({ table, theme, lobby, bumperItems, view, hidd
     const renderer = new PinballRenderer(canvas, { table, theme, shape: lobby.shape, bumperItems, view });
     for (const [src, img] of imagesRef.current) renderer.setImage(src, img);
     const size = sizeRef.current;
-    if (size) renderer.resize(size.w, size.h, size.dpr);
+    if (size) {
+      renderer.resize(size.w, size.h, size.dpr);
+      setViewBox(renderer.visibleRect());
+    }
     rendererRef.current = renderer;
     gameRef.current = game;
   }, [table, theme, lobby, bumperItems, view]);
@@ -99,10 +106,11 @@ export function PinballStageBoard({ table, theme, lobby, bumperItems, view, hidd
     const ro = new ResizeObserver(resize);
     ro.observe(wrap);
     return () => ro.disconnect();
-  }, []);
+  }, [view]);
 
   // 毎フレーム描く（かざぐるまは回し、アイテムはゆれる。玉は動かさない）
   useEffect(() => {
+    if (!active) return;
     let raf = 0;
     let last = performance.now();
     const loop = (now: number) => {
@@ -122,10 +130,10 @@ export function PinballStageBoard({ table, theme, lobby, bumperItems, view, hidd
     };
     raf = requestAnimationFrame(loop);
     return () => cancelAnimationFrame(raf);
-  }, []);
+  }, [active]);
 
   return (
-    <div ref={wrapRef} className="relative w-full overflow-hidden rounded-[20px] border border-white/10 bg-black" style={{ aspectRatio: `${view.w} / ${view.h}` }}>
+    <div ref={wrapRef} className="relative w-full overflow-hidden rounded-[20px] border border-white/10 bg-black" style={{ aspectRatio: `${view.w} / ${view.h}`, height: fitToScreen ? "clamp(280px, calc(100dvh - 370px), 660px)" : undefined }}>
       <canvas ref={canvasRef} className="absolute inset-0 block h-full w-full" aria-hidden="true" />
       <svg
         ref={svgRef}
