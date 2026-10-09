@@ -23,6 +23,9 @@ const PUBLIC_PATHS = [
 ];
 
 function isPublicPath(pathname: string) {
+  if (pathname === "/mini-games-preview/town-builder" || pathname.startsWith("/mini-games-preview/town-builder/")) {
+    return false;
+  }
   return PUBLIC_PATHS.some((p) => pathname === p || pathname.startsWith(`${p}/`));
 }
 
