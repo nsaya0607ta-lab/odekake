@@ -3,6 +3,7 @@ import Image from "next/image";
 import { PageBody } from "@/components/page-body";
 import { TopHeader } from "@/components/page-header";
 import { canSeeMemoryGame } from "@/lib/games/memory-game-access";
+import { canSeeTownBuilder } from "@/lib/games/town-builder-access";
 import { requireUser } from "@/lib/supabase/server";
 
 export const metadata = { title: "ミニゲーム | おでかけ記録" };
@@ -18,6 +19,7 @@ const PINBALL_CARD_SRC = "/games/pinball/menu-icon.webp";
 export default async function GamesPage() {
   const { user } = await requireUser();
   const canSeeMemoryGamePreview = canSeeMemoryGame(user.displayName);
+  const canSeeTownBuilderPreview = canSeeTownBuilder(user.displayName);
 
   return (
     <>
@@ -38,7 +40,7 @@ export default async function GamesPage() {
         </section>
 
         <section className="space-y-4" aria-label="ゲーム一覧">
-          <Link
+          {canSeeTownBuilderPreview && <Link
             href="/games/town-builder"
             aria-label="ぼくのまちづくりで遊ぶ"
             className="pressable group relative block overflow-hidden rounded-[30px] border border-[#a7cebb] bg-gradient-to-br from-[#f4fff2] via-[#e5f6e7] to-[#d2ece6] p-5 text-ink shadow-[0_14px_34px_rgba(69,132,87,0.15)] transition-transform active:scale-[0.985]"
@@ -61,7 +63,7 @@ export default async function GamesPage() {
               </span>
               <span className="ml-2 flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-[#3a805e] text-xl font-black text-white">›</span>
             </span>
-          </Link>
+          </Link>}
           <Link
             href="/games/item-catch"
             aria-label="アイテムキャッチで遊ぶ"

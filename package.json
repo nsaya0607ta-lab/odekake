@@ -8,7 +8,7 @@
     "start": "next start",
     "lint": "eslint .",
     "typecheck": "tsc --noEmit",
-    "test:town": "node scripts/test-town-builder.cjs"
+    "test:town": "node scripts/test-town-builder.cjs && node scripts/test-town-builder-access.cjs"
   },
   "dependencies": {
     "@pixi/particle-emitter": "^5.0.10",

@@ -23,6 +23,9 @@ const PUBLIC_PATHS = [
 ];
 
 function isPublicPath(pathname: string) {
+  if (pathname === "/mini-games-preview/town-builder" || pathname.startsWith("/mini-games-preview/town-builder/")) {
+    return false;
+  }
   return PUBLIC_PATHS.some((p) => pathname === p || pathname.startsWith(`${p}/`));
 }
 
@@ -35,7 +38,7 @@ export async function middleware(request: NextRequest) {
       pathname === "/setup" ||
       pathname === "/manifest.webmanifest" ||
       pathname === "/gacha-preview" ||
-      (pathname === "/mini-games-preview" || pathname.startsWith("/mini-games-preview/")) ||
+      pathname === "/mini-games-preview" ||
       pathname === "/memory-game-preview" ||
       pathname === "/privacy" ||
       pathname === "/terms"

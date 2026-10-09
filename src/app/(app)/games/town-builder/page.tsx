@@ -1,6 +1,8 @@
 import type { Metadata } from "next";
+import { notFound } from "next/navigation";
 import { TopHeader } from "@/components/page-header";
 import { TownBuilder } from "@/components/games/town-builder";
+import { canSeeTownBuilder } from "@/lib/games/town-builder-access";
 import { requireUser } from "@/lib/supabase/server";
 
 export const metadata: Metadata = {
@@ -11,6 +13,7 @@ export const dynamic = "force-dynamic";
 
 export default async function TownBuilderPage() {
   const { user } = await requireUser();
+  if (!canSeeTownBuilder(user.displayName)) notFound();
   return (
     <>
       <TopHeader backHref="/games" title="ぼくのまちづくり" subtitle="交通と建築で街を育てよう" />
