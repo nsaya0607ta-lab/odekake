@@ -35,7 +35,7 @@ export async function middleware(request: NextRequest) {
       pathname === "/setup" ||
       pathname === "/manifest.webmanifest" ||
       pathname === "/gacha-preview" ||
-      pathname === "/mini-games-preview" ||
+      (pathname === "/mini-games-preview" || pathname.startsWith("/mini-games-preview/")) ||
       pathname === "/memory-game-preview" ||
       pathname === "/privacy" ||
       pathname === "/terms"
