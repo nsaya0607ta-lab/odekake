@@ -49,7 +49,7 @@ function linkedStationCount(tiles: Tile[]): number {
       if (tiles[i] === "station") stations++;
       const x = i % MAP_SIZE, y = Math.floor(i / MAP_SIZE);
       for (const next of neighbours(x, y)) {
-        if (TRANSPORT.includes(tiles[next]) && !visited.has(next)) {
+        if (TRANSPORT.includes(tiles[next] ?? "grass") && !visited.has(next)) {
           visited.add(next);
           queue.push(next);
         }
@@ -117,7 +117,7 @@ function growTown(town: Town): Town {
   if (!choices.length) return town;
   const next = tiles.slice();
   // Deterministic choice ensures repeatable simulation and safe save/reload.
-  const choice = choices[(town.day * 7919 + stats.population * 17) % choices.length];
+  const choice = choices[(town.day * 7919 + stats.population * 17) % choices.length]!;
   next[choice] = stats.shops * 3 < stats.homes ? "shop" : "house";
   return { ...town, tiles: next };
 }
