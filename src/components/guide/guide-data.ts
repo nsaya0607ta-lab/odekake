@@ -56,16 +56,16 @@ export const VISIT_EXP = [
   { id: "firstRegion", label: "はじめての地方", exp: 200 },
 ] as const;
 
-/** ホームの犬カードに降ってくるコイン（wandering-frenchie.tsx・0129 と同じ） */
+/** ホームの犬カードに降ってくるコイン（wandering-frenchie.tsx・0129 と同じ。赤コインの枚数 redAmount は 0140 と同じ） */
 export const HOME_DROP = {
   everySeconds: 5,
   chance: 20,
   /** 赤コイン（ご当地ピンボールのステージの部品に使う）は、黄色・青とは別にこの％で降る（wandering-frenchie.tsx の COIN_RED_CHANCE） */
   redChance: 5,
   tiers: [
-    { tier: "common", label: "ふつう", rate: 85, amount: 5 },
-    { tier: "rare", label: "中レア", rate: 12, amount: 20 },
-    { tier: "epic", label: "高レア", rate: 3, amount: 100 },
+    { tier: "common", label: "ふつう", rate: 85, amount: 5, redAmount: 13 },
+    { tier: "rare", label: "中レア", rate: 12, amount: 20, redAmount: 50 },
+    { tier: "epic", label: "高レア", rate: 3, amount: 100, redAmount: 250 },
   ],
 } as const;
 

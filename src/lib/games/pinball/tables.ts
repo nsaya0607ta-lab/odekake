@@ -15,7 +15,6 @@ import { capsuleItem, type PinballItem } from "./game";
 import { pinballItems, pinballPrefCodes } from "./items";
 import { PINBALL_MAP_IDS, getPinballTable } from "./maps";
 import { getPinballSkill, starsForCount } from "./skills";
-import { getPinballPart } from "./stage";
 
 export type PinballShapeData = { paths: string[]; bbox: [number, number, number, number] };
 
@@ -75,7 +74,8 @@ export function buildPinballLobby(owned: ReadonlyMap<string, number>, optimize: 
     };
   });
   // 自分で作るステージは、バンパーを持てる数まで置ける
-  const maxBumpers = Math.max(getPinballPart("bumper")?.max ?? 0, ...PINBALL_MAP_IDS.map((id) => getPinballTable(id).bumpers.length));
+  // バンパーは持てる数に上限が無いが、台のすき間の決まりで1つのステージに置けるのは多くても20こくらい（足りなければ絵をくり返す）
+  const maxBumpers = Math.max(20, ...PINBALL_MAP_IDS.map((id) => getPinballTable(id).bumpers.length));
   const bumperItems = pool.slice(0, maxBumpers);
   for (let i = bumperItems.length; i < maxBumpers; i += 1) {
     const cap = capsuleItem(CAPSULE_ORDER[i % CAPSULE_ORDER.length]!);

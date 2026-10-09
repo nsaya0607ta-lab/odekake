@@ -961,37 +961,37 @@ select pg_temp.record('グループ削除で写真とメッセージも消える
 -- ご当地ピンボールと赤コイン・自分で作るステージ
 -- -------------------------------------------------------------
 -- ここでは alice と bob が相互フレンド（carol はどちらとも友達ではない）。
--- 赤コインは スコア ÷ 11875（切り捨て）、1プレイ 2400 まで（0138。0136〜0137 のあいだは青コインだった）。
+-- 赤コインは スコア ÷ 4750（切り捨て）、1プレイ 6000 まで（0140 で2.5倍。0136〜0137 のあいだは青コインだった）。
 -- 同じ round_id は二重に記録・付与しない。結果の置き場はコインガチャのテストの gacha_last / gacha_as を使う。
 
 select pg_temp.gacha_as(:'alice',
   $q$select public.record_pinball_result('pb-alice-0001', 'default', 1234567, 120000, 6, 0, 0, 3)$q$);
-select pg_temp.record('ピンボール: スコア÷11875（切り捨て）の赤コインが付く',
-  (select (result ->> 'coins')::integer from gacha_last) = 103
+select pg_temp.record('ピンボール: スコア÷4750（切り捨て）の赤コインが付く',
+  (select (result ->> 'coins')::integer from gacha_last) = 259
   and (select result ->> 'kind' from gacha_last) = 'red'
   and (select (result ->> 'balance')::integer from gacha_last) = (select balance from public.user_red_coins where user_id = :'alice')
   and (select result ->> 'applied' from gacha_last) = 'true'
   and (select result ->> 'is_best' from gacha_last) = 'true'
-  and (select coalesce(sum(amount), 0) from public.red_coin_events where user_id = :'alice' and event_type = 'pinball') = 103);
+  and (select coalesce(sum(amount), 0) from public.red_coin_events where user_id = :'alice' and event_type = 'pinball') = 259);
 
 select pg_temp.gacha_as(:'alice',
   $q$select public.record_pinball_result('pb-alice-0001', 'default', 1234567, 120000, 6, 0, 0, 3)$q$);
 select pg_temp.record('ピンボール: 同じプレイを送り直しても二重に付かない（1回目の枚数を返す）',
   (select result ->> 'applied' from gacha_last) = 'false'
-  and (select (result ->> 'coins')::integer from gacha_last) = 103
+  and (select (result ->> 'coins')::integer from gacha_last) = 259
   and (select result ->> 'is_best' from gacha_last) = 'false'
   and (select count(*) from public.red_coin_events where user_id = :'alice' and event_type = 'pinball') = 1
   and (select count(*) from public.pinball_scores where user_id = :'alice') = 1);
 
 select pg_temp.gacha_as(:'alice',
   $q$select public.record_pinball_result('pb-alice-0002', 'bumper', 50000000, 600000, 30, 3, 9, 5)$q$);
-select pg_temp.record('ピンボール: 1プレイの赤コインは2400枚まで',
-  (select (result ->> 'coins')::integer from gacha_last) = 2400
-  and (select coalesce(sum(amount), 0) from public.red_coin_events where user_id = :'alice' and event_type = 'pinball') = 2503);
+select pg_temp.record('ピンボール: 1プレイの赤コインは6000枚まで',
+  (select (result ->> 'coins')::integer from gacha_last) = 6000
+  and (select coalesce(sum(amount), 0) from public.red_coin_events where user_id = :'alice' and event_type = 'pinball') = 6259);
 
 select pg_temp.gacha_as(:'alice',
-  $q$select public.record_pinball_result('pb-alice-0003', 'default', 11874, 30000, 0, 0, 0, 0)$q$);
-select pg_temp.record('ピンボール: 11874点は0枚。ベストは台ごとで、前の記録のまま',
+  $q$select public.record_pinball_result('pb-alice-0003', 'default', 4749, 30000, 0, 0, 0, 0)$q$);
+select pg_temp.record('ピンボール: 4749点は0枚。ベストは台ごとで、前の記録のまま',
   (select (result ->> 'coins')::integer from gacha_last) = 0
   and (select (result ->> 'best')::integer from gacha_last) = 1234567
   and (select result ->> 'is_best' from gacha_last) = 'false'
@@ -1061,36 +1061,36 @@ select pg_temp.expect_denied('ピンボール: ランキングの期間は week 
   $q$select * from public.get_friend_pinball_ranking('month')$q$);
 
 -- ---------- 部品（赤コインで買う） ----------
--- alice の赤コインは 2503 枚（ピンボールの 103 + 2400）。部品の値段（0139 で3倍）には足りないので、
--- もう1回遊んでおく（1プレイ 2400 枚まで）→ 4903 枚
-select pg_temp.gacha_as(:'alice',
-  $q$select public.record_pinball_result('pb-alice-0007', 'pachinko', 30000000, 600000, 0, 0, 0, 0)$q$);
-select pg_temp.record('部品: 買い物の前の alice の赤コインは 4903 枚',
-  (select balance from public.user_red_coins where user_id = :'alice') = 4903);
+-- alice の赤コインは 6259 枚（ピンボールの 259 + 6000）
+select pg_temp.record('部品: 買い物の前の alice の赤コインは 6259 枚',
+  (select balance from public.user_red_coins where user_id = :'alice') = 6259);
 
 select pg_temp.expect_denied('部品: 知らない部品は買えない', :'alice',
   $q$select public.buy_pinball_part('rocket')$q$);
 select pg_temp.gacha_as(:'alice', $q$select public.buy_pinball_part('bumper')$q$);
 select pg_temp.record('部品: 赤コインでバンパーを買える（はじめの3こ＋1こ・900枚）',
   (select (result ->> 'owned')::integer from gacha_last) = 4
-  and (select (result ->> 'balance')::integer from gacha_last) = 4003
+  and (select (result ->> 'balance')::integer from gacha_last) = 5359
   and (select count from public.user_pinball_parts where user_id = :'alice' and part = 'bumper') = 1
   and (select amount from public.red_coin_events where user_id = :'alice' and event_type = 'pinball_part') = -900);
 select pg_temp.gacha_as(:'alice', $q$select public.buy_pinball_part('peg')$q$);
 select pg_temp.record('部品: くぎは10本ずつ（はじめの10本＋10本・300枚）',
   (select (result ->> 'owned')::integer from gacha_last) = 20
-  and (select (result ->> 'balance')::integer from gacha_last) = 3703);
+  and (select (result ->> 'balance')::integer from gacha_last) = 5059);
 select pg_temp.gacha_as(:'alice', $q$select public.buy_pinball_part('ramp_top')$q$);
 select pg_temp.expect_denied('部品: ランプは1つまで', :'alice',
   $q$select public.buy_pinball_part('ramp_top')$q$);
-select pg_temp.expect_denied('部品: 赤コインが足りないと買えない（のこり103枚・コースターランプは5400枚）', :'alice',
+select pg_temp.gacha_as(:'alice', $q$select public.buy_pinball_part('rail')$q$);
+select pg_temp.record('部品: 新しい部品（ガイドレール）も買える。持てる数の上限は無い（はじめの2本＋1本・450枚）',
+  (select (result ->> 'owned')::integer from gacha_last) = 3
+  and (select (result ->> 'balance')::integer from gacha_last) = 1009
+  and (select max_count from public.pinball_part_catalog() where part = 'rail') is null);
+select pg_temp.expect_denied('部品: 赤コインが足りないと買えない（のこり1009枚・コースターランプは5400枚）', :'alice',
   $q$select public.buy_pinball_part('ramp_cross')$q$);
-select pg_temp.expect_denied('部品: 新しい部品も、赤コインが足りないと買えない（ガイドレールは450枚）', :'alice',
-  $q$select public.buy_pinball_part('rail')$q$);
 select pg_temp.record('部品: 買えなかったときは赤コインがへらない',
-  (select balance from public.user_red_coins where user_id = :'alice') = 103
+  (select balance from public.user_red_coins where user_id = :'alice') = 1009
   and (select count(*) from public.user_pinball_parts where user_id = :'alice' and part = 'ramp_cross' and count > 0) = 0);
-select pg_temp.expect_denied('部品: 赤コインが足りない人は買えない（bob は168枚・てっぺんランプは3600枚）', :'bob',
+select pg_temp.expect_denied('部品: 赤コインが足りない人は買えない（bob は421枚・てっぺんランプは3600枚）', :'bob',
   $q$select public.buy_pinball_part('ramp_top')$q$);
 select pg_temp.expect_blocked('部品: 持っている数を直接書きかえられない', :'alice',
   $q$update public.user_pinball_parts set count = 999$q$);
@@ -1109,7 +1109,7 @@ select pg_temp.expect_count('部品: 他人の部品は見えない', :'bob', 's
 \set stage_bad_part '{"v":1,"look":"default","ramp":"standard","parts":[{"kind":"rocket","x":200,"y":200}],"items":[{"x":120,"y":300},{"x":360,"y":300},{"x":240,"y":280}]}'
 \set stage_empty '{"v":1,"look":"pachinko","ramp":"standard","parts":[],"items":[{"x":120,"y":300},{"x":360,"y":300},{"x":240,"y":280}]}'
 \set stage_rails '{"v":1,"look":"default","ramp":"standard","parts":[{"kind":"rail","x":100,"y":220,"angle":60},{"kind":"rail","x":380,"y":220,"angle":120}],"items":[{"x":120,"y":300},{"x":360,"y":300},{"x":240,"y":280}]}'
-\set stage_3rails '{"v":1,"look":"default","ramp":"standard","parts":[{"kind":"rail","x":100,"y":220,"angle":60},{"kind":"rail","x":380,"y":220,"angle":120},{"kind":"rail","x":240,"y":400,"angle":90}],"items":[{"x":120,"y":300},{"x":360,"y":300},{"x":240,"y":280}]}'
+\set stage_4rails '{"v":1,"look":"default","ramp":"standard","parts":[{"kind":"rail","x":100,"y":220,"angle":60},{"kind":"rail","x":380,"y":220,"angle":120},{"kind":"rail","x":240,"y":400,"angle":90},{"kind":"rail","x":240,"y":200,"angle":90}],"items":[{"x":120,"y":300},{"x":360,"y":300},{"x":240,"y":280}]}'
 \set stage_spinner '{"v":1,"look":"default","ramp":"standard","parts":[{"kind":"spinner","x":240,"y":220}],"items":[{"x":120,"y":300},{"x":360,"y":300},{"x":240,"y":280}]}'
 
 select pg_temp.gacha_as(:'alice', format(
@@ -1131,8 +1131,8 @@ select pg_temp.expect_denied('ステージ: 知らない見た目は使えない
   $q$select public.save_pinball_stage(null, 'うちゅう', %L::jsonb, false)$q$, :'stage_bad_look'));
 select pg_temp.expect_denied('ステージ: 知らない部品は置けない', :'alice', format(
   $q$select public.save_pinball_stage(null, 'ロケット', %L::jsonb, false)$q$, :'stage_bad_part'));
-select pg_temp.expect_denied('ステージ: 新しい部品も、持っている数（ガイドレールははじめの2本）より多くは置けない', :'alice', format(
-  $q$select public.save_pinball_stage(null, 'レール3本', %L::jsonb, false)$q$, :'stage_3rails'));
+select pg_temp.expect_denied('ステージ: 新しい部品も、持っている数（ガイドレールははじめの2本＋買った1本）より多くは置けない', :'alice', format(
+  $q$select public.save_pinball_stage(null, 'レール4本', %L::jsonb, false)$q$, :'stage_4rails'));
 select pg_temp.expect_denied('ステージ: 持っていない新しい部品（スピナー）は置けない', :'alice', format(
   $q$select public.save_pinball_stage(null, 'スピナー', %L::jsonb, false)$q$, :'stage_spinner'));
 select pg_temp.expect_denied('ステージ: 名前が空だと保存できない', :'alice', format(
@@ -1162,7 +1162,7 @@ select pg_temp.gacha_as(:'bob', format(
   $q$select public.record_pinball_result('pb-bob-stage-0001', 'stage', 3000000, 120000, 5, 0, 0, 2, %L)$q$, :'stage_a'));
 select pg_temp.record('ステージ: フレンドが公開したステージを遊ぶと、記録と赤コインが付く',
   (select result ->> 'applied' from gacha_last) = 'true'
-  and (select (result ->> 'coins')::integer from gacha_last) = 252
+  and (select (result ->> 'coins')::integer from gacha_last) = 631
   and (select result ->> 'is_best' from gacha_last) = 'true'
   and (select stage_id from public.pinball_scores where user_id = :'bob' and round_id = 'pb-bob-stage-0001') = :'stage_a'::uuid);
 select pg_temp.expect_denied('ステージ: 公開していないステージは、フレンドでも遊べない', :'bob', format(
@@ -1250,8 +1250,8 @@ select pg_temp.record('ピンボール: 1時間に41回目のプレイは記録�
   pg_temp.run_as(:'bob', $q$select public.record_pinball_result('pb-bob-0099', 'default', 1000, 60000, 0, 0, 0, 0)$q$) like '%TOO_MANY_ROUNDS%');
 select pg_temp.expect_ok('ピンボール: 回数の制限中でも、記録ずみのプレイの再送は通る', :'bob',
   $q$select public.record_pinball_result('pb-bob-0001', 'coaster', 2000000, 90000, 4, 0, 0, 2)$q$);
-select pg_temp.record('ピンボール: 再送で bob の赤コインは増えない（168 + ステージの252）',
-  (select coalesce(sum(amount), 0) from public.red_coin_events where user_id = :'bob' and event_type = 'pinball') = 420);
+select pg_temp.record('ピンボール: 再送で bob の赤コインは増えない（421 + ステージの631）',
+  (select coalesce(sum(amount), 0) from public.red_coin_events where user_id = :'bob' and event_type = 'pinball') = 1052);
 
 -- 0138 より前のプレイ（青コインで付けたもの）を送り直しても、赤コインは付けない
 insert into public.pinball_scores (user_id, round_id, table_id, score, duration_ms, coins, played_at)
@@ -1260,16 +1260,16 @@ select pg_temp.gacha_as(:'bob',
   $q$select public.record_pinball_result('pb-bob-old-0001', 'default', 950000, 90000, 0, 0, 0, 0)$q$);
 select pg_temp.record('ピンボール: 前のプレイの再送では、赤コインは付かない',
   (select result ->> 'applied' from gacha_last) = 'false'
-  and (select coalesce(sum(amount), 0) from public.red_coin_events where user_id = :'bob' and event_type = 'pinball') = 420);
+  and (select coalesce(sum(amount), 0) from public.red_coin_events where user_id = :'bob' and event_type = 'pinball') = 1052);
 
 -- ホームに降るコイン（黄色・青・赤）
 select pg_temp.gacha_as(:'alice',
   $q$select public.claim_home_coin_drop('red-drop-alice-01', 'red', 'common')$q$);
-select pg_temp.record('赤コイン: ホームに降った赤コインを受け取れる（ふつう5枚）',
+select pg_temp.record('赤コイン: ホームに降った赤コインを受け取れる（ふつう13枚）',
   (select result ->> 'granted' from gacha_last) = 'true'
-  and (select (result ->> 'amount')::integer from gacha_last) = 5
-  and (select (result ->> 'red_balance')::integer from gacha_last) = 183
-  and (select coalesce(sum(amount), 0) from public.red_coin_events where user_id = :'alice' and event_type = 'home_drop') = 5);
+  and (select (result ->> 'amount')::integer from gacha_last) = 13
+  and (select (result ->> 'red_balance')::integer from gacha_last) = 1211
+  and (select coalesce(sum(amount), 0) from public.red_coin_events where user_id = :'alice' and event_type = 'home_drop') = 13);
 select pg_temp.gacha_as(:'alice',
   $q$select public.claim_home_coin_drop('blue-drop-alice-01', 'blue', 'common')$q$);
 select pg_temp.record('赤コイン: 赤コインを拾った直後は、ほかの色も8秒あける',
@@ -1277,16 +1277,16 @@ select pg_temp.record('赤コイン: 赤コインを拾った直後は、ほか�
 select pg_temp.expect_denied('ホームのコインの色がちがうと受け取れない', :'alice',
   $q$select public.claim_home_coin_drop('gold-drop-alice-01', 'gold', 'common')$q$);
 
--- ログイン（毎日 赤コイン50枚）
+-- ログイン（毎日 赤コイン125枚）
 select pg_temp.gacha_as(:'carol', $q$select public.claim_login_bonus()$q$);
-select pg_temp.record('赤コイン: ログインで毎日50枚',
+select pg_temp.record('赤コイン: ログインで毎日125枚',
   (select result ->> 'granted' from gacha_last) = 'true'
-  and (select (result ->> 'red_amount')::integer from gacha_last) = 50
-  and (select coalesce(sum(amount), 0) from public.red_coin_events where user_id = :'carol' and event_type = 'login') = 50);
+  and (select (result ->> 'red_amount')::integer from gacha_last) = 125
+  and (select coalesce(sum(amount), 0) from public.red_coin_events where user_id = :'carol' and event_type = 'login') = 125);
 select pg_temp.gacha_as(:'carol', $q$select public.claim_login_bonus()$q$);
 select pg_temp.record('赤コイン: 同じ日の2回目のログインでは付かない',
   (select (result ->> 'red_amount')::integer from gacha_last) = 0
-  and (select coalesce(sum(amount), 0) from public.red_coin_events where user_id = :'carol' and event_type = 'login') = 50);
+  and (select coalesce(sum(amount), 0) from public.red_coin_events where user_id = :'carol' and event_type = 'login') = 125);
 
 -- 後続のアカウント削除テストに影響しないよう、フレンド関係を戻しておく。
 delete from public.friendships where user_id in (:'alice', :'bob') and friend_user_id in (:'alice', :'bob');

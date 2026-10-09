@@ -358,7 +358,7 @@ export function PinballRulebook({ owned }: { owned: ReadonlyMap<string, number> 
                       {n(part.price)}
                     </span>
                     {part.free ? `はじめから${part.free}こ・` : ""}
-                    {part.max}こまで
+                    {part.max !== null ? `${part.max}こまで` : "いくつでも"}
                   </span>
                 </li>
               ))}

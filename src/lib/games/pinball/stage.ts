@@ -29,24 +29,27 @@ export type PinballPartInfo = {
   pack: number;
   /** はじめから持っている数 */
   free: number;
-  /** 持てる数（はじめのぶんもふくめて）。1つのステージに置けるのも、この数まで */
-  max: number;
+  /**
+   * 持てる数（はじめのぶんもふくめて）。null は上限なし（2026-10-09〜、ランプのほかは上限なし。ユーザー指定）。
+   * 1つのステージに置ける数は、持っている数まで。部品どうしのすき間（STAGE_GAP）があるので、置ける数は台の広さで自然に決まる
+   */
+  max: number | null;
   /** 部品の説明（ショップに出す） */
   lead: string;
 };
 
 export const PINBALL_PARTS: readonly PinballPartInfo[] = [
-  { id: "bumper", name: "バンパー", price: 900, pack: 1, free: 3, max: 8, lead: "当たると玉をはじき飛ばす。大きさは3つからえらべる" },
-  { id: "pinwheel", name: "かざぐるま", price: 1200, pack: 1, free: 1, max: 4, lead: "いつも回っている羽根。回る向きをえらべる" },
-  { id: "post", name: "ゴムのポスト", price: 150, pack: 1, free: 4, max: 16, lead: "小さなゴムの柱。玉の通り道を作る" },
-  { id: "peg", name: "くぎ（10本）", price: 300, pack: 10, free: 10, max: 60, lead: "パチンコのくぎ。カチカチ当たりながら落ちてくる" },
-  { id: "sling", name: "ミニスリングショット", price: 1200, pack: 1, free: 0, max: 4, lead: "ゴムの面に当たると、横へはじく。向きをえらべる" },
-  { id: "rail", name: "ガイドレール", price: 450, pack: 1, free: 2, max: 8, lead: "まっすぐな金属のレール。玉の通り道を作る。向きを変えられる" },
-  { id: "rubber", name: "ゴムのかべ", price: 600, pack: 1, free: 0, max: 6, lead: "2本のポストに張ったゴム。当たった玉がよくはねる。向きを変えられる" },
-  { id: "block", name: "ブロック", price: 450, pack: 1, free: 0, max: 6, lead: "ひし形のプラスチックのかたまり。玉をななめにはね返す" },
-  { id: "bar", name: "回転バー", price: 1500, pack: 1, free: 0, max: 2, lead: "ゆっくり回る長いバー。近くの玉をはらいのける。回る向きをえらべる" },
-  { id: "spinner", name: "スピナー", price: 1200, pack: 1, free: 0, max: 3, lead: "玉がくぐると板がくるくる回って、回ったぶん点が入る" },
-  { id: "drop", name: "ドロップターゲット", price: 900, pack: 1, free: 0, max: 6, lead: "当てるとたおれる的。全部たおすとボーナスが入って、また立つ。向きを変えられる" },
+  { id: "bumper", name: "バンパー", price: 900, pack: 1, free: 3, max: null, lead: "当たると玉をはじき飛ばす。大きさは3つからえらべる" },
+  { id: "pinwheel", name: "かざぐるま", price: 1200, pack: 1, free: 1, max: null, lead: "いつも回っている羽根。回る向きをえらべる" },
+  { id: "post", name: "ゴムのポスト", price: 150, pack: 1, free: 4, max: null, lead: "小さなゴムの柱。玉の通り道を作る" },
+  { id: "peg", name: "くぎ（10本）", price: 300, pack: 10, free: 10, max: null, lead: "パチンコのくぎ。カチカチ当たりながら落ちてくる" },
+  { id: "sling", name: "ミニスリングショット", price: 1200, pack: 1, free: 0, max: null, lead: "ゴムの面に当たると、横へはじく。向きをえらべる" },
+  { id: "rail", name: "ガイドレール", price: 450, pack: 1, free: 2, max: null, lead: "まっすぐな金属のレール。玉の通り道を作る。向きを変えられる" },
+  { id: "rubber", name: "ゴムのかべ", price: 600, pack: 1, free: 0, max: null, lead: "2本のポストに張ったゴム。当たった玉がよくはねる。向きを変えられる" },
+  { id: "block", name: "ブロック", price: 450, pack: 1, free: 0, max: null, lead: "ひし形のプラスチックのかたまり。玉をななめにはね返す" },
+  { id: "bar", name: "回転バー", price: 1500, pack: 1, free: 0, max: null, lead: "ゆっくり回る長いバー。近くの玉をはらいのける。回る向きをえらべる" },
+  { id: "spinner", name: "スピナー", price: 1200, pack: 1, free: 0, max: null, lead: "玉がくぐると板がくるくる回って、回ったぶん点が入る" },
+  { id: "drop", name: "ドロップターゲット", price: 900, pack: 1, free: 0, max: null, lead: "当てるとたおれる的。全部たおすとボーナスが入って、また立つ。向きを変えられる" },
   { id: "ramp_top", name: "てっぺんランプ", price: 3600, pack: 1, free: 0, max: 1, lead: "ランプをのぼった玉を、インレーンではなく台のてっぺんに落とす" },
   { id: "ramp_cross", name: "コースターランプ", price: 5400, pack: 1, free: 0, max: 1, lead: "左右のランプがXに交わって、反対がわのインレーンへ降りてくる" },
 ];
@@ -60,7 +63,10 @@ export type OwnedParts = Record<PinballPartId, number>;
 /** 持っている部品の数（はじめのぶん＋買ったぶん）。rows は user_pinball_parts の行（買ったぶん） */
 export function ownedPinballParts(bought: Partial<Record<string, number>>): OwnedParts {
   const out = {} as OwnedParts;
-  for (const part of PINBALL_PARTS) out[part.id] = Math.min(part.max, part.free + Math.max(0, Math.floor(bought[part.id] ?? 0)));
+  for (const part of PINBALL_PARTS) {
+    const have = part.free + Math.max(0, Math.floor(bought[part.id] ?? 0));
+    out[part.id] = part.max === null ? have : Math.min(part.max, have);
+  }
   return out;
 }
 
@@ -575,7 +581,7 @@ export function validateStage(spec: StageSpec, owned?: OwnedParts): StageIssue[]
   if (spec.parts.length > STAGE_PARTS_MAX) issues.push({ target: { type: "stage" }, message: `部品は全部で${STAGE_PARTS_MAX}こまでです` });
   const counts = stagePartCounts(spec);
   for (const part of PINBALL_PARTS) {
-    const limit = Math.min(part.max, owned ? owned[part.id] : part.max);
+    const limit = Math.min(part.max ?? Infinity, owned ? owned[part.id] : Infinity);
     if (counts[part.id] > limit) {
       issues.push({
         target: { type: "stage" },

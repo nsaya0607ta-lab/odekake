@@ -93,7 +93,7 @@ export function PinballPartsShop({ theme, bumperItem, owned, redCoins, onClose, 
         <ul className="mt-3 space-y-2">
           {PINBALL_PARTS.map((part) => {
             const have = owned[part.id];
-            const full = have + part.pack > part.max;
+            const full = part.max !== null && have + part.pack > part.max;
             const short = redCoins !== null && redCoins < part.price;
             return (
               <li key={part.id} className="flex items-center gap-3 rounded-[20px] border border-white/10 bg-white/[0.04] p-3">
@@ -107,7 +107,8 @@ export function PinballPartsShop({ theme, bumperItem, owned, redCoins, onClose, 
                   <span className="block text-[13px] font-black">{part.name}</span>
                   <span className="mt-0.5 block text-[10px] font-bold leading-snug text-white/55">{part.lead}</span>
                   <span className="mt-1 block text-[10px] font-black tabular-nums text-white/75">
-                    持っている {have} / {part.max}
+                    持っている {have}
+                    {part.max !== null ? ` / ${part.max}` : ""}
                     {part.free ? <span className="font-bold text-white/45">（はじめから{part.free}）</span> : null}
                   </span>
                 </span>
