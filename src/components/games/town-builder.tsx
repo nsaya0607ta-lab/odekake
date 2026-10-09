@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   BUILDINGS, MAP_SIZE, advanceTown, buildTile, createTown,
   decodeTown, getTownStats, neighbours,
@@ -95,6 +95,7 @@ function TileArt({ tile, index, tiles, selected, hovered, onSelect, onHover }: {
 }
 export function TownBuilder({ userId }: { userId: string }) {
   const key = "odekake-town-builder:v1:" + userId;
+  const viewportRef = useRef<HTMLDivElement>(null);
   const [town, setTown] = useState<Town>(createTown);
   const [loaded, setLoaded] = useState(false);
   const [tool, setTool] = useState<Tool>("road");
@@ -104,6 +105,10 @@ export function TownBuilder({ userId }: { userId: string }) {
   const [inspect, setInspect] = useState(false);
   const stats = useMemo(() => getTownStats(town.tiles), [town.tiles]);
   const tiles = town.tiles;
+  useEffect(() => {
+    const viewport = viewportRef.current;
+    if (viewport) viewport.scrollLeft = Math.max(0, (viewport.scrollWidth - viewport.clientWidth) / 2);
+  }, [zoom]);
 
   useEffect(() => {
     try {
@@ -187,7 +192,7 @@ export function TownBuilder({ userId }: { userId: string }) {
               className="rounded-xl border border-[#c6d7bc] bg-white px-3 py-2 font-bold">＋</button>
           </div>
         </div>
-        <div className="relative max-h-[580px] min-h-[340px] overflow-auto rounded-[20px] border border-[#a6cbb2] bg-gradient-to-b from-[#c9ebdf] via-[#d9f0d1] to-[#b6dab2]">
+        <div ref={viewportRef} className="relative max-h-[580px] min-h-[340px] overflow-auto rounded-[20px] border border-[#a6cbb2] bg-gradient-to-b from-[#c9ebdf] via-[#d9f0d1] to-[#b6dab2]">
           <svg viewBox="0 0 1000 585" width={Math.round(1000 * zoom)}
             height={Math.round(585 * zoom)} role="img"
             aria-label="24×24マスの街の建設マップ。タイルを選んで建設できます。"
