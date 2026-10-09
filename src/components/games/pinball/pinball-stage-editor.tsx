@@ -36,7 +36,7 @@ import {
 import { CX, type Pt } from "@/lib/games/pinball/table";
 import type { PinballLobby } from "@/lib/games/pinball/tables";
 import { getPinballTheme, type PinballTheme } from "@/lib/games/pinball/themes";
-import { PinballPartIcon } from "./pinball-part-icon";
+import { PinballPartArt, RAMP_ART } from "./pinball-part-art";
 import { PinballStageBoard } from "./pinball-stage-board";
 import type { ViewRect } from "./render";
 
@@ -437,6 +437,8 @@ export function PinballStageEditor({ draft, lobby, owned, redCoins, onClose, onS
   };
 
   const selectedPart = selected?.type === "part" ? spec.parts[selected.index] ?? null : null;
+  // 次に置くバンパーの笠の絵（バンパーの絵は、置いた順に決まる）
+  const nextBumperItem = lobby.bumperItems[Math.min(counts.bumper, lobby.bumperItems.length - 1)] ?? null;
   const rampExit = TOP_RAMP.path[TOP_RAMP.path.length - 1]!;
 
   return (
@@ -650,12 +652,17 @@ export function PinballStageEditor({ draft, lobby, owned, redCoins, onClose, onS
                       say(`${PART_NAMES[kind]}：点線の中をタップすると置けます（もう一度押すとやめる）`, "info");
                     }
                   }}
-                  className={`flex flex-col items-center rounded-2xl border px-1 py-1.5 active:scale-95 ${active ? "border-[#ffd166] bg-[#ffd166]/15" : "border-white/10 bg-white/[0.04]"} ${left <= 0 && !active ? "opacity-45" : ""}`}
+                  className={`flex flex-col items-center rounded-2xl border px-1 pb-1.5 pt-2 active:scale-95 ${active ? "border-[#ffd166] bg-[#ffd166]/15" : "border-white/10 bg-white/[0.04]"} ${left <= 0 && !active ? "opacity-45" : ""}`}
                   aria-pressed={active}
                   aria-label={`${PART_NAMES[kind]}（のこり${Math.max(0, left)}こ）`}
                 >
-                  <PinballPartIcon part={kind} className="h-8 w-8" accent={theme.colors.accent} />
-                  <span className="mt-0.5 text-[9px] font-black leading-none">{PART_NAMES[kind]}</span>
+                  <PinballPartArt
+                    art={kind}
+                    theme={theme}
+                    bumperItem={nextBumperItem}
+                    className="h-10 w-10 rounded-xl shadow-[0_2px_6px_rgba(0,0,0,0.45)] ring-1 ring-white/15"
+                  />
+                  <span className="mt-1 text-[9px] font-black leading-none">{PART_NAMES[kind]}</span>
                   <span className="mt-0.5 text-[9px] font-bold tabular-nums text-white/60">
                     {counts[kind]}/{owned[kind]}
                   </span>
@@ -687,11 +694,15 @@ export function PinballStageEditor({ draft, lobby, owned, redCoins, onClose, onS
                       }
                       setSpec((current) => ({ ...current, ramp }));
                     }}
-                    className={`rounded-2xl border px-1.5 py-2 text-[11px] font-black ${active ? "border-[#ff6b6b] bg-[#ff6b6b]/20" : "border-white/10 bg-white/[0.04]"} ${locked ? "text-white/45" : ""}`}
+                    className={`overflow-hidden rounded-2xl border-2 text-[11px] font-black active:scale-95 ${active ? "border-[#ff6b6b] bg-[#ff6b6b]/20" : "border-white/10 bg-white/[0.04]"} ${locked ? "text-white/45" : ""}`}
                     aria-pressed={active}
+                    aria-label={locked ? `${RAMP_NAMES[ramp]}（部品のお店で買えます）` : RAMP_NAMES[ramp]}
                   >
-                    {locked ? "🔒 " : ""}
-                    {RAMP_NAMES[ramp]}
+                    <span className="relative block">
+                      <PinballPartArt art={RAMP_ART[ramp]} theme={theme} className={`block h-[58px] w-full ${locked ? "opacity-35" : ""}`} />
+                      {locked ? <span className="absolute inset-0 flex items-center justify-center text-[18px]">🔒</span> : null}
+                    </span>
+                    <span className="block px-1 py-1.5">{RAMP_NAMES[ramp]}</span>
                   </button>
                 );
               })}

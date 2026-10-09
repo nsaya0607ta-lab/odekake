@@ -2,11 +2,17 @@
 
 import { useEffect, useRef, useState } from "react";
 import { RedCoinArt } from "@/components/coin-art";
+import type { PinballItem } from "@/lib/games/pinball/game";
 import { PINBALL_PARTS, type OwnedParts, type PinballPartId } from "@/lib/games/pinball/stage";
+import type { PinballTheme } from "@/lib/games/pinball/themes";
 import { RED_COIN_SOURCES_SHORT } from "@/lib/red-coin-rewards";
-import { PinballPartIcon } from "./pinball-part-icon";
+import { PinballPartArt } from "./pinball-part-art";
 
 type Props = {
+  /** 部品の絵の色（いつもの台の色） */
+  theme: PinballTheme;
+  /** バンパーの絵にのせるアイテム */
+  bumperItem: PinballItem | null;
   /** 持っている数（はじめのぶん＋買ったぶん） */
   owned: OwnedParts;
   redCoins: number | null;
@@ -16,7 +22,7 @@ type Props = {
 };
 
 /** ステージの部品のお店（赤コインで買う。くぎは10本ずつ） */
-export function PinballPartsShop({ owned, redCoins, onClose, onBought }: Props) {
+export function PinballPartsShop({ theme, bumperItem, owned, redCoins, onClose, onBought }: Props) {
   const [busy, setBusy] = useState<PinballPartId | null>(null);
   const [message, setMessage] = useState<{ text: string; ok: boolean } | null>(null);
   const closeRef = useRef<HTMLButtonElement | null>(null);
@@ -91,9 +97,12 @@ export function PinballPartsShop({ owned, redCoins, onClose, onBought }: Props) 
             const short = redCoins !== null && redCoins < part.price;
             return (
               <li key={part.id} className="flex items-center gap-3 rounded-[20px] border border-white/10 bg-white/[0.04] p-3">
-                <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-black/30">
-                  <PinballPartIcon part={part.id} className="h-9 w-9" />
-                </span>
+                <PinballPartArt
+                  art={part.id}
+                  theme={theme}
+                  bumperItem={bumperItem}
+                  className="h-14 w-14 shrink-0 rounded-2xl shadow-[0_2px_8px_rgba(0,0,0,0.45)] ring-1 ring-white/15"
+                />
                 <span className="min-w-0 flex-1">
                   <span className="block text-[13px] font-black">{part.name}</span>
                   <span className="mt-0.5 block text-[10px] font-bold leading-snug text-white/55">{part.lead}</span>

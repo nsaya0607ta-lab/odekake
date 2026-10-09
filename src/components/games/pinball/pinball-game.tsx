@@ -7,7 +7,7 @@ import { RedCoinArt } from "@/components/coin-art";
 import type { PinballStageInfo } from "@/lib/data/pinball";
 import { RARITY_STYLES } from "@/lib/gacha/config";
 import { STAMP_COUNT } from "@/lib/games/pinball/config";
-import { resolvePinballMapId } from "@/lib/games/pinball/maps";
+import { DEFAULT_MAP_ID, resolvePinballMapId } from "@/lib/games/pinball/maps";
 import { ownedPinballParts, starterStage, type PinballPartId, type StageSpec } from "@/lib/games/pinball/stage";
 import type { PinballLobby } from "@/lib/games/pinball/tables";
 import { getPinballTheme, stageTheme } from "@/lib/games/pinball/themes";
@@ -303,7 +303,16 @@ export function PinballGame({ lobby, bests: initialBests, redCoins: initialCoins
         />
       ) : null}
 
-      {shopOpen ? <PinballPartsShop owned={owned} redCoins={redCoins} onClose={() => setShopOpen(false)} onBought={onBought} /> : null}
+      {shopOpen ? (
+        <PinballPartsShop
+          theme={getPinballTheme(DEFAULT_MAP_ID)}
+          bumperItem={lobby.bumperItems[0] ?? null}
+          owned={owned}
+          redCoins={redCoins}
+          onClose={() => setShopOpen(false)}
+          onBought={onBought}
+        />
+      ) : null}
 
       {playing && theme ? (
         <PinballPlay
