@@ -5,6 +5,7 @@ on:
     paths:
       - "src/lib/games/town-*.ts"
       - "src/components/games/town-builder*"
+      - "src/components/bottom-nav.tsx"
       - "src/app/mini-games-preview/town-builder/**"
       - "scripts/test-town-builder*.cjs"
       - "src/middleware.ts"
@@ -31,4 +32,4 @@ jobs:
       - run: npm ci --no-audit --no-fund
       - run: npm run typecheck
       - run: npm run test:town
-      - run: npx eslint src/components/games/town-builder.tsx src/lib/games/town-builder.ts src/lib/games/town-renderer.ts src/lib/games/town-builder-access.ts src/middleware.ts 'src/app/(app)/games/page.tsx' 'src/app/(app)/games/town-builder/page.tsx' src/app/mini-games-preview/town-builder/page.tsx
+      - run: npx eslint src/components/games/town-builder.tsx src/components/bottom-nav.tsx src/lib/games/town-builder.ts src/lib/games/town-renderer.ts src/lib/games/town-builder-access.ts src/middleware.ts 'src/app/(app)/games/page.tsx' 'src/app/(app)/games/town-builder/page.tsx' src/app/mini-games-preview/town-builder/page.tsx
