@@ -59,6 +59,14 @@ test('empty land and points outside the map retain ground picking', () => {
   assert.equal(scene.pickTile(p.x, p.y, blank()), 8 * 24 + 3);
   assert.equal(scene.pickTile(3000, -3000, blank()), null);
 });
+test('selection bounds include the roof and foundation of a tall building', () => {
+  const scene = new TownScene(), town = blank(), i = 5 * 24 + 5;
+  town.tiles[i] = 'house'; town.levels[i] = 3; scene.camera = { x: 195, y: -100, zoom: .85 };
+  const bounds = scene.tileBounds(i, town), roof = iso(5.5, 5.5, 80), ground = iso(5.5, 5.5);
+  assert(bounds.top <= scene.camera.y + roof.y * .85);
+  assert(bounds.bottom >= scene.camera.y + ground.y * .85);
+  assert(bounds.left < bounds.right);
+});
 test('zooming a fitted small map does not jump to a larger minimum scale', () => {
   const scene = new TownScene(); scene.fit(320, 568);
   const camera = { ...scene.camera };
@@ -71,6 +79,20 @@ test('factory smoke does not make the construction ghost opaque', () => {
   scene.render(c, 800, 600, town, { ...options, preview: [5 * 24 + 5], tool: 'factory' }, 0);
   const counter = fills.find(f => f.color === '#c9d4bb');
   assert(counter); assert.equal(counter.alpha, .55); assert.equal(c.globalAlpha, 1);
+});
+test('the selection marker is drawn below a house instead of washing out its walls', () => {
+  const { c, fills } = recordingContext(), town = blank(), i = 5 * 24 + 5;
+  town.tiles[i] = 'house'; town.levels[i] = 1;
+  new TownScene().render(c, 390, 844, town, { ...options, selected: i }, 0);
+  const marker = fills.findIndex(f => f.color === '#d8b56618');
+  const door = fills.findIndex(f => f.color === '#677d70');
+  assert(marker >= 0 && door > marker, 'Building details must remain above the selection marker');
+});
+test('touch exploration has no white hover layer following the camera', () => {
+  const town = blank(), baseline = recordingContext(), hovered = recordingContext();
+  new TownScene().render(baseline.c, 390, 844, town, options, 0);
+  new TownScene().render(hovered.c, 390, 844, town, { ...options, hover: 100 }, 0);
+  assert.deepEqual(hovered.fills, baseline.fills);
 });
 test('town assets and catalog icons render without floating text or clipped smoke', () => {
   const { c, fills } = recordingContext();

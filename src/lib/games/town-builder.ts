@@ -9,8 +9,8 @@ export type TownStats = {
   happiness: number; jobs: number; routes: number[][];
 };
 export const BUILDINGS: ReadonlyArray<{ id: Tool; title: string; price: number; info: string; category: "交通" | "建物" | "環境" }> = [
-  { id: "road", title: "道路", price: 35, info: "ドラッグで連続敷設。川の上は橋になります（¥120）。", category: "交通" },
-  { id: "rail", title: "線路", price: 55, info: "ドラッグで駅を結ぶ。川の上は鉄道橋（¥160）。", category: "交通" },
+  { id: "road", title: "道路", price: 35, info: "タップで1マス配置。「連続敷設」で道路を延ばせます。川の上は橋（¥120）。", category: "交通" },
+  { id: "rail", title: "線路", price: 55, info: "タップで1マス配置。「連続敷設」で駅を結べます。川の上は鉄道橋（¥160）。", category: "交通" },
   { id: "station", title: "駅", price: 550, info: "2駅を線路で結ぶと列車が運行。周囲3マスの住民を輸送します。", category: "交通" },
   { id: "house", title: "住宅", price: 250, info: "道路沿いに建設。公園と仕事があると集合住宅へ育ちます。", category: "建物" },
   { id: "shop", title: "商店", price: 400, info: "道路沿いに建設。街に仕事と買い物の楽しみを届けます。", category: "建物" },

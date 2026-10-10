@@ -236,6 +236,17 @@ export class TownScene {
     }
     return this.tileAt(px, py);
   }
+  tileBounds(i: number, town: Town) {
+    const x = i % MAP_SIZE, y = Math.floor(i / MAP_SIZE), { camera } = this;
+    const points = [iso(x, y), iso(x + 1, y), iso(x + 1, y + 1), iso(x, y + 1), ...buildingFaces(town.tiles[i]!, x, y, town.levels[i] || 1).flat()];
+    if (town.tiles[i] === "park") points.push(iso(x + .5, y + .5, 40));
+    return {
+      left: camera.x + Math.min(...points.map(p => p.x)) * camera.zoom,
+      right: camera.x + Math.max(...points.map(p => p.x)) * camera.zoom,
+      top: camera.y + Math.min(...points.map(p => p.y)) * camera.zoom,
+      bottom: camera.y + Math.max(...points.map(p => p.y)) * camera.zoom,
+    };
+  }
   render(c: CanvasRenderingContext2D, width: number, height: number, town: Town, options: SceneOptions, dt: number) {
     if (!options.paused) this.time += Math.min(dt, .1) * options.speed;
     const time = this.time;
@@ -267,6 +278,16 @@ export class TownScene {
       if (options.grid && !water) poly(c, [iso(x, y), iso(x + 1, y), iso(x + 1, y + 1), iso(x, y + 1)], "#ffffff00", "#547b4933", .6);
       if (tile === "road" || tile === "rail") transport(c, town, x, y, tile, options.night);
     }
+    // Mark the ground before drawing buildings; selecting a house must not wash out its walls.
+    const highlight = (i: number, color: string, fill: string) => { const x = i % MAP_SIZE, y = Math.floor(i / MAP_SIZE); poly(c, [iso(x, y, 1), iso(x + 1, y, 1), iso(x + 1, y + 1, 1), iso(x, y + 1, 1)], fill, color, 1.8); };
+    const previewTiles = options.preview.length ? options.preview : options.hover !== null && options.tool !== "pan" && options.tool !== "inspect" ? [options.hover] : [];
+    const allowedAt = (i: number) => {
+      const tile = town.tiles[i];
+      const hasAccess = !["house", "shop", "factory"].includes(options.tool) || touchesRoad(town.tiles, i % MAP_SIZE, Math.floor(i / MAP_SIZE));
+      return options.tool === "bulldoze" || tile === "grass" && hasAccess || tile === "water" && ["rail", "road"].includes(options.tool);
+    };
+    if (options.selected !== null) highlight(options.selected, "#f4d184", "#d8b56618");
+    for (const i of previewTiles) highlight(i, allowedAt(i) ? "#efdaa0" : "#d87962", allowedAt(i) ? "#e6dba222" : "#ef957922");
     if (this.lastTiles !== town.tiles) {
       const roads = town.tiles.flatMap((t, i) => t === "road" && neighbours(i % MAP_SIZE, Math.floor(i / MAP_SIZE)).some(n => town.tiles[n] === "road") ? [i] : []);
       this.vehicles = this.vehicles.filter(v => town.tiles[v.from] === "road" && town.tiles[v.to] === "road");
@@ -323,14 +344,8 @@ export class TownScene {
     }
     objects.sort((a, b) => a.depth - b.depth).forEach(o => o.draw());
     if (options.night) { c.save(); c.globalCompositeOperation = "multiply"; patch(c, 0, 0, MAP_SIZE, MAP_SIZE, "#849fad"); c.restore(); }
-    const highlight = (i: number, color: string, fill: string) => { const x = i % MAP_SIZE, y = Math.floor(i / MAP_SIZE); poly(c, [iso(x, y, 1), iso(x + 1, y, 1), iso(x + 1, y + 1, 1), iso(x, y + 1, 1)], fill, color, 1.8); };
-    if (options.selected !== null) highlight(options.selected, "#fbebaf", "#f1d68a20");
-    for (const i of options.preview.length ? options.preview : options.hover !== null && options.tool !== "pan" ? [options.hover] : []) {
-      const tile = town.tiles[i];
-      const hasAccess = !["house", "shop", "factory"].includes(options.tool) || touchesRoad(town.tiles, i % MAP_SIZE, Math.floor(i / MAP_SIZE));
-      const allowed = options.tool === "inspect" || options.tool === "bulldoze" || tile === "grass" && hasAccess || tile === "water" && ["rail", "road"].includes(options.tool);
-      highlight(i, allowed ? "#ffffdd" : "#e68c76", allowed ? "#fffdc842" : "#ef957944");
-      if (allowed && ["house", "shop", "factory", "park", "station"].includes(options.tool)) { c.globalAlpha = .55; building(c, options.tool as Tile, i % MAP_SIZE, Math.floor(i / MAP_SIZE), 1, options.night, time); c.globalAlpha = 1; }
+    for (const i of previewTiles) {
+      if (allowedAt(i) && ["house", "shop", "factory", "park", "station"].includes(options.tool)) { c.globalAlpha = .55; building(c, options.tool as Tile, i % MAP_SIZE, Math.floor(i / MAP_SIZE), 1, options.night, time); c.globalAlpha = 1; }
     }
     c.restore();
   }
