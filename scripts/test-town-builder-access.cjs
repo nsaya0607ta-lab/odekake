@@ -6,6 +6,7 @@ const ts = require('typescript');
 // Exercise the real server pages and middleware with authenticated-session fixtures.
 // Next's redirect/notFound control flow is represented by distinct thrown errors.
 let session = { id: 'shun-account', displayName: 'しゅん' };
+let pathname = '/games/town-builder';
 let configured = true;
 const exit = (kind, location) => { throw Object.assign(new Error(kind), { kind, location }); };
 const TownBuilder = () => null;
@@ -14,7 +15,7 @@ const esm = value => ({ __esModule: true, default: value });
 const stubs = {
   'next/link': esm(component),
   'next/image': esm(component),
-  'next/navigation': { notFound: () => exit('notFound'), redirect: location => exit('redirect', location) },
+  'next/navigation': { notFound: () => exit('notFound'), redirect: location => exit('redirect', location), usePathname: () => pathname },
   '@/components/page-body': { PageBody: component },
   '@/components/page-header': { TopHeader: component },
   '@/components/games/town-builder': { TownBuilder },
@@ -57,6 +58,7 @@ const games = load('src/app/(app)/games/page.tsx').default;
 const town = load('src/app/(app)/games/town-builder/page.tsx').default;
 const preview = load('src/app/mini-games-preview/town-builder/page.tsx').default;
 const { middleware } = load('src/middleware.ts');
+const { BottomNav } = load('src/components/bottom-nav.tsx');
 const request = pathname => {
   const url = new URL(pathname, 'https://odekake.test');
   url.clone = () => new URL(url);
@@ -109,6 +111,14 @@ const test = async (name, fn) => { await fn(); passed++; console.log(`PASS ${nam
       const response = await middleware(request(route));
       assert.equal(response.kind, 'redirect');
       assert.equal(response.url.pathname, '/setup');
+    }
+  });
+  await test('the main app navigation is absent inside the full screen town and present on regular pages', async () => {
+    for (const route of ['/games/town-builder', '/games/town-builder/subpath']) {
+      pathname = route; assert.equal(BottomNav({}), null);
+    }
+    for (const route of ['/home', '/games', '/games/town-builder-other']) {
+      pathname = route; assert.equal(BottomNav({}).type, 'nav');
     }
   });
   console.log(`${passed} town access checks passed`);

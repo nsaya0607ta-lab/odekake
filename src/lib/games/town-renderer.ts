@@ -69,7 +69,7 @@ function lamp(c: CanvasRenderingContext2D, x: number, y: number, night: boolean)
   ellipse(c, { x: p.x + 5, y: p.y - 23 }, 3, 1.5, night ? "#ffe6a1" : "#dfead8");
   if (night) { const g = c.createRadialGradient(p.x, p.y, 0, p.x, p.y, 19); g.addColorStop(0, "#ffdd7745"); g.addColorStop(1, "#ffdd7700"); ellipse(c, p, 19, 10, g); }
 }
-function building(c: CanvasRenderingContext2D, kind: Tile, x: number, y: number, level: number, night: boolean, time: number) {
+function building(c: CanvasRenderingContext2D, kind: Tile, x: number, y: number, level: number, night: boolean, time: number, showSmoke = true) {
   const seed = y * MAP_SIZE + x, v = hash(seed), bx = x + .16, by = y + .15;
   patch(c, x + .05, y + .05, .9, .9, "#c8c9af");
   if (kind === "park") {
@@ -88,8 +88,8 @@ function building(c: CanvasRenderingContext2D, kind: Tile, x: number, y: number,
     for (let j = 0; j < 4; j++) box(c, x + .12 + j * .19, y + .32, .035, .035, 19, ["#809d96", "#587a73", "#cfe0d2"]);
     box(c, x + .10, y + .22, .78, .43, 3, ["#477f78", "#326760", "#75aca1"], 19);
     box(c, x + .1, y + .7, .35, .19, 15, ["#f4e6c7", "#caba98", "#cf9361"]);
-    const p = iso(x + .58, y + .77, 10);
-    c.fillStyle = "#355c54"; c.font = "bold 6px sans-serif"; c.textAlign = "center"; c.fillText("STATION", p.x, p.y);
+    // A small physical sign follows the platform perspective; no floating lettering.
+    box(c, x + .51, y + .72, .24, .03, 3, ["#3f766c", "#315d55", "#cde0c4"], 7);
     ellipse(c, iso(x + .48, y + .66, 22), 3.3, 3.3, "#f9f1d9");
     line(c, iso(x + .48, y + .66, 22), iso(x + .50, y + .66, 24), "#536c64", .7);
     lamp(c, x + .9, y + .8, night); return;
@@ -100,9 +100,9 @@ function building(c: CanvasRenderingContext2D, kind: Tile, x: number, y: number,
     windows(c, bx, by, .72, .64, 2, night, seed);
     for (let j = 0; j < 3; j++) box(c, bx + j * .23, by + .08, .22, .48, 5, ["#739c9f", "#547b81", "#9cb9b4"], 26 + level * 3);
     box(c, x + .77, y + .17, .1, .1, 47, ["#bf8d75", "#8e6557", "#e1b199"]);
-    for (let j = 0; j < 4; j++) {
+    for (let j = 0; showSmoke && j < 4; j++) {
       const t = (time * .23 + j / 4 + v) % 1, p = iso(x + .82, y + .22, 47);
-      c.globalAlpha = (1 - t) * .24; ellipse(c, { x: p.x + t * 12, y: p.y - t * 32 }, 3 + t * 7, 3 + t * 4, "#eaf0dc"); c.globalAlpha = 1;
+      c.save(); c.globalAlpha *= (1 - t) * .24; ellipse(c, { x: p.x + t * 12, y: p.y - t * 32 }, 3 + t * 7, 3 + t * 4, "#eaf0dc"); c.restore();
     }
     box(c, x + .12, y + .86, .25, .08, 4, ["#a6b6aa", "#6f8b7d", "#c9d4bb"]); return;
   }
@@ -128,7 +128,9 @@ function building(c: CanvasRenderingContext2D, kind: Tile, x: number, y: number,
     for (let j = 1; j < 3; j++) line(c, iso(bx + .37, by + .12 + j * .08, height + 3.4), iso(bx + .57, by + .12 + j * .08, height + 3.4), "#99b9bb", .6);
     if (kind === "shop") {
       for (let j = 0; j < 6; j++) patch(c, bx - .03 + j * .12, by + .64, .12, .22, j % 2 ? "#f9ecd1" : "#ce8572", 13);
-      const p = iso(bx + .32, by + .87, 15); c.fillStyle = "#536e65"; c.font = "bold 5.5px sans-serif"; c.textAlign = "center"; c.fillText(v > .5 ? "BAKERY" : "COFFEE", p.x, p.y);
+      // A window and display counter identify the shop without labels on the artwork.
+      poly(c, [iso(bx + .05, by + .66, 4), iso(bx + .21, by + .66, 4), iso(bx + .21, by + .66, 11), iso(bx + .05, by + .66, 11)], night ? "#ffe7ad" : "#8bbab4");
+      box(c, bx + .05, by + .82, .20, .09, 3, ["#ab8d60", "#7e684c", "#ead3a2"]);
       box(c, x + .84, y + .85, .07, .09, 6, ["#927856", "#6e604d", "#e1c89a"]);
     }
   }
@@ -176,6 +178,34 @@ function transport(c: CanvasRenderingContext2D, town: Town, x: number, y: number
   }
 }
 type Vehicle = { from: number; to: number; previous: number; t: number; color: string; seed: number };
+function contains(p: Point, vertices: Point[]): boolean {
+  let inside = false;
+  for (let i = 0, j = vertices.length - 1; i < vertices.length; j = i++) {
+    const a = vertices[i]!, b = vertices[j]!;
+    if ((a.y > p.y) !== (b.y > p.y) && p.x < (b.x - a.x) * (p.y - a.y) / (b.y - a.y) + a.x) inside = !inside;
+  }
+  return inside;
+}
+function boxFaces(x: number, y: number, w: number, d: number, h: number, z = 0): Point[][] {
+  return [
+    [iso(x, y + d, z), iso(x + w, y + d, z), iso(x + w, y + d, z + h), iso(x, y + d, z + h)],
+    [iso(x + w, y, z), iso(x + w, y + d, z), iso(x + w, y + d, z + h), iso(x + w, y, z + h)],
+    [iso(x, y, z + h), iso(x + w, y, z + h), iso(x + w, y + d, z + h), iso(x, y + d, z + h)],
+  ];
+}
+function buildingFaces(kind: Tile, x: number, y: number, level: number): Point[][] {
+  if (kind === "station") return [...boxFaces(x + .1, y + .22, .78, .43, 3, 19), ...boxFaces(x + .1, y + .7, .35, .19, 15)];
+  if (kind === "factory") return [...boxFaces(x + .16, y + .15, .72, .64, 23 + level * 3), ...boxFaces(x + .77, y + .17, .1, .1, 47), ...boxFaces(x + .16, y + .23, .68, .48, 5, 26 + level * 3)];
+  if (kind !== "house" && kind !== "shop") return [];
+  const h = (kind === "house" ? level === 1 ? 1 : level * 2 : level + 1) * 12 + 5;
+  const faces = boxFaces(x + .16, y + .15, .67, .65, h);
+  if (kind === "house" && level === 1) {
+    const bx = x + .11, by = y + .10, w = .77, d = .75;
+    const a = iso(bx, by + d / 2, h + 13), b = iso(bx + w, by + d / 2, h + 13);
+    faces.push([iso(bx, by, h), iso(bx + w, by, h), b, a], [a, b, iso(bx + w, by + d, h), iso(bx, by + d, h)], [iso(bx + w, by, h), b, iso(bx + w, by + d, h)]);
+  } else faces.push(...boxFaces(x + .135, y + .125, .72, .70, 3, h), ...boxFaces(x + .26, y + .30, .16, .12, 5, h + 3));
+  return faces;
+}
 export class TownScene {
   private vehicles: Vehicle[] = [];
   private lastTiles: Tile[] | null = null;
@@ -186,13 +216,25 @@ export class TownScene {
     this.camera = { x: width / 2, y: height * .53 - MAP_SIZE * H * Math.min(width / 1680, height / 930), zoom: Math.min(width / 1680, height / 930) };
   }
   zoomAt(factor: number, px: number, py: number) {
-    const old = this.camera.zoom, next = Math.max(.22, Math.min(2.8, old * factor));
+    const old = this.camera.zoom, next = Math.max(.12, Math.min(2.8, old * factor));
     this.camera.x = px - (px - this.camera.x) * next / old; this.camera.y = py - (py - this.camera.y) * next / old; this.camera.zoom = next;
   }
   tileAt(px: number, py: number): number | null {
     const a = (px - this.camera.x) / this.camera.zoom / W, b = (py - this.camera.y) / this.camera.zoom / H;
     const x = Math.floor((a + b) / 2), y = Math.floor((b - a) / 2);
     return x >= 0 && y >= 0 && x < MAP_SIZE && y < MAP_SIZE ? y * MAP_SIZE + x : null;
+  }
+  pickTile(px: number, py: number, town: Town): number | null {
+    const p = { x: (px - this.camera.x) / this.camera.zoom, y: (py - this.camera.y) / this.camera.zoom };
+    // Reverse the renderer's painter order so visible roofs and walls select their own building.
+    for (let depth = (MAP_SIZE - 1) * 2; depth >= 0; depth--) {
+      for (let y = Math.min(depth, MAP_SIZE - 1); y >= Math.max(0, depth - MAP_SIZE + 1); y--) {
+        const x = depth - y, i = y * MAP_SIZE + x, origin = iso(x, y);
+        if (Math.abs(p.x - origin.x) > 36 || p.y < origin.y - 85 || p.y > origin.y + 33) continue;
+        if (buildingFaces(town.tiles[i]!, x, y, town.levels[i] || 1).some(face => contains(p, face))) return i;
+      }
+    }
+    return this.tileAt(px, py);
   }
   render(c: CanvasRenderingContext2D, width: number, height: number, town: Town, options: SceneOptions, dt: number) {
     if (!options.paused) this.time += Math.min(dt, .1) * options.speed;
@@ -262,11 +304,12 @@ export class TownScene {
     }
     for (let r = 0; r < Math.min(options.routes.length, 12); r++) {
       const route = options.routes[r]!;
-      const max = route.length - 1, phase = ((time * .45 + r * 4) % (max * 2 + 4));
-      const at = Math.min(max, phase <= max + 2 ? Math.max(0, phase - 1) : Math.max(0, max * 2 + 3 - phase));
+      const max = route.length - 1, travel = max - .68, phase = (time * .45 + r * 4) % (travel * 2 + 4);
+      const center = .34 + Math.min(travel, phase <= travel + 2 ? Math.max(0, phase - 1) : Math.max(0, travel * 2 + 3 - phase));
       for (let wagon = 0; wagon < 3; wagon++) {
-        const pos = Math.max(0, Math.min(max, at - wagon * .34 * (phase <= max + 2 ? 1 : -1)));
-        const a = route[Math.floor(pos)]!, b = route[Math.min(max, Math.floor(pos) + 1)]!, t = pos % 1;
+        // Keep the whole train on the route; cars must not collapse into one at the terminus.
+        const pos = Math.max(0, Math.min(max, center + (wagon - 1) * .34)), segment = Math.min(max - 1, Math.floor(pos));
+        const a = route[segment]!, b = route[segment + 1]!, t = pos - segment;
         const dx = b % MAP_SIZE - a % MAP_SIZE, dy = Math.floor(b / MAP_SIZE) - Math.floor(a / MAP_SIZE);
         const x = a % MAP_SIZE + .5 + dx * t, y = Math.floor(a / MAP_SIZE) + .5 + dy * t;
         objects.push({ depth: x + y, draw: () => {
@@ -293,14 +336,16 @@ export class TownScene {
   }
 }
 export function drawTownIcon(c: CanvasRenderingContext2D, kind: Tool, width: number, height: number) {
-  c.clearRect(0, 0, width, height); c.save(); c.translate(width * .5, height * .71); c.scale(.85, .85);
+  // Leave room for the taller buildings and their cast shadows on all four sides.
+  const scale = .72;
+  c.clearRect(0, 0, width, height); c.save(); c.translate(width * .5 - 4, height - 32 * scale - 5); c.scale(scale, scale);
   if (kind === "bulldoze") {
     box(c, -.3, -.25, .6, .4, 8, ["#d9ac5d", "#b98843", "#f2cb7e"]);
     box(c, -.15, -.22, .25, .28, 12, ["#8caca4", "#527d78", "#f0c775"], 8);
     box(c, .3, -.3, .05, .6, 8, ["#b4b9a2", "#7f917f", "#d5d5be"]);
   } else if (kind === "road" || kind === "rail") {
     const town = createIconTown(kind); transport(c, town, 0, 0, kind, false);
-  } else building(c, kind, 0, 0, 1, false, 0);
+  } else building(c, kind, 0, 0, 1, false, 0, false);
   c.restore();
 }
 function createIconTown(kind: "road" | "rail"): Town {
