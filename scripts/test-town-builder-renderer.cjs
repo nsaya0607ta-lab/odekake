@@ -8,7 +8,9 @@ function compile(file, imports = {}) {
   return mod.exports;
 }
 const game = compile('src/lib/games/town-builder.ts');
-const { TownScene, drawTownIcon } = compile('src/lib/games/town-renderer.ts', { './town-builder': game });
+const transport = compile('src/lib/games/town-transport.ts', { './town-builder': game });
+const sprites = compile('src/lib/games/town-sprites.ts');
+const { TownScene, drawTownIcon } = compile('src/lib/games/town-renderer.ts', { './town-builder': game, './town-transport': transport, './town-sprites': sprites });
 const iso = (x, y, z = 0) => ({ x: (x - y) * 32, y: (x + y) * 16 - z });
 const blank = () => ({ ...game.createTown(false), tiles: Array(576).fill('grass'), terrain: Array(576).fill(false), levels: Array(576).fill(0) });
 let passed = 0;
@@ -112,5 +114,123 @@ test('train cars remain separated at both termini and while travelling', () => {
     assert.equal(cars.length, 3);
     assert(new Set(cars.map(x => Math.round(x * 100))).size === 3, 'Train cars overlap at a terminus');
   }
+});
+function inside(point, polygon) {
+  let result = false;
+  for (let i = 0, j = polygon.length - 1; i < polygon.length; j = i++) {
+    const a = polygon[i], b = polygon[j];
+    if ((a.y > point.y) !== (b.y > point.y) && point.x < (b.x - a.x) * (point.y - a.y) / (b.y - a.y) + a.x) result = !result;
+  }
+  return result;
+}
+test('all 16 road junctions have one continuous surface and only the connected open ends', () => {
+  for (let mask = 0; mask < 16; mask++) {
+    const outline = transport.transportOutline(mask, .24);
+    assert(inside({ x: .5, y: .5 }, outline));
+    for (const { bit, dx, dy } of transport.DIRECTIONS) {
+      assert.equal(inside({ x: .5 + dx * .499, y: .5 + dy * .499 }, outline), Boolean(mask & bit), `mask ${mask}, direction ${bit}`);
+      if (mask & bit) for (const offset of [-.24, 0, .24]) assert(inside({ x: .5 + dx * .499 + dy * offset, y: .5 + dy * .499 + dx * offset }, outline));
+    }
+    assert(!inside({ x: .05, y: .05 }, outline), 'A junction must not pave the whole tile');
+  }
+});
+test('transport connections never wrap around a map edge and rails join a station', () => {
+  const town = blank(); town.tiles[24] = 'road'; town.tiles[23] = 'road';
+  assert.equal(transport.transportMask(town, 24, 'road'), 0);
+  town.tiles[25] = 'station'; town.tiles[24] = 'rail';
+  assert.equal(transport.transportMask(town, 24, 'rail'), 2);
+});
+test('every road and rail bridge meets the adjacent land ramp without a height discontinuity', () => {
+  for (const kind of ['road', 'rail']) for (const { dx, dy } of transport.DIRECTIONS) {
+    const town = blank(), i = 10 * 24 + 10, n = (10 + dy) * 24 + 10 + dx;
+    town.tiles[i] = kind; town.tiles[n] = kind; town.terrain[n] = true;
+    assert.equal(transport.transportHeight(town, i, .5, .5, kind), 0);
+    assert.equal(transport.transportHeight(town, i, .5 + dx * .25, .5 + dy * .25, kind), 2.5);
+    assert.equal(transport.transportHeight(town, i, .5 + dx * .5, .5 + dy * .5, kind), transport.transportHeight(town, n, .5 - dx * .5, .5 - dy * .5, kind));
+  }
+});
+test('curved rails stay on their ballast and use a continuous heading', () => {
+  for (let mask = 1; mask < 16; mask++) for (const path of transport.trackPaths(mask)) {
+    const outline = transport.transportOutline(mask, .28);
+    for (let j = 1; j < 40; j++) {
+      const p = transport.trackPoint(path, j / 40);
+      assert(Math.abs(Math.hypot(p.dx, p.dy) - 1) < 1e-9);
+      for (const side of [-1, 1]) assert(inside({ x: p.x + p.dy * .095 * side, y: p.y - p.dx * .095 * side }, outline), `rail outside ballast: ${mask}`);
+    }
+  }
+});
+test('station roofs and picking rotate with the connected railway', () => {
+  const town = blank(), i = 5 * 24 + 5; town.tiles[i] = 'station'; town.tiles[i - 24] = town.tiles[i + 24] = 'rail';
+  assert.equal(transport.stationAxis(town, i), 'y');
+  const p = iso(5.8, 5.15, 23);
+  assert.equal(new TownScene().pickTile(p.x, p.y, town), i);
+  town.tiles[i - 24] = town.tiles[i + 24] = 'grass'; town.tiles[i - 1] = town.tiles[i + 1] = 'rail';
+  assert.equal(transport.stationAxis(town, i), 'x');
+});
+test('car positions and headings remain continuous through curves and dead-end reversals', () => {
+  for (const route of [[125,126,150,151], [125,126,125,126]]) for (let position = .5; position <= 2.5; position += .5) {
+    const a = transport.sampleTransportPath(route, position - .00001), b = transport.sampleTransportPath(route, position + .00001);
+    const offset = p => ({ x: p.x + (p.laneApplied ? 0 : p.dy * .13), y: p.y - (p.laneApplied ? 0 : p.dx * .13) });
+    const p = offset(a), q = offset(b);
+    assert(Math.hypot(p.x - q.x, p.y - q.y) < .001, 'Position jumps at a turn');
+    assert(Math.hypot(a.dx - b.dx, a.dy - b.dy) < .001, 'Heading snaps at a turn');
+  }
+});
+test('three train cars keep their spacing around consecutive bends', () => {
+  const path = transport.measureTransportRoute([125,126,127,151,175,176]);
+  for (let distance = .34; distance < path.length - .34; distance += .025) {
+    const a = transport.sampleTransportDistance(path, distance - .34), b = transport.sampleTransportDistance(path, distance), c = transport.sampleTransportDistance(path, distance + .34);
+    assert(Math.hypot(a.x - b.x, a.y - b.y) > .29);
+    assert(Math.hypot(b.x - c.x, b.y - c.y) > .29);
+  }
+});
+test('factory roof units rest on the roof at every upgrade level', () => {
+  for (let level = 1; level <= 3; level++) {
+    const town = blank(), i = 5 * 24 + 5; town.tiles[i] = 'factory'; town.levels[i] = level;
+    const { c, fills } = recordingContext(); new TownScene().render(c, 800, 600, town, options, 0);
+    const top = fills.find(f => f.color === '#9cb9b4'); assert(top);
+    assert.deepEqual(top.points[0], iso(5.16, 5.23, 23 + level * 3 + 5));
+  }
+});
+test('a platform and train are painted before the station canopy', () => {
+  const town = blank(), route = [125,126,127,128]; route.forEach((i,j)=>town.tiles[i] = j === 0 || j === 3 ? 'station' : 'rail');
+  const { c, fills } = recordingContext(); new TownScene().render(c, 800, 600, town, { ...options, routes: [route] }, 0);
+  const platform = fills.findIndex(f => f.color === '#e6dbc3'), train = fills.findIndex(f => f.color === '#f3e5bf'), canopy = fills.findIndex(f => f.color === '#75aca1');
+  assert(platform >= 0 && train > platform && canopy > train);
+});
+test('removing a rail stops a stale route immediately', () => {
+  const town = blank(), route = [125,126,127,128]; route.forEach((i,j)=>town.tiles[i] = j === 0 || j === 3 ? 'station' : 'rail');
+  const { c, fills } = recordingContext(), scene = new TownScene(), settings = { ...options, routes: [route] };
+  scene.render(c, 800, 600, town, settings, 0); assert(fills.some(f => f.color === '#f3e5bf'));
+  fills.length = 0; const tiles = town.tiles.slice(); tiles[126] = 'grass';
+  scene.render(c, 800, 600, { ...town, tiles }, settings, 0); assert(!fills.some(f => f.color === '#f3e5bf'));
+});
+function canvasFactory() {
+  const surfaces = [];
+  return { surfaces, create() {
+    const record = recordingContext(), canvas = { width: 300, height: 150, getContext: () => record.c }; record.c.canvas = canvas;
+    surfaces.push({ canvas, ...record }); return canvas;
+  } };
+}
+test('camera movement and accounting reuse ground and artwork; building changes invalidate the right cache', () => {
+  const factory = canvasFactory(), { c } = recordingContext(), town = blank();
+  town.tiles[125] = 'house'; town.levels[125] = 1; town.tiles[149] = 'road';
+  const scene = new TownScene(() => factory.create()); scene.camera = { x: 200, y: 30, zoom: .85 };
+  scene.render(c, 390, 844, town, options, 0);
+  const ground = factory.surfaces[0], groundPaints = ground.fills.length, surfaces = factory.surfaces.length;
+  const paintings = factory.surfaces.reduce((sum,s)=>sum+s.fills.length,0);
+  for (let j = 0; j < 20; j++) { scene.camera.x += .1; scene.render(c, 390, 844, { ...town, money: town.money + j }, options, 0); }
+  assert.equal(factory.surfaces.length, surfaces); assert.equal(factory.surfaces.reduce((sum,s)=>sum+s.fills.length,0), paintings);
+  const levels = town.levels.slice(); levels[125] = 3; scene.render(c, 390, 844, { ...town, levels }, options, 0);
+  assert.equal(ground.fills.length, groundPaints); assert(factory.surfaces.length > surfaces);
+  const tiles = town.tiles.slice(); tiles[150] = 'road'; scene.render(c, 390, 844, { ...town, tiles }, options, 0);
+  assert(ground.fills.length > groundPaints, 'Road connections must refresh when a neighbouring road is added');
+});
+test('sprite memory is bounded and recently used artwork stays cached', () => {
+  const factory = canvasFactory(), cache = new sprites.TownSprites(() => factory.create()), { c } = recordingContext(); let paintings = 0;
+  const bounds = { left: 0, top: 0, width: 512, height: 512 }, paint = () => paintings++;
+  for (let i = 0; i < 10; i++) cache.draw(c, String(i), 0, 0, bounds, paint);
+  cache.draw(c, '9', 0, 0, bounds, paint); assert.equal(paintings, 10);
+  cache.draw(c, '0', 0, 0, bounds, paint); assert.equal(paintings, 11, 'The least recently used sprite must be evicted');
 });
 console.log(`${passed} town renderer checks passed`);
