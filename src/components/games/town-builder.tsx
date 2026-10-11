@@ -157,7 +157,8 @@ export function TownBuilder({ userId }: { userId: string }) {
     }); resize.observe(canvas);
     const animate = (timestamp: number) => {
       frame = requestAnimationFrame(animate);
-      if (timestamp - last < 32 || document.hidden) return;
+      // Follow the display refresh rate during touch movement; cached artwork keeps this cheap.
+      if (document.hidden) { last = 0; return; }
       const dt = last ? (timestamp - last) / 1000 : 0; last = timestamp;
       const state = stateRef.current;
       if (!state) return;
@@ -214,7 +215,7 @@ export function TownBuilder({ userId }: { userId: string }) {
       const other = [...pointers.current.entries()].find(([id]) => id !== e.pointerId)?.[1];
       if (other) {
         const before = Math.hypot(old.x - other.x, old.y - other.y), after = Math.hypot(p.x - other.x, p.y - other.y);
-        if (before > 5) scene.zoomAt(after / before, (p.x + other.x) / 2, (p.y + other.y) / 2);
+        if (before > 5) scene.zoomAt(after / before, (old.x + other.x) / 2, (old.y + other.y) / 2);
         scene.camera.x += (p.x - old.x) / 2; scene.camera.y += (p.y - old.y) / 2;
       }
     } else if (drag.current?.multiple) {
@@ -225,7 +226,7 @@ export function TownBuilder({ userId }: { userId: string }) {
         d.moved = true;
         if (d.pan) { scene.camera.x += p.x - d.x; scene.camera.y += p.y - d.y; setPreview([]); }
       } else if (d.pan && d.moved) { scene.camera.x += p.x - old.x; scene.camera.y += p.y - old.y; }
-      if (!d.pan) { const tile = scene.tileAt(p.x, p.y); if (tile !== null) { d.to = tile; setPreview(d.from !== null ? lineTiles(d.from, tile) : [tile]); } }
+      if (!d.pan) { const tile = scene.tileAt(p.x, p.y); if (tile !== null && tile !== d.to) { d.to = tile; setPreview(d.from !== null ? lineTiles(d.from, tile) : [tile]); } }
     }
     pointers.current.set(e.pointerId, p);
   };
