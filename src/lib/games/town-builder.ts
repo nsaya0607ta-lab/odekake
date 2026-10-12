@@ -2,7 +2,36 @@
 export const MAP_SIZE = 24;
 export type Tile = "grass" | "water" | "road" | "rail" | "station" | "house" | "shop" | "factory" | "park";
 export type Tool = Exclude<Tile, "grass" | "water"> | "bulldoze";
-export type Town = { tiles: Tile[]; money: number; day: number; paused: boolean; levels: number[]; terrain: boolean[]; rewards: string[] };
+export type ParkPart = "tree" | "flowers" | "bench" | "fountain" | "playground" | "path" | "light";
+export type ParkLot = { id: number; x: number; y: number; width: number; height: number; kind: "park" | "plaza"; parts: { tile: number; kind: ParkPart; rotation: number }[] };
+export type FacilityPart = "garden" | "terrace" | "light" | "sign" | "storage" | "greenbelt" | "solar" | "bench";
+export type FacilityAttachment = { tile: number; kind: Tile; parts: FacilityPart[] };
+export type Town = { tiles: Tile[]; money: number; day: number; paused: boolean; levels: number[]; terrain: boolean[]; rewards: string[]; parks: ParkLot[]; attachments: FacilityAttachment[] };
+export const PARK_SIZES = [
+  { id: "small", width: 2, height: 2, price: 580, title: "2×2" },
+  { id: "medium", width: 3, height: 3, price: 1150, title: "3×3" },
+  { id: "large", width: 4, height: 3, price: 1500, title: "4×3" },
+] as const;
+export type ParkSize = typeof PARK_SIZES[number]["id"];
+export const PARK_PARTS: ReadonlyArray<{ id: ParkPart; title: string; price: number; layer: "ground" | "object"; value: number }> = [
+  { id: "tree", title: "木", price: 70, layer: "object", value: 3 },
+  { id: "flowers", title: "花壇", price: 60, layer: "object", value: 2 },
+  { id: "bench", title: "ベンチ", price: 80, layer: "object", value: 2 },
+  { id: "fountain", title: "噴水", price: 180, layer: "object", value: 3 },
+  { id: "playground", title: "遊具", price: 240, layer: "object", value: 4 },
+  { id: "path", title: "通路", price: 25, layer: "ground", value: 0 },
+  { id: "light", title: "照明", price: 90, layer: "object", value: 1 },
+];
+export const FACILITY_PARTS: ReadonlyArray<{ id: FacilityPart; title: string; price: number; kinds: Tile[]; info: string }> = [
+  { id: "garden", title: "植栽・花壇", price: 90, kinds: ["house", "shop"], info: "庭先を彩る" },
+  { id: "terrace", title: "テラス", price: 220, kinds: ["house", "shop"], info: "住宅の定員＋6人・商店の収入＋¥14" },
+  { id: "light", title: "照明", price: 70, kinds: ["house", "shop", "station", "road"], info: "夜の街を照らす" },
+  { id: "sign", title: "看板", price: 120, kinds: ["shop"], info: "商店の収入＋¥8" },
+  { id: "storage", title: "資材置き場", price: 220, kinds: ["factory"], info: "工場の収入＋¥18" },
+  { id: "greenbelt", title: "緑化帯", price: 140, kinds: ["factory"], info: "近所への影響を和らげる" },
+  { id: "solar", title: "太陽光パネル", price: 260, kinds: ["factory"], info: "工場の収入＋¥8・維持費−¥4" },
+  { id: "bench", title: "待合ベンチ", price: 90, kinds: ["station"], info: "ホームに休憩場所を追加" },
+];
 export type TownStats = {
   population: number; homes: number; shops: number; factories: number; roads: number; rails: number;
   stations: number; parks: number; linkedStations: number; income: number; upkeep: number;
@@ -15,7 +44,7 @@ export const BUILDINGS: ReadonlyArray<{ id: Tool; title: string; price: number; 
   { id: "house", title: "住宅", price: 250, info: "道路沿いに建設。公園と仕事があると集合住宅へ育ちます。", category: "建物" },
   { id: "shop", title: "商店", price: 400, info: "道路沿いに建設。街に仕事と買い物の楽しみを届けます。", category: "建物" },
   { id: "factory", title: "工場", price: 650, info: "収入と雇用を増やします。住宅から離すと住民も快適。", category: "建物" },
-  { id: "park", title: "公園", price: 140, info: "噴水や花壇で街を彩ります。近所の住宅の満足度が上がります。", category: "環境" },
+  { id: "park", title: "公園・広場", price: 580, info: "敷地を購入し、木・噴水・ベンチなどを買って配置します。", category: "環境" },
   { id: "bulldoze", title: "撤去", price: 0, info: "タップで撤去。直前の工事は「元に戻す」で取り消せます。", category: "環境" },
 ];
 const PRICE = Object.fromEntries(BUILDINGS.map(b => [b.id, b.price])) as Record<Tool, number>;
@@ -32,9 +61,120 @@ export function createTown(starter = true): Town {
   if (starter) {
     for (let x = 6; x <= 13; x++) tiles[indexAt(x, 10)] = "road";
     for (let y = 7; y <= 14; y++) tiles[indexAt(9, y)] = "road";
-    for (const [x, y, kind] of [[7, 9, "house"], [8, 11, "house"], [10, 8, "house"], [10, 12, "shop"], [8, 8, "park"]] as const) tiles[indexAt(x, y)] = kind;
+    for (const [x, y, kind] of [[7, 9, "house"], [8, 11, "house"], [10, 8, "house"], [10, 12, "shop"]] as const) tiles[indexAt(x, y)] = kind;
+    for (const i of lotTiles({ x: 7, y: 7, width: 2, height: 2 })) tiles[i] = "park";
   }
-  return { tiles, terrain, levels: tiles.map(t => ["house", "shop", "factory"].includes(t) ? 1 : 0), money: 20000, day: 1, paused: false, rewards: [] };
+  const parks: ParkLot[] = starter ? [{ id: indexAt(7, 7), x: 7, y: 7, width: 2, height: 2, kind: "park", parts: [{ tile: indexAt(7, 7), kind: "tree", rotation: 0 }, { tile: indexAt(8, 7), kind: "bench", rotation: 0 }, { tile: indexAt(7, 8), kind: "flowers", rotation: 0 }, { tile: indexAt(8, 8), kind: "path", rotation: 0 }] }] : [];
+  return { tiles, terrain, levels: tiles.map(t => ["house", "shop", "factory"].includes(t) ? 1 : 0), money: 20000, day: 1, paused: false, rewards: [], parks, attachments: [] };
+}
+export function lotTiles(lot: Pick<ParkLot, "x" | "y" | "width" | "height">): number[] {
+  return Array.from({ length: lot.width * lot.height }, (_, n) => indexAt(lot.x + n % lot.width, lot.y + Math.floor(n / lot.width)));
+}
+export function parkAt(town: Town, tile: number): ParkLot | undefined {
+  const x = tile % MAP_SIZE, y = Math.floor(tile / MAP_SIZE);
+  return town.parks?.find(p => x >= p.x && x < p.x + p.width && y >= p.y && y < p.y + p.height);
+}
+export function parkFootprint(x: number, y: number, size: ParkSize, rotate = false) {
+  const shape = PARK_SIZES.find(s => s.id === size)!;
+  return { x, y, width: rotate ? shape.height : shape.width, height: rotate ? shape.width : shape.height };
+}
+export function canBuyPark(town: Town, x: number, y: number, size: ParkSize, rotate = false) {
+  const shape = PARK_SIZES.find(s => s.id === size); if (!shape) return false;
+  const lot = parkFootprint(x, y, size, rotate);
+  return Number.isInteger(x) && Number.isInteger(y) && x >= 0 && y >= 0 && x + lot.width <= MAP_SIZE && y + lot.height <= MAP_SIZE && lotTiles(lot).every(i => town.tiles[i] === "grass" && !town.terrain[i]);
+}
+export function buyParkLot(town: Town, x: number, y: number, size: ParkSize, kind: ParkLot["kind"] = "park", rotate = false): { town: Town; message: string; lotId?: number } {
+  const shape = PARK_SIZES.find(s => s.id === size);
+  if (!shape || !canBuyPark(town, x, y, size, rotate)) return { town, message: "敷地全体を空いている陸地に置いてください" };
+  if (town.money < shape.price) return { town, message: "敷地を購入する資金が不足しています" };
+  const lot: ParkLot = { id: indexAt(x, y), ...parkFootprint(x, y, size, rotate), kind, parts: [] }, tiles = town.tiles.slice();
+  for (const i of lotTiles(lot)) tiles[i] = "park";
+  return { town: { ...town, tiles, parks: [...(town.parks ?? []), lot], money: town.money - shape.price }, lotId: lot.id, message: `${kind === "park" ? "公園" : "広場"}の敷地を購入しました −¥${shape.price}` };
+}
+export function expandParkLot(town: Town, id: number, size: ParkSize) {
+  const lot = town.parks.find(p => p.id === id), target = PARK_SIZES.find(p => p.id === size);
+  if (!lot || !target) return { town, message: "敷地が見つかりません" };
+  const next = parkFootprint(lot.x, lot.y, size, lot.width < lot.height);
+  if (next.width < lot.width || next.height < lot.height || next.width * next.height <= lot.width * lot.height) return { town, message: "今より大きな敷地を選んでください" };
+  const occupied = new Set(lotTiles(lot));
+  if (next.x + next.width > MAP_SIZE || next.y + next.height > MAP_SIZE || lotTiles(next).some(i => !occupied.has(i) && (town.tiles[i] !== "grass" || town.terrain[i]))) return { town, message: "広げる先に建物・道路・川があります" };
+  const oldPrice = PARK_SIZES.find(p => p.width * p.height === lot.width * lot.height)?.price ?? 140, cost = target.price - oldPrice;
+  if (town.money < cost) return { town, message: "敷地を広げる資金が不足しています" };
+  const tiles = town.tiles.slice(); for (const i of lotTiles(next)) tiles[i] = "park";
+  return { town: { ...town, tiles, parks: town.parks.map(p => p.id === id ? { ...p, ...next } : p), money: town.money - cost }, message: `敷地を${next.width}×${next.height}へ広げました −¥${cost}` };
+}
+export function canPlaceParkPart(lot: ParkLot, tile: number, kind: ParkPart) {
+  const part = PARK_PARTS.find(p => p.id === kind);
+  return Boolean(part && lotTiles(lot).includes(tile) && !lot.parts.some(p => p.tile === tile && PARK_PARTS.find(s => s.id === p.kind)?.layer === part.layer));
+}
+export function placeParkPart(town: Town, lotId: number, tile: number, kind: ParkPart, rotation = 0) {
+  const lot = town.parks.find(p => p.id === lotId), part = PARK_PARTS.find(p => p.id === kind);
+  if (!lot || !part || !lotTiles(lot).includes(tile) || !Number.isInteger(rotation)) return { town, message: "購入した敷地の中に置いてください" };
+  if (!canPlaceParkPart(lot, tile, kind)) return { town, message: "ここには設備があります。撤去するか別のマスを選んでください" };
+  if (town.money < part.price) return { town, message: "部品を購入する資金が不足しています" };
+  const parks = town.parks.map(p => p.id === lotId ? { ...p, parts: [...p.parts, { tile, kind, rotation: ((rotation % 4) + 4) % 4 }] } : p);
+  return { town: { ...town, parks, money: town.money - part.price }, message: `${part.title}を配置しました −¥${part.price}` };
+}
+export function removeParkPart(town: Town, lotId: number, tile: number) {
+  const lot = town.parks.find(p => p.id === lotId);
+  const part = lot?.parts.find(p => p.tile === tile && p.kind !== "path") ?? lot?.parts.find(p => p.tile === tile);
+  if (!part) return { town, message: "ここには部品がありません" };
+  return { town: { ...town, parks: town.parks.map(p => p.id === lotId ? { ...p, parts: p.parts.filter(s => s !== part) } : p) }, message: "部品を撤去しました。敷地は残ります" };
+}
+export function removeParkLot(town: Town, lotId: number) {
+  const lot = town.parks.find(p => p.id === lotId); if (!lot) return { town, message: "敷地が見つかりません" };
+  const tiles = town.tiles.slice(), levels = town.levels.slice();
+  for (const i of lotTiles(lot)) { tiles[i] = town.terrain[i] ? "water" : "grass"; levels[i] = 0; }
+  return { town: { ...town, tiles, levels, parks: town.parks.filter(p => p.id !== lotId) }, message: "敷地と設備を撤去しました" };
+}
+export function buyFacilityPart(town: Town, tile: number, id: FacilityPart) {
+  const part = FACILITY_PARTS.find(p => p.id === id), kind = town.tiles[tile], old = town.attachments.find(a => a.tile === tile);
+  if (!part || !kind || !part.kinds.includes(kind)) return { town, message: "この施設には取り付けられません" };
+  if (old?.parts.includes(id)) return { town, message: "購入済みです" };
+  if (town.money < part.price) return { town, message: "部品を購入する資金が不足しています" };
+  const next = { tile, kind, parts: [...(old?.parts ?? []), id] };
+  return { town: { ...town, attachments: [...town.attachments.filter(a => a.tile !== tile), next], money: town.money - part.price }, message: `${part.title}を取り付けました −¥${part.price}` };
+}
+export function removeFacilityPart(town: Town, tile: number, id: FacilityPart) {
+  const attachment = town.attachments.find(a => a.tile === tile);
+  if (!attachment?.parts.includes(id)) return { town, message: "部品がありません" };
+  const parts = attachment.parts.filter(p => p !== id);
+  return { town: { ...town, attachments: town.attachments.flatMap(a => a.tile === tile ? parts.length ? [{ ...a, parts }] : [] : [a]) }, message: "部品を取り外しました" };
+}
+type MetadataEdit<T> = { before?: T; after?: T; index: number };
+export type TownEdit = {
+  changes: { i: number; before: Tile; after: Tile; beforeLevel: number; afterLevel: number }[];
+  parks: (MetadataEdit<ParkLot> & { id: number })[];
+  attachments: (MetadataEdit<FacilityAttachment> & { tile: number })[];
+  cost: number;
+};
+export function recordTownEdit(before: Town, after: Town): TownEdit {
+  const parks = [...new Set([...before.parks, ...after.parks].map(p => p.id))].flatMap(id => {
+    const a = before.parks.find(p => p.id === id), b = after.parks.find(p => p.id === id);
+    return JSON.stringify(a) === JSON.stringify(b) ? [] : [{ id, before: a, after: b, index: before.parks.findIndex(p => p.id === id) }];
+  });
+  const attachments = [...new Set([...before.attachments, ...after.attachments].map(a => a.tile))].flatMap(tile => {
+    const a = before.attachments.find(p => p.tile === tile), b = after.attachments.find(p => p.tile === tile);
+    return JSON.stringify(a) === JSON.stringify(b) ? [] : [{ tile, before: a, after: b, index: before.attachments.findIndex(p => p.tile === tile) }];
+  });
+  return { changes: before.tiles.flatMap((tile, i) => tile !== after.tiles[i] || before.levels[i] !== after.levels[i] ? [{ i, before: tile, after: after.tiles[i]!, beforeLevel: before.levels[i]!, afterLevel: after.levels[i]! }] : []), parks, attachments, cost: before.money - after.money };
+}
+export function undoTownEdit(current: Town, edit: TownEdit): Town {
+  const tiles = edit.changes.some(c => c.before !== c.after) ? current.tiles.slice() : current.tiles;
+  const levels = edit.changes.some(c => c.beforeLevel !== c.afterLevel) ? current.levels.slice() : current.levels;
+  for (const c of edit.changes) { if (c.before !== c.after) tiles[c.i] = c.before; if (c.beforeLevel !== c.afterLevel) levels[c.i] = c.beforeLevel; }
+  let parks = current.parks, attachments = current.attachments;
+  for (const c of edit.parks) {
+    if (!c.before) parks = parks.filter(p => p.id !== c.id);
+    else if (parks.some(p => p.id === c.id)) parks = parks.map(p => p.id === c.id ? c.before! : p);
+    else { parks = parks.slice(); parks.splice(Math.max(0, Math.min(c.index, parks.length)), 0, c.before); }
+  }
+  for (const c of edit.attachments) {
+    if (!c.before) attachments = attachments.filter(a => a.tile !== c.tile);
+    else if (attachments.some(a => a.tile === c.tile)) attachments = attachments.map(a => a.tile === c.tile ? c.before! : a);
+    else { attachments = attachments.slice(); attachments.splice(Math.max(0, Math.min(c.index, attachments.length)), 0, c.before); }
+  }
+  return { ...current, tiles, levels, parks, attachments, money: current.money + edit.cost };
 }
 export function touchesRoad(tiles: Tile[], x: number, y: number) { return neighbours(x, y).some(i => tiles[i] === "road"); }
 function near(tiles: Tile[], i: number, kinds: Tile[], radius: number) {
@@ -71,36 +211,52 @@ export function railRoutes(tiles: Tile[]): number[][] {
   }
   return routes;
 }
-export function getTownStats(tiles: Tile[], levels: number[] = []): TownStats {
+export function getTownStats(tiles: Tile[], levels: number[] = [], lots: ParkLot[] = [], attachments: FacilityAttachment[] = []): TownStats {
   const count = (t: Tile) => tiles.filter(v => v === t).length;
-  const homes = count("house"), shops = count("shop"), factories = count("factory"), roads = count("road"), rails = count("rail"), stations = count("station"), parks = count("park");
+  const covered = new Set(lots.flatMap(lotTiles)), legacyParks = tiles.flatMap((t, i) => t === "park" && !covered.has(i) ? [i] : []);
+  const developed = lots.filter(l => l.parts.some(p => p.kind !== "path" && p.kind !== "light"));
+  const homes = count("house"), shops = count("shop"), factories = count("factory"), roads = count("road"), rails = count("rail"), stations = count("station"), parks = legacyParks.length + developed.length;
   const routes = railRoutes(tiles), linkedStations = new Set(routes.flatMap(r => [r[0]!, r[r.length - 1]!])).size;
+  const extras = new Map(attachments.map(a => [a.tile, a.parts]));
+  const parkBonus = (i: number) => {
+    const x = i % MAP_SIZE, y = Math.floor(i / MAP_SIZE);
+    const legacy = legacyParks.filter(p => Math.abs(x - p % MAP_SIZE) + Math.abs(y - Math.floor(p / MAP_SIZE)) <= 3).length * 12;
+    return legacy + developed.reduce((value, p) => {
+      const distance = Math.max(p.x - x, x - (p.x + p.width - 1), 0) + Math.max(p.y - y, y - (p.y + p.height - 1), 0);
+      const score = p.parts.reduce((sum, part) => sum + (PARK_PARTS.find(s => s.id === part.kind)?.value ?? 0), 0);
+      return value + (distance <= 3 ? Math.min(24, 6 + score * 2) : 0);
+    }, 0);
+  };
   let population = 0, income = 0, jobs = 0, satisfaction = 0, occupied = 0;
   tiles.forEach((t, i) => {
     if (!touchesRoad(tiles, i % MAP_SIZE, Math.floor(i / MAP_SIZE))) return;
     const level = levels[i] || 1;
     if (t === "house") {
-      const happy = Math.max(20, Math.min(100, 60 + near(tiles, i, ["park"], 3) * 12 + near(tiles, i, ["shop"], 3) * 4 - near(tiles, i, ["factory"], 3) * 10));
-      population += 18 * level; income += 23 * level; satisfaction += happy; occupied++;
+      const greenFactories = attachments.filter(a => a.kind === "factory" && a.parts.includes("greenbelt") && Math.abs(i % MAP_SIZE - a.tile % MAP_SIZE) + Math.abs(Math.floor(i / MAP_SIZE) - Math.floor(a.tile / MAP_SIZE)) <= 3).length;
+      const happy = Math.max(20, Math.min(100, 60 + parkBonus(i) + (extras.get(i)?.includes("garden") ? 3 : 0) + near(tiles, i, ["shop"], 3) * 4 - near(tiles, i, ["factory"], 3) * 10 + greenFactories * 7));
+      population += 18 * level + (extras.get(i)?.includes("terrace") ? 6 : 0); income += 23 * level; satisfaction += happy; occupied++;
     }
-    if (t === "shop") { income += 48 * level; jobs += 14 * level; }
-    if (t === "factory") { income += 74 * level; jobs += 32 * level; }
+    if (t === "shop") { income += 48 * level + (extras.get(i)?.includes("terrace") ? 14 : 0) + (extras.get(i)?.includes("sign") ? 8 : 0); jobs += 14 * level; }
+    if (t === "factory") { income += 74 * level + (extras.get(i)?.includes("storage") ? 18 : 0) + (extras.get(i)?.includes("solar") ? 8 : 0); jobs += 32 * level; }
   });
   const railPassengers = new Set(routes.flatMap(r => [r[0]!, r[r.length - 1]!])).size;
   // Empty disconnected stations do not produce passenger income.
   const servedHomes = tiles.reduce((sum, t, i) => sum + (t === "house" && routes.some(r => [r[0]!, r[r.length - 1]!].some(s => Math.abs(s % MAP_SIZE - i % MAP_SIZE) + Math.abs(Math.floor(s / MAP_SIZE) - Math.floor(i / MAP_SIZE)) <= 3)) && touchesRoad(tiles, i % MAP_SIZE, Math.floor(i / MAP_SIZE)) ? (levels[i] || 1) : 0), 0);
   income += Math.min(railPassengers * 110, servedHomes * 65);
-  const upkeep = roads * 3 + rails * 4 + stations * 30 + parks * 10 + factories * 8;
+  const upkeep = roads * 3 + rails * 4 + stations * 30 + legacyParks.length * 10 + lots.reduce((sum, l) => sum + Math.ceil(l.width * l.height / 4) * 4 + l.parts.length, 0) + factories * 8 - attachments.filter(a => a.kind === "factory" && a.parts.includes("solar")).length * 4;
   const happiness = occupied ? Math.round(satisfaction / occupied) : 60;
   return { population, homes, shops, factories, roads, rails, stations, parks, linkedStations, income, upkeep, happiness, jobs, routes };
 }
 export function buildTile(town: Town, tool: Tool, x: number, y: number): { town: Town; message: string } {
   if (!Number.isInteger(x) || !Number.isInteger(y) || x < 0 || y < 0 || x >= MAP_SIZE || y >= MAP_SIZE) return { town, message: "マップの範囲外です" };
+  if (tool === "park") return buyParkLot(town, x, y, "small");
   const i = indexAt(x, y), existing = town.tiles[i];
   if (tool === "bulldoze") {
+    const lot = parkAt(town, i);
+    if (lot) return removeParkPart(town, lot.id, i);
     if (existing === "grass" || existing === "water") return { town, message: "ここには建設物がありません" };
     const tiles = town.tiles.slice(), levels = town.levels.slice(); tiles[i] = town.terrain[i] ? "water" : "grass"; levels[i] = 0;
-    return { town: { ...town, tiles, levels }, message: "撤去しました" };
+    return { town: { ...town, tiles, levels, attachments: town.attachments.filter(a => a.tile !== i) }, message: "撤去しました" };
   }
   if (existing !== "grass" && !(existing === "water" && ["road", "rail"].includes(tool))) return { town, message: existing === "water" ? "川には道路・線路で橋を架けられます" : "建設物があります。撤去するか、別の場所を選んでください" };
   if (["house", "shop", "factory"].includes(tool) && !touchesRoad(town.tiles, x, y)) return { town, message: "道路の隣に建ててください" };
@@ -146,7 +302,7 @@ export const MILESTONES = [
 export function advanceTown(town: Town): Town {
   if (town.paused) return town;
   let next = { ...town, day: town.day + 1 };
-  let stats = getTownStats(next.tiles, next.levels);
+  let stats = getTownStats(next.tiles, next.levels, next.parks, next.attachments);
   if (next.day % 6 === 0) next = { ...next, money: next.money + stats.income - stats.upkeep };
   if (next.day % (stats.linkedStations ? 12 : 24) === 0 && stats.homes >= 2 && stats.roads >= 5 && stats.happiness >= 45) {
     const choices = next.tiles.flatMap((t, i) => t === "grass" && touchesRoad(next.tiles, i % MAP_SIZE, Math.floor(i / MAP_SIZE)) && near(next.tiles, i, ["house", "shop"], 2) ? [i] : []);
@@ -161,7 +317,7 @@ export function advanceTown(town: Town): Town {
       if (i >= 0) { const levels = next.levels.slice(); levels[i] = (levels[i] || 1) + 1; next = { ...next, levels }; }
     }
   }
-  stats = getTownStats(next.tiles, next.levels);
+  stats = getTownStats(next.tiles, next.levels, next.parks, next.attachments);
   for (const m of MILESTONES) if (!next.rewards.includes(m.id) && m.progress(stats) >= 1) next = { ...next, money: next.money + m.reward, rewards: [...next.rewards, m.id] };
   return next;
 }
@@ -179,6 +335,33 @@ export function decodeTown(raw: string | null): Town | null {
     // Existing v1 saves retain every tile; no river is inserted into an old city.
     const terrain = Array.isArray(obj.terrain) && obj.terrain.length === tiles.length && obj.terrain.every(v => typeof v === "boolean") ? obj.terrain as boolean[] : tiles.map(t => t === "water");
     const rewards = Array.isArray(obj.rewards) ? obj.rewards.filter((v): v is string => typeof v === "string" && MILESTONES.some(m => m.id === v)) : [];
-    return { tiles, levels, terrain, rewards, money: obj.money, day: obj.day, paused: obj.paused === true };
+    const parks: ParkLot[] = [], occupied = new Set<number>();
+    if (obj.parks !== undefined && !Array.isArray(obj.parks)) return null;
+    for (const raw of obj.parks as unknown[] ?? []) {
+      if (!raw || typeof raw !== "object") return null;
+      const p = raw as ParkLot;
+      if (![p.id, p.x, p.y, p.width, p.height].every(Number.isInteger) || p.id !== indexAt(p.x, p.y) || !["park", "plaza"].includes(p.kind) || p.x < 0 || p.y < 0 || p.x + p.width > MAP_SIZE || p.y + p.height > MAP_SIZE || !(p.width === 1 && p.height === 1 || PARK_SIZES.some(s => s.width === p.width && s.height === p.height || s.width === p.height && s.height === p.width)) || !Array.isArray(p.parts)) return null;
+      const cells = lotTiles(p), used = new Set<string>();
+      if (cells.some(i => occupied.has(i) || tiles[i] !== "park" || terrain[i])) return null;
+      const parts: ParkLot["parts"] = [];
+      for (const part of p.parts) {
+        if (!part || typeof part !== "object") return null;
+        const detail = PARK_PARTS.find(s => s.id === part.kind), key = `${part.tile}:${detail?.layer}`;
+        if (!detail || !cells.includes(part.tile) || !Number.isInteger(part.rotation) || part.rotation < 0 || part.rotation > 3 || used.has(key)) return null;
+        used.add(key); parts.push({ tile: part.tile, kind: part.kind, rotation: part.rotation });
+      }
+      cells.forEach(i => occupied.add(i)); parks.push({ id: p.id, x: p.x, y: p.y, width: p.width, height: p.height, kind: p.kind, parts });
+    }
+    // Old one-tile parks keep their place and value, and become editable without charging again.
+    tiles.forEach((t, i) => { if (t === "park" && !occupied.has(i)) parks.push({ id: i, x: i % MAP_SIZE, y: Math.floor(i / MAP_SIZE), width: 1, height: 1, kind: "park", parts: [{ tile: i, kind: "fountain", rotation: 0 }] }); });
+    const attachments: FacilityAttachment[] = [], attached = new Set<number>();
+    if (obj.attachments !== undefined && !Array.isArray(obj.attachments)) return null;
+    for (const raw of obj.attachments as unknown[] ?? []) {
+      if (!raw || typeof raw !== "object") return null;
+      const a = raw as FacilityAttachment;
+      if (!Number.isInteger(a.tile) || a.tile < 0 || a.tile >= MAP_SIZE ** 2 || tiles[a.tile] !== a.kind || attached.has(a.tile) || !Array.isArray(a.parts) || new Set(a.parts).size !== a.parts.length || a.parts.some(id => !FACILITY_PARTS.some(p => p.id === id && p.kinds.includes(a.kind)))) return null;
+      attached.add(a.tile); if (a.parts.length) attachments.push({ tile: a.tile, kind: a.kind, parts: [...a.parts] });
+    }
+    return { tiles, levels, terrain, rewards, parks, attachments, money: obj.money, day: obj.day, paused: obj.paused === true };
   } catch { return null; }
 }

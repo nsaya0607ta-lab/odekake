@@ -191,3 +191,53 @@
   .secondary { margin-top: 6px; }
 }
 @media (prefers-reduced-motion: reduce) { .game * { transition: none !important; } }
+.customize { min-width: 52px; min-height: 48px; padding: 5px 8px; border: 1px solid #a6b698; border-radius: 11px; background: #e4ecd9; color: var(--green); font-size: 11px !important; font-weight: 700; }
+.customize small { display: block; font-size: 9px; margin-top: 2px; font-weight: 500; }
+.selectionCard .upgrade { min-width: 64px; }
+.landCatalog { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 7px; }
+.landCatalog > button { display: flex; flex-direction: column; align-items: center; gap: 6px; min-height: 112px; min-width: 0; padding: 10px 4px; border: 1px solid var(--line); border-radius: 13px; background: #f4f4e7; color: var(--ink); }
+.landCatalog > button[aria-pressed=true] { background: #e5edda; border-color: #6f8c60; box-shadow: inset 0 0 0 1px #6f8c60; }
+.landCatalog b { font-size: 13px; }
+.landCatalog small { color: var(--muted); font-size: 10px; }
+.landShape { display: grid; gap: 2px; width: 54px; height: 42px; padding: 3px; border: 2px solid #889d6e; border-radius: 3px; background: #c2d3a2; }
+.landShape i { background: #99b67c; border-radius: 1px; }
+.landShape[data-kind=plaza] { border-color: #ac9b76; background: #e5d9bb; }
+.landShape[data-kind=plaza] i { background: #ccbd99; }
+.purchaseActions { display: flex; gap: 8px; margin-top: 10px; }
+.rotatePart { min-height: 44px; min-width: 70px; padding: 6px 9px; border: 1px solid #a7b898; border-radius: 10px; background: #e6ecdc; color: var(--green); font-size: 11px !important; }
+.placeLot { display: flex; justify-content: space-between; align-items: center; flex: 1; min-height: 46px; padding: 8px 11px; border: 0; border-radius: 11px; background: var(--green); color: #fff8de; font-size: 12px !important; font-weight: 700; }
+.placeLot span { font-size: 10px; font-weight: 500; }
+.workshop { max-height: min(47svh, 365px); }
+.workshop .panelTitle { position: sticky; top: -12px; z-index: 1; background: var(--surface); }
+.partCatalog { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 5px; }
+.partCatalog > button { min-width: 0; min-height: 83px; padding: 0 2px 6px; display: flex; flex-direction: column; align-items: center; border: 1px solid var(--line); border-radius: 11px; background: #f5f5e9; color: var(--ink); }
+.partCatalog > button[aria-pressed=true] { background: #e2ecd5; border-color: #6f8c60; box-shadow: inset 0 0 0 1px #6f8c60; }
+.partIcon { display: block; width: 60px; height: 48px; max-width: 100%; object-fit: contain; }
+.partCatalog b, .facilityCatalog b { font-size: 11px; font-weight: 700; }
+.partCatalog small { display: block; font-size: 9px; color: var(--muted); margin-top: 3px; }
+.partRemoveIcon { height: 48px; display: grid; place-items: center; font-size: 32px; color: #a07956; }
+.workshopHint { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-top: 8px; padding: 4px 0; background: var(--surface); }
+.workshopHint > span { color: var(--muted); font-size: 10px; }
+.lotDetails { margin-top: 6px; border-top: 1px solid #d9dfcf; }
+.lotDetails > summary { min-height: 44px; padding-block: 12px; font-size: 11px; color: var(--muted); cursor: pointer; }
+.expandSizes { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 5px; }
+.expandSizes button { min-height: 48px; padding: 6px 2px; background: #e9eedf; border: 1px solid var(--line); border-radius: 9px; color: var(--green); font-size: 10px; }
+.expandSizes small { display: block; margin-top: 3px; font-size: 9px; }
+.removeLot { min-height: 44px; width: 100%; margin-top: 8px; padding: 8px; border: 1px solid #c5b69a; border-radius: 9px; background: #f1e8d7; color: #8d7151; font-size: 11px !important; }
+.facilityCatalog { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+.facilityOption { border: 1px solid var(--line); border-radius: 12px; overflow: hidden; background: #f5f5e9; }
+.facilityOption[data-owned=true] { background: #e5edda; border-color: #8ca179; }
+.facilityOption > button:first-child { display: flex; flex-direction: column; align-items: center; width: 100%; min-height: 112px; padding: 3px 7px 8px; border: 0; background: transparent; color: var(--ink); }
+.facilityOption[data-owned=true] > button:disabled { opacity: 1; }
+.facilityOption small { color: var(--green); font-size: 10px; margin: 4px 0; }
+.facilityOption span { color: var(--muted); font-size: 9px; line-height: 1.6; text-align: center; }
+.removeAttachment { width: 100%; min-height: 44px; padding: 8px; border: 0; border-top: 1px solid #cfdac3; background: #dce7cf; color: var(--green); font-size: 10px !important; }
+.game[data-panel=customize] .sceneButtons { display: none; }
+.activeTool[data-decorate=true] > button:not(.dismiss) { min-width: 54px; padding: 6px 8px; }
+.activeTool[data-decorate=true] > button[aria-label="部品の向きを変える"] { min-width: 48px; }
+@media (min-width: 641px) { .workshop { max-height: min(62svh, 490px); } }
+@media (max-height: 560px) and (min-width: 561px) {
+  .workshop { max-height: calc(100% - var(--dock) - var(--top) - 75px); }
+  .workshop .panelTitle { top: -10px; }
+  .partCatalog { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+}
