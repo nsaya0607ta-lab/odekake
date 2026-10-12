@@ -10,7 +10,7 @@ function compile(file, imports = {}) {
 const game = compile('src/lib/games/town-builder.ts');
 const transport = compile('src/lib/games/town-transport.ts', { './town-builder': game });
 const sprites = compile('src/lib/games/town-sprites.ts');
-const { TownScene, drawTownIcon } = compile('src/lib/games/town-renderer.ts', { './town-builder': game, './town-transport': transport, './town-sprites': sprites });
+const { TownScene, drawTownIcon, drawTownPartIcon } = compile('src/lib/games/town-renderer.ts', { './town-builder': game, './town-transport': transport, './town-sprites': sprites });
 const iso = (x, y, z = 0) => ({ x: (x - y) * 32, y: (x + y) * 16 - z });
 const blank = () => ({ ...game.createTown(false), tiles: Array(576).fill('grass'), terrain: Array(576).fill(false), levels: Array(576).fill(0) });
 let passed = 0;
@@ -232,5 +232,35 @@ test('sprite memory is bounded and recently used artwork stays cached', () => {
   for (let i = 0; i < 10; i++) cache.draw(c, String(i), 0, 0, bounds, paint);
   cache.draw(c, '9', 0, 0, bounds, paint); assert.equal(paintings, 10);
   cache.draw(c, '0', 0, 0, bounds, paint); assert.equal(paintings, 11, 'The least recently used sprite must be evicted');
+});
+test('an empty purchased park has no automatic fountain or furniture; paid equipment updates without changing terrain tiles', () => {
+  let town = game.buyParkLot(blank(),5,5,'small').town;const scene=new TownScene(),{c,fills}=recordingContext();
+  scene.render(c,800,600,town,options,0);assert(!fills.some(f=>f.color==='#79bac4'||f.color==='#d5b387'));
+  const tiles=town.tiles;town=game.placeParkPart(town,125,125,'fountain').town;assert.equal(town.tiles,tiles);fills.length=0;
+  scene.render(c,800,600,town,options,0);assert(fills.some(f=>f.color==='#79bac4'));
+  town=game.removeParkPart(town,125,125).town;fills.length=0;scene.render(c,800,600,town,options,0);assert(!fills.some(f=>f.color==='#79bac4'));
+});
+test('selection bounds include a complete multi-cell plot and space for its trees',()=>{
+  const town=game.buyParkLot(blank(),5,5,'medium').town,scene=new TownScene();scene.camera={x:195,y:0,zoom:1.4};
+  const bounds=scene.tileBounds(6*24+6,town);for(const p of [iso(5,5),iso(8,5),iso(5,8),iso(8,8),iso(5.5,5.5,40)])assert(bounds.left<=195+p.x*1.4&&bounds.right>=195+p.x*1.4&&bounds.top<=p.y*1.4&&bounds.bottom>=p.y*1.4);
+});
+test('park tree canopies select their own component tile at different camera scales',()=>{
+  let town=game.buyParkLot(blank(),5,5,'small').town;town=game.placeParkPart(town,125,125,'tree').town;const scene=new TownScene(),p=iso(5.5,5.5,24);
+  for(const zoom of [.6,1.4,2.8]){scene.camera={x:195,y:50,zoom};assert.equal(scene.pickTile(195+p.x*zoom,50+p.y*zoom,town),125);}
+});
+test('land placement previews the selected complete footprint',()=>{
+  const town=blank(),{c,fills}=recordingContext();new TownScene().render(c,800,600,town,{...options,tool:'park',hover:125,parkSize:'medium'},0);
+  const preview=fills.find(f=>f.color==='#bdd0a655');assert(preview);assert.deepEqual(preview.points,[iso(5,5,1),iso(8,5,1),iso(8,8,1),iso(5,8,1)]);
+});
+test('every park and facility component icon renders without labels or smoke',()=>{
+  const {c,fills}=recordingContext();for(const part of [...game.PARK_PARTS,...game.FACILITY_PARTS])drawTownPartIcon(c,part.id,60,48);
+  assert(fills.length>30);assert(fills.every(f=>f.alpha===1));
+});
+test('component and path changes refresh the cache; movement after editing reuses it',()=>{
+  const factory=canvasFactory(),{c}=recordingContext();let town=game.buyParkLot(blank(),5,5,'small').town;
+  const scene=new TownScene(()=>factory.create());scene.camera={x:195,y:20,zoom:1};scene.render(c,390,844,town,options,0);
+  const ground=factory.surfaces[0],before=ground.fills.length;town=game.placeParkPart(town,125,125,'path').town;scene.render(c,390,844,town,options,0);assert(ground.fills.length>before);
+  town=game.placeParkPart(town,125,125,'bench').town;scene.render(c,390,844,town,options,0);const paints=factory.surfaces.reduce((n,s)=>n+s.fills.length,0),surfaces=factory.surfaces.length;
+  for(let i=0;i<20;i++){scene.camera.x+=.1;scene.render(c,390,844,town,options,0);}assert.equal(factory.surfaces.length,surfaces);assert.equal(factory.surfaces.reduce((n,s)=>n+s.fills.length,0),paints);
 });
 console.log(`${passed} town renderer checks passed`);

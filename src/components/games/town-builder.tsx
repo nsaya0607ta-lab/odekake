@@ -2,13 +2,14 @@
 
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { BUILDINGS, MAP_SIZE, MILESTONES, advanceTown, buildLine, createTown, decodeTown, getTownStats, lineTiles, touchesRoad, upgradeTile, type Tool, type Town } from "@/lib/games/town-builder";
+import { BUILDINGS, FACILITY_PARTS, MAP_SIZE, MILESTONES, PARK_PARTS, PARK_SIZES, advanceTown, buildLine, buyFacilityPart, buyParkLot, createTown, decodeTown, expandParkLot, getTownStats, lineTiles, parkAt, placeParkPart, recordTownEdit, removeFacilityPart, removeParkLot, removeParkPart, touchesRoad, undoTownEdit, upgradeTile, type FacilityPart, type ParkLot, type ParkPart, type ParkSize, type Tool, type Town, type TownEdit } from "@/lib/games/town-builder";
 import { TownScene, drawTownIcon, type SceneOptions } from "@/lib/games/town-renderer";
 import { TownCanvas } from "@/lib/games/town-canvas";
+import { FacilityWorkshop, ParkPurchase, ParkWorkshop } from "./town-workshop";
 import styles from "./town-builder.module.css";
 
-type Mode = Tool | "inspect" | "pan";
-type Panel = "build" | "view" | "help" | null;
+type Mode = Tool | "inspect" | "pan" | "decorate";
+type Panel = "build" | "view" | "help" | "land" | "customize" | null;
 const F = new Intl.NumberFormat("ja-JP");
 function BuildingIcon({ kind }: { kind: Tool }) {
   const ref = useRef<HTMLCanvasElement>(null);
@@ -36,14 +37,16 @@ function Glyph({ name }: { name: string }) {
   </svg>;
 }
 export function TownBuilder({ userId }: { userId: string }) {
-  const key = "odekake-town-builder:v1:" + userId;
+  const key = "odekake-town-builder:v2:" + userId, legacyKey = "odekake-town-builder:v1:" + userId;
   const [town, setTown] = useState<Town>(() => createTown());
   const [loadedKey, setLoadedKey] = useState<string | null>(null), [welcome, setWelcome] = useState(false);
   const loaded = loadedKey === key;
   const [mode, setMode] = useState<Mode>("inspect"), [category, setCategory] = useState("交通");
   const [speed, setSpeed] = useState(1), [night, setNight] = useState(false), [grid, setGrid] = useState(false);
   const [selected, setSelected] = useState<number | null>(null), [hover, setHover] = useState<number | null>(null);
-  const [preview, setPreview] = useState<number[]>([]), [undo, setUndo] = useState<{ changes: { i: number; before: Town["tiles"][number]; after: Town["tiles"][number]; beforeLevel: number; afterLevel: number }[]; cost: number }[]>([]);
+  const [preview, setPreview] = useState<number[]>([]), [undo, setUndo] = useState<TownEdit[]>([]);
+  const [parkSize, setParkSize] = useState<ParkSize>("small"), [parkKind, setParkKind] = useState<ParkLot["kind"]>("park"), [parkRotated, setParkRotated] = useState(false);
+  const [editingLotId, setEditingLotId] = useState<number | null>(null), [part, setPart] = useState<ParkPart | "remove">("tree"), [partRotation, setPartRotation] = useState(0);
   const [notice, updateNotice] = useState("1本指で移動、2本指で拡大・縮小。建物はタップで調べられます。");
   const [toast, setToast] = useState(false), noticeTimer = useRef<number | null>(null);
   const setNotice = useCallback((message: string) => {
@@ -57,6 +60,8 @@ export function TownBuilder({ userId }: { userId: string }) {
   const canvasRef = useRef<HTMLCanvasElement>(null), sceneRef = useRef<TownScene | null>(null);
   const gameRef = useRef<HTMLElement>(null);
   const selectionRef = useRef<HTMLElement>(null), toolbarRef = useRef<HTMLDivElement>(null), statsRef = useRef<HTMLDivElement>(null);
+  const panelRef = useRef<HTMLElement>(null);
+  const activeToolRef = useRef<HTMLDivElement>(null);
   const returnControlsRef = useRef<HTMLButtonElement>(null);
   const pendingSave = useRef<{ key: string; town: Town } | null>(null);
   const flushSave = useCallback((showStatus = true) => {
@@ -68,11 +73,14 @@ export function TownBuilder({ userId }: { userId: string }) {
   const sizeRef = useRef({ width: 800, height: 600 });
   const pointers = useRef(new Map<number, { x: number; y: number }>());
   const drag = useRef<{ x: number; y: number; from: number | null; to: number | null; pan: boolean; moved: boolean; multiple: boolean } | null>(null);
-  const stats = useMemo(() => getTownStats(town.tiles, town.levels), [town.tiles, town.levels]);
+  const stats = useMemo(() => getTownStats(town.tiles, town.levels, town.parks, town.attachments), [town.tiles, town.levels, town.parks, town.attachments]);
   const item = BUILDINGS.find(b => b.id === mode);
   const mission = MILESTONES.find(m => !town.rewards.includes(m.id));
   const active = selected === null ? null : town.tiles[selected];
   const selectedLevel = selected === null ? 0 : town.levels[selected] || 0;
+  const selectedLot = selected === null ? undefined : parkAt(town, selected), editingLot = town.parks.find(p => p.id === editingLotId);
+  const selectedParts = town.attachments.find(a => a.tile === selected)?.parts;
+  const canCustomize = Boolean(selectedLot || active && FACILITY_PARTS.some(p => p.kinds.includes(active)));
   const showSelection = mode === "inspect" && selected !== null && active !== "grass" && active !== "water" && !panel && !scenery && !welcome;
   const canUpgrade = active === "house" || active === "shop" || active === "factory";
   const linearTool = mode === "road" || mode === "rail";
@@ -81,13 +89,13 @@ export function TownBuilder({ userId }: { userId: string }) {
   const phase = stats.population >= 500 ? "小さな都市" : stats.population >= 150 ? "にぎやかな街" : "小さな集落";
   useEffect(() => () => { if (noticeTimer.current) window.clearTimeout(noticeTimer.current); }, []);
   // One stable renderer reads current data without restarting the animation on React updates.
-  useEffect(() => { stateRef.current = { town, options: { night, grid, hover, selected, preview, tool: mode, routes: stats.routes, paused: town.paused || welcome || !loaded, speed } }; }, [town, night, grid, hover, selected, preview, mode, stats.routes, welcome, loaded, speed]);
+  useEffect(() => { stateRef.current = { town, options: { night, grid, hover, selected, preview, tool: mode, routes: stats.routes, paused: town.paused || welcome || !loaded, speed, parkSize, parkKind, parkRotated, editLot: mode === "decorate" ? editingLotId ?? undefined : undefined, parkPart: part, partRotation } }; }, [town, night, grid, hover, selected, preview, mode, stats.routes, welcome, loaded, speed, parkSize, parkKind, parkRotated, editingLotId, panel, part, partRotation]);
   useEffect(() => {
     setLoadedKey(null); setUndo([]); setSelected(null); setPanel(null); pendingSave.current = null;
-    try { const saved = decodeTown(localStorage.getItem(key)); if (saved) { setTown(saved); setWelcome(false); } else { setTown(createTown()); setWelcome(true); setSaveStatus("開始すると自動保存"); } }
+    try { const saved = decodeTown(localStorage.getItem(key) ?? localStorage.getItem(legacyKey)); if (saved) { setTown(saved); setWelcome(false); } else { setTown(createTown()); setWelcome(true); setSaveStatus("開始すると自動保存"); } }
     catch { setTown(createTown()); setWelcome(true); setSaveStatus("保存できません"); }
     setLoadedKey(key);
-  }, [key]);
+  }, [key, legacyKey]);
   useEffect(() => {
     if (!loaded || welcome) { pendingSave.current = null; return; }
     pendingSave.current = { key, town }; setSaveStatus("保存中");
@@ -113,26 +121,31 @@ export function TownBuilder({ userId }: { userId: string }) {
   }, [flushSave]);
   useEffect(() => { if (scenery) returnControlsRef.current?.focus(); }, [scenery]);
   useEffect(() => {
-    if (!showSelection || selected === null) return;
+    if ((!showSelection && panel !== "customize" && mode !== "decorate") || selected === null) return;
     // Keep the selected roof and foundation above the compact card, without a modal backdrop.
     const keepVisible = () => {
       const scene = sceneRef.current, currentTown = stateRef.current?.town; if (!scene || !currentTown) return;
       const { width, height } = sizeRef.current;
       const top = (statsRef.current?.getBoundingClientRect().bottom ?? 110) + 14;
-      const bottom = (selectionRef.current?.getBoundingClientRect().top ?? toolbarRef.current?.getBoundingClientRect().top ?? height - 90) - 18;
+      const panelBounds = panel === "customize" ? panelRef.current?.getBoundingClientRect() : null;
+      const sidePanel = panelBounds && panelBounds.width < width * .7;
+      const right = sidePanel ? panelBounds.left - 14 : width - 24;
+      const bottom = (panelBounds && !sidePanel ? panelBounds.top : selectionRef.current?.getBoundingClientRect().top ?? activeToolRef.current?.getBoundingClientRect().top ?? toolbarRef.current?.getBoundingClientRect().top ?? height - 90) - 18;
       let bounds = scene.tileBounds(selected, currentTown);
-      const factor = Math.min(1, Math.max(40, bottom - top) / (bounds.bottom - bounds.top), Math.max(40, width - 48) / (bounds.right - bounds.left));
+      const factor = Math.min((panel === "customize" || mode === "decorate") && scene.camera.zoom < 1.4 ? 1.4 / scene.camera.zoom : 1, Math.max(40, bottom - top) / (bounds.bottom - bounds.top), Math.max(40, right - 24) / (bounds.right - bounds.left));
       // Tall homes also fit above the card after rotating a phone into landscape.
-      if (factor < 1) { scene.zoomAt(factor, (bounds.left + bounds.right) / 2, (bounds.top + bounds.bottom) / 2); bounds = scene.tileBounds(selected, currentTown); }
-      scene.camera.x += bounds.left < 24 ? 24 - bounds.left : bounds.right > width - 24 ? width - 24 - bounds.right : 0;
+      if (factor !== 1) { scene.zoomAt(factor, (bounds.left + bounds.right) / 2, (bounds.top + bounds.bottom) / 2); bounds = scene.tileBounds(selected, currentTown); }
+      scene.camera.x += bounds.left < 24 ? 24 - bounds.left : bounds.right > right ? right - bounds.right : 0;
       scene.camera.y += bounds.bottom > bottom ? bottom - bounds.bottom : bounds.top < top ? top - bounds.top : 0;
     };
     keepVisible();
     const resize = new ResizeObserver(keepVisible);
     if (gameRef.current) resize.observe(gameRef.current);
     if (selectionRef.current) resize.observe(selectionRef.current);
+    if (panelRef.current && panel === "customize") resize.observe(panelRef.current);
+    if (activeToolRef.current) resize.observe(activeToolRef.current);
     return () => resize.disconnect();
-  }, [showSelection, selected, active, selectedLevel]);
+  }, [showSelection, selected, active, selectedLevel, panel, editingLotId, selectedLot?.width, selectedLot?.height, mode]);
   useEffect(() => {
     if (!loaded || town.paused || welcome) return;
     const timer = window.setInterval(() => setTown(prev => advanceTown(prev)), 2500 / speed);
@@ -171,15 +184,28 @@ export function TownBuilder({ userId }: { userId: string }) {
     canvas.addEventListener("wheel", wheel, { passive: false });
     return () => { cancelAnimationFrame(frame); resize.disconnect(); canvas.removeEventListener("wheel", wheel); sceneRef.current = null; };
   }, [setNotice]);
-  const chooseMode = (next: Mode) => { setMode(next); setStroke(false); setPreview([]); setHover(null); setSelected(null); setNotice(next === "pan" || next === "inspect" ? "1本指で移動、2本指で拡大・縮小。建物はタップで調べられます。" : BUILDINGS.find(b => b.id === next)?.info ?? ""); };
+  const chooseMode = (next: Mode) => { setMode(next); setEditingLotId(null); setStroke(false); setPreview([]); setHover(null); setSelected(null); setNotice(next === "pan" || next === "inspect" ? "1本指で移動、2本指で拡大・縮小。建物はタップで調べられます。" : BUILDINGS.find(b => b.id === next)?.info ?? ""); };
+  const closePanel = () => { setPanel(null); if (panel === "customize") { setMode("inspect"); setEditingLotId(null); setPreview([]); setHover(null); } };
+  const openCustomize = () => { if (selected === null) return; setPanel("customize"); setEditingLotId(selectedLot?.id ?? null); setMode(selectedLot ? "decorate" : "inspect"); setPart("tree"); setPreview([]); setHover(null); };
   const remember = (next: Town) => {
-    const changes = town.tiles.flatMap((before, i) => before !== next.tiles[i] || town.levels[i] !== next.levels[i] ? [{ i, before, after: next.tiles[i]!, beforeLevel: town.levels[i]!, afterLevel: next.levels[i]! }] : []);
-    setUndo(list => [...list.slice(-19), { changes, cost: town.money - next.money }]);
+    setUndo(list => [...list.slice(-19), recordTownEdit(town, next)]);
   };
+  const applyEdit = (result: { town: Town; message: string }) => { if (result.town !== town) { remember(result.town); setTown(result.town); } setNotice(result.message); };
   const commit = (path: number[]) => {
     if (!loaded || welcome || !path.length) return;
     if (mode === "pan") return;
     if (mode === "inspect") { setSelected(path[path.length - 1]!); setPanel(null); return; }
+    if (mode === "decorate") {
+      if (!editingLot) return;
+      const tile = path[path.length - 1]!;
+      applyEdit(part === "remove" ? removeParkPart(town, editingLot.id, tile) : placeParkPart(town, editingLot.id, tile, part, partRotation)); return;
+    }
+    if (mode === "park") {
+      const i = path[path.length - 1]!, result = buyParkLot(town, i % MAP_SIZE, Math.floor(i / MAP_SIZE), parkSize, parkKind, parkRotated);
+      applyEdit(result);
+      if (result.lotId !== undefined) { setSelected(result.lotId); setEditingLotId(result.lotId); setMode("decorate"); setPart("tree"); setPanel("customize"); setHover(null); }
+      return;
+    }
     const result = buildLine(town, mode, path);
     if (result.town !== town) {
       remember(result.town);
@@ -189,18 +215,15 @@ export function TownBuilder({ userId }: { userId: string }) {
   };
   const undoBuild = () => {
     const prev = undo[undo.length - 1]; if (!prev) return;
-    setTown(current => {
-      const tiles = current.tiles.slice(), levels = current.levels.slice();
-      for (const change of prev.changes) { tiles[change.i] = change.before; levels[change.i] = change.beforeLevel; }
-      return { ...current, tiles, levels, money: current.money + prev.cost };
-    });
+    setTown(current => undoTownEdit(current, prev));
+    if (editingLotId !== null && !undoTownEdit(town, prev).parks.some(p => p.id === editingLotId)) { setEditingLotId(null); setMode("inspect"); setPanel(null); setSelected(null); }
     setUndo(list => list.slice(0, -1)); setNotice("直前の工事を取り消しました");
   };
   const position = (e: React.PointerEvent<HTMLCanvasElement>) => { const rect = e.currentTarget.getBoundingClientRect(); return { x: e.clientX - rect.left, y: e.clientY - rect.top }; };
   const pointerDown = (e: React.PointerEvent<HTMLCanvasElement>) => {
     e.currentTarget.setPointerCapture(e.pointerId);
     const p = position(e), scene = sceneRef.current;
-    const tile = scene ? mode === "inspect" || mode === "bulldoze" ? scene.pickTile(p.x, p.y, town) : scene.tileAt(p.x, p.y) : null;
+    const tile = scene ? mode === "inspect" || mode === "bulldoze" || mode === "decorate" && part === "remove" ? scene.pickTile(p.x, p.y, town) : scene.tileAt(p.x, p.y) : null;
     pointers.current.set(e.pointerId, p);
     if (pointers.current.size > 1) { if (drag.current) drag.current.multiple = true; setPreview([]); return; }
     setHover(null);
@@ -236,7 +259,7 @@ export function TownBuilder({ userId }: { userId: string }) {
       const p = position(e), scene = sceneRef.current;
       const onMap = p.x >= 0 && p.y >= 0 && p.x < sizeRef.current.width && p.y < sizeRef.current.height && document.elementFromPoint(e.clientX, e.clientY) === e.currentTarget;
       const wasTap = Math.hypot(p.x - d.x, p.y - d.y) <= 8;
-      const to = onMap && scene && (!d.pan || wasTap) ? mode === "inspect" || mode === "bulldoze" ? scene.pickTile(p.x, p.y, town) : scene.tileAt(p.x, p.y) : null;
+      const to = onMap && scene && (!d.pan || wasTap) ? mode === "inspect" || mode === "bulldoze" || mode === "decorate" && part === "remove" ? scene.pickTile(p.x, p.y, town) : scene.tileAt(p.x, p.y) : null;
       if (to !== null) commit(!d.pan && d.from !== null ? lineTiles(d.from, to) : [to]);
       else if (mode !== "inspect" && !d.pan) setNotice("マップの外で指を離したため、工事を取り消しました");
     }
@@ -252,8 +275,8 @@ export function TownBuilder({ userId }: { userId: string }) {
   const reset = () => {
     if (!window.confirm("今の街を初期化します。よろしいですか？")) return;
     pendingSave.current = null;
-    try { localStorage.removeItem(key); setSaveStatus("開始すると自動保存"); } catch { setSaveStatus("保存できません"); }
-    setTown(createTown(false)); setUndo([]); setSelected(null); setPanel(null); setWelcome(true);
+    try { localStorage.setItem(key, "null"); localStorage.removeItem(legacyKey); setSaveStatus("開始すると自動保存"); } catch { setSaveStatus("保存できません"); }
+    setTown(createTown(false)); setUndo([]); setSelected(null); setPanel(null); setEditingLotId(null); setMode("inspect"); setWelcome(true);
   };
   const viewScenery = (value: boolean) => { setScenery(value); setPanel(null); chooseMode(value ? "pan" : "inspect"); if (!value) canvasRef.current?.focus(); };
   const toggleFullscreen = async () => {
@@ -285,7 +308,7 @@ export function TownBuilder({ userId }: { userId: string }) {
     else if (e.key.toLowerCase() === "z" && (e.ctrlKey || e.metaKey)) { e.preventDefault(); undoBuild(); }
   };
   return <main ref={gameRef} className={styles.game} data-town-screen data-scenery={scenery} data-night={night} data-panel={panel ?? "none"} onKeyDown={e => {
-    if (e.key === "Escape") { setPanel(null); if (scenery) viewScenery(false); }
+    if (e.key === "Escape") { closePanel(); if (scenery) viewScenery(false); }
   }}>
     <section className={styles.world} aria-label="街の建設マップ">
       <canvas ref={canvasRef} className={styles.canvas} tabIndex={0} aria-label="街のマップ。1本指で移動、2本指で拡大縮小。建物をタップして調査。建設時はタップで配置、連続敷設を選ぶとドラッグで道路・線路を敷設。矢印キーとEnterでも操作できます。" onKeyDown={handleKey}
@@ -322,15 +345,21 @@ export function TownBuilder({ userId }: { userId: string }) {
     {mission && !panel && !welcome && !showSelection && mode === "inspect" && <div className={styles.mission}>
       <span className={styles.missionMark}>✦</span><div><small>次の目標</small><b>{mission.title}</b><p>{mission.detail}</p><div className={styles.progress}><i style={{ width: `${Math.min(100, mission.progress(stats) * 100)}%` }} /></div></div><strong>+¥{F.format(mission.reward)}</strong>
     </div>}
-    {panel && <aside id="town-panel" className={styles.sidebar} aria-label={panel === "build" ? "建設パネル" : panel === "view" ? "表示と設定" : "遊び方"}>
-      <div className={styles.panelTitle}><h2>{panel === "build" ? "街に、新しい暮らしを。" : panel === "view" ? "表示と設定" : "街づくりのヒント"}</h2><button type="button" aria-label="パネルを閉じる" onClick={() => setPanel(null)}>×</button></div>
+    {panel && <aside ref={panelRef} id="town-panel" className={`${styles.sidebar} ${panel === "customize" ? styles.workshop : ""}`} aria-label={panel === "build" ? "建設パネル" : panel === "land" ? "敷地の購入" : panel === "customize" ? "施設の部品" : panel === "view" ? "表示と設定" : "遊び方"}>
+      <div className={styles.panelTitle}><h2>{panel === "build" ? "建設" : panel === "land" ? "敷地を選ぶ" : panel === "customize" ? editingLot ? `${editingLot.kind === "park" ? "公園" : "広場"} ${editingLot.width}×${editingLot.height} · 部品` : `${BUILDINGS.find(b => b.id === active)?.title ?? "施設"}の部品` : panel === "view" ? "表示と設定" : "街づくりのヒント"}</h2><button type="button" aria-label="パネルを閉じる" onClick={closePanel}>×</button></div>
       {panel === "build" && <>
         <div className={styles.categories}>{["交通", "建物", "環境"].map(c => <button type="button" key={c} aria-pressed={category === c} onClick={() => setCategory(c)}>{c}</button>)}</div>
         <div className={styles.catalog}>{BUILDINGS.filter(b => b.category === category).map(b => <button type="button" key={b.id} aria-pressed={mode === b.id} onClick={() => {
+          if (b.id === "park") { chooseMode("inspect"); setPanel("land"); return; }
           chooseMode(b.id); setPanel(null);
         }} className={mode === b.id ? styles.selectedBuild : ""}><BuildingIcon kind={b.id} /><span><b>{b.title}</b><small>{b.price ? `¥${F.format(b.price)}` : "無料"}</small></span></button>)}</div>
         <p className={styles.toolDescription}>選んだら、街をタップして配置。指でドラッグすると移動できます。</p>
       </>}
+      {panel === "land" && <ParkPurchase kind={parkKind} size={parkSize} rotated={parkRotated} money={town.money} onKind={setParkKind} onSize={setParkSize} onRotate={() => setParkRotated(v => !v)} onPlace={() => { chooseMode("park"); setPanel(null); }} />}
+      {panel === "customize" && (editingLot ? <ParkWorkshop lot={editingLot} part={part} rotation={partRotation} money={town.money} onPart={p => { setPart(p); setPreview([]); setHover(null); setPanel(null); }} onRotate={() => setPartRotation(v => (v + 1) % 4)} onExpand={size => applyEdit(expandParkLot(town, editingLot.id, size))} onRemoveLot={() => {
+        if (!window.confirm("この敷地と中の部品を撤去しますか？")) return;
+        applyEdit(removeParkLot(town, editingLot.id)); setPanel(null); setEditingLotId(null); setMode("inspect"); setSelected(null);
+      }} /> : active && selected !== null ? <FacilityWorkshop kind={active} installed={selectedParts ?? []} money={town.money} onBuy={(id: FacilityPart) => applyEdit(buyFacilityPart(town, selected, id))} onRemove={id => applyEdit(removeFacilityPart(town, selected, id))} /> : null)}
       {panel === "view" && <>
         <div className={styles.viewOptions}>
           <button type="button" aria-label={night ? "昼にする" : "夜にする"} onClick={() => setNight(v => !v)}><Glyph name={night ? "moon" : "sun"} />{night ? "昼にする" : "夜にする"}</button>
@@ -344,7 +373,7 @@ export function TownBuilder({ userId }: { userId: string }) {
         <div className={styles.finance}><div><span>税収・交通収入</span><b>+¥{F.format(stats.income)}</b></div><div><span>維持費</span><b>−¥{F.format(stats.upkeep)}</b></div><small>6日ごとに精算 · 次はDAY {Math.ceil((town.day + 1) / 6) * 6}<br />鉄道 {stats.linkedStations}駅が接続 · 雇用 {stats.jobs}人分</small></div>
       </>}
       {panel === "help" && <div className={styles.help}>
-        <ol><li><b>指で街を移動する</b><span>1本指でドラッグ、2本指で拡大・縮小。建設中も同じ操作で移動できます。</span></li><li><b>タップしてつくる</b><span>「建設」から選び、街をタップして配置。道路・線路は「連続敷設」を押すと、ドラッグでまとめてつなげられます。</span></li><li><b>建物を育てる</b><span>「街を見る」で建物をタップ。下の小さなカードから増築できます。道路沿いに住宅と商店、公園をつくりましょう。</span></li><li><b>鉄道を開通する</b><span>離れた2駅を線路で結ぶと列車が運行。駅の周囲3マスの住宅が輸送収入につながります。</span></li></ol>
+        <ol><li><b>指で街を移動する</b><span>1本指でドラッグ、2本指で拡大・縮小。建設・部品の編集でも同じ操作です。</span></li><li><b>タップしてつくる</b><span>「建設」から選び、街をタップして配置。道路・線路は「連続敷設」でまとめてつなげられます。</span></li><li><b>公園をつくる</b><span>敷地の広さを選んで購入し、木・花壇・噴水などの部品を買って配置。通路の上にも設備を置けます。部品だけの撤去や敷地の拡張もできます。</span></li><li><b>施設を育てる</b><span>建物をタップして「部品」から設備を追加。増築や部品の購入は「元に戻す」で取り消せます。2駅を線路で結ぶと列車が運行します。</span></li></ol>
         <details><summary>キーボード・座標で操作</summary><p>マップを選択して矢印キー・Enterで建設。＋／−で拡大縮小。Ctrl／⌘＋Zで工事を取り消せます。</p><div className={styles.coordinates}><label>X<input type="number" min={1} max={24} value={tileX} onChange={e => setTileX(Number(e.target.value))} /></label><label>Y<input type="number" min={1} max={24} value={tileY} onChange={e => setTileY(Number(e.target.value))} /></label><button type="button" onClick={() => {
           if (Number.isInteger(tileX) && Number.isInteger(tileY) && tileX >= 1 && tileY >= 1 && tileX <= 24 && tileY <= 24) { const i = (tileY - 1) * MAP_SIZE + tileX - 1; focusTile(i); commit([i]); }
         }}>選択中の操作を実行</button></div></details>
@@ -352,23 +381,30 @@ export function TownBuilder({ userId }: { userId: string }) {
       </div>}
     </aside>}
     {showSelection && active && selected !== null && <section ref={selectionRef} className={styles.selectionCard} aria-label="選択した建物" data-selected-tile={selected}>
-      <div className={styles.selectionInfo}><strong>{BUILDINGS.find(b => b.id === active)?.title}{town.levels[selected]! > 0 && <small>Lv.{town.levels[selected]}</small>}</strong>
-        <p>{canUpgrade ? connected ? `道路接続${active === "house" ? ` · 定員 ${(town.levels[selected] || 1) * 18}人` : ""}` : "道路への接続が必要です" : active === "station" ? stats.routes.some(r => r[0] === selected || r[r.length - 1] === selected) ? "列車が運行しています" : "もう1つの駅へ線路をつなごう" : active === "park" ? "街の満足度を高めています" : "街をつなぐ道"}</p>
+      <div className={styles.selectionInfo}><strong>{selectedLot ? selectedLot.kind === "park" ? "公園" : "広場" : BUILDINGS.find(b => b.id === active)?.title}{town.levels[selected]! > 0 && <small>Lv.{town.levels[selected]}</small>}{selectedLot && <small>{selectedLot.width}×{selectedLot.height}</small>}</strong>
+        <p>{selectedLot ? `部品 ${selectedLot.parts.length}点${selectedLot.parts.length ? "" : " · 部品を追加しよう"}` : canUpgrade ? connected ? `道路接続${active === "house" ? ` · 定員 ${(town.levels[selected] || 1) * 18 + (selectedParts?.includes("terrace") ? 6 : 0)}人` : ""}` : "道路への接続が必要です" : active === "station" ? stats.routes.some(r => r[0] === selected || r[r.length - 1] === selected) ? "列車が運行しています" : "もう1つの駅へ線路をつなごう" : "街をつなぐ道"}</p>
       </div>
       {canUpgrade && <button type="button" className={styles.upgrade} onClick={upgrade} disabled={town.levels[selected]! >= 3 || !connected || town.money < (town.levels[selected] || 1) * 450}>{town.levels[selected]! >= 3 ? "最大Lv." : <><span>増築する</span><small>¥{F.format((town.levels[selected] || 1) * 450)}</small></>}</button>}
+      {canCustomize && <button type="button" className={styles.customize} aria-label="施設の部品を追加" onClick={openCustomize}>部品<small>追加</small></button>}
       <button type="button" className={styles.dismiss} aria-label="建物の選択を解除" onClick={() => setSelected(null)}>×</button>
     </section>}
-    {item && !panel && !welcome && !scenery && <div className={styles.activeTool}>
-      <div><strong>{item.title}<small>{item.price ? `¥${F.format(item.price)}` : "無料"}</small></strong><p>{linearTool && stroke ? "ドラッグで敷設 · 2本指で移動" : "タップで配置 · ドラッグで移動"}</p></div>
+    {mode === "decorate" && editingLot && !panel && !welcome && !scenery && <div ref={activeToolRef} className={styles.activeTool} data-decorate="true">
+      <div><strong>{part === "remove" ? "部品を撤去" : PARK_PARTS.find(p => p.id === part)?.title}<small>{part === "remove" ? "無料" : `¥${PARK_PARTS.find(p => p.id === part)?.price}`}</small></strong><p>{part === "remove" ? "外す部品をタップ" : "敷地のマスをタップ"}</p></div>
+      <button type="button" aria-label="公園の部品を選ぶ" onClick={() => setPanel("customize")}>部品</button>
+      <button type="button" aria-label="部品の向きを変える" disabled={part === "remove"} onClick={() => setPartRotation(v => (v + 1) % 4)}>↻ {partRotation * 90}°</button>
+      <button type="button" className={styles.dismiss} aria-label="公園の編集を終了" onClick={() => { setMode("inspect"); setEditingLotId(null); setPreview([]); setHover(null); }}>×</button>
+    </div>}
+    {item && !panel && !welcome && !scenery && <div ref={activeToolRef} className={styles.activeTool}>
+      <div><strong>{mode === "park" ? `${parkKind === "park" ? "公園" : "広場"} ${parkRotated ? PARK_SIZES.find(s => s.id === parkSize)!.height : PARK_SIZES.find(s => s.id === parkSize)!.width}×${parkRotated ? PARK_SIZES.find(s => s.id === parkSize)!.width : PARK_SIZES.find(s => s.id === parkSize)!.height}` : item.title}<small>{mode === "park" ? `¥${F.format(PARK_SIZES.find(s => s.id === parkSize)!.price)}` : item.price ? `¥${F.format(item.price)}` : "無料"}</small></strong><p>{mode === "park" ? "空いた場所をタップして敷地を購入" : linearTool && stroke ? "ドラッグで敷設 · 2本指で移動" : "タップで配置 · ドラッグで移動"}</p></div>
       {linearTool && <button type="button" aria-pressed={stroke} onClick={() => { setStroke(v => !v); setPreview([]); }}>{stroke ? "移動に戻す" : "連続敷設"}</button>}
       <button type="button" className={styles.dismiss} aria-label="建設を終了" onClick={() => chooseMode("inspect")}>×</button>
     </div>}
     <div ref={toolbarRef} className={styles.toolbar}>
       <div className={styles.tools}>
-        <button type="button" className={styles.buildButton} aria-expanded={panel === "build"} aria-controls="town-panel" disabled={welcome || !loaded} onClick={() => setPanel(p => p === "build" ? null : "build")}><Glyph name="build" /><span>建設</span></button>
+        <button type="button" className={styles.buildButton} aria-expanded={panel === "build" || panel === "land"} aria-controls="town-panel" disabled={welcome || !loaded} onClick={() => { if (mode === "decorate") chooseMode("inspect"); setPanel(p => p === "build" ? null : "build"); }}><Glyph name="build" /><span>建設</span></button>
         <button type="button" aria-pressed={mode === "inspect" && !panel} disabled={welcome} onClick={() => { chooseMode("inspect"); setPanel(null); }}><Glyph name="pan" /><span>街を見る</span></button>
         <button type="button" disabled={!undo.length} onClick={undoBuild}><Glyph name="undo" /><span>元に戻す</span></button>
-        <button type="button" disabled={welcome} aria-expanded={panel === "view" || panel === "help"} aria-controls="town-panel" onClick={() => setPanel(p => p === "view" || p === "help" ? null : "view")}><Glyph name="settings" /><span>表示・設定</span></button>
+        <button type="button" disabled={welcome} aria-expanded={panel === "view" || panel === "help"} aria-controls="town-panel" onClick={() => { if (mode === "decorate") chooseMode("inspect"); setPanel(p => p === "view" || p === "help" ? null : "view"); }}><Glyph name="settings" /><span>表示・設定</span></button>
       </div>
     </div>
     <p role="status" aria-live="polite" className={styles.notice} data-visible={toast && !scenery && !welcome}>{notice}</p>

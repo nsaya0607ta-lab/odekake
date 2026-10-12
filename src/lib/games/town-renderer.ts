@@ -1,10 +1,10 @@
-import { MAP_SIZE, neighbours, touchesRoad, type Tile, type Town, type Tool } from "./town-builder";
+import { MAP_SIZE, canBuyPark, canPlaceParkPart, lotTiles, neighbours, parkAt, parkFootprint, touchesRoad, type FacilityPart, type ParkLot, type ParkPart, type ParkSize, type Tile, type Town, type Tool } from "./town-builder";
 import { DIRECTIONS, elevationAt, measureTransportRoute, sampleTransportDistance, sampleTransportPath, stationAxis, trackPaths, trackPoint, transportHeight, transportMask, transportOutline, type TransportKind, type TransportRoute } from "./town-transport";
 import { TownSprites, type SpriteBounds } from "./town-sprites";
 
 type Point = { x: number; y: number };
 export type TownCamera = { x: number; y: number; zoom: number };
-export type SceneOptions = { night: boolean; grid: boolean; hover: number | null; selected: number | null; preview: number[]; tool: Tool | "inspect" | "pan"; routes: number[][]; paused: boolean; speed: number };
+export type SceneOptions = { night: boolean; grid: boolean; hover: number | null; selected: number | null; preview: number[]; tool: Tool | "inspect" | "pan" | "decorate"; routes: number[][]; paused: boolean; speed: number; parkSize?: ParkSize; parkKind?: ParkLot["kind"]; parkRotated?: boolean; editLot?: number; parkPart?: ParkPart | "remove"; partRotation?: number };
 const W = 32, H = 16;
 const iso = (x: number, y: number, z = 0): Point => ({ x: (x - y) * W, y: (x + y) * H - z });
 const hash = (n: number) => { const v = Math.sin(n * 127.1 + 311.7) * 43758.5453; return v - Math.floor(v); };
@@ -73,8 +73,77 @@ function lamp(c: CanvasRenderingContext2D, x: number, y: number, night: boolean)
   ellipse(c, { x: p.x + 5, y: p.y - 23 }, 3, 1.5, night ? "#ffe6a1" : "#dfead8");
   if (night) { const g = c.createRadialGradient(p.x, p.y, 0, p.x, p.y, 19); g.addColorStop(0, "#ffdd7745"); g.addColorStop(1, "#ffdd7700"); ellipse(c, p, 19, 10, g); }
 }
+function parkPart(c: CanvasRenderingContext2D, kind: ParkPart, x: number, y: number, rotation: number, night: boolean) {
+  const at = (u: number, v: number, z = 0) => {
+    const p = rotation % 4 === 1 ? [1 - v, u] : rotation % 4 === 2 ? [1 - u, 1 - v] : rotation % 4 === 3 ? [v, 1 - u] : [u, v];
+    return iso(x + p[0]!, y + p[1]!, z);
+  };
+  const b = (u: number, v: number, w: number, d: number, h: number, colors: string[], z = 1) => {
+    const p = rotation % 4 === 1 ? [1 - v - d / 2, u + w / 2] : rotation % 4 === 2 ? [1 - u - w / 2, 1 - v - d / 2] : rotation % 4 === 3 ? [v + d / 2, 1 - u - w / 2] : [u + w / 2, v + d / 2];
+    const dx = [1, 0, -1, 0][rotation % 4]!, dy = [0, 1, 0, -1][rotation % 4]!;
+    orientedBox(c, x + p[0]!, y + p[1]!, w, d, h, dx, dy, colors, z);
+  };
+  if (kind === "tree") { tree(c, x + .5, y + .5, 13, .6); return; }
+  if (kind === "light") { lamp(c, x + .5, y + .5, night); return; }
+  if (kind === "path") { poly(c, [at(.08, .32), at(.92, .32), at(.92, .68), at(.08, .68)], "#e4d7b6"); return; }
+  if (kind === "flowers") {
+    b(.14, .18, .72, .62, 2, ["#a39875", "#8b8968", "#76975f"]);
+    for (let j = 0; j < 14; j++) {
+      const p = at(.2 + hash(j + 31) * .59, .24 + hash(j + 8) * .48, 4);
+      ellipse(c, p, 1.7, 1.2, ["#e8c765", "#d78993", "#f1e8bf"][j % 3]!);
+    }
+    return;
+  }
+  if (kind === "fountain") {
+    const p = at(.5, .5); ellipse(c, p, 15, 7, "#8caaa0"); ellipse(c, { x: p.x, y: p.y - 2 }, 15, 7, "#d4ded0");
+    ellipse(c, { x: p.x, y: p.y - 2.4 }, 11, 4.8, "#79bac4"); b(.45, .45, .10, .10, 3, ["#a7c6be", "#8caeaa", "#e2ece0"], 2); return;
+  }
+  if (kind === "bench") {
+    for (const u of [.23, .68]) b(u, .40, .045, .19, 3, ["#4e6d62", "#395d53", "#6f8b75"]);
+    b(.17, .37, .68, .25, 2, ["#a48461", "#896e50", "#d5b387"], 4);
+    b(.17, .37, .68, .045, 5, ["#b69470", "#896e50", "#e0c297"], 6);
+    for (const v of [.43, .51]) line(c, at(.20, v, 6.2), at(.82, v, 6.2), "#927455", .5);
+    return;
+  }
+  // A supported slide with a platform, ladder and a slope contained inside its tile.
+  for (const u of [.19, .45]) b(u, .20, .045, .30, 12, ["#967553", "#765d45", "#c09f75"]);
+  b(.18, .18, .32, .34, 2, ["#d18c74", "#a77160", "#eac3a1"], 12);
+  poly(c, [at(.27, .51, 13), at(.46, .51, 13), at(.68, .90, 2), at(.43, .90, 2)], "#98bdc3", "#e2e9d7", 1);
+  line(c, at(.18, .22, 14), at(.08, .08, 1), "#749b93", 1.2); line(c, at(.48, .22, 14), at(.37, .08, 1), "#749b93", 1.2);
+  for (let j = 1; j < 5; j++) line(c, at(.16 - j * .018, .22 - j * .028, 14 - j * 2.5), at(.47 - j * .018, .22 - j * .028, 14 - j * 2.5), "#d4d3aa", .8);
+}
+function facilityParts(c: CanvasRenderingContext2D, kind: Tile, x: number, y: number, level: number, parts: FacilityPart[], night: boolean, axis: "x" | "y", behind = false) {
+  if (behind) {
+    if (parts.includes("greenbelt")) for (let j = 0; j < 5; j++) box(c, x + .05 + j * .18, y + .04, .15, .09, 5, ["#6d985f", "#4e7951", "#97b979"]);
+    return;
+  }
+  if (parts.includes("garden") || parts.includes("greenbelt")) {
+    for (const u of [.07, .72]) { box(c, x + u, y + .88, .20, .08, 3, ["#a5926e", "#7d7f5f", "#7ca66c"]); for (let j = 0; j < 4; j++) ellipse(c, iso(x + u + .025 + j * .045, y + .91, 4), 1, .7, j % 2 ? "#e6c26b" : "#d98998"); }
+  }
+  if (parts.includes("terrace")) {
+    patch(c, x + .59, y + .82, .32, .16, "#beae87", 1);
+    box(c, x + .70, y + .85, .08, .07, 4, ["#917655", "#745f47", "#e4c59a"], 1);
+    for (const u of [.61, .82]) box(c, x + u, y + .85, .06, .06, 3, ["#97a387", "#6f8a74", "#cad1ac"], 1);
+  }
+  if (parts.includes("light")) { c.save(); if (kind === "station") c.translate(0, -3); lamp(c, x + (kind === "station" && axis === "y" ? .98 : .91), y + (kind === "station" && axis === "x" ? .98 : .86), night); c.restore(); }
+  if (parts.includes("sign")) {
+    line(c, iso(x + .92, y + .65, 1), iso(x + .92, y + .65, 15), "#7d7056", 1.1);
+    box(c, x + .91, y + .60, .04, .17, 5, ["#6c9881", "#476f63", "#d5caaa"], 10);
+  }
+  if (parts.includes("storage")) for (let j = 0; j < 3; j++) box(c, x + .12 + j * .10, y + .87, .085, .08, 3 + j % 2 * 2, ["#b79b72", "#8e795b", "#d9c29a"], 4);
+  if (parts.includes("solar")) {
+    const z = 23 + level * 3 + 5;
+    box(c, x + .20, y + .28, .58, .36, 1, ["#768b88", "#4d7377", "#658f98"], z);
+    patch(c, x + .22, y + .30, .54, .32, "#48778c", z + 1.1);
+    for (let j = 1; j < 4; j++) line(c, iso(x + .22 + j * .135, y + .30, z + 1.2), iso(x + .22 + j * .135, y + .62, z + 1.2), "#9bbfcb", .5);
+    line(c, iso(x + .22, y + .46, z + 1.2), iso(x + .76, y + .46, z + 1.2), "#9bbfcb", .5);
+  }
+  if (parts.includes("bench") && kind === "station") {
+    box(c, x + (axis === "x" ? .39 : .77), y + (axis === "x" ? .77 : .39), axis === "x" ? .32 : .09, axis === "x" ? .09 : .32, 3, ["#a48461", "#896e50", "#d5b387"], 3);
+  }
+}
 function station(c: CanvasRenderingContext2D, x: number, y: number, axis: "x" | "y", night: boolean, roof: boolean) {
-  const alongX = axis === "x", px = x + (alongX ? .04 : .65), py = y + (alongX ? .65 : .04), w = alongX ? .92 : .31, d = alongX ? .31 : .92;
+  const alongX = axis === "x", px = x + (alongX ? .04 : .65), py = y + (alongX ? .65 : .04), w = alongX ? .92 : .34, d = alongX ? .34 : .92;
   if (!roof) {
     box(c, px, py, w, d, 3, ["#b6b8a3", "#919f92", "#e6dbc3"]);
     patch(c, px + .02, py + .02, alongX ? .88 : .045, alongX ? .045 : .88, "#e1c887", 3.1);
@@ -104,7 +173,7 @@ function plot(c: CanvasRenderingContext2D, kind: Tile, x: number, y: number, acc
     for (const { bit, dx, dy } of DIRECTIONS) if (access & bit) patch(c, x + (dx < 0 ? 0 : dx > 0 ? .78 : .44), y + (dy < 0 ? 0 : dy > 0 ? .78 : .44), dx ? .22 : .12, dy ? .22 : .12, "#e4d9bc");
   }
 }
-function building(c: CanvasRenderingContext2D, kind: Tile, x: number, y: number, level: number, night: boolean, time: number, showSmoke = true, axis: "x" | "y" = "x", access = 0, showPlot = true) {
+function building(c: CanvasRenderingContext2D, kind: Tile, x: number, y: number, level: number, night: boolean, time: number, showSmoke = true, axis: "x" | "y" = "x", access = 0, showPlot = true, parts: FacilityPart[] = []) {
   // Twenty consistent facade variants share artwork even when every city tile is developed.
   const style = Math.floor(hash(y * MAP_SIZE + x) * 20), seed = style * 31, v = (style + .5) / 20, bx = x + .16, by = y + .15;
   if (showPlot) plot(c, kind, x, y, access);
@@ -132,7 +201,7 @@ function building(c: CanvasRenderingContext2D, kind: Tile, x: number, y: number,
     for (let j = 0; j < 3; j++) box(c, bx + j * .23, by + .08, .22, .48, 5, ["#739c9f", "#547b81", "#9cb9b4"], height);
     box(c, x + .77, y + .17, .1, .1, 47, ["#bf8d75", "#8e6557", "#e1b199"]);
     if (showSmoke) factorySmoke(c, x, y, time);
-    box(c, x + .12, y + .86, .25, .08, 4, ["#a6b6aa", "#6f8b7d", "#c9d4bb"]); return;
+    box(c, x + .12, y + .86, parts.includes("storage") ? .34 : .25, .08, 4, ["#a6b6aa", "#6f8b7d", "#c9d4bb"]); return;
   }
   const floors = kind === "house" ? level === 1 ? 1 : level * 2 : level + 1;
   const height = floors * 12 + 5;
@@ -148,7 +217,7 @@ function building(c: CanvasRenderingContext2D, kind: Tile, x: number, y: number,
   if (kind === "house" && level === 1) {
     pitchedRoof(c, bx - .05, by - .05, .77, .75, height, roofs[Math.floor(v * 5)]!, "#8c7565");
     box(c, bx + .44, by + .05, .08, .09, 9, ["#caa790", "#987763", "#ead3b3"], height + 6);
-    for (const offset of [.14, .70]) box(c, x + offset, y + .88, .18, .09, 4, ["#709464", "#567853", "#96b777"]);
+    for (const offset of [.14, .70]) if (!parts.includes("garden") && !(offset === .70 && parts.includes("terrace"))) box(c, x + offset, y + .88, .18, .09, 4, ["#709464", "#567853", "#96b777"]);
   } else {
     box(c, bx - .025, by - .025, .72, .70, 3, ["#c1b8a1", "#969f96", roofs[Math.floor(v * 5)]!], height);
     box(c, bx + .1, by + .15, .16, .12, 5, ["#aebbad", "#8b9d94", "#d9e0cc"], height + 3);
@@ -160,7 +229,7 @@ function building(c: CanvasRenderingContext2D, kind: Tile, x: number, y: number,
       for (let j = 0; j < 6; j++) patch(c, bx - .03 + j * .12, by + .64, .12, .22, j % 2 ? "#f9ecd1" : "#ce8572", 13);
       // A window and display counter identify the shop without labels on the artwork.
       box(c, bx + .05, by + .82, .20, .09, 3, ["#ab8d60", "#7e684c", "#ead3a2"]);
-      box(c, x + .84, y + .85, .07, .09, 6, ["#927856", "#6e604d", "#e1c89a"]);
+      if (!parts.includes("terrace")) box(c, x + .84, y + .85, .07, .09, 6, ["#927856", "#6e604d", "#e1c89a"]);
     }
   }
   if (v > .3) tree(c, x + .86, y + .14, 6.5, .6, time);
@@ -267,6 +336,31 @@ function buildingFaces(kind: Tile, x: number, y: number, level: number, axis: "x
 }
 type SceneObject = { depth: number; x: number; y: number; bounds: SpriteBounds; key?: string; paint: (c: CanvasRenderingContext2D) => void };
 const GROUND_BOUNDS = { left: -824, top: -30, width: 1648, height: 850 };
+function parkGround(c: CanvasRenderingContext2D, lot: ParkLot, town: Town) {
+  box(c, lot.x + .035, lot.y + .035, lot.width - .07, lot.height - .07, 1, ["#8eaa79", "#7c9b6b", lot.kind === "park" ? "#a8c58a" : "#e1d4b3"]);
+  for (const v of [.09, lot.height - .21]) patch(c, lot.x + .09, lot.y + v, lot.width - .18, .12, "#ded5b5", 1.1);
+  for (const u of [.09, lot.width - .21]) patch(c, lot.x + u, lot.y + .09, .12, lot.height - .18, "#ded5b5", 1.1);
+  const paths = new Set(lot.parts.filter(p => p.kind === "path").map(p => p.tile));
+  for (const part of lot.parts) if (part.kind === "path") {
+    const x = part.tile % MAP_SIZE, y = Math.floor(part.tile / MAP_SIZE), neighboursHere = neighbours(x, y).filter(n => paths.has(n) || town.tiles[n] === "road");
+    patch(c, x + .34, y + .34, .32, .32, "#e4d7b6", 1.2);
+    if (!neighboursHere.length) patch(c, x + (part.rotation % 2 ? .34 : .08), y + (part.rotation % 2 ? .08 : .34), part.rotation % 2 ? .32 : .84, part.rotation % 2 ? .84 : .32, "#e4d7b6", 1.2);
+    for (const n of neighboursHere) {
+      const dx = n % MAP_SIZE - x, dy = Math.floor(n / MAP_SIZE) - y;
+      patch(c, x + (dx < 0 ? 0 : .34), y + (dy < 0 ? 0 : .34), dx ? .66 : .32, dy ? .66 : .32, "#e4d7b6", 1.2);
+    }
+  }
+}
+function parkFence(c: CanvasRenderingContext2D, x: number, y: number, bit: number, gate: boolean) {
+  const a = bit === 1 ? { x: .04, y: .04 } : bit === 2 ? { x: .96, y: .04 } : bit === 4 ? { x: .04, y: .04 } : { x: .04, y: .96 };
+  const b = bit === 1 || bit === 2 ? { x: a.x, y: .96 } : { x: .96, y: a.y };
+  const at = (t: number, z: number) => iso(x + a.x + (b.x - a.x) * t, y + a.y + (b.y - a.y) * t, z);
+  for (const [start, end] of gate ? [[0, .29], [.71, 1]] : [[0, 1]]) {
+    line(c, at(start!, 6), at(end!, 6), "#819b6a", 1.2);
+    const posts = Math.ceil((end! - start!) * 4);
+    for (let j = 0; j <= posts; j++) { const t = start! + (end! - start!) * j / posts; line(c, at(t, 1), at(t, 7), "#6c8b5d", 1.3); }
+  }
+}
 function drawTerrain(c: CanvasRenderingContext2D, town: Town, options: SceneOptions) {
   ellipse(c, iso(12, 12), 820, 390, "#2f605f15");
   const edge = MAP_SIZE;
@@ -290,10 +384,12 @@ function drawTerrain(c: CanvasRenderingContext2D, town: Town, options: SceneOpti
     }
     if (options.grid && !water) poly(c, [iso(x, y), iso(x + 1, y), iso(x + 1, y + 1), iso(x, y + 1)], "#ffffff00", "#547b4933", .6);
   }
+  const covered = new Set((town.parks ?? []).flatMap(lotTiles));
   for (let y = 0; y < MAP_SIZE; y++) for (let x = 0; x < MAP_SIZE; x++) {
     const i = y * MAP_SIZE + x, tile = town.tiles[i]!;
-    if (["house", "shop", "factory", "station", "park"].includes(tile)) plot(c, tile, x, y, transportMask(town, i, "road"));
+    if (["house", "shop", "factory", "station", "park"].includes(tile) && !covered.has(i)) plot(c, tile, x, y, transportMask(town, i, "road"));
   }
+  for (const lot of town.parks ?? []) parkGround(c, lot, town);
   for (let depth = 0; depth < MAP_SIZE * 2 - 1; depth++) for (let y = Math.max(0, depth - MAP_SIZE + 1); y <= Math.min(depth, MAP_SIZE - 1); y++) {
     const x = depth - y, tile = town.tiles[y * MAP_SIZE + x];
     if (tile === "road" || tile === "rail" || tile === "station") transport(c, town, x, y, tile === "road" ? "road" : "rail");
@@ -305,6 +401,8 @@ export class TownScene {
   private lastLevels: number[] | null = null;
   private lastTerrain: boolean[] | null = null;
   private lastNight = false;
+  private lastParks: ParkLot[] | null = null;
+  private lastAttachments: Town["attachments"] | null = null;
   private objects: SceneObject[] = [];
   private effects: { kind: Tile; x: number; y: number }[] = [];
   private roadNeighbours = new Map<number, number[]>();
@@ -314,7 +412,7 @@ export class TownScene {
   private readonly createCanvas: (() => HTMLCanvasElement) | null;
   private readonly sprites: TownSprites | null;
   private ground: HTMLCanvasElement | null = null;
-  private groundState: { tiles: Tile[]; terrain: boolean[]; grid: boolean } | null = null;
+  private groundState: { tiles: Tile[]; terrain: boolean[]; grid: boolean; parks: ParkLot[] } | null = null;
   constructor(createCanvas?: () => HTMLCanvasElement) {
     this.createCanvas = createCanvas ?? (typeof document !== "undefined" ? () => document.createElement("canvas") : null);
     this.sprites = this.createCanvas ? new TownSprites(this.createCanvas) : null;
@@ -342,6 +440,11 @@ export class TownScene {
         const x = depth - y, i = y * MAP_SIZE + x, origin = iso(x, y);
         if (Math.abs(p.x - origin.x) > 36 || p.y < origin.y - 85 || p.y > origin.y + 33) continue;
         if (buildingFaces(town.tiles[i]!, x, y, town.levels[i] || 1, stationAxis(town, i)).some(face => contains(p, face))) return i;
+        const part = parkAt(town, i)?.parts.find(p => p.tile === i && p.kind !== "path");
+        if (part && part.kind === "tree") {
+          const center = iso(x + .5, y + .5);
+          if (contains(p, [{ x: center.x - 9, y: center.y - 10 }, { x: center.x - 10, y: center.y - 21 }, { x: center.x, y: center.y - 29 }, { x: center.x + 10, y: center.y - 21 }, { x: center.x + 9, y: center.y - 10 }])) return i;
+        } else if (part && boxFaces(x + .15, y + .2, .7, .6, part.kind === "playground" ? 15 : part.kind === "light" ? 23 : 8).some(face => contains(p, face))) return i;
       }
     }
     return this.tileAt(px, py);
@@ -349,7 +452,12 @@ export class TownScene {
   tileBounds(i: number, town: Town) {
     const x = i % MAP_SIZE, y = Math.floor(i / MAP_SIZE), { camera } = this;
     const points = [iso(x, y), iso(x + 1, y), iso(x + 1, y + 1), iso(x, y + 1), ...buildingFaces(town.tiles[i]!, x, y, town.levels[i] || 1, stationAxis(town, i)).flat()];
-    if (town.tiles[i] === "park") points.push(iso(x + .5, y + .5, 40));
+    const lot = parkAt(town, i);
+    if (lot) {
+      points.push(iso(lot.x, lot.y), iso(lot.x + lot.width, lot.y), iso(lot.x + lot.width, lot.y + lot.height), iso(lot.x, lot.y + lot.height));
+      points.push(iso(lot.x + .5, lot.y + .5, 40));
+      for (const part of lot.parts) points.push(iso(part.tile % MAP_SIZE + .5, Math.floor(part.tile / MAP_SIZE) + .5, part.kind === "tree" ? 40 : 25));
+    } else if (town.tiles[i] === "park") points.push(iso(x + .5, y + .5, 40));
     return {
       left: camera.x + Math.min(...points.map(p => p.x)) * camera.zoom,
       right: camera.x + Math.max(...points.map(p => p.x)) * camera.zoom,
@@ -358,7 +466,7 @@ export class TownScene {
     };
   }
   private prepareObjects(town: Town, night: boolean) {
-    if (this.lastTiles === town.tiles && this.lastLevels === town.levels && this.lastTerrain === town.terrain && this.lastNight === night) return;
+    if (this.lastTiles === town.tiles && this.lastLevels === town.levels && this.lastTerrain === town.terrain && this.lastNight === night && this.lastParks === town.parks && this.lastAttachments === town.attachments) return;
     if (this.lastTiles !== town.tiles) {
       this.roadNeighbours = new Map(town.tiles.flatMap((tile, i) => tile === "road" ? [[i, neighbours(i % MAP_SIZE, Math.floor(i / MAP_SIZE)).filter(n => town.tiles[n] === "road")] as const] : []));
       const roads = [...this.roadNeighbours].filter(([, next]) => next.length).map(([i]) => i);
@@ -376,22 +484,23 @@ export class TownScene {
     const add = (x: number, y: number, depth: number, key: string, bounds: SpriteBounds, paint: SceneObject["paint"]) => {
       const origin = iso(x, y); objects.push({ x: origin.x, y: origin.y, depth: x + y + depth, key, bounds, paint });
     };
+    const extras = new Map((town.attachments ?? []).map(a => [a.tile, a.parts])), covered = new Set((town.parks ?? []).flatMap(lotTiles));
     for (let y = 0; y < MAP_SIZE; y++) for (let x = 0; x < MAP_SIZE; x++) {
       const i = y * MAP_SIZE + x, tile = town.tiles[i]!, level = town.levels[i] || 1;
-      if (["house", "shop", "factory", "station", "park"].includes(tile)) {
+      if (["house", "shop", "factory", "station", "park"].includes(tile) && !covered.has(i)) {
         const axis = tile === "station" ? stationAxis(town, i) : "x";
         const style = tile === "station" || tile === "factory" && !night ? 0 : Math.floor(hash(i) * 20);
-        const key = `${tile}:${style}:${level}:${night}:${axis}`;
+        const parts = extras.get(i) ?? [], key = `${tile}:${style}:${level}:${night}:${axis}:${parts.slice().sort().join(",")}`;
         const faces = buildingFaces(tile, x, y, level, axis).flat(), origin = iso(x, y);
         const top = Math.min(-24, ...faces.map(p => p.y - origin.y)) - 4;
         const h = tile === "house" ? (level === 1 ? 1 : level * 2) * 12 + 13 : tile === "shop" ? (level + 1) * 12 + 13 : 32;
-        const right = Math.max(38, h * .8 + 24), bottom = Math.max(38, h * .22 + 32);
+        const right = Math.max(38, h * .8 + 24), bottom = Math.max(parts.includes("light") ? 52 : 38, h * .22 + 32);
         const bounds = { left: -38, top, width: right + 38, height: bottom - top };
         if (tile === "station") {
-          add(x, y, .35, key + ":base", bounds, c => station(c, x, y, axis, night, false));
+          add(x, y, .35, key + ":base", bounds, c => { station(c, x, y, axis, night, false); facilityParts(c, tile, x, y, level, parts.filter(p => p !== "light"), night, axis); });
           // Trains run between the platform and canopy, with visible supporting pillars.
-          add(x, y, 1.55, key + ":roof", bounds, c => station(c, x, y, axis, night, true));
-        } else add(x, y, 1, key, bounds, c => building(c, tile, x, y, level, night, 0, false, axis, 0, false));
+          add(x, y, 1.55, key + ":roof", bounds, c => { station(c, x, y, axis, night, true); facilityParts(c, tile, x, y, level, parts.filter(p => p === "light"), night, axis); });
+        } else add(x, y, 1, key, bounds, c => { facilityParts(c, tile, x, y, level, parts, night, axis, true); building(c, tile, x, y, level, night, 0, false, axis, 0, false, parts); facilityParts(c, tile, x, y, level, parts, night, axis); });
         if (tile === "factory" || tile === "park") effects.push({ kind: tile, x, y });
       }
       if (tile === "grass" && hash(i * 3) > .63 && !neighbours(x, y).some(n => ["road", "rail", "station"].includes(town.tiles[n]!))) {
@@ -401,15 +510,36 @@ export class TownScene {
         const origin = iso(x, y);
         objects.push({ x: origin.x, y: origin.y, depth: x + y + 1, key: `tree:${size}:${variant}`, bounds, paint: c => tree(c, x + .5, y + .5, size, variant) });
       }
-      if (tile === "road" && !town.terrain[i] && (x + y) % 7 === 0) {
+      if (tile === "road" && (!town.terrain[i] && (x + y) % 7 === 0 || extras.get(i)?.includes("light"))) {
         const mask = transportMask(town, i, "road"), corner = Boolean(mask & 3) && Boolean(mask & 12), alongX = Boolean(mask & 3);
-        const position = corner ? "corner" : alongX ? "x" : "y";
-        add(x, y, 1.3, `lamp:${night}:${position}`, { left: -40, top: -16, width: 80, height: 64 }, c => lamp(c, x + (corner ? .87 : alongX ? .42 : .86), y + (corner ? .87 : alongX ? .86 : .42), night));
+        const position = corner ? "corner" : alongX ? "x" : "y", bridge = Boolean(town.terrain[i]), pair = Boolean(extras.get(i)?.includes("light"));
+        add(x, y, 1.3, `lamp:${night}:${position}:${bridge}:${pair}`, { left: -40, top: -30, width: 80, height: 82 }, c => {
+          c.save(); if (bridge) c.translate(0, -5);
+          lamp(c, x + (corner ? bridge ? .77 : .87 : alongX ? .42 : bridge ? .22 : .86), y + (corner ? bridge ? .77 : .87 : alongX ? bridge ? .22 : .86 : .42), night);
+          if (pair) lamp(c, x + (corner ? bridge ? .23 : .13 : alongX ? .72 : bridge ? .78 : .14), y + (corner ? bridge ? .23 : .13 : alongX ? bridge ? .78 : .14 : .72), night);
+          c.restore();
+        });
       }
       if ((tile === "road" || tile === "rail") && town.terrain[i]) add(x, y, 1.4, `bridge:${tile}:${transportMask(town, i, tile)}`, { left: -36, top: -14, width: 72, height: 52 }, c => bridgeRails(c, town, x, y, tile));
     }
+    for (const lot of town.parks ?? []) {
+      for (const part of lot.parts) if (part.kind !== "path") {
+        const x = part.tile % MAP_SIZE, y = Math.floor(part.tile / MAP_SIZE);
+        add(x, y, 1, `park-part:${part.kind}:${part.rotation}:${night}`, { left: -38, top: -34, width: 76, height: 82 }, c => parkPart(c, part.kind, x, y, part.rotation, night));
+        if (part.kind === "fountain") effects.push({ kind: "park", x, y });
+      }
+      for (const i of lotTiles(lot)) {
+        const x = i % MAP_SIZE, y = Math.floor(i / MAP_SIZE);
+        for (const { bit, dx, dy } of DIRECTIONS) {
+          if (!(dx < 0 && x === lot.x || dx > 0 && x === lot.x + lot.width - 1 || dy < 0 && y === lot.y || dy > 0 && y === lot.y + lot.height - 1)) continue;
+          const nx = x + dx, ny = y + dy, gate = nx >= 0 && ny >= 0 && nx < MAP_SIZE && ny < MAP_SIZE && town.tiles[ny * MAP_SIZE + nx] === "road";
+          add(x, y, dx < 0 || dy < 0 ? .05 : 1.9, `fence:${bit}:${gate}`, { left: -36, top: -8, width: 72, height: 48 }, c => parkFence(c, x, y, bit, gate));
+        }
+      }
+    }
     this.objects = objects.sort((a, b) => a.depth - b.depth); this.effects = effects;
     this.lastTiles = town.tiles; this.lastLevels = town.levels; this.lastTerrain = town.terrain; this.lastNight = night;
+    this.lastParks = town.parks; this.lastAttachments = town.attachments;
   }
   private drawGround(c: CanvasRenderingContext2D, town: Town, options: SceneOptions) {
     if (!this.createCanvas) { drawTerrain(c, town, options); return; }
@@ -417,11 +547,11 @@ export class TownScene {
       this.ground = this.createCanvas(); this.ground.width = GROUND_BOUNDS.width * 2; this.ground.height = GROUND_BOUNDS.height * 2;
     }
     const previous = this.groundState;
-    if (!previous || previous.tiles !== town.tiles || previous.terrain !== town.terrain || previous.grid !== options.grid) {
+    if (!previous || previous.tiles !== town.tiles || previous.terrain !== town.terrain || previous.grid !== options.grid || previous.parks !== town.parks) {
       const context = this.ground.getContext("2d"); if (!context) { drawTerrain(c, town, options); return; }
       context.setTransform(1, 0, 0, 1, 0, 0); context.clearRect(0, 0, this.ground.width, this.ground.height);
       context.setTransform(2, 0, 0, 2, -GROUND_BOUNDS.left * 2, -GROUND_BOUNDS.top * 2); drawTerrain(context, town, options);
-      this.groundState = { tiles: town.tiles, terrain: town.terrain, grid: options.grid };
+      this.groundState = { tiles: town.tiles, terrain: town.terrain, grid: options.grid, parks: town.parks };
     }
     c.drawImage(this.ground, GROUND_BOUNDS.left, GROUND_BOUNDS.top, GROUND_BOUNDS.width, GROUND_BOUNDS.height);
   }
@@ -453,12 +583,25 @@ export class TownScene {
     const highlight = (i: number, color: string, fill: string) => { const x = i % MAP_SIZE, y = Math.floor(i / MAP_SIZE), z = town.terrain[i] ? 5.5 : 1; poly(c, [iso(x, y, z), iso(x + 1, y, z), iso(x + 1, y + 1, z), iso(x, y + 1, z)], fill, color, 1.8); };
     const previewTiles = options.preview.length ? options.preview : options.hover !== null && options.tool !== "pan" && options.tool !== "inspect" ? [options.hover] : [];
     const allowedAt = (i: number) => {
+      if (options.tool === "decorate") {
+        const lot = town.parks.find(l => l.id === options.editLot);
+        return Boolean(lot && (options.parkPart === "remove" ? lot.parts.some(p => p.tile === i) : canPlaceParkPart(lot, i, options.parkPart ?? "tree")));
+      }
       const tile = town.tiles[i];
       const hasAccess = !["house", "shop", "factory"].includes(options.tool) || touchesRoad(town.tiles, i % MAP_SIZE, Math.floor(i / MAP_SIZE));
       return options.tool === "bulldoze" || tile === "grass" && hasAccess || tile === "water" && ["rail", "road"].includes(options.tool);
     };
-    if (options.selected !== null) highlight(options.selected, "#f4d184", "#d8b56618");
-    for (const i of previewTiles) highlight(i, allowedAt(i) ? "#efdaa0" : "#d87962", allowedAt(i) ? "#e6dba222" : "#ef957922");
+    const selectedLot = options.selected === null ? undefined : parkAt(town, options.selected), editor = town.parks?.find(l => l.id === options.editLot);
+    if (selectedLot || editor) {
+      const lot = editor ?? selectedLot!;
+      poly(c, [iso(lot.x, lot.y, 1.5), iso(lot.x + lot.width, lot.y, 1.5), iso(lot.x + lot.width, lot.y + lot.height, 1.5), iso(lot.x, lot.y + lot.height, 1.5)], "#d8b56610", "#f4d184", 1.8);
+      if (editor) for (const i of lotTiles(editor)) highlight(i, "#65825b66", "#ffffff00");
+    } else if (options.selected !== null) highlight(options.selected, "#f4d184", "#d8b56618");
+    if (options.tool === "park" && previewTiles.length) {
+      const i = previewTiles[0]!, x = i % MAP_SIZE, y = Math.floor(i / MAP_SIZE), size = options.parkSize ?? "small", lot = parkFootprint(x, y, size, options.parkRotated);
+      const valid = canBuyPark(town, x, y, size, options.parkRotated);
+      poly(c, [iso(x, y, 1), iso(x + lot.width, y, 1), iso(x + lot.width, y + lot.height, 1), iso(x, y + lot.height, 1)], valid ? "#bdd0a655" : "#ef957944", valid ? "#efdaa0" : "#d87962", 2);
+    } else for (const i of previewTiles) highlight(i, allowedAt(i) ? "#efdaa0" : "#d87962", allowedAt(i) ? "#e6dba222" : "#ef957922");
     const moving: SceneObject[] = [];
     const add = (x: number, y: number, depth: number, paint: SceneObject["paint"]) => { const origin = iso(x, y); moving.push({ x: origin.x, y: origin.y, depth: x + y + depth, bounds: { left: -28, top: -85, width: 66, height: 110 }, paint }); };
     for (const { kind, x, y } of this.effects) {
@@ -515,7 +658,9 @@ export class TownScene {
     while (movingIndex < moving.length) draw(moving[movingIndex++]!);
     if (options.night) { c.save(); c.globalCompositeOperation = "multiply"; patch(c, 0, 0, MAP_SIZE, MAP_SIZE, "#849fad"); c.restore(); }
     for (const i of previewTiles) {
-      if (allowedAt(i) && ["house", "shop", "factory", "park", "station"].includes(options.tool)) {
+      if (options.tool === "decorate" && options.parkPart !== "remove" && allowedAt(i)) {
+        c.save(); c.globalAlpha *= .5; parkPart(c, options.parkPart ?? "tree", i % MAP_SIZE, Math.floor(i / MAP_SIZE), options.partRotation ?? 0, options.night); c.restore();
+      } else if (allowedAt(i) && ["house", "shop", "factory", "station"].includes(options.tool)) {
         c.save(); c.globalAlpha *= .55; building(c, options.tool as Tile, i % MAP_SIZE, Math.floor(i / MAP_SIZE), 1, options.night, time, true, stationAxis(town, i), transportMask(town, i, "road")); c.restore();
       }
     }
@@ -524,14 +669,18 @@ export class TownScene {
 }
 export function drawTownIcon(c: CanvasRenderingContext2D, kind: Tool, width: number, height: number) {
   // Leave room for the taller buildings and their cast shadows on all four sides.
-  const scale = .72;
-  c.clearRect(0, 0, width, height); c.save(); c.translate(width * .5 - 4, height - 32 * scale - 5); c.scale(scale, scale);
+  const scale = kind === "park" ? .48 : .72;
+  c.clearRect(0, 0, width, height); c.save(); c.translate(width * .5 - 4, height - (kind === "park" ? 64 : 32) * scale - 5); c.scale(scale, scale);
   if (kind === "bulldoze") {
     box(c, -.34, -.30, .65, .12, 4, ["#667569", "#4b6055", "#839589"]);
     box(c, -.34, .10, .65, .12, 4, ["#667569", "#4b6055", "#839589"]);
     box(c, -.3, -.25, .6, .4, 8, ["#d9ac5d", "#b98843", "#f2cb7e"]);
     box(c, -.15, -.22, .25, .28, 12, ["#8caca4", "#527d78", "#f0c775"], 8);
     box(c, .3, -.3, .05, .6, 8, ["#b4b9a2", "#7f917f", "#d5d5be"]);
+  } else if (kind === "park") {
+    const town = createIconTown("road"), lot: ParkLot = { id: 0, x: 0, y: 0, width: 2, height: 2, kind: "park", parts: [] };
+    parkGround(c, lot, town); for (const bit of [1, 4]) parkFence(c, 0, 0, bit, false); for (const bit of [2, 8]) parkFence(c, 1, 1, bit, false);
+    parkPart(c, "tree", 0, 0, 0, false);
   } else if (kind === "road" || kind === "rail") {
     const town = createIconTown(kind); transport(c, town, 0, 0, kind);
   } else building(c, kind, 0, 0, 1, false, 0, false);
@@ -539,5 +688,25 @@ export function drawTownIcon(c: CanvasRenderingContext2D, kind: Tool, width: num
 }
 function createIconTown(kind: "road" | "rail"): Town {
   const tiles = Array<Tile>(MAP_SIZE ** 2).fill("grass"); tiles[0] = kind; tiles[1] = kind;
-  return { tiles, levels: [], terrain: [], rewards: [], money: 0, day: 1, paused: true };
+  return { tiles, levels: [], terrain: [], rewards: [], parks: [], attachments: [], money: 0, day: 1, paused: true };
+}
+export function drawTownPartIcon(c: CanvasRenderingContext2D, part: ParkPart | FacilityPart, width: number, height: number) {
+  c.clearRect(0, 0, width, height); c.save(); c.translate(width / 2, height / 2 - 3); c.scale(.9, .9);
+  if (["tree", "flowers", "bench", "fountain", "playground", "path", "light"].includes(part)) {
+    parkPart(c, part as ParkPart, 0, 0, 0, false);
+    if (part === "fountain") line(c, iso(.5, .5, 5), iso(.5, .5, 14), "#d9f7f0", 2);
+  } else if (part === "garden" || part === "greenbelt") parkPart(c, "flowers", 0, 0, 0, false);
+  else if (part === "terrace") {
+    patch(c, .1, .12, .8, .76, "#c6b68e", 1); box(c, .42, .41, .2, .2, 6, ["#917655", "#745f47", "#e4c59a"]);
+    for (const u of [.14, .73]) box(c, u, .43, .12, .12, 4, ["#97a387", "#6f8a74", "#cad1ac"]);
+  } else if (part === "storage") {
+    for (const [u, v, h] of [[.2, .25, 5], [.55, .3, 8], [.3, .65, 4]]) box(c, u!, v!, .22, .2, h!, ["#b79b72", "#8e795b", "#d9c29a"]);
+  } else if (part === "solar") {
+    box(c, .15, .20, .70, .55, 4, ["#768b88", "#4d7377", "#48778c"]);
+    for (let j = 1; j < 4; j++) line(c, iso(.15 + j * .175, .20, 4.2), iso(.15 + j * .175, .75, 4.2), "#9bbfcb", .7);
+    line(c, iso(.15, .475, 4.2), iso(.85, .475, 4.2), "#9bbfcb", .7);
+  } else {
+    line(c, iso(.5, .5), iso(.5, .5, 15), "#7d7056", 2); box(c, .24, .5, .54, .05, 7, ["#6c9881", "#476f63", "#d5caaa"], 11);
+  }
+  c.restore();
 }
