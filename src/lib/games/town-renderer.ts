@@ -25,23 +25,46 @@ function box(c: CanvasRenderingContext2D, x: number, y: number, w: number, d: nu
   poly(c, [iso(x, y + d, z), iso(x + w, y + d, z), iso(x + w, y + d, z + h), iso(x, y + d, z + h)], colors[0]!);
   poly(c, [iso(x + w, y, z), iso(x + w, y + d, z), iso(x + w, y + d, z + h), iso(x + w, y, z + h)], colors[1]!);
   patch(c, x, y, w, d, colors[2]!, z + h);
+  // Shared bevels and contact edges make even the smallest fittings read as solids.
+  line(c, iso(x, y + d, z + h), iso(x + w, y + d, z + h), "#fff9e747", .45);
+  line(c, iso(x + w, y, z + h), iso(x + w, y + d, z + h), "#f7f9e32b", .4);
+  line(c, iso(x + w, y + d, z), iso(x + w, y + d, z + h), "#30483830", .45);
+}
+function glaze(c: CanvasRenderingContext2D, points: Point[], light: string, dark: string) {
+  const top = Math.min(...points.map(p => p.y)), bottom = Math.max(...points.map(p => p.y));
+  const g = c.createLinearGradient(0, top, 0, bottom); g.addColorStop(0, light); g.addColorStop(1, dark); poly(c, points, g);
+}
+function blossom(c: CanvasRenderingContext2D, p: Point, color: string, size = 1) {
+  line(c, { x: p.x, y: p.y + 2 }, p, "#4d7950", .45);
+  for (let j = 0; j < 5; j++) { const a = j * Math.PI * 2 / 5; ellipse(c, { x: p.x + Math.cos(a) * size, y: p.y + Math.sin(a) * size * .6 }, size * .72, size * .55, color); }
+  ellipse(c, p, size * .4, size * .3, "#f4d783");
 }
 function shadow(c: CanvasRenderingContext2D, x: number, y: number, w: number, d: number, h: number) {
   const p = iso(x + w, y + d);
+  c.save(); c.shadowColor = "#25463225"; c.shadowBlur = 2;
   poly(c, [iso(x, y + d), p, { x: p.x + h * .8, y: p.y + h * .22 }, { x: iso(x + w, y).x + h * .8, y: iso(x + w, y).y + h * .22 }, iso(x + w, y)], "#234e3735");
+  c.restore();
+  line(c, iso(x, y + d), iso(x + w, y + d), "#526d453a", 1.5);
 }
 function tree(c: CanvasRenderingContext2D, x: number, y: number, size: number, variant: number, time = 0) {
   const p = iso(x, y), sway = Math.sin(time * .6 + x) * .4;
   ellipse(c, { x: p.x + 5, y: p.y + 1 }, size * .6, size * .25, "#245a3436");
   line(c, p, { x: p.x + sway, y: p.y - size }, "#786744", size * .17);
+  line(c, { x: p.x - size * .03, y: p.y - 1 }, { x: p.x - size * .03 + sway, y: p.y - size }, "#b5a07a", size * .04);
+  for (const s of [-1, 1]) line(c, { x: p.x, y: p.y - size * .55 }, { x: p.x + s * size * .3, y: p.y - size * 1.15 }, "#796c4f", size * .075);
   if (variant < .3) {
-    poly(c, [{ x: p.x - size * .6, y: p.y - size * .48 }, { x: p.x + sway, y: p.y - size * 2.25 }, { x: p.x + size * .6, y: p.y - size * .48 }], "#326b50");
-    poly(c, [{ x: p.x - size * .43, y: p.y - size }, { x: p.x + sway, y: p.y - size * 2.25 }, { x: p.x, y: p.y - size }], "#4a9166");
+    for (let j = 0; j < 4; j++) { const base = p.y - size * (.38 + j * .39), spread = size * (.64 - j * .13), tip = base - size * .92;
+      glaze(c, [{ x: p.x - spread, y: base }, { x: p.x + sway, y: tip }, { x: p.x + spread, y: base - size * .03 }, { x: p.x + spread * .28, y: base + size * .12 }], "#5b9270", "#285c47");
+      line(c, { x: p.x - spread * .80, y: base - size * .06 }, { x: p.x + sway, y: tip + size * .15 }, "#94b77b55", .7);
+    }
   } else {
     const colors = variant > .88 ? ["#c99767", "#ebbb7b", "#f5d191"] : ["#3e7955", "#62a565", "#80b872"];
-    ellipse(c, { x: p.x + sway, y: p.y - size * 1.25 }, size * .7, size * .8, colors[0]!);
-    ellipse(c, { x: p.x - size * .18 + sway, y: p.y - size * 1.55 }, size * .58, size * .65, colors[1]!);
-    ellipse(c, { x: p.x - size * .25 + sway, y: p.y - size * 1.75 }, size * .32, size * .36, colors[2]!);
+    for (const [u, v, r] of [[.26, 1.19, .48], [-.30, 1.24, .46], [.02, 1.65, .54], [-.28, 1.71, .34], [.32, 1.52, .31]]) {
+      const q = { x: p.x + u! * size + sway, y: p.y - v! * size }, radius = size * r!;
+      const g = c.createRadialGradient(q.x - radius * .35, q.y - radius * .45, 0, q.x, q.y, radius * 1.15);
+      g.addColorStop(0, colors[2]!); g.addColorStop(.48, colors[1]!); g.addColorStop(1, colors[0]!); ellipse(c, q, radius, radius * 1.05, g);
+    }
+    for (let j = 0; j < 10; j++) { const a = j * 2.4, r = size * (.16 + hash(j + 5) * .38); ellipse(c, { x: p.x + Math.cos(a) * r + sway, y: p.y - size * 1.5 + Math.sin(a) * r }, size * .055, size * .034, j % 3 ? "#d5e6ae50" : "#23533e38"); }
   }
 }
 function windows(c: CanvasRenderingContext2D, x: number, y: number, w: number, d: number, floors: number, night: boolean, seed: number, entrance = true) {
@@ -51,11 +74,17 @@ function windows(c: CanvasRenderingContext2D, x: number, y: number, w: number, d
       const color = night && hash(seed + j + floor * 7) > .25 ? "#ffe6a2" : "#779f9e";
       const wx = x + .09 + j * w / 3;
       if (!(entrance && floor === 0 && j === 1)) {
+        poly(c, [iso(wx - .018, y + d + .003, z - .8), iso(wx + .123, y + d + .003, z - .8), iso(wx + .123, y + d + .003, z + 6.8), iso(wx - .018, y + d + .003, z + 6.8)], "#536c614d");
         poly(c, [iso(wx, y + d + .004, z), iso(wx + .105, y + d + .004, z), iso(wx + .105, y + d + .004, z + 6), iso(wx, y + d + .004, z + 6)], color);
         line(c, iso(wx - .015, y + d + .005, z), iso(wx + .12, y + d + .005, z), "#f6ecd2", 1);
+        line(c, iso(wx + .052, y + d + .009, z), iso(wx + .052, y + d + .009, z + 6), "#ece9d4", .55);
+        line(c, iso(wx, y + d + .009, z + 3), iso(wx + .105, y + d + .009, z + 3), "#f7efda96", .45);
+        line(c, iso(wx + .015, y + d + .01, z + 4.5), iso(wx + .045, y + d + .01, z + 5.8), "#ffffff78", .6);
       }
       const wy = y + .09 + j * d / 3;
       poly(c, [iso(x + w + .004, wy, z), iso(x + w + .004, wy + .10, z), iso(x + w + .004, wy + .10, z + 6), iso(x + w + .004, wy, z + 6)], color);
+      line(c, iso(x + w + .008, wy, z), iso(x + w + .008, wy + .10, z), "#eee2c0", .7);
+      line(c, iso(x + w + .008, wy + .05, z), iso(x + w + .008, wy + .05, z + 6), "#cfcbb2", .5);
     }
   }
 }
@@ -64,13 +93,24 @@ function pitchedRoof(c: CanvasRenderingContext2D, x: number, y: number, w: numbe
   poly(c, [iso(x, y, h), iso(x + w, y, h), ridgeB, ridgeA], dark);
   poly(c, [ridgeA, ridgeB, iso(x + w, y + d, h), iso(x, y + d, h)], color);
   poly(c, [iso(x + w, y, h), ridgeB, iso(x + w, y + d, h)], "#e8d7b8");
+  glaze(c, [ridgeA, ridgeB, iso(x + w, y + d, h), iso(x, y + d, h)], "#ffffff24", "#352d3e35");
+  for (let row = 1; row < 5; row++) { const t = row / 5, yy = y + d / 2 + t * d / 2, z = h + 13 * (1 - t);
+    line(c, iso(x, yy, z), iso(x + w, yy, z), "#493f4938", .5);
+    for (let col = 0; col < 7; col++) { const xx = x + (col + (row % 2 ? .5 : 0)) * w / 7; line(c, iso(xx, yy, z), iso(xx, yy + d / 10, z - 2.6), "#f5e7d522", .4); }
+  }
   for (let t = .13; t < 1; t += .13) line(c, iso(x + w * t, y + d / 2, h + 13), iso(x + w * t, y + d, h), "#ffffff21", .7);
   line(c, ridgeA, ridgeB, "#ffffff6b", 1);
+  line(c, iso(x, y + d, h - .8), iso(x + w, y + d, h - .8), "#675b54", 1.2);
+  line(c, iso(x + w, y + d, h), iso(x + w, y + d, h - 3), "#c9b692", .8);
 }
 function lamp(c: CanvasRenderingContext2D, x: number, y: number, night: boolean) {
-  const p = iso(x, y); line(c, p, { x: p.x, y: p.y - 21 }, "#486365", 1.2);
+  const p = iso(x, y); ellipse(c, { x: p.x + 3, y: p.y + 1 }, 4, 1.8, "#25453728");
+  box(c, x - .025, y - .025, .05, .05, 1.6, ["#688079", "#405e5a", "#a3b7a1"]);
+  line(c, p, { x: p.x, y: p.y - 21 }, "#486365", 1.5);
+  line(c, { x: p.x - .35, y: p.y - 2 }, { x: p.x - .35, y: p.y - 20.5 }, "#b6c8b4", .45);
   line(c, { x: p.x, y: p.y - 21 }, { x: p.x + 5, y: p.y - 23 }, "#486365", 1.2);
   ellipse(c, { x: p.x + 5, y: p.y - 23 }, 3, 1.5, night ? "#ffe6a1" : "#dfead8");
+  line(c, { x: p.x + 2, y: p.y - 24 }, { x: p.x + 7, y: p.y - 24 }, "#617975", .75);
   if (night) { const g = c.createRadialGradient(p.x, p.y, 0, p.x, p.y, 19); g.addColorStop(0, "#ffdd7745"); g.addColorStop(1, "#ffdd7700"); ellipse(c, p, 19, 10, g); }
 }
 function parkPart(c: CanvasRenderingContext2D, kind: ParkPart, x: number, y: number, rotation: number, night: boolean) {
@@ -83,63 +123,104 @@ function parkPart(c: CanvasRenderingContext2D, kind: ParkPart, x: number, y: num
     const dx = [1, 0, -1, 0][rotation % 4]!, dy = [0, 1, 0, -1][rotation % 4]!;
     orientedBox(c, x + p[0]!, y + p[1]!, w, d, h, dx, dy, colors, z);
   };
-  if (kind === "tree") { tree(c, x + .5, y + .5, 13, .6); return; }
+  if (kind === "tree") {
+    box(c, x + .30, y + .30, .4, .4, 1, ["#a29270", "#7b815c", "#a8b67e"]);
+    for (let j = 0; j < 8; j++) { const a = j * Math.PI / 4; ellipse(c, iso(x + .5 + Math.cos(a) * .19, y + .5 + Math.sin(a) * .19, 1.6), 1.2, .6, "#c6c4a3"); }
+    tree(c, x + .5, y + .5, 13, .6); return;
+  }
   if (kind === "light") { lamp(c, x + .5, y + .5, night); return; }
-  if (kind === "path") { poly(c, [at(.08, .32), at(.92, .32), at(.92, .68), at(.08, .68)], "#e4d7b6"); return; }
+  if (kind === "path") { b(.08, .32, .84, .36, .8, ["#b8ac90", "#a89980", "#e4d7b6"], 0); for (let j = 1; j < 5; j++) line(c, at(.08 + j * .168, .32, .9), at(.08 + j * .168, .68, .9), "#b4a78a", .5); line(c, at(.08, .50, .9), at(.92, .50, .9), "#c6b899", .4); return; }
   if (kind === "flowers") {
-    b(.14, .18, .72, .62, 2, ["#a39875", "#8b8968", "#76975f"]);
-    for (let j = 0; j < 14; j++) {
-      const p = at(.2 + hash(j + 31) * .59, .24 + hash(j + 8) * .48, 4);
-      ellipse(c, p, 1.7, 1.2, ["#e8c765", "#d78993", "#f1e8bf"][j % 3]!);
+    b(.14, .18, .72, .62, 2, ["#b4a389", "#938672", "#cabc9d"]);
+    b(.18, .22, .64, .54, .3, ["#71805c", "#627454", "#6c7650"], 3);
+    for (let j = 0; j < 18; j++) {
+      const p = at(.22 + hash(j + 31) * .55, .27 + hash(j + 8) * .43, 5);
+      ellipse(c, { x: p.x - .9, y: p.y + 1.2 }, 1.8, .7, "#8dac67");
+      blossom(c, p, ["#f0c968", "#d57b96", "#f6efd5", "#9b92c0"][j % 4]!, .95);
     }
     return;
   }
   if (kind === "fountain") {
-    const p = at(.5, .5); ellipse(c, p, 15, 7, "#8caaa0"); ellipse(c, { x: p.x, y: p.y - 2 }, 15, 7, "#d4ded0");
-    ellipse(c, { x: p.x, y: p.y - 2.4 }, 11, 4.8, "#79bac4"); b(.45, .45, .10, .10, 3, ["#a7c6be", "#8caeaa", "#e2ece0"], 2); return;
+    const p = at(.5, .5); ellipse(c, { x: p.x + 3, y: p.y + 2 }, 17, 7.5, "#324e3c30");
+    ellipse(c, p, 15.8, 7.5, "#7e928c"); ellipse(c, { x: p.x, y: p.y - 1.8 }, 15.8, 7.5, "#a2b4ac"); ellipse(c, { x: p.x, y: p.y - 3 }, 15.8, 7.5, "#e5e5d4");
+    ellipse(c, { x: p.x, y: p.y - 3 }, 12.7, 5.8, "#859f98");
+    const water = c.createRadialGradient(p.x - 5, p.y - 4, 1, p.x, p.y - 3, 13); water.addColorStop(0, "#c4ede3"); water.addColorStop(.5, "#7bc9c8"); water.addColorStop(1, "#4f9fae");
+    ellipse(c, { x: p.x, y: p.y - 2.6 }, 12, 5.2, water);
+    for (let j = 0; j < 10; j++) { const a = j * Math.PI / 5; line(c, { x: p.x + Math.cos(a) * 13, y: p.y - 3 + Math.sin(a) * 6 }, { x: p.x + Math.cos(a) * 15.6, y: p.y - 3 + Math.sin(a) * 7.3 }, "#b0b6a1", .55); }
+    b(.45, .45, .10, .10, 5, ["#abc6ba", "#759e96", "#e2ece0"], 2);
+    ellipse(c, { x: p.x, y: p.y - 6 }, 4.8, 2.1, "#e2e5d3"); ellipse(c, { x: p.x, y: p.y - 6.4 }, 3.8, 1.5, "#80c7c9");
+    for (const s of [-1, 1]) { line(c, { x: p.x + s * 3.4, y: p.y - 6 }, { x: p.x + s * 6.5, y: p.y - 2.5 }, "#e0f5e995", .7); }
+    ellipse(c, { x: p.x - 6, y: p.y - 2 }, 2.8, .6, "#d7f2e58a"); return;
   }
   if (kind === "bench") {
     for (const u of [.23, .68]) b(u, .40, .045, .19, 3, ["#4e6d62", "#395d53", "#6f8b75"]);
-    b(.17, .37, .68, .25, 2, ["#a48461", "#896e50", "#d5b387"], 4);
-    b(.17, .37, .68, .045, 5, ["#b69470", "#896e50", "#e0c297"], 6);
-    for (const v of [.43, .51]) line(c, at(.20, v, 6.2), at(.82, v, 6.2), "#927455", .5);
+    for (let j = 0; j < 4; j++) b(.17, .37 + j * .063, .68, .052, 1.5, ["#ab825c", "#785b43", j % 2 ? "#d9b788" : "#cba577"], 4);
+    for (let j = 0; j < 3; j++) b(.17, .37, .68, .04, 1.3, ["#b69470", "#896e50", "#e0c297"], 6 + j * 1.65);
+    for (const u of [.20, .78]) { line(c, at(u, .40, 4), at(u, .40, 9), "#496d5d", 1); line(c, at(u, .40, 8), at(u, .62, 8), "#547663", 1); }
     return;
   }
   // A supported slide with a platform, ladder and a slope contained inside its tile.
+  b(.08, .08, .82, .84, .7, ["#be9b80", "#a58471", "#dbc3a1"], 0);
   for (const u of [.19, .45]) b(u, .20, .045, .30, 12, ["#967553", "#765d45", "#c09f75"]);
   b(.18, .18, .32, .34, 2, ["#d18c74", "#a77160", "#eac3a1"], 12);
+  for (const u of [.19, .46]) { line(c, at(u, .18, 14), at(u, .18, 21), "#648e80", 1.2); line(c, at(u, .18, 21), at(u, .48, 21), "#a7c3a0", 1); line(c, at(u, .48, 21), at(u, .48, 14), "#648e80", 1.2); }
+  poly(c, [at(.12, .12, 22), at(.52, .12, 22), at(.52, .34, 25), at(.12, .34, 25)], "#75a798");
+  poly(c, [at(.12, .34, 25), at(.52, .34, 25), at(.52, .56, 22), at(.12, .56, 22)], "#a7c7ac");
   poly(c, [at(.27, .51, 13), at(.46, .51, 13), at(.68, .90, 2), at(.43, .90, 2)], "#98bdc3", "#e2e9d7", 1);
+  line(c, at(.27, .51, 15), at(.43, .90, 3), "#d9e5d8", 1.3); line(c, at(.46, .51, 15), at(.68, .90, 3), "#adc6bd", 1.3);
   line(c, at(.18, .22, 14), at(.08, .08, 1), "#749b93", 1.2); line(c, at(.48, .22, 14), at(.37, .08, 1), "#749b93", 1.2);
   for (let j = 1; j < 5; j++) line(c, at(.16 - j * .018, .22 - j * .028, 14 - j * 2.5), at(.47 - j * .018, .22 - j * .028, 14 - j * 2.5), "#d4d3aa", .8);
 }
+function terrace(c: CanvasRenderingContext2D, x: number, y: number) {
+  box(c, x, y, .32, .18, 1, ["#b79c78", "#8f7c60", "#d9bd95"]);
+  for (let j = 1; j < 5; j++) line(c, iso(x + j * .064, y, 1.1), iso(x + j * .064, y + .18, 1.1), "#aa8c69", .4);
+  box(c, x + .11, y + .065, .08, .07, 4, ["#917655", "#745f47", "#e4c59a"], 1);
+  for (const u of [.025, .245]) { box(c, x + u, y + .07, .055, .06, 3, ["#97a387", "#6f8a74", "#cad1ac"], 1); box(c, x + u, y + .065, .055, .015, 3, ["#829777", "#567661", "#cfdbaf"], 4); }
+  const cx = x + .155, cy = y + .10; line(c, iso(cx, cy, 1), iso(cx, cy, 13), "#8f7654", .7);
+  const top = iso(cx, cy, 14), ring = Array.from({ length: 6 }, (_, j) => { const a = j * Math.PI / 3; return iso(cx + Math.cos(a) * .14, cy + Math.sin(a) * .14, 11); });
+  for (let j = 0; j < 6; j++) poly(c, [top, ring[j]!, ring[(j + 1) % 6]!], j % 2 ? "#eee5c9" : "#cc9a7d", "#9b897b55", .35);
+}
+function crate(c: CanvasRenderingContext2D, x: number, y: number, w: number, d: number, h: number, z = 0) {
+  box(c, x, y, w, d, h, ["#b79b72", "#8e795b", "#d9c29a"], z);
+  for (let j = 1; j < 4; j++) { line(c, iso(x, y + d, z + h * j / 4), iso(x + w, y + d, z + h * j / 4), "#826845", .4); line(c, iso(x + w, y, z + h * j / 4), iso(x + w, y + d, z + h * j / 4), "#6c624a", .4); }
+  line(c, iso(x + .015, y + d, z + .5), iso(x + w - .015, y + d, z + h - .5), "#e1c49a", .8);
+  line(c, iso(x + w, y + .01, z + h), iso(x + w, y + d - .01, z + .5), "#b49f77", .7);
+}
+function solarPanel(c: CanvasRenderingContext2D, x: number, y: number, w: number, d: number, z: number) {
+  box(c, x, y, w, d, 1, ["#768b88", "#4d7377", "#658f98"], z);
+  patch(c, x + .01, y + .01, w - .02, d - .02, "#31586f", z + 1.1);
+  for (let u = 0; u < 4; u++) for (let v = 0; v < 2; v++) {
+    const sx = x + .025 + u * (w - .04) / 4, sy = y + .025 + v * (d - .04) / 2;
+    patch(c, sx, sy, (w - .04) / 4 - .012, (d - .04) / 2 - .012, u % 2 ? "#476f89" : "#3b627e", z + 1.2);
+    line(c, iso(sx + .015, sy + .02, z + 1.3), iso(sx + .055, sy + .02, z + 1.3), "#88b5c779", .45);
+  }
+  glaze(c, [iso(x, y, z + 1.3), iso(x + w, y, z + 1.3), iso(x + w, y + d, z + 1.3), iso(x, y + d, z + 1.3)], "#b6d5df26", "#17354919");
+}
 function facilityParts(c: CanvasRenderingContext2D, kind: Tile, x: number, y: number, level: number, parts: FacilityPart[], night: boolean, axis: "x" | "y", behind = false) {
   if (behind) {
-    if (parts.includes("greenbelt")) for (let j = 0; j < 5; j++) box(c, x + .05 + j * .18, y + .04, .15, .09, 5, ["#6d985f", "#4e7951", "#97b979"]);
+    if (parts.includes("greenbelt")) for (let j = 0; j < 5; j++) { box(c, x + .05 + j * .18, y + .04, .15, .09, 2, ["#8c9b77", "#6b8069", "#b6b995"]); tree(c, x + .12 + j * .18, y + .08, 4.5, .6); }
     return;
   }
   if (parts.includes("garden") || parts.includes("greenbelt")) {
-    for (const u of [.07, .72]) { box(c, x + u, y + .88, .20, .08, 3, ["#a5926e", "#7d7f5f", "#7ca66c"]); for (let j = 0; j < 4; j++) ellipse(c, iso(x + u + .025 + j * .045, y + .91, 4), 1, .7, j % 2 ? "#e6c26b" : "#d98998"); }
+    for (const u of [.07, .72]) { box(c, x + u, y + .88, .20, .08, 3, ["#bdad8b", "#928766", "#70965f"]); for (let j = 0; j < 4; j++) blossom(c, iso(x + u + .025 + j * .045, y + .91, 5), j % 2 ? "#e6c26b" : "#d98998", .7); }
   }
   if (parts.includes("terrace")) {
-    patch(c, x + .59, y + .82, .32, .16, "#beae87", 1);
-    box(c, x + .70, y + .85, .08, .07, 4, ["#917655", "#745f47", "#e4c59a"], 1);
-    for (const u of [.61, .82]) box(c, x + u, y + .85, .06, .06, 3, ["#97a387", "#6f8a74", "#cad1ac"], 1);
+    terrace(c, x + .59, y + .80);
   }
   if (parts.includes("light")) { c.save(); if (kind === "station") c.translate(0, -3); lamp(c, x + (kind === "station" && axis === "y" ? .98 : .91), y + (kind === "station" && axis === "x" ? .98 : .86), night); c.restore(); }
   if (parts.includes("sign")) {
     line(c, iso(x + .92, y + .65, 1), iso(x + .92, y + .65, 15), "#7d7056", 1.1);
     box(c, x + .91, y + .60, .04, .17, 5, ["#6c9881", "#476f63", "#d5caaa"], 10);
+    const p = iso(x + .955, y + .69, 12.5); ellipse(c, p, 1.8, 1.8, "#ead7a9"); line(c, { x: p.x - 1, y: p.y }, { x: p.x + 1, y: p.y }, "#778b67", .5);
   }
-  if (parts.includes("storage")) for (let j = 0; j < 3; j++) box(c, x + .12 + j * .10, y + .87, .085, .08, 3 + j % 2 * 2, ["#b79b72", "#8e795b", "#d9c29a"], 4);
+  if (parts.includes("storage")) for (let j = 0; j < 3; j++) crate(c, x + .12 + j * .10, y + .87, .085, .08, 3 + j % 2 * 2, 4);
   if (parts.includes("solar")) {
     const z = 23 + level * 3 + 5;
-    box(c, x + .20, y + .28, .58, .36, 1, ["#768b88", "#4d7377", "#658f98"], z);
-    patch(c, x + .22, y + .30, .54, .32, "#48778c", z + 1.1);
-    for (let j = 1; j < 4; j++) line(c, iso(x + .22 + j * .135, y + .30, z + 1.2), iso(x + .22 + j * .135, y + .62, z + 1.2), "#9bbfcb", .5);
-    line(c, iso(x + .22, y + .46, z + 1.2), iso(x + .76, y + .46, z + 1.2), "#9bbfcb", .5);
+    solarPanel(c, x + .20, y + .28, .58, .36, z);
   }
   if (parts.includes("bench") && kind === "station") {
     box(c, x + (axis === "x" ? .39 : .77), y + (axis === "x" ? .77 : .39), axis === "x" ? .32 : .09, axis === "x" ? .09 : .32, 3, ["#a48461", "#896e50", "#d5b387"], 3);
+    for (let j = 0; j < 3; j++) line(c, iso(x + (axis === "x" ? .39 : .79 + j * .02), y + (axis === "x" ? .79 + j * .02 : .39), 6.2), iso(x + (axis === "x" ? .71 : .79 + j * .02), y + (axis === "x" ? .79 + j * .02 : .71), 6.2), "#866345", .45);
   }
 }
 function station(c: CanvasRenderingContext2D, x: number, y: number, axis: "x" | "y", night: boolean, roof: boolean) {
@@ -147,18 +228,25 @@ function station(c: CanvasRenderingContext2D, x: number, y: number, axis: "x" | 
   if (!roof) {
     box(c, px, py, w, d, 3, ["#b6b8a3", "#919f92", "#e6dbc3"]);
     patch(c, px + .02, py + .02, alongX ? .88 : .045, alongX ? .045 : .88, "#e1c887", 3.1);
+    for (let j = 1; j < 7; j++) { const t = j * .13; line(c, iso(px + (alongX ? t : 0), py + (alongX ? 0 : t), 3.2), iso(px + (alongX ? t : w), py + (alongX ? d : t), 3.2), "#bdbba26b", .4); }
+    for (let j = 0; j < 10; j++) { const t = .08 + j * .08; ellipse(c, iso(px + (alongX ? t : .04), py + (alongX ? .04 : t), 3.3), .5, .3, "#a99759"); }
     box(c, x + .10, y + .10, .22, .23, 13, ["#f4e6c7", "#caba98", "#cf9361"]);
     poly(c, [iso(x + .14, y + .332, 4), iso(x + .28, y + .332, 4), iso(x + .28, y + .332, 10), iso(x + .14, y + .332, 10)], night ? "#ffe6a2" : "#779f9e");
     return;
   }
   for (const t of [.16, .82]) box(c, x + (alongX ? t : .86), y + (alongX ? .86 : t), .028, .028, 18, ["#809d96", "#587a73", "#cfe0d2"], 3);
   box(c, x + (alongX ? .04 : .55), y + (alongX ? .55 : .04), alongX ? .92 : .41, alongX ? .41 : .92, 3, ["#477f78", "#326760", "#75aca1"], 21);
+  const rx = x + (alongX ? .04 : .55), ry = y + (alongX ? .55 : .04);
+  for (let j = 1; j < 7; j++) { const t = j * .13; line(c, iso(rx + (alongX ? t : .02), ry + (alongX ? .02 : t), 24.1), iso(rx + (alongX ? t : .39), ry + (alongX ? .39 : t), 24.1), "#accbb355", .6); }
+  line(c, iso(rx, ry + (alongX ? .41 : .92), 21), iso(rx + (alongX ? .92 : .41), ry + (alongX ? .41 : .92), 21), "#d0dac1", .8);
   const sx = x + (alongX ? .42 : .93), sy = y + (alongX ? .93 : .42);
   const signX = sx + (alongX ? .115 : 0), signY = sy + (alongX ? 0 : .115);
   line(c, iso(signX, signY, 3), iso(signX, signY, 21), "#587a73", 1.1);
   box(c, sx, sy, alongX ? .23 : .025, alongX ? .025 : .23, 3, ["#3f766c", "#315d55", "#cde0c4"], 12);
   const clock = iso(signX, signY, 19); ellipse(c, clock, 3, 3, "#f9f1d9");
   line(c, clock, { x: clock.x + 1.4, y: clock.y - 1.4 }, "#536c64", .7);
+  line(c, clock, { x: clock.x - 1.5, y: clock.y - .3 }, "#536c64", .6);
+  for (let j = 0; j < 4; j++) { const a = j * Math.PI / 2; ellipse(c, { x: clock.x + Math.cos(a) * 2.3, y: clock.y + Math.sin(a) * 2.3 }, .3, .3, "#9a967b"); }
 }
 function factorySmoke(c: CanvasRenderingContext2D, x: number, y: number, time: number) {
   for (let j = 0; j < 4; j++) {
@@ -168,6 +256,7 @@ function factorySmoke(c: CanvasRenderingContext2D, x: number, y: number, time: n
 }
 function plot(c: CanvasRenderingContext2D, kind: Tile, x: number, y: number, access: number) {
   patch(c, x + .05, y + .05, .9, .9, "#c8c9af");
+  for (let j = 1; j < 5; j++) { const u = .05 + j * .18; line(c, iso(x + u, y + .05), iso(x + u, y + .95), "#a5af973b", .45); line(c, iso(x + .05, y + u), iso(x + .95, y + u), "#edf0cf39", .4); }
   if (kind !== "park" && kind !== "station") {
     // Connect the lot to its actual road edge, including side and rear entrances.
     for (const { bit, dx, dy } of DIRECTIONS) if (access & bit) patch(c, x + (dx < 0 ? 0 : dx > 0 ? .78 : .44), y + (dy < 0 ? 0 : dy > 0 ? .78 : .44), dx ? .22 : .12, dy ? .22 : .12, "#e4d9bc");
@@ -197,9 +286,16 @@ function building(c: CanvasRenderingContext2D, kind: Tile, x: number, y: number,
     shadow(c, bx, by, .7, .65, 26);
     const height = 23 + level * 3;
     box(c, bx, by, .72, .64, height, ["#c3c8be", "#959f9c", "#e0deca"]);
+    glaze(c, [iso(bx, by + .64), iso(bx + .72, by + .64), iso(bx + .72, by + .64, height), iso(bx, by + .64, height)], "#fff9e718", "#41564f35");
+    for (let j = 1; j < 8; j++) line(c, iso(bx + j * .09, by + .641, 2), iso(bx + j * .09, by + .641, height - 2), "#758c803b", .6);
     windows(c, bx, by, .72, .64, 2, night, seed, false);
     for (let j = 0; j < 3; j++) box(c, bx + j * .23, by + .08, .22, .48, 5, ["#739c9f", "#547b81", "#9cb9b4"], height);
+    for (let j = 0; j < 3; j++) { const u = bx + j * .23; for (let k = 1; k < 5; k++) line(c, iso(u + .02, by + .08 + k * .09, height + 5.1), iso(u + .20, by + .08 + k * .09, height + 5.1), "#476e7478", .65); }
     box(c, x + .77, y + .17, .1, .1, 47, ["#bf8d75", "#8e6557", "#e1b199"]);
+    for (const z of [12, 22, 32, 42]) { line(c, iso(x + .77, y + .27, z), iso(x + .87, y + .27, z), "#efd6af", 1.2); line(c, iso(x + .87, y + .17, z), iso(x + .87, y + .27, z), "#c5b194", 1); }
+    patch(c, x + .785, y + .185, .07, .07, "#685f56", 47.1);
+    poly(c, [iso(bx + .24, by + .645, 1), iso(bx + .46, by + .645, 1), iso(bx + .46, by + .645, 12), iso(bx + .24, by + .645, 12)], "#678984");
+    for (let j = 1; j < 6; j++) line(c, iso(bx + .245, by + .65, j * 2), iso(bx + .455, by + .65, j * 2), "#9ab2a354", .6);
     if (showSmoke) factorySmoke(c, x, y, time);
     box(c, x + .12, y + .86, parts.includes("storage") ? .34 : .25, .08, 4, ["#a6b6aa", "#6f8b7d", "#c9d4bb"]); return;
   }
@@ -209,17 +305,30 @@ function building(c: CanvasRenderingContext2D, kind: Tile, x: number, y: number,
   const walls = ["#f4e9cc", "#ebd3b6", "#dee8df", "#f0d8c6"];
   shadow(c, bx, by, .67, .65, height + 8);
   box(c, bx, by, .67, .65, height, [walls[Math.floor(v * 4)]!, "#bdbaa0", "#e8dcc1"]);
+  glaze(c, [iso(bx, by + .65), iso(bx + .67, by + .65), iso(bx + .67, by + .65, height), iso(bx, by + .65, height)], "#fff9ec25", "#82755e1c");
+  glaze(c, [iso(bx + .67, by), iso(bx + .67, by + .65), iso(bx + .67, by + .65, height), iso(bx + .67, by, height)], "#e7dbc615", "#484c402b");
+  for (let floor = 1; floor < floors; floor++) { const z = floor * 12 + 3; line(c, iso(bx, by + .655, z), iso(bx + .67, by + .655, z), "#f4ead395", .75); line(c, iso(bx + .675, by, z), iso(bx + .675, by + .65, z), "#aaa68c", .6); }
   windows(c, bx, by, .67, .65, floors, night, seed);
   // Foundation, doorstep and planted hedge.
   box(c, bx - .015, by + .63, .7, .055, 2, ["#c1b294", "#aa9b81", "#efe2c2"]);
   const door = [iso(bx + .27, by + .652, 2), iso(bx + .39, by + .652, 2), iso(bx + .39, by + .652, 11), iso(bx + .27, by + .652, 11)];
   poly(c, door, "#677d70");
+  poly(c, [iso(bx + .285, by + .657, 5), iso(bx + .375, by + .657, 5), iso(bx + .375, by + .657, 10), iso(bx + .285, by + .657, 10)], night ? "#edcf8e" : "#97b7ac");
+  ellipse(c, iso(bx + .38, by + .66, 5), .6, .6, "#e4c27b");
+  patch(c, bx + .23, by + .69, .21, .07, "#aa9c7c", 1.1);
   if (kind === "house" && level === 1) {
     pitchedRoof(c, bx - .05, by - .05, .77, .75, height, roofs[Math.floor(v * 5)]!, "#8c7565");
     box(c, bx + .44, by + .05, .08, .09, 9, ["#caa790", "#987763", "#ead3b3"], height + 6);
+    patch(c, bx + .455, by + .065, .05, .06, "#716757", height + 15.1);
+    line(c, iso(bx + .50, by + .64, 17), iso(bx + .50, by + .64, 2), "#8f958580", .8);
+    box(c, bx + .24, by + .65, .18, .12, 1, ["#a78b67", "#7f775b", "#d6c2a0"], 11.5);
+    for (const u of [.245, .405]) line(c, iso(bx + u, by + .755, 1), iso(bx + u, by + .755, 11.5), "#a8ad90", .65);
+    for (const u of [.09, .45]) { box(c, bx + u, by + .66, .11, .04, 1.6, ["#af997b", "#827960", "#7b9e66"], 6); for (let j = 0; j < 3; j++) blossom(c, iso(bx + u + .025 + j * .027, by + .68, 8), j % 2 ? "#ede1b1" : "#d78f91", .55); }
     for (const offset of [.14, .70]) if (!parts.includes("garden") && !(offset === .70 && parts.includes("terrace"))) box(c, x + offset, y + .88, .18, .09, 4, ["#709464", "#567853", "#96b777"]);
   } else {
     box(c, bx - .025, by - .025, .72, .70, 3, ["#c1b8a1", "#969f96", roofs[Math.floor(v * 5)]!], height);
+    for (const u of [0, .65]) box(c, bx + u, by, .028, .65, 1.8, ["#c9c6ad", "#969f96", "#e8dfc4"], height + 3);
+    box(c, bx, by + .64, .67, .03, 1.8, ["#c9c6ad", "#969f96", "#e8dfc4"], height + 3);
     box(c, bx + .1, by + .15, .16, .12, 5, ["#aebbad", "#8b9d94", "#d9e0cc"], height + 3);
     patch(c, bx + .37, by + .12, .2, .26, "#5a858e", height + 3.2);
     for (let j = 1; j < 3; j++) line(c, iso(bx + .37, by + .12 + j * .08, height + 3.4), iso(bx + .57, by + .12 + j * .08, height + 3.4), "#99b9bb", .6);
@@ -227,9 +336,16 @@ function building(c: CanvasRenderingContext2D, kind: Tile, x: number, y: number,
       poly(c, [iso(bx + .04, by + .653, 3), iso(bx + .24, by + .653, 3), iso(bx + .24, by + .653, 12), iso(bx + .04, by + .653, 12)], night ? "#ffe7ad" : "#8bbab4");
       poly(c, [iso(bx + .43, by + .653, 3), iso(bx + .63, by + .653, 3), iso(bx + .63, by + .653, 12), iso(bx + .43, by + .653, 12)], night ? "#ffe7ad" : "#8bbab4");
       for (let j = 0; j < 6; j++) patch(c, bx - .03 + j * .12, by + .64, .12, .22, j % 2 ? "#f9ecd1" : "#ce8572", 13);
+      for (let j = 0; j < 6; j++) { const xx = bx - .03 + j * .12; poly(c, [iso(xx, by + .86, 13), iso(xx + .12, by + .86, 13), iso(xx + .12, by + .86, 11), iso(xx, by + .86, 11)], j % 2 ? "#e7d8b9" : "#b46858"); }
       // A window and display counter identify the shop without labels on the artwork.
       box(c, bx + .05, by + .82, .20, .09, 3, ["#ab8d60", "#7e684c", "#ead3a2"]);
+      for (let j = 0; j < 4; j++) ellipse(c, iso(bx + .08 + j * .043, by + .86, 4), 1, .75, j % 2 ? "#db9b69" : "#88a15c");
       if (!parts.includes("terrace")) box(c, x + .84, y + .85, .07, .09, 6, ["#927856", "#6e604d", "#e1c89a"]);
+    }
+    if (kind === "house") for (let floor = 1; floor < floors; floor += 2) {
+      const z = floor * 12 + 5; box(c, bx + .055, by + .65, .16, .065, 1, ["#bdb09b", "#979c8a", "#e3d7b7"], z);
+      line(c, iso(bx + .055, by + .715, z + 4), iso(bx + .215, by + .715, z + 4), "#82937e", .7);
+      for (let j = 0; j < 4; j++) line(c, iso(bx + .055 + j * .053, by + .715, z), iso(bx + .055 + j * .053, by + .715, z + 4), "#96a18b", .5);
     }
   }
   if (v > .3) tree(c, x + .86, y + .14, 6.5, .6, time);
@@ -250,6 +366,11 @@ function transport(c: CanvasRenderingContext2D, town: Town, x: number, y: number
   poly(c, outer.map(p => point(p)), kind === "road" ? "#d5d8c2" : "#b6b49a");
   if (kind === "road") {
     poly(c, transportOutline(mask, .24).map(p => point(p, .15)), "#6c817b");
+    const surface = transportOutline(mask, .24);
+    for (let j = 0; j < 14; j++) { const u = hash(j * 13 + 8), v = hash(j * 7 + 11); if (contains({ x: u, y: v }, surface)) ellipse(c, point({ x: u, y: v }, .18), .45, .25, j % 2 ? "#bdc7ad24" : "#354e4620"); }
+    for (const { dx, dy, bit } of DIRECTIONS) if (mask & bit) for (const side of [-1, 1]) {
+      for (const t of [.30, .43]) line(c, point({ x: .5 + dx * t + dy * .26 * side, y: .5 + dy * t + dx * .26 * side }, .2), point({ x: .5 + dx * t + dy * .30 * side, y: .5 + dy * t + dx * .30 * side }, .2), "#a2ad975e", .45);
+    }
     const directions = DIRECTIONS.filter(d => mask & d.bit);
     if (directions.length === 2) {
       const [a, b] = directions, path = { a: { x: .5 + a!.dx * .5, y: .5 + a!.dy * .5 }, b: { x: .5 + b!.dx * .5, y: .5 + b!.dy * .5 }, curve: Boolean(a!.dx !== -b!.dx || a!.dy !== -b!.dy) };
@@ -269,6 +390,8 @@ function transport(c: CanvasRenderingContext2D, town: Town, x: number, y: number
       }
     }
   } else {
+    const bed = transportOutline(mask || 3, .28);
+    for (let j = 0; j < 22; j++) { const u = hash(j * 11 + 31), v = hash(j * 17 + 42); if (contains({ x: u, y: v }, bed)) ellipse(c, point({ x: u, y: v }, .12), .8, .45, j % 2 ? "#d9d2b488" : "#786f5f55"); }
     for (const path of trackPaths(mask)) {
       for (let j = 0; j <= 7; j++) {
         const p = trackPoint(path, j / 7);
@@ -295,6 +418,7 @@ function bridgeRails(c: CanvasRenderingContext2D, town: Town, x: number, y: numb
     for (let n = 0; n <= steps; n++) {
       const px = x + a.x + (b.x - a.x) * n / steps, py = y + a.y + (b.y - a.y) * n / steps;
       line(c, iso(px, py, 5), iso(px, py, 11), "#839b8b", .9);
+      ellipse(c, iso(px, py, 11), .9, .5, "#e5e3c9");
     }
   }
 }
@@ -340,6 +464,10 @@ function parkGround(c: CanvasRenderingContext2D, lot: ParkLot, town: Town) {
   box(c, lot.x + .035, lot.y + .035, lot.width - .07, lot.height - .07, 1, ["#8eaa79", "#7c9b6b", lot.kind === "park" ? "#a8c58a" : "#e1d4b3"]);
   for (const v of [.09, lot.height - .21]) patch(c, lot.x + .09, lot.y + v, lot.width - .18, .12, "#ded5b5", 1.1);
   for (const u of [.09, lot.width - .21]) patch(c, lot.x + u, lot.y + .09, .12, lot.height - .18, "#ded5b5", 1.1);
+  for (const i of lotTiles(lot)) { const x = i % MAP_SIZE, y = Math.floor(i / MAP_SIZE);
+    if (lot.kind === "plaza") { for (const t of [.25, .50, .75]) { line(c, iso(x + t, y + .05, 1.02), iso(x + t, y + .95, 1.02), "#bcae903f", .45); line(c, iso(x + .05, y + t, 1.02), iso(x + .95, y + t, 1.02), "#f2e8cb70", .4); } }
+    else for (let j = 0; j < 6; j++) { const p = iso(x + .2 + hash(i + j * 31) * .60, y + .2 + hash(i * 3 + j) * .60, 1.02); line(c, p, { x: p.x + 1.5, y: p.y - .5 }, "#7c9c6440", .55); }
+  }
   const paths = new Set(lot.parts.filter(p => p.kind === "path").map(p => p.tile));
   for (const part of lot.parts) if (part.kind === "path") {
     const x = part.tile % MAP_SIZE, y = Math.floor(part.tile / MAP_SIZE), neighboursHere = neighbours(x, y).filter(n => paths.has(n) || town.tiles[n] === "road");
@@ -357,8 +485,10 @@ function parkFence(c: CanvasRenderingContext2D, x: number, y: number, bit: numbe
   const at = (t: number, z: number) => iso(x + a.x + (b.x - a.x) * t, y + a.y + (b.y - a.y) * t, z);
   for (const [start, end] of gate ? [[0, .29], [.71, 1]] : [[0, 1]]) {
     line(c, at(start!, 6), at(end!, 6), "#819b6a", 1.2);
+    line(c, at(start!, 3.5), at(end!, 3.5), "#8da076", .75);
+    line(c, at(start!, 6.5), at(end!, 6.5), "#c9cba080", .55);
     const posts = Math.ceil((end! - start!) * 4);
-    for (let j = 0; j <= posts; j++) { const t = start! + (end! - start!) * j / posts; line(c, at(t, 1), at(t, 7), "#6c8b5d", 1.3); }
+    for (let j = 0; j <= posts; j++) { const t = start! + (end! - start!) * j / posts; line(c, at(t, 1), at(t, 7), "#6c8b5d", 1.6); line(c, { x: at(t, 1).x - .35, y: at(t, 1).y }, { x: at(t, 7).x - .35, y: at(t, 7).y }, "#c3c398", .5); ellipse(c, at(t, 7.2), 1, .55, "#ded2ad"); }
   }
 }
 function drawTerrain(c: CanvasRenderingContext2D, town: Town, options: SceneOptions) {
@@ -371,9 +501,10 @@ function drawTerrain(c: CanvasRenderingContext2D, town: Town, options: SceneOpti
     const i = y * MAP_SIZE + x, tile = town.tiles[i]!, water = town.terrain[i] || tile === "water";
     patch(c, x, y, 1.008, 1.008, water ? "#78b6bd" : ["#adca91", "#b1cc95", "#b6cf97", "#abc78e"][Math.floor(hash(i) * 4)]!);
     if (water) {
+      glaze(c, [iso(x, y), iso(x + 1, y), iso(x + 1, y + 1), iso(x, y + 1)], "#b8dacf18", "#3e829d27");
       if (tile === "water") for (let j = 0; j < 3; j++) {
         const p = iso(x + .15 + hash(i + j) * .7, y + .2 + j * .24);
-        line(c, { x: p.x - 3, y: p.y }, { x: p.x + 4, y: p.y }, "#d5ebe67a", .8);
+        line(c, { x: p.x - 3, y: p.y }, { x: p.x + 4, y: p.y }, "#d5ebe67a", .8); line(c, { x: p.x - 1, y: p.y + 1.3 }, { x: p.x + 2, y: p.y + 1.3 }, "#d5ebe638", .45);
       }
       for (const n of neighbours(x, y)) if (!town.terrain[n] && town.tiles[n] !== "water") {
         const dx = n % MAP_SIZE - x, dy = Math.floor(n / MAP_SIZE) - y;
@@ -505,7 +636,7 @@ export class TownScene {
       }
       if (tile === "grass" && hash(i * 3) > .63 && !neighbours(x, y).some(n => ["road", "rail", "station"].includes(town.tiles[n]!))) {
         const size = Math.round((8 + hash(i * 7) * 9) * 2) / 2, v = hash(i * 5), variant = v < .3 ? .1 : v > .88 ? .95 : .5;
-        const bounds = { left: -size - 2, top: 16 - size * 2.3 - 2, width: size * 2 + 12, height: size * 2.3 + 8 };
+        const bounds = { left: -size - 2, top: 16 - size * 2.55 - 2, width: size * 2 + 12, height: size * 2.55 + 8 };
         // Reuse identical trees instead of retaining hundreds of almost identical bitmaps.
         const origin = iso(x, y);
         objects.push({ x: origin.x, y: origin.y, depth: x + y + 1, key: `tree:${size}:${variant}`, bounds, paint: c => tree(c, x + .5, y + .5, size, variant) });
@@ -606,7 +737,7 @@ export class TownScene {
     const add = (x: number, y: number, depth: number, paint: SceneObject["paint"]) => { const origin = iso(x, y); moving.push({ x: origin.x, y: origin.y, depth: x + y + depth, bounds: { left: -28, top: -85, width: 66, height: 110 }, paint }); };
     for (const { kind, x, y } of this.effects) {
       if (kind === "factory" && !this.reducedMotion) add(x, y, 1.01, c => factorySmoke(c, x, y, time));
-      if (kind === "park") add(x, y, 1.01, c => { const p = iso(x + .5, y + .5); line(c, { x: p.x, y: p.y - 1 }, { x: p.x, y: p.y - 9 - (this.reducedMotion ? 0 : Math.sin(time * 3)) }, "#d9f7f0", 2); });
+      if (kind === "park") add(x, y, 1.01, c => { const p = iso(x + .5, y + .5), jet = 17 + (this.reducedMotion ? 0 : Math.sin(time * 3)); line(c, { x: p.x, y: p.y - 6.5 }, { x: p.x, y: p.y - jet }, "#d9f7f0", 1.6); ellipse(c, { x: p.x, y: p.y - jet }, 1.4, .8, "#e9f9ed"); });
     }
     for (const v of this.vehicles) {
       if (!options.paused) v.t += Math.min(dt, .1) * options.speed * .65;
@@ -619,8 +750,10 @@ export class TownScene {
       const x = p.x + (p.laneApplied ? 0 : dy * .13), y = p.y - (p.laneApplied ? 0 : dx * .13), z = elevationAt(town, x, y, "road");
       add(x, y, 0, c => {
         ellipse(c, iso(x, y, z), 5, 2.5, "#29443d44");
+        for (const a of [-.07, .07]) for (const s of [-1, 1]) { const p = iso(x + dx * a - dy * s * .065, y + dy * a + dx * s * .065, z + 1.2); ellipse(c, p, 1.2, 1.5, "#35483f"); ellipse(c, p, .45, .6, "#b9bba4"); }
         orientedBox(c, x, y, .23, .12, 4, dx, dy, [v.color, "#64796c", v.color], z);
         orientedBox(c, x - dx * .015, y - dy * .015, .13, .09, 2, dx, dy, ["#b8dbd1", "#6b9397", "#e1ecdc"], z + 4);
+        line(c, iso(x + dx * .105 - dy * .05, y + dy * .105 + dx * .05, z + 2), iso(x + dx * .105 + dy * .05, y + dy * .105 - dx * .05, z + 2), "#ece9d0", .7);
         if (options.night) ellipse(c, iso(x + dx * .12, y + dy * .12, z + 2), 2, 1.2, "#fff1b4");
       });
     }
@@ -631,6 +764,8 @@ export class TownScene {
         const pos = Math.max(0, Math.min(max, center + (wagon - 1) * .34)), { x, y, dx, dy } = sampleTransportDistance(route, pos), z = elevationAt(town, x, y, "rail");
         add(x, y, 0, c => {
           const faces = orientedBox(c, x, y, .29, .18, 9, dx, dy, ["#f3e5bf", "#8d9e94", "#d9e1cb"], z);
+          orientedBox(c, x, y, .25, .16, .8, dx, dy, ["#abbab0", "#7a918a", "#e3e7d3"], z + 9);
+          for (const a of [-.10, .10]) { const p = iso(x + dx * a, y + dy * a, z + 1); ellipse(c, p, 2.4, 1.1, "#3b4e46"); }
           for (const { a, b } of faces) {
             line(c, iso(a.x, a.y, z + 4), iso(b.x, b.y, z + 4), "#c37c5e", 1.5);
             const p = { x: a.x + (b.x - a.x) * .2, y: a.y + (b.y - a.y) * .2 }, q = { x: a.x + (b.x - a.x) * .8, y: a.y + (b.y - a.y) * .8 };
@@ -677,6 +812,10 @@ export function drawTownIcon(c: CanvasRenderingContext2D, kind: Tool, width: num
     box(c, -.3, -.25, .6, .4, 8, ["#d9ac5d", "#b98843", "#f2cb7e"]);
     box(c, -.15, -.22, .25, .28, 12, ["#8caca4", "#527d78", "#f0c775"], 8);
     box(c, .3, -.3, .05, .6, 8, ["#b4b9a2", "#7f917f", "#d5d5be"]);
+    for (const v of [-.30, .10]) for (let j = 0; j < 6; j++) line(c, iso(-.30 + j * .10, v + .12, .4), iso(-.30 + j * .10, v + .12, 3.6), "#bcc1a3", .7);
+    for (const v of [-.18, .13]) line(c, iso(.03, v, 8), iso(.30, v, 5), "#e3c17c", 2);
+    patch(c, -.3, -.25, .15, .4, "#e5bb6b", 8.2);
+    line(c, iso(-.25, -.05, 8.3), iso(-.12, -.05, 8.3), "#947e50", .8);
   } else if (kind === "park") {
     const town = createIconTown("road"), lot: ParkLot = { id: 0, x: 0, y: 0, width: 2, height: 2, kind: "park", parts: [] };
     parkGround(c, lot, town); for (const bit of [1, 4]) parkFence(c, 0, 0, bit, false); for (const bit of [2, 8]) parkFence(c, 1, 1, bit, false);
@@ -695,18 +834,17 @@ export function drawTownPartIcon(c: CanvasRenderingContext2D, part: ParkPart | F
   if (["tree", "flowers", "bench", "fountain", "playground", "path", "light"].includes(part)) {
     parkPart(c, part as ParkPart, 0, 0, 0, false);
     if (part === "fountain") line(c, iso(.5, .5, 5), iso(.5, .5, 14), "#d9f7f0", 2);
-  } else if (part === "garden" || part === "greenbelt") parkPart(c, "flowers", 0, 0, 0, false);
+  } else if (part === "garden") parkPart(c, "flowers", 0, 0, 0, false);
+  else if (part === "greenbelt") { box(c, .15, .32, .7, .28, 2, ["#a4a185", "#7e8d6d", "#a4b882"]); for (const u of [.27, .5, .73]) tree(c, u, .46, 7.5, .6); }
   else if (part === "terrace") {
-    patch(c, .1, .12, .8, .76, "#c6b68e", 1); box(c, .42, .41, .2, .2, 6, ["#917655", "#745f47", "#e4c59a"]);
-    for (const u of [.14, .73]) box(c, u, .43, .12, .12, 4, ["#97a387", "#6f8a74", "#cad1ac"]);
+    c.translate(-4, 5); c.scale(2, 2); terrace(c, 0, 0);
   } else if (part === "storage") {
-    for (const [u, v, h] of [[.2, .25, 5], [.55, .3, 8], [.3, .65, 4]]) box(c, u!, v!, .22, .2, h!, ["#b79b72", "#8e795b", "#d9c29a"]);
+    patch(c, .12, .18, .75, .7, "#b6b49a"); for (const [u, v, h] of [[.2, .25, 5], [.55, .3, 8], [.3, .65, 4]]) crate(c, u!, v!, .22, .2, h!);
   } else if (part === "solar") {
-    box(c, .15, .20, .70, .55, 4, ["#768b88", "#4d7377", "#48778c"]);
-    for (let j = 1; j < 4; j++) line(c, iso(.15 + j * .175, .20, 4.2), iso(.15 + j * .175, .75, 4.2), "#9bbfcb", .7);
-    line(c, iso(.15, .475, 4.2), iso(.85, .475, 4.2), "#9bbfcb", .7);
+    for (const u of [.25, .68]) box(c, u, .35, .04, .30, 3, ["#929f8e", "#697f77", "#c2cbb4"]); solarPanel(c, .15, .20, .70, .55, 3);
   } else {
     line(c, iso(.5, .5), iso(.5, .5, 15), "#7d7056", 2); box(c, .24, .5, .54, .05, 7, ["#6c9881", "#476f63", "#d5caaa"], 11);
+    const p = iso(.51, .56, 14.5); ellipse(c, p, 3, 3, "#e6d6ac"); ellipse(c, p, 1.4, 1.4, "#879c78");
   }
   c.restore();
 }

@@ -16,6 +16,10 @@ const blank = () => ({ ...game.createTown(false), tiles: Array(576).fill('grass'
 let passed = 0;
 const test = (name, fn) => { fn(); passed++; console.log(`PASS ${name}`); };
 // Record real renderer operations: text, opacity and train geometry, without a GPU dependency.
+class RecordedGradient {
+  constructor(kind, coordinates) { this.kind = kind; this.coordinates = coordinates; this.stops = []; }
+  addColorStop(position, color) { this.stops.push([position, color]); }
+}
 function recordingContext() {
   const fills = [], stack = [];
   let points = [];
@@ -29,8 +33,8 @@ function recordingContext() {
     fillText() { assert.fail('Text must stay in the interface, not on town artwork'); },
     save() { stack.push({ globalAlpha: this.globalAlpha, fillStyle: this.fillStyle }); },
     restore() { Object.assign(this, stack.pop()); },
-    createLinearGradient() { return { addColorStop() {} }; },
-    createRadialGradient() { return { addColorStop() {} }; },
+    createLinearGradient(...coordinates) { return new RecordedGradient('linear', coordinates); },
+    createRadialGradient(...coordinates) { return new RecordedGradient('radial', coordinates); },
   };
   return { c: new Proxy(target, { get: (obj, key) => key in obj ? obj[key] : () => {} }), fills };
 }
@@ -235,10 +239,11 @@ test('sprite memory is bounded and recently used artwork stays cached', () => {
 });
 test('an empty purchased park has no automatic fountain or furniture; paid equipment updates without changing terrain tiles', () => {
   let town = game.buyParkLot(blank(),5,5,'small').town;const scene=new TownScene(),{c,fills}=recordingContext();
-  scene.render(c,800,600,town,options,0);assert(!fills.some(f=>f.color==='#79bac4'||f.color==='#d5b387'));
+  const fountainWater = f => f.color instanceof RecordedGradient && f.color.kind === 'radial' && f.color.stops.some(([, color]) => color === '#7bc9c8');
+  scene.render(c,800,600,town,options,0);assert(!fills.some(fountainWater));
   const tiles=town.tiles;town=game.placeParkPart(town,125,125,'fountain').town;assert.equal(town.tiles,tiles);fills.length=0;
-  scene.render(c,800,600,town,options,0);assert(fills.some(f=>f.color==='#79bac4'));
-  town=game.removeParkPart(town,125,125).town;fills.length=0;scene.render(c,800,600,town,options,0);assert(!fills.some(f=>f.color==='#79bac4'));
+  scene.render(c,800,600,town,options,0);assert(fills.some(fountainWater));
+  town=game.removeParkPart(town,125,125).town;fills.length=0;scene.render(c,800,600,town,options,0);assert(!fills.some(fountainWater));
 });
 test('selection bounds include a complete multi-cell plot and space for its trees',()=>{
   const town=game.buyParkLot(blank(),5,5,'medium').town,scene=new TownScene();scene.camera={x:195,y:0,zoom:1.4};
