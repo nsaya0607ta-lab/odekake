@@ -55,13 +55,79 @@ export function drawTownDecoration(c: CanvasRenderingContext2D, kind: string, x:
     for (let j = 0; j < 4; j++) box(.18, .36 + j * .07, .64, .056, 1, wood, 10);
     for (const v of [.18, .76]) { box(.16, v, .68, .08, 1, wood, 5); for (const u of [.26, .68]) box(u, v, .04, .055, 4, metal); }
     oval(at(.44, .46, 11.5), 1.8, .8, "#e8ddbe"); box(.55, .50, .05, .05, 1.5, ["#a48b65", "#8d7959", "#e6cc97"], 11);
-  } else if (kind === "gazebo" || kind === "canopy") {
-    const compact = kind === "canopy"; box(.10, .12, .8, .76, 2, wood);
+  } else if (kind === "gazebo") {
+    // Assemble the shelter from the deck upwards. Furniture belongs beneath
+    // the roof, and every timber member meets a post, beam or floor.
+    box(.12, .12, .76, .76, 2, wood);
+    for (let j = 1; j < 8; j++) line(at(.12 + j * .095, .12, 3.05), at(.12 + j * .095, .88, 3.05), "#927857", .45);
+    poly([at(.15, .15, 3.1), at(.85, .15, 3.1), at(.85, .85, 3.1), at(.15, .85, 3.1)], "#59613e24");
+    box(.38, .88, .30, .07, .8, wood);
+
+    const structure: { depth: number; paint: () => void }[] = [];
+    const timber = (u: number, v: number, paint: () => void) => {
+      const p = world(u, v); structure.push({ depth: p.x + p.y, paint });
+    };
+    const bench = (u: number, v: number, alongX: boolean) => {
+      const block = (a: number, b: number, w: number, d: number, h: number, z: number) =>
+        alongX ? box(u + a, v + b, w, d, h, wood, z) : box(u + b, v + a, d, w, h, wood, z);
+      timber(u + (alongX ? .21 : .05), v + (alongX ? .05 : .21), () => {
+        for (const a of [.035, .345]) {
+          block(a, .025, .04, .05, 3.2, 3);
+          block(a + .008, -.025, .025, .03, 8.2, 3);
+        }
+        for (let j = 0; j < 3; j++) block(0, j * .035, .42, .03, .8, 6.2);
+        block(0, -.025, .42, .03, 2, 9.2);
+      });
+    };
+    bench(.32, .25, true); bench(.25, .38, false);
+    for (const [u, v] of [[.20, .20], [.80, .20], [.20, .80], [.80, .80]]) {
+      timber(u!, v!, () => {
+        box(u! - .035, v! - .035, .07, .07, .65, ["#a89475", "#88775c", "#d3bd95"], 3);
+        box(u! - .024, v! - .024, .048, .048, 18.85, wood, 3.65);
+        const inwardU = u! < .5 ? .13 : -.13, inwardV = v! < .5 ? .13 : -.13;
+        line(at(u!, v!, 19), at(u! + inwardU, v!, 23), "#ad8a60", 1.1);
+        line(at(u!, v!, 19), at(u!, v! + inwardV, 23), "#95744f", 1.1);
+      });
+    }
+    structure.sort((a, b) => a.depth - b.depth).forEach(part => part.paint());
+    const beams = [[.17, .17, .66, .055], [.17, .775, .66, .055], [.17, .225, .055, .55], [.775, .225, .055, .55]];
+    beams.sort((a, b) => {
+      const p = world(a[0]! + a[2]! / 2, a[1]! + a[3]! / 2), q = world(b[0]! + b[2]! / 2, b[1]! + b[3]! / 2);
+      return p.x + p.y - q.x - q.y;
+    }).forEach(([u, v, w, d]) => box(u!, v!, w!, d!, 1.8, wood, 22.5));
+
+    const peak = at(.5, .5, 38);
+    const corners = [[.08, .08], [.92, .08], [.92, .92], [.08, .92]].map(([u, v]) => ({ u: u!, v: v!, p: world(u!, v!) }));
+    const faces = corners.map((a, j) => {
+      const b = corners[(j + 1) % 4]!, cx = (a.p.x + b.p.x) / 2 - x - .5, cy = (a.p.y + b.p.y) / 2 - y - .5;
+      return { a, b, depth: a.p.x + a.p.y + b.p.x + b.p.y,
+        color: cx > .1 ? "#527d69" : cx < -.1 ? "#759a7f" : cy > .1 ? "#7b9f83" : "#9ab497" };
+    }).sort((a, b) => a.depth - b.depth);
+    for (const { a, b, color } of faces) {
+      const left = at(a.u, a.v, 25), right = at(b.u, b.v, 25);
+      poly([left, right, peak], color, "#bad0ac70", .45);
+      // Tile courses follow the pitch instead of forming a flat diamond.
+      const onRoof = (t: number, s: number) => ({ x: peak.x + ((left.x + (right.x - left.x) * s) - peak.x) * t, y: peak.y + ((left.y + (right.y - left.y) * s) - peak.y) * t });
+      for (let row = 1; row < 6; row++) {
+        const t = row / 6;
+        line(onRoof(t, 0), onRoof(t, 1), "#d6dfba3b", .4);
+        for (let j = 1; j <= row; j++) {
+          const s = (j - (row % 2 ? .5 : 0)) / (row + 1);
+          line(onRoof(t, s), onRoof(t + 1 / 6, s), "#365e482e", .35);
+        }
+      }
+    }
+    // Only the two camera-facing eaves have a visible fascia.
+    for (const { a, b, color } of faces.slice(2)) {
+      poly([at(a.u, a.v, 23.8), at(b.u, b.v, 23.8), at(b.u, b.v, 25), at(a.u, a.v, 25)], color, "#3e665459", .4);
+      line(at(a.u, a.v, 25), at(b.u, b.v, 25), "#ccdab078", .5);
+    }
+  } else if (kind === "canopy") {
+    box(.10, .12, .8, .76, 2, wood);
     for (let j = 1; j < 7; j++) line(at(.10 + j * .11, .12, 3.1), at(.10 + j * .11, .88, 3.1), "#927857", .5);
-    const high = compact ? 19 : 23;
+    const high = 19;
     for (const [u, v] of [[.17, .19], [.83, .19], [.17, .81], [.83, .81]]) { box(u! - .02, v! - .02, .04, .04, high - 3, wood, 3); line(at(u!, v!, high - 2), at(u! + (u! < .5 ? .13 : -.13), v!, high + .2), "#9c7e57", 1); }
-    if (compact) { for (let j = 0; j < 6; j++) poly([at(.10 + j * .133, .12, high), at(.10 + (j + 1) * .133, .12, high), at(.10 + (j + 1) * .133, .88, high - 2), at(.10 + j * .133, .88, high - 2)], j % 2 ? "#f0dfbf" : "#a5bfa2"); }
-    else { const peak = at(.5, .5, 33), cs = [at(.06, .08, 24), at(.94, .08, 24), at(.94, .92, 24), at(.06, .92, 24)]; for (let j = 0; j < 4; j++) poly([cs[j]!, cs[(j + 1) % 4]!, peak], ["#658b77", "#537c6b", "#82a491", "#9ab5a0"][j]!, "#c7d7b86b"); for (const v of [.20, .72]) box(.28, v, .44, .065, 2, wood, 5); }
+    for (let j = 0; j < 6; j++) poly([at(.10 + j * .133, .12, high), at(.10 + (j + 1) * .133, .12, high), at(.10 + (j + 1) * .133, .88, high - 2), at(.10 + j * .133, .88, high - 2)], j % 2 ? "#f0dfbf" : "#a5bfa2");
   } else if (kind === "swings") {
     box(.08, .12, .84, .74, .8, ["#a6ad87", "#8d9c75", "#c5c59a"]);
     for (const u of [.16, .84]) { line(at(u, .22, 1), at(u, .48, 26), "#6c8f85", 2); line(at(u, .76, 1), at(u, .48, 26), "#517b73", 2); }
