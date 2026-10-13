@@ -37,7 +37,7 @@ function Glyph({ name }: { name: string }) {
   </svg>;
 }
 export function TownBuilder({ userId }: { userId: string }) {
-  const key = "odekake-town-builder:v2:" + userId, legacyKey = "odekake-town-builder:v1:" + userId;
+  const key = "odekake-town-builder:v3:" + userId, previousKey = "odekake-town-builder:v2:" + userId, legacyKey = "odekake-town-builder:v1:" + userId;
   const [town, setTown] = useState<Town>(() => createTown());
   const [loadedKey, setLoadedKey] = useState<string | null>(null), [welcome, setWelcome] = useState(false);
   const loaded = loadedKey === key;
@@ -92,10 +92,10 @@ export function TownBuilder({ userId }: { userId: string }) {
   useEffect(() => { stateRef.current = { town, options: { night, grid, hover, selected, preview, tool: mode, routes: stats.routes, paused: town.paused || welcome || !loaded, speed, parkSize, parkKind, parkRotated, editLot: mode === "decorate" ? editingLotId ?? undefined : undefined, parkPart: part, partRotation } }; }, [town, night, grid, hover, selected, preview, mode, stats.routes, welcome, loaded, speed, parkSize, parkKind, parkRotated, editingLotId, panel, part, partRotation]);
   useEffect(() => {
     setLoadedKey(null); setUndo([]); setSelected(null); setPanel(null); pendingSave.current = null;
-    try { const saved = decodeTown(localStorage.getItem(key) ?? localStorage.getItem(legacyKey)); if (saved) { setTown(saved); setWelcome(false); } else { setTown(createTown()); setWelcome(true); setSaveStatus("開始すると自動保存"); } }
+    try { const saved = decodeTown(localStorage.getItem(key) ?? localStorage.getItem(previousKey) ?? localStorage.getItem(legacyKey)); if (saved) { setTown(saved); setWelcome(false); } else { setTown(createTown()); setWelcome(true); setSaveStatus("開始すると自動保存"); } }
     catch { setTown(createTown()); setWelcome(true); setSaveStatus("保存できません"); }
     setLoadedKey(key);
-  }, [key, legacyKey]);
+  }, [key, previousKey, legacyKey]);
   useEffect(() => {
     if (!loaded || welcome) { pendingSave.current = null; return; }
     pendingSave.current = { key, town }; setSaveStatus("保存中");
@@ -275,7 +275,7 @@ export function TownBuilder({ userId }: { userId: string }) {
   const reset = () => {
     if (!window.confirm("今の街を初期化します。よろしいですか？")) return;
     pendingSave.current = null;
-    try { localStorage.setItem(key, "null"); localStorage.removeItem(legacyKey); setSaveStatus("開始すると自動保存"); } catch { setSaveStatus("保存できません"); }
+    try { localStorage.setItem(key, "null"); localStorage.removeItem(previousKey); localStorage.removeItem(legacyKey); setSaveStatus("開始すると自動保存"); } catch { setSaveStatus("保存できません"); }
     setTown(createTown(false)); setUndo([]); setSelected(null); setPanel(null); setEditingLotId(null); setMode("inspect"); setWelcome(true);
   };
   const viewScenery = (value: boolean) => { setScenery(value); setPanel(null); chooseMode(value ? "pan" : "inspect"); if (!value) canvasRef.current?.focus(); };
@@ -390,7 +390,13 @@ export function TownBuilder({ userId }: { userId: string }) {
     </section>}
     {mode === "decorate" && editingLot && !panel && !welcome && !scenery && <div ref={activeToolRef} className={styles.activeTool} data-decorate="true">
       <div><strong>{part === "remove" ? "部品を撤去" : PARK_PARTS.find(p => p.id === part)?.title}<small>{part === "remove" ? "無料" : `¥${PARK_PARTS.find(p => p.id === part)?.price}`}</small></strong><p>{part === "remove" ? "外す部品をタップ" : "敷地のマスをタップ"}</p></div>
-      <button type="button" aria-label="公園の部品を選ぶ" onClick={() => setPanel("customize")}>部品</button>
+      <button type="button" aria-label="公園の部品を選ぶ" onPointerUp={e => {
+        // A mobile browser can suppress the first compatibility click after map panning.
+        // Opening a panel is idempotent, so touch release and keyboard/mouse click can share it.
+        if (e.pointerType !== "touch" || !e.isPrimary) return;
+        const r = e.currentTarget.getBoundingClientRect();
+        if (e.clientX >= r.left && e.clientX <= r.right && e.clientY >= r.top && e.clientY <= r.bottom) setPanel("customize");
+      }} onClick={() => setPanel("customize")}>部品</button>
       <button type="button" aria-label="部品の向きを変える" disabled={part === "remove"} onClick={() => setPartRotation(v => (v + 1) % 4)}>↻ {partRotation * 90}°</button>
       <button type="button" className={styles.dismiss} aria-label="公園の編集を終了" onClick={() => { setMode("inspect"); setEditingLotId(null); setPreview([]); setHover(null); }}>×</button>
     </div>}

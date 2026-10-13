@@ -241,3 +241,8 @@
   .workshop .panelTitle { top: -10px; }
   .partCatalog { grid-template-columns: repeat(4, minmax(0, 1fr)); }
 }
+
+.partCategories { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 5px; margin-bottom: 8px; }
+.partCategories button { min-height: 44px; padding: 7px 2px; border: 1px solid var(--line); border-radius: 10px; color: var(--green); background: #edf1e3; font-size: 11px !important; }
+.partCategories button[aria-pressed=true] { color: #fff8de; background: var(--green); border-color: var(--green); }
+.partCategories small { font-size: 9px; margin-left: 4px; opacity: .75; }

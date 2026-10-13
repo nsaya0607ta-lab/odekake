@@ -1,7 +1,7 @@
 export type SpriteBounds = { left: number; top: number; width: number; height: number };
 type Sprite = { canvas: HTMLCanvasElement; bounds: SpriteBounds; pixels: number };
 
-/** Reuse vector artwork as crisp 2× sprites. Bound memory even in a fully built city. */
+/** Reuse vector artwork as crisp 3× sprites. Bound memory even in a fully built city. */
 export class TownSprites {
   private readonly entries = new Map<string, Sprite>();
   private pixels = 0;
@@ -13,8 +13,8 @@ export class TownSprites {
     if (!sprite) {
       const canvas = this.createCanvas(), context = canvas.getContext("2d");
       if (!context) { c.save(); c.translate(x, y); paint(c); c.restore(); return; }
-      canvas.width = Math.ceil(bounds.width * 2); canvas.height = Math.ceil(bounds.height * 2);
-      context.setTransform(2, 0, 0, 2, -bounds.left * 2, -bounds.top * 2);
+      canvas.width = Math.ceil(bounds.width * 3); canvas.height = Math.ceil(bounds.height * 3);
+      context.setTransform(3, 0, 0, 3, -bounds.left * 3, -bounds.top * 3);
       paint(context);
       sprite = { canvas, bounds, pixels: canvas.width * canvas.height };
       this.pixels += sprite.pixels;

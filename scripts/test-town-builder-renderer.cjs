@@ -10,7 +10,8 @@ function compile(file, imports = {}) {
 const game = compile('src/lib/games/town-builder.ts');
 const transport = compile('src/lib/games/town-transport.ts', { './town-builder': game });
 const sprites = compile('src/lib/games/town-sprites.ts');
-const { TownScene, drawTownIcon, drawTownPartIcon } = compile('src/lib/games/town-renderer.ts', { './town-builder': game, './town-transport': transport, './town-sprites': sprites });
+const decorations = compile('src/lib/games/town-decorations.ts');
+const { TownScene, drawTownIcon, drawTownPartIcon } = compile('src/lib/games/town-renderer.ts', { './town-builder': game, './town-transport': transport, './town-sprites': sprites, './town-decorations': decorations });
 const iso = (x, y, z = 0) => ({ x: (x - y) * 32, y: (x + y) * 16 - z });
 const blank = () => ({ ...game.createTown(false), tiles: Array(576).fill('grass'), terrain: Array(576).fill(false), levels: Array(576).fill(0) });
 let passed = 0;
@@ -267,5 +268,12 @@ test('component and path changes refresh the cache; movement after editing reuse
   const ground=factory.surfaces[0],before=ground.fills.length;town=game.placeParkPart(town,125,125,'path').town;scene.render(c,390,844,town,options,0);assert(ground.fills.length>before);
   town=game.placeParkPart(town,125,125,'bench').town;scene.render(c,390,844,town,options,0);const paints=factory.surfaces.reduce((n,s)=>n+s.fills.length,0),surfaces=factory.surfaces.length;
   for(let i=0;i<20;i++){scene.camera.x+=.1;scene.render(c,390,844,town,options,0);}assert.equal(factory.surfaces.length,surfaces);assert.equal(factory.surfaces.reduce((n,s)=>n+s.fills.length,0),paints);
+});
+test('tall new park structures can be selected above the ground tile at different zooms',()=>{
+  for(const kind of ['cherry','pine','gazebo','clock','arch','swings']){
+    let town=game.buyParkLot(blank(),5,5,'medium').town;town=game.placeParkPart(town,125,125,kind).town;
+    const scene=new TownScene(),p=iso(5.5,5.5,kind==='swings'?23:30);
+    for(const zoom of [.6,1.4,2.8]){scene.camera={x:160,y:60,zoom};assert.equal(scene.pickTile(160+p.x*zoom,60+p.y*zoom,town),125,kind);}
+  }
 });
 console.log(`${passed} town renderer checks passed`);

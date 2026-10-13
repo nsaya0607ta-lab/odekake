@@ -2,9 +2,9 @@
 export const MAP_SIZE = 24;
 export type Tile = "grass" | "water" | "road" | "rail" | "station" | "house" | "shop" | "factory" | "park";
 export type Tool = Exclude<Tile, "grass" | "water"> | "bulldoze";
-export type ParkPart = "tree" | "flowers" | "bench" | "fountain" | "playground" | "path" | "light";
+export type ParkPart = "tree" | "flowers" | "bench" | "fountain" | "playground" | "path" | "light" | "cherry" | "pine" | "hedge" | "pond" | "gazebo" | "picnic" | "swings" | "sandbox" | "sculpture" | "clock" | "trash" | "bikeRack" | "stones" | "arch";
 export type ParkLot = { id: number; x: number; y: number; width: number; height: number; kind: "park" | "plaza"; parts: { tile: number; kind: ParkPart; rotation: number }[] };
-export type FacilityPart = "garden" | "terrace" | "light" | "sign" | "storage" | "greenbelt" | "solar" | "bench";
+export type FacilityPart = "garden" | "terrace" | "light" | "sign" | "storage" | "greenbelt" | "solar" | "bench" | "vending" | "canopy" | "planter";
 export type FacilityAttachment = { tile: number; kind: Tile; parts: FacilityPart[] };
 export type Town = { tiles: Tile[]; money: number; day: number; paused: boolean; levels: number[]; terrain: boolean[]; rewards: string[]; parks: ParkLot[]; attachments: FacilityAttachment[] };
 export const PARK_SIZES = [
@@ -13,14 +13,30 @@ export const PARK_SIZES = [
   { id: "large", width: 4, height: 3, price: 1500, title: "4×3" },
 ] as const;
 export type ParkSize = typeof PARK_SIZES[number]["id"];
-export const PARK_PARTS: ReadonlyArray<{ id: ParkPart; title: string; price: number; layer: "ground" | "object"; value: number }> = [
-  { id: "tree", title: "木", price: 70, layer: "object", value: 3 },
-  { id: "flowers", title: "花壇", price: 60, layer: "object", value: 2 },
-  { id: "bench", title: "ベンチ", price: 80, layer: "object", value: 2 },
-  { id: "fountain", title: "噴水", price: 180, layer: "object", value: 3 },
-  { id: "playground", title: "遊具", price: 240, layer: "object", value: 4 },
-  { id: "path", title: "通路", price: 25, layer: "ground", value: 0 },
-  { id: "light", title: "照明", price: 90, layer: "object", value: 1 },
+export const PARK_CATEGORIES = ["植栽", "遊具", "休憩", "景観"] as const;
+export type ParkCategory = typeof PARK_CATEGORIES[number];
+export const PARK_PARTS: ReadonlyArray<{ id: ParkPart; title: string; price: number; category: ParkCategory; layer: "ground" | "object"; value: number }> = [
+  { id: "tree", title: "木", price: 70, category: "植栽", layer: "object", value: 3 },
+  { id: "flowers", title: "花壇", price: 60, category: "植栽", layer: "object", value: 2 },
+  { id: "bench", title: "ベンチ", price: 80, category: "休憩", layer: "object", value: 2 },
+  { id: "fountain", title: "噴水", price: 180, category: "景観", layer: "object", value: 3 },
+  { id: "playground", title: "遊具", price: 240, category: "遊具", layer: "object", value: 4 },
+  { id: "path", title: "通路", price: 25, category: "景観", layer: "ground", value: 0 },
+  { id: "light", title: "照明", price: 90, category: "休憩", layer: "object", value: 1 },
+  { id: "cherry", title: "桜", price: 130, category: "植栽", layer: "object", value: 4 },
+  { id: "pine", title: "針葉樹", price: 90, category: "植栽", layer: "object", value: 3 },
+  { id: "hedge", title: "生垣", price: 65, category: "植栽", layer: "object", value: 2 },
+  { id: "arch", title: "花のアーチ", price: 180, category: "植栽", layer: "object", value: 4 },
+  { id: "swings", title: "ブランコ", price: 220, category: "遊具", layer: "object", value: 4 },
+  { id: "sandbox", title: "砂場", price: 120, category: "遊具", layer: "object", value: 3 },
+  { id: "picnic", title: "ピクニック", price: 150, category: "休憩", layer: "object", value: 3 },
+  { id: "gazebo", title: "東屋", price: 320, category: "休憩", layer: "object", value: 5 },
+  { id: "trash", title: "ごみ箱", price: 45, category: "休憩", layer: "object", value: 1 },
+  { id: "bikeRack", title: "駐輪ラック", price: 100, category: "休憩", layer: "object", value: 2 },
+  { id: "pond", title: "池", price: 260, category: "景観", layer: "object", value: 4 },
+  { id: "sculpture", title: "モニュメント", price: 210, category: "景観", layer: "object", value: 3 },
+  { id: "clock", title: "時計塔", price: 190, category: "景観", layer: "object", value: 2 },
+  { id: "stones", title: "飛び石", price: 40, category: "景観", layer: "ground", value: 0 },
 ];
 export const FACILITY_PARTS: ReadonlyArray<{ id: FacilityPart; title: string; price: number; kinds: Tile[]; info: string }> = [
   { id: "garden", title: "植栽・花壇", price: 90, kinds: ["house", "shop"], info: "庭先を彩る" },
@@ -31,6 +47,9 @@ export const FACILITY_PARTS: ReadonlyArray<{ id: FacilityPart; title: string; pr
   { id: "greenbelt", title: "緑化帯", price: 140, kinds: ["factory"], info: "近所への影響を和らげる" },
   { id: "solar", title: "太陽光パネル", price: 260, kinds: ["factory"], info: "工場の収入＋¥8・維持費−¥4" },
   { id: "bench", title: "待合ベンチ", price: 90, kinds: ["station"], info: "ホームに休憩場所を追加" },
+  { id: "vending", title: "自販機", price: 160, kinds: ["shop", "station"], info: "飲み物を買える場所" },
+  { id: "canopy", title: "日よけ", price: 180, kinds: ["house", "shop"], info: "庭先に日陰をつくる" },
+  { id: "planter", title: "プランター", price: 80, kinds: ["house", "shop", "station"], info: "入口に緑を添える" },
 ];
 export type TownStats = {
   population: number; homes: number; shops: number; factories: number; roads: number; rails: number;
@@ -117,7 +136,7 @@ export function placeParkPart(town: Town, lotId: number, tile: number, kind: Par
 }
 export function removeParkPart(town: Town, lotId: number, tile: number) {
   const lot = town.parks.find(p => p.id === lotId);
-  const part = lot?.parts.find(p => p.tile === tile && p.kind !== "path") ?? lot?.parts.find(p => p.tile === tile);
+  const part = lot?.parts.find(p => p.tile === tile && PARK_PARTS.find(s => s.id === p.kind)?.layer === "object") ?? lot?.parts.find(p => p.tile === tile);
   if (!part) return { town, message: "ここには部品がありません" };
   return { town: { ...town, parks: town.parks.map(p => p.id === lotId ? { ...p, parts: p.parts.filter(s => s !== part) } : p) }, message: "部品を撤去しました。敷地は残ります" };
 }
@@ -214,7 +233,7 @@ export function railRoutes(tiles: Tile[]): number[][] {
 export function getTownStats(tiles: Tile[], levels: number[] = [], lots: ParkLot[] = [], attachments: FacilityAttachment[] = []): TownStats {
   const count = (t: Tile) => tiles.filter(v => v === t).length;
   const covered = new Set(lots.flatMap(lotTiles)), legacyParks = tiles.flatMap((t, i) => t === "park" && !covered.has(i) ? [i] : []);
-  const developed = lots.filter(l => l.parts.some(p => p.kind !== "path" && p.kind !== "light"));
+  const developed = lots.filter(l => l.parts.some(p => (PARK_PARTS.find(s => s.id === p.kind)?.value ?? 0) >= 2));
   const homes = count("house"), shops = count("shop"), factories = count("factory"), roads = count("road"), rails = count("rail"), stations = count("station"), parks = legacyParks.length + developed.length;
   const routes = railRoutes(tiles), linkedStations = new Set(routes.flatMap(r => [r[0]!, r[r.length - 1]!])).size;
   const extras = new Map(attachments.map(a => [a.tile, a.parts]));
