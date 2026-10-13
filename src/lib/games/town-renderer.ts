@@ -1,5 +1,6 @@
-import { MAP_SIZE, canBuyPark, canPlaceParkPart, lotTiles, neighbours, parkAt, parkFootprint, touchesRoad, type FacilityPart, type ParkLot, type ParkPart, type ParkSize, type Tile, type Town, type Tool } from "./town-builder";
+import { MAP_SIZE, PARK_PARTS, canBuyPark, canPlaceParkPart, lotTiles, neighbours, parkAt, parkFootprint, touchesRoad, type FacilityPart, type ParkLot, type ParkPart, type ParkSize, type Tile, type Town, type Tool } from "./town-builder";
 import { DIRECTIONS, elevationAt, measureTransportRoute, sampleTransportDistance, sampleTransportPath, stationAxis, trackPaths, trackPoint, transportHeight, transportMask, transportOutline, type TransportKind, type TransportRoute } from "./town-transport";
+import { drawTownDecoration, decorationPickFaces } from "./town-decorations";
 import { TownSprites, type SpriteBounds } from "./town-sprites";
 
 type Point = { x: number; y: number };
@@ -114,6 +115,7 @@ function lamp(c: CanvasRenderingContext2D, x: number, y: number, night: boolean)
   if (night) { const g = c.createRadialGradient(p.x, p.y, 0, p.x, p.y, 19); g.addColorStop(0, "#ffdd7745"); g.addColorStop(1, "#ffdd7700"); ellipse(c, p, 19, 10, g); }
 }
 function parkPart(c: CanvasRenderingContext2D, kind: ParkPart, x: number, y: number, rotation: number, night: boolean) {
+  if (drawTownDecoration(c, kind, x, y, rotation, night)) return;
   const at = (u: number, v: number, z = 0) => {
     const p = rotation % 4 === 1 ? [1 - v, u] : rotation % 4 === 2 ? [1 - u, 1 - v] : rotation % 4 === 3 ? [v, 1 - u] : [u, v];
     return iso(x + p[0]!, y + p[1]!, z);
@@ -207,6 +209,10 @@ function facilityParts(c: CanvasRenderingContext2D, kind: Tile, x: number, y: nu
   if (parts.includes("terrace")) {
     terrace(c, x + .59, y + .80);
   }
+  const extra = (kind: string, u: number, v: number, scale: number, r = 0) => { const p = iso(x + u, y + v); c.save(); c.translate(p.x, p.y); c.scale(scale, scale); drawTownDecoration(c, kind, 0, 0, r, night); c.restore(); };
+  if (parts.includes("vending")) extra("vending", kind === "station" && axis === "y" ? .48 : .0, kind === "station" ? axis === "x" ? .44 : -.03 : .72, .40);
+  if (parts.includes("canopy")) extra("canopy", .01, .79, .26);
+  if (parts.includes("planter")) extra("planter", kind === "station" ? .31 : .80, kind === "station" ? .20 : .38, .30);
   if (parts.includes("light")) { c.save(); if (kind === "station") c.translate(0, -3); lamp(c, x + (kind === "station" && axis === "y" ? .98 : .91), y + (kind === "station" && axis === "x" ? .98 : .86), night); c.restore(); }
   if (parts.includes("sign")) {
     line(c, iso(x + .92, y + .65, 1), iso(x + .92, y + .65, 15), "#7d7056", 1.1);
@@ -571,11 +577,12 @@ export class TownScene {
         const x = depth - y, i = y * MAP_SIZE + x, origin = iso(x, y);
         if (Math.abs(p.x - origin.x) > 36 || p.y < origin.y - 85 || p.y > origin.y + 33) continue;
         if (buildingFaces(town.tiles[i]!, x, y, town.levels[i] || 1, stationAxis(town, i)).some(face => contains(p, face))) return i;
-        const part = parkAt(town, i)?.parts.find(p => p.tile === i && p.kind !== "path");
+        const part = parkAt(town, i)?.parts.find(p => p.tile === i && PARK_PARTS.find(s => s.id === p.kind)?.layer === "object");
         if (part && part.kind === "tree") {
           const center = iso(x + .5, y + .5);
           if (contains(p, [{ x: center.x - 9, y: center.y - 10 }, { x: center.x - 10, y: center.y - 21 }, { x: center.x, y: center.y - 29 }, { x: center.x + 10, y: center.y - 21 }, { x: center.x + 9, y: center.y - 10 }])) return i;
-        } else if (part && boxFaces(x + .15, y + .2, .7, .6, part.kind === "playground" ? 15 : part.kind === "light" ? 23 : 8).some(face => contains(p, face))) return i;
+        } else if (part && decorationPickFaces(part.kind, x, y, part.rotation).some(face => contains(p, face))) return i;
+        else if (part && boxFaces(x + .15, y + .2, .7, .6, part.kind === "playground" ? 15 : part.kind === "light" ? 23 : 8).some(face => contains(p, face))) return i;
       }
     }
     return this.tileAt(px, py);
@@ -587,7 +594,7 @@ export class TownScene {
     if (lot) {
       points.push(iso(lot.x, lot.y), iso(lot.x + lot.width, lot.y), iso(lot.x + lot.width, lot.y + lot.height), iso(lot.x, lot.y + lot.height));
       points.push(iso(lot.x + .5, lot.y + .5, 40));
-      for (const part of lot.parts) points.push(iso(part.tile % MAP_SIZE + .5, Math.floor(part.tile / MAP_SIZE) + .5, part.kind === "tree" ? 40 : 25));
+      for (const part of lot.parts) points.push(iso(part.tile % MAP_SIZE + .5, Math.floor(part.tile / MAP_SIZE) + .5, ["tree", "cherry", "pine", "gazebo", "clock", "arch", "swings"].includes(part.kind) ? 42 : 25));
     } else if (town.tiles[i] === "park") points.push(iso(x + .5, y + .5, 40));
     return {
       left: camera.x + Math.min(...points.map(p => p.x)) * camera.zoom,
@@ -656,7 +663,7 @@ export class TownScene {
     for (const lot of town.parks ?? []) {
       for (const part of lot.parts) if (part.kind !== "path") {
         const x = part.tile % MAP_SIZE, y = Math.floor(part.tile / MAP_SIZE);
-        add(x, y, 1, `park-part:${part.kind}:${part.rotation}:${night}`, { left: -38, top: -34, width: 76, height: 82 }, c => parkPart(c, part.kind, x, y, part.rotation, night));
+        add(x, y, PARK_PARTS.find(p => p.id === part.kind)?.layer === "ground" ? .08 : 1, `park-part:${part.kind}:${part.rotation}:${night}`, { left: -38, top: -34, width: 76, height: 82 }, c => parkPart(c, part.kind, x, y, part.rotation, night));
         if (part.kind === "fountain") effects.push({ kind: "park", x, y });
       }
       for (const i of lotTiles(lot)) {
@@ -831,6 +838,7 @@ function createIconTown(kind: "road" | "rail"): Town {
 }
 export function drawTownPartIcon(c: CanvasRenderingContext2D, part: ParkPart | FacilityPart, width: number, height: number) {
   c.clearRect(0, 0, width, height); c.save(); c.translate(width / 2, height / 2 - 3); c.scale(.9, .9);
+  if (drawTownDecoration(c, part, 0, 0, 0, false)) { c.restore(); return; }
   if (["tree", "flowers", "bench", "fountain", "playground", "path", "light"].includes(part)) {
     parkPart(c, part as ParkPart, 0, 0, 0, false);
     if (part === "fountain") line(c, iso(.5, .5, 5), iso(.5, .5, 14), "#d9f7f0", 2);

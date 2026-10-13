@@ -87,4 +87,31 @@ test('undo retains the exact order of multiple plots and equipped facilities',()
   const removed=removeParkLot(t,indexAt(3,12)).town;assert.deepEqual(undoTownEdit(removed,recordTownEdit(t,removed)),t);
   const demolished=buildTile(t,'bulldoze',7,9).town;assert.deepEqual(undoTownEdit(demolished,recordTownEdit(t,demolished)),t);
 });
-console.log('28 town simulation checks passed');
+test('every expanded park item purchases, rotates, survives saving and undoes at its exact price',()=>{
+  for(const part of mod.exports.PARK_PARTS) for(let rotation=0;rotation<4;rotation++){
+    const base=buyParkLot(createTown(false),4,12,'small').town,id=indexAt(4,12);
+    const next=placeParkPart(base,id,id,part.id,rotation).town;
+    assert.equal(next.money,base.money-part.price);assert.equal(next.parks[0].parts[0].rotation,rotation);
+    assert.deepEqual(decodeTown(JSON.stringify(next)),next);
+    assert.deepEqual(undoTownEdit(next,recordTownEdit(base,next)),base);
+    assert.equal(placeParkPart(next,id,id,part.id).town,next);
+    assert.equal(placeParkPart({...base,money:part.price-1},id,id,part.id).town.money,part.price-1);
+  }
+});
+test('stepping stones share ground with furniture; removal removes furniture before the stones',()=>{
+  let town=buyParkLot(createTown(false),4,12,'small').town,id=indexAt(4,12);
+  town=placeParkPart(town,id,id,'stones').town;town=placeParkPart(town,id,id,'picnic').town;
+  assert.equal(town.parks[0].parts.length,2);assert.equal(placeParkPart(town,id,id,'path').town,town);
+  const next=removeParkPart(town,id,id).town;assert.deepEqual(next.parks[0].parts.map(p=>p.kind),['stones']);
+  assert.equal(getTownStats(next.tiles,next.levels,next.parks).parks,0);
+});
+test('new facility equipment enforces compatibility and retains the existing city through saves and undo',()=>{
+  for(const part of mod.exports.FACILITY_PARTS.filter(p=>['vending','canopy','planter'].includes(p.id))){
+    const base=createTown(),tile=indexAt(part.id==='vending'?10:7,part.id==='vending'?12:9);
+    const next=buyFacilityPart(base,tile,part.id).town;assert.equal(next.money,base.money-part.price);
+    assert.deepEqual(decodeTown(JSON.stringify(next)),next);assert.equal(buyFacilityPart(next,tile,part.id).town,next);
+    assert.deepEqual(undoTownEdit(next,recordTownEdit(base,next)),base);
+    assert.equal(buyFacilityPart(base,indexAt(9,10),part.id).town,base);
+  }
+});
+console.log('31 town simulation checks passed');

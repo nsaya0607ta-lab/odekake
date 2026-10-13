@@ -1,7 +1,7 @@
 "use client";
 
-import { useEffect, useRef } from "react";
-import { FACILITY_PARTS, PARK_PARTS, PARK_SIZES, type FacilityPart, type ParkLot, type ParkPart, type ParkSize, type Tile } from "@/lib/games/town-builder";
+import { useEffect, useRef, useState } from "react";
+import { FACILITY_PARTS, PARK_CATEGORIES, PARK_PARTS, PARK_SIZES, type FacilityPart, type ParkCategory, type ParkLot, type ParkPart, type ParkSize, type Tile } from "@/lib/games/town-builder";
 import { drawTownPartIcon } from "@/lib/games/town-renderer";
 import styles from "./town-builder.module.css";
 
@@ -35,8 +35,10 @@ export function ParkWorkshop({ lot, part, rotation, money, onPart, onRotate, onE
   onPart: (part: ParkPart | "remove") => void; onRotate: () => void; onExpand: (size: ParkSize) => void; onRemoveLot: () => void;
 }) {
   const selected = PARK_PARTS.find(p => p.id === part);
+  const [category, setCategory] = useState<ParkCategory>(selected?.category ?? "植栽");
   return <>
-    <div className={styles.partCatalog}>{PARK_PARTS.map(p => <button type="button" key={p.id} aria-label={`${p.title} ¥${p.price}`} aria-pressed={part === p.id} disabled={money < p.price} onClick={() => onPart(p.id)}>
+    <div className={styles.partCategories} aria-label="部品の種類">{PARK_CATEGORIES.map(k => <button type="button" key={k} aria-label={k} aria-pressed={category === k} onClick={() => setCategory(k)}>{k}<small>{PARK_PARTS.filter(p => p.category === k).length}</small></button>)}</div>
+    <div className={styles.partCatalog}>{PARK_PARTS.filter(p => p.category === category).map(p => <button type="button" key={p.id} aria-label={`${p.title} ¥${p.price}`} aria-pressed={part === p.id} disabled={money < p.price} onClick={() => onPart(p.id)}>
       <PartIcon part={p.id} /><b>{p.title}</b><small>¥{p.price}</small>
     </button>)}<button type="button" aria-label="部品を撤去" aria-pressed={part === "remove"} onClick={() => onPart("remove")}><span className={styles.partRemoveIcon} aria-hidden="true">−</span><b>撤去</b><small>敷地は残る</small></button></div>
     <div className={styles.workshopHint}><span>{part === "remove" ? "外す部品をタップ" : `${selected?.title} · 敷地のマスをタップ`}</span><button type="button" className={styles.rotatePart} aria-label="部品の向きを変える" disabled={part === "remove"} onClick={onRotate}>↻ {rotation * 90}°</button></div>
