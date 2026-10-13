@@ -48,7 +48,7 @@ export const FACILITY_PARTS: ReadonlyArray<{ id: FacilityPart; title: string; pr
   { id: "solar", title: "太陽光パネル", price: 260, kinds: ["factory"], info: "工場の収入＋¥8・維持費−¥4" },
   { id: "bench", title: "待合ベンチ", price: 90, kinds: ["station"], info: "ホームに休憩場所を追加" },
   { id: "vending", title: "自販機", price: 160, kinds: ["shop", "station"], info: "飲み物を買える場所" },
-  { id: "canopy", title: "日よけ", price: 180, kinds: ["house", "shop"], info: "庭先に日陰をつくる" },
+  { id: "canopy", title: "日よけ", price: 180, kinds: ["house", "shop"], info: "庭先・屋上に日陰をつくる" },
   { id: "planter", title: "プランター", price: 80, kinds: ["house", "shop", "station"], info: "入口に緑を添える" },
 ];
 export type TownStats = {

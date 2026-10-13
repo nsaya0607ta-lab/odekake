@@ -355,4 +355,40 @@ test('every building stage keeps its visible roof selectable and inside the sele
 test('all three stages have distinct names and a strictly growing skyline',()=>{
   for(const kind of ['house','shop','factory']){const heights=[1,2,3].map(l=>models.buildingHeight(kind,l));assert(heights[0]<heights[1]&&heights[1]<heights[2]);assert.equal(new Set(models.BUILDING_STAGES[kind]).size,3);}
 });
+const overlaps = (a,b) => a.u < b.u+b.w-1e-8 && a.u+a.w > b.u+1e-8 && a.v < b.v+b.d-1e-8 && a.v+a.d > b.v+1e-8;
+test('all purchased fittings keep separate spaces within the lot and clear of building interiors',()=>{
+  for(const kind of ['house','shop','factory'])for(const level of [1,2,3]){
+    const parts=game.FACILITY_PARTS.filter(p=>p.kinds.includes(kind)).map(p=>p.id),fittings=models.facilityLayout(kind,level,parts),body=models.buildingVolumes(kind,level);
+    for(const f of fittings){
+      assert(f.u>=0&&f.v>=0&&f.u+f.w<=1&&f.v+f.d<=1,kind+' '+level+' '+f.part+' outside lot');
+      if(f.mount==='ground')assert(body.every(b=>!overlaps(f,b)),kind+' '+level+' '+f.part+' intersects wall');
+      else if(f.part!=='solar')assert(body.some(b=>Math.abs(f.z-(b.z+b.height+2+(kind==='shop'&&level===1?1:0)))<1e-8&&f.u>=b.u&&f.v>=b.v&&f.u+f.w<=b.u+b.w&&f.v+f.d<=b.v+b.d),kind+' '+level+' deck unsupported');
+    }
+    for(let i=0;i<fittings.length;i++)for(let j=i+1;j<fittings.length;j++){
+      const a=fittings[i],b=fittings[j];if(a.z+a.height<=b.z||b.z+b.height<=a.z)continue;
+      if(['terrace','canopy'].includes(a.part)&&['terrace','canopy'].includes(b.part))continue;
+      assert(!overlaps(a,b),kind+' '+level+' fittings collide: '+a.part+' '+b.part);
+    }
+  }
+});
+test('roof decks and solar racks keep clear of fixed roof equipment and chimneys at all levels',()=>{
+  for(const kind of ['house','shop'])for(const level of [1,2,3])for(const f of models.facilityLayout(kind,level,['terrace','canopy']).filter(f=>f.mount==='roof')){
+    for(const b of models.roofFeatures(kind,level))assert(!overlaps(f,b),kind+' '+level+' deck covers roof unit');
+  }
+  for(const level of [1,2,3]){
+    const layout=models.factoryLayout(level),panel=layout.solar;
+    assert.equal(panel.z,layout.main.height,'Solar rack feet must meet the roof');
+    assert(panel.u>=layout.main.u&&panel.v>=layout.main.v&&panel.u+panel.w<=layout.main.u+layout.main.w&&panel.v+panel.d<=layout.main.v+layout.main.d);
+    for(const s of [...layout.stacks,...Array.from({length:3},(_,j)=>({...layout.vent,u:layout.vent.u+j*layout.vent.spacing}))])assert(!overlaps(panel,s),'Solar covers a vent or stack at Lv.'+level);
+  }
+});
+test('high roof canopies and tilted solar panels select their owner and stay inside selection bounds',()=>{
+  for(const kind of ['house','shop','factory'])for(const level of [1,2,3]){
+    const town=blank(),tile=125;town.tiles[tile]=kind;town.levels[tile]=level;
+    const parts=kind==='factory'?['solar','storage','greenbelt']:['terrace','canopy','garden','planter'];town.attachments=[{tile,kind,parts}];
+    const f=models.facilityLayout(kind,level,parts).find(f=>f.part===(kind==='factory'?'solar':'canopy'));
+    const p=iso(5+f.u+f.w/2,5+f.v+f.d/2,f.z+(kind==='factory'?2.9:10.7)),scene=new TownScene();
+    for(const zoom of [.6,1.4,2.8]){scene.camera={x:195,y:50,zoom};const x=195+p.x*zoom,y=50+p.y*zoom;assert.equal(scene.pickTile(x,y,town),tile,kind+' '+level);const bounds=scene.tileBounds(tile,town);assert(x>=bounds.left&&x<=bounds.right&&y>=bounds.top&&y<=bounds.bottom);}
+  }
+});
 console.log(`${passed} town renderer checks passed`);

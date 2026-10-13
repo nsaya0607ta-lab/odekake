@@ -2,7 +2,7 @@ import { MAP_SIZE, PARK_PARTS, canBuyPark, canPlaceParkPart, lotTiles, neighbour
 import { DIRECTIONS, elevationAt, measureTransportRoute, sampleTransportDistance, sampleTransportPath, stationAxis, trackPaths, trackPoint, transportHeight, transportMask, transportOutline, type TransportKind, type TransportRoute } from "./town-transport";
 import { drawTownDecoration, decorationPickFaces } from "./town-decorations";
 import { TownSprites, type SpriteBounds } from "./town-sprites";
-import { buildingHeight, buildingLevel, buildingVolumes, factoryLayout, roofFeatures } from "./town-building-models";
+import { buildingHeight, buildingLevel, buildingVolumes, factoryLayout, facilityLayout, roofFeatures, type FacilityPlacement } from "./town-building-models";
 
 type Point = { x: number; y: number };
 export type TownCamera = { x: number; y: number; zoom: number };
@@ -205,16 +205,6 @@ function parkPart(c: CanvasRenderingContext2D, kind: ParkPart, x: number, y: num
   const end = at(.52, .34).y > at(.12, .34).y ? .52 : .12;
   poly(c, [at(end, .12, 22), at(end, .34, 25), at(end, .56, 22)], "#759d86", "#b8d0b26b", .4);
 }
-function terrace(c: CanvasRenderingContext2D, x: number, y: number) {
-  box(c, x, y, .32, .18, 1, ["#b79c78", "#8f7c60", "#d9bd95"]);
-  for (let j = 1; j < 5; j++) line(c, iso(x + j * .064, y, 1.1), iso(x + j * .064, y + .18, 1.1), "#aa8c69", .4);
-  box(c, x + .11, y + .065, .08, .07, 4, ["#917655", "#745f47", "#e4c59a"], 1);
-  for (const u of [.025, .245]) { box(c, x + u, y + .07, .055, .06, 3, ["#97a387", "#6f8a74", "#cad1ac"], 1); box(c, x + u, y + .065, .055, .015, 3, ["#829777", "#567661", "#cfdbaf"], 4); }
-  const cx = x + .155, cy = y + .10; line(c, iso(cx, cy, 1), iso(cx, cy, 14), "#8f7654", .7);
-  const top = iso(cx, cy, 14), ring = Array.from({ length: 6 }, (_, j) => { const a = j * Math.PI / 3; return iso(cx + Math.cos(a) * .14, cy + Math.sin(a) * .14, 11); });
-  const faces = ring.map((a, j) => ({ a, b: ring[(j + 1) % 6]!, j })).sort((a, b) => a.a.y + a.b.y - b.a.y - b.b.y);
-  for (const { a, b, j } of faces) poly(c, [top, a, b], j % 2 ? "#eee5c9" : "#cc9a7d", "#9b897b55", .35);
-}
 function crate(c: CanvasRenderingContext2D, x: number, y: number, w: number, d: number, h: number, z = 0) {
   box(c, x, y, w, d, h, ["#b79b72", "#8e795b", "#d9c29a"], z);
   for (let j = 1; j < 4; j++) { line(c, iso(x, y + d, z + h * j / 4), iso(x + w, y + d, z + h * j / 4), "#826845", .4); line(c, iso(x + w, y, z + h * j / 4), iso(x + w, y + d, z + h * j / 4), "#6c624a", .4); }
@@ -222,51 +212,135 @@ function crate(c: CanvasRenderingContext2D, x: number, y: number, w: number, d: 
   line(c, iso(x + w, y + .01, z + h), iso(x + w, y + d - .01, z + .5), "#b49f77", .7);
 }
 function solarPanel(c: CanvasRenderingContext2D, x: number, y: number, w: number, d: number, z: number) {
-  box(c, x, y, w, d, 1, ["#768b88", "#4d7377", "#658f98"], z);
-  patch(c, x + .01, y + .01, w - .02, d - .02, "#31586f", z + 1.1);
-  for (let u = 0; u < 4; u++) for (let v = 0; v < 2; v++) {
-    const sx = x + .025 + u * (w - .04) / 4, sy = y + .025 + v * (d - .04) / 2;
-    patch(c, sx, sy, (w - .04) / 4 - .012, (d - .04) / 2 - .012, u % 2 ? "#476f89" : "#3b627e", z + 1.2);
-    line(c, iso(sx + .015, sy + .02, z + 1.3), iso(sx + .055, sy + .02, z + 1.3), "#88b5c779", .45);
+  const at = (u: number, v: number, lift = 0) => iso(x + u, y + v, z + 1.2 + 3 * (1 - v / d) + lift);
+  patch(c, x, y, w, d, "#254f4024", z + .05);
+  for (const u of [.035, w - .035]) for (const v of [.025, d - .025]) {
+    const height = 1.2 + 3 * (1 - v / d);
+    box(c, x + u - .01, y + v - .01, .02, .02, height, ["#98aba0", "#5e7e79", "#c6d2bb"], z);
   }
-  glaze(c, [iso(x, y, z + 1.3), iso(x + w, y, z + 1.3), iso(x + w, y + d, z + 1.3), iso(x, y + d, z + 1.3)], "#b6d5df26", "#17354919");
+  poly(c, [at(0, d, -.6), at(w, d, -.6), at(w, d), at(0, d)], "#708d8a");
+  poly(c, [at(w, 0, -.6), at(w, d, -.6), at(w, d), at(w, 0)], "#476d72");
+  poly(c, [at(0, 0), at(w, 0), at(w, d), at(0, d)], "#a8bbb0", "#cfe0cf", .4);
+  for (let u = 0; u < 4; u++) for (let v = 0; v < 2; v++) {
+    const sx = .015 + u * (w - .03) / 4, sy = .012 + v * (d - .024) / 2;
+    const cw = (w - .03) / 4 - .008, cd = (d - .024) / 2 - .006;
+    poly(c, [at(sx, sy, .1), at(sx + cw, sy, .1), at(sx + cw, sy + cd, .1), at(sx, sy + cd, .1)], u % 2 ? "#476f89" : "#315b77");
+    line(c, at(sx + cw * .5, sy, .2), at(sx + cw * .5, sy + cd, .2), "#9cc6d16b", .3);
+  }
+  glaze(c, [at(0, 0, .2), at(w, 0, .2), at(w, d, .2), at(0, d, .2)], "#cee4df25", "#25496612");
+}
+function facilityPlanter(c: CanvasRenderingContext2D, x: number, y: number, p: FacilityPlacement, level: number, flowers: boolean) {
+  const u = x + p.u, v = y + p.v, rim = flowers ? 2.6 : 3.5;
+  box(c, u, v, p.w, p.d, rim, level === 1 ? ["#b99b79", "#907955", "#dec49b"] : ["#b6c5ad", "#829e8b", "#e0e1c4"], p.z);
+  patch(c, u + .008, v + .008, p.w - .016, p.d - .016, "#626f49", p.z + rim + .05);
+  for (let j = 0; j < (flowers ? 4 : 3); j++) {
+    const center = iso(u + p.w * (j + .5) / (flowers ? 4 : 3), v + p.d / 2, p.z + rim);
+    line(c, center, { x: center.x, y: center.y - (flowers ? 1.5 : 2) }, "#63864f", .4);
+    if (flowers) blossom(c, { x: center.x, y: center.y - 1.5 }, j % 2 ? "#e5c278" : "#d9979d", .55);
+    else {
+      ellipse(c, { x: center.x - .5, y: center.y - 1.2 }, .8, 1.1, "#5d8956");
+      ellipse(c, { x: center.x + .5, y: center.y - 2 }, .75, 1.0, "#92b476");
+    }
+  }
+}
+function seating(c: CanvasRenderingContext2D, x: number, y: number, p: FacilityPlacement, level: number, night: boolean, furnished: boolean, covered: boolean) {
+  const u = x + p.u, v = y + p.v, { w, d, z } = p, floor = z + .8;
+  const at = (a: number, b: number, h: number) => iso(u + a * w, v + b * d, h);
+  box(c, u, v, w, d, .8, level === 1 ? ["#b29875", "#887658", "#d6bd94"] : ["#a9b6a2", "#7f978b", "#e4dfc5"], z);
+  for (let j = 1; j < 6; j++) line(c, at(j / 6, 0, floor + .05), at(j / 6, 1, floor + .05), "#8b957b5c", .35);
+  const post = (a: number, b: number) => {
+    const roof = floor + 9.5 + (1 - b) * .8;
+    box(c, u + a * w - .007, v + b * d - .007, .014, .014, roof - .5 - floor, ["#93a78d", "#678879", "#d3dfbd"], floor);
+    line(c, at(a, b, roof - 2), at(a + (a < .5 ? .11 : -.11), b, roof - .5), "#9bb196", .5);
+  };
+  if (covered) for (const a of [.07, .93]) post(a, .08);
+  if (p.mount === "roof") for (const a of [0, 1]) {
+    poly(c, [at(a, 0, floor), at(a, 1, floor), at(a, 1, floor + 3), at(a, 0, floor + 3)], level === 3 ? "#bfd9cb55" : "#bbcdb64a", "#8eac95", .4);
+    line(c, at(a, 0, floor + 3), at(a, 1, floor + 3), "#cdddbe", .5);
+  }
+  if (furnished) {
+    // Chair feet and table pedestals meet the deck; the backs rise from the seat.
+    for (const a of [.12, .72]) {
+      const cx = u + a * w, cy = v + .30 * d, cw = w * .16, cd = d * .40;
+      for (const du of [0, cw - .009]) for (const dv of [0, cd - .009]) box(c, cx + du, cy + dv, .009, .009, 2.5, ["#809c89", "#597965", "#c5d3b0"], floor);
+      box(c, cx, cy, cw, cd, .6, ["#a3b798", "#7a967d", "#d2dbc0"], floor + 2.5);
+      box(c, cx, cy, cw, .013, 2.6, ["#9fb490", "#72916d", "#d1dcb8"], floor + 3.1);
+    }
+    box(c, u + w * .47, v + d * .44, .025, .025, 4, ["#8fa28a", "#657f70", "#cfdbb5"], floor);
+    box(c, u + w * .35, v + d * .29, w * .29, d * .43, .6, ["#bba985", "#8f8469", "#e5d4ad"], floor + 4);
+    ellipse(c, at(.52, .46, floor + 4.65), .7, .4, "#edf0d1");
+    if (!covered) {
+      line(c, at(.52, .50, floor), at(.52, .50, floor + 10.5), "#7e896e", .6);
+      const center = at(.52, .50, floor + 10.5), ring = Array.from({ length: 6 }, (_, j) => { const a = j * Math.PI / 3; return at(.52 + Math.cos(a) * .39, .50 + Math.sin(a) * .40, floor + 9); });
+      ring.map((a, j) => ({ a, b: ring[(j + 1) % 6]!, j })).sort((a, b) => a.a.y + a.b.y - b.a.y - b.b.y).forEach(({ a, b, j }) => poly(c, [center, a, b], j % 2 ? "#e7dfbf" : "#a3bba1", "#b5b89770", .35));
+    }
+  }
+  if (p.mount === "roof") {
+    poly(c, [at(0, 1, floor), at(1, 1, floor), at(1, 1, floor + 3), at(0, 1, floor + 3)], level === 3 ? "#bfd9cb55" : "#bbcdb64a");
+    for (const a of [0, .5, 1]) line(c, at(a, 1, floor), at(a, 1, floor + 3), "#8caa91", .4);
+    line(c, at(0, 1, floor + 3), at(1, 1, floor + 3), "#dae3c5", .55);
+  }
+  if (covered) {
+    for (const a of [.07, .93]) post(a, .92);
+    const roofAt = (a: number, b: number, h = 0) => at(a, b, floor + 9.5 + (1 - b) * .8 + h);
+    poly(c, [roofAt(0, 1, -.5), roofAt(1, 1, -.5), roofAt(1, 1), roofAt(0, 1)], "#91a68b");
+    poly(c, [roofAt(1, 0, -.5), roofAt(1, 1, -.5), roofAt(1, 1), roofAt(1, 0)], "#718f7d");
+    for (let j = 0; j < 5; j++) poly(c, [roofAt(j / 5, 0), roofAt((j + 1) / 5, 0), roofAt((j + 1) / 5, 1), roofAt(j / 5, 1)], j % 2 ? "#e7dfbe" : "#a4bca0");
+    if (night) line(c, roofAt(.1, .92, -.7), roofAt(.9, .92, -.7), "#e8d09a", .55);
+  }
+}
+function compactVending(c: CanvasRenderingContext2D, x: number, y: number, p: FacilityPlacement, night: boolean) {
+  const u = x + p.u, v = y + p.v, z = p.z;
+  box(c, u, v, p.w, p.d, p.height, ["#a7bab0", "#688d85", "#d9dac4"], z);
+  const at = (a: number, h: number) => iso(u + a * p.w, v + p.d + .003, z + h * p.height);
+  poly(c, [at(.1, .34), at(.73, .34), at(.73, .86), at(.1, .86)], night ? "#c9e6c3" : "#6a9c9d");
+  for (let row = 0; row < 3; row++) for (let j = 0; j < 3; j++) line(c, at(.20 + j * .20, .42 + row * .15), at(.20 + j * .20, .50 + row * .15), ["#e5be7c", "#d98b85", "#dbe4bf"][j]!, .45);
+  poly(c, [at(.12, .10), at(.73, .10), at(.73, .23), at(.12, .23)], "#3b5c54");
+  for (const h of [.45, .60, .75]) ellipse(c, at(.87, h), .27, .27, "#e2dcb5");
 }
 function facilityParts(c: CanvasRenderingContext2D, kind: Tile, x: number, y: number, level: number, parts: FacilityPart[], night: boolean, axis: "x" | "y", behind = false) {
-  if (behind) {
-    if (parts.includes("greenbelt")) for (let j = 0; j < 5; j++) { box(c, x + .05 + j * .18, y + .04, .15, .09, 2, ["#8c9b77", "#6b8069", "#b6b995"]); tree(c, x + .12 + j * .18, y + .08, 4.5, .6); }
+  if (kind === "station") {
+    if (behind) return;
+    const extra = (part: string, u: number, v: number, scale: number, r = 0) => {
+      const p = iso(x + u, y + v, 3 - scale);
+      c.save(); c.translate(p.x, p.y); c.scale(scale, scale); drawTownDecoration(c, part, 0, 0, r, night); c.restore();
+    };
+    if (parts.includes("vending")) extra("vending", axis === "x" ? .075 : .56, axis === "x" ? .59 : .075, .40, axis === "x" ? 0 : 3);
+    if (parts.includes("planter")) extra("planter", axis === "x" ? .70 : .61, axis === "x" ? .61 : .70, .30);
+    if (parts.includes("light")) { c.save(); c.translate(0, -3); lamp(c, x + (axis === "y" ? .98 : .91), y + (axis === "x" ? .98 : .86), night); c.restore(); }
+    if (parts.includes("bench")) {
+      box(c, x + (axis === "x" ? .39 : .77), y + (axis === "x" ? .77 : .39), axis === "x" ? .32 : .09, axis === "x" ? .09 : .32, 3, ["#a48461", "#896e50", "#d5b387"], 3);
+      for (let j = 0; j < 3; j++) line(c, iso(x + (axis === "x" ? .39 : .79 + j * .02), y + (axis === "x" ? .79 + j * .02 : .39), 6.2), iso(x + (axis === "x" ? .71 : .79 + j * .02), y + (axis === "x" ? .79 + j * .02 : .71), 6.2), "#866345", .45);
+    }
     return;
   }
-  if (parts.includes("garden") || parts.includes("greenbelt")) {
-    for (const u of [.07, .72]) { box(c, x + u, y + .88, .20, .08, 3, ["#bdad8b", "#928766", "#70965f"]); for (let j = 0; j < 4; j++) blossom(c, iso(x + u + .025 + j * .045, y + .91, 5), j % 2 ? "#e6c26b" : "#d98998", .7); }
-  }
-  if (parts.includes("terrace")) {
-    terrace(c, x + .59, y + .80);
-  }
-  const extra = (part: string, u: number, v: number, scale: number, r = 0) => {
-    // Decoration feet start at z=1; place those feet on the raised platform.
-    const p = iso(x + u, y + v, kind === "station" ? 3 - scale : 0);
-    c.save(); c.translate(p.x, p.y); c.scale(scale, scale); drawTownDecoration(c, part, 0, 0, r, night); c.restore();
-  };
-  if (parts.includes("vending")) {
-    if (kind === "station") extra("vending", axis === "x" ? .075 : .56, axis === "x" ? .59 : .075, .40, axis === "x" ? 0 : 3);
-    else extra("vending", .0, .72, .40);
-  }
-  if (parts.includes("canopy")) extra("canopy", .01, .79, .26);
-  if (parts.includes("planter")) extra("planter", kind === "station" ? axis === "x" ? .70 : .61 : .80, kind === "station" ? axis === "x" ? .61 : .70 : .38, .30);
-  if (parts.includes("light")) { c.save(); if (kind === "station") c.translate(0, -3); lamp(c, x + (kind === "station" && axis === "y" ? .98 : .91), y + (kind === "station" && axis === "x" ? .98 : .86), night); c.restore(); }
-  if (parts.includes("sign")) {
-    line(c, iso(x + .92, y + .65, 1), iso(x + .92, y + .65, 15), "#7d7056", 1.1);
-    box(c, x + .91, y + .60, .04, .17, 5, ["#6c9881", "#476f63", "#d5caaa"], 10);
-    const p = iso(x + .955, y + .69, 12.5); ellipse(c, p, 1.8, 1.8, "#ead7a9"); line(c, { x: p.x - 1, y: p.y }, { x: p.x + 1, y: p.y }, "#778b67", .5);
-  }
-  if (parts.includes("storage")) for (let j = 0; j < 3; j++) crate(c, x + .12 + j * .10, y + .87, .085, .08, 3 + j % 2 * 2, 4);
-  if (parts.includes("solar")) {
-    const panel = factoryLayout(level).solar;
-    solarPanel(c, x + panel.u, y + panel.v, panel.w, panel.d, panel.z);
-  }
-  if (parts.includes("bench") && kind === "station") {
-    box(c, x + (axis === "x" ? .39 : .77), y + (axis === "x" ? .77 : .39), axis === "x" ? .32 : .09, axis === "x" ? .09 : .32, 3, ["#a48461", "#896e50", "#d5b387"], 3);
-    for (let j = 0; j < 3; j++) line(c, iso(x + (axis === "x" ? .39 : .79 + j * .02), y + (axis === "x" ? .79 + j * .02 : .39), 6.2), iso(x + (axis === "x" ? .71 : .79 + j * .02), y + (axis === "x" ? .79 + j * .02 : .71), 6.2), "#866345", .45);
+  const layout = facilityLayout(kind, level, parts).filter(p => Boolean(p.behind) === behind).sort((a, b) => a.z - b.z || a.u + a.v - b.u - b.v);
+  for (const p of layout) {
+    const u = x + p.u, v = y + p.v;
+    if (p.part === "terrace" || p.part === "canopy") {
+      if (p.part === "canopy" && parts.includes("terrace")) continue;
+      seating(c, x, y, p, level, night, parts.includes("terrace"), parts.includes("canopy"));
+    } else if (p.part === "garden" || p.part === "planter" || p.part === "greenbelt") {
+      if (p.behind) for (let j = 0; j < 5; j++) {
+        const a = p.u + j * .18;
+        box(c, x + a, v, .15, p.d, 2, ["#8c9b77", "#6b8069", "#b6b995"]);
+        tree(c, x + a + .075, v + p.d / 2, 4.5, .6);
+      }
+      else facilityPlanter(c, x, y, p, level, p.part !== "planter");
+    } else if (p.part === "vending") compactVending(c, x, y, p, night);
+    else if (p.part === "light") lamp(c, u + p.w / 2, v + p.d / 2, night);
+    else if (p.part === "sign") {
+      line(c, iso(u + .01, v + p.d / 2, 0), iso(u + .01, v + p.d / 2, 16), "#7d7056", 1.1);
+      box(c, u, v, p.w, p.d, 5, ["#6c9881", "#476f63", "#d5caaa"], 10);
+      const q = iso(u + p.w, v + p.d / 2, 12.5); ellipse(c, q, 1.8, 1.8, "#ead7a9"); line(c, { x: q.x - 1, y: q.y }, { x: q.x + 1, y: q.y }, "#778b67", .5);
+    } else if (p.part === "storage") {
+      box(c, u, v, p.w, p.d, .8, ["#8c9e8b", "#667f70", "#becaae"]);
+      for (let j = 0; j < 3; j++) {
+        const h = j === 1 ? 5 : 3.5, a = u + .012 + j * .115;
+        crate(c, a, v + .012, .10, .065, h, .8);
+        if (level === 3 && j === 1) crate(c, a + .01, v + .018, .08, .055, 3, .8 + h);
+      }
+    } else if (p.part === "solar") solarPanel(c, u, v, p.w, p.d, p.z);
   }
 }
 function station(c: CanvasRenderingContext2D, x: number, y: number, axis: "x" | "y", night: boolean, roof: boolean) {
@@ -412,9 +486,9 @@ function building(c: CanvasRenderingContext2D, kind: Tile, x: number, y: number,
     }
     const vent = layout.vent;
     for (let j = 0; j < 3; j++) {
-      const u = x + vent.u + j * .23;
+      const u = x + vent.u + j * vent.spacing;
       box(c, u, y + vent.v, vent.w, vent.d, 5, ["#739c9f", "#547b81", "#9cb9b4"], height);
-      for (let k = 1; k < 5; k++) line(c, iso(u + .02, y + vent.v + k * vent.d / 5, height + 5.1), iso(u + .20, y + vent.v + k * vent.d / 5, height + 5.1), "#476e7478", .65);
+      for (let k = 1; k < 5; k++) line(c, iso(u + .015, y + vent.v + k * vent.d / 5, height + 5.1), iso(u + vent.w - .015, y + vent.v + k * vent.d / 5, height + 5.1), "#476e7478", .45);
     }
     for (const stack of layout.stacks) {
       box(c, x + stack.u, y + stack.v, stack.w, stack.d, stack.height, ["#bf8d75", "#8e6557", "#e1b199"], stack.z);
@@ -435,7 +509,7 @@ function building(c: CanvasRenderingContext2D, kind: Tile, x: number, y: number,
       for (let k = 1; k < (stage === 3 ? 9 : 6); k++) line(c, iso(u - w / 2 + .005, v + .005, k * 2), iso(u + w / 2 - .005, v + .005, k * 2), "#9ab2a354", .6);
     }
     if (showSmoke) factorySmoke(c, x, y, time, level);
-    box(c, x + .12, y + .86, parts.includes("storage") ? .34 : .25, .08, 4, ["#a6b6aa", "#6f8b7d", "#c9d4bb"]); return;
+    if (!parts.includes("storage")) box(c, x + .29, y + .87, .25, .09, 4, ["#a6b6aa", "#6f8b7d", "#c9d4bb"]); return;
   }
   const floors = kind === "house" ? level === 1 ? 1 : level * 2 : level + 1;
   const height = floors * 12 + 5;
@@ -465,7 +539,7 @@ function building(c: CanvasRenderingContext2D, kind: Tile, x: number, y: number,
     box(c, bx + .24, by + .65, .18, .12, 1, ["#a78b67", "#7f775b", "#d6c2a0"], 11.5);
     for (const u of [.245, .405]) line(c, iso(bx + u, by + .755, 1), iso(bx + u, by + .755, 11.5), "#a8ad90", .65);
     for (const u of [.09, .45]) { box(c, bx + u, by + .66, .11, .04, 1.6, ["#af997b", "#827960", "#7b9e66"], 6); for (let j = 0; j < 3; j++) blossom(c, iso(bx + u + .025 + j * .027, by + .68, 8), j % 2 ? "#ede1b1" : "#d78f91", .55); }
-    for (const offset of [.14, .70]) if (!parts.includes("garden") && !(offset === .70 && parts.includes("terrace"))) box(c, x + offset, y + .88, .18, .09, 4, ["#709464", "#567853", "#96b777"]);
+    for (const offset of [.14, .70]) if (!parts.includes("garden") && !(offset === .14 && parts.includes("planter")) && !(offset === .70 && (parts.includes("terrace") || parts.includes("canopy")))) box(c, x + offset, y + .88, .18, .09, 4, ["#709464", "#567853", "#96b777"]);
   } else {
     box(c, bx - .025, by - .025, .72, .70, 3, ["#c1b8a1", "#969f96", roofs[Math.floor(v * 5)]!], height);
     for (const u of [0, .65]) box(c, bx + u, by, .028, .65, 1.8, ["#c9c6ad", "#969f96", "#e8dfc4"], height + 3);
@@ -479,9 +553,11 @@ function building(c: CanvasRenderingContext2D, kind: Tile, x: number, y: number,
       for (let j = 0; j < 6; j++) patch(c, bx - .03 + j * .12, by + .64, .12, .22, j % 2 ? "#f9ecd1" : "#ce8572", 13);
       for (let j = 0; j < 6; j++) { const xx = bx - .03 + j * .12; poly(c, [iso(xx, by + .86, 13), iso(xx + .12, by + .86, 13), iso(xx + .12, by + .86, 11), iso(xx, by + .86, 11)], j % 2 ? "#e7d8b9" : "#b46858"); }
       // A window and display counter identify the shop without labels on the artwork.
-      box(c, bx + .05, by + .82, .20, .09, 3, ["#ab8d60", "#7e684c", "#ead3a2"]);
-      for (let j = 0; j < 4; j++) ellipse(c, iso(bx + .08 + j * .043, by + .86, 4), 1, .75, j % 2 ? "#db9b69" : "#88a15c");
-      if (!parts.includes("terrace")) box(c, x + .84, y + .85, .07, .09, 6, ["#927856", "#6e604d", "#e1c89a"]);
+      if (!parts.includes("planter")) {
+        box(c, x + .235, y + .90, .13, .06, 3, ["#ab8d60", "#7e684c", "#ead3a2"]);
+        for (let j = 0; j < 4; j++) ellipse(c, iso(x + .25 + j * .03, y + .93, 4), .7, .5, j % 2 ? "#db9b69" : "#88a15c");
+      }
+      if (!parts.includes("garden")) box(c, x + .84, y + .85, .07, .09, 6, ["#927856", "#6e604d", "#e1c89a"]);
     }
     if (kind === "house") for (let floor = 1; floor < floors; floor += 2) {
       const z = floor * 12 + 5; box(c, bx + .055, by + .65, .16, .065, 1, ["#bdb09b", "#979c8a", "#e3d7b7"], z);
@@ -589,7 +665,7 @@ function boxFaces(x: number, y: number, w: number, d: number, h: number, z = 0):
 function buildingFaces(kind: Tile, x: number, y: number, level: number, axis: "x" | "y" = "x"): Point[][] {
   if (kind === "station") return [...boxFaces(x + (axis === "x" ? .04 : .55), y + (axis === "x" ? .55 : .04), axis === "x" ? .92 : .41, axis === "x" ? .41 : .92, 3, 21), ...boxFaces(x + .1, y + .1, .22, .23, 13)];
   if (kind === "factory") {
-    const layout = factoryLayout(level), volumes = [...layout.volumes, ...layout.stacks, { ...layout.vent, height: 5, z: layout.main.height }];
+    const layout = factoryLayout(level), volumes = [...layout.volumes, ...layout.stacks, ...Array.from({ length: 3 }, (_, j) => ({ ...layout.vent, u: layout.vent.u + j * layout.vent.spacing, height: 5, z: layout.main.height }))];
     return volumes.flatMap(b => boxFaces(x + b.u, y + b.v, b.w, b.d, b.height, b.z));
   }
   if (kind !== "house" && kind !== "shop") return [];
@@ -605,6 +681,9 @@ function buildingFaces(kind: Tile, x: number, y: number, level: number, axis: "x
     faces.push([iso(bx, by, h), iso(bx + w, by, h), b, a], [a, b, iso(bx + w, by + d, h), iso(bx, by + d, h)], [iso(bx + w, by, h), b, iso(bx + w, by + d, h)]);
   } else faces.push(...boxFaces(x + .135, y + .125, .72, .70, 3, h), ...boxFaces(x + .26, y + .30, .16, .12, 5, h + 3));
   return faces;
+}
+function facilityFaces(kind: Tile, x: number, y: number, level: number, parts: FacilityPart[]): Point[][] {
+  return facilityLayout(kind, level, parts).flatMap(p => boxFaces(x + p.u, y + p.v, p.w, p.d, p.height, p.z));
 }
 type SceneObject = { depth: number; x: number; y: number; bounds: SpriteBounds; key?: string; paint: (c: CanvasRenderingContext2D) => void };
 const GROUND_BOUNDS = { left: -824, top: -30, width: 1648, height: 850 };
@@ -713,12 +792,16 @@ export class TownScene {
   }
   pickTile(px: number, py: number, town: Town): number | null {
     const p = { x: (px - this.camera.x) / this.camera.zoom, y: (py - this.camera.y) / this.camera.zoom };
+    const extras = new Map((town.attachments ?? []).map(a => [a.tile, a.parts]));
     // Reverse the renderer's painter order so visible roofs and walls select their own building.
     for (let depth = (MAP_SIZE - 1) * 2; depth >= 0; depth--) {
       for (let y = Math.min(depth, MAP_SIZE - 1); y >= Math.max(0, depth - MAP_SIZE + 1); y--) {
         const x = depth - y, i = y * MAP_SIZE + x, origin = iso(x, y);
-        if (Math.abs(p.x - origin.x) > 36 || p.y < origin.y - 85 || p.y > origin.y + 33) continue;
-        if (buildingFaces(town.tiles[i]!, x, y, town.levels[i] || 1, stationAxis(town, i)).some(face => contains(p, face))) return i;
+        if (Math.abs(p.x - origin.x) > 36 || p.y > origin.y + 33) continue;
+        const kind = town.tiles[i]!, level = town.levels[i] || 1, parts = extras.get(i) ?? [];
+        const fittings = facilityLayout(kind, level, parts), height = Math.max(85, ...fittings.map(f => f.z + f.height + 4));
+        if (p.y < origin.y - height) continue;
+        if ([...buildingFaces(kind, x, y, level, stationAxis(town, i)), ...facilityFaces(kind, x, y, level, parts)].some(face => contains(p, face))) return i;
         const part = parkAt(town, i)?.parts.find(p => p.tile === i && PARK_PARTS.find(s => s.id === p.kind)?.layer === "object");
         if (part && part.kind === "tree") {
           const center = iso(x + .5, y + .5);
@@ -731,7 +814,8 @@ export class TownScene {
   }
   tileBounds(i: number, town: Town) {
     const x = i % MAP_SIZE, y = Math.floor(i / MAP_SIZE), { camera } = this;
-    const points = [iso(x, y), iso(x + 1, y), iso(x + 1, y + 1), iso(x, y + 1), ...buildingFaces(town.tiles[i]!, x, y, town.levels[i] || 1, stationAxis(town, i)).flat()];
+    const parts = town.attachments?.find(a => a.tile === i)?.parts ?? [];
+    const points = [iso(x, y), iso(x + 1, y), iso(x + 1, y + 1), iso(x, y + 1), ...buildingFaces(town.tiles[i]!, x, y, town.levels[i] || 1, stationAxis(town, i)).flat(), ...facilityFaces(town.tiles[i]!, x, y, town.levels[i] || 1, parts).flat()];
     const lot = parkAt(town, i);
     if (lot) {
       points.push(iso(lot.x, lot.y), iso(lot.x + lot.width, lot.y), iso(lot.x + lot.width, lot.y + lot.height), iso(lot.x, lot.y + lot.height));
@@ -773,9 +857,9 @@ export class TownScene {
         // Daytime upper floors share one palette at Lv.3 and three at Lv.2.
         if (!night && (tile === "house" || tile === "shop") && level > 1) style = level >= 3 ? 0 : style % 3;
         const parts = extras.get(i) ?? [], key = `${tile}:${style}:${level}:${night}:${axis}:${parts.slice().sort().join(",")}`;
-        const faces = buildingFaces(tile, x, y, level, axis).flat(), origin = iso(x, y);
+        const faces = [...buildingFaces(tile, x, y, level, axis), ...facilityFaces(tile, x, y, level, parts)].flat(), origin = iso(x, y);
         const top = Math.min(-24, ...faces.map(p => p.y - origin.y)) - 4;
-        const h = tile === "house" || tile === "shop" || tile === "factory" ? buildingHeight(tile, level) : 32;
+        const h = Math.max(tile === "house" || tile === "shop" || tile === "factory" ? buildingHeight(tile, level) : 32, ...facilityLayout(tile, level, parts).map(p => p.z + p.height));
         const right = Math.max(38, h * .8 + 24), bottom = Math.max(parts.includes("light") ? 52 : 38, h * .22 + 32);
         const bounds = { left: -38, top, width: right + 38, height: bottom - top };
         if (tile === "station") {
@@ -986,18 +1070,26 @@ function createIconTown(kind: "road" | "rail"): Town {
 }
 export function drawTownPartIcon(c: CanvasRenderingContext2D, part: ParkPart | FacilityPart, width: number, height: number) {
   c.clearRect(0, 0, width, height); c.save(); c.translate(width / 2, height / 2 - 3); c.scale(.9, .9);
+  if (part === "terrace" || part === "canopy") {
+    c.translate(-4, 5); c.scale(2, 2);
+    seating(c, 0, 0, { u: 0, v: 0, w: .32, d: .18, z: 0, height: 12, part, mount: "ground" }, 1, false, part === "terrace", part === "canopy"); c.restore(); return;
+  }
+  if (part === "vending") {
+    compactVending(c, 0, 0, { u: .27, v: .31, w: .46, d: .34, z: 0, height: 23, part, mount: "ground" }, false); c.restore(); return;
+  }
+  if (part === "planter") {
+    facilityPlanter(c, 0, 0, { u: .28, v: .31, w: .44, d: .38, z: 0, height: 7, part, mount: "ground" }, 1, false); c.restore(); return;
+  }
   if (drawTownDecoration(c, part, 0, 0, 0, false)) { c.restore(); return; }
   if (["tree", "flowers", "bench", "fountain", "playground", "path", "light"].includes(part)) {
     parkPart(c, part as ParkPart, 0, 0, 0, false);
     if (part === "fountain") line(c, iso(.5, .5, 5), iso(.5, .5, 14), "#d9f7f0", 2);
   } else if (part === "garden") parkPart(c, "flowers", 0, 0, 0, false);
   else if (part === "greenbelt") { box(c, .15, .32, .7, .28, 2, ["#a4a185", "#7e8d6d", "#a4b882"]); for (const u of [.27, .5, .73]) tree(c, u, .46, 7.5, .6); }
-  else if (part === "terrace") {
-    c.translate(-4, 5); c.scale(2, 2); terrace(c, 0, 0);
-  } else if (part === "storage") {
+  else if (part === "storage") {
     patch(c, .12, .18, .75, .7, "#b6b49a"); for (const [u, v, h] of [[.2, .25, 5], [.55, .3, 8], [.3, .65, 4]]) crate(c, u!, v!, .22, .2, h!);
   } else if (part === "solar") {
-    for (const u of [.25, .68]) box(c, u, .35, .04, .30, 3, ["#929f8e", "#697f77", "#c2cbb4"]); solarPanel(c, .15, .20, .70, .55, 3);
+    solarPanel(c, .15, .20, .70, .55, 0);
   } else {
     line(c, iso(.5, .5), iso(.5, .5, 15), "#7d7056", 2); box(c, .24, .5, .54, .05, 7, ["#6c9881", "#476f63", "#d5caaa"], 11);
     const p = iso(.51, .56, 14.5); ellipse(c, p, 3, 3, "#e6d6ac"); ellipse(c, p, 1.4, 1.4, "#879c78");
