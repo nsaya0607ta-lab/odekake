@@ -11,7 +11,8 @@ const game = compile('src/lib/games/town-builder.ts');
 const transport = compile('src/lib/games/town-transport.ts', { './town-builder': game });
 const sprites = compile('src/lib/games/town-sprites.ts');
 const decorations = compile('src/lib/games/town-decorations.ts');
-const { TownScene, drawTownIcon, drawTownPartIcon } = compile('src/lib/games/town-renderer.ts', { './town-builder': game, './town-transport': transport, './town-sprites': sprites, './town-decorations': decorations });
+const models = compile('src/lib/games/town-building-models.ts');
+const { TownScene, drawTownIcon, drawTownPartIcon } = compile('src/lib/games/town-renderer.ts', { './town-builder': game, './town-transport': transport, './town-sprites': sprites, './town-decorations': decorations, './town-building-models': models });
 const iso = (x, y, z = 0) => ({ x: (x - y) * 32, y: (x + y) * 16 - z });
 const blank = () => ({ ...game.createTown(false), tiles: Array(576).fill('grass'), terrain: Array(576).fill(false), levels: Array(576).fill(0) });
 let passed = 0;
@@ -59,7 +60,7 @@ test('a tall roof remains selectable above the edge of the ground map', () => {
 });
 test('overlapping buildings select the visible front wall', () => {
   const town = blank(); for (const i of [5 * 24 + 5, 6 * 24 + 6]) { town.tiles[i] = 'house'; town.levels[i] = 3; }
-  const scene = new TownScene(), p = iso(6.3, 6.8, 70);
+  const scene = new TownScene(), p = iso(6.3, 6.72, 70);
   assert.equal(scene.pickTile(p.x, p.y, town), 6 * 24 + 6);
 });
 test('empty land and points outside the map retain ground picking', () => {
@@ -195,7 +196,7 @@ test('factory roof units rest on the roof at every upgrade level', () => {
     const town = blank(), i = 5 * 24 + 5; town.tiles[i] = 'factory'; town.levels[i] = level;
     const { c, fills } = recordingContext(); new TownScene().render(c, 800, 600, town, options, 0);
     const top = fills.find(f => f.color === '#9cb9b4'); assert(top);
-    assert.deepEqual(top.points[0], iso(5.16, 5.23, 23 + level * 3 + 5));
+    const layout=models.factoryLayout(level);assert.deepEqual(top.points[0], iso(5+layout.vent.u, 5+layout.vent.v, layout.main.height+5));
   }
 });
 test('a platform and train are painted before the station canopy', () => {
@@ -238,6 +239,16 @@ test('sprite memory is bounded and recently used artwork stays cached', () => {
   for (let i = 0; i < 10; i++) cache.draw(c, String(i), 0, 0, bounds, paint);
   cache.draw(c, '9', 0, 0, bounds, paint); assert.equal(paintings, 10);
   cache.draw(c, '0', 0, 0, bounds, paint); assert.equal(paintings, 11, 'The least recently used sprite must be evicted');
+});
+test('close-range sprites match screen density and reuse artwork while panning', () => {
+  const factory = canvasFactory(), cache = new sprites.TownSprites(() => factory.create()), { c } = recordingContext(); let paintings = 0;
+  const bounds = { left: -38, top: -90, width: 112, height: 130 }, paint = () => paintings++;
+  cache.draw(c, 'tower', 0, 0, bounds, paint, 4.4);
+  assert.equal(factory.surfaces[0].canvas.width, 560); assert.equal(factory.surfaces[0].canvas.height, 650);
+  cache.draw(c, 'tower', 12, -8, bounds, paint, 4.8); assert.equal(paintings, 1);
+  cache.draw(c, 'tower', 0, 0, bounds, paint, 6.2); assert.equal(paintings, 2);
+  assert.equal(factory.surfaces[1].canvas.width, 784);
+  cache.draw(c, 'tower', 24, -8, bounds, paint, 6.2); assert.equal(paintings, 2);
 });
 test('an empty purchased park has no automatic fountain or furniture; paid equipment updates without changing terrain tiles', () => {
   let town = game.buyParkLot(blank(),5,5,'small').town;const scene=new TownScene(),{c,fills}=recordingContext();
@@ -317,10 +328,11 @@ test('factory stacks start at the roof and stay clear of the roof equipment',()=
   for(let level=1;level<=3;level++){
     const town=blank();town.tiles[125]='factory';town.levels[125]=level;
     const {c,fills}=recordingContext();new TownScene().render(c,800,600,town,options,0);
-    const sides=fills.filter(f=>['#bf8d75','#8e6557'].includes(f.color));assert.equal(sides.length,2);
-    const roof=23+level*3;
-    const expected=[[iso(5.77,5.22,roof),iso(5.87,5.22,roof)],[iso(5.87,5.16,roof),iso(5.87,5.22,roof)]];
-    sides.forEach((side,j)=>side.points.slice(0,2).forEach((p,k)=>assert(Math.hypot(p.x-expected[j][k].x,p.y-expected[j][k].y)<1e-6)));
+    const layout=models.factoryLayout(level),sides=fills.filter(f=>['#bf8d75','#8e6557'].includes(f.color));assert.equal(sides.length,layout.stacks.length*2);
+    layout.stacks.forEach((stack,j)=>{
+      const expected=[[iso(5+stack.u,5+stack.v+stack.d,stack.z),iso(5+stack.u+stack.w,5+stack.v+stack.d,stack.z)],[iso(5+stack.u+stack.w,5+stack.v,stack.z),iso(5+stack.u+stack.w,5+stack.v+stack.d,stack.z)]];
+      sides.slice(j*2,j*2+2).forEach((side,n)=>side.points.slice(0,2).forEach((p,k)=>assert(Math.hypot(p.x-expected[n][k].x,p.y-expected[n][k].y)<1e-6)));
+    });
   }
 });
 test('platform benches are painted over passing trains and below the station canopy',()=>{
@@ -329,5 +341,18 @@ test('platform benches are painted over passing trains and below the station can
   const {c,fills}=recordingContext();new TownScene().render(c,800,600,town,{...options,routes:[route]},0);
   const train=fills.findIndex(f=>f.color==='#f3e5bf'),bench=fills.findIndex(f=>f.color==='#d5b387'),roof=fills.findIndex(f=>f.color==='#75aca1');
   assert(train>=0&&bench>train&&roof>bench,'A train must not paint through a bench on the front platform');
+});
+test('every building stage keeps its visible roof selectable and inside the selection bounds',()=>{
+  for(const kind of ['house','shop','factory'])for(const level of [1,2,3]){
+    const town=blank(),tile=125;town.tiles[tile]=kind;town.levels[tile]=level;
+    const scene=new TownScene();let point;
+    if(kind==='factory'){const s=models.factoryLayout(level).stacks[0];point=iso(5+s.u+s.w/2,5+s.v+s.d/2,s.z+s.height);}
+    else if(kind==='house'&&level===1)point=iso(5.5,5.6,26);
+    else {const b=models.buildingVolumes(kind,level).at(-1);point=iso(5+b.u+b.w/2,5+b.v+b.d/2,b.z+b.height+(level>1?2:3));}
+    for(const zoom of [.6,1.4,2.8]){scene.camera={x:195,y:50,zoom};const x=195+point.x*zoom,y=50+point.y*zoom;assert.equal(scene.pickTile(x,y,town),tile,kind+' '+level);const bounds=scene.tileBounds(tile,town);assert(x>=bounds.left&&x<=bounds.right&&y>=bounds.top&&y<=bounds.bottom);}
+  }
+});
+test('all three stages have distinct names and a strictly growing skyline',()=>{
+  for(const kind of ['house','shop','factory']){const heights=[1,2,3].map(l=>models.buildingHeight(kind,l));assert(heights[0]<heights[1]&&heights[1]<heights[2]);assert.equal(new Set(models.BUILDING_STAGES[kind]).size,3);}
 });
 console.log(`${passed} town renderer checks passed`);
