@@ -155,32 +155,64 @@ function parkPart(c: CanvasRenderingContext2D, kind: ParkPart, x: number, y: num
     ellipse(c, { x: p.x - 6, y: p.y - 2 }, 2.8, .6, "#d7f2e58a"); return;
   }
   if (kind === "bench") {
-    for (const u of [.23, .68]) b(u, .40, .045, .19, 3, ["#4e6d62", "#395d53", "#6f8b75"]);
-    for (let j = 0; j < 4; j++) b(.17, .37 + j * .063, .68, .052, 1.5, ["#ab825c", "#785b43", j % 2 ? "#d9b788" : "#cba577"], 4);
-    for (let j = 0; j < 3; j++) b(.17, .37, .68, .04, 1.3, ["#b69470", "#896e50", "#e0c297"], 6 + j * 1.65);
-    for (const u of [.20, .78]) { line(c, at(u, .40, 4), at(u, .40, 9), "#496d5d", 1); line(c, at(u, .40, 8), at(u, .62, 8), "#547663", 1); }
+    const pieces = [
+      { depth: at(.51, .39).y, paint: () => {
+        for (const u of [.20, .78]) line(c, at(u, .39, 4), at(u, .39, 10.6), "#496d5d", 1);
+        for (let j = 0; j < 3; j++) b(.17, .37, .68, .04, 1.3, ["#b69470", "#896e50", "#e0c297"], 6 + j * 1.65);
+      } },
+      { depth: at(.51, .50).y, paint: () => {
+        for (const u of [.23, .68]) b(u, .40, .045, .19, 3, ["#4e6d62", "#395d53", "#6f8b75"]);
+        for (let j = 0; j < 4; j++) b(.17, .37 + j * .063, .68, .052, 1.5, ["#ab825c", "#785b43", j % 2 ? "#d9b788" : "#cba577"], 4);
+      } },
+      ...[.20, .78].map(u => ({ depth: at(u, .51).y, paint: () => { line(c, at(u, .39, 8), at(u, .61, 8), "#547663", 1); line(c, at(u, .61, 5.5), at(u, .61, 8), "#496d5d", .8); } })),
+    ];
+    pieces.sort((a, b) => a.depth - b.depth).forEach(piece => piece.paint());
     return;
   }
-  // A supported slide with a platform, ladder and a slope contained inside its tile.
+  // Four narrow columns support the platform; separate posts meet the pitched roof.
   b(.08, .08, .82, .84, .7, ["#be9b80", "#a58471", "#dbc3a1"], 0);
-  for (const u of [.19, .45]) b(u, .20, .045, .30, 12, ["#967553", "#765d45", "#c09f75"]);
-  b(.18, .18, .32, .34, 2, ["#d18c74", "#a77160", "#eac3a1"], 12);
-  for (const u of [.19, .46]) { line(c, at(u, .18, 14), at(u, .18, 21), "#648e80", 1.2); line(c, at(u, .18, 21), at(u, .48, 21), "#a7c3a0", 1); line(c, at(u, .48, 21), at(u, .48, 14), "#648e80", 1.2); }
-  poly(c, [at(.12, .12, 22), at(.52, .12, 22), at(.52, .34, 25), at(.12, .34, 25)], "#75a798");
-  poly(c, [at(.12, .34, 25), at(.52, .34, 25), at(.52, .56, 22), at(.12, .56, 22)], "#a7c7ac");
-  poly(c, [at(.27, .51, 13), at(.46, .51, 13), at(.68, .90, 2), at(.43, .90, 2)], "#98bdc3", "#e2e9d7", 1);
-  line(c, at(.27, .51, 15), at(.43, .90, 3), "#d9e5d8", 1.3); line(c, at(.46, .51, 15), at(.68, .90, 3), "#adc6bd", 1.3);
-  line(c, at(.18, .22, 14), at(.08, .08, 1), "#749b93", 1.2); line(c, at(.48, .22, 14), at(.37, .08, 1), "#749b93", 1.2);
-  for (let j = 1; j < 5; j++) line(c, at(.16 - j * .018, .22 - j * .028, 14 - j * 2.5), at(.47 - j * .018, .22 - j * .028, 14 - j * 2.5), "#d4d3aa", .8);
+  const pieces = [
+    { depth: at(.27, .14).y, paint: () => {
+      line(c, at(.18, .20, 14), at(.08, .08, .7), "#749b93", 1.2); line(c, at(.48, .20, 14), at(.37, .08, .7), "#749b93", 1.2);
+      for (let j = 1; j < 6; j++) { const t = j / 6, v = .20 - .12 * t, z = 14 - 13.3 * t; line(c, at(.18 - .10 * t, v, z), at(.48 - .11 * t, v, z), "#d4d3aa", .8); }
+    } },
+    { depth: at(.34, .35).y, paint: () => {
+      const posts = [[.19, .20], [.455, .20], [.19, .455], [.455, .455]].sort((a, b) => at(a[0]!, a[1]!).y - at(b[0]!, b[1]!).y);
+      for (const [u, v] of posts) b(u!, v!, .035, .035, 11.3, ["#967553", "#765d45", "#c09f75"], .7);
+      b(.18, .18, .32, .34, 2, ["#d18c74", "#a77160", "#eac3a1"], 12);
+      for (const u of [.19, .46]) for (const v of [.18, .48]) {
+        const roof = 25 - 3 * Math.abs(v - .34) / .22;
+        b(u - .012, v - .012, .024, .024, roof - .6 - 14, ["#648e80", "#4e7b70", "#a7c3a0"], 14);
+      }
+      for (const u of [.19, .46]) { line(c, at(u, .18, 19), at(u, .48, 19), "#a7c3a0", 1); for (const v of [.28, .38]) line(c, at(u, v, 14), at(u, v, 19), "#648e80", .7); }
+      line(c, at(.19, .18, 19), at(.46, .18, 19), "#a7c3a0", 1);
+    } },
+    { depth: at(.48, .71).y, paint: () => {
+      b(.43, .85, .25, .055, .7, ["#7a9e99", "#587f79", "#abc5b1"], .7);
+      poly(c, [at(.27, .51, 13), at(.46, .51, 13), at(.68, .90, 1.4), at(.43, .90, 1.4)], "#98bdc3", "#e2e9d7", .6);
+      const rails = [[.27, .43], [.46, .68]].sort((a, b) => at((a[0]! + a[1]!) / 2, .71).y - at((b[0]! + b[1]!) / 2, .71).y);
+      for (const [u, end] of rails) poly(c, [at(u!, .51, 13), at(end!, .90, 1.4), at(end!, .90, 2.4), at(u!, .51, 15)], "#b3cec4", "#e2e9d7", .5);
+    } },
+  ];
+  pieces.sort((a, b) => a.depth - b.depth).forEach(piece => piece.paint());
+  const panels = [.12, .56].map(v => ({ v, depth: at(.32, (.34 + v) / 2).y })).sort((a, b) => a.depth - b.depth);
+  for (const { v } of panels) {
+    const edgeA = at(.12, v, 22), edgeB = at(.52, v, 22), ridgeA = at(.12, .34, 25), ridgeB = at(.52, .34, 25);
+    poly(c, [edgeA, edgeB, ridgeB, ridgeA], at(.32, v).y > at(.32, .34).y ? "#9abda5" : "#659183", "#b8d0b26b", .5);
+    for (let j = 1; j < 4; j++) { const t = j / 4; line(c, at(.12, .34 + (v - .34) * t, 25 - 3 * t), at(.52, .34 + (v - .34) * t, 25 - 3 * t), "#d0debe55", .4); }
+  }
+  const end = at(.52, .34).y > at(.12, .34).y ? .52 : .12;
+  poly(c, [at(end, .12, 22), at(end, .34, 25), at(end, .56, 22)], "#759d86", "#b8d0b26b", .4);
 }
 function terrace(c: CanvasRenderingContext2D, x: number, y: number) {
   box(c, x, y, .32, .18, 1, ["#b79c78", "#8f7c60", "#d9bd95"]);
   for (let j = 1; j < 5; j++) line(c, iso(x + j * .064, y, 1.1), iso(x + j * .064, y + .18, 1.1), "#aa8c69", .4);
   box(c, x + .11, y + .065, .08, .07, 4, ["#917655", "#745f47", "#e4c59a"], 1);
   for (const u of [.025, .245]) { box(c, x + u, y + .07, .055, .06, 3, ["#97a387", "#6f8a74", "#cad1ac"], 1); box(c, x + u, y + .065, .055, .015, 3, ["#829777", "#567661", "#cfdbaf"], 4); }
-  const cx = x + .155, cy = y + .10; line(c, iso(cx, cy, 1), iso(cx, cy, 13), "#8f7654", .7);
+  const cx = x + .155, cy = y + .10; line(c, iso(cx, cy, 1), iso(cx, cy, 14), "#8f7654", .7);
   const top = iso(cx, cy, 14), ring = Array.from({ length: 6 }, (_, j) => { const a = j * Math.PI / 3; return iso(cx + Math.cos(a) * .14, cy + Math.sin(a) * .14, 11); });
-  for (let j = 0; j < 6; j++) poly(c, [top, ring[j]!, ring[(j + 1) % 6]!], j % 2 ? "#eee5c9" : "#cc9a7d", "#9b897b55", .35);
+  const faces = ring.map((a, j) => ({ a, b: ring[(j + 1) % 6]!, j })).sort((a, b) => a.a.y + a.b.y - b.a.y - b.b.y);
+  for (const { a, b, j } of faces) poly(c, [top, a, b], j % 2 ? "#eee5c9" : "#cc9a7d", "#9b897b55", .35);
 }
 function crate(c: CanvasRenderingContext2D, x: number, y: number, w: number, d: number, h: number, z = 0) {
   box(c, x, y, w, d, h, ["#b79b72", "#8e795b", "#d9c29a"], z);
@@ -209,10 +241,17 @@ function facilityParts(c: CanvasRenderingContext2D, kind: Tile, x: number, y: nu
   if (parts.includes("terrace")) {
     terrace(c, x + .59, y + .80);
   }
-  const extra = (kind: string, u: number, v: number, scale: number, r = 0) => { const p = iso(x + u, y + v); c.save(); c.translate(p.x, p.y); c.scale(scale, scale); drawTownDecoration(c, kind, 0, 0, r, night); c.restore(); };
-  if (parts.includes("vending")) extra("vending", kind === "station" && axis === "y" ? .48 : .0, kind === "station" ? axis === "x" ? .44 : -.03 : .72, .40);
+  const extra = (part: string, u: number, v: number, scale: number, r = 0) => {
+    // Decoration feet start at z=1; place those feet on the raised platform.
+    const p = iso(x + u, y + v, kind === "station" ? 3 - scale : 0);
+    c.save(); c.translate(p.x, p.y); c.scale(scale, scale); drawTownDecoration(c, part, 0, 0, r, night); c.restore();
+  };
+  if (parts.includes("vending")) {
+    if (kind === "station") extra("vending", axis === "x" ? .075 : .56, axis === "x" ? .59 : .075, .40, axis === "x" ? 0 : 3);
+    else extra("vending", .0, .72, .40);
+  }
   if (parts.includes("canopy")) extra("canopy", .01, .79, .26);
-  if (parts.includes("planter")) extra("planter", kind === "station" ? .31 : .80, kind === "station" ? .20 : .38, .30);
+  if (parts.includes("planter")) extra("planter", kind === "station" ? axis === "x" ? .70 : .61 : .80, kind === "station" ? axis === "x" ? .61 : .70 : .38, .30);
   if (parts.includes("light")) { c.save(); if (kind === "station") c.translate(0, -3); lamp(c, x + (kind === "station" && axis === "y" ? .98 : .91), y + (kind === "station" && axis === "x" ? .98 : .86), night); c.restore(); }
   if (parts.includes("sign")) {
     line(c, iso(x + .92, y + .65, 1), iso(x + .92, y + .65, 15), "#7d7056", 1.1);
@@ -256,7 +295,7 @@ function station(c: CanvasRenderingContext2D, x: number, y: number, axis: "x" | 
 }
 function factorySmoke(c: CanvasRenderingContext2D, x: number, y: number, time: number) {
   for (let j = 0; j < 4; j++) {
-    const t = (time * .23 + j / 4 + hash(y * MAP_SIZE + x)) % 1, p = iso(x + .82, y + .22, 47);
+    const t = (time * .23 + j / 4 + hash(y * MAP_SIZE + x)) % 1, p = iso(x + .82, y + .19, 47);
     c.save(); c.globalAlpha *= (1 - t) * .24; ellipse(c, { x: p.x + t * 12, y: p.y - t * 32 }, 3 + t * 7, 3 + t * 4, "#eaf0dc"); c.restore();
   }
 }
@@ -297,9 +336,10 @@ function building(c: CanvasRenderingContext2D, kind: Tile, x: number, y: number,
     windows(c, bx, by, .72, .64, 2, night, seed, false);
     for (let j = 0; j < 3; j++) box(c, bx + j * .23, by + .08, .22, .48, 5, ["#739c9f", "#547b81", "#9cb9b4"], height);
     for (let j = 0; j < 3; j++) { const u = bx + j * .23; for (let k = 1; k < 5; k++) line(c, iso(u + .02, by + .08 + k * .09, height + 5.1), iso(u + .20, by + .08 + k * .09, height + 5.1), "#476e7478", .65); }
-    box(c, x + .77, y + .17, .1, .1, 47, ["#bf8d75", "#8e6557", "#e1b199"]);
-    for (const z of [12, 22, 32, 42]) { line(c, iso(x + .77, y + .27, z), iso(x + .87, y + .27, z), "#efd6af", 1.2); line(c, iso(x + .87, y + .17, z), iso(x + .87, y + .27, z), "#c5b194", 1); }
-    patch(c, x + .785, y + .185, .07, .07, "#685f56", 47.1);
+    // The stack occupies the clear rear roof strip; its buried section is hidden.
+    box(c, x + .77, y + .16, .1, .06, 47 - height, ["#bf8d75", "#8e6557", "#e1b199"], height);
+    for (const z of [32, 42]) if (z > height) { line(c, iso(x + .77, y + .22, z), iso(x + .87, y + .22, z), "#efd6af", 1.2); line(c, iso(x + .87, y + .16, z), iso(x + .87, y + .22, z), "#c5b194", 1); }
+    patch(c, x + .785, y + .172, .07, .036, "#685f56", 47.1);
     poly(c, [iso(bx + .24, by + .645, 1), iso(bx + .46, by + .645, 1), iso(bx + .46, by + .645, 12), iso(bx + .24, by + .645, 12)], "#678984");
     for (let j = 1; j < 6; j++) line(c, iso(bx + .245, by + .65, j * 2), iso(bx + .455, by + .65, j * 2), "#9ab2a354", .6);
     if (showSmoke) factorySmoke(c, x, y, time);
@@ -324,7 +364,10 @@ function building(c: CanvasRenderingContext2D, kind: Tile, x: number, y: number,
   patch(c, bx + .23, by + .69, .21, .07, "#aa9c7c", 1.1);
   if (kind === "house" && level === 1) {
     pitchedRoof(c, bx - .05, by - .05, .77, .75, height, roofs[Math.floor(v * 5)]!, "#8c7565");
-    box(c, bx + .44, by + .05, .08, .09, 9, ["#caa790", "#987763", "#ead3b3"], height + 6);
+    const chimneyTop = height + 15, roofAt = (u: number, v: number) => iso(bx + u, by + v, height + 13 * (1 - Math.abs(v - .325) / .375));
+    poly(c, [roofAt(.44, .14), roofAt(.52, .14), iso(bx + .52, by + .14, chimneyTop), iso(bx + .44, by + .14, chimneyTop)], "#caa790");
+    poly(c, [roofAt(.52, .05), roofAt(.52, .14), iso(bx + .52, by + .14, chimneyTop), iso(bx + .52, by + .05, chimneyTop)], "#987763");
+    patch(c, bx + .44, by + .05, .08, .09, "#ead3b3", chimneyTop);
     patch(c, bx + .455, by + .065, .05, .06, "#716757", height + 15.1);
     line(c, iso(bx + .50, by + .64, 17), iso(bx + .50, by + .64, 2), "#8f958580", .8);
     box(c, bx + .24, by + .65, .18, .12, 1, ["#a78b67", "#7f775b", "#d6c2a0"], 11.5);
@@ -431,7 +474,7 @@ function bridgeRails(c: CanvasRenderingContext2D, town: Town, x: number, y: numb
 function orientedBox(c: CanvasRenderingContext2D, x: number, y: number, length: number, width: number, height: number, dx: number, dy: number, colors: string[], z: number) {
   const corners = [[-1, -1], [1, -1], [1, 1], [-1, 1]].map(([along, across]) => ({ x: x + dx * along! * length / 2 - dy * across! * width / 2, y: y + dy * along! * length / 2 + dx * across! * width / 2 }));
   const edges = corners.map((a, j) => ({ a, b: corners[(j + 1) % 4]!, depth: a.x + a.y + corners[(j + 1) % 4]!.x + corners[(j + 1) % 4]!.y })).sort((a, b) => a.depth - b.depth).slice(2);
-  edges.forEach(({ a, b }, j) => poly(c, [iso(a.x, a.y, z), iso(b.x, b.y, z), iso(b.x, b.y, z + height), iso(a.x, a.y, z + height)], colors[j]!));
+  edges.forEach(({ a, b }, j) => poly(c, [iso(a.x, a.y, z), iso(b.x, b.y, z), iso(b.x, b.y, z + height), iso(a.x, a.y, z + height)], colors[Math.abs(a.x - b.x) < 1e-6 ? 1 : Math.abs(a.y - b.y) < 1e-6 ? 0 : j]!));
   poly(c, corners.map(p => iso(p.x, p.y, z + height)), colors[2]!);
   return edges;
 }
@@ -453,7 +496,7 @@ function boxFaces(x: number, y: number, w: number, d: number, h: number, z = 0):
 }
 function buildingFaces(kind: Tile, x: number, y: number, level: number, axis: "x" | "y" = "x"): Point[][] {
   if (kind === "station") return [...boxFaces(x + (axis === "x" ? .04 : .55), y + (axis === "x" ? .55 : .04), axis === "x" ? .92 : .41, axis === "x" ? .41 : .92, 3, 21), ...boxFaces(x + .1, y + .1, .22, .23, 13)];
-  if (kind === "factory") return [...boxFaces(x + .16, y + .15, .72, .64, 23 + level * 3), ...boxFaces(x + .77, y + .17, .1, .1, 47), ...boxFaces(x + .16, y + .23, .68, .48, 5, 23 + level * 3)];
+  if (kind === "factory") return [...boxFaces(x + .16, y + .15, .72, .64, 23 + level * 3), ...boxFaces(x + .77, y + .16, .1, .06, 47 - (23 + level * 3), 23 + level * 3), ...boxFaces(x + .16, y + .23, .68, .48, 5, 23 + level * 3)];
   if (kind !== "house" && kind !== "shop") return [];
   const h = (kind === "house" ? level === 1 ? 1 : level * 2 : level + 1) * 12 + 5;
   const faces = boxFaces(x + .16, y + .15, .67, .65, h);
@@ -635,7 +678,9 @@ export class TownScene {
         const right = Math.max(38, h * .8 + 24), bottom = Math.max(parts.includes("light") ? 52 : 38, h * .22 + 32);
         const bounds = { left: -38, top, width: right + 38, height: bottom - top };
         if (tile === "station") {
-          add(x, y, .35, key + ":base", bounds, c => { station(c, x, y, axis, night, false); facilityParts(c, tile, x, y, level, parts.filter(p => p !== "light"), night, axis); });
+          add(x, y, .35, key + ":base", bounds, c => station(c, x, y, axis, night, false));
+          // Platform furniture has its own depth so a train cannot paint through it.
+          for (const part of parts.filter(p => p !== "light")) add(x, y, part === "planter" ? 1.62 : part === "bench" ? 1.37 : 1.07, key + ":part:" + part, bounds, c => facilityParts(c, tile, x, y, level, [part], night, axis));
           // Trains run between the platform and canopy, with visible supporting pillars.
           add(x, y, 1.55, key + ":roof", bounds, c => { station(c, x, y, axis, night, true); facilityParts(c, tile, x, y, level, parts.filter(p => p === "light"), night, axis); });
         } else add(x, y, 1, key, bounds, c => { facilityParts(c, tile, x, y, level, parts, night, axis, true); building(c, tile, x, y, level, night, 0, false, axis, 0, false, parts); facilityParts(c, tile, x, y, level, parts, night, axis); });

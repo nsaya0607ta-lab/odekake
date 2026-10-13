@@ -22,7 +22,7 @@ class RecordedGradient {
   addColorStop(position, color) { this.stops.push([position, color]); }
 }
 function recordingContext() {
-  const fills = [], stack = [];
+  const fills = [], strokes = [], stack = [];
   let points = [];
   const target = {
     globalAlpha: 1,
@@ -31,13 +31,14 @@ function recordingContext() {
     moveTo(x, y) { points.push({ x, y }); },
     lineTo(x, y) { points.push({ x, y }); },
     fill() { fills.push({ color: this.fillStyle, alpha: this.globalAlpha, points: [...points] }); },
+    stroke() { strokes.push({ color: this.strokeStyle, points: [...points] }); },
     fillText() { assert.fail('Text must stay in the interface, not on town artwork'); },
     save() { stack.push({ globalAlpha: this.globalAlpha, fillStyle: this.fillStyle }); },
     restore() { Object.assign(this, stack.pop()); },
     createLinearGradient(...coordinates) { return new RecordedGradient('linear', coordinates); },
     createRadialGradient(...coordinates) { return new RecordedGradient('radial', coordinates); },
   };
-  return { c: new Proxy(target, { get: (obj, key) => key in obj ? obj[key] : () => {} }), fills };
+  return { c: new Proxy(target, { get: (obj, key) => key in obj ? obj[key] : () => {} }), fills, strokes };
 }
 const options = { night: false, grid: false, hover: null, selected: null, preview: [], tool: 'inspect', routes: [], paused: true, speed: 1 };
 test('the visible roof selects its house at multiple camera positions and zooms', () => {
@@ -286,5 +287,47 @@ test('gazebo furniture stays under the roof and roof lighting stays fixed when r
     if(reference)assert.deepEqual(colors,reference,'Rotating furniture must not rotate the sunlight');
     reference=colors;
   }
+});
+test('clock dials remain on the two visible tower walls in every orientation',()=>{
+  for(const rotation of [0,1,2,3])for(const night of [false,true]){
+    const {c,fills}=recordingContext();decorations.drawTownDecoration(c,'clock',0,0,rotation,night);
+    const walls=fills.filter(f=>['#6c8c80','#476b65'].includes(f.color)&&Math.max(...f.points.map(p=>p.x))-Math.min(...f.points.map(p=>p.x))>5);
+    const dials=fills.filter(f=>f.color===(night?'#ffdf9d':'#f4edd0')&&f.points.length===32);
+    assert.equal(walls.length,2);assert.equal(dials.length,2);
+    for(const dial of dials)assert(walls.some(wall=>dial.points.every(point=>inside(point,wall.points))), 'A clock face floats outside its wall');
+  }
+});
+test('a vending machine never paints its display through its opaque back',()=>{
+  for(const rotation of [0,1,2,3])for(const night of [false,true]){
+    const {c,fills}=recordingContext();decorations.drawTownDecoration(c,'vending',0,0,rotation,night);
+    assert.equal(fills.some(f=>f.color===(night?'#c9e6c3':'#6a9c9d')),[0,3].includes(rotation));
+  }
+});
+test('every ladder rung joins both slide ladder rails after rotating',()=>{
+  const onSegment=(p,a,b)=>Math.abs((p.x-a.x)*(b.y-a.y)-(p.y-a.y)*(b.x-a.x))<1e-6&&(p.x-a.x)*(p.x-b.x)+(p.y-a.y)*(p.y-b.y)<=1e-6;
+  for(const rotation of [0,1,2,3]){
+    let town=game.buyParkLot(blank(),5,5,'small').town;town=game.placeParkPart(town,125,125,'playground',rotation).town;
+    const {c,strokes}=recordingContext();new TownScene().render(c,800,600,town,options,0);
+    const rails=strokes.filter(s=>s.color==='#749b93'),rungs=strokes.filter(s=>s.color==='#d4d3aa');
+    assert.equal(rails.length,2);assert.equal(rungs.length,5);
+    for(const rung of rungs){assert(onSegment(rung.points[0],...rails[0].points));assert(onSegment(rung.points[1],...rails[1].points));}
+  }
+});
+test('factory stacks start at the roof and stay clear of the roof equipment',()=>{
+  for(let level=1;level<=3;level++){
+    const town=blank();town.tiles[125]='factory';town.levels[125]=level;
+    const {c,fills}=recordingContext();new TownScene().render(c,800,600,town,options,0);
+    const sides=fills.filter(f=>['#bf8d75','#8e6557'].includes(f.color));assert.equal(sides.length,2);
+    const roof=23+level*3;
+    const expected=[[iso(5.77,5.22,roof),iso(5.87,5.22,roof)],[iso(5.87,5.16,roof),iso(5.87,5.22,roof)]];
+    sides.forEach((side,j)=>side.points.slice(0,2).forEach((p,k)=>assert(Math.hypot(p.x-expected[j][k].x,p.y-expected[j][k].y)<1e-6)));
+  }
+});
+test('platform benches are painted over passing trains and below the station canopy',()=>{
+  const town=blank(),route=[125,126,127,128];route.forEach((tile,j)=>town.tiles[tile]=j===0||j===3?'station':'rail');
+  town.attachments=[{tile:125,kind:'station',parts:['bench']}];
+  const {c,fills}=recordingContext();new TownScene().render(c,800,600,town,{...options,routes:[route]},0);
+  const train=fills.findIndex(f=>f.color==='#f3e5bf'),bench=fills.findIndex(f=>f.color==='#d5b387'),roof=fills.findIndex(f=>f.color==='#75aca1');
+  assert(train>=0&&bench>train&&roof>bench,'A train must not paint through a bench on the front platform');
 });
 console.log(`${passed} town renderer checks passed`);
