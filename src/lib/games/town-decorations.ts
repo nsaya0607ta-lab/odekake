@@ -19,13 +19,22 @@ export function drawTownDecoration(c: CanvasRenderingContext2D, kind: string, x:
   };
   const line = (a: Point, b: Point, color: string, width = .8) => { c.beginPath(); c.moveTo(a.x, a.y); c.lineTo(b.x, b.y); c.strokeStyle = color; c.lineWidth = width; c.stroke(); };
   const oval = (p: Point, rx: number, ry: number, color: string | CanvasGradient) => { c.beginPath(); c.ellipse(p.x, p.y, rx, ry, 0, 0, Math.PI * 2); c.fillStyle = color; c.fill(); };
-  const box = (u: number, v: number, w: number, d: number, h: number, colors: string[], z = 1) => {
-    const vertices = [[u, v], [u + w, v], [u + w, v + d], [u, v + d]].map(([a, b]) => world(a!, b!));
-    const sides = vertices.map((a, j) => ({ a, b: vertices[(j + 1) % 4]! })).sort((a, b) => a.a.x + a.a.y + a.b.x + a.b.y - b.a.x - b.a.y - b.b.x - b.b.y).slice(2);
-    for (const [j, { a, b }] of sides.entries()) { poly([iso(a.x, a.y, z), iso(b.x, b.y, z), iso(b.x, b.y, z + h), iso(a.x, a.y, z + h)], colors[j]!); line(iso(a.x, a.y, z + h), iso(b.x, b.y, z + h), "#f4edcb65", .45); }
-    poly(vertices.map(p => iso(p.x, p.y, z + h)), colors[2]!);
-    for (const { a, b } of sides) line(iso(a.x, a.y, z + h), iso(b.x, b.y, z + h), "#f4edcb60", .45);
+  const visibleFaces = (u: number, v: number, w: number, d: number) => {
+    const vertices = [[u, v], [u + w, v], [u + w, v + d], [u, v + d]].map(([a, b]) => ({ u: a!, v: b!, p: world(a!, b!) }));
+    return vertices.map((a, j) => ({ a, b: vertices[(j + 1) % 4]! })).sort((a, b) => a.a.p.x + a.a.p.y + a.b.p.x + a.b.p.y - b.a.p.x - b.a.p.y - b.b.p.x - b.b.p.y).slice(2);
   };
+  const box = (u: number, v: number, w: number, d: number, h: number, colors: string[], z = 1) => {
+    const sides = visibleFaces(u, v, w, d);
+    for (const { a, b } of sides) {
+      // Sunlight is fixed in world space, independent of the item's rotation.
+      const shade = Math.abs(a.p.x - b.p.x) < 1e-6 ? 1 : 0;
+      poly([at(a.u, a.v, z), at(b.u, b.v, z), at(b.u, b.v, z + h), at(a.u, a.v, z + h)], colors[shade]!);
+    }
+    poly([at(u, v, z + h), at(u + w, v, z + h), at(u + w, v + d, z + h), at(u, v + d, z + h)], colors[2]!);
+    for (const { a, b } of sides) line(at(a.u, a.v, z + h), at(b.u, b.v, z + h), "#f4edcb60", .45);
+    return sides;
+  };
+  const assemble = (parts: { u: number; v: number; paint: () => void }[]) => parts.map(part => ({ ...part, p: world(part.u, part.v) })).sort((a, b) => a.p.x + a.p.y - b.p.x - b.p.y).forEach(part => part.paint());
   const wood = ["#b18b63", "#826345", "#d4b28a"], stone = ["#a8b09e", "#7c9289", "#d4d6bb"], metal = ["#6c8c80", "#476b65", "#adc1a7"];
   const leaf = (p: Point, rx: number, ry: number, palette: string[]) => { const g = c.createRadialGradient(p.x - rx * .3, p.y - ry * .4, 0, p.x, p.y, Math.max(rx, ry) * 1.2); g.addColorStop(0, palette[2]!); g.addColorStop(.55, palette[1]!); g.addColorStop(1, palette[0]!); oval(p, rx, ry, g); };
   const bloom = (p: Point, color: string, r = 1) => { for (let j = 0; j < 5; j++) { const a = j * Math.PI * .4; oval({ x: p.x + Math.cos(a) * r, y: p.y + Math.sin(a) * r * .7 }, r * .65, r * .5, color); } oval(p, r * .32, r * .25, "#f6d786"); };
@@ -51,10 +60,17 @@ export function drawTownDecoration(c: CanvasRenderingContext2D, kind: string, x:
     for (let j = 0; j < 5; j++) { line(at(.76 + j * .02, .27, 1), at(.76 + j * .02, .27, 6 + j % 2 * 2), "#6f9459", .55); }
     line({ x: q.x - 8, y: q.y - 2 }, { x: q.x - 2, y: q.y - 2 }, "#d4eee0a0", .8);
   } else if (kind === "picnic") {
-    for (const u of [.29, .66]) { line(at(u, .30, 1), at(u, .55, 9), "#8e7352", 1.5); line(at(u, .75, 1), at(u, .45, 9), "#8e7352", 1.5); }
-    for (let j = 0; j < 4; j++) box(.18, .36 + j * .07, .64, .056, 1, wood, 10);
-    for (const v of [.18, .76]) { box(.16, v, .68, .08, 1, wood, 5); for (const u of [.26, .68]) box(u, v, .04, .055, 4, metal); }
-    oval(at(.44, .46, 11.5), 1.8, .8, "#e8ddbe"); box(.55, .50, .05, .05, 1.5, ["#a48b65", "#8d7959", "#e6cc97"], 11);
+    assemble([
+      ...[.18, .76].map(v => ({ u: .50, v: v + .04, paint: () => {
+        for (const u of [.26, .68]) box(u, v + .01, .04, .055, 4, metal);
+        for (let j = 0; j < 2; j++) box(.16, v + j * .043, .68, .036, 1, wood, 5);
+      } })),
+      { u: .5, v: .5, paint: () => {
+        for (const u of [.29, .66]) { line(at(u, .30, 1), at(u, .55, 10), "#8e7352", 1.5); line(at(u, .75, 1), at(u, .45, 10), "#8e7352", 1.5); }
+        for (let j = 0; j < 4; j++) box(.18, .36 + j * .07, .64, .056, 1, wood, 10);
+        oval(at(.44, .46, 11.1), 1.8, .8, "#e8ddbe"); box(.55, .50, .05, .05, 1.5, ["#a48b65", "#8d7959", "#e6cc97"], 11);
+      } },
+    ]);
   } else if (kind === "gazebo") {
     // Assemble the shelter from the deck upwards. Furniture belongs beneath
     // the roof, and every timber member meets a post, beam or floor.
@@ -125,19 +141,34 @@ export function drawTownDecoration(c: CanvasRenderingContext2D, kind: string, x:
   } else if (kind === "canopy") {
     box(.10, .12, .8, .76, 2, wood);
     for (let j = 1; j < 7; j++) line(at(.10 + j * .11, .12, 3.1), at(.10 + j * .11, .88, 3.1), "#927857", .5);
-    const high = 19;
-    for (const [u, v] of [[.17, .19], [.83, .19], [.17, .81], [.83, .81]]) { box(u! - .02, v! - .02, .04, .04, high - 3, wood, 3); line(at(u!, v!, high - 2), at(u! + (u! < .5 ? .13 : -.13), v!, high + .2), "#9c7e57", 1); }
-    for (let j = 0; j < 6; j++) poly([at(.10 + j * .133, .12, high), at(.10 + (j + 1) * .133, .12, high), at(.10 + (j + 1) * .133, .88, high - 2), at(.10 + j * .133, .88, high - 2)], j % 2 ? "#f0dfbf" : "#a5bfa2");
+    const roofHeight = (v: number) => 19 - 2 * (v - .12) / .76;
+    const roofAt = (u: number, v: number, below = 0) => at(u, v, roofHeight(v) - below);
+    assemble([[.17, .19], [.83, .19], [.17, .81], [.83, .81]].map(([u, v]) => ({ u: u!, v: v!, paint: () => {
+      box(u! - .02, v! - .02, .04, .04, roofHeight(v!) - .6 - 3, wood, 3);
+      line(at(u!, v!, roofHeight(v!) - 3), roofAt(u! + (u! < .5 ? .12 : -.12), v!, .7), "#9c7e57", 1);
+    } })));
+    for (const v of [.19, .81]) box(.17, v - .02, .66, .04, 1, wood, roofHeight(v) - 1.2);
+    for (const u of [.17, .83]) line(roofAt(u, .19, .9), roofAt(u, .81, .9), "#ac8c65", 1.3);
+    for (const { a, b } of visibleFaces(.10, .12, .8, .76)) poly([roofAt(a.u, a.v, .7), roofAt(b.u, b.v, .7), roofAt(b.u, b.v), roofAt(a.u, a.v)], "#a7a990");
+    for (let j = 0; j < 6; j++) poly([roofAt(.10 + j * .8 / 6, .12), roofAt(.10 + (j + 1) * .8 / 6, .12), roofAt(.10 + (j + 1) * .8 / 6, .88), roofAt(.10 + j * .8 / 6, .88)], j % 2 ? "#f0dfbf" : "#a5bfa2");
   } else if (kind === "swings") {
     box(.08, .12, .84, .74, .8, ["#a6ad87", "#8d9c75", "#c5c59a"]);
-    for (const u of [.16, .84]) { line(at(u, .22, 1), at(u, .48, 26), "#6c8f85", 2); line(at(u, .76, 1), at(u, .48, 26), "#517b73", 2); }
+    assemble([
+      ...[.16, .84].map(u => ({ u, v: .49, paint: () => { line(at(u, .22, 1.8), at(u, .48, 26), "#6c8f85", 2); line(at(u, .76, 1.8), at(u, .48, 26), "#517b73", 2); } })),
+      ...[.31, .57].map(u => ({ u: u + .055, v: .55, paint: () => {
+        for (const a of [0, .11]) line(at(u + a, .48, 25), at(u + a, .55, 7), "#d6d7b9", .65);
+        box(u - .01, .49, .13, .14, 1, ["#be9167", "#926b4e", "#e0b787"], 6);
+      } })),
+    ]);
     line(at(.12, .48, 26), at(.88, .48, 26), "#9ebba6", 2);
-    for (const u of [.31, .57]) { for (const a of [0, .11]) line(at(u + a, .48, 25), at(u + a, .55, 7), "#d6d7b9", .65); box(u - .01, .49, .13, .14, 1, ["#be9167", "#926b4e", "#e0b787"], 6); }
   } else if (kind === "sandbox") {
     box(.10, .15, .8, .7, 2, ["#ae9270", "#8b775a", "#d3b791"]); box(.16, .21, .68, .58, .2, ["#bea56d", "#a79265", "#e4ce9d"], 3);
     for (let j = 0; j < 18; j++) oval(at(.20 + noise(j) * .58, .25 + noise(j + 17) * .48, 3.2), .55, .3, j % 2 ? "#bfa76f" : "#f4dfb6");
     box(.25, .32, .11, .09, 3, ["#b3a47a", "#96835e", "#e8d7a8"], 3); box(.26, .33, .025, .025, 2, stone, 6);
-    const q = at(.64, .63, 5); oval(q, 2.2, 1, "#cf9e7b"); line(q, at(.65, .63, 8), "#9a8364", .6);
+    const q = at(.64, .63, 5.5), foot = at(.64, .63, 3.2);
+    poly([{ x: foot.x - 1.5, y: foot.y }, { x: foot.x + 1.5, y: foot.y }, { x: q.x + 2.2, y: q.y }, { x: q.x - 2.2, y: q.y }], "#bb876b");
+    oval(q, 2.2, 1, "#e1b28a"); oval(q, 1.55, .65, "#987256");
+    c.beginPath(); c.moveTo(q.x - 1.7, q.y); c.quadraticCurveTo(q.x, q.y - 4, q.x + 1.7, q.y); c.strokeStyle = "#9a8364"; c.lineWidth = .6; c.stroke();
   } else if (kind === "arch") {
     for (const u of [.17, .83]) { box(u - .05, .41, .10, .18, 3, stone); box(u - .015, .47, .03, .03, 21, metal, 4); }
     const points = Array.from({ length: 13 }, (_, j) => { const t = j / 12; return at(.17 + .66 * t, .49, 23 + Math.sin(t * Math.PI) * 8); });
@@ -145,26 +176,59 @@ export function drawTownDecoration(c: CanvasRenderingContext2D, kind: string, x:
     for (let j = 0; j < 18; j++) { const t = j / 17, q = at(.17 + .66 * t, .49, 22 + Math.sin(t * Math.PI) * 8); leaf(q, 1.9, 1.5, ["#4c7651", "#80a36a", "#b2c88a"]); if (j % 2 === 0) bloom(q, j % 4 ? "#e5a7ad" : "#edce91", 1.05); }
   } else if (kind === "sculpture") {
     box(.30, .30, .40, .40, 3, stone); box(.37, .37, .26, .26, 6, stone, 4);
-    const a = at(.5, .5, 11), b = at(.57, .47, 26), q = at(.37, .5, 20); poly([a, { x: a.x + 5, y: a.y - 1 }, b, { x: b.x - 4, y: b.y + 1 }, q], "#88a89a", "#c4d5b7", .6); line(q, b, "#e1e2c160", .8);
+    // A solid bent prism meets the plinth and keeps its shape from every side.
+    const sections = [[.43, .455, .14, .09, 10], [.38, .465, .14, .07, 20], [.53, .435, .08, .07, 26]].map(([u, v, w, d, z]) => ({ z: z!, corners: [[u!, v!], [u! + w!, v!], [u! + w!, v! + d!], [u!, v! + d!]] }));
+    for (let k = 1; k < sections.length; k++) {
+      const lower = sections[k - 1]!, upper = sections[k]!;
+      const sides = lower.corners.map(([u, v], j) => ({ j, p: world((u! + lower.corners[(j + 1) % 4]![0]!) / 2, (v! + lower.corners[(j + 1) % 4]![1]!) / 2) })).sort((a, b) => a.p.x + a.p.y - b.p.x - b.p.y).slice(2);
+      for (const { j } of sides) {
+        const n = (j + 1) % 4, a = lower.corners[j]!, b = lower.corners[n]!, t = upper.corners[n]!, s = upper.corners[j]!;
+        const p = world(a[0]!, a[1]!), q = world(b[0]!, b[1]!);
+        poly([at(a[0]!, a[1]!, lower.z), at(b[0]!, b[1]!, lower.z), at(t[0]!, t[1]!, upper.z), at(s[0]!, s[1]!, upper.z)], Math.abs(p.x - q.x) < 1e-6 ? "#648779" : "#9ab5a1", "#c4d5b780", .45);
+      }
+    }
     oval(at(.57, .47, 28), 3.4, 3.4, "#b9c9a8");
   } else if (kind === "clock") {
-    box(.37, .37, .26, .26, 2, stone); box(.46, .46, .08, .08, 22, metal, 3); box(.37, .38, .26, .24, 8, metal, 25); box(.35, .36, .30, .28, 1, ["#64796b", "#425f56", "#b1b998"], 33);
-    const q = at(.50, .63, 29.3); oval(q, 3.4, 3.7, night ? "#ffdf9d" : "#f4edd0");
-    for (let j = 0; j < 12; j++) { const a = j * Math.PI / 6; oval({ x: q.x + Math.cos(a) * 2.55, y: q.y + Math.sin(a) * 2.8 }, .22, .28, "#71806a"); }
-    line(q, { x: q.x + 1.8, y: q.y - 1.8 }, "#4d695a", .65); line(q, { x: q.x - 1.5, y: q.y - .3 }, "#4d695a", .65);
+    box(.37, .37, .26, .26, 2, stone); box(.46, .46, .08, .08, 22, metal, 3);
+    const faces = box(.37, .38, .26, .24, 8, metal, 25);
+    box(.35, .36, .30, .28, 1, ["#64796b", "#425f56", "#b1b998"], 33);
+    for (const { a, b } of faces) {
+      const u = (a.u + b.u) / 2, v = (a.v + b.v) / 2, du = Math.abs(a.u - b.u) > .1 ? .08 : 0, dv = du ? 0 : .08;
+      const dial = (across: number, high: number) => at(u + du * across, v + dv * across, 29 + high * 2.9);
+      poly(Array.from({ length: 32 }, (_, j) => { const t = j * Math.PI / 16; return dial(Math.cos(t), Math.sin(t)); }), night ? "#ffdf9d" : "#f4edd0", "#647b68", .35);
+      for (let j = 0; j < 12; j++) { const t = j * Math.PI / 6; line(dial(Math.cos(t) * .77, Math.sin(t) * .77), dial(Math.cos(t) * .87, Math.sin(t) * .87), "#71806a", .35); }
+      line(dial(0, 0), dial(.5, .55), "#4d695a", .6); line(dial(0, 0), dial(-.5, .10), "#4d695a", .6);
+    }
   } else if (kind === "trash") {
-    box(.34, .37, .32, .26, 10, ["#7e9988", "#577b6b", "#a5b69a"]); box(.31, .34, .38, .32, 1.5, ["#687f70", "#425f54", "#9dab90"], 11);
-    for (let j = 1; j < 5; j++) line(at(.34 + j * .064, .635, 2), at(.34 + j * .064, .635, 10), "#c2c8a859", .5);
+    const faces = box(.34, .37, .32, .26, 10, ["#7e9988", "#577b6b", "#a5b69a"]); box(.31, .34, .38, .32, 1.5, ["#687f70", "#425f54", "#9dab90"], 11);
+    for (const { a, b } of faces) for (let j = 1; j < 5; j++) {
+      const u = a.u + (b.u - a.u) * j / 5, v = a.v + (b.v - a.v) * j / 5;
+      line(at(u, v, 2), at(u, v, 10), "#c2c8a859", .5);
+    }
     poly([at(.40, .43, 12.6), at(.60, .43, 12.6), at(.60, .53, 12.6), at(.40, .53, 12.6)], "#354e42");
   } else if (kind === "bikeRack") {
     box(.13, .23, .74, .50, 1, stone);
-    for (const u of [.24, .48, .72]) { line(at(u, .33, 2), at(u, .33, 9), "#819e93", 1.3); line(at(u, .33, 9), at(u, .65, 9), "#adc3b0", 1.3); line(at(u, .65, 9), at(u, .65, 2), "#587f75", 1.3); }
-    for (const v of [.38, .63]) { const q = at(.29, v, 4); c.beginPath(); c.ellipse(q.x, q.y, 2.2, 3, 0, 0, Math.PI * 2); c.strokeStyle = "#53685b"; c.lineWidth = .7; c.stroke(); }
-    line(at(.29, .38, 4), at(.37, .51, 9), "#c79872", .9); line(at(.37, .51, 9), at(.29, .63, 4), "#c79872", .9); line(at(.29, .63, 4), at(.29, .38, 4), "#c79872", .9); line(at(.37, .51, 9), at(.39, .51, 12), "#6f8c7a", .7);
+    assemble([
+      ...[.24, .48, .72].map(u => ({ u, v: .49, paint: () => { line(at(u, .33, 2), at(u, .33, 9), "#819e93", 1.3); line(at(u, .33, 9), at(u, .65, 9), "#adc3b0", 1.3); line(at(u, .65, 9), at(u, .65, 2), "#587f75", 1.3); } })),
+      { u: .30, v: .52, paint: () => {
+        for (const v of [.36, .69]) {
+          poly(Array.from({ length: 32 }, (_, j) => { const t = j * Math.PI / 16; return at(.30, v + Math.cos(t) * .078, 5 + Math.sin(t) * 3); }), "#ffffff00", "#53685b", .7);
+          for (let j = 0; j < 6; j++) { const t = j * Math.PI / 3; line(at(.30, v, 5), at(.30, v + Math.cos(t) * .071, 5 + Math.sin(t) * 2.7), "#a7b4a455", .35); }
+        }
+        const rear = at(.30, .36, 5), front = at(.30, .69, 5), crank = at(.30, .52, 5.5), seat = at(.30, .47, 9), head = at(.30, .62, 9);
+        for (const [a, b] of [[rear, seat], [seat, crank], [crank, rear], [seat, head], [head, crank], [head, front]]) line(a!, b!, "#c79872", .9);
+        line(at(.30, .43, 9.5), at(.30, .50, 9.5), "#5d7669", 1);
+        line(head, at(.30, .64, 10.5), "#6f8c7a", .7); line(at(.30, .61, 10.5), at(.30, .67, 10.5), "#6f8c7a", .8);
+      } },
+    ]);
   } else if (kind === "vending") {
-    box(.27, .31, .46, .34, 23, ["#a7bab0", "#688d85", "#d9dac4"]); poly([at(.31, .655, 8), at(.60, .655, 8), at(.60, .655, 20), at(.31, .655, 20)], night ? "#c9e6c3" : "#6a9c9d");
-    for (let row = 0; row < 3; row++) for (let j = 0; j < 4; j++) { const u = .335 + j * .062, z = 10 + row * 3.4; line(at(u, .66, z), at(u, .66, z + 2), ["#e5be7c", "#d98b85", "#dbe4bf", "#8fb2aa"][j]!, 1.3); }
-    poly([at(.33, .66, 2), at(.59, .66, 2), at(.59, .66, 5), at(.33, .66, 5)], "#3b5c54"); for (const z of [9, 12, 15]) oval(at(.65, .66, z), .7, .7, "#e2dcb5");
+    const faces = box(.27, .31, .46, .34, 23, ["#a7bab0", "#688d85", "#d9dac4"]);
+    if (faces.some(({ a, b }) => Math.abs(a.v - .65) < 1e-6 && Math.abs(b.v - .65) < 1e-6)) {
+      poly([at(.31, .655, 8), at(.60, .655, 8), at(.60, .655, 20), at(.31, .655, 20)], night ? "#c9e6c3" : "#6a9c9d");
+      for (let row = 0; row < 3; row++) for (let j = 0; j < 4; j++) { const u = .335 + j * .062, z = 10 + row * 3.4; line(at(u, .66, z), at(u, .66, z + 2), ["#e5be7c", "#d98b85", "#dbe4bf", "#8fb2aa"][j]!, 1.3); }
+      poly([at(.33, .66, 2), at(.59, .66, 2), at(.59, .66, 5), at(.33, .66, 5)], "#3b5c54"); for (const z of [9, 12, 15]) oval(at(.65, .66, z), .7, .7, "#e2dcb5");
+    }
+    for (const { a, b } of faces) if (Math.abs(a.u - b.u) < 1e-6) for (let j = 0; j < 4; j++) line(at(a.u, .40, 5 + j), at(a.u, .55, 5 + j), "#567c705c", .5);
   } else if (kind === "planter") {
     box(.31, .34, .38, .32, 7, ["#bf9d79", "#927856", "#dbbc94"]); box(.28, .31, .44, .38, 1.5, ["#c9ab88", "#a68b69", "#e8ccaa"], 8); oval(at(.50, .50, 9.6), 5.3, 2.5, "#6f7751");
     for (let j = 0; j < 7; j++) { const a = j * Math.PI * 2 / 7, p = at(.50 + Math.cos(a) * .09, .50 + Math.sin(a) * .09, 13 + j % 3 * 2); line(at(.5, .5, 9), p, "#678652", .6); leaf(p, 2.8, 3.1, ["#52774a", "#81a366", "#b2c481"]); }
