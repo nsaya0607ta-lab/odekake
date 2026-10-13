@@ -276,4 +276,15 @@ test('tall new park structures can be selected above the ground tile at differen
     for(const zoom of [.6,1.4,2.8]){scene.camera={x:160,y:60,zoom};assert.equal(scene.pickTile(160+p.x*zoom,60+p.y*zoom,town),125,kind);}
   }
 });
+test('gazebo furniture stays under the roof and roof lighting stays fixed when rotated',()=>{
+  const samples=[{x:-3,y:-4},{x:3,y:-2},{x:2.56,y:.68},{x:0,y:2}], roofs=new Set(['#527d69','#759a7f','#7b9f83','#9ab497']);
+  let reference;
+  for(let rotation=0;rotation<4;rotation++){
+    const {c,fills}=recordingContext();decorations.drawTownDecoration(c,'gazebo',0,0,rotation,false);
+    const colors=samples.map(point=>fills.findLast(f=>f.points.length>=3&&inside(point,f.points))?.color);
+    assert(colors.every(color=>roofs.has(color)), 'A bench or column is painted through the opaque roof');
+    if(reference)assert.deepEqual(colors,reference,'Rotating furniture must not rotate the sunlight');
+    reference=colors;
+  }
+});
 console.log(`${passed} town renderer checks passed`);
