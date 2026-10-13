@@ -1,4 +1,5 @@
 "use client";
+import { buildingStage } from "@/lib/games/town-building-models";
 
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
@@ -78,6 +79,7 @@ export function TownBuilder({ userId }: { userId: string }) {
   const mission = MILESTONES.find(m => !town.rewards.includes(m.id));
   const active = selected === null ? null : town.tiles[selected];
   const selectedLevel = selected === null ? 0 : town.levels[selected] || 0;
+  const selectedStage = buildingStage(active ?? undefined, selectedLevel), nextStage = selectedLevel < 3 ? buildingStage(active ?? undefined, selectedLevel + 1) : undefined;
   const selectedLot = selected === null ? undefined : parkAt(town, selected), editingLot = town.parks.find(p => p.id === editingLotId);
   const selectedParts = town.attachments.find(a => a.tile === selected)?.parts;
   const canCustomize = Boolean(selectedLot || active && FACILITY_PARTS.some(p => p.kinds.includes(active)));
@@ -381,10 +383,10 @@ export function TownBuilder({ userId }: { userId: string }) {
       </div>}
     </aside>}
     {showSelection && active && selected !== null && <section ref={selectionRef} className={styles.selectionCard} aria-label="選択した建物" data-selected-tile={selected}>
-      <div className={styles.selectionInfo}><strong>{selectedLot ? selectedLot.kind === "park" ? "公園" : "広場" : BUILDINGS.find(b => b.id === active)?.title}{town.levels[selected]! > 0 && <small>Lv.{town.levels[selected]}</small>}{selectedLot && <small>{selectedLot.width}×{selectedLot.height}</small>}</strong>
+      <div className={styles.selectionInfo}><strong>{selectedLot ? selectedLot.kind === "park" ? "公園" : "広場" : selectedStage ?? BUILDINGS.find(b => b.id === active)?.title}{town.levels[selected]! > 0 && <small>Lv.{town.levels[selected]}</small>}{selectedLot && <small>{selectedLot.width}×{selectedLot.height}</small>}</strong>
         <p>{selectedLot ? `部品 ${selectedLot.parts.length}点${selectedLot.parts.length ? "" : " · 部品を追加しよう"}` : canUpgrade ? connected ? `道路接続${active === "house" ? ` · 定員 ${(town.levels[selected] || 1) * 18 + (selectedParts?.includes("terrace") ? 6 : 0)}人` : ""}` : "道路への接続が必要です" : active === "station" ? stats.routes.some(r => r[0] === selected || r[r.length - 1] === selected) ? "列車が運行しています" : "もう1つの駅へ線路をつなごう" : "街をつなぐ道"}</p>
       </div>
-      {canUpgrade && <button type="button" className={styles.upgrade} onClick={upgrade} disabled={town.levels[selected]! >= 3 || !connected || town.money < (town.levels[selected] || 1) * 450}>{town.levels[selected]! >= 3 ? "最大Lv." : <><span>増築する</span><small>¥{F.format((town.levels[selected] || 1) * 450)}</small></>}</button>}
+      {canUpgrade && <button type="button" className={styles.upgrade} aria-label={nextStage ? `${nextStage}へ増築する Lv.${selectedLevel + 1}` : undefined} onClick={upgrade} disabled={town.levels[selected]! >= 3 || !connected || town.money < (town.levels[selected] || 1) * 450}>{town.levels[selected]! >= 3 ? "最大Lv." : <><span>増築する</span><small>Lv.{selectedLevel + 1} · ¥{F.format((town.levels[selected] || 1) * 450)}</small></>}</button>}
       {canCustomize && <button type="button" className={styles.customize} aria-label="施設の部品を追加" onClick={openCustomize}>部品<small>追加</small></button>}
       <button type="button" className={styles.dismiss} aria-label="建物の選択を解除" onClick={() => setSelected(null)}>×</button>
     </section>}

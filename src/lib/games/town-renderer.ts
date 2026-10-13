@@ -2,6 +2,7 @@ import { MAP_SIZE, PARK_PARTS, canBuyPark, canPlaceParkPart, lotTiles, neighbour
 import { DIRECTIONS, elevationAt, measureTransportRoute, sampleTransportDistance, sampleTransportPath, stationAxis, trackPaths, trackPoint, transportHeight, transportMask, transportOutline, type TransportKind, type TransportRoute } from "./town-transport";
 import { drawTownDecoration, decorationPickFaces } from "./town-decorations";
 import { TownSprites, type SpriteBounds } from "./town-sprites";
+import { buildingHeight, buildingLevel, buildingVolumes, factoryLayout, roofFeatures } from "./town-building-models";
 
 type Point = { x: number; y: number };
 export type TownCamera = { x: number; y: number; zoom: number };
@@ -68,10 +69,10 @@ function tree(c: CanvasRenderingContext2D, x: number, y: number, size: number, v
     for (let j = 0; j < 10; j++) { const a = j * 2.4, r = size * (.16 + hash(j + 5) * .38); ellipse(c, { x: p.x + Math.cos(a) * r + sway, y: p.y - size * 1.5 + Math.sin(a) * r }, size * .055, size * .034, j % 3 ? "#d5e6ae50" : "#23533e38"); }
   }
 }
-function windows(c: CanvasRenderingContext2D, x: number, y: number, w: number, d: number, floors: number, night: boolean, seed: number, entrance = true) {
+function windows(c: CanvasRenderingContext2D, x: number, y: number, w: number, d: number, floors: number, night: boolean, seed: number, entrance = true, base = 0) {
   for (let floor = 0; floor < floors; floor++) {
     for (let j = 0; j < 3; j++) {
-      const z = 7 + floor * 12;
+      const z = base + 7 + floor * 12;
       const color = night && hash(seed + j + floor * 7) > .25 ? "#ffe6a2" : "#779f9e";
       const wx = x + .09 + j * w / 3;
       if (!(entrance && floor === 0 && j === 1)) {
@@ -260,8 +261,8 @@ function facilityParts(c: CanvasRenderingContext2D, kind: Tile, x: number, y: nu
   }
   if (parts.includes("storage")) for (let j = 0; j < 3; j++) crate(c, x + .12 + j * .10, y + .87, .085, .08, 3 + j % 2 * 2, 4);
   if (parts.includes("solar")) {
-    const z = 23 + level * 3 + 5;
-    solarPanel(c, x + .20, y + .28, .58, .36, z);
+    const panel = factoryLayout(level).solar;
+    solarPanel(c, x + panel.u, y + panel.v, panel.w, panel.d, panel.z);
   }
   if (parts.includes("bench") && kind === "station") {
     box(c, x + (axis === "x" ? .39 : .77), y + (axis === "x" ? .77 : .39), axis === "x" ? .32 : .09, axis === "x" ? .09 : .32, 3, ["#a48461", "#896e50", "#d5b387"], 3);
@@ -293,11 +294,80 @@ function station(c: CanvasRenderingContext2D, x: number, y: number, axis: "x" | 
   line(c, clock, { x: clock.x - 1.5, y: clock.y - .3 }, "#536c64", .6);
   for (let j = 0; j < 4; j++) { const a = j * Math.PI / 2; ellipse(c, { x: clock.x + Math.cos(a) * 2.3, y: clock.y + Math.sin(a) * 2.3 }, .3, .3, "#9a967b"); }
 }
-function factorySmoke(c: CanvasRenderingContext2D, x: number, y: number, time: number) {
-  for (let j = 0; j < 4; j++) {
-    const t = (time * .23 + j / 4 + hash(y * MAP_SIZE + x)) % 1, p = iso(x + .82, y + .19, 47);
+function factorySmoke(c: CanvasRenderingContext2D, x: number, y: number, time: number, level = 1) {
+  for (const [k, stack] of factoryLayout(level).stacks.entries()) for (let j = 0; j < 4; j++) {
+    const t = (time * .23 + j / 4 + hash(y * MAP_SIZE + x) + k * .37) % 1, p = iso(x + stack.u + stack.w / 2, y + stack.v + stack.d / 2, stack.z + stack.height);
     c.save(); c.globalAlpha *= (1 - t) * .24; ellipse(c, { x: p.x + t * 12, y: p.y - t * 32 }, 3 + t * 7, 3 + t * 4, "#eaf0dc"); c.restore();
   }
+}
+function balcony(c: CanvasRenderingContext2D, x: number, y: number, w: number, z: number, night: boolean) {
+  poly(c, [iso(x + .012, y + .003, z + 1), iso(x + w - .012, y + .003, z + 1), iso(x + w - .012, y + .003, z + 10), iso(x + .012, y + .003, z + 10)], night ? "#f1d6a2" : "#83aea8");
+  for (let j = 1; j < 3; j++) line(c, iso(x + w * j / 3, y + .006, z + 1), iso(x + w * j / 3, y + .006, z + 10), "#d3dfc3", .5);
+  box(c, x, y, w, .075, 1, ["#b5ba9e", "#849789", "#e4dec3"], z);
+  poly(c, [iso(x, y + .075, z + 1), iso(x + w, y + .075, z + 1), iso(x + w, y + .075, z + 4), iso(x, y + .075, z + 4)], night ? "#e2c78866" : "#b9d6cb7a", "#739586", .5);
+  line(c, iso(x, y + .075, z + 4), iso(x + w, y + .075, z + 4), "#f1e9ca", .7);
+  for (let j = 0; j <= 3; j++) line(c, iso(x + w * j / 3, y + .075, z), iso(x + w * j / 3, y + .075, z + 4), "#819b89", .45);
+}
+function developedBuilding(c: CanvasRenderingContext2D, kind: "house" | "shop", x: number, y: number, level: number, night: boolean, seed: number) {
+  const volumes = buildingVolumes(kind, level), top = volumes[volumes.length - 1]!, total = top.z + top.height;
+  shadow(c, x + .14, y + .13, .72, .70, total + 4);
+  const warm = ["#d9c1a2", "#e0cbaa", "#c8d5c4"][seed % 3]!;
+  for (const [k, block] of volumes.entries()) {
+    const u = x + block.u, v = y + block.v, { w, d, height, z } = block;
+    const colors = level === 3 ? [kind === "house" ? "#d6e1ce" : "#c6d8cd", "#8daaa0", "#e7e7ce"] : [warm, "#b3b09b", "#e6dcc1"];
+    box(c, u, v, w, d, height, colors, z);
+    glaze(c, [iso(u, v + d, z), iso(u + w, v + d, z), iso(u + w, v + d, z + height), iso(u, v + d, z + height)], "#fffced26", "#68806b27");
+    glaze(c, [iso(u + w, v, z), iso(u + w, v + d, z), iso(u + w, v + d, z + height), iso(u + w, v, z + height)], "#c8ddd020", "#436f683d");
+    const floors = Math.floor((height - 1) / 12);
+    windows(c, u, v, w, d, floors, night, seed + k * 11, k === 0, z);
+    for (let floor = 1; floor < floors; floor++) {
+      const band = z + floor * 12 + 3;
+      box(c, u - .008, v + d, w + .016, .018, .8, ["#e2dcc2", "#a9b3a0", "#f4eed5"], band);
+      line(c, iso(u + w + .005, v, band), iso(u + w + .005, v + d, band), "#bfd0b7", .65);
+    }
+    if (kind === "house" && (level === 2 || k > 0)) for (let floor = 1; floor < floors; floor++) {
+      const band = z + floor * 12 + 2;
+      if (level === 2) { balcony(c, u + .045, v + d, .24, band, night); balcony(c, u + w - .285, v + d, .24, band, night); }
+      else balcony(c, u + .035, v + d, w - .07, band, night);
+    }
+    if (kind === "shop") {
+      const glass = night ? "#f5dba4" : level === 3 ? "#699d9a" : "#82b4ad";
+      const low = z + 3, high = z + Math.min(height - 3, k === 0 ? 13 : 10);
+      poly(c, [iso(u + .035, v + d + .004, low), iso(u + w - .035, v + d + .004, low), iso(u + w - .035, v + d + .004, high), iso(u + .035, v + d + .004, high)], glass);
+      for (let j = 1; j < 5; j++) line(c, iso(u + w * j / 5, v + d + .009, low), iso(u + w * j / 5, v + d + .009, high), "#e5e8cb", .65);
+      poly(c, [iso(u + w + .004, v + .045, low), iso(u + w + .004, v + d - .045, low), iso(u + w + .004, v + d - .045, high), iso(u + w + .004, v + .045, high)], night ? "#dfc694" : "#608e91");
+      for (let j = 1; j < 4; j++) line(c, iso(u + w + .009, v + d * j / 4, low), iso(u + w + .009, v + d * j / 4, high), "#b8d0bb", .55);
+    }
+    box(c, u - .012, v - .012, w + .024, d + .024, 2, ["#aab7a2", "#7e988d", "#e4e5c9"], z + height);
+  }
+  const base = volumes[0]!, front = y + base.v + base.d + .008, doorX = x + base.u + base.w / 2;
+  poly(c, [iso(doorX - .065, front, 2), iso(doorX + .065, front, 2), iso(doorX + .065, front, 12), iso(doorX - .065, front, 12)], "#677d70");
+  poly(c, [iso(doorX - .05, front + .003, 5), iso(doorX + .05, front + .003, 5), iso(doorX + .05, front + .003, 11), iso(doorX - .05, front + .003, 11)], night ? "#ffdda0" : "#a3c7bc");
+  // A broad entrance canopy belongs to the podium; balconies belong to their floors.
+  box(c, doorX - .14, front - .01, .28, .13, 1.2, ["#829f8c", "#5f8076", "#c8d8b9"], 12);
+  for (const u of [doorX - .13, doorX + .12]) box(c, u, front + .095, .012, .015, 12, ["#a9b69b", "#7f9b86", "#d8dfbd"]);
+  if (level === 3) {
+    const roof = total + 2;
+    for (const v of [top.v + .04, top.v + top.d - .035]) line(c, iso(x + top.u + .03, y + v, roof + 2.8), iso(x + top.u + top.w - .03, y + v, roof + 2.8), "#b7caae", .65);
+    for (const u of [top.u + .03, top.u + top.w - .03]) for (const v of [top.v + .04, top.v + top.d - .035]) line(c, iso(x + u, y + v, roof), iso(x + u, y + v, roof + 2.8), "#85a48c", .55);
+  }
+  for (const [j, f] of roofFeatures(kind, level).entries()) {
+    if (kind === "house" && level === 3 && j === 1) {
+      box(c, x + f.u, y + f.v, f.w, f.d, 2, ["#b5b494", "#8d9e7d", "#758a5f"], f.z);
+      c.save(); c.translate(0, -f.z - 2); tree(c, x + f.u + f.w / 2, y + f.v + f.d / 2, 2.2, .6); c.restore();
+    } else {
+      box(c, x + f.u, y + f.v, f.w, f.d, f.height, kind === "shop" && level === 3 ? ["#a7c8b6", "#608e91", "#d3e2c7"] : ["#b3c4ae", "#889f92", "#e1e6cf"], f.z);
+      for (let k = 1; k < 4; k++) line(c, iso(x + f.u + f.w * k / 4, y + f.v, f.z + f.height + .1), iso(x + f.u + f.w * k / 4, y + f.v + f.d, f.z + f.height + .1), "#789f9559", .4);
+    }
+  }
+}
+function industrialTank(c: CanvasRenderingContext2D, x: number, y: number, z: number, height: number) {
+  const a = iso(x, y, z), b = iso(x, y, z + height);
+  const g = c.createLinearGradient(a.x - 3.3, 0, a.x + 3.3, 0); g.addColorStop(0, "#78958e"); g.addColorStop(.35, "#d8e1c9"); g.addColorStop(1, "#5f827d");
+  poly(c, [{ x: a.x - 3.3, y: a.y }, { x: a.x + 3.3, y: a.y }, { x: b.x + 3.3, y: b.y }, { x: b.x - 3.3, y: b.y }], g);
+  ellipse(c, a, 3.3, 1.6, "#7b9589"); ellipse(c, b, 3.3, 1.6, "#dce4ca");
+  for (const t of [.25, .70]) line(c, { x: a.x - 3.2, y: a.y - height * t }, { x: a.x + 3.2, y: a.y - height * t }, "#8eada150", .6);
+  line(c, { x: b.x + 2.3, y: b.y }, { x: a.x + 2.3, y: a.y }, "#557f75", .7);
 }
 function plot(c: CanvasRenderingContext2D, kind: Tile, x: number, y: number, access: number) {
   patch(c, x + .05, y + .05, .9, .9, "#c8c9af");
@@ -327,22 +397,44 @@ function building(c: CanvasRenderingContext2D, kind: Tile, x: number, y: number,
     for (const side of [.405, .595]) line(c, iso(x + (axis === "x" ? .04 : side), y + (axis === "x" ? side : .04), .8), iso(x + (axis === "x" ? .96 : side), y + (axis === "x" ? side : .96), .8), "#d6dfcf", 1.2);
     station(c, x, y, axis, night, false); station(c, x, y, axis, night, true); return;
   }
+  if ((kind === "house" || kind === "shop") && level > 1) {
+    developedBuilding(c, kind, x, y, buildingLevel(level), night, seed); return;
+  }
   if (kind === "factory") {
-    shadow(c, bx, by, .7, .65, 26);
-    const height = 23 + level * 3;
-    box(c, bx, by, .72, .64, height, ["#c3c8be", "#959f9c", "#e0deca"]);
-    glaze(c, [iso(bx, by + .64), iso(bx + .72, by + .64), iso(bx + .72, by + .64, height), iso(bx, by + .64, height)], "#fff9e718", "#41564f35");
-    for (let j = 1; j < 8; j++) line(c, iso(bx + j * .09, by + .641, 2), iso(bx + j * .09, by + .641, height - 2), "#758c803b", .6);
-    windows(c, bx, by, .72, .64, 2, night, seed, false);
-    for (let j = 0; j < 3; j++) box(c, bx + j * .23, by + .08, .22, .48, 5, ["#739c9f", "#547b81", "#9cb9b4"], height);
-    for (let j = 0; j < 3; j++) { const u = bx + j * .23; for (let k = 1; k < 5; k++) line(c, iso(u + .02, by + .08 + k * .09, height + 5.1), iso(u + .20, by + .08 + k * .09, height + 5.1), "#476e7478", .65); }
-    // The stack occupies the clear rear roof strip; its buried section is hidden.
-    box(c, x + .77, y + .16, .1, .06, 47 - height, ["#bf8d75", "#8e6557", "#e1b199"], height);
-    for (const z of [32, 42]) if (z > height) { line(c, iso(x + .77, y + .22, z), iso(x + .87, y + .22, z), "#efd6af", 1.2); line(c, iso(x + .87, y + .16, z), iso(x + .87, y + .22, z), "#c5b194", 1); }
-    patch(c, x + .785, y + .172, .07, .036, "#685f56", 47.1);
-    poly(c, [iso(bx + .24, by + .645, 1), iso(bx + .46, by + .645, 1), iso(bx + .46, by + .645, 12), iso(bx + .24, by + .645, 12)], "#678984");
-    for (let j = 1; j < 6; j++) line(c, iso(bx + .245, by + .65, j * 2), iso(bx + .455, by + .65, j * 2), "#9ab2a354", .6);
-    if (showSmoke) factorySmoke(c, x, y, time);
+    const layout = factoryLayout(level), stage = buildingLevel(level), height = layout.main.height;
+    shadow(c, x + layout.main.u, y + layout.main.v, layout.main.w, .68, height + 8);
+    for (const [k, block] of layout.volumes.entries()) {
+      const u = x + block.u, v = y + block.v;
+      box(c, u, v, block.w, block.d, block.height, stage === 3 ? ["#b9cec4", "#7f9b97", "#e2e4cb"] : ["#c3c8be", "#959f9c", "#e0deca"]);
+      glaze(c, [iso(u, v + block.d), iso(u + block.w, v + block.d), iso(u + block.w, v + block.d, block.height), iso(u, v + block.d, block.height)], "#fff9e718", "#41564f35");
+      for (let j = 1; j < 8; j++) line(c, iso(u + j * block.w / 8, v + block.d + .001, 2), iso(u + j * block.w / 8, v + block.d + .001, block.height - 2), "#758c803b", .6);
+      windows(c, u, v, block.w, block.d, Math.floor((block.height - 1) / 12), night, seed + k * 11, false);
+    }
+    const vent = layout.vent;
+    for (let j = 0; j < 3; j++) {
+      const u = x + vent.u + j * .23;
+      box(c, u, y + vent.v, vent.w, vent.d, 5, ["#739c9f", "#547b81", "#9cb9b4"], height);
+      for (let k = 1; k < 5; k++) line(c, iso(u + .02, y + vent.v + k * vent.d / 5, height + 5.1), iso(u + .20, y + vent.v + k * vent.d / 5, height + 5.1), "#476e7478", .65);
+    }
+    for (const stack of layout.stacks) {
+      box(c, x + stack.u, y + stack.v, stack.w, stack.d, stack.height, ["#bf8d75", "#8e6557", "#e1b199"], stack.z);
+      for (let z = stack.z + 6; z < stack.z + stack.height; z += 10) { line(c, iso(x + stack.u, y + stack.v + stack.d, z), iso(x + stack.u + stack.w, y + stack.v + stack.d, z), "#efd6af", 1.2); line(c, iso(x + stack.u + stack.w, y + stack.v, z), iso(x + stack.u + stack.w, y + stack.v + stack.d, z), "#c5b194", 1); }
+      patch(c, x + stack.u + .015, y + stack.v + .012, stack.w - .03, stack.d - .024, "#685f56", stack.z + stack.height + .1);
+    }
+    const front = layout.volumes[layout.volumes.length - 1]!;
+    if (stage > 1) {
+      const tankPositions = stage === 2 ? [.70] : [.34, .68];
+      for (const u of tankPositions) industrialTank(c, x + u, y + .69, front.height, stage === 2 ? 13 : 16);
+      line(c, iso(x + front.u + .03, y + front.v + front.d, front.height + 3), iso(x + front.u + front.w - .03, y + front.v + front.d, front.height + 3), "#bdd0b5", .75);
+      for (let j = 0; j < 5; j++) line(c, iso(x + front.u + .03 + j * (front.w - .06) / 4, y + front.v + front.d, front.height), iso(x + front.u + .03 + j * (front.w - .06) / 4, y + front.v + front.d, front.height + 3), "#82a190", .6);
+    }
+    const bays = stage === 1 ? 1 : stage === 2 ? 2 : 3;
+    for (let j = 0; j < bays; j++) {
+      const u = x + front.u + (j + .5) * front.w / bays, v = y + front.v + front.d + .005, w = bays === 1 ? .22 : .15;
+      poly(c, [iso(u - w / 2, v, 1), iso(u + w / 2, v, 1), iso(u + w / 2, v, stage === 3 ? 18 : 12), iso(u - w / 2, v, stage === 3 ? 18 : 12)], "#678984");
+      for (let k = 1; k < (stage === 3 ? 9 : 6); k++) line(c, iso(u - w / 2 + .005, v + .005, k * 2), iso(u + w / 2 - .005, v + .005, k * 2), "#9ab2a354", .6);
+    }
+    if (showSmoke) factorySmoke(c, x, y, time, level);
     box(c, x + .12, y + .86, parts.includes("storage") ? .34 : .25, .08, 4, ["#a6b6aa", "#6f8b7d", "#c9d4bb"]); return;
   }
   const floors = kind === "house" ? level === 1 ? 1 : level * 2 : level + 1;
@@ -496,8 +588,15 @@ function boxFaces(x: number, y: number, w: number, d: number, h: number, z = 0):
 }
 function buildingFaces(kind: Tile, x: number, y: number, level: number, axis: "x" | "y" = "x"): Point[][] {
   if (kind === "station") return [...boxFaces(x + (axis === "x" ? .04 : .55), y + (axis === "x" ? .55 : .04), axis === "x" ? .92 : .41, axis === "x" ? .41 : .92, 3, 21), ...boxFaces(x + .1, y + .1, .22, .23, 13)];
-  if (kind === "factory") return [...boxFaces(x + .16, y + .15, .72, .64, 23 + level * 3), ...boxFaces(x + .77, y + .16, .1, .06, 47 - (23 + level * 3), 23 + level * 3), ...boxFaces(x + .16, y + .23, .68, .48, 5, 23 + level * 3)];
+  if (kind === "factory") {
+    const layout = factoryLayout(level), volumes = [...layout.volumes, ...layout.stacks, { ...layout.vent, height: 5, z: layout.main.height }];
+    return volumes.flatMap(b => boxFaces(x + b.u, y + b.v, b.w, b.d, b.height, b.z));
+  }
   if (kind !== "house" && kind !== "shop") return [];
+  if (level > 1) {
+    const volumes = buildingVolumes(kind, level), top = volumes[volumes.length - 1]!;
+    return [...volumes, { ...top, u: top.u - .012, v: top.v - .012, w: top.w + .024, d: top.d + .024, z: top.z + top.height, height: 2 }, ...roofFeatures(kind, level)].flatMap(b => boxFaces(x + b.u, y + b.v, b.w, b.d, b.height, b.z));
+  }
   const h = (kind === "house" ? level === 1 ? 1 : level * 2 : level + 1) * 12 + 5;
   const faces = boxFaces(x + .16, y + .15, .67, .65, h);
   if (kind === "house" && level === 1) {
@@ -584,7 +683,7 @@ export class TownScene {
   private lastParks: ParkLot[] | null = null;
   private lastAttachments: Town["attachments"] | null = null;
   private objects: SceneObject[] = [];
-  private effects: { kind: Tile; x: number; y: number }[] = [];
+  private effects: { kind: Tile; x: number; y: number; level?: number }[] = [];
   private roadNeighbours = new Map<number, number[]>();
   private lastRoutes: number[][] | null = null;
   private lastRouteTiles: Tile[] | null = null;
@@ -670,11 +769,13 @@ export class TownScene {
       const i = y * MAP_SIZE + x, tile = town.tiles[i]!, level = town.levels[i] || 1;
       if (["house", "shop", "factory", "station", "park"].includes(tile) && !covered.has(i)) {
         const axis = tile === "station" ? stationAxis(town, i) : "x";
-        const style = tile === "station" || tile === "factory" && !night ? 0 : Math.floor(hash(i) * 20);
+        let style = tile === "station" || tile === "factory" && !night ? 0 : Math.floor(hash(i) * 20);
+        // Daytime upper floors share one palette at Lv.3 and three at Lv.2.
+        if (!night && (tile === "house" || tile === "shop") && level > 1) style = level >= 3 ? 0 : style % 3;
         const parts = extras.get(i) ?? [], key = `${tile}:${style}:${level}:${night}:${axis}:${parts.slice().sort().join(",")}`;
         const faces = buildingFaces(tile, x, y, level, axis).flat(), origin = iso(x, y);
         const top = Math.min(-24, ...faces.map(p => p.y - origin.y)) - 4;
-        const h = tile === "house" ? (level === 1 ? 1 : level * 2) * 12 + 13 : tile === "shop" ? (level + 1) * 12 + 13 : 32;
+        const h = tile === "house" || tile === "shop" || tile === "factory" ? buildingHeight(tile, level) : 32;
         const right = Math.max(38, h * .8 + 24), bottom = Math.max(parts.includes("light") ? 52 : 38, h * .22 + 32);
         const bounds = { left: -38, top, width: right + 38, height: bottom - top };
         if (tile === "station") {
@@ -684,7 +785,7 @@ export class TownScene {
           // Trains run between the platform and canopy, with visible supporting pillars.
           add(x, y, 1.55, key + ":roof", bounds, c => { station(c, x, y, axis, night, true); facilityParts(c, tile, x, y, level, parts.filter(p => p === "light"), night, axis); });
         } else add(x, y, 1, key, bounds, c => { facilityParts(c, tile, x, y, level, parts, night, axis, true); building(c, tile, x, y, level, night, 0, false, axis, 0, false, parts); facilityParts(c, tile, x, y, level, parts, night, axis); });
-        if (tile === "factory" || tile === "park") effects.push({ kind: tile, x, y });
+        if (tile === "factory" || tile === "park") effects.push({ kind: tile, x, y, level });
       }
       if (tile === "grass" && hash(i * 3) > .63 && !neighbours(x, y).some(n => ["road", "rail", "station"].includes(town.tiles[n]!))) {
         const size = Math.round((8 + hash(i * 7) * 9) * 2) / 2, v = hash(i * 5), variant = v < .3 ? .1 : v > .88 ? .95 : .5;
@@ -752,6 +853,8 @@ export class TownScene {
     for (let j = 0; j < 4; j++) { const px = ((j * .27 + time * .0007) % 1.5 - .2) * width; ellipse(c, { x: px, y: 55 + j * 47 }, 85, 15, options.night ? "#ffffff03" : "#fffef014"); }
     c.save(); c.translate(this.camera.x, this.camera.y); c.scale(this.camera.zoom, this.camera.zoom);
     this.drawGround(c, town, options);
+    const transform = c.getTransform?.();
+    const spriteResolution = Math.max(3, Math.min(7, Math.ceil(transform ? Math.hypot(transform.a, transform.b) : this.camera.zoom * 2)));
     const detail = this.camera.zoom > 1.5;
     if (detail) {
       // At close range, draw the few visible streets as vectors to retain sharp rails and markings.
@@ -786,9 +889,9 @@ export class TownScene {
       poly(c, [iso(x, y, 1), iso(x + lot.width, y, 1), iso(x + lot.width, y + lot.height, 1), iso(x, y + lot.height, 1)], valid ? "#bdd0a655" : "#ef957944", valid ? "#efdaa0" : "#d87962", 2);
     } else for (const i of previewTiles) highlight(i, allowedAt(i) ? "#efdaa0" : "#d87962", allowedAt(i) ? "#e6dba222" : "#ef957922");
     const moving: SceneObject[] = [];
-    const add = (x: number, y: number, depth: number, paint: SceneObject["paint"]) => { const origin = iso(x, y); moving.push({ x: origin.x, y: origin.y, depth: x + y + depth, bounds: { left: -28, top: -85, width: 66, height: 110 }, paint }); };
-    for (const { kind, x, y } of this.effects) {
-      if (kind === "factory" && !this.reducedMotion) add(x, y, 1.01, c => factorySmoke(c, x, y, time));
+    const add = (x: number, y: number, depth: number, paint: SceneObject["paint"], bounds: SpriteBounds = { left: -28, top: -85, width: 66, height: 110 }) => { const origin = iso(x, y); moving.push({ x: origin.x, y: origin.y, depth: x + y + depth, bounds, paint }); };
+    for (const { kind, x, y, level } of this.effects) {
+      if (kind === "factory" && !this.reducedMotion) add(x, y, 1.01, c => factorySmoke(c, x, y, time, level), { left: -28, top: -112, width: 76, height: 145 });
       if (kind === "park") add(x, y, 1.01, c => { const p = iso(x + .5, y + .5), jet = 17 + (this.reducedMotion ? 0 : Math.sin(time * 3)); line(c, { x: p.x, y: p.y - 6.5 }, { x: p.x, y: p.y - jet }, "#d9f7f0", 1.6); ellipse(c, { x: p.x, y: p.y - jet }, 1.4, .8, "#e9f9ed"); });
     }
     for (const v of this.vehicles) {
@@ -833,7 +936,7 @@ export class TownScene {
     };
     const draw = (o: SceneObject) => {
       if (!visible(o)) return;
-      if (o.key && this.sprites && !detail) this.sprites.draw(c, o.key, o.x, o.y, o.bounds, context => { context.save(); context.translate(-o.x, -o.y); o.paint(context); context.restore(); });
+      if (o.key && this.sprites) this.sprites.draw(c, o.key, o.x, o.y, o.bounds, context => { context.save(); context.translate(-o.x, -o.y); o.paint(context); context.restore(); }, spriteResolution);
       else o.paint(c);
     };
     // The immutable scene is already sorted; merge only the small moving layer each frame.
