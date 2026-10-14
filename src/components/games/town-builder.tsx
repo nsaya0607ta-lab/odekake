@@ -204,8 +204,9 @@ export function TownBuilder({ userId }: { userId: string }) {
   }, [loadGame, cancelReads]);
   useEffect(() => {
     if (!loaded) return;
-    const refresh = () => {
-      if (document.hidden || performance.now() - lastReadAt.current < 3000) return;
+    const refresh = (event?: Event) => {
+      if (document.hidden || event?.type !== "online" && performance.now() - lastReadAt.current < 3000) return;
+      if (event?.type === "online" && !inFlight.current && !pendingRequest.current) cancelReads();
       void loadGame(undefined, true);
     };
     const checkDay = () => {
@@ -219,7 +220,7 @@ export function TownBuilder({ userId }: { userId: string }) {
       window.removeEventListener("focus", refresh); window.removeEventListener("online", refresh); window.removeEventListener("pageshow", refresh);
       document.removeEventListener("visibilitychange", refresh); window.clearInterval(timer);
     };
-  }, [loaded, loadGame]);
+  }, [loaded, loadGame, cancelReads]);
   useEffect(() => {
     if (editingLotId !== null && !town.parks.some(p => p.id === editingLotId)) {
       setEditingLotId(null); setMode(m => m === "decorate" ? "inspect" : m); setPanel(p => p === "customize" ? null : p); setSelected(null);
