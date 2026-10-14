@@ -234,11 +234,13 @@ const WRITE_MS = 1300;
  * コイン：5秒ごとに 20% で降る。1回 5 枚（枚数は DB が決める）。青と黄色は半々。1日の回数に上限はない。
  * ホームを開いているあいだ、平均して1時間に 144 回（3600 / 5 × 20%）＝ 720 枚。
  * 赤コイン（ご当地ピンボールのステージの部品に使う）は、黄色・青とは別に 5秒ごとに 5%（黄色・青の降る数は変えない）。
+ * 白コイン（まちづくりに使う）も別に 5秒ごとに 10%（平均50秒に1回。白コインの仕組みがあるときだけ）。
  */
 const COIN_TICK_MS = 5000;
 const COIN_CHANCE = 0.2;
 const COIN_BLUE_CHANCE = 0.5;
 const COIN_RED_CHANCE = 0.05;
+const COIN_WHITE_CHANCE = 0.1;
 /**
  * レア度。降ったコインのうち、ふつう 85%・中レア 12%・高レア 3%。もらえる枚数は黄色も青も同じで、
  * ふつう 5・中レア 20・高レア 100（枚数は DB が決める。ここは見た目と抽選だけ）。
@@ -597,7 +599,7 @@ export function WanderingFrenchie({
     };
   }, [level]);
 
-  // 5秒ごとに、空からコインが降る（黄色・青は 20%、赤はそれとは別に 5%。画面を見ているときだけ）
+  // 5秒ごとに、空からコインが降る（黄色・青は 20%、赤はそれとは別に 5%、白は 10%。画面を見ているときだけ）
   useEffect(() => {
     if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
     const id = setInterval(() => {
@@ -606,7 +608,7 @@ export function WanderingFrenchie({
       // 黄色・青（いままでどおり）か、それとは別の赤（赤コインの仕組みがあるときだけ）
       const roll = Math.random();
       const kind: CoinKind | null =
-        roll < COIN_CHANCE ? (Math.random() < COIN_BLUE_CHANCE ? "blue" : "coin") : redOkRef.current && roll < COIN_CHANCE + COIN_RED_CHANCE ? "red" : whiteOkRef.current && roll >= COIN_CHANCE + COIN_RED_CHANCE && roll < COIN_CHANCE + COIN_RED_CHANCE + 0.05 ? "white" : null;
+        roll < COIN_CHANCE ? (Math.random() < COIN_BLUE_CHANCE ? "blue" : "coin") : redOkRef.current && roll < COIN_CHANCE + COIN_RED_CHANCE ? "red" : whiteOkRef.current && roll >= COIN_CHANCE + COIN_RED_CHANCE && roll < COIN_CHANCE + COIN_RED_CHANCE + COIN_WHITE_CHANCE ? "white" : null;
       if (!kind) return;
       const box = boxRef.current;
       if (!box) return;
