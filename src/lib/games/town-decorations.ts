@@ -1,4 +1,5 @@
 import type { ParkPart } from "./town-builder";
+import { paintState, snowy } from "./town-paint";
 
 type Point = { x: number; y: number };
 const ITEMS = new Set(["cherry", "pine", "hedge", "pond", "gazebo", "picnic", "swings", "sandbox", "sculpture", "clock", "trash", "bikeRack", "stones", "arch", "vending", "canopy", "planter"]);
@@ -30,7 +31,7 @@ export function drawTownDecoration(c: CanvasRenderingContext2D, kind: string, x:
       const shade = Math.abs(a.p.x - b.p.x) < 1e-6 ? 1 : 0;
       poly([at(a.u, a.v, z), at(b.u, b.v, z), at(b.u, b.v, z + h), at(a.u, a.v, z + h)], colors[shade]!);
     }
-    poly([at(u, v, z + h), at(u + w, v, z + h), at(u + w, v + d, z + h), at(u, v + d, z + h)], colors[2]!);
+    poly([at(u, v, z + h), at(u + w, v, z + h), at(u + w, v + d, z + h), at(u, v + d, z + h)], snowy(colors[2]!));
     for (const { a, b } of sides) line(at(a.u, a.v, z + h), at(b.u, b.v, z + h), "#f4edcb60", .45);
     return sides;
   };
@@ -41,9 +42,18 @@ export function drawTownDecoration(c: CanvasRenderingContext2D, kind: string, x:
   if (kind !== "stones") oval(at(.53, .58), 17, 6.8, "#294f3c24");
   if (kind === "cherry") {
     box(.40, .40, .20, .20, 1, stone); line(at(.5, .5, 1), at(.49, .5, 21), "#8c7359", 2.3); line(at(.49, .5, 12), at(.3, .48, 24), "#8c7359", 1); line(at(.49, .5, 14), at(.72, .53, 24), "#8c7359", 1);
-    for (const [u, v, z, r] of [[.28, .48, 22, 7], [.64, .52, 24, 8], [.45, .5, 30, 8.5], [.7, .48, 29, 5.5], [.32, .46, 29, 5.8]]) leaf(at(u!, v!, z), r!, r! * .84, ["#c77996", "#e4a7b8", "#ffe0df"]);
-    for (let j = 0; j < 20; j++) bloom(at(.28 + noise(j + 1) * .43, .47 + noise(j + 43) * .08, 20 + noise(j + 18) * 13), j % 3 ? "#f7d6d9" : "#f9e5d7", .65);
-    for (let j = 0; j < 8; j++) oval(at(.25 + noise(j * 3) * .6, .23 + noise(j * 7) * .6, 1), .65, .4, "#e8b8bf");
+    const live = paintState.season !== "default", blossom = !live || paintState.blossom > .15;
+    const leaves = paintState.bare > .5 ? null : paintState.foliage > .35 ? ["#a8483c", "#d36f4e", "#f0a072"] : paintState.lush > .35 ? ["#2f6a46", "#4e8f56", "#73ab64"] : ["#3f7a55", "#63a565", "#86ba74"];
+    if (blossom) {
+      for (const [u, v, z, r] of [[.28, .48, 22, 7], [.64, .52, 24, 8], [.45, .5, 30, 8.5], [.7, .48, 29, 5.5], [.32, .46, 29, 5.8]]) leaf(at(u!, v!, z), r!, r! * .84, ["#c77996", "#e4a7b8", "#ffe0df"]);
+      for (let j = 0; j < 20; j++) bloom(at(.28 + noise(j + 1) * .43, .47 + noise(j + 43) * .08, 20 + noise(j + 18) * 13), j % 3 ? "#f7d6d9" : "#f9e5d7", .65);
+      for (let j = 0; j < 8; j++) oval(at(.25 + noise(j * 3) * .6, .23 + noise(j * 7) * .6, 1), .65, .4, "#e8b8bf");
+    } else if (leaves) {
+      for (const [u, v, z, r] of [[.28, .48, 22, 7], [.64, .52, 24, 8], [.45, .5, 30, 8.5], [.7, .48, 29, 5.5], [.32, .46, 29, 5.8]]) leaf(at(u!, v!, z), r!, r! * .84, leaves);
+      if (paintState.snow) for (const [u, v, z, r] of [[.45, .5, 33, 6], [.64, .52, 27, 5]]) oval(at(u!, v!, z), r!, r! * .45, "#f3f6f9e0");
+    } else {
+      for (let j = 0; j < 9; j++) { const a = -Math.PI / 2 + (j - 4) * .32, from = at(.49, .5, 16 + (j % 3) * 4), to = { x: from.x + Math.cos(a) * 9, y: from.y + Math.sin(a) * 10 }; line(from, to, "#86705a", .8); if (paintState.snow) line({ x: to.x - .8, y: to.y }, { x: to.x + .8, y: to.y - .3 }, "#f4f7f9", 1.1); }
+    }
   } else if (kind === "pine") {
     line(at(.5, .5, 1), at(.5, .5, 15), "#827053", 2);
     for (let j = 0; j < 4; j++) { const z = 8 + j * 5.5, q = at(.5, .5, z), tip = at(.5, .5, z + 12), w = 11 - j * 2; poly([{ x: q.x - w, y: q.y }, tip, { x: q.x + w, y: q.y }, { x: q.x + w * .2, y: q.y + 3 }], j % 2 ? "#397757" : "#326e50"); poly([{ x: q.x - w, y: q.y }, tip, { x: q.x - 1, y: q.y + 1 }], "#6a9d6a"); line({ x: q.x - w + 1, y: q.y - .3 }, { x: q.x + 3, y: q.y + 2 }, "#9bb88555", .6); }
@@ -197,7 +207,7 @@ export function drawTownDecoration(c: CanvasRenderingContext2D, kind: string, x:
       const dial = (across: number, high: number) => at(u + du * across, v + dv * across, 29 + high * 2.9);
       poly(Array.from({ length: 32 }, (_, j) => { const t = j * Math.PI / 16; return dial(Math.cos(t), Math.sin(t)); }), night ? "#ffdf9d" : "#f4edd0", "#647b68", .35);
       for (let j = 0; j < 12; j++) { const t = j * Math.PI / 6; line(dial(Math.cos(t) * .77, Math.sin(t) * .77), dial(Math.cos(t) * .87, Math.sin(t) * .87), "#71806a", .35); }
-      line(dial(0, 0), dial(.5, .55), "#4d695a", .6); line(dial(0, 0), dial(-.5, .10), "#4d695a", .6);
+      if (!paintState.liveClocks) { line(dial(0, 0), dial(.5, .55), "#4d695a", .6); line(dial(0, 0), dial(-.5, .10), "#4d695a", .6); }
     }
   } else if (kind === "trash") {
     const faces = box(.34, .37, .32, .26, 10, ["#7e9988", "#577b6b", "#a5b69a"]); box(.31, .34, .38, .32, 1.5, ["#687f70", "#425f54", "#9dab90"], 11);
@@ -241,4 +251,15 @@ export function decorationPickFaces(kind: ParkPart, x: number, y: number, rotati
   const h = heights[kind]; if (!h) return [];
   const corners = [[.15, .15], [.85, .15], [.85, .85], [.15, .85]].map(([u, v]) => { const r = rotation % 4; const a = r === 1 ? 1 - v! : r === 2 ? 1 - u! : r === 3 ? v! : u!; const b = r === 1 ? u! : r === 2 ? 1 - v! : r === 3 ? 1 - u! : v!; return { x: x + a, y: y + b }; });
   return corners.map((a, j) => { const b = corners[(j + 1) % 4]!; return [iso(a.x, a.y), iso(b.x, b.y), iso(b.x, b.y, h), iso(a.x, a.y, h)]; });
+}
+
+/** The two visible clock faces of a clock tower, as (across, up) → screen point, for live hands. */
+export function clockDials(x: number, y: number, rotation = 0): ((across: number, high: number) => Point)[] {
+  const r = ((rotation % 4) + 4) % 4;
+  const world = (u: number, v: number) => r === 1 ? { x: x + 1 - v, y: y + u } : r === 2 ? { x: x + 1 - u, y: y + 1 - v } : r === 3 ? { x: x + v, y: y + 1 - u } : { x: x + u, y: y + v };
+  const vertices = [[.37, .38], [.63, .38], [.63, .62], [.37, .62]].map(([u, v]) => ({ u: u!, v: v!, p: world(u!, v!) }));
+  return vertices.map((a, j) => ({ a, b: vertices[(j + 1) % 4]! })).sort((a, b) => a.a.p.x + a.a.p.y + a.b.p.x + a.b.p.y - b.a.p.x - b.a.p.y - b.b.p.x - b.b.p.y).slice(2).map(({ a, b }) => {
+    const u = (a.u + b.u) / 2, v = (a.v + b.v) / 2, du = Math.abs(a.u - b.u) > .1 ? .08 : 0, dv = du ? 0 : .08;
+    return (across: number, high: number) => { const p = world(u + du * across, v + dv * across); return iso(p.x, p.y, 29 + high * 2.9); };
+  });
 }

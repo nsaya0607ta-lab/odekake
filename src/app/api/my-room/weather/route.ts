@@ -18,7 +18,7 @@ export async function GET(request: Request) {
   const q = new URLSearchParams({
     latitude: (Math.round(lat * 100) / 100).toFixed(2),
     longitude: (Math.round(lon * 100) / 100).toFixed(2),
-    current: "weather_code,temperature_2m,cloud_cover,precipitation,wind_speed_10m",
+    current: "weather_code,temperature_2m,cloud_cover,precipitation,wind_speed_10m,wind_direction_10m",
     // ホームのお天気チップ用：きょうの最高・最低気温と、いちばん高い降水確率
     daily: "temperature_2m_max,temperature_2m_min,precipitation_probability_max",
     forecast_days: "1",
@@ -44,7 +44,7 @@ export async function GET(request: Request) {
     };
     if (!c || typeof c.weather_code !== "number") throw new Error("no current weather");
     return NextResponse.json(
-      { code: c.weather_code, temp: c.temperature_2m ?? null, cloud: c.cloud_cover ?? 0, precip: c.precipitation ?? 0, wind: c.wind_speed_10m ?? 0,
+      { code: c.weather_code, temp: c.temperature_2m ?? null, cloud: c.cloud_cover ?? 0, precip: c.precipitation ?? 0, wind: c.wind_speed_10m ?? 0, windDir: c.wind_direction_10m ?? null,
         tmax: today("temperature_2m_max"), tmin: today("temperature_2m_min"), pop: today("precipitation_probability_max"),
         at: new Date().toISOString() },
       { headers: { "Cache-Control": "private, max-age=600" } },

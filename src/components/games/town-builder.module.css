@@ -57,6 +57,21 @@
 .sceneButtons { position: absolute; top: calc(var(--top) + 137px); right: var(--edge); display: grid; gap: 6px; }
 .sceneButtons button { display: grid; place-items: center; width: 46px; height: 46px; border-radius: 13px; color: var(--green); font-size: 17px; }
 .mission { display: none; }
+.skyChip { position: absolute; top: calc(var(--top) + 137px); left: var(--edge); display: flex; align-items: center; gap: 6px; height: 40px; max-width: calc(100% - var(--edge) * 2 - 60px); padding: 0 12px 0 9px; border: 1px solid var(--line); border-radius: 13px; color: var(--ink); background: var(--surface); box-shadow: 0 4px 16px #294e3c18; }
+.skyChip > span { font-size: 17px; line-height: 1; }
+.skyChip b { font-size: 14px; font-weight: 800; font-variant-numeric: tabular-nums; letter-spacing: -.3px; }
+.skyChip small { font-size: 11px; color: var(--muted); font-variant-numeric: tabular-nums; }
+.skyChip em { min-width: 0; font-style: normal; font-size: 9px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.game[data-scenery=true] .skyChip { display: none; }
+.skySettings { display: grid; gap: 8px; margin: 0 0 12px; padding: 11px; border: 1px solid var(--line); border-radius: 13px; background: #f1f3e7; }
+.skyNow { display: flex; align-items: center; gap: 10px; }
+.skyNow > span { display: grid; place-items: center; width: 38px; height: 38px; flex-shrink: 0; border-radius: 11px; background: #e3eadc; font-size: 20px; }
+.skyNow b { display: block; font-size: 13px; }
+.skyNow small { display: block; margin-top: 2px; font-size: 10px; color: var(--muted); }
+.skyChoices { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 4px; }
+.skyChoices button { min-height: 40px; padding: 0 2px; border: 1px solid #d7dfcf; border-radius: 9px; background: #eef1e2; color: var(--green); font-size: 11px; font-weight: 700; }
+.skyChoices button[aria-pressed=true] { border-color: var(--green); background: var(--green); color: #fff8de; }
+.skySettings > small { font-size: 9px; line-height: 1.6; color: var(--muted); }
 .toolbar { position: absolute; bottom: var(--bottom); left: 50%; transform: translateX(-50%); width: min(520px, calc(100% - var(--edge) * 2)); padding: 7px; border-radius: 20px; }
 .tools { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 5px; }
 .tools button { min-height: 58px; border: 0; background: #e8ecdc; border-radius: 13px; color: var(--muted); display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 5px; font-size: 10px; font-weight: 700; white-space: nowrap; }
@@ -142,6 +157,7 @@
   .statIcon { display: grid; place-items: center; width: 28px; height: 28px; border-radius: 9px; background: #e8ecdc; color: #668462; }
   .stat strong { font-size: 18px; }
   .sceneButtons { top: calc(var(--top) + 111px); }
+  .skyChip { top: calc(var(--top) + 162px); }
   .mission { display: flex; align-items: center; gap: 12px; position: absolute; left: var(--edge); bottom: var(--dock); max-width: 330px; padding: 12px; border-radius: 16px; pointer-events: none; }
   .missionMark { display: grid; place-items: center; width: 30px; height: 30px; border-radius: 10px; color: #a1844d; background: #eee7ca; font-size: 21px; flex-shrink: 0; }
   .mission small { display: block; color: var(--muted); font-size: 9px; }
@@ -179,6 +195,7 @@
   .statIcon { display: none; }
   .stat strong { font-size: 15px; }
   .sceneButtons { top: calc(var(--top) + 122px); display: flex; }
+  .skyChip { top: calc(var(--top) + 134px); height: 36px; }
   .mission { display: none; }
   .tools button { min-height: 48px; }
   .sidebar { right: var(--edge); bottom: var(--dock); width: 300px; max-height: calc(100% - var(--dock) - var(--top) - 75px); padding: 10px; }
@@ -196,6 +213,8 @@
 .customize { min-width: 52px; min-height: 48px; padding: 5px 8px; border: 1px solid #a6b698; border-radius: 11px; background: #e4ecd9; color: var(--green); font-size: 11px !important; font-weight: 700; }
 .customize small { display: block; font-size: 9px; margin-top: 2px; font-weight: 500; }
 .selectionCard .upgrade { min-width: 64px; }
+.roomLink { display: flex; flex-direction: column; justify-content: center; align-items: center; gap: 2px; flex-shrink: 0; min-width: 92px; height: 48px; padding: 5px 10px; border-radius: 11px; background: linear-gradient(135deg, #e07a5f, #c85f4a); color: #fff8ee; text-decoration: none; font-size: 12px; font-weight: 800; box-shadow: 0 3px 10px #c85f4a40; touch-action: manipulation; }
+.roomLink small { font-size: 9px; font-weight: 500; opacity: .9; }
 .landCatalog { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 7px; }
 .landCatalog > button { display: flex; flex-direction: column; align-items: center; gap: 6px; min-height: 112px; min-width: 0; padding: 10px 4px; border: 1px solid var(--line); border-radius: 13px; background: #f4f4e7; color: var(--ink); }
 .landCatalog > button[aria-pressed=true] { background: #e5edda; border-color: #6f8c60; box-shadow: inset 0 0 0 1px #6f8c60; }

@@ -64,6 +64,9 @@ export async function POST(request: Request) {
       TOWN_UNDO_EMPTY: ["取り消せる工事がありません。", 400],
       TOWN_NOT_ALLOWED: ["見つかりません", 404],
       TOWN_ALREADY_STARTED: ["保存済みの街を読み込みます。", 409],
+      TOWN_HOME_LIMIT: ["マイホームは1軒だけ建てられます。", 400],
+      TOWN_ROAD_REQUIRED: ["道路の隣に建ててください。", 400],
+      INVALID_TOWN: ["この工事は保存できませんでした。街を読み込み直してから、もう一度お試しください。", 400],
     };
     const known = messages[error.message];
     if (!known) console.error("Town operation failed", { code: error.code, message: error.message });

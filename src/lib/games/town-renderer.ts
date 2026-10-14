@@ -1,12 +1,16 @@
 import { MAP_SIZE, PARK_PARTS, canBuyPark, canPlaceParkPart, lotTiles, neighbours, parkAt, parkFootprint, touchesRoad, type FacilityPart, type ParkLot, type ParkPart, type ParkSize, type Tile, type Town, type Tool } from "./town-builder";
 import { DIRECTIONS, elevationAt, measureTransportRoute, sampleTransportDistance, sampleTransportPath, stationAxis, trackPaths, trackPoint, transportHeight, transportMask, transportOutline, type TransportKind, type TransportRoute } from "./town-transport";
-import { drawTownDecoration, decorationPickFaces } from "./town-decorations";
+import { clockDials, drawTownDecoration, decorationPickFaces } from "./town-decorations";
 import { TownSprites, type SpriteBounds } from "./town-sprites";
 import { buildingHeight, buildingLevel, buildingVolumes, factoryLayout, facilityLayout, roofFeatures, type FacilityPlacement } from "./town-building-models";
+import { lightGradient, NIGHT_AMBIENT, paintState, resetPaintState, shade, snowy, type TreePalette } from "./town-paint";
+import { mixColor, type TownEnvironment } from "./town-environment";
+import { drawCloudShadows, drawFog, drawPrecipitation, drawSplashes, lightningFlash, SkyPainter, skyHorizon } from "./town-sky";
+import { drawDog, TownLife } from "./town-life";
 
 type Point = { x: number; y: number };
 export type TownCamera = { x: number; y: number; zoom: number };
-export type SceneOptions = { night: boolean; grid: boolean; hover: number | null; selected: number | null; preview: number[]; tool: Tool | "inspect" | "pan" | "decorate"; routes: number[][]; paused: boolean; speed: number; parkSize?: ParkSize; parkKind?: ParkLot["kind"]; parkRotated?: boolean; editLot?: number; parkPart?: ParkPart | "remove"; partRotation?: number };
+export type SceneOptions = { night: boolean; environment?: TownEnvironment; grid: boolean; hover: number | null; selected: number | null; preview: number[]; tool: Tool | "inspect" | "pan" | "decorate"; routes: number[][]; paused: boolean; speed: number; parkSize?: ParkSize; parkKind?: ParkLot["kind"]; parkRotated?: boolean; editLot?: number; parkPart?: ParkPart | "remove"; partRotation?: number };
 const W = 32, H = 16;
 const iso = (x: number, y: number, z = 0): Point => ({ x: (x - y) * W, y: (x + y) * H - z });
 const hash = (n: number) => { const v = Math.sin(n * 127.1 + 311.7) * 43758.5453; return v - Math.floor(v); };
@@ -21,7 +25,7 @@ function ellipse(c: CanvasRenderingContext2D, p: Point, rx: number, ry: number, 
   c.beginPath(); c.ellipse(p.x, p.y, rx, ry, 0, 0, Math.PI * 2); c.fillStyle = color; c.fill();
 }
 function patch(c: CanvasRenderingContext2D, x: number, y: number, w: number, d: number, fill: string, z = 0) {
-  poly(c, [iso(x, y, z), iso(x + w, y, z), iso(x + w, y + d, z), iso(x, y + d, z)], fill);
+  poly(c, [iso(x, y, z), iso(x + w, y, z), iso(x + w, y + d, z), iso(x, y + d, z)], snowy(fill));
 }
 function box(c: CanvasRenderingContext2D, x: number, y: number, w: number, d: number, h: number, colors: string[], z = 0) {
   poly(c, [iso(x, y + d, z), iso(x + w, y + d, z), iso(x + w, y + d, z + h), iso(x, y + d, z + h)], colors[0]!);
@@ -48,7 +52,24 @@ function shadow(c: CanvasRenderingContext2D, x: number, y: number, w: number, d:
   c.restore();
   line(c, iso(x, y + d), iso(x + w, y + d), "#526d453a", 1.5);
 }
-function tree(c: CanvasRenderingContext2D, x: number, y: number, size: number, variant: number, time = 0) {
+const PALETTES: Record<Exclude<TreePalette, "bare">, string[]> = {
+  default: ["#3e7955", "#62a565", "#80b872"], fresh: ["#4f8e57", "#7db866", "#b2d68a"], lush: ["#2d6745", "#4b8f55", "#70aa63"],
+  yellow: ["#b7892c", "#dcb447", "#f2d778"], orange: ["#c99767", "#ebbb7b", "#f5d191"], red: ["#a54a3b", "#cf6c4c", "#eb9a6e"],
+};
+const BLOSSOM = ["#cf8aa0", "#eeb6c6", "#ffe6ec"];
+/** Season of one deciduous tree: each tree turns and drops its leaves at its own time. */
+function treePalette(seed: number, variant: number): TreePalette | "blossom" {
+  if (paintState.season === "default") return variant > .88 ? "orange" : "default";
+  const h = hash(seed * 1.37 + 5);
+  // Japanese streets are lined with cherry trees: a third of the round trees bloom together.
+  if (paintState.blossom > .15 && (variant > .8 || hash(seed * 2.31 + 9) < .34)) return "blossom";
+  if (h < paintState.bare) return "bare";
+  if (h < paintState.foliage * 1.05) return (["yellow", "orange", "red"] as const)[Math.floor(hash(seed * 3.1) * 3)]!;
+  return paintState.lush > .35 ? "lush" : paintState.season === "spring" ? "fresh" : "default";
+}
+function tree(c: CanvasRenderingContext2D, x: number, y: number, size: number, variant: number, time = 0, chosen?: TreePalette | "blossom") {
+  // Trees inside building artwork follow the season too, each at its own pace.
+  const palette = chosen ?? (paintState.season === "default" ? variant > .88 ? "orange" : "default" : treePalette(Math.round(x * 97 + y * 13), variant));
   const p = iso(x, y), sway = Math.sin(time * .6 + x) * .4;
   ellipse(c, { x: p.x + 5, y: p.y + 1 }, size * .6, size * .25, "#245a3436");
   line(c, p, { x: p.x + sway, y: p.y - size }, "#786744", size * .17);
@@ -57,23 +78,33 @@ function tree(c: CanvasRenderingContext2D, x: number, y: number, size: number, v
   if (variant < .3) {
     for (let j = 0; j < 4; j++) { const base = p.y - size * (.38 + j * .39), spread = size * (.64 - j * .13), tip = base - size * .92;
       glaze(c, [{ x: p.x - spread, y: base }, { x: p.x + sway, y: tip }, { x: p.x + spread, y: base - size * .03 }, { x: p.x + spread * .28, y: base + size * .12 }], "#5b9270", "#285c47");
-      line(c, { x: p.x - spread * .80, y: base - size * .06 }, { x: p.x + sway, y: tip + size * .15 }, "#94b77b55", .7);
+      line(c, { x: p.x - spread * .80, y: base - size * .06 }, { x: p.x + sway, y: tip + size * .15 }, paintState.snow ? "#f3f6f8" : "#94b77b55", paintState.snow ? size * .09 : .7);
+    }
+  } else if (palette === "bare") {
+    // Winter branches: a fine crown of twigs, with snow resting on the upper boughs.
+    for (let j = 0; j < 9; j++) {
+      const a = -Math.PI / 2 + (j - 4) * .3, len = size * (.55 + hash(j + x) * .35), from = { x: p.x, y: p.y - size * (.7 + (j % 3) * .2) };
+      const to = { x: from.x + Math.cos(a) * len * .8 + sway, y: from.y + Math.sin(a) * len };
+      line(c, from, to, "#7a6a52", size * .045);
+      line(c, to, { x: to.x + Math.cos(a - .5) * len * .3, y: to.y + Math.sin(a - .5) * len * .3 }, "#8a7a62", size * .025);
+      if (paintState.snow) line(c, { x: to.x - 1, y: to.y }, { x: to.x + 1, y: to.y - .4 }, "#f4f7f9", size * .05);
     }
   } else {
-    const colors = variant > .88 ? ["#c99767", "#ebbb7b", "#f5d191"] : ["#3e7955", "#62a565", "#80b872"];
+    const colors = palette === "blossom" ? BLOSSOM : PALETTES[palette];
     for (const [u, v, r] of [[.26, 1.19, .48], [-.30, 1.24, .46], [.02, 1.65, .54], [-.28, 1.71, .34], [.32, 1.52, .31]]) {
       const q = { x: p.x + u! * size + sway, y: p.y - v! * size }, radius = size * r!;
       const g = c.createRadialGradient(q.x - radius * .35, q.y - radius * .45, 0, q.x, q.y, radius * 1.15);
       g.addColorStop(0, colors[2]!); g.addColorStop(.48, colors[1]!); g.addColorStop(1, colors[0]!); ellipse(c, q, radius, radius * 1.05, g);
+      if (paintState.snow) ellipse(c, { x: q.x - radius * .15, y: q.y - radius * .55 }, radius * .7, radius * .38, "#f2f5f8e6");
     }
-    for (let j = 0; j < 10; j++) { const a = j * 2.4, r = size * (.16 + hash(j + 5) * .38); ellipse(c, { x: p.x + Math.cos(a) * r + sway, y: p.y - size * 1.5 + Math.sin(a) * r }, size * .055, size * .034, j % 3 ? "#d5e6ae50" : "#23533e38"); }
+    for (let j = 0; j < 10; j++) { const a = j * 2.4, r = size * (.16 + hash(j + 5) * .38); ellipse(c, { x: p.x + Math.cos(a) * r + sway, y: p.y - size * 1.5 + Math.sin(a) * r }, size * .055, size * .034, palette === "blossom" ? j % 3 ? "#fff3f6c0" : "#b8708650" : j % 3 ? "#d5e6ae50" : "#23533e38"); }
   }
 }
 function windows(c: CanvasRenderingContext2D, x: number, y: number, w: number, d: number, floors: number, night: boolean, seed: number, entrance = true, base = 0) {
   for (let floor = 0; floor < floors; floor++) {
     for (let j = 0; j < 3; j++) {
       const z = base + 7 + floor * 12;
-      const color = night && hash(seed + j + floor * 7) > .25 ? "#ffe6a2" : "#779f9e";
+      const color = night && hash(seed + j + floor * 7) > paintState.litThreshold ? "#ffe6a2" : "#779f9e";
       const wx = x + .09 + j * w / 3;
       if (!(entrance && floor === 0 && j === 1)) {
         poly(c, [iso(wx - .018, y + d + .003, z - .8), iso(wx + .123, y + d + .003, z - .8), iso(wx + .123, y + d + .003, z + 6.8), iso(wx - .018, y + d + .003, z + 6.8)], "#536c614d");
@@ -90,8 +121,8 @@ function windows(c: CanvasRenderingContext2D, x: number, y: number, w: number, d
     }
   }
 }
-function pitchedRoof(c: CanvasRenderingContext2D, x: number, y: number, w: number, d: number, h: number, color: string, dark: string) {
-  const ridgeA = iso(x, y + d / 2, h + 13), ridgeB = iso(x + w, y + d / 2, h + 13);
+function pitchedRoof(c: CanvasRenderingContext2D, x: number, y: number, w: number, d: number, h: number, roof: string, shadowSide: string) {
+  const ridgeA = iso(x, y + d / 2, h + 13), ridgeB = iso(x + w, y + d / 2, h + 13), color = snowy(roof, .8), dark = snowy(shadowSide, .7);
   poly(c, [iso(x, y, h), iso(x + w, y, h), ridgeB, ridgeA], dark);
   poly(c, [ridgeA, ridgeB, iso(x + w, y + d, h), iso(x, y + d, h)], color);
   poly(c, [iso(x + w, y, h), ridgeB, iso(x + w, y + d, h)], "#e8d7b8");
@@ -113,9 +144,12 @@ function lamp(c: CanvasRenderingContext2D, x: number, y: number, night: boolean)
   line(c, { x: p.x, y: p.y - 21 }, { x: p.x + 5, y: p.y - 23 }, "#486365", 1.2);
   ellipse(c, { x: p.x + 5, y: p.y - 23 }, 3, 1.5, night ? "#ffe6a1" : "#dfead8");
   line(c, { x: p.x + 2, y: p.y - 24 }, { x: p.x + 7, y: p.y - 24 }, "#617975", .75);
-  if (night) { const g = c.createRadialGradient(p.x, p.y, 0, p.x, p.y, 19); g.addColorStop(0, "#ffdd7745"); g.addColorStop(1, "#ffdd7700"); ellipse(c, p, 19, 10, g); }
+  if (night) {
+    const g = lightGradient(c.createRadialGradient(p.x, p.y, 0, p.x, p.y, 19)); g.addColorStop(0, "#ffdd7745"); g.addColorStop(1, "#ffdd7700"); ellipse(c, p, 19, 10, g);
+    const bulb = lightGradient(c.createRadialGradient(p.x + 5, p.y - 23, 0, p.x + 5, p.y - 23, 9)); bulb.addColorStop(0, "#ffe7a866"); bulb.addColorStop(1, "#ffe7a800"); ellipse(c, { x: p.x + 5, y: p.y - 21 }, 9, 7, bulb);
+  }
 }
-function parkPart(c: CanvasRenderingContext2D, kind: ParkPart, x: number, y: number, rotation: number, night: boolean) {
+function parkPart(c: CanvasRenderingContext2D, kind: ParkPart, x: number, y: number, rotation: number, night: boolean, palette?: TreePalette | "blossom") {
   if (drawTownDecoration(c, kind, x, y, rotation, night)) return;
   const at = (u: number, v: number, z = 0) => {
     const p = rotation % 4 === 1 ? [1 - v, u] : rotation % 4 === 2 ? [1 - u, 1 - v] : rotation % 4 === 3 ? [v, 1 - u] : [u, v];
@@ -129,17 +163,18 @@ function parkPart(c: CanvasRenderingContext2D, kind: ParkPart, x: number, y: num
   if (kind === "tree") {
     box(c, x + .30, y + .30, .4, .4, 1, ["#a29270", "#7b815c", "#a8b67e"]);
     for (let j = 0; j < 8; j++) { const a = j * Math.PI / 4; ellipse(c, iso(x + .5 + Math.cos(a) * .19, y + .5 + Math.sin(a) * .19, 1.6), 1.2, .6, "#c6c4a3"); }
-    tree(c, x + .5, y + .5, 13, .6); return;
+    tree(c, x + .5, y + .5, 13, .6, 0, palette && palette in PALETTES || palette === "bare" || palette === "blossom" ? palette : "default"); return;
   }
   if (kind === "light") { lamp(c, x + .5, y + .5, night); return; }
   if (kind === "path") { b(.08, .32, .84, .36, .8, ["#b8ac90", "#a89980", "#e4d7b6"], 0); for (let j = 1; j < 5; j++) line(c, at(.08 + j * .168, .32, .9), at(.08 + j * .168, .68, .9), "#b4a78a", .5); line(c, at(.08, .50, .9), at(.92, .50, .9), "#c6b899", .4); return; }
   if (kind === "flowers") {
     b(.14, .18, .72, .62, 2, ["#b4a389", "#938672", "#cabc9d"]);
     b(.18, .22, .64, .54, .3, ["#71805c", "#627454", "#6c7650"], 3);
+    const dormant = paintState.snow || paintState.season === "winter" && paintState.bare > .5;
     for (let j = 0; j < 18; j++) {
       const p = at(.22 + hash(j + 31) * .55, .27 + hash(j + 8) * .43, 5);
-      ellipse(c, { x: p.x - .9, y: p.y + 1.2 }, 1.8, .7, "#8dac67");
-      blossom(c, p, ["#f0c968", "#d57b96", "#f6efd5", "#9b92c0"][j % 4]!, .95);
+      ellipse(c, { x: p.x - .9, y: p.y + 1.2 }, 1.8, .7, dormant ? paintState.snow ? "#eef2f4" : "#8c8a6e" : "#8dac67");
+      if (!dormant || j % 6 === 0) blossom(c, p, dormant ? "#e9e4d6" : ["#f0c968", "#d57b96", "#f6efd5", "#9b92c0"][j % 4]!, .95);
     }
     return;
   }
@@ -363,15 +398,17 @@ function station(c: CanvasRenderingContext2D, x: number, y: number, axis: "x" | 
   const signX = sx + (alongX ? .115 : 0), signY = sy + (alongX ? 0 : .115);
   line(c, iso(signX, signY, 3), iso(signX, signY, 21), "#587a73", 1.1);
   box(c, sx, sy, alongX ? .23 : .025, alongX ? .025 : .23, 3, ["#3f766c", "#315d55", "#cde0c4"], 12);
-  const clock = iso(signX, signY, 19); ellipse(c, clock, 3, 3, "#f9f1d9");
-  line(c, clock, { x: clock.x + 1.4, y: clock.y - 1.4 }, "#536c64", .7);
-  line(c, clock, { x: clock.x - 1.5, y: clock.y - .3 }, "#536c64", .6);
+  const clock = iso(signX, signY, 19); ellipse(c, clock, 3, 3, night ? "#ffefc4" : "#f9f1d9");
+  if (!paintState.liveClocks) {
+    line(c, clock, { x: clock.x + 1.4, y: clock.y - 1.4 }, "#536c64", .7);
+    line(c, clock, { x: clock.x - 1.5, y: clock.y - .3 }, "#536c64", .6);
+  }
   for (let j = 0; j < 4; j++) { const a = j * Math.PI / 2; ellipse(c, { x: clock.x + Math.cos(a) * 2.3, y: clock.y + Math.sin(a) * 2.3 }, .3, .3, "#9a967b"); }
 }
-function factorySmoke(c: CanvasRenderingContext2D, x: number, y: number, time: number, level = 1) {
+function factorySmoke(c: CanvasRenderingContext2D, x: number, y: number, time: number, level = 1, wind = 1, night = 0) {
   for (const [k, stack] of factoryLayout(level).stacks.entries()) for (let j = 0; j < 4; j++) {
     const t = (time * .23 + j / 4 + hash(y * MAP_SIZE + x) + k * .37) % 1, p = iso(x + stack.u + stack.w / 2, y + stack.v + stack.d / 2, stack.z + stack.height);
-    c.save(); c.globalAlpha *= (1 - t) * .24; ellipse(c, { x: p.x + t * 12, y: p.y - t * 32 }, 3 + t * 7, 3 + t * 4, "#eaf0dc"); c.restore();
+    c.save(); c.globalAlpha *= (1 - t) * .24; ellipse(c, { x: p.x + t * 12 * wind, y: p.y - t * (32 - Math.min(14, Math.abs(wind) * 5)) }, 3 + t * 7, 3 + t * 4, shade("#eaf0dc", night * .8)); c.restore();
   }
 }
 function balcony(c: CanvasRenderingContext2D, x: number, y: number, w: number, z: number, night: boolean) {
@@ -405,11 +442,11 @@ function developedBuilding(c: CanvasRenderingContext2D, kind: "house" | "shop", 
       else balcony(c, u + .035, v + d, w - .07, band, night);
     }
     if (kind === "shop") {
-      const glass = night ? "#f5dba4" : level === 3 ? "#699d9a" : "#82b4ad";
+      const glass = night ? paintState.shopsOpen ? "#f5dba4" : "#56676b" : level === 3 ? "#699d9a" : "#82b4ad";
       const low = z + 3, high = z + Math.min(height - 3, k === 0 ? 13 : 10);
       poly(c, [iso(u + .035, v + d + .004, low), iso(u + w - .035, v + d + .004, low), iso(u + w - .035, v + d + .004, high), iso(u + .035, v + d + .004, high)], glass);
       for (let j = 1; j < 5; j++) line(c, iso(u + w * j / 5, v + d + .009, low), iso(u + w * j / 5, v + d + .009, high), "#e5e8cb", .65);
-      poly(c, [iso(u + w + .004, v + .045, low), iso(u + w + .004, v + d - .045, low), iso(u + w + .004, v + d - .045, high), iso(u + w + .004, v + .045, high)], night ? "#dfc694" : "#608e91");
+      poly(c, [iso(u + w + .004, v + .045, low), iso(u + w + .004, v + d - .045, low), iso(u + w + .004, v + d - .045, high), iso(u + w + .004, v + .045, high)], night ? paintState.shopsOpen ? "#dfc694" : "#4e5e62" : "#608e91");
       for (let j = 1; j < 4; j++) line(c, iso(u + w + .009, v + d * j / 4, low), iso(u + w + .009, v + d * j / 4, high), "#b8d0bb", .55);
     }
     box(c, u - .012, v - .012, w + .024, d + .024, 2, ["#aab7a2", "#7e988d", "#e4e5c9"], z + height);
@@ -435,6 +472,79 @@ function developedBuilding(c: CanvasRenderingContext2D, kind: "house" | "shop", 
     }
   }
 }
+/** The player's own home: the entrance to My Room. Cream walls, a terracotta gable, a doghouse and a mailbox. */
+function myHome(c: CanvasRenderingContext2D, x: number, y: number, night: boolean, access: number) {
+  const glass = (lit: boolean) => night && lit ? "#ffe4a8" : "#8fb5b3", wall = ["#f6eedf", "#dcd1bf", "#efe4d0"], trim = "#fbf7ee";
+  const fence = (bit: number, front: boolean) => {
+    const gate = Boolean(access & bit), a = bit === 1 ? { u: .04, v: .04 } : bit === 2 ? { u: .96, v: .04 } : bit === 4 ? { u: .04, v: .04 } : { u: .04, v: .96 };
+    const b = bit === 1 || bit === 2 ? { u: a.u, v: .96 } : { u: .96, v: a.v };
+    if ((bit === 2 || bit === 8) !== front) return;
+    const point = (t: number, z: number) => iso(x + a.u + (b.u - a.u) * t, y + a.v + (b.v - a.v) * t, z);
+    for (const [start, end] of gate ? [[0, .36], [.64, 1]] : [[0, 1]]) {
+      line(c, point(start!, 4.2), point(end!, 4.2), snowy("#f1ece0", .3), 1);
+      line(c, point(start!, 2.2), point(end!, 2.2), "#e0d8c6", .7);
+      const posts = Math.ceil((end! - start!) * 9);
+      for (let j = 0; j <= posts; j++) { const t = start! + (end! - start!) * j / posts; line(c, point(t, 0), point(t, 5.2), "#f7f3ea", 1.1); line(c, { x: point(t, 0).x + .4, y: point(t, 0).y }, { x: point(t, 5.2).x + .4, y: point(t, 5.2).y }, "#cfc6b2", .35); }
+    }
+  };
+  // Back fences and the garden tree stand behind the house.
+  fence(1, false); fence(4, false);
+  tree(c, x + .86, y + .17, 7.5, .6, 0, paintState.season === "default" ? "default" : treePalette(y * MAP_SIZE + x + 3, .6));
+  shadow(c, x + .16, y + .16, .44, .40, 34);
+  // Main two-storey volume.
+  box(c, x + .16, y + .16, .44, .40, 24, wall);
+  glaze(c, [iso(x + .16, y + .56), iso(x + .60, y + .56), iso(x + .60, y + .56, 24), iso(x + .16, y + .56, 24)], "#fffcf026", "#8a7a6224");
+  line(c, iso(x + .16, y + .563, 12.4), iso(x + .60, y + .563, 12.4), "#e2d6c0", .8);
+  const pane = (u: number, z: number, w: number, lit: boolean) => {
+    poly(c, [iso(x + u - .012, y + .562, z - .8), iso(x + u + w + .012, y + .562, z - .8), iso(x + u + w + .012, y + .562, z + 6.8), iso(x + u - .012, y + .562, z + 6.8)], trim);
+    poly(c, [iso(x + u, y + .565, z), iso(x + u + w, y + .565, z), iso(x + u + w, y + .565, z + 6), iso(x + u, y + .565, z + 6)], glass(lit));
+    line(c, iso(x + u + w / 2, y + .568, z), iso(x + u + w / 2, y + .568, z + 6), "#f4efe2", .5);
+    line(c, iso(x + u + .01, y + .568, z + 4.6), iso(x + u + .035, y + .568, z + 5.7), "#ffffff70", .55);
+  };
+  pane(.43, 3.5, .12, true); pane(.20, 15, .1, hash(x * 7 + y) > .3); pane(.43, 15, .1, true);
+  // Flower box under the ground-floor window.
+  box(c, x + .42, y + .56, .14, .035, 1.6, ["#a0705a", "#7f5a48", "#6f9a5c"], 2.4);
+  for (let j = 0; j < 4; j++) blossom(c, iso(x + .44 + j * .032, y + .58, 4.6), j % 2 ? "#f2c2cf" : "#f6dc8a", .5);
+  // Side window above the sunroom, and the door with its lamp and canopy.
+  poly(c, [iso(x + .604, y + .22, 15), iso(x + .604, y + .31, 15), iso(x + .604, y + .31, 21), iso(x + .604, y + .22, 21)], glass(true));
+  line(c, iso(x + .608, y + .22, 18), iso(x + .608, y + .31, 18), "#f4efe2", .5);
+  poly(c, [iso(x + .245, y + .563, 1), iso(x + .345, y + .563, 1), iso(x + .345, y + .563, 10.5), iso(x + .245, y + .563, 10.5)], "#9b6a46");
+  poly(c, [iso(x + .27, y + .566, 6), iso(x + .32, y + .566, 6), iso(x + .32, y + .566, 9.4), iso(x + .27, y + .566, 9.4)], night ? "#ffdda0" : "#c9d8cf");
+  ellipse(c, iso(x + .335, y + .57, 5), .45, .45, "#e9c46a");
+  box(c, x + .22, y + .56, .15, .09, 1, ["#b88a5e", "#8f6a49", snowy("#d8b48a")], 11);
+  box(c, x + .23, y + .56, .13, .1, 1, ["#cfc5b2", "#a8a08f", snowy("#e6dfcf")]);
+  const porch = iso(x + .38, y + .575, 10);
+  ellipse(c, porch, 1.2, 1.4, night ? "#ffe6a1" : "#f2e7c9");
+  if (night) { const g = lightGradient(c.createRadialGradient(porch.x, porch.y + 6, 0, porch.x, porch.y + 6, 16)); g.addColorStop(0, "#ffdd7740"); g.addColorStop(1, "#ffdd7700"); ellipse(c, { x: porch.x, y: porch.y + 7 }, 16, 9, g); }
+  // Terracotta gable roof with a round attic window and a chimney.
+  pitchedRoof(c, x + .12, y + .12, .52, .48, 24, "#c8664c", "#93493a");
+  const gable = iso(x + .64, y + .36, 30.5);
+  ellipse(c, gable, 2.2, 2.4, trim); ellipse(c, gable, 1.6, 1.8, glass(true));
+  line(c, { x: gable.x - 1.6, y: gable.y }, { x: gable.x + 1.6, y: gable.y }, "#f4efe2", .45);
+  const chimney = (u: number, v: number, z: number) => iso(x + u, y + v, z);
+  poly(c, [chimney(.22, .24, 31), chimney(.29, .24, 31), chimney(.29, .24, 45), chimney(.22, .24, 45)], "#b9846b");
+  poly(c, [chimney(.29, .17, 34), chimney(.29, .24, 31), chimney(.29, .24, 45), chimney(.29, .17, 45)], "#8f604f");
+  patch(c, x + .215, y + .165, .08, .08, "#d9b39b", 45); patch(c, x + .23, y + .18, .05, .05, "#5d4b42", 45.1);
+  // Single-storey sunroom with a balcony on its roof.
+  box(c, x + .58, y + .32, .25, .26, 12, wall);
+  poly(c, [iso(x + .62, y + .583, 1.5), iso(x + .79, y + .583, 1.5), iso(x + .79, y + .583, 9.5), iso(x + .62, y + .583, 9.5)], glass(true));
+  for (const u of [.675, .735]) line(c, iso(x + u, y + .586, 1.5), iso(x + u, y + .586, 9.5), "#f4efe2", .55);
+  poly(c, [iso(x + .834, y + .37, 3.5), iso(x + .834, y + .5, 3.5), iso(x + .834, y + .5, 9.5), iso(x + .834, y + .37, 9.5)], glass(hash(x + y * 3) > .4));
+  for (const [a, b] of [[[.58, .58], [.83, .58]], [[.83, .32], [.83, .58]]] as const) {
+    line(c, iso(x + a[0], y + a[1], 15.5), iso(x + b[0], y + b[1], 15.5), "#f3eee2", .9);
+    for (let j = 0; j <= 6; j++) { const t = j / 6; line(c, iso(x + a[0] + (b[0] - a[0]) * t, y + a[1] + (b[1] - a[1]) * t, 12), iso(x + a[0] + (b[0] - a[0]) * t, y + a[1] + (b[1] - a[1]) * t, 15.5), "#e6dfd0", .45); }
+  }
+  // Doghouse with a red roof, the mailbox and the front fences.
+  box(c, x + .67, y + .68, .13, .12, 4.6, ["#d9b48a", "#b48d63", "#e2c39b"]);
+  poly(c, [iso(x + .715, y + .801, .4), iso(x + .755, y + .801, .4), iso(x + .755, y + .801, 3), iso(x + .715, y + .801, 3)], "#4a3a30");
+  const ridgeA = iso(x + .66, y + .74, 8.8), ridgeB = iso(x + .81, y + .74, 8.8);
+  poly(c, [iso(x + .66, y + .67, 4.6), iso(x + .81, y + .67, 4.6), ridgeB, ridgeA], snowy("#8f3d33", .75));
+  poly(c, [ridgeA, ridgeB, iso(x + .81, y + .81, 4.6), iso(x + .66, y + .81, 4.6)], snowy("#c45546", .8));
+  line(c, iso(x + .14, y + .9, 0), iso(x + .14, y + .9, 7), "#8a6a4f", .9);
+  box(c, x + .11, y + .87, .07, .05, 3, ["#c8473d", "#9d342d", snowy("#d8574b")], 7);
+  line(c, iso(x + .18, y + .9, 9), iso(x + .18, y + .9, 11.5), "#e7c35a", .6);
+  fence(2, true); fence(8, true);
+}
 function industrialTank(c: CanvasRenderingContext2D, x: number, y: number, z: number, height: number) {
   const a = iso(x, y, z), b = iso(x, y, z + height);
   const g = c.createLinearGradient(a.x - 3.3, 0, a.x + 3.3, 0); g.addColorStop(0, "#78958e"); g.addColorStop(.35, "#d8e1c9"); g.addColorStop(1, "#5f827d");
@@ -444,6 +554,16 @@ function industrialTank(c: CanvasRenderingContext2D, x: number, y: number, z: nu
   line(c, { x: b.x + 2.3, y: b.y }, { x: a.x + 2.3, y: a.y }, "#557f75", .7);
 }
 function plot(c: CanvasRenderingContext2D, kind: Tile, x: number, y: number, access: number) {
+  if (kind === "home") {
+    patch(c, x + .04, y + .04, .92, .92, "#a7c98b");
+    for (let j = 0; j < 14; j++) { const p = iso(x + .08 + hash(x * 31 + y * 7 + j) * .84, y + .08 + hash(x * 17 + y * 13 + j * 3) * .84); line(c, p, { x: p.x + 1.4, y: p.y - .6 }, "#86ab6d55", .5); }
+    // Stepping stones from the door to each street-side gate.
+    for (const { bit, dx, dy } of DIRECTIONS) if (access & bit) for (let j = 0; j < 5; j++) {
+      const t = (j + .5) / 5, from = { u: .3, v: .64 }, to = { u: .5 + dx * .48, v: .5 + dy * .48 }, q = iso(x + from.u + (to.u - from.u) * t, y + from.v + (to.v - from.v) * t, .2);
+      ellipse(c, { x: q.x, y: q.y + .4 }, 3.4, 1.6, "#9c9a86"); ellipse(c, q, 3.3, 1.5, snowy("#e2dccb"));
+    }
+    return;
+  }
   patch(c, x + .05, y + .05, .9, .9, "#c8c9af");
   for (let j = 1; j < 5; j++) { const u = .05 + j * .18; line(c, iso(x + u, y + .05), iso(x + u, y + .95), "#a5af973b", .45); line(c, iso(x + .05, y + u), iso(x + .95, y + u), "#edf0cf39", .4); }
   if (kind !== "park" && kind !== "station") {
@@ -466,6 +586,7 @@ function building(c: CanvasRenderingContext2D, kind: Tile, x: number, y: number,
     for (let j = 0; j < 7; j++) ellipse(c, iso(x + .72 + hash(seed + j) * .13, y + .72 + hash(seed + j + 42) * .15), 1.3, 1, j % 2 ? "#efcf7c" : "#d98187");
     return;
   }
+  if (kind === "home") { myHome(c, x, y, night, access); return; }
   if (kind === "station") {
     patch(c, x + (axis === "x" ? .04 : .30), y + (axis === "x" ? .30 : .04), axis === "x" ? .92 : .40, axis === "x" ? .40 : .92, "#b6b49a");
     for (const side of [.405, .595]) line(c, iso(x + (axis === "x" ? .04 : side), y + (axis === "x" ? side : .04), .8), iso(x + (axis === "x" ? .96 : side), y + (axis === "x" ? side : .96), .8), "#d6dfcf", 1.2);
@@ -548,8 +669,8 @@ function building(c: CanvasRenderingContext2D, kind: Tile, x: number, y: number,
     patch(c, bx + .37, by + .12, .2, .26, "#5a858e", height + 3.2);
     for (let j = 1; j < 3; j++) line(c, iso(bx + .37, by + .12 + j * .08, height + 3.4), iso(bx + .57, by + .12 + j * .08, height + 3.4), "#99b9bb", .6);
     if (kind === "shop") {
-      poly(c, [iso(bx + .04, by + .653, 3), iso(bx + .24, by + .653, 3), iso(bx + .24, by + .653, 12), iso(bx + .04, by + .653, 12)], night ? "#ffe7ad" : "#8bbab4");
-      poly(c, [iso(bx + .43, by + .653, 3), iso(bx + .63, by + .653, 3), iso(bx + .63, by + .653, 12), iso(bx + .43, by + .653, 12)], night ? "#ffe7ad" : "#8bbab4");
+      poly(c, [iso(bx + .04, by + .653, 3), iso(bx + .24, by + .653, 3), iso(bx + .24, by + .653, 12), iso(bx + .04, by + .653, 12)], night ? paintState.shopsOpen ? "#ffe7ad" : "#5a6b6d" : "#8bbab4");
+      poly(c, [iso(bx + .43, by + .653, 3), iso(bx + .63, by + .653, 3), iso(bx + .63, by + .653, 12), iso(bx + .43, by + .653, 12)], night ? paintState.shopsOpen ? "#ffe7ad" : "#5a6b6d" : "#8bbab4");
       for (let j = 0; j < 6; j++) patch(c, bx - .03 + j * .12, by + .64, .12, .22, j % 2 ? "#f9ecd1" : "#ce8572", 13);
       for (let j = 0; j < 6; j++) { const xx = bx - .03 + j * .12; poly(c, [iso(xx, by + .86, 13), iso(xx + .12, by + .86, 13), iso(xx + .12, by + .86, 11), iso(xx, by + .86, 11)], j % 2 ? "#e7d8b9" : "#b46858"); }
       // A window and display counter identify the shop without labels on the artwork.
@@ -668,6 +789,12 @@ function buildingFaces(kind: Tile, x: number, y: number, level: number, axis: "x
     const layout = factoryLayout(level), volumes = [...layout.volumes, ...layout.stacks, ...Array.from({ length: 3 }, (_, j) => ({ ...layout.vent, u: layout.vent.u + j * layout.vent.spacing, height: 5, z: layout.main.height }))];
     return volumes.flatMap(b => boxFaces(x + b.u, y + b.v, b.w, b.d, b.height, b.z));
   }
+  if (kind === "home") {
+    const faces = [...boxFaces(x + .16, y + .16, .44, .40, 24), ...boxFaces(x + .58, y + .32, .25, .26, 15.5), ...boxFaces(x + .22, y + .17, .07, .07, 45), ...boxFaces(x + .66, y + .67, .15, .14, 8.8)];
+    const a = iso(x + .12, y + .36, 37), b = iso(x + .64, y + .36, 37);
+    faces.push([iso(x + .12, y + .12, 24), iso(x + .64, y + .12, 24), b, a], [a, b, iso(x + .64, y + .6, 24), iso(x + .12, y + .6, 24)], [iso(x + .64, y + .12, 24), b, iso(x + .64, y + .6, 24)]);
+    return faces;
+  }
   if (kind !== "house" && kind !== "shop") return [];
   if (level > 1) {
     const volumes = buildingVolumes(kind, level), top = volumes[volumes.length - 1]!;
@@ -685,7 +812,20 @@ function buildingFaces(kind: Tile, x: number, y: number, level: number, axis: "x
 function facilityFaces(kind: Tile, x: number, y: number, level: number, parts: FacilityPart[]): Point[][] {
   return facilityLayout(kind, level, parts).flatMap(p => boxFaces(x + p.u, y + p.v, p.w, p.d, p.height, p.z));
 }
-type SceneObject = { depth: number; x: number; y: number; bounds: SpriteBounds; key?: string; paint: (c: CanvasRenderingContext2D) => void };
+type SceneObject = {
+  depth: number; x: number; y: number; bounds: SpriteBounds;
+  key?: string;
+  /** Cache key of the lit night artwork, when it differs from the day key. */
+  nightKey?: string;
+  /** Has windows, signs or lamps that light up at night. */
+  emits?: boolean;
+  /** A street lamp switches on when the share of lit lamps passes this threshold. */
+  lamp?: number;
+  /** Trees bend in the wind around their trunk base. */
+  sway?: boolean;
+  tile?: number;
+  paint: (c: CanvasRenderingContext2D, night: boolean, lit: boolean) => void;
+};
 const GROUND_BOUNDS = { left: -824, top: -30, width: 1648, height: 850 };
 function parkGround(c: CanvasRenderingContext2D, lot: ParkLot, town: Town) {
   box(c, lot.x + .035, lot.y + .035, lot.width - .07, lot.height - .07, 1, ["#8eaa79", "#7c9b6b", lot.kind === "park" ? "#a8c58a" : "#e1d4b3"]);
@@ -718,7 +858,18 @@ function parkFence(c: CanvasRenderingContext2D, x: number, y: number, bit: numbe
     for (let j = 0; j <= posts; j++) { const t = start! + (end! - start!) * j / posts; line(c, at(t, 1), at(t, 7), "#6c8b5d", 1.6); line(c, { x: at(t, 1).x - .35, y: at(t, 1).y }, { x: at(t, 7).x - .35, y: at(t, 7).y }, "#c3c398", .5); ellipse(c, at(t, 7.2), 1, .55, "#ded2ad"); }
   }
 }
+/** Grass colour through the year: fresh in spring, deep in summer, warm in autumn, dry in winter. */
+function grassPalette() {
+  const s = paintState.season;
+  if (s === "default") return { grass: ["#adca91", "#b1cc95", "#b6cf97", "#abc78e"], tuft: "#91b37c" };
+  if (s === "winter" && paintState.bare >= .5) return { grass: ["#bcc59d", "#c0c8a1", "#c5cba5", "#b8c199"], tuft: "#a3ad83" };
+  if (s === "autumn" && paintState.foliage > .35 || s === "winter" && paintState.bare < .5) return { grass: ["#b3c68e", "#b7c992", "#bccc95", "#b0c38b"], tuft: "#9fae74" };
+  if (s === "autumn") return { grass: ["#adca91", "#b1cc95", "#b6cf97", "#abc78e"], tuft: "#91b37c" };
+  if (paintState.lush > .35) return { grass: ["#a1c386", "#a5c68a", "#aac98d", "#9ec083"], tuft: "#84aa6c" };
+  return { grass: ["#b0d095", "#b4d399", "#b9d59c", "#add093"], tuft: "#91b87c" };
+}
 function drawTerrain(c: CanvasRenderingContext2D, town: Town, options: SceneOptions) {
+  const { grass, tuft } = grassPalette();
   ellipse(c, iso(12, 12), 820, 390, "#2f605f15");
   const edge = MAP_SIZE;
   poly(c, [iso(0, edge), iso(edge, edge), { ...iso(edge, edge), y: iso(edge, edge).y + 22 }, { ...iso(0, edge), y: iso(0, edge).y + 22 }], "#829d6d");
@@ -726,7 +877,8 @@ function drawTerrain(c: CanvasRenderingContext2D, town: Town, options: SceneOpti
   // Finish the land first so a later neighbouring cell cannot paint over a curb or bridge.
   for (let y = 0; y < MAP_SIZE; y++) for (let x = 0; x < MAP_SIZE; x++) {
     const i = y * MAP_SIZE + x, tile = town.tiles[i]!, water = town.terrain[i] || tile === "water";
-    patch(c, x, y, 1.008, 1.008, water ? "#78b6bd" : ["#adca91", "#b1cc95", "#b6cf97", "#abc78e"][Math.floor(hash(i) * 4)]!);
+    if (water) poly(c, [iso(x, y), iso(x + 1.008, y), iso(x + 1.008, y + 1.008), iso(x, y + 1.008)], "#78b6bd");
+    else patch(c, x, y, 1.008, 1.008, grass[Math.floor(hash(i) * 4)]!);
     if (water) {
       glaze(c, [iso(x, y), iso(x + 1, y), iso(x + 1, y + 1), iso(x, y + 1)], "#b8dacf18", "#3e829d27");
       if (tile === "water") for (let j = 0; j < 3; j++) {
@@ -737,15 +889,15 @@ function drawTerrain(c: CanvasRenderingContext2D, town: Town, options: SceneOpti
         const dx = n % MAP_SIZE - x, dy = Math.floor(n / MAP_SIZE) - y;
         line(c, iso(x + (dx === 1 ? 1 : 0), y + (dy === 1 ? 1 : 0)), iso(x + (dx === -1 ? 0 : 1), y + (dy === -1 ? 0 : 1)), "#d0dbc1", 2);
       }
-    } else if (tile === "grass") {
-      for (let j = 0; j < 3; j++) { const p = iso(x + hash(i * 7 + j) * .8 + .1, y + hash(i * 9 + j) * .8 + .1); ellipse(c, p, 1, .6, j === 1 && hash(i) > .7 ? "#e8dd9a" : "#91b37c"); }
+    } else if (tile === "grass" && !paintState.snow) {
+      for (let j = 0; j < 3; j++) { const p = iso(x + hash(i * 7 + j) * .8 + .1, y + hash(i * 9 + j) * .8 + .1); ellipse(c, p, 1, .6, j === 1 && hash(i) > .7 ? paintState.season === "spring" ? "#f4c9d4" : paintState.season === "autumn" ? "#e7b977" : "#e8dd9a" : tuft); }
     }
     if (options.grid && !water) poly(c, [iso(x, y), iso(x + 1, y), iso(x + 1, y + 1), iso(x, y + 1)], "#ffffff00", "#547b4933", .6);
   }
   const covered = new Set((town.parks ?? []).flatMap(lotTiles));
   for (let y = 0; y < MAP_SIZE; y++) for (let x = 0; x < MAP_SIZE; x++) {
     const i = y * MAP_SIZE + x, tile = town.tiles[i]!;
-    if (["house", "shop", "factory", "station", "park"].includes(tile) && !covered.has(i)) plot(c, tile, x, y, transportMask(town, i, "road"));
+    if (["house", "shop", "factory", "station", "park", "home"].includes(tile) && !covered.has(i)) plot(c, tile, x, y, transportMask(town, i, "road"));
   }
   for (const lot of town.parks ?? []) parkGround(c, lot, town);
   for (let depth = 0; depth < MAP_SIZE * 2 - 1; depth++) for (let y = Math.max(0, depth - MAP_SIZE + 1); y <= Math.min(depth, MAP_SIZE - 1); y++) {
@@ -753,16 +905,61 @@ function drawTerrain(c: CanvasRenderingContext2D, town: Town, options: SceneOpti
     if (tile === "road" || tile === "rail" || tile === "station") transport(c, town, x, y, tile === "road" ? "road" : "rail");
   }
 }
+const CAR_COLORS = ["#f0d29d", "#c8786c", "#60899b", "#eee7cf", "#879677", "#d9a35f", "#7d8fb3", "#b9615a", "#e6e2d6", "#4f6a78"];
+/** Sedans, kei cars, minivans and small trucks share the road; headlights and tail lights follow the light. */
+function drawCar(c: CanvasRenderingContext2D, v: Vehicle, x: number, y: number, z: number, dx: number, dy: number, night: number, lights: boolean) {
+  const s = (color: string) => shade(color, night), body = s(v.color), side = s("#64796c"), glass = s("#b8dbd1"), glassSide = s("#6b9397"), roof = s("#e1ecdc");
+  const model = v.seed % 7 === 3 ? "truck" : v.seed % 5 === 2 ? "kei" : v.seed % 6 === 4 ? "van" : "sedan";
+  const length = model === "truck" ? .26 : model === "van" ? .25 : model === "kei" ? .19 : .23, width = model === "kei" ? .11 : .12;
+  ellipse(c, iso(x, y, z), length * 22, 2.5, "#29443d44");
+  for (const a of [-length * .3, length * .3]) for (const k of [-1, 1]) { const p = iso(x + dx * a - dy * k * .065, y + dy * a + dx * k * .065, z + 1.2); ellipse(c, p, 1.2, 1.5, s("#35483f")); ellipse(c, p, .45, .6, s("#b9bba4")); }
+  if (model === "truck") {
+    orientedBox(c, x + dx * .07, y + dy * .07, .09, width, 5, dx, dy, [body, side, body], z);
+    orientedBox(c, x + dx * .07, y + dy * .07, .06, .1, 2, dx, dy, [glass, glassSide, roof], z + 5);
+    orientedBox(c, x - dx * .05, y - dy * .05, .15, width + .01, 6.5, dx, dy, [s("#e6e3d4"), s("#9aa79c"), s("#f1efe2")], z + .6);
+  } else {
+    const h = model === "van" ? 4.5 : model === "kei" ? 3.8 : 4, cab = model === "van" ? .19 : model === "kei" ? .13 : .13;
+    orientedBox(c, x, y, length, width, h, dx, dy, [body, side, body], z);
+    orientedBox(c, x - dx * (model === "sedan" ? .015 : .005), y - dy * (model === "sedan" ? .015 : .005), cab, .09, model === "kei" ? 2.8 : 2, dx, dy, [glass, glassSide, roof], z + h);
+  }
+  line(c, iso(x + dx * length * .46 - dy * .05, y + dy * length * .46 + dx * .05, z + 2), iso(x + dx * length * .46 + dy * .05, y + dy * length * .46 - dx * .05, z + 2), s("#ece9d0"), .7);
+  if (!lights) return;
+  for (const k of [-1, 1]) {
+    ellipse(c, iso(x + dx * length * .52 - dy * k * .04, y + dy * length * .52 + dx * k * .04, z + 2), 1.1, .8, "#fff1b4");
+    ellipse(c, iso(x - dx * length * .52 - dy * k * .045, y - dy * length * .52 + dx * k * .045, z + 2), .9, .6, "#ff8a76");
+  }
+  // A soft beam on the road ahead.
+  const a = iso(x + dx * length * .5, y + dy * length * .5, z + .5), b = iso(x + dx * (length * .5 + .42), y + dy * (length * .5 + .42), z);
+  const beam = c.createRadialGradient(a.x, a.y, 0, b.x, b.y, 15); beam.addColorStop(0, `rgba(255,240,190,${.28 * Math.max(night, .45)})`); beam.addColorStop(1, "rgba(255,240,190,0)");
+  c.save(); c.globalCompositeOperation = "lighter"; c.fillStyle = beam; c.beginPath(); c.ellipse((a.x + b.x) / 2, (a.y + b.y) / 2, 12, 6, Math.atan2(b.y - a.y, b.x - a.x), 0, Math.PI * 2); c.fill(); c.restore();
+}
+function groundPath(c: CanvasRenderingContext2D) {
+  const a = iso(0, 0), b = iso(MAP_SIZE, 0), d = iso(MAP_SIZE, MAP_SIZE), e = iso(0, MAP_SIZE);
+  c.beginPath(); c.moveTo(a.x, a.y); c.lineTo(b.x, b.y); c.lineTo(b.x, b.y + 22); c.lineTo(d.x, d.y + 22); c.lineTo(e.x, e.y + 22); c.lineTo(e.x, e.y); c.closePath();
+}
+/** Station dial position, shared by the painted face and the live hands. */
+function stationClock(x: number, y: number, axis: "x" | "y") {
+  const alongX = axis === "x", sx = x + (alongX ? .42 : .93), sy = y + (alongX ? .93 : .42);
+  return iso(sx + (alongX ? .115 : 0), sy + (alongX ? 0 : .115), 19);
+}
+function clockHands(c: CanvasRenderingContext2D, minutes: number, at: (angle: number, length: number) => Point, center: Point, color: string, width: number) {
+  const minute = minutes % 60 / 60 * Math.PI * 2, hour = (minutes / 60 % 12) / 12 * Math.PI * 2;
+  line(c, center, at(hour, .5), color, width * 1.2); line(c, center, at(minute, .78), color, width);
+}
 export class TownScene {
-  private vehicles: Vehicle[] = [];
+  private vehicles: (Vehicle & { alpha: number })[] = [];
   private lastTiles: Tile[] | null = null;
   private lastLevels: number[] | null = null;
   private lastTerrain: boolean[] | null = null;
-  private lastNight = false;
+  private lastLook = "";
   private lastParks: ParkLot[] | null = null;
   private lastAttachments: Town["attachments"] | null = null;
   private objects: SceneObject[] = [];
   private effects: { kind: Tile; x: number; y: number; level?: number }[] = [];
+  private clocks: { x: number; y: number; depth: number; dials: ((across: number, high: number) => Point)[] }[] = [];
+  private homes: number[] = [];
+  private readonly life = new TownLife();
+  private readonly sky: SkyPainter;
   private roadNeighbours = new Map<number, number[]>();
   private lastRoutes: number[][] | null = null;
   private lastRouteTiles: Tile[] | null = null;
@@ -770,14 +967,19 @@ export class TownScene {
   private readonly createCanvas: (() => HTMLCanvasElement) | null;
   private readonly sprites: TownSprites | null;
   private ground: HTMLCanvasElement | null = null;
-  private groundState: { tiles: Tile[]; terrain: boolean[]; grid: boolean; parks: ParkLot[] } | null = null;
+  private groundState: { tiles: Tile[]; terrain: boolean[]; grid: boolean; parks: ParkLot[]; look: string } | null = null;
   constructor(createCanvas?: () => HTMLCanvasElement) {
     this.createCanvas = createCanvas ?? (typeof document !== "undefined" ? () => document.createElement("canvas") : null);
     this.sprites = this.createCanvas ? new TownSprites(this.createCanvas) : null;
+    this.sky = new SkyPainter(this.createCanvas);
   }
   private time = 0;
+  /** Weather, sky and wind keep moving at their own pace, independent of the 1×/2×/4× town speed. */
+  private ambient = 0;
   private readonly reducedMotion = typeof window !== "undefined" && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
   camera: TownCamera = { x: 0, y: 0, zoom: 1 };
+  /** Fireworks over the town at night, confetti by day (level ups). */
+  celebrate(night: boolean) { if (!this.reducedMotion) this.life.celebrate(night); }
   fit(width: number, height: number) {
     this.camera = { x: width / 2, y: height * .53 - MAP_SIZE * H * Math.min(width / 1680, height / 930), zoom: Math.min(width / 1680, height / 930) };
   }
@@ -829,8 +1031,13 @@ export class TownScene {
       bottom: camera.y + Math.max(...points.map(p => p.y)) * camera.zoom,
     };
   }
-  private prepareObjects(town: Town, night: boolean) {
-    if (this.lastTiles === town.tiles && this.lastLevels === town.levels && this.lastTerrain === town.terrain && this.lastNight === night && this.lastParks === town.parks && this.lastAttachments === town.attachments) return;
+  /** Season palettes and snow change artwork, so they take part in the cache keys. */
+  private look() {
+    return `${paintState.season}:${paintState.blossom > .15 ? "b" : ""}${Math.round(paintState.foliage * 8)}:${Math.round(paintState.bare * 8)}:${paintState.lush > .35 ? "l" : ""}${paintState.snow ? ":s" : ""}${paintState.liveClocks ? ":c" : ""}`;
+  }
+  private prepareObjects(town: Town) {
+    const look = this.look();
+    if (this.lastTiles === town.tiles && this.lastLevels === town.levels && this.lastTerrain === town.terrain && this.lastLook === look && this.lastParks === town.parks && this.lastAttachments === town.attachments) return;
     if (this.lastTiles !== town.tiles) {
       this.roadNeighbours = new Map(town.tiles.flatMap((tile, i) => tile === "road" ? [[i, neighbours(i % MAP_SIZE, Math.floor(i / MAP_SIZE)).filter(n => town.tiles[n] === "road")] as const] : []));
       const roads = [...this.roadNeighbours].filter(([, next]) => next.length).map(([i]) => i);
@@ -840,61 +1047,68 @@ export class TownScene {
         const j = this.vehicles.length, from = roads[Math.floor(hash(j + 8) * roads.length)]!, to = this.roadNeighbours.get(from)![0]!;
         const previous = this.roadNeighbours.get(from)!.find(n => n !== to) ?? to;
         const next = this.roadNeighbours.get(to)!.find(n => n !== from) ?? from;
-        this.vehicles.push({ from, to, previous, next, t: hash(j), seed: j, color: ["#f0d29d", "#c8786c", "#60899b", "#eee7cf", "#879677"][j % 5]! });
+        this.vehicles.push({ from, to, previous, next, t: hash(j), seed: j, color: CAR_COLORS[j % CAR_COLORS.length]!, alpha: 1 });
       }
       this.vehicles = this.vehicles.slice(0, target);
     }
-    const objects: SceneObject[] = [], effects: typeof this.effects = [];
-    const add = (x: number, y: number, depth: number, key: string, bounds: SpriteBounds, paint: SceneObject["paint"]) => {
-      const origin = iso(x, y); objects.push({ x: origin.x, y: origin.y, depth: x + y + depth, key, bounds, paint });
+    const objects: SceneObject[] = [], effects: typeof this.effects = [], clocks: typeof this.clocks = [], homes: number[] = [];
+    const add = (x: number, y: number, depth: number, key: string, bounds: SpriteBounds, paint: SceneObject["paint"], extra: Partial<SceneObject> = {}) => {
+      const origin = iso(x, y); objects.push({ x: origin.x, y: origin.y, depth: x + y + depth, key, bounds, paint, tile: y * MAP_SIZE + x, ...extra });
     };
     const extras = new Map((town.attachments ?? []).map(a => [a.tile, a.parts])), covered = new Set((town.parks ?? []).flatMap(lotTiles));
     for (let y = 0; y < MAP_SIZE; y++) for (let x = 0; x < MAP_SIZE; x++) {
       const i = y * MAP_SIZE + x, tile = town.tiles[i]!, level = town.levels[i] || 1;
-      if (["house", "shop", "factory", "station", "park"].includes(tile) && !covered.has(i)) {
-        const axis = tile === "station" ? stationAxis(town, i) : "x";
-        let style = tile === "station" || tile === "factory" && !night ? 0 : Math.floor(hash(i) * 20);
-        // Daytime upper floors share one palette at Lv.3 and three at Lv.2.
-        if (!night && (tile === "house" || tile === "shop") && level > 1) style = level >= 3 ? 0 : style % 3;
-        const parts = extras.get(i) ?? [], key = `${tile}:${style}:${level}:${night}:${axis}:${parts.slice().sort().join(",")}`;
+      if (["house", "shop", "factory", "station", "park", "home"].includes(tile) && !covered.has(i)) {
+        const axis = tile === "station" ? stationAxis(town, i) : "x", access = tile === "home" ? transportMask(town, i, "road") : 0;
+        if (tile === "home") homes.push(i);
+        // Daytime upper floors share one palette at Lv.3 and three at Lv.2; lit windows vary by building.
+        const nightStyle = tile === "station" ? 0 : Math.floor(hash(i) * 20);
+        let dayStyle = tile === "station" || tile === "factory" ? 0 : nightStyle;
+        if ((tile === "house" || tile === "shop") && level > 1) dayStyle = level >= 3 ? 0 : dayStyle % 3;
+        const parts = extras.get(i) ?? [], base = `${tile}:${level}:${axis}:${parts.slice().sort().join(",")}${tile === "home" ? `:${access}` : ""}`;
+        const keys = { key: `${base}:${dayStyle}`, nightKey: `${base}:${nightStyle}`, emits: true };
         const faces = [...buildingFaces(tile, x, y, level, axis), ...facilityFaces(tile, x, y, level, parts)].flat(), origin = iso(x, y);
         const top = Math.min(-24, ...faces.map(p => p.y - origin.y)) - 4;
-        const h = Math.max(tile === "house" || tile === "shop" || tile === "factory" ? buildingHeight(tile, level) : 32, ...facilityLayout(tile, level, parts).map(p => p.z + p.height));
+        const h = Math.max(tile === "house" || tile === "shop" || tile === "factory" ? buildingHeight(tile, level) : tile === "home" ? 48 : 32, ...facilityLayout(tile, level, parts).map(p => p.z + p.height));
         const right = Math.max(38, h * .8 + 24), bottom = Math.max(parts.includes("light") ? 52 : 38, h * .22 + 32);
         const bounds = { left: -38, top, width: right + 38, height: bottom - top };
         if (tile === "station") {
-          add(x, y, .35, key + ":base", bounds, c => station(c, x, y, axis, night, false));
+          add(x, y, .35, keys.key + ":base", bounds, (c, night) => station(c, x, y, axis, night, false), { nightKey: keys.nightKey + ":base", emits: true });
           // Platform furniture has its own depth so a train cannot paint through it.
-          for (const part of parts.filter(p => p !== "light")) add(x, y, part === "planter" ? 1.62 : part === "bench" ? 1.37 : 1.07, key + ":part:" + part, bounds, c => facilityParts(c, tile, x, y, level, [part], night, axis));
+          for (const part of parts.filter(p => p !== "light")) add(x, y, part === "planter" ? 1.62 : part === "bench" ? 1.37 : 1.07, keys.key + ":part:" + part, bounds, (c, night) => facilityParts(c, tile, x, y, level, [part], night, axis), { nightKey: keys.nightKey + ":part:" + part, emits: part === "vending" });
           // Trains run between the platform and canopy, with visible supporting pillars.
-          add(x, y, 1.55, key + ":roof", bounds, c => { station(c, x, y, axis, night, true); facilityParts(c, tile, x, y, level, parts.filter(p => p === "light"), night, axis); });
-        } else add(x, y, 1, key, bounds, c => { facilityParts(c, tile, x, y, level, parts, night, axis, true); building(c, tile, x, y, level, night, 0, false, axis, 0, false, parts); facilityParts(c, tile, x, y, level, parts, night, axis); });
+          add(x, y, 1.55, keys.key + ":roof", bounds, (c, night) => { station(c, x, y, axis, night, true); facilityParts(c, tile, x, y, level, parts.filter(p => p === "light"), night, axis); }, { nightKey: keys.nightKey + ":roof", emits: true });
+          clocks.push({ x, y, depth: x + y + 1.56, dials: [] });
+        } else add(x, y, 1, keys.key, bounds, (c, night) => { facilityParts(c, tile, x, y, level, parts, night, axis, true); building(c, tile, x, y, level, night, 0, false, axis, access, false, parts); facilityParts(c, tile, x, y, level, parts, night, axis); }, keys);
         if (tile === "factory" || tile === "park") effects.push({ kind: tile, x, y, level });
       }
       if (tile === "grass" && hash(i * 3) > .63 && !neighbours(x, y).some(n => ["road", "rail", "station"].includes(town.tiles[n]!))) {
         const size = Math.round((8 + hash(i * 7) * 9) * 2) / 2, v = hash(i * 5), variant = v < .3 ? .1 : v > .88 ? .95 : .5;
-        const bounds = { left: -size - 2, top: 16 - size * 2.55 - 2, width: size * 2 + 12, height: size * 2.55 + 8 };
+        const palette = variant < .3 ? "conifer" : treePalette(i, variant), bounds = { left: -size - 2, top: 16 - size * 2.55 - 2, width: size * 2 + 12, height: size * 2.55 + 8 };
         // Reuse identical trees instead of retaining hundreds of almost identical bitmaps.
-        const origin = iso(x, y);
-        objects.push({ x: origin.x, y: origin.y, depth: x + y + 1, key: `tree:${size}:${variant}`, bounds, paint: c => tree(c, x + .5, y + .5, size, variant) });
+        add(x, y, 1, `tree:${size}:${variant}:${palette}`, bounds, c => tree(c, x + .5, y + .5, size, variant, 0, palette === "conifer" ? "default" : palette), { sway: true });
       }
       if (tile === "road" && (!town.terrain[i] && (x + y) % 7 === 0 || extras.get(i)?.includes("light"))) {
         const mask = transportMask(town, i, "road"), corner = Boolean(mask & 3) && Boolean(mask & 12), alongX = Boolean(mask & 3);
         const position = corner ? "corner" : alongX ? "x" : "y", bridge = Boolean(town.terrain[i]), pair = Boolean(extras.get(i)?.includes("light"));
-        add(x, y, 1.3, `lamp:${night}:${position}:${bridge}:${pair}`, { left: -40, top: -30, width: 80, height: 82 }, c => {
+        add(x, y, 1.3, `lamp:${position}:${bridge}:${pair}`, { left: -40, top: -30, width: 80, height: 82 }, (c, _night, lit) => {
           c.save(); if (bridge) c.translate(0, -5);
-          lamp(c, x + (corner ? bridge ? .77 : .87 : alongX ? .42 : bridge ? .22 : .86), y + (corner ? bridge ? .77 : .87 : alongX ? bridge ? .22 : .86 : .42), night);
-          if (pair) lamp(c, x + (corner ? bridge ? .23 : .13 : alongX ? .72 : bridge ? .78 : .14), y + (corner ? bridge ? .23 : .13 : alongX ? bridge ? .78 : .14 : .72), night);
+          lamp(c, x + (corner ? bridge ? .77 : .87 : alongX ? .42 : bridge ? .22 : .86), y + (corner ? bridge ? .77 : .87 : alongX ? bridge ? .22 : .86 : .42), lit);
+          if (pair) lamp(c, x + (corner ? bridge ? .23 : .13 : alongX ? .72 : bridge ? .78 : .14), y + (corner ? bridge ? .23 : .13 : alongX ? bridge ? .78 : .14 : .72), lit);
           c.restore();
-        });
+        }, { lamp: hash(i * 5.3 + 2), emits: true });
       }
       if ((tile === "road" || tile === "rail") && town.terrain[i]) add(x, y, 1.4, `bridge:${tile}:${transportMask(town, i, tile)}`, { left: -36, top: -14, width: 72, height: 52 }, c => bridgeRails(c, town, x, y, tile));
     }
     for (const lot of town.parks ?? []) {
       for (const part of lot.parts) if (part.kind !== "path") {
-        const x = part.tile % MAP_SIZE, y = Math.floor(part.tile / MAP_SIZE);
-        add(x, y, PARK_PARTS.find(p => p.id === part.kind)?.layer === "ground" ? .08 : 1, `park-part:${part.kind}:${part.rotation}:${night}`, { left: -38, top: -34, width: 76, height: 82 }, c => parkPart(c, part.kind, x, y, part.rotation, night));
+        const x = part.tile % MAP_SIZE, y = Math.floor(part.tile / MAP_SIZE), tall = part.kind === "tree" || part.kind === "cherry" || part.kind === "pine";
+        const palette = part.kind === "tree" ? treePalette(part.tile, .6) : part.kind === "cherry" ? `${paintState.blossom > .15 || paintState.season === "default" ? "bloom" : paintState.bare > .5 ? "bare" : paintState.foliage > .35 ? "red" : "green"}` : part.kind === "flowers" ? paintState.snow || paintState.season === "winter" && paintState.bare > .5 ? "dormant" : "bloom" : "";
+        add(x, y, PARK_PARTS.find(p => p.id === part.kind)?.layer === "ground" ? .08 : 1, `park-part:${part.kind}:${part.rotation}:${palette}`, { left: -38, top: -34, width: 76, height: 82 },
+          (c, night, lit) => parkPart(c, part.kind, x, y, part.rotation, part.kind === "light" ? lit : night, palette as TreePalette),
+          { sway: tall, emits: part.kind === "light" || part.kind === "clock", ...(part.kind === "light" ? { lamp: hash(part.tile * 3.7 + 1) } : {}) });
         if (part.kind === "fountain") effects.push({ kind: "park", x, y });
+        if (part.kind === "clock") clocks.push({ x, y, depth: x + y + 1.001, dials: clockDials(x, y, part.rotation) });
       }
       for (const i of lotTiles(lot)) {
         const x = i % MAP_SIZE, y = Math.floor(i / MAP_SIZE);
@@ -905,8 +1119,11 @@ export class TownScene {
         }
       }
     }
-    this.objects = objects.sort((a, b) => a.depth - b.depth); this.effects = effects;
-    this.lastTiles = town.tiles; this.lastLevels = town.levels; this.lastTerrain = town.terrain; this.lastNight = night;
+    if (this.lastTiles && this.lastLevels && this.lastParks && this.lastAttachments && (this.lastTiles !== town.tiles || this.lastLevels !== town.levels || this.lastParks !== town.parks || this.lastAttachments !== town.attachments)) {
+      this.life.changed({ ...town, tiles: this.lastTiles, levels: this.lastLevels, parks: this.lastParks, attachments: this.lastAttachments }, town);
+    }
+    this.objects = objects.sort((a, b) => a.depth - b.depth); this.effects = effects; this.clocks = clocks; this.homes = homes;
+    this.lastTiles = town.tiles; this.lastLevels = town.levels; this.lastTerrain = town.terrain; this.lastLook = look;
     this.lastParks = town.parks; this.lastAttachments = town.attachments;
   }
   private drawGround(c: CanvasRenderingContext2D, town: Town, options: SceneOptions) {
@@ -914,27 +1131,45 @@ export class TownScene {
     if (!this.ground) {
       this.ground = this.createCanvas(); this.ground.width = GROUND_BOUNDS.width * 2; this.ground.height = GROUND_BOUNDS.height * 2;
     }
-    const previous = this.groundState;
-    if (!previous || previous.tiles !== town.tiles || previous.terrain !== town.terrain || previous.grid !== options.grid || previous.parks !== town.parks) {
+    const previous = this.groundState, look = this.look();
+    if (!previous || previous.tiles !== town.tiles || previous.terrain !== town.terrain || previous.grid !== options.grid || previous.parks !== town.parks || previous.look !== look) {
       const context = this.ground.getContext("2d"); if (!context) { drawTerrain(c, town, options); return; }
       context.setTransform(1, 0, 0, 1, 0, 0); context.clearRect(0, 0, this.ground.width, this.ground.height);
       context.setTransform(2, 0, 0, 2, -GROUND_BOUNDS.left * 2, -GROUND_BOUNDS.top * 2); drawTerrain(context, town, options);
-      this.groundState = { tiles: town.tiles, terrain: town.terrain, grid: options.grid, parks: town.parks };
+      this.groundState = { tiles: town.tiles, terrain: town.terrain, grid: options.grid, parks: town.parks, look };
     }
     c.drawImage(this.ground, GROUND_BOUNDS.left, GROUND_BOUNDS.top, GROUND_BOUNDS.width, GROUND_BOUNDS.height);
   }
+  private applyPaintState(env: TownEnvironment | undefined) {
+    if (!env) return;
+    Object.assign(paintState, {
+      litThreshold: env.windows === "late" ? .8 : .25, shopsOpen: env.shopsOpen, snow: env.snowCover, season: env.season,
+      blossom: env.blossom, foliage: env.foliage, bare: env.bare, lush: env.lush, liveClocks: true,
+    });
+  }
   render(c: CanvasRenderingContext2D, width: number, height: number, town: Town, options: SceneOptions, dt: number) {
-    if (!options.paused) this.time += Math.min(dt, .1) * options.speed;
-    const time = this.time;
-    this.prepareObjects(town, options.night);
+    const env = options.environment, step = Math.min(dt, .1);
+    if (!options.paused) { this.time += step * options.speed; this.ambient += step; }
+    this.applyPaintState(env);
+    try { this.paintFrame(c, width, height, town, options, env, step); }
+    finally { resetPaintState(); }
+  }
+  private paintFrame(c: CanvasRenderingContext2D, width: number, height: number, town: Town, options: SceneOptions, env: TownEnvironment | undefined, step: number) {
+    const time = this.time, ambient = this.ambient, reduced = this.reducedMotion;
+    const night = env ? env.night : options.night ? 1 : 0;
+    this.prepareObjects(town);
+    this.sprites?.beginFrame(6);
     if (this.lastRoutes !== options.routes || this.lastRouteTiles !== town.tiles) {
       this.trainRoutes = options.routes.slice(0, 12).filter(route => route.length >= 3 && route.every(i => town.tiles[i] === "rail" || town.tiles[i] === "station")).map(measureTransportRoute);
       this.lastRoutes = options.routes;
       this.lastRouteTiles = town.tiles;
     }
-    const sky = c.createLinearGradient(0, 0, 0, height); sky.addColorStop(0, options.night ? "#203e51" : "#b8d8cf"); sky.addColorStop(1, options.night ? "#314e53" : "#e9ecd8");
-    c.fillStyle = sky; c.fillRect(0, 0, width, height);
-    for (let j = 0; j < 4; j++) { const px = ((j * .27 + time * .0007) % 1.5 - .2) * width; ellipse(c, { x: px, y: 55 + j * 47 }, 85, 15, options.night ? "#ffffff03" : "#fffef014"); }
+    if (env) this.sky.draw(c, width, height, env, ambient, skyHorizon(height), reduced);
+    else {
+      const sky = c.createLinearGradient(0, 0, 0, height); sky.addColorStop(0, options.night ? "#203e51" : "#b8d8cf"); sky.addColorStop(1, options.night ? "#314e53" : "#e9ecd8");
+      c.fillStyle = sky; c.fillRect(0, 0, width, height);
+      for (let j = 0; j < 4; j++) { const px = ((j * .27 + time * .0007) % 1.5 - .2) * width; ellipse(c, { x: px, y: 55 + j * 47 }, 85, 15, options.night ? "#ffffff03" : "#fffef014"); }
+    }
     c.save(); c.translate(this.camera.x, this.camera.y); c.scale(this.camera.zoom, this.camera.zoom);
     this.drawGround(c, town, options);
     const transform = c.getTransform?.();
@@ -950,6 +1185,17 @@ export class TownScene {
         if (tile === "road" || tile === "rail" || tile === "station") transport(c, town, x, y, tile === "road" ? "road" : "rail");
       }
     }
+    if (env) {
+      this.life.sync(town, this.roadNeighbours);
+      if (!options.paused) this.life.update(step * options.speed, step, env);
+      this.life.drawWater(c, env, ambient, reduced);
+      drawCloudShadows(c, env, ambient, reduced);
+      if (night > 0) {
+        c.save(); c.globalCompositeOperation = "multiply"; c.fillStyle = mixColor("#ffffff", NIGHT_AMBIENT, night); groundPath(c); c.fill();
+        // The soft shadow under the island darkens with the sky as well.
+        c.globalAlpha = .5; c.beginPath(); c.ellipse(iso(12, 12).x, iso(12, 12).y, 820, 390, 0, 0, Math.PI * 2); c.fill(); c.restore();
+      }
+    }
     const highlight = (i: number, color: string, fill: string) => { const x = i % MAP_SIZE, y = Math.floor(i / MAP_SIZE), z = town.terrain[i] ? 5.5 : 1; poly(c, [iso(x, y, z), iso(x + 1, y, z), iso(x + 1, y + 1, z), iso(x, y + 1, z)], fill, color, 1.8); };
     const previewTiles = options.preview.length ? options.preview : options.hover !== null && options.tool !== "pan" && options.tool !== "inspect" ? [options.hover] : [];
     const allowedAt = (i: number) => {
@@ -958,7 +1204,8 @@ export class TownScene {
         return Boolean(lot && (options.parkPart === "remove" ? lot.parts.some(p => p.tile === i) : canPlaceParkPart(lot, i, options.parkPart ?? "tree")));
       }
       const tile = town.tiles[i];
-      const hasAccess = !["house", "shop", "factory"].includes(options.tool) || touchesRoad(town.tiles, i % MAP_SIZE, Math.floor(i / MAP_SIZE));
+      const hasAccess = !["house", "shop", "factory", "home"].includes(options.tool) || touchesRoad(town.tiles, i % MAP_SIZE, Math.floor(i / MAP_SIZE));
+      if (options.tool === "home" && town.tiles.includes("home")) return false;
       return options.tool === "bulldoze" || tile === "grass" && hasAccess || tile === "water" && ["rail", "road"].includes(options.tool);
     };
     const selectedLot = options.selected === null ? undefined : parkAt(town, options.selected), editor = town.parks?.find(l => l.id === options.editLot);
@@ -973,44 +1220,81 @@ export class TownScene {
       poly(c, [iso(x, y, 1), iso(x + lot.width, y, 1), iso(x + lot.width, y + lot.height, 1), iso(x, y + lot.height, 1)], valid ? "#bdd0a655" : "#ef957944", valid ? "#efdaa0" : "#d87962", 2);
     } else for (const i of previewTiles) highlight(i, allowedAt(i) ? "#efdaa0" : "#d87962", allowedAt(i) ? "#e6dba222" : "#ef957922");
     const moving: SceneObject[] = [];
-    const add = (x: number, y: number, depth: number, paint: SceneObject["paint"], bounds: SpriteBounds = { left: -28, top: -85, width: 66, height: 110 }) => { const origin = iso(x, y); moving.push({ x: origin.x, y: origin.y, depth: x + y + depth, bounds, paint }); };
+    const add = (x: number, y: number, depth: number, paint: (c: CanvasRenderingContext2D) => void, bounds: SpriteBounds = { left: -28, top: -85, width: 66, height: 110 }) => { const origin = iso(x, y); moving.push({ x: origin.x, y: origin.y, depth: x + y + depth, bounds, paint }); };
+    const windX = env ? Math.cos(env.windAngle) * (.5 + env.wind / 25) : 1;
     for (const { kind, x, y, level } of this.effects) {
-      if (kind === "factory" && !this.reducedMotion) add(x, y, 1.01, c => factorySmoke(c, x, y, time, level), { left: -28, top: -112, width: 76, height: 145 });
-      if (kind === "park") add(x, y, 1.01, c => { const p = iso(x + .5, y + .5), jet = 17 + (this.reducedMotion ? 0 : Math.sin(time * 3)); line(c, { x: p.x, y: p.y - 6.5 }, { x: p.x, y: p.y - jet }, "#d9f7f0", 1.6); ellipse(c, { x: p.x, y: p.y - jet }, 1.4, .8, "#e9f9ed"); });
+      if (kind === "factory" && !reduced) add(x, y, 1.01, c => factorySmoke(c, x, y, time, level, windX, night), { left: -60, top: -112, width: 140, height: 145 });
+      if (kind === "park") add(x, y, 1.01, c => { const p = iso(x + .5, y + .5), jet = 17 + (reduced ? 0 : Math.sin(time * 3)); line(c, { x: p.x, y: p.y - 6.5 }, { x: p.x, y: p.y - jet }, shade("#d9f7f0", night), 1.6); ellipse(c, { x: p.x, y: p.y - jet }, 1.4, .8, shade("#e9f9ed", night)); });
     }
-    for (const v of this.vehicles) {
-      if (!options.paused) v.t += Math.min(dt, .1) * options.speed * .65;
+    if (env) for (const clock of this.clocks) {
+      const paint = clock.dials.length
+        ? (c: CanvasRenderingContext2D) => { for (const dial of clock.dials) { const probe = dial(1, 0), center = dial(0, 0), flip = probe.x >= center.x ? 1 : -1; clockHands(c, env.minutes, (a, r) => dial(Math.sin(a) * r * flip, Math.cos(a) * r), center, "#3f5a4c", .6); } }
+        : (c: CanvasRenderingContext2D) => { const axis = stationAxis(town, clock.y * MAP_SIZE + clock.x), center = stationClock(clock.x, clock.y, axis); clockHands(c, env.minutes, (a, r) => ({ x: center.x + Math.sin(a) * r * 2.6, y: center.y - Math.cos(a) * r * 2.6 }), center, "#4e655e", .55); };
+      moving.push({ x: iso(clock.x, clock.y).x, y: iso(clock.x, clock.y).y, depth: clock.depth, bounds: { left: -40, top: -60, width: 80, height: 70 }, paint });
+    }
+    const traffic = env ? Math.max(.12, env.traffic) : 1, carLights = env ? env.lightsOn > .35 || env.rain > .55 || env.fog > .5 : options.night;
+    for (const [index, v] of this.vehicles.entries()) {
+      const active = index < Math.max(1, Math.round(this.vehicles.length * traffic));
+      v.alpha = Math.max(0, Math.min(1, v.alpha + (active ? 1 : -1) * step * 1.5));
+      if (!options.paused) v.t += step * options.speed * .65;
       if (v.t >= 1) {
         v.t -= 1; v.previous = v.from; v.from = v.to; v.to = v.next;
         const choices = this.roadNeighbours.get(v.to)!.filter(n => n !== v.from);
         v.next = choices.length ? choices[Math.floor(hash(time * .1 + v.seed) * choices.length)]! : v.from;
       }
+      if (v.alpha <= 0) continue;
       const p = sampleTransportPath([v.previous, v.from, v.to, v.next], 1 + v.t), { dx, dy } = p;
       const x = p.x + (p.laneApplied ? 0 : dy * .13), y = p.y - (p.laneApplied ? 0 : dx * .13), z = elevationAt(town, x, y, "road");
       add(x, y, 0, c => {
-        ellipse(c, iso(x, y, z), 5, 2.5, "#29443d44");
-        for (const a of [-.07, .07]) for (const s of [-1, 1]) { const p = iso(x + dx * a - dy * s * .065, y + dy * a + dx * s * .065, z + 1.2); ellipse(c, p, 1.2, 1.5, "#35483f"); ellipse(c, p, .45, .6, "#b9bba4"); }
-        orientedBox(c, x, y, .23, .12, 4, dx, dy, [v.color, "#64796c", v.color], z);
-        orientedBox(c, x - dx * .015, y - dy * .015, .13, .09, 2, dx, dy, ["#b8dbd1", "#6b9397", "#e1ecdc"], z + 4);
-        line(c, iso(x + dx * .105 - dy * .05, y + dy * .105 + dx * .05, z + 2), iso(x + dx * .105 + dy * .05, y + dy * .105 - dx * .05, z + 2), "#ece9d0", .7);
-        if (options.night) ellipse(c, iso(x + dx * .12, y + dy * .12, z + 2), 2, 1.2, "#fff1b4");
+        if (v.alpha < 1) { c.save(); c.globalAlpha *= v.alpha; }
+        drawCar(c, v, x, y, z, dx, dy, night, carLights);
+        if (v.alpha < 1) c.restore();
       });
+    }
+    if (env) {
+      // Passengers gather after a train leaves and board while the next one stands at the platform.
+      const crowds = new Map<number, number>(), base = 1 + env.activity * 4;
+      for (let r = 0; r < this.trainRoutes.length; r++) {
+        const route = this.trainRoutes[r]!, travel = route.length - .68, cycle = travel * 2 + 4, phase = (time * .45 + r * 4) % cycle;
+        for (const [tile, departs] of [[route.tiles[0]!, 1], [route.tiles[route.tiles.length - 1]!, travel + 3]] as const) {
+          const since = ((phase - departs) % cycle + cycle) % cycle, boarding = since > cycle - 2 ? (cycle - since) / 2 : 1;
+          crowds.set(tile, Math.max(crowds.get(tile) ?? 0, base * Math.min(1, since / (cycle * .5) + .25) * boarding));
+        }
+      }
+      this.life.platforms((x, y, depth, paint, bounds) => add(x, y, depth, paint, bounds), [...crowds].map(([tile, crowd]) => ({ tile, crowd, axis: stationAxis(town, tile) })), env, night, this.camera.zoom);
     }
     for (let r = 0; r < this.trainRoutes.length; r++) {
       const route = this.trainRoutes[r]!, max = route.length, travel = max - .68, phase = (time * .45 + r * 4) % (travel * 2 + 4);
       const center = .34 + Math.min(travel, phase <= travel + 2 ? Math.max(0, phase - 1) : Math.max(0, travel * 2 + 3 - phase));
+      const heading = phase <= travel + 2 ? 1 : -1;
       for (let wagon = 0; wagon < 3; wagon++) {
         const pos = Math.max(0, Math.min(max, center + (wagon - 1) * .34)), { x, y, dx, dy } = sampleTransportDistance(route, pos), z = elevationAt(town, x, y, "rail");
+        const lead = wagon === (heading > 0 ? 2 : 0);
         add(x, y, 0, c => {
-          const faces = orientedBox(c, x, y, .29, .18, 9, dx, dy, ["#f3e5bf", "#8d9e94", "#d9e1cb"], z);
-          orientedBox(c, x, y, .25, .16, .8, dx, dy, ["#abbab0", "#7a918a", "#e3e7d3"], z + 9);
-          for (const a of [-.10, .10]) { const p = iso(x + dx * a, y + dy * a, z + 1); ellipse(c, p, 2.4, 1.1, "#3b4e46"); }
+          const faces = orientedBox(c, x, y, .29, .18, 9, dx, dy, [shade("#f3e5bf", night), shade("#8d9e94", night), shade("#d9e1cb", night)], z);
+          orientedBox(c, x, y, .25, .16, .8, dx, dy, [shade("#abbab0", night), shade("#7a918a", night), shade("#e3e7d3", night)], z + 9);
+          for (const a of [-.10, .10]) { const p = iso(x + dx * a, y + dy * a, z + 1); ellipse(c, p, 2.4, 1.1, shade("#3b4e46", night)); }
           for (const { a, b } of faces) {
-            line(c, iso(a.x, a.y, z + 4), iso(b.x, b.y, z + 4), "#c37c5e", 1.5);
+            line(c, iso(a.x, a.y, z + 4), iso(b.x, b.y, z + 4), shade("#c37c5e", night), 1.5);
             const p = { x: a.x + (b.x - a.x) * .2, y: a.y + (b.y - a.y) * .2 }, q = { x: a.x + (b.x - a.x) * .8, y: a.y + (b.y - a.y) * .8 };
-            poly(c, [iso(p.x, p.y, z + 5), iso(q.x, q.y, z + 5), iso(q.x, q.y, z + 8), iso(p.x, p.y, z + 8)], options.night ? "#ffe9a7" : "#739a9c");
+            poly(c, [iso(p.x, p.y, z + 5), iso(q.x, q.y, z + 5), iso(q.x, q.y, z + 8), iso(p.x, p.y, z + 8)], night > .4 ? "#ffe9a7" : shade("#739a9c", night));
           }
+          if (lead && carLights) { const s = heading > 0 ? 1 : -1; ellipse(c, iso(x + dx * .15 * s, y + dy * .15 * s, z + 4), 1.4, 1, "#fff1b4"); }
         });
+      }
+    }
+    if (env) {
+      this.life.collect((x, y, depth, paint, bounds) => add(x, y, depth, paint, bounds), town, env, night, this.camera.zoom);
+      for (const i of this.homes) {
+        const hx = i % MAP_SIZE, hy = Math.floor(i / MAP_SIZE), selected = options.selected === i, wet = env.rain > .2 || env.snow > 0;
+        const asleep = env.night > .75 && (env.windows === "late" || env.activity < .3), loop = (ambient / 16 + hash(i)) % 1;
+        const walking = !asleep && !wet && !selected && loop < .62, angle = loop / .62 * Math.PI * 2;
+        const u = walking ? .36 + Math.cos(angle) * .15 : .735, v = walking ? .8 + Math.sin(angle) * .065 : wet || asleep ? .84 : .87;
+        add(hx + u, hy + v, .02, c => {
+          const p = iso(hx + u, hy + v);
+          drawDog(c, p, walking ? -Math.sin(angle) >= 0 ? 1 : -1 : 1, ambient * 8, night, "#efe6d6", { sleep: asleep || wet, wag: selected ? ambient * 30 : ambient * 9, jump: selected ? Math.abs(Math.sin(ambient * 6)) * 2.5 : 0 });
+          if (asleep && !reduced) for (let j = 0; j < 2; j++) { const k = (ambient * .4 + j * .5) % 1; c.globalAlpha = 1 - k; line(c, { x: p.x + 2 + k * 3, y: p.y - 5 - k * 7 }, { x: p.x + 3.2 + k * 3, y: p.y - 5 - k * 7 }, shade("#eef2f8", night * .3), .45); line(c, { x: p.x + 3.2 + k * 3, y: p.y - 5 - k * 7 }, { x: p.x + 2 + k * 3, y: p.y - 3.8 - k * 7 }, shade("#eef2f8", night * .3), .45); line(c, { x: p.x + 2 + k * 3, y: p.y - 3.8 - k * 7 }, { x: p.x + 3.2 + k * 3, y: p.y - 3.8 - k * 7 }, shade("#eef2f8", night * .3), .45); c.globalAlpha = 1; }
+        }, { left: -10, top: -16, width: 22, height: 20 });
       }
     }
     moving.sort((a, b) => a.depth - b.depth);
@@ -1018,10 +1302,23 @@ export class TownScene {
       const left = this.camera.x + (o.x + o.bounds.left) * this.camera.zoom, top = this.camera.y + (o.y + o.bounds.top) * this.camera.zoom;
       return left < width && top < height && left + o.bounds.width * this.camera.zoom > 0 && top + o.bounds.height * this.camera.zoom > 0;
     };
+    const sway = env && !reduced ? Math.min(.085, .012 + env.wind / 40 * .07) : 0, swayRate = env ? 1.1 + env.wind * .02 : 1;
+    const lightsOn = env ? env.lightsOn : options.night ? 1 : 0, lightsKey = env ? `${env.windows}:${env.shopsOpen ? 1 : 0}` : "", look = this.look();
     const draw = (o: SceneObject) => {
       if (!visible(o)) return;
-      if (o.key && this.sprites) this.sprites.draw(c, o.key, o.x, o.y, o.bounds, context => { context.save(); context.translate(-o.x, -o.y); o.paint(context); context.restore(); }, spriteResolution);
-      else o.paint(c);
+      const lit = o.lamp === undefined ? night > 0 : lightsOn > o.lamp;
+      if (!o.key || !this.sprites) { o.paint(c, night >= .5, o.lamp === undefined ? night >= .5 : lit); return; }
+      const bend = o.sway && sway ? Math.sin(ambient * swayRate + o.x * .05 + o.y * .031) * sway : 0;
+      const rise = env && o.tile !== undefined && !o.sway ? this.life.rise(o.tile) : 1;
+      if (bend || rise !== 1) { c.save(); const base = o.y + 16; c.translate(o.x, base); if (bend) c.transform(1, 0, bend, 1, 0, 0); if (rise !== 1) c.scale(rise < 1 ? .9 + rise * .1 : rise, rise); c.translate(-o.x, -base); }
+      if (night < 1) this.sprites.draw(c, `${o.key}|${look}`, o.x, o.y, o.bounds, context => { context.save(); context.translate(-o.x, -o.y); o.paint(context, false, false); context.restore(); }, spriteResolution);
+      if (night > 0) {
+        const key = `${o.nightKey ?? o.key}|${look}|n${o.emits ? `:${lightsKey}` : ""}${o.lamp === undefined ? "" : lit ? ":on" : ":off"}`;
+        const paint = (context: CanvasRenderingContext2D) => { context.save(); context.translate(-o.x, -o.y); o.paint(context, true, lit); context.restore(); };
+        // Early dusk fills in night artwork a few sprites per frame; past halfway it must be complete.
+        this.sprites.draw(c, key, o.x, o.y, o.bounds, paint, spriteResolution, { alpha: night, optional: night < .5, night: { ambient: NIGHT_AMBIENT, emissive: o.emits ? paint : () => {} } });
+      }
+      if (bend || rise !== 1) c.restore();
     };
     // The immutable scene is already sorted; merge only the small moving layer each frame.
     let movingIndex = 0;
@@ -1030,15 +1327,24 @@ export class TownScene {
       draw(o);
     }
     while (movingIndex < moving.length) draw(moving[movingIndex++]!);
-    if (options.night) { c.save(); c.globalCompositeOperation = "multiply"; patch(c, 0, 0, MAP_SIZE, MAP_SIZE, "#849fad"); c.restore(); }
+    if (env) { drawSplashes(c, env, ambient, reduced); this.life.overlay(c, env, ambient, night, reduced); }
     for (const i of previewTiles) {
       if (options.tool === "decorate" && options.parkPart !== "remove" && allowedAt(i)) {
-        c.save(); c.globalAlpha *= .5; parkPart(c, options.parkPart ?? "tree", i % MAP_SIZE, Math.floor(i / MAP_SIZE), options.partRotation ?? 0, options.night); c.restore();
-      } else if (allowedAt(i) && ["house", "shop", "factory", "station"].includes(options.tool)) {
-        c.save(); c.globalAlpha *= .55; building(c, options.tool as Tile, i % MAP_SIZE, Math.floor(i / MAP_SIZE), 1, options.night, time, true, stationAxis(town, i), transportMask(town, i, "road")); c.restore();
+        c.save(); c.globalAlpha *= .5; parkPart(c, options.parkPart ?? "tree", i % MAP_SIZE, Math.floor(i / MAP_SIZE), options.partRotation ?? 0, night >= .5); c.restore();
+      } else if (allowedAt(i) && ["house", "shop", "factory", "station", "home"].includes(options.tool)) {
+        c.save(); c.globalAlpha *= .55; building(c, options.tool as Tile, i % MAP_SIZE, Math.floor(i / MAP_SIZE), 1, night >= .5, time, true, stationAxis(town, i), transportMask(town, i, "road")); c.restore();
       }
     }
     c.restore();
+    if (env) {
+      if (env.grade && Math.min(...[1, 3, 5].map(i => parseInt(env.grade!.slice(i, i + 2), 16))) < 251) { c.save(); c.globalCompositeOperation = "multiply"; c.fillStyle = env.grade; c.fillRect(0, 0, width, height); c.restore(); }
+      if (env.grey > .02) { c.save(); c.globalCompositeOperation = "saturation"; c.fillStyle = `rgba(128,128,128,${env.grey.toFixed(3)})`; c.fillRect(0, 0, width, height); c.restore(); }
+      drawFog(c, width, height, env, ambient);
+      drawPrecipitation(c, width, height, env, ambient, reduced);
+      const flash = lightningFlash(env, ambient, reduced);
+      if (flash > 0) { c.save(); c.globalCompositeOperation = "lighter"; c.fillStyle = `rgba(210,220,255,${flash * .5})`; c.fillRect(0, 0, width, height); c.restore(); }
+      this.life.screen(c, width, height);
+    }
   }
 }
 export function drawTownIcon(c: CanvasRenderingContext2D, kind: Tool, width: number, height: number) {
