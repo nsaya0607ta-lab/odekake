@@ -6,12 +6,14 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { BUILDINGS, FACILITY_PARTS, MAP_SIZE, MILESTONES, PARK_PARTS, PARK_SIZES, advanceTown, buildLine, buyFacilityPart, buyParkLot, createTown, decodeTown, expandParkLot, getTownStats, lineTiles, parkAt, placeParkPart, recordTownEdit, removeFacilityPart, removeParkLot, removeParkPart, touchesRoad, undoTownEdit, upgradeTile, type FacilityPart, type ParkLot, type ParkPart, type ParkSize, type Tool, type Town, type TownEdit } from "@/lib/games/town-builder";
 import { TownScene, drawTownIcon, type SceneOptions } from "@/lib/games/town-renderer";
 import { TownCanvas } from "@/lib/games/town-canvas";
+import { TownTouchControls } from "@/lib/games/town-touch-controls";
 import { FacilityWorkshop, ParkPurchase, ParkWorkshop } from "./town-workshop";
 import styles from "./town-builder.module.css";
 
 type Mode = Tool | "inspect" | "pan" | "decorate";
 type Panel = "build" | "view" | "help" | "land" | "customize" | null;
 const F = new Intl.NumberFormat("ja-JP");
+const compactMoney = new Intl.NumberFormat("ja-JP", { notation: "compact", maximumFractionDigits: 1 });
 function BuildingIcon({ kind }: { kind: Tool }) {
   const ref = useRef<HTMLCanvasElement>(null);
   useEffect(() => { const c = ref.current?.getContext("2d"); if (c) { c.setTransform(2, 0, 0, 2, 0, 0); drawTownIcon(c, kind, 76, 66); } }, [kind]);
@@ -50,17 +52,19 @@ export function TownBuilder({ userId }: { userId: string }) {
   const [editingLotId, setEditingLotId] = useState<number | null>(null), [part, setPart] = useState<ParkPart | "remove">("tree"), [partRotation, setPartRotation] = useState(0);
   const [notice, updateNotice] = useState("1本指で移動、2本指で拡大・縮小。建物はタップで調べられます。");
   const [toast, setToast] = useState(false), noticeTimer = useRef<number | null>(null);
-  const setNotice = useCallback((message: string) => {
-    updateNotice(message); setToast(true);
+  const setNotice = useCallback((message: string, visible = true) => {
+    updateNotice(message); setToast(visible);
     if (noticeTimer.current) window.clearTimeout(noticeTimer.current);
-    noticeTimer.current = window.setTimeout(() => setToast(false), 3200);
+    noticeTimer.current = visible ? window.setTimeout(() => setToast(false), 3200) : null;
   }, []);
   const [saveStatus, setSaveStatus] = useState("読み込み中"), [panel, setPanel] = useState<Panel>(null);
   const [scenery, setScenery] = useState(false), [browserFullscreen, setBrowserFullscreen] = useState(false), [stroke, setStroke] = useState(false);
   const [tileX, setTileX] = useState(10), [tileY, setTileY] = useState(11);
   const canvasRef = useRef<HTMLCanvasElement>(null), sceneRef = useRef<TownScene | null>(null);
   const gameRef = useRef<HTMLElement>(null);
-  const selectionRef = useRef<HTMLElement>(null), toolbarRef = useRef<HTMLDivElement>(null), statsRef = useRef<HTMLDivElement>(null);
+  const touchControls = useRef<TownTouchControls | null>(null);
+  if (!touchControls.current) touchControls.current = new TownTouchControls();
+  const headerRef = useRef<HTMLElement>(null), selectionRef = useRef<HTMLElement>(null), toolbarRef = useRef<HTMLDivElement>(null), statsRef = useRef<HTMLDivElement>(null);
   const panelRef = useRef<HTMLElement>(null);
   const activeToolRef = useRef<HTMLDivElement>(null);
   const returnControlsRef = useRef<HTMLButtonElement>(null);
@@ -74,6 +78,19 @@ export function TownBuilder({ userId }: { userId: string }) {
   const sizeRef = useRef({ width: 800, height: 600 });
   const pointers = useRef(new Map<number, { x: number; y: number }>());
   const drag = useRef<{ x: number; y: number; from: number | null; to: number | null; pan: boolean; moved: boolean; multiple: boolean } | null>(null);
+  const cancelPointer = useCallback(() => { drag.current = null; pointers.current.clear(); touchControls.current?.cancel(); setPreview([]); }, []);
+  useEffect(() => {
+    cancelPointer();
+    const visibility = () => { if (document.hidden) cancelPointer(); };
+    window.addEventListener("blur", cancelPointer);
+    window.addEventListener("resize", cancelPointer);
+    document.addEventListener("visibilitychange", visibility);
+    return () => {
+      window.removeEventListener("blur", cancelPointer);
+      window.removeEventListener("resize", cancelPointer);
+      document.removeEventListener("visibilitychange", visibility);
+    };
+  }, [panel, welcome, loaded, cancelPointer]);
   const stats = useMemo(() => getTownStats(town.tiles, town.levels, town.parks, town.attachments), [town.tiles, town.levels, town.parks, town.attachments]);
   const item = BUILDINGS.find(b => b.id === mode);
   const mission = MILESTONES.find(m => !town.rewards.includes(m.id));
@@ -128,7 +145,7 @@ export function TownBuilder({ userId }: { userId: string }) {
     const keepVisible = () => {
       const scene = sceneRef.current, currentTown = stateRef.current?.town; if (!scene || !currentTown) return;
       const { width, height } = sizeRef.current;
-      const top = (statsRef.current?.getBoundingClientRect().bottom ?? 110) + 14;
+      const top = Math.max(headerRef.current?.getBoundingClientRect().bottom ?? 0, statsRef.current?.getBoundingClientRect().bottom ?? 0) + 14;
       const panelBounds = panel === "customize" ? panelRef.current?.getBoundingClientRect() : null;
       const sidePanel = panelBounds && panelBounds.width < width * .7;
       const right = sidePanel ? panelBounds.left - 14 : width - 24;
@@ -147,7 +164,7 @@ export function TownBuilder({ userId }: { userId: string }) {
     if (panelRef.current && panel === "customize") resize.observe(panelRef.current);
     if (activeToolRef.current) resize.observe(activeToolRef.current);
     return () => resize.disconnect();
-  }, [showSelection, selected, active, selectedLevel, panel, editingLotId, selectedLot?.width, selectedLot?.height, mode]);
+  }, [showSelection, selected, active, selectedLevel, panel, editingLotId, selectedLot?.width, selectedLot?.height, town.attachments, mode]);
   useEffect(() => {
     if (!loaded || town.paused || welcome) return;
     const timer = window.setInterval(() => setTown(prev => advanceTown(prev)), 2500 / speed);
@@ -186,13 +203,13 @@ export function TownBuilder({ userId }: { userId: string }) {
     canvas.addEventListener("wheel", wheel, { passive: false });
     return () => { cancelAnimationFrame(frame); resize.disconnect(); canvas.removeEventListener("wheel", wheel); sceneRef.current = null; };
   }, [setNotice]);
-  const chooseMode = (next: Mode) => { setMode(next); setEditingLotId(null); setStroke(false); setPreview([]); setHover(null); setSelected(null); setNotice(next === "pan" || next === "inspect" ? "1本指で移動、2本指で拡大・縮小。建物はタップで調べられます。" : BUILDINGS.find(b => b.id === next)?.info ?? ""); };
+  const chooseMode = (next: Mode) => { setMode(next); setEditingLotId(null); setStroke(false); setPreview([]); setHover(null); setSelected(null); setNotice(next === "pan" || next === "inspect" ? "1本指で移動、2本指で拡大・縮小。建物はタップで調べられます。" : BUILDINGS.find(b => b.id === next)?.info ?? "", false); };
   const closePanel = () => { setPanel(null); if (panel === "customize") { setMode("inspect"); setEditingLotId(null); setPreview([]); setHover(null); } };
   const openCustomize = () => { if (selected === null) return; setPanel("customize"); setEditingLotId(selectedLot?.id ?? null); setMode(selectedLot ? "decorate" : "inspect"); setPart("tree"); setPreview([]); setHover(null); };
   const remember = (next: Town) => {
     setUndo(list => [...list.slice(-19), recordTownEdit(town, next)]);
   };
-  const applyEdit = (result: { town: Town; message: string }) => { if (result.town !== town) { remember(result.town); setTown(result.town); } setNotice(result.message); };
+  const applyEdit = (result: { town: Town; message: string }) => { if (result.town !== town) { remember(result.town); setTown(result.town); } setNotice(result.message, result.town === town || panel !== "customize"); };
   const commit = (path: number[]) => {
     if (!loaded || welcome || !path.length) return;
     if (mode === "pan") return;
@@ -217,25 +234,31 @@ export function TownBuilder({ userId }: { userId: string }) {
   };
   const undoBuild = () => {
     const prev = undo[undo.length - 1]; if (!prev) return;
-    setTown(current => undoTownEdit(current, prev));
-    if (editingLotId !== null && !undoTownEdit(town, prev).parks.some(p => p.id === editingLotId)) { setEditingLotId(null); setMode("inspect"); setPanel(null); setSelected(null); }
-    setUndo(list => list.slice(0, -1)); setNotice("直前の工事を取り消しました");
+    const next = undoTownEdit(town, prev); setTown(next);
+    const lotRemoved = editingLotId !== null && !next.parks.some(p => p.id === editingLotId);
+    const selectionRemoved = selected !== null && next.tiles[selected] !== town.tiles[selected];
+    if (lotRemoved || selectionRemoved) {
+      setSelected(null);
+      if (lotRemoved || panel === "customize") { setEditingLotId(null); setMode("inspect"); setPanel(null); setPreview([]); setHover(null); }
+    }
+    setUndo(list => list.slice(0, -1)); setNotice("直前の工事を取り消しました", !showSelection && panel !== "customize");
   };
   const position = (e: React.PointerEvent<HTMLCanvasElement>) => { const rect = e.currentTarget.getBoundingClientRect(); return { x: e.clientX - rect.left, y: e.clientY - rect.top }; };
   const pointerDown = (e: React.PointerEvent<HTMLCanvasElement>) => {
+    if (!loaded || welcome || e.button !== 0) return;
     e.currentTarget.setPointerCapture(e.pointerId);
     const p = position(e), scene = sceneRef.current;
     const tile = scene ? mode === "inspect" || mode === "bulldoze" || mode === "decorate" && part === "remove" ? scene.pickTile(p.x, p.y, town) : scene.tileAt(p.x, p.y) : null;
     pointers.current.set(e.pointerId, p);
     if (pointers.current.size > 1) { if (drag.current) drag.current.multiple = true; setPreview([]); return; }
     setHover(null);
-    drag.current = { ...p, from: tile, to: tile, pan: !(linearTool && stroke) || e.button !== 0, moved: false, multiple: false };
-    if (tile !== null && mode !== "pan" && mode !== "inspect") setPreview([tile]);
+    drag.current = { ...p, from: tile, to: tile, pan: Boolean(panel) || !(linearTool && stroke), moved: false, multiple: false };
+    if (!panel && tile !== null && mode !== "pan" && mode !== "inspect") setPreview([tile]);
   };
   const pointerMove = (e: React.PointerEvent<HTMLCanvasElement>) => {
     const p = position(e), scene = sceneRef.current; if (!scene) return;
     const old = pointers.current.get(e.pointerId);
-    if (!old) { if (e.pointerType === "mouse" && mode !== "inspect" && mode !== "pan") setHover(scene.tileAt(p.x, p.y)); return; }
+    if (!old) { if (!panel && e.pointerType === "mouse" && mode !== "inspect" && mode !== "pan") setHover(scene.tileAt(p.x, p.y)); return; }
     if (pointers.current.size === 2) {
       const other = [...pointers.current.entries()].find(([id]) => id !== e.pointerId)?.[1];
       if (other) {
@@ -256,8 +279,9 @@ export function TownBuilder({ userId }: { userId: string }) {
     pointers.current.set(e.pointerId, p);
   };
   const pointerUp = (e: React.PointerEvent<HTMLCanvasElement>) => {
+    if (!pointers.current.has(e.pointerId)) return;
     const d = drag.current; pointers.current.delete(e.pointerId);
-    if (d && !d.multiple && !welcome && mode !== "pan" && (!d.pan || !d.moved)) {
+    if (d && !d.multiple && loaded && !welcome && !panel && mode !== "pan" && (!d.pan || !d.moved)) {
       const p = position(e), scene = sceneRef.current;
       const onMap = p.x >= 0 && p.y >= 0 && p.x < sizeRef.current.width && p.y < sizeRef.current.height && document.elementFromPoint(e.clientX, e.clientY) === e.currentTarget;
       const wasTap = Math.hypot(p.x - d.x, p.y - d.y) <= 8;
@@ -267,12 +291,11 @@ export function TownBuilder({ userId }: { userId: string }) {
     }
     if (!pointers.current.size) drag.current = null; setPreview([]);
   };
-  const cancelPointer = () => { drag.current = null; pointers.current.clear(); setPreview([]); };
   const upgrade = () => {
     if (selected === null) return;
     const result = upgradeTile(town, selected);
     if (result.town !== town) { remember(result.town); setTown(result.town); }
-    setNotice(result.message);
+    setNotice(result.message, result.town === town);
   };
   const reset = () => {
     if (!window.confirm("今の街を初期化します。よろしいですか？")) return;
@@ -298,6 +321,7 @@ export function TownBuilder({ userId }: { userId: string }) {
   };
   const handleKey = (e: React.KeyboardEvent<HTMLCanvasElement>) => {
     const s = sceneRef.current; if (!s) return;
+    if (panel || welcome || !loaded) return;
     if (["ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight"].includes(e.key)) {
       e.preventDefault(); const current = hover ?? 10 * MAP_SIZE + 10;
       const x = Math.max(0, Math.min(MAP_SIZE - 1, current % MAP_SIZE + (e.key === "ArrowRight" ? 1 : e.key === "ArrowLeft" ? -1 : 0)));
@@ -309,13 +333,23 @@ export function TownBuilder({ userId }: { userId: string }) {
     else if (e.key === "Escape") { chooseMode("inspect"); setSelected(null); }
     else if (e.key.toLowerCase() === "z" && (e.ctrlKey || e.metaKey)) { e.preventDefault(); undoBuild(); }
   };
-  return <main ref={gameRef} className={styles.game} data-town-screen data-scenery={scenery} data-night={night} data-panel={panel ?? "none"} onKeyDown={e => {
+  const controlTarget = (target: EventTarget | null) => {
+    const element = target instanceof Element ? target.closest<HTMLElement>("button, a[href]") : null;
+    return element && gameRef.current?.contains(element) ? element : null;
+  };
+  return <main ref={gameRef} className={styles.game} data-town-screen data-scenery={scenery} data-night={night} data-welcome={welcome} data-panel={panel ?? "none"}
+    onPointerDownCapture={e => touchControls.current?.start(controlTarget(e.target), e)}
+    onPointerMoveCapture={e => touchControls.current?.move(e)}
+    onPointerUpCapture={e => touchControls.current?.end(e)}
+    onPointerCancelCapture={e => touchControls.current?.cancel(e.pointerId)}
+    onClickCapture={e => { const native = e.nativeEvent as PointerEvent; if (touchControls.current?.suppressClick(e.detail, native.pointerType, native.pointerId)) { e.preventDefault(); e.stopPropagation(); } }}
+    onKeyDown={e => {
     if (e.key === "Escape") { closePanel(); if (scenery) viewScenery(false); }
   }}>
     <section className={styles.world} aria-label="街の建設マップ">
       <canvas ref={canvasRef} className={styles.canvas} tabIndex={0} aria-label="街のマップ。1本指で移動、2本指で拡大縮小。建物をタップして調査。建設時はタップで配置、連続敷設を選ぶとドラッグで道路・線路を敷設。矢印キーとEnterでも操作できます。" onKeyDown={handleKey}
         onPointerDown={pointerDown} onPointerMove={pointerMove} onPointerUp={pointerUp} onPointerCancel={cancelPointer}
-        onLostPointerCapture={() => { if (!pointers.current.size) drag.current = null; }} onPointerLeave={() => { if (!drag.current) setHover(null); }} onContextMenu={e => e.preventDefault()} />
+        onLostPointerCapture={e => { pointers.current.delete(e.pointerId); if (!pointers.current.size) drag.current = null; setPreview([]); }} onPointerLeave={() => { if (!drag.current) setHover(null); }} onContextMenu={e => e.preventDefault()} />
       {welcome && <div className={styles.welcome}><div className={styles.welcomeCard}>
         <span className={styles.eyebrow}>ぼくのまちづくり</span><h2>ここから、<br />あなたの街がはじまる。</h2>
         <p>川のそばに家を建てて、道路を延ばして。<br />小さな暮らしが、にぎやかな街になる。</p>
@@ -324,12 +358,12 @@ export function TownBuilder({ userId }: { userId: string }) {
         <small>下の「建設」から、自由に街をつくれます。</small>
       </div></div>}
     </section>
-    <header className={styles.header}>
+    <header ref={headerRef} className={styles.header}>
       <div className={styles.identity}>
         <Link href="/games" className={styles.back} aria-label="ミニゲーム一覧へ戻る" onClick={() => flushSave()}><Glyph name="back" /></Link>
-        <div><h1>ぼくのまちづくり</h1><p>{phase}<span> · </span>DAY {town.day}{town.paused || welcome ? " ・一時停止" : ""}</p></div>
+        <div><h1>ぼくのまちづくり</h1><p title={`${phase} · DAY ${town.day}${town.paused || welcome ? " ・一時停止" : ""}`}>{phase}<span> · </span>DAY {town.day}{town.paused || welcome ? " ・一時停止" : ""}</p></div>
       </div>
-      <div className={styles.budget}><span>街の予算</span><strong>¥{F.format(town.money)}</strong><small aria-live="polite">{saveStatus}</small></div>
+      <button type="button" className={styles.budget} aria-label={`予算 ¥${F.format(town.money)}。予算と収支を確認`} disabled={welcome || !loaded} onClick={() => { if (mode === "decorate") chooseMode("inspect"); setPanel("view"); }}><span>街の予算</span><strong title={`¥${F.format(town.money)}`}>{Math.abs(town.money) >= 1e7 ? `約¥${compactMoney.format(town.money)}` : `¥${F.format(town.money)}`}</strong><small aria-live="polite">{saveStatus}</small></button>
     </header>
     <div ref={statsRef} className={styles.stats} aria-label="街の状況">
       {[{ icon: "people", label: "人口", value: F.format(stats.population), unit: "人" },
@@ -371,12 +405,12 @@ export function TownBuilder({ userId }: { userId: string }) {
           <button type="button" aria-label={browserFullscreen ? "ブラウザの全画面表示を終了" : "ブラウザの全画面表示"} aria-pressed={browserFullscreen} onClick={toggleFullscreen}><Glyph name="fullscreen" />全画面表示</button>
           <button type="button" onClick={() => setPanel("help")}><span className={styles.question} aria-hidden="true">?</span>遊び方</button>
         </div>
-        <div className={styles.clock}><span>時間の速さ</span>{[1, 2, 4].map(v => <button type="button" key={v} aria-pressed={speed === v} className={speed === v ? styles.chosenSpeed : ""} onClick={() => setSpeed(v)}>{v}×</button>)}</div>
-        <div className={styles.finance}><div><span>税収・交通収入</span><b>+¥{F.format(stats.income)}</b></div><div><span>維持費</span><b>−¥{F.format(stats.upkeep)}</b></div><small>6日ごとに精算 · 次はDAY {Math.ceil((town.day + 1) / 6) * 6}<br />鉄道 {stats.linkedStations}駅が接続 · 雇用 {stats.jobs}人分</small></div>
+        <div className={styles.clock}><span>時間</span><button type="button" aria-label={town.paused ? "時間を再開" : "時間を停止"} onClick={() => setTown(t => ({ ...t, paused: !t.paused }))}>{town.paused ? "▶" : "Ⅱ"}</button>{[1, 2, 4].map(v => <button type="button" key={v} aria-pressed={speed === v} className={speed === v ? styles.chosenSpeed : ""} onClick={() => setSpeed(v)}>{v}×</button>)}</div>
+        <div className={styles.finance}><div><span>現在の予算</span><b>¥{F.format(town.money)}</b></div><div><span>税収・交通収入</span><b>+¥{F.format(stats.income)}</b></div><div><span>維持費</span><b>−¥{F.format(stats.upkeep)}</b></div><small>6日ごとに精算 · 次はDAY {Math.ceil((town.day + 1) / 6) * 6}<br />鉄道 {stats.linkedStations}駅が接続 · 雇用 {stats.jobs}人分</small><button type="button" className={styles.saveButton} onClick={() => flushSave()}>{saveStatus === "保存できません" ? "保存を再試行" : "今すぐ保存"}</button>{saveStatus === "保存できません" && <small role="alert">保存できません。ブラウザの保存設定や空き容量を確認してください。</small>}</div>
       </>}
       {panel === "help" && <div className={styles.help}>
         <ol><li><b>指で街を移動する</b><span>1本指でドラッグ、2本指で拡大・縮小。建設・部品の編集でも同じ操作です。</span></li><li><b>タップしてつくる</b><span>「建設」から選び、街をタップして配置。道路・線路は「連続敷設」でまとめてつなげられます。</span></li><li><b>公園をつくる</b><span>敷地の広さを選んで購入し、木・花壇・噴水などの部品を買って配置。通路の上にも設備を置けます。部品だけの撤去や敷地の拡張もできます。</span></li><li><b>施設を育てる</b><span>建物をタップして「部品」から設備を追加。増築や部品の購入は「元に戻す」で取り消せます。2駅を線路で結ぶと列車が運行します。</span></li></ol>
-        <details><summary>キーボード・座標で操作</summary><p>マップを選択して矢印キー・Enterで建設。＋／−で拡大縮小。Ctrl／⌘＋Zで工事を取り消せます。</p><div className={styles.coordinates}><label>X<input type="number" min={1} max={24} value={tileX} onChange={e => setTileX(Number(e.target.value))} /></label><label>Y<input type="number" min={1} max={24} value={tileY} onChange={e => setTileY(Number(e.target.value))} /></label><button type="button" onClick={() => {
+        <details><summary>キーボード・座標で操作</summary><p>マップを選択して矢印キー・Enterで建設。＋／−で拡大縮小。Ctrl／⌘＋Zで工事を取り消せます。</p><div className={styles.coordinates}><label>X<input type="number" inputMode="numeric" min={1} max={24} value={tileX} onChange={e => setTileX(Number(e.target.value))} /></label><label>Y<input type="number" inputMode="numeric" min={1} max={24} value={tileY} onChange={e => setTileY(Number(e.target.value))} /></label><button type="button" disabled={!Number.isInteger(tileX) || !Number.isInteger(tileY) || tileX < 1 || tileY < 1 || tileX > 24 || tileY > 24} onClick={() => {
           if (Number.isInteger(tileX) && Number.isInteger(tileY) && tileX >= 1 && tileY >= 1 && tileX <= 24 && tileY <= 24) { const i = (tileY - 1) * MAP_SIZE + tileX - 1; focusTile(i); commit([i]); }
         }}>選択中の操作を実行</button></div></details>
         <div className={styles.helpFooter}><p>街はこの端末・このアカウントに自動保存されます。別端末とは同期しません。</p><button type="button" onClick={reset}>新しい街をはじめる</button></div>
@@ -392,13 +426,7 @@ export function TownBuilder({ userId }: { userId: string }) {
     </section>}
     {mode === "decorate" && editingLot && !panel && !welcome && !scenery && <div ref={activeToolRef} className={styles.activeTool} data-decorate="true">
       <div><strong>{part === "remove" ? "部品を撤去" : PARK_PARTS.find(p => p.id === part)?.title}<small>{part === "remove" ? "無料" : `¥${PARK_PARTS.find(p => p.id === part)?.price}`}</small></strong><p>{part === "remove" ? "外す部品をタップ" : "敷地のマスをタップ"}</p></div>
-      <button type="button" aria-label="公園の部品を選ぶ" onPointerUp={e => {
-        // A mobile browser can suppress the first compatibility click after map panning.
-        // Opening a panel is idempotent, so touch release and keyboard/mouse click can share it.
-        if (e.pointerType !== "touch" || !e.isPrimary) return;
-        const r = e.currentTarget.getBoundingClientRect();
-        if (e.clientX >= r.left && e.clientX <= r.right && e.clientY >= r.top && e.clientY <= r.bottom) setPanel("customize");
-      }} onClick={() => setPanel("customize")}>部品</button>
+      <button type="button" aria-label="公園の部品を選ぶ" onClick={() => setPanel("customize")}>部品</button>
       <button type="button" aria-label="部品の向きを変える" disabled={part === "remove"} onClick={() => setPartRotation(v => (v + 1) % 4)}>↻ {partRotation * 90}°</button>
       <button type="button" className={styles.dismiss} aria-label="公園の編集を終了" onClick={() => { setMode("inspect"); setEditingLotId(null); setPreview([]); setHover(null); }}>×</button>
     </div>}
