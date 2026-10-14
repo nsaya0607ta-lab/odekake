@@ -6,7 +6,7 @@ export const dynamic = "force-dynamic";
 
 /** 旧体験版のURLにも同じ制限を適用し、本人の保存データを使う本体へ送る。 */
 export default async function TownPreviewPage() {
-  const { user } = await requireUser();
-  if (!canSeeTownBuilder(user.displayName)) notFound();
+  const { supabase, user } = await requireUser();
+  if (!(await canSeeTownBuilder(user.displayName, supabase))) notFound();
   redirect("/games/town-builder");
 }

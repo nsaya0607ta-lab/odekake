@@ -6,12 +6,12 @@ import { requireUser } from "@/lib/supabase/server";
 
 export const metadata: Metadata = {
   title: "ぼくのまちづくり | おでかけ記録",
-  description: "道路と鉄道を敷き、住宅や商店を建てて街を育てる箱庭ゲーム。",
+  description: "白コインで街をつくり、クエストとレベルアップで育てる箱庭RPG。",
 };
 export const dynamic = "force-dynamic";
 
 export default async function TownBuilderPage() {
-  const { user } = await requireUser();
-  if (!canSeeTownBuilder(user.displayName)) notFound();
+  const { supabase, user } = await requireUser();
+  if (!(await canSeeTownBuilder(user.displayName, supabase))) notFound();
   return <TownBuilder userId={user.id} />;
 }

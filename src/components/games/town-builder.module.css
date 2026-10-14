@@ -261,3 +261,120 @@
 .partCategories button { min-height: 44px; padding: 7px 2px; border: 1px solid var(--line); border-radius: 10px; color: var(--green); background: #edf1e3; font-size: 11px !important; }
 .partCategories button[aria-pressed=true] { color: #fff8de; background: var(--green); border-color: var(--green); }
 .partCategories small { font-size: 9px; margin-left: 4px; opacity: .75; }
+
+.playerIdentity { display: flex; align-items: center; gap: 9px; border: 0; background: transparent; text-align: left; color: inherit; padding: 0; min-width: 0; min-height: 58px; }
+.playerIdentity > span:last-child { display: block; min-width: 0; }
+.playerIdentity > span > small { display: block; margin-top: 4px; color: #aebdb2; font-size: 8px; letter-spacing: .2px; font-variant-numeric: tabular-nums; }
+.headerExp, .expTrack { display: block; height: 4px; background: #ffffff19; border-radius: 8px; overflow: hidden; margin-top: 6px; }
+.headerExp i, .expTrack i { display: block; height: 100%; background: linear-gradient(90deg,#c5a264,#f0d498); border-radius: inherit; transition: width .5s ease; }
+.crest { position: relative; display: inline-grid; place-items: center; width: 38px; height: 45px; flex-shrink: 0; }
+.crest svg { position: absolute; width: 100%; height: 100%; }
+.crest b { position: relative; margin-top: -2px; font-size: 19px; line-height: 1; color: #f5dfa9; font-weight: 800; font-variant-numeric: tabular-nums; font-family: Georgia,serif; }
+.largeCrest { width: 66px; height: 78px; }
+.largeCrest b { font-size: 31px; }
+.whitePrice { display: inline-flex !important; align-items: center; justify-content: center; gap: 3px; white-space: nowrap; vertical-align: middle; font-variant-numeric: tabular-nums; }
+.whitePrice svg { width: 15px; height: 15px; flex-shrink: 0; }
+.budget strong { display: flex; align-items: center; justify-content: flex-end; gap: 4px; }
+.budget strong > svg { width: 22px; height: 22px; flex-shrink: 0; }
+.identity { background: #263e3c; border-color: #b59b6555; color: #f8f3e3; }
+.identity .back { color: #d4c394; background: #ffffff0d; border: 1px solid #c5b78030; }
+.identity p { color: #b5c6b6; }
+.header h1 { font-size: 14px; margin-bottom: 3px; }
+.budget { background: #fbfaf0; border-color: #b5c3ac; }
+.stats { top: calc(var(--top) + 86px); }
+.sceneButtons { top: calc(var(--top) + 145px); }
+.notice { top: calc(var(--top) + 145px); }
+.questButton { position: relative; }
+.questButton em { position: absolute; top: 3px; right: 5px; min-width: 16px; height: 16px; padding: 0 4px; display: grid; place-items: center; border-radius: 50%; border: 1px solid #fff3d8; font-size: 9px; font-style: normal; color: #fff9eb; background: #a36d37; }
+.questPanel { background: #f5f1e5; border-color: #c1b78e; }
+.questPanel .panelTitle { background: #f5f1e5; }
+.rpgPanel { display: grid; gap: 12px; }
+.rpgPanel > .categories { margin: 0; }
+.rankJourney { list-style: none; padding: 0; margin: 0; display: grid; gap: 7px; }
+.rankJourney li { display: flex; align-items: center; gap: 12px; border: 1px solid #d8d4bf; border-radius: 12px; padding: 10px 12px; background: #eeecdf; }
+.rankJourney li[data-unlocked=true] { background: #e8eedf; border-color: #bdcdb2; }
+.rankJourney li > div { flex: 1; min-width: 0; }
+.rankJourney b { display: block; font-size: 12px; }
+.rankJourney small { display: block; margin-top: 5px; font-size: 9px; color: #7a806c; }
+.rankJourney li > span:last-child { color: #88a075; font-size: 17px; }
+.rpgProfile { display: flex; gap: 15px; align-items: center; padding: 15px 14px; border: 1px solid #b49a60; border-radius: 14px; color: #f6edda; background: radial-gradient(ellipse at 100% 0,#4c6355,transparent 80%),#263e3c; box-shadow: inset 0 0 0 4px #ffffff03; }
+.rpgProfile > div { min-width: 0; flex: 1; }
+.rpgEyebrow { color: #c9b580; font-size: 7px; letter-spacing: 2px; }
+.rpgProfile h3 { font-size: 16px; margin: 6px 0; font-weight: 750; }
+.rpgProfile p { font-size: 10px; color: #c7d2c4; margin: 0; }
+.rpgProfile small { display: block; text-align: right; font-size: 9px; color: #d6c795; font-variant-numeric: tabular-nums; margin-top: 5px; }
+.expTrack { margin-top: 11px; height: 6px; }
+.nextReward { display: flex; align-items: center; flex-wrap: wrap; gap: 7px; padding: 0 3px; font-size: 11px; color: #685c3b; }
+.nextReward > span:first-child { margin-right: auto; }
+.nextReward small { width: 100%; font-size: 9px; color: #7a7b63; }
+.rpgHint { margin: 0; padding: 0 3px; font-size: 10px; line-height: 1.8; color: #707666; }
+.dailyQuest { display: flex; align-items: center; gap: 10px; background: #e7ecda; border: 1px solid #c9d4b8; border-radius: 13px; padding: 12px; }
+.dailyQuest > div { flex: 1; min-width: 0; }
+.dailyQuest small, .questTop small { font-size: 8px; letter-spacing: 1px; color: #7e8a65; }
+.dailyQuest h3 { font-size: 13px; margin: 5px 0; }
+.dailyQuest p { color: #7b846e; margin: 0; font-size: 9px; }
+.dailyQuest button { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; min-width: 88px; min-height: 48px; background: #466e58; color: #fff9e6; border: 0; border-radius: 10px; padding: 7px 10px; font-size: 10px; }
+.questHeading { display: flex; justify-content: space-between; align-items: center; padding: 3px; }
+.questHeading h3 { margin: 0; font-size: 13px; }
+.questHeading > span { font-size: 10px; color: #7d836d; }
+.questCard { border: 1px solid #d9d3bb; border-radius: 13px; padding: 12px; background: #fffcf2; }
+.questCard[data-ready=true] { border-color: #b59d57; background: linear-gradient(120deg,#fff8df,#fffcf3); box-shadow: inset 3px 0 #baa057; }
+.questCard[data-locked=true] { background: #eeecdf; }
+.questTop { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.questTop b { font-size: 9px; color: #8c7539; font-weight: 600; }
+.questCard h3 { font-size: 14px; margin: 7px 0 5px; }
+.questCard p { color: #7b806c; font-size: 10px; line-height: 1.7; margin: 0; }
+.questTrack { height: 3px; background: #e6e4d4; border-radius: 5px; overflow: hidden; margin-top: 10px; }
+.questTrack i { display: block; height: 100%; background: #92ac7a; border-radius: 5px; }
+.questCard[data-ready=true] .questTrack i { background: #c4a65f; }
+.questFoot { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-top: 9px; }
+.questFoot > span { display: flex; flex-wrap: wrap; gap: 4px 10px; align-items: center; font-size: 11px; color: #5f7056; }
+.questFoot em { font-size: 9px; font-style: normal; color: #9a7d45; white-space: nowrap; }
+.questFoot button { border: 1px solid #c7ccaf; border-radius: 9px; min-height: 44px; padding: 7px 10px; background: #e6ebd6; color: #576c4e; font-size: 10px; white-space: nowrap; }
+.questCard[data-ready=true] .questFoot button { background: #526e50; color: #fff9e6; border-color: #526e50; }
+.completedQuests summary { min-height: 44px; display: list-item; padding: 13px 3px; font-size: 11px; color: #758166; cursor: pointer; }
+.completedQuests p { display: flex; justify-content: space-between; gap: 8px; font-size: 10px; padding: 5px; color: #5f785e; }
+.completedQuests p span { font-size: 9px; color: #8a8e7a; }
+.connectionBanner { position: absolute; left: var(--edge); right: var(--edge); top: calc(var(--top) + 145px); z-index: 4; display: flex; align-items: center; justify-content: center; gap: 10px; max-width: 480px; margin-inline: auto; padding: 10px; border: 1px solid #ccaa73; border-radius: 12px; background: #fff7e5; box-shadow: 0 4px 20px #294c4326; }
+.connectionBanner span { font-size: 10px; line-height: 1.7; flex: 1; }
+.connectionBanner button { min-height: 44px; padding: 8px 12px; flex-shrink: 0; border: 0; border-radius: 8px; background: #756445; color: #fff8e6; font-size: 11px; }
+.levelUp { display: flex; align-items: center; justify-content: center; gap: 12px; position: absolute; z-index: 3; left: 50%; transform: translateX(-50%); top: calc(var(--top) + 145px); max-width: calc(100% - 100px); width: 300px; border: 1px solid #cfb371; border-radius: 14px; padding: 10px 16px; background: #293f3c; color: #f9edce; box-shadow: 0 8px 30px #203b3735; text-align: left; animation: townLevelReveal .6s ease-out; }
+.levelUp > span:nth-child(2) { display: grid; gap: 4px; min-width: 0; }
+.levelUp small { letter-spacing: 3px; color: #d5b77d; font-size: 9px; }
+.levelUp b { font-size: 14px; }
+.levelUp .whitePrice { justify-content: flex-start; font-size: 11px; }
+.levelUp em { color: #edd499; font-size: 26px; font-style: normal; }
+.starterGift { display: flex; gap: 10px; align-items: center; margin: 0 0 17px; background: #eaf0e0; padding: 10px 12px; border-radius: 11px; }
+.starterGift svg { width: 36px; height: 36px; }
+.starterGift span { color: #6b7e62; font-size: 9px; }
+.starterGift b { display: block; margin-top: 3px; font-size: 14px; color: #3e5d4c; }
+@keyframes townLevelReveal { from { opacity: 0; translate: 0 -8px; } to { opacity: 1; translate: 0; } }
+@media (min-width: 641px) {
+  .header h1 { font-size: 18px; }
+  .stats { top: calc(var(--top) + 99px); }
+  .notice, .connectionBanner, .levelUp { top: calc(var(--top) + 169px); }
+  .questPanel { max-height: min(66svh,640px); }
+  .playerIdentity { gap: 12px; }
+  .playerIdentity > span > small { font-size: 9px; }
+}
+@media (max-width: 360px) {
+  .playerIdentity { gap: 6px; }
+  .playerIdentity .crest { display: none; }
+  .header h1 { font-size: 12px; }
+  .budget { min-width: 96px; }
+  .budget strong { font-size: 16px; }
+  .budget strong > svg { width: 18px; height: 18px; }
+  .questFoot > span { gap: 3px 7px; }
+}
+@media (max-height: 560px) and (min-width: 561px) {
+  .playerIdentity { min-height: 50px; }
+  .header h1 { font-size: 14px; line-height: 1.2; margin-bottom: 2px; }
+  .identity p { font-size: 9px; line-height: 1.3; }
+  .playerIdentity > span > small { font-size: 7px; line-height: 1.3; margin-top: 3px; }
+  .headerExp { margin-top: 4px; }
+  .stats { top: calc(var(--top) + 84px); }
+  .notice, .connectionBanner, .levelUp { top: calc(var(--top) + 133px); }
+  .sidebar, .workshop, .questPanel { max-height: calc(100% - var(--dock) - var(--top) - 90px); }
+  .starterGift { display: none; }
+}
+@media (prefers-reduced-motion: reduce) { .levelUp { animation: none; } }

@@ -6,6 +6,15 @@ on:
       - "src/lib/games/town-*.ts"
       - "src/components/games/town-builder*"
       - "src/components/games/town-workshop.tsx"
+      - "src/components/games/town-rpg.tsx"
+      - "src/components/*coin*.tsx"
+      - "src/components/login-bonus.tsx"
+      - "src/components/wandering-frenchie.tsx"
+      - "src/lib/data/white-coins.ts"
+      - "src/lib/data/town-builder.ts"
+      - "src/app/api/games/town-builder/**"
+      - "src/app/api/coins/**"
+      - "supabase/migrations/0141_white_coins_town_rpg.sql"
       - "src/components/bottom-nav.tsx"
       - "src/app/mini-games-preview/town-builder/**"
       - "scripts/test-town-builder*.cjs"
@@ -33,4 +42,4 @@ jobs:
       - run: npm ci --no-audit --no-fund
       - run: npm run typecheck
       - run: npm run test:town
-      - run: npx eslint src/components/games/town-builder.tsx src/components/games/town-workshop.tsx src/components/bottom-nav.tsx src/lib/games/town-builder.ts src/lib/games/town-renderer.ts src/lib/games/town-decorations.ts src/lib/games/town-transport.ts src/lib/games/town-sprites.ts src/lib/games/town-canvas.ts src/lib/games/town-builder-access.ts src/lib/games/town-touch-controls.ts src/lib/games/town-building-models.ts src/middleware.ts 'src/app/(app)/games/page.tsx' 'src/app/(app)/games/town-builder/page.tsx' src/app/mini-games-preview/town-builder/page.tsx
+      - run: npx eslint src/components/games/town-builder.tsx src/components/games/town-rpg.tsx src/components/games/town-workshop.tsx src/components/coin-art.tsx src/components/coin-badge.tsx src/components/white-coin-section.tsx src/components/home-coin-art.tsx src/lib/data/white-coins.ts src/lib/data/town-builder.ts src/app/api/games/town-builder/route.ts src/app/api/coins/home-drop/route.ts src/app/api/coins/login-bonus/route.ts src/components/bottom-nav.tsx src/lib/games/town-builder.ts src/lib/games/town-progression.ts src/lib/games/town-commands.ts src/lib/games/town-renderer.ts src/lib/games/town-decorations.ts src/lib/games/town-transport.ts src/lib/games/town-sprites.ts src/lib/games/town-canvas.ts src/lib/games/town-builder-access.ts src/lib/games/town-touch-controls.ts src/lib/games/town-building-models.ts src/middleware.ts 'src/app/(app)/games/page.tsx' 'src/app/(app)/games/town-builder/page.tsx' src/app/mini-games-preview/town-builder/page.tsx

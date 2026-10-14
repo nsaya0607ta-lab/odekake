@@ -1,5 +1,5 @@
 import { useId } from "react";
-import { BlueCoinArt, CoinArt, RedCoinArt } from "@/components/coin-art";
+import { BlueCoinArt, CoinArt, RedCoinArt, WhiteCoinArt } from "@/components/coin-art";
 
 /**
  * ホームの犬カードに降ってくるコインの絵（レア度で、コインそのものの豪華さを変える）。
@@ -12,12 +12,13 @@ import { BlueCoinArt, CoinArt, RedCoinArt } from "@/components/coin-art";
  * 色は黄色・青・赤の3系統。どれも同じ形で、色だけ変える（赤の高レアは、地金が赤銅・宝石が黄金色のトパーズ）。
  */
 
-type Kind = "coin" | "blue" | "red";
+type Kind = "coin" | "blue" | "red" | "white";
 type Tier = "common" | "rare" | "epic";
 
 const METAL = {
   coin: { light: "#FFF6C4", mid: "#F6C850", dark: "#C98A1C", edge: "#9A6412", line: "#B47A18", bead: "#FFF1B0", emboss: "#E3A92E" },
   blue: { light: "#EEF6FF", mid: "#86B6F2", dark: "#2F64BE", edge: "#1E4A93", line: "#3A6CC2", bead: "#E4F1FF", emboss: "#5E92DD" },
+  white: { light: "#FFFFFF", mid: "#EBF0E6", dark: "#9AAEA1", edge: "#5C766B", line: "#8CA393", bead: "#FFFFFF", emboss: "#C5D4C9" },
   red: { light: "#FFE6E1", mid: "#F07A72", dark: "#C7353B", edge: "#8E1F28", line: "#B2323A", bead: "#FFE3DE", emboss: "#E2585A" },
 } as const;
 
@@ -27,6 +28,7 @@ const PLATINUM = { light: "#FFFFFF", mid: "#D5E1F2", dark: "#8EA5C8", edge: "#5F
 const GEM = {
   coin: { light: "#FFC2D3", mid: "#F2416E", dark: "#9E1240" },
   blue: { light: "#C8E9FF", mid: "#3B8CF0", dark: "#173E9E" },
+  white: { light: "#FAFFE4", mid: "#A6C98C", dark: "#4C7959" },
   red: { light: "#FFF4C2", mid: "#F5B921", dark: "#A8670A" },
 } as const;
 
@@ -165,6 +167,7 @@ export function HomeCoinArt({ kind, tier }: { kind: Kind; tier: Tier }) {
   const uid = `hc${useId().replace(/[^a-zA-Z0-9]/g, "")}`;
   if (tier === "rare") return <RareCoin kind={kind} uid={uid} />;
   if (tier === "epic") return <EpicCoin kind={kind} uid={uid} />;
+  if (kind === "white") return <WhiteCoinArt className="h-full w-full" />;
   if (kind === "red") return <RedCoinArt className="h-full w-full" />;
   return kind === "blue" ? <BlueCoinArt className="h-full w-full" /> : <CoinArt className="h-full w-full" />;
 }

@@ -27,7 +27,7 @@ export async function POST(request: Request) {
 
   const body = toRecord(await request.json().catch(() => null));
   const dropId = typeof body.dropId === "string" ? body.dropId : "";
-  const kind = body.kind === "blue" || body.kind === "red" ? body.kind : "coin";
+  const kind = body.kind === "blue" || body.kind === "red" || body.kind === "white" ? body.kind : "coin";
   const tier = body.tier === "epic" || body.tier === "rare" ? body.tier : "common";
   if (!/^[A-Za-z0-9_-]{8,64}$/.test(dropId)) {
     return NextResponse.json({ error: "コインが見つかりませんでした。" }, { status: 400 });
@@ -36,7 +36,7 @@ export async function POST(request: Request) {
   const { data, error } = await supabase.rpc("claim_home_coin_drop", { p_drop_id: dropId, p_kind: kind, p_tier: tier });
   if (error) {
     // 赤コインに対応する前の関数（0138 の前。0136 で一度やめていた）は 'red' を知らない
-    if (kind === "red" && /Invalid coin kind/i.test(error.message)) {
+    if ((kind === "red" || kind === "white") && /Invalid coin kind/i.test(error.message)) {
       return NextResponse.json({ ok: true, granted: false, kind, tier, amount: 0, reason: "unavailable" }, { headers: { "Cache-Control": "no-store" } });
     }
     console.error("Failed to claim home coin drop", { code: error.code, message: error.message });
@@ -48,7 +48,7 @@ export async function POST(request: Request) {
     {
       ok: true,
       granted: result.granted === true,
-      kind: result.kind === "blue" || result.kind === "red" ? result.kind : "coin",
+      kind: result.kind === "blue" || result.kind === "red" || result.kind === "white" ? result.kind : "coin",
       tier: result.tier === "epic" || result.tier === "rare" ? result.tier : "common",
       amount: typeof result.amount === "number" ? result.amount : 0,
       reason: typeof result.reason === "string" ? result.reason : null,

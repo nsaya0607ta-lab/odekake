@@ -17,9 +17,9 @@ const OSANPO_RUN_CARD_SRC = "/games/osanpo-run/menu-icon.webp";
 const PINBALL_CARD_SRC = "/games/pinball/menu-icon.webp";
 
 export default async function GamesPage() {
-  const { user } = await requireUser();
+  const { supabase, user } = await requireUser();
   const canSeeMemoryGamePreview = canSeeMemoryGame(user.displayName);
-  const canSeeTownBuilderPreview = canSeeTownBuilder(user.displayName);
+  const canSeeTownBuilderPreview = (await canSeeTownBuilder(user.displayName, supabase));
 
   return (
     <>
@@ -51,9 +51,9 @@ export default async function GamesPage() {
             </span>
             <span className="relative z-10 mt-3 flex items-center gap-3">
               <span className="min-w-0 flex-1">
-                <span className="block text-[10px] font-black tracking-[0.08em] text-[#447d5b]">道路・鉄道を引いて、街を育てよう</span>
+                <span className="block text-[10px] font-black tracking-[0.08em] text-[#447d5b]">白コインでつくる、街づくりRPG</span>
                 <span className="mt-1 block text-[21px] font-black tracking-[-0.03em]">ぼくのまちづくり</span>
-                <span className="mt-1.5 block text-[11px] font-bold leading-relaxed text-ink-soft">OpenTTDの発想から生まれた、自由な箱庭シミュレーション。</span>
+                <span className="mt-1.5 block text-[11px] font-bold leading-relaxed text-ink-soft">クエストを達成してレベルアップ。小さな街の物語を育てよう。</span>
               </span>
               <span className="flex h-[108px] w-[108px] shrink-0 items-center justify-center rounded-[25px] border border-white/80 bg-gradient-to-b from-[#bce4ce] to-[#8dc9af] text-6xl shadow-[0_8px_18px_rgba(80,66,46,0.09)]" aria-hidden="true">🏘️</span>
             </span>

@@ -3,15 +3,21 @@ import { buildingStage } from "@/lib/games/town-building-models";
 
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { BUILDINGS, FACILITY_PARTS, MAP_SIZE, MILESTONES, PARK_PARTS, PARK_SIZES, advanceTown, buildLine, buyFacilityPart, buyParkLot, createTown, decodeTown, expandParkLot, getTownStats, lineTiles, parkAt, placeParkPart, recordTownEdit, removeFacilityPart, removeParkLot, removeParkPart, touchesRoad, undoTownEdit, upgradeTile, type FacilityPart, type ParkLot, type ParkPart, type ParkSize, type Tool, type Town, type TownEdit } from "@/lib/games/town-builder";
+import { BUILDINGS, FACILITY_PARTS, MAP_SIZE, PARK_PARTS, PARK_SIZES, createTown, decodeTown, getTownStats, lineTiles, parkAt, touchesRoad, type FacilityPart, type ParkLot, type ParkPart, type ParkSize, type Tool, type Town } from "@/lib/games/town-builder";
 import { TownScene, drawTownIcon, type SceneOptions } from "@/lib/games/town-renderer";
 import { TownCanvas } from "@/lib/games/town-canvas";
 import { TownTouchControls } from "@/lib/games/town-touch-controls";
 import { FacilityWorkshop, ParkPurchase, ParkWorkshop } from "./town-workshop";
+import { WhiteCoinArt } from "@/components/coin-art";
+import { decodeTownSnapshot } from "@/lib/data/town-builder";
+import type { TownCommand } from "@/lib/games/town-commands";
+import { TOWN_QUESTS, townProgress, townQuestMetrics, townRank, type TownSnapshot } from "@/lib/games/town-progression";
+import { TownCrest, TownRpgPanel, WhitePrice } from "./town-rpg";
 import styles from "./town-builder.module.css";
 
 type Mode = Tool | "inspect" | "pan" | "decorate";
-type Panel = "build" | "view" | "help" | "land" | "customize" | null;
+type Panel = "build" | "view" | "help" | "land" | "customize" | "quests" | null;
+type TownRequest = { userId: string; requestId: string; revision: number; action: "start" | "edit" | "undo" | "quest" | "daily" | "reset"; command?: TownCommand; questId?: string; starter?: boolean; legacy?: Town };
 const F = new Intl.NumberFormat("ja-JP");
 const compactMoney = new Intl.NumberFormat("ja-JP", { notation: "compact", maximumFractionDigits: 1 });
 function BuildingIcon({ kind }: { kind: Tool }) {
@@ -27,6 +33,7 @@ function Glyph({ name }: { name: string }) {
       name === "pan" ? <><path d="M8 12V6a2 2 0 0 1 4 0v5-7a2 2 0 0 1 4 0v7-5a2 2 0 0 1 4 0v9c0 4-2 6-6 6h-2c-2 0-3-1-4-3l-4-6c-1-2 1-4 3-2l1 2" /></> :
       name === "inspect" ? <><circle cx="10" cy="10" r="6" /><path d="m15 15 5 5" /></> :
       name === "settings" ? <><path d="M4 6h16M4 12h16M4 18h16" /><circle cx="8" cy="6" r="2" fill="currentColor" /><circle cx="16" cy="12" r="2" fill="currentColor" /><circle cx="10" cy="18" r="2" fill="currentColor" /></> :
+      name === "quests" ? <><path d="M6 3h12v18l-6-3-6 3V3Z" /><path d="m9 10 2 2 4-4" /></> :
       name === "undo" ? <><path d="m8 4-5 5 5 5M3 9h10a7 7 0 0 1 0 14" /></> :
       name === "fullscreen" ? <path d="M8 3H3v5m13-5h5v5M3 16v5h5m13-5v5h-5" /> :
       name === "fit" ? <><path d="M8 3H3v5m13-5h5v5M3 16v5h5m13-5v5h-5" /><circle cx="12" cy="12" r="3" /></> :
@@ -47,7 +54,13 @@ export function TownBuilder({ userId }: { userId: string }) {
   const [mode, setMode] = useState<Mode>("inspect"), [category, setCategory] = useState("交通");
   const [speed, setSpeed] = useState(1), [night, setNight] = useState(false), [grid, setGrid] = useState(false);
   const [selected, setSelected] = useState<number | null>(null), [hover, setHover] = useState<number | null>(null);
-  const [preview, setPreview] = useState<number[]>([]), [undo, setUndo] = useState<TownEdit[]>([]);
+  const [preview, setPreview] = useState<number[]>([]);
+  const [snapshot, setSnapshot] = useState<TownSnapshot | null>(null), [busy, setBusy] = useState(false), [connectionError, setConnectionError] = useState("");
+  const economyRef = useRef<TownSnapshot | null>(null), inFlight = useRef(false), pendingRequest = useRef<TownRequest | null>(null);
+  const accountRef = useRef(userId), interaction = useRef(0);
+  accountRef.current = userId;
+  const [rpgTab, setRpgTab] = useState<"quests" | "growth">("quests");
+  const [levelUp, setLevelUp] = useState<{ level: number; reward: number } | null>(null);
   const [parkSize, setParkSize] = useState<ParkSize>("small"), [parkKind, setParkKind] = useState<ParkLot["kind"]>("park"), [parkRotated, setParkRotated] = useState(false);
   const [editingLotId, setEditingLotId] = useState<number | null>(null), [part, setPart] = useState<ParkPart | "remove">("tree"), [partRotation, setPartRotation] = useState(0);
   const [notice, updateNotice] = useState("1本指で移動、2本指で拡大・縮小。建物はタップで調べられます。");
@@ -71,7 +84,7 @@ export function TownBuilder({ userId }: { userId: string }) {
   const pendingSave = useRef<{ key: string; town: Town } | null>(null);
   const flushSave = useCallback((showStatus = true) => {
     const snapshot = pendingSave.current; if (!snapshot) return;
-    try { localStorage.setItem(snapshot.key, JSON.stringify(snapshot.town)); if (showStatus) setSaveStatus("自動保存済み"); }
+    try { localStorage.setItem(snapshot.key, JSON.stringify(snapshot.town)); }
     catch { if (showStatus) setSaveStatus("保存できません"); }
   }, []);
   const stateRef = useRef<{ town: Town; options: SceneOptions } | null>(null);
@@ -93,7 +106,9 @@ export function TownBuilder({ userId }: { userId: string }) {
   }, [panel, welcome, loaded, cancelPointer]);
   const stats = useMemo(() => getTownStats(town.tiles, town.levels, town.parks, town.attachments), [town.tiles, town.levels, town.parks, town.attachments]);
   const item = BUILDINGS.find(b => b.id === mode);
-  const mission = MILESTONES.find(m => !town.rewards.includes(m.id));
+  const progress = townProgress(snapshot?.xp ?? 0), rank = townRank(progress.level);
+  const questMetrics = useMemo(() => townQuestMetrics({ tiles: town.tiles, levels: town.levels, parks: town.parks, attachments: town.attachments }, stats), [town.tiles, town.levels, town.parks, town.attachments, stats]);
+  const readyQuests = TOWN_QUESTS.filter(q => q.level <= progress.level && !snapshot?.claimedQuests.includes(q.id) && (questMetrics[q.id] ?? 0) >= q.target).length;
   const active = selected === null ? null : town.tiles[selected];
   const selectedLevel = selected === null ? 0 : town.levels[selected] || 0;
   const selectedStage = buildingStage(active ?? undefined, selectedLevel), nextStage = selectedLevel < 3 ? buildingStage(active ?? undefined, selectedLevel + 1) : undefined;
@@ -104,20 +119,99 @@ export function TownBuilder({ userId }: { userId: string }) {
   const canUpgrade = active === "house" || active === "shop" || active === "factory";
   const linearTool = mode === "road" || mode === "rail";
   const connected = selected !== null && touchesRoad(town.tiles, selected % MAP_SIZE, Math.floor(selected / MAP_SIZE));
-  const net = stats.income - stats.upkeep;
   const phase = stats.population >= 500 ? "小さな都市" : stats.population >= 150 ? "にぎやかな街" : "小さな集落";
   useEffect(() => () => { if (noticeTimer.current) window.clearTimeout(noticeTimer.current); }, []);
   // One stable renderer reads current data without restarting the animation on React updates.
   useEffect(() => { stateRef.current = { town, options: { night, grid, hover, selected, preview, tool: mode, routes: stats.routes, paused: town.paused || welcome || !loaded, speed, parkSize, parkKind, parkRotated, editLot: mode === "decorate" ? editingLotId ?? undefined : undefined, parkPart: part, partRotation } }; }, [town, night, grid, hover, selected, preview, mode, stats.routes, welcome, loaded, speed, parkSize, parkKind, parkRotated, editingLotId, panel, part, partRotation]);
+  const receiveSnapshot = useCallback((next: TownSnapshot, celebrate = false) => {
+    const previous = economyRef.current;
+    if (celebrate && previous) {
+      const beforeLevel = townProgress(previous.xp).level, afterLevel = townProgress(next.xp).level;
+      if (afterLevel > beforeLevel) {
+        let reward = 0;
+        for (let l = Math.max(previous.maxLevel + 1, beforeLevel + 1); l <= afterLevel; l++) reward += 200 + l * 50;
+        setLevelUp({ level: afterLevel, reward });
+      }
+    }
+    economyRef.current = next; setSnapshot(next);
+    if (next.town) {
+      setTown(previousTown => ({ ...next.town!, money: next.balance, day: Math.max(previousTown.day, next.town!.day), paused: previousTown.paused }));
+      setWelcome(false);
+    } else { setWelcome(true); setTown(createTown()); }
+    setConnectionError(""); setSaveStatus("アカウント保存済み");
+  }, []);
+  const loadGame = useCallback(async (signal?: AbortSignal) => {
+    let saved: Town | null = null;
+    try { saved = decodeTown(localStorage.getItem(key) ?? localStorage.getItem(previousKey) ?? localStorage.getItem(legacyKey)); } catch { /* Account save is still available. */ }
+    if (saved) setTown(saved);
+    try {
+      const response = await fetch(`/api/games/town-builder?account=${encodeURIComponent(userId)}`, { cache: "no-store", signal });
+      const body = await response.json().catch(() => null);
+      if (!body || response.redirected) throw new Error("ログイン状態と通信を確認して、再試行してください。");
+      const remote = decodeTownSnapshot(body.snapshot);
+      if (!response.ok || !remote) throw new Error(body.error ?? "街の保存データに接続できません。");
+      if (signal?.aborted) return;
+      if (!remote.town && saved) {
+        // Store the import request before sending it so an interrupted response can be retried safely.
+        const importKey = `${key}:import-request`;
+        let requestId: string;
+        try { const oldId = localStorage.getItem(importKey); requestId = oldId && /^[0-9a-f-]{36}$/i.test(oldId) ? oldId : crypto.randomUUID(); localStorage.setItem(importKey, requestId); } catch { requestId = crypto.randomUUID(); }
+        const imported = await fetch("/api/games/town-builder", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ userId, requestId, revision: remote.revision, action: "start", legacy: saved }), signal });
+        const result = await imported.json().catch(() => null), importedSnapshot = decodeTownSnapshot(result?.snapshot);
+        if (!imported.ok || !importedSnapshot) throw new Error(result?.error ?? "街を引き継げませんでした。");
+        if (signal?.aborted) return;
+        receiveSnapshot(importedSnapshot); setNotice("これまでの街を引き継ぎました。白コインで新しい開拓へ！");
+      } else receiveSnapshot(remote);
+      setLoadedKey(key);
+    } catch (error) {
+      if (signal?.aborted) return;
+      setConnectionError(error instanceof Error ? error.message : "接続を確認してください。"); setSaveStatus("接続を確認"); setWelcome(!saved); setLoadedKey(key);
+    }
+  }, [key, previousKey, legacyKey, userId, receiveSnapshot, setNotice]);
   useEffect(() => {
-    setLoadedKey(null); setUndo([]); setSelected(null); setPanel(null); pendingSave.current = null;
-    try { const saved = decodeTown(localStorage.getItem(key) ?? localStorage.getItem(previousKey) ?? localStorage.getItem(legacyKey)); if (saved) { setTown(saved); setWelcome(false); } else { setTown(createTown()); setWelcome(true); setSaveStatus("開始すると自動保存"); } }
-    catch { setTown(createTown()); setWelcome(true); setSaveStatus("保存できません"); }
-    setLoadedKey(key);
-  }, [key, previousKey, legacyKey]);
+    const abort = new AbortController();
+    economyRef.current = null; pendingRequest.current = null; inFlight.current = false; setBusy(false); setSnapshot(null); setLoadedKey(null); setSelected(null); setPanel(null); pendingSave.current = null;
+    void loadGame(abort.signal);
+    return () => abort.abort();
+  }, [loadGame]);
+  useEffect(() => {
+    if (!levelUp) return;
+    const timer = window.setTimeout(() => setLevelUp(null), 4200);
+    return () => window.clearTimeout(timer);
+  }, [levelUp]);
+  const runAction = async (action: Omit<TownRequest, "requestId" | "revision" | "userId">, retry = false) => {
+    if (inFlight.current) return false;
+    if (!economyRef.current) { setNotice("街のデータに接続してから、もう一度お試しください。"); return false; }
+    if (pendingRequest.current && !retry) { setNotice("前の保存結果を確認しています。「再試行」を押してください。"); return false; }
+    const payload = retry && pendingRequest.current ? pendingRequest.current : { ...action, userId, requestId: crypto.randomUUID(), revision: economyRef.current.revision };
+    const account = userId;
+    pendingRequest.current = payload; inFlight.current = true; setBusy(true); setSaveStatus("保存中");
+    const controller = new AbortController(), timeout = window.setTimeout(() => controller.abort(), 20_000);
+    try {
+      const response = await fetch("/api/games/town-builder", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload), signal: controller.signal });
+      const result = await response.json().catch(() => null), next = decodeTownSnapshot(result?.snapshot);
+      if (accountRef.current !== account) return false;
+      if (!result || response.redirected) throw new Error("ログイン状態と通信を確認して、再試行してください。");
+      if (!response.ok || !next) {
+        if (response.status < 500) { pendingRequest.current = null; setConnectionError(""); }
+        if (response.status === 409) { await loadGame(); setSelected(null); setPanel(p => p === "customize" ? null : p); setEditingLotId(null); }
+        throw new Error(result.error ?? "保存結果を確認できませんでした。");
+      }
+      pendingRequest.current = null; receiveSnapshot(next, true);
+      if (result.message) setNotice(result.message, payload.action === "quest" || payload.action === "daily");
+      return true;
+    } catch (error) {
+      if (accountRef.current !== account) return false;
+      const message = error instanceof Error && error.name !== "AbortError" ? error.message : "通信が途切れました。同じ操作を再試行できます。";
+      setNotice(message);
+      if (pendingRequest.current) { setConnectionError(message); setSaveStatus("保存を確認"); }
+      else setSaveStatus("アカウント保存済み");
+      return false;
+    } finally { window.clearTimeout(timeout); if (accountRef.current === account) { inFlight.current = false; setBusy(false); } }
+  };
   useEffect(() => {
     if (!loaded || welcome) { pendingSave.current = null; return; }
-    pendingSave.current = { key, town }; setSaveStatus("保存中");
+    pendingSave.current = { key, town };
     const timer = window.setTimeout(() => flushSave(), 350);
     return () => window.clearTimeout(timer);
   }, [town, key, loaded, welcome, flushSave]);
@@ -167,7 +261,8 @@ export function TownBuilder({ userId }: { userId: string }) {
   }, [showSelection, selected, active, selectedLevel, panel, editingLotId, selectedLot?.width, selectedLot?.height, town.attachments, mode]);
   useEffect(() => {
     if (!loaded || town.paused || welcome) return;
-    const timer = window.setInterval(() => setTown(prev => advanceTown(prev)), 2500 / speed);
+    // The visual clock never mints account currency or builds unpaid houses.
+    const timer = window.setInterval(() => setTown(prev => prev.paused ? prev : { ...prev, day: Math.min(1e9, prev.day + 1) }), 2500 / speed);
     const onVisibility = () => { if (document.hidden) setTown(prev => ({ ...prev, paused: true })); };
     document.addEventListener("visibilitychange", onVisibility);
     return () => { window.clearInterval(timer); document.removeEventListener("visibilitychange", onVisibility); };
@@ -206,10 +301,7 @@ export function TownBuilder({ userId }: { userId: string }) {
   const chooseMode = (next: Mode) => { setMode(next); setEditingLotId(null); setStroke(false); setPreview([]); setHover(null); setSelected(null); setNotice(next === "pan" || next === "inspect" ? "1本指で移動、2本指で拡大・縮小。建物はタップで調べられます。" : BUILDINGS.find(b => b.id === next)?.info ?? "", false); };
   const closePanel = () => { setPanel(null); if (panel === "customize") { setMode("inspect"); setEditingLotId(null); setPreview([]); setHover(null); } };
   const openCustomize = () => { if (selected === null) return; setPanel("customize"); setEditingLotId(selectedLot?.id ?? null); setMode(selectedLot ? "decorate" : "inspect"); setPart("tree"); setPreview([]); setHover(null); };
-  const remember = (next: Town) => {
-    setUndo(list => [...list.slice(-19), recordTownEdit(town, next)]);
-  };
-  const applyEdit = (result: { town: Town; message: string }) => { if (result.town !== town) { remember(result.town); setTown(result.town); } setNotice(result.message, result.town === town || panel !== "customize"); };
+  const edit = (command: TownCommand) => runAction({ action: "edit", command });
   const commit = (path: number[]) => {
     if (!loaded || welcome || !path.length) return;
     if (mode === "pan") return;
@@ -217,31 +309,24 @@ export function TownBuilder({ userId }: { userId: string }) {
     if (mode === "decorate") {
       if (!editingLot) return;
       const tile = path[path.length - 1]!;
-      applyEdit(part === "remove" ? removeParkPart(town, editingLot.id, tile) : placeParkPart(town, editingLot.id, tile, part, partRotation)); return;
+      void edit(part === "remove" ? { type: "remove-park-part", lotId: editingLot.id, tile } : { type: "park-part", lotId: editingLot.id, tile, part, rotation: partRotation }); return;
     }
     if (mode === "park") {
-      const i = path[path.length - 1]!, result = buyParkLot(town, i % MAP_SIZE, Math.floor(i / MAP_SIZE), parkSize, parkKind, parkRotated);
-      applyEdit(result);
-      if (result.lotId !== undefined) { setSelected(result.lotId); setEditingLotId(result.lotId); setMode("decorate"); setPart("tree"); setPanel("customize"); setHover(null); }
+      const i = path[path.length - 1]!;
+      const intent = interaction.current;
+      void edit({ type: "park", tile: i, size: parkSize, kind: parkKind, rotated: parkRotated }).then(ok => {
+        if (ok && interaction.current === intent) { setSelected(i); setEditingLotId(i); setMode("decorate"); setPart("tree"); setPanel("customize"); setHover(null); }
+      });
       return;
     }
-    const result = buildLine(town, mode, path);
-    if (result.town !== town) {
-      remember(result.town);
-      setTown(result.town); setSelected(path[path.length - 1]!);
-    }
-    setNotice(result.message);
+    const intent = interaction.current;
+    void edit({ type: "build", tool: mode, path }).then(ok => { if (ok && interaction.current === intent) setSelected(path[path.length - 1]!); });
   };
   const undoBuild = () => {
-    const prev = undo[undo.length - 1]; if (!prev) return;
-    const next = undoTownEdit(town, prev); setTown(next);
-    const lotRemoved = editingLotId !== null && !next.parks.some(p => p.id === editingLotId);
-    const selectionRemoved = selected !== null && next.tiles[selected] !== town.tiles[selected];
-    if (lotRemoved || selectionRemoved) {
-      setSelected(null);
-      if (lotRemoved || panel === "customize") { setEditingLotId(null); setMode("inspect"); setPanel(null); setPreview([]); setHover(null); }
-    }
-    setUndo(list => list.slice(0, -1)); setNotice("直前の工事を取り消しました", !showSelection && panel !== "customize");
+    if (!snapshot?.canUndo) return;
+    if (inFlight.current || pendingRequest.current) return;
+    chooseMode("inspect"); setPanel(null);
+    void runAction({ action: "undo" });
   };
   const position = (e: React.PointerEvent<HTMLCanvasElement>) => { const rect = e.currentTarget.getBoundingClientRect(); return { x: e.clientX - rect.left, y: e.clientY - rect.top }; };
   const pointerDown = (e: React.PointerEvent<HTMLCanvasElement>) => {
@@ -293,15 +378,13 @@ export function TownBuilder({ userId }: { userId: string }) {
   };
   const upgrade = () => {
     if (selected === null) return;
-    const result = upgradeTile(town, selected);
-    if (result.town !== town) { remember(result.town); setTown(result.town); }
-    setNotice(result.message, result.town === town);
+    void edit({ type: "upgrade", tile: selected });
   };
   const reset = () => {
-    if (!window.confirm("今の街を初期化します。よろしいですか？")) return;
-    pendingSave.current = null;
-    try { localStorage.setItem(key, "null"); localStorage.removeItem(previousKey); localStorage.removeItem(legacyKey); setSaveStatus("開始すると自動保存"); } catch { setSaveStatus("保存できません"); }
-    setTown(createTown(false)); setUndo([]); setSelected(null); setPanel(null); setEditingLotId(null); setMode("inspect"); setWelcome(true);
+    if (!window.confirm("今の街を更地に戻します。白コイン・経験値・達成したクエストは引き継ぎます。よろしいですか？")) return;
+    void runAction({ action: "reset", starter: false }).then(ok => {
+      if (ok) { setSelected(null); setPanel(null); setEditingLotId(null); setMode("inspect"); }
+    });
   };
   const viewScenery = (value: boolean) => { setScenery(value); setPanel(null); chooseMode(value ? "pan" : "inspect"); if (!value) canvasRef.current?.focus(); };
   const toggleFullscreen = async () => {
@@ -337,8 +420,10 @@ export function TownBuilder({ userId }: { userId: string }) {
     const element = target instanceof Element ? target.closest<HTMLElement>("button, a[href]") : null;
     return element && gameRef.current?.contains(element) ? element : null;
   };
-  return <main ref={gameRef} className={styles.game} data-town-screen data-scenery={scenery} data-night={night} data-welcome={welcome} data-panel={panel ?? "none"}
-    onPointerDownCapture={e => touchControls.current?.start(controlTarget(e.target), e)}
+  return <main ref={gameRef} className={styles.game} data-town-screen data-scenery={scenery} data-night={night} data-welcome={welcome} data-panel={panel ?? "none"} data-revision={snapshot?.revision ?? 0} aria-busy={busy}
+    onPointerDownCapture={e => { interaction.current++; touchControls.current?.start(controlTarget(e.target), e); }}
+    onKeyDownCapture={() => { interaction.current++; }}
+    onWheelCapture={() => { interaction.current++; }}
     onPointerMoveCapture={e => touchControls.current?.move(e)}
     onPointerUpCapture={e => touchControls.current?.end(e)}
     onPointerCancelCapture={e => touchControls.current?.cancel(e.pointerId)}
@@ -351,25 +436,28 @@ export function TownBuilder({ userId }: { userId: string }) {
         onPointerDown={pointerDown} onPointerMove={pointerMove} onPointerUp={pointerUp} onPointerCancel={cancelPointer}
         onLostPointerCapture={e => { pointers.current.delete(e.pointerId); if (!pointers.current.size) drag.current = null; setPreview([]); }} onPointerLeave={() => { if (!drag.current) setHover(null); }} onContextMenu={e => e.preventDefault()} />
       {welcome && <div className={styles.welcome}><div className={styles.welcomeCard}>
-        <span className={styles.eyebrow}>ぼくのまちづくり</span><h2>ここから、<br />あなたの街がはじまる。</h2>
-        <p>川のそばに家を建てて、道路を延ばして。<br />小さな暮らしが、にぎやかな街になる。</p>
-        <button type="button" className={styles.primary} onClick={() => { setTown(createTown()); setWelcome(false); chooseMode("inspect"); }}>小さな集落からはじめる <span>→</span></button>
-        <button type="button" className={styles.secondary} onClick={() => { setTown(createTown(false)); setWelcome(false); chooseMode("inspect"); }}>更地から自由につくる</button>
-        <small>下の「建設」から、自由に街をつくれます。</small>
+        <span className={styles.eyebrow}>TOWN ADVENTURE</span><h2>小さな一歩が、<br />街の物語になる。</h2>
+        <p>建てて、育てて、レベルアップ。<br />クエストを達成して、あなたらしい街へ。</p>
+        <div className={styles.starterGift}><WhiteCoinArt /><span>はじまりの支援<b>白コイン 20,000枚</b></span></div>
+        <button type="button" className={styles.primary} disabled={busy || !snapshot} onClick={() => { void runAction({ action: "start", starter: true }).then(ok => { if (ok) chooseMode("inspect"); }); }}>小さな集落からはじめる <span>→</span></button>
+        <button type="button" className={styles.secondary} disabled={busy || !snapshot} onClick={() => { void runAction({ action: "start", starter: false }).then(ok => { if (ok) chooseMode("inspect"); }); }}>更地から自由につくる</button>
+        <small>白コインは、街づくり専用のコインです。</small>
       </div></div>}
     </section>
     <header ref={headerRef} className={styles.header}>
       <div className={styles.identity}>
         <Link href="/games" className={styles.back} aria-label="ミニゲーム一覧へ戻る" onClick={() => flushSave()}><Glyph name="back" /></Link>
-        <div><h1>ぼくのまちづくり</h1><p title={`${phase} · DAY ${town.day}${town.paused || welcome ? " ・一時停止" : ""}`}>{phase}<span> · </span>DAY {town.day}{town.paused || welcome ? " ・一時停止" : ""}</p></div>
+        <button type="button" className={styles.playerIdentity} disabled={welcome || !loaded} aria-label={`まちづくりレベル${progress.level} ${rank.title}。クエストと成長を見る`} onClick={() => { chooseMode("inspect"); setRpgTab("growth"); setPanel("quests"); }}>
+          <TownCrest level={progress.level} /><span><h1>ぼくのまちづくり</h1><p>{rank.title}</p><span className={styles.headerExp} aria-label={progress.max ? "最高レベル" : `経験値 ${progress.current} / ${progress.required}`}><i style={{ width: `${progress.ratio * 100}%` }} /></span><small>{progress.max ? "MAX LEVEL" : `Lv.${progress.level} · ${progress.current} / ${progress.required} EXP`}</small></span>
+        </button>
       </div>
-      <button type="button" className={styles.budget} aria-label={`予算 ¥${F.format(town.money)}。予算と収支を確認`} disabled={welcome || !loaded} onClick={() => { if (mode === "decorate") chooseMode("inspect"); setPanel("view"); }}><span>街の予算</span><strong title={`¥${F.format(town.money)}`}>{Math.abs(town.money) >= 1e7 ? `約¥${compactMoney.format(town.money)}` : `¥${F.format(town.money)}`}</strong><small aria-live="polite">{saveStatus}</small></button>
+      <button type="button" className={styles.budget} aria-label={`白コイン ${F.format(snapshot?.balance ?? 0)}枚。もらい方を見る`} disabled={welcome || !loaded} onClick={() => { chooseMode("inspect"); setRpgTab("quests"); setPanel("quests"); }}><span>白コイン</span><strong title={`${F.format(snapshot?.balance ?? 0)}枚`}><WhiteCoinArt />{(snapshot?.balance ?? 0) >= 1e7 ? `約${compactMoney.format(snapshot?.balance ?? 0)}` : F.format(snapshot?.balance ?? 0)}</strong><small aria-live="polite">{busy ? "保存中…" : saveStatus}</small></button>
     </header>
     <div ref={statsRef} className={styles.stats} aria-label="街の状況">
       {[{ icon: "people", label: "人口", value: F.format(stats.population), unit: "人" },
         { icon: "leaf", label: "満足度", value: String(stats.happiness), unit: "%" },
         { icon: "train", label: "鉄道", value: String(stats.routes.length), unit: "路線" },
-        { icon: "chart", label: "6日ごとの収支", value: `${net >= 0 ? "+" : ""}${F.format(net)}`, unit: "円" }].map(s => <div key={s.label} className={styles.stat}>
+        { icon: "chart", label: phase, value: String(town.day), unit: "日目" }].map(s => <div key={s.label} className={styles.stat}>
         <span className={styles.statIcon}><Glyph name={s.icon} /></span><div><span>{s.label}</span><strong>{s.value}<small>{s.unit}</small></strong></div>
       </div>)}
     </div>
@@ -378,24 +466,22 @@ export function TownBuilder({ userId }: { userId: string }) {
       <button type="button" title="マップ全体を表示" aria-label="マップ全体を表示" onClick={() => sceneRef.current?.fit(sizeRef.current.width, sizeRef.current.height)}><Glyph name="fit" /></button>
       <button type="button" title="街だけを眺める" aria-label="街だけを眺める" disabled={welcome} onClick={() => viewScenery(true)}><Glyph name="eye" /></button>
     </div>
-    {mission && !panel && !welcome && !showSelection && mode === "inspect" && <div className={styles.mission}>
-      <span className={styles.missionMark}>✦</span><div><small>次の目標</small><b>{mission.title}</b><p>{mission.detail}</p><div className={styles.progress}><i style={{ width: `${Math.min(100, mission.progress(stats) * 100)}%` }} /></div></div><strong>+¥{F.format(mission.reward)}</strong>
-    </div>}
-    {panel && <aside ref={panelRef} id="town-panel" className={`${styles.sidebar} ${panel === "customize" ? styles.workshop : ""}`} aria-label={panel === "build" ? "建設パネル" : panel === "land" ? "敷地の購入" : panel === "customize" ? "施設の部品" : panel === "view" ? "表示と設定" : "遊び方"}>
-      <div className={styles.panelTitle}><h2>{panel === "build" ? "建設" : panel === "land" ? "敷地を選ぶ" : panel === "customize" ? editingLot ? `${editingLot.kind === "park" ? "公園" : "広場"} ${editingLot.width}×${editingLot.height} · 部品` : `${BUILDINGS.find(b => b.id === active)?.title ?? "施設"}の部品` : panel === "view" ? "表示と設定" : "街づくりのヒント"}</h2><button type="button" aria-label="パネルを閉じる" onClick={closePanel}>×</button></div>
+    {panel && <aside key={panel === "quests" ? `${panel}:${rpgTab}` : panel} ref={panelRef} id="town-panel" className={`${styles.sidebar} ${panel === "customize" ? styles.workshop : ""} ${panel === "quests" ? styles.questPanel : ""}`} aria-label={panel === "build" ? "建設パネル" : panel === "land" ? "敷地の購入" : panel === "customize" ? "施設の部品" : panel === "view" ? "表示と設定" : panel === "quests" ? "クエストと成長" : "遊び方"}>
+      <div className={styles.panelTitle}><h2>{panel === "build" ? "建設" : panel === "land" ? "敷地を選ぶ" : panel === "customize" ? editingLot ? `${editingLot.kind === "park" ? "公園" : "広場"} ${editingLot.width}×${editingLot.height} · 部品` : `${BUILDINGS.find(b => b.id === active)?.title ?? "施設"}の部品` : panel === "view" ? "表示と設定" : panel === "quests" ? "開拓の冒険手帳" : "街づくりのヒント"}</h2><button type="button" aria-label="パネルを閉じる" onClick={closePanel}>×</button></div>
+      {panel === "quests" && <TownRpgPanel tab={rpgTab} onTab={setRpgTab} metrics={questMetrics} snapshot={snapshot} busy={busy} onClaim={questId => { void runAction({ action: "quest", questId }); }} onDaily={() => { void runAction({ action: "daily" }); }} />}
       {panel === "build" && <>
         <div className={styles.categories}>{["交通", "建物", "環境"].map(c => <button type="button" key={c} aria-pressed={category === c} onClick={() => setCategory(c)}>{c}</button>)}</div>
         <div className={styles.catalog}>{BUILDINGS.filter(b => b.category === category).map(b => <button type="button" key={b.id} aria-pressed={mode === b.id} onClick={() => {
           if (b.id === "park") { chooseMode("inspect"); setPanel("land"); return; }
           chooseMode(b.id); setPanel(null);
-        }} className={mode === b.id ? styles.selectedBuild : ""}><BuildingIcon kind={b.id} /><span><b>{b.title}</b><small>{b.price ? `¥${F.format(b.price)}` : "無料"}</small></span></button>)}</div>
+        }} className={mode === b.id ? styles.selectedBuild : ""}><BuildingIcon kind={b.id} /><span><b>{b.title}</b><small>{b.price ? <WhitePrice amount={b.price} /> : "無料"}</small></span></button>)}</div>
         <p className={styles.toolDescription}>選んだら、街をタップして配置。指でドラッグすると移動できます。</p>
       </>}
-      {panel === "land" && <ParkPurchase kind={parkKind} size={parkSize} rotated={parkRotated} money={town.money} onKind={setParkKind} onSize={setParkSize} onRotate={() => setParkRotated(v => !v)} onPlace={() => { chooseMode("park"); setPanel(null); }} />}
-      {panel === "customize" && (editingLot ? <ParkWorkshop lot={editingLot} part={part} rotation={partRotation} money={town.money} onPart={p => { setPart(p); setPreview([]); setHover(null); setPanel(null); }} onRotate={() => setPartRotation(v => (v + 1) % 4)} onExpand={size => applyEdit(expandParkLot(town, editingLot.id, size))} onRemoveLot={() => {
+      {panel === "land" && <ParkPurchase kind={parkKind} size={parkSize} rotated={parkRotated} money={snapshot && !pendingRequest.current && !busy ? town.money : -1} onKind={setParkKind} onSize={setParkSize} onRotate={() => setParkRotated(v => !v)} onPlace={() => { chooseMode("park"); setPanel(null); }} />}
+      {panel === "customize" && (editingLot ? <ParkWorkshop lot={editingLot} part={part} rotation={partRotation} money={snapshot && !pendingRequest.current && !busy ? town.money : -1} onPart={p => { setPart(p); setPreview([]); setHover(null); setPanel(null); }} onRotate={() => setPartRotation(v => (v + 1) % 4)} onExpand={size => { void edit({ type: "expand", lotId: editingLot.id, size }); }} onRemoveLot={() => {
         if (!window.confirm("この敷地と中の部品を撤去しますか？")) return;
-        applyEdit(removeParkLot(town, editingLot.id)); setPanel(null); setEditingLotId(null); setMode("inspect"); setSelected(null);
-      }} /> : active && selected !== null ? <FacilityWorkshop kind={active} installed={selectedParts ?? []} money={town.money} onBuy={(id: FacilityPart) => applyEdit(buyFacilityPart(town, selected, id))} onRemove={id => applyEdit(removeFacilityPart(town, selected, id))} /> : null)}
+        void edit({ type: "remove-park", lotId: editingLot.id }).then(ok => { if (ok) { setPanel(null); setEditingLotId(null); setMode("inspect"); setSelected(null); } });
+      }} /> : active && selected !== null ? <FacilityWorkshop kind={active} installed={selectedParts ?? []} money={snapshot && !pendingRequest.current && !busy ? town.money : -1} onBuy={(id: FacilityPart) => { void edit({ type: "facility-part", tile: selected, part: id }); }} onRemove={id => { void edit({ type: "remove-facility-part", tile: selected, part: id }); }} /> : null)}
       {panel === "view" && <>
         <div className={styles.viewOptions}>
           <button type="button" aria-label={night ? "昼にする" : "夜にする"} onClick={() => setNight(v => !v)}><Glyph name={night ? "moon" : "sun"} />{night ? "昼にする" : "夜にする"}</button>
@@ -406,44 +492,46 @@ export function TownBuilder({ userId }: { userId: string }) {
           <button type="button" onClick={() => setPanel("help")}><span className={styles.question} aria-hidden="true">?</span>遊び方</button>
         </div>
         <div className={styles.clock}><span>時間</span><button type="button" aria-label={town.paused ? "時間を再開" : "時間を停止"} onClick={() => setTown(t => ({ ...t, paused: !t.paused }))}>{town.paused ? "▶" : "Ⅱ"}</button>{[1, 2, 4].map(v => <button type="button" key={v} aria-pressed={speed === v} className={speed === v ? styles.chosenSpeed : ""} onClick={() => setSpeed(v)}>{v}×</button>)}</div>
-        <div className={styles.finance}><div><span>現在の予算</span><b>¥{F.format(town.money)}</b></div><div><span>税収・交通収入</span><b>+¥{F.format(stats.income)}</b></div><div><span>維持費</span><b>−¥{F.format(stats.upkeep)}</b></div><small>6日ごとに精算 · 次はDAY {Math.ceil((town.day + 1) / 6) * 6}<br />鉄道 {stats.linkedStations}駅が接続 · 雇用 {stats.jobs}人分</small><button type="button" className={styles.saveButton} onClick={() => flushSave()}>{saveStatus === "保存できません" ? "保存を再試行" : "今すぐ保存"}</button>{saveStatus === "保存できません" && <small role="alert">保存できません。ブラウザの保存設定や空き容量を確認してください。</small>}</div>
+        <div className={styles.finance}><div><span>街づくりに使える白コイン</span><WhitePrice amount={snapshot?.balance ?? 0} /></div><div><span>まちづくりの経験値</span><b>{F.format(snapshot?.xp ?? 0)} EXP</b></div><div><span>街の経済力</span><b>{F.format(stats.income - stats.upkeep)} pt</b></div><small>白コインはクエスト・レベル報酬・毎日のログイン・ホームで集められます。<br />建物・敷地・部品の購入と増築に使います。<br />鉄道 {stats.linkedStations}駅が接続 · 雇用 {stats.jobs}人分</small><button type="button" className={styles.saveButton} disabled={busy} onClick={() => { flushSave(); if (pendingRequest.current) void runAction(pendingRequest.current, true); else void loadGame(); }}>{pendingRequest.current ? "保存結果を再確認" : "保存データを再読み込み"}</button>{saveStatus === "保存できません" && <small role="alert">端末へのバックアップを保存できません。街と白コインはアカウントに保存されています。</small>}</div>
       </>}
       {panel === "help" && <div className={styles.help}>
-        <ol><li><b>指で街を移動する</b><span>1本指でドラッグ、2本指で拡大・縮小。建設・部品の編集でも同じ操作です。</span></li><li><b>タップしてつくる</b><span>「建設」から選び、街をタップして配置。道路・線路は「連続敷設」でまとめてつなげられます。</span></li><li><b>公園をつくる</b><span>敷地の広さを選んで購入し、木・花壇・噴水などの部品を買って配置。通路の上にも設備を置けます。部品だけの撤去や敷地の拡張もできます。</span></li><li><b>施設を育てる</b><span>建物をタップして「部品」から設備を追加。増築や部品の購入は「元に戻す」で取り消せます。2駅を線路で結ぶと列車が運行します。</span></li></ol>
+        <ol><li><b>街を育ててレベルアップ</b><span>白コインで建設・増築・部品購入をするとEXPを獲得。「クエスト」で条件を達成して報酬を受け取ると、さらに成長できます。アプリのレベルと、まちづくりLv.は別々です。</span></li><li><b>指で街を移動する</b><span>1本指でドラッグ、2本指で拡大・縮小。建設・部品の編集でも同じ操作です。</span></li><li><b>タップしてつくる</b><span>「建設」から選び、街をタップして配置。道路・線路は「連続敷設」でまとめてつなげられます。</span></li><li><b>公園をつくる</b><span>敷地の広さを選んで購入し、木・花壇・噴水などの部品を買って配置。通路の上にも設備を置けます。部品だけの撤去や敷地の拡張もできます。</span></li><li><b>施設を育てる</b><span>建物をタップして「部品」から設備を追加。増築や部品の購入は「元に戻す」で取り消せます。2駅を線路で結ぶと列車が運行します。工事の取り消しでは、その工事の白コインとEXPを戻します。</span></li></ol>
         <details><summary>キーボード・座標で操作</summary><p>マップを選択して矢印キー・Enterで建設。＋／−で拡大縮小。Ctrl／⌘＋Zで工事を取り消せます。</p><div className={styles.coordinates}><label>X<input type="number" inputMode="numeric" min={1} max={24} value={tileX} onChange={e => setTileX(Number(e.target.value))} /></label><label>Y<input type="number" inputMode="numeric" min={1} max={24} value={tileY} onChange={e => setTileY(Number(e.target.value))} /></label><button type="button" disabled={!Number.isInteger(tileX) || !Number.isInteger(tileY) || tileX < 1 || tileY < 1 || tileX > 24 || tileY > 24} onClick={() => {
           if (Number.isInteger(tileX) && Number.isInteger(tileY) && tileX >= 1 && tileY >= 1 && tileX <= 24 && tileY <= 24) { const i = (tileY - 1) * MAP_SIZE + tileX - 1; focusTile(i); commit([i]); }
         }}>選択中の操作を実行</button></div></details>
-        <div className={styles.helpFooter}><p>街はこの端末・このアカウントに自動保存されます。別端末とは同期しません。</p><button type="button" onClick={reset}>新しい街をはじめる</button></div>
+        <div className={styles.helpFooter}><p>街・白コイン・経験値はアカウントに保存されます。端末の以前の街は初回に引き継ぎます。</p><button type="button" disabled={busy || Boolean(pendingRequest.current)} onClick={reset}>新しい街をはじめる</button></div>
       </div>}
     </aside>}
     {showSelection && active && selected !== null && <section ref={selectionRef} className={styles.selectionCard} aria-label="選択した建物" data-selected-tile={selected}>
       <div className={styles.selectionInfo}><strong>{selectedLot ? selectedLot.kind === "park" ? "公園" : "広場" : selectedStage ?? BUILDINGS.find(b => b.id === active)?.title}{town.levels[selected]! > 0 && <small>Lv.{town.levels[selected]}</small>}{selectedLot && <small>{selectedLot.width}×{selectedLot.height}</small>}</strong>
         <p>{selectedLot ? `部品 ${selectedLot.parts.length}点${selectedLot.parts.length ? "" : " · 部品を追加しよう"}` : canUpgrade ? connected ? `道路接続${active === "house" ? ` · 定員 ${(town.levels[selected] || 1) * 18 + (selectedParts?.includes("terrace") ? 6 : 0)}人` : ""}` : "道路への接続が必要です" : active === "station" ? stats.routes.some(r => r[0] === selected || r[r.length - 1] === selected) ? "列車が運行しています" : "もう1つの駅へ線路をつなごう" : "街をつなぐ道"}</p>
       </div>
-      {canUpgrade && <button type="button" className={styles.upgrade} aria-label={nextStage ? `${nextStage}へ増築する Lv.${selectedLevel + 1}` : undefined} onClick={upgrade} disabled={town.levels[selected]! >= 3 || !connected || town.money < (town.levels[selected] || 1) * 450}>{town.levels[selected]! >= 3 ? "最大Lv." : <><span>増築する</span><small>Lv.{selectedLevel + 1} · ¥{F.format((town.levels[selected] || 1) * 450)}</small></>}</button>}
+      {canUpgrade && <button type="button" className={styles.upgrade} aria-label={nextStage ? `${nextStage}へ増築する 建物Lv.${selectedLevel + 1}` : undefined} onClick={upgrade} disabled={!snapshot || Boolean(pendingRequest.current) || busy || town.levels[selected]! >= 3 || !connected || town.money < (town.levels[selected] || 1) * 450}>{town.levels[selected]! >= 3 ? "最大Lv." : <><span>増築する</span><small>建物Lv.{selectedLevel + 1} · <WhitePrice amount={(town.levels[selected] || 1) * 450} /></small></>}</button>}
       {canCustomize && <button type="button" className={styles.customize} aria-label="施設の部品を追加" onClick={openCustomize}>部品<small>追加</small></button>}
       <button type="button" className={styles.dismiss} aria-label="建物の選択を解除" onClick={() => setSelected(null)}>×</button>
     </section>}
     {mode === "decorate" && editingLot && !panel && !welcome && !scenery && <div ref={activeToolRef} className={styles.activeTool} data-decorate="true">
-      <div><strong>{part === "remove" ? "部品を撤去" : PARK_PARTS.find(p => p.id === part)?.title}<small>{part === "remove" ? "無料" : `¥${PARK_PARTS.find(p => p.id === part)?.price}`}</small></strong><p>{part === "remove" ? "外す部品をタップ" : "敷地のマスをタップ"}</p></div>
+      <div><strong>{part === "remove" ? "部品を撤去" : PARK_PARTS.find(p => p.id === part)?.title}<small>{part === "remove" ? "無料" : <WhitePrice amount={PARK_PARTS.find(p => p.id === part)?.price ?? 0} />}</small></strong><p>{busy ? "工事を保存中…" : part === "remove" ? "外す部品をタップ" : "敷地のマスをタップ"}</p></div>
       <button type="button" aria-label="公園の部品を選ぶ" onClick={() => setPanel("customize")}>部品</button>
       <button type="button" aria-label="部品の向きを変える" disabled={part === "remove"} onClick={() => setPartRotation(v => (v + 1) % 4)}>↻ {partRotation * 90}°</button>
       <button type="button" className={styles.dismiss} aria-label="公園の編集を終了" onClick={() => { setMode("inspect"); setEditingLotId(null); setPreview([]); setHover(null); }}>×</button>
     </div>}
     {item && !panel && !welcome && !scenery && <div ref={activeToolRef} className={styles.activeTool}>
-      <div><strong>{mode === "park" ? `${parkKind === "park" ? "公園" : "広場"} ${parkRotated ? PARK_SIZES.find(s => s.id === parkSize)!.height : PARK_SIZES.find(s => s.id === parkSize)!.width}×${parkRotated ? PARK_SIZES.find(s => s.id === parkSize)!.width : PARK_SIZES.find(s => s.id === parkSize)!.height}` : item.title}<small>{mode === "park" ? `¥${F.format(PARK_SIZES.find(s => s.id === parkSize)!.price)}` : item.price ? `¥${F.format(item.price)}` : "無料"}</small></strong><p>{mode === "park" ? "空いた場所をタップして敷地を購入" : linearTool && stroke ? "ドラッグで敷設 · 2本指で移動" : "タップで配置 · ドラッグで移動"}</p></div>
+      <div><strong>{mode === "park" ? `${parkKind === "park" ? "公園" : "広場"} ${parkRotated ? PARK_SIZES.find(s => s.id === parkSize)!.height : PARK_SIZES.find(s => s.id === parkSize)!.width}×${parkRotated ? PARK_SIZES.find(s => s.id === parkSize)!.width : PARK_SIZES.find(s => s.id === parkSize)!.height}` : item.title}<small>{mode === "park" ? <WhitePrice amount={PARK_SIZES.find(s => s.id === parkSize)!.price} /> : item.price ? <WhitePrice amount={item.price} /> : "無料"}</small></strong><p>{busy ? "工事を保存中…" : mode === "park" ? "空いた場所をタップして敷地を購入" : linearTool && stroke ? "ドラッグで敷設 · 2本指で移動" : "タップで配置 · ドラッグで移動"}</p></div>
       {linearTool && <button type="button" aria-pressed={stroke} onClick={() => { setStroke(v => !v); setPreview([]); }}>{stroke ? "移動に戻す" : "連続敷設"}</button>}
       <button type="button" className={styles.dismiss} aria-label="建設を終了" onClick={() => chooseMode("inspect")}>×</button>
     </div>}
     <div ref={toolbarRef} className={styles.toolbar}>
       <div className={styles.tools}>
         <button type="button" className={styles.buildButton} aria-expanded={panel === "build" || panel === "land"} aria-controls="town-panel" disabled={welcome || !loaded} onClick={() => { if (mode === "decorate") chooseMode("inspect"); setPanel(p => p === "build" ? null : "build"); }}><Glyph name="build" /><span>建設</span></button>
-        <button type="button" aria-pressed={mode === "inspect" && !panel} disabled={welcome} onClick={() => { chooseMode("inspect"); setPanel(null); }}><Glyph name="pan" /><span>街を見る</span></button>
-        <button type="button" disabled={!undo.length} onClick={undoBuild}><Glyph name="undo" /><span>元に戻す</span></button>
+        <button type="button" aria-expanded={panel === "quests"} aria-controls="town-panel" disabled={welcome} className={styles.questButton} onClick={() => { chooseMode("inspect"); setRpgTab("quests"); setPanel(p => p === "quests" && rpgTab === "quests" ? null : "quests"); }}><Glyph name="quests" /><span>クエスト</span>{readyQuests > 0 && <em aria-label={`報酬を受け取れるクエスト${readyQuests}件`}>{readyQuests}</em>}</button>
+        <button type="button" disabled={!snapshot?.canUndo || busy || Boolean(pendingRequest.current)} onClick={undoBuild}><Glyph name="undo" /><span>元に戻す</span></button>
         <button type="button" disabled={welcome} aria-expanded={panel === "view" || panel === "help"} aria-controls="town-panel" onClick={() => { if (mode === "decorate") chooseMode("inspect"); setPanel(p => p === "view" || p === "help" ? null : "view"); }}><Glyph name="settings" /><span>表示・設定</span></button>
       </div>
     </div>
     <p role="status" aria-live="polite" className={styles.notice} data-visible={toast && !scenery && !welcome}>{notice}</p>
+    {connectionError && <div className={styles.connectionBanner} role="alert"><span>{connectionError}</span><button type="button" disabled={busy} onClick={() => { if (pendingRequest.current) void runAction(pendingRequest.current, true); else void loadGame(); }}>再試行</button></div>}
+    {levelUp && !scenery && !welcome && <button type="button" className={styles.levelUp} aria-label={`まちづくりレベル${levelUp.level}にアップ${levelUp.reward ? `、白コイン${levelUp.reward}枚獲得` : ""}`} onClick={() => { setLevelUp(null); chooseMode("inspect"); setRpgTab("growth"); setPanel("quests"); }}><TownCrest level={levelUp.level} /><span><small>LEVEL UP</small><b>{townRank(levelUp.level).title}</b>{levelUp.reward > 0 && <WhitePrice amount={levelUp.reward} />}</span><em>✦</em></button>}
     {scenery && <button type="button" ref={returnControlsRef} className={styles.returnControls} onClick={() => viewScenery(false)}><Glyph name="eye" />操作に戻る</button>}
   </main>;
 }

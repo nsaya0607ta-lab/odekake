@@ -21,7 +21,7 @@ const stubs = {
   '@/components/games/town-builder': { TownBuilder },
   '@/lib/supabase/server': { requireUser: async () => {
     if (!session) exit('redirect', '/login');
-    return { user: session };
+    return { user: session, supabase: { rpc: async () => ({ data: session.id === 'shun-account', error: null }) } };
   } },
   '@/lib/supabase/env': { getSupabaseEnv: () => configured ? { url: 'https://example.test', anonKey: 'test' } : null },
   '@supabase/ssr': { createServerClient: () => ({ auth: { getClaims: async () => ({ data: { claims: session ? { sub: session.id } : null } }) } }) },
@@ -83,6 +83,12 @@ const test = async (name, fn) => { await fn(); passed++; console.log(`PASS ${nam
       await assert.rejects(town(), control('notFound'));
       await assert.rejects(preview(), control('notFound'));
     }
+  });
+  await test('another account with the same display name cannot see the screen', async () => {
+    session = { id: 'other-account', displayName: 'しゅん' };
+    assert(!elements(await games()).some(e => e.props.href === '/games/town-builder'));
+    await assert.rejects(town(), control('notFound'));
+    await assert.rejects(preview(), control('notFound'));
   });
   await test('logged-out users never receive a game page or public demo', async () => {
     session = null;

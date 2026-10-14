@@ -298,7 +298,7 @@ type Walker = {
   pen: boolean;
 };
 
-type CoinKind = "coin" | "blue" | "red";
+type CoinKind = "coin" | "blue" | "red" | "white";
 
 type Coin = {
   id: string;
@@ -332,12 +332,14 @@ export function WanderingFrenchie({
   level = 1,
   skin = "default",
   redDrops = false,
+  whiteDrops = false,
 }: {
   level?: number;
   /** 表示する犬スキン。所持していないスキンを渡さないのは呼び出し側の責任 */
   skin?: DogSkinId;
   /** 赤コインも降らせるか（赤コインの仕組みがある環境だけ） */
   redDrops?: boolean;
+  whiteDrops?: boolean;
 }) {
   // 基本ポーズは常に、報酬モーションは解放済みのものだけ重ねて置く。書くときの絵（wave）はいつでも
   const visibleKeys: string[] = [
@@ -376,6 +378,8 @@ export function WanderingFrenchie({
   /** 赤コインを降らせてよいか（DB がまだ赤に対応していないと分かったら、この画面ではもう降らせない） */
   const redOkRef = useRef(redDrops);
   redOkRef.current = redOkRef.current && redDrops;
+  const whiteOkRef = useRef(whiteDrops);
+  whiteOkRef.current = whiteOkRef.current && whiteDrops;
 
   // 拾う（犬が拾っても、タップで拾っても同じ）。数は DB が決めて返す
   const collectCoin = (id: string) => {
@@ -395,7 +399,7 @@ export function WanderingFrenchie({
         .then((response) => (response.ok ? response.json() : null))
         .then((body: { granted?: boolean; kind?: CoinKind; tier?: CoinTier; amount?: number; reason?: string | null } | null) => {
           if (!body) return finish();
-          if (body.reason === "unavailable") redOkRef.current = false;
+          if (body.reason === "unavailable") { if (coin.kind === "white") whiteOkRef.current = false; else if (coin.kind === "red") redOkRef.current = false; }
           if (body.reason === "too_soon" && tries < 3) {
             setTimeout(() => claim(tries + 1), 8500);
             return;
@@ -602,7 +606,7 @@ export function WanderingFrenchie({
       // 黄色・青（いままでどおり）か、それとは別の赤（赤コインの仕組みがあるときだけ）
       const roll = Math.random();
       const kind: CoinKind | null =
-        roll < COIN_CHANCE ? (Math.random() < COIN_BLUE_CHANCE ? "blue" : "coin") : redOkRef.current && roll < COIN_CHANCE + COIN_RED_CHANCE ? "red" : null;
+        roll < COIN_CHANCE ? (Math.random() < COIN_BLUE_CHANCE ? "blue" : "coin") : redOkRef.current && roll < COIN_CHANCE + COIN_RED_CHANCE ? "red" : whiteOkRef.current && roll >= COIN_CHANCE + COIN_RED_CHANCE && roll < COIN_CHANCE + COIN_RED_CHANCE + 0.05 ? "white" : null;
       if (!kind) return;
       const box = boxRef.current;
       if (!box) return;
@@ -1093,6 +1097,7 @@ export function WanderingFrenchie({
         const tier = COIN_TIERS[coin.tier];
         const blue = coin.kind === "blue";
         const red = coin.kind === "red";
+        const white = coin.kind === "white";
         return (
           <div
             key={coin.id}
@@ -1113,7 +1118,7 @@ export function WanderingFrenchie({
             />
             <button
               type="button"
-              aria-label={`${coin.tier === "epic" ? "おおばん" : coin.tier === "rare" ? "きらきら" : ""}${blue ? "青コイン" : red ? "赤コイン" : "コイン"}を拾う`}
+              aria-label={`${coin.tier === "epic" ? "おおばん" : coin.tier === "rare" ? "きらきら" : ""}${blue ? "青コイン" : red ? "赤コイン" : white ? "白コイン" : "コイン"}を拾う`}
               disabled={coin.state === "taken"}
               onClick={() => collectRef.current(coin.id)}
               className={`pointer-events-auto relative block w-full ${coin.state === "falling" ? "home-coin-fall" : coin.state === "ground" ? "home-coin-ground" : "home-coin-take"}`}
@@ -1121,7 +1126,7 @@ export function WanderingFrenchie({
             >
               <span
                 className="home-coin-spin relative block h-full w-full"
-                style={{ filter: blue ? "drop-shadow(0 0 2px rgba(90,160,255,.7))" : red ? "drop-shadow(0 0 2px rgba(255,110,96,.75))" : "drop-shadow(0 0 2px rgba(255,210,90,.7))" }}
+                style={{ filter: blue ? "drop-shadow(0 0 2px rgba(90,160,255,.7))" : white ? "drop-shadow(0 0 3px rgba(246,255,232,.9))" : red ? "drop-shadow(0 0 2px rgba(255,110,96,.75))" : "drop-shadow(0 0 2px rgba(255,210,90,.7))" }}
               >
                 <HomeCoinArt kind={coin.kind} tier={coin.tier} />
               </span>

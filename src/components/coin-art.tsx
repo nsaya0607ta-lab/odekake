@@ -7,6 +7,17 @@
 
 type ArtProps = { className?: string };
 
+/** 白コイン。白銀の縁と肉球の刻印。街づくりの建設・増築・部品購入に使う。 */
+export function WhiteCoinArt({ className }: ArtProps) {
+  return <svg viewBox="0 0 24 24" className={className} aria-hidden="true">
+    <ellipse cx="12" cy="12.5" rx="10" ry="9.8" fill="#81928f" />
+    <circle cx="12" cy="11.2" r="9.7" fill="#f9fcf7" stroke="#a5b8ae" strokeWidth=".6" />
+    <circle cx="12" cy="11.2" r="7.2" fill="#e0e9e1" stroke="#b7c9bf" strokeWidth=".6" />
+    <path d="M5 7a8 8 0 0 1 6-3.5M17 17l1-1" stroke="#fff" strokeWidth="1.5" strokeLinecap="round" />
+    <g fill="#6c887d"><ellipse cx="12" cy="13.4" rx="3" ry="2.4" /><circle cx="8.3" cy="10.4" r="1.25" /><circle cx="10.6" cy="8.5" r="1.35" /><circle cx="13.4" cy="8.5" r="1.35" /><circle cx="15.7" cy="10.4" r="1.25" /></g>
+  </svg>;
+}
+
 /** 金貨（肉球入り）。枚数の横に置く小さいものから、宝箱まわりの大きいものまで同じ絵 */
 export function CoinArt({ className }: ArtProps) {
   return (
