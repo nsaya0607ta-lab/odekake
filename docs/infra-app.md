@@ -101,7 +101,7 @@ DNS が切りかわるまでのアクセスは失われる。
 
 ## 6. 画面
 
-- **トップ**：タブ「ステージ」「ずかん」「ラボ」「サーバー室」。ステージは路線図のように縦に並ぶ（★・理解バッジつき）
+- **トップ**：タブ「ステージ」「ずかん」「ラボ」「サーバー室」「勉強部屋」。ステージは路線図のように縦に並ぶ（★・理解バッジつき）
 - **ステージ**：上に成績（成功率・平均の速さ・月額）と時間のバー、まんなかに盤面、その下にフレブル先生のひとこと欄（ヒント）、いちばん下に操作。
   盤面には何も重ねない（事件のお知らせだけ、盤面の下の空きに短く出す）
 - **盤面**（縦長・スマホ向け）：上から 利用者 → 入口（DNS・CDN・WAF・右はしに予備の拠点）→ ロードバランサー（右にオートスケール）
@@ -193,7 +193,8 @@ DNS が切りかわるまでのアクセスは失われる。
 - `node scripts/fuzz-infra.mjs 2000` … でたらめな構成で、シミュレーター・ラボの設計図・書き出し・サーバー室の小さな部品が
   こわれないかを確かめる（例外・数の食いちがい・向かってくる数のずれ・休んでいるサーバーの仕事・保存の読みもどし・undefined の混入 など）。
   レッスンの台本も見る（お手本があるか・光らせる行がプログラムにあるか・あいさつを `"` や `$&` に書きかえても壊れないか・`**` の閉じわすれ など）。
-  2026-10-08：1万通り こわれず
+  **勉強部屋（LDAP）**も毎回確かめる：SHA-1・base64・{SSHA}・DN・フィルタ・ACL・LDIF の部品と、設定カード11枚を最初から最後まで通して
+  （ok が通る・learn に undefined/NaN がない・`**` の対応・設定が最後に入る）。2026-10-08：1万通り こわれず／2026-10-14：LDAP も通った
 - `FUZZ_VALIDATE=1 node scripts/fuzz-infra.mjs 420` … 書き出した設定ファイルを、`docker compose config` と
   `terraform fmt -check`・`terraform validate`（AWS プロバイダ 5.70）でも確かめる。2026-10-08：60通り すべて通った
 - サーバー室（Web Worker）はブラウザで確かめる。2026-10-08（Chromium）：ヘルスチェック・振り分け（2台に10件ずつ）・DB・CDN の HIT・
@@ -203,6 +204,64 @@ DNS が切りかわるまでのアクセスは失われる。
   2026-10-08（Chromium・375×667／390×844）：全ステップが思ったとおりの返事になり、エラーなし（通しで約3分。キャッシュの10秒待ちをふくむ）。
   CDN を20秒待ってから送ると retry の文が出て、もう一度で HIT になること、ヘッダーの ‹・ブラウザの「戻る」・「つぎのレッスンへ」も確かめた
 - 画面は 375×667・390×844・430×932 で見た
+- **勉強部屋（LDAP）** はブラウザで確かめる。2026-10-14（Chromium・375×667／390×844／430×932）：11枚のカードを最初から最後まで通して、
+  各ステップの返事・設定スイッチの切りかわり・パケット（平文でパスワードが赤く見える／StartTLS で Application Data になる）・名簿（memberOf・ロック）・
+  設定（cn=config と sssd.conf の「書いたもの／動いているもの」）のパネルがすべて正しく出て、横スクロールもエラーも出ないこと
+
+## 6.8 勉強部屋（LDAP）
+
+タブ「勉強部屋」。会社やお店の「名簿サーバー」**LDAP**（OpenLDAP／slapd 2.6 相当）を、本物のコマンドをターミナルで打って学ぶ。
+サーバー室と同じ「1画面に、いまやること1つ」の方針。**1枚のカード＝1つの設定**で、
+「この設定が**なかったら**こう動く（実践つき）」→「**入れると**こう変わる」を、同じコマンドを打ってくらべる。
+
+### ねらい・かたち
+
+- どのカードも：① 設定**なし**で本物のコマンドを打つ（たいてい、あぶない・こまる・うごかない）→ ② 設定を**入れる**（本物の
+  `ldapmodify -Y EXTERNAL`・`ldapadd`・sssd.conf の書きかえ）→ ③ 設定**あり**で同じことをもう一度 → ④ くらべる（表）→ わかったこと → クイズ（1問）
+- 画面の上に「設定スイッチ」（なし↔あり。`knob.isOn(lab)` で今の状態を出す）と、3台の図（あなたのパソコン → LDAP サーバー → お店のサーバー）。
+  くわしいもの（**サーバーの中**＝なぜその返事をしたか・**パケット**・**ログ**・**名簿**・**設定**）は、開いたときだけ下から出す
+- **パケット**は「なぜ暗号が要るか」の山場：ldap://（暗号なし）でログインすると、流れたバイト（16進ダンプ）の中にパスワードがそのまま見える（赤）。
+  StartTLS／ldaps:// にすると `Application Data`（読めないバイト）になる
+
+### 設定カード（`ldap-lessons.ts`・全11枚）
+
+| # | id | 設定 | なし → あり |
+|---|---|---|---|
+| 1 | rootpw | olcRootPW | 管理者も入れない（49）→ {SSHA} を決めてログイン |
+| 2 | anon | olcDisallows: bind_anon | 匿名で全員の情報が読める → 48 で断る |
+| 3 | acl | olcAccess | userPassword のハッシュが誰でも読める → self/auth/none で隠す |
+| 4 | tls | StartTLS / olcSecurity | 平文でパスワードが流れる → 13 で断り、暗号で守る |
+| 5 | schema | nis スキーマ | posixAccount が足せない（21）→ 読みこんで使える |
+| 6 | index | olcDbIndex | 2000件を全部見る（遅い）→ 索引で候補だけ |
+| 7 | ppolicy | ppolicy overlay | パスワードをため放題 → 3回でロック |
+| 8 | memberof | memberof overlay | 人からグループを辿れない → memberOf が自動で付く |
+| 9 | refint | refint overlay | 消した人が member に残る → 自動で片づく |
+| 10 | unique | unique overlay | uidNumber がかぶって他人のファイルも読める → 19 で止める |
+| 11 | sssd | ldap_access_filter | 名簿の全員が ssh ログインできる → 店長だけ（restart が要る） |
+
+### しくみ（`ldap.ts`・`ldap-shell.ts`・`ldap-bits.ts`）
+
+- `ldap-bits.ts` … 種つき乱数・UTF-8・base64・SHA-1・{SSHA}・LDAP のバイト列（BER：bind/search/result/拡張操作）・TLS レコード・16進ダンプ。
+  React にも DOM にも依存しない（node で動く）
+- `ldap.ts` … 名簿サーバー本体。エントリ・DN（RFC 4514 の正規化）・スキーマ（core/cosine/inetorgperson/nis/ppolicy/memberof）・
+  フィルタ（RFC 4515）・アクセス制御（olcAccess を上から順に・最初に当たった to の by で決まる・1行もなければ「だれでも読める」）・
+  bind（匿名・DN＋{SSHA}・olcRootPW）・search（インデックスで候補しぼり）・add/modify/delete/passwd/whoami・設定（cn=config を `ldapmodify -Y EXTERNAL` で変える。すぐ効く）・
+  overlay（memberof・refint・unique・ppolicy）。どの操作も slapd のログ・「サーバーの中で起きたこと（trace）」・流れたパケットを残す
+- `ldap-shell.ts` … 3台（あなたのパソコン・LDAP サーバー・お店のサーバー）のターミナル。本物と同じ形のコマンド
+  （ldapsearch・ldapwhoami・ldapadd・ldapmodify・ldapdelete・ldappasswd・slappasswd・slapcat・ssh・systemctl・getent・id・cat…）。
+  お店のサーバーは **SSSD** が LDAP の名簿でログインさせる（sssd.conf は書きかえても `systemctl restart sssd` まで反映されない＝「書いたもの／動いているもの」を分けてある）
+- 画面は `study-room.tsx`、見た目は `infra.module.css` の `.study*`
+- **外とはつながらない**：すべてブラウザの中の計算。ssh で使う本人のパスワードは `cast` に用意したもので、「本人が入力した」ことにしている
+  （攻撃の実演ではなく、設定の効き目を見るための台本）
+
+### カードを追加・調整するとき
+
+1. `ldap-lessons.ts` の `CARDS` に `StudyCard` を足す（intro・knob〈設定スイッチ〉・build〈シナリオ〉・steps・compare・quiz）。
+   `build` は毎回まっさらな `LdapLab` を返す。step の `phase`（off/apply/on）は設定スイッチの状態と合わせる（off の前は入っていない・on の前は入っている）
+2. 名簿・コマンドの返り方を変えたら `ldap.ts`／`ldap-shell.ts` を直す
+3. `node scripts/fuzz-infra.mjs 2000` で、どのカードも最初から最後まで通ること（ok が通る・learn がおかしくない・`**` の対応・最後に設定が入る）を確かめる
+4. ブラウザで、新しいカードを最初から最後まで通す（375×667／390×844／430×932）。とくにパケット・名簿・設定パネルの見え方
+5. この節の表を更新する
 
 ## 7. シミュレーションのルール（`sim.ts`）
 
@@ -251,9 +310,11 @@ DNS が切りかわるまでのアクセスは失われる。
   - `design.ts` … ラボの設計図（置いたパーツ・つなぎ方・注意・保存）
   - `export.ts` … ラボの構成を docker-compose・nginx・Terraform にする
   - `room.ts` / `server-room.tsx` / `room-templates.ts` / `room-lessons.ts` … サーバー室（本物のプログラムで動くサーバー・レッスンの台本）
+  - `ldap-bits.ts` / `ldap.ts` / `ldap-shell.ts` / `ldap-lessons.ts` / `study-room.tsx` … 勉強部屋（LDAP の部品・名簿サーバー・3台のターミナル・設定カード・画面。6.8）
   - `render.ts` … canvas の描画
   - `board.tsx` / `stage-play.tsx` / `infra-app.tsx` / `lab.tsx` … 画面
-- `scripts/fuzz-infra.mjs` … でたらめな構成で、シミュレーター・設計図・書き出し・サーバー室の部品がこわれないかを確かめる（6.7）
+- `scripts/fuzz-infra.mjs` … でたらめな構成で、シミュレーター・設計図・書き出し・サーバー室の部品がこわれないか、
+  勉強部屋（LDAP）の部品と設定カード11枚が通しで動くかを確かめる（6.7）
 - `scripts/simulate-infra.mjs` … 各ステージを「お手本の構成」と「何もしない構成」で何度も動かして、
   目標値がちょうどよいか確かめる（`node scripts/simulate-infra.mjs`）
 - アイコン：`public/launcher/icons/infra.webp`

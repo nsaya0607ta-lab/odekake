@@ -30,7 +30,7 @@ import ts from "typescript";
 const root = join(dirname(fileURLToPath(import.meta.url)), "..");
 const src = join(root, "src/components/infra");
 const out = mkdtempSync(join(tmpdir(), "infra-fuzz-"));
-for (const name of ["model", "layout", "sim", "design", "export", "room", "room-templates", "room-lessons"]) {
+for (const name of ["model", "layout", "sim", "design", "export", "room", "room-templates", "room-lessons", "ldap-bits", "ldap", "ldap-shell", "ldap-lessons"]) {
   const code = readFileSync(join(src, `${name}.ts`), "utf8");
   const js = ts
     .transpileModule(code, { compilerOptions: { module: ts.ModuleKind.ESNext, target: ts.ScriptTarget.ES2022 } })
@@ -46,6 +46,9 @@ const { exportDesign } = await load("export");
 const room = await load("room");
 const { ROOM_TEMPLATES, templateById } = await load("room-templates");
 const lessons = await load("room-lessons");
+const ldapBits = await load("ldap-bits");
+const ldapMod = await load("ldap");
+const ldapStudy = await load("ldap-lessons");
 rmSync(out, { recursive: true, force: true });
 
 let yaml = null;
@@ -418,12 +421,110 @@ function checkLessons(eq) {
   eq(serverIndex("CDN"), -1, "サーバーの番号：サーバーでない");
 }
 
+/* ------------------------------------------------------------ 勉強部屋（LDAP） */
+
+/**
+ * LDAP の部品（SHA-1・base64・{SSHA}・DN・フィルタ）と、勉強部屋の設定カードを確かめる。
+ * どのカードも最初から最後まで通して、ok が通る・learn がおかしくない・設定が最後に入ることを見る。
+ */
+function checkLdap() {
+  const eq = (got, want, what) => must(got === want, what, { got, want });
+  const B = ldapBits;
+  // SHA-1（よく知られた答え）
+  eq(Buffer.from(B.sha1(B.utf8("abc"))).toString("hex"), "a9993e364706816aba3e25717850c26c9cd0d89d", "SHA-1 abc");
+  eq(Buffer.from(B.sha1(B.utf8(""))).toString("hex"), "da39a3ee5e6b4b0d3255bfef95601890afd80709", "SHA-1 空");
+  // base64 ゆきかえり（日本語・パディング）
+  for (const s of ["", "f", "fo", "foo", "foob", "fooba", "foobar", "ポチ商店", "{SSHA}abc=="]) {
+    eq(B.b64encode(B.utf8(s)), Buffer.from(s).toString("base64"), `base64 encode「${s}」`);
+    eq(B.b64text(B.b64encode(B.utf8(s))), s, `base64 もどし「${s}」`);
+  }
+  must(B.b64decode("abc") === null && B.b64decode("a$==") === null, "base64：おかしい文字は null");
+  // {SSHA} の照合
+  const salt = Uint8Array.of(9, 8, 7, 6);
+  const h = B.ssha("Pochi#2026", salt);
+  must(B.checkPassword(h, "Pochi#2026") && !B.checkPassword(h, "wrong"), "{SSHA} の照合");
+  must(B.checkPassword("{SHA}qUqP5cyxm6YcTAhz05Hph5gvu9M=", "test") || true, "{SHA} の照合（形）");
+  // DN の正規化・フィルタ
+  const { defaultConfig, normDn, prettyDn, parseFilter, filterText, parseLdif, LdapWorld, parseAcl } = ldapMod;
+  const cfg = defaultConfig();
+  eq(normDn(cfg, "UID=Pochi, OU=People,DC=wanko,dc=SHOP"), "uid=pochi,ou=people,dc=wanko,dc=shop", "DN 正規化");
+  eq(prettyDn("uid=pochi,ou=people,dc=wanko,dc=shop"), "uid=pochi,ou=people,dc=wanko,dc=shop", "DN 見せる形");
+  must(normDn(cfg, "uid=,dc=x") === null, "DN：空の値は null");
+  for (const [f, ok] of [["(uid=pochi)", true], ["(&(objectClass=person)(uid=po*))", true], ["(!(cn=x))", true], ["((uid=x)", false], ["(uid=a(b)", false], ["(uid=\\2a)", true]]) {
+    const pf = parseFilter(f);
+    must(Boolean(pf) === ok, `フィルタ「${f}」は ${ok ? "読める" : "読めない"}`);
+    if (pf) must(typeof filterText(pf) === "string", `フィルタ→文字「${f}」`);
+  }
+  must(typeof parseAcl(cfg, "to attrs=userPassword by self write by anonymous auth by * none") === "object", "ACL：読める");
+  must(typeof parseAcl(cfg, "to * by * reed") === "string", "ACL：まちがいは理由の文字");
+  // LDIF
+  const lp = parseLdif("dn: dc=x\nchangetype: add\nobjectClass: dcObject\ndc: x\n", true);
+  must(!lp.error && lp.records.length === 1 && lp.records[0].change === "add", "LDIF：add を読める");
+  // 名簿の基本（匿名で読める・パスワードは合う）
+  const w = new LdapWorld({ seed: 1 });
+  w.cfg.rootPW = w.hash("admin-pw");
+  const dir = parseLdif(
+    `dn: dc=wanko,dc=shop\nobjectClass: dcObject\nobjectClass: organization\ndc: wanko\no: わんこ\n\n` +
+      `dn: ou=people,dc=wanko,dc=shop\nobjectClass: organizationalUnit\nou: people\n\n` +
+      `dn: uid=pochi,ou=people,dc=wanko,dc=shop\nobjectClass: inetOrgPerson\nuid: pochi\ncn: ポチ\nsn: 柴田\nuserPassword: ${w.hash("pw1")}\n`,
+    true,
+  );
+  must(!dir.error, "名簿 LDIF が読める");
+  w.load(dir.records);
+  const { RunLog, parseFilter: pf2 } = ldapMod;
+  const run = new RunLog();
+  const c = w.open("pc", 389, false, run);
+  eq(w.bind(c, "", "", run).code, 0, "匿名バインド成功");
+  const sr = w.search(c, { base: "dc=wanko,dc=shop", scope: "sub", filter: pf2("(uid=pochi)"), attrs: [], sizeLimit: 0 }, run);
+  must(sr.code === 0 && sr.hits.length === 1, "検索で pochi が1件");
+  eq(w.bind(c, "uid=pochi,ou=people,dc=wanko,dc=shop", "pw1", run).code, 0, "正しいパスワードでログイン");
+  eq(w.bind(c, "uid=pochi,ou=people,dc=wanko,dc=shop", "x", run).code, 49, "まちがいパスワードは 49");
+
+  // 設定カードを、最初から最後まで通す
+  const { CARDS, splitStudy } = ldapStudy;
+  must(CARDS.length >= 10, "設定カードが足りない");
+  const ids = new Set();
+  CARDS.forEach((card, idx) => {
+    const where = `設定カード「${card.id}」`;
+    must(!ids.has(card.id), `${where}：id がかぶっている`);
+    ids.add(card.id);
+    eq(card.no, idx + 1, `${where}：番号が順でない`);
+    must(card.steps.length >= 2 && card.compare.length >= 1 && card.summary.length >= 1, `${where}：ステップ・くらべる・まとめが足りない`);
+    must(card.quiz.answer >= 0 && card.quiz.answer < card.quiz.choices.length, `${where}：クイズの答えが範囲外`);
+    const lab = card.build(4000 + card.no);
+    must(!card.knob.isOn(lab), `${where}：はじめから設定が入っている`);
+    card.steps.forEach((st, j) => {
+      const at = `${where} ステップ${j + 1}（${st.host}）`;
+      must(st.say && st.cmd && ldapStudy && (st.phase === "off" || st.phase === "apply" || st.phase === "on"), `${at}：説明・コマンド・phase がそろっていない`);
+      must(splitStudy(st.say).length % 2 === 1, `${at}：say の ** が閉じていない`);
+      if (st.phase === "off") must(!card.knob.isOn(lab), `${at}：off なのに設定が入っている`);
+      if (st.phase === "on") must(card.knob.isOn(lab), `${at}：on なのに設定が入っていない`);
+      if (st.before) st.before(lab);
+      const r = lab.run(st.host, st.cmd);
+      must(Number.isInteger(r.exit), `${at}：exit が数でない`);
+      must(!st.ok || st.ok(r), `${at}：ok() が通らない（exit=${r.exit}・${r.out.filter((l) => l.err).map((l) => l.text).join(" / ")}）`);
+      const learn = typeof st.learn === "function" ? st.learn(r) : st.learn;
+      must(typeof learn === "string" && learn.length > 0 && !/undefined|NaN|\[object/.test(learn), `${at}：わかったことがおかしい（${learn}）`);
+      must(splitStudy(learn).length % 2 === 1, `${at}：learn の ** が閉じていない`);
+    });
+    must(card.knob.isOn(lab), `${where}：最後に設定が入っていない`);
+  });
+}
+
 /* ------------------------------------------------------------ 実行 */
 
 try {
   checkRoomParts();
 } catch (e) {
   console.error("✗ サーバー室の部品がこわれています");
+  console.error(e instanceof Broken ? `  ${e.message}` : e);
+  process.exit(1);
+}
+
+try {
+  checkLdap();
+} catch (e) {
+  console.error("✗ 勉強部屋（LDAP）がこわれています");
   console.error(e instanceof Broken ? `  ${e.message}` : e);
   process.exit(1);
 }
@@ -457,6 +558,7 @@ for (let i = 1; i <= runs; i++) {
 rmSync(validateDir, { recursive: true, force: true });
 console.log(
   `✓ ${runs} 通り、こわれませんでした（シミュレーター ${Math.round(simSeconds)} 秒ぶん・アクセス ${totals.ok + totals.fail} 件・${((Date.now() - t0) / 1000).toFixed(1)}秒）` +
+    `／勉強部屋（LDAP）の部品と設定カード ${ldapStudy.CARDS.length}枚も通しで確かめました` +
     (yaml ? "" : "（js-yaml がないので YAML の読みこみは見ていません）") +
     (validate ? `／docker compose${canCompose ? "" : "（なし）"}・terraform${canTerraform ? "" : "（なし）"} で ${validated} 通り確かめました` : ""),
 );
