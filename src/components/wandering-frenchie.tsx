@@ -231,14 +231,17 @@ const PEN_OUT_MS = 520;
 const WRITE_MS = 1300;
 
 /**
- * コイン：5秒ごとに 20% で降る。1回 5 枚（枚数は DB が決める）。青と黄色は半々。1日の回数に上限はない。
- * ホームを開いているあいだ、平均して1時間に 144 回（3600 / 5 × 20%）＝ 720 枚。
- * 赤コイン（ご当地ピンボールのステージの部品に使う）は、黄色・青とは別に 5秒ごとに 5%（黄色・青の降る数は変えない）。
+ * コイン：約3.3秒ごとに 20% で降る（2026-10-14 にユーザー指定で5秒ごと→約3.3秒ごと、全体で1.5倍）。1回 5 枚（枚数は DB が決める）。
+ * 青と黄色は半々。1日の回数に上限はない。ホームを開いているあいだ、黄色・青は平均して1時間に 216 回（1080 × 20%）。
+ * 赤コイン（ご当地ピンボールのステージの部品に使う）は、黄色・青とは別に 約3.3秒ごとに 5%。
+ * 白コイン（まちづくりに使う）も別に 約3.3秒ごとに 10%（白コインの仕組みがあるときだけ）。
+ * 受け取りの間かく（5秒）とレアの回数の上限は DB（0143）が決める。
  */
-const COIN_TICK_MS = 5000;
+const COIN_TICK_MS = 10000 / 3;
 const COIN_CHANCE = 0.2;
 const COIN_BLUE_CHANCE = 0.5;
 const COIN_RED_CHANCE = 0.05;
+const COIN_WHITE_CHANCE = 0.1;
 /**
  * レア度。降ったコインのうち、ふつう 85%・中レア 12%・高レア 3%。もらえる枚数は黄色も青も同じで、
  * ふつう 5・中レア 20・高レア 100（枚数は DB が決める。ここは見た目と抽選だけ）。
@@ -255,7 +258,7 @@ const pickCoinTier = (): CoinTier => {
   const r = Math.random();
   return r < COIN_TIERS.epic.chance ? "epic" : r < COIN_TIERS.epic.chance + COIN_TIERS.rare.chance ? "rare" : "common";
 };
-const COIN_MAX_ON_GROUND = 3;
+const COIN_MAX_ON_GROUND = 5;
 /** コインの大きさ（カード幅に対する％。手前のとき） */
 const COIN_WIDTH = 6.4;
 const PEN_SRC = "/home-magic-pen.webp";
@@ -389,7 +392,7 @@ export function WanderingFrenchie({
     // 拾ったコインは消えるが、「+5」を出しおわるまで場所は残しておく
     const finish = () => setTimeout(() => setCoins((list) => list.filter((c) => c.id !== id)), 1600);
 
-    // 続けて拾うと DB が「間かくが短い（8秒）」と断るので、そのときは少し待って受け取りなおす
+    // 続けて拾うと DB が「間かくが短い（5秒）」と断るので、そのときは少し待って受け取りなおす
     const claim = (tries: number) => {
       void fetch("/api/coins/home-drop", {
         method: "POST",
@@ -401,7 +404,7 @@ export function WanderingFrenchie({
           if (!body) return finish();
           if (body.reason === "unavailable") { if (coin.kind === "white") whiteOkRef.current = false; else if (coin.kind === "red") redOkRef.current = false; }
           if (body.reason === "too_soon" && tries < 3) {
-            setTimeout(() => claim(tries + 1), 8500);
+            setTimeout(() => claim(tries + 1), 5500);
             return;
           }
           if (body.granted && body.amount) {
@@ -546,7 +549,9 @@ export function WanderingFrenchie({
       collectRef.current(id);
       // 高レアは大よろこびで少し長めに
       set({ ...walkerRef.current, pose: "happy" });
-      await sleep(coin.tier === "epic" ? 1800 : coin.tier === "rare" ? 1300 : 1000);
+      // ほかにも落ちているときは、ふつうのコインのよろこびを短くして次へ（降る数に拾うのが追いつくように）
+      const waiting = coinsRef.current.some((c) => c.id !== id && c.state !== "taken");
+      await sleep(coin.tier === "epic" ? 1800 : coin.tier === "rare" ? 1300 : waiting ? 500 : 1000);
     };
 
     const runNext = async () => {
@@ -597,7 +602,7 @@ export function WanderingFrenchie({
     };
   }, [level]);
 
-  // 5秒ごとに、空からコインが降る（黄色・青は 20%、赤はそれとは別に 5%。画面を見ているときだけ）
+  // 約3.3秒ごとに、空からコインが降る（黄色・青は 20%、赤はそれとは別に 5%、白は 10%。画面を見ているときだけ）
   useEffect(() => {
     if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
     const id = setInterval(() => {
@@ -606,7 +611,7 @@ export function WanderingFrenchie({
       // 黄色・青（いままでどおり）か、それとは別の赤（赤コインの仕組みがあるときだけ）
       const roll = Math.random();
       const kind: CoinKind | null =
-        roll < COIN_CHANCE ? (Math.random() < COIN_BLUE_CHANCE ? "blue" : "coin") : redOkRef.current && roll < COIN_CHANCE + COIN_RED_CHANCE ? "red" : whiteOkRef.current && roll >= COIN_CHANCE + COIN_RED_CHANCE && roll < COIN_CHANCE + COIN_RED_CHANCE + 0.05 ? "white" : null;
+        roll < COIN_CHANCE ? (Math.random() < COIN_BLUE_CHANCE ? "blue" : "coin") : redOkRef.current && roll < COIN_CHANCE + COIN_RED_CHANCE ? "red" : whiteOkRef.current && roll >= COIN_CHANCE + COIN_RED_CHANCE && roll < COIN_CHANCE + COIN_RED_CHANCE + COIN_WHITE_CHANCE ? "white" : null;
       if (!kind) return;
       const box = boxRef.current;
       if (!box) return;
