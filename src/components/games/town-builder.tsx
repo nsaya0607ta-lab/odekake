@@ -10,7 +10,7 @@ import { TownTouchControls } from "@/lib/games/town-touch-controls";
 import { FacilityWorkshop, ParkPurchase, ParkWorkshop } from "./town-workshop";
 import { WhiteCoinArt } from "@/components/coin-art";
 import { decodeTownSnapshot } from "@/lib/data/town-builder";
-import type { TownCommand } from "@/lib/games/town-commands";
+import { applyTownCommand, type TownCommand } from "@/lib/games/town-commands";
 import { TOWN_QUESTS, townProgress, townQuestMetrics, townRank, type TownSnapshot } from "@/lib/games/town-progression";
 import { TownCrest, TownRpgPanel, WhitePrice } from "./town-rpg";
 import { useTownSky, type TownSkyModes } from "./use-town-sky";
@@ -20,6 +20,8 @@ import styles from "./town-builder.module.css";
 
 type Mode = Tool | "inspect" | "pan" | "decorate";
 type Panel = "build" | "view" | "help" | "land" | "customize" | "quests" | null;
+/** Same buildings, parks and parts: a saved result that matches the screen keeps the drawn arrays. */
+const sameLayout = (a: Town, b: Town) => a.tiles.join() === b.tiles.join() && a.levels.join() === b.levels.join() && a.terrain.join() === b.terrain.join() && JSON.stringify(a.parks) === JSON.stringify(b.parks) && JSON.stringify(a.attachments) === JSON.stringify(b.attachments);
 type TownRequest = { userId: string; requestId: string; revision: number; action: "start" | "edit" | "undo" | "quest" | "daily" | "reset"; command?: TownCommand; questId?: string; starter?: boolean; legacy?: Town };
 const F = new Intl.NumberFormat("ja-JP");
 const compactMoney = new Intl.NumberFormat("ja-JP", { notation: "compact", maximumFractionDigits: 1 });
@@ -169,7 +171,8 @@ export function TownBuilder({ userId }: { userId: string }) {
     // Keeping the town arrays avoids redrawing the whole map and re-framing a selected building.
     if (previous?.revision === next.revision) { if (next.town) setTown(t => t.money === next.balance ? t : { ...t, money: next.balance }); }
     else if (next.town) {
-      setTown(previousTown => ({ ...next.town!, money: next.balance, day: Math.max(previousTown.day, next.town!.day), paused: previousTown.paused }));
+      // An edit already shown on screen keeps its arrays, so the map and its build animation are not redrawn.
+      setTown(previousTown => sameLayout(previousTown, next.town!) ? { ...previousTown, money: next.balance, day: Math.max(previousTown.day, next.town!.day) } : { ...next.town!, money: next.balance, day: Math.max(previousTown.day, next.town!.day), paused: previousTown.paused });
       setWelcome(false);
     } else { setWelcome(true); setTown(createTown()); }
     setConnectionError(""); setSaveStatus("アカウント保存済み");
@@ -269,7 +272,13 @@ export function TownBuilder({ userId }: { userId: string }) {
     const timer = window.setTimeout(() => setLevelUp(null), 4200);
     return () => window.clearTimeout(timer);
   }, [levelUp]);
-  const runAction = async (action: Omit<TownRequest, "requestId" | "revision" | "userId">, retry = false) => {
+  /** Put back the saved town after a change the server refused. */
+  const restoreTown = useCallback(() => {
+    const saved = economyRef.current;
+    if (!saved?.town) return;
+    setTown(t => sameLayout(t, saved.town!) && t.money === saved.balance ? t : { ...saved.town!, money: saved.balance, day: Math.max(t.day, saved.town!.day), paused: t.paused });
+  }, []);
+  const runAction = async (action: Omit<TownRequest, "requestId" | "revision" | "userId">, retry = false, shown = false) => {
     if (inFlight.current) return false;
     if (!economyRef.current) { setNotice("街のデータに接続してから、もう一度お試しください。"); return false; }
     if (pendingRequest.current && !retry) { setNotice("前の保存結果を確認しています。「再試行」を押してください。"); return false; }
@@ -290,12 +299,14 @@ export function TownBuilder({ userId }: { userId: string }) {
       }
       readServerClock(response);
       pendingRequest.current = null; receiveSnapshot(next, true);
-      if (result.message) setNotice(result.message, payload.action === "quest" || payload.action === "daily");
+      if (result.message && !shown) setNotice(result.message, payload.action === "quest" || payload.action === "daily");
       return true;
     } catch (error) {
       if (accountRef.current !== account) return false;
       const message = connectionMessage(error, "通信が途切れました。同じ操作を再試行できます。");
       setNotice(message);
+      // A refused edit returns to the saved town. One still being checked stays on screen until "再試行".
+      if (!pendingRequest.current) restoreTown();
       if (pendingRequest.current) { setConnectionError(message); setSaveStatus("保存を確認"); }
       else setSaveStatus("アカウント保存済み");
       return false;
@@ -401,7 +412,16 @@ export function TownBuilder({ userId }: { userId: string }) {
   const chooseMode = (next: Mode) => { setMode(next); setEditingLotId(null); setStroke(false); setPreview([]); setHover(null); setSelected(null); setNotice(next === "pan" || next === "inspect" ? "1本指で移動、2本指で拡大・縮小。建物はタップで調べられます。" : BUILDINGS.find(b => b.id === next)?.info ?? "", false); };
   const closePanel = () => { setPanel(null); if (panel === "customize") { setMode("inspect"); setEditingLotId(null); setPreview([]); setHover(null); } };
   const openCustomize = () => { if (selected === null) return; setPanel("customize"); setEditingLotId(selectedLot?.id ?? null); setMode(selectedLot ? "decorate" : "inspect"); setPart("tree"); setPreview([]); setHover(null); };
-  const edit = (command: TownCommand) => runAction({ action: "edit", command });
+  // The change appears at once, worked out with the same rules the server uses; saving finishes in the background.
+  const edit = (command: TownCommand): Promise<boolean> => {
+    if (!economyRef.current?.town || inFlight.current || pendingRequest.current) return runAction({ action: "edit", command });
+    const local = applyTownCommand(town, command);
+    if (local.town === town) { setNotice(local.message.replaceAll("資金", "白コイン")); return Promise.resolve(false); }
+    setTown(t => ({ ...local.town, day: t.day, paused: t.paused }));
+    setNotice(local.message.replaceAll("¥", "白コイン "));
+    void runAction({ action: "edit", command }, false, true);
+    return Promise.resolve(true);
+  };
   const commit = (path: number[]) => {
     if (!loaded || welcome || !path.length) return;
     if (mode === "pan") return;
