@@ -1,6 +1,6 @@
--- ホームに降ってくるコインを全体で5倍にする（ユーザー指定）。0142 の後に適用する。
--- アプリは5秒ごとの抽選を1秒ごとにする。DB は受け取りの間かくを 8秒→1秒、
--- 直近1時間のレア回数の上限を 中レア 30→150・高レア 8→40 にする（枚数・二重受け取りの防止は変えない）。
+-- ホームに降ってくるコインを全体で1.5倍にする（ユーザー指定）。0142 の後に適用する。
+-- アプリは5秒ごとの抽選を約3.3秒ごとにする。DB は受け取りの間かくを 8秒→5秒、
+-- 直近1時間のレア回数の上限を 中レア 30→45・高レア 8→12 にする（枚数・二重受け取りの防止は変えない）。
 begin;
 
 create or replace function public.claim_home_coin_drop(p_drop_id text, p_kind text, p_tier text default 'common')
@@ -41,7 +41,7 @@ begin
     return jsonb_build_object('ok', true, 'granted', false, 'reason', 'duplicate');
   end if;
 
-  -- 前の受け取りから 1 秒（4色のどれでも。0143 で 8 秒から短くした）
+  -- 前の受け取りから 5 秒（4色のどれでも。0143 で 8 秒から短くした）
   select max(created_at) into v_last
     from public.coin_events
    where user_id = v_user_id and event_type = 'home_drop' and created_at > now() - interval '1 minute';
@@ -52,11 +52,11 @@ begin
     from public.red_coin_events
    where user_id = v_user_id and event_type = 'home_drop' and created_at > now() - interval '1 minute';
   select greatest(v_last, max(created_at)) into v_last from public.white_coin_events where user_id=v_user_id and event_type='home_drop' and created_at>now()-interval '1 minute';
-  if v_last is not null and v_last > now() - interval '1 second' then
+  if v_last is not null and v_last > now() - interval '5 seconds' then
     return jsonb_build_object('ok', true, 'granted', false, 'reason', 'too_soon');
   end if;
 
-  -- レア度ごとの、直近1時間の回数（4色あわせて。0143 で5倍）。超えたら、ふつうとして渡す
+  -- レア度ごとの、直近1時間の回数（4色あわせて。0143 で1.5倍）。超えたら、ふつうとして渡す
   v_tier := p_tier;
   if v_tier <> 'common' then
     select
@@ -71,7 +71,7 @@ begin
           and created_at > now() - interval '1 hour' and metadata->>'tier' = v_tier)
       + (select count(*) from public.white_coin_events where user_id=v_user_id and event_type='home_drop' and created_at>now()-interval '1 hour' and metadata->>'tier'=v_tier)
       into v_tier_count;
-    v_tier_limit := (case v_tier when 'epic' then 40 else 150 end);
+    v_tier_limit := (case v_tier when 'epic' then 12 else 45 end);
     if v_tier_count >= v_tier_limit then
       v_tier := 'common';
     end if;

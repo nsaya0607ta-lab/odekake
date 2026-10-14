@@ -5,7 +5,7 @@ import { requireUser } from "@/lib/supabase/server";
 /**
  * ホームの犬カードに降ってきたコインを受け取る。ふつう 5 枚・中レア 20 枚・高レア 100 枚（黄色・青・赤どれも同じ）。
  *
- * 1日の回数に上限はない。間かく（1秒。0143 で8秒から短くした）・二重受け取り・レアの回数（直近1時間）は DB（claim_home_coin_drop）が止める。
+ * 1日の回数に上限はない。間かく（5秒。0143 で8秒から短くした）・二重受け取り・レアの回数（直近1時間）は DB（claim_home_coin_drop）が止める。
  * ここはむだな呼び出しを間引くだけ。赤コイン（ご当地ピンボールのステージの部品に使う）は 0138 を当てるまで
  * 受け取れないので、そのときは「準備中」と返す（アプリはそれを見て、その画面ではもう赤コインを降らせない）。
  */
@@ -17,7 +17,7 @@ function toRecord(value: unknown): Record<string, unknown> {
 export async function POST(request: Request) {
   const { supabase, user } = await requireUser();
 
-  const limit = checkRateLimit(`home-drop:${user.id}`, 90, 60_000);
+  const limit = checkRateLimit(`home-drop:${user.id}`, 20, 60_000);
   if (!limit.allowed) {
     return NextResponse.json(
       { error: "すこし時間をおいてからお試しください。" },
