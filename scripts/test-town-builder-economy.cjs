@@ -246,13 +246,13 @@ function apiWithSession(session) {
     assert.equal((await db.query('select balance from public.user_coins where user_id=auth.uid()')).rows[0].balance, before);
     assert.equal((await rpc('claim_login_bonus')).white_amount, 0);
   });
-  await test('home white coins share cross-color duplicate protection and the 8-second cooldown', async () => {
+  await test('home white coins share cross-color duplicate protection and the 1-second cooldown (0143)', async () => {
     const id = randomUUID().replaceAll('-', '');
     const a = await rpc('claim_home_coin_drop', { p_drop_id: id, p_kind: 'white', p_tier: 'epic' });
     assert.equal(a.amount, 100); assert(a.granted);
     assert.equal((await rpc('claim_home_coin_drop', { p_drop_id: id, p_kind: 'red' })).reason, 'duplicate');
     assert.equal((await rpc('claim_home_coin_drop', { p_drop_id: randomUUID(), p_kind: 'coin' })).reason, 'too_soon');
-    await db.exec("update public.white_coin_events set created_at=now()-interval '9 seconds' where event_type='home_drop'");
+    await db.exec("update public.white_coin_events set created_at=now()-interval '2 seconds' where event_type='home_drop'");
     const blue = await rpc('claim_home_coin_drop', { p_drop_id: randomUUID(), p_kind: 'blue', p_tier: 'rare' });
     assert.equal(blue.amount, 20);
   });
@@ -291,6 +291,7 @@ function apiWithSession(session) {
     await asUser(); const before = await snapshot();
     await db.exec(fs.readFileSync(path.join(root, 'supabase/migrations/0141_white_coins_town_rpg.sql'), 'utf8'));
     await db.exec(fs.readFileSync(path.join(root, 'supabase/migrations/0142_town_my_home.sql'), 'utf8'));
+    await db.exec(fs.readFileSync(path.join(root, 'supabase/migrations/0143_home_coin_drops_x5.sql'), 'utf8'));
     assert.deepEqual(await snapshot(), before);
     await rpc('claim_login_bonus'); // Would recurse if the wrapper were renamed again.
     assert.equal((await rpc('claim_login_bonus')).white_amount, 0);

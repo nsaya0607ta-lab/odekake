@@ -16,6 +16,7 @@ on:
       - "src/app/api/coins/**"
       - "supabase/migrations/0141_white_coins_town_rpg.sql"
       - "supabase/migrations/0142_town_my_home.sql"
+      - "supabase/migrations/0143_home_coin_drops_x5.sql"
       - "src/components/games/use-town-sky.ts"
       - "src/lib/room/weather.ts"
       - "src/lib/room/sun.ts"
