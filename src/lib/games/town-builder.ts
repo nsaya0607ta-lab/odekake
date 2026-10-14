@@ -1,6 +1,6 @@
 // Independent simulation; OpenTTD code and assets are not used.
 export const MAP_SIZE = 24;
-export type Tile = "grass" | "water" | "road" | "rail" | "station" | "house" | "shop" | "factory" | "park";
+export type Tile = "grass" | "water" | "road" | "rail" | "station" | "house" | "shop" | "factory" | "park" | "home";
 export type Tool = Exclude<Tile, "grass" | "water"> | "bulldoze";
 export type ParkPart = "tree" | "flowers" | "bench" | "fountain" | "playground" | "path" | "light" | "cherry" | "pine" | "hedge" | "pond" | "gazebo" | "picnic" | "swings" | "sandbox" | "sculpture" | "clock" | "trash" | "bikeRack" | "stones" | "arch";
 export type ParkLot = { id: number; x: number; y: number; width: number; height: number; kind: "park" | "plaza"; parts: { tile: number; kind: ParkPart; rotation: number }[] };
@@ -63,6 +63,7 @@ export const BUILDINGS: ReadonlyArray<{ id: Tool; title: string; price: number; 
   { id: "house", title: "住宅", price: 250, info: "道路沿いに建設。公園と仕事があると集合住宅へ育ちます。", category: "建物" },
   { id: "shop", title: "商店", price: 400, info: "道路沿いに建設。街に仕事と買い物の楽しみを届けます。", category: "建物" },
   { id: "factory", title: "工場", price: 650, info: "経済力と雇用を増やします。住宅から離すと住民も快適。", category: "建物" },
+  { id: "home", title: "マイホーム", price: 500, info: "あなたとわんこの家。道路沿いに1軒だけ建てられ、タップすると「マイルームへ」で部屋に入れます。", category: "建物" },
   { id: "park", title: "公園・広場", price: 580, info: "敷地を購入し、木・噴水・ベンチなどを買って配置します。", category: "環境" },
   { id: "bulldoze", title: "撤去", price: 0, info: "タップで撤去。直前の工事は「元に戻す」で取り消せます。", category: "環境" },
 ];
@@ -278,7 +279,8 @@ export function buildTile(town: Town, tool: Tool, x: number, y: number): { town:
     return { town: { ...town, tiles, levels, attachments: town.attachments.filter(a => a.tile !== i) }, message: "撤去しました" };
   }
   if (existing !== "grass" && !(existing === "water" && ["road", "rail"].includes(tool))) return { town, message: existing === "water" ? "川には道路・線路で橋を架けられます" : "建設物があります。撤去するか、別の場所を選んでください" };
-  if (["house", "shop", "factory"].includes(tool) && !touchesRoad(town.tiles, x, y)) return { town, message: "道路の隣に建ててください" };
+  if (["house", "shop", "factory", "home"].includes(tool) && !touchesRoad(town.tiles, x, y)) return { town, message: "道路の隣に建ててください" };
+  if (tool === "home" && town.tiles.includes("home")) return { town, message: "マイホームは1軒だけ建てられます" };
   const cost = town.terrain[i] ? tool === "road" ? 120 : 160 : PRICE[tool];
   if (town.money < cost) return { town, message: "資金が不足しています" };
   const tiles = town.tiles.slice(), levels = town.levels.slice(); tiles[i] = tool; levels[i] = ["house", "shop", "factory"].includes(tool) ? 1 : 0;
@@ -345,8 +347,8 @@ export function decodeTown(raw: string | null): Town | null {
   try {
     const obj = JSON.parse(raw) as Record<string, unknown>;
     if (!obj || typeof obj !== "object") return null;
-    const allowed = new Set(["grass", "water", "road", "rail", "station", "house", "shop", "factory", "park"]);
-    if (!Array.isArray(obj.tiles) || obj.tiles.length !== MAP_SIZE ** 2 || !obj.tiles.every(v => allowed.has(v))) return null;
+    const allowed = new Set(["grass", "water", "road", "rail", "station", "house", "shop", "factory", "park", "home"]);
+    if (!Array.isArray(obj.tiles) || obj.tiles.length !== MAP_SIZE ** 2 || !obj.tiles.every(v => allowed.has(v)) || obj.tiles.filter(v => v === "home").length > 1) return null;
     if (typeof obj.money !== "number" || !Number.isFinite(obj.money) || Math.abs(obj.money) > 1e12) return null;
     if (typeof obj.day !== "number" || !Number.isInteger(obj.day) || obj.day < 1 || obj.day > 1e9) return null;
     const tiles = obj.tiles as Tile[];

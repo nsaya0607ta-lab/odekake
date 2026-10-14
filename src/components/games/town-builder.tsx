@@ -13,6 +13,9 @@ import { decodeTownSnapshot } from "@/lib/data/town-builder";
 import type { TownCommand } from "@/lib/games/town-commands";
 import { TOWN_QUESTS, townProgress, townQuestMetrics, townRank, type TownSnapshot } from "@/lib/games/town-progression";
 import { TownCrest, TownRpgPanel, WhitePrice } from "./town-rpg";
+import { useTownSky, type TownSkyModes } from "./use-town-sky";
+import { townClockLabel } from "@/lib/games/town-environment";
+import { WEATHER_LABEL } from "@/lib/room/weather";
 import styles from "./town-builder.module.css";
 
 type Mode = Tool | "inspect" | "pan" | "decorate";
@@ -48,13 +51,34 @@ function Glyph({ name }: { name: string }) {
       <><path d="m3 17 6-6 4 4 8-10M16 5h5v5" /></>}
   </svg>;
 }
+type TownSky = ReturnType<typeof useTownSky>;
+type SkyEnvironment = NonNullable<TownSky["environment"]>;
+function skyIcon(env: SkyEnvironment) {
+  if (env.night > .55 && (env.weather === "clear" || env.weather === "partly")) return "🌙";
+  return WEATHER_LABEL[env.weather].icon;
+}
+function skyWord(env: SkyEnvironment) { return WEATHER_LABEL[env.weather].label; }
+const TIME_CHOICES: { id: TownSkyModes["time"]; label: string }[] = [{ id: "real", label: "現実" }, { id: "morning", label: "朝" }, { id: "day", label: "昼" }, { id: "evening", label: "夕方" }, { id: "night", label: "夜" }];
+const WEATHER_CHOICES: { id: TownSkyModes["weather"]; label: string }[] = [{ id: "real", label: "現実" }, { id: "clear", label: "晴れ" }, { id: "cloudy", label: "くもり" }, { id: "rain", label: "雨" }, { id: "snow", label: "雪" }];
+/** The sky follows the real time and weather of the My Room place; it can also be fixed for viewing. */
+function SkySettings({ sky }: { sky: TownSky }) {
+  const env = sky.environment;
+  return <section className={styles.skySettings} aria-label="空と天気">
+    <div className={styles.skyNow}><span aria-hidden="true">{env ? skyIcon(env) : "☁️"}</span><div><b>{env ? `${skyWord(env)}${env.temperature === null ? "" : ` ${Math.round(env.temperature)}℃`}` : "空を読み込み中"}</b><small>{sky.placeName} · {env ? townClockLabel(env) : "--:--"}{env?.live ? " · 現実と同じ" : " · 表示を変更中"}</small></div></div>
+    <div className={styles.skyChoices} role="group" aria-label="時間帯">{TIME_CHOICES.map(c => <button type="button" key={c.id} aria-pressed={sky.modes.time === c.id} onClick={() => sky.setMode({ time: c.id })}>{c.label}</button>)}</div>
+    <div className={styles.skyChoices} role="group" aria-label="天気">{WEATHER_CHOICES.map(c => <button type="button" key={c.id} aria-pressed={sky.modes.weather === c.id} onClick={() => sky.setMode({ weather: c.id })}>{c.label}</button>)}</div>
+    <small>「現実」は、マイルームで選んだ場所{sky.place.saved ? "" : "（未設定のため東京）"}の時刻と天気です。</small>
+  </section>;
+}
 export function TownBuilder({ userId }: { userId: string }) {
   const key = "odekake-town-builder:v3:" + userId, previousKey = "odekake-town-builder:v2:" + userId, legacyKey = "odekake-town-builder:v1:" + userId;
   const [town, setTown] = useState<Town>(() => createTown());
   const [loadedKey, setLoadedKey] = useState<string | null>(null), [welcome, setWelcome] = useState(false);
   const loaded = loadedKey === key;
   const [mode, setMode] = useState<Mode>("inspect"), [category, setCategory] = useState("交通");
-  const [speed, setSpeed] = useState(1), [night, setNight] = useState(false), [grid, setGrid] = useState(false);
+  const [speed, setSpeed] = useState(1), [grid, setGrid] = useState(false);
+  const sky = useTownSky(), environment = sky.environment, night = (environment?.night ?? 0) > .55;
+  const darkness = useRef(0); darkness.current = environment?.night ?? 0;
   const [selected, setSelected] = useState<number | null>(null), [hover, setHover] = useState<number | null>(null);
   const [preview, setPreview] = useState<number[]>([]);
   const [snapshot, setSnapshot] = useState<TownSnapshot | null>(null), [busy, setBusy] = useState(false), [connectionError, setConnectionError] = useState("");
@@ -122,12 +146,13 @@ export function TownBuilder({ userId }: { userId: string }) {
   const canCustomize = Boolean(selectedLot || active && FACILITY_PARTS.some(p => p.kinds.includes(active)));
   const showSelection = mode === "inspect" && selected !== null && active !== "grass" && active !== "water" && !panel && !scenery && !welcome;
   const canUpgrade = active === "house" || active === "shop" || active === "factory";
+  const homeTile = town.tiles.indexOf("home");
   const linearTool = mode === "road" || mode === "rail";
   const connected = selected !== null && touchesRoad(town.tiles, selected % MAP_SIZE, Math.floor(selected / MAP_SIZE));
   const phase = stats.population >= 500 ? "小さな都市" : stats.population >= 150 ? "にぎやかな街" : "小さな集落";
   useEffect(() => () => { if (noticeTimer.current) window.clearTimeout(noticeTimer.current); }, []);
   // One stable renderer reads current data without restarting the animation on React updates.
-  useEffect(() => { stateRef.current = { town, options: { night, grid, hover, selected, preview, tool: mode, routes: stats.routes, paused: town.paused || welcome || !loaded, speed, parkSize, parkKind, parkRotated, editLot: mode === "decorate" ? editingLotId ?? undefined : undefined, parkPart: part, partRotation } }; }, [town, night, grid, hover, selected, preview, mode, stats.routes, welcome, loaded, speed, parkSize, parkKind, parkRotated, editingLotId, panel, part, partRotation]);
+  useEffect(() => { stateRef.current = { town, options: { night, environment: environment ?? undefined, grid, hover, selected, preview, tool: mode, routes: stats.routes, paused: town.paused || welcome || !loaded, speed, parkSize, parkKind, parkRotated, editLot: mode === "decorate" ? editingLotId ?? undefined : undefined, parkPart: part, partRotation } }; }, [town, night, environment, grid, hover, selected, preview, mode, stats.routes, welcome, loaded, speed, parkSize, parkKind, parkRotated, editingLotId, panel, part, partRotation]);
   const receiveSnapshot = useCallback((next: TownSnapshot, celebrate = false) => {
     const previous = economyRef.current;
     if (previous && next.revision < previous.revision) return;
@@ -240,6 +265,7 @@ export function TownBuilder({ userId }: { userId: string }) {
   }, [town.parks, town.tiles, editingLotId, selected]);
   useEffect(() => {
     if (!levelUp) return;
+    sceneRef.current?.celebrate(darkness.current > .45);
     const timer = window.setTimeout(() => setLevelUp(null), 4200);
     return () => window.clearTimeout(timer);
   }, [levelUp]);
@@ -329,10 +355,18 @@ export function TownBuilder({ userId }: { userId: string }) {
     if (!loaded || town.paused || welcome) return;
     // The visual clock never mints account currency or builds unpaid houses.
     const timer = window.setInterval(() => setTown(prev => prev.paused ? prev : { ...prev, day: Math.min(1e9, prev.day + 1) }), 2500 / speed);
-    const onVisibility = () => { if (document.hidden) setTown(prev => ({ ...prev, paused: true })); };
-    document.addEventListener("visibilitychange", onVisibility);
-    return () => { window.clearInterval(timer); document.removeEventListener("visibilitychange", onVisibility); };
+    return () => window.clearInterval(timer);
   }, [loaded, town.paused, welcome, speed]);
+  const autoPaused = useRef(false);
+  useEffect(() => {
+    // A hidden tab pauses the town; coming back resumes it, unless the player paused it themselves.
+    const onVisibility = () => {
+      if (document.hidden) setTown(prev => { if (prev.paused) return prev; autoPaused.current = true; return { ...prev, paused: true }; });
+      else if (autoPaused.current) { autoPaused.current = false; setTown(prev => prev.paused ? { ...prev, paused: false } : prev); }
+    };
+    document.addEventListener("visibilitychange", onVisibility);
+    return () => document.removeEventListener("visibilitychange", onVisibility);
+  }, []);
   useEffect(() => {
     const canvas = canvasRef.current; if (!canvas) return;
     const scene = new TownScene(); sceneRef.current = scene;
@@ -528,6 +562,9 @@ export function TownBuilder({ userId }: { userId: string }) {
         <span className={styles.statIcon}><Glyph name={s.icon} /></span><div><span>{s.label}</span><strong>{s.value}<small>{s.unit}</small></strong></div>
       </div>)}
     </div>
+    {environment && <button type="button" className={styles.skyChip} aria-label={`${sky.placeName} ${townClockLabel(environment)} ${skyWord(environment)}${environment.temperature === null ? "" : ` ${Math.round(environment.temperature)}度`}。空と天気の設定`} disabled={welcome} onClick={() => { if (mode === "decorate") chooseMode("inspect"); setPanel("view"); }}>
+      <span aria-hidden="true">{skyIcon(environment)}</span><b>{townClockLabel(environment)}</b>{environment.temperature !== null && <small>{Math.round(environment.temperature)}℃</small>}<em>{environment.live ? sky.placeName : "表示中"}</em>
+    </button>}
     <div className={styles.sceneButtons}>
       <button type="button" aria-label={town.paused ? "時間を再開" : "時間を停止"} disabled={welcome || !loaded} onClick={() => setTown(t => ({ ...t, paused: !t.paused }))}>{town.paused ? "▶" : "Ⅱ"}</button>
       <button type="button" title="マップ全体を表示" aria-label="マップ全体を表示" onClick={() => sceneRef.current?.fit(sizeRef.current.width, sizeRef.current.height)}><Glyph name="fit" /></button>
@@ -538,10 +575,11 @@ export function TownBuilder({ userId }: { userId: string }) {
       {panel === "quests" && <TownRpgPanel tab={rpgTab} onTab={setRpgTab} metrics={questMetrics} snapshot={snapshot} busy={busy || Boolean(pendingRequest.current)} onClaim={questId => { void runAction({ action: "quest", questId }); }} onDaily={() => { void runAction({ action: "daily" }); }} />}
       {panel === "build" && <>
         <div className={styles.categories}>{["交通", "建物", "環境"].map(c => <button type="button" key={c} aria-pressed={category === c} onClick={() => setCategory(c)}>{c}</button>)}</div>
-        <div className={styles.catalog}>{BUILDINGS.filter(b => b.category === category).map(b => <button type="button" key={b.id} aria-pressed={mode === b.id} onClick={() => {
+        <div className={styles.catalog}>{BUILDINGS.filter(b => b.category === category).map(b => <button type="button" key={b.id} aria-pressed={mode === b.id} aria-label={b.id === "home" && homeTile >= 0 ? "マイホーム 建設済み。家の場所を見る" : undefined} onClick={() => {
           if (b.id === "park") { chooseMode("inspect"); setPanel("land"); return; }
+          if (b.id === "home" && homeTile >= 0) { chooseMode("inspect"); setPanel(null); focusTile(homeTile); setHover(null); setSelected(homeTile); setNotice("マイホームはここです。タップするとマイルームへ行けます。"); return; }
           chooseMode(b.id); setPanel(null);
-        }} className={mode === b.id ? styles.selectedBuild : ""}><BuildingIcon kind={b.id} /><span><b>{b.title}</b><small>{b.price ? <WhitePrice amount={b.price} /> : "無料"}</small></span></button>)}</div>
+        }} className={mode === b.id ? styles.selectedBuild : ""}><BuildingIcon kind={b.id} /><span><b>{b.title}</b><small>{b.id === "home" && homeTile >= 0 ? "建設済み" : b.price ? <WhitePrice amount={b.price} /> : "無料"}</small></span></button>)}</div>
         <p className={styles.toolDescription}>選んだら、街をタップして配置。指でドラッグすると移動できます。</p>
       </>}
       {panel === "land" && <ParkPurchase kind={parkKind} size={parkSize} rotated={parkRotated} money={snapshot && !pendingRequest.current && !busy ? town.money : -1} onKind={setParkKind} onSize={setParkSize} onRotate={() => setParkRotated(v => !v)} onPlace={() => { chooseMode("park"); setPanel(null); }} />}
@@ -551,8 +589,8 @@ export function TownBuilder({ userId }: { userId: string }) {
         void edit({ type: "remove-park", lotId: editingLot.id }).then(ok => { if (ok && interaction.current === intent) { setPanel(null); setEditingLotId(null); setMode("inspect"); setSelected(null); } });
       }} /> : active && selected !== null ? <FacilityWorkshop kind={active} installed={selectedParts ?? []} money={snapshot && !pendingRequest.current && !busy ? town.money : -1} onBuy={(id: FacilityPart) => { void edit({ type: "facility-part", tile: selected, part: id }); }} onRemove={id => { void edit({ type: "remove-facility-part", tile: selected, part: id }); }} /> : null)}
       {panel === "view" && <>
+        <SkySettings sky={sky} />
         <div className={styles.viewOptions}>
-          <button type="button" aria-label={night ? "昼にする" : "夜にする"} onClick={() => setNight(v => !v)}><Glyph name={night ? "moon" : "sun"} />{night ? "昼にする" : "夜にする"}</button>
           <button type="button" aria-label="マス目の表示" aria-pressed={grid} onClick={() => setGrid(v => !v)}><Glyph name="grid" />マス目</button>
           <button type="button" aria-label="拡大" onClick={() => zoom(1.25)}>＋ 拡大</button>
           <button type="button" aria-label="縮小" onClick={() => zoom(.8)}>− 縮小</button>
@@ -572,8 +610,9 @@ export function TownBuilder({ userId }: { userId: string }) {
     </aside>}
     {showSelection && active && selected !== null && <section ref={selectionRef} className={styles.selectionCard} aria-label="選択した建物" data-selected-tile={selected}>
       <div className={styles.selectionInfo}><strong>{selectedLot ? selectedLot.kind === "park" ? "公園" : "広場" : selectedStage ?? BUILDINGS.find(b => b.id === active)?.title}{town.levels[selected]! > 0 && <small>Lv.{town.levels[selected]}</small>}{selectedLot && <small>{selectedLot.width}×{selectedLot.height}</small>}</strong>
-        <p>{selectedLot ? `部品 ${selectedLot.parts.length}点${selectedLot.parts.length ? "" : " · 部品を追加しよう"}` : canUpgrade ? connected ? `道路接続${active === "house" ? ` · 定員 ${(town.levels[selected] || 1) * 18 + (selectedParts?.includes("terrace") ? 6 : 0)}人` : ""}` : "道路への接続が必要です" : active === "station" ? stats.routes.some(r => r[0] === selected || r[r.length - 1] === selected) ? "列車が運行しています" : "もう1つの駅へ線路をつなごう" : "街をつなぐ道"}</p>
+        <p>{selectedLot ? `部品 ${selectedLot.parts.length}点${selectedLot.parts.length ? "" : " · 部品を追加しよう"}` : active === "home" ? "わんこが待っている、あなたの家です" : canUpgrade ? connected ? `道路接続${active === "house" ? ` · 定員 ${(town.levels[selected] || 1) * 18 + (selectedParts?.includes("terrace") ? 6 : 0)}人` : ""}` : "道路への接続が必要です" : active === "station" ? stats.routes.some(r => r[0] === selected || r[r.length - 1] === selected) ? "列車が運行しています" : "もう1つの駅へ線路をつなごう" : "街をつなぐ道"}</p>
       </div>
+      {active === "home" && <Link href="/room" className={styles.roomLink} onClick={() => flushSave()}><span>マイルームへ</span><small>部屋に入る</small></Link>}
       {canUpgrade && <button type="button" className={styles.upgrade} aria-label={nextStage ? `${nextStage}へ増築する 建物Lv.${selectedLevel + 1}` : undefined} onClick={upgrade} disabled={!snapshot || Boolean(pendingRequest.current) || busy || town.levels[selected]! >= 3 || !connected || town.money < (town.levels[selected] || 1) * 450}>{town.levels[selected]! >= 3 ? "最大Lv." : <><span>増築する</span><small>建物Lv.{selectedLevel + 1} · <WhitePrice amount={(town.levels[selected] || 1) * 450} /></small></>}</button>}
       {canCustomize && <button type="button" className={styles.customize} aria-label="施設の部品を追加" onClick={openCustomize}>部品<small>追加</small></button>}
       <button type="button" className={styles.dismiss} aria-label="建物の選択を解除" onClick={() => setSelected(null)}>×</button>

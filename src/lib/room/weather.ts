@@ -18,6 +18,8 @@ export type RoomWeather = {
   precip: number;
   /** 風速（km/h） */
   wind: number;
+  /** 風が吹いてくる方角（度。北0・東90）。取れなければ null */
+  windDir?: number | null;
   /** きょうの最高・最低気温（℃）。取れなければ null */
   tmax?: number | null;
   tmin?: number | null;
@@ -95,6 +97,7 @@ export function parseRoomWeather(raw: unknown): RoomWeather | null {
     cloud,
     precip: Math.max(0, num(r.precip, 0)),
     wind: Math.max(0, num(r.wind, 0)),
+    windDir: opt(r.windDir) == null ? null : ((opt(r.windDir)! % 360) + 360) % 360,
     tmax: opt(r.tmax),
     tmin: opt(r.tmin),
     pop: opt(r.pop) == null ? null : Math.max(0, Math.min(100, opt(r.pop)!)),

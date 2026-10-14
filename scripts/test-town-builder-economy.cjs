@@ -168,6 +168,24 @@ function apiWithSession(session) {
       if (tile === g.indexAt(11, 11)) await action('undo');
     }
   });
+  await test('my home costs 500 white coins, needs a road and stays unique even against forged saves', async () => {
+    const before = await snapshot(), tile = g.indexAt(12, 11);
+    assert.equal(g.BUILDINGS.find(b => b.id === 'home').price, 500);
+    const built = await edit(t => g.buildTile(t, 'home', 12, 11));
+    assert.equal(built.town.tiles[tile], 'home'); assert.equal(built.town.levels[tile], 0);
+    assert.equal(built.balance, before.balance - 500); assert.equal(built.xp, before.xp + 50);
+    assert.equal(g.buildTile({ ...built.town, money: 1e6 }, 'home', 13, 11).message, 'マイホームは1軒だけ建てられます');
+    const second = structuredClone(built.town); second.tiles[g.indexAt(13, 11)] = 'home';
+    await expectError(() => action('edit', { p_town: second }), 'TOWN_HOME_LIMIT');
+    const roadless = structuredClone(built.town); roadless.tiles[tile] = 'grass'; roadless.tiles[g.indexAt(2, 2)] = 'home';
+    await expectError(() => action('edit', { p_town: roadless }), 'TOWN_ROAD_REQUIRED');
+    const upgraded = structuredClone(built.town); upgraded.levels[tile] = 1;
+    await expectError(() => action('edit', { p_town: upgraded }), 'INVALID_TOWN');
+    assert.deepEqual(g.decodeTown(JSON.stringify(built.town)).tiles, built.town.tiles);
+    assert.equal(g.decodeTown(JSON.stringify(second)), null);
+    const undone = await action('undo');
+    assert.equal(undone.town.tiles[tile], 'grass'); assert.equal(undone.balance, before.balance); assert.equal(undone.xp, before.xp);
+  });
   await test('quest metrics match real road connections, park parts and railway routes', async () => {
     let town = g.createTown(false); town.money = 1e6;
     for (let x = 3; x < 16; x++) town = g.buildTile(town, 'road', x, 5).town;
@@ -272,6 +290,7 @@ function apiWithSession(session) {
   await test('reapplying the migration preserves cities, balances, quests and the old login implementation', async () => {
     await asUser(); const before = await snapshot();
     await db.exec(fs.readFileSync(path.join(root, 'supabase/migrations/0141_white_coins_town_rpg.sql'), 'utf8'));
+    await db.exec(fs.readFileSync(path.join(root, 'supabase/migrations/0142_town_my_home.sql'), 'utf8'));
     assert.deepEqual(await snapshot(), before);
     await rpc('claim_login_bonus'); // Would recurse if the wrapper were renamed again.
     assert.equal((await rpc('claim_login_bonus')).white_amount, 0);
@@ -291,6 +310,12 @@ function apiWithSession(session) {
     const after = (await response.json()).snapshot;
     assert.equal(after.balance, before.balance - 35); assert.equal(after.xp, before.xp + 3);
     const replay = await post(payload); assert.equal(replay.status, 200); assert.deepEqual((await replay.json()).snapshot, after);
+    const home = await post({ ...payload, requestId: randomUUID(), revision: after.revision, command: { type: 'build', tool: 'home', path: [g.indexAt(3, 4)] } });
+    assert.equal(home.status, 200); const withHome = (await home.json()).snapshot;
+    let reward = 0; for (let level = after.maxLevel + 1; level <= rpg.townProgress(withHome.xp).level; level++) reward += rpg.townLevelReward(level);
+    assert.equal(withHome.town.tiles[g.indexAt(3, 4)], 'home'); assert.equal(withHome.balance, after.balance - 500 + reward); assert.equal(withHome.xp, after.xp + 50);
+    const again = await post({ ...payload, requestId: randomUUID(), revision: withHome.revision, command: { type: 'build', tool: 'home', path: [g.indexAt(4, 3)] } });
+    assert.equal(again.status, 400); assert.match((await again.json()).error, /1軒だけ/);
     session.displayName = '別の人';
     assert.equal((await api.GET(new Request(`${url}?account=${userId}`))).status, 404);
     assert.equal((await post({ ...payload, requestId: randomUUID() })).status, 404);

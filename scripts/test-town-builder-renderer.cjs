@@ -9,10 +9,15 @@ function compile(file, imports = {}) {
 }
 const game = compile('src/lib/games/town-builder.ts');
 const transport = compile('src/lib/games/town-transport.ts', { './town-builder': game });
-const sprites = compile('src/lib/games/town-sprites.ts');
-const decorations = compile('src/lib/games/town-decorations.ts');
+const paint = compile('src/lib/games/town-paint.ts');
+const sun = compile('src/lib/room/sun.ts'), roomWeather = compile('src/lib/room/weather.ts');
+const environment = compile('src/lib/games/town-environment.ts', { '../room/sun': sun, '../room/weather': roomWeather });
+const sprites = compile('src/lib/games/town-sprites.ts', { './town-paint': paint });
+const decorations = compile('src/lib/games/town-decorations.ts', { './town-paint': paint });
 const models = compile('src/lib/games/town-building-models.ts');
-const { TownScene, drawTownIcon, drawTownPartIcon } = compile('src/lib/games/town-renderer.ts', { './town-builder': game, './town-transport': transport, './town-sprites': sprites, './town-decorations': decorations, './town-building-models': models });
+const sky = compile('src/lib/games/town-sky.ts', { './town-builder': game, './town-environment': environment });
+const life = compile('src/lib/games/town-life.ts', { './town-builder': game, './town-paint': paint, './town-transport': transport });
+const { TownScene, drawTownIcon, drawTownPartIcon } = compile('src/lib/games/town-renderer.ts', { './town-builder': game, './town-transport': transport, './town-sprites': sprites, './town-decorations': decorations, './town-building-models': models, './town-paint': paint, './town-environment': environment, './town-sky': sky, './town-life': life });
 const iso = (x, y, z = 0) => ({ x: (x - y) * 32, y: (x + y) * 16 - z });
 const blank = () => ({ ...game.createTown(false), tiles: Array(576).fill('grass'), terrain: Array(576).fill(false), levels: Array(576).fill(0) });
 let passed = 0;
