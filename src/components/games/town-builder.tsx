@@ -56,6 +56,9 @@ export function TownBuilder({ userId }: { userId: string }) {
   const [selected, setSelected] = useState<number | null>(null), [hover, setHover] = useState<number | null>(null);
   const [preview, setPreview] = useState<number[]>([]);
   const [snapshot, setSnapshot] = useState<TownSnapshot | null>(null), [busy, setBusy] = useState(false), [connectionError, setConnectionError] = useState("");
+  const [refreshing, setRefreshing] = useState(false);
+  const readVersion = useRef(0), readController = useRef<AbortController | null>(null), lastReadAt = useRef(-Infinity);
+  const serverClock = useRef<{ time: number; received: number } | null>(null);
   const economyRef = useRef<TownSnapshot | null>(null), inFlight = useRef(false), pendingRequest = useRef<TownRequest | null>(null);
   const accountRef = useRef(userId), interaction = useRef(0);
   accountRef.current = userId;
@@ -108,7 +111,7 @@ export function TownBuilder({ userId }: { userId: string }) {
   const item = BUILDINGS.find(b => b.id === mode);
   const progress = townProgress(snapshot?.xp ?? 0), rank = townRank(progress.level);
   const questMetrics = useMemo(() => townQuestMetrics({ tiles: town.tiles, levels: town.levels, parks: town.parks, attachments: town.attachments }, stats), [town.tiles, town.levels, town.parks, town.attachments, stats]);
-  const readyQuests = TOWN_QUESTS.filter(q => q.level <= progress.level && !snapshot?.claimedQuests.includes(q.id) && (questMetrics[q.id] ?? 0) >= q.target).length;
+  const readyQuests = snapshot ? TOWN_QUESTS.filter(q => q.level <= progress.level && !snapshot.claimedQuests.includes(q.id) && (questMetrics[q.id] ?? 0) >= q.target).length + (snapshot.dailyClaimed ? 0 : 1) + (!snapshot.dailyQuestClaimed && snapshot.dailySpent >= 500 ? 1 : 0) : 0;
   const active = selected === null ? null : town.tiles[selected];
   const selectedLevel = selected === null ? 0 : town.levels[selected] || 0;
   const selectedStage = buildingStage(active ?? undefined, selectedLevel), nextStage = selectedLevel < 3 ? buildingStage(active ?? undefined, selectedLevel + 1) : undefined;
@@ -125,6 +128,7 @@ export function TownBuilder({ userId }: { userId: string }) {
   useEffect(() => { stateRef.current = { town, options: { night, grid, hover, selected, preview, tool: mode, routes: stats.routes, paused: town.paused || welcome || !loaded, speed, parkSize, parkKind, parkRotated, editLot: mode === "decorate" ? editingLotId ?? undefined : undefined, parkPart: part, partRotation } }; }, [town, night, grid, hover, selected, preview, mode, stats.routes, welcome, loaded, speed, parkSize, parkKind, parkRotated, editingLotId, panel, part, partRotation]);
   const receiveSnapshot = useCallback((next: TownSnapshot, celebrate = false) => {
     const previous = economyRef.current;
+    if (previous && next.revision < previous.revision) return;
     if (celebrate && previous) {
       const beforeLevel = townProgress(previous.xp).level, afterLevel = townProgress(next.xp).level;
       if (afterLevel > beforeLevel) {
@@ -140,40 +144,90 @@ export function TownBuilder({ userId }: { userId: string }) {
     } else { setWelcome(true); setTown(createTown()); }
     setConnectionError(""); setSaveStatus("アカウント保存済み");
   }, []);
-  const loadGame = useCallback(async (signal?: AbortSignal) => {
+  const readServerClock = useCallback((response: Response) => {
+    const time = Date.parse(response.headers.get("date") ?? "");
+    if (Number.isFinite(time)) serverClock.current = { time, received: performance.now() };
+  }, []);
+  const cancelReads = useCallback(() => {
+    readVersion.current++; readController.current?.abort(); readController.current = null;
+  }, []);
+  const loadGame = useCallback(async (signal?: AbortSignal, background = false) => {
+    if (signal?.aborted || background && (inFlight.current || pendingRequest.current || readController.current)) return;
+    const version = ++readVersion.current, account = userId;
+    readController.current?.abort();
+    const controller = new AbortController(); readController.current = controller;
+    const abort = () => controller.abort();
+    signal?.addEventListener("abort", abort, { once: true });
+    const current = () => accountRef.current === account && version === readVersion.current && !signal?.aborted;
+    const timeout = window.setTimeout(abort, 20_000);
+    lastReadAt.current = performance.now(); setRefreshing(true);
     let saved: Town | null = null;
     try { saved = decodeTown(localStorage.getItem(key) ?? localStorage.getItem(previousKey) ?? localStorage.getItem(legacyKey)); } catch { /* Account save is still available. */ }
-    if (saved) setTown(saved);
+    if (saved && !economyRef.current) setTown(saved);
     try {
-      const response = await fetch(`/api/games/town-builder?account=${encodeURIComponent(userId)}`, { cache: "no-store", signal });
+      const response = await fetch(`/api/games/town-builder?account=${encodeURIComponent(userId)}`, { cache: "no-store", signal: controller.signal });
       const body = await response.json().catch(() => null);
+      if (!current()) return;
+      if (controller.signal.aborted) throw new DOMException("Connection timeout", "AbortError");
       if (!body || response.redirected) throw new Error("ログイン状態と通信を確認して、再試行してください。");
       const remote = decodeTownSnapshot(body.snapshot);
       if (!response.ok || !remote) throw new Error(body.error ?? "街の保存データに接続できません。");
-      if (signal?.aborted) return;
+      readServerClock(response);
       if (!remote.town && saved) {
         // Store the import request before sending it so an interrupted response can be retried safely.
         const importKey = `${key}:import-request`;
         let requestId: string;
         try { const oldId = localStorage.getItem(importKey); requestId = oldId && /^[0-9a-f-]{36}$/i.test(oldId) ? oldId : crypto.randomUUID(); localStorage.setItem(importKey, requestId); } catch { requestId = crypto.randomUUID(); }
-        const imported = await fetch("/api/games/town-builder", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ userId, requestId, revision: remote.revision, action: "start", legacy: saved }), signal });
+        const imported = await fetch("/api/games/town-builder", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ userId, requestId, revision: remote.revision, action: "start", legacy: saved }), signal: controller.signal });
         const result = await imported.json().catch(() => null), importedSnapshot = decodeTownSnapshot(result?.snapshot);
+        if (!current()) return;
+        if (controller.signal.aborted) throw new DOMException("Connection timeout", "AbortError");
         if (!imported.ok || !importedSnapshot) throw new Error(result?.error ?? "街を引き継げませんでした。");
-        if (signal?.aborted) return;
+        readServerClock(imported);
         receiveSnapshot(importedSnapshot); setNotice("これまでの街を引き継ぎました。白コインで新しい開拓へ！");
       } else receiveSnapshot(remote);
       setLoadedKey(key);
     } catch (error) {
-      if (signal?.aborted) return;
-      setConnectionError(error instanceof Error ? error.message : "接続を確認してください。"); setSaveStatus("接続を確認"); setWelcome(!saved); setLoadedKey(key);
+      if (!current()) return;
+      setConnectionError(error instanceof Error && error.name !== "AbortError" ? error.message : "接続に時間がかかっています。街を残したまま再試行できます。"); setSaveStatus("接続を確認");
+      if (!economyRef.current) { setWelcome(!saved); setLoadedKey(key); }
+    } finally {
+      window.clearTimeout(timeout); signal?.removeEventListener("abort", abort);
+      if (version === readVersion.current) { readController.current = null; if (accountRef.current === account) setRefreshing(false); }
     }
-  }, [key, previousKey, legacyKey, userId, receiveSnapshot, setNotice]);
+  }, [key, previousKey, legacyKey, userId, receiveSnapshot, readServerClock, setNotice]);
   useEffect(() => {
     const abort = new AbortController();
-    economyRef.current = null; pendingRequest.current = null; inFlight.current = false; setBusy(false); setSnapshot(null); setLoadedKey(null); setSelected(null); setPanel(null); pendingSave.current = null;
+    economyRef.current = null; pendingRequest.current = null; inFlight.current = false; serverClock.current = null; setBusy(false); setSnapshot(null); setLoadedKey(null); setSelected(null); setPanel(null); pendingSave.current = null;
     void loadGame(abort.signal);
-    return () => abort.abort();
-  }, [loadGame]);
+    return () => { abort.abort(); cancelReads(); };
+  }, [loadGame, cancelReads]);
+  useEffect(() => {
+    if (!loaded) return;
+    const refresh = (event?: Event) => {
+      if (document.hidden || event?.type !== "online" && performance.now() - lastReadAt.current < 3000) return;
+      if (event?.type === "online" && !inFlight.current && !pendingRequest.current) cancelReads();
+      void loadGame(undefined, true);
+    };
+    const checkDay = () => {
+      const clock = serverClock.current, saved = economyRef.current;
+      if (clock && saved && new Date(clock.time + performance.now() - clock.received + 9 * 60 * 60_000).toISOString().slice(0, 10) !== saved.date) refresh();
+    };
+    window.addEventListener("focus", refresh); window.addEventListener("online", refresh); window.addEventListener("pageshow", refresh);
+    document.addEventListener("visibilitychange", refresh);
+    const timer = window.setInterval(checkDay, 15_000);
+    return () => {
+      window.removeEventListener("focus", refresh); window.removeEventListener("online", refresh); window.removeEventListener("pageshow", refresh);
+      document.removeEventListener("visibilitychange", refresh); window.clearInterval(timer);
+    };
+  }, [loaded, loadGame, cancelReads]);
+  useEffect(() => {
+    if (editingLotId !== null && !town.parks.some(p => p.id === editingLotId)) {
+      setEditingLotId(null); setMode(m => m === "decorate" ? "inspect" : m); setPanel(p => p === "customize" ? null : p); setSelected(null);
+    } else if (selected !== null && (town.tiles[selected] === "grass" || town.tiles[selected] === "water")) {
+      setSelected(null); setPanel(p => p === "customize" ? null : p);
+    }
+  }, [town.parks, town.tiles, editingLotId, selected]);
   useEffect(() => {
     if (!levelUp) return;
     const timer = window.setTimeout(() => setLevelUp(null), 4200);
@@ -185,6 +239,7 @@ export function TownBuilder({ userId }: { userId: string }) {
     if (pendingRequest.current && !retry) { setNotice("前の保存結果を確認しています。「再試行」を押してください。"); return false; }
     const payload = retry && pendingRequest.current ? pendingRequest.current : { ...action, userId, requestId: crypto.randomUUID(), revision: economyRef.current.revision };
     const account = userId;
+    cancelReads(); setRefreshing(false);
     pendingRequest.current = payload; inFlight.current = true; setBusy(true); setSaveStatus("保存中");
     const controller = new AbortController(), timeout = window.setTimeout(() => controller.abort(), 20_000);
     try {
@@ -194,9 +249,10 @@ export function TownBuilder({ userId }: { userId: string }) {
       if (!result || response.redirected) throw new Error("ログイン状態と通信を確認して、再試行してください。");
       if (!response.ok || !next) {
         if (response.status < 500) { pendingRequest.current = null; setConnectionError(""); }
-        if (response.status === 409) { await loadGame(); setSelected(null); setPanel(p => p === "customize" ? null : p); setEditingLotId(null); }
+        if (response.status === 409) { await loadGame(); if (accountRef.current !== account) return false; setSelected(null); setPanel(p => p === "customize" ? null : p); setEditingLotId(null); }
         throw new Error(result.error ?? "保存結果を確認できませんでした。");
       }
+      readServerClock(response);
       pendingRequest.current = null; receiveSnapshot(next, true);
       if (result.message) setNotice(result.message, payload.action === "quest" || payload.action === "daily");
       return true;
@@ -382,8 +438,9 @@ export function TownBuilder({ userId }: { userId: string }) {
   };
   const reset = () => {
     if (!window.confirm("今の街を更地に戻します。白コイン・経験値・達成したクエストは引き継ぎます。よろしいですか？")) return;
+    const intent = interaction.current;
     void runAction({ action: "reset", starter: false }).then(ok => {
-      if (ok) { setSelected(null); setPanel(null); setEditingLotId(null); setMode("inspect"); }
+      if (ok && interaction.current === intent) { setSelected(null); setPanel(null); setEditingLotId(null); setMode("inspect"); }
     });
   };
   const viewScenery = (value: boolean) => { setScenery(value); setPanel(null); chooseMode(value ? "pan" : "inspect"); if (!value) canvasRef.current?.focus(); };
@@ -420,7 +477,7 @@ export function TownBuilder({ userId }: { userId: string }) {
     const element = target instanceof Element ? target.closest<HTMLElement>("button, a[href]") : null;
     return element && gameRef.current?.contains(element) ? element : null;
   };
-  return <main ref={gameRef} className={styles.game} data-town-screen data-scenery={scenery} data-night={night} data-welcome={welcome} data-panel={panel ?? "none"} data-revision={snapshot?.revision ?? 0} aria-busy={busy}
+  return <main ref={gameRef} className={styles.game} data-town-screen data-scenery={scenery} data-night={night} data-welcome={welcome} data-panel={panel ?? "none"} data-revision={snapshot?.revision ?? 0} aria-busy={busy || refreshing}
     onPointerDownCapture={e => { interaction.current++; touchControls.current?.start(controlTarget(e.target), e); }}
     onKeyDownCapture={() => { interaction.current++; }}
     onWheelCapture={() => { interaction.current++; }}
@@ -451,7 +508,7 @@ export function TownBuilder({ userId }: { userId: string }) {
           <TownCrest level={progress.level} /><span><h1>ぼくのまちづくり</h1><p>{rank.title}</p><span className={styles.headerExp} aria-label={progress.max ? "最高レベル" : `経験値 ${progress.current} / ${progress.required}`}><i style={{ width: `${progress.ratio * 100}%` }} /></span><small>{progress.max ? "MAX LEVEL" : `Lv.${progress.level} · ${progress.current} / ${progress.required} EXP`}</small></span>
         </button>
       </div>
-      <button type="button" className={styles.budget} aria-label={`白コイン ${F.format(snapshot?.balance ?? 0)}枚。もらい方を見る`} disabled={welcome || !loaded} onClick={() => { chooseMode("inspect"); setRpgTab("quests"); setPanel("quests"); }}><span>白コイン</span><strong title={`${F.format(snapshot?.balance ?? 0)}枚`}><WhiteCoinArt />{(snapshot?.balance ?? 0) >= 1e7 ? `約${compactMoney.format(snapshot?.balance ?? 0)}` : F.format(snapshot?.balance ?? 0)}</strong><small aria-live="polite">{busy ? "保存中…" : saveStatus}</small></button>
+      <button type="button" className={styles.budget} aria-label={`白コイン ${F.format(snapshot?.balance ?? 0)}枚。もらい方を見る`} disabled={welcome || !loaded} onClick={() => { chooseMode("inspect"); setRpgTab("quests"); setPanel("quests"); }}><span>白コイン</span><strong title={`${F.format(snapshot?.balance ?? 0)}枚`}><WhiteCoinArt />{(snapshot?.balance ?? 0) >= 1e7 ? `約${compactMoney.format(snapshot?.balance ?? 0)}` : F.format(snapshot?.balance ?? 0)}</strong><small aria-live="polite">{busy ? "保存中…" : refreshing ? "最新情報を確認中…" : saveStatus}</small></button>
     </header>
     <div ref={statsRef} className={styles.stats} aria-label="街の状況">
       {[{ icon: "people", label: "人口", value: F.format(stats.population), unit: "人" },
@@ -468,7 +525,7 @@ export function TownBuilder({ userId }: { userId: string }) {
     </div>
     {panel && <aside key={panel === "quests" ? `${panel}:${rpgTab}` : panel} ref={panelRef} id="town-panel" className={`${styles.sidebar} ${panel === "customize" ? styles.workshop : ""} ${panel === "quests" ? styles.questPanel : ""}`} aria-label={panel === "build" ? "建設パネル" : panel === "land" ? "敷地の購入" : panel === "customize" ? "施設の部品" : panel === "view" ? "表示と設定" : panel === "quests" ? "クエストと成長" : "遊び方"}>
       <div className={styles.panelTitle}><h2>{panel === "build" ? "建設" : panel === "land" ? "敷地を選ぶ" : panel === "customize" ? editingLot ? `${editingLot.kind === "park" ? "公園" : "広場"} ${editingLot.width}×${editingLot.height} · 部品` : `${BUILDINGS.find(b => b.id === active)?.title ?? "施設"}の部品` : panel === "view" ? "表示と設定" : panel === "quests" ? "開拓の冒険手帳" : "街づくりのヒント"}</h2><button type="button" aria-label="パネルを閉じる" onClick={closePanel}>×</button></div>
-      {panel === "quests" && <TownRpgPanel tab={rpgTab} onTab={setRpgTab} metrics={questMetrics} snapshot={snapshot} busy={busy} onClaim={questId => { void runAction({ action: "quest", questId }); }} onDaily={() => { void runAction({ action: "daily" }); }} />}
+      {panel === "quests" && <TownRpgPanel tab={rpgTab} onTab={setRpgTab} metrics={questMetrics} snapshot={snapshot} busy={busy || Boolean(pendingRequest.current)} onClaim={questId => { void runAction({ action: "quest", questId }); }} onDaily={() => { void runAction({ action: "daily" }); }} />}
       {panel === "build" && <>
         <div className={styles.categories}>{["交通", "建物", "環境"].map(c => <button type="button" key={c} aria-pressed={category === c} onClick={() => setCategory(c)}>{c}</button>)}</div>
         <div className={styles.catalog}>{BUILDINGS.filter(b => b.category === category).map(b => <button type="button" key={b.id} aria-pressed={mode === b.id} onClick={() => {
@@ -480,7 +537,8 @@ export function TownBuilder({ userId }: { userId: string }) {
       {panel === "land" && <ParkPurchase kind={parkKind} size={parkSize} rotated={parkRotated} money={snapshot && !pendingRequest.current && !busy ? town.money : -1} onKind={setParkKind} onSize={setParkSize} onRotate={() => setParkRotated(v => !v)} onPlace={() => { chooseMode("park"); setPanel(null); }} />}
       {panel === "customize" && (editingLot ? <ParkWorkshop lot={editingLot} part={part} rotation={partRotation} money={snapshot && !pendingRequest.current && !busy ? town.money : -1} onPart={p => { setPart(p); setPreview([]); setHover(null); setPanel(null); }} onRotate={() => setPartRotation(v => (v + 1) % 4)} onExpand={size => { void edit({ type: "expand", lotId: editingLot.id, size }); }} onRemoveLot={() => {
         if (!window.confirm("この敷地と中の部品を撤去しますか？")) return;
-        void edit({ type: "remove-park", lotId: editingLot.id }).then(ok => { if (ok) { setPanel(null); setEditingLotId(null); setMode("inspect"); setSelected(null); } });
+        const intent = interaction.current;
+        void edit({ type: "remove-park", lotId: editingLot.id }).then(ok => { if (ok && interaction.current === intent) { setPanel(null); setEditingLotId(null); setMode("inspect"); setSelected(null); } });
       }} /> : active && selected !== null ? <FacilityWorkshop kind={active} installed={selectedParts ?? []} money={snapshot && !pendingRequest.current && !busy ? town.money : -1} onBuy={(id: FacilityPart) => { void edit({ type: "facility-part", tile: selected, part: id }); }} onRemove={id => { void edit({ type: "remove-facility-part", tile: selected, part: id }); }} /> : null)}
       {panel === "view" && <>
         <div className={styles.viewOptions}>
@@ -524,13 +582,13 @@ export function TownBuilder({ userId }: { userId: string }) {
     <div ref={toolbarRef} className={styles.toolbar}>
       <div className={styles.tools}>
         <button type="button" className={styles.buildButton} aria-expanded={panel === "build" || panel === "land"} aria-controls="town-panel" disabled={welcome || !loaded} onClick={() => { if (mode === "decorate") chooseMode("inspect"); setPanel(p => p === "build" ? null : "build"); }}><Glyph name="build" /><span>建設</span></button>
-        <button type="button" aria-expanded={panel === "quests"} aria-controls="town-panel" disabled={welcome} className={styles.questButton} onClick={() => { chooseMode("inspect"); setRpgTab("quests"); setPanel(p => p === "quests" && rpgTab === "quests" ? null : "quests"); }}><Glyph name="quests" /><span>クエスト</span>{readyQuests > 0 && <em aria-label={`報酬を受け取れるクエスト${readyQuests}件`}>{readyQuests}</em>}</button>
+        <button type="button" aria-expanded={panel === "quests"} aria-controls="town-panel" disabled={welcome} className={styles.questButton} onClick={() => { chooseMode("inspect"); setRpgTab("quests"); setPanel(p => p === "quests" && rpgTab === "quests" ? null : "quests"); }}><Glyph name="quests" /><span>クエスト</span>{readyQuests > 0 && <em aria-label={`受け取れる報酬${readyQuests}件`}>{readyQuests}</em>}</button>
         <button type="button" disabled={!snapshot?.canUndo || busy || Boolean(pendingRequest.current)} onClick={undoBuild}><Glyph name="undo" /><span>元に戻す</span></button>
         <button type="button" disabled={welcome} aria-expanded={panel === "view" || panel === "help"} aria-controls="town-panel" onClick={() => { if (mode === "decorate") chooseMode("inspect"); setPanel(p => p === "view" || p === "help" ? null : "view"); }}><Glyph name="settings" /><span>表示・設定</span></button>
       </div>
     </div>
     <p role="status" aria-live="polite" className={styles.notice} data-visible={toast && !scenery && !welcome}>{notice}</p>
-    {connectionError && <div className={styles.connectionBanner} role="alert"><span>{connectionError}</span><button type="button" disabled={busy} onClick={() => { if (pendingRequest.current) void runAction(pendingRequest.current, true); else void loadGame(); }}>再試行</button></div>}
+    {connectionError && <div className={styles.connectionBanner} role="alert"><span>{connectionError}</span><button type="button" disabled={busy || refreshing} onClick={() => { if (pendingRequest.current) void runAction(pendingRequest.current, true); else void loadGame(); }}>再試行</button></div>}
     {levelUp && !scenery && !welcome && <button type="button" className={styles.levelUp} aria-label={`まちづくりレベル${levelUp.level}にアップ${levelUp.reward ? `、白コイン${levelUp.reward}枚獲得` : ""}`} onClick={() => { setLevelUp(null); chooseMode("inspect"); setRpgTab("growth"); setPanel("quests"); }}><TownCrest level={levelUp.level} /><span><small>LEVEL UP</small><b>{townRank(levelUp.level).title}</b>{levelUp.reward > 0 && <WhitePrice amount={levelUp.reward} />}</span><em>✦</em></button>}
     {scenery && <button type="button" ref={returnControlsRef} className={styles.returnControls} onClick={() => viewScenery(false)}><Glyph name="eye" />操作に戻る</button>}
   </main>;
