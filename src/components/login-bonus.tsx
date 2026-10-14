@@ -5,7 +5,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { formatCoins } from "@/lib/coins";
 import { todayInJapan } from "@/lib/date";
 import { getFrenchieSrc, type DogSkinId } from "@/lib/dog-skins";
-import { BlueCoinArt, CoinArt, RedCoinArt } from "./coin-art";
+import { BlueCoinArt, CoinArt, RedCoinArt, WhiteCoinArt } from "./coin-art";
 import { IconClose } from "./icons";
 
 /**
@@ -19,13 +19,14 @@ import { IconClose } from "./icons";
  * 引き継がれてしまっていた。現在は userId ごとにキーを分ける。
  */
 
-const SEEN_KEY_PREFIX = "odekake:login-bonus-checked-on";
+// v2 rechecks once when white coins launch; each color is still deduplicated in the database.
+const SEEN_KEY_PREFIX = "odekake:login-bonus-checked-on:v2";
 
 /**
  * blueAmount は通算7日ごとにいっしょにもらえる青コイン（ふだんは 0）。redAmount は毎日の赤コイン
  * （ご当地ピンボールのステージの部品に使う）。totalDays は通算のログイン日数
  */
-type Reward = { amount: number; balance: number; blueAmount: number; redAmount: number; totalDays: number | null };
+type Reward = { amount: number; balance: number; blueAmount: number; redAmount: number; whiteAmount: number; totalDays: number | null };
 
 function waitForSplash(): Promise<void> {
   return new Promise((resolve) => {
@@ -77,6 +78,7 @@ export function LoginBonus({ skin = "default", userId }: { skin?: DogSkinId; use
           balance?: number;
           blueAmount?: number;
           redAmount?: number;
+          whiteAmount?: number;
           totalDays?: number | null;
           date?: string | null;
         };
@@ -87,13 +89,13 @@ export function LoginBonus({ skin = "default", userId }: { skin?: DogSkinId; use
           // 保存できなくても支障はない。
         }
 
-        if (cancelled || !data.granted) return;
+        if (cancelled || (!data.granted && !(data.whiteAmount && data.whiteAmount > 0))) return;
 
         router.refresh();
 
         await waitForSplash();
         if (cancelled) return;
-        setReward({ amount: data.amount ?? 0, balance: data.balance ?? 0, blueAmount: data.blueAmount ?? 0, redAmount: data.redAmount ?? 0, totalDays: data.totalDays ?? null });
+        setReward({ amount: data.amount ?? 0, balance: data.balance ?? 0, blueAmount: data.blueAmount ?? 0, redAmount: data.redAmount ?? 0, whiteAmount: data.whiteAmount ?? 0, totalDays: data.totalDays ?? null });
       } catch {
         // 圏外なら次に開いたときに再試行する。
       }
@@ -118,6 +120,7 @@ export function LoginBonus({ skin = "default", userId }: { skin?: DogSkinId; use
   }, [reward, close]);
 
   if (!reward) return null;
+  const whiteOnly = reward.amount === 0 && reward.whiteAmount > 0;
 
   return (
     <div
@@ -184,7 +187,7 @@ export function LoginBonus({ skin = "default", userId }: { skin?: DogSkinId; use
       `}</style>
 
       <div
-        className="lb-card relative w-full max-w-[320px] overflow-hidden rounded-[28px] border border-[#eadfc8] bg-[#fffdf8] shadow-[0_18px_50px_rgba(75,56,36,0.22)]"
+        className="lb-card relative max-h-[calc(100dvh-2rem)] w-full max-w-[320px] overflow-y-auto overscroll-contain rounded-[28px] border border-[#eadfc8] bg-[#fffdf8] shadow-[0_18px_50px_rgba(75,56,36,0.22)]"
         onClick={(event) => event.stopPropagation()}
       >
         <button
@@ -192,7 +195,7 @@ export function LoginBonus({ skin = "default", userId }: { skin?: DogSkinId; use
           type="button"
           onClick={close}
           aria-label="とじる"
-          className="absolute right-3 top-3 z-20 flex h-8 w-8 items-center justify-center rounded-full bg-white/80 text-ink-faint shadow-sm active:bg-paper-deep"
+          className="absolute right-3 top-3 z-20 flex h-11 w-11 items-center justify-center rounded-full bg-white/80 text-ink-faint shadow-sm active:bg-paper-deep"
         >
           <IconClose size={17} />
         </button>
@@ -212,12 +215,12 @@ export function LoginBonus({ skin = "default", userId }: { skin?: DogSkinId; use
           </p>
 
           <div className="relative z-10 mt-2 flex items-center justify-center gap-2">
-            <CoinArt className="lb-coin h-11 w-11 drop-shadow-[0_2px_3px_rgba(150,110,45,0.25)]" />
+            {whiteOnly ? <WhiteCoinArt className="lb-coin h-11 w-11" /> : <CoinArt className="lb-coin h-11 w-11 drop-shadow-[0_2px_3px_rgba(150,110,45,0.25)]" />}
             <span className="lb-amount flex items-baseline text-[#6e5a3c]">
               <span className="text-[40px] leading-none font-black tabular-nums">
-                +{formatCoins(reward.amount)}
+                +{formatCoins(whiteOnly ? reward.whiteAmount : reward.amount)}
               </span>
-              <span className="ml-1 text-sm font-bold">枚</span>
+              <span className="ml-1 text-sm font-bold">{whiteOnly ? "白コイン" : "枚"}</span>
             </span>
           </div>
 
@@ -257,6 +260,8 @@ export function LoginBonus({ skin = "default", userId }: { skin?: DogSkinId; use
               <span className="text-[11px]">赤コイン</span>
             </p>
           ) : null}
+
+          {!whiteOnly && reward.whiteAmount > 0 && <p className="mt-2 flex items-center justify-center gap-1.5 rounded-2xl border border-[#bdcbbf] bg-[#f8fcf3] px-3 py-2 text-[12px] font-bold text-[#486457]">街づくりに<WhiteCoinArt className="h-4 w-4" /><span className="font-black tabular-nums">+{formatCoins(reward.whiteAmount)}</span><span className="text-[11px]">白コイン</span></p>}
 
           <p className="mt-3 flex items-center justify-center gap-1.5 rounded-full bg-paper-deep py-2 text-[11px] text-ink-soft">
             いまのコイン

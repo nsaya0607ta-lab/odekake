@@ -7,6 +7,7 @@ import { IconUser } from "@/components/icons";
 import { TopHeader } from "@/components/page-header";
 import { PageBody } from "@/components/page-body";
 import { CoinBadge } from "@/components/coin-badge";
+import { getWhiteCoinBalance } from "@/lib/data/white-coins";
 import { GuideBadge } from "@/components/guide-badge";
 import { SharedTripBadge } from "@/components/shared-trip-badge";
 import { HomeScene } from "@/components/home-scene";
@@ -73,6 +74,7 @@ export default async function HomePage({
     blueCoins,
     friendList,
     redCoins,
+    whiteCoins,
   ] = await Promise.all([
     spacePromise.then((space) => loadAreaIndex(supabase, space.tripIds)),
     getExpDashboard(supabase, user.id),
@@ -90,6 +92,7 @@ export default async function HomePage({
     getFriendList(supabase).catch(() => []),
     // 赤コイン（ご当地ピンボールのステージの部品に使う）。仕組みが無い環境では null
     getRedCoinBalance(supabase, user.id).catch(() => null),
+    getWhiteCoinBalance(supabase, user.id).catch(() => null),
   ]);
   const friendIds = new Set(friendList.map((f) => f.friend_user_id));
 
@@ -214,7 +217,7 @@ export default async function HomePage({
         }
         action={
           <div className="flex items-center gap-2">
-            <CoinBadge balance={coins.balance} blueBalance={blueCoins} redBalance={redCoins} />
+            <CoinBadge balance={coins.balance} blueBalance={blueCoins} redBalance={redCoins} whiteBalance={whiteCoins} />
             <GuideBadge />
             <SharedTripBadge />
           </div>
@@ -241,7 +244,7 @@ export default async function HomePage({
                     initialCoinBalance={coins.balance}
                   />
                 </HomeScene>
-                <WanderingFrenchie level={expProgress.level} skin={dogSkin} redDrops={redCoins !== null} />
+                <WanderingFrenchie level={expProgress.level} skin={dogSkin} redDrops={redCoins !== null} whiteDrops={whiteCoins !== null} />
                 <HomeWeatherChip />
 
                 <div className="absolute right-2 top-2 z-40 flex w-[132px] flex-col" style={{ gap: 0 }}>

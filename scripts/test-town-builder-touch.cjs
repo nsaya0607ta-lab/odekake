@@ -38,4 +38,5 @@ test('Safari compatibility mouse clicks are deduplicated without PointerEvent fi
 test('blur or resize cancels a held control and suppresses its delayed native click',()=>{const c=new TownTouchControls(),b=button();c.start(b,point());c.cancel();c.end(point());assert.equal(b.clicks,0);assert(c.suppressClick(1,'touch',1));c.start(b,point());c.end(point());assert.equal(b.clicks,1);});
 
 test('a long confirmation dialog does not let its delayed click activate the next screen',()=>{let now=0;const c=new TownTouchControls(()=>now),b=button();b.click=function(){this.clicks++;now=5000};c.start(b,point());c.end(point());now=5001;assert(c.suppressClick(1,'touch',1));assert.equal(b.clicks,1);});
+test('slow layout never replays an identified touch, and a fresh gesture still activates normally',()=>{let now=0;const c=new TownTouchControls(()=>now),b=button();c.start(b,point());c.end(point());now=3000;assert(c.suppressClick(1,'touch',1));assert.equal(c.suppressClick(1,'touch',1),false);c.start(b,point({pointerId:2}));c.end(point({pointerId:2}));assert.equal(b.clicks,2);assert(c.suppressClick(1,'touch',2));});
 console.log(count+' town touch-control checks passed');

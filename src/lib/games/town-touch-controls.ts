@@ -41,8 +41,13 @@ export class TownTouchControls {
     }
   }
   suppressClick(detail: number, pointerType = "", pointerId?: number) {
-    if (this.activating || !this.last || this.now() > this.last.until || detail === 0 && pointerType !== "touch") return false;
+    if (this.activating || !this.last || detail === 0 && pointerType !== "touch") return false;
     if (pointerType === "touch" && pointerId !== undefined && pointerId !== this.last.id) return false;
+    // Layout/font work can delay the same gesture's click beyond 750 ms on a phone.
+    // A new physical gesture calls start() and clears last; a positively identified
+    // duplicate remains a duplicate even when its dispatch was delayed.
+    const sameTouch = pointerType === "touch" && pointerId === this.last.id;
+    if (!sameTouch && this.now() > this.last.until) return false;
     // Closing a drawer can retarget the delayed click to a newly exposed button.
     this.last = null; return true;
   }

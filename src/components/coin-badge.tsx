@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { formatCoins } from "@/lib/coins";
-import { BlueCoinArt, RedCoinArt } from "./coin-art";
+import { BlueCoinArt, RedCoinArt, WhiteCoinArt } from "./coin-art";
 import { IconCoin } from "./icons";
 
 /**
@@ -8,7 +8,14 @@ import { IconCoin } from "./icons";
  * blueBalance を渡すと、となりに青コインも出す（ならぶぶん、少し小さくする）。
  * redBalance も渡すと3つになるので、黄色を上の段、青と赤を下の段に重ねて、横にのびないようにする
  */
-export function CoinBadge({ balance, blueBalance = null, redBalance = null }: { balance: number; blueBalance?: number | null; redBalance?: number | null }) {
+const compact = new Intl.NumberFormat("ja-JP", { notation: "compact", maximumFractionDigits: 1 });
+
+export function CoinBadge({ balance, blueBalance = null, redBalance = null, whiteBalance = null }: { balance: number; blueBalance?: number | null; redBalance?: number | null; whiteBalance?: number | null }) {
+  if (whiteBalance !== null) return <div className="grid shrink-0 grid-cols-2 gap-0.5" aria-label="所持コイン">
+    {([{ name: "コイン", value: balance, Art: null, color: "text-ink", bg: "bg-sun-soft/70 border-[#e8d4aa]" }, { name: "青コイン", value: blueBalance, Art: BlueCoinArt, color: "text-[#1F4F8F]", bg: "bg-[#EEF5FF] border-[#BFD7F5]" }, { name: "赤コイン", value: redBalance, Art: RedCoinArt, color: "text-[#9C2B31]", bg: "bg-[#FFF0EE] border-[#F2C4BF]" }, { name: "白コイン", value: whiteBalance, Art: WhiteCoinArt, color: "text-[#486457]", bg: "bg-[#f8fcf3] border-[#bdcbbf]" }]).filter(c => c.value !== null).map(c => <div key={c.name} aria-label={`${c.name} ${formatCoins(c.value ?? 0)}枚`} title={`${c.name} ${formatCoins(c.value ?? 0)}枚`} className={`flex min-w-0 items-center justify-end gap-0.5 rounded-full border px-1.5 py-px shadow-sm ${c.bg}`}>
+      {c.Art ? <c.Art className="h-[14px] w-[14px] shrink-0" /> : <IconCoin size={14} />}<span className={`text-[11px] font-bold tabular-nums ${c.color}`}>{(c.value ?? 0) >= 1e6 ? compact.format(c.value ?? 0) : formatCoins(c.value ?? 0)}</span>
+    </div>)}
+  </div>;
   const pair = blueBalance !== null || redBalance !== null;
   const trio = blueBalance !== null && redBalance !== null;
   const yellow = (

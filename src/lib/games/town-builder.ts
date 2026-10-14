@@ -40,12 +40,12 @@ export const PARK_PARTS: ReadonlyArray<{ id: ParkPart; title: string; price: num
 ];
 export const FACILITY_PARTS: ReadonlyArray<{ id: FacilityPart; title: string; price: number; kinds: Tile[]; info: string }> = [
   { id: "garden", title: "植栽・花壇", price: 90, kinds: ["house", "shop"], info: "庭先を彩る" },
-  { id: "terrace", title: "テラス", price: 220, kinds: ["house", "shop"], info: "住宅の定員＋6人・商店の収入＋¥14" },
+  { id: "terrace", title: "テラス", price: 220, kinds: ["house", "shop"], info: "住宅の定員＋6人・商店の経済力＋14" },
   { id: "light", title: "照明", price: 70, kinds: ["house", "shop", "station", "road"], info: "夜の街を照らす" },
-  { id: "sign", title: "看板", price: 120, kinds: ["shop"], info: "商店の収入＋¥8" },
-  { id: "storage", title: "資材置き場", price: 220, kinds: ["factory"], info: "工場の収入＋¥18" },
+  { id: "sign", title: "看板", price: 120, kinds: ["shop"], info: "商店の経済力＋8" },
+  { id: "storage", title: "資材置き場", price: 220, kinds: ["factory"], info: "工場の経済力＋18" },
   { id: "greenbelt", title: "緑化帯", price: 140, kinds: ["factory"], info: "近所への影響を和らげる" },
-  { id: "solar", title: "太陽光パネル", price: 260, kinds: ["factory"], info: "工場の収入＋¥8・維持費−¥4" },
+  { id: "solar", title: "太陽光パネル", price: 260, kinds: ["factory"], info: "工場の経済力＋8・維持負担−4" },
   { id: "bench", title: "待合ベンチ", price: 90, kinds: ["station"], info: "ホームに休憩場所を追加" },
   { id: "vending", title: "自販機", price: 160, kinds: ["shop", "station"], info: "飲み物を買える場所" },
   { id: "canopy", title: "日よけ", price: 180, kinds: ["house", "shop"], info: "庭先・屋上に日陰をつくる" },
@@ -57,12 +57,12 @@ export type TownStats = {
   happiness: number; jobs: number; routes: number[][];
 };
 export const BUILDINGS: ReadonlyArray<{ id: Tool; title: string; price: number; info: string; category: "交通" | "建物" | "環境" }> = [
-  { id: "road", title: "道路", price: 35, info: "タップで1マス配置。「連続敷設」で道路を延ばせます。川の上は橋（¥120）。", category: "交通" },
-  { id: "rail", title: "線路", price: 55, info: "タップで1マス配置。「連続敷設」で駅を結べます。川の上は鉄道橋（¥160）。", category: "交通" },
+  { id: "road", title: "道路", price: 35, info: "タップで1マス配置。「連続敷設」で道路を延ばせます。川の上は橋（白コイン120枚）。", category: "交通" },
+  { id: "rail", title: "線路", price: 55, info: "タップで1マス配置。「連続敷設」で駅を結べます。川の上は鉄道橋（白コイン160枚）。", category: "交通" },
   { id: "station", title: "駅", price: 550, info: "2駅を線路で結ぶと列車が運行。周囲3マスの住民を輸送します。", category: "交通" },
   { id: "house", title: "住宅", price: 250, info: "道路沿いに建設。公園と仕事があると集合住宅へ育ちます。", category: "建物" },
   { id: "shop", title: "商店", price: 400, info: "道路沿いに建設。街に仕事と買い物の楽しみを届けます。", category: "建物" },
-  { id: "factory", title: "工場", price: 650, info: "収入と雇用を増やします。住宅から離すと住民も快適。", category: "建物" },
+  { id: "factory", title: "工場", price: 650, info: "経済力と雇用を増やします。住宅から離すと住民も快適。", category: "建物" },
   { id: "park", title: "公園・広場", price: 580, info: "敷地を購入し、木・噴水・ベンチなどを買って配置します。", category: "環境" },
   { id: "bulldoze", title: "撤去", price: 0, info: "タップで撤去。直前の工事は「元に戻す」で取り消せます。", category: "環境" },
 ];
