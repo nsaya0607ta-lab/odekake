@@ -38,11 +38,12 @@
   box-shadow: 0 4px 16px #294e3c18;
 }
 .header { position: absolute; top: var(--top); left: var(--edge); right: var(--edge); display: flex; justify-content: space-between; align-items: stretch; gap: 8px; pointer-events: none; }
-.identity { display: flex; align-items: center; gap: 8px; border-radius: 15px; padding: 5px 12px 5px 5px; pointer-events: auto; }
+.identity { display: flex; align-items: center; gap: 8px; border-radius: 15px; padding: 5px 12px 5px 5px; pointer-events: auto; min-width: 0; }
+.identity > div { min-width: 0; }
 .back { display: grid; place-items: center; width: 44px; height: 44px; flex-shrink: 0; border-radius: 10px; color: var(--green); text-decoration: none; background: #e6ecdd; touch-action: manipulation; }
-.header h1 { margin: 0 0 4px; font-size: 16px; font-weight: 800; letter-spacing: -.7px; }
-.header p { margin: 0; font-size: 9px; color: var(--muted); }
-.budget { min-width: 110px; padding: 7px 11px; border-radius: 15px; text-align: right; pointer-events: auto; }
+.header h1 { margin: 0 0 4px; font-size: 16px; font-weight: 800; letter-spacing: -.7px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.header p { margin: 0; font-size: 9px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.budget { min-width: 110px; flex-shrink: 0; padding: 7px 11px; border-radius: 15px; text-align: right; color: var(--ink); pointer-events: auto; }
 .budget > span, .budget small { display: block; font-size: 8px; color: var(--muted); }
 .budget strong { display: block; font-size: 19px; line-height: 1.3; font-weight: 800; font-variant-numeric: tabular-nums; letter-spacing: -.6px; }
 .budget small { font-size: 8px; min-height: 11px; }
@@ -63,7 +64,8 @@
 .tools button[aria-pressed=true], .tools button[aria-expanded=true] { box-shadow: inset 0 0 0 1px #8ca582; background: #dce8d0; color: var(--ink); }
 .selectionCard, .activeTool { position: absolute; bottom: var(--dock); left: 50%; transform: translateX(-50%); display: flex; align-items: center; gap: 10px; width: min(480px, calc(100% - var(--edge) * 2)); min-height: 74px; padding: 10px; border-radius: 18px; }
 .selectionInfo, .activeTool > div { flex: 1; min-width: 0; padding-left: 3px; }
-.selectionInfo strong, .activeTool strong { display: flex; align-items: center; gap: 7px; font-size: 14px; }
+.selectionInfo strong, .activeTool strong { display: flex; align-items: center; flex-wrap: wrap; gap: 4px 7px; font-size: 14px; overflow-wrap: anywhere; }
+.selectionInfo strong small { flex-shrink: 0; white-space: nowrap; }
 .selectionInfo strong small { padding: 3px 6px; border-radius: 6px; background: #e4ebd8; color: var(--muted); font-size: 9px; }
 .selectionInfo p, .activeTool p { margin: 6px 0 0; font-size: 10px; line-height: 1.5; color: var(--muted); }
 .upgrade { display: flex; flex-direction: column; justify-content: center; align-items: center; gap: 3px; min-width: 74px; height: 48px; padding: 5px 8px; border: 0; border-radius: 11px; background: var(--green); color: #fff8de; font-size: 11px !important; }
@@ -233,12 +235,25 @@
 .facilityOption span { color: var(--muted); font-size: 9px; line-height: 1.6; text-align: center; }
 .removeAttachment { width: 100%; min-height: 44px; padding: 8px; border: 0; border-top: 1px solid #cfdac3; background: #dce7cf; color: var(--green); font-size: 10px !important; }
 .game[data-panel=customize] .sceneButtons { display: none; }
+.game:not([data-panel=none]) :is(.stats, .sceneButtons) { display: none; }
+.game[data-welcome=true] :is(.stats, .sceneButtons, .toolbar, .mission) { display: none; }
+.welcome { padding: calc(var(--top) + 82px) max(16px, var(--edge)) var(--bottom); }
+.welcomeCard { max-height: 100%; overflow: auto; overscroll-behavior: contain; }
+.sidebar { --panel-padding: 12px; padding: var(--panel-padding); max-height: min(42dvh, 380px, calc(100% - var(--dock) - var(--top) - 160px)); }
+.sidebar .panelTitle { position: sticky; top: calc(-1 * var(--panel-padding)); z-index: 2; background: var(--surface); padding-block: 2px 5px; }
+.workshop { max-height: min(47dvh, 365px, calc(100% - var(--dock) - var(--top) - 190px)); }
+.selectionCard :is(.upgrade, .customize) { flex-shrink: 0; }
+.coordinates input { font-size: 16px; }
+.finance b { overflow-wrap: anywhere; text-align: right; }
+.saveButton { width: 100%; min-height: 44px; margin-top: 10px; border: 1px solid var(--line); border-radius: 10px; background: #e6edda; color: var(--green); font-size: 11px !important; }
 .activeTool[data-decorate=true] > button:not(.dismiss) { min-width: 54px; padding: 6px 8px; }
 .activeTool[data-decorate=true] > button[aria-label="部品の向きを変える"] { min-width: 48px; }
-@media (min-width: 641px) { .workshop { max-height: min(62svh, 490px); } }
+@media (min-width: 641px) {
+  .sidebar { --panel-padding: 16px; }
+  .workshop { max-height: min(62dvh, 490px, calc(100% - var(--dock) - var(--top) - 150px)); }
+}
 @media (max-height: 560px) and (min-width: 561px) {
-  .workshop { max-height: calc(100% - var(--dock) - var(--top) - 75px); }
-  .workshop .panelTitle { top: -10px; }
+  .sidebar, .workshop { --panel-padding: 10px; left: auto; right: var(--edge); max-height: calc(100% - var(--dock) - var(--top) - 75px); }
   .partCatalog { grid-template-columns: repeat(4, minmax(0, 1fr)); }
 }
 
