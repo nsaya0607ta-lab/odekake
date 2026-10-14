@@ -20,6 +20,8 @@ type Panel = "build" | "view" | "help" | "land" | "customize" | "quests" | null;
 type TownRequest = { userId: string; requestId: string; revision: number; action: "start" | "edit" | "undo" | "quest" | "daily" | "reset"; command?: TownCommand; questId?: string; starter?: boolean; legacy?: Town };
 const F = new Intl.NumberFormat("ja-JP");
 const compactMoney = new Intl.NumberFormat("ja-JP", { notation: "compact", maximumFractionDigits: 1 });
+// Only our own Japanese errors are shown; browser fetch failures ("Failed to fetch", "Load failed") use the fallback.
+const connectionMessage = (error: unknown, fallback: string) => error instanceof Error && error.name === "Error" && error.message ? error.message : fallback;
 function BuildingIcon({ kind }: { kind: Tool }) {
   const ref = useRef<HTMLCanvasElement>(null);
   useEffect(() => { const c = ref.current?.getContext("2d"); if (c) { c.setTransform(2, 0, 0, 2, 0, 0); drawTownIcon(c, kind, 76, 66); } }, [kind]);
@@ -58,7 +60,7 @@ export function TownBuilder({ userId }: { userId: string }) {
   const [snapshot, setSnapshot] = useState<TownSnapshot | null>(null), [busy, setBusy] = useState(false), [connectionError, setConnectionError] = useState("");
   const [refreshing, setRefreshing] = useState(false);
   const readVersion = useRef(0), readController = useRef<AbortController | null>(null), lastReadAt = useRef(-Infinity);
-  const serverClock = useRef<{ time: number; received: number } | null>(null);
+  const serverClock = useRef<{ time: number; received: number; wall: number } | null>(null);
   const economyRef = useRef<TownSnapshot | null>(null), inFlight = useRef(false), pendingRequest = useRef<TownRequest | null>(null);
   const accountRef = useRef(userId), interaction = useRef(0);
   accountRef.current = userId;
@@ -138,7 +140,10 @@ export function TownBuilder({ userId }: { userId: string }) {
       }
     }
     economyRef.current = next; setSnapshot(next);
-    if (next.town) {
+    // Every saved change raises the revision, so a same-revision refresh only updates the wallet.
+    // Keeping the town arrays avoids redrawing the whole map and re-framing a selected building.
+    if (previous?.revision === next.revision) { if (next.town) setTown(t => t.money === next.balance ? t : { ...t, money: next.balance }); }
+    else if (next.town) {
       setTown(previousTown => ({ ...next.town!, money: next.balance, day: Math.max(previousTown.day, next.town!.day), paused: previousTown.paused }));
       setWelcome(false);
     } else { setWelcome(true); setTown(createTown()); }
@@ -146,7 +151,7 @@ export function TownBuilder({ userId }: { userId: string }) {
   }, []);
   const readServerClock = useCallback((response: Response) => {
     const time = Date.parse(response.headers.get("date") ?? "");
-    if (Number.isFinite(time)) serverClock.current = { time, received: performance.now() };
+    if (Number.isFinite(time)) serverClock.current = { time, received: performance.now(), wall: Date.now() };
   }, []);
   const cancelReads = useCallback(() => {
     readVersion.current++; readController.current?.abort(); readController.current = null;
@@ -189,7 +194,7 @@ export function TownBuilder({ userId }: { userId: string }) {
       setLoadedKey(key);
     } catch (error) {
       if (!current()) return;
-      setConnectionError(error instanceof Error && error.name !== "AbortError" ? error.message : "接続に時間がかかっています。街を残したまま再試行できます。"); setSaveStatus("接続を確認");
+      setConnectionError(connectionMessage(error, error instanceof Error && error.name === "AbortError" ? "接続に時間がかかっています。街を残したまま再試行できます。" : "通信できませんでした。街を残したまま再試行できます。")); setSaveStatus("接続を確認");
       if (!economyRef.current) { setWelcome(!saved); setLoadedKey(key); }
     } finally {
       window.clearTimeout(timeout); signal?.removeEventListener("abort", abort);
@@ -205,13 +210,18 @@ export function TownBuilder({ userId }: { userId: string }) {
   useEffect(() => {
     if (!loaded) return;
     const refresh = (event?: Event) => {
-      if (document.hidden || event?.type !== "online" && performance.now() - lastReadAt.current < 3000) return;
+      // Offline viewing stays quiet; the "online" event refreshes once the connection returns.
+      if (document.hidden || !navigator.onLine || event?.type !== "online" && performance.now() - lastReadAt.current < 3000) return;
       if (event?.type === "online" && !inFlight.current && !pendingRequest.current) cancelReads();
       void loadGame(undefined, true);
     };
     const checkDay = () => {
       const clock = serverClock.current, saved = economyRef.current;
-      if (clock && saved && new Date(clock.time + performance.now() - clock.received + 9 * 60 * 60_000).toISOString().slice(0, 10) !== saved.date) refresh();
+      if (!clock || !saved) return;
+      // Some browsers pause performance.now() while the computer sleeps; the device clock's elapsed time covers that.
+      // A device clock moved forward only causes one extra read, which re-anchors the server time.
+      const elapsed = Math.max(performance.now() - clock.received, Date.now() - clock.wall);
+      if (new Date(clock.time + elapsed + 9 * 60 * 60_000).toISOString().slice(0, 10) !== saved.date) refresh();
     };
     window.addEventListener("focus", refresh); window.addEventListener("online", refresh); window.addEventListener("pageshow", refresh);
     document.addEventListener("visibilitychange", refresh);
@@ -258,7 +268,7 @@ export function TownBuilder({ userId }: { userId: string }) {
       return true;
     } catch (error) {
       if (accountRef.current !== account) return false;
-      const message = error instanceof Error && error.name !== "AbortError" ? error.message : "通信が途切れました。同じ操作を再試行できます。";
+      const message = connectionMessage(error, "通信が途切れました。同じ操作を再試行できます。");
       setNotice(message);
       if (pendingRequest.current) { setConnectionError(message); setSaveStatus("保存を確認"); }
       else setSaveStatus("アカウント保存済み");
