@@ -403,7 +403,7 @@ export class MailLab {
         return needPostfix(cmd) ? this.postfixCmd(rest, out, log) : 127;
       case "postqueue":
         if (!needPostfix(cmd)) return 127;
-        if (rest[0] === "-p") return this.mailq(out);
+        if (rest[0] === "-p") return this.mailq(out, log);
         if (rest[0] === "-f") {
           w.flush(log);
           return 0;
@@ -423,10 +423,10 @@ export class MailLab {
       case "newaliases":
         return onMail(cmd) ? this.newaliases(out, log) : 127;
       case "mailq":
-        return onMail(cmd) ? this.mailq(out) : 127;
+        return onMail(cmd) ? this.mailq(out, log) : 127;
       case "sendmail":
         if (!onMail(cmd)) return 127;
-        if (rest[0] === "-bp") return this.mailq(out);
+        if (rest[0] === "-bp") return this.mailq(out, log);
         if (rest[0] === "-bi") return this.newaliases(out, log);
         if (rest[0] === "-q") {
           w.flush(log);
@@ -878,7 +878,7 @@ export class MailLab {
     show(dr, dr.code >= 400);
     if (dr.code !== 354) return finish(25);
     const date = rfcDate(w.clock);
-    const msgId = `<${date.replace(/\D/g, "").slice(0, 14)}.${w.newPid()}@${HOST_FQDN[host]}>`;
+    const msgId = `<${new Date(w.clock + 9 * 3600e3).toISOString().replace(/\D/g, "").slice(0, 14)}.${String(w.newPid()).padStart(6, "0")}@${HOST_FQDN[host]}>`;
     const head: [string, string][] = [
       ["Date", date],
       ["To", toList.join(", ")],
@@ -991,6 +991,8 @@ export class MailLab {
       vsay(`> ${text}`, secret && !tls ? { mark: "secret" } : {});
       w.packet(log, cAddr, sAddr, pop ? "POP3" : "IMAP", `C: ${text.length > 40 ? `${text.slice(0, 40)}…` : text}`, `${text}\n`, tls, secret);
     };
+    const stale = w.dcStale();
+    if (stale.length) log.note(`Dovecot の設定ファイル（${stale.slice(0, 2).join("・")}）は書きかえてあるが、**動いている Dovecot はまだ前の設定**（reload していない）`, "warn", "dovecot:running");
     const secured = () => tls || local;
     const plainOk = () => w.dcPlainAllowed(secured());
     const sslReqd = flag(o.opt, "--ssl-reqd", "--ssl");
@@ -1277,8 +1279,10 @@ export class MailLab {
     }
   }
 
-  private mailq(out: OutLine[]): number {
+  private mailq(out: OutLine[], log?: RunLog): number {
     const w = this.world;
+    if (w.queue.some((q) => q.status === "deferred"))
+      log?.note("届けられなかったメールが **キューで待っている**（deferred）。やりなおしは決まった時間がたってから。**postqueue -f** で、いますぐやりなおせる", "warn", "queue");
     if (!w.queue.length) {
       out.push({ text: w.mta === "postfix" ? "Mail queue is empty" : "/var/spool/mqueue is empty" });
       if (w.mta === "sendmail") out.push({ text: "\t\tTotal requests: 0" });
@@ -1595,6 +1599,7 @@ export class MailLab {
       w.smLoad();
       w.log(log, "sendmail", `sendmail[${w.newPid()}]: starting daemon (8.16.1): SMTP+queueing@01:00:00`);
       log.note(`sendmail を起動しなおした → **sendmail.cf** を読みこんだ（待ち受け：${w.sm!.listen}:25）`, w.sm!.listen === "0.0.0.0" ? "ok" : "info", "sendmail:daemon");
+      if (w.smMcStale()) log.note("sendmail が読むのは **sendmail.cf**。sendmail.mc を書きかえても、m4 で sendmail.cf を作りなおすまでは前のまま", "warn", "sendmail:cf");
     }
     log.ops.push({ kind: "service", code: 0, note: `${unit} ${action}` });
     return 0;

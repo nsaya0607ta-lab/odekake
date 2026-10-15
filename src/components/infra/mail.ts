@@ -282,6 +282,8 @@ export function pfGet(conf: Map<string, string>, name: string, depth = 0): strin
   return raw.replace(/\$(?:\{([A-Za-z0-9_]+)\}|\(([A-Za-z0-9_]+)\)|([A-Za-z0-9_]+))/g, (_, a, b, c) => pfGet(conf, (a ?? b ?? c) as string, depth + 1));
 }
 export const pfList = (conf: Map<string, string>, name: string) => pfGet(conf, name).split(/[\s,]+/).filter(Boolean);
+/** このドメインは「自分あて」（mydestination）か */
+export const pfIsLocalConf = (conf: Map<string, string>, domain: string) => pfList(conf, "mydestination").some((x) => bare(x) === bare(domain));
 export const pfYes = (conf: Map<string, string>, name: string) => /^(yes|true|1)$/i.test(pfGet(conf, name));
 
 /** master.cf の、外から受けるサービス（smtp・submission・smtps）と、その -o の上書き */
@@ -865,12 +867,17 @@ export class MailWorld {
     this.sm = { listen: sendmailListen(cf), cw };
   }
 
+  /** sendmail.mc を書きかえたのに、sendmail.cf を作りなおしていないか */
+  smMcStale() {
+    const mc = this.files.get("/etc/mail/sendmail.mc");
+    return mc != null && sendmailListen(m4Sendmail(mc).cf) !== sendmailListen(this.files.get("/etc/mail/sendmail.cf") ?? "");
+  }
+
   /* ---------- 名前の判断 ---------- */
 
   /** Postfix：このドメインは「自分あて」（mydestination）か */
   pfIsLocal(conf: Map<string, string>, domain: string) {
-    const d = bare(domain);
-    return pfList(conf, "mydestination").some((x) => bare(x) === d);
+    return pfIsLocalConf(conf, domain);
   }
 
   /** sendmail：このドメインは自分あて（Cw・local-host-names）か */
@@ -917,6 +924,7 @@ export class MailWorld {
       if (!this.sm || port !== 25) return { ok: false, error: "Connection refused" };
       if (this.sm.listen !== "0.0.0.0" && !local && this.sm.listen !== ip) {
         run.note(`sendmail は **${this.sm.listen}:25** でしか待っていない（DaemonPortOptions の Addr=）。外からはつながらない`, "ng", "sendmail:daemon");
+        if (this.smMcStale()) run.note("sendmail.mc は書きかえてあるが、**sendmail.cf は前のまま**（m4 で作りなおしていない）", "warn", "sendmail:cf");
         return { ok: false, error: "Connection refused" };
       }
       if (this.sm.listen !== "0.0.0.0" && local) run.note(`sendmail は ${this.sm.listen}:25 で待っている。メールサーバーの中からなので、つながる`, "info", "sendmail:daemon");
@@ -1338,7 +1346,11 @@ export class SmtpSession {
     this.local = local;
     this.remoteName = remoteName;
     this.pid = w.newPid();
-    if (kind === "postfix") w.log(run, "postfix", `postfix/smtpd[${this.pid}]: connect from ${client.name}[${client.ip}]`);
+    if (kind === "postfix") {
+      w.log(run, "postfix", `postfix/smtpd[${this.pid}]: connect from ${client.name}[${client.ip}]`);
+      const stale = w.pfStale();
+      if (stale.length) run.note(`main.cf の ${stale.slice(0, 3).join("・")} は書きかえてあるが、**動いている Postfix はまだ前の設定**（postfix reload していない）`, "warn", "postfix:running");
+    }
   }
 
   get serverIp() {
@@ -1424,7 +1436,7 @@ export class SmtpSession {
       if (pfYes(this.conf, "smtpd_sasl_auth_enable") && !this.authOffered()) this.run.note("smtpd_sasl_auth_enable = yes だが **smtpd_tls_auth_only = yes** → 暗号になるまで AUTH を見せない", "info", "tls:auth_only");
       else if (this.authOffered()) this.run.note("smtpd_sasl_auth_enable = yes → EHLO の返事に **AUTH PLAIN LOGIN** をのせた", "info", "sasl");
       else this.run.note("smtpd_sasl_auth_enable = no → AUTH（ログイン）を受けつけていない", "info", "sasl");
-      if (!this.tls) this.run.note(this.tlsReady() ? "証明書があって smtpd_tls_security_level = " + pfGet(this.conf, "smtpd_tls_security_level") + " → **STARTTLS** を出した" : "TLS の設定（smtpd_tls_security_level・証明書）がない → STARTTLS を出さない", this.tlsReady() ? "info" : "warn", "tls");
+      if (!this.tls) this.run.note(this.tlsReady() ? "証明書があって smtpd_tls_security_level = " + pfGet(this.conf, "smtpd_tls_security_level") + " → **STARTTLS** を出した" : "TLS の設定（smtpd_tls_security_level・証明書）がない → STARTTLS を出さない", "info", "tls");
     }
     return reply(250, ...caps);
   }
@@ -1614,6 +1626,8 @@ export class SmtpSession {
     }
     if (isLocal) {
       const known = this.w.expandAlias(lp, null) != null;
+      if (!known && parseAliases(this.w.files.get("/etc/aliases") ?? "").map.has(lp.toLowerCase()))
+        run.note(`/etc/aliases には **${lp.toLowerCase()}** があるのに、aliases.db にはない → **newaliases** していないので、Postfix は知らない`, "warn", "aliases:db");
       if (!known)
         return reject(
           550,
@@ -1662,6 +1676,9 @@ export class SmtpSession {
         }
         if (/^(REJECT|DISCARD)/i.test(v)) return reject(550, `5.7.1 <${rcpt}>... Access denied`, `access.db に ${key} ${v} → 断る`, "sendmail:access");
       }
+    const file = parseAccess(this.w.files.get("/etc/mail/access") ?? "");
+    if (keys.some((k) => /^(RELAY|OK)$/i.test(file.get(`connect:${k}`) ?? file.get(k) ?? "")))
+      run.note("/etc/mail/access には中継してよいと書いてあるのに、**access.db** にはない → **makemap** していないので、sendmail は知らない", "warn", "sendmail:db");
     return reject(550, `5.7.1 <${rcpt}>... Relaying denied`, `access.db に ${this.client.ip} を中継してよいと書いた行がない → **断る（550 Relaying denied）**`, "sendmail:access");
   }
 

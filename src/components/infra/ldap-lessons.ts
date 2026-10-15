@@ -15,81 +15,16 @@
  */
 import { LdapWorld, parseLdif, type HostId } from "./ldap";
 import { LdapLab, type ClientConf, type FsNode, type Run, type SssdConf } from "./ldap-shell";
-import type { GlyphId } from "./glyphs";
+import { prepareWith, splitStudy, type CompareRow, type KnobOf, type Phase, type PrepRunOf, type Quiz, type StudyCardOf, type StudyStepOf } from "./study-kit";
 
-/* ------------------------------------------------------------ 型 */
+/* ------------------------------------------------------------ 型（共通の形は study-kit.ts） */
 
-/** learn＝ことばを覚える（はじめに）、off＝設定なしの実演、apply＝設定を入れる、on＝設定ありの実演、trap＝落とし穴 */
-export type Phase = "learn" | "off" | "apply" | "on" | "trap";
-
-export type StudyStep = {
-  say: string;
-  host: HostId;
-  /** ボタンで動かすコマンド（本物の形） */
-  cmd: string;
-  phase: Phase;
-  /** cmd の前に動かすコマンド（設定を変える など。ターミナルにも出す） */
-  pre?: { host: HostId; cmd: string };
-  /** cmd を動かす前にやること（設定ファイルの書きかえなど、コマンドでないこと） */
-  before?: (lab: LdapLab) => void;
-  /** before でやったことの見出し（ターミナルに「⚙ …を書きかえた」と出す） */
-  beforeNote?: string;
-  /** 思ったとおりの結果か（ちがえば retry でもう一度） */
-  ok?: (r: Run) => boolean;
-  retry?: string;
-  learn: string | ((r: Run) => string);
-  /** 返事といっしょに開くとよいパネル */
-  show?: Panel[];
-  /** 「サーバーの中」で先に見せる説明の目じるし（trace の ref。なければ knob.ref） */
-  why?: string;
-  /** apply のステップで、cmd が「効き目を見るだけ」のとき false（見くらべる・自由に試すで設定を入れるときは動かさない） */
-  prep?: false;
-};
+export type { Phase, Quiz, CompareRow };
 export type Panel = "trace" | "packets" | "logs" | "tree" | "config";
-
-export type Knob = {
-  /** 設定の目じるし（trace の ref と合わせる） */
-  ref: string;
-  title: string;
-  /** どこの設定か */
-  where: string;
-  off: string;
-  on: string;
-  /** いまの設定が「あり」か（スイッチに出す） */
-  isOn: (lab: LdapLab) => boolean;
-};
-
-export type Quiz = { q: string; choices: string[]; answer: number; explain: string };
-export type CompareRow = { head: string; off: string; on: string };
+export type StudyStep = StudyStepOf<LdapLab, Run, HostId, Panel>;
+export type Knob = KnobOf<LdapLab>;
 export type Try = { label: string; host: HostId; cmd: string };
-
-export type StudyCard = {
-  id: string;
-  /** 0 は はじめに */
-  no: number;
-  chapter: number;
-  icon: GlyphId;
-  color: string;
-  title: string;
-  sub: string;
-  /** はじめの説明（フレブル先生） */
-  intro: string;
-  analogy?: string;
-  /** 学ぶ設定（はじめに には、ない） */
-  knob?: Knob;
-  /** シナリオを作る（毎回まっさらから） */
-  build: (seed: number) => LdapLab;
-  steps: StudyStep[];
-  /** 見くらべる：同じコマンドを、設定なし・ありのまっさらな名簿で1回ずつ動かす */
-  probe?: { host: HostId; cmd: string; note?: string; label?: (r: Run) => string };
-  compare?: CompareRow[];
-  /** ことばのまとめ（はじめに） */
-  words?: { term: string; mean: string }[];
-  /** 自由に試すで出す、ためしてみたいコマンド */
-  tries: Try[];
-  summary: string[];
-  quiz: Quiz;
-};
+export type StudyCard = StudyCardOf<LdapLab, Run, HostId, Panel>;
 
 export const CHAPTERS = [
   { no: 0, title: "はじめに", sub: "LDAP の名簿と、ことば" },
@@ -1396,29 +1331,12 @@ export const CARDS: StudyCard[] = [
 export const cardById = (id: string) => CARDS.find((c) => c.id === id);
 /** 一覧・見出しに出す番号 */
 export const cardLabel = (c: StudyCard) => (c.no ? `設定 ${c.no}` : "はじめに");
-/** 文の中の **ことば** を分ける */
-export const splitStudy = (text: string) => text.split("**");
+export { splitStudy };
 
 /** 設定を入れるために動かしたこと（コマンド、または設定ファイルの書きかえ） */
-export type PrepRun = { host: HostId; cmd: string; run: Run } | { note: string };
+export type PrepRun = PrepRunOf<Run, HostId>;
 
-/**
- * まっさらな名簿を作る。on なら、設定を入れるステップ（apply）だけを順に動かして「設定あり」にする
- * （prep: false のステップは、設定ファイルの書きかえ（before）だけ）。見くらべる・自由に試すで使う。
- * runs … そのとき動かしたこと（ターミナルに出す）
- */
+/** まっさらな名簿を作る（on なら設定ありに）。見くらべる・自由に試すで使う */
 export function prepareLab(card: StudyCard, on: boolean, seed = SEED_BASE + card.no): { lab: LdapLab; runs: PrepRun[] } {
-  const lab = card.build(seed);
-  const runs: PrepRun[] = [];
-  if (on)
-    for (const st of card.steps) {
-      if (st.phase !== "apply") continue;
-      if (st.before) {
-        st.before(lab);
-        if (st.beforeNote) runs.push({ note: st.beforeNote });
-      }
-      if (st.pre) runs.push({ host: st.pre.host, cmd: st.pre.cmd, run: lab.run(st.pre.host, st.pre.cmd) });
-      if (st.prep !== false) runs.push({ host: st.host, cmd: st.cmd, run: lab.run(st.host, st.cmd) });
-    }
-  return { lab, runs };
+  return prepareWith(card, on, seed);
 }
