@@ -1,7 +1,6 @@
 import { getTownStats, type Town, type TownStats } from "./town-builder";
 
 export const TOWN_MAX_LEVEL = 50;
-export const WHITE_STARTER_COINS = 20_000;
 export const WHITE_LOGIN_COINS = 500;
 /** Cumulative EXP. Keep in sync with town_level / town_level_xp in migration 0141. */
 export function townLevelXp(level: number): number {

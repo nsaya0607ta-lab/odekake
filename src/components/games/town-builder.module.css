@@ -363,10 +363,6 @@
 .levelUp b { font-size: 14px; }
 .levelUp .whitePrice { justify-content: flex-start; font-size: 11px; }
 .levelUp em { color: #edd499; font-size: 26px; font-style: normal; }
-.starterGift { display: flex; gap: 10px; align-items: center; margin: 0 0 17px; background: #eaf0e0; padding: 10px 12px; border-radius: 11px; }
-.starterGift svg { width: 36px; height: 36px; }
-.starterGift span { color: #6b7e62; font-size: 9px; }
-.starterGift b { display: block; margin-top: 3px; font-size: 14px; color: #3e5d4c; }
 @keyframes townLevelReveal { from { opacity: 0; translate: 0 -8px; } to { opacity: 1; translate: 0; } }
 @media (min-width: 641px) {
   .header h1 { font-size: 18px; }
@@ -394,7 +390,6 @@
   .stats { top: calc(var(--top) + 84px); }
   .notice, .connectionBanner, .levelUp { top: calc(var(--top) + 133px); }
   .sidebar, .workshop, .questPanel { max-height: calc(100% - var(--dock) - var(--top) - 90px); }
-  .starterGift { display: none; }
 }
 @media (prefers-reduced-motion: reduce) { .levelUp { animation: none; } }
 
