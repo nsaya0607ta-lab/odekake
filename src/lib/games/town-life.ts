@@ -215,8 +215,12 @@ export class TownLife {
     this.spots.clear(); this.swings = [];
     for (const lot of parks) for (const part of lot.parts) {
       const x = part.tile % MAP_SIZE, y = Math.floor(part.tile / MAP_SIZE), r = part.rotation;
+      const blocked = new Set(lot.parts.filter(q => q.tile !== part.tile && q.kind !== "path" && q.kind !== "stones").map(q => q.tile));
       const spot = (slot: number, kind: SpotKind, u: number, v: number, z: number, du: number, dv: number, child = false) => {
         const p = turn(x, y, r, u, v), key = `${part.tile}:${part.kind}:${slot}`;
+        // Onlookers stand inside the fence and never inside another part (they may step into the next tile).
+        const m = .16, cell = Math.floor(p.y) * MAP_SIZE + Math.floor(p.x);
+        if (kind === "watch" && (p.x < lot.x + m || p.y < lot.y + m || p.x > lot.x + lot.width - m || p.y > lot.y + lot.height - m || blocked.has(cell))) return;
         this.spots.set(key, { key, lot: lot.id, kind, x: p.x, y: p.y, tile: part.tile, rotation: r, u, v, z, facing: facingOf(r, du, dv), child });
       };
       switch (part.kind) {
@@ -226,12 +230,19 @@ export class TownLife {
         case "bench": spot(0, "seat", .36, .5, 5.6, 0, 1); spot(1, "seat", .64, .5, 5.6, 0, 1); break;
         case "picnic": spot(0, "seat", .36, .23, 6, 0, 1); spot(1, "seat", .64, .23, 6, 0, 1); spot(2, "seat", .4, .8, 6, 0, -1); spot(3, "seat", .62, .8, 6, 0, -1); break;
         case "gazebo": spot(0, "seat", .5, .3, 9.4, 0, 1); spot(1, "seat", .3, .58, 9.4, 1, 0); break;
-        case "fountain": spot(0, "watch", .5, .95, 1, 0, -1, true); spot(1, "watch", .95, .55, 1, -1, 0); spot(2, "watch", .08, .45, 1, 1, 0); break;
-        case "pond": spot(0, "watch", .5, .96, 1, 0, -1, true); spot(1, "watch", .96, .6, 1, -1, 0); break;
-        case "cherry": case "flowers": case "sculpture": case "clock": case "arch": spot(0, "watch", .5, .93, 1, 0, -1); break;
+        // Around the basin's rim, or beside the pond in the neighbouring tile (the pond fills its own).
+        case "fountain": spot(0, "watch", .5, .88, 1, 0, -1, true); spot(1, "watch", .88, .5, 1, -1, 0); spot(2, "watch", .12, .5, 1, 1, 0); spot(3, "watch", .5, .12, 1, 0, 1, true); break;
+        case "pond": spot(0, "watch", .5, 1.12, 1, 0, -1, true); spot(1, "watch", 1.12, .5, 1, -1, 0); spot(2, "watch", -.12, .5, 1, 1, 0, true); spot(3, "watch", .5, -.12, 1, 0, 1); break;
+        case "cherry": case "flowers": case "sculpture": case "clock": spot(0, "watch", .5, .86, 1, 0, -1); spot(1, "watch", .86, .5, 1, -1, 0); break;
+        case "arch": spot(0, "watch", .5, .8, 1, 0, -1); break;
       }
     }
     for (const v of this.visitors) if (v.spot && !this.spots.has(v.spot)) this.leaveSpot(v);
+  }
+  /** A tile of the park with nothing standing on it, so strollers never stop inside a pond or a hedge. */
+  private openCell(lot: ParkLot) {
+    const taken = new Set(lot.parts.filter(p => p.kind !== "path" && p.kind !== "stones").map(p => p.tile)), cells = lotTiles(lot), open = cells.filter(i => !taken.has(i));
+    return this.random.pick(open.length ? open : cells);
   }
   private occupied(key: string, except?: Visitor) { return this.visitors.some(v => v !== except && v.spot === key); }
   /** Choose something to do in the park; children like the play equipment, grown-ups the seats and the view. */
@@ -410,7 +421,7 @@ export class TownLife {
   }
   private spawnVisitor(env: TownEnvironment): Visitor | undefined {
     if (!this.parks.length) return;
-    const r = this.random, lot = r.pick(this.parks), cells = lotTiles(lot), cell = r.pick(cells);
+    const r = this.random, lot = r.pick(this.parks), cell = this.openCell(lot);
     const play = [...this.spots.values()].some(s => s.lot === lot.id && s.child && s.kind !== "watch");
     const kind: Look["kind"] = play && r.next() < .6 ? "child" : r.next() < .3 ? "elder" : "adult";
     const x = cell % MAP_SIZE + .2 + r.next() * .6, y = Math.floor(cell / MAP_SIZE) + .2 + r.next() * .6;
@@ -457,7 +468,7 @@ export class TownLife {
       else if (v.spot) v.using = 0;
       else if ((v.rest -= dt) <= 0) {
         const lot = this.parks.find(l => l.id === v.lot);
-        if (lot && !(r.next() < .45 && this.chooseSpot(v))) { v.tx = lot.x + .2 + r.next() * (lot.width - .4); v.ty = lot.y + .2 + r.next() * (lot.height - .4); v.rest = 2 + r.next() * 5; }
+        if (lot && !(r.next() < .45 && this.chooseSpot(v))) { const cell = this.openCell(lot); v.tx = cell % MAP_SIZE + .25 + r.next() * .5; v.ty = Math.floor(cell / MAP_SIZE) + .25 + r.next() * .5; v.rest = 2 + r.next() * 5; }
       }
     }
     // Nobody vanishes in mid-swing: people finish what they are doing before they go home.
