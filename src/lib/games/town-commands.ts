@@ -4,7 +4,9 @@ import { buildLine, buyFacilityPart, buyParkLot, expandParkLot, placeParkPart, r
 const tile = z.number().int().min(0).max(575);
 const parkSize = z.enum(["small", "medium", "large"]);
 const facilityPart = z.enum(["garden", "terrace", "light", "sign", "storage", "greenbelt", "solar", "bench", "vending", "canopy", "planter"]);
-const parkPart = z.enum(["tree", "flowers", "bench", "fountain", "playground", "path", "light", "cherry", "pine", "hedge", "pond", "gazebo", "picnic", "swings", "sandbox", "sculpture", "clock", "trash", "bikeRack", "stones", "arch"]);
+const parkPart = z.enum(["tree", "flowers", "bench", "fountain", "playground", "path", "light", "cherry", "pine", "hedge", "pond", "gazebo", "picnic", "swings", "sandbox", "sculpture", "clock", "trash", "bikeRack", "stones", "arch",
+  "seesaw", "springRider", "globe", "carousel", "jungleGym", "splashPad", "bars", "basketball", "maple", "ginkgo", "wisteria", "flowerField", "bamboo",
+  "foodCart", "parasol", "drinkFountain", "bandstand", "windmill", "flowerClock", "lantern", "flagPole"]);
 export const townCommandSchema = z.discriminatedUnion("type", [
   z.object({ type: z.literal("build"), tool: z.enum(["road", "rail", "station", "house", "shop", "factory", "home", "bulldoze"]), path: z.array(tile).min(1).max(576) }),
   z.object({ type: z.literal("park"), tile, size: parkSize, kind: z.enum(["park", "plaza"]), rotated: z.boolean() }),

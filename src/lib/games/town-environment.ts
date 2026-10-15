@@ -9,6 +9,8 @@ import { overcastOf, withWeather, type RoomWeather, type WeatherKind } from "../
 export type TownTimeMode = "real" | "morning" | "day" | "evening" | "night";
 export type TownWeatherMode = "real" | "clear" | "cloudy" | "rain" | "snow";
 export type TownSeason = "spring" | "summer" | "autumn" | "winter";
+/** What the seasonal flower beds show: tulips, then hydrangeas in the rainy season, sunflowers, cosmos and winter pansies. */
+export type TownFlora = "tulip" | "hydrangea" | "sunflower" | "cosmos" | "pansy";
 
 export type TownEnvironment = {
   /** The represented moment (ms). Manual time modes keep today's date. */
@@ -23,6 +25,9 @@ export type TownEnvironment = {
   bare: number;
   /** Lush deep green of high summer, 0..1. */
   lush: number;
+  /** Wisteria in bloom, 0..1: about a month after the cherry blossom. */
+  wisteria: number;
+  flora: TownFlora;
   sun: { altitude: number; azimuth: number };
   moon: { altitude: number; azimuth: number; phase: number };
   skyTop: string;
@@ -112,7 +117,10 @@ function seasonal(dayOfYear: number, lat: number) {
   const d = after(dayOfYear, colourPeak), leavesBack = after(blossomPeak - 8, colourPeak);
   const bare = d < 10 ? 0 : d < 36 ? smooth(10, 36, d) : d < leavesBack ? 1 : d < leavesBack + 24 ? 1 - smooth(leavesBack, leavesBack + 24, d) : 0;
   const lush = clamp(1 - Math.abs(signed(dayOfYear, 205 - (lat - 35.7) * 2)) / 55);
-  return { blossom, foliage, bare, lush };
+  const wisteria = clamp(1 - Math.abs(signed(dayOfYear, blossomPeak + 30)) / 13);
+  const flora: TownFlora = after(dayOfYear, blossomPeak - 6) < 66 ? "tulip" : after(dayOfYear, blossomPeak + 60) < 40 ? "hydrangea"
+    : dayOfYear >= Math.min(188, blossomPeak + 100) && dayOfYear < 245 ? "sunflower" : dayOfYear >= 245 && dayOfYear < 315 ? "cosmos" : "pansy";
+  return { blossom, foliage, bare, lush, wisteria, flora };
 }
 export function townEnvironment(input: { now: number; place: GeoPoint; weather: RoomWeather | null; timeMode?: TownTimeMode; weatherMode?: TownWeatherMode; reducedMotion?: boolean }): TownEnvironment {
   const timeMode = input.timeMode ?? "real", weatherMode = input.weatherMode ?? "real";

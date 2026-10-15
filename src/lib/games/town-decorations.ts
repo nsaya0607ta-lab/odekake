@@ -39,7 +39,15 @@ export function drawTownDecoration(c: CanvasRenderingContext2D, kind: string, x:
   const wood = ["#b18b63", "#826345", "#d4b28a"], stone = ["#a8b09e", "#7c9289", "#d4d6bb"], metal = ["#6c8c80", "#476b65", "#adc1a7"];
   const leaf = (p: Point, rx: number, ry: number, palette: string[]) => { const g = c.createRadialGradient(p.x - rx * .3, p.y - ry * .4, 0, p.x, p.y, Math.max(rx, ry) * 1.2); g.addColorStop(0, palette[2]!); g.addColorStop(.55, palette[1]!); g.addColorStop(1, palette[0]!); oval(p, rx, ry, g); };
   const bloom = (p: Point, color: string, r = 1) => { for (let j = 0; j < 5; j++) { const a = j * Math.PI * .4; oval({ x: p.x + Math.cos(a) * r, y: p.y + Math.sin(a) * r * .7 }, r * .65, r * .5, color); } oval(p, r * .32, r * .25, "#f6d786"); };
-  if (kind !== "stones") oval(at(.53, .58), 17, 6.8, "#294f3c24");
+  // Each part casts its shadow where it actually touches the ground, so nothing seems to hover over a
+  // shadow on empty grass (the flower arch only stands on its two posts, the hedge on its kerb).
+  const footprint = (u: number, v: number, w: number, d: number) => { const k = (a: number, b: number) => { const q = at(a, b, .6); return { x: q.x + 1.2, y: q.y + .6 }; }; poly([k(u, v), k(u + w, v), k(u + w, v + d), k(u, v + d)], "#294f3c2b"); };
+  const SHADOW: Record<string, [number, number, number, number][]> = {
+    hedge: [[.07, .31, .86, .36]], arch: [[.1, .39, .15, .22], [.76, .39, .15, .22]], gazebo: [[.1, .1, .82, .82]], picnic: [[.14, .14, .72, .74]],
+    sculpture: [[.27, .27, .46, .46]], clock: [[.34, .34, .32, .32]], trash: [[.3, .33, .4, .34]], vending: [[.24, .28, .52, .40]], planter: [[.27, .3, .46, .41]],
+  };
+  if (kind === "cherry" || kind === "pine") oval(at(.5, .52), kind === "cherry" ? 15 : 11, kind === "cherry" ? 6.5 : 5, "#294f3c26");
+  for (const [u, v, w, d] of SHADOW[kind] ?? []) footprint(u, v, w, d);
   if (kind === "cherry") {
     box(.40, .40, .20, .20, 1, stone); line(at(.5, .5, 1), at(.49, .5, 21), "#8c7359", 2.3); line(at(.49, .5, 12), at(.3, .48, 24), "#8c7359", 1); line(at(.49, .5, 14), at(.72, .53, 24), "#8c7359", 1);
     const live = paintState.season !== "default", blossom = !live || paintState.blossom > .15;
@@ -165,7 +173,7 @@ export function drawTownDecoration(c: CanvasRenderingContext2D, kind: string, x:
     box(.08, .12, .84, .74, .8, ["#a6ad87", "#8d9c75", "#c5c59a"]);
     assemble([
       ...[.16, .84].map(u => ({ u, v: .49, paint: () => { line(at(u, .22, 1.8), at(u, .48, 26), "#6c8f85", 2); line(at(u, .76, 1.8), at(u, .48, 26), "#517b73", 2); } })),
-      ...(paintState.liveSwings ? [] : [.31, .57]).map(u => ({ u: u + .055, v: .55, paint: () => {
+      ...(paintState.liveParts ? [] : [.31, .57]).map(u => ({ u: u + .055, v: .55, paint: () => {
         for (const a of [0, .11]) line(at(u + a, .48, 25), at(u + a, .55, 7), "#d6d7b9", .65);
         box(u - .01, .49, .13, .14, 1, ["#be9167", "#926b4e", "#e0b787"], 6);
       } })),
@@ -197,7 +205,10 @@ export function drawTownDecoration(c: CanvasRenderingContext2D, kind: string, x:
         poly([at(a[0]!, a[1]!, lower.z), at(b[0]!, b[1]!, lower.z), at(t[0]!, t[1]!, upper.z), at(s[0]!, s[1]!, upper.z)], Math.abs(p.x - q.x) < 1e-6 ? "#648779" : "#9ab5a1", "#c4d5b780", .45);
       }
     }
-    oval(at(.57, .47, 28), 3.4, 3.4, "#b9c9a8");
+    // A stone ball resting on the top of the column, shaded so it reads as solid.
+    const top = at(.57, .47, 26), ball = { x: top.x, y: top.y - 2.8 }, g = c.createRadialGradient(ball.x - 1.2, ball.y - 1.3, .3, ball.x, ball.y, 3.6);
+    g.addColorStop(0, "#e6eedb"); g.addColorStop(.55, "#9fb8a6"); g.addColorStop(1, "#5f8377");
+    oval({ x: top.x, y: top.y + .2 }, 2.6, 1.1, "#4f6f6290"); oval(ball, 3.3, 3.3, g);
   } else if (kind === "clock") {
     box(.37, .37, .26, .26, 2, stone); box(.46, .46, .08, .08, 22, metal, 3);
     const faces = box(.37, .38, .26, .24, 8, metal, 25);

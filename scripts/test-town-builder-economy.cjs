@@ -292,6 +292,7 @@ function apiWithSession(session) {
     await db.exec(fs.readFileSync(path.join(root, 'supabase/migrations/0141_white_coins_town_rpg.sql'), 'utf8'));
     await db.exec(fs.readFileSync(path.join(root, 'supabase/migrations/0142_town_my_home.sql'), 'utf8'));
     await db.exec(fs.readFileSync(path.join(root, 'supabase/migrations/0143_home_coin_drops_x1_5.sql'), 'utf8'));
+    await db.exec(fs.readFileSync(path.join(root, 'supabase/migrations/0144_town_park_parts.sql'), 'utf8'));
     assert.deepEqual(await snapshot(), before);
     await rpc('claim_login_bonus'); // Would recurse if the wrapper were renamed again.
     assert.equal((await rpc('claim_login_bonus')).white_amount, 0);

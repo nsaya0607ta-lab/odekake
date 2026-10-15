@@ -17,11 +17,14 @@ export const paintState = {
   lush: 0,
   /** Live clocks are drawn as animated hands on top of the dial artwork. */
   liveClocks: false,
-  /** Swing seats hang from the moving layer (so children can swing on them) instead of the cached frame. */
-  liveSwings: false,
+  /** Moving park pieces (swing seats, seesaw planks, carousel, windmill sails…) are drawn by the moving layer, not the cached artwork. */
+  liveParts: false,
+  /** Wisteria in bloom (0..1) and the flowers of the seasonal flower beds; "default" is the shop icon's spring look. */
+  wisteria: 0,
+  flora: "default" as "default" | "tulip" | "hydrangea" | "sunflower" | "cosmos" | "pansy",
 };
 export function resetPaintState() {
-  Object.assign(paintState, { litThreshold: .25, shopsOpen: true, snow: false, season: "default", blossom: 0, foliage: 0, bare: 0, lush: 0, liveClocks: false, liveSwings: false });
+  Object.assign(paintState, { litThreshold: .25, shopsOpen: true, snow: false, season: "default", blossom: 0, foliage: 0, bare: 0, lush: 0, liveClocks: false, liveParts: false, wisteria: 0, flora: "default" });
 }
 
 /** Multiplied into everything that is not a light source once it is fully dark. */

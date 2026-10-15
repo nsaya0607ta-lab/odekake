@@ -1,6 +1,7 @@
 import { MAP_SIZE, PARK_PARTS, canBuyPark, canPlaceParkPart, lotTiles, neighbours, parkAt, parkFootprint, touchesRoad, type FacilityPart, type ParkLot, type ParkPart, type ParkSize, type Tile, type Town, type Tool } from "./town-builder";
 import { DIRECTIONS, elevationAt, measureTransportRoute, sampleTransportDistance, sampleTransportPath, stationAxis, trackPaths, trackPoint, transportHeight, transportMask, transportOutline, type TransportKind, type TransportRoute } from "./town-transport";
 import { clockDials, drawTownDecoration, decorationPickFaces } from "./town-decorations";
+import { PARK_ART_HEIGHT, PARK_ART_LIGHTS, PARK_ART_SWAY, drawParkArt, parkArtVariant } from "./town-park-art";
 import { TownSprites, type SpriteBounds } from "./town-sprites";
 import { buildingHeight, buildingLevel, buildingVolumes, factoryLayout, facilityLayout, roofFeatures, type FacilityPlacement } from "./town-building-models";
 import { lightGradient, NIGHT_AMBIENT, paintState, resetPaintState, shade, snowy, type TreePalette } from "./town-paint";
@@ -149,7 +150,8 @@ function lamp(c: CanvasRenderingContext2D, x: number, y: number, night: boolean)
     const bulb = lightGradient(c.createRadialGradient(p.x + 5, p.y - 23, 0, p.x + 5, p.y - 23, 9)); bulb.addColorStop(0, "#ffe7a866"); bulb.addColorStop(1, "#ffe7a800"); ellipse(c, { x: p.x + 5, y: p.y - 21 }, 9, 7, bulb);
   }
 }
-function parkPart(c: CanvasRenderingContext2D, kind: ParkPart, x: number, y: number, rotation: number, night: boolean, palette?: TreePalette | "blossom") {
+function parkPart(c: CanvasRenderingContext2D, kind: ParkPart, x: number, y: number, rotation: number, night: boolean, palette?: TreePalette | "blossom", variant = 0) {
+  if (drawParkArt(c, kind, x, y, rotation, night, variant)) return;
   if (drawTownDecoration(c, kind, x, y, rotation, night)) return;
   const at = (u: number, v: number, z = 0) => {
     const p = rotation % 4 === 1 ? [1 - v, u] : rotation % 4 === 2 ? [1 - u, 1 - v] : rotation % 4 === 3 ? [v, 1 - u] : [u, v];
@@ -828,7 +830,11 @@ type SceneObject = {
 };
 const GROUND_BOUNDS = { left: -824, top: -30, width: 1648, height: 850 };
 function parkGround(c: CanvasRenderingContext2D, lot: ParkLot, town: Town) {
-  box(c, lot.x + .035, lot.y + .035, lot.width - .07, lot.height - .07, 1, ["#8eaa79", "#7c9b6b", lot.kind === "park" ? "#a8c58a" : "#e1d4b3"]);
+  // The lawn follows the seasons like the grass around it, a shade greener because it is looked after.
+  const lawn = paintState.season === "default" ? "#a8c58a" : mixColor(grassPalette().grass[2]!, "#8fc276", .35);
+  box(c, lot.x + .035, lot.y + .035, lot.width - .07, lot.height - .07, 1, ["#8eaa79", "#7c9b6b", lot.kind === "park" ? lawn : "#e1d4b3"]);
+  // Mowing stripes across the lawn.
+  if (lot.kind === "park" && !paintState.snow) for (let u = .21, j = 0; u < lot.width - .21; u += .5, j++) if (j % 2 === 0) patch(c, lot.x + u, lot.y + .21, Math.min(.5, lot.width - .21 - u), lot.height - .42, "#f6ffe61c", 1.01);
   for (const v of [.09, lot.height - .21]) patch(c, lot.x + .09, lot.y + v, lot.width - .18, .12, "#ded5b5", 1.1);
   for (const u of [.09, lot.width - .21]) patch(c, lot.x + u, lot.y + .09, .12, lot.height - .18, "#ded5b5", 1.1);
   for (const i of lotTiles(lot)) { const x = i % MAP_SIZE, y = Math.floor(i / MAP_SIZE);
@@ -969,6 +975,7 @@ export class TownScene {
   private ground: HTMLCanvasElement | null = null;
   private groundState: { tiles: Tile[]; terrain: boolean[]; grid: boolean; parks: ParkLot[]; look: string } | null = null;
   constructor(createCanvas?: () => HTMLCanvasElement) {
+    this.life.reduced = this.reducedMotion;
     this.createCanvas = createCanvas ?? (typeof document !== "undefined" ? () => document.createElement("canvas") : null);
     this.sprites = this.createCanvas ? new TownSprites(this.createCanvas) : null;
     this.sky = new SkyPainter(this.createCanvas);
@@ -1009,6 +1016,7 @@ export class TownScene {
           const center = iso(x + .5, y + .5);
           if (contains(p, [{ x: center.x - 9, y: center.y - 10 }, { x: center.x - 10, y: center.y - 21 }, { x: center.x, y: center.y - 29 }, { x: center.x + 10, y: center.y - 21 }, { x: center.x + 9, y: center.y - 10 }])) return i;
         } else if (part && decorationPickFaces(part.kind, x, y, part.rotation).some(face => contains(p, face))) return i;
+        else if (part && PARK_ART_HEIGHT[part.kind] && boxFaces(x + .12, y + .12, .76, .76, PARK_ART_HEIGHT[part.kind]!).some(face => contains(p, face))) return i;
         else if (part && boxFaces(x + .15, y + .2, .7, .6, part.kind === "playground" ? 15 : part.kind === "light" ? 23 : 8).some(face => contains(p, face))) return i;
       }
     }
@@ -1022,7 +1030,7 @@ export class TownScene {
     if (lot) {
       points.push(iso(lot.x, lot.y), iso(lot.x + lot.width, lot.y), iso(lot.x + lot.width, lot.y + lot.height), iso(lot.x, lot.y + lot.height));
       points.push(iso(lot.x + .5, lot.y + .5, 40));
-      for (const part of lot.parts) points.push(iso(part.tile % MAP_SIZE + .5, Math.floor(part.tile / MAP_SIZE) + .5, ["tree", "cherry", "pine", "gazebo", "clock", "arch", "swings"].includes(part.kind) ? 42 : 25));
+      for (const part of lot.parts) points.push(iso(part.tile % MAP_SIZE + .5, Math.floor(part.tile / MAP_SIZE) + .5, ["tree", "cherry", "pine", "gazebo", "clock", "arch", "swings"].includes(part.kind) ? 42 : PARK_ART_HEIGHT[part.kind] ?? 25));
     } else if (town.tiles[i] === "park") points.push(iso(x + .5, y + .5, 40));
     return {
       left: camera.x + Math.min(...points.map(p => p.x)) * camera.zoom,
@@ -1033,7 +1041,7 @@ export class TownScene {
   }
   /** Season palettes and snow change artwork, so they take part in the cache keys. */
   private look() {
-    return `${paintState.season}:${paintState.blossom > .15 ? "b" : ""}${Math.round(paintState.foliage * 8)}:${Math.round(paintState.bare * 8)}:${paintState.lush > .35 ? "l" : ""}${paintState.snow ? ":s" : ""}${paintState.liveClocks ? ":c" : ""}${paintState.liveSwings ? ":w" : ""}`;
+    return `${paintState.season}:${paintState.blossom > .15 ? "b" : ""}${Math.round(paintState.foliage * 8)}:${Math.round(paintState.bare * 8)}:${paintState.lush > .35 ? "l" : ""}${paintState.snow ? ":s" : ""}${paintState.liveClocks ? ":c" : ""}${paintState.liveParts ? ":w" : ""}:${paintState.flora}:${Math.round(paintState.wisteria * 8)}`;
   }
   private prepareObjects(town: Town) {
     const look = this.look();
@@ -1102,12 +1110,12 @@ export class TownScene {
     }
     for (const lot of town.parks ?? []) {
       for (const part of lot.parts) if (part.kind !== "path") {
-        const x = part.tile % MAP_SIZE, y = Math.floor(part.tile / MAP_SIZE), tall = part.kind === "tree" || part.kind === "cherry" || part.kind === "pine";
+        const x = part.tile % MAP_SIZE, y = Math.floor(part.tile / MAP_SIZE), tall = part.kind === "tree" || part.kind === "cherry" || part.kind === "pine" || PARK_ART_SWAY.has(part.kind);
+        const variant = parkArtVariant(part.kind, part.tile), lamp = part.kind === "light" || part.kind === "lantern";
         const palette = part.kind === "tree" ? treePalette(part.tile, .6) : part.kind === "cherry" ? `${paintState.blossom > .15 || paintState.season === "default" ? "bloom" : paintState.bare > .5 ? "bare" : paintState.foliage > .35 ? "red" : "green"}` : part.kind === "flowers" ? paintState.snow || paintState.season === "winter" && paintState.bare > .5 ? "dormant" : "bloom" : "";
-        add(x, y, PARK_PARTS.find(p => p.id === part.kind)?.layer === "ground" ? .08 : 1, `park-part:${part.kind}:${part.rotation}:${palette}`, { left: -38, top: -34, width: 76, height: 82 },
-          (c, night, lit) => parkPart(c, part.kind, x, y, part.rotation, part.kind === "light" ? lit : night, palette as TreePalette),
-          { sway: tall, emits: part.kind === "light" || part.kind === "clock", ...(part.kind === "light" ? { lamp: hash(part.tile * 3.7 + 1) } : {}) });
-        if (part.kind === "fountain") effects.push({ kind: "park", x, y });
+        add(x, y, PARK_PARTS.find(p => p.id === part.kind)?.layer === "ground" ? .08 : 1, `park-part:${part.kind}:${part.rotation}:${palette}:${variant}`, { left: -40, top: -36, width: 80, height: 86 },
+          (c, night, lit) => parkPart(c, part.kind, x, y, part.rotation, lamp ? lit : night, palette as TreePalette, variant),
+          { sway: tall, emits: part.kind === "light" || part.kind === "clock" || PARK_ART_LIGHTS.has(part.kind) || part.kind === "parasol", ...(lamp ? { lamp: hash(part.tile * 3.7 + 1) } : {}) });
         if (part.kind === "clock") clocks.push({ x, y, depth: x + y + 1.001, dials: clockDials(x, y, part.rotation) });
       }
       for (const i of lotTiles(lot)) {
@@ -1144,7 +1152,7 @@ export class TownScene {
     if (!env) return;
     Object.assign(paintState, {
       litThreshold: env.windows === "late" ? .8 : .25, shopsOpen: env.shopsOpen, snow: env.snowCover, season: env.season,
-      blossom: env.blossom, foliage: env.foliage, bare: env.bare, lush: env.lush, liveClocks: true, liveSwings: true,
+      blossom: env.blossom, foliage: env.foliage, bare: env.bare, lush: env.lush, liveClocks: true, liveParts: true, wisteria: env.wisteria, flora: env.flora,
     });
   }
   render(c: CanvasRenderingContext2D, width: number, height: number, town: Town, options: SceneOptions, dt: number) {
@@ -1224,7 +1232,6 @@ export class TownScene {
     const windX = env ? Math.cos(env.windAngle) * (.5 + env.wind / 25) : 1;
     for (const { kind, x, y, level } of this.effects) {
       if (kind === "factory" && !reduced) add(x, y, 1.01, c => factorySmoke(c, x, y, time, level, windX, night), { left: -60, top: -112, width: 140, height: 145 });
-      if (kind === "park") add(x, y, 1.01, c => { const p = iso(x + .5, y + .5), jet = 17 + (reduced ? 0 : Math.sin(time * 3)); line(c, { x: p.x, y: p.y - 6.5 }, { x: p.x, y: p.y - jet }, shade("#d9f7f0", night), 1.6); ellipse(c, { x: p.x, y: p.y - jet }, 1.4, .8, shade("#e9f9ed", night)); });
     }
     if (env) for (const clock of this.clocks) {
       const paint = clock.dials.length
@@ -1331,9 +1338,9 @@ export class TownScene {
     for (const i of previewTiles) {
       if (options.tool === "decorate" && options.parkPart !== "remove" && allowedAt(i)) {
         // The ghost of a new swing keeps its seats: nobody swings on it yet.
-        const live = paintState.liveSwings; paintState.liveSwings = false;
+        const live = paintState.liveParts; paintState.liveParts = false;
         c.save(); c.globalAlpha *= .5; parkPart(c, options.parkPart ?? "tree", i % MAP_SIZE, Math.floor(i / MAP_SIZE), options.partRotation ?? 0, night >= .5); c.restore();
-        paintState.liveSwings = live;
+        paintState.liveParts = live;
       } else if (allowedAt(i) && ["house", "shop", "factory", "station", "home"].includes(options.tool)) {
         c.save(); c.globalAlpha *= .55; building(c, options.tool as Tile, i % MAP_SIZE, Math.floor(i / MAP_SIZE), 1, night >= .5, time, true, stationAxis(town, i), transportMask(town, i, "road")); c.restore();
       }
@@ -1389,6 +1396,9 @@ export function drawTownPartIcon(c: CanvasRenderingContext2D, part: ParkPart | F
   if (part === "planter") {
     facilityPlanter(c, 0, 0, { u: .28, v: .31, w: .44, d: .38, z: 0, height: 7, part, mount: "ground" }, 1, false); c.restore(); return;
   }
+  const tall = PARK_ART_HEIGHT[part as ParkPart] ?? 0;
+  if (tall > 30) { const s = 30 / tall; c.translate(0, 16 * (1 - s) + 4); c.scale(s, s); }
+  if (drawParkArt(c, part, 0, 0, 0, false)) { c.restore(); return; }
   if (drawTownDecoration(c, part, 0, 0, 0, false)) { c.restore(); return; }
   if (["tree", "flowers", "bench", "fountain", "playground", "path", "light"].includes(part)) {
     parkPart(c, part as ParkPart, 0, 0, 0, false);
