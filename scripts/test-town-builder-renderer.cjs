@@ -16,8 +16,11 @@ const sprites = compile('src/lib/games/town-sprites.ts', { './town-paint': paint
 const decorations = compile('src/lib/games/town-decorations.ts', { './town-paint': paint });
 const models = compile('src/lib/games/town-building-models.ts');
 const sky = compile('src/lib/games/town-sky.ts', { './town-builder': game, './town-environment': environment });
-const life = compile('src/lib/games/town-life.ts', { './town-builder': game, './town-paint': paint, './town-transport': transport });
-const { TownScene, drawTownIcon, drawTownPartIcon } = compile('src/lib/games/town-renderer.ts', { './town-builder': game, './town-transport': transport, './town-sprites': sprites, './town-decorations': decorations, './town-building-models': models, './town-paint': paint, './town-environment': environment, './town-sky': sky, './town-life': life });
+const figures = compile('src/lib/games/town-figures.ts', { './town-paint': paint });
+const art = compile('src/lib/games/town-park-art.ts', { './town-paint': paint });
+const motion = compile('src/lib/games/town-park-motion.ts', { './town-paint': paint, './town-figures': figures, './town-park-art': art });
+const life = compile('src/lib/games/town-life.ts', { './town-builder': game, './town-paint': paint, './town-transport': transport, './town-figures': figures, './town-park-art': art, './town-park-motion': motion });
+const { TownScene, drawTownIcon, drawTownPartIcon } = compile('src/lib/games/town-renderer.ts', { './town-builder': game, './town-transport': transport, './town-sprites': sprites, './town-decorations': decorations, './town-building-models': models, './town-paint': paint, './town-environment': environment, './town-sky': sky, './town-life': life, './town-park-art': art });
 const iso = (x, y, z = 0) => ({ x: (x - y) * 32, y: (x + y) * 16 - z });
 const blank = () => ({ ...game.createTown(false), tiles: Array(576).fill('grass'), terrain: Array(576).fill(false), levels: Array(576).fill(0) });
 let passed = 0;
@@ -290,6 +293,13 @@ test('tall new park structures can be selected above the ground tile at differen
   for(const kind of ['cherry','pine','gazebo','clock','arch','swings']){
     let town=game.buyParkLot(blank(),5,5,'medium').town;town=game.placeParkPart(town,125,125,kind).town;
     const scene=new TownScene(),p=iso(5.5,5.5,kind==='swings'?23:30);
+    for(const zoom of [.6,1.4,2.8]){scene.camera={x:160,y:60,zoom};assert.equal(scene.pickTile(160+p.x*zoom,60+p.y*zoom,town),125,kind);}
+  }
+});
+test('the tall parts added in 2026-10 (windmill, carousel, flag pole, bandstand, ginkgo) are selected by their tops too',()=>{
+  for(const [kind,z] of [['windmill',40],['carousel',30],['flagPole',40],['bandstand',28],['ginkgo',32],['bamboo',38]]){
+    let town=game.buyParkLot(blank(),5,5,'medium').town;town=game.placeParkPart(town,125,125,kind).town;
+    const scene=new TownScene(),p=iso(5.5,5.5,z);
     for(const zoom of [.6,1.4,2.8]){scene.camera={x:160,y:60,zoom};assert.equal(scene.pickTile(160+p.x*zoom,60+p.y*zoom,town),125,kind);}
   }
 });

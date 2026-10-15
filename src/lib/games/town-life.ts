@@ -1,33 +1,41 @@
-import { MAP_SIZE, lotTiles, neighbours, type ParkLot, type Tile, type Town } from "./town-builder";
+import { MAP_SIZE, lotTiles, neighbours, type ParkLot, type ParkPart, type Tile, type Town } from "./town-builder";
 import type { TownEnvironment } from "./town-environment";
+import { TAU, drawDog, drawPerson, drawPigeon, ellipse, stroke, type Look, type Point } from "./town-figures";
+import { parkArtVariant } from "./town-park-art";
+import { PAINTED, PART_MOTION, PART_SPOTS, motionDepth, motionKit, spotDuration, spotOpen, type PartFrame, type PartState, type Rider, type SpotKind, type Who } from "./town-park-motion";
 import { shade } from "./town-paint";
 import { elevationAt, sampleTransportPath } from "./town-transport";
+
+export { drawDog, drawPerson } from "./town-figures";
 
 /**
  * People, animals and small effects that bring the town to life. Everything is driven by a seeded
  * random generator and the scene clock, so the same sequence of frames always looks the same.
  */
-type Point = { x: number; y: number };
 type Bounds = { left: number; top: number; width: number; height: number };
 export type LifeAdd = (x: number, y: number, depth: number, paint: (c: CanvasRenderingContext2D) => void, bounds?: Bounds) => void;
-const TAU = Math.PI * 2;
 const iso = (x: number, y: number, z = 0): Point => ({ x: (x - y) * 32, y: (x + y) * 16 - z });
 const hash = (n: number) => { const v = Math.sin(n * 12.9898 + 78.233) * 43758.5453; return v - Math.floor(v); };
-function ellipse(c: CanvasRenderingContext2D, x: number, y: number, rx: number, ry: number, color: string) {
-  c.beginPath(); c.ellipse(x, y, rx, ry, 0, 0, TAU); c.fillStyle = color; c.fill();
-}
-function stroke(c: CanvasRenderingContext2D, ax: number, ay: number, bx: number, by: number, color: string, width: number) {
-  c.beginPath(); c.moveTo(ax, ay); c.lineTo(bx, by); c.strokeStyle = color; c.lineWidth = width; c.stroke();
-}
 
 type Door = { tile: number; kind: Tile; road: number; dx: number; dy: number };
-type Look = { top: string; bottom: string; hair: string; skin: string; accent: string; umbrella: string; scale: number; bag: "none" | "randoseru" | "tote" | "briefcase"; hat: boolean; parasol: boolean; dog: string | null; kind: "adult" | "child" | "elder" | "jogger" };
 type Walker = { points: Point[]; lengths: number[]; total: number; s: number; speed: number; look: Look; seed: number; phase: number };
-/** A place in a park where someone does something: swings, slides, digs in the sand, sits or looks. */
-type SpotKind = "swing" | "slide" | "sand" | "seat" | "watch";
-type Spot = { key: string; lot: number; kind: SpotKind; x: number; y: number; tile: number; rotation: number; u: number; v: number; z: number; facing: number; child: boolean };
+/** A place in a park where someone does something: plays on a part, sits, looks, queues, or plays on the lawn. */
+type Spot = { key: string; lot: number; kind: SpotKind; part: ParkPart | null; slot: number; x: number; y: number; tile: number; rotation: number; u: number; v: number; z: number; facing: number; side: number; who: Who };
+/** Games on an open patch of lawn: a picnic blanket, cherry-blossom viewing, catch, tag, a kite, soap bubbles, fetch with the dog. */
+type Lawn = "blanket" | "hanami" | "ball" | "tag" | "kite" | "bubbles" | "fetch";
+const LAWN: Record<Lawn, { who: Who; slots: [number, number][]; weight: number }> = {
+  blanket: { who: "any", slots: [[.36, .44], [.63, .42], [.5, .63]], weight: 3 },
+  hanami: { who: "adult", slots: [[.32, .42], [.6, .36], [.66, .6], [.38, .64]], weight: 5 },
+  ball: { who: "child", slots: [[.16, .52], [.84, .48]], weight: 2 },
+  tag: { who: "child", slots: [[.24, .5], [.76, .5]], weight: 2 },
+  kite: { who: "any", slots: [[.5, .64]], weight: 2 },
+  bubbles: { who: "child", slots: [[.5, .58]], weight: 2 },
+  fetch: { who: "adult", slots: [[.3, .62]], weight: 2 },
+};
 /** `spot` is the place they are heading to or using; `using` counts seconds of use (below 0 while still walking there). */
-type Visitor = { lot: number; x: number; y: number; tx: number; ty: number; rest: number; life: number; age: number; look: Look; seed: number; phase: number; spot: string | null; using: number; duration: number };
+type Visitor = { lot: number; x: number; y: number; tx: number; ty: number; rest: number; life: number; age: number; look: Look; seed: number; phase: number; spot: string | null; using: number; duration: number; lawn?: Lawn };
+type Pigeon = { lot: number; x: number; y: number; dir: number; peck: number; wait: number; fly: { fx: number; fy: number; tx: number; ty: number; t: number } | null; seed: number };
+type MotionPart = { tile: number; kind: ParkPart; rotation: number; x: number; y: number; variant: number; depth: number };
 /** Local (u, v) inside a tile, turned the same way as the park artwork. */
 const turn = (x: number, y: number, rotation: number, u: number, v: number): Point => {
   const r = ((rotation % 4) + 4) % 4;
@@ -35,9 +43,42 @@ const turn = (x: number, y: number, rotation: number, u: number, v: number): Poi
 };
 /** +1 when a local direction points towards the viewer on screen. */
 const facingOf = (rotation: number, du: number, dv: number) => { const a = turn(0, 0, rotation, du, dv), o = turn(0, 0, rotation, 0, 0); return a.x - o.x + a.y - o.y >= 0 ? 1 : -1; };
-/** Swing seats hang below the top bar; the pendulum swings along the seat's local v. */
-const SWING_SEATS = [.365, .625];
-const swingSeat = (angle: number) => ({ v: .55 + Math.sin(angle) * .42, z: 25 - 18 * Math.cos(angle) });
+/** Screen side (+1 right, -1 left) of a local direction. */
+const sideOf = (rotation: number, du: number, dv: number) => { const a = turn(0, 0, rotation, du, dv), o = turn(0, 0, rotation, 0, 0); return a.x - o.x - (a.y - o.y) >= 0 ? 1 : -1; };
+const BALLOONS = ["#e8604f", "#f2c43c", "#4f8fc0", "#5aa469", "#e889b5", "#9a7bcc"], ICE_CREAM = ["#f6c6d4", "#fbf3e6", "#a8d8b9", "#8a5a3c", "#f5d66b"];
+/** Feet point that puts the hips of a sitting person on the seat. */
+const onSeat = (p: Point, look: Look) => ({ x: p.x, y: p.y + 2.8 * look.scale });
+/** A picnic blanket (gingham) or the blue sheet of a cherry-blossom party, with a basket and lunch boxes. */
+function blanket(c: CanvasRenderingContext2D, cx: number, cy: number, game: Lawn, night: number) {
+  const at = (u: number, v: number) => iso(cx + u, cy + v, 1.05), n = (color: string) => shade(color, night);
+  const quad = (u0: number, v0: number, u1: number, v1: number, color: string) => { const ps = [at(u0, v0), at(u1, v0), at(u1, v1), at(u0, v1)]; c.beginPath(); ps.forEach((q, j) => j ? c.lineTo(q.x, q.y) : c.moveTo(q.x, q.y)); c.closePath(); c.fillStyle = n(color); c.fill(); };
+  if (game === "hanami") {
+    quad(.16, .22, .84, .8, "#3f7fd0");
+    for (const u of [.38, .62]) { const a = at(u, .22), b = at(u, .8); stroke(c, a.x, a.y, b.x, b.y, n("#7aa8ea"), .4); }
+    quad(.44, .44, .56, .52, "#e9d7b0"); quad(.46, .46, .5, .5, "#d9534f"); quad(.51, .46, .55, .5, "#f6f1e6");
+    const bottle = at(.57, .55); ellipse(c, bottle.x, bottle.y - 1.4, .5, 1.4, n("#5f8f5a"));
+    return;
+  }
+  quad(.22, .28, .78, .74, "#f6efe2");
+  for (let j = 0; j < 4; j++) { quad(.22 + j * .14, .28, .29 + j * .14, .74, "#e0757066"); quad(.22, .28 + j * .115, .78, .335 + j * .115, "#e0757066"); }
+  const basket = at(.7, .34); ellipse(c, basket.x, basket.y - 1, 2.2, 1.4, n("#a0703f")); ellipse(c, basket.x, basket.y - 1.6, 2, .8, n("#c08a52"));
+  c.beginPath(); c.ellipse(basket.x, basket.y - 1.6, 1.6, 1.8, 0, Math.PI, TAU); c.strokeStyle = n("#7a5530"); c.lineWidth = .4; c.stroke();
+  quad(.42, .46, .5, .53, "#d9534f"); quad(.52, .46, .58, .53, "#f2c43c");
+}
+function kite(c: CanvasRenderingContext2D, hand: Point, time: number, env: TownEnvironment, night: number, seed: number) {
+  const wx = Math.cos(env.windAngle), wy = Math.sin(env.windAngle), n = (color: string) => shade(color, night);
+  const k = { x: hand.x + wx * 34 + Math.sin(time * .8 + seed) * 3, y: hand.y - 58 + wy * 8 + Math.sin(time * 1.3 + seed) * 2.5 };
+  c.beginPath(); c.moveTo(hand.x, hand.y); c.quadraticCurveTo((hand.x + k.x) / 2 + wx * 5, (hand.y + k.y) / 2 + 12, k.x, k.y + 3.5); c.strokeStyle = n("#f4f1e8"); c.lineWidth = .3; c.stroke();
+  const top = { x: k.x, y: k.y - 5 }, right = { x: k.x + 4, y: k.y - .5 }, bottom = { x: k.x, y: k.y + 4.5 }, left = { x: k.x - 4, y: k.y - .5 };
+  const tri = (a: Point, b: Point, color: string) => { c.beginPath(); c.moveTo(a.x, a.y); c.lineTo(b.x, b.y); c.lineTo(k.x, k.y - .5); c.closePath(); c.fillStyle = n(color); c.fill(); };
+  tri(top, right, "#e15b4f"); tri(right, bottom, "#f0c14b"); tri(bottom, left, "#4f8fc0"); tri(left, top, "#5aa469");
+  stroke(c, top.x, top.y, bottom.x, bottom.y, n("#6b5a46"), .3); stroke(c, left.x, left.y, right.x, right.y, n("#6b5a46"), .3);
+  c.beginPath(); c.moveTo(bottom.x, bottom.y);
+  const tail: Point[] = [];
+  for (let j = 1; j <= 7; j++) { const q = { x: bottom.x - wx * j * 2.4, y: bottom.y + j * 1.5 + Math.sin(time * 5 + j * .9) * 1.3 }; tail.push(q); c.lineTo(q.x, q.y); }
+  c.strokeStyle = n("#f4f1e8"); c.lineWidth = .35; c.stroke();
+  tail.forEach((q, j) => { if (j % 2) ellipse(c, q.x, q.y, .9, .45, n(j % 4 === 1 ? "#e15b4f" : "#f0c14b")); });
+}
 /** One trip round the slide: up the steps, across the deck, down the chute and back round to the steps. */
 const SLIDE: { from: [number, number, number]; to: [number, number, number]; time: number; sit?: boolean; via?: [number, number][] }[] = [
   { from: [.28, .05, 0], to: [.30, .22, 14], time: 1.5 },
@@ -87,71 +128,6 @@ function at(w: { points: Point[]; lengths: number[] }, s: number) {
   return { x: a.x + (b.x - a.x) * t, y: a.y + (b.y - a.y) * t, dx: (b.x - a.x) / span, dy: (b.y - a.y) / span };
 }
 
-/** Draw one small person; `walk` is the stride phase, `facing` is +1 towards the viewer. */
-export function drawPerson(c: CanvasRenderingContext2D, p: Point, look: Look, walk: number, facing: number, night: number, options: { rain: boolean; sit?: boolean; jump?: number; detail: boolean }) {
-  const s = look.scale, n = (color: string) => shade(color, night), lift = options.jump ?? 0;
-  const base = { x: p.x, y: p.y - lift };
-  ellipse(c, p.x + .6, p.y + .2, 2.1 * s, .85 * s, "#1e332a33");
-  if (!options.detail) {
-    ellipse(c, base.x, base.y - 3.6 * s, 1.35 * s, 2.6 * s, n(look.top));
-    ellipse(c, base.x, base.y - 7.1 * s, 1.1 * s, 1.1 * s, n(look.skin));
-    if (options.rain) ellipse(c, base.x, base.y - 9.6 * s, 4 * s, 1.6 * s, n(look.umbrella));
-    return;
-  }
-  const stride = Math.sin(walk) * 1.15 * s, legTop = base.y - 3.1 * s;
-  if (options.sit) {
-    stroke(c, base.x - .5 * s, legTop + .4, base.x + 1.6 * s, legTop + 1.1 * s, n(look.bottom), 1.05 * s);
-    stroke(c, base.x + .5 * s, legTop + .4, base.x + 2.2 * s, legTop + 1.3 * s, n(look.bottom), 1.05 * s);
-  } else {
-    stroke(c, base.x - .45 * s, legTop, base.x - .45 * s + stride * .7, base.y, n(look.bottom), 1.05 * s);
-    stroke(c, base.x + .45 * s, legTop, base.x + .45 * s - stride * .7, base.y, n(look.bottom), 1.05 * s);
-  }
-  if (look.bag === "randoseru" && facing < 0) ellipse(c, base.x, base.y - 4.7 * s, 1.5 * s, 1.6 * s, n(look.accent));
-  // Body, then arms swinging opposite to the legs.
-  c.beginPath(); c.ellipse(base.x, base.y - 4.6 * s, 1.5 * s, 2.15 * s, 0, 0, TAU); c.fillStyle = n(look.top); c.fill();
-  const swing = options.sit ? 0 : -stride * .55;
-  stroke(c, base.x - 1.2 * s, base.y - 5.6 * s, base.x - 1.4 * s + swing, base.y - 3.3 * s, n(look.top), .8 * s);
-  if (!options.rain && !look.parasol) stroke(c, base.x + 1.2 * s, base.y - 5.6 * s, base.x + 1.4 * s - swing, base.y - 3.3 * s, n(look.top), .8 * s);
-  if (look.bag === "tote") ellipse(c, base.x + 1.6 * s, base.y - 3.4 * s, .9 * s, 1.1 * s, n(look.accent));
-  if (look.bag === "briefcase") ellipse(c, base.x - 1.7 * s, base.y - 3.1 * s, 1 * s, .7 * s, n("#4a3d33"));
-  if (look.bag === "randoseru" && facing >= 0) ellipse(c, base.x, base.y - 5.1 * s, 1.55 * s, 1.5 * s, n(look.accent));
-  ellipse(c, base.x, base.y - 7.7 * s, 1.18 * s, 1.18 * s, n(look.skin));
-  c.beginPath(); c.fillStyle = n(look.hair);
-  if (facing >= 0) c.ellipse(base.x, base.y - 8.15 * s, 1.24 * s, .85 * s, 0, Math.PI, TAU);
-  else c.ellipse(base.x, base.y - 7.8 * s, 1.24 * s, 1.24 * s, 0, 0, TAU);
-  c.fill();
-  if (look.hat && !options.rain) ellipse(c, base.x, base.y - 8.8 * s, 1.6 * s, .55 * s, n(look.accent));
-  const canopy = options.rain ? look.umbrella : look.parasol ? "#f4efe6dd" : null;
-  if (canopy) {
-    const top = base.y - 11.2 * s;
-    stroke(c, base.x + .9 * s, base.y - 4.8 * s, base.x + .2 * s, top + .6 * s, n("#5a5752"), .45 * s);
-    c.beginPath(); c.ellipse(base.x + .2 * s, top + 1.4 * s, 4.4 * s, 1.5 * s, 0, Math.PI, TAU); c.fillStyle = n(canopy); c.fill();
-    c.beginPath(); c.moveTo(base.x - 4.2 * s, top + 1.4 * s); c.quadraticCurveTo(base.x + .2 * s, top - 2.2 * s, base.x + 4.6 * s, top + 1.4 * s); c.fill();
-  }
-}
-/** A tiny French bulldog: cream body, grey eye patch and bat ears, like the app's own dog. */
-export function drawDog(c: CanvasRenderingContext2D, p: Point, dir: number, step: number, night: number, color = "#efe6d6", options: { sleep?: boolean; wag?: number; jump?: number } = {}) {
-  const n = (col: string) => shade(col, night), y = p.y - (options.jump ?? 0), f = dir >= 0 ? 1 : -1;
-  ellipse(c, p.x, p.y + .3, 2.3, .8, "#1e332a30");
-  if (options.sleep) {
-    ellipse(c, p.x, y - 1.1, 2.4, 1.3, n(color));
-    ellipse(c, p.x + f * 1.6, y - 1.5, 1.2, 1, n(color));
-    ellipse(c, p.x + f * 1.9, y - 1.6, .45, .35, n("#8a8f94"));
-    return;
-  }
-  const legs = Math.sin(step) * .6;
-  for (const [u, k] of [[-1, 1], [1, -1]] as const) stroke(c, p.x + u * 1.1, y - 1.3, p.x + u * 1.1 + legs * k * .8, y, n("#d9cdb8"), .7);
-  ellipse(c, p.x, y - 2, 2.2, 1.3, n(color));
-  const wag = options.wag ? Math.sin(options.wag) * .8 : 0;
-  stroke(c, p.x - f * 2.1, y - 2.4, p.x - f * 2.8, y - 3.1 + wag, n(color), .55);
-  const hx = p.x + f * 1.9, hy = y - 3.2;
-  ellipse(c, hx, hy, 1.35, 1.2, n(color));
-  ellipse(c, hx + f * .35, hy - .1, .55, .5, n("#8f9196"));
-  for (const k of [-1, 1]) { c.beginPath(); c.moveTo(hx + k * .55 - .3, hy - .8); c.lineTo(hx + k * .9, hy - 2); c.lineTo(hx + k * .9 + .5 * (k > 0 ? 0 : 1), hy - .7); c.closePath(); c.fillStyle = n(color); c.fill(); }
-  ellipse(c, hx + f * .9, hy + .25, .32, .25, n("#3c3a3a"));
-  ellipse(c, p.x + f * .9, y - 2.7, .9, .35, n("#a9c98a"));
-}
-
 export class TownLife {
   private random = new Random(20261014);
   private walkers: Walker[] = [];
@@ -164,7 +140,16 @@ export class TownLife {
   private water: number[] = [];
   private parks: ParkLot[] = [];
   private spots = new Map<string, Spot>();
-  private swings: { tile: number; rotation: number }[] = [];
+  private motions: MotionPart[] = [];
+  private states = new Map<number, PartState>();
+  private lawnPlans = new Map<number, Lawn>();
+  private cherries = new Set<number>();
+  private fallers: { x: number; y: number; kind: ParkPart }[] = [];
+  private pigeons: Pigeon[] = [];
+  private lots: ParkLot[] = [];
+  private env: TownEnvironment | null = null;
+  /** Set by the renderer when the viewer prefers reduced motion: decorative turning and splashing stop. */
+  reduced = false;
   private blooms: Point[] = [];
   private chimneys: { x: number; y: number; z: number; seed: number }[] = [];
   private tiles: Tile[] | null = null;
@@ -195,7 +180,9 @@ export class TownLife {
     this.population = town.tiles.reduce((sum, t, i) => sum + (t === "house" ? 18 * (town.levels[i] || 1) : 0), 0);
     this.blooms = [];
     for (const lot of town.parks) for (const part of lot.parts) if (["flowers", "arch", "cherry"].includes(part.kind)) this.blooms.push({ x: part.tile % MAP_SIZE + .5, y: Math.floor(part.tile / MAP_SIZE) + .5 });
+    this.lots = town.parks;
     this.buildSpots(town.parks);
+    this.syncPigeons(town.parks);
     for (let i = 0; i < town.tiles.length; i++) if (town.tiles[i] === "grass" && hash(i * 3) > .63 && hash(i * 5) > .8) this.blooms.push({ x: i % MAP_SIZE + .5, y: Math.floor(i / MAP_SIZE) + .5 });
     if (tilesChanged) {
       // People whose street was removed step aside; ducks stay on water.
@@ -210,33 +197,36 @@ export class TownLife {
       this.ducks = this.ducks.filter(d => !d.pond).concat(ponds.slice(0, 6).map((tile, j) => ({ x: tile % MAP_SIZE + .5, y: Math.floor(tile / MAP_SIZE) + .5, heading: j, speed: .03, seed: tile, pond: true, turn: 0 })));
     }
   }
-  /** Where people use the park furniture. Rebuilt with the parks; anyone whose spot was removed walks on. */
+  /** Where people use the park parts. Rebuilt with the parks; anyone whose spot was removed walks on. */
   private buildSpots(parks: ParkLot[]) {
-    this.spots.clear(); this.swings = [];
-    for (const lot of parks) for (const part of lot.parts) {
-      const x = part.tile % MAP_SIZE, y = Math.floor(part.tile / MAP_SIZE), r = part.rotation;
-      const blocked = new Set(lot.parts.filter(q => q.tile !== part.tile && q.kind !== "path" && q.kind !== "stones").map(q => q.tile));
-      const spot = (slot: number, kind: SpotKind, u: number, v: number, z: number, du: number, dv: number, child = false) => {
-        const p = turn(x, y, r, u, v), key = `${part.tile}:${part.kind}:${slot}`;
-        // Onlookers stand inside the fence and never inside another part (they may step into the next tile).
-        const m = .16, cell = Math.floor(p.y) * MAP_SIZE + Math.floor(p.x);
-        if (kind === "watch" && (p.x < lot.x + m || p.y < lot.y + m || p.x > lot.x + lot.width - m || p.y > lot.y + lot.height - m || blocked.has(cell))) return;
-        this.spots.set(key, { key, lot: lot.id, kind, x: p.x, y: p.y, tile: part.tile, rotation: r, u, v, z, facing: facingOf(r, du, dv), child });
-      };
-      switch (part.kind) {
-        case "swings": this.swings.push({ tile: part.tile, rotation: r }); SWING_SEATS.forEach((u, j) => spot(j, "swing", u, .8, 0, 0, 1, true)); break;
-        case "playground": spot(0, "slide", .28, .05, 0, 0, 1, true); break;
-        case "sandbox": spot(0, "sand", .45, .6, 3.2, 0, 1, true); spot(1, "sand", .64, .4, 3.2, -1, 0, true); break;
-        case "bench": spot(0, "seat", .36, .5, 5.6, 0, 1); spot(1, "seat", .64, .5, 5.6, 0, 1); break;
-        case "picnic": spot(0, "seat", .36, .23, 6, 0, 1); spot(1, "seat", .64, .23, 6, 0, 1); spot(2, "seat", .4, .8, 6, 0, -1); spot(3, "seat", .62, .8, 6, 0, -1); break;
-        case "gazebo": spot(0, "seat", .5, .3, 9.4, 0, 1); spot(1, "seat", .3, .58, 9.4, 1, 0); break;
-        // Around the basin's rim, or beside the pond in the neighbouring tile (the pond fills its own).
-        case "fountain": spot(0, "watch", .5, .88, 1, 0, -1, true); spot(1, "watch", .88, .5, 1, -1, 0); spot(2, "watch", .12, .5, 1, 1, 0); spot(3, "watch", .5, .12, 1, 0, 1, true); break;
-        case "pond": spot(0, "watch", .5, 1.12, 1, 0, -1, true); spot(1, "watch", 1.12, .5, 1, -1, 0); spot(2, "watch", -.12, .5, 1, 1, 0, true); spot(3, "watch", .5, -.12, 1, 0, 1); break;
-        case "cherry": case "flowers": case "sculpture": case "clock": spot(0, "watch", .5, .86, 1, 0, -1); spot(1, "watch", .86, .5, 1, -1, 0); break;
-        case "arch": spot(0, "watch", .5, .8, 1, 0, -1); break;
+    this.spots.clear(); this.motions = []; this.cherries.clear(); this.fallers = [];
+    const live = new Set<number>();
+    for (const lot of parks) {
+      const objects = new Map(lot.parts.filter(q => q.kind !== "path" && q.kind !== "stones").map(q => [q.tile, q.kind] as const));
+      for (const part of lot.parts) {
+        const x = part.tile % MAP_SIZE, y = Math.floor(part.tile / MAP_SIZE), r = part.rotation;
+        if (part.kind === "cherry") this.cherries.add(part.tile);
+        if (part.kind === "cherry" || part.kind === "maple" || part.kind === "ginkgo") this.fallers.push({ x: x + .5, y: y + .5, kind: part.kind });
+        for (const def of PART_SPOTS[part.kind] ?? []) {
+          const p = turn(x, y, r, def.u, def.v), key = `${part.tile}:${part.kind}:${def.slot}`, cell = Math.floor(p.y) * MAP_SIZE + Math.floor(p.x);
+          // People who wait, watch or listen stand inside the fence and never inside another part (they may use the next tile).
+          const m = def.kind === "watch" || def.kind === "audience" ? .16 : .1, outside = cell !== part.tile, standing = def.kind === "watch" || def.kind === "audience" || def.kind === "queue" || def.kind === "drink";
+          if ((standing || outside) && (p.x < lot.x + m || p.y < lot.y + m || p.x > lot.x + lot.width - m || p.y > lot.y + lot.height - m || outside && objects.has(cell))) continue;
+          this.spots.set(key, { key, lot: lot.id, kind: def.kind, part: part.kind, slot: def.slot, x: p.x, y: p.y, tile: part.tile, rotation: r, u: def.u, v: def.v, z: def.z ?? 0, facing: facingOf(r, def.du ?? 0, def.dv ?? 1), side: sideOf(r, def.du ?? 0, def.dv ?? 1), who: def.who });
+        }
+        if (PART_MOTION[part.kind]) {
+          live.add(part.tile);
+          this.motions.push({ tile: part.tile, kind: part.kind, rotation: r, x, y, variant: parkArtVariant(part.kind, part.tile), depth: motionDepth(part.kind, { c: {} as CanvasRenderingContext2D, x, y, rotation: r }) });
+          if (!this.states.has(part.tile)) this.states.set(part.tile, { angle: hash(part.tile) * TAU, speed: 0, bob: 0 });
+        }
+      }
+      // Open lawn (or paving on a plaza) for games and picnics: up to four people per tile.
+      for (const cell of lotTiles(lot)) if (!objects.has(cell)) for (let slot = 0; slot < 4; slot++) {
+        const key = `${cell}:lawn:${slot}`, x = cell % MAP_SIZE, y = Math.floor(cell / MAP_SIZE);
+        this.spots.set(key, { key, lot: lot.id, kind: "lawn", part: null, slot, x: x + .5, y: y + .5, tile: cell, rotation: 0, u: .5, v: .5, z: 1, facing: 1, side: 1, who: "any" });
       }
     }
+    for (const tile of [...this.states.keys()]) if (!live.has(tile)) this.states.delete(tile);
     for (const v of this.visitors) if (v.spot && !this.spots.has(v.spot)) this.leaveSpot(v);
   }
   /** A tile of the park with nothing standing on it, so strollers never stop inside a pond or a hedge. */
@@ -245,14 +235,64 @@ export class TownLife {
     return this.random.pick(open.length ? open : cells);
   }
   private occupied(key: string, except?: Visitor) { return this.visitors.some(v => v !== except && v.spot === key); }
-  /** Choose something to do in the park; children like the play equipment, grown-ups the seats and the view. */
+  private fits(who: Who, v: Visitor) { return who === "any" || (who === "child") === (v.look.kind === "child"); }
+  /** Lawn games that suit the weather, the time of day and the place. */
+  private lawnAllowed(game: Lawn, cell: number, lot: ParkLot, v: Visitor, env: TownEnvironment) {
+    const dry = env.rain < .2 && env.snow === 0, day = env.night < .35, temp = env.temperature ?? 20, x = cell % MAP_SIZE, y = Math.floor(cell / MAP_SIZE);
+    if (!dry || !this.fits(LAWN[game].who, v)) return false;
+    switch (game) {
+      case "blanket": return day && lot.kind === "park" && temp >= 10 && temp <= 31;
+      case "hanami": return env.blossom > .3 && env.night < .8 && [...this.cherries].some(t => Math.abs(t % MAP_SIZE - x) <= 1 && Math.abs(Math.floor(t / MAP_SIZE) - y) <= 1);
+      case "kite": return day && lot.kind === "park" && env.wind >= 12;
+      case "bubbles": return day && env.wind < 28;
+      case "fetch": return day && lot.kind === "park" && Boolean(v.look.dog);
+      default: return day;
+    }
+  }
+  /** Choose something to do in the park: children like the play equipment, grown-ups the seats and the view, everyone the lawn. */
   private chooseSpot(v: Visitor) {
-    const r = this.random, child = v.look.kind === "child";
-    const free = [...this.spots.values()].filter(s => s.lot === v.lot && (child ? s.child : s.kind === "seat" || s.kind === "watch") && !this.occupied(s.key, v));
-    if (!free.length || r.next() < .2) return false;
-    const spot = r.pick(free);
+    const r = this.random, env = this.env, child = v.look.kind === "child";
+    if (!env || r.next() < .15) return false;
+    const lot = this.parks.find(l => l.id === v.lot);
+    if (!lot) return false;
+    const options: { spot: Spot; weight: number; game?: Lawn }[] = [];
+    const queues = new Map<number, Spot[]>();
+    for (const spot of this.spots.values()) {
+      if (spot.lot !== v.lot || spot.kind === "lawn" || !this.fits(spot.who, v) || !spotOpen(spot.kind, env) || this.occupied(spot.key, v)) continue;
+      // A queue is joined at its end.
+      if (spot.kind === "queue") { const line = queues.get(spot.tile) ?? []; line.push(spot); queues.set(spot.tile, line); continue; }
+      options.push({ spot, weight: PAINTED.has(spot.kind) || spot.kind === "slide" ? child ? 2.4 : 1 : spot.kind === "audience" ? 2 : 1 });
+    }
+    for (const line of queues.values()) options.push({ spot: line.sort((a, b) => a.slot - b.slot)[0]!, weight: 1.6 });
+    // Lawn: join a game already going on, or start one on a free patch.
+    const cells = [...new Set([...this.spots.values()].filter(s => s.lot === v.lot && s.kind === "lawn").map(s => s.tile))];
+    for (const cell of cells) {
+      const plan = this.lawnPlans.get(cell), used = [0, 1, 2, 3].filter(slot => this.occupied(`${cell}:lawn:${slot}`, v));
+      if (plan) {
+        const free = LAWN[plan].slots.findIndex((_, slot) => !used.includes(slot));
+        if (free >= 0 && this.lawnAllowed(plan, cell, lot, v, env)) options.push({ spot: this.spots.get(`${cell}:lawn:${free}`)!, weight: 2.2, game: plan });
+      } else if (!used.length) {
+        const games = (Object.keys(LAWN) as Lawn[]).filter(g => this.lawnAllowed(g, cell, lot, v, env));
+        if (games.length) {
+          let roll = r.next() * games.reduce((sum, g) => sum + LAWN[g].weight, 0), game = games[0]!;
+          for (const g of games) { roll -= LAWN[g].weight; if (roll <= 0) { game = g; break; } }
+          options.push({ spot: this.spots.get(`${cell}:lawn:0`)!, weight: .5 / Math.max(1, cells.length / 3), game });
+        }
+      }
+    }
+    if (!options.length) return false;
+    let roll = r.next() * options.reduce((sum, o) => sum + o.weight, 0), choice = options[0]!;
+    for (const o of options) { roll -= o.weight; if (roll <= 0) { choice = o; break; } }
+    const spot = choice.spot;
+    if (choice.game) {
+      // Lawn spots take their place from the game.
+      this.lawnPlans.set(spot.tile, choice.game);
+      const [u, w] = LAWN[choice.game].slots[spot.slot]!, cx = spot.tile % MAP_SIZE, cy = Math.floor(spot.tile / MAP_SIZE);
+      Object.assign(spot, { x: cx + u, y: cy + w, u, v: w, z: 1, facing: facingOf(0, .5 - u, .5 - w), side: sideOf(0, .5 - u, .5 - w) });
+      v.lawn = choice.game;
+    } else v.lawn = undefined;
     v.spot = spot.key; v.using = -1;
-    v.duration = spot.kind === "slide" ? SLIDE_TIME * (2 + Math.floor(r.next() * 3)) : spot.kind === "swing" ? 9 + r.next() * 10 : spot.kind === "seat" ? 12 + r.next() * 20 : 6 + r.next() * 8;
+    v.duration = spot.kind === "slide" ? SLIDE_TIME * (2 + Math.floor(r.next() * 3)) : spot.kind === "queue" && spot.slot > 0 ? 45 : spotDuration(spot.kind, r.next(), spot.slot);
     v.tx = spot.x; v.ty = spot.y;
     return true;
   }
@@ -260,7 +300,110 @@ export class TownLife {
     const spot = v.spot ? this.spots.get(v.spot) : undefined;
     // Step off in front of the thing they used, then wander or pick the next thing.
     if (spot && v.using >= 0) { const p = spot.kind === "swing" ? turn(Math.floor(spot.tile % MAP_SIZE), Math.floor(spot.tile / MAP_SIZE), spot.rotation, spot.u, .92) : { x: spot.x, y: spot.y }; v.x = p.x; v.y = p.y; }
-    v.spot = null; v.using = 0; v.tx = v.x; v.ty = v.y; v.rest = .5 + this.random.next() * 1.5;
+    v.spot = null; v.using = 0; v.tx = v.x; v.ty = v.y; v.rest = .5 + this.random.next() * 1.5; v.lawn = undefined;
+  }
+  /** Who is on each slot of a part right now, for its painter and its motion. */
+  private ridersOf(tile: number): (Rider | undefined)[] {
+    const riders: (Rider | undefined)[] = [];
+    for (const v of this.visitors) {
+      if (!v.spot || v.using < 0) continue;
+      const spot = this.spots.get(v.spot);
+      if (spot && spot.tile === tile && spot.kind !== "lawn") riders[spot.slot] = { look: v.look, using: v.using, duration: v.duration, seed: v.seed };
+    }
+    return riders;
+  }
+  /** Pigeons peck round plazas, paths and benches, and take off when someone walks up to them. */
+  private syncPigeons(lots: ParkLot[]) {
+    this.pigeons = this.pigeons.filter(p => lots.some(l => l.id === p.lot));
+    for (const lot of lots) {
+      const busy = lot.kind === "plaza" || lot.parts.some(p => ["bench", "path", "picnic", "foodCart", "fountain", "parasol"].includes(p.kind));
+      let have = this.pigeons.filter(p => p.lot === lot.id).length;
+      const want = busy ? Math.min(6, 2 + Math.floor(lot.width * lot.height / 3)) : 0;
+      while (have < want) {
+        const cell = this.openCell(lot);
+        this.pigeons.push({ lot: lot.id, x: cell % MAP_SIZE + .2 + this.random.next() * .6, y: Math.floor(cell / MAP_SIZE) + .2 + this.random.next() * .6, dir: 1, peck: 0, wait: this.random.next() * 2, fly: null, seed: this.random.next() * 100 });
+        have++;
+      }
+    }
+  }
+  private updatePigeons(dt: number, ambientDt: number, env: TownEnvironment) {
+    if (env.night > .55) return;
+    const r = this.random;
+    for (const p of this.pigeons) {
+      const lot = this.lots.find(l => l.id === p.lot); if (!lot) continue;
+      if (p.fly) { p.fly.t += ambientDt / 1.5; if (p.fly.t >= 1) { p.x = p.fly.tx; p.y = p.fly.ty; p.fly = null; p.wait = 1 + r.next() * 2; } continue; }
+      const startled = this.visitors.some(v => v.lot === p.lot && Math.hypot(v.x - p.x, v.y - p.y) < (v.look.kind === "child" ? .32 : .2) && (Math.hypot(v.tx - v.x, v.ty - v.y) > .03 || v.look.kind === "child" && !v.spot));
+      if (startled) {
+        const cell = this.openCell(lot), tx = cell % MAP_SIZE + .2 + r.next() * .6, ty = Math.floor(cell / MAP_SIZE) + .2 + r.next() * .6;
+        p.fly = { fx: p.x, fy: p.y, tx, ty, t: 0 }; p.dir = tx - ty - (p.x - p.y) >= 0 ? 1 : -1;
+        continue;
+      }
+      p.peck = Math.max(0, p.peck - dt);
+      if ((p.wait -= dt) <= 0) {
+        if (r.next() < .55) p.peck = .35;
+        else {
+          const a = r.next() * TAU, nx = p.x + Math.cos(a) * .07, ny = p.y + Math.sin(a) * .07;
+          if (nx > lot.x + .1 && ny > lot.y + .1 && nx < lot.x + lot.width - .1 && ny < lot.y + lot.height - .1) { p.dir = Math.cos(a) - Math.sin(a) >= 0 ? 1 : -1; p.x = nx; p.y = ny; }
+        }
+        p.wait = .4 + r.next() * 1.2;
+      }
+    }
+  }
+  /** Games on the lawn, drawn group by group so a ball or a dog can travel between the players. */
+  private drawLawn(add: LifeAdd, cells: Map<number, Visitor[]>, env: TownEnvironment, night: number, detail: boolean) {
+    const t = this.time;
+    for (const [cell, people] of cells) {
+      const game = this.lawnPlans.get(cell); if (!game) continue;
+      const cx = cell % MAP_SIZE, cy = Math.floor(cell / MAP_SIZE), slot = (v: Visitor) => this.spots.get(v.spot!)?.slot ?? 0;
+      if (game === "blanket" || game === "hanami") add(cx + .5, cy + .5, -.48, c => blanket(c, cx, cy, game, night), { left: -30, top: -6, width: 60, height: 24 });
+      if (game === "ball") {
+        const a = people.find(v => slot(v) === 0), b = people.find(v => slot(v) === 1);
+        const pa = { x: cx + .16, y: cy + .52 }, pb = { x: cx + .84, y: cy + .48 }, cycle = (t % 2.4) / 1.2, q = cycle % 1, there = cycle >= 1;
+        const from = there ? pb : pa, to = there ? pa : pb, both = Boolean(a && b);
+        const ball = both ? { x: from.x + (to.x - from.x) * q, y: from.y + (to.y - from.y) * q, z: 1.4 + Math.sin(q * Math.PI) * 5 } : { x: (a ? pa : pb).x + .06, y: (a ? pa : pb).y + .03, z: 1.4 + Math.abs(Math.sin(t * 4)) * 4 };
+        add(ball.x, ball.y, .02, c => { const p = iso(ball.x, ball.y, ball.z), g = iso(ball.x, ball.y, 1); ellipse(c, g.x + .3, g.y + .2, 1.1, .4, "#1e332a30"); ellipse(c, p.x, p.y, 1.1, 1.1, shade("#f6f3ee", night)); ellipse(c, p.x + .3, p.y + .2, .45, .45, shade("#3f6fa8", night)); }, { left: -4, top: -12, width: 8, height: 14 });
+      }
+      for (const v of people) {
+        const spot = this.spots.get(v.spot!); if (!spot) continue;
+        const beat = t * 2.4 + v.seed, s = v.look.scale;
+        if (game === "tag") {
+          // Chasing each other round in a circle.
+          const a = t * 1.7 + slot(v) * Math.PI, x = cx + .5 + Math.cos(a) * .24, y = cy + .5 + Math.sin(a) * .24, tangent = -Math.sin(a) + Math.cos(a);
+          add(x, y, .03, c => drawPerson(c, iso(x, y, 1), v.look, t * 14 + v.seed, tangent >= 0 ? 1 : -1, night, { rain: false, detail, beat }), { left: -12, top: -26, width: 24, height: 30 });
+          continue;
+        }
+        const p = iso(spot.x, spot.y, 1.2);
+        add(spot.x, spot.y, .03, c => {
+          if (game === "blanket" || game === "hanami") {
+            const kanpai = game === "hanami" && (t + v.seed) % 9 < 1.1, look = game === "hanami" ? { ...v.look, carry: "drink" as const, carryColor: "#f1ebdc" } : v.look;
+            drawPerson(c, onSeat(p, v.look), look, 0, spot.facing, night, { rain: false, pose: kanpai ? "cheer" : "sit", sit: true, side: spot.side, detail, beat });
+          } else if (game === "kite") {
+            const hand = { x: p.x + spot.side * 1.6 * s, y: p.y - 9 * s };
+            kite(c, hand, t, env, night, v.seed);
+            drawPerson(c, p, v.look, 0, spot.facing, night, { rain: false, pose: "cheer", detail, beat: Math.sin(t * .6) * .4, empty: true });
+          } else if (game === "bubbles") {
+            const hand = { x: p.x + 1.8 * s, y: p.y - 8.8 * s }, wx = Math.cos(env.windAngle);
+            drawPerson(c, p, v.look, 0, spot.facing, night, { rain: false, pose: Math.sin(t * .9 + v.seed) > 0 ? "cheer" : "walk", detail, beat, empty: true });
+            for (let j = 0; j < 8; j++) {
+              const a = (t * .5 + j / 8 + hash(v.seed)) % 1, x = hand.x + wx * a * 24 + Math.sin(t * 2 + j) * 2, y = hand.y - a * 18 - Math.sin(a * Math.PI) * 2, r = .7 + a * 1.4;
+              c.save(); c.globalAlpha *= 1 - a; c.beginPath(); c.arc(x, y, r, 0, TAU); c.strokeStyle = shade(j % 2 ? "#ffffff" : "#d9ccff", night); c.lineWidth = .3; c.stroke(); ellipse(c, x - r * .35, y - r * .35, r * .25, r * .2, "#ffffffbb"); c.restore();
+            }
+          } else if (game === "fetch") {
+            // Throw, the dog runs out for the ball and brings it back.
+            const tau = (t + v.seed) % 4, far = { x: cx + .84, y: cy + .3 }, me = { x: spot.x + .08, y: spot.y + .02 };
+            const out = Math.min(1, Math.max(0, (tau - .4) / 1.2)), back = Math.min(1, Math.max(0, (tau - 1.7) / 1.5)), dogAt = tau < 1.7 ? out : 1 - back;
+            const dx = me.x + (far.x - me.x) * dogAt, dy = me.y + (far.y - me.y) * dogAt, dogPoint = iso(dx, dy, 1), runningOut = tau < 1.7;
+            drawPerson(c, p, v.look, 0, spot.facing, night, { rain: false, pose: tau < .45 ? "cheer" : "walk", detail, beat });
+            if (tau >= .4 && tau < 1.5) { const q = (tau - .4) / 1.1, bp = iso(me.x + (far.x - me.x) * q, me.y + (far.y - me.y) * q, 1 + 9 * s + Math.sin(q * Math.PI) * 10 - q * 9 * s); ellipse(c, bp.x, bp.y, .7, .7, shade("#c8e04f", night)); }
+            drawDog(c, dogPoint, (runningOut ? far.x - far.y - (me.x - me.y) : me.x - me.y - (far.x - far.y)) >= 0 ? 1 : -1, tau * 14, night, v.look.dog ?? "#efe6d6", { wag: tau * 20, jump: tau > 3.3 ? Math.abs(Math.sin(tau * 9)) : 0, size: .78 });
+            if (tau >= 1.5 && tau < 3.2) { const dir = (me.x - me.y - (far.x - far.y)) >= 0 ? 1 : -1; ellipse(c, dogPoint.x + dir * 2.1, dogPoint.y - 2.4, .55, .55, shade("#c8e04f", night)); }
+          } else {
+            const kick = game === "ball" && ((t % 2.4) / 1.2) % 1 < .18;
+            drawPerson(c, p, v.look, kick ? 1.4 : 0, spot.facing, night, { rain: false, detail, beat, jump: game === "ball" ? 0 : Math.max(0, Math.sin(t * 3 + v.seed)) * .8 });
+          }
+        }, game === "kite" ? { left: -44, top: -90, width: 88, height: 96 } : game === "bubbles" ? { left: -30, top: -50, width: 60, height: 56 } : game === "fetch" ? { left: -40, top: -40, width: 80, height: 50 } : { left: -12, top: -26, width: 24, height: 30 });
+      }
+    }
   }
   /** Construction feedback: rising dust for a new building, a dust cloud for demolition, sparkles for upgrades. */
   changed(before: Town, after: Town) {
@@ -422,10 +565,14 @@ export class TownLife {
   private spawnVisitor(env: TownEnvironment): Visitor | undefined {
     if (!this.parks.length) return;
     const r = this.random, lot = r.pick(this.parks), cell = this.openCell(lot);
-    const play = [...this.spots.values()].some(s => s.lot === lot.id && s.child && s.kind !== "watch");
-    const kind: Look["kind"] = play && r.next() < .6 ? "child" : r.next() < .3 ? "elder" : "adult";
+    const play = [...this.spots.values()].some(s => s.lot === lot.id && s.who === "child");
+    const kind: Look["kind"] = play && r.next() < .55 || r.next() < .12 ? "child" : r.next() < .3 ? "elder" : "adult";
     const x = cell % MAP_SIZE + .2 + r.next() * .6, y = Math.floor(cell / MAP_SIZE) + .2 + r.next() * .6;
-    const v: Visitor = { lot: lot.id, x, y, tx: x, ty: y, rest: 0, life: 30 + r.next() * 40, age: 0, look: this.look(env, kind, "walk"), seed: Math.floor(r.next() * 1e6), phase: r.next() * TAU, spot: null, using: 0, duration: 0 };
+    const look = this.look(env, kind, "walk");
+    // About a third of grown-ups bring the dog; children come with a balloon now and then.
+    if (look.dog && (kind === "child" || r.next() < .5)) look.dog = null;
+    if (kind === "child" && r.next() < .14) { look.carry = "balloon"; look.carryColor = r.pick(BALLOONS); }
+    const v: Visitor = { lot: lot.id, x, y, tx: x, ty: y, rest: 0, life: 34 + r.next() * 46, age: 0, look, seed: Math.floor(r.next() * 1e6), phase: r.next() * TAU, spot: null, using: 0, duration: 0 };
     this.visitors.push(v);
     this.chooseSpot(v);
     return v;
@@ -433,10 +580,12 @@ export class TownLife {
   /** Advance people and animals. `dt` follows the town speed; `ambientDt` is real time. */
   update(dt: number, ambientDt: number, env: TownEnvironment) {
     const population = this.population;
-    this.time += ambientDt;
+    this.time += ambientDt; this.env = env;
     const r = this.random, daylight = 1 - env.night;
     const walkers = Math.round(Math.min(64, 4 + population / 12) * env.activity);
-    const visitors = Math.round(Math.min(32, this.parks.length * 3 + this.spots.size * .6) * env.activity * (.25 + daylight * .75) * (env.rain > .3 || env.snow > 0 ? .15 : 1));
+    let partSpots = 0, lawn = 0;
+    for (const s of this.spots.values()) if (s.kind === "lawn") { if (s.slot === 0) lawn++; } else partSpots++;
+    const visitors = Math.round(Math.min(48, this.parks.length * 3 + partSpots * .6 + lawn * .5) * env.activity * (.25 + daylight * .75) * (env.rain > .3 || env.snow > 0 ? .15 : 1));
     if (!this.started && this.doors.length > 1) {
       // Open the town mid-day rather than empty: people are already on their way, part-way along.
       this.started = true;
@@ -457,14 +606,32 @@ export class TownLife {
     this.walkers = this.walkers.filter(w => w.s < w.total);
     for (const v of this.visitors) {
       v.age += dt; v.phase += dt * 9;
+      const spot = v.spot ? this.spots.get(v.spot) : undefined;
+      // The carousel stops, the band goes home, the rain starts: people leave what has closed.
+      if (spot && !spotOpen(spot.kind, env)) { this.leaveSpot(v); continue; }
+      // A queue moves up when the person in front has been served.
+      if (spot?.kind === "queue" && spot.slot > 0 && !this.occupied(`${spot.tile}:${spot.part}:${spot.slot - 1}`, v)) {
+        const ahead = this.spots.get(`${spot.tile}:${spot.part}:${spot.slot - 1}`);
+        if (ahead) { v.spot = ahead.key; v.using = -1; v.tx = ahead.x; v.ty = ahead.y; v.duration = ahead.slot === 0 ? spotDuration("queue", r.next()) : 45; continue; }
+      }
       if (v.spot && v.using >= 0) {
         // Using something runs on real time, so the town speed does not make a swing fly round.
         v.using += ambientDt;
-        if (v.using >= v.duration) { this.leaveSpot(v); if (v.age < v.life - 8 && r.next() < .5) this.chooseSpot(v); else v.life = Math.max(v.life, v.age + .6); }
+        if (v.using >= v.duration) {
+          const served = spot?.kind === "queue" && spot.slot === 0;
+          this.leaveSpot(v);
+          if (served) { v.look.carry = "icecream"; v.look.carryColor = r.pick(ICE_CREAM); }
+          // With an ice cream, a seat or a spot on the lawn is the next stop.
+          if (v.age < v.life - 8 && (served || r.next() < .5)) this.chooseSpot(v); else v.life = Math.max(v.life, v.age + .6);
+        }
         continue;
       }
       const d = Math.hypot(v.tx - v.x, v.ty - v.y);
-      if (d > .03) { const step = Math.min(d, dt * .2); v.x += (v.tx - v.x) / d * step; v.y += (v.ty - v.y) / d * step; }
+      if (d > .03) {
+        const step = Math.min(d, dt * .2); v.x += (v.tx - v.x) / d * step; v.y += (v.ty - v.y) / d * step;
+        // Someone who cannot get to their spot gives up and strolls on.
+        if (v.spot && (v.using -= dt) < -25) this.leaveSpot(v);
+      }
       else if (v.spot) v.using = 0;
       else if ((v.rest -= dt) <= 0) {
         const lot = this.parks.find(l => l.id === v.lot);
@@ -472,7 +639,15 @@ export class TownLife {
       }
     }
     // Nobody vanishes in mid-swing: people finish what they are doing before they go home.
-    this.visitors = this.visitors.filter(v => (v.age < v.life || v.spot && v.using >= 0) && this.parks.some(l => l.id === v.lot));
+    this.visitors = this.visitors.filter(v => (v.age < v.life || v.spot) && this.parks.some(l => l.id === v.lot));
+    // Lawn games end when the last player leaves.
+    for (const cell of [...this.lawnPlans.keys()]) if (![0, 1, 2, 3].some(slot => this.occupied(`${cell}:lawn:${slot}`))) this.lawnPlans.delete(cell);
+    // Moving parts: the carousel speeds up and slows down, the globe is pushed, the windmill follows the wind.
+    for (const m of this.motions) {
+      const motion = PART_MOTION[m.kind], state = this.states.get(m.tile);
+      if (motion?.update && state) motion.update(state, ambientDt, this.ridersOf(m.tile), env, this.reduced);
+    }
+    this.updatePigeons(dt, ambientDt, env);
     for (const duck of this.ducks) {
       if (env.night > .7) continue;
       duck.turn -= dt;
@@ -516,12 +691,14 @@ export class TownLife {
         if (fade < 1) c.restore();
       }, { left: -10, top: -18, width: 20, height: 22 });
     }
-    const riders = new Map<string, Visitor>();
+    const lawnCells = new Map<number, Visitor[]>(), riders = new Map<number, (Rider | undefined)[]>();
     for (const v of this.visitors) {
       const spot = v.spot && v.using >= 0 ? this.spots.get(v.spot) : undefined;
-      if (spot?.kind === "swing") { riders.set(spot.key, v); continue; }
-      const fade = Math.min(1, v.age / .6, Math.max(0, v.life - v.age) / .6 || (spot ? 1 : 0));
-      const bounds = { left: -10, top: -20, width: 20, height: 24 };
+      if (spot && spot.kind !== "lawn") { const list = riders.get(spot.tile) ?? []; list[spot.slot] = { look: v.look, using: v.using, duration: v.duration, seed: v.seed }; riders.set(spot.tile, list); }
+      if (spot && PAINTED.has(spot.kind)) continue;
+      if (spot?.kind === "lawn") { const list = lawnCells.get(spot.tile) ?? []; list.push(v); lawnCells.set(spot.tile, list); continue; }
+      const fade = Math.min(1, v.age / .6, v.spot ? 1 : Math.max(0, v.life - v.age) / .6);
+      const bounds = { left: -12, top: -26, width: 24, height: 30 };
       const draw = (c: CanvasRenderingContext2D, paint: () => void) => {
         if (fade < 1) { c.save(); c.globalAlpha *= Math.max(0, fade); }
         paint();
@@ -532,51 +709,79 @@ export class TownLife {
         const facing = facingOf(spot.rotation, pose.du, pose.dv);
         // Above the playground artwork while on the steps, deck or chute; on the ground they sort like anyone else.
         add(pose.z > 0 ? tx + .5 : w.x, pose.z > 0 ? ty + .5 : w.y, pose.z > 0 ? .56 : .03, c => draw(c, () => {
-          drawPerson(c, p, v.look, pose.sit ? 0 : v.using * 9, facing, night, { rain, sit: pose.sit, detail });
-          if (pose.sit && detail && hash(v.seed) > .4) stroke(c, p.x - 1.4 * v.look.scale, p.y - 6.2 * v.look.scale, p.x - 2.6 * v.look.scale, p.y - 8.6 * v.look.scale, shade(v.look.top, night), .7 * v.look.scale);
-        }), { left: -10, top: -20, width: 20, height: 24 });
+          drawPerson(c, pose.sit ? onSeat(p, v.look) : p, v.look, pose.sit ? 0 : v.using * 9, facing, night, { rain, pose: pose.sit ? "sit" : "walk", side: sideOf(spot.rotation, pose.du, pose.dv), detail, beat: this.time * 2 });
+          if (pose.sit && detail && hash(v.seed) > .4) stroke(c, p.x - 1.4 * v.look.scale, p.y + 2.8 * v.look.scale - 6.2 * v.look.scale, p.x - 2.6 * v.look.scale, p.y + 2.8 * v.look.scale - 8.6 * v.look.scale, shade(v.look.top, night), .7 * v.look.scale);
+        }), bounds);
         continue;
       }
       if (spot) {
-        const p = iso(spot.x, spot.y, spot.z), sway = spot.kind === "watch" ? Math.sin(v.using * .8 + v.seed) * .35 : 0;
-        // Children at the fountain hop; at the sandbox they crouch and scoop.
-        const jump = spot.kind === "watch" && v.look.kind === "child" ? Math.max(0, Math.sin(v.using * 4.2)) * 1.8 : 0;
+        const p = iso(spot.x, spot.y, spot.z || 1), s = v.look.scale, beat = this.time * 2.4 + v.seed, side = spot.side;
         add(spot.x, spot.y, spot.kind === "seat" ? .4 : .03, c => draw(c, () => {
-          drawPerson(c, { x: p.x + sway, y: p.y }, v.look, 0, spot.facing, night, { rain, sit: spot.kind === "seat" || spot.kind === "sand", jump, detail });
-          if (spot.kind === "sand") {
-            const k = (v.using * .9 + hash(v.seed)) % 1, hand = { x: p.x - 1.6 * v.look.scale, y: p.y - 2.6 };
-            stroke(c, p.x - 1 * v.look.scale, p.y - 5.4 * v.look.scale, hand.x, hand.y - Math.sin(k * Math.PI) * 1.2, shade(v.look.top, night), .8 * v.look.scale);
-            if (k > .45) for (let j = 0; j < 3; j++) { const q = (k - .45) / .55; ellipse(c, hand.x - 1.5 * q - j * .6, hand.y - 2.6 * Math.sin(q * Math.PI) + j * .5, .45, .3, shade(j % 2 ? "#e4ce9d" : "#bfa76f", night)); }
+          const dog = (sit: boolean) => { if (v.look.dog) drawDog(c, { x: p.x + side * 3, y: p.y + (spot.kind === "seat" ? 2.8 * s + .4 : .6) }, -side, 0, night, v.look.dog, { sleep: sit, wag: beat * 3, size: .78 }); };
+          switch (spot.kind) {
+            case "seat":
+              dog(true);
+              drawPerson(c, onSeat(p, v.look), v.look, 0, spot.facing, night, { rain: false, pose: "sit", side, detail, beat });
+              break;
+            case "sand": {
+              drawPerson(c, p, v.look, 0, spot.facing, night, { rain, pose: "crouch", side, detail, beat });
+              const k = (v.using * .9 + hash(v.seed)) % 1, hand = { x: p.x + side * 1.6 * s, y: p.y - 1.4 * s };
+              if (k > .45) for (let j = 0; j < 3; j++) { const q = (k - .45) / .55; ellipse(c, hand.x + side * (1.5 * q + j * .6), hand.y - 2.6 * Math.sin(q * Math.PI) + j * .5, .45, .3, shade(j % 2 ? "#e4ce9d" : "#bfa76f", night)); }
+              break;
+            }
+            case "queue":
+              dog(false);
+              drawPerson(c, p, v.look, 0, spot.facing, night, { rain, pose: spot.slot === 0 && v.using > 1.2 ? "bend" : "walk", side, detail, beat });
+              break;
+            case "drink":
+              drawPerson(c, p, v.look, 0, spot.facing, night, { rain, pose: v.using > .5 && v.using < v.duration - .4 ? "bend" : "walk", side, detail, beat });
+              if (v.look.dog) drawDog(c, iso(spot.x + .14, spot.y - .02, 1), 1, 0, night, v.look.dog, { wag: beat * 3, size: .78 });
+              break;
+            case "audience": {
+              // Sitting on the grass in front of the stage, clapping along.
+              const cheer = v.look.kind === "child" && Math.sin(beat * .4) > .85;
+              drawPerson(c, onSeat({ x: p.x, y: p.y + .4 }, v.look), v.look, 0, spot.facing, night, { rain: false, pose: cheer ? "cheer" : "clap", sit: true, side, detail, beat: this.time * 11.3 + v.seed });
+              break;
+            }
+            default: {
+              // Looking at a fountain, flowers, a windmill or a clock; children hop with excitement.
+              dog(false);
+              const sway = Math.sin(v.using * .8 + v.seed) * .35, jump = v.look.kind === "child" ? Math.max(0, Math.sin(v.using * 4.2)) * 1.8 : 0;
+              drawPerson(c, { x: p.x + sway, y: p.y }, v.look, 0, spot.facing, night, { rain, jump, detail, beat });
+            }
           }
         }), bounds);
         continue;
       }
-      const p = iso(v.x, v.y, 1), moving = Math.hypot(v.tx - v.x, v.ty - v.y) > .03;
-      add(v.x, v.y, .03, c => draw(c, () => drawPerson(c, p, v.look, moving ? v.phase : 0, v.ty >= v.y ? 1 : -1, night, { rain, detail })), bounds);
+      const p = iso(v.x, v.y, 1), dx = v.tx - v.x, dy = v.ty - v.y, length = Math.hypot(dx, dy), moving = length > .03, facing = v.ty >= v.y ? 1 : -1;
+      add(v.x, v.y, .03, c => draw(c, () => {
+        if (v.look.dog) {
+          // A dog on a lead trots behind, or sits beside its owner.
+          const back = moving ? { x: v.x - dx / length * .13, y: v.y - dy / length * .13 } : { x: v.x + .1, y: v.y + .04 }, d = iso(back.x, back.y, 1);
+          stroke(c, p.x - 1.3 * v.look.scale, p.y - 3.6, d.x, d.y - 2.6, shade("#5a5046", night), .3);
+          drawDog(c, d, moving ? dx - dy >= 0 ? 1 : -1 : -1, v.phase * 1.4, night, v.look.dog, { wag: v.phase * 2, size: .78 });
+        }
+        drawPerson(c, p, v.look, moving ? v.phase : 0, facing, night, { rain, detail, beat: this.time * 2 + v.seed });
+      }), bounds);
     }
-    // Swing seats hang here rather than in the cached artwork, so they can carry a child back and forth.
-    const windSway = Math.min(.12, env.wind / 120);
-    for (const { tile, rotation } of this.swings) {
-      const tx = tile % MAP_SIZE, ty = Math.floor(tile / MAP_SIZE), facing = facingOf(rotation, 0, 1);
-      const at3 = (u: number, v: number, z: number) => { const w = turn(tx, ty, rotation, u, v); return iso(w.x, w.y, z); };
-      add(tx + .5, ty + .5, .55, c => {
-        SWING_SEATS.forEach((u, j) => {
-          const rider = riders.get(`${tile}:swings:${j}`);
-          // Pump up to full height, then slow down before hopping off.
-          const ramp = rider ? Math.min(1, rider.using / 3, Math.max(0, rider.duration - rider.using) / 2.5) : 0;
-          const angle = rider ? ramp * .75 * Math.sin(rider.using * 2.4 + j) : windSway * Math.sin(this.time * 1.3 + j * 1.7 + tile);
-          const seat = swingSeat(angle);
-          for (const a of [-.055, .055]) stroke(c, at3(u + a, .48, 25).x, at3(u + a, .48, 25).y, at3(u + a, seat.v, seat.z + .6).x, at3(u + a, seat.v, seat.z + .6).y, shade("#d6d7b9", night), .65);
-          const corners = [at3(u - .065, seat.v - .05, seat.z), at3(u + .065, seat.v - .05, seat.z), at3(u + .065, seat.v + .05, seat.z), at3(u - .065, seat.v + .05, seat.z)];
-          c.beginPath(); corners.forEach((q, k) => k ? c.lineTo(q.x, q.y) : c.moveTo(q.x, q.y)); c.closePath(); c.fillStyle = shade("#be9167", night); c.fill();
-          c.beginPath(); c.moveTo(corners[3]!.x, corners[3]!.y); c.lineTo(corners[2]!.x, corners[2]!.y); c.lineTo(corners[2]!.x, corners[2]!.y + 1); c.lineTo(corners[3]!.x, corners[3]!.y + 1); c.closePath(); c.fillStyle = shade("#926b4e", night); c.fill();
-          if (rider) drawPerson(c, at3(u, seat.v, seat.z), rider.look, 0, facing, night, { rain, sit: true, detail });
-        });
-      }, { left: -40, top: -50, width: 80, height: 74 });
+    this.drawLawn(add, lawnCells, env, night, detail);
+    // Moving parts and the people riding them.
+    for (const m of this.motions) {
+      const motion = PART_MOTION[m.kind], state = this.states.get(m.tile);
+      if (!motion || !state) continue;
+      add(m.x + .5, m.y + .5, m.depth, c => {
+        const f: PartFrame = { c, x: m.x, y: m.y, tile: m.tile, rotation: m.rotation, variant: m.variant, time: this.time, env, night, detail, rain, reduced: this.reduced, state, riders: riders.get(m.tile) ?? [] };
+        motion.paint(f, motionKit(f));
+      }, motion.bounds);
+    }
+    if (env.night <= .55) for (const pigeon of this.pigeons) {
+      const fly = pigeon.fly, q = fly ? fly.t : 0, x = fly ? fly.fx + (fly.tx - fly.fx) * q : pigeon.x, y = fly ? fly.fy + (fly.ty - fly.fy) * q : pigeon.y, z = fly ? Math.sin(q * Math.PI) * 18 : 0;
+      add(x, y, .02, c => drawPigeon(c, iso(x, y, z + 1), pigeon.dir, pigeon.peck > 0 ? 1 : 0, fly ? this.time * 24 + pigeon.seed : 0, night), { left: -6, top: -26, width: 12, height: 28 });
     }
     for (const duck of this.ducks) {
       const p = iso(duck.x, duck.y), dir = Math.cos(duck.heading) - Math.sin(duck.heading) >= 0 ? 1 : -1, bob = Math.sin(this.time * 2 + duck.seed) * .25, asleep = env.night > .7;
-      add(duck.x, duck.y, -.4, c => {
+      // River ducks swim on the ground layer; pond ducks above the pond's artwork.
+      add(duck.x, duck.y, duck.pond ? .05 : -.4, c => {
         if (!asleep) {
           c.strokeStyle = shade("#e4f1ee88", night); c.lineWidth = .5; c.beginPath();
           const back = iso(duck.x - Math.cos(duck.heading) * .18, duck.y - Math.sin(duck.heading) * .18);
@@ -636,6 +841,20 @@ export class TownLife {
       }
       c.globalAlpha = 1;
     }
+    // Petals and leaves drifting down from the park's own cherries, maples and ginkgos.
+    if (!reduced) for (const [i, tree] of this.fallers.entries()) {
+      const on = tree.kind === "cherry" ? env.blossom > .2 : env.foliage > (tree.kind === "ginkgo" ? .45 : .4) && env.bare < .8;
+      if (!on) continue;
+      const colors = tree.kind === "cherry" ? ["#f6c9d4", "#fbe3e8"] : tree.kind === "maple" ? ["#d0473a", "#e0703e"] : ["#f0c537", "#e5b62c"];
+      for (let j = 0; j < 5; j++) {
+        const cycle = 4 + hash(i * 7 + j) * 3, k = ((t + hash(i * 3 + j) * cycle) % cycle) / cycle;
+        const p = iso(tree.x + (hash(i + j * 5) - .5) * .7 + k * wind * .6, tree.y + (hash(i * 5 + j) - .5) * .5 + k * .2, (tree.kind === "ginkgo" ? 30 : 22) * (1 - k));
+        c.globalAlpha = Math.min(1, (1 - k) * 4);
+        const spin = Math.sin(t * 3 + j + i);
+        ellipse(c, p.x + Math.sin(t * 1.6 + j) * 2.4, p.y, (tree.kind === "cherry" ? .9 : 1.2) * Math.abs(spin) + .3, tree.kind === "cherry" ? .55 : .75, shade(colors[j % 2]!, night));
+      }
+    }
+    c.globalAlpha = 1;
     // Butterflies on spring and summer days, red dragonflies in early autumn, fireflies on early summer nights.
     const month = new Date(env.time + 9 * 3600_000).getUTCMonth() + 1;
     if (!reduced && this.blooms.length) {

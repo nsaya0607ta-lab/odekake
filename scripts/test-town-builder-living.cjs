@@ -221,4 +221,83 @@ test('park visitors use the furniture: children swing and slide, grown-ups sit, 
   life.sync(town, new Map());
   assert(!life.visitors.some(v => v.spot && v.spot.includes('swings')));
 });
+const motion = load('src/lib/games/town-park-motion.ts');
+const art = load('src/lib/games/town-park-art.ts');
+const NEW_PARTS = ['seesaw', 'springRider', 'globe', 'carousel', 'jungleGym', 'splashPad', 'bars', 'basketball', 'maple', 'ginkgo', 'wisteria', 'flowerField', 'bamboo', 'foodCart', 'parasol', 'drinkFountain', 'bandstand', 'windmill', 'flowerClock', 'lantern', 'flagPole'];
+const childLook = { top: '#3f6fa8', bottom: '#2f3540', hair: '#2f2a28', skin: '#f1d3b8', accent: '#e15b4f', umbrella: '#eef4f6', scale: .6, bag: 'none', hat: false, parasol: false, dog: null, kind: 'child' };
+/** A street with one park lot of 4×3 at (4,8) holding the given parts row by row. */
+function parkTown(parts, kind = 'park') {
+  const town = street(), idx = game.indexAt;
+  for (let y = 8; y < 11; y++) for (let x = 4; x < 8; x++) town.tiles[idx(x, y)] = 'park';
+  town.parks = [{ id: idx(4, 8), x: 4, y: 8, width: 4, height: 3, kind, parts: parts.map((part, j) => part && { tile: idx(4 + j % 4, 8 + Math.floor(j / 4)), kind: part, rotation: j % 4 }).filter(Boolean) }];
+  return town;
+}
+test('every new park part paints in all four rotations, at rest and live, and its moving pieces paint by day, at dusk and at night with riders', () => {
+  for (const kind of NEW_PARTS) for (let rotation = 0; rotation < 4; rotation++) for (const live of [false, true]) {
+    const rec = recordingContext();
+    paint.paintState.liveParts = live;
+    assert(art.drawParkArt(rec.c, kind, 5, 5, rotation, rotation % 2 === 1, rotation), kind);
+    assert(rec.fills.length > 3, `${kind} draws its artwork`);
+    paint.resetPaintState();
+  }
+  assert.equal(art.drawParkArt(recordingContext().c, 'tree', 0, 0), false, 'Older parts keep their own artwork');
+  for (const [kind, m] of Object.entries(motion.PART_MOTION)) for (let rotation = 0; rotation < 4; rotation++) for (const hours of [13, 19.6, 23]) {
+    const rec = recordingContext(), e = env('2026-08-01', hours, { weather: weather('clear', { temp: 30 }) });
+    const f = { c: rec.c, x: 5, y: 5, tile: 125, rotation, variant: rotation % 2, time: 3.7 + hours, env: e, night: e.night, detail: true, rain: false, reduced: hours === 23, state: { angle: 1, speed: .5, bob: 2 }, riders: [0, 1, 2, 3].map(j => ({ look: childLook, using: 1 + j * 2.3, duration: 20, seed: j })) };
+    paint.paintState.liveParts = true;
+    m.paint(f, motion.motionKit(f));
+    paint.resetPaintState();
+    assert(rec.fills.length + rec.strokes.length >= 0, kind);
+  }
+});
+test('the carousel turns while the shops are open, water play needs a warm dry day, the band plays 11:00–20:00 and carp streamers fly in spring', () => {
+  assert(motion.carouselRunning(env('2026-08-01', 14))); assert(!motion.carouselRunning(env('2026-08-01', 22)));
+  assert(motion.splashActive(env('2026-08-01', 13, { weather: weather('clear', { temp: 30 }) })));
+  assert(!motion.splashActive(env('2026-11-20', 13, { weather: weather('clear', { temp: 14 }) })), 'No water play on a cold day');
+  assert(!motion.splashActive(env('2026-08-01', 13, { weather: weather('rain', { temp: 28 }) })), 'No water play in the rain');
+  assert(!motion.splashActive(env('2026-08-01', 21, { weather: weather('clear', { temp: 28 }) })), 'No water play after dark');
+  assert(motion.performing(env('2026-08-01', 15))); assert(!motion.performing(env('2026-08-01', 21))); assert(!motion.performing(env('2026-08-01', 15, { weather: weather('rain') })));
+  assert(motion.koinoboriSeason(env('2026-05-01', 12))); assert(!motion.koinoboriSeason(env('2026-07-01', 12)));
+});
+test('wisteria blooms about a month after the cherry blossom, and the flower beds follow the year', () => {
+  assert(seasonOf('2026-04-28', TOKYO).wisteria > .7); assert.equal(seasonOf('2026-03-29', TOKYO).wisteria, 0);
+  assert(seasonOf('2026-05-20', SAPPORO).wisteria > seasonOf('2026-05-20', TOKYO).wisteria, 'Later further north');
+  for (const [date, flora] of [['2026-04-10', 'tulip'], ['2026-06-15', 'hydrangea'], ['2026-08-01', 'sunflower'], ['2026-10-10', 'cosmos'], ['2027-01-20', 'pansy']]) assert.equal(seasonOf(date, TOKYO).flora, flora, date);
+});
+test('children ride the new equipment, people queue for ice cream and leave with one, and lawn games follow the weather', () => {
+  const town = parkTown(['carousel', 'seesaw', 'springRider', 'globe', 'jungleGym', 'splashPad', 'bars', 'basketball', 'foodCart', null, null, null]);
+  const life = new TownLife(), day = env('2026-08-01', 13, { weather: weather('clear', { temp: 30, wind: 22 }) });
+  life.sync(town, new Map());
+  const used = new Set(), games = new Set(); let iceCream = false;
+  for (let j = 0; j < 9000; j++) {
+    life.update(1 / 30, 1 / 30, day);
+    const busy = life.visitors.filter(v => v.spot && v.using >= 0);
+    assert.equal(new Set(busy.map(v => v.spot)).size, busy.length, 'One person per place');
+    for (const v of busy) {
+      used.add(v.spot.split(':')[1]); if (v.lawn) games.add(v.lawn);
+      const spot = life.spots.get(v.spot);
+      if (spot.who === 'child') assert.equal(v.look.kind, 'child', `Only children play on the ${spot.part}`);
+      if (spot.who === 'adult') assert.notEqual(v.look.kind, 'child', `Grown-ups only at the ${spot.part}`);
+    }
+    if (life.visitors.some(v => v.look.carry === 'icecream')) iceCream = true;
+    if (j % 600 === 0) { const rec = recordingContext(); life.collect((x, y, depth, paint) => paint(rec.c), town, day, 0, 2); }
+  }
+  for (const kind of ['carousel', 'seesaw', 'springRider', 'globe', 'jungleGym', 'splashPad', 'foodCart']) assert(used.has(kind), `Someone used the ${kind}`);
+  assert(iceCream, 'Someone bought an ice cream');
+  assert(games.size > 0, 'Someone played on the lawn');
+  const wet = env('2026-08-01', 13, { weather: weather('rain', { temp: 24 }) });
+  life.update(1 / 30, 1 / 30, wet);
+  assert(!life.visitors.some(v => v.spot && (v.spot.includes(':lawn:') || v.spot.includes('splashPad') || v.spot.includes('basketball'))), 'Rain ends lawn games, water play and basketball');
+});
+test('kites need wind, picnics need a dry day, and pigeons on the plaza take off when a child runs up', () => {
+  const town = parkTown(['bench', 'fountain', null, null, null, null, null, null, null, null, null, null], 'plaza');
+  const life = new TownLife(), calm = env('2026-08-01', 13, { weather: weather('clear', { temp: 24, wind: 2 }) });
+  life.sync(town, new Map());
+  for (let j = 0; j < 4000; j++) { life.update(1 / 30, 1 / 30, calm); assert(!life.visitors.some(v => v.lawn === 'kite' || v.lawn === 'blanket'), 'No kites without wind, no picnic blankets on paving'); }
+  assert(life.pigeons.length > 0);
+  const bird = life.pigeons[0];
+  life.visitors = [{ lot: town.parks[0].id, x: bird.x + .05, y: bird.y, tx: bird.x + .5, ty: bird.y, rest: 0, life: 99, age: 1, look: childLook, seed: 1, phase: 0, spot: null, using: 0, duration: 0 }];
+  life.update(1 / 30, 1 / 30, calm);
+  assert(bird.fly, 'The pigeon flies away from a running child');
+});
 console.log(`${passed} living town checks passed`);

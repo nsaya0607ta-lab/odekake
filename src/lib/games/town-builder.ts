@@ -2,7 +2,11 @@
 export const MAP_SIZE = 24;
 export type Tile = "grass" | "water" | "road" | "rail" | "station" | "house" | "shop" | "factory" | "park" | "home";
 export type Tool = Exclude<Tile, "grass" | "water"> | "bulldoze";
-export type ParkPart = "tree" | "flowers" | "bench" | "fountain" | "playground" | "path" | "light" | "cherry" | "pine" | "hedge" | "pond" | "gazebo" | "picnic" | "swings" | "sandbox" | "sculpture" | "clock" | "trash" | "bikeRack" | "stones" | "arch";
+export type ParkPart = "tree" | "flowers" | "bench" | "fountain" | "playground" | "path" | "light" | "cherry" | "pine" | "hedge" | "pond" | "gazebo" | "picnic" | "swings" | "sandbox" | "sculpture" | "clock" | "trash" | "bikeRack" | "stones" | "arch"
+  | "seesaw" | "springRider" | "globe" | "carousel" | "jungleGym" | "splashPad" | "bars" | "basketball"
+  | "maple" | "ginkgo" | "wisteria" | "flowerField" | "bamboo"
+  | "foodCart" | "parasol" | "drinkFountain" | "bandstand"
+  | "windmill" | "flowerClock" | "lantern" | "flagPole";
 export type ParkLot = { id: number; x: number; y: number; width: number; height: number; kind: "park" | "plaza"; parts: { tile: number; kind: ParkPart; rotation: number }[] };
 export type FacilityPart = "garden" | "terrace" | "light" | "sign" | "storage" | "greenbelt" | "solar" | "bench" | "vending" | "canopy" | "planter";
 export type FacilityAttachment = { tile: number; kind: Tile; parts: FacilityPart[] };
@@ -37,6 +41,28 @@ export const PARK_PARTS: ReadonlyArray<{ id: ParkPart; title: string; price: num
   { id: "sculpture", title: "モニュメント", price: 210, category: "景観", layer: "object", value: 3 },
   { id: "clock", title: "時計塔", price: 190, category: "景観", layer: "object", value: 2 },
   { id: "stones", title: "飛び石", price: 40, category: "景観", layer: "ground", value: 0 },
+  // 2026-10-15: moving play equipment, seasonal plants, places to eat and rest, and landmarks.
+  { id: "seesaw", title: "シーソー", price: 160, category: "遊具", layer: "object", value: 3 },
+  { id: "springRider", title: "ゆらゆら遊具", price: 110, category: "遊具", layer: "object", value: 2 },
+  { id: "globe", title: "回転ジャングル", price: 210, category: "遊具", layer: "object", value: 3 },
+  { id: "carousel", title: "メリーゴーランド", price: 680, category: "遊具", layer: "object", value: 6 },
+  { id: "jungleGym", title: "ジャングルジム", price: 190, category: "遊具", layer: "object", value: 3 },
+  { id: "splashPad", title: "じゃぶじゃぶ池", price: 280, category: "遊具", layer: "object", value: 4 },
+  { id: "bars", title: "鉄棒", price: 90, category: "遊具", layer: "object", value: 2 },
+  { id: "basketball", title: "バスケット", price: 230, category: "遊具", layer: "object", value: 3 },
+  { id: "maple", title: "もみじ", price: 140, category: "植栽", layer: "object", value: 4 },
+  { id: "ginkgo", title: "いちょう", price: 130, category: "植栽", layer: "object", value: 4 },
+  { id: "wisteria", title: "藤棚", price: 360, category: "植栽", layer: "object", value: 5 },
+  { id: "flowerField", title: "季節の花畑", price: 150, category: "植栽", layer: "object", value: 3 },
+  { id: "bamboo", title: "竹林", price: 110, category: "植栽", layer: "object", value: 3 },
+  { id: "foodCart", title: "キッチンカー", price: 320, category: "休憩", layer: "object", value: 4 },
+  { id: "parasol", title: "パラソル席", price: 140, category: "休憩", layer: "object", value: 3 },
+  { id: "drinkFountain", title: "水飲み場", price: 60, category: "休憩", layer: "object", value: 1 },
+  { id: "bandstand", title: "野外ステージ", price: 450, category: "休憩", layer: "object", value: 5 },
+  { id: "windmill", title: "風車", price: 420, category: "景観", layer: "object", value: 5 },
+  { id: "flowerClock", title: "花時計", price: 300, category: "景観", layer: "object", value: 4 },
+  { id: "lantern", title: "石灯籠", price: 120, category: "景観", layer: "object", value: 2 },
+  { id: "flagPole", title: "旗ポール", price: 130, category: "景観", layer: "object", value: 2 },
 ];
 export const FACILITY_PARTS: ReadonlyArray<{ id: FacilityPart; title: string; price: number; kinds: Tile[]; info: string }> = [
   { id: "garden", title: "植栽・花壇", price: 90, kinds: ["house", "shop"], info: "庭先を彩る" },

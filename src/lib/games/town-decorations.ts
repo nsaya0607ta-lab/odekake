@@ -173,7 +173,7 @@ export function drawTownDecoration(c: CanvasRenderingContext2D, kind: string, x:
     box(.08, .12, .84, .74, .8, ["#a6ad87", "#8d9c75", "#c5c59a"]);
     assemble([
       ...[.16, .84].map(u => ({ u, v: .49, paint: () => { line(at(u, .22, 1.8), at(u, .48, 26), "#6c8f85", 2); line(at(u, .76, 1.8), at(u, .48, 26), "#517b73", 2); } })),
-      ...(paintState.liveSwings ? [] : [.31, .57]).map(u => ({ u: u + .055, v: .55, paint: () => {
+      ...(paintState.liveParts ? [] : [.31, .57]).map(u => ({ u: u + .055, v: .55, paint: () => {
         for (const a of [0, .11]) line(at(u + a, .48, 25), at(u + a, .55, 7), "#d6d7b9", .65);
         box(u - .01, .49, .13, .14, 1, ["#be9167", "#926b4e", "#e0b787"], 6);
       } })),
