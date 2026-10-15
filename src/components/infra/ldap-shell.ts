@@ -467,6 +467,7 @@ export class LdapLab {
       log.note("ldaps://：はじめから暗号（TLS）で話す", "ok", "tls:client");
       return { conn };
     }
+    log.note("ldap://：暗号なしで話す（ネットワークの通り道で、中身がそのまま読める）", "warn", "tls:client");
     return { conn: s.open(host, port, false, log) };
   }
 
@@ -533,9 +534,11 @@ export class LdapLab {
         this.server.close(conn, log, false);
         return { exit: 250 };
       }
-      err("SASL/EXTERNAL authentication started");
-      err("SASL username: gidNumber=0+uidNumber=0,cn=peercred,cn=external,cn=auth");
-      err("SASL SSF: 0");
+      // 本物と同じく標準エラーに出るが、エラーではない（ただのお知らせ）なので、うすく出す
+      const info = (text: string) => out.push({ text, err: true, mark: "dim" });
+      info("SASL/EXTERNAL authentication started");
+      info("SASL username: gidNumber=0+uidNumber=0,cn=peercred,cn=external,cn=auth");
+      info("SASL SSF: 0");
       this.server.bindExternal(conn, log);
       return { conn };
     }
@@ -575,8 +578,11 @@ export class LdapLab {
     const noWrap = (g.opt.get("o") ?? "").split("\n").some((o) => /^ldif[-_]wrap=no$/i.test(o.trim()));
     const baseGiven = g.opt.has("b");
     const base = g.opt.get("b") ?? this.client[host].base;
-    const filterText = g.rest[0] ?? "(objectclass=*)";
-    const attrs = g.rest.slice(1);
+    // 本物の ldapsearch と同じ：最初の引数が「(」で始まらず「=」もなければ、それは属性で、フィルタは (objectclass=*)
+    const first = g.rest[0];
+    const filterGiven = first != null && (first.startsWith("(") || first.includes("="));
+    const filterText = filterGiven ? first : "(objectclass=*)";
+    const attrs = filterGiven ? g.rest.slice(1) : g.rest;
     const size = Number(g.opt.get("z") ?? 0) || 0;
     const filter = parseFilter(filterText);
     const say = (text: string, extra: Partial<OutLine> = {}) => out.push({ text, ...extra });
@@ -821,6 +827,7 @@ export class LdapLab {
     const conf = this.sssd.running;
     const s = this.server;
     const c = this.connect("shop", conf.uri, log);
+    main.ops.push({ kind: "sssd", code: "code" in c ? -1 : 0, host: "shop", tls: !("code" in c) && c.conn.tls });
     if ("code" in c) {
       this.sssdLog(log, `Backend is offline: ${conf.uri}: ${RESULT_TEXT[-1]}`);
       main.note("SSSD：LDAP サーバーにつながらない（オフライン）→ だれも見つけられない", "ng", "sssd:uri");

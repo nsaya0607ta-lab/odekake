@@ -425,7 +425,8 @@ function checkLessons(eq) {
 
 /**
  * LDAP の部品（SHA-1・base64・{SSHA}・DN・フィルタ）と、勉強部屋の設定カードを確かめる。
- * どのカードも最初から最後まで通して、ok が通る・learn がおかしくない・設定が最後に入ることを見る。
+ * どのカードも最初から最後まで通して、ok が通る・learn がおかしくない・設定なし／ありの順に動く・設定が最後に入る、
+ * 見くらべる（まっさらな名簿2つ）で結果がちがう、自由に試すのコマンドがこわれない、を見る。
  */
 function checkLdap() {
   const eq = (got, want, what) => must(got === want, what, { got, want });
@@ -480,34 +481,72 @@ function checkLdap() {
   eq(w.bind(c, "uid=pochi,ou=people,dc=wanko,dc=shop", "pw1", run).code, 0, "正しいパスワードでログイン");
   eq(w.bind(c, "uid=pochi,ou=people,dc=wanko,dc=shop", "x", run).code, 49, "まちがいパスワードは 49");
 
-  // 設定カードを、最初から最後まで通す
-  const { CARDS, splitStudy } = ldapStudy;
+  // 設定カードを、最初から最後まで通す（画面と同じ種と、別の種の2回）
+  const { CARDS, CHAPTERS, SEED_BASE, splitStudy, prepareLab } = ldapStudy;
   must(CARDS.length >= 10, "設定カードが足りない");
   const ids = new Set();
+  const PHASES = new Set(["learn", "off", "apply", "on", "trap"]);
+  // 「attribute type undefined」は slapd の本物のエラーの文なので、おかしい文あつかいしない
+  const weird = (s) => /(?<!attribute type )undefined|NaN|\[object/.test(s);
+  const text = (s, at) => must(typeof s === "string" && s.length > 0 && !weird(s) && splitStudy(s).length % 2 === 1, `${at}：文がおかしい（${s}）`);
+  const outOk = (r, at) => {
+    must(Number.isInteger(r.exit), `${at}：exit が数でない`);
+    for (const l of r.out) must(!weird(l.text) && !weird(l.hint ?? ""), `${at}：出力がおかしい（${l.text}）`);
+    for (const t of r.trace) text(t.text, `${at} trace`);
+  };
   CARDS.forEach((card, idx) => {
     const where = `設定カード「${card.id}」`;
     must(!ids.has(card.id), `${where}：id がかぶっている`);
     ids.add(card.id);
-    eq(card.no, idx + 1, `${where}：番号が順でない`);
-    must(card.steps.length >= 2 && card.compare.length >= 1 && card.summary.length >= 1, `${where}：ステップ・くらべる・まとめが足りない`);
+    eq(card.no, idx, `${where}：番号が順でない（はじめに が 0）`);
+    must(CHAPTERS.some((c) => c.no === card.chapter), `${where}：章がない`);
+    must(card.steps.length >= 2 && card.summary.length >= 1 && card.tries.length >= 2, `${where}：ステップ・まとめ・自由に試すが足りない`);
+    must(card.knob ? (card.compare?.length ?? 0) >= 1 && Boolean(card.probe) : (card.words?.length ?? 0) >= 1, `${where}：くらべる表・見くらべる（はじめに は ことば）が足りない`);
     must(card.quiz.answer >= 0 && card.quiz.answer < card.quiz.choices.length, `${where}：クイズの答えが範囲外`);
-    const lab = card.build(4000 + card.no);
-    must(!card.knob.isOn(lab), `${where}：はじめから設定が入っている`);
-    card.steps.forEach((st, j) => {
-      const at = `${where} ステップ${j + 1}（${st.host}）`;
-      must(st.say && st.cmd && ldapStudy && (st.phase === "off" || st.phase === "apply" || st.phase === "on"), `${at}：説明・コマンド・phase がそろっていない`);
-      must(splitStudy(st.say).length % 2 === 1, `${at}：say の ** が閉じていない`);
-      if (st.phase === "off") must(!card.knob.isOn(lab), `${at}：off なのに設定が入っている`);
-      if (st.phase === "on") must(card.knob.isOn(lab), `${at}：on なのに設定が入っていない`);
-      if (st.before) st.before(lab);
-      const r = lab.run(st.host, st.cmd);
-      must(Number.isInteger(r.exit), `${at}：exit が数でない`);
-      must(!st.ok || st.ok(r), `${at}：ok() が通らない（exit=${r.exit}・${r.out.filter((l) => l.err).map((l) => l.text).join(" / ")}）`);
-      const learn = typeof st.learn === "function" ? st.learn(r) : st.learn;
-      must(typeof learn === "string" && learn.length > 0 && !/undefined|NaN|\[object/.test(learn), `${at}：わかったことがおかしい（${learn}）`);
-      must(splitStudy(learn).length % 2 === 1, `${at}：learn の ** が閉じていない`);
-    });
-    must(card.knob.isOn(lab), `${where}：最後に設定が入っていない`);
+    const words = [card.intro, card.analogy, card.probe?.note, ...card.summary, card.quiz.q, card.quiz.explain, ...card.quiz.choices];
+    words.push(...(card.compare ?? []).flatMap((r) => [r.head, r.off, r.on]), ...(card.words ?? []).flatMap((w) => [w.term, w.mean]));
+    for (const s of words.filter((x) => x != null)) text(s, where);
+    for (const seed of [SEED_BASE + card.no, 4000 + card.no]) {
+      const lab = card.build(seed);
+      if (card.knob) must(!card.knob.isOn(lab), `${where}：はじめから設定が入っている`);
+      card.steps.forEach((st, j) => {
+        const at = `${where} ステップ${j + 1}（${st.host}・種 ${seed}）`;
+        must(st.say && st.cmd && PHASES.has(st.phase), `${at}：説明・コマンド・phase がそろっていない`);
+        must(card.knob || st.phase === "learn", `${at}：設定のないカードは learn だけ`);
+        text(st.say, at);
+        if (st.before) st.before(lab);
+        if (st.pre) {
+          const pr = lab.run(st.pre.host, st.pre.cmd);
+          outOk(pr, `${at} 先に`);
+          eq(pr.exit, 0, `${at}：先に動かすコマンドが失敗（${st.pre.cmd}）`);
+        }
+        if (card.knob && st.phase === "off") must(!card.knob.isOn(lab), `${at}：off なのに設定が入っている`);
+        if (card.knob && (st.phase === "on" || st.phase === "trap")) must(card.knob.isOn(lab), `${at}：on・trap なのに設定が入っていない`);
+        const r = lab.run(st.host, st.cmd);
+        outOk(r, at);
+        must(!st.ok || st.ok(r), `${at}：ok() が通らない（exit=${r.exit}・${r.out.filter((l) => l.err).map((l) => l.text).join(" / ")}）`);
+        text(typeof st.learn === "function" ? st.learn(r) : st.learn, `${at} learn`);
+      });
+      if (card.knob) must(card.knob.isOn(lab), `${where}：最後に設定が入っていない`);
+    }
+    // 見くらべる：まっさらな名簿2つ（片方にだけ設定）で、同じコマンドの結果がちがう
+    const off = prepareLab(card, false);
+    const on = prepareLab(card, true);
+    if (card.knob) {
+      must(!card.knob.isOn(off.lab) && card.knob.isOn(on.lab), `${where}：見くらべるの名簿の設定がおかしい`);
+      for (const p of on.runs) if ("run" in p) eq(p.run.exit, 0, `${where}：設定を入れるコマンドが失敗（${p.cmd}）`);
+    }
+    if (card.probe) {
+      const a = off.lab.run(card.probe.host, card.probe.cmd);
+      const b = on.lab.run(card.probe.host, card.probe.cmd);
+      outOk(a, `${where} 見くらべる（なし）`);
+      outOk(b, `${where} 見くらべる（あり）`);
+      const sig = (r) => `${r.exit}|${r.out.map((l) => l.text).join("\n")}|${card.probe.label?.(r) ?? ""}`;
+      must(sig(a) !== sig(b), `${where}：見くらべるで、設定なし・ありの結果が同じ`);
+      if (card.probe.label) for (const r of [a, b]) text(card.probe.label(r), `${where} 見くらべるのひとこと`);
+    }
+    // 自由に試す：設定なし・ありの名簿で「ためしてみよう」を全部動かしても、こわれない
+    for (const L of [off.lab, on.lab]) for (const t of card.tries) outOk(L.run(t.host, t.cmd), `${where}「${t.label}」`);
   });
 }
 

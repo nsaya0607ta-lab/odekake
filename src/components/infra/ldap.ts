@@ -280,6 +280,15 @@ function normValue(cfg: ServerConfig, def: AttrDef, raw: string): string | null 
 
 export type Ava = { type: string; value: string };
 
+const ENC = new TextEncoder();
+const DEC = new TextDecoder();
+/** 1文字を UTF-8 のバイトにして足す（英数字はそのまま。名簿を作るときに何万回も呼ぶので速く） */
+const pushUtf8 = (bytes: number[], c: string) => {
+  const code = c.charCodeAt(0);
+  if (c.length === 1 && code < 0x80) bytes.push(code);
+  else bytes.push(...ENC.encode(c));
+};
+
 /** DN を RDN（その中の AVA）に分ける。書き方がおかしければ null。"" は木のいちばん上（ルート） */
 export function parseDn(dn: string): Ava[][] | null {
   const chars = Array.from(dn.trim());
@@ -290,11 +299,10 @@ export function parseDn(dn: string): Ava[][] | null {
   let bytes: number[] = [];
   let trailing = 0;
   let inValue = false;
-  const enc = new TextEncoder();
   const endAva = (): boolean => {
     const t = type.trim();
     if (!/^([A-Za-z][A-Za-z0-9-]*|\d+(\.\d+)+)$/.test(t)) return false;
-    const value = new TextDecoder().decode(Uint8Array.from(bytes.slice(0, bytes.length - trailing)));
+    const value = DEC.decode(Uint8Array.from(bytes.slice(0, bytes.length - trailing)));
     if (!value) return false;
     avas.push({ type: t, value });
     type = "";
@@ -319,7 +327,7 @@ export function parseDn(dn: string): Ava[][] | null {
         bytes.push(parseInt(h, 16));
         i += 2;
       } else if (i + 1 < chars.length) {
-        bytes.push(...enc.encode(chars[i + 1]!));
+        pushUtf8(bytes, chars[i + 1]!);
         i += 1;
       } else return null;
       trailing = 0;
@@ -335,7 +343,7 @@ export function parseDn(dn: string): Ava[][] | null {
       continue;
     }
     if (c === '"' || c === "=") return null;
-    bytes.push(...enc.encode(c));
+    pushUtf8(bytes, c);
     trailing = c === " " ? trailing + 1 : 0;
   }
   if (!inValue || !endAva()) return null;
@@ -420,7 +428,6 @@ export function parseFilter(text: string): Filter | null {
   let i = 0;
   const value = (raw: string): string | null => {
     const bytes: number[] = [];
-    const enc = new TextEncoder();
     const chars = Array.from(raw);
     for (let k = 0; k < chars.length; k++) {
       const c = chars[k]!;
@@ -430,9 +437,9 @@ export function parseFilter(text: string): Filter | null {
         bytes.push(parseInt(h, 16));
         k += 2;
       } else if (c === "(" || c === ")" || c === "*") return null;
-      else bytes.push(...enc.encode(c));
+      else pushUtf8(bytes, c);
     }
-    return new TextDecoder().decode(Uint8Array.from(bytes));
+    return DEC.decode(Uint8Array.from(bytes));
   };
   const item = (): Filter | null => {
     const start = i;
@@ -924,6 +931,23 @@ export class LdapWorld {
     return null;
   }
 
+  /** 17・21 で断ったわけ（知らない属性・オブジェクトクラス・値の書き方）を、サーバーの中に書く */
+  private explainBad(run: RunLog, bad: { code: number; text: string }, values: { name: string; value: string }[]) {
+    // ppolicy・memberof の言葉は、そのモジュールを読みこむと使える（目じるしも overlay の名前）
+    const why = (sc: SchemaId) => (sc === "ppolicy" || sc === "memberof" ? `${sc} モジュールを読みこんでいない` : `${sc} スキーマを読みこんでいない`);
+    const ref = (sc: SchemaId) => (sc === "ppolicy" || sc === "memberof" ? sc : `schema:${sc}`);
+    const m = /^(.+?): value #(\d+)/.exec(bad.text);
+    if (bad.code === 21 && m?.[1] === "objectClass") {
+      const name = values.filter((a) => a.name.toLowerCase() === "objectclass")[Number(m[2])]?.value ?? "";
+      const sc = classSchema(name);
+      run.note(`オブジェクトクラス「${name}」を${sc && sc !== "system" ? `知らない（${why(sc)}）` : "どのスキーマも知らない"} → 21`, "ng", sc && sc !== "system" ? ref(sc) : undefined);
+    } else if (bad.code === 17) {
+      const name = bad.text.split(":")[0]!;
+      const sc = attrSchema(name);
+      run.note(`属性「${name}」を${sc ? `知らない（${why(sc)}）` : "どのスキーマも知らない"} → 17`, "ng", sc ? ref(sc) : undefined);
+    } else run.note(`値の書き方が、その属性の決まり（シンタックス）に合わない → ${bad.code}`, "ng");
+  }
+
   /** 属性の名前と値の書き方（17・21） */
   private checkAttrs(list: { name: string; value: string }[]): { code: number; text: string } | null {
     const count = new Map<string, number>();
@@ -1288,6 +1312,11 @@ export class LdapWorld {
       run.note("確かめられないので、正しいパスワードでも 49", "ng", why.ref);
       return done(49, "");
     }
+    // olcAccess を書いているときは、確かめてよかったわけも見せる（書いていなければ「by * read」に auth も入っている）
+    if (this.cfg.acl.length) {
+      const why = this.describe(d);
+      run.note(`パスワードを確かめていい？（匿名が userPassword を auth できるか）→ ${why.text} → 確かめられる`, "ok", why.ref);
+    }
     const policy = this.policyFor(e);
     if (policy && policy.lockout) {
       const lockedAt = this.first(e, "pwdAccountLockedTime");
@@ -1455,9 +1484,9 @@ export class LdapWorld {
     run.note(
       cand.indexed
         ? `インデックス（olcDbIndex: ${cand.used}）で、見る候補を ${scanned.toLocaleString("en-US")}件にしぼった`
-        : `${cand.unindexed.length ? `${cand.unindexed.join("・")} のインデックスがない → ` : ""}「${baseEntry.dn}」の下を全部（${scanned.toLocaleString("en-US")}件）1件ずつ見た`,
+        : `${cand.unindexed.length ? `${cand.unindexed.map((u) => this.unindexedText(u)).join("・")} → ` : ""}「${baseEntry.dn}」の下を全部（${scanned.toLocaleString("en-US")}件）1件ずつ見た`,
       cand.indexed ? "ok" : scanned > 1000 ? "warn" : "info",
-      cand.unindexed[0] || cand.used ? `index:${(cand.used || cand.unindexed[0] || "").split(" ")[0]!.toLowerCase()}` : undefined,
+      cand.used || cand.unindexed[0] ? `index:${(cand.used.split(" ")[0] || cand.unindexed[0]!.attr).toLowerCase()}` : undefined,
     );
     if (denied.size) run.note(`${[...denied].join("・")} は、さがすための権限（search）がないので「わからない」あつかい`, "warn", "acl");
     run.note(`フィルタ ${ftext} に合ったのは ${hits.length + (over ? 1 : 0) + skipped > hits.length ? `${hits.length}件${over ? "（ここで止めた）" : ""}` : `${hits.length}件`}`, hits.length ? "info" : "warn");
@@ -1514,14 +1543,24 @@ export class LdapWorld {
     return { dn: e.dn, ndn: e.ndn, attrs: out };
   }
 
+  /** 「mail の sub（部分一致）のインデックスがない（mail eq はあるけれど、この さがし方には使えない）」 */
+  private unindexedText(u: { attr: string; kind: IndexKind }): string {
+    const ja: Record<IndexKind, string> = { eq: "ぴったり同じ", sub: "部分一致", pres: "あるかどうか", approx: "だいたい同じ" };
+    const has = this.cfg.index.get(u.attr.toLowerCase());
+    const other = has?.size ? `（${u.attr} ${[...has].join(",")} はあるけれど、このさがし方には使えない）` : "";
+    return `${u.attr} の ${u.kind}（${ja[u.kind]}）のインデックスがない${other}`;
+  }
+
   /** インデックスで候補をしぼる（使えるインデックスがなければ、範囲の中を全部） */
-  private candidates(f: Filter, base: string, scope: Scope, run: RunLog): { list: Entry[]; indexed: boolean; used: string; unindexed: string[] } {
+  private candidates(f: Filter, base: string, scope: Scope, run: RunLog): { list: Entry[]; indexed: boolean; used: string; unindexed: { attr: string; kind: IndexKind }[] } {
     const scopeList = () => [...this.entries.values()].filter((e) => inScope(e.ndn, base, scope));
-    const unindexed: string[] = [];
+    const unindexed: { attr: string; kind: IndexKind }[] = [];
     const tryItem = (x: Filter): { kind: IndexKind; attr: string } | null => {
       if (x.t === "and" || x.t === "or" || x.t === "not") return null;
       const def = attrDef(this.cfg, x.attr);
       if (!def) return null;
+      // (objectClass=*) は「全部」。back-mdb はインデックスを見ずに、範囲の中を全部にする（not indexed とも書かない）
+      if (x.t === "present" && def.key === "objectclass") return null;
       const kind: IndexKind = x.t === "present" ? "pres" : x.t === "sub" ? "sub" : x.t === "approx" ? "approx" : "eq";
       if (x.t === "ge" || x.t === "le") return null;
       const has = this.cfg.index.get(def.key);
@@ -1529,7 +1568,7 @@ export class LdapWorld {
       const where = kind === "eq" || kind === "approx" ? "equality" : kind === "sub" ? "substring" : "presence";
       const line = `<= mdb_${where}_candidates: (${def.name}) not indexed`;
       this.log(run, "ldap", "slapd", line);
-      if (!unindexed.includes(def.name)) unindexed.push(def.name);
+      if (!unindexed.some((u) => u.attr === def.name && u.kind === kind)) unindexed.push({ attr: def.name, kind });
       return null;
     };
     const items = f.t === "and" ? f.list : [f];
@@ -1573,20 +1612,7 @@ export class LdapWorld {
     }
     const bad = this.checkAttrs(rec.attrs);
     if (bad) {
-      const m = /^(.+?): value #(\d+)/.exec(bad.text);
-      if (bad.code === 21 && m?.[1] === "objectClass") {
-        const name = rec.attrs.filter((a) => a.name.toLowerCase() === "objectclass")[Number(m[2])]?.value ?? "";
-        const sc = classSchema(name);
-        run.note(
-          `オブジェクトクラス「${name}」を${sc && sc !== "system" ? `知らない（${sc} スキーマを読みこんでいない）` : "どのスキーマも知らない"} → 21`,
-          "ng",
-          sc ? `schema:${sc}` : undefined,
-        );
-      } else if (bad.code === 17) {
-        const name = bad.text.split(":")[0]!;
-        const sc = attrSchema(name);
-        run.note(`属性「${name}」を${sc ? `知らない（${sc} スキーマを読みこんでいない）` : "どのスキーマも知らない"} → 17`, "ng", sc ? `schema:${sc}` : undefined);
-      } else run.note(`値の書き方が、その属性の決まり（シンタックス）に合わない → ${bad.code}`, "ng");
+      this.explainBad(run, bad, rec.attrs);
       return done(bad.code, bad.text);
     }
     const suffix = normDn(this.cfg, this.cfg.suffix)!;
@@ -1726,8 +1752,18 @@ export class LdapWorld {
     for (const [k, a] of e.attrs) next.set(k, { name: a.name, vals: [...a.vals] });
     for (const m of rec.mods) {
       const def = attrDef(this.cfg, m.attr);
-      if (!def) return done(17, `${m.attr}: attribute type undefined`);
-      for (const [n, v] of m.values.entries()) if (normValue(this.cfg, def, v) == null) return done(21, `${def.name}: value #${n} invalid per syntax`);
+      const vals = m.values.map((value) => ({ name: m.attr, value }));
+      if (!def) {
+        const bad = { code: 17, text: `${m.attr}: attribute type undefined` };
+        this.explainBad(run, bad, vals);
+        return done(bad.code, bad.text);
+      }
+      const badAt = m.values.findIndex((v) => normValue(this.cfg, def, v) == null);
+      if (badAt >= 0) {
+        const bad = { code: 21, text: `${def.name}: value #${badAt} invalid per syntax` };
+        this.explainBad(run, bad, vals);
+        return done(bad.code, bad.text);
+      }
       if (def.noMod || (def.op && !c.who.root)) {
         run.note(`${def.name} は${def.noMod ? "サーバー（overlay）が書く属性なので、人は書きかえられない" : "操作属性なので、管理者しか書きかえられない"}`, "ng");
         return done(def.noMod ? 19 : 50, def.noMod ? `${def.name}: no user modification allowed` : "");
@@ -1780,15 +1816,38 @@ export class LdapWorld {
     if (rec.mods.some((m) => m.attr.toLowerCase() === "userpassword") && this.cfg.modules.has("ppolicy")) e.attrs.delete("pwdfailuretime");
     run.note(`${rdnOf(e.dn)} の ${[...new Set(rec.mods.map((m) => attrName(m.attr)))].join("・")} を書きかえた`, "ok");
     if (this.isA(e, "groupOfNames")) {
-      const after = this.vals(e, "member");
-      const n = (v: string) => normDn(this.cfg, v);
-      const joined = after.filter((m) => !before.some((b) => n(b) === n(m)));
-      const left = before.filter((b) => !after.some((m) => n(m) === n(b)));
+      // memberof overlay は、変更の1つずつを見る（delete してから add すると、入れなおしになる）
+      const n = (v: string) => normDn(this.cfg, v) ?? v;
+      const cur = new Map(before.map((v) => [n(v), v]));
+      const added = new Map<string, string>();
+      const removed = new Map<string, string>();
+      const join = (v: string) => {
+        cur.set(n(v), v);
+        added.set(n(v), v);
+        removed.delete(n(v));
+      };
+      const leave = (v: string) => {
+        cur.delete(n(v));
+        removed.set(n(v), v);
+        added.delete(n(v));
+      };
+      for (const m of rec.mods) {
+        if (attrDef(this.cfg, m.attr)?.key !== "member") continue;
+        if (m.op === "add") m.values.forEach(join);
+        else if (m.op === "delete") (m.values.length ? m.values : [...cur.values()]).forEach(leave);
+        else {
+          [...cur.values()].forEach(leave);
+          m.values.forEach(join);
+        }
+      }
+      const joined = [...added.values()];
+      const left = [...removed.values()];
       if (overlay(this.cfg, "memberof")) {
-        for (const m of joined) if (this.addMemberOf(m, e.dn)) touched.push(m);
-        for (const m of left) if (this.delMemberOf(m, e.dn)) touched.push(m);
-        if (joined.length) run.note(`memberof overlay：グループに入った ${joined.map(rdnOf).join("・")} に、memberOf: ${rdnOf(e.dn)} を書いた`, "ok", "memberof");
-        if (left.length) run.note(`memberof overlay：グループを出た ${left.map(rdnOf).join("・")} から、memberOf を消した`, "info", "memberof");
+        const wrote = joined.filter((m) => this.addMemberOf(m, e.dn));
+        const erased = left.filter((m) => this.delMemberOf(m, e.dn));
+        touched.push(...wrote, ...erased);
+        if (wrote.length) run.note(`memberof overlay：グループに入った ${wrote.map(rdnOf).join("・")} に、memberOf: ${rdnOf(e.dn)} を書いた`, "ok", "memberof");
+        if (erased.length) run.note(`memberof overlay：グループを出た ${erased.map(rdnOf).join("・")} から、memberOf を消した`, "info", "memberof");
       } else if (joined.length || left.length) run.note("memberof overlay がない → グループの member だけが変わった（人のほうには何も書かない）", "info", "memberof");
     }
     return done(0, "");
@@ -2306,16 +2365,12 @@ export type TreeNode = {
   locked?: boolean;
 };
 
-/** olcDbIndex の行（属性ごと。objectClass eq がいちばん上） */
+/** olcDbIndex の行（足した順に、属性ごとに1行。objectClass eq がいちばん上） */
 export function indexLines(cfg: ServerConfig): string[] {
-  const groups = new Map<string, string[]>();
-  for (const [attr, kinds] of cfg.index) {
-    const key = [...kinds].sort((a, b) => ["eq", "pres", "sub", "approx"].indexOf(a) - ["eq", "pres", "sub", "approx"].indexOf(b)).join(",");
-    const list = groups.get(key) ?? [];
-    list.push(attrName(attr));
-    groups.set(key, list);
-  }
-  return [...groups].map(([k, attrs]) => `${attrs.join(",")} ${k}`).sort((a, b) => (a.startsWith("objectClass ") ? -1 : b.startsWith("objectClass ") ? 1 : 0));
+  const order: IndexKind[] = ["eq", "pres", "sub", "approx"];
+  return [...cfg.index]
+    .map(([attr, kinds]) => `${attrName(attr)} ${[...kinds].sort((a, b) => order.indexOf(a) - order.indexOf(b)).join(",")}`)
+    .sort((a, b) => (a.startsWith("objectClass ") ? -1 : b.startsWith("objectClass ") ? 1 : 0));
 }
 
 function parseIndex(cfg: ServerConfig, v: string): { attrs: string[]; kinds: IndexKind[] } | null {
