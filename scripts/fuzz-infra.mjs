@@ -30,7 +30,7 @@ import ts from "typescript";
 const root = join(dirname(fileURLToPath(import.meta.url)), "..");
 const src = join(root, "src/components/infra");
 const out = mkdtempSync(join(tmpdir(), "infra-fuzz-"));
-for (const name of ["model", "layout", "sim", "design", "export", "room", "room-templates", "room-lessons", "ldap-bits", "ldap", "ldap-shell", "ldap-lessons"]) {
+for (const name of ["model", "layout", "sim", "design", "export", "room", "room-templates", "room-lessons", "ldap-bits", "ldap", "ldap-shell", "study-kit", "ldap-lessons", "mail", "mail-shell", "mail-lessons"]) {
   const code = readFileSync(join(src, `${name}.ts`), "utf8");
   const js = ts
     .transpileModule(code, { compilerOptions: { module: ts.ModuleKind.ESNext, target: ts.ScriptTarget.ES2022 } })
@@ -49,6 +49,8 @@ const lessons = await load("room-lessons");
 const ldapBits = await load("ldap-bits");
 const ldapMod = await load("ldap");
 const ldapStudy = await load("ldap-lessons");
+const mailStudy = await load("mail-lessons");
+const mailMod = await load("mail");
 rmSync(out, { recursive: true, force: true });
 
 let yaml = null;
@@ -482,7 +484,13 @@ function checkLdap() {
   eq(w.bind(c, "uid=pochi,ou=people,dc=wanko,dc=shop", "x", run).code, 49, "まちがいパスワードは 49");
 
   // 設定カードを、最初から最後まで通す（画面と同じ種と、別の種の2回）
-  const { CARDS, CHAPTERS, SEED_BASE, splitStudy, prepareLab } = ldapStudy;
+  checkCards("LDAP", ldapStudy.CARDS, ldapStudy.CHAPTERS, ldapStudy.SEED_BASE, (c, on) => ldapStudy.prepareLab(c, on));
+}
+
+/** 設定カード（LDAP・メールサーバー）を、最初から最後まで通す。見くらべる・ためしてみようもこわれないか */
+function checkCards(kind, CARDS, CHAPTERS, SEED_BASE, prepareLab, prepareProbe = prepareLab) {
+  const eq = (got, want, what) => must(got === want, what, { got, want });
+  const { splitStudy } = ldapStudy;
   must(CARDS.length >= 10, "設定カードが足りない");
   const ids = new Set();
   const PHASES = new Set(["learn", "off", "apply", "on", "trap"]);
@@ -495,7 +503,7 @@ function checkLdap() {
     for (const t of r.trace) text(t.text, `${at} trace`);
   };
   CARDS.forEach((card, idx) => {
-    const where = `設定カード「${card.id}」`;
+    const where = `${kind}の設定カード「${card.id}」`;
     must(!ids.has(card.id), `${where}：id がかぶっている`);
     ids.add(card.id);
     eq(card.no, idx, `${where}：番号が順でない（はじめに が 0）`);
@@ -530,8 +538,8 @@ function checkLdap() {
       if (card.knob) must(card.knob.isOn(lab), `${where}：最後に設定が入っていない`);
     }
     // 見くらべる：まっさらな名簿2つ（片方にだけ設定）で、同じコマンドの結果がちがう
-    const off = prepareLab(card, false);
-    const on = prepareLab(card, true);
+    const off = prepareProbe(card, false);
+    const on = prepareProbe(card, true);
     if (card.knob) {
       must(!card.knob.isOn(off.lab) && card.knob.isOn(on.lab), `${where}：見くらべるの名簿の設定がおかしい`);
       for (const p of on.runs) if ("run" in p) eq(p.run.exit, 0, `${where}：設定を入れるコマンドが失敗（${p.cmd}）`);
@@ -550,12 +558,46 @@ function checkLdap() {
   });
 }
 
+
+/* ------------------------------------------------------------ 勉強部屋（メールサーバー） */
+
+function checkMail() {
+  const M = mailMod;
+  const eq = (got, want, what) => must(got === want, what, { got, want });
+  // 小さな部品
+  must(M.inCidr("192.168.10.5", "192.168.10.0/24") && !M.inCidr("203.0.113.80", "192.168.10.0/24") && M.inCidr("1.2.3.4", "0.0.0.0/0"), "inCidr");
+  const cf = M.parseMainCf("a = 1\n  2\n# x\nb=$a 3\n");
+  eq(cf.get("a"), "1 2", "main.cf の続きの行");
+  eq(M.pfGet(cf, "b"), "1 2 3", "main.cf の $");
+  eq(M.parseMainCf(M.editMainCf("a = 1\n  2\nb = 3\n", "a", "9")).get("a"), "9", "postconf -e の書きかえ");
+  const dc = M.parseDovecot([["x", "service auth {\n  unix_listener /p {\n    mode = 0660\n  }\n}\nmail_plugins = a\nprotocol lmtp {\n  mail_plugins = $mail_plugins sieve\n}\n"]]);
+  eq(dc.errors.length, 0, "dovecot の設定が読めない");
+  eq(dc.conf.get("service auth/unix_listener /p/mode"), "0660", "dovecot の入れ子");
+  eq(dc.conf.get("protocol lmtp/mail_plugins"), "a sieve", "dovecot の $");
+  const mail = { qid: "Q", from: "a@b", rcpts: [], head: [["Subject", "[広告] x"]], body: "", at: 0, size: 1 };
+  eq(M.runSieve('require ["fileinto"];\nif header :contains "subject" "[広告]" { fileinto "Ads"; }', mail).folders.join(), "Ads", "Sieve の fileinto");
+  eq(M.runSieve('if true { keep; }', mail).folders.join(), "INBOX", "Sieve の keep");
+  must(M.runSieve('fileinto "Ads";', mail).errors.length === 1, "Sieve の require 忘れ");
+  must(M.runSieve('if header :contains "subject" "x" { fileint "Ads"; }', mail).errors.length === 1, "Sieve の書きまちがい");
+  eq(M.sendmailListen(M.m4Sendmail("DAEMON_OPTIONS(`Port=smtp,Addr=127.0.0.1, Name=MTA')dnl\n").cf), "127.0.0.1", "m4 の Addr");
+  eq(M.sendmailListen(M.m4Sendmail("DAEMON_OPTIONS(`Port=smtp, Name=MTA')dnl\n").cf), "0.0.0.0", "m4 の Addr なし");
+  checkCards("メール", mailStudy.MAIL_CARDS, mailStudy.MAIL_CHAPTERS, mailStudy.MAIL_SEED_BASE, (c, on) => mailStudy.prepareMailLab(c, on), (c, on) => mailStudy.prepareMailLab(c, on, undefined, true));
+}
+
 /* ------------------------------------------------------------ 実行 */
 
 try {
   checkRoomParts();
 } catch (e) {
   console.error("✗ サーバー室の部品がこわれています");
+  console.error(e instanceof Broken ? `  ${e.message}` : e);
+  process.exit(1);
+}
+
+try {
+  checkMail();
+} catch (e) {
+  console.error("✗ 勉強部屋（メールサーバー）がこわれています");
   console.error(e instanceof Broken ? `  ${e.message}` : e);
   process.exit(1);
 }
@@ -597,7 +639,7 @@ for (let i = 1; i <= runs; i++) {
 rmSync(validateDir, { recursive: true, force: true });
 console.log(
   `✓ ${runs} 通り、こわれませんでした（シミュレーター ${Math.round(simSeconds)} 秒ぶん・アクセス ${totals.ok + totals.fail} 件・${((Date.now() - t0) / 1000).toFixed(1)}秒）` +
-    `／勉強部屋（LDAP）の部品と設定カード ${ldapStudy.CARDS.length}枚も通しで確かめました` +
+    `／勉強部屋の部品と設定カード（LDAP ${ldapStudy.CARDS.length}枚・メール ${mailStudy.MAIL_CARDS.length}枚）も通しで確かめました` +
     (yaml ? "" : "（js-yaml がないので YAML の読みこみは見ていません）") +
     (validate ? `／docker compose${canCompose ? "" : "（なし）"}・terraform${canTerraform ? "" : "（なし）"} で ${validated} 通り確かめました` : ""),
 );

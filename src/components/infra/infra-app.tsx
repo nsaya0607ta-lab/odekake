@@ -21,8 +21,9 @@ import { emptyProgress, isCleared, isUnlocked, loadProgress, saveProgress, total
 import { BottomSheet } from "./sheets";
 import { setSoundEnabled } from "./sound";
 import { RoomMenu, RoomScreen, isRoomScreen } from "./server-room";
-import { StudyMenu, StudyScreen, isStudyScreen } from "./study-room";
-import { CARDS, cardById } from "./ldap-lessons";
+import { StudyMenu, StudyScreen } from "./study-room";
+import { LDAP_SUBJECT } from "./study-ldap";
+import { MAIL_SUBJECT } from "./study-mail";
 import { STAGES, stageById, type StageDef } from "./stages";
 import { SoundButton, StagePlay } from "./stage-play";
 import styles from "./infra.module.css";
@@ -35,6 +36,9 @@ const TABS: { id: Tab; label: string }[] = [
   { id: "room", label: "サーバー室" },
   { id: "study", label: "勉強部屋" },
 ];
+
+/** 勉強部屋の教科 */
+const SUBJECTS = [LDAP_SUBJECT, MAIL_SUBJECT] as const;
 
 /** おまけ「このアプリの裏側」が開くステージ（CDN まで習ったら） */
 const BACKSTAGE_AFTER = "s6";
@@ -49,7 +53,10 @@ export function InfraApp() {
   const roomParam = params.get("room");
   const roomScreen = tab === "room" && isRoomScreen(roomParam) ? roomParam : null;
   const cardParam = params.get("card");
-  const studyCard = tab === "study" && isStudyScreen(cardParam) ? cardById(cardParam) : undefined;
+  const subject = params.get("s") === "mail" ? MAIL_SUBJECT : LDAP_SUBJECT;
+  /** 勉強部屋の URL の教科の部分（LDAP は書かない） */
+  const subjQ = subject.id === "mail" ? "&s=mail" : "";
+  const studyCard = tab === "study" && cardParam ? subject.cards.find((c) => c.id === cardParam) : undefined;
   const [progress, setProgress] = useState<Progress>(emptyProgress);
   const [loaded, setLoaded] = useState(false);
   const pushed = useRef(false);
@@ -82,8 +89,8 @@ export function InfraApp() {
       window.history.back();
       return;
     }
-    go(tab === "stages" ? "" : `tab=${tab}`, false);
-  }, [go, tab]);
+    go(tab === "stages" ? "" : `tab=${tab}${tab === "study" ? subjQ : ""}`, false);
+  }, [go, tab, subjQ]);
 
   const stage = stageId ? stageById(stageId) : undefined;
   const stageIndex = stage ? STAGES.indexOf(stage) : -1;
@@ -123,11 +130,11 @@ export function InfraApp() {
   }
 
   if (studyCard && loaded) {
-    const idx = CARDS.indexOf(studyCard);
-    const nextCard = CARDS[idx + 1];
+    const idx = subject.cards.indexOf(studyCard);
+    const nextCard = subject.cards[idx + 1];
     return (
       <div className={styles.shell}>
-        <StudyScreen key={studyCard.id} card={studyCard} onExit={back} onNext={nextCard ? () => go(`tab=study&card=${nextCard.id}`, false) : null} />
+        <StudyScreen key={studyCard.id} subject={subject} card={studyCard} onExit={back} onNext={nextCard ? () => go(`tab=study${subjQ}&card=${nextCard.id}`, false) : null} />
       </div>
     );
   }
@@ -204,7 +211,14 @@ export function InfraApp() {
         {tab === "glossary" ? <Glossary unlocked={terms} /> : null}
         {tab === "lab" && loaded ? <Lab parts={labParts} /> : null}
         {tab === "room" && loaded ? <RoomMenu onOpen={(id) => go(`tab=room&room=${id}`, true)} /> : null}
-        {tab === "study" && loaded ? <StudyMenu onOpen={(id) => go(`tab=study&card=${id}`, true)} /> : null}
+        {tab === "study" && loaded ? (
+          <StudyMenu
+            subjects={SUBJECTS}
+            subject={subject}
+            onPick={(id) => go(`tab=study${id === "mail" ? "&s=mail" : ""}`, false)}
+            onOpen={(id) => go(`tab=study${subjQ}&card=${id}`, true)}
+          />
+        ) : null}
       </div>
     </div>
   );
