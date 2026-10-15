@@ -192,4 +192,33 @@ test('construction plays an effect: a new building rises from the ground, then s
   assert.equal(life.rise(tile), 1);
   assert.equal(life.rise(game.indexAt(2, 5)), 1, 'Other buildings are unaffected');
 });
+test('park visitors use the furniture: children swing and slide, grown-ups sit, and nobody shares a seat', () => {
+  const town = street(), idx = game.indexAt;
+  for (let y = 9; y < 11; y++) for (let x = 4; x < 7; x++) town.tiles[idx(x, y)] = 'park';
+  town.parks = [{ id: idx(4, 9), x: 4, y: 9, width: 3, height: 2, kind: 'park', parts: [
+    { tile: idx(4, 9), kind: 'swings', rotation: 0 }, { tile: idx(5, 9), kind: 'playground', rotation: 1 }, { tile: idx(6, 9), kind: 'sandbox', rotation: 0 },
+    { tile: idx(4, 10), kind: 'bench', rotation: 0 }, { tile: idx(5, 10), kind: 'picnic', rotation: 0 }, { tile: idx(6, 10), kind: 'fountain', rotation: 0 }] }];
+  const life = new TownLife(), day = env('2026-10-14', 15), used = new Set();
+  life.sync(town, new Map());
+  for (let j = 0; j < 3600; j++) {
+    life.update(1 / 30, 1 / 30, day);
+    const busy = life.visitors.filter(v => v.spot && v.using >= 0);
+    assert.equal(new Set(busy.map(v => v.spot)).size, busy.length, 'One person per swing seat, bench place or slide');
+    for (const v of busy) {
+      used.add(v.spot.split(':')[1]);
+      if (/swings|playground|sandbox/.test(v.spot)) assert.equal(v.look.kind, 'child', 'Only children play on the equipment');
+    }
+  }
+  for (const kind of ['swings', 'playground', 'bench']) assert(used.has(kind), `Someone used the ${kind}`);
+  const draws = [];
+  life.collect((x, y, depth, paint) => draws.push(paint), town, day, 0, 2);
+  assert(draws.length > 0);
+  paint.paintState.liveSwings = true;
+  const recorded = recordingContext(); for (const d of draws) d(recorded.c);
+  paint.resetPaintState();
+  // Removing the swings sends their riders off to do something else.
+  town.parks = [{ ...town.parks[0], parts: town.parks[0].parts.filter(p => p.kind !== 'swings') }];
+  life.sync(town, new Map());
+  assert(!life.visitors.some(v => v.spot && v.spot.includes('swings')));
+});
 console.log(`${passed} living town checks passed`);

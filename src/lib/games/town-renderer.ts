@@ -1033,7 +1033,7 @@ export class TownScene {
   }
   /** Season palettes and snow change artwork, so they take part in the cache keys. */
   private look() {
-    return `${paintState.season}:${paintState.blossom > .15 ? "b" : ""}${Math.round(paintState.foliage * 8)}:${Math.round(paintState.bare * 8)}:${paintState.lush > .35 ? "l" : ""}${paintState.snow ? ":s" : ""}${paintState.liveClocks ? ":c" : ""}`;
+    return `${paintState.season}:${paintState.blossom > .15 ? "b" : ""}${Math.round(paintState.foliage * 8)}:${Math.round(paintState.bare * 8)}:${paintState.lush > .35 ? "l" : ""}${paintState.snow ? ":s" : ""}${paintState.liveClocks ? ":c" : ""}${paintState.liveSwings ? ":w" : ""}`;
   }
   private prepareObjects(town: Town) {
     const look = this.look();
@@ -1144,7 +1144,7 @@ export class TownScene {
     if (!env) return;
     Object.assign(paintState, {
       litThreshold: env.windows === "late" ? .8 : .25, shopsOpen: env.shopsOpen, snow: env.snowCover, season: env.season,
-      blossom: env.blossom, foliage: env.foliage, bare: env.bare, lush: env.lush, liveClocks: true,
+      blossom: env.blossom, foliage: env.foliage, bare: env.bare, lush: env.lush, liveClocks: true, liveSwings: true,
     });
   }
   render(c: CanvasRenderingContext2D, width: number, height: number, town: Town, options: SceneOptions, dt: number) {
@@ -1330,7 +1330,10 @@ export class TownScene {
     if (env) { drawSplashes(c, env, ambient, reduced); this.life.overlay(c, env, ambient, night, reduced); }
     for (const i of previewTiles) {
       if (options.tool === "decorate" && options.parkPart !== "remove" && allowedAt(i)) {
+        // The ghost of a new swing keeps its seats: nobody swings on it yet.
+        const live = paintState.liveSwings; paintState.liveSwings = false;
         c.save(); c.globalAlpha *= .5; parkPart(c, options.parkPart ?? "tree", i % MAP_SIZE, Math.floor(i / MAP_SIZE), options.partRotation ?? 0, night >= .5); c.restore();
+        paintState.liveSwings = live;
       } else if (allowedAt(i) && ["house", "shop", "factory", "station", "home"].includes(options.tool)) {
         c.save(); c.globalAlpha *= .55; building(c, options.tool as Tile, i % MAP_SIZE, Math.floor(i / MAP_SIZE), 1, night >= .5, time, true, stationAxis(town, i), transportMask(town, i, "road")); c.restore();
       }
