@@ -574,6 +574,7 @@ export function TownBuilder({ userId }: { userId: string }) {
       </div>
       <button type="button" className={styles.budget} aria-label={`白コイン ${F.format(snapshot?.balance ?? 0)}枚。もらい方を見る`} disabled={welcome || !loaded} onClick={() => { chooseMode("inspect"); setRpgTab("quests"); setPanel("quests"); }}><span>白コイン</span><strong title={`${F.format(snapshot?.balance ?? 0)}枚`}><WhiteCoinArt />{(snapshot?.balance ?? 0) >= 1e7 ? `約${compactMoney.format(snapshot?.balance ?? 0)}` : F.format(snapshot?.balance ?? 0)}</strong><small aria-live="polite">{busy ? "保存中…" : refreshing ? "最新情報を確認中…" : saveStatus}</small></button>
     </header>
+    <div className={styles.hudRow}>
     <div ref={statsRef} className={styles.stats} aria-label="街の状況">
       {[{ icon: "people", label: "人口", value: F.format(stats.population), unit: "人" },
         { icon: "leaf", label: "満足度", value: String(stats.happiness), unit: "%" },
@@ -585,6 +586,7 @@ export function TownBuilder({ userId }: { userId: string }) {
     {environment && <button type="button" className={styles.skyChip} aria-label={`${sky.placeName} ${townClockLabel(environment)} ${skyWord(environment)}${environment.temperature === null ? "" : ` ${Math.round(environment.temperature)}度`}。空と天気の設定`} disabled={welcome} onClick={() => { if (mode === "decorate") chooseMode("inspect"); setPanel("view"); }}>
       <span aria-hidden="true">{skyIcon(environment)}</span><b>{townClockLabel(environment)}</b>{environment.temperature !== null && <small>{Math.round(environment.temperature)}℃</small>}<em>{environment.live ? sky.placeName : "表示中"}</em>
     </button>}
+    </div>
     <div className={styles.sceneButtons}>
       <button type="button" aria-label={town.paused ? "時間を再開" : "時間を停止"} disabled={welcome || !loaded} onClick={() => setTown(t => ({ ...t, paused: !t.paused }))}>{town.paused ? "▶" : "Ⅱ"}</button>
       <button type="button" title="マップ全体を表示" aria-label="マップ全体を表示" onClick={() => sceneRef.current?.fit(sizeRef.current.width, sizeRef.current.height)}><Glyph name="fit" /></button>

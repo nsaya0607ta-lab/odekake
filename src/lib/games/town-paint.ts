@@ -17,9 +17,11 @@ export const paintState = {
   lush: 0,
   /** Live clocks are drawn as animated hands on top of the dial artwork. */
   liveClocks: false,
+  /** Swing seats hang from the moving layer (so children can swing on them) instead of the cached frame. */
+  liveSwings: false,
 };
 export function resetPaintState() {
-  Object.assign(paintState, { litThreshold: .25, shopsOpen: true, snow: false, season: "default", blossom: 0, foliage: 0, bare: 0, lush: 0, liveClocks: false });
+  Object.assign(paintState, { litThreshold: .25, shopsOpen: true, snow: false, season: "default", blossom: 0, foliage: 0, bare: 0, lush: 0, liveClocks: false, liveSwings: false });
 }
 
 /** Multiplied into everything that is not a light source once it is fully dark. */

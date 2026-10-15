@@ -23,7 +23,41 @@ function stroke(c: CanvasRenderingContext2D, ax: number, ay: number, bx: number,
 type Door = { tile: number; kind: Tile; road: number; dx: number; dy: number };
 type Look = { top: string; bottom: string; hair: string; skin: string; accent: string; umbrella: string; scale: number; bag: "none" | "randoseru" | "tote" | "briefcase"; hat: boolean; parasol: boolean; dog: string | null; kind: "adult" | "child" | "elder" | "jogger" };
 type Walker = { points: Point[]; lengths: number[]; total: number; s: number; speed: number; look: Look; seed: number; phase: number };
-type Visitor = { lot: number; x: number; y: number; tx: number; ty: number; rest: number; life: number; age: number; look: Look; seed: number; sit: boolean; play: boolean; phase: number };
+/** A place in a park where someone does something: swings, slides, digs in the sand, sits or looks. */
+type SpotKind = "swing" | "slide" | "sand" | "seat" | "watch";
+type Spot = { key: string; lot: number; kind: SpotKind; x: number; y: number; tile: number; rotation: number; u: number; v: number; z: number; facing: number; child: boolean };
+/** `spot` is the place they are heading to or using; `using` counts seconds of use (below 0 while still walking there). */
+type Visitor = { lot: number; x: number; y: number; tx: number; ty: number; rest: number; life: number; age: number; look: Look; seed: number; phase: number; spot: string | null; using: number; duration: number };
+/** Local (u, v) inside a tile, turned the same way as the park artwork. */
+const turn = (x: number, y: number, rotation: number, u: number, v: number): Point => {
+  const r = ((rotation % 4) + 4) % 4;
+  return r === 1 ? { x: x + 1 - v, y: y + u } : r === 2 ? { x: x + 1 - u, y: y + 1 - v } : r === 3 ? { x: x + v, y: y + 1 - u } : { x: x + u, y: y + v };
+};
+/** +1 when a local direction points towards the viewer on screen. */
+const facingOf = (rotation: number, du: number, dv: number) => { const a = turn(0, 0, rotation, du, dv), o = turn(0, 0, rotation, 0, 0); return a.x - o.x + a.y - o.y >= 0 ? 1 : -1; };
+/** Swing seats hang below the top bar; the pendulum swings along the seat's local v. */
+const SWING_SEATS = [.365, .625];
+const swingSeat = (angle: number) => ({ v: .55 + Math.sin(angle) * .42, z: 25 - 18 * Math.cos(angle) });
+/** One trip round the slide: up the steps, across the deck, down the chute and back round to the steps. */
+const SLIDE: { from: [number, number, number]; to: [number, number, number]; time: number; sit?: boolean; via?: [number, number][] }[] = [
+  { from: [.28, .05, 0], to: [.30, .22, 14], time: 1.5 },
+  { from: [.30, .22, 14], to: [.365, .47, 14], time: .6 },
+  { from: [.365, .52, 13.5], to: [.555, .88, 2], time: .75, sit: true },
+  { from: [.555, .88, 2], to: [.6, .97, 0], time: .35 },
+  { from: [.6, .97, 0], to: [.28, .05, 0], time: 3.4, via: [[.9, .8], [.9, .08]] },
+];
+const SLIDE_TIME = SLIDE.reduce((sum, s) => sum + s.time, 0);
+function slidePose(t: number) {
+  let k = ((t % SLIDE_TIME) + SLIDE_TIME) % SLIDE_TIME;
+  for (const seg of SLIDE) {
+    if (k > seg.time) { k -= seg.time; continue; }
+    const f = k / seg.time;
+    if (!seg.via) return { u: seg.from[0] + (seg.to[0] - seg.from[0]) * f, v: seg.from[1] + (seg.to[1] - seg.from[1]) * f, z: seg.from[2] + (seg.to[2] - seg.from[2]) * f, sit: Boolean(seg.sit), du: seg.to[0] - seg.from[0], dv: seg.to[1] - seg.from[1] };
+    const pts = [{ x: seg.from[0], y: seg.from[1] }, ...seg.via.map(([x, y]) => ({ x, y })), { x: seg.to[0], y: seg.to[1] }], line = { points: pts, ...polyline(pts) }, q = at(line, f * line.total);
+    return { u: q.x, v: q.y, z: 0, sit: false, du: q.dx, dv: q.dy };
+  }
+  return { u: .28, v: .05, z: 0, sit: false, du: 0, dv: 1 };
+}
 type Duck = { x: number; y: number; heading: number; speed: number; seed: number; pond: boolean; turn: number };
 type Effect = { kind: "build" | "remove" | "upgrade" | "part"; x: number; y: number; start: number };
 type Spark = { x: number; y: number; z: number; vx: number; vy: number; vz: number; color: string; start: number; life: number; size: number };
@@ -129,6 +163,8 @@ export class TownLife {
   private roads = new Map<number, number[]>();
   private water: number[] = [];
   private parks: ParkLot[] = [];
+  private spots = new Map<string, Spot>();
+  private swings: { tile: number; rotation: number }[] = [];
   private blooms: Point[] = [];
   private chimneys: { x: number; y: number; z: number; seed: number }[] = [];
   private tiles: Tile[] | null = null;
@@ -159,6 +195,7 @@ export class TownLife {
     this.population = town.tiles.reduce((sum, t, i) => sum + (t === "house" ? 18 * (town.levels[i] || 1) : 0), 0);
     this.blooms = [];
     for (const lot of town.parks) for (const part of lot.parts) if (["flowers", "arch", "cherry"].includes(part.kind)) this.blooms.push({ x: part.tile % MAP_SIZE + .5, y: Math.floor(part.tile / MAP_SIZE) + .5 });
+    this.buildSpots(town.parks);
     for (let i = 0; i < town.tiles.length; i++) if (town.tiles[i] === "grass" && hash(i * 3) > .63 && hash(i * 5) > .8) this.blooms.push({ x: i % MAP_SIZE + .5, y: Math.floor(i / MAP_SIZE) + .5 });
     if (tilesChanged) {
       // People whose street was removed step aside; ducks stay on water.
@@ -172,6 +209,47 @@ export class TownLife {
       }
       this.ducks = this.ducks.filter(d => !d.pond).concat(ponds.slice(0, 6).map((tile, j) => ({ x: tile % MAP_SIZE + .5, y: Math.floor(tile / MAP_SIZE) + .5, heading: j, speed: .03, seed: tile, pond: true, turn: 0 })));
     }
+  }
+  /** Where people use the park furniture. Rebuilt with the parks; anyone whose spot was removed walks on. */
+  private buildSpots(parks: ParkLot[]) {
+    this.spots.clear(); this.swings = [];
+    for (const lot of parks) for (const part of lot.parts) {
+      const x = part.tile % MAP_SIZE, y = Math.floor(part.tile / MAP_SIZE), r = part.rotation;
+      const spot = (slot: number, kind: SpotKind, u: number, v: number, z: number, du: number, dv: number, child = false) => {
+        const p = turn(x, y, r, u, v), key = `${part.tile}:${part.kind}:${slot}`;
+        this.spots.set(key, { key, lot: lot.id, kind, x: p.x, y: p.y, tile: part.tile, rotation: r, u, v, z, facing: facingOf(r, du, dv), child });
+      };
+      switch (part.kind) {
+        case "swings": this.swings.push({ tile: part.tile, rotation: r }); SWING_SEATS.forEach((u, j) => spot(j, "swing", u, .8, 0, 0, 1, true)); break;
+        case "playground": spot(0, "slide", .28, .05, 0, 0, 1, true); break;
+        case "sandbox": spot(0, "sand", .45, .6, 3.2, 0, 1, true); spot(1, "sand", .64, .4, 3.2, -1, 0, true); break;
+        case "bench": spot(0, "seat", .36, .5, 5.6, 0, 1); spot(1, "seat", .64, .5, 5.6, 0, 1); break;
+        case "picnic": spot(0, "seat", .36, .23, 6, 0, 1); spot(1, "seat", .64, .23, 6, 0, 1); spot(2, "seat", .4, .8, 6, 0, -1); spot(3, "seat", .62, .8, 6, 0, -1); break;
+        case "gazebo": spot(0, "seat", .5, .3, 9.4, 0, 1); spot(1, "seat", .3, .58, 9.4, 1, 0); break;
+        case "fountain": spot(0, "watch", .5, .95, 1, 0, -1, true); spot(1, "watch", .95, .55, 1, -1, 0); spot(2, "watch", .08, .45, 1, 1, 0); break;
+        case "pond": spot(0, "watch", .5, .96, 1, 0, -1, true); spot(1, "watch", .96, .6, 1, -1, 0); break;
+        case "cherry": case "flowers": case "sculpture": case "clock": case "arch": spot(0, "watch", .5, .93, 1, 0, -1); break;
+      }
+    }
+    for (const v of this.visitors) if (v.spot && !this.spots.has(v.spot)) this.leaveSpot(v);
+  }
+  private occupied(key: string, except?: Visitor) { return this.visitors.some(v => v !== except && v.spot === key); }
+  /** Choose something to do in the park; children like the play equipment, grown-ups the seats and the view. */
+  private chooseSpot(v: Visitor) {
+    const r = this.random, child = v.look.kind === "child";
+    const free = [...this.spots.values()].filter(s => s.lot === v.lot && (child ? s.child : s.kind === "seat" || s.kind === "watch") && !this.occupied(s.key, v));
+    if (!free.length || r.next() < .2) return false;
+    const spot = r.pick(free);
+    v.spot = spot.key; v.using = -1;
+    v.duration = spot.kind === "slide" ? SLIDE_TIME * (2 + Math.floor(r.next() * 3)) : spot.kind === "swing" ? 9 + r.next() * 10 : spot.kind === "seat" ? 12 + r.next() * 20 : 6 + r.next() * 8;
+    v.tx = spot.x; v.ty = spot.y;
+    return true;
+  }
+  private leaveSpot(v: Visitor) {
+    const spot = v.spot ? this.spots.get(v.spot) : undefined;
+    // Step off in front of the thing they used, then wander or pick the next thing.
+    if (spot && v.using >= 0) { const p = spot.kind === "swing" ? turn(Math.floor(spot.tile % MAP_SIZE), Math.floor(spot.tile / MAP_SIZE), spot.rotation, spot.u, .92) : { x: spot.x, y: spot.y }; v.x = p.x; v.y = p.y; }
+    v.spot = null; v.using = 0; v.tx = v.x; v.ty = v.y; v.rest = .5 + this.random.next() * 1.5;
   }
   /** Construction feedback: rising dust for a new building, a dust cloud for demolition, sparkles for upgrades. */
   changed(before: Town, after: Town) {
@@ -330,15 +408,16 @@ export class TownLife {
     const speed = (kind === "jogger" ? .55 : kind === "child" ? .3 : kind === "elder" ? .17 : .24) * (.9 + r.next() * .2) * (env.rain > .5 ? 1.15 : 1);
     this.walkers.push({ points, lengths, total, s: 0, speed, look: this.look(env, kind, purpose), seed: Math.floor(r.next() * 1e6), phase: r.next() * TAU });
   }
-  private spawnVisitor(env: TownEnvironment) {
+  private spawnVisitor(env: TownEnvironment): Visitor | undefined {
     if (!this.parks.length) return;
     const r = this.random, lot = r.pick(this.parks), cells = lotTiles(lot), cell = r.pick(cells);
-    const bench = lot.parts.find(p => (p.kind === "bench" || p.kind === "picnic") && r.next() < .5);
-    const playful = lot.parts.find(p => (p.kind === "playground" || p.kind === "swings" || p.kind === "sandbox") && r.next() < .6);
-    const kind: Look["kind"] = playful ? "child" : r.next() < .3 ? "elder" : "adult";
-    const target = bench ?? playful;
+    const play = [...this.spots.values()].some(s => s.lot === lot.id && s.child && s.kind !== "watch");
+    const kind: Look["kind"] = play && r.next() < .6 ? "child" : r.next() < .3 ? "elder" : "adult";
     const x = cell % MAP_SIZE + .2 + r.next() * .6, y = Math.floor(cell / MAP_SIZE) + .2 + r.next() * .6;
-    this.visitors.push({ lot: lot.id, x, y, tx: target ? target.tile % MAP_SIZE + .5 : x, ty: target ? Math.floor(target.tile / MAP_SIZE) + .62 : y, rest: 0, life: 25 + r.next() * 40, age: 0, look: this.look(env, kind, "walk"), seed: Math.floor(r.next() * 1e6), sit: Boolean(bench), play: Boolean(playful), phase: r.next() * TAU });
+    const v: Visitor = { lot: lot.id, x, y, tx: x, ty: y, rest: 0, life: 30 + r.next() * 40, age: 0, look: this.look(env, kind, "walk"), seed: Math.floor(r.next() * 1e6), phase: r.next() * TAU, spot: null, using: 0, duration: 0 };
+    this.visitors.push(v);
+    this.chooseSpot(v);
+    return v;
   }
   /** Advance people and animals. `dt` follows the town speed; `ambientDt` is real time. */
   update(dt: number, ambientDt: number, env: TownEnvironment) {
@@ -346,12 +425,16 @@ export class TownLife {
     this.time += ambientDt;
     const r = this.random, daylight = 1 - env.night;
     const walkers = Math.round(Math.min(64, 4 + population / 12) * env.activity);
-    const visitors = Math.round(Math.min(26, this.parks.length * 4) * env.activity * (.25 + daylight * .75) * (env.rain > .3 || env.snow > 0 ? .15 : 1));
+    const visitors = Math.round(Math.min(32, this.parks.length * 3 + this.spots.size * .6) * env.activity * (.25 + daylight * .75) * (env.rain > .3 || env.snow > 0 ? .15 : 1));
     if (!this.started && this.doors.length > 1) {
       // Open the town mid-day rather than empty: people are already on their way, part-way along.
       this.started = true;
       for (let j = 0; j < walkers; j++) { this.spawnWalker(env); const w = this.walkers[this.walkers.length - 1]; if (w) w.s = r.next() * w.total * .9; }
-      for (let j = 0; j < visitors; j++) { this.spawnVisitor(env); const v = this.visitors[this.visitors.length - 1]; if (v) { v.age = 1 + r.next() * v.life * .5; v.x = v.tx + (r.next() - .5) * .2; v.y = v.ty + (r.next() - .5) * .2; } }
+      for (let j = 0; j < visitors; j++) {
+        const v = this.spawnVisitor(env); if (!v) continue;
+        v.age = 1 + r.next() * v.life * .5;
+        if (v.spot) { v.x = v.tx; v.y = v.ty; v.using = r.next() * v.duration * .6; } else { v.x = v.tx + (r.next() - .5) * .2; v.y = v.ty + (r.next() - .5) * .2; }
+      }
     }
     this.spawnClock -= dt;
     if (this.spawnClock <= 0) {
@@ -363,14 +446,22 @@ export class TownLife {
     this.walkers = this.walkers.filter(w => w.s < w.total);
     for (const v of this.visitors) {
       v.age += dt; v.phase += dt * 9;
+      if (v.spot && v.using >= 0) {
+        // Using something runs on real time, so the town speed does not make a swing fly round.
+        v.using += ambientDt;
+        if (v.using >= v.duration) { this.leaveSpot(v); if (v.age < v.life - 8 && r.next() < .5) this.chooseSpot(v); else v.life = Math.max(v.life, v.age + .6); }
+        continue;
+      }
       const d = Math.hypot(v.tx - v.x, v.ty - v.y);
       if (d > .03) { const step = Math.min(d, dt * .2); v.x += (v.tx - v.x) / d * step; v.y += (v.ty - v.y) / d * step; }
-      else if (!v.sit && !v.play && (v.rest -= dt) <= 0) {
+      else if (v.spot) v.using = 0;
+      else if ((v.rest -= dt) <= 0) {
         const lot = this.parks.find(l => l.id === v.lot);
-        if (lot) { v.tx = lot.x + .2 + r.next() * (lot.width - .4); v.ty = lot.y + .2 + r.next() * (lot.height - .4); v.rest = 2 + r.next() * 5; }
+        if (lot && !(r.next() < .45 && this.chooseSpot(v))) { v.tx = lot.x + .2 + r.next() * (lot.width - .4); v.ty = lot.y + .2 + r.next() * (lot.height - .4); v.rest = 2 + r.next() * 5; }
       }
     }
-    this.visitors = this.visitors.filter(v => v.age < v.life && this.parks.some(l => l.id === v.lot));
+    // Nobody vanishes in mid-swing: people finish what they are doing before they go home.
+    this.visitors = this.visitors.filter(v => (v.age < v.life || v.spot && v.using >= 0) && this.parks.some(l => l.id === v.lot));
     for (const duck of this.ducks) {
       if (env.night > .7) continue;
       duck.turn -= dt;
@@ -414,15 +505,63 @@ export class TownLife {
         if (fade < 1) c.restore();
       }, { left: -10, top: -18, width: 20, height: 22 });
     }
+    const riders = new Map<string, Visitor>();
     for (const v of this.visitors) {
-      const fade = Math.min(1, v.age / .6, (v.life - v.age) / .6), seated = v.sit && Math.hypot(v.tx - v.x, v.ty - v.y) < .04;
-      const jump = v.play && Math.hypot(v.tx - v.x, v.ty - v.y) < .04 ? Math.abs(Math.sin(v.phase * .45)) * 2.2 : 0;
-      const p = iso(v.x, v.y, seated ? 4.5 : 1), moving = Math.hypot(v.tx - v.x, v.ty - v.y) > .03;
-      add(v.x, v.y, .03, c => {
+      const spot = v.spot && v.using >= 0 ? this.spots.get(v.spot) : undefined;
+      if (spot?.kind === "swing") { riders.set(spot.key, v); continue; }
+      const fade = Math.min(1, v.age / .6, Math.max(0, v.life - v.age) / .6 || (spot ? 1 : 0));
+      const bounds = { left: -10, top: -20, width: 20, height: 24 };
+      const draw = (c: CanvasRenderingContext2D, paint: () => void) => {
         if (fade < 1) { c.save(); c.globalAlpha *= Math.max(0, fade); }
-        drawPerson(c, p, v.look, moving ? v.phase : 0, v.ty >= v.y ? 1 : -1, night, { rain, sit: seated, jump, detail });
+        paint();
         if (fade < 1) c.restore();
-      }, { left: -10, top: -20, width: 20, height: 24 });
+      };
+      if (spot?.kind === "slide") {
+        const tx = spot.tile % MAP_SIZE, ty = Math.floor(spot.tile / MAP_SIZE), pose = slidePose(v.using), w = turn(tx, ty, spot.rotation, pose.u, pose.v), p = iso(w.x, w.y, pose.z + 1);
+        const facing = facingOf(spot.rotation, pose.du, pose.dv);
+        // Above the playground artwork while on the steps, deck or chute; on the ground they sort like anyone else.
+        add(pose.z > 0 ? tx + .5 : w.x, pose.z > 0 ? ty + .5 : w.y, pose.z > 0 ? .56 : .03, c => draw(c, () => {
+          drawPerson(c, p, v.look, pose.sit ? 0 : v.using * 9, facing, night, { rain, sit: pose.sit, detail });
+          if (pose.sit && detail && hash(v.seed) > .4) stroke(c, p.x - 1.4 * v.look.scale, p.y - 6.2 * v.look.scale, p.x - 2.6 * v.look.scale, p.y - 8.6 * v.look.scale, shade(v.look.top, night), .7 * v.look.scale);
+        }), { left: -10, top: -20, width: 20, height: 24 });
+        continue;
+      }
+      if (spot) {
+        const p = iso(spot.x, spot.y, spot.z), sway = spot.kind === "watch" ? Math.sin(v.using * .8 + v.seed) * .35 : 0;
+        // Children at the fountain hop; at the sandbox they crouch and scoop.
+        const jump = spot.kind === "watch" && v.look.kind === "child" ? Math.max(0, Math.sin(v.using * 4.2)) * 1.8 : 0;
+        add(spot.x, spot.y, spot.kind === "seat" ? .4 : .03, c => draw(c, () => {
+          drawPerson(c, { x: p.x + sway, y: p.y }, v.look, 0, spot.facing, night, { rain, sit: spot.kind === "seat" || spot.kind === "sand", jump, detail });
+          if (spot.kind === "sand") {
+            const k = (v.using * .9 + hash(v.seed)) % 1, hand = { x: p.x - 1.6 * v.look.scale, y: p.y - 2.6 };
+            stroke(c, p.x - 1 * v.look.scale, p.y - 5.4 * v.look.scale, hand.x, hand.y - Math.sin(k * Math.PI) * 1.2, shade(v.look.top, night), .8 * v.look.scale);
+            if (k > .45) for (let j = 0; j < 3; j++) { const q = (k - .45) / .55; ellipse(c, hand.x - 1.5 * q - j * .6, hand.y - 2.6 * Math.sin(q * Math.PI) + j * .5, .45, .3, shade(j % 2 ? "#e4ce9d" : "#bfa76f", night)); }
+          }
+        }), bounds);
+        continue;
+      }
+      const p = iso(v.x, v.y, 1), moving = Math.hypot(v.tx - v.x, v.ty - v.y) > .03;
+      add(v.x, v.y, .03, c => draw(c, () => drawPerson(c, p, v.look, moving ? v.phase : 0, v.ty >= v.y ? 1 : -1, night, { rain, detail })), bounds);
+    }
+    // Swing seats hang here rather than in the cached artwork, so they can carry a child back and forth.
+    const windSway = Math.min(.12, env.wind / 120);
+    for (const { tile, rotation } of this.swings) {
+      const tx = tile % MAP_SIZE, ty = Math.floor(tile / MAP_SIZE), facing = facingOf(rotation, 0, 1);
+      const at3 = (u: number, v: number, z: number) => { const w = turn(tx, ty, rotation, u, v); return iso(w.x, w.y, z); };
+      add(tx + .5, ty + .5, .55, c => {
+        SWING_SEATS.forEach((u, j) => {
+          const rider = riders.get(`${tile}:swings:${j}`);
+          // Pump up to full height, then slow down before hopping off.
+          const ramp = rider ? Math.min(1, rider.using / 3, Math.max(0, rider.duration - rider.using) / 2.5) : 0;
+          const angle = rider ? ramp * .75 * Math.sin(rider.using * 2.4 + j) : windSway * Math.sin(this.time * 1.3 + j * 1.7 + tile);
+          const seat = swingSeat(angle);
+          for (const a of [-.055, .055]) stroke(c, at3(u + a, .48, 25).x, at3(u + a, .48, 25).y, at3(u + a, seat.v, seat.z + .6).x, at3(u + a, seat.v, seat.z + .6).y, shade("#d6d7b9", night), .65);
+          const corners = [at3(u - .065, seat.v - .05, seat.z), at3(u + .065, seat.v - .05, seat.z), at3(u + .065, seat.v + .05, seat.z), at3(u - .065, seat.v + .05, seat.z)];
+          c.beginPath(); corners.forEach((q, k) => k ? c.lineTo(q.x, q.y) : c.moveTo(q.x, q.y)); c.closePath(); c.fillStyle = shade("#be9167", night); c.fill();
+          c.beginPath(); c.moveTo(corners[3]!.x, corners[3]!.y); c.lineTo(corners[2]!.x, corners[2]!.y); c.lineTo(corners[2]!.x, corners[2]!.y + 1); c.lineTo(corners[3]!.x, corners[3]!.y + 1); c.closePath(); c.fillStyle = shade("#926b4e", night); c.fill();
+          if (rider) drawPerson(c, at3(u, seat.v, seat.z), rider.look, 0, facing, night, { rain, sit: true, detail });
+        });
+      }, { left: -40, top: -50, width: 80, height: 74 });
     }
     for (const duck of this.ducks) {
       const p = iso(duck.x, duck.y), dir = Math.cos(duck.heading) - Math.sin(duck.heading) >= 0 ? 1 : -1, bob = Math.sin(this.time * 2 + duck.seed) * .25, asleep = env.night > .7;
