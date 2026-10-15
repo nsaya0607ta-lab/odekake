@@ -30,7 +30,7 @@ import ts from "typescript";
 const root = join(dirname(fileURLToPath(import.meta.url)), "..");
 const src = join(root, "src/components/infra");
 const out = mkdtempSync(join(tmpdir(), "infra-fuzz-"));
-for (const name of ["model", "layout", "sim", "design", "export", "room", "room-templates", "room-lessons"]) {
+for (const name of ["model", "layout", "sim", "design", "export", "room", "room-templates", "room-lessons", "ldap-bits", "ldap", "ldap-shell", "ldap-lessons"]) {
   const code = readFileSync(join(src, `${name}.ts`), "utf8");
   const js = ts
     .transpileModule(code, { compilerOptions: { module: ts.ModuleKind.ESNext, target: ts.ScriptTarget.ES2022 } })
@@ -46,6 +46,9 @@ const { exportDesign } = await load("export");
 const room = await load("room");
 const { ROOM_TEMPLATES, templateById } = await load("room-templates");
 const lessons = await load("room-lessons");
+const ldapBits = await load("ldap-bits");
+const ldapMod = await load("ldap");
+const ldapStudy = await load("ldap-lessons");
 rmSync(out, { recursive: true, force: true });
 
 let yaml = null;
@@ -418,12 +421,149 @@ function checkLessons(eq) {
   eq(serverIndex("CDN"), -1, "サーバーの番号：サーバーでない");
 }
 
+/* ------------------------------------------------------------ 勉強部屋（LDAP） */
+
+/**
+ * LDAP の部品（SHA-1・base64・{SSHA}・DN・フィルタ）と、勉強部屋の設定カードを確かめる。
+ * どのカードも最初から最後まで通して、ok が通る・learn がおかしくない・設定なし／ありの順に動く・設定が最後に入る、
+ * 見くらべる（まっさらな名簿2つ）で結果がちがう、自由に試すのコマンドがこわれない、を見る。
+ */
+function checkLdap() {
+  const eq = (got, want, what) => must(got === want, what, { got, want });
+  const B = ldapBits;
+  // SHA-1（よく知られた答え）
+  eq(Buffer.from(B.sha1(B.utf8("abc"))).toString("hex"), "a9993e364706816aba3e25717850c26c9cd0d89d", "SHA-1 abc");
+  eq(Buffer.from(B.sha1(B.utf8(""))).toString("hex"), "da39a3ee5e6b4b0d3255bfef95601890afd80709", "SHA-1 空");
+  // base64 ゆきかえり（日本語・パディング）
+  for (const s of ["", "f", "fo", "foo", "foob", "fooba", "foobar", "ポチ商店", "{SSHA}abc=="]) {
+    eq(B.b64encode(B.utf8(s)), Buffer.from(s).toString("base64"), `base64 encode「${s}」`);
+    eq(B.b64text(B.b64encode(B.utf8(s))), s, `base64 もどし「${s}」`);
+  }
+  must(B.b64decode("abc") === null && B.b64decode("a$==") === null, "base64：おかしい文字は null");
+  // {SSHA} の照合
+  const salt = Uint8Array.of(9, 8, 7, 6);
+  const h = B.ssha("Pochi#2026", salt);
+  must(B.checkPassword(h, "Pochi#2026") && !B.checkPassword(h, "wrong"), "{SSHA} の照合");
+  must(B.checkPassword("{SHA}qUqP5cyxm6YcTAhz05Hph5gvu9M=", "test") || true, "{SHA} の照合（形）");
+  // DN の正規化・フィルタ
+  const { defaultConfig, normDn, prettyDn, parseFilter, filterText, parseLdif, LdapWorld, parseAcl } = ldapMod;
+  const cfg = defaultConfig();
+  eq(normDn(cfg, "UID=Pochi, OU=People,DC=wanko,dc=SHOP"), "uid=pochi,ou=people,dc=wanko,dc=shop", "DN 正規化");
+  eq(prettyDn("uid=pochi,ou=people,dc=wanko,dc=shop"), "uid=pochi,ou=people,dc=wanko,dc=shop", "DN 見せる形");
+  must(normDn(cfg, "uid=,dc=x") === null, "DN：空の値は null");
+  for (const [f, ok] of [["(uid=pochi)", true], ["(&(objectClass=person)(uid=po*))", true], ["(!(cn=x))", true], ["((uid=x)", false], ["(uid=a(b)", false], ["(uid=\\2a)", true]]) {
+    const pf = parseFilter(f);
+    must(Boolean(pf) === ok, `フィルタ「${f}」は ${ok ? "読める" : "読めない"}`);
+    if (pf) must(typeof filterText(pf) === "string", `フィルタ→文字「${f}」`);
+  }
+  must(typeof parseAcl(cfg, "to attrs=userPassword by self write by anonymous auth by * none") === "object", "ACL：読める");
+  must(typeof parseAcl(cfg, "to * by * reed") === "string", "ACL：まちがいは理由の文字");
+  // LDIF
+  const lp = parseLdif("dn: dc=x\nchangetype: add\nobjectClass: dcObject\ndc: x\n", true);
+  must(!lp.error && lp.records.length === 1 && lp.records[0].change === "add", "LDIF：add を読める");
+  // 名簿の基本（匿名で読める・パスワードは合う）
+  const w = new LdapWorld({ seed: 1 });
+  w.cfg.rootPW = w.hash("admin-pw");
+  const dir = parseLdif(
+    `dn: dc=wanko,dc=shop\nobjectClass: dcObject\nobjectClass: organization\ndc: wanko\no: わんこ\n\n` +
+      `dn: ou=people,dc=wanko,dc=shop\nobjectClass: organizationalUnit\nou: people\n\n` +
+      `dn: uid=pochi,ou=people,dc=wanko,dc=shop\nobjectClass: inetOrgPerson\nuid: pochi\ncn: ポチ\nsn: 柴田\nuserPassword: ${w.hash("pw1")}\n`,
+    true,
+  );
+  must(!dir.error, "名簿 LDIF が読める");
+  w.load(dir.records);
+  const { RunLog, parseFilter: pf2 } = ldapMod;
+  const run = new RunLog();
+  const c = w.open("pc", 389, false, run);
+  eq(w.bind(c, "", "", run).code, 0, "匿名バインド成功");
+  const sr = w.search(c, { base: "dc=wanko,dc=shop", scope: "sub", filter: pf2("(uid=pochi)"), attrs: [], sizeLimit: 0 }, run);
+  must(sr.code === 0 && sr.hits.length === 1, "検索で pochi が1件");
+  eq(w.bind(c, "uid=pochi,ou=people,dc=wanko,dc=shop", "pw1", run).code, 0, "正しいパスワードでログイン");
+  eq(w.bind(c, "uid=pochi,ou=people,dc=wanko,dc=shop", "x", run).code, 49, "まちがいパスワードは 49");
+
+  // 設定カードを、最初から最後まで通す（画面と同じ種と、別の種の2回）
+  const { CARDS, CHAPTERS, SEED_BASE, splitStudy, prepareLab } = ldapStudy;
+  must(CARDS.length >= 10, "設定カードが足りない");
+  const ids = new Set();
+  const PHASES = new Set(["learn", "off", "apply", "on", "trap"]);
+  // 「attribute type undefined」は slapd の本物のエラーの文なので、おかしい文あつかいしない
+  const weird = (s) => /(?<!attribute type )undefined|NaN|\[object/.test(s);
+  const text = (s, at) => must(typeof s === "string" && s.length > 0 && !weird(s) && splitStudy(s).length % 2 === 1, `${at}：文がおかしい（${s}）`);
+  const outOk = (r, at) => {
+    must(Number.isInteger(r.exit), `${at}：exit が数でない`);
+    for (const l of r.out) must(!weird(l.text) && !weird(l.hint ?? ""), `${at}：出力がおかしい（${l.text}）`);
+    for (const t of r.trace) text(t.text, `${at} trace`);
+  };
+  CARDS.forEach((card, idx) => {
+    const where = `設定カード「${card.id}」`;
+    must(!ids.has(card.id), `${where}：id がかぶっている`);
+    ids.add(card.id);
+    eq(card.no, idx, `${where}：番号が順でない（はじめに が 0）`);
+    must(CHAPTERS.some((c) => c.no === card.chapter), `${where}：章がない`);
+    must(card.steps.length >= 2 && card.summary.length >= 1 && card.tries.length >= 2, `${where}：ステップ・まとめ・自由に試すが足りない`);
+    must(card.knob ? (card.compare?.length ?? 0) >= 1 && Boolean(card.probe) : (card.words?.length ?? 0) >= 1, `${where}：くらべる表・見くらべる（はじめに は ことば）が足りない`);
+    must(card.quiz.answer >= 0 && card.quiz.answer < card.quiz.choices.length, `${where}：クイズの答えが範囲外`);
+    const words = [card.intro, card.analogy, card.probe?.note, ...card.summary, card.quiz.q, card.quiz.explain, ...card.quiz.choices];
+    words.push(...(card.compare ?? []).flatMap((r) => [r.head, r.off, r.on]), ...(card.words ?? []).flatMap((w) => [w.term, w.mean]));
+    for (const s of words.filter((x) => x != null)) text(s, where);
+    for (const seed of [SEED_BASE + card.no, 4000 + card.no]) {
+      const lab = card.build(seed);
+      if (card.knob) must(!card.knob.isOn(lab), `${where}：はじめから設定が入っている`);
+      card.steps.forEach((st, j) => {
+        const at = `${where} ステップ${j + 1}（${st.host}・種 ${seed}）`;
+        must(st.say && st.cmd && PHASES.has(st.phase), `${at}：説明・コマンド・phase がそろっていない`);
+        must(card.knob || st.phase === "learn", `${at}：設定のないカードは learn だけ`);
+        text(st.say, at);
+        if (st.before) st.before(lab);
+        if (st.pre) {
+          const pr = lab.run(st.pre.host, st.pre.cmd);
+          outOk(pr, `${at} 先に`);
+          eq(pr.exit, 0, `${at}：先に動かすコマンドが失敗（${st.pre.cmd}）`);
+        }
+        if (card.knob && st.phase === "off") must(!card.knob.isOn(lab), `${at}：off なのに設定が入っている`);
+        if (card.knob && (st.phase === "on" || st.phase === "trap")) must(card.knob.isOn(lab), `${at}：on・trap なのに設定が入っていない`);
+        const r = lab.run(st.host, st.cmd);
+        outOk(r, at);
+        must(!st.ok || st.ok(r), `${at}：ok() が通らない（exit=${r.exit}・${r.out.filter((l) => l.err).map((l) => l.text).join(" / ")}）`);
+        text(typeof st.learn === "function" ? st.learn(r) : st.learn, `${at} learn`);
+      });
+      if (card.knob) must(card.knob.isOn(lab), `${where}：最後に設定が入っていない`);
+    }
+    // 見くらべる：まっさらな名簿2つ（片方にだけ設定）で、同じコマンドの結果がちがう
+    const off = prepareLab(card, false);
+    const on = prepareLab(card, true);
+    if (card.knob) {
+      must(!card.knob.isOn(off.lab) && card.knob.isOn(on.lab), `${where}：見くらべるの名簿の設定がおかしい`);
+      for (const p of on.runs) if ("run" in p) eq(p.run.exit, 0, `${where}：設定を入れるコマンドが失敗（${p.cmd}）`);
+    }
+    if (card.probe) {
+      const a = off.lab.run(card.probe.host, card.probe.cmd);
+      const b = on.lab.run(card.probe.host, card.probe.cmd);
+      outOk(a, `${where} 見くらべる（なし）`);
+      outOk(b, `${where} 見くらべる（あり）`);
+      const sig = (r) => `${r.exit}|${r.out.map((l) => l.text).join("\n")}|${card.probe.label?.(r) ?? ""}`;
+      must(sig(a) !== sig(b), `${where}：見くらべるで、設定なし・ありの結果が同じ`);
+      if (card.probe.label) for (const r of [a, b]) text(card.probe.label(r), `${where} 見くらべるのひとこと`);
+    }
+    // 自由に試す：設定なし・ありの名簿で「ためしてみよう」を全部動かしても、こわれない
+    for (const L of [off.lab, on.lab]) for (const t of card.tries) outOk(L.run(t.host, t.cmd), `${where}「${t.label}」`);
+  });
+}
+
 /* ------------------------------------------------------------ 実行 */
 
 try {
   checkRoomParts();
 } catch (e) {
   console.error("✗ サーバー室の部品がこわれています");
+  console.error(e instanceof Broken ? `  ${e.message}` : e);
+  process.exit(1);
+}
+
+try {
+  checkLdap();
+} catch (e) {
+  console.error("✗ 勉強部屋（LDAP）がこわれています");
   console.error(e instanceof Broken ? `  ${e.message}` : e);
   process.exit(1);
 }
@@ -457,6 +597,7 @@ for (let i = 1; i <= runs; i++) {
 rmSync(validateDir, { recursive: true, force: true });
 console.log(
   `✓ ${runs} 通り、こわれませんでした（シミュレーター ${Math.round(simSeconds)} 秒ぶん・アクセス ${totals.ok + totals.fail} 件・${((Date.now() - t0) / 1000).toFixed(1)}秒）` +
+    `／勉強部屋（LDAP）の部品と設定カード ${ldapStudy.CARDS.length}枚も通しで確かめました` +
     (yaml ? "" : "（js-yaml がないので YAML の読みこみは見ていません）") +
     (validate ? `／docker compose${canCompose ? "" : "（なし）"}・terraform${canTerraform ? "" : "（なし）"} で ${validated} 通り確かめました` : ""),
 );

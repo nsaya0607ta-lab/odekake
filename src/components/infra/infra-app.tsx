@@ -21,16 +21,19 @@ import { emptyProgress, isCleared, isUnlocked, loadProgress, saveProgress, total
 import { BottomSheet } from "./sheets";
 import { setSoundEnabled } from "./sound";
 import { RoomMenu, RoomScreen, isRoomScreen } from "./server-room";
+import { StudyMenu, StudyScreen, isStudyScreen } from "./study-room";
+import { CARDS, cardById } from "./ldap-lessons";
 import { STAGES, stageById, type StageDef } from "./stages";
 import { SoundButton, StagePlay } from "./stage-play";
 import styles from "./infra.module.css";
 
-type Tab = "stages" | "glossary" | "lab" | "room";
+type Tab = "stages" | "glossary" | "lab" | "room" | "study";
 const TABS: { id: Tab; label: string }[] = [
   { id: "stages", label: "ステージ" },
   { id: "glossary", label: "ずかん" },
   { id: "lab", label: "ラボ" },
   { id: "room", label: "サーバー室" },
+  { id: "study", label: "勉強部屋" },
 ];
 
 /** おまけ「このアプリの裏側」が開くステージ（CDN まで習ったら） */
@@ -42,9 +45,11 @@ export function InfraApp() {
   const stageId = params.get("stage");
   const view = params.get("view");
   const tabParam = params.get("tab");
-  const tab: Tab = tabParam === "glossary" || tabParam === "lab" || tabParam === "room" ? tabParam : "stages";
+  const tab: Tab = tabParam === "glossary" || tabParam === "lab" || tabParam === "room" || tabParam === "study" ? tabParam : "stages";
   const roomParam = params.get("room");
   const roomScreen = tab === "room" && isRoomScreen(roomParam) ? roomParam : null;
+  const cardParam = params.get("card");
+  const studyCard = tab === "study" && isStudyScreen(cardParam) ? cardById(cardParam) : undefined;
   const [progress, setProgress] = useState<Progress>(emptyProgress);
   const [loaded, setLoaded] = useState(false);
   const pushed = useRef(false);
@@ -113,6 +118,16 @@ export function InfraApp() {
     return (
       <div className={styles.shell}>
         <RoomScreen id={roomScreen} onExit={back} onOpen={(id) => go(`tab=room&room=${id}`, false)} />
+      </div>
+    );
+  }
+
+  if (studyCard && loaded) {
+    const idx = CARDS.indexOf(studyCard);
+    const nextCard = CARDS[idx + 1];
+    return (
+      <div className={styles.shell}>
+        <StudyScreen key={studyCard.id} card={studyCard} onExit={back} onNext={nextCard ? () => go(`tab=study&card=${nextCard.id}`, false) : null} />
       </div>
     );
   }
@@ -189,6 +204,7 @@ export function InfraApp() {
         {tab === "glossary" ? <Glossary unlocked={terms} /> : null}
         {tab === "lab" && loaded ? <Lab parts={labParts} /> : null}
         {tab === "room" && loaded ? <RoomMenu onOpen={(id) => go(`tab=room&room=${id}`, true)} /> : null}
+        {tab === "study" && loaded ? <StudyMenu onOpen={(id) => go(`tab=study&card=${id}`, true)} /> : null}
       </div>
     </div>
   );
