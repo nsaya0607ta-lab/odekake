@@ -1,7 +1,8 @@
 "use client";
 
 /**
- * 勉強部屋（LDAP）の画面。設定カード（ldap-lessons.ts）を、本物のターミナルで1ステップずつ進める。
+ * 勉強部屋の画面（LDAP・メールサーバーで同じ）。設定カード（ldap-lessons.ts・mail-lessons.ts）を、本物のターミナルで1ステップずつ進める。
+ * 教科ごとにちがうところ（図の線・パネル・コンピューター）は Subject（study-ldap.tsx・study-mail.tsx）からもらう。
  * - StudyMenu … タブの中。章ごとのカードの一覧と、進み具合（できたら ✓）
  * - StudyScreen … 全画面（?tab=study&card=…）
  *     はじめ → ステップ（やってみる → 返事 → サーバーの中のひとこと → わかったこと）
@@ -10,64 +11,79 @@
  * 1画面に出すのは「いまやること1つ」。くわしいもの（サーバーの中・パケット・ログ・名簿・設定）は、開いたときだけ。
  */
 import Image from "next/image";
-import { useCallback, useEffect, useReducer, useRef, useState, type CSSProperties, type KeyboardEvent, type ReactNode } from "react";
-import { Glyph, type GlyphId } from "./glyphs";
+import { createContext, useCallback, useContext, useEffect, useReducer, useRef, useState, type CSSProperties, type KeyboardEvent, type ReactNode } from "react";
+import { Glyph } from "./glyphs";
 import { MASCOT, Teacher } from "./intro";
-import { CARDS, CHAPTERS, SEED_BASE, cardById, cardLabel, prepareLab, splitStudy, type Panel, type Phase, type PrepRun, type StudyCard } from "./ldap-lessons";
-import { HOST_IP, RESULT_JA, clockText, type HostId, type TraceItem, type TreeNode } from "./ldap";
-import { HOSTS, HOST_IDS, ldapConf, sssdConf, type LdapLab, type Run } from "./ldap-shell";
-import { hexdump } from "./ldap-bits";
+import type { TraceItem } from "./ldap";
+import type { Phase } from "./study-kit";
+import { NetDiagram, Rich, TermLine, keyNotes, type AnyCard, type AnyLab, type AnyPrepRun, type AnyRun, type Last, type Subject } from "./study-ui";
 import { BottomSheet } from "./sheets";
 import { sfx } from "./sound";
 import styles from "./infra.module.css";
 
-const DONE_KEY = "odekake_infra_study_v1";
+/** 見ている教科（LDAP・メールサーバー）。画面の中の部品は、ここから教科ごとのちがいを引く */
+const SubjectCtx = createContext<Subject | null>(null);
+function useSubject(): Subject {
+  const s = useContext(SubjectCtx);
+  if (!s) throw new Error("勉強部屋の教科がない");
+  return s;
+}
 
-function loadDone(): Set<string> {
+function loadDone(key: string): Set<string> {
   try {
-    const raw = JSON.parse(window.localStorage.getItem(DONE_KEY) ?? "[]") as unknown;
+    const raw = JSON.parse(window.localStorage.getItem(key) ?? "[]") as unknown;
     return new Set(Array.isArray(raw) ? raw.filter((x): x is string => typeof x === "string") : []);
   } catch {
     return new Set();
   }
 }
-function saveDone(id: string) {
+function saveDone(key: string, id: string) {
   try {
-    const done = loadDone();
+    const done = loadDone(key);
     done.add(id);
-    window.localStorage.setItem(DONE_KEY, JSON.stringify([...done]));
+    window.localStorage.setItem(key, JSON.stringify([...done]));
   } catch {
     // 覚えられなくてもよい（一覧の ✓ が出ないだけ）
   }
 }
 
-export const isStudyScreen = (id: string | null): id is string => Boolean(id && cardById(id));
-
 /* ------------------------------------------------------------ 入口（タブの中） */
 
-export function StudyMenu({ onOpen }: { onOpen: (id: string) => void }) {
-  const [done] = useState(loadDone);
-  const next = CARDS.find((c) => !done.has(c.id));
-  const count = CARDS.filter((c) => done.has(c.id)).length;
+export function StudyMenu({ subjects, subject, onPick, onOpen }: { subjects: readonly Subject[]; subject: Subject; onPick: (id: Subject["id"]) => void; onOpen: (id: string) => void }) {
+  const [doneAll] = useState(() => new Map(subjects.map((x) => [x.id, loadDone(x.doneKey)])));
+  const done = doneAll.get(subject.id) ?? new Set<string>();
+  const cards = subject.cards;
+  const next = cards.find((c) => !done.has(c.id));
+  const count = cards.filter((c) => done.has(c.id)).length;
   return (
     <div className={styles.room}>
+      <div className={styles.studySubjects} role="tablist" aria-label="勉強する教科">
+        {subjects.map((x) => {
+          const n = x.cards.filter((c) => doneAll.get(x.id)?.has(c.id)).length;
+          return (
+            <button key={x.id} type="button" role="tab" aria-selected={x.id === subject.id} data-on={x.id === subject.id ? "1" : undefined} onClick={() => onPick(x.id)}>
+              <b>{x.name}</b>
+              <small>
+                {n} / {x.cards.length} 枚
+              </small>
+            </button>
+          );
+        })}
+      </div>
       <div className={styles.roomIntro}>
-        <Teacher sub="勉強部屋・LDAP" />
-        <p>
-          会社やお店の「名簿サーバー」、<b>LDAP</b> の勉強部屋です。1枚のカードで1つの設定を、「なかったらどう動くか」→「入れると何が変わるか」の順に、
-          本物のコマンドを打ってたしかめよう。
-        </p>
+        <Teacher sub={subject.sub} />
+        <p>{subject.lead}</p>
       </div>
       <div className={styles.studyProgress}>
         <p>
-          <b>{count}</b> / {CARDS.length} 枚できた
-          <small>{count === CARDS.length ? "ぜんぶできた！ 自由に試すで、組み合わせも試してみよう" : next ? `つぎは「${next.title}」` : ""}</small>
+          <b>{count}</b> / {cards.length} 枚できた
+          <small>{count === cards.length ? "ぜんぶできた！ 自由に試すで、組み合わせも試してみよう" : next ? `つぎは「${next.title}」` : ""}</small>
         </p>
-        <span className={styles.studyProgressBar} role="progressbar" aria-valuemin={0} aria-valuemax={CARDS.length} aria-valuenow={count} aria-label="できたカード">
-          <i style={{ width: `${(count / CARDS.length) * 100}%` }} />
+        <span className={styles.studyProgressBar} role="progressbar" aria-valuemin={0} aria-valuemax={cards.length} aria-valuenow={count} aria-label="できたカード">
+          <i style={{ width: `${(count / cards.length) * 100}%` }} />
         </span>
       </div>
-      {CHAPTERS.map((ch) => (
+      {subject.chapters.map((ch) => (
         <section key={ch.no} className={styles.studyChapter} aria-label={ch.title}>
           <h2 className={styles.studyChapterHead}>
             <span>{ch.no ? `第${ch.no}章` : "まず"}</span>
@@ -75,61 +91,68 @@ export function StudyMenu({ onOpen }: { onOpen: (id: string) => void }) {
             <small>{ch.sub}</small>
           </h2>
           <ol className={styles.roomLessons}>
-            {CARDS.filter((c) => c.chapter === ch.no).map((c) => {
-              const ok = done.has(c.id);
-              const isNext = next?.id === c.id;
-              return (
-                <li key={c.id}>
-                  <button type="button" className={styles.roomLesson} data-next={isNext ? "1" : undefined} data-done={ok ? "1" : undefined} onClick={() => onOpen(c.id)}>
-                    <span className={styles.studyNo} style={{ "--c": c.color } as CSSProperties} aria-hidden="true">
-                      {ok ? "✓" : <Glyph id={c.icon} size={18} />}
-                    </span>
-                    <span className={styles.roomLessonText}>
-                      <small>
-                        {cardLabel(c)}
-                        {ok ? "・できた" : isNext ? "・つぎはこれ" : ""}
-                      </small>
-                      <b>{c.title}</b>
-                      <em>{c.sub}</em>
-                    </span>
-                    <span className={styles.roomLessonGo} aria-hidden="true">
-                      ▶
-                    </span>
-                  </button>
-                </li>
-              );
-            })}
+            {cards
+              .filter((c) => c.chapter === ch.no)
+              .map((c) => {
+                const ok = done.has(c.id);
+                const isNext = next?.id === c.id;
+                return (
+                  <li key={c.id}>
+                    <button type="button" className={styles.roomLesson} data-next={isNext ? "1" : undefined} data-done={ok ? "1" : undefined} onClick={() => onOpen(c.id)}>
+                      <span className={styles.studyNo} style={{ "--c": c.color } as CSSProperties} aria-hidden="true">
+                        {ok ? "✓" : <Glyph id={c.icon} size={18} />}
+                      </span>
+                      <span className={styles.roomLessonText}>
+                        <small>
+                          {subject.cardLabel(c)}
+                          {ok ? "・できた" : isNext ? "・つぎはこれ" : ""}
+                        </small>
+                        <b>{c.title}</b>
+                        <em>{c.sub}</em>
+                      </span>
+                      <span className={styles.roomLessonGo} aria-hidden="true">
+                        ▶
+                      </span>
+                    </button>
+                  </li>
+                );
+              })}
           </ol>
         </section>
       ))}
-      <p className={styles.studyFoot}>
-        LDAP＝Lightweight Directory Access Protocol。社員・パソコン・グループを1か所にまとめて、ログインや権限に使うしくみです。この部屋のサーバーは、すべてブラウザの中の
-        しくみで動いていて、外とはつながりません。
-      </p>
+      <p className={styles.studyFoot}>{subject.foot}</p>
     </div>
   );
 }
 
 /* ------------------------------------------------------------ 全画面（1カード） */
 
-type Block = { id: number; kind: "cmd"; host: HostId; cmd: string; out: Run["out"]; tag?: string } | { id: number; kind: "note"; text: string };
-type NewBlock = { kind: "cmd"; host: HostId; cmd: string; out: Run["out"]; tag?: string } | { kind: "note"; text: string };
+type Block = { id: number; kind: "cmd"; host: string; cmd: string; out: AnyRun["out"]; tag?: string } | { id: number; kind: "note"; text: string };
+type NewBlock = { kind: "cmd"; host: string; cmd: string; out: AnyRun["out"]; tag?: string } | { kind: "note"; text: string };
 type Status = "idle" | "ok" | "retry";
 type View = "intro" | "play" | "done" | "free";
-type Last = { run: Run; pre: Run | null };
 
 const PHASE_LABEL: Record<Phase, string> = { learn: "ことば", off: "設定なし", apply: "設定を入れる", on: "設定あり", trap: "落とし穴" };
 
-export function StudyScreen({ card, onExit, onNext }: { card: StudyCard; onExit: () => void; onNext: (() => void) | null }) {
-  const [lab, setLab] = useState(() => card.build(SEED_BASE + card.no));
+export function StudyScreen({ subject, card, onExit, onNext }: { subject: Subject; card: AnyCard; onExit: () => void; onNext: (() => void) | null }) {
+  return (
+    <SubjectCtx.Provider value={subject}>
+      <StudyCardScreen card={card} onExit={onExit} onNext={onNext} />
+    </SubjectCtx.Provider>
+  );
+}
+
+function StudyCardScreen({ card, onExit, onNext }: { card: AnyCard; onExit: () => void; onNext: (() => void) | null }) {
+  const subject = useSubject();
+  const [lab, setLab] = useState<AnyLab>(() => card.build(subject.seedBase + card.no));
   const [, bump] = useReducer((n: number) => n + 1, 0);
   const [view, setView] = useState<View>("intro");
   const [i, setI] = useState(0);
   const [status, setStatus] = useState<Status>("idle");
   const [last, setLast] = useState<Last | null>(null);
   const [blocks, setBlocks] = useState<Block[]>([]);
-  const [sheet, setSheet] = useState<Panel | null>(null);
-  const [wasDone] = useState(() => loadDone().has(card.id));
+  const [sheet, setSheet] = useState<string | null>(null);
+  const [wasDone] = useState(() => loadDone(subject.doneKey).has(card.id));
   const [cleared, setCleared] = useState(false);
   const nextId = useRef(1);
   /** さっき足したブロックのうち、いちばん上の id（ターミナルを、そこから見せる） */
@@ -163,7 +186,7 @@ export function StudyScreen({ card, onExit, onNext }: { card: StudyCard; onExit:
     firstNew.current = withIds[0]?.id ?? 0;
     setBlocks((cur) => (reset ? withIds : [...cur, ...withIds]));
   };
-  const cmdBlock = (host: HostId, cmd: string, r: Run, tag?: string): NewBlock => ({ kind: "cmd", host, cmd, out: r.out, tag });
+  const cmdBlock = (host: string, cmd: string, r: AnyRun, tag?: string): NewBlock => ({ kind: "cmd", host, cmd, out: r.out, tag });
 
   /* ---------- ガイド（ステップ） ---------- */
 
@@ -175,7 +198,7 @@ export function StudyScreen({ card, onExit, onNext }: { card: StudyCard; onExit:
       step.before(lab);
       if (step.beforeNote) list.push({ kind: "note", text: step.beforeNote });
     }
-    let pre: Run | null = null;
+    let pre: AnyRun | null = null;
     if (step.pre) {
       pre = lab.run(step.pre.host, step.pre.cmd);
       list.push(cmdBlock(step.pre.host, step.pre.cmd, pre, "先に"));
@@ -196,7 +219,7 @@ export function StudyScreen({ card, onExit, onNext }: { card: StudyCard; onExit:
     if (i + 1 >= card.steps.length) {
       setView("done");
       if (!cleared) {
-        saveDone(card.id);
+        saveDone(subject.doneKey, card.id);
         setCleared(true);
         sfx("clear");
       }
@@ -209,7 +232,7 @@ export function StudyScreen({ card, onExit, onNext }: { card: StudyCard; onExit:
 
   /* ---------- 自由に試す ---------- */
 
-  const [host, setHost] = useState<HostId>("pc");
+  const [host, setHost] = useState<string>("pc");
   const [input, setInput] = useState("");
   const [history, setHistory] = useState<string[]>([]);
   const [histAt, setHistAt] = useState(-1);
@@ -218,14 +241,14 @@ export function StudyScreen({ card, onExit, onNext }: { card: StudyCard; onExit:
   const openFree = () => {
     setView("free");
     setStatus("idle");
-    add([{ kind: "note", text: `ここからは自由に試せます。${card.knob ? "上のボタンで、設定なし・ありの名簿に切りかえられます。" : ""}help で、使えるコマンドが出ます` }]);
+    add([{ kind: "note", text: `ここからは自由に試せます。${card.knob ? "上のボタンで、設定なし・ありの${subject.thing}に切りかえられます。" : ""}help で、使えるコマンドが出ます` }]);
   };
 
   const rebuild = (withKnob: boolean) => {
-    const p = prepareLab(card, withKnob);
+    const p = subject.prepare(card, withKnob);
     setLab(p.lab);
     setLast(null);
-    const list: NewBlock[] = [{ kind: "note", text: withKnob && card.knob ? `まっさらな名簿に、設定（${card.knob.title}）を入れました` : card.knob ? "まっさらな名簿（設定なし）にしました" : "まっさらな名簿にもどしました" }];
+    const list: NewBlock[] = [{ kind: "note", text: withKnob && card.knob ? `まっさらな${subject.thing}に、設定（${card.knob.title}）を入れました` : card.knob ? `まっさらな${subject.thing}（設定なし）にしました` : `まっさらな${subject.thing}にもどしました` }];
     for (const x of p.runs) list.push("note" in x ? { kind: "note", text: x.note } : cmdBlock(x.host, x.cmd, x.run, "設定"));
     add(list, true);
     sfx("place");
@@ -288,7 +311,7 @@ export function StudyScreen({ card, onExit, onNext }: { card: StudyCard; onExit:
   );
 
   return (
-    <Screen sub={`勉強部屋・${cardLabel(card)}`} title={card.title} onExit={onExit} scrollKey={view}>
+    <Screen sub={`${subject.sub}・${subject.cardLabel(card)}`} title={card.title} onExit={onExit} scrollKey={view}>
       {view === "intro" ? (
         <StudyIntro
           card={card}
@@ -337,7 +360,7 @@ export function StudyScreen({ card, onExit, onNext }: { card: StudyCard; onExit:
             </div>
 
             <div ref={deskRef} className={styles.studyStage}>
-              <Diagram runs={[last?.pre ?? null, run]} at={step.host} />
+              <NetDiagram view={subject.net([last?.pre ?? null, run])} at={step.host} />
               {terminal}
             </div>
 
@@ -351,7 +374,7 @@ export function StudyScreen({ card, onExit, onNext }: { card: StudyCard; onExit:
                   <div className={styles.studyPeek}>
                     {step.show.map((p) => (
                       <button key={p} type="button" onClick={() => setSheet(p)}>
-                        {PANEL_LABEL[p]} を見る
+                        {subject.panelLabel[p]} を見る
                       </button>
                     ))}
                   </div>
@@ -374,23 +397,23 @@ export function StudyScreen({ card, onExit, onNext }: { card: StudyCard; onExit:
           ) : (
             <div className={styles.studyFreeBar}>
               <button type="button" onClick={() => rebuild(false)}>
-                まっさらな名簿にもどす
+                まっさらな{subject.thing}にもどす
               </button>
             </div>
           )}
           <section className={styles.studyDesk} aria-label="自由に試す">
-            <Diagram runs={[run]} at={host} />
+            <NetDiagram view={subject.net([run])} at={host} />
             {terminal}
             <div className={styles.studyHosts} role="radiogroup" aria-label="コマンドを打つコンピューター">
-              {HOST_IDS.map((h) => (
-                <button key={h} type="button" role="radio" aria-checked={host === h} data-on={host === h ? "1" : undefined} style={{ "--c": hostColor(h) } as CSSProperties} onClick={() => setHost(h)}>
-                  <Glyph id={hostGlyph(h)} size={13} />
-                  {HOSTS[h].label}
+              {subject.hostIds.map((h) => (
+                <button key={h} type="button" role="radio" aria-checked={host === h} data-on={host === h ? "1" : undefined} style={{ "--c": subject.hostColor(h) } as CSSProperties} onClick={() => setHost(h)}>
+                  <Glyph id={subject.hostGlyph(h)} size={13} />
+                  {subject.hosts[h]?.label}
                 </button>
               ))}
             </div>
             <div className={styles.studyInput}>
-              <span className={styles.termPrompt}>{HOSTS[host].prompt}</span>
+              <span className={styles.termPrompt}>{subject.hosts[host]?.prompt}</span>
               <input
                 ref={inputRef}
                 type="text"
@@ -423,7 +446,7 @@ export function StudyScreen({ card, onExit, onNext }: { card: StudyCard; onExit:
                     if (window.matchMedia("(pointer: fine)").matches) inputRef.current?.focus({ preventScroll: true });
                   }}
                 >
-                  <small style={{ "--c": hostColor(t.host) } as CSSProperties}>{t.host === "pc" ? "パソコン" : t.host === "ldap" ? "LDAP" : "お店"}</small>
+                  <small style={{ "--c": subject.hostColor(t.host) } as CSSProperties}>{subject.hostShort(t.host)}</small>
                   {t.label}
                 </button>
               ))}
@@ -441,16 +464,16 @@ export function StudyScreen({ card, onExit, onNext }: { card: StudyCard; onExit:
 
       {showDesk ? (
         <div className={`${styles.rlLinks} ${styles.studyLinks}`}>
-          {(["trace", "packets", "logs", "tree", "config"] as Panel[]).map((p) => (
+          {subject.panels.map((p) => (
             <button key={p} type="button" onClick={() => setSheet(p)}>
-              {PANEL_LABEL[p]}
+              {subject.panelLabel[p]}
             </button>
           ))}
         </div>
       ) : null}
 
-      <BottomSheet open={sheet != null} onClose={() => setSheet(null)} label={sheet ? PANEL_LABEL[sheet] : ""}>
-        {sheet ? <PanelView panel={sheet} lab={lab} last={last} card={card} keyRef={key} /> : null}
+      <BottomSheet open={sheet != null} onClose={() => setSheet(null)} label={sheet ? (subject.panelLabel[sheet] ?? "") : ""}>
+        {sheet ? subject.renderPanel({ panel: sheet, lab, last, card, keyRef: key }) : null}
       </BottomSheet>
     </Screen>
   );
@@ -480,14 +503,15 @@ function Screen({ sub, title, onExit, scrollKey, children }: { sub: string; titl
   );
 }
 
-function CardHead({ card }: { card: StudyCard }) {
+function CardHead({ card }: { card: AnyCard }) {
+  const subject = useSubject();
   return (
     <div className={styles.studyHead} style={{ "--c": card.color } as CSSProperties}>
       <span className={styles.studyHeadIcon}>
         <Glyph id={card.icon} size={30} />
       </span>
       <div>
-        <small>{card.no ? `${cardLabel(card)}・第${card.chapter}章 ${CHAPTERS.find((c) => c.no === card.chapter)?.title ?? ""}` : "はじめに・まず ことばから"}</small>
+        <small>{card.no ? `${subject.cardLabel(card)}・第${card.chapter}章 ${subject.chapters.find((c) => c.no === card.chapter)?.title ?? ""}` : "はじめに・まず ことばから"}</small>
         <h2>{card.title}</h2>
         <em>{card.sub}</em>
       </div>
@@ -495,7 +519,8 @@ function CardHead({ card }: { card: StudyCard }) {
   );
 }
 
-function StudyIntro({ card, wasDone, onStart, onFree }: { card: StudyCard; wasDone: boolean; onStart: () => void; onFree: () => void }) {
+function StudyIntro({ card, wasDone, onStart, onFree }: { card: AnyCard; wasDone: boolean; onStart: () => void; onFree: () => void }) {
+  const subject = useSubject();
   const traps = card.steps.filter((s) => s.phase === "trap").length;
   return (
     <section className={styles.rlStep} aria-label="このカードについて">
@@ -530,13 +555,13 @@ function StudyIntro({ card, wasDone, onStart, onFree }: { card: StudyCard; wasDo
         <div className={styles.studyKnobMap}>
           <b>出てくるコンピューター</b>
           <ul className={styles.studyCast}>
-            {HOST_IDS.map((h) => (
-              <li key={h} style={{ "--c": hostColor(h) } as CSSProperties}>
+            {subject.hostIds.map((h) => (
+              <li key={h} style={{ "--c": subject.hostColor(h) } as CSSProperties}>
                 <span>
-                  <Glyph id={hostGlyph(h)} size={14} />
+                  <Glyph id={subject.hostGlyph(h)} size={14} />
                 </span>
-                <b>{HOSTS[h].label}</b>
-                <small>{HOST_ROLE[h]}</small>
+                <b>{subject.hosts[h]?.label}</b>
+                <small>{subject.hostRole[h]}</small>
               </li>
             ))}
           </ul>
@@ -554,13 +579,7 @@ function StudyIntro({ card, wasDone, onStart, onFree }: { card: StudyCard; wasDo
   );
 }
 
-const HOST_ROLE: Record<HostId, string> = {
-  pc: "あなたがコマンドを打つ",
-  ldap: "名簿をしまっている（slapd）",
-  shop: "名簿を見て、ログインさせる（SSSD）",
-};
-
-function StudyDone({ card, onExit, onNext, onFree }: { card: StudyCard; onExit: () => void; onNext: (() => void) | null; onFree: () => void }) {
+function StudyDone({ card, onExit, onNext, onFree }: { card: AnyCard; onExit: () => void; onNext: (() => void) | null; onFree: () => void }) {
   const [picked, setPicked] = useState<number | null>(null);
   const correct = picked === card.quiz.answer;
   return (
@@ -663,18 +682,19 @@ function StudyDone({ card, onExit, onNext, onFree }: { card: StudyCard; onExit: 
 
 /* ------------------------------------------------------------ 見くらべる（同じコマンド、ちがう結果） */
 
-type ProbeResult = { off: Run; on: Run; prep: PrepRun[] };
+type ProbeResult = { off: AnyRun; on: AnyRun; prep: AnyPrepRun[] };
 
-function Probe({ card }: { card: StudyCard }) {
+function Probe({ card }: { card: AnyCard }) {
+  const subject = useSubject();
   const probe = card.probe!;
   const [res, setRes] = useState<ProbeResult | null>(null);
   const [busy, setBusy] = useState(false);
   const go = () => {
     setBusy(true);
-    // 名簿を2つ作る（2000人の名簿のカードもある）。ボタンの見た目を先に変えてから動かす
+    // まっさらな状態を2つ作る（2000人の名簿のカードもある）。ボタンの見た目を先に変えてから動かす
     window.setTimeout(() => {
-      const a = prepareLab(card, false);
-      const b = prepareLab(card, true);
+      const a = subject.prepare(card, false, true);
+      const b = subject.prepare(card, true, true);
       setRes({ off: a.lab.run(probe.host, probe.cmd), on: b.lab.run(probe.host, probe.cmd), prep: b.runs });
       setBusy(false);
       sfx("good");
@@ -683,7 +703,7 @@ function Probe({ card }: { card: StudyCard }) {
   return (
     <div className={styles.studyProbe}>
       <p className={styles.studyCompareHead}>同じコマンド、ちがう結果</p>
-      <p className={styles.studyProbeLead}>まっさらな名簿を2つ用意して、片方にだけ設定を入れます。同じコマンドを、両方で本当に動かしてみよう。</p>
+      <p className={styles.studyProbeLead}>まっさらな{subject.thing}を2つ用意して、片方にだけ設定を入れます。同じコマンドを、両方で本当に動かしてみよう。</p>
       <CmdChip host={probe.host} cmd={probe.cmd} />
       {res ? (
         <>
@@ -698,7 +718,7 @@ function Probe({ card }: { card: StudyCard }) {
           ) : null}
           {res.prep.length ? (
             <details className={styles.studyProbePrep}>
-              <summary>「設定あり」の名簿に入れたもの（{res.prep.length}つ）</summary>
+              <summary>「設定あり」の{subject.thing}に入れたもの（{res.prep.length}つ）</summary>
               <ul>
                 {res.prep.map((p, k) =>
                   "note" in p ? (
@@ -707,7 +727,7 @@ function Probe({ card }: { card: StudyCard }) {
                     </li>
                   ) : (
                     <li key={k}>
-                      <span className={styles.termPrompt}>{HOSTS[p.host].prompt}</span> {p.cmd}
+                      <span className={styles.termPrompt}>{subject.hosts[p.host]?.prompt}</span> {p.cmd}
                     </li>
                   ),
                 )}
@@ -717,15 +737,16 @@ function Probe({ card }: { card: StudyCard }) {
         </>
       ) : (
         <button type="button" className={`${styles.btnPrimary} ${styles.studyRun}`} onClick={go} disabled={busy}>
-          {busy ? "名簿を用意しています…" : "2つの名簿で動かす"}
+          {busy ? `${subject.thing}を用意しています…` : `2つの${subject.thing}で動かす`}
         </button>
       )}
     </div>
   );
 }
 
-function ProbeSide({ title, tone, run, card }: { title: string; tone: "off" | "on"; run: Run; card: StudyCard }) {
-  const o = outcome(run);
+function ProbeSide({ title, tone, run, card }: { title: string; tone: "off" | "on"; run: AnyRun; card: AnyCard }) {
+  const subject = useSubject();
+  const o = subject.outcome(run);
   const note = keyNotes(run, card.knob?.ref).at(-1);
   const leak = run.packets.find((p) => p.secretText);
   const lines = run.out.filter((l) => l.text.trim() !== "");
@@ -764,39 +785,6 @@ function ProbeSide({ title, tone, run, card }: { title: string; tone: "off" | "o
   );
 }
 
-/** 結果のひとこと（成功・49 ログインできない など） */
-function outcome(r: Run): { ok: boolean; text: string } {
-  const ssh = r.ops.find((o) => o.kind === "ssh");
-  if (ssh) return ssh.code === 0 ? { ok: true, text: "ログインできた" } : { ok: false, text: ssh.stage === "access" ? "入れない（ログインの条件）" : "ログインできない" };
-  if (r.exit === 0) return { ok: true, text: "成功（0）" };
-  const ja = RESULT_JA[r.exit];
-  return { ok: false, text: ja ? `${r.exit}（${ja}）` : `終了コード ${r.exit}` };
-}
-
-/* ------------------------------------------------------------ サーバーの中のひとこと */
-
-/**
- * サーバーの中で起きたことのうち、いま見てほしい行（1〜2行）。
- * key（ステップの why か、カードの設定）の行 → 同じなかまの行 → だめ・注意の行 → うまくいった行 の順にさがす。
- */
-function keyNotes(run: Run, key?: string): TraceItem[] {
-  const tr = run.trace;
-  if (!tr.length) return [];
-  const two = (xs: TraceItem[]) => (xs.length > 2 ? [xs[0]!, xs[xs.length - 1]!] : xs);
-  if (key) {
-    const exact = tr.filter((t) => t.ref && (t.ref === key || t.ref.startsWith(`${key}:`)));
-    if (exact.length) return two(exact);
-    const family = key.split(":")[0]!;
-    const near = tr.filter((t) => t.ref && t.ref.split(":")[0] === family);
-    if (near.length) return two(near);
-  }
-  const bad = tr.filter((t) => t.tone === "ng" || t.tone === "warn");
-  if (bad.length) return [bad[0]!];
-  const good = tr.filter((t) => t.tone === "ok" && !t.ref);
-  if (good.length) return [good[good.length - 1]!];
-  return [tr[tr.length - 1]!];
-}
-
 function WhyBox({ notes, onMore }: { notes: TraceItem[]; onMore: () => void }) {
   return (
     <div className={styles.studyWhy}>
@@ -817,7 +805,7 @@ function WhyBox({ notes, onMore }: { notes: TraceItem[]; onMore: () => void }) {
 
 /* ------------------------------------------------------------ 設定スイッチ */
 
-function Switch({ card, on, flip, onOpenConfig }: { card: StudyCard; on: boolean; flip: boolean; onOpenConfig: () => void }) {
+function Switch({ card, on, flip, onOpenConfig }: { card: AnyCard; on: boolean; flip: boolean; onOpenConfig: () => void }) {
   const knob = card.knob!;
   return (
     <button
@@ -842,8 +830,8 @@ function Switch({ card, on, flip, onOpenConfig }: { card: StudyCard; on: boolean
   );
 }
 
-/** 自由に試す：名簿を、まっさらの設定なし・ありに切りかえる */
-function FreeSwitch({ card, on, onPick }: { card: StudyCard; on: boolean; onPick: (on: boolean) => void }) {
+/** 自由に試す：まっさらの設定なし・ありに切りかえる */
+function FreeSwitch({ card, on, onPick }: { card: AnyCard; on: boolean; onPick: (on: boolean) => void }) {
   const knob = card.knob!;
   return (
     <div className={styles.studyFreeSwitch} style={{ "--c": card.color } as CSSProperties}>
@@ -851,7 +839,7 @@ function FreeSwitch({ card, on, onPick }: { card: StudyCard; on: boolean; onPick
         <small>{knob.title}</small>
         <b>いま：{on ? knob.on : knob.off}</b>
       </p>
-      <div role="group" aria-label="名簿をまっさらにして、設定を切りかえる">
+      <div role="group" aria-label="まっさらにして、設定を切りかえる">
         <button type="button" data-on={!on ? "1" : undefined} onClick={() => onPick(false)}>
           設定なしで やりなおす
         </button>
@@ -863,135 +851,16 @@ function FreeSwitch({ card, on, onPick }: { card: StudyCard; on: boolean; onPick
   );
 }
 
-/* ------------------------------------------------------------ 3台の図 */
-
-type WireState = "tls" | "starttls" | "plain";
-type Wire = { lit: boolean; state: WireState | null; leak: boolean };
-
-/** そのコマンド（先に動かしたものもふくむ）で、どの線に、どんなつながりが流れたか（ops の順に見る） */
-function wires(runs: (Run | null)[]): { pcLdap: Wire; shopLdap: Wire; pcShop: Wire; local: boolean } {
-  const blank = (): Wire => ({ lit: false, state: null, leak: false });
-  const w = { pcLdap: blank(), shopLdap: blank(), pcShop: blank(), local: false };
-  const list = runs.filter((r): r is Run => r != null);
-  const conns: { wire: Wire; state: WireState }[] = [];
-  for (const o of list.flatMap((r) => r.ops)) {
-    if (o.kind === "connect") {
-      if (o.host === "ldap") {
-        w.local = true;
-        continue;
-      }
-      const wire = o.host === "shop" ? w.shopLdap : w.pcLdap;
-      wire.lit = true;
-      conns.push({ wire, state: o.tls ? "tls" : "plain" });
-    } else if (o.kind === "starttls" && o.code === 0) {
-      const c = conns[conns.length - 1];
-      if (c && c.state === "plain") c.state = "starttls";
-    } else if (o.kind === "ssh") w.pcShop.lit = true;
-    else if (o.kind === "sssd") {
-      w.shopLdap.lit = true;
-      if (o.code === 0) conns.push({ wire: w.shopLdap, state: o.tls ? "tls" : "plain" });
-    }
-  }
-  const rank: Record<WireState, number> = { tls: 0, starttls: 1, plain: 2 };
-  for (const c of conns) if (c.wire.state == null || rank[c.state] > rank[c.wire.state]) c.wire.state = c.state;
-  for (const p of list.flatMap((r) => r.packets)) {
-    if (!p.secretText) continue;
-    if (p.from.startsWith(`${HOST_IP.shop}:`)) w.shopLdap.leak = true;
-    else w.pcLdap.leak = true;
-  }
-  if (w.pcShop.lit) w.pcShop.state = "tls";
-  return w;
-}
-
-/** 図の中の場所（%）。上に LDAP サーバー、左下にあなたのパソコン、右下にお店のサーバー */
-const SPOT: Record<HostId, { x: number; y: number }> = { ldap: { x: 50, y: 20 }, pc: { x: 16, y: 72 }, shop: { x: 84, y: 72 } };
-/** a から b へ、t（0〜1）だけ進んだところ（線の名札を置く。LDAP サーバーの名前にかぶらないよう、少し下に） */
-const along = (a: HostId, b: HostId, t: number) => ({ x: SPOT[a].x + (SPOT[b].x - SPOT[a].x) * t, y: SPOT[a].y + (SPOT[b].y - SPOT[a].y) * t });
-
-function Diagram({ runs, at }: { runs: (Run | null)[]; at: HostId | null }) {
-  const w = wires(runs);
-  const lines: { a: HostId; b: HostId; wire: Wire }[] = [
-    { a: "pc", b: "ldap", wire: w.pcLdap },
-    { a: "ldap", b: "shop", wire: w.shopLdap },
-    { a: "pc", b: "shop", wire: w.pcShop },
-  ];
-  const said = [
-    w.pcLdap.lit ? `パソコンと LDAP サーバー：${stateJa(w.pcLdap)}` : "",
-    w.shopLdap.lit ? `お店のサーバーと LDAP サーバー：${stateJa(w.shopLdap)}` : "",
-    w.pcShop.lit ? "パソコンとお店のサーバー：SSH（暗号）" : "",
-    w.local ? "LDAP サーバーの中から（ldapi）" : "",
-  ].filter(Boolean);
-  return (
-    <div className={styles.studyNet} role="img" aria-label={`3台の図。${said.length ? `いまのコマンドで流れた線：${said.join("、")}` : "まだ何も流れていません"}`}>
-      <svg className={styles.studyNetSvg} viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true">
-        {lines.map((l) => (
-          <line
-            key={`${l.a}${l.b}`}
-            x1={SPOT[l.a].x}
-            y1={SPOT[l.a].y}
-            x2={SPOT[l.b].x}
-            y2={SPOT[l.b].y}
-            vectorEffect="non-scaling-stroke"
-            data-lit={l.wire.lit ? "1" : undefined}
-            data-state={l.wire.leak ? "leak" : (l.wire.state ?? undefined)}
-          />
-        ))}
-      </svg>
-      <WireTag spot={along("ldap", "pc", 0.6)} wire={w.pcLdap} name="LDAP" />
-      <WireTag spot={along("ldap", "shop", 0.6)} wire={w.shopLdap} name="SSSD" />
-      <WireTag spot={along("pc", "shop", 0.5)} wire={w.pcShop} name="SSH" />
-      {HOST_IDS.map((h) => (
-        <span
-          key={h}
-          className={styles.studyNode}
-          data-on={at === h ? "1" : undefined}
-          style={{ "--c": hostColor(h), left: `${SPOT[h].x}%`, top: `${SPOT[h].y}%` } as CSSProperties}
-        >
-          <span className={styles.studyNodeIcon}>
-            <Glyph id={hostGlyph(h)} size={18} />
-          </span>
-          <small>{HOSTS[h].label}</small>
-          {h === "ldap" && w.local ? <em className={styles.studyLocal}>中から（ldapi）</em> : null}
-        </span>
-      ))}
-    </div>
-  );
-}
-
-const stateJa = (w: Wire) => (w.leak ? "平文（パスワードが見えた）" : w.state === "tls" ? "暗号（TLS）" : w.state === "starttls" ? "途中から暗号（StartTLS）" : w.state === "plain" ? "平文" : "つながらなかった");
-
-function WireTag({ spot, wire, name }: { spot: { x: number; y: number }; wire: Wire; name: string }) {
-  const text = !wire.lit ? name : wire.leak ? `${name}・平文！` : wire.state === "plain" ? `${name}・平文` : wire.state === "starttls" ? `${name}・StartTLS` : wire.state ? `${name}・暗号` : name;
-  const locked = wire.lit && (wire.state === "tls" || wire.state === "starttls");
-  return (
-    <span className={styles.studyWireTag} data-lit={wire.lit ? "1" : undefined} data-state={wire.leak ? "leak" : (wire.state ?? undefined)} style={{ left: `${spot.x}%`, top: `${spot.y}%` }}>
-      {wire.lit && wire.state ? <Lock open={!locked} /> : null}
-      {text}
-    </span>
-  );
-}
-
-function Lock({ open }: { open: boolean }) {
-  return (
-    <svg width="10" height="11" viewBox="0 0 10 11" aria-hidden="true">
-      <rect x="1" y="4.6" width="8" height="5.8" rx="1.4" fill="currentColor" />
-      <path d={open ? "M3 4.6V3.2a2 2 0 0 1 3.9-.6" : "M3 4.6V3.2a2 2 0 0 1 4 0v1.4"} fill="none" stroke="currentColor" strokeWidth="1.3" />
-    </svg>
-  );
-}
-
-const hostGlyph = (id: HostId): GlyphId => (id === "pc" ? "user" : id === "ldap" ? "db" : "app");
-const hostColor = (id: HostId) => (id === "pc" ? "#9fb4ff" : id === "ldap" ? "#b08cff" : "#5fd8ff");
-
 /* ------------------------------------------------------------ ターミナル */
 
-function CmdChip({ host, cmd, label }: { host: HostId; cmd: string; label?: string }) {
+function CmdChip({ host, cmd, label }: { host: string; cmd: string; label?: string }) {
+  const subject = useSubject();
   return (
     <div className={styles.studyCmd}>
-      <span className={styles.studyCmdHost} style={{ "--c": hostColor(host) } as CSSProperties}>
-        <Glyph id={hostGlyph(host)} size={13} />
+      <span className={styles.studyCmdHost} style={{ "--c": subject.hostColor(host) } as CSSProperties}>
+        <Glyph id={subject.hostGlyph(host)} size={13} />
         {label ? `${label}：` : ""}
-        {HOSTS[host].label}
+        {subject.hosts[host]?.label}
       </span>
       <code>{cmd}</code>
     </div>
@@ -1006,6 +875,7 @@ function scrollTerm(el: HTMLDivElement | null, firstId: number) {
 }
 
 function TermBlock({ block }: { block: Block }) {
+  const subject = useSubject();
   if (block.kind === "note")
     return (
       <p className={styles.termNote} data-block={block.id}>
@@ -1016,7 +886,7 @@ function TermBlock({ block }: { block: Block }) {
     <div className={styles.termBlock} data-block={block.id}>
       <p className={styles.termCmd}>
         {block.tag ? <span className={styles.termTag}>{block.tag}</span> : null}
-        <span className={styles.termPrompt}>{HOSTS[block.host].prompt}</span> {block.cmd}
+        <span className={styles.termPrompt}>{subject.hosts[block.host]?.prompt}</span> {block.cmd}
       </p>
       {block.out.map((l, k) => (
         <TermLine key={k} line={l} />
@@ -1025,381 +895,3 @@ function TermBlock({ block }: { block: Block }) {
   );
 }
 
-function TermLine({ line }: { line: Run["out"][number] }) {
-  return (
-    <p className={styles.termLine} data-err={line.err ? "1" : undefined} data-mark={line.mark}>
-      <span>{line.text || "\u00a0"}</span>
-      {line.hint ? <em className={styles.termHintInline}>{line.hint}</em> : null}
-    </p>
-  );
-}
-
-/** 文の中の **ことば** を目立たせる */
-const Rich = ({ text }: { text: string }) => (
-  <>
-    {splitStudy(text).map((t, k) =>
-      k % 2 ? (
-        <b key={k} className={styles.term}>
-          {t}
-        </b>
-      ) : (
-        t
-      ),
-    )}
-  </>
-);
-
-/* ------------------------------------------------------------ パネル */
-
-const PANEL_LABEL: Record<Panel, string> = { trace: "サーバーの中", packets: "パケット", logs: "ログ", tree: "名簿", config: "設定" };
-
-function PanelView({ panel, lab, last, card, keyRef }: { panel: Panel; lab: LdapLab; last: Last | null; card: StudyCard; keyRef?: string }) {
-  if (panel === "trace") return <TracePanel last={last} keyRef={keyRef} />;
-  if (panel === "packets") return <PacketPanel run={last?.run ?? null} />;
-  if (panel === "logs") return <LogPanel lab={lab} run={last?.run ?? null} />;
-  if (panel === "tree") return <TreePanel lab={lab} />;
-  return <ConfigPanel lab={lab} card={card} last={last} />;
-}
-
-function TracePanel({ last, keyRef }: { last: Last | null; keyRef?: string }) {
-  if (!last || (!last.run.trace.length && !last.pre?.trace.length))
-    return (
-      <div>
-        <h2 className={styles.sheetTitle}>サーバーの中で起きたこと</h2>
-        <p className={styles.roomNote}>{last ? "このコマンドでは、サーバーの中で特別なことは起きていません" : "まだコマンドを実行していません"}</p>
-      </div>
-    );
-  const hit = new Set(keyNotes(last.run, keyRef));
-  return (
-    <div>
-      <h2 className={styles.sheetTitle}>サーバーの中で起きたこと</h2>
-      <p className={styles.exportLead}>
-        さっきのコマンドで、サーバーが「なぜその返事をしたか」を順に並べています。<b className={styles.studyMark}>黄色の行</b>が、いちばん大事なところ。
-      </p>
-      {last.pre ? (
-        <details className={styles.studyTracePre}>
-          <summary>先に動かしたコマンド：{last.pre.line}</summary>
-          <TraceList items={last.pre.trace} hit={new Set()} />
-        </details>
-      ) : null}
-      <p className={styles.studyTraceCmd}>
-        <span className={styles.termPrompt}>{HOSTS[last.run.host].prompt}</span> {last.run.line}
-      </p>
-      <TraceList items={last.run.trace} hit={hit} />
-    </div>
-  );
-}
-
-function TraceList({ items, hit }: { items: TraceItem[]; hit: Set<TraceItem> }) {
-  return (
-    <ol className={styles.studyTrace}>
-      {items.map((t, k) => (
-        <li key={k} data-tone={t.tone} data-hit={hit.has(t) ? "1" : undefined}>
-          <Rich text={t.text} />
-        </li>
-      ))}
-    </ol>
-  );
-}
-
-function PacketPanel({ run }: { run: Run | null }) {
-  const packets = run?.packets ?? [];
-  const leaked = packets.find((p) => p.secretText);
-  const [open, setOpen] = useState<number | null>(leaked?.no ?? null);
-  const plain = packets.filter((p) => p.proto === "LDAP").length;
-  return (
-    <div>
-      <h2 className={styles.sheetTitle}>ネットワークを流れたパケット</h2>
-      <p className={styles.exportLead}>
-        コンピューターどうしのあいだを、実際に流れたバイトです。<b className={styles.studyKey}>赤いところ</b>は、あなたのパスワード。
-        <b>TLS（暗号）</b>のときは中身が読めません。LDAP サーバーの中から（ldapi）や、お店のサーバーの中の SSSD の話は、ここには出ません。
-      </p>
-      {packets.length ? (
-        <>
-          <p className={styles.studyPktSum} data-bad={leaked ? "1" : undefined}>
-            {packets.length}こ（平文 {plain}・暗号 {packets.length - plain}）
-            {leaked ? ` — No.${leaked.no} に、パスワード「${leaked.secretText}」がそのまま入っていた` : plain ? "" : " — 中身は読めません"}
-          </p>
-          <ul className={styles.studyPkts}>
-            {packets.map((p) => (
-              <li key={p.no} data-secret={p.secretText ? "1" : undefined}>
-                <button type="button" onClick={() => setOpen(open === p.no ? null : p.no)} aria-expanded={open === p.no}>
-                  <span className={styles.studyPktNo}>{p.no}</span>
-                  <span className={styles.studyPktDir}>
-                    {shortIp(p.from)} <i>→</i> {shortIp(p.to)}
-                  </span>
-                  <span className={styles.studyPktProto} data-proto={p.proto}>
-                    {p.proto}
-                  </span>
-                  <span className={styles.studyPktInfo}>{p.info}</span>
-                </button>
-                {open === p.no ? (
-                  <div className={styles.studyDump}>
-                    {p.secretText && p.secret ? <p className={styles.studyDumpWarn}>このパケットの中に、パスワード「{p.secretText}」がそのまま入っています</p> : null}
-                    {p.proto === "TLS" ? (
-                      <p className={styles.studyDumpWarn} data-ok="1">
-                        暗号化されているので、中身（パスワードなど）は読めません
-                      </p>
-                    ) : null}
-                    <pre>
-                      {hexdump(p.bytes, p.secret).map((row, k) => (
-                        <div key={k}>
-                          <i>{row.offset}</i>
-                          <span>
-                            {row.cells.map((c, j) => (
-                              <b key={j} data-secret={c.secret ? "1" : undefined}>
-                                {c.hex}{" "}
-                              </b>
-                            ))}
-                          </span>
-                          <span className={styles.studyDumpAscii}>
-                            {row.cells.map((c, j) => (
-                              <b key={j} data-secret={c.secret ? "1" : undefined}>
-                                {c.ch}
-                              </b>
-                            ))}
-                          </span>
-                        </div>
-                      ))}
-                    </pre>
-                  </div>
-                ) : null}
-              </li>
-            ))}
-          </ul>
-        </>
-      ) : (
-        <p className={styles.roomNote}>{run ? "このコマンドでは、ネットワークにパケットは流れていません" : "まだパケットは流れていません"}</p>
-      )}
-    </div>
-  );
-}
-
-const shortIp = (s: string) => s.replace(/^IP=/, "").replace("192.168.10.", ".");
-
-function LogPanel({ lab, run }: { lab: LdapLab; run: Run | null }) {
-  const logs = lab.server.logs.slice(-60);
-  const fresh = new Set(run?.logs ?? []);
-  return (
-    <div>
-      <h2 className={styles.sheetTitle}>サーバーのログ</h2>
-      <p className={styles.exportLead}>
-        LDAP サーバー（slapd）・お店のサーバー（sshd・SSSD）が書いたログです。本物と同じ形。<b className={styles.studyMark}>光っている行</b>が、さっきのコマンドのぶん。
-      </p>
-      <ul className={styles.studyLog}>
-        {logs.length ? (
-          logs
-            .slice()
-            .reverse()
-            .map((l, k) => (
-              <li key={k} data-src={l.src} data-new={fresh.has(l) ? "1" : undefined}>
-                <time>{clockText(l.at)}</time>
-                <b>{l.src}</b>
-                <span>{l.text}</span>
-              </li>
-            ))
-        ) : (
-          <li className={styles.roomNote}>まだログはありません</li>
-        )}
-      </ul>
-    </div>
-  );
-}
-
-function TreePanel({ lab }: { lab: LdapLab }) {
-  // パネルを開くたびに作りなおす（名簿はコマンドで変わる）
-  const nodes = lab.server.tree();
-  return (
-    <div>
-      <h2 className={styles.sheetTitle}>いまの名簿</h2>
-      <p className={styles.exportLead}>LDAP サーバーの名簿（ディレクトリ）です。親子の形で、上から下へつながっています。DN は、下から上へ読んだ住所です。</p>
-      <ul className={styles.studyTree}>
-        {nodes.map((n) => (
-          <li key={n.ndn} style={{ marginLeft: `${n.depth * 14}px` }}>
-            <TreeRow n={n} />
-          </li>
-        ))}
-      </ul>
-    </div>
-  );
-}
-
-function TreeRow({ n }: { n: TreeNode }) {
-  const icon: GlyphId = n.kind === "person" ? "user" : n.kind === "group" ? "worker" : n.kind === "root" ? "db" : n.kind === "policy" ? "monitor" : "lb";
-  const color = n.kind === "person" ? "#9fb4ff" : n.kind === "group" ? "#ffa45c" : n.kind === "policy" ? "#60a5fa" : "#b08cff";
-  return (
-    <div className={styles.studyTreeRow} style={{ "--c": color } as CSSProperties} data-bulk={n.kind === "bulk" ? "1" : undefined}>
-      {n.kind === "bulk" ? (
-        <span className={styles.studyTreeBulk}>… ほか {n.rdn}</span>
-      ) : (
-        <>
-          <span className={styles.studyTreeIcon}>
-            <Glyph id={icon} size={14} />
-          </span>
-          <b>{n.rdn}</b>
-          {n.label ? <small>{n.label}</small> : null}
-          {n.locked ? (
-            <span className={styles.studyTag} data-tone="ng">
-              ロック中
-            </span>
-          ) : n.fails ? (
-            <span className={styles.studyTag} data-tone="ng">
-              まちがい {n.fails}回
-            </span>
-          ) : null}
-          {n.kind === "person" && n.memberOf?.length ? (
-            <span className={styles.studyTag} data-tone="on">
-              memberOf: {n.memberOf.join("・")}
-            </span>
-          ) : null}
-          {n.kind === "person" && n.uidNumber ? <span className={styles.studyTag}>uidNumber {n.uidNumber}</span> : null}
-          {n.kind === "group" && n.members ? <span className={styles.studyTag}>member {n.members.length}人</span> : null}
-        </>
-      )}
-    </div>
-  );
-}
-
-/* ---------- 設定（cn=config・ldap.conf・sssd.conf） ---------- */
-
-const OVERLAYS = new Set(["ppolicy", "memberof", "refint", "unique"]);
-
-/** このカードの設定が、エントリまるごとか（スキーマ・overlay） */
-function entryHit(ref: string, dn: string): boolean {
-  const d = dn.toLowerCase();
-  if (ref === "schema:nis") return d.includes("}nis,cn=schema");
-  return OVERLAYS.has(ref) && /^olcoverlay=\{\d+\}/.test(d) && d.includes(`}${ref},`);
-}
-
-/** このカードの設定の行か（光らせる） */
-function lineHit(ref: string, dn: string, name: string, value: string): boolean {
-  const n = name.toLowerCase();
-  const mdb = dn.toLowerCase().startsWith("olcdatabase={1}mdb");
-  switch (ref) {
-    case "rootpw":
-      return mdb && n === "olcrootpw";
-    case "anon:disallow":
-      return n === "olcdisallows";
-    case "acl":
-      return mdb && n === "olcaccess";
-    case "tls:security":
-      return n === "olcsecurity";
-    case "index:mail":
-      return mdb && n === "olcdbindex" && value.toLowerCase().startsWith("mail ");
-    default:
-      return OVERLAYS.has(ref) && n === "olcmoduleload" && value.toLowerCase().endsWith(`}${ref}`);
-  }
-}
-
-function ConfigPanel({ lab, card, last }: { lab: LdapLab; card: StudyCard; last: Last | null }) {
-  const ref = card.knob?.ref ?? "";
-  const entries = lab.server.configEntries();
-  // さっきのコマンドで当たった olcAccess の行（{0}・{1} …）
-  const used = new Set<number>();
-  for (const t of [...(last?.run.trace ?? []), ...(last?.pre?.trace ?? [])]) {
-    const m = /^acl:(\d+)/.exec(t.ref ?? "");
-    if (m) used.add(Number(m[1]));
-  }
-  const marked = entries.map((e) => {
-    const whole = entryHit(ref, e.dn);
-    return { ...e, whole, hit: whole || e.attrs.some(([name, vals]) => vals.some((v) => lineHit(ref, e.dn, name, v))) };
-  });
-  const mine = marked.filter((e) => e.hit);
-  const rest = marked.filter((e) => !e.hit);
-  const isSssd = ref.startsWith("sssd");
-  const isTls = ref.startsWith("tls");
-  return (
-    <div>
-      <h2 className={styles.sheetTitle}>いまの設定</h2>
-      {isSssd ? <SssdConfView lab={lab} /> : null}
-      {isTls ? (
-        <>
-          <p className={styles.exportLead}>
-            あなたのパソコンの <b>/etc/openldap/ldap.conf</b>。-H を書かないと、ここの URI でつなぎます（ldap:// は暗号なし、ldaps:// ははじめから暗号）。
-          </p>
-          <ConfText text={ldapConf(lab.client.pc)} hit={(l) => l.startsWith("URI")} />
-        </>
-      ) : null}
-      {card.knob && !isSssd ? (
-        <p className={styles.exportLead}>
-          LDAP サーバーの設定（<b>cn=config</b>）。<b className={styles.studyMark}>黄色い行</b>が、このカードの設定（{card.knob.title}）です。
-          {mine.length ? "" : "まだ入っていません。"}
-        </p>
-      ) : (
-        <p className={styles.exportLead}>LDAP サーバーの設定（cn=config）。名簿と同じ形で、エントリと属性でできています。</p>
-      )}
-      <div className={styles.studyConf}>
-        {mine.map((e) => (
-          <ConfEntry key={e.dn} dn={e.dn} attrs={e.attrs} isHit={(name, v) => e.whole || lineHit(ref, e.dn, name, v)} used={ref === "acl" ? used : null} />
-        ))}
-      </div>
-      {rest.length ? (
-        <details className={styles.studyConfRest} open={!mine.length && !isSssd && !isTls}>
-          <summary>{mine.length ? `そのほかの設定（${rest.length}）` : `ぜんぶの設定（${rest.length}）`}</summary>
-          <div className={styles.studyConf}>
-            {rest.map((e) => (
-              <ConfEntry key={e.dn} dn={e.dn} attrs={e.attrs} isHit={() => false} used={null} />
-            ))}
-          </div>
-        </details>
-      ) : null}
-    </div>
-  );
-}
-
-function ConfEntry({ dn, attrs, isHit, used }: { dn: string; attrs: [string, string[]][]; isHit: (name: string, v: string) => boolean; used: Set<number> | null }) {
-  const mdb = dn.toLowerCase().startsWith("olcdatabase={1}mdb");
-  return (
-    <div className={styles.studyConfEntry}>
-      <p className={styles.studyConfDn}>{dn}</p>
-      {attrs.map(([name, vals]) =>
-        vals.map((v, k) => {
-          const rule = mdb && name === "olcAccess" ? Number(/^\{(\d+)\}/.exec(v)?.[1] ?? -1) : -1;
-          return (
-            <p key={`${name}${k}`} className={styles.studyConfLine} data-hit={isHit(name, v) ? "1" : undefined}>
-              <b>{name}:</b> {v}
-              {used && rule >= 0 && used.has(rule) ? <em className={styles.studyUsed}>← さっき当たった行</em> : null}
-            </p>
-          );
-        }),
-      )}
-    </div>
-  );
-}
-
-function ConfText({ text, hit }: { text: string; hit: (line: string) => boolean }) {
-  return (
-    <div className={styles.studyConfEntry}>
-      {text.split("\n").map((l, k) => (
-        <p key={k} className={styles.studyConfLine} data-hit={hit(l) ? "1" : undefined} data-dim={l.startsWith("#") ? "1" : undefined}>
-          {l || "\u00a0"}
-        </p>
-      ))}
-    </div>
-  );
-}
-
-function SssdConfView({ lab }: { lab: LdapLab }) {
-  const file = sssdConf(lab.sssd.file).split("\n");
-  const running = sssdConf(lab.sssd.running).split("\n");
-  const stale = file.join("\n") !== running.join("\n");
-  const access = (l: string) => l.startsWith("access_provider") || l.startsWith("ldap_access_filter");
-  return (
-    <>
-      <p className={styles.exportLead}>
-        お店のサーバーの <b>/etc/sssd/sssd.conf</b>。「書いたもの（ファイル）」と「いま動いている SSSD が読みこんだもの」は、<b>systemctl restart sssd</b> するまでちがいます。
-      </p>
-      {stale ? <p className={styles.studyStale}>ファイルは書きかえたけれど、SSSD はまだ前の設定で動いています</p> : null}
-      <div className={styles.studyConfPair}>
-        <div>
-          <small>書いたもの（ファイル）</small>
-          <ConfText text={file.join("\n")} hit={(l) => access(l) || (stale && !running.includes(l))} />
-        </div>
-        <div>
-          <small>いま動いているもの</small>
-          <ConfText text={running.join("\n")} hit={access} />
-        </div>
-      </div>
-    </>
-  );
-}

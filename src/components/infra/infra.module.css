@@ -4544,7 +4544,7 @@ button.studyRun {
   font-size: 9.5px;
   font-weight: 900;
 }
-.studyPktProto[data-proto="LDAP"] {
+.studyPktProto[data-proto="plain"] {
   background: rgba(176, 140, 255, 0.2);
   color: #cbb6ff;
 }
@@ -5427,4 +5427,37 @@ button.studyAlt {
     animation: none !important;
     transition: none !important;
   }
+}
+
+/* 勉強部屋：教科の切りかえ（LDAP・メール） */
+.studySubjects {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 6px;
+  margin: 10px 12px 0;
+}
+.studySubjects button {
+  display: grid;
+  gap: 2px;
+  min-height: 48px;
+  padding: 7px 8px;
+  border: 1.5px solid var(--line);
+  border-radius: 14px;
+  background: var(--panel);
+  color: var(--faint);
+  text-align: center;
+  cursor: pointer;
+}
+.studySubjects button b {
+  font-size: 12.5px;
+  font-weight: 800;
+}
+.studySubjects button small {
+  font-size: 10px;
+  font-weight: 700;
+}
+.studySubjects button[data-on="1"] {
+  border-color: var(--mint);
+  background: color-mix(in srgb, var(--mint) 12%, var(--panel));
+  color: var(--text);
 }

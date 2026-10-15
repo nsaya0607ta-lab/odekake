@@ -9,7 +9,7 @@
  */
 import { MailWorld, inCidr, pfGet, pfIsLocalConf, m4Sendmail, HOST_IP, type Mail, type Stored } from "./mail";
 import { MailLab, type HostId, type Run } from "./mail-shell";
-import { prepareWith, splitStudy, type KnobOf, type PrepRunOf, type StudyCardOf } from "./study-kit";
+import { prepareWith, splitStudy, type PrepRunOf, type StudyCardOf } from "./study-kit";
 
 export type MailPanel = "trace" | "packets" | "logs" | "boxes" | "config";
 export type MailCard = StudyCardOf<MailLab, Run, HostId, MailPanel>;
@@ -621,6 +621,7 @@ export const MAIL_CARDS: MailCard[] = [
         ok: (r) => r.exit === 24 && has(r, "Relay access denied"),
         learn: "外からの中継は、いままでどおり **554** で断ります。ログの **NOQUEUE: reject: RCPT from …** の行が、断った記録です。mynetworks は「信用する範囲」なので、必要なところだけにします（広げすぎると、知らない人のメールまで運んでしまう）。",
         show: ["logs", "trace"],
+        why: "relay",
       },
       {
         say: "落とし穴：mynetworks を広げたり絞ったりすると、外からお店あてのメールは届かなくなる？",
@@ -630,6 +631,7 @@ export const MAIL_CARDS: MailCard[] = [
         ok,
         learn: "届きます。mynetworks・reject_unauth_destination は **中継（よそあて）** の決まり。**自分あて**（mydestination）は、だれからでも受けとります。「受けとる」と「運ぶ」は別の話です。",
         show: ["trace"],
+        why: "mydest",
       },
     ],
     probe: { host: "pc", cmd: `swaks --to tomodachi@example.com --from pochi@wanko.shop ${SV}`, label: (r) => (ok(r) ? "お店のパソコンからの中継を引きうけた" : "お店のパソコンでも中継しない") },
@@ -827,6 +829,7 @@ export const MAIL_CARDS: MailCard[] = [
         ok,
         learn: "受けとりました（暗号なし）。**may** は「できれば」なので、STARTTLS をしない相手も断りません。25番でよそのサーバーから受けとるときは may がふつう（encrypt にすると、TLS を使えない相手からのメールが届かなくなる）。ログインして送る 587番（submission）は encrypt にします。",
         show: ["trace", "packets"],
+        why: "tls:may",
       },
     ],
     probe: { host: "pc", cmd: `swaks --to tomodachi@example.com --from pochi@wanko.shop ${SV} ${AUTH("pochi")}`, label: (r) => (r.packets.some((p) => p.secretText) ? "パスワードが base64 のまま流れた" : "暗号の外ではログインさせない") },

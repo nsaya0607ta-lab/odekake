@@ -101,7 +101,7 @@ DNS が切りかわるまでのアクセスは失われる。
 
 ## 6. 画面
 
-- **トップ**：タブ「ステージ」「ずかん」「ラボ」「サーバー室」「勉強部屋」。ステージは路線図のように縦に並ぶ（★・理解バッジつき）
+- **トップ**：タブ「ステージ」「ずかん」「ラボ」「サーバー室」「勉強部屋」（勉強部屋は上で LDAP・メールを切りかえる）。ステージは路線図のように縦に並ぶ（★・理解バッジつき）
 - **ステージ**：上に成績（成功率・平均の速さ・月額）と時間のバー、まんなかに盤面、その下にフレブル先生のひとこと欄（ヒント）、いちばん下に操作。
   盤面には何も重ねない（事件のお知らせだけ、盤面の下の空きに短く出す）
 - **盤面**（縦長・スマホ向け）：上から 利用者 → 入口（DNS・CDN・WAF・右はしに予備の拠点）→ ロードバランサー（右にオートスケール）
@@ -197,6 +197,7 @@ DNS が切りかわるまでのアクセスは失われる。
   画面と同じ種・別の種の2回、最初から最後まで通して（ok が通る・learn／出力／サーバーの中に undefined/NaN がない・`**` の対応・
   off の前は設定なし／on・落とし穴の前は設定あり・先に動かすコマンドが通る・最後に設定が入る）、見くらべる（まっさらな名簿2つ）で
   設定なし・ありの結果がちがうこと、自由に試すの「ためしてみよう」を両方の名簿で全部動かしてもこわれないことを見る。
+  **勉強部屋（メールサーバー）**も同じように、main.cf・Dovecot の設定・Sieve・m4 の部品と、カード12枚を通す。
   2026-10-08：1万通り こわれず／2026-10-15：2000通り・LDAP 12枚も通った
 - `FUZZ_VALIDATE=1 node scripts/fuzz-infra.mjs 420` … 書き出した設定ファイルを、`docker compose config` と
   `terraform fmt -check`・`terraform validate`（AWS プロバイダ 5.70）でも確かめる。2026-10-08：60通り すべて通った
@@ -212,6 +213,10 @@ DNS が切りかわるまでのアクセスは失われる。
   StartTLS で Application Data になる）・名簿（memberOf・ロック）・設定（cn=config と sssd.conf の「書いたもの／動いているもの」）のパネル、
   まとめの「同じコマンド、ちがう結果」、自由に試す（設定なし・ありでやりなおす・ためしてみよう・help）、一覧の ✓（12枚）がすべて正しく出て、
   横スクロールもエラーも出ないこと
+
+- **勉強部屋（メールサーバー）** もブラウザで確かめる。2026-10-15（Chromium・375×667／390×844／430×932）：12枚のカードを最初から最後まで通して、
+  やりなおしが1回も出ない・横スクロールなし・エラーなし。見くらべる（設定なし・ありで結果がちがう）・自由に試す（設定ありでやりなおす・ためしてみよう全部・help）・
+  図（メールサーバー・パソコン・外のサーバー・インターネット）・設定／メールボックスのパネルも見た。画面を共通にしたあとの LDAP 12枚も、390×844 で同じように通した
 
 ## 6.8 勉強部屋（LDAP）
 
@@ -288,6 +293,58 @@ DNS が切りかわるまでのアクセスは失われる。
 5. ブラウザで、新しいカードを最初から最後まで通す（375×667／390×844／430×932）。とくに図・パケット・名簿・設定パネル・見くらべるの見え方
 6. この節の表を更新する
 
+## 6.9 勉強部屋（メールサーバー）
+
+タブ「勉強部屋」の上の切りかえで「メール（Postfix・sendmail）」をえらぶ（URL は `?tab=study&s=mail`、カードは `&card=…`）。
+メールを運ぶ **Postfix・sendmail**（MTA）と、メールボックスの **Dovecot**（IMAP・POP3・LMTP・Sieve・SMTP AUTH の受け口）を、
+LPIC-2 の 202 試験（211 電子メールサービス）くらいの深さで学ぶ。かたちは LDAP の勉強部屋（6.8）とまったく同じ
+（1枚＝1設定。設定なし → 入れる → 設定あり → 落とし穴 → 見くらべる・クイズ・自由に試す）。できたカードは `odekake_infra_mail_v1` に覚える。
+
+- 3台＋1：**あなたのパソコン**（pc・192.168.10.5。お店の LAN）・**メールサーバー**（mail・192.168.10.3）・**外のサーバー**（out・203.0.113.80。お客さん・取引先）、
+  図の右上に **インターネット**（example.com の MX・プロバイダの中継サーバー。なんでも受けとる）。名前・IP はすべてこの中だけのもの（example.com・example.net・.example は説明用の名前）
+- 送るのは **swaks**（SMTP のやりとりをぜんぶ見せる。`--auth`・`--tls`・`--header`・`--quit-after` など）、読むのは **curl** の IMAP・POP3
+  （`imap://`・`imaps://`・`pop3(s)://`、`?ALL` の SEARCH・`;UID=1` の FETCH・`-v`・`--ssl-reqd`）。telnet・nc の1行ずつのやりとりはしない
+- 設定は「書いたもの（ファイル）」と「動いているもの」を分けてある：main.cf は `postfix reload`、Dovecot は `systemctl reload dovecot`、
+  sendmail.cf は `systemctl restart sendmail`。`/etc/aliases` は `newaliases`、`/etc/mail/access` は `makemap` で .db にしてはじめて効く（.db は毎回読むので再起動はいらない）。
+  ずれているときは「サーバーの中では」とパネル（設定）に出す
+- パネル：サーバーの中・パケット（SMTP・IMAP の平文。AUTH PLAIN の base64 も「読める形で」赤く出す）・ログ（/var/log/maillog。本物の形）・
+  **メールボックス**（人ごとに Dovecot が見ているフォルダーと通数、Dovecot が見ていない場所に残ったメール、キュー、外へ配ったメール）・設定（書いたもの／動いているもの）
+- 外からの中継（オープンリレー）は、**断られる（554・550）ようすとログの読み方** で見せる。知らない相手のメールを運んでしまう実演はしない（ユーザー指定）
+
+### カード（`mail-lessons.ts`・はじめに＋設定11枚）
+
+| # | id | 章 | 設定 | なし → あり | 落とし穴 |
+|---|---|---|---|---|---|
+| はじめに | mail-basics | まず | （ことば） | MX・SMTP の順番・maillog・IMAP で読む・550・postconf | — |
+| 1 | mydest | 1 | mydestination に $mydomain | wanko.shop あてが 554 → 受けとる | postconf -e だけでは効かない（postfix reload） |
+| 2 | aliases | 1 | /etc/aliases の info: pochi, hana | 550 User unknown → 2人に届く | 書いただけでは効かない（newaliases） |
+| 3 | relay | 2 | mynetworks に 192.168.10.0/24 | LAN からの中継が 554 → 中継する（外からはいままでどおり 554） | 自分あては外からも届く（中継とは別） |
+| 4 | sasl | 2 | smtpd_sasl_auth_enable（Dovecot） | AUTH がない → 235 でログインして中継 | AUTH PLAIN は base64（暗号ではない） |
+| 5 | smtp-tls | 2 | smtpd_tls_* ＋ smtpd_tls_auth_only | パスワードが流れる → STARTTLS の中でだけログイン | may は「できれば」（暗号なしの相手からも受けとる） |
+| 6 | imap-plain | 2 | disable_plaintext_auth = yes | imap:// で平文ログイン → LOGINDISABLED | localhost からは secured として通る |
+| 7 | maildir | 3 | home_mailbox = Maildir/ | 届いたのに IMAP で見えない → 見える | 前のメールは /var/mail に残る |
+| 8 | sieve | 3 | mailbox_transport = lmtp:… | Sieve が読まれない → Ads にふり分け | 書きまちがいはログにエラー、INBOX に入る |
+| 9 | relayhost | 3 | relayhost = [smtp.isp.example] | 250 なのにキューに残る（OP25B）→ 届く | 残っていたメールは postqueue -f |
+| 10 | sendmail-daemon | 4 | DAEMON_OPTIONS の Addr を消す | 127.0.0.1:25 だけ → 0.0.0.0:25 | sendmail.mc だけでは効かない（m4 → restart） |
+| 11 | sendmail-access | 4 | Connect:192.168.10 RELAY | Relaying denied → 中継する（外からはいままでどおり） | 書いただけでは効かない（makemap） |
+
+### しくみ（`mail.ts`・`mail-shell.ts`）
+
+- `mail.ts` … メールの世界。main.cf・master.cf・Dovecot の設定（入れ子）・aliases・access の読み方、sendmail.mc を m4 にかけて sendmail.cf を作る、
+  小さな Sieve の読み手（require・if/elsif/else・header/address/exists/anyof/allof/not・fileinto/keep/discard/stop）、
+  SMTP のサーバー側（Postfix・sendmail・インターネットの向こうの3つの返し方。smtpd_relay_restrictions を左から順に・SMTP AUTH・STARTTLS・smtpd_tls_auth_only）、
+  キュー（qmgr・deferred・postqueue -f）・配りかた（local の mbox／Maildir・LMTP と Sieve・relayhost・OP25B・bounce）・maillog・trace（`ref`：mydest・relay・sasl・tls・imap・maildir・sieve・relayhost・queue・sendmail:… など）
+- `mail-shell.ts` … 3台のターミナル（swaks・curl・dig・postconf・postfix・mailq・postqueue・postsuper・postcat・newaliases・postalias・doveconf・doveadm・
+  systemctl・ss・m4・makemap・sed -i・echo >>・cat・ls・tail・grep・help）。`> ・>> ・<` が使える（パイプは使えない）
+- 画面は LDAP と共通：`study-room.tsx`（画面）・`study-ui.tsx`（教科の型・図・パケット・サーバーの中）・`study-kit.ts`（カードの型・prepareWith）。
+  教科ごとのちがいは `study-ldap.tsx`・`study-mail.tsx`（図の線・パネル・コンピューター・結果のひとこと）
+
+### カードを追加・調整するとき
+
+LDAP（6.8）と同じ手順。`mail-lessons.ts` の `MAIL_CARDS` を直し、`node scripts/fuzz-infra.mjs 2000` で12枚が通しで動くこと
+（見くらべるで設定なし・ありの結果がちがう・ためしてみようがこわれない）を確かめ、ブラウザで新しいカードを最初から最後まで通す（375×667／390×844／430×932）。
+届いたメールを数える見くらべるは、先に1通送っておく（`PROBE_SETUP`）。
+
 ## 7. シミュレーションのルール（`sim.ts`）
 
 - アクセスは「リンク」（a → b のつながり）のとおりに流れる。ステージでは置いたパーツからふつうのつなぎ方が決まり（`layout.ts` の `computeLinks`）、
@@ -335,7 +392,9 @@ DNS が切りかわるまでのアクセスは失われる。
   - `design.ts` … ラボの設計図（置いたパーツ・つなぎ方・注意・保存）
   - `export.ts` … ラボの構成を docker-compose・nginx・Terraform にする
   - `room.ts` / `server-room.tsx` / `room-templates.ts` / `room-lessons.ts` … サーバー室（本物のプログラムで動くサーバー・レッスンの台本）
-  - `ldap-bits.ts` / `ldap.ts` / `ldap-shell.ts` / `ldap-lessons.ts` / `study-room.tsx` … 勉強部屋（LDAP の部品・名簿サーバー・3台のターミナル・カードの台本・画面。6.8）
+  - `ldap-bits.ts` / `ldap.ts` / `ldap-shell.ts` / `ldap-lessons.ts` / `study-ldap.tsx` … 勉強部屋の LDAP（部品・名簿サーバー・3台のターミナル・カードの台本・図とパネル。6.8）
+  - `mail.ts` / `mail-shell.ts` / `mail-lessons.ts` / `study-mail.tsx` … 勉強部屋のメールサーバー（メールの世界・3台のターミナル・カードの台本・図とパネル。6.9）
+  - `study-kit.ts` / `study-ui.tsx` / `study-room.tsx` … 勉強部屋の共通（カードの型・部品・画面）
   - `render.ts` … canvas の描画
   - `board.tsx` / `stage-play.tsx` / `infra-app.tsx` / `lab.tsx` … 画面
 - `scripts/fuzz-infra.mjs` … でたらめな構成で、シミュレーター・設計図・書き出し・サーバー室の部品がこわれないか、

@@ -128,7 +128,6 @@ const T0 = Date.UTC(2026, 9, 15, 1, 0, 0);
 const MON = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
 const DOW = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 const jst = (ms: number) => new Date(ms + 9 * 3600e3);
-const p2 = (n: number) => String(n).padStart(2, "0");
 export const clockText = (ms: number) => jst(ms).toISOString().slice(11, 19);
 /** syslog の時刻（Oct 15 10:02:11） */
 export const syslogTime = (ms: number) => {
@@ -139,11 +138,6 @@ export const syslogTime = (ms: number) => {
 export const rfcDate = (ms: number) => {
   const d = jst(ms);
   return `${DOW[d.getUTCDay()]}, ${d.getUTCDate()} ${MON[d.getUTCMonth()]} ${d.getUTCFullYear()} ${clockText(ms)} +0900`;
-};
-/** mbox の From の行の時刻（Thu Oct 15 10:02:11 2026） */
-const ctime = (ms: number) => {
-  const d = jst(ms);
-  return `${DOW[d.getUTCDay()]} ${MON[d.getUTCMonth()]} ${String(d.getUTCDate()).padStart(2, " ")} ${clockText(ms)} ${d.getUTCFullYear()}`;
 };
 
 /* ------------------------------------------------------------ 人とメール */
@@ -1540,6 +1534,8 @@ export class SmtpSession {
       this.run.note("smtpd_tls_security_level = encrypt → 暗号にしないと送れない", "ng", "tls");
       return reply(530, "5.7.0 Must issue a STARTTLS command first");
     }
+    if (this.kind === "postfix" && pfGet(this.conf, "smtpd_tls_security_level") === "may" && !this.tls)
+      this.run.note("smtpd_tls_security_level = **may**（できれば暗号）→ 相手が STARTTLS をしなくても、そのまま受けとる", "info", "tls:may");
     this.from = m[1]!;
     this.rcpts = [];
     this.count("mail", true);
