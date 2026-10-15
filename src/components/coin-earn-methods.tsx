@@ -22,7 +22,7 @@ import { HOME_DROP } from "@/components/guide/guide-data";
 import { COIN_MAX as PINBALL_COIN_MAX, COIN_POINTS as PINBALL_COIN_POINTS } from "@/lib/games/pinball/config";
 import { RED_LOGIN_COINS } from "@/lib/red-coin-rewards";
 import { BlueCoinArt, RedCoinArt, WhiteCoinArt } from "./coin-art";
-import { WHITE_LOGIN_COINS, WHITE_STARTER_COINS } from "@/lib/games/town-progression";
+import { WHITE_LOGIN_COINS } from "@/lib/games/town-progression";
 import { IconChevronDown, IconCoin } from "./icons";
 
 /** コインの取得方法をまとめて表示する折りたたみ。 */
@@ -159,7 +159,7 @@ export function CoinEarnMethods() {
         <div className="rounded-2xl border border-[#bdcbbf] bg-[#f8fcf3] p-2.5">
           <p className="flex items-center gap-1 font-bold text-[#486457]"><WhiteCoinArt className="h-3.5 w-3.5" />白コイン（街づくりに使えます）</p>
           <div className="mt-1.5 flex flex-wrap gap-1.5 text-[10px] text-[#58705b]"><span className="rounded-full bg-white/80 px-2 py-1">毎日のログイン +{WHITE_LOGIN_COINS}枚</span><span className="rounded-full bg-white/80 px-2 py-1">ホームで拾う +5〜100枚</span><span className="rounded-full bg-white/80 px-2 py-1">クエスト・まちづくりLv.の報酬</span></div>
-          <p className="mt-2 text-[10px] leading-relaxed text-ink-soft">道路・建物・公園の敷地や部品の購入、増築に使います。街づくりの初回には{formatCoins(WHITE_STARTER_COINS)}枚の支援も受け取れます。</p>
+          <p className="mt-2 text-[10px] leading-relaxed text-ink-soft">道路・建物・公園の敷地や部品の購入、増築に使います。</p>
         </div>
       </div>
     </details>

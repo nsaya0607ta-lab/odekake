@@ -559,10 +559,9 @@ export function TownBuilder({ userId }: { userId: string }) {
       {welcome && <div className={styles.welcome}><div className={styles.welcomeCard}>
         <span className={styles.eyebrow}>TOWN ADVENTURE</span><h2>小さな一歩が、<br />街の物語になる。</h2>
         <p>建てて、育てて、レベルアップ。<br />クエストを達成して、あなたらしい街へ。</p>
-        <div className={styles.starterGift}><WhiteCoinArt /><span>はじまりの支援<b>白コイン 20,000枚</b></span></div>
         <button type="button" className={styles.primary} disabled={busy || !snapshot} onClick={() => { void runAction({ action: "start", starter: true }).then(ok => { if (ok) chooseMode("inspect"); }); }}>小さな集落からはじめる <span>→</span></button>
         <button type="button" className={styles.secondary} disabled={busy || !snapshot} onClick={() => { void runAction({ action: "start", starter: false }).then(ok => { if (ok) chooseMode("inspect"); }); }}>更地から自由につくる</button>
-        <small>白コインは、街づくり専用のコインです。</small>
+        <small>白コインは街づくり専用のコイン。毎日のログイン・ホーム・クエストで集めます。</small>
       </div></div>}
     </section>
     <header ref={headerRef} className={styles.header}>

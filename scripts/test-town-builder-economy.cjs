@@ -72,12 +72,38 @@ function apiWithSession(session) {
 (async () => {
   db = new PGlite();
   await db.exec(fs.readFileSync(path.join(root, 'supabase/tests/00_supabase_stub.sql'), 'utf8').replace('create extension if not exists "pgcrypto";', ''));
-  for (const name of fs.readdirSync(path.join(root, 'supabase/migrations')).filter(n => n.endsWith('.sql')).sort()) {
+  const migrations = fs.readdirSync(path.join(root, 'supabase/migrations')).filter(n => n.endsWith('.sql')).sort();
+  async function migrate(name) {
     let sql = fs.readFileSync(path.join(root, 'supabase/migrations', name), 'utf8').replace(/create extension if not exists "?pgcrypto"?;/gi, '');
     // This historical file has a pre-existing truncated dollar delimiter. Normalize only in the isolated test database.
     if (name.startsWith('0085_')) sql = sql.replace(/^as \$$/m, () => 'as $$').replace(/^\$;$/m, () => '$$;');
     await db.exec(sql);
   }
+  for (const name of migrations.filter(n => n < '0145_')) await migrate(name);
+  // Accounts that received the 20,000 starter coins before 0145, then kept everything plus a login reward, spent most, or spent all.
+  const starters = [['77777777-7777-4777-8777-777777777777', 20500, 500], ['88888888-8888-4888-8888-888888888888', 3000, 0], ['99999999-9999-4999-8999-999999999999', 0, 0]];
+  const whiteBalance = async id => (await db.query('select balance from public.user_white_coins where user_id=$1', [id])).rows[0].balance;
+  for (const [id, balance] of starters) {
+    await asUser(id);
+    assert.equal((await action('start', { p_town: g.createTown() })).balance, 20000);
+    if (balance === 20500) await rpc('claim_white_login_bonus');
+    else await db.query('update public.user_white_coins set balance=$2 where user_id=$1', [id, balance]);
+    assert.equal(await whiteBalance(id), balance);
+  }
+  for (const name of migrations.filter(n => n >= '0145_')) await migrate(name);
+  await test('0145 takes the starter coins back once: 20,000 from the balance, or everything when less is left', async () => {
+    for (const [id, before, left] of starters) {
+      assert.equal(await whiteBalance(id), left);
+      const events = (await db.query("select amount,idempotency_key as key,metadata from public.white_coin_events where user_id=$1 and event_type='starter' order by id", [id])).rows;
+      assert.deepEqual(events.map(e => [e.amount, e.key]), before > 0 ? [[20000, 'town-starter'], [left - before, 'town-starter-revoked']] : [[20000, 'town-starter']]);
+      assert.equal(events[0].metadata.revoked, before - left);
+      if (events[1]) assert.equal(events[1].metadata.label, 'はじまりの支援の取り消し');
+    }
+    // Coins earned after the first run are never taken, even from an account that had nothing left to take back.
+    await asUser(starters[2][0]); await rpc('claim_white_login_bonus');
+    await migrate('0145_town_no_starter_coins.sql');
+    for (const [id, , left] of starters) assert.equal(await whiteBalance(id), id === starters[2][0] ? 500 : left);
+  });
   await asUser();
   await test('all 50 level thresholds match the database, including exact boundaries', async () => {
     for (let level = 1; level <= 50; level++) {
@@ -104,11 +130,14 @@ function apiWithSession(session) {
       assert.deepEqual(quests.find(v => v.id === q.id), expected);
     }
   });
-  await test('starter grant and initial city are atomic and an identical request never grants twice', async () => {
+  await test('starting a city grants no white coins (0145) and an identical request is applied once', async () => {
     const args = { p_request_id: randomUUID(), p_revision: 0, p_action: 'start', p_town: g.createTown() };
     const a = await rpc('commit_town_builder', args), b = await rpc('commit_town_builder', args);
-    assert.deepEqual(a, b); assert.equal(a.balance, 20000); assert.equal(a.xp, 0);
+    assert.deepEqual(a, b); assert.equal(a.balance, 0); assert.equal(a.xp, 0); assert.equal(a.revision, 1);
     assert.deepEqual(a.town.tiles, g.createTown().tiles);
+    assert.equal((await db.query('select count(*)::integer as n from public.white_coin_events where user_id=$1', [userId])).rows[0].n, 0);
+    // The checks below spend coins: fund the wallet through the internal ledger function, as rewards do.
+    await db.query("select public.add_white_coin_event($1,'quest',20000,'test:funds')", [userId]);
   });
   await test('a paid construction and its delayed replay charge only once', async () => {
     const before = await snapshot(), next = g.buildTile(before.town, 'house', 11, 9).town;
@@ -234,7 +263,7 @@ function apiWithSession(session) {
     await rpc('claim_white_login_bonus');
     const legacy = g.createTown(); legacy.money = 1e12; legacy.day = 120;
     const imported = await action('start', { p_town: legacy, p_import: true });
-    assert.equal(imported.balance, 20500); assert(imported.xp > 0); assert.equal(imported.town.day, 120); assert.deepEqual(imported.town.tiles, legacy.tiles);
+    assert.equal(imported.balance, 500); assert(imported.xp > 0); assert.equal(imported.town.day, 120); assert.deepEqual(imported.town.tiles, legacy.tiles);
   });
   await test('white login rewards preserve existing yellow, blue and red rewards', async () => {
     await asUser('33333333-3333-4333-8333-333333333333');
@@ -289,13 +318,15 @@ function apiWithSession(session) {
   });
   await test('reapplying the migration preserves cities, balances, quests and the old login implementation', async () => {
     await asUser(); const before = await snapshot();
-    await db.exec(fs.readFileSync(path.join(root, 'supabase/migrations/0141_white_coins_town_rpg.sql'), 'utf8'));
-    await db.exec(fs.readFileSync(path.join(root, 'supabase/migrations/0142_town_my_home.sql'), 'utf8'));
-    await db.exec(fs.readFileSync(path.join(root, 'supabase/migrations/0143_home_coin_drops_x1_5.sql'), 'utf8'));
-    await db.exec(fs.readFileSync(path.join(root, 'supabase/migrations/0144_town_park_parts.sql'), 'utf8'));
+    const balances = await Promise.all(starters.map(([id]) => whiteBalance(id)));
+    for (const name of migrations.filter(n => n >= '0141_')) await migrate(name);
     assert.deepEqual(await snapshot(), before);
+    assert.deepEqual(await Promise.all(starters.map(([id]) => whiteBalance(id))), balances);
     await rpc('claim_login_bonus'); // Would recurse if the wrapper were renamed again.
     assert.equal((await rpc('claim_login_bonus')).white_amount, 0);
+    // Replaying 0141 restores its starter grant only until 0145 is replayed after it.
+    await asUser('aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa');
+    assert.equal((await action('start', { p_town: g.createTown(false) })).balance, 0);
   });
   await test('the actual API validates the account and commands, computes server prices and replays without charging twice', async () => {
     await asUser(); await db.exec('set role authenticated');

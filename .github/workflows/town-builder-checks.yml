@@ -18,6 +18,7 @@ on:
       - "supabase/migrations/0142_town_my_home.sql"
       - "supabase/migrations/0143_home_coin_drops_x1_5.sql"
       - "supabase/migrations/0144_town_park_parts.sql"
+      - "supabase/migrations/0145_town_no_starter_coins.sql"
       - "src/components/games/use-town-sky.ts"
       - "src/lib/room/weather.ts"
       - "src/lib/room/sun.ts"
