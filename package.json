@@ -8,7 +8,7 @@
     "start": "next start",
     "lint": "eslint .",
     "typecheck": "tsc --noEmit",
-    "test:town": "node scripts/test-town-builder.cjs && node scripts/test-town-builder-access.cjs && node scripts/test-town-builder-renderer.cjs && node scripts/test-town-builder-canvas.cjs && node scripts/test-town-builder-touch.cjs && node scripts/test-town-builder-economy.cjs && node scripts/test-town-builder-rpg.cjs && node scripts/test-town-builder-living.cjs"
+    "test:town": "node scripts/test-town-builder.cjs && node scripts/test-town-builder-access.cjs && node scripts/test-town-builder-renderer.cjs && node scripts/test-town-builder-canvas.cjs && node scripts/test-town-builder-touch.cjs && node scripts/test-town-builder-economy.cjs && node scripts/test-town-builder-rpg.cjs && node scripts/test-town-builder-living.cjs && node scripts/test-town-builder-insights.cjs"
   },
   "dependencies": {
     "@pixi/particle-emitter": "^5.0.10",

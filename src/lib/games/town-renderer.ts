@@ -10,7 +10,9 @@ import { drawDog, TownLife } from "./town-life";
 
 type Point = { x: number; y: number };
 export type TownCamera = { x: number; y: number; zoom: number };
-export type SceneOptions = { night: boolean; environment?: TownEnvironment; grid: boolean; hover: number | null; selected: number | null; preview: number[]; tool: Tool | "inspect" | "pan" | "decorate"; routes: number[][]; paused: boolean; speed: number; parkSize?: ParkSize; parkKind?: ParkLot["kind"]; parkRotated?: boolean; editLot?: number; parkPart?: ParkPart | "remove"; partRotation?: number };
+/** 情報マップ（満足度・駅の利用圏など）：地面に塗る色と、建物の上の小さな札 */
+export type SceneLayer = { cells: { tile: number; fill?: string; pin?: { text: string; color: string } }[] };
+export type SceneOptions = { layer?: SceneLayer; night: boolean; environment?: TownEnvironment; grid: boolean; hover: number | null; selected: number | null; preview: number[]; tool: Tool | "inspect" | "pan" | "decorate"; routes: number[][]; paused: boolean; speed: number; parkSize?: ParkSize; parkKind?: ParkLot["kind"]; parkRotated?: boolean; editLot?: number; parkPart?: ParkPart | "remove"; partRotation?: number };
 const W = 32, H = 16;
 const iso = (x: number, y: number, z = 0): Point => ({ x: (x - y) * W, y: (x + y) * H - z });
 const hash = (n: number) => { const v = Math.sin(n * 127.1 + 311.7) * 43758.5453; return v - Math.floor(v); };
@@ -1196,6 +1198,11 @@ export class TownScene {
         c.globalAlpha = .5; c.beginPath(); c.ellipse(iso(12, 12).x, iso(12, 12).y, 820, 390, 0, 0, Math.PI * 2); c.fill(); c.restore();
       }
     }
+    if (options.layer) for (const cell of options.layer.cells) {
+      if (!cell.fill) continue;
+      const x = cell.tile % MAP_SIZE, y = Math.floor(cell.tile / MAP_SIZE), z = town.terrain[cell.tile] ? 5.5 : 1;
+      poly(c, [iso(x, y, z), iso(x + 1, y, z), iso(x + 1, y + 1, z), iso(x, y + 1, z)], cell.fill, "#ffffff55", .5);
+    }
     const highlight = (i: number, color: string, fill: string) => { const x = i % MAP_SIZE, y = Math.floor(i / MAP_SIZE), z = town.terrain[i] ? 5.5 : 1; poly(c, [iso(x, y, z), iso(x + 1, y, z), iso(x + 1, y + 1, z), iso(x, y + 1, z)], fill, color, 1.8); };
     const previewTiles = options.preview.length ? options.preview : options.hover !== null && options.tool !== "pan" && options.tool !== "inspect" ? [options.hover] : [];
     const allowedAt = (i: number) => {
@@ -1345,6 +1352,37 @@ export class TownScene {
       if (flash > 0) { c.save(); c.globalCompositeOperation = "lighter"; c.fillStyle = `rgba(210,220,255,${flash * .5})`; c.fillRect(0, 0, width, height); c.restore(); }
       this.life.screen(c, width, height);
     }
+    if (options.layer) this.drawPins(c, town, options.layer, width, height);
+  }
+  /** 情報マップの札（画面の大きさで描く。拡大しても縮小しても読める） */
+  private drawPins(c: CanvasRenderingContext2D, town: Town, layer: SceneLayer, width: number, height: number) {
+    const { camera } = this;
+    c.save();
+    c.font = "700 11px system-ui, -apple-system, sans-serif"; c.textAlign = "center"; c.textBaseline = "middle";
+    const pins = layer.cells.filter(cell => cell.pin).map(cell => {
+      const x = cell.tile % MAP_SIZE, y = Math.floor(cell.tile / MAP_SIZE), tile = town.tiles[cell.tile]!;
+      const faces = ["house", "shop", "factory", "station", "home"].includes(tile) ? buildingFaces(tile, x, y, town.levels[cell.tile] || 1, stationAxis(town, cell.tile)).flat() : [];
+      const top = faces.length ? Math.min(...faces.map(p => p.y)) : iso(x + .5, y + .5).y - 4;
+      return { cell, sx: camera.x + iso(x + .5, y + .5).x * camera.zoom, sy: camera.y + top * camera.zoom - 12, depth: x + y };
+    }).sort((a, b) => a.depth - b.depth);
+    // 縮小すると札が重なるので、手前（あとに描く）を優先して、重なる奥の札は省く
+    const drawn: { l: number; r: number; t: number; b: number }[] = [];
+    for (let k = pins.length - 1; k >= 0; k--) {
+      const { cell, sx, sy } = pins[k]!;
+      const w = Math.max(22, c.measureText(cell.pin!.text).width + 12), box = { l: sx - w / 2, r: sx + w / 2, t: sy - 10, b: sy + 12 };
+      if (drawn.some(d => box.l < d.r && box.r > d.l && box.t < d.b && box.b > d.t)) { pins.splice(k, 1); continue; }
+      drawn.push(box);
+    }
+    for (const { cell, sx, sy } of pins) {
+      if (sx < -40 || sy < -20 || sx > width + 40 || sy > height + 20) continue;
+      const text = cell.pin!.text, w = Math.max(22, c.measureText(text).width + 12);
+      c.fillStyle = "rgba(20, 32, 30, .28)"; c.beginPath(); c.roundRect(sx - w / 2, sy - 8, w, 18, 9); c.fill();
+      c.fillStyle = cell.pin!.color; c.beginPath(); c.roundRect(sx - w / 2, sy - 10, w, 18, 9); c.fill();
+      c.strokeStyle = "rgba(255,255,255,.85)"; c.lineWidth = 1.2; c.stroke();
+      c.beginPath(); c.moveTo(sx - 4, sy + 7); c.lineTo(sx + 4, sy + 7); c.lineTo(sx, sy + 12); c.closePath(); c.fillStyle = cell.pin!.color; c.fill();
+      c.fillStyle = "#ffffff"; c.fillText(text, sx, sy - 1);
+    }
+    c.restore();
   }
 }
 export function drawTownIcon(c: CanvasRenderingContext2D, kind: Tool, width: number, height: number) {

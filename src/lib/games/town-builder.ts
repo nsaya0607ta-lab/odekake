@@ -231,13 +231,11 @@ export function railRoutes(tiles: Tile[]): number[][] {
   }
   return routes;
 }
-export function getTownStats(tiles: Tile[], levels: number[] = [], lots: ParkLot[] = [], attachments: FacilityAttachment[] = []): TownStats {
-  const count = (t: Tile) => tiles.filter(v => v === t).length;
+/** 住宅の満足度の内訳（公園・商店・工場・庭・緑化帯）。getTownStats と同じ計算 */
+export type HappinessParts = { total: number; base: number; park: number; garden: number; shops: number; factories: number; greenbelt: number };
+function parkBonusOf(tiles: Tile[], lots: ParkLot[]) {
   const covered = new Set(lots.flatMap(lotTiles)), legacyParks = tiles.flatMap((t, i) => t === "park" && !covered.has(i) ? [i] : []);
   const developed = lots.filter(l => l.parts.some(p => (PARK_PARTS.find(s => s.id === p.kind)?.value ?? 0) >= 2));
-  const homes = count("house"), shops = count("shop"), factories = count("factory"), roads = count("road"), rails = count("rail"), stations = count("station"), parks = legacyParks.length + developed.length;
-  const routes = railRoutes(tiles), linkedStations = new Set(routes.flatMap(r => [r[0]!, r[r.length - 1]!])).size;
-  const extras = new Map(attachments.map(a => [a.tile, a.parts]));
   const parkBonus = (i: number) => {
     const x = i % MAP_SIZE, y = Math.floor(i / MAP_SIZE);
     const legacy = legacyParks.filter(p => Math.abs(x - p % MAP_SIZE) + Math.abs(y - Math.floor(p / MAP_SIZE)) <= 3).length * 12;
@@ -247,13 +245,29 @@ export function getTownStats(tiles: Tile[], levels: number[] = [], lots: ParkLot
       return value + (distance <= 3 ? Math.min(24, 6 + score * 2) : 0);
     }, 0);
   };
+  return { legacyParks, developed, parkBonus };
+}
+function happinessWith(tiles: Tile[], attachments: FacilityAttachment[], extras: Map<number, FacilityPart[]>, parkBonus: (i: number) => number, i: number): HappinessParts {
+  const greenFactories = attachments.filter(a => a.kind === "factory" && a.parts.includes("greenbelt") && Math.abs(i % MAP_SIZE - a.tile % MAP_SIZE) + Math.abs(Math.floor(i / MAP_SIZE) - Math.floor(a.tile / MAP_SIZE)) <= 3).length;
+  const park = parkBonus(i), garden = extras.get(i)?.includes("garden") ? 3 : 0, shops = near(tiles, i, ["shop"], 3) * 4, factories = near(tiles, i, ["factory"], 3) * 10, greenbelt = greenFactories * 7;
+  return { total: Math.max(20, Math.min(100, 60 + park + garden + shops - factories + greenbelt)), base: 60, park, garden, shops, factories, greenbelt };
+}
+/** 1軒の住宅の満足度と、その内訳 */
+export function houseHappiness(tiles: Tile[], lots: ParkLot[], attachments: FacilityAttachment[], i: number): HappinessParts {
+  return happinessWith(tiles, attachments, new Map(attachments.map(a => [a.tile, a.parts])), parkBonusOf(tiles, lots).parkBonus, i);
+}
+export function getTownStats(tiles: Tile[], levels: number[] = [], lots: ParkLot[] = [], attachments: FacilityAttachment[] = []): TownStats {
+  const count = (t: Tile) => tiles.filter(v => v === t).length;
+  const { legacyParks, developed, parkBonus } = parkBonusOf(tiles, lots);
+  const homes = count("house"), shops = count("shop"), factories = count("factory"), roads = count("road"), rails = count("rail"), stations = count("station"), parks = legacyParks.length + developed.length;
+  const routes = railRoutes(tiles), linkedStations = new Set(routes.flatMap(r => [r[0]!, r[r.length - 1]!])).size;
+  const extras = new Map(attachments.map(a => [a.tile, a.parts]));
   let population = 0, income = 0, jobs = 0, satisfaction = 0, occupied = 0;
   tiles.forEach((t, i) => {
     if (!touchesRoad(tiles, i % MAP_SIZE, Math.floor(i / MAP_SIZE))) return;
     const level = levels[i] || 1;
     if (t === "house") {
-      const greenFactories = attachments.filter(a => a.kind === "factory" && a.parts.includes("greenbelt") && Math.abs(i % MAP_SIZE - a.tile % MAP_SIZE) + Math.abs(Math.floor(i / MAP_SIZE) - Math.floor(a.tile / MAP_SIZE)) <= 3).length;
-      const happy = Math.max(20, Math.min(100, 60 + parkBonus(i) + (extras.get(i)?.includes("garden") ? 3 : 0) + near(tiles, i, ["shop"], 3) * 4 - near(tiles, i, ["factory"], 3) * 10 + greenFactories * 7));
+      const happy = happinessWith(tiles, attachments, extras, parkBonus, i).total;
       population += 18 * level + (extras.get(i)?.includes("terrace") ? 6 : 0); income += 23 * level; satisfaction += happy; occupied++;
     }
     if (t === "shop") { income += 48 * level + (extras.get(i)?.includes("terrace") ? 14 : 0) + (extras.get(i)?.includes("sign") ? 8 : 0); jobs += 14 * level; }
