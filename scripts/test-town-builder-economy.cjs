@@ -90,7 +90,18 @@ function apiWithSession(session) {
     else await db.query('update public.user_white_coins set balance=$2 where user_id=$1', [id, balance]);
     assert.equal(await whiteBalance(id), balance);
   }
-  for (const name of migrations.filter(n => n >= '0145_')) await migrate(name);
+  for (const name of migrations.filter(n => n >= '0145_' && n < '0147_')) await migrate(name);
+  await test('until 0147 only the registered preview account opens the town; 0147 opens it to every signed-in account', async () => {
+    await asUser('cccccccc-cccc-4ccc-8ccc-cccccccccccc', '別の人');
+    assert.equal(await rpc('has_town_builder_access'), false);
+    await expectError(() => snapshot(), 'TOWN_NOT_ALLOWED');
+    await expectError(() => rpc('commit_town_builder', { p_request_id: randomUUID(), p_revision: 0, p_action: 'start', p_town: g.createTown() }), 'TOWN_NOT_ALLOWED');
+    for (const name of migrations.filter(n => n >= '0147_')) await migrate(name);
+    assert.equal(await rpc('has_town_builder_access'), true);
+    assert.equal((await snapshot()).town, null);
+    const started = await action('start', { p_town: g.createTown() });
+    assert.equal(started.revision, 1); assert.equal(started.balance, 0);
+  });
   await test('0145 takes the starter coins back once: 20,000 from the balance, or everything when less is left', async () => {
     for (const [id, before, left] of starters) {
       assert.equal(await whiteBalance(id), left);
@@ -101,7 +112,7 @@ function apiWithSession(session) {
     }
     // Coins earned after the first run are never taken, even from an account that had nothing left to take back.
     await asUser(starters[2][0]); await rpc('claim_white_login_bonus');
-    await migrate('0145_town_no_starter_coins.sql');
+    for (const name of migrations.filter(n => n >= '0145_')) await migrate(name);
     for (const [id, , left] of starters) assert.equal(await whiteBalance(id), id === starters[2][0] ? 500 : left);
   });
   await asUser();
@@ -337,17 +348,23 @@ function apiWithSession(session) {
     const blue = await rpc('claim_home_coin_drop', { p_drop_id: randomUUID(), p_kind: 'blue', p_tier: 'rare' });
     assert.equal(blue.amount, 20);
   });
-  await test('RLS prevents direct wallet/EXP edits and other-account reads; the private town gate also applies to RPC', async () => {
+  await test('RLS prevents direct wallet/EXP edits and other-account reads; any signed-in account opens only its own town (0147)', async () => {
     await asUser();
     await db.exec('set role authenticated');
     await expectError(() => db.query('update public.user_white_coins set balance=999999 where user_id=auth.uid()'), 'permission denied');
     await expectError(() => db.query('update public.user_town_builder set xp=999999 where user_id=auth.uid()'), 'permission denied');
     assert.equal((await db.query('select * from public.user_white_coins where user_id<>auth.uid()')).rows.length, 0);
     await expectError(() => rpc('add_white_coin_event', { p_user_id: userId, p_event_type: 'starter', p_amount: 100, p_key: 'forged' }), 'permission denied');
+    // No town_builder_access row: since 0147 the town is open to every signed-in account.
     await asUser('44444444-4444-4444-8444-444444444444', '別の人');
     await db.exec('set role authenticated');
-    await expectError(() => snapshot(), 'TOWN_NOT_ALLOWED');
-    await expectError(() => rpc('commit_town_builder', { p_request_id: randomUUID(), p_revision: 0, p_action: 'start', p_town: g.createTown() }), 'TOWN_NOT_ALLOWED');
+    assert.equal(await rpc('has_town_builder_access'), true);
+    const fresh = await snapshot();
+    assert.equal(fresh.town, null); assert.equal(fresh.revision, 0); assert.equal(fresh.balance, 0);
+    const started = await rpc('commit_town_builder', { p_request_id: randomUUID(), p_revision: 0, p_action: 'start', p_town: g.createTown() });
+    assert.deepEqual(started.town.tiles, g.createTown().tiles); assert.equal(started.revision, 1); assert.equal(started.balance, 0);
+    assert.equal((await db.query('select * from public.user_town_builder where user_id<>auth.uid()')).rows.length, 0);
+    await expectError(() => db.query('insert into public.town_builder_access(user_id) values(auth.uid())'), 'permission denied');
     await db.exec('reset role');
     await db.query("select set_config('request.jwt.claims','{}',false)");
     await db.exec('set role anon');
@@ -355,18 +372,6 @@ function apiWithSession(session) {
     await expectError(() => rpc('claim_white_login_bonus'), 'permission denied');
     assert.equal((await db.query('select * from public.user_white_coins')).rows.length, 0);
     await db.exec('reset role');
-  });
-  await test('a same-name account cannot promote itself or inherit access on migration replay', async () => {
-    await asUser('66666666-6666-4666-8666-666666666666', 'しゅん', false);
-    await db.exec('set role authenticated');
-    assert.equal(await rpc('has_town_builder_access'), false);
-    await expectError(() => snapshot(), 'TOWN_NOT_ALLOWED');
-    await expectError(() => db.query('insert into public.town_builder_access(user_id) values(auth.uid())'), 'permission denied');
-    const denied = apiWithSession({ id: '66666666-6666-4666-8666-666666666666', displayName: 'しゅん' });
-    assert.equal((await denied.GET(new Request('https://qa.example.test/api/games/town-builder?account=66666666-6666-4666-8666-666666666666'))).status, 404);
-    await db.exec('reset role');
-    await db.exec(fs.readFileSync(path.join(root, 'supabase/migrations/0141_white_coins_town_rpg.sql'), 'utf8'));
-    assert.equal(await rpc('has_town_builder_access'), false);
   });
   await test('reapplying the migration preserves cities, balances, quests and the old login implementation', async () => {
     await asUser(); const before = await snapshot();
@@ -376,8 +381,8 @@ function apiWithSession(session) {
     assert.deepEqual(await Promise.all(starters.map(([id]) => whiteBalance(id))), balances);
     await rpc('claim_login_bonus'); // Would recurse if the wrapper were renamed again.
     assert.equal((await rpc('claim_login_bonus')).white_amount, 0);
-    // Replaying 0141 restores its starter grant only until 0145 is replayed after it.
-    await asUser('aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa');
+    // Replaying 0141 restores its starter grant and its private gate only until 0145 and 0147 are replayed after it.
+    await asUser('aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa', '新しい人');
     assert.equal((await action('start', { p_town: g.createTown(false) })).balance, 0);
   });
   await test('the actual API validates the account and commands, computes server prices and replays without charging twice', async () => {
@@ -401,9 +406,20 @@ function apiWithSession(session) {
     assert.equal(withHome.town.tiles[g.indexAt(3, 4)], 'home'); assert.equal(withHome.balance, after.balance - 500 + reward); assert.equal(withHome.xp, after.xp + 50);
     const again = await post({ ...payload, requestId: randomUUID(), revision: withHome.revision, command: { type: 'build', tool: 'home', path: [g.indexAt(4, 3)] } });
     assert.equal(again.status, 400); assert.match((await again.json()).error, /1軒だけ/);
+    // The display name never decides access: a renamed account keeps its own town.
     session.displayName = '別の人';
-    assert.equal((await api.GET(new Request(`${url}?account=${userId}`))).status, 404);
-    assert.equal((await post({ ...payload, requestId: randomUUID() })).status, 404);
+    const renamed = await api.GET(new Request(`${url}?account=${userId}`));
+    assert.equal(renamed.status, 200); assert.deepEqual((await renamed.json()).snapshot, withHome);
+    assert.equal((await post({ ...payload, requestId: randomUUID() })).status, 409);
+    // A brand-new account with no access row opens and starts its own town through the API (0147).
+    const newcomer = { id: 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb', displayName: 'はじめての人' }, open = apiWithSession(newcomer);
+    await asUser(newcomer.id, newcomer.displayName); await db.exec('set role authenticated');
+    const first = await open.GET(new Request(`${url}?account=${newcomer.id}`));
+    assert.equal(first.status, 200); assert.equal((await first.json()).snapshot.town, null);
+    const start = await open.POST(new Request(url, { method: 'POST', headers: { Origin: 'https://qa.example.test', 'Content-Type': 'application/json' }, body: JSON.stringify({ userId: newcomer.id, requestId: randomUUID(), revision: 0, action: 'start', starter: true }) }));
+    assert.equal(start.status, 200);
+    const begun = (await start.json()).snapshot;
+    assert.deepEqual(begun.town.tiles, g.createTown(true).tiles); assert.equal(begun.balance, 0); assert.equal(begun.revision, 1);
     await db.exec('reset role');
   });
   console.log(`${passed} town economy checks passed`);

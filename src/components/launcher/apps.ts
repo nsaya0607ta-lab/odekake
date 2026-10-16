@@ -54,6 +54,7 @@ export function launcherItems({ sns, memoryGame }: LauncherOptions): LauncherIte
 
   const items: LauncherItem[] = [
     { kind: "folder", id: "folder-games", name: "ミニゲーム", apps: games, keywords: ["げーむ", "あそぶ", "ゲーム"] },
+    app({ id: "town-builder", name: "まちづくり", href: "/games/town-builder", tint: ["#aee6ff", "#40b48f"], keywords: ["まちづくり", "ぼくのまちづくり", "まち", "街", "けんせつ", "建設", "白コイン", "しろこいん", "ゲーム"], shortcuts: [{ label: "街を育てる", href: "/games/town-builder" }, { label: "白コインを見る", href: "/mypage/coins#white-coins" }] }),
     app({ id: "gacha", name: "ガチャ", href: "/mypage/coins", tint: ["#ffc0d6", "#ec6496"], keywords: ["がちゃ", "カプセル", "コイン"], shortcuts: [{ label: "ガチャを引く", href: "/mypage/coins" }, { label: "図鑑を見る", href: "/collection" }] }),
     app({ id: "room", name: "マイルーム", href: "/room", tint: ["#b8e6ff", "#4c9fea"], keywords: ["まいるーむ", "へや", "部屋", "家具"], shortcuts: [{ label: "おへやに行く", href: "/room" }] }),
     app({ id: "collection", name: "図鑑", href: "/collection", tint: ["#c9b9ff", "#7655e6"], keywords: ["ずかん", "コレクション", "アイテム"] }),
@@ -105,7 +106,7 @@ export function launcherItems({ sns, memoryGame }: LauncherOptions): LauncherIte
 
 /** はじめからアプリの画面に出ているもの（この順に並ぶ） */
 export const DEFAULT_SHOWN = [
-  "folder-games", "gacha", "collection", "room", "friends", "dog-skin", "infra",
+  "folder-games", "town-builder", "gacha", "collection", "room", "friends", "dog-skin", "infra",
   "google", "chatgpt", "claude", "instagram", "google-maps", "yahoo-weather", "google-photos", "youtube",
 ];
 

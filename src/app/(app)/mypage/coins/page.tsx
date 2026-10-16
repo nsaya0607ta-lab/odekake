@@ -12,7 +12,6 @@ import { TopHeader } from "@/components/page-header";
 import { RedCoinSection } from "@/components/red-coin-section";
 import { WhiteCoinSection } from "@/components/white-coin-section";
 import { getWhiteCoinBalance, getWhiteCoinEvents } from "@/lib/data/white-coins";
-import { canSeeTownBuilder } from "@/lib/games/town-builder-access";
 import { getBlueCoinBalance } from "@/lib/data/blue-coins";
 import { getCoinSummary } from "@/lib/data/coins";
 import { getCurrentDogSkin } from "@/lib/data/dog-skin";
@@ -75,7 +74,7 @@ export default async function CoinsPage() {
           <DambourleGachaSection balance={summary.balance} />
           {/* 赤コイン（ご当地ピンボールのステージの部品に使う）。仕組みが無い環境では出さない */}
           {redCoins !== null ? <RedCoinSection balance={redCoins} events={redEvents} tableNames={tableNames} /> : null}
-          {whiteCoins !== null ? <WhiteCoinSection balance={whiteCoins} events={whiteEvents} canPlay={(await canSeeTownBuilder(user.displayName, supabase))} /> : null}
+          {whiteCoins !== null ? <WhiteCoinSection balance={whiteCoins} events={whiteEvents} /> : null}
           <CoinEarnMethods />
         </div>
       </PageBody>
