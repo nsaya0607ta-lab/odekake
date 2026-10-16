@@ -1,6 +1,6 @@
 import { MAP_SIZE, isRoadTile, lotTiles, neighbours, type ParkLot, type ParkPart, type Tile, type Town } from "./town-builder";
 import type { TownEnvironment } from "./town-environment";
-import { TAU, drawDog, drawPerson, drawPigeon, ellipse, stroke, type Look, type Point } from "./town-figures";
+import { TAU, drawBicycle, drawDog, drawPerson, drawPigeon, ellipse, stroke, type Look, type Point } from "./town-figures";
 import { parkArtVariant } from "./town-park-art";
 import { PAINTED, PART_MOTION, PART_SPOTS, illuminationSeason, motionDepth, motionKit, spotDuration, spotOpen, type PartFrame, type PartState, type Rider, type SpotKind, type Who } from "./town-park-motion";
 import { parkRoute, parkStroll, parkWays, routeLength, type ParkGate, type ParkWays } from "./town-park-paths";
@@ -25,6 +25,8 @@ type Walker = {
   points: WalkPoint[]; lengths: number[]; total: number; s: number; speed: number; look: Look; seed: number; phase: number;
   /** Seconds left standing at a post box or a vending machine, the way they face meanwhile, and the stops passed. */
   pause: number; face: number; passed: number[];
+  /** Riding a bicycle along the sidewalk (in the frame's colour): faster, and nobody stops to post a letter on a bike. */
+  bike: string | null;
 };
 /** People waiting at one side of a bus stop. */
 type Queue = { key: string; tile: number; side: -1 | 1; x: number; y: number; along: { dx: number; dy: number }; toRoad: { dx: number; dy: number }; shelter: boolean; count: number; clock: number; looks: Look[]; boarding: boolean };
@@ -718,8 +720,11 @@ export class TownLife {
     const points = this.sidewalks(from, to);
     if (!points) return;
     const { lengths, total } = polyline(points);
-    const speed = (kind === "jogger" ? .55 : kind === "child" ? .3 : kind === "elder" ? .17 : .24) * (.9 + r.next() * .2) * (env.rain > .5 ? 1.15 : 1);
-    this.walkers.push({ points, lengths, total, s: 0, speed, look: this.look(env, kind, purpose), seed: Math.floor(r.next() * 1e6), phase: r.next() * TAU, pause: 0, face: 1, passed: [] });
+    // About one in six goes by bicycle (school children, shoppers, commuters to the station), not in heavy rain or snow.
+    const bike = kind !== "jogger" && kind !== "elder" && env.rain < .5 && env.snow < .3 && r.next() < .17 ? r.pick(["#3f6f9a", "#c8786c", "#e6e2d6", "#4f7f62", "#2f3437"]) : null;
+    const speed = (bike ? .52 : kind === "jogger" ? .55 : kind === "child" ? .3 : kind === "elder" ? .17 : .24) * (.9 + r.next() * .2) * (env.rain > .5 ? 1.15 : 1);
+    const look = this.look(env, kind, purpose); if (bike) { look.dog = null; look.parasol = false; }
+    this.walkers.push({ points, lengths, total, s: 0, speed, look, seed: Math.floor(r.next() * 1e6), phase: r.next() * TAU, pause: 0, face: 1, passed: [], bike });
   }
   private spawnVisitor(env: TownEnvironment): Visitor | undefined {
     if (!this.parks.length) return;
@@ -750,7 +755,13 @@ export class TownLife {
     if (!this.started && this.doors.length > 1) {
       // Open the town mid-day rather than empty: people are already on their way, part-way along.
       this.started = true;
-      for (let j = 0; j < walkers; j++) { this.spawnWalker(env); const w = this.walkers[this.walkers.length - 1]; if (w) w.s = r.next() * w.total * .9; }
+      for (let j = 0; j < walkers; j++) {
+        this.spawnWalker(env); const w = this.walkers[this.walkers.length - 1]; if (!w) continue;
+        w.s = r.next() * w.total * .9;
+        // Nobody starts out in the middle of the road: those would be standing on a crossing wait at its curb.
+        let k = 0; while (k < w.lengths.length - 2 && w.lengths[k + 1]! <= w.s) k++;
+        if (w.points[k + 1]?.cross) w.s = Math.max(0, w.lengths[k]! - .03);
+      }
       for (let j = 0; j < visitors; j++) {
         const v = this.spawnVisitor(env); if (!v) continue;
         v.age = 1 + r.next() * v.life * .5; v.path = [];
@@ -786,7 +797,7 @@ export class TownLife {
       if (end && after?.cross && w.s + step >= w.lengths[j + 1]! - .03 && !this.mayCross(after.cross, Math.abs(after.x - end.x) > Math.abs(after.y - end.y) ? "x" : "y")) {
         w.s = Math.max(w.s, Math.min(w.s + step, w.lengths[j + 1]! - .03)); w.phase = 0; continue;
       }
-      if (this.stops.length && w.look.kind !== "jogger") {
+      if (this.stops.length && w.look.kind !== "jogger" && !w.bike) {
         const p = at(w, w.s);
         for (const [k, stop] of this.stops.entries()) {
           if (w.passed.includes(k) || Math.abs(p.x - stop.x) > .14 || Math.abs(p.y - stop.y) > .14) continue;
@@ -904,7 +915,11 @@ export class TownLife {
           stroke(c, screen.x - 1.3 * w.look.scale, screen.y - 3.6, dog.x, dog.y - 2.6, shade("#5a5046", night), .3);
           drawDog(c, dog, iso(p.dx, p.dy).x >= 0 ? 1 : -1, w.phase * 1.4, night, w.look.dog, { wag: w.phase * 2 });
         }
-        drawPerson(c, screen, w.look, w.phase, facing, night, { rain, detail });
+        if (w.bike) {
+          // The rider sits on the saddle, legs on the pedals.
+          const seat = drawBicycle(c, screen, p.dx, p.dy, w.phase, night, w.bike);
+          drawPerson(c, seat, w.look, w.phase, facing, night, { rain: false, detail, pose: "ride", side: iso(p.dx, p.dy).x >= 0 ? 1 : -1 });
+        } else drawPerson(c, screen, w.look, w.phase, facing, night, { rain, detail });
         if (fade < 1) c.restore();
       }, { left: -10, top: -18, width: 20, height: 22 });
     }

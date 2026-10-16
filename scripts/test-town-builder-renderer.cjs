@@ -23,9 +23,10 @@ const paths = compile('src/lib/games/town-park-paths.ts', { './town-builder': ga
 const sidewalks = compile('src/lib/games/town-sidewalks.ts', { './town-builder': game });
 const traffic = compile('src/lib/games/town-traffic.ts', { './town-builder': game, './town-transport': transport });
 const roadParts = compile('src/lib/games/town-road-parts.ts', { './town-builder': game });
+const vehicles = compile('src/lib/games/town-vehicles.ts', { './town-paint': paint, './town-traffic': traffic });
 const roadArt = compile('src/lib/games/town-road-art.ts', { './town-paint': paint, './town-park-art': art, './town-road-parts': roadParts });
 const life = compile('src/lib/games/town-life.ts', { './town-builder': game, './town-paint': paint, './town-transport': transport, './town-figures': figures, './town-park-art': art, './town-park-motion': motion, './town-park-paths': paths, './town-sidewalks': sidewalks, './town-road-parts': roadParts });
-const { TownScene, drawTownIcon, drawTownPartIcon, trainAt } = compile('src/lib/games/town-renderer.ts', { './town-builder': game, './town-transport': transport, './town-sprites': sprites, './town-decorations': decorations, './town-building-models': models, './town-paint': paint, './town-environment': environment, './town-sky': sky, './town-life': life, './town-park-art': art, './town-park-paths': paths, './town-park-motion': motion, './town-traffic': traffic, './town-road-parts': roadParts, './town-road-art': roadArt });
+const { TownScene, drawTownIcon, drawTownPartIcon, trainAt } = compile('src/lib/games/town-renderer.ts', { './town-builder': game, './town-transport': transport, './town-sprites': sprites, './town-decorations': decorations, './town-building-models': models, './town-paint': paint, './town-environment': environment, './town-sky': sky, './town-life': life, './town-park-art': art, './town-park-paths': paths, './town-park-motion': motion, './town-traffic': traffic, './town-road-parts': roadParts, './town-road-art': roadArt, './town-vehicles': vehicles });
 const iso = (x, y, z = 0) => ({ x: (x - y) * 32, y: (x + y) * 16 - z });
 const blank = () => ({ ...game.createTown(false), tiles: Array(576).fill('grass'), terrain: Array(576).fill(false), levels: Array(576).fill(0) });
 let passed = 0;

@@ -250,6 +250,9 @@
 .facilityOption[data-owned=true] { background: #e5edda; border-color: #8ca179; }
 .facilityOption > button:first-child { display: flex; flex-direction: column; align-items: center; width: 100%; min-height: 112px; padding: 3px 7px 8px; border: 0; background: transparent; color: var(--ink); }
 .facilityOption[data-owned=true] > button:disabled { opacity: 1; }
+.facilityOption[data-unfit=true] { background: #efeee6; border-style: dashed; }
+.facilityOption[data-unfit=true] > button:disabled { opacity: .62; }
+.facilityOption[data-unfit=true] span { color: #8a6a4f; }
 .facilityOption small { color: var(--green); font-size: 10px; margin: 4px 0; }
 .facilityOption span { color: var(--muted); font-size: 9px; line-height: 1.6; text-align: center; }
 .removeAttachment { width: 100%; min-height: 44px; padding: 8px; border: 0; border-top: 1px solid #cfdac3; background: #dce7cf; color: var(--green); font-size: 10px !important; }

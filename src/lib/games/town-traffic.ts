@@ -60,12 +60,21 @@ export class Traffic {
     this.vehicles = this.vehicles.filter(v => [v.previous, v.from, v.to, v.next].every(isRoad));
     const target = Math.min(22, Math.floor(tiles.length / 3));
     while (this.vehicles.length < target) {
-      const j = this.vehicles.length, from = tiles[Math.floor(hash(j + 8) * tiles.length)]!, to = roads.get(from)![0]!;
-      const previous = roads.get(from)!.find(n => n !== to) ?? to, next = roads.get(to)!.find(n => n !== from) ?? from;
-      // Start between junctions, never inside one, and clear of the cars already in the lane (room for a bus).
-      const free = (t: number) => !(this.junction(to) && t >= STOP_LINE || this.junction(from) && t < 1 - STOP_LINE) && !this.vehicles.some(o => o.from === from && o.to === to && Math.abs(o.t - t) < FOLLOW + .2);
-      const t = [hash(j), .5, .05, .95, .25, .75].find(free) ?? hash(j);
-      this.vehicles.push({ from, to, previous, next, t, seed: j, color: colorOf(modelOf(j), j), model: modelOf(j), alpha: 1, wait: 0, halt: 0, dwell: 0, served: -1 });
+      const j = this.vehicles.length, start = Math.floor(hash(j + 8) * tiles.length);
+      let placed = false;
+      // Start between junctions, never inside one, and clear of the cars already on the road (room for a bus):
+      // the first road from a random place on that has room.
+      for (let k = 0; k < tiles.length && !placed; k++) {
+        const from = tiles[(start + k * 7) % tiles.length]!, ways = roads.get(from)!, to = ways[(j + k) % ways.length]!;
+        const previous = ways.find(n => n !== to) ?? to, next = roads.get(to)!.find(n => n !== from) ?? from;
+        const free = (t: number) => !(this.junction(to) && t >= STOP_LINE || this.junction(from) && t < 1 - STOP_LINE)
+          && !this.vehicles.some(o => o.from === from && o.to === to && Math.abs(o.t - t) < FOLLOW + .2 || o.from === to && o.to === next && 1 - t + o.t < FOLLOW + .2 || o.from === previous && o.to === from && 1 - o.t + t < FOLLOW + .2);
+        const t = [hash(j), .5, .05, .95, .25, .75].find(free);
+        if (t === undefined) continue;
+        this.vehicles.push({ from, to, previous, next, t, seed: j, color: colorOf(modelOf(j), j), model: modelOf(j), alpha: 1, wait: 0, halt: 0, dwell: 0, served: -1 });
+        placed = true;
+      }
+      if (!placed) break;
     }
     this.vehicles = this.vehicles.slice(0, target);
     const buses = busStops.size ? Math.min(4, 1 + Math.floor(busStops.size / 2), this.vehicles.length) : 0;
@@ -90,7 +99,16 @@ export class Traffic {
   /** `traffic` (0..1) is how many of the cars are out; the rest fade away. `time` drives the choice of turns. */
   update(step: number, move: number, traffic: number, time: number, gate?: TrafficGate) {
     const active = Math.max(1, Math.round(this.vehicles.length * traffic));
-    this.vehicles.forEach((v, index) => { v.alpha = Math.max(0, Math.min(1, v.alpha + (index < active ? 1 : -1) * step * 1.5)); });
+    // A car coming back into sight waits until it has room, so it never appears on top of another.
+    const crowded = (v: Vehicle) => this.vehicles.some(o => o !== v && o.alpha > 0 && (
+      o.from === v.from && o.to === v.to && Math.abs(o.t - v.t) < gap(v, o)
+      || o.from === v.to && o.to === v.next && 1 - v.t + o.t < gap(v, o)
+      || o.from === v.previous && o.to === v.from && 1 - o.t + v.t < gap(v, o)));
+    this.vehicles.forEach((v, index) => {
+      const show = index < active;
+      if (show && v.alpha === 0 && crowded(v)) return;
+      v.alpha = Math.max(0, Math.min(1, v.alpha + (show ? 1 : -1) * step * 1.5));
+    });
     if (move <= 0) return;
     const live = this.vehicles.filter(v => v.alpha > 0), lanes = new Map<string, Vehicle[]>(), inside = new Map<number, Vehicle>();
     for (const v of live) {

@@ -174,3 +174,20 @@ function pigeon(c: CanvasRenderingContext2D, p: Point, dir: number, peck: number
   ellipse(c, head.x + f * .55, head.y + .1, .28, .14, n("#d8c4a4"));
   stroke(c, p.x - f * 1.3, y - 1.1, p.x - f * 2.1, y - .9, n("#6f7782"), .7);
 }
+
+/**
+ * A bicycle under its rider: two thin wheels along the way it goes, the frame, turning pedals and a front basket.
+ * `p` is the ground point; returns the saddle, where the rider sits.
+ */
+export function drawBicycle(c: CanvasRenderingContext2D, p: Point, dx: number, dy: number, phase: number, night: number, frame = "#3f6f9a"): Point {
+  const n = (color: string) => shade(color, night), wx = (dx - dy) * 32, wy = (dx + dy) * 16, len = Math.hypot(wx, wy) || 1, ux = wx / len, uy = wy / len;
+  const wheel = (t: number) => ({ x: p.x + ux * t, y: p.y + uy * t - 1.8 }), back = wheel(-2.6), fore = wheel(2.6);
+  ellipse(c, p.x + .5, p.y + .3, 4.2, 1.1, "#1e332a30");
+  for (const q of [back, fore]) { c.beginPath(); c.ellipse(q.x, q.y, Math.max(.6, Math.abs(ux) * 1.9), 1.9, 0, 0, TAU); c.strokeStyle = n("#2b2f2d"); c.lineWidth = .55; c.stroke(); }
+  const seat = { x: p.x - ux * .8, y: p.y - 4.6 + uy * -.4 }, bar = { x: p.x + ux * 1.7, y: p.y - 5.2 }, crank = { x: p.x + ux * .3, y: p.y - 2 };
+  for (const [a, b] of [[back, seat], [seat, bar], [bar, fore], [back, crank], [crank, bar], [crank, seat]] as const) stroke(c, a.x, a.y, b.x, b.y, n(frame), .55);
+  const turn = phase * 2.2;
+  stroke(c, crank.x + Math.cos(turn), crank.y + Math.sin(turn) * .6, crank.x - Math.cos(turn), crank.y - Math.sin(turn) * .6, n("#2b2f2d"), .5);
+  c.beginPath(); c.moveTo(fore.x - 1, fore.y - 3.4); c.lineTo(fore.x + 1, fore.y - 3.6); c.lineTo(fore.x + .8, fore.y - 2.2); c.lineTo(fore.x - .8, fore.y - 2); c.closePath(); c.fillStyle = n("#c9c3b2"); c.fill();
+  return { x: seat.x, y: seat.y + 3.4 };
+}

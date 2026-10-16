@@ -46,30 +46,30 @@ function shadow(c: CanvasRenderingContext2D, x: number, y: number, rx: number, r
 export function utilityPole(c: CanvasRenderingContext2D, item: Item<"pole">, across: "x" | "y", toRoad: Facing, night: boolean) {
   const { x, y, seed } = item, ax = across === "x" ? 1 : 0, ay = across === "y" ? 1 : 0;
   shadow(c, x, y, 4.5);
-  post(c, x, y, .032, 0, 40, CONCRETE);
+  post(c, x, y, .032, 0, 35, CONCRETE);
   // The yellow and black guard round the foot.
   post(c, x, y, .036, .5, 8.5, ["#e8c63e", "#b7962b", "#f0d670"]);
   const foot = iso(x, y), rx = .036 * TILE_PX;
   for (let j = 0; j < 4; j++) line(c, { x: foot.x - rx, y: foot.y - 1.6 - j * 1.9 }, { x: foot.x + rx, y: foot.y - 2.9 - j * 1.9 }, "#2d2b26", .85);
   // Step bolts up the pole, and its number plate.
-  for (let j = 0; j < 7; j++) { const p = iso(x, y, 15 + j * 2.6), side = j % 2 ? 1 : -1; line(c, { x: p.x + side * .9, y: p.y }, { x: p.x + side * 2.2, y: p.y - .2 }, "#5b5d58", .55); }
+  for (let j = 0; j < 6; j++) { const p = iso(x, y, 14 + j * 2.5), side = j % 2 ? 1 : -1; line(c, { x: p.x + side * .9, y: p.y }, { x: p.x + side * 2.2, y: p.y - .2 }, "#5b5d58", .55); }
   const tag = iso(x, y, 12); poly(c, [{ x: tag.x - 1, y: tag.y }, { x: tag.x + 1.2, y: tag.y - .3 }, { x: tag.x + 1.2, y: tag.y - 2.4 }, { x: tag.x - 1, y: tag.y - 2.1 }], "#e9efe9"); line(c, { x: tag.x - .6, y: tag.y - 1.1 }, { x: tag.x + .8, y: tag.y - 1.3 }, "#3f6f9a", .4);
   // Cross-arms across the road with porcelain insulators.
-  for (const [z, reach, count] of [[37.5, .13, 3], [33, .1, 2]] as const) {
+  for (const [z, reach, count] of [[33, .13, 3], [29, .1, 2]] as const) {
     line(c, iso(x - ax * reach, y - ay * reach, z), iso(x + ax * reach, y + ay * reach, z), "#6d6f6a", 1.25);
     for (let j = 0; j < count; j++) { const t = -reach * .8 + j * reach * 1.6 / (count - 1), p = iso(x + ax * t, y + ay * t, z + 1.2); ellipse(c, p, .8, 1.1, "#e9ebe2"); ellipse(c, { x: p.x, y: p.y + .5 }, .9, .35, "#a9aca0"); }
   }
   if (seed % 3 === 0) {
     // A pole transformer on its bracket.
     const t = { x: x + ax * .045 + .02, y: y + ay * .045 + .02 };
-    line(c, iso(x, y, 27), iso(t.x, t.y, 27), "#6d6f6a", .9);
-    post(c, t.x, t.y, .03, 22, 29, ["#9aa39f", "#6e7773", "#bfc6c1"]);
-    for (const h of [24, 26.5]) line(c, iso(t.x - .02, t.y + .02, h), iso(t.x + .02, t.y - .02, h), "#7f8884", .45);
+    line(c, iso(x, y, 24), iso(t.x, t.y, 24), "#6d6f6a", .9);
+    post(c, t.x, t.y, .03, 19, 26, ["#9aa39f", "#6e7773", "#bfc6c1"]);
+    for (const h of [21, 23.5]) line(c, iso(t.x - .02, t.y + .02, h), iso(t.x + .02, t.y - .02, h), "#7f8884", .45);
   }
   if (seed % 2 === 1) {
     // A small street light on an arm over the sidewalk.
-    const end = { x: x + toRoad.dx * .1, y: y + toRoad.dy * .1 }, p = iso(end.x, end.y, 24.5);
-    line(c, iso(x, y, 25.5), p, "#6d6f6a", .9);
+    const end = { x: x + toRoad.dx * .1, y: y + toRoad.dy * .1 }, p = iso(end.x, end.y, 21.5);
+    line(c, iso(x, y, 22.5), p, "#6d6f6a", .9);
     ellipse(c, { x: p.x, y: p.y + .6 }, 1.8, .9, night ? "#fff3cf" : "#dfe6dc");
     if (night) { const g = lightGradient(c.createRadialGradient(p.x, p.y + 1, 0, p.x, p.y + 1, 10)); g.addColorStop(0, "#fff3cf55"); g.addColorStop(1, "#fff3cf00"); ellipse(c, { x: p.x, y: p.y + 3 }, 10, 7, g); }
   }
@@ -77,7 +77,7 @@ export function utilityPole(c: CanvasRenderingContext2D, item: Item<"pole">, acr
 /** The points the wires hang from on a pole (power on the top arm, telephone cable lower down). */
 function wirePoints(x: number, y: number, across: "x" | "y") {
   const ax = across === "x" ? 1 : 0, ay = across === "y" ? 1 : 0;
-  return [-.104, 0, .104].map(t => ({ x: x + ax * t, y: y + ay * t, z: 38.7 })).concat([{ x, y, z: 22.5 }]);
+  return [-.104, 0, .104].map(t => ({ x: x + ax * t, y: y + ay * t, z: 34.2 })).concat([{ x, y, z: 19.5 }]);
 }
 /** Wires sagging between two poles. */
 export function poleWires(c: CanvasRenderingContext2D, from: Point, to: Point, across: "x" | "y", acrossTo: "x" | "y") {
@@ -378,16 +378,21 @@ export function streetTree(c: CanvasRenderingContext2D, item: Item<"tree">) {
 export function roadPaving(c: CanvasRenderingContext2D, l: Pick<RoadLayout, "x" | "y">, surface: Point[], lift: (p: Point, z: number) => Point) {
   const { x, y } = l, ground = surface.map(p => lift(p, .2));
   c.save(); c.beginPath(); ground.forEach((p, j) => j ? c.lineTo(p.x, p.y) : c.moveTo(p.x, p.y)); c.closePath(); c.fillStyle = paintState.snow ? "#d9dcd8" : "#a99f8e"; c.fill(); c.clip();
-  for (let row = 0; row < 14; row++) {
-    const v = row / 14 + .5 / 14;
-    line(c, lift({ x: 0, y: row / 14 }, .25), lift({ x: 1, y: row / 14 }, .25), "#7f7666", .45);
-    for (let j = 0; j < 9; j++) {
-      // Some stones a shade lighter or darker than the rest.
-      const u = (j + (row % 2) * .5) / 8.5, tone = noise(row * 13 + j + x * 7 + y * 3);
-      line(c, lift({ x: u, y: row / 14 }, .25), lift({ x: u, y: (row + 1) / 14 }, .25), "#7f7666", .4);
-      if (tone > .7) poly(c, [lift({ x: u + .01, y: v - .025 }, .26), lift({ x: u + .1, y: v - .025 }, .26), lift({ x: u + .1, y: v + .025 }, .26), lift({ x: u + .01, y: v + .025 }, .26)], tone > .85 ? "#bdb3a1" : "#968c7b");
-    }
+  // Some stones a shade lighter or darker than the rest, then every joint in one stroke.
+  const light: Point[][] = [], dark: Point[][] = [];
+  for (let row = 0; row < 14; row++) for (let j = 0; j < 9; j++) {
+    const v = row / 14 + .5 / 14, u = (j + (row % 2) * .5) / 8.5, tone = noise(row * 13 + j + x * 7 + y * 3);
+    if (tone > .7) (tone > .85 ? light : dark).push([lift({ x: u + .01, y: v - .025 }, .26), lift({ x: u + .1, y: v - .025 }, .26), lift({ x: u + .1, y: v + .025 }, .26), lift({ x: u + .01, y: v + .025 }, .26)]);
   }
+  for (const [stones, color] of [[light, "#bdb3a1"], [dark, "#968c7b"]] as const) {
+    c.beginPath(); for (const q of stones) { q.forEach((p, j) => j ? c.lineTo(p.x, p.y) : c.moveTo(p.x, p.y)); c.closePath(); } c.fillStyle = color; c.fill();
+  }
+  c.beginPath();
+  for (let row = 0; row < 14; row++) {
+    const a = lift({ x: 0, y: row / 14 }, .25), b = lift({ x: 1, y: row / 14 }, .25); c.moveTo(a.x, a.y); c.lineTo(b.x, b.y);
+    for (let j = 0; j < 9; j++) { const u = (j + (row % 2) * .5) / 8.5, p = lift({ x: u, y: row / 14 }, .25), q = lift({ x: u, y: (row + 1) / 14 }, .25); c.moveTo(p.x, p.y); c.lineTo(q.x, q.y); }
+  }
+  c.strokeStyle = "#7f7666"; c.lineWidth = .42; c.stroke();
   c.restore();
 }
 /** Markings painted on the road: zebra crossings and stop lines. Points are tile-local. */

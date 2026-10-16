@@ -47,13 +47,17 @@ export function ParkWorkshop({ lot, part, rotation, money, onPart, onRotate, onE
   </>;
 }
 
-export function FacilityWorkshop({ kind, installed, money, onBuy, onRemove }: {
+export function FacilityWorkshop({ kind, installed, money, problem, onBuy, onRemove }: {
   kind: Tile; installed: FacilityPart[]; money: number; onBuy: (part: FacilityPart) => void; onRemove: (part: FacilityPart) => void;
+  /** Why a part cannot go here (the shape of the road, a part it cannot share the pavement with), or null. */
+  problem?: (part: FacilityPart) => string | null;
 }) {
-  return <div className={styles.facilityCatalog}>{FACILITY_PARTS.filter(p => p.kinds.includes(kind)).map(p => {
-    const owned = installed.includes(p.id);
-    return <div key={p.id} className={styles.facilityOption} data-owned={owned}>
-      <button type="button" aria-label={`${p.title}を購入 白コイン${p.price}枚`} disabled={owned || money < p.price} onClick={() => onBuy(p.id)}><PartIcon part={p.id} /><b>{p.title}</b><small>{owned ? "✓ 購入済み" : <WhitePrice amount={p.price} />}</small><span>{p.id === "terrace" ? kind === "house" ? "定員＋6人" : "経済力＋14" : p.info}</span></button>
+  // Parts that fit this place first; the others stay listed, greyed, with the reason.
+  const parts = FACILITY_PARTS.filter(p => p.kinds.includes(kind)).map(p => ({ ...p, owned: installed.includes(p.id), why: installed.includes(p.id) ? null : problem?.(p.id) ?? null }));
+  return <div className={styles.facilityCatalog}>{[...parts.filter(p => !p.why), ...parts.filter(p => p.why)].map(p => {
+    const { owned, why } = p;
+    return <div key={p.id} className={styles.facilityOption} data-owned={owned} data-unfit={Boolean(why)}>
+      <button type="button" aria-label={why ? `${p.title}（${why}）` : `${p.title}を購入 白コイン${p.price}枚`} disabled={owned || Boolean(why) || money < p.price} onClick={() => onBuy(p.id)}><PartIcon part={p.id} /><b>{p.title}</b><small>{owned ? "✓ 購入済み" : <WhitePrice amount={p.price} />}</small><span>{why ?? (p.id === "terrace" ? kind === "house" ? "定員＋6人" : "経済力＋14" : p.info)}</span></button>
       {owned && <button type="button" className={styles.removeAttachment} aria-label={`${p.title}を取り外す`} onClick={() => onRemove(p.id)}>取り外す</button>}
     </div>;
   })}</div>;

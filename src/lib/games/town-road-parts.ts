@@ -120,7 +120,8 @@ function straight(l: RoadLayout, defaultLamp: boolean) {
     for (const [s, a] of spot ?? []) l.items.push({ kind: "tree", ...at(a, s, .11), seed: l.tile * 2 + (s > 0 ? 1 : 0) });
   }
   if (parts.has("pole")) {
-    const spot = place([[[-1, .93, .06]], [[-1, .07, .06]], [[1, .93, .06]], [[1, .07, .06]], [[-1, .55, .06]], [[1, .45, .06]]]);
+    // The same place on every tile when it can, so a row of poles stands evenly spaced along the street.
+    const spot = place([[[-1, .93, .06]], [[-1, .75, .06]], [[-1, .55, .06]], [[1, .93, .06]], [[1, .75, .06]], [[-1, .07, .06]], [[1, .07, .06]], [[1, .45, .06]]]);
     if (spot) l.items.push({ kind: "pole", ...at(spot[0]![1], spot[0]![0], .07), seed: l.tile });
   }
   if (parts.has("vending")) {
